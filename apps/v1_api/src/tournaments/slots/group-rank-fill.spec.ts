@@ -12,6 +12,10 @@ const loadMock = loadGroupRankPreview as jest.MockedFunction<typeof loadGroupRan
 
 const row = (slotId: string, state: GroupRankPreviewRow['state'], extra: Partial<GroupRankPreviewRow> = {}): GroupRankPreviewRow => ({
   slotId,
+  groupId: null,
+  bracketTrack: 'overall',
+  position: 1,
+  sourceGroupId: 'source-group',
   label: `라벨-${slotId}`,
   state,
   candidateRegistrationId: null,
@@ -116,6 +120,17 @@ describe('planFillFromStandings', () => {
       [{ slotId: 's1', registrationId: 'Y' }],
     );
     expect(plan.assignments).toEqual([{ slotId: 's1', registrationId: 'Y' }]);
+  });
+
+  it('split upper ready 자리는 원천 조 팀이어도 그 순위 후보가 아닌 override 를 거절한다', () => {
+    const upperFirst = Object.assign(row('upper-a1', 'ready', { candidateRegistrationId: 'RANK-1' }), {
+      bracketTrack: 'upper',
+      position: 1,
+    });
+    expect(failure(() => planFillFromStandings(
+      previewOf([upperFirst], { 'upper-a1': ['RANK-1', 'RANK-2', 'RANK-3', 'RANK-4'] }),
+      [{ slotId: 'upper-a1', registrationId: 'RANK-3' }],
+    ))).toEqual({ type: UnprocessableEntityException.name, code: 'SLOT_REGISTRATION_INVALID' });
   });
 
   // 허용 범위는 스펙 S4 그대로다 — tied 자리 = 그 동률 팀만, ready 자리 = 그 자리의 원천 조 팀만, 그 밖은 전부 422.

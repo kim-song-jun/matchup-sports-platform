@@ -15,6 +15,7 @@ import { isLeagueCompetition } from '@/lib/competition-kind';
 import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import { withFromPath } from '@/lib/session-storage';
 import { competitionMatchLabel } from '@/lib/tournament-round-label';
+import { bracketTrackLabel, effectiveBracketTrack } from '@/lib/bracket-track';
 import type {
   V1LeagueOverallStandingsResponse,
   V1TournamentDetail,
@@ -71,6 +72,24 @@ function buildKnockoutFinalRanking(fixtures: V1TournamentFixture[]): FinalRankRo
     if (fourth) rows.push({ pos: 4, name: fourth });
   }
   return rows;
+}
+
+function buildSplitFinalResults(tournament: V1TournamentDetail) {
+  return (['upper', 'lower'] as const).map((track) => {
+    const finalGroupIds = new Set(
+      tournament.groups
+        .filter((group) => group.phase === 'final' && effectiveBracketTrack(group.bracketTrack) === track)
+        .map((group) => group.id),
+    );
+    const fixture = tournament.fixtures.find((item) => finalGroupIds.has(item.groupId ?? '') && item.result !== null);
+    const winnerSide = fixture?.result ? getWinnerSide(fixture.result) : null;
+    return {
+      track,
+      label: bracketTrackLabel(track)!,
+      winner: fixture && winnerSide ? (winnerSide === 'home' ? fixture.homeTeamName : fixture.awayTeamName) : null,
+      runnerUp: fixture && winnerSide ? (winnerSide === 'home' ? fixture.awayTeamName : fixture.homeTeamName) : null,
+    };
+  });
 }
 
 /**
@@ -1064,6 +1083,10 @@ export function ResultsPageContent({ tournament }: { tournament: V1TournamentDet
   );
   const isCompleted  = tournament.status === 'completed';
   const isInProgress = tournament.status === 'in_progress';
+  const isSplitBracket = tournament.groups.some((group) =>
+    effectiveBracketTrack(group.bracketTrack) === 'upper' || effectiveBracketTrack(group.bracketTrack) === 'lower',
+  );
+  const splitFinalResults = isSplitBracket ? buildSplitFinalResults(tournament) : [];
   // format 만 보면 정규 리그(거울 행 format='group_knockout')를 놓친다 — 두 질문을 다 한다.
   const isLeague = isLeagueCompetition(tournament);
   const isMultiGroupLeague = isLeague && tournament.groups.filter((g) => g.phase === 'group').length > 1;
@@ -1107,7 +1130,29 @@ export function ResultsPageContent({ tournament }: { tournament: V1TournamentDet
     <div className="tm-tourn-sub-page" style={{ paddingBottom: 40 }}>
       <h1 className="sr-only">{tournament.title} 최종 결과</h1>
       {/* ── 챔피언 섹션 ── */}
-      {isCompleted && isCoChampion && (
+      {isCompleted && isSplitBracket && (
+        <div style={{ padding: '16px 20px 0', display: 'grid', gap: 12 }}>
+          {splitFinalResults.map((result) => (
+            <section
+              key={result.track}
+              aria-label={`${result.label} 결과`}
+              className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4"
+            >
+              <h2 className="tm-text-body-lg font-bold" style={{ color: 'var(--text-strong)' }}>{result.label}</h2>
+              {result.winner ? (
+                <div className="mt-3 grid gap-2">
+                  <p className="m-0 tm-text-label"><strong>우승</strong> · {result.winner}</p>
+                  {result.runnerUp ? <p className="m-0 tm-text-label" style={{ color: 'var(--text-muted)' }}>준우승 · {result.runnerUp}</p> : null}
+                </div>
+              ) : (
+                <p className="mt-3 mb-0 tm-text-caption" style={{ color: 'var(--text-muted)' }}>결승 결과가 아직 등록되지 않았어요.</p>
+              )}
+            </section>
+          ))}
+          <TournamentSummaryCard tournament={tournament} detailHref={detailHref} />
+        </div>
+      )}
+      {isCompleted && !isSplitBracket && isCoChampion && (
         <div style={{ padding: '16px 20px 0' }}>
           <CoChampionBanner names={coChampionNames} />
           <div style={{ marginTop: 16 }}>
@@ -1115,7 +1160,7 @@ export function ResultsPageContent({ tournament }: { tournament: V1TournamentDet
           </div>
         </div>
       )}
-      {isCompleted && !isCoChampion && championName && (
+      {isCompleted && !isSplitBracket && !isCoChampion && championName && (
         <div style={{ padding: '16px 20px 0' }}>
           {/* 데스크탑: 풀 화면 히어로 */}
           <DesktopChampionHero champion={championName} tournament={tournament} record={championRow?.record} />
@@ -1181,7 +1226,17 @@ export function ResultsPageContent({ tournament }: { tournament: V1TournamentDet
         <div className="tm-tourn-sub-grid tm-tourn-sub-grid-6040 tm-results-grid">
           <div className="tm-tourn-sub-col" style={{ padding: '16px 20px 0' }}>
             <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>최종 순위</h3>
-            {knockoutRows.length > 0 ? (
+            {isSplitBracket ? (
+              <div className="grid gap-3">
+                {splitFinalResults.map((result) => (
+                  <section key={result.track} aria-label={`${result.label} 순위`} className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
+                    <h4 className="tm-text-body font-bold" style={{ color: 'var(--text-strong)' }}>{result.label}</h4>
+                    <p className="mt-2 mb-0 tm-text-label">{result.winner ? `우승 · ${result.winner}` : '결승 결과가 아직 등록되지 않았어요.'}</p>
+                    {result.runnerUp ? <p className="mt-1 mb-0 tm-text-caption" style={{ color: 'var(--text-muted)' }}>준우승 · {result.runnerUp}</p> : null}
+                  </section>
+                ))}
+              </div>
+            ) : knockoutRows.length > 0 ? (
               <FinalStandingsTable rows={knockoutRows} fixtures={tournament.fixtures} />
             ) : (
               <EmptyState

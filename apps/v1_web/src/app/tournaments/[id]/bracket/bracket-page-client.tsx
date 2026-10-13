@@ -197,8 +197,26 @@ function GroupStandingsSection({
   const stageComplete = isGroupStageComplete(group.id, fixtures);
   // 진출 팀은 서버가 결선 대진 기준으로 알려 준다(group.qualification) — 완전 동률이면 position 이
   // 임의 순서라 `position <= advanceCount` 로 칠하면 실제 결선 팀과 갈린다. 없으면 칠하지 않는다.
-  const advancingKeys =
-    stageComplete && group.qualification ? new Set(group.qualification.advancingRegistrationIds) : null;
+  const trackQualifications = group.qualificationByTrack;
+  const hasSplitQualificationTracks = trackQualifications !== undefined &&
+    ('upper' in trackQualifications || 'lower' in trackQualifications);
+  const hasResolvedTrackQualifications = trackQualifications?.upper != null || trackQualifications?.lower != null;
+  const advancingLabels = new Map<string, string[]>();
+  if (stageComplete && hasResolvedTrackQualifications) {
+    for (const [track, qualification] of Object.entries(trackQualifications)) {
+      if (qualification == null) continue;
+      for (const registrationId of qualification.advancingRegistrationIds) {
+        const labels = advancingLabels.get(registrationId) ?? [];
+        labels.push(track === 'upper' ? '상위 진출' : '하위 진출');
+        advancingLabels.set(registrationId, labels);
+      }
+    }
+  }
+  const advancingKeys = stageComplete
+    ? hasSplitQualificationTracks
+      ? hasResolvedTrackQualifications ? new Set(advancingLabels.keys()) : null
+      : group.qualification ? new Set(group.qualification.advancingRegistrationIds) : null
+    : null;
   const advance = stageComplete ? group.advanceCount : null;
   /* #381 — 펼침 상세는 "이 조에서 치른 경기"만 보여준다. 예전엔 대회 전체 픽스처를
      팀 id 로만 걸러서, 조별 순위 영역인데도 그 팀의 결선(4강·결승·3·4위전) 경기와
@@ -219,7 +237,11 @@ function GroupStandingsSection({
         }}
       >
         {group.name}
-        {advance !== null ? (
+        {hasSplitQualificationTracks ? (
+          <span className="tm-text-caption" style={{ marginLeft: 8 }}>
+            각 조 1·2위는 상위 결선, 3·4위는 하위 결선에 참가해요.
+          </span>
+        ) : advance !== null ? (
           <span className="tm-text-caption" style={{ marginLeft: 8 }}>
             상위 {advance}팀 진출
           </span>
@@ -229,7 +251,12 @@ function GroupStandingsSection({
           </span>
         ) : null}
       </div>
-      {stageComplete && group.qualification?.undecided ? (
+      {stageComplete && hasSplitQualificationTracks && !hasResolvedTrackQualifications ? (
+        <p role="status" className="tm-text-caption" style={{ marginBottom: 8 }}>
+          결선 진출 팀을 확인 중이에요.
+        </p>
+      ) : null}
+      {stageComplete && (group.qualification?.undecided || trackQualifications?.upper?.undecided || trackQualifications?.lower?.undecided) ? (
         <div className="tm-text-caption" style={{ marginBottom: 8 }}>
           동률 — 운영자가 진출 팀을 정해요
         </div>
@@ -238,6 +265,7 @@ function GroupStandingsSection({
       <TournamentStandingsTable
         rows={toGroupStandingsRows(group)}
         advancingKeys={advancingKeys}
+        advancingLabels={hasResolvedTrackQualifications ? advancingLabels : undefined}
         ariaLabel={`${group.name} 순위표`}
         renderDetail={(row) => <TeamFixturesDetail teamId={row.teamId} fixtures={groupFixtures} />}
         fromHref={fromHref}

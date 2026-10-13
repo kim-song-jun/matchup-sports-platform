@@ -6,7 +6,9 @@ import { Button } from '@/components/v1-ui/button';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { useV1AddBracketFixture, useV1SetBracketSources } from '@/hooks/use-v1-bracket-canvas';
 import { describeBracketCanvasError } from '@/lib/bracket-canvas-errors';
-import { bracketSourceCandidates, bracketSourceSideOptions, isFixtureLinkable, knockoutRoundLabel } from '@/lib/bracket-fixture-tools';
+import { bracketExistingSource, bracketSourceCandidates, isFixtureLinkable, knockoutRoundLabel } from '@/lib/bracket-fixture-tools';
+import { bracketTrackLabel } from '@/lib/bracket-track';
+import { bracketSourceSideOptions } from '@/lib/bracket-fixture-tools';
 import type { V1AdminBracketFixture, V1AdminTournamentBracket, V1TournamentFormat } from '@/types/api';
 import { BracketLeagueAddFixtureForm, type LeagueAddSubmit } from './bracket-league-add-fixture-form';
 
@@ -35,30 +37,57 @@ export function BracketFixtureToolsDialog({ open, mode, format, tournamentId, br
     [bracket.groups],
   );
   const linkable = useMemo(
-    () =>
-      bracket.fixtures
-        .filter((fixture) => isFixtureLinkable(fixture) && bracketSourceCandidates({ target: fixture, groups: bracket.groups, fixtures: bracket.fixtures }).length > 0)
-        .sort((a, b) => a.fixtureNumber - b.fixtureNumber),
+    () => bracket.fixtures
+      .filter((fixture) => {
+        const input = { target: fixture, groups: bracket.groups, fixtures: bracket.fixtures };
+        const canChooseNewSources = isFixtureLinkable(fixture) && bracketSourceCandidates(input).length > 0;
+        const hasExistingSource = fixture.bracketSources?.some((source) =>
+          bracketExistingSource({ ...input, sourceFixtureId: source.fixtureId }) !== null,
+        ) ?? false;
+        return canChooseNewSources || hasExistingSource;
+      })
+      .sort((a, b) => a.fixtureNumber - b.fixtureNumber),
     [bracket.fixtures, bracket.groups],
   );
-  const groupName = (fixture: V1AdminBracketFixture) => bracket.groups.find((group) => group.id === fixture.groupId)?.name ?? fixture.round;
+  const groupName = (fixture: V1AdminBracketFixture) => {
+    const group = bracket.groups.find((candidate) => candidate.id === fixture.groupId);
+    const trackLabel = bracketTrackLabel(group?.bracketTrack);
+    return `${trackLabel ? `${trackLabel} · ` : ''}${group?.name ?? fixture.round}`;
+  };
   const fixtureTitle = (fixture: V1AdminBracketFixture) => `${groupName(fixture)} ${fixture.fixtureNumber}번 경기`;
 
   const [groupId, setGroupId] = useState(addableGroups[0]?.id ?? '');
   const [targetId, setTargetId] = useState(linkable[0]?.id ?? '');
-  const sourceOf = (fixture: V1AdminBracketFixture | undefined, side: 'HOME' | 'AWAY') =>
-    fixture?.bracketSources?.find((source) => source.side === side)?.fixtureId ?? '';
+  const sourceOf = (fixture: V1AdminBracketFixture | undefined, side: 'HOME' | 'AWAY') => {
+    const sourceId = fixture?.bracketSources?.find((source) => source.side === side)?.fixtureId ?? '';
+    if (fixture === undefined || sourceId === '') return '';
+    const input = { target: fixture, groups: bracket.groups, fixtures: bracket.fixtures };
+    return bracketSourceCandidates(input).some((candidate) => candidate.id === sourceId)
+      ? sourceId
+      : bracketExistingSource({ ...input, sourceFixtureId: sourceId })?.id ?? '';
+  };
   const [homeSource, setHomeSource] = useState(() => sourceOf(linkable[0], 'HOME'));
   const [awaySource, setAwaySource] = useState(() => sourceOf(linkable[0], 'AWAY'));
 
   const target = linkable.find((fixture) => fixture.id === targetId) ?? null;
   const candidates = target === null ? [] : bracketSourceCandidates({ target, groups: bracket.groups, fixtures: bracket.fixtures });
-  const sourceOptions = (side: 'HOME' | 'AWAY') => bracketSourceSideOptions({
-    candidates,
-    fixtures: bracket.fixtures,
-    currentFixtureId: side === 'HOME' ? homeSource : awaySource,
-    oppositeFixtureId: side === 'HOME' ? awaySource : homeSource,
-  });
+  const lockedSources = target?.bracketSources?.map((source) => source.fixtureId) ?? [];
+  const requestedSources = [homeSource, awaySource].filter((sourceId) => sourceId !== '');
+  const hasLockedMatch = target !== null && [target.id, ...lockedSources, ...requestedSources]
+    .some((fixtureId) => {
+      const fixture = bracket.fixtures.find((candidate) => candidate.id === fixtureId);
+      return fixture === undefined || !isFixtureLinkable(fixture);
+    });
+  const sourceOptions = (side: 'HOME' | 'AWAY') => {
+    const currentFixtureId = side === 'HOME' ? homeSource : awaySource;
+    const oppositeFixtureId = side === 'HOME' ? awaySource : homeSource;
+    const options = bracketSourceSideOptions({ candidates, fixtures: bracket.fixtures, currentFixtureId, oppositeFixtureId });
+    if (target === null || currentFixtureId === '' || currentFixtureId === oppositeFixtureId) return options;
+    const existing = bracketExistingSource({ target, sourceFixtureId: currentFixtureId, groups: bracket.groups, fixtures: bracket.fixtures });
+    return options.filter((fixture) =>
+      candidates.some((candidate) => candidate.id === fixture.id) || (existing !== null && fixture.id === existing.id),
+    );
+  };
   const duplicateSourceSelected = homeSource !== '' && homeSource === awaySource;
   const targetPhase = target === null ? '' : (bracket.groups.find((group) => group.id === target.groupId)?.phase ?? '');
   const outcomeLabel = targetPhase === 'third_place' ? '패자' : '승자';
@@ -72,7 +101,7 @@ export function BracketFixtureToolsDialog({ open, mode, format, tournamentId, br
 
   const group = addableGroups.find((candidate) => candidate.id === groupId) ?? null;
   const addDisabled = group === null || pending;
-  const linkDisabled = target === null || pending;
+  const linkDisabled = target === null || pending || hasLockedMatch;
 
   const submitting = useRef(false);
 
@@ -190,6 +219,11 @@ export function BracketFixtureToolsDialog({ open, mode, format, tournamentId, br
               <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>이전 단계 경기를 이어 줄 수 있는 경기가 없어요.</p>
             ) : (
               <>
+                {hasLockedMatch && (
+                  <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+                    시작된 경기가 있어 연결을 저장할 수 없어요. 기존 연결은 확인용으로 표시돼요.
+                  </p>
+                )}
                 <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
                   미정인 자리에 이전 경기의 {outcomeLabel}를 연결해요. 결과가 확정되면 기존 진출 처리로 팀이 들어가요.
                 </p>
@@ -204,6 +238,7 @@ export function BracketFixtureToolsDialog({ open, mode, format, tournamentId, br
                 {(['HOME', 'AWAY'] as const).map((side) => {
                   const current = side === 'HOME' ? homeSource : awaySource;
                   const options = sourceOptions(side);
+                  const isPreserved = (fixture: V1AdminBracketFixture) => !candidates.some((candidate) => candidate.id === fixture.id);
                   return (
                     <div key={side} className="flex flex-col gap-1">
                       <label htmlFor={`${idPrefix}-${side}`} className="tm-text-label font-semibold" style={{ color: 'var(--text-strong)' }}>
@@ -218,7 +253,9 @@ export function BracketFixtureToolsDialog({ open, mode, format, tournamentId, br
                       >
                         <option value="">연결 없음 · 직접 배정</option>
                         {options.map((fixture) => (
-                          <option key={fixture.id} value={fixture.id}>{`${fixtureTitle(fixture)} ${outcomeLabel}`}</option>
+                          <option key={fixture.id} value={fixture.id} disabled={isPreserved(fixture)}>
+                            {`${fixtureTitle(fixture)} ${outcomeLabel}${isPreserved(fixture) ? ' · 현재 연결' : ''}`}
+                          </option>
                         ))}
                       </select>
                     </div>

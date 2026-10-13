@@ -14,6 +14,7 @@ import { ALL_COMPETITION_KINDS, findTournamentOnSurface } from '../tournament-su
 import { syncByeSlotInTx } from './bye-slot-sync';
 import { lockCompetitionForBracketMutationInTx, lockCompetitionForSlotReleaseInTx } from './competition-bracket-lock';
 import { fillSlotsFromStandings, previewGroupRankStandings, type FillOverride } from './group-rank-fill';
+import { assertBracketTrackRegistrationEligible } from './bracket-track-eligibility';
 import { pickRandomAssignments } from './random-assignment';
 import { applyCrossGroupRound12, previewCrossGroupRound12 } from './cross-group-round12';
 import type { CrossGroupRound12Dto } from './dto/cross-group-round12.dto';
@@ -57,7 +58,7 @@ const alreadyPlaced = () =>
 
 async function assertPlaceable(
   tx: Tx,
-  slot: { id: string; tournamentId: string; kind: V1TournamentSlotKind; groupId: string | null },
+  slot: { id: string; tournamentId: string; kind: V1TournamentSlotKind; groupId: string | null; group?: { phase: string; bracketTrack: string } | null },
   registrationId: string,
 ): Promise<void> {
   const registration = await tx.v1TournamentRegistration.findFirst({
@@ -86,6 +87,18 @@ async function assertPlaceable(
     select: { id: true },
   });
   if (placed !== null) throw alreadyPlaced();
+  if (
+    slot.kind === 'GROUP_RANK' && slot.groupId !== null && slot.group?.phase !== 'group' &&
+    (slot.group?.bracketTrack === 'upper' || slot.group?.bracketTrack === 'lower')
+  ) {
+    await assertBracketTrackRegistrationEligible(tx, {
+      tournamentId: slot.tournamentId,
+      groupId: slot.groupId,
+      bracketTrack: slot.group.bracketTrack,
+      registrationId,
+      slotId: slot.id,
+    });
+  }
 }
 
 async function assignSlotCore(
@@ -97,7 +110,15 @@ async function assignSlotCore(
 ): Promise<{ tournamentId: string; fixtureIds: string[] }> {
   const slot = await tx.v1TournamentSlot.findUnique({
     where: { id: slotId },
-    select: { id: true, tournamentId: true, kind: true, groupId: true, position: true, registrationId: true },
+    select: {
+      id: true,
+      tournamentId: true,
+      kind: true,
+      groupId: true,
+      position: true,
+      registrationId: true,
+      group: { select: { phase: true, bracketTrack: true } },
+    },
   });
   if (slot === null) throw slotNotFound();
   const competition = await findTournamentOnSurface(tx, ALL_COMPETITION_KINDS, {

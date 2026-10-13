@@ -69,6 +69,7 @@ function BracketPageBody() {
             <BracketCanvasWorkspace
               tournamentId={tournamentId}
               format={tournament?.format}
+              kind={tournament?.kind}
               registrations={registrations}
               registrationsState={registrationsState}
               bracketPublishedAt={tournament?.bracketPublishedAt}

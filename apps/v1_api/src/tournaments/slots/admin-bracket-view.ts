@@ -4,7 +4,7 @@ import { parseTournamentFixtureOfficialScore } from '../tournament-fixture-offic
 import { slotLabelFromRow } from './tournament-slot-label';
 
 export const adminBracketSlotInclude = {
-  group: { select: { name: true, phase: true } },
+  group: { select: { name: true, phase: true, bracketTrack: true } },
   sourceGroup: { select: { name: true } },
   registration: { select: { team: { select: { name: true } } } },
 } satisfies Prisma.V1TournamentSlotInclude;
@@ -15,6 +15,7 @@ export type AdminBracketSlot = {
   id: string;
   kind: V1TournamentSlotKind;
   groupId: string | null;
+  bracketTrack: 'overall' | 'upper' | 'lower';
   sourceGroupId: string | null;
   position: number;
   label: string;
@@ -27,6 +28,7 @@ export function serializeAdminBracketSlot(row: AdminBracketSlotRow): AdminBracke
     id: row.id,
     kind: row.kind,
     groupId: row.groupId,
+    bracketTrack: row.group?.bracketTrack ?? 'overall',
     sourceGroupId: row.sourceGroupId,
     position: row.position,
     label: slotLabelFromRow(row),

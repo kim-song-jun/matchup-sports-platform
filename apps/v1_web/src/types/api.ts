@@ -3660,6 +3660,8 @@ export type V1Tournament = {
   /** 관리자 응답에만 온다 — false 면 일반 사용자 화면(목록·검색·상세·기록)에서 숨겨져 있다. */
   isPublic?: boolean;
   status: V1TournamentStatus;
+  /** 대회 종류. `format` 으로 결선 가능 여부를 추론하지 않는다. */
+  kind?: V1CompetitionKind | null;
   format: V1TournamentFormat;
   registrationDeadlineAt: string | null;
   /** 명단(선수단) 제출 마감일 — 지나면 신청 팀의 명단 추가/삭제/수정이 차단된다(팀별 예외 부여 가능) */
@@ -3800,6 +3802,8 @@ export type V1TournamentGroupQualification = {
   undecided: boolean;
 };
 
+export type V1TournamentBracketTrack = 'overall' | 'upper' | 'lower';
+
 export type V1TournamentGroup = {
   id: string;
   name: string;
@@ -3809,6 +3813,9 @@ export type V1TournamentGroup = {
   groupTeams: V1TournamentGroupTeam[];
   standings: V1TournamentStanding[];
   qualification: V1TournamentGroupQualification | null;
+  /** Older serialized groups may omit this; omission has the same meaning as overall. */
+  bracketTrack?: V1TournamentBracketTrack;
+  qualificationByTrack?: Partial<Record<'upper' | 'lower', V1TournamentGroupQualification | null>>;
 };
 
 /** 경기 득점자 — 명단에 있으면 playerId, 비회원/대타는 playerId=null + playerName만 */
@@ -4048,6 +4055,7 @@ export type V1TournamentDetail = {
   reviewsTotalCount: number;
   /** 어드민이 입력한 개인 어워드 (MVP, 득점왕 등) */
   awards: V1TournamentAward[];
+  awardSets?: V1TournamentAwardSet[];
   createdAt: string;
   updatedAt: string;
 };
@@ -4101,6 +4109,24 @@ export type V1TournamentAward = {
   recipientProfileImageUrl?: string | null;
   teamName: string | null;
   note: string | null;
+  bracketTrack?: V1TournamentBracketTrack;
+};
+
+export type V1TournamentAwardSet = {
+  bracketTrack: 'upper' | 'lower';
+  prizePool: number | null;
+  prizeSummary: string | null;
+  prizeBreakdown: string | null;
+};
+
+/** Admin award-set GET/PUT adds its row id; public detail emits the four fields above. */
+export type V1AdminTournamentAwardSet = V1TournamentAwardSet & { id: string };
+
+export type V1TournamentAwardSetInput = {
+  bracketTrack: 'upper' | 'lower';
+  prizePool?: number | null;
+  prizeSummary?: string | null;
+  prizeBreakdown?: string | null;
 };
 
 export type V1TournamentAwardIconKey =
@@ -4259,6 +4285,7 @@ export type V1AdminBracketGroup = {
   createdAt: string;
   updatedAt: string;
   groupTeams: V1AdminBracketGroupTeam[];
+  bracketTrack?: V1TournamentBracketTrack;
 };
 
 export type V1AdminBracketGroupTeam = {
@@ -4382,6 +4409,7 @@ export type BracketTemplateInput =
       advancePerGroup: 1 | 2;
       legs: 1 | 2;
       thirdPlace: boolean;
+      lowerBracket?: boolean;
     }
   | { kind: 'league'; teamCount: number; legs: 1 | 2 };
 

@@ -28,8 +28,11 @@ export function planFillFromStandings(preview: GroupRankPreview, overrides: read
     if (row.state === 'group_incomplete') {
       throw invalidOverride(`${row.label}은 조별 경기가 아직 끝나지 않아 팀을 고를 수 없어요.`);
     }
-    const allowed =
-      row.state === 'tied' ? new Set(row.tiedRegistrationIds) : preview.groupMembers.get(override.slotId);
+    const allowed = row.state === 'tied'
+      ? new Set(row.tiedRegistrationIds)
+      : row.bracketTrack === 'overall'
+        ? preview.groupMembers.get(override.slotId)
+        : new Set(row.candidateRegistrationId === null ? [] : [row.candidateRegistrationId]);
     if (allowed === undefined || !allowed.has(override.registrationId)) {
       throw invalidOverride(`${row.label}에 넣을 수 없는 팀이에요.`);
     }

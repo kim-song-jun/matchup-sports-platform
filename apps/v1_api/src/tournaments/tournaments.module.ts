@@ -30,6 +30,8 @@ import { TournamentSponsorsController } from './tournament-sponsors.controller';
 import { TournamentSponsorsService } from './tournament-sponsors.service';
 import { TournamentReviewsController } from './tournament-reviews.controller';
 import { TournamentReviewsService } from './tournament-reviews.service';
+import { TournamentAwardSetsController } from './tournament-award-sets.controller';
+import { TournamentAwardSetsService } from './tournament-award-sets.service';
 import {
   TournamentCampaignsAdminController,
   TournamentCampaignsPublicController,
@@ -95,6 +97,7 @@ import { TeamCompetitionEntriesService } from './team-competition-entries.servic
     TournamentAnnouncementsController,
     TournamentSponsorsController,
     TournamentReviewsController,
+    TournamentAwardSetsController,
     TournamentsReadController,
     AdminQuickResultController,
     TournamentResultReviewController,
@@ -115,6 +118,7 @@ import { TeamCompetitionEntriesService } from './team-competition-entries.servic
     TournamentAnnouncementsService,
     TournamentSponsorsService,
     TournamentReviewsService,
+    TournamentAwardSetsService,
     TournamentCampaignReadService,
     TournamentCampaignAdminService,
     TournamentCampaignStatusService,

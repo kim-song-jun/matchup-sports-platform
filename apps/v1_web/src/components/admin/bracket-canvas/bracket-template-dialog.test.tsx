@@ -250,8 +250,18 @@ describe('BracketTemplateDialog — 조별+결선', () => {
     description: `조별 ${advancePerGroup}위까지 진출해요. 결선은 ${groups * advancePerGroup}팀이에요.`,
   }));
 
-  it('2조 x 4팀 2팀 진출이 기본이고 만들어질 개수를 미리 보여 준다', () => {
+  it('대회 종류 확인 전에는 split 선택을 숨기고 lowerBracket 요청을 보내지 않는다', () => {
     renderDialog({ format: 'group_knockout' });
+    expect(screen.queryByLabelText('상위·하위 결선도 만들기')).not.toBeInTheDocument();
+    create();
+    expect(mocks.apply).toHaveBeenCalledWith(
+      { kind: 'group_knockout', groupCount: 2, teamsPerGroup: 4, advancePerGroup: 2, legs: 1, thirdPlace: false },
+      expect.any(Object),
+    );
+  });
+
+  it('2조 x 4팀 2팀 진출이 기본이고 만들어질 개수를 미리 보여 준다', () => {
+    renderDialog({ format: 'group_knockout', allowSplitBracket: true });
     expect(screen.getByLabelText('조 수')).toHaveValue('2');
     const selectedShape = screen.getAllByRole('radio', { name: /2개 조 × 4팀/ }).find((option) => (option as HTMLInputElement).checked);
     expect(selectedShape).toBeDefined();
@@ -262,7 +272,7 @@ describe('BracketTemplateDialog — 조별+결선', () => {
   });
 
   it('만들기는 계약 본문(group_knockout 평탄화)으로 보낸다', () => {
-    renderDialog({ format: 'group_knockout' });
+    renderDialog({ format: 'group_knockout', allowSplitBracket: true });
     change('참가 팀 수', '12');
     chooseShape(2, 6);
     change('조별 회전', '2');
@@ -271,6 +281,28 @@ describe('BracketTemplateDialog — 조별+결선', () => {
       { kind: 'group_knockout', groupCount: 2, teamsPerGroup: 6, advancePerGroup: 2, legs: 2, thirdPlace: false },
       expect.any(Object),
     );
+  });
+
+  it('상위·하위 결선을 선택하면 두 결선 경기 수를 합산하고 lowerBracket 계약을 보낸다', () => {
+    renderDialog({ format: 'group_knockout', allowSplitBracket: true });
+    fireEvent.click(screen.getByLabelText('상위·하위 결선도 만들기'));
+
+    // 2조 × 4팀 조별 12경기 + 4강/결승 각 3경기 × 두 결선.
+    expect(screen.getByText('경기 18개 · 자리 16개 · 연결 4개')).toBeInTheDocument();
+    create();
+    expect(mocks.apply).toHaveBeenCalledWith(
+      { kind: 'group_knockout', groupCount: 2, teamsPerGroup: 4, advancePerGroup: 2, legs: 1, thirdPlace: false, lowerBracket: true },
+      expect.any(Object),
+    );
+  });
+
+  it('분리 결선은 4팀 이상이 있는 조에서만 만들 수 있다', () => {
+    renderDialog({ format: 'group_knockout', allowSplitBracket: true });
+    change('참가 팀 수', '6');
+    chooseShape(2, 3, 2);
+    fireEvent.click(screen.getByLabelText('상위·하위 결선도 만들기'));
+    expect(screen.getByRole('button', { name: '대진 만들기' })).toBeDisabled();
+    expect(screen.getByRole('alert')).toHaveTextContent('4팀');
   });
 
   it('현재 참가 수와 맞는 지원 구성이 없으면 만들 수 없고 이유를 보여 준다', () => {

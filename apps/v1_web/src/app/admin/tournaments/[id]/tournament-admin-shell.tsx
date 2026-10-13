@@ -82,7 +82,7 @@ const SECTION_GROUPS: { label: string; items: SectionItem[] }[] = [
     label: '사후',
     items: [
       { slug: 'reviews', label: '리뷰 관리' },
-      { slug: 'awards', label: '개인 어워드' },
+      { slug: 'awards', label: '시상' },
       { slug: 'statistics', label: '통계' },
     ],
   },

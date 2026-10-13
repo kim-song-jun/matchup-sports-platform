@@ -42,8 +42,8 @@ vi.mock('./bracket-fixture-tools-dialog', () => ({
     props.open ? <div data-testid="tools-dialog" data-mode={props.mode} data-format={props.format ?? ''} /> : null,
 }));
 vi.mock('./bracket-template-dialog', () => ({
-  BracketTemplateDialog: (props: { open: boolean; hasExistingBracket: boolean; format: string; confirmedTeamCountStatus: string }) =>
-    props.open ? <div data-testid="template-dialog" data-existing={String(props.hasExistingBracket)} data-format={props.format} data-registrations-status={props.confirmedTeamCountStatus} /> : null,
+  BracketTemplateDialog: (props: { open: boolean; hasExistingBracket: boolean; format: string; allowSplitBracket?: boolean; confirmedTeamCountStatus: string }) =>
+    props.open ? <div data-testid="template-dialog" data-existing={String(props.hasExistingBracket)} data-format={props.format} data-split={String(props.allowSplitBracket === true)} data-registrations-status={props.confirmedTeamCountStatus} /> : null,
 }));
 
 vi.mock('./bracket-standings-fill-button', () => ({
@@ -148,9 +148,24 @@ describe('BracketCanvasWorkspace — 로딩·에러·빈 상태', () => {
 
   it('조별+결선 방식 대회도 템플릿으로 시작한다 — 대화상자가 group_knockout 형식으로 열린다', () => {
     setBracket(makeBracket());
-    renderWorkspace({ format: 'group_knockout' });
+    renderWorkspace({ format: 'group_knockout', kind: 'regular_tournament' });
     fireEvent.click(screen.getByRole('button', { name: '템플릿으로 시작' }));
     expect(screen.getByTestId('template-dialog')).toHaveAttribute('data-format', 'group_knockout');
+    expect(screen.getByTestId('template-dialog')).toHaveAttribute('data-split', 'true');
+  });
+
+  it('형식이 조별+결선이어도 대회 종류가 일반 대회로 확인되지 않으면 분리 결선을 숨긴다', () => {
+    setBracket(makeBracket());
+    renderWorkspace({ format: 'group_knockout', kind: null });
+    fireEvent.click(screen.getByRole('button', { name: '템플릿으로 시작' }));
+    expect(screen.getByTestId('template-dialog')).toHaveAttribute('data-split', 'false');
+  });
+
+  it('정규 리그도 group_knockout 형식만으로 분리 결선을 활성화하지 않는다', () => {
+    setBracket(makeBracket());
+    renderWorkspace({ format: 'group_knockout', kind: 'regular_league' });
+    fireEvent.click(screen.getByRole('button', { name: '템플릿으로 시작' }));
+    expect(screen.getByTestId('template-dialog')).toHaveAttribute('data-split', 'false');
   });
 
   it('형식을 알 수 없는 대회는 템플릿 대신 목록으로 안내한다(대화상자를 열지 않는다)', () => {

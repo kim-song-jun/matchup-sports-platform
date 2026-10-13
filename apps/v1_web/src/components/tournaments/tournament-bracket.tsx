@@ -16,6 +16,7 @@ import { buildBracketGraph, bracketConnectionPath, type BracketGraphRound } from
 import { Trophy } from 'lucide-react';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
+import { bracketTrackLabel, effectiveBracketTrack } from '@/lib/bracket-track';
 import type { V1TournamentFixture, V1TournamentGroup } from '@/types/api';
 
 /* ── 라운드 그룹핑 (기존 pure logic 유지) ── */
@@ -754,7 +755,7 @@ export interface TournamentBracketProps {
   groups: V1TournamentGroup[];
 }
 
-export function TournamentBracket({ fixtures, groups }: TournamentBracketProps) {
+function SingleTournamentBracket({ fixtures, groups }: TournamentBracketProps) {
   const rounds = groupFixturesByRound(fixtures, groups);
 
 
@@ -930,6 +931,30 @@ export function TournamentBracket({ fixtures, groups }: TournamentBracketProps) 
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+export function TournamentBracket({ fixtures, groups }: TournamentBracketProps) {
+  const splitTracks = (['upper', 'lower'] as const).filter((track) =>
+    groups.some((group) => effectiveBracketTrack(group.bracketTrack) === track),
+  );
+  if (splitTracks.length === 0) return <SingleTournamentBracket fixtures={fixtures} groups={groups} />;
+
+  return (
+    <div className="flex flex-col gap-6">
+      {splitTracks.map((track) => {
+        const trackGroups = groups.filter((group) => effectiveBracketTrack(group.bracketTrack) === track);
+        const trackGroupIds = new Set(trackGroups.map((group) => group.id));
+        const trackFixtures = fixtures.filter((fixture) => fixture.groupId !== null && trackGroupIds.has(fixture.groupId));
+        const label = bracketTrackLabel(track)!;
+        return (
+          <section key={track} aria-label={label}>
+            <h4 className="tm-text-body-lg font-bold mb-3" style={{ color: 'var(--text-strong)' }}>{label}</h4>
+            <SingleTournamentBracket fixtures={trackFixtures} groups={trackGroups} />
+          </section>
+        );
+      })}
     </div>
   );
 }

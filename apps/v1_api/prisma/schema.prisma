@@ -2578,6 +2578,12 @@ enum V1TournamentGroupPhase {
   third_place
 }
 
+enum V1TournamentBracketTrack {
+  overall
+  upper
+  lower
+}
+
 
 
 enum V1TournamentAnnouncementAudience {
@@ -2726,6 +2732,7 @@ model V1Tournament {
   sponsors             V1TournamentSponsor[]
   reviews              V1TournamentReview[]
   awards               V1TournamentAward[]
+  awardSets            V1TournamentAwardSet[]
   campaign             V1TournamentCampaign?
   popups               V1TournamentPopup[]
   fields               V1TournamentField[]
@@ -2810,6 +2817,7 @@ model V1TournamentReview {
 model V1TournamentAward {
   id            String   @id @default(uuid())
   tournamentId  String   @map("tournament_id")
+  bracketTrack  V1TournamentBracketTrack @default(overall) @map("bracket_track")
   awardType     String   @map("award_type") // 'mvp' | 'top_scorer' | 'best_defense' | etc.
   awardLabel    String   @map("award_label") // 표시명: 'MVP', '득점왕', '베스트 11' 등
   iconKey       String?  @map("icon_key") // trophy | crown | goal | shield | glove | handshake | sparkles | medal | star
@@ -2824,10 +2832,27 @@ model V1TournamentAward {
   tournament V1Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
   recipient  V1User?      @relation("V1TournamentAwardRecipient", fields: [recipientUserId], references: [id], onDelete: SetNull)
 
-  @@unique([tournamentId, awardType])
+  @@unique([tournamentId, bracketTrack, awardType])
   @@index([tournamentId, sortOrder])
   @@index([recipientUserId, createdAt])
   @@map("v1_tournament_awards")
+}
+
+/// 정규대회 상위·하위 결선의 팀 시상 안내. 대회 전체 안내는 기존 prize 필드를 사용한다.
+model V1TournamentAwardSet {
+  id             String                   @id @default(uuid())
+  tournamentId   String                   @map("tournament_id")
+  bracketTrack   V1TournamentBracketTrack  @map("bracket_track")
+  prizePool      Int?                      @map("prize_pool")
+  prizeSummary   String?                   @map("prize_summary")
+  prizeBreakdown String?                   @map("prize_breakdown")
+  createdAt      DateTime                  @default(now()) @map("created_at")
+  updatedAt      DateTime                  @updatedAt @map("updated_at")
+
+  tournament V1Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+
+  @@unique([tournamentId, bracketTrack])
+  @@map("v1_tournament_award_sets")
 }
 
 model V1TournamentRegistration {
@@ -2949,6 +2974,7 @@ model V1TournamentGroup {
   tournamentId String                 @map("tournament_id")
   name         String
   phase        V1TournamentGroupPhase @default(group)
+  bracketTrack V1TournamentBracketTrack @default(overall) @map("bracket_track")
   sortOrder    Int                    @default(0) @map("sort_order")
   // 이 조에서 상위 몇 팀이 다음 단계로 진출하는지(조별리그 진출선 표시용). null이면 진출 표시 없음.
   advanceCount Int?                   @map("advance_count")

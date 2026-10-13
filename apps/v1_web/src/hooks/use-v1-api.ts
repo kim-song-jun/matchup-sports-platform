@@ -216,6 +216,8 @@ import type {
   V1TournamentReviewsPage,
   V1AdminTournamentReviewsPage,
   V1TournamentAward,
+  V1AdminTournamentAwardSet,
+  V1TournamentAwardSetInput,
   V1TournamentRegistration,
   V1TournamentRosterResponse,
   V1AdminTournamentRosterResponse,
@@ -4195,12 +4197,34 @@ export function useV1SetTournamentAwards(tournamentId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (awards: {
-      awardType: string; awardLabel: string; recipientName: string; recipientUserId: string;
+      awardType: string; awardLabel: string; recipientName: string; recipientUserId: string; bracketTrack?: 'overall' | 'upper' | 'lower';
       iconKey?: string; teamName?: string; note?: string; sortOrder?: number;
     }[]) => v1Put<V1TournamentAward[]>(`/admin/tournaments/${tournamentId}/awards`, { awards }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
       void queryClient.invalidateQueries({ queryKey: ['admin-tournament-awards', tournamentId] });
+    },
+  });
+}
+
+/** 어드민: 상·하위 결선의 팀 시상 안내 조회 */
+export function useV1AdminTournamentAwardSets(tournamentId: string, enabled = true) {
+  return useQuery({
+    queryKey: ['admin-tournament-award-sets', tournamentId],
+    queryFn: () => v1Get<V1AdminTournamentAwardSet[]>(`/admin/tournaments/${tournamentId}/award-sets`),
+    enabled: !!tournamentId && enabled,
+  });
+}
+
+/** 어드민: 상·하위 결선 팀 시상 안내 저장 */
+export function useV1SetTournamentAwardSets(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (awardSets: V1TournamentAwardSetInput[]) =>
+      v1Put<V1AdminTournamentAwardSet[]>(`/admin/tournaments/${tournamentId}/award-sets`, { awardSets }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
+      void queryClient.invalidateQueries({ queryKey: ['admin-tournament-award-sets', tournamentId] });
     },
   });
 }

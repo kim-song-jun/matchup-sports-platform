@@ -18,6 +18,7 @@ const PAIRINGS: Readonly<Record<string, ReadonlyArray<readonly [string, string]>
 };
 
 export const MAX_GROUP_RANK_SLOTS = Math.max(...Object.values(PAIRINGS).map((pairs) => pairs.length * 2));
+export const MAX_GROUP_RANK_OVERRIDES = 32;
 
 function parseRef(text: string): GroupRankRef {
   return { group: text.charCodeAt(0) - 65, rank: Number(text.slice(1)) };

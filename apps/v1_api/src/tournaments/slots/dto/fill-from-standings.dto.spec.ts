@@ -22,10 +22,10 @@ describe('FillFromStandingsDto', () => {
     expect(await check({ overrides: [{ slotId: UUID_A, registrationId: UUID_B }] })).toHaveLength(0);
   });
 
-  it('16개까지 받고 17개부터 거절한다 (결선 크기 상한, 16강 포함)', async () => {
+  it('split 결선 최대 32자리를 받고 33개부터 거절한다 (8조×상위 2위·하위 2위)', async () => {
     const item = { slotId: UUID_A, registrationId: UUID_B };
-    expect(await check({ overrides: Array.from({ length: 16 }, () => item) })).toHaveLength(0);
-    expect(paths(await check({ overrides: Array.from({ length: 17 }, () => item) }))).toContain('overrides');
+    expect(await check({ overrides: Array.from({ length: 32 }, () => item) })).toHaveLength(0);
+    expect(paths(await check({ overrides: Array.from({ length: 33 }, () => item) }))).toContain('overrides');
   });
 
   it.each([

@@ -253,14 +253,45 @@ function AwardsPodium({
 /* ── 상금 상세 — 파서·아이콘은 어드민 미리보기와 공유 (lib/prize-breakdown, prize-rank-icon) ── */
 
 function hasPrizeData(tournament: V1TournamentDetail): boolean {
-  return Boolean(tournament.prizeSummary?.trim() || tournament.prizePool);
+  return Boolean(tournament.prizeSummary?.trim() || (tournament.prizePool !== null && tournament.prizePool !== undefined) || tournament.prizeBreakdown?.trim());
+}
+
+function getTrackTopThree(tournament: V1TournamentDetail, track: 'upper' | 'lower'): Array<{ pos: number; name: string }> {
+  const groups = tournament.groups.filter((group) => group.bracketTrack === track);
+  const fixtureByPhase = (phase: string) => {
+    const groupIds = new Set(groups.filter((group) => group.phase === phase).map((group) => group.id));
+    return tournament.fixtures.find((fixture) => groupIds.has(fixture.groupId ?? '') && fixture.result !== null);
+  };
+  const rows: Array<{ pos: number; name: string }> = [];
+  const final = fixtureByPhase('final');
+  if (final?.result) {
+    const winner = final.result.hasPenalty && final.result.homePenaltyScore !== null && final.result.awayPenaltyScore !== null
+      ? (final.result.homePenaltyScore === final.result.awayPenaltyScore ? null : final.result.homePenaltyScore > final.result.awayPenaltyScore ? 'home' : 'away')
+      : final.result.homeScore === final.result.awayScore ? null : final.result.homeScore > final.result.awayScore ? 'home' : 'away';
+    if (winner) {
+      rows.push({ pos: 1, name: (winner === 'home' ? final.homeTeamName : final.awayTeamName) ?? '비공개' });
+      rows.push({ pos: 2, name: (winner === 'home' ? final.awayTeamName : final.homeTeamName) ?? '비공개' });
+    }
+  }
+  const third = fixtureByPhase('third_place');
+  if (third?.result) {
+    const winner = third.result.hasPenalty && third.result.homePenaltyScore !== null && third.result.awayPenaltyScore !== null
+      ? (third.result.homePenaltyScore === third.result.awayPenaltyScore ? null : third.result.homePenaltyScore > third.result.awayPenaltyScore ? 'home' : 'away')
+      : third.result.homeScore === third.result.awayScore ? null : third.result.homeScore > third.result.awayScore ? 'home' : 'away';
+    if (winner) {
+      rows.push({ pos: 3, name: (winner === 'home' ? third.homeTeamName : third.awayTeamName) ?? '비공개' });
+      rows.push({ pos: 4, name: (winner === 'home' ? third.awayTeamName : third.homeTeamName) ?? '비공개' });
+    }
+  }
+  return rows;
 }
 
 function PrizeSection({
-  tournament, top3 = [],
+  tournament, top3 = [], heading = '상금 · 시상',
 }: {
   tournament: V1TournamentDetail;
   top3?: Array<{ pos: number; name: string }>;
+  heading?: string;
 }) {
   if (!hasPrizeData(tournament)) return null;
 
@@ -275,7 +306,7 @@ function PrizeSection({
 
   return (
     <section className="tm-prize-section" style={{ marginBottom: 20 }}>
-      <h3 className="tm-hub-section-title">상금 · 시상</h3>
+      <h3 className="tm-hub-section-title">{heading}</h3>
       <div className="tm-prize-card" style={{ background: 'var(--card-surface)', borderRadius: 'var(--radius-field)', border: '1px solid var(--grey150)', overflow: 'hidden' }}>
         {/* 총 상금 헤더 */}
         {tournament.prizePool !== null && tournament.prizePool > 0 && (
@@ -368,6 +399,14 @@ function IndividualAwardsSection({ tournament }: { tournament: V1TournamentDetai
   // 프로필에서 뒤로가면 이 시상 화면(받은 출처 포함)으로 돌아온다.
   const currentHref = useCurrentHref();
   const awards = tournament.awards ?? [];
+  const isScoped = awards.some((award) => award.bracketTrack === 'upper' || award.bracketTrack === 'lower');
+  const awardGroups = isScoped
+    ? (['overall', 'upper', 'lower'] as const).map((track) => ({
+        track,
+        label: track === 'overall' ? '대회 전체' : track === 'upper' ? '상위 결선' : '하위 결선',
+        awards: awards.filter((award) => (award.bracketTrack ?? 'overall') === track),
+      })).filter((group) => group.awards.length > 0)
+    : [{ track: 'overall' as const, label: '개인 어워드', awards }];
 
   if (awards.length === 0) {
     return (
@@ -388,8 +427,12 @@ function IndividualAwardsSection({ tournament }: { tournament: V1TournamentDetai
   return (
     <section style={{ marginBottom: 20 }}>
       <h3 className="tm-hub-section-title">개인 어워드</h3>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {awards.map((award) => {
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {awardGroups.map((group) => (
+          <section key={group.track} aria-label={`${group.label} 개인 어워드`}>
+            {isScoped ? <h4 className="tm-text-label font-bold mb-2" style={{ color: 'var(--text-muted)' }}>{group.label}</h4> : null}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {group.awards.map((award) => {
           // M-A 감사: 바로 위 개인 기록 섹션은 이미 같은 화면에서 /users/:id 링크를
           // 공개한다 — recipientUserId가 있을 때만(탈퇴 계정 제외, presenter가 걸러줌)
           // 같은 방식으로 아바타+링크를 붙인다. 없으면 기존 아이콘·일반 텍스트 그대로.
@@ -457,6 +500,9 @@ function IndividualAwardsSection({ tournament }: { tournament: V1TournamentDetai
             </div>
           );
         })}
+            </div>
+          </section>
+        ))}
       </div>
     </section>
   );
@@ -1068,7 +1114,16 @@ function AwardsPageContent({ tournament }: { tournament: V1TournamentDetail }) {
   const top3 = isCoChampion
     ? rawTop3.map((row) => (row.pos <= championCount ? { ...row, pos: 1 } : row))
     : rawTop3;
-  const showPrizeColumn = isCompleted && hasPrizeData(tournament);
+  const hasTrackPrizeData = tournament.awardSets?.some((set) => set.prizeSummary?.trim() || (set.prizePool !== null && set.prizePool !== undefined) || set.prizeBreakdown?.trim()) ?? false;
+  const showPrizeColumn = isCompleted && (hasPrizeData(tournament) || hasTrackPrizeData);
+  const isSplitBracket = tournament.groups.some((group) => group.bracketTrack === 'upper' || group.bracketTrack === 'lower');
+  const splitPodiums = isSplitBracket
+    ? (['upper', 'lower'] as const).map((track) => ({
+        track,
+        label: track === 'upper' ? '상위 결선' : '하위 결선',
+        rows: getTrackTopThree(tournament, track),
+      })).filter((podium) => podium.rows.length > 0)
+    : [];
 
   return (
     <div className="tm-tourn-sub-page">
@@ -1081,11 +1136,41 @@ function AwardsPageContent({ tournament }: { tournament: V1TournamentDetail }) {
               여기만 prizeSummary 존재만 봤다면, 운영자가 prizePool+prizeBreakdown만 채우고
               prizeSummary를 비운 흔한 조합에서 대회가 completed로 바뀌기 전까지 총 상금·
               순위별 배분이 화면에 전혀 안 보이는 모순이 생긴다(감사 evidence). */}
-          {hasPrizeData(tournament) && <PrizeSection tournament={tournament} top3={top3} />}
+          {hasPrizeData(tournament) ? (
+            <PrizeSection
+              tournament={tournament}
+              top3={isSplitBracket ? [] : top3}
+              heading={tournament.awardSets && tournament.awardSets.length > 0 ? '대회 전체 시상 안내' : undefined}
+            />
+          ) : null}
+          {tournament.awardSets && tournament.awardSets.length > 0 ? (
+            tournament.awardSets.map((awardSet) => {
+              const label = awardSet.bracketTrack === 'upper' ? '상위 결선 시상' : '하위 결선 시상';
+              return (
+                <PrizeSection
+                  key={awardSet.bracketTrack}
+                  tournament={{ ...tournament, prizePool: awardSet.prizePool, prizeSummary: awardSet.prizeSummary, prizeBreakdown: awardSet.prizeBreakdown }}
+                  heading={label}
+                />
+              );
+            })
+          ) : null}
         </div>
       )}
 
-      {isCompleted && top3.length > 0 && (
+      {isCompleted && isSplitBracket && splitPodiums.length > 0 && (
+        <div className="tm-tourn-hero-full" style={{ padding: '20px 20px 0' }}>
+          {splitPodiums.map((podium) => (
+            <section key={podium.track} aria-label={`${podium.label} 시상 결과`} style={{ marginBottom: 20 }}>
+              <h3 className="tm-hub-section-title">{podium.label} 시상 결과</h3>
+              <Card pad={16}>
+                <AwardsPodium top3={podium.rows} />
+              </Card>
+            </section>
+          ))}
+        </div>
+      )}
+      {isCompleted && !isSplitBracket && top3.length > 0 && (
         /* 시상대는 그리드 밖 풀와이드 히어로로 — 좌/우 콘텐츠양 격차(포디움+상금 vs 어워드+후기)를 줄임 */
         <div className="tm-tourn-hero-full" style={{ padding: '20px 20px 0' }}>
           <section style={{ marginBottom: 20 }}>
@@ -1101,7 +1186,23 @@ function AwardsPageContent({ tournament }: { tournament: V1TournamentDetail }) {
         <div className="tm-tourn-sub-grid tm-tourn-sub-grid-6040 tm-awards-grid">
           <div className="tm-tourn-sub-col tm-awards-col-prize" style={{ padding: '0 20px' }}>
             {/* 상금 */}
-            <PrizeSection tournament={tournament} top3={top3} />
+            {hasPrizeData(tournament) ? (
+              <PrizeSection
+                tournament={tournament}
+                top3={isSplitBracket ? [] : top3}
+                heading={tournament.awardSets && tournament.awardSets.length > 0 ? '대회 전체 시상 안내' : undefined}
+              />
+            ) : null}
+            {tournament.awardSets && tournament.awardSets.length > 0 ? (
+              tournament.awardSets.map((awardSet) => (
+                <PrizeSection
+                  key={awardSet.bracketTrack}
+                  tournament={{ ...tournament, prizePool: awardSet.prizePool, prizeSummary: awardSet.prizeSummary, prizeBreakdown: awardSet.prizeBreakdown }}
+                  top3={getTrackTopThree(tournament, awardSet.bracketTrack)}
+                  heading={awardSet.bracketTrack === 'upper' ? '상위 결선 시상' : '하위 결선 시상'}
+                />
+              ))
+            ) : null}
           </div>
 
           <div className="tm-tourn-sub-col" style={{ padding: '0 20px' }}>

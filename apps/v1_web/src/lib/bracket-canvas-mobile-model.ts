@@ -10,6 +10,7 @@ import {
   type SideLabelContext,
 } from '@/lib/bracket-canvas-layout';
 import { formatGameResultScoreWithPenalties } from '@/lib/game-result-score';
+import { bracketTrackLabel } from '@/lib/bracket-track';
 import { buildLeagueBoard, type LeagueBoardNode, type LeagueBoardSide } from '@/lib/league-board-model';
 import type {
   V1AdminBracketFixture,
@@ -115,6 +116,7 @@ export function bracketMobileNode(
   groupName: string | null,
   knockout: boolean,
   labels: SideLabelContext,
+  bracketTrack?: V1AdminBracketGroup['bracketTrack'],
 ): MobileNode {
   const game = fixture.game;
   // 취소는 게임을 SCHEDULED 로 남기는 경우가 있어 팀매치 status 가 먼저다(PR-5b `buildLeagueBoard` 와 같은 규칙).
@@ -122,7 +124,7 @@ export function bracketMobileNode(
   return {
     fixtureId: fixture.id,
     groupId: fixture.groupId,
-    title: groupName ? `${groupName} · ${fixture.fixtureNumber}번 경기` : `${fixture.fixtureNumber}번 경기`,
+    title: `${bracketTrackLabel(bracketTrack) ? `${bracketTrackLabel(bracketTrack)} · ` : ''}${groupName ? `${groupName} · ` : ''}${fixture.fixtureNumber}번 경기`,
     state,
     home: bracketMobileSide(fixture, 'HOME', labels),
     away: bracketMobileSide(fixture, 'AWAY', labels),
@@ -193,6 +195,14 @@ const PHASE_BUCKET: Record<V1TournamentGroupPhase, { key: string; label: string 
   final: { key: 'final', label: '결승' },
   third_place: { key: 'final', label: '결승' },
 };
+const PHASE_ORDER: Record<string, number> = {
+  group: 0,
+  round16: 1,
+  round12: 2,
+  quarter: 3,
+  semi: 4,
+  final: 5,
+};
 
 type FixtureOrder = { fixtureNumber: number; legNumber: number };
 const byFixtureOrder = (a: FixtureOrder, b: FixtureOrder) => a.fixtureNumber - b.fixtureNumber || a.legNumber - b.legNumber;
@@ -213,7 +223,7 @@ export function buildBracketMobileRounds(input: {
     const nodes = input.fixtures
       .filter((f) => f.groupId === group.id)
       .sort(byFixtureOrder)
-      .map((f) => bracketMobileNode(f, group.name, group.phase !== 'group', labels));
+      .map((f) => bracketMobileNode(f, group.name, group.phase !== 'group', labels, group.bracketTrack));
     if (nodes.length === 0) continue;
 
     const bucket = PHASE_BUCKET[group.phase as V1TournamentGroupPhase] ?? { key: `phase:${group.phase}`, label: group.name };
@@ -223,7 +233,8 @@ export function buildBracketMobileRounds(input: {
       roundByKey.set(bucket.key, round);
       rounds.push(round);
     }
-    round.sections.push({ key: group.id, heading: group.name, nodes });
+    const trackLabel = bracketTrackLabel(group.bracketTrack);
+    round.sections.push({ key: group.id, heading: trackLabel ? `${trackLabel} · ${group.name}` : group.name, nodes });
     if (group.phase === 'third_place') thirdPlaceSectionKeys.add(group.id);
   }
 
@@ -231,6 +242,7 @@ export function buildBracketMobileRounds(input: {
     if (round.key === 'group' && round.sections.length === 1) round.label = round.sections[0].heading ?? round.label;
     round.sections.sort((a, b) => Number(thirdPlaceSectionKeys.has(a.key)) - Number(thirdPlaceSectionKeys.has(b.key)));
   }
+  rounds.sort((a, b) => PHASE_ORDER[a.key] - PHASE_ORDER[b.key]);
 
   const orphans = input.fixtures
     .filter((f) => f.groupId === null || !groupIds.has(f.groupId))

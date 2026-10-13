@@ -42,6 +42,9 @@ export class BracketTemplateService {
 
   async apply(user: V1AuthUser, tournamentId: string, dto: ApplyBracketTemplateDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
+    if (dto.lowerBracket === true && dto.kind !== 'group_knockout') {
+      throw new UnprocessableEntityException({ code: 'BRACKET_TEMPLATE_UNSUPPORTED', message: '하위 결선은 조별리그+토너먼트에서만 만들 수 있어요.' });
+    }
     const input = toBracketTemplateInput(dto);
     const tournament = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId, deletedAt: null },
@@ -54,6 +57,12 @@ export class BracketTemplateService {
       throw new UnprocessableEntityException({
         code: 'BRACKET_TEMPLATE_FORMAT_MISMATCH',
         message: '대회 진행 방식과 맞지 않는 템플릿이에요.',
+      });
+    }
+    if (input.kind === 'group_knockout' && input.lowerBracket && tournament.kind !== 'regular_tournament') {
+      throw new UnprocessableEntityException({
+        code: 'BRACKET_TEMPLATE_UNSUPPORTED',
+        message: '상·하위 결선 템플릿은 정규대회에서만 만들 수 있어요.',
       });
     }
     // 잠금을 잡기 전에 422(범위 밖·상한 초과)를 먼저 낸다. 번호 offset 은 잠금 안에서 다시 정한다.
@@ -82,6 +91,12 @@ export class BracketTemplateService {
         throw new ConflictException({ code: 'BRACKET_NOT_EMPTY', message: '이미 대진이 있어요. 비어 있는 대진에서만 템플릿으로 시작할 수 있어요.' });
       }
       this.assertReplaceable(existing.fixtures);
+      await this.assertScopedAwardsCanSurviveReplacement(
+        tx,
+        tournament.id,
+        existing.groups.some((group) => group.bracketTrack === 'upper' || group.bracketTrack === 'lower'),
+        !planBracketTemplate(input, { fixtureNumberOffset: 0 }).groups.some((group) => group.bracketTrack === 'upper' || group.bracketTrack === 'lower'),
+      );
       await this.teardown(tx, admin, tournament.id, existing);
       replaced = true;
     }
@@ -127,9 +142,33 @@ export class BracketTemplateService {
       },
       orderBy: { teamMatchId: 'asc' },
     });
-    const groups = await tx.v1TournamentGroup.findMany({ where: { tournamentId }, select: { id: true }, orderBy: { id: 'asc' } });
+    const groups = await tx.v1TournamentGroup.findMany({ where: { tournamentId }, select: { id: true, bracketTrack: true }, orderBy: { id: 'asc' } });
     const slotCount = await tx.v1TournamentSlot.count({ where: { tournamentId } });
     return { fixtures, groups, isEmpty: fixtures.length === 0 && groups.length === 0 && slotCount === 0 };
+  }
+
+  private async assertScopedAwardsCanSurviveReplacement(
+    tx: Tx,
+    tournamentId: string,
+    replacingSplitBracket: boolean,
+    plannedSingleBracket: boolean,
+  ): Promise<void> {
+    if (!replacingSplitBracket || !plannedSingleBracket) return;
+    const [awardSets, individualAwards] = await Promise.all([
+      tx.v1TournamentAwardSet.findMany({
+        where: { tournamentId, bracketTrack: { in: ['upper', 'lower'] } },
+        select: { id: true },
+      }),
+      tx.v1TournamentAward.findMany({
+        where: { tournamentId, bracketTrack: { in: ['upper', 'lower'] } },
+        select: { id: true },
+      }),
+    ]);
+    if (awardSets.length === 0 && individualAwards.length === 0) return;
+    throw new ConflictException({
+      code: 'BRACKET_TRACK_AWARDS_REQUIRE_RESCOPING',
+      message: '상·하위 시상이 설정되어 있어 단일 결선으로 바꿀 수 없어요. 시상 관리에서 범위를 먼저 정리해 주세요.',
+    });
   }
 
   /** 하나라도 시작·결과가 있으면 아무것도 지우기 전에 끊는다. */
@@ -174,6 +213,7 @@ export class BracketTemplateService {
     for (const group of plan.groups) {
       const created = await createGroupInTx(tx, admin, tournament.id, {
         name: group.name, phase: group.phase, sortOrder: group.sortOrder, advanceCount: group.advanceCount,
+        bracketTrack: group.bracketTrack ?? 'overall',
       });
       groupIds.set(group.key, created.id);
     }

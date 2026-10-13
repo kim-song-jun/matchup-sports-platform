@@ -173,6 +173,7 @@ function tournamentAwardRow() {
   return {
     id: 'award-1',
     tournamentId: 'tournament-1',
+    bracketTrack: 'upper',
     awardType: 'best_playmaker',
     awardLabel: '베스트 플레이메이커',
     iconKey: 'star',
@@ -234,6 +235,7 @@ describe('PublicUserRecordsService', () => {
         awardLabel: '베스트 플레이메이커',
         tournamentTitle: '2026 여름 챔피언십',
         teamName: '우리팀',
+        bracketTrack: 'upper',
       }),
     ]);
   });

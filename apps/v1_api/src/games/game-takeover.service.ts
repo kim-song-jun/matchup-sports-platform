@@ -27,30 +27,77 @@ export interface GameTakeoverGrant {
   readonly expiresAt: number;
 }
 
+const REQUEST_ORDINAL = Symbol('game-takeover-request-ordinal');
+
+/** Internal identity minted before authorization awaits; never accepted from a client payload. */
+export interface GameTakeoverRequestReservation {
+  readonly gameId: string;
+  readonly [REQUEST_ORDINAL]: number;
+}
+
+type GrantInput = {
+  gameId: string;
+  authorizationSubject: string;
+  clientInstanceId: string;
+  lastSequence: number;
+};
+
+type PendingRequestOrder = {
+  nextOrdinal: number;
+  latestGrantedOrdinal: number;
+  pending: Set<GameTakeoverRequestReservation>;
+};
+
 export const GAME_TAKEOVER_TOKEN_TTL_MS = 90_000;
 
 @Injectable()
 export class GameTakeoverService {
   private readonly grants = new Map<string, GameTakeoverGrant>();
+  private readonly requestOrders = new Map<string, PendingRequestOrder>();
 
-  grant(input: {
-    gameId: string;
-    authorizationSubject: string;
-    clientInstanceId: string;
-    lastSequence: number;
-  }): GameTakeoverGrant {
-    const record: GameTakeoverGrant = {
-      gameId: input.gameId,
-      token: randomBytes(32).toString('hex'),
-      authorizationSubject: input.authorizationSubject,
-      clientInstanceId: input.clientInstanceId,
-      lastSequence: input.lastSequence,
-      expiresAt: Date.now() + GAME_TAKEOVER_TOKEN_TTL_MS,
+  reserveRequest(gameId: string): GameTakeoverRequestReservation {
+    const order = this.requestOrders.get(gameId) ?? {
+      nextOrdinal: 0, latestGrantedOrdinal: 0, pending: new Set<GameTakeoverRequestReservation>(),
     };
-    // A fresh grant always replaces whatever token currently holds the
-    // game -- exclusive by construction, regardless of who held it before.
-    this.grants.set(input.gameId, record);
-    return record;
+    const reservation = Object.freeze({ gameId, [REQUEST_ORDINAL]: ++order.nextOrdinal });
+    order.pending.add(reservation);
+    this.requestOrders.set(gameId, order);
+    return reservation;
+  }
+
+  finishRequest(reservation: GameTakeoverRequestReservation): void {
+    const order = this.requestOrders.get(reservation.gameId);
+    if (order === undefined || !order.pending.delete(reservation)) return;
+    // Keep the successful watermark until the pending count reaches zero.
+    // Expiry/revocation must not let an older authorization resume and revive a grant.
+    if (order.pending.size === 0) this.requestOrders.delete(reservation.gameId);
+  }
+
+  grant(input: GrantInput): GameTakeoverGrant;
+  grant(input: GrantInput, reservation: GameTakeoverRequestReservation): GameTakeoverGrant | null;
+  grant(input: GrantInput, reservation?: GameTakeoverRequestReservation): GameTakeoverGrant | null {
+    const pending = reservation ?? this.reserveRequest(input.gameId);
+    try {
+      const order = this.requestOrders.get(input.gameId);
+      if (
+        order === undefined || !order.pending.has(pending) ||
+        pending[REQUEST_ORDINAL] <= order.latestGrantedOrdinal
+      ) return null;
+      const record: GameTakeoverGrant = {
+        gameId: input.gameId,
+        token: randomBytes(32).toString('hex'),
+        authorizationSubject: input.authorizationSubject,
+        clientInstanceId: input.clientInstanceId,
+        lastSequence: input.lastSequence,
+        expiresAt: Date.now() + GAME_TAKEOVER_TOKEN_TTL_MS,
+      };
+      // Check, grant and successful watermark advance are one synchronous operation.
+      this.grants.set(input.gameId, record);
+      order.latestGrantedOrdinal = pending[REQUEST_ORDINAL];
+      return record;
+    } finally {
+      if (reservation === undefined) this.finishRequest(pending);
+    }
   }
 
   renew(input: {

@@ -129,6 +129,7 @@ dependencies {
     // 1.19.0 requires compileSdk 37 / AGP 9.1; Play target 36 remains the stable release baseline.
     implementation("androidx.core:core:1.17.0")
     implementation("androidx.webkit:webkit:1.17.0")
+    implementation("com.google.android.play:app-update:2.1.0")
     implementation("com.kakao.sdk:v2-user:2.25.1")
     testImplementation("junit:junit:4.13.2")
 }

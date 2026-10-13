@@ -48,6 +48,10 @@ import androidx.webkit.WebMessageCompat;
 import androidx.webkit.WebSettingsCompat;
 import androidx.webkit.WebViewCompat;
 import androidx.webkit.WebViewFeature;
+import com.google.android.play.core.appupdate.AppUpdateInfo;
+import com.google.android.play.core.appupdate.AppUpdateManager;
+import com.google.android.play.core.appupdate.AppUpdateManagerFactory;
+import com.google.android.play.core.install.model.UpdateAvailability;
 import com.google.firebase.messaging.FirebaseMessaging;
 import java.util.Collections;
 import java.util.ArrayList;
@@ -76,6 +80,7 @@ public final class MainActivity extends AppCompatActivity {
     private boolean keyboardVisible;
     private String lastRecoverableUrl = BuildConfig.WEB_ORIGIN + "/home";
     private long lastBackPressAtMillis = BackNavigationPolicy.NO_PREVIOUS_PRESS_MILLIS;
+    private long webDocumentGeneration;
     private final HomeRootReset homeRootReset = new HomeRootReset();
 
     @Override protected void onCreate(Bundle savedInstanceState) {
@@ -240,13 +245,16 @@ public final class MainActivity extends AppCompatActivity {
                 "TeameetNative",
                 Collections.singleton(BuildConfig.WEB_ORIGIN),
                 (view, message, sourceOrigin, isMainFrame, replyProxy) -> {
-                    if (isMainFrame) handleNativeMessage(message);
+                    if (isMainFrame && AllowedNavigation.isInternalOrigin(sourceOrigin.toString())) {
+                        handleNativeMessage(message);
+                    }
                 });
         }
-        publishKakaoCapabilityAtDocumentStart();
+        publishNativeCapabilitiesAtDocumentStart();
         webView.setWebViewClient(new WebViewClient() {
             @Override public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
                 super.onPageStarted(view, url, favicon);
+                webDocumentGeneration++;
                 if (AllowedNavigation.isInternalAbsoluteUrl(url)) {
                     lastRecoverableUrl = url;
                 }
@@ -265,6 +273,7 @@ public final class MainActivity extends AppCompatActivity {
                 if (homeRootReset.onPageFinished(url)) view.clearHistory();
                 if (AllowedNavigation.isInternal(Uri.parse(url))) {
                     lastRecoverableUrl = url;
+                    publishNativeCapabilities();
                     publishKakaoCapability();
                     publishSystemInsets();
                     if (canRegisterPush()) {
@@ -550,6 +559,7 @@ public final class MainActivity extends AppCompatActivity {
                     requestId, canRegisterPush() && InstallationIdentity.isRegistered(this));
                 case "request-notification-permission" -> requestPushPermission(requestId);
                 case "open-notification-settings" -> openNotificationSettings(requestId);
+                case NativeAppUpdatePolicy.ACTION -> checkAppUpdate(requestId);
                 case KakaoLoginPolicy.ACTION -> {
                     List<String> scopes = new ArrayList<>();
                     JSONArray requestedScopes = request.optJSONArray("scopes");
@@ -605,14 +615,97 @@ public final class MainActivity extends AppCompatActivity {
         if (!isDestroyed() && webView != null) webView.evaluateJavascript(script, null);
     }
 
-    /**
-     * The web reads `TeameetNative.supports` when the button is tapped, so the onPageFinished
-     * publish alone is enough; the document-start script just removes the timing question.
-     */
-    private void publishKakaoCapabilityAtDocumentStart() {
-        String script = KakaoLoginPolicy.capabilityScript(BuildConfig.KAKAO_NATIVE_APP_KEY);
-        if (script == null || !WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) return;
-        WebViewCompat.addDocumentStartJavaScript(webView, script, Collections.singleton(BuildConfig.WEB_ORIGIN));
+    private void checkAppUpdate(String requestId) {
+        String channel = getPackageName().endsWith(".alpha")
+            ? NativeAppUpdatePolicy.CHANNEL_ALPHA
+            : NativeAppUpdatePolicy.CHANNEL_PRODUCTION;
+        int installedBuild;
+        String version;
+        long ownerGeneration = webDocumentGeneration;
+        try {
+            android.content.pm.PackageInfo packageInfo = getPackageManager().getPackageInfo(getPackageName(), 0);
+            installedBuild = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
+                ? (int) packageInfo.getLongVersionCode()
+                : packageInfo.versionCode;
+            version = packageInfo.versionName == null ? "" : packageInfo.versionName;
+        } catch (PackageManager.NameNotFoundException impossible) {
+            reportAppUpdateResult(requestId, channel, "", 0,
+                "unavailable", null, "installed-version-unavailable", ownerGeneration);
+            return;
+        }
+        if (NativeAppUpdatePolicy.CHANNEL_ALPHA.equals(channel)) {
+            reportAppUpdateResult(requestId, channel, version, installedBuild,
+                "unavailable", null, "store-check-disabled-for-alpha", ownerGeneration);
+            return;
+        }
+
+        try {
+            AppUpdateManager manager = AppUpdateManagerFactory.create(this);
+            manager.getAppUpdateInfo().addOnCompleteListener(this, task -> {
+                if (!isCurrentTrustedDocument(ownerGeneration)) return;
+                if (!task.isSuccessful() || task.getResult() == null) {
+                    reportAppUpdateResult(requestId, channel, version, installedBuild,
+                        "unavailable", null, "play-check-failed", ownerGeneration);
+                    return;
+                }
+
+                try {
+                    AppUpdateInfo info = task.getResult();
+                    int availability = info.updateAvailability();
+                    int availableBuild = info.availableVersionCode();
+                    String status = NativeAppUpdatePolicy.statusFor(
+                        availability, availableBuild, installedBuild);
+                    Integer reportedBuild = availability == UpdateAvailability.UPDATE_AVAILABLE
+                        || availability == UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS
+                        ? (availableBuild > 0 ? availableBuild : null)
+                        : null;
+                    reportAppUpdateResult(requestId, channel, version, installedBuild,
+                        status, reportedBuild,
+                        NativeAppUpdatePolicy.errorFor(availability, availableBuild, installedBuild), ownerGeneration);
+                } catch (RuntimeException error) {
+                    reportAppUpdateResult(requestId, channel, version, installedBuild,
+                        "unavailable", null, "play-check-failed", ownerGeneration);
+                }
+            });
+        } catch (RuntimeException error) {
+            reportAppUpdateResult(requestId, channel, version, installedBuild,
+                "unavailable", null, "play-check-failed", ownerGeneration);
+        }
+    }
+
+    private boolean isCurrentTrustedDocument(long ownerGeneration) {
+        return !isDestroyed() && webView != null && webDocumentGeneration == ownerGeneration
+            && AllowedNavigation.isInternalAbsoluteUrl(webView.getUrl());
+    }
+
+    private void reportAppUpdateResult(
+        String requestId,
+        String channel,
+        String version,
+        int installedBuild,
+        String status,
+        Integer availableBuild,
+        String error,
+        long ownerGeneration
+    ) {
+        if (!isCurrentTrustedDocument(ownerGeneration)) return;
+        webView.evaluateJavascript(NativeAppUpdatePolicy.resultScript(
+            requestId, channel, version, installedBuild, status, availableBuild, error), null);
+    }
+
+    private void publishNativeCapabilitiesAtDocumentStart() {
+        if (!WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) return;
+        WebViewCompat.addDocumentStartJavaScript(
+            webView, NativeAppUpdatePolicy.capabilityScript(), Collections.singleton(BuildConfig.WEB_ORIGIN));
+        String kakaoScript = KakaoLoginPolicy.capabilityScript(BuildConfig.KAKAO_NATIVE_APP_KEY);
+        if (kakaoScript != null) {
+            WebViewCompat.addDocumentStartJavaScript(
+                webView, kakaoScript, Collections.singleton(BuildConfig.WEB_ORIGIN));
+        }
+    }
+
+    private void publishNativeCapabilities() {
+        webView.evaluateJavascript(NativeAppUpdatePolicy.capabilityScript(), null);
     }
 
     private void publishKakaoCapability() {

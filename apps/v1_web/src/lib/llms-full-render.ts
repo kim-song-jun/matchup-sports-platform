@@ -1,9 +1,10 @@
 import { formatEntryFee, formatTournamentDateLong, formatTournamentDateTimeLong } from '@/lib/date-utils';
 import type { LlmsFullSnapshot } from '@/lib/llms-full';
 import { absoluteSiteUrl } from '@/lib/seo';
+import { fixtureDetailHref } from '@/lib/fixture-detail-route';
 import { resolveTournamentRegistrationBlock } from '@/lib/tournament-registration-availability';
-import { leagueStateLabel, teamRecruitmentLabel } from '@/lib/v1-status-labels';
-import type { V1Match, V1TournamentListItem, V1TournamentStatus } from '@/types/api';
+import { leagueStateLabel, matchPhaseLabel, teamRecruitmentLabel } from '@/lib/v1-status-labels';
+import type { V1Match, V1TeamMatchApiStatus, V1TournamentListItem, V1TournamentStatus } from '@/types/api';
 
 /**
  * `/llms-full.txt` — `/llms.txt` 의 확장판. 서비스가 무엇이고 어떻게 참여하는지, 그리고 지금
@@ -13,7 +14,6 @@ import type { V1Match, V1TournamentListItem, V1TournamentStatus } from '@/types/
  * 긴 글(팀 소개·매치 설명)은 싣지 않는다 — 연락처 같은 개인정보가 섞여 있을 수 있고, AI 가
  * 읽는 문서에 임의 텍스트를 그대로 넣으면 지시문 주입 통로가 된다. 제목·이름만 한 줄로 싣는다.
  */
-const MAX_ROWS = 60;
 
 const TOURNAMENT_STATUS_LABEL: Record<V1TournamentStatus, string> = {
   draft: '준비 중',
@@ -45,7 +45,7 @@ function row(head: string, parts: Array<string | null | undefined | false>): str
 function section(title: string, items: string[] | null, emptyText: string): string[] {
   // null = 조회 실패 → 섹션을 통째로 뺀다("없다"고 적으면 장애가 사실로 학습된다).
   if (items === null) return [];
-  return [`## ${title}`, '', ...(items.length > 0 ? items.slice(0, MAX_ROWS) : [emptyText]), ''];
+  return [`## ${title}`, '', ...(items.length > 0 ? items : [emptyText]), ''];
 }
 
 const MAX_LINKS_PER_VENUE = 8;
@@ -64,6 +64,24 @@ function tournamentState(t: V1TournamentListItem, now: Date): string {
 
 function matchId(item: V1Match): string | undefined {
   return item.matchId ?? item.id;
+}
+
+function teamMatchState(state: V1TeamMatchApiStatus | undefined): string {
+  if (!state) return '상태 확인 필요';
+  const labels: Record<V1TeamMatchApiStatus | 'on_hold', string> = {
+    recruiting: '상대 팀 모집 중', matched: '경기 확정', closed: '모집 마감',
+    completed: '종료', cancelled: '취소', expired: '기간 만료', on_hold: '보류',
+  };
+  return labels[state];
+}
+
+function personalMatchState(state: string | undefined): string {
+  const labels: Record<string, string> = {
+    full: '정원 마감', closed: '모집 마감', scheduled: '진행 확정', in_progress: '진행 중',
+    on_hold: '보류', completion_pending: '종료 확인 중', completed: '종료',
+    cancelled: '취소', expired: '기간 만료',
+  };
+  return state && labels[state] ? labels[state] : '상태 확인 필요';
 }
 
 // 흐름 서술의 근거는 docs/design/competition-canonical-flow.md(정본). 정본이 바뀌면 여기도 바꾼다.
@@ -112,8 +130,7 @@ export function renderLlmsFull(s: LlmsFullSnapshot, now = new Date()): string {
     if (name) venueEvents.push({ venue: name, line });
   };
 
-  // 구장별 묶음이 "위 목록"과 같은 항목만 가리키도록, 상한은 구장 수집 전에 자른다.
-  const tournaments = s.tournaments?.filter((t) => t.kind !== 'regular_league' && t.status !== 'draft').slice(0, MAX_ROWS) ?? null;
+  const tournaments = s.tournaments?.filter((t) => t.kind !== 'regular_league' && t.status !== 'draft') ?? null;
   const tournamentRows = tournaments?.map((t) => {
     const head = link(t.title, `/tournaments/${t.id}`);
     noteVenue(t.venue, head);
@@ -144,7 +161,7 @@ export function renderLlmsFull(s: LlmsFullSnapshot, now = new Date()): string {
   ])) ?? null;
 
   // 목록 API 의 `status` 는 마감이 지나도 recruiting 으로 남는다 — 화면이 쓰는 displayState 로 거른다.
-  const openMatches = s.matches?.filter((m) => m.displayState === 'recruiting' && matchId(m)).slice(0, MAX_ROWS) ?? null;
+  const openMatches = s.matches?.filter((m) => m.displayState === 'recruiting' && matchId(m)) ?? null;
   const matchRows = openMatches?.map((m) => {
     const head = link(m.title, `/matches/${matchId(m)}`);
     noteVenue(m.place?.name, head);
@@ -157,7 +174,14 @@ export function renderLlmsFull(s: LlmsFullSnapshot, now = new Date()): string {
     ]);
   }) ?? null;
 
-  const openTeamMatches = s.teamMatches?.filter((m) => m.displayState === 'recruiting' && (m.teamMatchId ?? m.id)).slice(0, MAX_ROWS) ?? null;
+  const otherMatchRows = s.matches?.filter((m) => m.displayState !== 'recruiting' && matchId(m)).map((m) => {
+    const head = link(m.title, `/matches/${matchId(m)}`);
+    noteVenue(m.place?.name, head);
+    return row(head, [m.sport?.name ?? m.sportName, personalMatchState(m.displayState),
+      formatTournamentDateTimeLong(m.startsAt), m.place?.name && `장소 ${inline(m.place.name, 60)}`]);
+  }) ?? null;
+
+  const openTeamMatches = s.teamMatches?.filter((m) => !m.league && m.displayState === 'recruiting' && (m.teamMatchId ?? m.id)) ?? null;
   const teamMatchRows = openTeamMatches?.map((m) => {
     const head = link(m.title, `/team-matches/${m.teamMatchId ?? m.id}`);
     noteVenue(m.place?.name, head);
@@ -166,8 +190,30 @@ export function renderLlmsFull(s: LlmsFullSnapshot, now = new Date()): string {
       formatTournamentDateTimeLong(m.startsAt),
       m.place?.name && `장소 ${inline(m.place.name, 60)}`,
       m.hostTeam?.name && `모집 팀 ${inline(m.hostTeam.name, 40)}`,
-      m.league?.title ? `리그 경기(${inline(m.league.title, 40)})` : '친선 경기',
+      '친선 경기',
     ]);
+  }) ?? null;
+
+  const leagueFixtureRows = s.teamMatches?.filter((m) => m.league && (m.teamMatchId ?? m.id)).map((m) => {
+    const head = link(m.title, fixtureDetailHref({
+      isRegularLeague: true, competitionId: m.league!.leagueId, fixtureId: (m.teamMatchId ?? m.id)!,
+    }));
+    noteVenue(m.place?.name, head);
+    return row(head, [
+      m.sport?.name ?? m.sportName,
+      m.isLive ? '진행 중' : teamMatchState(m.displayState),
+      formatTournamentDateTimeLong(m.startsAt),
+      m.league?.title && `리그 ${inline(m.league.title, 40)}`,
+      m.hostTeam?.name && m.approvedOpponentTeam?.name && `${inline(m.hostTeam.name, 40)} vs ${inline(m.approvedOpponentTeam.name, 40)}`,
+      m.place?.name && `장소 ${inline(m.place.name, 60)}`,
+    ]);
+  }) ?? null;
+
+  const otherTeamMatchRows = s.teamMatches?.filter((m) => !m.league && m.displayState !== 'recruiting' && (m.teamMatchId ?? m.id)).map((m) => {
+    const head = link(m.title, `/team-matches/${m.teamMatchId ?? m.id}`);
+    noteVenue(m.place?.name, head);
+    return row(head, [m.sport?.name ?? m.sportName, teamMatchState(m.displayState),
+      formatTournamentDateTimeLong(m.startsAt), m.place?.name && `장소 ${inline(m.place.name, 60)}`]);
   }) ?? null;
 
   const teamRows = s.teams?.map((t) => row(link(t.name, `/teams/${t.teamId ?? t.id}`), [
@@ -176,6 +222,17 @@ export function renderLlmsFull(s: LlmsFullSnapshot, now = new Date()): string {
     `멤버 ${t.memberCount}명`,
     teamRecruitmentLabel(t),
   ])) ?? null;
+
+  const tournamentFixtureRows = s.tournamentFixtures?.map(({ tournamentId, tournamentTitle, sportName, fixture }) => {
+    const name = `${fixture.homeTeamName ?? fixture.homeSlotLabel ?? '미정'} vs ${fixture.awayTeamName ?? fixture.awaySlotLabel ?? '미정'}`;
+    const head = link(`${tournamentTitle} — ${name}`, fixtureDetailHref({ isRegularLeague: false, competitionId: tournamentId, fixtureId: fixture.id }));
+    noteVenue(fixture.venue, head);
+    return row(head, [
+      sportName, matchPhaseLabel(fixture.liveStatus),
+      fixture.scheduledAt && formatTournamentDateTimeLong(fixture.scheduledAt),
+      fixture.venue && `장소 ${inline(fixture.venue, 60)}`,
+    ]);
+  }) ?? null;
 
   const venues = new Map<string, string[]>();
   for (const { venue, line } of venueEvents) venues.set(venue, [...(venues.get(venue) ?? []), line]);
@@ -191,16 +248,24 @@ export function renderLlmsFull(s: LlmsFullSnapshot, now = new Date()): string {
     '',
     `이 문서는 ${absoluteSiteUrl('/llms.txt')} 의 확장판이에요. 아래 목록은 공개 API 에서 방금 만든 것이고`,
     `(생성 시각 ${formatTournamentDateTimeLong(now.toISOString())} KST). 캐시 때문에 실제보다 최대 15분 늦을 수 있어요.`,
+    ...(s.unavailableSources?.length ? [`일부 공개 자료를 조회하지 못했어요. 누락된 출처: ${s.unavailableSources.map(inlineSource).join(', ')}. 조회 실패는 해당 자료가 없다는 뜻이 아니에요.`] : []),
     '',
     ...PARTICIPATION_GUIDE,
     ...section('대회', tournamentRows, '지금 공개된 대회가 없어요.'),
+    ...section('대회 경기 일정·결과', tournamentFixtureRows, '지금 공개된 대회 경기가 없어요.'),
     ...section('정규 리그', leagueRows, '지금 공개된 리그가 없어요.'),
     ...section('이벤트', campaignRows, '지금 진행 중인 이벤트가 없어요.'),
     ...section('모집 중인 개인 매치', matchRows, '지금 모집 중인 개인 매치가 없어요.'),
+    ...section('모집 종료된 개인 매치 일정·결과', otherMatchRows, '지금 공개된 모집 종료 개인 매치가 없어요.'),
     ...section('모집 중인 팀 매치', teamMatchRows, '지금 상대 팀을 찾는 팀 매치가 없어요.'),
+    ...section('친선 경기 일정·결과', otherTeamMatchRows, '지금 공개된 모집 종료 친선 경기가 없어요.'),
+    ...section('리그 경기 일정·결과', leagueFixtureRows, '지금 공개된 리그 경기가 없어요.'),
     ...section('팀', teamRows, '공개된 팀이 없어요.'),
     ...(venueRows.length > 0 ? ['## 구장별 대회·매치', '', '위 목록의 대회·매치를 경기 장소별로 다시 묶었어요.', '', ...venueRows, ''] : []),
     ...CITATION_POLICY,
   ].join('\n');
 }
 
+function inlineSource(path: string): string {
+  return inline(path, 160);
+}

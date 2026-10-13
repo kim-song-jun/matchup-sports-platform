@@ -7,6 +7,7 @@ import {
   AddLeagueTeamDto,
   ApplyLeagueTemplateDto,
   CancelLeagueFixtureDto,
+  ChangeLeagueStateDto,
   CreateLeagueMatchDto,
   CreateManualLeagueFixtureDto,
   GenerateLeagueFixturesDto,
@@ -206,6 +207,17 @@ export class LeagueMatchAdminController {
     @Body() dto: UpdateLeagueDisciplineDto,
   ) {
     return this.service.updateDiscipline(user, leagueId, dto);
+  }
+
+  /** 리그 상태 변경 — 준비 중·진행 중·보류·종료 중 목표 상태 하나를 받는다. */
+  @Post(':leagueId/state')
+  @HttpCode(200)
+  changeState(
+    @CurrentUser() user: V1AuthUser,
+    @Param('leagueId', leagueIdPipe) leagueId: string,
+    @Body() dto: ChangeLeagueStateDto,
+  ) {
+    return this.service.changeState(user, leagueId, dto);
   }
 
   @Post(':leagueId/open-registration')

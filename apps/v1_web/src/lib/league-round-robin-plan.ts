@@ -9,7 +9,12 @@
 
 export type RoundRobinLegs = 1 | 2;
 
-export type WeeksPlan = { readonly kind: 'single' } | { readonly kind: 'double' } | { readonly kind: 'custom'; readonly weeks: number };
+/** `fixtures` = 리그를 만들 때 정한 총 경기 수. 그 수를 채우는 라운드만 만들고 서버가 그 수에서 자른다. */
+export type WeeksPlan =
+  | { readonly kind: 'single' }
+  | { readonly kind: 'double' }
+  | { readonly kind: 'custom'; readonly weeks: number }
+  | { readonly kind: 'fixtures'; readonly count: number };
 
 export function roundRobinRounds(teamCount: number, legs: RoundRobinLegs): number {
   if (teamCount < 2) return 0;
@@ -26,13 +31,21 @@ export function suggestedWeeks(teamCount: number, legs: RoundRobinLegs, gamesPer
  * 팀당 하루 경기 수로 주차가 올림되어도 남는 칸에 앞 라운드를 다시 만들지 않는다.
  * 직접 입력은 `주차 × 하루 경기`를 그대로 쓴다(넘치면 서버가 처음부터 다시 돈다).
  */
+/** 총 경기 수를 채우는 라운드 수(한 라운드 = floor(팀 수 / 2)경기). */
+export function roundsForFixtureCount(teamCount: number, fixtureCount: number): number {
+  const perRound = Math.floor(teamCount / 2);
+  return perRound < 1 || fixtureCount < 1 ? 0 : Math.ceil(fixtureCount / perRound);
+}
+
 export function plannedRounds(plan: WeeksPlan, teamCount: number, weeksCount: number, gamesPerTeamPerDay = 1): number {
   if (plan.kind === 'custom') return weeksCount * Math.max(1, gamesPerTeamPerDay);
+  if (plan.kind === 'fixtures') return roundsForFixtureCount(teamCount, plan.count);
   return roundRobinRounds(teamCount, plan.kind === 'double' ? 2 : 1);
 }
 
 export function resolveWeeksCount(plan: WeeksPlan, teamCount: number, gamesPerTeamPerDay = 1): number {
   if (plan.kind === 'custom') return plan.weeks;
+  if (plan.kind === 'fixtures') return Math.max(1, Math.ceil(roundsForFixtureCount(teamCount, plan.count) / Math.max(1, gamesPerTeamPerDay)));
   return suggestedWeeks(teamCount, plan.kind === 'double' ? 2 : 1, gamesPerTeamPerDay);
 }
 
@@ -46,6 +59,7 @@ const PLAN_LABEL: Record<WeeksPlan['kind'], string> = {
   single: '단일 라운드로빈',
   double: '홈앤어웨이',
   custom: '직접 입력',
+  fixtures: '총 경기 수',
 };
 
 export function weeksPlanLabel(plan: WeeksPlan): string {

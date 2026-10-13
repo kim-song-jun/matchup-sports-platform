@@ -44,6 +44,27 @@ draft or on-hold league returns `409 LEAGUE_NOT_ACTIVE`; an already completed le
 `alreadyProcessed: true`. Records `league_match.complete` in the admin audit and returns
 `{ leagueId, state: "completed", alreadyProcessed }`.
 
+## State change (상태 변경)
+
+`POST /api/v1/admin/league-matches/:leagueId/state` takes `{ "state": "draft" | "active" | "on_hold" | "completed", "reason"?: string }`
+(reason max 500) and is the single endpoint behind the admin "상태 변경" button. It reuses the rules of the
+endpoints below instead of adding new ones:
+
+- `on_hold` → hold (reason required, otherwise `422 LEAGUE_REASON_REQUIRED`).
+- From `on_hold`, only the remembered pre-hold state is accepted (resume); any other target returns
+  `409 LEAGUE_ON_HOLD`.
+- `completed` → manual completion (same `409 LEAGUE_FIXTURES_PENDING` / `LEAGUE_NOT_ACTIVE`).
+- `active` from `completed` → revert completion. `active` from `draft` (stored `draft`/`open`/`closed`)
+  starts the league (stored `in_progress`, audit `league_match.start`). Before this, only fixture
+  generation moved a league to active.
+- `draft` from `active` moves back to stored `draft` (audit `league_match.revert_to_draft`) only while no
+  game has started (`LIVE`/`PAUSED`/`ENDED`); otherwise `409 LEAGUE_HAS_STARTED_GAMES`. `draft` from
+  `completed` returns `409 LEAGUE_NOT_ACTIVE` (revert to active first).
+- Asking for the current state returns `alreadyProcessed: true`.
+
+Returns `{ leagueId, state, alreadyProcessed }`. The individual `hold`/`resume`/`complete`/`revert-completion`
+endpoints stay for compatibility.
+
 ## Hold and resume (보류)
 
 A regular league is put on hold instead of being cancelled (2026-10-07).
@@ -217,6 +238,9 @@ lock); it is intentionally not opened for leagues.
   "confirmed" exceed "active"; screen hints — the final
   reason-required decision is the save transaction's own count). Bank fields are
   admin-only.
+- Admin detail also returns `heldFromState` (the state resume returns to; only while on hold, otherwise
+  `null`), `minPlayers`, `maxPlayers` (team roster cap, `null` = unlimited) and `plannedFixtureCount`
+  (total games chosen at creation, `null` = not set).
 - Public detail (`GET /api/v1/league-matches/:leagueId`) adds `sportCode`,
   `coverImageUrl`, `entryFee` and `entryFeeConfigured` (`entryFeeConfiguredAt != null`).
   The raw timestamp, the bank fields and registration counts are never in any public
@@ -242,6 +266,16 @@ mutation-admin authorization remains unchanged; support administrators cannot cr
 `startsOn` and `endsOn`, and UUID `teamIds`. `regionId` is a non-empty master
 region identifier. Master data may use stable slugs such as
 `region-busan-jung`; it is not required to be a UUID.
+
+Optional roster and plan fields:
+
+- `minPlayers` / `maxPlayers` (1–50): team roster size. `maxPlayers: null` means **unlimited** — every
+  eligible team member goes onto the roster (auto-fill and roster add skip the `ROSTER_FULL` check).
+  Omitting either keeps the column default (6 / 10). `minPlayers > maxPlayers` returns
+  `422 LEAGUE_ROSTER_RANGE_INVALID`. The admin create screen sends `minPlayers: 1, maxPlayers: null` by
+  default. Responses that carry `maxPlayers` (tournament list/detail for a league) may now return `null`.
+- `plannedFixtureCount` (1–500): total games planned for the league. It is only the default for the
+  fixture generation form (see `fixtureCount` below); it never limits manual fixtures.
 
 The service then verifies that the region exists, is active, and has level 2.
 An unknown, inactive, or non-district identifier returns `422
@@ -304,6 +338,9 @@ LEAGUE_REGION_INVALID` for an unknown or unsuitable region.
   3) so the spare slot does not replay round 1 as a rematch. A total above 104
   rounds still returns `422 LEAGUE_FIXTURE_LIMIT_EXCEEDED`; `roundsCount` itself
   is capped at 104.
+- They also accept optional `fixtureCount` (1–500): fixtures are generated in round-robin order and cut
+  at that count, so a league created with `plannedFixtureCount` gets exactly that many games. The client
+  sends enough rounds (`ceil(fixtureCount / floor(teams / 2))`) for the count.
 - `POST /api/v1/admin/league-matches/:leagueId/fixtures/:teamMatchId/cancel`
   (`{ reason }`) cancels one fixture; an already-cancelled fixture returns
   `alreadyProcessed: true`. A fixture whose game is in progress (`LIVE` or

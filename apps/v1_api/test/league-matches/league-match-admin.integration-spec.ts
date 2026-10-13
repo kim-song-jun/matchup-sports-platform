@@ -314,6 +314,64 @@ describe('POST /admin/league-matches + fixtures', () => {
     expect(new Date(detailRes.body.data.startsOn).getTime()).toBe(startsOn.getTime());
   });
 
+  it('리그를 만들 때 팀 명단 인원 제한 없음과 총 경기 수를 정하고, 대진 생성은 그 수에서 자른다', async () => {
+    const createRes = await request(app.getHttpServer())
+      .post('/api/v1/admin/league-matches')
+      .set('x-v1-user-id', ownerUserId)
+      .send({
+        title: '총 경기 수 리그',
+        sportId,
+        regionId,
+        startsOn: new Date().toISOString(),
+        endsOn: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+        teamIds: [teamAId, teamBId],
+        minPlayers: 1,
+        maxPlayers: null,
+        plannedFixtureCount: 2,
+      });
+    expect(createRes.status).toBe(201);
+    const leagueId = createRes.body.data.leagueId;
+
+    const detailRes = await request(app.getHttpServer())
+      .get(`/api/v1/admin/league-matches/${leagueId}`)
+      .set('x-v1-user-id', ownerUserId);
+    expect(detailRes.body.data).toMatchObject({ minPlayers: 1, maxPlayers: null, plannedFixtureCount: 2 });
+
+    // 2팀 = 라운드당 1경기. 3라운드를 만들 수 있어도 총 경기 수 2에서 자른다.
+    const fixturesRes = await request(app.getHttpServer())
+      .post(`/api/v1/admin/league-matches/${leagueId}/fixtures`)
+      .set('x-v1-user-id', ownerUserId)
+      .send({ weeksCount: 3, fixtureCount: 2 });
+    expect(fixturesRes.status).toBe(201);
+    expect(fixturesRes.body.data.teamMatchIds).toHaveLength(2);
+  });
+
+  it('상태 변경 하나로 시작·보류·해제·준비 중 되돌리기를 처리한다', async () => {
+    const createRes = await request(app.getHttpServer())
+      .post('/api/v1/admin/league-matches')
+      .set('x-v1-user-id', ownerUserId)
+      .send({
+        title: '상태 변경 리그',
+        sportId,
+        regionId,
+        startsOn: new Date().toISOString(),
+        endsOn: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+        teamIds: [teamAId, teamBId],
+      });
+    const leagueId = createRes.body.data.leagueId;
+    const change = (body: Record<string, unknown>) =>
+      request(app.getHttpServer()).post(`/api/v1/admin/league-matches/${leagueId}/state`).set('x-v1-user-id', ownerUserId).send(body);
+
+    expect((await change({ state: 'active' })).body.data).toMatchObject({ state: 'active', alreadyProcessed: false });
+    expect((await change({ state: 'on_hold' })).body.code).toBe('LEAGUE_REASON_REQUIRED');
+    expect((await change({ state: 'on_hold', reason: '구장 공사' })).body.data).toMatchObject({ state: 'on_hold' });
+    expect((await change({ state: 'draft' })).body.code).toBe('LEAGUE_ON_HOLD');
+    expect((await change({ state: 'active' })).body.data).toMatchObject({ state: 'active' });
+    expect((await change({ state: 'draft' })).body.data).toMatchObject({ state: 'draft' });
+    const league = await prisma.v1Tournament.findUniqueOrThrow({ where: { id: leagueId }, select: { status: true } });
+    expect(league.status).toBe('draft');
+  });
+
   it('요일·시각·장소 템플릿을 지정하지 않으면 기존 동작(시작일 그대로, 장소 미정)을 유지한다', async () => {
     const createRes = await request(app.getHttpServer())
       .post('/api/v1/admin/league-matches')

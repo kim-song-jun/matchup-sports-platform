@@ -5786,7 +5786,8 @@ import type {
   V1AdminLeagueDetail,
   V1AdminLeagueListItem,
   V1UpdateLeagueVisibilityResult,
-  V1LeagueHoldResult,
+  V1ChangeLeagueStatePayload,
+  V1ChangeLeagueStateResult,
   V1AdminLeagueTeamsResponse,
   V1CancelLeagueFixturePayload,
   V1CancelLeagueFixtureResult,
@@ -5806,9 +5807,6 @@ import type {
   V1RegenerateLeagueFixturesPayload,
   V1RegenerateLeagueFixturesResult,
   V1RemoveLeagueTeamResult,
-  V1RevertLeagueCompletionPayload,
-  V1RevertLeagueCompletionResult,
-  V1CompleteLeagueResult,
   V1UpdateLeagueFixturePayload,
   V1UpdateLeagueFixtureResult,
   V1OpenLeagueRegistrationPayload,
@@ -6136,52 +6134,26 @@ export function useV1CancelLeagueFixture(leagueId: string) {
   });
 }
 
-// R6: 리그 종료 역전이 — POST /admin/league-matches/:leagueId/revert-completion.
-// 상태 뱃지(진행 중/종료)와 목록의 state 컬럼이 함께 바뀌므로 상세·목록 캐시를 모두 무효화한다.
 /**
- * 리그 보류(취소 대신)·보류 해제. 보류는 리그와 경기를 공개 화면에서 숨기므로 공개 읽기 캐시도 다시
- * 확인한다(공개 설정 변경과 같은 범위).
+ * 리그 상태 변경(준비 중·진행 중·보류·종료) — 상태 변경 버튼 하나가 쓴다. 보류는 리그와 경기를 공개 화면에서 숨기고
+ * 종료는 공개 상세·목록·홈의 상태 표시를 바꾸므로 공개 읽기 캐시까지 다시 확인한다.
  */
-function useLeagueStatusMutation<TResult>(leagueId: string, action: 'hold' | 'resume' | 'complete') {
+function invalidateLeagueEverywhere(queryClient: ReturnType<typeof useQueryClient>, leagueId: string) {
+  queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
+  queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
+  queryClient.invalidateQueries({ queryKey: v1Keys.leagueMatches() });
+  queryClient.invalidateQueries({ queryKey: v1Keys.leagueMatch(leagueId) });
+  queryClient.invalidateQueries({ queryKey: v1Keys.tournament(leagueId) });
+  queryClient.invalidateQueries({ queryKey: v1Keys.home() });
+  queryClient.invalidateQueries({ queryKey: v1Keys.tournaments() });
+}
+
+export function useV1ChangeLeagueState(leagueId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: { reason?: string }) =>
-      v1Post<TResult>(`/admin/league-matches/${encodeURIComponent(leagueId)}/${action}`, body),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
-      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
-      queryClient.invalidateQueries({ queryKey: v1Keys.leagueMatches() });
-      queryClient.invalidateQueries({ queryKey: v1Keys.leagueMatch(leagueId) });
-      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(leagueId) });
-      queryClient.invalidateQueries({ queryKey: v1Keys.home() });
-      queryClient.invalidateQueries({ queryKey: v1Keys.tournaments() });
-    },
-  });
-}
-
-export function useV1HoldLeague(leagueId: string) {
-  return useLeagueStatusMutation<V1LeagueHoldResult>(leagueId, 'hold');
-}
-
-export function useV1ResumeLeague(leagueId: string) {
-  return useLeagueStatusMutation<V1LeagueHoldResult>(leagueId, 'resume');
-}
-
-// 되돌리기·보류 해제 뒤 남은 대진이 없으면 자동 종료 판정이 다시 불리지 않는다(MD-QA #93) — 수동 종료.
-// 종료되면 공개 상세·목록·홈의 상태 표시도 바뀌므로 보류와 같은 범위를 무효화한다.
-export function useV1CompleteLeague(leagueId: string) {
-  return useLeagueStatusMutation<V1CompleteLeagueResult>(leagueId, 'complete');
-}
-
-export function useV1RevertLeagueCompletion(leagueId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (body: V1RevertLeagueCompletionPayload) =>
-      v1Post<V1RevertLeagueCompletionResult>(`/admin/league-matches/${leagueId}/revert-completion`, body),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
-      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
-    },
+    mutationFn: (body: V1ChangeLeagueStatePayload) =>
+      v1Post<V1ChangeLeagueStateResult>(`/admin/league-matches/${encodeURIComponent(leagueId)}/state`, body),
+    onSuccess: () => invalidateLeagueEverywhere(queryClient, leagueId),
   });
 }
 

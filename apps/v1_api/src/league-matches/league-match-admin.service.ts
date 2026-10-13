@@ -55,6 +55,7 @@ import {
   ApplyLeagueTemplateDto,
   LeagueFixtureScheduleDto,
   CancelLeagueFixtureDto,
+  ChangeLeagueStateDto,
   CreateLeagueMatchDto,
   CreateManualLeagueFixtureDto,
   GenerateLeagueFixturesDto,
@@ -136,6 +137,16 @@ function toKstScheduleLog(startAts: readonly Date[]): { dates: string[]; time: s
   return { dates: startAts.map((at) => parts(at)[0]), time: parts(startAts[0])[1] };
 }
 
+/** 팀 명단 인원 범위. maxPlayers 가 null(제한 없음)이면 최소만 본다. */
+function assertLeagueRosterRange(minPlayers: number | undefined, maxPlayers: number | null | undefined): void {
+  if (minPlayers !== undefined && maxPlayers !== undefined && maxPlayers !== null && minPlayers > maxPlayers) {
+    throw new UnprocessableEntityException({
+      code: 'LEAGUE_ROSTER_RANGE_INVALID',
+      message: '최소 인원이 최대 인원보다 많아요.',
+    });
+  }
+}
+
 function totalRoundsOf(schedule: readonly RoundRobinFixture[]): number {
   return schedule.reduce((max, fixture) => (fixture.round > max ? fixture.round : max), 0);
 }
@@ -182,6 +193,7 @@ export class LeagueMatchAdminService {
         message: '종료일은 시작일보다 빠를 수 없어요.',
       });
     }
+    assertLeagueRosterRange(dto.minPlayers, dto.maxPlayers);
     const uniqueTeamIds = [...new Set(dto.teamIds)];
     if (uniqueTeamIds.length < 2) {
       throw new UnprocessableEntityException({
@@ -240,7 +252,14 @@ export class LeagueMatchAdminService {
       // 경로가 생길 때마다 빠뜨린다 — 실제로 시즌 쪽 두 곳이 빠져 있었다.
       await createLeagueMirrorWithRosterSchedule(
         tx,
-        { ...leagueMirrorCreateData(created), createdByAdminUserId: admin.id },
+        {
+          ...leagueMirrorCreateData(created),
+          createdByAdminUserId: admin.id,
+          // 생략한 값은 DB 기본값에 맡긴다(maxPlayers 의 null 은 "제한 없음"이라 그대로 싣는다).
+          ...(dto.minPlayers !== undefined ? { minPlayers: dto.minPlayers } : {}),
+          ...(dto.maxPlayers !== undefined ? { maxPlayers: dto.maxPlayers } : {}),
+          ...(dto.plannedFixtureCount !== undefined ? { plannedFixtureCount: dto.plannedFixtureCount } : {}),
+        },
         { leagueId: created.id, startsOn },
       );
       // 로스터와 짝이 되는 confirmed 등록 — **거울 create 뒤여야 한다**(등록의
@@ -427,6 +446,10 @@ export class LeagueMatchAdminService {
       // 한다 — 그 기준일이 응답에 없어서 화면은 계산할 수가 없었다(요일을 고르면 옛 형태를
       // 그대로 보내 400 이 났다). 공개 상세가 이미 같은 값을 내려주고 있었다.
       startsOn: league.startsOn,
+      heldFromState: league.heldFromState,
+      minPlayers: league.minPlayers,
+      maxPlayers: league.maxPlayers,
+      plannedFixtureCount: league.plannedFixtureCount,
       // 참가 신청 상태 — 어드민이 "지금 신청을 받는가 / 마감이 언제인가" 를 보고 신청을
       // 열 수 있어야 한다. 공개 상세와 **같은 판정 함수**를 쓴다(두 화면이 갈리면 어드민은
       // 열었다고 보는데 사용자 화면엔 입구가 없다).
@@ -614,7 +637,7 @@ export class LeagueMatchAdminService {
     const teamIds = league.teams.map((entry) => entry.teamId);
     const regulation = await regulationMinutesForConfigVersion(this.prisma, config.id);
     const { totalRounds, timing } = this.resolveFixturePlan(dto, regulation);
-    const schedule = generateRoundRobinFixtures(teamIds, totalRounds);
+    const schedule = generateRoundRobinFixtures(teamIds, totalRounds).slice(0, dto.fixtureCount);
     // 날짜 검증은 **트랜잭션 밖**에서 한다 — 도메인 거부가 락을 잡을 이유가 없다.
     const matchdayStartAts = this.resolveScheduleStartAts(dto, totalRounds, timing);
 
@@ -980,7 +1003,7 @@ export class LeagueMatchAdminService {
     }
     const regulation = await regulationMinutesForConfigVersion(this.prisma, config.id);
     const { totalRounds, timing } = this.resolveFixturePlan(dto, regulation);
-    const schedule = generateRoundRobinFixtures(teamIds, totalRounds);
+    const schedule = generateRoundRobinFixtures(teamIds, totalRounds).slice(0, dto.fixtureCount);
     const matchdayStartAts = this.resolveScheduleStartAts(dto, totalRounds, timing);
     const slots = timing
       ? resolveFixtureTimeSlots(schedule, matchdayStartAts ?? weeklyMatchdayStartAts(league.startsOn, totalRounds, timing), timing)
@@ -1129,7 +1152,7 @@ export class LeagueMatchAdminService {
     const regulation = await regulationMinutesForConfigVersion(this.prisma, config.id);
     const { totalRounds, timing } = this.resolveFixturePlan(dto, regulation);
     const matchdayStartAts = this.resolveScheduleStartAts(dto, totalRounds, timing);
-    const schedule = generateRoundRobinFixtures(teamIds, totalRounds);
+    const schedule = generateRoundRobinFixtures(teamIds, totalRounds).slice(0, dto.fixtureCount);
 
     const result = await this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${leagueId} FOR UPDATE`;
@@ -1767,6 +1790,101 @@ export class LeagueMatchAdminService {
   }
 
   /**
+   * 리그 상태 변경 — 화면의 '상태 변경' 버튼 하나가 고른 목표 상태를 보낸다. 전이마다 이미 있는 규칙을 그대로 쓴다:
+   * 보류(사유 필수)·보류 해제(보류 전 상태로만)·종료(취소 제외 전 경기 확정)·종료 되돌리기. 준비 중 ↔ 진행 중만 새로 연다.
+   */
+  async changeState(user: V1AuthUser, leagueId: string, dto: ChangeLeagueStateDto) {
+    // 위임하는 각 전이도 다시 확인하지만, 멱등 응답·409 로 먼저 끝나는 경로가 권한 확인 없이 상태를 알려 주지 않게 여기서 막는다.
+    await this.adminContext.getMutationAdmin(user.id);
+    const reason = dto.reason?.trim() || undefined;
+    const league = await findTournamentOnSurface(this.prisma, ['regular_league'], {
+      where: { id: leagueId, deletedAt: null },
+      select: { status: true, heldFromStatus: true },
+    });
+    if (league === null) {
+      throw new NotFoundException({ code: 'LEAGUE_NOT_FOUND', message: '리그를 찾을 수 없어요.' });
+    }
+    const current = LEAGUE_STATE_BY_STATUS[league.status];
+    if (current === dto.state) {
+      return { leagueId, state: current, alreadyProcessed: true };
+    }
+    if (current === 'on_hold') {
+      const restoring = LEAGUE_STATE_BY_STATUS[league.heldFromStatus ?? 'draft'];
+      if (dto.state !== restoring) {
+        throw new ConflictException({
+          code: 'LEAGUE_ON_HOLD',
+          message: '보류 중인 리그는 보류 전 상태로만 되돌릴 수 있어요. 보류를 해제한 뒤 다시 바꿔 주세요.',
+        });
+      }
+      return this.resumeLeague(user, leagueId, { reason });
+    }
+    switch (dto.state) {
+      case 'on_hold':
+        if (reason === undefined) {
+          throw new UnprocessableEntityException({ code: 'LEAGUE_REASON_REQUIRED', message: '보류 사유를 입력해 주세요.' });
+        }
+        return this.holdLeague(user, leagueId, { reason });
+      case 'completed':
+        return this.completeLeague(user, leagueId, { reason });
+      case 'active':
+        return current === 'completed'
+          ? this.revertCompletion(user, leagueId, { reason })
+          : this.moveBetweenDraftAndActive(user, leagueId, 'active', reason);
+      case 'draft':
+        if (current === 'completed') {
+          throw new ConflictException({
+            code: 'LEAGUE_NOT_ACTIVE',
+            message: '종료된 리그는 먼저 진행 중으로 되돌린 뒤 준비 중으로 바꿀 수 있어요.',
+          });
+        }
+        return this.moveBetweenDraftAndActive(user, leagueId, 'draft', reason);
+    }
+  }
+
+  /**
+   * 준비 중 ↔ 진행 중. 지금까지는 대진을 만들 때만 진행 중이 됐다. 준비 중으로 돌리는 것은 아직 시작한 경기가
+   * 없을 때만 연다 — 이미 치른 경기가 있으면 '보류'가 맞다(준비 중은 신청을 다시 받을 수 있는 상태라서).
+   */
+  private async moveBetweenDraftAndActive(user: V1AuthUser, leagueId: string, target: 'draft' | 'active', reason: string | undefined) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+    return this.prisma.$transaction(async (tx) => {
+      if (target === 'draft') {
+        const startedGames = await tx.v1Game.count({
+          where: { teamMatch: { leagueId, deletedAt: null }, state: { in: ['LIVE', 'PAUSED', 'ENDED'] } },
+        });
+        if (startedGames > 0) {
+          throw new ConflictException({
+            code: 'LEAGUE_HAS_STARTED_GAMES',
+            message: '이미 시작한 경기가 있어 준비 중으로 돌릴 수 없어요. 리그를 멈추려면 보류를 써 주세요.',
+          });
+        }
+      }
+      const fromStatuses: Prisma.V1TournamentWhereInput['status'] =
+        target === 'active' ? { in: ['draft', 'open', 'closed'] } : 'in_progress';
+      const moved = await tx.v1Tournament.updateMany({
+        where: { id: leagueId, kind: 'regular_league', deletedAt: null, status: fromStatuses },
+        data: { status: STATUS_BY_LEAGUE_STATE[target] },
+      });
+      if (moved.count !== 1) {
+        throw new ConflictException({ code: 'LEAGUE_STATE_CHANGED', message: '리그 상태가 방금 바뀌었어요. 새로고침한 뒤 다시 시도해 주세요.' });
+      }
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: target === 'active' ? 'league_match.start' : 'league_match.revert_to_draft',
+          targetType: 'league_match',
+          targetId: leagueId,
+          reason: reason ?? null,
+          fromStatus: target === 'active' ? 'draft' : 'active',
+          toStatus: target,
+        },
+        tx,
+      );
+      return { leagueId, state: target, alreadyProcessed: false };
+    });
+  }
+
+  /**
    * 리그 보류 — 리그 "취소" 대신 쓴다(2026-10-07 사용자 확정). 상태를 on_hold 로 바꾸고 리그와
    * 그 경기를 공개 화면에서 숨긴다(isPublic=false — 공개 목록·상세·기록이 모두 이 값을 본다).
    * 대진·결과·참가는 그대로 두고, 보류 직전 상태·공개 여부를 기억해 resumeLeague 가 되돌린다.
@@ -2026,6 +2144,11 @@ export class LeagueMatchAdminService {
         sport: { select: { code: true } },
         // 거울이 `startsOn` 을 여기 담는다(leagueMirrorCreateData).
         scheduledAt: true,
+        heldFromStatus: true,
+        // 팀 명단 인원(null = 제한 없음)·총 경기 수 계획 — 대진 생성 폼의 기본값과 화면 표시용.
+        minPlayers: true,
+        maxPlayers: true,
+        plannedFixtureCount: true,
         registrations: {
           // 로스터 = confirmed 등록. 신청만 들어온 팀은 대진 대상이 아니다.
           where: { status: 'confirmed' },
@@ -2048,10 +2171,12 @@ export class LeagueMatchAdminService {
     }
     // 호출부는 `league.teams`·`league.state`·`league.startsOn` 을 그대로 쓴다 — 이름과
     // 값만 맞춰 돌려주고 응답 계약은 건드리지 않는다(BE-5 는 저장소 축만 옮긴다).
-    const { registrations, scheduledAt, status, regionId, sport, entryFeeConfiguredAt, ...rest } = league;
+    const { registrations, scheduledAt, heldFromStatus, status, regionId, sport, entryFeeConfiguredAt, ...rest } = league;
     return {
       ...rest,
       regionId,
+      // 보류 해제가 돌아갈 상태 — 상태 변경 모달이 보류 중에 고를 수 있는 단 하나의 목표다.
+      heldFromState: status === 'on_hold' ? LEAGUE_STATE_BY_STATUS[heldFromStatus ?? 'draft'] : null,
       sportCode: sport.code,
       entryFeeConfiguredAt: entryFeeConfiguredAt?.toISOString() ?? null,
       state: LEAGUE_STATE_BY_STATUS[status],

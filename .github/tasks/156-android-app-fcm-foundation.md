@@ -783,7 +783,7 @@ Reviewed 8/8 areas: signup age; chat access/blocking; report processing; final a
 ### Scope / Progress Snapshot
 
 - Initial base: freshly fetched `origin/dev` `9e9a019253`; isolated Windows worktree `.claude/worktrees/android-play-launch-20261013`, branch `fix/android-play-launch-20261013`.
-- Owned: Android R8 rules, dedicated-emulator startup smoke test, Android release runbook and scenario evidence. Forbidden: API/Web behavior, unrelated WIP, publishing/promoting main or Play.
+- Owned: Android R8 rules and release metadata, dedicated-emulator startup smoke test, Android release runbook and scenario evidence. Forbidden: API/Web behavior, unrelated WIP, publishing/promoting main or Play.
 - [x] Latest dev/main Android trees match; `versionCode=2`, `versionName=0.1.1`.
 - [x] Successful production AAB from Actions `38271649807` (`c22fd5da975101fb41fef2794dbbde3a235261ac`) downloaded; SHA-256 `f054d3640468d075f56fc11aa1b412237af50eff9762ebe4d2ea786569d31d0b` matches its CI checksum.
 - [x] Original optimized AAB converted by bundletool 1.18.2, debug-signed only for emulator installation. Android 14/API 34 x86_64 reproduces first-launch termination twice.
@@ -793,7 +793,9 @@ Reviewed 8/8 areas: signup age; chat access/blocking; report processing; final a
 - [x] Startup smoke GREEN after clearing only this task's emulator app data, plus visually inspected home/announcement, COLD relaunch and settled HOME → HOT resume. Actual release has all production public identifiers, DEBUG=false, version 0.1.2/code3, and workstation debug signing solely for QA.
 - [x] Play source-policy, PowerShell syntax, diff and new-debt checks PASS.
 - [x] PR #1881 review: production-only smoke guard rejects Alpha before APK/device handling (actual invocation RED → GREEN). Alpha's application ID suffix cannot be used to derive its Activity class; no Alpha runtime coverage is claimed.
+- [x] Additional PR review: inspect the supplied APK's manifest with SDK aapt2 before installation; reject a real CI Alpha APK before device access; require successful app-data clearing on the dedicated emulator. Updated script reproduces original release RED and fixed release native-startup GREEN. Play 0.1.2 release notes synchronized. Rerun screenshot contains a SystemUI ANR overlay; no unobstructed-home verdict is claimed for that rerun.
 - [x] Owned emulator launcher PID36464/child35900 stopped; no devices remained, so task-started ADB daemon stopped. Single-use Gradle processes exited; no unrelated process stopped. Final details in `docs/scenarios/android-release-startup-20261013.md`.
+- [x] Review rerun cleanup: launcher PID40564, qemu32712, crash handler30032 and console14240 stopped; no devices remained and task-started ADB31452 stopped. No unrelated process stopped.
 
 ### Acceptance Criteria / Test Scenarios
 

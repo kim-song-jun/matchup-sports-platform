@@ -2,18 +2,28 @@ param(
     [Parameter(Mandatory = $true)][string]$ApkPath,
     [Parameter(Mandatory = $true)][string]$EvidenceDirectory,
     [string]$DeviceSerial = 'emulator-5554',
-    [string]$PackageName = 'kr.co.teameet'
+    [string]$PackageName = 'kr.co.teameet',
+    [string]$Aapt2Path = 'aapt2'
 )
 
 $ErrorActionPreference = 'Stop'
 if ($DeviceSerial -notmatch '^emulator-[0-9]+$') {
-    throw 'Use a dedicated emulator: this smoke test clears its logcat buffers.'
+    throw 'Use a dedicated emulator: this smoke test clears its app data and logcat buffers.'
 }
 if ($PackageName -ne 'kr.co.teameet') {
     throw 'PackageName must be the production Android application ID (kr.co.teameet).'
 }
 $apk = (Resolve-Path -LiteralPath $ApkPath).Path
+$apkMetadata = & $Aapt2Path dump badging $apk 2>&1
+if ($LASTEXITCODE -ne 0) {
+    throw "aapt2 dump badging failed: $($apkMetadata -join [Environment]::NewLine)"
+}
+$apkPackage = [regex]::Match(($apkMetadata -join [Environment]::NewLine), "(?m)^package: name='(?<name>[^']+)'")
+if (-not $apkPackage.Success -or $apkPackage.Groups['name'].Value -cne $PackageName) {
+    throw 'The supplied APK must declare the production package kr.co.teameet.'
+}
 $evidence = New-Item -ItemType Directory -Path $EvidenceDirectory -Force
+$apkMetadata | Set-Content -LiteralPath (Join-Path $evidence.FullName 'apk.txt') -Encoding utf8
 
 function Invoke-DeviceAdb {
     param([string[]]$Arguments)
@@ -29,6 +39,10 @@ $package = Invoke-DeviceAdb -Arguments @('shell', 'dumpsys', 'package', $Package
 $package | Set-Content -LiteralPath (Join-Path $evidence.FullName 'package.txt') -Encoding utf8
 if ($package -match '(?m)^\s*flags=\[[^\r\n]*DEBUGGABLE') {
     throw 'A debuggable APK cannot prove the production release startup contract.'
+}
+$cleared = Invoke-DeviceAdb -Arguments @('shell', 'pm', 'clear', $PackageName)
+if ($cleared.Trim() -ne 'Success') {
+    throw "Unable to clear the dedicated emulator's application data: $cleared"
 }
 Invoke-DeviceAdb -Arguments @('shell', 'am', 'force-stop', $PackageName) | Out-Null
 Invoke-DeviceAdb -Arguments @('logcat', '-c') | Out-Null

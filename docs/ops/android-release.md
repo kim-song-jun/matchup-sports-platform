@@ -80,18 +80,22 @@ Debug unit tests and a successful AAB build did not expose this R8 generic-signa
 `0.1.2` source change preserves the Retrofit reflection contract; shrinking remains enabled.
 
 Use a dedicated booted emulator and the optimized release APK, with the same public Firebase/Kakao
-identifiers as the release. In PowerShell:
+identifiers as the release. Put Android SDK `adb` on PATH and provide the SDK build-tools `aapt2`
+executable (or put it on PATH). This smoke clears the production app's data on that emulator.
+In PowerShell:
 
 ```powershell
 ./scripts/qa/test-android-release-startup.ps1 `
   -ApkPath '<optimized-production-release.apk>' `
   -EvidenceDirectory 'output/android-release-startup' `
-  -DeviceSerial 'emulator-5554'
+  -DeviceSerial 'emulator-5554' `
+  -Aapt2Path '<Android-SDK>/build-tools/36.0.0/aapt2.exe'
 ```
 
-The smoke installs with `-r` (never uninstalls), rejects debuggable APKs, starts MainActivity, then
-checks the crash buffer, live process and resumed activity after 15 seconds. It saves package/launch/
-activity/crash evidence and a success screenshot. It accepts only the production application ID
+The smoke checks the APK manifest application ID before installation, installs with `-r` (never
+uninstalls), rejects debuggable APKs, clears the dedicated emulator's application data, and starts
+MainActivity. It then checks the crash buffer, live process and resumed activity after 15 seconds.
+It saves APK/package/launch/activity/crash evidence and a success screenshot. It accepts only the production application ID
 `kr.co.teameet` and emulator serials because it clears that device's logcat buffers. Alpha is rejected
 before APK/device handling; its application ID suffix uses a different Activity component. Repeat
 the user launch, relaunch and background/resume flow;

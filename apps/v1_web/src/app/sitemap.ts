@@ -2,16 +2,14 @@ import type { MetadataRoute } from 'next';
 import { absoluteSiteUrl, fetchPublicV1 } from '@/lib/seo';
 import { PUBLIC_SITE_ROUTES } from '@/lib/public-site/routes';
 import { fixtureDetailHref } from '@/lib/fixture-detail-route';
-import { collectPublicTournamentFixtures } from '@/lib/public-competition-discovery';
+import { collectPublicMatchInventory, collectPublicTournamentFixtures, fetchPublicPages } from '@/lib/public-competition-discovery';
 import type {
-  CursorPage,
   V1Match,
   V1Notice,
   V1NoticesResponse,
   V1Team,
   V1TeamMatch,
   V1TournamentListItem,
-  V1TournamentListPage,
 } from '@/types/api';
 import type { V1PublicLeagueListItem, V1PublicLeagueListResponse } from '@/types/league-match';
 
@@ -53,10 +51,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   );
 
   const results = await Promise.allSettled([
-    fetchCursorItems<V1Match>('/matches'),
-    fetchCursorItems<V1Team>('/teams'),
-    fetchCursorItems<V1TeamMatch>('/team-matches', { cache: 'no-store' }),
-    fetchTournamentItems(),
+    collectPublicMatchInventory<V1Match>('/matches').then((result) => result.items ?? []),
+    fetchPublicPages<V1Team>('/teams'),
+    collectPublicMatchInventory<V1TeamMatch>('/team-matches').then((result) => result.items ?? []),
+    fetchPublicPages<V1TournamentListItem>('/tournaments', { cache: 'no-store' }),
     fetchNoticeItems(),
     fetchLeagueItems(),
   ]);
@@ -66,8 +64,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const tournaments = settledItems<V1TournamentListItem>(results[3]);
   const notices = settledItems<V1Notice>(results[4]);
   const leagues = settledItems<V1PublicLeagueListItem>(results[5]);
-  const fixtureResults = await Promise.allSettled([collectPublicTournamentFixtures(tournaments)]);
-  const tournamentFixtures = settledItems(fixtureResults[0]);
+  const tournamentFixtures = (await collectPublicTournamentFixtures(tournaments)).items ?? [];
 
   return [
     ...staticEntries,
@@ -115,40 +112,6 @@ function settledItems<T>(result: PromiseSettledResult<T[]>): T[] {
   if (result.status === 'fulfilled') return result.value;
   console.error('[seo] sitemap 공개 목록 조회 실패', result.reason);
   return [];
-}
-
-async function fetchCursorItems<T>(path: string, options: { cache?: 'no-store' } = {}): Promise<T[]> {
-  const items: T[] = [];
-  let cursor: string | null = null;
-
-  do {
-    const query = new URLSearchParams({ limit: '50' });
-    if (cursor) query.set('cursor', cursor);
-    const page = await fetchPublicV1<CursorPage<T>>(`${path}?${query.toString()}`, options);
-    if (!page) break;
-    items.push(...page.items);
-    cursor = page.pageInfo
-      ? (page.pageInfo.hasNext ? page.pageInfo.nextCursor : null)
-      : page.nextCursor;
-  } while (cursor);
-
-  return items;
-}
-
-async function fetchTournamentItems(): Promise<V1TournamentListItem[]> {
-  const items: V1TournamentListItem[] = [];
-  let cursor: string | null = null;
-
-  do {
-    const query = new URLSearchParams({ limit: '50' });
-    if (cursor) query.set('cursor', cursor);
-    const page = await fetchPublicV1<V1TournamentListPage>(`/tournaments?${query.toString()}`, { cache: 'no-store' });
-    if (!page) break;
-    items.push(...page.items);
-    cursor = page.pageInfo.hasNext ? page.pageInfo.nextCursor : null;
-  } while (cursor);
-
-  return items;
 }
 
 async function fetchNoticeItems(): Promise<V1Notice[]> {

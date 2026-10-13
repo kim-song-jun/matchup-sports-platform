@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PUBLIC_SITE_ROUTES } from '@/lib/public-site/routes';
 import { fetchPublicV1 } from '@/lib/seo';
 
@@ -11,7 +11,11 @@ vi.mock('@/lib/seo', async (importOriginal) => ({
 const { default: sitemap } = await import('./sitemap');
 
 describe('sitemap', () => {
-  beforeEach(() => { vi.mocked(fetchPublicV1).mockReset().mockResolvedValue(null); });
+  beforeEach(() => {
+    vi.mocked(fetchPublicV1).mockReset().mockResolvedValue(null);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+  afterEach(() => vi.restoreAllMocks());
 
   it('리그 경기는 최종 상세 주소로 싣고 친선 경기는 기존 주소를 유지한다', async () => {
     vi.mocked(fetchPublicV1).mockImplementation(async (path) => path.startsWith('/team-matches?') ? {

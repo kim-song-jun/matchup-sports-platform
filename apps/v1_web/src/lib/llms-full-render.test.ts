@@ -22,6 +22,15 @@ const match = (over: Partial<V1Match>) => ({
 }) as unknown as V1Match;
 
 describe('renderLlmsFull', () => {
+  it('정원이 찬 개인 매치는 알려진 정원 마감 상태로 안내한다', () => {
+    expect(renderLlmsFull({ ...empty, matches: [match({ displayState: 'full' })] })).toContain('풋살 · 정원 마감');
+  });
+
+  it('조회 실패 출처를 명시해 부분 목록을 전체 자료 없음으로 오해하지 않게 한다', () => {
+    expect(renderLlmsFull({ ...empty, unavailableSources: ['/tournaments/bad'] }))
+      .toContain('누락된 출처: /tournaments/bad');
+  });
+
   it('조회에 실패한 섹션(null)은 빼고, 비어 있는 섹션은 "없어요"로 적는다', () => {
     const text = renderLlmsFull({ ...empty, matches: null });
     expect(text).not.toContain('## 모집 중인 개인 매치');

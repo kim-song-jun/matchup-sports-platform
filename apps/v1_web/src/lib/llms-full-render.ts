@@ -68,16 +68,16 @@ function matchId(item: V1Match): string | undefined {
 
 function teamMatchState(state: V1TeamMatchApiStatus | undefined): string {
   if (!state) return '상태 확인 필요';
-  const labels: Record<V1TeamMatchApiStatus, string> = {
+  const labels: Record<V1TeamMatchApiStatus | 'on_hold', string> = {
     recruiting: '상대 팀 모집 중', matched: '경기 확정', closed: '모집 마감',
-    completed: '종료', cancelled: '취소', expired: '기간 만료',
+    completed: '종료', cancelled: '취소', expired: '기간 만료', on_hold: '보류',
   };
   return labels[state];
 }
 
 function personalMatchState(state: string | undefined): string {
   const labels: Record<string, string> = {
-    closed: '모집 마감', scheduled: '진행 확정', in_progress: '진행 중',
+    full: '정원 마감', closed: '모집 마감', scheduled: '진행 확정', in_progress: '진행 중',
     on_hold: '보류', completion_pending: '종료 확인 중', completed: '종료',
     cancelled: '취소', expired: '기간 만료',
   };
@@ -201,7 +201,7 @@ export function renderLlmsFull(s: LlmsFullSnapshot, now = new Date()): string {
     noteVenue(m.place?.name, head);
     return row(head, [
       m.sport?.name ?? m.sportName,
-      teamMatchState(m.displayState),
+      m.isLive ? '진행 중' : teamMatchState(m.displayState),
       formatTournamentDateTimeLong(m.startsAt),
       m.league?.title && `리그 ${inline(m.league.title, 40)}`,
       m.hostTeam?.name && m.approvedOpponentTeam?.name && `${inline(m.hostTeam.name, 40)} vs ${inline(m.approvedOpponentTeam.name, 40)}`,
@@ -248,6 +248,7 @@ export function renderLlmsFull(s: LlmsFullSnapshot, now = new Date()): string {
     '',
     `이 문서는 ${absoluteSiteUrl('/llms.txt')} 의 확장판이에요. 아래 목록은 공개 API 에서 방금 만든 것이고`,
     `(생성 시각 ${formatTournamentDateTimeLong(now.toISOString())} KST). 캐시 때문에 실제보다 최대 15분 늦을 수 있어요.`,
+    ...(s.unavailableSources?.length ? [`일부 공개 자료를 조회하지 못했어요. 누락된 출처: ${s.unavailableSources.map(inlineSource).join(', ')}. 조회 실패는 해당 자료가 없다는 뜻이 아니에요.`] : []),
     '',
     ...PARTICIPATION_GUIDE,
     ...section('대회', tournamentRows, '지금 공개된 대회가 없어요.'),
@@ -263,5 +264,9 @@ export function renderLlmsFull(s: LlmsFullSnapshot, now = new Date()): string {
     ...(venueRows.length > 0 ? ['## 구장별 대회·매치', '', '위 목록의 대회·매치를 경기 장소별로 다시 묶었어요.', '', ...venueRows, ''] : []),
     ...CITATION_POLICY,
   ].join('\n');
+}
+
+function inlineSource(path: string): string {
+  return inline(path, 160);
 }
 

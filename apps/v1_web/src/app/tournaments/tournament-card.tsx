@@ -8,7 +8,7 @@ import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { formatTournamentDateRangeShort, formatEntryFee } from '@/lib/date-utils';
 import { resolveTournamentImage } from '@/lib/tournament-promo';
-import { competitionDetailHref } from '@/lib/fixture-detail-route';
+import { withFromPath } from '@/lib/session-storage';
 import {
   CompetitionCardHeader,
   CompetitionCardShell,
@@ -134,8 +134,8 @@ export function TournamentCard({
     <div role="listitem" style={{ height: '100%' }}>
       <CompetitionCardShell
         interactive={interactive}
-        // 정규 리그는 순위·일정이 있는 리그 상세로 간다 — 홈 리그 카드와 같은 화면이다.
-        href={competitionDetailHref({ isRegularLeague: isLeague, competitionId: item.id, fromHref: fromPath })}
+        // 통합 목록은 리그도 소개·신청 정보가 있는 기존 상세로 연결하고 목록 필터를 보존한다.
+        href={withFromPath(`/tournaments/${item.id}`, fromPath)}
         ariaLabel={`${item.title} — ${sportAccent.label} — ${status.label}`}
       >
         <CompetitionCardHeader

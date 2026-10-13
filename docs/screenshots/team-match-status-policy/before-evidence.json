@@ -1,0 +1,78 @@
+{
+  "origin": "https://alpha.teameet.co.kr",
+  "stage": "before",
+  "errors": [],
+  "networkErrors": [],
+  "viewports": [
+    {
+      "name": "list",
+      "width": 390,
+      "route": "https://alpha.teameet.co.kr/team-matches",
+      "overflow": false,
+      "holdLabels": 0
+    },
+    {
+      "name": "list",
+      "width": 768,
+      "route": "https://alpha.teameet.co.kr/team-matches",
+      "overflow": false,
+      "holdLabels": 0
+    },
+    {
+      "name": "list",
+      "width": 1440,
+      "route": "https://alpha.teameet.co.kr/team-matches",
+      "overflow": false,
+      "holdLabels": 0
+    },
+    {
+      "name": "detail",
+      "width": 390,
+      "route": "https://alpha.teameet.co.kr/team-matches/6c3748b9-d6fb-4522-a22a-50088eb6ea53",
+      "overflow": false,
+      "holdLabels": 1
+    },
+    {
+      "name": "detail",
+      "width": 768,
+      "route": "https://alpha.teameet.co.kr/team-matches/6c3748b9-d6fb-4522-a22a-50088eb6ea53",
+      "overflow": false,
+      "holdLabels": 1
+    },
+    {
+      "name": "detail",
+      "width": 1440,
+      "route": "https://alpha.teameet.co.kr/team-matches/6c3748b9-d6fb-4522-a22a-50088eb6ea53",
+      "overflow": false,
+      "holdLabels": 1
+    },
+    {
+      "name": "admin",
+      "width": 390,
+      "route": "https://alpha.teameet.co.kr/admin/team-matches",
+      "overflow": false,
+      "holdLabels": 0
+    },
+    {
+      "name": "admin",
+      "width": 768,
+      "route": "https://alpha.teameet.co.kr/admin/team-matches",
+      "overflow": false,
+      "holdLabels": 0
+    },
+    {
+      "name": "admin",
+      "width": 1440,
+      "route": "https://alpha.teameet.co.kr/admin/team-matches",
+      "overflow": false,
+      "holdLabels": 0
+    }
+  ],
+  "publicStatuses": [
+    "matched",
+    "completed",
+    "closed",
+    "recruiting"
+  ],
+  "teamMatchId": "6c3748b9-d6fb-4522-a22a-50088eb6ea53"
+}

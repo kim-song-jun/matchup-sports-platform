@@ -1,6 +1,6 @@
 # Task 181 — 미충족 매치 보류와 주최자 후속 조치
 
-Status: Review — local implementation verified; real DB / Alpha deployment and visual QA pending
+Status: Completed — 2026-10-13 team policy follow-up deployed to dev/Alpha and live QA passed
 Scope: v1 API/Web, migration, notification, API docs, scenarios
 
 ## Acceptance Criteria
@@ -19,7 +19,7 @@ Root agent only. 기존 shared-tree WIP 보존. 2026-10-01 사용자 dev 배포 
 ## Validation
 - [x] API lifecycle focused tests
 - [x] Web focused tests and typecheck (final output below)
-- [ ] Browser mobile 390 / tablet 768 / desktop 1440, console/network and cleanup
+- [x] Team policy follow-up: Alpha mobile 390 / tablet 768 / desktop 1440, console/network and cleanup (final evidence below)
 - [x] Diff/debt inspection; own/new file dependencies present, unrelated WIP preserved
 
 
@@ -141,3 +141,25 @@ Remove team-only hold and stale status cache behavior. Keep admin role/service a
 
 ### Shared-root documentation safety
 Automatic approval review rejected appending a resume pointer to the shared root task document, citing an unapproved cross-session side effect. That command did not run. The safe alternative is this isolated worktree's canonical task document and branch; no retry or indirect root mutation was performed. Final source/code evidence remains here.
+
+### Dev deployment cursor (2026-10-13)
+- User explicitly requested dev/Alpha deployment only. PR #1892 targets dev; owned code commit 38df9785e, latest-dev merge beb009313. No main promotion.
+- GitHub CI run 38353133555 completed successfully: API 13m25s (includes actual PostgreSQL integration), Web 10m29s, Gates 5m54s. PR MERGEABLE/CLEAN, review threads 0.
+- Copilot request CLI returned success repeatedly, but no review request/event/review was registered after more than 15 minutes. Direct requestReviewsByLogin with botLogins also returned an empty request list. This is NOT a clean-review result. Asked user whether to waive this unavailable Copilot gate for this dev deployment; approval pending. No merge/deployment yet.
+- CUA still kernel-reset blocked. WSL headed browser failed on missing libnspr4; Windows headed Chrome worked using isolated Playwright module paths. Real read-only Alpha public list, historical team match 6c3748b9-d6fb-4522-a22a-50088eb6ea53 and authenticated admin list captured at 390/768/1440. Historical detail has on_hold/visible hold; no console/network errors, no horizontal overflow. No data mutation.
+- Before images and read-only QA helper currently untracked in this owned worktree: docs/screenshots/team-match-status-policy and scripts/qa/team-match-status-alpha.cjs. After images/gallery await deployment. Owned native browser parents 39836/28796/9052/38956 and recorded Chrome child 44256 exited; no browser remains from this QA.
+- Root is local/dev-clean-20261001 with unrelated WIP: do not switch or overwrite it. Local dev is clean in WSL worktree _worktrees/synced-dev-20261012; perform fetch + merge --ff-only there after the dev PR merge.
+### Authorized deployment / live test progress
+- User approved proceeding without unavailable Copilot and requested tests. Approval recorded in PR #1892 comment; dev merge 1841cdbcb741039cb934cf2bbaf2666e4f53e43c completed. Local dev FF synced in its existing WSL worktree, preserving root WIP.
+- Later dev merges superseded two deployment candidates (their CI was cancelled, so no older runtime was deployed). Latest candidate 403e33980cbe6d207177c6c83f80ec24c30aa56b contains #1892; CI 38358454381 SUCCESS. Alpha deploy 38358454346 is building immutable images.
+- User-authorized mutation QA helper creates one new labelled Alpha fixture and cancels only that fixture. Tests planned: expired deadline effective closed; actual admin UI reopening clears deadline; close/edit retains closed; unapproved matching rejected; test captain applies and sees My match before cancellation; cancellation removes public/direct/eligibility/lineup/record/My access while admin retains it; cancelled reopening rejected. No existing match state mutation planned. Both QA scripts parse with node --check.
+### Final deployed / live verification (2026-10-13)
+- PR #1892 merged to dev (1841cdbcb); deployed Alpha web/API both report 403e33980cbe6d207177c6c83f80ec24c30aa56b, a descendant containing this change. CI 38358454381 and Deploy Alpha 38358454346 SUCCESS. Both public web and API health HTTP 200. No main promotion or production data mutation.
+- Existing historical fixture 6c3748b9-d6fb-4522-a22a-50088eb6ea53: before UI on_hold/보류, after API closed/UI 신청 마감. Existing cancelled fixture admin HTTP 200/public HTTP 404. Public list/detail and authenticated admin captured at 390/768/1440; zero browser/related API errors and horizontal overflow.
+- Actual headed admin UI and test-captain flow: 25/25 contract checks PASS. New fixture deadline elapsed -> closed; admin UI recruiting clears deadline -> public recruiting; unapproved matching 409; admin UI closed -> closed editor hydrates exact entity -> PATCH persists description without reopening; recruit -> test-captain application -> My list/UI visible; cancel -> admin retained, user detail/eligibility/lineup/record 404, explicit cancelled public filter empty, My list/UI absent, direct browser URL is 404/not-found; cancelled reopen 409.
+- Standalone cancellation calendar absence and underlying schedule cancellation are proved by CI PostgreSQL HTTP/DB regression; the live Alpha fixture used a pending application, without claiming an approved-team calendar scenario.
+- Mutation harness initially failed before creating a fixture because login hydration was not proved. Added stateful password-toggle hydration check. First lifecycle run passed through user 404 checks but used invalid public q instead of query; corrected harness, retained failed-attempt evidence, reran with another owned fixture. No product-code change was needed. Final pass is recorded separately; earlier partial checks are not double-counted.
+- Created only two labelled Alpha QA fixtures: cb32da5e-f2b9-42aa-aa12-ad4346e8f6e3 and 82810c31-01c6-451c-8a33-74e969bd5cc0. Both cleanup cancellation HTTP 201; users cannot access them. Admin records remain intentionally, including the rejected test applications/audit trail. Existing match states untouched.
+- Visual verdict PASS for 390/768/1440: public list/detail, admin list, closed edit, My before/after cancellation, cancelled detail. Actual screenshots inspected; hold-panel removal leaves balanced title/body spacing, controls readable and available; no horizontal overflow. Gallery uses immutable evidence commit URLs in the merged PR.
+- Owned headed browser parent/Chrome pairs: 17832/44440, 30136/35416, 26476/45188, 45828/36688, 42940/42224 all exited after browser.close; process checks found no survivors. Credentials only process environment, cleared after each command; no storage state or tokens saved. No local Next server.
+- Runtime source is the merged/CI-tested tree. Post-deployment screenshots, QA helpers and final cursor are evidence-only on the original feature branch; they do not trigger another runtime deployment. Both helpers pass node --check; diff --check PASS. Shared root WIP preserved; local dev FF sync uses its existing WSL worktree.

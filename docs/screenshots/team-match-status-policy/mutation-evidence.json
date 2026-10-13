@@ -1,0 +1,155 @@
+{
+  "origin": "https://alpha.teameet.co.kr",
+  "checks": [
+    {
+      "name": "initial recruiting",
+      "pass": true,
+      "values": {
+        "status": "recruiting"
+      }
+    },
+    {
+      "name": "elapsed deadline closes recruitment",
+      "pass": true,
+      "values": {
+        "status": "closed"
+      }
+    },
+    {
+      "name": "admin UI reopening applies and clears deadline",
+      "pass": true,
+      "values": {
+        "publicStatus": "recruiting",
+        "deadlineAt": null
+      }
+    },
+    {
+      "name": "unapproved matching forbidden",
+      "pass": true,
+      "values": {
+        "http": 409,
+        "code": "TEAM_MATCH_ASSIGNMENT_REQUIRED"
+      }
+    },
+    {
+      "name": "admin UI close applies",
+      "pass": true
+    },
+    {
+      "name": "closed editor hydrates correct entity",
+      "pass": true
+    },
+    {
+      "name": "closed editor overflow 390",
+      "pass": true
+    },
+    {
+      "name": "closed editor overflow 768",
+      "pass": true
+    },
+    {
+      "name": "closed editor overflow 1440",
+      "pass": true
+    },
+    {
+      "name": "closed edit persisted without reopening",
+      "pass": true,
+      "values": {
+        "status": "closed"
+      }
+    },
+    {
+      "name": "applicant my matches visible before cancel",
+      "pass": true
+    },
+    {
+      "name": "my matches overflow 390",
+      "pass": true
+    },
+    {
+      "name": "my matches overflow 768",
+      "pass": true
+    },
+    {
+      "name": "my matches overflow 1440",
+      "pass": true
+    },
+    {
+      "name": "cancelled admin record retained",
+      "pass": true,
+      "values": {
+        "status": "cancelled"
+      }
+    },
+    {
+      "name": "cancelled user detail hidden",
+      "pass": true,
+      "values": {
+        "http": 404
+      }
+    },
+    {
+      "name": "cancelled user /application-eligibility hidden",
+      "pass": true,
+      "values": {
+        "http": 404
+      }
+    },
+    {
+      "name": "cancelled user /lineup hidden",
+      "pass": true,
+      "values": {
+        "http": 404
+      }
+    },
+    {
+      "name": "cancelled user /record hidden",
+      "pass": true,
+      "values": {
+        "http": 404
+      }
+    },
+    {
+      "name": "cancelled public list absent even explicit filter",
+      "pass": true
+    },
+    {
+      "name": "cancelled applicant my matches absent",
+      "pass": true
+    },
+    {
+      "name": "cancelled my UI absent",
+      "pass": true
+    },
+    {
+      "name": "cancelled direct URL shows not found",
+      "pass": true,
+      "values": {
+        "http": 404
+      }
+    },
+    {
+      "name": "cancelled reopen forbidden",
+      "pass": true,
+      "values": {
+        "http": 409,
+        "code": "TEAM_MATCH_REOPEN_FORBIDDEN"
+      }
+    },
+    {
+      "name": "no browser errors",
+      "pass": true,
+      "values": {
+        "count": 0
+      }
+    }
+  ],
+  "errors": [],
+  "cleanup": {
+    "fixtureId": "82810c31-01c6-451c-8a33-74e969bd5cc0",
+    "cancelledHttp": 201
+  },
+  "phase": "fixture lifecycle",
+  "fixtureId": "82810c31-01c6-451c-8a33-74e969bd5cc0",
+  "title": "(QA) 팀매치 상태 b3d06187"
+}

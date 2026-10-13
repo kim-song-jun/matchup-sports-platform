@@ -217,6 +217,18 @@ describe('선수 카드', () => {
     expect(img?.getAttribute('sizes')).toBe('138px');
   });
 
+  it('사진 프레임은 절대 위치가 아니라 상단 줄 안에 있어 이름 줄을 덮지 않는다', () => {
+    // 페이드(마스크)를 없앤 선명한 프레임이라 카드 면에 절대 위치로 걸치면 이름·능력치를 가린다
+    // (사용자 선택 B안, 2026-10-13). 사진 추가 슬롯과 같은 줄에 두어 높이가 왼쪽 열을 따라간다.
+    const { container } = render(
+      <PlayerCard card={card()} displayName="김선준" profileImageUrl="/uploads/2026/08/me.webp" teamName={null} isOwner />,
+    );
+
+    const top = container.querySelector('.tm-player-card-top');
+    expect(top?.querySelector(':scope > .tm-pcard-render')).not.toBeNull();
+    expect(container.querySelector('.tm-pcard-face > .tm-pcard-render')).toBeNull();
+  });
+
   it('사진 오류는 사람 아이콘으로 표시하고 새 사진으로 복구한다', async () => {
     const { container, rerender } = render(<PlayerCard card={card()} displayName="김선준" profileImageUrl="/uploads/broken.png" teamName={null} isOwner={false} />);
     fireEvent.error(container.querySelector('.tm-pcard-render-photo img') as HTMLImageElement);

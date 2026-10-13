@@ -154,12 +154,14 @@ export function SocialSignupClient() {
     // 서버가 가입 상태를 되돌린 오류라 fresh 캐시도 재조회해야 약관 게이트에 갇히지 않는다.
     setTermsRecoveryPending(true);
     try {
+      // 재조회가 전역 게이트를 바꾸기 전에 URL에만 있는 원 목적지를 보존한다.
+      const termsRoute = continuationPath('/terms?mode=social');
       const currentAuth = await authMe.refetch();
       if (currentAuth.isError) {
         setError(extractErrorMessage(currentAuth.error, '가입을 완료하지 못했어요.'));
         return;
       }
-      router.replace('/terms?mode=social');
+      router.replace(termsRoute);
     } finally {
       setTermsRecoveryPending(false);
     }

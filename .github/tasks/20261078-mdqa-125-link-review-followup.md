@@ -88,3 +88,5 @@ PR1888 기존 head2bb4 및 원 PR1835·1837 이력은 아래 Progress Snapshot�
 - Runner evidence: Windows .codex rootDir glob 혼합 경로로0test 발견 및 최초 cold bootstrap15초timeout은 RED로 인정하지 않았다. root CLI 상대 integration glob과 bootstrap60초 제한으로 실제3사례를 실행했으며 repo Jest gate/ignore 목록은 수정하지 않았다.
 - 첫 웹 GREEN32중30PASS/2FAIL은 authMe503 최종 오류의 미관측 실패로 보존하고 조사 중이다.
 - Actual alpha session is expired, existing QA login question pending. No new PR/commit/dev merge/alpha PASS yet.
+
+- 2026-10-13 11:28Z root: 최신 dev06a를 정상 merge한023266의 F6 독립 리뷰에서 URL에만 있는 복귀 주소가 약관 복구 refetch 전에 사라지는 실제 결함을 확인했다. 앞선2회 handler순서/CTA 테스트 준비 실패는 제품RED에서 제외하고 보존했다. 실제 TermsClient·프로필·sport/level/region/confirm을 모두 거친 회귀에서 최종/chat 기대→/home 실제1FAIL/8skip의 유효RED를 확인했다 (mdqa125-f6-full-consumer-destination-red1.log). 기존 bounded helper를 refetch 전에 사용하는 최소수정 뒤 기존8+신규1=9/9GREEN이었다 (mdqa125-f6-full-consumer-terms-recovery-green9.log). backend 미사용maskEmail import1행도 제거했다. 타입·새committedhead 독립 리뷰·PR1888 push·외부리뷰/CI·alpha·tracker 완료는 남아 있다.

@@ -1,19 +1,25 @@
 import { useEffect, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { V1AuthMe } from '@/types/api';
 import { v1Keys } from '@/lib/query-keys';
-import { saveStoredV1Session } from '@/lib/session-storage';
+import { getSavedRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
+import { RECORD_CONSENT_POLICY_HASH } from '@/lib/record-consent';
 import { PendingSocialSignupGate } from './pending-social-signup-gate';
 import { SocialSignupClient } from './social-signup-client';
+import { TermsClient } from './terms-client';
+import { OnboardingClient } from './onboarding-client';
+import { authSession, createRedirectFixture, DOCUMENT, stepForRoute } from './social-link-required-redirect-fixtures';
 
-const navigation = vi.hoisted(() => ({ pathname: '/signup/social', replace: vi.fn() }));
+const navigation = vi.hoisted(() => ({ pathname: '/signup/social', replace: vi.fn(), push: vi.fn() }));
 vi.mock('next/navigation', () => ({
   usePathname: () => navigation.pathname,
-  useRouter: () => ({ replace: navigation.replace }),
+  useRouter: () => ({ replace: navigation.replace, push: navigation.push }),
+  useSearchParams: () => new URLSearchParams(window.location.search),
 }));
 vi.mock('@/lib/analytics', () => ({ trackEvent: vi.fn() }));
 
@@ -55,6 +61,26 @@ function RoutedSignup() {
   );
 }
 
+// Next.js의 주소 변경만 대신하며 약관·프로필·온보딩의 각 액션과 전역 게이트는 실제로 실행한다.
+function RoutedTermsRecoveryJourney() {
+  const [route, setRoute] = useState(window.location.pathname + window.location.search + window.location.hash);
+  useEffect(() => {
+    const navigate = (path: string) => {
+      window.history.replaceState({}, '', path);
+      navigation.pathname = window.location.pathname;
+      setRoute(path);
+    };
+    navigation.replace.mockImplementation(navigate);
+    navigation.push.mockImplementation(navigate);
+  }, []);
+  const pathname = new URL(route, window.location.origin).pathname;
+  const step = stepForRoute(pathname);
+  return <PendingSocialSignupGate>{pathname === '/signup/social' ? <SocialSignupClient />
+    : pathname === '/terms' ? <TermsClient />
+      : step ? <OnboardingClient key={pathname} step={step} />
+        : <h1>{route}</h1>}</PendingSocialSignupGate>;
+}
+
 function requireCurrentTerms() {
   mutationRequests += 1;
   serverAuth = {
@@ -73,6 +99,7 @@ beforeEach(() => {
   mutationRequests = 0;
   navigation.pathname = '/signup/social';
   navigation.replace.mockReset();
+  navigation.push.mockReset();
   window.history.replaceState({}, '', '/signup/social');
   window.localStorage.clear();
   window.sessionStorage.clear();
@@ -105,6 +132,89 @@ async function prepareProfile() {
 }
 
 describe('필수 약관이 변경된 소셜 가입의 실제 인증 캐시 복구', () => {
+  it('URL만 가진 중첩 목적지를 약관 복구와 실제 프로필·네 단계 온보딩 뒤에 한 번 소비한다', async () => {
+    // Given: OAuth 저장값 없이 가입 URL에만 최종 채팅의 query/hash를 감싼 필수 단계가 있다.
+    const destination = '/chat?room=team#latest';
+    const nestedRedirect = `/onboarding/sport?redirect=${encodeURIComponent(destination)}`;
+    window.history.replaceState({}, '', `/signup/social?redirect=${encodeURIComponent(nestedRedirect)}`);
+    expect(getSavedRedirectPath()).toBeNull();
+    const fixture = createRedirectFixture();
+    const state = fixture.state;
+    state.auth = requiredAuth;
+    let termsRequests = 0;
+    let profileRequests = 0;
+    // MSW는 같은 use 호출 안의 첫 일치 handler를 쓰므로 공통 fixture 뒤에 override를 따로 등록한다.
+    server.use(...fixture.server.listHandlers());
+    server.use(
+      http.get('*/api/v1/auth/me', () => {
+        authReads += 1;
+        return success(state.auth);
+      }),
+      http.post('*/api/v1/auth/social-profile/defer', () => {
+        mutationRequests += 1;
+        state.auth = {
+          ...requiredAuth,
+          user: { ...requiredAuth.user, onboardingStatus: 'social_terms_required' },
+          termsCompliance: { compliant: false, pendingRequiredDocumentIds: [DOCUMENT], nextRoute: '/terms?mode=social' },
+        };
+        return HttpResponse.json({ status: 'error', statusCode: 400, code: 'TERMS_REQUIRED', message: '필수 약관 동의가 필요해요.' }, { status: 400 });
+      }),
+      http.post('*/api/v1/auth/social-terms', async ({ request }) => {
+        expect(await request.json()).toEqual({ requiredTermsAccepted: true, acceptedTermsDocumentIds: [DOCUMENT], ageConfirmed: true });
+        termsRequests += 1;
+        state.acceptedTerms = true;
+        state.auth = requiredAuth;
+        return success(authSession(state.auth, '/signup/social'));
+      }),
+      http.post('*/api/v1/auth/social-profile', async ({ request }) => {
+        expect(await request.json()).toEqual({ nickname: '카카오러너', displayName: '김러너', phone: '01012345678',
+          birthDate: '19950115', gender: 'female', recordConsent: { granted: true, policyHash: RECORD_CONSENT_POLICY_HASH } });
+        profileRequests += 1;
+        state.auth = { ...requiredAuth, user: { ...requiredAuth.user, onboardingStatus: 'signup_done' } };
+        return success(authSession(state.auth, '/onboarding/sport'));
+      }),
+    );
+    render(<QueryClientProvider client={client}><RoutedTermsRecoveryJourney /></QueryClientProvider>);
+    const user = userEvent.setup();
+
+    // When: 실제 defer 오류가 auth/me와 전역 게이트를 갱신한 뒤 다시 약관부터 완료한다.
+    await screen.findByRole('button', { name: '나중에 입력할게요' });
+    expect(client.getQueryData<V1AuthMe>(v1Keys.authMe())?.user.onboardingStatus).toBe('social_profile_required');
+    expect(mutationRequests).toBe(0);
+    expect(authReads).toBe(0);
+    await user.click(await screen.findByRole('button', { name: '나중에 입력할게요' }));
+    await waitFor(() => {
+      expect(mutationRequests).toBe(1);
+      expect(authReads).toBe(1);
+      expect(client.getQueryData<V1AuthMe>(v1Keys.authMe())?.user.onboardingStatus).toBe('social_terms_required');
+    });
+    await user.click(await screen.findByRole('button', { name: /전체 동의/ }));
+    await user.click(await screen.findByRole('button', { name: '동의하고 회원가입하기' }));
+    await screen.findByRole('button', { name: '나중에 입력할게요' });
+    await user.click(await prepareProfile());
+    await user.click(await screen.findByRole('button', { name: /풋살/ }));
+    await user.click(screen.getByRole('button', { name: '실력 입력하기' }));
+    await user.click(await screen.findByRole('button', { name: '초급' }));
+    await user.click(screen.getByRole('button', { name: '지역 선택하기' }));
+    await user.click(await screen.findByRole('button', { name: '서울' }));
+    await user.click(screen.getByRole('button', { name: '마포구' }));
+    await user.click(screen.getByRole('button', { name: '지역 선택 완료' }));
+    await user.click(await screen.findByRole('button', { name: '홈으로 시작하기' }));
+
+    // Then: 각 실제 consumer의 HTTP 성공을 거친 최종 URL에서만 목적지를 소비한다.
+    await waitFor(() => expect(state.completeRequests).toBe(1));
+    expect(mutationRequests).toBe(1);
+    expect(termsRequests).toBe(1);
+    expect(profileRequests).toBe(1);
+    expect(state.savedSteps).toEqual(['sport', 'level', 'region']);
+    await waitFor(() => expect(navigation.pathname).toBe('/chat'));
+    expect(window.location.search).toBe('?room=team');
+    expect(window.location.hash).toBe('#latest');
+    expect(navigation.replace.mock.calls.filter(([path]) => path === destination)).toHaveLength(1);
+    expect(getSavedRedirectPath()).toBeNull();
+    expect(window.sessionStorage.getItem('teameet.v1.savedRedirect')).toBeNull();
+  });
+
   it('나중에 입력 요청이 TERMS_REQUIRED이면 인증을 재조회하고 약관 화면에 머문다', async () => {
     // Given: 60초 동안 fresh인 required 캐시가 있고 요청 중 서버의 필수 약관이 변경된다.
     server.use(http.post('*/api/v1/auth/social-profile/defer', requireCurrentTerms));

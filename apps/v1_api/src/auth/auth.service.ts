@@ -2,7 +2,6 @@ import { BadRequestException, ConflictException, ForbiddenException, Injectable,
 import { Prisma, V1AccountStatus, V1AuthProvider } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { buildOnboardingSummary, hasAcceptedRequiredTerms } from '../onboarding/onboarding-summary';
-import { maskEmail } from './account-recovery.service';
 import { AppleLoginDto } from './dto/apple-login.dto';
 import { AppleIdentityService } from './apple-identity.service';
 import type { AppleIdentityClaims } from './apple-identity-token';

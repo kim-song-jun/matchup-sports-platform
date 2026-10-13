@@ -132,6 +132,7 @@ export function resetMobileEditorFixture() {
       const fixtureId = String(params.fixtureId);
       mobileEditorFixture.fixtureWrites.push({ fixtureId, body });
       if (!mobileEditorFixture.canWrite) return failure(403, 'FORBIDDEN', '읽기 전용 권한이에요.');
+      if (mobileEditorFixture.league.state === 'completed') return failure(409, 'LEAGUE_ENDED', '끝났거나 취소된 리그는 대진을 만들거나 바꿀 수 없어요.');
       if (mobileEditorFixture.updateFails) return failure(409, 'FIXTURE_HAS_RESULT', '경기 결과가 생겨 저장하지 못했어요.');
       const fixture = mobileEditorFixture.league.fixtures.find((candidate) => candidate.teamMatchId === fixtureId);
       if (!fixture || typeof body !== 'object' || body === null) return failure(404, 'FIXTURE_NOT_FOUND', '경기를 찾을 수 없어요.');

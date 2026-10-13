@@ -49,3 +49,5 @@ Phase A 단일 frontend owner: bracket-canvas-mobile 및 실제 league fixtures 
 ## Progress Snapshot
 - 2026-10-13 09:55Z: 최초 모바일 실제 소비자9건에서6 FAIL/3 PASS RED를 확인했다. 실제 API의 취소 이력 유지·기존 경기 전부에 대한 replaceExisting 계약으로 fixture를 대조한 추가10건은2 FAIL/8 PASS RED였고, 최소 parent 수정 후10/10 GREEN (`mdqa138-mobile-editor-final-green.log`). 390px 최초 진입,768/1440 전환, GET→템플릿POST→새 경기GET→상세PATCH, 완료/결과 보호, readonly, 취소 이력 보존과 새 경기 포커스를 검증한다. jsdom viewport 시나리오는 실제 alpha 스크린샷 PASS가 아니다. 최신 committed head 타입·독립 리뷰·dev PR·댓글·머지·alpha 검증은 남아 있다.
 - 2026-10-13 root: 관리형 생성/등록 완료, feature branch 준비. Phase A 회귀 준비 중; 새 테스트·PR·alpha는 NOT RUN.
+
+- 2026-10-13 11:11Z root: 기존 완료 경기 상세 편집 C1의 실제 소비자 회귀는 1 FAIL/10 PASS RED 후 canWrite && !leagueEnded 최소수정으로 11/11 GREEN (mdqa138-completed-existing-fixture-green11.log). 현재 기준 ee7은 최신 peer1901 dev06a7과 부모 파일이 겹치므로 이 결과를 최신 dev 검증으로 재사용하지 않는다. 원 모바일 편집 진입 결함은 실제06a 코드에 남음을 독립 확인했고, peer mobileFocusFixtureId/수동추가/징계/공식결과 보호를 보존해 정상 merge 통합 후 영향 검증을 갱신한다. PR/alpha는 NOT RUN.

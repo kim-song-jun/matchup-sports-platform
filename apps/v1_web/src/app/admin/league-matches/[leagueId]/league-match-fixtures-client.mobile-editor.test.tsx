@@ -168,6 +168,27 @@ describe('MD-QA #138 초기 모바일 consumer → 실제 편집 → HTTP 저장
     expect(mobileEditorFixture.templateWrites).toEqual([]);
   });
 
+  it('완료된 리그의 기존 경기는 쓰기 권한이 있어도 모바일에서 읽기만 하고 수정 진입을 열지 않아요', async () => {
+    // Given: 결과가 남은 종료 리그를 쓰기 권한이 있는 운영자가 처음 모바일로 열어요.
+    mobileEditorFixture.league = {
+      ...mobileLeague([mobileFixture({ resultStage: 'official', gameState: 'ENDED' })]),
+      state: 'completed',
+    };
+    await renderMobileConsumer();
+    // When: 기존 경기의 상세는 계속 열어 이력을 확인해요.
+    fireEvent.click(await screen.findByRole('button', { name: /모바일 리그 1주차/ }));
+    const sheet = await screen.findByRole('dialog', { name: '모바일 리그 1주차' });
+    // Then: updateFixture의 LEAGUE_ENDED 계약에 맞춰 저장할 수 없는 수정 진입은 없어요.
+    expect(within(sheet).getByText('합성 홈팀')).toBeVisible();
+    expect(within(sheet).getByText('합성 원정팀')).toBeVisible();
+    expect(within(sheet).queryByRole('button', { name: /경기 수정|일정 수정/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: '경기 수정' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('경기 이름')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '템플릿으로 다시 만들기' })).not.toBeInTheDocument();
+    expect(mobileEditorFixture.fixtureWrites).toEqual([]);
+    expect(mobileEditorFixture.templateWrites).toEqual([]);
+  });
+
   it('쓰기 권한 없는 첫 모바일 진입은 경기 내용만 보이고 새 편집 쓰기를 열지 않아요', async () => {
     // Given
     mobileEditorFixture.canWrite = false;

@@ -697,11 +697,20 @@ export class LeagueSeriesAdminService {
         const seriesSportCode = (
           await tx.v1Sport.findUniqueOrThrow({ where: { id: series.sportId }, select: { code: true } })
         ).code;
-        // 직전 시즌의 같은 티어에서 이미지·참가비·계좌를 이어받는다(값 복사, 이후 독립). 티어별로 갈라서
-        // 1부 값이 2부로 새지 않게 하고, 직전 시즌에 없던 티어는 기본값 그대로 둔다.
+        // 직전 시즌의 같은 티어에서 이미지·참가비·계좌·팀 명단 인원을 이어받는다(값 복사, 이후 독립). 티어별로
+        // 갈라서 1부 값이 2부로 새지 않게 하고, 직전 시즌에 없던 티어는 기본값 그대로 둔다.
         const previousSeasonRows = await tx.v1Tournament.findMany({
           where: { id: { in: [...leagueByTier.values()] }, kind: 'regular_league', deletedAt: null },
-          select: { tier: true, coverImageUrl: true, entryFee: true, bankName: true, bankAccount: true, bankHolder: true },
+          select: {
+            tier: true,
+            coverImageUrl: true,
+            entryFee: true,
+            bankName: true,
+            bankAccount: true,
+            bankHolder: true,
+            minPlayers: true,
+            maxPlayers: true,
+          },
         });
         const inheritedByTier = new Map(previousSeasonRows.map(({ tier, ...values }) => [tier, values]));
         for (const { tier, teamIds } of nextSeasonPlan.tiers) {

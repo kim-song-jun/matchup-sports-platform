@@ -247,7 +247,8 @@ lock); it is intentionally not opened for leagues.
   league response or in `/tournaments` responses. Clients must not render the fee
   when `entryFeeConfigured` is `false` — an unset fee is not "free".
 - Season carry-over: `commitPromotions` (promotion/relegation commit) copies
-  `coverImageUrl`, `entryFee` and the three bank fields from the previous season's
+  `coverImageUrl`, `entryFee`, the three bank fields and the team roster size (`minPlayers`,
+  `maxPlayers` — `null` stays unlimited) from the previous season's
   league of the **same tier** into the new season. `entryFeeConfiguredAt` is left
   `null`, so the new season shows as "inherited — please confirm". Values are copied,
   not linked: later edits to either season do not affect the other. First-season

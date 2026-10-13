@@ -28,6 +28,13 @@ describe('leagueStateOptions — 서버 changeState 와 같은 전이 규칙', (
     expect(reasonOf(done, 'completed')).toBeNull();
   });
 
+  it('준비 중으로 돌려도 신청이 열린다고 약속하지 않는다 — 신청은 마감이 정한다', () => {
+    const options = leagueStateOptions({ state: 'active', heldFromState: null, fixtures: [] });
+    const draft = options.find((option) => option.state === 'draft');
+    expect(draft?.description).not.toContain('다시 받을 수');
+    expect(draft?.description).toContain('신청 마감');
+  });
+
   it('보류 중에는 보류 전 상태로만, 종료된 리그는 진행 중으로만 돌아간다', () => {
     const held = leagueStateOptions({ state: 'on_hold', heldFromState: 'active', fixtures: [] });
     expect(reasonOf(held, 'active')).toBeNull();

@@ -1843,7 +1843,7 @@ export class LeagueMatchAdminService {
 
   /**
    * 준비 중 ↔ 진행 중. 지금까지는 대진을 만들 때만 진행 중이 됐다. 준비 중으로 돌리는 것은 아직 시작한 경기가
-   * 없을 때만 연다 — 이미 치른 경기가 있으면 '보류'가 맞다(준비 중은 신청을 다시 받을 수 있는 상태라서).
+   * 없을 때만 연다 — 이미 치른 경기가 있으면 '보류'가 맞다(치른 경기가 있는 리그를 '준비 중'으로 보이면 공개 화면이 거짓말을 한다).
    */
   private async moveBetweenDraftAndActive(user: V1AuthUser, leagueId: string, target: 'draft' | 'active', reason: string | undefined) {
     const admin = await this.adminContext.getMutationAdmin(user.id);

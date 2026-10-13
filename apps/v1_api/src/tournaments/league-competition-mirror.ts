@@ -82,6 +82,9 @@ export interface LeagueMirrorSource {
     bankName: string | null;
     bankAccount: string | null;
     bankHolder: string | null;
+    /** 팀 명단 인원. null = 제한 없음 — 안 이어받으면 다음 시즌이 숨은 기본 정원(10명)으로 돌아가 명단이 잘린다. */
+    minPlayers: number;
+    maxPlayers: number | null;
   };
 }
 
@@ -119,6 +122,8 @@ export function leagueMirrorCreateData(
           bankName: league.inherited.bankName,
           bankAccount: league.inherited.bankAccount,
           bankHolder: league.inherited.bankHolder,
+          minPlayers: league.inherited.minPlayers,
+          maxPlayers: league.inherited.maxPlayers,
         }),
   };
 }

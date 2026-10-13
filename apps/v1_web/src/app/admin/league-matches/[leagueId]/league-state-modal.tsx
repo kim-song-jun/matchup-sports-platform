@@ -48,7 +48,8 @@ export function leagueStateOptions(series: Pick<V1AdminLeagueDetail, 'state' | '
     if (state === 'on_hold' && target === holdRestore) return '보류를 풀고 보류 전 상태와 공개 설정으로 돌아가요.';
     switch (target) {
       case 'draft':
-        return '공개 화면에서 준비 중으로 보이고, 참가 신청을 다시 받을 수 있어요.';
+        // 신청 여부는 상태가 아니라 신청 마감이 정한다(isLeagueRegistrationOpen) — 준비 중으로 돌린다고 신청이 열리지 않는다.
+        return '공개 화면에서 준비 중으로 보여요. 참가 신청은 상태와 관계없이 신청 마감까지 받아요.';
       case 'active':
         return state === 'completed' ? '종료를 풀고 다시 진행 중으로 돌려요. 남은 경기가 모두 확정되면 다시 자동으로 종료돼요.' : '리그를 시작해요.';
       case 'on_hold':

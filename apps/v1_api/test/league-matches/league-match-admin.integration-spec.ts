@@ -346,6 +346,29 @@ describe('POST /admin/league-matches + fixtures', () => {
     expect(fixturesRes.body.data.teamMatchIds).toHaveLength(2);
   });
 
+  it('총 경기 수에 null 을 보내면 0경기로 만들지 않고 거부한다', async () => {
+    const createRes = await request(app.getHttpServer())
+      .post('/api/v1/admin/league-matches')
+      .set('x-v1-user-id', ownerUserId)
+      .send({
+        title: '총 경기 수 null 리그',
+        sportId,
+        regionId,
+        startsOn: new Date().toISOString(),
+        endsOn: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+        teamIds: [teamAId, teamBId],
+      });
+    const leagueId = createRes.body.data.leagueId;
+
+    const fixturesRes = await request(app.getHttpServer())
+      .post(`/api/v1/admin/league-matches/${leagueId}/fixtures`)
+      .set('x-v1-user-id', ownerUserId)
+      .send({ weeksCount: 1, fixtureCount: null });
+    expect(fixturesRes.status).toBe(400);
+    expect(fixturesRes.body.code).toBe('VALIDATION_ERROR');
+    expect(await prisma.v1TeamMatch.count({ where: { leagueId } })).toBe(0);
+  });
+
   it('상태 변경 하나로 시작·보류·해제·준비 중 되돌리기를 처리한다', async () => {
     const createRes = await request(app.getHttpServer())
       .post('/api/v1/admin/league-matches')

@@ -1,5 +1,5 @@
 import { Transform, Type } from 'class-transformer';
-import { ArrayNotEmpty, IsArray, IsBoolean, IsDateString, IsDefined, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
+import { ArrayNotEmpty, IsArray, IsBoolean, IsDateString, IsDefined, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateIf, ValidateNested } from 'class-validator';
 import { IsPlaceLatitude, IsPlaceLongitude, IsPlaceProvider, IsPlaceProviderId } from '../../places/place-snapshot';
 
 /** 경기 장소 스냅샷 입력(이름은 각 DTO 의 `placeName`). 규칙은 `places/place-snapshot.ts` 가 소유한다. */
@@ -169,7 +169,8 @@ export class GenerateLeagueFixturesDto extends LeaguePlaceSnapshotDto {
   roundsCount?: number;
 
   // 리그를 만들 때 정한 총 경기 수 — 라운드로빈 순서대로 만든 뒤 이 수에서 자른다. 생략하면 라운드 전부.
-  @IsOptional()
+  // null 은 거부한다 — `@IsOptional` 은 null 도 통과시키는데 `slice(0, null)` 은 0경기를 만든다.
+  @ValidateIf((_object, value) => value !== undefined)
   @IsInt()
   @Min(1)
   @Max(500)

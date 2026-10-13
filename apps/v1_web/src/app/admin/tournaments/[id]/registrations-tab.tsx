@@ -43,9 +43,15 @@ export function RosterModal({
   showToast: (msg: string, v?: 'success' | 'error') => void;
   canWrite: boolean;
 }) {
+  const visibleRegistrationId = open ? registration?.id ?? '' : '';
   const { data, isPending, isError, error, refetch } = useV1AdminTournamentPlayers(
-    registration?.id ?? '',
+    visibleRegistrationId,
   );
+  // 모달은 닫혀도 마운트되어 있어 같은 신청을 재열면 캐시만 남는다.
+  // 보이는 신청만 관찰하고, 열릴 때마다 현재 프로필이 반영된 명단을 다시 받는다.
+  useEffect(() => {
+    if (visibleRegistrationId) void refetch({ cancelRefetch: false });
+  }, [visibleRegistrationId, refetch]);
   const updateEligibility = useV1UpdatePlayerEligibility(registration?.id ?? '');
   const addPlayer = useV1AdminAddPlayer(registration?.id ?? '');
   const removePlayer = useV1AdminRemovePlayer(registration?.id ?? '');

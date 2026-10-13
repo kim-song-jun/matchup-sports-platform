@@ -56,6 +56,8 @@ shared api.ts는 이 작업자 한 명만 해당 타입을 수정한다. UI 변�
 | 2026-10-13 | root | PR1883 이미 머지 여부와 중복 | PR1883은 games/arrival console 식별 정보만 변경하며 이 관리자 등록 선수 목록은 포함하지 않음 |
 
 ## Progress Snapshot
+- 2026-10-13 09:33Z: 최신 외부 리뷰 P1 `r4256355299`·P2 `r4256355309`를 같은 PR1896에서 추적한다. P2 실제 소비자 RED5 FAIL/9 PASS와 만료 캐시·StrictMode 중복 GET의 RED1 FAIL/15 PASS를 확인한 뒤 영향3파일71/71 GREEN (`mdqa140-reopen-final-affected-green.log`). 닫힌 명단 조회를 중단하고 재열 때 기존 요청과 합류해 현재 프로필을 다시 조회한다. 403/503에서 이전 개인정보를 숨기고 재시도·다른 신청의 지연 응답을 검증했다.
+- 2026-10-13 09:33Z: P1은 Nest가 선택하는 `tsconfig.build.json`의 production root를 분리하고 일반 타입·테스트 대상은 유지한다. 실제 닫힌 TypeScript program, 배포 실행파일7건의 메모리 내 JavaScript emit, 원래 넓은 설정이424 test root와 Jest fixture를 실제 emit하는 실패 대조, runtime import 재유입 대조5/5 PASS (`mdqa140-api-build-boundary-green.log`). `pnpm qa:alpha-seed-runtime` PASS. full build·alpha 실측 PASS와 구분한다. 최신 commit 타입·독립 리뷰·동일PR push·외부 재리뷰·dev 머지·배포 후 alpha 검증은 남아 있다.
 - Claim verified 2026-10-13 05:16Z; branch `fix/mdqa-140-admin-player-nickname`; base `5d289d7f40ccc6f0e447d5ce1f89a1f4c331c711`.
 - 2026-10-13 Phase A: 실제 관리자 service의 신규 5건 RED → 기존 포함112/112 GREEN. 현재 프로필 닉네임은 nullable 별도 필드이며 등록 당시 실명·CSV·권한·정렬을 보존한다.
 - 2026-10-13 Phase B: 선택된 A안 실제 RosterModal + QueryClient + MSW GET/PATCH/DELETE 소비자6건에서5 FAIL/1 PASS RED를 확인한 뒤 기존 이름 영역만 수정했다. 기존 roster16 + awards11 + 신규6 =33/33 GREEN (`mdqa140-ui-a-affected-green.log`). 403 시 명단·개인정보를 숨기는 기존 계약과 read-only 수정 차단도 통과했다. 403의 logger HTTP boundary는 204 핸들러를 추가했고 신규6/6 재검증 PASS, unhandled request 없음 (`mdqa140-ui-a-logger-boundary-green.log`).

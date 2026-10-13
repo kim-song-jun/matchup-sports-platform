@@ -233,8 +233,9 @@ describe('admin tournament roster modal', () => {
 
     expect(screen.getByRole('alert')).toHaveTextContent('관리자 명단 조회 실패');
     expect(screen.queryByText('등록된 선수가 없어요.')).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: '다시 시도' }));
     expect(refetch).toHaveBeenCalledTimes(1);
+    await userEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+    expect(refetch).toHaveBeenCalledTimes(2);
   });
 
   // 2026-08-03 사고: 어드민 콘솔에 명단 추가·제거가 아예 없어서, 운영자가 무엇을 눌러도

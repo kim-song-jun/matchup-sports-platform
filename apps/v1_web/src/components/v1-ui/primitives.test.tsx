@@ -1,6 +1,6 @@
-import { render } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
-import { Card } from './primitives';
+import { fireEvent, render, within } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { Card, ErrorState } from './primitives';
 
 describe('Card — aria-busy 는 실제로 DOM 에 닿아야 한다', () => {
   it('aria-busy 를 넘기면 렌더된 요소에 그대로 붙는다', () => {
@@ -18,5 +18,47 @@ describe('Card — aria-busy 는 실제로 DOM 에 닿아야 한다', () => {
     const { container } = render(<Card>내용</Card>);
 
     expect(container.querySelector('.tm-card')?.hasAttribute('aria-busy')).toBe(false);
+  });
+});
+
+describe('ErrorState optional compact and pending retry contracts', () => {
+  it('preserves the existing full error layout and retry action by default', () => {
+    const onRetry = vi.fn();
+    const { container } = render(<ErrorState message="실제 요청이 실패했어요" onRetry={onRetry} />);
+    const alert = within(container).getByRole('alert');
+    expect(alert).toHaveClass('tm-empty-state');
+    expect(alert.querySelector('.tm-empty-icon')).toBeInTheDocument();
+    const retry = within(alert).getByRole('button', { name: '다시 시도하기' });
+    expect(retry).toBeEnabled();
+    fireEvent.click(retry);
+    expect(onRetry).toHaveBeenCalledOnce();
+  });
+
+  it('uses compact token spacing without the page-sized empty-state layout when opted in', () => {
+    const { container } = render(<ErrorState message="실제 요청이 실패했어요" compact />);
+    const alert = within(container).getByRole('alert');
+    expect(alert).toHaveTextContent('실제 요청이 실패했어요');
+    expect(alert).not.toHaveClass('tm-empty-state');
+    expect(alert).toHaveStyle({ padding: 'var(--spacing-4)' });
+  });
+
+  it('keeps the focused retry mounted and blocks duplicate actions while pending', () => {
+    const onRetry = vi.fn();
+    const { container, rerender } = render(<ErrorState message="실제 요청이 실패했어요" onRetry={onRetry} />);
+    const retry = within(container).getByRole('button', { name: '다시 시도하기' });
+    retry.focus();
+    rerender(<ErrorState message="실제 요청이 실패했어요" onRetry={onRetry} retryPending />);
+    expect(retry).toBeInTheDocument();
+    expect(retry).toHaveFocus();
+    expect(retry).toHaveAttribute('aria-disabled', 'true');
+    expect(retry).toHaveTextContent('조회 중...');
+    fireEvent.click(retry);
+    expect(onRetry).not.toHaveBeenCalled();
+    rerender(<ErrorState message="실제 요청이 실패했어요" onRetry={onRetry} />);
+    expect(retry).toHaveFocus();
+    expect(retry).toBeEnabled();
+    expect(retry).not.toHaveAttribute('aria-disabled');
+    fireEvent.click(retry);
+    expect(onRetry).toHaveBeenCalledOnce();
   });
 });

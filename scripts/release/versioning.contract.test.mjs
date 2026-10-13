@@ -249,7 +249,7 @@ test('a half-bumped release commit does not get the release exemption', () => {
   }
 });
 
-function runPromotionPolicy(root, changedFiles, baseVersion = '0.1.0') {
+function runPromotionPolicy(root, changedFiles, baseVersion = '0.1.0', headRef = 'dev') {
   return runNode(policyPath, [
     '--repo',
     root,
@@ -260,7 +260,7 @@ function runPromotionPolicy(root, changedFiles, baseVersion = '0.1.0') {
     '--base-ref',
     'main',
     '--head-ref',
-    'dev',
+    headRef,
     '--base-api-version',
     baseVersion,
     '--base-web-version',
@@ -268,7 +268,7 @@ function runPromotionPolicy(root, changedFiles, baseVersion = '0.1.0') {
   ]);
 }
 
-test('a fully versioned dev-to-main promotion may include released behavior changes', () => {
+test('a fully versioned main promotion may include released behavior changes', () => {
   const root = createFixture({ apiVersion: '0.2.0', webVersion: '0.2.0' });
   try {
     const changedFiles = join(root, 'changed-files.txt');
@@ -287,7 +287,7 @@ test('a fully versioned dev-to-main promotion may include released behavior chan
     const result = runPromotionPolicy(root, changedFiles);
 
     assert.equal(result.status, 0, result.stderr);
-    assert.match(result.stdout, /verified dev -> main release promotion/i);
+    assert.match(result.stdout, /verified main release promotion/i);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -306,7 +306,7 @@ test('promotion workflow includes Changesets added and consumed within the relea
   );
 });
 
-test('dev-to-main promotion rejects pending unreleased Changesets', () => {
+test('main promotion rejects pending unreleased Changesets', () => {
   const root = createFixture({
     apiVersion: '0.2.0',
     webVersion: '0.2.0',
@@ -335,7 +335,7 @@ test('dev-to-main promotion rejects pending unreleased Changesets', () => {
   }
 });
 
-test('dev-to-main promotion rejects a version that did not advance', () => {
+test('main promotion rejects a version that did not advance', () => {
   const root = createFixture({ apiVersion: '0.2.0', webVersion: '0.2.0' });
   try {
     const changedFiles = join(root, 'changed-files.txt');
@@ -358,6 +358,106 @@ test('dev-to-main promotion rejects a version that did not advance', () => {
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test('a non-dev branch targeting main passes only with the full release contract', () => {
+  const root = createFixture({ apiVersion: '0.2.0', webVersion: '0.2.0' });
+  try {
+    const changedFiles = join(root, 'changed-files.txt');
+    writeFileSync(
+      changedFiles,
+      [
+        'apps/v1_api/src/main.ts',
+        'apps/v1_api/package.json',
+        'apps/v1_web/package.json',
+        'apps/v1_api/CHANGELOG.md',
+        'apps/v1_web/CHANGELOG.md',
+        '.changeset/consumed-one.md',
+      ].join('\n'),
+    );
+
+    const result = runPromotionPolicy(root, changedFiles, '0.1.0', 'hotfix/kakao-login');
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /verified main release promotion/i);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('main release promotion rejects missing base version metadata', () => {
+  const root = createFixture({ apiVersion: '0.2.0', webVersion: '0.2.0' });
+  try {
+    const changedFiles = join(root, 'changed-files.txt');
+    writeFileSync(
+      changedFiles,
+      [
+        'apps/v1_api/src/main.ts', 'apps/v1_api/package.json', 'apps/v1_web/package.json',
+        'apps/v1_api/CHANGELOG.md', 'apps/v1_web/CHANGELOG.md', '.changeset/consumed-one.md',
+      ].join('\n'),
+    );
+    const args = [
+      '--repo', root, '--changed-files-file', changedFiles, '--release-promotion', 'true',
+      '--base-ref', 'main', '--head-ref', 'hotfix/kakao-login', '--base-api-version', '0.1.0',
+    ];
+    const result = runNode(policyPath, args);
+
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /require base\/head refs and both base versions/i);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('release promotion is never selected for a non-main target', () => {
+  const root = createFixture({
+    changesets: [[{ packageName: 'v1_api', bump: 'patch' }]],
+    apiVersion: '0.2.0',
+    webVersion: '0.2.0',
+  });
+  try {
+    const changedFiles = join(root, 'changed-files.txt');
+    writeFileSync(changedFiles, 'apps/v1_api/src/main.ts\n.changeset/fixture-1.md\n');
+
+    const result = runNode(policyPath, [
+      '--repo', root, '--changed-files-file', changedFiles, '--release-promotion', 'true',
+      '--base-ref', 'dev', '--head-ref', 'hotfix/kakao-login',
+      '--base-api-version', '0.1.0', '--base-web-version', '0.1.0',
+    ]);
+
+    assert.equal(result.status, 0, result.stderr);
+    assert.doesNotMatch(result.stdout, /verified main release promotion/i);
+    assert.match(result.stdout, /release changeset accepted/i);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('main promotion requires an auditable consumed Changeset receipt', () => {
+  const root = createFixture({ apiVersion: '0.2.0', webVersion: '0.2.0' });
+  try {
+    const changedFiles = join(root, 'changed-files.txt');
+    writeFileSync(
+      changedFiles,
+      [
+        'apps/v1_api/src/main.ts', 'apps/v1_api/package.json', 'apps/v1_web/package.json',
+        'apps/v1_api/CHANGELOG.md', 'apps/v1_web/CHANGELOG.md',
+      ].join('\n'),
+    );
+    const result = runPromotionPolicy(root, changedFiles, '0.1.0', 'hotfix/kakao-login');
+
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /must include consumed Changesets/i);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('deploy workflow selects promotion checks for every main-target PR source branch', () => {
+  const workflow = readFileSync(join(repoRoot, '.github/workflows/deploy.yml'), 'utf8');
+
+  assert.match(workflow, /if \[\[ \$\{BASE_REF\} == main && -n \$\{HEAD_REF\} \]\]; then/);
+  assert.doesNotMatch(workflow, /if \[\[ \$\{BASE_REF\} == main && \$\{HEAD_REF\} == dev \]\]; then/);
 });
 
 test('resolver still labels an alpha build after every changeset has been released', () => {

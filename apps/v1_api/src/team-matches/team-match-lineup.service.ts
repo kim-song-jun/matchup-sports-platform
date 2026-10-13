@@ -888,9 +888,10 @@ export class TeamMatchLineupService {
         startAt: true,
         leagueId: true,
         tournamentId: true,
+        deletedAt: true,
       },
     });
-    if (teamMatch === null) {
+    if (teamMatch === null || teamMatch.deletedAt || ['cancelled', 'archived'].includes(teamMatch.status)) {
       throw new NotFoundException({
         code: 'TEAM_MATCH_NOT_FOUND',
         message: '팀 매칭을 찾을 수 없어요.',

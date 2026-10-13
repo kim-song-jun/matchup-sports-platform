@@ -45,7 +45,6 @@ import {
   TEAM_MATCH_WITHDRAW_CONFIRM,
   teamMatchCancelReasonField,
 } from './team-match-cancel-confirm';
-import { MatchLifecyclePanel } from '../matches/match-lifecycle-panel';
 import { buildAttendanceSummary } from './team-match-attendance-summary';
 import {
   buildNextAction,
@@ -649,9 +648,11 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
           isLeagueFixture,
           closeTeamMatch: () => closeTeamMatch.mutateAsync({ reason: 'host_closed_from_v1_web' }),
           reopenTeamMatch: () => reopenTeamMatch.mutateAsync({ reason: 'host_reopened_from_v1_web' }),
-          cancelTeamMatch: (reason) => cancelTeamMatch.mutateAsync({ reason: reason || null }),
-          // 보류 매치의 취소·삭제는 상세의 보류 결정 패널이 맡는다 — 메뉴에 같은 동작을 두 번 두지 않는다.
-          deleteTeamMatch: query.data.lifecycle?.canDelete && apiStatus !== 'on_hold'
+          cancelTeamMatch: async (reason) => {
+            await cancelTeamMatch.mutateAsync({ reason: reason || null });
+            router.replace('/team-matches');
+          },
+          deleteTeamMatch: query.data.lifecycle?.canDelete
             ? () => deleteTeamMatch.mutateAsync()
             : undefined,
           pending: closeTeamMatch.isPending || reopenTeamMatch.isPending || cancelTeamMatch.isPending || deleteTeamMatch.isPending,
@@ -725,7 +726,7 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
     applyConfirm: applyAction && applyAction === withdrawApplication ? TEAM_MATCH_WITHDRAW_CONFIRM : undefined,
   };
 
-  return <TeamMatchDetailPageView model={model} lifecyclePanel={!seeding && query.data.lifecycle && !query.data.league && apiStatus === 'on_hold' ? <MatchLifecyclePanel id={teamMatchId} domain="team-matches" status={getStatus(query.data)} lifecycle={query.data.lifecycle} canManage={Boolean(query.data.viewer?.manageableHostTeam && query.data.viewer?.manageRoute)} /> : undefined} recordEntry={query.data.gameId ? <TeamMatchRecordEntry teamMatchId={teamMatchId} detailOnly={recordParams.get('view') === 'detail'} fromHref={fromPath} /> : undefined} />;
+  return <TeamMatchDetailPageView model={model} recordEntry={query.data.gameId ? <TeamMatchRecordEntry teamMatchId={teamMatchId} detailOnly={recordParams.get('view') === 'detail'} fromHref={fromPath} /> : undefined} />;
 }
 
 
@@ -799,8 +800,9 @@ function toTeamMatchKind(value: string | null): '' | 'friendly' | 'competition' 
 }
 
 function filterTeamMatchesByLevels(matches: V1TeamMatch[] | undefined, levels: NonNullable<TeamMatchListViewModel['filterSheet']>['levels']) {
-  if (!matches || levels.length === 0) return matches ?? [];
-  return matches.filter((match) => levelRangeMatches(levels, match.minLevel?.code, match.maxLevel?.code, match.levelLabel));
+  const visible = (matches ?? []).filter((match) => getStatus(match) !== 'cancelled');
+  if (levels.length === 0) return visible;
+  return visible.filter((match) => levelRangeMatches(levels, match.minLevel?.code, match.maxLevel?.code, match.levelLabel));
 }
 
 function countTeamMatchFilters(
@@ -923,7 +925,6 @@ function applyLabel(
 const OWN_TEAM_MATCH_LABEL = '우리 팀 경기예요';
 
 function statusLabel(viewerState: V1TeamMatchViewerState, status: V1TeamMatchApiStatus) {
-  if (status === 'on_hold') return '보류';
   if (status === 'cancelled') return TEAM_MATCH_CANCELLED_LABEL;
   if (viewerState === 'host_team') return '내가 만든 팀매치';
   if (viewerState === 'requested') return '승인 대기';
@@ -1047,7 +1048,6 @@ function buildHostActions({
       }
     : null;
   const withDelete = (actions: NonNullable<TeamMatchDetailViewModel['hostActions']>) => (deleteAction ? [...actions, deleteAction] : actions);
-  if (status === 'on_hold') return [];
   if (canCloseRecruitment) {
     const closeLabel = status === 'closed' ? '대기 신청 종료' : '모집 마감';
     // 마감하면 서버가 대기 신청을 전부 expired 로 끝낸다(close()) — 끝나는 팀이 있을 때만 확인한다.

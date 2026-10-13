@@ -5,6 +5,7 @@ import { useV1MyMatchesInfinite, useV1MyTeamMatchesInfinite } from '@/hooks/use-
 import { formatCardDate, formatCardTime } from '@/lib/date-utils';
 import { withFromPath } from '@/lib/session-storage';
 import { personalMatchLifecycleLabel } from '@/lib/v1-status-labels';
+import { getStatus as getTeamMatchStatus } from '../team-matches/team-matches.card-model';
 import type { V1Match, V1MyTeamMatch } from '@/types/api';
 import { MyMatchesPageView } from './my-page';
 import type { MyMatch, MyMatchesViewModel, MyMatchStatus } from './my.types';
@@ -30,6 +31,7 @@ export function MyMatchesPageClient({ mode }: { mode: 'joined' | 'created' }) {
     ? teamQuery.data.pages
       .flatMap((page) => page.items)
       .filter((item, index, items) => items.findIndex((other) => other.teamMatchId === item.teamMatchId) === index)
+      .filter((match) => getTeamMatchStatus(match) !== 'cancelled')
       .map((match) => toTeamMatch(match, mode, listHref))
     : [];
 
@@ -243,8 +245,7 @@ function toPersonalStatus(match: V1Match): MyMatchStatus {
 }
 
 function toTeamStatus(match: V1MyTeamMatch): MyMatchStatus {
-  const display = match.displayState ?? match.status;
-  if (display === 'on_hold') return 'on_hold';
+  const display = getTeamMatchStatus(match);
   if (match.relation === 'requested') return 'pending';
   if (match.relation === 'rejected' || match.relation === 'withdrawn') return 'ended';
   if (display === 'completed' || display === 'expired' || display === 'closed' || display === 'cancelled') return 'ended';
@@ -269,8 +270,7 @@ function personalStatusLabel(status: MyMatchStatus, match: V1Match) {
 }
 
 function teamStatusLabel(match: V1MyTeamMatch, mode: 'joined' | 'created') {
-  const display = match.displayState ?? match.status;
-  if (display === 'on_hold') return '보류';
+  const display = getTeamMatchStatus(match);
   if (display === 'completed') return '경기 완료';
   if (display === 'cancelled') return '경기 취소';
   if (display === 'expired') return '기간 종료';

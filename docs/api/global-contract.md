@@ -161,3 +161,6 @@ above. UI must not simulate successful transactions or support outcomes for thes
 `POST /admin/tournaments/:tournamentId/byes` follows the standard auth guard, mutation-admin permission, DTO whitelist and success/error envelopes. A bye is a saved group-team entry, without a TeamMatch or Game result. See [the tournament domain](./domains/tournaments.md#라운드별-부전승-직접-등록-2026-10-05) for phase, capacity, conflict and display-position contracts.
 
 - 2026-10-05: tournament bye slots allow null registration + byeId reassignment; pre-start fixture deletion archives canonical history. See [tournament contract](domains/tournaments.md).
+## Team-match visibility update (2026-10-13)
+
+Team matches do not expose `on_hold`: unmatched recruitment with an elapsed deadline or kickoff is `closed`. Cancelled/archived team matches are excluded from public and personal team-match lists and counts; user detail and eligibility return 404. Linked team/my schedules are hidden, while admin records remain. Admin reopening of a future unmatched match clears an elapsed deadline in the same audited transaction. Personal-match hold behavior remains domain-specific; see `domains/team-matches.md` and `domains/admin-and-ops.md` for status gates.

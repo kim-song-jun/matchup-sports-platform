@@ -108,7 +108,7 @@ describe('MD-QA #58 실제 홈 날짜 소비자와 상세 계약', () => {
 
   it('개인 매치 두 API 모양·리그 마감·공지·팝업도 같은 KST 날짜를 소비한다', () => {
     const [input, date, time] = DATES[1];
-    const legacy = homeModel({ recommendedMatches: [teamMatch(input)],
+    const legacy = homeModel({ recommendedMatches: [{ ...teamMatch(input), status: 'recruiting', displayState: undefined }],
       notices: [{ noticeId: 'notice-1', title: '공지', publishedAt: input }],
       popup: { popupId: 'popup-1', title: '팝업', body: '본문', targetScreens: ['home'], publishedAt: input, linkUrl: null, linkLabel: null } });
     const current = homeModel({ recommendations: [{ matchId: MATCH_ID, title: '개인 매치', sportName: '풋살', regionName: '서울', startsAt: input }] });

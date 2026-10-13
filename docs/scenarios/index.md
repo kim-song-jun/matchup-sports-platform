@@ -513,3 +513,9 @@ Implementation and isolated API/browser evidence tracked in Task 156; production
 ### 2026-10-01 — Task 181 매치 보류 후속 조치
 
 개인·팀매치 보류와 주최자 후속 조치. [Task 181](../../.github/tasks/181-match-on-hold-lifecycle.md)에서 배포 및 검증 진행 상태를 관리한다.
+
+## 2026-10-13 — 팀매치 마감·취소 비노출·어드민 상태 수정
+
+[Task 181](../../.github/tasks/181-match-on-hold-lifecycle.md#2026-10-13-team-match-policy-override-active-follow-up) / [팀매치 시나리오](./05-team-match-flows.md#task-181--미매칭-마감취소-비노출어드민-상태-변경-2026-10-13-개정): 보류를 마감으로 통일, 취소는 사용자 목록·내 매치·상세·연결 일정에서 숨기고 어드민 이력 유지, 어드민 모집 재개 시 지난 마감일 해제 및 캐시 갱신. 구현은 별도 최신 dev 기반 작업트리에 있으며 운영 데이터 변경 없음. 관련 API 단위 168/168, Web 135/135 통과. 최종 타입/범위 점검 진행 중. 신규 HTTP/DB 회귀는 PostgreSQL 미가동으로 미실행; Alpha after QA 및 배포 미완료. 브라우저 커넥터는 kernel reset 오류로 시작 실패. 테스트 통과를 배포·실사용 QA 완료로 계산하지 않는다.
+
+- 최종 로컬 검증: 관련 API 297/297, Web 225/225; 양 앱 lint(타입+표면/패턴) 통과, diff --check 통과. 참석명단·기록 직접 URL의 사용자 비노출과 활성 관리자 기록 유지도 반영. 실제 DB/Alpha 배포/실화면 390·768·1440 검증은 여전히 미완료이며 운영 데이터는 변경하지 않았다.

@@ -460,6 +460,8 @@ function deepLinkForEvent(
   targetType: V1NotificationTargetType,
   targetId: string | null,
 ): string | null {
+  // 취소된 팀매치는 사용자 상세에서 사라지므로 알림도 존재하는 목록으로 보낸다.
+  if (type === 'team_match_cancelled') return '/team-matches';
   if (type === 'admin_team_match_application_received' && targetId) {
     return `/admin/team-matches/${targetId}`;
   }

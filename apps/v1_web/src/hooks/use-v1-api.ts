@@ -3538,6 +3538,9 @@ export function useV1UpdateAdminTeamMatchRecruitment(teamMatchId: string) {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminTeamMatch(teamMatchId) });
       queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'team-matches'] });
       queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'team-matches'] });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'me', 'team-matches'] });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'me', 'schedule'] });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'teams'] });
     },
   });
 }
@@ -3632,9 +3635,15 @@ export function useV1ChangeTeamMatchStatus() {
   return useMutation({
     mutationFn: ({ id, status, reason }: StatusChangeMutationVars) =>
       v1Post<V1AdminStatusChangeResult>(`/admin/team-matches/${id}/status`, { status, reason }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.adminTeamMatches() });
+    onSuccess: (_data, { id }) => {
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'team-matches'] });
       queryClient.invalidateQueries({ queryKey: v1Keys.adminOverview() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamMatchesAll() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamMatch(id) });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'me', 'team-matches'] });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'me', 'schedule'] });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'teams'] });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'home'] });
     },
   });
 }

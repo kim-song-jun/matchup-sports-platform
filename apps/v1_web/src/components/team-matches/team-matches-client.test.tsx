@@ -26,6 +26,7 @@ const {
   cancelTeamMatchMutateAsync,
   useV1WithdrawTeamMatchApplicationMock,
   routerPush,
+  routerReplace,
   useV1TeamMatchMock,
   useV1TeamMatchEligibilityMock,
   useV1TeamMatchesMock,
@@ -43,6 +44,7 @@ const {
       isPending: false,
     })),
     routerPush: vi.fn(),
+    routerReplace: vi.fn(),
     useV1TeamMatchMock: vi.fn(),
     useV1TeamMatchEligibilityMock: vi.fn(),
     useV1TeamMatchesMock: vi.fn(),
@@ -52,7 +54,7 @@ const {
 });
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: routerPush }),
+  useRouter: () => ({ push: routerPush, replace: routerReplace }),
   useSearchParams: () => searchParamsRef.current,
 }));
 
@@ -892,7 +894,7 @@ describe('toTeamMatch — legacy/unmigrated condition fields never show mock dat
       placeName: '진짜 경기장',
       startsAt: '2026-09-01T10:00:00.000Z',
       capacityText: '1/2',
-      status: 'open',
+      status: 'recruiting',
       ...overrides,
     };
   }
@@ -1349,7 +1351,7 @@ describe('TeamMatchDetailPageClient — 리그 대진은 "팀매치 취소"를 �
     expect(withoutOpponent.reason).toMatchObject({ label: '취소 사유 (선택)', required: false, maxLength: 500 });
   });
 
-  it('호스트가 적은 취소 사유를 취소 API 로 보내고, 비워 두면 사유를 보내지 않는다', () => {
+  it('취소 사유를 API에 보내고 취소 성공 뒤 사용자 목록으로 이동한다', async () => {
     mockHostView('recruiting', null);
     render(<TeamMatchDetailPageClient teamMatchId="team-match-host-1" />);
 
@@ -1358,6 +1360,7 @@ describe('TeamMatchDetailPageClient — 리그 대진은 "팀매치 취소"를 �
 
     expect(cancelTeamMatchMutateAsync).toHaveBeenNthCalledWith(1, { reason: '일정이 바뀌었어요' });
     expect(cancelTeamMatchMutateAsync).toHaveBeenNthCalledWith(2, { reason: null });
+    await waitFor(() => expect(routerReplace).toHaveBeenCalledWith('/team-matches'));
   });
 
   it('일반 팀매치(리그 아님, 같은 상태)는 여전히 "팀매치 취소"가 보인다(회귀 방지)', () => {
@@ -1937,12 +1940,13 @@ describe('TeamMatchDetailPageClient — 호스트의 신청 승인·관리 메�
     expect(screen.getByTestId('team-match-host-actions')).toHaveTextContent(/^모집 마감,팀매치 취소$/);
   });
 
-  it('보류 매치는 취소·삭제를 보류 결정 패널이 맡고 ⋯ 메뉴에는 두지 않는다', () => {
-    mockHost({ status: 'on_hold', lifecycle: { canEdit: true, canDelete: true, onHoldReason: 'NO_OPPONENT', canCloseRecruitment: false, canReopenRecruitment: false } });
+  it('시작 시간이 지난 미매칭 매치는 마감으로 표시하고 취소·삭제는 메뉴에서 처리한다', () => {
+    mockHost({ status: 'closed', lifecycle: { canEdit: true, canDelete: true, onHoldReason: null, canCloseRecruitment: false, canReopenRecruitment: false } });
     render(<TeamMatchDetailPageClient teamMatchId="tm-h6" />);
 
-    expect(screen.getByTestId('team-match-lifecycle-panel')).toHaveTextContent('true');
-    expect(screen.getByTestId('team-match-host-actions')).toBeEmptyDOMElement();
+    expect(screen.getByTestId('team-match-lifecycle-panel')).toHaveTextContent('false');
+    expect(screen.getByTestId('team-match-host-actions')).toHaveTextContent('팀매치 취소');
+    expect(screen.getByTestId('team-match-host-actions')).toHaveTextContent('팀매치 삭제');
   });
 
   it('상대 확정 뒤 — 진행 체크리스트(확정 시각·명단 제출·잠금 안내)와 하단 바 참석명단 관리', () => {

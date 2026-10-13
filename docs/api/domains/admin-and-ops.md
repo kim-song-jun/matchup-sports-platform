@@ -42,8 +42,8 @@
 | `POST` | `/api/v1/admin/team-matches` | `CreateAdminTeamMatchRecruitmentDto` | owner/ops | 팀을 지정하지 않은 플랫폼 팀매치 모집 생성 |
 | `POST` | `/api/v1/admin/team-matches/:teamMatchId/applications/:applicationId/approve` | `ApproveAdminTeamMatchApplicationDto` | owner/ops | 신청 팀을 한 팀씩 승인. 두 번째 승인에서 경기 확정 |
 | `POST` | `/api/v1/admin/team-matches/:teamMatchId/applications/:applicationId/reject` | `RejectAdminTeamMatchApplicationDto` | owner/ops | 대기 신청을 필수 사유와 함께 거절하고 감사 로그·팀 알림 기록 |
-| `PATCH` | `/api/v1/admin/team-matches/:teamMatchId` | `UpdateAdminTeamMatchRecruitmentDto` | owner/ops | 모집 중인 플랫폼 단발 팀매치를 버전 검사 후 수정 |
-| `POST` | `/api/v1/admin/team-matches/:teamMatchId/status` | `ChangeTeamMatchStatusDto` | owner/ops | 팀 매치 상태 변경 |
+| `PATCH` | `/api/v1/admin/team-matches/:teamMatchId` | `UpdateAdminTeamMatchRecruitmentDto` | owner/ops | 모집 중/마감된 플랫폼 단발 팀매치를 상태 유지·버전 검사 후 수정, 연결 일정 동기화 |
+| `POST` | `/api/v1/admin/team-matches/:teamMatchId/status` | `ChangeTeamMatchStatusDto` | owner/ops | 일반 팀매치 모집/마감/취소/보관 상태 변경. 과거 마감 시각은 모집 재개 시 해제하며 취소 기록은 운영자에게만 남김 |
 | `GET` | `/api/v1/admin/popups` | `AdminPopupListQueryDto` | active admin | 팝업 목록 |
 | `GET` | `/api/v1/admin/popups/:popupId` | - | active admin | 팝업 상세 |
 | `POST` | `/api/v1/admin/popups` | `CreateAdminPopupDto` | owner/ops | 팝업 생성 |
@@ -294,3 +294,12 @@ type AdminListSummary = {
 `POST /admin/team-matches/:id/status` (owner/ops) rejects fixtures with either `leagueId` or `tournamentId` with HTTP 409 `COMPETITION_TEAM_MATCH_STATUS_MANAGED`, after locking and loading the target and before any status/audit write. Manage those fixtures through competition operations; generic status updates would bypass Game/schedule consistency. Friendly updates retain both action and status-change logs. Direct `completed` remains independently forbidden with `TEAM_MATCH_COMPLETION_ADMIN_FORBIDDEN`.
 
 Admin team-match list also accepts optional `kind=friendly|league|tournament`; DTO whitelist rejects other values. Friendly means both IDs null; league means non-null `leagueId`; tournament means null `leagueId` and non-null `tournamentId`. Pagination totals and status facets share this category filter (status itself remains excluded from status facets).
+
+### Team-match status changes (2026-10-13, Task 181)
+- owner/ops only; existing service authorization and row locking remain. League/tournament fixtures return `COMPETITION_TEAM_MATCH_STATUS_MANAGED` (409).
+- `recruiting`: future kickoff + no confirmed opponent + not cancelled. An elapsed deadline is cleared atomically, so the public API actually returns recruiting. Future deadlines remain. Before/after audit JSON includes the deadline ISO string or null. Past kickoff returns `TEAM_MATCH_REOPEN_FORBIDDEN`; change schedule first through the recruitment editor.
+- `closed`: unmatched, uncancelled recruitment only. Public team-match hold was removed; expired deadline/kickoff maps to closed.
+- `matched`: new matching must use participant approval/assignment; generic flips return `TEAM_MATCH_ASSIGNMENT_REQUIRED`. `completed` remains forbidden here (`TEAM_MATCH_COMPLETION_ADMIN_FORBIDDEN`); completed results cannot be reopened.
+- `cancelled`: stamp cancelledAt, reject pending applications, cancel SCHEDULED games and connected schedules in the same transaction, then notify team managers. Already-started matched games require the game operations flow. Cancelled matches remain in admin list/detail/audits and are absent from user lists/my matches/detail/eligibility and linked schedules. User direct links return 404.
+- `archived`: matched games must first be cancelled. Past cancellation cannot be revived by first archiving it. Existing application/result history is retained.
+- Web status mutations invalidate admin list/detail, public team-match list/detail, my team matches, schedules, teams and home query families. The status modal retains recruitment/close/cancel/archive; team confirmation is handled by the existing application approval flow.

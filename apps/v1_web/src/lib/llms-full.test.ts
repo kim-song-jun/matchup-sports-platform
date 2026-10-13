@@ -21,6 +21,54 @@ afterEach(() => {
 const page = (items: unknown[]) => ({ items, nextCursor: null, pageInfo: { hasNext: false, nextCursor: null } });
 
 describe('collectLlmsFullSnapshot', () => {
+  it('기본 목록에서 빠진 과거 공개 매치도 포함하고 중복 경기는 한 번만 싣는다', async () => {
+    fetchPublicV1.mockImplementation(async (path: string) => {
+      if (!path.startsWith('/matches?')) return page([]);
+      const status = new URL(path, 'https://teameet.co.kr').searchParams.get('status');
+      return page(status === 'completed' ? [{ matchId: 'old-completed' }, { matchId: 'current' }]
+        : status === 'cancelled' ? [{ matchId: 'cancelled' }]
+        : status === 'expired' ? [{ matchId: 'expired' }, { matchId: 'old-completed' }]
+        : [{ matchId: 'current' }]);
+    });
+    expect((await collectLlmsFullSnapshot()).matches?.map((item) => item.matchId)).toEqual(
+      ['current', 'old-completed', 'cancelled', 'expired'],
+    );
+  });
+
+  it('한 대회가 장애여도 정상 대회의 경기 URL은 보존하고 실패 출처를 안내한다', async () => {
+    fetchPublicV1.mockImplementation(async (path: string) => {
+      if (path.startsWith('/tournaments?')) return page([
+        { id: 'bad', title: '장애 대회', sport: { name: '풋살' }, status: 'completed' },
+        { id: 'good', title: '정상 대회', sport: { name: '풋살' }, status: 'completed' },
+      ]);
+      if (path === '/tournaments/bad') throw new Error('upstream 502');
+      if (path === '/tournaments/good') return { fixtures: [{ id: 'good-game' }] };
+      return page([]);
+    });
+    const snapshot = await collectLlmsFullSnapshot();
+    expect(snapshot.tournamentFixtures?.map((item) => item.fixture.id)).toEqual(['good-game']);
+    expect(snapshot.unavailableSources).toContain('/tournaments/bad');
+  });
+
+  it('공개 목록은 다섯 번째 페이지 이후도 빠짐없이 가져온다', async () => {
+    fetchPublicV1.mockImplementation(async (path: string) => {
+      if (!path.startsWith('/teams?')) return page([]);
+      const index = Number(new URL(path, 'https://teameet.co.kr').searchParams.get('cursor') ?? 0);
+      return { items: [{ id: `team-${index}` }], pageInfo: { hasNext: index < 5, nextCursor: index < 5 ? String(index + 1) : null } };
+    });
+    expect((await collectLlmsFullSnapshot()).teams?.map((team) => team.id)).toEqual(
+      ['team-0', 'team-1', 'team-2', 'team-3', 'team-4', 'team-5'],
+    );
+  });
+
+  it('반복 커서는 불완전한 목록을 성공으로 내보내지 않는다', async () => {
+    fetchPublicV1.mockImplementation(async (path: string) => path.startsWith('/teams?')
+      ? { items: [{ id: 'team-0' }], pageInfo: { hasNext: true, nextCursor: 'same' } }
+      : page([]));
+    expect((await collectLlmsFullSnapshot()).teams).toBeNull();
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('팀'), expect.any(Error));
+  });
+
   it('does not cache league or team-match lists in the generated publication-sensitive snapshot', async () => {
     fetchPublicV1.mockImplementation(async () => page([]));
 
@@ -33,7 +81,8 @@ describe('collectLlmsFullSnapshot', () => {
   it('한 목록이 실패해도 나머지는 채우고, 실패한 섹션만 null 로 표시하며 로그를 남긴다', async () => {
     fetchPublicV1.mockImplementation(async (path: string) => {
       if (path.startsWith('/teams')) throw new Error('upstream 502');
-      return page([{ id: path }]);
+      if (path.startsWith('/tournaments/')) return { fixtures: [] };
+      return page([{ id: new URL(path, 'https://teameet.co.kr').pathname }]);
     });
 
     const snapshot = await collectLlmsFullSnapshot();

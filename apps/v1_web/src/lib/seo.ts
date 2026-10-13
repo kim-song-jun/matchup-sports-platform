@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { competitionFormatLabel } from '@/lib/competition-kind';
-import { formatEntryFee, formatTournamentDateMedium, formatTournamentDateRangeMedium } from '@/lib/date-utils';
+import { formatEntryFee, formatTournamentDateLong, formatTournamentDateRangeLong } from '@/lib/date-utils';
+import { resolveTournamentRegistrationBlock } from '@/lib/tournament-registration-availability';
 import type { ApiEnvelope, V1TournamentDetail, V1TournamentStatus } from '@/types/api';
 
 const DEFAULT_SITE_ORIGIN = 'https://teameet.co.kr';
@@ -184,13 +185,14 @@ export function buildTournamentDescription(
     | 'entryFeeConfigured'
     | 'teamCount'
     | 'confirmedCount'
+    | 'pendingPaymentCount'
     | 'registrationDeadlineAt'
     | 'prizeSummary'
     | 'promoListSubtitle'
   >,
 ): string {
   const facts = [
-    formatTournamentDateRangeMedium(tournament.scheduledAt, tournament.scheduledEndAt),
+    tournament.scheduledAt ? formatTournamentDateRangeLong(tournament.scheduledAt, tournament.scheduledEndAt) : null,
     tournament.venue?.trim() || null,
     `${tournament.sport.name} ${competitionFormatLabel(tournament)}`,
     // 미설정 리그의 entryFee 0 은 '무료' 가 아니라 미확정이다.
@@ -198,10 +200,12 @@ export function buildTournamentDescription(
       ? null
       : `참가비 ${formatEntryFee(tournament.entryFee)}`,
   ];
-  if (tournament.status === 'open') {
-    if (tournament.teamCount) facts.push(`${tournament.teamCount}팀 중 ${tournament.confirmedCount}팀 확정`);
-    const deadline = formatTournamentDateMedium(tournament.registrationDeadlineAt);
-    if (deadline) facts.push(`신청 마감 ${deadline}`);
+  const block = resolveTournamentRegistrationBlock(tournament);
+  if (tournament.status === 'open' || (tournament.kind === 'regular_league' && block === null)) {
+    if (tournament.kind !== 'regular_league' && tournament.teamCount) facts.push(`${tournament.teamCount}팀 중 ${tournament.confirmedCount}팀 확정`);
+    if (block === 'deadline_passed') facts.push('신청 마감됨');
+    else if (block === 'capacity_full') facts.push('정원 마감');
+    if (tournament.registrationDeadlineAt) facts.push(`신청 마감 ${formatTournamentDateLong(tournament.registrationDeadlineAt)}`);
   } else {
     facts.push(TOURNAMENT_STATUS_PHRASE[tournament.status] ?? null);
   }

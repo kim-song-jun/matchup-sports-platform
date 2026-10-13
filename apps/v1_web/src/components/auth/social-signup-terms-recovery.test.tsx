@@ -165,4 +165,65 @@ describe('필수 약관이 변경된 소셜 가입의 실제 인증 캐시 복�
     expect(navigation.pathname).toBe('/signup/social');
     expect(navigation.replace).not.toHaveBeenCalledWith('/terms?mode=social');
   });
+
+  it.each([
+    ['defer', 'success'], ['complete', 'success'],
+    ['defer', '503'], ['complete', '503'],
+  ] as const)('%s의 약관 복구 중 가입 액션을 잠그고 %s 응답 후 회복한다', async (action, result) => {
+    // Given: 실제 가입 오류는 끝났지만 서버의 인증 응답은 아직 도착하지 않았다.
+    let releaseAuth!: () => void;
+    const authResponse = new Promise<void>((resolve) => { releaseAuth = resolve; });
+    server.use(
+      http.post('*/api/v1/auth/social-profile/defer', requireCurrentTerms),
+      http.post('*/api/v1/auth/social-profile', requireCurrentTerms),
+      http.get('*/api/v1/auth/me', async () => {
+        authReads += 1;
+        await authResponse;
+        return result === 'success' ? success(serverAuth) : HttpResponse.json({
+          status: 'error', statusCode: 503, code: 'SERVICE_UNAVAILABLE', message: '인증 상태를 확인하지 못했어요.',
+        }, { status: 503 });
+      }),
+    );
+    await openSignup();
+    const completeButton = await prepareProfile();
+    const deferButton = screen.getByRole('button', { name: '나중에 입력할게요' });
+    const trigger = action === 'defer' ? deferButton : completeButton;
+    const signupForm = screen.getByLabelText(/^닉네임/).closest('form')!;
+
+    try {
+      fireEvent.click(trigger);
+      await waitFor(() => {
+        expect(authReads).toBe(1);
+        expect(client.isMutating()).toBe(0);
+        expect(client.getQueryState(v1Keys.authMe())?.fetchStatus).toBe('fetching');
+      });
+
+      // Then: mutation의 종료와 별개로 복구 중 표시와 두 가입 액션의 잠금을 유지한다.
+      expect(trigger).toHaveAttribute('aria-busy', 'true');
+      expect(completeButton).toBeDisabled();
+      expect(deferButton).toBeDisabled();
+      fireEvent.click(trigger);
+      fireEvent.click(deferButton);
+      fireEvent.submit(signupForm);
+
+      releaseAuth();
+      if (result === 'success') {
+        await screen.findByRole('heading', { name: '필수 약관' });
+        expect(authReads).toBe(1);
+        expect(navigation.pathname).toBe('/terms');
+      } else {
+        await screen.findByText('인증 상태를 확인하지 못했어요.');
+        expect(authReads).toBe(4);
+        expect(completeButton).toBeEnabled();
+        expect(deferButton).toBeEnabled();
+        expect(trigger).not.toHaveAttribute('aria-busy', 'true');
+        expect(navigation.pathname).toBe('/signup/social');
+      }
+      expect(mutationRequests).toBe(1);
+    } finally {
+      // RED도 실제 보류 응답을 끝낸 뒤 정리하여 다음 사례에 요청을 남기지 않는다.
+      releaseAuth();
+      await waitFor(() => expect(client.getQueryState(v1Keys.authMe())?.fetchStatus).toBe('idle'));
+    }
+  });
 });

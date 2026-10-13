@@ -59,6 +59,7 @@ export function SocialSignupClient() {
   const [nicknameCheck, setNicknameCheck] = useState<DuplicateCheckState>({ status: 'idle', value: '' });
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [error, setError] = useState<string | null>(null);
+  const [termsRecoveryPending, setTermsRecoveryPending] = useState(false);
   const exitFlow = useSocialSignupExit();
   const [phoneConflict, setPhoneConflict] = useState(false);
   // 충돌한 번호의 소유 증명을 시작한 상태 — 이때부터 가입 인증 카드 대신 연결용 인증 카드를 보여 준다.
@@ -135,7 +136,8 @@ export function SocialSignupClient() {
   const nicknameVerified = nicknameCheck.status === 'available' && nicknameCheck.value === nickname.trim();
   const profileDraft = { displayName, phone: phoneDigits, birthDate: birthDateDigits, gender };
   const profileIssue = getSignupProfileIssue(profileDraft);
-  const isBlocked = completeProfile.isPending || deferProfile.isPending || checkNickname.isPending || !nicknameVerified || profileIssue !== null;
+  const signupPending = completeProfile.isPending || deferProfile.isPending || termsRecoveryPending;
+  const isBlocked = signupPending || checkNickname.isPending || !nicknameVerified || profileIssue !== null;
   const disabledReason = !nicknameVerified ? '닉네임 중복 확인이 필요해요.' : null;
 
   const actionReason = disabledReason ?? (profileIssue ? SIGNUP_PROFILE_ERROR_MESSAGES[profileIssue] : null);
@@ -171,16 +173,21 @@ export function SocialSignupClient() {
 
   const recoverRequiredTerms = async () => {
     // 서버가 가입 상태를 되돌린 오류라 fresh 캐시도 재조회해야 약관 게이트에 갇히지 않는다.
-    const currentAuth = await authMe.refetch();
-    if (currentAuth.isError) {
-      setError(extractErrorMessage(currentAuth.error, '가입을 완료하지 못했어요.'));
-      return;
+    setTermsRecoveryPending(true);
+    try {
+      const currentAuth = await authMe.refetch();
+      if (currentAuth.isError) {
+        setError(extractErrorMessage(currentAuth.error, '가입을 완료하지 못했어요.'));
+        return;
+      }
+      router.replace('/terms?mode=social');
+    } finally {
+      setTermsRecoveryPending(false);
     }
-    router.replace('/terms?mode=social');
   };
 
   const deferSignup = () => {
-    if (deferProfile.isPending || completeProfile.isPending) return;
+    if (signupPending) return;
     setError(null);
     deferProfile.mutate(undefined, {
       onSuccess: (result) => {
@@ -208,10 +215,8 @@ export function SocialSignupClient() {
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    // 로딩 중 재클릭 시 중복 제출 방지 — isPending 은 disabled 속성과 동일하게 리렌더
-    // 이후에나 반영되는 값이라 동시 클릭까지 막지는 못하지만, 스피너가 보이는 동안의
-    // 재클릭은 막는다(동시 클릭 방지가 필요하면 ref 락을 따로 둔다).
-    if (completeProfile.isPending) return;
+    // mutation 종료 뒤에도 약관 복구가 끝나기 전에는 다른 가입 요청을 보내지 않는다.
+    if (signupPending) return;
     setError(null);
     setPhoneConflict(false);
     setFieldErrors({});
@@ -311,7 +316,7 @@ export function SocialSignupClient() {
             block
             disabled={isBlocked}
             form="v1-social-signup-form"
-            loading={completeProfile.isPending}
+            loading={completeProfile.isPending || termsRecoveryPending}
             size="lg"
             type="submit"
             variant={isBlocked ? 'neutral' : 'primary'}
@@ -322,7 +327,7 @@ export function SocialSignupClient() {
           {signupMode ? (
             <>
               <div className="tm-auth-fixed-skip-row" style={{ justifyContent: 'center' }}>
-                <Button disabled={deferProfile.isPending} onClick={deferSignup} size="sm" type="button" variant="ghost">
+                <Button disabled={signupPending} loading={deferProfile.isPending || termsRecoveryPending} onClick={deferSignup} size="sm" type="button" variant="ghost">
                   나중에 입력할게요
                 </Button>
               </div>

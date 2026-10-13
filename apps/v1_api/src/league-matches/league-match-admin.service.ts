@@ -2463,8 +2463,8 @@ export class LeagueMatchAdminService {
 
   /**
    * 템플릿 교체 — 취소 안 된 경기가 **전부** 시작 전·결과 없음일 때만 접는다. 게임 행을 먼저 id 순으로
-   * 잠근 뒤 판정해서, 판정과 취소 사이에 콘솔이 경기를 시작하지 못하게 한다. 리그엔 소프트 삭제가 없다
-   * (게임이 `Restrict` 로 붙어 있다) — 취소가 곧 "접기"이고, 취소는 자리 연결도 풀기 때문에 옛 자리를 지울 수 있다.
+   * 잠근 뒤 판정해서, 판정과 취소 사이에 콘솔이 경기를 시작하지 못하게 한다. 취소는 자리 연결도 풀기 때문에
+   * 옛 자리를 지울 수 있고, 접은 경기는 대진 재생성과 같이 deletedAt 으로 현재 목록에서 숨긴다(기록은 남는다).
    */
   private async replaceLeagueFixturesInTx(
     tx: Prisma.TransactionClient,
@@ -2503,6 +2503,11 @@ export class LeagueMatchAdminService {
         notices.push({ id: fixture.id, title: fixture.title, hostTeamId: fixture.hostTeamId, approvedApplicantTeamId: fixture.approvedApplicantTeamId });
       }
     }
+    // 숨기지 않으면 어드민 경기 수·보드 라운드·공개 상세 주차가 옛 경기 날짜까지 센다.
+    await tx.v1TeamMatch.updateMany({
+      where: { id: { in: existing.map((fixture) => fixture.id) }, deletedAt: null },
+      data: { deletedAt: new Date() },
+    });
     await tx.v1TournamentSlot.deleteMany({ where: { tournamentId: leagueId } });
     return notices;
   }

@@ -72,7 +72,7 @@ describe('LeagueTemplateDialog', () => {
     const { onSubmit } = setup({ replaceExisting: true });
 
     expect(screen.getByRole('dialog', { name: '템플릿으로 다시 만들기' })).toBeInTheDocument();
-    expect(screen.getByText(/기존 경기는 취소되고/)).toBeInTheDocument();
+    expect(screen.getByText(/기존 경기는 목록에서 빠지고/)).toBeInTheDocument();
     fillByWeekday();
     fireEvent.click(screen.getByRole('button', { name: '다시 만들기' }));
 

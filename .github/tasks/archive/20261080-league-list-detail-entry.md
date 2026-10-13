@@ -1,6 +1,6 @@
 # Task 20261080: 리그 목록의 이전 상세페이지 연결 복구
 
-Status: In Progress
+Status: Done
 **Owner**: root
 **Created**: 2026-10-14
 
@@ -35,7 +35,7 @@ Status: In Progress
 ## Acceptance Criteria
 - [x] 요청한 목록 링크·복귀 계약과 카드 회귀 검증 통과.
 - [x] diff 범위 및 whitespace 검사 통과.
-- [ ] alpha 배포 후 실제 카드 클릭을 통한 이동 검증. 로컬 검증과 구분해 보고한다.
+- [x] alpha 배포 후 실제 카드 클릭을 통한 이동 검증. 로컬 검증과 구분해 보고한다.
 
 ## Tech Debt Resolved
 최근 링크 변경을 단언하던 테스트를 사용자 요청 경로 및 정확한 복귀 쿼리 계약으로 교체한다.
@@ -44,7 +44,7 @@ Status: In Progress
 기존 `withFromPath`의 내부 경로 검증을 재사용한다. 인증·신청·권한 계약을 변경하지 않는다.
 
 ## Risks & Dependencies
-현재 요청은 통합 목록에 한정한다. 홈 리그 카드와 순위·일정용 링크는 그대로 둔다. 실제 alpha 반영에는 dev 배포가 필요하다. 로컬 dev fast-forward는 완료했다. Headed Chromium은 `libnspr4.so` 부재로 기동 실패하여 실제 클릭·3폭 검증이 남는다.
+통합 목록의 링크 복구와 실제 alpha 검증을 완료했다. 홈 리그 카드와 순위·일정용 링크는 그대로 둔다. 문의 영역이 비로그인 상태를 확인하는 `GET /auth/me` 401 `UNAUTHENTICATED`는 제품의 `api-client.ts:isExpectedGuestAuthProbe` 계약에 맞는 정상 거절이며, 원본 console/network 증거에 별도로 남겼다. main 승격은 실행하지 않았다.
 
 ## Ambiguity Log
 | Date | Raised by | Question | Resolution |
@@ -69,3 +69,12 @@ Status: In Progress
 - PR #1908, head `0278bb95b`, base dev. 직전 dev CI 38416474799의 Web 로그인 복귀 테스트 1건은 변경된 sessionStorage 복귀 계약과 불일치했다. 실제 consumer 로컬 RED 1 FAIL/6 PASS(`/tmp/teameet-deploy-email-login-red.log`); 필수 약관 경로, 저장된 원 목적지, 최종 이동·소비를 함께 검증하도록 동기화했다.
 - 같은 CI API 통합 실패는 단건 리그 취소가 팀 이름을 비동기로 조회한 뒤 알림을 발송하는데 테스트가 응답 직후 spy count를 검사한 race다. 기존 HTTP 200·spy 2회 검증을 유지하고 실제 `V1Notification` 2행의 양 팀 owner 수신자 및 팀 이름·취소 사유 저장을 기다려 검증한다. API 제품 코드·권한·DB schema 변경은 없다. 관련 테이블은 조회·검증하는 기존 `V1Notification`, `V1Team`이며 migration은 필요하지 않다. DB 실측은 PR CI가 수행한다.
 - 배포 blocker 테스트 수정 후 로그인·복귀 경로 31/31 PASS(`/tmp/teameet-deploy-email-login-green.log`), Web incremental 타입 검사 PASS(`/tmp/teameet-league-detail-typecheck-deploy.log`), API 표면 검사 PASS. 브라우저 공유 라이브러리는 시스템 설치 없이 `/tmp/teameet-browser-runtime-libs`에 추출해 headed 기동에 성공했고 현재 alpha 목록의 원래 `/league-matches/:id` 링크를 실제 브라우저로 재확인했다.
+
+### Final deployment and QA
+- PR [#1908](https://github.com/kim-song-jun/matchup-sports-platform/pull/1908), head `ffe2f098e`: [PR CI 38428039499](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/38428039499) Gates/Web/API PASS. 사용자 승인 “이번에만 Copilot 없이 alpha 배포 진행”을 [PR 코멘트](https://github.com/kim-song-jun/matchup-sports-platform/pull/1908#issuecomment-6150168557)에 기록한 일회성 예외로 적용했다. 직접 코드 검토에서 요청 경로·정확한 from·권한 변경 없음·실제 DB 수신자 검증을 확인했다.
+- dev merge `439e4d2e045ccbf00c4f718271f444f0024a6e09`, [dev CI 38430412013](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/38430412013) PASS. 동시 PR #1907 머지로 구 배포 38430411972는 success로 끝났지만 최신 dev 보호 게이트가 실제 서버 활성화를 생략했다. 최초 브라우저 검증의 서빙 SHA 단언이 이를 검출했다. 구 run 성공을 실제 배포 완료로 취급하지 않았다.
+- 최종 서빙 SHA `e6cecf51fb95425955eafe942e8b44b719ccf556`는 PR1908 merge를 포함하며 카드 소스 변경은 유지된다. [최신 dev CI 38432476504](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/38432476504) PASS, [Alpha 38432476754](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/38432476754)의 SSM 활성화 및 공개 release identity 검증 모두 PASS. `/landing` 헤더의 release=`1.9.0-alpha.20261014.ge6cecf51fb95`, commit=e6cecf51f와 공개 health DB=true를 재확인했다. 로컬 dev도 e6cecf51f로 FF 동기화했다.
+- 비로그인 공개 방문자, **390×900 / 768×900 / 1440×900 — processed 3/3 PASS**. 실제 카드 클릭 → `/tournaments/aef0d98f-17eb-4590-b27d-a2d8bab765e6?from=%2Ftournaments%3Fkind%3Dleague` → 실제 화면 뒤로가기 링크 클릭 → `/tournaments?kind=league`. DOM 뒤로가기 href와 전체 from 값을 함께 검증했다.
+- 세 폭 모두 document 가로 넘침=false, pageerror0, 예상하지 못한 console/API 실패0. 비로그인 auth/me 401은 실제 응답 body의 `UNAUTHENTICATED`와 연결된 console URL을 확인해 따로 기록했다. 다른 401·403·5xx·하이드레이션·이동 오류를 허용하지 않는다. 문의 컴포넌트의 guest 판정과 API client의 정상 guest probe 계약을 교차 검증했다.
+- 배포 전 SHA614b4f440의 목록·기존 연결 상세와 배포 후 SHAe6cecf51f의 목록·복구 상세를 각3폭 캡처했다. 최종 after 이미지는 route progress, 폰트, 보이는 이미지 로딩이 끝난 뒤 캡처했다. 증거: `docs/screenshots/task20261080-league-detail-entry/`의 PNG12개, before/after results JSON 및 PID/PPID 기록. 검증 도구 `scripts/qa/verify-league-list-original-detail.cjs`는 항상 headed다.
+- 마지막 owned Node11660/Chromium11673 및 기록된 자식 트리는 browser.close 후 종료됐고 PID 잔류0이다. 로컬 Next 서버·MCP·alpha DB 변경·seed/reset은 실행하지 않았다. 기타 공유 트리의 WIP는 유지했다.

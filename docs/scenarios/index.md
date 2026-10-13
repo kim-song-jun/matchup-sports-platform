@@ -1,3 +1,7 @@
+## 2026-10-14 — 리그 목록의 이전 상세 연결 복구
+
+[Task 20261080 완료](../../.github/tasks/archive/20261080-league-list-detail-entry.md) · [Alpha 증거](../screenshots/task20261080-league-detail-entry/README.md): PR1908 dev merge를 포함한 SHAe6cecf51f의 alpha 배포38432476754 및 공개 DB health PASS. 실제 비로그인 카드 클릭 → `/tournaments/:id` → 화면 뒤로가기 → `/tournaments?kind=league`를 390/768/1440에서 **processed3/3 PASS**. 정확한 from·서빙 SHA·가로 넘침0·예상하지 못한 console/page/API 실패0을 확인했다. 문의 영역의 정상 guest auth/me401 UNAUTHENTICATED와 원본 console 항목은 별도로 기록했다. 전후12장·PID/PPID·cleanup 증거가 있으며 main 승격·alpha DB mutation은 하지 않았다.
+
 ## 2026-10-12 — 대진 목록 5조·20팀→12강 자동 배정
 
 [Task 20261057 후속](../../.github/tasks/20261057-admin-bracket-canvas.md): 빈 목록의 전체 대진 생성(조별30+결선11), 조별 자리 편집/무작위 배정, 12강 성적 비교·동률 확인·팀 교환·일괄 저장 구현. 실제 임시 PostgreSQL 신규3+기존슬롯44=47/47, Web114/114, API 타입/surface·Web 패턴 통과. 최초 로컬 의존성 불일치로 보였던 leave-team 타입 오류2개는 lockfile TanStack 5.102.8 일치 후 해소, 신규 테스트 role 옵션 수정 후 Web 전체 타입 검사 0. Headed 합성 컴포넌트 390/768/1440 3/3, overflow·JS/console/network 오류0, [증거](../screenshots/round12-list/evidence.json). Alpha 대상 URL은 로그인 이동(auth/me401); **실제 Alpha 기능 QA 0/3, 배포/실제 대회 데이터 변경 없음**. 합성 화면은 실제 Alpha 검증으로 계산하지 않는다.

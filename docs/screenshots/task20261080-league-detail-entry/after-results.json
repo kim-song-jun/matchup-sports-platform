@@ -1,0 +1,74 @@
+[
+  {
+    "width": 390,
+    "href": "/tournaments/aef0d98f-17eb-4590-b27d-a2d8bab765e6?from=%2Ftournaments%3Fkind%3Dleague",
+    "detailUrl": "https://alpha.teameet.co.kr/tournaments/aef0d98f-17eb-4590-b27d-a2d8bab765e6?from=%2Ftournaments%3Fkind%3Dleague",
+    "returnedUrl": "https://alpha.teameet.co.kr/tournaments?kind=league",
+    "releaseSha": "e6cecf51fb95425955eafe942e8b44b719ccf556",
+    "overflow": false,
+    "consoleErrors": [
+      {
+        "text": "Failed to load resource: the server responded with a status of 401 ()",
+        "url": "https://alpha.teameet.co.kr/api/v1/auth/me"
+      }
+    ],
+    "unexpectedConsoleErrors": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "expectedGuestAuthProbes": [
+      {
+        "url": "https://alpha.teameet.co.kr/api/v1/auth/me",
+        "status": 401,
+        "code": "UNAUTHENTICATED"
+      }
+    ]
+  },
+  {
+    "width": 768,
+    "href": "/tournaments/aef0d98f-17eb-4590-b27d-a2d8bab765e6?from=%2Ftournaments%3Fkind%3Dleague",
+    "detailUrl": "https://alpha.teameet.co.kr/tournaments/aef0d98f-17eb-4590-b27d-a2d8bab765e6?from=%2Ftournaments%3Fkind%3Dleague",
+    "returnedUrl": "https://alpha.teameet.co.kr/tournaments?kind=league",
+    "releaseSha": "e6cecf51fb95425955eafe942e8b44b719ccf556",
+    "overflow": false,
+    "consoleErrors": [
+      {
+        "text": "Failed to load resource: the server responded with a status of 401 ()",
+        "url": "https://alpha.teameet.co.kr/api/v1/auth/me"
+      }
+    ],
+    "unexpectedConsoleErrors": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "expectedGuestAuthProbes": [
+      {
+        "url": "https://alpha.teameet.co.kr/api/v1/auth/me",
+        "status": 401,
+        "code": "UNAUTHENTICATED"
+      }
+    ]
+  },
+  {
+    "width": 1440,
+    "href": "/tournaments/aef0d98f-17eb-4590-b27d-a2d8bab765e6?from=%2Ftournaments%3Fkind%3Dleague",
+    "detailUrl": "https://alpha.teameet.co.kr/tournaments/aef0d98f-17eb-4590-b27d-a2d8bab765e6?from=%2Ftournaments%3Fkind%3Dleague",
+    "returnedUrl": "https://alpha.teameet.co.kr/tournaments?kind=league",
+    "releaseSha": "e6cecf51fb95425955eafe942e8b44b719ccf556",
+    "overflow": false,
+    "consoleErrors": [
+      {
+        "text": "Failed to load resource: the server responded with a status of 401 ()",
+        "url": "https://alpha.teameet.co.kr/api/v1/auth/me"
+      }
+    ],
+    "unexpectedConsoleErrors": [],
+    "pageErrors": [],
+    "failedRequests": [],
+    "expectedGuestAuthProbes": [
+      {
+        "url": "https://alpha.teameet.co.kr/api/v1/auth/me",
+        "status": 401,
+        "code": "UNAUTHENTICATED"
+      }
+    ]
+  }
+]

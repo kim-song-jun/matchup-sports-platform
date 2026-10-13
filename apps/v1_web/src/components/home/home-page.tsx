@@ -23,6 +23,7 @@ import { cssUrl } from '@/lib/assets';
 import { SportIllustration } from '@/components/v1-ui/sport-illustration';
 import { formatTournamentDateRangeShort } from '@/lib/date-utils';
 import { withFromPath } from '@/lib/session-storage';
+import { competitionDetailHref } from '@/lib/fixture-detail-route';
 import { userRecordResultLabel } from '@/components/public-game-records/format';
 import { resultChipStyle } from '@/components/public-game-records/result-emphasis';
 import { useV1AllTournaments, useV1LeagueMatches, useV1TeamMatches, useV1Tournaments } from '@/hooks/use-v1-api';
@@ -891,7 +892,7 @@ function SidebarTournamentsWidget({ items, loading }: { items: V1TournamentListI
             return (
               <Link
                 key={t.id}
-                href={withFromPath(`/tournaments/${t.id}`, '/home')}
+                href={competitionDetailHref({ isRegularLeague: t.kind === 'regular_league', competitionId: t.id, fromHref: '/home' })}
                 className="tm-pressable"
                 aria-label={`대회 상세 보기 — ${t.title}`}
                 style={{

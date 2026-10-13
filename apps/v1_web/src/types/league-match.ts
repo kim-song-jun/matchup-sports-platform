@@ -289,6 +289,21 @@ export interface V1PublicLeagueDetail extends Omit<V1AdminLeagueDetail, V1AdminO
    * optional 이 아니다.
    */
   seriesSiblings: V1LeagueSeriesSibling[];
+  /**
+   * 같은 티어의 바로 다음 시즌 — 신청이 마감된 리그가 "다음 회차로 신청하기"를 거는 대상.
+   * 단발 리그거나 다음 시즌이 아직 없으면 null. optional 은 API 가 먼저 배포되지 않은 창의 구버전 응답용이다.
+   */
+  nextRound?: V1LeagueNextRound | null;
+}
+
+export interface V1LeagueNextRound {
+  leagueId: string;
+  title: string;
+  seasonNo: number;
+  startsOn: string;
+  endsOn: string;
+  registrationOpen: boolean;
+  registrationDeadlineAt: string | null;
 }
 
 export interface V1CloseLeagueRegistrationPayload {

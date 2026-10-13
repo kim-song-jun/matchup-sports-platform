@@ -245,6 +245,12 @@ describe('TournamentCard — 리그는 정원을 그리지 않는다', () => {
     return item;
   };
 
+  it('리그 카드는 홈 리그 카드와 같은 리그 상세(/league-matches/:id)로 간다', () => {
+    const item = leagueItem();
+    render(<TournamentCard item={item} fromPath="/tournaments?kind=league" />);
+    expect(screen.getByRole('link').getAttribute('href')).toMatch(new RegExp(`^/league-matches/${item.id}\\?from=`));
+  });
+
   it('리그 카드에 정원 진행바가 없다', () => {
     render(<TournamentCard item={leagueItem()} />);
     expect(screen.queryByRole('progressbar')).toBeNull();

@@ -486,11 +486,29 @@ export class LeagueMatchPublicService {
             // 최신 시즌이 먼저, 같은 시즌 안에서는 1부부터 — 사용자가 "지금 시즌의 다른
             // 티어"를 가장 먼저 찾는다는 전제(승강 체계는 시즌 단위로 갱신되므로).
             orderBy: [{ seasonNo: 'desc' }, { tier: 'asc' }],
-            select: { id: true, tier: true, seasonNo: true, status: true },
+            select: {
+              id: true,
+              title: true,
+              tier: true,
+              seasonNo: true,
+              status: true,
+              registrationDeadlineAt: true,
+              scheduledAt: true,
+              scheduledEndAt: true,
+            },
           })
           .then((rows) =>
-            rows.map(({ status, ...rest }) => ({ ...rest, state: LEAGUE_STATE_BY_STATUS[status] })),
+            rows.map(({ status, ...rest }) => ({
+              ...rest,
+              state: LEAGUE_STATE_BY_STATUS[status],
+              registrationOpen: isLeagueRegistrationOpen(status, rest.registrationDeadlineAt),
+            })),
           );
+    // 신청이 마감된 리그가 "다음 회차로 신청하기"를 걸 대상 — 같은 티어의 바로 다음 시즌.
+    // ponytail: 같은 티어만 본다. 신규 팀의 입문 티어를 따로 정하면 그 규칙으로 바꾼다.
+    const nextRound = siblings
+      .filter((sibling) => sibling.tier === league.tier && (sibling.seasonNo ?? 0) > (league.seasonNo ?? 0))
+      .sort((a, b) => (a.seasonNo ?? 0) - (b.seasonNo ?? 0))[0];
 
     return {
       leagueId: league.id,
@@ -528,6 +546,18 @@ export class LeagueMatchPublicService {
         seasonNo: sibling.seasonNo as number,
         state: sibling.state,
       })),
+      // 다음 회차가 없으면(단발 리그 포함) null — 화면은 "다음 회차에 신청해 주세요"만 적는다.
+      nextRound: nextRound === undefined || nextRound.scheduledAt === null || nextRound.scheduledEndAt === null
+        ? null
+        : {
+            leagueId: nextRound.id,
+            title: nextRound.title,
+            seasonNo: nextRound.seasonNo as number,
+            startsOn: nextRound.scheduledAt,
+            endsOn: nextRound.scheduledEndAt,
+            registrationOpen: nextRound.registrationOpen,
+            registrationDeadlineAt: nextRound.registrationDeadlineAt?.toISOString() ?? null,
+          },
       teamIds: league.teams.map((entry) => entry.teamId),
       // 미확정 대진의 점수를 null 로 두는 것, 몰수를 boolean 하나로만 내보내는 것(사유
       // 원문 비공개)은 `league-fixture-list-source.ts` 가 지킨다 — 대회 표면의 리그

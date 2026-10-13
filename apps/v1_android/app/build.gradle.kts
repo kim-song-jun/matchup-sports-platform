@@ -131,6 +131,7 @@ dependencies {
     implementation("androidx.webkit:webkit:1.17.0")
     implementation("com.google.android.play:app-update:2.1.0")
     implementation("com.kakao.sdk:v2-user:2.25.1")
+    testImplementation("org.json:json:20260814")
     testImplementation("junit:junit:4.13.2")
 }
 

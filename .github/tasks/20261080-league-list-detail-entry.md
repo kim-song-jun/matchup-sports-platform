@@ -30,7 +30,7 @@ Status: In Progress
 기존 실제 카드 fixture를 재사용하며 API·schema·MSW 계약 변경은 없다.
 
 ## Parallel Work Breakdown
-단일 에이전트가 직렬 실행한다. Owned: `apps/v1_web/src/app/tournaments/tournament-card.tsx`, 해당 테스트, 이 task와 Changeset. Forbidden: 홈 카드, 공용 상세/경기 링크 helper, API, 공유 작업트리의 기존 수정.
+단일 에이전트가 직렬 실행한다. Owned: `apps/v1_web/src/app/tournaments/tournament-card.tsx`, 해당 테스트, 이 task와 Changeset. 배포를 막는 기존 CI 실패 수정을 위해 `apps/v1_web/src/components/auth/email-login-client.test.tsx`, `apps/v1_api/test/league-matches/league-slot-cancel-regenerate.integration-spec.ts` 테스트만 추가한다. Forbidden: 홈 카드, 공용 상세/경기 링크 helper, API 제품 코드·schema, 공유 작업트리의 기존 수정.
 
 ## Acceptance Criteria
 - [x] 요청한 목록 링크·복귀 계약과 카드 회귀 검증 통과.
@@ -66,3 +66,6 @@ Status: In Progress
 - 사용자 후속 요청 `배포해줘`에 따라 dev PR → 최신 head Copilot clean/CI → merge → alpha 배포 및 실제 링크 검증을 진행한다. main 승격은 범위 밖이다.
 - Web 패턴 검사 PASS. 처음 sandbox에서 child shell 실행 EPERM으로 중단되어 같은 읽기 전용 검사를 제한 밖에서 실행했다. 반복 전체 test/build는 실행하지 않는다.
 - 착수 fetch 후 origin/dev는 동일한 `d10ce4df4`다. 직전 alpha run 38416474964와 38415881913은 failure여서 실패 단계와 CI 상태를 별도로 조사 중이다.
+- PR #1908, head `0278bb95b`, base dev. 직전 dev CI 38416474799의 Web 로그인 복귀 테스트 1건은 변경된 sessionStorage 복귀 계약과 불일치했다. 실제 consumer 로컬 RED 1 FAIL/6 PASS(`/tmp/teameet-deploy-email-login-red.log`); 필수 약관 경로, 저장된 원 목적지, 최종 이동·소비를 함께 검증하도록 동기화했다.
+- 같은 CI API 통합 실패는 단건 리그 취소가 팀 이름을 비동기로 조회한 뒤 알림을 발송하는데 테스트가 응답 직후 spy count를 검사한 race다. 기존 HTTP 200·spy 2회 검증을 유지하고 실제 `V1Notification` 2행의 양 팀 owner 수신자 및 팀 이름·취소 사유 저장을 기다려 검증한다. API 제품 코드·권한·DB schema 변경은 없다. 관련 테이블은 조회·검증하는 기존 `V1Notification`, `V1Team`이며 migration은 필요하지 않다. DB 실측은 PR CI가 수행한다.
+- 배포 blocker 테스트 수정 후 로그인·복귀 경로 31/31 PASS(`/tmp/teameet-deploy-email-login-green.log`), Web incremental 타입 검사 PASS(`/tmp/teameet-league-detail-typecheck-deploy.log`), API 표면 검사 PASS. 브라우저 공유 라이브러리는 시스템 설치 없이 `/tmp/teameet-browser-runtime-libs`에 추출해 headed 기동에 성공했고 현재 alpha 목록의 원래 `/league-matches/:id` 링크를 실제 브라우저로 재확인했다.

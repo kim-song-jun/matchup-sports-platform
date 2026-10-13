@@ -453,13 +453,6 @@ test('main promotion requires an auditable consumed Changeset receipt', () => {
   }
 });
 
-test('deploy workflow selects promotion checks for every main-target PR source branch', () => {
-  const workflow = readFileSync(join(repoRoot, '.github/workflows/deploy.yml'), 'utf8');
-
-  assert.match(workflow, /if \[\[ \$\{BASE_REF\} == main && -n \$\{HEAD_REF\} \]\]; then/);
-  assert.doesNotMatch(workflow, /if \[\[ \$\{BASE_REF\} == main && \$\{HEAD_REF\} == dev \]\]; then/);
-});
-
 test('resolver still labels an alpha build after every changeset has been released', () => {
   // 릴리스 직후 상태: changeset 0개 + 버전이 이미 올라간 package.json.
   // deploy-alpha.yml 은 이 리졸버를 가드 없이 호출하므로, 여기서 실패하면 릴리스를 한

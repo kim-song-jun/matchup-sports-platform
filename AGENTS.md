@@ -310,7 +310,7 @@ Global rules inherited from `~/.codex/AGENTS.md`:
   `gh pr create --base main` 어느 방식으로도 **직접 실행하지 않는다** — 필요해 보이면 사용자에게
   알리고 멈춘다. 자동으로 승격하는 워크플로는 없다(워크플로의 `refs/heads/main` 참조는 전부 감지용 `if:` 조건이다).
 - **`main`에 dev에 없는 커밋이 생겼다면** `origin/main → dev` 방향으로만 흡수한다.
-- **main 대상 PR의 릴리스 검사는 출발 브랜치와 무관하게 동일하다.** 사용자 승인으로 범위를 제한한 hotfix PR도 Changesets 소비, 고정 API/Web 버전 증가, 두 변경 이력을 모두 검증한다. 이 CI 계약은 승격 권한이나 승인 정책을 대신하지 않는다.
+- **배포 동작에 영향을 주는 main 대상 PR의 릴리스 검사는 출발 브랜치와 무관하게 동일하다.** 사용자 승인으로 범위를 제한한 hotfix PR도 Changesets 소비, 고정 API/Web 버전 증가, 두 변경 이력을 모두 검증한다. 순수 문서·테스트 변경에는 버전 증가를 요구하지 않는다. 이 CI 계약은 승격 권한이나 승인 정책을 대신하지 않는다.
 - **`main`에는 classic branch protection은 없지만 ruleset이 걸려 있다**(2026-08-09 실측 정정).
   ruleset "Copilot review for default branch"(active)가 `deletion`·`non_fast_forward`·`copilot_code_review`를
   강제한다 — main으로의 force-push·삭제는 막힌다(#231 롤백이 `git revert`로만 가능했던 이유). 일반

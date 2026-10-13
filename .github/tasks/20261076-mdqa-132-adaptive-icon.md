@@ -66,7 +66,7 @@ Windows Android SDK36/build-tools36.0.0/JDK17은 설치돼 있다. 프로젝트 
 - Debug artifacts: 임시 프로세스·이미지 생성·이미지 편집 없음. 회귀 검증은 Node가 OS 임시 폴더에 Java source probe를 만들고 `finally`에서 그 폴더만 제거한다. PNG/XML/manifest의 실제 데이터만 읽으며 장치 렌더링을 흉내 내 PASS라고 하지 않는다.
 - Root RED: host preflight 후 `node --test scripts/qa/android-adaptive-icon.test.mjs`, 6 tests 중 PASS1/FAIL5. 네 실제 레이어는 colored tile pixels 152,458, radius 67.0217dp를 반환했다. Root가 `mdqa132-red.log`로 근거를 보관했다.
 - Root GREEN: 같은 좁은 회귀 6/6 PASS. 마지막 브랜드 assertion은 manifest→XML이 실제 참조하는 leaf PNG의 바이트를 정본과 대조한다. 이후 assertion 변경 없이 레이어 metrics를 TAP diagnostic으로 노출해 다음 committed-tree 실행에서 실제 probe 수치를 보관할 수 있게 했다. worker는 테스트/빌드를 실행하지 않았다.
-- Changeset policy: `scripts/release/check-changeset-policy.mjs`의 `affectsRelease`는 Android resource-only를 포함하지 않고 Android는 Changesets workspace package가 아니다. 따라서 관계없는 v1_web/API 버전 bump와 Changeset은 추가하지 않는다(root 확인).
+- Changeset policy correction: Android resource-only는 affectsRelease에 없지만 root가 추가한 `.github/workflows/android-alpha.yml`는 릴리스 대상이다. CI Gates가 own Changeset 누락으로 실패했다. 게이트 예외를 만들지 않고 기존 fixed v1 package 계약에 맞는 patch Changeset을 추가한다.
 - Native validation handoff: CI는 Gradle9.1.0/JDK17, 프로젝트는 AGP9.0.1이다. 적합한 Gradle 준비 뒤 최소 명령은 `gradle.bat -p apps/v1_android :app:processAlphaDebugResources --max-workers=1 --no-daemon --offline`. 현재의 SDK 도구로는 `C:/dev/android/build-tools/36.0.0/aapt2.exe compile --dir apps/v1_android/app/src/main/res -o <root-owned-qa-dir>/mdqa132-native-res.zip`가 가능한 별도 syntax 검증이다. Root 실행 전까지 native compile PASS로 적지 않는다.
 
 ## Ambiguity Log
@@ -88,3 +88,9 @@ Windows Android SDK36/build-tools36.0.0/JDK17은 설치돼 있다. 프로젝트 
 - Native AAPT2 36.0.0 `compile --dir apps/v1_android/app/src/main/res` succeeded (exit 0), creating `mdqa132-native-res.zip` in that evidence directory. This proves native resource syntax only; Gradle APK build and installed OEM rendering remain separate.
 - Independent code reviewer found the new regression was absent from CI. Root added only its PR/dev-push path filters and Node test step after JDK17 setup in `.github/workflows/android-alpha.yml`. This seventh path is root-owned. Re-review verdict CLEAR / APPROVE, no source/CI blockers.
 - Latest prepublication fetch: `origin/dev` remains `552f5b6fb98d8546daf5e26f7de7a8ac413251f2`, no dev drift. Explicit pathspec commit and committed-tree verification follow; no main/prod action or tracker completion is authorized by these source checks.
+
+### Published PR / CI receipt — 2026-10-13
+- PR https://github.com/kim-song-jun/matchup-sports-platform/pull/1884, OPEN, base dev. Initial source head966da55dab5eec5df93995ee5e5bf65c2dc63eec independent exact-head OK/FindingsNone. Committed resource regression6/6, Android Alpha test-and-build SUCCESS run38341219465. Device BEFORE/AFTER remains NOTRUN.
+- Common CI Gates run38341219442 FAILURE: workflow addition is release-affecting and requires own Changeset; resource-only exemption did not cover the final7-path diff. Root adds truthful patch Changeset, no policy weakening. Other CI checks/reviews revalidated at new head after push.
+- Existing #132 tracker comment314 saved and reload-verified, screenshot report-132-comment.png, explicitly OPEN/merge waiting/native NOTRUN. No tracker completion, release or main action.
+- Latest fetch origin/dev d1086112d6809f36030c1b592b6bcc42ed723b9d; source changes across drift must be checked before push.

@@ -702,6 +702,7 @@ export default function LeagueMatchStandingsClient({
         registrationDeadlineAt={series.registrationDeadlineAt}
         entryFee={series.entryFee}
         entryFeeConfigured={series.entryFeeConfigured}
+        nextRound={series.nextRound ?? null}
       />
       {/* 사용자 확정(2026-08-23) — 종료된 리그에만 뜬다. 진행 중·준비 중 리그에는
           이 자리에 아무것도 늘어나지 않는다(우승팀 개념이 아직 성립하지 않는다). */}

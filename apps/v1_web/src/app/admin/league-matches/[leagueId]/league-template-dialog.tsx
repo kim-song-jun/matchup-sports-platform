@@ -22,6 +22,11 @@ import { CompetitionTemplateCard } from '@/shared/ui/competition-template-card';
 
 const TEAM_COUNT_MIN = 3;
 const TEAM_COUNT_MAX = 20;
+const GAMES_PER_DAY_MAX = 50;
+
+/** 빈 칸 = null, 숫자가 아니면 NaN — 범위 검사는 부르는 쪽이 한다. */
+const parseOptionalCount = (text: string): number | null => (text.trim() === '' ? null : /^\d{1,3}$/.test(text.trim()) ? Number(text.trim()) : Number.NaN);
+const inRange = (value: number | null, min: number, max: number) => value === null || (value >= min && value <= max);
 
 const inputClass =
   'h-[44px] rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 text-[length:var(--font-size-body-sm)] text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20';
@@ -34,6 +39,8 @@ export interface LeagueTemplateDialogProps {
   defaultPlace: V1PlaceView | null;
   /** 참가팀이 과거에 쓴 장소(추천 칩). 없으면 빈 배열. */
   recentVenues: readonly V1PlaceView[];
+  /** 리그 피리어드 설정의 경기 시간(분) — 하루 경기 수를 넣었을 때 경기 시간 칸을 미리 채운다. */
+  defaultGameMinutes?: number | null;
   /** 경기가 이미 있는 리그를 새 템플릿으로 바꾸는 중인가. */
   replaceExisting: boolean;
   isSubmitting: boolean;
@@ -46,6 +53,7 @@ export function LeagueTemplateDialog({
   initialTeamCount,
   defaultPlace,
   recentVenues,
+  defaultGameMinutes = null,
   replaceExisting,
   isSubmitting,
   onSubmit,
@@ -57,6 +65,10 @@ export function LeagueTemplateDialog({
   const [dayOfWeek, setDayOfWeek] = useState<number | ''>('');
   const [time, setTime] = useState('19:00');
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
+  const [gamesPerDayText, setGamesPerDayText] = useState('');
+  // null = 아직 안 건드림 — 리그 설정 시간을 보여 준다.
+  const [durationInput, setDurationInput] = useState<string | null>(null);
+  const [breakText, setBreakText] = useState('');
   const [placeChoice, setPlaceChoice] = useState<LeaguePlaceChoice>(DEFAULT_LEAGUE_PLACE_CHOICE);
   const [error, setError] = useState<string | null>(null);
   // pending 을 넘겨 제출 중 ESC 로 닫히지 않게 한다 — 요청은 날아가는데 화면만 사라지면 결과를 알 수 없다.
@@ -65,17 +77,22 @@ export function LeagueTemplateDialog({
   const trimmedTeamCount = teamCountText.trim();
   const teamCount = /^\d{1,2}$/.test(trimmedTeamCount) ? Number(trimmedTeamCount) : null;
   const teamCountInRange = teamCount !== null && teamCount >= TEAM_COUNT_MIN && teamCount <= TEAM_COUNT_MAX;
-  // 템플릿은 하루에 한 라운드를 치른다 — 필요한 경기 날짜 수가 곧 라운드 수다.
   const rounds = teamCountInRange ? roundRobinRounds(teamCount, legs) : 0;
   const singleRounds = teamCountInRange ? roundRobinRounds(teamCount, 1) : 0;
   const doubleRounds = teamCountInRange ? roundRobinRounds(teamCount, 2) : 0;
+  const totalGames = teamCountInRange ? plannedGameCount(teamCount, rounds) : 0;
+  const gamesPerDay = parseOptionalCount(gamesPerDayText);
+  const gamesPerDayValid = gamesPerDay !== null && Number.isInteger(gamesPerDay) && gamesPerDay >= 1 && gamesPerDay <= GAMES_PER_DAY_MAX;
+  const durationText = durationInput ?? (defaultGameMinutes === null ? '' : String(defaultGameMinutes));
+  // 하루 경기 수가 없으면 하루에 한 라운드 — 필요한 날짜 수가 곧 라운드 수다. 있으면 총 경기 수 ÷ 하루 경기 수(올림).
+  const requiredDays = gamesPerDayValid ? Math.ceil(totalGames / gamesPerDay) : rounds;
   const hasStartsOn = !Number.isNaN(new Date(leagueStartsOn).getTime());
 
   const fillByWeekday =
     hasStartsOn && dayOfWeek !== '' && time.trim() !== '' && rounds > 0
       ? () =>
           setSelectedDates(
-            expandWeeklyFixtureDates({ startsOn: leagueStartsOn, dayOfWeek, time, weeksCount: rounds, now: new Date() }),
+            expandWeeklyFixtureDates({ startsOn: leagueStartsOn, dayOfWeek, time, weeksCount: requiredDays, now: new Date() }),
           )
       : null;
 
@@ -90,8 +107,18 @@ export function LeagueTemplateDialog({
       setError('시작 시각을 입력해 주세요.');
       return;
     }
-    if (describeDateSelection(selectedDates.length, rounds).state === 'short') {
-      setError(`경기 날짜가 ${rounds}일 필요해요. ${selectedDates.length}일 골랐어요.`);
+    const durationMinutes = parseOptionalCount(durationText);
+    const breakMinutes = parseOptionalCount(breakText);
+    if (gamesPerDayText.trim() !== '' && !gamesPerDayValid) {
+      setError(`하루 경기 수는 1~${GAMES_PER_DAY_MAX} 사이로 입력해 주세요.`);
+      return;
+    }
+    if (gamesPerDayValid && (!inRange(durationMinutes, 5, 240) || !inRange(breakMinutes, 0, 120))) {
+      setError('경기 시간은 5~240분, 휴식은 0~120분 사이로 입력해 주세요.');
+      return;
+    }
+    if (describeDateSelection(selectedDates.length, requiredDays).state === 'short') {
+      setError(`경기 날짜가 ${requiredDays}일 필요해요. ${selectedDates.length}일 골랐어요.`);
       return;
     }
     if (isLeaguePlaceChoiceIncomplete(placeChoice)) {
@@ -103,6 +130,13 @@ export function LeagueTemplateDialog({
         teamCount,
         legs,
         schedule: { dates: selectedDates, time: time.trim() },
+        ...(gamesPerDayValid
+          ? {
+              gamesPerDay,
+              ...(durationMinutes === null ? {} : { gameDurationMinutes: durationMinutes }),
+              ...(breakMinutes === null ? {} : { breakMinutes }),
+            }
+          : {}),
         ...leaguePlacePayload(placeChoice),
         ...(replaceExisting ? { replaceExisting: true } : {}),
       });
@@ -174,9 +208,62 @@ export function LeagueTemplateDialog({
         </fieldset>
         {teamCountInRange ? (
           <p className="mb-4 text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-strong)]">
-            {`${rounds}라운드 · ${plannedGameCount(teamCount, rounds)}경기를 만들어요`}
+            {`${rounds}라운드 · ${totalGames}경기를 만들어요`}
+            {gamesPerDayValid ? ` · 하루 ${gamesPerDay}경기씩 ${requiredDays}일` : ''}
           </p>
         ) : null}
+
+        <div className="mb-4 grid grid-cols-1 items-start gap-3 md:max-w-xl">
+          <div>
+            <label htmlFor="league-template-games-per-day" className="mb-1 block text-[length:var(--font-size-body-sm)] font-medium text-[var(--text-strong)]">하루 경기 수</label>
+            <input
+              id="league-template-games-per-day"
+              type="text"
+              inputMode="numeric"
+              maxLength={2}
+              value={gamesPerDayText}
+              onChange={(event) => setGamesPerDayText(event.target.value)}
+              placeholder={teamCountInRange ? `비우면 하루 한 라운드(${plannedGameCount(teamCount, 1)}경기)` : '비우면 하루 한 라운드'}
+              aria-describedby="league-template-games-per-day-hint"
+              className={`${inputClass} w-full`}
+            />
+            <p id="league-template-games-per-day-hint" className="mt-1 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
+              {gamesPerDayValid
+                ? '그날 경기는 시작 시각부터 한 구장에서 경기 시간 + 휴식 간격으로 이어져요. 한 팀이 하루에 두 경기 이상 할 수 있어요.'
+                : '비우면 하루에 한 라운드를 같은 시각에 시작해요.'}
+            </p>
+          </div>
+          {gamesPerDayValid ? (
+            <div className="grid grid-cols-2 items-start gap-3">
+              <div>
+                <label htmlFor="league-template-duration" className="mb-1 block text-[length:var(--font-size-body-sm)] font-medium text-[var(--text-strong)]">경기 시간(분)</label>
+                <input
+                  id="league-template-duration"
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={3}
+                  value={durationText}
+                  onChange={(event) => setDurationInput(event.target.value)}
+                  placeholder="리그 설정 시간"
+                  className={`${inputClass} w-full`}
+                />
+              </div>
+              <div>
+                <label htmlFor="league-template-break" className="mb-1 block text-[length:var(--font-size-body-sm)] font-medium text-[var(--text-strong)]">휴식(분)</label>
+                <input
+                  id="league-template-break"
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={3}
+                  value={breakText}
+                  onChange={(event) => setBreakText(event.target.value)}
+                  placeholder="0"
+                  className={`${inputClass} w-full`}
+                />
+              </div>
+            </div>
+          ) : null}
+        </div>
 
         <div className="mb-4 grid grid-cols-2 items-start gap-3 md:max-w-xl">
           <div>
@@ -222,7 +309,7 @@ export function LeagueTemplateDialog({
         <LeagueFixtureDatePicker
           selectedDates={selectedDates}
           onChange={setSelectedDates}
-          requiredCount={rounds}
+          requiredCount={requiredDays}
           today={toKstDateString(new Date())}
           onFillByWeekday={fillByWeekday}
           fillDisabledReason={hasStartsOn ? '팀 수·요일·시각을 고르면 한 번에 채울 수 있어요.' : '리그 시작일이 없어 요일로 채울 수 없어요.'}

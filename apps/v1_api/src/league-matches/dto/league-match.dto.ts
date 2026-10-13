@@ -358,6 +358,27 @@ export class ApplyLeagueTemplateDto extends LeaguePlaceSnapshotDto {
   @Type(() => LeagueFixtureScheduleDto)
   schedule!: LeagueFixtureScheduleDto;
 
+  // 하루에 치르는 경기 수(전 팀 합계). 비우면 하루 한 라운드 — 그 라운드 경기가 같은 시각에 시작한다.
+  // 넣으면 라운드로빈 순서대로 하루 N경기씩 나누고, 그날 경기는 한 구장에서 `경기 시간 + 휴식` 간격으로 잇는다.
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  gamesPerDay?: number;
+
+  // gamesPerDay 와 함께만 쓴다. 생략하면 경기 설정의 정규 시간(연장 제외 피리어드 합계).
+  @IsOptional()
+  @IsInt()
+  @Min(5)
+  @Max(240)
+  gameDurationMinutes?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(120)
+  breakMinutes?: number;
+
   // 비우면 일괄 생성과 같은 기본값('장소 미정')이다.
   @IsOptional()
   @IsString()

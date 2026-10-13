@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PUBLIC_SITE_ROUTES } from '@/lib/public-site/routes';
+import { fetchPublicV1 } from '@/lib/seo';
 
 // 목록 API 는 전부 404(null) — 정적 경로만 남는 상황에서도 공개 도움말 페이지는 빠지면 안 된다.
 vi.mock('@/lib/seo', async (importOriginal) => ({
@@ -10,6 +11,33 @@ vi.mock('@/lib/seo', async (importOriginal) => ({
 const { default: sitemap } = await import('./sitemap');
 
 describe('sitemap', () => {
+  beforeEach(() => { vi.mocked(fetchPublicV1).mockReset().mockResolvedValue(null); });
+
+  it('리그 경기는 최종 상세 주소로 싣고 친선 경기는 기존 주소를 유지한다', async () => {
+    vi.mocked(fetchPublicV1).mockImplementation(async (path) => path.startsWith('/team-matches?') ? {
+      items: [
+        { teamMatchId: 'fixture-1', league: { leagueId: 'league-1' } },
+        { teamMatchId: 'friendly-1', league: null },
+      ], nextCursor: null,
+    } : null);
+    const urls = (await sitemap()).map((entry) => entry.url);
+    expect(urls).toContain('https://teameet.co.kr/league-matches/league-1/fixtures/fixture-1');
+    expect(urls).not.toContain('https://teameet.co.kr/team-matches/fixture-1');
+    expect(urls).toContain('https://teameet.co.kr/team-matches/friendly-1');
+  });
+
+  it('공개 대회에 실제 생성된 경기만 기존 상세 주소로 싣는다', async () => {
+    vi.mocked(fetchPublicV1).mockImplementation(async (path) => {
+      if (path.startsWith('/tournaments?')) return {
+        items: [{ id: 'cup-1', title: '풋살컵', sport: { name: '풋살' }, kind: 'regular_tournament', status: 'completed' }],
+        pageInfo: { hasNext: false, nextCursor: null },
+      };
+      if (path === '/tournaments/cup-1') return { fixtures: [{ id: 'game-1' }] };
+      return null;
+    });
+    expect((await sitemap()).map((entry) => entry.url)).toContain('https://teameet.co.kr/tournaments/cup-1/matches/game-1');
+  });
+
   it('도움말·이용 대상·문의 페이지를 전부 싣고, 콘텐츠 갱신일을 lastModified 로 준다', async () => {
     const entries = await sitemap();
     const byUrl = new Map(entries.map((entry) => [entry.url, entry]));

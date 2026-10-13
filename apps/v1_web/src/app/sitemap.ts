@@ -1,6 +1,8 @@
 import type { MetadataRoute } from 'next';
 import { absoluteSiteUrl, fetchPublicV1 } from '@/lib/seo';
 import { PUBLIC_SITE_ROUTES } from '@/lib/public-site/routes';
+import { fixtureDetailHref } from '@/lib/fixture-detail-route';
+import { collectPublicTournamentFixtures } from '@/lib/public-competition-discovery';
 import type {
   CursorPage,
   V1Match,
@@ -64,6 +66,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const tournaments = settledItems<V1TournamentListItem>(results[3]);
   const notices = settledItems<V1Notice>(results[4]);
   const leagues = settledItems<V1PublicLeagueListItem>(results[5]);
+  const fixtureResults = await Promise.allSettled([collectPublicTournamentFixtures(tournaments)]);
+  const tournamentFixtures = settledItems(fixtureResults[0]);
 
   return [
     ...staticEntries,
@@ -75,7 +79,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...teams.map((item) => sitemapEntry(`/teams/${item.id}`, 0.6, 'weekly')),
     ...teamMatches.flatMap((item) => {
       const id = item.teamMatchId ?? item.matchId ?? item.id;
-      return id ? [sitemapEntry(`/team-matches/${id}`, 0.7, 'daily')] : [];
+      if (!id) return [];
+      const path = item.league
+        ? fixtureDetailHref({ isRegularLeague: true, competitionId: item.league.leagueId, fixtureId: id })
+        : `/team-matches/${encodeURIComponent(id)}`;
+      return [sitemapEntry(path, 0.7, 'daily')];
     }),
     ...tournaments.flatMap((item) => [
       sitemapEntry(`/tournaments/${item.id}`, 0.8, 'daily', item.updatedAt),
@@ -97,11 +105,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // 리그의 draft는 "팀은 모였지만 대진이 아직 안 생성된" 상태다). 로그인 없이 보이는
     // 화면을 sitemap에서만 숨기면 "브라우징은 되는데 검색은 안 되는" 불일치가 생긴다.
     ...leagues.map((item) => sitemapEntry(`/league-matches/${item.leagueId}`, 0.7, 'daily')),
+    ...tournamentFixtures.map((item) => sitemapEntry(fixtureDetailHref({
+      isRegularLeague: false, competitionId: item.tournamentId, fixtureId: item.fixture.id,
+    }), 0.6, 'daily')),
   ];
 }
 
 function settledItems<T>(result: PromiseSettledResult<T[]>): T[] {
-  return result.status === 'fulfilled' ? result.value : [];
+  if (result.status === 'fulfilled') return result.value;
+  console.error('[seo] sitemap 공개 목록 조회 실패', result.reason);
+  return [];
 }
 
 async function fetchCursorItems<T>(path: string, options: { cache?: 'no-store' } = {}): Promise<T[]> {

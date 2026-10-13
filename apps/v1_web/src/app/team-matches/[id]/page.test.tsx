@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fetchPublicV1 } from '@/lib/seo';
 import { redirect } from 'next/navigation';
 import { buildTeamMatchEventLd } from '@/lib/structured-data';
-import TeamMatchDetailPage from './page';
+import TeamMatchDetailPage, { generateMetadata } from './page';
 
 vi.mock('next/navigation', () => ({
   redirect: vi.fn((url: string) => {
@@ -14,11 +14,9 @@ vi.mock('next/navigation', () => ({
   }),
 }));
 
-vi.mock('@/lib/seo', () => ({
+vi.mock('@/lib/seo', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/seo')>()),
   fetchPublicV1: vi.fn(),
-  buildNoIndexMetadata: vi.fn(),
-  buildPublicMetadata: vi.fn(),
-  metadataDescription: vi.fn(),
 }));
 
 vi.mock('@/lib/structured-data', () => ({ buildTeamMatchEventLd: vi.fn(() => ({ '@type': 'SportsEvent' })) }));
@@ -46,6 +44,16 @@ describe('TeamMatchDetailPage (server)', () => {
   beforeEach(() => {
     // redirect spy 호출 기록이 테스트 간 이월되면 "리다이렉트 없음" 검증이 오염된다.
     vi.clearAllMocks();
+  });
+
+  it.each([
+    [null, '/team-matches/fx-1'],
+    [{ leagueId: 'lg-1', title: '가을 리그' }, '/league-matches/lg-1/fixtures/fx-1'],
+  ])('canonical은 실제 경기 상세 주소와 일치한다 (%s)', async (league, canonical) => {
+    fetchPublicV1Mock.mockResolvedValue({ title: '풋살 경기', sportName: '풋살', league } as never);
+    const metadata = await generateMetadata({ params: Promise.resolve({ id: 'fx-1' }) });
+    expect(metadata.alternates?.canonical).toBe(canonical);
+    expect(metadata.robots).toMatchObject({ index: true, follow: true });
   });
 
   // 리그 대진의 알림·목록 딥링크는 전부 /team-matches/:id 로 온다 — 이 리다이렉트가

@@ -21,6 +21,25 @@ afterEach(() => {
 const page = (items: unknown[]) => ({ items, nextCursor: null, pageInfo: { hasNext: false, nextCursor: null } });
 
 describe('collectLlmsFullSnapshot', () => {
+  it('공개 목록은 다섯 번째 페이지 이후도 빠짐없이 가져온다', async () => {
+    fetchPublicV1.mockImplementation(async (path: string) => {
+      if (!path.startsWith('/teams?')) return page([]);
+      const index = Number(new URL(path, 'https://teameet.co.kr').searchParams.get('cursor') ?? 0);
+      return { items: [{ id: `team-${index}` }], pageInfo: { hasNext: index < 5, nextCursor: index < 5 ? String(index + 1) : null } };
+    });
+    expect((await collectLlmsFullSnapshot()).teams?.map((team) => team.id)).toEqual(
+      ['team-0', 'team-1', 'team-2', 'team-3', 'team-4', 'team-5'],
+    );
+  });
+
+  it('반복 커서는 불완전한 목록을 성공으로 내보내지 않는다', async () => {
+    fetchPublicV1.mockImplementation(async (path: string) => path.startsWith('/teams?')
+      ? { items: [{ id: 'team-0' }], pageInfo: { hasNext: true, nextCursor: 'same' } }
+      : page([]));
+    expect((await collectLlmsFullSnapshot()).teams).toBeNull();
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('팀'), expect.any(Error));
+  });
+
   it('does not cache league or team-match lists in the generated publication-sensitive snapshot', async () => {
     fetchPublicV1.mockImplementation(async () => page([]));
 

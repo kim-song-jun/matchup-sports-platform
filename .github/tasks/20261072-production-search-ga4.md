@@ -1,10 +1,23 @@
 # Task 20261072: 운영 검색 노출 및 홈 GA4 계측 정정
 
-Status: SEO deployed and verified on alpha; latest-dev pipeline improvement and authorized main release in progress
+Status: Existing-page search/AI discovery corrections in progress (2026-10-13)
 **Owner**: Codex main (단일 에이전트)
 **Created**: 2026-10-12
 
 ## Context
+2026-10-13 최종 범위: 새 페이지를 만들지 않고 기존 팀·대회·리그·개인 매치·팀 매치·리그 경기의 공개 검색 정보를 정리한다. 사용자 승인: Alpha 검증 후 이번 SEO 변경만 main에 배포하고 실제 Google 색인 상태까지 확인한다. 월별·지역별 새 라우트 제안은 폐기됐다.
+
+Owned extension: sitemap/llms publication, existing detail metadata, structured-data builders and focused tests, this task and SEO measurement report. Forbidden: DB/public visibility mutations, auth/Kakao/store configuration, new routes, unrelated dev changes, shared-root WIP.
+
+Acceptance criteria:
+- [ ] Sitemap·canonical·AI links agree on final existing league-fixture routes; no arbitrary public inventory truncation.
+- [ ] Recruitment facts match actual deadline/capacity checks; dates include year; venue names are not fabricated postal addresses.
+- [ ] Focused RED → GREEN and exact-head CI pass; Alpha guest routes, errors and noindex exclusion verified.
+- [ ] Scoped production deployment verified by commit/release headers and public inventory audit.
+- [ ] Google actual indexed/pending statuses recorded separately from indexing requests and AI inclusion expectations.
+
+Current cursor: task-owned existing checkout `mdqa-127-kakao-talk-login`, base `9e3d596629ca350e5a12ac38a06ab42fff14713f`; shared-root files excluded. RED 2026-10-13 19:38: 8 failed / 34 passed, reproducing canonical, truncation, registration and false-address defects. Further RED confirmed year/state descriptions, missing tournament fixture links, and closed-public-match separation. GREEN: 87 focused tests across seven files; frontend typecheck/pattern lint passed. Host load 27.43/24.35/30.56 (12 cores), free memory 36%, swap 16.1GB, Node/browser signatures 439; narrow tests run serially by user-authorized policy. Docker unavailable, not used. Test harness corrections: beforeEach returned mock was interpreted as teardown; tournament list fixture needed real pageInfo contract. Both corrected and affected sitemap tests passed. Missing-path read attempts were corrected; no product code was affected. No newly spawned coding agents (project delegation restriction); main performed implementation and direct checks, CI review pending.
+
 사용자가 Google 검색에서 `/home`의 제목 대신 URL과 “이 페이지에 대한 정보가 없습니다”가 나오는 화면을 제공했다. Google·네이버에서는 운영만 노출하고 alpha는 제외하며, 로그인된 ego 프로필로 GA4의 메인 페이지 분석과 계측 결함 수정을 요청했다.
 
 ## Goal

@@ -1,4 +1,5 @@
 import { fetchPublicV1 } from '@/lib/seo';
+import { collectPublicTournamentFixtures, type PublicTournamentFixture } from '@/lib/public-competition-discovery';
 import type { V1Match, V1Team, V1TeamMatch, V1TournamentListItem } from '@/types/api';
 import type { V1PublicLeagueListItem } from '@/types/league-match';
 import type { V1TournamentCampaignListItem } from '@/types/tournament-campaign';
@@ -17,18 +18,18 @@ export type LlmsFullSnapshot = {
   matches: V1Match[] | null;
   teamMatches: V1TeamMatch[] | null;
   teams: V1Team[] | null;
+  tournamentFixtures?: PublicTournamentFixture[] | null;
 };
 
 const PAGE_SIZE = 50;
-// 한 섹션이 문서를 독점하지 않게 하는 상한. 팀은 prod 기준 68개(2026-09-27)라 전부 실린다.
-const MAX_PAGES = 4;
 
 type Paged<T> = { items: T[]; nextCursor?: string | null; pageInfo?: { hasNext: boolean; nextCursor: string | null } };
 
 async function fetchAllPages<T>(path: string, options: { cache?: 'no-store' } = {}): Promise<T[]> {
   const items: T[] = [];
   let cursor: string | null = null;
-  for (let page = 0; page < MAX_PAGES; page += 1) {
+  const seenCursors = new Set<string>();
+  do {
     const query = new URLSearchParams({ limit: String(PAGE_SIZE) });
     if (cursor) query.set('cursor', cursor);
     const result: Paged<T> | null = await fetchPublicV1<Paged<T>>(`${path}?${query.toString()}`, options);
@@ -39,8 +40,11 @@ async function fetchAllPages<T>(path: string, options: { cache?: 'no-store' } = 
     cursor = result.pageInfo
       ? (result.pageInfo.hasNext ? result.pageInfo.nextCursor : null)
       : (result.nextCursor ?? null);
-    if (!cursor) break;
-  }
+    if (cursor) {
+      if (seenCursors.has(cursor)) throw new Error(`공개 목록 커서 반복: ${path}`);
+      seenCursors.add(cursor);
+    }
+  } while (cursor);
   return items;
 }
 
@@ -62,5 +66,7 @@ export async function collectLlmsFullSnapshot(): Promise<LlmsFullSnapshot> {
     settle('팀 매치', () => fetchAllPages<V1TeamMatch>('/team-matches', { cache: 'no-store' })),
     settle('팀', () => fetchAllPages<V1Team>('/teams')),
   ]);
-  return { tournaments, leagues, campaigns, matches, teamMatches, teams };
+  const tournamentFixtures = tournaments === null ? null
+    : await settle('대회 경기', () => collectPublicTournamentFixtures(tournaments));
+  return { tournaments, leagues, campaigns, matches, teamMatches, teams, tournamentFixtures };
 }

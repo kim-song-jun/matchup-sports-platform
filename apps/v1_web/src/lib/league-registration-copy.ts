@@ -15,6 +15,7 @@ import { formatTournamentDateTimeShort } from './date-utils';
  * | 마감을 아직 안 정했다 (`registrationDeadlineAt === null`) | 호출자가 준 `noDeadlineHint` | 마감을 정하면 열린다 |
  * | 마감이 지났다 | "신청이 마감됐어요" | 마감을 미래로 바꾸면 다시 열린다 |
  * | 리그가 끝났거나 취소됐다 | "끝났거나 취소된 리그" | **마감을 바꿔도 열리지 않는다** |
+ * | 첫 경기가 킥오프했다 (2026-10-13) | "첫 경기가 시작돼 신청을 받지 않아요" | **마감을 바꿔도 열리지 않는다** |
  *
  * 뒤 둘을 섞으면 마감이 **미래인데도** "마감됐어요" 라고 말하게 된다(끝난 리그의 마감은 보통
  * 미래로 남아 있다). 그러면 운영자는 마감을 다시 넣어 보고, 서버는 409
@@ -24,6 +25,22 @@ import { formatTournamentDateTimeShort } from './date-utils';
  * 가리킨다(`LEAGUE_STATE_BY_STATUS`). 화면은 그 둘을 구분할 방법이 없으므로 문구도
  * 서버 가드와 같은 표현("끝났거나 취소된")을 쓴다.
  */
+/**
+ * 취소되지 않은 대진 중 가장 이른 예정 시작 시각(ISO). 대진이 없으면 null.
+ * 어드민이 "마감이 첫 경기보다 늦다" 를 안내하는 기준이다 — 실제로 신청을 닫는 것은 예정 시각이
+ * 아니라 첫 경기의 실제 킥오프(서버 `hasLeagueFirstMatchStarted`)다.
+ */
+export function earliestFixtureStartAt(fixtures: readonly { startAt: string; status: string }[]): string | null {
+  let earliest: string | null = null;
+  for (const fixture of fixtures) {
+    if (fixture.status === 'cancelled') continue;
+    const at = Date.parse(fixture.startAt);
+    if (!Number.isFinite(at)) continue;
+    if (earliest === null || at < Date.parse(earliest)) earliest = fixture.startAt;
+  }
+  return earliest;
+}
+
 export function describeLeagueRegistrationWindow(input: {
   /** 리그 수명주기. `'completed'` 는 끝난 리그와 취소된 리그를 함께 가리킨다. */
   state: 'draft' | 'active' | 'completed' | 'on_hold';
@@ -35,8 +52,15 @@ export function describeLeagueRegistrationWindow(input: {
    * 있고, 다른 쪽은 "신청 관리" 로 넘어가야 한다) 문장을 호출자가 준다.
    */
   noDeadlineHint: string;
+  /** 첫 경기가 킥오프했는가(서버 값). 참이면 마감이 남아 있어도 신청을 받지 않는다. */
+  firstMatchStarted?: boolean;
 }): string {
-  const { state, registrationOpen, registrationDeadlineAt, noDeadlineHint } = input;
+  const { state, registrationOpen, registrationDeadlineAt, noDeadlineHint, firstMatchStarted = false } = input;
+  if (!registrationOpen && state !== 'completed' && firstMatchStarted) {
+    // 첫 경기가 시작된 리그는 마감을 바꿔도 열리지 않는다 — "마감됐어요" 라고 하면 운영자가 마감을
+    // 다시 넣어 보고 409 `LEAGUE_ALREADY_STARTED` 를 만난다(끝난 리그와 같은 함정).
+    return '첫 경기가 시작돼 신청을 받지 않아요.';
+  }
   if (registrationDeadlineAt === null) {
     // 정본 §6: 마감을 안 정하면 그 리그는 신청을 안 받는다. 그래서 이 가지는 열림/닫힘
     // 어느 쪽에서도 같은 안내다 — "먼저 마감을 정해라".

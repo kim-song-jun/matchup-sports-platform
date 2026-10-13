@@ -85,4 +85,27 @@ describe('리그 기본 정보 — 실제 HTTP/DB', () => {
     expect(await h.prisma.v1AdminActionLog.count({ where: { targetId: id } })).toBe(0);
     expect((await patch(id, { ...body, title: '기간은 유지하고 이름만 변경' })).status).toBe(200);
   });
+  it('첫 경기가 킥오프하면 마감이 남아 있어도 신청이 닫히고 다시 열 수 없다 — 마감 날짜 자체는 제한하지 않는다 (2026-10-13)', async () => {
+    const id = await h.makeLeague({ state: 'active' });
+    await h.prisma.v1Tournament.update({ where: { id }, data: { scheduledAt: new Date('2098-01-01T00:00:00Z'), scheduledEndAt: new Date('2098-12-31T00:00:00Z') } });
+    const teamMatchId = await h.createFixture(id, { startAt: new Date('2098-02-01T00:00:00Z') });
+    // 첫 경기 예정 시각(2098-02-01)보다 늦은 마감도 저장된다 — 어드민 화면이 안내만 한다.
+    const saved = await patch(id, { ...await snapshot(id), registrationDeadlineAt: '2098-03-01T00:00:00Z' });
+    expect(saved.status).toBe(200);
+    const publicOpen = async () => (await request(app.getHttpServer()).get(`/api/v1/league-matches/${id}`)).body.data.registrationOpen;
+    expect(await publicOpen()).toBe(true);
+
+    const kicked = await h.prisma.v1Game.updateMany({ where: { teamMatchId }, data: { state: 'LIVE' } });
+    expect(kicked.count).toBe(1);
+    expect(await publicOpen()).toBe(false);
+    const tournamentDetail = await request(app.getHttpServer()).get(`/api/v1/tournaments/${id}`);
+    expect(tournamentDetail.body.data.leagueFirstMatchStarted).toBe(true);
+
+    const reopen = await request(app.getHttpServer())
+      .post(`/api/v1/admin/league-matches/${id}/open-registration`)
+      .set('x-v1-user-id', h.adminUserId)
+      .send({ registrationDeadlineAt: '2098-04-01T00:00:00Z' });
+    expect(reopen.status).toBe(409);
+    expect(reopen.body.code).toBe('LEAGUE_ALREADY_STARTED');
+  });
 });

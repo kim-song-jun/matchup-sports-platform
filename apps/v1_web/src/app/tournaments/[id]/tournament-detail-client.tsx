@@ -59,9 +59,10 @@ import {
   describeTournamentRegistrationBlock,
   resolveTournamentCapacity,
   type TournamentRegistrationBlockReason,
-
   pendingCapacityLabel,
 } from '@/lib/tournament-registration-availability';
+import { toKstDateString } from '@/lib/kst-calendar';
+import type { V1LeagueFixture } from '@/types/league-match';
 import type {
   V1PlaceView,
   V1TournamentDetail,
@@ -124,10 +125,17 @@ export function getBracketEntryCtaLabel(
    * 조용히 새어 나온다.
    */
   isRegularLeague = false,
+  /**
+   * 리그의 **경기가 있는 날**인가(`isLeagueMatchDay`). 리그는 몇 주에 걸쳐 열려 시즌 내내
+   * `in_progress` 라, 경기가 없는 날에도 "진행 중인 리그 보기" 를 쓰면 지금 중계 중인 것처럼
+   * 읽힌다 — 그날은 중립 문구 "리그 일정 보기" 를 쓴다(2026-10-13 사용자 확정). 대회는 쓰지 않는다.
+   */
+  isLeagueMatchDayToday = true,
 ): string | null {
   switch (status) {
     case 'in_progress':
-      return isRegularLeague ? '진행 중인 리그 보기' : '진행 중인 대회 보기';
+      if (!isRegularLeague) return '진행 중인 대회 보기';
+      return isLeagueMatchDayToday ? '진행 중인 리그 보기' : '리그 일정 보기';
     case 'completed':
       return isRegularLeague ? '최종 순위 보기' : '경기 결과 · 대진표 보기';
     case 'open':
@@ -138,6 +146,52 @@ export function getBracketEntryCtaLabel(
     default:
       return null;
   }
+}
+
+/**
+ * 상세가 **모집 중 화면**(신청 CTA)을 그리는가.
+ *
+ * · 대회: `status === 'open'`.
+ * · 정규 리그: 끝나지 않았고 **첫 경기가 아직 킥오프하지 않았다**. 리그는 대진이 생기면 `in_progress`
+ *   가 되지만 첫 경기 전이면 신청을 계속 받는다(정본 §6). 첫 경기가 시작되면 서버도 신청을 받지
+ *   않으므로(2026-10-13 사용자 확정) 이 화면은 신청 대신 실시간 중계 진입(`/bracket`)을 앞세운다.
+ *   판정 값은 서버가 계산한 `leagueFirstMatchStarted` 다(공개 정책이 hidden 인 경기도 센다).
+ *   예전엔 시작 여부를 보지 않아 진행 중인 리그가 늘 "모집 중" 으로 판정됐고, 그 결과 데스크톱
+ *   레일과 비참가자의 모바일 상단에서 "진행 중인 리그 보기" 가 사라졌다.
+ */
+export function isDetailRegistrationPhase(
+  tournament: Pick<V1TournamentDetail, 'kind' | 'status' | 'leagueFirstMatchStarted'>,
+): boolean {
+  if (tournament.kind !== 'regular_league') return tournament.status === 'open';
+  if (tournament.status === 'completed' || tournament.status === 'cancelled') return false;
+  return tournament.leagueFirstMatchStarted !== true;
+}
+
+/**
+ * 정규 리그의 **경기가 있는 날**인가 — 리그 진입 CTA 를 LIVE 로 그리는 기준(2026-10-13 사용자 확정).
+ *
+ * 대회는 하루 안에 끝나 `in_progress` 만으로 LIVE 가 맞지만, 리그는 몇 주에 걸쳐 열려 경기가 없는
+ * 날이 대부분이다. 그래서
+ * · 진행 중·일시정지인 경기가 있으면 날짜와 상관없이 경기일이다(자정을 넘긴 경기).
+ * · 아니면 오늘(KST) 시작하는 경기가 하나라도 있으면 경기일이다. 취소된 경기는 세지 않는다.
+ */
+export function isLeagueMatchDay(
+  fixtures: readonly Pick<V1LeagueFixture, 'startAt' | 'status' | 'gameState'>[],
+  now: Date = new Date(),
+): boolean {
+  const today = toKstDateString(now);
+  return fixtures.some((fixture) => {
+    if (fixture.gameState === 'LIVE' || fixture.gameState === 'PAUSED') return true;
+    if (fixture.status === 'cancelled' || fixture.gameState === 'CANCELLED') return false;
+    const startsAt = new Date(fixture.startAt);
+    return Number.isFinite(startsAt.getTime()) && toKstDateString(startsAt) === today;
+  });
+}
+
+/** 리그면 오늘이 경기일인지, 대회면 항상 true — 진입 CTA 의 문구·LIVE 강조가 함께 쓴다. */
+function isMatchDayForEntryCta(tournament: V1TournamentDetail, now: Date = new Date()): boolean {
+  if (tournament.kind !== 'regular_league') return true;
+  return isLeagueMatchDay(tournament.leagueFixtures ?? [], now);
 }
 
 function getGenderCategoryLabel(category: V1TournamentDetail['genderCategory']) {
@@ -408,9 +462,7 @@ export function ApplyCTA({
   tournament: V1TournamentDetail;
   myRegistration: V1TournamentRegistration | null;
 }) {
-  const isOpen = tournament.kind === 'regular_league'
-    ? tournament.status !== 'completed' && tournament.status !== 'cancelled'
-    : tournament.status === 'open';
+  const isOpen = isDetailRegistrationPhase(tournament);
 
   // 신청이 있으면 제목 아래 "우리 팀 참가" 카드가 신청 내역·명단으로 보낸다(R-1) — 같은 입구를 한 화면에 두지 않는다.
   if (!isOpen || (myRegistration !== null && myRegistration.status !== 'cancelled')) return null;
@@ -425,14 +477,16 @@ export function ApplyCTA({
   );
 }
 
-/* ── Unified bracket-entry CTA (top-sticky + bottom, mobile/tablet only — desktop
-   uses the always-visible sticky rail below) ── */
+/* ── Unified bracket-entry CTA — 모바일·태블릿 상단 스티키와 데스크톱 진행 중 레일이 같은
+   버튼을 쓴다(둘이 따로 그리던 시절 리그의 경기일 판정이 한쪽에만 들어갈 뻔했다). ── */
 
 function BracketEntryCtaButton({ tournament }: { tournament: V1TournamentDetail }) {
   const childHref = useChildHref();
-  const label = getBracketEntryCtaLabel(tournament.status, tournament.kind === 'regular_league');
+  const isMatchDay = isMatchDayForEntryCta(tournament);
+  const label = getBracketEntryCtaLabel(tournament.status, tournament.kind === 'regular_league', isMatchDay);
   if (!label) return null;
-  const isLive = tournament.status === 'in_progress';
+  // 리그는 경기가 있는 날만 LIVE 로 강조한다 — 경기 없는 날은 중립 톤의 "리그 일정 보기".
+  const isLive = tournament.status === 'in_progress' && isMatchDay;
 
   return (
     <Link
@@ -600,9 +654,7 @@ export function TournamentDetailView({
   const childHref = useChildHref();
   const participantFrom = useContext(DetailChainFromContext) ?? `/tournaments/${tournament.id}`;
   const sportAccent = getSportAccent(tournament.sport.code);
-  const isOpen = tournament.kind === 'regular_league'
-    ? tournament.status !== 'completed' && tournament.status !== 'cancelled'
-    : tournament.status === 'open';
+  const isOpen = isDetailRegistrationPhase(tournament);
   const isCompleted = tournament.status === 'completed';
   const pendingPaymentCount = getPendingPaymentCount(tournament);
   const reservedTeamCount = getReservedTeamCount(tournament);
@@ -706,7 +758,7 @@ export function TournamentDetailView({
      railCTA가 대신한다. [P2] 페이지 맨 끝에 같은 CTA(같은 href /bracket)를 하나 더
      두고 IntersectionObserver로 서로 안 겹치게 껐었는데, 하단 CTA를 없애 그 관측
      로직째로 지운다 — 오너 요구("CTA 동시 노출 금지")는 하나만 있으면 자동으로 지켜진다. */
-  const bracketCtaLabel = getBracketEntryCtaLabel(tournament.status, isLeagueMirror);
+  const bracketCtaLabel = getBracketEntryCtaLabel(tournament.status, isLeagueMirror, isMatchDayForEntryCta(tournament));
 
   /* ── Prize card — rendered in left column just after metric strip ── */
   // 상금 칩 분리: '/'·개행·콤마 구분 지원. 단 "600,000" 같은 천단위 콤마(양옆이 숫자)는
@@ -1163,9 +1215,11 @@ export function TournamentDetailView({
   );
 
   /* ── Desktop right-rail CTA card ── */
-  const railCTA = isOpen ? (
+  /* 신청한 리그 팀은 "우리 팀 참가" 카드가 신청 입구를 맡으므로 신청 레일 대신 아래 상태별 레일
+     (진행 중이면 진입 CTA)을 받는다 — 모바일 상단 스티키가 같은 조건(`showsApplyCta` 거짓)으로 뜨는
+     것과 맞춘다. 예전엔 여기서 null 을 돌려 데스크톱에서만 진입 CTA 가 사라졌다. */
+  const railCTA = isOpen && !(isLeagueMirror && hasActiveRegistration) ? (
     isLeagueMirror ? (
-      hasActiveRegistration ? null : (
       <aside className="tm-tournament-rail tm-show-desktop" role="complementary" aria-label="리그 참가 신청">
         <div className="tm-text-label" style={{ color: 'var(--text-strong)', marginBottom: 2 }}>
           {hasActiveRegistration ? '내 리그 신청' : '리그 참가 신청'}
@@ -1177,7 +1231,6 @@ export function TournamentDetailView({
         ) : null}
         <ApplyCTAButtons tournament={tournament} blockReason={registrationBlock} myRegistration={myRegistration} />
       </aside>
-      )
     ) : (
 
     <aside
@@ -1248,26 +1301,10 @@ export function TournamentDetailView({
     )
   ) : tournament.status === 'in_progress' ? (
     <aside className="tm-tournament-rail tm-show-desktop" role="complementary" aria-label="대회 진행 상태">
-      {/* Live CTA */}
-      <Link
-        href={childHref(`/tournaments/${tournament.id}/bracket`)}
-        style={{
-          display: 'flex', alignItems: 'center', gap: 12,
-          padding: '16px 16px',
-          background: 'var(--blue500)', borderRadius: 'var(--radius-field)',
-          textDecoration: 'none',
-          boxShadow: '0 2px 14px rgba(49,130,246,0.28)',
-          marginBottom: 16,
-        }}
-      >
-        <span style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.18)', borderRadius: 20, padding: '3px 8px', flexShrink: 0 }}>
-          <span style={{ width: 6, height: 6, borderRadius: 'var(--radius-circle)', background: '#4ADE80', flexShrink: 0, boxShadow: '0 0 0 2px rgba(74,222,128,0.35)' }} aria-hidden="true" />
-          <span style={{ fontSize: 'var(--font-size-caption)', fontWeight: 800, color: '#fff', letterSpacing: '0.02em' }}>LIVE</span>
-        </span>
-        {/* 라벨: getBracketEntryCtaLabel과 단일 소스 — 모바일 상단/하단 CTA와 동일 문구("진행 중인 대회 보기")를 쓴다. */}
-        <span style={{ flex: 1, fontSize: 'var(--font-size-body-lg)', fontWeight: 800, color: '#fff', letterSpacing: '-0.01em' }}>{getBracketEntryCtaLabel(tournament.status, isLeagueMirror)}</span>
-        <ChevronRight size={17} strokeWidth={2.5} style={{ color: 'rgba(255,255,255,0.65)', flexShrink: 0 }} aria-hidden="true" />
-      </Link>
+      {/* Live CTA — 모바일 상단 스티키와 같은 버튼(문구·LIVE 강조·리그 경기일 판정이 한 곳에서 나온다). */}
+      <div style={{ marginBottom: 16 }}>
+        <BracketEntryCtaButton tournament={tournament} />
+      </div>
       {/* Key facts */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1275,9 +1312,9 @@ export function TournamentDetailView({
           <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>{formatTournamentDateRangeWithTime(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정'}</span>
         </div>
         <ScheduleNoticeCaption style={{ marginTop: 0 }} />
-        {/* **리그가 실제로 닿는 레일은 여기(in_progress)다.** 위 `open` 레일은 리그가
-            도달하지 못한다(거울 status 에 `open` 이 없다) — 진행 중인 리그에 "정원 2/8팀 ·
-            참가비 무료" 가 뜨던 자리가 이쪽이다. */}
+        {/* **시작한 리그가 닿는 레일은 여기(in_progress)다.** 시작 전 리그는 위 신청 레일을
+            받는다(`isDetailRegistrationPhase`) — 진행 중인 리그에 "정원 2/8팀 · 참가비 무료" 가
+            뜨던 자리가 이쪽이라 리그는 정원 대신 참가팀 수를 그린다. */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>
             {showsCapacity ? '정원' : '참가팀'}

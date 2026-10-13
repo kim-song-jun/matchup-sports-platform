@@ -17,6 +17,8 @@ const leagueData: {
   bankAccount: string | null;
   bankHolder: string | null;
   activeRegistrationCount: number;
+  firstMatchStarted?: boolean;
+  fixtures?: Array<{ startAt: string; status: string }>;
 } = {
   isPublic: true,
   state: 'draft',
@@ -63,6 +65,39 @@ describe('리그 참가 신청 관리', () => {
     leagueData.bankAccount = null;
     leagueData.bankHolder = null;
     leagueData.activeRegistrationCount = 0;
+    leagueData.firstMatchStarted = undefined;
+    leagueData.fixtures = undefined;
+  });
+
+  it('첫 경기가 시작된 리그는 마감 컨트롤 없이 닫힌 이유만 말한다 — 다시 열 수 없다 (2026-10-13)', () => {
+    leagueData.state = 'active';
+    leagueData.registrationDeadlineAt = '2099-01-01T00:00:00.000Z';
+    leagueData.firstMatchStarted = true;
+    render(<LeagueRegistrationsClient leagueId="league-1" />);
+    expect(screen.getByText('첫 경기가 시작돼 신청을 받지 않아요.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '직접 정하기' })).toBeNull();
+  });
+
+  it('마감이 첫 경기 예정 시각보다 늦어도 막지 않고 안내만 한다 (2026-10-13)', () => {
+    leagueData.fixtures = [
+      { startAt: '2099-09-01T11:00:00.000Z', status: 'cancelled' },
+      { startAt: '2099-09-20T11:00:00.000Z', status: 'matched' },
+      { startAt: '2099-09-27T11:00:00.000Z', status: 'matched' },
+    ];
+    render(<LeagueRegistrationsClient leagueId="league-1" />);
+    chooseCustom();
+    fireEvent.change(screen.getByLabelText(/신청 마감 \(한국/), { target: { value: '2099-10-01T23:59' } });
+    expect(screen.getByText(/신청 마감이 첫 경기\(.+\)보다 늦어요/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '신청 열기' }));
+    expect(openMutate).toHaveBeenCalledTimes(1);
+  });
+
+  it('마감이 첫 경기보다 이르면 안내하지 않는다', () => {
+    leagueData.fixtures = [{ startAt: '2099-10-20T11:00:00.000Z', status: 'matched' }];
+    render(<LeagueRegistrationsClient leagueId="league-1" />);
+    chooseCustom();
+    fireEvent.change(screen.getByLabelText(/신청 마감 \(한국/), { target: { value: '2099-10-01T23:59' } });
+    expect(screen.queryByText(/첫 경기.+보다 늦어요/)).toBeNull();
   });
 
   it('끝난 리그는 마감이 미래여도 "마감됐어요" 라고 하지 않는다', () => {

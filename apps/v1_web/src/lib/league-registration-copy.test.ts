@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { describeLeagueRegistrationWindow } from './league-registration-copy';
+import { describeLeagueRegistrationWindow, earliestFixtureStartAt } from './league-registration-copy';
 
 const HINT = '마감을 정해야 신청을 받아요.';
 
@@ -71,5 +71,36 @@ describe('리그 신청 창 안내 문구', () => {
         noDeadlineHint: HINT,
       }),
     ).toBe('not-a-date까지 신청을 받아요.');
+  });
+
+  it('첫 경기가 시작된 리그는 마감이 미래로 남아 있어도 "마감됐어요" 가 아니라 시작돼서 안 받는다고 말한다', () => {
+    // "마감됐어요" 라고 하면 운영자가 마감을 다시 넣어 보고 409 LEAGUE_ALREADY_STARTED 를 만난다.
+    const base = { state: 'active' as const, registrationOpen: false, noDeadlineHint: HINT, firstMatchStarted: true };
+    expect(
+      describeLeagueRegistrationWindow({ ...base, registrationDeadlineAt: '2026-10-30T00:00:00.000Z' }),
+    ).toBe('첫 경기가 시작돼 신청을 받지 않아요.');
+    // 마감을 안 정한 채 시작한 리그도 "마감을 정하라" 고 하지 않는다 — 정해도 열리지 않는다.
+    expect(
+      describeLeagueRegistrationWindow({ ...base, registrationDeadlineAt: null }),
+    ).toBe('첫 경기가 시작돼 신청을 받지 않아요.');
+    // 끝난 리그는 기존 문장 그대로다.
+    expect(
+      describeLeagueRegistrationWindow({ ...base, state: 'completed', registrationDeadlineAt: '2026-10-30T00:00:00.000Z' }),
+    ).toBe('끝났거나 취소된 리그라 신청을 받지 않아요.');
+  });
+});
+
+describe('earliestFixtureStartAt', () => {
+  it('취소되지 않은 대진 중 가장 이른 예정 시각을 고르고, 없으면 null', () => {
+    expect(earliestFixtureStartAt([])).toBeNull();
+    expect(earliestFixtureStartAt([{ startAt: '2026-10-01T00:00:00.000Z', status: 'cancelled' }])).toBeNull();
+    expect(
+      earliestFixtureStartAt([
+        { startAt: '2026-10-20T11:00:00.000Z', status: 'matched' },
+        { startAt: '2026-10-01T11:00:00.000Z', status: 'cancelled' },
+        { startAt: '2026-10-13T11:00:00.000Z', status: 'completed' },
+        { startAt: 'not-a-date', status: 'matched' },
+      ]),
+    ).toBe('2026-10-13T11:00:00.000Z');
   });
 });

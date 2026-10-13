@@ -242,6 +242,9 @@ describe('TournamentsReadService', () => {
     v1GameOperationFlag: {
       findUnique: jest.Mock;
     };
+    v1Game: {
+      findFirst: jest.Mock;
+    };
   };
 
   beforeEach(async () => {
@@ -271,6 +274,10 @@ describe('TournamentsReadService', () => {
       // 케이스가 갈리므로 실제 운영 기본값(켜짐)으로 고정한다.
       v1GameOperationFlag: {
         findUnique: jest.fn().mockResolvedValue({ value: 'on' }),
+      },
+      // 정규 리그 상세의 첫 경기 킥오프 판정(`leagueFirstMatchStarted`) — 기본은 "시작한 경기 없음".
+      v1Game: {
+        findFirst: jest.fn().mockResolvedValue(null),
       },
     };
 

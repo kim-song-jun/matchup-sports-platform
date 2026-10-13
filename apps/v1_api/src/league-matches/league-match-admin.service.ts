@@ -89,7 +89,12 @@ import { assignLeagueFixtureSideInTx } from './league-fixture-side-assignment';
 import { lockCompetitionForBracketMutationInTx } from '../tournaments/slots/competition-bracket-lock';
 import { planLeagueTemplate } from './league-template-plan';
 import { LeagueStateValue } from './league-state';
-import { isLeagueRegistrationOpen } from './league-registration-open';
+import {
+  hasLeagueFirstMatchStarted,
+  isLeagueRegistrationOpen,
+  LEAGUE_STARTED_GAME_STATES,
+  leagueAlreadyStartedException,
+} from './league-registration-open';
 import { competitionTeamTargets, enqueueRosterResync } from '../games/roster/roster-resync-events';
 import { adminBracketSlotInclude, serializeAdminBracketGame, serializeAdminBracketSlot } from '../tournaments/slots/admin-bracket-view';
 
@@ -434,6 +439,9 @@ export class LeagueMatchAdminService {
       orderBy: [{ position: 'asc' }],
       include: adminBracketSlotInclude,
     });
+    const firstMatchStarted = fixtures.some((fixture) =>
+      (LEAGUE_STARTED_GAME_STATES as readonly string[]).includes(fixture.game?.state ?? ''),
+    );
     return {
       leagueId: league.id,
       title: league.title,
@@ -452,7 +460,15 @@ export class LeagueMatchAdminService {
       // 열 수 있어야 한다. 공개 상세와 **같은 판정 함수**를 쓴다(두 화면이 갈리면 어드민은
       // 열었다고 보는데 사용자 화면엔 입구가 없다).
       registrationDeadlineAt: league.registrationDeadlineAt?.toISOString() ?? null,
-      registrationOpen: league.registrationOpen,
+      registrationOpen: isLeagueRegistrationOpen(
+        league.mirrorStatus,
+        league.registrationDeadlineAt,
+        // 위에서 읽은 대진(삭제 제외)의 경기 상태로 판정한다 — `hasLeagueFirstMatchStarted` 와 같은 조건이라
+        // 쿼리를 한 번 더 하지 않는다.
+        firstMatchStarted,
+      ),
+      // 어드민 화면이 "첫 경기가 시작돼 신청을 받지 않아요" 와 마감 경과를 가르는 데 쓴다.
+      firstMatchStarted,
       // 그룹 B 감사 결함 1: 참가팀 추가 화면이 "이 리그 종목과 같은 팀만" 검색을 좁히려면
       // 종목ID가 필요하다 — 지금까지는 대진 표에서 쓸 일이 없어 응답에 없었다.
       sportId: league.sportId,
@@ -1801,6 +1817,12 @@ export class LeagueMatchAdminService {
         message: '신청 마감은 지금보다 뒤여야 해요.',
       });
     }
+    // 첫 경기가 킥오프한 리그는 신청을 열지 않는다(2026-10-13 사용자 확정) — 열어도 등록 서비스가
+    // 곧바로 LEAGUE_ALREADY_STARTED 로 막아 "열었는데 아무도 못 신청" 이 된다. 마감 날짜 자체는
+    // 제한하지 않는다(첫 경기 예정 시각보다 늦으면 어드민 화면이 안내만 한다).
+    if (await hasLeagueFirstMatchStarted(this.prisma, leagueId)) {
+      throw leagueAlreadyStartedException();
+    }
 
     // `updateMany` + `kind` 가드인 이유는 이 파일의 다른 dual-write 와 같다 — `update` 는
     // `where` 에 unique 필드만 받아 `kind` 를 못 걸어서, 같은 id 의 **진짜 대회**가 있으면
@@ -2321,7 +2343,9 @@ export class LeagueMatchAdminService {
       // `state`(draft/active/completed)로는 신청 여부를 알 수 없다 — 거울의 원시 `status`
       // 가 `'open'` 인지를 봐야 하고, 그 값은 여기서 destructure 되어 밖으로 안 나간다.
       // 그래서 판정을 **여기서** 해 결과만 올려보낸다(공개 상세와 같은 함수).
-      registrationOpen: isLeagueRegistrationOpen(status, league.registrationDeadlineAt),
+      // 신청 판정에 쓰는 거울의 원시 status. 판정 자체는 첫 경기 킥오프 조회가 필요해 상세 응답
+      // (`detail`)에서만 한다 — 이 로더는 팀 추가·대진 재생성 등 판정이 필요 없는 작업도 함께 쓴다.
+      mirrorStatus: status,
     };
   }
 

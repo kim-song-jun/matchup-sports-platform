@@ -34,6 +34,7 @@ import {
   publicLeagueFixtureListWhere,
   toLeagueFixtureList,
 } from '../league-matches/league-fixture-list-source';
+import { hasLeagueFirstMatchStarted } from '../league-matches/league-registration-open';
 import {
   calculateLeagueStandingsWithTieBreakInfo,
   resolveLeagueChampions,
@@ -234,15 +235,24 @@ export class TournamentsReadService {
         ? await loadGroupStandingSummaries(this.prisma, tournamentId)
         : new Map<string, GroupStandingSummary>();
 
-    return presentTournamentDetail(
-      row,
-      publicLiveEnabled,
-      now,
-      staffBypass,
-      leagueFixtures,
-      rosterByRegistrationId,
-      groupStandingSummaries,
-    );
+    // 리그의 첫 경기가 실제로 킥오프했는가 — 신청이 닫히고 상세가 신청 대신 실시간 진입을 앞세우는
+    // 기준이다(2026-10-13 사용자 확정, `isLeagueRegistrationOpen`). `leagueFixtures[].gameState` 는 경기
+    // 공개 정책이 hidden 이면 비어 화면이 대신 판정할 수 없어 서버가 계산해 싣는다. 대회는 항상 false.
+    const leagueFirstMatchStarted =
+      row.kind === V1CompetitionKind.regular_league ? await hasLeagueFirstMatchStarted(this.prisma, tournamentId) : false;
+
+    return {
+      ...presentTournamentDetail(
+        row,
+        publicLiveEnabled,
+        now,
+        staffBypass,
+        leagueFixtures,
+        rosterByRegistrationId,
+        groupStandingSummaries,
+      ),
+      leagueFirstMatchStarted,
+    };
   }
 
   /**

@@ -221,6 +221,15 @@ describe('리그 참가 신청 — 대회 스택 재사용', () => {
     ).rejects.toMatchObject({ response: { code: 'LEAGUE_REGISTRATION_DEADLINE_PAST' } });
   });
 
+  it('마감 날짜는 리그 시작일이나 첫 경기보다 늦어도 저장된다 — 닫히는 시점은 첫 경기 킥오프가 정한다 (2026-10-13)', async () => {
+    // 리그 시작일은 30일 뒤다(beforeAll). 그보다 늦은 마감도 막지 않는다 — 어드민 화면이 안내만 한다.
+    await expect(
+      makeAdminService().openRegistration(auth, leagueId, {
+        registrationDeadlineAt: new Date(Date.now() + 45 * 86_400_000).toISOString(),
+      }),
+    ).resolves.toMatchObject({ registrationOpen: true });
+  });
+
   it('거울 teamCount(8)를 넘겨도 신청·확정이 통과한다 — 리그엔 정원이 없다', async () => {
     const registrations = new TournamentRegistrationsService(
       prisma,

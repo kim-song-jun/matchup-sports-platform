@@ -105,6 +105,17 @@ describe('resolveTournamentRegistrationBlock', () => {
     expect(resolveTournamentRegistrationBlock(tournament({ kind: 'regular_league', status: 'in_progress', registrationDeadlineAt: '2026-07-01T00:00:00.000Z' }), NOW)).toBe('deadline_passed');
   });
 
+  it('blocks a regular league once its first match has kicked off, even with a future deadline (2026-10-13)', () => {
+    const league = (leagueFirstMatchStarted?: boolean) => tournament({ kind: 'regular_league', status: 'in_progress', leagueFirstMatchStarted });
+    expect(resolveTournamentRegistrationBlock(league(true), NOW)).toBe('not_open');
+    expect(resolveTournamentRegistrationBlock(league(false), NOW)).toBeNull();
+    // 값이 없는 입력(목록 카드 등)은 마감만으로 판정한다.
+    expect(resolveTournamentRegistrationBlock(league(undefined), NOW)).toBeNull();
+  });
+
+  it('does not apply the first-match rule to tournaments', () => {
+    expect(resolveTournamentRegistrationBlock(tournament({ leagueFirstMatchStarted: true }), NOW)).toBeNull();
+  });
 });
 
 describe('copy helpers', () => {

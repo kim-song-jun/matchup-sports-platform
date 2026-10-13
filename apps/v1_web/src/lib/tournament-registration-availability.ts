@@ -8,8 +8,8 @@
  * paid · confirmed`를 모두 정원 점유로 세므로(`tournament-registrations.service.ts`),
  * 입금대기 팀이 정원을 채운 대회는 "5 / 8"처럼 여유가 있어 보여도 실제로는 신청을 받을 수 없다.
  * 그 간극이 "왜 신청이 안 받아지냐"의 원인이었다.
- * 정규 리그는 fixture 생성 뒤에도 미래 registrationDeadlineAt까지 신청할 수 있고, 정원은
- * 신청 가능 여부를 결정하지 않는다.
+ * 정규 리그는 fixture 생성 뒤에도 미래 registrationDeadlineAt까지 신청할 수 있지만 첫 경기가
+ * 실제로 킥오프하면 닫히고, 정원은 신청 가능 여부를 결정하지 않는다.
  */
 
 export type TournamentRegistrationBlockReason =
@@ -18,13 +18,18 @@ export type TournamentRegistrationBlockReason =
   | 'capacity_full';
 
 export type TournamentCapacityInput = {
-  /** regular_league uses deadline/status only; other competitions use open + capacity. */
+  /** regular_league uses deadline/first-match/status only; other competitions use open + capacity. */
   kind?: 'regular_league' | 'regular_tournament' | null;
   status: string;
   teamCount: number;
   confirmedCount: number;
   pendingPaymentCount?: number | null;
   registrationDeadlineAt?: string | null;
+  /**
+   * 정규 리그의 첫 경기가 실제로 킥오프했는가(서버가 계산한 상세 응답 값). 참이면 마감이 남아 있어도
+   * 신청이 닫힌다 — 서버 `isLeagueRegistrationOpen` 과 같은 규칙. 값이 없으면(목록 등) 판정에서 뺀다.
+   */
+  leagueFirstMatchStarted?: boolean;
 };
 
 export type TournamentCapacity = {
@@ -70,6 +75,8 @@ export function resolveTournamentRegistrationBlock(
     // block the request.
     if (tournament.status === 'completed' || tournament.status === 'cancelled') return 'not_open';
     if (!tournament.registrationDeadlineAt) return 'not_open';
+    // 첫 경기가 킥오프하면 마감이 남아 있어도 받지 않는다(2026-10-13 사용자 확정, 서버와 같은 규칙).
+    if (tournament.leagueFirstMatchStarted === true) return 'not_open';
     const deadline = new Date(tournament.registrationDeadlineAt).getTime();
     if (!Number.isFinite(deadline)) return 'not_open';
     if (deadline < now.getTime()) return 'deadline_passed';

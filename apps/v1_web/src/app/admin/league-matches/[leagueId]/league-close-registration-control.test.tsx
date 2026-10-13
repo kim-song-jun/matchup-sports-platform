@@ -104,6 +104,12 @@ describe('LeagueCloseRegistrationControl', () => {
     }
   });
 
+  it('첫 경기가 시작된 리그는 닫힌 이유를 말하고 다시 열기 링크를 숨긴다 (2026-10-13)', () => {
+    renderControl({ registrationOpen: false, registrationDeadlineAt: '2099-01-01T00:00:00.000Z', firstMatchStarted: true });
+    expect(screen.getByText('첫 경기가 시작돼 신청을 받지 않아요.')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /신청 관리에서/ })).toBeNull();
+  });
+
   it('실패하면 모달을 연 채 오류를 alert 로 보여 준다', () => {
     renderControl();
     fireEvent.click(screen.getByRole('button', { name: '지금 마감하기' }));

@@ -70,6 +70,7 @@ describe('TournamentRegistrationsService', () => {
     v1TeamMembership: { findFirst: jest.Mock };
     v1User: { findUnique: jest.Mock };
     v1Tournament: { findFirst: jest.Mock };
+    v1Game: { findFirst: jest.Mock };
     v1TournamentRegistration: { findUnique: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock; count: jest.Mock };
     v1TournamentPayment: { upsert: jest.Mock; findUnique: jest.Mock; update: jest.Mock };
     v1TournamentPlayer: { count: jest.Mock; groupBy: jest.Mock; findMany: jest.Mock; updateMany: jest.Mock };
@@ -94,6 +95,8 @@ describe('TournamentRegistrationsService', () => {
         findUnique: jest.fn().mockResolvedValue({ phoneVerifiedAt: new Date('2026-07-01T00:00:00.000Z') }),
       },
       v1Tournament: { findFirst: jest.fn() },
+      // 리그 첫 경기 킥오프 판정 — 기본은 "아직 시작한 경기 없음".
+      v1Game: { findFirst: jest.fn().mockResolvedValue(null) },
       v1TournamentRegistration: { findUnique: jest.fn(), findFirst: jest.fn(), findMany: jest.fn(), create: jest.fn(), update: jest.fn(), count: jest.fn().mockResolvedValue(0) },
       v1TournamentPayment: { upsert: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
       v1TournamentPlayer: { count: jest.fn().mockResolvedValue(0), groupBy: jest.fn().mockResolvedValue([]), findMany: jest.fn().mockResolvedValue([]), updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
@@ -215,6 +218,41 @@ describe('TournamentRegistrationsService', () => {
       await expect(
         service.create(manager, 'league-1', { teamId: 'team-1' }),
       ).rejects.toMatchObject({ response: { code: 'REGISTRATION_DEADLINE_PASSED' } });
+    });
+
+    it('create: 첫 경기가 킥오프하면 마감이 남아 있어도 LEAGUE_ALREADY_STARTED 로 막는다 (2026-10-13)', async () => {
+      prisma.v1Tournament.findFirst.mockImplementation(
+        kindAwareFindFirst(
+          openTournament({
+            kind: 'regular_league',
+            status: 'in_progress',
+            registrationDeadlineAt: LEAGUE_OPEN_DEADLINE,
+          }),
+        ),
+      );
+      prisma.v1Game.findFirst.mockResolvedValue({ id: 'game-1' });
+      await expect(
+        service.create(manager, 'league-1', { teamId: 'team-1' }),
+      ).rejects.toMatchObject({ response: { code: 'LEAGUE_ALREADY_STARTED' } });
+    });
+
+    it('create: 대진이 있어도 첫 경기 킥오프 전이면 신청 게이트를 지난다 — 판정은 시작된 경기만 센다', async () => {
+      prisma.v1Tournament.findFirst.mockImplementation(
+        kindAwareFindFirst(
+          openTournament({
+            kind: 'regular_league',
+            status: 'in_progress',
+            registrationDeadlineAt: LEAGUE_OPEN_DEADLINE,
+          }),
+        ),
+      );
+      prisma.v1TeamMembership.findFirst.mockResolvedValue(null);
+      await expect(
+        service.create(manager, 'league-1', { teamId: 'team-1' }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prisma.v1Game.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+        where: { teamMatch: { leagueId: 'tournament-1', deletedAt: null }, state: { in: ['LIVE', 'PAUSED', 'ENDED'] } },
+      }));
     });
 
     it('대회는 그대로다 — status 가 open 이 아니면 마감이 남아 있어도 안 받는다', async () => {

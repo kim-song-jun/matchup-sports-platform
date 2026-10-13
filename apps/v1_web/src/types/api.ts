@@ -4035,6 +4035,12 @@ export type V1TournamentDetail = {
    * 거짓이 된다 — 타입도 값도 정상으로 보인다.
    */
   leagueFixtures: V1LeagueFixture[];
+  /**
+   * 정규 리그의 첫 경기가 실제로 킥오프했는가(대회는 항상 false). 킥오프하면 신청이 닫히고 상세는
+   * 신청 대신 실시간 진입을 앞세운다(2026-10-13). `leagueFixtures[].gameState` 는 경기 공개 정책이
+   * hidden 이면 비어 화면이 대신 판정할 수 없어 서버가 계산해 싣는다. optional 은 구버전 응답용이다.
+   */
+  leagueFirstMatchStarted?: boolean;
   announcements: V1TournamentAnnouncement[];
   sponsors: V1TournamentSponsor[];
   /** 대회 참가팀 후기 (status=completed 이후 참가 확정팀만 작성 가능). 최신순 최대 30건만 포함 — 전체 개수는 reviewsTotalCount 참조 */

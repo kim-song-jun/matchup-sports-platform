@@ -12,6 +12,7 @@ import { describeLeagueRegistrationWindow } from '@/lib/league-registration-copy
 import { deriveRegistrationSetupSteps, DEADLINE_PRESET_DAYS, presetDeadlineIso } from '@/lib/league-registration-setup';
 import { extractErrorMessage } from '@/lib/error-message';
 import { kstDatetimeLocalToIso } from '@/lib/kst-calendar';
+import { earliestFixtureStartAt } from '@/lib/league-registration-copy';
 import type { V1UpdateLeagueEntryFeePayload } from '@/types/league-match';
 import { LeagueFeeCard } from './league-fee-card';
 
@@ -47,7 +48,11 @@ export default function LeagueRegistrationsClient({ leagueId }: { leagueId: stri
   const state = league?.state ?? 'draft';
   const registrationOpen = league?.registrationOpen ?? false;
   const registrationDeadlineAt = league?.registrationDeadlineAt ?? null;
-  const canChangeDeadline = state !== 'completed';
+  // 첫 경기가 킥오프한 리그는 신청을 열 수 없다(서버 409 `LEAGUE_ALREADY_STARTED`, 2026-10-13 사용자
+  // 확정) — 마감 컨트롤을 숨기고 이유 문장만 남긴다.
+  const firstMatchStarted = league?.firstMatchStarted === true;
+  const canChangeDeadline = state !== 'completed' && !firstMatchStarted;
+  const firstFixtureAt = earliestFixtureStartAt(league?.fixtures ?? []);
   const inheritedFee = league !== undefined && league.entryFeeConfiguredAt === null && league.entryFee > 0;
   const executeLabel = registrationOpen ? '마감 변경' : registrationDeadlineAt === null ? '신청 열기' : '다시 열기';
 
@@ -131,7 +136,12 @@ export default function LeagueRegistrationsClient({ leagueId }: { leagueId: stri
   };
 
   const selectedDeadlineIso = preset === 'custom' ? kstDatetimeLocalToIso(deadline) : presetIso;
-  const deadlineAfterStart = Boolean(league && selectedDeadlineIso && Date.parse(selectedDeadlineIso) > Date.parse(league.startsOn));
+  // 마감 날짜는 막지 않는다(2026-10-13 사용자 확정). 첫 경기 예정 시각보다 늦으면 첫 경기 킥오프에
+  // 먼저 닫힌다는 것만 알린다 — 고르는 중인 마감, 없으면 지금 받는 중인 마감을 본다.
+  const shownDeadlineIso = selectedDeadlineIso ?? (registrationOpen ? registrationDeadlineAt : null);
+  const deadlineAfterFirstMatch = Boolean(
+    firstFixtureAt !== null && shownDeadlineIso !== null && Date.parse(shownDeadlineIso) > Date.parse(firstFixtureAt),
+  );
 
   const steps = league
     ? deriveRegistrationSetupSteps({
@@ -188,6 +198,7 @@ export default function LeagueRegistrationsClient({ leagueId }: { leagueId: stri
             registrationDeadlineAt,
             noDeadlineHint:
               '마감을 정해야 신청을 받아요. 정하기 전에는 팀장 화면에 신청 입구가 보이지 않아요.',
+            firstMatchStarted,
           })}
         </p>
         {canChangeDeadline ? (
@@ -231,9 +242,9 @@ export default function LeagueRegistrationsClient({ leagueId }: { leagueId: stri
                 </p>
               </div>
             ) : null}
-            {deadlineAfterStart ? (
+            {deadlineAfterFirstMatch && firstFixtureAt !== null ? (
               <p role="status" className="mt-2 text-[length:var(--font-size-caption)] text-[var(--orange700)]">
-                신청 마감이 리그 시작일 이후예요. 리그가 시작된 뒤에도 신청을 받아요.
+                신청 마감이 첫 경기({formatTournamentDateTimeLong(firstFixtureAt)})보다 늦어요. 첫 경기가 시작되면 마감 전이라도 신청이 닫혀요.
               </p>
             ) : null}
             {preset === 'custom' ? (

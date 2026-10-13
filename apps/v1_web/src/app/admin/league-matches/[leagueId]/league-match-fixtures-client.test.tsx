@@ -2183,6 +2183,17 @@ describe('참가 신청 요약 카드', () => {
     expect(screen.queryByText(/신청 마감을 정하면/)).not.toBeInTheDocument();
   });
 
+  it('신청을 받는 중에 대진을 만들려 하면 막지 않고 안내한다 (2026-10-13)', async () => {
+    renderWith(true, '2099-09-10T11:00:00.000Z');
+    expect(await screen.findByText(/아직 참가 신청을 받는 중이에요/)).toBeInTheDocument();
+  });
+
+  it('신청을 안 받는 중이면 대진 생성 안내가 없다', async () => {
+    renderWith(false, null);
+    expect(await screen.findByText('신청 안 받는 중')).toBeInTheDocument();
+    expect(screen.queryByText(/아직 참가 신청을 받는 중이에요/)).toBeNull();
+  });
+
   it('안 받는 중이면 마감을 정하라고 안내한다', async () => {
     renderWith(false, null);
     expect(await screen.findByText('신청 안 받는 중')).toBeInTheDocument();

@@ -34,7 +34,7 @@ import {
 import { LEAGUE_TIE_BREAK_ORDER } from './league-tie-break';
 import type { LeagueState } from './league-state';
 import { findPublicTournamentOnSurface } from '../tournaments/tournament-surface-lookup';
-import { isLeagueRegistrationOpen } from './league-registration-open';
+import { hasLeagueFirstMatchStarted, isLeagueRegistrationOpen } from './league-registration-open';
 import { TOURNAMENT_VENUE_SELECT, tournamentVenueSnapshot } from '../places/tournament-venue';
 
 const PLAYER_RECORDS_LIMIT = 30;
@@ -530,7 +530,11 @@ export class LeagueMatchPublicService {
       // 신청을 열 수 있고 등록 서비스도 리그를 받는데(`ALL_COMPETITION_KINDS`), 그 사실이
       // 공개 응답에 실리지 않아 화면이 알 방법이 없었다.
       registrationDeadlineAt: league.registrationDeadlineAt?.toISOString() ?? null,
-      registrationOpen: league.registrationOpen,
+      registrationOpen: isLeagueRegistrationOpen(
+        league.mirrorStatus,
+        league.registrationDeadlineAt,
+        await hasLeagueFirstMatchStarted(this.prisma, leagueId),
+      ),
       // 시리즈에 속하지 않은 단발 리그는 셋 다 null 이다 — 화면은 null 이면 티어 뱃지를 띄우지 않는다.
       seriesId: league.seriesId,
       seriesTitle: league.series?.title ?? null,
@@ -849,10 +853,11 @@ export class LeagueMatchPublicService {
       teams: registrations,
       registrationDeadlineAt,
       // **신청 가능 여부는 서버가 판정해서 결과만 내려준다.** 등록 서비스가 실제로 던지는
-      // 조건(신청 마감 미도과·미종료)과 **같은 규칙**이다 — 화면이 이 판정을
+      // 조건(신청 마감 미도과·첫 경기 킥오프 전·미종료)과 **같은 규칙**이다 — 화면이 이 판정을
       // 복제하면 두 곳이 갈려 "버튼은 보이는데 누르면 409 `TOURNAMENT_NOT_OPEN`" 이 난다.
       // 마감이 `null` 이면 신청을 받지 않는다(league-registration-open.ts와 같은 규칙).
-      registrationOpen: isLeagueRegistrationOpen(status, registrationDeadlineAt),
+      // 판정 자체는 첫 경기 킥오프 조회가 필요해 `detail` 에서만 한다 — 이 로더는 순위·기록 조회도 쓴다.
+      mirrorStatus: status,
     };
   }
 }

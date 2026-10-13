@@ -44,7 +44,7 @@ import { toKstDateString } from '@/lib/kst-calendar';
 import { LeagueFixtureDatePicker } from './league-fixture-date-picker';
 import { LeagueWeeksPlanField } from './league-weeks-plan-field';
 import { resolveFixturePlan, type WeeksPlan } from '@/lib/league-round-robin-plan';
-import { formatKstDateShort, formatKstTime } from '@/lib/date-utils';
+import { formatKstDateShort, formatKstTime, formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { LeagueVisibilityControl } from './league-visibility-control';
 import { LeagueStateModal } from './league-state-modal';
 import { LeagueCloseRegistrationControl } from './league-close-registration-control';
@@ -801,7 +801,7 @@ export default function LeagueMatchFixturesClient({
       )}
       {/* 보류 중에는 공개 설정을 따로 바꾸지 않는다 — 보류 해제가 공개 여부까지 되돌린다(서버도 409). */}
       {series.state === 'on_hold' ? null : <LeagueVisibilityControl leagueId={leagueId} isPublic={series.isPublic} />}
-      <LeagueCloseRegistrationControl leagueId={leagueId} state={series.state} registrationOpen={series.registrationOpen} registrationDeadlineAt={series.registrationDeadlineAt} activeRegistrationCount={series.activeRegistrationCount} confirmedCount={series.confirmedRegistrationCount} showToast={showToast} />
+      <LeagueCloseRegistrationControl leagueId={leagueId} state={series.state} registrationOpen={series.registrationOpen} registrationDeadlineAt={series.registrationDeadlineAt} firstMatchStarted={series.firstMatchStarted} activeRegistrationCount={series.activeRegistrationCount} confirmedCount={series.confirmedRegistrationCount} showToast={showToast} />
       <TournamentPeriodSettingsEditor tournamentId={leagueId} canWrite={canWrite} showToast={showToast} />
       <LeagueDisciplineSettings league={series} canWrite={canWrite} showToast={showToast} />
       <LeagueCoverImageControl leagueId={leagueId} sportCode={series.sportCode} coverImageUrl={series.coverImageUrl} />
@@ -867,6 +867,7 @@ export default function LeagueMatchFixturesClient({
         state={series.state}
         registrationOpen={series?.registrationOpen ?? false}
         registrationDeadlineAt={series?.registrationDeadlineAt ?? null}
+        firstMatchStarted={series.firstMatchStarted}
       />
 
       {/* 그룹 B 감사 결함 1: 개설 후 참가팀 추가·제거. 대진이 이미 있어도 로스터 자체는
@@ -1076,6 +1077,14 @@ export default function LeagueMatchFixturesClient({
             </div>
           </div>
           {!hasLeagueStartsOn && <MissingStartsOnNotice />}
+          {series.registrationOpen && series.registrationDeadlineAt !== null ? (
+            /* 신청 마감 전에 대진을 만드는 경우의 안내(2026-10-13 사용자 확정) — 막지 않는다. 대진은
+               지금 확정된 팀으로만 짜이고, 첫 경기가 킥오프하면 마감 전이라도 신청이 닫힌다. */
+            <p role="status" className="text-[length:var(--font-size-caption)] text-[var(--orange700)]">
+              아직 참가 신청을 받는 중이에요(마감 {formatTournamentDateTimeShort(series.registrationDeadlineAt) ?? series.registrationDeadlineAt}).
+              지금 대진을 만들면 이후에 확정되는 팀은 이 대진에 들어가지 않아요. 첫 경기가 시작되면 마감 전이라도 신청이 닫혀요.
+            </p>
+          ) : null}
           <TimingSuggestionRow
             suggestion={timingSuggestion}
             showNoFit={showTimingNoFit}
@@ -1225,6 +1234,7 @@ export default function LeagueMatchFixturesClient({
             state={series.state}
             registrationOpen={series?.registrationOpen ?? false}
             registrationDeadlineAt={series?.registrationDeadlineAt ?? null}
+            firstMatchStarted={series.firstMatchStarted}
           />
 
           {/* 그룹 B 감사 결함 1: 개설 후 참가팀 추가·제거. 대진이 이미 있어도 로스터 자체는
@@ -1948,11 +1958,13 @@ function LeagueRegistrationSummary({
   state,
   registrationOpen,
   registrationDeadlineAt,
+  firstMatchStarted,
 }: {
   leagueId: string;
   state: 'draft' | 'active' | 'completed' | 'on_hold';
   registrationOpen: boolean;
   registrationDeadlineAt: string | null;
+  firstMatchStarted?: boolean;
 }) {
   return (
     <div className="mb-4 rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
@@ -1975,6 +1987,7 @@ function LeagueRegistrationSummary({
           registrationOpen,
           registrationDeadlineAt,
           noDeadlineHint: '신청 마감을 정하면 팀장이 리그 화면에서 바로 신청할 수 있어요.',
+          firstMatchStarted,
         })}
       </p>
       <Link

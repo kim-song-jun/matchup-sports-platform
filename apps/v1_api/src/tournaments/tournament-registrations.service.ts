@@ -12,6 +12,7 @@ import {
   V1TournamentPayment,
   V1TournamentRegistration,
 } from '@prisma/client';
+import { hasLeagueFirstMatchStarted, leagueAlreadyStartedException } from '../league-matches/league-registration-open';
 import { competitionNounFor, NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
@@ -60,18 +61,23 @@ type TournamentPaymentInstructionSource = Pick<
  * 신청을 받는 중인지 — **리그와 대회가 판정 축이 다르다.**
  *
  * · **대회**: `status === 'open'` 이 곧 "모집 중" 이다(운영자가 상태로 연다). 그대로 둔다.
- * · **리그**: 판정자는 `registrationDeadlineAt` 하나다(정본 §6, 2026-09-04 사용자 확정).
- *   `status` 는 수명주기 표시 전용이 됐다 — `generateFixtures` 가 `in_progress` 로 옮기기
- *   때문에 status 를 보면 **대진이 있는 리그가 영영 신청을 못 받는다**(alpha 실측).
+ * · **리그**: 판정자는 `registrationDeadlineAt` 과 첫 경기의 실제 킥오프다(정본 §6 —
+ *   2026-09-04 마감, 2026-10-13 첫 경기 사용자 확정). `status` 는 수명주기 표시 전용이 됐다 —
+ *   `generateFixtures` 가 `in_progress` 로 옮기기 때문에 status 를 보면 **대진이 있는 리그가
+ *   영영 신청을 못 받는다**(alpha 실측). 공개 화면의 `isLeagueRegistrationOpen` 과 같은 규칙이다.
  *
  * 두 축을 한 조건으로 합치지 않는 이유: 대회의 `status === 'open'` 요구를 건드리면 대회
  * 신청 경로 전체가 회귀 범위에 들어온다. 리그만 갈라 대회는 한 줄도 안 바뀌게 한다.
  */
-function assertRegistrationOpen(tournament: {
-  kind: string | null;
-  status: string;
-  registrationDeadlineAt: Date | null;
-}): void {
+async function assertRegistrationOpen(
+  db: Prisma.TransactionClient | PrismaService,
+  tournament: {
+    id: string;
+    kind: string | null;
+    status: string;
+    registrationDeadlineAt: Date | null;
+  },
+): Promise<void> {
   if (tournament.kind === 'regular_league') {
     if (tournament.status === 'completed' || tournament.status === 'cancelled') {
       throw new ConflictException({ code: 'TOURNAMENT_NOT_OPEN', message: '지금은 참가 신청을 받지 않아요.' });
@@ -79,6 +85,10 @@ function assertRegistrationOpen(tournament: {
     if (tournament.registrationDeadlineAt === null) {
       // 마감이 없으면 아무도 연 적이 없는 리그다(정본 §6 "안 정하면 신청을 안 받는다").
       throw new ConflictException({ code: 'TOURNAMENT_NOT_OPEN', message: '지금은 참가 신청을 받지 않아요.' });
+    }
+    // 첫 경기 검사를 마감보다 먼저 한다 — 둘 다 지났으면 "시작해서 안 받는다" 가 더 정확한 이유다.
+    if (await hasLeagueFirstMatchStarted(db, tournament.id)) {
+      throw leagueAlreadyStartedException();
     }
     if (tournament.registrationDeadlineAt.getTime() < Date.now()) {
       throw new ConflictException({ code: 'REGISTRATION_DEADLINE_PASSED', message: '신청이 마감됐어요.' });
@@ -155,7 +165,7 @@ export class TournamentRegistrationsService {
     if (!tournament) {
       throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
     }
-    assertRegistrationOpen(tournament);
+    await assertRegistrationOpen(this.prisma, tournament);
     return tournament;
   }
 
@@ -346,7 +356,7 @@ export class TournamentRegistrationsService {
       }
       // 트랜잭션 안에서도 **같은 판정 함수**를 쓴다 — 밖과 안이 다른 규칙을 보면 TOCTOU
       // 재검증이 통과시키는 것과 막는 것이 갈린다.
-      assertRegistrationOpen(lockedTournament);
+      await assertRegistrationOpen(tx, lockedTournament);
       this.assertPaymentInstructions(lockedTournament, dto.paymentMethod);
 
       // ## 입금자명은 **낼 돈이 있을 때만** 필요하다 — 그리고 **잠근 뒤의 값**으로 판단한다

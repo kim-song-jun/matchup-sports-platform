@@ -1,8 +1,8 @@
 import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render as rtlRender, screen, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
-import { ApplyCTA, TournamentDetailView, getBracketEntryCtaLabel } from './tournament-detail-client';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ApplyCTA, TournamentDetailView, getBracketEntryCtaLabel, isDetailRegistrationPhase, isLeagueMatchDay } from './tournament-detail-client';
 import type { V1TournamentDetail, V1TournamentGroup, V1TournamentRegistration, V1TournamentStatus } from '@/types/api';
 
 /**
@@ -198,19 +198,23 @@ describe('TournamentDetailView — 통합 CTA가 실제 화면에 상태별로 �
 /**
  * [P2] 같은 통합 진입 CTA(BracketEntryCtaButton, 같은 href /bracket)가 상단 스티키와
  * 페이지 맨 끝에 2회 렌더돼 완전히 중복됐다 — 페이지 끝 인스턴스를 없애 상단 스티키
- * 하나만 남긴다. `aria-label`은 BracketEntryCtaButton만 붙이므로(데스크탑 레일·
- * StandingsMovedNotice 등 같은 href를 쓰는 다른 안내 링크와 구분된다) 그 속성으로 좁혀 센다.
+ * 하나만 남긴다. `aria-label`은 BracketEntryCtaButton만 붙이므로(StandingsMovedNotice 등 같은
+ * href를 쓰는 다른 안내 링크와 구분된다) 그 속성으로 좁혀 센다. 진행 중 데스크톱 레일은 같은 버튼을
+ * 재사용하지만 `.tm-show-desktop`/`.tm-hide-desktop` 으로 상단 스티키와 동시에 보이지 않으므로
+ * 레일 밖과 안을 나눠 센다.
  */
 describe('TournamentDetailView — 통합 진입 CTA 중복 제거(P2)', () => {
   it.each<V1TournamentStatus>(['closed', 'in_progress', 'completed'])(
-    '%s 상태에서 BracketEntryCtaButton 인스턴스가 정확히 한 번만 렌더된다(상단 스티키 하나, 페이지 끝 없음)',
+    '%s 상태에서 BracketEntryCtaButton 인스턴스가 레일 밖에서 정확히 한 번만 렌더된다(상단 스티키 하나, 페이지 끝 없음)',
     (status) => {
       const tournament = makeTournament({ id: 't-cta-dedupe', status, format: 'knockout' });
       const { container } = render(<TournamentDetailView tournament={tournament} myRegistration={null} />);
 
       const label = getBracketEntryCtaLabel(status, false);
       expect(label).not.toBeNull();
-      expect(container.querySelectorAll(`a[aria-label="${label}"]`).length).toBe(1);
+      const all = [...container.querySelectorAll(`a[aria-label="${label}"]`)];
+      expect(all.filter((a) => !a.closest('.tm-tournament-rail'))).toHaveLength(1);
+      expect(all.filter((a) => a.closest('.tm-tournament-rail'))).toHaveLength(status === 'in_progress' ? 1 : 0);
     },
   );
 });
@@ -360,5 +364,102 @@ describe('대회 상세 — 신청한 팀의 입구는 카드 하나', () => {
     const tournament = makeTournament({ id: 't-r1', status: 'open', format: 'knockout' });
     render(<ApplyCTA tournament={tournament} myRegistration={registration('cancelled')} />);
     expect(screen.getByRole('link', { name: '대회 다시 신청하기' })).toBeInTheDocument();
+  });
+});
+
+/**
+ * 정규 리그의 진입 CTA(2026-10-13 사용자 확정).
+ *  - 리그는 첫 경기 킥오프 전까지만 "모집 중 화면" 이다. 첫 경기가 시작된 리그는 참가 여부와 상관없이 진입 CTA 를
+ *    받는다 — 예전엔 진행 중 리그가 늘 모집 중으로 판정돼 데스크톱 레일과 비참가자의 모바일 상단에서
+ *    "진행 중인 리그 보기" 가 사라졌다.
+ *  - 리그는 몇 주에 걸쳐 열리므로 **경기가 있는 날**만 LIVE 로 강조하고, 아니면 중립 "리그 일정 보기".
+ */
+describe('TournamentDetailView — 정규 리그 진입 CTA', () => {
+  const NOW = new Date('2026-10-13T03:00:00.000Z'); // 2026-10-13 12:00 KST
+
+  function leagueFixture(startAt: string, overrides: Partial<V1TournamentDetail['leagueFixtures'][number]> = {}) {
+    return {
+      teamMatchId: `tm-${startAt}`, title: '1주차', homeTeamId: 't1', awayTeamId: 't2', startAt,
+      placeName: '성수 풋살장', status: 'matched', gameState: 'SCHEDULED', ...overrides,
+    } as V1TournamentDetail['leagueFixtures'][number];
+  }
+
+  function makeLeague(leagueFixtures: V1TournamentDetail['leagueFixtures'], overrides: Partial<V1TournamentDetail> = {}) {
+    return makeTournament({
+      id: 'league-1', status: 'in_progress', format: 'league', kind: 'regular_league',
+      scheduledAt: '2026-09-16T00:00:00.000+09:00', scheduledEndAt: '2026-10-27T23:59:00.000+09:00',
+      registrationDeadlineAt: '2026-10-30T00:00:00.000+09:00', leagueFirstMatchStarted: true, leagueFixtures, ...overrides,
+    });
+  }
+
+  const ENTRY = (container: HTMLElement, label: string) => [...container.querySelectorAll(`a[aria-label="${label}"]`)];
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(NOW);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('isDetailRegistrationPhase — 리그는 첫 경기 킥오프 전까지만 모집 중 화면이다(서버 leagueFirstMatchStarted)', () => {
+    expect(isDetailRegistrationPhase({ kind: 'regular_league', status: 'in_progress', leagueFirstMatchStarted: false })).toBe(true);
+    // 구버전 응답(값 없음)은 기존처럼 모집 중으로 본다 — 서버가 실제 신청을 판정한다.
+    expect(isDetailRegistrationPhase({ kind: 'regular_league', status: 'in_progress' })).toBe(true);
+    expect(isDetailRegistrationPhase({ kind: 'regular_league', status: 'in_progress', leagueFirstMatchStarted: true })).toBe(false);
+    expect(isDetailRegistrationPhase({ kind: 'regular_league', status: 'completed', leagueFirstMatchStarted: false })).toBe(false);
+    expect(isDetailRegistrationPhase({ kind: 'regular_tournament', status: 'open', leagueFirstMatchStarted: false })).toBe(true);
+  });
+
+  it('isLeagueMatchDay — 오늘(KST) 시작하는 경기, 또는 날짜를 넘긴 진행 중 경기가 있으면 경기일이다', () => {
+    expect(isLeagueMatchDay([leagueFixture('2026-10-13T20:00:00.000+09:00')], NOW)).toBe(true);
+    // KST 자정 직전 시작 — UTC 로는 전날이지만 한국 날짜로 오늘이다.
+    expect(isLeagueMatchDay([leagueFixture('2026-10-13T00:10:00.000+09:00')], NOW)).toBe(true);
+    expect(isLeagueMatchDay([leagueFixture('2026-10-14T00:00:00.000+09:00')], NOW)).toBe(false);
+    expect(isLeagueMatchDay([leagueFixture('2026-10-12T23:00:00.000+09:00', { gameState: 'LIVE' })], NOW)).toBe(true);
+    expect(isLeagueMatchDay([leagueFixture('2026-10-12T23:00:00.000+09:00', { gameState: 'PAUSED' })], NOW)).toBe(true);
+    expect(isLeagueMatchDay([leagueFixture('2026-10-13T20:00:00.000+09:00', { status: 'cancelled' })], NOW)).toBe(false);
+    expect(isLeagueMatchDay([], NOW)).toBe(false);
+  });
+
+  it('첫 경기가 시작된 뒤 경기가 있는 날: 비참가자에게도 모바일 상단·데스크톱 레일 모두 LIVE "진행 중인 리그 보기" 가 뜨고 신청 버튼은 없다', () => {
+    const league = makeLeague([leagueFixture('2026-10-13T20:00:00.000+09:00')]);
+    const { container } = render(<TournamentDetailView tournament={league} myRegistration={null} />);
+
+    const links = ENTRY(container, '진행 중인 리그 보기');
+    expect(links.filter((a) => !a.closest('.tm-tournament-rail'))).toHaveLength(1);
+    expect(links.filter((a) => a.closest('.tm-tournament-rail'))).toHaveLength(1);
+    for (const link of links) {
+      expect(link).toHaveTextContent('LIVE');
+      expect(link.getAttribute('href')).toContain('/tournaments/league-1/bracket');
+    }
+    expect(container.querySelector('aside[aria-label="리그 참가 신청"]')).toBeNull();
+    expect(screen.queryByText('모집 마감')).toBeNull();
+  });
+
+  it('경기가 없는 날: LIVE 없이 중립 "리그 일정 보기" 가 같은 자리에 뜬다', () => {
+    const league = makeLeague([leagueFixture('2026-10-20T20:00:00.000+09:00')]);
+    const { container } = render(<TournamentDetailView tournament={league} myRegistration={null} />);
+
+    expect(ENTRY(container, '진행 중인 리그 보기')).toHaveLength(0);
+    const links = ENTRY(container, '리그 일정 보기');
+    expect(links).toHaveLength(2);
+    for (const link of links) expect(link).not.toHaveTextContent('LIVE');
+  });
+
+  it('참가 팀도 데스크톱 레일에 진입 CTA 를 받는다 — 예전엔 레일이 통째로 비었다', () => {
+    const league = makeLeague([leagueFixture('2026-10-13T20:00:00.000+09:00')]);
+    const registration = { id: 'reg-1', teamId: 't1', status: 'confirmed' } as V1TournamentRegistration;
+    const { container } = render(<TournamentDetailView tournament={league} myRegistration={registration} />);
+
+    expect(ENTRY(container, '진행 중인 리그 보기').filter((a) => a.closest('.tm-tournament-rail'))).toHaveLength(1);
+  });
+
+  it('첫 경기 킥오프 전 리그는 지금처럼 비참가자에게 신청 레일·하단 신청 버튼을 보여준다 — 경기일이어도 그렇다', () => {
+    const league = makeLeague([leagueFixture('2026-10-13T20:00:00.000+09:00')], { leagueFirstMatchStarted: false });
+    const { container } = render(<TournamentDetailView tournament={league} myRegistration={null} />);
+
+    expect(container.querySelector('aside[aria-label="리그 참가 신청"]')).not.toBeNull();
+    expect(ENTRY(container, '리그 일정 보기')).toHaveLength(0);
   });
 });

@@ -17,6 +17,8 @@ function makeService(row: Record<string, unknown>) {
   const prisma = {
     v1Tournament: { findFirst },
     v1TeamMatch: { findMany: jest.fn().mockResolvedValue([]) },
+    // 첫 경기 킥오프 판정 — 시작한 경기 없음.
+    v1Game: { findFirst: jest.fn().mockResolvedValue(null) },
     v1GameOfficialFact: { findMany: jest.fn().mockResolvedValue([]) },
     v1GameOperationFlag: { findUnique: jest.fn().mockResolvedValue(null) },
   };

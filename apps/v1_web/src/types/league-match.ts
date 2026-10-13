@@ -215,6 +215,12 @@ export interface V1AdminLeagueDetail {
    * "버튼은 보이는데 누르면 409" 로 갈린다. 공개 상세도 같은 함수를 쓴다.
    */
   registrationOpen: boolean;
+  /**
+   * 리그의 첫 경기가 실제로 킥오프했는가(어드민 상세 전용). 킥오프하면 마감이 남아 있어도 신청이
+   * 닫히고 다시 열 수 없다(2026-10-13) — 어드민 화면이 닫힌 이유를 마감 경과와 가르는 데 쓴다.
+   * optional 은 API 가 먼저 배포되지 않은 창의 구버전 응답용이다.
+   */
+  firstMatchStarted?: boolean;
   /** 대표 이미지의 종목 그래픽 폴백(`CompetitionThumbnail`)에 쓴다. */
   sportCode: string;
   coverImageUrl: string | null;
@@ -269,7 +275,8 @@ type V1AdminOnlyLeagueFields =
   | 'entryFeeConfiguredAt'
   | 'activeRegistrationCount'
   | 'confirmedRegistrationCount'
-  | 'slots';
+  | 'slots'
+  | 'firstMatchStarted';
 
 export interface V1PublicLeagueDetail extends Omit<V1AdminLeagueDetail, V1AdminOnlyLeagueFields> {
   rulesText?: string | null;

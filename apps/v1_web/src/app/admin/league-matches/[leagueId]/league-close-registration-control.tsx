@@ -24,6 +24,7 @@ export function LeagueCloseRegistrationControl({
   state,
   registrationOpen,
   registrationDeadlineAt,
+  firstMatchStarted = false,
   activeRegistrationCount,
   confirmedCount,
   showToast,
@@ -32,6 +33,8 @@ export function LeagueCloseRegistrationControl({
   state: LeagueState;
   registrationOpen: boolean;
   registrationDeadlineAt: string | null;
+  /** 첫 경기가 킥오프했는가(서버 값) — 참이면 다시 열 수 없으므로 닫힌 이유를 말하고 재오픈 링크를 숨긴다. */
+  firstMatchStarted?: boolean;
   activeRegistrationCount: number;
   confirmedCount: number;
   showToast: (message: string, variant?: 'success' | 'error') => void;
@@ -88,6 +91,7 @@ export function LeagueCloseRegistrationControl({
                 registrationOpen,
                 registrationDeadlineAt,
                 noDeadlineHint: '마감을 정해야 신청을 받아요. 신청 관리에서 정해 주세요.',
+                firstMatchStarted,
               })}
             </p>
             <p className="tm-text-caption mt-2 font-medium text-[var(--text-muted)]" aria-live="polite">
@@ -108,7 +112,7 @@ export function LeagueCloseRegistrationControl({
         >
           지금 마감하기
         </button>
-      ) : (
+      ) : firstMatchStarted ? null : (
         <Link href={`/admin/league-matches/${leagueId}/registrations`} className={OUTLINE_BUTTON}>
           {registrationDeadlineAt === null ? '신청 관리에서 열기' : '신청 관리에서 다시 열기'}
         </Link>

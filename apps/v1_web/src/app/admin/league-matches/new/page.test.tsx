@@ -133,7 +133,7 @@ describe('AdminLeagueMatchNewPage', () => {
     useV1CreateLeagueMatchMock.mockReturnValue({ mutateAsync, isPending: false } as never);
     await fillLeagueForm();
 
-    expect(screen.getByText('2팀이 한 번씩 만나면 1경기, 두 번씩이면 2경기예요. 대진을 만들 때 이 수만큼 만들고, 나중에 경기를 더 추가할 수 있어요.')).toBeInTheDocument();
+    expect(screen.getByText('2팀이 한 번씩 만나면 1경기, 두 번씩이면 2경기예요. 대진을 만들 때 이 수만큼 만들고, 나중에 경기를 더 추가할 수 있어요. 이 수만큼 결과가 확정되면 리그가 자동으로 끝나요.')).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText('제한 없음'));
     fireEvent.change(screen.getByLabelText('최소 (명)'), { target: { value: '5' } });
     fireEvent.change(screen.getByLabelText('최대 (명)'), { target: { value: '15' } });

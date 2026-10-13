@@ -37,7 +37,15 @@ enforce publication. Production promotion from dev to main is performed by the u
 `POST /api/v1/admin/league-matches/:leagueId/complete` (optional `reason`, max 200) closes an
 `active` league whose remaining fixtures are all settled — the same rule as the automatic
 transition (`shouldCompleteLeague`: at least one non-cancelled, non-voided fixture and every one of
-them has an official result). Automatic completion only runs on result confirmation and fixture
+them has an official result). The automatic transition additionally waits for the league's
+`plannedFixtureCount` when one is set: while fewer non-cancelled fixtures exist than planned, the league
+stays `active` even if every existing fixture is official (so a league built one fixture at a time is not
+closed after each game). Manual completion ignores `plannedFixtureCount`.
+
+A `draft` league (stored `draft`/`open`/`closed`) moves to `active` on its own when one of its games is
+started (after the start command commits; status-change reason `game_started`) or when a result becomes
+official (quick result, forfeit or console end + confirm; reason `result_confirmed`). `on_hold` and
+`completed` leagues are never touched. Automatic completion only runs on result confirmation and fixture
 cancellation, so a league reopened with `revert-completion` without any fixture change used to stay
 `active` (MD-QA #93). Fixtures still waiting for a result return `409 LEAGUE_FIXTURES_PENDING`; a
 draft or on-hold league returns `409 LEAGUE_NOT_ACTIVE`; an already completed league returns

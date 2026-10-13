@@ -1,7 +1,7 @@
 import type { OperationAuditWriterService } from '../common/audit/operation-audit-writer.service';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import type { PrismaService } from '../prisma/prisma.service';
-import type { GameTakeoverService } from './game-takeover.service';
+import { GameTakeoverService } from './game-takeover.service';
 import { GamesService } from './games.service';
 
 /**
@@ -21,11 +21,8 @@ describe('GamesService.requestTakeover — 플랫폼 운영자와 TEAM_MATCH 게
   const ADMIN_UPDATED_AT = new Date('2026-09-01T00:00:00.000Z');
 
   function makeService(options: { admin?: unknown } = {}) {
-    // 서비스는 `grant.token` 을 읽어 `takeoverToken` 으로 내보낸다 — 필드명을 맞춘다.
-    const grant = jest.fn().mockReturnValue({
-      token: 'token-1',
-      expiresAt: '2026-09-05T00:01:30.000Z',
-    });
+    const takeover = new GameTakeoverService();
+    const grant = jest.spyOn(takeover, 'grant');
     const prisma = {
       v1Game: {
         findUnique: jest.fn().mockResolvedValue({
@@ -65,17 +62,23 @@ describe('GamesService.requestTakeover — 플랫폼 운영자와 TEAM_MATCH 게
     const service = new GamesService(
       prisma as unknown as PrismaService,
       {} as OperationAuditWriterService,
-      { grant } as unknown as GameTakeoverService,
+      takeover,
     );
-    return { service, prisma, grant };
+    return { service, prisma, grant, takeover };
   }
 
   it('운영자가 리그 경기(TEAM_MATCH)의 takeover 를 받는다 — 이게 없어 콘솔이 먹통이었다', async () => {
-    const { service, grant } = makeService();
+    const { service, grant, takeover } = makeService();
 
-    await expect(
-      service.requestTakeover(ops, 'game-1', { clientInstanceId: 'c1', lastSequence: 0 }),
-    ).resolves.toMatchObject({ takeoverToken: 'token-1' });
+    const result = await service.requestTakeover(ops, 'game-1', { clientInstanceId: 'c1', lastSequence: 0 });
+
+    expect(result).toMatchObject({ gameId: 'game-1', version: 3, lastSequence: 7 });
+    expect(result.takeoverToken).toMatch(/^[a-f0-9]{64}$/);
+    expect(takeover.validate({
+      gameId: 'game-1',
+      token: result.takeoverToken,
+      authorizationSubject: `platform_ops:ops-user@${ADMIN_UPDATED_AT.getTime()}`,
+    })).toBe(true);
 
     // **주체가 실제로 실려야 한다.** 토큰이 이 문자열에 묶이므로, 비어 있으면
     // `requestTakeover` 가 그 자리에서 403 을 던진다.
@@ -83,19 +86,21 @@ describe('GamesService.requestTakeover — 플랫폼 운영자와 TEAM_MATCH 게
       expect.objectContaining({
         authorizationSubject: `platform_ops:ops-user@${ADMIN_UPDATED_AT.getTime()}`,
       }),
+      expect.objectContaining({ gameId: 'game-1' }),
     );
   });
 
   it('권한이 없는 사람은 그대로 막힌다 — 문을 연 것이 아니라 운영자만 통과시킨다', async () => {
-    const { service } = makeService({ admin: null });
+    const { service, grant } = makeService({ admin: null });
 
     await expect(
       service.requestTakeover(ops, 'game-1', { clientInstanceId: 'c1', lastSequence: 0 }),
     ).rejects.toMatchObject({ status: 403 });
+    expect(grant).not.toHaveBeenCalled();
   });
 
   it('권한이 정지된 운영자도 막힌다', async () => {
-    const { service } = makeService({
+    const { service, grant } = makeService({
       admin: {
         adminRole: 'ops',
         status: 'suspended',
@@ -108,5 +113,6 @@ describe('GamesService.requestTakeover — 플랫폼 운영자와 TEAM_MATCH 게
     await expect(
       service.requestTakeover(ops, 'game-1', { clientInstanceId: 'c1', lastSequence: 0 }),
     ).rejects.toMatchObject({ status: 403 });
+    expect(grant).not.toHaveBeenCalled();
   });
 });

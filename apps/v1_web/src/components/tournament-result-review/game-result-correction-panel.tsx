@@ -27,6 +27,7 @@ import {
 } from './result-review-copy';
 import { AdminListSkeleton } from '@/components/admin/admin-skeleton';
 import { regularPeriodCountOf } from '@/components/tournament-live/operate/period-label';
+import { josa } from '@/lib/korean';
 
 type DirectorGateStatus = 'unknown' | 'enabled' | 'disabled';
 type CorrectionSnapshot = {
@@ -228,7 +229,7 @@ export function GameResultCorrectionPanel({
       // 직전에 틀린 문구를 보여준 것과 같은 계열의 사고. lib/game-result-score 참조.
       // 승부차기까지 넣어 읽어준다 — 결선 무승부를 확정하는 자리에서 정규 점수만
       // 보여주면 정작 승자를 가른 값이 확인 문구에서 빠진다.
-      message: `${formatGameResultScoreWithPenalties(pendingCorrection.score)}로 공식 결과를 확정해요. ${entryCopy.confirmMessage}`,
+      message: `${josa(formatGameResultScoreWithPenalties(pendingCorrection.score), ['으로', '로'])} 공식 결과를 확정해요. ${entryCopy.confirmMessage}`,
       confirmLabel: entryCopy.confirmCta,
     });
     if (!ok) return;

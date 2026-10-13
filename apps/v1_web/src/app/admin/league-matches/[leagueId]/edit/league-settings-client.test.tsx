@@ -11,7 +11,8 @@ vi.mock('@/hooks/use-admin-can-write', () => ({ useAdminCanWrite: () => mocks.ca
 vi.mock('@/hooks/use-v1-api', () => ({ useV1MasterRegions: () => ({ data: [], isError: false }) }));
 const initial = { leagueId: 'league-test', title: '기존 리그', rulesText: '운영 안내', regionId: 'region-test',
   startsOn: '2097-12-31T15:00:00.123Z', endsOn: '2098-12-31T14:59:59.999Z',
-  registrationDeadlineAt: '2098-01-01T03:12:34.567Z', updatedAt: '2026-10-13T00:00:00.123Z', status: 'draft', sportName: '풋살' };
+  registrationDeadlineAt: '2098-01-01T03:12:34.567Z', plannedFixtureCount: 12,
+  updatedAt: '2026-10-13T00:00:00.123Z', status: 'draft', sportName: '풋살' };
 const path = '*/api/v1/admin/league-matches/league-test/settings';
 let stored = { ...initial };
 let submitted: Record<string, unknown> | undefined;
@@ -37,21 +38,38 @@ describe('실제 설정 hook/API를 통한 별도 리그 수정 화면', () => {
     expect(title).toHaveValue(initial.title);
     expect(screen.getByLabelText('시작일 (한국 시간)')).toHaveValue('2098-01-01');
     expect(screen.getByLabelText('신청 마감 (한국 시간)')).toHaveValue('2098-01-01T12:12');
+    expect(screen.getByLabelText('총 경기 수')).toHaveValue(12);
     fireEvent.change(title, { target: { value: '변경 리그' } });
     fireEvent.click(screen.getByRole('button', { name: '변경사항 저장' }));
     await waitFor(() => expect(mocks.push).toHaveBeenCalledWith('/admin/league-matches/league-test'));
     expect(submitted).toEqual({ title: '변경 리그', rulesText: initial.rulesText, regionId: initial.regionId,
-      startsOn: initial.startsOn, endsOn: initial.endsOn, registrationDeadlineAt: initial.registrationDeadlineAt, expectedUpdatedAt: initial.updatedAt });
+      startsOn: initial.startsOn, endsOn: initial.endsOn, registrationDeadlineAt: initial.registrationDeadlineAt,
+      plannedFixtureCount: 12, expectedUpdatedAt: initial.updatedAt });
     expect(stored.title).toBe('변경 리그');
+  });
+  it('총 경기 수를 변경할 수 있다', async () => {
+    mount(); await screen.findByLabelText('리그명');
+    fireEvent.change(screen.getByLabelText('총 경기 수'), { target: { value: '24' } });
+    fireEvent.click(screen.getByRole('button', { name: '변경사항 저장' }));
+    await waitFor(() => expect(submitted).toMatchObject({ plannedFixtureCount: 24 }));
+    expect(stored.plannedFixtureCount).toBe(24);
+  });
+  it('총 경기 수 범위를 벗어나면 저장하지 않는다', async () => {
+    mount(); await screen.findByLabelText('리그명');
+    fireEvent.change(screen.getByLabelText('총 경기 수'), { target: { value: '501' } });
+    expect(screen.getByText('총 경기 수는 1~500 사이로 입력해 주세요.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '변경사항 저장' })).toBeDisabled();
+    expect(submitted).toBeUndefined();
   });
   it('변경한 날짜는 한국 시간으로 저장하고 마감을 비우면 null을 전송한다', async () => {
     mount(); await screen.findByLabelText('리그명');
     fireEvent.change(screen.getByLabelText('시작일 (한국 시간)'), { target: { value: '2098-02-01' } });
     fireEvent.change(screen.getByLabelText('종료일 (한국 시간)'), { target: { value: '2099-01-01' } });
     fireEvent.change(screen.getByLabelText('신청 마감 (한국 시간)'), { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText('총 경기 수'), { target: { value: '' } });
     fireEvent.click(screen.getByRole('button', { name: '변경사항 저장' }));
     await waitFor(() => expect(submitted).toBeDefined());
-    expect(submitted).toMatchObject({ startsOn: '2098-01-31T15:00:00.000Z', endsOn: '2099-01-01T14:59:59.999Z', registrationDeadlineAt: null });
+    expect(submitted).toMatchObject({ startsOn: '2098-01-31T15:00:00.000Z', endsOn: '2099-01-01T14:59:59.999Z', registrationDeadlineAt: null, plannedFixtureCount: null });
   });
   it('409와 재조회 실패에도 초안을 보존하고 명시적으로 확인한 재조회만 초안을 바꾼다', async () => {
     server.use(http.patch(path, () => HttpResponse.json({ statusCode: 409, code: 'LEAGUE_SETTINGS_STALE', message: '최신 정보를 다시 불러와 주세요.' }, { status: 409 })));

@@ -109,7 +109,7 @@ export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
                 <>
                 <h2 className="tm-text-body-lg">프로필</h2>
                 <div className="tm-my-account-block">
-                  <UserAvatar imageUrl={model.user.profileImageUrl} size={52} className="tm-my-avatar tm-my-account-avatar" radius="var(--radius-container)" />
+                  <UserAvatar imageUrl={model.user.profileImageUrl} size={52} className="tm-my-avatar tm-my-account-avatar" />
                   <div className="tm-my-account-name">{model.user.name}</div>
                   <div className="tm-my-account-meta">
                     {model.user.handle} · {model.user.region} · {model.user.genderLabel}

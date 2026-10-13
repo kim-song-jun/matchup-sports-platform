@@ -568,7 +568,7 @@ async function createLeagueMatch(leagueId: string, options: LeagueMatchOptions =
   return { teamMatchId, gameId };
 }
 
-async function createLeague(): Promise<string> {
+async function createLeague(state: 'draft' | 'active' = 'active'): Promise<string> {
   const leagueId = randomUUID();
   await seedLeagueOnTournamentAxis(prisma, {
     id: leagueId,
@@ -577,7 +577,7 @@ async function createLeague(): Promise<string> {
     sportCode: 'futsal',
     regionId,
     createdByAdminUserId: opsAdminRowId,
-    state: 'active',
+    state,
   });
   return leagueId;
 }
@@ -605,6 +605,40 @@ describe('빠른 결과 — 정규 리그 경기', () => {
       expect(revision).toMatchObject({ state: 'OFFICIAL', reason: '[quick-result]' });
       expect(await prisma.v1GameOfficialFact.findUnique({ where: { revisionId: revision.id } })).not.toBeNull();
     }
+  });
+
+  it('준비 중 리그도 결과가 확정되면 진행 중이 되고, 총 경기 수를 채워야 자동 종료된다', async () => {
+    const leagueId = await createLeague('draft');
+    await prisma.v1Tournament.update({ where: { id: leagueId }, data: { plannedFixtureCount: 2 } });
+    const statusOf = async () => (await prisma.v1Tournament.findUniqueOrThrow({ where: { id: leagueId } })).status;
+    const first = await createLeagueMatch(leagueId);
+
+    expect((await quickResult(first.gameId, users.ops, { home: 1, away: 0 })).status).toBe(201);
+    await drainOutboxWorker(prisma);
+    // 남은 경기는 다 확정됐지만 총 2경기 중 1경기라 종료하지 않고 진행 중으로만 올린다.
+    expect(await statusOf()).toBe('in_progress');
+    expect(await prisma.v1StatusChangeLog.count({ where: { targetId: leagueId, toStatus: 'active', reason: 'result_confirmed' } })).toBe(1);
+
+    const second = await createLeagueMatch(leagueId);
+    expect((await quickResult(second.gameId, users.ops, { home: 0, away: 2 })).status).toBe(201);
+    await drainOutboxWorker(prisma);
+    expect(await statusOf()).toBe('completed');
+  });
+
+  it('총 경기 수를 못 채웠어도 운영자가 상태 변경으로 직접 끝낼 수 있다 — 총 경기 수는 자동 종료 기준일 뿐이다', async () => {
+    const leagueId = await createLeague();
+    await prisma.v1Tournament.update({ where: { id: leagueId }, data: { plannedFixtureCount: 5 } });
+    const only = await createLeagueMatch(leagueId);
+    expect((await quickResult(only.gameId, users.ops, { home: 2, away: 2 })).status).toBe(201);
+    await drainOutboxWorker(prisma);
+    expect((await prisma.v1Tournament.findUniqueOrThrow({ where: { id: leagueId } })).status).toBe('in_progress');
+
+    const res = await request(app.getHttpServer())
+      .post(`/api/v1/admin/league-matches/${leagueId}/state`)
+      .set('x-v1-user-id', users.ops)
+      .send({ state: 'completed' });
+    expect(res.status).toBe(200);
+    expect(res.body.data).toMatchObject({ state: 'completed' });
   });
 
   it('취소된 리그 대진은 게임이 SCHEDULED 여도 QUICK_RESULT_FIXTURE_CANCELLED — 같은 리그의 정상 대진은 확정된다', async () => {

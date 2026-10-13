@@ -362,9 +362,11 @@ export function ResultEditModal({
       ...(event.participantId ? {} : { anonymous: true }),
     })),
   );
-  const [participants, setParticipants] = useState<EditableParticipant[]>(() =>
-    base.participants.map(toEditable),
-  );
+  // 홈팀부터 보여 준다 — 서버 순서를 그대로 쓰면 원정이 먼저 나왔다(2026-10-13 alpha). 같은 팀 안 순서는 그대로다.
+  const [participants, setParticipants] = useState<EditableParticipant[]>(() => {
+    const isHome = (sideId: string) => sides.find((side) => side.id === sideId)?.sideKey === 'HOME';
+    return base.participants.map(toEditable).sort((a, b) => Number(isHome(b.sideId)) - Number(isHome(a.sideId)));
+  });
   const [mvpParticipantId, setMvpParticipantId] = useState<string>(base.mvpParticipantId ?? '');
   const [reason, setReason] = useState('');
 

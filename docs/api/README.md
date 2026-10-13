@@ -6,6 +6,8 @@ For every domain document here, the actual `apps/v1_api/src/**` controller/DTO/s
 source of truth — a contract doc that disagrees with the running code is wrong and should be fixed
 in the same change that discovers the drift.
 
+Team-match lifecycle (2026-10-13): unmatched elapsed recruitment is `closed`; cancelled matches are absent from user routes and retained in admin records. Admin reopening also clears an elapsed deadline. See [team matches](./domains/team-matches.md) and [admin/ops](./domains/admin-and-ops.md).
+
 ## Read order
 
 1. [Global contract](./global-contract.md)

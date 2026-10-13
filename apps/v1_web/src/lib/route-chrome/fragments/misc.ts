@@ -4,7 +4,9 @@
 import type { RouteChromeEntry } from '../types';
 
 export const MISC_ROUTES: RouteChromeEntry[] = [
-  { pattern: '/events', chrome: { title: '이벤트', activeTab: 'tournaments', showNotifications: true, desktopHead: true, pageOwnsHeading: true } },
+  // backHref 는 `?from=` 이 없을 때(주소 직접 입력·외부 링크)의 고정 목적지다. 앱 안에서 들어오면
+  // AppBackLink 가 `?from=`(= 바로 전 화면)을 따라 돌아간다.
+  { pattern: '/events', chrome: { title: '이벤트', activeTab: 'tournaments', backHref: '/tournaments', showNotifications: true, desktopHead: true, pageOwnsHeading: true } },
 
   { pattern: '/notices', chrome: { title: '공지사항', activeTab: 'home', bottomNav: false, backHref: '/home' } },
   { pattern: '/notices/:id', chrome: { title: '공지사항', activeTab: 'home', bottomNav: false, backHref: '/notices' } },

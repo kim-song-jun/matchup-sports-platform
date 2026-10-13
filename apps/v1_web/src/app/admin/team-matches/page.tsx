@@ -40,7 +40,6 @@ const STATUS_OPTIONS = [
 const REASON_MODAL_STATUS_OPTIONS = [
   { value: 'recruiting', label: STATUS_META['recruiting']?.label ?? '모집 중' },
   { value: 'closed', label: STATUS_META['closed']?.label ?? '마감' },
-  { value: 'matched', label: STATUS_META['matched']?.label ?? '매칭됨' },
   { value: 'cancelled', label: STATUS_META['cancelled']?.label ?? '취소됨' },
   { value: 'archived', label: STATUS_META['archived']?.label ?? '보관' },
 ];
@@ -139,6 +138,10 @@ function AdminTeamMatchesPageContent() {
 
   // ── Moderation modal ───────────────────────────────────────────────
   const [modalRow, setModalRow] = useState<V1AdminTeamMatchRow | null>(null);
+  // 현재 확정 상태는 선택값으로 유지하지만, 미확정 매치를 임의로 매칭하는 선택지는 제공하지 않는다.
+  const reasonModalStatusOptions = useMemo(() => modalRow?.status === 'matched'
+    ? [...REASON_MODAL_STATUS_OPTIONS, { value: 'matched', label: STATUS_META['matched']?.label ?? '매칭됨' }]
+    : REASON_MODAL_STATUS_OPTIONS, [modalRow?.status]);
   const mutation = useV1ChangeTeamMatchStatus();
 
   // ── Toast ──────────────────────────────────────────────────────────
@@ -431,7 +434,7 @@ function AdminTeamMatchesPageContent() {
         open={!!modalRow}
         title="팀매치 상태 변경"
         currentStatus={REASON_MODAL_STATUS_OPTIONS.some((option) => option.value === modalRow?.status) ? modalRow?.status : undefined}
-        statusOptions={REASON_MODAL_STATUS_OPTIONS}
+        statusOptions={reasonModalStatusOptions}
         onSubmit={handleModalSubmit}
         onClose={() => setModalRow(null)}
         pending={mutation.isPending}

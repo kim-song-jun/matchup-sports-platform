@@ -110,7 +110,7 @@ function fixtureHasStartedOrResult(fixture: V1LeagueFixture): boolean {
 }
 
 function manualFixtureHint(canAdd: boolean, leagueEnded: boolean): string {
-  if (leagueEnded) return '끝난 리그에는 경기를 추가할 수 없어요. 먼저 ‘진행 중으로 되돌리기’를 해 주세요.';
+  if (leagueEnded) return '끝난 리그에는 경기를 추가할 수 없어요. 먼저 위 ‘상태 변경’에서 진행 중으로 바꿔 주세요.';
   return canAdd
     ? '우천 순연 재편성이나 대체 경기처럼 한 경기만 필요할 때 써요.'
     : '참가팀이 2팀 이상이어야 경기를 추가할 수 있어요.';
@@ -518,7 +518,7 @@ export default function LeagueMatchFixturesClient({
     // 만들어야 하므로, 잘못 눌러도 되돌릴 수 있는 척하지 않고 미리 알린다.
     const ok = await confirm({
       title: '라운드로빈 대진을 만들까요?',
-      message: '만든 대진은 지울 수 없고 취소만 할 수 있어요. 주차·요일·시각을 한 번 더 확인해 주세요.',
+      message: '주차·요일·시각을 한 번 더 확인해 주세요. 만든 경기는 나중에 하나씩 고치거나 지울 수 있어요.',
       confirmLabel: '대진 만들기',
     });
     if (!ok) return;
@@ -1393,7 +1393,7 @@ export default function LeagueMatchFixturesClient({
                   <p className="mt-2 text-[length:var(--font-size-body-sm)] text-[var(--orange700)]">
                     {leagueHasOfficialResult
                       ? '끝난 리그라 대진을 다시 만들 수 없어요. 확정된 결과가 있어 진행 중으로 되돌려도 다시 만들 수는 없어요.'
-                      : '끝난 리그라 대진을 다시 만들 수 없어요. 먼저 ‘진행 중으로 되돌리기’를 해 주세요.'}
+                      : '끝난 리그라 대진을 다시 만들 수 없어요. 먼저 위 ‘상태 변경’에서 진행 중으로 바꿔 주세요.'}
                   </p>
                 ) : null}
                 {inProgressFixtures.length > 0 ? (

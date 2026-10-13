@@ -7,6 +7,7 @@ import { GameCommandDto } from './dto/game-command.dto';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import {
   canonicalGameCommandPayloadHash,
+  canViewParticipantIdentity,
   applyForfeitScore,
   extractEndForfeitSideId,
   extractEndOutcome,
@@ -858,5 +859,75 @@ describe('GamesService start — 취소된 대진의 경기', () => {
 
   it('양 팀이 확정된 매칭 대진은 그대로 시작할 수 있다', async () => {
     await expect(assertStartable(makeTx('matched'))).resolves.toBeUndefined();
+  });
+});
+
+describe('GamesService.listOperationsLineups — 운영진 전용 본인 확인 정보(실명·전화번호)', () => {
+  const USER = { id: 'user-1' } as V1AuthUser;
+
+  function build(role: string) {
+    const prisma = {
+      v1Game: { findUnique: jest.fn().mockResolvedValue({ state: V1GameState.LIVE }) },
+      v1GameSide: { findFirst: jest.fn().mockResolvedValue({ id: 'side-home' }) },
+      v1GameLineup: {
+        findMany: jest.fn().mockResolvedValue([{ id: 'lineup-1', sideId: 'side-home', revision: 1, state: 'SUBMITTED' }]),
+      },
+      v1GameParticipant: {
+        findMany: jest.fn().mockResolvedValue([
+          participant({ id: 'p-1', lineupId: 'lineup-1', userId: 'user-a', displayNameSnapshot: 'E2E선수01' }),
+          participant({ id: 'p-2', lineupId: 'lineup-1', userId: null, displayNameSnapshot: '게스트' }),
+          participant({ id: 'p-3', lineupId: 'lineup-1', userId: 'user-gone', displayNameSnapshot: 'E2E선수03' }),
+        ]),
+      },
+      v1User: {
+        findMany: jest.fn().mockResolvedValue([
+          { id: 'user-a', phone: '01030101000', profile: { realName: ' 김철수 ' } },
+        ]),
+      },
+    };
+    const service = new GamesService(prisma as never, {} as never, {} as never);
+    jest.spyOn(service as never, 'resolveActor' as never).mockResolvedValue({ role, teamId: 'team-home' } as never);
+    return { service, prisma };
+  }
+
+  it.each(['platform_ops', 'tournament_director', 'field_operator'])('%s 에게는 참가자마다 실명·전화번호(identity)를 싣는다', async (role) => {
+    const { service } = build(role);
+
+    const [lineup] = await service.listOperationsLineups(USER, 'game-1');
+
+    const byId = Object.fromEntries(lineup.participants.map((p) => [p.id, p]));
+    expect(byId['p-1']).toMatchObject({ displayNameSnapshot: 'E2E선수01', identity: { realName: '김철수', phone: '01030101000' } });
+    // 계정이 없는 참가자와 탈퇴한(조회에 안 잡히는) 회원은 값을 지어내지 않고 null 이다.
+    expect(byId['p-2']).toMatchObject({ identity: null });
+    expect(byId['p-3']).toMatchObject({ identity: null });
+  });
+
+  it.each(['team_manager', 'team_owner', 'team_member', 'opponent_manager', 'support_readonly'])(
+    '%s 응답에는 identity 키도, 계정 조회도 없다 — 상대 팀 선수의 전화번호가 새지 않게',
+    async (role) => {
+      const { service, prisma } = build(role);
+
+      const [lineup] = await service.listOperationsLineups(USER, 'game-1');
+
+      for (const p of lineup.participants) expect(p).not.toHaveProperty('identity');
+      expect(prisma.v1User.findMany).not.toHaveBeenCalled();
+    },
+  );
+
+  it('계정 조회는 탈퇴하지 않은 참가자 계정만, 한 번에 가져온다', async () => {
+    const { service, prisma } = build('platform_ops');
+
+    await service.listOperationsLineups(USER, 'game-1');
+
+    expect(prisma.v1User.findMany).toHaveBeenCalledTimes(1);
+    expect(prisma.v1User.findMany).toHaveBeenCalledWith({
+      where: { id: { in: ['user-a', 'user-gone'] }, deletedAt: null },
+      select: { id: true, phone: true, profile: { select: { realName: true } } },
+    });
+  });
+
+  it('canViewParticipantIdentity 는 대회 운영 역할만 통과시킨다', () => {
+    expect(['platform_ops', 'tournament_director', 'field_operator'].every(canViewParticipantIdentity)).toBe(true);
+    expect(['team_manager', 'team_owner', 'team_member', 'opponent_manager', 'support_readonly', 'x'].some(canViewParticipantIdentity)).toBe(false);
   });
 });

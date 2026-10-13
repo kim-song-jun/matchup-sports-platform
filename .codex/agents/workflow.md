@@ -77,5 +77,7 @@
 
 ## Compatibility Rule
 
+- Release review: behavior-affecting main-target PRs, including user-approved scoped hotfixes, must consume Changesets, advance both fixed app versions and include both changelogs. Pure documentation/test changes do not require a version bump. The source branch does not relax this gate; CI does not grant promotion authorization.
+
 - Codex 글로벌 built-in `agent-*` 스킬은 현재 `.codex/agents/`를 직접 보지 않는다.
 - 따라서 Codex roster, command alias, mandatory rule이 바뀌면 `.claude/agents/prompts.md` compatibility entry를 같은 변경에서 sync해야 한다.

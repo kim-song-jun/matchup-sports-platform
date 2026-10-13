@@ -11,8 +11,9 @@ import { createV1IntegrationApp } from '../integration/integration-app';
 /**
  * Default public list order is computed by the database. The fixture mixes every group, null dates,
  * id ties, and rows the public surface must hide, so a wrong ORDER BY, keyset comparison or filter
- * changes the visible sequence. A stored `open` row the card shows as "모집 마감" (deadline passed or
- * capacity held) must sort with the closed group; leagues keep their stored status.
+ * changes the visible sequence. In progress comes first, then recruiting, recruitment closed and finished.
+ * A stored `open` row the card shows as "모집 마감" (deadline passed or capacity held) must sort with the
+ * closed group; leagues keep their stored status.
  */
 describe('대회 공개 목록 DB 정렬·페이지 계약', () => {
   let app: INestApplication;
@@ -125,17 +126,18 @@ describe('대회 공개 목록 DB 정렬·페이지 계약', () => {
   const ids = (res: { items: Array<{ id: string }> }) => res.items.map((i) => i.id.slice(prefix.length + 1));
 
   const TOURNAMENT_ORDER = [
+    // in progress: earliest start first
+    'ip-soon', 'ip-late',
     // recruiting: earliest start first, id ties, no date last
     'o-soon', 'o-tie-a', 'o-tie-b', 'legacy-null-kind', 'f-female', 'o-future-deadline', 'o-room', 'o-cancelled-reg',
     'o-late', 'o-nodate',
     // closed: stored closed plus stored-open rows past their deadline or at capacity, by start
     'o-full-confirmed', 'o-expired', 'cl-soon', 'o-full-pending', 'cl-late',
-    'ip-soon', 'ip-late',
     // finished: most recently ended first (end falls back to start), no date last
     'c-new', 'c-noend', 'c-old', 'c-nodate',
   ];
 
-  it('groups open -> closed -> in_progress -> completed with the per-group date direction', async () => {
+  it('groups in_progress -> open -> closed -> completed with the per-group date direction', async () => {
     expect(ids(await list({ limit: 50 }))).toEqual(TOURNAMENT_ORDER);
   });
 
@@ -145,7 +147,7 @@ describe('대회 공개 목록 DB 정렬·페이지 계약', () => {
     const firstClosed = Math.min(...closedNames.map((name) => order.indexOf(name)));
     const lastClosed = Math.max(...closedNames.map((name) => order.indexOf(name)));
     expect(firstClosed).toBe(order.indexOf('o-nodate') + 1);
-    expect(lastClosed).toBe(order.indexOf('ip-soon') - 1);
+    expect(lastClosed).toBe(order.indexOf('c-new') - 1);
     for (const name of ['o-future-deadline', 'o-room', 'o-cancelled-reg', 'lg-expired', 'lg-full']) {
       expect(order.indexOf(name)).toBeLessThan(firstClosed);
     }
@@ -157,9 +159,10 @@ describe('대회 공개 목록 DB 정렬·페이지 계약', () => {
     ]);
     const all = ids(await list({ kind: 'all', limit: 50 }));
     expect(all).toEqual([
+      'ip-soon', 'ip-late',
       'lg-draft', 'o-soon', 'o-tie-a', 'o-tie-b', 'legacy-null-kind', 'lg-open', 'f-female', 'o-future-deadline',
       'o-room', 'o-cancelled-reg', 'lg-expired', 'lg-full', 'o-late', 'o-nodate',
-      'o-full-confirmed', 'o-expired', 'cl-soon', 'o-full-pending', 'cl-late', 'ip-soon', 'ip-late', 'c-new', 'c-noend', 'lg-done', 'c-old', 'c-nodate',
+      'o-full-confirmed', 'o-expired', 'cl-soon', 'o-full-pending', 'cl-late', 'c-new', 'c-noend', 'lg-done', 'c-old', 'c-nodate',
     ]);
   });
 
@@ -207,7 +210,7 @@ describe('대회 공개 목록 DB 정렬·페이지 계약', () => {
   });
 
   it('a cursor row that turns into 모집 마감 between pages does not skip the rows still recruiting', async () => {
-    const first = await list({ limit: 7 });
+    const first = await list({ limit: 9 });
     expect(ids(first).at(-1)).toBe('o-room');
     expect(first.pageInfo.hasNext).toBe(true);
 
@@ -216,7 +219,7 @@ describe('대회 공개 목록 DB 정렬·페이지 계약', () => {
       const rest: string[] = [];
       let cursor: string | undefined = first.pageInfo.nextCursor ?? undefined;
       for (let guard = 0; cursor && guard < 40; guard += 1) {
-        const page = await list({ limit: 7, cursor });
+        const page = await list({ limit: 9, cursor });
         rest.push(...ids(page));
         cursor = page.pageInfo.nextCursor ?? undefined;
       }
@@ -230,9 +233,9 @@ describe('대회 공개 목록 DB 정렬·페이지 계약', () => {
 
   it('page 1 wins over a cursor sent with it: the first rows, reported as page 1 with the total', async () => {
     const first = await list({ limit: 1 });
-    expect(ids(first)).toEqual(['o-soon']);
+    expect(ids(first)).toEqual(['ip-soon']);
     const res = await list({ cursor: first.pageInfo.nextCursor, page: 1, limit: 2 });
-    expect(ids(res)).toEqual(['o-soon', 'o-tie-a']);
+    expect(ids(res)).toEqual(['ip-soon', 'ip-late']);
     expect(res.pageInfo).toMatchObject({ page: 1, total: TOURNAMENT_ORDER.length, hasPrev: false });
   });
 

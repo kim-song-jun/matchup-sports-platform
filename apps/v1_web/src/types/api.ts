@@ -68,7 +68,7 @@ export type AdminCursorPage<T> = CursorPage<T> & {
 
 export type V1Status = 'open' | 'pending' | 'confirmed' | 'closed' | 'cancelled';
 export type V1MatchApiStatus = V1Status | 'recruiting' | 'completed' | 'expired' | 'full' | 'in_progress' | 'completion_pending' | 'on_hold' | 'scheduled';
-export type V1TeamMatchApiStatus = 'recruiting' | 'closed' | 'matched' | 'cancelled' | 'completed' | 'expired' | 'on_hold';
+export type V1TeamMatchApiStatus = 'recruiting' | 'closed' | 'matched' | 'cancelled' | 'completed' | 'expired';
 export type V1ViewerState = 'none' | 'guest' | 'host' | 'requested' | 'approved' | 'participant' | 'rejected' | 'withdrawn' | 'expired' | 'cancelled_by_host';
 export type V1TeamMatchViewerState = 'none' | 'guest' | 'host_team' | 'requested' | 'approved' | 'rejected' | 'withdrawn';
 export type TrustState = 'verified' | 'estimated' | 'sample';
@@ -1308,7 +1308,8 @@ export type V1MySchedulePage = {
   nextCursor: string | null;
 };
 
-export type V1TeamMatch = V1Match & {
+export type V1TeamMatch = Omit<V1Match, 'status' | 'displayState'> & {
+  status: V1TeamMatchApiStatus;
   listImageUrl?: string | null;
   /** Server-clock derived friendly-match progress; raw matched status remains the permission contract. */
   isLive?: boolean;
@@ -3248,7 +3249,7 @@ export type V1AdminTeamMatchRecruitmentUpdatePayload = V1AdminTeamMatchRecruitme
 
 export type V1AdminTeamMatchRecruitmentUpdateResult = {
   teamMatchId: string;
-  status: 'recruiting';
+  status: 'recruiting' | 'closed';
   version: string;
   detailRoute: string;
 };

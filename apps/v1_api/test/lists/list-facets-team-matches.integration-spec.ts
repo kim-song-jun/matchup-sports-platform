@@ -82,6 +82,60 @@ describe('팀 매치 목록 totalCount·facets HTTP/DB 계약', () => {
     expect(body.facets?.recruiting).toBe(3);
   });
 
+  it('admin reopening clears an elapsed deadline; cancellation hides every user match route but retains admin detail', async () => {
+    const id = randomUUID();
+    const activeTeamId = randomUUID();
+    const scheduleId = randomUUID();
+    await db.v1AdminUser.create({ data: { userId: host, adminRole: 'ops', status: 'active' } });
+    await db.v1Team.create({ data: { id: activeTeamId, ownerUserId: host, sportId: sportA, regionId, name: `취소 검증 ${host}`, status: 'active' } });
+    await db.v1TeamMembership.create({ data: { teamId: activeTeamId, userId: host, role: 'owner', status: 'active' } });
+    await db.v1TeamMatch.create({ data: row(sportA, { id, hostTeamId: activeTeamId, deadlineAt: new Date(Date.now() - 60_000) }) });
+    await db.v1TeamSchedule.create({ data: {
+      id: scheduleId, teamId: activeTeamId, teamMatchId: id, title: '취소 연결 일정', type: 'MATCH',
+      startAt: new Date(Date.now() + 3 * DAY), endAt: new Date(Date.now() + 3 * DAY + 3_600_000), timezone: 'Asia/Seoul', visibility: 'PUBLIC',
+    } });
+    const detail = () => request(app.getHttpServer()).get(`/api/v1/team-matches/${id}`);
+    const setStatus = (status: string) => request(app.getHttpServer())
+      .post(`/api/v1/admin/team-matches/${id}/status`).set('x-v1-user-id', host)
+      .send({ status, reason: '상태 계약 통합 검증' }).expect(201);
+    try {
+      expect((await detail().expect(200)).body.data.status).toBe('closed');
+      await setStatus('recruiting');
+      expect((await detail().expect(200)).body.data).toMatchObject({ status: 'recruiting', deadlineAt: null });
+      const beforeCalendar = await request(app.getHttpServer()).get('/api/v1/me/schedule').set('x-v1-user-id', host).expect(200);
+      expect(beforeCalendar.body.data.items.map((item: { id: string }) => item.id)).toContain(scheduleId);
+      await setStatus('cancelled');
+      await detail().expect(404);
+      await request(app.getHttpServer()).get(`/api/v1/team-matches/${id}`).set('x-v1-user-id', host).expect(404);
+      for (const status of [undefined, 'cancelled', 'expired']) {
+        const publicList = await list({ ...(status ? { status } : {}) });
+        expect(publicList.items.map((item) => item.teamMatchId)).not.toContain(id);
+      }
+      for (const status of [undefined, 'cancelled']) {
+        const mine = await request(app.getHttpServer()).get('/api/v1/me/team-matches').set('x-v1-user-id', host)
+          .query({ scope: 'created', limit: 50, ...(status ? { status } : {}) }).expect(200);
+        expect(mine.body.data.items.map((item: { teamMatchId: string }) => item.teamMatchId)).not.toContain(id);
+      }
+      const admin = await request(app.getHttpServer()).get(`/api/v1/admin/team-matches/${id}`).set('x-v1-user-id', host).expect(200);
+      expect(admin.body.data.status).toBe('cancelled');
+      expect((await db.v1TeamMatch.findUniqueOrThrow({ where: { id } })).cancelledAt).not.toBeNull();
+      expect((await db.v1TeamSchedule.findUniqueOrThrow({ where: { id: scheduleId } })).state).toBe('CANCELLED');
+      await request(app.getHttpServer()).get(`/api/v1/teams/${activeTeamId}/schedules/${scheduleId}`).set('x-v1-user-id', host).expect(404);
+      const schedules = await request(app.getHttpServer()).get(`/api/v1/teams/${activeTeamId}/schedules`).set('x-v1-user-id', host).expect(200);
+      expect(schedules.body.data.items).toHaveLength(0);
+      const calendar = await request(app.getHttpServer()).get('/api/v1/me/schedule').set('x-v1-user-id', host).expect(200);
+      expect(calendar.body.data.items.map((item: { id: string }) => item.id)).not.toContain(scheduleId);
+    } finally {
+      await db.v1AdminActionLog.deleteMany({ where: { targetId: id } });
+      await db.v1StatusChangeLog.deleteMany({ where: { targetId: id } });
+      await db.v1TeamSchedule.deleteMany({ where: { id: scheduleId } });
+      await db.v1TeamMatch.deleteMany({ where: { id } });
+      await db.v1TeamMembership.deleteMany({ where: { teamId: activeTeamId } });
+      await db.v1Team.deleteMany({ where: { id: activeTeamId } });
+      await db.v1AdminUser.deleteMany({ where: { userId: host } });
+    }
+  });
+
   it('종목 필터: 전체 건수는 그 종목만 세지만 다른 종목 칩 건수는 그대로 남는다', async () => {
     const body = await list({ sportId: sportB });
 

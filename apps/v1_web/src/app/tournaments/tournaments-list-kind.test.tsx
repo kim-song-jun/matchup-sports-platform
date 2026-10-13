@@ -94,8 +94,9 @@ describe('#1543 대회 목록 — 상태와 모순되지 않는 영역 이름', 
         expect(within(region).queryByText('조건에 맞는 대회가 없어요')).not.toBeInTheDocument();
       } else {
         expect(within(region).getByText('조건에 맞는 대회가 없어요')).toBeInTheDocument();
+        // 팀밋 대회 화면의 뒤로가기가 지금 보던 목록(필터 포함)으로 돌아오도록 출처를 싣는다.
         expect(within(region).getByRole('link', { name: '팀밋 대회 보기' }))
-          .toHaveAttribute('href', '/events');
+          .toHaveAttribute('href', `/events?${new URLSearchParams({ from: `/tournaments?${params.toString()}` })}`);
       }
     });
   });
@@ -140,7 +141,10 @@ describe('#1516 대회 목록 — 조건에 맞는 정상 빈 결과', () => {
       expect(screen.getByText('조건에 맞는 대회가 없어요')).toBeInTheDocument();
       expect(screen.getByText('필터 조건을 바꾸거나 팀밋 대회를 확인해 보세요.')).toBeInTheDocument();
       expect(screen.queryByText(/모집 중인 대회가 없어요|대회 알림/)).not.toBeInTheDocument();
-      expect(screen.getByRole('link', { name: '팀밋 대회 보기' })).toHaveAttribute('href', '/events');
+      const listPath = params.toString() ? `/tournaments?${params.toString()}` : '/tournaments';
+      expect(screen.getByRole('link', { name: '팀밋 대회 보기' })).toHaveAttribute(
+        'href', `/events?${new URLSearchParams({ from: listPath })}`,
+      );
     });
   });
 

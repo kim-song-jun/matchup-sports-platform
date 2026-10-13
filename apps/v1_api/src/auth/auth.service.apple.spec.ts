@@ -3,7 +3,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { V1AuthProvider } from '@prisma/client';
 import { AppleIdentityService } from './apple-identity.service';
 import { AppleTokenService } from './apple-token.service';
-import { NotificationsService } from '../notifications/notifications.service';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
@@ -63,7 +62,6 @@ describe('AuthService.appleSignIn', () => {
         { provide: PhoneVerificationService, useValue: { enabled: false } },
         { provide: AppleIdentityService, useValue: appleIdentity },
         { provide: AppleTokenService, useValue: appleTokens },
-        { provide: NotificationsService, useValue: { emitNotification: jest.fn() } },
       ],
     }).compile();
 

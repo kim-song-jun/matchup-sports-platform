@@ -87,14 +87,6 @@ export type V1FoundAccount = {
   hasPassword: boolean;
 };
 
-/** 소셜 가입 대기 계정이 번호 주인의 기존 계정에 연결되기 전 확인용 요약. */
-export type V1SocialLinkPreview = {
-  maskedEmail: string | null;
-  providers: ('kakao' | 'apple' | 'email' | 'naver')[];
-  hasPassword: boolean;
-  linkingProvider: 'kakao' | 'apple';
-};
-
 export type V1AuthMe = {
   /**
    * 카카오 가입 진행 중에만 채워진다 — 카카오 동의항목이 승인된 앱에서만 값이 오고,

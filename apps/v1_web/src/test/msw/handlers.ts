@@ -1,6 +1,8 @@
 import { http, HttpResponse } from 'msw';
 import isISO8601 from 'validator/lib/isISO8601';
+import isEmail from 'validator/lib/isEmail';
 import { toKstDateString } from '@/lib/kst-calendar';
+import { randomUuid } from '@/lib/uuid';
 import type { SharedRecord } from '@/hooks/use-team-match-record';
 import {
   getSignupProfileIssue,
@@ -100,6 +102,208 @@ function ok<T>(data: T) {
     data,
     timestamp: '2026-05-18T00:00:00.000Z',
   });
+}
+
+const authAccountPhoneFixture = '01012345678';
+type PhoneProofPurpose = 'signup' | 'password_reset' | 'social_link';
+type PhoneProof = {
+  readonly phone: string;
+  readonly channel: 'phone';
+  readonly purpose: PhoneProofPurpose;
+  readonly expiresAt: number;
+};
+
+type RecoveryEmailChallenge = {
+  readonly expiresAt: number;
+  readonly attemptCount: number;
+};
+type PhoneProofChallenge = RecoveryEmailChallenge & { readonly verified: boolean };
+type RecoveryEmailProof = {
+  readonly email: string;
+  readonly channel: 'email';
+  readonly purpose: 'password_reset';
+  readonly expiresAt: number;
+};
+
+// These maps model the verification adapter's mutable challenge/proof state, not account data.
+const recoveryEmailChallenges = new Map<string, RecoveryEmailChallenge>();
+const recoveryEmailProofs = new Map<string, RecoveryEmailProof>();
+const authPhoneChallenges = new Map<string, PhoneProofChallenge>();
+const authPhoneProofs = new Map<string, PhoneProof>();
+
+function authProofError(code: string, message: string, statusCode = 400) {
+  return HttpResponse.json({
+    status: 'error', statusCode, code, message, timestamp: new Date().toISOString(),
+  }, { status: statusCode });
+}
+
+function parseAuthProofInput(value: unknown, allowedFields: readonly string[]): Readonly<Record<string, string>> | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+  const fields: Record<string, string> = {};
+  for (const [key, field] of Object.entries(value)) {
+    if (!allowedFields.includes(key) || typeof field !== 'string') return null;
+    fields[key] = field;
+  }
+  return fields;
+}
+
+function recoveryEmail(body: Readonly<Record<string, string>> | null): string | null {
+  const email = body?.email;
+  return email && email.length <= 254 && isEmail(email) ? email.trim().toLowerCase() : null;
+}
+
+function sweepRecoveryEmailState() {
+  const now = Date.now();
+  for (const [email, challenge] of recoveryEmailChallenges) {
+    if (challenge.expiresAt < now) recoveryEmailChallenges.delete(email);
+  }
+  for (const [token, proof] of recoveryEmailProofs) {
+    if (proof.expiresAt < now) recoveryEmailProofs.delete(token);
+  }
+}
+
+function sweepAuthPhoneState() {
+  const now = Date.now();
+  for (const [phone, challenge] of authPhoneChallenges) {
+    // The backend retains verified challenge metadata while the separately issued proof is valid.
+    const retainUntil = challenge.expiresAt + (challenge.verified ? 10 * 60 * 1000 : 0);
+    if (retainUntil < now) authPhoneChallenges.delete(phone);
+  }
+  for (const [token, proof] of authPhoneProofs) {
+    if (proof.expiresAt < now) authPhoneProofs.delete(token);
+  }
+}
+
+function isPhoneProofPurpose(value: string): value is PhoneProofPurpose {
+  return value === 'signup' || value === 'password_reset' || value === 'social_link';
+}
+
+function hasPhoneProof(phone: string, proofToken: string, purpose: PhoneProofPurpose): boolean {
+  sweepAuthPhoneState();
+  const proof = authPhoneProofs.get(proofToken);
+  return Boolean(proof && proof.phone === phone && proof.channel === 'phone' && proof.purpose === purpose);
+}
+
+async function issueAuthPhone(request: Request) {
+  const body = parseAuthProofInput(await request.json(), ['phone']);
+  if (!body || !/^\d{11}$/.test(body.phone ?? '')) {
+    return authProofError('VALIDATION_ERROR', '휴대폰 번호는 숫자 11자리예요.');
+  }
+  sweepAuthPhoneState();
+  const expiresAt = Date.now() + 5 * 60 * 1000;
+  authPhoneChallenges.set(body.phone, { expiresAt, attemptCount: 0, verified: false });
+  return ok({ expiresAt: new Date(expiresAt).toISOString(), devCode: '123456' });
+}
+
+async function verifyAuthPhone(request: Request) {
+  const body = parseAuthProofInput(await request.json(), ['phone', 'code', 'purpose']);
+  const purpose = body?.purpose ?? 'signup';
+  if (!body || !/^\d{11}$/.test(body.phone ?? '') || body.code?.length !== 6 || !isPhoneProofPurpose(purpose)) {
+    return authProofError('VALIDATION_ERROR', '입력값을 다시 확인해 주세요.');
+  }
+  sweepAuthPhoneState();
+  const challenge = authPhoneChallenges.get(body.phone);
+  if (!challenge || challenge.expiresAt < Date.now()) return authProofError('VERIFICATION_NO_PENDING', '유효한 인증 요청이 없어요. 인증번호를 다시 받아 주세요.');
+  if (body.code !== '123456') {
+    if (challenge.attemptCount >= 5) return authProofError('VERIFICATION_TOO_MANY_ATTEMPTS', '시도 횟수를 초과했어요. 인증번호를 다시 받아 주세요.');
+    authPhoneChallenges.set(body.phone, { ...challenge, attemptCount: challenge.attemptCount + 1 });
+    return authProofError('VERIFICATION_CODE_MISMATCH', '인증번호가 올바르지 않아요.');
+  }
+  authPhoneChallenges.set(body.phone, { ...challenge, verified: true });
+  const proofToken = `msw-phone-${purpose}-${randomUuid()}`;
+  authPhoneProofs.set(proofToken, { phone: body.phone, channel: 'phone', purpose, expiresAt: Date.now() + 10 * 60 * 1000 });
+  return ok({ verified: true, proofToken });
+}
+
+async function socialLinkAccountProofRequired(request: Request) {
+  const body = parseAuthProofInput(await request.json(), ['phone', 'proofToken']);
+  if (!body || !/^\d{11}$/.test(body.phone ?? '') || !body.proofToken || body.proofToken.length > 512) {
+    return authProofError('VALIDATION_ERROR', '입력값을 다시 확인해 주세요.');
+  }
+  if (!hasPhoneProof(body.phone, body.proofToken, 'social_link') || !authPhoneChallenges.get(body.phone)?.verified) {
+    return authProofError('PHONE_NOT_VERIFIED', '휴대폰 본인인증을 다시 진행해 주세요.');
+  }
+  if (body.phone !== authAccountPhoneFixture) {
+    return authProofError('ACCOUNT_NOT_FOUND', '이 번호로 가입된 계정을 찾지 못했어요.', 404);
+  }
+  return authProofError('SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF',
+    '휴대폰 번호 인증만으로 기존 계정에 연결할 수 없어요. 처음 가입한 방법으로 로그인해 주세요. 비밀번호를 잊었다면 로그인 화면에서 이메일로 재설정해 주세요.', 409);
+}
+
+async function requestRecoveryEmail(request: Request) {
+  const email = recoveryEmail(parseAuthProofInput(await request.json(), ['email']));
+  if (!email) return authProofError('VALIDATION_ERROR', '이메일 형식이 올바르지 않아요.');
+  sweepRecoveryEmailState();
+  const expiresAt = Date.now() + 5 * 60 * 1000;
+  recoveryEmailChallenges.set(email, { expiresAt, attemptCount: 0 });
+  // Registered and absent addresses receive the same public response; no account metadata is exposed.
+  return ok({ sent: true, expiresAt: new Date(expiresAt).toISOString() });
+}
+
+async function confirmRecoveryEmail(request: Request) {
+  const body = parseAuthProofInput(await request.json(), ['email', 'code']);
+  const email = recoveryEmail(body);
+  if (!email || body?.code?.length !== 6) return authProofError('VALIDATION_ERROR', '입력값을 다시 확인해 주세요.');
+  sweepRecoveryEmailState();
+  const challenge = recoveryEmailChallenges.get(email);
+  if (!challenge) return authProofError('VERIFICATION_NO_PENDING', '유효한 인증 요청이 없어요. 인증번호를 다시 받아 주세요.');
+  if (body.code !== '123456') {
+    if (challenge.attemptCount >= 5) return authProofError('VERIFICATION_TOO_MANY_ATTEMPTS', '시도 횟수를 초과했어요. 인증번호를 다시 받아 주세요.');
+    recoveryEmailChallenges.set(email, { ...challenge, attemptCount: challenge.attemptCount + 1 });
+    return authProofError('VERIFICATION_CODE_MISMATCH', '인증번호가 올바르지 않아요.');
+  }
+  const proofToken = `msw-email-password-reset-${randomUuid()}`;
+  recoveryEmailProofs.set(proofToken, { email, channel: 'email', purpose: 'password_reset', expiresAt: Date.now() + 10 * 60 * 1000 });
+  return ok({ verified: true, proofToken });
+}
+
+async function resetPasswordByRecoveryEmail(request: Request) {
+  const body = parseAuthProofInput(await request.json(), ['email', 'proofToken', 'newPassword']);
+  const email = recoveryEmail(body);
+  if (!email || typeof body?.proofToken !== 'string' || (body.newPassword?.length ?? 0) < 8) {
+    return authProofError('VALIDATION_ERROR', '입력값을 다시 확인해 주세요.');
+  }
+  sweepRecoveryEmailState();
+  const proof = recoveryEmailProofs.get(body.proofToken);
+  if (!proof || proof.email !== email || proof.channel !== 'email' || proof.purpose !== 'password_reset') {
+    return authProofError('EMAIL_NOT_VERIFIED', '이메일 본인인증을 다시 진행해 주세요.');
+  }
+  if (email !== v1UserFixture.email?.trim().toLowerCase()) {
+    return authProofError('ACCOUNT_NOT_FOUND', '이 이메일로 가입된 계정을 찾지 못했어요.', 404);
+  }
+  return ok({ ok: true });
+}
+
+async function resetPasswordByRecoveryPhone(request: Request) {
+  const body = parseAuthProofInput(await request.json(), ['phone', 'proofToken', 'newPassword']);
+  if (!body || !/^\d{11}$/.test(body.phone ?? '') || typeof body.proofToken !== 'string' || (body.newPassword?.length ?? 0) < 8) {
+    return authProofError('VALIDATION_ERROR', '입력값을 다시 확인해 주세요.');
+  }
+  if (!hasPhoneProof(body.phone, body.proofToken, 'password_reset')) {
+    return authProofError('PHONE_NOT_VERIFIED', '휴대폰 본인인증을 다시 진행해 주세요.');
+  }
+  if (body.phone !== authAccountPhoneFixture) {
+    return authProofError('ACCOUNT_NOT_FOUND', '이 번호로 가입된 계정을 찾지 못했어요.', 404);
+  }
+  return authProofError('ACCOUNT_RECOVERY_REQUIRES_EMAIL',
+    '휴대폰 번호 인증만으로 기존 계정의 비밀번호를 바꿀 수 없어요. 이메일 본인 확인으로 재설정하거나 처음 가입한 방법으로 로그인해 주세요.', 409);
+}
+
+async function findAccountByRecoveryPhone(request: Request) {
+  const body = parseAuthProofInput(await request.json(), ['phone', 'proofToken']);
+  if (!body || !/^\d{11}$/.test(body.phone ?? '') || typeof body.proofToken !== 'string') {
+    return authProofError('VALIDATION_ERROR', '입력값을 다시 확인해 주세요.');
+  }
+  if (!hasPhoneProof(body.phone, body.proofToken, 'password_reset')) {
+    return authProofError('PHONE_NOT_VERIFIED', '휴대폰 본인인증을 다시 진행해 주세요.');
+  }
+  if (body.phone !== authAccountPhoneFixture) {
+    return authProofError('ACCOUNT_NOT_FOUND', '이 번호로 가입된 계정을 찾지 못했어요.', 404);
+  }
+  const email = v1UserFixture.email;
+  const [local = '', domain] = email?.split('@') ?? [];
+  const maskedEmail = email ? (domain ? `${local.length > 2 ? local.slice(0, 2) : ''}***@${domain}` : '***') : null;
+  return ok({ maskedEmail, providers: ['email'], hasPassword: true });
 }
 
 function notFound(message: string) {
@@ -500,10 +704,15 @@ export const v1MswHandlers = [
   ...v1TeamInviteLinkMswHandlers,
   ...v1LeagueVisibilityMswHandlers,
   http.get(`${api}/auth/me`, () => ok(v1UserFixture)),
-  http.post(`${api}/auth/phone/issue`, () => ok({ expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(), devCode: '123456' })),
-  http.post(`${api}/auth/phone/verify`, () => ok({ verified: true, proofToken: 'proof-social-link' })),
-  http.post(`${api}/auth/social-link/preview`, () => ok({ maskedEmail: 'ru***@gmail.com', providers: ['email'], hasPassword: true, linkingProvider: 'kakao' })),
-  http.post(`${api}/auth/social-link`, () => ok({ session: { userId: v1UserFixture.id, userEmail: v1UserFixture.email }, ...v1UserFixture })),
+  http.post(`${api}/auth/phone/issue`, ({ request }) => issueAuthPhone(request)),
+  http.post(`${api}/auth/phone/verify`, ({ request }) => verifyAuthPhone(request)),
+  http.post(`${api}/auth/social-link/preview`, ({ request }) => socialLinkAccountProofRequired(request)),
+  http.post(`${api}/auth/social-link`, ({ request }) => socialLinkAccountProofRequired(request)),
+  http.post(`${api}/auth/recovery/find-account`, ({ request }) => findAccountByRecoveryPhone(request)),
+  http.post(`${api}/auth/recovery/reset-password`, ({ request }) => resetPasswordByRecoveryPhone(request)),
+  http.post(`${api}/auth/recovery/email/request`, ({ request }) => requestRecoveryEmail(request)),
+  http.post(`${api}/auth/recovery/email/confirm`, ({ request }) => confirmRecoveryEmail(request)),
+  http.post(`${api}/auth/recovery/email/reset-password`, ({ request }) => resetPasswordByRecoveryEmail(request)),
   http.post(`${api}/auth/login`, () => ok({ session: { userId: v1UserFixture.id, userEmail: v1UserFixture.email }, ...v1UserFixture })),
   http.post(`${api}/auth/register`, async ({ request }) => {
     const body = await request.json();

@@ -1,70 +1,74 @@
-# Task 20261078: MD-QA #125 계정 연결 후속 리뷰 결함 수정
+# Task 20261078: MD-QA #125·#133 계정 증명과 인증 복귀 후속 수정
 
 Status: In Progress
 **Owner**: root integration / backend-data-dev / frontend-ui-dev
 **Created**: 2026-10-13
 
 ## Context
-기존 https://teameet.jmandu.kr/issues/125/ 는 김성준 담당 확인 중이다. 원 PR1835는 dev MERGED지만 최신 원 head의 실제 리뷰 4건이 현재 dev552f에도 남아 있고 PR1837로 해결되지 않았다. 기존 task71/73는 원 수정·네이티브 릴리스 이력이며 본 문서는 그 4건의 후속 커서다. 다른 담당의 Maps/timer/native 릴리스 작업을 변경하지 않는다.
+기존 [#125](https://teameet.jmandu.kr/issues/125/)·[#133](https://teameet.jmandu.kr/issues/133/)는 김성준 담당 확인 중이다. #125 기존 PR1888의 실제 후속 finding을 이어 처리한다. #133에서 현재 휴대폰 소유만으로 다른 계정에 연결하거나 비밀번호를 변경하는 실제 결함을 확인했으므로 같은 계정 증명 API·선택된 A 복구 UI를 PR1888에 통합한다. 별도 중복 #133 PR은 만들지 않는다. 원인 조사용 #133 전용 task·워크트리·기존 증거는 보존한다.
 
 ## Goal
-가입 계정 연결의 원래 목적지, 약관 복구 auth cache, 업로드 소유권을 보존하고 현재 API 문서를 맞춘 dev PR을 검증·독립 리뷰·기존 리포트 댓글까지 게시한다. 실제 alpha와 dev 머지는 별도 증거로 추적한다.
+현재 번호 소유를 기존 계정 소유로 인정하는 경로를 차단하고 이메일 증명 복구·기존 계정 로그인 안내를 제공한다. 안전한 최초 목적지와 필수 약관·온보딩 우선순위, 실패 후 실제 auth cache 복구를 보존한다. 같은 열린 dev PR의 최신 head 리뷰·기존 두 리포트 댓글·배포 후 실제 alpha 검증을 이어간다.
 
 ## Original Conditions (must all be satisfied)
-- [ ] required 가입 모드에서 연결 성공 후 안전한 저장 redirect를 소비한다. holder의 미완료 필수 단계는 우회하지 않는다.
-- [ ] defer/complete TERMS_REQUIRED 오류 이후 서버가 변경한 auth/me를 갱신해 약관 화면이 signup gate에 되돌아가지 않는다.
-- [ ] deferred caller가 보유한 허용된 업로드는 같은 transaction에서 holder로 이관하고 storage/URL/holder 프로필을 보존한다.
-- [ ] auth 문서 표·상세 caller 조건과 retained data 이관을 실제 서비스 계약과 맞춘다.
+- [ ] 휴대폰 전용 preview/link는409 SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF로 거부하고 기존 계정·소유 자산·권한·프로필·세션을 변경하지 않는다.
+- [ ] SMS password_reset 증명만으로 비밀번호를 바꾸지 않고409 ACCOUNT_RECOVERY_REQUIRES_EMAIL로 안내한다. 실제 이메일 OTP 복구와 기존 인증·토큰 purpose를 유지한다.
+- [ ] 카카오 제공자 이메일 verified flags만으로 서비스 미검증 이메일 소유자에 연결하지 않는다. 이미 확립된 provider identity 로그인은 보존한다.
+- [ ] 번호 충돌에서 실제 기존 계정 로그인·이메일 복구 출구를 제공하고 로그아웃 실패를 성공으로 숨기지 않는다. 오래된 이메일·휴대폰 응답이 다른 입력·모드의 인증 상태를 덮어쓰지 않는다.
+- [ ] 실제 정상 로그인·가입 완료 뒤 안전한 원 목적지를 필수 약관·온보딩 완료까지 보존하고 최종 성공에서만 소비한다. 중간 next와 부분 동의·실패는 최종 목적지를 덮어쓰지 않는다.
+- [ ] defer/complete TERMS_REQUIRED 오류 뒤 실제 auth/me를 갱신하고 가입 게이트로 되돌아가는 결함을 막는다.
+- [ ] API 문서·DTO 호환 payload·타입·shared MSW·회귀 fixture·Changeset이 같은 실제 계약을 설명한다.
 
 ## User Scenarios
-1. required 계정이 /teams/new로 가던 중 번호 충돌 → 기존 계정 연결 → 필수 holder 단계 충족 후 /teams/new 이동, 저장 redirect 제거.
-2. fresh required cache에서 defer 또는 완료를 요청했으나 서버가 terms_required로 변경 → 400 TERMS_REQUIRED → 현재 auth/me 반영 → 약관 화면 유지.
-3. deferred 계정이 avatar 등 허용된 asset 업로드 후 verified holder 연결 → owner 변경·asset 보존·caller 삭제·holder 프로필 보존.
+1. 재할당된 번호가 기존 계정과 충돌하면 기존 로그인 또는 이메일 복구로 이동한다. 번호만으로 기존 계정을 합치거나 자산을 이전하지 않는다.
+2. 이메일 OTP 복구 중 주소·모드를 바꾸면 이전 응답과 비밀번호 재설정 결과는 현재 화면에 반영되지 않는다. 정상 현재 주소 복구는 계속 사용할 수 있다.
+3. 정상 로그인·가입 완료 후 약관·온보딩을 마치면 최초 안전한 nested query/hash 목적지로 한 번 이동한다.
+4. 약관 상태 전환 실패는 실제 재조회와 재시도를 통해 복구하며 실패를 성공으로 표시하지 않는다.
 
 ## Test Scenarios
 ### Happy path
-- [ ] 기존 deferred/required 연결과 onboarding gate 검증을 보존한다.
+- [ ] 정상 이메일 OTP 복구·기존 provider identity·현재 인증 continuation의 실제 API/HTTP/UI 소비자 계약을 유지한다.
 ### Edge cases
-- [ ] 실제 consumer + QueryClient/MSW로 저장 redirect 소비와 holder 필수 단계 우선순위 검증.
-- [ ] actual DB Restrict FK에서 업로드 이관 성공과 rollback 검증(전용 disposable fixture만).
+- [ ] 실제 QueryClient60초 캐시와 MSW HTTP에서 최초 URL·저장 목적지 우선순위 및 필수 단계 우선순위를 검증한다.
+- [ ] 실 disposable PostgreSQL HTTP에서 거부 전후 관련 테이블·세션·쿠키·passwordHash와 정상 이메일 복구를 검증한다.
 ### Error paths
-- [ ] defer/complete 두 TERMS_REQUIRED 경로가 실제 auth/me 재조회 후 회복된다.
-- [ ] proof/충돌/소유권 권한 게이트를 우회하지 않는다.
+- [ ] SMS proof·카카오 미검증 서비스 이메일·잘못된 token purpose는 권한을 얻거나 데이터를 변경하지 않는다.
+- [ ] 지연 응답·모드/주소 ABA·403/409/429/503 및 로그아웃 실패가 실제 오류로 표시되고 재시도를 보존한다.
 ### Mock data updates needed
-- [ ] 실제 DB fixture와 관련 좁은 unit/MSW 응답을 계약과 맞춘다. shared hooks/types/MSW는 root 사전 소유권 승인 없이 수정하지 않는다.
+- [ ] shared MSW의 오래된 phone-only200 연결·SMS 재설정 성공을 제거하고 실제409·purpose-bound 이메일 복구 계약으로 맞춘다.
 
 ## Parallel Work Breakdown
-### Backend phase B1 — backend-data-dev
-Owned: apps/v1_api/src/auth/auth.service.ts, 가장 좁은 auth service/integration test 및 해당 fixture, docs/api/domains/auth.md.
-Forbidden: frontend, schema/DTO/shared auth policy, task71/73, secrets, state, git mutations. schema 변경은 필요 없음.
-### Frontend phase F1 — frontend-ui-dev
-Owned: apps/v1_web/src/components/auth/social-signup-client.tsx, 관련 실제 consumer regression tests. social-link-flow.tsx는 필요시 root와 소유권 확인 후.
-Forbidden: shared hooks/types/MSW, API/schema, task71/73, secrets, state, git mutations. 기존 화면/문구/토큰을 유지하는 흐름 결함 수정이며 새 시각 디자인은 없다.
-### Sequential — root
-Owned: 본 문서, Changeset, test execution/preflight, integration/review, explicit-path commit/push/dev PR, review replies, existing tracker comment, SSOT. workers는 혼자가 아니므로 타인 변경을 원복하지 않는다. 테스트/commit/push는 worker 금지; root가 좁게 직렬 실행한다.
+- Backend 단일 소유자:125의 auth.service.ts·account-recovery.service.ts 및 좁은 unit/actual HTTP fixture. backend-api child는 exact auth.module.ts의 미사용 Notifications DI 두 줄과 복구 controller 주석만 소유한다. schema/migration/Web/다른 task·정책·secret·Git·runtime 실행은 금지한다.
+- Frontend 단일 소유자:125 auth social signup·email login·account recovery UI와 직접 회귀 fixture, 해당 목적의 shared hooks/types/MSW만 root exact 범위 승인에 따라 수정한다.133에서 입증한 복구 구현을 최소 통합하되125 F4/F5 continuation·action lock을 보존한다. API/schema/다른 워크트리/source/정책/Git/runtime은 금지한다.
+- root:현재 문서·Changeset·docs/api/auth 계약·SSOT·좁은 직렬 검증·최신 committed head 독립 리뷰·explicit pathspec Git·동일PR push·리뷰 답변·기존 리포트 댓글·실제 alpha 증거. 작업자는 혼자가 아니며 타인 변경을 원복하지 않는다.
 
 ## Acceptance Criteria
-- [ ] 위 original conditions 및 의미 있는 RED → GREEN, 범위 lint/typecheck.
-- [ ] Critical0 / Warning0 latest exact head independent review.
-- [ ] fixture/docs/Changeset sync, no new debt markers, committed-tree scope/import proof.
-- [ ] dev PR와 기존 #125 저장 댓글의 실제 표시 확인.
-- [ ] 실제 alpha는 serving SHA/persona/viewport/원 시나리오를 증명한 경우에만 PASS, 미검증은 pending.
+- [ ] 위 조건과 실제 RED→GREEN, 필요한 committed-tree 타입·패턴/표면 검사.
+- [ ] 최신 정확한 head 독립 Critical0/Warning0, 실제 외부 finding 해소·재리뷰·CI.
+- [ ] 의도한 커밋·PR diff/import 범위 확인, fixture/docs/Changeset sync.
+- [ ] 기존 PR1888와 #125·#133 한국어 진행 댓글 저장·실제 표시 확인.
+- [ ] 실제 dev MERGED와 배포 SHA·로그인 persona·시나리오·viewport가 일치하는 alpha 증거는 별도 PASS로 기록한다. 미배포·미검증은 pending.
 
 ## Tech Debt Resolved
-성공 경로만 invalidation되는 서버 상태 전환 복구, required link redirect 소비 누락, 보존 asset의 Restrict FK 누락, API 문서 상세 drift.
+미사용 알림 DI, 도달 불가능한 전화번호 전용 연결 UI·200 fixture, 불일치한 복구 mock과 원 목적지·필수 단계의 우선순위 drift를 같은 변경에서 정리한다.
 
 ## Security Notes
-holder identity/proof/완료된 계정의 필수 단계와 기존 destructive account-link gate를 보존한다. 계정 삭제 시 실제 소유 자산을 orphan하거나 잃지 않는다. 운영 사용자/secret/.env 읽기 금지. 전용 테스트 fixture만 사용한다.
+전화번호만으로 기존 계정·password·소유 자산·세션을 변경하지 않는다. 기존 계정 소유 증명·role/purpose 경계는 유지한다. 운영 계정 자격증명이나 .env는 읽지 않고 실제 DB 검증은 root 소유 disposable fixture만 사용한다.
 
 ## Risks & Dependencies
-원 PR1835 merge2dc2e697b816a87275c7a3383c037a5433f5e373; original head44b0ef369731bb99c9e7475ff9a2819d08102065. 실제 리뷰 thread suffix K ef/eh/ej/ek 및 상세는 root artifact current-active-review-threads.json. DB/runtime 제한은 정확히 기록하며 mock 통과로 FK 검증을 대체하지 않는다. 완료는 첨부 영구 삭제이므로 action-time 인간 확인 전 실행하지 않는다.
+PR1888 기존 head2bb4 및 원 PR1835·1837 이력은 아래 Progress Snapshot에 보존한다. 옛 업로드 이전 성공은 현재 안전 계약의 PASS가 아니다. 현재 거부 경로의 실제 무변경 검증을 기준으로 삼는다. PostgreSQL schema push+정본 chat CHECK 적용 증거는 full migration replay의 PASS와 구분한다. 리포트 완료는 첨부 영구 삭제이므로 구체적 action-time 인간 확인 전 실행하지 않는다.
 
 ## Ambiguity Log
 | Date | Raised by | Question | Resolution |
 |---|---|---|---|
-| 2026-10-13 | root independent review | 후속1837/실제 담당이 4건을 해결했는가? | dev552f 기준 4건 모두 남음. Maps/timer/native 진행 근거는 있으나 이 4건의 담당 진행 근거 없음. 후속 범위만 분리. |
+| 2026-10-13 | root |125/133 같은 계정 증명 API의 중복 PR 및 부분409 UI | 기존 PR1888에 전체 계정 증명+A 복구 UI를 통합,133 조사 task/증거는 보존 |
+| 2026-10-13 | 사용자 |133 복구 화면 | A:기존 로그인·이메일 복구 폼 재사용, 번호 충돌은 기존 로그인으로 안내 |
 
 ## Progress Snapshot
+- 2026-10-13T10:33Z latest-dev audit: remote and clean actual dev are9e3d596629ca350e5a12ac38a06ab42fff14713f. Current auth/recovery/continuation defects remain in that dev; no duplicate merged fix found. Local d25 is26 upstream commits behind and shares hooks/types with upstream team-match changes. Own candidate checkpoint precedes safe dev integration; upstream cache/status hunks must be preserved and committed-tree validation/review refreshed before same PR1888 push. Auth recovery documentation now matches phone409/email-only password reset. #133 remains consolidated, no separate PR.
+- 2026-10-13T10:18:41.354Z: #125/#133 consolidated current source API4files187 PASS, Web13files188 PASS, isolated PostgreSQL/HTTP4files26 PASS. Initial HTTP run16 PASS/10 failed beforeAll60000ms (bodies not executed), same timeout warm single-file retry10 PASS; both logs preserved. Committed-tree type/lint, exact-head independent review, same PR1888 push/external review/CI and actual alpha remain pending; no separate133 PR.
+- 2026-10-13 09:38Z: root 실제 recovery unit18은 SMS2 FAIL/이메일16 PASS RED. 실제 social signup+로그인 continuation27은 신규 충돌7 FAIL·필수 단계 priority1 FAIL·정상19 PASS RED (`mdqa125-recovery-unit-actual-red.log`, `mdqa125-proof-continuation-ui-actual-red.log`). Backend 최소 GREEN source 준비, Frontend 전체 A 통합 구현 중이다. worker 정적 리뷰는 실행 PASS나 최신 immutable head OK가 아니다.
+- 아래 이전 전화번호 연결·asset 이전 성공 기록은 역사이며 현재 차단 계약으로 대체됐다. 최종 current unit/실PG/committed gate/최신 head 리뷰/동일PR push/두 리포트 댓글·dev머지·alpha 검증은 남아 있다.
 - 2026-10-13 06:13Z F4: PR1888 head2bb4 actual Codex P2 r4255058030 and Copilot r4255054209 were checked against three real consumers. Six stacked mandatory-step cases actually failed; an additional partial-consent case skipped onboarding after the second required-document consent (1 FAIL /16 skipped). A shared continuation helper preserves safe ultimate destination separately from intermediate renewal/onboarding URLs and consumes only at final success. The exact three-file run passed67 (existing storage35 + new helper15 + actual consumer17), evidence `mdqa125-f4-helper-consumers-green.log`. Tests used unchanged wire fixtures and actual auth gate. Latest immutable review/CI remains pending. #133 proved a separate current-number-only account-proof vulnerability; this PR must not merge until that security contract and upload integration expectations are reconciled. Alpha account-link PASS remains NOTRUN. Actual report comment322 save/reload image was uploaded to PR1888 comment6139157908; it proves tracker persistence only, not alpha resolution.
 - 2026-10-13 05:16Z F3: latest3c6 independent frontend review found invalid `in_progress`/unverified-holder fixtures and unchecked test assertions (Critical1/Warning1). Production behavior was consistent. Corrected the real consumer fixture to verified active holder + signup_done/sport_done/level_done/region_done and completed/done or deferred/confirm GET/PATCH contracts; strict unknown payload guard and explicit route switch replace casts/assertions. Dedicated test helper stays under250 pure LOC. Same11 real consumer cases PASS (`mdqa125-f3-contract-green.log`); previous87 test run is historical and does not override this review finding. Latest immutable independent re-review, same PR push/CI and actual alpha link scenarios remain pending.
 - Latest root checkpoint 2026-10-13 04:58Z: PR1888 cfb3ca1989 실제 Codex P1 r4254784648을 실제 가입→온보딩 sport/level/region/confirm 및 renewal consumer로 재현했다(9사례 중7FAIL). 최종 성공에서 안전한 URL 목적지 우선·저장 목적지 fallback을 소비하고, 중간 저장/추가 필수 next에서는 보존하도록 onboarding/terms 두 source를 수정했다. 안전 URL 우선2건 포함11/11 GREEN. 기존 link fixture의 없는 /onboarding/sports·terms social 경로는 실제 /onboarding/sport·renewal로 맞췄다. 최신 committed-tree 영향 검증·독립 리뷰·동일 PR push가 다음 단계다.

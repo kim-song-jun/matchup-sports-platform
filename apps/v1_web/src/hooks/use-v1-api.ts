@@ -54,7 +54,6 @@ import type {
   V1AdminRow,
   V1PushFailureSummary,
   V1FoundAccount,
-  V1SocialLinkPreview,
   V1SmsFailureSummary,
   V1AdminMonitoringSummary,
   V1AdminOpsSummary,
@@ -406,32 +405,10 @@ export function useV1PhoneVerify() {
   });
 }
 
-export function useV1SocialLinkPreview() {
-  return useMutation({
-    mutationFn: (body: { phone: string; proofToken: string }) =>
-      v1Post<V1SocialLinkPreview>('/auth/social-link/preview', body),
-  });
-}
-
-/** 성공하면 서버가 세션 쿠키를 기존 계정으로 바꾼다 — 호출자가 세션 저장·캐시 비우기를 맡는다. */
-export function useV1SocialLink() {
-  return useMutation({
-    mutationFn: (body: { phone: string; proofToken: string }) =>
-      v1Post<V1AuthSessionResponse>('/auth/social-link', body),
-  });
-}
-
 export function useV1FindAccountByPhone() {
   return useMutation({
     mutationFn: (body: { phone: string; proofToken: string }) =>
       v1Post<V1FoundAccount>('/auth/recovery/find-account', body),
-  });
-}
-
-export function useV1ResetPasswordByPhone() {
-  return useMutation({
-    mutationFn: (body: { phone: string; proofToken: string; newPassword: string }) =>
-      v1Post<{ ok: true }>('/auth/recovery/reset-password', body),
   });
 }
 

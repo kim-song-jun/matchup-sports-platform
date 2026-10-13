@@ -24,7 +24,6 @@ import { RegisterDto } from './dto/register.dto';
 import { isSignupAgeEligible, isValidBirthDateDigits, normalizeSignupDisplayName } from './dto/required-signup-profile.dto';
 import { SocialLinkDto } from './dto/social-link.dto';
 import { SocialProfileDto, SocialTermsDto } from './dto/social-profile.dto';
-import { NotificationsService } from '../notifications/notifications.service';
 import { recordSignupConsent } from './signup-record-consent';
 import { hashPassword, verifyPassword } from './password-hash';
 import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
@@ -72,11 +71,6 @@ function assertLinkableByEmail(user: { emailVerifiedAt: Date | null }): void {
   });
 }
 
-const SOCIAL_PROVIDER_LABELS: Partial<Record<V1AuthProvider, string>> = {
-  kakao: '카카오',
-  apple: 'Apple',
-};
-
 type KakaoProfile = {
   providerUserKey: string;
   email: string | null;
@@ -98,7 +92,6 @@ export class AuthService {
     private readonly managedTerms: ManagedTermsRuntimeService,
     private readonly phoneVerification: PhoneVerificationService,
     private readonly appleTokens: AppleTokenService,
-    private readonly notifications: NotificationsService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -568,9 +561,13 @@ export class AuthService {
         throw this.kakaoContactConflict();
       }
       const emailMatches = Boolean(email && candidate.email === email && candidate.emailVerifiedAt);
-      const phoneMatches = Boolean(phone && candidate.phone === phone && candidate.phoneVerifiedAt);
-      if (!emailMatches && !phoneMatches) {
+      // A historical phone verification cannot authenticate the current number owner as this member.
+      // Attaching a new identity requires independent matching service/provider email proof.
+      if (!emailMatches) {
         if (email && candidate.email === email) assertLinkableByEmail(candidate);
+        if (phone && candidate.phone === phone && candidate.phoneVerifiedAt) {
+          throw this.socialLinkAccountProofRequired();
+        }
         throw this.kakaoContactConflict();
       }
       // Lock and recheck the verified contact. A concurrent profile edit must invalidate this claim.
@@ -578,7 +575,7 @@ export class AuthService {
         where: {
           id: candidate.id, accountStatus: 'active',
           email: candidate.email, phone: candidate.phone,
-          ...(emailMatches ? { emailVerifiedAt: { not: null } } : { phoneVerifiedAt: { not: null } }),
+          emailVerifiedAt: { not: null },
         },
         data: {
           lastLoginAt: now,
@@ -591,7 +588,7 @@ export class AuthService {
         data: { userId, provider: V1AuthProvider.kakao, providerUserKey: profile.providerUserKey, email, status: 'active', lastLoginAt: now },
       });
       await tx.v1StatusChangeLog.create({
-        data: { targetType: 'auth_identity', targetId: identity.id, fromStatus: 'unlinked', toStatus: 'linked', actorType: 'user', actorUserId: userId, reason: `kakao_verified_contact:${emailMatches ? 'email' : 'phone'}` },
+        data: { targetType: 'auth_identity', targetId: identity.id, fromStatus: 'unlinked', toStatus: 'linked', actorType: 'user', actorUserId: userId, reason: 'kakao_verified_contact:email' },
       });
       return { id: userId, email: email ?? candidate.email };
     });
@@ -1341,113 +1338,20 @@ export class AuthService {
   }
 
   /**
-   * 휴대폰 OTP 로 소유를 증명한 뒤, 대기 중인 소셜 신원을 그 번호의 기존 계정으로 옮기고 빈 대기 계정을 지운다.
-   * 이메일 없는 소셜 로그인이 같은 사람의 두 번째 계정을 만든 경우(MD-QA #126)를 푸는 경로다.
+   * Current phone possession cannot prove ownership of an older account.
+   * This compatibility endpoint rejects until an independent account-proof contract exists.
    */
-  async linkSocialToPhoneOwner(callerId: string, dto: SocialLinkDto) {
-    const { phone } = dto;
-    const { identity, holder } = await this.resolveSocialLinkTarget(callerId, dto);
-
-    const now = new Date();
-    try {
-      await this.prisma.$transaction(async (tx) => {
-        // 이 갱신이 holder 행 잠금을 쥐어 아래 재검증들을 동시 요청과 직렬화한다.
-        const locked = await tx.v1User.updateMany({
-          where: { id: holder.id, phone, accountStatus: 'active', phoneVerifiedAt: { not: null } },
-          data: { lastLoginAt: now },
-        });
-        if (locked.count !== 1) throw this.socialLinkConflict();
-
-        await this.assertHolderLinkable(tx, holder.id, identity.provider);
-
-        // 증명 토큰은 stateless 라 챌린지 행이 단회성의 실체다.
-        const consumed = await tx.v1PhoneVerificationChallenge.deleteMany({
-          where: { phone, verifiedAt: { not: null } },
-        });
-        if (consumed.count !== 1) throw this.phoneNotVerified();
-
-        const stillPending = await tx.v1User.updateMany({
-          where: { id: callerId, onboardingStatus: { in: ['social_profile_required', 'social_profile_deferred'] } },
-          data: { updatedAt: now },
-        });
-        if (stillPending.count !== 1) throw this.socialLinkConflict();
-
-        // create 가 아니라 이동 — Apple refresh token 과 (provider, key) unique 를 그대로 보존한다.
-        await tx.v1AuthIdentity.update({
-          where: { id: identity.id, userId: callerId },
-          data: { userId: holder.id, lastLoginAt: now },
-        });
-        // A deferred account may already have filed support inquiries (cascade on user delete); they are the same person's.
-        await tx.v1Inquiry.updateMany({ where: { userId: callerId }, data: { userId: holder.id } });
-        // Keep permitted uploads and their storage paths while clearing the restrictive owner FK before deletion.
-        await tx.v1UploadAsset.updateMany({ where: { ownerUserId: callerId }, data: { ownerUserId: holder.id } });
-        await tx.v1User.delete({ where: { id: callerId } });
-        await tx.v1StatusChangeLog.create({
-          data: {
-            targetType: 'auth_identity',
-            targetId: identity.id,
-            fromStatus: 'pending_social_account',
-            toStatus: 'linked',
-            actorType: 'user',
-            actorUserId: holder.id,
-            reason: `social_link:${identity.provider}; removed_pending_user=${callerId}`,
-          },
-        });
-      });
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError) {
-        if (error.code === 'P2003') {
-          throw new ConflictException({
-            code: 'SOCIAL_LINK_ACCOUNT_NOT_EMPTY',
-            message: '이미 활동 기록이 있는 계정이라 연결할 수 없어요.',
-          });
-        }
-        if (error.code === 'P2002' || error.code === 'P2025') throw this.socialLinkConflict();
-      }
-      throw error;
-    }
-
-    void this.notifications
-      .emitNotification(holder.id, 'social_identity_linked', null, undefined, {
-        vars: { name: SOCIAL_PROVIDER_LABELS[identity.provider] ?? '소셜' },
-        businessKey: `social-link:${identity.id}`,
-      })
-      .catch((error: unknown) => {
-        this.logger.warn(
-          `social link notification failed: ${error instanceof Error ? error.message : String(error)}`,
-        );
-      });
-
-    return this.sessionResponse(holder.id, holder.email, { social: true });
+  async linkSocialToPhoneOwner(callerId: string, dto: SocialLinkDto): Promise<never> {
+    return this.assertSocialLinkAccountProof(callerId, dto);
   }
 
-  /**
-   * 연결 전 확인 창용 요약. link 와 같은 검사를 같은 순서로 하되 증명을 소모하지 않고 아무것도 쓰지 않는다.
-   * 증명을 통과한 뒤에만 번호 주인의 정보가 나간다.
-   */
-  async previewSocialLink(callerId: string, dto: SocialLinkDto) {
-    const { identity, holder } = await this.resolveSocialLinkTarget(callerId, dto);
-    await this.assertHolderLinkable(this.prisma, holder.id, identity.provider);
-
-    const proofStillValid = await this.prisma.v1PhoneVerificationChallenge.count({
-      where: { phone: dto.phone, verifiedAt: { not: null } },
-    });
-    if (proofStillValid !== 1) throw this.phoneNotVerified();
-
-    const holderIdentities = await this.prisma.v1AuthIdentity.findMany({
-      where: { userId: holder.id, status: 'active' },
-      select: { provider: true, passwordHash: true },
-    });
-    return {
-      maskedEmail: holder.email ? maskEmail(holder.email) : null,
-      providers: holderIdentities.map((row) => row.provider),
-      hasPassword: holderIdentities.some((row) => Boolean(row.passwordHash)),
-      linkingProvider: identity.provider,
-    };
+  /** The preview shares the account-proof boundary and reveals no holder login metadata. */
+  async previewSocialLink(callerId: string, dto: SocialLinkDto): Promise<never> {
+    return this.assertSocialLinkAccountProof(callerId, dto);
   }
 
-  /** link 와 preview 가 공유하는 증명·호출자·번호 주인 검사 (계약 3절 1~4). */
-  private async resolveSocialLinkTarget(callerId: string, dto: SocialLinkDto) {
+  /** Validate existing preconditions, then require proof that this phone-only DTO cannot supply. */
+  private async assertSocialLinkAccountProof(callerId: string, dto: SocialLinkDto): Promise<never> {
     const phone = dto.phone;
     if (!verifyPhoneProofToken(dto.proofToken, phone, 'social_link')) {
       throw this.phoneNotVerified();
@@ -1523,7 +1427,12 @@ export class AuthService {
         message: '기존 계정에서 인증되지 않은 번호라 연결할 수 없어요. 처음 가입한 방법으로 로그인해 주세요.',
       });
     }
-    return { identity, holder };
+    await this.assertHolderLinkable(this.prisma, holder.id, identity.provider);
+    const proofStillValid = await this.prisma.v1PhoneVerificationChallenge.count({
+      where: { phone, verifiedAt: { not: null } },
+    });
+    if (proofStillValid !== 1) throw this.phoneNotVerified();
+    throw this.socialLinkAccountProofRequired();
   }
 
   private async assertHolderLinkable(
@@ -1560,10 +1469,10 @@ export class AuthService {
     });
   }
 
-  private socialLinkConflict() {
+  private socialLinkAccountProofRequired() {
     return new ConflictException({
-      code: 'SOCIAL_LINK_CONFLICT',
-      message: '계정 정보가 바뀌어 연결하지 못했어요. 다시 시도해 주세요.',
+      code: 'SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF',
+      message: '휴대폰 번호 인증만으로 기존 계정에 연결할 수 없어요. 처음 가입한 방법으로 로그인해 주세요. 비밀번호를 잊었다면 로그인 화면에서 이메일로 재설정해 주세요.',
     });
   }
 

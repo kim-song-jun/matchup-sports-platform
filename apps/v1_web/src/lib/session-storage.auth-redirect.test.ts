@@ -56,3 +56,54 @@ describe('필수 인증 단계와 최종 복귀 목적지', () => {
     expect(window.sessionStorage.getItem('teameet.v1.savedRedirect')).toBeNull();
   });
 });
+
+describe('중첩된 필수 인증 redirect의 최종 목적지', () => {
+  const wrap = (destination: string) => `/onboarding/confirm?redirect=${encodeURIComponent(destination)}`;
+  it.each(['stored', 'requested'])('%s 중첩 경로의 최종 query/hash 목적지를 단계 전에 복원하고 마지막에 한 번 소비한다', (source) => {
+    const destination = '/chat?room=team#latest';
+    const nested = wrap(`/terms?mode=renewal&redirect=${encodeURIComponent(destination)}`);
+    saveRedirectPath(source === 'stored' ? nested : '/teams/new');
+    const next = resolveAuthContinuationPath('/onboarding/sport', source === 'requested' ? nested : null);
+    expect(new URL(next, 'https://teameet.test').pathname).toBe('/onboarding/sport');
+    expect(getSavedRedirectPath()).toBe(destination);
+    resolveAuthContinuationPath('/onboarding/level');
+    expect(getSavedRedirectPath()).toBe(destination);
+    expect(resolveAuthContinuationPath('/home')).toBe(destination);
+    expect(getSavedRedirectPath()).toBeNull();
+    expect(resolveAuthContinuationPath('/home')).toBe('/home');
+  });
+
+  it('명시된 안전한 최종 URL은 저장된 중첩 목적지보다 우선한다', () => {
+    saveRedirectPath(wrap('/teams/new'));
+    resolveAuthContinuationPath('/onboarding/sport', '/chat?room=team#latest');
+    expect(getSavedRedirectPath()).toBe('/chat?room=team#latest');
+    expect(resolveAuthContinuationPath('/home')).toBe('/chat?room=team#latest');
+  });
+
+  it.each(['//outside.invalid', '/\\outside.invalid', '/..//outside.invalid', 'https://outside.invalid'])('중간 hop의 외부 목적지 %s는 차단하고 안전한 저장 목적지만 사용한다', (unsafe) => {
+    saveRedirectPath('/teams/new');
+    const next = resolveAuthContinuationPath('/onboarding/sport', wrap(unsafe));
+    expect(new URL(next, 'https://teameet.test').pathname).toBe('/onboarding/sport');
+    expect(getSavedRedirectPath()).toBe('/teams/new');
+    expect(resolveAuthContinuationPath('/home')).toBe('/teams/new');
+    expect(getSavedRedirectPath()).toBeNull();
+  });
+
+  it('저장된 중첩 외부 주소는 최종 성공에서 정리되며 외부로 이동하지 않는다', () => {
+    saveRedirectPath(wrap('/\\outside.invalid'));
+    resolveAuthContinuationPath('/onboarding/sport');
+    expect(resolveAuthContinuationPath('/home')).toBe('/home');
+    expect(window.sessionStorage.getItem('teameet.v1.savedRedirect')).toBeNull();
+  });
+
+  it('과도한 중첩과 반복된 필수 단계에 최종 목적지가 없으면 홈에서 정리한다', () => {
+    let deep = '/teams/new';
+    for (let index = 0; index < 16; index += 1) deep = wrap(deep);
+    saveRedirectPath(deep);
+    expect(resolveAuthContinuationPath('/home')).toBe('/home');
+    expect(getSavedRedirectPath()).toBeNull();
+    saveRedirectPath('/terms?mode=renewal&redirect=%2Fterms%3Fmode%3Drenewal');
+    expect(resolveAuthContinuationPath('/home')).toBe('/home');
+    expect(getSavedRedirectPath()).toBeNull();
+  });
+});

@@ -134,6 +134,34 @@ describe('V1 social link upload ownership integration', () => {
   const link = (proofToken: string) => request(app.getHttpServer())
     .post('/api/v1/auth/social-link').set('x-v1-user-id', CALLER).send({ phone: PHONE, proofToken });
 
+  function accountState() {
+    return Promise.all([
+      prisma.v1User.findMany({ where: { id: { in: USER_IDS } }, orderBy: { id: 'asc' } }),
+      prisma.v1UserProfile.findMany({ where: { userId: { in: USER_IDS } }, orderBy: { id: 'asc' } }),
+      prisma.v1AuthIdentity.findMany({ where: { userId: { in: USER_IDS } }, orderBy: { id: 'asc' } }),
+      prisma.v1Inquiry.findMany({ where: { userId: { in: USER_IDS } }, orderBy: { id: 'asc' } }),
+      prisma.v1UploadAsset.findMany({ where: { ownerUserId: { in: USER_IDS } }, orderBy: { id: 'asc' } }),
+      prisma.v1ManagedTermsConsentEvent.findMany({ where: { userId: { in: USER_IDS } }, orderBy: { id: 'asc' } }),
+      prisma.v1PhoneVerificationChallenge.findMany({ where: { phone: PHONE }, orderBy: { id: 'asc' } }),
+      prisma.v1StatusChangeLog.findMany({ where: { targetId: `${PREFIX}-identity` }, orderBy: { id: 'asc' } }),
+      prisma.v1Notification.findMany({ where: { recipientUserId: { in: USER_IDS } }, orderBy: { id: 'asc' } }),
+      prisma.v1ChatMessage.findMany({ where: { chatRoomId: `${PREFIX}-room` }, orderBy: { id: 'asc' } }),
+    ]);
+  }
+
+  function expectAccountProofRequired(response: request.Response) {
+    expect({ status: response.status, code: response.body.code }).toEqual({
+      status: 409, code: 'SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF',
+    });
+    expect(response.headers['set-cookie']).toBeUndefined();
+    expect(response.body).not.toHaveProperty('data.session');
+    expect(response.body).not.toHaveProperty('data.maskedEmail');
+    expect(response.body).not.toHaveProperty('data.providers');
+    expect(response.body).not.toHaveProperty('data.hasPassword');
+    expect(response.body).not.toHaveProperty('data.linkingProvider');
+    expect(JSON.stringify(response.body)).not.toContain('social-link-uploads@integration.test');
+  }
+
   it('enforces the real Restrict foreign key when a caller still owns an upload', async () => {
     // Given: a real deferred user owns uploads in the isolated PostgreSQL clone.
     expect(await prisma.v1UploadAsset.count({ where: { ownerUserId: CALLER } })).toBe(2);
@@ -146,29 +174,24 @@ describe('V1 social link upload ownership integration', () => {
     expect(await prisma.v1UploadAsset.count({ where: { ownerUserId: CALLER } })).toBe(2);
   });
 
-  it('links a deferred uploader without losing assets or overwriting the holder profile', async () => {
-    // Given: the caller has an avatar and an unused upload; another user owns a third asset.
-    const callerAssets = await prisma.v1UploadAsset.findMany({ where: { ownerUserId: CALLER }, orderBy: { id: 'asc' } });
-    const holderProfile = await prisma.v1UserProfile.findUniqueOrThrow({ where: { userId: HOLDER } });
-    const otherAsset = await prisma.v1UploadAsset.findUniqueOrThrow({ where: { id: `${PREFIX}-other` } });
-    const proof = await provePhone();
+  it.each(['social-link', 'social-link/preview'] as const)(
+    'rejects phone-only %s without transferring uploads, changing accounts, or issuing a session',
+    async (endpoint) => {
+      // Given: current-number proof alone and a deferred caller with retained uploads and an inquiry.
+      const proof = await provePhone();
+      const before = await accountState();
 
-    // When: the actual authenticated HTTP account-link endpoint runs with verified proof.
-    const response = await link(proof);
+      // When: the actual authenticated HTTP endpoint receives the valid current-number proof.
+      const response = await request(app.getHttpServer()).post(`/api/v1/auth/${endpoint}`)
+        .set('x-v1-user-id', CALLER).send({ phone: PHONE, proofToken: proof });
 
-    // Then: the link succeeds, transfers metadata unchanged, and retains the holder's profile.
-    expect({ status: response.status, code: response.body.code }).toEqual({ status: 200, code: undefined });
-    expect(response.body.data.session.userId).toBe(HOLDER);
-    expect(await prisma.v1UploadAsset.findMany({ where: { ownerUserId: HOLDER }, orderBy: { id: 'asc' } }))
-      .toEqual(callerAssets.map((asset) => ({ ...asset, ownerUserId: HOLDER })));
-    expect(await prisma.v1UploadAsset.findUniqueOrThrow({ where: { id: otherAsset.id } })).toEqual(otherAsset);
-    expect(await prisma.v1UserProfile.findUniqueOrThrow({ where: { userId: HOLDER } })).toEqual(holderProfile);
-    expect(await prisma.v1User.findUnique({ where: { id: CALLER } })).toBeNull();
-    expect((await prisma.v1AuthIdentity.findUniqueOrThrow({ where: { id: `${PREFIX}-identity` } })).userId).toBe(HOLDER);
-    expect((await prisma.v1Inquiry.findUniqueOrThrow({ where: { id: `${PREFIX}-inquiry` } })).userId).toBe(HOLDER);
-  });
+      // Then: independent account proof is required; all original rows and the phone proof remain unchanged.
+      expectAccountProofRequired(response);
+      expect(await accountState()).toEqual(before);
+    },
+  );
 
-  it('rolls back upload ownership and proof consumption when disallowed activity prevents caller deletion', async () => {
+  it('rejects phone-only linking before transferring uploads or deleting a caller with retained activity', async () => {
     // Given: a retained activity FK deliberately makes this caller non-empty.
     await prisma.v1Sport.create({
       data: { id: ACTIVITY_SPORT, code: ACTIVITY_SPORT, name: '계정 연결 활동 테스트 종목' },
@@ -181,19 +204,14 @@ describe('V1 social link upload ownership integration', () => {
     });
     await prisma.v1ChatRoom.create({ data: { id: `${PREFIX}-room`, teamId: ACTIVITY_TEAM } });
     await prisma.v1ChatMessage.create({ data: { chatRoomId: `${PREFIX}-room`, senderUserId: CALLER, body: '이전 활동' } });
-    const callerAssets = await prisma.v1UploadAsset.findMany({ where: { ownerUserId: CALLER }, orderBy: { id: 'asc' } });
     const proof = await provePhone();
+    const before = await accountState();
 
-    // When: the HTTP link transaction reaches the remaining Restrict activity FK.
+    // When: the HTTP link endpoint receives current-number proof for a caller with retained activity.
     const response = await link(proof);
 
-    // Then: rejection preserves the complete original account and the unused proof.
-    expect({ status: response.status, code: response.body.code }).toEqual({ status: 409, code: 'SOCIAL_LINK_ACCOUNT_NOT_EMPTY' });
-    expect(await prisma.v1UploadAsset.findMany({ where: { ownerUserId: CALLER }, orderBy: { id: 'asc' } })).toEqual(callerAssets);
-    expect(await prisma.v1User.findUnique({ where: { id: CALLER } })).not.toBeNull();
-    expect((await prisma.v1AuthIdentity.findUniqueOrThrow({ where: { id: `${PREFIX}-identity` } })).userId).toBe(CALLER);
-    expect((await prisma.v1Inquiry.findUniqueOrThrow({ where: { id: `${PREFIX}-inquiry` } })).userId).toBe(CALLER);
-    expect(await prisma.v1PhoneVerificationChallenge.count({ where: { phone: PHONE, verifiedAt: { not: null } } })).toBe(1);
-    expect(await prisma.v1StatusChangeLog.count({ where: { targetId: `${PREFIX}-identity` } })).toBe(0);
+    // Then: the account-proof gate rejects before any transfer, consumption, or activity deletion.
+    expectAccountProofRequired(response);
+    expect(await accountState()).toEqual(before);
   });
 });

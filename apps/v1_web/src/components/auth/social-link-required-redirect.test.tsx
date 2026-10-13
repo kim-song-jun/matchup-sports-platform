@@ -1,16 +1,16 @@
 import { useEffect, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getSavedRedirectPath, saveRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
-import { SocialSignupClient } from './social-signup-client';
+import { getSavedRedirectPath, saveRedirectPath } from '@/lib/session-storage';
+import { EmailLoginClient } from './email-login-client';
 import { PendingSocialSignupGate } from './pending-social-signup-gate';
 import { OnboardingClient } from './onboarding-client';
 import { TermsClient } from './terms-client';
-import { createRedirectFixture, makeAuth, PENDING, requiredRoutes, signupJourneys, signupStatuses, stepForRoute } from './social-link-required-redirect-fixtures';
+import { createRedirectFixture, requiredRoutes, stepForRoute } from './social-link-required-redirect-fixtures';
 
-const navigation = vi.hoisted(() => ({ pathname: '/signup/social', replace: vi.fn(), push: vi.fn() }));
+const navigation = vi.hoisted(() => ({ pathname: '/login/email', replace: vi.fn(), push: vi.fn() }));
 vi.mock('next/navigation', () => ({
   useRouter: () => navigation,
   usePathname: () => navigation.pathname,
@@ -21,8 +21,8 @@ const { state, server, reset } = createRedirectFixture();
 let client: QueryClient;
 
 // 주소 변경만 Next.js 대신 맡고 가입·게이트·필수 단계·API 훅은 실제 consumer를 쓴다.
-function LinkedJourney() {
-  const [route, setRoute] = useState('/signup/social');
+function LoginJourney() {
+  const [route, setRoute] = useState(window.location.pathname + window.location.search);
   useEffect(() => {
     const navigate = (path: string) => {
       window.history.replaceState({}, '', path);
@@ -34,7 +34,7 @@ function LinkedJourney() {
   }, []);
   const pathname = new URL(route, window.location.origin).pathname;
   const step = stepForRoute(pathname);
-  return <PendingSocialSignupGate>{pathname === '/signup/social' ? <SocialSignupClient />
+  return <PendingSocialSignupGate>{pathname === '/login/email' ? <EmailLoginClient redirectPath={new URLSearchParams(window.location.search).get('redirect')} />
     : step ? <OnboardingClient key={pathname} step={step} />
       : pathname === '/terms' ? <TermsClient /> : <h1>{pathname}</h1>}</PendingSocialSignupGate>;
 }
@@ -43,27 +43,24 @@ afterAll(() => server.close());
 beforeEach(() => {
   window.localStorage.clear();
   window.sessionStorage.clear();
-  window.history.replaceState({}, '', '/signup/social');
-  navigation.pathname = '/signup/social';
+  window.history.replaceState({}, '', '/login/email');
+  navigation.pathname = '/login/email';
   navigation.push.mockReset();
   navigation.replace.mockReset();
   reset();
-  saveStoredV1Session({ userId: PENDING, userEmail: null });
   client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 60_000 }, mutations: { retry: false } } });
 });
 afterEach(() => { cleanup(); client.clear(); server.resetHandlers(); });
 
-async function linkAccount() {
-  render(<QueryClientProvider client={client}><LinkedJourney /></QueryClientProvider>);
+async function loginAccount() {
+  render(<QueryClientProvider client={client}><LoginJourney /></QueryClientProvider>);
   const user = userEvent.setup();
-  fireEvent.change(await screen.findByLabelText('휴대폰 번호'), { target: { value: '01012345678' } });
-  await user.click(await screen.findByRole('button', { name: '인증번호 받기' }));
-  await user.click(await screen.findByRole('button', { name: '인증하고 기존 계정에 연결' }));
-  await user.click(await screen.findByRole('button', { name: '인증번호 받기' }));
-  await user.click(await screen.findByRole('button', { name: '확인' }));
-  await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '연결하고 로그인' }));
+  fireEvent.change(await screen.findByLabelText('이메일'), { target: { value: 'owner@example.test' } });
+  fireEvent.change(screen.getByLabelText('비밀번호'), { target: { value: 'synthetic-password' } });
+  await user.click(screen.getByRole('button', { name: '로그인' }));
   await waitFor(() => expect(navigation.pathname).toBe(state.renewalRequired ? '/terms' : state.requiredRoute.split('?')[0]));
-  expect(state.linkRequests).toBe(1);
+  expect(state.loginRequests).toBe(1);
+  expect(state.phoneOnlyRequests).toBe(0);
   return user;
 }
 async function finishOnboarding(user: ReturnType<typeof userEvent.setup>) {
@@ -87,10 +84,10 @@ async function expectDestination(path: string) {
   expect(getSavedRedirectPath()).toBeNull();
   expect(window.sessionStorage.getItem('teameet.v1.savedRedirect')).toBeNull();
 }
-async function linkWithRenewal(expectedTarget = '/teams/new') {
+async function loginWithRenewal(expectedTarget = '/teams/new', storedTarget = expectedTarget) {
   state.renewalRequired = true;
-  saveRedirectPath('/teams/new');
-  const user = await linkAccount();
+  saveRedirectPath(storedTarget);
+  const user = await loginAccount();
   await screen.findByRole('button', { name: /전체 동의/ });
   expect(new URLSearchParams(window.location.search).get('redirect')).toBe('/onboarding/sport');
   expect(getSavedRedirectPath()).toBe(expectedTarget);
@@ -98,12 +95,11 @@ async function linkWithRenewal(expectedTarget = '/teams/new') {
   return user;
 }
 
-describe('연결된 계정의 필수 단계 완료 후 실제 복귀 계약', () => {
-  it.each(signupJourneys)('%s 연결 후 %s를 마쳐 원래 목적지를 한 번 소비한다', async (status, next) => {
-    state.auth = makeAuth(status);
+describe('로그인한 계정의 필수 단계 완료 후 실제 복귀 계약', () => {
+  it.each(requiredRoutes)('로그인 후 %s를 마쳐 원래 목적지를 한 번 소비한다', async (next) => {
     state.requiredRoute = next;
     saveRedirectPath('/teams/new');
-    const user = await linkAccount();
+    const user = await loginAccount();
     expect(getSavedRedirectPath()).toBe('/teams/new');
     expect(navigation.replace).not.toHaveBeenCalledWith('/teams/new');
     if (next.startsWith('/onboarding')) await finishOnboarding(user);
@@ -114,8 +110,8 @@ describe('연결된 계정의 필수 단계 완료 후 실제 복귀 계약', ()
 
   it.each(requiredRoutes)('%s까지 전달된 외부 redirect는 마지막에도 차단한다', async (next) => {
     state.requiredRoute = next;
-    window.history.replaceState({}, '', '/signup/social?redirect=%2F%5Coutside.invalid');
-    const user = await linkAccount();
+    window.history.replaceState({}, '', '/login/email?redirect=%2F%5Coutside.invalid');
+    const user = await loginAccount();
     if (next.startsWith('/onboarding')) await finishOnboarding(user);
     else await finishRenewal(user);
     await expectDestination('/home');
@@ -125,7 +121,7 @@ describe('연결된 계정의 필수 단계 완료 후 실제 복귀 계약', ()
   it.each(requiredRoutes)('%s의 안전한 URL 목적지가 저장 목적지보다 우선하며 마지막에 정리된다', async (next) => {
     state.requiredRoute = next;
     saveRedirectPath('/teams/new');
-    const user = await linkAccount();
+    const user = await loginAccount();
     act(() => navigation.replace(`${next}${next.includes('?') ? '&' : '?'}redirect=%2Fchat`));
     if (next.startsWith('/onboarding')) await finishOnboarding(user);
     else await finishRenewal(user);
@@ -136,7 +132,7 @@ describe('연결된 계정의 필수 단계 완료 후 실제 복귀 계약', ()
     state.requiredRoute = '/terms?mode=renewal';
     state.acceptedTerms = true;
     saveRedirectPath('/teams/new');
-    const user = await linkAccount();
+    const user = await loginAccount();
     await user.click(await screen.findByRole('button', { name: '동의하고 계속하기' }));
     await expectDestination('/teams/new');
     expect(state.acceptRequests).toBe(0);
@@ -144,7 +140,7 @@ describe('연결된 계정의 필수 단계 완료 후 실제 복귀 계약', ()
 
   it('온보딩 완료 후 다시 진입해도 이미 소비한 복귀 목적지를 재사용하지 않는다', async () => {
     saveRedirectPath('/teams/new');
-    const user = await linkAccount();
+    const user = await loginAccount();
     await finishOnboarding(user);
     await expectDestination('/teams/new');
     act(() => navigation.replace('/onboarding/confirm'));
@@ -155,26 +151,25 @@ describe('연결된 계정의 필수 단계 완료 후 실제 복귀 계약', ()
 
   it('서버가 허용한 온보딩 나중에 설정하기 성공도 복귀 목적지를 소비한다', async () => {
     saveRedirectPath('/teams/new');
-    const user = await linkAccount();
+    const user = await loginAccount();
     await user.click(await screen.findByRole('button', { name: '나중에 설정하기' }));
     await expectDestination('/teams/new');
   });
 
-  it.each(signupStatuses)('%s 연결의 연속 필수 약관·온보딩을 마칠 때까지 원 목적지를 보존한다', async (status) => {
-    state.auth = makeAuth(status);
-    const user = await linkWithRenewal();
+  it.each(['/teams/new', '/chat'])('로그인 뒤 연속 필수 약관·온보딩을 마칠 때까지 %s 원 목적지를 보존한다', async (destination) => {
+    const user = await loginWithRenewal(destination);
     await finishRenewal(user);
     await screen.findByRole('button', { name: /풋살/ });
-    expect(getSavedRedirectPath()).toBe('/teams/new');
+    expect(getSavedRedirectPath()).toBe(destination);
     await finishOnboarding(user);
-    await expectDestination('/teams/new');
+    await expectDestination(destination);
     expect(state.acceptRequests).toBe(1);
     expect(state.completeRequests).toBe(1);
   });
 
   it('연속 필수 단계에서도 안전한 최초 URL 목적지를 저장값보다 우선하고 마지막에 소비한다', async () => {
-    window.history.replaceState({}, '', '/signup/social?redirect=%2Fchat');
-    const user = await linkWithRenewal('/chat');
+    window.history.replaceState({}, '', '/login/email?redirect=%2Fchat');
+    const user = await loginWithRenewal('/chat', '/teams/new');
     await finishRenewal(user);
     await screen.findByRole('button', { name: /풋살/ });
     expect(getSavedRedirectPath()).toBe('/chat');
@@ -183,8 +178,8 @@ describe('연결된 계정의 필수 단계 완료 후 실제 복귀 계약', ()
   });
 
   it('연속 필수 단계의 외부 URL을 차단하고 안전한 저장 목적지를 마지막까지 보존한다', async () => {
-    window.history.replaceState({}, '', '/signup/social?redirect=%2F%5Coutside.invalid');
-    const user = await linkWithRenewal();
+    window.history.replaceState({}, '', '/login/email?redirect=%2F%5Coutside.invalid');
+    const user = await loginWithRenewal();
     await finishRenewal(user);
     await screen.findByRole('button', { name: /풋살/ });
     expect(getSavedRedirectPath()).toBe('/teams/new');
@@ -195,7 +190,7 @@ describe('연결된 계정의 필수 단계 완료 후 실제 복귀 계약', ()
 
   it('연속 필수 단계의 부분 동의 응답은 새 문서를 보여주며 원 목적지를 소비하거나 덮어쓰지 않는다', async () => {
     state.consentResult = 'partial';
-    const user = await linkWithRenewal();
+    const user = await loginWithRenewal();
     await finishRenewal(user);
     await screen.findByRole('button', { name: '추가 필수 약관 체크' });
     expect(navigation.pathname).toBe('/terms');
@@ -214,7 +209,7 @@ describe('연결된 계정의 필수 단계 완료 후 실제 복귀 계약', ()
 
   it('연속 필수 단계의 실제 503 실패는 목적지를 남기고 재시도·온보딩 성공 뒤에만 정리한다', async () => {
     state.consentResult = 'failure';
-    const user = await linkWithRenewal();
+    const user = await loginWithRenewal();
     await finishRenewal(user);
     await screen.findByText('약관 저장 응답이 지연됐어요.');
     expect(navigation.pathname).toBe('/terms');

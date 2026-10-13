@@ -172,13 +172,25 @@ function isRequiredAuthPath(path: string) {
     || (pathname === '/terms' && !searchParams.has('document') && ['signup', 'social', 'renewal'].includes(searchParams.get('mode') ?? ''));
 }
 
+const AUTH_REDIRECT_MAX_DEPTH = 8;
+
+function getUltimateAuthRedirect(path: string | null) {
+  let cursor = sanitizeRedirectPath(path);
+  const visited = new Set<string>();
+  for (let depth = 0; cursor && depth < AUTH_REDIRECT_MAX_DEPTH; depth += 1) {
+    if (!isRequiredAuthPath(cursor)) return cursor;
+    if (visited.has(cursor)) return null;
+    visited.add(cursor);
+    cursor = sanitizeRedirectPath(new URL(cursor, REDIRECT_BASE).searchParams.get('redirect'));
+  }
+  return null;
+}
+
 /** 필수 단계의 복귀 경로는 원 목적지를 보존하고, 마지막 성공에서만 원 목적지를 소비한다. */
 export function resolveAuthContinuationPath(nextRoute?: string | null, requestedRedirect?: string | null) {
   const requested = sanitizeRedirectPath(requestedRedirect);
   const requestedStep = requested && isRequiredAuthPath(requested);
-  const saved = getSavedRedirectPath();
-  const savedDestination = saved && !isRequiredAuthPath(saved) ? saved : null;
-  const destination = requested && !requestedStep ? requested : savedDestination;
+  const destination = getUltimateAuthRedirect(requested) ?? getUltimateAuthRedirect(getSavedRedirectPath());
   const next = sanitizeRedirectPath(nextRoute);
   const continuation = next && next !== '/home'
     ? next : !next && requestedStep ? requested : null;

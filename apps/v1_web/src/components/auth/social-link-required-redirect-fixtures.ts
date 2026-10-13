@@ -1,7 +1,8 @@
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { expect } from 'vitest';
-import type { V1AuthMe, V1CurrentSignupTerms, V1OnboardingDetail, V1OnboardingPreferencePayload } from '@/types/api';
+import { RECORD_CONSENT_POLICY_HASH } from '@/lib/record-consent';
+import type { V1AuthMe, V1AuthSessionResponse, V1CurrentSignupTerms, V1OnboardingDetail, V1OnboardingPreferencePayload } from '@/types/api';
 
 export const SPORT = '22222222-2222-4222-8222-222222222222';
 export const LEVEL = '33333333-3333-4333-8333-333333333333';
@@ -12,16 +13,11 @@ export const ADDED_DOCUMENT = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 export const HOLDER = '88888888-8888-4888-8888-888888888888';
 export const PENDING = '99999999-9999-4999-8999-999999999999';
 type SignupStatus = 'social_profile_required' | 'social_profile_deferred';
-export const signupStatuses: SignupStatus[] = ['social_profile_required', 'social_profile_deferred'];
 type TermsSnapshot = V1CurrentSignupTerms & { compliance: NonNullable<V1CurrentSignupTerms['compliance']> };
 export type RequiredRoute = '/onboarding/sport' | '/terms?mode=renewal';
 type PreferenceStep = V1OnboardingPreferencePayload['currentStep'];
 export type FixtureStatus = SignupStatus | 'signup_done' | 'sport_done' | 'level_done' | 'region_done' | 'completed' | 'deferred';
 export const requiredRoutes: RequiredRoute[] = ['/onboarding/sport', '/terms?mode=renewal'];
-export const signupJourneys: Array<[SignupStatus, RequiredRoute]> = [
-  ['social_profile_required', '/onboarding/sport'], ['social_profile_deferred', '/onboarding/sport'],
-  ['social_profile_required', '/terms?mode=renewal'], ['social_profile_deferred', '/terms?mode=renewal'],
-];
 export const compliance = (accepted: boolean): NonNullable<V1CurrentSignupTerms['compliance']> => ({
   compliant: accepted, pendingRequiredDocumentIds: accepted ? [] : [DOCUMENT], nextRoute: accepted ? null : '/terms?mode=renewal',
 });
@@ -41,6 +37,9 @@ export const makeAuth = (status: FixtureStatus, id = PENDING, phoneVerified = fa
   verification: { emailVerified: false, phoneVerified },
   socialSignupPrefill: null,
   termsCompliance: compliance(true),
+});
+export const authSession = (auth: V1AuthMe, nextRoute?: string): V1AuthSessionResponse => ({
+  ...auth, session: { userId: auth.user.id, userEmail: auth.user.email }, next: nextRoute ? { route: nextRoute } : undefined,
 });
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 export function isPreferencePayload(value: unknown): value is V1OnboardingPreferencePayload {
@@ -71,7 +70,9 @@ type RedirectFixtureState = {
   acceptedTerms: boolean;
   additionalTermsAccepted: boolean;
   consentResult: 'accepted' | 'partial' | 'failure';
-  linkRequests: number;
+  loginRequests: number;
+  profileRequests: number;
+  phoneOnlyRequests: number;
   completeRequests: number;
   acceptRequests: number;
   savedSteps: PreferenceStep[];
@@ -81,7 +82,7 @@ function initialState(): RedirectFixtureState {
     auth: makeAuth('social_profile_required'),
     onboarding: { status: 'signup_done', currentStep: 'sport', canResume: true, missing: ['sports'], sports: [], regions: [], regionOptional: true },
     requiredRoute: '/onboarding/sport', renewalRequired: false, acceptedTerms: false, additionalTermsAccepted: false, consentResult: 'accepted',
-    linkRequests: 0, completeRequests: 0, acceptRequests: 0, savedSteps: [],
+    loginRequests: 0, profileRequests: 0, phoneOnlyRequests: 0, completeRequests: 0, acceptRequests: 0, savedSteps: [],
   };
 }
 function currentTerms(state: RedirectFixtureState): TermsSnapshot {
@@ -97,26 +98,43 @@ function currentTerms(state: RedirectFixtureState): TermsSnapshot {
 }
 const success = (data: unknown) => HttpResponse.json({ status: 'success', data });
 const failure = (message: string, status = 400) => HttpResponse.json({ status: 'error', statusCode: status, code: status === 503 ? 'SERVICE_UNAVAILABLE' : 'VALIDATION_FAILED', message }, { status });
+function authenticatedEntry(state: RedirectFixtureState) {
+  if (state.renewalRequired || state.requiredRoute.startsWith('/terms')) state.auth.termsCompliance = compliance(false);
+  if (state.requiredRoute.startsWith('/terms')) state.onboarding = { ...state.onboarding, status: 'completed', currentStep: 'done', canResume: false, missing: [],
+    sports: [{ sportId: SPORT, sportName: '풋살', levelId: LEVEL, levelName: '초급' }],
+  };
+  const response = success(authSession(state.auth, state.requiredRoute));
+  if (state.acceptedTerms) state.auth = { ...state.auth, termsCompliance: compliance(true) };
+  return response;
+}
 export function createRedirectFixture() {
   const state = initialState();
   const server = setupServer(
     http.get('*/api/v1/auth/me', () => success(state.auth)),
     http.post('*/api/v1/logs/client-error', () => success({})),
     http.post('*/api/v1/verification/phone/request', () => HttpResponse.json({ status: 'error', statusCode: 409, code: 'PHONE_CONFLICT', message: '이미 사용 중인 번호예요.' }, { status: 409 })),
-    http.post('*/api/v1/auth/phone/issue', () => success({ expiresAt: new Date(Date.now() + 300_000).toISOString(), devCode: '123456' })),
-    http.post('*/api/v1/auth/phone/verify', () => success({ verified: true, proofToken: 'proof-1' })),
-    http.post('*/api/v1/auth/social-link/preview', () => success({ maskedEmail: 'ru***@gmail.com', providers: ['email'], hasPassword: true, linkingProvider: 'kakao' })),
-    http.post('*/api/v1/auth/social-link', () => {
-      state.linkRequests += 1;
+    http.post('*/api/v1/auth/login', async ({ request }) => {
+      expect(await request.json()).toEqual({ email: 'owner@example.test', password: 'synthetic-password' });
+      state.loginRequests += 1;
       state.auth = makeAuth(state.requiredRoute.startsWith('/onboarding') ? 'signup_done' : 'completed', HOLDER, true);
-      if (state.renewalRequired || state.requiredRoute.startsWith('/terms')) state.auth.termsCompliance = compliance(false);
-      if (state.requiredRoute.startsWith('/terms')) state.onboarding = { ...state.onboarding, status: 'completed', currentStep: 'done', canResume: false, missing: [],
-        sports: [{ sportId: SPORT, sportName: '풋살', levelId: LEVEL, levelName: '초급' }],
-      };
-      const response = success({ ...state.auth, session: { userId: HOLDER, userEmail: null }, next: { route: state.requiredRoute } });
-      if (state.acceptedTerms) state.auth = { ...state.auth, termsCompliance: compliance(true) };
-      return response;
+      state.auth.user = { ...state.auth.user, email: 'owner@example.test', authProvider: 'email' };
+      return authenticatedEntry(state);
     }),
+    http.get('*/api/v1/auth/check-nickname', () => success({ available: true })),
+    http.post('*/api/v1/auth/social-profile', async ({ request }) => {
+      expect(await request.json()).toEqual({ nickname: '카카오러너', displayName: '김러너', phone: '01087654321',
+        birthDate: '20000229', gender: 'female', recordConsent: { granted: true, policyHash: RECORD_CONSENT_POLICY_HASH } });
+      state.profileRequests += 1;
+      state.auth = makeAuth('signup_done', PENDING, true);
+      state.auth.user.phone = '01087654321';
+      return authenticatedEntry(state);
+    }),
+    ...['auth/phone/issue', 'auth/phone/verify', 'auth/social-link/preview', 'auth/social-link'].map((path) =>
+      http.post('*/api/v1/' + path, () => {
+        state.phoneOnlyRequests += 1;
+        return HttpResponse.json({ status: 'error', statusCode: 409, code: 'SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF',
+          message: '기존 계정으로 로그인해 주세요.' }, { status: 409 });
+      })),
     http.get('*/api/v1/master/sports', () => success([{ id: SPORT, code: 'futsal', name: '풋살', levels: [{ id: LEVEL, name: '초급' }] }])),
     http.get('*/api/v1/master/regions', () => success([{ id: REGION, name: '서울', parentId: null, level: 1, children: [{ id: DISTRICT, name: '마포구', parentId: REGION, level: 2 }] }])),
     http.get('*/api/v1/onboarding', () => success(state.onboarding)),

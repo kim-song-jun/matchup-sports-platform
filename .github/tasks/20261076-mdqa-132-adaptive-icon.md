@@ -94,3 +94,9 @@ Windows Android SDK36/build-tools36.0.0/JDK17은 설치돼 있다. 프로젝트 
 - Common CI Gates run38341219442 FAILURE: workflow addition is release-affecting and requires own Changeset; resource-only exemption did not cover the final7-path diff. Root adds truthful patch Changeset, no policy weakening. Other CI checks/reviews revalidated at new head after push.
 - Existing #132 tracker comment314 saved and reload-verified, screenshot report-132-comment.png, explicitly OPEN/merge waiting/native NOTRUN. No tracker completion, release or main action.
 - Latest fetch origin/dev d1086112d6809f36030c1b592b6bcc42ed723b9d; source changes across drift must be checked before push.
+
+### 2026-10-13 same-PR review correction
+- 실제 unresolved P2 discussion_r4254369957: canonical web mark만 바뀌면 Android Alpha workflow의 path filter가 실행하지 않아 byte-identity gate가 빠지는 결함 확인.
+- 실제 event-specific RED는 기존6PASS / pull_request·push trigger2FAIL. 양쪽 paths에 canonical mark를 추가한 GREEN8/8. 본인 workflow/test/task만 같은 PR1884에 반영한다.
+- 이전 head2946f94에서 Gates/API/Web/Android CI 모두 SUCCESS. Copilot 최신head 0 objective findings이지만 설치된 OEM-mask/themed icon 실제 외형은 미검증이라 Needs a closer look; source CI를 native visual PASS로 표현하지 않는다.
+- 현재 origin/dev29fd7fef7 Android startup/proguard 릴리스 변경을 보존하여 통합한다. 실제 alpha 로그인/물리 native 검증은 pending.

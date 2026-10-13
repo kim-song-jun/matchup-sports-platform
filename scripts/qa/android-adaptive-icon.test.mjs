@@ -132,3 +132,65 @@ test('Android launcher reuses the canonical transparent Teameet mark without red
       `${layer.icon} ${layer.kind} points at different artwork`);
   }
 });
+
+// Evaluate the actual event filters with a one-file change, rather than searching
+// the whole workflow for a path that could appear in a comment or another event.
+const workflowLines = readFileSync(path.join(repo, '.github/workflows/android-alpha.yml'), 'utf8').split(/\r?\n/);
+function workflowBlock(lines, key, indent) {
+  const header = new RegExp(`^${' '.repeat(indent)}${key}:\\s*(?:#.*)?$`);
+  const starts = lines.flatMap((line, index) => header.test(line) ? [index] : []);
+  assert.equal(starts.length, 1, `Expected one workflow ${key} block`);
+  const body = lines.slice(starts[0] + 1);
+  const end = body.findIndex(line => line.trim() && !line.trimStart().startsWith('#') && line.search(/\S/) <= indent);
+  return end < 0 ? body : body.slice(0, end);
+}
+
+function workflowScalar(value) {
+  const scalar = value.trim().replace(/\s+#.*$/, '').replace(/^(['"])(.*)\1$/, '$2');
+  assert.match(scalar, /^[!a-zA-Z0-9_./*-]+$/, `Unsupported workflow filter scalar: ${value}`);
+  return scalar;
+}
+
+function eventFilters(event) {
+  const body = workflowBlock(workflowBlock(workflowLines, 'on', 0), event, 2);
+  assert.ok(!body.some(line => /^    (?:paths-ignore|branches-ignore):/.test(line)), 'Unexpected exclusion-only filter');
+  const branches = body.filter(line => /^    branches:/.test(line));
+  assert.equal(branches.length, 1, `${event} needs a branch filter`);
+  const branchList = branches[0].match(/^    branches:\s*\[([^\]]+)\]\s*(?:#.*)?$/);
+  assert.ok(branchList, `${event} uses an unsupported branch list`);
+  const paths = workflowBlock(body, 'paths', 4).filter(line => line.trim() && !line.trimStart().startsWith('#')).map(line => {
+    const entry = line.match(/^      - (.+)$/);
+    assert.ok(entry, `Unsupported workflow path entry: ${line}`);
+    return workflowScalar(entry[1]);
+  });
+  assert.ok(paths.length > 0, `${event} needs path filters`);
+  return { branches: branchList[1].split(',').map(workflowScalar), paths };
+}
+
+function filterAccepts(patterns, value) {
+  let included = false;
+  for (const raw of patterns) {
+    const excluded = raw.startsWith('!');
+    const pattern = excluded ? raw.slice(1) : raw;
+    // Current workflow uses literals and trailing /**. Fail closed on new syntax
+    // until this contract evaluator supports it; preserve GitHub's pattern order.
+    assert.ok(!pattern.includes('*') || pattern.endsWith('/**') && !pattern.slice(0, -3).includes('*'),
+      `Unsupported workflow filter pattern: ${raw}`);
+    const matches = pattern.endsWith('/**') ? value.startsWith(pattern.slice(0, -2)) : value === pattern;
+    if (matches) included = !excluded;
+  }
+  return included;
+}
+
+for (const event of ['pull_request', 'push']) {
+  test(`Android Alpha ${event} to dev runs for a canonical mark-only change`, () => {
+    const filters = eventFilters(event);
+    const runsFor = (branch, changedFiles) => filterAccepts(filters.branches, branch)
+      && changedFiles.some(file => filterAccepts(filters.paths, file));
+    assert.equal(runsFor('dev', ['apps/v1_android/app/src/main/AndroidManifest.xml']), true);
+    assert.equal(runsFor('dev', ['docs/README.md']), false);
+    assert.equal(runsFor('main', ['apps/v1_web/public/brand/teameet-mark.png']), false);
+    assert.equal(runsFor('dev', ['apps/v1_web/public/brand/teameet-mark.png']), true,
+      `${event} skips the canonical artwork dependency: ${JSON.stringify(filters)}`);
+  });
+}

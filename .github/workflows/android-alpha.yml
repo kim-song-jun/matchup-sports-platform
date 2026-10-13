@@ -6,6 +6,7 @@ on:
     branches: [dev]
     paths:
       - apps/v1_android/**
+      - apps/v1_web/public/brand/teameet-mark.png
       - scripts/qa/android-native-insets.test.mjs
       - scripts/qa/android-adaptive-icon.test.mjs
       - .github/workflows/android-alpha.yml
@@ -13,6 +14,7 @@ on:
     branches: [dev]
     paths:
       - apps/v1_android/**
+      - apps/v1_web/public/brand/teameet-mark.png
       - scripts/qa/android-native-insets.test.mjs
       - scripts/qa/android-adaptive-icon.test.mjs
       - .github/workflows/android-alpha.yml

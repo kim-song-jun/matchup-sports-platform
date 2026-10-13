@@ -450,7 +450,7 @@ test_prepare_only() {
   [[ "$(git -C "${origin}" rev-parse main)" == "${before_main}" ]] || fail 'prepare-only changed main'
   [[ "$(git -C "${work}" write-tree)" == "${before_index}" ]] || fail 'prepare-only staged'
   [[ ! -e "${work}/.changeset/pending-prepare.md" ]] || fail 'prepare-only did not consume changesets'
-  grep -q 'Verified dev -> main release promotion' "${TEST_ROOT}/prepare.log" || fail 'prepare-only skipped gate'
+  grep -q 'Verified main release promotion' "${TEST_ROOT}/prepare.log" || fail 'prepare-only skipped gate'
   rm -rf "${origin}" "${work}"
   echo '[test-promote-main] prepare-only -> release diff, unchanged index/refs, no dispatch: OK'
 }

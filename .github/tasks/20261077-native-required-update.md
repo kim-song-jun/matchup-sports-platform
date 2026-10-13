@@ -52,7 +52,7 @@ Failed checks do not assert up-to-date. Once a required result is known, a later
 3. [ ] iOS checks `Storefront.current` and uses the Korean public lookup for KOR, currently the distribution country. Unknown/other storefronts return unavailable. A cancellable request validates identity and minimum OS before returning a newer public marketing version.
 4. [ ] Web calls the capability with a random requestId and a 12-second timeout; parses response fields and drops mismatched events. Render the fixed platform store link in a non-dismissable modal using existing design tokens, lock background input and restore focus/scroll on removal.
 5. [ ] Run focused tests once per platform when supported, minimum workers; run scoped type checking and CI for the committed artifact. Record any unavailable toolchain rather than claiming a build passed.
-6. [ ] Commit only owned paths; create dev PR, run independent review and exact-head CI. Do not promote the unrelated dev delta to main. Preserve current store submissions.
+6. [ ] Commit only owned paths; create dev PR, run independent review and exact-head CI. Do not promote the unrelated dev delta to main. After Alpha QA and scoped production deployment, upload and submit the latest Android and iOS builds as explicitly authorized on 2026-10-13.
 
 ## Acceptance Criteria
 - [ ] Original conditions and scenarios pass.
@@ -66,7 +66,7 @@ Native app binary update detection was absent; add one cross-platform capability
 Existing main-frame/origin checks remain mandatory. Store result identity and versions are validated. No secrets, database schema, authentication or personal data are added. Blocking is a client UX policy, not a security authorization boundary.
 
 ## Risks & Dependencies
-Legacy binaries cannot retroactively gain this capability. A startup crash before the WebView cannot show any web gate. Android must be Play-installed for Play availability; internal/sideload and iOS non-Korean storefronts are unavailable, not treated as latest. Actual Play/App Store installation requires distribution testing after release. The pending crash fix review is not cancelled.
+Legacy binaries cannot retroactively gain this capability. A startup crash before the WebView cannot show any web gate. Android must be Play-installed for Play availability; internal/sideload and iOS non-Korean storefronts are unavailable, not treated as latest. Actual Play/App Store installation requires distribution testing after release. The latest user instruction authorizes replacing previous submissions with the verified mandatory-update builds.
 
 ## Ambiguity Log
 2026-10-13: B chosen explicitly. Availability is resolved by store responses, not CI/native source version. Do not block users from installing an OS-incompatible build.
@@ -83,3 +83,5 @@ Legacy binaries cannot retroactively gain this capability. A startup crash befor
 - Alpha browser baseline captured with ego task 391. Deployed changed UI verification pending. Store eligibility is tested separately from simulated bridge UI scenarios.
 - Dev #1889 merged as f4e442d06; later Alpha 8104b688 carries the same feature. At 390/768/1440, layout, 50px actions, error retention, warning deduplication and current-version clearing passed. Fresh-mount first Escape exposed an unprevented native cancel event; 5024bcfa8 registers native cancellation before showModal, with focused 9-test pass. A fresh deployed first-Escape replay remains mandatory; jsdom synthetic cancel is not native browser proof.
 - Scoped main #1891 consumes only main-side Changesets with the official CLI, preserves old changelog history and advances fixed package versions to 1.8.1 (production resolver 1.8.2). Main-target release gates must apply equally to the explicitly approved scoped branch; pending receipts or missing/unchanged version metadata must still fail. No unrelated dev league/DB changes are included.
+- Alpha 403e33980cbe contains #1893, but first Escape still closed the dialog: the trusted cancel event was non-cancelable. Synthetic cancel prevention was insufficient. WHATWG specifies `closedby=none` to disable these native close requests. Live diagnostic application of this attribute kept the dialog modal after Escape; the product patch also prevents Escape's default action within the dialog for older WebViews. The 9 focused tests pass; a fresh deployed Alpha replay is still required.
+- User now authorizes Android 0.1.3(4) and iOS 0.1.6(10) uploads and review submissions after Alpha QA and scoped main deployment. A hourly heartbeat delegates store status checks to GPT-6 Luna; uploaded, submitted, approved and publicly installable states remain separate.

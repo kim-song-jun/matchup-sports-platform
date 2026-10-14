@@ -5654,11 +5654,17 @@ export function useV1MyTournamentStaffAssignments(options?: QueryOptions) {
 
 /** GET /tournament-ops/tournaments/:tournamentId/fields — 필터 드롭다운용 필드/코트 목록. */
 export function useV1TournamentFields(tournamentId: string, options?: QueryOptions) {
-  return useQuery({
+  const enabled = Boolean(tournamentId) && (options?.enabled ?? true);
+  const query = useQuery({
     queryKey: v1Keys.tournamentOperationsFields(tournamentId),
     queryFn: () => v1Get<V1TournamentFieldListResponse>(`/tournament-ops/tournaments/${tournamentId}/fields`),
-    enabled: Boolean(tournamentId) && (options?.enabled ?? true),
+    enabled,
+    // 다른 탭에서 추가한 필드도 운영 보드의 15초 갱신 및 화면 복귀 때 함께 읽는다.
+    refetchInterval: OPERATIONS_BOARD_POLL_INTERVAL_MS,
+    refetchOnWindowFocus: 'always',
   });
+  useV1WindowFocusRefetch(query, enabled, 'always');
+  return query;
 }
 
 /**

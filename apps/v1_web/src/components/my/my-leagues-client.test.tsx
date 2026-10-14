@@ -162,8 +162,8 @@ describe('MyLeaguesPageClient — 팀별 순위·다음 경기 노출', () => {
     render(<MyLeaguesPageClient />);
 
     const link = screen.getByRole('link', { name: '성수 풋살 리그 상세로 이동' });
-    expect(link).toHaveAttribute('href', '/league-matches/league-1?from=%2Fmy%2Fleagues');
+    expect(link).toHaveAttribute('href', '/tournaments/league-1?from=%2Fmy%2Fleagues');
     // 회귀 방지: from 파라미터가 조용히 빠지면 뒤로가기가 홈으로 튄다.
-    expect(link.getAttribute('href')).not.toBe('/league-matches/league-1');
+    expect(link.getAttribute('href')).not.toBe('/tournaments/league-1');
   });
 });

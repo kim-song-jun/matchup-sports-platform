@@ -103,6 +103,7 @@ function periodSettingsOf(minutes: number[]) {
 }
 
 vi.mock('@/hooks/use-v1-api', () => ({
+  useV1TournamentFields: () => ({ data: { items: [{ id: 'field-a', name: '등록 A구장', active: true }] }, isPending: false, isError: false }),
   useV1UpdateLeagueDiscipline: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
   useV1ActivePopup: vi.fn(),
   // 그룹 B 감사 결함 1: 참가팀 추가·제거. 대부분의 테스트는 로스터 조작을 다루지 않으므로

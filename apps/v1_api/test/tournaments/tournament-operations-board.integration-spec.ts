@@ -1229,7 +1229,7 @@ describe('Task 18 tournament field/court CRUD and fixture assignment', () => {
     expectHttpError(stale, 409, 'STALE_FIELD_VERSION');
   });
 
-  it('assigns and reassigns a fixture to a field, PERSISTING the change to the canonical TeamMatch.fieldId (not just the returned object), without duplicating field rows, then clears it -- and a replayed Idempotency-Key does not re-apply the mutation or duplicate the audit trail (regression for review finding #15: the prior version of this test only checked the constructed return value and a field-row count, which an implementation that merely echoed dto.fieldId/null without writing the TeamMatch would also have satisfied)', async () => {
+  it('persists assignment/reassignment and idempotent replay without duplicate fields/audits; rejects field-only clearing while preserving the real place (Task 20261082)', async () => {
     const courtB = await fieldsService.create(
       fieldIds.platformOps,
       fieldIds.tournament,
@@ -1311,14 +1311,13 @@ describe('Task 18 tournament field/court CRUD and fixture assignment', () => {
     // A denied attempt must never have touched the persisted row.
     expect(await persistedFieldId()).toBe(courtB.id);
 
-    const cleared = await fieldsService.clearFixtureField(
-      fieldIds.director,
-      fieldIds.tournament,
-      fieldIds.fixture,
-      { requestId: randomUUID() },
-    );
-    expect(cleared).toEqual({ fixtureId: fieldIds.fixture, tournamentId: fieldIds.tournament, fieldId: null });
-    expect(await persistedFieldId()).toBeNull();
+    const beforePlace = await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: fieldIds.fixture }, select: { placeName: true, placeAddress: true, placeLatitude: true, placeLongitude: true } });
+    const clearDenied = await captureFailure(() => fieldsService.clearFixtureField(
+      fieldIds.director, fieldIds.tournament, fieldIds.fixture, { requestId: randomUUID() },
+    ));
+    expectHttpError(clearDenied, 409, 'FIELD_PLACE_LINK_REQUIRED');
+    expect(await persistedFieldId()).toBe(courtB.id);
+    expect(await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: fieldIds.fixture }, select: { placeName: true, placeAddress: true, placeLatitude: true, placeLongitude: true } })).toEqual(beforePlace);
     expect((await fieldsService.list(fieldIds.platformOps, fieldIds.tournament)).items).toHaveLength(beforeCount);
   });
 

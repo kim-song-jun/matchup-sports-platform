@@ -202,6 +202,10 @@ export class GenerateLeagueFixturesDto extends LeaguePlaceSnapshotDto {
 
 export class UpdateLeagueFixtureDto extends LeaguePlaceSnapshotDto {
   @IsOptional()
+  @IsUUID()
+  fieldId?: string | null;
+
+  @IsOptional()
   @IsDateString()
   startsAt?: string;
 

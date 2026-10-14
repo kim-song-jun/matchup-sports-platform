@@ -1,10 +1,11 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import type { V1AuthUser } from '../../auth/v1-auth-user';
 import { PrismaService } from '../../prisma/prisma.service';
 import { TournamentStaffAccessService } from '../../tournaments/staff/tournament-staff-access.service';
 import type { GameRosterBatchDto, GameRosterBatchOp } from './dto/team-game-roster.dto';
 import { buildTeamRosterMatrix } from './game-roster-matrix';
-import { syncPreparedGameSideRoster } from './game-roster-sync';
+import { isUnmigratedTeamAuthoredLineup, syncLockedCompetitionTeam, syncPreparedGameSideRoster, upcomingCompetitionGameWhere } from './game-roster-sync';
+import { loadGameRosterContext } from './game-roster-loader';
 import { GameRosterService } from './game-roster.service';
 import { resolveTeamRosterAccess } from './team-roster-access';
 import { loadTeamRosterColumns } from './team-roster-columns';
@@ -73,7 +74,7 @@ export class TeamGameRosterService {
    * 시작된 경기가 하나라도 섞이면 아무것도 쓰지 않는다(409).
    */
   applyBatch(user: V1AuthUser, teamId: string, dto: GameRosterBatchDto) {
-    const keys = dto.changes.map((change) => `${change.gameId}:${change.userId}`);
+    const keys = dto.changes.map((change) => `${change.gameId}:${change.userId}:${change.op === "SET_GOALKEEPER" ? "ROLE" : "ATTENDANCE"}`);
     if (new Set(keys).size !== keys.length) {
       throw new BadRequestException({
         code: 'ROSTER_BATCH_DUPLICATE_CHANGE',
@@ -85,6 +86,9 @@ export class TeamGameRosterService {
         code: 'ROSTER_BATCH_REASON_ON_REVOKE',
         message: '되돌리기에는 사유를 붙이지 않아요.',
       });
+    }
+    if (dto.changes.some((change) => change.op === "SET_GOALKEEPER" ? typeof change.goalkeeper !== "boolean" || change.reason !== undefined : change.goalkeeper !== undefined)) {
+      throw new BadRequestException({ code: "ROSTER_BATCH_INVALID_GOALKEEPER", message: "골키퍼 지정 값을 확인해 주세요." });
     }
     return this.prisma.$transaction(async (tx) => {
       const team = await tx.v1Team.findFirst({ where: { id: teamId, deletedAt: null }, select: { id: true } });
@@ -108,10 +112,36 @@ export class TeamGameRosterService {
         const target = { gameId, sideId: sideIdByGame.get(gameId)! };
         accessByGame.set(gameId, await this.gameRoster.authorizeSide(tx, user.id, target, 'write'));
       }
-      await this.gameRoster.lockScheduledGames(
-        tx,
-        gameIds.map((gameId) => ({ gameId, sideId: sideIdByGame.get(gameId)! })),
-      );
+      const roleScopes = new Map<string, string>();
+      const roleKeys = new Set<string>();
+      for (const change of dto.changes.filter((row) => row.op === 'SET_GOALKEEPER')) {
+        const context = await loadGameRosterContext(tx, { gameId: change.gameId, sideId: sideIdByGame.get(change.gameId)! });
+        if (context === null || context.teamId !== teamId) throw new ConflictException({ code: 'COMMAND_CONCURRENCY_CONFLICT', message: '경기 팀이 바뀌었어요. 새로고침해 주세요.' });
+        // A competition-wide default needs competition-wide authority, not a single assigned fixture.
+        if (accessByGame.get(change.gameId)!.writeRole === 'STAFF') {
+          await this.staffAccess.assertAccess({ userId: user.id, action: 'lineup_mutate', resource: { tournamentId: context.competitionId } });
+        }
+        const key = context.competitionId + ':' + change.userId;
+        if (roleKeys.has(key)) throw new BadRequestException({ code: 'ROSTER_BATCH_DUPLICATE_CHANGE', message: '같은 대회·선수의 골키퍼 변경은 한 번만 보내 주세요.' });
+        roleKeys.add(key);
+        roleScopes.set(change.gameId, context.competitionId);
+      }
+      const competitionIds = [...new Set(roleScopes.values())].sort();
+      const affected = competitionIds.length === 0 ? [] : await tx.v1Game.findMany({
+        where: { OR: competitionIds.map((id) => upcomingCompetitionGameWhere(id, teamId, new Date())) },
+        select: { id: true, sides: { where: { teamId }, select: { id: true } } },
+      });
+      for (const game of affected) if (game.sides[0]) sideIdByGame.set(game.id, game.sides[0].id);
+      const lockedIds = [...new Set([...gameIds, ...affected.map((game) => game.id)])];
+      await this.gameRoster.lockScheduledGames(tx, lockedIds.map((gameId) => ({ gameId, sideId: sideIdByGame.get(gameId)! })));
+      // Propagation must not silently skip an old team-authored league lineup.
+      for (const game of affected) {
+        const context = await loadGameRosterContext(tx, { gameId: game.id, sideId: sideIdByGame.get(game.id)! });
+        if (context === null || context.teamId !== teamId || !competitionIds.includes(context.competitionId)) throw new ConflictException({ code: 'COMMAND_CONCURRENCY_CONFLICT', message: '경기 팀이 바뀌었어요. 새로고침해 주세요.' });
+        if (!context.isLeague) continue;
+        const latest = await tx.v1GameLineup.findFirst({ where: { gameId: game.id, sideId: context.sideId, invalidatedAt: null }, orderBy: { revision: 'desc' } });
+        if (latest !== null && await isUnmigratedTeamAuthoredLineup(tx, game.id, context.sideId, latest)) throw new ConflictException({ code: 'ROSTER_GOALKEEPER_MIGRATION_REQUIRED', message: '기존 경기 명단을 옮긴 뒤 골키퍼를 바꿀 수 있어요. 운영진에게 문의해 주세요.' });
+      }
 
       const results: GameRosterBatchResult[] = [];
       const touched = new Set<string>();
@@ -119,16 +149,22 @@ export class TeamGameRosterService {
         const target = { gameId: change.gameId, sideId: sideIdByGame.get(change.gameId)!, teamId };
         const actor = { userId: user.id, role: accessByGame.get(change.gameId)!.writeRole! };
         const { alreadyApplied } =
-          change.op === 'EXCLUDE'
+          change.op === "SET_GOALKEEPER"
+            ? await this.gameRoster.applyGoalkeeper(tx, actor, target, change.userId, change.goalkeeper!)
+            : change.op === 'EXCLUDE'
             ? await this.gameRoster.applyExclude(tx, actor, target, { userId: change.userId, reason: change.reason })
             : await this.gameRoster.applyRevoke(tx, actor, target, change.userId);
         if (!alreadyApplied) touched.add(change.gameId);
         results.push({ gameId: target.gameId, sideId: target.sideId, userId: change.userId, op: change.op, alreadyApplied });
       }
-      for (const gameId of touched) {
-        await syncPreparedGameSideRoster(tx, { gameId, sideId: sideIdByGame.get(gameId)! });
+      const changedCompetitions = new Set([...touched].flatMap((gameId) => roleScopes.has(gameId) ? [roleScopes.get(gameId)!] : []));
+      for (const competitionId of [...changedCompetitions].sort()) {
+        await syncLockedCompetitionTeam(tx, { competitionId, teamId }, new Set(lockedIds));
       }
-      return { teamId, results };
+      for (const gameId of touched) {
+        if (!roleScopes.has(gameId)) await syncPreparedGameSideRoster(tx, { gameId, sideId: sideIdByGame.get(gameId)! });
+      }
+      return { teamId, results, affectedGames: lockedIds.map((gameId) => ({ gameId, sideId: sideIdByGame.get(gameId)! })) };
     });
   }
 

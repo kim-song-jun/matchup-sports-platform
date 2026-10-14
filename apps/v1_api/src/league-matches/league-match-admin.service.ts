@@ -76,6 +76,7 @@ import { LEAGUE_TIE_BREAK_ORDER } from './league-tie-break';
 import { PLACE_SELECT } from '../places/place-select';
 import { rejectPartialPlaceUpdate, toPlaceColumns, toPlaceView, type PlaceSnapshot, type PlaceView } from '../places/place-snapshot';
 import { DEFAULT_FIXTURE_PLACE_NAME, resolveLeagueFixturePlace, type LeagueFixturePlaceInput } from './league-fixture-place';
+import { assertFieldPlaceInput, registerCompetitionPlace, resolveCompetitionFieldPlace } from '../places/competition-field-place';
 import { findTournamentOnSurface } from '../tournaments/tournament-surface-lookup';
 import {
   assertLeagueFixtureGenerationAllowedInTx,
@@ -376,6 +377,8 @@ export class LeagueMatchAdminService {
         approvedApplicantTeamId: true,
         startAt: true,
         ...PLACE_SELECT,
+        fieldId: true,
+        field: { select: { name: true } },
         status: true,
         homeSlotId: true,
         awaySlotId: true,
@@ -485,7 +488,8 @@ export class LeagueMatchAdminService {
           awaySlotId: fixture.awaySlotId,
           game: fixture.game === null ? null : serializeAdminBracketGame(fixture.game),
           startAt: fixture.startAt,
-          placeName: fixture.placeName,
+          placeName: fixture.field?.name ?? fixture.placeName,
+          fieldId: fixture.fieldId,
           placeAddress: fixture.placeAddress,
           place: toPlaceView(fixture),
           status: fixture.status,
@@ -1530,6 +1534,7 @@ export class LeagueMatchAdminService {
 
   async updateFixture(user: V1AuthUser, leagueId: string, teamMatchId: string, dto: UpdateLeagueFixtureDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
+    assertFieldPlaceInput(dto.fieldId, dto.placeName !== undefined);
     rejectPartialPlaceUpdate(dto.placeName, [dto.placeAddress, dto.placeLatitude, dto.placeLongitude, dto.placeProvider, dto.placeProviderId]);
     const teamMatch = await this.prisma.v1TeamMatch.findFirst({ where: { id: teamMatchId, leagueId, deletedAt: null } });
     if (teamMatch === null) {
@@ -1555,13 +1560,25 @@ export class LeagueMatchAdminService {
           ? new Date(nextStartAt.getTime() + durationMs)
           : (await defaultFixtureEndAt(tx, teamMatch.competitionConfigVersionId, nextStartAt)) ?? undefined;
       // 이름이 오면 스냅샷 전체를 교체한다(새 이름에 옛 좌표가 남지 않게). 빈 이름은 생성과 같이 리그 기본 장소로 되돌린다.
-      const nextPlace = dto.placeName === undefined ? undefined : await resolveLeagueFixturePlace(tx, leagueId, dto);
+      const changingPlace = dto.fieldId !== undefined || dto.placeName !== undefined;
+      if (changingPlace) {
+        await tx.$queryRaw`SELECT id FROM v1_games WHERE team_match_id = ${teamMatchId} FOR UPDATE`;
+        await tx.$queryRaw`SELECT id FROM v1_team_matches WHERE id = ${teamMatchId} FOR UPDATE`;
+      }
+      const currentPlaceRow = changingPlace
+        ? await tx.v1TeamMatch.findUniqueOrThrow({ where: { id: teamMatchId }, select: { ...PLACE_SELECT, fieldId: true } }) : teamMatch;
+      const nextPlace = dto.fieldId != null
+        ? await resolveCompetitionFieldPlace(tx, leagueId, dto.fieldId, toPlaceView(currentPlaceRow), currentPlaceRow.fieldId)
+        : dto.placeName === undefined ? undefined : await resolveLeagueFixturePlace(tx, leagueId, dto);
+      const nextFieldId = dto.fieldId == null && (nextPlace !== undefined || dto.fieldId === null)
+        ? await registerCompetitionPlace(tx, leagueId, nextPlace === undefined ? toPlaceView(currentPlaceRow) : nextPlace) : dto.fieldId;
       const result = await tx.v1TeamMatch.update({
         where: { id: teamMatchId },
         data: {
           ...(nextStartAt === undefined ? {} : { startAt: nextStartAt }),
           ...(nextEndAt === undefined ? {} : { endAt: nextEndAt }),
           ...(nextPlace === undefined ? {} : toPlaceColumns(nextPlace)),
+          ...(nextFieldId === undefined ? {} : { fieldId: nextFieldId }),
           ...(dto.title === undefined ? {} : { title: dto.title.trim() }),
         },
       });
@@ -1598,6 +1615,7 @@ export class LeagueMatchAdminService {
             startAt: persistedStartAt.toISOString(),
             endAt: result.endAt !== null ? result.endAt.toISOString() : null,
             placeName: result.placeName,
+            fieldId: result.fieldId,
             title: result.title,
             ...(teamsChanged ? { homeTeamId: result.hostTeamId, awayTeamId: result.approvedApplicantTeamId } : {}),
           },
@@ -1617,6 +1635,7 @@ export class LeagueMatchAdminService {
       startAt: updated.startAt,
       endAt: updated.endAt,
       placeName: updated.placeName,
+      fieldId: updated.fieldId,
       placeAddress: updated.placeAddress,
       place: toPlaceView(updated),
     };

@@ -1,4 +1,5 @@
 import type { Prisma, V1GameState } from '@prisma/client';
+import { parseLineupCatalog } from '../../tournaments/competition-config/competition-config.parse';
 import { compareRosterOrder } from '../../common/roster-order';
 import { leagueTeamRosterBase, readLeagueTeamRosters } from '../../league-matches/league-fixture-creation';
 import { readSuspensionVerdicts, type OrderedCompetitionGame } from '../../tournaments/discipline/suspension-verdicts';
@@ -51,6 +52,7 @@ export async function loadCompetitionRosterBase(
         select: {
           id: true,
           userId: true,
+          goalkeeper: true,
           user: { select: { profile: { select: { nickname: true, displayName: true } } } },
         },
         orderBy: { id: 'asc' },
@@ -67,6 +69,7 @@ export async function loadCompetitionRosterBase(
       displayNameSnapshot: participantDisplayName(player),
       jerseyNumber: jerseys.get(player.id) ?? null,
       sourceParticipantId: player.id,
+      goalkeeper: player.goalkeeper,
     })).sort(rosterOrder),
   };
 }
@@ -106,6 +109,7 @@ function rosterOrder(a: GameRosterBaseEntry, b: GameRosterBaseEntry): number {
 }
 
 export interface GameRosterSideContext extends CompetitionTeamScope {
+  readonly goalkeeperPositionCode?: string;
   readonly gameId: string;
   readonly sideId: string;
   readonly gameState: V1GameState;
@@ -152,6 +156,7 @@ export async function loadGameRosterContext(
     select: {
       id: true,
       state: true,
+      competitionConfig: { select: { lineup: true } },
       teamMatch: { select: { id: true, tournamentId: true, leagueId: true, startAt: true } },
       sides: { where: { id: target.sideId }, select: { id: true, teamId: true } },
     },
@@ -168,6 +173,7 @@ export async function loadGameRosterContext(
     competitionId,
     isLeague: teamMatch.leagueId !== null,
     teamId: side.teamId,
+    goalkeeperPositionCode: parseLineupCatalog(game.competitionConfig?.lineup ?? null).positions.find((position) => position.goalkeeper)?.code ?? "GK",
     gameId: game.id,
     sideId: side.id,
     gameState: game.state,
@@ -191,6 +197,13 @@ export async function loadGameRosterForContext(
 ): Promise<LoadedGameRoster | null> {
   const base = preloaded.base !== undefined ? preloaded.base : await loadCompetitionRosterBase(tx, context);
   if (base === null) return null;
+
+  const roles = await tx.v1GameRosterRole.findMany({
+    where: { gameId: context.gameId, sideId: context.sideId, teamId: context.teamId },
+    select: { userId: true, goalkeeper: true },
+  });
+  const goalkeeperByUser = new Map(roles.map((row) => [row.userId, row.goalkeeper]));
+  const entries = base.entries.map((entry) => ({ ...entry, goalkeeper: entry.goalkeeper ?? goalkeeperByUser.get(entry.userId) ?? false }));
 
   // 사이드 팀이 바뀌었으면 옛 팀의 조정은 이 팀 명단과 무관하다.
   const adjustments = await tx.v1GameRosterAdjustment.findMany({
@@ -232,9 +245,9 @@ export async function loadGameRosterForContext(
   return {
     context,
     baseSource: base.source,
-    base: base.entries,
+    base: entries,
     computation: computeGameRoster({
-      base: base.entries,
+      base: entries,
       adjustments,
       unavailabilities,
       gameStartAt: context.startAt,

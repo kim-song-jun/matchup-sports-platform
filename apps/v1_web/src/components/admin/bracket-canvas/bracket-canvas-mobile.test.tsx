@@ -15,10 +15,13 @@ import type { V1AdminBracketFixtureGame, V1AdminBracketSlot, V1TournamentGroupPh
 import { BracketCanvasMobile, type BracketCanvasMobileProps } from './bracket-canvas-mobile';
 import type { RegistrationsLoadState } from './bracket-team-tray';
 
-const { assignSlot, quickMutate, updateFixture } = vi.hoisted(() => ({ assignSlot: vi.fn(), quickMutate: vi.fn(), updateFixture: vi.fn() }));
+const { assignSlot, quickMutate, updateFixture, assignField } = vi.hoisted(() => ({ assignSlot: vi.fn(), quickMutate: vi.fn(), updateFixture: vi.fn(), assignField: vi.fn() }));
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }) }));
 vi.mock('@/hooks/use-v1-api', () => ({
+  useV1TournamentFields: () => ({ data: { items: [{ id: 'field-a', name: '등록 A구장', active: true }] }, isPending: false, isError: false }),
+  useV1AssignFixtureField: () => ({ mutate: assignField, isPending: false }),
+  useV1ClearFixtureField: () => ({ mutate: vi.fn(), isPending: false }),
   useV1UpdateFixture: () => ({ mutateAsync: updateFixture, isPending: false }),
 }));
 vi.mock('@/hooks/use-v1-bracket-canvas', () => ({
@@ -107,6 +110,15 @@ function renderMobile(overrides: Partial<BracketCanvasMobileProps> = {}, queryCl
 const card = (name: RegExp) => screen.getByRole('button', { name });
 
 describe('BracketCanvasMobile — 목록', () => {
+  it('모바일 경기 시트에서도 등록된 필드를 선택해 같은 경기로 저장한다', () => {
+    renderMobile();
+    fireEvent.click(card(/8강 · 1번 경기/));
+    const picker = screen.getByRole('combobox', { name: '등록된 경기장(필드)' });
+    fireEvent.change(picker, { target: { value: 'field-a' } });
+    expect(picker).toHaveValue('field-a');
+    fireEvent.click(screen.getByRole('button', { name: '경기장 저장' }));
+    expect(assignField).toHaveBeenCalledWith({ fixtureId: 'fx-1', fieldId: 'field-a' }, expect.any(Object));
+  });
   it('끝나지 않은 경기가 있는 첫 라운드를 열고 그 라운드의 칸만 보인다', () => {
     renderMobile();
     expect(screen.getByRole('tab', { name: '8강' })).toHaveAttribute('aria-selected', 'true');

@@ -43,7 +43,7 @@ describe('ConsoleNextSteps', () => {
     mocks.useV1Tournament.mockReturnValue({ data: LEAGUE_DETAIL });
     render(<ConsoleNextSteps tournamentId="league-1" fixtureId="m1" />);
 
-    expect(screen.getByRole('link', { name: '순위표 보기' })).toHaveAttribute('href', '/league-matches/league-1');
+    expect(screen.getByRole('link', { name: '순위표 보기' })).toHaveAttribute('href', '/tournaments/league-1');
     // 리그명·주차만으로는 어느 팀 경기인지 몰라 홈·원정 팀 이름으로 부른다(MD-QA #151).
     expect(screen.getByRole('link', { name: '다음 경기 · 한강 로버스 vs 송파 유나이티드' })).toHaveAttribute(
       'href',

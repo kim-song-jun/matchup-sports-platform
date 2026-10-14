@@ -77,6 +77,7 @@ export function createV1GameRosterMswHandlers() {
     /** 리그 전체 상태와 개별 경기 state를 독립적으로 검증하기 위한 대회 종류. */
     competitionKind: 'TOURNAMENT' as V1GameRosterView['competitionKind'],
     /** 등번호의 원본은 참가 명단이다 — 저장(PATCH)이 여기를 바꾸고, 명단 응답은 여기서 읽는다. */
+    goalkeepers: new Map<string, boolean>(),
     jerseys: new Map<string, number | null>(GAME_ROSTER_MSW.players.map((p) => [p.userId, p.jerseyNumber])),
     /** TEAM_MEMBERS = 참가 명단이 없는 리그 팀(팀원 전체가 기준 — 번호 원본·선수 id 가 없다). */
     baseSource: 'REGISTRATION' as 'REGISTRATION' | 'TEAM_MEMBERS',
@@ -84,6 +85,7 @@ export function createV1GameRosterMswHandlers() {
     rosterLocked: false,
     /** false = 보기만 하는 운영자(지원 계정·명단 권한 없는 스태프) — 서버의 `canWrite`/`writeRole null`. */
     canWrite: true,
+    goalkeeperWritable: true,
     /** 출전정지(규정 있는 대회) — userId → 사유·남은 경기. 모든 경기에 같이 건다. */
     suspensions: new Map<string, { reason: string; remainingMatches: number }>(),
     /** 대진 뒤 참가 명단에 추가돼 들어온 선수. */
@@ -109,7 +111,8 @@ export function createV1GameRosterMswHandlers() {
     role,
   });
   const fallback = () => state.baseSource === 'TEAM_MEMBERS';
-  const person = ({ participantId, ...p }: (typeof GAME_ROSTER_MSW.players)[number]) => ({
+  const person = ({ participantId, ...p }: (typeof GAME_ROSTER_MSW.players)[number], gameId: string) => ({
+    goalkeeper: state.goalkeepers.get(p.userId) ?? false,
     ...p,
     jerseyNumber: fallback() ? null : (state.jerseys.get(p.userId) ?? null),
     accountLinked: !fallback(),
@@ -141,24 +144,24 @@ export function createV1GameRosterMswHandlers() {
         : activeAdjustment(game.gameId, p.userId)
           ? ('EXCLUDED' as const)
           : ('PARTICIPATING' as const);
-      return { ...person(p), status };
+      return { ...person(p, game.gameId), status };
     });
     const excluded = orderedPlayers().flatMap((p) => {
       const adj = activeAdjustment(game.gameId, p.userId);
       if (!adj || state.suspensions.has(p.userId) || coveringUnavailability(p.userId, game.startAt)) return [];
-      return [{ ...person(p), adjustmentId: adj.id, reason: adj.reason, excludedAt: adj.createdAt, actor: actor(adj.actorUserId, adj.actorRole) }];
+      return [{ ...person(p, game.gameId), adjustmentId: adj.id, reason: adj.reason, excludedAt: adj.createdAt, actor: actor(adj.actorUserId, adj.actorRole) }];
     });
     const unavailable = orderedPlayers().flatMap((p) => {
       const u = coveringUnavailability(p.userId, game.startAt);
       if (!u || state.suspensions.has(p.userId)) return [];
-      return [{ ...person(p), unavailabilityId: u.id, reason: u.reason, startsAt: u.startsAt, endsAt: u.endsAt, actor: actor(u.actorUserId, u.actorRole) }];
+      return [{ ...person(p, game.gameId), unavailabilityId: u.id, reason: u.reason, startsAt: u.startsAt, endsAt: u.endsAt, actor: actor(u.actorUserId, u.actorRole) }];
     });
     const participants = base
       .filter((p) => p.status === 'PARTICIPATING')
       .map(({ status: _status, ...p }) => ({ ...p, joinedAfterFixtureCreated: state.joinedAfter.has(p.userId) }));
     const suspended = orderedPlayers().flatMap((p) => {
       const s = state.suspensions.get(p.userId);
-      return s ? [{ ...person(p), reason: s.reason, remainingMatches: s.remainingMatches }] : [];
+      return s ? [{ ...person(p, game.gameId), reason: s.reason, remainingMatches: s.remainingMatches }] : [];
     });
     return {
       gameId: game.gameId,
@@ -170,6 +173,7 @@ export function createV1GameRosterMswHandlers() {
       gameState,
       deadline: game.startAt,
       editable: gameState === 'SCHEDULED' && canWrite(),
+      goalkeeperEditable: gameState === 'SCHEDULED' && canWrite() && state.goalkeeperWritable,
       viewerRole: state.viewerRole,
       baseSource: state.baseSource,
       jerseyRegistrationId:
@@ -204,6 +208,7 @@ export function createV1GameRosterMswHandlers() {
       scheduledAt: game.startAt,
       gameState: roster.gameState,
       editable: roster.editable,
+      goalkeeperEditable: roster.goalkeeperEditable,
       summary: {
         participating: roster.counts.participating,
         excluded: roster.counts.excluded,
@@ -216,7 +221,7 @@ export function createV1GameRosterMswHandlers() {
       displayName: p.displayName,
       accountLinked: true,
       cells: views.map(({ roster }): V1TeamRosterCell => {
-        const empty = { reason: null, actorRole: null, adjustmentId: null, unavailabilityId: null, remainingMatches: null };
+        const empty = { reason: null, actorRole: null, adjustmentId: null, unavailabilityId: null, remainingMatches: null, goalkeeper: state.goalkeepers.get(p.userId) ?? false };
         const ex = roster.excluded.find((e) => e.userId === p.userId);
         if (ex) return { ...empty, gameId: roster.gameId, status: 'EXCLUDED', reason: ex.reason, actorRole: ex.actor.role, adjustmentId: ex.adjustmentId };
         const un = roster.unavailable.find((u) => u.userId === p.userId);
@@ -306,7 +311,7 @@ export function createV1GameRosterMswHandlers() {
     http.post(`${api}/teams/:teamId/game-rosters/batch`, async ({ request, params }) => {
       await record(request, new URL(request.url).pathname);
       const { changes } = state.requests.at(-1)!.body as {
-        changes: { gameId: string; userId: string; op: 'EXCLUDE' | 'REVOKE'; reason?: string }[];
+        changes: { gameId: string; userId: string; op: 'EXCLUDE' | 'REVOKE' | 'SET_GOALKEEPER'; reason?: string; goalkeeper?: boolean }[];
       };
       if (!canWrite()) return forbidden('팀장·매니저만 경기 명단을 바꿀 수 있어요.');
       const detached = [...new Set(changes.map((c) => c.gameId))].filter((id) => state.detached.has(id));
@@ -316,7 +321,11 @@ export function createV1GameRosterMswHandlers() {
       if (changes.some((c) => !inRoster(c.userId))) return fail(422, 'ROSTER_ADJUSTMENT_NOT_IN_ROSTER', '기준 명단에 없는 선수예요.');
       const results = changes.map((c) => {
         const game = findGame(c.gameId)!;
-        const alreadyApplied = c.op === 'EXCLUDE' ? exclude(c.gameId, c.userId, c.reason ?? null) : revoke(c.gameId, c.userId);
+        const key = c.gameId + ':' + c.userId;
+        const alreadyApplied = c.op === 'SET_GOALKEEPER'
+          ? (state.goalkeepers.get(c.userId) ?? false) === c.goalkeeper
+          : c.op === 'EXCLUDE' ? exclude(c.gameId, c.userId, c.reason ?? null) : revoke(c.gameId, c.userId);
+        if (c.op === 'SET_GOALKEEPER') state.goalkeepers.set(c.userId, c.goalkeeper!);
         return { gameId: c.gameId, sideId: game.sideId, userId: c.userId, op: c.op, alreadyApplied };
       });
       return ok({ teamId: String(params.teamId), results });
@@ -432,6 +441,7 @@ export function createV1GameRosterMswHandlers() {
       state.jerseys.set(userId, jerseyNumber);
     },
     /** 보기만 하는 운영자로 — 표의 `editable` 이 전부 false, 쓰기는 403. */
+    setGoalkeeperWritable(value: boolean) { state.goalkeeperWritable = value; },
     setCanWrite(value: boolean) {
       state.canWrite = value;
     },

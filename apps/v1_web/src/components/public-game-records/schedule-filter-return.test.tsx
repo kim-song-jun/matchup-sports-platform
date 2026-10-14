@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { renderToString } from 'react-dom/server';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, afterEach, describe, it, expect, vi } from 'vitest';
@@ -25,6 +25,7 @@ vi.mock('next/link', () => ({default: ({href,children,onClick,prefetch: _prefetc
  onClick?.(event); if(event.defaultPrevented) return; event.preventDefault(); window.history.pushState({},'',href);
 }}>{children}</a>}));
 vi.mock('@/hooks/use-v1-api', () => ({
+ useV1MyTeams: () => ({data:undefined,isPending:false,isError:false}),
  useV1MyTournamentFixtures: () => ({data:undefined}),
  useV1LeagueMatch:vi.fn(),useV1LeagueMatchStandings:vi.fn(),useV1TeamMatch:vi.fn(),useV1ResolveChatRoom:vi.fn(),
 }));
@@ -50,7 +51,8 @@ let client: QueryClient;
 let restoreNextBoundary: (() => void) | undefined;
 function mount(element: React.ReactNode) { return render(<QueryClientProvider client={client}>{element}</QueryClientProvider>); }
 function selectRegular() { fireEvent.click(screen.getByRole('tab',{name:'정규 라운드'})); }
-function selected(name:string) { expect(screen.getByRole('tab',{name})).toHaveAttribute('aria-selected','true'); }
+function phaseTab(name:string) { return within(screen.getByRole('tablist',{name:'경기 일정 보기'})).getByRole('tab',{name}); }
+function selected(name:string) { expect(phaseTab(name)).toHaveAttribute('aria-selected','true'); }
 function fixtureLink() { return Array.from(document.querySelectorAll<HTMLAnchorElement>('a')).find((a) => a.getAttribute('href')?.startsWith('/league-matches/league-one/fixtures/fixture-one'))!; }
 function backControl() { return <AppBackLink fallbackHref="/teams">뒤로</AppBackLink>; }
 async function backTo(target:string) {
@@ -238,7 +240,7 @@ describe('실제 bracket caller → 일정 → 경기 → 선수 → 페이지 B
  });
  it('빠른 연속 선택은 마지막 선택과 그 경기 링크 출처를 유지한다',() => {
   navigation.snapshot=window.location.search;
-  mount(bracket());selectRegular();fireEvent.click(screen.getByRole('tab',{name:'전체'}));selectRegular();
+  mount(bracket());selectRegular();fireEvent.click(phaseTab('전체'));selectRegular();
   selected('정규 라운드');expect(new URL(window.location.href).searchParams.get('schedulePhase')).toBe('knockout');
   const link=new URL(fixtureLink().href);expect(new URL(link.searchParams.get('from')!,window.location.origin).searchParams.get('schedulePhase')).toBe('knockout');
  });
@@ -256,7 +258,7 @@ describe('실제 bracket caller → 일정 → 경기 → 선수 → 페이지 B
   expect(now.searchParams.get('from')).toBe(initial.searchParams.get('from'));expect(now.searchParams.get('q')).toBe('keep');
   expect(now.searchParams.getAll('tag')).toEqual(['a','b']);expect(now.hash).toBe('#schedule');
   expect(window.history.length).toBe(length);
-  fireEvent.click(screen.getByRole('tab',{name:'전체'}));expect(new URL(window.location.href).searchParams.has('schedulePhase')).toBe(false);
+  fireEvent.click(phaseTab('전체'));expect(new URL(window.location.href).searchParams.has('schedulePhase')).toBe(false);
  });
  it('잘못된 phase는 전체 기본값을 유지한다',() => {
   window.history.replaceState(null,'',`${bracketPath}?schedulePhase=invalid`);mount(bracket());selected('전체');

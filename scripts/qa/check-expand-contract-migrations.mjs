@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -42,6 +43,26 @@ class UnparsableSqlError extends Error {}
 // the gate exists to catch does not apply. Keep this list SHORT: every entry
 // weakens the gate for exactly one (file, statement) pair and nothing else.
 const REVIEWED_NON_ADDITIVE = [
+  {
+    file: "apps/v1_api/prisma/migrations/20261014000100_v1_competition_field_places/migration.sql",
+    statement: "WITH places AS ( SELECT tm.tournament_id, btrim(tm.place_name) AS name, lower(btrim(tm.place_name)) AS name_key, jsonb_build_object(\u0027name\u0027, btrim(tm.place_name), \u0027address\u0027, nullif(btrim(tm.place_address), \u0027\u0027), \u0027latitude\u0027, tm.place_latitude, \u0027longitude\u0027, tm.place_longitude, \u0027provider\u0027, nullif(btrim(tm.place_provider), \u0027\u0027), \u0027providerPlaceId\u0027, nullif(btrim(tm.place_provider_id), \u0027\u0027)) AS snapshot, ((nullif(btrim(tm.place_provider), \u0027\u0027) IS NULL AND nullif(btrim(tm.place_provider_id), \u0027\u0027) IS NULL AND tm.place_latitude IS NULL AND tm.place_longitude IS NULL) OR (btrim(tm.place_provider) = \u0027kakao\u0027 AND nullif(btrim(tm.place_provider_id), \u0027\u0027) IS NOT NULL AND tm.place_latitude BETWEEN -90 AND 90 AND tm.place_longitude BETWEEN -180 AND 180)) AS valid_place FROM v1_team_matches tm JOIN v1_tournaments t ON t.id = tm.tournament_id WHERE tm.deleted_at IS NULL AND t.deleted_at IS NULL AND (t.kind IN (\u0027regular_tournament\u0027, \u0027regular_league\u0027) OR t.kind IS NULL) AND tm.place_name IS NOT NULL AND btrim(tm.place_name) \u003c\u003e \u0027\u0027 AND lower(btrim(tm.place_name)) NOT IN (\u0027장소 미정\u0027, \u0027미정\u0027, \u0027tbd\u0027) ), grouped AS ( SELECT tournament_id, name_key, min(name) AS name, CASE WHEN count(DISTINCT (snapshot - \u0027name\u0027)) = 1 AND bool_and(valid_place) THEN (array_agg(snapshot ORDER BY name))[1] ELSE NULL END AS snapshot FROM places GROUP BY tournament_id, name_key ) INSERT INTO v1_tournament_fields (id, tournament_id, scope_key, name, place_snapshot, sort_order, active, version, created_at, updated_at) SELECT gen_random_uuid()::text, g.tournament_id, \u0027place-\u0027 || md5(g.name_key), g.name, g.snapshot, 0, true, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM grouped g WHERE NOT EXISTS ( SELECT 1 FROM v1_tournament_fields f WHERE f.tournament_id = g.tournament_id AND lower(btrim(f.name)) = g.name_key ) ON CONFLICT (tournament_id, scope_key) DO NOTHING",
+    reason: "User explicitly approved full competition place/field integration (Task 20261082, 2026-10-14). This exact INSERT adds one field per scoped trimmed name with NOT EXISTS and ON CONFLICT DO NOTHING. Blank/unknown/deleted places are excluded; ambiguous coordinates are not shared. No match/staff/result/old field is changed. Previous APIs accept these ordinary field rows and ignore the new nullable JSON column.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20261014000100_v1_competition_field_places/migration.sql",
+    statement: "WITH places AS ( SELECT f.id AS field_id, jsonb_build_object(\u0027name\u0027, btrim(tm.place_name), \u0027address\u0027, nullif(btrim(tm.place_address), \u0027\u0027), \u0027latitude\u0027, tm.place_latitude, \u0027longitude\u0027, tm.place_longitude, \u0027provider\u0027, nullif(btrim(tm.place_provider), \u0027\u0027), \u0027providerPlaceId\u0027, nullif(btrim(tm.place_provider_id), \u0027\u0027)) AS snapshot, ((nullif(btrim(tm.place_provider), \u0027\u0027) IS NULL AND nullif(btrim(tm.place_provider_id), \u0027\u0027) IS NULL AND tm.place_latitude IS NULL AND tm.place_longitude IS NULL) OR (btrim(tm.place_provider) = \u0027kakao\u0027 AND nullif(btrim(tm.place_provider_id), \u0027\u0027) IS NOT NULL AND tm.place_latitude BETWEEN -90 AND 90 AND tm.place_longitude BETWEEN -180 AND 180)) AS valid_place FROM v1_tournament_fields f JOIN v1_team_matches tm ON tm.tournament_id = f.tournament_id AND (tm.field_id = f.id OR lower(btrim(tm.place_name)) = lower(btrim(f.name))) JOIN v1_tournaments t ON t.id = tm.tournament_id WHERE tm.deleted_at IS NULL AND t.deleted_at IS NULL AND (t.kind IN (\u0027regular_tournament\u0027, \u0027regular_league\u0027) OR t.kind IS NULL) AND tm.place_name IS NOT NULL AND btrim(tm.place_name) \u003c\u003e \u0027\u0027 AND lower(btrim(tm.place_name)) NOT IN (\u0027장소 미정\u0027, \u0027미정\u0027, \u0027tbd\u0027) ), grouped AS ( SELECT field_id, (array_agg(snapshot))[1] AS snapshot FROM places GROUP BY field_id HAVING count(DISTINCT snapshot) = 1 AND bool_and(valid_place) ) UPDATE v1_tournament_fields f SET place_snapshot = g.snapshot, version = f.version + 1, updated_at = CURRENT_TIMESTAMP FROM grouped g WHERE f.id = g.field_id AND f.place_snapshot IS NULL",
+    reason: "User-approved full competition place/field integration (Task 20261082). This exact UPDATE enriches only NULL catalogue snapshots from unambiguous valid locations. Existing field IDs/names and all match addresses/coordinates/results/staff remain intact. Old APIs ignore place_snapshot, so rollback remains compatible.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20261014000100_v1_competition_field_places/migration.sql",
+    statement: "WITH candidates AS ( SELECT tm.id, (SELECT f.id FROM v1_tournament_fields f WHERE f.tournament_id = tm.tournament_id AND lower(btrim(f.name)) = lower(btrim(tm.place_name)) ORDER BY f.active DESC, f.sort_order, f.id LIMIT 1) AS field_id FROM v1_team_matches tm JOIN v1_tournaments t ON t.id = tm.tournament_id WHERE tm.deleted_at IS NULL AND t.deleted_at IS NULL AND tm.field_id IS NULL AND (t.kind IN (\u0027regular_tournament\u0027, \u0027regular_league\u0027) OR t.kind IS NULL) AND lower(btrim(tm.place_name)) NOT IN (\u0027\u0027, \u0027장소 미정\u0027, \u0027미정\u0027, \u0027tbd\u0027) ) UPDATE v1_team_matches tm SET field_id = c.field_id FROM candidates c WHERE tm.id = c.id AND c.field_id IS NOT NULL",
+    reason: "User explicitly approved connecting all existing named unassigned fixtures (Task 20261082). This exact UPDATE changes only NULL field_id on nondeleted competition matches using a same-competition deterministic name lookup; existing assignments and every place/result/staff column are preserved. New scope membership follows existing field permissions as intended. Old APIs already support these field IDs; no deletion, constraint narrowing, or mandatory-column change.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20261014180000_v1_game_roster_goalkeepers/migration.sql",
+    statement: "INSERT INTO \"v1_game_roster_roles\" (\"game_id\", \"side_id\", \"team_id\", \"user_id\", \"goalkeeper\", \"updated_at\")\nSELECT DISTINCT g.id, s.id, s.team_id, p.user_id, true, CURRENT_TIMESTAMP\nFROM v1_games g\nJOIN v1_game_sides s ON s.game_id = g.id AND s.team_id IS NOT NULL\nJOIN v1_team_matches tm ON tm.id = g.team_match_id AND (tm.tournament_id IS NOT NULL OR tm.league_id IS NOT NULL)\nJOIN v1_competition_config_versions c ON c.id = g.competition_config_version_id\nJOIN LATERAL (\n SELECT l.id FROM v1_game_lineups l\n WHERE l.game_id = g.id AND l.side_id = s.id AND l.invalidated_at IS NULL\n ORDER BY CASE WHEN l.state IN ('SUBMITTED','LOCKED') THEN 0 ELSE 1 END, l.revision DESC LIMIT 1\n) chosen ON true\nJOIN v1_game_participants p ON p.lineup_id = chosen.id AND p.user_id IS NOT NULL\nWHERE p.position = COALESCE((SELECT pos->>'code' FROM jsonb_array_elements(CASE WHEN jsonb_typeof(c.lineup->'positions') = 'array' THEN c.lineup->'positions' ELSE '[]'::jsonb END) pos WHERE pos->>'goalkeeper' = 'true' LIMIT 1), 'GK')\nON CONFLICT (game_id, side_id, team_id, user_id) DO NOTHING",
+    reason: "Task 20261082 (2026-10-14): copies existing GK positions into only the new v1_game_roster_roles table created earlier in this same migration. INSERT ... ON CONFLICT DO NOTHING never updates or deletes any source row; old APIs ignore the additive table, so rolling deployment and rollback keep their existing roster behavior. SUBMITTED/LOCKED-first selection matches the results selector. Existing game, lineup and participant tables and immutable historical migrations are unchanged. PostgreSQL replay and the real multi-GK/GOLEIRO/exclude-revoke integration scenario passed in CI 38507178317."
+  },
   {
     file: "apps/v1_api/prisma/migrations/20261013100000_league_roster_limit_planned_fixtures/migration.sql",
     statement: "ALTER TABLE \"v1_tournaments\" ALTER COLUMN \"max_players\" DROP NOT NULL",
@@ -1719,7 +1740,15 @@ const changes = runGit([
 const addedFiles = [];
 for (const line of changes.split('\n').filter(Boolean)) {
   const [status, file] = line.split('\t');
-  if (status !== 'A') fail(`existing migration changed (${status}): ${file}`);
+  // Task 20261082: alpha attempt failed with CAS violation, applied_steps_count=0,
+  // place_snapshot absent; resolved rolled-back via SSM 21d57395-ddd5-4843-ac6a-269065aefbfa.
+  // Never deployed to main. Permit only this exact failed-source -> repaired-source pair;
+  // repaired SQL still passes the normal statement-level compatibility review below.
+  const failedFieldRepair = status === 'M'
+    && file === 'apps/v1_api/prisma/migrations/20261014000100_v1_competition_field_places/migration.sql'
+    && createHash('sha256').update(runGit(['show', `${diffBase}:${file}`])).digest('hex') === '2aefdb02ee5c5a4bb2113f0d4ee95d823cc0a04c4720e49577811bcfb059d925'
+    && createHash('sha256').update(runGit(['show', `${headSha}:${file}`])).digest('hex') === 'acc84842952611f8c8addc2dc34ecd88fab57ddc3a386d3f15af95473bc71d39';
+  if (status !== 'A' && !failedFieldRepair) fail(`existing migration changed (${status}): ${file}`);
   addedFiles.push(file);
 }
 

@@ -45,3 +45,6 @@ origin/dev 3542691e4 기반 feat/competition-goalkeeper-defaults 격리 작업�
 
 - origin/dev f45dc0a8b의 경기장 관리 변경을 보존해 통합. 통합 LF schema SHA 89ccedfb1f48f088a5f61ceede57e7f520a4b40a7ad9862c3d817d4cefc84ae0. 기존 배포 SHA는 manifest allowlist에 보존.
 - 공통 GK는 대회 전체 권한을 추가 검증: 특정 경기만 담당하는 FIELD_OPERATOR는 기존 경기 출전 조정만 허용, GK 공통 지정은 403 및 UI 읽기 전용.
+
+- 통합 후 API 관련 105 tests 및 Web 19 tests PASS, 양쪽 tsc PASS. 실제 현장 스태프 권한·다음 경기 상속은 최종 CI에서 재검증.
+- 상세 PR 런북 §1.1의 오래된 main 기준을 정본 CLAUDE.md의 origin/dev 기준으로 sync(공유 root는 전환하지 않음).

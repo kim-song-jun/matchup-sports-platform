@@ -1,0 +1,109 @@
+{
+  "url": "https://alpha.teameet.co.kr/tournaments/aef0d98f-17eb-4590-b27d-a2d8bab765e6/bracket?from=%2Ftournaments%2Faef0d98f-17eb-4590-b27d-a2d8bab765e6%3Ffrom%3D%252Ftournaments%253Fkind%253Dleague",
+  "persona": "비로그인",
+  "viewports": [
+    {
+      "width": 390,
+      "progress": {
+        "total": 3,
+        "played": 2,
+        "remaining": 1,
+        "percent": 67
+      },
+      "teams": [
+        {
+          "name": "한강 로버스",
+          "rows": 6
+        },
+        {
+          "name": "마포 레인저스",
+          "rows": 6
+        },
+        {
+          "name": "송파 유나이티드",
+          "rows": 6
+        }
+      ],
+      "pageOverflow": false,
+      "detailPageOverflow": false
+    },
+    {
+      "width": 768,
+      "progress": {
+        "total": 3,
+        "played": 2,
+        "remaining": 1,
+        "percent": 67
+      },
+      "teams": [
+        {
+          "name": "한강 로버스",
+          "rows": 6
+        },
+        {
+          "name": "마포 레인저스",
+          "rows": 6
+        },
+        {
+          "name": "송파 유나이티드",
+          "rows": 6
+        }
+      ],
+      "pageOverflow": false,
+      "detailPageOverflow": false
+    },
+    {
+      "width": 1440,
+      "progress": {
+        "total": 3,
+        "played": 2,
+        "remaining": 1,
+        "percent": 67
+      },
+      "teams": [
+        {
+          "name": "한강 로버스",
+          "rows": 6
+        },
+        {
+          "name": "마포 레인저스",
+          "rows": 6
+        },
+        {
+          "name": "송파 유나이티드",
+          "rows": 6
+        }
+      ],
+      "pageOverflow": false,
+      "detailPageOverflow": false
+    }
+  ],
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 401 ()",
+    "Failed to load resource: the server responded with a status of 401 ()",
+    "Failed to load resource: the server responded with a status of 401 ()"
+  ],
+  "pageErrors": [],
+  "networkFailures": [],
+  "knownGuestAuthResponses": [
+    {
+      "status": 401,
+      "origin": "https://alpha.teameet.co.kr",
+      "path": "/api/v1/auth/me"
+    },
+    {
+      "status": 401,
+      "origin": "https://alpha.teameet.co.kr",
+      "path": "/api/v1/auth/me"
+    },
+    {
+      "status": 401,
+      "origin": "https://alpha.teameet.co.kr",
+      "path": "/api/v1/auth/me"
+    }
+  ],
+  "browserClosed": true,
+  "browserPid": 13252,
+  "parentPid": 15608,
+  "success": true
+}

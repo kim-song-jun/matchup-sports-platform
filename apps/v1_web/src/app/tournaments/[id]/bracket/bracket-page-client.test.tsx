@@ -1,6 +1,8 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { http, HttpResponse } from 'msw';
+import { server } from '@/test/msw/server';
 import { renderBracketPage, renderBracketStandingsTab } from './bracket-test-utils';
 import { AppBackLink } from '@/components/v1-ui/app-back-link';
 import { __resetNavigationHistoryForTests } from '@/lib/navigation-history';
@@ -1044,6 +1046,49 @@ describe('BracketPageContent — 정규 리그 거울 행(format=group_knockout,
       },
     ],
     nextCursor: null,
+  });
+
+  it('리그 순위의 전적 버튼으로 해당 팀 경기를 행 아래 펼치고 다시 접는다', async () => {
+    const match: PublicScheduleEntry = {
+      fixtureId: 'fixture-expand', round: '1주차', fixtureNumber: 1, legNumber: 1,
+      groupId: null, groupName: null, scheduledAt: '2026-10-01T10:00:00.000Z',
+      venue: null, fieldId: null, fieldName: null,
+      home: { registrationId: 'r-home', teamId: 'team-42', teamName: '성수 FC' },
+      away: { registrationId: 'r-away', teamId: 'team-away', teamName: '전적 상대 FC' },
+      homeSlotLabel: null, awaySlotLabel: null,
+      visibilityMode: 'live', status: 'ended', resultState: 'official', scoreStatus: 'official',
+      score: { home: 2, away: 1, penalties: null }, clock: null, periodBreak: null,
+      scorers: [], cards: [], outcome: null, hasVideo: false,
+    };
+    const { container } = renderBracketStandingsTab(mirrorLeague(), { ...leagueSchedule(), items: [match] });
+    expect(screen.queryByText('전적 상대 FC')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: '성수 FC 경기 전적 펼치기' }));
+    const detail = container.querySelector('.tm-standings-detail-row');
+    expect(detail).toHaveTextContent('홈전적 상대 FC 승 2-1');
+    expect(screen.getByRole('button', { name: '성수 FC 경기 전적 접기' })).toHaveAttribute('aria-expanded', 'true');
+    await userEvent.click(screen.getByRole('button', { name: '성수 FC 경기 전적 접기' }));
+    expect(container.querySelector('.tm-standings-detail-row')).not.toBeInTheDocument();
+  });
+
+  it('리그 순위 카드 상단에 상세 API의 전체 일정 퍼센트 바를 표시한다', async () => {
+    vi.stubEnv('NEXT_PUBLIC_API_URL', 'http://localhost/api/v1');
+    server.use(http.get('*/api/v1/tournaments/league-1/standings/overall', () => HttpResponse.json({
+      status: 'success', timestamp: '', data: {
+        standings: [], progress: { total: 3, played: 2, remaining: 1, percent: 67 },
+        magicNumber: null, recalculatedAt: null, champions: [], tieBreakGroups: [],
+      },
+    })));
+    server.listen({ onUnhandledRequest: 'bypass' });
+    try {
+      renderBracketStandingsTab(mirrorLeague(), leagueSchedule());
+      const bar = await screen.findByRole('progressbar', { name: '전체 일정 진행률 2 / 3경기, 67%' });
+      expect(bar).toHaveAttribute('aria-valuenow', '67');
+      const card = bar.closest('.tm-card');
+      expect(card).not.toBeNull();
+      expect(within(card as HTMLElement).getByRole('table', { name: '리그 순위표' })).toBeInTheDocument();
+    } finally {
+      server.close(); server.resetHandlers(); vi.unstubAllEnvs();
+    }
   });
 
   it('리그 순위의 팀 전적에서 화면 뒤로가기를 누르면 선택한 탭과 순위표를 복원한다', async () => {

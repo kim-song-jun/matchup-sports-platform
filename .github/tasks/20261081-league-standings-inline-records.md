@@ -59,3 +59,6 @@ alpha 검증은 변경 배포 이후에 가능. 로컬 next 서버는 띄우지 
 - alpha before, 비로그인 persona: `/bracket?tab=standings`, headed Chrome 390/768/1440×900에서 순위 API 로드 후 table 1, viewport overflow false, pageerror/API 4xx·5xx 0. `docs/screenshots/league-standings-inline-records-2026-10-14/before-{390,768,1440}.png`.
 - QA browser PID/PPID: 최초 11584/27888, 데이터 로드 완료 캡처 25872/29640. 각 owned browser/server는 finally에서 종료. 첫 캡처는 로딩 상태였으므로 같은 경로를 실제 팀명 로드 완료 후 다시 캡처했다.
 - alpha after: 미배포로 미검증. 커밋 트리/PR 기준 검증도 미실행이며 PR-ready 또는 기능 최종 완료로 주장하지 않는다.
+
+## Deployment Progress
+사용자 2026-10-14 배포 승인. PR #1915, base dev. 추가 페이지 오류가 상위 순위의 로딩/오류 분기에 가려지던 문제를 보완했고 실제 bracket 경로 재시도 테스트 1건을 추가해 PASS(중복 제외 총 68 tests). CI 및 Copilot clean gate 진행 중.

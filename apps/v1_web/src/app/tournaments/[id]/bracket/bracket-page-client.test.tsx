@@ -1091,6 +1091,34 @@ describe('BracketPageContent — 정규 리그 거울 행(format=group_knockout,
     }
   });
 
+  it('전적 다음 페이지 실패에도 순위와 펼친 행을 유지하고 그 자리에서 재시도한다', async () => {
+    vi.stubEnv('NEXT_PUBLIC_API_URL', 'http://localhost/api/v1');
+    server.use(
+      http.get('*/api/v1/tournaments/league-1/standings/overall', () => HttpResponse.json({ status: 'success', data: {
+        standings: [], progress: { total: 3, played: 2, remaining: 1, percent: 67 }, magicNumber: null, recalculatedAt: null, champions: [], tieBreakGroups: [],
+      } })),
+      http.get('*/api/v1/tournaments/league-1/schedule', () => new HttpResponse(null, { status: 500 })),
+    );
+    server.listen({ onUnhandledRequest: 'bypass' });
+    try {
+      setMockSearchParams(new URLSearchParams({ tab: 'standings' }));
+      const { container } = renderBracketStandingsTab(mirrorLeague(), { ...leagueSchedule(), nextCursor: 'next' });
+      await userEvent.click(screen.getByRole('button', { name: '성수 FC 경기 전적 펼치기' }));
+      await userEvent.click(screen.getByRole('button', { name: '경기 전적 더 보기' }));
+      expect(await screen.findByText('다음 경기 전적을 불러오지 못했어요.')).toBeInTheDocument();
+      expect(screen.getByRole('table', { name: '리그 순위표' })).toBeVisible();
+      expect(screen.queryByText('순위를 불러오지 못했어요.')).not.toBeInTheDocument();
+      server.use(http.get('*/api/v1/tournaments/league-1/schedule', () => HttpResponse.json({ status: 'success', data: leagueSchedule() })));
+      const detail = container.querySelector('.tm-standings-detail-row');
+      expect(detail).not.toBeNull();
+      await userEvent.click(within(detail as HTMLElement).getByRole('button', { name: '다시 시도하기' }));
+      expect(await screen.findByText('배정된 경기가 아직 없어요')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '성수 FC 경기 전적 접기' })).toHaveAttribute('aria-expanded', 'true');
+    } finally {
+      server.close(); server.resetHandlers(); vi.unstubAllEnvs();
+    }
+  });
+
   it('리그 순위의 팀 전적에서 화면 뒤로가기를 누르면 선택한 탭과 순위표를 복원한다', async () => {
     const tournament = { ...mirrorLeague(), id: 'tour-1', groups: [] };
     const schedule = { ...leagueSchedule(), tournamentId: 'tour-1' };

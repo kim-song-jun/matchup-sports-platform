@@ -588,7 +588,8 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
    * 못 찾는다.
    */
   const leagueScheduleSettled = isRegularLeague
-    ? !leagueSchedule.isLoading && !leagueSchedule.isError
+    // 추가 페이지 오류는 이미 받은 순위를 없애지 않는다. 펼친 전적에서 재시도를 제공한다.
+    ? !leagueSchedule.isLoading && (!leagueSchedule.isError || leagueSchedule.isFetchNextPageError)
     : true;
   /**
    * 순위표 제목. 사용자 확정값은 **"tierLabel(1부/2부)을 쓰고 없으면 '리그 순위'"** 인데

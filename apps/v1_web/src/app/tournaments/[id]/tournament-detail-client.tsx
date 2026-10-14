@@ -9,6 +9,7 @@ import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { FormattedText } from '@/components/v1-ui/formatted-text';
 import { BlockedAction } from '@/components/v1-ui/blocked-action';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
+import { TournamentCampaignMedia } from '@/components/tournaments/tournament-campaign-media';
 import { Trophy, Goal, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useV1Tournament, useV1MyRegistrations } from '@/hooks/use-v1-api';
 import { v1Get } from '@/lib/api-client';
@@ -769,6 +770,18 @@ export function TournamentDetailView({
   /* ── Header identity block (icon + title + badges) — shared by open/scheduled/in_progress
      layout and the completed layout, which relocates it above the result hero (TARGET §1). ── */
   const headerIdentitySection = (
+    <>
+    {tournament.kind === 'regular_league' && tournament.coverImageUrl?.trim() ? (
+      <div className="mb-4 aspect-video overflow-hidden rounded-[var(--radius-container)] bg-[var(--grey50)]">
+        <TournamentCampaignMedia
+          src={tournament.coverImageUrl}
+          sportCode={tournament.sport?.code ?? ''}
+          alt={`${tournament.title} 대표 이미지`}
+          className="h-full w-full object-contain"
+          eager
+        />
+      </div>
+    ) : null}
     <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
       <div
         aria-hidden="true"
@@ -829,6 +842,7 @@ export function TournamentDetailView({
         </div>
       </div>
     </div>
+    </>
   );
 
   /* ── Left column body content (open / scheduled / in_progress — unchanged behavior) ── */

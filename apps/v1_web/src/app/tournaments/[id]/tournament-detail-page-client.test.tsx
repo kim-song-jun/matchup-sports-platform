@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackEvent } from '@/lib/analytics';
 import type { V1TournamentDetail } from '@/types/api';
 import { TournamentDetailPageClient } from './tournament-detail-client';
+import { queryImageBySrc } from '@/test/next-image';
 
 function render(ui: ReactElement) {
   const queryClient = new QueryClient({
@@ -130,6 +131,19 @@ describe('TournamentDetailPageClient GA events', () => {
       isFetching: false,
       refetch: vi.fn(),
     });
+  });
+
+  it.each(['in_progress', 'completed'] as const)('리그 %s 상세에서 저장된 대표 이미지를 본문에 표시한다', async (status) => {
+    tournamentApiMocks.useV1Tournament.mockReturnValue({
+      data: makeTournament({ kind: 'regular_league', status, coverImageUrl: '/uploads/leagues/cover.webp' }),
+      isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    });
+    const { container } = render(<TournamentDetailPageClient tournamentId="tournament-1" />);
+    await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
+    const image = queryImageBySrc(container, '/uploads/leagues/cover.webp');
+    expect(image).not.toBeNull();
+    expect(image).toHaveAttribute('alt', '테스트 대회 대표 이미지');
+    expect(image).toHaveClass('object-contain');
   });
 
   it('tracks tournament_view once the tournament detail loads', async () => {

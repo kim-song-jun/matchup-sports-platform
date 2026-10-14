@@ -1,0 +1,36 @@
+{
+  "persona": "ADMIN",
+  "rosterPath": "/teams/ea6c8df8-fd86-4738-9dbd-f9cf6c83c3b5/games/1835d796-5b9f-42cd-b6f5-37af7ba5b1b6/roster",
+  "widths": [
+    {
+      "width": 390,
+      "goalkeeperControls": 7,
+      "overflow": false,
+      "touchTargets": "PASS"
+    },
+    {
+      "width": 768,
+      "goalkeeperControls": 7,
+      "overflow": false,
+      "touchTargets": "PASS"
+    },
+    {
+      "width": 1440,
+      "goalkeeperControls": 7,
+      "overflow": false,
+      "touchTargets": "PASS"
+    }
+  ],
+  "consoleErrors": [],
+  "pageErrors": [],
+  "httpErrors": [],
+  "scenarios": [
+    "two independent goalkeepers saved and reloaded; jerseys and attendance preserved",
+    "actual team member sees both GK labels and has no role edit controls",
+    "clearing one goalkeeper preserves the other"
+  ],
+  "restored": true,
+  "commit": "3542691e4d13d6d35d70d9e4c14acc34840d7de4",
+  "browserPid": 34820,
+  "launcherPid": 9520
+}

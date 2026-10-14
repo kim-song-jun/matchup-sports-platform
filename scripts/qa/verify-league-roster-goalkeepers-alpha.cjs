@@ -14,6 +14,7 @@ const report = { persona: expectedRole, rosterPath, widths: [], consoleErrors: [
 const contexts = [];
 let original;
 let adminPage;
+let readyForWrites = false;
 
 function watch(page) {
   page.on('console', (message) => { if (message.type() === 'error') report.consoleErrors.push(message.text()); });
@@ -60,12 +61,14 @@ async function setRole(page, player, value) {
 async function save(page) {
   const control = page.getByRole('button', { name: /^저장 \(\d+건\)$/ });
   if (await control.count() === 0) return;
+  const refreshed = page.waitForResponse((response) => response.request().method() === 'GET' && new URL(response.url()).pathname === apiPath).then((response) => response.json());
   const saved = page.waitForResponse((response) => response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/game-rosters/batch'));
   await control.click();
   const response = await saved;
   assert.equal(response.status(), 200, JSON.stringify(await response.json()));
   await page.getByText('명단을 저장했어요.', { exact: true }).waitFor();
   await page.getByRole('button', { name: '저장', exact: true }).waitFor();
+  await refreshed;
 }
 function unchangedPlayers(data) {
   assert.deepEqual(data.base.map((row) => [row.userId, row.jerseyNumber, row.status]), original.base.map((row) => [row.userId, row.jerseyNumber, row.status]));
@@ -93,6 +96,7 @@ function unchangedPlayers(data) {
     assert(original.base.every((row) => typeof row.goalkeeper === 'boolean'));
     const players = original.participants.filter((row) => !row.goalkeeper).slice(0, 2);
     assert.equal(players.length, 2, 'Need two unselected fixture players to exercise independent selection');
+    readyForWrites = true;
     for (const player of players) await setRole(adminPage, player, true);
     await save(adminPage);
     let data = await reload(adminPage);
@@ -116,7 +120,8 @@ function unchangedPlayers(data) {
       assert.equal(member.data.viewerRole, 'TEAM_MEMBER');
       assert.equal(member.data.editable, false);
       assert.equal(await member.page.getByRole('button', { name: /골키퍼/ }).count(), 0);
-      assert.equal(await member.page.getByText(/ · GK$/).count(), players.length);
+      assert.equal(await member.page.getByText(/ · GK$/).count(), data.participants.filter((row) => row.goalkeeper).length);
+      for (const player of players) assert.equal(member.data.participants.find((row) => row.userId === player.userId).goalkeeper, true);
       await member.page.screenshot({ path: `${output}/after-member-390.png`, fullPage: true });
       report.scenarios.push('actual team member sees both GK labels and has no role edit controls');
       }
@@ -128,7 +133,7 @@ function unchangedPlayers(data) {
     unchangedPlayers(data);
     report.scenarios.push('clearing one goalkeeper preserves the other');
   } finally {
-    if (adminPage && original) {
+    if (adminPage && original && readyForWrites) {
       try {
         await reload(adminPage);
         for (const player of original.base) await setRole(adminPage, player, player.goalkeeper);

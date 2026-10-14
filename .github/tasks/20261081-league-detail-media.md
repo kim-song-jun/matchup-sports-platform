@@ -53,3 +53,4 @@ Status: Review
 - 변경 전 headed Chrome 390/768/1440 3/3: 순위 로고0, 대표 이미지 없음, 명단 클릭 정상, overflow0. 비로그인 auth/me401만 있고 업무 API 실패 없음. QA PID17656, 브라우저8764 종료 확인.
 - Alpha 원본 참가팀 명단 수 6/6/5. 공개 상세와 리그 전용 상세 모두 coverImageUrl=null. 별도 이미지/실데이터 변경 없음.
 - RED 실행은 기존 Windows 의존성 shim/링크 문제로 못 했고 격리 설치 후 GREEN을 확인했다. 기존 공유 node_modules/Prisma 산출물 변경 없음.
+- 대표 이미지가 실제 저장된 완료 리그 `85a7c32f-17c7-485c-9d27-128406ebaa91`에서 before 3폭 재현: savedCover=true, coverVisible=false, overflow0. 이 리그를 이미지 after QA 대상으로 사용한다.

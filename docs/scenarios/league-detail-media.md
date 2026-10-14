@@ -16,3 +16,4 @@ Task: [20261081](../../.github/tasks/20261081-league-detail-media.md)
 - 비로그인 auth/me401은 예상 인증 조회이며 업무 API 실패와 구분한다.
 - Web 49/API 40 회귀 통과, 양쪽 타입·패턴 검사 통과.
 - After: dev 배포 후 실제 3폭 검증 대기. 단위 테스트를 alpha 화면 PASS로 표현하지 않는다.
+- 추가 실제 이미지 시나리오: 완료 리그 `/tournaments/85a7c32f-17c7-485c-9d27-128406ebaa91`의 API는 coverImageUrl을 반환하지만 before 390/768/1440에서 coverVisible=false. 해당 리그를 이미지 after QA에 사용한다.

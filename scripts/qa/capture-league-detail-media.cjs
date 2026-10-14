@@ -30,20 +30,30 @@ async function main() {
         if (response.status() >= 400) failed.push({ url: new URL(response.url()).pathname, status: response.status() });
       });
       await page.goto(`${origin}/tournaments/${id}?from=%2Ftournaments%3Fkind%3Dleague`, { waitUntil: 'domcontentloaded' });
-      await page.getByRole('heading', { level: 1 }).first().waitFor();
+      const detailResponse = await context.request.get(`${origin}/api/v1/tournaments/${id}`);
+      const detail = (await detailResponse.json()).data;
+      if (!detail?.title) throw new Error(`Detail API failed: ${detailResponse.status()}`);
+      await page.getByRole('heading', { level: 1, name: detail.title, exact: true }).waitFor();
       const standings = page.getByRole('table', { name: '통합 순위표' });
-      await standings.waitFor({ state: 'visible', timeout: 20000 }).catch(() => {});
-      const accessible = await standings.isVisible();
-      if (accessible) {
-        await page.getByRole('button', { name: /명단 펼치기/ }).first().click();
-        await page.locator('li').first().waitFor();
+      if (detail.status !== 'completed') await standings.waitFor({ state: 'visible', timeout: 20000 }).catch(() => {});
+      const standingsVisible = await standings.isVisible();
+      const rosterToggle = page.getByRole('button', { name: /명단 펼치기/ }).first();
+      if (detail.status !== 'completed' && await rosterToggle.isVisible()) {
+        await rosterToggle.click();
+        await page.getByRole('button', { name: /명단 접기/ }).first().waitFor();
       }
+      await page.locator('img[alt$="대표 이미지"]').evaluateAll(async (images) => {
+        await Promise.all(images.map((image) => image.complete ? Promise.resolve() : new Promise((resolve) => {
+          image.addEventListener('load', resolve, { once: true }); image.addEventListener('error', resolve, { once: true });
+        })));
+      });
       await page.screenshot({ path: path.join(output, `${width}-detail.png`), fullPage: true });
-      if (accessible) await standings.screenshot({ path: path.join(output, `${width}-standings.png`) });
-      results.push({ width, pathname: new URL(page.url()).pathname, accessible, errors, failed,
+      if (standingsVisible) await standings.screenshot({ path: path.join(output, `${width}-standings.png`) });
+      results.push({ width, pathname: new URL(page.url()).pathname, accessible: true, standingsVisible, savedCover: Boolean(detail.coverImageUrl), errors, failed,
         ...(await page.evaluate(() => ({
           overflow: document.documentElement.scrollWidth > window.innerWidth,
           coverVisible: Boolean(document.querySelector('img[alt$="대표 이미지"]')),
+          coverLoaded: Boolean(document.querySelector('img[alt$="대표 이미지"]')?.naturalWidth),
           standingLogoCount: document.querySelectorAll('table[aria-label="통합 순위표"] tbody img').length,
         }))) });
       await context.close();

@@ -60,7 +60,7 @@ WITH places AS (
   FROM places GROUP BY field_id HAVING count(DISTINCT snapshot) = 1 AND bool_and(valid_place)
 )
 UPDATE v1_tournament_fields f
-SET place_snapshot = g.snapshot
+SET place_snapshot = g.snapshot, version = f.version + 1, updated_at = CURRENT_TIMESTAMP
 FROM grouped g
 WHERE f.id = g.field_id
   AND f.place_snapshot IS NULL;

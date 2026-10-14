@@ -301,6 +301,9 @@ describe('운영 콘솔 목록 — 정규 리그', () => {
   it('장소 backfill/import는 미배정만 연결하고 필드 선택은 공개 장소까지 원자적으로 바꾼다 (Task 20261082)', async () => {
     const rollback = new Error('rollback-field-place-integration');
     await expect(prisma.$transaction(async (tx) => {
+      const existingField = await tx.v1TournamentField.create({ data: {
+        tournamentId: ids.league, scopeKey: 'existing-venue', name: '검증 구장', version: 7,
+      } });
       await tx.v1TeamMatch.update({ where: { id: matchId(2) }, data: {
         placeName: '등록 별도 구장', placeAddress: '서울 테스트 주소', placeLatitude: 37.5, placeLongitude: 126.9,
         placeProvider: 'kakao', placeProviderId: 'synthetic-place',
@@ -314,6 +317,12 @@ describe('운영 콘솔 목록 — 정규 리그', () => {
       expect(after.every((row) => row.fieldId !== null)).toBe(true);
       const catalogue = await tx.v1TournamentField.findMany({ where: { tournamentId: ids.league } });
       expect(catalogue.map((field) => field.name).sort()).toEqual(['검증 구장', '등록 별도 구장']);
+      expect(catalogue.find((field) => field.id === existingField.id)).toMatchObject({
+        version: 8, placeSnapshot: { name: '검증 구장' },
+      });
+      // A second execution must neither advance the enriched field version nor change assignments.
+      for (const statement of migration.split(';').slice(1).filter((value) => value.trim())) await tx.$executeRawUnsafe(statement);
+      expect(await tx.v1TournamentField.findUnique({ where: { id: existingField.id } })).toMatchObject({ version: 8 });
       // The service's nested transaction boundary shares this real DB transaction; all writes roll back below.
       const transactional = new Proxy(tx, { get: (target, key) => key === '$transaction'
         ? async (callback: (client: typeof tx) => Promise<unknown>) => callback(tx) : Reflect.get(target, key) }) as unknown as PrismaService;

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -49,7 +50,7 @@ const REVIEWED_NON_ADDITIVE = [
   },
   {
     file: "apps/v1_api/prisma/migrations/20261014000100_v1_competition_field_places/migration.sql",
-    statement: "WITH places AS ( SELECT f.id AS field_id, jsonb_build_object(\u0027name\u0027, btrim(tm.place_name), \u0027address\u0027, nullif(btrim(tm.place_address), \u0027\u0027), \u0027latitude\u0027, tm.place_latitude, \u0027longitude\u0027, tm.place_longitude, \u0027provider\u0027, nullif(btrim(tm.place_provider), \u0027\u0027), \u0027providerPlaceId\u0027, nullif(btrim(tm.place_provider_id), \u0027\u0027)) AS snapshot, ((nullif(btrim(tm.place_provider), \u0027\u0027) IS NULL AND nullif(btrim(tm.place_provider_id), \u0027\u0027) IS NULL AND tm.place_latitude IS NULL AND tm.place_longitude IS NULL) OR (btrim(tm.place_provider) = \u0027kakao\u0027 AND nullif(btrim(tm.place_provider_id), \u0027\u0027) IS NOT NULL AND tm.place_latitude BETWEEN -90 AND 90 AND tm.place_longitude BETWEEN -180 AND 180)) AS valid_place FROM v1_tournament_fields f JOIN v1_team_matches tm ON tm.tournament_id = f.tournament_id AND (tm.field_id = f.id OR lower(btrim(tm.place_name)) = lower(btrim(f.name))) JOIN v1_tournaments t ON t.id = tm.tournament_id WHERE tm.deleted_at IS NULL AND t.deleted_at IS NULL AND (t.kind IN (\u0027regular_tournament\u0027, \u0027regular_league\u0027) OR t.kind IS NULL) AND tm.place_name IS NOT NULL AND btrim(tm.place_name) \u003c\u003e \u0027\u0027 AND lower(btrim(tm.place_name)) NOT IN (\u0027장소 미정\u0027, \u0027미정\u0027, \u0027tbd\u0027) ), grouped AS ( SELECT field_id, (array_agg(snapshot))[1] AS snapshot FROM places GROUP BY field_id HAVING count(DISTINCT snapshot) = 1 AND bool_and(valid_place) ) UPDATE v1_tournament_fields f SET place_snapshot = g.snapshot FROM grouped g WHERE f.id = g.field_id AND f.place_snapshot IS NULL",
+    statement: "WITH places AS ( SELECT f.id AS field_id, jsonb_build_object(\u0027name\u0027, btrim(tm.place_name), \u0027address\u0027, nullif(btrim(tm.place_address), \u0027\u0027), \u0027latitude\u0027, tm.place_latitude, \u0027longitude\u0027, tm.place_longitude, \u0027provider\u0027, nullif(btrim(tm.place_provider), \u0027\u0027), \u0027providerPlaceId\u0027, nullif(btrim(tm.place_provider_id), \u0027\u0027)) AS snapshot, ((nullif(btrim(tm.place_provider), \u0027\u0027) IS NULL AND nullif(btrim(tm.place_provider_id), \u0027\u0027) IS NULL AND tm.place_latitude IS NULL AND tm.place_longitude IS NULL) OR (btrim(tm.place_provider) = \u0027kakao\u0027 AND nullif(btrim(tm.place_provider_id), \u0027\u0027) IS NOT NULL AND tm.place_latitude BETWEEN -90 AND 90 AND tm.place_longitude BETWEEN -180 AND 180)) AS valid_place FROM v1_tournament_fields f JOIN v1_team_matches tm ON tm.tournament_id = f.tournament_id AND (tm.field_id = f.id OR lower(btrim(tm.place_name)) = lower(btrim(f.name))) JOIN v1_tournaments t ON t.id = tm.tournament_id WHERE tm.deleted_at IS NULL AND t.deleted_at IS NULL AND (t.kind IN (\u0027regular_tournament\u0027, \u0027regular_league\u0027) OR t.kind IS NULL) AND tm.place_name IS NOT NULL AND btrim(tm.place_name) \u003c\u003e \u0027\u0027 AND lower(btrim(tm.place_name)) NOT IN (\u0027장소 미정\u0027, \u0027미정\u0027, \u0027tbd\u0027) ), grouped AS ( SELECT field_id, (array_agg(snapshot))[1] AS snapshot FROM places GROUP BY field_id HAVING count(DISTINCT snapshot) = 1 AND bool_and(valid_place) ) UPDATE v1_tournament_fields f SET place_snapshot = g.snapshot, version = f.version + 1, updated_at = CURRENT_TIMESTAMP FROM grouped g WHERE f.id = g.field_id AND f.place_snapshot IS NULL",
     reason: "User-approved full competition place/field integration (Task 20261082). This exact UPDATE enriches only NULL catalogue snapshots from unambiguous valid locations. Existing field IDs/names and all match addresses/coordinates/results/staff remain intact. Old APIs ignore place_snapshot, so rollback remains compatible.",
   },
   {
@@ -1739,7 +1740,15 @@ const changes = runGit([
 const addedFiles = [];
 for (const line of changes.split('\n').filter(Boolean)) {
   const [status, file] = line.split('\t');
-  if (status !== 'A') fail(`existing migration changed (${status}): ${file}`);
+  // Task 20261082: alpha attempt failed with CAS violation, applied_steps_count=0,
+  // place_snapshot absent; resolved rolled-back via SSM 21d57395-ddd5-4843-ac6a-269065aefbfa.
+  // Never deployed to main. Permit only this exact failed-source -> repaired-source pair;
+  // repaired SQL still passes the normal statement-level compatibility review below.
+  const failedFieldRepair = status === 'M'
+    && file === 'apps/v1_api/prisma/migrations/20261014000100_v1_competition_field_places/migration.sql'
+    && createHash('sha256').update(runGit(['show', `${diffBase}:${file}`])).digest('hex') === '2aefdb02ee5c5a4bb2113f0d4ee95d823cc0a04c4720e49577811bcfb059d925'
+    && createHash('sha256').update(runGit(['show', `${headSha}:${file}`])).digest('hex') === 'acc84842952611f8c8addc2dc34ecd88fab57ddc3a386d3f15af95473bc71d39';
+  if (status !== 'A' && !failedFieldRepair) fail(`existing migration changed (${status}): ${file}`);
   addedFiles.push(file);
 }
 

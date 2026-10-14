@@ -1,0 +1,119 @@
+[
+  {
+    "width": 390,
+    "scenario": "search",
+    "passed": true,
+    "url": "/league-matches/87ba8a61-c590-4789-9479-8216fdb99b6e?from=%2Fsearch%3Fq%3D%2528%25ED%2585%258C%25EC%258A%25A4%25ED%258A%25B8%25291014"
+  },
+  {
+    "width": 390,
+    "scenario": "team",
+    "passed": true,
+    "url": "/league-matches/aef0d98f-17eb-4590-b27d-a2d8bab765e6?from=%2Fteams%2Fad300000-0000-4000-8000-000000000003"
+  },
+  {
+    "width": 390,
+    "scenario": "fixture-parent",
+    "passed": true,
+    "url": "/league-matches/aef0d98f-17eb-4590-b27d-a2d8bab765e6"
+  },
+  {
+    "width": 390,
+    "scenario": "awards-parent",
+    "passed": true,
+    "url": "/league-matches/aef0d98f-17eb-4590-b27d-a2d8bab765e6"
+  },
+  {
+    "width": 390,
+    "errors": [
+      {
+        "route": "/search",
+        "message": "Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+      }
+    ],
+    "failed": [
+      {
+        "path": "/api/v1/auth/me",
+        "status": 401
+      }
+    ]
+  },
+  {
+    "width": 768,
+    "scenario": "search",
+    "passed": true,
+    "url": "/league-matches/87ba8a61-c590-4789-9479-8216fdb99b6e?from=%2Fsearch%3Fq%3D%2528%25ED%2585%258C%25EC%258A%25A4%25ED%258A%25B8%25291014"
+  },
+  {
+    "width": 768,
+    "scenario": "team",
+    "passed": true,
+    "url": "/league-matches/aef0d98f-17eb-4590-b27d-a2d8bab765e6?from=%2Fteams%2Fad300000-0000-4000-8000-000000000003"
+  },
+  {
+    "width": 768,
+    "scenario": "fixture-parent",
+    "passed": true,
+    "url": "/league-matches/aef0d98f-17eb-4590-b27d-a2d8bab765e6"
+  },
+  {
+    "width": 768,
+    "scenario": "awards-parent",
+    "passed": true,
+    "url": "/league-matches/aef0d98f-17eb-4590-b27d-a2d8bab765e6"
+  },
+  {
+    "width": 768,
+    "errors": [
+      {
+        "route": "/search",
+        "message": "Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+      }
+    ],
+    "failed": [
+      {
+        "path": "/api/v1/auth/me",
+        "status": 401
+      }
+    ]
+  },
+  {
+    "width": 1440,
+    "scenario": "search",
+    "passed": true,
+    "url": "/league-matches/87ba8a61-c590-4789-9479-8216fdb99b6e?from=%2Fsearch%3Fq%3D%2528%25ED%2585%258C%25EC%258A%25A4%25ED%258A%25B8%25291014"
+  },
+  {
+    "width": 1440,
+    "scenario": "team",
+    "passed": true,
+    "url": "/league-matches/aef0d98f-17eb-4590-b27d-a2d8bab765e6?from=%2Fteams%2Fad300000-0000-4000-8000-000000000003"
+  },
+  {
+    "width": 1440,
+    "scenario": "fixture-parent",
+    "passed": true,
+    "url": "/league-matches/aef0d98f-17eb-4590-b27d-a2d8bab765e6"
+  },
+  {
+    "width": 1440,
+    "scenario": "awards-parent",
+    "passed": true,
+    "url": "/league-matches/aef0d98f-17eb-4590-b27d-a2d8bab765e6"
+  },
+  {
+    "width": 1440,
+    "errors": [
+      {
+        "route": "/search",
+        "message": "Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+      }
+    ],
+    "failed": [
+      {
+        "path": "/api/v1/auth/me",
+        "status": 401
+      }
+    ]
+  }
+]

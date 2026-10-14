@@ -10,3 +10,5 @@ Task: [20261080](../../.github/tasks/20261080-league-list-detail-entry.md)
 - after: dev 배포 후 scripts/qa/capture-league-detail-routes.cjs after 실행 예정.
 - 보호 화면: 마이·신청·팀 멤버 persona alpha 로그인 실측 미실행. 단위 렌더 검증과 구분한다.
 - cleanup: 캡처 도구가 소유 Node/Chrome PID 기록 후 browser.close/server.close.
+
+추가 before 검증: 검색·공개 팀 상세·경기 상위·시상 상위 링크를 390/768/1440에서 12/12 클릭 확인. 모바일 팀 링크는 반응형 숨김 복제 링크를 제외하고 실제 보이는 링크를 선택했다. /search에서는 변경 전부터 React hydration #418이 재현되며 이번 링크 변경으로 새로 발생한 오류와 구분한다. 인증 persona의 내 리그·신청은 아직 alpha 미실측이다.

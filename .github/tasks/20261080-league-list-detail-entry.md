@@ -123,3 +123,5 @@ Base origin/dev=dde8964ca. Worktree _worktrees/league-detail-routes. Phase 1 inv
 배포 전 게이트: Web/API tsc 0, 양 앱 pattern/surface 검사 PASS, API 81/81, 영향받은 Web 소비자·복귀·SEO·redirect 테스트 PASS. before 3폭에서 실제 홈 리그/목록 클릭 완료. /leagues 과거 알림404 재현. 코드 신규 debt marker0, diff check PASS.
 
 추가 적대 검토: 알림 아이콘이 구 경로에 의존함을 발견. 새 알림 링크의 kind=league와 기존 알림 정규화에 같은 구분을 보존하고 알림 카드/시트는 해당 정보를 사용한다. API 알림78/78, Web 추가32/32 PASS. 셸 기본 복귀/선수 기록 빈 상태의 이전 주소 단언도 동기화했다.
+
+PR #1918 head73c1523ba, base dev. 추가 before 검색/팀/경기/시상12/12 클릭 성공. /search hydration #418은 기존 배포에서도 재현되는 별도 baseline. 증거는 docs/league-detail-routes-qa 브랜치에 보존하여 제품 PR CI를 다시 시작하지 않는다. Copilot 요청2회, 현재 review0. 정책 Gates PASS, 전체 Web/API CI 대기.

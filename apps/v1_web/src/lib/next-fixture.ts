@@ -3,7 +3,7 @@ import type { V1TournamentDetail } from '@/types/api';
 export interface NextFixtureRef {
   /** 콘솔 경로의 `fixtureId` — 대회는 대진 id, 리그는 팀매치 id. */
   readonly fixtureId: string;
-  /** 대회는 "홈 vs 원정", 리그는 대진 제목("2주차 1경기"). */
+  /** "홈 vs 원정". 리그 경기의 팀 이름을 참가팀 목록에서 못 찾으면(모집 중이라 가려짐 등) 대진 제목. */
   readonly label: string;
 }
 
@@ -26,9 +26,10 @@ function toMs(iso: string | null | undefined): number | null {
  * (엉뚱한 경기를 "다음"이라 부르지 않는다).
  */
 export function findNextFixture(
-  tournament: Pick<V1TournamentDetail, 'fixtures' | 'leagueFixtures'>,
+  tournament: Pick<V1TournamentDetail, 'fixtures' | 'leagueFixtures' | 'participantTeams'>,
   currentFixtureId: string,
 ): NextFixtureRef | null {
+  const teamNames = new Map(tournament.participantTeams.map((team) => [team.teamId, team.teamName]));
   const candidates: Candidate[] = [
     ...tournament.fixtures.map((fixture) => ({
       fixtureId: fixture.id,
@@ -36,12 +37,16 @@ export function findNextFixture(
       startMs: toMs(fixture.scheduledAt),
       finished: fixture.liveStatus === 'ended' || fixture.liveStatus === 'cancelled',
     })),
-    ...tournament.leagueFixtures.map((fixture) => ({
-      fixtureId: fixture.teamMatchId,
-      label: fixture.title,
-      startMs: toMs(fixture.startAt),
-      finished: fixture.status === 'cancelled' || fixture.status === 'completed',
-    })),
+    ...tournament.leagueFixtures.map((fixture) => {
+      const home = fixture.homeTeamId ? teamNames.get(fixture.homeTeamId) : undefined;
+      const away = fixture.awayTeamId ? teamNames.get(fixture.awayTeamId) : undefined;
+      return {
+        fixtureId: fixture.teamMatchId,
+        label: home && away ? `${home} vs ${away}` : fixture.title,
+        startMs: toMs(fixture.startAt),
+        finished: fixture.status === 'cancelled' || fixture.status === 'completed',
+      };
+    }),
   ];
   // 안정 정렬 — 같은 시각이면 서버가 준 순서를 지킨다.
   const ordered = candidates

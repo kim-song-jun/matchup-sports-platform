@@ -4425,6 +4425,8 @@ export interface V1GenerateLeagueFixturesResponse {
  */
 interface V1LeagueOverallStandingRowBase {
   teamName: string;
+  /** 팀의 현재 로고. 기존 응답/fixture 호환을 위해 optional이며 미등록은 null. */
+  teamLogoUrl?: string | null;
   position: number | null;
   points: number;
   wins: number;

@@ -281,6 +281,10 @@ export function OperationsBoardClient({ tournamentId }: Props) {
 
   const board = useV1TournamentOperationsBoard(tournamentId, filters);
   const fields = useV1TournamentFields(tournamentId);
+  const refreshBoard = () => {
+    void board.refetch();
+    void fields.refetch();
+  };
   const tournament = useV1Tournament(tournamentId);
 
   const role = useTournamentOpsRole();
@@ -499,12 +503,12 @@ export function OperationsBoardClient({ tournamentId }: Props) {
         action={
           <button
             type="button"
-            onClick={() => void board.refetch()}
-            disabled={board.isFetching}
+            onClick={refreshBoard}
+            disabled={board.isFetching || fields.isFetching}
             aria-label="지금 새로고침"
             className="flex items-center justify-center w-[44px] h-[44px] rounded-xl border border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-soft)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50 shrink-0"
           >
-            <RefreshCw size={18} aria-hidden="true" className={board.isFetching ? 'animate-spin' : ''} />
+            <RefreshCw size={18} aria-hidden="true" className={board.isFetching || fields.isFetching ? 'animate-spin' : ''} />
           </button>
         }
       />
@@ -590,7 +594,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
           </p>
           <button
             type="button"
-            onClick={() => void board.refetch()}
+            onClick={refreshBoard}
             className="text-sm text-[var(--blue700)] hover:bg-[var(--blue50)] underline underline-offset-2 min-h-[44px] px-3 rounded transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >
             다시 시도하기

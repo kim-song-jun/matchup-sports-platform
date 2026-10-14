@@ -118,6 +118,8 @@ After bracket publication, each public `groups[].standings[]` row includes nulla
 
 ### Overall standings — two competition kinds, two row shapes
 
+Each `standings[]` row includes nullable `teamLogoUrl` from the team's current profile, for both competition kinds. It follows the same participant-identity gate as `teamName`: hidden identities return `null`. The public table uses the shared `TeamAvatar` fallback for missing or failed logos. Participant `players[]` are active registered competition roster rows (`v1_tournament_players`, `removed_at IS NULL`), not the team's entire membership list; only jersey number and nickname are public.
+
 `v1_tournaments` holds both single tournaments (`kind = regular_tournament`) and the mirror rows of
 regular league seasons (`kind = regular_league`, whose id equals the league id). This endpoint serves
 both, but a mirror row has no groups and no tournament fixtures — those are created only on the

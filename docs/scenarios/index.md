@@ -1,3 +1,7 @@
+## 2026-10-14 — 리그 상세 대표 이미지·통합 순위 팀 마크
+
+[시나리오](./league-detail-media.md) · [Task 20261081](../../.github/tasks/20261081-league-detail-media.md). Web49/API40·양쪽 타입/패턴 PASS. 실제 alpha before 3폭 확인, after 배포 검증 대기. 제공 리그의 저장 대표 이미지는 null이며 참가 명단은 등록 선수 6/6/5명이다.
+
 ## 2026-10-12 — 대진 목록 5조·20팀→12강 자동 배정
 
 [Task 20261057 후속](../../.github/tasks/20261057-admin-bracket-canvas.md): 빈 목록의 전체 대진 생성(조별30+결선11), 조별 자리 편집/무작위 배정, 12강 성적 비교·동률 확인·팀 교환·일괄 저장 구현. 실제 임시 PostgreSQL 신규3+기존슬롯44=47/47, Web114/114, API 타입/surface·Web 패턴 통과. 최초 로컬 의존성 불일치로 보였던 leave-team 타입 오류2개는 lockfile TanStack 5.102.8 일치 후 해소, 신규 테스트 role 옵션 수정 후 Web 전체 타입 검사 0. Headed 합성 컴포넌트 390/768/1440 3/3, overflow·JS/console/network 오류0, [증거](../screenshots/round12-list/evidence.json). Alpha 대상 URL은 로그인 이동(auth/me401); **실제 Alpha 기능 QA 0/3, 배포/실제 대회 데이터 변경 없음**. 합성 화면은 실제 Alpha 검증으로 계산하지 않는다.

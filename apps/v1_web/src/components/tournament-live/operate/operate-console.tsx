@@ -35,7 +35,7 @@ import {
   isClockSuspicious,
   type FrozenEventCapture,
 } from '@/lib/game-operations-clock';
-import { extractErrorMessage } from '@/lib/error-message';
+import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
 import { randomUuid } from '@/lib/uuid';
 import { isV1NetworkError, V1ApiError } from '@/lib/api-client';
 import { ActionTargetPicker, type EventCaptureCommitInput } from './action-target-picker';
@@ -1215,7 +1215,9 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center gap-2 px-4 text-center">
         <p className="text-sm font-medium text-[var(--text-body)]">
-          {extractErrorMessage(fixtureLineup.error, '경기 정보를 불러오지 못했어요.')}
+          {extractErrorCode(fixtureLineup.error) === 'STAFF_SCOPE_DENIED'
+            ? gameOperationsErrorMessage('STAFF_SCOPE_DENIED')
+            : extractErrorMessage(fixtureLineup.error, '경기 정보를 불러오지 못했어요.')}
         </p>
         <Button size="md" variant="outline" onClick={() => fixtureLineup.refetch()}>
           다시 시도

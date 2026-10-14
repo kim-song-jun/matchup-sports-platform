@@ -157,8 +157,8 @@ function revisionBadgeTone(state: V1GameResultRevision['state']) {
  * 멤버**가 결과 영수증을 볼 수 있는데(participantMember), `GET /team-matches/:id/lineup`은
  * owner/manager가 아니면 403을 던진다(team-match-lineup.service.ts loadContext) — 일반
  * 멤버가 리그 결과 화면에 들어오면 needsOwnLineup=true 그대로는 이 403이 `isError`를
- * 덮어써서 정상적인 영수증 대신 에러 화면을 보게 된다. 리그 결과는 애초에 라인업을
- * 쓰지 않는다(LeagueMatchResultEntryService는 항상 actualParticipants=[]).
+ * 덮어써서 정상적인 영수증 대신 에러 화면을 보게 된다. 결과 API의 정책 적용된
+ * 선수 이름을 사용하므로 팀장 전용 라인업 조회는 필요하지 않다.
  */
 function useResultScreenBase(teamMatchId: string, options: { needsOwnLineup: boolean }) {
   const teamMatch = useV1TeamMatch(teamMatchId);
@@ -187,12 +187,9 @@ function retryAll(...queries: Array<{ refetch: () => unknown }>) {
 /**
  * P0-4: 상대팀 승인 화면 + 호스트의 SUBMITTED/OFFICIAL 화면에서 득점자·카드·MVP를 보여준다.
  *
- * `resultParticipants`에는 이름이 없다(participantId만 있음, `V1GameResultParticipantRow`
- * 참고). 상대팀 승인 화면은 애초에 이름을 가져올 방법이 없다 — `TeamMatchLineupService.getLineup`도
- * `GamesService.listLineups`도 참가팀 액터에게는 항상 자기 팀(ownSideId) 라인업만 돌려주고,
- * 상대팀(호스트) 라인업을 조회하는 엔드포인트는 존재하지 않는다(공정성 원칙 — 정정 요청은
- * blind action). 그래서 `roster`가 없으면 이름 대신 participantId 앞 8자를 노출한다 —
- * "완전히 안 보이는 것"보다는 선수를 구분할 수 있는 만큼은 낫다.
+ * 결과 API가 동의·이름 공개 정책을 적용한 displayName/jerseyNumber를 우선 사용한다.
+ * 리그는 일반 팀원도 결과를 보므로 팀장 전용 라인업 API를 추가 호출하지 않는다.
+ * 옛 응답은 이미 조회한 자기 팀 roster로 연결하고, 공개 이름이 없으면 식별자로 구분한다.
  *
  * 호스트는 자기 팀 라인업(`roster`)을 항상 조회할 수 있으므로, 호스트 화면에서는 이 컴포넌트에
  * `roster`를 넘겨 실명 표시로 격상한다 — SUBMITTED 승인 대기 중과 OFFICIAL 확정 후에도(감사
@@ -212,6 +209,8 @@ function ApprovalParticipantSummary({
   if (scorers.length === 0 && carded.length === 0 && !mvpParticipantId) return null;
 
   const label = (participantId: string) => {
+    const resultRow = resultParticipants.find((row) => row.participantId === participantId);
+    if (resultRow?.displayName) return `${resultRow.jerseyNumber != null ? `#${resultRow.jerseyNumber} ` : ''}${resultRow.displayName}`;
     const rosterRow = roster?.find((row) => row.participantId === participantId);
     if (rosterRow) return `${rosterRow.jerseyNumber ? `#${rosterRow.jerseyNumber} ` : ''}${rosterRow.displayName}`;
     return `선수 #${participantId.slice(0, 8)}`;

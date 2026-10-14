@@ -37,3 +37,8 @@ origin/dev 3542691e4 기반 feat/competition-goalkeeper-defaults 격리 작업�
 - DB Docker 미가동: 실제 migration replay/drift와 통합 시나리오는 CI에서 검증. additive nullable 컬럼이며 destructive SQL 없음.
 - schema LF SHA 4f236e5869208c55b916f3a3b4308d719e7d565afccafd92cf477e4466c2ce86. M11 변경 없음. 이전 SHA도 stored manifest allowlist에 보존.
 - 단계: 구현 완료 → PR/CI/Copilot → dev merge/alpha → 실제 UI·전파·원복 검증 → 완료 문서.
+
+- 사용자 후속 확인: 팀장급 GK·등번호·참가 선수 추가/삭제는 동일 대회 시작 전 경기 공통 적용, 출전 체크는 경기별 유지(명시 선택 완료). 기존 선수/등번호 저장 서비스는 competitionTeam resync 이벤트로 같은 범위를 반영한다.
+- Alpha 실제 대상은 경기 API로 확인한 c37f4a30-1acb-4f71-b154-89d1df13ce2e 리그. 이게팀이야 참가 등록에 현재/다음 경기 2개, 선수 7명. 어드민 390/768/1440 before 확보. 전용 Chrome PID 35196 / Node PID 32388.
+
+- CI 38516388686: Gates/Web SUCCESS, 실제 migration chain 및 drift PASS. API integration 163 suites/1197 tests PASS, 새 리그 생성 상속 테스트 1개에서 fixture의 자동 명단이 비어 있어 실패. 하네스는 적격 자동 채움 팀원이 없는 구조이므로 참가 선수를 명시 등록하도록 수정. 대회 신규 생성/시작 기록 보존/다른 대회 격리 테스트는 PASS.

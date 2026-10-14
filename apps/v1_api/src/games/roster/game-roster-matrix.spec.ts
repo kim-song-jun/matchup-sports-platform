@@ -177,3 +177,10 @@ describe('buildTeamRosterMatrix — 선수 순서', () => {
     expect(matrix.players.map((player) => player.displayName)).toEqual(['가람', '나래', '하늘']);
   });
 });
+
+
+it('GK는 출전 제외와 독립적으로 어드민 셀에 표시된다', () => {
+  const base = [{ ...entry('gk'), goalkeeper: true }];
+  const matrix = buildTeamRosterMatrix({ canWrite: true, columns: [{ game: game('g1'), loaded: loaded(base, { adjustments: [{ id: 'x', userId: 'gk', reason: null, actorUserId: 'admin', actorRole: 'ADMIN', createdAt: KICKOFF, revokedAt: null }] }) }] });
+  expect(matrix.players[0].cells[0]).toMatchObject({ status: 'EXCLUDED', goalkeeper: true });
+});

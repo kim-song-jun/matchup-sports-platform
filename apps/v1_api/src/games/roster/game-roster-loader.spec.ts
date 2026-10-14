@@ -330,3 +330,14 @@ describe('loadJerseyRegistration — 등번호 원본 신청은 참가 명단 �
     await expect(loadJerseyRegistration(tx, scope, managerInput)).resolves.toBeNull();
   });
 });
+
+
+describe('대회 공통 GK 정본 우선순위', () => {
+  it('참가 명단의 명시 true/false는 이전 경기별 값보다 우선하고 null은 이전 값을 보존한다', async () => {
+    const registration = { ...TOURNAMENT_REGISTRATION, players: TOURNAMENT_REGISTRATION.players.map((player, i) => ({ ...player, goalkeeper: i === 0 ? false : i === 1 ? true : null })) };
+    const tx = fakeTx({ teamMatch: TOURNAMENT_MATCH, sideTeamId: 'team-A', registration,
+      goalkeepers: [{ userId: 'pa', goalkeeper: true, teamId: 'team-A' }, { userId: 'pc', goalkeeper: true, teamId: 'team-A' }] });
+    const result = await loadGameRoster(tx, { gameId: 'game-1', sideId: 'side-1' });
+    expect(result?.base.map((row) => [row.userId, row.goalkeeper]).sort((a,b) => String(a[0]).localeCompare(String(b[0])))).toEqual([['pa', false], ['pb', true], ['pc', true]]);
+  });
+});

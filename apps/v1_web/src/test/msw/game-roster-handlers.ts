@@ -111,7 +111,7 @@ export function createV1GameRosterMswHandlers() {
   });
   const fallback = () => state.baseSource === 'TEAM_MEMBERS';
   const person = ({ participantId, ...p }: (typeof GAME_ROSTER_MSW.players)[number], gameId: string) => ({
-    goalkeeper: state.goalkeepers.get(`${gameId}:${p.userId}`) ?? false,
+    goalkeeper: state.goalkeepers.get(p.userId) ?? false,
     ...p,
     jerseyNumber: fallback() ? null : (state.jerseys.get(p.userId) ?? null),
     accountLinked: !fallback(),
@@ -218,7 +218,7 @@ export function createV1GameRosterMswHandlers() {
       displayName: p.displayName,
       accountLinked: true,
       cells: views.map(({ roster }): V1TeamRosterCell => {
-        const empty = { reason: null, actorRole: null, adjustmentId: null, unavailabilityId: null, remainingMatches: null };
+        const empty = { reason: null, actorRole: null, adjustmentId: null, unavailabilityId: null, remainingMatches: null, goalkeeper: state.goalkeepers.get(p.userId) ?? false };
         const ex = roster.excluded.find((e) => e.userId === p.userId);
         if (ex) return { ...empty, gameId: roster.gameId, status: 'EXCLUDED', reason: ex.reason, actorRole: ex.actor.role, adjustmentId: ex.adjustmentId };
         const un = roster.unavailable.find((u) => u.userId === p.userId);
@@ -320,9 +320,9 @@ export function createV1GameRosterMswHandlers() {
         const game = findGame(c.gameId)!;
         const key = c.gameId + ':' + c.userId;
         const alreadyApplied = c.op === 'SET_GOALKEEPER'
-          ? (state.goalkeepers.get(key) ?? false) === c.goalkeeper
+          ? (state.goalkeepers.get(c.userId) ?? false) === c.goalkeeper
           : c.op === 'EXCLUDE' ? exclude(c.gameId, c.userId, c.reason ?? null) : revoke(c.gameId, c.userId);
-        if (c.op === 'SET_GOALKEEPER') state.goalkeepers.set(key, c.goalkeeper!);
+        if (c.op === 'SET_GOALKEEPER') state.goalkeepers.set(c.userId, c.goalkeeper!);
         return { gameId: c.gameId, sideId: game.sideId, userId: c.userId, op: c.op, alreadyApplied };
       });
       return ok({ teamId: String(params.teamId), results });

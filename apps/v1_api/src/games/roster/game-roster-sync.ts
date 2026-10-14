@@ -378,7 +378,7 @@ export function upcomingCompetitionGameWhere(
  * 잠근 경기 안에서 한 팀의 그 대회·리그 시작 전 경기 명단을 다시 계산한다. 바뀐 사이드 수를 돌려준다.
  * 잠근 뒤 다시 읽으므로 그 사이 시작된 경기는 빠진다.
  */
-async function syncLockedCompetitionTeam(
+export async function syncLockedCompetitionTeam(
   tx: Tx,
   input: { competitionId: string; teamId: string },
   locked: ReadonlySet<string>,

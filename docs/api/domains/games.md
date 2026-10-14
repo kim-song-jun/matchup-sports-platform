@@ -225,10 +225,10 @@ Raw migration triggers `v1_guard_result_revision_transition`, `v1_block_terminal
 ### 경기 명단 GK 지정 (Task 20261082)
 
 경기·팀 명단 조회의 모든 선수 행(기준/출전/빠짐/결장/출전정지)은 `goalkeeper: boolean`을 포함한다.
-시작 전에는 `V1GameRosterRole`의 경기·사이드·현재 팀·선수 지정, 시작 후 출전자는 기록에 선택된 라인업 position 스냅샷을 사용한다.
+시작 전에는 참가 명단 `V1TournamentPlayer.goalkeeper`의 명시 true/false를 정본으로 사용한다. null인 기존 선수만 `V1GameRosterRole` 경기별 지정으로 호환 조회한다. 시작 후 출전자는 기록에 선택된 라인업 position 스냅샷을 사용한다.
 `POST /api/v1/teams/:teamId/game-rosters/batch`는 `{gameId,userId,op:'SET_GOALKEEPER',goalkeeper:boolean}`을 추가로 받는다.
 복수 GK에 인원 제한이 없으며 같은 선수의 EXCLUDE/REVOKE와 GK 변경을 같은 트랜잭션으로 저장할 수 있다.
-출전 조정끼리 또는 GK 변경끼리 같은 경기·선수 중복은 400이다. GK의 누락/비 boolean/사유 첨부 및 다른 op에 GK 첨부도 400이다.
+출전 조정끼리 같은 경기·선수 중복, GK 변경끼리 같은 대회·선수 중복은 400이다. GK의 누락/비 boolean/사유 첨부 및 다른 op에 GK 첨부도 400이다.
 기존 사이드 권한, 시작 마감, 명단 밖 선수, 팀 변경 검증을 동일하게 적용한다. 출전 제외·복귀는 GK 지정을 지우지 않는다.
 GK 변경은 변경 전후 값과 처리 역할을 `GAME_ROSTER_GOALKEEPER_CHANGED` 운영 감사에 남긴다.
 명단 동기화 시 게임 규칙의 GK 코드(풋살 GOLEIRO 등)를 실제 참가자 position에 저장한다.
@@ -236,3 +236,7 @@ GK 변경은 변경 전후 값과 처리 역할을 `GAME_ROSTER_GOALKEEPER_CHANG
 
 관련 근거: `games/roster/dto/team-game-roster.dto.ts`, `game-roster-loader.ts`, `game-roster.service.ts`,
 `game-roster-sync.ts`, `test/games/team-game-rosters.integration-spec.ts`, Web `hooks/use-v1-game-roster.ts`.
+
+### 대회 공통 GK 및 어드민 관리 (Task 20261083)
+GK 저장/해제는 해당 참가 등록(대회·팀)의 선수 값에 보관한다. 해당 대회의 시작 전 경기들을 첫 잠금 범위에 포함해 동일 트랜잭션에서 실제 lineup position을 동기화한다. 이후 대회/리그/플레이오프 경기 생성도 참가 명단 GK와 종목 GK 코드(예: GOLEIRO)를 상속한다. 시작·종료 경기의 저장된 참가자 position은 변경하지 않는다. 다른 대회·팀의 GK에는 영향이 없다.
+일괄 응답은 `{teamId,results,affectedGames:[{gameId,sideId}]}`. 클라이언트는 전파 대상 경기의 명단·라인업·공개 기록 캐시를 모두 무효화한다. 어드민 출전 표의 선수 셀은 `goalkeeper:boolean`, 경기 열은 `goalkeeperEditable:boolean`을 포함한다. support/read-only 스태프는 조회만 한다. 어드민 GK 열은 EXCLUDE/REVOKE와 함께 동일 batch로 저장하고 일반 실패는 GK 초안을 보존한다.

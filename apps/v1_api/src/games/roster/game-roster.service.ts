@@ -262,13 +262,19 @@ export class GameRosterService {
     }
     const key = { gameId: target.gameId, sideId: target.sideId, teamId: target.teamId, userId };
     const existing = await tx.v1GameRosterRole.findUnique({ where: { gameId_sideId_teamId_userId: key } });
-    if ((existing?.goalkeeper ?? false) === goalkeeper) return { alreadyApplied: true };
+    const player = await tx.v1TournamentPlayer.findFirst({
+      where: { userId, removedAt: null, registration: { tournamentId: loaded.context.competitionId, teamId: target.teamId, status: 'confirmed' } },
+      select: { id: true, goalkeeper: true },
+    });
+    if (player === null) throw rosterNotAvailable('참가 명단을 등록한 뒤 골키퍼를 지정해 주세요.');
+    if (player.goalkeeper === goalkeeper) return { alreadyApplied: true };
+    await tx.v1TournamentPlayer.update({ where: { id: player.id }, data: { goalkeeper } });
     await tx.v1GameRosterRole.upsert({ where: { gameId_sideId_teamId_userId: key }, create: { ...key, goalkeeper }, update: { goalkeeper } });
     await new OperationAuditWriterService().create(tx, {
       actor: { type: actor.role === 'TEAM_MANAGER' ? 'TEAM_MANAGER' : actor.role === 'ADMIN' ? 'PLATFORM_OPS' : 'TOURNAMENT_STAFF', id: actor.userId }, action: 'GAME_ROSTER_GOALKEEPER_CHANGED', requestId: randomUUID(), occurredAt: new Date(),
       targetType: 'GAME_SIDE', targetId: target.sideId,
       tournamentId: loaded.context.competitionId, teamMatchId: loaded.context.tournamentId === null ? null : loaded.context.teamMatchId,
-      before: { userId, goalkeeper: existing?.goalkeeper ?? false }, after: { userId, goalkeeper, role: actor.role },
+      before: { userId, goalkeeper: player.goalkeeper ?? existing?.goalkeeper ?? false }, after: { userId, goalkeeper, role: actor.role, scope: 'COMPETITION' },
     });
     return { alreadyApplied: false };
   }

@@ -2906,6 +2906,8 @@ model V1TournamentPlayer {
   /// 유일성은 **등록(팀) 단위**다 — 같은 대회의 다른 팀이 같은 번호를 쓰는 것은 정상이다.
   /// 라인업은 이 값을 기본값으로 상속하고, 라인업에서 바꾸면 그 경기만 바뀐다.
   jerseyNumber      Int?                          @map("jersey_number")
+  /// null preserves legacy per-game roles; explicit true/false applies to all unstarted competition games.
+  goalkeeper        Boolean?
   eligibilityStatus V1TournamentPlayerEligibility @default(needs_review) @map("eligibility_status")
   eligibilityNote   String?                       @map("eligibility_note")
   addedAt           DateTime                      @default(now()) @map("added_at")

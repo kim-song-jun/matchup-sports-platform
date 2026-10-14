@@ -257,7 +257,7 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
           canEdit && data.participants.length > 0 ? (
             <>
               {GAME_ROSTER_PLAYING_HINT}
-              <br />골키퍼는 GK 버튼으로 선택해요. 여러 명을 지정할 수 있어요.
+              <br />골키퍼는 GK 버튼으로 선택해요. 여러 명을 지정할 수 있고, 이 대회의 시작 전 경기에도 유지돼요.
               {data.jerseyRegistrationId !== null ? (
                 <>
                   <br />

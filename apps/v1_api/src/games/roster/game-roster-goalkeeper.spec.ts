@@ -11,10 +11,15 @@ const actor = { userId: 'manager', role: 'TEAM_MANAGER' as const };
 const target = { gameId: 'game', sideId: 'side', teamId: 'team' };
 function setup(isLeague = false) {
   const roles = new Map<string, boolean>();
+  const defaults = new Map<string, boolean>();
   const loaded = { context: { ...target, isLeague, competitionId: 'league', tournamentId: null, teamMatchId: 'match' }, base: [{ userId: 'a' }, { userId: 'b' }] };
   jest.mocked(loadGameRoster).mockResolvedValue(loaded as unknown as Awaited<ReturnType<typeof loadGameRoster>>);
   jest.mocked(isUnmigratedTeamAuthoredLineup).mockResolvedValue(false);
   const tx = {
+    v1TournamentPlayer: {
+      findFirst: jest.fn(async ({ where }: { where: { userId: string } }) => ({ id: where.userId, goalkeeper: defaults.get(where.userId) ?? null })),
+      update: jest.fn(async ({ where, data }: { where: { id: string }; data: { goalkeeper: boolean } }) => { defaults.set(where.id, data.goalkeeper); }),
+    },
     v1GameLineup: { findFirst: jest.fn(async () => ({ id: 'lineup' })) },
     v1GameRosterRole: {
       findUnique: jest.fn(async ({ where }: { where: { gameId_sideId_teamId_userId: { userId: string } } }) => {
@@ -40,7 +45,7 @@ describe('경기 명단 GK 지정 쓰기', () => {
     expect([...roles]).toEqual([['a', false], ['b', true]]);
     expect(tx.v1OperationAudit.create).toHaveBeenLastCalledWith(expect.objectContaining({ data: expect.objectContaining({
       actorUserId: 'manager', action: 'GAME_ROSTER_GOALKEEPER_CHANGED', tournamentId: 'league', teamMatchId: null,
-      before: { userId: 'a', goalkeeper: true }, after: { userId: 'a', goalkeeper: false, role: 'TEAM_MANAGER' },
+      before: { userId: 'a', goalkeeper: true }, after: { userId: 'a', goalkeeper: false, role: 'TEAM_MANAGER', scope: 'COMPETITION' },
     }) }));
   });
   it('명단 밖 선수와 인가 후 팀 변경은 역할을 저장하지 않는다', async () => {

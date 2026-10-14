@@ -72,6 +72,14 @@ DB/Docker 미가동 및 브라우저 sandbox 초기화 오류. backfill은 정�
 
 ## Validation / Handoff
 
+### Alpha deployment recovery (2026-10-14)
+- PR #1920 merged dev f45dc0a8b; combined API/Web/Gates CI passed. Alpha run 38516665999 failed: existing-field snapshot UPDATE omitted required version increment (SQLSTATE 40001). Previous release restored; DB health normal.
+- Read-only alpha SSM 03feaa38-7cf4-4e21-9099-0670e9b7a93a: failed migration finished_at/rolled_back_at NULL, applied_steps_count=0, place_snapshot column absent. No partial DDL/data applied.
+- Under alpha deployment lock, Prisma resolve --rolled-back for only 20261014000100_v1_competition_field_places succeeded (SSM 21d57395-ddd5-4843-ac6a-269065aefbfa). No business-data mutation or main deployment.
+- Repair increments field version and updated_at. Real DB integration now starts with an existing NULL-snapshot field at version 7 and expects version 8, preserved match locations, and no version change on replay.
+- Immutable migration gate exception is restricted to the exact failed/repaired SHA256 pair, with ordinary statement compatibility review retained. This failed migration was never successfully applied to alpha or shipped to main.
+- API tsc and diff checks passed; corrected CI/redeployment and browser QA pending.
+
 ### 후속 전체 연결 변경
 - 최종 배포 전 CI에서 Gates/Web/실제 DB migration replay·integration PASS. API unit은 자동 필드 등록이 추가된 두 mock fixture 모형 누락으로 실패해, competition-scoped stateful field delegate를 도입했다. 해당 두 스위트 230/230 PASS, mock seed의 6경기가 등록 필드 하나에 연결되는 실제 payload 검증 추가. 로컬 전체 API unit도 실행했으며 변경하지 않은 약관 SQL/Markdown fixture의 Windows CRLF 차이 실패를 관측해 해당 판정은 Linux CI 기준으로 진행한다. 생산 코드나 약관 내용은 변경하지 않음.
 - 배포 게이트 보완: CTE INSERT/UPDATE 세 문장을 expand-contract 정식 review 목록에 **정확한 SQL 문자열**로 등록했다. field 생성은 NOT EXISTS/ON CONFLICT, metadata 갱신은 NULL snapshot+유효·단일 위치, 경기 연결은 NULL field_id+같은 competition 이름 lookup으로 제한한다. 기존 place/result/staff/배정 ID 불변 및 이전 API rollback 호환 근거 포함. 기존 negative controls/allowlist integrity/base diagnostics와 실제 dev→HEAD 검사 PASS. 이전 전체 CI의 Web 9048/9049·DB 1192건 통과 후 구 표시 기대값·해제 거절 검증·source schema pin을 수정, 로컬 공개 records 75/75 PASS.

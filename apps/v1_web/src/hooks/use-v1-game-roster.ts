@@ -31,6 +31,7 @@ export type V1GameRosterPerson = {
   userId: string;
   displayName: string;
   jerseyNumber: number | null;
+  goalkeeper: boolean;
   /** false = 리그 폴백 팀원(경기 기록에 계정 없이 들어간다). */
   accountLinked: boolean;
   /** 참가 명단 선수 id(등번호 저장 API 의 `:playerId`). 참가 명단 행이 없는 리그 폴백 팀원은 null. */
@@ -145,7 +146,9 @@ export type V1AdminRegistrationRosterMatrix = {
 export type V1GameRosterBatchChange = {
   gameId: string;
   userId: string;
-  op: 'EXCLUDE' | 'REVOKE';
+  op: 'EXCLUDE' | 'REVOKE' | 'SET_GOALKEEPER';
+  /** SET_GOALKEEPER 에 필수. 지정 인원 제한은 없다. */
+  goalkeeper?: boolean;
   /** EXCLUDE 에만. REVOKE 에 붙이면 서버가 400(ROSTER_BATCH_REASON_ON_REVOKE). */
   reason?: GameRosterAdjustmentReason;
 };

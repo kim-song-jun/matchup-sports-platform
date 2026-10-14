@@ -10,6 +10,7 @@ export interface GameRosterBaseEntry {
   readonly accountLinked: boolean;
   readonly displayNameSnapshot: string;
   readonly jerseyNumber: number | null;
+  readonly goalkeeper?: boolean;
   /** 참가 명단 선수 id 또는 폴백 멤버십 id. */
   readonly sourceParticipantId: string;
 }

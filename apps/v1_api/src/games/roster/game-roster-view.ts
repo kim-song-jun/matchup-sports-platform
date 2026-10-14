@@ -44,6 +44,7 @@ export interface GameRosterPersonView {
   readonly userId: string;
   readonly displayName: string;
   readonly jerseyNumber: number | null;
+  readonly goalkeeper: boolean;
   /** false = 리그 폴백 팀원(경기 기록에 계정 없이 들어간다). */
   readonly accountLinked: boolean;
   /** 참가 명단 선수 id — 등번호 저장 API 의 `:playerId`. 리그 폴백 팀원은 참가 명단 행이 없어 null. */
@@ -99,6 +100,7 @@ export interface GameRosterView {
 
 /** 경기 기록이 쓰는 명단 행(사이드의 제출본, 없으면 최신 리비전) — `selectLineupParticipantsWithDraftFallback` 결과. */
 export interface PlayedLineupRow {
+  readonly goalkeeper?: boolean;
   readonly id: string;
   readonly userId: string | null;
   readonly displayNameSnapshot: string;
@@ -110,6 +112,7 @@ function person(entry: GameRosterBaseEntry): GameRosterPersonView {
     userId: entry.userId,
     displayName: entry.displayNameSnapshot,
     jerseyNumber: entry.jerseyNumber,
+    goalkeeper: entry.goalkeeper ?? false,
     accountLinked: entry.accountLinked,
     participantId: entry.accountLinked ? entry.sourceParticipantId : null,
   };
@@ -168,6 +171,7 @@ function playedPeople(rows: readonly PlayedLineupRow[], base: readonly GameRoste
         userId: entry?.userId ?? row.userId ?? `game-participant:${row.id}`,
         displayName: row.displayNameSnapshot,
         jerseyNumber: row.jerseyNumber,
+        goalkeeper: row.goalkeeper ?? false,
         accountLinked: row.userId !== null,
         participantId: entry === null ? null : person(entry).participantId,
       };

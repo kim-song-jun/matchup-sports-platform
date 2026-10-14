@@ -219,7 +219,8 @@ describe('자동으로 빠지거나 들어온 선수', () => {
     expect(within(suspended).getByText('한도윤')).toBeInTheDocument();
     expect(within(suspended).getByText('출전정지 1경기')).toBeInTheDocument();
     expect(within(suspended).getByText(/퇴장 1회/)).toBeInTheDocument();
-    expect(within(suspended).queryByRole('button')).toBeNull();
+    expect(within(suspended).queryByRole('button', { name: /되돌리기/ })).toBeNull();
+    expect(within(suspended).getByRole('button', { name: '한도윤 골키퍼로 지정' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '출전 2명' })).toBeInTheDocument();
   });
 
@@ -241,7 +242,8 @@ describe('자동으로 빠지거나 들어온 선수', () => {
     expect(within(unavailable).getByText('결장 · 부상')).toBeInTheDocument();
     expect(within(unavailable).getByText(/10\/1 \(목\)~10\/4 \(일\) 결장/)).toBeInTheDocument();
     expect(within(unavailable).getByText(/여기서 바꿀 수 없고/)).toBeInTheDocument();
-    expect(within(unavailable).queryByRole('button')).toBeNull();
+    expect(within(unavailable).queryByRole('button', { name: /되돌리기|결장.*변경/ })).toBeNull();
+    expect(within(unavailable).getByRole('button', { name: '김민재 골키퍼로 지정' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '출전 2명' })).toBeInTheDocument();
   });
 });

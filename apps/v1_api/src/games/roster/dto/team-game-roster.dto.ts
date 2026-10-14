@@ -1,9 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
+  IsBoolean,
+  ValidateIf,
   IsDateString,
   IsIn,
   IsISO8601,
@@ -16,7 +18,7 @@ import {
 } from 'class-validator';
 import { GAME_ROSTER_ADJUSTMENT_REASONS, type GameRosterAdjustmentReason } from './game-roster-adjustment.dto';
 
-export const GAME_ROSTER_BATCH_OPS = ['EXCLUDE', 'REVOKE'] as const;
+export const GAME_ROSTER_BATCH_OPS = ['EXCLUDE', 'REVOKE', 'SET_GOALKEEPER'] as const;
 export type GameRosterBatchOp = (typeof GAME_ROSTER_BATCH_OPS)[number];
 
 export class GameRosterBatchChangeDto {
@@ -40,6 +42,13 @@ export class GameRosterBatchChangeDto {
   @IsOptional()
   @IsIn(GAME_ROSTER_ADJUSTMENT_REASONS)
   reason?: GameRosterAdjustmentReason;
+
+  @ApiPropertyOptional({ description: "SET_GOALKEEPER 에 필수. 여러 선수를 동시에 지정할 수 있다." })
+  // 전역 implicit conversion은 문자열 'false'도 true로 만든다. JSON Boolean 원문만 받는다.
+  @Transform(({ obj, key }: { obj: Record<string, unknown>; key: string }) => obj[key])
+  @ValidateIf((change: GameRosterBatchChangeDto) => change.op === "SET_GOALKEEPER" || change.goalkeeper !== undefined)
+  @IsBoolean()
+  goalkeeper?: boolean;
 }
 
 export class GameRosterBatchDto {

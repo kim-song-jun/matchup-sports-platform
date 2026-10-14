@@ -67,7 +67,7 @@ export function draftToBatchChanges(
 
 /** 지금 표로 보낼 수 있는 초안만. 표가 새로 오면(경기 시작·권한·명단 변경) "저장 전" 표시도 보낼 것만 남는다. */
 export function liveDraft(draft: TeamRosterDraft, matrix: Pick<V1TeamRosterMatrix, 'games' | 'players'>): TeamRosterDraft {
-  return Object.fromEntries(draftToBatchChanges(draft, matrix).map((change) => [cellKey(change.gameId, change.userId), change.op]));
+  return Object.fromEntries(draftToBatchChanges(draft, matrix).flatMap((change) => change.op === "SET_GOALKEEPER" ? [] : [[cellKey(change.gameId, change.userId), change.op]]));
 }
 
 /** 거절된 경기의 초안만 버린다 — 나머지는 다시 저장할 수 있게 남긴다. */

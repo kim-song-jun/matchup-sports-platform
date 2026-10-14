@@ -18,7 +18,7 @@ export function ConsoleNextSteps({ tournamentId, fixtureId }: { tournamentId: st
   const tournament = useV1Tournament(tournamentId);
   const isLeague = tournament.data?.kind === 'regular_league';
   const standingsHref = isLeague
-    ? `/league-matches/${encodeURIComponent(tournamentId)}`
+    ? `/tournaments/${encodeURIComponent(tournamentId)}`
     : `/tournaments/${encodeURIComponent(tournamentId)}/results`;
   const next = tournament.data ? findNextFixture(tournament.data, fixtureId) : null;
   const base = resolveTournamentLiveBase(pathname, tournamentId);

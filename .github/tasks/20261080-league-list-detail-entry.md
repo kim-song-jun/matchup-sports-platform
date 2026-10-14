@@ -93,3 +93,33 @@ Alpha before: headed Chromium(owned node PID8521 → chrome PID8585) 비로그�
 PR 요청에 따라 최신 origin/dev=`e6cecf51f` 기반 `/tmp/teameet-league-live-pr`, branch `fix/league-live-public-entry`로 동일한 4개 파일을 옮겼다. 최신 dev에서 touched source/test/task 변경 없음 확인; 기존 공유 작업트리 WIP는 수정하지 않는다. alpha after 갤러리는 정본 CLAUDE.md 규칙대로 머지·배포 뒤 첨부하며 이번 요청은 dev 대상 PR 생성까지다.
 
 PR 전 검증: 최신 dev와 원래 검증한 상세 source/test 바이트 동일성 확인(81/81 결과 재사용), Web 전체 `tsc --noEmit` PASS(`/tmp/teameet-live-pr-typecheck.log`), 올바른 앱 cwd의 Web 패턴 검사 PASS(`/tmp/teameet-live-pr-pattern.log`). 최초 패턴 실행은 잘못된 cwd와 sandbox child-shell EPERM으로 실패했으며 앱 cwd의 읽기 전용 실행으로 해소했다. Changeset 포함 4개 파일만 커밋·push 대상이다.
+
+
+## Follow-up: unify every public league detail entry (2026-10-14)
+Status: In Progress
+
+### Context / Goal
+User approved all entry points from the 14-category inventory to use /tournaments/:id.
+### Original Conditions
+- [ ] Home recommendation/sidebar, search, my leagues, team detail, apply/my-registration returns, sibling links, fixture/awards returns, operations CTA, notifications and SEO use canonical detail.
+- [ ] Existing /league-matches/:id and /leagues/:id bookmarks redirect with query preserved.
+- [ ] Fixture, awards, roster, admin and API routes retain their contracts.
+### User / Test Scenarios
+Follow discovery links and return to original filtered source. Open historical notifications/bookmarks. Check fixture IDs, parent links, unknown IDs, unsafe notification URLs and query/hash preservation. Update consumer expectations; no schema or response-shape changes.
+### Parallel Work Breakdown / Ownership
+Single agent sequential. Owned: v1 public detail navigation, notification links, associated tests/docs. Forbidden: admin/API endpoint paths, roster policy and unrelated WIP.
+### Acceptance Criteria
+- [ ] 14/14 entry categories aligned; regression tests/typechecks pass.
+- [ ] dev review/deploy and alpha runtime checks complete; report unavailable authenticated personas.
+### Tech Debt Resolved / Security Notes / Risks & Dependencies
+Fix historical /leagues/:id dead links. Preserve safe internal from validation. Redirect detail roots only. Reuse user-selected existing detail UI.
+### Ambiguity Log
+2026-10-14: User requested all entries after inventory; previous list-only restriction superseded.
+### Progress Snapshot
+Base origin/dev=dde8964ca. Worktree _worktrees/league-detail-routes. Phase 1 inventory complete; Phase 2 implementation in progress; Phase 3 validation/review/deploy pending.
+
+검증 진행: 14/14 진입 유형 코드 수정·감사 완료. Web 소비자/복귀/SEO 회귀 green, Web tsc PASS, API 알림·명단 테스트 81/81 PASS. API tsc/표면 검사 진행. 기존 상세/죽은 알림 링크 before를 390/768/1440에서 수집(구 주소200, /leagues 주소404, 목록 클릭 정상). 비로그인 auth/consent 401 외 pageerror 없음. Headed browser는 finally에서 종료. 로그인 persona의 마이·신청·팀 멤버 화면은 단위 consumer로 검증했고 alpha 로그인 실측은 아직 미실행.
+
+배포 전 게이트: Web/API tsc 0, 양 앱 pattern/surface 검사 PASS, API 81/81, 영향받은 Web 소비자·복귀·SEO·redirect 테스트 PASS. before 3폭에서 실제 홈 리그/목록 클릭 완료. /leagues 과거 알림404 재현. 코드 신규 debt marker0, diff check PASS.
+
+추가 적대 검토: 알림 아이콘이 구 경로에 의존함을 발견. 새 알림 링크의 kind=league와 기존 알림 정규화에 같은 구분을 보존하고 알림 카드/시트는 해당 정보를 사용한다. API 알림78/78, Web 추가32/32 PASS. 셸 기본 복귀/선수 기록 빈 상태의 이전 주소 단언도 동기화했다.

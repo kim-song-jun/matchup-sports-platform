@@ -265,7 +265,7 @@ describe('LeagueFixtureDetailClient', () => {
     expect(screen.getByText('리그 · 진행 중')).toBeInTheDocument();
     expect(screen.getByText('경기 · 예정')).toBeInTheDocument();
     expect(screen.queryByText('진행 중')).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '가을 리그' })).toHaveAttribute('href', '/league-matches/lg-1');
+    expect(screen.getByRole('link', { name: '가을 리그' })).toHaveAttribute('href', '/tournaments/lg-1');
     // 대진 날짜가 9/1(1주차)·9/8(2주차) 두 날이고 이 경기는 9/8 — 2주차.
     expect(screen.getByText('2주차')).toBeInTheDocument();
     // 관전자에게는 참가팀 통로가 뜨지 않는다.
@@ -277,11 +277,11 @@ describe('LeagueFixtureDetailClient', () => {
   // 이 화면이 받는 것과 같은 ?from=을 AppBackLink에 직접 먹여 실제 뒤로가기 href를 본다.
   it.each([
     ['활동 기록에서 들어오면 그 화면으로', 'from=%2Fusers%2Fu1%2Frecords%3Ffrom%3D%252Fmy', '/users/u1/records?from=%2Fmy'],
-    ['출처가 없으면 셸 기본값(리그 화면)을 그대로', '', '/league-matches/lg-1'],
-    ['외부 주소는 무시하고 기본값을', 'from=%2F..%2F%2Fevil.example', '/league-matches/lg-1'],
+    ['출처가 없으면 셸 기본값(리그 화면)을 그대로', '', '/tournaments/lg-1'],
+    ['외부 주소는 무시하고 기본값을', 'from=%2F..%2F%2Fevil.example', '/tournaments/lg-1'],
   ])('뒤로가기: %s 쓴다', async (_label, query, expectedHref) => {
     navigation.searchParams = new URLSearchParams(query);
-    render(<AppBackLink fallbackHref="/league-matches/lg-1">뒤로가기</AppBackLink>);
+    render(<AppBackLink fallbackHref="/tournaments/lg-1">뒤로가기</AppBackLink>);
     expect(await screen.findByRole('link', { name: '뒤로가기' })).toHaveAttribute('href', expectedHref);
     navigation.searchParams = new URLSearchParams();
   });
@@ -611,7 +611,7 @@ describe('LeagueFixtureDetailClient', () => {
     render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="no-such" />);
 
     expect(screen.getByText(/해당 경기를 찾을 수 없어요/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '리그 순위표·일정으로 이동' })).toHaveAttribute('href', '/league-matches/lg-1');
+    expect(screen.getByRole('link', { name: '리그 순위표·일정으로 이동' })).toHaveAttribute('href', '/tournaments/lg-1');
     // Wave 5 — 대진이 방금 재생성돼 목록이 갱신됐을 수 있으니 재시도 버튼도 함께 준다.
     expect(screen.getByRole('button', { name: '다시 시도하기' })).toBeInTheDocument();
   });
@@ -622,7 +622,7 @@ describe('LeagueFixtureDetailClient', () => {
     mockViewer('none');
     render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
 
-    const parentWithChain = '/league-matches/lg-1?from=%2Fhome';
+    const parentWithChain = '/tournaments/lg-1?from=%2Fhome';
     expect(screen.getByRole('link', { name: '전체 순위표·일정 보기' })).toHaveAttribute('href', parentWithChain);
     navigation.searchParams = new URLSearchParams();
   });
@@ -633,7 +633,7 @@ describe('LeagueFixtureDetailClient', () => {
     mockViewer('none');
     render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
 
-    expect(screen.getByRole('link', { name: '전체 순위표·일정 보기' })).toHaveAttribute('href', '/league-matches/lg-1?from=%2Fusers%2Fu1%2Frecords');
+    expect(screen.getByRole('link', { name: '전체 순위표·일정 보기' })).toHaveAttribute('href', '/tournaments/lg-1?from=%2Fusers%2Fu1%2Frecords');
     navigation.searchParams = new URLSearchParams();
   });
 });

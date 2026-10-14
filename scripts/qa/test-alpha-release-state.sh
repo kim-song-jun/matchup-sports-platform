@@ -373,4 +373,6 @@ fi
 [[ "$(cd -P "${ALPHA_LIVE_DIR}" && pwd)" == "${live_before}" ]] ||
   { echo "a failed activation moved the live link anyway" >&2; exit 1; }
 
+bash "${ROOT_DIR}/scripts/release/create-alpha-release-manifest.sh" --self-test
+
 echo "[alpha-release-state] passed"

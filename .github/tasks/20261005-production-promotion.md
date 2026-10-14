@@ -30,6 +30,18 @@ The latest user request is `메인 승격 준비해줘`. Refresh existing prepar
 
 Owned: isolated `_worktrees/promotion-pr1911-fix`, remote `release/main-promotion-prep-20261014`, release manifests/changelogs/consumed Changesets, this status record and requested PR descriptions. Forbidden: original shared WIP, production deployment and DB mutation. Native pnpm/Changesets was obtained through Corepack; no local Next, browser or database process was started.
 
+## Promotion PR follow-up — 2026-10-14
+
+- Request: inspect preparation #1911 and promotion draft #1912 and resolve blockers. Scope: infra, release contract tests and this existing status record; application source and shared WIP are outside this follow-up.
+- #1911 head `5f3d31438f8804af143f797f2f81c9fca709ded5`: Gates/API/Web PASS; no submitted Copilot review at inspection. It consumes 32 Changesets and prepares both fixed packages at source version 1.9.0.
+- #1912 Gates fails correctly because dev has unreleased Changesets. API/Web and CodeQL pass. Keep the draft pending preparation consumption, current-head CI and review; no main merge or production approval is authorized.
+- Alpha run `38475457320` fails in existing-manifest validation on same-SHA redeploy: resolved previous SHA becomes release SHA while the immutable manifest retains its original rollback predecessor. Actual public Alpha API is already serving `792042b7d359c5552f9dba7f8cb45dab3e19699b`, release `1.9.0-alpha.20261014.g792042b7d359`, HTTP 200 and DB=true. The failed rerun is not evidence that the runtime is down.
+- Owned: isolated `_worktrees/alpha-manifest-redeploy`, manifest validator/self-test, existing Alpha release-state CI test, a patch Changeset and this record. Forbidden: original shared WIP, version-only #1911 implementation changes, main/prod and database mutations.
+- Acceptance: same-SHA final-policy reuse preserves original rollback provenance; malformed provenance and changed source/image identity fail; different-SHA and StageA predecessor checks remain strict. Existing CI release-state test must execute the regression. No manifest rewrite or cloud mutation is used by the test.
+- Validation: new same-SHA regression fails at the original validator's rollback comparison. Updated self-test and the full existing Alpha release-state CI test PASS; Alpha immutable-deploy check plus negative controls PASS. WSL root ran isolated `/tmp` fixtures because the ordinary-user test waited for sudo/rsync; that owned sudo process was terminated. No service or DB was started. Shell-only change: package tsc/build is delegated to exact-head CI.
+- Dependency: the fix adds a new patch Changeset. If merged before promotion, refresh/consume it with the official release preparation flow after #1911; do not claim the old 1.9.0 preparation covers it. No review exception from an earlier PR applies.
+- Progress: inspection, RED/GREEN and scoped implementation complete; publish the dev fix, then verify new-head CI/review. Main promotion and exact new-dev Alpha verification remain pending. No local Next/browser/database workload started.
+
 ## Request and scope
 
 User requested deploying current dev through main. Scope: release preparation and verification, then the repository's human-operated main PR/production environment gate. Preserve the original Windows/WSL working tree and its CRLF-only changes. No new application feature or alpha QA data mutation.

@@ -4,6 +4,7 @@ import { type Prisma, V1GameSideKey, V1GameSourceType } from '@prisma/client';
 import request = require('supertest');
 import { canonicalGameCommandPayloadHash, GamesService } from '../../src/games/games.service';
 import type { GameCommandContext, GameSourceCreationInput } from '../../src/games/games.types';
+import { createTournamentMatchInTx } from '../../src/tournaments/tournament-match-creation';
 import { syncCompetitionTeamRosters } from '../../src/games/roster/game-roster-sync';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { ManagedTermsRuntimeService } from '../../src/terms/managed-terms-runtime.service';
@@ -302,6 +303,26 @@ describe('팀 경기 명단 표·일괄·결장 기간 API (Task 179)', () => {
       expect(await prisma.v1GameParticipant.findMany({ where: { lineupId: first.id }, select: { userId: true, position: true } })).toEqual(snapshot);
       expect((await getAs(f.sidePath('g1', f.teamA.id) + '/roster', f.adminId)).body.data.participants.find((row: { userId: string }) => row.userId === userId).goalkeeper).toBe(true);
       expect((await prisma.v1TournamentPlayer.findUniqueOrThrow({ where: { id: otherPlayer.id } })).goalkeeper).toBe(true);
+    });
+
+    it('저장한 GK는 이후 생성하는 대회 경기의 실제 position에도 상속된다', async () => {
+      const f = await seedTournament();
+      const userId = f.teamA.members[0];
+      expect((await postAs(matrixPath(f.teamA.id) + '/batch', f.adminId, { changes: [{ gameId: f.games.g1.gameId, userId, op: 'SET_GOALKEEPER', goalkeeper: true }] })).status).toBe(200);
+      const players = async (teamId: string, sideKey: V1GameSideKey) => (await prisma.v1TournamentPlayer.findMany({ where: { registrationId: f.registrations.get(teamId), removedAt: null } })).map((row) => ({ sourceParticipantId: row.id, userId: row.userId, sideKey, displayNameSnapshot: row.realName }));
+      const homeParticipants = await players(f.teamA.id, V1GameSideKey.HOME);
+      const awayParticipants = await players(f.teamB.id, V1GameSideKey.AWAY);
+      const durableCommandId = randomUUID();
+      const result = await inTx((tx) => createTournamentMatchInTx(tx, app.get(GamesService), {
+        tournamentId: f.tournament.id, groupId: null, round: 'group', fixtureNumber: 3, legNumber: 1, parentTeamMatchId: null,
+        homeRegistrationId: f.registrations.get(f.teamA.id)!, awayRegistrationId: f.registrations.get(f.teamB.id)!,
+        sportId, regionId, title: 'GK inheritance', place: null, startAt: new Date(Date.now() + 3 * DAY), createdByUserId: f.adminId,
+        competitionConfigVersionId: configId, home: { id: f.teamA.id, name: 'A', participants: homeParticipants }, away: { id: f.teamB.id, name: 'B', participants: awayParticipants },
+        actor: { actorType: 'USER', actorUserId: f.adminId, role: 'platform_ops', tournamentId: f.tournament.id }, durableCommandId,
+        payloadHash: canonicalGameCommandPayloadHash({ durableCommandId }),
+      }));
+      const row = await prisma.v1GameParticipant.findFirstOrThrow({ where: { gameId: result.game.gameId, userId } });
+      expect(row.position).toBe('GOLEIRO');
     });
 
     it('같은 선수의 출전·GK 변경을 함께 허용하고 잘못된 GK payload·권한·시작 후 쓰기를 거절한다', async () => {

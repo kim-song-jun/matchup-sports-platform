@@ -6,7 +6,6 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { excludeUnfilledSlotFixturesWhere } from '../common/competition/unfilled-slot-gate';
 import { isParticipantPubliclyEligible, isRankedRecordHiddenByEligibility, loadParticipantConsentEligibility } from '../games/public-records/public-consent';
 import { isPublicLiveEnabled } from '../games/public-records/public-live-flag';
 import { LEAGUE_STATE_PRIORITY_ORDER, paginateByStatePriority, sortMyLeaguesByState } from './league-lifecycle-rules';
@@ -487,15 +486,34 @@ export class LeagueMatchPublicService {
             // 최신 시즌이 먼저, 같은 시즌 안에서는 1부부터 — 사용자가 "지금 시즌의 다른
             // 티어"를 가장 먼저 찾는다는 전제(승강 체계는 시즌 단위로 갱신되므로).
             orderBy: [{ seasonNo: 'desc' }, { tier: 'asc' }],
-            select: { id: true, tier: true, seasonNo: true, status: true },
+            select: {
+              id: true,
+              title: true,
+              tier: true,
+              seasonNo: true,
+              status: true,
+              registrationDeadlineAt: true,
+              scheduledAt: true,
+              scheduledEndAt: true,
+            },
           })
           .then((rows) =>
-            rows.map(({ status, ...rest }) => ({ ...rest, state: LEAGUE_STATE_BY_STATUS[status] })),
+            rows.map(({ status, ...rest }) => ({
+              ...rest,
+              state: LEAGUE_STATE_BY_STATUS[status],
+              registrationOpen: isLeagueRegistrationOpen(status, rest.registrationDeadlineAt),
+            })),
           );
+    // 신청이 마감된 리그가 "다음 회차로 신청하기"를 걸 대상 — 같은 티어의 바로 다음 시즌.
+    // ponytail: 같은 티어만 본다. 신규 팀의 입문 티어를 따로 정하면 그 규칙으로 바꾼다.
+    const nextRound = siblings
+      .filter((sibling) => sibling.tier === league.tier && (sibling.seasonNo ?? 0) > (league.seasonNo ?? 0))
+      .sort((a, b) => (a.seasonNo ?? 0) - (b.seasonNo ?? 0))[0];
 
     return {
       leagueId: league.id,
       title: league.title,
+      rulesText: league.rulesText,
       state: league.state,
       startsOn: league.startsOn,
       endsOn: league.endsOn,
@@ -528,6 +546,18 @@ export class LeagueMatchPublicService {
         seasonNo: sibling.seasonNo as number,
         state: sibling.state,
       })),
+      // 다음 회차가 없으면(단발 리그 포함) null — 화면은 "다음 회차에 신청해 주세요"만 적는다.
+      nextRound: nextRound === undefined || nextRound.scheduledAt === null || nextRound.scheduledEndAt === null
+        ? null
+        : {
+            leagueId: nextRound.id,
+            title: nextRound.title,
+            seasonNo: nextRound.seasonNo as number,
+            startsOn: nextRound.scheduledAt,
+            endsOn: nextRound.scheduledEndAt,
+            registrationOpen: nextRound.registrationOpen,
+            registrationDeadlineAt: nextRound.registrationDeadlineAt?.toISOString() ?? null,
+          },
       teamIds: league.teams.map((entry) => entry.teamId),
       // 미확정 대진의 점수를 null 로 두는 것, 몰수를 boolean 하나로만 내보내는 것(사유
       // 원문 비공개)은 `league-fixture-list-source.ts` 가 지킨다 — 대회 표면의 리그
@@ -547,7 +577,7 @@ export class LeagueMatchPublicService {
     const league = await this.loadLeague(leagueId);
     const teamIds = league.teams.map((entry) => entry.teamId);
     const teamMatches = await this.prisma.v1TeamMatch.findMany({
-      where: { leagueId, ...excludeUnfilledSlotFixturesWhere() },
+      where: publicLeagueFixtureListWhere(leagueId),
       select: {
         id: true,
         hostTeamId: true,
@@ -771,6 +801,7 @@ export class LeagueMatchPublicService {
       select: {
         id: true,
         title: true,
+        rulesText: true,
         status: true,
         registrationDeadlineAt: true,
         scheduledAt: true,
@@ -818,9 +849,9 @@ export class LeagueMatchPublicService {
       teams: registrations,
       registrationDeadlineAt,
       // **신청 가능 여부는 서버가 판정해서 결과만 내려준다.** 등록 서비스가 실제로 던지는
-      // 조건(`status === 'open'` + 마감 미도과)과 **같은 규칙**이다 — 화면이 이 판정을
+      // 조건(신청 마감 미도과·미종료)과 **같은 규칙**이다 — 화면이 이 판정을
       // 복제하면 두 곳이 갈려 "버튼은 보이는데 누르면 409 `TOURNAMENT_NOT_OPEN`" 이 난다.
-      // 마감이 `null` 이면 기한 없이 열려 있는 것이다(등록 서비스도 그렇게 읽는다).
+      // 마감이 `null` 이면 신청을 받지 않는다(league-registration-open.ts와 같은 규칙).
       registrationOpen: isLeagueRegistrationOpen(status, registrationDeadlineAt),
     };
   }

@@ -134,4 +134,11 @@ describe('AdminTeamMatchEditPage', () => {
     expect(screen.getByText('수정할 수 없는 팀매치예요')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '수정 내용 저장' })).not.toBeInTheDocument();
   });
+
+  it('마감된 플랫폼 모집도 일정을 수정할 수 있다', () => {
+    hooks.detail = { ...hooks.detail, data: { ...DETAIL, status: 'closed' } };
+    render(<AdminTeamMatchEditPage />);
+    expect(screen.getByLabelText('경기 시작')).toHaveValue('2026-10-20T19:00');
+    expect(screen.getByRole('button', { name: '수정 내용 저장' })).toBeInTheDocument();
+  });
 });

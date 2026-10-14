@@ -50,6 +50,7 @@ import {
   teamRoleLabel,
   tournamentRegistrationStatusConfig as registrationStatusConfig,
 } from '@/lib/v1-status-labels';
+import { rosterLimitText } from '@/lib/roster-limit';
 
 /** 정규 리그를 "대회"라고 부르지 않는다("리그 상세 보기"). 종류를 모르면(로딩 실패) 대회 말투를 쓴다. */
 function competitionNoun(isLeague: boolean): string {
@@ -635,7 +636,7 @@ function RegistrationDetailView({
     title: string;
     entryFee: number;
     minPlayers: number;
-    maxPlayers: number;
+    maxPlayers: number | null;
     scheduledAt: string | null;
     scheduledEndAt: string | null;
     venue: string | null;
@@ -793,7 +794,7 @@ function RegistrationDetailView({
           )}
         </div>
         <div className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
-          {players.length}명 · 최소 {tournament.minPlayers}명 · 최대 {tournament.maxPlayers}명
+          {players.length}명 · {rosterLimitText(tournament.minPlayers, tournament.maxPlayers, (min, max) => `최소 ${min}명 · 최대 ${max}명`)}
         </div>
       </div>
 
@@ -928,7 +929,7 @@ function RegistrationDetailView({
                       <span className="tm-text-caption" style={{ color: 'var(--text-muted)', marginLeft: 4 }}>등록됨</span>
                     </div>
                     <div className="tm-text-micro" style={{ color: 'var(--text-caption)', marginTop: 2 }}>
-                      {`최소 ${tournament.minPlayers}명 · 최대 ${tournament.maxPlayers}명`}
+                      {rosterLimitText(tournament.minPlayers, tournament.maxPlayers, (min, max) => `최소 ${min}명 · 최대 ${max}명`)}
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

@@ -10,10 +10,11 @@ import {
 } from './dto/account-recovery.dto';
 
 /**
- * 비로그인 계정 찾기 — 본인 확인(OTP)을 마친 뒤에만 응답한다.
+ * 비로그인 계정 복구 — 휴대폰 OTP로 계정을 찾고 이메일 OTP로 비밀번호를 재설정한다.
  *
  * 휴대폰 경로: OTP 발급/대조는 기존 공개 엔드포인트(/auth/phone/issue, /auth/phone/verify)를
  * 그대로 쓰고, verify 에 purpose='password_reset' 을 넘겨 받은 증명 토큰만 여기서 통과시킨다.
+ * 휴대폰 증명은 현재 번호 점유만 확인하며, 기존 계정의 비밀번호 변경을 허용하지 않는다.
  *
  * 이메일 경로: 로그인 후 이메일 인증(/verification/email/*)은 V1AuthGuard 뒤라 비로그인
  * 재설정에 쓸 수 없어, 여기 아래에 공개 OTP 를 따로 둔다. 이쪽 증명 토큰은 비밀번호 재설정
@@ -32,7 +33,7 @@ export class AccountRecoveryController {
     return this.accountRecovery.findAccountByPhone(dto);
   }
 
-  // 비밀번호를 실제로 바꾸는 경로라 조회보다 좁게 잠근다.
+  // 유효한 휴대폰 증명으로 기존 계정을 찾아도 409 ACCOUNT_RECOVERY_REQUIRES_EMAIL을 반환한다.
   @Post('reset-password')
   @HttpCode(200)
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
@@ -57,7 +58,7 @@ export class AccountRecoveryController {
     return this.accountRecovery.confirmPasswordResetEmail(dto);
   }
 
-  // 휴대폰 경로와 같은 이유로 대조(confirm)보다 좁게 잠근다.
+  // 비밀번호를 실제로 바꾸는 경로라 대조(confirm)보다 좁게 잠근다.
   @Post('email/reset-password')
   @HttpCode(200)
   @Throttle({ default: { limit: 5, ttl: 60_000 } })

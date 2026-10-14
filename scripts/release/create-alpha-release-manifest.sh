@@ -78,12 +78,15 @@ build_stage_b_full_history_json() {
 
 validate_existing_manifest() {
   local manifest_file="$1"
+  # Same-SHA final-policy reruns preserve the original manifest's rollback
+  # provenance, just like migrationValidatedFrom. Other releases must still
+  # match the freshly resolved predecessor exactly.
   jq -e \
     --arg sha "$RELEASE_SHA" --arg version "$RELEASE_VERSION" \
     --arg bucket "$DEPLOY_BUCKET" --arg sourceVersionId "$SOURCE_VERSION_ID" --arg sourceSha256 "$SOURCE_SHA256" \
     --arg apiRepository "$REGISTRY/teameet-alpha-v1-api" --arg apiDigest "$api_digest" \
     --arg webRepository "$REGISTRY/teameet-alpha-v1-web" --arg webDigest "$web_digest" \
-    --arg previous "$PREVIOUS_SHA" --arg migrationBase "$MIGRATION_BASE_SHA" \
+    --arg previous "$PREVIOUS_SHA" --arg previousStage "$PREVIOUS_STAGE" --arg migrationBase "$MIGRATION_BASE_SHA" \
     --arg schema "$TASK168_SCHEMA_SHA256" --arg m11 "$TASK168_M11_SHA256" \
     --arg rollbackCompatible "$rollback_compatible_with" \
     '.schemaVersion == 1 and .environment == "alpha" and
@@ -96,7 +99,8 @@ validate_existing_manifest() {
      .database.compatibilityCheck == "expand-contract-sql-v1" and
      ((.database.migrationValidatedFrom == null) or (.database.migrationValidatedFrom | test("^[0-9a-f]{40}$"))) and
      (($migrationBase == $sha) or .database.migrationValidatedFrom == (if $migrationBase == "none" then null else $migrationBase end)) and
-     .database.rollbackCompatibleWith == (if $rollbackCompatible == "" then null else $rollbackCompatible end) and
+     ((.database.rollbackCompatibleWith == null) or (.database.rollbackCompatibleWith | test("^[0-9a-f]{40}$"))) and
+     (($previous == $sha and $previousStage == "final") or .database.rollbackCompatibleWith == (if $rollbackCompatible == "" then null else $rollbackCompatible end)) and
      .database.task168.stage == "final" and .database.task168.schemaSha256 == $schema and
      .database.task168.runtimeClientSchemaSha256 == $schema and
      .database.task168.m11Sha256 == $m11' \
@@ -113,12 +117,12 @@ if [[ "${1:-}" == '--self-test' ]]; then
   PREVIOUS_SHA="$RELEASE_SHA"
   PREVIOUS_STAGE=final
   MIGRATION_BASE_SHA="$RELEASE_SHA"
-  TASK168_SCHEMA_SHA256=b63d3222b1f3d0e1a3c8309f116cfd50eb28b624245685dbea2f7fff1f6ee2b9
+  TASK168_SCHEMA_SHA256=89ccedfb1f48f088a5f61ceede57e7f520a4b40a7ad9862c3d817d4cefc84ae0
   TASK168_M11_SHA256=08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323
   api_digest=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
   web_digest=sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
   fixture="$(mktemp)"
-  trap 'rm -f "${fixture}"' EXIT
+  trap 'rm -f "${fixture}" "${fixture}.next"' EXIT
 
   rollback_compatible_with="$PREVIOUS_SHA"
   jq -n \
@@ -126,6 +130,37 @@ if [[ "${1:-}" == '--self-test' ]]; then
     --arg apiDigest "$api_digest" --arg webDigest "$web_digest" --arg schema "$TASK168_SCHEMA_SHA256" --arg m11 "$TASK168_M11_SHA256" --arg rollbackCompatible "$rollback_compatible_with" \
     '{schemaVersion:1,environment:"alpha",release:{sha:$sha,version:$version},source:{bucket:$bucket,key:("releases/"+$sha+".tar.gz"),versionId:$sourceVersion,sha256:$sourceSha},database:{migrationPolicy:"task168-final",rollbackMode:"final-only",compatibilityCheck:"expand-contract-sql-v1",migrationValidatedFrom:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",rollbackCompatibleWith:$rollbackCompatible,task168:{stage:"final",schemaSha256:$schema,runtimeClientSchemaSha256:$schema,m11Sha256:$m11}},images:{api:{repository:($registry+"/teameet-alpha-v1-api"),digest:$apiDigest,uri:($registry+"/teameet-alpha-v1-api@"+$apiDigest)},web:{repository:($registry+"/teameet-alpha-v1-web"),digest:$webDigest,uri:($registry+"/teameet-alpha-v1-web@"+$webDigest)}}}' > "$fixture"
   validate_existing_manifest "$fixture"
+
+  # A same-SHA rerun observes this release as active, but its immutable
+  # manifest still records the predecessor from the original activation.
+  jq '.database.rollbackCompatibleWith = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"' "$fixture" > "${fixture}.next"
+  mv "${fixture}.next" "$fixture"
+  validate_existing_manifest "$fixture"
+  jq '.database.rollbackCompatibleWith = null' "$fixture" > "${fixture}.next"
+  mv "${fixture}.next" "$fixture"
+  validate_existing_manifest "$fixture"
+
+  for mutation in \
+    '.database.rollbackCompatibleWith = "invalid"' \
+    '.release.sha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"' \
+    '.source.versionId = "different-source-version"' \
+    '.images.api.digest = "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"'; do
+    jq "$mutation" "$fixture" > "${fixture}.next"
+    if validate_existing_manifest "${fixture}.next"; then
+      echo "Same-SHA reuse accepted changed immutable identity: ${mutation}" >&2
+      exit 1
+    fi
+  done
+  rm -f "${fixture}.next"
+
+  PREVIOUS_SHA=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  rollback_compatible_with="$PREVIOUS_SHA"
+  # Different-SHA activation must still compare the actual predecessor.
+  if validate_existing_manifest "$fixture"; then
+    echo 'Different-SHA reuse accepted mismatched rollback provenance' >&2
+    exit 1
+  fi
+  PREVIOUS_SHA="$RELEASE_SHA"
 
   # Positive: previous release was StageA (or absent) -> rollbackCompatibleWith
   # must be null, never bound to a StageA sha.
@@ -301,7 +336,7 @@ fi
 for name in RELEASE_SHA RELEASE_VERSION REGISTRY DEPLOY_BUCKET EXPECTED_BUCKET_OWNER SOURCE_VERSION_ID SOURCE_SHA256 IMAGE_TAG PREVIOUS_SHA PREVIOUS_STAGE MIGRATION_BASE_SHA TASK168_SCHEMA_SHA256 TASK168_M11_SHA256; do
   [[ -n "${!name:-}" ]] || { echo "$name is required" >&2; exit 1; }
 done
-[[ "$TASK168_SCHEMA_SHA256" == b63d3222b1f3d0e1a3c8309f116cfd50eb28b624245685dbea2f7fff1f6ee2b9 && "$TASK168_M11_SHA256" == 08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323 ]] || { echo 'Task168 final-policy binding mismatch' >&2; exit 1; }
+[[ "$TASK168_SCHEMA_SHA256" == 89ccedfb1f48f088a5f61ceede57e7f520a4b40a7ad9862c3d817d4cefc84ae0 && "$TASK168_M11_SHA256" == 08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323 ]] || { echo 'Task168 final-policy binding mismatch' >&2; exit 1; }
 
 if [[ "$PREVIOUS_STAGE" == final && "$PREVIOUS_SHA" != none ]]; then
   rollback_compatible_with="$PREVIOUS_SHA"

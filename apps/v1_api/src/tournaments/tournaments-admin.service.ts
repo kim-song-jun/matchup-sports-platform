@@ -457,7 +457,8 @@ export class TournamentsAdminService {
 
     // 변경 후 최종 min/max 기준으로 검증(둘 중 하나만 들어와도 일관성 보장).
     const nextMin = dto.minPlayers ?? existing.minPlayers;
-    const nextMax = dto.maxPlayers ?? existing.maxPlayers;
+    // 대회는 생성 때 항상 정원을 채운다(null = 제한 없음은 리그 전용) — 생성 기본값과 같은 10 으로 받친다.
+    const nextMax = dto.maxPlayers ?? existing.maxPlayers ?? 10;
     this.assertPlayerRange(nextMin, nextMax);
     const nextGenderCategory =
       dto.genderCategory !== undefined

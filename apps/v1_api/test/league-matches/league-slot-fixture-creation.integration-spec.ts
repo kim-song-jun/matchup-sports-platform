@@ -76,4 +76,20 @@ describe('createLeagueFixture — 팀 null + 자리 id', () => {
     expect(teamMatch.awaySlotId).toBeNull();
     expect(await h.prisma.v1TeamSchedule.count({ where: { teamMatchId } })).toBe(2);
   });
+  it('참가 명단에 지정한 GK는 이후 생성 리그 경기의 실제 position으로 상속된다', async () => {
+    const teamA = await h.makeTeam('persistent-gk-a');
+    const teamB = await h.makeTeam('persistent-gk-b');
+    const leagueId = await h.makeLeague({ teams: [teamA, teamB] });
+    await h.createFixture(leagueId, { homeTeamId: teamA.id, awayTeamId: teamB.id });
+    const registrationId = await h.registrationId(leagueId, teamA.id);
+    // This harness intentionally has no eligible auto-fill members; register its owner explicitly.
+    const team = await h.prisma.v1Team.findUniqueOrThrow({ where: { id: teamA.id }, select: { ownerUserId: true } });
+    const player = await h.prisma.v1TournamentPlayer.create({ data: { registrationId, userId: team.ownerUserId, realName: 'registered goalkeeper', goalkeeper: true } });
+    const teamMatchId = await h.createFixture(leagueId, { homeTeamId: teamA.id, awayTeamId: teamB.id });
+    const game = await h.prisma.v1Game.findUniqueOrThrow({ where: { teamMatchId }, include: { participants: true, competitionConfig: true } });
+    const lineup = game.competitionConfig.lineup as { positions?: { code: string; goalkeeper?: boolean }[] };
+    const goalkeeperCode = lineup.positions?.find((position) => position.goalkeeper)?.code ?? 'GK';
+    expect(game.participants.find((row) => row.userId === player.userId)?.position).toBe(goalkeeperCode);
+  });
+
 });

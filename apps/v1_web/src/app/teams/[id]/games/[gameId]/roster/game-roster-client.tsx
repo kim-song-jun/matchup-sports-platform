@@ -45,6 +45,7 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
   const batch = useV1ApplyGameRosterBatch(teamId);
   const { confirm, ConfirmModal } = useConfirm();
   const [draft, setDraft] = useState<GameRosterDraft>({});
+  const [goalkeepers, setGoalkeepers] = useState<Record<string, boolean>>({});
   const [notice, setNotice] = useState<Notice | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   // 등번호 시트 — 닫히는 동안에도 내용이 남도록 대상은 유지하고 열림만 끈다.
@@ -52,7 +53,12 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
   const historyHeadingRef = useRef<HTMLHeadingElement>(null);
 
   const data = roster.data;
-  const changes = useMemo(() => (data === undefined ? [] : draftToChanges(draft, data)), [draft, data]);
+  const changes = useMemo(() => data === undefined ? [] : [
+    ...draftToChanges(draft, data),
+    ...data.base.flatMap((row): V1GameRosterBatchChange[] =>
+      data.goalkeeperEditable === false || goalkeepers[row.userId] === undefined || goalkeepers[row.userId] === row.goalkeeper ? [] :
+        [{ gameId: data.gameId, userId: row.userId, op: 'SET_GOALKEEPER', goalkeeper: goalkeepers[row.userId] }]),
+  ], [draft, goalkeepers, data]);
   const canEdit = data?.editable === true;
   const dirty = canEdit && changes.length > 0;
   const { UnsavedChangesModal } = useUnsavedChangesGuard(dirty);
@@ -72,11 +78,13 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
     try {
       await batch.mutateAsync(batchChanges);
       setDraft({});
+      setGoalkeepers({});
       setNotice({ tone: 'info', message: successMessage });
     } catch (caught) {
       // 화면이 낡은 거절(시작·명단·대진·권한 변경)이면 최신으로 다시 받고, 이미 무의미한 초안은 버린다.
       if (isStaleGameRosterWrite(caught)) {
         setDraft({});
+        setGoalkeepers({});
         void roster.refetch();
         void history.refetch();
       }
@@ -116,7 +124,7 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
   const events = history.data?.events;
   const historyShown = started || historyOpen;
   const pendingExcludes = changes.filter((change) => change.op === 'EXCLUDE').length;
-  const pendingRevokes = changes.length - pendingExcludes;
+  const pendingRevokes = changes.filter((change) => change.op === 'REVOKE').length;
   // 등번호 칸은 팀장·매니저의 편집 목록에서만 버튼이다. 참가 명단이 없는 팀은 칸을 눌러도 입력 대신 이유를 안내한다.
   // 시작한 경기는 편집 목록 자체가 없어 번호가 읽기 전용이고, 그 이유는 아래 `jerseyLocked` 가 말한다.
   // 잠기거나 제출 마감이 지난 참가 명단은 저장이 409 라 칸을 열지 않는다(`jerseyEditable`).
@@ -126,6 +134,26 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
   const jerseyLocked = started && data.viewerRole === 'TEAM_MANAGER' && data.baseSource === 'REGISTRATION';
   const jerseyTarget = jersey === null ? null : (data.base.find((row) => row.userId === jersey.userId) ?? null);
   const competitionNoun = data.competitionKind === 'LEAGUE' ? '리그' : '대회';
+
+  function goalkeeperControl(row: { userId: string; displayName: string; goalkeeper: boolean }) {
+    const checked = goalkeepers[row.userId] ?? row.goalkeeper;
+    return canEdit && data?.goalkeeperEditable !== false ? (
+      <Button
+        variant={checked ? 'primary' : 'outline'}
+        size="sm"
+        style={{ minWidth: 'var(--size-control-md)', padding: '0 var(--spacing-2)' }}
+        aria-label={checked ? row.displayName + ', 골키퍼 지정 해제' : row.displayName + ' 골키퍼로 지정'}
+        aria-pressed={checked}
+        disabled={batch.isPending || data?.legacyLineupPending}
+        onClick={() => {
+          setNotice(null);
+          setGoalkeepers((current) => ({ ...current, [row.userId]: !(current[row.userId] ?? row.goalkeeper) }));
+        }}
+      >
+        GK
+      </Button>
+    ) : row.goalkeeper ? <span className="tm-text-caption">GK</span> : null;
+  }
 
   const historySection = historyShown ? (
     <Card pad={16}>
@@ -229,6 +257,7 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
           canEdit && data.participants.length > 0 ? (
             <>
               {GAME_ROSTER_PLAYING_HINT}
+              <br />{data.goalkeeperEditable === false ? 'GK는 팀장·매니저와 대회 운영진이 관리해요.' : '골키퍼는 GK 버튼으로 선택해요. 여러 명을 지정할 수 있고, 이 대회의 시작 전 경기에도 유지돼요.'}
               {data.jerseyRegistrationId !== null ? (
                 <>
                   <br />
@@ -270,11 +299,14 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
                     note={leaving ? '저장하면 이번 경기에서 빠져요' : row.joinedAfterFixtureCreated ? '새로 추가' : null}
                     onJerseyPress={jerseyPressable ? () => setJersey({ userId: row.userId, open: true }) : undefined}
                     trailing={
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-1)' }}>
+                        {goalkeeperControl(row)}
                       <GameRosterPlayingCheckbox
                         displayName={row.displayName}
                         playing={leaving === null}
                         onChange={(playing) => setEntry(row.userId, playing ? null : { op: 'EXCLUDE', reason: null })}
                       />
+                      </div>
                     }
                   />
                   {leaving ? (
@@ -293,6 +325,7 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
             {data.participants.map((row) => (
               <li key={row.userId} className="tm-badge tm-badge-grey">
                 {row.jerseyNumber === null ? row.displayName : `${row.jerseyNumber} ${row.displayName}`}
+                {row.goalkeeper ? " · GK" : null}
               </li>
             ))}
           </ul>
@@ -311,6 +344,7 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
                     jerseyNumber={row.jerseyNumber}
                     displayName={row.displayName}
                     accountLinked={row.accountLinked}
+                    extraBadges={goalkeeperControl(row)}
                     status="EXCLUDED"
                     reason={row.reason}
                     actorRole={row.actor.role}
@@ -347,6 +381,7 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
                   jerseyNumber={row.jerseyNumber}
                   displayName={row.displayName}
                   accountLinked={row.accountLinked}
+                  extraBadges={goalkeeperControl(row)}
                   status="UNAVAILABLE"
                   reason={row.reason}
                   actorRole={row.actor.role}
@@ -370,6 +405,7 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
                   jerseyNumber={row.jerseyNumber}
                   displayName={row.displayName}
                   accountLinked={row.accountLinked}
+                  extraBadges={goalkeeperControl(row)}
                   status="SUSPENDED"
                   remainingMatches={row.remainingMatches}
                   note={row.reason}

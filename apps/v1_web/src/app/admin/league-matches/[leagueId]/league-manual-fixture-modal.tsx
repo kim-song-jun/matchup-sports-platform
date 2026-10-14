@@ -35,6 +35,7 @@ export function LeagueManualFixtureModal({
   teams,
   defaultPlace,
   recentVenues,
+  defaultDuration = null,
   isSubmitting,
   onSubmit,
   onClose,
@@ -44,6 +45,8 @@ export function LeagueManualFixtureModal({
   /** 리그 기본 장소 — "기본 장소 사용" 이 가리키는 곳. */
   defaultPlace: V1PlaceView | null;
   recentVenues?: ReadonlyArray<V1PlaceView>;
+  /** 리그 피리어드 설정의 경기 시간 — 일괄 생성 폼과 같은 값으로 경기 시간 칸을 미리 채운다. */
+  defaultDuration?: { minutes: number; label: string } | null;
   isSubmitting: boolean;
   /**
    * **계약 타입을 그대로 쓴다** — 인라인으로 다시 적으면 서버 DTO 가 바뀌었을 때
@@ -55,7 +58,9 @@ export function LeagueManualFixtureModal({
   const [home, setHome] = useState<EntityPickerItem | null>(null);
   const [away, setAway] = useState<EntityPickerItem | null>(null);
   const [startsAtLocal, setStartsAtLocal] = useState('');
-  const [duration, setDuration] = useState('');
+  // null = 아직 안 건드림 — 리그 설정 값을 보여 준다. 설정이 늦게 와도 그대로 따라온다.
+  const [durationInput, setDuration] = useState<string | null>(null);
+  const duration = durationInput ?? (defaultDuration === null ? '' : String(defaultDuration.minutes));
   const [placeChoice, setPlaceChoice] = useState<LeaguePlaceChoice>(DEFAULT_LEAGUE_PLACE_CHOICE);
   const [error, setError] = useState<string | null>(null);
   // ESC·focus trap·body 스크롤 잠금은 어드민 모달 공용 훅이 담당한다. **`pending` 을 넘기는
@@ -147,7 +152,7 @@ export function LeagueManualFixtureModal({
 
       <div className="flex-1 overflow-y-auto px-5 py-4">
         <p className="mb-4 text-xs text-[var(--text-muted)]">
-          라운드로빈 일괄 생성과 별개로 한 경기만 만들어요. 우천 순연 재편성이나 대체 경기에 써요.
+          두 팀을 골라 한 경기를 만들어요. 한 경기씩 운영하는 리그나 우천 순연·대체 경기에 써요.
         </p>
 
         <div className="mb-4">
@@ -158,7 +163,7 @@ export function LeagueManualFixtureModal({
             id="manual-fixture-home"
             value={home}
             onChange={setHome}
-            items={teams}
+            items={teams.filter((team) => team.id !== away?.id)}
             placeholder="참가팀에서 고르기"
             emptyText="참가팀이 없어요"
           />
@@ -172,7 +177,7 @@ export function LeagueManualFixtureModal({
             id="manual-fixture-away"
             value={away}
             onChange={setAway}
-            items={teams}
+            items={teams.filter((team) => team.id !== home?.id)}
             placeholder="참가팀에서 고르기"
             emptyText="참가팀이 없어요"
           />
@@ -204,8 +209,14 @@ export function LeagueManualFixtureModal({
             value={duration}
             onChange={(event) => setDuration(event.target.value)}
             placeholder="비우면 종료 시각 없이 만들어요"
+            aria-describedby={durationInput === null && defaultDuration !== null ? 'manual-fixture-duration-hint' : undefined}
             className="tm-input min-h-[44px] w-full"
           />
+          {durationInput === null && defaultDuration !== null ? (
+            <p id="manual-fixture-duration-hint" className="mt-1 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
+              이 리그의 피리어드 설정({defaultDuration.label})에서 가져왔어요. 일정의 종료 시각에만 쓰여요.
+            </p>
+          ) : null}
         </div>
 
         <div className="mb-4 grid">

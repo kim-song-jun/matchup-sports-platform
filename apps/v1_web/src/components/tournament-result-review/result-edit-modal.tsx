@@ -125,6 +125,34 @@ function participantLabel(
   return `${sideLabel(sides, sideId)} · 참가자 ${participantId.slice(-6)} (라인업에 없음)`;
 }
 
+/** 같은 사람을 가르는 키. 라인업 리비전마다 참가자 행이 새로 생기므로 id 가 아니라 사이드 + 계정으로 묶는다. */
+function personKeyMap(lineups: readonly GameLineup[]): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const lineup of lineups) {
+    for (const participant of lineup.participants) map.set(participant.id, `${participant.sideId}:${participant.userId ?? participant.id}`);
+  }
+  return map;
+}
+
+/**
+ * 출전 기록에 더할 수 있는 사람 — 이 경기 라인업에 오른 적 있는(운영보드에서 뺀 사람 포함) 참가자를 사람마다 최신 리비전
+ * 행 하나로. 팀이 바뀌어 무효가 된 라인업은 빼앗긴 팀의 행이라 서버가 거부하므로 후보에서 뺀다.
+ */
+function rosterCandidates(lineups: readonly GameLineup[]): Array<{ participantId: string; sideId: string; key: string }> {
+  const latestByKey = new Map<string, { participantId: string; sideId: string; key: string; revision: number }>();
+  for (const lineup of lineups) {
+    if (lineup.invalidatedAt !== null) continue;
+    for (const participant of lineup.participants) {
+      const key = `${participant.sideId}:${participant.userId ?? participant.id}`;
+      const current = latestByKey.get(key);
+      if (current === undefined || current.revision < lineup.revision) {
+        latestByKey.set(key, { participantId: participant.id, sideId: participant.sideId, key, revision: lineup.revision });
+      }
+    }
+  }
+  return [...latestByKey.values()];
+}
+
 /**
  * 이미 남아 있는 기록을 **한 필드도 빠뜨리지 않고** 편집 상태로 옮긴다.
  *
@@ -334,9 +362,11 @@ export function ResultEditModal({
       ...(event.participantId ? {} : { anonymous: true }),
     })),
   );
-  const [participants, setParticipants] = useState<EditableParticipant[]>(() =>
-    base.participants.map(toEditable),
-  );
+  // 홈팀부터 보여 준다 — 서버 순서를 그대로 쓰면 원정이 먼저 나왔다(2026-10-13 alpha). 같은 팀 안 순서는 그대로다.
+  const [participants, setParticipants] = useState<EditableParticipant[]>(() => {
+    const isHome = (sideId: string) => sides.find((side) => side.id === sideId)?.sideKey === 'HOME';
+    return base.participants.map(toEditable).sort((a, b) => Number(isHome(b.sideId)) - Number(isHome(a.sideId)));
+  });
   const [mvpParticipantId, setMvpParticipantId] = useState<string>(base.mvpParticipantId ?? '');
   const [reason, setReason] = useState('');
 
@@ -488,9 +518,10 @@ export function ResultEditModal({
   const warningId = `${idPrefix}-knockout-penalty`;
   const participantDiffs = useMemo(
     () =>
-      participants.filter((participant, index) => {
-        const original = base.participants[index];
-        if (!original) return true;
+      participants.filter((participant) => {
+        // 추가한 사람은 아래 출전 추가로 따로 센다.
+        const original = base.participants.find((candidate) => candidate.participantId === participant.participantId);
+        if (!original) return false;
         return (
           participant.goals !== original.goals ||
           // 어시스트·파울도 diff 대상이다 -- 폼에서 고칠 수 있는 값이 diff 에서 빠지면
@@ -505,6 +536,15 @@ export function ResultEditModal({
       }),
     [participants, base.participants],
   );
+  const addedCount = participants.filter((participant) => !base.participants.some((original) => original.participantId === participant.participantId)).length;
+  const removedCount = base.participants.filter((original) => !participants.some((participant) => participant.participantId === original.participantId)).length;
+  // 출전자 추가 후보 — 이미 출전 기록에 있는 사람(같은 사이드·같은 계정)은 뺀다.
+  const keyByParticipantId = useMemo(() => personKeyMap(lineups), [lineups]);
+  const addableCandidates = useMemo(() => {
+    const present = new Set(participants.map((participant) => keyByParticipantId.get(participant.participantId) ?? participant.participantId));
+    return rosterCandidates(lineups).filter((candidate) => !present.has(candidate.key));
+  }, [lineups, participants, keyByParticipantId]);
+  const [candidateToAdd, setCandidateToAdd] = useState('');
   const homeSideId = sides.find((side) => side.sideKey === 'HOME')?.id;
   const awaySideId = sides.find((side) => side.sideKey === 'AWAY')?.id;
   const baseRecorded = readGameResultScore(base.score);
@@ -529,6 +569,28 @@ export function ResultEditModal({
     setParticipants((current) =>
       current.map((participant, i) => (i === index ? { ...participant, ...patch } : participant)),
     );
+  }
+
+  /** 기록(득점·도움·카드)이 있거나 득점·MVP 로 걸린 사람은 빼지 않는다 — 빼면 그 기록이 함께 사라진다. */
+  function removalBlockedReason(participant: EditableParticipant): string | null {
+    const hasStats = participant.goals > 0 || (participant.assists ?? 0) > 0 || participant.cards.yellow > 0 || participant.cards.red > 0;
+    if (hasStats || goalEvents.some((event) => event.participantId === participant.participantId)) return '기록이 있는 선수는 기록을 먼저 지운 뒤 뺄 수 있어요.';
+    if (mvpParticipantId === participant.participantId) return 'MVP로 선정된 선수는 MVP를 바꾼 뒤 뺄 수 있어요.';
+    return null;
+  }
+
+  function removeParticipant(participantId: string) {
+    setParticipants((current) => current.filter((participant) => participant.participantId !== participantId));
+  }
+
+  function addParticipant(participantId: string) {
+    const candidate = addableCandidates.find((row) => row.participantId === participantId);
+    if (!candidate) return;
+    setParticipants((current) => [
+      ...current,
+      { participantId: candidate.participantId, sideId: candidate.sideId, started: true, goals: 0, assists: 0, fouls: 0, cards: { yellow: 0, red: 0 }, goalkeeper: false },
+    ]);
+    setCandidateToAdd('');
   }
 
   function replaceGoalEvents(next: GameResultGoalEventInput[]) {
@@ -850,15 +912,36 @@ export function ResultEditModal({
             </div>
           </section>
 
-          <p className="tm-text-label" style={{ fontWeight: 600, color: 'var(--text-strong)', marginBottom: 8 }}>
+          <p className="tm-text-label" style={{ fontWeight: 600, color: 'var(--text-strong)', marginBottom: 4 }}>
             참가자별 기록
           </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
-            {participants.map((participant, index) => (
+          <p className="tm-text-caption" style={{ color: 'var(--text-muted)', marginBottom: 8 }}>
+            여기 있는 선수가 이 경기에 출전한 것으로 기록돼요. 안 뛴 선수는 빼고, 빠진 선수는 아래에서 추가해 주세요.
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 12 }}>
+            {participants.map((participant, index) => {
+              const label = participantLabel(sides, participantNameMap, participant.participantId, participant.sideId);
+              const blockedReason = removalBlockedReason(participant);
+              return (
               <fieldset key={participant.participantId} className="tm-card" style={{ padding: 12, margin: 0, minWidth: 0 }}>
                 <legend className="tm-text-caption" style={{ fontWeight: 600, padding: '0 4px' }}>
-                  {participantLabel(sides, participantNameMap, participant.participantId, participant.sideId)}
+                  {label}
                 </legend>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  {blockedReason ? (
+                    <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>{blockedReason}</span>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="tm-btn tm-btn-sm tm-btn-neutral"
+                    style={{ minHeight: 44 }}
+                    aria-label={`${label} 출전 기록에서 빼기`}
+                    disabled={blockedReason !== null}
+                    onClick={() => removeParticipant(participant.participantId)}
+                  >
+                    빼기
+                  </button>
+                </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '8px 8px' }}>
                   <StatNumberField
                     id={`${idPrefix}-p${index}-goals`}
@@ -911,12 +994,50 @@ export function ResultEditModal({
                   골키퍼
                 </label>
               </fieldset>
-            ))}
+              );
+            })}
           </div>
 
-          {participantDiffs.length > 0 ? (
+          {addableCandidates.length > 0 ? (
+            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginBottom: 20 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <label htmlFor={`${idPrefix}-add-participant`} className="tm-text-label" style={{ display: 'block', marginBottom: 8 }}>
+                  출전 선수 추가
+                </label>
+                <select
+                  id={`${idPrefix}-add-participant`}
+                  className="tm-input"
+                  style={{ width: '100%', minHeight: 44 }}
+                  value={candidateToAdd}
+                  onChange={(event) => setCandidateToAdd(event.target.value)}
+                >
+                  <option value="">선수 선택</option>
+                  {addableCandidates.map((candidate) => (
+                    <option key={candidate.participantId} value={candidate.participantId}>
+                      {participantLabel(sides, participantNameMap, candidate.participantId, candidate.sideId)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                type="button"
+                className="tm-btn tm-btn-md tm-btn-neutral"
+                style={{ minHeight: 44 }}
+                disabled={candidateToAdd === ''}
+                onClick={() => addParticipant(candidateToAdd)}
+              >
+                추가
+              </button>
+            </div>
+          ) : null}
+
+          {participantDiffs.length > 0 || addedCount > 0 || removedCount > 0 ? (
             <p className="tm-text-caption" style={{ color: 'var(--blue700)', marginBottom: 16 }}>
-              참가자 기록 변경: {participantDiffs.length}명
+              {[
+                participantDiffs.length > 0 ? `참가자 기록 변경: ${participantDiffs.length}명` : null,
+                addedCount > 0 ? `출전 추가: ${addedCount}명` : null,
+                removedCount > 0 ? `출전 제외: ${removedCount}명` : null,
+              ].filter(Boolean).join(' · ')}
             </p>
           ) : null}
 

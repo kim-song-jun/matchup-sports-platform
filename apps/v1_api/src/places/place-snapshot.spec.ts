@@ -68,6 +68,11 @@ describe('resolvePlaceSnapshot', () => {
 });
 
 describe('toPlaceColumns / toPlaceView', () => {
+  it('공개 장소 이름은 배정 필드로 통일하고 주소와 좌표 스냅샷은 보존한다', () => {
+    const columns = toPlaceColumns(resolvePlaceSnapshot(picked));
+    expect(toPlaceView({ ...columns, field: { name: 'A필드' } })).toEqual({ ...toPlaceView(columns), name: 'A필드' });
+    expect(columns.placeName).toBe(picked.name.trim());
+  });
   it('round-trips a picked place through the place_* columns', () => {
     const columns = toPlaceColumns(resolvePlaceSnapshot(picked));
     expect(toPlaceView(columns)).toEqual({

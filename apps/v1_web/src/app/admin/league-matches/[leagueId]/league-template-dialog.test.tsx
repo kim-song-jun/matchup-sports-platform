@@ -72,7 +72,7 @@ describe('LeagueTemplateDialog', () => {
     const { onSubmit } = setup({ replaceExisting: true });
 
     expect(screen.getByRole('dialog', { name: '템플릿으로 다시 만들기' })).toBeInTheDocument();
-    expect(screen.getByText(/기존 경기는 취소되고/)).toBeInTheDocument();
+    expect(screen.getByText(/기존 경기는 목록에서 빠지고/)).toBeInTheDocument();
     fillByWeekday();
     fireEvent.click(screen.getByRole('button', { name: '다시 만들기' }));
 
@@ -90,6 +90,48 @@ describe('LeagueTemplateDialog', () => {
     fireEvent.change(screen.getByLabelText('팀 수'), { target: { value: '5' } });
     // 홀수 팀은 부전 한 자리를 더해 라운드가 5, 라운드당 2경기 → 홈앤어웨이 10라운드 20경기.
     expect(screen.getByText('10라운드 · 20경기를 만들어요')).toBeInTheDocument();
+  });
+
+  it('하루 경기 수를 넣으면 필요한 날짜가 총 경기 ÷ 하루 경기(올림)로 바뀌고, 리그 경기 시간·휴식과 함께 보낸다', async () => {
+    const { onSubmit } = setup({ defaultGameMinutes: 50 });
+
+    fireEvent.change(screen.getByLabelText('하루 경기 수'), { target: { value: '4' } });
+    // 4팀 단일 = 6경기 → 하루 4경기면 2일.
+    expect(screen.getByText('3라운드 · 6경기를 만들어요 · 하루 4경기씩 2일')).toBeInTheDocument();
+    expect(screen.getByLabelText('경기 시간(분)')).toHaveValue('50');
+    fireEvent.change(screen.getByLabelText('휴식(분)'), { target: { value: '5' } });
+    fillByWeekday();
+    fireEvent.click(screen.getByRole('button', { name: '빈 경기 만들기' }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    const payload = onSubmit.mock.calls[0][0];
+    expect(payload).toMatchObject({ gamesPerDay: 4, gameDurationMinutes: 50, breakMinutes: 5 });
+    expect(payload.schedule.dates).toEqual(['2030-01-07', '2030-01-14']);
+  });
+
+  it('하루 경기 수를 비우면 경기 시간·휴식 칸이 없고 그 키들도 보내지 않는다', async () => {
+    const { onSubmit } = setup({ defaultGameMinutes: 50 });
+
+    expect(screen.queryByLabelText('경기 시간(분)')).toBeNull();
+    fillByWeekday();
+    fireEvent.click(screen.getByRole('button', { name: '빈 경기 만들기' }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    const payload = onSubmit.mock.calls[0][0];
+    expect(payload).not.toHaveProperty('gamesPerDay');
+    expect(payload).not.toHaveProperty('gameDurationMinutes');
+    expect(payload).not.toHaveProperty('breakMinutes');
+  });
+
+  it.each(['0', '51', 'x'])('하루 경기 수 %s 는 1~50 밖이라 보내지 않는다', (value) => {
+    const { onSubmit } = setup();
+    fillByWeekday();
+
+    fireEvent.change(screen.getByLabelText('하루 경기 수'), { target: { value } });
+    fireEvent.click(screen.getByRole('button', { name: '빈 경기 만들기' }));
+
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent('하루 경기 수는 1~50 사이로 입력해 주세요.');
   });
 
   it('날짜가 라운드 수보다 모자라면 보내지 않고 몇 일이 필요한지 알린다', () => {

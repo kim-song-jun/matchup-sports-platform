@@ -1,10 +1,11 @@
 'use client';
 
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 import { getV1ApiBaseUrl, v1Api, v1Delete, v1Get, v1MultipartPost, v1Patch, v1Post, v1Put, V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
 import { compressImagesForUpload, type CompressOptions } from '@/lib/image-compress';
-import { earliestPublicLivePollDelay } from '@/lib/public-live-polling';
+import { earliestPublicLivePollDelay, leagueFixturesPollDelay } from '@/lib/public-live-polling';
 import { OPERATIONS_BOARD_POLL_INTERVAL_MS } from '@/lib/operations-board-polling';
 import { v1Keys } from '@/lib/query-keys';
 import { invalidateV1ChatMessageQueries } from './use-v1-realtime-socket';
@@ -54,7 +55,6 @@ import type {
   V1AdminRow,
   V1PushFailureSummary,
   V1FoundAccount,
-  V1SocialLinkPreview,
   V1SmsFailureSummary,
   V1AdminMonitoringSummary,
   V1AdminOpsSummary,
@@ -406,32 +406,10 @@ export function useV1PhoneVerify() {
   });
 }
 
-export function useV1SocialLinkPreview() {
-  return useMutation({
-    mutationFn: (body: { phone: string; proofToken: string }) =>
-      v1Post<V1SocialLinkPreview>('/auth/social-link/preview', body),
-  });
-}
-
-/** 성공하면 서버가 세션 쿠키를 기존 계정으로 바꾼다 — 호출자가 세션 저장·캐시 비우기를 맡는다. */
-export function useV1SocialLink() {
-  return useMutation({
-    mutationFn: (body: { phone: string; proofToken: string }) =>
-      v1Post<V1AuthSessionResponse>('/auth/social-link', body),
-  });
-}
-
 export function useV1FindAccountByPhone() {
   return useMutation({
     mutationFn: (body: { phone: string; proofToken: string }) =>
       v1Post<V1FoundAccount>('/auth/recovery/find-account', body),
-  });
-}
-
-export function useV1ResetPasswordByPhone() {
-  return useMutation({
-    mutationFn: (body: { phone: string; proofToken: string; newPassword: string }) =>
-      v1Post<{ ok: true }>('/auth/recovery/reset-password', body),
   });
 }
 
@@ -1725,7 +1703,7 @@ export function useV1MySchedule(filters?: ListFilters, options?: { enabled?: boo
 
 export function useV1TeamMatches(
   filters?: ListFilters,
-  options?: QueryOptions & { seed?: CursorPage<V1TeamMatch>; refetchInterval?: number | false },
+  options?: QueryOptions & { seed?: CursorPage<V1TeamMatch>; refetchInterval?: number | false; refetchOnWindowFocus?: boolean | 'always' },
 ) {
   const seed = options?.seed;
   return useQuery({
@@ -1733,6 +1711,7 @@ export function useV1TeamMatches(
     queryFn: () => v1Get<CursorPage<V1TeamMatch>>('/team-matches', filters),
     // 홈 추천처럼 한 장만 보여 주는 곳은 끈다 — 모든 방문자가 15초마다 목록을 다시 받을 이유가 없다.
     refetchInterval: options?.refetchInterval ?? 15000,
+    refetchOnWindowFocus: options?.refetchOnWindowFocus ?? false,
     enabled: options?.enabled,
     // useV1Matches와 동일한 이유 — cursor로 쿼리키가 바뀌는 "더 보기" 중 목록이 비지 않게 하고,
     // 첫 진입에만 서버 seed 를 쓴다.
@@ -1740,13 +1719,18 @@ export function useV1TeamMatches(
   });
 }
 
-export function useV1TeamMatch(teamMatchId: string, options?: { seed?: V1TeamMatch | null }) {
+export function useV1TeamMatch(
+  teamMatchId: string,
+  options?: { seed?: V1TeamMatch | null; refetchInterval?: number | false; refetchOnWindowFocus?: boolean | 'always' },
+) {
   const queryClient = useQueryClient();
   const seed = options?.seed;
   return useQuery({
     queryKey: v1Keys.teamMatch(teamMatchId),
     queryFn: () => v1Get<V1TeamMatch>(`/team-matches/${teamMatchId}`),
     enabled: Boolean(teamMatchId),
+    refetchInterval: options?.refetchInterval ?? false,
+    refetchOnWindowFocus: options?.refetchOnWindowFocus ?? false,
     // useV1Match 와 같은 이유·같은 안전장치(뷰어 상태·신청 목록 제거) — 자세한 근거는 그쪽 주석.
     placeholderData: () => {
       const source =
@@ -3532,6 +3516,9 @@ export function useV1UpdateAdminTeamMatchRecruitment(teamMatchId: string) {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminTeamMatch(teamMatchId) });
       queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'team-matches'] });
       queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'team-matches'] });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'me', 'team-matches'] });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'me', 'schedule'] });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'teams'] });
     },
   });
 }
@@ -3626,9 +3613,15 @@ export function useV1ChangeTeamMatchStatus() {
   return useMutation({
     mutationFn: ({ id, status, reason }: StatusChangeMutationVars) =>
       v1Post<V1AdminStatusChangeResult>(`/admin/team-matches/${id}/status`, { status, reason }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.adminTeamMatches() });
+    onSuccess: (_data, { id }) => {
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'team-matches'] });
       queryClient.invalidateQueries({ queryKey: v1Keys.adminOverview() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamMatchesAll() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamMatch(id) });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'me', 'team-matches'] });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'me', 'schedule'] });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'teams'] });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'home'] });
     },
   });
 }
@@ -5084,9 +5077,9 @@ export function useV1UpdateFixture(tournamentId: string) {
         homeRegistrationId?: string | null;
         awayRegistrationId?: string | null;
       }) => v1Patch<V1UpdateFixtureResult>(`/admin/fixtures/${fixtureId}`, body),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentBracket(tournamentId) });
-      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
+    onSuccess: (_result, variables) => {
+      invalidateCompetitionFieldViews(queryClient, tournamentId);
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamMatch(variables.fixtureId) });
     },
   });
 }
@@ -5661,11 +5654,17 @@ export function useV1MyTournamentStaffAssignments(options?: QueryOptions) {
 
 /** GET /tournament-ops/tournaments/:tournamentId/fields — 필터 드롭다운용 필드/코트 목록. */
 export function useV1TournamentFields(tournamentId: string, options?: QueryOptions) {
-  return useQuery({
+  const enabled = Boolean(tournamentId) && (options?.enabled ?? true);
+  const query = useQuery({
     queryKey: v1Keys.tournamentOperationsFields(tournamentId),
     queryFn: () => v1Get<V1TournamentFieldListResponse>(`/tournament-ops/tournaments/${tournamentId}/fields`),
-    enabled: Boolean(tournamentId) && (options?.enabled ?? true),
+    enabled,
+    // 다른 탭에서 추가한 필드도 운영 보드의 15초 갱신 및 화면 복귀 때 함께 읽는다.
+    refetchInterval: OPERATIONS_BOARD_POLL_INTERVAL_MS,
+    refetchOnWindowFocus: 'always',
   });
+  useV1WindowFocusRefetch(query, enabled, 'always');
+  return query;
 }
 
 /**
@@ -5689,11 +5688,34 @@ export function useV1CreateTournamentField(tournamentId: string) {
   });
 }
 
+function invalidateCompetitionFieldViews(queryClient: QueryClient, competitionId: string) {
+  for (const queryKey of [
+    v1Keys.tournamentOperationsBoardAll(competitionId), v1Keys.tournamentOperationsFields(competitionId),
+    v1Keys.adminTournamentBracket(competitionId), v1Keys.adminLeagueMatch(competitionId),
+    v1Keys.tournament(competitionId), v1Keys.leagueMatch(competitionId), v1Keys.myTournamentStaffAssignments(),
+    ['v1', 'public-game-records', 'schedule', competitionId],
+    ['v1', 'public-game-records', 'match', competitionId],
+    ['v1', 'public-game-records', 'league-fixture-record', competitionId],
+  ]) void queryClient.invalidateQueries({ queryKey });
+}
+
+export function useV1ImportTournamentFieldPlaces(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => v1Post<{ addedCount: number; existingCount: number; updatedCount: number }>(
+      `/tournament-ops/tournaments/${tournamentId}/fields/import-places`, {}, idempotencyInit(),
+    ),
+    onSuccess: () => {
+      invalidateCompetitionFieldViews(queryClient, tournamentId);
+    },
+  });
+}
+
 /**
  * 경기 ↔ 경기장(필드) 연결.
  *
- * `V1TournamentFixture.fieldId` 의 **유일한 쓰기 경로**다(백엔드 DTO 주석이 그렇게 못박고
- * 있다). 백엔드는 Task 18 때부터 있었는데 호출부가 없어서, 필드를 만들어 스태프에게
+ * 운영 콘솔·모바일 경기 시트에서 canonical TeamMatch의 필드와 장소를 함께 저장한다.
+ * 관리자 경기 설정 PATCH도 같은 선택을 지원한다. 백엔드는 Task 18 때부터 있었는데 호출부가 없어서, 필드를 만들어 스태프에게
  * 배정해도 그 필드에 걸린 경기가 영원히 0건이었다 — 필드 담당자는 담당 경기를 가질 수
  * 없었고, `NO_FIELD_ASSIGNED`·`NO_STAFF_ASSIGNED` 경고는 끌 방법이 없어 운영 보드에서
  * 통째로 숨겨져 있었다(2026-08-13 alpha 실측: 픽스처 20건 전부 `fieldId=null`).
@@ -5703,7 +5725,7 @@ export function useV1CreateTournamentField(tournamentId: string) {
  * 구분되지 않아서, 백엔드가 의도적으로 갈라 놓았다.
  *
  * 권한: 필드 *관리*(생성·수정)와 달리 플랫폼 운영자 전용이 아니다. 서버는
- * `event_reverse` 권한으로 판정하므로 **플랫폼 운영자와 대회 디렉터**가 통과하고,
+ * `tournament_admin` 권한으로 판정하므로 **플랫폼 운영자와 대회 디렉터**가 통과하고,
  * 필드 담당자·조회 전용은 거부된다. 호출 화면에서 역할을 먼저 가릴 것.
  *
  * 보드가 `fieldName` 을 직접 렌더하므로 성공 시 보드 쿼리도 함께 무효화한다.
@@ -5717,9 +5739,9 @@ export function useV1AssignFixtureField(tournamentId: string) {
         { fieldId },
         idempotencyInit(),
       ),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.tournamentOperationsBoardAll(tournamentId) });
-      queryClient.invalidateQueries({ queryKey: v1Keys.tournamentOperationsFields(tournamentId) });
+    onSuccess: (_result, variables) => {
+      invalidateCompetitionFieldViews(queryClient, tournamentId);
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamMatch(variables.fixtureId) });
     },
   });
 }
@@ -5735,8 +5757,7 @@ export function useV1ClearFixtureField(tournamentId: string) {
         idempotencyInit(),
       ),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.tournamentOperationsBoardAll(tournamentId) });
-      queryClient.invalidateQueries({ queryKey: v1Keys.tournamentOperationsFields(tournamentId) });
+      invalidateCompetitionFieldViews(queryClient, tournamentId);
     },
   });
 }
@@ -5780,10 +5801,13 @@ import type {
   V1AdminLeagueDetail,
   V1AdminLeagueListItem,
   V1UpdateLeagueVisibilityResult,
-  V1LeagueHoldResult,
+  V1ChangeLeagueStatePayload,
+  V1ChangeLeagueStateResult,
   V1AdminLeagueTeamsResponse,
   V1CancelLeagueFixturePayload,
   V1CancelLeagueFixtureResult,
+  V1DeleteLeagueFixturePayload,
+  V1DeleteLeagueFixtureResult,
   V1CreateLeaguePayload,
   V1CreateLeagueResult,
   V1GenerateLeagueFixturesPayload,
@@ -5800,9 +5824,6 @@ import type {
   V1RegenerateLeagueFixturesPayload,
   V1RegenerateLeagueFixturesResult,
   V1RemoveLeagueTeamResult,
-  V1RevertLeagueCompletionPayload,
-  V1RevertLeagueCompletionResult,
-  V1CompleteLeagueResult,
   V1UpdateLeagueFixturePayload,
   V1UpdateLeagueFixtureResult,
   V1OpenLeagueRegistrationPayload,
@@ -5866,6 +5887,18 @@ export function useV1AdminLeagueMatchList(seriesId?: string, visibility?: 'publi
         ...(seriesId ? { seriesId } : {}),
         ...(visibility ? { visibility } : {}),
       }),
+  });
+}
+
+export function useV1UpdateLeagueDiscipline(leagueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { yellowAccumulationLimit: number | null; redCardSuspensionMatches: number | null }) =>
+      v1Patch<{ leagueId: string; yellowAccumulationLimit: number | null; redCardSuspensionMatches: number | null }>(`/admin/league-matches/${leagueId}`, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(leagueId) });
+    },
   });
 }
 
@@ -6049,8 +6082,25 @@ export function useV1UpdateLeagueFixture(leagueId: string) {
   return useMutation({
     mutationFn: ({ teamMatchId, body }: { teamMatchId: string; body: V1UpdateLeagueFixturePayload }) =>
       v1Patch<V1UpdateLeagueFixtureResult>(`/admin/league-matches/${leagueId}/fixtures/${teamMatchId}`, body),
+    onSuccess: (_result, variables) => {
+      invalidateCompetitionFieldViews(queryClient, leagueId);
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamMatch(variables.teamMatchId) });
+    },
+  });
+}
+
+// 경기 삭제 — 취소와 같은 후처리(리그 자동 종료 가능)라 목록 캐시까지 무효화한다.
+export function useV1DeleteLeagueFixture(leagueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ teamMatchId, body }: { teamMatchId: string; body: V1DeleteLeagueFixturePayload }) =>
+      v1Post<V1DeleteLeagueFixtureResult>(
+        `/admin/league-matches/${encodeURIComponent(leagueId)}/fixtures/${encodeURIComponent(teamMatchId)}/delete`,
+        body,
+      ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
     },
   });
 }
@@ -6130,52 +6180,26 @@ export function useV1CancelLeagueFixture(leagueId: string) {
   });
 }
 
-// R6: 리그 종료 역전이 — POST /admin/league-matches/:leagueId/revert-completion.
-// 상태 뱃지(진행 중/종료)와 목록의 state 컬럼이 함께 바뀌므로 상세·목록 캐시를 모두 무효화한다.
 /**
- * 리그 보류(취소 대신)·보류 해제. 보류는 리그와 경기를 공개 화면에서 숨기므로 공개 읽기 캐시도 다시
- * 확인한다(공개 설정 변경과 같은 범위).
+ * 리그 상태 변경(준비 중·진행 중·보류·종료) — 상태 변경 버튼 하나가 쓴다. 보류는 리그와 경기를 공개 화면에서 숨기고
+ * 종료는 공개 상세·목록·홈의 상태 표시를 바꾸므로 공개 읽기 캐시까지 다시 확인한다.
  */
-function useLeagueStatusMutation<TResult>(leagueId: string, action: 'hold' | 'resume' | 'complete') {
+function invalidateLeagueEverywhere(queryClient: ReturnType<typeof useQueryClient>, leagueId: string) {
+  queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
+  queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
+  queryClient.invalidateQueries({ queryKey: v1Keys.leagueMatches() });
+  queryClient.invalidateQueries({ queryKey: v1Keys.leagueMatch(leagueId) });
+  queryClient.invalidateQueries({ queryKey: v1Keys.tournament(leagueId) });
+  queryClient.invalidateQueries({ queryKey: v1Keys.home() });
+  queryClient.invalidateQueries({ queryKey: v1Keys.tournaments() });
+}
+
+export function useV1ChangeLeagueState(leagueId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: { reason?: string }) =>
-      v1Post<TResult>(`/admin/league-matches/${encodeURIComponent(leagueId)}/${action}`, body),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
-      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
-      queryClient.invalidateQueries({ queryKey: v1Keys.leagueMatches() });
-      queryClient.invalidateQueries({ queryKey: v1Keys.leagueMatch(leagueId) });
-      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(leagueId) });
-      queryClient.invalidateQueries({ queryKey: v1Keys.home() });
-      queryClient.invalidateQueries({ queryKey: v1Keys.tournaments() });
-    },
-  });
-}
-
-export function useV1HoldLeague(leagueId: string) {
-  return useLeagueStatusMutation<V1LeagueHoldResult>(leagueId, 'hold');
-}
-
-export function useV1ResumeLeague(leagueId: string) {
-  return useLeagueStatusMutation<V1LeagueHoldResult>(leagueId, 'resume');
-}
-
-// 되돌리기·보류 해제 뒤 남은 대진이 없으면 자동 종료 판정이 다시 불리지 않는다(MD-QA #93) — 수동 종료.
-// 종료되면 공개 상세·목록·홈의 상태 표시도 바뀌므로 보류와 같은 범위를 무효화한다.
-export function useV1CompleteLeague(leagueId: string) {
-  return useLeagueStatusMutation<V1CompleteLeagueResult>(leagueId, 'complete');
-}
-
-export function useV1RevertLeagueCompletion(leagueId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (body: V1RevertLeagueCompletionPayload) =>
-      v1Post<V1RevertLeagueCompletionResult>(`/admin/league-matches/${leagueId}/revert-completion`, body),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
-      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
-    },
+    mutationFn: (body: V1ChangeLeagueStatePayload) =>
+      v1Post<V1ChangeLeagueStateResult>(`/admin/league-matches/${encodeURIComponent(leagueId)}/state`, body),
+    onSuccess: () => invalidateLeagueEverywhere(queryClient, leagueId),
   });
 }
 
@@ -6195,13 +6219,28 @@ export function useV1RegenerateLeagueFixtures(leagueId: string) {
 
 
 export function useV1LeagueMatch(leagueId: string, options?: { seed?: V1PublicLeagueDetail | null }) {
-  return useQuery({
+  const queryClient = useQueryClient();
+  const query = useQuery({
     queryKey: v1Keys.leagueMatch(leagueId),
     queryFn: () => v1Get<V1PublicLeagueDetail>(`/league-matches/${leagueId}`),
     enabled: Boolean(leagueId),
     // 리그 상세 page 가 서버에서 받은 공개 응답 — 순위표·일정이 서버 HTML 에 들어가게 첫 값으로 쓴다.
     placeholderData: options?.seed ?? undefined,
+    // 진행 중·결과 대기 경기가 있거나 킥오프가 가까우면 폴링한다 — 열어 둔 화면도 종료·확정을 스스로 발견한다.
+    refetchInterval: (current) => leagueFixturesPollDelay(current.state.data?.fixtures ?? []),
   });
+  // 순위·개인 기록은 경기 상태를 몰라 스스로 폴링할 기준이 없다. 리그 상세가 실제로 바뀌면(확정 포함 —
+  // 같은 응답이면 react-query 가 같은 참조를 돌려준다) 같이 다시 받는다.
+  const fetched = query.isPlaceholderData ? undefined : query.data;
+  const previous = useRef(fetched);
+  useEffect(() => {
+    const before = previous.current;
+    previous.current = fetched;
+    if (before === undefined || fetched === undefined || before === fetched) return;
+    void queryClient.invalidateQueries({ queryKey: v1Keys.leagueMatchStandings(leagueId) });
+    void queryClient.invalidateQueries({ queryKey: v1Keys.leagueMatchPlayerRecords(leagueId) });
+  }, [fetched, leagueId, queryClient]);
+  return query;
 }
 
 export function useV1LeagueMatchStandings(

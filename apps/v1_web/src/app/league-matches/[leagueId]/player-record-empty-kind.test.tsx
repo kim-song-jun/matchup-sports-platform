@@ -79,7 +79,7 @@ describe('실제 순위표·시상 인접 상태 계약 (#1436)', () => {
     expect(empty).toHaveTextContent('아직 공개할 수 있는 기록이 없어요');
     expect(empty).toHaveTextContent(`공개 가능한 ${label} 기록만 순위에 표시돼요`);
     expect(empty).not.toHaveTextContent(`${label} 기록은 있지만`);
-    expect(within(empty).getByRole('link', { name: '리그 순위표 보러가기' })).toHaveAttribute('href', '/league-matches/league-contract?from=%2Fhome');
+    expect(within(empty).getByRole('link', { name: '리그 순위표 보러가기' })).toHaveAttribute('href', '/tournaments/league-contract?from=%2Fhome');
   });
 
   it.each(['bothHidden', 'bothNoHidden'] as const)('actual service → combined standings keeps %s and schedule action', (key) => {

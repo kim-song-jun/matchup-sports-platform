@@ -95,6 +95,8 @@ function BracketPageBody() {
           tournamentId={tournamentId}
           showToast={showToast}
           registrations={registrations}
+          confirmedTeamCount={registrations.filter((registration) => registration.status === 'confirmed').length}
+          confirmedTeamCountStatus={registrationsState.status}
           registrationDeadlineAt={tournament?.registrationDeadlineAt}
           tournamentStatus={tournament?.status}
           bracketPublishedAt={tournament?.bracketPublishedAt}

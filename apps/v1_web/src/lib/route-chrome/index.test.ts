@@ -134,6 +134,11 @@ describe('ROUTE_CHROME_TABLE — 골든 샘플(전 세그먼트 통합, U39)', (
     expect(campaign?.params).toEqual({ slug: 'summer-cup' });
   });
 
+  it('/events(팀밋이 여는 대회) — 뒤로가기가 있고 ?from= 이 없을 때의 고정 목적지는 대회 탭이다', () => {
+    // 이 화면은 대회 탭의 배너로 들어오는 하위 화면인데 backHref 가 없어 모바일 헤더에 뒤로가기가 아예 없었다.
+    expect(resolveRouteChrome('/events')?.chrome.backHref).toBe('/tournaments');
+  });
+
   it('/team-matches/:id/record — 엔트리 누락 시 세그먼트 수가 달라 어떤 행에도 안 걸려 null이 된다', () => {
     // 2026-09-26 alpha 감사: 이 pattern이 테이블에 없으면 3세그먼트 경로가 2세그먼트
     // '/team-matches/:id'와도 세그먼트 수가 달라 매치되지 않아 resolveRouteChrome이 null을

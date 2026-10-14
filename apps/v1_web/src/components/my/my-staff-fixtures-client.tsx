@@ -168,10 +168,10 @@ function StaffFixtureRow({
   tournamentId: string;
   fixture: V1MyTournamentStaffFixture;
 }) {
-  const matchName = competitionMatchLabel({ groupName: fixture.groupName, round: fixture.round, legNumber: fixture.legNumber });
+  const matchName = fixture.round === null ? fixture.title : competitionMatchLabel({ groupName: fixture.groupName, round: fixture.round, legNumber: fixture.legNumber });
   // 서버가 붙이는 `title` 은 "대회 · 조 · 라운드" 순번이라 어느 경기인지 알려 주지 못한다.
   const teamTitle = fixture.homeTeamName && fixture.awayTeamName ? `${fixture.homeTeamName} vs ${fixture.awayTeamName}` : fixture.title;
-  const meta = `${matchName} · ${fixture.fixtureNumber}번 경기 · ${formatTournamentDateTimeShort(fixture.scheduledAt) ?? '일정 미정'}`;
+  const meta = [matchName, fixture.fixtureNumber === null ? null : `${fixture.fixtureNumber}번 경기`, formatTournamentDateTimeShort(fixture.scheduledAt) ?? '일정 미정'].filter(Boolean).join(' · ');
   return (
     <Link
       className="tm-list-row tm-pressable"

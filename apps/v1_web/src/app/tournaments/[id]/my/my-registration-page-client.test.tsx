@@ -783,8 +783,8 @@ describe('MyRegistrationPageClient — 리그는 "리그"라고 부른다', () =
 
     const links = screen.getAllByRole('link', { name: '리그 상세 보기' });
     expect(links).toHaveLength(2);
-    // 리그 상세는 다른 화면과 같은 `/league-matches/:id` 다(대회 상세 경로는 리그 거울 화면).
-    for (const link of links) expect(link).toHaveAttribute('href', '/league-matches/tournament-1');
+    // 리그 상세는 다른 화면과 같은 `/tournaments/:id` 다(대회 상세 경로는 리그 거울 화면).
+    for (const link of links) expect(link).toHaveAttribute('href', '/tournaments/tournament-1');
     expect(container.textContent).not.toContain('대회');
   });
 
@@ -805,7 +805,7 @@ describe('MyRegistrationPageClient — 리그는 "리그"라고 부른다', () =
     render(<MyRegistrationPageClient tournamentId="tournament-1" />);
     const probe = render(<BackHrefProbe />);
 
-    expect(probe.getByTestId('probe-backhref')).toHaveTextContent('/league-matches/tournament-1');
+    expect(probe.getByTestId('probe-backhref')).toHaveTextContent('/tournaments/tournament-1');
   });
 
   it('신청을 받지 않는 리그의 팀 없음 안내도 "이 리그는" 이다', () => {

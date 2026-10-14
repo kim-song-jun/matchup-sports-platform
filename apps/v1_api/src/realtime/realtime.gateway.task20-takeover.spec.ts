@@ -62,16 +62,14 @@ describe('Task 20 game-operations takeover realtime protocol', () => {
   const prisma = { v1Game: { findUnique: jest.fn() }, v1User: { findFirst: jest.fn() } };
   const staffAccess = { assertAccess: jest.fn() };
   const logger = { debug: jest.fn(), warn: jest.fn(), error: jest.fn() };
-  // 백로그 결함 수정(realtime-takeover-and-eviction-protocol): 게이트웨이는
-  // renew 실패를 잡은 뒤 이 서비스에 "지금 이 게임을 쥔, 내 것과 다른 살아있는
-  // grant가 있는가"를 직접 물어 TAKEOVER_TOKEN_EXPIRED와 TAKEOVER_SUPERSEDED를
-  // 가른다. 기본값 false = "아무도 안 쥐고 있다(자연 만료)".
-  const gameTakeover = { isSuperseded: jest.fn().mockReturnValue(false) };
+  // The actual registry owns pre-await request ordering and renewal supersession.
+  let gameTakeover: GameTakeoverService;
 
   beforeEach(async () => {
     jest.clearAllMocks();
     prisma.v1User.findFirst.mockReset().mockResolvedValue({ onboardingStatus: 'completed', adminUser: null });
-    gameTakeover.isSuperseded.mockReturnValue(false);
+    gameTakeover = new GameTakeoverService();
+    jest.spyOn(gameTakeover, 'isSuperseded');
     const moduleRef = await Test.createTestingModule({
       providers: [
         RealtimeGateway,
@@ -111,7 +109,7 @@ describe('Task 20 game-operations takeover realtime protocol', () => {
     expect(gamesService.requestTakeover).toHaveBeenCalledWith(USER, GAME_ID, {
       clientInstanceId: 'client-1',
       lastSequence: 2,
-    });
+    }, expect.objectContaining({ gameId: GAME_ID }));
     expect(client.emit).toHaveBeenCalledWith('game.takeover.granted', grant);
     expect(result).toEqual({ status: 'granted', ...grant });
   });
@@ -235,7 +233,10 @@ describe('Task 20 game-operations takeover realtime protocol', () => {
     gamesService.renewTakeover.mockRejectedValue(
       new ForbiddenException({ code: 'TAKEOVER_TOKEN_EXPIRED', message: 'expired' }),
     );
-    gameTakeover.isSuperseded.mockReturnValue(true);
+    gameTakeover.grant({
+      gameId: GAME_ID, authorizationSubject: 'task20-other-operator',
+      clientInstanceId: 'other-client', lastSequence: 2,
+    });
 
     const result = await task20Gateway(gateway).renewGameTakeover(client, {
       gameId: GAME_ID,

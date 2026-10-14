@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import { Archive } from 'lucide-react';
 import { Card, ListItem } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
@@ -12,7 +13,7 @@ import type { V1TeamDetail } from '@/types/api';
  * 해체(보관)된 팀의 읽기 전용 페이지(Task 180 H3). 지난 경기·알림에서 들어와도 막다른 길이
  * 되지 않게 전적으로 가는 길을 남기고, 운영 입구(가입·컨택·관리)는 두지 않는다.
  */
-export function DissolvedTeamView({ team, selfHref }: { team: V1TeamDetail; selfHref: string }) {
+export function DissolvedTeamView({ team, selfHref, refreshError }: { team: V1TeamDetail; selfHref: string; refreshError?: ReactNode }) {
   const dissolution = team.dissolution ?? null;
   const dissolvedLabel = formatTournamentDateMedium(dissolution?.dissolvedAt);
   const deadlineLabel = formatTournamentDateTimeShort(dissolution?.restoreDeadlineAt);
@@ -20,6 +21,7 @@ export function DissolvedTeamView({ team, selfHref }: { team: V1TeamDetail; self
 
   return (
     <div className="tm-content-enter" style={{ padding: '16px var(--v1-shell-page-x) 32px', display: 'grid', gap: 16 }}>
+      {refreshError}
       <Card pad={20}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <TeamAvatar seed={team.teamId} name={team.name} logoUrl={team.profile.logoUrl} size="lg" />

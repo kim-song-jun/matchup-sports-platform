@@ -533,7 +533,7 @@ export default function LeagueMatchStandingsClient({
   const fromPath = sanitizeRedirectPath(searchParams.get('from'));
   const currentHref = useCurrentHref();
   // 팀 이름 링크의 뒤로가기 출처 — 이 화면 자기 자신(상위에서 받은 from까지 포함해서 이어 붙인다).
-  const selfHref = withFromPath(`/league-matches/${leagueId}`, fromPath);
+  const selfHref = withFromPath(`/tournaments/${leagueId}`, fromPath);
   const seriesQuery = useV1LeagueMatch(leagueId, { seed: seed?.league });
   const standingsQuery = useV1LeagueMatchStandings(leagueId, { seed: seed?.standings });
   const recordsQuery = useV1LeagueMatchPlayerRecords(leagueId);
@@ -691,6 +691,10 @@ export default function LeagueMatchStandingsClient({
           <StatusChip chip={leagueStateChip(series.state)} size="md" />
         </div>
       </div>
+      {series.rulesText && <section className="mt-4 space-y-2" aria-label="리그 운영 안내">
+        <h3 className="tm-text-body font-semibold text-[var(--text-strong)]">리그 운영 안내</h3>
+        <p className="whitespace-pre-wrap break-words tm-text-label text-[var(--text-muted)]">{series.rulesText}</p>
+      </section>}
       <LeagueJoinGuideCard
         leagueId={leagueId}
         state={series.state}
@@ -698,6 +702,7 @@ export default function LeagueMatchStandingsClient({
         registrationDeadlineAt={series.registrationDeadlineAt}
         entryFee={series.entryFee}
         entryFeeConfigured={series.entryFeeConfigured}
+        nextRound={series.nextRound ?? null}
       />
       {/* 사용자 확정(2026-08-23) — 종료된 리그에만 뜬다. 진행 중·준비 중 리그에는
           이 자리에 아무것도 늘어나지 않는다(우승팀 개념이 아직 성립하지 않는다). */}
@@ -725,7 +730,7 @@ export default function LeagueMatchStandingsClient({
             {series.seriesSiblings.map((sibling) => {
               return (
                 <li key={sibling.leagueId}>
-                  <Link href={withFromPath(`/league-matches/${sibling.leagueId}`, selfHref)} className="tm-chip">
+                  <Link href={withFromPath(`/tournaments/${sibling.leagueId}`, selfHref)} className="tm-chip">
                     {sibling.seasonNo}시즌 · {sibling.tierLabel}
                     {/* 상태를 컬러 뱃지 + 텍스트로 함께 표기 — 컬러만으로 진행 여부를 전달하지 않는다. */}
                     <StatusChip chip={leagueStateChip(sibling.state)} />

@@ -6,7 +6,7 @@ import { PUBLIC_TOURNAMENT_STATUSES } from './tournaments-read.query';
 
 /**
  * Default public list order, evaluated by the database:
- * recruiting (open, plus a regular league's draft) -> recruitment closed -> in progress -> finished.
+ * in progress -> recruiting (open, plus a regular league's draft) -> recruitment closed -> finished.
  * "Recruitment closed" is the status the card shows: a stored `closed`, or a tournament still stored
  * as `open` whose deadline has passed or whose capacity is full (the web's
  * `resolveTournamentRegistrationBlock`; leagues have no capacity and keep their stored status).
@@ -25,9 +25,11 @@ const OPEN_BUT_BLOCKED_SQL = Prisma.sql`(
   )
 )`;
 
+// Group rank: 0 in progress, 1 recruiting, 2 recruitment closed, 3 finished (FINISHED_RANK), 4 anything else.
 const GROUP_RANK_SQL = Prisma.sql`CASE t.status::text
-  WHEN 'draft' THEN 0 WHEN 'open' THEN (CASE WHEN ${OPEN_BUT_BLOCKED_SQL} THEN 1 ELSE 0 END)
-  WHEN 'closed' THEN 1 WHEN 'in_progress' THEN 2 WHEN 'completed' THEN 3
+  WHEN 'in_progress' THEN 0
+  WHEN 'draft' THEN 1 WHEN 'open' THEN (CASE WHEN ${OPEN_BUT_BLOCKED_SQL} THEN 2 ELSE 1 END)
+  WHEN 'closed' THEN 2 WHEN 'completed' THEN 3
   ELSE 4 END`;
 
 const FINISHED_RANK = Prisma.raw('3');

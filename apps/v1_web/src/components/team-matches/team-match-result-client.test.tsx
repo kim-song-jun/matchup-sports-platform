@@ -814,6 +814,33 @@ describe('리그 대진 결과 - 확정 영수증', () => {
   }
 
   it.each([
+    ['host' as const, 'OFFICIAL' as const], ['approval' as const, 'OFFICIAL' as const],
+    ['host' as const, 'SUBMITTED' as const], ['approval' as const, 'SUBMITTED' as const],
+  ])('%s / %s: 일반 참가팀 멤버도 서버가 공개한 득점자·카드·MVP 이름을 본다', (entry, state) => {
+    renderReceipt(entry, {}, {}, [revision({
+      state, mvpParticipantId: 'p-1',
+      resultParticipants: [{ id: 'rp-1', resultRevisionId: 'rev-1', participantId: 'p-1', sideId: 'side-home',
+        goals: 1, cards: { yellow: 1, red: 0 }, started: true, minutesPlayed: 15, assists: 0, fouls: 0,
+        goalkeeper: false, displayName: '김민준', jerseyNumber: 7 }],
+    })]);
+    expect(screen.getByText('#7 김민준 · 1골')).toBeInTheDocument();
+    expect(screen.getByText(/#7 김민준 · 옐로카드 1/)).toBeInTheDocument();
+    expect(screen.queryByText(/선수 #p-1/)).not.toBeInTheDocument();
+    expect(useV1TeamMatchLineupMock).toHaveBeenCalledWith('tm-1', { enabled: false });
+  });
+
+  it('등번호가 없어도 이름을 표시하고 서버가 비공개 처리한 선수의 이름은 추측하지 않는다', () => {
+    const player = { id: 'rp-1', resultRevisionId: 'rev-1', participantId: 'p-1', sideId: 'side-home',
+      goals: 1, cards: { yellow: 0, red: 0 }, started: true, minutesPlayed: 15, assists: 0, fouls: 0,
+      goalkeeper: false, displayName: '김민준', jerseyNumber: null };
+    renderReceipt('host', {}, {}, [revision({ state: 'SUBMITTED', resultParticipants: [
+      player, { ...player, id: 'rp-2', participantId: 'other-player', sideId: 'side-away', displayName: null },
+    ] })]);
+    expect(screen.getByText('김민준 · 1골')).toBeInTheDocument();
+    expect(screen.getByText('선수 #other-pl · 1골')).toBeInTheDocument();
+  });
+
+  it.each([
     ['host' as const, '호스트만 결과를 입력할 수 있어요'],
     ['approval' as const, '상대팀만 결과를 승인할 수 있어요'],
   ])('%s 진입점도 리그 대진이면 "%s" 문구 대신 확정 영수증을 보여준다', (entry, gatedText) => {

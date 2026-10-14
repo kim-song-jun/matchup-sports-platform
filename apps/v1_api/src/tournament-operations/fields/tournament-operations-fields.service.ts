@@ -23,6 +23,9 @@ import type {
   UpdateTournamentFieldDto,
 } from './dto/tournament-operations-field.dto';
 import { ALL_COMPETITION_KINDS, findTournamentOnSurface } from '../../tournaments/tournament-surface-lookup';
+import { fieldPlaceForMatch, lockCompetitionFieldMatches, normalizedFieldName, tournamentFieldPlace } from '../../places/competition-field-place';
+import { PLACE_SELECT } from '../../places/place-select';
+import { toPlaceColumns, toPlaceView, type PlaceView } from '../../places/place-snapshot';
 
 export type TournamentOperationsFieldAuditContext = {
   readonly requestId: string;
@@ -37,6 +40,7 @@ export type TournamentFieldResult = {
   readonly sortOrder: number;
   readonly active: boolean;
   readonly version: number;
+  readonly place: PlaceView;
 };
 
 export type TournamentFixtureFieldResult = {
@@ -140,6 +144,96 @@ export class TournamentOperationsFieldsService {
     return { items: fields.map((field) => this.serialize(field)) };
   }
 
+  /** Explicit import is a mutation: list/read must never silently create catalogue entries. */
+  async importFixturePlaces(actorUserId: string, tournamentId: string, audit: TournamentOperationsFieldAuditContext) {
+    await this.assertTournamentExists(tournamentId);
+    const action = 'tournament.field.import_places';
+    const resourceType = 'TOURNAMENT_FIELD_IMPORT';
+    const payloadHash = this.hashPayload({ tournamentId });
+    return this.prisma.$transaction(async (tx) => {
+      const principal = await this.authorizeFieldManagement(actorUserId, tournamentId, tx);
+      await lockCompetitionFieldMatches(tx, tournamentId);
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`competition-field-names:${tournamentId}`}, 0))`;
+      const replay = await this.consumeIdempotency<{ addedCount: number; existingCount: number; updatedCount: number }>(
+        tx, actorUserId, action, resourceType, tournamentId, audit.requestId, payloadHash,
+      );
+      if (replay !== undefined) return replay;
+      const rows = await tx.v1TeamMatch.findMany({ where: { tournamentId, deletedAt: null }, orderBy: { id: 'asc' }, select: { ...PLACE_SELECT, id: true, fieldId: true } });
+      const existing = await tx.v1TournamentField.findMany({ where: { tournamentId } });
+      const names = new Set(existing.map((field) => normalizedFieldName(field.name)));
+      const places = new Map<string, { name: string; place: PlaceView | null; fingerprints: Set<string> }>();
+      for (const row of rows) {
+        const storedPlace = toPlaceView(row);
+        if (!storedPlace) continue;
+        const name = storedPlace.name.trim();
+        const key = normalizedFieldName(name);
+        if (!key || ['장소 미정', '미정', 'tbd'].includes(key)) continue;
+        const place = tournamentFieldPlace({ name, placeSnapshot: { ...storedPlace } });
+        const fingerprint = JSON.stringify({ ...place, name: key });
+        const bucket = places.get(key) ?? { name, place: { ...place, name }, fingerprints: new Set<string>() };
+        bucket.fingerprints.add(fingerprint);
+        if (bucket.fingerprints.size > 1) bucket.place = null;
+        places.set(key, bucket);
+      }
+      let addedCount = 0;
+      let existingCount = 0;
+      let updatedCount = 0;
+      const fingerprint = (place: PlaceView) => JSON.stringify([
+        place.address, place.latitude, place.longitude, place.provider, place.providerPlaceId,
+      ]);
+      for (const field of existing) {
+        const candidates = rows.filter((row) => row.fieldId === field.id ||
+          (row.placeName != null && normalizedFieldName(row.placeName) === normalizedFieldName(field.name)))
+          .map(toPlaceView).filter((place): place is PlaceView => place !== null &&
+            !['', '장소 미정', '미정', 'tbd'].includes(normalizedFieldName(place.name)))
+          .map((place) => tournamentFieldPlace({ name: place.name, placeSnapshot: { ...place } }));
+        if (candidates.length === 0) continue;
+        const unique = new Map(candidates.map((place) => [fingerprint(place), place]));
+        const next = unique.size === 1 ? { ...unique.values().next().value!, name: field.name } : null;
+        const current = field.placeSnapshot == null ? null : tournamentFieldPlace(field);
+        if (current === null && next === null || current !== null && next !== null && fingerprint(current) === fingerprint(next)) continue;
+        const changed = await tx.v1TournamentField.updateMany({ where: { id: field.id, tournamentId, version: field.version }, data: {
+          placeSnapshot: next === null ? Prisma.DbNull : next as unknown as Prisma.InputJsonValue,
+          version: { increment: 1 },
+        } });
+        if (changed.count !== 1) throw new ConflictException({ code: 'STALE_FIELD_VERSION', message: '경기장 정보가 변경됐어요. 다시 시도해 주세요.' });
+        updatedCount++;
+        await this.writeAudit(tx, principal, audit, { action, targetType: 'TOURNAMENT_FIELD', targetId: field.id,
+          tournamentId, fieldId: field.id, before: { version: field.version },
+          after: { version: field.version + 1, source: 'fixture_places',
+            placeFingerprint: createHash('sha256').update(JSON.stringify(next)).digest('hex') },
+        });
+      }
+      for (const [key, bucket] of places) {
+        if (names.has(key)) { existingCount++; continue; }
+        const field = await tx.v1TournamentField.create({ data: {
+          tournamentId, scopeKey: `place-${createHash('md5').update(key).digest('hex')}`, name: bucket.name,
+          sortOrder: existing.length + addedCount,
+          ...(bucket.place === null ? {} : { placeSnapshot: bucket.place as unknown as Prisma.InputJsonValue }),
+        } });
+        names.add(key);
+        addedCount++;
+        await this.writeAudit(tx, principal, audit, {
+          action, targetType: 'TOURNAMENT_FIELD', targetId: field.id, tournamentId, fieldId: field.id,
+          before: null, after: { name: field.name, source: 'fixture_places' },
+        });
+      }
+      const catalogue = await tx.v1TournamentField.findMany({ where: { tournamentId }, orderBy: [{ active: 'desc' }, { sortOrder: 'asc' }, { id: 'asc' }] });
+      for (const row of rows) {
+        if (row.fieldId !== null) continue;
+        const field = catalogue.find((entry) => row.placeName != null && normalizedFieldName(entry.name) === normalizedFieldName(row.placeName));
+        if (!field) continue;
+        const changed = await tx.v1TeamMatch.updateMany({ where: { id: row.id, tournamentId, deletedAt: null, fieldId: null }, data: { fieldId: field.id } });
+        if (changed.count !== 1) throw new ConflictException({ code: 'FIXTURE_FIELD_ASSIGNMENT_CONFLICT', message: '경기장 배정이 변경됐어요. 다시 시도해 주세요.' });
+        await this.writeAudit(tx, principal, audit, { action, targetType: 'TEAM_MATCH', targetId: row.id,
+          tournamentId, teamMatchId: row.id, fieldId: field.id, before: { fieldId: null }, after: { fieldId: field.id } });
+      }
+      const result = { addedCount, existingCount, updatedCount };
+      await this.recordIdempotency(tx, actorUserId, action, resourceType, tournamentId, audit.requestId, payloadHash, 200, result);
+      return result;
+    });
+  }
+
   async create(
     actorUserId: string,
     tournamentId: string,
@@ -166,6 +260,7 @@ export class TournamentOperationsFieldsService {
       // `$transaction` opened (the pre-fix behavior) left the entire transaction body -- including
       // the create() write below -- unprotected against a revoke committing after the check.
       const principal = await this.authorizeFieldManagement(actorUserId, tournamentId, tx);
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`competition-field-names:${tournamentId}`}, 0))`;
       const replay = await this.consumeIdempotency<TournamentFieldResult>(
         tx,
         actorUserId,
@@ -189,6 +284,7 @@ export class TournamentOperationsFieldsService {
       // 비교하고 **트림한 값을 그대로 저장한다** -- 비교 기준과 저장값이 다르면 공백 하나로
       // 이 가드를 우회할 수 있다(Copilot 리뷰 지적, PR #805).
       const trimmedName = dto.name.trim();
+      if (!trimmedName) throw new UnprocessableEntityException({ code: 'FIELD_NAME_EMPTY', message: '경기장 이름을 입력해 주세요.' });
       const duplicate = await tx.v1TournamentField.findFirst({
         where: { tournamentId, name: { equals: trimmedName, mode: 'insensitive' } },
         select: { id: true },
@@ -264,6 +360,8 @@ export class TournamentOperationsFieldsService {
         message: '변경할 값을 하나 이상 입력해주세요.',
       });
     }
+    const nextName = dto.name?.trim();
+    if (nextName === '') throw new UnprocessableEntityException({ code: 'FIELD_NAME_EMPTY', message: '경기장 이름을 입력해 주세요.' });
 
     const action = 'tournament.field.update';
     const resourceType = 'TOURNAMENT_FIELD';
@@ -277,6 +375,7 @@ export class TournamentOperationsFieldsService {
     return this.prisma.$transaction(async (tx) => {
       // Recheck as the first statement inside the transaction (P0-3) -- see create()'s comment.
       const principal = await this.authorizeFieldManagement(actorUserId, tournamentId, tx);
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`competition-field-names:${tournamentId}`}, 0))`;
       const replay = await this.consumeIdempotency<TournamentFieldResult>(
         tx,
         actorUserId,
@@ -296,11 +395,16 @@ export class TournamentOperationsFieldsService {
       if (before === null) {
         throw new NotFoundException({ code: 'FIELD_NOT_FOUND', message: '필드를 찾을 수 없어요.' });
       }
+      if (nextName !== undefined && await tx.v1TournamentField.findFirst({ where: {
+        tournamentId, id: { not: fieldId }, name: { equals: nextName, mode: 'insensitive' },
+      }, select: { id: true } })) {
+        throw new ConflictException({ code: 'FIELD_NAME_DUPLICATE', message: '이미 같은 이름의 경기장이 있어요.' });
+      }
 
       const result = await tx.v1TournamentField.updateMany({
         where: { id: fieldId, tournamentId, version: dto.expectedVersion },
         data: {
-          ...(dto.name === undefined ? {} : { name: dto.name }),
+          ...(nextName === undefined ? {} : { name: nextName }),
           ...(dto.sortOrder === undefined ? {} : { sortOrder: dto.sortOrder }),
           ...(dto.active === undefined ? {} : { active: dto.active }),
           version: { increment: 1 },
@@ -391,7 +495,7 @@ export class TournamentOperationsFieldsService {
       const canonical = await tx.v1TeamMatch.findUnique({
         where: { id: fixtureId },
         select: {
-          id: true, tournamentId: true, leagueId: true, fieldId: true, deletedAt: true,
+          id: true, tournamentId: true, leagueId: true, fieldId: true, deletedAt: true, ...PLACE_SELECT,
           tournament: { select: { kind: true } },
           tournamentDetails: { select: { tournamentId: true, teamMatchId: true } },
           game: { select: { id: true, sourceType: true } },
@@ -417,26 +521,33 @@ export class TournamentOperationsFieldsService {
         if (canonical.game === null || canonical.game.sourceType !== 'TEAM_MATCH') {
           throw new ConflictException({ code: 'TOURNAMENT_MATCH_GAME_MISSING', message: '대회 경기의 정본 게임을 찾을 수 없어요.' });
         }
+        await tx.$queryRaw`SELECT id FROM v1_tournament_fields WHERE id = ${dto.fieldId} AND tournament_id = ${tournamentId} FOR SHARE`;
         const field = await tx.v1TournamentField.findUnique({
           where: { tournamentId_id: { tournamentId, id: dto.fieldId } },
-          select: { id: true },
+          select: { id: true, name: true, active: true, placeSnapshot: true },
         });
         if (field === null) throw new NotFoundException({ code: 'FIELD_NOT_FOUND', message: '필드를 찾을 수 없어요.' });
+        const latest = await tx.v1TeamMatch.findUniqueOrThrow({ where: { id: fixtureId }, select: PLACE_SELECT });
+        const currentPlace = toPlaceView(latest);
         const before = canonical.fieldId;
+        const place = fieldPlaceForMatch(field, currentPlace);
         if (locked[0].fieldId !== before) {
           throw new ConflictException({ code: 'FIXTURE_FIELD_ASSIGNMENT_CONFLICT', message: '다른 요청이 먼저 경기장을 변경했어요. 새로고침 후 다시 시도해주세요.' });
         }
-        if (before === dto.fieldId) {
+        if (before === dto.fieldId && JSON.stringify(toPlaceView(latest)) === JSON.stringify(place)) {
           const response: TournamentFixtureFieldResult = { fixtureId, tournamentId, fieldId: before };
           await this.recordIdempotency(tx, actorUserId, action, resourceType, fixtureId, audit.requestId, payloadHash, 200, response);
           return response;
         }
-        const cas = await tx.v1TeamMatch.updateMany({ where: { id: fixtureId, tournamentId, deletedAt: null, fieldId: before }, data: { fieldId: dto.fieldId } });
+        const cas = await tx.v1TeamMatch.updateMany({ where: { id: fixtureId, tournamentId, deletedAt: null, fieldId: before }, data: { fieldId: dto.fieldId, ...toPlaceColumns(place) } });
         if (cas.count !== 1) throw new ConflictException({ code: 'FIXTURE_FIELD_ASSIGNMENT_CONFLICT', message: '다른 요청이 먼저 경기장을 변경했어요. 새로고침 후 다시 시도해주세요.' });
         const response: TournamentFixtureFieldResult = { fixtureId, tournamentId, fieldId: dto.fieldId };
         await this.writeAudit(tx, principal, audit, {
           action, targetType: 'TEAM_MATCH', targetId: fixtureId, tournamentId, teamMatchId: fixtureId, fieldId: dto.fieldId,
-          before: { fieldId: before }, after: { fieldId: dto.fieldId },
+          before: { fieldId: before, placeName: latest.placeName,
+            placeFingerprint: createHash('sha256').update(JSON.stringify(currentPlace)).digest('hex') },
+          after: { fieldId: dto.fieldId, placeName: place.name,
+            placeFingerprint: createHash('sha256').update(JSON.stringify(place)).digest('hex') },
         });
         await this.recordIdempotency(tx, actorUserId, action, resourceType, fixtureId, audit.requestId, payloadHash, 200, response);
         return response;
@@ -512,6 +623,10 @@ export class TournamentOperationsFieldsService {
         const before = canonical.fieldId;
         if (locked[0].fieldId !== before) {
           throw new ConflictException({ code: 'FIXTURE_FIELD_ASSIGNMENT_CONFLICT', message: '다른 요청이 먼저 경기장을 변경했어요. 새로고침 후 다시 시도해주세요.' });
+        }
+        const latest = await tx.v1TeamMatch.findUniqueOrThrow({ where: { id: fixtureId }, select: PLACE_SELECT });
+        if (latest.placeName && !['', '장소 미정', '미정', 'tbd'].includes(normalizedFieldName(latest.placeName))) {
+          throw new ConflictException({ code: 'FIELD_PLACE_LINK_REQUIRED', message: '장소가 설정된 경기는 경기장 연결을 유지해야 해요. 경기 설정에서 다른 경기장을 선택해 주세요.' });
         }
         if (before === null) {
           const response: TournamentFixtureFieldResult = { fixtureId, tournamentId, fieldId: null };
@@ -753,6 +868,7 @@ export class TournamentOperationsFieldsService {
       sortOrder: field.sortOrder,
       active: field.active,
       version: field.version,
+      place: tournamentFieldPlace(field),
     };
   }
 }

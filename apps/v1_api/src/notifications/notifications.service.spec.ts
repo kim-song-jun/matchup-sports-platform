@@ -11,7 +11,7 @@ import { Prisma } from '@prisma/client';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getLoggerToken } from 'nestjs-pino';
 import { PrismaService } from '../prisma/prisma.service';
-import { NotificationsService } from './notifications.service';
+import { NotificationsService, notificationCopyFor } from './notifications.service';
 import { REALTIME_NOTIFIER } from './realtime-notifier.port';
 import { WebPushService } from './web-push.service';
 
@@ -21,6 +21,10 @@ const user = {
   accountStatus: 'active' as const,
   onboardingStatus: 'completed' as const,
 };
+
+it('cancelled team-match notifications link to the list rather than the now-hidden detail', () => {
+  expect(notificationCopyFor('team_match_cancelled', 'team_match', 'cancelled-fixture').deepLink).toBe('/team-matches');
+});
 
 function makeNotification(overrides: Record<string, unknown> = {}) {
   return {
@@ -1202,4 +1206,8 @@ describe('NotificationsService', () => {
       expect(logger.warn).toHaveBeenCalledTimes(2);
     });
   });
+});
+
+it.each(['league_fixture_scheduled', 'league_fixture_cancelled', 'league_promotion_promoted', 'league_promotion_relegated', 'league_promotion_stayed', 'league_promotion_withdrawn'] as const)('canonical league detail for %s', (type) => {
+  expect(notificationCopyFor(type, 'tournament', 'league-1').deepLink).toBe('/tournaments/league-1?kind=league');
 });

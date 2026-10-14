@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { LeagueStandingsTable } from './league-standings-table';
+import { queryImageBySrc } from '@/test/next-image';
 
 const baseData = {
   standings: [
@@ -15,6 +16,17 @@ const baseData = {
 };
 
 describe('LeagueStandingsTable', () => {
+  it('대회와 정규 리그 행의 실제 팀 로고를 팀 이름 옆에 표시한다', () => {
+    const { container } = render(<LeagueStandingsTable data={{ ...baseData, standings: [
+      { ...baseData.standings[0], teamLogoUrl: '/uploads/teams/tournament.webp' },
+      { ...baseData.standings[1], registrationId: undefined, teamId: 'team-2', teamLogoUrl: '/uploads/teams/league.webp' },
+    ] }} />);
+    for (const path of ['/uploads/teams/tournament.webp', '/uploads/teams/league.webp']) {
+      const image = queryImageBySrc(container, path);
+      expect(image).not.toBeNull();
+      expect(image?.closest('td')).toHaveTextContent(path.includes('tournament') ? '성수 블루웨이브' : '강남 FC');
+    }
+  });
   it('순위·팀명·승점을 표시한다', () => {
     render(<LeagueStandingsTable data={baseData} />);
     expect(screen.getByText('성수 블루웨이브')).toBeInTheDocument();

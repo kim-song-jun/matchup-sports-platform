@@ -1,5 +1,5 @@
 import { Transform, Type } from 'class-transformer';
-import { ArrayNotEmpty, IsArray, IsBoolean, IsDateString, IsDefined, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
+import { ArrayNotEmpty, IsArray, IsBoolean, IsDateString, IsDefined, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateIf, ValidateNested } from 'class-validator';
 import { IsPlaceLatitude, IsPlaceLongitude, IsPlaceProvider, IsPlaceProviderId } from '../../places/place-snapshot';
 
 /** 경기 장소 스냅샷 입력(이름은 각 DTO 의 `placeName`). 규칙은 `places/place-snapshot.ts` 가 소유한다. */
@@ -59,6 +59,38 @@ export class CreateLeagueMatchDto {
   @IsArray()
   @IsUUID('4', { each: true })
   teamIds!: string[];
+
+  /** 팀 명단 최소 인원. 생략하면 1(제한 없음과 함께). */
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  minPlayers?: number;
+
+  /** 팀 명단 최대 인원. `null`·생략 = 제한 없음(리그 기본값). */
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  maxPlayers?: number | null;
+
+  /** 리그 총 경기 수(계획). 대진 생성 폼의 기본값이다. */
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(500)
+  plannedFixtureCount?: number;
+}
+
+/** 리그 상태 변경 — 상태 변경 버튼 하나가 보류·해제·종료·되돌리기·시작을 모두 이 요청으로 보낸다. */
+export class ChangeLeagueStateDto {
+  @IsIn(['draft', 'active', 'on_hold', 'completed'])
+  state!: 'draft' | 'active' | 'on_hold' | 'completed';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string;
 }
 
 // 그룹 B 감사 결함 1: 개설 후 참가팀을 추가·제거할 방법이 아예 없었다(V1LeagueTeam write는
@@ -79,7 +111,7 @@ export class AddLeagueTeamDto {
  *
  * 규칙(`league-fixture-dates.ts`): 중복 제거 · 오름차순 배정 · 과거 날짜 거부 ·
  * 날짜가 **매치데이 수**보다 적으면 422 `LEAGUE_SCHEDULE_SLOTS_INSUFFICIENT`.
- * (라운드 수가 아니다 — `timing.gamesPerTeamPerDay` 가 2 면 라운드 6 이 매치데이 3 이다.)
+ * (라운드 수가 아니다 — 4팀 6경기를 `timing.gamesPerDay` 3 으로 치르면 라운드 3 이 매치데이 2 다.)
  */
 export class LeagueFixtureScheduleDto {
   /** `'YYYY-MM-DD'` (KST 달력 날짜). 순서·중복 무관 — 서버가 정리한다. */
@@ -97,8 +129,10 @@ export class LeagueFixtureScheduleDto {
 }
 
 // 운영자 요구(2026-08-25): "한 구장 순차 진행" — 22시 리그에 한 경기장을 쓰면 4팀이
-// 15분 경기·5분 휴식으로 22:00~00:00 사이 하루 6경기(팀당 3경기)를 치르는 식으로,
-// 경기 시간·휴식·팀당 하루 경기 수를 설정하면 매치데이 안에서 경기별 시각이 계산된다.
+// 15분 경기·5분 휴식으로 22:00~00:00 사이 하루 6경기를 치르는 식으로,
+// 경기 시간·휴식·하루 경기 수를 설정하면 매치데이 안에서 경기별 시각이 계산된다.
+// 하루 경기 수는 2026-10-13 사용자 확정으로 '팀당'에서 '하루 전체'로 바꿨다 — 팀당이면 하루 경기가
+// 라운드 크기의 배수로만 정해져 6팀 하루 4경기 같은 운영을 못 했다.
 export class LeagueFixtureTimingDto {
   /** 경기당 소요 시간(분). 생략하면 경기 설정의 정규 시간(연장 제외 피리어드 합계). */
   @IsOptional()
@@ -114,27 +148,36 @@ export class LeagueFixtureTimingDto {
   @Max(120)
   breakMinutes?: number;
 
-  /** 팀당 매치데이(하루) 경기 수 = 하루에 소화하는 라운드 수. 생략 시 1. */
+  /** 하루 경기 수(전 팀 합계). 대진 순서대로 하루 N경기씩 묶는다. 생략하면 하루에 한 라운드. */
   @IsOptional()
   @IsInt()
   @Min(1)
-  @Max(10)
-  gamesPerTeamPerDay?: number;
+  @Max(50)
+  gamesPerDay?: number;
 }
 
 export class GenerateLeagueFixturesDto extends LeaguePlaceSnapshotDto {
   @IsInt()
   @Min(1)
-  @Max(52)
+  @Max(104)
+  // 만들 라운드 수(이름은 하루 한 라운드 시절의 '주차 수'를 그대로 둔다). 필요한 경기 날짜 수는
+  // 하루 경기 수(`timing.gamesPerDay`)가 정한다 — 없으면 이 수와 같다.
   weeksCount!: number;
 
-  // 지정하면 총 라운드를 `weeksCount × 팀당 하루 경기 수` 대신 이 수로 자른다 — 단일/홈앤어웨이가
-  // 라운드로빈 한 바퀴를 넘겨 앞 라운드를 다시 만들지 않게. 생략하면 기존 동작.
+  // 지정하면 총 라운드를 이 수로 자른다(옛 화면 호환 — 지금 화면은 weeksCount 에 라운드 수를 바로 싣는다).
   @IsOptional()
   @IsInt()
   @Min(1)
   @Max(104)
   roundsCount?: number;
+
+  // 리그를 만들 때 정한 총 경기 수 — 라운드로빈 순서대로 만든 뒤 이 수에서 자른다. 생략하면 라운드 전부.
+  // null 은 거부한다 — `@IsOptional` 은 null 도 통과시키는데 `slice(0, null)` 은 0경기를 만든다.
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsInt()
+  @Min(1)
+  @Max(500)
+  fixtureCount?: number;
 
   // 지정하지 않으면 기존 동작(시작일 그대로 매주 반복)을 유지한다 — 하위 호환.
   @IsOptional()
@@ -159,6 +202,10 @@ export class GenerateLeagueFixturesDto extends LeaguePlaceSnapshotDto {
 
 export class UpdateLeagueFixtureDto extends LeaguePlaceSnapshotDto {
   @IsOptional()
+  @IsUUID()
+  fieldId?: string | null;
+
+  @IsOptional()
   @IsDateString()
   startsAt?: string;
 
@@ -166,6 +213,30 @@ export class UpdateLeagueFixtureDto extends LeaguePlaceSnapshotDto {
   @IsString()
   @MaxLength(120)
   placeName?: string;
+
+  /** 경기 이름. 비우면 그대로다. */
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(100)
+  title?: string;
+
+  /** 홈·원정 팀(리그 확정 참가팀). 시작 전·결과 없는 경기만 바꿀 수 있다. 자리 방식 경기는 자리에서 바꾼다. */
+  @IsOptional()
+  @IsUUID()
+  homeTeamId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  awayTeamId?: string;
+}
+
+/** 경기 삭제 — 취소하고 대진표에서 숨긴다(기록은 지우지 않는다). 사유는 감사 로그에 남는다. */
+export class DeleteLeagueFixtureDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(500)
+  reason!: string;
 }
 
 // R6: 결과 정정 등으로 completed -> active 역전이할 때, 왜 되돌렸는지 감사 로그에
@@ -357,6 +428,27 @@ export class ApplyLeagueTemplateDto extends LeaguePlaceSnapshotDto {
   @ValidateNested()
   @Type(() => LeagueFixtureScheduleDto)
   schedule!: LeagueFixtureScheduleDto;
+
+  // 하루에 치르는 경기 수(전 팀 합계). 비우면 하루 한 라운드 — 그 라운드 경기가 같은 시각에 시작한다.
+  // 넣으면 라운드로빈 순서대로 하루 N경기씩 나누고, 그날 경기는 한 구장에서 `경기 시간 + 휴식` 간격으로 잇는다.
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  gamesPerDay?: number;
+
+  // gamesPerDay 와 함께만 쓴다. 생략하면 경기 설정의 정규 시간(연장 제외 피리어드 합계).
+  @IsOptional()
+  @IsInt()
+  @Min(5)
+  @Max(240)
+  gameDurationMinutes?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(120)
+  breakMinutes?: number;
 
   // 비우면 일괄 생성과 같은 기본값('장소 미정')이다.
   @IsOptional()

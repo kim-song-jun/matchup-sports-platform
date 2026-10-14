@@ -81,7 +81,8 @@ describe('리그 대진 timing(경기 시간·휴식·팀당 하루 경기 수)'
     return createRes.body.data.leagueId as string;
   }
 
-  const kakaoTiming = { gameDurationMinutes: 15, breakMinutes: 5, gamesPerTeamPerDay: 3 };
+  // 4팀 단일 = 3라운드 6경기. 하루 6경기면 한 날에 다 치른다.
+  const kakaoTiming = { gameDurationMinutes: 15, breakMinutes: 5, gamesPerDay: 6 };
   // Task 164 BE-2: 요일이 아니라 **날짜 목록**이다. 과거 날짜는 422 이므로 오늘 기준 미래로
   // 만든다 — 고정 날짜를 박으면 그 날이 지나는 순간 시간 때문에 깨진다.
   const futureDates = [7, 14, 21].map((days) =>
@@ -100,14 +101,14 @@ describe('리그 대진 timing(경기 시간·휴식·팀당 하루 경기 수)'
   ];
 
   it('감사 로그에 요청 원문이 아니라 **실제로 쓰인 날짜**를 남긴다', async () => {
-    // 이 케이스는 날짜를 3개 주지만 gamesPerTeamPerDay=3 이라 매치데이는 1개다 —
+    // 이 케이스는 날짜를 3개 주지만 하루 6경기라 매치데이는 1개다 —
     // 2개는 안 쓰인다. 요청 원문을 남기면 로그만 보고는 어느 날에 경기를 만들었는지
     // 알 수 없다(이 파일은 placeName·timing 에서 이미 "실제 결과를 남긴다"를 지키고 있다).
     const leagueId = await createLeague('감사 로그 리그');
     const res = await request(app.getHttpServer())
       .post(`/api/v1/admin/league-matches/${leagueId}/fixtures`)
       .set('x-v1-user-id', ownerUserId)
-      .send({ weeksCount: 1, schedule: wednesday22, placeName: '베이컨 풋살장', timing: kakaoTiming });
+      .send({ weeksCount: 3, schedule: wednesday22, placeName: '베이컨 풋살장', timing: kakaoTiming });
     expect(res.status).toBe(201);
 
     const log = await prisma.v1AdminActionLog.findFirst({
@@ -124,7 +125,7 @@ describe('리그 대진 timing(경기 시간·휴식·팀당 하루 경기 수)'
     const res = await request(app.getHttpServer())
       .post(`/api/v1/admin/league-matches/${leagueId}/fixtures`)
       .set('x-v1-user-id', ownerUserId)
-      .send({ weeksCount: 1, schedule: wednesday22, placeName: '베이컨 풋살장', timing: kakaoTiming });
+      .send({ weeksCount: 3, schedule: wednesday22, placeName: '베이컨 풋살장', timing: kakaoTiming });
     expect(res.status).toBe(201);
     expect(res.body.data.teamMatchIds).toHaveLength(6);
 
@@ -149,7 +150,7 @@ describe('리그 대진 timing(경기 시간·휴식·팀당 하루 경기 수)'
     const res = await request(app.getHttpServer())
       .post(`/api/v1/admin/league-matches/${leagueId}/fixtures/preview`)
       .set('x-v1-user-id', ownerUserId)
-      .send({ weeksCount: 1, schedule: wednesday22, timing: kakaoTiming });
+      .send({ weeksCount: 3, schedule: wednesday22, timing: kakaoTiming });
     expect(res.status).toBe(201);
     expect(res.body.data.fixtureCount).toBe(6);
     expect(res.body.data.matchdayCount).toBe(1);
@@ -190,16 +191,16 @@ describe('리그 대진 timing(경기 시간·휴식·팀당 하루 경기 수)'
     expect(fixtures.every((f) => f.title === '레거시 리그 1주차')).toBe(true);
   });
 
-  it('경기 시간을 비우고 팀당 하루 경기 수만 보내면 전·후반 합계를 경기 시간으로 순차 배치한다', async () => {
+  it('경기 시간을 비우고 하루 경기 수만 보내면 전·후반 합계를 경기 시간으로 순차 배치한다', async () => {
     const leagueId = await createLeague('기본 경기 시간 리그');
     const res = await request(app.getHttpServer())
       .post(`/api/v1/admin/league-matches/${leagueId}/fixtures`)
       .set('x-v1-user-id', ownerUserId)
-      .send({ weeksCount: 1, schedule: wednesday22, timing: { gamesPerTeamPerDay: 2 } });
+      .send({ weeksCount: 2, schedule: wednesday22, timing: { gamesPerDay: 4 } });
     expect(res.status).toBe(201);
 
     const fixtures = await prisma.v1TeamMatch.findMany({ where: { leagueId }, orderBy: { startAt: 'asc' } });
-    expect(fixtures).toHaveLength(4); // 4팀 × 팀당 2경기 = 하루 4경기
+    expect(fixtures).toHaveLength(4); // 2라운드 × 2경기 = 하루 4경기
     const regulation = await regulationOf(fixtures[0].competitionConfigVersionId);
     for (const [index, fixture] of fixtures.entries()) {
       expect(fixture.endAt!.getTime() - fixture.startAt!.getTime()).toBe(regulation * 60_000);
@@ -207,13 +208,14 @@ describe('리그 대진 timing(경기 시간·휴식·팀당 하루 경기 수)'
     }
   });
 
-  it('roundsCount 로 자르면 라운드로빈 한 바퀴만 만들고 마지막 날은 남는 라운드만 연다(재대결 없음)', async () => {
-    // 4팀 단일 = 3라운드. 하루 2라운드면 2일 = 4라운드 칸이지만 3라운드까지만 만든다.
+  it('하루 경기 수가 총 경기를 나눠떨어뜨리지 않으면 마지막 날은 남는 경기만 연다 — roundsCount 상한도 지킨다(재대결 없음)', async () => {
+    // 4팀 단일 = 3라운드 6경기. 옛 화면처럼 weeksCount 4 에 roundsCount 3 을 보내도 3라운드까지만 만들고,
+    // 하루 4경기면 첫날 4경기 · 둘째 날 2경기다.
     const leagueId = await createLeague('라운드 상한 리그');
     const res = await request(app.getHttpServer())
       .post(`/api/v1/admin/league-matches/${leagueId}/fixtures`)
       .set('x-v1-user-id', ownerUserId)
-      .send({ weeksCount: 2, roundsCount: 3, schedule: wednesday22, timing: { gameDurationMinutes: 15, gamesPerTeamPerDay: 2 } });
+      .send({ weeksCount: 4, roundsCount: 3, schedule: wednesday22, timing: { gameDurationMinutes: 15, gamesPerDay: 4 } });
     expect(res.status).toBe(201);
     expect(res.body.data.teamMatchIds).toHaveLength(6);
 
@@ -229,14 +231,16 @@ describe('리그 대진 timing(경기 시간·휴식·팀당 하루 경기 수)'
     expect(fixtures.filter((f) => dayOf(f) === futureDates[1])).toHaveLength(2);
   });
 
-  it('주차 수 × 팀당 하루 경기 수가 총 라운드 상한을 넘으면 422로 거부한다', async () => {
+  it('라운드가 상한(104)을 넘거나 하루 경기 수가 50을 넘으면 400으로 거부한다', async () => {
     const leagueId = await createLeague('상한 초과 리그');
-    const res = await request(app.getHttpServer())
-      .post(`/api/v1/admin/league-matches/${leagueId}/fixtures`)
-      .set('x-v1-user-id', ownerUserId)
-      .send({ weeksCount: 52, timing: { gameDurationMinutes: 15, gamesPerTeamPerDay: 3 } });
-    expect(res.status).toBe(422);
-    expect(res.body.code).toBe('LEAGUE_FIXTURE_LIMIT_EXCEEDED');
+    const post = (body: object) =>
+      request(app.getHttpServer()).post(`/api/v1/admin/league-matches/${leagueId}/fixtures`).set('x-v1-user-id', ownerUserId).send(body);
+    const tooManyRounds = await post({ weeksCount: 105, timing: { gameDurationMinutes: 15 } });
+    expect(tooManyRounds.status).toBe(400);
+    expect(tooManyRounds.body.code).toBe('VALIDATION_ERROR');
+    expect((await post({ weeksCount: 3, timing: { gameDurationMinutes: 15, gamesPerDay: 51 } })).status).toBe(400);
+    // 옛 이름(팀당 하루 경기)은 더 받지 않는다 — 조용히 무시하면 운영자가 고른 값과 다른 일정이 생긴다.
+    expect((await post({ weeksCount: 3, timing: { gameDurationMinutes: 15, gamesPerTeamPerDay: 2 } })).status).toBe(400);
     expect(await prisma.v1TeamMatch.count({ where: { leagueId } })).toBe(0);
   });
 });

@@ -380,32 +380,6 @@ export function PlayerCard({
       <div className="tm-pcard-fx" aria-hidden="true" />
       <div className="tm-pcard-crest-bg" aria-hidden="true" />
 
-      {/* 선수 렌더 -- 원형 아바타가 아니라 아래로 잘려 사라지는 큰 컷아웃. 사진이 없는 본인 카드는
-          렌더 대신 위쪽 줄 안의 사진 추가 슬롯을 쓴다(아래 .tm-player-card-top). */}
-      {photoSlotHref ? null : (
-        <div className="tm-pcard-render" aria-hidden="true">
-          {!photoLoaded ? <div className="tm-pcard-render-img" style={{ position: 'absolute', inset: 0 }}><AvatarFallback kind="user" size={72} /></div> : null}
-          {photoUrl && failedPhotoUrl !== photoUrl ? (
-            /* background-image div 가 아니라 next/image: 900×1200 원본 JPEG 를 138px 상자에
-               그대로 받던 것을 276px WebP/AVIF 로 줄여 받고(sizes), 이 카드는 페이지 최상단
-               LCP 후보라 미리 불러온다(priority). 도착 전까지는 투명이고 CSS 가 페이드시킨다 --
-               사진이 한 박자 늦게 "툭" 나타나던 팝인이 사라진다. */
-            <div className="tm-pcard-render-photo" data-loaded={photoLoaded ? 'true' : undefined}>
-              <Image
-                key={photoUrl}
-                src={publicAssetPath(photoUrl)}
-                alt=""
-                fill
-                sizes="138px"
-                priority
-                onLoad={() => setLoadedPhotoUrl(photoUrl)}
-                onError={() => setFailedPhotoUrl(photoUrl)}
-              />
-            </div>
-          ) : null}
-        </div>
-      )}
-
       <div className="tm-player-card-top">
         {/* 왼쪽 세로 열: 총점 → 구분선 → 포지션 → 등급 → 배지 스택.
             이 열이 실제 FUT 카드의 서명이다 -- 없으면 색을 맞춰도 피파로 안 읽힌다. */}
@@ -428,9 +402,10 @@ export function PlayerCard({
             </span>
           </div>
         </div>
-        {/* 사진이 없는 **본인** 카드: 렌더 자리를 사진 추가 슬롯으로 바꾼다(사용자 선택 A안, 2026-08-26).
-            절대 위치가 아니라 이 줄 안에 두어 높이가 왼쪽 열을 따라간다 -- 총점·포지션 유무에 따라
-            이름 줄이 오르내려서 고정 높이로는 슬롯이 이름을 덮었다. */}
+        {/* 선수 사진 -- 선명한 둥근 프레임(사용자 선택 B안, 2026-10-13). 사진이 없는 **본인** 카드는 이 자리를
+            사진 추가 슬롯으로 바꾼다(사용자 선택 A안, 2026-08-26). 둘 다 절대 위치가 아니라 이 줄 안에 두어
+            높이가 왼쪽 열을 따라간다 -- 총점·포지션 유무에 따라 이름 줄이 오르내려서 고정 높이로는
+            프레임이 이름을 덮었다. */}
         {photoSlotHref ? (
           <Link
             href={photoSlotHref}
@@ -440,7 +415,29 @@ export function PlayerCard({
             <Camera size={22} strokeWidth={2.1} aria-hidden="true" />
             <span aria-hidden="true">사진 추가</span>
           </Link>
-        ) : null}
+        ) : (
+          <div className="tm-pcard-render" aria-hidden="true">
+            {!photoLoaded ? <div className="tm-pcard-render-img"><AvatarFallback kind="user" size={56} /></div> : null}
+            {photoUrl && failedPhotoUrl !== photoUrl ? (
+              /* background-image div 가 아니라 next/image: 900×1200 원본 JPEG 를 138px 상자에
+                 그대로 받던 것을 276px WebP/AVIF 로 줄여 받고(sizes), 이 카드는 페이지 최상단
+                 LCP 후보라 미리 불러온다(priority). 도착 전까지는 투명이고 CSS 가 페이드시킨다 --
+                 사진이 한 박자 늦게 "툭" 나타나던 팝인이 사라진다. */
+              <div className="tm-pcard-render-photo" data-loaded={photoLoaded ? 'true' : undefined}>
+                <Image
+                  key={photoUrl}
+                  src={publicAssetPath(photoUrl)}
+                  alt=""
+                  fill
+                  sizes="138px"
+                  priority
+                  onLoad={() => setLoadedPhotoUrl(photoUrl)}
+                  onError={() => setFailedPhotoUrl(photoUrl)}
+                />
+              </div>
+            ) : null}
+          </div>
+        )}
       </div>
 
       <div className="tm-player-card-name">

@@ -1,5 +1,9 @@
 # Domain Contract - Team Matches
 
+## Competition field place display (Task 20261082)
+
+Public team-match list/detail include the assigned field's name. For league/tournament matches, `place.name` uses that field name while address/coordinates remain the match's saved snapshot. Ordinary friendly matches retain their existing place contract. Historical DB names are not overwritten by this display normalization; fixture setting writes use the shared competition registry in [tournament operations](./tournament-operations.md#place-registry-integration-2026-10-14-task-20261082).
+
 ## 플랫폼 주관 공동 운영 (Task 149, 2026-09-30)
 
 - 기존 `GET/POST /team-matches/:id/record` 계약에 `operator: boolean`을 추가한다. `participant`는 계속 실제 최신 제출 라인업 선수만 뜻한다.
@@ -132,7 +136,7 @@
 | POST | `/admin/team-matches` | Admin owner/ops | 플랫폼 팀매치 모집 생성 |
 | POST | `/admin/team-matches/:id/applications/:applicationId/approve` | Admin owner/ops | 신청 팀을 한 팀씩 승인하고 두 번째 승인에서 경기 확정 |
 | POST | `/admin/team-matches/:id/applications/:applicationId/reject` | Admin owner/ops | 대기 신청을 사유와 함께 거절 |
-| PATCH | `/admin/team-matches/:id` | Admin owner/ops | 모집 중인 플랫폼 단발 팀매치 수정 |
+| PATCH | `/admin/team-matches/:id` | Admin owner/ops | 모집 중/마감된 플랫폼 단발 팀매치 수정 |
 
 ## GET /me/team-matches
 
@@ -196,7 +200,7 @@ Rules:
 ## PATCH /admin/team-matches/:id
 
 - 생성 DTO의 모집 필드와 상세 조회에서 받은 `version`을 전송한다. 현재 구현에서는 종목을 바꿀 수 없다.
-- 플랫폼이 운영하는 단발 `recruiting` 팀매치만 수정할 수 있다. `version`이 최신 `updatedAt`과 다르면 `VERSION_CONFLICT`로 거절한다.
+- 플랫폼이 운영하는 단발 `recruiting/closed` 팀매치를 수정할 수 있다. 마감 상태에서 일정·조건을 수정해도 `closed`를 유지하며, 모집 재개는 별도 상태 변경으로 한다. 연결된 SCHEDULED 팀 일정도 같은 트랜잭션에서 동기화한다. 응답 `status`는 저장된 `recruiting/closed`다. `version`이 최신 `updatedAt`과 다르면 `VERSION_CONFLICT`로 거절한다.
 - 제목, 소개, 이미지, 지역, 장소/주소, 시작·종료·마감, 비용·규칙, 등급, 성별, 경기 형식·성격, 유니폼을 갱신하고 관리자 감사 로그를 남긴다.
 - 배정 뒤에도 저장된 `platformManaged=true`는 유지된다. 공개 목록/상세는 실제 홈·원정 팀과 `플랫폼 주관` 출처를 함께 노출한다.
 - 플랫폼 모집의 HOME/AWAY는 경기 사이드 식별자다. HOME 팀 owner/manager도 참석명단·채팅·경기 기록에는 참여하지만 모집 수정·마감·취소, 신청 승인/거절 권한은 얻지 않으며 이 운영 권한은 관리자에게 남는다. 따라서 공개 목록/상세의 `viewerState`/`viewer.state`도 플랫폼 HOME 팀에 `host_team`을 부여하지 않고 `viewer.manageRoute`는 `null`이다. `viewer.manageableHostTeam`은 HOME 사이드의 참가 기능 판정일 뿐 모집 관리 권한이 아니다.
@@ -241,8 +245,9 @@ Rules:
 - `status`를 생략한 일반 탐색은 경기 시작 전인 `recruiting`, `closed`, `matched`를 포함한다.
 - 기본 목록(그리고 `recommended`/`deadline`/`starts_at`)은 경기일 순이다: 시작 전 경기를 `startAt ASC` 로 먼저, 이미 시작한 경기를 `startAt DESC` 로 그 뒤에, 일정 미정(`startAt` null)을 `createdAt DESC` 로 맨 뒤에 잇는다(동률은 `createdAt DESC, id DESC`). `latest` 만 `createdAt DESC, id DESC` 등록 최신순이다.
 - `pageInfo.nextCursor` 는 `"<구간>:<id>@<기준 시각 epoch ms>"`(`upcoming:`/`past:`/`unscheduled:`, 최신순은 시각 없는 `latest:<id>`) 형태다 — 기준 시각 규칙(구간 분할에만 사용, 공개 범위는 요청 시각 판정, 미래 값은 요청 시각으로 내림, 깨진 값은 첫 페이지부터, 시각 없는 구형 커서는 요청 시각 기준)은 개인매치 목록과 같다. 커서 행이 그사이 목록 조건을 벗어나도 다음 경기를 건너뛰지 않는 것도 같다.
-- 일반 목록에서는 신청 마감이 지났거나 raw status가 `closed`/`matched`인 항목도 경기 시작 전까지 신청마감으로 노출하고, 경기 시작 시각 이후에는 제외한다.
-- `sort=recommended`는 경기 시작 전인 raw `recruiting` 중 신청 마감이 없거나 아직 지나지 않은 항목만 포함한다.
+- 일반 목록은 신청 마감 시각에 도달한 일반 미매칭 모집도 `closed` 상태로 경기 시작 전까지 노출한다. 신청 마감이 없더라도 시작 시각이 지난 미매칭 모집은 `closed`다. 기본 탐색에서는 기존 시작 후 제외 규칙을 따른다. 취소·보관된 팀매치는 명시적인 status 필터에서도 노출하지 않으며 건수/facets에도 포함하지 않는다.
+- `status=closed`는 저장된 `closed`와 마감 시각이 지난 일반 미매칭 `recruiting`을 포함하며, `status=recruiting`은 마감이 남았거나 마감 시각이 없는 모집만 포함한다. 검색 결과도 같은 필터를 적용한다.
+- `sort=recommended`는 경기 시작 전인 raw `recruiting` 중 신청 마감이 없거나 아직 지나지 않은 항목만 포함한다. 신청 가능 목록과 `facets.recruiting`도 마감 시각과 같아지는 순간부터 제외한다.
 - `teamId`는 `hostTeamId = teamId` 또는 `applications.some(applicantTeamId = teamId)` 둘 중 하나를 만족하면 포함
 - `platformManaged`는 생성 출처를 뜻하며 팀 배정 후에도 `true`다. `hostTeam`/`approvedOpponentTeam`은 현재 배정된 실제 양 팀을 별도로 반환한다.
 - Level response fields: `levelLabel`, `minLevel`, `maxLevel`
@@ -303,7 +308,7 @@ Rules:
 
 - host team owner/manager 전용, body `{ reason?: string | null }`
 - `close`는 팀매치를 `closed`로 바꾸고 새 신청을 거절하며 대기 중이던 신청을 `expired`로 정리한다.
-- `reopen`은 `startAt` 이전의 `closed` 팀매치만 되돌린다. 만료된 신청은 자동 복구되지 않는다.
+- `reopen`은 현재 시각이 `startAt`보다 이른 `closed` 팀매치만 되돌린다. `startAt`과 같은 순간부터는 재개할 수 없고, 상세 `canReopenRecruitment`도 같은 경계를 사용한다. 만료된 신청은 자동 복구되지 않는다.
 
 ## POST /team-matches/:teamMatchId/applications
 
@@ -313,7 +318,7 @@ Rules:
 
 - 신청 팀은 사용자가 아니라 팀이며, 요청자는 신청 팀의 `manager+`여야 한다.
 - host team은 자기 자신에게 신청할 수 없다.
-- `deadlineAt`이 지나면 신청 가능 여부 응답이 `NOT_RECRUITING`이고 대기 신청도 더 이상 승인할 수 없다.
+- `deadlineAt`과 같거나 지난 시각부터 새 신청 가능 여부 응답은 `NOT_RECRUITING`이다. 이미 접수된 `requested` 신청은 기록과 검토 대상에 남으며, 매치 시작 전까지 일반 승인과 관리자 개별 승인이 가능하다.
 - `409`: 같은 팀이 같은 모집글에 중복 신청
 
 ## Approve / Reject / Withdraw
@@ -394,7 +399,7 @@ Task 172 공개 기록은 기존 가시성 정책과 `PUBLIC_LIVE` 플래그를 
 - 두 생성 API는 `validateTeamMatchDates`를 공유한다. 시작은 미래, 종료는 시작 이후, 새 마감은 현재 이후·시작 이전이어야 한다. 잘못된 종료값을 `null`로 바꾸어 성공시키지 않는다.
 - 일반 생성/수정 폼도 종료 날짜를 지정할 수 있다. 비워두면 시작 날짜를 사용하며, 명시한 종료 날짜에는 종료 시간이 필요하다. 로컬 날짜·시간을 ISO로 변환하고 수정 시 같은 로컬 날짜로 복원한다.
 - 일반/관리자 스타일 입력은 프리셋과 직접 입력을 함께 지원하며 최대 3개다.
-- 신청 마감은 **새 신청 접수**를 닫는다. 기존 `requested` 신청은 raw status가 `recruiting`이고 시작 전이면 일반 승인과 관리자 개별 승인이 가능하다. `closed`/`cancelled`/`matched` 상태나 시작 이후는 승인 불가다. 일반 신청 목록의 `canApprove`도 이 조건과 같다.
+- 신청 마감은 **새 신청 접수**를 닫고, 일반 미매칭 모집은 API에서 `closed`로 표시한다. 기존 `requested` 신청은 저장 상태가 `recruiting`이고 시작 전이면 일반 승인과 관리자 개별 승인이 가능하다. 신청 마감 시각이 지났다는 이유만으로 기존 신청을 만료하거나 승인을 막지 않는다. 수동 마감(`closed`), 취소, 상대팀 확정, 경기 시작 이후는 승인 불가다. 일반 신청 목록의 `canApprove`도 이 조건과 같다.
 - `platform_managed` migration과 후속 `20260921141000_v1_platform_recruitment_host_constraint`가 필요하다. 후자는 기존 CHECK를 트랜잭션 안에서 확장해 플랫폼 모집만 host 없이 허용하고 생성자·지역·장소·시작 필수값은 유지한다. 일반 모집은 여전히 host가 필요하다.
 
 MSW 기본 픽스처의 라인업은 DRAFT이므로 공동 기록 조회는 편집 불가 상태이며 POST는 403을 반환한다. 실제 공동 편집 검증은 API 통합 픽스처와 headed 브라우저 흐름을 사용한다. 테스트 성공을 흉내내는 mock 확정 처리는 제공하지 않는다.
@@ -415,16 +420,18 @@ MSW 기본 픽스처의 라인업은 DRAFT이므로 공동 기록 조회는 편�
 서브매치 또는 득점 변경은 기존 종료 확인을 취소한다. 양 팀 라인업 참가자가 같은 버전을 확인하면 `score.home`, `score.away`, 선택적인 `score.subMatches[]`를 가진 공식 결과 revision 하나를 만든다. 팀 전적과 참가자 출전·득점은 팀매치 전체에서 한 번만 집계한다.
 
 
-## 2026-10-01 보류 및 주최팀 삭제 계약 (Task 181)
+## 팀매치 마감·취소 및 주최팀 삭제 계약 (Task 181, 2026-10-13 개정)
 
-- recruiting/closed에서 확정 상대팀이 없고 deadlineAt 또는 startAt이 지나면 status/displayState=`on_hold`. requested 신청은 확정 상대팀이 아니다. terminal/matched 상태는 이 계산으로 덮어쓰지 않는다.
-- 보류 중 관리자는 일정 변경 후 다시 모집 또는 취소 가능. 개인매치와 달리 상대팀 없는 팀매치를 그대로 진행하는 액션은 제공하지 않는다.
-- `GET /team-matches/:id`의 `lifecycle`은 `canEdit/canDelete/onHoldReason=NO_OPPONENT|null`을 제공한다. viewer.manageableHostTeam 및 서비스의 기존 owner/manager 권한 검증을 유지한다.
+취소·보관·삭제된 매치의 참석명단/상대 명단 및 일반 사용자 경기 기록 조회도 404로 처리한다. 취소·보관된 원본 경기 기록은 활성 관리자(현재 계정도 active)에게만 기존 조회를 허용하고, 데이터를 삭제하지 않는다. 취소된 기록이 수정 가능 상태가 되지는 않는다.
+
+- 일반 미매칭 `recruiting/closed`는 신청 마감 시각(`deadlineAt`) 또는 경기 시작 시각(`startAt`)이 지나면 `closed`로 표시한다. 팀매치 API는 `on_hold`를 반환하지 않는다. 리그·대회·상대팀 확정 모집의 기존 `displayState` 마감 규칙은 유지한다. `requested` 신청은 확정 상대팀이 아니다. terminal/matched 상태는 이 계산으로 덮어쓰지 않는다.
+- 마감된 매치는 일정 변경 후 다시 모집하거나 취소할 수 있다. 상대팀 없는 팀매치를 그대로 진행하는 액션은 제공하지 않는다.
+- `GET /team-matches/:id`의 `lifecycle`은 `canEdit/canDelete/canCloseRecruitment/canReopenRecruitment/onHoldReason=null`을 제공한다. 기존 owner/manager 권한 검증을 유지한다. 경기 시작 시각이 지난 raw `recruiting` 글은 수동 마감할 수 없고 대기 신청 종료·알림을 보내지 않는다. 신청 마감 시각과 같거나 지난 raw `closed` 글은 일반 주최팀 재개 API에서 마감 시각을 수정한 뒤 다시 재개해야 한다.
 - `PATCH /team-matches/:id`는 recruiting/closed + 상대팀 미확정에서 허용. 미래 일정 및 stale version 검증 후 recruiting으로 저장하고 연동 팀 일정을 동기화한다. 이미 matched인 매치는 계속 수정 제한.
-- `POST /team-matches/:id/cancel`은 보류에서도 허용. 신청 이력, 감사 로그, 확정 상대팀 알림 및 연결 팀 일정 취소를 유지한다.
-- 신규 `DELETE /team-matches/:id`: 인증 + 주최팀 기존 관리 권한. recruiting/closed/cancelled이고 확정 상대팀과 **모든 신청 이력**이 없을 때만 archived/deletedAt soft delete 및 감사 로그. 연결 팀 일정은 취소한다. 신청 이력이 있으면 409 STATE_CONFLICT로 취소를 안내한다.
+- `POST /team-matches/:id/cancel`은 마감에서도 허용. 신청 이력, 감사 로그, 확정 상대팀 알림 및 연결 팀 일정 취소를 유지한다. 취소 후 사용자 목록·내 팀매치에서 제외하고 상세/관리/신청 자격은 404로 처리한다. 취소된 팀매치와 연결된 팀 일정·내 일정도 숨긴다. 어드민 목록·상세와 감사 이력은 유지한다.
+- `DELETE /team-matches/:id`: 인증 + 주최팀 기존 관리 권한. 사용자에게 보이는 recruiting/closed이고 확정 상대팀과 **모든 신청 이력**이 없을 때만 archived/deletedAt soft delete 및 감사 로그. 연결 팀 일정은 취소한다. 신청 이력이 있으면 409 STATE_CONFLICT로 취소를 안내한다. 취소된 매치는 이미 사용자 조회에서 제외된다.
 - 신청/승인/수정/취소/삭제는 team-match row lock 아래 상태를 재검사한다. 수정 stale version은 409 VERSION_CONFLICT.
-- `on_hold`는 표시 상태이며 목록 status query filter 추가는 없다. 기존 expired query 호환 계약은 유지. 별도 DB enum/backfill 불필요.
+- 별도 DB enum/backfill 없이 조회 시 `closed`를 계산한다. 공개 목록과 내 팀매치 목록의 `closed` query는 저장된 closed와 마감/시작 시각이 지난 일반 미매칭 recruiting을 함께 반환한다. `recruiting` query는 마감 전 모집만 반환한다. 취소·보관된 행은 모든 사용자 status query에서 제외된다. 기존 expired query 호환 계약은 유지.
 
 - 일정·장소 변경 시 기존 requested 신청은 expired로 전환하고 `team_match_updated` 알림으로 재신청을 안내한다. 과거 신청 이력은 보존한다.
 - 취소·삭제 시 연결된 SCHEDULED Game도 CANCELLED로 전환하여 팀 일정/경기 상태가 어긋나지 않게 한다.

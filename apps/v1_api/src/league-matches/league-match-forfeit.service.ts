@@ -159,7 +159,7 @@ export class LeagueMatchForfeitService {
     const admin = await this.adminContext.getMutationAdmin(user.id);
 
     const teamMatch = await this.prisma.v1TeamMatch.findFirst({
-      where: { id: teamMatchId, leagueId },
+      where: { id: teamMatchId, leagueId, deletedAt: null },
       select: {
         id: true,
         status: true,

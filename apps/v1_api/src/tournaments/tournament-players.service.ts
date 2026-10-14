@@ -1317,7 +1317,8 @@ export function evaluateRosterCandidate(input: {
   tournamentMutable: boolean;
   registrationMutable: boolean;
   rosterCount: number;
-  maxPlayers: number;
+  /** null = 정원 제한 없음(리그 기본값). */
+  maxPlayers: number | null;
   member: RosterCandidateMember | null;
   genderCategory: V1TournamentGenderCategory | null;
   phoneEnforced: boolean;
@@ -1354,7 +1355,7 @@ export function evaluateRosterCandidate(input: {
       conflict: true,
     };
   }
-  if (input.rosterCount >= input.maxPlayers) {
+  if (input.maxPlayers !== null && input.rosterCount >= input.maxPlayers) {
     return {
       code: 'ROSTER_FULL',
       message: `최대 인원(${input.maxPlayers}명)을 초과할 수 없어요.`,

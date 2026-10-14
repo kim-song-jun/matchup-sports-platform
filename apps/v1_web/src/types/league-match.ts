@@ -113,6 +113,7 @@ export type V1LeagueMatchesFilters = {
 };
 
 export interface V1LeagueFixture {
+  fieldId?: string | null;
   teamMatchId: string;
   title: string;
   homeTeamId: string | null;
@@ -157,6 +158,11 @@ export interface V1LeagueFixture {
    */
   scoreHidden?: boolean;
   /**
+   * 확정 결과가 무효화됐는지 — 공개 상세·일정 목록에서 채워진다. 무효 경기는 점수가 null 이라
+   * 이 값이 없으면 끝난 경기가 '결과 대기'로 읽힌다. 어드민은 `resultStage === 'voided'` 로 안다.
+   */
+  resultVoided?: boolean;
+  /**
    * 이 경기 사이드가 연결된 자리(slot). 어드민 상세에서만 채워지고, 자리 없이 만든 기존 경기는 null/없음이다.
    * 자리가 있는데 팀 id 가 null 이면 "자리만 있고 팀은 아직 안 정해진" 경기다.
    */
@@ -192,6 +198,13 @@ export interface V1AdminLeagueDetail {
    * 공개 상세가 이미 같은 값을 갖고 있었고, 이제 어드민 상세도 내려준다.
    */
   startsOn: string;
+  /** 보류 해제가 돌아갈 상태 — 보류 중일 때만 값이 있다. */
+  heldFromState?: 'draft' | 'active' | 'completed' | null;
+  /** 팀 명단 인원. maxPlayers 가 null 이면 제한 없음. */
+  minPlayers?: number;
+  maxPlayers?: number | null;
+  /** 리그를 만들 때 정한 총 경기 수(계획). 대진 생성 폼의 기본값. */
+  plannedFixtureCount?: number | null;
   /**
    * 참가 신청 마감. **`null` 은 "안 받음" 이다** — 정본 §6 이 "마감을 안 정하면 그 리그는
    * 신청을 받지 않는다" 로 확정했다(2026-09-04). 받는지 여부는 `registrationOpen` 이 답한다.
@@ -219,6 +232,8 @@ export interface V1AdminLeagueDetail {
   activeRegistrationCount: number;
   /** 같은 모집단(팀이 직접 낸 신청) 중 확정 수 — 운영자 시드 팀은 넣지 않는다. */
   confirmedRegistrationCount: number;
+  yellowAccumulationLimit?: number | null;
+  redCardSuspensionMatches?: number | null;
   /**
    * 대진 자리(slot) 목록 — 어드민 상세 전용. optional 은 API 가 먼저 배포되지 않은 창의 구버전 응답용이다.
    * 자리를 쓰지 않는 기존 리그는 빈 배열로 온다.
@@ -258,6 +273,7 @@ type V1AdminOnlyLeagueFields =
   | 'slots';
 
 export interface V1PublicLeagueDetail extends Omit<V1AdminLeagueDetail, V1AdminOnlyLeagueFields> {
+  rulesText?: string | null;
   /** 참가비를 운영자가 확정했는가. `false` 면 참가비를 '무료'로 말하지 않는다. */
   entryFeeConfigured: boolean;
   // startsOn 은 V1AdminLeagueDetail 로 올라갔다(대진 폼이 기준일로 쓴다) — 여기서 다시
@@ -279,6 +295,21 @@ export interface V1PublicLeagueDetail extends Omit<V1AdminLeagueDetail, V1AdminO
    * optional 이 아니다.
    */
   seriesSiblings: V1LeagueSeriesSibling[];
+  /**
+   * 같은 티어의 바로 다음 시즌 — 신청이 마감된 리그가 "다음 회차로 신청하기"를 거는 대상.
+   * 단발 리그거나 다음 시즌이 아직 없으면 null. optional 은 API 가 먼저 배포되지 않은 창의 구버전 응답용이다.
+   */
+  nextRound?: V1LeagueNextRound | null;
+}
+
+export interface V1LeagueNextRound {
+  leagueId: string;
+  title: string;
+  seasonNo: number;
+  startsOn: string;
+  endsOn: string;
+  registrationOpen: boolean;
+  registrationDeadlineAt: string | null;
 }
 
 export interface V1CloseLeagueRegistrationPayload {
@@ -338,6 +369,24 @@ export interface V1CreateLeaguePayload {
   startsOn: string;
   endsOn: string;
   teamIds: string[];
+  minPlayers?: number;
+  /** null = 팀 명단 인원 제한 없음. */
+  maxPlayers?: number | null;
+  plannedFixtureCount?: number;
+}
+
+export type V1LeagueStateValue = 'draft' | 'active' | 'completed' | 'on_hold';
+
+/** POST /admin/league-matches/:leagueId/state — 목표 상태 하나. 보류는 사유가 필요하다. */
+export interface V1ChangeLeagueStatePayload {
+  state: V1LeagueStateValue;
+  reason?: string;
+}
+
+export interface V1ChangeLeagueStateResult {
+  leagueId: string;
+  state: V1LeagueStateValue;
+  alreadyProcessed: boolean;
 }
 
 export interface V1CreateLeagueResult {
@@ -367,14 +416,17 @@ export interface V1LeagueFixtureTimingPayload {
   gameDurationMinutes?: number;
   /** 경기 간 휴식(분), 0~120. 생략 시 서버 기본 0. */
   breakMinutes?: number;
-  /** 팀당 매치데이(하루) 경기 수, 1~10. 생략 시 서버 기본 1. */
-  gamesPerTeamPerDay?: number;
+  /** 하루 경기 수(전 팀 합계), 1~50. 생략하면 하루에 한 라운드. */
+  gamesPerDay?: number;
 }
 
 export interface V1GenerateLeagueFixturesPayload extends V1PlaceSnapshotPayload {
+  /** 만들 라운드 수, 1~104(이름은 하루 한 라운드 시절의 '주차 수'). 경기 날짜 수는 `timing.gamesPerDay` 가 정한다. */
   weeksCount: number;
-  /** 총 라운드 수, 1~104. 주면 서버가 `weeksCount × 팀당 하루 경기 수` 대신 이 수까지만 만든다(라운드로빈 재대결 방지). */
+  /** 옛 화면 호환 — 주면 서버가 라운드를 이 수까지 자른다. 지금 화면은 보내지 않는다. */
   roundsCount?: number;
+  /** 총 경기 수. 주면 서버가 라운드로빈 순서대로 만든 뒤 이 수에서 자른다. */
+  fixtureCount?: number;
   /** 지정하지 않으면 시작일 그대로(자정) 매주 반복하는 기존 동작을 유지한다. */
   schedule?: V1LeagueFixtureScheduleTemplate;
   /** 지정하지 않으면 서버 기본값('장소 미정')을 사용한다. */
@@ -485,33 +537,6 @@ export interface V1CancelLeagueFixtureResult {
   alreadyProcessed: boolean;
 }
 
-// R6: 리그 종료 역전이 — POST /admin/league-matches/:leagueId/revert-completion.
-// 사유는 선택(감사 로그용). 이미 active 면 alreadyProcessed: true 로 멱등 응답한다.
-export interface V1RevertLeagueCompletionPayload {
-  reason?: string;
-}
-
-/** 리그 보류·보류 해제 응답 — state 는 바뀐 뒤 상태, alreadyProcessed 는 이미 그 상태였는지. */
-export interface V1LeagueHoldResult {
-  leagueId: string;
-  state: 'draft' | 'active' | 'completed' | 'on_hold';
-  isPublic: boolean;
-  alreadyProcessed: boolean;
-}
-
-export interface V1RevertLeagueCompletionResult {
-  leagueId: string;
-  state: 'active';
-  alreadyProcessed: boolean;
-}
-
-/** 리그 종료(수동) 응답 — POST /admin/league-matches/:leagueId/complete. */
-export interface V1CompleteLeagueResult {
-  leagueId: string;
-  state: 'completed';
-  alreadyProcessed: boolean;
-}
-
 // R13: 대진 재생성 — POST /admin/league-matches/:leagueId/fixtures/regenerate
 export interface V1RegenerateLeagueFixturesPayload extends V1GenerateLeagueFixturesPayload {
   reason: string;
@@ -526,13 +551,33 @@ export interface V1RegenerateLeagueFixturesResult {
 }
 
 export interface V1UpdateLeagueFixturePayload extends V1PlaceSnapshotPayload {
+  fieldId?: string | null;
   startsAt?: string;
   placeName?: string;
   placeAddress?: string;
+  title?: string;
+  /** 리그 참가 확정 팀. 시작 전·결과 없는 경기만, 자리 방식 경기는 자리에서 바꾼다. */
+  homeTeamId?: string;
+  awayTeamId?: string;
+}
+
+/** POST /admin/league-matches/:leagueId/fixtures/:teamMatchId/delete — 취소하고 대진표에서 숨긴다. */
+export interface V1DeleteLeagueFixturePayload {
+  reason: string;
+}
+
+export interface V1DeleteLeagueFixtureResult {
+  teamMatchId: string;
+  deleted: true;
+  /** 이 삭제로 남은 경기가 모두 확정돼 리그가 끝났는가. */
+  leagueCompleted: boolean;
 }
 
 export interface V1UpdateLeagueFixtureResult {
   teamMatchId: string;
+  title?: string;
+  homeTeamId?: string | null;
+  awayTeamId?: string | null;
   startAt: string;
   placeName: string;
   placeAddress: string | null;
@@ -725,6 +770,11 @@ export interface V1ApplyLeagueTemplatePayload extends V1PlaceSnapshotPayload {
   legs: 1 | 2;
   /** 기존 일괄 생성과 같은 모양 — 날짜 목록이 정본이다. */
   schedule: V1LeagueFixtureScheduleTemplate;
+  /** 하루 경기 수(전 팀 합계, 1~50). 비우면 하루 한 라운드를 같은 시각에 시작한다. */
+  gamesPerDay?: number;
+  /** gamesPerDay 와 함께만. 비우면 서버가 경기 설정의 정규 시간을 쓴다. */
+  gameDurationMinutes?: number;
+  breakMinutes?: number;
   /** 모든 경기의 기본 장소. 비우면(키 없음) 서버가 '장소 미정' 을 쓴다. */
   placeName?: string;
   placeAddress?: string;

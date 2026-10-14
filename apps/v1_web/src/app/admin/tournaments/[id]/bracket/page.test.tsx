@@ -33,8 +33,8 @@ vi.mock('@/components/admin/bracket-canvas/bracket-canvas-mobile-screen', () => 
   BracketCanvasMobileScreen: () => null,
 }));
 vi.mock('../bracket-tab', () => ({
-  BracketTab: (props: { tournamentId: string; canWrite: boolean; bracketPublishedAt: string | null | undefined }) => (
-    <div data-testid="list" data-published={props.bracketPublishedAt ?? ''}>{props.tournamentId}</div>
+  BracketTab: (props: { tournamentId: string; canWrite: boolean; bracketPublishedAt: string | null | undefined; confirmedTeamCount: number; confirmedTeamCountStatus: string }) => (
+    <div data-testid="list" data-published={props.bracketPublishedAt ?? ''} data-confirmed-count={props.confirmedTeamCount} data-registrations-status={props.confirmedTeamCountStatus}>{props.tournamentId}</div>
   ),
 }));
 
@@ -69,10 +69,16 @@ describe('AdminTournamentBracketPage — [그림 | 목록]', () => {
 
   it('?view=list 이면 기존 목록 화면(BracketTab)을 그대로 보여 준다', () => {
     mocks.searchParams = new URLSearchParams('view=list');
+    mocks.registrations.data = {
+      items: Array.from({ length: 12 }, (_, index) => ({ id: `r${index + 1}`, status: 'confirmed' })),
+      truncated: false,
+    };
     render(<AdminTournamentBracketPage />);
     expect(screen.getByRole('tab', { name: '목록' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByTestId('list')).toHaveTextContent('t-1');
     expect(screen.getByTestId('list')).toHaveAttribute('data-published', '2026-10-01T00:00:00.000Z');
+    expect(screen.getByTestId('list')).toHaveAttribute('data-confirmed-count', '12');
+    expect(screen.getByTestId('list')).toHaveAttribute('data-registrations-status', 'success');
     expect(screen.queryByTestId('workspace')).not.toBeInTheDocument();
   });
 
@@ -135,5 +141,25 @@ describe('AdminTournamentBracketPage — 신청 목록 조회 상태를 그림 �
     expect(workspace).toHaveAttribute('data-reg-truncated', 'true');
     fireEvent.click(screen.getByRole('button', { name: '재시도' }));
     expect(mocks.registrations.refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('캐시된 참가 목록이 있으면 재조회 오류 중에도 목록 화면에 success와 확정 팀 수를 전달한다', () => {
+    mocks.searchParams = new URLSearchParams('view=list');
+    mocks.registrations.data = {
+      items: Array.from({ length: 12 }, (_, index) => ({ id: `r${index + 1}`, status: 'confirmed' })),
+      truncated: false,
+    };
+    mocks.registrations.isError = true;
+    render(<AdminTournamentBracketPage />);
+    expect(screen.getByTestId('list')).toHaveAttribute('data-confirmed-count', '12');
+    expect(screen.getByTestId('list')).toHaveAttribute('data-registrations-status', 'success');
+  });
+
+  it('목록 화면은 빈 참가 배열을 pending/error 상태와 함께 전달한다', () => {
+    mocks.searchParams = new URLSearchParams('view=list');
+    mocks.registrations.data = undefined;
+    render(<AdminTournamentBracketPage />);
+    expect(screen.getByTestId('list')).toHaveAttribute('data-confirmed-count', '0');
+    expect(screen.getByTestId('list')).toHaveAttribute('data-registrations-status', 'pending');
   });
 });

@@ -263,7 +263,7 @@ export default function AdminTeamMatchDetailPage() {
         description={teamMatch.title}
         action={
           <div className="flex items-center gap-2">
-            {teamMatch.platformManaged && !teamMatch.league && !teamMatch.tournament && teamMatch.status === 'recruiting' && adminMe?.capabilities.includes('status:write') && (
+            {teamMatch.platformManaged && !teamMatch.league && !teamMatch.tournament && ['recruiting', 'closed'].includes(teamMatch.status) && adminMe?.capabilities.includes('status:write') && (
               <Link
                 href={`/admin/team-matches/${encodeURIComponent(teamMatch.teamMatchId)}/edit`}
                 className="inline-flex h-[44px] items-center rounded-xl bg-blue-500 px-4 text-[length:var(--font-size-body-sm)] font-semibold text-white hover:bg-blue-600 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"

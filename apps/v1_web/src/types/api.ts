@@ -68,7 +68,7 @@ export type AdminCursorPage<T> = CursorPage<T> & {
 
 export type V1Status = 'open' | 'pending' | 'confirmed' | 'closed' | 'cancelled';
 export type V1MatchApiStatus = V1Status | 'recruiting' | 'completed' | 'expired' | 'full' | 'in_progress' | 'completion_pending' | 'on_hold' | 'scheduled';
-export type V1TeamMatchApiStatus = 'recruiting' | 'closed' | 'matched' | 'cancelled' | 'completed' | 'expired' | 'on_hold';
+export type V1TeamMatchApiStatus = 'recruiting' | 'closed' | 'matched' | 'cancelled' | 'completed' | 'expired';
 export type V1ViewerState = 'none' | 'guest' | 'host' | 'requested' | 'approved' | 'participant' | 'rejected' | 'withdrawn' | 'expired' | 'cancelled_by_host';
 export type V1TeamMatchViewerState = 'none' | 'guest' | 'host_team' | 'requested' | 'approved' | 'rejected' | 'withdrawn';
 export type TrustState = 'verified' | 'estimated' | 'sample';
@@ -85,14 +85,6 @@ export type V1FoundAccount = {
   maskedEmail: string | null;
   providers: string[];
   hasPassword: boolean;
-};
-
-/** 소셜 가입 대기 계정이 번호 주인의 기존 계정에 연결되기 전 확인용 요약. */
-export type V1SocialLinkPreview = {
-  maskedEmail: string | null;
-  providers: ('kakao' | 'apple' | 'email' | 'naver')[];
-  hasPassword: boolean;
-  linkingProvider: 'kakao' | 'apple';
 };
 
 export type V1AuthMe = {
@@ -409,6 +401,13 @@ export type V1MatchLifecycle = {
   canDelete: boolean;
   canConfirmProceed?: boolean;
   onHoldReason: 'NO_PARTICIPANTS' | 'UNDER_CAPACITY' | 'NO_OPPONENT' | null;
+};
+
+export type V1TeamMatchLifecycle = V1MatchLifecycle & {
+  /** Whether the host can end pending applications through the close action. */
+  canCloseRecruitment?: boolean;
+  /** Whether the host can reopen a manually closed recruitment. */
+  canReopenRecruitment?: boolean;
 };
 
 /** 서버가 내려주는 장소 스냅샷. 좌표·provider 가 없으면(이름만 직접 입력) 지도 없이 이름 검색 폴백으로 보여 준다. */
@@ -1301,7 +1300,8 @@ export type V1MySchedulePage = {
   nextCursor: string | null;
 };
 
-export type V1TeamMatch = V1Match & {
+export type V1TeamMatch = Omit<V1Match, 'status' | 'displayState'> & {
+  status: V1TeamMatchApiStatus;
   listImageUrl?: string | null;
   /** Server-clock derived friendly-match progress; raw matched status remains the permission contract. */
   isLive?: boolean;
@@ -1313,7 +1313,7 @@ export type V1TeamMatch = V1Match & {
   region?: { regionId: string; name: string; parentName?: string | null } | null;
   place?: V1PlaceView | null;
   displayState?: V1TeamMatchApiStatus;
-  lifecycle?: V1MatchLifecycle;
+  lifecycle?: V1TeamMatchLifecycle;
   costNote?: string | null;
   /**
    * 리그전 경기면 소속 리그, 일반 팀 매치면 null. 백엔드
@@ -3241,7 +3241,7 @@ export type V1AdminTeamMatchRecruitmentUpdatePayload = V1AdminTeamMatchRecruitme
 
 export type V1AdminTeamMatchRecruitmentUpdateResult = {
   teamMatchId: string;
-  status: 'recruiting';
+  status: 'recruiting' | 'closed';
   version: string;
   detailRoute: string;
 };
@@ -3679,7 +3679,8 @@ export type V1Tournament = {
   coverImageUrl: string | null;
   teamCount: number;
   minPlayers: number;
-  maxPlayers: number;
+  /** null = 정원 제한 없음(리그). 대회는 항상 값이 있다. */
+  maxPlayers: number | null;
   /**
    * 위 minPlayers/maxPlayers("등록" 로스터 크기, 성별 쿼터가 묶이는 값)와는 완전히 다른
    * 값 — "출전 인원"(경기장에 서는 라인업 상한, GK 포함). `GET /admin/tournaments/:id`
@@ -3980,7 +3981,8 @@ export type V1TournamentDetail = {
   coverImageUrl: string | null;
   teamCount: number;
   minPlayers: number;
-  maxPlayers: number;
+  /** null = 정원 제한 없음(리그). 대회는 항상 값이 있다. */
+  maxPlayers: number | null;
   genderCategory: V1TournamentGenderCategory | null;
   genderMinMale: number | null;
   genderMaxMale: number | null;
@@ -4266,6 +4268,7 @@ export type V1AdminBracketGroupTeam = {
 };
 
 export type V1AdminBracketFixture = {
+  fieldId?: string | null;
   bracketSources?: V1BracketSource[];
   id: string;
   tournamentId: string;
@@ -4422,6 +4425,8 @@ export interface V1GenerateLeagueFixturesResponse {
  */
 interface V1LeagueOverallStandingRowBase {
   teamName: string;
+  /** 팀의 현재 로고. 기존 응답/fixture 호환을 위해 optional이며 미등록은 null. */
+  teamLogoUrl?: string | null;
   position: number | null;
   points: number;
   wins: number;
@@ -4749,6 +4754,7 @@ export type V1CreateGroupTeamPayload = {
 };
 
 export type V1UpdateFixturePayload = {
+  fieldId?: string | null;
   fixtureNumber?: number;
   scheduledAt?: string;
   venue?: string;
@@ -5070,6 +5076,8 @@ export const V1_STABLE_WARNING_CODES: readonly V1TournamentStableWarningCode[] =
 /** GET /tournament-ops/tournaments/:tournamentId/operations 응답의 items[] 항목. */
 export type V1TournamentOperationsBoardItem = {
   fixtureId: string;
+  homeTeamName?: string | null;
+  awayTeamName?: string | null;
   tournamentId: string;
   /**
    * **리그 행에서는 `null` 이다.** 주차·번호는 대회 축(`V1TournamentFixture`)의 컬럼이고
@@ -5175,9 +5183,9 @@ export type V1MyTournamentStaffFixture = {
   scheduledAt: string | null;
   status: string;
   gameState: V1GameState | null;
-  round: string;
-  fixtureNumber: number;
-  legNumber: number;
+  round: string | null;
+  fixtureNumber: number | null;
+  legNumber: number | null;
   /** 조에 속하지 않은 경기(결선)는 `null`. */
   groupName: string | null;
   fieldId: string | null;
@@ -5237,6 +5245,7 @@ export type V1TournamentField = {
   sortOrder: number;
   active: boolean;
   version: number;
+  place?: V1PlaceView | null;
 };
 
 export type V1TournamentFieldListResponse = {

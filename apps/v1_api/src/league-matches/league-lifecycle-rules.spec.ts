@@ -133,6 +133,18 @@ describe('shouldCompleteLeague — 자동 종료 판정 (D-3)', () => {
     ).toBe(false);
   });
 
+  it('총 경기 수를 정한 리그는 확정된 경기가 그 수에 못 미치면 남은 경기가 다 확정돼도 끝내지 않는다', () => {
+    const done = { status: 'completed', hasOfficialResult: true };
+    // 하나씩 추가하는 리그: 총 3경기 중 2경기만 만들어 다 끝났다 → 아직 종료하지 않는다.
+    expect(shouldCompleteLeague({ state: 'active', fixtures: [done, done], plannedFixtureCount: 3 })).toBe(false);
+    // 세 번째 경기까지 확정되면 종료한다.
+    expect(shouldCompleteLeague({ state: 'active', fixtures: [done, done, done], plannedFixtureCount: 3 })).toBe(true);
+    // 취소된 경기는 총 경기 수를 채우지 않는다.
+    expect(shouldCompleteLeague({ state: 'active', fixtures: [done, done, { status: 'cancelled', hasOfficialResult: false }], plannedFixtureCount: 3 })).toBe(false);
+    // 총 경기 수를 안 정한 리그는 지금처럼 남은 경기 기준이다.
+    expect(shouldCompleteLeague({ state: 'active', fixtures: [done], plannedFixtureCount: null })).toBe(true);
+  });
+
   it('active 가 아닌 리그는 건드리지 않는다 (멱등)', () => {
     const fixtures = [{ status: 'completed', hasOfficialResult: true }];
     expect(shouldCompleteLeague({ state: 'completed', fixtures })).toBe(false);

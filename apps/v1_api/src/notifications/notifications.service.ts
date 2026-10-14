@@ -460,6 +460,8 @@ function deepLinkForEvent(
   targetType: V1NotificationTargetType,
   targetId: string | null,
 ): string | null {
+  // 취소된 팀매치는 사용자 상세에서 사라지므로 알림도 존재하는 목록으로 보낸다.
+  if (type === 'team_match_cancelled') return '/team-matches';
   if (type === 'admin_team_match_application_received' && targetId) {
     return `/admin/team-matches/${targetId}`;
   }
@@ -559,7 +561,7 @@ function deepLinkForEvent(
       type === 'league_promotion_withdrawn') &&
     targetId
   ) {
-    return `/league-matches/${targetId}`;
+    return `/tournaments/${targetId}?kind=league`;
   }
   // 리그 알림 문구 전용화(2026-08-25): 결과 확정/이의 접수/이의 처리 4종은 전부 결과
   // 결과 영수증 화면(경기 상세가 아니라 확정된 결과를 보여주는 화면)으로 보낸다 —

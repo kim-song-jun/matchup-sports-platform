@@ -239,6 +239,7 @@ describe('TournamentsReadService', () => {
     v1TournamentMatchDetails: {
       findMany: jest.Mock;
     };
+    v1TeamMatch: { findMany: jest.Mock };
     v1GameOperationFlag: {
       findUnique: jest.Mock;
     };
@@ -266,6 +267,7 @@ describe('TournamentsReadService', () => {
       v1TournamentMatchDetails: {
         findMany: jest.fn().mockResolvedValue([]),
       },
+      v1TeamMatch: { findMany: jest.fn().mockResolvedValue([]) },
       // PUBLIC_LIVE 켜짐 - 이 스펙의 대진은 전부 `visibilityPolicy.mode = 'LIVE'` 다.
       // 꺼진 값을 줘도 확정 결과는 `official_only` 로 남지만, 진행 중 점수를 보는
       // 케이스가 갈리므로 실제 운영 기본값(켜짐)으로 고정한다.
@@ -1311,6 +1313,28 @@ describe('TournamentsReadService', () => {
   describe('getOverallStandings', () => {
     const tournamentId = 'tournament-1';
 
+    it.each(['in_progress', 'open'])('정규 리그 %s 순위 로고가 참가팀 신원 공개 게이트를 따른다', async (status) => {
+      prisma.v1Tournament.findFirst
+        .mockResolvedValueOnce({ id: tournamentId, kind: 'regular_league', status })
+        .mockResolvedValueOnce({ id: tournamentId, title: '리그', registrations: [
+          { id: 'reg-1', teamId: 'team-1', team: { name: 'FC 서울', profile: { logoUrl: '/uploads/teams/seoul.webp' } } },
+          { id: 'reg-2', teamId: 'team-2', team: { name: 'FC 부산', profile: null } },
+        ] });
+      const result = await service.getOverallStandings(tournamentId);
+      expect(result.standings).toHaveLength(2);
+      if (status === 'open') {
+        expect(result.standings).toEqual(expect.arrayContaining([
+          expect.objectContaining({ registrationId: 'reg-1', teamId: null, teamName: null, teamLogoUrl: null }),
+          expect.objectContaining({ registrationId: 'reg-2', teamId: null, teamName: null, teamLogoUrl: null }),
+        ]));
+      } else {
+        expect(result.standings).toEqual(expect.arrayContaining([
+          expect.objectContaining({ teamId: 'team-1', teamName: 'FC 서울', teamLogoUrl: '/uploads/teams/seoul.webp' }),
+          expect.objectContaining({ teamId: 'team-2', teamName: 'FC 부산', teamLogoUrl: null }),
+        ]));
+      }
+    });
+
     beforeEach(() => {
       prisma.v1Tournament.findFirst.mockResolvedValue({
         id: tournamentId,
@@ -1330,7 +1354,7 @@ describe('TournamentsReadService', () => {
           fairPlayPoints: 3,
           recalculatedAt: new Date('2026-08-17T10:00:00.000Z'),
           registration: {
-            team: { name: 'FC 서울' },
+            team: { name: 'FC 서울', profile: { logoUrl: '/uploads/teams/seoul.webp' } },
             // 실제 select에는 없는 필드지만, 이후 실수로 select를 넓혀도 응답에
             // 새지 않는지 방어적으로 검증하기 위해 mock에 PII를 함께 심어 둔다.
             appliedByUser: {
@@ -1373,10 +1397,11 @@ describe('TournamentsReadService', () => {
       expect(result.standings[0]).toMatchObject({
         registrationId: 'reg-1',
         teamName: 'FC 서울',
+        teamLogoUrl: '/uploads/teams/seoul.webp',
         position: 1,
         points: 18,
       });
-      expect(result.standings[1]).toMatchObject({ registrationId: 'reg-2', teamName: 'FC 부산' });
+      expect(result.standings[1]).toMatchObject({ registrationId: 'reg-2', teamName: 'FC 부산', teamLogoUrl: null });
       expect(result.progress).toEqual({ total: 2, played: 1, remaining: 1, percent: 50 });
       expect(prisma.v1TournamentMatchDetails.findMany).toHaveBeenCalled();
       // 2위(reg-2) 최대 = 10 + 1(잔여) * 3(승점) = 13, 1위(reg-1) 현재 18 → 확정
@@ -1396,8 +1421,8 @@ describe('TournamentsReadService', () => {
 
       expect(result.standings).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({ registrationId: 'reg-1', teamName: null, points: 18 }),
-          expect.objectContaining({ registrationId: 'reg-2', teamName: null, points: 10 }),
+          expect.objectContaining({ registrationId: 'reg-1', teamName: null, teamLogoUrl: null, points: 18 }),
+          expect.objectContaining({ registrationId: 'reg-2', teamName: null, teamLogoUrl: null, points: 10 }),
         ]),
       );
     });

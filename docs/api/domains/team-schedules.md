@@ -133,3 +133,6 @@ Cross-team ownership validation for `teamMatchId` (the referenced team match mus
   - `reminder-worker-wiring.integration-spec.ts` — boots the **real** `v1-game-operations-worker.main.ts` entry point as a child process (production-shaped env: no `FRONTEND_URL`) and drives both real outbox event types through the actual running worker end-to-end, proving handler registration, dispatch-to-the-correct-handler, and durable notification persistence (including same-claim re-processing producing no duplicate rows) — this is the one spec in this domain that exercises the actual composition root rather than a hand-constructed service/class instance
   - `helpers/lock-barrier.ts` — shared deterministic-concurrency-barrier utility (`holdRowLock`/`isStillPending`) used by every genuine-race test above
 - Unit: `apps/v1_api/src/jobs/schedule-reminders/schedule-reminder.service.spec.ts` — durable-delivery contract in isolation (persistence failure propagates and is retryable, preference filtering, Web Push best-effort ordering)
+
+## 2026-10-13 Cancelled team-match visibility
+Team schedule list/detail and my-schedule omit entries linked to cancelled/archived/deleted team matches. The schedule rows remain as operational history. Ordinary cancelled team schedules without a team-match link retain their existing visibility; this rule concerns team-match cancellation only.

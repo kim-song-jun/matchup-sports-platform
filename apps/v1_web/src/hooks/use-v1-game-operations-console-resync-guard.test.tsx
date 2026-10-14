@@ -88,6 +88,7 @@ function createMockSocket(server: { events: readonly GameEventRecord[]; lastSequ
       if (event !== 'game.subscribe' || !cb) return;
       subscribeCalls.push(payload as SubscribeInput);
       const snapshot = {
+        gameId: GAME_ID,
         version: 7,
         state: 'LIVE' as GameState,
         lastSequence: server.lastSequence,

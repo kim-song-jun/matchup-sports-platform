@@ -1,15 +1,23 @@
 /**
- * 리그 대진 "주차 수"를 팀 수로 제안한다(Task 180 G13 F40).
+ * 리그 대진 계획 — 몇 라운드·몇 경기를 만들고, 경기 날짜가 며칠 필요한가(Task 180 G13 F40).
  *
  * 서버 라운드로빈(`apps/v1_api/src/common/scheduling/round-robin.ts`)과 같은 셈이어야 한다 —
- * 홀수 팀은 부전 한 자리를 더해 라운드 = (짝수로 맞춘 팀 수 − 1), 주차 수만큼 라운드를 돌리고
- * (넘치면 처음부터 다시 돈다) 한 라운드는 floor(팀 수 / 2)경기다. 서버는 총 라운드를
- * `weeksCount × gamesPerTeamPerDay` 로 만들되, `roundsCount` 를 주면 거기서 자른다.
+ * 홀수 팀은 부전 한 자리를 더해 라운드 = (짝수로 맞춘 팀 수 − 1), 한 라운드는 floor(팀 수 / 2)경기다.
+ * 하루 경기 수(전 팀 합계)를 주면 서버가 대진 순서대로 하루 그 수씩 묶고, 안 주면 하루에 한 라운드다
+ * (2026-10-13 사용자 확정 — 예전 '팀당 하루 경기'는 하루 경기가 라운드 크기의 배수로만 정해졌다).
  */
 
 export type RoundRobinLegs = 1 | 2;
 
-export type WeeksPlan = { readonly kind: 'single' } | { readonly kind: 'double' } | { readonly kind: 'custom'; readonly weeks: number };
+/**
+ * `fixtures` = 리그를 만들 때 정한 총 경기 수. 그 수를 채우는 라운드만 만들고 서버가 그 수에서 자른다.
+ * `custom.weeks` = 운영자가 직접 넣은 경기 날짜(주차) 수 — 하루 경기 수만큼 곱해 경기 수가 된다.
+ */
+export type WeeksPlan =
+  | { readonly kind: 'single' }
+  | { readonly kind: 'double' }
+  | { readonly kind: 'custom'; readonly weeks: number }
+  | { readonly kind: 'fixtures'; readonly count: number };
 
 export function roundRobinRounds(teamCount: number, legs: RoundRobinLegs): number {
   if (teamCount < 2) return 0;
@@ -17,23 +25,27 @@ export function roundRobinRounds(teamCount: number, legs: RoundRobinLegs): numbe
   return (padded - 1) * legs;
 }
 
-export function suggestedWeeks(teamCount: number, legs: RoundRobinLegs, gamesPerTeamPerDay = 1): number {
-  return Math.max(1, Math.ceil(roundRobinRounds(teamCount, legs) / Math.max(1, gamesPerTeamPerDay)));
+export interface FixturePlan {
+  /** 서버에 보낼 라운드 수(`weeksCount`). */
+  readonly rounds: number;
+  /** 만들어질 경기 수. 마지막 라운드를 다 쓰지 않으면 서버에 `fixtureCount` 로 알린다. */
+  readonly games: number;
+  /** 필요한 경기 날짜(주차) 수 = ceil(경기 수 / 하루 경기 수). */
+  readonly days: number;
 }
 
-/**
- * 이 계획이 서버에 요청할 총 라운드 수. 단일/홈앤어웨이는 라운드로빈 한 바퀴(들)로 못 박는다 —
- * 팀당 하루 경기 수로 주차가 올림되어도 남는 칸에 앞 라운드를 다시 만들지 않는다.
- * 직접 입력은 `주차 × 하루 경기`를 그대로 쓴다(넘치면 서버가 처음부터 다시 돈다).
- */
-export function plannedRounds(plan: WeeksPlan, teamCount: number, weeksCount: number, gamesPerTeamPerDay = 1): number {
-  if (plan.kind === 'custom') return weeksCount * Math.max(1, gamesPerTeamPerDay);
-  return roundRobinRounds(teamCount, plan.kind === 'double' ? 2 : 1);
-}
-
-export function resolveWeeksCount(plan: WeeksPlan, teamCount: number, gamesPerTeamPerDay = 1): number {
-  if (plan.kind === 'custom') return plan.weeks;
-  return suggestedWeeks(teamCount, plan.kind === 'double' ? 2 : 1, gamesPerTeamPerDay);
+/** 계획 → 라운드·경기·날짜 수. 팀이 2개 미만이면 만들 대진이 없지만 입력 칸은 1 이상으로 둔다. */
+export function resolveFixturePlan(plan: WeeksPlan, teamCount: number, gamesPerDay: number | null): FixturePlan {
+  const perRound = Math.floor(teamCount / 2);
+  if (perRound < 1) return { rounds: 1, games: 0, days: 1 };
+  const perDay = gamesPerDay !== null && gamesPerDay >= 1 ? gamesPerDay : perRound;
+  const games =
+    plan.kind === 'fixtures'
+      ? plan.count
+      : plan.kind === 'custom'
+        ? plan.weeks * perDay
+        : roundRobinRounds(teamCount, plan.kind === 'double' ? 2 : 1) * perRound;
+  return { rounds: Math.max(1, Math.ceil(games / perRound)), games, days: Math.max(1, Math.ceil(games / perDay)) };
 }
 
 /** 이 라운드 수로 만들어질 경기 수 — 서버와 같은 셈(한 라운드 = floor(팀 수 / 2)경기). */
@@ -46,6 +58,7 @@ const PLAN_LABEL: Record<WeeksPlan['kind'], string> = {
   single: '단일 라운드로빈',
   double: '홈앤어웨이',
   custom: '직접 입력',
+  fixtures: '총 경기 수',
 };
 
 export function weeksPlanLabel(plan: WeeksPlan): string {

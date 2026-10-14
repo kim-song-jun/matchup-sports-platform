@@ -282,13 +282,16 @@ There is **no** `check-in`, `evaluate`, or `referee-schedule` route in this cont
 - Screenshots and machine-readable report: [`docs/screenshots/team-match-shared-record-submatches/`](../screenshots/team-match-shared-record-submatches/).
 
 
-## Task 181 — 상대팀 미확정 보류
+## Task 181 — 미매칭 마감·취소 비노출·어드민 상태 변경 (2026-10-13 개정)
 
-- [ ] 확정 상대팀 없이 마감/시작 시각 경과하면 보류. 신청 대기팀이 있어도 동일.
-- [ ] 주최팀 관리자는 보류 일정 변경 후 재모집/취소 가능, 일반 팀원·비소속 사용자 mutation 불가.
+- [ ] 확정 상대팀 없이 마감/시작 시각 경과하면 마감. 신청 대기팀이 있어도 동일. 팀매치 ‘보류’ 표시/진행 결정 패널 없음.
+- [ ] 주최팀 관리자는 마감 일정 변경 후 재모집/취소 가능, 일반 팀원·비소속 사용자 mutation 불가.
 - [ ] 신청 이력 없을 때만 soft delete 및 연결 일정 취소. 신청 철회 이력도 보존.
-- [ ] matched/completed/cancelled 상태는 보류로 역전되지 않음.
-- [ ] 새로고침/내 팀매치/목록/상세 보류 표시 동일.
+- [ ] matched/completed 상태는 미매칭 마감으로 역전되지 않음.
+- [ ] 취소한 팀매치는 공개 목록·검색·건수·내 팀매치에서 없음. 사용자 상세/신청 자격/관리 링크 404. 연결 팀/내 일정에서 없음. 어드민 목록/상세/감사 로그에는 남음.
+- [ ] 취소 매치의 명단·상대 명단·경기 기록 직접 URL도 사용자에게 404. 활성 관리자만 원본 경기 기록 조회 가능. 새 취소 알림은 존재하는 팀매치 목록으로 연결.
+- [ ] owner/ops가 미래 미매칭 매치를 모집 중으로 변경하면 지난 신청 마감도 해제되고 실제 새 신청이 가능해짐. 시작 경과/팀 확정/취소/결과 확정/대회·리그 상태 우회는 차단.
+- [ ] 어드민 상태 변경 뒤 이미 열린 사용자 목록/상세/내 매치 및 어드민 상세가 다시 조회됨.
 - [ ] 390/768/1440 전체 route 및 console/network 확인.
 
 ## Competition record entry regression — 2026-10-03

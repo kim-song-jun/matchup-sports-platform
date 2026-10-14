@@ -122,7 +122,37 @@ describe('AdminLeagueMatchNewPage', () => {
       startsOn: new Date('2026-09-01T00:00:00').toISOString(),
       endsOn: new Date('2026-10-20T23:59:59.999').toISOString(),
       teamIds: ['team-a', 'team-b'],
+      // 리그는 팀 전원이 명단에 오르는 게 기본이라 팀 명단 인원은 '제한 없음'으로 시작한다.
+      minPlayers: 1,
+      maxPlayers: null,
     }));
+  });
+
+  it('팀 명단 인원을 직접 정하고 총 경기 수를 넣으면 함께 보낸다', async () => {
+    const mutateAsync = vi.fn().mockResolvedValue({ leagueId: 'league-1', title: 't', state: 'draft' });
+    useV1CreateLeagueMatchMock.mockReturnValue({ mutateAsync, isPending: false } as never);
+    await fillLeagueForm();
+
+    expect(screen.getByText('2팀이 한 번씩 만나면 1경기, 두 번씩이면 2경기예요. 대진을 만들 때 이 수만큼 만들고, 나중에 경기를 더 추가할 수 있어요. 이 수만큼 결과가 확정되면 리그가 자동으로 끝나요.')).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('제한 없음'));
+    fireEvent.change(screen.getByLabelText('최소 (명)'), { target: { value: '5' } });
+    fireEvent.change(screen.getByLabelText('최대 (명)'), { target: { value: '15' } });
+    fireEvent.change(screen.getByLabelText('총 경기 수 (선택)'), { target: { value: '6' } });
+    fireEvent.click(screen.getByRole('button', { name: '리그 만들기' }));
+
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ minPlayers: 5, maxPlayers: 15, plannedFixtureCount: 6 })));
+  });
+
+  it('최소 인원이 최대보다 많으면 만들 수 없고 이유를 알려준다', async () => {
+    useV1CreateLeagueMatchMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    await fillLeagueForm();
+
+    fireEvent.click(screen.getByLabelText('제한 없음'));
+    fireEvent.change(screen.getByLabelText('최소 (명)'), { target: { value: '12' } });
+    fireEvent.change(screen.getByLabelText('최대 (명)'), { target: { value: '8' } });
+
+    expect(screen.getByRole('button', { name: '리그 만들기' })).toBeDisabled();
+    expect(screen.getByText('최소 인원이 최대 인원보다 많아요.')).toBeInTheDocument();
   });
 
   it('종목을 먼저 고르지 않아도 팀을 검색·선택할 수 있고, 첫 팀을 고르면 그 팀의 종목으로 종목 select가 자동 채워지고 잠긴다', async () => {

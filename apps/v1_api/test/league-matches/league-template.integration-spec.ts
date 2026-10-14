@@ -60,6 +60,34 @@ describe('POST /admin/league-matches/:leagueId/fixtures/template', () => {
     expect(await h.prisma.v1TeamSchedule.count({ where: { teamMatchId: { in: fixtures.map((f) => f.id) } } })).toBe(0);
   });
 
+  it('하루 경기 수를 넣으면 하루 N경기씩 나눠 한 구장에서 경기 시간 + 휴식 간격으로 잇는다', async () => {
+    const leagueId = await h.makeLeague();
+    const dates = kstDates(2);
+
+    // 4팀 1회전 = 6경기 → 하루 4경기면 날짜 2일(4 + 2).
+    const res = await post(leagueId, {
+      teamCount: 4, legs: 1, schedule: { dates, time: '19:00' }, gamesPerDay: 4, gameDurationMinutes: 20, breakMinutes: 5,
+    });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data).toEqual({ slots: 4, fixtures: 6 });
+    const fixtures = await h.prisma.v1TeamMatch.findMany({ where: { leagueId }, orderBy: { startAt: 'asc' } });
+    const at = (date: string, time: string) => new Date(`${date}T${time}:00+09:00`).toISOString();
+    expect(fixtures.map((f) => f.startAt?.toISOString())).toEqual([
+      at(dates[0], '19:00'), at(dates[0], '19:25'), at(dates[0], '19:50'), at(dates[0], '20:15'),
+      at(dates[1], '19:00'), at(dates[1], '19:25'),
+    ]);
+    expect(fixtures.every((f) => f.endAt!.getTime() - f.startAt!.getTime() === 20 * 60_000)).toBe(true);
+    // 제목의 N주차는 N번째 경기 날짜다.
+    expect(fixtures.map((f) => Number(/(\d+)주차$/.exec(f.title)?.[1]))).toEqual([1, 1, 1, 1, 2, 2]);
+
+    // 날짜가 모자라면(하루 4경기 → 2일 필요) 422.
+    const other = await h.makeLeague();
+    const few = await post(other, { teamCount: 4, legs: 1, schedule: { dates: kstDates(1), time: '19:00' }, gamesPerDay: 4 });
+    expect(few.status).toBe(422);
+    expect(few.body.code).toBe('LEAGUE_SCHEDULE_SLOTS_INSUFFICIENT');
+  });
+
   it('일정은 필수다 — 없으면 400, 날짜가 모자라면 422, 과거 날짜는 422 이고 아무것도 만들지 않는다', async () => {
     const leagueId = await h.makeLeague();
     expect((await post(leagueId, { teamCount: 4, legs: 1 })).status).toBe(400);
@@ -181,6 +209,9 @@ describe('POST /admin/league-matches/:leagueId/fixtures/template', () => {
       const cancelled = fixtures.filter((f) => f.status === 'cancelled');
       expect(cancelled).toHaveLength(6);
       expect(cancelled.every((f) => f.homeSlotId === null && f.awaySlotId === null)).toBe(true);
+      // 접은 경기는 기록만 남고 현재 목록(deletedAt null)에서는 빠진다.
+      expect(cancelled.every((f) => f.deletedAt !== null)).toBe(true);
+      expect(await h.prisma.v1TeamMatch.count({ where: { leagueId, deletedAt: null } })).toBe(10);
       expect(fixtures.filter((f) => f.status === 'matched')).toHaveLength(10);
       const slots = await h.prisma.v1TournamentSlot.findMany({ where: { tournamentId: leagueId } });
       expect(slots).toHaveLength(5);

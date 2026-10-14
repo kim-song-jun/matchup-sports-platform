@@ -88,9 +88,11 @@ function fakeTx(startAt: Date | null = null, gameOptions: FakeGame = {}) {
   const events: unknown[] = [];
   const gameEvents = GAME_EVENTS.map((event) => ({ ...event }));
   const tx = {
+    v1TournamentField: { findMany: jest.fn(async () => []), create: jest.fn(async ({ data }: { data: { name: string } }) => ({ id: 'registered-field', ...data })) },
     v1CompetitionConfigVersion: { findUnique: jest.fn().mockResolvedValue(null) },
     $executeRaw: jest.fn(async (strings: TemplateStringsArray, ...values: unknown[]) => {
       const query = strings.join('?');
+      if (query.includes('pg_advisory_xact_lock')) return 1;
       if (query.includes('UPDATE v1_result_escalations') || query.includes('UPDATE v1_outbox_events')) {
         calls.push(`close-sla:${String(values[values.length - 1])}`);
         return 1;
@@ -202,6 +204,32 @@ function fakeTx(startAt: Date | null = null, gameOptions: FakeGame = {}) {
 beforeEach(() => jest.clearAllMocks());
 
 describe('updateTournamentMatchInTx — 자기 경기만 잠그고 명단은 후속 이벤트로', () => {
+  it('직접 장소 수정도 같은 쓰기에서 필드를 등록·배정한다', async () => {
+    const { tx, mocks } = fakeTx();
+    const place = { name: '직접 등록 구장', address: null, latitude: null, longitude: null, provider: null, providerPlaceId: null };
+    await updateTournamentMatchInTx(tx, { teamMatchId: 'tm-x', place });
+    expect(mocks.v1TeamMatch.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ fieldId: 'registered-field', placeName: place.name }) }));
+    expect(mocks.v1TournamentField.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ tournamentId: 'tour-1', name: place.name, placeSnapshot: place }) }));
+  });
+  it('등록 필드 선택은 경기 장소와 필드 ID를 같은 저장 결과로 돌려준다', async () => {
+    const { tx, mocks, events } = fakeTx();
+    const place = { name: '선택 구장', address: '서울', latitude: 37.5, longitude: 126.9, provider: 'kakao', providerPlaceId: 'synthetic' };
+    const stored = { id: 'tm-x', tournamentId: 'tour-1', title: 'X', startAt: null, fieldId: null as string | null,
+      placeName: null as string | null, placeAddress: null as string | null, placeLatitude: null as number | null,
+      placeLongitude: null as number | null, placeProvider: null as string | null, placeProviderId: null as string | null,
+      status: 'matched', createdAt: new Date(), updatedAt: new Date() };
+    Object.assign(tx, { v1TournamentField: { findFirst: jest.fn(async () => ({ id: 'field', name: '선택 구장', active: true, placeSnapshot: place })) } });
+    const raw = mocks.$queryRaw.getMockImplementation()!;
+    mocks.$queryRaw.mockImplementation(async (strings) => strings.join('?').includes('v1_tournament_fields') ? [] : raw(strings));
+    mocks.v1TeamMatch.update.mockImplementation((async ({ data }: { data: Record<string, unknown> }) => {
+      Object.assign(stored, data); return stored;
+    }) as never);
+    const result = await updateTournamentMatchInTx(tx, { teamMatchId: 'tm-x', fieldId: 'field' });
+    expect(stored).toMatchObject({ fieldId: 'field', placeName: '선택 구장', placeAddress: '서울', placeLatitude: 37.5, placeLongitude: 126.9 });
+    expect(result.fieldId).toBe('field');
+    expect(result.place).toEqual(place);
+    expect(events).toEqual([]);
+  });
   it.each([{ place: { name: '새 구장', address: null, latitude: null, longitude: null, provider: null, providerPlaceId: null } }, { fixtureNumber: 7 }])('종료 없는 경기의 부분 수정은 경기와 양 팀 캘린더 종료를 함께 보충한다: %j', async (patch) => {
     const startAt = new Date('2026-11-15T09:00:00Z');
     const endAt = new Date('2026-11-15T09:40:00Z');

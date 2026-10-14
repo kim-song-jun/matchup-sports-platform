@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OPERATIONS_BOARD_POLL_INTERVAL_MS } from '@/lib/operations-board-polling';
 import type { GameLineup, GameLineupParticipant, GameSide } from '@/types/game-operations';
@@ -6,11 +6,13 @@ import { KickoffChecklist } from './kickoff-checklist';
 
 const mocks = vi.hoisted(() => ({
   useV1TeamGameRoster: vi.fn(),
+  setParticipation: vi.fn(),
   href: { value: '/admin/live/l-1/fixtures/f-1/operate' as string | null },
 }));
 
 vi.mock('@/hooks/use-v1-game-roster', () => ({
   useV1TeamGameRoster: (...args: unknown[]) => mocks.useV1TeamGameRoster(...args),
+  useV1SetGameRosterParticipation: () => ({ mutateAsync: mocks.setParticipation }),
 }));
 vi.mock('@/components/v1-ui/use-current-href', () => ({ useCurrentHref: () => mocks.href.value }));
 
@@ -52,7 +54,7 @@ function rosterData(counts: { excluded: number; unavailable: number; suspended: 
 
 function renderChecklist(props: { lineups: GameLineup[] }) {
   return render(
-    <KickoffChecklist gameId="g-1" sides={SIDES} lineups={props.lineups} onToggleArrival={vi.fn()} onConfirmSide={vi.fn()} />,
+    <KickoffChecklist gameId="g-1" sides={SIDES} lineups={props.lineups} onToggleArrival={vi.fn()} onConfirmSide={vi.fn()} onRosterError={vi.fn()} />,
   );
 }
 
@@ -95,8 +97,9 @@ describe('KickoffChecklist — 킥오프 준비', () => {
   });
 
   it('요약을 못 읽은 팀은 못 읽었다고 말한다 — 0 으로 그리지 않고, 다른 팀 요약은 그대로 보인다', () => {
+    // 리그 여부는 첫 팀(레드) 명단으로 판정하므로, 요약 실패는 두 번째 팀으로 본다.
     mocks.useV1TeamGameRoster.mockImplementation((teamId: string) =>
-      teamId === 'team-red'
+      teamId === 'team-blue'
         ? { data: undefined, isPending: false, isError: true }
         : rosterData({ excluded: 0, unavailable: 0, suspended: 2 }),
     );
@@ -104,7 +107,26 @@ describe('KickoffChecklist — 킥오프 준비', () => {
 
     expect(screen.getByText('명단 요약을 불러오지 못했어요.')).toBeInTheDocument();
     expect(screen.getByText('빠짐 0 · 정지 2')).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: '레드팀 경기 명단 보기' })).toBeNull();
+    expect(screen.queryByRole('link', { name: '블루팀 경기 명단 보기' })).toBeNull();
+  });
+
+  it('리그인지 확인하는 동안에는 대회용 도착 확인을 먼저 그리지 않는다', () => {
+    mocks.useV1TeamGameRoster.mockReturnValue({ data: undefined, isPending: true, isError: false });
+    renderChecklist({ lineups: lineups(NOT_YET, NOT_YET) });
+
+    expect(screen.getByRole('status')).toHaveTextContent('킥오프 준비를 불러오는 중이에요…');
+    expect(screen.queryByRole('button', { name: /전원 도착 확인/ })).toBeNull();
+  });
+
+  it('리그인지 확인하지 못하면 도착 확인 대신 오류와 다시 불러오기를 보여 준다', () => {
+    const refetch = vi.fn();
+    mocks.useV1TeamGameRoster.mockReturnValue({ data: undefined, isPending: false, isError: true, refetch });
+    renderChecklist({ lineups: lineups(NOT_YET, NOT_YET) });
+
+    expect(screen.getByRole('alert')).toHaveTextContent('킥오프 준비를 불러오지 못했어요.');
+    expect(screen.queryByRole('button', { name: /전원 도착 확인/ })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' }));
+    expect(refetch).toHaveBeenCalledTimes(1);
   });
 
   it('팀이 정해지지 않은 사이드에는 요약도 링크도 없다', () => {
@@ -114,6 +136,7 @@ describe('KickoffChecklist — 킥오프 준비', () => {
         sides={[side('side-home', null, '미정')]}
         lineups={[lineup('side-home', [participant('h1', 'side-home', 'lineup-side-home', NOT_YET)])]}
         onToggleArrival={vi.fn()}
+        onRosterError={vi.fn()}
       />,
     );
 
@@ -141,5 +164,56 @@ describe('KickoffChecklist — 킥오프 준비', () => {
 
     expect(screen.queryByRole('status')).toBeNull();
     expect(screen.getByText('제출된 명단이 없어 검인할 대상이 없어요.')).toBeInTheDocument();
+  });
+
+  describe('리그 경기 — 체크 = 출전', () => {
+    const leagueRoster = (base: Array<{ userId: string; displayName: string; status: string }>) => ({
+      data: {
+        sideId: 'side-home',
+        competitionKind: 'LEAGUE',
+        editable: true,
+        base: base.map((player) => ({ ...player, jerseyNumber: null, accountLinked: true, participantId: null })),
+        counts: {
+          base: base.length,
+          participating: base.filter((player) => player.status === 'PARTICIPATING').length,
+          excluded: base.filter((player) => player.status === 'EXCLUDED').length,
+          unavailable: 0,
+          suspended: base.filter((player) => player.status === 'SUSPENDED').length,
+        },
+      },
+      isPending: false,
+      isError: false,
+    });
+
+    it('도착 확인 대신 팀원 전원이 출전으로 체크돼 있고, 누르면 이번 경기에서 뺀다', async () => {
+      mocks.setParticipation.mockReset().mockResolvedValue({});
+      mocks.useV1TeamGameRoster.mockReturnValue(leagueRoster([
+        { userId: 'u1', displayName: '김선수', status: 'PARTICIPATING' },
+        { userId: 'u2', displayName: '이선수', status: 'SUSPENDED' },
+      ]));
+      renderChecklist({ lineups: lineups(NOT_YET, NOT_YET) });
+
+      expect(screen.queryByRole('button', { name: /전원 도착 확인/ })).toBeNull();
+      const kim = screen.getAllByRole('switch', { name: /김선수 — 출전/ })[0];
+      expect(kim).toHaveAttribute('aria-checked', 'true');
+      expect(screen.getAllByRole('switch', { name: /이선수 — 출전정지/ })[0]).toBeDisabled();
+
+      fireEvent.click(kim);
+      await waitFor(() => expect(mocks.setParticipation).toHaveBeenCalledWith({ userId: 'u1', participating: false }));
+    });
+
+    it('뺀 선수가 있으면 전원 출전으로 한 번에 되돌린다', async () => {
+      mocks.setParticipation.mockReset().mockResolvedValue({});
+      mocks.useV1TeamGameRoster.mockReturnValue(leagueRoster([
+        { userId: 'u1', displayName: '김선수', status: 'EXCLUDED' },
+        { userId: 'u3', displayName: '박선수', status: 'EXCLUDED' },
+      ]));
+      renderChecklist({ lineups: lineups(NOT_YET, NOT_YET) });
+
+      fireEvent.click(screen.getByRole('button', { name: '레드팀 전원 출전' }));
+      await waitFor(() => expect(mocks.setParticipation).toHaveBeenCalledTimes(2));
+      expect(mocks.setParticipation).toHaveBeenNthCalledWith(1, { userId: 'u1', participating: true });
+      expect(mocks.setParticipation).toHaveBeenNthCalledWith(2, { userId: 'u3', participating: true });
+    });
   });
 });

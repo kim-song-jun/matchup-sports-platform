@@ -68,7 +68,7 @@ export function MyLeaguesPageClient() {
               return (
                 <li key={item.leagueId} className="tm-card tm-my-league-card">
                   <Link
-                    href={withFromPath(`/league-matches/${item.leagueId}`, '/my/leagues')}
+                    href={withFromPath(`/tournaments/${item.leagueId}`, '/my/leagues')}
                     className="tm-pressable tm-list-row-interactive tm-my-league-head"
                     aria-label={`${item.title} 상세로 이동`}
                   >

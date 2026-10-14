@@ -102,6 +102,7 @@ type TeamMatchWithRelations = V1TeamMatch & {
   } | null;
   applications: Array<V1TeamMatchApplication & { applicantTeam: { id: string; name: string } }>;
   game: { id: string } | null;
+  field?: { name: string } | null;
   // teamMatchInclude() 와 짝을 이루는 **손으로 쓴** 타입이라, include 를 넓혀도 여기를
   // 함께 고치지 않으면 컴파일이 깨진다(실제로 CI 가 TS2551 로 잡았다).
   league: { id: string; title: string } | null;
@@ -217,10 +218,12 @@ export class TeamMatchesService {
     const publicHistoryFrom = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const constraints: Prisma.V1TeamMatchWhereInput[] = [
       ...(query.today ? [startsTodayWhere(now)] : []),
-      ...(query.recruitingOnly ? [recruitingNowWhere(now)] : []),
+      ...(query.recruitingOnly
+        ? [recruitingNowWhere(now), { OR: [{ deadlineAt: null }, { deadlineAt: { gt: now } }] } satisfies Prisma.V1TeamMatchWhereInput]
+        : []),
       // 추천순의 모집 글에는 신청 마감을 적용한다. 확정 경기는 진행 중에도 찾을 수 있게 남긴다.
       ...(status === 'recruiting' && query.sort === 'recommended'
-        ? [{ OR: [...(isDefaultDiscovery ? [{ status: 'matched' as const }] : []), { deadlineAt: null }, { deadlineAt: { gte: now } }] } satisfies Prisma.V1TeamMatchWhereInput]
+        ? [{ OR: [...(isDefaultDiscovery ? [{ status: 'matched' as const }] : []), { deadlineAt: null }, { deadlineAt: { gt: now } }] } satisfies Prisma.V1TeamMatchWhereInput]
         : []),
       ...(query.query
         ? [{
@@ -234,6 +237,12 @@ export class TeamMatchesService {
           } satisfies Prisma.V1TeamMatchWhereInput]
         : []),
     ];
+    if (!isDefaultDiscovery && status === 'closed') {
+      constraints.push(deadlineAwareStatusWhere('closed', now));
+    }
+    if (!isDefaultDiscovery && status === 'recruiting') {
+      constraints.push(deadlineAwareStatusWhere('recruiting', now));
+    }
     return {
       deletedAt: null,
       OR: [{ tournamentId: null }, { leagueId: { not: null } }],
@@ -264,6 +273,8 @@ export class TeamMatchesService {
             { hostTeamId: null, leagueId: null, tournamentId: null },
           ],
         },
+        // 취소·보관된 모집은 status 필터를 직접 지정해도 공개 검색에 노출하지 않는다.
+        { status: { notIn: ['cancelled', 'archived'] } },
       ],
       ...(status === 'expired'
         ? { startAt: { lt: now } }
@@ -277,7 +288,9 @@ export class TeamMatchesService {
             }
             : {}
           : status === 'recruiting'
-          ? { status, startAt: { gte: now } }
+          ? { status }
+          : status === 'closed'
+          ? {}
           : { status }),
       ...(query.sportId ? { sportId: query.sportId } : {}),
       ...(query.regionId ? { regionId: query.regionId } : {}),
@@ -299,6 +312,7 @@ export class TeamMatchesService {
   }
 
   async detail(user: V1AuthUser | null, teamMatchId: string) {
+    const now = new Date();
     const teamMatch = await this.getPublicTeamMatch(teamMatchId, user, { includeTrust: true });
     const participantTeamIds = [teamMatch.hostTeamId, teamMatch.approvedApplicantTeamId]
       .filter((teamId): teamId is string => teamId !== null);
@@ -307,6 +321,7 @@ export class TeamMatchesService {
       computePublicTeamRatingBatch(this.prisma, participantTeamIds),
     ]);
     const viewer = await this.getViewer(teamMatch, user);
+    const apiStatus = this.getApiStatus(teamMatch, now);
     const approvedApplication = teamMatch.applications.find(
       (item) => item.status === 'approved' && item.applicantTeamId === teamMatch.approvedApplicantTeamId,
     );
@@ -327,9 +342,15 @@ export class TeamMatchesService {
       startsAt: teamMatch.startAt,
       endsAt: teamMatch.endAt,
       deadlineAt: teamMatch.deadlineAt,
-      status: this.getApiStatus(teamMatch),
-      displayState: this.getDisplayState(teamMatch),
-      lifecycle: { canEdit: !teamMatch.leagueId && !teamMatch.tournamentId && ['recruiting', 'closed'].includes(teamMatch.status) && !teamMatch.approvedApplicantTeamId, canDelete: !teamMatch.leagueId && !teamMatch.tournamentId && Boolean(viewer.manageRoute) && !teamMatch.approvedApplicantTeamId && ['recruiting', 'closed', 'cancelled'].includes(teamMatch.status) && await this.prisma.v1TeamMatchApplication.count({ where: { teamMatchId } }) === 0, onHoldReason: this.getApiStatus(teamMatch) === 'on_hold' ? 'NO_OPPONENT' : null },
+      status: apiStatus,
+      displayState: this.getDisplayState(teamMatch, now),
+      lifecycle: {
+        canEdit: !teamMatch.leagueId && !teamMatch.tournamentId && ['recruiting', 'closed'].includes(teamMatch.status) && !teamMatch.approvedApplicantTeamId,
+        canDelete: !teamMatch.leagueId && !teamMatch.tournamentId && Boolean(viewer.manageRoute) && !teamMatch.approvedApplicantTeamId && ['recruiting', 'closed', 'cancelled'].includes(teamMatch.status) && await this.prisma.v1TeamMatchApplication.count({ where: { teamMatchId } }) === 0,
+        canCloseRecruitment: Boolean(viewer.manageRoute) && teamMatch.status === 'recruiting' && (teamMatch.startAt === null || teamMatch.startAt > now),
+        canReopenRecruitment: Boolean(viewer.manageRoute) && teamMatch.status === 'closed' && teamMatch.startAt !== null && teamMatch.startAt > now && !(teamMatch.deadlineAt && teamMatch.deadlineAt <= now),
+        onHoldReason: null,
+      },
       isLive: teamMatch.status === 'matched' && !teamMatch.leagueId && !teamMatch.tournamentId && !!teamMatch.startAt && teamMatch.startAt <= new Date(),
       costNote: teamMatch.costNote,
       // null 이면 일반 팀 매치, 값이 있으면 리그전이다. 프론트는 이 값의 유무로 배지를 건다.
@@ -520,6 +541,7 @@ export class TeamMatchesService {
       (['recruiting', 'closed', 'matched', 'cancelled', 'completed', 'expired'] as const).find(
         (status) => status === query.status,
       ) ?? null;
+    const now = new Date();
     if (query.scope === 'created' && applicationStatusFilter) {
       return { items: [], pageInfo: { nextCursor: null, hasNext: false } };
     }
@@ -533,15 +555,19 @@ export class TeamMatchesService {
       where: {
         deletedAt: null,
         AND: [
+          { status: { notIn: ['cancelled', 'archived'] } },
           { OR: [{ tournamentId: null }, { leagueId: { not: null } }] },
           { OR: [{ leagueId: null }, { league: { is: { isPublic: true } } }] },
           excludeUnfilledSlotFixturesWhere(),
+          ...(matchStatusFilter === 'closed' || matchStatusFilter === 'recruiting'
+            ? [deadlineAwareStatusWhere(matchStatusFilter, now)]
+            : []),
         ],
         // 'expired'는 계산 상태(getApiStatus)라 DB status 로 존재하지 않는다 — list()와
         // 동일하게 startAt 과거 조건으로 매핑한다.
-        ...(matchStatusFilter
+        ...(matchStatusFilter && matchStatusFilter !== 'closed' && matchStatusFilter !== 'recruiting'
           ? matchStatusFilter === 'expired'
-            ? { startAt: { lt: new Date() } }
+            ? { startAt: { lt: now } }
             : { status: matchStatusFilter }
           : {}),
         OR: [
@@ -1012,11 +1038,29 @@ export class TeamMatchesService {
     if (teamMatch.status === 'closed') {
       throw new ConflictException({ code: 'ALREADY_PROCESSED', message: 'Team match is already closed' });
     }
-    if (teamMatch.status !== 'recruiting' || this.getApiStatus(teamMatch) === 'on_hold') {
+    if (teamMatch.status !== 'recruiting' || (teamMatch.startAt !== null && teamMatch.startAt <= new Date())) {
       throw stateConflict('Only active recruiting team matches can be closed');
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "v1_team_matches" WHERE id = ${teamMatch.id} FOR UPDATE`;
+      const currentTeamMatch = await tx.v1TeamMatch.findFirst({
+        where: { id: teamMatch.id, deletedAt: null },
+        select: {
+          status: true,
+          startAt: true,
+          approvedApplicantTeamId: true,
+        },
+      });
+      if (
+        !currentTeamMatch ||
+        currentTeamMatch.status !== 'recruiting' ||
+        currentTeamMatch.approvedApplicantTeamId ||
+        (currentTeamMatch.startAt !== null && currentTeamMatch.startAt <= new Date())
+      ) {
+        throw stateConflict('Only active recruiting team matches can be closed');
+      }
+
       const updated = await tx.v1TeamMatch.update({
         where: { id: teamMatch.id },
         data: { status: 'closed' },
@@ -1059,11 +1103,30 @@ export class TeamMatchesService {
     if (teamMatch.status !== 'closed') {
       throw stateConflict('Only closed team matches can be reopened');
     }
-    if (teamMatch.startAt < new Date()) {
+    const now = new Date();
+    if (teamMatch.startAt <= now) {
       throw stateConflict('Expired team matches cannot be reopened');
+    }
+    if (teamMatch.deadlineAt && teamMatch.deadlineAt <= now) {
+      throw stateConflict('Expired application deadlines cannot be reopened; update the deadline first');
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "v1_team_matches" WHERE id = ${teamMatch.id} FOR UPDATE`;
+      const currentTeamMatch = await tx.v1TeamMatch.findFirst({
+        where: { id: teamMatch.id, deletedAt: null },
+        select: { status: true, startAt: true, deadlineAt: true },
+      });
+      const transactionNow = new Date();
+      if (!currentTeamMatch || currentTeamMatch.status !== 'closed') {
+        throw stateConflict('Only closed team matches can be reopened');
+      }
+      if (currentTeamMatch.startAt && currentTeamMatch.startAt <= transactionNow) {
+        throw stateConflict('Expired team matches cannot be reopened');
+      }
+      if (currentTeamMatch.deadlineAt && currentTeamMatch.deadlineAt <= transactionNow) {
+        throw stateConflict('Expired application deadlines cannot be reopened; update the deadline first');
+      }
       const nextTeamMatch = await tx.v1TeamMatch.update({
         where: { id: teamMatch.id },
         data: { status: 'recruiting' },
@@ -1072,7 +1135,7 @@ export class TeamMatchesService {
         data: {
           targetType: 'team_match',
           targetId: teamMatch.id,
-          fromStatus: teamMatch.status,
+          fromStatus: currentTeamMatch.status,
           toStatus: 'recruiting',
           actorType: 'user',
           actorUserId: user.id,
@@ -1697,6 +1760,7 @@ export class TeamMatchesService {
 
   private teamMatchInclude(user: V1AuthUser | null) {
     return {
+      field: { select: { name: true } },
       sport: { select: { id: true, name: true } },
       minSportLevel: { select: { id: true, code: true, name: true, sortOrder: true, sportId: true } },
       maxSportLevel: { select: { id: true, code: true, name: true, sortOrder: true, sportId: true } },
@@ -1824,6 +1888,7 @@ export class TeamMatchesService {
       where: {
         id: teamMatchId,
         deletedAt: null,
+        status: { notIn: ['cancelled', 'archived'] },
         OR: [{ tournamentId: null }, { leagueId: { not: null } }],
         AND: [{
           OR: [{ leagueId: null }, { league: { is: { isPublic: true } } }],
@@ -1836,7 +1901,7 @@ export class TeamMatchesService {
       },
       include: this.teamMatchInclude(user),
     });
-    if (!teamMatch) throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: 'Team match was not found' });
+    if (!teamMatch || ['cancelled', 'archived'].includes(teamMatch.status)) throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: 'Team match was not found' });
     assertTeamMatchPublicInvariant(teamMatch);
 
     // 양 팀 신뢰점수는 detail() 응답에만 노출된다. applicationEligibility()/createApplication()은
@@ -1972,6 +2037,7 @@ export class TeamMatchesService {
       where: {
         id: teamMatchId,
         deletedAt: null,
+        status: { notIn: ['cancelled', 'archived'] },
         OR: [{ tournamentId: null }, { leagueId: { not: null } }],
       },
       include: {
@@ -1999,6 +2065,7 @@ export class TeamMatchesService {
         id: applicationId,
         teamMatch: {
           deletedAt: null,
+          status: { notIn: ['cancelled', 'archived'] },
           OR: [{ tournamentId: null }, { leagueId: { not: null } }],
         },
       },
@@ -2259,14 +2326,17 @@ export class TeamMatchesService {
     return [levelLabel, conditionText, normalizeGenderRule(teamMatch.genderRule)].filter(Boolean).join(' · ') || null;
   }
 
-  private getApiStatus(teamMatch: V1TeamMatch) {
-    if (!teamMatch.leagueId && !teamMatch.tournamentId && ['recruiting', 'closed'].includes(teamMatch.status) && !teamMatch.approvedApplicantTeamId && ((teamMatch.startAt !== null && teamMatch.startAt <= new Date()) || (teamMatch.deadlineAt && teamMatch.deadlineAt <= new Date()))) return 'on_hold';
+  private getApiStatus(teamMatch: V1TeamMatch, now = new Date()) {
+    const isOrdinaryMatch = !teamMatch.leagueId && !teamMatch.tournamentId;
+    const hasNoOpponent = !teamMatch.approvedApplicantTeamId;
+    if (isOrdinaryMatch && hasNoOpponent && teamMatch.status === 'recruiting' && teamMatch.deadlineAt && teamMatch.deadlineAt <= now) return 'closed';
+    if (isOrdinaryMatch && hasNoOpponent && ['recruiting', 'closed'].includes(teamMatch.status) && teamMatch.startAt !== null && teamMatch.startAt <= now) return 'closed';
     return teamMatch.status;
   }
 
-  private getDisplayState(teamMatch: V1TeamMatch) {
-    const status = this.getApiStatus(teamMatch);
-    if (status === 'recruiting' && teamMatch.deadlineAt && teamMatch.deadlineAt < new Date()) return 'closed';
+  private getDisplayState(teamMatch: V1TeamMatch, now = new Date()) {
+    const status = this.getApiStatus(teamMatch, now);
+    if (status === 'recruiting' && teamMatch.deadlineAt && teamMatch.deadlineAt < now) return 'closed';
     return status;
   }
 }
@@ -2275,6 +2345,42 @@ type TeamMatchOperationalFields = {
   hostTeamId: string | null;
   startAt: Date | null;
 };
+
+function deadlineAwareStatusWhere(
+  status: 'recruiting' | 'closed',
+  now: Date,
+): Prisma.V1TeamMatchWhereInput {
+  if (status === 'closed') {
+    return {
+      OR: [
+        {
+          status: 'closed',
+        },
+        {
+          status: 'recruiting',
+          leagueId: null,
+          tournamentId: null,
+          approvedApplicantTeamId: null,
+          OR: [{ deadlineAt: { lte: now } }, { startAt: { lte: now } }],
+        },
+      ],
+    };
+  }
+  return {
+    status: 'recruiting',
+    OR: [
+      { leagueId: { not: null } },
+      { tournamentId: { not: null } },
+      { approvedApplicantTeamId: { not: null } },
+      {
+        AND: [
+          { OR: [{ startAt: null }, { startAt: { gt: now } }] },
+          { OR: [{ deadlineAt: null }, { deadlineAt: { gt: now } }] },
+        ],
+      },
+    ],
+  };
+}
 
 type TeamMatchReadFields = TeamMatchOperationalFields & {
   hostTeam: { id: string } | null;
@@ -2429,7 +2535,7 @@ function getEligibilityReason(
     teamMatch.status !== 'recruiting' ||
     teamMatch.startAt === null ||
     teamMatch.startAt < new Date() ||
-    (teamMatch.deadlineAt && teamMatch.deadlineAt < new Date())
+    (teamMatch.deadlineAt && teamMatch.deadlineAt <= new Date())
   ) return 'NOT_RECRUITING';
   return 'OK';
 }

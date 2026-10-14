@@ -1,5 +1,7 @@
 # Global v1 API contract
 
+Public `GET /tournaments/:id/standings/overall` rows include `teamLogoUrl: string | null` for both tournaments and regular leagues. Hidden participant identity returns `null` for the logo, matching the team name gate. See the [tournaments contract](./domains/tournaments.md#overall-standings--two-competition-kinds-two-row-shapes).
+
 조별 성적 기반 12강 배정은 [tournaments](./domains/tournaments.md)의 `round12-preview` / `round12-assignments` 계약을 따른다. 읽기는 support 포함, 쓰기는 mutation admin만 허용한다. 미리보기의 버전은 저장 시 다시 검증하며 성적·대진 변경은 409로 차단한다. 12자리 및 부전승·8강 직행 반영은 단일 트랜잭션이며 부분 성공 응답은 없다.
 
 This contract is frozen against the approved Task 127 plan. Domain documents provide navigation and domain-specific policy; this registry is the exact cross-domain REST, field, actor, idempotency, error, transition, and compensation contract.
@@ -46,6 +48,8 @@ All responses use `{status,data,timestamp}`. Collection reads use `limit` (defau
 | `GET/POST /api/v1/tournament-ops/tournaments/:tournamentId/staff` | list or `{userId,role,fieldId?,fixtureIds?,expiresAt}` → assignment/version/audit | platform_ops; tournament_director may manage field_operator/support_readonly |
 | `POST /api/v1/tournament-ops/tournaments/:tournamentId/staff/:assignmentId/revoke` | `{expectedVersion,reason}` → revoked assignment/version/audit/realtime eviction | platform_ops; owning tournament_director for subordinate roles |
 | `GET/POST /api/v1/tournament-ops/tournaments/:tournamentId/fields` and `PATCH /api/v1/tournament-ops/tournaments/:tournamentId/fields/:fieldId` | list or `{scopeKey,name,sortOrder}` / `{expectedVersion,name?,sortOrder?,active?}` → stable field/version | platform_ops; tournament_director read |
+| `POST /api/v1/tournament-ops/tournaments/:tournamentId/fields/import-places` | empty body + `Idempotency-Key` → `{addedCount,existingCount,updatedCount}`; name-based import links unassigned matches, preserves place snapshots/existing assignments and refreshes catalogue snapshots | platform_ops only; transaction-bound authorization, real replay |
+| `PATCH /api/v1/admin/fixtures/:fixtureId` and `PATCH /api/v1/admin/league-matches/:leagueId/fixtures/:teamMatchId` (location selection extension) | `fieldId?: UUID \| null`; selected field and place committed together, conflicting venue/place input rejected | mutation admin; active same-competition field only; fieldId returned to edit forms |
 | `GET/PUT /api/v1/tournament-ops/tournaments/:tournamentId/fixtures/:fixtureId/lineup` and `POST .../lineup/submit` | read; `{expectedVersion,sideId,formation,starters,bench}`; `{expectedVersion,takeoverToken}` → fixture lineup/version/state | assigned tournament_director save/submit; assigned field_operator may capture actual participants after start |
 | `POST /api/v1/tournament-ops/jobs/:jobId/requeue` | `{expectedVersion,reason}` → `{status:"RETRY",attempts:0,retryGeneration,availableAt,version}` | platform_ops only; atomically requires `POISONED`, increments retryGeneration/version, resets attempts to 0, clears lease/lastError, audits `JOB_REQUEUED`; otherwise `409 JOB_NOT_POISONED` |
 | `GET/PATCH /api/v1/tournament-ops/operation-flags/:key` | read or `{expectedVersion,value,gateBundlePath,gateBundleHash,reason}` → flag/value/version/audit | platform_ops; descriptor-verifies the attempt-bound bundle then applies CAS transition. `key` is `PUBLIC_LIVE` or `DIRECTOR_OFFICIALIZE` (`GAME_WRITE`/`GAME_READ` retired with the Task 10 cutover cleanup — see `docs/api/domains/game-migration.md`); `value` is `off`/`on` only. |
@@ -161,3 +165,12 @@ above. UI must not simulate successful transactions or support outcomes for thes
 `POST /admin/tournaments/:tournamentId/byes` follows the standard auth guard, mutation-admin permission, DTO whitelist and success/error envelopes. A bye is a saved group-team entry, without a TeamMatch or Game result. See [the tournament domain](./domains/tournaments.md#라운드별-부전승-직접-등록-2026-10-05) for phase, capacity, conflict and display-position contracts.
 
 - 2026-10-05: tournament bye slots allow null registration + byeId reassignment; pre-start fixture deletion archives canonical history. See [tournament contract](domains/tournaments.md).
+## Team-match visibility update (2026-10-13)
+
+Team matches do not expose `on_hold`: unmatched recruitment with an elapsed deadline or kickoff is `closed`. Cancelled/archived team matches are excluded from public and personal team-match lists and counts; user detail and eligibility return 404. Linked team/my schedules are hidden, while admin records remain. Admin reopening of a future unmatched match clears an elapsed deadline in the same audited transaction. Personal-match hold behavior remains domain-specific; see `domains/team-matches.md` and `domains/admin-and-ops.md` for status gates.
+
+### League basic settings exception
+
+`GET/PATCH /api/v1/admin/league-matches/:leagueId/settings` uses a full editable snapshot and `expectedUpdatedAt` concurrency, without a mandatory Idempotency-Key. PATCH permits owner/ops only; stale snapshots return `409 LEAGUE_SETTINGS_STALE`, DTO failures `400 VALIDATION_ERROR`, semantic dates/region/deadline failures `422`. Detailed fields and transactional audit are in [league-matches](domains/league-matches.md#basic-information-editing-리그-기본-정보-수정).
+
+- Public league notification detail links use `/tournaments/:id?kind=league` (the kind query preserves the league icon/category) (2026-10-14). Historical `/league-matches/:id` and `/leagues/:id` links redirect to the same detail; fixture and API routes retain their existing paths.

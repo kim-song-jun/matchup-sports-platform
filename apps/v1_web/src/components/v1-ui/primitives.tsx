@@ -462,6 +462,8 @@ type ErrorStateProps = {
   message: string;
   onRetry?: () => void;
   retryLabel?: string;
+  compact?: boolean;
+  retryPending?: boolean;
   /** 다시 해도 소용없는 막힘(권한 없음 등)에서 돌아갈 곳. `onRetry` 와 함께 쓰지 않는다. */
   back?: { href: string; label: string };
 };
@@ -471,8 +473,42 @@ export function ErrorState({
   message,
   onRetry,
   retryLabel = '다시 시도하기',
+  compact = false,
+  retryPending = false,
   back,
 }: ErrorStateProps) {
+  const retryButton = onRetry ? (
+    <button
+      className={`tm-btn tm-btn-sm tm-btn-outline${retryPending ? ' tm-btn-disabled' : ''}`}
+      type="button"
+      style={compact ? undefined : { marginTop: 24 }}
+      aria-disabled={retryPending || undefined}
+      onClick={() => { if (!retryPending) onRetry(); }}
+    >
+      {retryPending ? '조회 중...' : retryLabel}
+    </button>
+  ) : null;
+  const backLink = back ? (
+    <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={back.href} style={compact ? undefined : { marginTop: 24 }}>
+      {back.label}
+    </Link>
+  ) : null;
+
+  if (compact) {
+    return (
+      <div className="tm-card" role="alert" style={{ padding: 'var(--spacing-4)', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--spacing-3)' }}>
+        <div style={{ flex: '1 1 0', minWidth: 0 }}>
+          <div className="tm-text-label">{title}</div>
+          <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 'var(--spacing-1)', lineHeight: 1.5 }}>
+            {message}
+          </div>
+        </div>
+        {retryButton}
+        {backLink}
+      </div>
+    );
+  }
+
   return (
     <div className="tm-empty-state" role="alert">
       <div className="tm-empty-icon" aria-hidden="true" style={{ background: 'var(--red50)', color: 'var(--red700)' }}>
@@ -486,21 +522,8 @@ export function ErrorState({
       <div className="tm-text-label" style={{ color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.5 }}>
         {message}
       </div>
-      {onRetry ? (
-        <button
-          className="tm-btn tm-btn-sm tm-btn-outline"
-          type="button"
-          style={{ marginTop: 24 }}
-          onClick={onRetry}
-        >
-          {retryLabel}
-        </button>
-      ) : null}
-      {back ? (
-        <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={back.href} style={{ marginTop: 24 }}>
-          {back.label}
-        </Link>
-      ) : null}
+      {retryButton}
+      {backLink}
     </div>
   );
 }

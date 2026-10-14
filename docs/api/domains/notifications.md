@@ -290,3 +290,8 @@ V1Notification
 - `apps/v1_api/src/notifications/dto/push-device.dto.ts`
 - `apps/v1_web/src/hooks/use-v1-push-registration.ts`
 - `apps/v1_web/src/lib/native-push.ts`
+
+## Cancelled team-match destination (2026-10-13)
+New `team_match_cancelled` notifications link to `/team-matches`, because cancelled team-match details now return 404 for users. The cancellation body can explain the operation, but its CTA must not navigate to the removed entity. Existing notification records are not deleted or rewritten by this change.
+
+- Public league notification detail links use `/tournaments/:id?kind=league` (the kind query preserves the league icon/category) (2026-10-14). Historical `/league-matches/:id` and `/leagues/:id` links redirect to the same detail; fixture and API routes retain their existing paths.

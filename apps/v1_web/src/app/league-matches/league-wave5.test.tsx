@@ -20,7 +20,7 @@ describe('Wave 5 — 리그 라우트 크롬', () => {
     expect(resolved?.chrome.desktopHead).toBe(true);
     const backHref = resolved?.chrome.backHref;
     expect(typeof backHref === 'function' ? backHref({ leagueId: 'lg-1' }) : backHref).toBe(
-      '/league-matches/lg-1',
+      '/tournaments/lg-1',
     );
   });
 
@@ -29,7 +29,7 @@ describe('Wave 5 — 리그 라우트 크롬', () => {
     expect(resolved?.chrome.desktopHead).toBe(true);
     const backHref = resolved?.chrome.backHref;
     expect(typeof backHref === 'function' ? backHref({ leagueId: 'lg-1' }) : backHref).toBe(
-      '/league-matches/lg-1',
+      '/tournaments/lg-1',
     );
   });
 });

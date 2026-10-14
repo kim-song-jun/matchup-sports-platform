@@ -294,4 +294,4 @@ V1Notification
 ## Cancelled team-match destination (2026-10-13)
 New `team_match_cancelled` notifications link to `/team-matches`, because cancelled team-match details now return 404 for users. The cancellation body can explain the operation, but its CTA must not navigate to the removed entity. Existing notification records are not deleted or rewritten by this change.
 
-- Public league notification detail links use `/tournaments/:id` (2026-10-14). Historical `/league-matches/:id` and `/leagues/:id` links redirect to the same detail; fixture and API routes retain their existing paths.
+- Public league notification detail links use `/tournaments/:id?kind=league` (the kind query preserves the league icon/category) (2026-10-14). Historical `/league-matches/:id` and `/leagues/:id` links redirect to the same detail; fixture and API routes retain their existing paths.

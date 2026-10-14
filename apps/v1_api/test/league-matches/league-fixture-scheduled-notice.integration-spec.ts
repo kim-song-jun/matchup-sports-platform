@@ -118,14 +118,14 @@ describe('리그 대진 확정 알림 — 팀장·매니저 현행 문구 + 시�
     expect(captainM[0]).toMatchObject({
       title: '리그 대진이 확정됐어요',
       body: '"마포 주말 리그" 리그 대진이 확정됐어요. 이번 시즌 1경기가 배정됐어요.',
-      deepLink: `/tournaments/${leagueId}`,
+      deepLink: `/tournaments/${leagueId}?kind=league`,
     });
 
     const playerM1 = await notificationsOf(id('player-m1'));
     expect(playerM1).toHaveLength(1);
     expect(playerM1[0].title).toBe('리그 대진이 확정됐어요');
     expect(playerM1[0].body).toContain(`"마포 주말 리그" 첫 경기는 ${firstGameAt}, 합정 유나이티드 ${suiteId}`);
-    expect(playerM1[0].deepLink).toBe(`/tournaments/${leagueId}`);
+    expect(playerM1[0].deepLink).toBe(`/tournaments/${leagueId}?kind=league`);
 
     const playerH2 = await notificationsOf(id('player-h2'));
     expect(playerH2).toHaveLength(1);

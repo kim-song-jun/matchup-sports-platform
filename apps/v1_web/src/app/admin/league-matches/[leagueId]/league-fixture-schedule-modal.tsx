@@ -1,4 +1,5 @@
 'use client';
+import { CompetitionFieldPicker } from '@/components/admin/competition-field-picker';
 
 import { useId, useState } from 'react';
 import { Button } from '@/components/v1-ui/button';
@@ -45,6 +46,7 @@ const fieldClass =
  * 팀은 시작 전·결과 없는 경기만 바꿀 수 있고, 자리 방식 경기는 일정 보드의 자리에서 바꾼다(`teamLockedReason`).
  */
 export function LeagueFixtureScheduleModal({
+  leagueId,
   fixture,
   defaultPlace,
   recentVenues,
@@ -55,6 +57,7 @@ export function LeagueFixtureScheduleModal({
   onSubmit,
   onClose,
 }: {
+  leagueId: string;
   fixture: V1LeagueFixture;
   defaultPlace: V1PlaceView | null;
   recentVenues?: ReadonlyArray<V1PlaceView>;
@@ -81,6 +84,7 @@ export function LeagueFixtureScheduleModal({
       : { mode: 'custom', place: placeFromView(currentPlace) };
   const [startsAtLocal, setStartsAtLocal] = useState(initialStartsAt);
   const [placeChoice, setPlaceChoice] = useState<LeaguePlaceChoice>(initialChoice);
+  const [fieldId, setFieldId] = useState(fixture.fieldId ?? '');
   const [title, setTitle] = useState(fixture.title);
   const [homeTeamId, setHomeTeamId] = useState(fixture.homeTeamId ?? '');
   const [awayTeamId, setAwayTeamId] = useState(fixture.awayTeamId ?? '');
@@ -93,6 +97,7 @@ export function LeagueFixtureScheduleModal({
   });
 
   const changed = {
+    field: fieldId !== (fixture.fieldId ?? ''),
     startAt: startsAtLocal !== initialStartsAt,
     place: placeChoiceKey(placeChoice) !== placeChoiceKey(initialChoice),
     title: title.trim() !== fixture.title,
@@ -128,7 +133,8 @@ export function LeagueFixtureScheduleModal({
       }
       patch.startsAt = startsAt;
     }
-    if (changed.place) {
+    if (changed.field) patch.fieldId = fieldId || null;
+    if (changed.place && !fieldId) {
       if (isLeaguePlaceChoiceIncomplete(placeChoice)) {
         setError('다른 장소를 골라 주세요.');
         return;
@@ -208,6 +214,8 @@ export function LeagueFixtureScheduleModal({
           />
         </div>
         <div className="grid">
+          <CompetitionFieldPicker tournamentId={leagueId} value={fieldId} onChange={setFieldId} disabled={isSubmitting} />
+          {!fieldId ? (
           <LeagueFixturePlaceField
             maxLength={PLACE_NAME_MAX_LENGTH.leagueFixture}
             defaultPlace={defaultPlace}
@@ -216,6 +224,7 @@ export function LeagueFixtureScheduleModal({
             onChange={setPlaceChoice}
             disabled={isSubmitting}
           />
+          ) : null}
         </div>
         {error ? (
           <p role="alert" className="text-[length:var(--font-size-label)] font-medium text-[var(--red700)]">

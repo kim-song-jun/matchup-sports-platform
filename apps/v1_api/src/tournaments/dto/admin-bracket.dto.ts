@@ -183,6 +183,10 @@ export class CreateFixtureDto {
 }
 
 export class UpdateFixtureDto {
+  @IsOptional()
+  @IsUUID()
+  fieldId?: string | null;
+
   /** 번호 생략은 미변경, null은 허용하지 않는다. */
   @ValidateIf((_object, value) => value !== undefined)
   @IsInt()

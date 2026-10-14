@@ -4,6 +4,7 @@ import { type Prisma, V1GameSideKey, V1GameSourceType } from '@prisma/client';
 import request = require('supertest');
 import { canonicalGameCommandPayloadHash, GamesService } from '../../src/games/games.service';
 import type { GameCommandContext, GameSourceCreationInput } from '../../src/games/games.types';
+import { createTournamentMatchInTx } from '../../src/tournaments/tournament-match-creation';
 import { syncCompetitionTeamRosters } from '../../src/games/roster/game-roster-sync';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { ManagedTermsRuntimeService } from '../../src/terms/managed-terms-runtime.service';
@@ -262,6 +263,99 @@ describe('팀 경기 명단 표·일괄·결장 기간 API (Task 179)', () => {
   });
 
   describe('팀 B — 일괄 변경', () => {
+    it('복수 GK 지정·해제는 실제 명단 리비전에 반영되고 제외·복귀 뒤에도 유지된다', async () => {
+      const f = await seedTournament();
+      const [a1, a2] = f.teamA.members;
+      const target = sideOf(f, 'g1', f.teamA.id);
+      const path = matrixPath(f.teamA.id) + '/batch';
+      const designate = (userId: string, goalkeeper: boolean) => ({ gameId: target.gameId, userId, op: 'SET_GOALKEEPER', goalkeeper });
+      expect((await postAs(path, f.teamA.managerId, { changes: [designate(a1, true), designate(a2, true)] })).status).toBe(200);
+      const read = async () => (await getAs(f.sidePath('g1', f.teamA.id) + '/roster', f.teamA.ownerId)).body.data;
+      expect((await read()).participants.filter((row: { goalkeeper: boolean }) => row.goalkeeper).map((row: { userId: string }) => row.userId).sort()).toEqual(sorted([a1, a2]));
+      const positions = async () => {
+        const lineup = await prisma.v1GameLineup.findFirstOrThrow({ where: { ...target, invalidatedAt: null }, orderBy: { revision: 'desc' } });
+        return prisma.v1GameParticipant.findMany({ where: { lineupId: lineup.id }, select: { userId: true, position: true } });
+      };
+      expect((await positions()).map((row) => row.position)).toEqual(['GOLEIRO', 'GOLEIRO']);
+      expect((await postAs(path, f.teamA.ownerId, { changes: [{ gameId: target.gameId, userId: a1, op: 'EXCLUDE' }, designate(a2, false)] })).status).toBe(200);
+      expect((await read()).excluded.find((row: { userId: string }) => row.userId === a1).goalkeeper).toBe(true);
+      expect((await positions())).toEqual([{ userId: a2, position: null }]);
+      expect((await postAs(path, f.teamA.ownerId, { changes: [{ gameId: target.gameId, userId: a1, op: 'REVOKE' }] })).status).toBe(200);
+      expect((await positions()).find((row) => row.userId === a1)?.position).toBe('GOLEIRO');
+      // The shared competition designation is inherited by the next fixture.
+      expect((await getAs(f.sidePath('g2', f.teamA.id) + '/roster', f.teamA.ownerId)).body.data.participants.filter((row: { goalkeeper: boolean }) => row.goalkeeper).map((row: { userId: string }) => row.userId)).toEqual([a1]);
+      expect(await prisma.v1TournamentPlayer.findFirst({ where: { registrationId: f.registrations.get(f.teamA.id), userId: a1 }, select: { goalkeeper: true } })).toEqual({ goalkeeper: true });
+    });
+
+    it('시작된 경기의 GK 기록은 변경하지 않고 다른 대회는 격리한다', async () => {
+      const f = await seedTournament();
+      const userId = f.teamA.members[0];
+      const change = (key: 'g1' | 'g2', goalkeeper: boolean) => ({ gameId: f.games[key].gameId, userId, op: 'SET_GOALKEEPER', goalkeeper });
+      const path = matrixPath(f.teamA.id) + '/batch';
+      expect((await postAs(path, f.adminId, { changes: [change('g1', true)] })).status).toBe(200);
+      const first = await prisma.v1GameLineup.findFirstOrThrow({ where: { ...sideOf(f, 'g1', f.teamA.id), invalidatedAt: null }, orderBy: { revision: 'desc' } });
+      const snapshot = await prisma.v1GameParticipant.findMany({ where: { lineupId: first.id }, select: { userId: true, position: true } });
+      await prisma.v1Game.update({ where: { id: f.games.g1.gameId }, data: { state: 'LIVE' } });
+      const another = await prisma.v1Tournament.create({ data: { sportId, regionId, title: 'GK isolation ' + randomUUID(), competitionConfigVersionId: configId } });
+      const registration = await prisma.v1TournamentRegistration.create({ data: { tournamentId: another.id, teamId: f.teamA.id, appliedByUserId: f.teamA.ownerId, status: 'confirmed' } });
+      const otherPlayer = await prisma.v1TournamentPlayer.create({ data: { registrationId: registration.id, userId, realName: 'other competition', goalkeeper: true } });
+      expect((await postAs(path, f.adminId, { changes: [change('g2', false)] })).status).toBe(200);
+      expect(await prisma.v1GameParticipant.findMany({ where: { lineupId: first.id }, select: { userId: true, position: true } })).toEqual(snapshot);
+      expect((await getAs(f.sidePath('g1', f.teamA.id) + '/roster', f.adminId)).body.data.participants.find((row: { userId: string }) => row.userId === userId).goalkeeper).toBe(true);
+      expect((await prisma.v1TournamentPlayer.findUniqueOrThrow({ where: { id: otherPlayer.id } })).goalkeeper).toBe(true);
+    });
+
+    it('저장한 GK는 이후 생성하는 대회 경기의 실제 position에도 상속된다', async () => {
+      const f = await seedTournament();
+      const userId = f.teamA.members[0];
+      expect((await postAs(matrixPath(f.teamA.id) + '/batch', f.adminId, { changes: [{ gameId: f.games.g1.gameId, userId, op: 'SET_GOALKEEPER', goalkeeper: true }] })).status).toBe(200);
+      const players = async (teamId: string, sideKey: V1GameSideKey) => (await prisma.v1TournamentPlayer.findMany({ where: { registrationId: f.registrations.get(teamId), removedAt: null } })).map((row) => ({ sourceParticipantId: row.id, userId: row.userId, sideKey, displayNameSnapshot: row.realName }));
+      const homeParticipants = await players(f.teamA.id, V1GameSideKey.HOME);
+      const awayParticipants = await players(f.teamB.id, V1GameSideKey.AWAY);
+      const durableCommandId = randomUUID();
+      const result = await inTx((tx) => createTournamentMatchInTx(tx, app.get(GamesService), {
+        tournamentId: f.tournament.id, groupId: null, round: 'group', fixtureNumber: 3, legNumber: 1, parentTeamMatchId: null,
+        homeRegistrationId: f.registrations.get(f.teamA.id)!, awayRegistrationId: f.registrations.get(f.teamB.id)!,
+        sportId, regionId, title: 'GK inheritance', place: null, startAt: new Date(Date.now() + 3 * DAY), createdByUserId: f.adminId,
+        competitionConfigVersionId: configId, home: { id: f.teamA.id, name: 'A', participants: homeParticipants }, away: { id: f.teamB.id, name: 'B', participants: awayParticipants },
+        actor: { actorType: 'USER', actorUserId: f.adminId, role: 'platform_ops', tournamentId: f.tournament.id }, durableCommandId,
+        payloadHash: canonicalGameCommandPayloadHash({ durableCommandId }),
+      }));
+      const row = await prisma.v1GameParticipant.findFirstOrThrow({ where: { gameId: result.game.gameId, userId } });
+      expect(row.position).toBe('GOLEIRO');
+    });
+
+    it('한 경기만 담당하는 현장 스태프는 경기 출전만 조정하고 대회 공통 GK는 바꾸지 못한다', async () => {
+      const f = await seedTournament();
+      const fieldOperatorId = await makeUser('현장스태프');
+      await prisma.v1TournamentStaffAssignment.create({ data: { tournamentId: f.tournament.id, userId: fieldOperatorId, role: 'FIELD_OPERATOR', grantedByUserId: f.adminId,
+        fixtureScopes: { create: { tournamentId: f.tournament.id, teamMatchId: f.games.g1.teamMatchId } },
+      } });
+      const userId = f.teamA.members[0];
+      const path = matrixPath(f.teamA.id) + '/batch';
+      expect((await postAs(path, fieldOperatorId, { changes: [{ gameId: f.games.g1.gameId, userId, op: 'EXCLUDE' }] })).status).toBe(200);
+      const view = await getAs(f.sidePath('g1', f.teamA.id) + '/roster', fieldOperatorId);
+      expect(view.body.data.goalkeeperEditable).toBe(false);
+      expect((await postAs(path, fieldOperatorId, { changes: [{ gameId: f.games.g1.gameId, userId, op: 'SET_GOALKEEPER', goalkeeper: true }] })).status).toBe(403);
+      expect((await prisma.v1TournamentPlayer.findFirstOrThrow({ where: { registrationId: f.registrations.get(f.teamA.id), userId } })).goalkeeper).toBe(null);
+    });
+
+    it('같은 선수의 출전·GK 변경을 함께 허용하고 잘못된 GK payload·권한·시작 후 쓰기를 거절한다', async () => {
+      const f = await seedTournament();
+      const userId = f.teamA.members[0];
+      const target = sideOf(f, 'g1', f.teamA.id);
+      const path = matrixPath(f.teamA.id) + '/batch';
+      const change = { gameId: target.gameId, userId, op: 'SET_GOALKEEPER', goalkeeper: true };
+      expect((await postAs(path, f.teamA.ownerId, { changes: [change, { gameId: target.gameId, userId, op: 'EXCLUDE' }] })).status).toBe(200);
+      for (const changes of [[{ ...change, goalkeeper: undefined }], [{ ...change, goalkeeper: 'true' }], [{ ...change, reason: 'INJURY' }], [{ ...change, op: 'REVOKE' }], [change, change]]) {
+        expect((await postAs(path, f.teamA.ownerId, { changes })).status).toBe(400);
+      }
+      expect((await postAs(path, userId, { changes: [change] })).status).toBe(403);
+      expect((await postAs(path, f.teamB.ownerId, { changes: [change] })).status).toBe(403);
+      expect((await postAs(path, f.teamA.ownerId, { changes: [{ ...change, userId: f.outsiderId }] })).status).toBe(422);
+      await prisma.v1Game.update({ where: { id: target.gameId }, data: { state: 'LIVE' } });
+      expect((await postAs(path, f.teamA.ownerId, { changes: [{ ...change, goalkeeper: false }] })).status).toBe(409);
+    });
     it('여러 경기 빼기·되돌리기를 한 번에 쓰고, 경기마다 그 사이드 명단만 바뀐다(멱등 포함)', async () => {
       const f = await seedTournament();
       const [a1, a2] = f.teamA.members;

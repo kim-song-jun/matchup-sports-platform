@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { normalizeLeagueDetailHref } from '@/lib/fixture-detail-route';
 import { useSearchParams } from 'next/navigation';
 import { Trophy, Medal } from 'lucide-react';
 import { useMemo } from 'react';
@@ -233,8 +234,9 @@ function AwardsPageSkeleton() {
 }
 
 export function LeagueAwardsPageClient({ leagueId }: { leagueId: string }) {
-  const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
-  const detailHref = `/league-matches/${leagueId}`;
+  const sourcePath = sanitizeRedirectPath(useSearchParams().get('from'));
+  const fromPath = sourcePath ? normalizeLeagueDetailHref(sourcePath) : null;
+  const detailHref = `/tournaments/${leagueId}`;
   // 같은 리그에서 받은 출처의 필터/query/hash는 페이지 복귀에서도 그대로 유지한다.
   const parentHref = fromPath?.split(/[?#]/, 1)[0] === detailHref
     ? fromPath

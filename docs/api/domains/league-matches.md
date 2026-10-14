@@ -458,6 +458,7 @@ The result-entry reminder skips such fixtures as well.
 - Generate / regenerate / manual / template / update-fixture DTOs accept `placeName`, `placeAddress`, `placeLatitude`, `placeLongitude`, `placeProvider`, `placeProviderId`.
 - A blank `placeName` inherits the league's default place (the mirror tournament's `venue` snapshot); with no default it falls back to `장소 미정` with no coordinates. On update, a present `placeName` replaces the whole snapshot.
 - Fixture rows (admin detail, `updateFixture`, public list/detail) keep `placeName` and add `place: V1PlaceView | null`; admin `recentVenues` is now `V1PlaceView[]` (most recent snapshot per name, default excluded).
+- Update-fixture accepts `fieldId?: UUID | null` (Task 20261082). Omitted keeps assignment unless place is edited; null resolves/registers the retained/submitted venue. A UUID selects an active same-league field and atomically saves place + assignment. `fieldId` plus `placeName` is `400 FIELD_PLACE_INPUT_CONFLICT`. All manual/bulk fixture creation and standalone place editing register/select a field automatically. Same-name conflicting registered locations return `400 FIELD_PLACE_CONFLICT`. Existing same-field/name-matched pins are preserved; public names prefer the field. Admin responses include `fieldId`. [Catalogue/import/migration/permission contract](./tournament-operations.md#place-registry-integration-2026-10-14-task-20261082).
 
 ## Basic information editing (리그 기본 정보 수정)
 

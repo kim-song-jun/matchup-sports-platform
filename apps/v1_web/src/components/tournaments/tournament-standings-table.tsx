@@ -129,12 +129,18 @@ export function TournamentStandingsTable({
   emptyMessage = '순위 집계 전이에요',
   renderDetail,
   fromHref,
+  header,
+  keepTeamLink = false,
 }: {
   rows: readonly TournamentStandingsRow[];
   advancingKeys: ReadonlySet<string> | null;
   ariaLabel: string;
   emptyMessage?: string;
   renderDetail?: (row: TournamentStandingsRow) => ReactNode;
+  /** 진행률 같은 요약을 표와 같은 카드 안에 둔다. */
+  header?: ReactNode;
+  /** 리그는 기존 팀 전적 링크 옆에 별도 펼침 버튼을 둔다. */
+  keepTeamLink?: boolean;
   /** 팀 전적(`/records`) 링크의 뒤로가기 출처 — 없으면 기존처럼 쿼리 없는 링크. */
   fromHref?: string | null;
 }) {
@@ -162,6 +168,7 @@ export function TournamentStandingsTable({
 
   return (
     <Card pad={0}>
+      {header}
       <div style={{ overflowX: 'auto' }}>
         <table className="tm-standings-table" aria-label={ariaLabel} style={{ minWidth: 296 }}>
           <thead className="tm-standings-thead">
@@ -233,6 +240,22 @@ export function TournamentStandingsTable({
                           // 깨진 링크나(row.teamId===null), 펼쳐도 어느 팀인지 특정 못 하는
                           // 토글을 만들지 않는다. 비공개 상태는 그냥 정적 행이다.
                           <div style={cellStyle}>{teamCell}</div>
+                        ) : renderDetail && keepTeamLink ? (
+                          <div style={cellStyle}>
+                            <Link href={withFromPath(`/teams/${row.teamId}/records`, fromHref)} className="tm-pressable" style={{ ...cellStyle, minWidth: 0 }}>
+                              {teamCell}
+                            </Link>
+                            <button
+                              type="button"
+                              className="tm-pressable"
+                              aria-label={`${row.teamName} 경기 전적 ${expanded ? '접기' : '펼치기'}`}
+                              aria-expanded={expanded}
+                              onClick={() => setExpandedKey(expanded ? null : row.key)}
+                              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 'var(--size-control-md)', minHeight: 'var(--size-control-md)', padding: 0, border: 'none', background: 'none', color: 'var(--text-caption)', flexShrink: 0 }}
+                            >
+                              <ChevronDown size={14} aria-hidden="true" style={{ transform: expanded ? 'rotate(180deg)' : undefined }} />
+                            </button>
+                          </div>
                         ) : renderDetail ? (
                           <button
                             type="button"

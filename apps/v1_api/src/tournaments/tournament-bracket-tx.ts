@@ -238,6 +238,7 @@ export type TournamentFixtureUpdateInput = {
   fixtureNumber?: number;
   scheduledAt?: Date | null;
   place?: PlaceSnapshot | null;
+  fieldId?: string | null;
   homeRegistrationId?: string | null;
   awayRegistrationId?: string | null;
   /** The admin fixture edit sets these; other callers keep the "started games keep their teams" rule. */
@@ -284,6 +285,7 @@ export async function updateTournamentFixtureInTx(tx: Tx, admin: V1ActiveAdmin, 
     fixtureNumber: input.fixtureNumber,
     scheduledAt: input.scheduledAt,
     place: input.place,
+    fieldId: input.fieldId,
     homeRegistrationId: input.homeRegistrationId,
     awayRegistrationId: input.awayRegistrationId,
     allowStartedTeamChange: input.allowStartedTeamChange,

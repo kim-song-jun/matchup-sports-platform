@@ -291,7 +291,7 @@ export async function notifyLeagueRosterFillOutcomes(
             targetId: league.id,
             title: outcome.added > 0 ? '리그 명단이 자동 확정됐어요' : '리그 명단을 자동 확정하지 못했어요',
             body,
-            deepLink: `/leagues/${league.id}`,
+            deepLink: `/tournaments/${league.id}?kind=league`,
             businessKey: `league-roster-autoconfirm:${outcome.registrationId}:${userId}`,
           },
         ],

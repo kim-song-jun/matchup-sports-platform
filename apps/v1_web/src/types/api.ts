@@ -4268,6 +4268,7 @@ export type V1AdminBracketGroupTeam = {
 };
 
 export type V1AdminBracketFixture = {
+  fieldId?: string | null;
   bracketSources?: V1BracketSource[];
   id: string;
   tournamentId: string;
@@ -4424,6 +4425,8 @@ export interface V1GenerateLeagueFixturesResponse {
  */
 interface V1LeagueOverallStandingRowBase {
   teamName: string;
+  /** 팀의 현재 로고. 기존 응답/fixture 호환을 위해 optional이며 미등록은 null. */
+  teamLogoUrl?: string | null;
   position: number | null;
   points: number;
   wins: number;
@@ -4751,6 +4754,7 @@ export type V1CreateGroupTeamPayload = {
 };
 
 export type V1UpdateFixturePayload = {
+  fieldId?: string | null;
   fixtureNumber?: number;
   scheduledAt?: string;
   venue?: string;
@@ -5241,6 +5245,7 @@ export type V1TournamentField = {
   sortOrder: number;
   active: boolean;
   version: number;
+  place?: V1PlaceView | null;
 };
 
 export type V1TournamentFieldListResponse = {

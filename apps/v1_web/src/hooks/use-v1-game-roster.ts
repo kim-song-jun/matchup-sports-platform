@@ -49,6 +49,7 @@ export type V1GameRosterView = {
   /** 조정 마감 = 경기 시작 시각. 시각 미정이면 null(실제 마감은 경기 상태가 SCHEDULED 를 벗어날 때). */
   deadline: string | null;
   editable: boolean;
+  goalkeeperEditable?: boolean;
   viewerRole: V1GameRosterViewerRole;
   baseSource: 'REGISTRATION' | 'TEAM_MEMBERS';
   /** 등번호의 원본인 확정 참가 신청 id — 참가 명단이 기준이고 뷰어가 이 팀 팀장·매니저일 때만 온다. */

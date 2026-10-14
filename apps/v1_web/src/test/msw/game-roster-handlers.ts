@@ -85,6 +85,7 @@ export function createV1GameRosterMswHandlers() {
     rosterLocked: false,
     /** false = 보기만 하는 운영자(지원 계정·명단 권한 없는 스태프) — 서버의 `canWrite`/`writeRole null`. */
     canWrite: true,
+    goalkeeperWritable: true,
     /** 출전정지(규정 있는 대회) — userId → 사유·남은 경기. 모든 경기에 같이 건다. */
     suspensions: new Map<string, { reason: string; remainingMatches: number }>(),
     /** 대진 뒤 참가 명단에 추가돼 들어온 선수. */
@@ -172,6 +173,7 @@ export function createV1GameRosterMswHandlers() {
       gameState,
       deadline: game.startAt,
       editable: gameState === 'SCHEDULED' && canWrite(),
+      goalkeeperEditable: gameState === 'SCHEDULED' && canWrite() && state.goalkeeperWritable,
       viewerRole: state.viewerRole,
       baseSource: state.baseSource,
       jerseyRegistrationId:
@@ -206,6 +208,7 @@ export function createV1GameRosterMswHandlers() {
       scheduledAt: game.startAt,
       gameState: roster.gameState,
       editable: roster.editable,
+      goalkeeperEditable: roster.goalkeeperEditable,
       summary: {
         participating: roster.counts.participating,
         excluded: roster.counts.excluded,
@@ -438,6 +441,7 @@ export function createV1GameRosterMswHandlers() {
       state.jerseys.set(userId, jerseyNumber);
     },
     /** 보기만 하는 운영자로 — 표의 `editable` 이 전부 false, 쓰기는 403. */
+    setGoalkeeperWritable(value: boolean) { state.goalkeeperWritable = value; },
     setCanWrite(value: boolean) {
       state.canWrite = value;
     },

@@ -343,7 +343,7 @@ export class GameRosterService {
     if (access === null || (mode === 'write' && access.writeRole === null)) {
       throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: '이 경기 명단을 바꿀 권한이 없어요.' });
     }
-    return { ...access, teamId: side.teamId };
+    return { ...access, teamId: side.teamId, goalkeeperEditable: access.writeRole !== null && operator?.role !== 'field_operator' };
   }
 
   /**

@@ -14,6 +14,7 @@ import { GamesService } from '../games/games.service';
 import { createTeamMatchScheduleInTx } from '../team-schedules/team-match-schedule';
 import { toPlaceColumns, type PlaceSnapshot } from '../places/place-snapshot';
 import { parseLineupCatalog } from './competition-config/competition-config.parse';
+import { registerCompetitionPlace, resolveCompetitionFieldPlace } from '../places/competition-field-place';
 import { defaultFixtureEndAt } from './competition-config/fixture-end-at';
 
 export type TournamentMatchCreationTeam = {
@@ -230,11 +231,13 @@ export async function createTournamentMatchInTx(
   }
   // 종료 시각을 안 받았으면 시작 + 경기 설정의 정규 시간(연장 제외 피리어드 합계)으로 채운다.
   const endAt = input.endAt ?? await defaultFixtureEndAt(tx, input.competitionConfigVersionId, input.startAt);
+  const place = input.fieldId == null ? input.place : await resolveCompetitionFieldPlace(tx, input.tournamentId, input.fieldId, null);
+  const fieldId = input.fieldId ?? await registerCompetitionPlace(tx, input.tournamentId, place);
   const teamMatch = await tx.v1TeamMatch.create({
     data: {
       id: teamMatchId,
       tournamentId: input.tournamentId,
-      fieldId: input.fieldId ?? null,
+      fieldId,
       homeSlotId: input.homeSlotId ?? null,
       awaySlotId: input.awaySlotId ?? null,
       hostTeamId: input.home.id,
@@ -243,7 +246,7 @@ export async function createTournamentMatchInTx(
       sportId: input.sportId,
       regionId: input.regionId,
       title: input.title,
-      ...toPlaceColumns(input.place),
+      ...toPlaceColumns(place),
       startAt: input.startAt,
       endAt,
       status: input.status ?? V1TeamMatchStatus.matched,

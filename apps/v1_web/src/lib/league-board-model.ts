@@ -13,6 +13,7 @@ export interface LeagueBoardSide {
 }
 
 export interface LeagueBoardNode {
+  fieldId?: string | null;
   fixtureId: string;
   title: string;
   startAt: string;
@@ -86,6 +87,7 @@ export function buildLeagueBoard({ fixtures, slots, teamNameById }: BuildInput):
       title: fixture.title,
       startAt: fixture.startAt,
       placeName: fixture.placeName,
+      ...(fixture.fieldId === undefined ? {} : { fieldId: fixture.fieldId }),
       state: cancelled ? 'cancelled' : fixture.resultStage === 'voided' || game?.latestRevision?.state === 'VOID' ? 'voided' : fixtureNodeState(game),
       hiddenFromPublic:
         !cancelled &&

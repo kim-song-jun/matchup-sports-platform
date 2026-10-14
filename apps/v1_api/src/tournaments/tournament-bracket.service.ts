@@ -146,6 +146,7 @@ export interface SerializedCanonicalFixture {
   awayRegistrationId: string | null;
   scheduledAt: string | null;
   venue: string | null;
+  fieldId?: string | null;
   place: PlaceView | null;
   status: 'completed' | 'cancelled' | 'scheduled';
   createdAt: string;
@@ -1083,6 +1084,7 @@ export class TournamentBracketService {
           fixtureNumber: dto.fixtureNumber,
           scheduledAt: dto.scheduledAt == null ? dto.scheduledAt : new Date(dto.scheduledAt),
           place: dto.venue === undefined ? undefined : this.fixturePlace(dto),
+          fieldId: dto.fieldId,
           homeRegistrationId: dto.homeRegistrationId,
           awayRegistrationId: dto.awayRegistrationId,
           allowStartedTeamChange: true,
@@ -1431,6 +1433,7 @@ export class TournamentBracketService {
     awayRegistrationId: string | null;
     startAt: Date | null;
     placeName: string | null;
+    fieldId?: string | null;
     status: string;
     createdAt: Date;
     updatedAt: Date;
@@ -1453,6 +1456,7 @@ export class TournamentBracketService {
       awayRegistrationId: row.awayRegistrationId,
       scheduledAt: row.startAt?.toISOString() ?? null,
       venue: row.placeName,
+      fieldId: row.fieldId ?? null,
       place,
       status,
       createdAt: row.createdAt.toISOString(),

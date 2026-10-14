@@ -240,3 +240,5 @@ GK 변경은 변경 전후 값과 처리 역할을 `GAME_ROSTER_GOALKEEPER_CHANG
 ### 대회 공통 GK 및 어드민 관리 (Task 20261083)
 GK 저장/해제는 해당 참가 등록(대회·팀)의 선수 값에 보관한다. 해당 대회의 시작 전 경기들을 첫 잠금 범위에 포함해 동일 트랜잭션에서 실제 lineup position을 동기화한다. 이후 대회/리그/플레이오프 경기 생성도 참가 명단 GK와 종목 GK 코드(예: GOLEIRO)를 상속한다. 시작·종료 경기의 저장된 참가자 position은 변경하지 않는다. 다른 대회·팀의 GK에는 영향이 없다.
 일괄 응답은 `{teamId,results,affectedGames:[{gameId,sideId}]}`. 클라이언트는 전파 대상 경기의 명단·라인업·공개 기록 캐시를 모두 무효화한다. 어드민 출전 표의 선수 셀은 `goalkeeper:boolean`, 경기 열은 `goalkeeperEditable:boolean`을 포함한다. support/read-only 스태프는 조회만 한다. 어드민 GK 열은 EXCLUDE/REVOKE와 함께 동일 batch로 저장하고 일반 실패는 GK 초안을 보존한다.
+
+한 경기만 담당하는 현장 스태프는 경기별 출전 조정만 가능하다. 대회 공통 GK는 대회 전체 lineup_mutate 권한이 필요하고, 경기 명단 응답의 `goalkeeperEditable:false`로 GK 편집을 노출하지 않는다.

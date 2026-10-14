@@ -76,15 +76,30 @@ Response: `{platformRole, items[]}`.
 
 ## Field/court CRUD
 
-`apps/v1_api/src/tournament-operations/fields/**`. `scopeKey` is the caller-supplied *stable* identity for a field/court (`@@unique([tournamentId, scopeKey])`); assigning or reassigning a fixture only ever writes `V1TournamentFixture.fieldId` — it never creates or churns a `V1TournamentField` row.
+`apps/v1_api/src/tournament-operations/fields/**`. `scopeKey` is the stable identity for a field/court (`@@unique([tournamentId, scopeKey])`). Assignment uses canonical `V1TeamMatch.fieldId` and commits the selected field's venue snapshot in the same transaction. Assignment never creates or replaces a field ID. League and tournament matches share this registry.
 
 | Method and route | Body | Result | Actor |
 |---|---|---|---|
-| `GET /api/v1/tournament-ops/tournaments/:tournamentId/fields` | — | `{items: [{id,tournamentId,scopeKey,name,sortOrder,active,version}]}`, ordered `(sortOrder asc, createdAt asc, id asc)` | any assigned tournament staff role or `platform_ops` (see deviation 4 above) |
+| `GET /api/v1/tournament-ops/tournaments/:tournamentId/fields` | — | `{items: [{id,tournamentId,scopeKey,name,sortOrder,active,version,place}]}`, ordered `(sortOrder asc, createdAt asc, id asc)` | any assigned tournament staff role or `platform_ops` (see deviation 4 above) |
 | `POST /api/v1/tournament-ops/tournaments/:tournamentId/fields` | `{scopeKey,name,sortOrder?}` | created field (`201`) | `platform_ops` only |
+| `POST /api/v1/tournament-ops/tournaments/:tournamentId/fields/import-places` | empty body; `Idempotency-Key` | `{addedCount,existingCount,updatedCount}` | `platform_ops` only; same real idempotency contract as field mutations |
+
+가져오기는 기존 필드의 장소 스냅샷도 갱신한다. 같은 이름/기존 배정 경기의 주소가 서로 다르면 공용 스냅샷을 비워 임의 핀을 공유하지 않는다. `updatedCount`는 이 메타데이터 갱신 수이며, 경기의 장소·필드 배정은 바꾸지 않는다.
 | `PATCH /api/v1/tournament-ops/tournaments/:tournamentId/fields/:fieldId` | `{expectedVersion,name?,sortOrder?,active?}` — **at least one of `name`/`sortOrder`/`active` is required** | updated field, CAS'd | `platform_ops` only |
 
-`platform_ops`-only mutation (deviation 5's sibling nuance): `TOURNAMENT_STAFF_ACTIONS`'s `allowsRoleAction()` returns `true` for both `platform_ops` and `tournament_director` on every action, so it cannot by itself express "director may read but not mutate fields." The service layers an explicit `principal.role === 'platform_ops'` check on top of `assertAccess({action:'event_reverse'})` — the same nuance-layering pattern `TournamentStaffService.assertGrantAuthority` already uses for its own role rules.
+Standalone catalogue create/update/import remain `platform_ops`-only. Authorized admin fixture creation/edit also registers a submitted venue and links it in the same transaction, with fixture-route authorization preserved. Field operators cannot use the admin fixture route.
+
+### Place registry integration (2026-10-14, Task 20261082)
+
+- `V1TournamentField.placeSnapshot` is nullable JSON containing the existing `PlaceView` shape. GET always returns `place`; older/name-only fields return a name with null address/pin/provider fields. Coordinates are never fabricated.
+- Additive migration `20261014000100_v1_competition_field_places` creates catalogue entries per competition and trimmed/case-insensitive fixture place name, then links named unassigned matches (including completed matches). Empty/`장소 미정`/`미정`/`tbd` are excluded. Existing field IDs, match place snapshots, staff assignments and results are preserved. Pre-existing duplicate field names resolve deterministically: active first, sortOrder, id. Equal names with different addresses retain per-match pins; no arbitrary shared pin is selected.
+- Import is an explicit write, never a side effect of GET. It also links unassigned matches without modifying any place columns or existing field ID. Match locks use Game → TeamMatch before the field-name advisory lock, matching fixture writers. Field-name changes/import/create share the advisory lock; create/update trim and reject empty/duplicate names.
+- All league/tournament fixture creation and standalone place editing register/select a scoped field atomically. A known same-name field with a different stored location returns `400 FIELD_PLACE_CONFLICT`, never silently ignores the submitted location. Unknown places remain unassigned.
+- Public schedule/record/list names prefer the assigned field; actual addresses/coordinates remain match snapshots. Field selection saves the canonical field name. DELETE field returns `409 FIELD_PLACE_LINK_REQUIRED` when a real place remains, preserving both assignment and location. Mobile selection therefore offers registered fields only. Nullable fieldId in fixture PATCH re-resolves the preserved/submitted place instead of leaving a named venue unlinked.
+- Selecting another field resolves its stored venue; reselecting the current field or a name-matched imported venue preserves the match's existing address/pin. Inactive fields return `400 FIELD_INACTIVE`, an out-of-competition ID returns `404 FIELD_NOT_FOUND`.
+- Assignment audit records field IDs, place names and snapshot fingerprints; addresses/coordinates are not copied into operation audit snapshots.
+- The staff screen places registration below staff assignments. Admin league/tournament settings and mobile fixture sheets use the same catalogue. After assignment, public schedule/detail, admin bracket/league, operations board and assigned-staff caches are invalidated.
+- Unit/UI tests cover import counts/replay, persisted place+field changes, permissions, errors and current pins. The real-DB league operations integration test additionally executes the migration's actual data statements and checks unchanged historical rows and public output. Local PostgreSQL/alpha QA availability must be reported separately from these tests.
 
 **List ordering is now total** (Task 18 review finding #16.2): `id asc` is a final tie-breaker after `sortOrder`/`createdAt`, so two fields sharing both values still resolve to one deterministic, repeatable order instead of whatever order Postgres happens to return.
 
@@ -97,7 +112,7 @@ Response: `{platformRole, items[]}`.
 | `PATCH /api/v1/tournament-ops/tournaments/:tournamentId/fixtures/:fixtureId/field` | `{fieldId}` | `{fixtureId,tournamentId,fieldId}` | `platform_ops` or `tournament_director` (tournament-wide or scoped to this fixture/field) |
 | `DELETE /api/v1/tournament-ops/tournaments/:tournamentId/fixtures/:fixtureId/field` | — | `{fixtureId,tournamentId,fieldId:null}` | same as above |
 
-These two routes are new (deviation 5): `V1TournamentFixture.fieldId` and its FK to `V1TournamentField` already existed and were already migrated before Task 18, but nothing wrote to the column. Unlike literal field CRUD, assignment is treated as ordinary day-of-tournament operations work (`action:'event_reverse'`, no extra `platform_ops`-only gate) — `field_operator`/`support_readonly` are still denied because `event_reverse` is not in their allowed-action set. Assign is a separate verb from clear (`PATCH` vs `DELETE`, no nullable body) specifically so "assign to X" and "no-op" are never ambiguous over a nullable JSON field.
+Assignment and clear use `action:'tournament_admin'`; field operators/support readonly cannot mutate them. PATCH commits field ID and place columns together. DELETE clears only field ID and preserves the current venue. These operation routes remain separate verbs; admin fixture settings additionally support nullable `fieldId` in their existing PATCH DTOs.
 
 **Authorization is re-checked as late as possible, and both writes are CAS'd** (Task 18 review finding #8): `assignFixtureField()`/`clearFixtureField()` re-derive the acting principal via `TournamentStaffAccessService.assertAccess()` as the *first* statement inside the write transaction (not before it opens), so a revoke that commits between an earlier check and this call is visible and aborts the write. Both writes also CAS on the `fieldId` value the request actually observed (`WHERE fieldId = <observed>`) rather than a blind `UPDATE`, so two concurrent requests that both observed the same prior `fieldId` can never both silently win — the loser gets `409 FIXTURE_FIELD_ASSIGNMENT_CONFLICT` instead of a swallowed lost update.
 
@@ -112,6 +127,8 @@ These two routes are new (deviation 5): `V1TournamentFixture.fieldId` and its FK
 | `409` | `FIELD_SCOPE_KEY_DUPLICATE` | `(tournamentId, scopeKey)` already exists |
 | `409` | `STALE_FIELD_VERSION` | `expectedVersion` did not match the current row |
 | `409` | `FIXTURE_FIELD_ASSIGNMENT_CONFLICT` | a concurrent assign/clear already changed the fixture's `fieldId` (CAS loss) |
+| `409` | `FIELD_PLACE_LINK_REQUIRED` | a named location remains; field-only clear would split venue and assignment |
+| `400` | `FIELD_PLACE_CONFLICT` | new venue input conflicts with a same-name registered location; choose the existing field or a different name |
 | `409` | `IDEMPOTENCY_PAYLOAD_CONFLICT` | the same `Idempotency-Key` was reused with a different request body |
 | `422` | `FIELD_UPDATE_EMPTY` | PATCH body carried only `expectedVersion`, no actual field to change |
 

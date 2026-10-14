@@ -42,3 +42,6 @@ origin/dev 3542691e4 기반 feat/competition-goalkeeper-defaults 격리 작업�
 - Alpha 실제 대상은 경기 API로 확인한 c37f4a30-1acb-4f71-b154-89d1df13ce2e 리그. 이게팀이야 참가 등록에 현재/다음 경기 2개, 선수 7명. 어드민 390/768/1440 before 확보. 전용 Chrome PID 35196 / Node PID 32388.
 
 - CI 38516388686: Gates/Web SUCCESS, 실제 migration chain 및 drift PASS. API integration 163 suites/1197 tests PASS, 새 리그 생성 상속 테스트 1개에서 fixture의 자동 명단이 비어 있어 실패. 하네스는 적격 자동 채움 팀원이 없는 구조이므로 참가 선수를 명시 등록하도록 수정. 대회 신규 생성/시작 기록 보존/다른 대회 격리 테스트는 PASS.
+
+- origin/dev f45dc0a8b의 경기장 관리 변경을 보존해 통합. 통합 LF schema SHA 89ccedfb1f48f088a5f61ceede57e7f520a4b40a7ad9862c3d817d4cefc84ae0. 기존 배포 SHA는 manifest allowlist에 보존.
+- 공통 GK는 대회 전체 권한을 추가 검증: 특정 경기만 담당하는 FIELD_OPERATOR는 기존 경기 출전 조정만 허용, GK 공통 지정은 403 및 UI 읽기 전용.

@@ -325,6 +325,21 @@ describe('팀 경기 명단 표·일괄·결장 기간 API (Task 179)', () => {
       expect(row.position).toBe('GOLEIRO');
     });
 
+    it('한 경기만 담당하는 현장 스태프는 경기 출전만 조정하고 대회 공통 GK는 바꾸지 못한다', async () => {
+      const f = await seedTournament();
+      const fieldOperatorId = await makeUser('현장스태프');
+      await prisma.v1TournamentStaffAssignment.create({ data: { tournamentId: f.tournament.id, userId: fieldOperatorId, role: 'FIELD_OPERATOR', grantedByUserId: f.adminId,
+        fixtureScopes: { create: { tournamentId: f.tournament.id, teamMatchId: f.games.g1.teamMatchId } },
+      } });
+      const userId = f.teamA.members[0];
+      const path = matrixPath(f.teamA.id) + '/batch';
+      expect((await postAs(path, fieldOperatorId, { changes: [{ gameId: f.games.g1.gameId, userId, op: 'EXCLUDE' }] })).status).toBe(200);
+      const view = await getAs(f.sidePath('g1', f.teamA.id) + '/roster', fieldOperatorId);
+      expect(view.body.data.goalkeeperEditable).toBe(false);
+      expect((await postAs(path, fieldOperatorId, { changes: [{ gameId: f.games.g1.gameId, userId, op: 'SET_GOALKEEPER', goalkeeper: true }] })).status).toBe(403);
+      expect((await prisma.v1TournamentPlayer.findFirstOrThrow({ where: { registrationId: f.registrations.get(f.teamA.id), userId } })).goalkeeper).toBe(null);
+    });
+
     it('같은 선수의 출전·GK 변경을 함께 허용하고 잘못된 GK payload·권한·시작 후 쓰기를 거절한다', async () => {
       const f = await seedTournament();
       const userId = f.teamA.members[0];

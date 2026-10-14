@@ -529,4 +529,11 @@ Implementation and isolated API/browser evidence tracked in Task 156; production
 - 최종 로컬 검증: 관련 API 297/297, Web 225/225; 양 앱 lint(타입+표면/패턴) 통과, diff --check 통과. 참석명단·기록 직접 URL의 사용자 비노출과 활성 관리자 기록 유지도 반영. 실제 DB/Alpha 배포/실화면 390·768·1440 검증은 여전히 미완료이며 운영 데이터는 변경하지 않았다.
 - [어드민 리그 기본 정보 수정](admin-league-basic-edit.md): Task 20261075, 로컬 190개 테스트·타입·표면/패턴 PASS. Alpha 390/768/1440 및 실제 로그인 흐름 대기.
 
+## 2026-10-14 — 리그 경기 일정 전체/내 팀 필터
+
+- [전체/내 팀 필터 시나리오](league-schedule-team-filter.md): Task 20261081, 별도 최신 dev 기반 `feat/league-schedule-filter` 브랜치. active 소속 팀 전체·복수 팀·live/종료/시간 미정·로그인 redirect·URL 복귀·페이지/팀 오류 처리. 로컬 관련 테스트 125개·타입·패턴 PASS (패턴 검사는 Git Bash 실행). alpha 미배포, 브라우저 커넥터 초기화 오류로 390/768/1440 before/after·console/network·실제 로그인 흐름 미검증.
+
+## 2026-10-14 — 리그·대회 장소와 필드 연결
+
+- [경기장 등록·선택 시나리오](competition-place-field-registry.md): Task 20261082, 같은 dev 기반 작업 브랜치. 후속 “싹 다 해줘” 승인으로 기존 미배정 경기 연결, 새 경기·장소 수정 자동 필드 등록·배정, 공개 이름 단일 표시까지 확장. 역사적 장소/좌표와 기존 배정 보존. 로컬 unit PASS. DB migration/round-trip과 alpha 실화면 390/768/1440 QA 대기; 운영 DB·main 변경 없음.
 - [리그 상세 진입 통일](./league-detail-routes.md): 14/14 코드 정리, dev/alpha 검증 진행 — Task 20261080 후속.

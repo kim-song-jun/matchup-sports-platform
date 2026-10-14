@@ -117,6 +117,10 @@ export class TeamGameRosterService {
       for (const change of dto.changes.filter((row) => row.op === 'SET_GOALKEEPER')) {
         const context = await loadGameRosterContext(tx, { gameId: change.gameId, sideId: sideIdByGame.get(change.gameId)! });
         if (context === null || context.teamId !== teamId) throw new ConflictException({ code: 'COMMAND_CONCURRENCY_CONFLICT', message: '경기 팀이 바뀌었어요. 새로고침해 주세요.' });
+        // A competition-wide default needs competition-wide authority, not a single assigned fixture.
+        if (accessByGame.get(change.gameId)!.writeRole === 'STAFF') {
+          await this.staffAccess.assertAccess({ userId: user.id, action: 'lineup_mutate', resource: { tournamentId: context.competitionId } });
+        }
         const key = context.competitionId + ':' + change.userId;
         if (roleKeys.has(key)) throw new BadRequestException({ code: 'ROSTER_BATCH_DUPLICATE_CHANGE', message: '같은 대회·선수의 골키퍼 변경은 한 번만 보내 주세요.' });
         roleKeys.add(key);
@@ -133,7 +137,8 @@ export class TeamGameRosterService {
       // Propagation must not silently skip an old team-authored league lineup.
       for (const game of affected) {
         const context = await loadGameRosterContext(tx, { gameId: game.id, sideId: sideIdByGame.get(game.id)! });
-        if (!context?.isLeague) continue;
+        if (context === null || context.teamId !== teamId || !competitionIds.includes(context.competitionId)) throw new ConflictException({ code: 'COMMAND_CONCURRENCY_CONFLICT', message: '경기 팀이 바뀌었어요. 새로고침해 주세요.' });
+        if (!context.isLeague) continue;
         const latest = await tx.v1GameLineup.findFirst({ where: { gameId: game.id, sideId: context.sideId, invalidatedAt: null }, orderBy: { revision: 'desc' } });
         if (latest !== null && await isUnmigratedTeamAuthoredLineup(tx, game.id, context.sideId, latest)) throw new ConflictException({ code: 'ROSTER_GOALKEEPER_MIGRATION_REQUIRED', message: '기존 경기 명단을 옮긴 뒤 골키퍼를 바꿀 수 있어요. 운영진에게 문의해 주세요.' });
       }

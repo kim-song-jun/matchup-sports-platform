@@ -88,3 +88,13 @@ describe('리그 경기 선수별 골키퍼', () => {
     expect(screen.queryByRole('button', { name: /골키퍼/ })).toBeNull();
   });
 });
+
+
+it('경기 출전 권한만 있는 현장 스태프는 출전 체크를 쓰되 공통 GK 버튼은 보지 않는다', async () => {
+  mock.setViewerRole('STAFF'); mock.setGoalkeeperWritable(false);
+  open();
+  await screen.findByRole('heading', { name: '출전 3명' });
+  expect(screen.queryByRole('button', { name: /골키퍼/ })).toBeNull();
+  expect(screen.getByRole('checkbox', { name: '김민재 이번 경기 출전' })).toBeEnabled();
+  expect(screen.getByText('GK는 팀장·매니저와 대회 운영진이 관리해요.')).toBeInTheDocument();
+});

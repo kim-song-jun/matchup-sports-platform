@@ -56,7 +56,7 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
   const changes = useMemo(() => data === undefined ? [] : [
     ...draftToChanges(draft, data),
     ...data.base.flatMap((row): V1GameRosterBatchChange[] =>
-      goalkeepers[row.userId] === undefined || goalkeepers[row.userId] === row.goalkeeper ? [] :
+      data.goalkeeperEditable === false || goalkeepers[row.userId] === undefined || goalkeepers[row.userId] === row.goalkeeper ? [] :
         [{ gameId: data.gameId, userId: row.userId, op: 'SET_GOALKEEPER', goalkeeper: goalkeepers[row.userId] }]),
   ], [draft, goalkeepers, data]);
   const canEdit = data?.editable === true;
@@ -137,7 +137,7 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
 
   function goalkeeperControl(row: { userId: string; displayName: string; goalkeeper: boolean }) {
     const checked = goalkeepers[row.userId] ?? row.goalkeeper;
-    return canEdit ? (
+    return canEdit && data?.goalkeeperEditable !== false ? (
       <Button
         variant={checked ? 'primary' : 'outline'}
         size="sm"
@@ -257,7 +257,7 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
           canEdit && data.participants.length > 0 ? (
             <>
               {GAME_ROSTER_PLAYING_HINT}
-              <br />골키퍼는 GK 버튼으로 선택해요. 여러 명을 지정할 수 있고, 이 대회의 시작 전 경기에도 유지돼요.
+              <br />{data.goalkeeperEditable === false ? 'GK는 팀장·매니저와 대회 운영진이 관리해요.' : '골키퍼는 GK 버튼으로 선택해요. 여러 명을 지정할 수 있고, 이 대회의 시작 전 경기에도 유지돼요.'}
               {data.jerseyRegistrationId !== null ? (
                 <>
                   <br />

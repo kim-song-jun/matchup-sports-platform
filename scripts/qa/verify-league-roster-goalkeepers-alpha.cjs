@@ -3,10 +3,14 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { chromium } = require('playwright');
 const origin = 'https://alpha.teameet.co.kr';
-const rosterPath = '/teams/ea6c8df8-fd86-4738-9dbd-f9cf6c83c3b5/games/1835d796-5b9f-42cd-b6f5-37af7ba5b1b6/roster';
+const rosterPath = process.argv[6] ?? '/teams/ea6c8df8-fd86-4738-9dbd-f9cf6c83c3b5/games/1835d796-5b9f-42cd-b6f5-37af7ba5b1b6/roster';
+assert.match(rosterPath, /^\/teams\/[0-9a-f-]+\/games\/[0-9a-f-]+\/roster$/);
+const expectedRole = process.argv[7] ?? 'ADMIN';
+assert(['ADMIN', 'TEAM_MANAGER'].includes(expectedRole));
+const capturePrefix = expectedRole === 'ADMIN' ? 'after' : 'after-manager';
 const apiPath = '/api/v1' + rosterPath;
 const output = 'docs/screenshots/league-roster-goalkeepers-2026-10-14';
-const report = { widths: [], consoleErrors: [], pageErrors: [], httpErrors: [], scenarios: [], restored: false };
+const report = { persona: expectedRole, rosterPath, widths: [], consoleErrors: [], pageErrors: [], httpErrors: [], scenarios: [], restored: false };
 const contexts = [];
 let original;
 let adminPage;
@@ -83,7 +87,7 @@ function unchangedPlayers(data) {
     const admin = await enter(browser, adminState);
     adminPage = admin.page;
     original = admin.data;
-    assert.equal(original.viewerRole, 'ADMIN');
+    assert.equal(original.viewerRole, expectedRole);
     assert.equal(original.editable, true);
     assert.equal(original.legacyLineupPending, false);
     assert(original.base.every((row) => typeof row.goalkeeper === 'boolean'));
@@ -104,16 +108,18 @@ function unchangedPlayers(data) {
         const box = await control.boundingBox();
         assert(box && box.width >= 44 && box.height >= 44);
       }
-      await adminPage.screenshot({ path: `${output}/after-${width}.png`, fullPage: true });
+      await adminPage.screenshot({ path: `${output}/${capturePrefix}-${width}.png`, fullPage: true });
       report.widths.push({ width, goalkeeperControls: original.base.length, overflow: false, touchTargets: 'PASS' });
     }
-    const member = await enter(browser, memberState);
-    assert.equal(member.data.viewerRole, 'TEAM_MEMBER');
-    assert.equal(member.data.editable, false);
-    assert.equal(await member.page.getByRole('button', { name: /골키퍼/ }).count(), 0);
-    assert.equal(await member.page.getByText(/ · GK$/).count(), players.length);
-    await member.page.screenshot({ path: `${output}/after-member-390.png`, fullPage: true });
-    report.scenarios.push('actual team member sees both GK labels and has no role edit controls');
+    if (memberState !== '-') {
+      const member = await enter(browser, memberState);
+      assert.equal(member.data.viewerRole, 'TEAM_MEMBER');
+      assert.equal(member.data.editable, false);
+      assert.equal(await member.page.getByRole('button', { name: /골키퍼/ }).count(), 0);
+      assert.equal(await member.page.getByText(/ · GK$/).count(), players.length);
+      await member.page.screenshot({ path: `${output}/after-member-390.png`, fullPage: true });
+      report.scenarios.push('actual team member sees both GK labels and has no role edit controls');
+      }
     await setRole(adminPage, players[0], false);
     await save(adminPage);
     data = await reload(adminPage);
@@ -134,7 +140,7 @@ function unchangedPlayers(data) {
       } catch (error) { report.restoreError = error.message; }
     }
     for (const context of contexts) await context.close();
-    fs.writeFileSync(`${output}/after-report.json`, JSON.stringify(report, null, 2));
+    fs.writeFileSync(`${output}/${capturePrefix}-report.json`, JSON.stringify(report, null, 2));
   }
   assert.equal(report.restored, true);
   assert.deepEqual(report.pageErrors, []);
@@ -142,4 +148,4 @@ function unchangedPlayers(data) {
   assert.deepEqual(report.consoleErrors, []);
   console.log(JSON.stringify(report));
   process.exit(0);
-})().catch((error) => { console.error(error.message); fs.writeFileSync(`${output}/after-report.json`, JSON.stringify({ ...report, failure: error.message }, null, 2)); process.exit(1); });
+})().catch((error) => { console.error(error.message); fs.writeFileSync(`${output}/${capturePrefix}-report.json`, JSON.stringify({ ...report, failure: error.message }, null, 2)); process.exit(1); });

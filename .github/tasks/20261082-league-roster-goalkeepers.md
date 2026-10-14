@@ -51,3 +51,6 @@ Forbidden: 다른 작업트리와 공유 트리 WIP, 레거시 소스.
 - 실제 전역 ValidationPipe에서 JSON true/false 보존 및 문자열/숫자/null/누락 거절 8 tests PASS.
 - 실제 release schema binder를 committed LF schema/M11 입력으로 실행해 새 schema SHA 출력 확인.
 - baseline은 실제 ADMIN 편집 화면 390/768/1440으로 확보. 제공된 이게팀이야 선수 계정은 TEAM_MEMBER로 별도 확인한다.
+
+- 한강 로버스(동일 경기 상대팀) 제공 계정의 TEAM_MANAGER/수정 가능/등번호 수정 가능 상태에서 baseline 3폭도 확보.
+- 새 테이블에 기존 GK만 복사하는 INSERT는 보수 SQL 분류기가 거절하여, 기존 reviewed non-additive 방식으로 정확한 migration 경로·SQL 문장 한 쌍에 보존 근거를 추가. 이전 테이블은 읽기만 하고 새 테이블에 ON CONFLICT DO NOTHING으로 채운다.

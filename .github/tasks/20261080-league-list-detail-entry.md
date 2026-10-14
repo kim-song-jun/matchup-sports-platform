@@ -119,3 +119,5 @@ Fix historical /leagues/:id dead links. Preserve safe internal from validation. 
 Base origin/dev=dde8964ca. Worktree _worktrees/league-detail-routes. Phase 1 inventory complete; Phase 2 implementation in progress; Phase 3 validation/review/deploy pending.
 
 검증 진행: 14/14 진입 유형 코드 수정·감사 완료. Web 소비자/복귀/SEO 회귀 green, Web tsc PASS, API 알림·명단 테스트 81/81 PASS. API tsc/표면 검사 진행. 기존 상세/죽은 알림 링크 before를 390/768/1440에서 수집(구 주소200, /leagues 주소404, 목록 클릭 정상). 비로그인 auth/consent 401 외 pageerror 없음. Headed browser는 finally에서 종료. 로그인 persona의 마이·신청·팀 멤버 화면은 단위 consumer로 검증했고 alpha 로그인 실측은 아직 미실행.
+
+배포 전 게이트: Web/API tsc 0, 양 앱 pattern/surface 검사 PASS, API 81/81, 영향받은 Web 소비자·복귀·SEO·redirect 테스트 PASS. before 3폭에서 실제 홈 리그/목록 클릭 완료. /leagues 과거 알림404 재현. 코드 신규 debt marker0, diff check PASS.

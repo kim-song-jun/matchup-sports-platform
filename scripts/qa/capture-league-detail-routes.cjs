@@ -48,6 +48,7 @@ async function main() {
         const current=new URL(page.url());
         results.push({width,alias,status:response.status(),path:current.pathname,from:current.searchParams.get('from')});
         if(phase==='after' && (current.pathname!='/tournaments/'+id || current.searchParams.get('from')!='/home'))throw new Error('alias redirect failed: '+page.url());
+        if(alias==='/league-matches/') { await page.getByRole('table').first().waitFor({state:'visible',timeout:20000}); await page.locator('table img').evaluateAll(images=>Promise.all(images.map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.addEventListener('load',resolve,{once:true});img.addEventListener('error',resolve,{once:true});})))); }
         if(alias==='/league-matches/')await page.screenshot({path:path.join(out,width+'-detail.png')});
       }
       results.push({width,errors,failed,overflow:await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)});

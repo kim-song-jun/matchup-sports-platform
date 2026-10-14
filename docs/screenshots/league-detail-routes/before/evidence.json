@@ -5,22 +5,27 @@
     "landed": "/home",
     "links": [
       {
-        "text": "(테스트) E2E 16강 공개 1010풋살 · 10/16 (금)~10/17 (토) · 0/16팀",
-        "href": "/tournaments/1b05e66b-b593-4849-a81c-946acf0ebb57?from=%2Fhome"
+        "text": "(테스트)1014풋살 · 10/14 (수)~11/11 (수) · 4팀 참가",
+        "href": "/league-matches/87ba8a61-c590-4789-9479-8216fdb99b6e?from=%2Fhome"
       },
       {
-        "text": "(테스트) E2E 조별 라벨 1010풋살 · 10/16 (금)~10/17 (토) · 0/6팀",
-        "href": "/tournaments/79039d76-6d8a-4607-b0b6-95199d4b3577?from=%2Fhome"
+        "text": "1013 리그 LIVE페이지 TEST풋살 · 10/14 (수)~11/25 (수) · 4팀 참가",
+        "href": "/league-matches/e299ce2f-4076-4f62-9c4f-6dae67d485e0?from=%2Fhome"
       },
       {
-        "text": "(테스트) 알파 재구축 정규 대회풋살 · 9/27 (일) · 2/4팀",
-        "href": "/tournaments/7e04a6e9-4d5c-4a90-89dc-6865130c6a99?from=%2Fhome"
+        "text": "수요일 10월풋살 · 10/14 (수)~11/25 (수) · 4팀 참가",
+        "href": "/league-matches/8576abc8-5f5f-46b3-bbe3-ccd531e709d4?from=%2Fhome"
       },
       {
-        "text": "(테스트) 버퍼링재현 대회 0918풋살 · 9/30 (수) · 0/8팀",
-        "href": "/tournaments/35cbdff3-c661-4970-ad7a-4b1665d90fa7?from=%2Fhome"
+        "text": "(테스트)10.13풋살 · 10/13 (화)~11/12 (목) · 8팀 참가",
+        "href": "/league-matches/5c8bb5ac-59f7-4127-adee-c11906f67ae0?from=%2Fhome"
       }
     ]
+  },
+  {
+    "width": 390,
+    "action": "home-league-click",
+    "url": "https://alpha.teameet.co.kr/league-matches/87ba8a61-c590-4789-9479-8216fdb99b6e?from=%2Fhome"
   },
   {
     "width": 390,
@@ -153,22 +158,6 @@
     "landed": "/home",
     "links": [
       {
-        "text": "(테스트) E2E 16강 공개 1010풋살 · 10/16 (금)~10/17 (토) · 0/16팀",
-        "href": "/tournaments/1b05e66b-b593-4849-a81c-946acf0ebb57?from=%2Fhome"
-      },
-      {
-        "text": "(테스트) E2E 조별 라벨 1010풋살 · 10/16 (금)~10/17 (토) · 0/6팀",
-        "href": "/tournaments/79039d76-6d8a-4607-b0b6-95199d4b3577?from=%2Fhome"
-      },
-      {
-        "text": "(테스트) 알파 재구축 정규 대회풋살 · 9/27 (일) · 2/4팀",
-        "href": "/tournaments/7e04a6e9-4d5c-4a90-89dc-6865130c6a99?from=%2Fhome"
-      },
-      {
-        "text": "(테스트) 버퍼링재현 대회 0918풋살 · 9/30 (수) · 0/8팀",
-        "href": "/tournaments/35cbdff3-c661-4970-ad7a-4b1665d90fa7?from=%2Fhome"
-      },
-      {
         "text": "(테스트)1014풋살 · 10/14 (수)~11/11 (수) · 4팀 참가",
         "href": "/league-matches/87ba8a61-c590-4789-9479-8216fdb99b6e?from=%2Fhome"
       },
@@ -185,6 +174,11 @@
         "href": "/league-matches/5c8bb5ac-59f7-4127-adee-c11906f67ae0?from=%2Fhome"
       }
     ]
+  },
+  {
+    "width": 768,
+    "action": "home-league-click",
+    "url": "https://alpha.teameet.co.kr/league-matches/87ba8a61-c590-4789-9479-8216fdb99b6e?from=%2Fhome"
   },
   {
     "width": 768,
@@ -333,6 +327,11 @@
         "href": "/league-matches/5c8bb5ac-59f7-4127-adee-c11906f67ae0?from=%2Fhome"
       }
     ]
+  },
+  {
+    "width": 1440,
+    "action": "home-league-click",
+    "url": "https://alpha.teameet.co.kr/league-matches/87ba8a61-c590-4789-9479-8216fdb99b6e?from=%2Fhome"
   },
   {
     "width": 1440,

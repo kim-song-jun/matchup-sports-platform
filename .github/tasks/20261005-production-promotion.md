@@ -4,19 +4,21 @@ Status: Review
 
 ## Current preparation — 2026-10-14
 
-The latest user request is `main승격 준비 pr 만들어줘`. This run creates a dev-targeted version-preparation PR and a linked draft dev-to-main PR. It does not merge either PR, push main, or approve production deployment. This snapshot supersedes the historical release coordinates below.
+The latest user request is `메인 승격 준비해줘`. Refresh existing preparation PR #1911 and promotion draft #1912 against the latest verified dev. Production merge and approval remain user-operated. This snapshot supersedes the historical release coordinates below.
 
-- Base dev: `792042b7d359c5552f9dba7f8cb45dab3e19699b` (#1909); base main: `3dd537d4e` (#1903).
+- Base dev: `ac997f5d3b8702fb8250f588f8cd2e6a1441359b` (#1916); base main: `3dd537d4e` (#1903).
 - Main-only SEO source was already present on dev. A clean main-to-feature merge changes only the two manifests and two changelogs, preserving the production 1.8.2 release history and ancestry. No application source, dependencies, migrations, credentials, native versions or shared WIP were changed.
-- Official `corepack pnpm dlx @changesets/cli@2.30.0 version` consumes 32 pending Changesets. Both fixed source manifests become 1.9.0; both changelogs retain the production 1.8.2 entry. Artifact identities remain determined by the existing release resolver, rather than assuming the manifest version is the deployed identity.
+- Official `corepack pnpm dlx @changesets/cli@2.30.0 version` consumes all 35 pending Changesets, including the three introduced by #1914/#1915/#1916. Regenerated the owned release metadata from main's 1.8.2 history plus the complete current Changeset set, preserving source version 1.9.0 instead of double-bumping the previous preparation. Both changelogs retain production 1.8.2. Artifact identities remain determined by the existing release resolver.
 - Local preparation policy and main-promotion policy PASS; `git diff --check` PASS. No new debt marker. Existing `COLORXXX500` in an old changelog entry is unchanged.
-- At preparation time, base dev CI `38475457167` and Alpha `38475457320` are still running. Alpha currently serves `e6cecf51fb95425955eafe942e8b44b719ccf556`, not the base dev SHA. Therefore exact latest-dev Alpha verification has NOT passed, and the Alpha-gated `promote-main.sh --prepare-only` is not reported as successful. Its gate functions were invoked for local release-metadata validation only.
+- Base dev CI `38496329800` and Alpha `38496329788` PASS. Public Alpha API serves exact base `ac997f5d3b8702fb8250f588f8cd2e6a1441359b`, release `1.9.0-alpha.20261014.gac997f5d3b87`, HTTP 200 and DB=true. This proves the base runtime, not the future preparation merge.
+- Follow-up #1913 (`635dcea16`) fixes same-SHA Alpha manifest reuse; its Gates/API/Web pass but it is not merged and has no submitted Copilot review. Its patch Changeset is not included in this 35-Changeset preparation. If integrated before promotion, it must also be consumed and the candidate revalidated.
+- GitHub CLI help now documents `--add-reviewer @copilot`; requested #1913 using that supported alias as well as the existing documented login. No clean review or exception is inferred from command success or the user's preparation request.
 - The prior Copilot waiver applies only to #1908. It does not apply to these new PRs. Review and exact-head CI remain required before merging the preparation PR.
 - Preparation scope is release metadata plus this existing status record. No new UI requires a new browser screenshot; the restored league navigation evidence is linked at https://github.com/kim-song-jun/matchup-sports-platform/pull/1908#issuecomment-6151240723.
 
 ### Remaining promotion gates
 
-- [x] Preserve main release history and prepare fixed source version 1.9.0 with official Changeset consumption.
+- [x] Preserve main release history and prepare fixed source version 1.9.0 with all 35 current Changesets consumed.
 - [x] Verify local release-preparation and promotion contracts and whitespace.
 - [ ] Preparation PR exact-head CI and required review.
 - [ ] Merge preparation into dev; synchronize local dev and verify actual new dev CI and Alpha activation/headers/health.
@@ -26,7 +28,7 @@ The latest user request is `main승격 준비 pr 만들어줘`. This run creates
 
 ### Ownership and cleanup
 
-Owned: isolated `/tmp/teameet-main-promotion-prep-20261014`, `release/main-promotion-prep-20261014`, release manifests/changelogs/consumed Changesets, this status record and the requested PR descriptions. Forbidden: original shared WIP, production deployment and DB mutation. Native pnpm/Changesets was obtained through Corepack; no local Next, browser or database process was started.
+Owned: isolated `_worktrees/promotion-pr1911-fix`, remote `release/main-promotion-prep-20261014`, release manifests/changelogs/consumed Changesets, this status record and requested PR descriptions. Forbidden: original shared WIP, production deployment and DB mutation. Native pnpm/Changesets was obtained through Corepack; no local Next, browser or database process was started.
 
 ## Request and scope
 

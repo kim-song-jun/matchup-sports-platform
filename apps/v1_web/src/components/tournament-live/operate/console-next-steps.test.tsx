@@ -23,8 +23,13 @@ const LEAGUE_DETAIL = {
   kind: 'regular_league',
   fixtures: [],
   leagueFixtures: [
-    { teamMatchId: 'm1', title: '1주차 1경기', startAt: '2026-09-30T01:10:00Z', status: 'completed' },
-    { teamMatchId: 'm2', title: '2주차 1경기', startAt: '2026-10-07T01:10:00Z', status: 'matched' },
+    { teamMatchId: 'm1', title: '1주차 1경기', startAt: '2026-09-30T01:10:00Z', status: 'completed', homeTeamId: 't1', awayTeamId: 't2' },
+    { teamMatchId: 'm2', title: '2주차 1경기', startAt: '2026-10-07T01:10:00Z', status: 'matched', homeTeamId: 't2', awayTeamId: 't3' },
+  ],
+  participantTeams: [
+    { teamId: 't1', teamName: '마포 레인저스' },
+    { teamId: 't2', teamName: '한강 로버스' },
+    { teamId: 't3', teamName: '송파 유나이티드' },
   ],
 };
 
@@ -39,7 +44,8 @@ describe('ConsoleNextSteps', () => {
     render(<ConsoleNextSteps tournamentId="league-1" fixtureId="m1" />);
 
     expect(screen.getByRole('link', { name: '순위표 보기' })).toHaveAttribute('href', '/league-matches/league-1');
-    expect(screen.getByRole('link', { name: /다음 경기 · 2주차 1경기/ })).toHaveAttribute(
+    // 리그명·주차만으로는 어느 팀 경기인지 몰라 홈·원정 팀 이름으로 부른다(MD-QA #151).
+    expect(screen.getByRole('link', { name: '다음 경기 · 한강 로버스 vs 송파 유나이티드' })).toHaveAttribute(
       'href',
       '/admin/live/league-1/fixtures/m2/operate',
     );
@@ -62,6 +68,7 @@ describe('ConsoleNextSteps', () => {
       data: {
         kind: 'regular_tournament',
         leagueFixtures: [],
+        participantTeams: [],
         fixtures: [{ id: 'f1', scheduledAt: '2026-09-30T01:00:00Z', liveStatus: 'ended', homeTeamName: 'A', awayTeamName: 'B' }],
       },
     });
@@ -91,7 +98,7 @@ describe('ConsoleNextSteps', () => {
   it('결과 정정: 스태프 표면에서는 스태프 경로로, 플랫폼 운영자에게도 열린다', () => {
     mocks.usePathname.mockReturnValue('/tournament-ops/tournaments/t-1/fixtures/f1/operate');
     mocks.useTournamentOpsRole.mockReturnValue('PLATFORM_OPS');
-    mocks.useV1Tournament.mockReturnValue({ data: { kind: 'regular_tournament', leagueFixtures: [], fixtures: [] } });
+    mocks.useV1Tournament.mockReturnValue({ data: { kind: 'regular_tournament', leagueFixtures: [], fixtures: [], participantTeams: [] } });
     render(<ConsoleNextSteps tournamentId="t-1" fixtureId="f1" />);
 
     expect(screen.getByRole('link', { name: '결과 정정' })).toHaveAttribute(

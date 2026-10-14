@@ -13,6 +13,7 @@ import {
   buildTournamentStages,
 } from '@/components/tournaments/tournament-progress-stepper';
 import { TournamentBracket } from '@/components/tournaments/tournament-bracket';
+import { LeagueProgressSummary, LeagueTeamFixturesDetail } from '@/components/tournaments/league-inline-records';
 import {
   TournamentStandingsTable,
   type TournamentStandingsRow,
@@ -248,10 +249,16 @@ function GroupStandingsSection({
 
 /* ── 리그 최종 순위표 (리그 포맷) ── */
 function LeagueStandingsSection({
+  tournamentId,
+  isRegularLeague,
+  fixtures,
   rows,
   label = '리그 순위',
   fromHref,
 }: {
+  tournamentId: string;
+  isRegularLeague: boolean;
+  fixtures: V1TournamentFixture[];
   rows: readonly TournamentStandingsRow[];
   /** 티어가 있으면 `'1부'`·`'2부'` — 아래 `leagueStandingsHeading` 참조. */
   label?: string;
@@ -259,7 +266,17 @@ function LeagueStandingsSection({
 }) {
   return (
     <section aria-label={standingsAriaLabel(label)} style={{ marginBottom: 16 }}>
-      <TournamentStandingsTable rows={rows} advancingKeys={null} ariaLabel={standingsAriaLabel(label, '표')} fromHref={fromHref} />
+      <TournamentStandingsTable
+        rows={rows}
+        advancingKeys={null}
+        ariaLabel={standingsAriaLabel(label, '표')}
+        fromHref={fromHref}
+        keepTeamLink
+        header={<LeagueProgressSummary tournamentId={tournamentId} />}
+        renderDetail={(row) => isRegularLeague
+          ? <LeagueTeamFixturesDetail tournamentId={tournamentId} teamId={row.teamId} />
+          : <TeamFixturesDetail teamId={row.teamId} fixtures={fixtures} />}
+      />
     </section>
   );
 }
@@ -571,7 +588,8 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
    * 못 찾는다.
    */
   const leagueScheduleSettled = isRegularLeague
-    ? !leagueSchedule.isLoading && !leagueSchedule.isError
+    // 추가 페이지 오류는 이미 받은 순위를 없애지 않는다. 펼친 전적에서 재시도를 제공한다.
+    ? !leagueSchedule.isLoading && (!leagueSchedule.isError || leagueSchedule.isFetchNextPageError)
     : true;
   /**
    * 순위표 제목. 사용자 확정값은 **"tierLabel(1부/2부)을 쓰고 없으면 '리그 순위'"** 인데
@@ -735,7 +753,7 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
                       />
                     )
                   ) : (
-                    <LeagueStandingsSection rows={allLeagueRows} label={leagueStandingsHeading} fromHref={bracketSelfHref ?? undefined} />
+                    <LeagueStandingsSection tournamentId={tournament.id} isRegularLeague={isRegularLeague} fixtures={fixtures} rows={allLeagueRows} label={leagueStandingsHeading} fromHref={bracketSelfHref ?? undefined} />
                   )}
                 </section>
               )}

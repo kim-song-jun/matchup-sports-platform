@@ -4,6 +4,7 @@ import {
   PRESTART_POLL_WINDOW_MS,
   PUBLIC_LIVE_POLL_INTERVAL_MS,
   earliestPublicLivePollDelay,
+  leagueFixturesPollDelay,
   publicLivePollDelay,
 } from './public-live-polling';
 
@@ -47,5 +48,31 @@ describe('publicLivePollDelay — 경기 시작 전에 열어 둔 화면도 시�
       { status: 'scheduled', scheduledAt: new Date(at(20 * 60_000)).toISOString() },
     ], at(0))).toBe(5 * 60_000);
     expect(earliestPublicLivePollDelay([{ status: 'ended', scheduledAt }], at(0))).toBe(false);
+  });
+});
+
+describe('leagueFixturesPollDelay — 공개 리그 상세가 종료·확정을 새로고침 없이 받는다 (MD-QA #149)', () => {
+  const past = new Date(at(-24 * 60 * 60_000)).toISOString();
+  const fixture = (patch: Record<string, unknown>) =>
+    ({ status: 'matched', startAt: past, homeScore: null, awayScore: null, gameState: null, ...patch }) as Parameters<typeof leagueFixturesPollDelay>[0][number];
+
+  it('진행 중·일시 중지·결과 대기(끝났지만 확정 전) 경기가 있으면 라이브 주기다', () => {
+    expect(leagueFixturesPollDelay([fixture({ gameState: 'LIVE' })], at(0))).toBe(PUBLIC_LIVE_POLL_INTERVAL_MS);
+    expect(leagueFixturesPollDelay([fixture({ gameState: 'PAUSED' })], at(0))).toBe(PUBLIC_LIVE_POLL_INTERVAL_MS);
+    expect(leagueFixturesPollDelay([fixture({ gameState: 'ENDED' })], at(0))).toBe(PUBLIC_LIVE_POLL_INTERVAL_MS);
+  });
+
+  it('확정·무효·가려진 결과와 취소 경기만 남으면 멈춘다', () => {
+    expect(leagueFixturesPollDelay([
+      fixture({ gameState: 'ENDED', homeScore: 1, awayScore: 0 }),
+      fixture({ gameState: 'ENDED', resultVoided: true }),
+      fixture({ gameState: 'ENDED', scoreHidden: true }),
+      fixture({ status: 'cancelled' }),
+    ], at(0))).toBe(false);
+  });
+
+  it('시작 전 경기는 킥오프 창을 따르고, 하루 전에 지난 미시작 경기는 묻지 않는다', () => {
+    expect(leagueFixturesPollDelay([fixture({ gameState: 'SCHEDULED', startAt: scheduledAt })], at(0))).toBe(PUBLIC_LIVE_POLL_INTERVAL_MS);
+    expect(leagueFixturesPollDelay([fixture({ gameState: 'SCHEDULED' })], at(0))).toBe(false);
   });
 });

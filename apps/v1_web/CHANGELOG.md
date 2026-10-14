@@ -13,6 +13,9 @@
 
 ### Patch Changes
 
+- 635dcea: Allow same-commit Alpha redeploys to reuse the immutable release manifest while retaining its original rollback predecessor and strict source/image identity checks.
+- c7d28ff: 골키퍼 지정을 대회 참가 명단에 유지하고 어드민 출전 표에서 복수 지정·해제를 지원합니다.
+- 82b469d: 리그·대회 기존 미배정 경기 장소를 이름별 필드에 연결하고, 새 경기와 장소 수정도 필드 등록·배정을 함께 저장합니다. 공개 일정·상세·목록은 필드 이름으로 통일하며 기존 주소·좌표와 배정은 보존합니다.
 - d5bf700: "팀밋이 여는 대회" 화면에 뒤로가기를 추가했어요. 대회 탭에서 들어오면 보던 목록(필터·페이지 그대로)으로 바로 돌아가고, 종목 필터를 바꿔도 돌아갈 곳이 유지돼요. 주소를 직접 열었을 때는 대회 탭으로 돌아가요.
 - df63ab9: 리그 신청 마감 카드에서 "다음 회차에 신청해 주세요."를 마감 시각 문장과 다른 줄에 적어요. 좁은 화면에서 문장 중간에 끊겨 보이던 것을 고쳤어요.
 - 012a5c6: Display saved league cover images on public detail pages and team logos alongside overall standings.
@@ -26,6 +29,8 @@
 - dc4be45: 리그 QA 후속: 삭제한 경기를 순위표 취소 수에서 제외, '장소 미정' 표시·경기 수정 장소 초기값 보정, 몰수패 칸 이름, 경기 하나 추가 입구를 접이식 밖으로 옮기고 추가 뒤 화면 유지, 다른 설정 저장 뒤 피리어드 저장 409 해소
 - d1bc188: 리그 '템플릿으로 다시 만들기'로 교체한 옛 경기를 대진 재생성과 같이 목록에서 숨겨요. 어드민 경기 수·일정 보드 라운드·공개 경기 상세의 주차가 더 이상 옛 경기 날짜를 세지 않아요. 공개 일정과 경기 상세에서 무효 처리한 경기를 '결과 대기' 대신 '종료 · 무효 · 집계 제외'로 보여줘요.
 - 10362dd: 리그 대진 재생성·삭제 집계, 경기장 담당 목록, 자동 명단·등번호, 무료 신청 표시와 운영 설정을 개선합니다. 리그 상세에 출전정지 규정을 추가하고 운영·결과 화면과 알림에서 팀 이름으로 경기를 구분합니다.
+- eea23a8: 리그·대회 경기 명단에서 선수별 골키퍼를 복수 지정하고 실제 경기 기록까지 유지합니다.
+- 82b469d: 정규 리그 경기 일정에 전체/내 팀 필터를 추가하고 일반 멤버·복수 소속 팀의 경기, 로그인 복귀 및 필터 유지 동작을 지원합니다.
 - c8fce91: 리그 순위에서 팀별 경기 전적을 펼쳐 확인하고 통합 순위와 같은 진행률을 표시해요.
 - 3e65a4a: 리그 템플릿으로 빈 경기를 만들 때 하루 경기 수를 정할 수 있어요. 그날 경기는 경기 시간과 휴식 간격으로 이어서 잡혀요.
 - a2a8040: 가입 후 필수 단계와 저장 목적지를 보존하고, 약관 변경 시 인증 상태를 다시 조회합니다. 현재 휴대폰 번호 인증만으로 기존 계정을 연결하거나 조회하는 경로를 차단해 신원·업로드·문의·기존 프로필과 세션을 보존합니다.
@@ -40,6 +45,7 @@
 
 - 72126b6: 공개 리그 상세(일정·순위)와 리그 경기 상세를 열어 둔 채 경기가 끝나고 결과가 확정되면, 새로고침하지 않아도 종료·확정 점수·순위·전적이 반영돼요(MD-QA #149·#150). 경기 상세는 결과 대기 동안에도 계속 확인하고, 리그 상세는 진행 중·결과 대기 경기가 있는 동안 확인하며 바뀌면 순위와 개인 기록도 다시 받아요. 운영 콘솔의 결과 확정 뒤 다음 경기 링크는 "홈팀 vs 원정팀"으로 보여줘요(MD-QA #151).
 - 05ecf8f: 팀 상세 재조회가 실패하면 기존 내용과 실제 오류·재시도 안내를 함께 표시해요. 인증·권한·삭제 응답은 남아 있는 캐시와 운영 입구를 숨기고, 진행 중 재시도는 같은 GET을 중복 실행하지 않아요.
+- 5748875: 리그 운영 보드의 경기장 선택지를 새로고침·화면 복귀·15초 주기 갱신에 포함하고, 참가팀 결과 화면에서 서버가 공개한 선수 이름과 등번호를 표시합니다. 담당 범위 밖 경기 접근 오류는 한국어 권한 안내로 표시합니다.
 - 5fc68a4: 스토어에서 새 버전이 확인된 Android·iOS 앱에 필수 업데이트 안내를 표시합니다.
 - 5024bcf: Prevent the first Escape key from dismissing the mandatory native app update dialog.
 - 4c7a3bd: Prevent browser close requests from dismissing the mandatory native app update dialog, including its first automatic presentation.
@@ -49,6 +55,7 @@
 - a095261: Validate scoped main release PRs with the same consumed Changesets, fixed app versions, and changelog checks as full dev promotions.
 - 38df978: 팀매치의 미매칭 보류 표시를 마감으로 통일하고 취소된 팀매치를 사용자 목록·내 매치·상세와 연결 일정에서 숨겨요. 어드민에서 미래 매치의 모집을 다시 열면 지난 신청 마감도 해제하고, 상태 변경 후 사용자와 어드민 화면의 데이터를 다시 불러와요. 취소 기록과 감사 이력은 어드민에 유지해요.
 - f8f4819: 대진 목록에서 템플릿을 열 때 확정 참가팀 수와 조회 상태를 전달하고, 선택할 수 없는 그래픽 카드의 글자를 읽기 쉽게 표시합니다.
+- ad9a0d0: Unify public league detail entries and historical notification links under the tournament detail route.
 
 ## 1.8.2
 

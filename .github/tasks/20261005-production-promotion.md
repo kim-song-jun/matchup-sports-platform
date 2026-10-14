@@ -2,6 +2,18 @@
 
 Status: Review
 
+## Final preparation refresh — 2026-10-14
+
+This snapshot supersedes the preparation snapshots below.
+
+- User explicitly approved replacing Copilot review with direct code review and CI for #1911 and #1913 only. No exception is inferred for #1912.
+- Latest dev baseline: `5b6ea95b75f1260289f5ebfa58861793a216ae97` (#1922). Main baseline: `3dd537d4eb74a0d2c74f1a28e6da3962611130b9`.
+- #1913 refreshed head: `8392402562f856ccdc89fdcd0d1b494546ab09c5`; latest-dev merge preserves its four-file scope. Updated release-state regression PASS, including negative controls. Exact-head CI remains the merge gate.
+- Preparation integrates main ancestry and latest dev with no application-source difference against dev. The observed dev/main sitemap conflicts disappear through that ancestry; no sitemap source is reverted.
+- Official Changesets CLI 2.30.0 regenerated both app manifests/changelogs from main 1.8.2 and all 43 pending Changesets, including #1913. Both source versions remain 1.9.0; the existing resolver calculates stable artifact 1.9.1 when pending Changesets are zero.
+- Order: #1913 exact-head CI and dev merge; #1911 exact-head CI and dev merge; final dev CI/Alpha activation; #1912 promotion gates and user main merge/production approval.
+- No shared WIP, production or database mutation. No application UI change introduced by this preparation.
+
 ## Current preparation — 2026-10-14
 
 The latest user request is `메인 승격 준비해줘`. Refresh existing preparation PR #1911 and promotion draft #1912 against the latest verified dev. Production merge and approval remain user-operated. This snapshot supersedes the historical release coordinates below.

@@ -221,7 +221,7 @@ describe('실제 리그 caller → shared 선수 링크', () => {
     setLocation(fixturePath);
     render(fixture);
     expect(playerUrl(players[2][0]).searchParams.get('from')).toBe(fixturePath);
-    expect(screen.getByRole('link', { name: '전체 순위표·일정 보기' })).toHaveAttribute('href', '/league-matches/league-one');
+    expect(screen.getByRole('link', { name: '전체 순위표·일정 보기' })).toHaveAttribute('href', '/tournaments/league-one');
   });
 
   it.each(['https://outside.example/record', '//outside.example/record', '/\\outside.example/record', '/..//outside.example/record', 'javascript:alert(1)', '/login?from=%2Fhome'])('외부/비정상 부모 %s는 선수 복귀 체인에 남기지 않는다', (parent) => {
@@ -232,7 +232,7 @@ describe('실제 리그 caller → shared 선수 링크', () => {
     expect(target.searchParams.get('view')).toBe('record');
     expect(target.searchParams.has('from')).toBe(false);
     expect(target.hash).toBe(anchor);
-    expect(screen.getByRole('link', { name: '전체 순위표·일정 보기' })).toHaveAttribute('href', '/league-matches/league-one');
+    expect(screen.getByRole('link', { name: '전체 순위표·일정 보기' })).toHaveAttribute('href', '/tournaments/league-one');
   });
 
   it('서버가 profileHref:null을 주면 실제 caller에도 선수 링크가 생기지 않는다', () => {

@@ -342,7 +342,7 @@ function ActiveTeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: V
     leagueId: item.leagueId,
     title: item.title,
     // profileHref와 같은 이유로 출처를 넘긴다 — 뒤로가기가 리그 목록이 아니라 이 팀으로.
-    href: withFromPath(`/league-matches/${item.leagueId}`, selfHref),
+    href: withFromPath(`/tournaments/${item.leagueId}`, selfHref),
   }));
   const fallback = getTeamDetailViewModel();
 

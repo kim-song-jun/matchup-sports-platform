@@ -14,7 +14,7 @@ export function buildLeagueEventLd(
   league: V1PublicLeagueDetail,
   standings: V1LeagueStandingsResponse | null,
 ): JsonLdNode {
-  const url = absoluteSiteUrl(`/league-matches/${league.leagueId}`);
+  const url = absoluteSiteUrl(`/tournaments/${league.leagueId}`);
   const node: JsonLdNode = {
     '@context': 'https://schema.org',
     '@type': 'SportsEvent',

@@ -268,7 +268,7 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
                   network={false}
                   signedOut={model.signedOut}
                   eyebrow="정규 리그 · 모집 중"
-                  href={withFromPath(`/league-matches/${featuredLeague.id}`, '/home')}
+                  href={withFromPath(`/tournaments/${featuredLeague.id}`, '/home')}
                 />
               ) : null}
               {featuredTeamMatch ? (
@@ -1006,7 +1006,7 @@ function SidebarLeaguesWidget({ items, loading }: { items: V1PublicLeagueListIte
             return (
               <Link
                 key={l.leagueId}
-                href={withFromPath(`/league-matches/${l.leagueId}`, '/home')}
+                href={withFromPath(`/tournaments/${l.leagueId}`, '/home')}
                 className="tm-pressable"
                 aria-label={`정규 리그 상세 보기 — ${l.title}`}
                 style={{

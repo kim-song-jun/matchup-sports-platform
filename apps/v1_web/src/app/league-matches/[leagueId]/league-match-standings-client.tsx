@@ -533,7 +533,7 @@ export default function LeagueMatchStandingsClient({
   const fromPath = sanitizeRedirectPath(searchParams.get('from'));
   const currentHref = useCurrentHref();
   // 팀 이름 링크의 뒤로가기 출처 — 이 화면 자기 자신(상위에서 받은 from까지 포함해서 이어 붙인다).
-  const selfHref = withFromPath(`/league-matches/${leagueId}`, fromPath);
+  const selfHref = withFromPath(`/tournaments/${leagueId}`, fromPath);
   const seriesQuery = useV1LeagueMatch(leagueId, { seed: seed?.league });
   const standingsQuery = useV1LeagueMatchStandings(leagueId, { seed: seed?.standings });
   const recordsQuery = useV1LeagueMatchPlayerRecords(leagueId);
@@ -730,7 +730,7 @@ export default function LeagueMatchStandingsClient({
             {series.seriesSiblings.map((sibling) => {
               return (
                 <li key={sibling.leagueId}>
-                  <Link href={withFromPath(`/league-matches/${sibling.leagueId}`, selfHref)} className="tm-chip">
+                  <Link href={withFromPath(`/tournaments/${sibling.leagueId}`, selfHref)} className="tm-chip">
                     {sibling.seasonNo}시즌 · {sibling.tierLabel}
                     {/* 상태를 컬러 뱃지 + 텍스트로 함께 표기 — 컬러만으로 진행 여부를 전달하지 않는다. */}
                     <StatusChip chip={leagueStateChip(sibling.state)} />

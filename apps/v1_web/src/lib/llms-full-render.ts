@@ -145,7 +145,7 @@ export function renderLlmsFull(s: LlmsFullSnapshot, now = new Date()): string {
     ]);
   }) ?? null;
 
-  const leagueRows = s.leagues?.map((l) => row(link(l.title, `/league-matches/${l.leagueId}`), [
+  const leagueRows = s.leagues?.map((l) => row(link(l.title, `/tournaments/${l.leagueId}`), [
     l.sport.name,
     leagueStateLabel(l.state),
     `${formatTournamentDateLong(l.startsOn)} ~ ${formatTournamentDateLong(l.endsOn)}`,

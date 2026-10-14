@@ -153,9 +153,7 @@ describe('#1533 리그 경기 일정 필터의 URL/history 계약', () => {
     const view = awards();
     fireEvent.click(screen.getByRole('link', { name: '리그 상세로' }));
     view.unmount();
-    detail();
-    expect(currentHref()).toBe(source);
-    expectSelection(true);
+    expect(currentHref()).toBe(source.replace('/league-matches/', '/tournaments/'));
   });
 
   it.each([

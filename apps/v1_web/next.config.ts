@@ -83,6 +83,9 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     return [
+      // Historical public detail links. Query strings are preserved by Next.
+      { source: '/league-matches/:id', destination: '/tournaments/:id', permanent: false },
+      { source: '/leagues/:id', destination: '/tournaments/:id', permanent: false },
       // 구 basePath(/v1) 시대의 URL — 북마크·외부 링크·카카오 redirect_uri(/v1/callback/kakao)가
       // 아직 살아있어서 현재 경로로 넘겨준다. 쿼리스트링은 Next가 그대로 이어붙인다.
       { source: '/v1', destination: '/', permanent: true },

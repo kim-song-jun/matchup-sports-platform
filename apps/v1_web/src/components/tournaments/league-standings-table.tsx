@@ -1,6 +1,7 @@
 'use client';
 
 import { EmptyState } from '@/components/v1-ui/primitives';
+import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
 import type {
   V1LeagueOverallStandingRow,
@@ -125,7 +126,8 @@ export function LeagueStandingsTable({ data }: { data: LeagueStandingsTableData 
                     </span>
                   </td>
                   <td>
-                    <div style={{ display: 'flex', alignItems: 'center', minHeight: 44 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', minHeight: 44, gap: 'var(--spacing-2)' }}>
+                      <TeamAvatar seed={row.teamId ?? row.registrationId ?? ''} name={row.teamName} logoUrl={row.teamLogoUrl} size="sm" />
                       <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-strong)' }}>
                         {row.teamName}
                       </span>

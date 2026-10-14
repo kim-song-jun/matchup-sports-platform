@@ -15,8 +15,8 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { leagueId } = await params;
-  const path = leaguePath(leagueId);
-  const league = await loadPublic<V1PublicLeagueDetail>(path);
+  const path = `/tournaments/${encodeURIComponent(leagueId)}`;
+  const league = await loadPublic<V1PublicLeagueDetail>(leaguePath(leagueId));
   if (!league.ok) {
     return buildPublicMetadata({ title: '정규 리그', description: '정규 리그 순위표와 경기 일정·결과를 확인해 보세요.', path });
   }
@@ -54,7 +54,7 @@ export default async function LeagueMatchPage({ params }: Props) {
             data={buildBreadcrumbLd([
               { name: '대회', path: '/tournaments' },
               { name: '정규 리그', path: '/tournaments?kind=league' },
-              { name: detail.title, path: leaguePath(leagueId) },
+              { name: detail.title, path: `/tournaments/${encodeURIComponent(leagueId)}` },
             ])}
           />
         </>

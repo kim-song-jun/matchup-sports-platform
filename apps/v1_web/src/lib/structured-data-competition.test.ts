@@ -91,7 +91,7 @@ describe('리그 대진 LD (buildTeamMatchEventLd + path 옵션)', () => {
       placeName: '송파 풋살파크', status: 'matched', hostTeam: { teamId: 'team-a', name: '송파 유나이티드' },
     } as unknown as V1TeamMatch;
 
-    const ld = buildTeamMatchEventLd(teamMatch, 'f9', { path: '/league-matches/lg1/fixtures/f9', superEventPath: '/league-matches/lg1' });
+    const ld = buildTeamMatchEventLd(teamMatch, 'f9', { path: '/league-matches/lg1/fixtures/f9', superEventPath: '/tournaments/lg1' });
 
     expect(ld?.['@id']).toBe('https://teameet.co.kr/league-matches/lg1/fixtures/f9#event');
     expect(ld?.superEvent).toEqual({ '@id': buildLeagueEventLd(league, null)['@id'] });

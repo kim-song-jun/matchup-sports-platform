@@ -201,24 +201,24 @@ describe('MD-QA59 실제 리그 일정→경기 상세→페이지 복귀', () =
     const source = `${leaguePath}?schedule=upcoming&from=${encodeURIComponent(upstream)}&extra=keep#league-schedule`;
     renderAt(`${fixturePath(fixtures[7].teamMatchId)}?from=${encodeURIComponent(source)}`);
     const parent = await screen.findByRole('link', { name: league.title });
+    expect(parent).toHaveAttribute('href', source.replace('/league-matches/', '/tournaments/'));
     fireEvent.click(parent);
-    await expectList(true);
-    expect(currentHref()).toBe(source);
-    expect(screen.queryByRole('link', { name: '전체 순위표·일정 보기' })).not.toBeInTheDocument();
+    expect(currentHref()).toBe(source.replace('/league-matches/', '/tournaments/'));
   });
 
   it.each(['', 'https://unsafe.example/league', '//unsafe.example/league', '/..//unsafe.example/league'])('직접 진입·위험 출처는 같은 리그 전체9로 안전하게 복귀한다 (%s)', async (source) => {
     renderAt(`${fixturePath(fixtures[7].teamMatchId)}${source ? `?from=${encodeURIComponent(source)}` : ''}`);
-    fireEvent.click(await screen.findByRole('link', { name: league.title }));
-    await expectList(false);
-    expect(currentHref()).toBe(leaguePath);
+    const parent = await screen.findByRole('link', { name: league.title });
+    expect(parent).toHaveAttribute('href', `/tournaments/${leagueId}`);
+    fireEvent.click(parent);
+    expect(currentHref()).toBe(`/tournaments/${leagueId}`);
   });
 
   it('다른 리그 출처는 현재 리그 parent를 바꾸지 않고 안전한 상위 체인으로만 남긴다', async () => {
     const source = '/league-matches/qa59-other?schedule=upcoming#league-schedule';
     renderAt(`${fixturePath(fixtures[7].teamMatchId)}?from=${encodeURIComponent(source)}`);
     const parent = await screen.findByRole('link', { name: league.title });
-    expect(parent).toHaveAttribute('href', `${leaguePath}?from=${encodeURIComponent(source)}`);
+    expect(parent).toHaveAttribute('href', `/tournaments/${leagueId}?from=${encodeURIComponent(source.replace('/league-matches/', '/tournaments/'))}`);
     expect(screen.getAllByRole('link', { name: '뒤로가기' }).every((link) => link.getAttribute('href') === source)).toBe(true);
   });
 });

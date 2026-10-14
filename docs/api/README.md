@@ -81,3 +81,5 @@ Current Kakao signup and existing-account linking use the [provider contact conf
 - 2026-10-05: tournament bye slots allow null registration + byeId reassignment; pre-start fixture deletion archives canonical history. See [tournament contract](domains/tournaments.md).
 
 리그 기본 정보 수정: [league-matches](domains/league-matches.md#basic-information-editing-리그-기본-정보-수정) — 실제 리그 GET/PATCH, updatedAt 충돌 검증, 기간·권한 보호 및 공개 운영 안내.
+
+- Public league notification detail links use `/tournaments/:id?kind=league` (the kind query preserves the league icon/category) (2026-10-14). Historical `/league-matches/:id` and `/leagues/:id` links redirect to the same detail; fixture and API routes retain their existing paths.

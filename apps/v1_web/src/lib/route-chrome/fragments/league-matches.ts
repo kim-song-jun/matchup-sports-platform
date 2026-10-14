@@ -20,7 +20,7 @@ export const LEAGUE_MATCHES_ROUTES: RouteChromeEntry[] = [
     chrome: {
       title: '리그 경기',
       activeTab: 'tournaments',
-      backHref: (p) => `/league-matches/${p.leagueId}`,
+      backHref: (p) => `/tournaments/${p.leagueId}`,
       desktopHead: true,
     },
   },
@@ -29,7 +29,7 @@ export const LEAGUE_MATCHES_ROUTES: RouteChromeEntry[] = [
     chrome: {
       title: '시즌 결산',
       activeTab: 'tournaments',
-      backHref: (p) => `/league-matches/${p.leagueId}`,
+      backHref: (p) => `/tournaments/${p.leagueId}`,
       desktopHead: true,
     },
   },

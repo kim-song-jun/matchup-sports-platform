@@ -102,6 +102,7 @@ type TeamMatchWithRelations = V1TeamMatch & {
   } | null;
   applications: Array<V1TeamMatchApplication & { applicantTeam: { id: string; name: string } }>;
   game: { id: string } | null;
+  field?: { name: string } | null;
   // teamMatchInclude() 와 짝을 이루는 **손으로 쓴** 타입이라, include 를 넓혀도 여기를
   // 함께 고치지 않으면 컴파일이 깨진다(실제로 CI 가 TS2551 로 잡았다).
   league: { id: string; title: string } | null;
@@ -1759,6 +1760,7 @@ export class TeamMatchesService {
 
   private teamMatchInclude(user: V1AuthUser | null) {
     return {
+      field: { select: { name: true } },
       sport: { select: { id: true, name: true } },
       minSportLevel: { select: { id: true, code: true, name: true, sortOrder: true, sportId: true } },
       maxSportLevel: { select: { id: true, code: true, name: true, sortOrder: true, sportId: true } },

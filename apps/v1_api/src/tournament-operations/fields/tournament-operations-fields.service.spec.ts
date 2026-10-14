@@ -1,5 +1,6 @@
 import { ConflictException, ForbiddenException, UnprocessableEntityException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { Prisma } from '@prisma/client';
 import { OperationAuditWriterService } from '../../common/audit/operation-audit-writer.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
@@ -40,7 +41,9 @@ type FakeTx = ReturnType<typeof createFakeTx>;
 
 function createFakeTx(initialFixtureFieldId: string | null) {
   const idempotency = new Map<string, { payloadHash: string; responseBody: unknown; expiresAt: Date }>();
-  const fixture = { id: fixtureId, tournamentId, fieldId: initialFixtureFieldId };
+  const fixture = { id: fixtureId, tournamentId, fieldId: initialFixtureFieldId,
+    placeName: 'Court A', placeAddress: null, placeLatitude: null, placeLongitude: null, placeProvider: null, placeProviderId: null };
+  const fieldStore: Array<{ id: string; name: string; scopeKey: string; sortOrder: number; active: boolean; version: number; placeSnapshot?: unknown }> = [];
 
   type IdempotencyKeyParts = {
     actorUserId: string;
@@ -55,6 +58,7 @@ function createFakeTx(initialFixtureFieldId: string | null) {
   return {
     idempotency,
     fixture,
+    fieldStore,
     $executeRaw: jest.fn().mockResolvedValue(undefined),
     v1IdempotencyRecord: {
       findUnique: jest.fn(async ({ where }: { where: { actorUserId_action_resourceType_resourceId_idempotencyKey: IdempotencyKeyParts } }) => {
@@ -95,18 +99,24 @@ function createFakeTx(initialFixtureFieldId: string | null) {
       ),
     },
     v1TournamentField: {
+      findMany: jest.fn(async () => fieldStore),
       // finding #76: create()가 이름 중복을 먼저 findFirst로 확인한다. 기본값은
       // "중복 없음"(null) -- 이름 중복 자체를 검증하는 케이스만 아래에서 override한다.
       findFirst: jest.fn(async (): Promise<{ id: string } | null> => null),
-      create: jest.fn(async ({ data }: { data: { scopeKey: string; name: string; sortOrder: number } }) => ({
-        id: fieldId,
+      create: jest.fn(async ({ data }: { data: { scopeKey: string; name: string; sortOrder: number; placeSnapshot?: unknown } }) => {
+        const row = {
+        id: `00000000-0000-4000-8000-${String(fieldStore.length + 10).padStart(12, '0')}`,
         tournamentId,
         scopeKey: data.scopeKey,
         name: data.name,
         sortOrder: data.sortOrder,
         active: true,
         version: 0,
-      })),
+        placeSnapshot: data.placeSnapshot,
+        };
+        fieldStore.push(row);
+        return row;
+      }),
       findUnique: jest.fn(async () => ({
         id: fieldId,
         tournamentId,
@@ -128,7 +138,10 @@ function createFakeTx(initialFixtureFieldId: string | null) {
       })),
     },
     v1TeamMatch: {
+      findMany: jest.fn(async () => [fixture]),
+      findUniqueOrThrow: jest.fn(async () => fixture),
       findUnique: jest.fn(async () => ({
+        ...fixture,
         id: fixture.id,
         tournamentId: fixture.tournamentId,
         leagueId: null,
@@ -142,7 +155,7 @@ function createFakeTx(initialFixtureFieldId: string | null) {
         if (where.fieldId !== fixture.fieldId) {
           return { count: 0 };
         }
-        fixture.fieldId = data.fieldId;
+        Object.assign(fixture, data);
         return { count: 1 };
       }),
     },
@@ -175,6 +188,94 @@ async function buildHarness(options: {
 }
 
 describe('TournamentOperationsFieldsService', () => {
+  it('경기 장소를 이름별로 가져오며 재실행·다른 주소·미정 장소·기존 배정을 보존한다', async () => {
+    const { service, moduleRef, tx } = await buildHarness({ assertAccess: jest.fn().mockResolvedValue(platformOpsPrincipal()), fixtureFieldId: fieldId });
+    tx.v1TeamMatch.findMany.mockResolvedValue([
+      { ...tx.fixture, placeName: ' A구장 ' }, { ...tx.fixture, placeName: 'A구장' },
+      { ...tx.fixture, placeName: 'B구장', placeAddress: '주소1' },
+      { ...tx.fixture, placeName: 'B구장', placeAddress: '주소2' },
+      { ...tx.fixture, placeName: '장소 미정' },
+    ] as never);
+    try {
+      await expect(service.importFixturePlaces(actorUserId, tournamentId, audit('import-1'))).resolves.toEqual({ addedCount: 2, existingCount: 0, updatedCount: 0 });
+      expect(tx.fieldStore.map((field) => field.name)).toEqual(['A구장', 'B구장']);
+      expect(tx.fieldStore[0].placeSnapshot).toMatchObject({ name: 'A구장' });
+      expect(tx.fieldStore[1].placeSnapshot).toBeUndefined();
+      expect(tx.fixture.fieldId).toBe(fieldId);
+      expect(tx.fixture.placeName).toBe('Court A');
+      await expect(service.importFixturePlaces(actorUserId, tournamentId, audit('import-2'))).resolves.toEqual({ addedCount: 0, existingCount: 2, updatedCount: 0 });
+      expect(tx.fieldStore).toHaveLength(2);
+      await expect(service.importFixturePlaces(actorUserId, tournamentId, audit('import-1'))).resolves.toEqual({ addedCount: 2, existingCount: 0, updatedCount: 0 });
+      expect(tx.fieldStore).toHaveLength(2);
+    } finally { await moduleRef.close(); }
+  });
+
+  it('같은 이름의 다른 주소가 추가되면 공용 장소만 해제하고 경기와 배정은 보존한다', async () => {
+    const { service, moduleRef, tx } = await buildHarness({ assertAccess: jest.fn().mockResolvedValue(platformOpsPrincipal()), fixtureFieldId: fieldId });
+    const place = { name: 'Court A', address: '주소1', latitude: null, longitude: null, provider: null, providerPlaceId: null };
+    tx.fieldStore.push({ id: fieldId, name: 'Court A', scopeKey: 'court-a', sortOrder: 0, active: true, version: 0, placeSnapshot: place });
+    const original = { ...tx.fixture };
+    tx.v1TeamMatch.findMany.mockResolvedValue([
+      { ...tx.fixture, placeAddress: '주소1' }, { ...tx.fixture, placeAddress: '주소2' },
+    ] as never);
+    tx.v1TournamentField.updateMany.mockImplementation(async (...args: unknown[]) => {
+      const { where, data } = args[0] as { where: { id: string; version: number }; data: { placeSnapshot: unknown } };
+      const row = tx.fieldStore.find((field) => field.id === where.id && field.version === where.version);
+      if (!row) return { count: 0 };
+      row.placeSnapshot = data.placeSnapshot === Prisma.DbNull ? null : data.placeSnapshot;
+      row.version++;
+      return { count: 1 };
+    });
+    try {
+      await expect(service.importFixturePlaces(actorUserId, tournamentId, audit('conflicting-addresses'))).resolves.toEqual({ addedCount: 0, existingCount: 1, updatedCount: 1 });
+      expect(tx.fieldStore[0]).toMatchObject({ id: fieldId, placeSnapshot: null, version: 1 });
+      expect(tx.fixture).toEqual(original);
+      expect(tx.v1TeamMatch.updateMany).not.toHaveBeenCalled();
+      await expect(service.importFixturePlaces(actorUserId, tournamentId, audit('conflicting-addresses-again'))).resolves.toEqual({ addedCount: 0, existingCount: 1, updatedCount: 0 });
+      expect(tx.v1TournamentField.updateMany).toHaveBeenCalledTimes(1);
+    } finally { await moduleRef.close(); }
+  });
+
+  it('미배정 경기를 이름으로 연결하며 실제 주소·좌표는 변경하지 않는다', async () => {
+    const { service, moduleRef, tx } = await buildHarness({ assertAccess: jest.fn().mockResolvedValue(platformOpsPrincipal()) });
+    const before = { ...tx.fixture };
+    try {
+      await service.importFixturePlaces(actorUserId, tournamentId, audit('link-unassigned'));
+      expect(tx.fixture).toEqual({ ...before, fieldId: tx.fieldStore[0].id });
+      await service.importFixturePlaces(actorUserId, tournamentId, audit('link-unassigned-again'));
+      expect(tx.v1TeamMatch.updateMany).toHaveBeenCalledTimes(1);
+    } finally { await moduleRef.close(); }
+  });
+
+  it('장소가 있는 경기의 필드만 따로 해제하지 않고 주소·배정을 보존한다', async () => {
+    const { service, moduleRef, tx } = await buildHarness({ assertAccess: jest.fn().mockResolvedValue(platformOpsPrincipal()), fixtureFieldId: fieldId });
+    const before = { ...tx.fixture };
+    try {
+      await expect(service.clearFixtureField(actorUserId, tournamentId, fixtureId, audit('clear-linked-place'))).rejects.toMatchObject({ response: { code: 'FIELD_PLACE_LINK_REQUIRED' } });
+      expect(tx.fixture).toEqual(before);
+      expect(tx.v1TeamMatch.updateMany).not.toHaveBeenCalled();
+    } finally { await moduleRef.close(); }
+  });
+
+  it('디렉터에게 경기 장소 가져오기 권한을 새로 부여하지 않는다', async () => {
+    const { service, moduleRef, tx } = await buildHarness({ assertAccess: jest.fn().mockResolvedValue({ ...platformOpsPrincipal(), role: 'tournament_director' }) });
+    try {
+      await expect(service.importFixturePlaces(actorUserId, tournamentId, audit('import-director'))).rejects.toBeInstanceOf(ForbiddenException);
+      expect(tx.fieldStore).toHaveLength(0);
+    } finally { await moduleRef.close(); }
+  });
+
+  it('필드 배정은 장소도 함께 저장하고 동일한 요청 재실행은 추가 쓰기를 하지 않는다', async () => {
+    const { service, moduleRef, tx } = await buildHarness({ assertAccess: jest.fn().mockResolvedValue(platformOpsPrincipal()) });
+    tx.fixture.placeName = '이전 구장';
+    try {
+      await service.assignFixtureField(actorUserId, tournamentId, fixtureId, { fieldId }, audit('assign-place'));
+      expect(tx.fixture).toMatchObject({ fieldId, placeName: 'Court A', placeLatitude: null, placeLongitude: null });
+      await service.assignFixtureField(actorUserId, tournamentId, fixtureId, { fieldId }, audit('assign-place'));
+      expect(tx.v1TeamMatch.updateMany).toHaveBeenCalledTimes(1);
+    } finally { await moduleRef.close(); }
+  });
+
   // Finding #8 -- authorization TOCTOU: a revoke that has already committed
   // must be visible to the recheck performed as the FIRST STATEMENT INSIDE
   // the write transaction (not a pre-check that gates whether the

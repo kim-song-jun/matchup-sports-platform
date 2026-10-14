@@ -103,10 +103,11 @@ export function toPlaceView(row: {
   placeLongitude: number | null;
   placeProvider: string | null;
   placeProviderId: string | null;
+  field?: { name: string } | null;
 }): PlaceView | null {
-  if (!row.placeName) return null;
+  if (!row.placeName && !row.field) return null;
   return {
-    name: row.placeName,
+    name: row.field?.name ?? row.placeName!,
     address: row.placeAddress,
     latitude: row.placeLatitude,
     longitude: row.placeLongitude,

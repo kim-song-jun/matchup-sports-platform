@@ -3770,6 +3770,8 @@ model V1TournamentField {
   tournamentId     String                        @map("tournament_id")
   scopeKey         String                        @map("scope_key")
   name             String
+  /// Optional reusable venue snapshot; historical matches retain their own place columns.
+  placeSnapshot    Json?                         @map("place_snapshot")
   sortOrder        Int                           @default(0) @map("sort_order")
   active           Boolean                       @default(true)
   version          Int                           @default(0)

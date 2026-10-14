@@ -1,6 +1,7 @@
 'use client';
 
 import { PlacePicker } from '@/components/v1-ui/place-picker';
+import { CompetitionFieldPicker } from '@/components/admin/competition-field-picker';
 import { PLACE_NAME_MAX_LENGTH } from '@/lib/place';
 import type { PlaceValue } from '@/lib/place';
 import { fixtureVenuePatch, fixtureVenueValue } from './fixture-venue-patch';
@@ -71,6 +72,7 @@ export function BracketNodePanel({
   const { requestReason, dialog: teamChangeDialog } = useStartedTeamChangeReason();
   const [scheduledAt, setScheduledAt] = useState(() => isoToKstDatetimeLocal(fixture.scheduledAt));
   const [venue, setVenue] = useState<PlaceValue | null>(fixtureVenueValue(fixture));
+  const [fieldId, setFieldId] = useState(fixture.fieldId ?? '');
   const [quickError, setQuickError] = useState<string | null>(null);
   const [homeSourceId, setHomeSourceId] = useState(() => fixture.bracketSources?.find((source) => source.side === 'HOME')?.fixtureId ?? '');
   const [awaySourceId, setAwaySourceId] = useState(() => fixture.bracketSources?.find((source) => source.side === 'AWAY')?.fixtureId ?? '');
@@ -258,7 +260,9 @@ export function BracketNodePanel({
       return;
     }
     updateFixture.mutate(
-      { fixtureId: fixture.id, ...(iso === null ? {} : { scheduledAt: iso }), ...fixtureVenuePatch(venue, fixture) },
+      { fixtureId: fixture.id, ...(iso === null ? {} : { scheduledAt: iso }),
+        ...(fieldId ? fieldId === fixture.fieldId ? {} : { fieldId }
+          : { ...(fixture.fieldId ? { fieldId: null } : {}), ...fixtureVenuePatch(venue, fixture) }) },
       {
         onSuccess: () => showToast('일정을 저장했어요.', 'success'),
         onError: (error) => showToast(describeBracketCanvasError(error, '일정을 저장하지 못했어요.'), 'error'),
@@ -426,14 +430,15 @@ export function BracketNodePanel({
               <label htmlFor={`${fixture.id}-scheduled`} className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>경기 시각</label>
               <input id={`${fixture.id}-scheduled`} type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} className="tm-input" style={{ minHeight: 44 }} />
             </div>
-            <PlacePicker
+            <CompetitionFieldPicker tournamentId={tournamentId} value={fieldId} onChange={setFieldId} disabled={updateFixture.isPending} />
+            {!fieldId ? <PlacePicker
               maxLength={PLACE_NAME_MAX_LENGTH.tournament}
               id={`${fixture.id}-venue`}
               label="장소"
               value={venue}
               onChange={setVenue}
               disabled={updateFixture.isPending}
-            />
+            /> : null}
             <Button type="submit" variant="outline" size="md" loading={updateFixture.isPending}>일정 저장</Button>
           </form>
         ) : (

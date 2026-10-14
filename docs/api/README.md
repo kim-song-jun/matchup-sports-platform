@@ -12,6 +12,8 @@ in the same change that discovers the drift.
 
 Team-match lifecycle (2026-10-13): unmatched elapsed recruitment is `closed`; cancelled matches are absent from user routes and retained in admin records. Admin reopening also clears an elapsed deadline. See [team matches](./domains/team-matches.md) and [admin/ops](./domains/admin-and-ops.md).
 
+Competition venue/field selection (2026-10-14): leagues and tournaments share a name-based field catalogue with reusable place snapshots. Existing fixture places/assignments are preserved; field selection saves place and assignment together. See [operations fields](./domains/tournament-operations.md#place-registry-integration-2026-10-14-task-20261082), [league fixtures](./domains/league-matches.md), and [tournament fixtures](./domains/tournaments.md).
+
 ## Read order
 
 1. [Global contract](./global-contract.md)

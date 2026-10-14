@@ -5077,9 +5077,9 @@ export function useV1UpdateFixture(tournamentId: string) {
         homeRegistrationId?: string | null;
         awayRegistrationId?: string | null;
       }) => v1Patch<V1UpdateFixtureResult>(`/admin/fixtures/${fixtureId}`, body),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournamentBracket(tournamentId) });
-      queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
+    onSuccess: (_result, variables) => {
+      invalidateCompetitionFieldViews(queryClient, tournamentId);
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamMatch(variables.fixtureId) });
     },
   });
 }
@@ -5688,11 +5688,34 @@ export function useV1CreateTournamentField(tournamentId: string) {
   });
 }
 
+function invalidateCompetitionFieldViews(queryClient: QueryClient, competitionId: string) {
+  for (const queryKey of [
+    v1Keys.tournamentOperationsBoardAll(competitionId), v1Keys.tournamentOperationsFields(competitionId),
+    v1Keys.adminTournamentBracket(competitionId), v1Keys.adminLeagueMatch(competitionId),
+    v1Keys.tournament(competitionId), v1Keys.leagueMatch(competitionId), v1Keys.myTournamentStaffAssignments(),
+    ['v1', 'public-game-records', 'schedule', competitionId],
+    ['v1', 'public-game-records', 'match', competitionId],
+    ['v1', 'public-game-records', 'league-fixture-record', competitionId],
+  ]) void queryClient.invalidateQueries({ queryKey });
+}
+
+export function useV1ImportTournamentFieldPlaces(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => v1Post<{ addedCount: number; existingCount: number; updatedCount: number }>(
+      `/tournament-ops/tournaments/${tournamentId}/fields/import-places`, {}, idempotencyInit(),
+    ),
+    onSuccess: () => {
+      invalidateCompetitionFieldViews(queryClient, tournamentId);
+    },
+  });
+}
+
 /**
  * 경기 ↔ 경기장(필드) 연결.
  *
- * `V1TournamentFixture.fieldId` 의 **유일한 쓰기 경로**다(백엔드 DTO 주석이 그렇게 못박고
- * 있다). 백엔드는 Task 18 때부터 있었는데 호출부가 없어서, 필드를 만들어 스태프에게
+ * 운영 콘솔·모바일 경기 시트에서 canonical TeamMatch의 필드와 장소를 함께 저장한다.
+ * 관리자 경기 설정 PATCH도 같은 선택을 지원한다. 백엔드는 Task 18 때부터 있었는데 호출부가 없어서, 필드를 만들어 스태프에게
  * 배정해도 그 필드에 걸린 경기가 영원히 0건이었다 — 필드 담당자는 담당 경기를 가질 수
  * 없었고, `NO_FIELD_ASSIGNED`·`NO_STAFF_ASSIGNED` 경고는 끌 방법이 없어 운영 보드에서
  * 통째로 숨겨져 있었다(2026-08-13 alpha 실측: 픽스처 20건 전부 `fieldId=null`).
@@ -5702,7 +5725,7 @@ export function useV1CreateTournamentField(tournamentId: string) {
  * 구분되지 않아서, 백엔드가 의도적으로 갈라 놓았다.
  *
  * 권한: 필드 *관리*(생성·수정)와 달리 플랫폼 운영자 전용이 아니다. 서버는
- * `event_reverse` 권한으로 판정하므로 **플랫폼 운영자와 대회 디렉터**가 통과하고,
+ * `tournament_admin` 권한으로 판정하므로 **플랫폼 운영자와 대회 디렉터**가 통과하고,
  * 필드 담당자·조회 전용은 거부된다. 호출 화면에서 역할을 먼저 가릴 것.
  *
  * 보드가 `fieldName` 을 직접 렌더하므로 성공 시 보드 쿼리도 함께 무효화한다.
@@ -5716,9 +5739,9 @@ export function useV1AssignFixtureField(tournamentId: string) {
         { fieldId },
         idempotencyInit(),
       ),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.tournamentOperationsBoardAll(tournamentId) });
-      queryClient.invalidateQueries({ queryKey: v1Keys.tournamentOperationsFields(tournamentId) });
+    onSuccess: (_result, variables) => {
+      invalidateCompetitionFieldViews(queryClient, tournamentId);
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamMatch(variables.fixtureId) });
     },
   });
 }
@@ -5734,8 +5757,7 @@ export function useV1ClearFixtureField(tournamentId: string) {
         idempotencyInit(),
       ),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.tournamentOperationsBoardAll(tournamentId) });
-      queryClient.invalidateQueries({ queryKey: v1Keys.tournamentOperationsFields(tournamentId) });
+      invalidateCompetitionFieldViews(queryClient, tournamentId);
     },
   });
 }
@@ -6060,8 +6082,9 @@ export function useV1UpdateLeagueFixture(leagueId: string) {
   return useMutation({
     mutationFn: ({ teamMatchId, body }: { teamMatchId: string; body: V1UpdateLeagueFixturePayload }) =>
       v1Patch<V1UpdateLeagueFixtureResult>(`/admin/league-matches/${leagueId}/fixtures/${teamMatchId}`, body),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
+    onSuccess: (_result, variables) => {
+      invalidateCompetitionFieldViews(queryClient, leagueId);
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamMatch(variables.teamMatchId) });
     },
   });
 }

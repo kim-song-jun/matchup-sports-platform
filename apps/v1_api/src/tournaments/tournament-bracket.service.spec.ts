@@ -26,6 +26,7 @@ import { TournamentBracketService } from './tournament-bracket.service';
 import { GamesService } from '../games/games.service';
 import { FOOTBALL_V1_CONFIG } from './competition-config/competition-config';
 import { kindAwareFindFirst } from '../../test/helpers/kind-aware-find-first';
+import { competitionFieldDelegate } from '../../test/helpers/competition-field-delegate';
 import { assignSlotInTx } from './slots/tournament-slot.service';
 import { assertSidesNotSlotLinked, assignTournamentFixtureSideInTx, type GroupEnrollment, createEmptyTournamentFixtureInTx, createGroupInTx, softDeleteTournamentFixtureInTx } from './tournament-bracket-tx';
 
@@ -291,6 +292,7 @@ const mockAssignSlotInTx = assignSlotInTx as jest.Mock;
 describe('TournamentBracketService', () => {
   let service: TournamentBracketService;
   let prisma: {
+    v1TournamentField: ReturnType<typeof competitionFieldDelegate>;
     v1AdminUser: { findUnique: jest.Mock };
     v1Tournament: { findFirst: jest.Mock };
     v1TournamentSlot: { findMany: jest.Mock; findFirst: jest.Mock };
@@ -324,6 +326,7 @@ describe('TournamentBracketService', () => {
 
   beforeEach(async () => {
     prisma = {
+      v1TournamentField: competitionFieldDelegate(),
       v1AdminUser: { findUnique: jest.fn() },
       v1Tournament: { findFirst: jest.fn().mockResolvedValue(tournamentRow({ status: 'closed' })) },
       v1TournamentSlot: { findMany: jest.fn().mockResolvedValue([]), findFirst: jest.fn().mockResolvedValue(null) },

@@ -529,4 +529,4 @@ Implementation and isolated API/browser evidence tracked in Task 156; production
 - 최종 로컬 검증: 관련 API 297/297, Web 225/225; 양 앱 lint(타입+표면/패턴) 통과, diff --check 통과. 참석명단·기록 직접 URL의 사용자 비노출과 활성 관리자 기록 유지도 반영. 실제 DB/Alpha 배포/실화면 390·768·1440 검증은 여전히 미완료이며 운영 데이터는 변경하지 않았다.
 - [어드민 리그 기본 정보 수정](admin-league-basic-edit.md): Task 20261075, 로컬 190개 테스트·타입·표면/패턴 PASS. Alpha 390/768/1440 및 실제 로그인 흐름 대기.
 
-- [리그 상세 진입 통일](./league-detail-routes.md): 14/14 코드 정리, dev/alpha 검증 진행 — Task 20261080 후속.
+- [리그 상세 진입 통일](./league-detail-routes.md): 14/14 코드 정리·dev/alpha 배포 완료, 공개 진입24/24 PASS(390/768/1440). 로그인 persona 미실측·기존 검색 경고 별도 기록 — Task 20261080 후속.

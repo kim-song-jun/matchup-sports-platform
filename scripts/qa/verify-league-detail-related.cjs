@@ -20,11 +20,11 @@ async function main(){
   ];
   for(const item of scenarios){try{
    await page.goto(origin+item.route,{waitUntil:'domcontentloaded'});const control=item.select();await control.waitFor({state:'visible',timeout:20000});
-   await page.screenshot({path:path.join(out,width+'-'+item.name+'.png')});await control.click();
+   await control.scrollIntoViewIfNeeded(); await page.waitForFunction(()=>Array.from(document.querySelectorAll('.tm-skeleton')).every(el=>!el.getClientRects().length),{},{timeout:20000}); await page.screenshot({animations:'disabled',path:path.join(out,width+'-'+item.name+'.png')});await control.click();
    await page.waitForURL(url=>url.pathname.endsWith('/'+item.target),{timeout:20000});
    const actual=new URL(page.url());const passed=phase==='before'||actual.pathname==='/tournaments/'+item.target;
    results.push({width,scenario:item.name,passed,url:actual.pathname+actual.search});
-  }catch(error){results.push({width,scenario:item.name,passed:item.name==='team'?undefined:false,blocked:item.name==='team',error:error.message});await page.screenshot({path:path.join(out,width+'-'+item.name+'-error.png')});}}
+  }catch(error){results.push({width,scenario:item.name,passed:item.name==='team'?undefined:false,blocked:item.name==='team',error:error.message});await page.waitForFunction(()=>Array.from(document.querySelectorAll('.tm-skeleton')).every(el=>!el.getClientRects().length),{},{timeout:20000}); await page.screenshot({animations:'disabled',path:path.join(out,width+'-'+item.name+'-error.png')});}}
   results.push({width,errors,failed});await context.close();
  }}finally{await browser.close();await server.close();await fs.writeFile(path.join(out,'related-evidence.json'),JSON.stringify(results,null,2));}
  console.log(JSON.stringify(results));if(results.some(r=>r.passed===false))process.exitCode=1;

@@ -96,27 +96,27 @@ PR 전 검증: 최신 dev와 원래 검증한 상세 source/test 바이트 동�
 
 
 ## Follow-up: unify every public league detail entry (2026-10-14)
-Status: In Progress
+Status: Done
 
 ### Context / Goal
 User approved all entry points from the 14-category inventory to use /tournaments/:id.
 ### Original Conditions
-- [ ] Home recommendation/sidebar, search, my leagues, team detail, apply/my-registration returns, sibling links, fixture/awards returns, operations CTA, notifications and SEO use canonical detail.
-- [ ] Existing /league-matches/:id and /leagues/:id bookmarks redirect with query preserved.
-- [ ] Fixture, awards, roster, admin and API routes retain their contracts.
+- [x] Home recommendation/sidebar, search, my leagues, team detail, apply/my-registration returns, sibling links, fixture/awards returns, operations CTA, notifications and SEO use canonical detail.
+- [x] Existing /league-matches/:id and /leagues/:id bookmarks redirect with query preserved.
+- [x] Fixture, awards, roster, admin and API routes retain their contracts.
 ### User / Test Scenarios
 Follow discovery links and return to original filtered source. Open historical notifications/bookmarks. Check fixture IDs, parent links, unknown IDs, unsafe notification URLs and query/hash preservation. Update consumer expectations; no schema or response-shape changes.
 ### Parallel Work Breakdown / Ownership
 Single agent sequential. Owned: v1 public detail navigation, notification links, associated tests/docs. Forbidden: admin/API endpoint paths, roster policy and unrelated WIP.
 ### Acceptance Criteria
-- [ ] 14/14 entry categories aligned; regression tests/typechecks pass.
-- [ ] dev review/deploy and alpha runtime checks complete; report unavailable authenticated personas.
+- [x] 14/14 entry categories aligned; regression tests/typechecks pass.
+- [x] dev review/deploy and alpha runtime checks complete; report unavailable authenticated personas.
 ### Tech Debt Resolved / Security Notes / Risks & Dependencies
 Fix historical /leagues/:id dead links. Preserve safe internal from validation. Redirect detail roots only. Reuse user-selected existing detail UI.
 ### Ambiguity Log
 2026-10-14: User requested all entries after inventory; previous list-only restriction superseded.
 ### Progress Snapshot
-Base origin/dev=dde8964ca. Worktree _worktrees/league-detail-routes. Phase 1 inventory complete; Phase 2 implementation in progress; Phase 3 validation/review/deploy pending.
+Base origin/dev=dde8964ca. Worktree _worktrees/league-detail-routes. Phases 1–3 complete. PR #1918 merged to dev; alpha release verified.
 
 검증 진행: 14/14 진입 유형 코드 수정·감사 완료. Web 소비자/복귀/SEO 회귀 green, Web tsc PASS, API 알림·명단 테스트 81/81 PASS. API tsc/표면 검사 진행. 기존 상세/죽은 알림 링크 before를 390/768/1440에서 수집(구 주소200, /leagues 주소404, 목록 클릭 정상). 비로그인 auth/consent 401 외 pageerror 없음. Headed browser는 finally에서 종료. 로그인 persona의 마이·신청·팀 멤버 화면은 단위 consumer로 검증했고 alpha 로그인 실측은 아직 미실행.
 
@@ -125,3 +125,14 @@ Base origin/dev=dde8964ca. Worktree _worktrees/league-detail-routes. Phase 1 inv
 추가 적대 검토: 알림 아이콘이 구 경로에 의존함을 발견. 새 알림 링크의 kind=league와 기존 알림 정규화에 같은 구분을 보존하고 알림 카드/시트는 해당 정보를 사용한다. API 알림78/78, Web 추가32/32 PASS. 셸 기본 복귀/선수 기록 빈 상태의 이전 주소 단언도 동기화했다.
 
 PR #1918 head73c1523ba, base dev. 추가 before 검색/팀/경기/시상12/12 클릭 성공. /search hydration #418은 기존 배포에서도 재현되는 별도 baseline. 증거는 docs/league-detail-routes-qa 브랜치에 보존하여 제품 PR CI를 다시 시작하지 않는다. Copilot 요청2회, 현재 review0. 정책 Gates PASS, 전체 Web/API CI 대기.
+
+
+### Final deployment / QA (2026-10-14 KST)
+- PR #1918 merged as 948948dcf32873a785dfc243cc06e39fc6d44df7. PR CI 38507833111 and dev CI 38509055778 SUCCESS; alpha run 38509055803 SUCCESS.
+- Copilot 요청 3회 미응답에 대해 사용자가 “CI 통과 후 예외 적용하여 dev 배포”를 명시 승인했다. Copilot clean 결과를 받은 것으로 기록하지 않는다.
+- alpha X-Teameet-Commit=948948dcf32873a785dfc243cc06e39fc6d44df7, release=1.9.0-alpha.20261014.g948948dcf328, API health db=true. 로컬 dev 작업트리도 origin/dev로 ff-only 동기화했다.
+- 전체 14/14 유형 코드 정리 완료. 공개 방문자 390/768/1440에서 홈·목록·검색·팀·경기 상위·시상 상위 클릭 18/18, 기존 주소 두 종류 리다이렉트 6/6: 총24/24 PASS. 복귀 from 보존, 상세 가로 넘침 없음, 21개 after 화면 확인.
+- 홈/목록/상세 pageerror 없음. 검색 React hydration #418은 before/after 동일한 기존 문제이며 링크 이동은 성공했다. 네트워크 실패는 비로그인 auth/me 및 record-consent 401뿐이다.
+- 로그인 persona의 마이·신청·팀 멤버 화면은 consumer 회귀 테스트/CI로 검증했고 alpha 로그인 수동 QA는 미실행이다. 이전 LIVE 진입 요청의 참가자 수동 QA 미완료 항목은 이 후속 작업이 대신 완료 처리하지 않는다. 따라서 상위 task Review 상태는 보존한다.
+- 증거: docs/screenshots/league-detail-routes/{before,after} 및 docs/scenarios/league-detail-routes.md. QA 캡처의 로딩 대기를 DOM skeleton 기준으로 보완했다. 최초 networkidle 대기는 반복 통신 때문에 timeout되어 사용하지 않았다.
+- 최종 브라우저 소유 PID: node41616(parent38264)/chrome21788, node38712(parent38656)/chrome40216. finally browser.close/server.close 수행 및 종료 확인. 데이터 변경 없음.

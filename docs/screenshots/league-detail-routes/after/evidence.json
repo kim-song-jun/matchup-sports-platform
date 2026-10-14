@@ -1,0 +1,493 @@
+[
+  {
+    "width": 390,
+    "route": "/home",
+    "landed": "/home",
+    "links": [
+      {
+        "text": "(테스트)1014풋살 · 10/14 (수)~11/11 (수) · 4팀 참가",
+        "href": "/tournaments/87ba8a61-c590-4789-9479-8216fdb99b6e?from=%2Fhome"
+      },
+      {
+        "text": "1013 리그 LIVE페이지 TEST풋살 · 10/14 (수)~11/25 (수) · 4팀 참가",
+        "href": "/tournaments/e299ce2f-4076-4f62-9c4f-6dae67d485e0?from=%2Fhome"
+      },
+      {
+        "text": "수요일 10월풋살 · 10/14 (수)~11/25 (수) · 4팀 참가",
+        "href": "/tournaments/8576abc8-5f5f-46b3-bbe3-ccd531e709d4?from=%2Fhome"
+      },
+      {
+        "text": "(테스트)10.13풋살 · 10/13 (화)~11/12 (목) · 8팀 참가",
+        "href": "/tournaments/5c8bb5ac-59f7-4127-adee-c11906f67ae0?from=%2Fhome"
+      }
+    ]
+  },
+  {
+    "width": 390,
+    "action": "home-league-click",
+    "url": "https://alpha.teameet.co.kr/tournaments/87ba8a61-c590-4789-9479-8216fdb99b6e?from=%2Fhome"
+  },
+  {
+    "width": 390,
+    "route": "/tournaments?kind=league",
+    "landed": "/tournaments",
+    "links": [
+      {
+        "text": "(테스트) 9.16진행 중풋살리그9/16 (수)~10/27 (화)3팀 참가",
+        "href": "/tournaments/aef0d98f-17eb-4590-b27d-a2d8bab765e6?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "(테스트) A-L 시즌티어검증 1시즌 1부진행 중풋살리그9/17 (목)~12/16 (수)2팀 참가",
+        "href": "/tournaments/525bd67a-e54b-41ad-a9bb-31415b882ced?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "서울 나이트 풋살 리그진행 중풋살리그9/20 (일)~10/18 (일)5팀 참가",
+        "href": "/tournaments/ad100000-0000-4000-8000-000000000001?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "(QA179) 명단 조정 리그진행 중풋살리그10/1 (목)~11/30 (월)2팀 참가",
+        "href": "/tournaments/9380735e-c60c-40e7-b856-9ea3cb7ffeb4?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "QA1001 Android 토스트 자책골 재검증진행 중풋살리그10/1 (목)~10/3 (토)2팀 참가",
+        "href": "/tournaments/fdf43b68-5d55-4593-bd2d-e45bce465651?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "(테스트) 알파 재구축 정규 리그 2026 가을진행 중풋살리그10/4 (일)~11/29 (일)6팀 참가",
+        "href": "/tournaments/33767023-5e85-4393-910a-9e26b9657b69?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "ㄱㄱㄱㄱ진행 중풋살리그10/13 (화)~10/14 (수)4팀 참가",
+        "href": "/tournaments/2642970d-256b-49b5-95c6-9468fcc23a12?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "(테스트)10.13진행 중풋살리그10/13 (화)~11/12 (목)8팀 참가",
+        "href": "/tournaments/5c8bb5ac-59f7-4127-adee-c11906f67ae0?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "수요일진행 중풋살리그10/14 (수)4팀 참가",
+        "href": "/tournaments/059e9009-ea9b-441f-9334-e883749b7ea1?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "(QA) 1013 템플릿 UI진행 중풋살리그10/14 (수)~12/31 (목)4팀 참가",
+        "href": "/tournaments/1701404b-317b-4018-a90d-2d160b6af45d?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "수요일 10월진행 중풋살리그10/14 (수)~11/25 (수)4팀 참가",
+        "href": "/tournaments/8576abc8-5f5f-46b3-bbe3-ccd531e709d4?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "(테스트)1014진행 중풋살리그10/14 (수)~11/11 (수)4팀 참가",
+        "href": "/tournaments/87ba8a61-c590-4789-9479-8216fdb99b6e?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "수원 여성 리그진행 중풋살리그10/14 (수)~11/25 (수)4팀 참가",
+        "href": "/tournaments/a4e8bcdb-878e-47c1-ad7b-9eee206cd62e?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "(테스트)1013 대진생성 리그진행 중풋살리그10/14 (수)~12/31 (목)4팀 참가",
+        "href": "/tournaments/c37f4a30-1acb-4f71-b154-89d1df13ce2e?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "(테스트)1013 한경기씩 리그진행 중풋살리그10/14 (수)~12/31 (목)4팀 참가",
+        "href": "/tournaments/d8c05237-314c-4ccd-83ae-069e0f5a7ef7?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "1013 리그 LIVE페이지 TEST진행 중풋살리그10/14 (수)~11/25 (수)수원대학교4팀 참가",
+        "href": "/tournaments/e299ce2f-4076-4f62-9c4f-6dae67d485e0?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "(테스트)1013 템플릿 리그진행 중풋살리그10/14 (수)~12/31 (목)4팀 참가",
+        "href": "/tournaments/21236202-5e41-4038-ae6e-f742bc87807b?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "(테스트)1013 총경기수 리그진행 중풋살리그10/14 (수)~12/31 (목)4팀 참가",
+        "href": "/tournaments/5221851f-7a3c-4ff0-9006-adb3dac4c973?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "1013 리그 테스트진행 중풋살리그10/20 (화)~11/3 (화)3팀 참가",
+        "href": "/tournaments/f56750e0-1466-4512-a394-d74aaee422af?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "(QA) 1013 하루경기수 리그진행 중풋살리그10/20 (화)~12/31 (목)6팀 참가",
+        "href": "/tournaments/7d968798-ab64-4656-879b-af22bc508986?from=%2Ftournaments%3Fkind%3Dleague"
+      }
+    ]
+  },
+  {
+    "width": 390,
+    "action": "list-click",
+    "url": "https://alpha.teameet.co.kr/tournaments/aef0d98f-17eb-4590-b27d-a2d8bab765e6?from=%2Ftournaments%3Fkind%3Dleague"
+  },
+  {
+    "width": 390,
+    "alias": "/league-matches/",
+    "status": 200,
+    "path": "/tournaments/aef0d98f-17eb-4590-b27d-a2d8bab765e6",
+    "from": "/home"
+  },
+  {
+    "width": 390,
+    "alias": "/leagues/",
+    "status": 200,
+    "path": "/tournaments/aef0d98f-17eb-4590-b27d-a2d8bab765e6",
+    "from": "/home"
+  },
+  {
+    "width": 390,
+    "errors": [],
+    "failed": [
+      {
+        "path": "/api/v1/me/record-consent",
+        "status": 401
+      },
+      {
+        "path": "/api/v1/auth/me",
+        "status": 401
+      },
+      {
+        "path": "/api/v1/auth/me",
+        "status": 401
+      },
+      {
+        "path": "/api/v1/auth/me",
+        "status": 401
+      }
+    ],
+    "overflow": false
+  },
+  {
+    "width": 768,
+    "route": "/home",
+    "landed": "/home",
+    "links": [
+      {
+        "text": "(테스트) 알파 재구축 정규 대회풋살 · 9/27 (일) · 2/4팀",
+        "href": "/tournaments/7e04a6e9-4d5c-4a90-89dc-6865130c6a99?from=%2Fhome"
+      },
+      {
+        "text": "(테스트) 버퍼링재현 대회 0918풋살 · 9/30 (수) · 0/8팀",
+        "href": "/tournaments/35cbdff3-c661-4970-ad7a-4b1665d90fa7?from=%2Fhome"
+      },
+      {
+        "text": "QA 1001 test풋살 · 10/3 (토)~10/4 (일) · 4/8팀",
+        "href": "/tournaments/7a3b65be-5a49-4234-843f-e7c71e4842a7?from=%2Fhome"
+      },
+      {
+        "text": "(테스트) 라인업 확인용 대회풋살 · 10/5 (월) · 0/8팀",
+        "href": "/tournaments/23ddb2f5-693d-4368-8eda-5492e7ab7a8c?from=%2Fhome"
+      },
+      {
+        "text": "(테스트)1014풋살 · 10/14 (수)~11/11 (수) · 4팀 참가",
+        "href": "/tournaments/87ba8a61-c590-4789-9479-8216fdb99b6e?from=%2Fhome"
+      },
+      {
+        "text": "1013 리그 LIVE페이지 TEST풋살 · 10/14 (수)~11/25 (수) · 4팀 참가",
+        "href": "/tournaments/e299ce2f-4076-4f62-9c4f-6dae67d485e0?from=%2Fhome"
+      },
+      {
+        "text": "수요일 10월풋살 · 10/14 (수)~11/25 (수) · 4팀 참가",
+        "href": "/tournaments/8576abc8-5f5f-46b3-bbe3-ccd531e709d4?from=%2Fhome"
+      },
+      {
+        "text": "(테스트)10.13풋살 · 10/13 (화)~11/12 (목) · 8팀 참가",
+        "href": "/tournaments/5c8bb5ac-59f7-4127-adee-c11906f67ae0?from=%2Fhome"
+      }
+    ]
+  },
+  {
+    "width": 768,
+    "action": "home-league-click",
+    "url": "https://alpha.teameet.co.kr/tournaments/87ba8a61-c590-4789-9479-8216fdb99b6e?from=%2Fhome"
+  },
+  {
+    "width": 768,
+    "route": "/tournaments?kind=league",
+    "landed": "/tournaments",
+    "links": [
+      {
+        "text": "(테스트) 9.16진행 중풋살리그9/16 (수)~10/27 (화)3팀 참가",
+        "href": "/tournaments/aef0d98f-17eb-4590-b27d-a2d8bab765e6?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "(테스트) A-L 시즌티어검증 1시즌 1부진행 중풋살리그9/17 (목)~12/16 (수)2팀 참가",
+        "href": "/tournaments/525bd67a-e54b-41ad-a9bb-31415b882ced?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "서울 나이트 풋살 리그진행 중풋살리그9/20 (일)~10/18 (일)5팀 참가",
+        "href": "/tournaments/ad100000-0000-4000-8000-000000000001?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "(QA179) 명단 조정 리그진행 중풋살리그10/1 (목)~11/30 (월)2팀 참가",
+        "href": "/tournaments/9380735e-c60c-40e7-b856-9ea3cb7ffeb4?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "QA1001 Android 토스트 자책골 재검증진행 중풋살리그10/1 (목)~10/3 (토)2팀 참가",
+        "href": "/tournaments/fdf43b68-5d55-4593-bd2d-e45bce465651?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "(테스트) 알파 재구축 정규 리그 2026 가을진행 중풋살리그10/4 (일)~11/29 (일)6팀 참가",
+        "href": "/tournaments/33767023-5e85-4393-910a-9e26b9657b69?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "ㄱㄱㄱㄱ진행 중풋살리그10/13 (화)~10/14 (수)4팀 참가",
+        "href": "/tournaments/2642970d-256b-49b5-95c6-9468fcc23a12?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "(테스트)10.13진행 중풋살리그10/13 (화)~11/12 (목)8팀 참가",
+        "href": "/tournaments/5c8bb5ac-59f7-4127-adee-c11906f67ae0?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "수요일진행 중풋살리그10/14 (수)4팀 참가",
+        "href": "/tournaments/059e9009-ea9b-441f-9334-e883749b7ea1?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "(QA) 1013 템플릿 UI진행 중풋살리그10/14 (수)~12/31 (목)4팀 참가",
+        "href": "/tournaments/1701404b-317b-4018-a90d-2d160b6af45d?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "수요일 10월진행 중풋살리그10/14 (수)~11/25 (수)4팀 참가",
+        "href": "/tournaments/8576abc8-5f5f-46b3-bbe3-ccd531e709d4?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "(테스트)1014진행 중풋살리그10/14 (수)~11/11 (수)4팀 참가",
+        "href": "/tournaments/87ba8a61-c590-4789-9479-8216fdb99b6e?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "수원 여성 리그진행 중풋살리그10/14 (수)~11/25 (수)4팀 참가",
+        "href": "/tournaments/a4e8bcdb-878e-47c1-ad7b-9eee206cd62e?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "(테스트)1013 대진생성 리그진행 중풋살리그10/14 (수)~12/31 (목)4팀 참가",
+        "href": "/tournaments/c37f4a30-1acb-4f71-b154-89d1df13ce2e?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "(테스트)1013 한경기씩 리그진행 중풋살리그10/14 (수)~12/31 (목)4팀 참가",
+        "href": "/tournaments/d8c05237-314c-4ccd-83ae-069e0f5a7ef7?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "1013 리그 LIVE페이지 TEST진행 중풋살리그10/14 (수)~11/25 (수)수원대학교4팀 참가",
+        "href": "/tournaments/e299ce2f-4076-4f62-9c4f-6dae67d485e0?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "(테스트)1013 템플릿 리그진행 중풋살리그10/14 (수)~12/31 (목)4팀 참가",
+        "href": "/tournaments/21236202-5e41-4038-ae6e-f742bc87807b?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "(테스트)1013 총경기수 리그진행 중풋살리그10/14 (수)~12/31 (목)4팀 참가",
+        "href": "/tournaments/5221851f-7a3c-4ff0-9006-adb3dac4c973?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "1013 리그 테스트진행 중풋살리그10/20 (화)~11/3 (화)3팀 참가",
+        "href": "/tournaments/f56750e0-1466-4512-a394-d74aaee422af?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "(QA) 1013 하루경기수 리그진행 중풋살리그10/20 (화)~12/31 (목)6팀 참가",
+        "href": "/tournaments/7d968798-ab64-4656-879b-af22bc508986?from=%2Ftournaments%3Fkind%3Dleague"
+      }
+    ]
+  },
+  {
+    "width": 768,
+    "action": "list-click",
+    "url": "https://alpha.teameet.co.kr/tournaments/aef0d98f-17eb-4590-b27d-a2d8bab765e6?from=%2Ftournaments%3Fkind%3Dleague"
+  },
+  {
+    "width": 768,
+    "alias": "/league-matches/",
+    "status": 200,
+    "path": "/tournaments/aef0d98f-17eb-4590-b27d-a2d8bab765e6",
+    "from": "/home"
+  },
+  {
+    "width": 768,
+    "alias": "/leagues/",
+    "status": 200,
+    "path": "/tournaments/aef0d98f-17eb-4590-b27d-a2d8bab765e6",
+    "from": "/home"
+  },
+  {
+    "width": 768,
+    "errors": [],
+    "failed": [
+      {
+        "path": "/api/v1/me/record-consent",
+        "status": 401
+      },
+      {
+        "path": "/api/v1/auth/me",
+        "status": 401
+      },
+      {
+        "path": "/api/v1/auth/me",
+        "status": 401
+      },
+      {
+        "path": "/api/v1/auth/me",
+        "status": 401
+      },
+      {
+        "path": "/api/v1/auth/me",
+        "status": 401
+      }
+    ],
+    "overflow": false
+  },
+  {
+    "width": 1440,
+    "route": "/home",
+    "landed": "/home",
+    "links": [
+      {
+        "text": "(테스트)1014풋살 · 10/14 (수)~11/11 (수) · 4팀 참가",
+        "href": "/tournaments/87ba8a61-c590-4789-9479-8216fdb99b6e?from=%2Fhome"
+      },
+      {
+        "text": "1013 리그 LIVE페이지 TEST풋살 · 10/14 (수)~11/25 (수) · 4팀 참가",
+        "href": "/tournaments/e299ce2f-4076-4f62-9c4f-6dae67d485e0?from=%2Fhome"
+      },
+      {
+        "text": "수요일 10월풋살 · 10/14 (수)~11/25 (수) · 4팀 참가",
+        "href": "/tournaments/8576abc8-5f5f-46b3-bbe3-ccd531e709d4?from=%2Fhome"
+      },
+      {
+        "text": "(테스트)10.13풋살 · 10/13 (화)~11/12 (목) · 8팀 참가",
+        "href": "/tournaments/5c8bb5ac-59f7-4127-adee-c11906f67ae0?from=%2Fhome"
+      }
+    ]
+  },
+  {
+    "width": 1440,
+    "action": "home-league-click",
+    "url": "https://alpha.teameet.co.kr/tournaments/87ba8a61-c590-4789-9479-8216fdb99b6e?from=%2Fhome"
+  },
+  {
+    "width": 1440,
+    "route": "/tournaments?kind=league",
+    "landed": "/tournaments",
+    "links": [
+      {
+        "text": "(테스트) 9.16진행 중풋살리그9/16 (수)~10/27 (화)3팀 참가",
+        "href": "/tournaments/aef0d98f-17eb-4590-b27d-a2d8bab765e6?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "(테스트) A-L 시즌티어검증 1시즌 1부진행 중풋살리그9/17 (목)~12/16 (수)2팀 참가",
+        "href": "/tournaments/525bd67a-e54b-41ad-a9bb-31415b882ced?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "서울 나이트 풋살 리그진행 중풋살리그9/20 (일)~10/18 (일)5팀 참가",
+        "href": "/tournaments/ad100000-0000-4000-8000-000000000001?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "(QA179) 명단 조정 리그진행 중풋살리그10/1 (목)~11/30 (월)2팀 참가",
+        "href": "/tournaments/9380735e-c60c-40e7-b856-9ea3cb7ffeb4?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "QA1001 Android 토스트 자책골 재검증진행 중풋살리그10/1 (목)~10/3 (토)2팀 참가",
+        "href": "/tournaments/fdf43b68-5d55-4593-bd2d-e45bce465651?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "(테스트) 알파 재구축 정규 리그 2026 가을진행 중풋살리그10/4 (일)~11/29 (일)6팀 참가",
+        "href": "/tournaments/33767023-5e85-4393-910a-9e26b9657b69?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "ㄱㄱㄱㄱ진행 중풋살리그10/13 (화)~10/14 (수)4팀 참가",
+        "href": "/tournaments/2642970d-256b-49b5-95c6-9468fcc23a12?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "(테스트)10.13진행 중풋살리그10/13 (화)~11/12 (목)8팀 참가",
+        "href": "/tournaments/5c8bb5ac-59f7-4127-adee-c11906f67ae0?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "수요일진행 중풋살리그10/14 (수)4팀 참가",
+        "href": "/tournaments/059e9009-ea9b-441f-9334-e883749b7ea1?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "(QA) 1013 템플릿 UI진행 중풋살리그10/14 (수)~12/31 (목)4팀 참가",
+        "href": "/tournaments/1701404b-317b-4018-a90d-2d160b6af45d?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "수요일 10월진행 중풋살리그10/14 (수)~11/25 (수)4팀 참가",
+        "href": "/tournaments/8576abc8-5f5f-46b3-bbe3-ccd531e709d4?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "(테스트)1014진행 중풋살리그10/14 (수)~11/11 (수)4팀 참가",
+        "href": "/tournaments/87ba8a61-c590-4789-9479-8216fdb99b6e?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "수원 여성 리그진행 중풋살리그10/14 (수)~11/25 (수)4팀 참가",
+        "href": "/tournaments/a4e8bcdb-878e-47c1-ad7b-9eee206cd62e?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "(테스트)1013 대진생성 리그진행 중풋살리그10/14 (수)~12/31 (목)4팀 참가",
+        "href": "/tournaments/c37f4a30-1acb-4f71-b154-89d1df13ce2e?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "(테스트)1013 한경기씩 리그진행 중풋살리그10/14 (수)~12/31 (목)4팀 참가",
+        "href": "/tournaments/d8c05237-314c-4ccd-83ae-069e0f5a7ef7?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "1013 리그 LIVE페이지 TEST진행 중풋살리그10/14 (수)~11/25 (수)수원대학교4팀 참가",
+        "href": "/tournaments/e299ce2f-4076-4f62-9c4f-6dae67d485e0?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "(테스트)1013 템플릿 리그진행 중풋살리그10/14 (수)~12/31 (목)4팀 참가",
+        "href": "/tournaments/21236202-5e41-4038-ae6e-f742bc87807b?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "(테스트)1013 총경기수 리그진행 중풋살리그10/14 (수)~12/31 (목)4팀 참가",
+        "href": "/tournaments/5221851f-7a3c-4ff0-9006-adb3dac4c973?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "1013 리그 테스트진행 중풋살리그10/20 (화)~11/3 (화)3팀 참가",
+        "href": "/tournaments/f56750e0-1466-4512-a394-d74aaee422af?from=%2Ftournaments%3Fkind%3Dleague"
+      },
+      {
+        "text": "(QA) 1013 하루경기수 리그진행 중풋살리그10/20 (화)~12/31 (목)6팀 참가",
+        "href": "/tournaments/7d968798-ab64-4656-879b-af22bc508986?from=%2Ftournaments%3Fkind%3Dleague"
+      }
+    ]
+  },
+  {
+    "width": 1440,
+    "action": "list-click",
+    "url": "https://alpha.teameet.co.kr/tournaments/aef0d98f-17eb-4590-b27d-a2d8bab765e6?from=%2Ftournaments%3Fkind%3Dleague"
+  },
+  {
+    "width": 1440,
+    "alias": "/league-matches/",
+    "status": 200,
+    "path": "/tournaments/aef0d98f-17eb-4590-b27d-a2d8bab765e6",
+    "from": "/home"
+  },
+  {
+    "width": 1440,
+    "alias": "/leagues/",
+    "status": 200,
+    "path": "/tournaments/aef0d98f-17eb-4590-b27d-a2d8bab765e6",
+    "from": "/home"
+  },
+  {
+    "width": 1440,
+    "errors": [],
+    "failed": [
+      {
+        "path": "/api/v1/me/record-consent",
+        "status": 401
+      },
+      {
+        "path": "/api/v1/auth/me",
+        "status": 401
+      },
+      {
+        "path": "/api/v1/auth/me",
+        "status": 401
+      },
+      {
+        "path": "/api/v1/auth/me",
+        "status": 401
+      }
+    ],
+    "overflow": false
+  }
+]

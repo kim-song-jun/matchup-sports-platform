@@ -27,7 +27,7 @@ async function main() {
         if(route==='/home' && active.length) await page.waitForFunction(ids=>Array.from(document.querySelectorAll('a')).some(a=>ids.some(id=>a.getAttribute('href')?.includes('/'+id+'?'))),active,{timeout:20000});
         const links=await page.locator('a').evaluateAll(as=>as.map(a=>({text:a.textContent?.trim(),href:a.getAttribute('href')})).filter(a=>/^\/(league-matches|tournaments)\/[^/?]+(?:\?|$)/.test(a.href||'')));
         results.push({width,route,landed:new URL(page.url()).pathname,links});
-        await page.screenshot({path:path.join(out,width+(route==='/home'?'-home':'-list')+'.png')});
+        await page.waitForFunction(()=>Array.from(document.querySelectorAll('.tm-skeleton')).every(el=>!el.getClientRects().length),{},{timeout:20000}); await page.screenshot({animations:'disabled',path:path.join(out,width+(route==='/home'?'-home':'-list')+'.png')});
         if(route==='/home') {
           const leagueLink=links.find(link=>active.some(id=>link.href.includes('/'+id+'?')));
           if(leagueLink) {
@@ -49,7 +49,7 @@ async function main() {
         results.push({width,alias,status:response.status(),path:current.pathname,from:current.searchParams.get('from')});
         if(phase==='after' && (current.pathname!='/tournaments/'+id || current.searchParams.get('from')!='/home'))throw new Error('alias redirect failed: '+page.url());
         if(alias==='/league-matches/') { await page.getByRole('table').first().waitFor({state:'visible',timeout:20000}); await page.locator('table img').evaluateAll(images=>Promise.all(images.map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.addEventListener('load',resolve,{once:true});img.addEventListener('error',resolve,{once:true});})))); }
-        if(alias==='/league-matches/')await page.screenshot({path:path.join(out,width+'-detail.png')});
+        if(alias==='/league-matches/')await page.waitForFunction(()=>Array.from(document.querySelectorAll('.tm-skeleton')).every(el=>!el.getClientRects().length),{},{timeout:20000}); await page.screenshot({animations:'disabled',path:path.join(out,width+'-detail.png')});
       }
       results.push({width,errors,failed,overflow:await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)});
       await context.close();

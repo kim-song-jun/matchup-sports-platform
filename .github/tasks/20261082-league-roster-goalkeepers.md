@@ -40,7 +40,14 @@ Forbidden: 다른 작업트리와 공유 트리 WIP, 레거시 소스.
 
 ## Validation Evidence
 - Web: 관련 59 tests PASS, tsc PASS, v1 pattern check PASS.
-- API: 関連 59 unique tests PASS, tsc PASS, v1 surface check PASS.
-- DB guardrails PASS.DB 통합 검증은 CI에서 실행(로컬 Docker 없음).
-- UI: headed alpha Chrome PID 34820, launcher Node PID 9520.인증은 사용자 제공 fixture 계정만 사용.
-- alpha 3폭 before/after, console/network, 저장·재조회は배포 후 실측 대기.
+- API: 관련 67 unique tests PASS, tsc PASS, v1 surface check PASS.
+- DB guardrails PASS. DB 통합 검증은 CI에서 실행(로컬 Docker 없음).
+- UI: headed alpha Chrome PID 34820, launcher Node PID 9520. 인증은 사용자 제공 fixture 계정만 사용.
+- alpha 3폭 before/after, console/network, 저장·재조회는 배포 후 실측 대기.
+
+- CI 38507178317: Web 전체 검사/빌드 PASS. API 복수 GK 저장·종목 코드·제외/복귀 통합 시나리오 PASS; 문자열 Boolean 자동 변환 거절과 스키마 guard 재핀 필요를 발견해 수정.
+- 추가 Owned: Dockerfile.v1-api, alpha manifest 공통 검증, release schema binder/manifest fixture와 game-schema fixture의 해시 고정값. 새 schema SHA 427caa0a…be40a, M11은 그대로 유지.
+
+- 실제 전역 ValidationPipe에서 JSON true/false 보존 및 문자열/숫자/null/누락 거절 8 tests PASS.
+- 실제 release schema binder를 committed LF schema/M11 입력으로 실행해 새 schema SHA 출력 확인.
+- baseline은 실제 ADMIN 편집 화면 390/768/1440으로 확보. 제공된 이게팀이야 선수 계정은 TEAM_MEMBER로 별도 확인한다.

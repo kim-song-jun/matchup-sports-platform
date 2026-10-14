@@ -1207,3 +1207,7 @@ describe('NotificationsService', () => {
     });
   });
 });
+
+it.each(['league_fixture_scheduled', 'league_fixture_cancelled', 'league_promotion_promoted', 'league_promotion_relegated', 'league_promotion_stayed', 'league_promotion_withdrawn'] as const)('canonical league detail for %s', (type) => {
+  expect(notificationCopyFor(type, 'tournament', 'league-1').deepLink).toBe('/tournaments/league-1');
+});

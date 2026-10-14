@@ -561,7 +561,7 @@ function deepLinkForEvent(
       type === 'league_promotion_withdrawn') &&
     targetId
   ) {
-    return `/league-matches/${targetId}`;
+    return `/tournaments/${targetId}`;
   }
   // 리그 알림 문구 전용화(2026-08-25): 결과 확정/이의 접수/이의 처리 4종은 전부 결과
   // 결과 영수증 화면(경기 상세가 아니라 확정된 결과를 보여주는 화면)으로 보낸다 —

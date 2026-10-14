@@ -1,3 +1,5 @@
+import { normalizeLeagueDetailHref } from './fixture-detail-route';
+
 export function normalizeNotificationHref(route?: string | null, type?: string | null): string {
   const normalized = (() => {
     if (!route) return type?.includes('review') ? '/my/reviews' : '/notifications';
@@ -6,7 +8,7 @@ export function normalizeNotificationHref(route?: string | null, type?: string |
     if (route === '/reviews' || route.startsWith('/reviews?')) return route.replace('/reviews', '/my/reviews');
     if (route.startsWith('/reviews/')) return `/my${route}`;
     if (type?.includes('review') && route === '/my') return '/my/reviews';
-    return route;
+    return normalizeLeagueDetailHref(route);
   })();
 
   if (normalized === '/notifications') return normalized;

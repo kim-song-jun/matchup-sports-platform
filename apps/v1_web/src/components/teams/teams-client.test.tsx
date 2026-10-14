@@ -979,7 +979,7 @@ describe('TeamDetailPageClient — 내 리그', () => {
     const leagueLinks = screen.getAllByRole('link', { name: /가을 리그/ });
     expect(leagueLinks).toHaveLength(2);
     // 뒤로가기가 이 팀 상세로 돌아오도록 `?from=`을 함께 실어 보낸다(QA 피드백 #1).
-    leagueLinks.forEach((link) => expect(link).toHaveAttribute('href', '/league-matches/lg-1?from=%2Fteams%2Fteam-1'));
+    leagueLinks.forEach((link) => expect(link).toHaveAttribute('href', '/tournaments/lg-1?from=%2Fteams%2Fteam-1'));
   });
 
   it('참가 중인 리그가 없으면 "내 리그" 섹션 자체가 없다', () => {

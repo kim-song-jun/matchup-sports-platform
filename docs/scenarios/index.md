@@ -1,6 +1,6 @@
 ## 2026-10-14 — 리그 상세 대표 이미지·통합 순위 팀 마크
 
-[시나리오](./league-detail-media.md) · [Task 20261081](../../.github/tasks/20261081-league-detail-media.md). Web49/API40·양쪽 타입/패턴 PASS. 실제 alpha before 3폭 확인, after 배포 검증 대기. 제공 리그의 저장 대표 이미지는 null이며 참가 명단은 등록 선수 6/6/5명이다.
+[시나리오](./league-detail-media.md) · [Task 20261081](../../.github/tasks/archive/20261081-league-detail-media.md). PR #1914 dev 머지·alpha 배포 완료(SHA3e8007a2f). CI Gates/API/Web PASS, 실제 두 리그×3폭 after 6/6 PASS: 순위 로고3/3, 저장 이미지 표시·로드, overflow0. 제공 리그의 대표 이미지는 null이며 참가 명단 6/6/5 및 기존 명단 정책을 유지했다.
 
 ## 2026-10-12 — 대진 목록 5조·20팀→12강 자동 배정
 

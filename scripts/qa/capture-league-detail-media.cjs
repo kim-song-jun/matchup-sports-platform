@@ -37,6 +37,11 @@ async function main() {
       const standings = page.getByRole('table', { name: '통합 순위표' });
       if (detail.status !== 'completed') await standings.waitFor({ state: 'visible', timeout: 20000 }).catch(() => {});
       const standingsVisible = await standings.isVisible();
+      if (standingsVisible) {
+        await standings.scrollIntoViewIfNeeded();
+        await page.waitForFunction(() => Array.from(document.querySelectorAll('table[aria-label="통합 순위표"] tbody img'))
+          .every((image) => image.complete), null, { timeout: 10000 });
+      }
       const rosterToggle = page.getByRole('button', { name: /명단 펼치기/ }).first();
       if (detail.status !== 'completed' && await rosterToggle.isVisible()) {
         await rosterToggle.click();
@@ -48,6 +53,8 @@ async function main() {
         })));
       });
       await page.screenshot({ path: path.join(output, `${width}-detail.png`), fullPage: true });
+      const cover = page.locator('img[alt$="대표 이미지"]');
+      if (await cover.count()) await cover.screenshot({ path: path.join(output, `${width}-cover.png`) });
       if (standingsVisible) await standings.screenshot({ path: path.join(output, `${width}-standings.png`) });
       results.push({ width, pathname: new URL(page.url()).pathname, accessible: true, standingsVisible, savedCover: Boolean(detail.coverImageUrl), errors, failed,
         ...(await page.evaluate(() => ({
@@ -55,6 +62,8 @@ async function main() {
           coverVisible: Boolean(document.querySelector('img[alt$="대표 이미지"]')),
           coverLoaded: Boolean(document.querySelector('img[alt$="대표 이미지"]')?.naturalWidth),
           standingLogoCount: document.querySelectorAll('table[aria-label="통합 순위표"] tbody img').length,
+          standingLoadedLogoCount: Array.from(document.querySelectorAll('table[aria-label="통합 순위표"] tbody img'))
+            .filter((image) => image.naturalWidth > 0).length,
         }))) });
       await context.close();
     }
@@ -62,5 +71,8 @@ async function main() {
   await writeFile(path.join(output, 'evidence.json'), JSON.stringify(results, null, 2));
   console.log(JSON.stringify(results));
   if (results.some((row) => !row.accessible)) process.exitCode = 2;
+  if (phase === 'after' && results.some((row) => (row.savedCover && !row.coverLoaded) ||
+    (row.standingsVisible && (row.standingLoadedLogoCount === 0 || row.standingLoadedLogoCount !== row.standingLogoCount)) ||
+    row.overflow)) process.exitCode = 3;
 }
 main().catch((error) => { console.error(error.message); process.exitCode = 1; });

@@ -66,7 +66,7 @@ export function LeagueTeamFixturesDetail({ tournamentId, teamId }: { tournamentI
         </ul>
       )}
       {query.isFetchNextPageError ? <ErrorState message="다음 경기 전적을 불러오지 못했어요." onRetry={() => void query.fetchNextPage()} /> : more ? (
-        <button type="button" className="tm-btn tm-btn-ghost" disabled={query.isFetchingNextPage} onClick={() => void query.fetchNextPage()} style={{ marginTop: 'var(--spacing-2)', minHeight: 'var(--size-control-md)' }}>
+        <button type="button" className="tm-btn tm-btn-sm tm-btn-ghost" disabled={query.isFetchingNextPage} onClick={() => void query.fetchNextPage()} style={{ marginTop: 'var(--spacing-2)', minHeight: 'var(--size-control-md)' }}>
           {query.isFetchingNextPage ? '불러오는 중…' : '경기 전적 더 보기'}
         </button>
       ) : null}

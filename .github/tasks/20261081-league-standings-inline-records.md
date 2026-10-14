@@ -62,3 +62,5 @@ alpha 검증은 변경 배포 이후에 가능. 로컬 next 서버는 띄우지 
 
 ## Deployment Progress
 사용자 2026-10-14 배포 승인. PR #1915, base dev. 추가 페이지 오류가 상위 순위의 로딩/오류 분기에 가려지던 문제를 보완했고 실제 bracket 경로 재시도 테스트 1건을 추가해 PASS(중복 제외 총 68 tests). CI 및 Copilot clean gate 진행 중.
+
+PR CI 38490985583: Gates/API PASS, Web 9006/9007 PASS. `tm-btn-size.test.ts`가 더 보기 버튼의 표준 size modifier 누락을 잡아 `tm-btn-sm`을 추가했다. 실제 터치 타깃은 기존 44px 토큰을 유지한다.

@@ -31,7 +31,7 @@ schema_sha="$(sha256sum "$schema" | awk '{print $1}')"
 m11_sha="$(sha256sum "$m11" | awk '{print $1}')"
 # 2026-10-13: V1Tournament.maxPlayers nullable + additive planned_fixture_count (20261013100000_league_roster_limit_planned_fixtures); M11 remains unchanged.
 # 2026-10-14: additive V1TournamentField.placeSnapshot with migration/backfill (Task 20261082).
-[[ "$schema_sha" == 2aa71922bfc133e942f71467ce4ab8ec3a7b5aad43435c57d684c105dddcd7cc \
+[[ "$schema_sha" == 89ccedfb1f48f088a5f61ceede57e7f520a4b40a7ad9862c3d817d4cefc84ae0 \
   && "$m11_sha" == 08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323 ]] \
   || { echo 'Task168 final-policy schema/M11 digest mismatch' >&2; exit 1; }
 

@@ -30,13 +30,13 @@ git push origin <current-branch>  # 항상 현재 브랜치 (브랜치 생성/�
 ### 1.1 squash-merge 후 같은 브랜치 재사용 금지 (CONFLICTING 함정)
 
 - PR이 **squash-merge**되면 머지된 변경은 브랜치 히스토리에 없는 **새 단일 커밋**이 된다. 그 브랜치를 그대로 이어서 새 작업 → 새 PR을 올리면 merge-base가 squash 이전이라 **3-dot diff가 과거 전체를 포함**(실측: 154 파일) + **`CONFLICTING`**.
-- **진단**: `gh pr view <N> --json mergeable` 가 `CONFLICTING`이고 변경 파일 수가 실제 작업량보다 비정상적으로 크면 이 함정을 의심. `git merge-base origin/main HEAD` 가 squash 커밋보다 과거인지 확인.
-- **복구**: 최신 `origin/main` 기준 **fresh 브랜치**를 만들어(공유 트리 안전 규칙상 **사용자 승인 게이트** 필수 — 전역 규칙 7·21) 필요한 커밋만 **cherry-pick** → 실제 변경분만 담긴 깨끗한 PR. (실측: 154→68 파일, `MERGEABLE`)
+- **진단**: `gh pr view <N> --json mergeable` 가 `CONFLICTING`이고 변경 파일 수가 실제 작업량보다 비정상적으로 크면 이 함정을 의심. `git merge-base origin/dev HEAD` 가 squash 커밋보다 과거인지 확인.
+- **복구**: 최신 `origin/dev` 기준 **fresh 브랜치**를 만들어(공유 트리 안전 규칙상 **사용자 승인 게이트** 필수 — 전역 규칙 7·21) 필요한 커밋만 **cherry-pick** → 실제 변경분만 담긴 깨끗한 PR. (실측: 154→68 파일, `MERGEABLE`)
   ```bash
-  git fetch origin main
+  git fetch origin dev
   git cherry-pick <sha1> <sha2> <sha3>   # 사용자 승인 후 fresh 브랜치에서
   ```
-- **예방**: PR 머지 후에는 그 브랜치를 **버리고** 항상 최신 main에서 다음 작업을 시작.
+- **예방**: PR 머지 후에는 그 브랜치를 **버리고** 항상 fetch 직후 origin/dev 기반의 새 격리 worktree에서 다음 작업을 시작.
 
 ---
 
@@ -223,7 +223,7 @@ gh api graphql -f query='mutation($tid:ID!){
 - 원인은 보통 **커밋된 스크린샷 PNG**. → **PNG를 트리에서 분리**(`git rm`)하면 갤러리 코멘트(§3)는 **SHA 고정 raw URL**이라 그대로 동작(히스토리 blob 유지). 코드 중심으로 줄여 재리뷰 가능.
 
 ```bash
-git diff --name-only origin/main...HEAD | grep '\.png$' | tr '\n' '\0' | xargs -0 git rm --quiet
+git diff --name-only origin/dev...HEAD | grep '\.png$' | tr '\n' '\0' | xargs -0 git rm --quiet
 ```
 
 ---
@@ -340,7 +340,7 @@ gh run view <run-id> --log-failed | grep -iE 'fail|error|FAIL'   # 실패 라인
   ```bash
   gh run rerun <run-id> --failed
   ```
-- 단, **재실행 전 내 변경과 무관함을 확인**: `git diff --name-only origin/main...HEAD | grep '^apps/api/'` 처럼 실패 테스트가 속한 앱을 내가 안 건드렸는지 검증. 무관하면 flake, 관련 있으면 재현+수정.
+- 단, **재실행 전 내 변경과 무관함을 확인**: `git diff --name-only origin/dev...HEAD | grep '^apps/api/'` 처럼 실패 테스트가 속한 앱을 내가 안 건드렸는지 검증. 무관하면 flake, 관련 있으면 재현+수정.
 - 머지 준비 = `gh pr view <N> --json mergeable,mergeStateStatus` → **`MERGEABLE/CLEAN`** + 미해결 스레드 0 + CI pass.
 
 ---

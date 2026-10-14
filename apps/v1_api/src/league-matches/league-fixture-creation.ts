@@ -1,7 +1,9 @@
+import { NotFoundException } from '@nestjs/common';
 import { Prisma, V1GameSideKey, V1GameSourceType } from '@prisma/client';
 import { canonicalGameCommandPayloadHash, GamesService } from '../games/games.service';
 import { createTeamMatchScheduleInTx } from '../team-schedules/team-schedules.service';
 import { scheduleLeagueResultEntryReminder } from '../jobs/league-reminders/league-result-entry-reminder.service';
+import { parseLineupCatalog } from '../tournaments/competition-config/competition-config.parse';
 import { participantDisplayName } from '../tournaments/participant-display-name';
 import type { GameRosterBaseEntry } from '../games/roster/game-roster-computation';
 import { toPlaceColumns, type PlaceSnapshot } from '../places/place-snapshot';
@@ -69,6 +71,7 @@ export interface LeagueFixtureTeam {
     id: string;
     userId: string;
     jerseyNumber: number | null;
+    goalkeeper?: boolean | null;
     user: { profile: ParticipantProfile | null };
   }>;
 }
@@ -103,6 +106,7 @@ export interface LeagueRosterEntry {
   userId?: string;
   displayNameSnapshot: string;
   jerseyNumber?: number;
+  position?: string;
 }
 
 /**
@@ -115,11 +119,12 @@ export interface LeagueRosterEntry {
  *
  * 대진 생성과 명단 동기화(`games/roster/game-roster-sync.ts`)가 같은 규칙을 쓴다.
  */
-export function leagueTeamRosterEntries(team: LeagueFixtureTeam): LeagueRosterEntry[] {
+export function leagueTeamRosterEntries(team: LeagueFixtureTeam, goalkeeperCode = 'GK'): LeagueRosterEntry[] {
   return leagueTeamRosterBase(team).map((entry) => ({
     sourceParticipantId: entry.sourceParticipantId,
     ...(entry.accountLinked ? { userId: entry.userId } : {}),
     displayNameSnapshot: entry.displayNameSnapshot,
+    ...(entry.goalkeeper ? { position: goalkeeperCode } : {}),
     ...(entry.jerseyNumber !== null ? { jerseyNumber: entry.jerseyNumber } : {}),
   }));
 }
@@ -138,6 +143,7 @@ export function leagueTeamRosterBase(team: LeagueFixtureTeam): GameRosterBaseEnt
       // 대회와 같다 — 경기 명단의 등번호는 참가 명단 번호다(경기별로 바꾸는 경로는 Task 179 로 없어졌다).
       jerseyNumber: player.jerseyNumber,
       sourceParticipantId: player.id,
+      goalkeeper: player.goalkeeper,
     }));
   }
   return team.memberships.map((membership) => ({
@@ -149,8 +155,8 @@ export function leagueTeamRosterBase(team: LeagueFixtureTeam): GameRosterBaseEnt
   }));
 }
 
-function fixtureRoster(team: LeagueFixtureTeam, sideKey: V1GameSideKey) {
-  return leagueTeamRosterEntries(team).map((entry) => ({ ...entry, sideKey }));
+function fixtureRoster(team: LeagueFixtureTeam, sideKey: V1GameSideKey, goalkeeperCode: string) {
+  return leagueTeamRosterEntries(team, goalkeeperCode).map((entry) => ({ ...entry, sideKey }));
 }
 
 /**
@@ -233,7 +239,7 @@ export async function readLeagueTeamRosters(
       players: {
         where: { removedAt: null },
         orderBy: { id: 'asc' },
-        select: { id: true, userId: true, jerseyNumber: true, user: profile },
+        select: { id: true, userId: true, jerseyNumber: true, goalkeeper: true, user: profile },
       },
     },
   });
@@ -290,6 +296,9 @@ export async function createLeagueFixture(
     await createTeamMatchScheduleInTx(tx, away.id, teamMatch.id, title, startAt, endAt);
   }
 
+  const rosterConfig = await tx.v1CompetitionConfigVersion.findUnique({ where: { id: input.competitionConfigId }, select: { lineup: true } });
+  if (rosterConfig === null) throw new NotFoundException({ code: 'COMPETITION_CONFIG_NOT_FOUND', message: '경기 규칙을 찾을 수 없어요.' });
+  const goalkeeperCode = parseLineupCatalog(rosterConfig.lineup).positions.find((position) => position.goalkeeper)?.code ?? 'GK';
   // ③ 게임 + 사이드 2개 + 자동 로스터. 팀이 없는 사이드는 참가자 없이 '미정' 이름으로 둔다.
   await games.createFromSourceInTransaction(
     tx,
@@ -302,8 +311,8 @@ export async function createLeagueFixture(
         { sideKey: V1GameSideKey.AWAY, teamId: away?.id ?? null, displayNameSnapshot: away?.name ?? UNDECIDED_SIDE_NAME.AWAY },
       ],
       participants: [
-        ...(home === null ? [] : fixtureRoster(home, V1GameSideKey.HOME)),
-        ...(away === null ? [] : fixtureRoster(away, V1GameSideKey.AWAY)),
+        ...(home === null ? [] : fixtureRoster(home, V1GameSideKey.HOME, goalkeeperCode)),
+        ...(away === null ? [] : fixtureRoster(away, V1GameSideKey.AWAY, goalkeeperCode)),
       ],
     },
     {

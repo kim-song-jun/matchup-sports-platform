@@ -13,6 +13,7 @@ import type { GameActorScope, GameCreationResult, GameParticipantCreationInput }
 import { GamesService } from '../games/games.service';
 import { createTeamMatchScheduleInTx } from '../team-schedules/team-match-schedule';
 import { toPlaceColumns, type PlaceSnapshot } from '../places/place-snapshot';
+import { parseLineupCatalog } from './competition-config/competition-config.parse';
 import { registerCompetitionPlace, resolveCompetitionFieldPlace } from '../places/competition-field-place';
 import { defaultFixtureEndAt } from './competition-config/fixture-end-at';
 
@@ -104,15 +105,15 @@ function isStoredGameReplay(value: unknown, existingGame: { id: string; sourceTy
   return game.gameId === existingGame.id && game.sourceType === existingGame.sourceType && game.sourceId === sourceId && game.competitionConfigVersionId === existingGame.competitionConfigVersionId && typeof game.state === 'string' && Object.values(V1GameState).includes(game.state as V1GameState) && Number.isSafeInteger(game.version) && (game.version as number) >= 0;
 }
 
-async function assertParticipantRoster(tx: Prisma.TransactionClient, input: TournamentMatchCreationInput): Promise<void> {
+async function assertParticipantRoster(tx: Prisma.TransactionClient, input: TournamentMatchCreationInput): Promise<Map<string, boolean | null>> {
   const entries = [
     { registrationId: input.homeRegistrationId, team: input.home, sideKey: V1GameSideKey.HOME },
     { registrationId: input.awayRegistrationId, team: input.away, sideKey: V1GameSideKey.AWAY },
   ];
   const participants = entries.flatMap(({ team, sideKey }) => (team.participants ?? []).map((participant) => ({ participant, sideKey })));
-  if (participants.length === 0) return;
+  if (participants.length === 0) return new Map();
   const playerIds = participants.map(({ participant }) => participant.sourceParticipantId);
-  const players = await tx.v1TournamentPlayer.findMany({ where: { id: { in: playerIds } }, select: { id: true, registrationId: true, userId: true, removedAt: true } });
+  const players = await tx.v1TournamentPlayer.findMany({ where: { id: { in: playerIds } }, select: { id: true, registrationId: true, userId: true, removedAt: true, goalkeeper: true } });
   const playerById = new Map(players.map((player) => [player.id, player]));
   for (const { participant, sideKey } of participants) {
     const player = playerById.get(participant.sourceParticipantId);
@@ -121,6 +122,7 @@ async function assertParticipantRoster(tx: Prisma.TransactionClient, input: Tour
       throw new UnprocessableEntityException({ code: 'PARTICIPANT_ROSTER_INVALID', message: '대회 경기 참가자는 해당 확정 등록의 활성 명단과 일치해야 해요.' });
     }
   }
+  return new Map(players.map((player) => [player.id, player.goalkeeper ?? null]));
 }
 
 async function assertTournamentReferences(tx: Prisma.TransactionClient, input: TournamentMatchCreationInput): Promise<void> {
@@ -210,7 +212,19 @@ export async function createTournamentMatchInTx(
     };
   }
   await assertTournamentReferences(tx, input);
-  await assertParticipantRoster(tx, input);
+  const goalkeeperDefaults = await assertParticipantRoster(tx, input);
+  let participants = [...(input.home.participants ?? []), ...(input.away.participants ?? [])];
+  if ([...goalkeeperDefaults.values()].some((value) => value !== null)) {
+    const config = await tx.v1CompetitionConfigVersion.findUnique({ where: { id: input.competitionConfigVersionId }, select: { lineup: true } });
+    if (config === null) throw new UnprocessableEntityException({ code: 'COMPETITION_CONFIG_NOT_FOUND', message: '경기 규칙을 찾을 수 없어요.' });
+    const goalkeeperCode = parseLineupCatalog(config.lineup).positions.find((position) => position.goalkeeper)?.code ?? 'GK';
+    participants = participants.map((participant) => {
+      const value = goalkeeperDefaults.get(participant.sourceParticipantId);
+      if (value === true) return { ...participant, position: goalkeeperCode };
+      if (value === false && participant.position === goalkeeperCode) return { ...participant, position: undefined };
+      return participant;
+    });
+  }
   const conflictingMatch = await tx.v1TeamMatch.findUnique({ where: { id: teamMatchId }, select: { id: true } });
   if (conflictingMatch !== null) {
     throw new ConflictException({ code: 'TEAM_MATCH_ID_COLLISION', message: '같은 대진 ID가 이미 다른 생성 요청에 사용됐어요.' });
@@ -266,7 +280,7 @@ export async function createTournamentMatchInTx(
         { sideKey: V1GameSideKey.HOME, teamId: input.home.id, displayNameSnapshot: input.home.name },
         { sideKey: V1GameSideKey.AWAY, teamId: input.away.id, displayNameSnapshot: input.away.name },
       ],
-      participants: [...(input.home.participants ?? []), ...(input.away.participants ?? [])],
+      participants,
     },
     {
       actor: input.actor,

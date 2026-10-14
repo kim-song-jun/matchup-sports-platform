@@ -49,6 +49,7 @@ export type V1GameRosterView = {
   /** 조정 마감 = 경기 시작 시각. 시각 미정이면 null(실제 마감은 경기 상태가 SCHEDULED 를 벗어날 때). */
   deadline: string | null;
   editable: boolean;
+  goalkeeperEditable?: boolean;
   viewerRole: V1GameRosterViewerRole;
   baseSource: 'REGISTRATION' | 'TEAM_MEMBERS';
   /** 등번호의 원본인 확정 참가 신청 id — 참가 명단이 기준이고 뷰어가 이 팀 팀장·매니저일 때만 온다. */
@@ -102,6 +103,7 @@ export type V1TeamRosterCell = {
   adjustmentId: string | null;
   unavailabilityId: string | null;
   remainingMatches: number | null;
+  goalkeeper?: boolean;
 };
 
 export type V1TeamRosterMatrixGame = {
@@ -115,6 +117,7 @@ export type V1TeamRosterMatrixGame = {
   scheduledAt: string | null;
   gameState: V1GameState;
   editable: boolean;
+  goalkeeperEditable?: boolean;
   /** 기준 명단이 없는 경기(대회 확정 신청 없음 등)는 null. */
   summary: V1GameRosterSummary | null;
 };
@@ -155,7 +158,8 @@ export type V1GameRosterBatchChange = {
 
 export type V1GameRosterBatchResult = {
   teamId: string;
-  results: { gameId: string; sideId: string; userId: string; op: 'EXCLUDE' | 'REVOKE'; alreadyApplied: boolean }[];
+  affectedGames?: { gameId: string; sideId: string }[];
+  results: { gameId: string; sideId: string; userId: string; op: 'EXCLUDE' | 'REVOKE' | 'SET_GOALKEEPER'; alreadyApplied: boolean }[];
 };
 
 export type V1MemberUnavailability = {
@@ -326,11 +330,11 @@ export function useV1ApplyGameRosterBatch(teamId: string) {
     mutationFn: (changes: V1GameRosterBatchChange[]) =>
       v1Post<V1GameRosterBatchResult>(`/teams/${teamId}/game-rosters/batch`, { changes }),
     onSuccess: (result) => {
-      const sides = new Map(result.results.map((row) => [`${row.gameId}:${row.sideId}`, row]));
+      const sides = new Map((result.affectedGames ?? result.results).map((row) => [`${row.gameId}:${row.sideId}`, row]));
       for (const row of sides.values()) {
         void queryClient.invalidateQueries({ queryKey: v1Keys.gameSideRosterAll(row.gameId, row.sideId) });
       }
-      const gameIds = [...new Set(result.results.map((row) => row.gameId))];
+      const gameIds = [...new Set((result.affectedGames ?? result.results).map((row) => row.gameId))];
       for (const gameId of gameIds) {
         void queryClient.invalidateQueries({ queryKey: v1Keys.teamGameRoster(result.teamId, gameId) });
       }

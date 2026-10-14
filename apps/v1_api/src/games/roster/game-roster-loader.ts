@@ -52,6 +52,7 @@ export async function loadCompetitionRosterBase(
         select: {
           id: true,
           userId: true,
+          goalkeeper: true,
           user: { select: { profile: { select: { nickname: true, displayName: true } } } },
         },
         orderBy: { id: 'asc' },
@@ -68,6 +69,7 @@ export async function loadCompetitionRosterBase(
       displayNameSnapshot: participantDisplayName(player),
       jerseyNumber: jerseys.get(player.id) ?? null,
       sourceParticipantId: player.id,
+      goalkeeper: player.goalkeeper,
     })).sort(rosterOrder),
   };
 }
@@ -201,7 +203,7 @@ export async function loadGameRosterForContext(
     select: { userId: true, goalkeeper: true },
   });
   const goalkeeperByUser = new Map(roles.map((row) => [row.userId, row.goalkeeper]));
-  const entries = base.entries.map((entry) => ({ ...entry, goalkeeper: goalkeeperByUser.get(entry.userId) ?? false }));
+  const entries = base.entries.map((entry) => ({ ...entry, goalkeeper: entry.goalkeeper ?? goalkeeperByUser.get(entry.userId) ?? false }));
 
   // 사이드 팀이 바뀌었으면 옛 팀의 조정은 이 팀 명단과 무관하다.
   const adjustments = await tx.v1GameRosterAdjustment.findMany({

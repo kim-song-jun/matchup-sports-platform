@@ -10,6 +10,7 @@ export interface GameRosterAccess {
   readonly viewerRole: GameRosterViewerRole;
   /** 쓰기 때 조정 기록에 남는 역할. null 이면 읽기만 한다. */
   readonly writeRole: GameRosterActorRole | null;
+  readonly goalkeeperEditable?: boolean;
 }
 
 /**
@@ -62,6 +63,7 @@ export interface GameRosterView {
   /** 조정 마감 = 경기 시작 시각. 실제 마감은 경기 상태가 SCHEDULED 를 벗어나는 때다. */
   readonly deadline: Date | null;
   readonly editable: boolean;
+  readonly goalkeeperEditable?: boolean;
   readonly viewerRole: GameRosterViewerRole;
   readonly baseSource: GameRosterBaseSource;
   /**
@@ -223,6 +225,7 @@ export function buildGameRosterView(input: GameRosterViewInput): GameRosterView 
     gameState: context.gameState,
     deadline: context.startAt,
     editable: input.access.writeRole !== null && context.gameState === 'SCHEDULED',
+    goalkeeperEditable: input.access.writeRole !== null && input.access.goalkeeperEditable !== false && context.gameState === 'SCHEDULED' && !input.legacyLineupPending,
     viewerRole: input.access.viewerRole,
     baseSource: input.baseSource,
     jerseyRegistrationId: input.jerseyRegistration?.id ?? null,

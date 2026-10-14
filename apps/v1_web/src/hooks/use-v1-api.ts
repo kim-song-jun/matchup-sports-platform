@@ -1,10 +1,11 @@
 'use client';
 
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 import { getV1ApiBaseUrl, v1Api, v1Delete, v1Get, v1MultipartPost, v1Patch, v1Post, v1Put, V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
 import { compressImagesForUpload, type CompressOptions } from '@/lib/image-compress';
-import { earliestPublicLivePollDelay } from '@/lib/public-live-polling';
+import { earliestPublicLivePollDelay, leagueFixturesPollDelay } from '@/lib/public-live-polling';
 import { OPERATIONS_BOARD_POLL_INTERVAL_MS } from '@/lib/operations-board-polling';
 import { v1Keys } from '@/lib/query-keys';
 import { invalidateV1ChatMessageQueries } from './use-v1-realtime-socket';
@@ -6189,13 +6190,28 @@ export function useV1RegenerateLeagueFixtures(leagueId: string) {
 
 
 export function useV1LeagueMatch(leagueId: string, options?: { seed?: V1PublicLeagueDetail | null }) {
-  return useQuery({
+  const queryClient = useQueryClient();
+  const query = useQuery({
     queryKey: v1Keys.leagueMatch(leagueId),
     queryFn: () => v1Get<V1PublicLeagueDetail>(`/league-matches/${leagueId}`),
     enabled: Boolean(leagueId),
     // 리그 상세 page 가 서버에서 받은 공개 응답 — 순위표·일정이 서버 HTML 에 들어가게 첫 값으로 쓴다.
     placeholderData: options?.seed ?? undefined,
+    // 진행 중·결과 대기 경기가 있거나 킥오프가 가까우면 폴링한다 — 열어 둔 화면도 종료·확정을 스스로 발견한다.
+    refetchInterval: (current) => leagueFixturesPollDelay(current.state.data?.fixtures ?? []),
   });
+  // 순위·개인 기록은 경기 상태를 몰라 스스로 폴링할 기준이 없다. 리그 상세가 실제로 바뀌면(확정 포함 —
+  // 같은 응답이면 react-query 가 같은 참조를 돌려준다) 같이 다시 받는다.
+  const fetched = query.isPlaceholderData ? undefined : query.data;
+  const previous = useRef(fetched);
+  useEffect(() => {
+    const before = previous.current;
+    previous.current = fetched;
+    if (before === undefined || fetched === undefined || before === fetched) return;
+    void queryClient.invalidateQueries({ queryKey: v1Keys.leagueMatchStandings(leagueId) });
+    void queryClient.invalidateQueries({ queryKey: v1Keys.leagueMatchPlayerRecords(leagueId) });
+  }, [fetched, leagueId, queryClient]);
+  return query;
 }
 
 export function useV1LeagueMatchStandings(

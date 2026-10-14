@@ -262,6 +262,45 @@ describe('팀 경기 명단 표·일괄·결장 기간 API (Task 179)', () => {
   });
 
   describe('팀 B — 일괄 변경', () => {
+    it('복수 GK 지정·해제는 실제 명단 리비전에 반영되고 제외·복귀 뒤에도 유지된다', async () => {
+      const f = await seedTournament();
+      const [a1, a2] = f.teamA.members;
+      const target = sideOf(f, 'g1', f.teamA.id);
+      const path = matrixPath(f.teamA.id) + '/batch';
+      const designate = (userId: string, goalkeeper: boolean) => ({ gameId: target.gameId, userId, op: 'SET_GOALKEEPER', goalkeeper });
+      expect((await postAs(path, f.teamA.managerId, { changes: [designate(a1, true), designate(a2, true)] })).status).toBe(200);
+      const read = async () => (await getAs(f.sidePath('g1', f.teamA.id) + '/roster', f.teamA.ownerId)).body.data;
+      expect((await read()).participants.filter((row: { goalkeeper: boolean }) => row.goalkeeper).map((row: { userId: string }) => row.userId).sort()).toEqual(sorted([a1, a2]));
+      const positions = async () => {
+        const lineup = await prisma.v1GameLineup.findFirstOrThrow({ where: { ...target, invalidatedAt: null }, orderBy: { revision: 'desc' } });
+        return prisma.v1GameParticipant.findMany({ where: { lineupId: lineup.id }, select: { userId: true, position: true } });
+      };
+      expect((await positions()).map((row) => row.position)).toEqual(['GOLEIRO', 'GOLEIRO']);
+      expect((await postAs(path, f.teamA.ownerId, { changes: [{ gameId: target.gameId, userId: a1, op: 'EXCLUDE' }, designate(a2, false)] })).status).toBe(200);
+      expect((await read()).excluded.find((row: { userId: string }) => row.userId === a1).goalkeeper).toBe(true);
+      expect((await positions())).toEqual([{ userId: a2, position: null }]);
+      expect((await postAs(path, f.teamA.ownerId, { changes: [{ gameId: target.gameId, userId: a1, op: 'REVOKE' }] })).status).toBe(200);
+      expect((await positions()).find((row) => row.userId === a1)?.position).toBe('GOLEIRO');
+      // Another fixture of the same competition does not inherit this game's designation.
+      expect((await getAs(f.sidePath('g2', f.teamA.id) + '/roster', f.teamA.ownerId)).body.data.participants.every((row: { goalkeeper: boolean }) => !row.goalkeeper)).toBe(true);
+    });
+
+    it('같은 선수의 출전·GK 변경을 함께 허용하고 잘못된 GK payload·권한·시작 후 쓰기를 거절한다', async () => {
+      const f = await seedTournament();
+      const userId = f.teamA.members[0];
+      const target = sideOf(f, 'g1', f.teamA.id);
+      const path = matrixPath(f.teamA.id) + '/batch';
+      const change = { gameId: target.gameId, userId, op: 'SET_GOALKEEPER', goalkeeper: true };
+      expect((await postAs(path, f.teamA.ownerId, { changes: [change, { gameId: target.gameId, userId, op: 'EXCLUDE' }] })).status).toBe(200);
+      for (const changes of [[{ ...change, goalkeeper: undefined }], [{ ...change, goalkeeper: 'true' }], [{ ...change, reason: 'INJURY' }], [{ ...change, op: 'REVOKE' }], [change, change]]) {
+        expect((await postAs(path, f.teamA.ownerId, { changes })).status).toBe(400);
+      }
+      expect((await postAs(path, userId, { changes: [change] })).status).toBe(403);
+      expect((await postAs(path, f.teamB.ownerId, { changes: [change] })).status).toBe(403);
+      expect((await postAs(path, f.teamA.ownerId, { changes: [{ ...change, userId: f.outsiderId }] })).status).toBe(422);
+      await prisma.v1Game.update({ where: { id: target.gameId }, data: { state: 'LIVE' } });
+      expect((await postAs(path, f.teamA.ownerId, { changes: [{ ...change, goalkeeper: false }] })).status).toBe(409);
+    });
     it('여러 경기 빼기·되돌리기를 한 번에 쓰고, 경기마다 그 사이드 명단만 바뀐다(멱등 포함)', async () => {
       const f = await seedTournament();
       const [a1, a2] = f.teamA.members;

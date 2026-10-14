@@ -221,3 +221,18 @@ Raw migration triggers `v1_guard_result_revision_transition`, `v1_block_terminal
 - GET .../result-revisions includes nullable goalEvents snapshots with id,
   sideId, participantId, minute, period, and ownGoal. Older null snapshots
   fall back to the append-only event stream.
+
+### 경기 명단 GK 지정 (Task 20261082)
+
+경기·팀 명단 조회의 모든 선수 행(기준/출전/빠짐/결장/출전정지)은 `goalkeeper: boolean`을 포함한다.
+시작 전에는 `V1GameRosterRole`의 경기·사이드·현재 팀·선수 지정, 시작 후 출전자는 기록에 선택된 라인업 position 스냅샷을 사용한다.
+`POST /api/v1/teams/:teamId/game-rosters/batch`는 `{gameId,userId,op:'SET_GOALKEEPER',goalkeeper:boolean}`을 추가로 받는다.
+복수 GK에 인원 제한이 없으며 같은 선수의 EXCLUDE/REVOKE와 GK 변경을 같은 트랜잭션으로 저장할 수 있다.
+출전 조정끼리 또는 GK 변경끼리 같은 경기·선수 중복은 400이다. GK의 누락/비 boolean/사유 첨부 및 다른 op에 GK 첨부도 400이다.
+기존 사이드 권한, 시작 마감, 명단 밖 선수, 팀 변경 검증을 동일하게 적용한다. 출전 제외·복귀는 GK 지정을 지우지 않는다.
+GK 변경은 변경 전후 값과 처리 역할을 `GAME_ROSTER_GOALKEEPER_CHANGED` 운영 감사에 남긴다.
+명단 동기화 시 게임 규칙의 GK 코드(풋살 GOLEIRO 등)를 실제 참가자 position에 저장한다.
+이관 전 팀장 작성 리그 명단은 `409 ROSTER_GOALKEEPER_MIGRATION_REQUIRED`로 거절해 기록에 반영되지 않은 저장을 성공 처리하지 않는다.
+
+관련 근거: `games/roster/dto/team-game-roster.dto.ts`, `game-roster-loader.ts`, `game-roster.service.ts`,
+`game-roster-sync.ts`, `test/games/team-game-rosters.integration-spec.ts`, Web `hooks/use-v1-game-roster.ts`.

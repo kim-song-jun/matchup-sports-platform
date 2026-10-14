@@ -1,3 +1,5 @@
+경기별 골키퍼 지정 (2026-10-14): 명단 조회에 `goalkeeper`를 추가하고 팀 일괄 명단 API에 복수 지정 `SET_GOALKEEPER`를 지원한다. [Games 계약](./domains/games.md#경기-명단-gk-지정-task-20261082)을 확인한다.
+
 # Teameet v1 API contracts
 
 Public competition overall standings include nullable `teamLogoUrl` under the existing team-identity visibility gate; see [tournaments](./domains/tournaments.md#overall-standings--two-competition-kinds-two-row-shapes).

@@ -585,8 +585,10 @@ export const gameSchemaSourceManifest = {
   // 20261013100000_league_roster_limit_planned_fixtures. Game models and the bound historical game-operations
   // migration are unchanged; re-pin the schema bytes only.
   // 2026-10-14: additive V1TournamentField.placeSnapshot and 20261014000100_v1_competition_field_places.
-  // Game models and the bound historical game migration are unchanged; pin committed LF schema bytes.
-  schema: '25c3ae304406a5be304731fc9d3aa4251d6a0faf77acbbbecf3f23a975ddd572',
+  // 2026-10-14 Task 20261082: additive V1GameRosterRole + back-relations, backed by
+  // 20261014180000_v1_game_roster_goalkeepers. Existing game columns and bound historical migration unchanged.
+  // Re-pin the combined committed LF schema, retaining both additive migrations.
+  schema: '2aa71922bfc133e942f71467ce4ab8ec3a7b5aad43435c57d684c105dddcd7cc',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

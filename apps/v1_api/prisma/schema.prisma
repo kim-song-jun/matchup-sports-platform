@@ -655,6 +655,7 @@ model V1User {
   teamContactRequestsResponded   V1TeamContact[]               @relation("V1TeamContactRespondedBy")
   teamContactBlocksCreated       V1TeamContactBlock[]
   gameRosterAdjustments          V1GameRosterAdjustment[]
+  gameRosterRoles               V1GameRosterRole[]
   teamUnavailabilities           V1TeamMemberUnavailability[]
 
   @@index([accountStatus])
@@ -1343,6 +1344,7 @@ model V1Team {
   reportedInquiries            V1Inquiry[]                 @relation("V1InquiryReportedTeam")
   memberUnavailabilities       V1TeamMemberUnavailability[]
   gameRosterAdjustments        V1GameRosterAdjustment[]
+  gameRosterRoles               V1GameRosterRole[]
 
   @@index([ownerUserId])
   @@index([sportId, regionId, status])
@@ -3225,6 +3227,7 @@ model V1Game {
   visibilityPolicy           V1GameVisibilityPolicy?
   officialResultCaches       V1GameOfficialResultCache[]
   rosterAdjustments          V1GameRosterAdjustment[]
+  gameRosterRoles               V1GameRosterRole[]
   competitionConfig          V1CompetitionConfigVersion  @relation("V1GameCompetitionConfig", fields: [competitionConfigVersionId], references: [id], onDelete: Restrict, map: "v1_games_competition_config_fk")
 
   @@unique([id, currentOfficialRevisionId], map: "v1_games_id_current_official_revision_key")
@@ -3245,6 +3248,7 @@ model V1GameSide {
   // R1 expand: 역참조 한 줄. v1_game_sides 의 컬럼·제약·인덱스는 바뀌지 않는다.
   tacticsBoard        V1TeamTacticsBoard? @relation("V1TeamTacticsBoardSide")
   rosterAdjustments   V1GameRosterAdjustment[]
+  gameRosterRoles               V1GameRosterRole[]
 
   @@unique([gameId, sideKey], map: "v1_game_sides_game_id_side_key_key")
   @@index([teamId], map: "v1_game_sides_team_id_idx")
@@ -4076,4 +4080,20 @@ model V1TournamentSlot {
   @@unique([tournamentId, kind, registrationId])
   @@index([tournamentId, groupId])
   @@map("v1_tournament_slots")
+}
+
+/// 경기별 GK 지정. 출전 제외/복귀와 별도로 유지하며 사이드 팀 변경 시 옛 팀 값은 읽지 않는다.
+model V1GameRosterRole {
+  gameId String @map("game_id")
+  sideId String @map("side_id")
+  teamId String @map("team_id")
+  userId String @map("user_id")
+  goalkeeper Boolean @default(false)
+  updatedAt DateTime @updatedAt @map("updated_at")
+  game V1Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  side V1GameSide @relation(fields: [sideId], references: [id], onDelete: Cascade)
+  team V1Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user V1User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  @@id([gameId, sideId, teamId, userId])
+  @@map("v1_game_roster_roles")
 }

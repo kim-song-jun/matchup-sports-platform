@@ -118,6 +118,7 @@ function createFake() {
   };
 
   const tx = {
+    v1TournamentField: { findMany: jest.fn(async () => []), create: jest.fn(async ({ data }: { data: { name: string } }) => ({ id: 'registered-field', ...data })) },
     // dual-write 대상 — 리그 state 를 바꾸는 자리는 통합 축의 거울도 같이 고친다.
     // `updateMany` 는 백필 전에는 0행이 정상이라(거울이 아직 없다) count 0 을 준다.
     // **인자를 잡아 둔다** — 호출 여부만 보면 `where` 에서 `kind` 가드가 빠져도 통과한다.
@@ -267,6 +268,7 @@ function createFake() {
       }),
     },
     v1TeamMatch: {
+      findUniqueOrThrow: track('v1TeamMatch.findUniqueOrThrow', async () => ({ fieldId: null, placeName: '기존 구장', placeAddress: null, placeLatitude: null, placeLongitude: null, placeProvider: null, placeProviderId: null })),
       count: track('v1TeamMatch.count', async () => 0),
       create: track('v1TeamMatch.create', async (args: { data: { title: string; startAt: Date; endAt?: Date; placeName: string } }) => {
         state.teamMatchCreates.push(args.data);
@@ -398,6 +400,7 @@ function createFake() {
     // 명단 재계산 이벤트(값 순서: id, business_key, aggregate_type, aggregate_id, type, payload)는 따로 모은다.
     // 실제 재계산은 test/league-matches/league-roster-sync.integration-spec.ts.
     $executeRaw: async (_strings: TemplateStringsArray, ...values: unknown[]) => {
+      if (_strings.join('?').includes('pg_advisory_xact_lock')) return 1;
       if (values[4] === 'COMPETITION_ROSTER_RESYNC') {
         state.rosterSyncTeamIds.push((JSON.parse(String(values[5])) as { teamId: string }).teamId);
         return 1;
@@ -925,15 +928,19 @@ describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신�
       await expect(svc.updateFixture(adminUser, 'league-1', 'tm-1', { placeName: '망원 운동장' }))
         .rejects.toMatchObject({ response: { code: 'LEAGUE_ENDED' } });
       const calls = fake.state.calls;
-      expect(calls.indexOf('v1TeamMatch.update')).toBeLessThan(calls.indexOf('$queryRaw'));
-      expect(calls.lastIndexOf('v1Tournament.findFirst')).toBeGreaterThan(calls.indexOf('$queryRaw'));
-      expect(fake.state.rawSql).toHaveLength(1);
-      expect(fake.state.rawSql[0]).toMatch(/v1_tournaments.*FOR SHARE NOWAIT/s);
+      expect(calls.indexOf('v1TeamMatch.update')).toBeLessThan(calls.lastIndexOf('$queryRaw'));
+      expect(calls.lastIndexOf('v1Tournament.findFirst')).toBeGreaterThan(calls.lastIndexOf('$queryRaw'));
+      expect(fake.state.rawSql).toHaveLength(3);
+      expect(fake.state.rawSql[0]).toMatch(/v1_games.*FOR UPDATE/s);
+      expect(fake.state.rawSql[1]).toMatch(/v1_team_matches.*FOR UPDATE/s);
+      expect(fake.state.rawSql[2]).toMatch(/v1_tournaments.*FOR SHARE NOWAIT/s);
     });
 
     it('updateFixture: 다른 작업이 리그 행을 쥐고 있으면 기다리지 않고 409 COMMAND_CONCURRENCY_CONFLICT', async () => {
       const { fake, svc } = await setup('in_progress', 0);
-      fake.tx.$queryRaw = (async () => {
+      const raw = fake.tx.$queryRaw;
+      fake.tx.$queryRaw = (async (strings: TemplateStringsArray) => {
+        if (!strings.join('?').includes('v1_tournaments')) return raw(strings);
         throw new Prisma.PrismaClientKnownRequestError('could not obtain lock on row', {
           code: 'P2010', clientVersion: Prisma.prismaVersion.client, meta: { code: '55P03' },
         });
@@ -953,9 +960,11 @@ describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신�
       const { fake, svc } = await setup(status, 0);
       await svc.updateFixture(adminUser, 'league-1', 'tm-1', { placeName: '망원 운동장' });
       expect(fake.state.calls.filter((call) => call === 'v1TeamMatch.update')).toHaveLength(1);
-      // 리그 행은 기다리는 잠금(FOR UPDATE)도, 게임 행 잠금도 잡지 않는다 — 두 잠금 순서 어느 쪽과도 교착하지 않게.
-      expect(fake.state.rawSql).toHaveLength(1);
-      expect(fake.state.rawSql[0]).toContain('FOR SHARE NOWAIT');
+      // Game → TeamMatch → 쓰기 → 리그 NOWAIT 순서. 필드 등록은 같은 경기 잠금 아래 실행한다.
+      expect(fake.state.rawSql).toHaveLength(3);
+      expect(fake.state.rawSql[0]).toMatch(/v1_games.*FOR UPDATE/s);
+      expect(fake.state.rawSql[1]).toMatch(/v1_team_matches.*FOR UPDATE/s);
+      expect(fake.state.rawSql[2]).toContain('FOR SHARE NOWAIT');
     });
   });
 

@@ -15,6 +15,9 @@ import type { RegistrationsLoadState } from './bracket-team-tray';
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }) }));
 vi.mock('@/hooks/use-v1-api', () => ({
+  useV1TournamentFields: () => ({ data: { items: [] }, isPending: false, isError: false }),
+  useV1AssignFixtureField: () => ({ mutate: vi.fn(), isPending: false }),
+  useV1ClearFixtureField: () => ({ mutate: vi.fn(), isPending: false }),
   useV1UpdateFixture: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 vi.mock('@/hooks/use-v1-bracket-canvas', () => ({

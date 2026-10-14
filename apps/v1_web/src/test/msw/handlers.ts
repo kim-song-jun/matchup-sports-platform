@@ -3,6 +3,7 @@ import isISO8601 from 'validator/lib/isISO8601';
 import isEmail from 'validator/lib/isEmail';
 import { toKstDateString } from '@/lib/kst-calendar';
 import { randomUuid } from '@/lib/uuid';
+import type { V1TournamentField, V1PlaceView } from '@/types/api';
 import type { SharedRecord } from '@/hooks/use-team-match-record';
 import {
   getSignupProfileIssue,
@@ -691,12 +692,15 @@ let v1TournamentStaffAssignments: V1TournamentStaffAssignment[] = [
   },
 ];
 
-// 필드 목록은 GET만 훅이 있다(useV1TournamentFields) — POST/PATCH/DELETE 필드 mutation은
-// use-v1-api.ts 어디에도 소비자가 없어 핸들러를 만들지 않는다(하단 리포트 참고).
-const v1TournamentFields = [
-  { id: 'field-1', tournamentId: 'tournament-1', scopeKey: 'court-1', name: '1번 코트', sortOrder: 1, active: true, version: 1 },
-  { id: 'field-2', tournamentId: 'tournament-1', scopeKey: 'court-2', name: '2번 코트', sortOrder: 2, active: true, version: 1 },
+// Shared field catalogue and fixture places mirror the real selection/import contract.
+const v1TournamentFields: Array<V1TournamentField & { place: V1PlaceView }> = [
+  { id: 'field-1', tournamentId: 'tournament-1', scopeKey: 'court-1', name: '1번 코트', sortOrder: 1, active: true, version: 1,
+    place: { name: '서울 풋살파크', address: '서울', latitude: null, longitude: null, provider: null, providerPlaceId: null } },
+  { id: 'field-2', tournamentId: 'tournament-1', scopeKey: 'court-2', name: '2번 코트', sortOrder: 2, active: true, version: 1,
+    place: { name: '2번 코트', address: null, latitude: null, longitude: null, provider: null, providerPlaceId: null } },
 ];
+const v1CompetitionFixturePlaces: Array<{ fixtureId: string; tournamentId: string; fieldId: string | null; place: V1PlaceView }> = [{ fixtureId: 'fixture-1', tournamentId: 'tournament-1', fieldId: 'field-1' as string | null,
+  place: { name: '서울 풋살파크', address: '서울' as string | null, latitude: null, longitude: null, provider: null, providerPlaceId: null } }];
 
 export const v1MswHandlers = [
   ...v1GameRosterMswHandlers,
@@ -1823,7 +1827,67 @@ export const v1MswHandlers = [
     assignment.version += 1;
     return ok(assignment);
   }),
-  http.get(`${api}/tournament-ops/tournaments/:tournamentId/fields`, () => ok({ items: v1TournamentFields })),
+  http.get(`${api}/tournament-ops/tournaments/:tournamentId/fields`, ({ params }) =>
+    ok({ items: v1TournamentFields.filter((field) => field.tournamentId === params.tournamentId) })),
+  http.post(`${api}/tournament-ops/tournaments/:tournamentId/fields`, async ({ params, request }) => {
+    const body = await request.json() as { name?: string; scopeKey?: string; sortOrder?: number };
+    const name = body.name?.trim() ?? '';
+    if (!name || name.length > 120 || !body.scopeKey || !/^[a-z0-9][a-z0-9_-]{0,63}$/.test(body.scopeKey)) {
+      return HttpResponse.json({ status: 'error', code: 'VALIDATION_ERROR', message: '경기장 이름과 코드를 확인해 주세요.' }, { status: 422 });
+    }
+    const same = v1TournamentFields.filter((field) => field.tournamentId === params.tournamentId);
+    if (same.some((field) => field.name.trim().toLowerCase() === name.toLowerCase() || field.scopeKey === body.scopeKey)) {
+      return HttpResponse.json({ status: 'error', code: 'FIELD_NAME_DUPLICATE', message: '이미 등록된 경기장이에요.' }, { status: 409 });
+    }
+    const field = { id: randomUuid(), tournamentId: String(params.tournamentId), scopeKey: body.scopeKey, name,
+      sortOrder: body.sortOrder ?? 0, active: true, version: 0,
+      place: { name, address: null, latitude: null, longitude: null, provider: null, providerPlaceId: null } };
+    v1TournamentFields.push(field);
+    return HttpResponse.json({ status: 'success', data: field, timestamp: '2026-05-18T00:00:00.000Z' }, { status: 201 });
+  }),
+  http.post(`${api}/tournament-ops/tournaments/:tournamentId/fields/import-places`, ({ params }) => {
+    let addedCount = 0;
+    let existingCount = 0;
+    const seen = new Set<string>();
+    for (const fixture of v1CompetitionFixturePlaces.filter((row) => row.tournamentId === params.tournamentId)) {
+      const name = fixture.place.name.trim();
+      const key = name.toLowerCase();
+      if (!key || ['장소 미정', '미정', 'tbd'].includes(key) || seen.has(key)) continue;
+      seen.add(key);
+      if (v1TournamentFields.some((field) => field.tournamentId === params.tournamentId && field.name.trim().toLowerCase() === key)) { existingCount++; continue; }
+      v1TournamentFields.push({ id: randomUuid(), tournamentId: String(params.tournamentId), scopeKey: `place-${randomUuid()}`, name,
+        sortOrder: v1TournamentFields.length, active: true, version: 0, place: { ...fixture.place } });
+      addedCount++;
+    }
+    for (const fixture of v1CompetitionFixturePlaces.filter((row) => row.tournamentId === params.tournamentId && row.fieldId === null)) {
+      const field = v1TournamentFields.find((entry) => entry.tournamentId === params.tournamentId && entry.name.trim().toLowerCase() === fixture.place.name.trim().toLowerCase());
+      if (!field) continue;
+      fixture.fieldId = field.id;
+      const item = v1TournamentOperationsBoardItems.find((entry) => entry.fixtureId === fixture.fixtureId);
+      if (item) { item.fieldId = field.id; item.fieldName = field.name; item.stableRevision = randomUuid(); }
+    }
+    return ok({ addedCount, existingCount, updatedCount: 0 });
+  }),
+  http.patch(`${api}/tournament-ops/tournaments/:tournamentId/fixtures/:fixtureId/field`, async ({ params, request }) => {
+    const body = await request.json() as { fieldId?: string };
+    const field = v1TournamentFields.find((row) => row.id === body.fieldId && row.tournamentId === params.tournamentId && row.active);
+    const fixture = v1CompetitionFixturePlaces.find((row) => row.fixtureId === params.fixtureId && row.tournamentId === params.tournamentId);
+    if (!field || !fixture) return notFound('경기 또는 경기장을 찾을 수 없어요.');
+    if (fixture.fieldId !== field.id && fixture.place.name.trim().toLowerCase() !== field.name.trim().toLowerCase()) fixture.place = { ...field.place };
+    fixture.fieldId = field.id;
+    const item = v1TournamentOperationsBoardItems.find((row) => row.fixtureId === fixture.fixtureId);
+    if (item) { item.fieldId = field.id; item.fieldName = field.name; item.stableRevision = randomUuid(); }
+    return ok({ fixtureId: fixture.fixtureId, tournamentId: fixture.tournamentId, fieldId: field.id });
+  }),
+  http.delete(`${api}/tournament-ops/tournaments/:tournamentId/fixtures/:fixtureId/field`, ({ params }) => {
+    const fixture = v1CompetitionFixturePlaces.find((row) => row.fixtureId === params.fixtureId && row.tournamentId === params.tournamentId);
+    if (!fixture) return notFound('경기를 찾을 수 없어요.');
+    if (!['', '장소 미정', '미정', 'tbd'].includes(fixture.place.name.trim().toLowerCase())) return HttpResponse.json({ status: 'error', code: 'FIELD_PLACE_LINK_REQUIRED', message: '장소가 설정된 경기는 경기장 연결을 유지해야 해요.' }, { status: 409 });
+    fixture.fieldId = null;
+    const item = v1TournamentOperationsBoardItems.find((row) => row.fixtureId === fixture.fixtureId);
+    if (item) { item.fieldId = null; item.fieldName = null; item.stableRevision = randomUuid(); }
+    return ok({ fixtureId: fixture.fixtureId, tournamentId: fixture.tournamentId, fieldId: null });
+  }),
 ];
 
 const levelOrder = ['beginner', 'novice', 'intermediate', 'advanced'];

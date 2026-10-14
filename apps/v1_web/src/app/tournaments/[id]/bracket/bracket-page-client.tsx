@@ -23,6 +23,7 @@ import {
 } from '@/app/tournaments/[id]/tournament-detail-client';
 import { usePublicTournamentPlayerRecords, usePublicTournamentSchedule } from '@/components/public-game-records/use-public-game-records';
 import { TournamentPlayerRecordsSections } from '@/components/public-game-records/player-records-sections';
+import { LeagueScheduleContent } from '@/components/public-game-records/league-schedule-content';
 import type { PublicTournamentPlayerRecordRow } from '@/components/public-game-records/types';
 // ⚠️ 이 파일에도 동명 지역 함수가 있다(대회 상세 `V1TournamentStanding` 용). 별칭으로 갈라
 // 둔다 — 같은 이름 두 개가 서로 다른 입력을 받으면 다음 사람이 아무거나 집는다.
@@ -390,7 +391,7 @@ export function BracketScheduleTab({
   useEffect(() => {
     setHasSessionHint(hasStoredV1Session());
   }, []);
-  const myFixtures = useV1MyTournamentFixtures(tournamentId, { enabled: hasSessionHint });
+  const myFixtures = useV1MyTournamentFixtures(tournamentId, { enabled: hasSessionHint && !isRegularLeague });
   // 리그는 조회조차 하지 않는다 — 위 섹션 주석 참조.
   const playerRecords = usePublicTournamentPlayerRecords(tournamentId, { enabled: !isRegularLeague });
 
@@ -420,6 +421,11 @@ export function BracketScheduleTab({
   }
 
   const combined = { ...firstPage, items: data.pages.flatMap((page) => page.items) };
+
+  if (isRegularLeague) {
+    return <LeagueScheduleContent tournamentId={tournamentId} data={combined} fromHref={fromHref}
+      hasNextPage={hasNextPage} isFetchingNextPage={isFetchingNextPage} onLoadMore={() => void fetchNextPage()} />;
+  }
 
   return (
     <>

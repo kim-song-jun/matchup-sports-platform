@@ -113,6 +113,7 @@ export type V1LeagueMatchesFilters = {
 };
 
 export interface V1LeagueFixture {
+  fieldId?: string | null;
   teamMatchId: string;
   title: string;
   homeTeamId: string | null;
@@ -550,6 +551,7 @@ export interface V1RegenerateLeagueFixturesResult {
 }
 
 export interface V1UpdateLeagueFixturePayload extends V1PlaceSnapshotPayload {
+  fieldId?: string | null;
   startsAt?: string;
   placeName?: string;
   placeAddress?: string;

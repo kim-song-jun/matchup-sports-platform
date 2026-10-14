@@ -40,6 +40,7 @@ export type LeagueFixtureListRow = {
   placeLongitude: number | null;
   placeProvider: string | null;
   placeProviderId: string | null;
+  field?: { name: string } | null;
   status: string;
   game: {
     id: string;
@@ -129,7 +130,7 @@ export function toLeagueFixtureList(
       homeAssigned: fixture.hostTeamId !== null,
       awayAssigned: fixture.approvedApplicantTeamId !== null,
       startAt: fixture.startAt,
-      placeName: fixture.placeName,
+      placeName: fixture.field?.name ?? fixture.placeName,
       place: toPlaceView(fixture),
       status: fixture.status,
       homeScore: scoreHidden ? null : fact?.homeScore ?? null,
@@ -213,6 +214,7 @@ export const LEAGUE_FIXTURE_LIST_SELECT = {
   approvedApplicantTeamId: true,
   startAt: true,
   ...PLACE_SELECT,
+  field: { select: { name: true } },
   status: true,
   // `visibilityPolicy` 를 빼면 매퍼가 모드를 **볼 수 없어** 가려야 할 점수를 그대로 싣는다.
   game: {

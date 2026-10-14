@@ -32,6 +32,7 @@ export interface MobileSide {
 }
 
 export interface MobileNode {
+  fieldId?: string | null;
   fixtureId: string;
   /** 조별 단계 후보 제외에만 쓴다. 리그 매치(scope 'league')는 대회 조가 없어 null. */
   groupId: string | null;
@@ -121,6 +122,7 @@ export function bracketMobileNode(
   const state = fixture.status === 'cancelled' ? 'cancelled' : fixtureNodeState(game);
   return {
     fixtureId: fixture.id,
+    ...(fixture.fieldId === undefined ? {} : { fieldId: fixture.fieldId }),
     groupId: fixture.groupId,
     title: groupName ? `${groupName} · ${fixture.fixtureNumber}번 경기` : `${fixture.fixtureNumber}번 경기`,
     state,
@@ -138,6 +140,7 @@ export function bracketMobileNode(
 export function leagueMobileNode(node: LeagueBoardNode, slotsById: ReadonlyMap<string, V1AdminBracketSlot>): MobileNode {
   return {
     fixtureId: node.fixtureId,
+    ...(node.fieldId === undefined ? {} : { fieldId: node.fieldId }),
     groupId: null,
     title: node.title,
     state: node.state,

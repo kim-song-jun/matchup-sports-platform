@@ -4268,6 +4268,7 @@ export type V1AdminBracketGroupTeam = {
 };
 
 export type V1AdminBracketFixture = {
+  fieldId?: string | null;
   bracketSources?: V1BracketSource[];
   id: string;
   tournamentId: string;
@@ -4751,6 +4752,7 @@ export type V1CreateGroupTeamPayload = {
 };
 
 export type V1UpdateFixturePayload = {
+  fieldId?: string | null;
   fixtureNumber?: number;
   scheduledAt?: string;
   venue?: string;
@@ -5241,6 +5243,7 @@ export type V1TournamentField = {
   sortOrder: number;
   active: boolean;
   version: number;
+  place?: V1PlaceView | null;
 };
 
 export type V1TournamentFieldListResponse = {

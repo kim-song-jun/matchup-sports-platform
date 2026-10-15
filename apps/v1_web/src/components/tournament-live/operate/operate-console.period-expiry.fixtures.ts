@@ -19,12 +19,14 @@ export function createFixture(server: SetupServerApi) {
     substitutionPolicy: { mode: 'rolling', maxSubstitutions: null }, isKnockoutFixture: false,
   };
   let reads = 0;
+  const readWaiters = new Set<{ readonly count: number; readonly resolve: () => void }>();
   const otherGame: GameDetail = { ...game, id: 'game-other', sides: game.sides.map((side) => ({ ...side, gameId: 'game-other', displayNameSnapshot: `다른 경기 ${side.displayNameSnapshot}` })), periods: game.periods.map((period) => ({ ...period, id: 'other-period', gameId: 'game-other', startedAt: new Date().toISOString() })) };
   let readError = false;
   let commandError = false;
-  let heldRead: { readonly started: () => void; readonly wait: Promise<void>; readonly responded: () => void; readonly beforeResponse: (() => void) | undefined } | null = null;
+  let heldRead: { readonly started: () => void; readonly wait: Promise<void>; readonly responded: () => void; readonly beforeResponse: (() => void) | undefined; readonly captureAfterRelease: boolean } | null = null;
   const commands: { readonly command: string; readonly body: unknown }[] = [];
   const resultRevisions: V1GameResultRevision[] = [];
+  const subscribed = Promise.withResolvers<void>();
   const handlers = new Map<string, (payload: unknown) => void>();
   const socket = {
     connected: true,
@@ -35,6 +37,7 @@ export function createFixture(server: SetupServerApi) {
       const target = typeof payload === 'object' && payload !== null && 'gameId' in payload && payload.gameId === otherGame.id ? otherGame : game;
       if (event === 'game.subscribe') {
         ack({ status: 'subscribed', snapshot: { gameId: target.id, state: target.state, version: target.version, lastSequence: 0, events: [] } });
+        if (target.id === game.id) subscribed.resolve();
       } else if (event === 'game.time.ping') {
         ack({ clientSentAt: Date.now(), serverReceivedAt: Date.now(), serverSentAt: Date.now() });
       } else if (event === 'game.takeover.request' || event === 'game.takeover.renew') {
@@ -61,11 +64,13 @@ export function createFixture(server: SetupServerApi) {
       if (params.gameId === otherGame.id) return success(otherGame);
       if (params.gameId !== game.id) return failure(404, '경기를 찾지 못했어요.');
       reads += 1;
-      const response = readError ? failure(400, '서버 종료 상태를 읽지 못했어요.') : success(game);
+      for (const waiter of readWaiters) if (reads >= waiter.count) { readWaiters.delete(waiter); waiter.resolve(); }
+      const readResponse = () => readError ? failure(400, '서버 종료 상태를 읽지 못했어요.') : success(game);
+      const response = readResponse();
       const held = heldRead;
       heldRead = null;
       if (held) { held.started(); await held.wait; held.beforeResponse?.(); held.responded(); }
-      return response;
+      return held?.captureAfterRelease ? readResponse() : response;
     }),
     http.post(`${API}/games/game-expiry/commands/:command`, async ({ params, request }) => {
       const body: unknown = await request.json();
@@ -96,19 +101,23 @@ export function createFixture(server: SetupServerApi) {
     http.post('*/api/v1/logs/client-error', () => success({ id: 'test-error' })),
   );
   return {
-    socket, commands, endPeriod, resultRevisions,
+    socket, commands, endPeriod, resultRevisions, subscribed: subscribed.promise,
     get reads() { return reads; },
+    waitForReads(count: number) {
+      if (reads >= count) return Promise.resolve();
+      return new Promise<void>((resolve) => readWaiters.add({ count, resolve }));
+    },
     setReadError(value: boolean) { readError = value; },
     setCommandError(value: boolean) { commandError = value; },
     pause() { game = { ...game, state: 'PAUSED', periods: game.periods.map((period) => ({ ...period, pausedAt: '2026-10-16T00:00:50.000Z' })) }; },
     halves() {
       game = { ...game, periodDurations: [{ durationMinutes: 1, extraTime: false }, { durationMinutes: 1, extraTime: false }], periods: [...game.periods, { id: 'period-2', gameId: game.id, number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null, pausedAt: null, pausedTotalMs: 0 }] };
     },
-    delayNextRead(beforeResponse?: () => void) {
+    delayNextRead(beforeResponse?: () => void, { captureAfterRelease = false } = {}) {
       const started = Promise.withResolvers<void>();
       const release = Promise.withResolvers<void>();
       const responded = Promise.withResolvers<void>();
-      heldRead = { started: started.resolve, wait: release.promise, responded: responded.resolve, beforeResponse };
+      heldRead = { started: started.resolve, wait: release.promise, responded: responded.resolve, beforeResponse, captureAfterRelease };
       return { started: started.promise, release: release.resolve, responded: responded.promise };
     },
     startNextPeriod() {
@@ -121,4 +130,3 @@ export function createFixture(server: SetupServerApi) {
     },
   };
 }
-

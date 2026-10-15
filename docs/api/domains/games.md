@@ -131,7 +131,8 @@ re-evaluates the same kick counts before persisting the result.
 
 `GET /api/v1/games/:gameId`의 `periods`, nullable `periodDurations`, `state`, `version`이
 운영 콘솔의 확인 기준이다. 기간 자동 종료는 `V1GameEvent`나 새 sequence를 만들지 않으며,
-콘솔의 만료 시 조회와 오류 재확인 계약은 [game realtime contract](./game-realtime.md#경기-시간-만료-확인-md-qa-142)를 따른다.
+콘솔의 일반 상세 상태·버전 수락, 만료·상세 버전 지연 복구와 오류 재확인 계약은
+[game realtime contract](./game-realtime.md#경기-시간-만료-확인-md-qa-142)를 따른다.
 
 ### Mutation, version, and history rules
 

@@ -393,6 +393,16 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     setExpiredPeriodId(expired ? currentPeriodId : null);
   }, [currentPeriodId]);
   const applyCommandResult = ops.applyCommandResult;
+  const detailGameId = gameDetail.data?.id;
+  const detailState = gameDetail.data?.state;
+  const detailVersion = gameDetail.data?.version;
+  const snapshotVersion = ops.gameSnapshot?.version;
+  useLayoutEffect(() => {
+    if (gameId === null || detailGameId !== gameId || detailState === undefined || detailVersion === undefined || detailVersion <= (snapshotVersion ?? 0)) return;
+    // 일반 상세가 worker의 더 최신 전환을 먼저 알릴 수 있어요. 같은 경기의
+    // 상태·버전을 함께 수락하고, 같은 배치의 최신 소켓 버전은 훅이 보호해요.
+    applyCommandResult({ state: detailState, version: detailVersion });
+  }, [gameId, detailGameId, detailState, detailVersion, snapshotVersion, applyCommandResult]);
   const periodReadGenerationRef = useRef(0);
   const periodStartedAt = currentPeriod?.startedAt;
   const periodPausedAt = currentPeriod?.pausedAt;

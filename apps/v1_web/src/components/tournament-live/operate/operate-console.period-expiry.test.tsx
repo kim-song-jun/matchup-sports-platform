@@ -38,7 +38,7 @@ async function tick(milliseconds: number) {
   await act(async () => { await vi.advanceTimersByTimeAsync(milliseconds); });
 }
 
-async function requestManualEnd(label = '정규 시간 종료', diagnostic?: () => unknown) {
+async function requestManualEnd(label = '정규 시간 종료') {
   const sentBefore = fixture.commands.length;
   fireEvent.click(screen.getByRole('button', { name: label }));
   const dialog = await screen.findByRole('dialog', { name: label === '경기 종료' ? '경기를 종료할까요?' : `${label}할까요?` });
@@ -48,10 +48,7 @@ async function requestManualEnd(label = '정규 시간 종료', diagnostic?: () 
     fireEvent.click(confirmButton);
     await waitForOverlayHistory();
   });
-  await waitFor(() => expect(fixture.commands).toHaveLength(sentBefore + 1), {
-    timeout: 2_000,
-    onTimeout: (error) => new Error(`${error.message}\n${JSON.stringify({ commands: fixture.commands, diagnostic: diagnostic?.() })}`),
-  });
+  await waitFor(() => expect(fixture.commands).toHaveLength(sentBefore + 1), { timeout: 2_000 });
 }
 
 async function holdWorkerRead(beforeResponse?: () => void) {
@@ -185,12 +182,6 @@ describe('OperateConsole — 서버가 확정하는 기간 시간 만료', () =>
   });
 
   it('worker가 마지막 기간을 끝내면 화면이 갱신되고 결과 제출은 운영자에게 남겨요', async () => {
-    const transportErrors: string[] = [];
-    const actualFetch = globalThis.fetch;
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
-      try { return await actualFetch(input, init); }
-      catch (error) { transportErrors.push(String(error)); throw error; }
-    });
     await openConsole();
     fixture.endPeriod();
     await tick(5_000);
@@ -202,12 +193,29 @@ describe('OperateConsole — 서버가 확정하는 기간 시간 만료', () =>
     const readsAfterEnd = fixture.reads;
     await tick(15_000);
     expect(fixture.reads).toBe(readsAfterEnd);
-    await requestManualEnd('경기 종료', () => ({
-      transportErrors,
-      requests: fetchSpy.mock.calls.map(([input, init]) => ({ input: String(input), method: init?.method })),
-      alerts: screen.queryAllByRole('alert').map((element) => element.textContent),
-      statuses: screen.queryAllByRole('status').map((element) => element.textContent),
-    }));
+    await requestManualEnd('경기 종료');
+    expect(fixture.commands[0]?.body).toMatchObject({ expectedVersion: 6 });
+    expect(fixture.commands.map(({ command }) => command)).toEqual(['end']);
+    expect(await screen.findByRole('region', { name: '결과 확정' })).toBeInTheDocument();
+    expect(queryClient.getQueryData<GameDetail>(v1Keys.game('game-expiry'))).toMatchObject({ state: 'ENDED', version: 7, currentOfficialRevisionId: null });
+    expect(fixture.resultRevisions).toMatchObject([{ state: 'SUBMITTED', officialAt: null }]);
+  });
+
+  it('초기 소켓 구독 뒤 worker가 끝낸 최신 상세를 받으면 수동 종료도 그 버전으로 보내요', async () => {
+    const held = fixture.delayNextRead(undefined, { captureAfterRelease: true });
+    render(consoleTree());
+    await waitFor(async () => { await held.started; await fixture.subscribed; });
+    expect(await screen.findByLabelText(/경과 시간/)).toBeInTheDocument();
+    expect(await screen.findByText(/설정된 시간이 끝났어요/)).toBeInTheDocument();
+    // Keep the initial GET held while both recovery and expiry reads capture v5.
+    await waitFor(() => fixture.waitForReads(3));
+    fixture.endPeriod();
+    await releaseRead(held);
+    expect(await screen.findByText('정규 시간이 끝났어요. 기록을 확인한 뒤 ‘경기 종료’를 눌러주세요.')).toBeInTheDocument();
+    expect(screen.queryByLabelText(/경과 시간/)).toBeNull();
+    expect(fixture.commands).toEqual([]);
+    expect(fixture.resultRevisions).toEqual([]);
+    await requestManualEnd('경기 종료');
     expect(fixture.commands[0]?.body).toMatchObject({ expectedVersion: 6 });
     expect(fixture.commands.map(({ command }) => command)).toEqual(['end']);
     expect(await screen.findByRole('region', { name: '결과 확정' })).toBeInTheDocument();

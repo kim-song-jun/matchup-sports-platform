@@ -99,9 +99,11 @@ function PeriodSettingsEditor({
       updateSettings.mutate(
         { expectedVersion, periods },
         {
-          onSuccess: () => {
+          onSuccess: (saved) => {
             setEditing(false);
-            showToast('피리어드 설정을 저장했어요. 시작 전 경기에도 적용했어요.', 'success');
+            // 다른 규칙 버전에 남은 경기는 옮기지 않으므로, 실제로 옮긴 수만 말한다.
+            const repointed = saved?.fixturesRepointed ?? 0;
+            showToast(repointed > 0 ? `피리어드 설정을 저장했어요. 시작 전 경기 ${repointed}개에도 적용했어요.` : '피리어드 설정을 저장했어요.', 'success');
           },
           onError: async (error) => {
             if (extractErrorCode(error) === 'TOURNAMENT_VERSION_CONFLICT') {

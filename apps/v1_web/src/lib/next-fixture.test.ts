@@ -7,12 +7,16 @@ function tournamentFixture(id: string, scheduledAt: string | null, liveStatus: '
   return { id, scheduledAt, liveStatus, homeTeamName: `${id} 홈`, awayTeamName: `${id} 원정` };
 }
 
-function leagueFixture(teamMatchId: string, startAt: string, status: string) {
-  return { teamMatchId, title: `${teamMatchId} 제목`, startAt, status };
+function leagueFixture(teamMatchId: string, startAt: string, status: string, teams: [string, string] | null = null) {
+  return { teamMatchId, title: `${teamMatchId} 제목`, startAt, status, homeTeamId: teams?.[0] ?? null, awayTeamId: teams?.[1] ?? null };
 }
 
-function detail(parts: { fixtures?: unknown[]; leagueFixtures?: unknown[] }): Detail {
-  return { fixtures: parts.fixtures ?? [], leagueFixtures: parts.leagueFixtures ?? [] } as unknown as Detail;
+function detail(parts: { fixtures?: unknown[]; leagueFixtures?: unknown[]; participantTeams?: unknown[] }): Detail {
+  return {
+    fixtures: parts.fixtures ?? [],
+    leagueFixtures: parts.leagueFixtures ?? [],
+    participantTeams: parts.participantTeams ?? [],
+  } as unknown as Detail;
 }
 
 describe('findNextFixture', () => {
@@ -28,6 +32,23 @@ describe('findNextFixture', () => {
       'm1',
     );
     expect(next).toEqual({ fixtureId: 'm2', label: 'm2 제목' });
+  });
+
+  it('리그: 참가팀 목록에서 찾은 홈·원정 팀 이름으로 부르고, 못 찾으면 대진 제목으로 부른다', () => {
+    const leagueFixtures = [
+      leagueFixture('m1', '2026-09-30T01:10:00Z', 'matched', ['t1', 't2']),
+      leagueFixture('m2', '2026-10-07T01:10:00Z', 'matched', ['t2', 't3']),
+    ];
+    const named = detail({
+      leagueFixtures,
+      participantTeams: [
+        { teamId: 't2', teamName: '마포 레인저스' },
+        { teamId: 't3', teamName: '한강 로버스' },
+      ],
+    });
+    expect(findNextFixture(named, 'm1')).toEqual({ fixtureId: 'm2', label: '마포 레인저스 vs 한강 로버스' });
+    // 모집 중이라 참가팀이 가려진 응답
+    expect(findNextFixture(detail({ leagueFixtures }), 'm1')?.label).toBe('m2 제목');
   });
 
   it('취소·종료된 경기는 건너뛰고 그 다음 경기를 고른다', () => {

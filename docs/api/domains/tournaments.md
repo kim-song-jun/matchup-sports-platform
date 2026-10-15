@@ -118,6 +118,8 @@ After bracket publication, each public `groups[].standings[]` row includes nulla
 
 ### Overall standings — two competition kinds, two row shapes
 
+Each `standings[]` row includes nullable `teamLogoUrl` from the team's current profile, for both competition kinds. It follows the same participant-identity gate as `teamName`: hidden identities return `null`. The public table uses the shared `TeamAvatar` fallback for missing or failed logos. Participant `players[]` are active registered competition roster rows (`v1_tournament_players`, `removed_at IS NULL`), not the team's entire membership list; only jersey number and nickname are public.
+
 `v1_tournaments` holds both single tournaments (`kind = regular_tournament`) and the mirror rows of
 regular league seasons (`kind = regular_league`, whose id equals the league id). This endpoint serves
 both, but a mirror row has no groups and no tournament fixtures — those are created only on the
@@ -284,6 +286,8 @@ an occupied coordinate with the same payload returns its current canonical fixtu
 |---|---|---|---|
 | `POST` | `/api/v1/admin/tournaments/:tournamentId/fixtures` | `CreateFixtureDto` | active admin fixture/Game source creation or the explicit pin/idempotency conflict above. `fixtureNumber` is optional: when omitted the server assigns the tournament-wide max (archived fixtures included) + 1 inside the creation transaction, under the same `league-fixture-generation` lock, and the durable command id uses the assigned number. A sent number keeps the existing idempotency behaviour. Optional `clientCommandId` (UUID, one per submission; see [요청 고유 키](#경기-추가-요청-고유-키-clientcommandid)). |
 | `PATCH` | `/api/v1/admin/fixtures/:fixtureId` | `UpdateFixtureDto` | fixture metadata including optional positive integer `fixtureNumber`; duplicate round/leg number returns `409 FIXTURE_NUMBER_CONFLICT`. See [대진 번호 수정](#대진-번호-수정-2026-10-05). |
+
+Task 20261082: fixture PATCH accepts `fieldId?: UUID | null`. A UUID selects an active same-tournament field and saves place + assignment in the locked transaction; omitted keeps assignment unless venue is edited, null resolves/registers the retained/submitted venue. Field selection plus `venue` returns `400 FIELD_PLACE_INPUT_CONFLICT`. Fixture creation/standalone venue editing automatically register/select a scoped field. Same-name conflicting locations return `400 FIELD_PLACE_CONFLICT`. Admin responses carry `fieldId`. Existing same-field/name-matched pins are preserved; public names prefer the field. Field operators cannot use the admin edit route. [Shared catalogue/import/migration contract](./tournament-operations.md#place-registry-integration-2026-10-14-task-20261082).
 
 The legacy generic result paths remain registered only to reject unsafe writes:
 

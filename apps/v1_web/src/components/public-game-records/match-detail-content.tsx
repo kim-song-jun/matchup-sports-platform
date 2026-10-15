@@ -412,8 +412,7 @@ export function MatchDetailContent({
             <span>
               {data.scheduledAt ? formatTournamentDateTimeLong(data.scheduledAt) : '일정 미정'}
               {showInlineStatus && data.status !== 'live' ? ` · ${fixtureStatusLabel(data.status)}` : ''}
-              {data.venue ? ` · ${data.venue}` : ''}
-              {data.fieldName ? ` (${data.fieldName})` : ''}
+              {data.fieldName || data.venue ? ` · ${data.fieldName ?? data.venue}` : ''}
             </span>
             {data.status === 'live' ? <LiveBadge clock={data.clock} periodBreak={data.periodBreak} periodCount={data.periodCount} /> : null}
           </div>
@@ -446,7 +445,7 @@ export function MatchDetailContent({
         <section>
           <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>장소</h3>
           <Card pad={16}>
-            <PlaceCard place={data.place} badge={placeBadge} />
+            <PlaceCard place={{ ...data.place, name: data.fieldName ?? data.place.name }} badge={placeBadge} />
           </Card>
         </section>
       ) : null}

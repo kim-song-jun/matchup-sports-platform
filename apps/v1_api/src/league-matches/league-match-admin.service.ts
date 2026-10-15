@@ -76,6 +76,7 @@ import { LEAGUE_TIE_BREAK_ORDER } from './league-tie-break';
 import { PLACE_SELECT } from '../places/place-select';
 import { rejectPartialPlaceUpdate, toPlaceColumns, toPlaceView, type PlaceSnapshot, type PlaceView } from '../places/place-snapshot';
 import { DEFAULT_FIXTURE_PLACE_NAME, resolveLeagueFixturePlace, type LeagueFixturePlaceInput } from './league-fixture-place';
+import { assertFieldPlaceInput, registerCompetitionPlace, resolveCompetitionFieldPlace } from '../places/competition-field-place';
 import { findTournamentOnSurface } from '../tournaments/tournament-surface-lookup';
 import {
   assertLeagueFixtureGenerationAllowedInTx,
@@ -376,6 +377,8 @@ export class LeagueMatchAdminService {
         approvedApplicantTeamId: true,
         startAt: true,
         ...PLACE_SELECT,
+        fieldId: true,
+        field: { select: { name: true } },
         status: true,
         homeSlotId: true,
         awaySlotId: true,
@@ -485,7 +488,8 @@ export class LeagueMatchAdminService {
           awaySlotId: fixture.awaySlotId,
           game: fixture.game === null ? null : serializeAdminBracketGame(fixture.game),
           startAt: fixture.startAt,
-          placeName: fixture.placeName,
+          placeName: fixture.field?.name ?? fixture.placeName,
+          fieldId: fixture.fieldId,
           placeAddress: fixture.placeAddress,
           place: toPlaceView(fixture),
           status: fixture.status,
@@ -1530,6 +1534,7 @@ export class LeagueMatchAdminService {
 
   async updateFixture(user: V1AuthUser, leagueId: string, teamMatchId: string, dto: UpdateLeagueFixtureDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
+    assertFieldPlaceInput(dto.fieldId, dto.placeName !== undefined);
     rejectPartialPlaceUpdate(dto.placeName, [dto.placeAddress, dto.placeLatitude, dto.placeLongitude, dto.placeProvider, dto.placeProviderId]);
     const teamMatch = await this.prisma.v1TeamMatch.findFirst({ where: { id: teamMatchId, leagueId, deletedAt: null } });
     if (teamMatch === null) {
@@ -1555,13 +1560,25 @@ export class LeagueMatchAdminService {
           ? new Date(nextStartAt.getTime() + durationMs)
           : (await defaultFixtureEndAt(tx, teamMatch.competitionConfigVersionId, nextStartAt)) ?? undefined;
       // 이름이 오면 스냅샷 전체를 교체한다(새 이름에 옛 좌표가 남지 않게). 빈 이름은 생성과 같이 리그 기본 장소로 되돌린다.
-      const nextPlace = dto.placeName === undefined ? undefined : await resolveLeagueFixturePlace(tx, leagueId, dto);
+      const changingPlace = dto.fieldId !== undefined || dto.placeName !== undefined;
+      if (changingPlace) {
+        await tx.$queryRaw`SELECT id FROM v1_games WHERE team_match_id = ${teamMatchId} FOR UPDATE`;
+        await tx.$queryRaw`SELECT id FROM v1_team_matches WHERE id = ${teamMatchId} FOR UPDATE`;
+      }
+      const currentPlaceRow = changingPlace
+        ? await tx.v1TeamMatch.findUniqueOrThrow({ where: { id: teamMatchId }, select: { ...PLACE_SELECT, fieldId: true } }) : teamMatch;
+      const nextPlace = dto.fieldId != null
+        ? await resolveCompetitionFieldPlace(tx, leagueId, dto.fieldId, toPlaceView(currentPlaceRow), currentPlaceRow.fieldId)
+        : dto.placeName === undefined ? undefined : await resolveLeagueFixturePlace(tx, leagueId, dto);
+      const nextFieldId = dto.fieldId == null && (nextPlace !== undefined || dto.fieldId === null)
+        ? await registerCompetitionPlace(tx, leagueId, nextPlace === undefined ? toPlaceView(currentPlaceRow) : nextPlace) : dto.fieldId;
       const result = await tx.v1TeamMatch.update({
         where: { id: teamMatchId },
         data: {
           ...(nextStartAt === undefined ? {} : { startAt: nextStartAt }),
           ...(nextEndAt === undefined ? {} : { endAt: nextEndAt }),
           ...(nextPlace === undefined ? {} : toPlaceColumns(nextPlace)),
+          ...(nextFieldId === undefined ? {} : { fieldId: nextFieldId }),
           ...(dto.title === undefined ? {} : { title: dto.title.trim() }),
         },
       });
@@ -1598,6 +1615,7 @@ export class LeagueMatchAdminService {
             startAt: persistedStartAt.toISOString(),
             endAt: result.endAt !== null ? result.endAt.toISOString() : null,
             placeName: result.placeName,
+            fieldId: result.fieldId,
             title: result.title,
             ...(teamsChanged ? { homeTeamId: result.hostTeamId, awayTeamId: result.approvedApplicantTeamId } : {}),
           },
@@ -1617,6 +1635,7 @@ export class LeagueMatchAdminService {
       startAt: updated.startAt,
       endAt: updated.endAt,
       placeName: updated.placeName,
+      fieldId: updated.fieldId,
       placeAddress: updated.placeAddress,
       place: toPlaceView(updated),
     };
@@ -2463,8 +2482,8 @@ export class LeagueMatchAdminService {
 
   /**
    * 템플릿 교체 — 취소 안 된 경기가 **전부** 시작 전·결과 없음일 때만 접는다. 게임 행을 먼저 id 순으로
-   * 잠근 뒤 판정해서, 판정과 취소 사이에 콘솔이 경기를 시작하지 못하게 한다. 리그엔 소프트 삭제가 없다
-   * (게임이 `Restrict` 로 붙어 있다) — 취소가 곧 "접기"이고, 취소는 자리 연결도 풀기 때문에 옛 자리를 지울 수 있다.
+   * 잠근 뒤 판정해서, 판정과 취소 사이에 콘솔이 경기를 시작하지 못하게 한다. 취소는 자리 연결도 풀기 때문에
+   * 옛 자리를 지울 수 있고, 접은 경기는 대진 재생성과 같이 deletedAt 으로 현재 목록에서 숨긴다(기록은 남는다).
    */
   private async replaceLeagueFixturesInTx(
     tx: Prisma.TransactionClient,
@@ -2503,6 +2522,11 @@ export class LeagueMatchAdminService {
         notices.push({ id: fixture.id, title: fixture.title, hostTeamId: fixture.hostTeamId, approvedApplicantTeamId: fixture.approvedApplicantTeamId });
       }
     }
+    // 숨기지 않으면 어드민 경기 수·보드 라운드·공개 상세 주차가 옛 경기 날짜까지 센다.
+    await tx.v1TeamMatch.updateMany({
+      where: { id: { in: existing.map((fixture) => fixture.id) }, deletedAt: null },
+      data: { deletedAt: new Date() },
+    });
     await tx.v1TournamentSlot.deleteMany({ where: { tournamentId: leagueId } });
     return notices;
   }

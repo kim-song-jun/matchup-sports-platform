@@ -19,6 +19,7 @@ vi.mock('@/hooks/use-v1-bracket-canvas', () => ({
   useV1SetBracketSources: () => ({ mutate: mocks.setSources, isPending: false }),
 }));
 vi.mock('@/hooks/use-v1-api', () => ({
+  useV1TournamentFields: () => ({ data: { items: [{ id: 'field-a', name: '등록 A구장', active: true }] }, isPending: false, isError: false }),
   useV1PlaceSearch: () => ({ data: undefined, isFetching: false, isError: false, error: null }),
   useV1PublicKakaoMapsKey: () => ({ data: { kakaoMapsJsKey: null }, isLoading: false }),
   useV1UpdateFixture: () => ({ mutate: mocks.updateFixture, isPending: false }),
@@ -83,6 +84,15 @@ beforeEach(() => {
 });
 
 describe('BracketNodePanel — 자리 배정', () => {
+  it('등록 필드를 선택한 대회 일정은 장소 문자열과 나눠 보내지 않는다', () => {
+    renderPanel();
+    fireEvent.change(screen.getByRole('combobox', { name: '등록된 경기장(필드)' }), { target: { value: 'field-a' } });
+    expect(screen.queryByLabelText('장소')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '일정 저장' }));
+    const payload = mocks.updateFixture.mock.calls[0][0];
+    expect(payload).toMatchObject({ fixtureId: 'f1', fieldId: 'field-a' });
+    expect(payload).not.toHaveProperty('venue');
+  });
   it('다른 자리에 이미 들어간 팀은 고르지 못하고, 현재 자리의 팀과 비워 두기는 고를 수 있다', () => {
     renderPanel();
     const homeSelect = screen.getByLabelText('홈 팀 선택');

@@ -64,7 +64,7 @@ describe('LeagueAwardsPageClient', () => {
     // 종료 전이므로 우승·순위 콘텐츠는 전혀 그려지지 않는다.
     expect(screen.queryByText('시상 결과')).not.toBeInTheDocument();
     // 받은 출처(from=/home)를 이어서 리그 상세로 돌아간다.
-    expect([...container.querySelectorAll('a')].some((a) => a.getAttribute('href') === '/league-matches/league-1?from=%2Fhome')).toBe(true);
+    expect([...container.querySelectorAll('a')].some((a) => a.getAttribute('href') === '/tournaments/league-1?from=%2Fhome')).toBe(true);
   });
 
   it('준비 중(draft) 리그도 종료 전과 같은 안내로 처리한다', async () => {
@@ -180,7 +180,7 @@ describe('LeagueAwardsPageClient', () => {
 
     renderAwards();
 
-    expect(await screen.findByRole('link', { name: /리그 상세로/ })).toHaveAttribute('href', '/league-matches/league-1?from=%2Fhome');
+    expect(await screen.findByRole('link', { name: /리그 상세로/ })).toHaveAttribute('href', '/tournaments/league-1?from=%2Fhome');
   });
 
   it('받은 from 이 리그 상세를 가리키면(자기 위 체인 포함) CTA·하단 링크 모두 그 값으로 돌아간다', async () => {
@@ -200,7 +200,7 @@ describe('LeagueAwardsPageClient', () => {
 
     renderAwards();
 
-    const parentWithChain = '/league-matches/league-1?from=%2Ftournaments';
+    const parentWithChain = '/tournaments/league-1?from=%2Ftournaments';
     expect(await screen.findByRole('link', { name: /리그 상세로/ })).toHaveAttribute('href', parentWithChain);
     useSearchParamsMock.mockReturnValue(new URLSearchParams('from=%2Fhome') as never);
   });
@@ -222,7 +222,7 @@ describe('LeagueAwardsPageClient', () => {
 
     expect(await screen.findByRole('link', { name: '리그 순위표 보러가기' })).toHaveAttribute(
       'href',
-      '/league-matches/league-1?from=%2Ftournaments',
+      '/tournaments/league-1?from=%2Ftournaments',
     );
     useSearchParamsMock.mockReturnValue(new URLSearchParams('from=%2Fhome') as never);
   });

@@ -8,9 +8,11 @@ import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
 import { useLeagueSettings, useUpdateLeagueSettings } from '@/hooks/use-league-settings';
 import { useV1MasterRegions } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
-import { DATE_INPUT_MAX, isoToKstDatetimeLocal, kstDatetimeLocalToIso, toKstDateString } from '@/lib/kst-calendar';
+import { isoToKstDatetimeLocal, kstDatetimeLocalToIso, toKstDateString } from '@/lib/kst-calendar';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
 import type { LeagueSettings } from '@/types/league-settings';
+import { LeagueBasicFields, leagueInputClass, leagueLabelClass } from '../../league-basic-fields';
+import { LeaguePlannedFixtureField } from '../../league-settings-fields';
 
 function draftOf(data: LeagueSettings) {
   return { title: data.title, rulesText: data.rulesText, regionId: data.regionId ?? '',
@@ -19,7 +21,6 @@ function draftOf(data: LeagueSettings) {
     deadline: isoToKstDatetimeLocal(data.registrationDeadlineAt),
     plannedFixtureCount: data.plannedFixtureCount?.toString() ?? '' };
 }
-const labelClass = 'grid gap-2 tm-text-label font-semibold text-[var(--text-strong)]';
 const buttonClass = 'tm-btn tm-btn-md tm-btn-neutral min-h-[44px]';
 
 export default function LeagueSettingsClient({ leagueId }: { leagueId: string }) {
@@ -82,51 +83,38 @@ function SettingsForm({ leagueId, initial, reload }: { leagueId: string; initial
     } catch (cause) { setError(extractErrorMessage(cause, '리그 정보를 저장하지 못했어요.')); }
     finally { lock.current = false; }
   };
-  return <div className="max-w-3xl space-y-6">
+  return <div className="tm-content-enter mx-auto max-w-2xl">
     <AdminPageHeader eyebrow="플랫폼 · 리그" title="리그 수정" description={`${snapshot.title} · ${snapshot.sportName}`} />
     {!canWrite && <p role="status">조회 권한으로 접속했어요. 기본 정보를 수정하려면 쓰기 권한이 필요해요.</p>}
     {ended && <p role="status">끝났거나 취소된 리그는 기본 정보를 수정할 수 없어요.</p>}
-    <form onSubmit={submit} className="space-y-6" aria-busy={busy}>
-      <fieldset disabled={disabled} className="grid gap-4 sm:grid-cols-2">
-        <legend className="mb-4 tm-text-body font-bold">기본 정보</legend>
-        <label className={`${labelClass} sm:col-span-2`} htmlFor={`${id}-title`}>리그명
-          <input id={`${id}-title`} className="tm-input min-h-[44px]" required maxLength={100} value={draft.title} onChange={e => change('title', e.target.value)} />
-        </label>
-        <label className={`${labelClass} sm:col-span-2`} htmlFor={`${id}-rules`}>설명·운영 안내
-          <textarea id={`${id}-rules`} className="tm-input tm-create-input-multiline" rows={5} maxLength={10000} value={draft.rulesText} onChange={e => change('rulesText', e.target.value)} />
-        </label>
-        <label className={labelClass} htmlFor={`${id}-region`}>지역
-          <select id={`${id}-region`} className="tm-input min-h-[44px]" required value={draft.regionId} onChange={e => change('regionId', e.target.value)}>
-            <option value="">지역 선택</option>
-            {draft.regionId && !regionOptions.some(region => region.id === draft.regionId) && <option value={draft.regionId}>현재 저장된 지역</option>}
-            {regionOptions.map(region => <option key={region.id} value={region.id}>{region.name}</option>)}
-          </select>
-        </label>
-        <label className={labelClass}>종목<input className="tm-input min-h-[44px]" value={snapshot.sportName} readOnly disabled /></label>
-        <label className={labelClass} htmlFor={`${id}-start`}>시작일 (한국 시간)
-          <input id={`${id}-start`} className="tm-input min-h-[44px]" type="date" max={DATE_INPUT_MAX} required value={draft.startsOn} onChange={e => change('startsOn', e.target.value)} />
-        </label>
-        <label className={labelClass} htmlFor={`${id}-end`}>종료일 (한국 시간)
-          <input id={`${id}-end`} className="tm-input min-h-[44px]" type="date" min={draft.startsOn || undefined} max={DATE_INPUT_MAX} required value={draft.endsOn} onChange={e => change('endsOn', e.target.value)} />
-        </label>
-      </fieldset>
+    <form onSubmit={submit} className="space-y-5" aria-busy={busy}>
+      <LeagueBasicFields
+        value={{ ...draft, sportId: snapshot.sportName }}
+        onChange={(field, value) => { if (field !== 'sportId') change(field, value); }}
+        sports={[{ id: snapshot.sportName, name: snapshot.sportName }]}
+        regions={regionOptions}
+        sportLocked
+        sportHint="리그를 만든 뒤에는 종목을 바꿀 수 없어요."
+        disabled={disabled}
+      />
       {regions.isError && <p role="alert">지역 목록을 불러오지 못했어요. <button className={buttonClass} type="button" disabled={busy} onClick={() => regions.refetch()}>지역 다시 불러오기</button></p>}
-      <fieldset disabled={disabled} className="grid gap-4 sm:grid-cols-2">
-        <legend className="mb-4 tm-text-body font-bold">모집 조건</legend>
-        <label className={labelClass} htmlFor={`${id}-deadline`}>신청 마감 (한국 시간)
-          <input id={`${id}-deadline`} className="tm-input min-h-[44px]" type="datetime-local" max="9999-12-31T23:59" value={draft.deadline} onChange={e => change('deadline', e.target.value)} />
-        </label>
-        <label className={labelClass} htmlFor={`${id}-planned-fixtures`}>총 경기 수
-          <input id={`${id}-planned-fixtures`} className="tm-input min-h-[44px]" type="number" inputMode="numeric" min={1} max={500}
-            placeholder="미지정" value={draft.plannedFixtureCount} onChange={e => change('plannedFixtureCount', e.target.value)} />
-        </label>
-        <p className="tm-text-label text-[var(--text-muted)] sm:col-span-2">총 경기 수는 대진 생성의 기본값과 자동 종료 기준이에요. 비우면 기준을 두지 않아요. 바꿔도 이미 만든 경기는 추가·삭제되지 않아요.</p>
-        <p className="tm-text-label text-[var(--text-muted)] sm:col-span-2">리그는 신청 정원 제한이 없어요. 신청 마감을 비우면 신규 신청이 닫혀요. 기간을 바꿔도 기존 경기 일정은 자동으로 이동하지 않아요.</p>
+      <LeaguePlannedFixtureField value={draft.plannedFixtureCount} onChange={value => change('plannedFixtureCount', value)} disabled={disabled} />
+      <p className="tm-text-caption text-[var(--text-muted)]">총 경기 수나 기간을 바꿔도 기존 경기의 수와 일정은 바뀌지 않아요.</p>
+      <fieldset disabled={disabled} className="min-w-0 space-y-5" aria-label="운영 안내 및 모집 조건">
+        <div>
+          <label className={leagueLabelClass} htmlFor={id + '-rules'}>설명·운영 안내</label>
+          <textarea id={id + '-rules'} className={leagueInputClass + ' tm-create-input-multiline'} rows={5} maxLength={10000} value={draft.rulesText} onChange={e => change('rulesText', e.target.value)} />
+        </div>
+        <div>
+          <label className={leagueLabelClass} htmlFor={id + '-deadline'}>신청 마감 (한국 시간)</label>
+          <input id={id + '-deadline'} className={leagueInputClass} type="datetime-local" max="9999-12-31T23:59" value={draft.deadline} onChange={e => change('deadline', e.target.value)} />
+          <p className="mt-1 tm-text-caption text-[var(--text-muted)]">리그는 신청 정원 제한이 없어요. 신청 마감을 비우면 신규 신청이 닫혀요.</p>
+        </div>
       </fieldset>
       {hint && <p role="status" className="tm-text-label text-[var(--text-muted)]">{hint}</p>}
       {error && <p role="alert" className="tm-text-label text-[var(--red700)]">{error}</p>}
       <div className="flex flex-wrap gap-2">
-        <button className="tm-btn tm-btn-md tm-btn-primary min-h-[44px]" type="submit" disabled={disabled || !dirty || !!hint}>{save.isPending ? '저장 중…' : '변경사항 저장'}</button>
+        <button className="min-h-[44px] w-full rounded-xl bg-blue-500 text-[length:var(--font-size-body-sm)] font-semibold text-white disabled:opacity-50" type="submit" disabled={disabled || !dirty || !!hint}>{save.isPending ? '저장 중…' : '변경사항 저장'}</button>
         <button className={buttonClass} type="button" disabled={busy} onClick={async () => { if (await discard()) router.push(detailHref); }}>상세로 돌아가기</button>
         <button className={buttonClass} type="button" disabled={busy} onClick={async () => {
           if (!(await discard())) return;

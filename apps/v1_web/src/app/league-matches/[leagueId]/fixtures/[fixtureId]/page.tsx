@@ -65,7 +65,7 @@ export default async function LeagueFixturePage({ params }: Props) {
   const title = detail ? await resolveFixtureTitle(detail, fixtureId) : '';
   const eventLd = detail
     ? buildTeamMatchEventLd({ ...detail, title }, fixtureId, league
-        ? { path: fixturePath(league.leagueId, fixtureId), superEventPath: leaguePath(league.leagueId) }
+        ? { path: fixturePath(league.leagueId, fixtureId), superEventPath: `/tournaments/${encodeURIComponent(league.leagueId)}` }
         : { path: fixturePath(leagueId, fixtureId) })
     : null;
 
@@ -77,7 +77,7 @@ export default async function LeagueFixturePage({ params }: Props) {
           data={buildBreadcrumbLd([
             { name: '대회', path: '/tournaments' },
             { name: '정규 리그', path: '/tournaments?kind=league' },
-            { name: league.title, path: leaguePath(league.leagueId) },
+            { name: league.title, path: `/tournaments/${encodeURIComponent(league.leagueId)}` },
             { name: title, path: fixturePath(league.leagueId, fixtureId) },
           ])}
         />

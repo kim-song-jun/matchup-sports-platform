@@ -2,7 +2,7 @@ import type { Prisma } from '@prisma/client';
 import { loadTeamCompetitionGameOrder } from '../../tournaments/discipline/team-game-order';
 import { loadCompetitionRosterBase, loadGameRoster, type LoadedGameRoster } from './game-roster-loader';
 import type { TeamRosterMatrixGame } from './game-roster-matrix';
-import { upcomingCompetitionGameWhere } from './game-roster-sync';
+import { isUnmigratedTeamAuthoredLineup, upcomingCompetitionGameWhere } from './game-roster-sync';
 
 type Tx = Prisma.TransactionClient;
 
@@ -97,5 +97,11 @@ export async function loadTeamRosterColumns(
         : await loadGameRoster(tx, { gameId: column.gameId, sideId: column.sideId }, preloaded);
     columns.push({ game: column, loaded });
   }
-  return columns;
+  const legacyCompetitions = new Set<string>();
+  for (const { column, isLeague } of rows) {
+    if (!isLeague) continue;
+    const latest = await tx.v1GameLineup.findFirst({ where: { gameId: column.gameId, sideId: column.sideId, invalidatedAt: null }, orderBy: { revision: 'desc' } });
+    if (latest !== null && await isUnmigratedTeamAuthoredLineup(tx, column.gameId, column.sideId, latest)) legacyCompetitions.add(column.competitionId);
+  }
+  return columns.map((column) => ({ ...column, game: { ...column.game, goalkeeperEditable: !legacyCompetitions.has(column.game.competitionId) } }));
 }

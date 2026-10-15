@@ -523,6 +523,13 @@ describe('MatchDetailContent — 득점자 아래 도움 줄', () => {
 });
 
 describe('MatchDetailContent — 장소 카드', () => {
+  it('경기 별칭 대신 배정 필드 이름 하나로 표시하고 같은 좌표로 길찾기한다', () => {
+    const place = { name: '과거 별칭', address: '서울 송파구', latitude: 37.5, longitude: 127.07, provider: 'kakao' as const, providerPlaceId: 'k1' };
+    render(<MatchDetailContent data={makeDetail({ place, venue: place.name, fieldName: '등록 경기장' })} />);
+    expect(screen.queryByText(/과거 별칭/)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '길찾기' }));
+    expect(screen.getByRole('link', { name: /^카카오맵/ })).toHaveAttribute('href', `https://map.kakao.com/link/to/${encodeURIComponent('등록 경기장')},37.5,127.07`);
+  });
   it('place 가 있으면 장소 섹션에 좌표 길찾기 링크를 보이고, 없으면 섹션을 만들지 않는다', () => {
     const place = { name: '잠실 보조구장', address: '서울 송파구 올림픽로 25', latitude: 37.5, longitude: 127.07, provider: 'kakao' as const, providerPlaceId: 'k1' };
     const { unmount } = render(<MatchDetailContent data={makeDetail({ place })} />);

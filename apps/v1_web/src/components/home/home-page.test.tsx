@@ -147,7 +147,7 @@ describe('HomePageView — 오늘의 추천에 리그·팀매치', () => {
 
     render(<HomePageView model={buildModel()} />);
 
-    expect(screen.getByRole('link', { name: /리그 league-soon/ })).toHaveAttribute('href', '/league-matches/league-soon?from=%2Fhome');
+    expect(screen.getByRole('link', { name: /리그 league-soon/ })).toHaveAttribute('href', '/tournaments/league-soon?from=%2Fhome');
     expect(screen.queryByRole('link', { name: /리그 league-later/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /리그 league-closed/ })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: /토요일 친선전/ })).toHaveAttribute('href', '/team-matches/tm-1?from=%2Fhome');
@@ -176,7 +176,7 @@ describe('HomePageView back-navigation from=/home', () => {
   it('carries from=/home on the sidebar league card link', () => {
     render(<HomePageView model={buildModel()} />);
     const link = screen.getByRole('link', { name: /정규 리그 상세 보기 — 테스트 리그/ });
-    expect(link).toHaveAttribute('href', '/league-matches/league-1?from=%2Fhome');
+    expect(link).toHaveAttribute('href', '/tournaments/league-1?from=%2Fhome');
   });
 
   it('carries from=/home on the record-consent nudge "어떤 기록인지 보기" link', () => {

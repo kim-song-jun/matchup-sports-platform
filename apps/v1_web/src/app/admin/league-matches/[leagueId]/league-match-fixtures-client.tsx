@@ -1457,6 +1457,7 @@ export default function LeagueMatchFixturesClient({
       />
       {scheduleFixture ? (
         <LeagueFixtureScheduleModal
+          leagueId={leagueId}
           key={scheduleFixture.teamMatchId}
           fixture={scheduleFixture}
           defaultPlace={series.defaultPlace ?? null}

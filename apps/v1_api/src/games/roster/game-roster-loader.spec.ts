@@ -19,6 +19,7 @@ interface FakeWorld {
   leagueTeam?: { memberships: Array<{ id: string; userId: string; user: unknown }> } | null;
   leagueRegistrations?: Array<{ id: string; teamId: string; players: unknown[]; _count: { players: number } }>;
   adjustments?: Array<Record<string, unknown>>;
+  goalkeepers?: Array<{ userId: string; goalkeeper: boolean; teamId: string }>;
   unavailabilities?: Array<Record<string, unknown>>;
   rules?: { yellowAccumulationLimit: number | null; redCardSuspensionMatches: number | null };
   competitionMatches?: Array<{ id: string; hostTeamId: string; approvedApplicantTeamId: string; game: { id: string } }>;
@@ -54,6 +55,7 @@ function fakeTx(world: FakeWorld) {
       ),
     },
     $queryRaw: jest.fn(async () => world.jerseys ?? []),
+    v1GameRosterRole: { findMany: jest.fn(async ({ where }: { where: { teamId: string } }) => (world.goalkeepers ?? []).filter((row) => row.teamId === where.teamId)) },
     v1GameRosterAdjustment: {
       findMany: jest.fn(async ({ where }: { where: { teamId?: string } }) =>
         (world.adjustments ?? []).filter((row) => where.teamId === undefined || row.teamId === where.teamId),
@@ -96,6 +98,12 @@ const TOURNAMENT_REGISTRATION = {
 };
 
 describe('loadGameRoster — 대회 경기', () => {
+  it('같은 경기·현재 팀의 여러 GK를 출전 여부와 별도로 읽는다', async () => {
+    const tx = fakeTx({ teamMatch: TOURNAMENT_MATCH, sideTeamId: 'team-A', registration: TOURNAMENT_REGISTRATION,
+      goalkeepers: [{ userId: 'pa', goalkeeper: true, teamId: 'team-A' }, { userId: 'pb', goalkeeper: true, teamId: 'team-A' }, { userId: 'pc', goalkeeper: true, teamId: 'old-team' }] });
+    const loaded = await loadGameRoster(tx, { gameId: 'game-1', sideId: 'side-1' });
+    expect(loaded?.base.map((row) => [row.userId, row.goalkeeper]).sort((a, b) => String(a[0]).localeCompare(String(b[0])))).toEqual([['pa', true], ['pb', true], ['pc', false]]);
+  });
   it('confirmed 참가 명단(등번호 포함)이 기준이고 활성 조정·결장 기간을 뺀다', async () => {
     const tx = fakeTx({
       teamMatch: TOURNAMENT_MATCH,
@@ -121,7 +129,7 @@ describe('loadGameRoster — 대회 경기', () => {
       expect.objectContaining({ competitionId: 'cup', isLeague: false, teamId: 'team-A', teamMatchId: 'm3' }),
     );
     expect(loaded?.computation.participants).toEqual([
-      { userId: 'pa', accountLinked: true, displayNameSnapshot: '에이', jerseyNumber: 10, sourceParticipantId: 'tp-1' },
+      { userId: 'pa', accountLinked: true, displayNameSnapshot: '에이', jerseyNumber: 10, sourceParticipantId: 'tp-1', goalkeeper: false },
     ]);
     expect(loaded?.computation.excluded.map((row) => row.entry.userId)).toEqual(['pb']);
     expect(loaded?.computation.unavailable).toEqual([
@@ -224,7 +232,7 @@ describe('loadGameRoster — 리그 폴백 팀(참가 명단 없음)', () => {
     expect(loaded?.baseSource).toBe('TEAM_MEMBERS');
     expect(loaded?.context).toEqual(expect.objectContaining({ competitionId: 'league-1', isLeague: true }));
     expect(loaded?.computation.participants).toEqual([
-      { userId: 'u1', accountLinked: false, displayNameSnapshot: '하나', jerseyNumber: null, sourceParticipantId: 'ms-1' },
+      { userId: 'u1', accountLinked: false, displayNameSnapshot: '하나', jerseyNumber: null, sourceParticipantId: 'ms-1', goalkeeper: false },
     ]);
     expect(loaded?.computation.excluded.map((row) => row.entry.sourceParticipantId)).toEqual(['ms-2']);
   });
@@ -249,8 +257,8 @@ describe('loadGameRoster — 리그 폴백 팀(참가 명단 없음)', () => {
     const loaded = await loadGameRoster(tx, { gameId: 'game-1', sideId: 'side-1' });
     expect(loaded?.baseSource).toBe('REGISTRATION');
     expect(loaded?.computation.participants).toEqual([
-      { userId: 'u7', accountLinked: true, displayNameSnapshot: '칠', jerseyNumber: 7, sourceParticipantId: 'lp-1' },
-      { userId: 'u8', accountLinked: true, displayNameSnapshot: '팔', jerseyNumber: null, sourceParticipantId: 'lp-2' },
+      { userId: 'u7', accountLinked: true, displayNameSnapshot: '칠', jerseyNumber: 7, sourceParticipantId: 'lp-1', goalkeeper: false },
+      { userId: 'u8', accountLinked: true, displayNameSnapshot: '팔', jerseyNumber: null, sourceParticipantId: 'lp-2', goalkeeper: false },
     ]);
   });
 });
@@ -320,5 +328,16 @@ describe('loadJerseyRegistration — 등번호 원본 신청은 참가 명단 �
   it('confirmed 신청이 그 사이 사라졌으면 null', async () => {
     const { tx } = registrationTx(null);
     await expect(loadJerseyRegistration(tx, scope, managerInput)).resolves.toBeNull();
+  });
+});
+
+
+describe('대회 공통 GK 정본 우선순위', () => {
+  it('참가 명단의 명시 true/false는 이전 경기별 값보다 우선하고 null은 이전 값을 보존한다', async () => {
+    const registration = { ...TOURNAMENT_REGISTRATION, players: TOURNAMENT_REGISTRATION.players.map((player, i) => ({ ...player, goalkeeper: i === 0 ? false : i === 1 ? true : null })) };
+    const tx = fakeTx({ teamMatch: TOURNAMENT_MATCH, sideTeamId: 'team-A', registration,
+      goalkeepers: [{ userId: 'pa', goalkeeper: true, teamId: 'team-A' }, { userId: 'pc', goalkeeper: true, teamId: 'team-A' }] });
+    const result = await loadGameRoster(tx, { gameId: 'game-1', sideId: 'side-1' });
+    expect(result?.base.map((row) => [row.userId, row.goalkeeper]).sort((a,b) => String(a[0]).localeCompare(String(b[0])))).toEqual([['pa', false], ['pb', true], ['pc', true]]);
   });
 });

@@ -8,6 +8,7 @@ import type { V1AdminLeagueDetail, V1AdminLeagueTeamsResponse, V1LeagueFixture }
 export const MOBILE_LEAGUE_ID = 'synthetic-mobile-league-138';
 export const MOBILE_FIXTURE_ID = 'synthetic-mobile-fixture-138';
 const STAMP = '2026-10-13T00:00:00.000Z';
+type HiddenMobileFixture = V1LeagueFixture & { deletedAt: string };
 
 export function mobileFixture(overrides: Partial<V1LeagueFixture> = {}): V1LeagueFixture {
   return {
@@ -48,12 +49,14 @@ export const mobileEditorFixture: {
   updateFails: boolean;
   templateWrites: unknown[];
   fixtureWrites: Array<{ fixtureId: string; body: unknown }>;
+  hiddenFixtures: HiddenMobileFixture[];
 } = {
   league: mobileLeague(),
   canWrite: true,
   updateFails: false,
   templateWrites: [],
   fixtureWrites: [],
+  hiddenFixtures: [],
 };
 
 function success(data: unknown) {
@@ -69,6 +72,7 @@ export function resetMobileEditorFixture() {
   mobileEditorFixture.updateFails = false;
   mobileEditorFixture.templateWrites = [];
   mobileEditorFixture.fixtureWrites = [];
+  mobileEditorFixture.hiddenFixtures = [];
   mobileEditorServer.use(
     http.get('*/api/v1/admin/me', () => success({
       userId: 'synthetic-admin-138', adminUserId: 'synthetic-admin-user-138', adminRole: 'ops',
@@ -82,6 +86,7 @@ export function resetMobileEditorFixture() {
       legacyPeriodCount: null, requiresDurationInput: false,
     })),
     http.get(`*/api/v1/admin/tournaments/${MOBILE_LEAGUE_ID}/registrations`, () => success({ items: [], truncated: false })),
+    http.get(`*/api/v1/tournament-ops/tournaments/${MOBILE_LEAGUE_ID}/fields`, () => success({ items: [] })),
     http.get('*/api/v1/teams', () => success({ items: [], pageInfo: { hasNextPage: false, nextCursor: null } })),
     http.get('*/api/v1/public/integrations/kakao-maps-key', () => success({ kakaoMapsJsKey: null })),
     http.post(`*/api/v1/admin/league-matches/${MOBILE_LEAGUE_ID}/fixtures/template`, async ({ request }) => {
@@ -113,17 +118,19 @@ export function resetMobileEditorFixture() {
           startAt,
         }));
       }
+      // replaceLeagueFixturesInTx()는 이력을 보존하고 기존 대진 전부를 deletedAt으로 현재 목록에서 숨겨요.
+      mobileEditorFixture.hiddenFixtures.push(
+        ...mobileEditorFixture.league.fixtures.map((fixture): HiddenMobileFixture => ({
+          ...fixture, status: 'cancelled', homeSlotId: null, awaySlotId: null,
+          gameState: fixture.gameState === 'SCHEDULED' ? 'CANCELLED' : fixture.gameState,
+          deletedAt: STAMP,
+        })),
+      );
       mobileEditorFixture.league = {
         ...mobileEditorFixture.league,
         slots: [1, 2, 3].map((position) => makeSlot({ id: `synthetic-slot-${position}`, position, label: `${position}번 자리` })),
-        // detail()는 deletedAt:null 이력을 startAt ASC로 읽어요. 취소 행을 지워 성공을 꾸미지 않아요.
-        fixtures: [
-          ...mobileEditorFixture.league.fixtures.map((fixture): V1LeagueFixture => ({
-            ...fixture, status: 'cancelled', homeSlotId: null, awaySlotId: null,
-            gameState: fixture.gameState === 'SCHEDULED' ? 'CANCELLED' : fixture.gameState,
-          })),
-          ...createdFixtures,
-        ].sort((left, right) => left.startAt.localeCompare(right.startAt)),
+        // detail() GET은 deletedAt:null만 반환하므로 숨긴 대진은 현재 fixtures에 포함하지 않아요.
+        fixtures: createdFixtures.sort((left, right) => left.startAt.localeCompare(right.startAt)),
       };
       return success({ slots: 3, fixtures: 3 });
     }),

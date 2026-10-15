@@ -53,7 +53,9 @@ async function openMobileSchedule() {
   fireEvent.click(await screen.findByRole('button', { name: /모바일 리그 1주차/ }));
   const sheet = await screen.findByRole('dialog', { name: '모바일 리그 1주차' });
   fireEvent.click(within(sheet).getByRole('button', { name: /경기 수정|일정 수정/ }));
-  return screen.findByRole('dialog', { name: '경기 수정' });
+  const dialog = await screen.findByRole('dialog', { name: '경기 수정' });
+  await waitFor(() => expect(within(dialog).getByLabelText('등록된 경기장(필드)')).toBeEnabled());
+  return dialog;
 }
 
 async function submitTemplate(replaceExisting: boolean) {
@@ -111,7 +113,7 @@ describe('MD-QA #138 초기 모바일 consumer → 실제 편집 → HTTP 저장
   });
 
   it('취소 이력만 있는 모바일 리그도 실제 template POST에 replaceExisting을 보내고 새 경기로 이동해요', async () => {
-    // Given: API 상세에는 이전 취소 경기도 남고, 취소 이력은 템플릿 보호 대상에서 빠져요.
+    // Given: 아직 숨기지 않은 취소 대진은 현재 상세에 남지만 템플릿 보호 대상에서는 빠져요.
     mobileEditorFixture.league = mobileLeague([mobileFixture({
       status: 'cancelled', gameState: 'CANCELLED', startAt: '2099-12-28T10:00:00.000Z',
     })]);
@@ -122,14 +124,18 @@ describe('MD-QA #138 초기 모바일 consumer → 실제 편집 → HTTP 저장
     fireEvent.change(within(dialog).getByLabelText('요일'), { target: { value: '1' } });
     fireEvent.click(within(dialog).getByRole('button', { name: '요일로 채우기' }));
     fireEvent.click(within(dialog).getByRole('button', { name: /^(빈 경기 만들기|다시 만들기)$/ }));
-    // Then: 취소 이력을 삭제하지 않는 실제 서버 계약으로 새 일정을 만들어요.
+    // Then: 기존 대진은 이력을 보존해 숨기고 새 일정만 조회하는 실제 서버 계약을 따라요.
     await waitFor(() => expect(mobileEditorFixture.templateWrites).toEqual([{
       teamCount: 3, legs: 1, replaceExisting: true,
       schedule: { dates: ['2100-01-04', '2100-01-11', '2100-01-18'], time: '19:00' },
     }]));
     expect(await screen.findByRole('dialog', { name: '모바일 생성 1주차' })).toBeVisible();
-    expect(mobileEditorFixture.league.fixtures.find((fixture) => fixture.teamMatchId === MOBILE_FIXTURE_ID)?.status).toBe('cancelled');
-    expect(mobileEditorFixture.league.fixtures.filter((fixture) => fixture.status !== 'cancelled')).toHaveLength(3);
+    expect(screen.queryByRole('button', { name: /모바일 리그 1주차/ })).not.toBeInTheDocument();
+    expect(mobileEditorFixture.hiddenFixtures).toEqual([expect.objectContaining({
+      teamMatchId: MOBILE_FIXTURE_ID, status: 'cancelled', deletedAt: expect.any(String),
+    })]);
+    expect(mobileEditorFixture.league.fixtures).toHaveLength(3);
+    expect(mobileEditorFixture.league.fixtures.some((fixture) => fixture.teamMatchId === MOBILE_FIXTURE_ID)).toBe(false);
   });
 
   it('모바일 수정의 서버 거절은 입력과 실제 오류를 남기고 성공 화면으로 닫지 않아요', async () => {

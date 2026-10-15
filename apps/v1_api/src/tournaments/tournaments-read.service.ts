@@ -94,7 +94,7 @@ type OverallStandingRow = {
   goalsAgainst: number;
   fairPlayPoints: number;
   recalculatedAt: Date | null;
-  registration: { team: { name: string } };
+  registration: { team: { name: string; profile?: { logoUrl: string | null } | null } };
 };
 
 type OverallStandingsFixtureRow = {
@@ -336,7 +336,7 @@ export class TournamentsReadService {
         where: { tournamentId },
         orderBy: { position: 'asc' },
         include: {
-          registration: { include: { team: { select: { name: true } } } },
+          registration: { include: { team: { select: { name: true, profile: { select: { logoUrl: true } } } } } },
         },
       }),
       this.prisma.v1TournamentMatchDetails.findMany({
@@ -377,6 +377,7 @@ export class TournamentsReadService {
     const standings = standingRows.map((row) => ({
       registrationId: row.registrationId,
       teamName: hideIdentity ? null : row.registration.team.name,
+      teamLogoUrl: hideIdentity ? null : row.registration.team.profile?.logoUrl ?? null,
       position: row.position,
       points: row.points,
       wins: row.wins,
@@ -527,6 +528,7 @@ export class TournamentsReadService {
         // 숨기고 confirmed registrationId를 opaque row key로만 싣는다.
         teamId: hideIdentity ? null : row.teamId,
         teamName: hideIdentity ? null : teamNameById.get(row.teamId) ?? '',
+        teamLogoUrl: hideIdentity ? null : teamLogoById.get(row.teamId) ?? null,
         ...(hideIdentity ? { registrationId: registrationIdByTeamId.get(row.teamId) ?? null } : {}),
         position: row.position,
         points: row.points,

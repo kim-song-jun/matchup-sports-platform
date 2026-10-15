@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { EmailLoginClient } from './email-login-client';
 import { V1ApiError } from '@/lib/api-client';
 import { __resetNavigationHistoryForTests, installNavigationHistory } from '@/lib/navigation-history';
+import { getSavedRedirectPath, resolveAuthContinuationPath } from '@/lib/session-storage';
 
 const router = vi.hoisted(() => ({
   replace: vi.fn(),
@@ -59,6 +60,8 @@ describe('EmailLoginClient GA events', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     nativeApple.available = false;
+    window.sessionStorage.clear();
+    window.history.replaceState({}, '', '/login/email');
   });
 
   it('tracks a login event with method=email on successful sign-in', async () => {
@@ -91,8 +94,12 @@ describe('EmailLoginClient GA events', () => {
     await submitLogin('me@example.com', 'password123');
 
     await waitFor(() =>
-      expect(router.replace).toHaveBeenCalledWith('/terms?mode=renewal&redirect=%2Fmy'),
+      expect(router.replace).toHaveBeenCalledWith('/terms?mode=renewal'),
     );
+    // 필수 단계에서 원 목적지는 sessionStorage에 보존하고 마지막 성공에서 소비한다.
+    expect(getSavedRedirectPath()).toBe('/my');
+    expect(resolveAuthContinuationPath('/home')).toBe('/my');
+    expect(getSavedRedirectPath()).toBeNull();
   });
 
   it('tracks a login_failed event carrying the API error code as reason', async () => {

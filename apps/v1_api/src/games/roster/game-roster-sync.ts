@@ -50,11 +50,12 @@ interface ParticipantRow {
   readonly userId: string | null;
   readonly displayNameSnapshot: string;
   readonly jerseyNumber: number | null;
+  readonly position?: string | null;
 }
 
 function rosterKey(rows: readonly ParticipantRow[]): string {
   return rows
-    .map((row) => `${row.userId ?? ''}␟${row.displayNameSnapshot}␟${row.jerseyNumber ?? ''}`)
+    .map((row) => `${row.userId ?? ''}␟${row.displayNameSnapshot}␟${row.jerseyNumber ?? ''}␟${row.position ?? ''}`)
     .sort()
     .join('␞');
 }
@@ -248,14 +249,22 @@ async function syncLockedGameSide(
     return false;
   }
 
-  const desired: ParticipantRow[] = computation.participants.map((entry) => ({
-    userId: entry.accountLinked ? entry.userId : null,
-    displayNameSnapshot: entry.displayNameSnapshot,
-    jerseyNumber: entry.jerseyNumber,
-  }));
   const current = await tx.v1GameParticipant.findMany({
     where: { lineupId: latest.id },
-    select: { userId: true, displayNameSnapshot: true, jerseyNumber: true },
+    select: { userId: true, displayNameSnapshot: true, jerseyNumber: true, position: true },
+  });
+  const goalkeeperCode = context.goalkeeperPositionCode ?? 'GK';
+  const desired: ParticipantRow[] = computation.participants.map((entry) => {
+    const previous = current.find((row) => entry.accountLinked
+      ? row.userId === entry.userId
+      : row.userId === null && row.displayNameSnapshot === entry.displayNameSnapshot);
+    return {
+      userId: entry.accountLinked ? entry.userId : null,
+      displayNameSnapshot: entry.displayNameSnapshot,
+      jerseyNumber: entry.jerseyNumber,
+      // GK 해제는 그 역할만 지운다. 기존 필드 포지션까지 지우는 변경은 아니다.
+      position: entry.goalkeeper ? goalkeeperCode : previous?.position === goalkeeperCode ? null : previous?.position ?? null,
+    };
   });
   // 같은 명단이어도 최신이 DRAFT(대진 생성 스냅샷·진출 뒤 초안)면 제출본으로 올린다. 공식 결과·운영
   // 보드는 제출본만 명단으로 치고, 대회·리그는 팀이 직접 제출할 경로가 없다(T-e). 빈 명단은 제출하지 않는다.
@@ -291,6 +300,7 @@ async function syncLockedGameSide(
       userId: row.userId,
       displayNameSnapshot: row.displayNameSnapshot,
       jerseyNumber: row.jerseyNumber,
+      position: row.position ?? null,
       // 명단 = 출전자(정본 §3). 출전 판정은 이 값을 읽는다.
       started: true,
       arrivedAt: arrivals[index],
@@ -368,7 +378,7 @@ export function upcomingCompetitionGameWhere(
  * 잠근 경기 안에서 한 팀의 그 대회·리그 시작 전 경기 명단을 다시 계산한다. 바뀐 사이드 수를 돌려준다.
  * 잠근 뒤 다시 읽으므로 그 사이 시작된 경기는 빠진다.
  */
-async function syncLockedCompetitionTeam(
+export async function syncLockedCompetitionTeam(
   tx: Tx,
   input: { competitionId: string; teamId: string },
   locked: ReadonlySet<string>,

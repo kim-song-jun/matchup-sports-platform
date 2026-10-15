@@ -31,6 +31,8 @@ interface BottomSheetBaseProps {
    * 시트 패널 자체에 포커스를 둬 닫기 버튼에 키보드 포커스 링이 그려지지 않게 한다.
    */
   initialFocus?: 'control' | 'sheet';
+  /** 공통 홍보 문구를 검색 요약에서 제외한다. 화면 표시와 포커스는 유지한다. */
+  excludeFromSnippet?: boolean;
 }
 
 type BottomSheetCloseProps =
@@ -89,7 +91,7 @@ const INTERACTIVE_SELECTOR = 'button, a, input, select, textarea, label, [role="
  * 없으므로 임계치 미만이면 무조건 원위치, 초과면 무조건 닫는다.
  */
 export function BottomSheet(props: BottomSheetProps) {
-  const { open, closeHref, onClose, children, title, ariaLabel, initialFocus = 'control' } = props;
+  const { open, closeHref, onClose, children, title, ariaLabel, initialFocus = 'control', excludeFromSnippet = false } = props;
   const router = useRouter();
 
   const navigate = useCallback(
@@ -197,6 +199,7 @@ export function BottomSheet(props: BottomSheetProps) {
         ref={dialogRef}
         className={`tm-filter-sheet${isDragging ? ' is-dragging' : ''}`}
         role="dialog"
+        data-nosnippet={excludeFromSnippet ? '' : undefined}
         aria-modal="true"
         aria-label={title ? undefined : ariaLabel}
         aria-labelledby={titleId}

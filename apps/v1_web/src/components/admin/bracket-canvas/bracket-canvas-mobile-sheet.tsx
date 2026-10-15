@@ -5,7 +5,8 @@ import { useState, type ReactNode } from 'react';
 import { ChevronLeft } from 'lucide-react';
 import type { AdminToastVariant } from '@/components/admin';
 import { StatusChip } from '@/components/v1-ui/status-chip';
-import { useV1UpdateFixture } from '@/hooks/use-v1-api';
+import { useV1AssignFixtureField, useV1UpdateFixture } from '@/hooks/use-v1-api';
+import { CompetitionFieldPicker } from '@/components/admin/competition-field-picker';
 import { useV1AssignTournamentSlot, useV1QuickResult } from '@/hooks/use-v1-bracket-canvas';
 import { describeBracketCanvasError } from '@/lib/bracket-canvas-errors';
 import {
@@ -344,6 +345,25 @@ function isNodeLocked(node: MobileNode): boolean {
   return node.state === 'cancelled' || (game !== null && (game.state !== 'SCHEDULED' || game.latestRevision !== null));
 }
 
+function MobileFieldSetting({ node, competitionId, showToast }: MobileNodeSheetBodyProps) {
+  const assign = useV1AssignFixtureField(competitionId);
+  const [fieldId, setFieldId] = useState(node.fieldId ?? '');
+  const [error, setError] = useState<string | null>(null);
+  const pending = assign.isPending;
+  return <section className="flex flex-col gap-3" aria-label="경기장 설정">
+    <CompetitionFieldPicker tournamentId={competitionId} value={fieldId} onChange={setFieldId} disabled={pending}
+      allowNew={false} emptyLabel="등록된 경기장을 선택해 주세요" />
+    {error ? <p role="alert" className="tm-text-caption" style={{ color: 'var(--red700)' }}>{error}</p> : null}
+    <button type="button" className="tm-btn tm-btn-md tm-btn-outline" disabled={pending || !fieldId || fieldId === (node.fieldId ?? '')}
+      onClick={() => {
+        setError(null);
+        const options = { onSuccess: () => showToast('경기장을 저장했어요.'),
+          onError: (err: unknown) => setError(extractErrorMessage(err, '경기장을 저장하지 못했어요.')) };
+        if (fieldId) assign.mutate({ fixtureId: node.fixtureId, fieldId }, options);
+      }}>{pending ? '저장 중…' : '경기장 저장'}</button>
+  </section>;
+}
+
 export function MobileNodeSheetBody(props: MobileNodeSheetBodyProps) {
   const { node, scope, canWrite, view, onViewChange } = props;
   const groups = props.groups ?? [];
@@ -390,6 +410,7 @@ export function MobileNodeSheetBody(props: MobileNodeSheetBodyProps) {
         <SideRow label="어웨이" side={node.away} canPick={pickKind(node.away) !== null} onPick={() => onViewChange({ kind: 'pick', side: 'AWAY' })} />
       </ul>
       {hasRankSlot ? <Note>조 순위가 정해지면 큰 화면에서 순위대로 채워요.</Note> : null}
+      {canWrite && node.state !== 'cancelled' ? <MobileFieldSetting key={node.fixtureId} {...props} /> : null}
       <ResultSection {...props} />
     </div>
   );

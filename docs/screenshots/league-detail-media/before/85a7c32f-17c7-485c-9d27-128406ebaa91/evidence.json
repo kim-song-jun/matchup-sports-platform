@@ -1,0 +1,62 @@
+[
+  {
+    "width": 390,
+    "pathname": "/tournaments/85a7c32f-17c7-485c-9d27-128406ebaa91",
+    "accessible": true,
+    "standingsVisible": false,
+    "savedCover": true,
+    "errors": [
+      "Failed to load resource: the server responded with a status of 401 ()"
+    ],
+    "failed": [
+      {
+        "url": "/api/v1/auth/me",
+        "status": 401
+      }
+    ],
+    "overflow": false,
+    "coverVisible": false,
+    "coverLoaded": false,
+    "standingLogoCount": 0
+  },
+  {
+    "width": 768,
+    "pathname": "/tournaments/85a7c32f-17c7-485c-9d27-128406ebaa91",
+    "accessible": true,
+    "standingsVisible": false,
+    "savedCover": true,
+    "errors": [
+      "Failed to load resource: the server responded with a status of 401 ()"
+    ],
+    "failed": [
+      {
+        "url": "/api/v1/auth/me",
+        "status": 401
+      }
+    ],
+    "overflow": false,
+    "coverVisible": false,
+    "coverLoaded": false,
+    "standingLogoCount": 0
+  },
+  {
+    "width": 1440,
+    "pathname": "/tournaments/85a7c32f-17c7-485c-9d27-128406ebaa91",
+    "accessible": true,
+    "standingsVisible": false,
+    "savedCover": true,
+    "errors": [
+      "Failed to load resource: the server responded with a status of 401 ()"
+    ],
+    "failed": [
+      {
+        "url": "/api/v1/auth/me",
+        "status": 401
+      }
+    ],
+    "overflow": false,
+    "coverVisible": false,
+    "coverLoaded": false,
+    "standingLogoCount": 0
+  }
+]

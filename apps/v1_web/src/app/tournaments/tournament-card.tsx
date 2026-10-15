@@ -134,6 +134,7 @@ export function TournamentCard({
     <div role="listitem" style={{ height: '100%' }}>
       <CompetitionCardShell
         interactive={interactive}
+        // 통합 목록은 리그도 소개·신청 정보가 있는 기존 상세로 연결하고 목록 필터를 보존한다.
         href={withFromPath(`/tournaments/${item.id}`, fromPath)}
         ariaLabel={`${item.title} — ${sportAccent.label} — ${status.label}`}
       >

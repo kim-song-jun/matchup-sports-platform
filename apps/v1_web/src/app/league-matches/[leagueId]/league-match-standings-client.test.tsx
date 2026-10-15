@@ -112,7 +112,7 @@ describe('LeagueMatchStandingsClient', () => {
     expect(screen.getByRole('region', { name: '리그 운영 안내' })).toHaveTextContent('첫 줄 운영 안내 둘째 줄');
     const link = await screen.findByRole('link', { name: /성수 FC/ });
     // 팀 상세에서 뒤로가기를 누르면 이 리그 화면으로 돌아오도록 ?from=이 함께 실린다.
-    expect(link).toHaveAttribute('href', `/teams/t1?from=${encodeURIComponent('/league-matches/league-1')}`);
+    expect(link).toHaveAttribute('href', `/teams/t1?from=${encodeURIComponent('/tournaments/league-1')}`);
   });
 
   // 한 경기도 안 치른 리그는 순위표 대신 참가팀 목록을 보여준다 — 거기서도 팀으로 갈 수
@@ -138,7 +138,7 @@ describe('LeagueMatchStandingsClient', () => {
 
     expect(await screen.findByRole('link', { name: /망원 FC/ })).toHaveAttribute(
       'href',
-      `/teams/t2?from=${encodeURIComponent('/league-matches/league-1')}`,
+      `/teams/t2?from=${encodeURIComponent('/tournaments/league-1')}`,
     );
   });
 
@@ -909,13 +909,13 @@ describe('LeagueMatchStandingsClient', () => {
 
     await waitFor(() => expect(screen.getByRole('navigation', { name: '같은 시리즈의 다른 리그' })).toBeInTheDocument());
     // 받은 from 이 없어도 형제 리그 링크는 "지금 이 리그"를 출처로 담아야 여기로 돌아온다.
-    const selfHref = '/league-matches/league-1';
+    const selfHref = '/tournaments/league-1';
     const siblingLink = screen.getByRole('link', { name: /2시즌/ });
     expect(siblingLink.textContent).toContain('2부');
-    expect(siblingLink).toHaveAttribute('href', withFromPath('/league-matches/league-2', selfHref));
-    expect(screen.getByRole('link', { name: /1시즌/ })).toHaveAttribute('href', withFromPath('/league-matches/league-3', selfHref));
+    expect(siblingLink).toHaveAttribute('href', withFromPath('/tournaments/league-2', selfHref));
+    expect(screen.getByRole('link', { name: /1시즌/ })).toHaveAttribute('href', withFromPath('/tournaments/league-3', selfHref));
     // 지금 보고 있는 리그 자기 자신으로 가는 링크는 없다.
-    expect(screen.queryAllByRole('link').map((link) => link.getAttribute('href'))).not.toContain('/league-matches/league-1');
+    expect(screen.queryAllByRole('link').map((link) => link.getAttribute('href'))).not.toContain('/tournaments/league-1');
   });
 
   it('이슈 1: 받은 from 을 형제 리그 링크에도 이어 붙인다', async () => {
@@ -945,8 +945,8 @@ describe('LeagueMatchStandingsClient', () => {
     );
 
     await waitFor(() => expect(screen.getByRole('navigation', { name: '같은 시리즈의 다른 리그' })).toBeInTheDocument());
-    const selfHref = withFromPath('/league-matches/league-1', '/teams/t9');
-    expect(screen.getByRole('link', { name: /2시즌/ })).toHaveAttribute('href', withFromPath('/league-matches/league-2', selfHref));
+    const selfHref = withFromPath('/tournaments/league-1', '/teams/t9');
+    expect(screen.getByRole('link', { name: /2시즌/ })).toHaveAttribute('href', withFromPath('/tournaments/league-2', selfHref));
     useSearchParamsMock.mockReturnValue(new URLSearchParams() as never);
   });
 

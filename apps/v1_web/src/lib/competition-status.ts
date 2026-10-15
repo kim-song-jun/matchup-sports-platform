@@ -88,7 +88,7 @@ export function competitionKindChip(kind: CompetitionKindKey): StatusChipModel {
 
 type LeagueFixturePhaseInput = Pick<
   V1LeagueFixture,
-  'status' | 'startAt' | 'homeScore' | 'awayScore' | 'scoreHidden' | 'gameState'
+  'status' | 'startAt' | 'homeScore' | 'awayScore' | 'scoreHidden' | 'gameState' | 'resultVoided'
 >;
 
 /**
@@ -99,7 +99,8 @@ type LeagueFixturePhaseInput = Pick<
  */
 export function leagueFixturePhase(fixture: LeagueFixturePhaseInput, nowMs: number = Date.now()): MatchPhase {
   if (fixture.status === 'cancelled' || fixture.gameState === 'CANCELLED') return 'cancelled';
-  if (fixture.scoreHidden === true) return 'ended';
+  // 무효는 결과를 기다리는 게 아니라 끝난 경기의 결과를 지운 것이다.
+  if (fixture.scoreHidden === true || fixture.resultVoided === true) return 'ended';
   if (typeof fixture.homeScore === 'number' && typeof fixture.awayScore === 'number') return 'ended';
   if (fixture.gameState === 'LIVE') return 'live';
   if (fixture.gameState === 'PAUSED') return 'paused';

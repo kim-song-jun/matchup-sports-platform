@@ -1802,7 +1802,7 @@ export const v1MswHandlers = [
         // 서버와 같다: 저장 요청이 실어 보낸 사람 연결을 응답이 그대로 되돌려준다.
         // 게스트는 계정이 없으므로 null.
         userId: participant.userId ?? null,
-        displayName: v1TeamMatchLineupFixture.eligibleMembers?.find((member) => member.userId === participant.userId)?.displayName ?? participant.displayName ?? '이름 미확인',
+        displayName: participant.displayName?.trim() || v1TeamMatchLineupFixture.eligibleMembers?.find((member) => member.userId === participant.userId)?.displayName || '이름 미확인',
         jerseyNumber: participant.jerseyNumber ?? null,
         position: participant.position ?? null,
         goalkeeper: participant.goalkeeper ?? false,

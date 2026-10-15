@@ -123,4 +123,24 @@ describe('MD-QA #146 registered friendly-default MSW submit contract', () => {
     });
     expect(await v1Get<V1TeamMatchLineup>(ownPath)).toEqual(before);
   });
+
+  it('preserves an explicitly saved display-name snapshot for a linked member', async () => {
+    // Given: the requested snapshot differs from the member's current profile name.
+    const preview = await v1Get<V1TeamMatchLineup>(ownPath);
+    const displayName = '이전 경기 표시명';
+    expect(preview.eligibleMembers?.find((member) => member.userId === 'user-1')?.displayName).not.toBe(displayName);
+
+    // When: the real client saves that linked member with an explicit snapshot name.
+    const saved = await v1Put<V1TeamMatchLineupSaveResult>(ownPath, {
+      expectedVersion: preview.revision,
+      participants: [{ userId: 'user-1', displayName }],
+    } satisfies V1TeamMatchLineupSavePayload, {
+      headers: { 'Idempotency-Key': '14600000-0000-4000-8000-000000000006' },
+    });
+
+    // Then: a fresh own GET retains the submitted snapshot instead of replacing it with the profile.
+    const draft = await v1Get<V1TeamMatchLineup>(ownPath);
+    expect(draft).toMatchObject({ lineupId: saved.lineupId, state: 'DRAFT', hasSavedDraft: true });
+    expect(draft.starters).toEqual([expect.objectContaining({ userId: 'user-1', displayName })]);
+  });
 });

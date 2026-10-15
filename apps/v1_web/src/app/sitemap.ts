@@ -31,10 +31,7 @@ const STATIC_ROUTES: Array<{ path: string; priority: number; changeFrequency: Me
   { path: '/teams', priority: 0.8, changeFrequency: 'daily' },
   { path: '/team-matches', priority: 0.8, changeFrequency: 'hourly' },
   { path: '/tournaments', priority: 0.9, changeFrequency: 'daily' },
-  /* `/league-matches`(리그 전용 목록)는 **여기서 뺐다** — 이제 `/tournaments?kind=league` 로
-     넘어가므로(2026-09-01) 리다이렉트하는 주소를 사이트맵에 올리면 크롤러가 한 번 더 돈다.
-     ⚠️ **리그 개별 페이지(`/league-matches/:id`)는 그대로 살아 있고 아래에서 계속 싣는다** —
-     넘어간 것은 목록 하나뿐이다. */
+  // League list/detail aliases redirect; only canonical destinations are indexed.
   { path: '/events', priority: 0.8, changeFrequency: 'daily' },
   { path: '/notices', priority: 0.5, changeFrequency: 'daily' },
 ];
@@ -101,7 +98,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // 이미 로그인 없이 브라우징 가능하다(admin이 아직 공개 안 한 대회 draft와 다른 개념 —
     // 리그의 draft는 "팀은 모였지만 대진이 아직 안 생성된" 상태다). 로그인 없이 보이는
     // 화면을 sitemap에서만 숨기면 "브라우징은 되는데 검색은 안 되는" 불일치가 생긴다.
-    ...leagues.map((item) => sitemapEntry(`/league-matches/${item.leagueId}`, 0.7, 'daily')),
+    ...leagues.map((item) => sitemapEntry(`/tournaments/${item.leagueId}`, 0.7, 'daily')),
     ...tournamentFixtures.map((item) => sitemapEntry(fixtureDetailHref({
       isRegularLeague: false, competitionId: item.tournamentId, fixtureId: item.fixture.id,
     }), 0.6, 'daily')),

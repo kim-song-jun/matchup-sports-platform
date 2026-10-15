@@ -1,3 +1,5 @@
+import { leagueFixturePhase } from './competition-status';
+
 /**
  * 관전자 공개 화면(대회 일정 · 경기 상세 · 대진표)의 라이브 폴링 주기 단일 소스.
  *
@@ -64,4 +66,26 @@ export function earliestPublicLivePollDelay(
     if (delay !== false && (earliest === false || delay < earliest)) earliest = delay;
   }
   return earliest;
+}
+
+/**
+ * 공개 리그 상세(일정·순위)의 다음 폴링까지 기다릴 시간. 진행 중·일시 중지 경기와 결과 대기(끝났지만
+ * 공식 확정 전) 경기는 라이브 주기, 시작 전 경기는 `publicLivePollDelay` 의 킥오프 창을 따른다.
+ * 결과 대기를 빼면 확정이 열어 둔 화면에 오지 않는다 — 진행 중 1 / 이전 순위가 새로고침 전까지 남았다.
+ */
+export function leagueFixturesPollDelay(
+  fixtures: ReadonlyArray<Parameters<typeof leagueFixturePhase>[0]>,
+  now: number = Date.now(),
+): number | false {
+  return earliestPublicLivePollDelay(
+    fixtures.map((fixture) => {
+      const phase = leagueFixturePhase(fixture, now);
+      const awaitingOfficial = phase === 'awaiting_result' && fixture.gameState === 'ENDED';
+      if (phase === 'live' || phase === 'paused' || awaitingOfficial) return { status: 'live', scheduledAt: fixture.startAt };
+      // 킥오프가 지났는데 아직 시작하지 않은 경기도 'scheduled' 로 묻는다 — 늦은 시작을 놓치지 않고, 3시간 뒤엔 멈춘다.
+      if (phase === 'scheduled' || phase === 'awaiting_result') return { status: 'scheduled', scheduledAt: fixture.startAt };
+      return { status: null, scheduledAt: null };
+    }),
+    now,
+  );
 }

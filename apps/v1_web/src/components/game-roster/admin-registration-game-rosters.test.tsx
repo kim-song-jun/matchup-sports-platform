@@ -147,7 +147,7 @@ describe('어드민 경기별 명단 — 칸 토글과 저장', () => {
     expect(screen.getAllByText('출전정지 1경기')).toHaveLength(2);
     expect(screen.getByText('빠짐 · 결장')).toBeInTheDocument();
     expect(screen.getByText('결장 · 부상 · 팀장')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^한도윤 / })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^한도윤 .* vs /  })).not.toBeInTheDocument();
   });
 });
 
@@ -234,4 +234,40 @@ describe('어드민 경기별 명단 — 역할별 노출', () => {
     expect(screen.queryByRole('button', { name: /^김민재 / })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /저장/ })).not.toBeInTheDocument();
   });
+});
+
+
+describe('어드민 대회 공통 GK 관리', () => {
+  it('복수 GK 지정·출전 변경을 함께 저장하고 표 재조회·개별 해제 뒤에도 유지한다', async () => {
+    const view = renderPanel();
+    fireEvent.click(await screen.findByRole('button', { name: '김민재 골키퍼로 지정' }));
+    fireEvent.click(screen.getByRole('button', { name: '박서준 골키퍼로 지정' }));
+    fireEvent.click(await cell('김민재', G2.opponentName, '출전'));
+    fireEvent.click(screen.getByRole('button', { name: '변경 3건 저장' }));
+    await screen.findByText('변경 3건을 저장했어요.');
+    expect(await screen.findByRole('button', { name: '김민재, 골키퍼 지정 해제' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: '박서준, 골키퍼 지정 해제' })).toHaveAttribute('aria-pressed', 'true');
+    expect(await cell('김민재', G2.opponentName, '빠짐 · 운영자')).toBeInTheDocument();
+    view.unmount(); renderPanel();
+    fireEvent.click(await screen.findByRole('button', { name: '김민재, 골키퍼 지정 해제' }));
+    fireEvent.click(screen.getByRole('button', { name: '변경 1건 저장' }));
+    await screen.findByRole('button', { name: '김민재 골키퍼로 지정' });
+    expect(screen.getByRole('button', { name: '박서준, 골키퍼 지정 해제' })).toHaveAttribute('aria-pressed', 'true');
+    expect(batchBodies()[0]).toEqual({ changes: [
+      { gameId: G2.gameId, userId: 'player-1', op: 'EXCLUDE' },
+      { gameId: G1.gameId, userId: 'player-1', op: 'SET_GOALKEEPER', goalkeeper: true },
+      { gameId: G1.gameId, userId: 'player-2', op: 'SET_GOALKEEPER', goalkeeper: true },
+    ] });
+  });
+});
+
+
+it('GK 저장이 실패하면 초안을 유지하고 재시도할 수 있다', async () => {
+  server.use(http.post('*/api/v1/teams/:teamId/game-rosters/batch', () => HttpResponse.json({ status: 'error', statusCode: 500, code: 'INTERNAL_ERROR', message: '저장 실패' }, { status: 500 })));
+  renderPanel();
+  fireEvent.click(await screen.findByRole('button', { name: '김민재 골키퍼로 지정' }));
+  fireEvent.click(screen.getByRole('button', { name: '변경 1건 저장' }));
+  await screen.findByRole('alert');
+  expect(screen.getByRole('button', { name: '김민재, 골키퍼 지정 해제' })).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.getByRole('button', { name: '변경 1건 저장' })).toBeEnabled();
 });

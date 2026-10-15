@@ -11,6 +11,12 @@ vi.mock('@/lib/seo', async (importOriginal) => ({
 const { default: sitemap } = await import('./sitemap');
 
 describe('sitemap', () => {
+  it('indexes canonical league detail without historical aliases', async () => {
+    vi.mocked(fetchPublicV1).mockImplementation(async (path) => path.startsWith('/league-matches?') ? { items: [{ leagueId: 'league-1' }], pageInfo: { hasNext: false, nextCursor: null } } : null);
+    const urls = (await sitemap()).map(entry => entry.url);
+    expect(urls).toContain('https://teameet.co.kr/tournaments/league-1');
+    expect(urls).not.toContain('https://teameet.co.kr/league-matches/league-1');
+  });
   beforeEach(() => {
     vi.mocked(fetchPublicV1).mockReset().mockResolvedValue(null);
     vi.spyOn(console, 'error').mockImplementation(() => {});

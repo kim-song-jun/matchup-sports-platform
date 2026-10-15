@@ -1,5 +1,9 @@
 # Domain Contract - Team Matches
 
+## Competition field place display (Task 20261082)
+
+Public team-match list/detail include the assigned field's name. For league/tournament matches, `place.name` uses that field name while address/coordinates remain the match's saved snapshot. Ordinary friendly matches retain their existing place contract. Historical DB names are not overwritten by this display normalization; fixture setting writes use the shared competition registry in [tournament operations](./tournament-operations.md#place-registry-integration-2026-10-14-task-20261082).
+
 ## 플랫폼 주관 공동 운영 (Task 149, 2026-09-30)
 
 - 기존 `GET/POST /team-matches/:id/record` 계약에 `operator: boolean`을 추가한다. `participant`는 계속 실제 최신 제출 라인업 선수만 뜻한다.

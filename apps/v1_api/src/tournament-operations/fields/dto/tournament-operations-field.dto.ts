@@ -61,9 +61,8 @@ export class UpdateTournamentFieldDto {
  * existing, same-tournament field. Clearing the assignment is a separate
  * DELETE (no body) so "assign" vs "no-op" is never ambiguous over a nullable
  * JSON field (user decision: sensible default, documented here since neither
- * the plan nor global-contract.md define this route -- V1TournamentFixture.fieldId
- * has no write path anywhere else in the codebase, confirmed by the schema
- * lane's recon).
+ * the plan nor global-contract.md define this route). Canonical TeamMatch field
+ * selection also exists in admin fixture settings; both save venue and assignment together.
  */
 export class AssignTournamentFixtureFieldDto {
   @IsUUID()

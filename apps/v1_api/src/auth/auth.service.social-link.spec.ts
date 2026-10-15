@@ -1,7 +1,6 @@
-import { Logger } from '@nestjs/common';
+import { ConflictException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { Prisma } from '@prisma/client';
-import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
 import { issuePhoneProofToken } from '../verification/phone-proof-token';
@@ -14,11 +13,11 @@ const PHONE = '01012345678';
 const CALLER_ID = 'pending-user';
 const HOLDER_ID = 'holder-user';
 const IDENTITY_ID = 'identity-1';
+const ACCOUNT_PROOF_REQUIRED = 'SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF';
 
 describe('AuthService.linkSocialToPhoneOwner', () => {
   let service: AuthService;
   let prisma: ReturnType<typeof buildPrisma>;
-  const notifications = { emitNotification: jest.fn() };
   let savedSecret: string | undefined;
 
   function buildPrisma() {
@@ -26,9 +25,11 @@ describe('AuthService.linkSocialToPhoneOwner', () => {
       v1User: { findUnique: jest.fn(), findFirst: jest.fn(), updateMany: jest.fn(), update: jest.fn(), delete: jest.fn() },
       v1AuthIdentity: { findFirst: jest.fn(), findMany: jest.fn(), update: jest.fn() },
       v1Inquiry: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      v1UploadAsset: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
       v1AdminUser: { findUnique: jest.fn() },
       v1PhoneVerificationChallenge: { deleteMany: jest.fn(), count: jest.fn() },
       v1StatusChangeLog: { create: jest.fn() },
+      v1Notification: { create: jest.fn() },
       v1UserOnboardingProgress: { upsert: jest.fn() },
       $transaction: jest.fn(),
     };
@@ -56,10 +57,14 @@ describe('AuthService.linkSocialToPhoneOwner', () => {
     proofToken: issuePhoneProofToken(PHONE, 'social_link'),
     ...overrides,
   });
-  const writes = () =>
-    prisma.v1AuthIdentity.update.mock.calls.length +
-    prisma.v1User.delete.mock.calls.length +
-    prisma.v1StatusChangeLog.create.mock.calls.length;
+  const noLinkSideEffects = () => {
+    for (const operation of [prisma.v1AuthIdentity.update, prisma.v1User.delete,
+      prisma.v1Inquiry.updateMany, prisma.v1UploadAsset.updateMany, prisma.v1User.update,
+      prisma.v1StatusChangeLog.create, prisma.v1Notification.create, prisma.v1PhoneVerificationChallenge.deleteMany]) {
+      expect(operation).not.toHaveBeenCalled();
+    }
+    expect(service.me).not.toHaveBeenCalled();
+  };
 
   beforeEach(async () => {
     savedSecret = process.env.V1_SESSION_SECRET;
@@ -74,9 +79,7 @@ describe('AuthService.linkSocialToPhoneOwner', () => {
     prisma.v1PhoneVerificationChallenge.deleteMany.mockResolvedValue({ count: 1 });
     prisma.v1PhoneVerificationChallenge.count.mockResolvedValue(1);
     prisma.v1AuthIdentity.findMany.mockResolvedValue([{ provider: 'email', passwordHash: 'hash' }]);
-    notifications.emitNotification.mockResolvedValue(undefined);
-    (prisma.$transaction as jest.Mock).mockImplementation((arg: unknown) =>
-      typeof arg === 'function' ? (arg as (tx: typeof prisma) => Promise<unknown>)(prisma) : Promise.all(arg as Promise<unknown>[]));
+    prisma.$transaction.mockImplementation((action: (tx: typeof prisma) => Promise<unknown>) => action(prisma));
 
     const module = await Test.createTestingModule({
       providers: [
@@ -86,66 +89,41 @@ describe('AuthService.linkSocialToPhoneOwner', () => {
         { provide: PhoneVerificationService, useValue: {} },
         { provide: AppleIdentityService, useValue: {} },
         { provide: AppleTokenService, useValue: {} },
-        { provide: NotificationsService, useValue: notifications },
       ],
     }).compile();
     service = module.get(AuthService);
-    jest.spyOn(service, 'me').mockResolvedValue({
-      user: { id: HOLDER_ID },
-      onboarding: { status: 'completed', missing: [] },
-    } as unknown as Awaited<ReturnType<AuthService['me']>>);
+    jest.spyOn(service, 'me');
   });
 
   afterEach(() => {
     if (savedSecret === undefined) delete process.env.V1_SESSION_SECRET;
     else process.env.V1_SESSION_SECRET = savedSecret;
+    jest.restoreAllMocks();
   });
 
   const expectCode = async (promise: Promise<unknown>, code: string) => {
     await expect(promise).rejects.toMatchObject({ response: { code } });
-    expect(writes()).toBe(0);
+    noLinkSideEffects();
+    // Expired signup intentionally resets only the caller's terms step; no account-link writes occur.
+    if (code !== 'SOCIAL_SIGNUP_EXPIRED') {
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.v1User.updateMany).not.toHaveBeenCalled();
+      expect(prisma.v1UserOnboardingProgress.upsert).not.toHaveBeenCalled();
+    }
   };
 
-  it('moves the identity to the holder, deletes the pending user, audits, notifies, and signs in as the holder', async () => {
-    const result = await service.linkSocialToPhoneOwner(CALLER_ID, dto());
-
-    expect(prisma.v1AuthIdentity.update).toHaveBeenCalledWith({
-      where: { id: IDENTITY_ID, userId: CALLER_ID },
-      data: { userId: HOLDER_ID, lastLoginAt: expect.any(Date) },
-    });
-    expect(prisma.v1Inquiry.updateMany).toHaveBeenCalledWith({ where: { userId: CALLER_ID }, data: { userId: HOLDER_ID } });
-    expect(prisma.v1User.delete).toHaveBeenCalledWith({ where: { id: CALLER_ID } });
-    expect(prisma.v1StatusChangeLog.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        targetType: 'auth_identity',
-        targetId: IDENTITY_ID,
-        toStatus: 'linked',
-        actorUserId: HOLDER_ID,
-        reason: `social_link:kakao; removed_pending_user=${CALLER_ID}`,
-      }),
-    });
-    const audit = JSON.stringify(prisma.v1StatusChangeLog.create.mock.calls);
-    expect(audit).not.toContain(PHONE);
-    expect(notifications.emitNotification).toHaveBeenCalledWith(
-      HOLDER_ID,
-      'social_identity_linked',
-      null,
-      undefined,
-      { vars: { name: '카카오' }, businessKey: `social-link:${IDENTITY_ID}` },
-    );
-    expect(result.session).toEqual({ userId: HOLDER_ID, userEmail: 'holder@example.com' });
+  it('requires account proof without transferring identity, inquiries, uploads or a holder session', async () => {
+    // Given: a valid current-number proof and a historically verified holder.
+    // When / Then: phone possession alone cannot authenticate that holder.
+    await expectCode(service.linkSocialToPhoneOwner(CALLER_ID, dto()), ACCOUNT_PROOF_REQUIRED);
+    expect(prisma.v1User.updateMany).not.toHaveBeenCalled();
+    expect(prisma.v1UserOnboardingProgress.upsert).not.toHaveBeenCalled();
   });
 
-  it('never rewrites the Apple refresh token when moving the identity', async () => {
+  it('keeps an Apple identity and its refresh token untouched when account proof is missing', async () => {
     prisma.v1User.findUnique.mockResolvedValue(pendingCaller({ authIdentities: [{ id: IDENTITY_ID, provider: 'apple' }] }));
 
-    await service.linkSocialToPhoneOwner(CALLER_ID, dto());
-
-    const { data } = prisma.v1AuthIdentity.update.mock.calls[0][0];
-    expect(Object.keys(data).sort()).toEqual(['lastLoginAt', 'userId']);
-    expect(notifications.emitNotification).toHaveBeenCalledWith(
-      HOLDER_ID, 'social_identity_linked', null, undefined, expect.objectContaining({ vars: { name: 'Apple' } }),
-    );
+    await expectCode(service.linkSocialToPhoneOwner(CALLER_ID, dto()), ACCOUNT_PROOF_REQUIRED);
   });
 
   describe('phone proof', () => {
@@ -160,10 +138,10 @@ describe('AuthService.linkSocialToPhoneOwner', () => {
     });
 
     it('rejects a proof whose challenge was already consumed and moves nothing', async () => {
-      prisma.v1PhoneVerificationChallenge.deleteMany.mockResolvedValue({ count: 0 });
+      prisma.v1PhoneVerificationChallenge.count.mockResolvedValue(0);
 
       await expectCode(service.linkSocialToPhoneOwner(CALLER_ID, dto()), 'PHONE_NOT_VERIFIED');
-      expect(notifications.emitNotification).not.toHaveBeenCalled();
+      expect(prisma.v1Notification.create).not.toHaveBeenCalled();
     });
   });
 
@@ -181,19 +159,15 @@ describe('AuthService.linkSocialToPhoneOwner', () => {
       await expectCode(service.linkSocialToPhoneOwner(CALLER_ID, dto()), 'SOCIAL_LINK_NOT_PENDING');
     });
 
-    it('accepts a deferred caller whose auto profile exists, for both link and preview', async () => {
+    it('requires account proof for a deferred caller while preserving its auto profile', async () => {
       prisma.v1User.findUnique.mockResolvedValue(
         pendingCaller({ onboardingStatus: 'social_profile_deferred', profile: { id: 'auto-profile' } }),
       );
 
-      await expect(service.previewSocialLink(CALLER_ID, dto())).resolves.toMatchObject({ linkingProvider: 'kakao' });
-      await service.linkSocialToPhoneOwner(CALLER_ID, dto());
-
-      expect(prisma.v1User.updateMany).toHaveBeenCalledWith({
-        where: { id: CALLER_ID, onboardingStatus: { in: ['social_profile_required', 'social_profile_deferred'] } },
-        data: { updatedAt: expect.any(Date) },
-      });
-      expect(prisma.v1User.delete).toHaveBeenCalledWith({ where: { id: CALLER_ID } });
+      await expectCode(service.previewSocialLink(CALLER_ID, dto()), ACCOUNT_PROOF_REQUIRED);
+      await expectCode(service.linkSocialToPhoneOwner(CALLER_ID, dto()), ACCOUNT_PROOF_REQUIRED);
+      expect(prisma.v1User.updateMany).not.toHaveBeenCalled();
+      expect(prisma.v1UserOnboardingProgress.upsert).not.toHaveBeenCalled();
     });
 
     it('still rejects a completed caller that has a profile', async () => {
@@ -215,6 +189,11 @@ describe('AuthService.linkSocialToPhoneOwner', () => {
         where: { id: CALLER_ID, onboardingStatus: { in: ['social_terms_required', 'social_profile_required'] } },
         data: { onboardingStatus: 'social_terms_required' },
       });
+      expect(prisma.v1UserOnboardingProgress.upsert).toHaveBeenCalledWith({
+        where: { userId: CALLER_ID }, update: { currentStep: 'terms' },
+        create: { userId: CALLER_ID, currentStep: 'terms' },
+      });
+      expect(prisma.v1User.findFirst).not.toHaveBeenCalled();
     });
 
     it('rejects a non-active caller', async () => {
@@ -262,10 +241,9 @@ describe('AuthService.linkSocialToPhoneOwner', () => {
     it.each([
       ['a revoked admin', { status: 'revoked' }],
       ['a non-admin', null],
-    ])('still links %s', async (_label, row) => {
+    ])('still requires account proof for %s', async (_label, row) => {
       prisma.v1AdminUser.findUnique.mockResolvedValue(row);
-      await service.linkSocialToPhoneOwner(CALLER_ID, dto());
-      expect(prisma.v1AuthIdentity.update).toHaveBeenCalledTimes(1);
+      await expectCode(service.linkSocialToPhoneOwner(CALLER_ID, dto()), ACCOUNT_PROOF_REQUIRED);
     });
   });
 
@@ -275,90 +253,94 @@ describe('AuthService.linkSocialToPhoneOwner', () => {
       await expectCode(service.linkSocialToPhoneOwner(CALLER_ID, dto()), 'SOCIAL_LINK_PROVIDER_EXISTS');
     });
 
-    it('queries only active identities of the incoming provider, so other providers and unlinked rows do not block', async () => {
-      await service.linkSocialToPhoneOwner(CALLER_ID, dto());
+    it('checks only active identities of the incoming provider before requiring account proof', async () => {
+      await expectCode(service.linkSocialToPhoneOwner(CALLER_ID, dto()), ACCOUNT_PROOF_REQUIRED);
 
       expect(prisma.v1AuthIdentity.findFirst).toHaveBeenCalledWith({
         where: { userId: HOLDER_ID, provider: 'kakao', status: 'active' },
         select: { id: true },
       });
-      expect(prisma.v1AuthIdentity.update).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('concurrency and failure', () => {
-    it('409s when the holder row can no longer be locked', async () => {
+    it('rejects before locking the holder even when a later lock would fail', async () => {
       prisma.v1User.updateMany.mockResolvedValueOnce({ count: 0 });
-      await expectCode(service.linkSocialToPhoneOwner(CALLER_ID, dto()), 'SOCIAL_LINK_CONFLICT');
+      await expectCode(service.linkSocialToPhoneOwner(CALLER_ID, dto()), ACCOUNT_PROOF_REQUIRED);
+      expect(prisma.v1User.updateMany).not.toHaveBeenCalled();
     });
 
-    it('409s when the pending user left the pending state mid-flight', async () => {
+    it('rejects before a caller state write could race with another signup request', async () => {
       prisma.v1User.updateMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 0 });
-      await expectCode(service.linkSocialToPhoneOwner(CALLER_ID, dto()), 'SOCIAL_LINK_CONFLICT');
+      await expectCode(service.linkSocialToPhoneOwner(CALLER_ID, dto()), ACCOUNT_PROOF_REQUIRED);
+      expect(prisma.v1User.updateMany).not.toHaveBeenCalled();
     });
 
-    it('maps a foreign-key failure on delete to SOCIAL_LINK_ACCOUNT_NOT_EMPTY', async () => {
+    it('rejects before deletion even when retained activity would restrict the caller delete', async () => {
       prisma.v1User.delete.mockRejectedValue(
         new Prisma.PrismaClientKnownRequestError('fk', { code: 'P2003', clientVersion: 'test' }),
       );
-      await expect(service.linkSocialToPhoneOwner(CALLER_ID, dto())).rejects.toMatchObject({
-        response: { code: 'SOCIAL_LINK_ACCOUNT_NOT_EMPTY' },
-      });
-      expect(notifications.emitNotification).not.toHaveBeenCalled();
+      await expectCode(service.linkSocialToPhoneOwner(CALLER_ID, dto()), ACCOUNT_PROOF_REQUIRED);
     });
 
-    it('still succeeds when the notification emit rejects', async () => {
-      notifications.emitNotification.mockRejectedValue(new Error('push down'));
+    it('rejects before a successful-link notification can be persisted', async () => {
+      prisma.v1Notification.create.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('notification constraint', { code: 'P2003', clientVersion: 'test' }),
+      );
+      await expectCode(service.linkSocialToPhoneOwner(CALLER_ID, dto()), ACCOUNT_PROOF_REQUIRED);
+      expect(prisma.v1Notification.create).not.toHaveBeenCalled();
+    });
 
-      const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    it('rejects repeated valid proof attempts without consuming proof or writing either account', async () => {
+      const input = dto();
+      await expectCode(service.linkSocialToPhoneOwner(CALLER_ID, input), ACCOUNT_PROOF_REQUIRED);
+      await expectCode(service.linkSocialToPhoneOwner(CALLER_ID, input), ACCOUNT_PROOF_REQUIRED);
+      expect(prisma.v1PhoneVerificationChallenge.count).toHaveBeenCalledTimes(2);
+      expect(prisma.v1User.updateMany).not.toHaveBeenCalled();
+    });
 
-      await expect(service.linkSocialToPhoneOwner(CALLER_ID, dto())).resolves.toMatchObject({
-        session: { userId: HOLDER_ID },
-      });
-      await new Promise((resolve) => setImmediate(resolve));
-      expect(warn).toHaveBeenCalledTimes(1);
-      const logged = String(warn.mock.calls[0][0]);
-      expect(logged).toContain('push down');
-      expect(logged).not.toContain(PHONE);
-      warn.mockRestore();
+    it('rejects parallel valid proof requests without granting either one a session', async () => {
+      const input = dto();
+      await Promise.all([
+        expectCode(service.linkSocialToPhoneOwner(CALLER_ID, input), ACCOUNT_PROOF_REQUIRED),
+        expectCode(service.previewSocialLink(CALLER_ID, input), ACCOUNT_PROOF_REQUIRED),
+      ]);
+      expect(prisma.v1PhoneVerificationChallenge.count).toHaveBeenCalledTimes(2);
+      expect(prisma.v1User.updateMany).not.toHaveBeenCalled();
     });
   });
   describe('previewSocialLink', () => {
     const noWrites = () => {
-      expect(writes()).toBe(0);
+      noLinkSideEffects();
       expect(prisma.v1PhoneVerificationChallenge.deleteMany).not.toHaveBeenCalled();
       expect(prisma.v1User.updateMany).not.toHaveBeenCalled();
       expect(prisma.$transaction).not.toHaveBeenCalled();
-      expect(notifications.emitNotification).not.toHaveBeenCalled();
+      expect(prisma.v1Notification.create).not.toHaveBeenCalled();
     };
 
-    it('returns a masked summary of the holder without consuming the proof', async () => {
+    it('reveals no holder login metadata or raw email and does not consume the proof', async () => {
       prisma.v1AuthIdentity.findMany.mockResolvedValue([
         { provider: 'email', passwordHash: 'hash' },
         { provider: 'apple', passwordHash: null },
       ]);
 
-      const result = await service.previewSocialLink(CALLER_ID, dto());
-
-      expect(result).toEqual({
-        maskedEmail: 'ho***@example.com',
-        providers: ['email', 'apple'],
-        hasPassword: true,
-        linkingProvider: 'kakao',
-      });
-      expect(JSON.stringify(result)).not.toContain('holder@example.com');
+      const request = service.previewSocialLink(CALLER_ID, dto());
+      await expectCode(request, ACCOUNT_PROOF_REQUIRED);
+      const error: unknown = await request.catch((cause: unknown) => cause);
+      if (!(error instanceof ConflictException)) throw error;
+      expect(error.getResponse()).toEqual({ code: ACCOUNT_PROOF_REQUIRED, message: expect.any(String) });
+      expect(JSON.stringify(error.getResponse())).not.toContain('holder@example.com');
+      expect(prisma.v1AuthIdentity.findMany).not.toHaveBeenCalled();
       noWrites();
     });
 
-    it('reports a social-only holder without a password or email', async () => {
+    it('does not reveal a social-only holder without a password or email', async () => {
       prisma.v1User.findFirst.mockResolvedValue(holder({ email: null }));
       prisma.v1AuthIdentity.findMany.mockResolvedValue([{ provider: 'apple', passwordHash: null }]);
 
-      await expect(service.previewSocialLink(CALLER_ID, dto())).resolves.toMatchObject({
-        maskedEmail: null,
-        providers: ['apple'],
-        hasPassword: false,
-      });
+      await expectCode(service.previewSocialLink(CALLER_ID, dto()), ACCOUNT_PROOF_REQUIRED);
+      expect(prisma.v1AuthIdentity.findMany).not.toHaveBeenCalled();
+      noWrites();
     });
 
     it.each([
@@ -393,9 +375,10 @@ describe('AuthService.linkSocialToPhoneOwner', () => {
     it.each([
       ['a revoked admin', () => prisma.v1AdminUser.findUnique.mockResolvedValue({ status: 'revoked' })],
       ['a non-admin', () => prisma.v1AdminUser.findUnique.mockResolvedValue(null)],
-    ])('still previews %s', async (_label, arrange) => {
+    ])('still requires account proof when previewing %s', async (_label, arrange) => {
       arrange();
-      await expect(service.previewSocialLink(CALLER_ID, dto())).resolves.toMatchObject({ linkingProvider: 'kakao' });
+      await expectCode(service.previewSocialLink(CALLER_ID, dto()), ACCOUNT_PROOF_REQUIRED);
+      noWrites();
     });
   });
 });

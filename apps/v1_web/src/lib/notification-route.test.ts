@@ -30,3 +30,11 @@ describe('normalizeNotificationHref', () => {
     expect(params.get('tournamentId')).toBe('t1');
   });
 });
+
+it.each(['/league-matches/league-1', '/leagues/league-1'])('normalizes historical league detail %s', (path) => {
+  const href = normalizeNotificationHref(path + '?tab=teams#roster');
+  expect(href).toBe('/tournaments/league-1?tab=teams&kind=league&from=%2Fnotifications#roster');
+});
+it('keeps league fixture notification routes', () => {
+  expect(normalizeNotificationHref('/league-matches/lg/fixtures/fx')).toBe('/league-matches/lg/fixtures/fx?from=%2Fnotifications');
+});

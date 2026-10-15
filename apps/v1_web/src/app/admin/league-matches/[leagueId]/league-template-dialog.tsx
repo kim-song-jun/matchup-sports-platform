@@ -177,7 +177,7 @@ export function LeagueTemplateDialog({
         </p>
         {replaceExisting ? (
           <p className="tm-on-tint mb-4 rounded-xl bg-[var(--tint-orange)] px-3 py-2 text-[length:var(--font-size-caption)] text-[var(--orange700)]">
-            기존 경기는 취소되고 새 일정으로 바뀌어요. 이미 시작했거나 결과가 있는 경기가 있으면 만들 수 없어요.
+            기존 경기는 목록에서 빠지고 새 일정으로 바뀌어요. 이미 시작했거나 결과가 있는 경기가 있으면 만들 수 없어요.
           </p>
         ) : null}
 

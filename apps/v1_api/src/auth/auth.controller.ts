@@ -108,7 +108,7 @@ export class AuthController {
     return this.authService.deferSocialProfile(user.id);
   }
 
-  /** Links the caller's pending social identity to the account that owns the OTP-proven phone. */
+  /** Rejects phone-only account linking after validating the caller and OTP proof. */
   @Post('social-link')
   @HttpCode(200)
   @UseGuards(V1AuthGuard)
@@ -117,7 +117,7 @@ export class AuthController {
     return this.authService.linkSocialToPhoneOwner(user.id, dto);
   }
 
-  /** Confirmation-step summary of the account the proven phone would link to; consumes nothing. */
+  /** Rejects phone-only account previews without consuming proof or exposing the holder. */
   @Post('social-link/preview')
   @HttpCode(200)
   @UseGuards(V1AuthGuard)

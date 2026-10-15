@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fixtureDetailHref } from './fixture-detail-route';
+import { competitionDetailHref, fixtureDetailHref } from './fixture-detail-route';
 
 describe('fixtureDetailHref', () => {
   it('대회는 대회 경기 상세로 간다', () => {
@@ -38,5 +38,11 @@ describe('fixtureDetailHref', () => {
     expect(
       fixtureDetailHref({ isRegularLeague: false, competitionId: 't-1', fixtureId: 'f-1', fromHref: null }),
     ).toBe('/tournaments/t-1/matches/f-1');
+  });
+});
+
+describe('competitionDetailHref', () => {
+  it.each([true, false])('uses canonical detail with encoded ID and return path, league=%s', (isRegularLeague) => {
+    expect(competitionDetailHref({isRegularLeague, competitionId: 'a/b', fromHref: '/search?q=league'})).toBe('/tournaments/a%2Fb?from=%2Fsearch%3Fq%3Dleague');
   });
 });

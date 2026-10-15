@@ -126,26 +126,19 @@ describe('AccountRecoveryService — 비밀번호 재설정(휴대폰)', () => {
     process.env.V1_SESSION_SECRET = 'x'.repeat(48);
   });
 
-  it('이메일 신원의 passwordHash 를 새 비밀번호로 바꾼다', async () => {
+  it('현재 휴대폰 증명만으로 이메일 계정의 비밀번호를 바꾸지 않는다', async () => {
     const update = jest.fn().mockResolvedValue({});
     const svc = service(prismaMock(emailUser, update));
 
-    await svc.resetPasswordByPhone({
+    await expect(svc.resetPasswordByPhone({
       phone: PHONE,
       proofToken: issuePhoneProofToken(PHONE, 'password_reset'),
       newPassword: 'brand-new-password',
-    });
-
-    expect(update).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: 'identity-1' } }),
-    );
-    const saved = update.mock.calls[0][0].data.passwordHash;
-    expect(saved).not.toBe('brand-new-password'); // 평문 저장 금지
-    expect(await verifyPassword('brand-new-password', saved)).toBe(true);
+    })).rejects.toMatchObject({ response: { code: 'ACCOUNT_RECOVERY_REQUIRES_EMAIL' }, status: 409 });
+    expect(update).not.toHaveBeenCalled();
   });
 
-  // 여기서 비밀번호를 만들어 주면 소셜 전용 계정에 이메일 로그인 경로가 몰래 열린다.
-  it('카카오 전용 계정은 비밀번호를 만들지 않고 안내로 되돌린다', async () => {
+  it('현재 휴대폰 증명만으로 소셜 전용 계정의 비밀번호 경로를 열지 않는다', async () => {
     const update = jest.fn();
     const svc = service(prismaMock(kakaoOnlyUser, update));
 
@@ -155,7 +148,7 @@ describe('AccountRecoveryService — 비밀번호 재설정(휴대폰)', () => {
         proofToken: issuePhoneProofToken(PHONE, 'password_reset'),
         newPassword: 'brand-new-password',
       }),
-    ).rejects.toMatchObject({ response: { code: 'PASSWORD_LOGIN_UNAVAILABLE' } });
+    ).rejects.toMatchObject({ response: { code: 'ACCOUNT_RECOVERY_REQUIRES_EMAIL' }, status: 409 });
     expect(update).not.toHaveBeenCalled();
   });
 });

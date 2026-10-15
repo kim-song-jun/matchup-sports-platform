@@ -9,7 +9,6 @@ vi.mock('next/navigation', () => ({
 
 const hooks = vi.hoisted(() => ({
   findAccountMutateAsync: vi.fn(),
-  resetPasswordMutateAsync: vi.fn(),
   resetPasswordByEmailMutateAsync: vi.fn(),
   verifyPurpose: null as null | string,
   emailCardEmail: null as null | string,
@@ -18,7 +17,6 @@ const hooks = vi.hoisted(() => ({
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AuthMe: () => ({ data: { user: { email: 'runner@example.com', phone: '01012345678' } }, isError: false }),
   useV1FindAccountByPhone: () => ({ mutateAsync: hooks.findAccountMutateAsync, isPending: false }),
-  useV1ResetPasswordByPhone: () => ({ mutateAsync: hooks.resetPasswordMutateAsync, isPending: false }),
   useV1ResetPasswordByEmail: () => ({
     mutateAsync: hooks.resetPasswordByEmailMutateAsync,
     isPending: false,
@@ -46,7 +44,6 @@ function enterPhone() {
 
 function goToEmailReset() {
   fireEvent.click(screen.getByRole('tab', { name: '비밀번호 재설정' }));
-  fireEvent.click(screen.getByRole('tab', { name: '이메일' }));
 }
 
 function enterEmail(value = 'runner@example.com') {
@@ -68,7 +65,6 @@ describe('AccountRecoveryClient', () => {
       providers: ['email'],
       hasPassword: true,
     });
-    hooks.resetPasswordMutateAsync.mockResolvedValue({ ok: true });
     hooks.resetPasswordByEmailMutateAsync.mockResolvedValue({ ok: true });
   });
 
@@ -76,21 +72,23 @@ describe('AccountRecoveryClient', () => {
     render(<AccountRecoveryClient initialMode="reset-password" backHref="/my/settings" />);
     expect(screen.getByRole('tab', { name: '비밀번호 재설정' })).toHaveAttribute('aria-selected', 'true');
     screen.getAllByRole('link', { name: '뒤로가기' }).forEach((link) => expect(link).toHaveAttribute('href', '/my/settings'));
-    enterPhone();
-    fireEvent.click(screen.getByRole('button', { name: '__stub_verify__' }));
+    expect(screen.getByLabelText('이메일')).toHaveValue('runner@example.com');
+    fireEvent.click(screen.getByRole('button', { name: '__stub_email_verify__' }));
     await fillNewPassword();
     fireEvent.click(screen.getByRole('button', { name: '비밀번호 바꾸기' }));
     expect(await screen.findByRole('link', { name: '계정 설정으로 돌아가기' })).toHaveAttribute('href', '/my/settings');
-    expect(hooks.resetPasswordMutateAsync).toHaveBeenCalledWith(expect.objectContaining({ proofToken: 'RESET-TOKEN' }));
+    expect(hooks.resetPasswordByEmailMutateAsync).toHaveBeenCalledWith({
+      email: 'runner@example.com', proofToken: 'EMAIL-RESET-TOKEN', newPassword: 'brand-new-pass',
+    });
   });
 
-  it('설정에서 다른 계정의 번호를 인증해도 현재 계정 비밀번호 변경으로 처리하지 않는다', async () => {
+  it('설정에서 다른 계정의 이메일을 인증해도 현재 계정 비밀번호 변경으로 처리하지 않는다', async () => {
     render(<AccountRecoveryClient initialMode="reset-password" backHref="/my/settings" />);
-    fireEvent.change(screen.getByLabelText('휴대폰 번호'), { target: { value: '01099998888' } });
-    fireEvent.click(screen.getByRole('button', { name: '__stub_verify__' }));
-    expect(await screen.findByText('로그인한 계정의 휴대폰 번호 또는 이메일로 본인인증해 주세요.')).toBeInTheDocument();
+    enterEmail('other@example.com');
+    fireEvent.click(screen.getByRole('button', { name: '__stub_email_verify__' }));
+    expect(await screen.findByText('로그인한 계정의 이메일로 본인인증해 주세요.')).toBeInTheDocument();
     expect(screen.queryByLabelText('새 비밀번호')).not.toBeInTheDocument();
-    expect(hooks.resetPasswordMutateAsync).not.toHaveBeenCalled();
+    expect(hooks.resetPasswordByEmailMutateAsync).not.toHaveBeenCalled();
   });
 
   // 가입용 증명으로 남의 비밀번호를 바꿀 수 없어야 하므로, 이 화면은 반드시 재설정 용도를 요청한다.
@@ -114,28 +112,22 @@ describe('AccountRecoveryClient', () => {
     });
   });
 
-  it('비밀번호 재설정 탭에서 새 비밀번호를 저장한다', async () => {
+  it('전화번호 조회 후 재설정으로 바꿔도 새 이메일 증명 없이 비밀번호를 저장하지 않는다', async () => {
     render(<AccountRecoveryClient />);
-    fireEvent.click(screen.getByRole('tab', { name: '비밀번호 재설정' }));
     enterPhone();
     fireEvent.click(screen.getByRole('button', { name: '__stub_verify__' }));
-
-    await fillNewPassword();
-    fireEvent.click(screen.getByRole('button', { name: '비밀번호 바꾸기' }));
-
-    await waitFor(() => expect(hooks.resetPasswordMutateAsync).toHaveBeenCalledWith({
-      phone: '01012345678',
-      proofToken: 'RESET-TOKEN',
-      newPassword: 'brand-new-pass',
-    }));
-    expect(await screen.findByText('비밀번호를 바꿨어요')).toBeInTheDocument();
+    await screen.findByText('ru***@example.com');
+    goToEmailReset();
+    expect(screen.getByLabelText('이메일')).toBeInTheDocument();
+    expect(screen.queryByLabelText('새 비밀번호')).not.toBeInTheDocument();
+    expect(hooks.resetPasswordByEmailMutateAsync).not.toHaveBeenCalled();
   });
 
   it('비밀번호가 일치하지 않으면 저장 버튼이 잠긴다', async () => {
     render(<AccountRecoveryClient />);
-    fireEvent.click(screen.getByRole('tab', { name: '비밀번호 재설정' }));
-    enterPhone();
-    fireEvent.click(screen.getByRole('button', { name: '__stub_verify__' }));
+    goToEmailReset();
+    enterEmail();
+    fireEvent.click(screen.getByRole('button', { name: '__stub_email_verify__' }));
 
     fireEvent.change(await screen.findByLabelText('새 비밀번호'), { target: { value: 'brand-new-pass' } });
     fireEvent.change(screen.getByLabelText('새 비밀번호 확인'), { target: { value: 'different-pass' } });
@@ -144,20 +136,19 @@ describe('AccountRecoveryClient', () => {
     expect(screen.getByText('비밀번호가 일치하지 않아요.')).toBeInTheDocument();
   });
 
-  // 카카오 전용 계정에 비밀번호 입력칸을 띄우면 있지도 않은 비밀번호를 바꾸라고 하는 셈이다.
-  it('카카오 전용 계정에는 재설정 입력 대신 안내를 띄운다', async () => {
+  it('아이디 찾기에서 소셜 계정 가입 방법을 안내하고 비밀번호 변경은 호출하지 않는다', async () => {
     hooks.findAccountMutateAsync.mockResolvedValue({
       maskedEmail: 'ka***@example.com',
       providers: ['kakao'],
       hasPassword: false,
     });
     render(<AccountRecoveryClient />);
-    fireEvent.click(screen.getByRole('tab', { name: '비밀번호 재설정' }));
     enterPhone();
     fireEvent.click(screen.getByRole('button', { name: '__stub_verify__' }));
 
-    expect(await screen.findByText('비밀번호가 없는 계정이에요')).toBeInTheDocument();
+    expect(await screen.findByText('이 계정은 카카오 로그인으로 가입했어요. 카카오로 로그인해 주세요.')).toBeInTheDocument();
     expect(screen.queryByLabelText('새 비밀번호')).not.toBeInTheDocument();
+    expect(hooks.resetPasswordByEmailMutateAsync).not.toHaveBeenCalled();
   });
 
   // 번호를 고치면 앞 번호로 받은 증명은 더는 유효하지 않다.
@@ -180,13 +171,14 @@ describe('AccountRecoveryClient — 이메일 재설정', () => {
     hooks.resetPasswordByEmailMutateAsync.mockResolvedValue({ ok: true });
   });
 
-  // 이메일로 이메일을 찾을 수는 없다 — 방법 선택은 재설정 탭에서만 의미가 있다.
-  it('아이디 찾기 탭에는 본인 확인 방법 선택이 없다', () => {
+  it('아이디 찾기는 전화번호, 비밀번호 재설정은 이메일 폼만 보여 준다', () => {
     render(<AccountRecoveryClient />);
     expect(screen.queryByRole('tab', { name: '이메일' })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('tab', { name: '비밀번호 재설정' }));
-    expect(screen.getByRole('tab', { name: '이메일' })).toBeInTheDocument();
+    expect(screen.getByLabelText('이메일')).toBeInTheDocument();
+    expect(screen.queryByLabelText('휴대폰 번호')).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: '휴대폰' })).not.toBeInTheDocument();
   });
 
   it('주소를 다 입력해야 인증 카드가 뜨고, 표준형 주소로 넘긴다', () => {
@@ -216,8 +208,6 @@ describe('AccountRecoveryClient — 이메일 재설정', () => {
       newPassword: 'brand-new-pass',
     }));
     expect(await screen.findByText('비밀번호를 바꿨어요')).toBeInTheDocument();
-    // 휴대폰 경로 API 를 잘못 부르면 증명이 안 맞아 서버에서 막히지만, 화면 단계에서 먼저 갈라 둔다.
-    expect(hooks.resetPasswordMutateAsync).not.toHaveBeenCalled();
   });
 
   /**
@@ -278,17 +268,19 @@ describe('AccountRecoveryClient — 이메일 재설정', () => {
     expect(screen.getByRole('button', { name: '__stub_email_verify__' })).toBeInTheDocument();
   });
 
-  // 방법을 오가는 동안 앞 방법의 증명이 남으면 "인증 안 했는데 인증된 화면"이 된다.
-  it('방법을 바꾸면 앞 방법의 인증 상태를 버린다', async () => {
+  // 찾기와 재설정을 오가는 동안 이메일 증명을 재사용하면 안 된다.
+  it('찾기 방법을 바꾸면 앞 방법의 인증 상태를 버린다', async () => {
     render(<AccountRecoveryClient />);
     goToEmailReset();
     enterEmail();
     fireEvent.click(screen.getByRole('button', { name: '__stub_email_verify__' }));
     expect(await screen.findByLabelText('새 비밀번호')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('tab', { name: '휴대폰' }));
+    fireEvent.click(screen.getByRole('tab', { name: '아이디 찾기' }));
 
     expect(screen.queryByLabelText('새 비밀번호')).not.toBeInTheDocument();
     expect(screen.getByLabelText('휴대폰 번호')).toBeInTheDocument();
+    goToEmailReset();
+    expect(screen.queryByLabelText('새 비밀번호')).not.toBeInTheDocument();
   });
 });

@@ -75,12 +75,12 @@ export function roundRobinFixtureCounts(teamCount: number): { single: number; do
 /** 리그 총 경기 수(계획). 비워 두면 대진을 만들 때 정한다. 대진 생성 폼이 이 값을 기본값으로 쓴다. */
 export function LeaguePlannedFixtureField({
   value,
-  teamCount,
+  teamCount = 0,
   onChange,
   disabled,
 }: {
   value: string;
-  teamCount: number;
+  teamCount?: number;
   onChange: (value: string) => void;
   disabled?: boolean;
 }) {

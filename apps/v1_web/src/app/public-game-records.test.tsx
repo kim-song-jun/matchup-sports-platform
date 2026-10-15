@@ -903,7 +903,7 @@ describe('ScheduleContent — 경기 일정에 시각과 구장을 함께 보여
     process.env.TZ = originalTz;
   });
 
-  it('scheduledAt은 M/D (요일) HH:MM 형식으로, venue·fieldName은 별도 줄로 보여준다', () => {
+  it('scheduledAt은 M/D (요일) HH:MM 형식으로, 경기장은 배정 필드 이름 하나로 보여준다', () => {
     const data = makeSchedule({
       items: [
         {
@@ -937,7 +937,8 @@ describe('ScheduleContent — 경기 일정에 시각과 구장을 함께 보여
     });
     render(<ScheduleContent tournamentId="tournament-1" data={data} />);
     expect(screen.getByText(/8\/7 \(금\) 20:00/)).toBeInTheDocument();
-    expect(screen.getByText('잠실종합운동장 (A구장)')).toBeInTheDocument();
+    expect(screen.getByText('A구장')).toBeInTheDocument();
+    expect(screen.queryByText('잠실종합운동장 (A구장)')).toBeNull();
   });
 
   it('venue·fieldName이 모두 없으면 null/undefined 문자열을 노출하지 않는다', () => {

@@ -1,6 +1,8 @@
 'use client';
 
+import { LeagueProgress } from './league-progress';
 import { EmptyState } from '@/components/v1-ui/primitives';
+import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
 import type {
   V1LeagueOverallStandingRow,
@@ -38,38 +40,7 @@ export function LeagueStandingsTable({ data }: { data: LeagueStandingsTableData 
   return (
     <div className="tm-card" style={{ padding: 0 }}>
       <div style={{ padding: '16px 16px 4px' }}>
-        {/* 진행률은 막대 + 숫자(N/M · P%)를 함께 표시한다 — 막대 색만으로 진행 상태를
-            전달하지 않는다. */}
-        <div
-          role="progressbar"
-          aria-valuenow={progress.played}
-          aria-valuemin={0}
-          aria-valuemax={progress.total}
-          aria-label={`전체 일정 진행률 ${progress.played} / ${progress.total}경기, ${progress.percent}%`}
-        >
-          <div
-            style={{
-              height: 5,
-              background: 'var(--grey100)',
-              borderRadius: 5,
-              overflow: 'hidden',
-            }}
-          >
-            <div
-              style={{
-                width: `${Math.min(100, Math.max(0, progress.percent))}%`,
-                height: '100%',
-                background: 'var(--blue500)',
-              }}
-            />
-          </div>
-          <div
-            className="tm-text-caption tab-num"
-            style={{ color: 'var(--text-caption)', marginTop: 8 }}
-          >
-            {progress.played} / {progress.total} · {progress.percent}%
-          </div>
-        </div>
+        <LeagueProgress progress={progress} />
 
         {magicNumber ? (
           <div
@@ -125,7 +96,8 @@ export function LeagueStandingsTable({ data }: { data: LeagueStandingsTableData 
                     </span>
                   </td>
                   <td>
-                    <div style={{ display: 'flex', alignItems: 'center', minHeight: 44 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', minHeight: 44, gap: 'var(--spacing-2)' }}>
+                      <TeamAvatar seed={row.teamId ?? row.registrationId ?? ''} name={row.teamName} logoUrl={row.teamLogoUrl} size="sm" />
                       <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-strong)' }}>
                         {row.teamName}
                       </span>

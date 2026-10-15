@@ -113,6 +113,7 @@ export type V1LeagueMatchesFilters = {
 };
 
 export interface V1LeagueFixture {
+  fieldId?: string | null;
   teamMatchId: string;
   title: string;
   homeTeamId: string | null;
@@ -156,6 +157,11 @@ export interface V1LeagueFixture {
    * 있을 때만** `true` 다(결과가 없는 대진은 가린 것이 아니라 아직 없는 것이다).
    */
   scoreHidden?: boolean;
+  /**
+   * 확정 결과가 무효화됐는지 — 공개 상세·일정 목록에서 채워진다. 무효 경기는 점수가 null 이라
+   * 이 값이 없으면 끝난 경기가 '결과 대기'로 읽힌다. 어드민은 `resultStage === 'voided'` 로 안다.
+   */
+  resultVoided?: boolean;
   /**
    * 이 경기 사이드가 연결된 자리(slot). 어드민 상세에서만 채워지고, 자리 없이 만든 기존 경기는 null/없음이다.
    * 자리가 있는데 팀 id 가 null 이면 "자리만 있고 팀은 아직 안 정해진" 경기다.
@@ -289,6 +295,21 @@ export interface V1PublicLeagueDetail extends Omit<V1AdminLeagueDetail, V1AdminO
    * optional 이 아니다.
    */
   seriesSiblings: V1LeagueSeriesSibling[];
+  /**
+   * 같은 티어의 바로 다음 시즌 — 신청이 마감된 리그가 "다음 회차로 신청하기"를 거는 대상.
+   * 단발 리그거나 다음 시즌이 아직 없으면 null. optional 은 API 가 먼저 배포되지 않은 창의 구버전 응답용이다.
+   */
+  nextRound?: V1LeagueNextRound | null;
+}
+
+export interface V1LeagueNextRound {
+  leagueId: string;
+  title: string;
+  seasonNo: number;
+  startsOn: string;
+  endsOn: string;
+  registrationOpen: boolean;
+  registrationDeadlineAt: string | null;
 }
 
 export interface V1CloseLeagueRegistrationPayload {
@@ -530,6 +551,7 @@ export interface V1RegenerateLeagueFixturesResult {
 }
 
 export interface V1UpdateLeagueFixturePayload extends V1PlaceSnapshotPayload {
+  fieldId?: string | null;
   startsAt?: string;
   placeName?: string;
   placeAddress?: string;

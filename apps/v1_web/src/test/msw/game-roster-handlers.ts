@@ -178,6 +178,7 @@ export function createV1GameRosterMswHandlers() {
       baseSource: state.baseSource,
       jerseyRegistrationId:
         state.viewerRole === 'TEAM_MANAGER' && !fallback() ? GAME_ROSTER_MSW.registrationId : null,
+      registrationId: !fallback() && ['TEAM_MANAGER', 'TEAM_MEMBER'].includes(state.viewerRole) ? GAME_ROSTER_MSW.registrationId : null,
       jerseyEditable: state.viewerRole === 'TEAM_MANAGER' && !fallback() && !state.rosterLocked,
       base,
       participants,
@@ -439,6 +440,12 @@ export function createV1GameRosterMswHandlers() {
     /** 다른 운영진이 먼저 번호를 바꾼 것처럼 서버 상태만 바꾼다. */
     setJersey(userId: string, jerseyNumber: number | null) {
       state.jerseys.set(userId, jerseyNumber);
+    },
+    setGoalkeeper(userId: string, goalkeeper: boolean) { state.goalkeepers.set(userId, goalkeeper); },
+    readRoster(gameId = GAME_ROSTER_MSW.games[0].gameId as string) {
+      const game = findGame(gameId);
+      if (!game) throw new Error('Unknown fixture game');
+      return view(game);
     },
     /** 보기만 하는 운영자로 — 표의 `editable` 이 전부 false, 쓰기는 403. */
     setGoalkeeperWritable(value: boolean) { state.goalkeeperWritable = value; },

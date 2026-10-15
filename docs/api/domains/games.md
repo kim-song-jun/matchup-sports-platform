@@ -2,6 +2,8 @@
 
 # Game aggregate contract
 
+Participant roster navigation: authenticated team roster reads also include `registrationId` for active `TEAM_MANAGER`/`TEAM_MEMBER` viewers when their base is a confirmed participant registration. It identifies the existing participant-roster read route; `jerseyRegistrationId`/`jerseyEditable` retain their separate manager-only write semantics. Operators and teams using the team-member fallback receive null. The registration and player APIs still enforce team membership and redact other players' personal information for ordinary members.
+
 ## Public fixture detail compatibility
 
 The shared tournament fixture detail URL may address a regular league

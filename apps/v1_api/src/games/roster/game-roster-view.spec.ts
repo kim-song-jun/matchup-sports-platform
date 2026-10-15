@@ -212,6 +212,11 @@ describe('buildGameRosterView', () => {
     expect(view({ jerseyRegistration: null }).jerseyRegistrationId).toBeNull();
   });
 
+  it('일반 팀원의 참가 명단 조회 id는 편집 id·권한과 분리한다', () => {
+    const result = view({ access: { viewerRole: 'TEAM_MEMBER', writeRole: null }, jerseyRegistration: null, rosterRegistrationId: 'reg-1' });
+    expect(result).toMatchObject({ registrationId: 'reg-1', jerseyRegistrationId: null, jerseyEditable: false, editable: false });
+  });
+
   it('잠긴 명단은 신청 id 는 그대로 주되(참가 명단 링크) 등번호 편집은 막는다', () => {
     const locked = view({ jerseyRegistration: { id: 'reg-1', editable: false } });
     expect(locked.jerseyRegistrationId).toBe('reg-1');

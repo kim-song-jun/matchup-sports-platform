@@ -18,7 +18,7 @@ import { AdminContextService, type V1ActiveAdmin } from '../common/admin-context
 import { PrismaService } from '../prisma/prisma.service';
 import { isPhoneVerificationEnforced } from '../verification/phone-verification-access';
 import { V1AuthUser } from '../auth/v1-auth-user';
-import { AddPlayerDto, UpdatePlayerEligibilityDto } from './dto/tournament-player.dto';
+import { AddPlayerDto, UpdatePlayerEligibilityDto, UpdatePlayerRosterSettingsDto } from './dto/tournament-player.dto';
 import {
   assertJerseyAvailable,
   readJerseyNumbers,
@@ -28,6 +28,8 @@ import { ALL_COMPETITION_KINDS, findTournamentOnSurface } from './tournament-sur
 import { competitionTeamTargets, enqueueRosterResync } from '../games/roster/roster-resync-events';
 import { endsWithFinalConsonant } from '../common/korean-josa';
 import { participantDisplayName } from './participant-display-name';
+import { randomUUID } from 'node:crypto';
+import { OperationAuditWriterService } from '../common/audit/operation-audit-writer.service';
 
 /**
  * 명단 표면은 **대회와 리그를 함께** 받는다.
@@ -594,6 +596,44 @@ export class TournamentPlayersService {
 
   // ─── 팀 명단 선수 정보 수정 ─────────────────────────────────────────────────
 
+  async updatePlayerRosterSettings(
+    user: V1AuthUser,
+    tournamentId: string,
+    registrationId: string,
+    playerId: string,
+    dto: UpdatePlayerRosterSettingsDto,
+  ) {
+    if (dto.jerseyNumber === undefined && dto.goalkeeper === undefined) {
+      throw new BadRequestException({ code: 'ROSTER_SETTINGS_EMPTY', message: '변경할 번호 또는 GK를 선택해 주세요.' });
+    }
+    const registration = await this.loadRegistration(tournamentId, registrationId);
+    await this.assertTeamManager(registration.teamId, user.id);
+    // 경기 유무와 관계없이 참가 명단의 잠금·마감·상태를 같은 트랜잭션 안에서 재확인한다.
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await this.lockAndLoadMutableRegistration(tx, tournamentId, registrationId);
+      const player = await tx.v1TournamentPlayer.findFirst({ where: { id: playerId, registrationId, removedAt: null } });
+      if (!player) throw new NotFoundException({ code: 'PLAYER_NOT_FOUND', message: '선수를 찾을 수 없어요.' });
+      if (dto.jerseyNumber !== undefined) {
+        if (dto.jerseyNumber !== null) await assertJerseyAvailable(tx, registrationId, dto.jerseyNumber, playerId);
+        await writeJerseyNumber(tx, playerId, dto.jerseyNumber);
+      }
+      const next = dto.goalkeeper === undefined ? player : await tx.v1TournamentPlayer.update({
+        where: { id: playerId }, data: { goalkeeper: dto.goalkeeper },
+      });
+      if (dto.goalkeeper !== undefined && dto.goalkeeper !== player.goalkeeper) {
+        await new OperationAuditWriterService().create(tx, {
+          actor: { type: 'TEAM_MANAGER', id: user.id }, action: 'COMPETITION_ROSTER_GOALKEEPER_CHANGED',
+          targetType: 'TOURNAMENT_PLAYER', targetId: playerId, requestId: randomUUID(), occurredAt: new Date(),
+          tournamentId, before: { goalkeeper: player.goalkeeper }, after: { goalkeeper: dto.goalkeeper, scope: 'COMPETITION' },
+        });
+      }
+      await enqueueRosterResync(tx, competitionTeamTargets(tournamentId, [registration.teamId]));
+      return next;
+    });
+    const jerseys = await readJerseyNumbers(this.prisma, registrationId);
+    return { ...this.serializePlayer(updated, jerseys.get(playerId) ?? null), goalkeeper: updated.goalkeeper ?? false };
+  }
+
   async updatePlayer(
     user: V1AuthUser,
     tournamentId: string,
@@ -1156,6 +1196,7 @@ export class TournamentPlayersService {
     const player = this.serializePlayer(row, jerseyNumber);
     return {
       ...player,
+      goalkeeper: row.goalkeeper ?? false,
       ...(access.personalInfo
         ? {}
         : { realName: null, birthDateSnapshot: null, genderSnapshot: null }),

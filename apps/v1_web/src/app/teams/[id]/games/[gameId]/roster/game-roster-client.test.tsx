@@ -301,10 +301,10 @@ describe('참가 명단으로 가는 한 줄(Task 180 R-1 C)', () => {
     renderScreen();
     await screen.findByRole('heading', { name: '출전 3명' });
     const outing = section(/출전 3명/);
-    const link = within(outing).getByRole('link', { name: '대회 참가 명단 관리' });
+    const link = within(outing).getByRole('link', { name: '참가 선수 관리' });
     expect(link).toHaveAttribute(
       'href',
-      `/tournaments/${GAME_ROSTER_MSW.tournamentId}/registrations/${GAME_ROSTER_MSW.registrationId}/roster?from=${FROM}`,
+      `/tournaments/${GAME_ROSTER_MSW.tournamentId}/registrations/${GAME_ROSTER_MSW.registrationId}/roster?game=roster-game-1&from=${FROM}`,
     );
     expect(within(outing).getByText(/대회 참가 명단에서 관리해요\. 선수 변경은 시작 전 경기에 반영돼요\./)).toBeInTheDocument();
   });
@@ -314,7 +314,7 @@ describe('참가 명단으로 가는 한 줄(Task 180 R-1 C)', () => {
     renderScreen();
     const link = await screen.findByRole('link', { name: '참가 명단 내러 가기' });
     expect(link).toHaveAttribute('href', `/tournaments/${GAME_ROSTER_MSW.tournamentId}/my?from=${FROM}`);
-    expect(screen.queryByRole('link', { name: '대회 참가 명단 관리' })).toBeNull();
+    expect(screen.queryByRole('link', { name: '참가 선수 관리' })).toBeNull();
   });
 
   it.each(['TEAM_MEMBER', 'ADMIN'] as const)('%s 에게는 보이지 않는다 — 참가 명단은 팀장·매니저가 고친다', async (role) => {
@@ -336,14 +336,14 @@ describe('#1538 리그 전체 상태에 맞는 실제 명단 화면 entry', () =
     )));
   }
   const readonlyName = '참가 명단 보기';
-  const editName = '리그 참가 명단 관리';
+  const editName = '참가 선수 관리';
 
   it('완료 리그의 종료 경기에서도 조회 링크/설명과 기존 중첩 from을 유지한다', async () => {
     leagueStatus('completed');
     mock.setGameState(G1.gameId, 'ENDED');
     renderScreen();
     const link = await screen.findByRole('link', { name: readonlyName });
-    expect(link).toHaveAttribute('href', `/tournaments/${GAME_ROSTER_MSW.tournamentId}/registrations/${GAME_ROSTER_MSW.registrationId}/roster?from=${encodeURIComponent('/teams/team-1/games/roster-game-1/roster')}`);
+    expect(link).toHaveAttribute('href', `/tournaments/${GAME_ROSTER_MSW.tournamentId}/registrations/${GAME_ROSTER_MSW.registrationId}/roster?game=roster-game-1&from=${encodeURIComponent('/teams/team-1/games/roster-game-1/roster')}`);
     expect(screen.getByText('종료된 리그의 참가 명단은 조회만 할 수 있어요.')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: editName })).not.toBeInTheDocument();
     expect(screen.queryByText(/바꾸면 시작 전 경기에 모두 반영/)).not.toBeInTheDocument();
@@ -379,7 +379,7 @@ describe('#1538 리그 전체 상태에 맞는 실제 명단 화면 entry', () =
     renderScreen();
     try {
       expect(await screen.findByText('리그 상태를 확인하고 있어요. 참가 명단 화면에서 확인해 주세요.')).toBeInTheDocument();
-      expect(screen.getByRole('link', { name: '참가 명단 확인' })).toHaveAttribute('href', expect.stringContaining('/roster?from='));
+      expect(screen.getByRole('link', { name: '참가 명단 확인' })).toHaveAttribute('href', expect.stringContaining('/roster?game=roster-game-1&from='));
       expect(screen.queryByRole('link', { name: editName })).not.toBeInTheDocument();
       expect(batchBodies()).toHaveLength(0);
     } finally {
@@ -394,7 +394,7 @@ describe('#1538 리그 전체 상태에 맞는 실제 명단 화면 entry', () =
     leagueStatus('draft', 403);
     renderScreen();
     expect(await screen.findByText('리그 상태를 불러오지 못했어요. 조회할 수 없어요. 참가 명단 화면에서 확인해 주세요.')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '참가 명단 확인' })).toHaveAttribute('href', expect.stringContaining('/roster?from='));
+    expect(screen.getByRole('link', { name: '참가 명단 확인' })).toHaveAttribute('href', expect.stringContaining('/roster?game=roster-game-1&from='));
     expect(screen.queryByRole('link', { name: editName })).not.toBeInTheDocument();
     expect(batchBodies()).toHaveLength(0);
   });

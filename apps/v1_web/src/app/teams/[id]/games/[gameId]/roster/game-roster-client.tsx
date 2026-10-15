@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useRef, useState, type ReactNode } from 'react';
+import { useContext, useMemo, useRef, useState, type ReactNode } from 'react';
+import { RosterManagerNavigation, useRosterEditorNavigation } from '@/components/game-roster/roster-manager-navigation';
 import { AlertBanner, Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { Button } from '@/components/v1-ui/button';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
@@ -12,6 +13,7 @@ import {
   GAME_ROSTER_PLAYING_HINT,
   GameRosterPlayerRow,
   GameRosterPlayingCheckbox,
+  RosterPlayerColumns,
 } from '@/components/game-roster/game-roster-player-row';
 import { GameRosterHistoryList } from '@/components/game-roster/game-roster-history';
 import { GameRosterJerseySheet, nextPlayerWithoutJersey } from '@/components/game-roster/game-roster-jersey-sheet';
@@ -41,6 +43,7 @@ type Notice = { tone: 'info' | 'error'; message: string };
  * 경로에 사이드가 없어 팀·경기로 명단을 받는다 — 권한(팀원 읽기·팀장/운영자 쓰기·지원 계정 읽기)은 서버 판정이다.
  */
 export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: string }) {
+  const managerNavigation = useContext(RosterManagerNavigation);
   const roster = useV1TeamGameRoster(teamId, gameId);
   const history = useV1GameRosterAdjustments(gameId, roster.data?.sideId ?? null);
   const batch = useV1ApplyGameRosterBatch(teamId);
@@ -81,6 +84,7 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
       setDraft({});
       setGoalkeepers({});
       setNotice({ tone: 'info', message: successMessage });
+      return true;
     } catch (caught) {
       // 화면이 낡은 거절(시작·명단·대진·권한 변경)이면 최신으로 다시 받고, 이미 무의미한 초안은 버린다.
       if (isStaleGameRosterWrite(caught)) {
@@ -93,6 +97,7 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
         tone: 'error',
         message: gameRosterErrorMessage(caught, '명단을 저장하지 못했어요. 잠시 후 다시 시도해 주세요.'),
       });
+      return false;
     }
   }
 
@@ -116,6 +121,11 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
     });
   }
 
+  useRosterEditorNavigation({ dirty, busy: batch.isPending,
+    save: () => submit(changes, '명단을 저장했어요.'),
+    discard: () => { setDraft({}); setGoalkeepers({}); },
+  });
+
   if (roster.isError) return <RosterLoadError error={roster.error} onRetry={() => void roster.refetch()} />;
   if (data === undefined) return <PageSkeleton variant="detail" />;
 
@@ -130,6 +140,7 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
   // 시작한 경기는 편집 목록 자체가 없어 번호가 읽기 전용이고, 그 이유는 아래 `jerseyLocked` 가 말한다.
   // 잠기거나 제출 마감이 지난 참가 명단은 저장이 409 라 칸을 열지 않는다(`jerseyEditable`).
   const jerseyPressable =
+    !managerNavigation &&
     data.viewerRole === 'TEAM_MANAGER' &&
     ((data.jerseyRegistrationId !== null && data.jerseyEditable) || data.baseSource === 'TEAM_MEMBERS');
   const jerseyLocked = started && data.viewerRole === 'TEAM_MANAGER' && data.baseSource === 'REGISTRATION';
@@ -140,6 +151,7 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
 
   function goalkeeperControl(row: { userId: string; displayName: string; goalkeeper: boolean }) {
     const checked = goalkeepers[row.userId] ?? row.goalkeeper;
+    if (managerNavigation) return <span className="tm-text-caption" style={{ minWidth: 44, textAlign: 'center' }}>{checked ? 'GK' : ''}</span>;
     return canEdit && data?.goalkeeperEditable !== false ? (
       <Button
         variant={checked ? 'primary' : 'outline'}
@@ -194,7 +206,7 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
         flexDirection: 'column',
         gap: 12,
         // 아래 고정 저장 바(.tm-fixed-cta)는 안전영역만큼 커진다 — 여백도 같이 늘린다.
-        padding: `16px var(--v1-shell-page-x) ${canEdit ? 'calc(112px + var(--v1-shell-safe-bottom))' : '16px'}`,
+        padding: `16px var(--v1-shell-page-x) ${canEdit && !managerNavigation ? 'calc(112px + var(--v1-shell-safe-bottom))' : '16px'}`,
       }}
     >
       <Card pad={16}>
@@ -261,8 +273,8 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
             <>
               {GAME_ROSTER_PLAYING_HINT}
               <br />{GAME_ROSTER_SCOPE}
-              <br />{data.goalkeeperEditable === false ? 'GK는 팀장·매니저와 대회 운영진이 관리해요.' : `GK는 ${competitionNoun} 공통 설정이에요. 여러 명을 지정할 수 있고, 시작 전 경기에도 반영돼요.`}
-              {data.jerseyRegistrationId !== null ? (
+              <br />{managerNavigation ? '번호·GK는 참가 선수 탭의 공통 설정이에요.' : data.goalkeeperEditable === false ? 'GK는 팀장·매니저와 대회 운영진이 관리해요.' : `GK는 ${competitionNoun} 공통 설정이에요. 여러 명을 지정할 수 있고, 시작 전 경기에도 반영돼요.`}
+              {!managerNavigation && data.jerseyRegistrationId !== null ? (
                 <>
                   <br />
                   {data.jerseyEditable
@@ -283,11 +295,12 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
           ) : null
         }
       >
+        {managerNavigation ? <RosterPlayerColumns action="출전" /> : null}
         {selectionPlayers.length === 0 ? (
           <p className="tm-text-caption" style={{ margin: 0 }}>
             출전하는 선수가 없어요.
           </p>
-        ) : canEdit ? (
+        ) : canEdit || managerNavigation ? (
           <ul style={listStyle}>
             {selectionPlayers.map((row) => {
               const entry = draft[row.userId];
@@ -315,7 +328,7 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
                         <GameRosterPlayingCheckbox
                           displayName={row.displayName}
                           playing={playing}
-                          disabled={batch.isPending}
+                          disabled={batch.isPending || !canEdit}
                           onChange={(next) => setEntry(row.userId,
                             next === !wasExcluded ? null : next ? { op: 'REVOKE' } : { op: 'EXCLUDE', reason: null },
                           )}
@@ -344,10 +357,10 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
             ))}
           </ul>
         )}
-        <RegistrationRosterEntry view={data} variant="block" />
+        {managerNavigation ? <Button variant="ghost" size="sm" onClick={managerNavigation.showPlayers}>선수 추가·번호·GK 관리</Button> : <RegistrationRosterEntry view={data} variant="block" />}
       </RosterSection>
 
-      {!canEdit && data.excluded.length > 0 ? (
+      {!canEdit && !managerNavigation && data.excluded.length > 0 ? (
         <RosterSection title={`이번 경기 빠짐 ${data.excluded.length}명`}>
           <ul style={listStyle}>
             {data.excluded.map((row) => {
@@ -419,7 +432,7 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
       {started ? null : historySection}
 
       {canEdit ? (
-        <div className="tm-fixed-cta">
+        <div className={managerNavigation ? undefined : 'tm-fixed-cta'}>
           <Button
             variant="primary"
             size="lg"
@@ -472,8 +485,8 @@ function RosterSection({
   action?: ReactNode;
   children: ReactNode;
 }) {
-  return (
-    <Card pad={16}>
+  const unified = useContext(RosterManagerNavigation);
+  const content = <>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
         <h2 className="tm-text-body-lg" style={{ fontWeight: 700, margin: 0 }}>
           {title}
@@ -486,8 +499,8 @@ function RosterSection({
         </p>
       ) : null}
       <div style={{ marginTop: 8 }}>{children}</div>
-    </Card>
-  );
+  </>;
+  return unified ? <section>{content}</section> : <Card pad={16}>{content}</Card>;
 }
 
 function RosterLoadError({ error, onRetry }: { error: unknown; onRetry: () => void }) {

@@ -44,7 +44,7 @@ export const TOURNAMENTS_EXTRA_ROUTES: RouteChromeEntry[] = [
   {
     pattern: '/tournaments/:id/registrations/:registrationId/roster',
     chrome: {
-      title: '참가 명단',
+      title: '명단 관리',
       activeTab: 'tournaments',
       bottomNav: false,
       backHref: (p) => `/tournaments/${p.id}/my`,

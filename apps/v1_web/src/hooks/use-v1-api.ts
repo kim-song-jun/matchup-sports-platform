@@ -4577,6 +4577,17 @@ export function useV1UpdatePlayer(tournamentId: string, registrationId: string) 
   });
 }
 
+export function useV1UpdatePlayerRosterSettings(tournamentId: string, registrationId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ playerId, ...body }: { playerId: string; jerseyNumber?: number | null; goalkeeper?: boolean }) =>
+      v1Patch<V1TournamentPlayer & { goalkeeper: boolean }>(
+        `/tournaments/${tournamentId}/registrations/${registrationId}/players/${playerId}/roster-settings`, body,
+      ),
+    onSuccess: () => invalidateRosterViews(queryClient, tournamentId, registrationId),
+  });
+}
+
 export function useV1RemovePlayer(tournamentId: string, registrationId: string) {
   const queryClient = useQueryClient();
   return useMutation({

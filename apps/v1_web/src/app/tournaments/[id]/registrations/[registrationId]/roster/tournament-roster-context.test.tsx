@@ -158,6 +158,6 @@ describe('#1549 참가 명단의 선택 팀·대회/리그 문맥', () => {
     expect(within(contexts[0]).getByText(state.team.name)).toBeInTheDocument();
     expect(within(contexts[0]).getByText(`리그 · ${state.tournament.title}`)).toBeInTheDocument();
     expect(contexts[0].querySelector('h1,h2')).toBeNull();
-    expect(resolveRouteChrome('/tournaments/competition-1/registrations/registration-c/roster')?.chrome.title).toBe('참가 명단');
+    expect(resolveRouteChrome('/tournaments/competition-1/registrations/registration-c/roster')?.chrome.title).toBe('명단 관리');
   });
 });

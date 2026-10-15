@@ -66,7 +66,7 @@ export const TEAMS_ROUTES: RouteChromeEntry[] = [
     // Task 179 대회·리그 경기 명단. 제목은 로딩·에러·성공 모두 같고, 상대팀은 본문 첫 줄이 싣는다.
     pattern: '/teams/:id/games/:gameId/roster',
     chrome: {
-      title: '이번 경기 출전 명단',
+      title: '명단 관리',
       activeTab: 'teams',
       bottomNav: false,
       backHref: (p) => `/teams/${p.id}`,

@@ -400,12 +400,14 @@ export class GameRosterService {
     const jerseyRegistration = await loadJerseyRegistration(tx, context, {
       baseSource: loaded.baseSource,
       isTeamManager: access.viewerRole === 'TEAM_MANAGER',
+      isTeamMember: access.viewerRole === 'TEAM_MEMBER',
     });
     return buildGameRosterView({
       context,
       access,
       baseSource: loaded.baseSource,
-      jerseyRegistration,
+      jerseyRegistration: access.viewerRole === 'TEAM_MANAGER' ? jerseyRegistration : null,
+      rosterRegistrationId: jerseyRegistration?.id ?? null,
       base: loaded.base,
       computation,
       fixtureSnapshotUserIds,

@@ -295,6 +295,11 @@ describe('loadJerseyRegistration — 등번호 원본 신청은 참가 명단 �
   };
   const managerInput = { baseSource: 'REGISTRATION', isTeamManager: true } as const;
 
+  it('활성 팀원의 참가 명단 탭을 위해 조회용 신청 id를 확인할 수 있다', async () => {
+    const { tx } = registrationTx(registrationRow());
+    await expect(loadJerseyRegistration(tx, scope, { baseSource: 'REGISTRATION', isTeamManager: false, isTeamMember: true })).resolves.toMatchObject({ id: 'reg-1' });
+  });
+
   it('팀장·매니저가 참가 명단 기준 경기를 보면 그 팀의 confirmed 신청 id 를 준다', async () => {
     const { tx, findFirst } = registrationTx(registrationRow());
     await expect(loadJerseyRegistration(tx, scope, managerInput)).resolves.toEqual({ id: 'reg-1', editable: true });

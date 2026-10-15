@@ -71,6 +71,8 @@ export interface GameRosterView {
    * (등번호 저장 API 의 권한과 같다). 경기가 시작됐는지는 여기서 가르지 않는다 — 번호는 대회·리그 전체에 걸린 값이다.
    */
   readonly jerseyRegistrationId: string | null;
+  /** 팀원용 참가 명단 조회 탭. 편집 권한은 jerseyEditable 및 원본 API에서 별도로 검증한다. */
+  readonly registrationId?: string | null;
   /** 그 신청의 명단이 잠겼거나 제출 마감이 지나면 false — 등번호 저장이 409 가 되므로 입력 칸을 열지 않는다. */
   readonly jerseyEditable: boolean;
   readonly base: (GameRosterPersonView & { status: 'PARTICIPATING' | 'EXCLUDED' | 'UNAVAILABLE' | 'SUSPENDED' })[];
@@ -142,6 +144,7 @@ export interface GameRosterViewInput {
   readonly legacyLineupPending: boolean;
   readonly displayNameByUserId: ReadonlyMap<string, string>;
   readonly jerseyRegistration: { readonly id: string; readonly editable: boolean } | null;
+  readonly rosterRegistrationId?: string | null;
   /**
    * 시작된 경기의 실제 명단. null 이면(시작 전) 참가 명단에서 계산한 출전자를 보여 준다.
    * 동기화는 시작 뒤 멈추므로, 시작 뒤 참가 명단을 다시 계산해 보여 주면 기록과 다른 사람이 "출전"으로 보인다.
@@ -229,6 +232,7 @@ export function buildGameRosterView(input: GameRosterViewInput): GameRosterView 
     viewerRole: input.access.viewerRole,
     baseSource: input.baseSource,
     jerseyRegistrationId: input.jerseyRegistration?.id ?? null,
+    ...(input.rosterRegistrationId !== undefined ? { registrationId: input.rosterRegistrationId } : {}),
     jerseyEditable: input.jerseyRegistration?.editable ?? false,
     base,
     participants: participants.map((row) => ({

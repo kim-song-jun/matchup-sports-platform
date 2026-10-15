@@ -388,7 +388,7 @@ function memberMissingReason(
   return getMemberIneligibility(member, genderCategory)?.listReason ?? '';
 }
 
-function AddPlayerForm({
+export function AddPlayerForm({
   formId,
   teamId,
   genderCategory,

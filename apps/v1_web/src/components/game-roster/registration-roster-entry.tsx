@@ -19,7 +19,7 @@ export function RegistrationRosterEntry({
   view,
   variant,
 }: {
-  view: Pick<V1GameRosterView, 'viewerRole' | 'competitionId' | 'competitionKind' | 'jerseyRegistrationId'>;
+  view: Pick<V1GameRosterView, 'viewerRole' | 'competitionId' | 'competitionKind' | 'jerseyRegistrationId'> & { gameId?: string };
   /** block: 경기 명단 화면 출전 목록 끝 · inline: 경기 상세 "우리 팀 출전" 카드 아래 한 줄 */
   variant: 'block' | 'inline';
 }) {
@@ -31,7 +31,8 @@ export function RegistrationRosterEntry({
   const noun = isLeague ? '리그' : '대회';
   // 신청 id 가 없으면 참가 명단이 아직 없는 팀이다(팀원 전체가 기준) — 내 신청 화면에서 명단을 낸다.
   const hasRoster = view.jerseyRegistrationId !== null;
-  const href = withFromPath(registrationRosterPath(view.competitionId, view.jerseyRegistrationId), currentHref);
+  const rosterPath = registrationRosterPath(view.competitionId, view.jerseyRegistrationId);
+  const href = withFromPath(view.gameId && hasRoster ? `${rosterPath}?game=${encodeURIComponent(view.gameId)}` : rosterPath, currentHref);
   const status = competition.data?.status;
   const closedLeague = isLeague && (status === 'completed' || status === 'cancelled');
   const editHint = !isLeague || (!competition.isError && status !== undefined && isTournamentRosterMutable(competition.data));
@@ -61,14 +62,14 @@ export function RegistrationRosterEntry({
         }}
       >
         <span className="tm-text-caption" style={{ wordBreak: 'keep-all' }}>
-          {editHint ? `선수 추가·삭제와 등번호는 ${noun} 참가 명단의 공통 설정이에요` : unavailableMessage}
+          {editHint ? `선수·번호·GK는 ${noun} 공통 설정이에요` : unavailableMessage}
         </span>
         <Link
           href={href}
           className="tm-btn tm-btn-sm tm-btn-ghost"
           style={{ minHeight: 44, gap: 2, flex: '0 0 auto', color: 'var(--blue700)' }}
         >
-          {editHint ? `${noun} 참가 명단 관리` : readonlyLabel}
+          {editHint ? '참가 선수 관리' : readonlyLabel}
           <ChevronRightIcon size={14} strokeWidth={2.2} aria-hidden="true" />
         </Link>
       </div>
@@ -83,7 +84,7 @@ export function RegistrationRosterEntry({
           : `${noun} 참가 명단을 내면 그 선수들로 경기 명단이 정해져요.`}
       </p>
       <Link href={href} className="tm-btn tm-btn-md tm-btn-outline tm-btn-block" style={{ minHeight: 44, gap: 4 }}>
-        {!editHint ? readonlyLabel : hasRoster ? `${noun} 참가 명단 관리` : '참가 명단 내러 가기'}
+        {!editHint ? readonlyLabel : hasRoster ? '참가 선수 관리' : '참가 명단 내러 가기'}
         <ChevronRightIcon size={16} strokeWidth={2.2} aria-hidden="true" />
       </Link>
     </div>

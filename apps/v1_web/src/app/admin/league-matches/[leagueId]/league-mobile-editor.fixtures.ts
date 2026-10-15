@@ -102,7 +102,11 @@ export function resetMobileEditorFixture() {
       if (mobileEditorFixture.league.fixtures.length > 0 && (!('replaceExisting' in body) || body.replaceExisting !== true)) {
         return failure(409, 'LEAGUE_FIXTURES_EXIST', '이미 대진이 생성된 리그예요.');
       }
-      if (mobileEditorFixture.league.fixtures.some((fixture) => fixture.status !== 'cancelled' && (fixture.resultStage === 'official' || fixture.resultStage === 'voided' || (fixture.gameState !== null && fixture.gameState !== undefined && fixture.gameState !== 'SCHEDULED')))) {
+      if (mobileEditorFixture.league.fixtures.some((fixture) => fixture.status !== 'cancelled' && (
+        (fixture.resultStage !== undefined && fixture.resultStage !== 'not_entered') ||
+        fixture.game?.latestRevision != null || fixture.game?.hasOfficialResult === true ||
+        (fixture.gameState !== null && fixture.gameState !== undefined && fixture.gameState !== 'SCHEDULED')
+      ))) {
         return failure(409, 'BRACKET_LOCKED', '이미 시작했거나 결과가 있는 경기가 있어 대진 템플릿으로 바꿀 수 없어요.');
       }
       const dates: string[] = body.schedule.dates.filter((date): date is string => typeof date === 'string');
@@ -123,7 +127,6 @@ export function resetMobileEditorFixture() {
       mobileEditorFixture.hiddenFixtures.push(
         ...mobileEditorFixture.league.fixtures.map((fixture): HiddenMobileFixture => ({
           ...fixture, status: 'cancelled', homeSlotId: null, awaySlotId: null,
-          gameState: fixture.gameState === 'SCHEDULED' ? 'CANCELLED' : fixture.gameState,
           deletedAt: STAMP,
         })),
       );

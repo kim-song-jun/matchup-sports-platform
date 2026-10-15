@@ -42,7 +42,7 @@ export function LeagueMobileScheduleBoard({
       {canApplyTemplate ? (
         <button
           type="button"
-          className="tm-btn tm-btn-outline w-full"
+          className="tm-btn tm-btn-md tm-btn-outline w-full"
           style={{ minHeight: 'var(--size-touch-min)' }}
           onClick={onOpenTemplate}
         >

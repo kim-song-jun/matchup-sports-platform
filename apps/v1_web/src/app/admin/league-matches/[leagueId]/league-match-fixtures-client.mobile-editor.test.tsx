@@ -93,6 +93,7 @@ describe('MD-QA #138 초기 모바일 consumer → 실제 편집 → HTTP 저장
 
   it('기존 미시작 경기도 모바일 템플릿 교체에서 replaceExisting 계약을 보내요', async () => {
     // Given
+    mobileEditorFixture.league = mobileLeague([mobileFixture({ game: makeGame() })]);
     await renderMobileConsumer();
     // When
     await submitTemplate(true);
@@ -104,13 +105,19 @@ describe('MD-QA #138 초기 모바일 consumer → 실제 편집 → HTTP 저장
     expect(await screen.findByRole('dialog', { name: '모바일 생성 1주차' })).toBeVisible();
   });
 
-  it('목록의 경기 상세에서 기존 수정 폼을 열어 현재 경기 이름과 일시를 실제 PATCH로 저장해요', async () => {
+  it('모바일 경기 수정 중 폭을 바꿔도 입력한 이름과 일시를 유지하고 실제 PATCH로 저장해요', async () => {
     // Given
     await renderMobileConsumer();
     const dialog = await openMobileSchedule();
     fireEvent.change(within(dialog).getByLabelText('경기 이름'), { target: { value: '모바일에서 바꾼 경기' } });
     fireEvent.change(within(dialog).getByLabelText('일시'), { target: { value: '2100-01-04T20:00' } });
-    // When
+    // When: 입력한 뒤 태블릿·데스크톱·모바일로 전환해도 같은 수정 흐름을 이어가요.
+    for (const width of [768, 1440, 390]) {
+      resizeViewport(width);
+      const retained = screen.getByRole('dialog', { name: '경기 수정' });
+      expect(within(retained).getByLabelText('경기 이름')).toHaveValue('모바일에서 바꾼 경기');
+      expect(within(retained).getByLabelText('일시')).toHaveValue('2100-01-04T20:00');
+    }
     fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
     // Then
     await waitFor(() => expect(mobileEditorFixture.fixtureWrites).toEqual([{
@@ -124,7 +131,8 @@ describe('MD-QA #138 초기 모바일 consumer → 실제 편집 → HTTP 저장
   it('취소 이력만 있는 모바일 리그도 실제 template POST에 replaceExisting을 보내고 새 경기로 이동해요', async () => {
     // Given: 아직 숨기지 않은 취소 대진은 현재 상세에 남지만 템플릿 보호 대상에서는 빠져요.
     mobileEditorFixture.league = mobileLeague([mobileFixture({
-      status: 'cancelled', gameState: 'CANCELLED', startAt: '2099-12-28T10:00:00.000Z',
+      status: 'cancelled', gameState: 'SCHEDULED', resultStage: 'draft', startAt: '2099-12-28T10:00:00.000Z',
+      game: makeGame({ latestRevision: { id: 'cancelled-draft-138', state: 'DRAFT', score: null, entryMethod: 'console' } }),
     })]);
     await renderMobileConsumer();
     // When: 실제 모바일 CTA와 기존 템플릿 폼을 밟아요.
@@ -175,6 +183,24 @@ describe('MD-QA #138 초기 모바일 consumer → 실제 편집 → HTTP 저장
     expect(screen.queryByRole('button', { name: '템플릿으로 다시 만들기' })).not.toBeInTheDocument();
     expect(mobileEditorFixture.templateWrites).toEqual([]);
     expect(mobileEditorFixture.fixtureWrites).toEqual([]);
+  });
+
+  it.each([
+    ['draft', 'DRAFT'], ['awaiting_approval', 'SUBMITTED'], ['change_requested', 'CHANGE_REQUESTED'],
+  ] as const)('시작 전 %s 결과 리비전이 있으면 서버가 거절할 템플릿 교체를 열지 않아요', async (resultStage, revisionState) => {
+    // Given: SCHEDULED여도 실제 상세 응답의 latestRevision이 있으면 revisionCount는 0이 아니에요.
+    mobileEditorFixture.league = mobileLeague([mobileFixture({
+      resultStage, gameState: 'SCHEDULED', game: makeGame({
+        latestRevision: { id: `revision-${revisionState}-138`, state: revisionState, score: { home: 2, away: 1 }, entryMethod: 'console' },
+      }),
+    })]);
+    // When: 관리자 권한·리그 상세를 실제 GET으로 읽어 처음 모바일 보드를 열어요.
+    await renderMobileConsumer();
+    // Then: 교체 POST로 결과 이력을 덮으려는 진입 대신 서버와 같은 제한 이유를 보여줘요.
+    expect(screen.queryByRole('button', { name: '템플릿으로 다시 만들기' })).not.toBeInTheDocument();
+    expect(screen.getByText('시작했거나 결과가 있는 경기가 있어 템플릿으로 다시 만들 수 없어요.')).toBeVisible();
+    expect(mobileEditorFixture.templateWrites).toEqual([]);
+    expect(mobileEditorFixture.hiddenFixtures).toEqual([]);
   });
 
   it('완료된 빈 리그는 모바일에서도 재생성 대신 완료 제한 이유를 보여줘요', async () => {
@@ -235,16 +261,32 @@ describe('MD-QA #138 초기 모바일 consumer → 실제 편집 → HTTP 저장
     expect(mobileEditorFixture.templateWrites).toEqual([]);
   });
 
-  it('모바일에서 처음 연 뒤 768과1440으로 바꿔도 같은 리그의 기존 템플릿 흐름을 유지해요', async () => {
+  it('모바일 템플릿 작성 중 폭을 바꿔도 선택한 요일·시각·날짜를 유지하고 실제 저장해요', async () => {
     // Given
     mobileEditorFixture.league = mobileLeague([]);
     await renderMobileConsumer();
-    // When
-    resizeViewport(768);
-    resizeViewport(1440);
-    await submitTemplate(false);
+    // When: 390에서 입력을 시작한 후 화면 폭을 바꾸며 작성 중인 내용을 확인해요.
+    fireEvent.click(await screen.findByRole('button', { name: '템플릿으로 시작' }));
+    const dialog = await screen.findByRole('dialog', { name: '템플릿으로 빈 경기 만들기' });
+    fireEvent.change(within(dialog).getByLabelText('시작 시각'), { target: { value: '20:30' } });
+    fireEvent.change(within(dialog).getByLabelText('요일'), { target: { value: '1' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '요일로 채우기' }));
+    for (const width of [768, 1440, 390]) {
+      resizeViewport(width);
+      const retained = screen.getByRole('dialog', { name: '템플릿으로 빈 경기 만들기' });
+      expect(within(retained).getByLabelText('요일')).toHaveValue('1');
+      expect(within(retained).getByLabelText('시작 시각')).toHaveValue('20:30');
+      for (const date of ['2100-01-04', '2100-01-11', '2100-01-18']) {
+        expect(within(retained).getByRole('button', { name: `${date} 빼기` })).toBeVisible();
+      }
+    }
+    fireEvent.click(within(dialog).getByRole('button', { name: '빈 경기 만들기' }));
     // Then
-    await waitFor(() => expect(mobileEditorFixture.templateWrites).toHaveLength(1));
+    await waitFor(() => expect(mobileEditorFixture.templateWrites).toEqual([{
+      teamCount: 3, legs: 1,
+      schedule: { dates: ['2100-01-04', '2100-01-11', '2100-01-18'], time: '20:30' },
+    }]));
+    expect(await screen.findByRole('dialog', { name: '모바일 생성 1주차' })).toBeVisible();
     expect(mobileEditorFixture.league.fixtures).toHaveLength(3);
     expect(screen.queryByRole('dialog', { name: '템플릿으로 빈 경기 만들기' })).not.toBeInTheDocument();
   });

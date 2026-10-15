@@ -776,7 +776,10 @@ export default function LeagueMatchFixturesClient({
               replaceExisting={series.fixtures.length > 0}
               templateBlockedReason={leagueEnded
                 ? '끝난 리그에서는 템플릿으로 경기를 만들 수 없어요.'
-                : series.fixtures.some((fixture) => fixture.status !== 'cancelled' && fixtureHasStartedOrResult(fixture))
+                : series.fixtures.some((fixture) => fixture.status !== 'cancelled' && (
+                    // 템플릿 교체는 미확정 리비전도 보호하므로 팀 변경 gate와 별도로 확인해요.
+                    fixtureHasStartedOrResult(fixture) || fixture.game?.latestRevision != null
+                  ))
                   ? '시작했거나 결과가 있는 경기가 있어 템플릿으로 다시 만들 수 없어요.'
                   : null}
               onOpenTemplate={() => setTemplateOpen(true)}

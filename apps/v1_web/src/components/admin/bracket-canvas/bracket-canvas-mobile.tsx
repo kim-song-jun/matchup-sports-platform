@@ -203,7 +203,7 @@ export function BracketCanvasMobile({ competitionId, scope, rounds, focusFixture
           {canWrite && onEditFixture && view.kind === 'detail' ? (
             <button
               type="button"
-              className="tm-btn tm-btn-outline mb-3 w-full"
+              className="tm-btn tm-btn-md tm-btn-outline mb-3 w-full"
               style={{ minHeight: 'var(--size-touch-min)' }}
               onClick={() => void closeOverlayThenNavigate(closeSheet, () => onEditFixture(selected.fixtureId))}
             >

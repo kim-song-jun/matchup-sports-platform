@@ -1,5 +1,28 @@
 # 검색·AI 노출 측정 — 기준선과 재측정 절차
 
+## 2026-10-13 기존 공개 페이지 발견성 배포
+
+새 페이지를 추가하지 않고 기존 팀·대회·리그·개인/친선 매치·대진 상세의 사이트맵, 대표 주소, 공개 AI 안내와 검색 메타 정보를 정리했다. Dev PR [#1902](https://github.com/kim-song-jun/matchup-sports-platform/pull/1902), 운영 PR [#1903](https://github.com/kim-song-jun/matchup-sports-platform/pull/1903) 머지 완료. 운영 CI/이미지/배포 [38393464125](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/38393464125) 성공, 실제 응답 커밋 `3dd537d4eb74a0d2c74f1a28e6da3962611130b9`, 릴리스 `1.8.3` 확인. 운영에는 이번 변경 18개 파일만 포함하며 다른 dev 기능·DB·인증·공개 여부·스토어 설정은 포함하지 않았다.
+
+2026-10-13 21:24 KST 공개 API와 실제 운영 게시물을 비교한 결과:
+
+| 검사 | 배포 전 | 배포 후 |
+|---|---:|---:|
+| 사이트맵 URL | 285 | 347 |
+| 공개 상세 기준 목록 | 308 | 308 |
+| 사이트맵의 기준 상세 누락 | 86 | 0 |
+| AI 안내의 기준 상세 누락 | 182 | 0 |
+| 사이트맵의 우회 주소 | 24 | 0 |
+| 운영 게시물의 Alpha URL 혼입 | 0 | 0 |
+
+347/347 URL의 실제 HTTP 200, 자기 대표 주소, noindex 없음, 제목, JSON-LD 문법과 우회 없음 확인. 기준 상세는 팀 104, 대회 5, 공개 리그 1, 개인 매치 3, 친선/리그 경기 148, 대회 경기 47개다. 현재 모집 중인 개인 매치는 없으며 과거 개인 매치 세 개에는 명시적으로 취소된 스토어 심사 테스트가 포함돼 있다. AI 안내는 이를 모집 중으로 광고하지 않고 실제 취소/보류 상태와 제목을 보존한다. 비공개 리그 등은 기존 공개 API 경계를 유지한다. Googlebot·Yeti·OAI-SearchBot UA로 운영 대회 200 확인은 수집 정책 검사이며 실제 봇 방문 증거로 해석하지 않는다.
+
+91개 집중 테스트, 타입/패턴 검사, 정확한 커밋 CI, 독립 Codex/Copilot 리뷰 수정 후 후속 열린 지적 0건. Alpha 실제 커밋 `79d1744c899725b5530b684983380caaaf48ab50`의 대표 7개 경로를 인증 없는 HTTP로 확인했고, 기존 로그인 UI 세션으로 동선을 확인했다. 390/768/1440px 화면에 가로 넘침과 런타임 오류 없음. Alpha의 HTTP noindex 및 sitemap/llms-full 404 유지. 시각 검사의 화면 밖 lazy 이미지 대기 타임아웃은 검사 조건을 고쳐 분리·재검증했다. 선택적 외부 AI 스캔은 모델 `claude-opus-5` 부재로 분석 전에 실패했고 보안 통과로 집계하지 않는다. CodeQL 검사는 별도로 통과했다.
+
+운영 근거: `/tmp/teameet-production-discovery-before.json`, `/tmp/teameet-production-discovery-audit.json`, `/tmp/teameet-alpha-seo-browser-qa.json`. Google 신규 사이트맵 제출 성공 화면과 대표 팀 URL의 우선순위 크롤링 대기열 추가 화면을 저장했다. Google 실제 색인 상태·요청 결과의 최종 목록은 후속 확인을 추가한다. 사이트맵 347개가 Google에서 모두 색인됐다는 뜻은 아니다.
+
+Google AI 기능은 기존 검색 색인과 스니펫 표시 자격을 전제로 하며 별도의 AI 파일이나 특별한 구조화 데이터가 필수인 것은 아니다. 이번 공개 안내와 기술 검증은 인용·검색 가능성을 지원하며 검색 순위, 전체 색인이나 AI 인용을 보장하지 않는다. [Google AI 기능 공식 안내](https://developers.google.com/search/docs/appearance/ai-features).
+
 ## 2026-10-12 운영 점검
 
 현재 작업: [Task 20261072](../../.github/tasks/20261072-production-search-ga4.md). 아래의 9월 기준선은 과거 기록이다.

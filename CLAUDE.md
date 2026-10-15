@@ -403,10 +403,14 @@ pnpm test:e2e:v1                       # Playwright — e2e/v1.config.ts (v1 스
 1. **커밋은 내 파일만 pathspec** + 직후 `git show --stat HEAD` 검증. 완료 보고 전 게이트 = `tsc 0` +
    영향받는 테스트 + (시각 변경이면) 아래 4번의 alpha 화면 검증.
 2. **Copilot 리뷰 루프**: 요청은 `gh pr edit <N> --add-reviewer copilot-pull-request-reviewer`
-   (REST `requested_reviewers`는 422). 도착은 비동기 ~3–8분 → 폴링(리뷰 수 증가). 각 finding은
+   또는 공식 REST `POST /repos/{owner}/{repo}/pulls/{number}/requested_reviewers`에
+   `reviewers: ["copilot-pull-request-reviewer[bot]"]`를 전달한다(2026-10-16 실제 접수·실행 확인).
+   도착은 비동기 ~3–8분 → 폴링(리뷰 수 증가). 각 finding은
    **적대적 검증으로 real만 수정**(Copilot도 틀림, 예: RQ `partialMatchKey` 빈 객체 부분일치). 스레드는
    GraphQL `addPullRequestReviewThreadReply` + `resolveReviewThread`로 답변·resolve.
    **`generated no new comments`(clean) 나올 때까지 반복.**
+   `429 rate_limit`이나 모델 세션 생성 실패는 분석 결과가 아니다. 재설정 시각 전 반복 요청하거나
+   모델·계정·요금제·머지 규칙을 바꾸지 말고 외부 차단을 기록한다. 이전 head 리뷰나 별도 독립 리뷰를 최신 Copilot clean으로 표시하지 않는다.
 3. **300-파일 한도**: 변경 파일 300개 초과 시 Copilot 리뷰 거부. 커밋된 스크린샷 PNG가 원인이면
    **트리에서 `git rm`** — 갤러리 코멘트는 **SHA 고정 raw URL**
    (`raw.githubusercontent.com/<owner>/<repo>/<SHA>/...`)이라 그대로 렌더된다.

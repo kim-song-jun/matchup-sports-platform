@@ -1,6 +1,7 @@
 'use client';
 
 import { useId, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { GameRosterClient } from '@/app/teams/[id]/games/[gameId]/roster/game-roster-client';
 import { useV1Registration, useV1TeamDetail, useV1TeamUpcomingGames, useV1Tournament } from '@/hooks/use-v1-api';
@@ -68,6 +69,10 @@ export function CompetitionRosterManager(entry: Entry) {
   if (entryQuery.isError) return <ErrorState title="명단 정보를 불러오지 못했어요" message={extractErrorMessage(entryQuery.error, '명단 조회에 실패했어요.')} onRetry={() => void entryQuery.refetch()} />;
   if (!entryQuery.data) return <PageSkeleton variant="detail" />;
   const listQuery = manager ? matrix : upcoming;
+  // 플랫폼 운영진은 팀 전용 참가 명단 API 대신 기존 admin 신청 관리에서 명단을 검토한다.
+  const adminRegistrationsHref = initialRoster.data?.viewerRole === 'ADMIN'
+    ? `/admin/${initialRoster.data.competitionKind === 'LEAGUE' ? 'league-matches' : 'tournaments'}/${encodeURIComponent(initialRoster.data.competitionId)}/registrations`
+    : null;
 
   return <RosterManagerNavigation.Provider value={navigation}>
     <div className={styles.manager}>
@@ -85,7 +90,12 @@ export function CompetitionRosterManager(entry: Entry) {
       <div role="tabpanel" id={`${ids}-panel`} aria-labelledby={`${ids}-${tab}`}>
         {tab === 'players' ? registrationId ? <ParticipantRosterEditor
           key={registrationId} tournamentId={competitionId} registrationId={registrationId}
-        /> : <div className={styles.message}><AlertBanner tone="info" message="등록된 참가 명단이 없거나 참가 명단 관리 권한이 없어요. 신청 내역을 확인하거나 팀장에게 문의해 주세요." /></div> : <>
+        /> : <div className={styles.message}>
+          <AlertBanner tone="info" message={adminRegistrationsHref
+            ? '신청 관리에서 해당 팀의 명단 검토를 열어 참가 선수를 확인해 주세요.'
+            : '등록된 참가 명단이 없거나 참가 명단 관리 권한이 없어요. 신청 내역을 확인하거나 팀장에게 문의해 주세요.'} />
+          {adminRegistrationsHref ? <Link href={adminRegistrationsHref} className="tm-btn tm-btn-md tm-btn-outline mt-3">신청 관리로 이동</Link> : null}
+        </div> : <>
           <div className={styles.picker}>
             <label className="tm-text-caption" htmlFor={`${ids}-game-select`}>출전을 관리할 경기</label>
             <select className="tm-input" id={`${ids}-game-select`} value={currentGame} disabled={listQuery.isLoading || games.length === 0}

@@ -1,5 +1,8 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { QueryClientProvider, type QueryClient } from '@tanstack/react-query';
+import { act, cleanup, fireEvent, render as renderWithProviders, screen, waitFor, within } from '@testing-library/react';
+import type { PropsWithChildren, ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createV1QueryClient } from '@/lib/query-client';
 import type { V1AdminTournamentRegistration } from '@/types/api';
 import {
   useV1AdminTournamentRegistrations,
@@ -21,6 +24,23 @@ import {
 } from '@/hooks/use-v1-api';
 import { RegistrationsTab } from './registrations-tab';
 import { REGISTRATION_STATUS_FILTERS } from './tournament-detail-shared';
+
+const clients: QueryClient[] = [];
+
+function render(ui: ReactElement) {
+  const client = createV1QueryClient();
+  clients.push(client);
+  return renderWithProviders(ui, {
+    wrapper: ({ children }: PropsWithChildren) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    ),
+  });
+}
+
+afterEach(() => {
+  cleanup();
+  clients.splice(0).forEach((client) => client.clear());
+});
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminTournamentRegistrations: vi.fn(),

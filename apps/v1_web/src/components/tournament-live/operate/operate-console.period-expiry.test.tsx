@@ -42,7 +42,7 @@ async function requestManualEnd(label = '정규 시간 종료') {
   const sentBefore = fixture.commands.length;
   fireEvent.click(screen.getByRole('button', { name: label }));
   const dialog = await screen.findByRole('dialog', { name: label === '경기 종료' ? '경기를 종료할까요?' : `${label}할까요?` });
-  const confirmButton = within(dialog).getByRole('button', { name: label, exact: true });
+  const confirmButton = within(dialog).getByRole('button', { name: label });
   expect(confirmButton).toBeEnabled();
   await act(async () => {
     fireEvent.click(confirmButton);

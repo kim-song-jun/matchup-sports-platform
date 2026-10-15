@@ -12,7 +12,7 @@ vi.mock('next/navigation', () => ({
 
 const review = {
   id: 'review-1', authorId: 'author-1', authorNickname: '참가팀장', authorProfileImageUrl: null,
-  teamName: '주말팀', rating: 5, comment: '경기 시간 안내가 정확하고 운영이 원활했어요.', photoUrls: [], createdAt: '2026-10-01T00:00:00Z',
+  teamName: '주말팀', rating: 5, comment: '경기 시간 안내가 정확하고 운영이 원활했어요.', photoUrls: [], createdAt: '2026-10-01T16:30:00Z',
 };
 const cup = { id: 'cup', title: '지역 풋살컵', kind: 'regular_tournament', status: 'completed', fixtures: [], groups: [], reviews: [review], reviewsTotalCount: 1 };
 const params = Promise.resolve({ id: 'cup' });
@@ -33,6 +33,8 @@ describe('참가 후기 공개 HTML과 검색 자격', () => {
     expect(html).toContain(cup.title);
     expect(html).toContain(review.comment);
     expect(html).toContain(review.teamName);
+    // UTC 서버에서도 한국 사용자와 동일한 날짜를 내야 hydration 시 내용이 바뀌지 않는다.
+    expect(html).toContain('10월 2일');
     expect((await generateMetadata({ params })).robots).toMatchObject({ index: true, follow: true });
     client.clear();
   });

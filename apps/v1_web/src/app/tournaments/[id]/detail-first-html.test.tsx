@@ -62,15 +62,18 @@ const MATCH = {
   history: [], videos: [], nextMatch: null,
 } as unknown as PublicMatchDetail;
 
+let tournamentDetail: V1TournamentDetail;
+
 function envelope(data: unknown): Response {
   return new Response(JSON.stringify({ status: 'success', data }), { status: 200 });
 }
 
 beforeEach(() => {
+  tournamentDetail = TOURNAMENT;
   vi.spyOn(console, 'error').mockImplementation(() => {});
   vi.stubGlobal('fetch', vi.fn(async (input: string | URL) => {
     const path = String(input).replace(/^.*\/api\/v1/, '');
-    if (path === '/tournaments/t-1') return envelope(TOURNAMENT);
+    if (path === '/tournaments/t-1') return envelope(tournamentDetail);
     if (path === '/tournaments/t-2') return envelope(GROUP_TOURNAMENT);
     if (path === '/tournaments/t-1/matches/f-1') return envelope(MATCH);
     return new Response('unexpected', { status: 500 });
@@ -96,6 +99,25 @@ describe('대회 상세 첫 HTML', () => {
     const html = await serverHtml(TournamentDetailPage({ params: Promise.resolve({ id: 't-1' }) }));
     expect(html).not.toContain('불러오지 못했어요');
     expect(html).toContain('가을 송파 풋살컵');
+  });
+
+  it('완료된 대회는 실제 등록된 장소 주소를 기본 정보 첫 HTML 에 그린다', async () => {
+    tournamentDetail = {
+      ...TOURNAMENT,
+      status: 'completed',
+      venueAddress: '서울특별시 송파구 올림픽로 240',
+    };
+
+    const html = await serverHtml(TournamentDetailPage({ params: Promise.resolve({ id: 't-1' }) }));
+    expect(html).toContain('>주소</div>');
+    expect(html).toContain('서울특별시 송파구 올림픽로 240');
+  });
+
+  it.each([null, '   '])('완료된 대회의 장소 주소가 %j이면 주소 행을 그리지 않는다', async (venueAddress) => {
+    tournamentDetail = { ...TOURNAMENT, status: 'completed', venueAddress };
+
+    const html = await serverHtml(TournamentDetailPage({ params: Promise.resolve({ id: 't-1' }) }));
+    expect(html).not.toContain('>주소</div>');
   });
 
   it('결과 화면도 오류 화면을 서버 HTML 에 넣지 않는다', async () => {

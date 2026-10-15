@@ -106,6 +106,13 @@ function placeNode(tournament: V1TournamentDetail): JsonLdNode | null {
     '@type': 'Place',
     name: tournament.venue,
   };
+  const venueAddress = tournament.venueAddress?.trim();
+  if (venueAddress) {
+    place.address = {
+      '@type': 'PostalAddress',
+      streetAddress: venueAddress,
+    };
+  }
   // 좌표는 지오코딩에 성공한 대회만 갖는다(카카오 로컬 API 미설정/검색 실패 시 null).
   if (typeof tournament.latitude === 'number' && typeof tournament.longitude === 'number') {
     place.geo = {

@@ -48,3 +48,5 @@ Phase A frontend owner는 규칙·DESIGN·reference·관련 v1 API와 component�
 
 ## Progress Snapshot
 - root: IAB2 DOM locator claim 성공·김성준/확인 중 표시·스크린샷 보존. branch fix/mdqa-157-roster-roles, base7596c6baa. 구현/RED/GREEN/PR/alpha NOTRUN.
+
+- 2026-10-15 root actual RED: real CompetitionRosterManager→GameRosterClient→MSW HTTP 8 cases, 4 FAIL / 4 PASS, 14.43s (mdqa157-roster-roles-red.log). Two ADMIN competition destinations and read-only CTA reproduced; owner/manager/member-denial/error-retry controls retained. Production only two existing UI files changed; immutable candidate 49fe0781915b8df8d00341841c4e46e14733632b, independent frontend/security static C0/W0 (3/3 source/test, verified real admin gates). Existing admin registration list is an honest entry to roster review, no query auto-open or new permissions promised. GREEN/type/CI/dev merge/alpha remain pending.

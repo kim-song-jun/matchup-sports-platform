@@ -105,6 +105,12 @@ describe('/tournaments 서버 렌더', () => {
     expect(requested.some((url) => url.includes('/tournaments?') && url.includes('kind=league'))).toBe(true);
     expect(markup(html)).toContain('서울 나이트 리그');
     expectFirstCardLink(html, '/tournaments/l-1', '/tournaments?kind=league');
+    const metadata = await generateMetadata({ searchParams: Promise.resolve({ kind: 'league' }) });
+    const body = new DOMParser().parseFromString(markup(html), 'text/html');
+    const ld = parseJsonLd<{ name: string; url: string }>(html);
+    expect(body.querySelector('h1')?.textContent).toBe(metadata.title);
+    expect(ld?.name).toBe(metadata.title);
+    expect(ld?.url).toBe(`https://teameet.co.kr${metadata.alternates?.canonical}`);
   });
 
   it('API 가 실패하면 빈 상태 대신 로딩 스켈레톤으로 넘기고 ItemList 를 내지 않는다', async () => {
@@ -158,14 +164,15 @@ describe('/tournaments 서버 렌더', () => {
 });
 
 describe('/tournaments 메타데이터', () => {
-  it('kind=league 는 리그 전용 제목·설명을 쓰고 canonical 은 /tournaments 로 묶는다', async () => {
+  it('kind=league는 실제 리그 목록과 일치하는 제목·설명·대표 주소를 쓴다', async () => {
     const league = await generateMetadata({ searchParams: Promise.resolve({ kind: 'league' }) });
     const all = await generateMetadata({ searchParams: Promise.resolve({}) });
 
-    expect(league.title).toBe('정규 리그');
-    expect(all.title).toBe('스포츠 대회');
+    expect(league.title).toContain('풋살');
+    expect(league.title).toContain('정규 리그');
+    expect(all.title).toContain('대회·리그');
     expect(league.description).not.toBe(all.description);
-    expect(league.alternates?.canonical).toBe('/tournaments');
+    expect(league.alternates?.canonical).toBe('/tournaments?kind=league');
     expect(all.alternates?.canonical).toBe('/tournaments');
   });
 });

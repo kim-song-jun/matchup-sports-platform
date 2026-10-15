@@ -60,7 +60,7 @@ describe('fillLeagueTeamRoster — 동시 호출 경쟁', () => {
   async function makeMember(teamId: string): Promise<string> {
     const userId = await makeUser();
     await prisma.v1TeamMembership.create({
-      data: { teamId, userId, role: 'member', status: 'active', joinedAt: new Date(Date.now() + seq * 1000) },
+      data: { teamId, userId, jerseyNumber: seq, role: 'member', status: 'active', joinedAt: new Date(Date.now() + seq * 1000) },
     });
     return userId;
   }
@@ -104,5 +104,7 @@ describe('fillLeagueTeamRoster — 동시 호출 경쟁', () => {
     const players = await prisma.v1TournamentPlayer.findMany({ where: { registrationId: registration.id } });
     expect(players).toHaveLength(members.length);
     expect(new Set(players.map((p) => p.userId)).size).toBe(members.length);
+    const memberships = await prisma.v1TeamMembership.findMany({ where: { teamId: team.id, userId: { in: members } } });
+    for (const player of players) expect(player.jerseyNumber).toBe(memberships.find((member) => member.userId === player.userId)?.jerseyNumber);
   });
 });

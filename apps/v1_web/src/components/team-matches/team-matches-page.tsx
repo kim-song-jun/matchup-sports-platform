@@ -272,7 +272,7 @@ export function TeamMatchDetailPageSkeleton() {
 
 const LINEUP_ACTION_COPY = {
   attendance: { title: '참석명단', description: '경기에 참석할 선수 명단을 작성하고 제출하세요.', cta: '참석명단 관리' },
-  'match-roster': { title: '경기 명단', description: '참가 명단 선수가 출전해요. 이번 경기에 빠지는 선수만 빼 주세요.', cta: '명단 조정' },
+  'match-roster': { title: '이번 경기 출전 명단', description: '체크된 선수가 출전해요. 빠질 선수만 체크를 풀어 주세요.', cta: '출전 명단 조정' },
 } as const;
 
 /** 히어로의 팀 칸 — href 가 있으면 칸 전체가 팀 화면으로 가는 링크(44px 이상)다. */

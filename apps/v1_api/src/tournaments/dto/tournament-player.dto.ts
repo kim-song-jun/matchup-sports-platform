@@ -1,4 +1,4 @@
-import { IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, ValidateIf } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, ValidateIf } from 'class-validator';
 
 export const PLAYER_ELIGIBILITY_STATUSES = ['non_pro', 'pro', 'needs_review'] as const;
 export type PlayerEligibilityStatus = (typeof PLAYER_ELIGIBILITY_STATUSES)[number];
@@ -63,4 +63,17 @@ export class UpdatePlayerJerseyDto {
   @Min(0, { message: '등번호는 0에서 99 사이로 입력해 주세요.' })
   @Max(99, { message: '등번호는 0에서 99 사이로 입력해 주세요.' })
   jerseyNumber!: number | null;
+}
+
+/** 참가 명단 공통 설정. 자격 심사와 별개로 저장하며 생략한 값은 보존한다. */
+export class UpdatePlayerRosterSettingsDto {
+  @ValidateIf((_, value) => value !== undefined && value !== null)
+  @IsInt()
+  @Min(0)
+  @Max(99)
+  jerseyNumber?: number | null;
+
+  @ValidateIf((_, value) => value !== undefined)
+  @IsBoolean()
+  goalkeeper?: boolean;
 }

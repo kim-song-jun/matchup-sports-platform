@@ -90,8 +90,8 @@ describe('참가팀 카드 — 공개 명단 펼치기', () => {
 
     // 0 으로 채우면 아무도 안 단 번호가 전원 0번이 된다.
     expect(screen.getByText('—')).toBeInTheDocument();
-    // 실명 폴백은 정본 위반이다. 서버가 `null` 을 주면 화면이 자리표시자를 그린다.
-    expect(screen.getByText('(탈퇴한 선수)')).toBeInTheDocument();
+    // 실명 폴백은 정본 위반이다. 서버가 `null` 을 주면 경기·참가 명단과 같은 자리표시자를 그린다.
+    expect(screen.getByText('팀원')).toBeInTheDocument();
   });
 
   it('명단을 안 낸 팀은 왜 비었는지 말해 준다 — 빈 칸만 남기지 않는다', () => {

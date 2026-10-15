@@ -315,7 +315,7 @@ function toLeagueResult(item: V1PublicLeagueListItem, from: string) {
     meta: [item.sport.name, item.region.name, item.tierLabel, dateLabel ?? '일정 미정', `${item.teamCount}팀 참가`]
       .filter(Boolean)
       .join(' · '),
-    href: withFromPath(`/league-matches/${item.leagueId}`, from),
+    href: withFromPath(`/tournaments/${item.leagueId}`, from),
   };
 }
 

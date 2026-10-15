@@ -7,9 +7,13 @@ import { competitionConfigContentHash, validateCompetitionConfig } from './compe
 import { normalizeCompetitionPeriods as normalizeTournamentPeriods } from './competition-config-periods';
 import { UpdateTournamentPeriodSettingsDto } from './tournament-period-settings.dto';
 import { ALL_COMPETITION_KINDS, findTournamentOnSurface } from '../tournament-surface-lookup';
+import {
+  lockCompetitionFixtureRows, lockTournamentForConfigChange, repointUntouchedFixtures, teamMatchOwnershipWhere, untouchedGameWhere,
+} from './tournament-competition-config';
 
 type StoredPeriod = { code: string; label: string; durationMinutes: number; extraTime: boolean };
 type PeriodRead = { periods: StoredPeriod[] | null; legacyPeriodCount: number | null };
+type ConfigContent = { periods: Prisma.JsonValue; events: Prisma.JsonValue; lineup: Prisma.JsonValue; result: Prisma.JsonValue; tieBreak: Prisma.JsonValue; visibility: Prisma.JsonValue };
 
 export { normalizeCompetitionPeriods as normalizeTournamentPeriods } from './competition-config-periods';
 
@@ -46,6 +50,8 @@ export class TournamentPeriodSettingsService {
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
         return await this.prisma.$transaction(async (tx) => {
+      // 경기 생성·설정 변경과 같은 잠금 순서(대회 → Game → TeamMatch). 시작 전 경기를 옮기는 동안 새 경기가 옛 설정으로 생기지 않게 한다.
+      await lockTournamentForConfigChange(tx, tournamentId);
       const row = await findTournamentOnSurface(tx, ALL_COMPETITION_KINDS, {
         where: { id: tournamentId, deletedAt: null },
         include: { competitionConfig: true },
@@ -62,11 +68,23 @@ export class TournamentPeriodSettingsService {
         });
       }
 
+      await lockCompetitionFixtureRows(tx, row.kind, row.id);
+
       const currentRead = this.readPeriods(row.competitionConfig.periods);
       const currentPeriods = currentRead.periods ?? [];
       const nextPeriods = normalizeTournamentPeriods(currentPeriods, dto.periods);
       if (currentRead.periods && periodsEqual(currentPeriods, nextPeriods)) {
-        return { changed: false, ...this.serialize(row) };
+        // 같은 값을 다시 저장하면 예전 설정에 남은 시작 전 경기만 지금 설정으로 맞춘다.
+        const fixturesRepointed = await this.followPeriods(tx, row, row.competitionConfig, nextPeriods);
+        if (fixturesRepointed > 0) {
+          await this.adminContext.logAdminAction(admin, {
+            action: 'tournament.period_settings.apply_pending',
+            targetType: 'tournament',
+            targetId: row.id,
+            afterJson: { competitionConfigVersionId: row.competitionConfigVersionId, fixturesRepointed },
+          }, tx);
+        }
+        return { changed: false, fixturesRepointed, ...this.serialize(row) };
       }
 
       const config = validateCompetitionConfig({
@@ -97,6 +115,7 @@ export class TournamentPeriodSettingsService {
       if (updated.count !== 1) {
         throw new ConflictException({ code: 'TOURNAMENT_VERSION_CONFLICT', message: '대회 설정이 다른 요청에서 변경됐어요. 다시 확인해 주세요.' });
       }
+      const fixturesRepointed = await this.followPeriods(tx, row, version, nextPeriods);
       const committedKinds = row.kind === V1CompetitionKind.regular_league
         ? [V1CompetitionKind.regular_league]
         : [V1CompetitionKind.regular_tournament];
@@ -109,7 +128,7 @@ export class TournamentPeriodSettingsService {
         targetType: 'tournament',
         targetId: row.id,
         beforeJson: { competitionConfigVersionId: row.competitionConfigVersionId, periods: row.competitionConfig.periods },
-        afterJson: { competitionConfigVersionId: version.id, periods: nextPeriods },
+        afterJson: { competitionConfigVersionId: version.id, periods: nextPeriods, fixturesRepointed },
       }, tx);
       return {
         changed: true,
@@ -117,6 +136,7 @@ export class TournamentPeriodSettingsService {
         competitionConfigVersionId: version.id,
         expectedVersion: committed?.updatedAt.toISOString() ?? dto.expectedVersion,
         periods: nextPeriods,
+        fixturesRepointed,
       };
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
       } catch (error) {
@@ -132,6 +152,42 @@ export class TournamentPeriodSettingsService {
       }
     }
     throw new ConflictException({ code: 'TOURNAMENT_PERIOD_SETTINGS_RETRYABLE', message: '대회 설정 저장을 다시 시도해 주세요.' });
+  }
+
+  /**
+   * 시작 전 경기(라인업만 낸 경기 포함)를 새 피리어드 버전으로 옮긴다. 피리어드 말고는 지금 설정과 같은 버전을 따르던
+   * 경기만 옮긴다 — 라인업·결과 규칙이 다른 버전으로 남겨 둔 경기를 피리어드 저장이 바꾸면 안 된다.
+   * 예전에 피리어드만 바꿔 옛 버전에 남은 경기도 이 조건에 들어 함께 따라온다.
+   */
+  private async followPeriods(
+    tx: Prisma.TransactionClient,
+    row: { id: string; kind: V1CompetitionKind | null },
+    target: { id: string; contentHash: string; periods: Prisma.JsonValue },
+    nextPeriods: StoredPeriod[],
+  ) {
+    const ownership = teamMatchOwnershipWhere(row.kind, row.id);
+    const pinned = await tx.v1TeamMatch.findMany({
+      where: { ...ownership, status: { not: 'completed' }, competitionConfigVersionId: { not: target.id }, OR: [{ game: null }, { game: { is: untouchedGameWhere(true) } }] },
+      select: { competitionConfigVersionId: true },
+      distinct: ['competitionConfigVersionId'],
+    });
+    const pinnedIds = pinned.flatMap((match) => match.competitionConfigVersionId ?? []);
+    const candidates: (ConfigContent & { id: string })[] = pinnedIds.length === 0 ? [] : await tx.v1CompetitionConfigVersion.findMany({
+      where: { id: { in: pinnedIds } },
+      select: { id: true, periods: true, events: true, lineup: true, result: true, tieBreak: true, visibility: true },
+    });
+    const fromVersionIds = candidates.filter((candidate) => this.sameExceptPeriods(candidate, nextPeriods, target.contentHash)).map((candidate) => candidate.id);
+    if (fromVersionIds.length === 0) return 0;
+    return repointUntouchedFixtures(tx, ownership, target, { fromVersionIds, allowSubmittedLineups: true });
+  }
+
+  private sameExceptPeriods(candidate: ConfigContent, periods: StoredPeriod[], targetHash: string) {
+    try {
+      const { events, lineup, result, tieBreak, visibility } = candidate;
+      return competitionConfigContentHash(validateCompetitionConfig({ periods, events, lineup, result, tieBreak, visibility }, { preserveMissingCatalogKeys: true })) === targetHash;
+    } catch {
+      return false;
+    }
   }
 
   private readPeriods(value: Prisma.JsonValue): PeriodRead {

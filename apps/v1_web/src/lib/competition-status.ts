@@ -88,7 +88,7 @@ export function competitionKindChip(kind: CompetitionKindKey): StatusChipModel {
 
 type LeagueFixturePhaseInput = Pick<
   V1LeagueFixture,
-  'status' | 'startAt' | 'homeScore' | 'awayScore' | 'scoreHidden' | 'gameState'
+  'status' | 'startAt' | 'homeScore' | 'awayScore' | 'scoreHidden' | 'gameState' | 'resultVoided'
 >;
 
 /**
@@ -99,7 +99,8 @@ type LeagueFixturePhaseInput = Pick<
  */
 export function leagueFixturePhase(fixture: LeagueFixturePhaseInput, nowMs: number = Date.now()): MatchPhase {
   if (fixture.status === 'cancelled' || fixture.gameState === 'CANCELLED') return 'cancelled';
-  if (fixture.scoreHidden === true) return 'ended';
+  // 무효는 결과를 기다리는 게 아니라 끝난 경기의 결과를 지운 것이다.
+  if (fixture.scoreHidden === true || fixture.resultVoided === true) return 'ended';
   if (typeof fixture.homeScore === 'number' && typeof fixture.awayScore === 'number') return 'ended';
   if (fixture.gameState === 'LIVE') return 'live';
   if (fixture.gameState === 'PAUSED') return 'paused';
@@ -285,14 +286,15 @@ export function splitByArrival<T extends { arrivedAt: string | null }>(
 }
 
 /** 어드민 대진 칸 상태 칩 — 데스크톱 캔버스·리그 보드·모바일이 같은 글자·아이콘·톤을 쓰는 단일 정의. */
-const BRACKET_NODE_CHIP: Record<FixtureNodeState, StatusChipModel> = {
+const BRACKET_NODE_CHIP: Record<FixtureNodeState | 'voided', StatusChipModel> = {
   scheduled: { label: '예정', tone: 'grey', icon: 'clock' },
   live: { label: '진행 중', tone: 'blue', icon: 'live' },
   submitted: { label: '확정 전', tone: 'orange', icon: 'hourglass' },
   official: { label: '확정', tone: 'green', icon: 'check' },
   cancelled: { label: '취소', tone: 'red', icon: 'cancel' },
+  voided: { label: '무효', tone: 'grey', icon: 'cancel' },
 };
 
-export function bracketNodeStateChip(state: FixtureNodeState): StatusChipModel {
+export function bracketNodeStateChip(state: FixtureNodeState | 'voided'): StatusChipModel {
   return BRACKET_NODE_CHIP[state];
 }

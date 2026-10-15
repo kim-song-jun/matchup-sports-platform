@@ -117,7 +117,7 @@ function FixtureReviewsSection({ tournament, hasSession }: { tournament: V1Tourn
   return <TournamentFixtureReviewEntrySection fixtures={tournament.fixtures} groups={tournament.groups} state={state} />;
 }
 
-export function TournamentReviewsPageClient({ tournamentId }: { tournamentId: string }) {
+export function TournamentReviewsPageClient({ tournamentId, seed }: { tournamentId: string; seed?: V1TournamentDetail }) {
   // route-chrome 표는 reviews 뒤로가기를 awards 로 고정한다 — from 이 있으면 그 출처로 돌아간다.
   const backFrom = sanitizeRedirectPath(useSearchParams()?.get('from'));
   useShellOverride({ backHref: backFrom ?? undefined });
@@ -138,7 +138,7 @@ export function TournamentReviewsPageClient({ tournamentId }: { tournamentId: st
   // 이 화면에 어느 대회의 후기인지 적으려면 대회 자체가 필요하다 — 예전에는 제목이
   // "참가팀 후기" 한 줄뿐이라, 링크를 타고 들어온 사람은 어느 대회 후기를 보고 있는지
   // 화면 어디에서도 알 수 없었다(오너 지적: "참가팀 후기도 명확하게 나왔으면 좋겠고").
-  const { data: tournament } = useV1Tournament(tournamentId);
+  const { data: tournament } = useV1Tournament(tournamentId, { seed });
   // 리그도 같은 후기 화면을 쓴다(리그 상세 '이번 시즌 요약' 카드에서 들어온다) — 종류는 `kind`로만 가린다.
   const noun = tournament?.kind === 'regular_league' ? '리그' : '대회';
   const reviewGate = useTournamentReviewWriteGate(tournamentId, tournament?.status ?? 'draft', noun);
@@ -148,6 +148,11 @@ export function TournamentReviewsPageClient({ tournamentId }: { tournamentId: st
     page: effectivePage,
     pageSize: PAGE_SIZE,
     search,
+  }, {
+    // 상세와 후기 API의 공개·숨김 제외·최신순 계약을 따른다. 검색/다음 페이지에는 재사용하지 않는다.
+    seed: seed?.id === tournamentId ? {
+      items: seed.reviews.slice(0, PAGE_SIZE), total: seed.reviewsTotalCount, page: 1, pageSize: PAGE_SIZE,
+    } : undefined,
   });
 
   const reviews = data?.items ?? [];

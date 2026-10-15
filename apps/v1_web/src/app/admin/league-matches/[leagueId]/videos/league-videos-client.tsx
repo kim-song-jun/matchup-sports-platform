@@ -1,15 +1,12 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import Link from 'next/link';
 import { Clapperboard, ExternalLink, Film, Trash2 } from 'lucide-react';
-import { AdminPageHeader } from '@/components/admin';
 import { AdminEmpty } from '@/components/admin/admin-empty';
 import { AdminListSkeleton } from '@/components/admin/admin-skeleton';
 import { AdminToasts, useAdminToast } from '@/components/admin/admin-toast';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { FixtureVideoAddForm } from '@/components/fixture-videos/fixture-video-add-form';
-import { useV1AdminLeagueMatch } from '@/hooks/use-v1-api';
 import { formatAdminKstDateTime } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 import {
@@ -130,7 +127,6 @@ function LeagueFixtureVideoCard({
 }
 
 export default function LeagueVideosClient({ leagueId }: { leagueId: string }) {
-  const series = useV1AdminLeagueMatch(leagueId);
   const videos = useLeagueFixtureVideos(leagueId);
   const remove = useDeleteLeagueFixtureVideo(leagueId);
   const { toasts, showToast } = useAdminToast();
@@ -161,19 +157,9 @@ export default function LeagueVideosClient({ leagueId }: { leagueId: string }) {
 
   return (
     <div className="tm-content-enter">
-      <AdminPageHeader
-        eyebrow="플랫폼 · 리그"
-        title={series.data ? `${series.data.title} 경기 영상` : '경기 영상'}
-        description={`경기마다 하이라이트·중계 영상을 등록해요. 외부 링크를 붙이거나 ${VIDEO_UPLOAD_EXTENSION_LABEL} 파일을 ${VIDEO_UPLOAD_MAX_LABEL}까지 직접 올릴 수 있어요. 등록한 영상은 리그 경기 상세에서 바로 재생돼요.`}
-        action={
-          <Link
-            href={`/admin/league-matches/${leagueId}`}
-            className="inline-flex min-h-[44px] items-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--text-strong)]"
-          >
-            리그 상세로
-          </Link>
-        }
-      />
+      <p className="mb-4 text-[length:var(--font-size-label)] text-[var(--text-muted)]">
+        경기마다 하이라이트·중계 영상을 등록해요. 외부 링크를 붙이거나 {VIDEO_UPLOAD_EXTENSION_LABEL} 파일을 {VIDEO_UPLOAD_MAX_LABEL}까지 직접 올릴 수 있어요. 등록한 영상은 리그 경기 상세에서 바로 재생돼요.
+      </p>
 
       {videos.isPending ? (
         <AdminListSkeleton />

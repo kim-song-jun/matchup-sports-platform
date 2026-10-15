@@ -1241,12 +1241,14 @@ function TournamentConsentDialog({
 }
 
 function TournamentSubmitConfirmDialog({
+  isFreeEntry,
   isSubmitting,
   refundPolicyText,
   onCancel,
   onConfirm,
 }: {
   isSubmitting: boolean;
+  isFreeEntry: boolean;
   refundPolicyText: string | null;
   onCancel: () => void;
   onConfirm: () => void;
@@ -1297,7 +1299,7 @@ function TournamentSubmitConfirmDialog({
           className="tm-text-caption"
           style={{ color: 'var(--text-muted)', lineHeight: 1.7, marginTop: 12 }}
         >
-          {customRefundPolicy ? (
+          {isFreeEntry ? '무료 참가 신청이에요. 운영진이 신청 내용을 확인한 뒤 참가를 확정해요.' : customRefundPolicy ? (
             <>
               <p style={{ margin: 0 }}>취소와 환불은 이 대회의 환불 정책을 따라요.</p>
               <div
@@ -2128,6 +2130,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
         ) : null}
         {submitConfirmOpen ? (
           <TournamentSubmitConfirmDialog
+            isFreeEntry={tournament.entryFee === 0}
             isSubmitting={isSubmittingApplication}
             refundPolicyText={tournament.refundPolicyText}
             onCancel={() => setSubmitConfirmOpen(false)}

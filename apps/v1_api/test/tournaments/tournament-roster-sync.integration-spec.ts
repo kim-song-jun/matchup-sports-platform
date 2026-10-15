@@ -145,6 +145,23 @@ describe('대회 참가 명단 → 시작 전 대진 경기 명단 동기화', (
     prisma.$transaction((tx) => syncCompetitionTeamRosters(tx, { competitionId: tournamentId, teamId }));
   const drain = () => drainOutboxWorker(prisma);
 
+  it('공통 번호·GK 설정은 시작 전 경기로 전파되고 시작한 경기의 기록은 보존한다', async () => {
+    const f = await seedFixture({ playersBeforeFixture: true });
+    const service = app.get(TournamentPlayersService);
+    const player = await prisma.v1TournamentPlayer.findFirstOrThrow({ where: { registrationId: f.registration.id, userId: f.members[0] } });
+    await service.updatePlayerRosterSettings(f.captain, f.tournament.id, f.registration.id, player.id, { goalkeeper: true, jerseyNumber: 0 });
+    await drain();
+    const startedLineup = await latestLineup(f.game.id, f.side.id);
+    // GK 포지션은 종목 설정의 골키퍼 코드다 — 풋살은 'GK' 가 아니라 'GOLEIRO'.
+    expect((await participantsOf(startedLineup.id)).find(row => row.userId === player.userId)).toMatchObject({ jerseyNumber: 0, position: 'GOLEIRO' });
+    await prisma.v1Game.update({ where: { id: f.game.id }, data: { state: 'LIVE' } });
+    await service.updatePlayerRosterSettings(f.captain, f.tournament.id, f.registration.id, player.id, { goalkeeper: false, jerseyNumber: 9 });
+    await drain();
+    expect((await latestLineup(f.game.id, f.side.id)).id).toBe(startedLineup.id);
+    expect((await participantsOf(startedLineup.id)).find(row => row.userId === player.userId)).toMatchObject({ jerseyNumber: 0, position: 'GOLEIRO' });
+    expect(await prisma.v1TournamentPlayer.findUniqueOrThrow({ where: { id: player.id } })).toMatchObject({ goalkeeper: false, jerseyNumber: 9 });
+  });
+
   it('대진 생성 시점에 로스터가 비어 있었어도, 이후 선수를 추가하면 시작 전 경기 참가자가 채워진다', async () => {
     const f = await seedFixture();
     // 대진이 이미 비어 있는 로스터로 만들어졌다는 전제를 실측으로 확인한다.

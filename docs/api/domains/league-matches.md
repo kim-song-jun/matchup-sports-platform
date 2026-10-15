@@ -458,6 +458,7 @@ The result-entry reminder skips such fixtures as well.
 - Generate / regenerate / manual / template / update-fixture DTOs accept `placeName`, `placeAddress`, `placeLatitude`, `placeLongitude`, `placeProvider`, `placeProviderId`.
 - A blank `placeName` inherits the league's default place (the mirror tournament's `venue` snapshot); with no default it falls back to `장소 미정` with no coordinates. On update, a present `placeName` replaces the whole snapshot.
 - Fixture rows (admin detail, `updateFixture`, public list/detail) keep `placeName` and add `place: V1PlaceView | null`; admin `recentVenues` is now `V1PlaceView[]` (most recent snapshot per name, default excluded).
+- Update-fixture accepts `fieldId?: UUID | null` (Task 20261082). Omitted keeps assignment unless place is edited; null resolves/registers the retained/submitted venue. A UUID selects an active same-league field and atomically saves place + assignment. `fieldId` plus `placeName` is `400 FIELD_PLACE_INPUT_CONFLICT`. All manual/bulk fixture creation and standalone place editing register/select a field automatically. Same-name conflicting registered locations return `400 FIELD_PLACE_CONFLICT`. Existing same-field/name-matched pins are preserved; public names prefer the field. Admin responses include `fieldId`. [Catalogue/import/migration/permission contract](./tournament-operations.md#place-registry-integration-2026-10-14-task-20261082).
 
 ## Basic information editing (리그 기본 정보 수정)
 
@@ -495,3 +496,10 @@ The form hydrates that exact league, preserves failed drafts, and confirms expli
 Dates use KST; untouched ISO instants retain seconds/milliseconds. A successful save invalidates
 admin/public league and tournament queries and returns to the admin detail. Public league detail
 now includes nullable `rulesText`, rendered as operating guidance only when populated.
+
+## 2026-10-13 리그 QA 후속
+
+- 대진 재생성은 교체한 모든 옛 대진(기존 취소 대진 포함)의 `deletedAt`을 설정한다. Game·결과·감사 기록은 보존하고 현재 목록·주차·경기 수에서 제외한다. 확정 결과가 있으면 기존 409 계약대로 재생성을 거부한다.
+- `PATCH /admin/league-matches/:leagueId`의 `yellowAccumulationLimit`, `redCardSuspensionMatches`는 리그 상세에서 설정한다. 1~20 정수, `null`은 미적용이며 LIVE·PAUSED·ENDED 경기가 있으면 `LEAGUE_DISCIPLINE_LOCKED`다.
+- 빈 확정 명단의 자동 채움은 활성 팀 멤버십 등번호를 참가 명단에 함께 저장한다. 번호를 임의로 생성하거나 기존 참가 명단을 백필하지 않는다.
+- 결과 미입력 리마인더에 두 팀 이름을 표시하고 해당 경기 결과 검토로 연결한다. 단일 경기 취소 알림도 두 팀 이름을 표시한다.

@@ -584,7 +584,11 @@ export const gameSchemaSourceManifest = {
   // 2026-10-13: V1Tournament.maxPlayers nullable (null = unlimited roster) + additive plannedFixtureCount backed by
   // 20261013100000_league_roster_limit_planned_fixtures. Game models and the bound historical game-operations
   // migration are unchanged; re-pin the schema bytes only.
-  schema: '47f0530160fa371bdab40affe880eed11201537565fb1af253b99d7c2fd5a23e',
+  // 2026-10-14: additive V1TournamentField.placeSnapshot and 20261014000100_v1_competition_field_places.
+  // 2026-10-14 Task 20261082: additive V1GameRosterRole + back-relations, backed by
+  // 20261014180000_v1_game_roster_goalkeepers. Existing game columns and bound historical migration unchanged.
+  // Re-pin the combined committed LF schema, retaining both additive migrations.
+  schema: '89ccedfb1f48f088a5f61ceede57e7f520a4b40a7ad9862c3d817d4cefc84ae0',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

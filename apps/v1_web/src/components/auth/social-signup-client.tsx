@@ -8,14 +8,13 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Card, DatePickerTextInput } from '@/components/v1-ui/primitives';
 import { Button } from '@/components/v1-ui/button';
 import { PhoneConflictNotice } from '@/components/auth/otp/phone-conflict-notice';
-import { SocialLinkPrompt, SocialLinkVerify } from '@/components/auth/social-link-flow';
 import { PhoneVerificationCard } from '@/components/auth/phone-verification/phone-verification-card';
 import { useV1AuthMe, useV1CheckNickname, useV1CompleteSocialProfile, useV1DeferSocialProfile } from '@/hooks/use-v1-api';
 import { useSocialSignupExit } from './use-social-signup-exit';
 import { V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
 import { clearV1IdentityCache } from '@/lib/query-keys';
-import { clearSavedRedirectPath, getSavedRedirectPath, sanitizeRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
+import { getSavedRedirectPath, resolveAuthContinuationPath, sanitizeRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
 import { AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
 import {
   formatBirthDate,
@@ -59,38 +58,24 @@ export function SocialSignupClient() {
   const [nicknameCheck, setNicknameCheck] = useState<DuplicateCheckState>({ status: 'idle', value: '' });
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [error, setError] = useState<string | null>(null);
+  const [termsRecoveryPending, setTermsRecoveryPending] = useState(false);
   const exitFlow = useSocialSignupExit();
   const [phoneConflict, setPhoneConflict] = useState(false);
-  // 충돌한 번호의 소유 증명을 시작한 상태 — 이때부터 가입 인증 카드 대신 연결용 인증 카드를 보여 준다.
-  const [linking, setLinking] = useState(false);
   // 카카오가 동의항목 승인 하에 내려준 값(이름·번호·성별)을 자동으로 채운다.
   // 동의항목이 없으면 socialSignupPrefill 이 null 이라 아무것도 하지 않고 직접 입력 흐름 그대로다.
   const authMe = useV1AuthMe();
   const prefill = authMe.data?.socialSignupPrefill ?? null;
   const providerLabel = socialProviderLabel(authMe.data?.user?.authProvider);
   const authProvider = authMe.data?.user?.authProvider;
-  // 서버가 연결을 허용하는 신원은 카카오·Apple 뿐이다 — 그 밖에는 기존의 로그인/계정 찾기 안내만 준다.
-  const canLink = authProvider === 'kakao' || authProvider === 'apple';
-  const chooseOtherNumber = () => {
-    setPhoneDigits('');
-    setPhoneVerified(false);
-    setPhoneConflict(false);
-    setLinking(false);
+  const conflictExitPath = (path: string) => {
+    const redirect = sanitizeRedirectPath(new URLSearchParams(window.location.search).get('redirect')) ?? getSavedRedirectPath();
+    return redirect ? `${path}?redirect=${encodeURIComponent(redirect)}` : path;
   };
-  const phoneConflictNotice = canLink ? (
-    <SocialLinkPrompt
-      providerLabel={providerLabel ?? '소셜'}
-      onStart={() => {
-        setPhoneConflict(false);
-        setLinking(true);
-      }}
-      onChooseOtherNumber={chooseOtherNumber}
-    />
-  ) : (
+  const phoneConflictNotice = (
     <PhoneConflictNotice
       pending={exitFlow.pending}
-      onLogin={() => void exitFlow.leaveTo('/login')}
-      onFindAccount={() => void exitFlow.leaveTo('/auth/find-account')}
+      onLogin={() => void exitFlow.leaveTo(conflictExitPath('/login'))}
+      onFindAccount={() => void exitFlow.leaveTo(conflictExitPath('/auth/find-account'))}
     />
   );
   // 카카오가 제공한 번호는 추가 인증 없이 사용한다. 다른 번호로 바꾼 경우에만 직접 인증한다.
@@ -135,7 +120,8 @@ export function SocialSignupClient() {
   const nicknameVerified = nicknameCheck.status === 'available' && nicknameCheck.value === nickname.trim();
   const profileDraft = { displayName, phone: phoneDigits, birthDate: birthDateDigits, gender };
   const profileIssue = getSignupProfileIssue(profileDraft);
-  const isBlocked = completeProfile.isPending || deferProfile.isPending || checkNickname.isPending || !nicknameVerified || profileIssue !== null;
+  const signupPending = completeProfile.isPending || deferProfile.isPending || termsRecoveryPending;
+  const isBlocked = signupPending || checkNickname.isPending || !nicknameVerified || profileIssue !== null;
   const disabledReason = !nicknameVerified ? '닉네임 중복 확인이 필요해요.' : null;
 
   const actionReason = disabledReason ?? (profileIssue ? SIGNUP_PROFILE_ERROR_MESSAGES[profileIssue] : null);
@@ -160,16 +146,29 @@ export function SocialSignupClient() {
     });
   };
 
-  // 주소의 redirect 가 먼저, 소셜 로그인을 거쳐 주소에서 사라졌다면 로그인 때 저장해 둔 값. 쓰는 즉시 비운다.
-  const consumeRedirect = () => {
-    const redirect = sanitizeRedirectPath(new URLSearchParams(window.location.search).get('redirect'))
-      ?? getSavedRedirectPath();
-    clearSavedRedirectPath();
-    return redirect;
+  const continuationPath = (nextRoute?: string | null) => resolveAuthContinuationPath(
+    nextRoute, new URLSearchParams(window.location.search).get('redirect'),
+  );
+
+  const recoverRequiredTerms = async () => {
+    // 서버가 가입 상태를 되돌린 오류라 fresh 캐시도 재조회해야 약관 게이트에 갇히지 않는다.
+    setTermsRecoveryPending(true);
+    try {
+      // 재조회가 전역 게이트를 바꾸기 전에 URL에만 있는 원 목적지를 보존한다.
+      const termsRoute = continuationPath('/terms?mode=social');
+      const currentAuth = await authMe.refetch();
+      if (currentAuth.isError) {
+        setError(extractErrorMessage(currentAuth.error, '가입을 완료하지 못했어요.'));
+        return;
+      }
+      router.replace(termsRoute);
+    } finally {
+      setTermsRecoveryPending(false);
+    }
   };
 
   const deferSignup = () => {
-    if (deferProfile.isPending || completeProfile.isPending) return;
+    if (signupPending) return;
     setError(null);
     deferProfile.mutate(undefined, {
       onSuccess: (result) => {
@@ -179,11 +178,11 @@ export function SocialSignupClient() {
           method: authMe.data?.user?.authProvider ?? 'social',
           profile: 'deferred',
         });
-        router.replace(consumeRedirect() ?? '/home');
+        router.replace(continuationPath(result.next?.route));
       },
-      onError: (nextError) => {
+      onError: async (nextError) => {
         if (nextError instanceof V1ApiError && nextError.code === 'TERMS_REQUIRED') {
-          router.replace('/terms?mode=social');
+          await recoverRequiredTerms();
           return;
         }
         if (nextError instanceof V1ApiError && nextError.code === 'SOCIAL_SIGNUP_EXPIRED') {
@@ -197,10 +196,8 @@ export function SocialSignupClient() {
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    // 로딩 중 재클릭 시 중복 제출 방지 — isPending 은 disabled 속성과 동일하게 리렌더
-    // 이후에나 반영되는 값이라 동시 클릭까지 막지는 못하지만, 스피너가 보이는 동안의
-    // 재클릭은 막는다(동시 클릭 방지가 필요하면 ref 락을 따로 둔다).
-    if (completeProfile.isPending) return;
+    // mutation 종료 뒤에도 약관 복구가 끝나기 전에는 다른 가입 요청을 보내지 않는다.
+    if (signupPending) return;
     setError(null);
     setPhoneConflict(false);
     setFieldErrors({});
@@ -242,13 +239,12 @@ export function SocialSignupClient() {
           const nextRoute = result.next?.route;
           if (activityMode || !nextRoute) {
             trackEvent('activity_profile_complete', { method });
-            router.replace(consumeRedirect() ?? '/home');
-            return;
+          } else {
+            trackEvent('sign_up_complete', { method });
           }
-          trackEvent('sign_up_complete', { method });
-          router.replace(nextRoute);
+          router.replace(continuationPath(nextRoute));
         },
-        onError: (nextError) => {
+        onError: async (nextError) => {
           if (nextError instanceof V1ApiError && nextError.code === 'NICKNAME_CONFLICT') {
             setFieldErrors({ nickname: '이미 사용 중인 닉네임이에요.' });
             setError('다른 닉네임으로 다시 시도해 주세요.');
@@ -266,7 +262,7 @@ export function SocialSignupClient() {
           }
 
           if (nextError instanceof V1ApiError && nextError.code === 'TERMS_REQUIRED') {
-            router.replace('/terms?mode=social');
+            await recoverRequiredTerms();
             return;
           }
 
@@ -300,7 +296,7 @@ export function SocialSignupClient() {
             block
             disabled={isBlocked}
             form="v1-social-signup-form"
-            loading={completeProfile.isPending}
+            loading={completeProfile.isPending || termsRecoveryPending}
             size="lg"
             type="submit"
             variant={isBlocked ? 'neutral' : 'primary'}
@@ -311,7 +307,7 @@ export function SocialSignupClient() {
           {signupMode ? (
             <>
               <div className="tm-auth-fixed-skip-row" style={{ justifyContent: 'center' }}>
-                <Button disabled={deferProfile.isPending} onClick={deferSignup} size="sm" type="button" variant="ghost">
+                <Button disabled={signupPending} loading={deferProfile.isPending || termsRecoveryPending} onClick={deferSignup} size="sm" type="button" variant="ghost">
                   나중에 입력할게요
                 </Button>
               </div>
@@ -422,7 +418,6 @@ export function SocialSignupClient() {
                 setPhoneDigits(normalizeSeparatedDigits(event.target.value));
                 setPhoneVerified(false);
                 setPhoneConflict(false);
-                setLinking(false);
               }}
               placeholder="010-0000-0000"
               required
@@ -430,19 +425,7 @@ export function SocialSignupClient() {
             />
           </label>
 
-          {phoneDigits.length === 11 && linking ? (
-            <SocialLinkVerify
-              phone={phoneDigits}
-              providerLabel={providerLabel ?? '소셜'}
-              onChooseOtherNumber={chooseOtherNumber}
-              onLogin={() => void exitFlow.leaveTo('/login')}
-              onFindAccount={() => void exitFlow.leaveTo('/auth/find-account')}
-              exitPending={exitFlow.pending}
-              onLinked={activityMode ? () => router.replace(consumeRedirect() ?? '/home') : undefined}
-            />
-          ) : null}
-
-          {phoneDigits.length === 11 && !contactReady && !linking ? (
+          {phoneDigits.length === 11 && !contactReady ? (
             <PhoneVerificationCard mode="authed" phone={phoneDigits} onVerified={() => setPhoneVerified(true)} surface="inset" conflictNotice={phoneConflictNotice} />
           ) : null}
 

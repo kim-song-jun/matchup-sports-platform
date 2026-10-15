@@ -31,7 +31,7 @@ const mockSocket = {
   off: vi.fn(),
   emit: vi.fn((event: string, payload: unknown, cb?: (result: unknown) => void) => {
     if (event === 'game.subscribe' && cb) {
-      cb({ status: 'subscribed', snapshot: { version: 5, state: 'LIVE', lastSequence: 0, events: [] } });
+      cb({ status: 'subscribed', snapshot: { gameId: 'game-1', version: 5, state: 'LIVE', lastSequence: 0, events: [] } });
     } else if (event === 'game.takeover.request' && cb) {
       cb({ status: 'granted', takeoverToken: 'tok-1', expiresAt: new Date(Date.now() + 60_000).toISOString() });
     } else if (event === 'game.event.append' && cb) {

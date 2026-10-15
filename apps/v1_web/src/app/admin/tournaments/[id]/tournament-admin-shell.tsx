@@ -3,13 +3,14 @@
 import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ChevronLeft, ExternalLink } from 'lucide-react';
+import { ChevronLeft } from 'lucide-react';
 import {
   AdminPageHeader,
   AdminTableSkeleton,
   AdminToasts,
   useAdminToast,
 } from '@/components/admin';
+import { AdminSectionNav, type AdminSectionNavGroup } from '@/components/admin/admin-section-nav';
 import { GateConfirmModal } from '@/components/admin/operation-flag-gate-confirm-modal';
 import { useConfirm, type ConfirmOptions } from '@/components/v1-ui/confirm-modal';
 import {
@@ -87,59 +88,6 @@ const SECTION_GROUPS: { label: string; items: SectionItem[] }[] = [
     ],
   },
 ];
-
-function SectionLink({
-  href,
-  active,
-  label,
-  count,
-  leavesShell = false,
-}: {
-  href: string;
-  active: boolean;
-  label: string;
-  count?: number;
-  /** 대회 셸 밖(전역 어드민 화면)으로 나가는 링크 — 아이콘과 라벨로 미리 알린다. */
-  leavesShell?: boolean;
-}) {
-  return (
-    <Link
-      href={href}
-      aria-current={active ? 'page' : undefined}
-      aria-label={
-        typeof count === 'number' || leavesShell
-          ? [label, typeof count === 'number' ? String(count) : '', leavesShell ? '전역 팝업 화면으로 이동' : '']
-              .filter(Boolean)
-              .join(' ')
-          : undefined
-      }
-      className={[
-        'inline-flex shrink-0 items-center justify-between gap-2 min-h-[44px] px-3 rounded-lg text-[length:var(--font-size-label)] transition-colors',
-        'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
-        active
-          ? 'bg-[var(--blue50)] text-[var(--blue700)] font-bold'
-          : 'text-[var(--text-muted)] hover:bg-[var(--surface-soft)] hover:text-[var(--text-strong)]',
-      ].join(' ')}
-    >
-      <span className="inline-flex items-center gap-1">
-        {label}
-        {leavesShell && <ExternalLink size={12} aria-hidden="true" />}
-      </span>
-      {typeof count === 'number' && (
-        <span
-          className={
-            active
-              ? 'font-semibold tabular-nums text-[var(--blue700)]'
-              : 'font-semibold tabular-nums text-[var(--text-muted)]'
-          }
-          aria-hidden="true"
-        >
-          {count.toLocaleString('ko-KR')}
-        </span>
-      )}
-    </Link>
-  );
-}
 
 const STATUS_CHANGE_CONFIRM: Partial<Record<V1TournamentStatus, ConfirmOptions>> = {
   closed: {
@@ -259,6 +207,16 @@ export function TournamentAdminShell({ id, children }: { id: string; children: R
   const revertCopy = revertTargetStatus(tournament.status) ? REVERT_COPY[tournament.status] : undefined;
   const scheduleLabel = formatDateRange(tournament.scheduledAt, tournament.scheduledEndAt);
   const counts = tournament.operationCounts;
+  const navGroups: AdminSectionNavGroup[] = SECTION_GROUPS.map((group) => ({
+    label: group.label,
+    items: group.items.map((item) => ({
+      slug: item.slug,
+      label: item.label,
+      count: item.countKey ? counts?.[item.countKey] : undefined,
+      externalHref: item.externalHref?.(id),
+      externalNote: item.externalHref ? '전역 팝업 화면으로 이동' : undefined,
+    })),
+  }));
 
   return (
     <TournamentAdminProvider value={{ tournamentId: id, role, canWrite, showToast }}>
@@ -339,38 +297,7 @@ export function TournamentAdminShell({ id, children }: { id: string; children: R
 
       <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
         {/* 섹션 내비 — 데스크톱은 좌측 세로 목록, 모바일은 가로 스크롤 한 줄 */}
-        <nav
-          aria-label="대회 관리 섹션"
-          className="lg:w-[184px] lg:shrink-0 lg:sticky lg:top-4 lg:self-start"
-        >
-          <div className="flex gap-1 overflow-x-auto pb-1 lg:flex-col lg:gap-0 lg:overflow-visible lg:pb-0">
-            {SECTION_GROUPS.map((group) => (
-              <div
-                key={group.label}
-                role="group"
-                aria-label={group.label}
-                className="flex shrink-0 gap-1 lg:flex-col lg:gap-0"
-              >
-                <p className="hidden lg:block px-3 pt-3 pb-1 text-[length:var(--font-size-caption)] font-bold tracking-wide text-[var(--text-caption)]">
-                  {group.label}
-                </p>
-                {group.items.map((item) => {
-                  const sectionHref = `${basePath}/${item.slug}`;
-                  return (
-                    <SectionLink
-                      key={item.slug}
-                      href={item.externalHref ? item.externalHref(id) : sectionHref}
-                      active={!item.externalHref && pathname === sectionHref}
-                      label={item.label}
-                      count={item.countKey ? counts?.[item.countKey] : undefined}
-                      leavesShell={Boolean(item.externalHref)}
-                    />
-                  );
-                })}
-              </div>
-            ))}
-          </div>
-        </nav>
+        <AdminSectionNav ariaLabel="대회 관리 섹션" groups={navGroups} basePath={basePath} pathname={pathname} />
 
         <div className="min-w-0 flex-1">{children}</div>
       </div>

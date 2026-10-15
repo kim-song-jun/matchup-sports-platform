@@ -4,8 +4,9 @@ import Link from 'next/link';
 import { useEffect, useId, useState } from 'react';
 import { InfoRow, Card } from '@/components/v1-ui/primitives';
 import { useV1MyRegistrations } from '@/hooks/use-v1-api';
-import { formatEntryFee, formatTournamentDateTimeLong } from '@/lib/date-utils';
+import { formatEntryFee, formatTournamentDateRangeShort, formatTournamentDateTimeLong } from '@/lib/date-utils';
 import { hasStoredV1Session } from '@/lib/session-storage';
+import type { V1LeagueNextRound } from '@/types/league-match';
 
 interface LeagueJoinGuideCardProps {
   leagueId: string;
@@ -14,15 +15,17 @@ interface LeagueJoinGuideCardProps {
   registrationDeadlineAt: string | null;
   entryFee: number;
   entryFeeConfigured: boolean;
+  /** 같은 티어의 다음 시즌. 없으면(단발 리그 포함) 마감 카드가 "다음 회차에 신청해 주세요"만 적는다. */
+  nextRound?: V1LeagueNextRound | null;
 }
 
 /**
  * 공개 리그 상세의 '참가 안내' 카드 — 신청 입구와 마감 안내를 한 컴포넌트의 상태로 둔다.
  *
  * | 조건(위에서부터 첫 일치)              | 그리는 것    |
- * | 끝난 리그 / 내 팀이 이미 신청         | 없음         |
+ * | 내 팀이 이미 신청 / 다음 회차 없는 끝난 리그 | 없음  |
  * | 신청 받는 중                          | 열림 카드    |
- * | 마감이 지났다(마감 시각이 있다)       | 닫힘 카드    |
+ * | 마감이 지났다 / 다음 회차 있는 끝난 리그 | 닫힘 카드 |
  * | 마감 미설정 + 참가비 확정             | 안내 전용    |
  * | 마감 미설정 + 참가비 미설정           | 없음         |
  *
@@ -36,6 +39,7 @@ export function LeagueJoinGuideCard({
   registrationDeadlineAt,
   entryFee,
   entryFeeConfigured,
+  nextRound = null,
 }: LeagueJoinGuideCardProps) {
   const headingId = useId();
   // 공개 화면이라 비로그인도 연다. 세션 힌트가 있을 때만 내 신청을 조회해 401 을 쏘지 않는다
@@ -54,7 +58,7 @@ export function LeagueJoinGuideCard({
   // 조회가 끝나기 전에 그리면 카드가 떴다 사라지거나, 신청한 팀장에게 닫힘 카드가 잠깐 보인다.
   const lookupPending = lookupEnabled && myRegistrations.isPending;
 
-  if (state === 'completed' || hasActiveRegistration) return null;
+  if ((state === 'completed' && nextRound === null) || hasActiveRegistration) return null;
 
   const feeLabel = entryFeeConfigured ? (entryFee > 0 ? `팀당 ${formatEntryFee(entryFee)}` : '무료') : null;
   const showsPaymentMethod = entryFee > 0;
@@ -91,8 +95,16 @@ export function LeagueJoinGuideCard({
     );
   }
 
-  if (hasClosed) {
+  if (hasClosed || nextRound !== null) {
     if (lookupPending) return null;
+    const closedNote = hasClosed ? `${formatTournamentDateTimeLong(registrationDeadlineAt)}에 마감됐어요.` : null;
+    const nextRows: { label: string; value: string }[] = nextRound === null ? [] : [
+      { label: '다음 회차', value: `${nextRound.seasonNo}시즌 · ${nextRound.title}` },
+      { label: '리그 기간', value: formatTournamentDateRangeShort(nextRound.startsOn, nextRound.endsOn) ?? '' },
+      ...(nextRound.registrationOpen && nextRound.registrationDeadlineAt !== null
+        ? [{ label: '신청 마감', value: formatTournamentDateTimeLong(nextRound.registrationDeadlineAt) }]
+        : []),
+    ];
     return (
       <section className="mt-3" aria-labelledby={headingId}>
         <Card pad={16} className="flex flex-col gap-2">
@@ -101,11 +113,41 @@ export function LeagueJoinGuideCard({
             <h3 id={headingId} className="tm-text-card-title text-[var(--text-strong)]">신청이 마감됐어요</h3>
           </div>
           <p className="tm-text-label text-[var(--text-muted)]">
-            {formatTournamentDateTimeLong(registrationDeadlineAt)}에 마감됐어요. 이미 신청한 팀은 확정 결과를 기다려 주세요.
+            {closedNote === null ? null : (
+              <>
+                {closedNote}
+                <br />
+              </>
+            )}
+            다음 회차에 신청해 주세요.
           </p>
-          <Link href="/tournaments?kind=league" className="tm-btn tm-btn-md tm-btn-neutral" style={{ minHeight: 44 }}>
-            다른 리그 둘러보기
-          </Link>
+          {nextRows.length > 0 ? (
+            <div>
+              {nextRows.map((row, index) => (
+                <InfoRow key={row.label} label={row.label} value={row.value} isLast={index === nextRows.length - 1} />
+              ))}
+            </div>
+          ) : null}
+          <p className="tm-text-caption text-[var(--text-muted)]">
+            {nextRound === null
+              ? '다음 회차 일정이 정해지면 여기서 알려 드릴게요.'
+              : nextRound.registrationOpen
+                ? '다음 회차 신청을 받고 있어요.'
+                : '다음 회차 신청이 열리면 여기서 바로 신청할 수 있어요.'}
+          </p>
+          {nextRound?.registrationOpen ? (
+            <Link
+              href={`/tournaments/${nextRound.leagueId}/apply`}
+              className="tm-btn tm-btn-md tm-btn-primary tm-btn-block"
+              style={{ minHeight: 44 }}
+            >
+              다음 회차로 신청하기
+            </Link>
+          ) : (
+            <Link href="/tournaments?kind=league" className="tm-btn tm-btn-md tm-btn-neutral" style={{ minHeight: 44 }}>
+              다른 리그 둘러보기
+            </Link>
+          )}
         </Card>
       </section>
     );

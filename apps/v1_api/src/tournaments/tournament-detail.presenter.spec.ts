@@ -898,6 +898,7 @@ describe('presentTournamentDetail — kind(종류)와 format(방식)은 독립�
           awayScore: null,
           isForfeit: false,
           scoreHidden: false,
+          resultVoided: false,
           gameState: null,
         },
       ],

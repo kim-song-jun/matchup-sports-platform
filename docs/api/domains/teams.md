@@ -341,3 +341,9 @@ CAUTION:
 The `recruiting_only` signal shared by team detail `canSendContact` and contact creation requires `hostTeamId=<recipient>`, `status=recruiting`, `deletedAt=null`, `leagueId=null`, and `tournamentId=null`. Deleted listings or competition fixtures do not open a team's contact inbox. The generic rejection still does not distinguish block/policy/not-recruiting causes.
 
 Live-game dissolution blockers choose league fixture detail first (`/league-matches/:leagueId/fixtures/:teamMatchId`), then tournament detail (`/tournaments/:tournamentId/matches/:teamMatchId`), then friendly detail. This is necessary because regular league fixtures also carry `tournamentId`. Blocker rules and dissolution mutation behavior are unchanged.
+
+경기별 골키퍼 지정은 팀 경기 명단 일괄 API의 `SET_GOALKEEPER` op를 사용한다. 복수 지정, 출전 조정과 동시 저장,
+사이드 팀 인가·시작 마감·이관 대기 거절 및 응답 필드의 계약은 [Games 도메인](games.md#경기-명단-gk-지정-task-20261082)을 따른다.
+
+### 대회 공통 GK 관리 (Task 20261083)
+`SET_GOALKEEPER`는 선택 경기의 참가 등록에 골키퍼 값을 저장해 같은 대회·팀의 시작 전 모든 경기와 이후 생성 경기에서 유지한다. 인원 제한 없이 지정·해제하며 출전 조정과 독립이다. 응답 `affectedGames`는 전파된 명단의 캐시 갱신 범위다. 시작된 기록은 당시 GK를 유지한다. 어드민 경기별 명단 표에서도 같은 쓰기 권한으로 관리한다.

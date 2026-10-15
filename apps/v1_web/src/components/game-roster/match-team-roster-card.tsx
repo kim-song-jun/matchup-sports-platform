@@ -1,13 +1,17 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
-import { AlertBanner, Card } from '@/components/v1-ui/primitives';
+import { type ReactNode } from 'react';
+import Link from 'next/link';
+import { Card } from '@/components/v1-ui/primitives';
 import { Button } from '@/components/v1-ui/button';
 import { useV1TeamGameRoster, type V1GameRosterView } from '@/hooks/use-v1-game-roster';
 import { V1ApiError } from '@/lib/api-client';
 import { gameRosterErrorMessage } from '@/lib/game-roster-errors';
 import { gameRosterReasonLabel } from '@/lib/v1-status-labels';
-import { GameRosterQuickSheet } from './game-roster-quick-sheet';
+import { gameRosterScreenPath } from '@/lib/game-roster-routes';
+import { withFromPath } from '@/lib/session-storage';
+import { useCurrentHref } from '@/components/v1-ui/use-current-href';
+import { GAME_ROSTER_TITLE } from '@/lib/roster-presentation';
 import { RegistrationRosterEntry } from './registration-roster-entry';
 import type { MyMatchRosterTeam } from './use-my-match-roster-team';
 
@@ -38,7 +42,7 @@ export function MatchTeamRosterCard({
     return (
       <Card pad={16}>
         <h2 className="tm-text-body-lg" style={{ fontWeight: 700, margin: 0 }}>
-          우리 팀 출전
+          {GAME_ROSTER_TITLE}
         </h2>
         <p className="tm-text-caption" style={{ margin: '4px 0 0' }}>
           {gameRosterErrorMessage(team.error, '우리 팀 경기 정보를 불러오지 못했어요.')}
@@ -61,15 +65,14 @@ function ResolvedRosterCard({
   footer?: Parameters<typeof MatchTeamRosterCard>[0]['footer'];
 }) {
   const roster = useV1TeamGameRoster(teamId, gameId);
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
+  const currentHref = useCurrentHref();
 
   if (roster.isError) {
     if (isExpectedAbsence(roster.error)) return null;
     return (
       <Card pad={16}>
         <h2 className="tm-text-body-lg" style={{ fontWeight: 700, margin: 0 }}>
-          우리 팀 출전
+          {GAME_ROSTER_TITLE}
         </h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
           <p className="tm-text-caption" style={{ margin: 0 }}>
@@ -93,7 +96,7 @@ function ResolvedRosterCard({
     <Card pad={16}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <h2 className="tm-text-body-lg" style={{ fontWeight: 700, margin: 0 }}>
-          우리 팀 출전
+          {GAME_ROSTER_TITLE}
         </h2>
         <span className="tm-badge tm-badge-sm tm-badge-green">{data.counts.participating}명</span>
       </div>
@@ -123,52 +126,27 @@ function ResolvedRosterCard({
           예전에 저장한 참석명단이 아직 경기 기록에 쓰이고 있어요.
         </p>
       ) : null}
-      {notice !== null ? (
-        <div style={{ marginTop: 8 }}>
-          <AlertBanner tone="info" message={notice} />
-        </div>
-      ) : null}
-      <RosterFooter
-        view={data}
-        onAdjust={() => {
-          setNotice(null);
-          setSheetOpen(true);
-        }}
-      />
+      <RosterFooter view={data} href={withFromPath(gameRosterScreenPath(teamId, gameId), currentHref)} />
       <RegistrationRosterEntry view={data} variant="inline" />
       {footer?.({ view: data, viewerRow: data.base.find((row) => row.userId === viewerUserId) })}
-      {/* 시트는 늘 마운트해 둔다 — 저장 중 마감(409)으로 editable 이 꺼져도 시트가 그 안내를 보여 줘야 한다. */}
-      <GameRosterQuickSheet
-        open={sheetOpen}
-        teamId={teamId}
-        roster={data}
-        onClose={() => setSheetOpen(false)}
-        onSaved={(count) => {
-          setSheetOpen(false);
-          setNotice(`${count}명을 이번 경기에서 뺐어요.`);
-        }}
-        onStale={() => void roster.refetch()}
-      />
     </Card>
   );
 }
 
-function RosterFooter({ view, onAdjust }: { view: V1GameRosterView; onAdjust: () => void }) {
+function RosterFooter({ view, href }: { view: V1GameRosterView; href: string }) {
   if (view.editable) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 8 }}>
         <span className="tm-text-caption">경기 시작 전까지 바꿀 수 있어요</span>
-        <Button variant="outline" size="sm" onClick={onAdjust}>
-          명단 조정
-        </Button>
+        <Link className="tm-btn tm-btn-sm tm-btn-outline" href={href}>이번 경기 출전 관리</Link>
       </div>
     );
   }
-  if (view.gameState === 'SCHEDULED') return null;
   return (
-    <p className="tm-text-caption" style={{ margin: '4px 0 0' }}>
-      경기가 시작돼 명단을 바꿀 수 없어요.
-    </p>
+    <div style={{ marginTop: 8 }}>
+      {view.gameState !== 'SCHEDULED' ? <p className="tm-text-caption">경기가 시작돼 명단을 바꿀 수 없어요.</p> : null}
+      <Link className="tm-btn tm-btn-sm tm-btn-outline" href={href}>경기 출전 보기</Link>
+    </div>
   );
 }
 

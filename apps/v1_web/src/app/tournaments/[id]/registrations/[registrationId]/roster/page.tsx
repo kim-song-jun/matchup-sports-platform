@@ -1,5 +1,5 @@
 import { RequireAuth } from '@/components/auth/require-auth';
-import { TournamentRosterPageClient } from './tournament-roster-client';
+import { CompetitionRosterManager } from '@/components/game-roster/competition-roster-manager';
 
 export default async function TournamentRosterPage({
   params,
@@ -9,7 +9,7 @@ export default async function TournamentRosterPage({
   const { id, registrationId } = await params;
   return (
     <RequireAuth>
-      <TournamentRosterPageClient tournamentId={id} registrationId={registrationId} />
+      <CompetitionRosterManager competitionId={id} registrationId={registrationId} />
     </RequireAuth>
   );
 }

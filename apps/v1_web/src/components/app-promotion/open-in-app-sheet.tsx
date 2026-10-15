@@ -78,7 +78,7 @@ export function OpenInAppSheet() {
   if (!mounted || !storeUrl) return null;
 
   return (
-    <BottomSheet open={open} onClose={dismiss} ariaLabel="팀밋 앱으로 열기" initialFocus="sheet">
+    <BottomSheet open={open} onClose={dismiss} ariaLabel="팀밋 앱으로 열기" initialFocus="sheet" excludeFromSnippet>
       <div className="tm-filter-sheet-handle" aria-hidden="true" />
       <div className="tm-filter-sheet-head">
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>

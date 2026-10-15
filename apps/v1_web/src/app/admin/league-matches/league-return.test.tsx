@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { installActualNextReplaceBoundary, type NextRestoreAction } from '@/test/helpers/next-history-boundary';
 import type { V1AdminLeagueListItem } from '@/types/league-match';
 import AdminLeagueHubPage from './page';
-import AdminLeagueMatchDetailPage from './[leagueId]/page';
+import { LeagueAdminShell } from './[leagueId]/league-admin-shell';
 
 const LIST_PATH = '/admin/league-matches';
 const SERIES_ID = 'ad200000-0000-4000-8000-000000000001';
@@ -44,12 +44,6 @@ vi.mock('next/link', () => ({
     }}>{children}</a>
   ),
 }));
-// 상세의 기본 보기는 일정 보드다 — 이 스펙은 목록 복귀만 보므로 보드 훅은 비워 둔다.
-vi.mock('@/hooks/use-v1-bracket-canvas', () => ({
-  useV1ApplyLeagueTemplate: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useV1AssignTournamentSlot: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useV1RandomFillSlots: () => ({ mutateAsync: vi.fn(), isPending: false }),
-}));
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminLeagueMatchList: (seriesId?: string) => ({
     data: { items: LEAGUES.filter((league) => !seriesId || (
@@ -74,44 +68,15 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1UpdateLeagueVisibility: () => ({
     mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false, isError: false, isSuccess: false, error: null,
   }),
-  useV1AdminLeagueTeams: () => ({ data: undefined }),
-  useV1AdminTeam: () => ({ data: undefined }),
-  useV1Teams: () => ({ data: undefined, isFetching: false }),
-  useV1AddLeagueTeam: () => ({ isPending: false }),
-  useV1RemoveLeagueTeam: () => ({ isPending: false }),
-  useV1RevertLeagueCompletion: () => ({ isPending: false }),
-  useV1CompleteLeague: () => ({ isPending: false }),
-  useV1HoldLeague: () => ({ mutate: vi.fn(), isPending: false }),
-  useV1ResumeLeague: () => ({ mutate: vi.fn(), isPending: false }),
-  useV1CloseLeagueRegistration: () => ({ mutate: vi.fn(), isPending: false }),
-  useV1UpdateLeagueCoverImage: () => ({ mutate: vi.fn(), isPending: false }),
-  useV1UpdateLeagueVenue: () => ({ mutate: vi.fn(), isPending: false }),
-  useV1PlaceSearch: () => ({ data: undefined, isFetching: false, isError: false, error: null }),
-  useV1PublicKakaoMapsKey: () => ({ data: { kakaoMapsJsKey: null }, isLoading: false }),
-  useV1UploadImages: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useV1GenerateLeagueFixtures: () => ({ isPending: false }),
-  useV1UpdateLeagueFixture: () => ({ isPending: false }),
-  useV1CancelLeagueFixture: () => ({ isPending: false }),
-  useV1DeleteLeagueFixture: () => ({ isPending: false }),
-  useV1RegenerateLeagueFixtures: () => ({ isPending: false }),
-  useV1CreateManualLeagueFixture: () => ({ isPending: false }),
-  useV1RecordLeagueForfeit: () => ({ isPending: false }),
-  useV1PreviewLeagueFixtures: () => ({ isPending: false }),
-  useV1AdminTournamentRegistrations: () => ({ data: { items: [], truncated: false }, isError: false, error: null, refetch: vi.fn() }),
+  useV1ChangeLeagueState: () => ({ mutate: vi.fn(), isPending: false }),
+  useV1TournamentStaffAssignments: () => ({ data: { items: [] }, isPending: false, isError: false, error: null }),
 }));
 
-vi.mock('@/hooks/use-tournament-period-settings', () => ({
-  useTournamentPeriodSettings: () => ({ data: undefined, isPending: true, isError: false, isFetching: false, refetch: vi.fn() }),
-  useUpdateTournamentPeriodSettings: () => ({ mutate: vi.fn(), isPending: false, error: null }),
-}));
-
+// 리그 상세의 복귀 링크는 공통 셸이 그린다 — 섹션 화면은 비워 둔다.
 async function renderDetail() {
+  searchSnapshot = null;
   const leagueId = window.location.pathname.split('/').at(-1) ?? '';
-  const props = {
-    params: Promise.resolve({ leagueId }),
-    searchParams: Promise.resolve(Object.fromEntries(new URLSearchParams(window.location.search))),
-  };
-  return render(await AdminLeagueMatchDetailPage(props));
+  return render(<LeagueAdminShell leagueId={leagueId}><div /></LeagueAdminShell>);
 }
 
 describe('MD-QA #25 관리자 리그 목록 복귀', () => {
@@ -286,10 +251,10 @@ describe('MD-QA #25 관리자 리그 목록 복귀', () => {
   });
 
   it('중복 from 값은 선택하지 않고 기본 목록으로 돌아간다', async () => {
-    render(await AdminLeagueMatchDetailPage({
-      params: Promise.resolve({ leagueId: 'ad210000-0000-4000-8000-000000000001' }),
-      searchParams: Promise.resolve({ from: [`${LIST_PATH}?seriesId=${SERIES_ID}`, '//evil.example'] }),
-    }));
+    navigate(
+      `${LIST_PATH}/ad210000-0000-4000-8000-000000000001?from=${encodeURIComponent(`${LIST_PATH}?seriesId=${SERIES_ID}`)}&from=${encodeURIComponent('//evil.example')}`,
+    );
+    await renderDetail();
     expect(screen.getByRole('link', { name: '리그 목록으로' })).toHaveAttribute('href', LIST_PATH);
   });
 

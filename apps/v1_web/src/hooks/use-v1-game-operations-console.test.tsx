@@ -23,7 +23,7 @@ const mockSocket = {
     if (event === 'game.subscribe' && cb) {
       cb({
         status: 'subscribed',
-        snapshot: { version: 5, state: 'LIVE', lastSequence: 0, events: [] },
+        snapshot: { gameId: 'game-1', version: 5, state: 'LIVE', lastSequence: 0, events: [] },
       });
     } else if (event === 'game.takeover.request' && cb) {
       cb({

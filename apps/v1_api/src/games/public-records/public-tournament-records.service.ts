@@ -33,6 +33,7 @@ import { decodeRecordCursor, encodeRecordCursor } from './public-cursor';
 import { isParticipantPubliclyEligible, isRankedRecordHiddenByEligibility, loadParticipantConsentEligibility, type ParticipantConsentEligibility } from './public-consent';
 import { resolveLiveClock, resolvePeriodBreak, type PublicGameClock, type PublicPeriodBreak } from './public-clock';
 import { tallyLiveScore } from './public-live-score';
+import { selectLineupParticipantsWithDraftFallback } from '../core/latest-lineup-participants';
 import {
   resolvePublicScorePresentation,
   type PublicScoreValue,
@@ -229,7 +230,7 @@ function presentCanonicalSchedule(row: CanonicalScheduleRow): FixtureScheduleRow
     legNumber: row.legNumber,
     groupId: row.groupId,
     scheduledAt: row.teamMatch.startAt,
-    venue: row.teamMatch.placeName,
+    venue: toPlaceView(row.teamMatch)?.name ?? null,
     place: toPlaceView(row.teamMatch),
     status: canonicalFixtureStatus(row.teamMatch.status),
     homeRegistrationId: row.homeRegistrationId,
@@ -317,7 +318,7 @@ function presentCanonicalMatch(row: CanonicalMatchRow): FixtureMatchRow {
     legNumber: row.legNumber,
     groupId: row.groupId,
     scheduledAt: row.teamMatch.startAt,
-    venue: row.teamMatch.placeName,
+    venue: toPlaceView(row.teamMatch)?.name ?? null,
     place: toPlaceView(row.teamMatch),
     status: canonicalFixtureStatus(row.teamMatch.status),
     homeRegistrationId: row.homeRegistrationId,
@@ -1875,6 +1876,7 @@ export class PublicTournamentRecordsService {
         hostTeam: { select: { id: true, name: true } },
         approvedApplicantTeam: { select: { id: true, name: true } },
         videos: { select: { id: true, title: true, url: true }, orderBy: { sortOrder: 'asc' } },
+        field: { select: { name: true } },
         game: { select: GAME_MATCH_SELECT },
       },
     });
@@ -1942,6 +1944,7 @@ export class PublicTournamentRecordsService {
       consentMap,
       nameProfileByUserId,
       false,
+      true,
     );
     // finding #60: getMatch 와 동일한 창(종료~공식 확정 전)에 대한 트윈 게이트.
     const hidePendingOfficialEvents = status === 'ended' && !showOfficialResult;
@@ -1985,9 +1988,9 @@ export class PublicTournamentRecordsService {
       groupId: null,
       groupName: null,
       scheduledAt: teamMatch.startAt.toISOString(),
-      venue: teamMatch.placeName,
+      venue: toPlaceView(teamMatch)?.name ?? null,
       place: toPlaceView(teamMatch),
-      fieldName: null,
+      fieldName: teamMatch.field?.name ?? null,
       // 리그 대진은 등록(registration) 개념이 없다 — teamId 를 그대로 안정적 id 로 쓴다.
       home: { registrationId: teamMatch.hostTeam.id, teamId: teamMatch.hostTeam.id, teamName: teamMatch.hostTeam.name },
       away: teamMatch.approvedApplicantTeam
@@ -2217,6 +2220,7 @@ const LEAGUE_SCHEDULE_SELECT = {
   leagueId: true,
   startAt: true,
   ...PLACE_SELECT,
+  field: { select: { id: true, name: true } },
   status: true,
   hostTeamId: true,
   approvedApplicantTeamId: true,
@@ -2260,7 +2264,7 @@ function leagueWeekNumbers(siblingStartAts: readonly Date[], fixtures: readonly 
  *   로 단계를 가르고(null 이면 던진다), `groupName` 이 없으면 이 값이 **그룹 제목으로 보인다.**
  * - `groupName`/`groupId` <- null. 그래서 위 `round` 가 제목이 되어 **주차별로 묶인 일정**이
  *   된다 -- 리그에 자연스러운 구획이고, `getLeagueFixtureRecord` 가 이미 쓰는 규약이다.
- * - `legNumber` <- 1, `field` <- null(리그 대진에 필드 개념이 없다).
+ * - `legNumber` <- 1, `field` <- canonical TeamMatch field (리그·대회 공통 경기장).
  * - `homeRegistrationId` <- **teamId**. 리그엔 참가 등록이 없어 팀 id 를 안정 식별자로 쓴다 --
  *   `getLeagueFixtureRecord` 의 선례와 같다. 여기서 `registrationId` 는 소비처가 **행을
  *   식별하는 값** 으로만 쓰므로 이름과 내용이 갈리지 않는다(통합 순위 행은 그 값을 나중에
@@ -2283,7 +2287,7 @@ function toLeagueScheduleRow(
     legNumber: 1,
     groupId: null,
     scheduledAt: fixture.startAt,
-    venue: fixture.placeName,
+    venue: toPlaceView(fixture)?.name ?? null,
     place: toPlaceView(fixture),
     status: LEAGUE_STATUS_TO_FIXTURE_STATUS[fixture.status],
     homeRegistrationId: fixture.hostTeamId,
@@ -2291,7 +2295,7 @@ function toLeagueScheduleRow(
     homeRegistration: { team: fixture.hostTeam },
     awayRegistration: fixture.approvedApplicantTeam === null ? null : { team: fixture.approvedApplicantTeam },
     group: null,
-    field: null,
+    field: fixture.field,
     homeSlot: null,
     awaySlot: null,
     videos: fixture.videos,
@@ -2510,6 +2514,7 @@ function buildLineup(
   consentMap: Map<string, ParticipantConsentEligibility>,
   nameProfileByUserId: ReadonlyMap<string, ParticipantNameProfileRow>,
   isStaffBypass: boolean,
+  allowAutomaticRoster = false,
 ) {
   if (fixture.game === null) return null;
   if (mode === 'status_only') return null;
@@ -2548,9 +2553,17 @@ function buildLineup(
     }
   }
 
+  const automaticRoster = allowAutomaticRoster
+    ? new Set(selectLineupParticipantsWithDraftFallback(
+        fixture.game.participants,
+        fixture.game.lineups.filter((lineup) => lineup.invalidatedAt === null),
+      ).map((participant) => participant.id))
+    : null;
   const bySide = new Map<string, ParticipantRow[]>();
   for (const participant of fixture.game.participants) {
-    if (latestLineupBySide.get(participant.sideId)?.id !== participant.lineupId) continue;
+    if (automaticRoster !== null
+      ? !automaticRoster.has(participant.id)
+      : latestLineupBySide.get(participant.sideId)?.id !== participant.lineupId) continue;
     const list = bySide.get(participant.sideId) ?? [];
     list.push(participant);
     bySide.set(participant.sideId, list);

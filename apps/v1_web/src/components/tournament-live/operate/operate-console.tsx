@@ -35,7 +35,7 @@ import {
   isClockSuspicious,
   type FrozenEventCapture,
 } from '@/lib/game-operations-clock';
-import { extractErrorMessage } from '@/lib/error-message';
+import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
 import { randomUuid } from '@/lib/uuid';
 import { isV1NetworkError, V1ApiError } from '@/lib/api-client';
 import { ActionTargetPicker, type EventCaptureCommitInput } from './action-target-picker';
@@ -1215,7 +1215,9 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center gap-2 px-4 text-center">
         <p className="text-sm font-medium text-[var(--text-body)]">
-          {extractErrorMessage(fixtureLineup.error, '경기 정보를 불러오지 못했어요.')}
+          {extractErrorCode(fixtureLineup.error) === 'STAFF_SCOPE_DENIED'
+            ? gameOperationsErrorMessage('STAFF_SCOPE_DENIED')
+            : extractErrorMessage(fixtureLineup.error, '경기 정보를 불러오지 못했어요.')}
         </p>
         <Button size="md" variant="outline" onClick={() => fixtureLineup.refetch()}>
           다시 시도
@@ -1347,7 +1349,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           hidden on desktop, so the console can return to the viewport top at lg. */}
       <header
         className={[
-          'sticky z-10 border-b border-[var(--border)] bg-white/95 px-4 py-3 sm:backdrop-blur-sm dark:bg-gray-900/95',
+          'sticky z-10 border-b border-[var(--border)] bg-[var(--card-surface)] px-4 py-3',
           tournamentOpsRole === 'FIELD_OPERATOR' ? 'top-[52px]' : 'top-[52px] lg:top-0',
         ].join(' ')}
       >

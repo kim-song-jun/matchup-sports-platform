@@ -1769,8 +1769,8 @@ export const v1MswHandlers = [
   http.post(`${api}/team-matches/:teamMatchId/lineup/late-additions`, () => HttpResponse.json({
     code: 'LINEUP_NOT_LOCKED', message: '아직 경기 기록 전이라 참석명단에서 바로 넣을 수 있어요.',
   }, { status: 409 })),
-  http.put(`${api}/team-matches/:teamMatchId/lineup`, async ({ request }) => {
-    const body: V1TeamMatchLineupSavePayload = await request.json();
+  http.put<{ teamMatchId: string }, V1TeamMatchLineupSavePayload>(`${api}/team-matches/:teamMatchId/lineup`, async ({ request }) => {
+    const body = await request.json();
     const versionFailure = friendlyLineupVersionFailure(body.expectedVersion);
     if (versionFailure) return versionFailure;
     const previousLineupId = v1TeamMatchLineupFixture.lineupId;
@@ -1827,8 +1827,8 @@ export const v1MswHandlers = [
       replayed: false,
     });
   }),
-  http.post(`${api}/team-matches/:teamMatchId/lineup/submit`, async ({ request }) => {
-    const body: { expectedVersion: number } = await request.json();
+  http.post<{ teamMatchId: string }, { expectedVersion: number }>(`${api}/team-matches/:teamMatchId/lineup/submit`, async ({ request }) => {
+    const body = await request.json();
     const versionFailure = friendlyLineupVersionFailure(body.expectedVersion);
     if (versionFailure) return versionFailure;
     // 서버와 같다(Task 180 R-2): 이미 낸 명단을 다시 내면 아무것도 바꾸지 않고 지금 상태로 성공한다.

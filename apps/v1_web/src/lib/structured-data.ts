@@ -268,12 +268,11 @@ export function buildMatchEventLd(match: V1Match, id: string): JsonLdNode | null
 export function buildTeamMatchEventLd(
   teamMatch: V1TeamMatch,
   id: string,
-  // 리그 대진은 `/league-matches/:leagueId/fixtures/:id` 가 canonical 이라 경로와 상위 리그를 받는다.
-  options: { readonly path?: string; readonly superEventPath?: string } = {},
+  // 리그 대진은 `/league-matches/:leagueId/fixtures/:id` 가 canonical 이라 경로를 받을 수 있다.
+  options: { readonly path?: string } = {},
 ): JsonLdNode | null {
   const node = buildMatchEventBase(teamMatch, options.path ?? `/team-matches/${id}`);
   if (!node) return null;
-  if (options.superEventPath) node.superEvent = { '@id': `${absoluteSiteUrl(options.superEventPath)}#event` };
   const host = teamReference(teamMatch.hostTeam?.teamId ?? teamMatch.hostTeamId, teamMatch.hostTeam?.name ?? teamMatch.hostTeamName);
   if (host) node.homeTeam = host;
   if (teamMatch.platformManaged) node.organizer = { '@id': organizationId() };

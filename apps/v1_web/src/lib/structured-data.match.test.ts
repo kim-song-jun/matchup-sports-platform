@@ -122,6 +122,7 @@ describe('buildTeamMatchEventLd', () => {
       homeTeam: { '@type': 'SportsTeam', name: '송파 FC' },
       awayTeam: { '@type': 'SportsTeam', name: '강동 유나이티드' },
     });
+    expect(ld).not.toHaveProperty('superEvent');
   });
 
   it('팀 참조의 @id 가 팀 상세의 SportsTeam @id 와 같다 — 같은 팀이 두 엔티티로 쪼개지지 않는다', () => {

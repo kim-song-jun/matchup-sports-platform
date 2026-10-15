@@ -2,7 +2,7 @@ import type { MetadataRoute } from 'next';
 import { absoluteSiteUrl, fetchPublicV1 } from '@/lib/seo';
 import { PUBLIC_SITE_ROUTES } from '@/lib/public-site/routes';
 import { fixtureDetailHref } from '@/lib/fixture-detail-route';
-import { collectPublicMatchInventory, collectPublicTournamentFixtures, fetchPublicPages } from '@/lib/public-competition-discovery';
+import { collectPublicMatchInventory, collectPublicTournamentDetails, publicTournamentFixtures, fetchPublicPages } from '@/lib/public-competition-discovery';
 import type {
   V1Match,
   V1Notice,
@@ -31,6 +31,8 @@ const STATIC_ROUTES: Array<{ path: string; priority: number; changeFrequency: Me
   { path: '/teams', priority: 0.8, changeFrequency: 'daily' },
   { path: '/team-matches', priority: 0.8, changeFrequency: 'hourly' },
   { path: '/tournaments', priority: 0.9, changeFrequency: 'daily' },
+  { path: '/tournaments?kind=tournament', priority: 0.8, changeFrequency: 'daily' },
+  { path: '/tournaments?kind=league', priority: 0.8, changeFrequency: 'daily' },
   // League list/detail aliases redirect; only canonical destinations are indexed.
   { path: '/events', priority: 0.8, changeFrequency: 'daily' },
   { path: '/notices', priority: 0.5, changeFrequency: 'daily' },
@@ -51,7 +53,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     collectPublicMatchInventory<V1Match>('/matches').then((result) => result.items ?? []),
     fetchPublicPages<V1Team>('/teams'),
     collectPublicMatchInventory<V1TeamMatch>('/team-matches').then((result) => result.items ?? []),
-    fetchPublicPages<V1TournamentListItem>('/tournaments', { cache: 'no-store' }),
+    fetchPublicPages<V1TournamentListItem>('/tournaments', { cache: 'no-store', query: { kind: 'all' } }),
     fetchNoticeItems(),
     fetchLeagueItems(),
   ]);
@@ -61,9 +63,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const tournaments = settledItems<V1TournamentListItem>(results[3]);
   const notices = settledItems<V1Notice>(results[4]);
   const leagues = settledItems<V1PublicLeagueListItem>(results[5]);
-  const tournamentFixtures = (await collectPublicTournamentFixtures(tournaments)).items ?? [];
+  const tournamentDetails = (await collectPublicTournamentDetails(tournaments)).items ?? [];
+  const tournamentFixtures = publicTournamentFixtures(tournamentDetails);
+  const reviewedTournamentIds = new Set(tournamentDetails
+    .filter(({ detail }) => detail.reviewsTotalCount > 0).map(({ item }) => item.id));
 
-  return [
+  const entries: MetadataRoute.Sitemap = [
     ...staticEntries,
     ...publicSiteEntries,
     ...matches.flatMap((item) => {
@@ -79,16 +84,23 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         : `/team-matches/${encodeURIComponent(id)}`;
       return [sitemapEntry(path, 0.7, 'daily')];
     }),
-    ...tournaments.flatMap((item) => [
-      sitemapEntry(`/tournaments/${item.id}`, 0.8, 'daily', item.updatedAt),
-      sitemapEntry(`/tournaments/${item.id}/bracket`, 0.6, 'daily', item.updatedAt),
-      sitemapEntry(`/tournaments/${item.id}/results`, 0.6, 'daily', item.updatedAt),
-      sitemapEntry(`/tournaments/${item.id}/awards`, 0.5, 'weekly', item.updatedAt),
-      sitemapEntry(`/tournaments/${item.id}/reviews`, 0.5, 'weekly', item.updatedAt),
-      ...(item.campaignSlug
-        ? [sitemapEntry(`/tournaments/campaigns/${item.campaignSlug}`, 0.9, 'daily', item.updatedAt)]
-        : []),
-    ]),
+    ...tournaments.flatMap((item) => {
+      const root = sitemapEntry(`/tournaments/${item.id}`, 0.8, 'daily', item.updatedAt);
+      const reviews = reviewedTournamentIds.has(item.id)
+        ? [sitemapEntry(`/tournaments/${item.id}/reviews`, 0.5, 'weekly', item.updatedAt)] : [];
+      // 리그의 대진·결과는 통합 상세/전용 경기 주소에 있다. 대회용 하위 경로를 만들지 않는다.
+      if (item.kind === 'regular_league') return [root, ...reviews];
+      return [
+        root,
+        sitemapEntry(`/tournaments/${item.id}/bracket`, 0.6, 'daily', item.updatedAt),
+        sitemapEntry(`/tournaments/${item.id}/results`, 0.6, 'daily', item.updatedAt),
+        sitemapEntry(`/tournaments/${item.id}/awards`, 0.5, 'weekly', item.updatedAt),
+        ...reviews,
+        ...(item.campaignSlug
+          ? [sitemapEntry(`/tournaments/campaigns/${item.campaignSlug}`, 0.9, 'daily', item.updatedAt)]
+          : []),
+      ];
+    }),
     ...notices.flatMap((item) => {
       const id = item.id ?? item.noticeId;
       return id ? [sitemapEntry(`/notices/${id}`, 0.4, 'monthly', item.publishedAt)] : [];
@@ -103,6 +115,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       isRegularLeague: false, competitionId: item.tournamentId, fixtureId: item.fixture.id,
     }), 0.6, 'daily')),
   ];
+  // 통합 대회 목록과 리그 목록이 같은 공개 리그를 반환할 수 있다. 최종 주소는 한 번만 싣는다.
+  const seen = new Set<string>();
+  return entries.filter((entry) => {
+    if (seen.has(entry.url)) return false;
+    seen.add(entry.url);
+    return true;
+  });
 }
 
 function settledItems<T>(result: PromiseSettledResult<T[]>): T[] {
@@ -116,8 +135,7 @@ async function fetchNoticeItems(): Promise<V1Notice[]> {
   return page?.notices ?? [];
 }
 
-// fetchTournamentItems와 같은 이유로 fetchCursorItems<T>() 제네릭 대신 전용 함수를 쓴다 —
-// V1PublicLeagueListResponse는 top-level nextCursor가 없고 pageInfo가 필수 필드다.
+// 리그 공개 여부는 매번 확인한다. V1PublicLeagueListResponse의 pageInfo 커서를 따른다.
 async function fetchLeagueItems(): Promise<V1PublicLeagueListItem[]> {
   const items: V1PublicLeagueListItem[] = [];
   let cursor: string | null = null;

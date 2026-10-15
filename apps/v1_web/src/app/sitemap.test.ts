@@ -11,6 +11,37 @@ vi.mock('@/lib/seo', async (importOriginal) => ({
 const { default: sitemap } = await import('./sitemap');
 
 describe('sitemap', () => {
+  it('기존 대회 유형별 대표 주소는 싣고, 빈 후기와 통합 전 리그 중복은 싣지 않는다', async () => {
+    vi.mocked(fetchPublicV1).mockImplementation(async (path) => {
+      if (path.startsWith('/tournaments?')) return {
+        // 실제 API는 kind가 없으면 정규 대회만 반환한다.
+        items: [{ id: 'cup' }, { id: 'empty' }, ...(new URL(path, 'https://api.test').searchParams.get('kind') === 'all'
+          ? [{ id: 'league', kind: 'regular_league' }] : [])],
+        pageInfo: { hasNext: false, nextCursor: null },
+      };
+      if (path.startsWith('/league-matches?')) return {
+        items: [{ leagueId: 'league' }], pageInfo: { hasNext: false, nextCursor: null },
+      };
+      if (path === '/tournaments/cup') return { fixtures: [], reviewsTotalCount: 2 };
+      if (path === '/tournaments/empty') return { fixtures: [], reviewsTotalCount: 0 };
+      if (path === '/tournaments/league') return { fixtures: [], reviewsTotalCount: 1 };
+      return null;
+    });
+    const urls = (await sitemap()).map((entry) => entry.url);
+    expect(urls).toContain('https://teameet.co.kr/tournaments?kind=tournament');
+    expect(urls).toContain('https://teameet.co.kr/tournaments?kind=league');
+    expect(urls).toContain('https://teameet.co.kr/tournaments/cup/reviews');
+    expect(urls).not.toContain('https://teameet.co.kr/tournaments/empty/reviews');
+    expect(urls).toContain('https://teameet.co.kr/tournaments/league/reviews');
+    for (const subroute of ['bracket', 'results', 'awards']) {
+      expect(urls).not.toContain(`https://teameet.co.kr/tournaments/league/${subroute}`);
+    }
+    expect(urls.filter((url) => url === 'https://teameet.co.kr/tournaments/league')).toHaveLength(1);
+    for (const id of ['cup', 'empty', 'league']) {
+      const reads = vi.mocked(fetchPublicV1).mock.calls.filter(([path]) => path === `/tournaments/${id}`);
+      expect(reads, `${id} 상세를 대진·후기 확인에 중복 조회하면 안 된다`).toHaveLength(1);
+    }
+  });
   it('indexes canonical league detail without historical aliases', async () => {
     vi.mocked(fetchPublicV1).mockImplementation(async (path) => path.startsWith('/league-matches?') ? { items: [{ leagueId: 'league-1' }], pageInfo: { hasNext: false, nextCursor: null } } : null);
     const urls = (await sitemap()).map(entry => entry.url);

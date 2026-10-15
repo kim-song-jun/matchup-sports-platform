@@ -1,5 +1,7 @@
 'use client';
 
+import { tournamentListTitle } from './tournament-list-copy';
+
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -304,7 +306,7 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
 
   return (
     <div className="tm-tournament-list">
-      <h1 className="sr-only">스포츠 대회</h1>
+      <h1 className="sr-only">{tournamentListTitle(activeKind)}</h1>
 
       {/* ── 홍보 카드뉴스 캐러셀 — 관리자가 리스트 홍보를 켠 open 대회를 우선순위 순으로 노출 ── */}
       <TournamentPromoCarousel

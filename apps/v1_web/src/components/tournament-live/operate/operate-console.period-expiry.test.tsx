@@ -1,14 +1,17 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { transferableAbortController } from 'node:util';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TournamentOpsRoleProvider } from '@/components/tournament-ops/role-context';
 import { saveStoredV1Session } from '@/lib/session-storage';
+import { v1Keys } from '@/lib/query-keys';
+import { __resetOverlayHistoryForTests, waitForOverlayHistory } from '@/lib/overlay-history';
+import { __resetNavigationHistoryForTests } from '@/lib/navigation-history';
 import type { GameDetail } from '@/types/game-operations';
 import { OperateConsole } from './operate-console';
+import { createFixture } from './operate-console.period-expiry.fixtures';
 
-const API = 'http://localhost/api/v1';
 const NOW = new Date('2026-10-16T00:01:00.000Z');
 const server = setupServer();
 let fixture: ReturnType<typeof createFixture>;
@@ -21,108 +24,148 @@ vi.mock('@/lib/v1-game-operations-socket', () => ({
   setGameOperationsAuthorizationSubjectVersion: () => {},
 }));
 
-function createFixture() {
-  let game: GameDetail = {
-    id: 'game-expiry', sourceType: 'TOURNAMENT_FIXTURE', state: 'LIVE', version: 5, lastSequence: 0,
-    competitionConfigVersionId: 'config-expiry', currentOfficialRevisionId: null, actorRole: 'tournament_director',
-    sides: [
-      { id: 'home', gameId: 'game-expiry', sideKey: 'HOME', teamId: 'team-home', displayNameSnapshot: '홈 팀', createdAt: '', updatedAt: '' },
-      { id: 'away', gameId: 'game-expiry', sideKey: 'AWAY', teamId: 'team-away', displayNameSnapshot: '원정 팀', createdAt: '', updatedAt: '' },
-    ],
-    periods: [{ id: 'period-1', gameId: 'game-expiry', number: 1, state: 'LIVE', startedAt: '2026-10-16T00:00:00.000Z', endedAt: null, pausedAt: null, pausedTotalMs: 0 }],
-    periodDurations: [{ durationMinutes: 1, extraTime: false }], lineups: [],
-    substitutionPolicy: { mode: 'rolling', maxSubstitutions: null }, isKnockoutFixture: false,
-  };
-  let reads = 0;
-  let readError = false;
-  let commandError = false;
-  const commands: { readonly command: string; readonly body: unknown }[] = [];
-  const handlers = new Map<string, (payload: unknown) => void>();
-  const socket = {
-    connected: true,
-    on(event: string, handler: (payload: unknown) => void) { handlers.set(event, handler); },
-    off(event: string) { handlers.delete(event); },
-    emit(event: string, payload: unknown, ack?: (result: unknown) => void) {
-      if (!ack) return;
-      if (event === 'game.subscribe') {
-        ack({ status: 'subscribed', snapshot: { gameId: game.id, state: game.state, version: game.version, lastSequence: 0, events: [] } });
-      } else if (event === 'game.time.ping') {
-        ack({ clientSentAt: Date.now(), serverReceivedAt: Date.now(), serverSentAt: Date.now() });
-      } else if (event === 'game.takeover.request' || event === 'game.takeover.renew') {
-        ack({ status: 'granted', gameId: game.id, takeoverToken: 'expiry-lease', expiresAt: new Date(Date.now() + 90_000).toISOString() });
-      } else {
-        throw new Error(`Unexpected socket request: ${event} ${JSON.stringify(payload)}`);
-      }
-    },
-  };
-  const success = (data: unknown) => HttpResponse.json({ status: 'success', data, timestamp: new Date().toISOString() });
-  const failure = (statusCode: number, message: string) => HttpResponse.json({ status: 'error', statusCode, code: 'EXPIRY_TEST_FAILURE', message }, { status: statusCode });
-  const endPeriod = () => {
-    game = { ...game, version: game.version + 1, periods: game.periods.map((period) => ({ ...period, state: 'ENDED', endedAt: new Date().toISOString() })) };
-  };
-  server.use(
-    http.get(`${API}/auth/me`, () => success({ user: { id: 'operator-expiry' } })),
-    http.get(`${API}/me/tournament-staff`, () => success({ platformRole: null, items: [] })),
-    http.get(`${API}/tournament-ops/tournaments/t-expiry/fixtures/f-expiry/lineup`, () => success({ gameId: game.id, lineups: [] })),
-    http.get(`${API}/games/game-expiry`, () => {
-      reads += 1;
-      return readError ? failure(400, '서버 종료 상태를 읽지 못했어요.') : success(game);
-    }),
-    http.post(`${API}/games/game-expiry/commands/:command`, async ({ params, request }) => {
-      const body: unknown = await request.json();
-      commands.push({ command: String(params.command), body });
-      if (request.headers.get('x-v1-user-id') !== 'operator-expiry' || typeof body !== 'object' || body === null || !('takeoverToken' in body) || body.takeoverToken !== 'expiry-lease' || !('clientCommandId' in body) || body.clientCommandId !== request.headers.get('Idempotency-Key')) return failure(403, '운영 권한이 없어요.');
-      if (!('expectedVersion' in body) || body.expectedVersion !== game.version) return failure(409, '경기 버전이 달라요.');
-      if (commandError) return failure(503, '종료 요청의 응답을 확인하지 못했어요.');
-      if (params.command === 'end-period') endPeriod();
-      return success({ gameId: game.id, state: game.state, version: game.version, durableCommandId: 'period-command', replayed: false });
-    }),
-    http.post(`${API}/logs/client-error`, () => success({ id: 'test-error' })),
-  );
-  return {
-    socket, commands, endPeriod,
-    get reads() { return reads; },
-    setReadError(value: boolean) { readError = value; },
-    setCommandError(value: boolean) { commandError = value; },
-    pause() { game = { ...game, state: 'PAUSED', periods: game.periods.map((period) => ({ ...period, pausedAt: '2026-10-16T00:00:50.000Z' })) }; },
-  };
+function consoleTree(fixtureId = 'f-expiry') {
+  return <QueryClientProvider client={queryClient}><TournamentOpsRoleProvider role="TOURNAMENT_DIRECTOR"><OperateConsole tournamentId="t-expiry" fixtureId={fixtureId} /></TournamentOpsRoleProvider></QueryClientProvider>;
 }
 
-async function openConsole() {
-  render(<QueryClientProvider client={queryClient}><TournamentOpsRoleProvider role="TOURNAMENT_DIRECTOR"><OperateConsole tournamentId="t-expiry" fixtureId="f-expiry" /></TournamentOpsRoleProvider></QueryClientProvider>);
-  await waitFor(() => expect(screen.getByRole('button', { name: '정규 시간 종료' })).toBeEnabled());
+async function openConsole(label = '정규 시간 종료') {
+  const view = render(consoleTree());
+  await waitFor(() => expect(screen.getByRole('button', { name: label })).toBeEnabled());
+  return view;
 }
 
 async function tick(milliseconds: number) {
   await act(async () => { await vi.advanceTimersByTimeAsync(milliseconds); });
 }
 
-async function requestManualEnd() {
-  fireEvent.click(screen.getByRole('button', { name: '정규 시간 종료' }));
-  const dialog = await screen.findByRole('dialog', { name: '정규 시간 종료할까요?' });
-  fireEvent.click(within(dialog).getByRole('button', { name: '정규 시간 종료' }));
+async function requestManualEnd(label = '정규 시간 종료', diagnostic?: () => unknown) {
+  const sentBefore = fixture.commands.length;
+  fireEvent.click(screen.getByRole('button', { name: label }));
+  const dialog = await screen.findByRole('dialog');
+  fireEvent.click(within(dialog).getByRole('button', { name: label }));
+  await waitForOverlayHistory();
+  await waitFor(() => expect(fixture.commands, JSON.stringify({ message: '확인 뒤 실제 HTTP 명령이 나가야 해요.', diagnostic: diagnostic?.() })).toHaveLength(sentBefore + 1), { timeout: 2_000 });
+}
+
+async function holdWorkerRead(beforeResponse?: () => void) {
+  await waitFor(() => expect(queryClient.isFetching()).toBe(0));
+  fixture.endPeriod();
+  const held = fixture.delayNextRead(beforeResponse);
+  await tick(5_000);
+  await held.started;
+  return held;
+}
+
+async function releaseRead(held: { readonly release: () => void; readonly responded: Promise<void> }) {
+  await act(async () => { held.release(); await held.responded; });
+  await waitFor(() => expect(queryClient.isFetching()).toBe(0));
 }
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterAll(() => server.close());
 beforeEach(() => {
+  // MSW uses Node Request; keep its real abort implementation in the same realm.
+  const nativeAbort = transferableAbortController();
+  vi.stubGlobal('AbortController', nativeAbort.constructor);
+  vi.stubGlobal('AbortSignal', nativeAbort.signal.constructor);
   vi.stubEnv('NEXT_PUBLIC_API_URL', 'http://localhost');
   vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
   vi.setSystemTime(NOW);
+  __resetOverlayHistoryForTests();
+  __resetNavigationHistoryForTests();
+  window.history.replaceState({}, '', '/');
   window.localStorage.clear();
   saveStoredV1Session({ userId: 'operator-expiry' });
-  fixture = createFixture();
+  fixture = createFixture(server);
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
 });
-afterEach(() => {
+afterEach(async () => {
   cleanup();
+  await waitForOverlayHistory();
+  __resetOverlayHistoryForTests();
+  __resetNavigationHistoryForTests();
   queryClient.clear();
   server.resetHandlers();
+  vi.restoreAllMocks();
   vi.useRealTimers();
   vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
 });
 
 describe('OperateConsole — 서버가 확정하는 기간 시간 만료', () => {
+  it.each(['after-push', 'with-response'] as const)('%s 지연된 v6 하프타임 조회가 더 최신 v7 후반 시작 뒤에 도착해도 시계를 되감거나 조회를 멈추지 않아요', async (timing) => {
+    fixture.halves();
+    await openConsole('전반 종료');
+    const held = await holdWorkerRead(timing === 'with-response' ? () => fixture.startNextPeriod() : undefined);
+    if (timing === 'after-push') act(() => fixture.startNextPeriod());
+    await releaseRead(held);
+    expect(screen.queryAllByText('하프타임', { selector: 'span' })).toHaveLength(0);
+    expect(screen.getByLabelText(/경과 시간/)).toBeInTheDocument();
+    await tick(5_000);
+    expect(await screen.findByLabelText('후반 경과 시간 00:05')).toBeInTheDocument();
+    expect(queryClient.getQueryData<GameDetail>(v1Keys.game('game-expiry'))?.version).toBe(7);
+    expect(fixture.commands).toEqual([]);
+  });
+
+  it.each(['pause', 'game-change', 'unmount'] as const)('%s 뒤의 지연된 만료 응답은 이전 경기 상세 캐시를 쓰거나 조회를 다시 시작하지 않아요', async (change) => {
+    fixture.halves();
+    const view = await openConsole('전반 종료');
+    const held = await holdWorkerRead();
+    if (change === 'pause') {
+      act(() => fixture.pauseAfterRevert());
+      await screen.findByRole('button', { name: '재개' });
+    } else if (change === 'game-change') {
+      view.rerender(consoleTree('f-other'));
+      await screen.findByRole('button', { name: '정규 시간 종료' });
+    } else {
+      view.unmount();
+    }
+    await releaseRead(held);
+    expect(queryClient.getQueryData<GameDetail>(v1Keys.game('game-expiry'))?.periods[0]?.state).toBe('LIVE');
+    expect(screen.queryAllByText('하프타임', { selector: 'span' })).toHaveLength(0);
+    if (change === 'pause') await waitFor(() => expect(queryClient.getQueryData<GameDetail>(v1Keys.game('game-expiry'))?.version).toBe(8));
+    const readsAfterRecovery = fixture.reads;
+    await tick(10_000);
+    expect(fixture.reads).toBe(readsAfterRecovery);
+    expect(fixture.commands).toEqual([]);
+  });
+
+  it('새 기간의 최신 상세 조회가 먼저 완료됐다면 이전 만료 응답이 그 기간을 덮지 않아요', async () => {
+    fixture.halves();
+    await openConsole('전반 종료');
+    const held = await holdWorkerRead();
+    act(() => fixture.startNextPeriod());
+    await act(async () => { await queryClient.refetchQueries({ queryKey: v1Keys.game('game-expiry'), exact: true }, { cancelRefetch: true }); });
+    expect(await screen.findByLabelText('후반 경과 시간 00:00')).toBeInTheDocument();
+    await releaseRead(held);
+    expect(screen.getByLabelText('후반 경과 시간 00:00')).toBeInTheDocument();
+    expect(screen.queryAllByText('하프타임', { selector: 'span' })).toHaveLength(0);
+    expect(queryClient.getQueryData<GameDetail>(v1Keys.game('game-expiry'))?.version).toBe(7);
+    expect(fixture.commands).toEqual([]);
+  });
+
+  it('기존 metadata 조회가 최신 만료 확인 뒤에 도착해도 과거 하프타임을 확정하거나 재확인을 멈추지 않아요', async () => {
+    fixture.halves();
+    await openConsole('전반 종료');
+    await waitFor(() => expect(queryClient.isFetching()).toBe(0));
+    fixture.endPeriod();
+    const held = fixture.delayNextRead();
+    const metadataRead = queryClient.refetchQueries({ queryKey: v1Keys.game('game-expiry'), exact: true });
+    await held.started;
+    act(() => fixture.startNextPeriod());
+    try {
+      await tick(5_000);
+      expect(await screen.findByLabelText('후반 경과 시간 00:05')).toBeInTheDocument();
+    } finally {
+      await releaseRead(held);
+      await act(async () => { await metadataRead; });
+    }
+    expect(screen.queryAllByText('하프타임', { selector: 'span' })).toHaveLength(0);
+    expect(await screen.findByLabelText('후반 경과 시간 00:05')).toBeInTheDocument();
+    expect(queryClient.getQueryData<GameDetail>(v1Keys.game('game-expiry'))?.version).toBe(7);
+    expect(fixture.commands).toEqual([]);
+  });
+
   it('만료 안내 중에도 기존 수동 기간 종료와 확인을 거쳐 서버 응답을 반영해요', async () => {
     await openConsole();
     expect(await screen.findByText(/설정된 시간이 끝났어요/)).toBeInTheDocument();
@@ -135,6 +178,12 @@ describe('OperateConsole — 서버가 확정하는 기간 시간 만료', () =>
   });
 
   it('worker가 마지막 기간을 끝내면 화면이 갱신되고 결과 제출은 운영자에게 남겨요', async () => {
+    const transportErrors: string[] = [];
+    const actualFetch = globalThis.fetch;
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      try { return await actualFetch(input, init); }
+      catch (error) { transportErrors.push(String(error)); throw error; }
+    });
     await openConsole();
     fixture.endPeriod();
     await tick(5_000);
@@ -146,16 +195,18 @@ describe('OperateConsole — 서버가 확정하는 기간 시간 만료', () =>
     const readsAfterEnd = fixture.reads;
     await tick(15_000);
     expect(fixture.reads).toBe(readsAfterEnd);
-    fireEvent.click(screen.getByRole('button', { name: '경기 종료' }));
-    const dialog = await screen.findByRole('dialog');
-    fireEvent.click(within(dialog).getByRole('button', { name: '경기 종료' }));
-    await waitFor(() => expect(fixture.commands).toHaveLength(1));
+    await requestManualEnd('경기 종료', () => ({
+      transportErrors,
+      requests: fetchSpy.mock.calls.map(([input, init]) => ({ input: String(input), method: init?.method })),
+      alerts: screen.queryAllByRole('alert').map((element) => element.textContent),
+      statuses: screen.queryAllByRole('status').map((element) => element.textContent),
+    }));
     expect(fixture.commands[0]?.body).toMatchObject({ expectedVersion: 6 });
   });
 
   it('열려 있는 일시정지 구간은 플레이 시간이나 만료 확인 요청을 늘리지 않아요', async () => {
     fixture.pause();
-    render(<QueryClientProvider client={queryClient}><TournamentOpsRoleProvider role="TOURNAMENT_DIRECTOR"><OperateConsole tournamentId="t-expiry" fixtureId="f-expiry" /></TournamentOpsRoleProvider></QueryClientProvider>);
+    render(consoleTree());
     expect(await screen.findByLabelText(/경과 시간 00:50/)).toBeInTheDocument();
     const initialReads = fixture.reads;
     await tick(15_000);

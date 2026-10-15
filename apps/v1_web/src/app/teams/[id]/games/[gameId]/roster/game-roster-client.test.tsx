@@ -61,11 +61,11 @@ describe('팀장 — 모아서 저장', () => {
   it('체크를 풀고 사유를 고르면 저장할 때 한 번의 일괄 요청으로 빠지고, 빠짐 섹션으로 옮겨진다', async () => {
     renderScreen();
     expect(await screen.findByRole('heading', { name: '출전 3명' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: `vs ${G1.opponentName}` })).toBeInTheDocument();
+    expect(screen.getByText(`vs ${G1.opponentName}`)).toBeInTheDocument();
     expect(screen.getByText('수정 가능')).toBeInTheDocument();
-    const save = screen.getByRole('button', { name: '저장' });
+    const save = screen.getByRole('button', { name: '변경사항 저장' });
     expect(save).toBeDisabled();
-    expect(within(section(/출전 3명/)).getByText(/^체크를 풀면 이번 경기에서 빠져요\./)).toBeInTheDocument();
+    expect(within(section(/출전 3명/)).getByText(/^체크된 선수가 출전해요\./)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('checkbox', { name: '박서준 이번 경기 출전' }));
     expect(screen.getByRole('heading', { name: '출전 2명' })).toBeInTheDocument();
@@ -74,13 +74,13 @@ describe('팀장 — 모아서 저장', () => {
     expect(within(chips).getByRole('button', { name: '부상' })).toHaveAttribute('aria-pressed', 'true');
     expect(batchBodies()).toHaveLength(0);
 
-    fireEvent.click(screen.getByRole('button', { name: '저장 (1건)' }));
+    fireEvent.click(screen.getByRole('button', { name: '변경사항 저장 (1건)' }));
 
     await screen.findByText('명단을 저장했어요.');
     expect(batchBodies()).toEqual([
       { changes: [{ gameId: G1.gameId, userId: 'player-2', op: 'EXCLUDE', reason: 'INJURY' }] },
     ]);
-    const excluded = await waitFor(() => section(/이번 경기 빠짐 1명/));
+    const excluded = await waitFor(() => section(/출전 2명/));
     expect(within(excluded).getByText('박서준')).toBeInTheDocument();
     expect(within(excluded).getByText('빠짐 · 부상')).toBeInTheDocument();
     expect(within(excluded).getByText('팀장 처리')).toBeInTheDocument();
@@ -91,10 +91,10 @@ describe('팀장 — 모아서 저장', () => {
     const box = await screen.findByRole('checkbox', { name: '김민재 이번 경기 출전' });
     fireEvent.click(box);
     fireEvent.click(box);
-    expect(screen.getByRole('button', { name: '저장' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '변경사항 저장' })).toBeDisabled();
 
     fireEvent.click(screen.getByRole('checkbox', { name: '김민재 이번 경기 출전' }));
-    fireEvent.click(screen.getByRole('button', { name: '저장 (1건)' }));
+    fireEvent.click(screen.getByRole('button', { name: '변경사항 저장 (1건)' }));
     await screen.findByText('명단을 저장했어요.');
     expect(batchBodies()).toEqual([{ changes: [{ gameId: G1.gameId, userId: 'player-1', op: 'EXCLUDE' }] }]);
   });
@@ -102,12 +102,12 @@ describe('팀장 — 모아서 저장', () => {
   it('빠진 선수를 되돌리면 REVOKE 로 저장되고 출전으로 돌아온다', async () => {
     mock.excludeAsTeamManager(G1.gameId, 'player-1', 'PERSONAL');
     renderScreen();
-    await screen.findByRole('heading', { name: '이번 경기 빠짐 1명' });
-    fireEvent.click(screen.getByRole('button', { name: '김민재 출전으로 되돌리기' }));
+    await screen.findByRole('heading', { name: '출전 2명' });
+    fireEvent.click(screen.getByRole('checkbox', { name: '김민재 이번 경기 출전' }));
     expect(screen.getByText(/저장하면 출전으로 돌아가요/)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '출전 3명' })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: '저장 (1건)' }));
+    fireEvent.click(screen.getByRole('button', { name: '변경사항 저장 (1건)' }));
     await screen.findByText('명단을 저장했어요.');
     expect(batchBodies()).toEqual([{ changes: [{ gameId: G1.gameId, userId: 'player-1', op: 'REVOKE' }] }]);
     await waitFor(() => expect(screen.queryByRole('heading', { name: /이번 경기 빠짐/ })).toBeNull());
@@ -143,7 +143,7 @@ describe('팀장 — 모아서 저장', () => {
     renderScreen();
     fireEvent.click(await screen.findByRole('checkbox', { name: '박서준 이번 경기 출전' }));
     mock.setGameState(G1.gameId, 'LIVE');
-    fireEvent.click(screen.getByRole('button', { name: '저장 (1건)' }));
+    fireEvent.click(screen.getByRole('button', { name: '변경사항 저장 (1건)' }));
 
     expect(await screen.findByText(/경기가 시작돼서 명단을 바꿀 수 없어요/)).toBeInTheDocument();
     await screen.findByText('경기 시작됨');
@@ -160,7 +160,7 @@ describe('열어 둔 사이 바뀐 서버 상태', () => {
     const rosterGets = () => mock.requests.filter((r) => r.method === 'GET' && r.path.endsWith('/roster')).length;
     const before = rosterGets();
 
-    fireEvent.click(screen.getByRole('button', { name: '저장 (1건)' }));
+    fireEvent.click(screen.getByRole('button', { name: '변경사항 저장 (1건)' }));
     expect(await screen.findByText('팀장·매니저만 경기 명단을 바꿀 수 있어요.')).toBeInTheDocument();
     await waitFor(() => expect(rosterGets()).toBe(before + 1));
     expect(await screen.findByText('보기 전용')).toBeInTheDocument();
@@ -260,7 +260,7 @@ describe('권한별 — 팀·경기 명단 한 번의 조회로 연다', () => {
     mock.setGameState(G1.gameId, 'LIVE');
     renderScreen();
     expect(await screen.findByText('경기 시작됨')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: `vs ${G1.opponentName}` })).toBeInTheDocument();
+    expect(screen.getByText(`vs ${G1.opponentName}`)).toBeInTheDocument();
     expect(screen.getByText('7 김민재')).toBeInTheDocument();
     expect(screen.queryByRole('checkbox')).toBeNull();
     expect(screen.queryByRole('button', { name: /저장|참가 명단대로|되돌리기/ })).toBeNull();
@@ -301,12 +301,12 @@ describe('참가 명단으로 가는 한 줄(Task 180 R-1 C)', () => {
     renderScreen();
     await screen.findByRole('heading', { name: '출전 3명' });
     const outing = section(/출전 3명/);
-    const link = within(outing).getByRole('link', { name: '참가 명단에서 선수 추가·빼기' });
+    const link = within(outing).getByRole('link', { name: '참가 선수 관리' });
     expect(link).toHaveAttribute(
       'href',
-      `/tournaments/${GAME_ROSTER_MSW.tournamentId}/registrations/${GAME_ROSTER_MSW.registrationId}/roster?from=${FROM}`,
+      `/tournaments/${GAME_ROSTER_MSW.tournamentId}/registrations/${GAME_ROSTER_MSW.registrationId}/roster?game=roster-game-1&from=${FROM}`,
     );
-    expect(within(outing).getByText(/대회 참가 명단에서 바꿔요\. 바꾸면 시작 전 경기에 모두 반영돼요\./)).toBeInTheDocument();
+    expect(within(outing).getByText(/대회 참가 명단에서 관리해요\. 선수 변경은 시작 전 경기에 반영돼요\./)).toBeInTheDocument();
   });
 
   it('참가 명단이 없는 팀(팀원 전체 기준)은 내 신청 화면에서 명단을 내러 간다', async () => {
@@ -314,7 +314,7 @@ describe('참가 명단으로 가는 한 줄(Task 180 R-1 C)', () => {
     renderScreen();
     const link = await screen.findByRole('link', { name: '참가 명단 내러 가기' });
     expect(link).toHaveAttribute('href', `/tournaments/${GAME_ROSTER_MSW.tournamentId}/my?from=${FROM}`);
-    expect(screen.queryByRole('link', { name: '참가 명단에서 선수 추가·빼기' })).toBeNull();
+    expect(screen.queryByRole('link', { name: '참가 선수 관리' })).toBeNull();
   });
 
   it.each(['TEAM_MEMBER', 'ADMIN'] as const)('%s 에게는 보이지 않는다 — 참가 명단은 팀장·매니저가 고친다', async (role) => {
@@ -336,14 +336,14 @@ describe('#1538 리그 전체 상태에 맞는 실제 명단 화면 entry', () =
     )));
   }
   const readonlyName = '참가 명단 보기';
-  const editName = '참가 명단에서 선수 추가·빼기';
+  const editName = '참가 선수 관리';
 
   it('완료 리그의 종료 경기에서도 조회 링크/설명과 기존 중첩 from을 유지한다', async () => {
     leagueStatus('completed');
     mock.setGameState(G1.gameId, 'ENDED');
     renderScreen();
     const link = await screen.findByRole('link', { name: readonlyName });
-    expect(link).toHaveAttribute('href', `/tournaments/${GAME_ROSTER_MSW.tournamentId}/registrations/${GAME_ROSTER_MSW.registrationId}/roster?from=${encodeURIComponent('/teams/team-1/games/roster-game-1/roster')}`);
+    expect(link).toHaveAttribute('href', `/tournaments/${GAME_ROSTER_MSW.tournamentId}/registrations/${GAME_ROSTER_MSW.registrationId}/roster?game=roster-game-1&from=${encodeURIComponent('/teams/team-1/games/roster-game-1/roster')}`);
     expect(screen.getByText('종료된 리그의 참가 명단은 조회만 할 수 있어요.')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: editName })).not.toBeInTheDocument();
     expect(screen.queryByText(/바꾸면 시작 전 경기에 모두 반영/)).not.toBeInTheDocument();
@@ -355,7 +355,7 @@ describe('#1538 리그 전체 상태에 맞는 실제 명단 화면 entry', () =
     mock.setGameState(G1.gameId, gameState);
     renderScreen();
     expect(await screen.findByRole('link', { name: editName })).toBeInTheDocument();
-    expect(screen.getByText(/리그 참가 명단에서 바꿔요/)).toBeInTheDocument();
+    expect(screen.getByText(/리그 참가 명단에서 관리해요/)).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: readonlyName })).not.toBeInTheDocument();
     expect(batchBodies()).toHaveLength(0);
   });
@@ -379,7 +379,7 @@ describe('#1538 리그 전체 상태에 맞는 실제 명단 화면 entry', () =
     renderScreen();
     try {
       expect(await screen.findByText('리그 상태를 확인하고 있어요. 참가 명단 화면에서 확인해 주세요.')).toBeInTheDocument();
-      expect(screen.getByRole('link', { name: '참가 명단 확인' })).toHaveAttribute('href', expect.stringContaining('/roster?from='));
+      expect(screen.getByRole('link', { name: '참가 명단 확인' })).toHaveAttribute('href', expect.stringContaining('/roster?game=roster-game-1&from='));
       expect(screen.queryByRole('link', { name: editName })).not.toBeInTheDocument();
       expect(batchBodies()).toHaveLength(0);
     } finally {
@@ -394,7 +394,7 @@ describe('#1538 리그 전체 상태에 맞는 실제 명단 화면 entry', () =
     leagueStatus('draft', 403);
     renderScreen();
     expect(await screen.findByText('리그 상태를 불러오지 못했어요. 조회할 수 없어요. 참가 명단 화면에서 확인해 주세요.')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '참가 명단 확인' })).toHaveAttribute('href', expect.stringContaining('/roster?from='));
+    expect(screen.getByRole('link', { name: '참가 명단 확인' })).toHaveAttribute('href', expect.stringContaining('/roster?game=roster-game-1&from='));
     expect(screen.queryByRole('link', { name: editName })).not.toBeInTheDocument();
     expect(batchBodies()).toHaveLength(0);
   });

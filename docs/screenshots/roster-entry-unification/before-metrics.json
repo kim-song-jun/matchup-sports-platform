@@ -1,0 +1,60 @@
+{
+  "metrics": [
+    {
+      "width": 390,
+      "screen": "quick",
+      "scroll": 390,
+      "bodyScroll": 390
+    },
+    {
+      "width": 390,
+      "screen": "full",
+      "scroll": 390,
+      "bodyScroll": 390
+    },
+    {
+      "width": 390,
+      "screen": "registration",
+      "scroll": 390,
+      "bodyScroll": 390
+    },
+    {
+      "width": 768,
+      "screen": "quick",
+      "scroll": 768,
+      "bodyScroll": 768
+    },
+    {
+      "width": 768,
+      "screen": "full",
+      "scroll": 768,
+      "bodyScroll": 768
+    },
+    {
+      "width": 768,
+      "screen": "registration",
+      "scroll": 768,
+      "bodyScroll": 768
+    },
+    {
+      "width": 1440,
+      "screen": "quick",
+      "scroll": 1440,
+      "bodyScroll": 1440
+    },
+    {
+      "width": 1440,
+      "screen": "full",
+      "scroll": 1440,
+      "bodyScroll": 1440
+    },
+    {
+      "width": 1440,
+      "screen": "registration",
+      "scroll": 1440,
+      "bodyScroll": 1440
+    }
+  ],
+  "errors": [],
+  "network": []
+}

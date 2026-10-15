@@ -327,10 +327,10 @@ function ParticipantTeamRow({
                   <span className="tm-text-caption tab-num" style={{ color: 'var(--text-caption)' }}>
                     {player.jerseyNumber ?? '—'}
                   </span>
-                  {/* 닉네임을 못 찾으면(탈퇴·프로필 삭제) 자리표시자다. **실명으로 떨어뜨리지
-                      않는다** — 정본 §3 은 공개 명단을 등번호·닉네임으로 못 박았다. */}
+                  {/* 닉네임을 못 찾으면(탈퇴·프로필 삭제) 서버 경기 명단과 같은 자리표시자 '팀원'이다.
+                      **실명으로 떨어뜨리지 않는다** — 정본 §3 은 공개 명단을 등번호·닉네임으로 못 박았다. */}
                   <span className="tm-text-caption" style={{ color: 'var(--text-strong)' }}>
-                    {player.nickname ?? '(탈퇴한 선수)'}
+                    {player.nickname ?? '팀원'}
                   </span>
                 </li>
               ))}

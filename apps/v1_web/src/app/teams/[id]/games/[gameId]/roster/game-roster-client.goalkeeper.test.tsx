@@ -30,9 +30,9 @@ function open() {
 const select = (name: string) => screen.getByRole('button', { name: `${name} 골키퍼로 지정` });
 const selected = (name: string) => screen.getByRole('button', { name: `${name}, 골키퍼 지정 해제` });
 async function save(count: number) {
-  fireEvent.click(screen.getByRole('button', { name: `저장 (${count}건)` }));
+  fireEvent.click(screen.getByRole('button', { name: `변경사항 저장 (${count}건)` }));
   await screen.findByText('명단을 저장했어요.');
-  await waitFor(() => expect(screen.getByRole('button', { name: '저장' })).toBeDisabled());
+  await waitFor(() => expect(screen.getByRole('button', { name: '변경사항 저장' })).toBeDisabled());
 }
 describe('리그 경기 선수별 골키퍼', () => {
   it('여러 명을 저장·재조회하고 한 명만 해제해도 다른 선수 지정과 등번호·출전이 유지된다', async () => {
@@ -66,7 +66,7 @@ describe('리그 경기 선수별 골키퍼', () => {
     expect(screen.getByRole('heading', { name: '출전 2명' })).toBeInTheDocument();
     await save(2);
     expect(selected('김민재')).toHaveAttribute('aria-pressed', 'true');
-    fireEvent.click(screen.getByRole('button', { name: '김민재 출전으로 되돌리기' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: '김민재 이번 경기 출전' }));
     await save(1);
     expect(selected('김민재')).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('checkbox', { name: '김민재 이번 경기 출전' })).toBeChecked();
@@ -76,10 +76,10 @@ describe('리그 경기 선수별 골키퍼', () => {
     open();
     await screen.findByRole('button', { name: '김민재 골키퍼로 지정' });
     fireEvent.click(select('김민재'));
-    fireEvent.click(screen.getByRole('button', { name: '저장 (1건)' }));
+    fireEvent.click(screen.getByRole('button', { name: '변경사항 저장 (1건)' }));
     await screen.findByText('지금 저장할 수 없어요.');
     expect(selected('김민재')).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: '저장 (1건)' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '변경사항 저장 (1건)' })).toBeEnabled();
   });
   it('읽기 전용 팀원에게는 지정 버튼을 노출하지 않는다', async () => {
     mock.setViewerRole('TEAM_MEMBER');

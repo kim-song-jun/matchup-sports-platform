@@ -126,7 +126,7 @@ export function buildNextAction(input: NextActionInput): TeamMatchDetailViewMode
     if (input.matchPhase) return link(input.resultAction);
     if (input.lineupAction?.kind === 'attendance') return { label: '참석명단 관리', href: input.lineupAction.href, tone: 'primary' };
     // 리그 대진의 경기 명단은 참가 명단에서 계산돼 손대지 않아도 된다(Task 179) — 결과 입구가 먼저다.
-    return link(input.resultAction) ?? (input.lineupAction ? { label: '명단 조정', href: input.lineupAction.href, tone: 'neutral' } : undefined);
+    return link(input.resultAction) ?? (input.lineupAction ? { label: '출전 명단 조정', href: input.lineupAction.href, tone: 'neutral' } : undefined);
   }
   if (!input.listingHost) return undefined;
   if (input.apiStatus === 'recruiting' && input.manageHref) return { label: '매치 수정', href: input.manageHref, tone: 'neutral' };

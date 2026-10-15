@@ -144,9 +144,9 @@ function CompetitionEntryCard({
           href={rosterHref}
           className={`tm-btn tm-btn-md ${editable ? 'tm-btn-primary' : 'tm-btn-outline'}`}
           style={{ minHeight: 44 }}
-          aria-label={`${teamName} 참가 ${editable ? '명단 수정하기' : '명단 보기'}`}
+          aria-label={`${teamName} 참가 선수 ${editable ? '관리' : '보기'}`}
         >
-          {editable ? '명단 수정' : '명단 보기'}
+          {editable ? '참가 선수 관리' : '참가 선수 보기'}
         </Link>
         {nextGame === null ? (
           <Link
@@ -163,7 +163,7 @@ function CompetitionEntryCard({
             style={{ minHeight: 44 }}
             aria-label={`다음 경기 명단 열기 (${formatTournamentDateTimeShort(nextGame.scheduledAt) ?? '일정 미정'})`}
           >
-            다음 경기 명단
+            다음 경기 출전 관리
           </Link>
         )}
       </div>

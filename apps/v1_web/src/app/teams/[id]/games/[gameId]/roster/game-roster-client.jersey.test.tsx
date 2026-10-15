@@ -60,9 +60,9 @@ describe('팀장·매니저 — 번호 칸이 곧 입력 버튼', () => {
     expect(await screen.findByRole('button', { name: '김민재 등번호 7번 바꾸기' })).toHaveTextContent('7');
     expect(screen.getByRole('button', { name: '박서준 등번호 10번 바꾸기' })).toHaveTextContent('10');
     expect(screen.getByRole('button', { name: '한도윤 등번호 넣기' })).toBeInTheDocument();
-    expect(screen.getByText(/번호 칸을 눌러 등번호를 넣어요\. 대회 참가 명단에 저장돼요\./)).toBeInTheDocument();
+    expect(screen.getByText(/등번호도 대회 참가 명단에 공통으로 저장돼요\./)).toBeInTheDocument();
     // 번호 저장은 시트에서 즉시 나가고, 하단 저장(출전 체크)은 그대로 비활성이다.
-    expect(screen.getByRole('button', { name: '저장' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '변경사항 저장' })).toBeDisabled();
   });
 
   it('빈 칸에 번호를 넣으면 참가 명단 등번호 API 로 저장되고 시트가 닫히며 화면에 번호가 나온다', async () => {

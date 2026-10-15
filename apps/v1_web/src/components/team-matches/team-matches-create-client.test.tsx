@@ -402,7 +402,7 @@ describe('team-match place payload', () => {
 
   it('좌표가 있는 수정 응답은 핀이 있는 장소로, 없는 옛 응답은 직접 입력 장소로 복원한다', () => {
     const form = { ...teamMatchEditData.form, manualPlaceName: '망원한강공원 풋살장', addressText: '서울 마포구 마포나루길 467' };
-    expect(draftFromTeamMatchEdit({ ...teamMatchEditData, status: 'recruiting' as const, form: { periods: null, ...form, placeLatitude: 37.5558, placeLongitude: 126.8985, placeProvider: 'kakao', placeProviderId: 'k-1' } }).place)
+    expect(draftFromTeamMatchEdit({ ...teamMatchEditData, status: 'recruiting' as const, form: { ...form, placeLatitude: 37.5558, placeLongitude: 126.8985, placeProvider: 'kakao', placeProviderId: 'k-1' } }).place)
       .toMatchObject({ kind: 'picked', providerPlaceId: 'k-1' });
     expect(draftFromTeamMatchEdit({ ...teamMatchEditData, status: 'recruiting' as const, form }).place)
       .toEqual({ kind: 'manual', name: '망원한강공원 풋살장', address: '서울 마포구 마포나루길 467' });

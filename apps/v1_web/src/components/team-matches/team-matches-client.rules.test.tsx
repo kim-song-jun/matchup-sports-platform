@@ -52,7 +52,9 @@ describe('MD-QA #141 actual detail API periods readback', () => {
           placeName: '합성 규칙 경기장', startsAt: '2030-10-10T09:00:00.000Z',
           endsAt: '2030-10-10T11:00:00.000Z', capacityText: '1/2', status: 'recruiting',
           hostTeam: { teamId: 'mdqa141-host', name: '합성 규칙 팀' },
-          viewerState: 'guest', viewer: { state: 'guest', canChat: false }, periods,
+          viewerState: 'guest', viewer: {
+            state: 'guest', applicationId: null, participantId: null, canApply: false, canChat: false,
+          }, periods,
         };
         return HttpResponse.json({ status: 'success', data: detail, timestamp: new Date().toISOString() });
       }),

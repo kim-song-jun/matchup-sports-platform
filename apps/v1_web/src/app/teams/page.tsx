@@ -9,8 +9,8 @@ import type { CursorPage, V1Team } from '@/types/api';
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 export const metadata = buildPublicMetadata({
-  title: '스포츠 팀 찾기',
-  description: '종목과 활동 지역이 맞는 스포츠 팀을 찾고 팀원으로 함께해 보세요.',
+  title: '활동 지역과 종목으로 스포츠 팀 찾기',
+  description: '동네에서 함께할 풋살·축구 팀을 찾아보세요. 활동 지역과 모집 상태를 살펴보고 러닝·수영 등 다양한 스포츠 팀의 가입 조건도 확인할 수 있어요.',
   path: '/teams',
 });
 

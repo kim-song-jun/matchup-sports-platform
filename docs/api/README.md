@@ -2,6 +2,8 @@
 
 # Teameet v1 API contracts
 
+Ordinary team-match period rules (MD-QA #141): host-authorized defaults, separate single/two-period selection, immutable pins and pre-play edit gates are documented in [team matches](./domains/team-matches.md#ordinary-team-match-period-rules-md-qa-141).
+
 Public competition overall standings include nullable `teamLogoUrl` under the existing team-identity visibility gate; see [tournaments](./domains/tournaments.md#overall-standings--two-competition-kinds-two-row-shapes).
 
 This directory is the single indexed contract tree for `apps/v1_api` and `apps/v1_web`. Swagger is reference material; the controller, DTO, service gates, integration tests, frontend hooks/types, and these canonical contracts must agree.

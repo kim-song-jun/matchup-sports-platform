@@ -1,12 +1,40 @@
 import { IsPlaceLatitude, IsPlaceLongitude, IsPlaceProvider, IsPlaceProviderId } from '../../places/place-snapshot';
 import { GENDER_RULES } from '../../common/gender-rule';
-import { ArrayMaxSize, IsArray, IsDateString, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength, IsIn } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
+  IsDateString,
+  IsIn,
+  IsInt,
+  IsNotEmpty,
+  IsObject,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  MaxLength,
+  Min,
+  ValidateIf,
+  ValidateNested,
+} from 'class-validator';
 import {
   MATCH_FORMAT_MAX_LENGTH,
   MATCH_STYLE_ITEM_MAX_LENGTH,
   MATCH_STYLE_MAX_ITEMS,
   UNIFORM_COLOR_MAX_LENGTH,
 } from '../team-match-conditions.constants';
+import { MAX_TEAM_MATCH_PERIOD_MINUTES } from '../team-match-periods.constants';
+
+export class TeamMatchPeriodSettingDto {
+  // Preserve JSON number types instead of implicitly converting strings or booleans.
+  @Transform(({ obj, key }: { obj: Record<string, unknown>; key: string }): unknown => obj[key])
+  @IsInt()
+  @Min(1)
+  @Max(MAX_TEAM_MATCH_PERIOD_MINUTES)
+  durationMinutes!: number;
+}
 
 export class MutateTeamMatchDto {
   @IsUUID()
@@ -80,6 +108,15 @@ export class MutateTeamMatchDto {
   @IsString()
   @MaxLength(2000)
   rulesText?: string | null;
+
+  @ValidateIf((_object, value: unknown) => value !== undefined)
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(2)
+  @IsObject({ each: true })
+  @ValidateNested({ each: true })
+  @Type(() => TeamMatchPeriodSettingDto)
+  periods?: TeamMatchPeriodSettingDto[];
 
   @IsOptional()
   @IsString()

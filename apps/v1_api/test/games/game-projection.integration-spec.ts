@@ -188,9 +188,13 @@ describe('Task 9 game projection real-database contract', () => {
     const takeoverOwner = auditWorker();
     const expiredClaim = await expiredOwner.claimOne();
     expect(expiredClaim?.id).toBe(takeoverJob);
+    // Expire past the first retry delay with millisecond flooring. Expiring by
+    // exactly one second made recovery's available_at equal the transaction
+    // timestamp, where TIMESTAMP(3) rounding could keep the job just ineligible.
     await prisma.$executeRaw`
       UPDATE v1_outbox_events
-      SET lease_until = CURRENT_TIMESTAMP - INTERVAL '1 second',
+      SET lease_until = date_trunc('milliseconds', CURRENT_TIMESTAMP)
+            - (${GAME_OPERATION_RETRY_DELAYS_MS[0]} + 1) * INTERVAL '1 millisecond',
           version = version + 1,
           updated_at = CURRENT_TIMESTAMP
       WHERE id = ${takeoverJob}

@@ -40,7 +40,8 @@ import {
   createTeamMatchScheduleInTx,
   syncTeamMatchScheduleInTx,
 } from '../team-schedules/team-schedules.service';
-import { resolveTeamMatchCompetitionConfig } from './resolve-team-match-competition-config';
+import { readTeamMatchCompetitionConfig, readTeamMatchRuleDefaults, readTeamMatchTwoPeriodDefaults, resolveTeamMatchCompetitionConfig, resolveTeamMatchPeriodConfig } from './resolve-team-match-competition-config';
+import { readTeamMatchRulesGame, repinTeamMatchRules, teamMatchRulesEditable } from './team-match-rule-repin';
 import { hydrateApprovedTeamMatchAwaySnapshot } from './team-match-game-snapshot';
 import { assertCreatorProfileComplete } from '../profile/creator-profile.guard';
 import { computePublicTeamRatingBatch, computeRevealedTeamTrustBatch } from '../reviews/team-trust-aggregation';
@@ -321,6 +322,9 @@ export class TeamMatchesService {
       computePublicTeamRatingBatch(this.prisma, participantTeamIds),
     ]);
     const viewer = await this.getViewer(teamMatch, user);
+    const competitionConfig = teamMatch.competitionConfigVersionId
+      ? await readTeamMatchCompetitionConfig(this.prisma, teamMatch.competitionConfigVersionId)
+      : null;
     const apiStatus = this.getApiStatus(teamMatch, now);
     const approvedApplication = teamMatch.applications.find(
       (item) => item.status === 'approved' && item.applicantTeamId === teamMatch.approvedApplicantTeamId,
@@ -366,6 +370,7 @@ export class TeamMatchesService {
       minLevel: teamMatch.minSportLevel ? { code: teamMatch.minSportLevel.code, name: teamMatch.minSportLevel.name } : null,
       maxLevel: teamMatch.maxSportLevel ? { code: teamMatch.maxSportLevel.code, name: teamMatch.maxSportLevel.name } : null,
       rulesText: this.formatMatchConditionsRulesText(teamMatch),
+      periods: competitionConfig?.config.periods ?? null,
       genderRule: normalizeGenderRule(teamMatch.genderRule),
       matchFormat: teamMatch.matchFormat,
       matchStyle: teamMatch.matchStyle,
@@ -469,6 +474,18 @@ export class TeamMatchesService {
       if (items.length >= 5) break;
     }
     return { items };
+  }
+
+  async ruleOptions(user: V1AuthUser, teamId: string) {
+    this.assertActiveAccount(user);
+    const membership = await this.assertCanManageTeam(user.id, teamId);
+    const defaults = await readTeamMatchRuleDefaults(this.prisma, membership.team.sportId);
+    if (!defaults.current) throw new ConflictException({ code: defaults.blockedReason, message: '이 종목에 단판·전후반으로 변경할 수 있는 활성 경기 설정이 필요해요.' });
+    const current = defaults.current;
+    return {
+      hostTeamId: teamId, sportId: membership.team.sportId, competitionConfigVersionId: current.id,
+      periods: current.config.periods, twoPeriodDefaults: await readTeamMatchTwoPeriodDefaults(this.prisma, current),
+    };
   }
 
   async applicationEligibility(
@@ -749,6 +766,13 @@ export class TeamMatchesService {
         dto.sportId,
         user.id,
       );
+      if (dto.periods !== undefined) {
+        const custom = await resolveTeamMatchPeriodConfig(tx, {
+          sportId: dto.sportId, currentConfigVersionId: source.competitionConfigVersionId,
+          periods: dto.periods, actorUserId: user.id,
+        });
+        source.competitionConfigVersionId = custom.id;
+      }
       const levelRange = await resolveSportLevelRange(tx, dto.sportId, dto.minLevelCode, dto.maxLevelCode);
       const conditionFields = this.normalizeMatchConditionFields(dto);
       const created = await tx.v1TeamMatch.create({
@@ -816,10 +840,22 @@ export class TeamMatchesService {
     const teamMatch = await this.getManageableTeamMatch(user, teamMatchId);
     const apiStatus = this.getApiStatus(teamMatch);
     const editable = ['recruiting', 'closed'].includes(teamMatch.status) && !teamMatch.approvedApplicantTeamId;
+    const competitionConfig = teamMatch.competitionConfigVersionId
+      ? await readTeamMatchCompetitionConfig(this.prisma, teamMatch.competitionConfigVersionId)
+      : null;
+    const game = await readTeamMatchRulesGame(this.prisma, teamMatch.id);
+    const defaults = await readTeamMatchRuleDefaults(this.prisma, teamMatch.sportId);
+    const rulesLockedReason = !competitionConfig || competitionConfig.status !== 'ACTIVE'
+      ? 'COMPETITION_CONFIG_REQUIRED'
+      : !teamMatchRulesEditable(teamMatch, game) ? 'TEAM_MATCH_RULES_LOCKED' : defaults.blockedReason;
+    const rulesEditable = rulesLockedReason === null;
     return {
       teamMatchId: teamMatch.id,
       editable,
       lockedReason: editable ? null : 'terminal_or_matched_status',
+      rulesEditable,
+      rulesLockedReason,
+      competitionConfigVersionId: teamMatch.competitionConfigVersionId,
       form: {
         hostTeamId: teamMatch.hostTeamId,
         sportId: teamMatch.sportId,
@@ -845,6 +881,7 @@ export class TeamMatchesService {
         matchFormat: teamMatch.matchFormat,
         matchStyle: teamMatch.matchStyle,
         uniformColor: teamMatch.uniformColor,
+        periods: competitionConfig?.config.periods.map(({ durationMinutes }) => ({ durationMinutes })) ?? null,
       },
       status: apiStatus,
       version: teamMatch.updatedAt.toISOString(),
@@ -888,6 +925,18 @@ export class TeamMatchesService {
       await tx.$queryRaw`SELECT id FROM v1_team_matches WHERE id = ${teamMatch.id} FOR UPDATE`;
       const current = await tx.v1TeamMatch.findFirst({ where: { id: teamMatch.id, deletedAt: null } });
       if (!current || current.updatedAt.toISOString() !== dto.version || current.approvedApplicantTeamId || !['recruiting', 'closed'].includes(current.status)) throw stateConflict('Team match state changed', 'VERSION_CONFLICT');
+      let competitionConfigVersionId: string | undefined;
+      let gameId: string | null;
+      if (dto.periods !== undefined) {
+        assertTeamMatchHasHostAndStart(current);
+        const membership = await this.assertCanManageTeam(user.id, current.hostTeamId, tx);
+        if (current.hostTeamId !== dto.hostTeamId || current.sportId !== dto.sportId || membership.team.sportId !== current.sportId) {
+          throw stateConflict('Team match host or sport changed', 'VERSION_CONFLICT');
+        }
+        const repinned = await repinTeamMatchRules(tx, { match: current, periods: dto.periods, actorUserId: user.id });
+        competitionConfigVersionId = repinned.competitionConfigVersionId;
+        gameId = repinned.gameId;
+      } else gameId = (await tx.v1Game.findUnique({ where: { teamMatchId: current.id }, select: { id: true } }))?.id ?? null;
       const teamMatchUpdated = await tx.v1TeamMatch.update({
         where: { id: teamMatch.id },
         data: {
@@ -910,6 +959,7 @@ export class TeamMatchesService {
           maxSportLevelId: levelRange.maxSportLevelId,
           genderRule: dto.genderRule ?? null,
           costNote: dto.costNote ?? null,
+          competitionConfigVersionId,
         },
       });
       if (requiresReconfirmation) await tx.v1TeamMatchApplication.updateMany({
@@ -921,18 +971,19 @@ export class TeamMatchesService {
         actorType: 'user', actorUserId: user.id, reason: requiresReconfirmation ? 'schedule_or_place_changed_reapply_required' : 'host_updated',
       } });
       await syncTeamMatchScheduleInTx(tx, teamMatch.id, dto.title, dates.startsAt, dates.endsAt);
-      return teamMatchUpdated;
+      return { teamMatchUpdated, gameId };
     });
 
     if (requiresReconfirmation) this.emitTeamMatchNotificationToApplicantManagers(
       teamMatch.id, 'team_match_updated', `"${teamMatch.title}" 일정 또는 장소가 변경됐어요. 변경 내용을 확인하고 다시 신청해 주세요.`,
     );
     return {
-      teamMatchId: updated.id,
-      status: updated.status,
-      updatedAt: updated.updatedAt,
-      version: updated.updatedAt.toISOString(),
-      detailRoute: `/team-matches/${updated.id}`,
+      teamMatchId: updated.teamMatchUpdated.id,
+      gameId: updated.gameId,
+      status: updated.teamMatchUpdated.status,
+      updatedAt: updated.teamMatchUpdated.updatedAt,
+      version: updated.teamMatchUpdated.updatedAt.toISOString(),
+      detailRoute: `/team-matches/${updated.teamMatchUpdated.id}`,
     };
   }
 
@@ -2098,8 +2149,8 @@ export class TeamMatchesService {
     });
   }
 
-  private async assertCanManageTeam(userId: string, teamId: string) {
-    const membership = await this.prisma.v1TeamMembership.findFirst({
+  private async assertCanManageTeam(userId: string, teamId: string, client: Prisma.TransactionClient = this.prisma) {
+    const membership = await client.v1TeamMembership.findFirst({
       where: { teamId, userId, status: 'active', role: { in: ['owner', 'manager'] }, team: { status: 'active', deletedAt: null } },
       select: { id: true, team: { select: { sportId: true, name: true } } },
     });

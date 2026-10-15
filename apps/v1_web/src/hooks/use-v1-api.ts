@@ -4100,6 +4100,7 @@ export function useV1Tournament(
 export function useV1TournamentReviews(
   tournamentId: string,
   params?: { page?: number; pageSize?: number; search?: string },
+  options?: { seed?: V1TournamentReviewsPage },
 ) {
   const page = params?.page ?? 1;
   const pageSize = params?.pageSize ?? 10;
@@ -4113,6 +4114,7 @@ export function useV1TournamentReviews(
         ...(search ? { search } : {}),
       }),
     enabled: !!tournamentId,
+    initialData: !search && page === options?.seed?.page && pageSize === options.seed.pageSize ? options.seed : undefined,
     placeholderData: keepPreviousData,
   });
 }

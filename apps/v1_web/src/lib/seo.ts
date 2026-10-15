@@ -154,6 +154,12 @@ export function buildNoIndexMetadata(title: string, description?: string): Metad
 // 이보다 짧은 사용자 입력("dfd"·"ㅇㅇ")은 검색 결과·AI 요약에 쓸 설명이 못 된다 — 종목·장소가 든 기본 문구가 낫다.
 const MIN_DESCRIPTION_LENGTH = 15;
 
+/** 운영자가 정한 이름을 보존하면서 실제 종목·대회 유형을 검색 제목에 명시한다. */
+export function buildTournamentTitle(tournament: Pick<V1TournamentDetail, 'title' | 'sport' | 'kind'>): string {
+  const context = `${tournament.sport.name} ${tournament.kind === 'regular_league' ? '리그' : '대회'}`;
+  return tournament.title.includes(context) ? tournament.title : `${tournament.title} · ${context}`;
+}
+
 export function metadataDescription(value: string | null | undefined, fallback: string): string {
   const normalized = value?.replace(/\s+/g, ' ').trim();
   if (!normalized || normalized.length < MIN_DESCRIPTION_LENGTH) return fallback;

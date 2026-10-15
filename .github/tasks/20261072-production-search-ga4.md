@@ -1,8 +1,26 @@
 # Task 20261072: 운영 검색 노출 및 홈 GA4 계측 정정
 
-Status: Existing-page search/AI discovery corrections in progress (2026-10-13)
+Status: Oct 13 production release complete; Oct 15 keyword/snippet follow-up in progress
 **Owner**: Codex main (단일 에이전트)
 **Created**: 2026-10-12
+
+## Current Cursor — 2026-10-15
+- User authorized existing routes only, Alpha verification then scoped main deployment. No further deployment permission is needed.
+- Oct 13 PRs #1902/#1903 and production run 38393464125 completed. Later releases advanced production to `37e314f212717027e478916c56e6ca1e8e08585c`; historical receipts are not current ranking evidence.
+- Actual Korean Google first results/AI area for 풋살 대회 and 풋살 리그 contained no Teameet source link. Site-restricted 풋살 search does show the mixed Teameet cup, friendly matches and teams. The league query also has official FK-league intent. A review snippet contained app-install copy.
+- Search Console AI report: 18 impressions for Sep 25–Oct 12, before the Oct 13 release. Do not report this as post-release performance.
+- Existing owned checkout retained docs commit `223643788` and merged latest dev `105afaf31` before coding. Root detached WIP is untouched. PR #1926 is being extended to the final follow-up scope; its initial documentation-only description/CI is superseded.
+- Owned: existing kind-list metadata/canonical/ItemList/h1, factual sport/type detail titles, app-promo data-nosnippet, public review SSR and empty-review noindex/follow, aligned sitemap/deduplication and evidence. No new routes, DB, auth, public visibility, Kakao or native/store changes.
+- RED: 7 failed/15 passed reproduced metadata/HTML/snippet defects; a separate sitemap regression reproduced. GREEN: 108 focused tests across eight files. Test expectations corrected to the existing brand suffix and team-first author display. Intentional upstream 404/503 logs are expected failure-isolation scenarios. Initial runner option placement and guessed read paths were corrected; they are not product failures. Docker is unavailable and not required for these frontend checks.
+- Main implemented and directly verified; no new coding subagent. Independent GitHub review and exact revised-head CI remain pending. The heartbeat's explicit gpt-6-luna store lookup is separate from SEO implementation/review.
+
+Follow-up acceptance:
+- [x] Existing all/tournament/league pages have truthful distinct metadata/canonical; arbitrary filters remain consolidated.
+- [x] App promotion remains usable but its actual section is excluded from snippets.
+- [x] Actual public reviews render in first HTML; empty reviews use noindex/follow and are absent from sitemap.
+- [ ] Exact-head CI and independent review pass.
+- [ ] Deployed Alpha checks pass, followed by scoped production deployment.
+- [ ] Production and Google statuses recorded without claiming guaranteed ranking or AI inclusion.
 
 ## Context
 2026-10-13 최종 범위: 새 페이지를 만들지 않고 기존 팀·대회·리그·개인 매치·팀 매치·리그 경기의 공개 검색 정보를 정리한다. 사용자 승인: Alpha 검증 후 이번 SEO 변경만 main에 배포하고 실제 Google 색인 상태까지 확인한다. 월별·지역별 새 라우트 제안은 폐기됐다.
@@ -16,7 +34,7 @@ Acceptance criteria:
 - [x] Scoped production deployment verified by commit/release headers and public inventory audit.
 - [ ] Google actual indexed/pending statuses recorded separately from indexing requests and AI inclusion expectations.
 
-Current cursor: task-owned existing checkout `mdqa-127-kakao-talk-login`, base `9e3d596629ca350e5a12ac38a06ab42fff14713f`; shared-root files excluded. RED 2026-10-13 19:38: 8 failed / 34 passed, reproducing canonical, truncation, registration and false-address defects. Further RED confirmed year/state descriptions, missing tournament fixture links, and closed-public-match separation. GREEN: 87 focused tests across seven files; frontend typecheck/pattern lint passed. Host load 27.43/24.35/30.56 (12 cores), free memory 36%, swap 16.1GB, Node/browser signatures 439; narrow tests run serially by user-authorized policy. Docker unavailable, not used. Test harness corrections: beforeEach returned mock was interpreted as teardown; tournament list fixture needed real pageInfo contract. Both corrected and affected sitemap tests passed. Missing-path read attempts were corrected; no product code was affected. No newly spawned coding agents (project delegation restriction); main performed implementation and direct checks, CI review pending.
+Historical implementation cursor — 2026-10-13: task-owned existing checkout `mdqa-127-kakao-talk-login`, base `9e3d596629ca350e5a12ac38a06ab42fff14713f`; shared-root files excluded. RED 2026-10-13 19:38: 8 failed / 34 passed, reproducing canonical, truncation, registration and false-address defects. Further RED confirmed year/state descriptions, missing tournament fixture links, and closed-public-match separation. GREEN: 87 focused tests across seven files; frontend typecheck/pattern lint passed. Host load 27.43/24.35/30.56 (12 cores), free memory 36%, swap 16.1GB, Node/browser signatures 439; narrow tests run serially by user-authorized policy. Docker unavailable, not used. Test harness corrections: beforeEach returned mock was interpreted as teardown; tournament list fixture needed real pageInfo contract. Both corrected and affected sitemap tests passed. Missing-path read attempts were corrected; no product code was affected. No newly spawned coding agents (project delegation restriction); main performed implementation and direct checks, CI review pending.
 
 PR #1902 first SHA `166053d70` CI `38386019964`: Web/API/Gates passed. Codex connector and Copilot independent reviews identified valid per-tournament failure isolation, history-query coverage and full-state mapping; corrected with RED → GREEN evidence. Cached detail reads now reuse 300-second publication data while the current public tournament inventory is fetched no-store. Failure IDs are explicit in AI output. Shared cursor validation replaces duplicate pagination loops. Target main still supports team-match `on_hold`, so label compatibility is preserved without importing unrelated dev type changes. Focused aggregate: 91 tests pass; frontend typecheck/pattern lint pass. Exact revised-head CI/Alpha still pending. Optional AI scan `38386026815` failed before analysis because external model `claude-opus-5` is unavailable; it is not a code-check pass.
 
@@ -61,7 +79,7 @@ Forbidden: DB/인증 동작/제품 시각 디자인/다른 세션 파일. 2026-1
 - [x] 검증 결과와 배포/검색 재수집 대기를 구분
 
 ## Tech Debt Resolved
-코드에서 robots Disallow와 noindex의 충돌, 홈 조회 이외 탐색 계측 누락을 정정했다. 실서비스 반영은 배포 대기다.
+robots Disallow와 noindex 충돌 및 홈 계측 누락은 정정·운영 배포 완료됐다. 현재 후속 작업은 상단 Current Cursor를 따른다.
 
 ## Security Notes
 환경 파일 및 인증 토큰을 읽거나 출력하지 않는다. 브라우저 기존 프로필만 사용하고 개인정보를 GA 이벤트 파라미터에 추가하지 않는다.
@@ -73,7 +91,7 @@ Forbidden: DB/인증 동작/제품 시각 디자인/다른 세션 파일. 2026-1
 - “main”은 운영 도메인 teameet.co.kr을 뜻한다. 코드 기준으로 브랜드 검색 정본은 `/landing`, `/home`은 앱 대시보드다. 인증 진입 동작은 변경하지 않는다.
 - 2026-10-12 사용자 확인: Google 계정 메뉴가 아닌 ego 브라우저 프로필 전환을 사용한다.
 
-## Progress Snapshot
+## Historical Progress Snapshot — 2026-10-12
 - 시작 checkout: detached HEAD `082d90b1b`, clean. 브랜치 전환 없이 작업. origin/dev fetch 후 소스 차이 없음.
 - 운영 실측: release `1.6.8`, commit `461d03081d4186abdb42436e936383ffb36493e4`; `/home` robots Disallow + HTTP noindex. `/landing` index/follow, canonical, 소유확인 메타 존재. 운영 sitemap 271개, alpha URL 없음.
 - alpha 실측: release `1.6.8-alpha.20261011.g082d90b1b9e2`; 모든 페이지 HTTP noindex, robots Disallow `/`. sitemap은 alpha 엔티티를 운영 URL로 출력(566개).
@@ -90,7 +108,7 @@ Forbidden: DB/인증 동작/제품 시각 디자인/다른 세션 파일. 2026-1
 - ego CDP 연결 및 일부 UI 반응이 지연됐다. 같은 space에서 연결이 복구됐고, 네이버 HTML 태그 radio의 pointer intercept는 label 클릭으로 해결했다. 새 홈 이벤트 live 수집은 배포 전이므로 미검증. main 승격·push·commit은 실행하지 않았다.
 - 공유 checkout의 HEAD가 작업 중 다른 세션에 의해 `32325e990`으로 이동했다. 이 작업의 소스·nginx·robots·analytics 의존 경로에는 시작 HEAD 대비 변경이 없고 내 변경 12개만 dirty 상태로 유지된다. HEAD 이동이나 원격 동기화는 이 세션이 실행하지 않았다.
 
-## Resume Cursor
+## Historical Resume Notes — superseded by Current Cursor
 0.4. Main release PR #1847 at version commit `4700b9110` exposed four valid regressions in already-merged chat work: a non-participating host loses existing-room access after guests leave; an unrelated send failure disappears on detail refresh; reconnect omits room detail/composer; cancelled-approved legacy participants lose history when visibleFromAt is null. Main merge is held for these release-review fixes. Added owned scope: chat entitlement/service + unit/integration tests, community send-error handling/test, realtime reconnect/test, chat API docs and a patch Changeset. No schema/data migration or unrelated UI redesign. Shared checkout was clean before edits; no concurrent dirty files were present.
 0.5. Release-review regression evidence: old owner predicates and reconnect detail exclusion failed the new assertions; a real TanStack send mutation with HTTP 502 lost its visible error after a detail refresh (confirmed after flushing its scheduled notification). Fixed all three and added PostgreSQL API scenarios for non-participating owners plus approval-time history with before-approval exclusion. Frontend focused verification: 9 passed. Backend first verification: 81 passed; one older fixture expected owner access to disappear, contrary to the clarified existing-room contract, so its expectation was corrected while withdrawn guests remain denied. PostgreSQL scenarios run in CI; local Docker is unavailable. Main PR is draft while the fixes are verified.
 0. SEO PR #1842 merged to dev at `8deac7bc16382b85615f70d98c1a91cd5ae858a7`; exact CI `38174051752` and Alpha `38174051733` succeeded. Live alpha verified: home/landing noindex, new robots, sitemap/RSS 404, health DB true. Actual home → teams click emitted one `home_navigation_click` and one SPA `page_view`, both GA HTTP 204, no runtime exception. Production remains `461d03081d4186abdb42436e936383ffb36493e4` pending promotion.

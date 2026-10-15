@@ -1,5 +1,13 @@
 # 검색·AI 노출 측정 — 기준선과 재측정 절차
 
+## 2026-10-15 실제 검색 재확인과 후속 수정
+
+Google 한국어 검색 첫 결과·AI 영역에서 풋살 대회/풋살 리그에 대한 Teameet 링크를 찾지 못했다. 사이트를 지정한 풋살 검색에서는 제2회 팀밋 풋살컵(비선출 혼성부), 팀매치와 팀 상세가 실제로 나타났다. 풋살 리그는 공식 FK리그 탐색 의도도 강하므로 전체 리그 검색 상위 노출을 약속하지 않는다.
+
+후기 결과의 설명에 실제 후기 대신 공통 앱 설치 안내가 잡혔다. 기존 유형별 대표 주소·종목 정보·실제 후기 첫 HTML·설치 안내의 검색 요약 제외를 수정 중이다. 새 경로는 추가하지 않는다. Alpha·운영 반영과 순위 상승·AI 인용은 별도로 검증한다.
+
+Search Console AI 보고서 18회 노출은 2026-09-25~10-12 기간이며 Oct 13 배포 효과가 아니다. 현재 확인한 운영 커밋은 `37e314f212717027e478916c56e6ca1e8e08585c`다.
+
 ## 2026-10-13 기존 공개 페이지 발견성 배포
 
 새 페이지를 추가하지 않고 기존 팀·대회·리그·개인/친선 매치·대진 상세의 사이트맵, 대표 주소, 공개 AI 안내와 검색 메타 정보를 정리했다. Dev PR [#1902](https://github.com/kim-song-jun/matchup-sports-platform/pull/1902), 운영 PR [#1903](https://github.com/kim-song-jun/matchup-sports-platform/pull/1903) 머지 완료. 운영 CI/이미지/배포 [38393464125](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/38393464125) 성공, 실제 응답 커밋 `3dd537d4eb74a0d2c74f1a28e6da3962611130b9`, 릴리스 `1.8.3` 확인. 운영에는 이번 변경 18개 파일만 포함하며 다른 dev 기능·DB·인증·공개 여부·스토어 설정은 포함하지 않았다.
@@ -19,7 +27,7 @@
 
 91개 집중 테스트, 타입/패턴 검사, 정확한 커밋 CI, 독립 Codex/Copilot 리뷰 수정 후 후속 열린 지적 0건. Alpha 실제 커밋 `79d1744c899725b5530b684983380caaaf48ab50`의 대표 7개 경로를 인증 없는 HTTP로 확인했고, 기존 로그인 UI 세션으로 동선을 확인했다. 390/768/1440px 화면에 가로 넘침과 런타임 오류 없음. Alpha의 HTTP noindex 및 sitemap/llms-full 404 유지. 시각 검사의 화면 밖 lazy 이미지 대기 타임아웃은 검사 조건을 고쳐 분리·재검증했다. 선택적 외부 AI 스캔은 모델 `claude-opus-5` 부재로 분석 전에 실패했고 보안 통과로 집계하지 않는다. CodeQL 검사는 별도로 통과했다.
 
-운영 근거: `/tmp/teameet-production-discovery-before.json`, `/tmp/teameet-production-discovery-audit.json`, `/tmp/teameet-alpha-seo-browser-qa.json`. Google 신규 사이트맵 제출 성공 화면과 대표 팀 URL의 우선순위 크롤링 대기열 추가 화면을 저장했다. Google 실제 색인 상태·요청 결과의 최종 목록은 후속 확인을 추가한다. 사이트맵 347개가 Google에서 모두 색인됐다는 뜻은 아니다.
+영구 보존 근거: [배포 전 285 URL](evidence/seo/20261013-production-before.json), [배포 후 347 URL](evidence/seo/20261013-production-after.json), [Alpha 브라우저 검사](evidence/seo/20261013-alpha-browser.json). 공개 경로·검사 상태만 보존하며 인증정보는 포함하지 않는다. Oct 13 시점의 응답 검사로 현재 운영이나 Google 색인을 보증하지 않는다. 사이트맵 제출·색인 요청 접수와 실제 색인은 구분한다.
 
 Google AI 기능은 기존 검색 색인과 스니펫 표시 자격을 전제로 하며 별도의 AI 파일이나 특별한 구조화 데이터가 필수인 것은 아니다. 이번 공개 안내와 기술 검증은 인용·검색 가능성을 지원하며 검색 순위, 전체 색인이나 AI 인용을 보장하지 않는다. [Google AI 기능 공식 안내](https://developers.google.com/search/docs/appearance/ai-features).
 

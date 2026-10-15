@@ -59,7 +59,8 @@ describe('OpenInAppSheet', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
     advance(1);
 
-    expect(screen.getByRole('dialog')).toBeTruthy();
+    // 검색 결과는 실제 대회·리그 내용을 요약해야 한다. 설치 안내는 여전히 사용자에게 보인다.
+    expect(screen.getByRole('dialog')).toHaveAttribute('data-nosnippet');
     expect(screen.getByRole('link', { name: '앱으로 열기' }).getAttribute('href')).toBe(storeUrl);
     expect(document.querySelector('img')?.getAttribute('src')).toBe('/brand/icon-192.png');
   });

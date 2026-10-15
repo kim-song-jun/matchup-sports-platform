@@ -10,6 +10,7 @@ import type {
   V1Team,
   V1TeamMatch,
   V1TournamentListItem,
+  V1TournamentDetail,
 } from '@/types/api';
 import type { V1PublicLeagueListItem, V1PublicLeagueListResponse } from '@/types/league-match';
 
@@ -31,6 +32,8 @@ const STATIC_ROUTES: Array<{ path: string; priority: number; changeFrequency: Me
   { path: '/teams', priority: 0.8, changeFrequency: 'daily' },
   { path: '/team-matches', priority: 0.8, changeFrequency: 'hourly' },
   { path: '/tournaments', priority: 0.9, changeFrequency: 'daily' },
+  { path: '/tournaments?kind=tournament', priority: 0.8, changeFrequency: 'daily' },
+  { path: '/tournaments?kind=league', priority: 0.8, changeFrequency: 'daily' },
   // League list/detail aliases redirect; only canonical destinations are indexed.
   { path: '/events', priority: 0.8, changeFrequency: 'daily' },
   { path: '/notices', priority: 0.5, changeFrequency: 'daily' },
@@ -62,8 +65,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const notices = settledItems<V1Notice>(results[4]);
   const leagues = settledItems<V1PublicLeagueListItem>(results[5]);
   const tournamentFixtures = (await collectPublicTournamentFixtures(tournaments)).items ?? [];
+  const reviewedTournamentIds = await collectReviewedTournamentIds(tournaments);
 
-  return [
+  const entries: MetadataRoute.Sitemap = [
     ...staticEntries,
     ...publicSiteEntries,
     ...matches.flatMap((item) => {
@@ -84,7 +88,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       sitemapEntry(`/tournaments/${item.id}/bracket`, 0.6, 'daily', item.updatedAt),
       sitemapEntry(`/tournaments/${item.id}/results`, 0.6, 'daily', item.updatedAt),
       sitemapEntry(`/tournaments/${item.id}/awards`, 0.5, 'weekly', item.updatedAt),
-      sitemapEntry(`/tournaments/${item.id}/reviews`, 0.5, 'weekly', item.updatedAt),
+      ...(reviewedTournamentIds.has(item.id)
+        ? [sitemapEntry(`/tournaments/${item.id}/reviews`, 0.5, 'weekly', item.updatedAt)] : []),
       ...(item.campaignSlug
         ? [sitemapEntry(`/tournaments/campaigns/${item.campaignSlug}`, 0.9, 'daily', item.updatedAt)]
         : []),
@@ -103,6 +108,27 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       isRegularLeague: false, competitionId: item.tournamentId, fixtureId: item.fixture.id,
     }), 0.6, 'daily')),
   ];
+  // 통합 대회 목록과 리그 목록이 같은 공개 리그를 반환할 수 있다. 최종 주소는 한 번만 싣는다.
+  const seen = new Set<string>();
+  return entries.filter((entry) => {
+    if (seen.has(entry.url)) return false;
+    seen.add(entry.url);
+    return true;
+  });
+}
+
+async function collectReviewedTournamentIds(tournaments: V1TournamentListItem[]): Promise<Set<string>> {
+  const ids = new Set<string>();
+  for (const item of tournaments) {
+    try {
+      const detail = await fetchPublicV1<V1TournamentDetail>(`/tournaments/${encodeURIComponent(item.id)}`, { cache: 'no-store' });
+      if (detail && detail.reviewsTotalCount > 0) ids.add(item.id);
+    } catch (error) {
+      // 다른 공개 도메인은 계속 발행하되 실패를 빈 후기나 성공으로 기록하지 않는다.
+      console.error(`[seo] 사이트맵 공개 후기 확인 실패: ${item.id}`, error);
+    }
+  }
+  return ids;
 }
 
 function settledItems<T>(result: PromiseSettledResult<T[]>): T[] {
@@ -116,8 +142,7 @@ async function fetchNoticeItems(): Promise<V1Notice[]> {
   return page?.notices ?? [];
 }
 
-// fetchTournamentItems와 같은 이유로 fetchCursorItems<T>() 제네릭 대신 전용 함수를 쓴다 —
-// V1PublicLeagueListResponse는 top-level nextCursor가 없고 pageInfo가 필수 필드다.
+// 리그 공개 여부는 매번 확인한다. V1PublicLeagueListResponse의 pageInfo 커서를 따른다.
 async function fetchLeagueItems(): Promise<V1PublicLeagueListItem[]> {
   const items: V1PublicLeagueListItem[] = [];
   let cursor: string | null = null;

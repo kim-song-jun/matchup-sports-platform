@@ -10,7 +10,7 @@ vi.mock('@/hooks/use-admin-can-write', () => ({ useAdminCanWrite: () => mocks.ca
 vi.mock('@/hooks/use-v1-api', () => ({ useV1MasterRegions: () => ({ data: [], isError: false }) }));
 const initial = { leagueId: 'league-test', title: '기존 리그', rulesText: '운영 안내', regionId: 'region-test',
   startsOn: '2097-12-31T15:00:00.123Z', endsOn: '2098-12-31T14:59:59.999Z',
-  registrationDeadlineAt: '2098-01-01T03:12:34.567Z', plannedFixtureCount: 12,
+  registrationDeadlineAt: '2098-01-01T03:12:34.567Z', plannedFixtureCount: 12, maxTeams: null,
   updatedAt: '2026-10-13T00:00:00.123Z', status: 'draft', sportName: '풋살' };
 const path = '*/api/v1/admin/league-matches/league-test/settings';
 let stored = { ...initial };
@@ -46,7 +46,7 @@ describe('실제 설정 hook/API를 통한 별도 리그 수정 화면', () => {
     expect(screen.queryByRole('button', { name: '상세로 돌아가기' })).toBeNull();
     expect(submitted).toEqual({ title: '변경 리그', rulesText: initial.rulesText, regionId: initial.regionId,
       startsOn: initial.startsOn, endsOn: initial.endsOn, registrationDeadlineAt: initial.registrationDeadlineAt,
-      plannedFixtureCount: 12, expectedUpdatedAt: initial.updatedAt });
+      plannedFixtureCount: 12, maxTeams: null, expectedUpdatedAt: initial.updatedAt });
     expect(stored.title).toBe('변경 리그');
   });
   it('생성과 같은 기본 입력 순서와 날짜 검증을 제공한다', async () => {

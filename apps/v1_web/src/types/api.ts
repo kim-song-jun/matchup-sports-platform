@@ -3631,7 +3631,7 @@ export type V1TournamentListItem = {
   venue: string | null;
   coverImageUrl: string | null;
   /**
-   * **정원. 정규 대회에만 있다** — 리그에는 이 개념이 없어 서버가 생략한다.
+   * **정규 대회의 참가팀 정원.** 리그는 별도 maxTeams를 쓰므로 서버가 생략한다.
    *
    * 거울 행은 `v1_tournaments` 에 살고 `team_count` 가 `@default(8)` 이라, 그대로 내보내면
    * 리그 카드에 **"8팀"** 이 뜬다(실제 참가는 2팀). 그래서 `optional` 이고, **리그 카드는
@@ -3640,6 +3640,8 @@ export type V1TournamentListItem = {
    * `0` 으로 채우지 않는 이유: `0` 은 "정원이 0 인 대회" 로 읽힌다. 없는 것은 부재로 둔다.
    */
   teamCount?: number;
+  /** 정규 리그에만 내려오는 참가팀 정원. null이면 무제한이다. */
+  maxTeams?: number | null;
   /** 리그 시즌에만 있다. 단발 리그는 셋 다 `null`(시리즈 없음) — 없는 것과 다르다. */
   tier?: number | null;
   seasonNo?: number | null;
@@ -3712,7 +3714,7 @@ export type V1Tournament = {
   coverImageUrl: string | null;
   teamCount: number;
   minPlayers: number;
-  /** null = 정원 제한 없음(리그). 대회는 항상 값이 있다. */
+  /** null = 팀당 선수 인원 제한 없음(리그). 참가팀 정원(maxTeams)과 별개다. */
   maxPlayers: number | null;
   /**
    * 위 minPlayers/maxPlayers("등록" 로스터 크기, 성별 쿼터가 묶이는 값)와는 완전히 다른
@@ -3989,6 +3991,8 @@ export type V1TournamentDetail = {
   format: V1TournamentFormat;
   /** 단발 대회 / 정규 리그 시즌. null 은 아직 채워지지 않은 행이다(R5에서 NOT NULL). */
   kind: V1CompetitionKind | null;
+  /** 정규 리그에만 내려오는 참가팀 정원. null이면 무제한이다. */
+  maxTeams?: number | null;
   registrationDeadlineAt: string | null;
   /** 명단(선수단) 제출 마감일 — 지나면 신청 팀의 명단 추가/삭제/수정이 차단된다(팀별 예외 부여 가능). */
   rosterDeadlineAt: string | null;
@@ -4014,7 +4018,7 @@ export type V1TournamentDetail = {
   coverImageUrl: string | null;
   teamCount: number;
   minPlayers: number;
-  /** null = 정원 제한 없음(리그). 대회는 항상 값이 있다. */
+  /** null = 팀당 선수 인원 제한 없음(리그). 참가팀 정원(maxTeams)과 별개다. */
   maxPlayers: number | null;
   genderCategory: V1TournamentGenderCategory | null;
   genderMinMale: number | null;

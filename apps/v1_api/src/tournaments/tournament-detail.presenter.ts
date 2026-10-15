@@ -364,6 +364,7 @@ export function presentTournamentDetail(
     teamCount: row.teamCount,
     minPlayers: row.minPlayers,
     maxPlayers: row.maxPlayers,
+    ...(row.kind === V1CompetitionKind.regular_league ? { maxTeams: row.maxTeams } : {}),
     genderCategory: row.genderCategory,
     genderMinMale: row.genderMinMale,
     genderMaxMale: row.genderMaxMale,

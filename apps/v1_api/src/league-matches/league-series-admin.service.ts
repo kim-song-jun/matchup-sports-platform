@@ -710,6 +710,7 @@ export class LeagueSeriesAdminService {
             bankHolder: true,
             minPlayers: true,
             maxPlayers: true,
+            maxTeams: true,
           },
         });
         const inheritedByTier = new Map(previousSeasonRows.map(({ tier, ...values }) => [tier, values]));

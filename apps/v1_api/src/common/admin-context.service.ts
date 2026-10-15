@@ -21,8 +21,8 @@ export class AdminContextService {
   constructor(private readonly prisma: PrismaService) {}
 
   /** 관리자 권한과 연결된 사용자 계정이 모두 active일 때만 통과. */
-  async getActiveAdmin(userId: string): Promise<V1ActiveAdmin> {
-    const admin = await this.prisma.v1AdminUser.findUnique({
+  async getActiveAdmin(userId: string, tx?: Prisma.TransactionClient): Promise<V1ActiveAdmin> {
+    const admin = await (tx ?? this.prisma).v1AdminUser.findUnique({
       where: { userId },
       select: {
         id: true,
@@ -44,8 +44,8 @@ export class AdminContextService {
   }
 
   /** support 등급은 mutation(생성/수정/상태변경) 불가 — ops·owner만 허용. */
-  async getMutationAdmin(userId: string): Promise<V1ActiveAdmin> {
-    const admin = await this.getActiveAdmin(userId);
+  async getMutationAdmin(userId: string, tx?: Prisma.TransactionClient): Promise<V1ActiveAdmin> {
+    const admin = await this.getActiveAdmin(userId, tx);
     if (admin.adminRole === 'support') {
       throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Support admins cannot mutate' });
     }

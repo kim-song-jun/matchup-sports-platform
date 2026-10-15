@@ -85,6 +85,8 @@ export interface LeagueMirrorSource {
     /** 팀 명단 인원. null = 제한 없음 — 안 이어받으면 다음 시즌이 숨은 기본 정원(10명)으로 돌아가 명단이 잘린다. */
     minPlayers: number;
     maxPlayers: number | null;
+    /** 같은 티어의 선택적 참가팀 정원. 이전 계약 입력은 생략할 수 있고 무제한을 유지한다. */
+    maxTeams?: number | null;
   };
 }
 
@@ -128,6 +130,7 @@ export function leagueMirrorCreateData(
           bankHolder: league.inherited.bankHolder,
           minPlayers: league.inherited.minPlayers,
           maxPlayers: league.inherited.maxPlayers,
+          maxTeams: league.inherited.maxTeams ?? null,
         }),
   };
 }

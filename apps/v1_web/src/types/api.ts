@@ -2,6 +2,7 @@
 // 생기고 서버 계약이 바뀔 때 조용히 갈린다. (league-match.ts 는 이 파일을 import 하지
 // 않으므로 순환이 없다.)
 import type { V1LeagueFixture } from './league-match';
+import type { GamePeriodDuration } from './game-operations';
 
 export type ApiEnvelope<T> = {
   status: 'success';
@@ -1309,6 +1310,8 @@ export type V1TeamMatch = Omit<V1Match, 'status' | 'displayState'> & {
   // Task 17: the Game backing this team match (see docs/api/domains/team-matches.md) —
   // the only client-facing way to reach `/api/v1/games/:gameId/result-revisions*`.
   gameId?: string | null;
+  /** 상세 응답의 실제 pinned 설정. 목록에는 없고 과거 pin 없는 경기는 null이다. */
+  periods?: readonly V1TeamMatchPeriod[] | null;
   sport?: { sportId: string; name: string };
   region?: { regionId: string; name: string; parentName?: string | null } | null;
   place?: V1PlaceView | null;
@@ -1418,6 +1421,28 @@ export type V1MyTeamMatch = {
 };
 
 
+export type V1TeamMatchPeriodInput = { readonly durationMinutes: number };
+
+export type V1TeamMatchPeriod = V1TeamMatchPeriodInput & {
+  readonly code: string;
+  readonly label: string;
+  readonly extraTime: boolean;
+};
+
+export type V1TeamMatchRuleOptions = {
+  readonly hostTeamId: string;
+  readonly sportId: string;
+  readonly competitionConfigVersionId: string;
+  readonly periods: readonly V1TeamMatchPeriod[];
+  /** 같은 종목의 ACTIVE 기본 설정 이력에서 확인한 전후반. 이력이 없으면 null이다. */
+  readonly twoPeriodDefaults: readonly V1TeamMatchPeriod[] | null;
+};
+
+export type V1TeamMatchRulesLockedReason =
+  | 'TEAM_MATCH_RULES_LOCKED'
+  | 'COMPETITION_CONFIG_REQUIRED'
+  | 'COMPETITION_PERIODS_UNAVAILABLE';
+
 export type V1TeamMatchMutationPayload = {
   hostTeamId: string;
   sportId: string;
@@ -1437,6 +1462,8 @@ export type V1TeamMatchMutationPayload = {
   placeProviderId?: string | null;
   costNote?: string | null;
   rulesText?: string | null;
+  /** 1/2개의 기간만 저장한다. 생략하면 생성 기본값 또는 기존 pin을 유지한다. */
+  periods?: readonly V1TeamMatchPeriodInput[];
   minLevelCode?: string | null;
   maxLevelCode?: string | null;
   genderRule?: string | null;
@@ -1451,6 +1478,7 @@ export type V1TeamMatchUpdatePayload = V1TeamMatchMutationPayload & {
 
 export type V1TeamMatchMutationResult = {
   teamMatchId: string;
+  gameId?: string | null;
   status: V1TeamMatchApiStatus;
   hostTeamId?: string;
   detailRoute: string;
@@ -1463,6 +1491,9 @@ export type V1TeamMatchEdit = {
   teamMatchId: string;
   editable: boolean;
   lockedReason: string | null;
+  rulesEditable: boolean;
+  rulesLockedReason: V1TeamMatchRulesLockedReason | null;
+  competitionConfigVersionId: string | null;
   form: {
     hostTeamId: string;
     sportId: string;
@@ -1482,6 +1513,7 @@ export type V1TeamMatchEdit = {
     placeProviderId?: string | null;
     costNote?: string | null;
     rulesText?: string | null;
+    periods: readonly V1TeamMatchPeriodInput[] | null;
     minLevelCode?: string | null;
     maxLevelCode?: string | null;
     genderRule?: string | null;
@@ -1600,6 +1632,7 @@ export type V1Game = {
   currentOfficialRevisionId: string | null;
   sides: V1GameSide[];
   periods: unknown[];
+  periodDurations?: readonly GamePeriodDuration[] | null;
   lineups: V1GameLineupSummary[];
   actorRole: string;
   lineupConfig?: V1LineupConfig;

@@ -138,6 +138,16 @@ Public team-match list/detail include the assigned field's name. For league/tour
 | POST | `/admin/team-matches/:id/applications/:applicationId/reject` | Admin owner/ops | 대기 신청을 사유와 함께 거절 |
 | PATCH | `/admin/team-matches/:id` | Admin owner/ops | 모집 중/마감된 플랫폼 단발 팀매치 수정 |
 
+## Ordinary team-match period rules (MD-QA #141)
+
+일반 호스트의 기존 `POST /team-matches`, `PATCH /team-matches/:teamMatchId`에 선택적 `periods: [{ durationMinutes: number }]`를 추가한다. 관리형 대회·리그 경기의 관리자 전용 설정 API를 일반 호스트에게 열지 않는다. 생성 시 생략하면 기존 기본 config를 사용하고 수정 시 생략하면 현재 immutable pin을 유지한다. 명시적으로 보낸 경우 1개(단판) 또는 2개(전후반)이며 각각 숫자 정수 `1..2147483647`이어야 한다. 문자열·boolean·null·중첩 배열·추가 필드와 범위 초과는 전역 DTO 검증의 `400 VALIDATION_ERROR`, direct-service의 잘못된 기간은 `422 TEAM_MATCH_PERIODS_INVALID`다. 상한은 실제 PostgreSQL 피리어드 trigger의 int4 범위와 일치한다.
+
+- `GET /api/v1/teams/:teamId/team-match-rule-options`: V1AuthGuard와 active 계정·호스트 owner/manager를 확인한다. `{hostTeamId,sportId,competitionConfigVersionId,periods,twoPeriodDefaults}`를 반환한다. `periods`는 현재 ACTIVE `${sportCode}-v1` 기본값 그대로다. `twoPeriodDefaults`는 같은 종목·global 계열 ACTIVE 이력에서 얻은 실제 FIRST_HALF/SECOND_HALF 두 값 또는 `null`이며, 단판 기본값을 가짜 전후반 값으로 바꾸지 않는다. 이력이 여러 페이지여도 끝까지 확인한다. 현재 지원 가능한 단판·전후반 구성이 없으면 `409 COMPETITION_CONFIG_REQUIRED` 또는 `COMPETITION_PERIODS_UNAVAILABLE`이다.
+- 사용자 기간은 `${sportCode}-team-match-rules-v1` 별도 계열에 발행하여 global default를 변경하지 않는다. 같은 종목·ACTIVE·실제 canonical JSON이 같으면 전역 unique contentHash의 기존 버전을 이름 계열과 관계없이 재사용한다. 종목/상태/실제 내용이 다르면 `409 COMPETITION_CONFIG_CONTENT_HASH_COLLISION`이다. 대회 period writer도 같은 판정을 사용하고 기존 pending fixture 적용·동일 값 복구·감사를 유지한다. 동시 발행으로 결과를 찾지 못하면 명시적 `TEAM_MATCH_RULES_RETRYABLE` 충돌을 반환한다.
+- `PATCH`는 기존 호스트 권한·버전·미래 일정 gate에 추가해 Game 다음 TeamMatch 순서로 잠그고 다시 검증한다. 제출/잠금 명단, 시작·종료·pause 이력, 이벤트·결과 또는 LIVE/PAUSED/ENDED면 `409 TEAM_MATCH_RULES_LOCKED`다. 실제 source가 만든 revision1 DRAFT 명단과 선수 identity는 유지하고 두 pin 및 미시작 period 구성을 같은 트랜잭션에서 바꾼다. 과거 null pin/periods에 임의 규칙을 합성하지 않는다.
+- 생성·수정 응답과 상세·edit·Game 조회는 같은 저장값을 사용한다. 상세 `periods`는 단판·불균등 전후반을 그대로 읽고, 운영 콘솔은 기존 `periodDurations`/pinned config를 사용한다. 생성 `/team-matches/new/rules`, 수정 `/team-matches/:id/edit/rules`는 중간 저장 없이 마지막 기존 POST/PATCH 한 번으로 반영한다. 수정 초안은 entity/version 범위로 기기에 보존하고 서버 버전이 다르면 섞지 않는다.
+- frontend `useV1TeamMatchRuleOptions`, API types 및 `src/test/msw/team-match-rules-*`는 같은 계약이다. MSW는 actual current defaults/nullable half history, int4 상한, auth/상태/버전 및 시작·종료·마감 날짜 검증을 보존한다. 날짜 오류는 `400 VALIDATION_FAILED`와 field 정보이며, 수정 시 기존의 동일한 경과 마감일만 예외로 유지한다. mock 성공은 실제 PostgreSQL/alpha 증거가 아니다.
+
 ## GET /me/team-matches
 
 마이페이지에서 사용하는 로그인 사용자 기준 팀매치 목록이다.

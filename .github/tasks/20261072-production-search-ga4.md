@@ -1,10 +1,40 @@
 # Task 20261072: 운영 검색 노출 및 홈 GA4 계측 정정
 
-Status: Oct 13 production release complete; Oct 15 keyword/snippet follow-up in progress
-**Owner**: Codex main (단일 에이전트)
+Status: Oct 15 prior release complete; local-discovery content and Alpha deployment repair in progress
+**Owner**: Codex main; explicit Luna implementation and Sol independent review
 **Created**: 2026-10-12
 
-## Current Cursor — 2026-10-15
+## Current Cursor — 2026-10-15 23:16 KST
+
+User explicitly requested immediate existing-page enrichment for 동네 풋살 / 풋살 대회 and AI retrieval, Alpha repair, Alpha verification and scoped main deployment. No new product route, geographic landing page, operating-data mutation, auth/privacy/key/store change or unrelated dev promotion is authorized by this follow-up.
+
+Resume sources: `/Users/sungjun/.cache/teameet-seo-release/STATUS.md`, `MONITOR.md` and evidence directory. Previous main PR #1927 deployed `58a2f6663480cfff97a38b53723bd93ad286f117`, release 1.9.2; five priority Google URLs actually indexed. This proves neither generic ranking nor AI citation. Daily monitor `teameet-ai-luna` is active. Its initial four Google organic queries returned 8–9 inspected results with no Teameet match; two completed AI answers had no Teameet mention/citation. New source work is active, so monitoring must not duplicate the release.
+
+Owned reusable checkout fast-forwarded cleanly from `94f4fc48f` to dev `d77f8e3176ffa03ad39a32f0f6a04c19e7a75bcb`; only pre-existing untracked node_modules symlinks. Shared-root bracket WIP and release-files.txt remain untouched. No branch switch/new worktree.
+
+Bounded design: add compact, visible, server-prerendered locality guidance inside existing team and competition lists, with descriptive links to existing team/daily-match/tournament/league routes. Use actual sport/activity-area/venue/date/eligibility facts, preserve multi-sport support and filter-row geometry. No hidden keyword list, fabricated neighborhood functionality, fake venue address or AI-placement promise.
+
+Parallel ownership:
+- Luna web implementation: teams metadata and list-view insertion; tournament type copy and list insertion; reusable local-discovery guidance and narrow rendered contract tests. Root owns this task, Changeset and release.
+- Luna deployment-gate repair: only `apps/v1_api/test/games/game-projection.integration-spec.ts` expired-lease setup. Runtime worker/service/schema changes require renewed analysis, not automatic scope expansion.
+- Sol independent review: final diff and actual lease/backoff contract; implementation claims are not accepted as proof.
+
+Implementation: compact shared public API `src/shared/ui/local-discovery-guidance/index.tsx` is rendered inside existing team and competition list views; all/tournament/league have distinct factual guidance, generic labels link to unfiltered existing destinations. No new routes/fetches/JSON-LD/data. Root preserved the complete removed old-module cleanup. Sol first review found all-kind guidance, unfiltered labels and shared public API gaps; corrections are under focused re-review. New/updated rendered-copy and metadata tests pass 7/7 across two files. Earlier web typecheck and pattern checks passed; final exact-head CI must compile the moved import paths. Alpha before screenshots captured settled three routes at 390/768/1440; no overflow or alert. Six sampled Alpha/prod HTTP paths and DB health are normal; production SHA unchanged.
+
+Deployment-gate fix: the fixture now floors current time to milliseconds and backdates the lease by the existing first retry delay plus 1ms. Production retry/worker semantics and all CAS/takeover assertions are unchanged. `git diff --check` passed; local PostgreSQL contract run is unavailable without a test DB connection and is explicitly deferred to exact-head CI. No other project containers or data were touched.
+
+Alpha diagnosis: all six sampled Alpha/prod HTTP paths are 200 and DB health true. Alpha serves `c4f477c31ff453cce371033381ad2065d355f635`, behind dev. Matching dev CI `38744066123` failed one PostgreSQL takeover-lease assertion (1 failed / 1202 passed); Alpha `38744066281` stopped waiting for CI. Equality at the retry available-at timestamp is under investigation. Browser home/tournaments hydrate normally; user-reported runtime symptom is not yet independently reproduced. Asked for affected route while continuing diagnosis.
+
+Exit proof:
+- [ ] Region/futsal guidance and real existing-route links are present in initial HTML and ordinary visible UI, without unsupported claims or filter regressions.
+- [ ] Expired-lease CI contract remains meaningful and deterministic; exact-head API/Web/Gates pass.
+- [ ] Independent Sol review has no unresolved blocking findings.
+- [ ] Latest matching Alpha deployment serves the tested SHA; 390/768/1440 views, links, filtering and bottom content pass actual browser/error/network checks.
+- [ ] Alpha noindex boundary and sitemap/AI-publication exclusions remain intact.
+- [ ] Only approved source/release paths are promoted; production serves the exact successful main SHA and public pages/health/metadata pass.
+- [ ] Public search/AI observations are reported separately from code deployment and indexing; monitor cursor is updated and owned processes/space are closed.
+
+## Historical Cursor — earlier 2026-10-15
 - User authorized existing routes only, Alpha verification then scoped main deployment. No further deployment permission is needed.
 - Oct 13 PRs #1902/#1903 and production run 38393464125 completed. Later releases advanced production to `37e314f212717027e478916c56e6ca1e8e08585c`; historical receipts are not current ranking evidence.
 - Actual Korean Google first results/AI area for 풋살 대회 and 풋살 리그 contained no Teameet source link. Site-restricted 풋살 search does show the mixed Teameet cup, friendly matches and teams. The league query also has official FK-league intent. A review snippet contained app-install copy.

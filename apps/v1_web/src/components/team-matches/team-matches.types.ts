@@ -1,6 +1,7 @@
+import type { TeamMatchRuleDraft } from './team-match-rules-draft';
 import type { ConfirmOptions, ConfirmReasonConfig } from '@/components/v1-ui/confirm-modal';
 import type { PlaceValue } from '@/lib/place';
-import type { V1PlaceView, V1RecentVenue, V1TeamMatchApiStatus } from '@/types/api';
+import type { V1PlaceView, V1RecentVenue, V1TeamMatchApiStatus, V1TeamMatchPeriod, V1TeamMatchPeriodInput } from '@/types/api';
 
 export type TeamMatchModel = {
   id: string;
@@ -124,6 +125,8 @@ export type TeamMatchDetailMode = 'default' | 'pending' | 'approved' | 'mine' | 
 export type TeamMatchDetailViewModel = {
   match: TeamMatchModel & {
     description: string;
+    /** 현재 상세 API가 내려준 immutable 규칙. 과거 pin 부재는 null이다. */
+    readonly periods?: readonly V1TeamMatchPeriod[] | null;
     /** 서버가 내려준 장소 스냅샷(좌표 없으면 이름·주소만). */
     place: V1PlaceView | null;
     hostTeamHref?: string;
@@ -276,10 +279,27 @@ export type TeamMatchDetailViewModel = {
 // 'complete' 스텝(웨이브4 이전): /team-matches/new/complete 페이지가 썼는데, 실제 제출 성공
 // 경로는 항상 /team-matches/:id 로 바로 이동해(team-matches-create-client.tsx) 이 스텝에
 // 닿는 진짜 경로가 없었다(죽은 라우트, 2026-09-04 감사) — 라우트·컴포넌트와 함께 제거한다.
-export type TeamMatchCreateStep = 'team' | 'sport' | 'info' | 'condition' | 'place-time' | 'confirm' | 'edit';
+export type TeamMatchCreateStep = 'team' | 'sport' | 'info' | 'condition' | 'rules' | 'place-time' | 'confirm' | 'edit' | 'edit-rules';
+
+export type TeamMatchRulesControl = {
+  periods: readonly V1TeamMatchPeriodInput[] | null;
+  twoPeriodDefaults?: readonly V1TeamMatchPeriodInput[] | null;
+  loading?: boolean;
+  error?: string | null;
+  validationError?: string;
+  lockedReason?: string | null;
+  allowDefaultChoice?: boolean;
+  defaultSelected?: boolean;
+  retryPending?: boolean;
+  onRetry?: () => void;
+  onKeepDefault?: () => void;
+  onChange: (periods: readonly V1TeamMatchPeriodInput[]) => void;
+};
 
 export type TeamMatchCreateViewModel = {
   step: TeamMatchCreateStep;
+  rules?: TeamMatchRulesControl;
+  onOpenRules?: () => void;
   /** Back-arrow target. Edit flow points to the real team-match detail; create flow falls back to the list. */
   backHref?: string;
   selectedTeam: string;
@@ -289,6 +309,7 @@ export type TeamMatchCreateViewModel = {
   teams: Array<{ name: string; sport: string; members: number; role: string; selected?: boolean; disabled?: boolean }>;
   sports: string[];
   draft: {
+    rules?: TeamMatchRuleDraft;
     title: string;
     description: string;
     grade: string;
@@ -328,6 +349,7 @@ export type TeamMatchCreateViewModel = {
     onCancel?: () => void;
     submitLabel?: string;
     submitting?: boolean;
+    primaryBlocked?: boolean;
     /** 이미지 업로드가 끝나기 전에 이동하거나 저장하면 빈 URL이 저장될 수 있으므로
      * 업로드 중에는 화면의 주 행동을 잠근다. */
     imageUploading?: boolean;

@@ -80,6 +80,9 @@ import { v1GameRosterMswHandlers } from './game-roster-handlers';
 import { v1TeamDissolutionMswHandlers } from './team-dissolution-handlers';
 import { v1TeamInviteLinkMswHandlers } from './team-invite-link-handlers';
 import { v1LeagueVisibilityMswHandlers } from './league-visibility-handlers';
+import { createV1TeamMatchRulesMswHandlers } from './team-match-rules-handlers';
+
+export const v1TeamMatchRulesMsw = createV1TeamMatchRulesMswHandlers(v1TeamMatchesFixture);
 
 const api = '*/api/v1';
 
@@ -709,6 +712,7 @@ export const v1MswHandlers = [
   ...v1TeamDissolutionMswHandlers,
   ...v1TeamInviteLinkMswHandlers,
   ...v1LeagueVisibilityMswHandlers,
+  ...v1TeamMatchRulesMsw.handlers,
   http.get(`${api}/auth/me`, () => ok(v1UserFixture)),
   http.post(`${api}/auth/phone/issue`, ({ request }) => issueAuthPhone(request)),
   http.post(`${api}/auth/phone/verify`, ({ request }) => verifyAuthPhone(request)),
@@ -895,7 +899,7 @@ export const v1MswHandlers = [
   http.get(`${api}/me/teams`, () => ok(v1TeamsFixture)),
   http.get(`${api}/me/team-matches`, ({ request }) => {
     const scope = new URL(request.url).searchParams.get('scope');
-    const items = v1TeamMatchesFixture.map((item) => {
+    const items = v1TeamMatchRulesMsw.listItems().map((item) => {
       const teamMatchId = item.id;
       const createdByMe = scope === 'created';
 
@@ -904,10 +908,10 @@ export const v1MswHandlers = [
         title: item.title,
         sportName: item.sport?.name ?? item.sportName ?? '종목 미정',
         startsAt: item.startsAt,
-        deadlineAt: null,
-        status: 'recruiting',
-        displayState: 'recruiting',
-        isLive: false,
+        deadlineAt: item.deadlineAt ?? null,
+        status: item.status,
+        displayState: item.displayState ?? item.status,
+        isLive: item.isLive ?? false,
         relation: createdByMe ? 'created_by_me' : 'approved',
         teamId: item.hostTeamId ?? null,
         teamName: item.hostTeam?.name ?? item.hostTeamName ?? null,
@@ -921,12 +925,13 @@ export const v1MswHandlers = [
     return ok(page(items));
   }),
   http.get(`${api}/team-matches`, ({ request }) => {
+    const storedTeamMatches = v1TeamMatchRulesMsw.listItems();
     const sportId = new URL(request.url).searchParams.get('sportId');
     const levelCodes = new URL(request.url).searchParams.get('levelCodes')?.split(',').filter(Boolean) ?? [];
     const sport = v1SportsFixture.find((item) => item.id === sportId);
     const teamMatchesBySport = sport
-      ? v1TeamMatchesFixture.filter((item) => item.sport?.sportId === sport.id || item.sportName === sport.name)
-      : v1TeamMatchesFixture;
+      ? storedTeamMatches.filter((item) => item.sport?.sportId === sport.id || item.sportName === sport.name)
+      : storedTeamMatches;
     const flags = readToggles(request);
     const byLevel = levelCodes.length
       ? teamMatchesBySport.filter((item) => rangeMatches(levelCodes, item.minLevel?.code, item.maxLevel?.code))
@@ -934,11 +939,10 @@ export const v1MswHandlers = [
     const teamMatches = applyToggles(byLevel, flags, false);
     // 종목 건수만 종목 필터를 빼고 센다(토글은 유지). 토글 칩은 종목·레벨 필터를 유지하고 자기 토글만 뺀다.
     const ignoringSportByLevel = levelCodes.length
-      ? v1TeamMatchesFixture.filter((item) => rangeMatches(levelCodes, item.minLevel?.code, item.maxLevel?.code))
-      : v1TeamMatchesFixture;
+      ? storedTeamMatches.filter((item) => rangeMatches(levelCodes, item.minLevel?.code, item.maxLevel?.code))
+      : storedTeamMatches;
     return ok(pageWithCounts(request, teamMatches, applyToggles(ignoringSportByLevel, flags, false), toggleFacets(byLevel, flags, false)));
   }),
-  http.get(`${api}/team-matches/:teamMatchId`, ({ params }) => ok(v1TeamMatchesFixture.find((item) => item.id === params.teamMatchId) ?? v1TeamMatchesFixture[0])),
   http.get(`${api}/chat/rooms`, () => ok(v1ChatRoomsFixture)),
   http.get(`${api}/chat/rooms/:roomId`, ({ params }) => {
     const room = v1ChatRoomsFixture.items.find((item) => item.roomId === params.roomId) ?? v1ChatRoomsFixture.items[0];

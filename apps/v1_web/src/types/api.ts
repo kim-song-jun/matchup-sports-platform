@@ -4203,6 +4203,8 @@ export type V1TournamentPlayer = {
  */
 export type V1TournamentRosterPlayer = Omit<V1TournamentPlayer, 'realName'> & {
   realName: string | null;
+  /** 경기 명단과 같은 공개 표시 이름. 구버전 서버 응답에는 없을 수 있다. */
+  displayName?: string;
   /** 프로필이 없으면 null — 실명으로 대체하지 않는다. */
   nickname: string | null;
   /** false 면 이 행의 개인정보 세 필드는 "미입력"이 아니라 가려진 것이다. */

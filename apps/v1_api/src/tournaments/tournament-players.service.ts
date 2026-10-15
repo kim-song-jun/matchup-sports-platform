@@ -27,6 +27,7 @@ import {
 import { ALL_COMPETITION_KINDS, findTournamentOnSurface } from './tournament-surface-lookup';
 import { competitionTeamTargets, enqueueRosterResync } from '../games/roster/roster-resync-events';
 import { endsWithFinalConsonant } from '../common/korean-josa';
+import { participantDisplayName } from './participant-display-name';
 
 /**
  * 명단 표면은 **대회와 리그를 함께** 받는다.
@@ -254,7 +255,7 @@ export class TournamentPlayersService {
 
     const players = await this.prisma.v1TournamentPlayer.findMany({
       where: { registrationId, removedAt: null },
-      include: { user: { select: { profile: { select: { nickname: true } } } } },
+      include: { user: { select: { profile: { select: { nickname: true, displayName: true } } } } },
       orderBy: { addedAt: 'asc' },
     });
 
@@ -269,6 +270,7 @@ export class TournamentPlayersService {
           jerseyByPlayerId.get(player.id) ?? null,
           playerUser.profile?.nickname ?? null,
           { personalInfo: isManagement || player.userId === user.id, reviewNote: isManagement },
+          participantDisplayName({ user: playerUser }),
         ),
       ),
       belowMinimum: players.length < tournament.minPlayers,
@@ -1149,6 +1151,7 @@ export class TournamentPlayersService {
     jerseyNumber: number | null,
     nickname: string | null,
     access: { personalInfo: boolean; reviewNote: boolean },
+    displayName: string,
   ) {
     const player = this.serializePlayer(row, jerseyNumber);
     return {
@@ -1158,6 +1161,7 @@ export class TournamentPlayersService {
         : { realName: null, birthDateSnapshot: null, genderSnapshot: null }),
       ...(access.reviewNote ? {} : { eligibilityNote: null }),
       nickname,
+      displayName,
       personalInfoVisible: access.personalInfo,
     };
   }

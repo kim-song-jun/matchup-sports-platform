@@ -61,14 +61,14 @@ export function RegistrationRosterEntry({
         }}
       >
         <span className="tm-text-caption" style={{ wordBreak: 'keep-all' }}>
-          {editHint ? `선수 추가·빼기와 등번호는 ${noun} 참가 명단에서 바꿔요` : unavailableMessage}
+          {editHint ? `선수 추가·삭제와 등번호는 ${noun} 참가 명단의 공통 설정이에요` : unavailableMessage}
         </span>
         <Link
           href={href}
           className="tm-btn tm-btn-sm tm-btn-ghost"
           style={{ minHeight: 44, gap: 2, flex: '0 0 auto', color: 'var(--blue700)' }}
         >
-          {editHint ? '참가 명단' : readonlyLabel}
+          {editHint ? `${noun} 참가 명단 관리` : readonlyLabel}
           <ChevronRightIcon size={14} strokeWidth={2.2} aria-hidden="true" />
         </Link>
       </div>
@@ -79,11 +79,11 @@ export function RegistrationRosterEntry({
     <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
       <p className="tm-text-caption" style={{ margin: '0 0 8px', color: 'var(--text-muted)', wordBreak: 'keep-all' }}>
         {!editHint ? unavailableMessage : hasRoster
-          ? `선수를 더하거나 명단에서 아예 빼려면 ${noun} 참가 명단에서 바꿔요. 바꾸면 시작 전 경기에 모두 반영돼요.`
+          ? `선수 추가·삭제와 등번호는 ${noun} 참가 명단에서 관리해요. 선수 변경은 시작 전 경기에 반영돼요. 이번 경기 출전 체크와는 별개예요.`
           : `${noun} 참가 명단을 내면 그 선수들로 경기 명단이 정해져요.`}
       </p>
       <Link href={href} className="tm-btn tm-btn-md tm-btn-outline tm-btn-block" style={{ minHeight: 44, gap: 4 }}>
-        {!editHint ? readonlyLabel : hasRoster ? '참가 명단에서 선수 추가·빼기' : '참가 명단 내러 가기'}
+        {!editHint ? readonlyLabel : hasRoster ? `${noun} 참가 명단 관리` : '참가 명단 내러 가기'}
         <ChevronRightIcon size={16} strokeWidth={2.2} aria-hidden="true" />
       </Link>
     </div>

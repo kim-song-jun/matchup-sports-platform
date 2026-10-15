@@ -8,6 +8,7 @@ import { V1ApiError } from '@/lib/api-client';
 import { gameRosterErrorMessage } from '@/lib/game-roster-errors';
 import { gameRosterReasonLabel } from '@/lib/v1-status-labels';
 import { GameRosterQuickSheet } from './game-roster-quick-sheet';
+import { GAME_ROSTER_TITLE } from '@/lib/roster-presentation';
 import { RegistrationRosterEntry } from './registration-roster-entry';
 import type { MyMatchRosterTeam } from './use-my-match-roster-team';
 
@@ -38,7 +39,7 @@ export function MatchTeamRosterCard({
     return (
       <Card pad={16}>
         <h2 className="tm-text-body-lg" style={{ fontWeight: 700, margin: 0 }}>
-          우리 팀 출전
+          {GAME_ROSTER_TITLE}
         </h2>
         <p className="tm-text-caption" style={{ margin: '4px 0 0' }}>
           {gameRosterErrorMessage(team.error, '우리 팀 경기 정보를 불러오지 못했어요.')}
@@ -69,7 +70,7 @@ function ResolvedRosterCard({
     return (
       <Card pad={16}>
         <h2 className="tm-text-body-lg" style={{ fontWeight: 700, margin: 0 }}>
-          우리 팀 출전
+          {GAME_ROSTER_TITLE}
         </h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
           <p className="tm-text-caption" style={{ margin: 0 }}>
@@ -93,7 +94,7 @@ function ResolvedRosterCard({
     <Card pad={16}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <h2 className="tm-text-body-lg" style={{ fontWeight: 700, margin: 0 }}>
-          우리 팀 출전
+          {GAME_ROSTER_TITLE}
         </h2>
         <span className="tm-badge tm-badge-sm tm-badge-green">{data.counts.participating}명</span>
       </div>
@@ -145,7 +146,7 @@ function ResolvedRosterCard({
         onClose={() => setSheetOpen(false)}
         onSaved={(count) => {
           setSheetOpen(false);
-          setNotice(`${count}명을 이번 경기에서 뺐어요.`);
+          setNotice(`출전 명단 ${count}건을 저장했어요.`);
         }}
         onStale={() => void roster.refetch()}
       />
@@ -159,7 +160,7 @@ function RosterFooter({ view, onAdjust }: { view: V1GameRosterView; onAdjust: ()
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 8 }}>
         <span className="tm-text-caption">경기 시작 전까지 바꿀 수 있어요</span>
         <Button variant="outline" size="sm" onClick={onAdjust}>
-          명단 조정
+          출전 명단 조정
         </Button>
       </div>
     );

@@ -802,6 +802,19 @@ describe('TournamentPlayersService', () => {
   });
 
   // ─── 8-1. 명단 조회의 개인정보 — 팀장·매니저와 본인 행만 실명·생년월일·성별을 본다 ────
+  it('참가 명단의 표시 이름도 경기 명단 규칙을 쓰고 실명으로 대체하지 않는다', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'owner' });
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
+    prisma.v1TournamentPlayer.findMany.mockResolvedValue([
+      playerRow({ user: { profile: { nickname: '경기닉네임', displayName: '프로필표시이름' } } }),
+      playerRow({ id: 'p2', userId: 'u2', user: { profile: { nickname: null, displayName: '프로필표시이름' } } }),
+      playerRow({ id: 'p3', userId: 'u3', user: { profile: null } }),
+    ]);
+    const result = await service.listPlayers(manager, 'tournament-1', 'reg-1');
+    expect(result.players.map((player) => player.displayName)).toEqual(['경기닉네임', '프로필표시이름', '팀원']);
+    expect(result.players[0].realName).toBe('홍길동');
+  });
   //
   // 한 팀에 owner·manager·member 를 모두 두고 **같은 명단**을 조회한다. 좁히는 변경이라
   // 대조군이 없으면 "member 가 못 받는다" 단언이 게이트를 과하게 좁혀도(팀장까지 가려도)

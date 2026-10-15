@@ -1,6 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { Button } from '@/components/v1-ui/button';
-import { PlusIcon } from '@/components/v1-ui/icons';
 import type { V1TeamRosterCellStatus } from '@/hooks/use-v1-game-roster';
 import { GAME_ROSTER_AUTO_ACTOR_LABEL, gameRosterActorRoleLabel } from '@/lib/v1-status-labels';
 import { gameRosterStatusChip } from '@/lib/competition-status';
@@ -47,7 +46,7 @@ export interface GameRosterPlayerRowProps {
   note?: string | null;
   /** 오른쪽 조작 영역(토글·버튼). 조작 요소의 44px 터치는 호출부가 맡는다. */
   trailing?: ReactNode;
-  /** 있으면 등번호 칸이 버튼이 된다 — 눌러서 번호를 넣거나 바꾼다(빈 칸은 점선 "+"). */
+  /** 있으면 등번호 칸이 버튼이 된다 — 눌러서 번호를 넣거나 바꾼다(빈 칸은 "번호 등록"). */
   onJerseyPress?: () => void;
 }
 
@@ -93,7 +92,7 @@ export function GameRosterPlayerRow({
           aria-label={`${displayName} 등번호 넣기`}
           style={emptyJerseyButtonStyle}
         >
-          <PlusIcon size={16} strokeWidth={2} />
+          번호 등록
         </Button>
       ) : (
         <Button
@@ -129,7 +128,7 @@ export function GameRosterPlayerRow({
 }
 
 /** 출전 체크의 뜻 — 체크를 쓰는 화면마다 같은 문구로 보인다. */
-export const GAME_ROSTER_PLAYING_HINT = '체크를 풀면 이번 경기에서 빠져요.';
+export const GAME_ROSTER_PLAYING_HINT = '체크된 선수가 출전해요. 빠질 선수만 체크를 풀어 주세요.';
 
 /**
  * 이번 경기 출전 체크 — 경기 명단 화면과 빠른 선택 시트가 같이 쓴다. 두 화면 모두 체크 = 출전,
@@ -139,16 +138,19 @@ export function GameRosterPlayingCheckbox({
   displayName,
   playing,
   onChange,
+  disabled = false,
 }: {
   displayName: string;
   playing: boolean;
   onChange: (playing: boolean) => void;
+  disabled?: boolean;
 }) {
   return (
     <label style={checkboxLabelStyle}>
       <input
         type="checkbox"
         checked={playing}
+        disabled={disabled}
         onChange={(event) => onChange(event.target.checked)}
         aria-label={`${displayName} 이번 경기 출전`}
         style={checkboxStyle}
@@ -170,8 +172,7 @@ const checkboxStyle: React.CSSProperties = { width: 22, height: 22, margin: 0, a
 const jerseyButtonStyle: CSSProperties = { flex: '0 0 auto', minWidth: 44, padding: 0, fontWeight: 700 };
 const emptyJerseyButtonStyle: CSSProperties = {
   flex: '0 0 auto',
-  minWidth: 44,
-  padding: 0,
-  borderStyle: 'dashed',
+  minWidth: 60,
+  padding: '0 var(--spacing-1)',
   color: 'var(--text-muted)',
 };

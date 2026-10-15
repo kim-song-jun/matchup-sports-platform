@@ -30,6 +30,7 @@ import { gameRosterErrorMessage, isStaleGameRosterWrite } from '@/lib/game-roste
 import { gameRosterEditStateLabel } from '@/lib/v1-status-labels';
 import { formatExclusiveEndRangeShort, formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { draftToChanges, resetToRegistrationChanges, type GameRosterDraft } from '@/components/game-roster/game-roster-draft';
+import { compareRosterPlayers, GAME_ROSTER_SCOPE, GAME_ROSTER_TITLE, ROSTER_SAVE_LABEL } from '@/lib/roster-presentation';
 
 type Notice = { tone: 'info' | 'error'; message: string };
 
@@ -134,6 +135,8 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
   const jerseyLocked = started && data.viewerRole === 'TEAM_MANAGER' && data.baseSource === 'REGISTRATION';
   const jerseyTarget = jersey === null ? null : (data.base.find((row) => row.userId === jersey.userId) ?? null);
   const competitionNoun = data.competitionKind === 'LEAGUE' ? '리그' : '대회';
+  const selectionPlayers = [...data.participants, ...data.excluded].sort(compareRosterPlayers);
+  const excludedIds = new Set(data.excluded.map((row) => row.userId));
 
   function goalkeeperControl(row: { userId: string; displayName: string; goalkeeper: boolean }) {
     const checked = goalkeepers[row.userId] ?? row.goalkeeper;
@@ -197,7 +200,7 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
       <Card pad={16}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <h1 className="tm-text-body-lg" style={{ fontWeight: 700, margin: 0, overflowWrap: 'anywhere' }}>
-            {data.opponentName === null ? '경기 명단' : `vs ${data.opponentName}`}
+            {data.opponentName === null ? GAME_ROSTER_TITLE : `vs ${data.opponentName}`}
           </h1>
           <StateBadge view={data} />
         </div>
@@ -254,15 +257,16 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
       <RosterSection
         title={`출전 ${data.participants.length - pendingExcludes + pendingRevokes}명`}
         sub={
-          canEdit && data.participants.length > 0 ? (
+          canEdit && selectionPlayers.length > 0 ? (
             <>
               {GAME_ROSTER_PLAYING_HINT}
-              <br />{data.goalkeeperEditable === false ? 'GK는 팀장·매니저와 대회 운영진이 관리해요.' : '골키퍼는 GK 버튼으로 선택해요. 여러 명을 지정할 수 있고, 이 대회의 시작 전 경기에도 유지돼요.'}
+              <br />{GAME_ROSTER_SCOPE}
+              <br />{data.goalkeeperEditable === false ? 'GK는 팀장·매니저와 대회 운영진이 관리해요.' : `GK는 ${competitionNoun} 공통 설정이에요. 여러 명을 지정할 수 있고, 시작 전 경기에도 반영돼요.`}
               {data.jerseyRegistrationId !== null ? (
                 <>
                   <br />
                   {data.jerseyEditable
-                    ? `번호 칸을 눌러 등번호를 넣어요. ${competitionNoun} 참가 명단에 저장돼요.`
+                    ? `등번호도 ${competitionNoun} 참가 명단에 공통으로 저장돼요. 번호 칸을 눌러 등록해 주세요.`
                     : `${competitionNoun} 참가 명단이 마감돼 번호를 바꿀 수 없어요. 운영진에게 문의해 주세요.`}
                 </>
               ) : null}
@@ -279,33 +283,43 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
           ) : null
         }
       >
-        {data.participants.length === 0 ? (
+        {selectionPlayers.length === 0 ? (
           <p className="tm-text-caption" style={{ margin: 0 }}>
             출전하는 선수가 없어요.
           </p>
         ) : canEdit ? (
           <ul style={listStyle}>
-            {data.participants.map((row) => {
+            {selectionPlayers.map((row) => {
               const entry = draft[row.userId];
               const leaving = entry?.op === 'EXCLUDE' ? entry : null;
+              const wasExcluded = excludedIds.has(row.userId);
+              const playing = entry === undefined ? !wasExcluded : entry.op === 'REVOKE';
               return (
                 <li key={row.userId} style={rowItemStyle}>
                   <GameRosterPlayerRow
                     jerseyNumber={row.jerseyNumber}
                     displayName={row.displayName}
                     accountLinked={row.accountLinked}
-                    status={leaving ? 'EXCLUDED' : 'PARTICIPATING'}
-                    reason={leaving?.reason ?? null}
-                    note={leaving ? '저장하면 이번 경기에서 빠져요' : row.joinedAfterFixtureCreated ? '새로 추가' : null}
+                    status={playing ? 'PARTICIPATING' : 'EXCLUDED'}
+                    reason={playing ? null : leaving?.reason ?? ('reason' in row ? row.reason : null)}
+                    actorRole={!playing && 'actor' in row ? row.actor.role : undefined}
+                    note={leaving
+                      ? '저장하면 이번 경기에서 빠져요'
+                      : entry?.op === 'REVOKE'
+                        ? '저장하면 출전으로 돌아가요'
+                        : 'joinedAfterFixtureCreated' in row && row.joinedAfterFixtureCreated ? '새로 추가' : null}
                     onJerseyPress={jerseyPressable ? () => setJersey({ userId: row.userId, open: true }) : undefined}
                     trailing={
                       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-1)' }}>
                         {goalkeeperControl(row)}
-                      <GameRosterPlayingCheckbox
-                        displayName={row.displayName}
-                        playing={leaving === null}
-                        onChange={(playing) => setEntry(row.userId, playing ? null : { op: 'EXCLUDE', reason: null })}
-                      />
+                        <GameRosterPlayingCheckbox
+                          displayName={row.displayName}
+                          playing={playing}
+                          disabled={batch.isPending}
+                          onChange={(next) => setEntry(row.userId,
+                            next === !wasExcluded ? null : next ? { op: 'REVOKE' } : { op: 'EXCLUDE', reason: null },
+                          )}
+                        />
                       </div>
                     }
                   />
@@ -333,11 +347,10 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
         <RegistrationRosterEntry view={data} variant="block" />
       </RosterSection>
 
-      {data.excluded.length > 0 ? (
+      {!canEdit && data.excluded.length > 0 ? (
         <RosterSection title={`이번 경기 빠짐 ${data.excluded.length}명`}>
           <ul style={listStyle}>
             {data.excluded.map((row) => {
-              const returning = draft[row.userId]?.op === 'REVOKE';
               return (
                 <li key={row.userId} style={rowItemStyle}>
                   <GameRosterPlayerRow
@@ -348,19 +361,6 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
                     status="EXCLUDED"
                     reason={row.reason}
                     actorRole={row.actor.role}
-                    note={returning ? '저장하면 출전으로 돌아가요' : null}
-                    trailing={
-                      canEdit ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setEntry(row.userId, returning ? null : { op: 'REVOKE' })}
-                          aria-label={`${row.displayName} ${returning ? '되돌리기 취소' : '출전으로 되돌리기'}`}
-                        >
-                          {returning ? '되돌리기 취소' : '되돌리기'}
-                        </Button>
-                      ) : undefined
-                    }
                   />
                 </li>
               );
@@ -428,7 +428,7 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
             disabled={!dirty}
             onClick={() => void submit(changes, '명단을 저장했어요.')}
           >
-            {dirty ? `저장 (${changes.length}건)` : '저장'}
+            {ROSTER_SAVE_LABEL}{dirty ? ` (${changes.length}건)` : ''}
           </Button>
         </div>
       ) : null}

@@ -74,6 +74,14 @@ export class CreateLeagueMatchDto {
   @Max(50)
   maxPlayers?: number | null;
 
+  /** 참가팀 정원. null·생략은 무제한이며 팀당 선수 정원(maxPlayers)과 독립이다. */
+  @Transform(({ obj }) => obj.maxTeams, { toClassOnly: true })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(2147483647)
+  maxTeams?: number | null;
+
   /** 리그 총 경기 수(계획). 대진 생성 폼의 기본값이다. */
   @IsOptional()
   @IsInt()

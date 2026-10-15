@@ -125,6 +125,7 @@ describe('AdminLeagueMatchNewPage', () => {
       // 리그는 팀 전원이 명단에 오르는 게 기본이라 팀 명단 인원은 '제한 없음'으로 시작한다.
       minPlayers: 1,
       maxPlayers: null,
+      maxTeams: null,
     }));
   });
 

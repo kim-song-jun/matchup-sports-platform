@@ -5,10 +5,11 @@ import { AdminContextService } from '../common/admin-context.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { findTournamentOnSurface, LEAGUE_KINDS } from '../tournaments/tournament-surface-lookup';
 import { UpdateLeagueSettingsDto } from './dto/league-settings.dto';
+import { countCapacityReservations } from '../tournaments/registration-capacity';
 
 const select = {
   id: true, title: true, rulesText: true, regionId: true, scheduledAt: true, scheduledEndAt: true,
-  registrationDeadlineAt: true, plannedFixtureCount: true, updatedAt: true, status: true,
+  registrationDeadlineAt: true, plannedFixtureCount: true, maxTeams: true, updatedAt: true, status: true,
   sport: { select: { name: true } },
 } satisfies Prisma.V1TournamentSelect;
 
@@ -22,6 +23,7 @@ function view(row: Awaited<ReturnType<typeof load>>) {
     startsOn: row.scheduledAt?.toISOString() ?? null, endsOn: row.scheduledEndAt?.toISOString() ?? null,
     registrationDeadlineAt: row.registrationDeadlineAt?.toISOString() ?? null,
     plannedFixtureCount: row.plannedFixtureCount,
+    maxTeams: row.maxTeams,
     updatedAt: row.updatedAt.toISOString(), status: row.status, sportName: row.sport.name };
 }
 export async function getLeagueSettings(prisma: PrismaService, admins: AdminContextService, user: V1AuthUser, id: string) {
@@ -38,6 +40,10 @@ export async function updateLeagueSettings(prisma: PrismaService, admins: AdminC
     }
     if (current.status === 'completed' || current.status === 'cancelled') {
       throw new ConflictException({ code: 'LEAGUE_ENDED', message: '끝났거나 취소된 리그는 기본 정보를 수정할 수 없어요.' });
+    }
+    if (dto.maxTeams !== undefined && dto.maxTeams !== null
+      && dto.maxTeams < await countCapacityReservations(tx, id)) {
+      throw new ConflictException({ code: 'LEAGUE_CAPACITY_BELOW_OCCUPANCY', message: '참가팀 정원은 확정·입금대기 팀 수보다 작게 설정할 수 없어요.' });
     }
     const startsOn = new Date(dto.startsOn), endsOn = new Date(dto.endsOn);
     if (endsOn < startsOn) throw new UnprocessableEntityException({ code: 'LEAGUE_PERIOD_INVALID', message: '종료일은 시작일보다 빠를 수 없어요.' });
@@ -58,6 +64,7 @@ export async function updateLeagueSettings(prisma: PrismaService, admins: AdminC
       title: dto.title.trim(), rulesText: dto.rulesText.trim() || null, regionId: dto.regionId,
       scheduledAt: startsOn, scheduledEndAt: endsOn, registrationDeadlineAt: deadline,
       ...(dto.plannedFixtureCount !== undefined ? { plannedFixtureCount: dto.plannedFixtureCount } : {}),
+      ...(dto.maxTeams !== undefined ? { maxTeams: dto.maxTeams } : {}),
     }, select });
     await admins.logAdminAction(admin, { action: 'league_match.update_settings', targetType: 'league_match', targetId: id,
       beforeJson: view(current), afterJson: view(updated) }, tx);

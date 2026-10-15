@@ -29,7 +29,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
     data: { items: [{ id: 'reg-1', status: 'confirmed', teamId: 'team-1', teamName: 'A팀' }] },
   }),
   useV1AdminTournamentPlayers: () => ({
-    data: { players: [{ id: 'player-1', userId: 'user-player-1', realName: '김선수' }] },
+    data: { players: [{ id: 'player-1', userId: 'user-player-1', realName: '김선수', nickname: '골잡이' }] },
     isFetching: false,
   }),
   useV1AdminTournamentAwards: () => ({ data: awardsHolder.current ?? [award] }),

@@ -1,0 +1,74 @@
+# Task 20261081: MD-QA #140 관리자 선수 명단 식별 이름
+
+Status: In Progress
+**Owner**: root → backend-data-dev
+**Created**: 2026-10-13
+
+## Context
+https://teameet.jmandu.kr/issues/140/ 원문·재현·최근 댓글 확인, 김성준 담당·확인 중 저장 재확인 완료. 관리자 선수 목록은 realName만 제공하며 공개 roster의 nickname-only 개인정보 경계는 이미 존재한다. 다른 PR1883은 games/arrival 영역으로 이 목록과 중복하지 않는다.
+
+## Goal
+관리자 선수 목록은 실명·현재 닉네임을 함께 구별할 수 있고 공개 응답·화면은 닉네임만 유지한다.
+
+## Original Conditions (must all be satisfied)
+- [x] 기존 관리자 role gate 뒤에서 realName+nickname 계약을 제공한다.
+- [x] 공개 목록에 실명이 새로 노출되지 않는다.
+
+## User Scenarios
+관리자는 실제 참가 선수의 실명과 닉네임을 비교한다. 일반 사용자는 기존 공개 닉네임만 본다.
+
+## Test Scenarios
+### Happy path
+- [x] 실제 listPlayersForAdmin 호출에서 가입 프로필 닉네임과 보존된 실명 반환을 검증한다.
+### Edge cases
+- [x] 닉네임 null/동일 이름/긴 한글 이름과 기존 CSV 계약을 보존한다.
+### Error paths
+- [x] 비관리자 공개 경로의 realName 제한과 기존 인증 실패를 유지한다.
+### Mock data updates needed
+- [x] frontend 타입·fixture가 실제 admin/public 계약과 맞는지 확인한다.
+
+## Parallel Work Breakdown
+- Phase A 단일 contract 소유자: Owned `apps/v1_api/src/tournaments/tournament-players.service.ts`, 관련 `tournament-players.service.spec.ts`, `docs/api/domains/tournaments.md` 해당 admin/public 선수 목록 계약; `apps/v1_web/src/types/api.ts` 관련 admin 선수 타입만. 추가 fixture/hook path는 정확한 위치를 찾아 root 승인 후 편집한다.
+- Forbidden: controller/DTO/schema, games/arrival, 다른 타입·공유 hooks/MSW, UI pages, 다른 task/state/Git 및 테스트 실행. UI는 Phase A 완료 후 단일 소유권으로 이어간다.
+- root 실제 RED/GREEN 최소 worker 직렬 검증, 독립 리뷰·dev PR·리포트 댓글·CI·실제 alpha/admin+public 실측.
+- Phase B A안 단일 UI 소유자: 기존 `registrations-tab.tsx`의 이름 영역과 새 `tournament-roster-identity.test.tsx`만 변경한다. 공유 타입은 Phase A 소유자가 선행 완료했고 root가 Git·직렬 검증을 담당한다.
+
+## Acceptance Criteria
+- [x] Original conditions와 실제 회귀 RED→GREEN
+- [x] 개인정보·권한 경계 유지 및 문서·fixture sync
+- [ ] 최신 committed head 독립 Critical0/Warning0
+- [ ] 필요한 alpha persona/viewport 검증은 코드 테스트와 구분
+
+## Tech Debt Resolved
+관리자 목록·CSV·공개 roster 사이 식별자 계약의 실제 drift만 좁게 해결한다.
+
+## Security Notes
+기존 접근 권한을 확장하지 않고 private realName은 public response/display로 전달하지 않는다.
+
+## Risks & Dependencies
+shared api.ts는 이 작업자 한 명만 해당 타입을 수정한다. UI 변경은 기존 토큰·컴포넌트와 시각 검증 기준을 따른다. Managed checkout 생성은 성공했으나 attachment100 제한으로 등록 실패; 반환된 checkout만 재사용한다.
+
+## Ambiguity Log
+| Date | Raised by | Question | Resolution |
+|---|---|---|---|
+| 2026-10-13 | root | nickname의 현재 값 또는 등록 snapshot | 실제 profile/API 계약 대조 후 현재 프로필 값을 사용 |
+| 2026-10-13 | 사용자 | 관리자 명단의 실명·닉네임 배치 | A 선택: 실명을 주 이름, 바로 아래 닉네임을 보조 정보로 표시 |
+| 2026-10-13 | root | PR1883 이미 머지 여부와 중복 | PR1883은 games/arrival console 식별 정보만 변경하며 이 관리자 등록 선수 목록은 포함하지 않음 |
+
+## Progress Snapshot
+- 2026-10-13 09:33Z: 최신 외부 리뷰 P1 `r4256355299`·P2 `r4256355309`를 같은 PR1896에서 추적한다. P2 실제 소비자 RED5 FAIL/9 PASS와 만료 캐시·StrictMode 중복 GET의 RED1 FAIL/15 PASS를 확인한 뒤 영향3파일71/71 GREEN (`mdqa140-reopen-final-affected-green.log`). 닫힌 명단 조회를 중단하고 재열 때 기존 요청과 합류해 현재 프로필을 다시 조회한다. 403/503에서 이전 개인정보를 숨기고 재시도·다른 신청의 지연 응답을 검증했다.
+- 2026-10-13 09:33Z: P1은 Nest가 선택하는 `tsconfig.build.json`의 production root를 분리하고 일반 타입·테스트 대상은 유지한다. 실제 닫힌 TypeScript program, 배포 실행파일7건의 메모리 내 JavaScript emit, 원래 넓은 설정이424 test root와 Jest fixture를 실제 emit하는 실패 대조, runtime import 재유입 대조5/5 PASS (`mdqa140-api-build-boundary-green.log`). `pnpm qa:alpha-seed-runtime` PASS. full build·alpha 실측 PASS와 구분한다. 최신 commit 타입·독립 리뷰·동일PR push·외부 재리뷰·dev 머지·배포 후 alpha 검증은 남아 있다.
+- Claim verified 2026-10-13 05:16Z; branch `fix/mdqa-140-admin-player-nickname`; base `5d289d7f40ccc6f0e447d5ce1f89a1f4c331c711`.
+- 2026-10-13 Phase A: 실제 관리자 service의 신규 5건 RED → 기존 포함112/112 GREEN. 현재 프로필 닉네임은 nullable 별도 필드이며 등록 당시 실명·CSV·권한·정렬을 보존한다.
+- 2026-10-13 Phase B: 선택된 A안 실제 RosterModal + QueryClient + MSW GET/PATCH/DELETE 소비자6건에서5 FAIL/1 PASS RED를 확인한 뒤 기존 이름 영역만 수정했다. 기존 roster16 + awards11 + 신규6 =33/33 GREEN (`mdqa140-ui-a-affected-green.log`). 403 시 명단·개인정보를 숨기는 기존 계약과 read-only 수정 차단도 통과했다. 403의 logger HTTP boundary는 204 핸들러를 추가했고 신규6/6 재검증 PASS, unhandled request 없음 (`mdqa140-ui-a-logger-boundary-green.log`).
+- 공개 상세 실제 service의 exact nickname-only 응답 검증1 PASS /37 skipped (`mdqa140-public-privacy-green.log`); 전체 공개 suite 통과로 표시하지 않는다. 최신 origin/dev 통합, committed-tree 타입 검사·독립 개인정보/프론트 리뷰·dev PR·실제 alpha390/768/1440 검증은 아직 남아 있다.
+- 2026-10-13 07:15Z: 최신 dev `403e33980cbe6d207177c6c83f80ec24c30aa56b` 안전 통합 후 source checkpoint `69f09b27e0c688bf7e7e54a00b5acaf366b926e7`의 API tsc/surface675 PASS, Web tsc/pattern PASS를 확인했다. 최초 committed Web 패턴 실패는 기존 화면 폰트 리터럴이 15→14로 줄어든 기준 불일치였으며 해당 baseline 한 항목만 낮춰 재발 허용량을 축소했다. 개인정보 독립 리뷰와 프론트 적대적 리뷰 모두 이 정확한 checkpoint에서 Critical0/Warning0/OK다. PR 게시·외부 최신 head 리뷰/CI와 배포 후 실제 admin/public390/768/1440 QA는 남아 있다. 이후 기록 전용 커밋은 소스 검증의 새 실행으로 간주하지 않는다.
+- 2026-10-13 07:34Z: dev 대상 PR1896 게시와 리포트 댓글325 저장·재조회 표시를 확인했다. head `3c6ee49fee4f496d446226b80957777a6ad285d8`의 CI는 통과했으나 Codex P2 `r4255815084`는 삭제된 프로필의 `deleted_<id>` 닉네임 노출을 지적했다. Copilot FindingsNone은 이 실제 미해결 지적을 대신 해소하지 않는다. PR 본문 이미지는 원 리포트 맥락이며 alpha 검증 이미지가 아니다.
+- 2026-10-13 07:50Z: 실제 관리자 service의 Prisma select를 적용하는 신규7건에서 사용자/프로필 삭제3 FAIL, 활성·프로필 없음·정상 접두사·상태만 변경4 PASS RED를 확인했다. 두 `deletedAt`를 조회하고 실제 삭제 시각이 있는 경우 nullable nickname으로 반환해 신규7+기존112=119 PASS (`mdqa140-deleted-and-existing-green.log`). 등록 실명·CSV·전화번호 및 공개 경로는 이 후속 수정의 범위 밖이다. 새 committed head의 타입·독립 리뷰·외부 재리뷰는 아직 남아 있으며 이전 head의 OK를 재사용하지 않는다.
+
+- 2026-10-13 11:25Z root: native Node AbortSignal fixture를 사용한 실제 HTTP75건은74 PASS/1 FAIL이었다. 남은 StrictMode 총GET2 단언은 실제 마지막observer 취소·재구독 경로와 충돌함을 독립 확인했고, 요청별 취소1/live1·늦은취소응답 DOM/cache 미반영·읽기전용/수정미호출로 강화한 해당1건을 root가 실제PASS했다 (mdqa140-strictmode-exact-abort-green1.log;17 skipped). 강화 뒤 전체75 PASS는 주장하지 않는다. 최신dev 통합·타입·committedhead 리뷰·PR1896 push·alpha·tracker 완료는 남아 있다.
+
+- 2026-10-15 root: startup-cleanup snapshot의 동일 원 branch·path를 복구한 뒤 native AbortSignal 실제 HTTP4파일75/75 PASS (mdqa140-recovered-75.log,58.13s). 이전74PASS/1FAIL 및 isolated1 기록은 보존한다. 복구 WIP 독립 리뷰 C0/W0는 d17+현재WIP에 한정하며 최신dev 통합·committed 검증·exact-head 재리뷰·같은PR1896 push·alpha는 아직 PENDING이다.
+- 2026-10-15 root: 최신 dev c4f477c31을 일반 merge한 source checkpoint3b7f6502468f492b743f62e1b15862c2ac7a9a77. f298 이후 API·등록명단·shared hook/type·빌드 proof 관련 경로 차이0이며 기존 free-entry 상태 표시를 보존했다. 실제 committed f298 소비자4파일75/75 PASS(26.45s), 현재 API 선수2파일129/129 PASS(16.08s), 공개 nickname-only 상세1 PASS/39 skipped(14.688s)를 확인했다. API/Web 타입·canonical 패턴 PASS. 실제 Nest closed program/7개 배포 entrypoint emit/원래 broad config433 test roots+실제 Jest fixture emit/런타임 test import 재유입의 실패 대조5/5 PASS(28.74s). 이는 전체 build·DB integration·alpha PASS가 아니다.
+- 2026-10-15 root: 삭제된 API dependency runtime은 다른 워크트리 deps를 변경하지 않고 git 제외 own QA 경로에 frozen lockfile·ignore-scripts·최소 병렬로 복구했다. offline tarball 부재·Windows bin alias·절대경로 glob escape로 시작하지 못한 실행은 실패로 보존하고, 실제 unit project 설정을 유지한 상대 testMatch+명시2파일 runTestsByPath로129건 실행을 확인했다. 독립 f29818/18 C0/W0와 마지막 dev의 관련 blob 불변을 대조했다. 기록 커밋의 최신 immutable head 재리뷰 후 같은 열린 PR1896에 일반 push하고 최신 CI·실제 외부 thread·tracker·alpha를 계속 추적한다.
+- 2026-10-15 root follow-up: head79c의 Gates/API/Web 성공 뒤 신규 실제 P2 r4283283293에서 build-boundary 회귀 검증의 CI 호출 누락을 확인해 머지를 보류했다. `deploy.yml`의 API job에서 frozen install·Prisma 생성 이후, 타입 검사 전에 실제 guard를 직렬 실행하도록 연결했다. guard5/5 PASS(63.86s), production-deploy-security와 v1-db-guardrails PASS, scoped 독립 인프라 리뷰 C0/W0. 기존 앱 소스·검증·배포 조건은 유지했다. 후속 immutable head 재리뷰·새 CI·실제 alpha·기존 리포트 갱신은 별도 게이트다.

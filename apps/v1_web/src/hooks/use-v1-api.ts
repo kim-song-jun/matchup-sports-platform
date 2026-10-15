@@ -4418,8 +4418,9 @@ export function useV1AdminTournamentPlayerRecords(tournamentId: string) {
 export function useV1AdminTournamentPlayers(registrationId: string) {
   return useQuery({
     queryKey: v1Keys.adminTournamentRoster(registrationId),
-    queryFn: () =>
-      v1Get<V1AdminTournamentRosterResponse>(`/admin/registrations/${registrationId}/players`),
+    // 부모 화면 오류로 모달이 제거돼도 이전 열림의 개인정보 응답을 새 열림에 재사용하지 않는다.
+    queryFn: ({ signal }) =>
+      v1Api<V1AdminTournamentRosterResponse>(`/admin/registrations/${registrationId}/players`, { method: 'GET', signal }),
     enabled: !!registrationId,
     retry: false,
   });

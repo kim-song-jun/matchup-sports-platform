@@ -5658,7 +5658,8 @@ export class GamesService {
       // numbers against the host; disputes belong to the existing result
       // approve/change_request decision surface, not a second event writer.
       const hostRole = managerRole(hostMembership);
-      if (hostRole === null || !canRecordHostTeamMatch({ role: hostRole, teamId: match.hostTeamId }, match.hostTeamId)) {
+      if (hostRole === null || match.hostTeamId === null ||
+        !canRecordHostTeamMatch({ role: hostRole, teamId: match.hostTeamId }, match.hostTeamId)) {
         throw this.forbidden();
       }
       return {

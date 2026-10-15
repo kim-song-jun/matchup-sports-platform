@@ -1,8 +1,22 @@
 # MD-QA #146: 자격 기준을 지키는 미제출 기본 명단
 
-Status: In Progress
+Status: Code repaired; committed CI, latest Copilot and Alpha gates pending
 **Owner**: QA root -> Phase A dedicated backend investigation
 **Created**: 2026-10-15
+
+## Current Review Cursor — 2026-10-16
+
+The repaired remote candidate is based on dev a264 and is separate from SEO production release1955/runtime1.9.4. Cumulative37-path independent gpt-6-sol review and the R4–R7 source/test deltas found C0/W0. This is static evidence, not Alpha or latest Copilot approval.
+
+Actual5f0 CI38793261867 passed Gates, Web lint/typecheck/unit/build, API typecheck and the real PostgreSQL migration/integration gate. API unit6427passed/1failed: the new published host GET→append scenario successfully freezes both sides and appends the selected opponent UUID, but its assertion expects2 total audits instead of the actual2SYSTEM freeze audits plus1USER EVENT_APPEND. R8 preserves the real command/freeze/UUID assertions and verifies all three audit contracts. Prior CI failures are not treated as current passes; fresh committed-head CI is required.
+
+R3–R7 also fix ordinary-member/support own-side privacy, one RepeatableRead snapshot across persisted/effective data, removed-registration history, highest eligible submitted revision despite a newer draft, actual gameLineups cache invalidation, saved-draft submit revision, pending refresh presentation and nullable host-team denial. The host operations exception requires LIVE, the existing event-write authority and the actual publication time. No early publication, authorization widening, fake successful operation or production data mutation was used.
+
+Latest Copilot attempts on5f0 failed before analysis with HTTP429/rate_limit. The19:29:29UTC service log said56minutes to reset (approximately20:25UTC); a retry was already attempted. No further review requests before reset, model/account/billing changes or merge-rule bypass. The previous688 review had0findings but is not a latest-head clean result. GitHub AI Scan's unavailable claude-opus-5 is a separate external failure, submitted once as Support4863223; it remains enabled.
+
+Source local tests were NOTRUN for this alternative remote tree because the shared generated Prisma does not match; no new DB, dependency replacement, disabled diagnostics or checkout workaround was used. Actual GitHub CI is authoritative. Alpha source deployment/full-role QA is still NOTRUN until permitted dev merge. Existing signed-in created-match pages are readable, but the current session has no host recording controls for that old fixture; read-only access is not an owner recording test. After required gates: dev merge, immediate own-checkout FF, matching CI/deploy and live SHA, then actual eligible owner/member flows and390/768/1440 evidence. This feature is not authorized as part of the scoped SEO main release.
+
+Current operational evidence and final run/merge/QA receipts are in /Users/sungjun/.cache/teameet-seo-release/STATUS.md and the PR body. This dated commit snapshot must not be interpreted as a claim that later pending gates have passed.
 
 ## Context
 기존 리포트 https://teameet.jmandu.kr/issues/146/ . 원 리포트의 NEEDS_DECISION은 최신 직접 사용자 선택으로 대체됐다. 현재 김성준 담당·확인 중이며 중복 task/worktree/branch/PR이 없음을 SSOT와 실제 Git ref에서 대조했다.

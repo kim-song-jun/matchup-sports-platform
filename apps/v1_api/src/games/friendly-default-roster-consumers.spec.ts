@@ -191,11 +191,25 @@ describe('MD-QA #146: actual generic lineup GET → event consumer', () => {
       expect(fixture.participants).toHaveLength(4);
       expect(fixture.participants.find((participant) => participant.id === away.id)).toMatchObject({ lineupId: frozenAway.id, sideId: ids.away });
       expect(fixture.participants.find((participant) => participant.sideId === ids.home && participant.lineupId === frozenHome.id)).toBeDefined();
-      expect(fixture.audits).toHaveLength(2);
-      expect(fixture.audits).toEqual(expect.arrayContaining([
+      const freezeAudits = fixture.audits.filter((audit) => audit.action === 'FRIENDLY_DEFAULT_ROSTER_FROZEN');
+      expect(freezeAudits).toHaveLength(2);
+      expect(freezeAudits).toEqual(expect.arrayContaining([
         expect.objectContaining({ actorType: 'SYSTEM', systemActor: 'FRIENDLY_DEFAULT_ROSTER_FROZEN', action: 'FRIENDLY_DEFAULT_ROSTER_FROZEN', after: expect.objectContaining({ sideId: ids.away, lineupId: frozenAway.id }) }),
         expect.objectContaining({ actorType: 'SYSTEM', systemActor: 'FRIENDLY_DEFAULT_ROSTER_FROZEN', action: 'FRIENDLY_DEFAULT_ROSTER_FROZEN', after: expect.objectContaining({ sideId: ids.home, lineupId: frozenHome.id }) }),
       ]));
+      const appendAudits = fixture.audits.filter((audit) => audit.action === 'EVENT_APPEND');
+      expect(appendAudits).toHaveLength(1);
+      expect(appendAudits[0]).toMatchObject({
+        actorType: 'USER', actorUserId: reader.id, systemActor: null,
+        action: 'EVENT_APPEND', resourceType: 'GAME', resourceId: ids.game, requestId: commandId,
+        after: expect.objectContaining({
+          state: 'LIVE', version: 1, sequence: 1,
+          event: expect.objectContaining({ type: 'GOAL', sideId: ids.away, participantId: away.id }),
+        }),
+      });
+      expect(fixture.audits.map((audit) => audit.action).sort()).toEqual([
+        'EVENT_APPEND', 'FRIENDLY_DEFAULT_ROSTER_FROZEN', 'FRIENDLY_DEFAULT_ROSTER_FROZEN',
+      ]);
     } finally { await fixture.close(); }
   });
 

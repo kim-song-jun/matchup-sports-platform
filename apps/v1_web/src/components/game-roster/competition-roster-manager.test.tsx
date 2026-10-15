@@ -62,6 +62,8 @@ describe('공통 명단 관리의 실제 탭·저장 흐름', () => {
   it.each(['match','registration'] as const)('%s 진입은 같은 두 탭을 사용하고 기본 탭만 다르다', async entry => {
     open(entry);
     await screen.findByRole('tab', { name: '참가 선수' });
+    // 화면 제목은 상단 바·데스크톱 머리글 몫이다 — 본문이 "명단 관리"를 한 번 더 그리지 않는다.
+    expect(screen.queryByText('명단 관리')).not.toBeInTheDocument();
     expect(tab(entry === 'match' ? '경기 출전' : '참가 선수')).toHaveAttribute('aria-selected', 'true');
     fireEvent.click(tab(entry === 'match' ? '참가 선수' : '경기 출전'));
     await waitFor(() => expect(tab(entry === 'match' ? '참가 선수' : '경기 출전')).toHaveAttribute('aria-selected', 'true'));

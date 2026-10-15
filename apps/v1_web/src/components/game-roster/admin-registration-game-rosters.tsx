@@ -130,7 +130,7 @@ export function AdminRegistrationGameRosters({
         <span className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-strong)]">경기별 명단</span>
         <span className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
           다가오는 경기 {data.games.length}개 · 선수 {data.players.length}명
-          <span className="block">GK는 이 대회의 시작 전 경기와 이후 경기에 유지돼요. 여러 명을 지정할 수 있어요.</span>
+          <span className="block">GK는 시작 전 경기와 이후 경기에 계속 유지돼요. 여러 명을 지정할 수 있어요.</span>
         </span>
         {adjustedCount > 0 ? <span className="tm-badge tm-badge-sm tm-badge-orange">조정 {adjustedCount}</span> : null}
       </div>

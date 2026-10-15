@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { TournamentPeriodSettingsEditor } from './tournament-period-settings-editor';
 import type { TournamentPeriodSettingsResponse } from '@/hooks/use-tournament-period-settings';
@@ -44,7 +44,7 @@ describe('TournamentPeriodSettingsEditor', () => {
     // A background query refresh must not silently change the CAS token for this draft.
     state.settings = { ...state.settings, expectedVersion: 'version-2' };
     view.rerender(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={showToast} />);
-    fireEvent.change(screen.getByLabelText('피리어드 1'), { target: { value: '40' } });
+    fireEvent.change(screen.getByLabelText('전반'), { target: { value: '40' } });
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
 
     expect(state.mutate).toHaveBeenCalledWith(
@@ -52,6 +52,19 @@ describe('TournamentPeriodSettingsEditor', () => {
       expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
     );
   });
+
+  it.each([[3, '피리어드 설정을 저장했어요. 시작 전 경기 3개에도 적용했어요.'], [0, '피리어드 설정을 저장했어요.']])(
+    '저장 토스트는 실제로 옮긴 시작 전 경기 수(%i)만 말한다', (fixturesRepointed, message) => {
+      state.mutate.mockClear();
+      const showToast = vi.fn();
+      render(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={showToast} />);
+      fireEvent.click(screen.getByRole('button', { name: '수정' }));
+      fireEvent.click(screen.getByRole('button', { name: '저장' }));
+      const [, callbacks] = state.mutate.mock.calls[0] as [unknown, { onSuccess: (data: { fixturesRepointed: number }) => void }];
+      act(() => callbacks.onSuccess({ fixturesRepointed }));
+      expect(showToast).toHaveBeenCalledWith(message, 'success');
+    },
+  );
 
   it('keeps the draft and query data when a generic server save fails', () => {
     state.settings = {
@@ -69,7 +82,7 @@ describe('TournamentPeriodSettingsEditor', () => {
     render(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={showToast} />);
 
     fireEvent.click(screen.getByRole('button', { name: '수정' }));
-    fireEvent.change(screen.getByLabelText('피리어드 1'), { target: { value: '40' } });
+    fireEvent.change(screen.getByLabelText('전반'), { target: { value: '40' } });
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
 
     const [, callbacks] = state.mutate.mock.calls[0] as [
@@ -85,6 +98,55 @@ describe('TournamentPeriodSettingsEditor', () => {
     expect(showToast).toHaveBeenCalledTimes(1);
     expect(showToast).toHaveBeenCalledWith('server unavailable', 'error');
     expect(showToast).not.toHaveBeenCalledWith(expect.stringContaining('저장했어요'), 'success');
+  });
+
+  // 2026-10-13 alpha: 기본 장소를 저장한 뒤 피리어드를 저장하면 리그 행 수정 시각이 바뀌어 409 가 났다.
+  it('버전 충돌이어도 서버 피리어드가 편집 시작 때와 같으면 새 버전으로 한 번 더 저장한다', async () => {
+    const base = {
+      ...state.settings,
+      expectedVersion: 'version-1',
+      periods: [
+        { code: 'FIRST_HALF', label: '전반', durationMinutes: 45, extraTime: false },
+        { code: 'SECOND_HALF', label: '후반', durationMinutes: 45, extraTime: false },
+      ],
+      legacyPeriodCount: null,
+      requiresDurationInput: false,
+    };
+    state.settings = base;
+    state.mutate.mockClear();
+    state.refetch.mockResolvedValue({ data: { ...base, expectedVersion: 'version-2' } });
+    const showToast = vi.fn();
+    render(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={showToast} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '수정' }));
+    fireEvent.change(screen.getByLabelText('후반'), { target: { value: '40' } });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    const [, callbacks] = state.mutate.mock.calls[0] as [unknown, { onError: (error: unknown) => Promise<void> }];
+    await act(() => callbacks.onError({ response: { data: { code: 'TOURNAMENT_VERSION_CONFLICT' } } }));
+
+    expect(state.mutate).toHaveBeenCalledTimes(2);
+    expect(state.mutate.mock.calls[1][0]).toEqual({ expectedVersion: 'version-2', periods: [{ durationMinutes: 45 }, { durationMinutes: 40 }] });
+    expect(showToast).not.toHaveBeenCalled();
+  });
+
+  it('버전 충돌이고 서버 피리어드도 바뀌었으면 덮어쓰지 않고 알린다', async () => {
+    const base = { ...state.settings, expectedVersion: 'version-1' };
+    state.settings = base;
+    state.mutate.mockClear();
+    state.refetch.mockResolvedValue({
+      data: { ...base, expectedVersion: 'version-2', periods: [{ code: 'FULL_TIME', label: '단판', durationMinutes: 30, extraTime: false }] },
+    });
+    const showToast = vi.fn();
+    render(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={showToast} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '수정' }));
+    fireEvent.change(screen.getByLabelText('전반'), { target: { value: '40' } });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    const [, callbacks] = state.mutate.mock.calls[0] as [unknown, { onError: (error: unknown) => Promise<void> }];
+    await act(() => callbacks.onError({ response: { data: { code: 'TOURNAMENT_VERSION_CONFLICT' } } }));
+
+    expect(state.mutate).toHaveBeenCalledTimes(1);
+    expect(showToast).toHaveBeenCalledWith(expect.stringContaining('피리어드 설정이 먼저 바뀌었어요'), 'error');
   });
 
   it('blocks save when write permission is revoked during editing', () => {

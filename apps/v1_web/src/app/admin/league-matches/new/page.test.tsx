@@ -371,7 +371,7 @@ describe('AdminLeagueMatchNewPage', () => {
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent(/경기 시간을 저장하지 못했어요|boom/);
-    expect(within(alert).getByRole('link', { name: '리그 상세로 이동' })).toHaveAttribute('href', '/admin/league-matches/league-1');
+    expect(within(alert).getByRole('link', { name: '경기 규칙으로 이동' })).toHaveAttribute('href', '/admin/league-matches/league-1/rules');
     expect(pushMock).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: '리그 만들기' })).toBeDisabled();
   });

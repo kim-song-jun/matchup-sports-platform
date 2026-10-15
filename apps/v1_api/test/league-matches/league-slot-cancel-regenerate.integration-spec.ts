@@ -59,6 +59,26 @@ describe('리그 경기 취소 — 빈 경기·자리 연결', () => {
     const teamMatchId = await h.createFixture(leagueId, { homeTeamId: teamA.id, awayTeamId: teamB.id });
 
     expect((await cancel(leagueId, teamMatchId)).status).toBe(200);
+    // 단건 취소는 팀 이름 조회와 알림 저장을 응답 뒤에 수행한다. 실제 수신자 저장까지 기다린다.
+    const readNotices = () => h.prisma.v1Notification.findMany({
+      where: { targetId: leagueId, title: '리그 대진이 취소됐어요' },
+    });
+    const deadline = Date.now() + 8_000;
+    let notices = await readNotices();
+    while (notices.length < 2 && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      notices = await readNotices();
+    }
+    const teams = await h.prisma.v1Team.findMany({
+      where: { id: { in: [teamA.id, teamB.id] } }, select: { ownerUserId: true },
+    });
+    expect(notices).toHaveLength(2);
+    expect(notices.map((notice) => notice.recipientUserId).sort()).toEqual(teams.map((team) => team.ownerUserId).sort());
+    for (const notice of notices) {
+      expect(notice.body).toContain(teamA.name);
+      expect(notice.body).toContain(teamB.name);
+      expect(notice.body).toContain('일정 조정');
+    }
     expect(cancelNotices()).toHaveLength(2);
   });
 

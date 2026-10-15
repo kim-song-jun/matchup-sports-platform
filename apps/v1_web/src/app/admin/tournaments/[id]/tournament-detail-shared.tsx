@@ -102,6 +102,7 @@ export function formatRegistrationPaymentSubtitle(
   payment: V1AdminTournamentRegistration['payment'],
 ): string | undefined {
   if (!payment) return undefined;
+  if (payment.amount === 0) return '무료 참가';
   const method = PAYMENT_METHOD_LABEL[payment.method] ?? payment.method;
   const status = PAYMENT_STATUS_LABEL[payment.status] ?? payment.status;
   return `${method} · ${status} · ${formatCurrency(payment.amount)}`;

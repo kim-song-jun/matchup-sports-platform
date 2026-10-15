@@ -104,5 +104,14 @@ describe('리그 시즌 승계 — 같은 티어 값 복사', () => {
     // 값 복사일 뿐 이후 독립이다 — 직전 시즌을 바꿔도 새 시즌은 그대로.
     await prisma.v1Tournament.update({ where: { id: leagueIds[0] }, data: { entryFee: 1, coverImageUrl: null } });
     expect(await prisma.v1Tournament.findUniqueOrThrow({ where: { id: next[0].id } })).toMatchObject({ entryFee: TIER1.entryFee, coverImageUrl: TIER1.coverImageUrl });
+
+    // 공개 상세의 '다음 회차' — 같은 티어의 다음 시즌을 가리키고, 그 시즌이 신청을 열면 registrationOpen 이 켜진다.
+    const nextRoundOf = async (leagueId: string) => (await http().get(`/api/v1/league-matches/${leagueId}`).expect(200)).body.data.nextRound;
+    expect(await nextRoundOf(leagueIds[1])).toMatchObject({ leagueId: next[1].id, seasonNo: 2, registrationOpen: false, registrationDeadlineAt: null });
+    const deadline = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    await prisma.v1Tournament.update({ where: { id: next[0].id }, data: { registrationDeadlineAt: deadline } });
+    expect(await nextRoundOf(leagueIds[0])).toMatchObject({ leagueId: next[0].id, seasonNo: 2, registrationOpen: true, registrationDeadlineAt: deadline.toISOString() });
+    // 마지막 시즌에는 다음 회차가 없다.
+    expect(await nextRoundOf(next[0].id)).toBeNull();
   });
 });

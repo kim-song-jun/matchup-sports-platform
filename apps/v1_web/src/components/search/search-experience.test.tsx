@@ -186,7 +186,7 @@ describe('SearchExperience GA events', () => {
     fireEvent.click(screen.getByRole('button', { name: /성수 Futsal 리그/ }));
 
     expect(router.push).toHaveBeenCalledWith('/team-matches/tm-1?from=%2Fsearch%3Fq%3Dfutsal');
-    expect(router.push).toHaveBeenCalledWith('/league-matches/league-1?from=%2Fsearch%3Fq%3Dfutsal');
+    expect(router.push).toHaveBeenCalledWith('/tournaments/league-1?from=%2Fsearch%3Fq%3Dfutsal');
   });
 });
 

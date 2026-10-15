@@ -121,8 +121,7 @@ function ScheduleOutcomeBadge({ outcome }: { outcome: PublicScheduleEntry['outco
 
 function venueLabel(entry: PublicScheduleEntry): string | null {
   if (!entry.venue && !entry.fieldName) return null;
-  if (entry.venue && entry.fieldName) return `${entry.venue} (${entry.fieldName})`;
-  return entry.venue ?? entry.fieldName;
+  return entry.fieldName ?? entry.venue;
 }
 
 /**
@@ -760,6 +759,8 @@ export function ScheduleContent({
   showStandings = true,
   prioritizeLiveGames = false,
   myFixtures,
+  myTeamIds,
+  showScheduleHeading = true,
   isRegularLeague = false,
   fromHref,
 }: {
@@ -785,6 +786,10 @@ export function ScheduleContent({
    * 짚어준다. 비로그인 방문자·참가하지 않은 사용자에게는 undefined라 화면이 종전 그대로다.
    */
   myFixtures?: V1MyTournamentFixtures;
+  /** Active memberships including members; presentation only, never operation permissions. */
+  myTeamIds?: ReadonlySet<string>;
+  /** An enclosing filter header already owns this heading. */
+  showScheduleHeading?: boolean;
   /** 이 일정 화면 자신의 URL(`useCurrentHref()`) — 경기 상세의 셸 뒤로가기가 여기로 돌아오게 한다. */
   fromHref?: string | null;
 }) {
@@ -864,7 +869,12 @@ export function ScheduleContent({
   for (const team of myFixtures?.teams ?? []) {
     for (const fixture of team.fixtures) myFixtureIds.add(fixture.fixtureId);
   }
-  const myTeams = (myFixtures?.teams ?? []).filter((team) => team.fixtures.length > 0);
+  for (const entry of [...sourceData.items, ...sourceData.unscheduled]) {
+    if ((entry.home?.teamId != null && myTeamIds?.has(entry.home.teamId)) ||
+        (entry.away?.teamId != null && myTeamIds?.has(entry.away.teamId))) {
+      myFixtureIds.add(entry.fixtureId);
+    }
+  }
 
   // F4 fix: 칩(전체/내 팀/조별리그/결선)은 "경기 일정" 섹션(data.items)만 보고 만들던 걸
   // 그대로 두되(단계 칩은 일정이 잡힌 경기 기준이 자연스럽다), "내 팀" 칩은 내 경기가
@@ -888,7 +898,8 @@ export function ScheduleContent({
   const hasMyFixtures =
     sourceData.items.some((entry) => myFixtureIds.has(entry.fixtureId)) ||
     sourceData.unscheduled.some((entry) => myFixtureIds.has(entry.fixtureId));
-  const filters = buildScheduleFilters(phases, hasMyFixtures);
+  // A membership-aware wrapper owns the team filter; keep only the existing phase controls here.
+  const filters = buildScheduleFilters(phases, myTeamIds === undefined && hasMyFixtures);
   // 고른 칩이 사라진 경우(내 경기가 없어졌다거나) 전체로 되돌린다 — 빈 화면에 갇히지 않게.
   const activeFilter = filters.some((option) => option.key === filter) ? filter : 'all';
 
@@ -943,9 +954,9 @@ export function ScheduleContent({
       ) : null}
 
       {data.items.length > 0 || live.length === 0 || hasNextPage ? <section>
-        <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>
+        {showScheduleHeading ? <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>
           경기 일정
-        </h3>
+        </h3> : null}
         {/* `items` 는 서버가 `scheduledAt: { not: null }` 로 거른 것이고, 시간 미정 경기는
             바로 아래 "시간 미정 경기" 섹션이 그린다. 그래서 전부 시간 미정이면 두 문장이
             나란히 놓여 모순으로 읽혔다 — "아직 확정된 일정이 없어요" 바로 밑에 경기 2건

@@ -8,6 +8,7 @@ import {
 } from '@/hooks/use-v1-game-roster';
 import { extractErrorMessage } from '@/lib/error-message';
 import { OPERATIONS_BOARD_POLL_INTERVAL_MS } from '@/lib/operations-board-polling';
+import { rosterPersonLabel } from '@/lib/roster-presentation';
 import type { GameSide } from '@/types/game-operations';
 import { jerseyText } from './player-label';
 
@@ -37,7 +38,7 @@ export function LeagueParticipationPanel({ gameId, sides, disabled = false, onEr
       <div>
         <h3 className="text-[length:var(--font-size-body-sm)] font-semibold">킥오프 준비 · 출전 선수</h3>
         <p className="mt-1 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
-          팀원 전원이 출전으로 체크돼 있어요. 오지 않은 선수만 눌러서 빼 주세요. 뺀 선수는 이 경기 출전 기록에 남지 않아요.
+          이 리그 참가 명단의 출전 가능한 선수가 체크돼 있어요. 오지 않은 선수만 눌러서 빼 주세요. 뺀 선수는 이 경기 출전 기록에 남지 않아요.
         </p>
       </div>
       {sides.map((side) => (
@@ -121,6 +122,8 @@ function LeagueSideParticipation({
             const checked = player.status === 'PARTICIPATING';
             const changeable = player.status === 'PARTICIPATING' || player.status === 'EXCLUDED';
             const jersey = jerseyText(player.jerseyNumber);
+            // 운영진 계정에는 실명이 같이 내려온다 — 현장에서 사람을 맞춰 보는 자리라 `실명 (닉네임)` 으로 그린다.
+            const name = rosterPersonLabel(player);
             return (
               <li key={player.userId}>
                 <button
@@ -128,7 +131,7 @@ function LeagueSideParticipation({
                   role="switch"
                   aria-checked={checked}
                   // 컬러만으로 상태를 전달하지 않는다 — aria-label 과 화면 텍스트에 상태를 함께 담는다.
-                  aria-label={`${player.displayName} — ${STATUS_TEXT[player.status]}${changeable ? (checked ? ', 누르면 이번 경기에서 빼요' : ', 누르면 다시 출전') : ''}`}
+                  aria-label={`${name} — ${STATUS_TEXT[player.status]}${changeable ? (checked ? ', 누르면 이번 경기에서 빼요' : ', 누르면 다시 출전') : ''}`}
                   disabled={locked || !changeable || pendingUserIds.has(player.userId)}
                   onClick={() => void change([player.userId], !checked)}
                   className={[
@@ -149,7 +152,7 @@ function LeagueSideParticipation({
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[length:var(--font-size-body-sm)] font-medium">
                       {jersey ? `${jersey} ` : ''}
-                      {player.displayName}
+                      {name}
                     </span>
                     <span className="block text-[length:var(--font-size-caption)] text-[var(--text-muted)]">{STATUS_TEXT[player.status]}</span>
                   </span>

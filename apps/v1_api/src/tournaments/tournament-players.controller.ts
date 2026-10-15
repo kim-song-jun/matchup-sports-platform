@@ -6,6 +6,7 @@ import {
   AddPlayerDto,
   UpdatePlayerEligibilityDto,
   UpdatePlayerJerseyDto,
+  UpdatePlayerRosterSettingsDto,
 } from './dto/tournament-player.dto';
 import { TournamentPlayersService } from './tournament-players.service';
 
@@ -67,6 +68,17 @@ export class TournamentPlayersController {
       playerId,
       dto.jerseyNumber,
     );
+  }
+
+  @Patch(':playerId/roster-settings')
+  updateRosterSettings(
+    @CurrentUser() user: V1AuthUser,
+    @Param('tournamentId') tournamentId: string,
+    @Param('registrationId') registrationId: string,
+    @Param('playerId') playerId: string,
+    @Body() dto: UpdatePlayerRosterSettingsDto,
+  ) {
+    return this.playersService.updatePlayerRosterSettings(user, tournamentId, registrationId, playerId, dto);
   }
 
   @Patch(':playerId')

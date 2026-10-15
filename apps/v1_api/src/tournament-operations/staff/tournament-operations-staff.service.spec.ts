@@ -184,6 +184,8 @@ type FakeAssignmentRow = {
 };
 
 type FakeTeamMatchRow = {
+  leagueId?: string | null;
+  competitionKind?: string;
   id: string;
   tournamentId: string | null;
   title: string;
@@ -248,7 +250,7 @@ function buildMyAssignmentsHarness(
     v1AdminUser: { findUnique: jest.fn().mockResolvedValue(admin) },
     v1TournamentStaffAssignment: { findMany, count: jest.fn() },
     v1TeamMatch: {
-      findMany: jest.fn(async ({ where, select }: { where: { tournamentId: string; deletedAt: null; tournamentDetails: { isNot: null }; game: { is: { sourceType: string } }; OR?: Array<{ id?: { in: string[] }; fieldId?: { in: string[] } }> }; select: { tournamentDetails: { select: Record<string, unknown> } } }) => {
+      findMany: jest.fn(async ({ where, select }: { where: { tournamentId: string; deletedAt: null; tournamentDetails?: { isNot: null }; AND?: Array<{ OR: Array<{ leagueId: string | null; tournamentDetails?: { is: { tournamentId: string } }; tournament?: { is: { kind: string } } }> }>; game: { is: { sourceType: string } }; OR?: Array<{ id?: { in: string[] }; fieldId?: { in: string[] } }> }; select: { tournamentDetails: { select: Record<string, unknown> } } }) => {
         const scopedIds = new Set(
           (where.OR ?? []).flatMap((clause) => clause.id?.in ?? []),
         );
@@ -258,11 +260,15 @@ function buildMyAssignmentsHarness(
         return teamMatchRows.filter((row) =>
           row.tournamentId === where.tournamentId
           && row.deletedAt === null
-          && row.tournamentDetails !== null
+          && (where.tournamentDetails ? row.tournamentDetails !== null : (where.AND?.[0]?.OR ?? []).some((clause) =>
+            (row.leagueId ?? null) === clause.leagueId &&
+            (clause.tournamentDetails ? row.tournamentDetails?.tournamentId === clause.tournamentDetails.is.tournamentId : row.competitionKind === clause.tournament?.is.kind),
+          ))
           && row.game?.sourceType === where.game.is.sourceType
           && (scopedIds.has(row.id) || (row.fieldId !== null && scopedFieldIds.has(row.fieldId))),
         ).map((row) => ({
           ...row,
+          leagueId: row.leagueId ?? null,
           // select 에 없는 상세 컬럼은 돌려주지 않는다 — 서비스가 `group` 을 안 고르면 조 이름도 없다.
           tournamentDetails: row.tournamentDetails === null
             ? null
@@ -304,6 +310,26 @@ function assignmentRow(overrides: Partial<FakeAssignmentRow> = {}): FakeAssignme
 }
 
 describe('TournamentOperationsStaffService.myAssignments', () => {
+  it('리그 경기장 배정은 Details가 없어도 담당 경기에 표시하고 다른 리그·삭제 경기·잘못된 종류는 제외한다', async () => {
+    const field = 'league-field';
+    const base: FakeTeamMatchRow = {
+      id: 'league-game', tournamentId, leagueId: tournamentId, competitionKind: 'regular_league',
+      title: '1주차', startAt: new Date('2026-10-13T01:00:00Z'), status: 'matched',
+      fieldId: field, field: { name: '1구장' }, deletedAt: null, tournamentDetails: null,
+      game: { id: 'game-1', state: 'SCHEDULED', sourceType: 'TEAM_MATCH', sides: [
+        { sideKey: 'HOME', displayNameSnapshot: '홈팀' }, { sideKey: 'AWAY', displayNameSnapshot: '원정팀' },
+      ] },
+    };
+    const { service } = buildMyAssignmentsHarness(
+      [assignmentRow({ role: V1TournamentStaffRole.FIELD_OPERATOR, fieldId: field, fixtureScopes: [] })],
+      null,
+      [base, { ...base, id: 'deleted', deletedAt: new Date() }, { ...base, id: 'foreign', leagueId: 'other' }, { ...base, id: 'wrong-kind', competitionKind: 'tournament' }],
+    );
+    const result = await service.myAssignments(targetUserId);
+    expect(result.items[0].fixtures.map((fixture) => fixture.fixtureId)).toEqual(['league-game']);
+    expect(result.items[0].fixtures[0]).toMatchObject({ homeTeamName: '홈팀', awayTeamName: '원정팀', round: null, fixtureNumber: null, fieldName: '1구장' });
+  });
+
   it('reports an active owner/ops admin as platform_ops even when staff assignments are mixed', async () => {
     const { service } = buildMyAssignmentsHarness(
       [assignmentRow({ role: V1TournamentStaffRole.SUPPORT_READONLY })],

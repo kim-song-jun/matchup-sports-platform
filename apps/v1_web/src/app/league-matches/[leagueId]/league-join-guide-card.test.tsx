@@ -87,7 +87,10 @@ describe('닫힘 카드 — 마감이 지났다', () => {
 
     expect(screen.getByText('모집 마감')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 3, name: '신청이 마감됐어요' })).toBeInTheDocument();
-    expect(screen.getByText(/10월 7일.*에 마감됐어요\. 이미 신청한 팀은 확정 결과를 기다려 주세요\./)).toBeInTheDocument();
+    // 마감 시각 문장과 "다음 회차에 신청해 주세요."는 줄을 바꿔 적는다(좁은 화면에서 문장 중간에 끊기지 않게).
+    const note = screen.getByText(/10월 7일.*에 마감됐어요\.다음 회차에 신청해 주세요\./);
+    expect(note.querySelector('br')).toBeInTheDocument();
+    expect(screen.getByText('다음 회차 일정이 정해지면 여기서 알려 드릴게요.')).toBeInTheDocument();
     const link = container.querySelector(OTHER_LEAGUES);
     expect(link).toHaveTextContent('다른 리그 둘러보기');
     expect(container.querySelector(APPLY)).not.toBeInTheDocument();
@@ -104,6 +107,49 @@ describe('닫힘 카드 — 마감이 지났다', () => {
     const shut = renderCard(closed);
     expect(shut.container.querySelector(APPLY)).not.toBeInTheDocument();
     expect(shut.container.querySelector(OTHER_LEAGUES)).toBeInTheDocument();
+  });
+
+  const nextRound = {
+    leagueId: 'lg-2',
+    title: '수요 리그 1부',
+    seasonNo: 2,
+    startsOn: '2026-12-01T00:00:00.000Z',
+    endsOn: '2027-01-31T14:59:59.000Z',
+    registrationOpen: false,
+    registrationDeadlineAt: null,
+  } satisfies NonNullable<Props['nextRound']>;
+  const NEXT_APPLY = 'a[href="/tournaments/lg-2/apply"]';
+
+  it('다음 회차가 정해졌지만 신청 전이면 일정만 안내하고 신청 버튼은 없다', () => {
+    const { container } = renderCard({ ...closed, nextRound });
+
+    expect(screen.getByText('2시즌 · 수요 리그 1부')).toBeInTheDocument();
+    expect(screen.getByText('리그 기간')).toBeInTheDocument();
+    expect(screen.getByText('다음 회차 신청이 열리면 여기서 바로 신청할 수 있어요.')).toBeInTheDocument();
+    expect(container.querySelector(NEXT_APPLY)).not.toBeInTheDocument();
+    expect(container.querySelector(OTHER_LEAGUES)).toBeInTheDocument();
+  });
+
+  it('다음 회차가 신청을 받으면 "다음 회차로 신청하기"가 그 회차 신청으로 간다', () => {
+    const { container } = renderCard({ ...closed, nextRound: { ...nextRound, registrationOpen: true, registrationDeadlineAt: DEADLINE } });
+
+    expect(container.querySelector(NEXT_APPLY)).toHaveTextContent('다음 회차로 신청하기');
+    expect(screen.getByText('신청 마감')).toBeInTheDocument();
+    expect(container.querySelector(APPLY)).not.toBeInTheDocument();
+    expect(container.querySelector(OTHER_LEAGUES)).not.toBeInTheDocument();
+  });
+
+  it('끝난 리그도 다음 회차가 있으면 그 회차로 안내한다', () => {
+    const { container } = renderCard({ state: 'completed', registrationOpen: false, registrationDeadlineAt: PAST, nextRound: { ...nextRound, registrationOpen: true, registrationDeadlineAt: DEADLINE } });
+
+    expect(container.querySelector(NEXT_APPLY)).toBeInTheDocument();
+  });
+
+  it('마감 시각이 없는 끝난 리그는 줄을 바꾸지 않고 "다음 회차에 신청해 주세요."만 적는다', () => {
+    renderCard({ state: 'completed', registrationOpen: false, registrationDeadlineAt: null, nextRound });
+
+    const note = screen.getByText('다음 회차에 신청해 주세요.');
+    expect(note.querySelector('br')).not.toBeInTheDocument();
   });
 
   it('보류(on_hold) 리그도 마감이 지났으면 닫힘 카드를 그린다', () => {

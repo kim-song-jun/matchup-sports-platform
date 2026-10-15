@@ -57,7 +57,7 @@ import {
   type KnockoutFixtureFacts,
   type StoredPenalties,
 } from './core/knockout-penalties';
-import { GameTakeoverService } from './game-takeover.service';
+import { GameTakeoverService, type GameTakeoverRequestReservation } from './game-takeover.service';
 import {
   loadParticipantConsentEligibility,
 } from './public-records/public-consent';
@@ -7016,6 +7016,7 @@ export class GamesService {
     user: V1AuthUser,
     gameId: string,
     input: { clientInstanceId: string; lastSequence: number },
+    reservation?: GameTakeoverRequestReservation,
   ): Promise<{
     gameId: string;
     takeoverToken: string;
@@ -7023,30 +7024,41 @@ export class GamesService {
     lastSequence: number;
     expiresAt: string;
   }> {
-    const actor = await this.resolveActor(this.prisma, gameId, user.id, 'tournament_command');
-    if (actor.authorizationSubject === undefined) {
-      throw this.forbidden();
+    const pending = reservation ?? this.takeover.reserveRequest(gameId);
+    try {
+      const actor = await this.resolveActor(this.prisma, gameId, user.id, 'tournament_command');
+      if (actor.authorizationSubject === undefined) {
+        throw this.forbidden();
+      }
+      const game = await this.prisma.v1Game.findUnique({
+        where: { id: gameId },
+        select: { version: true, lastSequence: true },
+      });
+      if (game === null) {
+        throw this.notFound();
+      }
+      const grant = this.takeover.grant({
+        gameId,
+        authorizationSubject: actor.authorizationSubject,
+        clientInstanceId: input.clientInstanceId,
+        lastSequence: input.lastSequence,
+      }, pending);
+      if (grant === null) {
+        throw new ForbiddenException({
+          code: 'TAKEOVER_SUPERSEDED',
+          message: 'A newer takeover request already acquired this game',
+        });
+      }
+      return {
+        gameId,
+        takeoverToken: grant.token,
+        version: game.version,
+        lastSequence: game.lastSequence,
+        expiresAt: new Date(grant.expiresAt).toISOString(),
+      };
+    } finally {
+      this.takeover.finishRequest(pending);
     }
-    const grant = this.takeover.grant({
-      gameId,
-      authorizationSubject: actor.authorizationSubject,
-      clientInstanceId: input.clientInstanceId,
-      lastSequence: input.lastSequence,
-    });
-    const game = await this.prisma.v1Game.findUnique({
-      where: { id: gameId },
-      select: { version: true, lastSequence: true },
-    });
-    if (game === null) {
-      throw this.notFound();
-    }
-    return {
-      gameId,
-      takeoverToken: grant.token,
-      version: game.version,
-      lastSequence: game.lastSequence,
-      expiresAt: new Date(grant.expiresAt).toISOString(),
-    };
   }
 
   /**

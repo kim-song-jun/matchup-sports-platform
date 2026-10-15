@@ -6,6 +6,7 @@ import type { V1TournamentOperationsBoardItem, V1TournamentOperationsBoardPage }
 
 const mocks = vi.hoisted(() => ({
   useV1TournamentOperationsBoard: vi.fn(),
+  useV1TournamentFields: vi.fn(),
   fetchV1TournamentOperationsBoardPage: vi.fn(),
   routerReplace: vi.fn(),
   useTournamentOpsRole: vi.fn(),
@@ -48,9 +49,7 @@ vi.mock('@tanstack/react-query', () => ({
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1TournamentOperationsBoard: (...args: unknown[]) => mocks.useV1TournamentOperationsBoard(...args),
   fetchV1TournamentOperationsBoardPage: (...args: unknown[]) => mocks.fetchV1TournamentOperationsBoardPage(...args),
-  useV1TournamentFields: () => ({
-    data: { items: [{ id: 'field-1', name: '1번 코트' }, { id: 'field-2', name: '2번 코트' }] },
-  }),
+  useV1TournamentFields: (...args: unknown[]) => mocks.useV1TournamentFields(...args),
   useV1AssignFixtureField: () => ({ mutate: mocks.assignFixtureField, isPending: false }),
   useV1ClearFixtureField: () => ({ mutate: mocks.clearFixtureField, isPending: false }),
   useV1Tournament: () => ({
@@ -124,6 +123,10 @@ const PAGE: V1TournamentOperationsBoardPage = {
 
 describe('OperationsBoardClient', () => {
   beforeEach(() => {
+    mocks.useV1TournamentFields.mockReturnValue({
+      data: { items: [{ id: 'field-1', name: '1번 코트' }, { id: 'field-2', name: '2번 코트' }] },
+      refetch: vi.fn(), isFetching: false,
+    });
     mocks.useV1TournamentOperationsBoard.mockReset();
     mocks.fetchV1TournamentOperationsBoardPage.mockReset();
     mocks.routerReplace.mockReset();
@@ -147,6 +150,29 @@ describe('OperationsBoardClient', () => {
     fireEvent.click(screen.getAllByRole('button', { name: new RegExp(`^${title} .+ 더보기$`) })[0]);
     return screen.getByRole('dialog', { name: `${title} 더보기` });
   }
+
+  it('새로고침은 경기 목록뿐 아니라 다른 탭에서 추가한 필드 선택지도 갱신한다', async () => {
+    let latestFields = [{ id: 'field-1', name: '1번 코트' }];
+    let refreshFields = false;
+    mocks.useV1TournamentFields.mockImplementation(() => ({
+      data: { items: latestFields }, isFetching: false,
+      refetch: async () => {
+        refreshFields = true;
+        latestFields = [...latestFields, { id: 'field-3', name: '새 코트' }];
+      },
+    }));
+    const boardRefetch = vi.fn();
+    mocks.useV1TournamentOperationsBoard.mockReturnValue({
+      data: PAGE, isPending: false, isError: false, isFetching: false, refetch: boardRefetch,
+    });
+    const { rerender } = render(<OperationsBoardClient tournamentId="t-1" />);
+    await userEvent.click(screen.getByRole('button', { name: '지금 새로고침' }));
+    expect(refreshFields).toBe(true);
+    expect(boardRefetch).toHaveBeenCalled();
+    rerender(<OperationsBoardClient tournamentId="t-1" />);
+    expect(within(screen.getByRole('combobox', { name: '필드' })).getByRole('option', { name: '새 코트' })).toBeInTheDocument();
+    expect(screen.getAllByRole('option', { name: '새 코트' }).length).toBeGreaterThan(1);
+  });
 
   it('renders a fixture row joined with its public team names, game state, and both stable + live warnings', () => {
     render(<OperationsBoardClient tournamentId="t-1" />);

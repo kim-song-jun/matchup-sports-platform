@@ -39,7 +39,7 @@ describe('NextGameCard', () => {
     expect(screen.getByText('내 출전')).toBeInTheDocument();
     expect(screen.getByText('마포 FC · 10명 출전')).toBeInTheDocument();
     expect(hrefOf('경기 상세')).toBe('/league-matches/league-1/fixtures/tm-1?from=%2Fhome');
-    expect(hrefOf('명단 보기')).toBe('/teams/team-a/games/game-1/roster');
+    expect(hrefOf('경기 출전 보기')).toBe('/teams/team-a/games/game-1/roster?from=%2Fhome');
   });
 
   it('명단에서 빠진 팀원: 칩은 없고 경기 상세·명단 보기 링크는 그대로 있다', () => {
@@ -48,15 +48,15 @@ describe('NextGameCard', () => {
     expect(screen.queryByText('내 출전')).not.toBeInTheDocument();
     expect(screen.queryByText(/빠졌|없어요/)).not.toBeInTheDocument();
     expect(hrefOf('경기 상세')).toContain('/league-matches/league-1/fixtures/tm-1');
-    expect(hrefOf('명단 보기')).toBe('/teams/team-a/games/game-1/roster');
+    expect(hrefOf('경기 출전 보기')).toBe('/teams/team-a/games/game-1/roster?from=%2Fhome');
   });
 
   it('팀장·매니저: 주 버튼이 명단 확인이 되고 경기 상세가 보조로 내려간다', () => {
     render(<NextGameCard game={leagueGame({ viewerCanManage: true, viewerParticipating: false })} now={NOW} />);
 
     const links = screen.getAllByRole('link').map((link) => link.textContent);
-    expect(links).toEqual(['명단 확인', '경기 상세']);
-    expect(hrefOf('명단 확인')).toBe('/teams/team-a/games/game-1/roster');
+    expect(links).toEqual(['이번 경기 출전 관리', '경기 상세']);
+    expect(hrefOf('이번 경기 출전 관리')).toBe('/teams/team-a/games/game-1/roster?from=%2Fhome');
     expect(screen.getByText('마포 FC · 10명 출전 · 경기 시작 전까지 바꿀 수 있어요')).toBeInTheDocument();
   });
 

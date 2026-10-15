@@ -424,6 +424,7 @@ export function RegistrationsTab({
   tournamentTeamCount,
   canWrite,
   requireCancelReason = false,
+  isFreeEntry = false,
 }: {
   tournamentId: string;
   showToast: (msg: string, v?: 'success' | 'error') => void;
@@ -438,6 +439,7 @@ export function RegistrationsTab({
    * 리그 화면이 이 탭을 리그 id 로 렌더하고, 대회 화면이 대회 id 로 렌더한다.
    */
   requireCancelReason?: boolean;
+  isFreeEntry?: boolean;
 }) {
   const { data, isPending, isError, error, refetch } = useV1AdminTournamentRegistrations(tournamentId);
   const confirmPayment = useV1ConfirmPayment();
@@ -474,6 +476,11 @@ export function RegistrationsTab({
   for (const r of registrations) {
     statusCounts[r.status] = (statusCounts[r.status] ?? 0) + 1;
   }
+  const registrationStatusFilters = REGISTRATION_STATUS_FILTERS.map((filter) =>
+    isFreeEntry && ['awaiting_payment', 'payment_checking', 'paid'].includes(filter.value)
+      ? { ...filter, label: filter.value === 'awaiting_payment' ? '신청 작성 중' : filter.value === 'payment_checking' ? '신청 확인 중' : '신청 완료' }
+      : filter,
+  );
   // 처리 대기 = 입금 확인 중(payment_checking) + 취소 요청(cancel_requested)
   const pendingReviewCount = (statusCounts.payment_checking ?? 0) + (statusCounts.cancel_requested ?? 0);
 
@@ -726,7 +733,7 @@ export function RegistrationsTab({
       {/* P1-2: 상태 필터 칩 + 전체 명단 CSV(필터와 무관한 탭 단위 액션이라 필터 그룹 밖에 둔다) */}
       <div className="tm-content-enter flex items-start justify-between gap-2 flex-wrap mb-3">
         <div className="flex items-center gap-2 flex-wrap" role="group" aria-label="신청 상태 필터">
-          {REGISTRATION_STATUS_FILTERS.map((opt) => {
+          {registrationStatusFilters.map((opt) => {
             const active = statusFilter === opt.value;
             const count = statusCounts[opt.value] ?? 0;
             return (
@@ -858,7 +865,7 @@ export function RegistrationsTab({
                 }]
               : []),
           ],
-          statusLabel: r.status === 'cancelled' && r.cancelOutcome ? registrationCancelOutcomeLabel(r.cancelOutcome) : undefined,
+          statusLabel: r.status === 'cancelled' && r.cancelOutcome ? registrationCancelOutcomeLabel(r.cancelOutcome) : isFreeEntry ? registrationStatusFilters.find((filter) => filter.value === r.status)?.label : undefined,
           description: r.cancelReason || r.adminCancelReason ? (
             <>
               {r.cancelReason ? <span className="block">{`팀 취소 사유: ${r.cancelReason}`}</span> : null}

@@ -2,8 +2,9 @@ import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import { JsonLd } from '@/components/seo/json-ld';
 import { TeamMatchDetailPageClient } from '@/components/team-matches/team-matches-client';
+import { fixtureDetailHref } from '@/lib/fixture-detail-route';
 import { buildNoIndexMetadata, buildPublicMetadata, fetchPublicV1, matchDescriptionFallback, metadataDescription } from '@/lib/seo';
-import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
+import { sanitizeRedirectPath } from '@/lib/session-storage';
 import { buildTeamMatchEventLd } from '@/lib/structured-data';
 import type { V1TeamMatch } from '@/types/api';
 
@@ -18,7 +19,9 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       teamMatch.description,
       matchDescriptionFallback('팀매치', teamMatch.sport?.name ?? teamMatch.sportName, teamMatch.place?.name ?? teamMatch.placeName),
     ),
-    path: `/team-matches/${id}`,
+    path: teamMatch.league
+      ? fixtureDetailHref({ isRegularLeague: true, competitionId: teamMatch.league.leagueId, fixtureId: id })
+      : `/team-matches/${encodeURIComponent(id)}`,
     image: teamMatch.imageUrl,
   });
 }
@@ -38,7 +41,7 @@ export default async function TeamMatchDetailPage({ params, searchParams }: {
   if (teamMatch.league) {
     const query = await searchParams;
     const from = typeof query?.from === 'string' ? sanitizeRedirectPath(query.from) : null;
-    redirect(withFromPath(`/league-matches/${teamMatch.league.leagueId}/fixtures/${id}`, from));
+    redirect(fixtureDetailHref({ isRegularLeague: true, competitionId: teamMatch.league.leagueId, fixtureId: id, fromHref: from }));
   }
   // matches/[id] 와 같은 이유 — 리다이렉트 판정을 위해 이미 받은 응답을 첫 표시값으로 넘긴다.
   const eventLd = buildTeamMatchEventLd(teamMatch, id);

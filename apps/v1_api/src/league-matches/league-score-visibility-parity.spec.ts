@@ -37,7 +37,7 @@ function rowWithPolicy(mode: V1VisibilityMode): LeagueFixtureListRow {
     placeProvider: null,
     placeProviderId: null,
     status: 'completed',
-    game: { id: 'game-1', state: 'ENDED', currentOfficialRevisionId: 'rev-1', visibilityPolicy: { mode } },
+    game: { id: 'game-1', state: 'ENDED', currentOfficialRevisionId: 'rev-1', currentOfficialRevision: null, visibilityPolicy: { mode } },
   };
 }
 

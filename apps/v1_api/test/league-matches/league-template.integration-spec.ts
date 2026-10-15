@@ -209,6 +209,9 @@ describe('POST /admin/league-matches/:leagueId/fixtures/template', () => {
       const cancelled = fixtures.filter((f) => f.status === 'cancelled');
       expect(cancelled).toHaveLength(6);
       expect(cancelled.every((f) => f.homeSlotId === null && f.awaySlotId === null)).toBe(true);
+      // 접은 경기는 기록만 남고 현재 목록(deletedAt null)에서는 빠진다.
+      expect(cancelled.every((f) => f.deletedAt !== null)).toBe(true);
+      expect(await h.prisma.v1TeamMatch.count({ where: { leagueId, deletedAt: null } })).toBe(10);
       expect(fixtures.filter((f) => f.status === 'matched')).toHaveLength(10);
       const slots = await h.prisma.v1TournamentSlot.findMany({ where: { tournamentId: leagueId } });
       expect(slots).toHaveLength(5);

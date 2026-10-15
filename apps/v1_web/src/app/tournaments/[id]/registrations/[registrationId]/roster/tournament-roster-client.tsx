@@ -52,6 +52,7 @@ import {
 import { PLAYER_ELIGIBILITY_LABEL, teamRoleLabel } from '@/lib/v1-status-labels';
 import { AvatarFallback } from '@/components/v1-ui/avatar-fallback';
 import { rosterLimitText } from '@/lib/roster-limit';
+import { compareRosterPlayers, rosterDisplayName } from '@/lib/roster-presentation';
 
 // 이 파일에서 가져다 쓰던 소비처(테스트 포함)가 그대로 돌아가게 이름만 다시 내보낸다.
 export { getRosterDeadlineState, isTournamentRosterMutable, tournamentRosterClosedMessage, type RosterDeadlineState };
@@ -387,7 +388,7 @@ function memberMissingReason(
   return getMemberIneligibility(member, genderCategory)?.listReason ?? '';
 }
 
-function AddPlayerForm({
+export function AddPlayerForm({
   formId,
   teamId,
   genderCategory,
@@ -868,11 +869,10 @@ function FormField({
 /* ── Player row ── */
 
 /**
- * 명단에서 선수를 부르는 이름. 팀장·매니저 응답은 실명이 있고, 일반 팀원 응답은 실명이 `null` 이라
- * 닉네임이다. 둘 다 없으면 탈퇴 등으로 프로필을 잃은 선수다(공개 명단의 자리표시자와 같은 말).
+ * 경기와 같은 공개 표시 이름. 등록 실명은 서버가 허용한 행에서만 아래 보조 정보로 표시한다.
  */
-function rosterPlayerName(player: Pick<V1TournamentRosterPlayer, 'realName' | 'nickname'>): string {
-  return player.realName ?? player.nickname ?? '(탈퇴한 선수)';
+function rosterPlayerName(player: Pick<V1TournamentRosterPlayer, 'displayName' | 'nickname'>): string {
+  return rosterDisplayName(player);
 }
 
 /** 행 저장 한 번에 바뀐 값만 담는다 — 자격과 등번호는 서버 경로가 다르다. */
@@ -888,7 +888,6 @@ function PlayerRow({
   isEditing,
   onToggleEdit,
   isPrimary,
-  showGameRosterName,
 }: {
   player: V1TournamentRosterPlayer;
   onSave: (playerId: string, changes: PlayerRowChanges) => Promise<void>;
@@ -905,11 +904,6 @@ function PlayerRow({
    * 칸이 있거나 다른 행이 편집 중이면 이 행의 "저장"은 보조로 낮춘다. 부모가
    * `draftForms.length === 0 && editingPlayerId === player.id` 로 계산해 넘긴다. */
   isPrimary: boolean;
-  /**
-   * 팀장·매니저 화면에서만 실명 옆에 경기 명단·기록에 나가는 이름(닉네임)을 함께 보인다 — 번호를 넣는 사람이
-   * 경기 명단의 누구인지 대조하지 않도록. 일반 팀원은 서버가 남의 실명을 비워 이미 닉네임만 보므로 그대로 둔다.
-   */
-  showGameRosterName: boolean;
 }) {
   const [draftEligibility, setDraftEligibility] = useState<V1PlayerEligibilityStatus>(player.eligibilityStatus);
   // 문자열로 든다 — 빈 값("번호 없음")과 `0` 을 숫자로는 못 가른다.
@@ -1029,9 +1023,9 @@ function PlayerRow({
               {formatRosterBirthDate(player.birthDateSnapshot)}
             </div>
           ) : null}
-          {showGameRosterName && player.realName !== null && player.nickname !== null && player.nickname !== player.realName ? (
+          {player.personalInfoVisible && player.realName !== null && playerName !== player.realName ? (
             <div className="tm-text-micro" style={{ color: 'var(--text-caption)', marginTop: 2 }}>
-              경기 명단 이름 <strong style={{ color: 'var(--text-strong)' }}>{player.nickname}</strong>
+              등록 이름 <strong style={{ color: 'var(--text-strong)' }}>{player.realName}</strong>
             </div>
           ) : null}
         </div>
@@ -1233,7 +1227,9 @@ export function TournamentRosterPageClient({
     setEditingPlayerId((prev) => (prev === playerId ? null : playerId));
   }
 
-  const players = rosterData?.players ?? [];
+  const players = [...(rosterData?.players ?? [])].sort((a, b) => compareRosterPlayers(
+    { ...a, displayName: rosterPlayerName(a) }, { ...b, displayName: rosterPlayerName(b) },
+  ));
   const belowMinimum = rosterData?.belowMinimum ?? false;
   // 종료·취소된 대회는 잠금·마감 예외와 무관하게 누구도 명단을 못 고친다 — 서버
   // assertRosterMutable의 첫 번째 검사와 같은 순서(감사 finding #1). 이 값이 아직 로딩 중이면
@@ -1605,6 +1601,10 @@ export function TournamentRosterPageClient({
           </div>
         ) : null}
 
+        <p className="tm-text-caption" style={{ margin: '0 0 12px', color: 'var(--text-muted)' }}>
+          {tournament?.kind === 'regular_league' ? '리그' : '대회'} 전체 참가 선수와 등번호를 관리해요. 선수 변경은 시작 전 경기에 반영돼요.
+          이번 경기에서만 빠질 선수는 이번 경기 출전 명단에서 체크를 풀어 주세요.
+        </p>
         {/* Roster header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <div>
@@ -1625,7 +1625,7 @@ export function TournamentRosterPageClient({
                 className="tm-text-caption"
                 style={{ color: 'var(--text-muted)', marginLeft: 4 }}
               >
-                선수 명단
+                {tournament?.kind === 'regular_league' ? '리그 참가 명단' : '대회 참가 명단'}
               </span>
             </div>
             <div className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-muted)' }}>
@@ -1715,7 +1715,6 @@ export function TournamentRosterPageClient({
                 isEditing={editingPlayerId === player.id}
                 onToggleEdit={() => handleToggleEdit(player.id)}
                 isPrimary={draftForms.length === 0 && editingPlayerId === player.id}
-                showGameRosterName={canManageRoster}
               />
             ))}
           </Card>

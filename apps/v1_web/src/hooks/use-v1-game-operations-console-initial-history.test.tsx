@@ -57,8 +57,8 @@ function createMockSocket() {
           // 재현한다.
           snapshot:
             input.afterSequence === 0
-              ? { version: 5, state: 'LIVE', lastSequence: 2, events: EXISTING_EVENTS }
-              : { version: 5, state: 'LIVE', lastSequence: 5, events: [] },
+              ? { gameId: input.gameId, version: 5, state: 'LIVE', lastSequence: 2, events: EXISTING_EVENTS }
+              : { gameId: input.gameId, version: 5, state: 'LIVE', lastSequence: 5, events: [] },
         });
       } else if (event === 'game.takeover.request' && cb) {
         cb({

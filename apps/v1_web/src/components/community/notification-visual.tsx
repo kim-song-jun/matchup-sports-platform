@@ -59,10 +59,14 @@ const LEAGUE_ROUTE = /^\/(league-matches|leagues)\//;
 
 /**
  * 아이콘·종류 이름을 고를 때 쓰는 종류. 한 리그의 소식이 서버 targetType 으로는 대진(`team_match`)과
- * 명단(`tournament`)으로 갈려 두 갈래로 보였다(F44) — 서버가 종류를 싣기 전까지 착지 경로로 리그를
+ * 명단(`tournament`)으로 갈려 두 갈래로 보였다(F44) — 기존 주소 또는 통합 상세의 kind=league로 리그를
  * 알아본다. 원본 `type` 은 분석 이벤트가 그대로 쓰므로 바꾸지 않는다.
  */
 export function notificationVisualType(type: string | null | undefined, href: string | null | undefined): string | null {
   if (href && LEAGUE_ROUTE.test(href)) return 'league';
+  if (href?.startsWith('/tournaments/')) {
+    const url = new URL(href, 'https://teameet.internal');
+    if (url.searchParams.get('kind') === 'league') return 'league';
+  }
   return type ?? null;
 }

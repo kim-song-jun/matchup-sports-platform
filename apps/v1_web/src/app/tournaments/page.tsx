@@ -5,7 +5,7 @@ import { firstSearchParam, tournamentListSeedPath, type TournamentListSeed } fro
 import { fetchSeoSeed } from '@/lib/seo-list';
 import { buildItemListLd } from '@/lib/structured-data';
 import type { V1TournamentListPage } from '@/types/api';
-import { buildTournamentListMetadata, tournamentListTitle } from './tournament-list-metadata';
+import { buildTournamentListMetadata, tournamentListCanonical, tournamentListTitle } from './tournament-list-metadata';
 import { TournamentsListPageClient } from './tournaments-list-client';
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -41,7 +41,7 @@ export default async function TournamentsPage({ searchParams }: { searchParams: 
         <JsonLd
           data={buildItemListLd(
             tournamentListTitle(kind),
-            '/tournaments',
+            tournamentListCanonical(kind),
             seed.page.items.map((item) => ({ name: item.title, path: `/tournaments/${item.id}` })),
           )}
         />

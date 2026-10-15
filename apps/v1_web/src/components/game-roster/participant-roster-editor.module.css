@@ -1,0 +1,12 @@
+.editor { padding:var(--spacing-4) var(--v1-shell-page-x) var(--spacing-8); display:grid; gap:var(--spacing-3); }
+.editor p { margin:0; }
+.heading { display:flex; align-items:center; justify-content:space-between; gap:var(--spacing-3); }
+.heading p { margin-top:var(--spacing-1); }
+.list { list-style:none; margin:0; padding:0; }
+.list li { border-bottom:1px solid var(--border); }
+.actions { display:flex; align-items:center; gap:var(--spacing-1); }
+.actions button,.gk { min-width:44px; width:44px; padding-inline:0; text-align:center; }
+.actions button[aria-pressed=true] { color:var(--blue700); background:var(--blue50); border-color:var(--blue500); }
+.gk { color:var(--blue700); font-size:var(--font-size-caption); }
+.footer { display:grid; gap:var(--spacing-2); padding-top:var(--spacing-3); }
+.sheet { display:grid; gap:var(--spacing-3); padding:var(--spacing-4) var(--v1-shell-page-x) var(--spacing-6); }

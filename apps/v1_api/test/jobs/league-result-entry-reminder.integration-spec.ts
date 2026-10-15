@@ -97,7 +97,8 @@ async function seedFixture(
     });
     await prisma.v1Game.update({ where: { id: game.id }, data: { currentOfficialRevisionId: revision.id } });
   }
-  return { teamMatchId: teamMatch.id, leagueId: league.id, gameId: game.id, startAt, creatorAdminUserId };
+  return { teamMatchId: teamMatch.id, leagueId: league.id, gameId: game.id, startAt, creatorAdminUserId,
+    fixtureTitle: teamMatch.title, homeTeamName: homeTeam.name, awayTeamName: awayTeam.name };
 }
 
 async function cleanupFixture(ctx: Awaited<ReturnType<typeof seedFixture>>) {
@@ -177,13 +178,14 @@ describe('LeagueResultEntryReminderService — 리그 결과 미입력 24시간 
       const recipients = (await recipientsFor(ctx.teamMatchId)).filter((id) => roster.allIds.includes(id) || id === ctx.creatorAdminUserId);
       expect(recipients.sort()).toEqual([ctx.creatorAdminUserId, roster.activeOwnerId, roster.activeOpsId].sort());
 
-      const row = await prisma.$queryRaw<Array<{ deepLink: string; title: string }>>`
-        SELECT deep_link AS "deepLink", title FROM v1_notifications
+      const row = await prisma.$queryRaw<Array<{ deepLink: string; title: string; body: string | null }>>`
+        SELECT deep_link AS "deepLink", title, body FROM v1_notifications
         WHERE business_key = ${`league-result-entry-reminder:${ctx.teamMatchId}:recipient:${roster.activeOpsId}`}
       `;
       expect(row).toHaveLength(1);
-      expect(row[0].deepLink).toBe(`/admin/league-matches/${ctx.leagueId}`);
+      expect(row[0].deepLink).toBe(`/admin/live/${ctx.leagueId}/result-review?fixtureId=${ctx.teamMatchId}`);
       expect(row[0].title).toBe('리그 경기 결과가 아직 입력되지 않았어요');
+      expect(row[0].body).toContain(`${ctx.fixtureTitle} · ${ctx.homeTeamName} vs ${ctx.awayTeamName}`);
     } finally {
       await cleanupAdminRoster(roster);
       await cleanupFixture(ctx);

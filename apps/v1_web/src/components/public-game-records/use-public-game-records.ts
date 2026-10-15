@@ -107,7 +107,11 @@ function shouldRetryPublicRecord(failureCount: number, error: unknown): boolean 
 /** 404 를 받은 기록은 더 묻지 않는다. 그 외 오류는 캐시된 상태 기준 폴링을 이어 가 성공하면 스스로 복구한다. */
 function publicRecordRefetchInterval(query: Query<PublicMatchDetail>): number | false {
   if (isNotFound(query.state.error)) return false;
-  return publicLivePollDelay(query.state.data?.status, query.state.data?.scheduledAt);
+  const data = query.state.data;
+  // 끝났지만 공식 결과를 기다리는 경기 — 멈추면 확정이 열어 둔 화면에 오지 않고 '결과 대기'로 남는다.
+  // ponytail: 확정되지 않고 방치된 경기는 화면을 닫을 때까지 10초마다 묻는다. 부하가 보이면 종료 시각 기준 상한을 둔다.
+  if (data?.status === 'ended' && data.resultState === 'pending') return LIVE_POLL_INTERVAL_MS;
+  return publicLivePollDelay(data?.status, data?.scheduledAt);
 }
 
 /**

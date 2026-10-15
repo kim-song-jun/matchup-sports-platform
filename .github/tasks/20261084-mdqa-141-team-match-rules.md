@@ -11,7 +11,7 @@ Status: In Progress
 ## Original Conditions
 - [x] 2026-10-13 최신 직접 사용자 B 선택으로 A 대체
 - [x] 관리형 전용 worktree/feature branch, origin/dev 9e3d596629ca350e5a12ac38a06ab42fff14713f
-- [ ] 단판/전후반 저장·읽기 계약과 상태/권한/종목 제약 고정
+- [x] 단판/전후반 저장·읽기 계약과 상태/권한/종목 제약 고정
 - [ ] 실제 RED→GREEN·독립 리뷰·dev PR·기존 댓글
 
 ## User Scenarios
@@ -53,6 +53,10 @@ host/team owner-manager 권한과 운영 콘솔의 별도 권한을 보존한다
 | 2026-10-13 | root | config version 저장 방식/종목별 제약 | Phase A 현재 v1 조사 중 |
 
 ## Progress Snapshot
+- 2026-10-15 root final source checkpoint: 최신 dev `d77f8e3176ffa03ad39a32f0f6a04c19e7a75bcb`를 일반 merge한 뒤 `887e357b0` R4 수정과 `454871a5c` fixture 계약 보완을 커밋했다. 50개 전체 변경 경로의 diff-check/debt marker는 0이며 미추적 파일은 독립 리뷰 `.omo/evidence/`뿐이다. API13+문서3+Changeset1 독립17/17 및 frontend32/32 정적 리뷰 Critical0/Warning0이다.
+- 2026-10-15 root final validation: committed API4파일250/250 PASS(20.192s)·API tsc PASS, UI6파일307/307 PASS(39.76s), fixture3파일34/34 PASS(12.97s), hook/cache/route chrome/조건5파일103/103 PASS(24.77s), shared facet 포함 이전3파일52/52 PASS. 그룹 간 중복을 전체 건수로 합산하지 않는다. 최종 Web tsc `--noEmit --incremental false` 및 실제 `apps/v1_web/scripts/v1-pattern-check.mjs` PASS. 초기 타입 fixture 오류3건은 필수 계약을 채우고 중복 선언을 제거해 해소했으며 타입을 약화하지 않았다.
+- 2026-10-15 root adversarial loop: 저장17/19·전역단판/전후반 이력 없음에서 단판 선택 후 원래 전후반으로 돌아가지 못하는 실제2 FAIL을 확인했다. 현재 route ID·version·rulesEditable에 묶인 저장 두 기간으로만 복원하고, unchanged PATCH는 periods 생략/기존 pin 보존, changed23/29는 실제 PATCH/독립 GET 일치를 검증했다. 생성과 잠긴 수정은 전역/상태 gate를 유지한다.
+- 2026-10-15 root remaining gates: 새 dev PR·정식 SHA 고정 리뷰·원격 CI/스레드·실제 dev 머지·alpha 배포와390/768/1440 실측·기존 리포트 댓글을 이어간다. 실제 PostgreSQL integration6건은 Docker daemon OFF로 NOTRUN이다. dev d77의 기존 worker lease 테스트 CI 실패는 별도 최소 수정 lane에서 처리하며 이 변경의 성공으로 숨기지 않는다. 초기 잘못된 루트 패턴 경로/인자 없는 Task127 전용 문서 검사 실행은 검증 성공 근거에 포함하지 않는다.
 - 2026-10-15 root: 기존 WIP38파일을 cc76159be에 명시 pathspec checkpoint로 보존하고 최신 dev c4f477c31을 일반 merge한53218c4cd를 검토 기준으로 고정했다. 이전 Phase A 기록은 역사다. API11/11 C2/W1·frontend27/27 C4의 실제 결함을 별도 독립 reviewer가 찾았다. 최초 실제 DTO/service83건에서11 FAIL/72 PASS, canonical JSON 반례2 FAIL, 옵션 응답3 FAIL을 확인하고 같은 작업에서 수정했다.
 - 2026-10-15 root: 실제 API DTO/service/controller/기존 service250/250 PASS(24.721s). 종목·ACTIVE·실제 canonical JSON 동일성으로 cross-writer reuse를 보호하고 유효 단판 default 및 페이지 끝까지의 실제 전후반 이력, nullable twoPeriodDefaults를 지원한다. int4 상한은2147483647이다. 기존1925 fixture 적용·잠금·동일 값 복구를 보존한다. 실제 PostgreSQL HTTP/잠금 회귀6건을 활성 경로에 작성했으나 Docker daemon OFF이므로 DB integration NOTRUN이다.
 - 2026-10-15 root: UI 최초6 FAIL/162 PASS는 초안 보존·캐시 오류·상세 readback 수정 뒤 해소됐다(중간300 PASS/1개 이전 문구 기대 FAIL은 새 저장 초안 계약·실제 저장소/재진입 단언으로 보강). shared HTTP historical1 FAIL 및 옵션/상한5 FAIL, 날짜/이력7 FAIL 뒤 실제3파일52/52 PASS(18.86s). 날짜만 고정하고 네트워크 타이머를 유지하며 actual MSW validation/write/read를 검증했다. 단판→전후반 이력 및 int4/합계 UI4 FAIL은 같은 루프에서 수정했다. 최종 committed UI·타입·패턴·독립 immutable head·dev PR/CI·alpha·기존 댓글은 아직 PENDING이다.

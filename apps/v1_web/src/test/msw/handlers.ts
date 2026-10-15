@@ -632,19 +632,21 @@ let v1TeamMatchLineupFixture: V1TeamMatchLineup = {
   lineupId: 'lineup-1',
   revision: 1,
   state: 'DRAFT',
+  effectiveRosterSource: 'DEFAULT_PREVIEW',
+  hasSavedDraft: false,
   editable: true,
   lockReason: null,
   lateAdditionAllowed: false,
   ownTeamName: '홈 FC',
   opponent: { teamName: '원정 FC', submitted: false, published: false, participantCount: null },
   version: 1,
-  formation: '2-2',
+  formation: null,
   publicLineupAt: null,
   starters: [
-    { id: 'participant-1', userId: 'user-1', displayName: '김도윤', jerseyNumber: 7, position: 'FW', goalkeeper: false, positionX: 30, positionY: 60 },
-    { id: 'participant-2', userId: 'user-2', displayName: '박서준', jerseyNumber: 1, position: 'GK', goalkeeper: true, positionX: 50, positionY: 6 },
+    { id: 'participant-1', userId: 'user-1', displayName: '김도윤', jerseyNumber: 7, position: null, goalkeeper: false, positionX: null, positionY: null },
+    { id: 'participant-2', userId: 'user-2', displayName: '박서준', jerseyNumber: 1, position: null, goalkeeper: false, positionX: null, positionY: null },
   ],
-  bench: [{ id: 'participant-3', displayName: '이하늘', jerseyNumber: 11 }],
+  bench: [],
   eligibleMembers: [
     { userId: 'user-1', displayName: '김도윤', jerseyNumber: 7, attending: true, rsvpStatus: null, alsoOpponentMember: false },
     { userId: 'user-2', displayName: '박서준', jerseyNumber: 1, attending: true, rsvpStatus: null, alsoOpponentMember: true },
@@ -1719,6 +1721,8 @@ export const v1MswHandlers = [
       version: v1TeamMatchLineupFixture.version + 1,
       // 서버와 같다(Task 180 R-2): 이미 낸 명단의 저장은 곧바로 새 제출본, 초안의 저장은 초안.
       state: v1TeamMatchLineupFixture.state === 'DRAFT' ? 'DRAFT' : 'SUBMITTED',
+      effectiveRosterSource: v1TeamMatchLineupFixture.state === 'DRAFT' ? 'DEFAULT_PREVIEW' : 'MANUAL',
+      hasSavedDraft: v1TeamMatchLineupFixture.state === 'DRAFT',
       formation: body.formation ?? null,
       // 서버(`rosterOf`)와 **같은 규칙**: `participants` 가 **비어 있지 않을 때만** 그것이
       // 명단이고, 그 밖에는 옛 `starters`+`bench` 를 합친다. `??` 로 쓰면 빈 배열에서
@@ -1765,6 +1769,8 @@ export const v1MswHandlers = [
       v1TeamMatchLineupFixture.version += 1;
       v1TeamMatchLineupFixture.publicLineupAt = new Date().toISOString();
     }
+    v1TeamMatchLineupFixture.effectiveRosterSource = 'MANUAL';
+    v1TeamMatchLineupFixture.hasSavedDraft = false;
     const publicLineupAt = v1TeamMatchLineupFixture.publicLineupAt;
     return ok({
       teamMatchId: v1TeamMatchLineupFixture.teamMatchId,

@@ -394,6 +394,43 @@ describe('TeamMatchResultPageClient — 호스트 결과 입력', () => {
     expect(screen.getByLabelText('5. MVP')).toHaveValue('p-1');
   });
 
+  it.each(['DEFAULT_PREVIEW', 'DEFAULT_FROZEN'] as const)(
+    '%s DRAFT 기본 명단은 첫 결과 입력에서 실제 참가자 UUID로 득점과 출전 기록을 보낸다 (MD-QA146)',
+    async (effectiveRosterSource) => {
+      const participantId = '14600000-0000-4000-8000-000000000001';
+      useV1TeamMatchLineupMock.mockReturnValue(settledQuery(lineup({
+        state: 'DRAFT',
+        revision: effectiveRosterSource === 'DEFAULT_PREVIEW' ? 1 : 2,
+        effectiveRosterSource,
+        starters: [{
+          id: participantId,
+          userId: '14600000-0000-4000-8000-000000000101',
+          displayName: '현재 자격 선수',
+          jerseyNumber: 7,
+          position: null,
+          goalkeeper: false,
+          positionX: null,
+          positionY: null,
+        }],
+      })));
+      createMutateAsync.mockResolvedValue({ revisionId: 'rev-new', version: 4 });
+      submitMutateAsync.mockResolvedValue({});
+      render(<TeamMatchResultPageClient teamMatchId="tm-1" />);
+
+      fireEvent.change(screen.getByLabelText('호스트팀 (홈)'), { target: { value: '1' } });
+      expect(within(screen.getByLabelText('1번 골')).getByRole('option', { name: /현재 자격 선수/ })).toHaveValue(participantId);
+      fireEvent.change(screen.getByLabelText('1번 골'), { target: { value: participantId } });
+      fireEvent.click(screen.getByText('결과 작성 완료'));
+      fireEvent.click(screen.getByText('제출하기'));
+
+      await waitFor(() => expect(createMutateAsync).toHaveBeenCalled());
+      expect(createMutateAsync.mock.calls[0][0]).toMatchObject({
+        score: { home: 1, away: 0 },
+        actualParticipants: [{ participantId, sideId: 'side-home', goals: 1 }],
+      });
+    },
+  );
+
   // 출전 게이트: 라인업에 이름이 오른 것과 경기에 나간 것은 다르다. 결과에 실린 선수만
   // 개인 프로필의 "출전 N경기"로 집계되므로(백엔드 PublicUserRecordsService), 끝까지
   // 벤치를 지킨 선수는 payload에서 빠져야 한다.

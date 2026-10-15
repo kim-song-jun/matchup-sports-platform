@@ -191,20 +191,10 @@ export function createEmptyLineupEditorState(baseRevision: number): LineupEditor
  * 추적이 그 사람을 못 찾는다.
  */
 export function hydrateLineupEditorState(lineup: V1TeamMatchLineup): LineupEditorState {
-  // **`revision === 1` 은 팀이 작성한 명단이 아니다.** 경기가 만들어질 때 자동으로 깔리는
-  // 미편집 행이고, 그 참가자는 대진 생성 시점의 **팀 전체 활성 멤버 스냅샷**이다
-  // (league-fixture-creation.ts · team-matches.service.ts 의 approved-away 스냅샷). 그
-  // 스냅샷에는 일부러 `userId` 를 붙이지 않는다 — 한 경기도 안 뛴 팀원에게 신원 연결을
-  // 만들면 개인 기록·상호평가가 전부 거짓이 되기 때문이다(그 파일의 근거 주석 참조).
-  //
-  // 그것을 편집기의 시작 상태로 삼으면 팀장은 **자기가 짜지 않은 명단**을 보고, 그대로
-  // 저장하는 순간 팀 전원이 이름뿐인 게스트로 박제된다. 그래서 빈 명단에서 시작해
-  // `eligibleMembers`(진짜 `userId` 를 지닌 목록)에서 골라 넣게 한다.
-  //
-  // `revision === 1` 을 "저장한 적 없음" 으로 읽는 것은 이 저장소가 이미 쓰는 판정이다
-  // (games.service.ts 의 팀별 라인업 작성 현황 `lineupState`) — 같은 뜻에 두 정의를
-  // 만들지 않으려고 그 규칙을 그대로 쓴다. CAS 토큰(`baseRevision`)은 그대로 1 이다.
-  if (lineup.revision === 1) {
+  // 출처가 있는 응답은 서버가 계산한 유효 명단이다. 기본 미리보기와 실제 수동 제출본도
+  // revision 1일 수 있으므로 참가자를 지우면 안 된다. 출처가 없는 구 API의 revision 1만
+  // 과거 자동 생성 스냅샷으로 처리하고, CAS 토큰은 받은 revision 그대로 유지한다.
+  if (lineup.revision === 1 && lineup.effectiveRosterSource === undefined) {
     return createEmptyLineupEditorState(lineup.revision);
   }
   // 서버는 아직 `starters`/`bench` 로 내려준다(응답 계약은 이 태스크가 바꾸지 않는다) —
@@ -237,10 +227,10 @@ export function hydrateLineupEditorState(lineup: V1TeamMatchLineup): LineupEdito
 
 /**
  * 편집할 수 없는 명단(추가만·잠김)을 서버 응답 그대로 보인다 — 키는 참가자 id 라 늦게 온 선수가 붙어도
- * 행이 흔들리지 않는다. `revision === 1` 은 팀이 짠 명단이 아니라서(위 hydrate 참고) 빈 목록이다.
+ * 행이 흔들리지 않는다. 출처가 없는 구 API의 revision 1만 과거 자동 생성 스냅샷으로 처리한다.
  */
 export function serverRosterEntries(lineup: V1TeamMatchLineup): LineupEntryDraft[] {
-  if (lineup.revision === 1) return [];
+  if (lineup.revision === 1 && lineup.effectiveRosterSource === undefined) return [];
   return [
     ...lineup.starters.map((row) => ({
       key: row.id,

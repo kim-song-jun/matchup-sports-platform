@@ -438,6 +438,11 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   const unavailableByUser = new Map((unavailabilityQuery.data?.items ?? []).map((item) => [item.userId, item]));
   // 편집할 수 없을 때는 서버가 가진 명단 그대로 — 추가만 모드에서 늦게 온 선수가 붙으면 바로 보인다.
   const rosterRows = (editable ? state.participants : serverRosterEntries(lineup)).slice().sort(compareByJersey);
+  const defaultRosterNotice = !state.dirty &&
+    (lineup.effectiveRosterSource === 'DEFAULT_PREVIEW' || lineup.effectiveRosterSource === 'DEFAULT_FROZEN')
+    ? '기본 참석명단이에요.'
+    : '';
+  const phaseHelperText = [defaultRosterNotice, phase.helperText].filter(Boolean).join(' ');
   const showWaitingList = rosterRows.length > 0 || (addAllCount === 0 && waitingMembers.length > 0);
   const sizeNotice = editable ? describeLineupSizeNotice(state.participants.length, lineup.lineupConfig) : null;
   const goalkeeperNotice = editable ? describeGoalkeeperNotice(state.participants.filter((entry) => entry.goalkeeper).length) : null;
@@ -705,9 +710,9 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
               {formatTournamentDateTimeLong(kickoffAt)} 킥오프
             </p>
           ) : null}
-          {phase.helperText ? (
+          {phaseHelperText ? (
             <p className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.6 }}>
-              {phase.helperText}
+              {phaseHelperText}
             </p>
           ) : null}
           {publicationNotice ? (
@@ -968,9 +973,9 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
             <SummaryRow label="킥오프" value={kickoffAt ? formatTournamentDateTimeLong(kickoffAt) : '일정 미정'} />
             <SummaryRow label="상대 공개" value={describePublicationSummary(publicAt, now)} />
             <SummaryRow label="상대 팀 제출" value={<OpponentSubmittedBadge lineup={lineup} />} />
-            {phase.helperText ? (
+            {phaseHelperText ? (
               <p className="tm-text-caption" style={{ color: 'var(--text-muted)', margin: '8px 0 0', lineHeight: 1.6 }}>
-                {phase.helperText}
+                {phaseHelperText}
               </p>
             ) : null}
             {submitButtons ? <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{submitButtons}</div> : null}

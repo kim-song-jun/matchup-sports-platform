@@ -61,7 +61,16 @@ function makeService() {
   // 트랜잭션 콜백이 같은 가짜 클라이언트를 받도록 자기 참조를 상자로 끊는다(타입 추론 순환 방지).
   const self: { client: unknown } = { client: undefined };
   const prisma = {
-    v1Game: { findUnique: jest.fn().mockResolvedValue({ sourceType: 'TEAM_MATCH', teamMatch }) },
+    v1Game: { findUnique: jest.fn().mockResolvedValue({
+      id: ids.game, state: 'LIVE', sourceType: 'TEAM_MATCH', teamMatchId: ids.teamMatch, teamMatch, sides: SIDES,
+      lineups: SIDES.map((side) => ({ id: `lineup-${side.id}`, sideId: side.id, revision: 1, state: 'SUBMITTED', submittedAt: new Date(), invalidatedAt: null })),
+      participants: SIDES.map((side) => ({
+        id: `p-${side.id}`, gameId: ids.game, sideId: side.id, lineupId: `lineup-${side.id}`, userId: null,
+        displayNameSnapshot: side.id, jerseyNumber: null, position: null, positionX: null, positionY: null,
+        started: true, arrivedAt: null, createdAt: new Date(), updatedAt: new Date(),
+      })),
+      sharedRecord: null, resultRevisions: [],
+    }) },
     v1AdminUser: { findUnique: jest.fn().mockResolvedValue(null) },
     v1TeamMembership: {
       findMany: jest.fn(async (args: { where: { userId: string; teamId: { in: string[] } } }) =>

@@ -657,6 +657,7 @@ describe('GamesService.confirmSideArrival', () => {
   } = {}) {
     const tx = {
       $queryRaw: jest.fn().mockResolvedValue([]),
+      v1Game: { findUnique: jest.fn().mockResolvedValue({ teamMatch: null }) },
       v1GameSide: {
         findFirst: jest.fn().mockResolvedValue(
           options.side === undefined ? { id: 'side-home', teamId: 'team-home' } : options.side,
@@ -867,7 +868,7 @@ describe('GamesService.listOperationsLineups — 운영진 전용 본인 확인 
 
   function build(role: string) {
     const prisma = {
-      v1Game: { findUnique: jest.fn().mockResolvedValue({ state: V1GameState.LIVE }) },
+      v1Game: { findUnique: jest.fn().mockResolvedValue({ state: V1GameState.LIVE, teamMatch: null }) },
       v1GameSide: { findFirst: jest.fn().mockResolvedValue({ id: 'side-home' }) },
       v1GameLineup: {
         findMany: jest.fn().mockResolvedValue([{ id: 'lineup-1', sideId: 'side-home', revision: 1, state: 'SUBMITTED' }]),

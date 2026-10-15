@@ -1,10 +1,37 @@
 # Task 20261072: 운영 검색 노출 및 홈 GA4 계측 정정
 
-Status: Oct 15 prior release complete; local-discovery content and Alpha deployment repair in progress
+Status: Oct 16 local-discovery release deployed and verified; generic-search and AI visibility monitoring continues
 **Owner**: Codex main; explicit Luna implementation and Sol independent review
 **Created**: 2026-10-12
 
-## Current Cursor — 2026-10-15 23:16 KST
+## Current Cursor — 2026-10-16 00:55 KST
+
+User-authorized existing-page locality guidance and the Alpha CI repair are deployed. Source PR #1934 merged as `434f1a91faac9ad39116df78b4d47d351fe90082`. Scoped main PR #1935 merged as `63d02c11a5a963e30b763682bd86b16a9d59ad42`; production run `38758889378` completed API/Web/Gates, immutable images and Deploy successfully. Actual production headers at 00:45 KST reported that main SHA and runtime **1.9.3**. Fixed package manifests are 1.9.2 under the existing resolver; runtime was measured, not inferred. Main CodeQL `38758889943` passed all three languages.
+
+Luna implemented visible guidance, descriptive existing-route links and teams/type metadata. Independent `gpt-6-sol` review found all-kind copy, unfiltered-link labels and shared-layer/public-API defects; all were corrected and focused re-review passed with zero blockers. Shared public API now lives in `src/shared/ui/local-discovery-guidance/index.tsx`. No new product routes, DB/auth/privacy/key/store changes or hidden keyword text. Focused rendered-copy/metadata tests passed 7/7 across two files. Exact source CI `38749948065` and main-candidate CI `38750035818` passed API/Web/Gates. Source PostgreSQL integration ran 165 suites with 1,203 passing tests and three existing skips; API unit ran 417 suites with 6,208 passing tests. Touched-path debt-marker grep found zero markers.
+
+The demonstrated Alpha problem was a blocked deployment gate: the takeover fixture's expired lease exactly canceled the first retry delay. Timestamp rounding could leave the reclaimed operation briefly ineligible. The fixture now uses millisecond-floor time minus the actual retry delay plus 1ms; production retry/worker logic and meaningful CAS/takeover assertions are unchanged. A newer unrelated dev push superseded the first merged-dev CI by design; it was not rerun. Latest matching dev CI `38752764073` and Alpha deploy `38752764090` succeeded at `1b9619995425a3862ebc9115f29fccc32b25d1ca`, which contains the same owned source paths. Alpha served that SHA and release `1.9.2-alpha.20261015.g1b9619995425`.
+
+Live evidence under `/Users/sungjun/.cache/teameet-seo-release/evidence/`: `local-alpha-final-verdict-20261016.json`, settled `local-alpha-browser-recheck-20261016.json`, and separate valid desktop-footer receipt `local-alpha-desktop-footer-20261016.json`. Four guest first-HTML routes, canonical/links/health and Alpha noindex boundaries passed; Alpha sitemap/llms-full remain actual 404 plus noindex. Twelve 390/768/1440 list views and category/link/filter interactions passed. Mobile/tablet use `main.tm-scroll-area`; desktop uses the document scroller after async heights settle. Initial invalid scroller probes and one transient notifications 503 remain recorded, not counted as clean evidence; direct endpoint recheck and complete settled recheck had no failures. Existing authenticated Alpha role plus guest HTTP were tested, not every role.
+
+Production `local-production-http-20261016.json` verifies four guest HTML routes, visible guidance, canonical/indexability, links and DB health. `local-production-browser-20261016.json` has twelve views without overflow, runtime/console errors or failed resources and three representative actual-footer checks. Actual production before (58a2/runtime1.9.2) and after (63d0/runtime1.9.3) screenshots are retained; the loaded mobile all-list pair was visually compared.
+
+Search evidence is separate from deployment: GSC `/teams` is actually indexed; one updated-content request was acknowledged at `2026-10-15T15:49:58.713Z` (`local-google-updated-teams-request-20261016.json`). This does not prove new copy indexed or ranking. Existing five priority URLs were indexed in the prior release. Naver report data dated Oct 14 showed one indexed page and zero crawl restrictions/exclusions/SEO errors; no post-release Naver gain is claimed. Fresh explicit Luna measurement found no exact Teameet-domain organic result in six inspected Google queries (9/8/9/10/9/9 cards). Three completed **AI Mode** answers for 풋살 대회 / 동네 풋살대회 / 수원 풋살 대회 contained neither Teameet, the expected competition titles nor owned-domain citations (`local-postrelease-ai-mode-20261016.json`). Separate AI Overview observations are not substituted for AI Mode. Signed-in profile, ko/KR, 1440×1000; personalization remains unknown even with pws=0. Generic ranking/AI inclusion remains an observed gap, not a release-success claim.
+
+Known separate limitation: dynamic GitHub AI security scans `38749955069` / `38750043141` failed before analysis because configured `claude-opus-5` is unavailable. They are not counted as security passes; provider/configuration was not changed. CodeQL and independent review passed separately.
+
+Owned Ego TaskSpace 34 was finished with `keep: []`: p1/p2/p3 closed, closedSpace true, zero unmanaged tabs preserved. Luna CLI processes exited; other-session TaskSpace 42 and shared-root bracket WIP were untouched. Daily `teameet-ai-luna` remains ACTIVE at 09:00 KST. Active source implementation is cleared; future runs compare actual search evidence and make only justified existing-page improvements. Release-artifact main→dev synchronization consumes only this release's Changeset, preserves unrelated Changesets and adds this completed task record; it has no runtime-source delta.
+
+Exit proof:
+- [x] Region/futsal guidance and real existing-route links appear in initial HTML and visible UI without unsupported filter claims.
+- [x] Exact-head API/Web/Gates pass with meaningful deterministic expired-lease coverage.
+- [x] Independent Sol review has zero unresolved blockers.
+- [x] Latest matching Alpha SHA, twelve viewport cases, links/filtering and actual bottom content verified.
+- [x] Alpha noindex and sitemap/AI-publication exclusions preserved.
+- [x] Scoped main deployed and actual production SHA/HTML/health/browser behavior verified.
+- [x] Search/indexing/AI outcomes recorded separately; monitor cursor updated and owned browser/processes closed.
+
+## Historical Cursor — 2026-10-15 23:16 KST
 
 User explicitly requested immediate existing-page enrichment for 동네 풋살 / 풋살 대회 and AI retrieval, Alpha repair, Alpha verification and scoped main deployment. No new product route, geographic landing page, operating-data mutation, auth/privacy/key/store change or unrelated dev promotion is authorized by this follow-up.
 

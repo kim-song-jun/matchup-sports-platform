@@ -375,6 +375,50 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     return entry?.durationMinutes ?? null;
   }, [currentPeriod, gameDetail.data?.periodDurations]);
 
+  const [expiredPeriodId, setExpiredPeriodId] = useState<string | null>(null);
+  const [periodExpiryError, setPeriodExpiryError] = useState<string | null>(null);
+  const [periodExpiryPending, setPeriodExpiryPending] = useState(false);
+  const [periodExpiryRetry, setPeriodExpiryRetry] = useState(0);
+  const currentPeriodId = currentPeriod?.id ?? null;
+  const periodExpired = gameState === 'LIVE' && currentPeriodId !== null && currentPeriodId === expiredPeriodId;
+  const handlePeriodExpiryChange = useCallback((expired: boolean) => {
+    setExpiredPeriodId(expired ? currentPeriodId : null);
+  }, [currentPeriodId]);
+  const refetchGame = gameDetail.refetch;
+  const applyCommandResult = ops.applyCommandResult;
+
+  useEffect(() => {
+    setPeriodExpiryError(null);
+    setPeriodExpiryPending(false);
+    if (!periodExpired) return;
+    let active = true;
+    let inFlight = false;
+    // Worker가 바꾼 기간은 소켓 스냅숏에 없으므로 만료한 동안만 상세를 읽는다.
+    // 느린 요청은 겹치지 않게 하고, 기간·일시정지·화면 전환 뒤의 완료는 버린다.
+    const refresh = async () => {
+      if (inFlight) return;
+      inFlight = true;
+      setPeriodExpiryPending(true);
+      try {
+        const result = await refetchGame({ throwOnError: true, cancelRefetch: false });
+        if (!active) return;
+        if (result.data) applyCommandResult(result.data);
+        setPeriodExpiryError(null);
+      } catch (error) {
+        if (active) setPeriodExpiryError(extractErrorMessage(error, '기간 종료 상태를 불러오지 못했어요. 다시 확인해 주세요.'));
+      } finally {
+        inFlight = false;
+        if (active) setPeriodExpiryPending(false);
+      }
+    };
+    void refresh();
+    const interval = setInterval(() => void refresh(), 5_000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [periodExpired, currentPeriodId, gameId, refetchGame, applyCommandResult, periodExpiryRetry]);
+
   const availableCommands: readonly GameCommandName[] = useMemo(() => {
     // 이슈 #375 — 하프타임은 gameState==='LIVE'인 채로 지속되는 실제 상태라
     // (요건 3 테스트: "LIVE 중에는 보이지 않는다"의 반례가 되지 않도록)
@@ -1518,6 +1562,8 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
                 pausedTotalMs={currentPeriod.pausedTotalMs}
                 pausedAtMs={currentPeriod.pausedAt === null ? null : new Date(currentPeriod.pausedAt).getTime()}
                 periodCount={periodCount}
+                periodDurationMinutes={gameState === 'LIVE' ? currentPeriodDurationMinutes : null}
+                onExpiryChange={handlePeriodExpiryChange}
               />
             ) : halftimePeriod !== null ? (
               // 이슈 #375 — 어떤 피리어드도 LIVE가 아니므로 경과 시간 자체가
@@ -1551,6 +1597,21 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
       {/* Banners — never silently swallowed; each condition is its own
           visible, dismissable-by-recovery state. */}
       <div className="flex flex-col gap-2 px-4 empty:hidden" aria-live="polite">
+        {periodExpired ? (
+          <>
+            <Banner tone="warning">
+              설정된 시간이 끝났어요. 서버의 기간 종료 처리를 확인하고 있어요. 처리가 늦어지면 ‘{endPeriodCommandLabel(currentPeriod?.number ?? 1, periodCount)}’를 눌러 주세요.
+            </Banner>
+            {periodExpiryError ? (
+              <div className="flex flex-col gap-2 sm:items-start">
+                <Banner tone="danger">{periodExpiryError}</Banner>
+                <Button size="md" variant="outline" disabled={periodExpiryPending} loading={periodExpiryPending} onClick={() => setPeriodExpiryRetry((retry) => retry + 1)}>
+                  종료 상태 다시 확인
+                </Button>
+              </div>
+            ) : null}
+          </>
+        ) : null}
         {!takeoverEnabled && (
           <Banner tone="info">지원 담당자는 이 경기의 기록을 조회할 수 있지만 수정할 수 없어요.</Banner>
         )}

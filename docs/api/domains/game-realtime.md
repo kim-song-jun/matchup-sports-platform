@@ -17,6 +17,25 @@
 
 <!-- API_CONTRACT_SECTION_END:Frozen realtime contract -->
 
+## 경기 시간 만료 확인 (MD-QA #142)
+
+서버 worker의 자동 기간 종료는 [Game 기간 종료 계약](./games.md#실제-경기-시간-만료와-기간-종료-md-qa-142)을
+따른다. 이 내부 처리를 위한 client/server Socket event나 payload는 추가하지 않는다. 기존
+`game.snapshot`에는 기간 상세가 없고 standalone worker에는 room broadcast delegate도 없으므로,
+Socket 연결이나 snapshot만으로 worker의 기간 종료가 즉시 전달된다고 가정하지 않는다.
+
+- 콘솔의 시계는 서버 offset을 적용하고 완료된 정지 및 진행 중 정지를 제외해 경과 시간을
+  표시한다. 진행 중인 기간의 설정 시간에 도달하고 일시정지가 아닐 때만 만료 안내를 보여 준다.
+  브라우저의 만료 판단은 안내와 조회를 시작할 뿐, `end-period`·`end`나 결과 제출을 자동 전송하지 않는다.
+- 만료 안내 중에만 `GET /api/v1/games/:gameId`를 즉시 읽고 이후 5초 간격으로 다시 확인한다.
+  진행 중인 조회와 다음 조회는 겹치지 않으며 기간·일시정지·화면 전환 후 늦게 완료된 조회는
+  적용하지 않는다. 받은 기간 상세와 최신 `state`/`version`을 함께 반영하므로 이후 운영 명령도
+  새 버전을 기준으로 보낸다. worker가 기간 종료를 저장하면 `HALFTIME` 또는 마지막 기간 종료
+  화면으로 전환하고, 다음 기간 시작이나 경기 종료/결과 제출은 운영자가 기존 흐름으로 진행한다.
+- 조회 실패는 오류와 ‘종료 상태 다시 확인’을 표시하고 재조회할 수 있게 한다. 서버 확인을
+  기다리는 동안 기존 수동 기간 종료도 유지하며, 운영 권한과 version 충돌 오류는 기존 HTTP
+  계약을 따른다. 5초 조회 주기는 서버의 확정 처리 시한을 뜻하지 않는다.
+
 ## Account withdrawal
 
 - A successful withdrawal commits `withdrawal_pending` before disconnecting the user's active user-room sockets. New connections for a pending account are rejected, and the user-room join path checks the current account state again after joining to close the race with a concurrent withdrawal commit.

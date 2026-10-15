@@ -25,6 +25,10 @@ export interface ElapsedMatchClockProps {
   readonly pausedAtMs: number | null;
   /** 정규 피리어드 수. 1이면 단판이라 시계 옆 "전반" 라벨을 뺀다. */
   readonly periodCount?: number | null;
+  /** 현재 기간의 설정 시간. 연장 기간도 자기 durationMinutes를 사용한다. */
+  readonly periodDurationMinutes?: number | null;
+  /** 만료는 안내만 하며 기간 종료의 확정은 서버 응답을 따른다. */
+  readonly onExpiryChange?: (expired: boolean) => void;
 }
 
 /**
@@ -47,6 +51,8 @@ export function ElapsedMatchClock({
   pausedTotalMs,
   pausedAtMs,
   periodCount,
+  periodDurationMinutes,
+  onExpiryChange,
 }: ElapsedMatchClockProps) {
   const [nowMs, setNowMs] = useState(() => Date.now());
 
@@ -62,6 +68,11 @@ export function ElapsedMatchClock({
     pausedTotalMs,
     pausedAtMs,
   });
+  const expired = !isPaused && periodDurationMinutes != null && elapsedMs >= periodDurationMinutes * 60_000;
+
+  useEffect(() => {
+    onExpiryChange?.(expired);
+  }, [expired, onExpiryChange]);
 
   return (
     <div className="flex items-center gap-2" aria-live="off">

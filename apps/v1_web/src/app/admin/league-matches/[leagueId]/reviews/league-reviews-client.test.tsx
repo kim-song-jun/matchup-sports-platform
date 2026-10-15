@@ -91,7 +91,7 @@ async function renderPage() {
   render(<QueryClientProvider client={client}>{page}</QueryClientProvider>);
 }
 
-describe('QA #47 실제 리그 관리자 route → hooks → 후기 관리', () => {
+describe('QA #47 실제 리그 관리자 route → hooks → 리뷰 관리', () => {
   it('대회 전용 상세 조회 없이 현재 리그 후기를 연결해요', async () => {
     await renderPage();
     expect(await screen.findByText(visibleReview.comment ?? '')).toBeVisible();
@@ -107,7 +107,7 @@ describe('QA #47 실제 리그 관리자 route → hooks → 후기 관리', () 
     }));
     await renderPage();
     try {
-      expect(screen.getByRole('status')).toHaveTextContent('후기 관리 정보를 불러오는 중이에요');
+      expect(screen.getByRole('status')).toHaveTextContent('리뷰 관리 정보를 불러오는 중이에요');
       expect(reviewReads).toEqual([]);
       expect(screen.queryByRole('button', { name: '숨기기' })).not.toBeInTheDocument();
     } finally { release(); }

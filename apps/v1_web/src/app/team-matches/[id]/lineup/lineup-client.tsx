@@ -303,8 +303,12 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
     submitMutation.mutate(
       { idempotencyKey: randomUuid(), expectedVersion },
       {
-        onSuccess: () => {
-          setSubmittedRevision(expectedVersion);
+        onSuccess: (result) => {
+          // 기본 미리보기를 처음 제출하면 서버가 새 revision을 만든다. 요청의 CAS가 아닌
+          // 응답의 CAS를 이어받고, 요청 중 추가한 로컬 편집의 dirty 상태는 보존한다.
+          setSubmittedRevision(result.revision);
+          setState((prev) => prev ? { ...prev, baseRevision: result.revision } : prev);
+          hydratedRevisionRef.current = result.revision;
           // 불러오기·프리셋 저장 결과 안내는 제출 전 작업의 것이다 — 제출 뒤에도 남으면 지금 상태처럼 읽힌다.
           setLoadNotice(null);
         },
@@ -438,7 +442,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   const unavailableByUser = new Map((unavailabilityQuery.data?.items ?? []).map((item) => [item.userId, item]));
   // 편집할 수 없을 때는 서버가 가진 명단 그대로 — 추가만 모드에서 늦게 온 선수가 붙으면 바로 보인다.
   const rosterRows = (editable ? state.participants : serverRosterEntries(lineup)).slice().sort(compareByJersey);
-  const defaultRosterNotice = !state.dirty &&
+  const defaultRosterNotice = !state.dirty && lineup.hasSavedDraft !== true &&
     (lineup.effectiveRosterSource === 'DEFAULT_PREVIEW' || lineup.effectiveRosterSource === 'DEFAULT_FROZEN')
     ? '기본 참석명단이에요.'
     : '';

@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { V1GameResultRevision } from '@/types/api';
+import type { GameLineup } from '@/types/game-operations';
 import {
   TeamMatchResultApprovalPageClient,
   TeamMatchResultPageClient,
@@ -12,6 +13,7 @@ const {
   useV1GameMock,
   useV1GameResultRevisionsMock,
   useV1TeamMatchLineupMock,
+  useV1GameLineupsMock,
   createMutateAsync,
   submitMutateAsync,
   decideMutateAsync,
@@ -20,6 +22,7 @@ const {
   useV1GameMock: vi.fn(),
   useV1GameResultRevisionsMock: vi.fn(),
   useV1TeamMatchLineupMock: vi.fn(),
+  useV1GameLineupsMock: vi.fn(() => ({ data: Array<GameLineup>(), isError: false, isLoading: false, isFetching: false, refetch: vi.fn() })),
   createMutateAsync: vi.fn(),
   submitMutateAsync: vi.fn(),
   decideMutateAsync: vi.fn(),
@@ -39,6 +42,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1Game: useV1GameMock,
   useV1GameResultRevisions: useV1GameResultRevisionsMock,
   useV1TeamMatchLineup: useV1TeamMatchLineupMock,
+  useV1GameLineups: useV1GameLineupsMock,
   useV1CreateGameResultRevision: () => ({ mutateAsync: createMutateAsync, isPending: false }),
   useV1SubmitGameResultRevision: () => ({ mutateAsync: submitMutateAsync, isPending: false }),
   useV1DecideGameResultRevision: () => ({ mutateAsync: decideMutateAsync, isPending: false }),
@@ -145,6 +149,7 @@ describe('TeamMatchResultPageClient — 호스트 결과 입력', () => {
     useV1GameMock.mockReturnValue(settledQuery(game()));
     useV1GameResultRevisionsMock.mockReturnValue(settledQuery<V1GameResultRevision[]>([]));
     useV1TeamMatchLineupMock.mockReturnValue(settledQuery(lineup()));
+    useV1GameLineupsMock.mockReturnValue(settledQuery([]));
   });
 
   it('호스트(owner)에게 결과 작성 폼과 라인업 선수를 보여준다', () => {
@@ -430,6 +435,44 @@ describe('TeamMatchResultPageClient — 호스트 결과 입력', () => {
       });
     },
   );
+
+  it('저장한 초안의 선수 ID 대신 실제 기록용 기본 명단의 UUID로 결과를 제출한다 (MD-QA146)', async () => {
+    const effectiveId = '14600000-0000-5000-8000-000000000001';
+    const currentMemberId = '14600000-0000-5000-8000-000000000002';
+    useV1TeamMatchLineupMock.mockReturnValue(settledQuery(lineup({
+      state: 'DRAFT', revision: 2, effectiveRosterSource: 'DEFAULT_PREVIEW', hasSavedDraft: true,
+      starters: [{ id: 'stored-draft-player', userId: 'user-1', displayName: '저장한 선수', jerseyNumber: 7, position: null, goalkeeper: false }],
+    })));
+    const effectiveLineups: GameLineup[] = [{
+      id: 'lineup-1', gameId: 'game-1', sideId: 'side-home', revision: 2, state: 'DRAFT', version: 1,
+      submittedAt: null, supersedesId: null, formation: null, invalidatedAt: null,
+      createdAt: '2026-10-16T00:00:00.000Z', updatedAt: '2026-10-16T00:00:00.000Z',
+      participants: [
+        { id: effectiveId, userId: 'user-1', displayNameSnapshot: '저장한 선수', jerseyNumber: 7 },
+        { id: currentMemberId, userId: 'user-2', displayNameSnapshot: '현재 자격 선수', jerseyNumber: 9 },
+      ].map((row) => ({
+        ...row, gameId: 'game-1', sideId: 'side-home', lineupId: 'lineup-1',
+        position: null, positionX: null, positionY: null, started: true, arrivedAt: null,
+        createdAt: '2026-10-16T00:00:00.000Z', updatedAt: '2026-10-16T00:00:00.000Z',
+      })),
+    }];
+    useV1GameLineupsMock.mockReturnValue(settledQuery(effectiveLineups));
+    createMutateAsync.mockResolvedValue({ revisionId: 'rev-new', version: 4 });
+    submitMutateAsync.mockResolvedValue({});
+    render(<TeamMatchResultPageClient teamMatchId="tm-1" />);
+
+    fireEvent.change(screen.getByLabelText('호스트팀 (홈)'), { target: { value: '1' } });
+    const scorer = within(screen.getByLabelText('1번 골')).getByRole('option', { name: /저장한 선수/ });
+    fireEvent.change(screen.getByLabelText('1번 골'), { target: { value: scorer.getAttribute('value') } });
+    fireEvent.click(screen.getByText('결과 작성 완료'));
+    fireEvent.click(screen.getByText('제출하기'));
+
+    await waitFor(() => expect(createMutateAsync).toHaveBeenCalled());
+    expect(createMutateAsync.mock.calls[0][0].actualParticipants).toEqual([
+      expect.objectContaining({ participantId: effectiveId, sideId: 'side-home', goals: 1 }),
+      expect.objectContaining({ participantId: currentMemberId, sideId: 'side-home', goals: 0 }),
+    ]);
+  });
 
   // 출전 게이트: 라인업에 이름이 오른 것과 경기에 나간 것은 다르다. 결과에 실린 선수만
   // 개인 프로필의 "출전 N경기"로 집계되므로(백엔드 PublicUserRecordsService), 끝까지

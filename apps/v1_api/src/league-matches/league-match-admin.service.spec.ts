@@ -76,7 +76,7 @@ interface FakeState {
   /** 잠금 뒤 재조회가 보는 **커밋된** 로스터. 기본은 등록된 두 팀. */
   registeredTeamIds: Set<string>;
   /** 팀별 리그 참가 명단. 기본은 비어 있다(명단 미제출). */
-  rosterPlayers: Map<string, Array<{ id: string; userId: string; nickname: string; jerseyNumber?: number }>>;
+  rosterPlayers: Map<string, Array<{ id: string; userId: string; nickname: string; jerseyNumber?: number; removedAt?: Date | null }>>;
   /** 명단 재계산 이벤트(outbox)를 남긴 팀. */
   rosterSyncTeamIds: string[];
   /** The league row's own config version; the sport-wide default is `config-1`. */
@@ -237,7 +237,8 @@ function createFake() {
           const regRow = (teamId: string) => ({
             id: `reg-${teamId}`,
             teamId,
-            players: (state.rosterPlayers.get(teamId) ?? []).map((player) => ({
+            _count: { players: (state.rosterPlayers.get(teamId) ?? []).length },
+            players: (state.rosterPlayers.get(teamId) ?? []).filter((player) => player.removedAt == null).map((player) => ({
               id: player.id,
               userId: player.userId,
               jerseyNumber: player.jerseyNumber ?? null,
@@ -245,7 +246,7 @@ function createFake() {
             })),
           });
           if (args.where.teamId?.in) {
-            // 이 fake 는 소프트 삭제를 모델링하지 않는다 — "활성 선수 수" 와 "전체 행 수" 가 같다.
+            // `none: {}` is registration history, including removed rows; the projected players above are active only.
             const withoutRows = args.where.players?.none !== undefined;
             return args.where.teamId.in
               .filter((id) => state.registeredTeamIds.has(id))

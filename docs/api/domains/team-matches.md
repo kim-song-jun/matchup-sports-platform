@@ -6,7 +6,7 @@ Public team-match list/detail include the assigned field's name. For league/tour
 
 ## 플랫폼 주관 공동 운영 (Task 149, 2026-09-30)
 
-- 기존 `GET/POST /team-matches/:id/record` 계약에 `operator: boolean`을 추가한다. `participant`는 계속 실제 최신 제출 라인업 선수만 뜻한다.
+- 기존 `GET/POST /team-matches/:id/record` 계약에 `operator: boolean`을 추가한다. `participant`는 유효 명단의 참가자와 기존 팀장 권한을 뜻하며, 미제출 친선은 아래 MD-QA #146의 기본 명단을 사용한다. 운영자 권한만 있는 계정은 참가자로 추가하지 않는다.
 - 독립 플랫폼 주관 경기(`platformManaged=true`, league/tournament 없음)의 active·미회수 owner/ops는 라인업 등록 없이 득점/서브매치를 공동 편집할 수 있다. 연결 계정도 active여야 한다. 일반 팀매치·support·회수/정지 계정에는 이 권한을 주지 않는다.
 - 참가자가 아닌 운영자는 `confirm/reopen` 불가(403 `TEAM_CONFIRMATION_REQUIRED`). 운영자가 실제 선수이면 기존 선수 권한을 유지한다.
 - 경기 시작, 양 팀 명단 준비, 공식 결과 잠금, `expectedVersion` 충돌, `commandId` 재실행 규칙은 기존과 같다. 운영자의 수정도 양 팀의 이전 확인을 초기화한다.
@@ -22,7 +22,7 @@ Public team-match list/detail include the assigned field's name. For league/tour
 | Method | Path | 권한 | 동작 |
 |---|---|---|---|
 | GET | `/api/v1/team-matches/:id/record` | OptionalV1AuthGuard | 공동 기록·서버 시각·편집 가능 여부 조회 |
-| POST | `/api/v1/team-matches/:id/record` | V1AuthGuard + 최신 유효 제출 라인업 참가자 | 득점 추가/수정/삭제/복구, 종료 확인/취소 |
+| POST | `/api/v1/team-matches/:id/record` | V1AuthGuard + 유효 명단 참가자·기존 팀장/운영자 권한 | 득점 추가/수정/삭제/복구, 종료 확인/취소 |
 
 - 응답은 공통 `{ status, data, timestamp }`. `phase`: scheduled/live/official/cancelled/legacy/managed.
 - `phase=legacy`는 공동 기록 편집 대상이 아닌 기존 v1 경기 상태다. 조회는 `currentOfficialRevision.state=OFFICIAL`인 현재 리비전의 실제 점수를 flat/nested JSON 형태 모두에서 읽으며, 최신 초안이나 오래된 공동 기록으로 대체하지 않는다. 현재 공식 결과가 없거나 점수 JSON이 유효하지 않으면 점수는 `null`이며 0:0을 만들지 않는다. `legacy`의 쓰기는 계속 409 `RECORD_NOT_EDITABLE`이다.
@@ -34,7 +34,7 @@ Public team-match list/detail include the assigned field's name. For league/tour
   경기결과와 같은 이름 공개 게이트 및 닉네임/실명 선택 정책을 사용한다.
 - 공개 득점의 `period?: number | null`은 읽기 전용 추가 필드다. 현재 공식 JSON이나 실제 경기 이벤트에서 알려진 양의 정수 period만 숫자로 제공한다. `minute`는 해당 period 안의 경과 분 그대로이며 전·후반 길이를 추정해 누적 분으로 바꾸지 않는다. JSON의 null·누락 period, period를 기록하지 않은 공동 기록, `GOAL_BACKFILL_V1`의 임시 period 값은 필드를 생략한다. 소비자는 null·누락을 모두 모름으로 처리하고 알려진 period와 minute 순으로 표시하며 같은 시각에는 원본 순서를 유지한다.
 - 기존 v1 공식 친선 결과(`phase=legacy`)도 공개 정책이 점수를 허용하면 같은 `goalEvents[]` 투영을 받는다. 공식 리비전의 JSON 득점을 우선하며, JSON이 `null`인 이벤트 기반 결과만 현재 경기의 취소되지 않은 GOAL/OWN_GOAL을 읽는다. 명시적 빈 JSON과 잘못된 JSON을 과거 이벤트로 대체하지 않는다. `OFFICIAL_ONLY`와 `PUBLIC_LIVE=off`는 공식 결과를 공개하고 `STATUS_ONLY`는 점수·득점을 가리며 `HIDDEN`은 공개 조회에 404다. 기존 참가자 private read 예외와 신원·이름 공개 정책은 유지한다. `legacy`의 `goals`·`subMatches`는 빈 배열로 두어 오래된 공동 기록을 공식 결과 앞에 표시하지 않는다.
-- 편집자는 최신 제출/잠금 라인업의 `userId` 또는 검증된 현재 identity link로 판정한다. 양쪽 라인업에 동시에 있는 계정은 확인자로 인정하지 않는다.
+- 편집자는 유효 명단의 `userId` 또는 검증된 현재 identity link로 판정한다. 실제 제출/잠금 명단이 있으면 그 명단을 사용하고, 미제출 친선은 아래 기본 명단 계약을 적용한다. 양쪽 명단에 동시에 있는 계정은 확인자로 인정하지 않는다.
 - **명단 밖 팀장·매니저(Task 180 H5)**: 친선 경기에서 라인업에 없는 사용자가 한쪽 참가팀의 active owner/manager 이면 그 팀 쪽으로 기록·종료 확인을 할 수 있다. 응답에 `teamAuthority: true`, 이력·확인자 이름은 `"<닉네임> · 팀장 권한"`. 양 팀을 모두 관리하면 권한을 주지 않는다. **대회·리그 경기(`phase=managed`)에는 적용하지 않는다** — 참가팀은 결과를 만들거나 확인하지 않으므로 기존처럼 403 `RECORD_PARTICIPANT_REQUIRED`(정본 §4).
 - 참가자 응답의 `participants[].guest` 는 계정·연결이 없는 출전자다(개인 기록에 남지 않는다).
 - `commandId` UUID와 `expectedVersion` 정수 필수. `action`: add/edit/delete/undo/confirm/reopen.
@@ -45,7 +45,7 @@ Public team-match list/detail include the assigned field's name. For league/tour
 - 같은 commandId/사용자/payload 재전송은 재실행 없이 최신 상태를 반환한다. 다른 payload/사용자의 키 재사용은 409.
 - Game row lock + record version으로 동시 수정 유실을 방지한다. stale version은 409 `VERSION_CONFLICT`.
 - 득점 변경/복구/reopen은 기존 양 팀 확인을 초기화한다. 같은 팀의 중복 confirm은 409.
-- 두 팀의 서로 다른 라인업 참가자가 확인하면 같은 트랜잭션에서 Game 결과 DRAFT→SUBMITTED→OFFICIAL,
+- 두 팀의 서로 다른 유효 명단 참가자 또는 기존 팀장 권한자가 확인하면 같은 트랜잭션에서 Game 결과 DRAFT→SUBMITTED→OFFICIAL,
   result participants/goalEvents/decisions, TeamMatch 완료·팀 일정 cascade, `GAME_RESULT_OFFICIAL` outbox를 기록한다.
 - 확정 후 참가자·팀장 편집은 409 `RECORD_NOT_EDITABLE`.
 - **확정 후 어드민 정정(2026-10-01 사용자 결정 "어드민은 언제든 수정")**: active 플랫폼 어드민(`owner`·`ops`)은
@@ -86,12 +86,12 @@ Public team-match list/detail include the assigned field's name. For league/tour
 
 | Method | Path | 권한 | 동작 |
 |---|---|---|---|
-| POST | `/team-matches/:id/lineup/late-additions` | V1AuthGuard + 참가팀 owner/manager, `Idempotency-Key` 필수 | 늦게 온 선수 한 명을 현재 제출본에 붙인다 |
+| POST | `/team-matches/:id/lineup/late-additions` | V1AuthGuard + 참가팀 owner/manager, `Idempotency-Key` 필수 | 늦게 온 선수 한 명을 현재 제출본 또는 검증된 고정 기본 명단에 붙인다 |
 | GET | `/team-matches/:id/lineup/opponent` | V1AuthGuard + 참가팀 owner/manager | 공개 뒤 상대 참석명단(번호·이름만) |
 
-- **추가만**: `GET .../lineup` 의 `lateAdditionAllowed` 가 true 일 때만 연다 — 잠금 사유가 `records_exist`/`active_lineups_complete` 이고, 결과 revision 이 없고, 우리 최신 명단이 `SUBMITTED`/`LOCKED` 일 때. body `{ userId? | displayName?, jerseyNumber?, goalkeeper? }`(userId 는 현재 활성 팀원, 없으면 게스트 이름). 새 리비전을 만들지 않고 **현재 제출본에 행만 추가**해 기존 참가자 id(득점이 매달린 곳)를 지킨다. 빼기·번호 변경은 계속 `PUT .../lineup` 의 409 `LINEUP_LOCKED_FOR_DIRECT_EDIT` 다.
+- **추가만**: 화면은 `GET .../lineup` 의 `lateAdditionAllowed` 를 단일 액션 gate로 사용한다. 서버는 기존 참가팀 owner/manager 권한과 terminal 상태를 확인하고 Game 행 잠금 뒤 현재 최신 명단을 다시 읽는다. 잠금 사유가 `records_exist`/`active_lineups_complete` 이고 결과 revision 이 없으며, 우리 최신 명단이 `SUBMITTED`/`LOCKED` **또는 시스템 감사로 고정 출처가 검증된 친선 `DRAFT`**일 때만 허용한다. body `{ userId? | displayName?, jerseyNumber?, goalkeeper? }`(userId 는 현재 활성 팀원, 없으면 게스트 이름). 새 리비전을 만들지 않고 **그 최신 명단에 행만 추가**해 기존 참가자 id(득점이 매달린 곳)를 지킨다. 고정 `DRAFT`를 사람의 `SUBMITTED`로 바꾸지 않는다. 빼기·번호 변경은 계속 `PUT .../lineup` 의 409 `LINEUP_LOCKED_FOR_DIRECT_EDIT` 다.
 - 추가 시각은 운영 감사(`LINEUP_LATE_ADDITION`)와, 공동 기록이 있으면 그 변경 이력(`action: participant_add`, `after: { participantId, sideId, name, jerseyNumber }`)에 남는다. 이력이 생기면 기록 `version` 이 오르고 양 팀 종료 확인이 초기화된다.
-- 오류: 409 `LINEUP_NOT_LOCKED`(첫 기록 전 — 참석명단에서 바로 고친다) · `LINEUP_LATE_ADDITION_CLOSED`(결과 확정 뒤·제출본 없음) · `LINEUP_MATCH_TERMINAL` · `ROSTER_MANAGED_BY_ADJUSTMENTS`(대회·리그); 422 `LINEUP_DUPLICATE_PARTICIPANT`/`LINEUP_DUPLICATE_JERSEY_NUMBER`/`LINEUP_PARTICIPANT_INELIGIBLE`; 403 `PERMISSION_DENIED`.
+- 오류: 409 `LINEUP_NOT_LOCKED`(첫 기록 전 — 참석명단에서 바로 고친다) · `LINEUP_LATE_ADDITION_CLOSED`(결과 revision 존재·제출본 또는 검증된 고정 명단 없음) · `LINEUP_MATCH_TERMINAL` · `ROSTER_MANAGED_BY_ADJUSTMENTS`(대회·리그); 422 `LINEUP_DUPLICATE_PARTICIPANT`/`LINEUP_DUPLICATE_JERSEY_NUMBER`/`LINEUP_PARTICIPANT_INELIGIBLE`; 403 `PERMISSION_DENIED`.
 - **상대 참석명단**: 공개 시각은 `V1GameVisibilityPolicy.lineupAt`, 없으면 킥오프 1시간 전. `GET .../lineup` 의 `opponent: { teamName, submitted, published, participantCount }` — 공개 전에는 제출 여부만, `participantCount` 는 공개 뒤에만 숫자. `GET .../lineup/opponent` 는 공개 뒤 `{ teamMatchId, teamName, publicLineupAt, participants: [{ jerseyNumber, displayName }] }`(번호순, 번호 없는 사람은 뒤)만 준다 — 공개 전 403 `OPPONENT_LINEUP_NOT_PUBLIC`(`details.publicLineupAt`), 미제출 404 `OPPONENT_LINEUP_NOT_SUBMITTED`, 대회·리그 409.
 - **응답 칩**: `eligibleMembers[].rsvpStatus` 는 이 경기 팀 일정(취소 제외)의 응답(`GOING`/`MAYBE`/`NOT_GOING`/`WAITLISTED`, 답이 없으면 `NO_RESPONSE`)이고 연결된 일정이 없으면 null. 읽기 전용 — 저장·추가 자격에 쓰지 않는다.
 - `GET .../lineup` 에 `ownTeamName` 도 싣는다.
@@ -368,7 +368,7 @@ Rules:
 
 `GET /team-matches/:teamMatchId`는 `gameId`(1:1 `V1Game.id`)를 포함한다 — 클라이언트가
 `/games/:gameId/result-revisions*`를 호출하는 데 필요한 유일한 경로다. `GET
-/team-matches/:teamMatchId/lineup`의 참가자 항목도 실제 `V1GameParticipant.id`를 포함해 호스트가
+/team-matches/:teamMatchId/lineup`의 참가자 항목은 저장된 명단 또는 첫 기록에 사용할 기본 명단의 참가자 UUID를 포함해 호스트가
 결과 초안에서 자기 팀 로스터의 특정 참가자에게 득점/카드를 귀속시킬 수 있다.
 
 체크인·쿼터별 점수 입력·상대 평가·심판 배정 API는 이 도메인에 존재하지 않는다 — 예전 v0 계약의
@@ -385,6 +385,32 @@ Rules:
 - Scheduled games remain editable regardless of wall-clock kickoff. LIVE/PAUSED games remain editable only while either side's latest lineup is incomplete and no event/shared-record/result revision exists. The GET response's `editable`/`lockReason` is the client source of truth.
 - Goalkeeper is an independent per-participant designation: multiple participants or no participant may be marked as goalkeeper.
 
+### 미제출 친선의 기본 참석명단 (MD-QA #146)
+
+`leagueId`와 `tournamentId`가 모두 없는 친선에 적용한다. 현재 참가팀의 활성 멤버십, 활성·미삭제 팀과 활성·미탈퇴 계정만 기본 출전자로 계산한다. 생성 당시 스냅샷이나 RSVP 응답으로 자격을 대신하지 않는다. 양 팀은 각자의 최신 명단과 제출 이력으로 독립적으로 판정한다.
+
+자기 팀 `GET /team-matches/:teamMatchId/lineup` 응답은 기존 `state`, `revision`, `version`, `editable`, `lockReason`과 함께 다음 필드를 반환한다. `version`은 계속 명단 계보의 `revision`이며 `expectedVersion`에 그대로 보낸다.
+
+| 필드 | 값 | 의미 |
+|---|---|---|
+| `effectiveRosterSource` | `MANUAL` | 최신 유효 명단이 실제 `SUBMITTED`/`LOCKED`. 제출된 선수만 기록에 사용한다. |
+| `effectiveRosterSource` | `DEFAULT_PREVIEW` | 실제 제출 이력·정정 요청이 없는 최신 유효 `DRAFT`. 기록에는 현재 자격을 만족하는 전체 팀원을 사용한다. |
+| `effectiveRosterSource` | `DEFAULT_FROZEN` | 첫 기록 저장 때 고정된 기본 명단. 행의 상태는 `DRAFT`이며 이후 팀원 변화로 다시 계산하지 않는다. |
+| `effectiveRosterSource` | `BLOCKED` | 명단 없음·무효화·과거 제출 뒤 다시 열린 초안·정정 검토 등으로 기본 명단을 사용할 수 없다. 과거 제출 이력을 기본 명단으로 우회하지 않는다. |
+| `hasSavedDraft` | `boolean` | `DEFAULT_PREVIEW`에 사람이 저장한 편집 초안이 있는지. `true`이면 자기 명단 GET은 저장된 선택·게스트·배치를 보존하고, 실제 제출 전 경기 기록은 계속 현재 기본 명단을 사용한다. |
+
+공유 프론트 타입 `V1TeamMatchLineup`의 두 필드는 대회·상대·구버전 응답과의 호환을 위해 optional이다. 현재 친선 자기 명단 GET은 두 값을 함께 반환하며, `state=DRAFT`만으로 실제 기록 명단이나 준비 여부를 추정하지 않는다. 공동 기록 GET의 `lineupReady`·`missingSides`, 명단 GET의 `editable`·`lockReason`은 서로 다른 계약이다.
+
+- **조회**: 자기 명단·공동 기록·Game 라인업 GET은 기본 명단을 계산만 한다. 조회로 명단 revision, 참가자, identity/consent, 감사 행을 생성하거나 `SUBMITTED`로 바꾸지 않는다. 기본 참가자 `id`는 Game·side·기준 명단·계정 범위의 안정적인 UUID이며, 같은 기본 명단의 첫 기록 저장에 그대로 사용한다. 저장 전 자격이 바뀌면 다시 조회해야 한다.
+- **저장과 실제 제출**: `PUT .../lineup`은 미제출 편집 초안을 `DRAFT`로 보존한다. 저장 초안 없이 `POST .../lineup/submit`하면 그 순간의 자격을 만족하는 기본 명단을 후속 `SUBMITTED` revision으로 제출하며 조회에서 받은 UUID·도착 확인을 유지한다. 저장 초안이 있으면 그 선택만 재검증해 제출하고 전체 기본 명단으로 덮지 않는다. 포함된 계정이 현재 자격을 잃었으면 `422 LINEUP_PARTICIPANT_INELIGIBLE`이다. 실제 제출은 기존 공개 시각·포함 알림을 처리하며 상대 팀 명단을 제출하거나 고정하지 않는다. 이미 제출한 뒤의 저장·멱등 재제출은 위 Task 180 R-2를 따른다.
+- **첫 기록**: 양 팀 모두 유효한 기본 명단 또는 실제 제출 명단이 있고 한 명 이상이어야 기록할 수 있다. 권한·상태·버전·참가자 검증을 통과한 첫 기록 mutation만 기존 Game 행 잠금과 같은 트랜잭션에서 기본 명단의 후속 `DRAFT`와 참가자를 append한다. 참가자 UUID와 도착 확인을 유지하고 source identity link·기존 공개 제외 동의를 승계하며 `SYSTEM`의 `FRIENDLY_DEFAULT_ROSTER_FROZEN` 감사를 남긴다. 사람의 제출 시각·제출 사실을 만들지 않고, 기존 초안·참가자·identity/consent 이력을 수정하거나 삭제하지 않는다. 실패한 요청은 고정도 롤백된다. 기록 이후 일반 저장·제출은 기존 `LINEUP_LOCKED_FOR_DIRECT_EDIT` gate를 따른다.
+- **오류·멱등성**: 양 팀 준비가 안 되면 기록은 `409 ROSTER_INCOMPLETE`, 선택한 참가자가 현재 유효 명단에 없으면 `422 PARTICIPANT_INVALID`다. 명단 저장·제출·정정 요청은 기존 `Idempotency-Key`와 `expectedVersion`을 사용한다. 키 누락은 `422 IDEMPOTENCY_KEY_REQUIRED`, 다른 payload로 재사용하면 `409 IDEMPOTENCY_PAYLOAD_CONFLICT`, revision 충돌은 `409 VERSION_CONFLICT`다. 공동 기록은 별도의 body `commandId`·`expectedVersion`과 위 재실행 규칙을 유지한다. 이 명단 조회에는 pagination이 없다.
+- **공개·상대 명단**: 기본 명단을 계산해도 상대 제출 상태는 바꾸지 않는다. `opponent.submitted`와 `GET .../lineup/opponent`는 계속 실제 제출본과 공개 시각을 기준으로 하며, 기본 명단만 있으면 상대 조회는 `404 OPPONENT_LINEUP_NOT_SUBMITTED`다. 공동 기록의 일반 공개 응답은 참가자 배열을 비우고, 권한 있는 기록 조회도 공개 시각 전에는 상대의 기본 preview/frozen 참가자를 숨긴다. 기본 명단으로 실명·전화번호·동의 없는 공개 개인 기록을 추가하지 않는다. Game 조회·도착 확인의 범위는 [Games](./games.md#미제출-친선-명단-조회기록도착-확인-md-qa-146)을 따른다.
+
+`late-additions`는 `DEFAULT_FROZEN`의 최신 `DRAFT`도 허용한다. 서버는 `GAME` 범위의 `SYSTEM` 감사에서 action·systemActor가 모두 `FRIENDLY_DEFAULT_ROSTER_FROZEN`이고 `requestId`가 정확히 `${gameId}:${ownLatestLineupId}`인 경우만 고정 출처로 인정한다. 화면은 상태를 직접 조합하지 않고 `lateAdditionAllowed`를 사용한다. 현재 권한·최신 명단·기록 단계·결과 revision 없음 조건을 계속 확인하며, 추가한 뒤에도 명단은 `DRAFT`이고 사람의 제출 이력을 만들지 않는다.
+
+대회·리그는 참가 등록·경기 조정·결장·출전정지 계산을 계속 사용한다. 이 친선 기본 명단으로 대회 참가 등록을 전체 팀원으로 대체하지 않는다.
+
 ## Frontend Mapping Notes
 
 - `V1TeamMatchStatus`는 `recruiting`, `closed`, `matched`, `cancelled`, `completed`, `archived`뿐이다 — `scheduled`/`checking_in`/`in_progress`는 v0 계약의 잔재이며 이 컬럼에 존재하지 않는다.
@@ -397,6 +423,9 @@ Rules:
 
 - `apps/v1_api/src/team-matches/team-matches.controller.ts`
 - `apps/v1_api/src/team-matches/team-matches.service.ts`
+- `apps/v1_api/src/team-matches/team-match-lineup.service.ts`
+- `apps/v1_api/src/team-matches/team-match-record.service.ts`
+- `apps/v1_api/src/games/roster/friendly-team-match-default-roster.ts`
 - `apps/v1_api/src/team-matches/dto/*.ts`
 - `apps/v1_api/src/sports/level-range.ts`
 - `apps/v1_web/src/hooks/use-v1-api.ts`
@@ -412,13 +441,13 @@ Task 172 공개 기록은 기존 가시성 정책과 `PUBLIC_LIVE` 플래그를 
 - 신청 마감은 **새 신청 접수**를 닫고, 일반 미매칭 모집은 API에서 `closed`로 표시한다. 기존 `requested` 신청은 저장 상태가 `recruiting`이고 시작 전이면 일반 승인과 관리자 개별 승인이 가능하다. 신청 마감 시각이 지났다는 이유만으로 기존 신청을 만료하거나 승인을 막지 않는다. 수동 마감(`closed`), 취소, 상대팀 확정, 경기 시작 이후는 승인 불가다. 일반 신청 목록의 `canApprove`도 이 조건과 같다.
 - `platform_managed` migration과 후속 `20260921141000_v1_platform_recruitment_host_constraint`가 필요하다. 후자는 기존 CHECK를 트랜잭션 안에서 확장해 플랫폼 모집만 host 없이 허용하고 생성자·지역·장소·시작 필수값은 유지한다. 일반 모집은 여전히 host가 필요하다.
 
-MSW 기본 픽스처의 라인업은 DRAFT이므로 공동 기록 조회는 편집 불가 상태이며 POST는 403을 반환한다. 실제 공동 편집 검증은 API 통합 픽스처와 headed 브라우저 흐름을 사용한다. 테스트 성공을 흉내내는 mock 확정 처리는 제공하지 않는다.
+MSW 기본 명단 픽스처는 `DRAFT`·`DEFAULT_PREVIEW`·`hasSavedDraft=false`를 구분한다. 공동 기록 mock의 권한·상태·오류 gate를 실제 API 성공의 근거로 쓰지 않는다. 실제 공동 편집·기본 명단 고정 검증은 API 통합 픽스처와 headed 브라우저 흐름을 사용한다. 테스트 성공을 흉내내는 mock 확정 처리는 제공하지 않는다.
 
 ## 공동 경기 기록 서브매치 (Task 173)
 
 `GET /team-matches/:id/record`는 `subMatches[]`를 순서대로 반환한다. 각 항목은 `id`, `title`, `order`, 양 팀의 `scores[]`를 포함한다. 최상단 `sides[].score`는 모든 득점의 합이며 서브매치 점수의 합과 같다.
 
-참가자 전용 응답의 `participants[]`에는 제출된 최신 라인업의 `id`, `sideId`, `name`, `jerseyNumber`, `profileImageUrl`이 포함된다. 직접 연결된 `userId`와 현재 identity link를 모두 해석하며, 공개 응답은 기존처럼 빈 배열이다.
+권한 있는 기록 조회의 `participants[]`에는 유효 명단의 `id`, `sideId`, `name`, `jerseyNumber`, `profileImageUrl`이 포함된다. 미제출 친선의 기본 명단과 공개 시각 전 상대 명단 제한은 MD-QA #146 절을 따른다. 직접 연결된 `userId`와 현재 identity link를 모두 해석하며, 공개 응답은 기존처럼 빈 배열이다.
 
 `POST /team-matches/:id/record`의 기존 버전 CAS와 `commandId` 멱등 계약을 그대로 사용한다.
 

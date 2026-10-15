@@ -26,25 +26,8 @@ export function presentTournamentCard(row: TournamentListRow) {
     scheduledEndAt: row.scheduledEndAt?.toISOString() ?? null,
     venue: row.venue,
     coverImageUrl: row.coverImageUrl,
-    /**
-     * **정원.** 리그에는 이 개념이 없어 생략한다 — `V1League` 모델에 `max`·`capacity`
-     * 계열 필드가 **아예 없다**(실측). 그런데 거울 행은 `v1_tournaments` 에 살고
-     * `team_count` 는 `@default(8)` 이라, 아무도 안 넣은 리그 거울은 **전부 8** 이다
-     * (alpha 실측: 리그 4개 모두 8, 실제 참가팀은 2).
-     *
-     * ⚠️ **같은 이름이 세 뜻을 갖는다** — 헷갈리기 쉬운 자리라 적어 둔다:
-     * ```
-     * 대회 teamCount        정원          의미 있음
-     * 리그 API teamCount    참가 팀 수     의미 있음(다른 뜻) — /league-matches 응답
-     * 거울 teamCount        8            **스키마 기본값. 아무 뜻도 없다**  ← 여기서 지운다
-     * ```
-     * 앞의 둘은 `league-matches-list-client.tsx:200` 이 이미 다룬다(*"같은 진행바를 그리면
-     * 리그는 항상 100% 로 보인다"*). 세 번째는 통합 목록에서 처음 나오는 것이고, 그대로
-     * 두면 리그 카드에 **"8팀"** 이 뜨는데 실제는 2팀이다.
-     *
-     * 리그 카드는 참가 팀 수로 `confirmedCount` 를 쓴다(alpha 실측 2 로 맞다).
-     */
-    ...(row.kind === 'regular_league' ? {} : { teamCount: row.teamCount }),
+    // 리그의 과거 teamCount 기본값 8은 상한이 아니다. 선택적 참가팀 정원만 별도로 노출한다.
+    ...(row.kind === 'regular_league' ? { maxTeams: row.maxTeams } : { teamCount: row.teamCount }),
 
     /**
      * 리그 시즌의 티어·시즌·시리즈. **거울 행에 저장돼 있는데 그동안 안 내보냈다**

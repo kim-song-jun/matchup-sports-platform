@@ -5,8 +5,12 @@
     "why": "SELECT id ... FOR UPDATE — 잠금만 잡고 데이터를 돌려주지 않아 누출은 아니다. 다만 잠금은 리그 행에도 걸리고 실제 게이트는 그 뒤의 Prisma 검사다: 순서를 바꾸거나 뒤 검사를 지우면 곧바로 구멍이 된다."
   },
   "src/tournaments/admin-registrations.service.ts": {
+    "allowed": 3,
+    "why": "MD-QA #145: confirmPayment·confirm(확정/대기)·rejectCancelRequest의 SELECT id ... FOR UPDATE 세 곳. 기존 등록이 가리키는 부모 대회 행을 잠가 제출·직접 추가·정원 변경과 참가 상태 복원을 직렬화한다. 대회와 리그를 모두 처리하는 관리자 경로이며, 잠금 뒤 같은 트랜잭션에서 mutation 관리자 권한과 등록(id·tournamentId)·현재 상태를 재조회하고 status·updatedAt CAS로 최종 취소를 덮어쓰지 않는다. 종류별 정원·리그 판정은 findTournamentOnSurface(ALL_COMPETITION_KINDS/LEAGUE_KINDS)를 거친다. raw 결과는 응답 데이터를 만들지 않는다."
+  },
+  "src/league-matches/league-team-admission.ts": {
     "allowed": 1,
-    "why": "위와 같은 FOR UPDATE 잠금. 게이트는 뒤의 Prisma 검사다."
+    "why": "MD-QA #145: 최초 팀 선택·관리자 직접 추가·시즌 시드·승계가 신청 제출과 같은 부모 리그 행을 잠그는 SELECT id ... FOR UPDATE 한 곳. SQL 자체가 kind='regular_league'·deleted_at IS NULL을 제한하고, 즉시 findTournamentOnSurface(['regular_league'])로 정원과 종류를 재조회한 뒤 유한 정원이면 전체 출처의 예약을 다시 센다. 권한 검사는 호출하는 관리자 서비스에 유지하며 등록과 같은 트랜잭션에서 처리한다. Prisma로 표현할 수 없는 행 잠금만 raw SQL을 쓰고 결과를 응답으로 노출하지 않는다."
   },
   "src/tournaments/competition-config/competition-config-backfill.ts": {
     "allowed": 2,

@@ -225,22 +225,11 @@ describe('TournamentCard — 커버 이미지 fallback', () => {
   });
 });
 
-/**
- * **정원은 대회에만 있다 — 리그 카드에 쓰레기 값이 뜨지 않는지 본다.**
- *
- * 거울 행은 `v1_tournaments` 에 살고 `team_count` 가 `@default(8)` 이라, 서버가 생략하지
- * 않으면 리그 카드에 **"8팀"** 이 뜬다(alpha 실측: 리그 4개 전부 8, 실제 참가는 2팀).
- * 그리고 정원 진행바는 리그에서 **항상 100%** 로 보인다 — 리그 목록이 같은 이유로 이미
- * 진행바를 포기했다(리그 전용 목록이 같은 이유로 같은 선택을 했었다 — 그 화면은
- * 통합 목록으로 흡수돼 사라졌다).
- *
- * 그래서 **문자열이 아니라 컨테이너(진행바)의 부재**로 단언한다. 문자열 부재만 보면
- * "무엇이 있으면 안 되는지" 를 안 보게 된다.
- */
-describe('TournamentCard — 리그는 정원을 그리지 않는다', () => {
-  /** 리그 거울: 서버가 `teamCount` 를 생략하고 `kind` 로 종류를 말한다. */
+/** 무제한 리그는 거울 teamCount를 정원으로 쓰지 않고 진행바도 그리지 않는다. */
+describe('TournamentCard — 무제한 리그는 정원 진행바를 그리지 않는다', () => {
+  /** 리그의 참가팀 정원은 nullable maxTeams로 말한다. */
   const leagueItem = () => {
-    const item = buildItem({ kind: 'regular_league', confirmedCount: 2 });
+    const item = buildItem({ kind: 'regular_league', maxTeams: null, confirmedCount: 2 });
     delete item.teamCount;
     return item;
   };
@@ -323,8 +312,9 @@ describe('TournamentCard — 정원이 다 찼으면 상태가 open이어도 마
     expect(text).toContain('모집 중');
   });
 
-  it('리그는 정원 개념이 없어 이 분기를 타지 않는다 — status 그대로', () => {
-    const item = buildItem({ kind: 'regular_league', status: 'open', confirmedCount: 2 });
+  it('무제한 리그는 미래 신청 마감까지 모집 중으로 표시한다', () => {
+    const item = buildItem({ kind: 'regular_league', status: 'open', maxTeams: null,
+      registrationDeadlineAt: '2099-08-10T14:59:00.000Z', confirmedCount: 2 });
     delete item.teamCount;
     const { container } = render(<TournamentCard item={item} />);
     const text = (container.textContent ?? '').replace(/\s+/g, ' ');
@@ -434,17 +424,19 @@ describe('TournamentCard — 모집 상태와 하단 정보', () => {
 });
 
 describe('TournamentCard — 참가비 표시', () => {
-  it('미설정 리그는 "무료" 도 참가비 블록도 그리지 않고, 정원 요약은 남는다', () => {
+  it('참가비 미설정·정원 무제한 리그는 금액과 거울 정원 대신 실제 참가팀 수를 표시한다', () => {
     render(
       <TournamentCard
-        item={buildItem({ kind: 'regular_league', entryFee: 0, entryFeeConfigured: false, teamCount: 8, confirmedCount: 3 })}
+        item={buildItem({ kind: 'regular_league', maxTeams: null, entryFee: 0, entryFeeConfigured: false, teamCount: 8, confirmedCount: 3 })}
       />,
     );
 
     const footer = screen.getByTestId('tournament-card-footer');
     expect(footer).not.toHaveTextContent('참가비');
     expect(footer).not.toHaveTextContent('무료');
-    expect(footer).toHaveTextContent('3/8팀 확정');
+    expect(footer).toHaveTextContent('3팀 참가');
+    expect(footer).not.toHaveTextContent('/8');
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
   });
 
   it('설정된 리그는 금액을, 0원 확정이면 "무료" 를 그린다', () => {

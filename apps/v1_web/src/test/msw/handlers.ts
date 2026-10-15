@@ -81,6 +81,7 @@ import { v1GameRosterMswHandlers } from './game-roster-handlers';
 import { v1TeamDissolutionMswHandlers } from './team-dissolution-handlers';
 import { v1TeamInviteLinkMswHandlers } from './team-invite-link-handlers';
 import { v1LeagueVisibilityMswHandlers } from './league-visibility-handlers';
+import { v1LeagueCapacityMswHandlers } from './league-capacity-handlers';
 import { createV1TeamMatchRulesMswHandlers } from './team-match-rules-handlers';
 
 export const v1TeamMatchRulesMsw = createV1TeamMatchRulesMswHandlers(v1TeamMatchesFixture);
@@ -750,6 +751,7 @@ export const v1MswHandlers = [
   ...v1GameRosterMswHandlers,
   ...v1TeamDissolutionMswHandlers,
   ...v1TeamInviteLinkMswHandlers,
+  ...v1LeagueCapacityMswHandlers,
   ...v1LeagueVisibilityMswHandlers,
   ...v1TeamMatchRulesMsw.handlers,
   http.get(`${api}/auth/me`, () => ok(v1UserFixture)),

@@ -25,7 +25,6 @@ import { formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { TeamUpcomingGamesCard } from './team-upcoming-games-card';
 import { TeamCompetitionEntriesSection } from './team-competition-entries-section';
 import { TeamMembersSection } from './team-members-section';
-import { LocalDiscoveryGuidance } from '@/shared/ui/local-discovery-guidance';
 import { SoloOwnerCard, TeamManageDissolveEntry } from './team-dissolve-entry';
 import type {
   TeamDetailViewModel,
@@ -116,7 +115,6 @@ export function TeamListPageView({ model, fromHref }: { readonly model: TeamList
           <h2 className="tm-list-scope-heading">{model.summary.scope}</h2>
           <div className="tm-text-caption tab-num"><TeamSummaryText summary={model.summary} /></div>
         </div>
-        <LocalDiscoveryGuidance kind="teams" />
         {model.listLoading ? (
           <TeamListSkeleton />
         ) : model.teams.length ? (

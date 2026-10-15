@@ -25,6 +25,7 @@ export function mobileLeague(fixtures: V1LeagueFixture[] = [mobileFixture()]): V
   return {
     leagueId: MOBILE_LEAGUE_ID, title: '합성 모바일 리그', state: 'active', isPublic: false,
     teamIds: ['synthetic-home', 'synthetic-away', 'synthetic-third'],
+    maxTeams: null, confirmedCount: 3, pendingPaymentCount: 0,
     startsOn: '2100-01-01T00:00:00.000Z', registrationDeadlineAt: null, registrationOpen: false,
     sportCode: 'futsal', coverImageUrl: null, entryFee: 0, entryFeeConfiguredAt: null,
     bankName: null, bankAccount: null, bankHolder: null,

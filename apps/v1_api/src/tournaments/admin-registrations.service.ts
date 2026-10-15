@@ -21,7 +21,7 @@ import {
   findLeagueAdmissionBlocker,
   leagueAdmissionBlockerMessage,
 } from '../league-matches/league-team-admission';
-import { capacityLimitOf, isCapacityFull } from './registration-capacity';
+import { CAPACITY_HOLD_STATUSES, capacityLimitOf, countCapacityReservations, isCapacityFull } from './registration-capacity';
 import { ALL_COMPETITION_KINDS, findTournamentOnSurface, LEAGUE_KINDS } from './tournament-surface-lookup';
 import { TournamentSlotService } from './slots/tournament-slot.service';
 import { readRosterAutoConfirmedAt } from './registration-auto-confirm';
@@ -46,20 +46,6 @@ const ADMIN_CONFIRMABLE_STATUSES: V1TournamentRegistration['status'][] = [
   'payment_checking',
   'paid',
   'waitlisted',
-];
-
-/**
- * 정원 한 자리를 점유하는 상태 목록. tournament-registrations.service.ts의 동일 이름 상수와
- * 같은 목록이다 — 그 파일은 이 배치(T-reg-roster-state-machine)의 ownedFiles 밖이라 공유
- * export로 승격하지 않고 여기 그대로 중복 정의한다. **상태값이 바뀌면 두 곳을 함께 고친다**
- * (감사 finding #48: 팀 자진 철회(withdrawCancelRequest, R17-006)에는 이미 이 가드가 있었는데
- * 운영자 잔류 처리(rejectCancelRequest)에는 빠져 있어 정원을 넘는 확정 팀이 생길 수 있었다).
- */
-const CAPACITY_HOLD_STATUSES: V1TournamentRegistration['status'][] = [
-  'awaiting_payment',
-  'payment_checking',
-  'paid',
-  'confirmed',
 ];
 
 @Injectable()
@@ -132,42 +118,48 @@ export class AdminRegistrationsService {
   }
 
   async confirmPayment(user: V1AuthUser, registrationId: string, dto: AdminConfirmPaymentDto) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    await this.adminContext.getMutationAdmin(user.id);
     const registration = await this.loadRegistration(registrationId);
-    const payment = await this.prisma.v1TournamentPayment.findUnique({ where: { registrationId } });
-
-    if (registration.status !== 'awaiting_payment') {
-      throw new ConflictException({
-        code: 'REGISTRATION_STATUS_INVALID',
-        message: '현재 상태에서는 입금 확인을 할 수 없어요.',
-      });
-    }
-
-    if (!payment) {
-      throw new ConflictException({
-        code: 'PAYMENT_NOT_FOUND',
-        message: '결제 정보를 찾을 수 없어요.',
-      });
-    }
-    if (payment.status !== 'ready') {
-      throw new ConflictException({
-        code: 'PAYMENT_STATUS_INVALID',
-        message: '이미 처리된 결제예요.',
-      });
-    }
 
     const result = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${registration.tournamentId} FOR UPDATE`;
+      const admin = await this.adminContext.getMutationAdmin(user.id, tx);
+      const current = await tx.v1TournamentRegistration.findUnique({
+        where: { id: registrationId, tournamentId: registration.tournamentId },
+      });
+      if (!current || current.status !== 'awaiting_payment') {
+        throw new ConflictException({ code: 'REGISTRATION_STATUS_INVALID', message: '현재 상태에서는 입금 확인을 할 수 없어요.' });
+      }
+      const payment = await tx.v1TournamentPayment.findUnique({ where: { registrationId } });
+      if (!payment) {
+        throw new ConflictException({ code: 'PAYMENT_NOT_FOUND', message: '결제 정보를 찾을 수 없어요.' });
+      }
+      if (payment.status !== 'ready') {
+        throw new ConflictException({ code: 'PAYMENT_STATUS_INVALID', message: '이미 처리된 결제예요.' });
+      }
+      // 취소는 정원을 반환하므로 잠금 전의 awaiting_payment를 복원하면 안 된다.
+      // 등록 → 결제 순서로 잠그고 CAS하여, 재조회 직후의 최종 취소도 덮어쓰지 않는다.
+      const updatedRegistration = await tx.v1TournamentRegistration.update({
+        where: { id: registrationId, status: 'awaiting_payment', updatedAt: current.updatedAt },
+        data: { status: 'payment_checking' },
+      }).catch((error: unknown) => {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+          throw new ConflictException({ code: 'REGISTRATION_STATUS_INVALID', message: '현재 상태에서는 입금 확인을 할 수 없어요.' });
+        }
+        throw error;
+      });
       const updatedPayment = await tx.v1TournamentPayment.update({
-        where: { registrationId },
+        where: { registrationId, status: 'ready', updatedAt: payment.updatedAt },
         data: {
           status: 'paid',
           paidAt: new Date(),
           confirmedByAdminUserId: admin.id,
         },
-      });
-      const updatedRegistration = await tx.v1TournamentRegistration.update({
-        where: { id: registrationId },
-        data: { status: 'payment_checking' },
+      }).catch((error: unknown) => {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+          throw new ConflictException({ code: 'PAYMENT_STATUS_INVALID', message: '이미 처리된 결제예요.' });
+        }
+        throw error;
       });
       await this.adminContext.logAdminAction(
         admin,
@@ -176,9 +168,9 @@ export class AdminRegistrationsService {
           targetType: 'tournament_registration',
           targetId: registrationId,
           reason: dto.note ?? null,
-          beforeJson: { registrationStatus: registration.status, paymentStatus: payment.status },
+          beforeJson: { registrationStatus: current.status, paymentStatus: payment.status },
           afterJson: { registrationStatus: 'payment_checking', paymentStatus: 'paid' },
-          fromStatus: registration.status,
+          fromStatus: current.status,
           toStatus: 'payment_checking',
         },
         tx,
@@ -200,7 +192,7 @@ export class AdminRegistrationsService {
   }
 
   async confirm(user: V1AuthUser, registrationId: string, dto: AdminConfirmRegistrationDto) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    await this.adminContext.getMutationAdmin(user.id);
     const registration = await this.loadRegistration(registrationId);
 
     // 멱등: 이미 목표 상태이면 alreadyProcessed 반환.
@@ -219,20 +211,30 @@ export class AdminRegistrationsService {
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
-      // AREG-03: confirm 분기에서 정원 초과 여부 확인.
+      // 확정·대기 승격도 제출/직접 추가와 같은 행을 먼저 잠가 마지막 자리를 직렬화한다.
+      await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${registration.tournamentId} FOR UPDATE`;
+      const admin = await this.adminContext.getMutationAdmin(user.id, tx);
+      const current = await tx.v1TournamentRegistration.findUnique({
+        where: { id: registrationId, tournamentId: registration.tournamentId },
+      });
+      if (!current) {
+        throw new ConflictException({ code: 'REGISTRATION_STATUS_INVALID', message: '현재 상태에서는 확정·대기 처리를 할 수 없어요.' });
+      }
+      if (current.status === targetStatus) return { updated: current, alreadyProcessed: true };
+      if (!ADMIN_CONFIRMABLE_STATUSES.includes(current.status)) {
+        throw new ConflictException({ code: 'REGISTRATION_STATUS_INVALID', message: '현재 상태에서는 확정·대기 처리를 할 수 없어요.' });
+      }
       if (dto.decision === 'confirm') {
-        // 대회를 **먼저** 읽는다 — 상한이 없으면(정규 리그) COUNT 자체를 건너뛴다.
         const tournament = await findTournamentOnSurface(tx, ALL_COMPETITION_KINDS, {
-          where: { id: registration.tournamentId },
-          select: { teamCount: true, kind: true },
+          where: { id: current.tournamentId },
+          select: { teamCount: true, maxTeams: true, kind: true },
         });
-        const confirmedCount =
+        const reservedCount =
           tournament === null || capacityLimitOf(tournament) === null
             ? 0
-            : await tx.v1TournamentRegistration.count({
-                where: { tournamentId: registration.tournamentId, status: 'confirmed' },
-              });
-        if (tournament && isCapacityFull(tournament, confirmedCount)) {
+            // 자신의 payment_checking/paid 예약은 추가 자리가 아니다. 대기에서 확정할 때만 한 자리가 늘어난다.
+            : await countCapacityReservations(tx, current.tournamentId, registrationId);
+        if (tournament && isCapacityFull(tournament, reservedCount)) {
           throw new ConflictException({
             code: 'TOURNAMENT_CAPACITY_FULL',
             message: '정원이 모두 찼어요. 더 확정할 수 없어요.',
@@ -251,13 +253,13 @@ export class AdminRegistrationsService {
       // 있으므로 **여기서 다시** 본다.
       if (dto.decision === 'confirm') {
         const leagueMirror = await findTournamentOnSurface(tx, LEAGUE_KINDS, {
-          where: { id: registration.tournamentId },
+          where: { id: current.tournamentId },
           select: { id: true },
         });
         if (leagueMirror !== null) {
           const blocker = await findLeagueAdmissionBlocker(tx, {
-            leagueId: registration.tournamentId,
-            teamId: registration.teamId,
+            leagueId: current.tournamentId,
+            teamId: current.teamId,
           });
           // 이미 로스터에 있으면 통과시킨다 — 백필로 들어온 팀이나 어드민이 손으로 넣은
           // 팀의 신청을 확정하는 것은 정상이고, 그때 막으면 확정 자체가 불가능해진다.
@@ -275,7 +277,7 @@ export class AdminRegistrationsService {
       }
 
       const updated = await tx.v1TournamentRegistration.update({
-        where: { id: registrationId },
+        where: { id: registrationId, status: current.status, updatedAt: current.updatedAt },
         data: {
           status: targetStatus,
           // 감사 finding #47: 이전에는 decision과 무관하게 항상 confirmedAt을 채워, '대기(waitlist)'
@@ -293,32 +295,39 @@ export class AdminRegistrationsService {
           targetType: 'tournament_registration',
           targetId: registrationId,
           reason: dto.note ?? null,
-          beforeJson: { status: registration.status },
+          beforeJson: { status: current.status },
           afterJson: { status: targetStatus, decision: dto.decision },
-          fromStatus: registration.status,
+          fromStatus: current.status,
           toStatus: targetStatus,
         },
         tx,
       );
-      return updated;
+      return { updated, alreadyProcessed: false };
+    }).catch((error: unknown) => {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        throw new ConflictException({ code: 'REGISTRATION_STATUS_INVALID', message: '현재 상태에서는 확정·대기 처리를 할 수 없어요.' });
+      }
+      throw error;
     });
 
     // 알림: 신청자에게 확정/대기 결과 안내 (fire-and-forget — 트랜잭션 실패와 무관)
-    void this.notifications.emitNotification(
-      registration.appliedByUserId,
-      dto.decision === 'confirm'
-        ? 'tournament_registration_confirmed'
-        : 'tournament_registration_waitlisted',
-      registration.tournamentId,
-      dto.decision === 'confirm'
-        ? `"${registration.tournament.title}" ${competitionNounFor(registration.tournament.kind)} 참가가 확정됐어요.`
-        : `"${registration.tournament.title}" ${competitionNounFor(registration.tournament.kind)} 대기자 명단에 등록됐어요.`,
-      { competitionKind: registration.tournament.kind },
-    );
+    if (!result.alreadyProcessed) {
+      void this.notifications.emitNotification(
+        registration.appliedByUserId,
+        dto.decision === 'confirm'
+          ? 'tournament_registration_confirmed'
+          : 'tournament_registration_waitlisted',
+        registration.tournamentId,
+        dto.decision === 'confirm'
+          ? `"${registration.tournament.title}" ${competitionNounFor(registration.tournament.kind)} 참가가 확정됐어요.`
+          : `"${registration.tournament.title}" ${competitionNounFor(registration.tournament.kind)} 대기자 명단에 등록됐어요.`,
+        { competitionKind: registration.tournament.kind },
+      );
+    }
 
     const payment = await this.prisma.v1TournamentPayment.findUnique({ where: { registrationId } });
     const playerCount = await this.countPlayers(registrationId);
-    return { alreadyProcessed: false, ...this.serialize(result, payment ?? null, playerCount) };
+    return { alreadyProcessed: result.alreadyProcessed, ...this.serialize(result.updated, payment ?? null, playerCount) };
   }
 
   async cancel(user: V1AuthUser, registrationId: string, dto: AdminCancelRegistrationDto) {
@@ -425,7 +434,7 @@ export class AdminRegistrationsService {
    * cancelRequestedAt은 초기화한다 — 남겨두면 목록 UI가 되돌린 이후에도 "취소 요청" 배지를 계속 표시함.
    */
   async rejectCancelRequest(user: V1AuthUser, registrationId: string) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    await this.adminContext.getMutationAdmin(user.id);
     const registration = await this.loadRegistration(registrationId);
 
     if (registration.status !== 'cancel_requested') {
@@ -435,17 +444,23 @@ export class AdminRegistrationsService {
       });
     }
 
-    const restoredStatus = registration.cancelPreviousStatus ?? 'confirmed';
-
     const result = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${registration.tournamentId} FOR UPDATE`;
+      const admin = await this.adminContext.getMutationAdmin(user.id, tx);
+      const current = await tx.v1TournamentRegistration.findUnique({
+        where: { id: registrationId, tournamentId: registration.tournamentId },
+      });
+      if (!current || current.status !== 'cancel_requested') {
+        throw new ConflictException({ code: 'NOT_CANCEL_REQUESTED', message: '취소 요청 상태가 아니에요.' });
+      }
+      const restoredStatus = current.cancelPreviousStatus ?? 'confirmed';
       // 감사 finding #48: 잔류 처리도 팀 자진 철회(withdrawCancelRequest)와 같은 '이전 상태로
       // 복원' 동작이라 같은 위험(정원 초과)을 안는다 — R17-006과 동일한 가드를 여기도 건다.
       // FOR UPDATE로 대회 row를 잠가 두 관리자가 동시에 마지막 자리를 처리해도 안전하게 만든다.
       if (CAPACITY_HOLD_STATUSES.includes(restoredStatus)) {
-        await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${registration.tournamentId} FOR UPDATE`;
         const tournament = await findTournamentOnSurface(tx, ALL_COMPETITION_KINDS, {
           where: { id: registration.tournamentId, deletedAt: null },
-          select: { teamCount: true, kind: true },
+          select: { teamCount: true, maxTeams: true, kind: true },
         });
         if (!tournament) {
           throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
@@ -453,13 +468,7 @@ export class AdminRegistrationsService {
         const reservedCount =
           capacityLimitOf(tournament) === null
             ? 0
-            : await tx.v1TournamentRegistration.count({
-                where: {
-                  tournamentId: registration.tournamentId,
-                  id: { not: registrationId },
-                  status: { in: CAPACITY_HOLD_STATUSES },
-                },
-              });
+            : await countCapacityReservations(tx, registration.tournamentId, registrationId);
         if (isCapacityFull(tournament, reservedCount)) {
           throw new ConflictException({
             code: 'TOURNAMENT_CAPACITY_FULL',
@@ -469,7 +478,7 @@ export class AdminRegistrationsService {
       }
 
       const updated = await tx.v1TournamentRegistration.update({
-        where: { id: registrationId },
+        where: { id: registrationId, status: 'cancel_requested', updatedAt: current.updatedAt },
         data: {
           status: restoredStatus,
           cancelPreviousStatus: null,
@@ -482,14 +491,19 @@ export class AdminRegistrationsService {
           action: 'tournament.registration.cancel_reject',
           targetType: 'tournament_registration',
           targetId: registrationId,
-          beforeJson: { status: registration.status },
+          beforeJson: { status: current.status },
           afterJson: { status: restoredStatus },
-          fromStatus: registration.status,
+          fromStatus: current.status,
           toStatus: restoredStatus,
         },
         tx,
       );
       return updated;
+    }).catch((error: unknown) => {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        throw new ConflictException({ code: 'NOT_CANCEL_REQUESTED', message: '취소 요청 상태가 아니에요.' });
+      }
+      throw error;
     });
 
     const payment = await this.prisma.v1TournamentPayment.findUnique({ where: { registrationId } });

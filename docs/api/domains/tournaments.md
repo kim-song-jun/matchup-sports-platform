@@ -227,9 +227,16 @@ Campaign admin routes inherit `V1AuthGuard`. Production accepts only the signed 
 
 Admin-created tournaments require `teamCount` per tournament. The API does not treat an omitted team count as unlimited; missing `teamCount` is rejected with `400 TOURNAMENT_TEAM_COUNT_REQUIRED`. Public capacity, registration blocking, and progress bars must use the saved tournament `teamCount`, not a hard-coded default.
 
+정규 리그(`kind=regular_league`)는 별도 [리그 생성·정원 계약](./league-matches.md#participant-team-capacity-참가팀-정원)을
+따른다. 참가팀 정원은 nullable `maxTeams`이며 `maxPlayers`는 팀당 선수 명단 정원이다.
+일반 대회(`kind=regular_tournament` 및 기존 `kind=null` 행)와 리그 방식 일반 대회
+(`format=league`)는 계속 `teamCount`로 참가팀 정원을 판단한다. `format`으로 두 종류를 구분하지 않는다.
+
 경기 시간(피리어드): `GET /api/v1/admin/competition-configs/lineup-size-options?sportId=` 응답의 `defaultPeriods`(`[{ label, durationMinutes }]`, 연장 제외)가 종목 기본값이다 — 축구 전반 45·후반 45, 풋살 20·20, 미지원 종목 `[]`. 생성 마법사는 이 값을 채워 두고 전·후반 또는 단판(피리어드 1개)으로 고칠 수 있게 하며, 고친 경우에만 대회 생성/수정 직후 `PATCH /api/v1/admin/tournaments/:tournamentId/periods`(피리어드 설정)로 저장한다. 생성 API 자체는 종목 기본 피리어드로 만든다.
 
 피리어드 설정 저장은 새 설정 버전을 대회(리그)에 연결하면서 **끝나지 않았고 시작 전인 경기**(게임 `SCHEDULED`, 이벤트·결과·시작된 피리어드 없음 — 라인업 제출은 무관)도 같은 버전으로 옮기고 경기 피리어드 행 수를 맞춘다. 옮기는 대상은 피리어드 말고는 현재 설정과 같은 버전을 따르던 경기뿐이다(라인업·결과 규칙이 다른 버전으로 남은 경기는 그대로). 같은 피리어드를 다시 저장하면 버전은 바뀌지 않고(`changed: false`) 예전 버전에 남은 시작 전 경기만 따라온다. 응답 `fixturesRepointed`가 옮긴 경기 수다. 시작했거나 끝난 경기는 만든 때의 피리어드 그대로다. 경기 종료 예정 시각(`endAt`)은 바꾸지 않는다.
+
+피리어드 이름: 요청은 시간만 보내고 이름·코드는 서버가 정한다. 전·후반을 하나로 줄이면 `SINGLE_PERIOD`(단일), 단판을 다시 둘로 나누면 `FIRST_HALF`·`SECOND_HALF`(전반·후반)로 저장한다(MD-QA #159). 단판을 세 개 이상으로 나누면 이전 `SINGLE_PERIOD`(단일)를 이어 받지 않고 모든 행을 `PERIOD_N`(N피리어드)으로 새로 정한다. 그 밖에는 같은 순서의 기존 이름을 유지하고, 새로 붙는 피리어드만 `PERIOD_N`(N피리어드)이다.
 
 초안 재저장: `PATCH /api/v1/admin/tournaments/:tournamentId`에 출전 인원·교체 정책을 다시 보내거나 변경해도 현재 고정된 설정의 피리어드·이벤트·결과·순위·공개 정책은 유지한다. 별도 이름으로 등록한 설정도 현재 종목/이름 계열에서 동일 버전을 재사용하고, 실제 라인업 변경은 같은 계열의 다른 섹션을 보존한 불변 새 버전으로 처리한다. 기존 v1 설정에서 `lineup.positions/formations` 키가 없으면 버전 쓰기도 부재를 유지한다(읽기 응답은 `[]`로 정규화). 명시적으로 잘못된 포지션/대형 목록의 검증은 그대로 적용한다. 생성 마법사는 피리어드 PATCH 성공 전에는 공개 확인·접수 시작을 허용하지 않는다. 실패 시 초안 ID와 입력을 유지하며 같은 초안에서 재시도한다.
 
@@ -342,9 +349,23 @@ The list (`GET /api/v1/tournaments`) and detail (`GET /api/v1/tournaments/:tourn
 | `GET` | `/api/v1/tournaments/:tournamentId/registrations/my-registration?scope=teams` | user, active team member | path ids | registrations for teams the caller belongs to |
 | `GET` | `/api/v1/tournaments/:tournamentId/registrations/my-registrations` | user, active team member | path ids | registrations for teams the caller belongs to |
 | `GET` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId` | user, active team member | path ids | registration detail |
-| `POST` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/submit` | user, team manager+ | `SubmitRegistrationDto` | registration in `awaiting_payment` |
+| `POST` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/submit` | user, team manager+ | `SubmitRegistrationDto` | paid entry: `awaiting_payment`; free entry: `payment_checking` with paid zero-amount payment |
 | `POST` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/cancel-request` | user, team manager+ | `CancelRegistrationRequestDto` | `draft` becomes `cancelled`; active statuses become `cancel_requested` |
 | `POST` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/cancel-request/withdraw` | user, team manager+ | empty body | `cancel_requested` returns to its saved previous status |
+
+일반 대회와 정규 리그는 이 신청 경로를 공유한다. 운영자 신청 관리도 같은 등록을 다룬다:
+
+| Method | Path | Auth | Request | Response |
+|---|---|---|---|---|
+| `GET` | `/api/v1/admin/tournaments/:tournamentId/registrations` | active admin | `status?`, `cursor?`, `limit?` | `items`, `pageInfo: { hasNext, nextCursor }` |
+| `PATCH` | `/api/v1/admin/registrations/:registrationId/confirm` | owner/ops admin | `{ decision: 'confirm' \| 'waitlist', note? }` | registration; already at the target status adds `alreadyProcessed: true` |
+| `PATCH` | `/api/v1/admin/registrations/:registrationId/reject-cancel` | owner/ops admin | empty body | restored registration |
+
+신청 목록은 `createdAt` 내림차순 cursor 페이지네이션이고 `limit`은 1~50(기본 20)이다.
+`waitlisted`도 기존 상태 필터로 조회하며 `note`는 선택 문자열(최대 500자)이다.
+정원 때문에 자동 대기 등록을 만들거나 신청 실패를 성공으로 돌려주지 않는다. 확정·대기 처리의
+허용 진입 상태는 `payment_checking`·`paid`·`waitlisted`다. 대기에서 확정할 때도 서버가 현재
+정원을 확인하며 `409 TOURNAMENT_CAPACITY_FULL`이면 대기 등록을 보존한다.
 
 `cancel-request` stores the status that existed before `cancel_requested`. It is rejected with `409 TOURNAMENT_ENDED` (registration unchanged) when the tournament or league is `completed` or `cancelled` — terminal states have nothing left to cancel; this applies to `draft` registrations too. Other non-cancellable registration statuses keep returning `409 REGISTRATION_NOT_CANCELLABLE`. `cancel-request/withdraw` is allowed only while the registration status is `cancel_requested`; it clears `cancelRequestedAt`, `cancelReason`, and the stored previous status after restoring the registration.
 
@@ -356,11 +377,11 @@ Registration responses carry `cancelReason` (the team's reason from `cancel-requ
 |---|---|---|
 | `409 TOURNAMENT_STATE_CHANGED` | the tournament is no longer reachable on the tournament surface at that moment (deleted, or its kind moved off the surface) | refresh and retry — **not** a dead link |
 | `409 TOURNAMENT_ALREADY_CANCELLED` | the tournament was cancelled meanwhile | refresh; the withdrawal can never succeed now |
-| `409 TOURNAMENT_CAPACITY_FULL` | the status being restored holds a capacity slot and the other capacity-holding registrations already fill `teamCount` | refresh; retrying only helps if someone else frees a slot |
+| `409 TOURNAMENT_CAPACITY_FULL` | the restored status holds a slot and other reservations already fill the ordinary tournament's `teamCount` or a regular league's non-null `maxTeams` | refresh; retrying only helps if a slot is freed or the operator raises/removes the league cap |
 
 The first two mean *the tournament changed while the request was in flight* — not *the tournament does not exist*, which is a `404 TOURNAMENT_NOT_FOUND` from the entry check. The third is different in kind: the tournament is fine, but **someone else took the slot this registration gave up**, so a withdrawal must not push the tournament over its limit. Retrying without a freed slot returns the same `409`.
 
-`POST /registrations` is resumable for the same tournament/team while the existing registration is still `draft`. This covers users leaving the apply flow before final submit; the endpoint returns the existing draft instead of `ALREADY_REGISTERED`.
+`POST /registrations` is resumable for the same tournament/team while the existing registration is still `draft`. This covers users leaving the apply flow before final submit; the endpoint returns the existing draft instead of `ALREADY_REGISTERED`. A saved draft does not reserve a slot, so it can still be read after capacity fills, provided the registration-window, team-permission and sport checks pass. Final submit rechecks capacity under the tournament row lock and returns `409 TOURNAMENT_CAPACITY_FULL` while full; resuming the draft does not promise admission.
 
 Registration create and submit both require the team's current `sportId` to match the tournament `sportId`. A mismatch is rejected with `409 TEAM_SPORT_MISMATCH`; clients must only offer same-sport teams as new registration candidates. Submit repeats the check so a saved draft cannot bypass a later team or tournament sport change.
 
@@ -374,7 +395,31 @@ Submission repeats the paid-tournament account invariant under the tournament ro
 
 `SubmitRegistrationDto.termsDocumentIds` is the accepted current managed-document UUID list. The service rejects stale IDs and missing required current documents before the registration transaction. In the same transaction as the legacy agreement booleans and payment row, it appends verified `web` consent events with registration/team/applicant provenance; unchecked optional documents become `not_accepted`. The four legacy boolean columns remain populated from the canonical tournament policy codes for compatibility.
 
-Public tournament list/detail responses include both `confirmedCount` and `pendingPaymentCount`. `pendingPaymentCount` counts registrations in payment-stage statuses (`awaiting_payment`, `payment_checking`, `paid`) so clients can show predicted capacity as confirmed + payment-pending teams. `POST /registrations` and `POST /registrations/:registrationId/submit` reject with `409 TOURNAMENT_CAPACITY_FULL` when confirmed + payment-stage registrations already reaches `teamCount`; draft registrations do not reserve capacity.
+Public tournament list/detail responses include both `confirmedCount` and `pendingPaymentCount`.
+`pendingPaymentCount` counts registrations in payment-stage statuses (`awaiting_payment`,
+`payment_checking`, `paid`); these and `confirmed` reserve capacity across all entry sources,
+including operator-seeded and promoted teams. `draft`, `submitted`, `waitlisted`,
+`cancel_requested` and `cancelled` do not reserve capacity.
+
+정원은 일반 대회의 `teamCount`, 정규 리그의 `maxTeams`로 판정한다. 리그의 `maxTeams`가
+`null`이거나 미설정이면 무제한이고, 선수 명단 `maxPlayers`·대진 템플릿 `teamCount`·현재
+등록 수로 대신 채우지 않는다. `/tournaments` 목록은 정규 리그 항목에 `maxTeams`를 싣고
+`teamCount`를 생략한다. 단건 상세는 리그에도 기존 `teamCount`·`minPlayers`·`maxPlayers`를
+유지하며 `maxTeams`를 추가하므로, 클라이언트는 `kind`를 보고 참가팀 정원을 선택해야 한다.
+카드 목록에는 `maxPlayers`가 없다.
+
+`POST /registrations`의 신규 초안 생성·취소 신청 재활성화와
+`POST /registrations/:registrationId/submit`은 현재 점유가 유한 정원에 도달했으면
+`409 TOURNAMENT_CAPACITY_FULL`로 거절한다. 초안 생성은 자리를 예약하지 않으며,
+같은 팀의 기존 초안 조회·재개는 정원이 찬 뒤에도 허용한다. 제출은 대회 행을 잠근 뒤 정원·점유와
+신청 마감·상태를 다시 확인하고 결제/등록을 같은 트랜잭션에 저장한다. 확정·대기 승격,
+팀의 취소 요청 철회, 운영자의 취소 요청 거부(잔류), 리그 직접 팀 추가도 같은 행 잠금 아래
+점유를 다시 센다. 자기 등록이 이미 점유한 자리는 확정 시 중복 계산하지 않는다.
+
+정규 리그 설정 저장에서 점유보다 작은 `maxTeams`를 보내면
+`409 LEAGUE_CAPACITY_BELOW_OCCUPANCY`다. 공개 응답의 `confirmedCount + pendingPaymentCount`는
+화면 안내에 사용하고, 최종 판단은 저장 트랜잭션의 현재 점유다. MSW 정원 fixture는 웹의
+유한 정원·무제한·오류 표시에 쓰며 실제 PostgreSQL 경합이나 alpha 검증을 대신하지 않는다.
 
 ## Roster Endpoints
 
@@ -556,11 +601,11 @@ All team roster mutations lock the registration row and re-read `rosterLockedAt`
 
 ## Public list default order (2026-10-10)
 
-`GET /tournaments` orders by status group (in progress, recruiting, recruitment closed, finished), then date, then `id` ascending as the tie-breaker. "Recruitment closed" is the status the card shows: stored `closed`, plus a stored-`open` tournament whose `registrationDeadlineAt` has passed or whose capacity (confirmed + awaiting_payment/payment_checking/paid registrations vs `teamCount`) is full; regular leagues have no capacity and keep their stored status. The server is the only place this order is defined; clients render `items[]` as received. The order, the cursor comparison and the `page` offset are all computed in the database (one `ORDER BY` over the status group, the group's date key and `id`), so request cost depends on the page size, not on how many tournaments exist. A `cursor` is an opaque token (`pageInfo.nextCursor`) that carries the sort key its row had on the page that issued it, so a row that turns into 모집 마감 mid-scroll does not make the next page skip rows; a token the list did not issue returns an empty page. When `page` is present (including `page=1`) it wins and any `cursor` sent with it is ignored; `total` is counted only for `page` requests. `page` is capped at 10,000 (`MAX_PAGE_NUMBER`); a larger value is a 400 instead of an overflowing offset.
+`GET /tournaments` orders by status group (in progress, recruiting, recruitment closed, finished), then date, then `id` ascending as the tie-breaker. "Recruitment closed" includes stored `closed`, plus a stored-`open` competition or stored-`draft` regular league whose capacity is full; ordinary tournaments also move into this display group when their `registrationDeadlineAt` has passed. Capacity is confirmed + awaiting_payment/payment_checking/paid registrations across all entry sources, compared with `teamCount` for an ordinary tournament or non-null `maxTeams` for a regular league. A league's null `maxTeams` cannot make it full. This display ordering does not change the stored lifecycle status or replace the league's separate deadline gate. The server is the only place this order is defined; clients render `items[]` as received. The order, the cursor comparison and the `page` offset are all computed in the database (one `ORDER BY` over the status group, the group's date key and `id`), so request cost depends on the page size, not on how many tournaments exist. A `cursor` is an opaque token (`pageInfo.nextCursor`) that carries the sort key its row had on the page that issued it, so a row that turns into 모집 마감 mid-scroll does not make the next page skip rows; a token the list did not issue returns an empty page. When `page` is present (including `page=1`) it wins and any `cursor` sent with it is ignored; `total` is counted only for `page` requests. `page` is capped at 10,000 (`MAX_PAGE_NUMBER`); a larger value is a 400 instead of an overflowing offset.
 
 1. `in_progress` - `scheduledAt` ascending (2026-10-13: moved to the front; it used to come third)
-2. `open` (a regular league's `draft` "upcoming" is grouped here) - `scheduledAt` ascending
-3. `closed` - `scheduledAt` ascending
+2. Recruiting (`open`, plus regular-league `draft` with room or null `maxTeams`) - `scheduledAt` ascending
+3. Recruitment closed (stored `closed`, blocked `open`, and capacity-full regular-league `draft`) - `scheduledAt` ascending
 4. `completed` - most recently finished first (`scheduledEndAt` descending, falling back to `scheduledAt`)
 
-Rows without a date sort last inside their group. `page` is an offset into the same order, so page-number paging never skips or repeats a row. Passing `status` narrows to one group; the group's ordering above still applies. The visible set is unchanged (`draft`/`cancelled` tournaments stay hidden).
+Rows without a date sort last inside their group. `page` is an offset into the same order, so page-number paging uses the same sorted rows. Passing `status` filters the stored lifecycle status; an `open` result or regular-league `draft` result can still span recruiting and recruitment-closed display groups. Regular tournament `draft`/`cancelled` rows stay hidden, while regular-league `draft` rows remain public with their capacity-derived display group.

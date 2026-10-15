@@ -10,6 +10,7 @@ import { gameOperationAuditActor, GamesService } from './games.service';
 
 const ids = { game: randomUUID(), match: randomUUID(), home: randomUUID(), away: randomUUID(), homeTeam: randomUUID(), awayTeam: randomUUID(), reader: randomUUID() };
 const reader: V1AuthUser = { id: ids.reader, email: null, accountStatus: 'active', onboardingStatus: 'completed' };
+const awayReader: V1AuthUser = { ...reader, id: 'away-player' };
 type LineupRow = Pick<V1GameLineup, 'id' | 'gameId' | 'sideId' | 'revision' | 'state' | 'submittedAt' | 'invalidatedAt'>;
 
 async function consumerFixture(options: { readonly scheduled?: boolean; readonly teamActor?: boolean; readonly competition?: boolean; readonly startAt?: Date } = {}) {
@@ -66,7 +67,11 @@ async function consumerFixture(options: { readonly scheduled?: boolean; readonly
       findMany: async () => sides,
     },
     v1GameLineup: {
-      findMany: async ({ where }: { where: { sideId?: string } }) => lineups.filter((lineup) => where.sideId === undefined || lineup.sideId === where.sideId),
+      findMany: async ({ where }: { where: { sideId?: string; invalidatedAt?: Date | null } }) => lineups.filter((lineup) =>
+        (where.sideId === undefined || lineup.sideId === where.sideId) &&
+        (where.invalidatedAt === undefined || (where.invalidatedAt === null
+          ? lineup.invalidatedAt === null
+          : lineup.invalidatedAt?.getTime() === where.invalidatedAt.getTime()))),
       create: async ({ data }: { data: Prisma.V1GameLineupUncheckedCreateInput }) => {
         const row = { id: data.id ?? randomUUID(), gameId: data.gameId, sideId: data.sideId, revision: data.revision, state: data.state ?? 'DRAFT', submittedAt: null, invalidatedAt: null };
         lineups.unshift(row); return row;
@@ -250,7 +255,16 @@ describe('MD-QA #146: actual generic lineup GET → arrival consumer', () => {
   it.each(['foreign', 'departed', 'stale-basis'] as const)('rejects a %s preview selection without an arrival audit or freeze', async (scenario) => {
     const fixture = await consumerFixture({ teamActor: true });
     try {
-      const rows = (await fixture.service.listOperationsLineups(reader, ids.game)).flatMap((lineup) => lineup.participants);
+      if (scenario === 'foreign') {
+        const awayMember = fixture.members.find((member) => member.userId === awayReader.id);
+        if (awayMember === undefined) throw new Error('The away owner must exist in the fixture.');
+        awayMember.role = 'owner';
+      }
+      const selectionReader = scenario === 'foreign' ? awayReader : reader;
+      const selectionLineups = scenario === 'foreign'
+        ? await fixture.service.listLineups(selectionReader, ids.game)
+        : await fixture.service.listOperationsLineups(selectionReader, ids.game);
+      const rows = selectionLineups.flatMap((lineup) => lineup.participants);
       let selected = rows.find((participant) => participant.sideId === (scenario === 'foreign' ? ids.away : ids.home));
       if (scenario === 'departed') {
         const late = { ...fixture.members[0], id: 'departing-home-member', userId: randomUUID(), role: 'member' };
@@ -263,10 +277,13 @@ describe('MD-QA #146: actual generic lineup GET → arrival consumer', () => {
         fixture.lineups.unshift({ ...previous, id: randomUUID(), revision: 2 });
       }
       if (selected === undefined) throw new Error('The selected current preview must exist before invalidation.');
+      if (scenario === 'foreign') expect(selectionLineups.map((lineup) => lineup.sideId)).toEqual([ids.away]);
       await expect(fixture.service.setParticipantArrival(reader, ids.game, selected.id, true)).rejects.toMatchObject({ status: scenario === 'foreign' ? 403 : 404 });
       if (scenario === 'foreign') await expect(fixture.service.confirmSideArrival(reader, ids.game, ids.away)).rejects.toMatchObject({ status: 403 });
       expect(fixture.audits).toEqual([]);
       expect(fixture.events).toEqual([]);
+      expect(fixture.participants).toHaveLength(2);
+      expect(fixture.lineups.filter((lineup) => lineup.revision >= 2)).toHaveLength(scenario === 'stale-basis' ? 1 : 0);
       expect(fixture.game.version).toBe(0);
     } finally { await fixture.close(); }
   });
@@ -426,12 +443,17 @@ describe('friendly default preview access by team-scoped readers', () => {
       );
 
       const beforePublication = await fixture.service.listOperationsLineups(reader, ids.game);
-      expect(beforePublication.find((lineup) => lineup.sideId === ids.away)?.participants).toEqual([]);
+      expect(beforePublication.filter((lineup) => lineup.sideId === ids.away).flatMap((lineup) => lineup.participants)).toEqual([]);
+      expect(beforePublication.some((lineup) => lineup.revision === 4)).toBe(false);
 
       fixture.game.visibilityPolicy.lineupAt = new Date(Date.now() - 60 * 60 * 1000);
       const afterPublication = await fixture.service.listOperationsLineups(reader, ids.game);
-      expect(afterPublication.map((lineup) => lineup.sideId).sort()).toEqual([ids.away, ids.home].sort());
-      expect(afterPublication.find((lineup) => lineup.sideId === ids.away)?.participants.map((participant) => participant.displayNameSnapshot)).toEqual(['생성 시점 원정 선수']);
+      const publishedAwayRows = afterPublication.filter((lineup) => lineup.sideId === ids.away);
+      expect(afterPublication.filter((lineup) => lineup.sideId === ids.home)).toHaveLength(1);
+      expect(publishedAwayRows.map((lineup) => lineup.revision).sort((a, b) => a - b)).toEqual([2, 3]);
+      expect(publishedAwayRows.find((lineup) => lineup.revision === 2)?.participants.map((participant) => participant.displayNameSnapshot)).toEqual(['생성 시점 원정 선수']);
+      expect(publishedAwayRows.find((lineup) => lineup.revision === 3)?.participants).toEqual([]);
+      expect(afterPublication.some((lineup) => lineup.revision === 4)).toBe(false);
     } finally { await fixture.close(); }
   });
 

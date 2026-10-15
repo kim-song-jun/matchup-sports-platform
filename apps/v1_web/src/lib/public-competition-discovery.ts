@@ -55,26 +55,41 @@ export async function collectPublicMatchInventory<T extends { id?: string; match
   return { items: successes ? [...rows.values()] : null, failedSources };
 }
 
-/** 공개 목록에 있는 대회만 조회한다. 리그 거울·draft와 관리용 API는 검색 자료가 아니다. */
-export async function collectPublicTournamentFixtures(tournaments: V1TournamentListItem[]): Promise<PublicDiscoveryResult<PublicTournamentFixture>> {
-  const rows: PublicTournamentFixture[] = [];
+type PublicTournamentDetail = { item: V1TournamentListItem; detail: V1TournamentDetail };
+
+/** 공개 목록을 통과한 상세를 한 번씩 읽어 대진·후기 등의 발행 판단에 함께 쓴다. */
+export async function collectPublicTournamentDetails(
+  tournaments: V1TournamentListItem[],
+  options: { cache?: 'no-store' } = {},
+): Promise<PublicDiscoveryResult<PublicTournamentDetail>> {
+  const rows: PublicTournamentDetail[] = [];
   const failedSources: string[] = [];
   let successes = 0;
-  // 최신 공개 목록으로 대상 판정을 끝낸 뒤 상세는 300초 캐시를 재사용한다.
   for (const item of tournaments) {
-    if (item.kind === 'regular_league' || item.status === 'draft') continue;
+    // 공개 리그의 준비 중 상태와 비공개 대회의 초안 상태는 다른 계약이다.
+    if (item.kind !== 'regular_league' && item.status === 'draft') continue;
     const source = `/tournaments/${encodeURIComponent(item.id)}`;
     try {
-      const detail = await fetchPublicV1<V1TournamentDetail>(source);
+      const detail = await fetchPublicV1<V1TournamentDetail>(source, options);
       successes += 1;
       if (!detail) continue;
-      for (const fixture of detail.fixtures) rows.push({
-        tournamentId: item.id, tournamentTitle: item.title, sportName: item.sport.name, fixture,
-      });
+      rows.push({ item, detail });
     } catch (error) {
-      console.error(`[seo] 공개 대회 경기 조회 실패: ${source}`, error);
+      console.error(`[seo] 공개 대회 상세 조회 실패: ${source}`, error);
       failedSources.push(source);
     }
   }
   return { items: successes || failedSources.length === 0 ? rows : null, failedSources };
+}
+
+export function publicTournamentFixtures(details: PublicTournamentDetail[]): PublicTournamentFixture[] {
+  return details.flatMap(({ item, detail }) => item.kind === 'regular_league' ? [] : detail.fixtures.map((fixture) => ({
+    tournamentId: item.id, tournamentTitle: item.title, sportName: item.sport.name, fixture,
+  })));
+}
+
+/** 리그 경기 모양은 대회 경기와 다르다. 기존 AI 안내의 대회 경기 수집 계약을 유지한다. */
+export async function collectPublicTournamentFixtures(tournaments: V1TournamentListItem[]): Promise<PublicDiscoveryResult<PublicTournamentFixture>> {
+  const details = await collectPublicTournamentDetails(tournaments.filter((item) => item.kind !== 'regular_league'));
+  return { items: details.items ? publicTournamentFixtures(details.items) : null, failedSources: details.failedSources };
 }

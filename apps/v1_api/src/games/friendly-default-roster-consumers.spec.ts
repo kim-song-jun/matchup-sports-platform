@@ -17,7 +17,8 @@ async function consumerFixture(options: { readonly scheduled?: boolean; readonly
     id: ids.match, deletedAt: null, tournamentId: null, leagueId: options.competition ? ids.match : null, fieldId: null, status: 'matched',
     hostTeamId: ids.homeTeam, approvedApplicantTeamId: ids.awayTeam, startAt: options.startAt ?? new Date(Date.now() + 24 * 60 * 60 * 1000), tournament: null, league: null, tournamentDetails: null,
   };
-  const game = { id: ids.game, sourceType: 'TEAM_MATCH', teamMatchId: ids.match, state: options.scheduled ? 'SCHEDULED' : 'LIVE', version: 0, lastSequence: 0, competitionConfigVersionId: 'futsal-config', visibilityPolicy: { lineupAt: new Date(Date.now() + 60 * 60 * 1000) } };
+  const visibilityPolicy: { lineupAt: Date | null } = { lineupAt: new Date(Date.now() + 60 * 60 * 1000) };
+  const game = { id: ids.game, sourceType: 'TEAM_MATCH', teamMatchId: ids.match, state: options.scheduled ? 'SCHEDULED' : 'LIVE', version: 0, lastSequence: 0, competitionConfigVersionId: 'futsal-config', visibilityPolicy };
   const sides = [{ id: ids.home, teamId: ids.homeTeam, sideKey: 'HOME' }, { id: ids.away, teamId: ids.awayTeam, sideKey: 'AWAY' }];
   const lineups: LineupRow[] = sides.map((side) => ({ id: randomUUID(), gameId: ids.game, sideId: side.id, revision: 1, state: 'DRAFT', submittedAt: null, invalidatedAt: null }));
   const participants: V1GameParticipant[] = lineups.map((lineup, index) => ({

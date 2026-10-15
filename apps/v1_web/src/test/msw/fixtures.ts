@@ -425,6 +425,7 @@ export const v1TeamMatchesFixture: V1TeamMatch[] = [
     listImageUrl: null,
     title: '마포 FC 상대팀 모집',
     sportName: '축구',
+    region: { regionId: 'region-seoul-mapo', name: '마포구', parentName: '서울' },
     levelLabel: 'A-',
     minLevel: { code: 'advanced', name: '고수' },
     maxLevel: { code: 'advanced', name: '고수' },
@@ -432,8 +433,8 @@ export const v1TeamMatchesFixture: V1TeamMatch[] = [
     startsAt: '2026-05-22T21:00:00.000Z',
     capacityText: '상대 0/1팀',
     status: 'recruiting',
-    hostTeamId: 'team-1',
-    hostTeamName: '마포 FC',
+    hostTeamId: 'team-mdqa141-football',
+    hostTeamName: '규칙 검증 축구팀',
     applicantTeamState: 'eligible',
   },
 ];

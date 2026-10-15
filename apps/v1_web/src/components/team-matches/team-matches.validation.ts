@@ -1,3 +1,4 @@
+import { ruleDraftMatches, validTeamMatchPeriods } from './team-match-rules-draft';
 import { toMatchPlacePayload } from '@/lib/place';
 import { teamMatchDateErrors } from '@/lib/team-match-dates';
 import { parseTeamMatchLevelRange } from '@/lib/team-match-level-range';
@@ -32,6 +33,7 @@ export type TeamMatchValidationContext = {
   regionId: string;
   draft: TeamMatchDraft;
   existingDeadlineAt?: string | null;
+  requireRules?: boolean;
 };
 
 const defaultGenderRule = '성별 무관';
@@ -63,6 +65,12 @@ const RULES: Array<{
   { field: 'title', label: '매치 제목을 입력해 주세요', step: 'info', isSatisfied: (ctx) => Boolean(ctx.draft.title.trim()) },
   { field: 'grade', label: '실력등급을 다시 선택해 주세요', step: 'condition', isSatisfied: (ctx) => parseTeamMatchLevelRange(ctx.draft.grade) !== null },
   { field: 'opponentCost', label: '상대팀 부담금은 총비용보다 클 수 없어요', step: 'condition', isSatisfied: (ctx) => ctx.draft.opponentCost <= ctx.draft.cost },
+  { field: 'rules', label: '경기 규칙을 확인해 주세요', step: 'rules', isSatisfied: (ctx) => {
+    const rules = ctx.draft.rules;
+    if (!ctx.requireRules && !rules) return true;
+    return ruleDraftMatches(rules, ctx.hostTeamId, ctx.sportId) && rules?.confirmed === true
+      && (rules.mode === 'default' || validTeamMatchPeriods(rules.periods));
+  } },
   { field: 'regionId', label: '지역을 선택해 주세요', step: 'place-time', isSatisfied: (ctx) => Boolean(ctx.regionId) },
   { field: 'place', label: '장소를 골라 주세요', step: 'place-time', isSatisfied: (ctx) => Boolean(ctx.draft.place?.name.trim()) },
   { field: 'date', label: '날짜를 입력해 주세요', step: 'place-time', isSatisfied: (ctx) => Boolean(ctx.draft.date) },
@@ -144,8 +152,8 @@ export type TeamMatchPayloadResult =
   | { payload: V1TeamMatchMutationPayload; missingFields?: undefined }
   | { payload?: undefined; missingFields: TeamMatchMissingField[] };
 
-export function buildTeamMatchPayloadResult(draft: TeamMatchDraft, hostTeamId: string, sportId: string, regionId: string, existingDeadlineAt?: string | null): TeamMatchPayloadResult {
-  const ctx: TeamMatchValidationContext = { hostTeamId, sportId, regionId, draft, existingDeadlineAt };
+export function buildTeamMatchPayloadResult(draft: TeamMatchDraft, hostTeamId: string, sportId: string, regionId: string, existingDeadlineAt?: string | null, requireRules = false): TeamMatchPayloadResult {
+  const ctx: TeamMatchValidationContext = { hostTeamId, sportId, regionId, draft, existingDeadlineAt, requireRules };
   const missingFields = getTeamMatchMissingFields(ctx);
   if (missingFields.length > 0) return { missingFields };
   const levelRange = parseTeamMatchLevelRange(draft.grade);
@@ -182,6 +190,7 @@ export function buildTeamMatchPayloadResult(draft: TeamMatchDraft, hostTeamId: s
       // 구조화 컬럼으로만 쓴다(team-matches-create-client.tsx의 원래 buildTeamMatchMutationPayload
       // 설계를 그대로 따른다 — 위저드 단계 게이팅 리팩터로 이 파일에 옮겨오며 함께 이관).
       rulesText: null,
+      ...(draft.rules?.mode === 'custom' && draft.rules.periods ? { periods: draft.rules.periods.map(({ durationMinutes }) => ({ durationMinutes })) } : {}),
       ...levelRange,
       genderRule: normalizeGenderRule(draft.gender),
       matchFormat: draft.format.trim() || null,

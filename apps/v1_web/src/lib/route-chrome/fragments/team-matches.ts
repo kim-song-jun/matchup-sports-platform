@@ -46,6 +46,10 @@ export const TEAM_MATCHES_ROUTES: RouteChromeEntry[] = [
     chrome: { title: '팀매치 만들기', activeTab: 'matches', bottomNav: false, backHref: '/team-matches', desktopHead: true },
   },
   {
+    pattern: '/team-matches/new/rules',
+    chrome: { title: '경기 규칙 설정', activeTab: 'matches', bottomNav: false, backHref: '/team-matches/new/condition', desktopHead: true },
+  },
+  {
     pattern: '/team-matches/new/place-time',
     chrome: { title: '팀매치 만들기', activeTab: 'matches', bottomNav: false, backHref: '/team-matches', desktopHead: true },
   },
@@ -62,6 +66,10 @@ export const TEAM_MATCHES_ROUTES: RouteChromeEntry[] = [
       backHref: (p) => `/team-matches/${p.id}`,
       desktopHead: true,
     },
+  },
+  {
+    pattern: '/team-matches/:id/edit/rules',
+    chrome: { title: '경기 규칙 설정', activeTab: 'matches', bottomNav: false, backHref: (p) => '/team-matches/' + p.id + '/edit', desktopHead: true },
   },
   {
     pattern: '/team-matches/:id/lineup',

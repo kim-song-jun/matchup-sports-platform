@@ -86,9 +86,10 @@ describe('platform applicant cost adjacent contracts', () => {
     ['총 120,000원 · 상대팀 60,000원', 120000, 60000],
   ] as const)('actual edit hydration → payload keeps the known costs: %s', (costNote, total, applicant) => {
     const edit: V1TeamMatchEdit = { teamMatchId: 'cost-edit', editable: true, lockedReason: null,
+      rulesEditable: false, rulesLockedReason: 'COMPETITION_CONFIG_REQUIRED', competitionConfigVersionId: null,
       status: 'recruiting', version: 'v1', form: { hostTeamId: 'team-1', sportId: 'sport-futsal',
         regionId: 'region-1', title: '합성 수정 비용', startsAt: '2099-10-10T10:00:00.000Z',
-        manualPlaceName: '합성 경기장', costNote } };
+        manualPlaceName: '합성 경기장', costNote, periods: null } };
     const draft = draftFromTeamMatchEdit(edit);
     expect(draft.cost).toBe(total);
     expect(draft.opponentCost).toBe(applicant);

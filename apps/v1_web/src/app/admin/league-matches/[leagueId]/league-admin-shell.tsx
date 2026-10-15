@@ -90,7 +90,7 @@ export function LeagueAdminShell({ leagueId, children }: { leagueId: string; chi
       label: '사후',
       items: [
         { slug: 'videos', label: '경기 영상' },
-        { slug: 'reviews', label: '후기 관리' },
+        { slug: 'reviews', label: '리뷰 관리' },
       ],
     },
   ];

@@ -23,7 +23,7 @@ export type TeamCompetitionEntryRow = {
   /** 명단을 지금 고칠 수 있는지 한 마디 — "수정 가능" · "10월 8일 (목)까지 수정" · "제출 마감" · "종료" · 멤버는 "팀장에게 요청" */
   rosterNote: string;
   rosterHref: string;
-  /** 보는 사람이 팀장·매니저이고 명단도 고칠 수 있을 때만 [명단 수정]. 아니면 [명단 보기]. */
+  /** 보는 사람이 팀장·매니저이고 명단도 고칠 수 있을 때만 [참가 선수 관리]. 아니면 [참가 선수 보기]. */
   canEdit: boolean;
 };
 
@@ -82,7 +82,7 @@ export function TeamCompetitionEntriesSection({ model }: { model: TeamCompetitio
         title="참가 중인 대회·리그"
         sub={
           model.viewerCanManageRoster
-            ? '선수 추가·빼기와 등번호는 [명단 수정]에서 고쳐요.'
+            ? '선수 추가·빼기와 등번호는 [참가 선수 관리]에서 고쳐요.'
             : '참가 명단은 팀장·매니저가 고쳐요.'
         }
       />
@@ -127,9 +127,9 @@ export function TeamCompetitionEntriesSection({ model }: { model: TeamCompetitio
                   href={row.rosterHref}
                   className={`tm-btn tm-btn-sm ${row.canEdit ? 'tm-btn-outline' : 'tm-btn-neutral'}`}
                   style={{ minHeight: 44, flex: '0 0 auto' }}
-                  aria-label={`${row.title} 참가 ${row.canEdit ? '명단 수정' : '명단 보기'}`}
+                  aria-label={`${row.title} 참가 선수 ${row.canEdit ? '관리' : '보기'}`}
                 >
-                  {row.canEdit ? '명단 수정' : '명단 보기'}
+                  {row.canEdit ? '참가 선수 관리' : '참가 선수 보기'}
                 </Link>
               </li>
             ))}

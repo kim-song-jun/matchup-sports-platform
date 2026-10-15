@@ -488,10 +488,9 @@ describe('Task 16 team result draft/submit authority and completion', () => {
     expect(gameAfterApproval.state).toBe(V1GameState.ENDED);
   });
 
-  it('[Task 106] blocks a friendly result draft with 409 ROSTER_INCOMPLETE while either side lacks a submitted lineup, then allows it once both are ready', async () => {
-    // createTeamMatchGame already submits both sides via the shared fixture
-    // helper — revert AWAY back to DRAFT here to simulate "opponent hasn't
-    // submitted their lineup yet", the exact precondition this gate guards.
+  it('[Task 106] blocks an actually empty default roster, then accepts a ready default preview without manual submission', async () => {
+    // A DRAFT alone is now a ready DEFAULT_PREVIEW when current qualified members exist.
+    // Make the away side genuinely ineligible so this still proves the incomplete-roster gate.
     const gameId = await createTeamMatchGame(ids.rosterGateMatch, true, configId);
     const awaySide = await prisma.v1GameSide.findFirstOrThrow({
       where: { gameId, sideKey: V1GameSideKey.AWAY },
@@ -499,6 +498,10 @@ describe('Task 16 team result draft/submit authority and completion', () => {
     await prisma.v1GameLineup.updateMany({
       where: { gameId, sideId: awaySide.id },
       data: { state: 'DRAFT', submittedAt: null },
+    });
+    await prisma.v1TeamMembership.updateMany({
+      where: { teamId: ids.opponentTeam, status: 'active' },
+      data: { status: 'left' },
     });
 
     const blocked = await captureFailure(() =>
@@ -513,11 +516,12 @@ describe('Task 16 team result draft/submit authority and completion', () => {
     expectHttpCode(blocked, 409, 'ROSTER_INCOMPLETE');
     expect(await prisma.v1GameResultRevision.count({ where: { gameId } })).toBe(0);
 
-    await prisma.v1GameLineup.updateMany({
-      where: { gameId, sideId: awaySide.id },
-      data: { state: 'SUBMITTED', submittedAt: new Date() },
+    await prisma.v1TeamMembership.updateMany({
+      where: { teamId: ids.opponentTeam, status: 'left' },
+      data: { status: 'active' },
     });
 
+    // With current members eligible again, the same AWAY DRAFT is ready as a default preview.
     const allowed = await service.createResultRevision(authUser(ids.hostUser), gameId, 'roster-gate-allowed', {
       expectedVersion: 0,
       clientCommandId: 'roster-gate-allowed',

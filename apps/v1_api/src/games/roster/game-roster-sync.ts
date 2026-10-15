@@ -464,19 +464,19 @@ export async function syncTeamMemberFallbackRosters(tx: Tx, teamIds: readonly st
       games.map((game) => game.teamMatch?.leagueId ?? null).filter((id): id is string => id !== null),
     );
     if (leagueIds.size === 0) continue;
-    const withRoster = await tx.v1TournamentRegistration.findMany({
+    const withRegistrationHistory = await tx.v1TournamentRegistration.findMany({
       where: {
         tournamentId: { in: [...leagueIds] },
         teamId,
         status: 'confirmed',
-        players: { some: { removedAt: null } },
+        // A removed player still proves this registration was explicitly managed.
+        // Only teams that have never had a registration player row use member fallback.
+        players: { some: {} },
       },
       select: { tournamentId: true },
     });
-    const registered = new Set(withRoster.map((row) => row.tournamentId));
-    for (const leagueId of leagueIds) {
-      if (!registered.has(leagueId)) targets.push({ competitionId: leagueId, teamId });
-    }
+    const registered = new Set(withRegistrationHistory.map((row) => row.tournamentId));
+    for (const leagueId of leagueIds) if (!registered.has(leagueId)) targets.push({ competitionId: leagueId, teamId });
   }
   return syncCompetitionTeams(tx, targets);
 }

@@ -25,9 +25,12 @@ import { PrismaService } from '../../src/prisma/prisma.service';
  */
 const ids = {
   hostUser: '64000000-0000-4000-8000-000000000001',
+  staffUser: '64000000-0000-4000-8000-000000000002',
+  awayOwner: '64000000-0000-4000-8000-000000000003',
   sport: '64000000-0000-4000-8000-000000000010',
   region: '64000000-0000-4000-8000-000000000011',
   hostTeam: '64000000-0000-4000-8000-000000000020',
+  awayTeam: '64000000-0000-4000-8000-000000000021',
   teamMatch: '64000000-0000-4000-8000-000000000030',
 } as const;
 
@@ -70,6 +73,25 @@ describe('Task 21 GamesService.listLineups() participants roster', () => {
         onboardingStatus: 'completed',
       },
     });
+    await prisma.v1User.create({
+      data: {
+        id: ids.staffUser,
+        email: 'task21-lineup-participants-staff@example.test',
+        accountStatus: 'active',
+        onboardingStatus: 'completed',
+      },
+    });
+    await prisma.v1User.create({
+      data: {
+        id: ids.awayOwner,
+        email: 'task21-lineup-participants-away@example.test',
+        accountStatus: 'active',
+        onboardingStatus: 'completed',
+      },
+    });
+    await prisma.v1AdminUser.create({
+      data: { userId: ids.staffUser, adminRole: 'owner', status: 'active' },
+    });
     // Shared 'football' sport code with a per-suite NAME -- v1_default_competition_config_version()
     // only maps soccer/football/futsal codes and raises COMPETITION_CONFIG_SPORT_UNSUPPORTED
     // otherwise; reusing the code (not the row id) across suites avoids that trap.
@@ -94,10 +116,23 @@ describe('Task 21 GamesService.listLineups() participants roster', () => {
     await prisma.v1TeamMembership.create({
       data: { teamId: ids.hostTeam, userId: ids.hostUser, role: 'owner', status: 'active' },
     });
+    await prisma.v1Team.create({
+      data: {
+        id: ids.awayTeam,
+        ownerUserId: ids.awayOwner,
+        sportId: sport.id,
+        regionId: ids.region,
+        name: 'Task 21 lineup participants away',
+      },
+    });
+    await prisma.v1TeamMembership.create({
+      data: { teamId: ids.awayTeam, userId: ids.awayOwner, role: 'owner', status: 'active' },
+    });
     await prisma.v1TeamMatch.create({
       data: {
         id: ids.teamMatch,
         hostTeamId: ids.hostTeam,
+        approvedApplicantTeamId: ids.awayTeam,
         createdByUserId: ids.hostUser,
         sportId: sport.id,
         regionId: ids.region,
@@ -119,20 +154,20 @@ describe('Task 21 GamesService.listLineups() participants roster', () => {
     gameId = game.id;
 
     const homeSide = await prisma.v1GameSide.create({
-      data: { gameId, sideKey: V1GameSideKey.HOME, displayNameSnapshot: 'Task 21 Home' },
+      data: { gameId, sideKey: V1GameSideKey.HOME, teamId: ids.hostTeam, displayNameSnapshot: 'Task 21 Home' },
     });
     homeSideId = homeSide.id;
     const awaySide = await prisma.v1GameSide.create({
-      data: { gameId, sideKey: V1GameSideKey.AWAY, displayNameSnapshot: 'Task 21 Away' },
+      data: { gameId, sideKey: V1GameSideKey.AWAY, teamId: ids.awayTeam, displayNameSnapshot: 'Task 21 Away' },
     });
     awaySideId = awaySide.id;
 
     const homeLineup = await prisma.v1GameLineup.create({
-      data: { gameId, sideId: homeSideId, revision: 1 },
+      data: { gameId, sideId: homeSideId, revision: 1, state: 'SUBMITTED', submittedAt: new Date() },
     });
     homeLineupId = homeLineup.id;
     const awayLineup = await prisma.v1GameLineup.create({
-      data: { gameId, sideId: awaySideId, revision: 1 },
+      data: { gameId, sideId: awaySideId, revision: 1, state: 'SUBMITTED', submittedAt: new Date() },
     });
     awayLineupId = awayLineup.id;
 
@@ -173,14 +208,20 @@ describe('Task 21 GamesService.listLineups() participants roster', () => {
     await prisma.$disconnect();
   });
 
-  it('attaches each lineup its own participants, correctly grouped by lineupId with no cross-lineup leakage', async () => {
-    const rows = await service.listLineups(authUser(ids.hostUser), gameId);
+  it('limits a team owner to its side and groups both submitted lineups for authorized platform staff', async () => {
+    const memberRows = await service.listLineups(authUser(ids.hostUser), gameId);
+    expect(memberRows.map((row) => row.id)).toEqual([homeLineupId]);
+    expect(memberRows[0]?.participants.map((participant) => participant.displayNameSnapshot)).toEqual([
+      'Alice (home)',
+      'Bob (home)',
+    ]);
 
-    expect(rows).toHaveLength(2);
-    const homeRow = rows.find((row) => row.id === homeLineupId);
-    const awayRow = rows.find((row) => row.id === awayLineupId);
+    const staffRows = await service.listLineups(authUser(ids.staffUser), gameId);
+    expect(staffRows).toHaveLength(2);
+    const homeRow = staffRows.find((row) => row.id === homeLineupId);
+    const awayRow = staffRows.find((row) => row.id === awayLineupId);
     if (homeRow === undefined || awayRow === undefined) {
-      throw new Error('expected both seeded lineup rows to be present in listLineups() output');
+      throw new Error('expected authorized platform staff to read both seeded lineup rows');
     }
 
     // The home lineup's roster: exactly Alice + Bob, ordered by jerseyNumber

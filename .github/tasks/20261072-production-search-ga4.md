@@ -15,6 +15,7 @@ Status: Oct 13 production release complete; Oct 15 keyword/snippet follow-up in 
 - Main implemented and directly verified; no new coding subagent. Independent GitHub review and exact revised-head CI remain pending. The heartbeat's explicit gpt-6-luna store lookup is separate from SEO implementation/review.
 
 Follow-up acceptance:
+- Review correction: Copilot identified duplicate cached/uncached detail reads during sitemap generation. Shared public-detail collection now supplies both fixture and review decisions with one no-store read per eligible entity; the AI fixture consumer retains its existing cache/public-boundary behavior. RED reproduced two reads, then all 13 affected sitemap/AI collection tests passed. Aggregate coverage is 120 unique tests across ten files. Revised type/pattern checks pass. Optional AI scan `38711816129` failed before analysis because `claude-opus-5` is unavailable; this is not a security pass. Google seven-day report was recovered with keyboard input: Oct 6–12, 12 impressions, still pre-release.
 - [x] Existing all/tournament/league pages have truthful distinct metadata/canonical; arbitrary filters remain consolidated.
 - [x] App promotion remains usable but its actual section is excluded from snippets.
 - [x] Actual public reviews render in first HTML; empty reviews use noindex/follow and are absent from sitemap.

@@ -31,6 +31,11 @@ describe('sitemap', () => {
     expect(urls).not.toContain('https://teameet.co.kr/tournaments/empty/reviews');
     expect(urls).not.toContain('https://teameet.co.kr/tournaments/league/reviews');
     expect(urls.filter((url) => url === 'https://teameet.co.kr/tournaments/league')).toHaveLength(1);
+    for (const id of ['cup', 'empty', 'league']) {
+      const reads = vi.mocked(fetchPublicV1).mock.calls.filter(([path]) => path === `/tournaments/${id}`);
+      expect(reads, `${id} 상세를 대진·후기 확인에 중복 조회하면 안 된다`).toHaveLength(1);
+      expect(reads[0]?.[1]).toEqual({ cache: 'no-store' });
+    }
   });
   it('indexes canonical league detail without historical aliases', async () => {
     vi.mocked(fetchPublicV1).mockImplementation(async (path) => path.startsWith('/league-matches?') ? { items: [{ leagueId: 'league-1' }], pageInfo: { hasNext: false, nextCursor: null } } : null);

@@ -2,7 +2,7 @@ import type { MetadataRoute } from 'next';
 import { absoluteSiteUrl, fetchPublicV1 } from '@/lib/seo';
 import { PUBLIC_SITE_ROUTES } from '@/lib/public-site/routes';
 import { fixtureDetailHref } from '@/lib/fixture-detail-route';
-import { collectPublicMatchInventory, collectPublicTournamentFixtures, fetchPublicPages } from '@/lib/public-competition-discovery';
+import { collectPublicMatchInventory, collectPublicTournamentDetails, publicTournamentFixtures, fetchPublicPages } from '@/lib/public-competition-discovery';
 import type {
   V1Match,
   V1Notice,
@@ -10,7 +10,6 @@ import type {
   V1Team,
   V1TeamMatch,
   V1TournamentListItem,
-  V1TournamentDetail,
 } from '@/types/api';
 import type { V1PublicLeagueListItem, V1PublicLeagueListResponse } from '@/types/league-match';
 
@@ -64,8 +63,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const tournaments = settledItems<V1TournamentListItem>(results[3]);
   const notices = settledItems<V1Notice>(results[4]);
   const leagues = settledItems<V1PublicLeagueListItem>(results[5]);
-  const tournamentFixtures = (await collectPublicTournamentFixtures(tournaments)).items ?? [];
-  const reviewedTournamentIds = await collectReviewedTournamentIds(tournaments);
+  const tournamentDetails = (await collectPublicTournamentDetails(tournaments, { cache: 'no-store' })).items ?? [];
+  const tournamentFixtures = publicTournamentFixtures(tournamentDetails);
+  const reviewedTournamentIds = new Set(tournamentDetails
+    .filter(({ detail }) => detail.reviewsTotalCount > 0).map(({ item }) => item.id));
 
   const entries: MetadataRoute.Sitemap = [
     ...staticEntries,
@@ -115,20 +116,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     seen.add(entry.url);
     return true;
   });
-}
-
-async function collectReviewedTournamentIds(tournaments: V1TournamentListItem[]): Promise<Set<string>> {
-  const ids = new Set<string>();
-  for (const item of tournaments) {
-    try {
-      const detail = await fetchPublicV1<V1TournamentDetail>(`/tournaments/${encodeURIComponent(item.id)}`, { cache: 'no-store' });
-      if (detail && detail.reviewsTotalCount > 0) ids.add(item.id);
-    } catch (error) {
-      // 다른 공개 도메인은 계속 발행하되 실패를 빈 후기나 성공으로 기록하지 않는다.
-      console.error(`[seo] 사이트맵 공개 후기 확인 실패: ${item.id}`, error);
-    }
-  }
-  return ids;
 }
 
 function settledItems<T>(result: PromiseSettledResult<T[]>): T[] {

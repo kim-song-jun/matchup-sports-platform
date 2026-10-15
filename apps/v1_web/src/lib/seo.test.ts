@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import sitemap from '@/app/sitemap';
 import { metadata as eventsMetadata } from '@/app/events/layout';
-import { absoluteSiteUrl, buildTournamentDescription, fetchPublicV1, getSiteOrigin, metadataDescription, teamDescriptionFallback } from './seo';
+import { absoluteSiteUrl, buildTournamentDescription, buildTournamentTitle, fetchPublicV1, getSiteOrigin, metadataDescription, teamDescriptionFallback } from './seo';
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -207,5 +207,16 @@ describe('buildTournamentDescription', () => {
   it('검색 설명도 실제 마감·결제 대기 정원을 기준으로 모집 상태를 안내한다', () => {
     expect(buildTournamentDescription({ ...open, registrationDeadlineAt: '2026-10-12T14:59:00.000Z' })).toContain('신청 마감됨');
     expect(buildTournamentDescription({ ...open, pendingPaymentCount: 6 })).toContain('정원 마감');
+  });
+});
+
+describe('buildTournamentTitle', () => {
+  it.each([
+    ['풋살', 'regular_league', '수요일 여성부', '수요일 여성부 · 풋살 리그'],
+    ['풋살', 'regular_tournament', '지역 컵', '지역 컵 · 풋살 대회'],
+    ['수영', 'regular_tournament', '시민 수영대회', '시민 수영대회 · 수영 대회'],
+    ['축구', 'regular_league', '서울 축구 리그', '서울 축구 리그'],
+  ] as const)('실제 %s 종목과 %s 유형을 보존한다', (sport, kind, title, expected) => {
+    expect(buildTournamentTitle({ title, sport: { name: sport } as never, kind })).toBe(expected);
   });
 });

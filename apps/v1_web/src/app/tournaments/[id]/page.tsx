@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { TournamentDetailPageClient } from './tournament-detail-client';
 import { JsonLd } from '@/components/seo/json-ld';
-import { buildNoIndexMetadata, buildPublicMetadata, buildTournamentDescription, fetchPublicV1 } from '@/lib/seo';
+import { buildNoIndexMetadata, buildPublicMetadata, buildTournamentDescription, buildTournamentTitle, fetchPublicV1 } from '@/lib/seo';
 import { buildBreadcrumbLd, buildSportsEventLd } from '@/lib/structured-data';
 import { resolveTournamentImage } from '@/lib/tournament-promo';
 import type { V1TournamentDetail } from '@/types/api';
@@ -13,7 +13,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   if (!tournament) return buildNoIndexMetadata('대회를 찾을 수 없어요');
 
   return buildPublicMetadata({
-    title: tournament.title,
+    title: buildTournamentTitle(tournament),
     description: buildTournamentDescription(tournament),
     path: `/tournaments/${id}`,
     image: resolveTournamentImage(tournament, 'cover'),

@@ -18,6 +18,8 @@ export interface TournamentPeriodSettingsResponse {
   periods: TournamentPeriodSetting[] | null;
   legacyPeriodCount: number | null;
   requiresDurationInput: boolean;
+  /** 저장(PATCH) 응답에만 있다 — 새 피리어드로 옮긴 시작 전 경기 수. */
+  fixturesRepointed?: number;
 }
 
 export interface UpdateTournamentPeriodSettingsPayload {

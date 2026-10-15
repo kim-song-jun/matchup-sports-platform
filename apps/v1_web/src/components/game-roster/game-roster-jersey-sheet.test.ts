@@ -6,6 +6,7 @@ const person = (userId: string, jerseyNumber: number | null, overrides: Partial<
   userId,
   displayName: userId,
   jerseyNumber,
+  goalkeeper: false,
   accountLinked: true,
   participantId: `tp-${userId}`,
   ...overrides,

@@ -23,7 +23,7 @@ import { getPendingSocialSignupRoute, isActivityProfileRequired } from '../auth/
 import { isPhoneVerificationExemptActor } from '../verification/phone-verification-access';
 import { AppendGameEventDto } from '../games/dto/game-event.dto';
 import { GameBroadcastRegistry } from '../games/game-broadcast.registry';
-import { GameTakeoverService } from '../games/game-takeover.service';
+import { GameTakeoverService, type GameTakeoverRequestReservation } from '../games/game-takeover.service';
 import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
 import { GamesService } from '../games/games.service';
 import type { GameEventAppendResult } from '../games/games.types';
@@ -116,6 +116,7 @@ type GameRealtimeOperations = {
     user: V1AuthUser,
     gameId: string,
     input: { clientInstanceId: string; lastSequence: number },
+    reservation?: GameTakeoverRequestReservation,
   ): Promise<GameTakeoverGrantResult>;
   renewTakeover(
     user: V1AuthUser,
@@ -221,10 +222,7 @@ type GameTakeoverResult =
       readonly code:
         | 'STAFF_SCOPE_DENIED'
         | 'TAKEOVER_TOKEN_EXPIRED'
-        // Backlog fix (realtime-takeover-and-eviction-protocol): renew-only.
-        // See `renewGameTakeover` for when this is returned instead of
-        // `TAKEOVER_TOKEN_EXPIRED`, and `GameTakeoverService.isSuperseded`
-        // for why the two must not be conflated.
+        // A late request or superseded renewal must not auto-reacquire.
         | 'TAKEOVER_SUPERSEDED'
         | 'ACTIVITY_PROFILE_REQUIRED'
         | 'VALIDATION_ERROR';
@@ -837,6 +835,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     if (client.data.authorizationSubjectVersion !== input.authorizationSubjectVersion) {
       return { status: 'denied', code: 'STAFF_SCOPE_DENIED', reason: 'AUTHORIZATION_SUBJECT_STALE' };
     }
+    const reservation = this.gameTakeover.reserveRequest(input.gameId);
     try {
       if (await this.isActivityProfileBlocked(authUser.id)) {
         return { status: 'denied', code: 'ACTIVITY_PROFILE_REQUIRED' };
@@ -844,14 +843,20 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       const grant = await this.gamesService.requestTakeover(authUser, input.gameId, {
         clientInstanceId: input.clientInstanceId,
         lastSequence: input.lastSequence,
-      });
+      }, reservation);
       client.emit('game.takeover.granted', grant);
       return { status: 'granted', ...grant };
     } catch (error) {
       if (error instanceof ForbiddenException) {
+        const response = error.getResponse();
+        if (isRecord(response) && response.code === 'TAKEOVER_SUPERSEDED') {
+          return { status: 'denied', code: 'TAKEOVER_SUPERSEDED' };
+        }
         return { status: 'denied', code: 'STAFF_SCOPE_DENIED', reason: staffDenialReasonOf(error) };
       }
       throw error;
+    } finally {
+      this.gameTakeover.finishRequest(reservation);
     }
   }
 

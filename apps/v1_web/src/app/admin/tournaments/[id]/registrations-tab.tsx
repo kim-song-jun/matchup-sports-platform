@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { ClipboardList, Download, Lock, Unlock, Check, X, Users, User, Clock, AlertCircle, Undo2, Timer, TimerOff, ListChecks } from 'lucide-react';
 import { useV1AdminTournamentRegistrations, useV1ConfirmPayment, useV1ConfirmRegistration, useV1CancelRegistrationAdmin, useV1RejectCancelRequest, useV1RosterLock, useV1RosterUnlock, useV1RosterDeadlineOverrideGrant, useV1RosterDeadlineOverrideRevoke, useV1ExportRosterCsv, useV1ExportTournamentRosterCsv, useV1AdminTournamentPlayers, useV1UpdatePlayerEligibility, useV1AdminAddPlayer, useV1AdminRemovePlayer, useV1AdminRosterEligibleMembers } from '@/hooks/use-v1-api';
 import type { V1AdminTournamentRegistration } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { registrationCancelOutcomeLabel } from '@/lib/v1-status-labels';
 import { V1ApiError } from '@/lib/api-client';
+import { v1Keys } from '@/lib/query-keys';
 import { AdminCardList, AdminEmpty } from '@/components/admin';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useUnsavedChangesGuard } from '@/components/v1-ui/use-unsaved-changes-guard';
@@ -43,9 +45,25 @@ export function RosterModal({
   showToast: (msg: string, v?: 'success' | 'error') => void;
   canWrite: boolean;
 }) {
+  const queryClient = useQueryClient();
+  const visibleRegistrationId = open ? registration?.id ?? '' : '';
+  const previousVisibleRegistrationId = useRef('');
   const { data, isPending, isError, error, refetch } = useV1AdminTournamentPlayers(
-    registration?.id ?? '',
+    visibleRegistrationId,
   );
+  // 모달은 닫혀도 마운트되어 있어 같은 신청을 재열면 캐시만 남는다.
+  // 보이는 신청만 관찰하고, 열릴 때마다 현재 프로필이 반영된 명단을 다시 받는다.
+  useEffect(() => {
+    const previousRegistrationId = previousVisibleRegistrationId.current;
+    previousVisibleRegistrationId.current = visibleRegistrationId;
+    if (previousRegistrationId && previousRegistrationId !== visibleRegistrationId) {
+      void queryClient.cancelQueries({
+        queryKey: v1Keys.adminTournamentRoster(previousRegistrationId),
+        exact: true,
+      });
+    }
+    if (visibleRegistrationId) void refetch({ cancelRefetch: false });
+  }, [visibleRegistrationId, refetch, queryClient]);
   const updateEligibility = useV1UpdatePlayerEligibility(registration?.id ?? '');
   const addPlayer = useV1AdminAddPlayer(registration?.id ?? '');
   const removePlayer = useV1AdminRemovePlayer(registration?.id ?? '');
@@ -184,7 +202,12 @@ export function RosterModal({
                   >
                     {p.jerseyNumber === null ? '—' : p.jerseyNumber}
                   </span>
-                  <p className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--text-strong)]">{p.realName}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="break-words text-[length:var(--font-size-body-sm)] font-medium text-[var(--text-strong)]">{p.realName}</p>
+                    <p className="mt-0.5 break-words text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
+                      닉네임 {p.nickname?.trim() || '미등록'}
+                    </p>
+                  </div>
                   {p.isTeamCaptain ? (
                     <span className="shrink-0 rounded-md bg-[var(--blue50)] px-2 py-0.5 text-[length:var(--font-size-caption)] font-semibold text-[var(--blue700)]">팀장</span>
                   ) : null}
@@ -401,6 +424,7 @@ export function RegistrationsTab({
   tournamentTeamCount,
   canWrite,
   requireCancelReason = false,
+  isFreeEntry = false,
 }: {
   tournamentId: string;
   showToast: (msg: string, v?: 'success' | 'error') => void;
@@ -415,6 +439,7 @@ export function RegistrationsTab({
    * 리그 화면이 이 탭을 리그 id 로 렌더하고, 대회 화면이 대회 id 로 렌더한다.
    */
   requireCancelReason?: boolean;
+  isFreeEntry?: boolean;
 }) {
   const { data, isPending, isError, error, refetch } = useV1AdminTournamentRegistrations(tournamentId);
   const confirmPayment = useV1ConfirmPayment();
@@ -451,6 +476,11 @@ export function RegistrationsTab({
   for (const r of registrations) {
     statusCounts[r.status] = (statusCounts[r.status] ?? 0) + 1;
   }
+  const registrationStatusFilters = REGISTRATION_STATUS_FILTERS.map((filter) =>
+    isFreeEntry && ['awaiting_payment', 'payment_checking', 'paid'].includes(filter.value)
+      ? { ...filter, label: filter.value === 'awaiting_payment' ? '신청 작성 중' : filter.value === 'payment_checking' ? '신청 확인 중' : '신청 완료' }
+      : filter,
+  );
   // 처리 대기 = 입금 확인 중(payment_checking) + 취소 요청(cancel_requested)
   const pendingReviewCount = (statusCounts.payment_checking ?? 0) + (statusCounts.cancel_requested ?? 0);
 
@@ -703,7 +733,7 @@ export function RegistrationsTab({
       {/* P1-2: 상태 필터 칩 + 전체 명단 CSV(필터와 무관한 탭 단위 액션이라 필터 그룹 밖에 둔다) */}
       <div className="tm-content-enter flex items-start justify-between gap-2 flex-wrap mb-3">
         <div className="flex items-center gap-2 flex-wrap" role="group" aria-label="신청 상태 필터">
-          {REGISTRATION_STATUS_FILTERS.map((opt) => {
+          {registrationStatusFilters.map((opt) => {
             const active = statusFilter === opt.value;
             const count = statusCounts[opt.value] ?? 0;
             return (
@@ -835,7 +865,7 @@ export function RegistrationsTab({
                 }]
               : []),
           ],
-          statusLabel: r.status === 'cancelled' && r.cancelOutcome ? registrationCancelOutcomeLabel(r.cancelOutcome) : undefined,
+          statusLabel: r.status === 'cancelled' && r.cancelOutcome ? registrationCancelOutcomeLabel(r.cancelOutcome) : isFreeEntry ? registrationStatusFilters.find((filter) => filter.value === r.status)?.label : undefined,
           description: r.cancelReason || r.adminCancelReason ? (
             <>
               {r.cancelReason ? <span className="block">{`팀 취소 사유: ${r.cancelReason}`}</span> : null}

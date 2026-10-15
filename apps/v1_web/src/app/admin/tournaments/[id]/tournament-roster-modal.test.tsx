@@ -1,9 +1,28 @@
-import { render, screen, within } from '@testing-library/react';
+import { QueryClientProvider, type QueryClient } from '@tanstack/react-query';
+import { cleanup, render as renderWithProviders, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useState } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { useState, type ReactElement, type PropsWithChildren } from 'react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createV1QueryClient } from '@/lib/query-client';
 import type { V1AdminTournamentRegistration } from '@/types/api';
 import { RosterModal } from './registrations-tab';
+
+const clients: QueryClient[] = [];
+
+function render(ui: ReactElement) {
+  const client = createV1QueryClient();
+  clients.push(client);
+  return renderWithProviders(ui, {
+    wrapper: ({ children }: PropsWithChildren) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    ),
+  });
+}
+
+afterEach(() => {
+  cleanup();
+  clients.splice(0).forEach((client) => client.clear());
+});
 
 const refetch = vi.fn();
 const updateEligibility = vi.fn();
@@ -89,6 +108,7 @@ describe('admin tournament roster modal', () => {
             id: 'player-1',
             userId: 'user-1',
             realName: '홍길동',
+            nickname: '길동이',
             birthDateSnapshot: '1995-03-15',
             genderSnapshot: 'male',
             phone: '01012345678',
@@ -232,8 +252,9 @@ describe('admin tournament roster modal', () => {
 
     expect(screen.getByRole('alert')).toHaveTextContent('관리자 명단 조회 실패');
     expect(screen.queryByText('등록된 선수가 없어요.')).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: '다시 시도' }));
     expect(refetch).toHaveBeenCalledTimes(1);
+    await userEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+    expect(refetch).toHaveBeenCalledTimes(2);
   });
 
   // 2026-08-03 사고: 어드민 콘솔에 명단 추가·제거가 아예 없어서, 운영자가 무엇을 눌러도

@@ -19,13 +19,10 @@ import {
   useV1Teams,
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
-import { DATE_INPUT_MAX } from '@/lib/kst-calendar';
+import { LeagueBasicFields, leagueInputClass as inputClass } from '../league-basic-fields';
 import { LEAGUE_TIE_BREAK_ORDER, formatTieBreakRule } from '@/lib/league-tie-break-labels';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
 import { LeaguePlannedFixtureField, LeagueRosterLimitField, rosterLimitError, type RosterLimitValue } from '../league-settings-fields';
-
-const inputClass =
-  'h-[44px] w-full rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-strong)] placeholder:text-[var(--text-muted)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50';
 
 /** 페이지 로컬 팀 선택 상태 — EntityPickerItem에 종목 판정에 필요한 필드만 얹는다. */
 type LeagueTeamPick = EntityPickerItem & { sportId: string };
@@ -183,7 +180,7 @@ export default function AdminLeagueMatchNewPage() {
         } catch (periodError) {
           setPeriodSaveFailure({
             leagueId: result.leagueId,
-            message: extractErrorMessage(periodError, '리그는 만들었지만 경기 시간을 저장하지 못했어요. 리그 상세에서 피리어드 설정을 다시 저장해 주세요.'),
+            message: extractErrorMessage(periodError, '리그는 만들었지만 경기 시간을 저장하지 못했어요. 리그 경기 규칙에서 피리어드 설정을 다시 저장해 주세요.'),
           });
           return;
         }
@@ -214,67 +211,21 @@ export default function AdminLeagueMatchNewPage() {
       </div>
 
       <div className="space-y-5">
-        <div>
-          <label htmlFor="series-title" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">리그 이름</label>
-          <input id="series-title" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={100} className={inputClass} />
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label htmlFor="series-sport" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">종목</label>
-            <select
-              id="series-sport"
-              value={sportId}
-              onChange={(e) => { setSportId(e.target.value); setPeriodsDirty(false); }}
-              disabled={isSportLocked}
-              className={inputClass}
-            >
-              <option value="">종목 선택</option>
-              {(sports ?? []).map((sport) => (
-                <option key={sport.id} value={sport.id}>{sport.name}</option>
-              ))}
-            </select>
-            {isSportLocked && (
-              <p className="mt-1 text-xs text-[var(--text-muted)]">자동 설정됨 · 변경하려면 선택한 팀을 모두 지우세요</p>
-            )}
-          </div>
-          <div>
-            <label htmlFor="series-region" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">지역</label>
-            <select id="series-region" value={regionId} onChange={(e) => setRegionId(e.target.value)} className={inputClass}>
-              <option value="">지역 선택</option>
-              {regionOptions.map((region) => (
-                <option key={region.id} value={region.id}>{region.name}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label htmlFor="series-starts-on" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">시작일</label>
-            <input id="series-starts-on" type="date" max={DATE_INPUT_MAX} value={startsOn} onChange={(e) => setStartsOn(e.target.value)} className={inputClass} />
-          </div>
-          <div>
-            <label htmlFor="series-ends-on" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">종료일</label>
-            <input
-              id="series-ends-on"
-              type="date"
-              min={startsOn || undefined}
-              max={DATE_INPUT_MAX}
-              value={endsOn}
-              onChange={(e) => setEndsOn(e.target.value)}
-              aria-invalid={periodRangeError ? true : undefined}
-              aria-describedby={periodRangeError ? 'series-ends-on-error' : undefined}
-              className={inputClass}
-            />
-          </div>
-        </div>
-
-        {periodRangeError && (
-          <p id="series-ends-on-error" role="alert" className="-mt-3 tm-text-caption font-medium text-[var(--red700)]">
-            {periodRangeError}
-          </p>
-        )}
+        <LeagueBasicFields
+          value={{ title, sportId, regionId, startsOn, endsOn }}
+          onChange={(field, value) => {
+            if (field === 'title') setTitle(value);
+            if (field === 'sportId') { setSportId(value); setPeriodsDirty(false); }
+            if (field === 'regionId') setRegionId(value);
+            if (field === 'startsOn') setStartsOn(value);
+            if (field === 'endsOn') setEndsOn(value);
+          }}
+          sports={sports ?? []}
+          regions={regionOptions}
+          sportLocked={isSportLocked}
+          sportHint={isSportLocked ? '자동 설정됨 · 변경하려면 선택한 팀을 모두 지우세요' : undefined}
+          disabled={submitting || !!periodSaveFailure}
+        />
 
         <div>
           <label htmlFor="series-team-picker" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">참가 팀 추가 (최소 2팀)</label>
@@ -371,10 +322,10 @@ export default function AdminLeagueMatchNewPage() {
           <div role="alert" className="rounded-xl bg-[var(--red50)] px-3 py-2 text-[length:var(--font-size-caption)] text-[var(--red700)]">
             {periodSaveFailure.message}
             <Link
-              href={`/admin/league-matches/${periodSaveFailure.leagueId}`}
+              href={`/admin/league-matches/${periodSaveFailure.leagueId}/rules`}
               className="ml-2 inline-flex min-h-[44px] items-center font-semibold underline focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
             >
-              리그 상세로 이동
+              경기 규칙으로 이동
             </Link>
           </div>
         )}

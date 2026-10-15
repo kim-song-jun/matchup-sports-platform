@@ -681,6 +681,10 @@ describe('POST /admin/league-matches + fixtures', () => {
 
       const detail = await request(app.getHttpServer()).get(`/api/v1/admin/league-matches/${leagueId}`).set('x-v1-user-id', ownerUserId);
       expect(detail.body.data.fixtures.map((fixture: { teamMatchId: string }) => fixture.teamMatchId)).toEqual([teamMatchIds[1]]);
+      // 지운 경기는 공개 순위표의 "취소된 N경기" 안내에도 세지 않는다(2026-10-13 alpha — 삭제 1건이 취소로 세였다).
+      const standings = await request(app.getHttpServer()).get(`/api/v1/league-matches/${leagueId}/standings`);
+      expect(standings.status).toBe(200);
+      expect(standings.body.data.cancelledFixtureCount).toBe(0);
       expect((await del()).status).toBe(404);
     });
 
@@ -1047,6 +1051,9 @@ describe('POST /admin/league-matches + fixtures', () => {
 
       const original = await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: originalFixtureId } });
       expect(original.status).toBe('cancelled');
+      expect(original.deletedAt).not.toBeNull();
+      const currentFixtures = await prisma.v1TeamMatch.findMany({ where: { leagueId, deletedAt: null }, select: { id: true } });
+      expect(currentFixtures.map((fixture) => fixture.id)).toEqual([newFixtureId]);
       const created = await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: newFixtureId } });
       expect(created.status).toBe('matched');
       expect(created.leagueId).toBe(leagueId);

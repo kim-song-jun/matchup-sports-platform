@@ -272,8 +272,15 @@ for a `scheduled` game from 15 minutes before `scheduledAt` until 3 hours after 
 (`publicLivePollDelay` in `apps/v1_web/src/lib/public-live-polling.ts`); before that
 window it re-checks at most every 15 minutes, so a page opened before kickoff picks
 up the start without a reload. All positive polling delays keep the 10-second
-floor, including the countdown immediately before the window opens. Ended,
-cancelled and time-unset detail pages do not poll. The bracket hub loads cursor pages
+floor, including the countdown immediately before the window opens. An `ended`
+match or league fixture record whose `resultState` is still `pending` keeps polling
+until the official result (or void) arrives; otherwise ended, cancelled and
+time-unset detail pages do not poll. The public league detail
+(`GET /league-matches/:leagueId`, `useV1LeagueMatch`) polls with the same rule over
+its fixtures (`leagueFixturesPollDelay`: live, paused, or ended-but-unconfirmed ->
+10 seconds; scheduled -> the kickoff window), and whenever its response changes it
+refetches the league standings and player records, which carry no fixture state of
+their own. The bracket hub loads cursor pages
 sequentially and displays all live entries first, then groups A/B/C and knockout
 rounds in competition order; live entries do not also appear in the regular list. A public,
 potentially-hundreds-of-viewers surface deliberately does not reuse the
@@ -557,3 +564,7 @@ Self-view returns linked tournament awards regardless of public-record consent,
 matching the existing self-view game-record bypass. Other viewers receive the
 linked award list only while the target user's record consent is `GRANTED`;
 the response still omits `consentGranted` for non-owners.
+
+## 2026-10-13 정규 리그 자동 명단 공개
+
+리그 경기 공개 기록은 사이드별 최신 제출·잠금 명단을 우선 사용한다. 제출본이 없는 사이드는 유효한 최신 자동 초안을 표시하므로 홈만 출전을 조정해도 원정 명단이 사라지지 않는다. 무효화된 명단은 제외하며 제출본 위의 미제출 초안은 기존 제출본을 덮어쓰지 않는다. 이름 동의·명단 공개 시각·가시성 정책과 대회 명단 규칙은 유지한다.

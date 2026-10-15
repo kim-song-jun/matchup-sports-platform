@@ -2,6 +2,7 @@
 // 생기고 서버 계약이 바뀔 때 조용히 갈린다. (league-match.ts 는 이 파일을 import 하지
 // 않으므로 순환이 없다.)
 import type { V1LeagueFixture } from './league-match';
+import type { GamePeriodDuration } from './game-operations';
 
 export type ApiEnvelope<T> = {
   status: 'success';
@@ -85,14 +86,6 @@ export type V1FoundAccount = {
   maskedEmail: string | null;
   providers: string[];
   hasPassword: boolean;
-};
-
-/** 소셜 가입 대기 계정이 번호 주인의 기존 계정에 연결되기 전 확인용 요약. */
-export type V1SocialLinkPreview = {
-  maskedEmail: string | null;
-  providers: ('kakao' | 'apple' | 'email' | 'naver')[];
-  hasPassword: boolean;
-  linkingProvider: 'kakao' | 'apple';
 };
 
 export type V1AuthMe = {
@@ -1317,6 +1310,8 @@ export type V1TeamMatch = Omit<V1Match, 'status' | 'displayState'> & {
   // Task 17: the Game backing this team match (see docs/api/domains/team-matches.md) —
   // the only client-facing way to reach `/api/v1/games/:gameId/result-revisions*`.
   gameId?: string | null;
+  /** 상세 응답의 실제 pinned 설정. 목록에는 없고 과거 pin 없는 경기는 null이다. */
+  periods?: readonly V1TeamMatchPeriod[] | null;
   sport?: { sportId: string; name: string };
   region?: { regionId: string; name: string; parentName?: string | null } | null;
   place?: V1PlaceView | null;
@@ -1426,6 +1421,28 @@ export type V1MyTeamMatch = {
 };
 
 
+export type V1TeamMatchPeriodInput = { readonly durationMinutes: number };
+
+export type V1TeamMatchPeriod = V1TeamMatchPeriodInput & {
+  readonly code: string;
+  readonly label: string;
+  readonly extraTime: boolean;
+};
+
+export type V1TeamMatchRuleOptions = {
+  readonly hostTeamId: string;
+  readonly sportId: string;
+  readonly competitionConfigVersionId: string;
+  readonly periods: readonly V1TeamMatchPeriod[];
+  /** 같은 종목의 ACTIVE 기본 설정 이력에서 확인한 전후반. 이력이 없으면 null이다. */
+  readonly twoPeriodDefaults: readonly V1TeamMatchPeriod[] | null;
+};
+
+export type V1TeamMatchRulesLockedReason =
+  | 'TEAM_MATCH_RULES_LOCKED'
+  | 'COMPETITION_CONFIG_REQUIRED'
+  | 'COMPETITION_PERIODS_UNAVAILABLE';
+
 export type V1TeamMatchMutationPayload = {
   hostTeamId: string;
   sportId: string;
@@ -1445,6 +1462,8 @@ export type V1TeamMatchMutationPayload = {
   placeProviderId?: string | null;
   costNote?: string | null;
   rulesText?: string | null;
+  /** 1/2개의 기간만 저장한다. 생략하면 생성 기본값 또는 기존 pin을 유지한다. */
+  periods?: readonly V1TeamMatchPeriodInput[];
   minLevelCode?: string | null;
   maxLevelCode?: string | null;
   genderRule?: string | null;
@@ -1459,6 +1478,7 @@ export type V1TeamMatchUpdatePayload = V1TeamMatchMutationPayload & {
 
 export type V1TeamMatchMutationResult = {
   teamMatchId: string;
+  gameId?: string | null;
   status: V1TeamMatchApiStatus;
   hostTeamId?: string;
   detailRoute: string;
@@ -1471,6 +1491,9 @@ export type V1TeamMatchEdit = {
   teamMatchId: string;
   editable: boolean;
   lockedReason: string | null;
+  rulesEditable: boolean;
+  rulesLockedReason: V1TeamMatchRulesLockedReason | null;
+  competitionConfigVersionId: string | null;
   form: {
     hostTeamId: string;
     sportId: string;
@@ -1490,6 +1513,7 @@ export type V1TeamMatchEdit = {
     placeProviderId?: string | null;
     costNote?: string | null;
     rulesText?: string | null;
+    periods: readonly V1TeamMatchPeriodInput[] | null;
     minLevelCode?: string | null;
     maxLevelCode?: string | null;
     genderRule?: string | null;
@@ -1608,6 +1632,7 @@ export type V1Game = {
   currentOfficialRevisionId: string | null;
   sides: V1GameSide[];
   periods: unknown[];
+  periodDurations?: readonly GamePeriodDuration[] | null;
   lineups: V1GameLineupSummary[];
   actorRole: string;
   lineupConfig?: V1LineupConfig;
@@ -4210,7 +4235,10 @@ export type V1TournamentPlayer = {
  * `eligibilityNote`(어드민 심사 메모)는 팀장·매니저 응답에만 값이 있다.
  */
 export type V1TournamentRosterPlayer = Omit<V1TournamentPlayer, 'realName'> & {
+  goalkeeper?: boolean;
   realName: string | null;
+  /** 경기 명단과 같은 공개 표시 이름. 구버전 서버 응답에는 없을 수 있다. */
+  displayName?: string;
   /** 프로필이 없으면 null — 실명으로 대체하지 않는다. */
   nickname: string | null;
   /** false 면 이 행의 개인정보 세 필드는 "미입력"이 아니라 가려진 것이다. */
@@ -4223,6 +4251,8 @@ export type V1TournamentRosterResponse = {
 };
 
 export type V1AdminTournamentPlayer = V1TournamentPlayer & {
+  /** 현재 프로필 닉네임. 프로필이 없으면 null이며 등록 당시 실명과 별도 필드다. */
+  nickname: string | null;
   phone: string | null;
   isTeamCaptain: boolean;
 };
@@ -4276,6 +4306,7 @@ export type V1AdminBracketGroupTeam = {
 };
 
 export type V1AdminBracketFixture = {
+  fieldId?: string | null;
   bracketSources?: V1BracketSource[];
   id: string;
   tournamentId: string;
@@ -4432,6 +4463,8 @@ export interface V1GenerateLeagueFixturesResponse {
  */
 interface V1LeagueOverallStandingRowBase {
   teamName: string;
+  /** 팀의 현재 로고. 기존 응답/fixture 호환을 위해 optional이며 미등록은 null. */
+  teamLogoUrl?: string | null;
   position: number | null;
   points: number;
   wins: number;
@@ -4759,6 +4792,7 @@ export type V1CreateGroupTeamPayload = {
 };
 
 export type V1UpdateFixturePayload = {
+  fieldId?: string | null;
   fixtureNumber?: number;
   scheduledAt?: string;
   venue?: string;
@@ -5080,6 +5114,8 @@ export const V1_STABLE_WARNING_CODES: readonly V1TournamentStableWarningCode[] =
 /** GET /tournament-ops/tournaments/:tournamentId/operations 응답의 items[] 항목. */
 export type V1TournamentOperationsBoardItem = {
   fixtureId: string;
+  homeTeamName?: string | null;
+  awayTeamName?: string | null;
   tournamentId: string;
   /**
    * **리그 행에서는 `null` 이다.** 주차·번호는 대회 축(`V1TournamentFixture`)의 컬럼이고
@@ -5185,9 +5221,9 @@ export type V1MyTournamentStaffFixture = {
   scheduledAt: string | null;
   status: string;
   gameState: V1GameState | null;
-  round: string;
-  fixtureNumber: number;
-  legNumber: number;
+  round: string | null;
+  fixtureNumber: number | null;
+  legNumber: number | null;
   /** 조에 속하지 않은 경기(결선)는 `null`. */
   groupName: string | null;
   fieldId: string | null;
@@ -5247,6 +5283,7 @@ export type V1TournamentField = {
   sortOrder: number;
   active: boolean;
   version: number;
+  place?: V1PlaceView | null;
 };
 
 export type V1TournamentFieldListResponse = {

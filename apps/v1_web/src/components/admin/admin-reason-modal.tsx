@@ -15,6 +15,8 @@ interface AdminReasonModalProps {
   title: string;
   currentStatus?: string;
   statusOptions: ReasonStatusOption[];
+  /** 선택 칸 이름. 상태가 아닌 것을 고를 때(예: 몰수패의 불참 팀) 바꾼다. */
+  statusLabel?: string;
   onSubmit: (status: string, reason: string) => void;
   onClose: () => void;
   /** True while the parent mutation is in flight */
@@ -31,6 +33,7 @@ export function AdminReasonModal({
   title,
   currentStatus,
   statusOptions,
+  statusLabel = '변경할 상태',
   onSubmit,
   onClose,
   pending = false,
@@ -110,7 +113,7 @@ export function AdminReasonModal({
                 htmlFor="admin-reason-status"
                 className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]"
               >
-                변경할 상태
+                {statusLabel}
               </label>
               <select
                 id="admin-reason-status"

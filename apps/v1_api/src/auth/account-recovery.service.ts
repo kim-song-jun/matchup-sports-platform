@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { V1AuthProvider } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailVerificationService } from '../verification/email-verification.service';
@@ -51,8 +51,12 @@ export class AccountRecoveryService {
   }
 
   async resetPasswordByPhone(dto: ResetPasswordDto): Promise<{ ok: true }> {
-    const user = await this.assertPhoneOwner(dto.phone, dto.proofToken);
-    return this.applyNewPassword(user, dto.newPassword);
+    await this.assertPhoneOwner(dto.phone, dto.proofToken);
+    // Current SMS possession does not prove ownership of the existing account.
+    throw new ConflictException({
+      code: 'ACCOUNT_RECOVERY_REQUIRES_EMAIL',
+      message: '휴대폰 번호 인증만으로 기존 계정의 비밀번호를 바꿀 수 없어요. 이메일 본인 확인으로 재설정하거나 처음 가입한 방법으로 로그인해 주세요.',
+    });
   }
 
   /**
@@ -110,9 +114,8 @@ export class AccountRecoveryService {
   }
 
   /**
-   * 본인 확인을 마친 계정의 비밀번호를 바꾼다. 휴대폰·이메일 두 경로가 같은 판정을 쓴다 —
-   * 한쪽에만 카카오 전용 계정 처리가 있으면 그쪽이 소셜 전용 계정에 이메일 로그인 경로를
-   * 몰래 열어 주는 구멍이 된다.
+   * 이메일 본인 확인을 마친 계정의 비밀번호를 바꾼다. 기존 이메일 로그인 신원만 허용해
+   * 소셜 전용 계정에 새 이메일 로그인 경로가 열리지 않도록 한다.
    */
   private async applyNewPassword(
     user: { authIdentities: { id: string; provider: string }[] },
@@ -159,9 +162,9 @@ export class AccountRecoveryService {
   }
 
   /**
-   * 이 번호의 주인임을 증명한 요청만 통과시킨다. 증명 토큰은 'password_reset' 용도로 발급된
-   * 것이어야 한다 — 가입용 토큰이 그대로 통하면 가입 흐름의 증명으로 남의 비밀번호를
-   * 바꿀 수 있게 된다.
+   * 현재 휴대폰 번호를 인증한 요청에만 계정 찾기를 허용한다. 호환된 복구 증명은
+   * 'password_reset' 용도여야 하며 가입·소셜 연결 증명과 구분한다. 이 증명만으로
+   * 기존 계정의 비밀번호를 변경할 수는 없다.
    */
   private async assertPhoneOwner(phone: string, proofToken: string) {
     if (!verifyPhoneProofToken(proofToken, phone, 'password_reset')) {

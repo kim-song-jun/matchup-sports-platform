@@ -3,7 +3,7 @@ import type { V1AdminLeagueTeam, V1LeagueFixture } from '@/types/league-match';
 import { fixtureNodeState } from './bracket-canvas-layout';
 import { toKstDateString } from './kst-calendar';
 
-export type LeagueBoardNodeState = ReturnType<typeof fixtureNodeState>;
+export type LeagueBoardNodeState = ReturnType<typeof fixtureNodeState> | 'voided';
 
 export interface LeagueBoardSide {
   slotId: string | null;
@@ -13,6 +13,7 @@ export interface LeagueBoardSide {
 }
 
 export interface LeagueBoardNode {
+  fieldId?: string | null;
   fixtureId: string;
   title: string;
   startAt: string;
@@ -86,7 +87,8 @@ export function buildLeagueBoard({ fixtures, slots, teamNameById }: BuildInput):
       title: fixture.title,
       startAt: fixture.startAt,
       placeName: fixture.placeName,
-      state: cancelled ? 'cancelled' : fixtureNodeState(game),
+      ...(fixture.fieldId === undefined ? {} : { fieldId: fixture.fieldId }),
+      state: cancelled ? 'cancelled' : fixture.resultStage === 'voided' || game?.latestRevision?.state === 'VOID' ? 'voided' : fixtureNodeState(game),
       hiddenFromPublic:
         !cancelled &&
         ((fixture.homeSlotId != null && fixture.homeTeamId === null) ||

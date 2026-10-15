@@ -53,6 +53,7 @@ export function AdminRegistrationGameRosters({
   const data = matrix.data;
   const batch = useV1ApplyGameRosterBatch(data?.teamId ?? '');
   const [draft, setDraft] = useState<TeamRosterDraft>({});
+  const [goalkeepers, setGoalkeepers] = useState<Record<string, boolean>>({});
   const [notice, setNotice] = useState<Notice | null>(null);
   const [sheetUserId, setSheetUserId] = useState('');
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -60,7 +61,14 @@ export function AdminRegistrationGameRosters({
 
   const changes = useMemo(() => (data === undefined ? [] : draftToBatchChanges(draft, data)), [draft, data]);
   const shownDraft = useMemo(() => (data === undefined ? {} : liveDraft(draft, data)), [draft, data]);
-  const dirty = changes.length > 0;
+  const roleChanges = useMemo(() => data === undefined ? [] : data.players.flatMap((player) => {
+    const value = goalkeepers[player.userId];
+    const index = data.games.findIndex((game, i) => (game.goalkeeperEditable ?? game.editable) && player.cells[i] !== undefined && player.cells[i].status !== 'NOT_IN_ROSTER');
+    if (value === undefined || index < 0 || value === (player.cells[index]?.goalkeeper ?? false)) return [];
+    return [{ gameId: data.games[index].gameId, userId: player.userId, op: 'SET_GOALKEEPER' as const, goalkeeper: value }];
+  }), [data, goalkeepers]);
+  const pendingCount = changes.length + roleChanges.length;
+  const dirty = pendingCount > 0;
   useEffect(() => {
     onDirtyChange?.(dirty);
   }, [dirty, onDirtyChange]);
@@ -103,12 +111,14 @@ export function AdminRegistrationGameRosters({
   async function save() {
     setNotice(null);
     try {
-      await batch.mutateAsync(changes);
+      await batch.mutateAsync([...changes, ...roleChanges]);
       setDraft({});
-      setNotice({ tone: 'info', message: `변경 ${changes.length}건을 저장했어요.` });
+      setGoalkeepers({});
+      setNotice({ tone: 'info', message: `변경 ${pendingCount}건을 저장했어요.` });
     } catch (caught) {
       const recovery = batchFailureRecovery(caught);
       setDraft(recovery.nextDraft);
+      if (recovery.refetch) setGoalkeepers({});
       if (recovery.refetch) void matrix.refetch();
       setNotice({ tone: 'error', message: recovery.message });
     }
@@ -120,6 +130,7 @@ export function AdminRegistrationGameRosters({
         <span className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-strong)]">경기별 명단</span>
         <span className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
           다가오는 경기 {data.games.length}개 · 선수 {data.players.length}명
+          <span className="block">GK는 이 대회의 시작 전 경기와 이후 경기에 유지돼요. 여러 명을 지정할 수 있어요.</span>
         </span>
         {adjustedCount > 0 ? <span className="tm-badge tm-badge-sm tm-badge-orange">조정 {adjustedCount}</span> : null}
       </div>
@@ -137,6 +148,7 @@ export function AdminRegistrationGameRosters({
                 <th scope="col" className="px-3 py-2 text-left text-[length:var(--font-size-caption)] font-semibold text-[var(--text-muted)]">
                   선수
                 </th>
+                <th scope="col" className="px-3 py-2 text-left text-[length:var(--font-size-caption)] font-semibold text-[var(--text-muted)]">GK</th>
                 {data.games.map((game) => (
                   <th key={game.gameId} scope="col" className="px-3 py-2 text-left text-[length:var(--font-size-caption)] font-semibold text-[var(--text-muted)]">
                     {gameColumnLabel(game)}
@@ -153,6 +165,19 @@ export function AdminRegistrationGameRosters({
                   <th scope="row" className="px-3 py-2 text-left font-semibold text-[var(--text-strong)]">
                     {player.displayName}
                   </th>
+                  <td className="px-3 py-1 align-middle">
+                    {(() => {
+                      const index = data.games.findIndex((game, i) => (game.goalkeeperEditable ?? game.editable) && player.cells[i] !== undefined && player.cells[i].status !== 'NOT_IN_ROSTER');
+                      const firstCell = player.cells.find((cell) => cell.status !== 'NOT_IN_ROSTER');
+                      const selected = goalkeepers[player.userId] ?? (index >= 0 ? player.cells[index]?.goalkeeper : firstCell?.goalkeeper) ?? false;
+                      return index < 0 ? <span aria-label={selected ? '골키퍼' : '필드 선수'}>{selected ? 'GK' : '—'}</span> : (
+                        <Button size="sm" variant={selected ? 'primary' : 'outline'} disabled={batch.isPending}
+                          aria-pressed={selected} aria-label={player.displayName + (selected ? ', 골키퍼 지정 해제' : ' 골키퍼로 지정')}
+                          onClick={() => { setNotice(null); setGoalkeepers((current) => ({ ...current, [player.userId]: !selected })); }}
+                          className="min-w-[44px]">GK</Button>
+                      );
+                    })()}
+                  </td>
                   {data.games.map((game, index) => {
                     const cell = player.cells[index];
                     return (
@@ -216,8 +241,8 @@ export function AdminRegistrationGameRosters({
             </>
           ) : null}
           {anyEditable ? (
-            <Button variant="primary" size="sm" loading={batch.isPending} disabled={changes.length === 0} onClick={() => void save()}>
-              {changes.length > 0 ? `변경 ${changes.length}건 저장` : '저장'}
+            <Button variant="primary" size="sm" loading={batch.isPending} disabled={pendingCount === 0} onClick={() => void save()}>
+              {pendingCount > 0 ? `변경 ${pendingCount}건 저장` : '저장'}
             </Button>
           ) : null}
         </div>

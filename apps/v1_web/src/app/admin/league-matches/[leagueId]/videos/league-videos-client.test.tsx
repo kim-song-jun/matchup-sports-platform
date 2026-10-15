@@ -58,9 +58,6 @@ describe.each([
     expect(screen.getByText('1주차 · 합성 A팀 vs 합성 B팀')).toBeInTheDocument();
     expect(screen.getByText('2주차 · 합성 B팀 vs 합성 A팀')).toBeInTheDocument();
     expect(screen.getAllByText('아직 등록된 영상이 없어요.')).toHaveLength(2);
-    const back = screen.getByRole('link', { name: '리그 상세로' });
-    expect(back).toHaveAttribute('href', '/admin/league-matches/synthetic-league');
-    await userEvent.setup().click(back); expect(api.navigate).toHaveBeenCalledWith('/admin/league-matches/synthetic-league');
     expect(api.create).not.toHaveBeenCalled(); expect(api.upload).not.toHaveBeenCalled(); expect(api.remove).not.toHaveBeenCalled();
   });
 

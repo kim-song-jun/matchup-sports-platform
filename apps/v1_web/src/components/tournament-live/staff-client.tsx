@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { MapPin, UserPlus } from 'lucide-react';
 import {
   useV1CreateTournamentField,
+  useV1ImportTournamentFieldPlaces,
   useV1GrantTournamentStaff,
   useV1RevokeTournamentStaff,
   useV1TournamentFields,
@@ -28,6 +29,7 @@ import type {
   V1TournamentStaffRole,
 } from '@/types/api';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
+import { ErrorState, SectionTitle } from '@/components/v1-ui/primitives';
 
 interface Props {
   tournamentId: string;
@@ -79,38 +81,37 @@ function TournamentFieldsSection({
   fields,
   isPending,
   canCreate,
+  queryError,
+  onRetry,
 }: {
   tournamentId: string;
   fields: V1TournamentField[];
   isPending: boolean;
   canCreate: boolean;
+  queryError?: string;
+  onRetry: () => void;
 }) {
   const create = useV1CreateTournamentField(tournamentId);
+  const importPlaces = useV1ImportTournamentFieldPlaces(tournamentId);
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const { confirm, ConfirmModal } = useConfirm();
 
   const trimmedName = name.trim();
-  // finding #76: 필드 이름에는 서버 유일성 제약이 없고(schema.prisma의 unique는
-  // scopeKey/id뿐), scopeKey는 매 제출마다 새로 생성돼(아래 참고) 서버의
-  // FIELD_SCOPE_KEY_DUPLICATE도 절대 걸리지 않는다 -- 그래서 두 번 눌리거나(오탭)
-  // 여러 기기에서 동시에 등록하면 같은 이름의 필드가 그대로 두 개 생겼고, 한 번
-  // 생기면 고치거나 지울 방법이 없다(수정·삭제 라우트 부재). 클라이언트에서라도
-  // 대소문자·공백을 무시한 이름 중복을 먼저 막아 사고 발생 지점을 원천 차단한다.
+  // Match the server's trimmed/case-insensitive name check before submitting.
   const isDuplicateName = fields.some(
     (field) => field.name.trim().toLowerCase() === trimmedName.toLowerCase() && trimmedName.length > 0,
   );
-  const canSubmit = trimmedName.length > 0 && !isDuplicateName && !create.isPending;
+  const canSubmit = trimmedName.length > 0 && !isDuplicateName && !create.isPending && !importPlaces.isPending && !queryError && !isPending;
 
-  // 한 번 만든 경기장은 고칠 수도 지울 수도 없다(수정·삭제 라우트 부재, finding #76).
-  // 오타가 그대로 영구히 남으므로 등록 전에 이름을 그대로 보여 주고 확인받는다.
+  // Confirm the exact name used by both fixture settings and staff assignment.
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!canSubmit) return;
     const ok = await confirm({
       title: `'${trimmedName}' 경기장을 등록할까요?`,
-      message: '등록한 경기장은 이름을 고치거나 지울 수 없어요. 이름이 맞는지 확인해 주세요.',
+      message: '등록한 경기장을 경기 설정과 스태프 배정에서 선택할 수 있어요.',
       confirmLabel: '등록하기',
     });
     if (!ok) return;
@@ -148,16 +149,14 @@ function TournamentFieldsSection({
           <MapPin size={18} />
         </span>
         <div>
-          <h2 id="tournament-fields-heading" className="text-[length:var(--font-size-body)] font-bold text-[var(--text-strong)]">
-            경기장(필드)
-          </h2>
+          <div role="heading" aria-level={2}><SectionTitle id="tournament-fields-heading" title="경기장(필드)" /></div>
           <p className="text-[length:var(--font-size-label)] text-[var(--text-muted)] mt-0.5">
-            경기가 열리는 코트·구장이에요. 필드 담당자는 담당 경기장을 정해야 배정할 수 있어요.
+            경기 설정과 스태프 배정에서 같은 경기장을 선택해요. 기존 경기 장소도 이름별로 모을 수 있어요.
           </p>
         </div>
       </div>
 
-      {isPending ? (
+      {queryError ? <ErrorState compact message={queryError} onRetry={onRetry} /> : isPending ? (
         <p className="text-[length:var(--font-size-label)] text-[var(--text-muted)]">경기장을 불러오는 중이에요…</p>
       ) : fields.length === 0 ? (
         <p className="text-[length:var(--font-size-label)] text-[var(--text-muted)]">
@@ -180,7 +179,17 @@ function TournamentFieldsSection({
         </ul>
       )}
 
-      {canCreate && (
+      {canCreate && !queryError && (
+        <button type="button" className="tm-btn tm-btn-md tm-btn-outline" disabled={isPending || importPlaces.isPending || create.isPending}
+          onClick={() => {
+            setError(null); setNotice(null);
+            importPlaces.mutate(undefined, {
+              onSuccess: (result) => setNotice(`경기 장소 ${result.addedCount}개를 추가했어요. 이미 등록된 장소는 ${result.existingCount}개예요.${result.updatedCount > 0 ? ` 장소 정보 ${result.updatedCount}개를 갱신했어요.` : ''}`),
+              onError: (err) => setError(extractErrorMessage(err, '기존 경기 장소를 가져오지 못했어요.')),
+            });
+          }}>{importPlaces.isPending ? '경기 장소 가져오는 중…' : '기존 경기 장소 추가'}</button>
+      )}
+      {canCreate && !queryError && (
         <form onSubmit={handleSubmit} noValidate className="flex flex-col sm:flex-row gap-2">
           <label htmlFor="tournament-field-name" className="sr-only">
             경기장 이름
@@ -219,8 +228,7 @@ function TournamentFieldsSection({
           className="text-[length:var(--font-size-label)] text-[var(--red700)]"
           role="alert"
         >
-          이미 같은 이름의 경기장이 있어요. 다른 이름을 써주세요 — 같은 이름이 두 개
-          생기면 나중에 구분·수정·삭제할 방법이 없어요.
+          이미 같은 이름의 경기장이 있어요. 등록된 경기장을 선택하거나 다른 이름을 써주세요.
         </p>
       )}
 
@@ -346,14 +354,6 @@ export function StaffClient({ tournamentId }: Props) {
           {grantNotice}
         </p>
       )}
-
-      {/* 스태프 배정이 막히는 원인(선택 가능한 필드 0건)을 같은 화면 안에서 풀 수 있게 목록 위에 둔다. */}
-      <TournamentFieldsSection
-        tournamentId={tournamentId}
-        fields={fields.data?.items ?? []}
-        isPending={fields.isPending}
-        canCreate={role === 'PLATFORM_OPS'}
-      />
 
       {staff.isPending ? (
         <>
@@ -517,6 +517,15 @@ export function StaffClient({ tournamentId }: Props) {
           </ul>
         </>
       )}
+
+      <TournamentFieldsSection
+        tournamentId={tournamentId}
+        fields={fields.isError ? [] : fields.data?.items ?? []}
+        isPending={fields.isPending}
+        canCreate={role === 'PLATFORM_OPS'}
+        queryError={fields.isError ? extractErrorMessage(fields.error, '경기장 목록을 불러오지 못했어요.') : undefined}
+        onRetry={() => void fields.refetch()}
+      />
 
       {canManage && (
         <GrantStaffModal

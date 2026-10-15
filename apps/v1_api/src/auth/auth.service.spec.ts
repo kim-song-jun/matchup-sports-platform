@@ -21,7 +21,6 @@ import { V1AuthProvider } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppleIdentityService } from './apple-identity.service';
 import { AppleTokenService } from './apple-token.service';
-import { NotificationsService } from '../notifications/notifications.service';
 import { AuthService } from './auth.service';
 import type { RegisterDto } from './dto/register.dto';
 import { hashPassword } from './password-hash';
@@ -180,7 +179,6 @@ describe('AuthService', () => {
         { provide: PhoneVerificationService, useValue: phoneVerification },
         { provide: AppleIdentityService, useValue: appleIdentity },
         { provide: AppleTokenService, useValue: { storeFromAuthorizationCode: jest.fn() } },
-        { provide: NotificationsService, useValue: { emitNotification: jest.fn() } },
       ],
     }).compile();
 
@@ -1428,16 +1426,41 @@ describe('AuthService', () => {
         onboardingProgress: { create: expect.objectContaining({ draftJson: expect.objectContaining({ kakaoBirthDate: '20000229' }) }) },
       }) }));
     });
-    it.each(['email', 'phone', 'both'])('links an existing verified %s contact to the same user ID without OTP', async (match) => {
-      const account = match === 'phone' ? { phone_number: verifiedKakaoAccount.phone_number } :
-        match === 'email' ? { email: verifiedKakaoAccount.email, is_email_valid: true, is_email_verified: true } : verifiedKakaoAccount;
+    it.each(['email', 'both'])('links an existing verified %s contact to the same user ID without OTP', async (match) => {
+      const account = match === 'email' ?
+        { email: verifiedKakaoAccount.email, is_email_valid: true, is_email_verified: true } : verifiedKakaoAccount;
       stubKakao([tokenInfo(123456), me({ id: 4994014420, kakao_account: account })]);
-      if (match !== 'phone') prisma.v1User.findUnique.mockResolvedValueOnce(contactOwner);
+      prisma.v1User.findUnique.mockResolvedValueOnce(contactOwner);
       prisma.v1User.findUnique.mockResolvedValueOnce(contactOwner).mockResolvedValueOnce(completedUserRow({ id: contactOwner.id }));
       if (match !== 'email') prisma.v1User.findFirst.mockResolvedValue(contactOwner);
       prisma.v1AuthIdentity.create.mockResolvedValue({ id: 'new-kakao-identity' });
-      await service.kakaoTokenLogin({ accessToken: TOKEN });
+      const result = await service.kakaoTokenLogin({ accessToken: TOKEN });
+      expect(result.session.userId).toBe(contactOwner.id);
       expect(prisma.v1AuthIdentity.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ userId: contactOwner.id, provider: 'kakao' }) }));
+      expect(prisma.v1User.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+        where: expect.objectContaining({ id: contactOwner.id, email: contactOwner.email, emailVerifiedAt: { not: null } }),
+      }));
+      expect(prisma.v1User.create).not.toHaveBeenCalled();
+      expect(prisma.v1User.delete).not.toHaveBeenCalled();
+    });
+    it.each([
+      { phone_number: verifiedKakaoAccount.phone_number },
+      { ...verifiedKakaoAccount, is_email_valid: false },
+      { ...verifiedKakaoAccount, is_email_verified: false },
+      { email: verifiedKakaoAccount.email, phone_number: verifiedKakaoAccount.phone_number },
+    ])('requires independent account proof when the provider supplies only trusted phone possession: %j', async (account) => {
+      // Given: a historically verified phone holder without matching trusted provider email proof.
+      stubKakao([tokenInfo(123456), me({ id: 4994014420, kakao_account: account })]);
+      prisma.v1User.findFirst.mockResolvedValue(contactOwner);
+      prisma.v1User.findUnique.mockResolvedValue(contactOwner);
+      // When / Then: attaching a new identity cannot authenticate the older account.
+      await expect(service.kakaoTokenLogin({ accessToken: TOKEN })).rejects.toMatchObject({
+        status: 409, response: { code: 'SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF' },
+      });
+      expect(prisma.v1AuthIdentity.create).not.toHaveBeenCalled();
+      expect(prisma.v1AuthIdentity.update).not.toHaveBeenCalled();
+      expect(prisma.v1StatusChangeLog.create).not.toHaveBeenCalled();
+      expect(prisma.v1User.updateMany).not.toHaveBeenCalled();
       expect(prisma.v1User.create).not.toHaveBeenCalled();
       expect(prisma.v1User.delete).not.toHaveBeenCalled();
     });
@@ -1449,17 +1472,23 @@ describe('AuthService', () => {
       expect(prisma.v1AuthIdentity.create).not.toHaveBeenCalled();
       expect(prisma.v1User.updateMany).not.toHaveBeenCalled();
     });
-    it('refuses a legacy unverified phone and a contact changed during the link transaction', async () => {
+    it('refuses a legacy unverified phone without changing an identity', async () => {
       const profile = { id: 4994014420, kakao_account: { phone_number: verifiedKakaoAccount.phone_number } };
       prisma.v1User.findFirst.mockResolvedValue(contactOwner);
       prisma.v1User.findUnique.mockResolvedValue({ ...contactOwner, phoneVerifiedAt: null });
       stubKakao([tokenInfo(123456), me(profile)]);
       await expect(service.kakaoTokenLogin({ accessToken: TOKEN })).rejects.toMatchObject({ response: { code: 'SOCIAL_LINK_CONTACT_CONFLICT' } });
+      expect(prisma.v1AuthIdentity.create).not.toHaveBeenCalled();
+      expect(prisma.v1User.updateMany).not.toHaveBeenCalled();
+    });
+    it('refuses a verified email contact changed during the link transaction', async () => {
       prisma.v1User.findUnique.mockResolvedValue(contactOwner);
+      prisma.v1User.findFirst.mockResolvedValue(contactOwner);
       prisma.v1User.updateMany.mockResolvedValue({ count: 0 });
-      stubKakao([tokenInfo(123456), me(profile)]);
+      stubKakao([tokenInfo(123456), me({ id: 4994014420, kakao_account: verifiedKakaoAccount })]);
       await expect(service.kakaoTokenLogin({ accessToken: TOKEN })).rejects.toMatchObject({ response: { code: 'SOCIAL_LINK_CONTACT_CONFLICT' } });
       expect(prisma.v1AuthIdentity.create).not.toHaveBeenCalled();
+      expect(prisma.v1StatusChangeLog.create).not.toHaveBeenCalled();
     });
 
     it('기존 identity 는 같은 providerUserKey 로 조회되어 재로그인된다', async () => {
@@ -1582,7 +1611,9 @@ describe('AuthService', () => {
         .mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: 'kakao-access-token' }) })
         .mockResolvedValueOnce({
           ok: true,
-          json: async () => ({ id: 777, kakao_account: { email: 'victim@example.com' } }),
+          json: async () => ({ id: 777, kakao_account: {
+            email: 'victim@example.com', is_email_valid: true, is_email_verified: true,
+          } }),
         }) as unknown as typeof fetch;
       prisma.v1AuthIdentity.findUnique.mockResolvedValue(null);
       prisma.v1User.findUnique.mockResolvedValue({
@@ -1597,6 +1628,8 @@ describe('AuthService', () => {
       // 붙이지도, 새로 만들지도 않아야 한다. email 은 unique 라 조용히 흘려보내면 P2002 → 500 이다.
       expect(prisma.v1AuthIdentity.create).not.toHaveBeenCalled();
       expect(prisma.v1User.create).not.toHaveBeenCalled();
+      expect(prisma.v1User.updateMany).not.toHaveBeenCalled();
+      expect(prisma.v1StatusChangeLog.create).not.toHaveBeenCalled();
     });
 
     it('우리가 인증한 이메일이면 기존 계정에 붙인다', async () => {

@@ -64,7 +64,7 @@ const CORRECTION_EVENT = {
 };
 
 let subscribeCallCount = 0;
-let subscribeSnapshots: Array<{ version: number; state: string; lastSequence: number; events: unknown[] }> = [];
+let subscribeSnapshots: Array<{ gameId: string; version: number; state: string; lastSequence: number; events: unknown[] }> = [];
 
 const mockSocket = {
   connected: true,
@@ -122,7 +122,7 @@ afterEach(() => {
 
 describe('useV1GameOperationsConsole — GOAL append committed broadcast reaches liveEvents', () => {
   it('자기 자신이 기록한 골이 실제 저장 행(진짜 id, reversesEventId: null)으로 liveEvents에 반영된다', async () => {
-    subscribeSnapshots = [{ version: 1, state: 'LIVE', lastSequence: 0, events: [] }];
+    subscribeSnapshots = [{ gameId: 'game-1', version: 1, state: 'LIVE', lastSequence: 0, events: [] }];
     const { useV1GameOperationsConsole } = await import('./use-v1-game-operations-console');
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const { result, unmount } = renderHook(
@@ -175,10 +175,10 @@ describe('useV1GameOperationsConsole — reverseEvent forces a resync so liveEve
   it('REST 되돌리기가 성공하면 liveEvents가 원래 골 + 정정(CORRECTION) 이벤트로 즉시 갱신된다', async () => {
     subscribeSnapshots = [
       // 최초 구독: 이미 골 1개가 기록된 상태로 콘솔을 연다.
-      { version: 2, state: 'LIVE', lastSequence: 1, events: [GOAL_EVENT] },
+      { gameId: 'game-1', version: 2, state: 'LIVE', lastSequence: 1, events: [GOAL_EVENT] },
       // reverseEvent 성공 후 강제 재동기화(afterSequence: 0)가 돌려주는
       // 전체 이력 — 원래 골 + 방금 만들어진 CORRECTION.
-      { version: 3, state: 'LIVE', lastSequence: 2, events: [GOAL_EVENT, CORRECTION_EVENT] },
+      { gameId: 'game-1', version: 3, state: 'LIVE', lastSequence: 2, events: [GOAL_EVENT, CORRECTION_EVENT] },
     ];
     const { useV1GameOperationsConsole } = await import('./use-v1-game-operations-console');
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });

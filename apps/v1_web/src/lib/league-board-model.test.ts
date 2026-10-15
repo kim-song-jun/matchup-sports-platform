@@ -172,3 +172,14 @@ describe('leagueDirectPlacedRegistrationIds', () => {
     expect([...ids]).toEqual(['r3']);
   });
 });
+
+
+describe('리그 무효 경기 상태', () => {
+  it('무효 경기를 예정 경기로 표시하지 않는다', () => {
+    const { columns } = buildLeagueBoard({
+      fixtures: [fixture({ teamMatchId: 'void', resultStage: 'voided' })],
+      slots: [], teamNameById: NAMES,
+    });
+    expect(columns[0].nodes[0].state).toBe('voided');
+  });
+});

@@ -8,12 +8,13 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   const tournament = await fetchPublicV1<V1TournamentDetail>(`/tournaments/${encodeURIComponent(id)}`, { cache: 'no-store' });
   if (!tournament) return buildNoIndexMetadata('대회 후기를 찾을 수 없어요');
-  return buildPublicMetadata({
+  const metadata = buildPublicMetadata({
     title: `${tournament.title} 참가 후기`,
     description: `${tournament.title}에 참가한 팀들의 실제 후기를 확인하세요.`,
     path: `/tournaments/${id}/reviews`,
     image: tournament.coverImageUrl,
   });
+  return tournament.reviewsTotalCount > 0 ? metadata : { ...metadata, robots: { index: false, follow: true } };
 }
 
 export default async function TournamentReviewsPage({
@@ -22,6 +23,7 @@ export default async function TournamentReviewsPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  if (!await fetchPublicV1<V1TournamentDetail>(`/tournaments/${encodeURIComponent(id)}`, { cache: 'no-store' })) notFound();
-  return <TournamentReviewsPageClient tournamentId={id} />;
+  const tournament = await fetchPublicV1<V1TournamentDetail>(`/tournaments/${encodeURIComponent(id)}`, { cache: 'no-store' });
+  if (!tournament) notFound();
+  return <TournamentReviewsPageClient tournamentId={id} seed={tournament} />;
 }

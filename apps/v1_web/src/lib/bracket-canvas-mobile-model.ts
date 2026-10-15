@@ -32,11 +32,12 @@ export interface MobileSide {
 }
 
 export interface MobileNode {
+  fieldId?: string | null;
   fixtureId: string;
   /** 조별 단계 후보 제외에만 쓴다. 리그 매치(scope 'league')는 대회 조가 없어 null. */
   groupId: string | null;
   title: string;
-  state: FixtureNodeState;
+  state: FixtureNodeState | 'voided';
   home: MobileSide;
   away: MobileSide;
   scoreText: string | null;
@@ -100,7 +101,7 @@ export function leagueMobileSide(side: LeagueBoardSide, slotsById: ReadonlyMap<s
   };
 }
 
-function scoreTextOf(state: FixtureNodeState, game: V1AdminBracketFixtureGame | null): string | null {
+function scoreTextOf(state: FixtureNodeState | 'voided', game: V1AdminBracketFixtureGame | null): string | null {
   if (state !== 'official' && state !== 'submitted') return null;
   const score = game?.latestRevision?.score ?? null;
   return score === null ? null : formatGameResultScoreWithPenalties(score);
@@ -121,6 +122,7 @@ export function bracketMobileNode(
   const state = fixture.status === 'cancelled' ? 'cancelled' : fixtureNodeState(game);
   return {
     fixtureId: fixture.id,
+    ...(fixture.fieldId === undefined ? {} : { fieldId: fixture.fieldId }),
     groupId: fixture.groupId,
     title: groupName ? `${groupName} · ${fixture.fixtureNumber}번 경기` : `${fixture.fixtureNumber}번 경기`,
     state,
@@ -138,6 +140,7 @@ export function bracketMobileNode(
 export function leagueMobileNode(node: LeagueBoardNode, slotsById: ReadonlyMap<string, V1AdminBracketSlot>): MobileNode {
   return {
     fixtureId: node.fixtureId,
+    ...(node.fieldId === undefined ? {} : { fieldId: node.fieldId }),
     groupId: null,
     title: node.title,
     state: node.state,
@@ -274,7 +277,7 @@ export function buildLeagueMobileRounds(input: {
   }));
 }
 
-const UNFINISHED: ReadonlySet<FixtureNodeState> = new Set(['scheduled', 'live', 'submitted']);
+const UNFINISHED: ReadonlySet<FixtureNodeState | 'voided'> = new Set(['scheduled', 'live', 'submitted', 'voided']);
 
 /** 운영자가 지금 만져야 할 라운드 — 끝나지 않은 경기가 있는 첫 라운드, 없으면 마지막. */
 export function pickInitialRoundKey(rounds: MobileRound[]): string | null {

@@ -166,6 +166,49 @@ export function clearSavedRedirectPath() {
   window.sessionStorage.removeItem(SAVED_REDIRECT_KEY);
 }
 
+function isRequiredAuthPath(path: string) {
+  const { pathname, searchParams } = new URL(path, REDIRECT_BASE);
+  return ['/onboarding/sport', '/onboarding/level', '/onboarding/region', '/onboarding/confirm', '/onboarding/resume', '/signup', '/signup/social'].includes(pathname)
+    || (pathname === '/terms' && !searchParams.has('document') && ['signup', 'social', 'renewal'].includes(searchParams.get('mode') ?? ''));
+}
+
+const AUTH_REDIRECT_MAX_DEPTH = 8;
+
+function getUltimateAuthRedirect(path: string | null) {
+  let cursor = sanitizeRedirectPath(path);
+  const visited = new Set<string>();
+  for (let depth = 0; cursor && depth < AUTH_REDIRECT_MAX_DEPTH; depth += 1) {
+    if (!isRequiredAuthPath(cursor)) return cursor;
+    if (visited.has(cursor)) return null;
+    visited.add(cursor);
+    cursor = sanitizeRedirectPath(new URL(cursor, REDIRECT_BASE).searchParams.get('redirect'));
+  }
+  return null;
+}
+
+/** 필수 단계의 복귀 경로는 원 목적지를 보존하고, 마지막 성공에서만 원 목적지를 소비한다. */
+export function resolveAuthContinuationPath(nextRoute?: string | null, requestedRedirect?: string | null) {
+  const requested = sanitizeRedirectPath(requestedRedirect);
+  const requestedStep = requested && isRequiredAuthPath(requested);
+  const destination = getUltimateAuthRedirect(requested) ?? getUltimateAuthRedirect(getSavedRedirectPath());
+  const next = sanitizeRedirectPath(nextRoute);
+  const continuation = next && next !== '/home'
+    ? next : !next && requestedStep ? requested : null;
+  if (continuation) {
+    if (destination) saveRedirectPath(destination);
+    if (requested && requestedStep && continuation !== requested && isRequiredAuthPath(continuation)) {
+      const route = new URL(continuation, REDIRECT_BASE);
+      if (!route.searchParams.has('redirect')) {
+        route.searchParams.set('redirect', requested);
+        return `${route.pathname}${route.search}${route.hash}`;
+      }
+    }
+    return continuation;
+  }
+  clearSavedRedirectPath();
+  return destination ?? '/home';
+}
+
 export function getCurrentRedirectPath() {
   if (typeof window === 'undefined') return '/home';
   return `${window.location.pathname}${window.location.search}${window.location.hash}`;

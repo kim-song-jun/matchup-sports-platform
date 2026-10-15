@@ -14,7 +14,7 @@ import {
 } from '@/hooks/use-v1-api';
 import { V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
-import { sanitizeRedirectPath } from '@/lib/session-storage';
+import { resolveAuthContinuationPath, sanitizeRedirectPath } from '@/lib/session-storage';
 import { saveSignupTermsDocumentIds } from '@/lib/signup-terms-storage';
 import { AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
 import { getTermsViewModel } from './auth.view-model';
@@ -114,6 +114,10 @@ export function TermsClient() {
     return () => window.removeEventListener('popstate', preventBack);
   }, [document, isRenewalMode]);
 
+  const continueAfterRenewal = (nextRoute?: string | null) => {
+    router.replace(resolveAuthContinuationPath(nextRoute, searchParams.get('redirect')));
+  };
+
   const continueToSignup = () => {
     if (!requiredAccepted) {
       return;
@@ -150,17 +154,15 @@ export function TermsClient() {
         .filter((agreement) => !agreement.accepted && checkedByDocumentId[agreement.documentId])
         .map((agreement) => agreement.documentId);
       if (documentIds.length === 0) {
-        const redirect = sanitizeRedirectPath(searchParams.get('redirect'));
-        router.replace(redirect ?? '/home');
+        continueAfterRenewal(currentTerms.data?.compliance?.compliant === false
+          ? currentTerms.data.compliance.nextRoute ?? '/terms?mode=renewal' : null);
         return;
       }
       acceptTerms.mutate(
         { documentIds },
         {
-          onSuccess: () => {
-            const redirect = sanitizeRedirectPath(searchParams.get('redirect'));
-            router.replace(redirect ?? '/home');
-          },
+          onSuccess: (result) => continueAfterRenewal(result?.compliance?.compliant === false
+            ? result.compliance.nextRoute ?? '/terms?mode=renewal' : null),
           onError: (nextError) =>
             setError(extractErrorMessage(nextError, '약관 동의를 저장하지 못했어요.')),
         },

@@ -167,7 +167,7 @@ describe('KickoffChecklist — 킥오프 준비', () => {
   });
 
   describe('리그 경기 — 체크 = 출전', () => {
-    const leagueRoster = (base: Array<{ userId: string; displayName: string; status: string }>) => ({
+    const leagueRoster = (base: Array<{ userId: string; displayName: string; status: string; realName?: string }>) => ({
       data: {
         sideId: 'side-home',
         competitionKind: 'LEAGUE',
@@ -200,6 +200,19 @@ describe('KickoffChecklist — 킥오프 준비', () => {
 
       fireEvent.click(kim);
       await waitFor(() => expect(mocks.setParticipation).toHaveBeenCalledWith({ userId: 'u1', participating: false }));
+    });
+
+    it('운영진에게 내려온 실명은 "실명 (닉네임)" 으로 보이고, 실명이 없으면 닉네임 그대로다', () => {
+      mocks.useV1TeamGameRoster.mockReturnValue(leagueRoster([
+        { userId: 'u1', displayName: '김선수', status: 'PARTICIPATING', realName: '김하나' },
+        { userId: 'u2', displayName: '이선수', status: 'PARTICIPATING' },
+      ]));
+      renderChecklist({ lineups: lineups(NOT_YET, NOT_YET) });
+
+      expect(screen.getAllByText('김하나 (김선수)')[0]).toBeInTheDocument();
+      expect(screen.getAllByRole('switch', { name: /^김하나 \(김선수\) — 출전/ })[0]).toBeInTheDocument();
+      expect(screen.getAllByText('이선수')[0]).toBeInTheDocument();
+      expect(screen.getAllByRole('switch', { name: /^이선수 — 출전/ })[0]).toBeInTheDocument();
     });
 
     it('뺀 선수가 있으면 전원 출전으로 한 번에 되돌린다', async () => {

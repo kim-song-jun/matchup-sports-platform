@@ -60,6 +60,17 @@ export class TournamentOperationsFieldsController {
     return this.fields.create(user.id, tournamentId, dto, this.auditContext(idempotencyKey, request));
   }
 
+  @Post('fields/import-places')
+  @HttpCode(HttpStatus.OK)
+  importFixturePlaces(
+    @CurrentUser() user: V1AuthUser,
+    @Param('tournamentId', UUID_PARAM) tournamentId: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Req() request: Request,
+  ) {
+    return this.fields.importFixturePlaces(user.id, tournamentId, this.auditContext(idempotencyKey, request));
+  }
+
   @Patch('fields/:fieldId')
   update(
     @CurrentUser() user: V1AuthUser,

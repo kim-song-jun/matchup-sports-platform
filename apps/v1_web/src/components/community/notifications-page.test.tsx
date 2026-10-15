@@ -115,8 +115,8 @@ describe('NotificationsPageView — 상세 시트', () => {
       <NotificationsPageView
         model={makeModel({
           notifications: [
-            make('n-fixtures', 'team_match', '리그 대진이 확정됐어요', '/league-matches/l-1?from=%2Fnotifications'),
-            make('n-roster', 'tournament', '리그 명단이 자동 확정됐어요', '/leagues/l-1?from=%2Fnotifications'),
+            make('n-fixtures', 'team_match', '리그 대진이 확정됐어요', '/tournaments/l-1?kind=league&from=%2Fnotifications'),
+            make('n-roster', 'tournament', '리그 명단이 자동 확정됐어요', '/tournaments/l-1?kind=league&from=%2Fnotifications'),
             make('n-friendly', 'team_match', '팀매치 신청이 왔어요', '/team-matches/tm-1?from=%2Fnotifications'),
             make('n-cup', 'tournament', '대회 참가가 승인됐어요', '/tournaments/t-1?from=%2Fnotifications'),
           ],

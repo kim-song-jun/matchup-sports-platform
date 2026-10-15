@@ -1,7 +1,7 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import sitemap from '@/app/sitemap';
 import { metadata as eventsMetadata } from '@/app/events/layout';
-import { absoluteSiteUrl, buildTournamentDescription, fetchPublicV1, getSiteOrigin, metadataDescription, teamDescriptionFallback } from './seo';
+import { absoluteSiteUrl, buildTournamentDescription, buildTournamentTitle, fetchPublicV1, getSiteOrigin, metadataDescription, teamDescriptionFallback } from './seo';
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -143,6 +143,8 @@ describe('metadataDescription', () => {
 });
 
 describe('buildTournamentDescription', () => {
+  beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date('2026-10-13T00:00:00.000Z')); });
+  afterEach(() => vi.useRealTimers());
   // 제2회 팀밋 풋살컵(비선출 남성부) 프로덕션 응답에서 가져온 값 — 주최자 소개는 이모지 한 줄뿐이었다.
   const open = {
     sport: { code: 'futsal', name: '풋살' },
@@ -155,6 +157,7 @@ describe('buildTournamentDescription', () => {
     entryFee: 300000,
     teamCount: 20,
     confirmedCount: 14,
+    pendingPaymentCount: 0,
     registrationDeadlineAt: '2026-10-16T14:59:00.000Z',
     prizeSummary: '총 800만원 상당의 상금 및 상품',
     promoListSubtitle: null,
@@ -162,13 +165,13 @@ describe('buildTournamentDescription', () => {
 
   it('모집 중 대회는 언제·어디·방식·참가비·남은 자리·마감·상금을 앞에 둔다', () => {
     expect(buildTournamentDescription(open)).toBe(
-      '10월 25일 (일) · 경기대 케이풋살파크 · 풋살 조별리그 + 토너먼트 · 참가비 300,000원 · 20팀 중 14팀 확정 · 신청 마감 10월 16일 (금) · 총 800만원 상당의 상금 및 상품',
+      '2026년 10월 25일 (일) · 경기대 케이풋살파크 · 풋살 조별리그 + 토너먼트 · 참가비 300,000원 · 20팀 중 14팀 확정 · 신청 마감 2026년 10월 16일 (금) · 총 800만원 상당의 상금 및 상품',
     );
   });
 
   it('모집이 끝난 대회는 정원·마감 대신 상태를 적는다', () => {
     const done = buildTournamentDescription({ ...open, status: 'completed', prizeSummary: null });
-    expect(done).toBe('10월 25일 (일) · 경기대 케이풋살파크 · 풋살 조별리그 + 토너먼트 · 참가비 300,000원 · 대회 종료');
+    expect(done).toBe('2026년 10월 25일 (일) · 경기대 케이풋살파크 · 풋살 조별리그 + 토너먼트 · 참가비 300,000원 · 대회 종료');
   });
 
   it('정규 리그는 형식 값이 기본값이어도 리그로 적는다', () => {
@@ -179,7 +182,8 @@ describe('buildTournamentDescription', () => {
     const league = { ...open, kind: 'regular_league' } as typeof open;
     const unset = buildTournamentDescription({ ...league, entryFee: 0, entryFeeConfigured: false });
     expect(unset).not.toContain('참가비');
-    expect(unset).toContain('풋살 리그 방식 · 20팀 중 14팀 확정');
+    expect(unset).toContain('풋살 리그 방식');
+    expect(unset).not.toContain('20팀 중');
     expect(buildTournamentDescription({ ...league, entryFee: 0, entryFeeConfigured: true })).toContain('참가비 무료');
     expect(buildTournamentDescription({ ...league, entryFee: 50000, entryFeeConfigured: true })).toContain('참가비 50,000원');
     expect(buildTournamentDescription({ ...open, entryFeeConfigured: true })).toContain('참가비 300,000원');
@@ -188,8 +192,8 @@ describe('buildTournamentDescription', () => {
   it('이모지뿐인 짧은 소개는 버리고, 충분한 소개는 사실 뒤에 잇되 155자에서 자른다', () => {
     expect(buildTournamentDescription({ ...open, promoListSubtitle: '⚽️ 5대5 ⚽️' })).not.toContain('⚽');
     const long = buildTournamentDescription({ ...open, promoListSubtitle: '비선출 남성 동호인을 위한 가을 정규 대회로 조별 예선 뒤 상위 팀이 결선 토너먼트에 오릅니다 '.repeat(3) });
-    expect(long.startsWith('10월 25일 (일) · 경기대 케이풋살파크')).toBe(true);
-    expect(long).toContain(' — 비선출 남성 동호인을 위한');
+    expect(long.startsWith('2026년 10월 25일 (일) · 경기대 케이풋살파크')).toBe(true);
+    expect(long).toContain('신청 마감 2026년 10월 16일');
     expect(long.length).toBeLessThanOrEqual(153);
     expect(long.endsWith('…')).toBe(true);
   });
@@ -198,5 +202,21 @@ describe('buildTournamentDescription', () => {
     expect(
       buildTournamentDescription({ ...open, scheduledAt: null, scheduledEndAt: null, venue: '  ', entryFee: 0, status: 'draft', prizeSummary: null }),
     ).toBe('풋살 조별리그 + 토너먼트 · 참가비 무료');
+  });
+
+  it('검색 설명도 실제 마감·결제 대기 정원을 기준으로 모집 상태를 안내한다', () => {
+    expect(buildTournamentDescription({ ...open, registrationDeadlineAt: '2026-10-12T14:59:00.000Z' })).toContain('신청 마감됨');
+    expect(buildTournamentDescription({ ...open, pendingPaymentCount: 6 })).toContain('정원 마감');
+  });
+});
+
+describe('buildTournamentTitle', () => {
+  it.each([
+    ['풋살', 'regular_league', '수요일 여성부', '수요일 여성부 · 풋살 리그'],
+    ['풋살', 'regular_tournament', '지역 컵', '지역 컵 · 풋살 대회'],
+    ['수영', 'regular_tournament', '시민 수영대회', '시민 수영대회 · 수영 대회'],
+    ['축구', 'regular_league', '서울 축구 리그', '서울 축구 리그'],
+  ] as const)('실제 %s 종목과 %s 유형을 보존한다', (sport, kind, title, expected) => {
+    expect(buildTournamentTitle({ title, sport: { name: sport } as never, kind })).toBe(expected);
   });
 });

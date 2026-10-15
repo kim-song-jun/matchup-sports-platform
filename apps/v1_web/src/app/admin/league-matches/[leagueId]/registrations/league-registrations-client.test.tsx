@@ -17,6 +17,7 @@ const leagueData: {
   bankAccount: string | null;
   bankHolder: string | null;
   activeRegistrationCount: number;
+  confirmedRegistrationCount: number;
 } = {
   isPublic: true,
   state: 'draft',
@@ -29,6 +30,7 @@ const leagueData: {
   bankAccount: null,
   bankHolder: null,
   activeRegistrationCount: 0,
+  confirmedRegistrationCount: 0,
 };
 
 vi.mock('@/hooks/use-admin-can-write', () => ({ useAdminCanWrite: () => true }));
@@ -36,6 +38,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminLeagueMatch: () => ({ data: leagueData }),
   useV1OpenLeagueRegistration: () => ({ mutate: openMutate, isPending: false }),
   useV1UpdateLeagueEntryFee: () => ({ mutate: feeMutate, mutateAsync: feeMutateAsync, isPending: false }),
+  useV1CloseLeagueRegistration: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 // 목록은 이 화면의 관심사가 아니다 — 훅을 여덟 개 넘게 쓰므로 여기서는 자리만 확인한다.
@@ -63,6 +66,22 @@ describe('리그 참가 신청 관리', () => {
     leagueData.bankAccount = null;
     leagueData.bankHolder = null;
     leagueData.activeRegistrationCount = 0;
+    leagueData.confirmedRegistrationCount = 0;
+  });
+
+  it('신청을 안 받는 중이면 신청 마감 카드는 없다 — 신청 받기 카드가 이미 같은 말을 한다', () => {
+    render(<LeagueRegistrationsClient leagueId="league-1" />);
+
+    expect(screen.queryByRole('region', { name: '신청 마감' })).not.toBeInTheDocument();
+  });
+
+  it('신청을 받는 중이면 같은 카드에서 지금 마감할 수 있다', () => {
+    leagueData.registrationOpen = true;
+    leagueData.registrationDeadlineAt = '2099-01-01T00:00:00.000Z';
+    render(<LeagueRegistrationsClient leagueId="league-1" />);
+
+    const card = screen.getByRole('region', { name: '신청 마감' });
+    expect(within(card).getByRole('button', { name: '지금 마감하기' })).toBeEnabled();
   });
 
   it('끝난 리그는 마감이 미래여도 "마감됐어요" 라고 하지 않는다', () => {

@@ -1,4 +1,10 @@
+경기별 골키퍼 지정 (2026-10-14): 명단 조회에 `goalkeeper`를 추가하고 팀 일괄 명단 API에 복수 지정 `SET_GOALKEEPER`를 지원한다. [Games 계약](./domains/games.md#경기-명단-gk-지정-task-20261082)을 확인한다.
+
 # Teameet v1 API contracts
+
+Ordinary team-match period rules (MD-QA #141): host-authorized defaults, separate single/two-period selection, immutable pins and pre-play edit gates are documented in [team matches](./domains/team-matches.md#ordinary-team-match-period-rules-md-qa-141).
+
+Public competition overall standings include nullable `teamLogoUrl` under the existing team-identity visibility gate; see [tournaments](./domains/tournaments.md#overall-standings--two-competition-kinds-two-row-shapes).
 
 This directory is the single indexed contract tree for `apps/v1_api` and `apps/v1_web`. Swagger is reference material; the controller, DTO, service gates, integration tests, frontend hooks/types, and these canonical contracts must agree.
 
@@ -7,6 +13,8 @@ source of truth — a contract doc that disagrees with the running code is wrong
 in the same change that discovers the drift.
 
 Team-match lifecycle (2026-10-13): unmatched elapsed recruitment is `closed`; cancelled matches are absent from user routes and retained in admin records. Admin reopening also clears an elapsed deadline. See [team matches](./domains/team-matches.md) and [admin/ops](./domains/admin-and-ops.md).
+
+Competition venue/field selection (2026-10-14): leagues and tournaments share a name-based field catalogue with reusable place snapshots. Existing fixture places/assignments are preserved; field selection saves place and assignment together. See [operations fields](./domains/tournament-operations.md#place-registry-integration-2026-10-14-task-20261082), [league fixtures](./domains/league-matches.md), and [tournament fixtures](./domains/tournaments.md).
 
 ## Read order
 
@@ -79,3 +87,7 @@ Current Kakao signup and existing-account linking use the [provider contact conf
 - 2026-10-05: tournament bye slots allow null registration + byeId reassignment; pre-start fixture deletion archives canonical history. See [tournament contract](domains/tournaments.md).
 
 리그 기본 정보 수정: [league-matches](domains/league-matches.md#basic-information-editing-리그-기본-정보-수정) — 실제 리그 GET/PATCH, updatedAt 충돌 검증, 기간·권한 보호 및 공개 운영 안내.
+
+- Public league notification detail links use `/tournaments/:id?kind=league` (the kind query preserves the league icon/category) (2026-10-14). Historical `/league-matches/:id` and `/leagues/:id` links redirect to the same detail; fixture and API routes retain their existing paths.
+
+- Task 20261083: 대회 참가 명단 GK 유지, 어드민 출전 표 GK 관리와 batch affectedGames 캐시 범위는 [games](domains/games.md)와 [teams](domains/teams.md) 참조.

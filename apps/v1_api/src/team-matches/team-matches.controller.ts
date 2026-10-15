@@ -53,6 +53,12 @@ export class TeamMatchesController {
     return this.teamMatchesService.recentVenues(user, teamId);
   }
 
+  @Get('teams/:teamId/team-match-rule-options')
+  @UseGuards(V1AuthGuard)
+  ruleOptions(@CurrentUser() user: V1AuthUser, @Param('teamId') teamId: string) {
+    return this.teamMatchesService.ruleOptions(user, teamId);
+  }
+
   @Get('team-matches/:teamMatchId/edit')
   @UseGuards(V1AuthGuard)
   edit(@CurrentUser() user: V1AuthUser, @Param('teamMatchId') teamMatchId: string) {

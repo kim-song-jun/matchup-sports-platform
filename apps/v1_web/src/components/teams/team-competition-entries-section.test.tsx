@@ -36,7 +36,7 @@ function renderSection(data: V1TeamCompetitionEntries, extra: { loading?: boolea
 describe('toCompetitionEntryRows', () => {
   it('리그는 리그 상세로, 대회는 대회 상세로 가고 [명단]은 그 신청의 참가 명단 화면으로 바로 간다', () => {
     const [league, cup] = toCompetitionEntryRows(fixture, SELF, NOW);
-    expect(league).toMatchObject({ kind: 'LEAGUE', href: `/league-matches/league-1${FROM}`, statusLabel: '참가 확정' });
+    expect(league).toMatchObject({ kind: 'LEAGUE', href: `/tournaments/league-1${FROM}`, statusLabel: '참가 확정' });
     expect(league.rosterHref).toBe(`/tournaments/league-1/registrations/registration-league-1/roster${FROM}`);
     expect(cup).toMatchObject({ kind: 'TOURNAMENT', href: `/tournaments/tournament-1${FROM}` });
     expect(cup.rosterHref).toBe(`/tournaments/tournament-1/registrations/registration-1/roster${FROM}`);

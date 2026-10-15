@@ -1,8 +1,9 @@
-import { UnprocessableEntityException } from '@nestjs/common';
+import { ConflictException, UnprocessableEntityException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { checkLeagueTeamAddAllowed } from './league-lifecycle-rules';
 import { tierLabel } from './league-tier-label';
 import { findTournamentOnSurface } from '../tournaments/tournament-surface-lookup';
+import { capacityLimitOf, countCapacityReservations, isCapacityFull } from '../tournaments/registration-capacity';
 
 /**
  * **팀을 리그 로스터에 넣어도 되는가** 를 DB 를 보고 판정하는 단일 경로 (Task 164 BE-3).
@@ -137,6 +138,25 @@ export async function createLeagueRosterRegistration(
     createdAt?: Date;
   },
 ): Promise<void> {
+  // 최초 선택·직접 추가·시즌 승계도 신청 제출과 같은 행을 잠가 예약을 초과하지 않는다.
+  await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${input.leagueId} AND kind = 'regular_league' AND deleted_at IS NULL FOR UPDATE`;
+  const league = await findTournamentOnSurface(tx, ['regular_league'], {
+    where: { id: input.leagueId, deletedAt: null },
+    select: { id: true, kind: true, teamCount: true, maxTeams: true },
+  });
+  if (league === null) {
+    throw new UnprocessableEntityException({ code: 'LEAGUE_TEAM_INVALID', message: '리그를 찾을 수 없어요.' });
+  }
+  if (capacityLimitOf(league) !== null) {
+    const existing = await tx.v1TournamentRegistration.findUnique({
+      where: { tournamentId_teamId: { tournamentId: input.leagueId, teamId: input.teamId } },
+      select: { id: true },
+    });
+    const reservedCount = await countCapacityReservations(tx, input.leagueId, existing?.id);
+    if (isCapacityFull(league, reservedCount)) {
+      throw new ConflictException({ code: 'TOURNAMENT_CAPACITY_FULL', message: '참가팀 정원이 가득 차 팀을 추가할 수 없어요.' });
+    }
+  }
   const team = await tx.v1Team.findUnique({
     where: { id: input.teamId },
     select: { ownerUserId: true },

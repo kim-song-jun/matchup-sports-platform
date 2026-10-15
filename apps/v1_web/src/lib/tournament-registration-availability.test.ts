@@ -9,7 +9,13 @@ import {
 
 const NOW = new Date('2026-07-27T00:00:00.000Z');
 
-function tournament(overrides: Partial<Parameters<typeof resolveTournamentCapacity>[0]> = {}) {
+type CapacityFixture = Parameters<typeof resolveTournamentCapacity>[0] & {
+  maxTeams?: number | null;
+  maxPlayers?: number | null;
+  activeRegistrationCount?: number;
+};
+
+function tournament(overrides: Partial<CapacityFixture> = {}) {
   return {
     status: 'open',
     teamCount: 8,
@@ -126,5 +132,77 @@ describe('copy helpers', () => {
       '신청이 마감돼서 새로 신청할 수 없어요.',
     );
     expect(describeTournamentRegistrationBlock('not_open', capacity)).toBe('지금은 참가 신청을 받지 않아요.');
+  });
+});
+
+describe('regular league optional team capacity', () => {
+  it.each(['draft', 'open', 'in_progress'])('blocks a full finite league while status is %s', (status) => {
+    // Given: the actual team cap differs from the legacy tournament mirror default.
+    const league = tournament({ kind: 'regular_league', status, maxTeams: 5, confirmedCount: 5 });
+    // When: the same capacity data reaches the application entry and summary.
+    const capacity = resolveTournamentCapacity(league);
+    // Then: neither consumer offers a sixth reserved place.
+    expect(resolveTournamentRegistrationBlock(league, NOW)).toBe('capacity_full');
+    expect(canStartTournamentRegistration(league, NOW)).toBe(false);
+    expect(capacity).toMatchObject({ reservedCount: 5, remainingCount: 0, isFull: true });
+  });
+
+  it('reserves places for awaiting_payment, payment_checking and paid in the server aggregate', () => {
+    // Given: two confirmed teams and the three pending-payment statuses occupy five places.
+    const league = tournament({
+      kind: 'regular_league', maxTeams: 5, confirmedCount: 2, pendingPaymentCount: 3,
+      activeRegistrationCount: 1,
+    });
+    // When: capacity is resolved from all-source serializer counts.
+    const capacity = resolveTournamentCapacity(league);
+    // Then: the applied-only operational count cannot replace occupancy.
+    expect(capacity).toMatchObject({ reservedCount: 5, remainingCount: 0, isFull: true });
+    expect(resolveTournamentRegistrationBlock(league, NOW)).toBe('capacity_full');
+  });
+
+  it.each([undefined, null])('keeps an unset team cap unlimited: %s', (maxTeams) => {
+    // Given: neither the mirror teamCount nor the player cap limits team admission.
+    const league = tournament({
+      kind: 'regular_league', maxTeams, maxPlayers: 2, teamCount: 8,
+      confirmedCount: 99, pendingPaymentCount: 99,
+    });
+    // When: unlimited capacity is resolved after more than eight registrations.
+    const capacity = resolveTournamentCapacity(league);
+    // Then: every reservation stays visible and another team can apply.
+    expect(capacity).toMatchObject({ teamCount: null, reservedCount: 198, remainingCount: null, isFull: false });
+    expect(describeTournamentCapacity(capacity)).toContain('무제한');
+    expect(resolveTournamentRegistrationBlock(league, NOW)).toBeNull();
+  });
+
+  it('keeps player limits and applied-only counts independent from the team cap', () => {
+    // Given: nine teams fit a ten-team league despite a smaller legacy mirror/player limit.
+    const league = tournament({
+      kind: 'regular_league', maxTeams: 10, maxPlayers: 2, teamCount: 8,
+      confirmedCount: 9, activeRegistrationCount: 99,
+    });
+    // When: the remaining team places are calculated.
+    const capacity = resolveTournamentCapacity(league);
+    // Then: one team place remains and the actual nine occupied places are retained.
+    expect(capacity).toMatchObject({ reservedCount: 9, remainingCount: 1, isFull: false });
+    expect(resolveTournamentRegistrationBlock(league, NOW)).toBeNull();
+  });
+
+  it('retains actual occupancy when existing teams exceed a finite league cap', () => {
+    // Given: historical data already contains six reserved teams against a three-team cap.
+    const league = tournament({ kind: 'regular_league', maxTeams: 3, confirmedCount: 4, pendingPaymentCount: 2 });
+    // When: the summary is resolved.
+    const capacity = resolveTournamentCapacity(league);
+    // Then: occupancy is never truncated to disguise the stored registrations.
+    expect(capacity).toMatchObject({ reservedCount: 6, remainingCount: 0, isFull: true });
+  });
+
+  it('preserves the regular tournament teamCount contract', () => {
+    // Given: a regular tournament still has eight team places.
+    const competition = tournament({ kind: 'regular_tournament', maxTeams: 1, maxPlayers: 1 });
+    // When: the tournament capacity is resolved.
+    const capacity = resolveTournamentCapacity(competition);
+    // Then: league and roster fields cannot shrink tournament capacity.
+    expect(capacity).toMatchObject({ teamCount: 8, reservedCount: 5, remainingCount: 3, isFull: false });
+    expect(resolveTournamentRegistrationBlock(competition, NOW)).toBeNull();
   });
 });

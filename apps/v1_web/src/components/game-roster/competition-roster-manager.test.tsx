@@ -133,6 +133,31 @@ describe('공통 명단 관리의 실제 탭·저장 흐름', () => {
     expect(screen.getByRole('button', { name: '김민재 GK 지정' })).toHaveAttribute('aria-pressed', 'true');
     expect(mock.readRoster().participants[0].goalkeeper).toBe(false);
   });
+  it('두 선수의 등번호를 맞바꿔도 한 번에 저장된다', async () => {
+    // 서버처럼 지금 다른 선수가 단 번호면 409 를 준다.
+    server.use(http.patch('*/api/v1/tournaments/:id/registrations/:reg/players/:player/roster-settings', async ({ params, request }) => {
+      const p = players.find(p => p.participantId === params.player)!;
+      const body = await request.json() as { jerseyNumber?: number | null };
+      if (body.jerseyNumber != null && mock.readRoster().base.some(other => other.userId !== p.userId && other.jerseyNumber === body.jerseyNumber)) {
+        return HttpResponse.json({ message: '이미 사용 중인 등번호예요.', code: 'ROSTER_DUPLICATE_JERSEY_NUMBER' }, { status: 409 });
+      }
+      if (body.jerseyNumber !== undefined) mock.setJersey(p.userId, body.jerseyNumber);
+      return ok({ id: p.participantId, ...body });
+    }));
+    open('registration');
+    const setNumber = async (button: string, value: string) => {
+      fireEvent.click(await screen.findByRole('button', { name: button }));
+      fireEvent.change(screen.getByLabelText('등번호'), { target: { value } });
+      fireEvent.click(screen.getByRole('button', { name: '적용' }));
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    };
+    await setNumber('김민재 등번호 7번 바꾸기', '');
+    await setNumber('박서준 등번호 10번 바꾸기', '7');
+    await setNumber('김민재 등번호 넣기', '10');
+    fireEvent.click(screen.getByRole('button', { name: '변경사항 저장' }));
+    await screen.findByText('참가 선수의 공통 설정을 저장했어요.');
+    expect(mock.readRoster().base.map(p => [p.userId, p.jerseyNumber])).toEqual(expect.arrayContaining([['player-1', 10], ['player-2', 7]]));
+  });
   it('일부 선수 저장 뒤 실패하면 성공한 인원과 남은 초안을 구분해 재시도한다', async () => {
     let failing = true;
     server.use(http.patch('*/api/v1/tournaments/:id/registrations/:reg/players/:player/roster-settings', ({ params }) => {

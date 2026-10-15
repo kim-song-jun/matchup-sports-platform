@@ -78,6 +78,14 @@ export function ParticipantRosterEditor({ tournamentId, registrationId }: { tour
     savingRef.current = true; setSaving(true); setError(null); setNotice(null);
     let completed = 0;
     try {
+      // 서버는 행마다 지금 DB 기준으로 번호 중복을 검사한다. 번호를 맞바꾸면(A 7→10, B 10→7) 첫 저장이 409 가 나므로
+      // 다른 선수가 가져갈 번호를 쥔 행은 먼저 번호를 비운다.
+      const targets = new Set(changes.map(p => draft[p.id].jerseyNumber).filter((n): n is number => n !== null));
+      for (const player of changes) {
+        if (player.jerseyNumber !== null && draft[player.id].jerseyNumber !== player.jerseyNumber && targets.has(player.jerseyNumber)) {
+          await update.mutateAsync({ playerId: player.id, jerseyNumber: null });
+        }
+      }
       // 행마다 서버 트랜잭션으로 저장한다. 일부 성공 뒤 실패하면 남은 초안을 유지하고 실제 결과를 안내한다.
       for (const player of changes) {
         const value = draft[player.id];

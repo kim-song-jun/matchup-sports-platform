@@ -5,8 +5,7 @@ import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import LeagueSettingsClient from './league-settings-client';
 
-const mocks = vi.hoisted(() => ({ push: vi.fn(), canWrite: true }));
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: mocks.push }) }));
+const mocks = vi.hoisted(() => ({ canWrite: true }));
 vi.mock('@/hooks/use-admin-can-write', () => ({ useAdminCanWrite: () => mocks.canWrite }));
 vi.mock('@/hooks/use-v1-api', () => ({ useV1MasterRegions: () => ({ data: [], isError: false }) }));
 const initial = { leagueId: 'league-test', title: '기존 리그', rulesText: '운영 안내', regionId: 'region-test',
@@ -29,10 +28,10 @@ function mount() {
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterAll(() => server.close());
 afterEach(() => { cleanup(); server.resetHandlers(); });
-beforeEach(() => { stored = { ...initial }; submitted = undefined; mocks.canWrite = true; mocks.push.mockReset(); });
+beforeEach(() => { stored = { ...initial }; submitted = undefined; mocks.canWrite = true; });
 
 describe('실제 설정 hook/API를 통한 별도 리그 수정 화면', () => {
-  it('현재 값을 채우고 PATCH 저장 후 상세로 돌아가며 변경하지 않은 시각은 그대로 보낸다', async () => {
+  it('현재 값을 채우고 PATCH 저장 후 같은 화면에 남아 알리며 변경하지 않은 시각은 그대로 보낸다', async () => {
     mount();
     const title = await screen.findByLabelText('리그 이름');
     expect(title).toHaveValue(initial.title);
@@ -41,7 +40,10 @@ describe('실제 설정 hook/API를 통한 별도 리그 수정 화면', () => {
     expect(screen.getByLabelText('총 경기 수 (선택)')).toHaveValue(12);
     fireEvent.change(title, { target: { value: '변경 리그' } });
     fireEvent.click(screen.getByRole('button', { name: '변경사항 저장' }));
-    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith('/admin/league-matches/league-test'));
+    expect(await screen.findByText('리그 정보를 저장했어요.')).toBeInTheDocument();
+    expect(screen.getByLabelText('리그 이름')).toHaveValue('변경 리그');
+    expect(screen.getByRole('button', { name: '변경사항 저장' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: '상세로 돌아가기' })).toBeNull();
     expect(submitted).toEqual({ title: '변경 리그', rulesText: initial.rulesText, regionId: initial.regionId,
       startsOn: initial.startsOn, endsOn: initial.endsOn, registrationDeadlineAt: initial.registrationDeadlineAt,
       plannedFixtureCount: 12, expectedUpdatedAt: initial.updatedAt });
@@ -88,7 +90,7 @@ describe('실제 설정 hook/API를 통한 별도 리그 수정 화면', () => {
     fireEvent.change(title, { target: { value: '보존할 초안' } });
     fireEvent.click(screen.getByRole('button', { name: '변경사항 저장' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('최신 정보를 다시 불러와 주세요.');
-    expect(title).toHaveValue('보존할 초안'); expect(mocks.push).not.toHaveBeenCalled();
+    expect(title).toHaveValue('보존할 초안');
     server.use(http.get(path, () => HttpResponse.json({ statusCode: 503, message: '조회 실패' }, { status: 503 })));
     fireEvent.click(screen.getByRole('button', { name: '최신 정보 다시 불러오기' }));
     fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '수정 내용 버리기' }));

@@ -48,15 +48,11 @@ describe('buildLeagueEventLd', () => {
 });
 
 describe('buildFixtureEventLd', () => {
-  it('상위 대회는 대회 상세 LD 와 같은 @id 로, 두 팀은 팀 상세 @id 로 잇는다', () => {
-    const tournamentLd = buildSportsEventLd({
-      id: 't1', title: '가을 풋살컵', scheduledAt: '2026-10-03T01:00:00.000Z', status: 'open',
-      sport: { code: 'futsal', name: '풋살' }, entryFee: 0,
-    } as V1TournamentDetail);
-
+  it('경기 자체의 공개 사실과 팀 연결은 싣되 미완성 상위 Event 를 참조하지 않는다', () => {
     const ld = buildFixtureEventLd(fixture());
 
-    expect(ld?.superEvent).toEqual({ '@id': tournamentLd?.['@id'] });
+    expect(ld).toMatchObject({ name: '송파 유나이티드 vs 한강 로버스 | 가을 풋살컵 결승', startDate: '2026-10-03T01:00:00.000Z' });
+    expect(ld).not.toHaveProperty('superEvent');
     expect(ld?.homeTeam).toMatchObject({ '@id': 'https://teameet.co.kr/teams/team-a#team' });
     expect(ld?.location).toMatchObject({ name: '송파 풋살파크 A코트' });
   });
@@ -85,16 +81,16 @@ describe('buildFixtureEventLd', () => {
 });
 
 describe('리그 대진 LD (buildTeamMatchEventLd + path 옵션)', () => {
-  it('리그 경기 주소를 @id 로 쓰고, 상위 리그 LD 의 @id 에 잇는다', () => {
+  it('리그 경기 주소를 @id 로 쓰되 미완성 상위 Event 는 참조하지 않는다', () => {
     const teamMatch = {
       teamMatchId: 'f9', title: '1주차', sportName: '풋살', startsAt: '2026-09-20T01:00:00.000Z',
       placeName: '송파 풋살파크', status: 'matched', hostTeam: { teamId: 'team-a', name: '송파 유나이티드' },
     } as unknown as V1TeamMatch;
 
-    const ld = buildTeamMatchEventLd(teamMatch, 'f9', { path: '/league-matches/lg1/fixtures/f9', superEventPath: '/tournaments/lg1' });
+    const ld = buildTeamMatchEventLd(teamMatch, 'f9', { path: '/league-matches/lg1/fixtures/f9' });
 
     expect(ld?.['@id']).toBe('https://teameet.co.kr/league-matches/lg1/fixtures/f9#event');
-    expect(ld?.superEvent).toEqual({ '@id': buildLeagueEventLd(league, null)['@id'] });
+    expect(ld).not.toHaveProperty('superEvent');
     expect(buildTeamMatchEventLd(teamMatch, 'f9')?.['@id']).toBe('https://teameet.co.kr/team-matches/f9#event');
   });
 });

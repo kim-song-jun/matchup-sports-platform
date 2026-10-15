@@ -51,7 +51,6 @@ export function buildFixtureEventLd(match: PublicMatchDetail): JsonLdNode | null
   // SportsEvent 의 사실상 필수 필드. 일정 미정 경기에 가짜 날짜를 채우지 않는다.
   if (!match.scheduledAt) return null;
 
-  const tournamentUrl = absoluteSiteUrl(`/tournaments/${match.tournamentId}`);
   const url = absoluteSiteUrl(`/tournaments/${match.tournamentId}/matches/${match.fixtureId}`);
   const homeName = match.home?.teamName ?? '미정';
   const awayName = match.away?.teamName ?? '미정';
@@ -68,7 +67,6 @@ export function buildFixtureEventLd(match: PublicMatchDetail): JsonLdNode | null
     eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
     inLanguage: 'ko-KR',
     organizer: { '@id': organizationId() },
-    superEvent: { '@id': `${tournamentUrl}#event` },
   };
 
   const home = teamReference(match.home?.teamId, match.home?.teamName);

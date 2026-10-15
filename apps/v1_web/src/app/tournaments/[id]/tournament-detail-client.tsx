@@ -990,6 +990,7 @@ export function TournamentDetailView({
   /* ── Left column body content (completed — TARGET §1~6 축약 레이아웃) ──
      헤더 → 결과 히어로 → 액션 리스트 → 참가팀 → 기본정보·상금 → (협찬) → 아코디언(규정/환불/유의사항).
      신청 안내·진행 방식·인라인 조별순위/일정·결선 대진표는 완료 상세에서 제거(중복 해소, 스크롤 감소). ── */
+  const completedVenueAddress = tournament.venueAddress?.trim();
   const completedLeftContent = (
     <>
       <section aria-label="대회 기본 정보" style={{ marginTop: 20 }}>
@@ -1035,6 +1036,7 @@ export function TournamentDetailView({
           {tournament.venue ? (
             <InfoRow label="장소" value={tournament.venue} />
           ) : null}
+          {completedVenueAddress ? <InfoRow label="주소" value={completedVenueAddress} /> : null}
           <InfoRow
             label="선수단 규모"
             value={rosterLimitText(tournament.minPlayers, tournament.maxPlayers, (min, max) => `팀당 ${min}~${max}명`)}

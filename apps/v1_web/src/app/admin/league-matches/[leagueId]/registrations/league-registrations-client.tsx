@@ -1,9 +1,8 @@
 'use client';
 
-import Link from 'next/link';
 import { Check } from 'lucide-react';
 import { useState } from 'react';
-import { AdminPageHeader, AdminToasts, useAdminToast } from '@/components/admin';
+import { AdminToasts, useAdminToast } from '@/components/admin';
 import { RegistrationsTab } from '@/app/admin/tournaments/[id]/registrations-tab';
 import { ConfirmModal } from '@/components/v1-ui/confirm-modal';
 import { useV1AdminLeagueMatch, useV1OpenLeagueRegistration, useV1UpdateLeagueEntryFee } from '@/hooks/use-v1-api';
@@ -13,6 +12,7 @@ import { deriveRegistrationSetupSteps, DEADLINE_PRESET_DAYS, presetDeadlineIso }
 import { extractErrorMessage } from '@/lib/error-message';
 import { kstDatetimeLocalToIso } from '@/lib/kst-calendar';
 import type { V1UpdateLeagueEntryFeePayload } from '@/types/league-match';
+import { LeagueCloseRegistrationControl } from '../league-close-registration-control';
 import { LeagueFeeCard } from './league-fee-card';
 
 type DeadlinePreset = (typeof DEADLINE_PRESET_DAYS)[number] | 'custom';
@@ -143,19 +143,17 @@ export default function LeagueRegistrationsClient({ leagueId }: { leagueId: stri
 
   return (
     <div className="pb-12">
-      <AdminPageHeader
-        title="참가 신청 관리"
-        description={league?.title ?? '리그'}
-        action={
-          <Link
-            href={`/admin/league-matches/${leagueId}`}
-            className="tm-btn tm-btn-sm tm-btn-outline"
-            style={{ minHeight: 44 }}
-          >
-            리그로 돌아가기
-          </Link>
-        }
-      />
+      {league && registrationOpen ? (
+        <LeagueCloseRegistrationControl
+          leagueId={leagueId}
+          state={league.state}
+          registrationOpen={registrationOpen}
+          registrationDeadlineAt={registrationDeadlineAt}
+          activeRegistrationCount={league.activeRegistrationCount}
+          confirmedCount={league.confirmedRegistrationCount}
+          showToast={showToast}
+        />
+      ) : null}
 
       {steps ? (
         <ol aria-label="신청 준비 순서" className="mb-4 flex list-none flex-wrap gap-2 p-0">

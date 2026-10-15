@@ -91,11 +91,9 @@ async function renderPage() {
 }
 
 describe('QA #47 실제 리그 관리자 route → hooks → 후기 관리', () => {
-  it('대회 전용 상세 조회 없이 현재 리그 후기와 관리자 상세 복귀를 연결해요', async () => {
+  it('대회 전용 상세 조회 없이 현재 리그 후기를 연결해요', async () => {
     await renderPage();
     expect(await screen.findByText(visibleReview.comment ?? '')).toBeVisible();
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('합성 종료 리그 후기 관리');
-    expect(screen.getByRole('link', { name: '리그 상세로' })).toHaveAttribute('href', `/admin/league-matches/${LEAGUE_ID}`);
     expect(reviewReads).toEqual([LEAGUE_ID]);
   });
 
@@ -122,7 +120,6 @@ describe('QA #47 실제 리그 관리자 route → hooks → 후기 관리', () 
     await renderPage();
     expect(await screen.findByRole('alert')).toHaveTextContent(message);
     expect(reviewReads).toEqual([]);
-    expect(screen.getByRole('link', { name: '리그 상세로' })).toBeVisible();
     server.use(http.get('*/api/v1/admin/league-matches/:leagueId', () => success(league)));
     fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
     expect(await screen.findByText(visibleReview.comment ?? '')).toBeVisible();

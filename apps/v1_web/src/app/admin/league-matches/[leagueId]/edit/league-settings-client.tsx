@@ -1,8 +1,7 @@
 'use client';
 
 import { useId, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { AdminEmpty, AdminPageHeader, AdminPageSkeleton } from '@/components/admin';
+import { AdminEmpty, AdminPageSkeleton, AdminToasts, useAdminToast } from '@/components/admin';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
 import { useLeagueSettings, useUpdateLeagueSettings } from '@/hooks/use-league-settings';
@@ -26,17 +25,22 @@ const buttonClass = 'tm-btn tm-btn-md tm-btn-neutral min-h-[44px]';
 export default function LeagueSettingsClient({ leagueId }: { leagueId: string }) {
   const query = useLeagueSettings(leagueId);
   const [revision, setRevision] = useState(0);
+  // 저장하면 폼을 새 스냅샷으로 다시 그리므로 토스트는 폼 밖에 둔다.
+  const { toasts, showToast } = useAdminToast();
   if (query.isPending) return <AdminPageSkeleton />;
   if (!query.data) return <AdminEmpty title="리그 정보를 불러오지 못했어요"
     description={extractErrorMessage(query.error, '잠시 후 다시 시도해 주세요.')}
     action={<button type="button" className={buttonClass} onClick={() => query.refetch()}>다시 시도</button>} />;
-  return <SettingsForm key={`${leagueId}:${revision}`} leagueId={leagueId} initial={query.data}
-    reload={async () => { const result = await query.refetch(); if (result.error) throw result.error; setRevision(value => value + 1); }} />;
+  return <>
+    <SettingsForm key={`${leagueId}:${revision}`} leagueId={leagueId} initial={query.data}
+      reload={async () => { const result = await query.refetch(); if (result.error) throw result.error; setRevision(value => value + 1); }}
+      onSaved={() => { setRevision(value => value + 1); showToast('리그 정보를 저장했어요.'); }} />
+    <AdminToasts toasts={toasts} />
+  </>;
 }
 
-function SettingsForm({ leagueId, initial, reload }: { leagueId: string; initial: LeagueSettings; reload: () => Promise<void> }) {
+function SettingsForm({ leagueId, initial, reload, onSaved }: { leagueId: string; initial: LeagueSettings; reload: () => Promise<void>; onSaved: () => void }) {
   const id = useId();
-  const router = useRouter();
   const canWrite = useAdminCanWrite();
   const regions = useV1MasterRegions();
   const regionOptions = toDistrictRegionOptions(regions.data ?? []);
@@ -53,7 +57,6 @@ function SettingsForm({ leagueId, initial, reload }: { leagueId: string; initial
   const ended = snapshot.status === 'completed' || snapshot.status === 'cancelled';
   const busy = save.isPending || reloading;
   const disabled = !canWrite || ended || busy;
-  const detailHref = `/admin/league-matches/${encodeURIComponent(leagueId)}`;
   const change = (key: keyof typeof draft, value: string) => setDraft(current => ({ ...current, [key]: value }));
   const plannedFixtureCountInvalid = draft.plannedFixtureCount.trim() !== ''
     && !(/^\d+$/.test(draft.plannedFixtureCount.trim())
@@ -79,12 +82,12 @@ function SettingsForm({ leagueId, initial, reload }: { leagueId: string; initial
         registrationDeadlineAt: draft.deadline === original.deadline ? snapshot.registrationDeadlineAt : kstDatetimeLocalToIso(draft.deadline),
         plannedFixtureCount: draft.plannedFixtureCount.trim() === '' ? null : Number(draft.plannedFixtureCount),
       });
-      router.push(detailHref);
+      // 저장 응답이 캐시에 들어가 있어 다시 그리면 새 updatedAt 으로 이어서 고칠 수 있다.
+      onSaved();
     } catch (cause) { setError(extractErrorMessage(cause, '리그 정보를 저장하지 못했어요.')); }
     finally { lock.current = false; }
   };
-  return <div className="tm-content-enter mx-auto max-w-2xl">
-    <AdminPageHeader eyebrow="플랫폼 · 리그" title="리그 수정" description={`${snapshot.title} · ${snapshot.sportName}`} />
+  return <div className="tm-content-enter max-w-2xl">
     {!canWrite && <p role="status">조회 권한으로 접속했어요. 기본 정보를 수정하려면 쓰기 권한이 필요해요.</p>}
     {ended && <p role="status">끝났거나 취소된 리그는 기본 정보를 수정할 수 없어요.</p>}
     <form onSubmit={submit} className="space-y-5" aria-busy={busy}>
@@ -115,7 +118,6 @@ function SettingsForm({ leagueId, initial, reload }: { leagueId: string; initial
       {error && <p role="alert" className="tm-text-label text-[var(--red700)]">{error}</p>}
       <div className="flex flex-wrap gap-2">
         <button className="min-h-[44px] w-full rounded-xl bg-blue-500 text-[length:var(--font-size-body-sm)] font-semibold text-white disabled:opacity-50" type="submit" disabled={disabled || !dirty || !!hint}>{save.isPending ? '저장 중…' : '변경사항 저장'}</button>
-        <button className={buttonClass} type="button" disabled={busy} onClick={async () => { if (await discard()) router.push(detailHref); }}>상세로 돌아가기</button>
         <button className={buttonClass} type="button" disabled={busy} onClick={async () => {
           if (!(await discard())) return;
           setReloading(true); setError(null);

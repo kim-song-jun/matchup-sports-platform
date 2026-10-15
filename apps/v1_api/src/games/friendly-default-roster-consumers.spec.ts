@@ -176,10 +176,10 @@ describe('MD-QA #146: actual generic lineup GET → event consumer', () => {
       const away = rows.find((lineup) => lineup.sideId === ids.away)?.participants[0];
       if (away === undefined) throw new Error('The published effective opponent roster must be selectable by the host recorder.');
 
-      const grant = await fixture.service.requestTakeover(reader, ids.game, { clientInstanceId: 'host-record-client', lastSequence: 0 });
+      // Friendly host actors append directly without requesting a takeover lease.
       const commandId = randomUUID();
       await fixture.service.appendEvent(reader, ids.game, commandId, {
-        clientEventId: commandId, expectedVersion: 0, takeoverToken: grant.takeoverToken,
+        clientEventId: commandId, expectedVersion: 0, takeoverToken: 'friendly-no-lease-required',
         type: 'GOAL', sideId: ids.away, participantId: away.id, period: 1, clockMs: 0,
         occurredAt: new Date().toISOString(), payload: {},
       });

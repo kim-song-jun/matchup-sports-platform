@@ -192,7 +192,7 @@ describe('TeamMatchResultPageClient — 호스트 결과 입력', () => {
     rerender(<TeamMatchResultPageClient teamMatchId="tm-1" />);
 
     expect(screen.getByText(lineupRefreshError)).toBeInTheDocument();
-    expect(screen.getByText('결과 작성 완료')).not.toBeInTheDocument();
+    expect(screen.queryByText('결과 작성 완료')).not.toBeInTheDocument();
   });
 
   it('keeps the result form visible while a matching cached recording lineup refreshes', () => {

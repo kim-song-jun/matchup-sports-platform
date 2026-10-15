@@ -80,6 +80,7 @@ import { v1GameRosterMswHandlers } from './game-roster-handlers';
 import { v1TeamDissolutionMswHandlers } from './team-dissolution-handlers';
 import { v1TeamInviteLinkMswHandlers } from './team-invite-link-handlers';
 import { v1LeagueVisibilityMswHandlers } from './league-visibility-handlers';
+import { v1LeagueCapacityMswHandlers } from './league-capacity-handlers';
 
 const api = '*/api/v1';
 
@@ -706,6 +707,7 @@ export const v1MswHandlers = [
   ...v1GameRosterMswHandlers,
   ...v1TeamDissolutionMswHandlers,
   ...v1TeamInviteLinkMswHandlers,
+  ...v1LeagueCapacityMswHandlers,
   ...v1LeagueVisibilityMswHandlers,
   http.get(`${api}/auth/me`, () => ok(v1UserFixture)),
   http.post(`${api}/auth/phone/issue`, ({ request }) => issueAuthPhone(request)),

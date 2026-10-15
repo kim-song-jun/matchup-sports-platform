@@ -10,12 +10,14 @@ function makeService(row: Record<string, unknown>) {
     seriesId: null, tier: null, seasonNo: null,
     sport: { id: 'sport-1', code: 'futsal', name: '풋살' }, region: { id: 'region-1', name: '서울' },
     registrations: [], series: null,
+    maxTeams: null,
     coverImageUrl: null, entryFee: 0, entryFeeConfiguredAt: null,
     ...SECRET, // 목은 select 를 지키지 않는다 — 서비스가 응답에 새로 싣지 않는지까지 본다.
     ...row,
   });
   const prisma = {
     v1Tournament: { findFirst },
+    v1TournamentRegistration: { count: jest.fn().mockResolvedValue(0) },
     v1TeamMatch: { findMany: jest.fn().mockResolvedValue([]) },
     v1GameOfficialFact: { findMany: jest.fn().mockResolvedValue([]) },
     v1GameOperationFlag: { findUnique: jest.fn().mockResolvedValue(null) },

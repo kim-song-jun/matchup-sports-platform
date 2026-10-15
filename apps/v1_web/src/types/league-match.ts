@@ -203,6 +203,12 @@ export interface V1AdminLeagueDetail {
   /** 팀 명단 인원. maxPlayers 가 null 이면 제한 없음. */
   minPlayers?: number;
   maxPlayers?: number | null;
+  /** 참가팀 정원. null이면 무제한이며 선수 정원·대진 템플릿과 독립이다. */
+  maxTeams: number | null;
+  /** 모든 유입 경로의 확정 팀 수(seed·승계 포함). */
+  confirmedCount: number;
+  /** 모든 유입 경로의 awaiting_payment·payment_checking·paid 팀 수. */
+  pendingPaymentCount: number;
   /** 리그를 만들 때 정한 총 경기 수(계획). 대진 생성 폼의 기본값. */
   plannedFixtureCount?: number | null;
   /**
@@ -372,6 +378,8 @@ export interface V1CreateLeaguePayload {
   minPlayers?: number;
   /** null = 팀 명단 인원 제한 없음. */
   maxPlayers?: number | null;
+  /** null·생략 = 참가팀 정원 무제한. */
+  maxTeams?: number | null;
   plannedFixtureCount?: number;
 }
 

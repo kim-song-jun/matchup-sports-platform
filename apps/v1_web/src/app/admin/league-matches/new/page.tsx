@@ -22,7 +22,7 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { LeagueBasicFields, leagueInputClass as inputClass } from '../league-basic-fields';
 import { LEAGUE_TIE_BREAK_ORDER, formatTieBreakRule } from '@/lib/league-tie-break-labels';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
-import { LeaguePlannedFixtureField, LeagueRosterLimitField, rosterLimitError, type RosterLimitValue } from '../league-settings-fields';
+import { LeaguePlannedFixtureField, LeagueRosterLimitField, LeagueTeamCapacityField, leagueTeamCapacityError, rosterLimitError, type RosterLimitValue } from '../league-settings-fields';
 
 /** 페이지 로컬 팀 선택 상태 — EntityPickerItem에 종목 판정에 필요한 필드만 얹는다. */
 type LeagueTeamPick = EntityPickerItem & { sportId: string };
@@ -44,6 +44,7 @@ export default function AdminLeagueMatchNewPage() {
   // 팀 명단 인원 — 리그는 팀 전원이 명단(=경기 출전자)에 오르는 것이 기본이라 '제한 없음'으로 시작한다.
   const [rosterLimit, setRosterLimit] = useState<RosterLimitValue>({ unlimited: true, minPlayers: '1', maxPlayers: '20' });
   const [plannedFixtureCount, setPlannedFixtureCount] = useState('');
+  const [maxTeams, setMaxTeams] = useState('');
   // Covers create + period lookup/save so the button stays locked until the whole flow settles.
   const [submitting, setSubmitting] = useState(false);
   const submitLock = useRef(false);
@@ -97,6 +98,7 @@ export default function AdminLeagueMatchNewPage() {
   const periodNames = periodLabels(periodMinutes.length);
   const periodsInvalid = periodMinutes.some((value) => !/^\d+$/.test(value.trim()) || Number(value) < 1 || Number(value) > 240);
   const rosterLimitInvalid = rosterLimitError(rosterLimit);
+  const teamCapacityInvalid = leagueTeamCapacityError(maxTeams);
   const plannedFixtureCountInvalid =
     plannedFixtureCount.trim() !== '' && !(/^\d+$/.test(plannedFixtureCount.trim()) && Number(plannedFixtureCount) >= 1 && Number(plannedFixtureCount) <= 500);
 
@@ -114,6 +116,7 @@ export default function AdminLeagueMatchNewPage() {
     selectedTeams.length >= 2 &&
     !periodsInvalid &&
     rosterLimitInvalid === null &&
+    teamCapacityInvalid === null &&
     !plannedFixtureCountInvalid;
 
   // 그룹 B 감사 결함 4: canSubmit이 false일 때 "왜"를 알려준다 — 지금까지는 버튼이 그냥
@@ -129,6 +132,7 @@ export default function AdminLeagueMatchNewPage() {
     if (selectedTeams.length < 2) return `참가 팀을 2팀 이상 추가해 주세요. (현재 ${selectedTeams.length}팀)`;
     if (periodsInvalid) return '경기 시간은 피리어드마다 1~240분 사이의 정수로 입력해 주세요.';
     if (rosterLimitInvalid) return rosterLimitInvalid;
+    if (teamCapacityInvalid) return teamCapacityInvalid;
     if (plannedFixtureCountInvalid) return '총 경기 수는 1~500 사이로 입력해 주세요.';
     return null;
   })();
@@ -162,6 +166,7 @@ export default function AdminLeagueMatchNewPage() {
         // 제한 없음이면 최소 인원도 1 로 둔다 — 남겨 두면 신청 화면이 '최소 6명'을 계속 재촉한다.
         minPlayers: rosterLimit.unlimited ? 1 : Number(rosterLimit.minPlayers),
         maxPlayers: rosterLimit.unlimited ? null : Number(rosterLimit.maxPlayers),
+        maxTeams: maxTeams.trim() === '' ? null : Number(maxTeams),
         ...(plannedFixtureCount.trim() !== '' ? { plannedFixtureCount: Number(plannedFixtureCount) } : {}),
       });
       if (periodsDirty) {
@@ -269,6 +274,8 @@ export default function AdminLeagueMatchNewPage() {
           onChange={setPlannedFixtureCount}
           disabled={submitting}
         />
+
+        <LeagueTeamCapacityField value={maxTeams} onChange={setMaxTeams} disabled={submitting || !!periodSaveFailure} />
 
         {periodMinutes.length > 0 && (
           <fieldset className="space-y-2">

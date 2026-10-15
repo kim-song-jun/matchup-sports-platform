@@ -36,6 +36,7 @@ import type { LeagueState } from './league-state';
 import { findPublicTournamentOnSurface } from '../tournaments/tournament-surface-lookup';
 import { isLeagueRegistrationOpen } from './league-registration-open';
 import { TOURNAMENT_VENUE_SELECT, tournamentVenueSnapshot } from '../places/tournament-venue';
+import { countPendingCapacityReservations } from '../tournaments/registration-capacity';
 
 const PLAYER_RECORDS_LIMIT = 30;
 const LEAGUE_LIST_DEFAULT_LIMIT = 20;
@@ -514,6 +515,9 @@ export class LeagueMatchPublicService {
       leagueId: league.id,
       title: league.title,
       rulesText: league.rulesText,
+      maxTeams: league.maxTeams,
+      confirmedCount: league.teams.length,
+      pendingPaymentCount: await countPendingCapacityReservations(this.prisma, leagueId),
       state: league.state,
       startsOn: league.startsOn,
       endsOn: league.endsOn,
@@ -802,6 +806,7 @@ export class LeagueMatchPublicService {
         id: true,
         title: true,
         rulesText: true,
+        maxTeams: true,
         status: true,
         registrationDeadlineAt: true,
         scheduledAt: true,

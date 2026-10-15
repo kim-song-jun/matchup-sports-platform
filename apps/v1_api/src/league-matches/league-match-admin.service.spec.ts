@@ -128,6 +128,9 @@ function createFake() {
       // 두면 서비스가 `LEAGUE_STATE_BY_STATUS[undefined]` 를 읽어 조용히 통과한다.
       findFirst: track('v1Tournament.findFirst', async () => ({
         id: 'league-1',
+        kind: 'regular_league',
+        teamCount: 8,
+        maxTeams: null,
         title: '테스트 리그',
         sportId: 'sport-futsal',
         regionId: 'region-1',
@@ -258,7 +261,9 @@ function createFake() {
           return [];
         },
       ),
-      count: track('v1TournamentRegistration.count', async (args: { where: { teamId?: string | { not: string } } }) => {
+      count: track('v1TournamentRegistration.count', async (args: { where: { teamId?: string | { not: string }; status?: string | { in: readonly string[] } } }) => {
+        // This fake stores confirmed roster registrations only; payment-stage predicates match none.
+        if (typeof args.where.status === 'object' && !args.where.status.in.includes('confirmed')) return 0;
         const teamId = args.where.teamId;
         if (typeof teamId === 'string') return state.registeredTeamIds.has(teamId) ? 1 : 0;
         if (teamId !== undefined) {

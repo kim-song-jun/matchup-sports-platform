@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminContextService, writeAdminActionLog, type V1ActiveAdmin } from './admin-context.service';
 
@@ -68,6 +69,39 @@ describe('AdminContextService', () => {
     await expect(service.getMutationAdmin('support-user-id')).rejects.toMatchObject({
       response: { code: 'PERMISSION_DENIED' },
     });
+  });
+});
+
+describe('MD-QA #145 AdminContext explicit transaction client', () => {
+  const activeAdmin = {
+    id: 'tx-admin-id', userId: 'user-id', adminRole: 'ops', status: 'active', user: { accountStatus: 'active' },
+  };
+
+  it.each(['getActiveAdmin', 'getMutationAdmin'] as const)('%s reads the supplied client instead of taking another pool connection', async (method) => {
+    const own = { v1AdminUser: { findUnique: jest.fn().mockResolvedValue({ ...activeAdmin, id: 'global-admin-id' }) } };
+    const tx = { v1AdminUser: { findUnique: jest.fn().mockResolvedValue(activeAdmin) } };
+    const service = new AdminContextService(own as unknown as PrismaService);
+    await expect(service[method]('user-id', tx as unknown as Prisma.TransactionClient)).resolves.toMatchObject({ id: 'tx-admin-id' });
+    expect(tx.v1AdminUser.findUnique).toHaveBeenCalledWith(expect.objectContaining({
+      where: { userId: 'user-id' }, select: expect.objectContaining({ user: { select: { accountStatus: true } } }),
+    }));
+    expect(own.v1AdminUser.findUnique).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['getActiveAdmin', { ...activeAdmin, user: { accountStatus: 'blocked' } }],
+    ['getActiveAdmin', { ...activeAdmin, status: 'revoked' }],
+    ['getMutationAdmin', { ...activeAdmin, adminRole: 'support' }],
+    ['getMutationAdmin', null],
+  ] as const)('%s still denies the supplied transaction snapshot %j', async (method, deniedAdmin) => {
+    const own = { v1AdminUser: { findUnique: jest.fn().mockResolvedValue(activeAdmin) } };
+    const tx = { v1AdminUser: { findUnique: jest.fn().mockResolvedValue(deniedAdmin) } };
+    const service = new AdminContextService(own as unknown as PrismaService);
+    await expect(service[method]('user-id', tx as unknown as Prisma.TransactionClient)).rejects.toMatchObject({
+      response: { code: 'PERMISSION_DENIED' },
+    });
+    expect(tx.v1AdminUser.findUnique).toHaveBeenCalledTimes(1);
+    expect(own.v1AdminUser.findUnique).not.toHaveBeenCalled();
   });
 });
 

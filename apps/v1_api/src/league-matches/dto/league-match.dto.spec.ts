@@ -31,6 +31,57 @@ describe('CreateLeagueMatchDto region identifiers', () => {
   });
 });
 
+describe('CreateLeagueMatchDto team capacity through the HTTP validation pipe', () => {
+  const metadata = { type: 'body' as const, metatype: CreateLeagueMatchDto };
+  const parse = (changes: object) => createGlobalValidationPipe().transform(
+    { ...valid, regionId: 'region-busan-jung', ...changes },
+    metadata,
+  );
+
+  it('preserves player roster limits when team capacity is omitted', async () => {
+    const dto = await parse({ minPlayers: 5, maxPlayers: 12 });
+
+    expect(dto).toMatchObject({ minPlayers: 5, maxPlayers: 12 });
+    expect(dto.maxTeams).toBeUndefined();
+  });
+
+  it('preserves explicit null for unlimited team capacity', async () => {
+    await expect(parse({ maxTeams: null })).resolves.toMatchObject({ maxTeams: null });
+  });
+
+  it.each([1, 2, 21, 51, 2147483647])('accepts positive integer team capacity %p without a roster or template cap', async (maxTeams) => {
+    await expect(parse({ maxTeams })).resolves.toMatchObject({ maxTeams });
+  });
+
+  it.each([0, -1, 1.5, '3', true, false, 2147483648])('rejects invalid team capacity %p without coercion', async (maxTeams) => {
+    await expect(parse({ maxTeams })).rejects.toMatchObject({
+      status: 400,
+      response: {
+        code: 'VALIDATION_ERROR',
+        details: expect.arrayContaining([expect.objectContaining({ field: 'maxTeams' })]),
+      },
+    });
+  });
+
+  it.each([
+    { minPlayers: 1, maxPlayers: null, maxTeams: 2 },
+    { minPlayers: 5, maxPlayers: 12, maxTeams: 1 },
+    { minPlayers: 1, maxPlayers: 50, maxTeams: 51 },
+  ])('preserves independent player roster limits and team capacity: %j', async (limits) => {
+    await expect(parse(limits)).resolves.toMatchObject(limits);
+  });
+
+  it.each([0, 51])('retains the player roster maximum range when team capacity is valid: %p', async (maxPlayers) => {
+    await expect(parse({ minPlayers: 1, maxPlayers, maxTeams: 51 })).rejects.toMatchObject({
+      status: 400,
+      response: {
+        code: 'VALIDATION_ERROR',
+        details: expect.arrayContaining([expect.objectContaining({ field: 'maxPlayers' })]),
+      },
+    });
+  });
+});
+
 describe('UpdateLeagueVisibilityDto', () => {
   const metadata = { type: 'body' as const, metatype: UpdateLeagueVisibilityDto };
 

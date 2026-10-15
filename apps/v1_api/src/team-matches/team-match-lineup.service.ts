@@ -33,6 +33,7 @@ import {
   SubmitTeamMatchLineupDto,
   TeamMatchLineupParticipantDto,
 } from './dto/team-match-lineup.dto';
+import { resolvePublicLineupAt } from './public-lineup-visibility';
 
 type Transaction = Prisma.TransactionClient;
 
@@ -62,9 +63,6 @@ export async function enqueueLineupIncludedNotice(tx: Transaction, lineupId: str
     skipDuplicates: true,
   });
 }
-
-/** 상대 팀에게 참석명단이 공개되는 기본 시각 — 킥오프 1시간 전(D-02). */
-const DEFAULT_PUBLIC_LINEUP_LEAD_MS = 60 * 60 * 1000;
 
 /** 팀 일정 응답(RSVP) — 참석명단 후보 행의 읽기 전용 칩. 명단 자격과 무관하다(H5 결정 A). */
 export type TeamMatchLineupRsvpStatus = 'GOING' | 'MAYBE' | 'NOT_GOING' | 'WAITLISTED' | 'NO_RESPONSE';
@@ -814,7 +812,7 @@ export class TeamMatchLineupService {
 
   /** 공개 시각 — 정책에 값이 없으면 킥오프 1시간 전(제출 때 정책에 같은 값이 박힌다). */
   private effectivePublicLineupAt(context: TeamMatchLineupContext, policyLineupAt: Date | null): Date {
-    return policyLineupAt ?? new Date(context.startAt.getTime() - DEFAULT_PUBLIC_LINEUP_LEAD_MS);
+    return resolvePublicLineupAt(context.startAt, policyLineupAt);
   }
 
   /** 공개 전에는 제출 여부만, 공개 뒤에는 인원까지 — 명단 내용은 `getOpponentLineup` 이 준다. */

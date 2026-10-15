@@ -1,22 +1,23 @@
 import { Test } from '@nestjs/testing';
+import { ForbiddenException } from '@nestjs/common';
 import { Prisma, type V1GameLineup, type V1GameParticipant } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import { OperationAuditWriterService } from '../common/audit/operation-audit-writer.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { GameTakeoverService } from './game-takeover.service';
-import { GamesService } from './games.service';
+import { gameOperationAuditActor, GamesService } from './games.service';
 
 const ids = { game: randomUUID(), match: randomUUID(), home: randomUUID(), away: randomUUID(), homeTeam: randomUUID(), awayTeam: randomUUID(), reader: randomUUID() };
 const reader: V1AuthUser = { id: ids.reader, email: null, accountStatus: 'active', onboardingStatus: 'completed' };
 type LineupRow = Pick<V1GameLineup, 'id' | 'gameId' | 'sideId' | 'revision' | 'state' | 'submittedAt' | 'invalidatedAt'>;
 
-async function consumerFixture(options: { readonly scheduled?: boolean; readonly teamActor?: boolean } = {}) {
+async function consumerFixture(options: { readonly scheduled?: boolean; readonly teamActor?: boolean; readonly competition?: boolean; readonly startAt?: Date } = {}) {
   const teamMatch = {
-    id: ids.match, deletedAt: null, tournamentId: null, leagueId: null, fieldId: null, status: 'matched',
-    hostTeamId: ids.homeTeam, approvedApplicantTeamId: ids.awayTeam, tournament: null, league: null, tournamentDetails: null,
+    id: ids.match, deletedAt: null, tournamentId: null, leagueId: options.competition ? ids.match : null, fieldId: null, status: 'matched',
+    hostTeamId: ids.homeTeam, approvedApplicantTeamId: ids.awayTeam, startAt: options.startAt ?? new Date(Date.now() + 24 * 60 * 60 * 1000), tournament: null, league: null, tournamentDetails: null,
   };
-  const game = { id: ids.game, sourceType: 'TEAM_MATCH', teamMatchId: ids.match, state: options.scheduled ? 'SCHEDULED' : 'LIVE', version: 0, lastSequence: 0, competitionConfigVersionId: 'futsal-config' };
+  const game = { id: ids.game, sourceType: 'TEAM_MATCH', teamMatchId: ids.match, state: options.scheduled ? 'SCHEDULED' : 'LIVE', version: 0, lastSequence: 0, competitionConfigVersionId: 'futsal-config', visibilityPolicy: { lineupAt: new Date(Date.now() + 60 * 60 * 1000) } };
   const sides = [{ id: ids.home, teamId: ids.homeTeam, sideKey: 'HOME' }, { id: ids.away, teamId: ids.awayTeam, sideKey: 'AWAY' }];
   const lineups: LineupRow[] = sides.map((side) => ({ id: randomUUID(), gameId: ids.game, sideId: side.id, revision: 1, state: 'DRAFT', submittedAt: null, invalidatedAt: null }));
   const participants: V1GameParticipant[] = lineups.map((lineup, index) => ({
@@ -25,6 +26,8 @@ async function consumerFixture(options: { readonly scheduled?: boolean; readonly
     positionX: null, positionY: null, started: true, arrivedAt: null, createdAt: new Date(), updatedAt: new Date(),
   }));
   const audits: Prisma.V1OperationAuditUncheckedCreateInput[] = [];
+  const transactionOptions: unknown[] = [];
+  const sideLookups: unknown[] = [];
   const events: Array<{ id: string; gameId: string; sequence: number; participantId?: string | null }> = [];
   const links: Array<{ participantId: string; userId: string; linkId: string }> = [];
   const members = sides.map((side, index) => ({
@@ -33,16 +36,32 @@ async function consumerFixture(options: { readonly scheduled?: boolean; readonly
   }));
   const database = {
     $queryRaw: async () => [],
-    $transaction: async <T>(callback: (tx: unknown) => Promise<T>) => callback(database),
+    $transaction: async <T>(callback: (tx: unknown) => Promise<T>, options?: unknown) => {
+      transactionOptions.push(options);
+      return callback(database);
+    },
     v1Game: {
       findUnique: async () => ({ ...game, teamMatch, sides, lineups, participants, sharedRecord: null, resultRevisions: [] }),
       update: async ({ data }: { data: { version: { increment: number }; lastSequence: number } }) => {
         game.version += data.version.increment; game.lastSequence = data.lastSequence; return { ...game };
       },
     },
-    v1TeamMatch: { findUnique: async () => teamMatch },
+    v1TeamMatch: {
+      findUnique: async () => teamMatch,
+      findFirst: async () => ({
+        startAt: teamMatch.startAt,
+        game: { id: ids.game },
+        tournamentDetails: {
+          homeRegistration: { id: 'home-registration', teamId: ids.homeTeam, team: { name: '홈 팀' } },
+          awayRegistration: { id: 'away-registration', teamId: ids.awayTeam, team: { name: '원정 팀' } },
+        },
+      }),
+    },
     v1GameSide: {
-      findFirst: async ({ where }: { where: { id?: string; teamId?: string } }) => sides.find((side) => (where.id === undefined || side.id === where.id) && (where.teamId === undefined || side.teamId === where.teamId)) ?? null,
+      findFirst: async ({ where }: { where: { id?: string; teamId?: string } }) => {
+        sideLookups.push(where);
+        return sides.find((side) => (where.id === undefined || side.id === where.id) && (where.teamId === undefined || side.teamId === where.teamId)) ?? null;
+      },
       findMany: async () => sides,
     },
     v1GameLineup: {
@@ -113,7 +132,7 @@ async function consumerFixture(options: { readonly scheduled?: boolean; readonly
   const moduleRef = await Test.createTestingModule({ providers: [GamesService, GameTakeoverService,
     { provide: PrismaService, useValue: database }, { provide: OperationAuditWriterService, useValue: new OperationAuditWriterService() },
   ] }).compile();
-  return { service: moduleRef.get(GamesService), game, events, audits, lineups, participants, members, close: () => moduleRef.close() };
+  return { service: moduleRef.get(GamesService), game, events, audits, lineups, participants, members, transactionOptions, sideLookups, sides, close: () => moduleRef.close() };
 }
 
 describe('MD-QA #146: actual generic lineup GET → event consumer', () => {
@@ -282,6 +301,141 @@ describe('MD-QA #146: actual generic lineup GET → arrival consumer', () => {
       expect(fixture.game.version).toBe(0);
       expect(fixture.events).toEqual([]);
       expect(fixture.audits.some((audit) => audit.action === 'FRIENDLY_DEFAULT_ROSTER_FROZEN')).toBe(false);
+    } finally { await fixture.close(); }
+  });
+});
+
+describe('friendly default preview access by team-scoped readers', () => {
+  it('limits DEFAULT_PREVIEW names to the reader team while preserving both post-kickoff lineup rows', async () => {
+    const fixture = await consumerFixture();
+    try {
+      jest.spyOn(fixture.service as unknown as { resolveActor: (...args: unknown[]) => Promise<unknown> }, 'resolveActor')
+        .mockResolvedValue({ actorType: 'USER', actorUserId: ids.reader, role: 'support_readonly', teamId: ids.homeTeam });
+
+      const ordinary = await fixture.service.listLineups(reader, ids.game);
+      const operations = await fixture.service.listOperationsLineups(reader, ids.game);
+
+      expect(ordinary.map((lineup) => lineup.sideId)).toEqual([ids.home]);
+      expect(ordinary.flatMap((lineup) => lineup.participants).map((participant) => participant.displayNameSnapshot)).toEqual(['현재 홈 선수']);
+      expect(operations.map((lineup) => lineup.sideId).sort()).toEqual([ids.away, ids.home].sort());
+      expect(operations.find((lineup) => lineup.sideId === ids.home)?.participants.map((participant) => participant.displayNameSnapshot)).toEqual(['현재 홈 선수']);
+      expect(operations.find((lineup) => lineup.sideId === ids.away)?.participants).toEqual([]);
+      const awayDraft = fixture.lineups.find((lineup) => lineup.sideId === ids.away);
+      if (awayDraft === undefined) throw new Error('The away lineup must exist in the fixture.');
+      awayDraft.state = 'SUBMITTED';
+      const submittedButPrivate = await fixture.service.listOperationsLineups(reader, ids.game);
+      expect(submittedButPrivate.find((lineup) => lineup.sideId === ids.away)?.participants).toEqual([]);
+      fixture.game.visibilityPolicy.lineupAt = new Date(Date.now() - 60 * 60 * 1000);
+      const actuallyPublished = await fixture.service.listOperationsLineups(reader, ids.game);
+      expect(actuallyPublished.find((lineup) => lineup.sideId === ids.away)?.participants.map((participant) => participant.displayNameSnapshot)).toEqual(['생성 시점 원정 선수']);
+      expect(fixture.transactionOptions).toHaveLength(4);
+      expect(fixture.transactionOptions.every((options) => (options as { isolationLevel?: string }).isolationLevel === 'RepeatableRead')).toBe(true);
+      expect(fixture.audits).toEqual([]);
+      expect(fixture.lineups).toHaveLength(2);
+    } finally { await fixture.close(); }
+  });
+
+  it('keeps an ordinary team member scoped to their own preview while retaining both post-kickoff rows', async () => {
+    const fixture = await consumerFixture();
+    try {
+      jest.spyOn(fixture.service as unknown as { resolveActor: (...args: unknown[]) => Promise<unknown> }, 'resolveActor')
+        .mockResolvedValue({ actorType: 'USER', actorUserId: ids.reader, role: 'team_member', teamId: ids.homeTeam });
+
+      const ordinary = await fixture.service.listLineups(reader, ids.game);
+      const operations = await fixture.service.listOperationsLineups(reader, ids.game);
+
+      expect(ordinary.map((lineup) => lineup.sideId)).toEqual([ids.home]);
+      expect(ordinary.flatMap((lineup) => lineup.participants).map((participant) => participant.displayNameSnapshot)).toEqual(['현재 홈 선수']);
+      expect(operations.map((lineup) => lineup.sideId).sort()).toEqual([ids.away, ids.home].sort());
+      expect(operations.find((lineup) => lineup.sideId === ids.home)?.participants.map((participant) => participant.displayNameSnapshot)).toEqual(['현재 홈 선수']);
+      expect(operations.find((lineup) => lineup.sideId === ids.away)?.participants).toEqual([]);
+    } finally { await fixture.close(); }
+  });
+
+  it('preserves all-side preview access for teamless tournament support staff without guessing a team side', async () => {
+    const fixture = await consumerFixture();
+    try {
+      jest.spyOn(fixture.service as unknown as { resolveActor: (...args: unknown[]) => Promise<unknown> }, 'resolveActor')
+        .mockResolvedValue({ actorType: 'USER', actorUserId: ids.reader, role: 'support_readonly' });
+
+      const ordinary = await fixture.service.listLineups(reader, ids.game);
+      const operations = await fixture.service.listOperationsLineups(reader, ids.game);
+
+      expect(ordinary.map((lineup) => lineup.sideId).sort()).toEqual([ids.away, ids.home].sort());
+      expect(operations.map((lineup) => lineup.sideId).sort()).toEqual([ids.away, ids.home].sort());
+      expect(ordinary.flatMap((lineup) => lineup.participants)).toHaveLength(2);
+      expect(operations.flatMap((lineup) => lineup.participants)).toHaveLength(2);
+      expect(fixture.sideLookups).toEqual([]);
+    } finally { await fixture.close(); }
+  });
+
+  it('keeps a submitted competition opponent visible to a team reader after its explicit publication time', async () => {
+    const fixture = await consumerFixture({ competition: true });
+    try {
+      jest.spyOn(fixture.service as unknown as { resolveActor: (...args: unknown[]) => Promise<unknown> }, 'resolveActor')
+        .mockResolvedValue({ actorType: 'USER', actorUserId: ids.reader, role: 'team_member', teamId: ids.homeTeam });
+      const away = fixture.lineups.find((lineup) => lineup.sideId === ids.away);
+      if (away === undefined) throw new Error('The away competition lineup must exist in the fixture.');
+      away.revision = 2;
+      away.state = 'SUBMITTED';
+      fixture.lineups.push(
+        { ...away, id: randomUUID(), revision: 3, state: 'DRAFT', submittedAt: null },
+        { ...away, id: randomUUID(), revision: 4, state: 'SUBMITTED', submittedAt: new Date(), invalidatedAt: new Date() },
+      );
+
+      const beforePublication = await fixture.service.listOperationsLineups(reader, ids.game);
+      expect(beforePublication.find((lineup) => lineup.sideId === ids.away)?.participants).toEqual([]);
+
+      fixture.game.visibilityPolicy.lineupAt = new Date(Date.now() - 60 * 60 * 1000);
+      const afterPublication = await fixture.service.listOperationsLineups(reader, ids.game);
+      expect(afterPublication.map((lineup) => lineup.sideId).sort()).toEqual([ids.away, ids.home].sort());
+      expect(afterPublication.find((lineup) => lineup.sideId === ids.away)?.participants.map((participant) => participant.displayNameSnapshot)).toEqual(['생성 시점 원정 선수']);
+    } finally { await fixture.close(); }
+  });
+
+  it('derives the competition publication time from scheduled kickoff when policy lineupAt is null', async () => {
+    const fixture = await consumerFixture({ competition: true, startAt: new Date(Date.now() - 2 * 60 * 60 * 1000) });
+    try {
+      jest.spyOn(fixture.service as unknown as { resolveActor: (...args: unknown[]) => Promise<unknown> }, 'resolveActor')
+        .mockResolvedValue({ actorType: 'USER', actorUserId: ids.reader, role: 'team_member', teamId: ids.homeTeam });
+      const away = fixture.lineups.find((lineup) => lineup.sideId === ids.away);
+      if (away === undefined) throw new Error('The away competition lineup must exist in the fixture.');
+      away.state = 'SUBMITTED';
+      fixture.game.visibilityPolicy.lineupAt = null;
+
+      const rows = await fixture.service.listOperationsLineups(reader, ids.game);
+
+      expect(rows.find((lineup) => lineup.sideId === ids.away)?.participants.map((participant) => participant.displayNameSnapshot))
+        .toEqual(['생성 시점 원정 선수']);
+    } finally { await fixture.close(); }
+  });
+
+  it('fails closed when a team-scoped reader has no matching game side', async () => {
+    const fixture = await consumerFixture();
+    try {
+      fixture.sides.splice(0, 1);
+      jest.spyOn(fixture.service as unknown as { resolveActor: (...args: unknown[]) => Promise<unknown> }, 'resolveActor')
+        .mockResolvedValue({ actorType: 'USER', actorUserId: ids.reader, role: 'team_member', teamId: ids.homeTeam });
+
+      await expect(fixture.service.listLineups(reader, ids.game)).rejects.toMatchObject({ status: 404 });
+      await expect(fixture.service.listOperationsLineups(reader, ids.game)).rejects.toMatchObject({ status: 404 });
+    } finally { await fixture.close(); }
+  });
+
+  it('keeps teamless support staff in the staff fixture-access and audit lanes', async () => {
+    const fixture = await consumerFixture({ competition: true });
+    try {
+      jest.spyOn(fixture.service as unknown as { resolveActor: (...args: unknown[]) => Promise<unknown> }, 'resolveActor')
+        .mockImplementation(async (_tx, _gameId, _userId, action) => {
+          if (action === 'read') return { actorType: 'USER', actorUserId: ids.reader, role: 'support_readonly' };
+          throw new ForbiddenException();
+        });
+
+      const access = await fixture.service.resolveFixtureLineupAccess(reader, ids.match, 'fixture-id');
+
+      expect(access).toMatchObject({ mySideId: null, isStaff: true, canMutateLineup: false });
+      expect(gameOperationAuditActor({ actorType: 'USER', actorUserId: ids.reader, role: 'support_readonly' } as Parameters<typeof gameOperationAuditActor>[0]))
+        .toEqual({ type: 'TOURNAMENT_STAFF', id: ids.reader });
     } finally { await fixture.close(); }
   });
 });

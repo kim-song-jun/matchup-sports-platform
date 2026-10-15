@@ -59,7 +59,7 @@ import {
   loadParticipantConsentEligibility,
 } from './public-records/public-consent';
 import { isPublicLiveEnabled } from './public-records/public-live-flag';
-import { effectivePublicVisibilityMode } from './public-records/public-visibility';
+import { effectivePublicVisibilityMode, isLineupPublished } from './public-records/public-visibility';
 import {
   loadParticipantNameProfiles,
   resolveParticipantDisplayName,
@@ -337,10 +337,19 @@ export function gameAuthorizationAction(action: string): GameAuthorizationAction
 
 /**
  * 팀에 묶인 액터 — 응답은 자기 팀 사이드로만 좁혀지고 스태프 취급을 받지 않는다.
- * 새 역할을 이 집합에 넣지 않으면 상대팀 라인업까지 보이는 쪽으로 기본값이 기운다.
+ * `support_readonly`는 대회 스태프와 팀 멤버가 공유하는 role이라 actor.teamId까지 확인하는
+ * `hasTeamScope`에서만 분류한다. role만 보는 다른 authorization/audit 소비자의 staff 경계를 보존한다.
  */
 export function isTeamScopedActorRole(role: string): boolean {
   return role === 'team_manager' || role === 'team_owner' || role === 'team_member';
+}
+
+function hasTeamScope(actor: { readonly role: string; readonly teamId?: string | null }): boolean {
+  return (isTeamScopedActorRole(actor.role) || actor.role === 'support_readonly') && typeof actor.teamId === 'string' && actor.teamId.length > 0;
+}
+
+function requiresTeamScope(actor: { readonly role: string; readonly teamId?: string | null }): boolean {
+  return isTeamScopedActorRole(actor.role) || (actor.role === 'support_readonly' && actor.teamId !== undefined);
 }
 
 /**
@@ -2579,23 +2588,22 @@ export class GamesService {
    * current qualified participants with the same IDs persisted by the first record.
    */
   async listLineups(user: V1AuthUser, gameId: string) {
-    const actor = await this.resolveActor(this.prisma, gameId, user.id, 'read');
-    // 참가팀 액터는 상대팀 라인업을 미리 볼 수 없다 — team-match 전용 라인업
-    // 서비스(getLineup)가 항상 ownSideId로만 조회하는 것과 동일한 공정성 원칙을
-    // 여기서도 지킨다. 스태프/platform_ops는 기존대로 양쪽 다 본다.
-    const ownSideId = isTeamScopedActorRole(actor.role)
-      ? (await this.prisma.v1GameSide.findFirst({ where: { gameId, teamId: actor.teamId } }))?.id ?? null
-      : null;
-    const lineups = await this.prisma.v1GameLineup.findMany({
-      where: { gameId, invalidatedAt: null, ...(ownSideId !== null ? { sideId: ownSideId } : {}) },
-      orderBy: [{ sideId: 'asc' }, { revision: 'desc' }],
-    });
-    const participants = await this.loadEffectiveLineupParticipants(gameId, lineups.map((lineup) => lineup.id));
-    const participantsByLineupId = groupParticipantsByLineupId(participants);
-    return lineups.map((lineup) => ({
-      ...lineup,
-      participants: participantsByLineupId.get(lineup.id) ?? [],
-    }));
+    return this.prisma.$transaction(async (tx) => {
+      const actor = await this.resolveActor(tx, gameId, user.id, 'read');
+      if (requiresTeamScope(actor) && !hasTeamScope(actor)) throw this.forbidden();
+      const ownSideId = hasTeamScope(actor)
+        ? (await tx.v1GameSide.findFirst({ where: { gameId, teamId: actor.teamId } }))?.id ?? null
+        : null;
+      if (hasTeamScope(actor) && ownSideId === null) throw this.notFound('GAME_SIDE_NOT_FOUND');
+      const lineups = await tx.v1GameLineup.findMany({
+        where: { gameId, invalidatedAt: null, ...(ownSideId !== null ? { sideId: ownSideId } : {}) },
+        orderBy: [{ sideId: 'asc' }, { revision: 'desc' }],
+      });
+      const previewSideIds = this.authorizedPreviewSideIds(actor, ownSideId, lineups.map((lineup) => lineup.sideId));
+      const participants = await this.loadEffectiveLineupParticipants(tx, gameId, lineups, previewSideIds);
+      const participantsByLineupId = groupParticipantsByLineupId(participants);
+      return lineups.map((lineup) => ({ ...lineup, participants: participantsByLineupId.get(lineup.id) ?? [] }));
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
   }
 
   /**
@@ -2606,67 +2614,116 @@ export class GamesService {
    * 사이드만" 으로 대체 보존한다 — 킥오프 전 상대 전술을 미리 볼 수 없게.
    */
   async listOperationsLineups(user: V1AuthUser, gameId: string) {
-    const actor = await this.resolveActor(this.prisma, gameId, user.id, 'read');
-    const game = await this.prisma.v1Game.findUnique({ where: { id: gameId }, select: { state: true } });
-    if (game === null) {
-      throw this.notFound();
-    }
-    const ownSideId =
-      game.state === V1GameState.SCHEDULED && isTeamScopedActorRole(actor.role)
-        ? (await this.prisma.v1GameSide.findFirst({ where: { gameId, teamId: actor.teamId } }))?.id ?? null
+    return this.prisma.$transaction(async (tx) => {
+      const actor = await this.resolveActor(tx, gameId, user.id, 'read');
+      if (requiresTeamScope(actor) && !hasTeamScope(actor)) throw this.forbidden();
+      const game = await tx.v1Game.findUnique({ where: { id: gameId }, select: {
+        state: true,
+        visibilityPolicy: { select: { lineupAt: true } },
+        teamMatch: { select: { startAt: true } },
+      } });
+      if (game === null) throw this.notFound();
+      const ownSideId = hasTeamScope(actor)
+        ? (await tx.v1GameSide.findFirst({ where: { gameId, teamId: actor.teamId } }))?.id ?? null
         : null;
-    const lineups = await this.prisma.v1GameLineup.findMany({
-      where: { gameId, invalidatedAt: null, ...(ownSideId !== null ? { sideId: ownSideId } : {}) },
-      orderBy: [{ sideId: 'asc' }, { revision: 'desc' }],
-    });
-    const participants = await this.loadEffectiveLineupParticipants(gameId, lineups.map((lineup) => lineup.id));
-    const participantsByLineupId = groupParticipantsByLineupId(participants);
-    // 운영진에게만 실명·전화번호를 실어 보낸다. 다른 역할 응답에는 `identity` 키 자체가 없다 — null 이
-    // 아니라 "없음"이어야 팀 매니저 화면이 빈 값을 만들어 내지도, 어떤 값이 있는지 짐작하지도 못한다.
-    const identityByUserId = canViewParticipantIdentity(actor.role)
-      ? await this.loadParticipantIdentities(participants)
-      : null;
-    return lineups.map((lineup) => ({
-      ...lineup,
-      participants: (participantsByLineupId.get(lineup.id) ?? []).map((participant) =>
-        identityByUserId === null
+      if (hasTeamScope(actor) && ownSideId === null) throw this.notFound('GAME_SIDE_NOT_FOUND');
+      const lineups = await tx.v1GameLineup.findMany({
+        where: { gameId, invalidatedAt: null, ...(game.state === V1GameState.SCHEDULED && ownSideId !== null ? { sideId: ownSideId } : {}) },
+        orderBy: [{ sideId: 'asc' }, { revision: 'desc' }],
+      });
+      const previewSideIds = this.authorizedPreviewSideIds(actor, ownSideId, lineups.map((lineup) => lineup.sideId));
+      const teamScopedReader = hasTeamScope(actor) && ownSideId !== null;
+      const lineupPublished = game.teamMatch !== null && isLineupPublished(
+        { lineupAt: game.visibilityPolicy?.lineupAt ?? null, scheduledAt: game.teamMatch.startAt },
+        new Date(),
+      );
+      const participants = await this.loadEffectiveLineupParticipants(
+        tx, gameId, lineups, previewSideIds,
+        teamScopedReader ? { ownSideId, lineupPublished } : null,
+      );
+      const participantsByLineupId = groupParticipantsByLineupId(participants);
+      const flatParticipants = lineups.flatMap((lineup) => participantsByLineupId.get(lineup.id) ?? []);
+      const identityByUserId = canViewParticipantIdentity(actor.role) ? await this.loadParticipantIdentities(tx, flatParticipants) : null;
+      return lineups.map((lineup) => ({
+        ...lineup,
+        participants: (participantsByLineupId.get(lineup.id) ?? []).map((participant) => identityByUserId === null
           ? participant
-          : {
-              ...participant,
-              identity: participant.userId === null ? null : (identityByUserId.get(participant.userId) ?? null),
-            },
-      ),
-    }));
+          : { ...participant, identity: participant.userId === null ? null : (identityByUserId.get(participant.userId) ?? null) }),
+      }));
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
   }
 
-  /** Latest automatic friendly rows must expose the same IDs accepted by the first record command. */
-  private async loadEffectiveLineupParticipants(gameId: string, lineupIds: readonly string[]): Promise<V1GameParticipant[]> {
+  private authorizedPreviewSideIds(
+    actor: { readonly role: string; readonly teamId?: string | null },
+    ownSideId: string | null,
+    visibleSideIds: readonly string[],
+  ): ReadonlySet<string> {
+    if (hasTeamScope(actor)) return new Set(ownSideId === null ? [] : [ownSideId]);
+    if (actor.role === 'platform_ops' || actor.role === 'tournament_director' || actor.role === 'field_operator' ||
+      (actor.role === 'support_readonly' && actor.teamId === undefined)) return new Set(visibleSideIds);
+    return new Set();
+  }
+
+  /** Read persisted rows and defaults from one repeatable snapshot; only authorized sides may expose previews. */
+  private async loadEffectiveLineupParticipants(
+    tx: Transaction,
+    gameId: string,
+    lineups: readonly { readonly id: string; readonly sideId: string; readonly revision: number; readonly state: V1GameLineupState; readonly invalidatedAt?: Date | null }[],
+    previewSideIds: ReadonlySet<string>,
+    teamReader: { readonly ownSideId: string; readonly lineupPublished: boolean } | null = null,
+  ): Promise<V1GameParticipant[]> {
+    const lineupIds = lineups.map((lineup) => lineup.id);
     const [persisted, effective] = await Promise.all([
-      this.prisma.v1GameParticipant.findMany({
+      tx.v1GameParticipant.findMany({
         where: { lineupId: { in: [...lineupIds] } },
         orderBy: [{ jerseyNumber: 'asc' }, { createdAt: 'asc' }],
       }),
-      readFriendlyEffectiveRoster(this.prisma, gameId),
+      readFriendlyEffectiveRoster(tx, gameId),
     ]);
     const visibleLineupIds = new Set(lineupIds);
-    const previews = effective?.sides.filter((side) =>
+    const defaultPreviewSides = effective?.sides.filter((side) =>
       side.source === 'DEFAULT_PREVIEW' && side.lineup !== null && visibleLineupIds.has(side.lineup.id)) ?? [];
-    const replacedLineupIds = new Set(previews.flatMap((side) => side.lineup === null ? [] : [side.lineup.id]));
+    const defaultPreviewLineupIds = new Set(defaultPreviewSides.flatMap((side) => side.lineup === null ? [] : [side.lineup.id]));
+    const previews = defaultPreviewSides.filter((side) => previewSideIds.has(side.sideId));
+    const publishedOpponentLineupIds = new Set<string>();
+    if (teamReader?.lineupPublished === true) {
+      if (effective !== null) {
+        for (const side of effective.sides) {
+          if (side.sideId !== teamReader.ownSideId && side.source === 'MANUAL' && side.lineup !== null) {
+            publishedOpponentLineupIds.add(side.lineup.id);
+          }
+        }
+      } else {
+        const latestLineupBySide = new Map<string, (typeof lineups)[number]>();
+        for (const lineup of lineups) {
+          if (lineup.invalidatedAt != null || (lineup.state !== V1GameLineupState.SUBMITTED && lineup.state !== V1GameLineupState.LOCKED)) continue;
+          const current = latestLineupBySide.get(lineup.sideId);
+          if (current === undefined || lineup.revision > current.revision) latestLineupBySide.set(lineup.sideId, lineup);
+        }
+        for (const [sideId, lineup] of latestLineupBySide) {
+          if (sideId !== teamReader.ownSideId) publishedOpponentLineupIds.add(lineup.id);
+        }
+      }
+    }
     return [
-      ...persisted.filter((participant) => !replacedLineupIds.has(participant.lineupId)),
+      ...persisted.filter((participant) => {
+        if (defaultPreviewLineupIds.has(participant.lineupId)) return false;
+        return teamReader === null || participant.sideId === teamReader.ownSideId || publishedOpponentLineupIds.has(participant.lineupId);
+      }),
       ...previews.flatMap((side) => [...side.participants]),
     ];
   }
 
   /** 참가자들의 계정(`userId`)을 한 번에 조회해 실명·전화번호를 모은다(N+1 금지). 탈퇴 회원은 싣지 않는다. */
   private async loadParticipantIdentities(
+    tx: Transaction,
     participants: readonly V1GameParticipant[],
   ): Promise<ReadonlyMap<string, GameParticipantIdentity>> {
     const userIds = Array.from(
       new Set(participants.map((participant) => participant.userId).filter((id): id is string => id !== null)),
     );
     if (userIds.length === 0) return new Map();
-    const users = await this.prisma.v1User.findMany({
+    const users = await tx.v1User.findMany({
       where: { id: { in: userIds }, deletedAt: null },
       select: { id: true, phone: true, profile: { select: { realName: true } } },
     });
@@ -3237,9 +3294,11 @@ export class GamesService {
     ) {
       throw this.forbidden();
     }
-    const mySideId = isTeamScopedActorRole(actor.role)
+    if (requiresTeamScope(actor) && !hasTeamScope(actor)) throw this.forbidden();
+    const mySideId = hasTeamScope(actor)
       ? (sides.find((side) => side.teamId === actor.teamId)?.id ?? null)
       : null;
+    if (hasTeamScope(actor) && mySideId === null) throw this.notFound('GAME_SIDE_NOT_FOUND');
     // F61/F62: `isStaff`만으로는 SUPPORT_READONLY(조회 전용)와 실제로 lineup_mutate
     // 권한이 있는 스태프(field_operator/tournament_director/platform_ops)를 구분할 수
     // 없었다 — 그 결과 SUPPORT_READONLY도 매니저와 동일한 편집기를 받고 저장을 눌러야만
@@ -3258,7 +3317,7 @@ export class GamesService {
     return {
       gameId,
       mySideId,
-      isStaff: !isTeamScopedActorRole(actor.role),
+      isStaff: !hasTeamScope(actor),
       // F61/F62 fix: 프론트가 "조회 전용 스태프에게는 편집기를 열지 않는다"를 판단할 수
       // 있도록 실제 lineup_mutate 인가 결과를 노출한다. mySideId가 있는(=팀 매니저/오너)
       // 경우도 true다.

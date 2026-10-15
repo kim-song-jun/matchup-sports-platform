@@ -36,6 +36,8 @@ interface Options {
   readonly emptyRegistrations?: Record<string, Array<{ id: string; teamId: string }>>;
   /** 활성 선수가 있는 확정 참가 명단을 가진 리그. */
   readonly leaguesWithRoster?: readonly string[];
+  /** 선수 이력(현재 또는 제거된 행)이 하나라도 있는 확정 참가 명단을 가진 리그. */
+  readonly leaguesWithRegistrationHistory?: readonly string[];
   /** 시작 전 경기 조회가 차례로 돌려줄 경기 id(없으면 `games` 에서 계산). */
   readonly upcomingSequence?: ReadonlyArray<readonly string[]>;
 }
@@ -130,7 +132,11 @@ function fakeTx(options: Options = {}) {
         async ({ where }: { where: { tournamentId: unknown; teamId?: { in: string[] }; players?: { none?: object; some?: object } } }) => {
           if (where.players?.some !== undefined) {
             const asked = (where.tournamentId as { in: string[] }).in;
-            return (options.leaguesWithRoster ?? []).filter((id) => asked.includes(id)).map((id) => ({ tournamentId: id }));
+            const history = options.leaguesWithRegistrationHistory ?? options.leaguesWithRoster ?? [];
+            const activeOnly = 'removedAt' in where.players.some && where.players.some.removedAt === null;
+            const matched = history.filter((id) => asked.includes(id));
+            return (activeOnly ? matched.filter((id) => (options.leaguesWithRoster ?? []).includes(id)) : matched)
+              .map((id) => ({ tournamentId: id }));
           }
           if (where.players?.none === undefined) return [];
           const leagueId = where.tournamentId as string;
@@ -264,16 +270,19 @@ describe('여러 대회·리그 재계산', () => {
     ]);
   });
 
-  it('참가 명단 없이 팀원 기준으로 뛰는 리그 경기만 잡는다 — 명단 있는 리그·대회 경기는 명단 정리 경로 몫이다', async () => {
+  it('등록 선수 이력이 전혀 없는 리그만 팀원 폴백으로 동기화한다', async () => {
     const { tx, calls } = fakeTx({
       games: [
         { id: 'g1', leagueId: 'league-registered', tournamentId: 'league-registered', teamIds: ['team-A'] },
+        { id: 'g4', leagueId: 'league-removed', tournamentId: 'league-removed', teamIds: ['team-A'] },
         { id: 'g2', leagueId: 'league-fallback', tournamentId: 'league-fallback', teamIds: ['team-A'] },
         { id: 'g3', leagueId: null, tournamentId: 'cup-1', teamIds: ['team-A'] },
       ],
       leaguesWithRoster: ['league-registered'],
+      leaguesWithRegistrationHistory: ['league-registered', 'league-removed'],
     });
     await syncTeamMemberFallbackRosters(tx, ['team-A']);
+    // The active roster is empty in league-removed, but its removed rows still suppress member fallback.
     expect(calls.filter((call) => /^(competition|lock):/.test(call))).toEqual(['competition:league-fallback', 'lock:g2']);
   });
 

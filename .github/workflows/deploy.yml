@@ -523,6 +523,9 @@ jobs:
       - name: Generate V1 Prisma client
         run: cd apps/v1_api && pnpm prisma generate
 
+      - name: V1 API production build boundary tests
+        run: node --test --test-concurrency=1 scripts/qa/check-v1-api-build-boundary.test.mjs
+
       - name: V1 API type-check
         run: pnpm --filter v1_api exec tsc --noEmit
 

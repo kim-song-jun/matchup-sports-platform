@@ -60,3 +60,5 @@ Phase A owner: v1 규칙·현재 소스를 읽고 exact owned production/test �
 - root actual P2 RED: `mdqa156-legacy-guard-red.log`, 8 cases = 1 FAIL / 7 PASS, 128.117s, exit 1. `미이관 팀 제출 명단은 그대로 두고 재추가 전의 캡처된 빠짐만 되돌린다`에서 기대 `revokedAt=NOW`, `revokedByRole=SYSTEM` 대비 실제 `null/null`로 정확히 실패했다.
 - 승인된 최소 P2 수정: `game-roster-sync.ts`에서 기존 미이관 명단 반환만 캡처 ID 되돌림 뒤로 옮겼다. context/state/base/currentOfficial·현재 game/side/team/user·고정 ID 조건과 잠금 순서는 유지한다. 기존 팀 제출 명단·참가자·감사 기록은 다시 쓰지 않고, 새 제외 ID 및 과거·공식 경기 보호를 유지한다.
 - P2 GREEN·타입·독립 재리뷰·Git은 root 단일 슬롯 대기, 작업자 실행 없음. P2 작업자 변경 범위는 기존 회귀 spec, `game-roster-sync.ts`, 이 Progress Snapshot뿐이다.
+
+- root P2 committed gate: 수정 커밋 f4a848706의 실제 service→outbox→worker→loader 회귀 8/8 PASS(93.752초), API TypeScript --noEmit --incremental false 종료 코드0, surface683 기존 baseline 일치 PASS. 기존08 통합본129/129 PASS는 이전 검증 이력이며 이8건과 합쳐 같은 실행의130건으로 표시하지 않는다. 구현자 외 적대적 재리뷰 C0/W0, 정확한 source/spec fingerprints는 mdqa156-legacy-guard-review.md에 보존한다. 명단 이관·현재 저장 스냅샷 쓰기를 확대하지 않았고 이후 명시적 이관이 새 제외 ID를 만들 수 있는 기존 정책은 보호한다. 최신 PR CI·정식 재리뷰·실제 alpha는 대기다.

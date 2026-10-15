@@ -2,10 +2,12 @@ import { randomUUID } from 'node:crypto';
 import { HttpException } from '@nestjs/common';
 import { V1GameOperationsWorkerService } from '../../src/jobs/v1-game-operations-worker.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { TeamMatchRecordService } from '../../src/team-matches/team-match-record.service';
 import {
   CLOCK_EXPIRY_PERIOD_MS,
   clockExpirySnapshot,
   createClockExpiryGame,
+  prepareFriendlyClockRoster,
   seedClockExpiryFixture,
 } from '../fixtures/game-clock-expiry.fixture';
 
@@ -180,5 +182,37 @@ describe('MD-QA #142 real worker game clock expiry', () => {
       }));
     }
     await assertFirstPeriodEndedOnce(gameId);
+  });
+
+  it('expires the real friendly start → shared-record path without manufacturing either team confirmation', async () => {
+    const gameId = await game({ friendly: true, gameState: 'SCHEDULED', startedAt: null });
+    const { homeSideId } = await prepareFriendlyClockRoster(fixture, gameId);
+    const commandId = randomUUID();
+    await fixture.service.executeCommand(fixture.authUser, gameId, 'start', commandId, {
+      expectedVersion: 0, clientCommandId: commandId, takeoverToken: commandId,
+      occurredAt: new Date().toISOString(), payload: {},
+    });
+    const ownedGame = await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId }, select: { teamMatchId: true } });
+    if (ownedGame.teamMatchId === null) throw new Error('Clock fixture requires canonical TeamMatch ownership');
+    await new TeamMatchRecordService(prisma).mutate(fixture.authUser, ownedGame.teamMatchId, {
+      action: 'add', commandId: randomUUID(), expectedVersion: 0, sideId: homeSideId, minute: 1,
+    });
+    // Simulate elapsed real play after those production consumers have produced the hybrid state.
+    await prisma.v1GamePeriod.updateMany({
+      where: { gameId, number: 1 }, data: { startedAt: new Date(Date.now() - CLOCK_EXPIRY_PERIOD_MS - 60_000) },
+    });
+    const before = await clockExpirySnapshot(prisma, gameId);
+    const record = await prisma.v1TeamMatchRecord.findUniqueOrThrow({ where: { gameId } });
+    expect(before.periods[0].state).toBe('LIVE');
+    expect(record.confirmations).toEqual([]);
+
+    await workerCycle();
+
+    const after = await clockExpirySnapshot(prisma, gameId);
+    expect(after.periods[0]).toMatchObject({ state: 'ENDED', endedAt: expect.any(Date) });
+    expect(after.game).toMatchObject({ state: 'LIVE', version: before.game.version + 1, currentOfficialRevisionId: null });
+    expect(after.endPeriodAudits).toHaveLength(1);
+    expect(after.revisions).toEqual([]);
+    expect(await prisma.v1TeamMatchRecord.findUniqueOrThrow({ where: { gameId } })).toEqual(record);
   });
 });

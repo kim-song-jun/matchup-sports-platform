@@ -86,12 +86,13 @@ export async function createClockExpiryGame(
     readonly pausedTotalMs?: number;
     readonly pausedAt?: Date | null;
     readonly scheduledEndAt?: Date;
+    readonly friendly?: boolean;
   },
 ) {
   const { prisma } = fixture;
   const match = await prisma.v1TeamMatch.create({
     data: {
-      tournamentId: fixture.tournamentId,
+      tournamentId: input.friendly ? null : fixture.tournamentId,
       hostTeamId: fixture.homeTeamId,
       approvedApplicantTeamId: fixture.awayTeamId,
       createdByUserId: fixture.authUser.id,
@@ -104,7 +105,7 @@ export async function createClockExpiryGame(
       competitionConfigVersionId: FOOTBALL_COMPETITION_CONFIG_ID,
     },
   });
-  await prisma.v1TournamentMatchDetails.create({
+  if (!input.friendly) await prisma.v1TournamentMatchDetails.create({
     data: {
       teamMatchId: match.id,
       tournamentId: fixture.tournamentId,
@@ -126,7 +127,9 @@ export async function createClockExpiryGame(
     ],
     participants: [],
   };
-  const actor: GameActorScope = {
+  const actor: GameActorScope = input.friendly ? {
+    actorType: 'USER', actorUserId: fixture.authUser.id, role: 'team_owner', teamId: fixture.homeTeamId,
+  } : {
     actorType: 'USER',
     actorUserId: fixture.authUser.id,
     role: 'tournament_director',
@@ -157,6 +160,38 @@ export async function createClockExpiryGame(
     });
   });
   return game.gameId;
+}
+
+/** Submitted roster is a precondition; start/shared-record/worker are real production consumers. */
+export async function prepareFriendlyClockRoster(fixture: ClockExpiryFixture, gameId: string) {
+  const { prisma } = fixture;
+  const away = await prisma.v1User.create({
+    data: { email: `clock-away-${randomUUID()}@example.test`, accountStatus: 'active', onboardingStatus: 'completed' },
+  });
+  await prisma.v1TeamMembership.upsert({
+    where: { teamId_userId: { teamId: fixture.homeTeamId, userId: fixture.authUser.id } },
+    create: { teamId: fixture.homeTeamId, userId: fixture.authUser.id, role: 'owner', status: 'active' },
+    update: { role: 'owner', status: 'active' },
+  });
+  const [lineups, sides] = await Promise.all([
+    prisma.v1GameLineup.findMany({ where: { gameId } }),
+    prisma.v1GameSide.findMany({ where: { gameId } }),
+  ]);
+  for (const lineup of lineups) {
+    const side = sides.find((row) => row.id === lineup.sideId);
+    if (!side) throw new Error('Clock fixture requires each lineup canonical side');
+    await prisma.v1GameLineup.update({ where: { id: lineup.id }, data: { state: 'SUBMITTED', submittedAt: new Date() } });
+    await prisma.v1GameParticipant.create({
+      data: {
+        gameId, sideId: lineup.sideId, lineupId: lineup.id,
+        userId: side.sideKey === 'HOME' ? fixture.authUser.id : away.id,
+        displayNameSnapshot: `Clock ${side.sideKey}`, started: true,
+      },
+    });
+  }
+  const home = sides.find((side) => side.sideKey === 'HOME');
+  if (!home) throw new Error('Clock fixture requires its canonical home side');
+  return { homeSideId: home.id };
 }
 
 export async function clockExpirySnapshot(prisma: PrismaService, gameId: string) {

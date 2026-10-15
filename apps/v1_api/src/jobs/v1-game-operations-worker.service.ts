@@ -25,6 +25,7 @@ import { COMPETITION_ROSTER_RESYNC_TYPE, enqueueRosterResync } from '../games/ro
 import { WebPushService } from '../notifications/web-push.service';
 import { VideoUploadCleanupService } from './video-upload-cleanup.service';
 import { VIDEO_UPLOAD_CLEANUP_TYPE } from '../games/video-url-lock';
+import { GameClockExpiryService } from './game-clock-expiry.service';
 
 export const GAME_OPERATION_RETRY_DELAYS_MS = [1_000, 5_000, 30_000, 120_000, 600_000] as const;
 export const GAME_OPERATION_LEASE_MS = 30_000;
@@ -102,6 +103,8 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
   private completionCount = 0;
   private casFailureCount = 0;
   private readonly transactionTimeoutMs: number;
+  private readonly clockExpiry: GameClockExpiryService;
+  private clockExpiryWork: Promise<boolean> | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -116,6 +119,7 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
     @Optional() private readonly videoUploadCleanup?: VideoUploadCleanupService,
   ) {
     this.transactionTimeoutMs = transactionTimeoutMs ?? GAME_OPERATION_TRANSACTION_TIMEOUT_MS;
+    this.clockExpiry = new GameClockExpiryService(prisma, () => this.acceptingClaims);
     if (this.transactionTimeoutMs <= 0 || this.transactionTimeoutMs >= GAME_OPERATION_SHUTDOWN_MS) {
       throw new Error('Worker transaction timeout must be positive and shorter than shutdown grace');
     }
@@ -427,8 +431,19 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
   }
 
   async processOne(): Promise<boolean> {
+    if (!this.acceptingClaims) return false;
+    this.clockExpiryWork ??= this.clockExpiry.processOne();
+    const clockWork = this.clockExpiryWork;
+    let clockProcessed = false;
+    try {
+      clockProcessed = await clockWork;
+    } catch (error: unknown) {
+      this.logger.error(`Game clock expiry scan failed: ${this.boundedError(error)}`);
+    } finally {
+      if (this.clockExpiryWork === clockWork) this.clockExpiryWork = null;
+    }
     const claim = await this.claimOne();
-    if (!claim) return false;
+    if (!claim) return clockProcessed;
 
     const handler = this.handlers.get(claim.type);
     if (!handler) {
@@ -516,7 +531,8 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
 
   async shutdown(graceMs = GAME_OPERATION_SHUTDOWN_MS): Promise<void> {
     this.acceptingClaims = false;
-    const promises = [...this.active.values()].map(({ promise }) => promise);
+    const promises: Promise<unknown>[] = [...this.active.values()].map(({ promise }) => promise);
+    if (this.clockExpiryWork !== null) promises.push(this.clockExpiryWork);
     if (promises.length > 0) {
       let graceTimer: ReturnType<typeof setTimeout> | undefined;
       try {

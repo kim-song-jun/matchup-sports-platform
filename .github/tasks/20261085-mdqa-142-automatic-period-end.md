@@ -55,3 +55,5 @@ Created: 2026-10-13
 
 ## Progress Snapshot
 - 2026-10-13 10:20Z: fresh managed checkout 생성 및 fix/mdqa-142-automatic-period-end 분리. 전용 canonical task 준비. 소스·테스트·PR·alpha는 아직 NOT RUN. 기존 tracker 담당·상태는 유지한다.
+
+- 2026-10-15 root recovery: same canonical checkout restored via existing branch + snapshot FF863ee6ef1 then normal latest-dev merge3cc383dc8e; no duplicate worktree. Actual worker initial RED1/controls4 (period remains LIVE), then shared-record running-clock actual RED1 after separately recorded compile0-tests actor repair. Minimal worker/period/audit helper implementation frozen; sharedRecord must not disable an already-started period. extraTime is the existing boolean separate-period marker; each configured period duration is used once, never numeric boolean addition or scheduled endAt. Unit10+core and DB11 GREEN not yet executed; DB Docker OFF NOTRUN. Frontend real-console tests5 first run fixture-origin errors (not feature RED), corrected fixture rerun pending. No alpha PASS or auto final result submission.

@@ -50,6 +50,8 @@ import {
   latestTeamMatchLineupBySide,
 } from './core/team-match-lineup-window';
 import { isCommandConcurrencyConflict } from './command-concurrency-error';
+import { endLiveGamePeriod } from './period-transition';
+import { gameOperationAuditScope } from './game-operation-audit-scope';
 import {
   assertBracketResolvable,
   assertPenaltiesNotAllowed,
@@ -794,6 +796,7 @@ async function appendIdentityEvent(
         systemActor:
           | 'IDENTITY_LINK_EXPIRY'
           | 'GAME_END_DERIVER'
+          | 'GAME_CLOCK_EXPIRY'
           | 'GAME_BACKFILL'
           | 'PROJECTION_REPAIR'
           // 라인업 리비전 복사(정정 요청)가 원본의 연결을 새 참가자 행으로 옮길 때.
@@ -863,6 +866,7 @@ export async function createRosterAssertedIdentityLink(
         actorType: 'SYSTEM';
         systemActor:
           | 'GAME_END_DERIVER'
+          | 'GAME_CLOCK_EXPIRY'
           | 'GAME_BACKFILL'
           | 'PROJECTION_REPAIR'
           | 'LINEUP_REVISION_COPY'
@@ -1676,46 +1680,7 @@ export class GamesService {
     game: LockedGame,
     context: GameCommandContext,
   ): Promise<GameMutationResult> {
-    if (game.state !== V1GameState.LIVE) {
-      throw new ConflictException({
-        code: 'PERIOD_NOT_STARTED',
-        message: '경기가 진행 중이어야 피리어드를 종료할 수 있어요',
-      });
-    }
-    const current = await tx.v1GamePeriod.findFirst({
-      where: { gameId: game.id, state: V1GamePeriodState.LIVE },
-    });
-    if (current === null) {
-      throw new ConflictException({
-        code: 'PERIOD_NOT_STARTED',
-        message: '진행 중인 피리어드가 없어요',
-      });
-    }
-    const next = await tx.v1GamePeriod.findFirst({
-      where: { gameId: game.id, number: current.number + 1 },
-    });
-    const now = new Date();
-    await tx.v1GamePeriod.update({
-      where: { id: current.id },
-      data: { state: V1GamePeriodState.ENDED, endedAt: now },
-    });
-    if (next !== null) {
-      await tx.v1GamePeriod.update({
-        where: { id: next.id },
-        data: { state: V1GamePeriodState.HALFTIME },
-      });
-    }
-    const updated = await tx.v1Game.update({
-      where: { id: game.id },
-      data: { version: { increment: 1 } },
-    });
-    return {
-      gameId: updated.id,
-      state: updated.state,
-      version: updated.version,
-      durableCommandId: context.durableCommandId,
-      replayed: false,
-    };
+    return endLiveGamePeriod(tx, game, context.durableCommandId);
   }
 
   /**
@@ -7209,82 +7174,9 @@ export class GamesService {
     before: unknown,
     after: unknown,
   ) {
-    const game = await tx.v1Game.findUnique({
-      where: { id: resourceId },
-      select: {
-        sourceType: true,
-        teamMatch: {
-          select: {
-            id: true,
-            deletedAt: true,
-            tournamentId: true,
-            leagueId: true,
-            fieldId: true,
-            tournament: { select: { kind: true } },
-            league: { select: { kind: true } },
-            tournamentDetails: { select: { teamMatchId: true, tournamentId: true } },
-          },
-        },
-      },
-    });
-    if (game === null) {
-      throw this.notFound();
-    }
-    let tournamentId: string | null = null;
-    let teamMatchId: string | null = null;
-    let fieldId: string | null = null;
-
-    if (game.sourceType === V1GameSourceType.TEAM_MATCH) {
-      const match = game.teamMatch;
-      if (match === null) {
-        throw new ConflictException({
-          code: 'GAME_AUDIT_SCOPE_INVALID',
-          message: 'Team match game is missing its TeamMatch scope.',
-        });
-      }
-      if (match.deletedAt !== null) {
-        throw this.notFound('TOURNAMENT_FIXTURE_GAME_NOT_FOUND');
-      }
-      if (
-        (match.tournamentId === null && match.leagueId !== null) ||
-        (match.tournamentId !== null && match.leagueId !== null && match.tournamentId !== match.leagueId)
-      ) {
-        throw new ConflictException({
-          code: 'GAME_AUDIT_SCOPE_INVALID',
-          message: 'TeamMatch competition ownership is inconsistent.',
-        });
-      }
-      const competitionId = match.tournamentId ?? match.leagueId;
-      const details = match.tournamentDetails;
-      const isRegularLeague =
-        match.tournament?.kind === 'regular_league' || match.league?.kind === 'regular_league';
-      if (
-        (isRegularLeague && (competitionId === null || details !== null)) ||
-        (!isRegularLeague && competitionId !== null &&
-          (match.leagueId !== null ||
-            details === null ||
-            details.tournamentId !== competitionId ||
-            details.teamMatchId !== match.id)) ||
-        (competitionId === null && details !== null)
-      ) {
-        throw new ConflictException({
-          code: 'GAME_AUDIT_SCOPE_INVALID',
-          message: 'TeamMatch tournament details do not match its ownership scope.',
-        });
-      }
-      // OperationAudit's TeamMatch/field relations use the TeamMatch
-      // `(tournamentId, id)` composite key. Canonical regular leagues carry
-      // the same id in both competition columns, so the resolved competition
-      // id is valid for the audit relation. Friendly matches keep both null.
-      tournamentId = competitionId;
-      teamMatchId = competitionId === null ? null : match.id;
-      fieldId = competitionId === null ? null : match.fieldId;
-    } else {
-      throw new ConflictException({
-        code: 'GAME_AUDIT_SCOPE_INVALID',
-        message: `Unsupported game source ${game.sourceType}.`,
-      });
-    }
+    const { tournamentId, teamMatchId, fieldId } = await gameOperationAuditScope(
+      tx, resourceId, (code) => this.notFound(code),
+    );
 
     await this.operationAuditWriter.create(tx, {
       actor: gameOperationAuditActor(actor),

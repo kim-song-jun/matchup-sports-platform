@@ -19,6 +19,7 @@ import {
   type ParticipantConsentEligibility,
 } from '../games/public-records/public-consent';
 import { regularPeriodCount } from '../tournaments/competition-config/competition-config.parse';
+import { resolvePublicLineupAt } from './public-lineup-visibility';
 import { MutateTeamMatchRecordDto } from './dto/team-match-record.dto';
 import { friendlyResultCorrector, platformMatchOperator } from './platform-match-operator';
 import { assertRevisionSupersession, assertRevisionTransition } from '../games/core/revision-state-machine';
@@ -307,7 +308,9 @@ export class TeamMatchRecordService {
     const changes = privateView ? await tx.v1TeamMatchRecordChange.findMany({ where: { gameId: game.id }, orderBy: { version: 'desc' }, take: 100 }) : [];
     const privateParticipants = privateView ? await this.participantViews(tx, game) : [];
     const kickoff = game.teamMatch?.startAt;
-    const publicLineupAt = game.visibilityPolicy?.lineupAt ?? (kickoff == null ? null : new Date(kickoff.getTime() - 60 * 60_000));
+    const publicLineupAt = kickoff == null
+      ? game.visibilityPolicy?.lineupAt ?? null
+      : resolvePublicLineupAt(kickoff, game.visibilityPolicy?.lineupAt ?? null);
     const participants = publicLineupAt !== null && publicLineupAt.getTime() <= Date.now()
       ? privateParticipants
       : privateParticipants.filter((participant) => participant.sideId === ownSideId || !game.effectiveRoster?.sides.some((side) =>

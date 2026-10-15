@@ -60,13 +60,15 @@ export default async function LeagueFixturePage({ params }: Props) {
   // 이 경로는 proxy.ts matcher 밖이라 없는 경기의 HTTP 404 를 여기서 낸다(조회 실패는 404 가 아니다).
   if (fixture.ok && !fixture.data) notFound();
   const detail = fixture.ok ? fixture.data : null;
-  // LD 는 주소가 아니라 경기가 실제로 속한 리그로 잇는다 — 리그가 아닌 경기면 리그 연결을 만들지 않는다.
+  // 이벤트 canonical 은 실제 소속 리그 경로를 우선하고, 상위 리그 탐색은 아래 breadcrumb 로 제공한다.
   const league = detail?.league ?? null;
   const title = detail ? await resolveFixtureTitle(detail, fixtureId) : '';
   const eventLd = detail
-    ? buildTeamMatchEventLd({ ...detail, title }, fixtureId, league
-        ? { path: fixturePath(league.leagueId, fixtureId), superEventPath: `/tournaments/${encodeURIComponent(league.leagueId)}` }
-        : { path: fixturePath(leagueId, fixtureId) })
+    ? buildTeamMatchEventLd(
+        { ...detail, title },
+        fixtureId,
+        { path: fixturePath(league?.leagueId ?? leagueId, fixtureId) },
+      )
     : null;
 
   return (

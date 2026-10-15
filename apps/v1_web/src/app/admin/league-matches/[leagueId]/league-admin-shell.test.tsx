@@ -76,7 +76,7 @@ describe('LeagueAdminShell', () => {
       expect(hrefOf('리그 정보')).toBe('/admin/league-matches/league-1/edit');
       expect(hrefOf('경기 규칙')).toBe('/admin/league-matches/league-1/rules');
       expect(hrefOf('경기 영상')).toBe('/admin/league-matches/league-1/videos');
-      expect(hrefOf('후기 관리')).toBe('/admin/league-matches/league-1/reviews');
+      expect(hrefOf('리뷰 관리')).toBe('/admin/league-matches/league-1/reviews');
     });
 
     // 신청 관리에는 숫자를 붙이지 않는다 — 운영자가 직접 넣은 팀은 '신청' 수에 안 잡혀서 팀이 있는데도 0으로 보인다.

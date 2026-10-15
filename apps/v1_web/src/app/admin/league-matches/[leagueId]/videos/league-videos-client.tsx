@@ -181,7 +181,7 @@ export default function LeagueVideosClient({ leagueId }: { leagueId: string }) {
         <AdminEmpty
           icon={<Film size={40} />}
           title="아직 대진이 없어요"
-          description="리그 상세에서 대진을 생성하면 여기에서 영상을 등록할 수 있어요."
+          description="일정에서 대진을 만들면 여기에서 영상을 등록할 수 있어요."
         />
       ) : (
         <>

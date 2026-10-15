@@ -124,7 +124,7 @@ export function ParticipantRosterEditor({ tournamentId, registrationId }: { tour
     {roster.data.belowMinimum ? <AlertBanner tone="warning" message={`최소 ${tournament.data.minPlayers}명 이상 등록해야 해요. 현재 ${Math.max(0, tournament.data.minPlayers - players.length)}명이 부족해요.`} /> : null}
     {tournament.data.rosterDeadlineAt ? <p className="tm-text-caption">명단 제출 마감 · {formatTournamentDateTimeLong(tournament.data.rosterDeadlineAt)}{deadline.overridden ? ' · 운영진이 수정 예외를 허용했어요.' : ''}</p> : null}
     <div className={styles.heading}>
-      <div><SectionTitle title={`참가 선수 ${players.length}명`} /><p className="tm-text-caption">{rosterLimitText(tournament.data.minPlayers, tournament.data.maxPlayers, (min, max) => `최소 ${min}명 · 최대 ${max}명`)}</p></div>
+      <div><SectionTitle compact title={`참가 선수 ${players.length}명`} /><p className="tm-text-caption">{rosterLimitText(tournament.data.minPlayers, tournament.data.maxPlayers, (min, max) => `최소 ${min}명 · 최대 ${max}명`)}</p></div>
       {editable && players.length < (tournament.data.maxPlayers ?? Infinity) ? <Button variant="outline" size="sm" disabled={busy || adding} onClick={() => { setAdding(true); setAddError(null); }}>선수 추가</Button> : null}
     </div>
     {error ? <AlertBanner tone="error" message={error} /> : null}

@@ -1,5 +1,5 @@
 /**
- * 팀 상세 "참가 중인 대회·리그"(Task 180 R-1 B) — 서버 응답을 줄로 바꾸는 규칙과, 누가 [명단 수정]을 보는지.
+ * 팀 상세 "참가 중인 대회·리그"(Task 180 R-1 B) — 서버 응답을 줄로 바꾸는 규칙과, 누가 [참가 선수 관리]를 보는지.
  */
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
@@ -70,7 +70,7 @@ describe('toCompetitionEntryRows', () => {
     expect(notes(true)).toEqual(['수정 가능', '10월 8일 (목)까지 수정', '제출 마감']);
   });
 
-  it('[명단 수정]은 팀장·매니저이면서 명단을 고칠 수 있을 때만 — 둘 중 하나라도 아니면 [명단 보기]', () => {
+  it('[참가 선수 관리]는 팀장·매니저이면서 명단을 고칠 수 있을 때만 — 둘 중 하나라도 아니면 [참가 선수 보기]', () => {
     const items = [{ rosterEditable: true }, { rosterEditable: false, rosterBlockedBy: 'deadline' as const }];
     expect(toCompetitionEntryRows(entries(items, true), SELF, NOW).map((row) => row.canEdit)).toEqual([true, false]);
     expect(toCompetitionEntryRows(entries(items, false), SELF, NOW).map((row) => row.canEdit)).toEqual([false, false]);
@@ -78,21 +78,21 @@ describe('toCompetitionEntryRows', () => {
 });
 
 describe('TeamCompetitionEntriesSection', () => {
-  it('팀장에게 줄마다 신청 상태·선수 수와 [명단 수정]·[명단 보기]를 보인다', () => {
+  it('팀장에게 줄마다 신청 상태·선수 수와 [참가 선수 관리]·[참가 선수 보기]를 보인다', () => {
     renderSection(fixture);
     expect(screen.getByText('참가 중인 대회·리그')).toBeInTheDocument();
-    const league = screen.getByRole('link', { name: '가을 정규 리그 참가 명단 수정' });
-    expect(league).toHaveTextContent('명단 수정');
-    expect(screen.getByRole('link', { name: '성수 풋살컵 참가 명단 보기' })).toHaveTextContent('명단 보기');
+    const league = screen.getByRole('link', { name: '가을 정규 리그 참가 선수 관리' });
+    expect(league).toHaveTextContent('참가 선수 관리');
+    expect(screen.getByRole('link', { name: '성수 풋살컵 참가 선수 보기' })).toHaveTextContent('참가 선수 보기');
     const row = league.closest('li') as HTMLElement;
     expect(within(row).getByText('참가 확정')).toBeInTheDocument();
     expect(within(row).getByText(/선수 10명 · 수정 가능/)).toBeInTheDocument();
   });
 
-  it('팀원에게는 [명단 보기]만 보인다', () => {
+  it('팀원에게는 [참가 선수 보기]만 보인다', () => {
     renderSection({ ...fixture, viewerCanManageRoster: false });
-    expect(screen.queryByRole('link', { name: /명단 수정/ })).not.toBeInTheDocument();
-    expect(screen.getAllByRole('link', { name: /명단 보기$/ })).toHaveLength(2);
+    expect(screen.queryByRole('link', { name: /참가 선수 관리/ })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: /참가 선수 보기$/ })).toHaveLength(2);
     expect(screen.getByText('참가 명단은 팀장·매니저가 고쳐요.')).toBeInTheDocument();
   });
 

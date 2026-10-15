@@ -32,9 +32,11 @@ const manager: V1AuthUser = {
   onboardingStatus: 'completed',
 };
 
-/** 라인업에 등록할 수 있는 활성 멤버 — resolveEntry 의 멤버십 검증이 통과할 사용자 집합.
- *  (가짜는 팀을 구분하지 않는다 — 홈/원정 구분은 아래 managerMembership 으로 표현한다.) */
-const ROSTER_USER_IDS = new Set(['user-1', 'user-2', 'user-3', 'away-user-1', 'away-user-3']);
+/** Player membership is attached to the team, independently of which manager is calling. */
+const ROSTER_USER_IDS_BY_TEAM = new Map<string, readonly string[]>([
+  ['team-home', ['user-1', 'user-2', 'user-3']],
+  ['team-away', ['away-user-1', 'away-user-3']],
+]);
 
 interface FakeState {
   participants: Array<{ id: string; lineupId: string; sideId: string | null; userId: string | null; displayNameSnapshot: string; position: string | null; jerseyNumber?: number | null; arrivedAt?: Date | null }>;
@@ -75,13 +77,15 @@ function createFake(options: {
   scheduleAttendance?: Array<{ userId: string; status: string }>;
   /** V1GameVisibilityPolicy.lineupAt. undefined 면 정책 행이 없다. */
   publicLineupAt?: Date | null;
-  /** 팀장 소속이 아닌 팀의 멤버십(팀 id → 행). 우리 팀 목록은 아래 고정 3명이다. */
+  /** 팀별 멤버십 override — 양 팀 소속 같은 시나리오도 같은 조회 데이터로 표현한다. */
   otherTeamMemberships?: Record<string, Array<{ userId: string; status: 'active' | 'left' | 'removed' }>>;
 } = {}) {
   /** 이 팀장이 어느 팀 소속인가. 홈이면 own=HOME, 원정이면 own=AWAY 로 갈린다.
    *  테스트 도중 바꿀 수 있게 객체로 들고 있는다 — "홈팀이 정정을 요청하고 원정팀이
    *  다시 저장한다"는 실제 흐름은 서로 다른 팀의 권한을 차례로 태워야 재현된다. */
   const managerMembership = { teamId: options.managerTeamId ?? 'team-home' };
+  const membershipsFor = (teamId: string) => options.otherTeamMemberships?.[teamId] ??
+    (ROSTER_USER_IDS_BY_TEAM.get(teamId) ?? []).map((userId) => ({ userId, status: 'active' as const }));
   const state: FakeState = {
     participants: [],
     linkEvents: [],
@@ -190,29 +194,19 @@ function createFake(options: {
           if (options.viewerNotManager) return null;
           return { id: 'membership-manager', teamId: managerMembership.teamId, userId: manager.id, role: 'owner', status: 'active' };
         }
-        const userId = args.where.userId as string;
-        if (!ROSTER_USER_IDS.has(userId)) return null;
+        const userId = args.where.userId;
+        const teamId = args.where.teamId;
+        if (typeof userId !== 'string' || typeof teamId !== 'string' ||
+          !membershipsFor(teamId).some((row) => row.userId === userId && row.status === 'active')) return null;
         return { userId, user: { profile: { nickname: `${userId} 님`, displayName: null } } };
       },
       findMany: async (args: { where: { teamId: string | { in: string[] }; status?: string; userId?: { in: string[] } } }) => {
-        if (typeof args.where.teamId !== 'string') {
-          return args.where.teamId.in.flatMap((teamId) =>
-            (teamId === managerMembership.teamId ? ['user-1', 'user-2', 'user-3'] : ['away-user-1', 'away-user-3'])
-              .map((userId, index) => ({ teamId, userId, jerseyNumber: index + 1, user: { profile: { nickname: `${userId} 님`, displayName: null, deletedAt: null } } })),
-          );
-        }
-        // 다른 팀 조회는 where(팀·상태·사용자)를 실제로 적용한다 — 서비스가 필터를 빠뜨리면 결과가 달라진다.
-        if (args.where.teamId !== managerMembership.teamId) {
-          return (options.otherTeamMemberships?.[args.where.teamId] ?? [])
+        const teamIds = typeof args.where.teamId === 'string' ? [args.where.teamId] : args.where.teamId.in;
+        return teamIds.flatMap((teamId) => membershipsFor(teamId)
             .filter((row) => args.where.status === undefined || row.status === args.where.status)
             .filter((row) => args.where.userId === undefined || args.where.userId.in.includes(row.userId))
-            .map((row) => ({ userId: row.userId }));
-        }
-        return ['user-1', 'user-2', 'user-3'].map((userId, index) => ({
-          userId,
-          jerseyNumber: index + 1,
-          user: { profile: { nickname: `${userId} 님`, displayName: null } },
-        }));
+            .map((row, index) => ({ teamId, userId: row.userId, jerseyNumber: index + 1,
+              user: { profile: { nickname: `${row.userId} 님`, displayName: null, deletedAt: null } } })));
       },
     },
     // 참석명단 자격은 활성 멤버십만 본다. RSVP 는 조회 화면의 읽기 전용 칩으로만 읽는다 —
@@ -812,6 +806,7 @@ function seedSubmittedAwayLineupWithHiddenPlayer(state: FakeState) {
     sideId: 'side-away',
     revision: 1,
     state: V1GameLineupState.SUBMITTED,
+    submittedAt: new Date('2026-10-14T09:00:00.000Z'),
     version: 0,
     formation: null,
     supersedesId: null,
@@ -958,6 +953,16 @@ describe('TeamMatchLineupService.saveLineup — 공개 제외 승계', () => {
   const rowOf = (state: FakeState, lineupId: string, userId: string) =>
     state.participants.find((row) => row.lineupId === lineupId && row.userId === userId)!;
 
+  async function reopenForResave(fake: ReturnType<typeof createFake>) {
+    seedSubmittedAwayLineupWithHiddenPlayer(fake.state);
+    const service = new TeamMatchLineupService(fake.prisma, audit);
+    const reopened = await service.requestChange(manager, 'team-match-1', 'privacy-reopen', {
+      expectedVersion: 1, reason: '명단을 다시 확인해 주세요.',
+    });
+    fake.managerMembership.teamId = 'team-away';
+    return { service, reopened };
+  }
+
   it('정정 요청을 받은 팀이 라인업을 다시 저장해도 숨긴 경기는 공개되지 않는다', async () => {
     const fake = createFake();
     seedSubmittedAwayLineupWithHiddenPlayer(fake.state);
@@ -994,13 +999,11 @@ describe('TeamMatchLineupService.saveLineup — 공개 제외 승계', () => {
   });
 
   it('재저장을 반복해도 숨김이 계속 따라간다', async () => {
-    const { state, prisma } = createFake({ managerTeamId: 'team-away' });
-    seedSubmittedAwayLineupWithHiddenPlayer(state);
-    // 원정팀이 직접 고칠 수 있으려면 자기 라인업이 초안 상태여야 한다.
-    state.lineups.find((row) => row.id === 'away-lineup-1')!.state = V1GameLineupState.DRAFT;
-    const service = new TeamMatchLineupService(prisma, audit);
+    const fake = createFake();
+    const { state } = fake;
+    const { service, reopened } = await reopenForResave(fake);
 
-    const first = await service.saveLineup(manager, 'team-match-1', 'key-1', awayResaveDto(1));
+    const first = await service.saveLineup(manager, 'team-match-1', 'key-1', awayResaveDto(reopened.revision));
     const second = await service.saveLineup(manager, 'team-match-1', 'key-2', awayResaveDto(first.revision));
 
     // 한 다리 건너 저장돼도 숨김이 살아 있어야 한다 — 한 칸만 이으면 두 번째 저장에서 샌다.
@@ -1009,16 +1012,15 @@ describe('TeamMatchLineupService.saveLineup — 공개 제외 승계', () => {
   });
 
   it('게스트로 올랐다가 본인이 가져간(claim) 행의 숨김도 사람 기준으로 이어진다', async () => {
-    const { state, prisma } = createFake({ managerTeamId: 'team-away' });
-    seedSubmittedAwayLineupWithHiddenPlayer(state);
-    state.lineups.find((row) => row.id === 'away-lineup-1')!.state = V1GameLineupState.DRAFT;
+    const fake = createFake();
+    const { state } = fake;
+    const { service, reopened } = await reopenForResave(fake);
     // 직전 리비전에서는 이름만 올라간 게스트였고, 본인이 신청·승인으로 가져간 상태 —
     // participant.userId 컬럼은 null 인데 연결에는 사람이 있다. 컬럼을 승계 키로 쓰면
     // 여기서 끊긴다.
-    state.participants.find((row) => row.id === 'away-participant-1')!.userId = null;
-    const service = new TeamMatchLineupService(prisma, audit);
+    rowOf(state, reopened.lineupId, 'away-user-1').userId = null;
 
-    const resaved = await service.saveLineup(manager, 'team-match-1', 'key-1', awayResaveDto(1));
+    const resaved = await service.saveLineup(manager, 'team-match-1', 'key-1', awayResaveDto(reopened.revision));
 
     expect(await isPubliclyVisible(state, rowOf(state, resaved.lineupId, 'away-user-1').id)).toBe(false);
     // 이번 저장에 새로 올라간 게스트(연결 없음)에는 아무것도 만들지 않는다.
@@ -1028,23 +1030,23 @@ describe('TeamMatchLineupService.saveLineup — 공개 제외 승계', () => {
   });
 
   it('숨긴 적 없는 사람에게는 공개 동의를 만들어내지 않는다', async () => {
-    const { state, prisma } = createFake({ managerTeamId: 'team-away' });
-    seedSubmittedAwayLineupWithHiddenPlayer(state);
-    state.lineups.find((row) => row.id === 'away-lineup-1')!.state = V1GameLineupState.DRAFT;
+    const fake = createFake();
+    const { state } = fake;
+    const { service, reopened } = await reopenForResave(fake);
     // 대조군에게 참가자 단위 GRANTED 가 명시적으로 달려 있어도 옮기지 않는다 —
     // GRANTED 와 "스냅샷 없음"은 판정 결과가 같고, 없는 동의를 새 연결 아래에 만들면
     // 본인이 동의한 적 없는 연결에 동의를 날조하는 셈이라 노출을 늘린다.
+    const open = rowOf(state, reopened.lineupId, 'away-user-3');
     state.consentSnapshots.push({
-      participantId: 'away-participant-3',
-      linkId: 'away-link-3',
+      participantId: open.id,
+      linkId: state.links.find((link) => link.participantId === open.id)!.linkId,
       consentVersion: 1,
       state: V1ConsentState.GRANTED,
       policyHash: 'policy-hash-at-grant-time',
       actorUserId: 'away-user-3',
     });
-    const service = new TeamMatchLineupService(prisma, audit);
 
-    const resaved = await service.saveLineup(manager, 'team-match-1', 'key-1', awayResaveDto(1));
+    const resaved = await service.saveLineup(manager, 'team-match-1', 'key-1', awayResaveDto(reopened.revision));
 
     const control = rowOf(state, resaved.lineupId, 'away-user-3');
     expect(state.consentSnapshots.some((row) => row.participantId === control.id)).toBe(false);
@@ -1319,7 +1321,11 @@ describe('TeamMatchLineupService.addLateParticipant — 첫 기록 뒤에는 추
   });
 
   it('상대 팀장이 부르면 자기 팀 명단에만 붙는다 — 우리 제출본은 그대로다', async () => {
-    const { state, prisma } = createFake({ gameState: V1GameState.LIVE, hasSharedRecord: true, managerTeamId: 'team-away' });
+    const { state, prisma } = createFake({ gameState: V1GameState.LIVE, hasSharedRecord: true, managerTeamId: 'team-away',
+      otherTeamMemberships: { 'team-away': [
+        { userId: 'away-user-1', status: 'active' }, { userId: 'away-user-3', status: 'active' }, { userId: 'user-3', status: 'active' },
+      ] },
+    });
     seedSubmittedLineups(state);
     const service = new TeamMatchLineupService(prisma, auditSpy().writer);
 
@@ -1448,7 +1454,10 @@ describe('TeamMatchLineupService.getLineup — 상대 팀에도 소속된 팀원
   it('원정 팀장이 보면 상대는 홈 팀이다 — 자기 팀 멤버십을 상대로 착각하지 않는다', async () => {
     const { prisma } = createFake({
       managerTeamId: 'team-away',
-      otherTeamMemberships: { 'team-home': [{ userId: 'user-3', status: 'active' }] },
+      otherTeamMemberships: {
+        'team-home': [{ userId: 'user-3', status: 'active' }],
+        'team-away': [{ userId: 'away-user-1', status: 'active' }, { userId: 'away-user-3', status: 'active' }, { userId: 'user-3', status: 'active' }],
+      },
     });
     const service = new TeamMatchLineupService(prisma, audit);
 

@@ -30,8 +30,18 @@ export function normalizeCompetitionPeriods(
     });
   }
   const shrinkingStandardHalves = requested.length === 1 && current.length >= 2 && current[0]?.code === 'FIRST_HALF' && current[1]?.code === 'SECOND_HALF';
+  const expandingSinglePeriod = current.length === 1 && current[0]?.code === 'SINGLE_PERIOD' && requested.length > 1;
+  // 단판을 다시 둘로 나누면 이전 행('단일')을 이어 받지 않고 전·후반으로 되돌린다 — 이어 받으면 '단일'·'2피리어드'가 저장된다.
+  if (requested.length === 2 && current.length === 1 && current[0]?.code === 'SINGLE_PERIOD') {
+    return requested.map((period, index) => ({
+      code: index === 0 ? 'FIRST_HALF' : 'SECOND_HALF',
+      label: index === 0 ? '전반' : '후반',
+      durationMinutes: period.durationMinutes,
+      extraTime: false,
+    }));
+  }
   return requested.map((period, index) => {
-    const previous = current[index];
+    const previous = expandingSinglePeriod ? undefined : current[index];
     let code = previous?.code;
     if (!code) {
       let suffix = index + 1;

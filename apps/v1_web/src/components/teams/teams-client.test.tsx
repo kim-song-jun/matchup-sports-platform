@@ -1028,7 +1028,7 @@ describe('TeamDetailPageClient — 내 리그', () => {
     expect(teamApiMocks.useV1LeagueMatches).toHaveBeenLastCalledWith(expect.objectContaining({ teamId: 'team-1' }), { enabled: false });
     // 데스크톱·모바일 레이아웃당 1개씩.
     expect(screen.getAllByText('참가 중인 대회·리그')).toHaveLength(2);
-    screen.getAllByRole('link', { name: '가을 정규 리그 참가 명단 수정' }).forEach((link) =>
+    screen.getAllByRole('link', { name: '가을 정규 리그 참가 선수 관리' }).forEach((link) =>
       expect(link).toHaveAttribute('href', '/tournaments/league-1/registrations/registration-league-1/roster?from=%2Fteams%2Fteam-1'),
     );
     expect(screen.queryByText('내 리그')).not.toBeInTheDocument();

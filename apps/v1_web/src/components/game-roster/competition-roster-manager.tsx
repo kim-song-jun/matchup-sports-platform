@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { GameRosterClient } from '@/app/teams/[id]/games/[gameId]/roster/game-roster-client';
 import { useV1Registration, useV1TeamDetail, useV1TeamUpcomingGames, useV1Tournament } from '@/hooks/use-v1-api';
 import { useV1TeamGameRoster, useV1TeamGameRosters } from '@/hooks/use-v1-game-roster';
-import { AlertBanner, EmptyState, ErrorState, SectionTitle } from '@/components/v1-ui/primitives';
+import { AlertBanner, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
 import { Button } from '@/components/v1-ui/button';
@@ -72,8 +72,8 @@ export function CompetitionRosterManager(entry: Entry) {
   return <RosterManagerNavigation.Provider value={navigation}>
     <div className={styles.manager}>
       <header className={styles.context}>
+        {/* 화면 제목 "명단 관리"는 상단 바·데스크톱 머리글이 이미 그린다 — 본문은 어느 대회·팀인지만 적는다. */}
         <p className="tm-text-caption">{competition.data?.title ?? '참가 명단'}{team.data ? ` · ${team.data.name}` : ''}</p>
-        <SectionTitle title="명단 관리" />
       </header>
       <div className={styles.tabs} role="tablist" aria-label="명단 관리 메뉴">
         {(['players', 'game'] as const).map(key => <button key={key} type="button" role="tab"

@@ -408,7 +408,7 @@ describe('MyRegistrationPageClient — 명단 수정 가능 배지', () => {
     expect(container.textContent).not.toContain('등록 완료');
     // **배지만 고치면 반쪽이다.** 편집 링크가 남아 있으면 눌러 들어가서 서버 409 를 만난다 —
     // 배지가 "못 고친다" 고 말하는데 버튼은 열려 있는 상태가 그 자체로 결함이다.
-    expect(screen.queryByRole('link', { name: '선수 명단 수정하기' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '참가 선수 관리' })).not.toBeInTheDocument();
   });
 
   it('어드민이 마감 예외를 줬으면 다시 "수정 가능" 이다 — 예외를 무시하면 안 된다', () => {
@@ -421,7 +421,7 @@ describe('MyRegistrationPageClient — 명단 수정 가능 배지', () => {
 
     expect(container.textContent).toContain('수정 가능');
     // 예외를 줬으면 **링크도 열려 있어야** 한다 — 배지만 되살리면 고칠 방법이 없다.
-    expect(screen.getAllByRole('link', { name: '선수 명단 수정하기' }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('link', { name: '참가 선수 관리' }).length).toBeGreaterThan(0);
   });
 
   it('대회가 끝났으면 "수정 불가" 다', () => {
@@ -431,7 +431,7 @@ describe('MyRegistrationPageClient — 명단 수정 가능 배지', () => {
 
     expect(container.textContent).toContain('수정 불가');
     expect(container.textContent).not.toContain('수정 가능');
-    expect(screen.queryByRole('link', { name: '선수 명단 수정하기' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '참가 선수 관리' })).not.toBeInTheDocument();
   });
 
   it('마감 전이고 대회도 진행 중이면 그대로 "수정 가능" 이다 (회귀 방지)', () => {
@@ -452,7 +452,7 @@ describe('MyRegistrationPageClient — 명단 수정 가능 배지', () => {
     expect(container.textContent).toContain('수정 가능');
     expect(container.textContent).not.toContain('수정 불가');
     expect(container.textContent).not.toContain('· 마감');
-    expect(screen.getAllByRole('link', { name: '선수 명단 수정하기' }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('link', { name: '참가 선수 관리' }).length).toBeGreaterThan(0);
   });
 
   it.each([
@@ -464,10 +464,10 @@ describe('MyRegistrationPageClient — 명단 수정 가능 배지', () => {
     const { container } = render(<MyRegistrationPageClient tournamentId="tournament-1" />);
 
     expect(container.textContent).toContain('수정 불가');
-    expect(screen.queryByRole('link', { name: '선수 명단 수정하기' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '참가 선수 관리' })).not.toBeInTheDocument();
   });
 
-  // 링크 글자가 잠금만 봐서, 마감이 지났거나 대회가 끝나 못 고치는데도 "선수 수정" 이라고 썼다.
+  // 링크 글자가 잠금만 봐서, 마감이 지났거나 대회가 끝나 못 고치는데도 "선수 수정"(지금은 "참가 선수 관리") 이라고 썼다.
   it.each([
     ['명단 제출 마감 경과', { rosterDeadlineAt: '2020-01-01T00:00:00.000Z' }],
     ['종료 리그', { kind: 'regular_league', status: 'completed' }],
@@ -476,18 +476,18 @@ describe('MyRegistrationPageClient — 명단 수정 가능 배지', () => {
 
     const { container } = render(<MyRegistrationPageClient tournamentId="tournament-1" />);
 
-    const link = screen.getByRole('link', { name: '선수 명단 확인하기' });
-    expect(link).toHaveTextContent('명단 확인');
-    expect(container.textContent).not.toContain('선수 수정');
+    const link = screen.getByRole('link', { name: '참가 선수 보기' });
+    expect(link).toHaveTextContent('참가 선수 보기');
+    expect(container.textContent).not.toContain('참가 선수 관리');
   });
 
-  it('대조군: 고칠 수 있는 명단의 링크는 그대로 "선수 수정" 이다', () => {
+  it('대조군: 고칠 수 있는 명단의 링크는 그대로 "참가 선수 관리" 다', () => {
     arrange({ kind: 'regular_league', status: 'draft' });
 
     render(<MyRegistrationPageClient tournamentId="tournament-1" />);
 
-    for (const link of screen.getAllByRole('link', { name: '선수 명단 수정하기' })) {
-      expect(link).toHaveTextContent('선수 수정');
+    for (const link of screen.getAllByRole('link', { name: '참가 선수 관리' })) {
+      expect(link).toHaveTextContent('참가 선수 관리');
     }
   });
 });
@@ -626,18 +626,18 @@ describe('MyRegistrationPageClient — 멤버가 보는 명단 상태', () => {
 
     expect(text).toContain('10명 등록 완료');
     expect(text).not.toContain('· 마감');
-    expect(screen.getByRole('link', { name: '선수 명단 보기' })).toHaveTextContent('명단 보기');
-    expect(screen.queryByRole('link', { name: '선수 명단 수정하기' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '참가 선수 보기' })).toHaveTextContent('참가 선수 보기');
+    expect(screen.queryByRole('link', { name: '참가 선수 관리' })).not.toBeInTheDocument();
     // 레일도 같은 판정 — 멤버에게 "수정 가능" 은 고칠 수 없는 사람에게 고칠 수 있다고 하는 말이다.
     expect(railText).toContain('팀장에게 요청');
     expect(railText).not.toContain('수정 가능');
   });
 
-  it('대조군: 팀장은 같은 명단에서 "수정 가능" 과 [선수 수정] 이다', () => {
+  it('대조군: 팀장은 같은 명단에서 "수정 가능" 과 [참가 선수 관리] 다', () => {
     const { text, railText } = arrange('owner', OPEN_DRAFT_LEAGUE);
 
     expect(text).toContain('10명 등록 완료');
-    expect(screen.getAllByRole('link', { name: '선수 명단 수정하기' }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('link', { name: '참가 선수 관리' }).length).toBeGreaterThan(0);
     expect(railText).toContain('수정 가능');
     expect(railText).not.toContain('팀장에게 요청');
   });
@@ -647,7 +647,7 @@ describe('MyRegistrationPageClient — 멤버가 보는 명단 상태', () => {
 
     expect(text).toContain('10명 · 마감');
     expect(text).not.toContain('등록 완료');
-    expect(screen.getByRole('link', { name: '선수 명단 확인하기' })).toHaveTextContent('명단 확인');
+    expect(screen.getByRole('link', { name: '참가 선수 보기' })).toHaveTextContent('참가 선수 보기');
     expect(railText).toContain('제출 마감');
     expect(railText).not.toContain('팀장에게 요청');
   });
@@ -879,7 +879,7 @@ describe('MyRegistrationPageClient — 팀 권한 조회 상태 구분', () => {
 
     expect(screen.getByRole('alert')).toHaveTextContent('팀 정보를 불러오지 못했어요');
     expect(screen.queryByText('권한 필요')).toBeNull();
-    expect(screen.queryByRole('link', { name: '선수 명단 수정하기' })).toBeNull();
+    expect(screen.queryByRole('link', { name: '참가 선수 관리' })).toBeNull();
 
     await userEvent.click(screen.getByRole('button', { name: '다시 시도하기' }));
     expect(refetchTeams).toHaveBeenCalledTimes(1);
@@ -894,7 +894,7 @@ describe('MyRegistrationPageClient — 팀 권한 조회 상태 구분', () => {
       refetch: refetchTeams,
     });
     const view = render(<MyRegistrationPageClient tournamentId="tournament-1" />);
-    expect(screen.queryByRole('link', { name: '선수 명단 수정하기' })).toBeNull();
+    expect(screen.queryByRole('link', { name: '참가 선수 관리' })).toBeNull();
 
     myRegistrationApiMocks.useV1MyTeams.mockReturnValue({
       data: { items: [makeTeam({ role: 'owner' })] },
@@ -906,7 +906,7 @@ describe('MyRegistrationPageClient — 팀 권한 조회 상태 구분', () => {
     view.rerender(<MyRegistrationPageClient tournamentId="tournament-1" />);
 
     expect(screen.queryByRole('alert')).toBeNull();
-    expect(screen.getAllByRole('link', { name: '선수 명단 수정하기' }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('link', { name: '참가 선수 관리' }).length).toBeGreaterThan(0);
   });
 
   it('조회에 성공했지만 멤버 권한이면 오류가 아니라 수정 링크만 숨는다 (대조군)', () => {
@@ -921,7 +921,7 @@ describe('MyRegistrationPageClient — 팀 권한 조회 상태 구분', () => {
     render(<MyRegistrationPageClient tournamentId="tournament-1" />);
 
     expect(screen.queryByRole('alert')).toBeNull();
-    expect(screen.queryByRole('link', { name: '선수 명단 수정하기' })).toBeNull();
+    expect(screen.queryByRole('link', { name: '참가 선수 관리' })).toBeNull();
   });
 
   it('조회 중에는 권한 판정 없이 로딩 상태만 보인다', () => {

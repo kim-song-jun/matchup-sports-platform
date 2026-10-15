@@ -32,8 +32,23 @@ export function pinForPeriods(host: TeamMatchRulesHostFixture, periods: readonly
 
 export function hostRulesBlockedReason(host: TeamMatchRulesHostFixture | undefined): V1TeamMatchRulesLockedReason | null {
   if (!host?.competitionConfigVersionId || !host.periods) return 'COMPETITION_CONFIG_REQUIRED';
-  if (host.periods.length !== 2 || host.periods[0]?.code !== 'FIRST_HALF'
-    || host.periods[1]?.code !== 'SECOND_HALF' || host.periods.some(period => period.extraTime)) return 'COMPETITION_PERIODS_UNAVAILABLE';
+  const singlePeriod = host.periods.length === 1 && host.periods[0]?.code === 'SINGLE_PERIOD' && !host.periods[0].extraTime;
+  const twoPeriods = host.periods.length === 2 && host.periods[0]?.code === 'FIRST_HALF'
+    && host.periods[1]?.code === 'SECOND_HALF' && host.periods.every(period => !period.extraTime);
+  if (!singlePeriod && !twoPeriods) return 'COMPETITION_PERIODS_UNAVAILABLE';
+  return null;
+}
+
+export function periodWriteBlockedReason(
+  host: TeamMatchRulesHostFixture, periods: readonly V1TeamMatchPeriodInput[] | undefined, existing?: StoredTeamMatchRules,
+): V1TeamMatchRulesLockedReason | null {
+  if (periods === undefined) return existing || host.competitionConfigVersionId ? null : 'COMPETITION_CONFIG_REQUIRED';
+  const blocked = existing?.rulesLockedReason ?? hostRulesBlockedReason(host);
+  if (blocked) return blocked;
+  const currentPeriods = existing ? existing.periods : host.periods;
+  // Expanding a single pin requires real identities from the active global two-half history.
+  if (currentPeriods?.length === 1 && currentPeriods[0]?.code === 'SINGLE_PERIOD'
+    && periods.length === 2 && host.twoPeriodDefaults === null) return 'COMPETITION_PERIODS_UNAVAILABLE';
   return null;
 }
 

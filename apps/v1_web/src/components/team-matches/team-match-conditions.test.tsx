@@ -9,6 +9,7 @@ import { __resetOverlayHistoryForTests } from '@/lib/overlay-history';
 import type { V1TeamMatchEdit, V1TeamMatchMutationPayload } from '@/types/api';
 import { TeamMatchCreatePageClient, TeamMatchEditPageClient } from './team-matches-create-client';
 import { getTeamMatchCreateViewModel } from './team-matches.view-model';
+import { teamMatchEditDraftKey, type TeamMatchStoredEditDraft } from './team-match-rules-draft';
 
 const state = vi.hoisted(() => ({
   push: vi.fn(), create: vi.fn(), update: vi.fn(),
@@ -40,7 +41,9 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1CancelTeamMatch: () => ({ mutate: vi.fn(), isPending: false }),
   useV1UploadImages: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useV1TeamMatchRuleOptions: () => ({ data: { hostTeamId: 'conditions-host', sportId: 'sport-futsal', competitionConfigVersionId: 'conditions-config',
-    periods: [{ code: 'FIRST_HALF', label: '전반', durationMinutes: 17, extraTime: false }, { code: 'SECOND_HALF', label: '후반', durationMinutes: 19, extraTime: false }] }, isLoading: false, isFetching: false, isError: false, refetch: vi.fn() }),
+    periods: [{ code: 'FIRST_HALF', label: '전반', durationMinutes: 17, extraTime: false }, { code: 'SECOND_HALF', label: '후반', durationMinutes: 19, extraTime: false }],
+    twoPeriodDefaults: [{ code: 'FIRST_HALF', label: '전반', durationMinutes: 17, extraTime: false }, { code: 'SECOND_HALF', label: '후반', durationMinutes: 19, extraTime: false }],
+  }, isLoading: false, isFetching: false, isError: false, isSuccess: true, refetch: vi.fn() }),
   useV1TeamRecentVenues: () => ({ data: { items: [] } }),
   useV1PlaceSearch: () => ({ data: undefined, error: null, isFetching: false, isError: false, refetch: vi.fn() }),
   useV1PublicKakaoMapsKey: () => ({ data: undefined }),
@@ -221,10 +224,10 @@ describe('#1599 actual team-match create/edit conditions', () => {
     state.edit = editFixture('beginner', 'advanced');
     state.pathname = '/team-matches/conditions-match/edit';
     window.history.replaceState(null, '', state.pathname);
-    const user = userEvent.setup(); renderClient(<TeamMatchEditPageClient teamMatchId="conditions-match" />);
+    const user = userEvent.setup(); const editing = renderClient(<TeamMatchEditPageClient teamMatchId="conditions-match" />);
     await user.selectOptions(screen.getByLabelText('최소 등급'), 'novice');
     await user.click(screen.getByRole('button', { name: '변경 취소' }));
-    expect(await screen.findByRole('dialog')).toHaveTextContent('작성 중인 내용이 사라져요');
+    expect(await screen.findByRole('dialog')).toHaveTextContent('작성 중인 내용은 이 기기에 잠시 저장돼 다음에 이어서 쓸 수 있어요.');
     await user.keyboard('{Escape}');
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(state.push).not.toHaveBeenCalled(); expect(state.update).not.toHaveBeenCalled();
@@ -237,6 +240,14 @@ describe('#1599 actual team-match create/edit conditions', () => {
     await user.click(screen.getByRole('button', { name: '변경 취소' }));
     await user.click(await screen.findByRole('button', { name: '나가기' }));
     await waitFor(() => expect(state.push).toHaveBeenCalledWith('/team-matches/conditions-match'));
+    expect(state.update).not.toHaveBeenCalled();
+    expect(readExpiringDraft<TeamMatchStoredEditDraft>(teamMatchEditDraftKey('conditions-match'))).toMatchObject({
+      teamMatchId: 'conditions-match', version: 'v1', draft: { grade: '초보-고수' },
+    });
+    editing.unmount();
+    renderClient(<TeamMatchEditPageClient teamMatchId="conditions-match" />);
+    await waitFor(() => expect(screen.getByLabelText('최소 등급')).toHaveValue('novice'));
+    expect(screen.getByLabelText('최대 등급')).toHaveValue('advanced');
     expect(state.update).not.toHaveBeenCalled();
   });
 });

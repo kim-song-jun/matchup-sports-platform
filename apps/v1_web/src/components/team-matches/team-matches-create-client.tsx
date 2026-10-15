@@ -26,6 +26,7 @@ import { V1ApiError } from '@/lib/api-client';
 import { ErrorState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { readTeamMatchRuleDraft, ruleDraftForOptions, ruleDraftForEdit, ruleDraftMatches, validTeamMatchPeriods, teamMatchEditDraftKey, readTeamMatchEditDraft } from './team-match-rules-draft';
+import { TEAM_MATCH_PERIOD_MINUTES_ERROR } from '@/lib/team-match-periods';
 import { placeFromEditForm, type PlaceValue } from '@/lib/place';
 import { getCreatorProfilePrompt, profileEditHref } from '@/lib/creator-profile';
 import { formatTeamMatchLevelRange } from '@/lib/team-match-level-range';
@@ -158,11 +159,12 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
   const defaultOnly = ruleOptions.error instanceof V1ApiError && ruleOptions.error.code === 'COMPETITION_PERIODS_UNAVAILABLE';
   useEffect(() => {
     const options = ruleOptions.data;
-    if (step !== 'rules' || !options || options.hostTeamId !== selectedTeamId || options.sportId !== selectedSportId) return;
+    if (step !== 'rules' || !ruleOptions.isSuccess || ruleOptions.isFetching || !options
+      || options.hostTeamId !== selectedTeamId || options.sportId !== selectedSportId) return;
     if (!ruleDraft || ruleDraft.mode !== 'custom' || ruleDraft.competitionConfigVersionId !== options.competitionConfigVersionId) {
       setDraft((current) => ({ ...current, rules: ruleDraftForOptions(options) }));
     }
-  }, [step, ruleOptions.data, selectedTeamId, selectedSportId, ruleDraft, setDraft]);
+  }, [step, ruleOptions.data, ruleOptions.isSuccess, ruleOptions.isFetching, selectedTeamId, selectedSportId, ruleDraft, setDraft]);
 
   // #1·#2 결정의 공유 소스: 이 ctx로 스텝 게이팅과 최종 제출 결측 필드 안내를 둘 다 계산한다.
   const hasEligibleSelectedTeam = creatableTeams.some((team) => team.teamId === selectedTeamId);
@@ -229,10 +231,11 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
       || (ruleOptions.isError && !(defaultOnly && ruleDraft?.mode === 'default'))),
     rules: {
       periods: ruleDraft?.periods ?? null,
-      defaultPeriods: ruleOptions.data?.periods,
+      twoPeriodDefaults: ruleOptions.data?.twoPeriodDefaults,
       loading: ruleOptions.isLoading,
       error: ruleOptions.isError ? extractErrorMessage(ruleOptions.error, '경기 규칙을 불러오지 못했어요.') : null,
-      validationError: fieldErrors.rules,
+      validationError: fieldErrors.rules && ruleDraft?.mode === 'custom' && !validTeamMatchPeriods(ruleDraft.periods)
+        ? fieldErrors.rules + '. ' + TEAM_MATCH_PERIOD_MINUTES_ERROR : fieldErrors.rules,
       allowDefaultChoice: defaultOnly,
       defaultSelected: ruleDraft?.mode === 'default',
       onKeepDefault: () => setDraft((current) => ({ ...current, rules: { hostTeamId: selectedTeamId, sportId: selectedSportId,
@@ -471,10 +474,10 @@ export function TeamMatchEditPageClient({ teamMatchId, rulesStep = false }: { te
     regions: editRegionOptions,
     rules: {
       periods: draft.rules?.periods ?? editQuery.data?.form.periods ?? null,
-      defaultPeriods: editRuleOptions.data?.periods,
+      twoPeriodDefaults: editRuleOptions.data?.twoPeriodDefaults,
       loading: editRuleOptions.isLoading,
       error: editRuleOptions.isError ? extractErrorMessage(editRuleOptions.error, '경기 규칙을 불러오지 못했어요.') : null,
-      validationError: editAttempted && !validTeamMatchPeriods(draft.rules?.periods) ? '경기 시간은 1분 이상의 정수로 입력해 주세요.' : undefined,
+      validationError: editAttempted && !validTeamMatchPeriods(draft.rules?.periods) ? TEAM_MATCH_PERIOD_MINUTES_ERROR : undefined,
       lockedReason: editQuery.data?.rulesEditable === false ? ruleLockedMessage(editQuery.data.rulesLockedReason) : null,
       retryPending: editRuleOptions.isFetching,
       onRetry: () => { void editRuleOptions.refetch(); },
@@ -523,7 +526,7 @@ export function TeamMatchEditPageClient({ teamMatchId, rulesStep = false }: { te
         return;
       }
       void confirmLeave().then((leave) => {
-        if (leave) { clearExpiringDraft(editStorageKey); router.push(detailHref); }
+        if (leave) router.push(detailHref);
       });
     },
     onNext: () => {

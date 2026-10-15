@@ -7,7 +7,9 @@ import { GamesService } from '../games/games.service';
 import type { GameSourceCreationInput } from '../games/games.types';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { AdminContextService } from '../common/admin-context.service';
 import { FUTSAL_V1_CONFIG, competitionConfigContentHash } from '../tournaments/competition-config/competition-config';
+import { TournamentPeriodSettingsService } from '../tournaments/competition-config/tournament-period-settings.service';
 import { TeamMatchesService } from './team-matches.service';
 
 export const periodsActor: V1AuthUser = {
@@ -32,6 +34,10 @@ export async function teamMatchPeriodsFixture() {
     status: 'ACTIVE', contentHash: competitionConfigContentHash(FUTSAL_V1_CONFIG),
   };
   const configs = new Map<string, ConfigRow>([[baseConfig.id, baseConfig]]);
+  const tournament = {
+    id: 'tournament-periods', kind: 'regular_tournament', deletedAt: null,
+    competitionConfigVersionId: baseConfig.id, updatedAt: version,
+  };
   const lineups: LineupRow[] = [];
   const periods: PeriodRow[] = [];
   let periodIdentitySequence = 0;
@@ -72,14 +78,27 @@ export async function teamMatchPeriodsFixture() {
         if (data.competitionConfigVersionId !== undefined) match.competitionConfigVersionId = data.competitionConfigVersionId;
         return Promise.resolve(match);
       }),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
+    v1Tournament: {
+      findFirst: jest.fn(() => Promise.resolve({ ...tournament, competitionConfig: configs.get(tournament.competitionConfigVersionId) })),
+      updateMany: jest.fn(({ data }: { data: { competitionConfigVersionId: string } }) => {
+        tournament.competitionConfigVersionId = data.competitionConfigVersionId;
+        tournament.updatedAt = new Date(tournament.updatedAt.getTime() + 1);
+        return Promise.resolve({ count: 1 });
+      }),
     },
     v1CompetitionConfigVersion: {
+      findMany: jest.fn(({ where, take }: { where: { name?: string; sportCode?: string; status?: V1CompetitionConfigStatus; version?: { lt: number } }; take?: number }) => Promise.resolve(
+        [...configs.values()].filter(row => (where.name === undefined || row.name === where.name) && (where.sportCode === undefined || row.sportCode === where.sportCode) && (where.status === undefined || row.status === where.status) && (where.version === undefined || row.version < where.version.lt)).sort((a, b) => b.version - a.version).slice(0, take),
+      )),
       findFirst: jest.fn(({ where }: { where: { name?: string; sportCode?: string; status?: V1CompetitionConfigStatus } }) => Promise.resolve(
         [...configs.values()].filter(row => (where.name === undefined || row.name === where.name) && (where.sportCode === undefined || row.sportCode === where.sportCode) && (where.status === undefined || row.status === where.status)).sort((a, b) => b.version - a.version)[0] ?? null,
       )),
       findUnique: jest.fn(({ where }: { where: { id?: string; contentHash?: string } }) => Promise.resolve(configByWhere(where))),
-      create: jest.fn(({ data }: { data: Omit<ConfigRow, 'id'> }) => {
-        const row = { ...data, id: `custom-${configs.size}` }; configs.set(row.id, row); return Promise.resolve(row);
+      create: jest.fn(({ data }: { data: Omit<ConfigRow, 'id' | 'status'> & { status?: V1CompetitionConfigStatus } }) => {
+        const row: ConfigRow = { ...data, status: data.status ?? V1CompetitionConfigStatus.ACTIVE, id: `custom-${configs.size}` };
+        configs.set(row.id, row); return Promise.resolve(row);
       }),
       createMany: jest.fn(({ data }: { data: ConfigRow[] }) => {
         let count = 0;
@@ -128,6 +147,7 @@ export async function teamMatchPeriodsFixture() {
     v1TeamSchedule: { create: jest.fn().mockResolvedValue({}), findMany: jest.fn().mockResolvedValue([]), updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
     v1TeamMatchApplication: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
     v1StatusChangeLog: { create: jest.fn().mockResolvedValue({}) },
+    v1AdminActionLog: { create: jest.fn().mockResolvedValue({}) },
     $queryRaw: jest.fn().mockResolvedValue([]), $executeRaw: jest.fn().mockResolvedValue(0),
     $transaction: jest.fn((work: (client: Prisma.TransactionClient) => Promise<unknown>) => work(tx)),
   };
@@ -143,9 +163,11 @@ export async function teamMatchPeriodsFixture() {
     }),
   };
   const module = await Test.createTestingModule({ providers: [
-    TeamMatchesService, { provide: PrismaService, useValue: prisma }, { provide: GamesService, useValue: games },
+    TeamMatchesService, TournamentPeriodSettingsService,
+    { provide: PrismaService, useValue: prisma }, { provide: GamesService, useValue: games },
+    { provide: AdminContextService, useValue: { getMutationAdmin: jest.fn().mockResolvedValue({ id: 'admin-periods' }), logAdminAction: jest.fn().mockResolvedValue(undefined) } },
     { provide: NotificationsService, useValue: { emitToManyDeferred: jest.fn() } },
   ] }).compile();
   tx = module.get<PrismaService>(PrismaService);
-  return { service: module.get(TeamMatchesService), module, prisma, match, game, configs, baseConfig, lineups, periods, participants, events, results };
+  return { service: module.get(TeamMatchesService), tournamentService: module.get(TournamentPeriodSettingsService), tournament, module, prisma, match, game, configs, baseConfig, lineups, periods, participants, events, results };
 }

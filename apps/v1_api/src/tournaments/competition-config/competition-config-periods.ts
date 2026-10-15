@@ -1,5 +1,19 @@
 import { UnprocessableEntityException } from '@nestjs/common';
+import type { V1CompetitionConfigVersion } from '@prisma/client';
 import type { CompetitionConfig } from './competition-config.types';
+import { canonicalize } from './competition-config.validator';
+
+/** A hash lookup is an index lookup; the immutable content and active sport still decide reuse. */
+export function isReusableCompetitionPeriodConfig(
+  stored: Pick<V1CompetitionConfigVersion, 'sportCode' | 'status' | 'periods' | 'events' | 'lineup' | 'result' | 'tieBreak' | 'visibility'>,
+  sportCode: string,
+  requested: CompetitionConfig,
+): boolean {
+  return stored.sportCode === sportCode && stored.status === 'ACTIVE' && canonicalize({
+    periods: stored.periods, events: stored.events, lineup: stored.lineup,
+    result: stored.result, tieBreak: stored.tieBreak, visibility: stored.visibility,
+  }) === canonicalize(requested);
+}
 
 export function normalizeCompetitionPeriods(
   current: readonly CompetitionConfig['periods'][number][],

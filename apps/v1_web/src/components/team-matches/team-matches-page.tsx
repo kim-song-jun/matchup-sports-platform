@@ -40,7 +40,7 @@ import { TeamMatchApplyTeamSheet, TeamMatchManageMenuSheet } from './team-match-
 import { TeamMatchImagesField, TeamMatchImagesPreview, teamMatchImage, teamMatchBackgroundImage } from './team-match-images';
 import { TeamMatchLevelRangeField } from './team-match-level-range-field';
 import { TeamMatchRulesFields } from './team-match-rules-fields';
-import { teamMatchRuleSummary } from './team-match-rules-draft';
+import { teamMatchRuleSummary, teamMatchSavedRuleSummary } from './team-match-rules-draft';
 
 const TEAM_MATCH_COST_EXPLANATION = '신청하는 팀의 비용이에요';
 
@@ -744,6 +744,7 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
                 <InfoRow label="종목" value={match.sport} />
                 <InfoRow label="실력등급" value={match.grade ? `${match.grade}등급` : '미정'} />
                 <InfoRow label="경기방식" value={match.format} />
+                <InfoRow label="경기 규칙" value={teamMatchSavedRuleSummary(match.periods)} />
                 <InfoRow label="경기 스타일" value={match.style} />
                 <InfoRow label="유니폼 색상" value={match.uniform} />
                 <InfoRow label="성별 조건" value={match.gender} />

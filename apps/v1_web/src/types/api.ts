@@ -1434,6 +1434,8 @@ export type V1TeamMatchRuleOptions = {
   readonly sportId: string;
   readonly competitionConfigVersionId: string;
   readonly periods: readonly V1TeamMatchPeriod[];
+  /** 같은 종목의 ACTIVE 기본 설정 이력에서 확인한 전후반. 이력이 없으면 null이다. */
+  readonly twoPeriodDefaults: readonly V1TeamMatchPeriod[] | null;
 };
 
 export type V1TeamMatchRulesLockedReason =

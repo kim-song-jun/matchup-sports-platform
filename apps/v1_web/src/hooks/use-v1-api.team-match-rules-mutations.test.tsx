@@ -7,6 +7,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { v1Get, v1Patch, v1Post } from '@/lib/api-client';
 import { createV1QueryClient } from '@/lib/query-client';
 import { v1MswHandlers, v1TeamMatchRulesMsw } from '@/test/msw/handlers';
+import { createV1TeamMatchRulesMswHandlers } from '@/test/msw/team-match-rules-handlers';
 import type { V1Game, V1TeamMatchEdit, V1TeamMatchMutationPayload, V1TeamMatchMutationResult } from '@/types/api';
 import { useV1TeamMatchRuleOptions } from './use-v1-api';
 
@@ -24,8 +25,11 @@ function wrapper() {
   return ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
 }
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-beforeEach(() => { v1TeamMatchRulesMsw.reset(); vi.stubEnv('NEXT_PUBLIC_API_URL', api); });
-afterEach(() => { cleanup(); clients.splice(0).forEach(client => client.clear()); server.resetHandlers(); vi.unstubAllEnvs(); });
+beforeEach(() => {
+  v1TeamMatchRulesMsw.reset(); vi.stubEnv('NEXT_PUBLIC_API_URL', api);
+  vi.useFakeTimers({ toFake: ['Date'], now: new Date('2027-01-19T10:00:00.000Z') });
+});
+afterEach(() => { cleanup(); clients.splice(0).forEach(client => client.clear()); server.resetHandlers(); vi.unstubAllEnvs(); vi.useRealTimers(); });
 afterAll(() => server.close());
 
 describe('team-match rules persisted mutation boundaries', () => {
@@ -76,6 +80,130 @@ describe('team-match rules persisted mutation boundaries', () => {
     // Then: neither a partial save nor a repin is reported by subsequent reads.
     expect(await v1Get(route)).toEqual(detail);
     expect(await v1Get(`${route}/edit`)).toEqual(edit);
+    expect(await v1Get(`/games/${created.gameId}`)).toEqual(game);
+  });
+
+  it('persists a title-only historical edit from its returned form without creating a rules pin', async () => {
+    // Given: the fixed May fixture is before kickoff, matching the API date gate while retaining its historical null pin.
+    vi.setSystemTime(new Date('2026-05-20T00:00:00.000Z'));
+    const route = '/team-matches/team-match-1';
+    const original = await v1Get<V1TeamMatchEdit>(`${route}/edit`);
+    expect(original).toMatchObject({ editable: true, rulesEditable: false, competitionConfigVersionId: null });
+    const { periods, ...generalForm } = original.form;
+    expect(periods).toBeNull();
+    // When: the unchanged server form and current version save only a new title, omitting periods.
+    await v1Patch(route, { ...generalForm, version: original.version, title: '과거 팀매치 제목 수정' });
+    // Then: a subsequent read observes the title save without inventing historical rules.
+    expect(await v1Get(`${route}/edit`)).toMatchObject({
+      editable: true, rulesEditable: false, competitionConfigVersionId: null,
+      form: { title: '과거 팀매치 제목 수정', periods: null },
+    });
+    expect(await v1Get(route)).toMatchObject({ title: '과거 팀매치 제목 수정', periods: null });
+  });
+
+  it.each(['create', 'edit'])('rejects PostgreSQL integer overflow on %s without changing any saved aggregate', async (operation) => {
+    // Given: independent reads of an existing match, its current pin and the complete list.
+    const created = await v1Post<V1TeamMatchMutationResult>('/team-matches', { ...payload, periods: [{ durationMinutes: 37 }] });
+    const route = `/team-matches/${created.teamMatchId}`;
+    const edit = await v1Get<V1TeamMatchEdit>(`${route}/edit`);
+    const detail = await v1Get(route);
+    const game = await v1Get(`/games/${created.gameId}`);
+    const list = await v1Get('/team-matches');
+    // When: the first value above PostgreSQL int4 reaches the same create or edit HTTP boundary.
+    const overflow = { ...payload, periods: [{ durationMinutes: 2147483648 }] };
+    const write = operation === 'create'
+      ? v1Post('/team-matches', overflow)
+      : v1Patch(route, { ...overflow, version: edit.version });
+    await expect(write).rejects.toMatchObject({ statusCode: 400, code: 'VALIDATION_ERROR' });
+    // Then: rejected input neither creates a row nor partially changes the match or backing Game.
+    expect(await v1Get('/team-matches')).toEqual(list);
+    expect(await v1Get(route)).toEqual(detail);
+    expect(await v1Get(`${route}/edit`)).toEqual(edit);
+    expect(await v1Get(`/games/${created.gameId}`)).toEqual(game);
+  });
+
+  it.each(['create', 'edit'])('rejects forged two-period %s when the active single default has no two-half history', async (operation) => {
+    // Given: the actual transport owns a single-period host with no authoritative two-half version.
+    const host = { hostTeamId: 'single-no-history', name: '단판 검증팀', sportId: 'sport-futsal', sportName: '풋살',
+      managerUserId: 'user-1', active: true, competitionConfigVersionId: 'config-single-only',
+      periods: [{ code: 'SINGLE_PERIOD', label: '단일', durationMinutes: 37, extraTime: false }], twoPeriodDefaults: null };
+    const transport = createV1TeamMatchRulesMswHandlers([], [host]);
+    server.use(...transport.handlers);
+    const body = { ...payload, hostTeamId: host.hostTeamId };
+    const created = await v1Post<V1TeamMatchMutationResult>('/team-matches', body);
+    const route = `/team-matches/${created.teamMatchId}`;
+    const edit = await v1Get<V1TeamMatchEdit>(`${route}/edit`);
+    const detail = await v1Get(route);
+    const game = await v1Get(`/games/${created.gameId}`);
+    const rows = transport.listItems();
+    // When: a caller forges two halves despite the absent published identities.
+    const forged = { ...body, periods: [{ durationMinutes: 17 }, { durationMinutes: 23 }] };
+    const write = operation === 'create' ? v1Post('/team-matches', forged) : v1Patch(route, { ...forged, version: edit.version });
+    await expect(write).rejects.toMatchObject({ statusCode: 409, code: 'COMPETITION_PERIODS_UNAVAILABLE' });
+    // Then: the backing aggregate and the same collection consumed by the global list handler are unchanged.
+    expect(transport.listItems()).toEqual(rows);
+    expect(await v1Get(route)).toEqual(detail);
+    expect(await v1Get(`${route}/edit`)).toEqual(edit);
+    expect(await v1Get(`/games/${created.gameId}`)).toEqual(game);
+  });
+
+  it.each([
+    { name: 'a past start on create', operation: 'create', dates: { startsAt: '2027-01-18T11:00:00.000Z' } },
+    { name: 'a past start on edit', operation: 'edit', dates: { startsAt: '2027-01-18T11:00:00.000Z' } },
+    { name: 'an end equal to kickoff on edit', operation: 'edit', dates: { endsAt: '2027-01-20T11:00:00.000Z' } },
+    { name: 'a deadline equal to kickoff on create', operation: 'create', dates: { deadlineAt: '2027-01-20T11:00:00.000Z' } },
+  ])('rejects $name without reporting a saved aggregate', async ({ operation, dates }) => {
+    // Given: valid persisted data and a controlled clock, with network timers left real.
+    vi.setSystemTime(new Date('2027-01-19T10:00:00.000Z'));
+    const created = await v1Post<V1TeamMatchMutationResult>('/team-matches', { ...payload, periods: [{ durationMinutes: 37 }] });
+    const route = `/team-matches/${created.teamMatchId}`;
+    const edit = await v1Get<V1TeamMatchEdit>(`${route}/edit`);
+    const detail = await v1Get(route);
+    const game = await v1Get(`/games/${created.gameId}`);
+    const list = await v1Get('/team-matches');
+    // When: an ISO-valid but chronologically invalid write reaches the service-shaped boundary.
+    const invalid = { ...payload, ...dates, periods: [{ durationMinutes: 99 }] };
+    const write = operation === 'create' ? v1Post('/team-matches', invalid) : v1Patch(route, { ...invalid, version: edit.version });
+    await expect(write).rejects.toMatchObject({ statusCode: 400, code: 'VALIDATION_FAILED' });
+    // Then: neither partial persistence nor a replacement pin is observable.
+    expect(await v1Get('/team-matches')).toEqual(list);
+    expect(await v1Get(route)).toEqual(detail);
+    expect(await v1Get(`${route}/edit`)).toEqual(edit);
+    expect(await v1Get(`/games/${created.gameId}`)).toEqual(game);
+  });
+
+  it('rejects a changed elapsed deadline while kickoff is still in the future', async () => {
+    // Given: an initially valid deadline that subsequently passes before kickoff.
+    vi.setSystemTime(new Date('2027-01-18T10:00:00.000Z'));
+    const created = await v1Post<V1TeamMatchMutationResult>('/team-matches', { ...payload, deadlineAt: '2027-01-19T10:00:00.000Z', periods: [{ durationMinutes: 37 }] });
+    const route = `/team-matches/${created.teamMatchId}`;
+    const edit = await v1Get<V1TeamMatchEdit>(`${route}/edit`);
+    const detail = await v1Get(route);
+    const game = await v1Get(`/games/${created.gameId}`);
+    vi.setSystemTime(new Date('2027-01-19T11:00:00.000Z'));
+    // When: an edit substitutes a different already elapsed deadline.
+    await expect(v1Patch(route, { ...payload, version: edit.version, deadlineAt: '2027-01-19T09:00:00.000Z' }))
+      .rejects.toMatchObject({ statusCode: 400, code: 'VALIDATION_FAILED' });
+    // Then: the deadline and the actual saved pin remain unchanged.
+    expect(await v1Get(route)).toEqual(detail);
+    expect(await v1Get(`${route}/edit`)).toEqual(edit);
+    expect(await v1Get(`/games/${created.gameId}`)).toEqual(game);
+  });
+
+  it('preserves the exact elapsed deadline on a general edit before kickoff', async () => {
+    // Given: a saved future match whose original application deadline has just elapsed.
+    vi.setSystemTime(new Date('2027-01-18T10:00:00.000Z'));
+    const originalBody = { ...payload, deadlineAt: '2027-01-19T10:00:00.000Z' };
+    const created = await v1Post<V1TeamMatchMutationResult>('/team-matches', { ...originalBody, periods: [{ durationMinutes: 37 }] });
+    const route = `/team-matches/${created.teamMatchId}`;
+    const edit = await v1Get<V1TeamMatchEdit>(`${route}/edit`);
+    const game = await v1Get(`/games/${created.gameId}`);
+    vi.setSystemTime(new Date('2027-01-19T11:00:00.000Z'));
+    // When: only the title changes while the existing deadline is sent unchanged.
+    await v1Patch(route, { ...originalBody, version: edit.version, title: '마감 뒤 제목 수정' });
+    // Then: the title persists without losing the original deadline or repinning the Game.
+    expect(await v1Get(`${route}/edit`)).toMatchObject({ competitionConfigVersionId: edit.competitionConfigVersionId,
+      form: { title: '마감 뒤 제목 수정', deadlineAt: '2027-01-19T10:00:00.000Z', periods: [{ durationMinutes: 37 }] } });
     expect(await v1Get(`/games/${created.gameId}`)).toEqual(game);
   });
 

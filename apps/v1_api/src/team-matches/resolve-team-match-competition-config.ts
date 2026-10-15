@@ -1,8 +1,10 @@
 import { Prisma } from '@prisma/client';
+import type { V1CompetitionConfigVersion } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { ConflictException, UnprocessableEntityException } from '@nestjs/common';
 import { competitionConfigContentHash, tryNormalizeCompetitionSportCode, validateCompetitionConfig } from '../tournaments/competition-config/competition-config';
-import { normalizeCompetitionPeriods } from '../tournaments/competition-config/competition-config-periods';
+import { isReusableCompetitionPeriodConfig, normalizeCompetitionPeriods } from '../tournaments/competition-config/competition-config-periods';
+import { MAX_TEAM_MATCH_PERIOD_MINUTES } from './team-match-periods.constants';
 
 /**
  * 팀매치(및 리그 대진)에 pin할 활성 competition config를 스포츠 코드로 찾는다.
@@ -44,16 +46,45 @@ type RuleDefaults = {
   blockedReason: 'COMPETITION_CONFIG_REQUIRED' | 'COMPETITION_PERIODS_UNAVAILABLE' | null;
 };
 
+type CompetitionPeriods = Awaited<ReturnType<typeof readTeamMatchCompetitionConfig>>['config']['periods'];
+
+function hasStandardHalves(periods: CompetitionPeriods): boolean {
+  return periods.length === 2 && periods[0]?.code === 'FIRST_HALF' && periods[1]?.code === 'SECOND_HALF' && periods.every(period => !period.extraTime);
+}
+
 export async function readTeamMatchRuleDefaults(tx: Prisma.TransactionClient, sportId: string): Promise<RuleDefaults> {
   const pin = await resolveTeamMatchCompetitionConfig(tx, sportId);
   if (!pin) return { current: null, blockedReason: 'COMPETITION_CONFIG_REQUIRED' };
   const current = await readTeamMatchCompetitionConfig(tx, pin.id);
   if (current.status !== 'ACTIVE') return { current: null, blockedReason: 'COMPETITION_CONFIG_REQUIRED' };
   const periods = current.config.periods;
-  if (periods.length !== 2 || periods[0]?.code !== 'FIRST_HALF' || periods[1]?.code !== 'SECOND_HALF' || periods.some(period => period.extraTime)) {
+  const singlePeriod = periods.length === 1 && periods[0]?.code === 'SINGLE_PERIOD' && !periods[0].extraTime;
+  if (!singlePeriod && !hasStandardHalves(periods)) {
     return { current: null, blockedReason: 'COMPETITION_PERIODS_UNAVAILABLE' };
   }
   return { current, blockedReason: null };
+}
+
+export async function readTeamMatchTwoPeriodDefaults(tx: Prisma.TransactionClient, defaults: NonNullable<RuleDefaults['current']>): Promise<CompetitionPeriods | null> {
+  if (hasStandardHalves(defaults.config.periods)) return defaults.config.periods;
+  let beforeVersion: number | undefined;
+  // Period identities come from the active sport lineage, including a two-half version before a legal single-period save.
+  for (;;) {
+    const versions = await tx.v1CompetitionConfigVersion.findMany({
+      where: { sportCode: defaults.sportCode, name: `${defaults.sportCode}-v1`, status: 'ACTIVE', ...(beforeVersion === undefined ? {} : { version: { lt: beforeVersion } }) },
+      orderBy: { version: 'desc' }, take: 20,
+    });
+    for (const row of versions) {
+      const config = validateCompetitionConfig({
+        periods: row.periods, events: row.events, lineup: row.lineup,
+        result: row.result, tieBreak: row.tieBreak, visibility: row.visibility,
+      }, { preserveMissingCatalogKeys: true });
+      if (hasStandardHalves(config.periods)) return config.periods;
+    }
+    const oldest = versions.at(-1);
+    if (versions.length < 20 || !oldest) return null;
+    beforeVersion = oldest.version;
+  }
 }
 
 type TeamMatchPeriodConfigInput = {
@@ -65,7 +96,7 @@ type TeamMatchPeriodConfigInput = {
 
 export async function resolveTeamMatchPeriodConfig(tx: Prisma.TransactionClient, input: TeamMatchPeriodConfigInput) {
   if (!Array.isArray(input.periods) || input.periods.length < 1 || input.periods.length > 2 || input.periods.some(period =>
-    !period || Array.isArray(period) || typeof period.durationMinutes !== 'number' || !Number.isInteger(period.durationMinutes) || period.durationMinutes < 1,
+    !period || Array.isArray(period) || typeof period.durationMinutes !== 'number' || !Number.isInteger(period.durationMinutes) || period.durationMinutes < 1 || period.durationMinutes > MAX_TEAM_MATCH_PERIOD_MINUTES,
   )) throw new UnprocessableEntityException({ code: 'TEAM_MATCH_PERIODS_INVALID', message: '경기는 단판 또는 전후반으로 구성하고 각 시간은 양의 정수로 입력해 주세요.' });
   const defaultRead = await readTeamMatchRuleDefaults(tx, input.sportId);
   if (!defaultRead.current) throw new ConflictException({ code: defaultRead.blockedReason, message: '이 종목에 단판·전후반으로 변경할 수 있는 활성 경기 설정이 필요해요.' });
@@ -75,8 +106,8 @@ export async function resolveTeamMatchPeriodConfig(tx: Prisma.TransactionClient,
     throw new ConflictException({ code: 'COMPETITION_CONFIG_REQUIRED', message: '현재 종목의 활성 경기 설정만 변경할 수 있어요.' });
   }
   const expandingSinglePeriod = current.config.periods.length === 1 && current.config.periods[0]?.code === 'SINGLE_PERIOD' && input.periods.length === 2;
-  const identities = expandingSinglePeriod ? defaults.config.periods : current.config.periods;
-  if (expandingSinglePeriod && identities.length !== 2) {
+  const identities = expandingSinglePeriod ? await readTeamMatchTwoPeriodDefaults(tx, defaults) : current.config.periods;
+  if (!identities) {
     throw new ConflictException({ code: 'COMPETITION_PERIODS_UNAVAILABLE', message: '현재 종목의 전후반 경기 구성이 없어요.' });
   }
   const config = { ...current.config, periods: normalizeCompetitionPeriods(identities, input.periods) };
@@ -102,12 +133,12 @@ export async function resolveTeamMatchPeriodConfig(tx: Prisma.TransactionClient,
 }
 
 function reusablePeriodConfig(
-  row: { id: string; sportCode: string; status: string },
+  row: Pick<V1CompetitionConfigVersion, 'id' | 'sportCode' | 'status' | 'periods' | 'events' | 'lineup' | 'result' | 'tieBreak' | 'visibility'>,
   sportCode: string,
   config: Awaited<ReturnType<typeof readTeamMatchCompetitionConfig>>['config'],
 ) {
-  if (row.sportCode !== sportCode || row.status !== 'ACTIVE') {
-    throw new ConflictException({ code: 'COMPETITION_CONFIG_CONTENT_HASH_COLLISION', message: '동일한 경기 설정이 다른 종목 또는 비활성 버전에 있어 재사용할 수 없어요.' });
+  if (!isReusableCompetitionPeriodConfig(row, sportCode, config)) {
+    throw new ConflictException({ code: 'COMPETITION_CONFIG_CONTENT_HASH_COLLISION', message: '동일한 해시의 설정이 다른 종목·비활성 버전이거나 실제 내용이 달라 재사용할 수 없어요.' });
   }
   return { id: row.id, config };
 }

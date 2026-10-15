@@ -38,6 +38,11 @@ describe.each([
       input: [{ durationMinutes: 1 }],
       expected: [{ durationMinutes: 1 }],
     },
+    {
+      name: 'the PostgreSQL durationMinutes integer upper boundary',
+      input: [{ durationMinutes: 2147483647 }],
+      expected: [{ durationMinutes: 2147483647 }],
+    },
   ])('accepts $name without dropping its duration', async ({ input, expected }) => {
     await expect(parse({ ...body, periods: input })).resolves.toMatchObject({
       ...body,
@@ -69,6 +74,7 @@ describe.each([
     { name: 'a zero duration', periods: [{ durationMinutes: 0 }] },
     { name: 'a negative duration', periods: [{ durationMinutes: -1 }] },
     { name: 'a fractional duration', periods: [{ durationMinutes: 1.5 }] },
+    { name: 'the first value above the PostgreSQL integer range', periods: [{ durationMinutes: 2147483648 }] },
     { name: 'a numeric string despite implicit conversion', periods: [{ durationMinutes: '25' }] },
     { name: 'a boolean despite implicit conversion', periods: [{ durationMinutes: true }] },
     {

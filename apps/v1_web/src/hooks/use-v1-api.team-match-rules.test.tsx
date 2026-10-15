@@ -7,8 +7,9 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { v1Get } from '@/lib/api-client';
 import { createV1QueryClient } from '@/lib/query-client';
 import { v1MswHandlers, v1TeamMatchRulesMsw } from '@/test/msw/handlers';
+import { createV1TeamMatchRulesMswHandlers } from '@/test/msw/team-match-rules-handlers';
 import type { V1TeamMatchMutationPayload } from '@/types/api';
-import { useV1CreateTeamMatch, useV1TeamMatch } from './use-v1-api';
+import { useV1CreateTeamMatch, useV1TeamMatch, useV1TeamMatchRuleOptions } from './use-v1-api';
 
 const api = 'http://localhost/api/v1';
 const server = setupServer(
@@ -36,12 +37,14 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(() => {
   v1TeamMatchRulesMsw.reset();
   vi.stubEnv('NEXT_PUBLIC_API_URL', api);
+  vi.useFakeTimers({ toFake: ['Date'], now: new Date('2027-01-19T10:00:00.000Z') });
 });
 afterEach(() => {
   cleanup();
   clients.splice(0).forEach(client => client.clear());
   server.resetHandlers();
   vi.unstubAllEnvs();
+  vi.useRealTimers();
 });
 afterAll(() => server.close());
 
@@ -85,6 +88,40 @@ describe('team-match rules shared HTTP contract', () => {
         { code: 'FIRST_HALF', label: '전반', durationMinutes: 20, extraTime: false },
         { code: 'SECOND_HALF', label: '후반', durationMinutes: 20, extraTime: false },
       ],
+      twoPeriodDefaults: [
+        { code: 'FIRST_HALF', label: '전반', durationMinutes: 20, extraTime: false },
+        { code: 'SECOND_HALF', label: '후반', durationMinutes: 20, extraTime: false },
+      ],
+    });
+  });
+
+  it.each([
+    {
+      name: 'a published two-half history',
+      twoPeriodDefaults: [
+        { code: 'FIRST_HALF', label: '전반', durationMinutes: 20, extraTime: false },
+        { code: 'SECOND_HALF', label: '후반', durationMinutes: 20, extraTime: false },
+      ],
+    },
+    { name: 'no published two-half history', twoPeriodDefaults: null },
+  ])('preserves the actual single-period default alongside $name', async ({ twoPeriodDefaults }) => {
+    // Given: the real MSW transport receives a valid single-period config and explicit history authority.
+    const singleHost = {
+      hostTeamId: 'team-mdqa141-single', name: '단판 규칙 검증팀',
+      sportId: 'sport-futsal', sportName: '풋살', managerUserId: 'user-1', active: true,
+      competitionConfigVersionId: 'config-futsal-single-v2',
+      periods: [{ code: 'SINGLE_PERIOD', label: '단일', durationMinutes: 37, extraTime: false }],
+      twoPeriodDefaults,
+    };
+    server.use(...createV1TeamMatchRulesMswHandlers([], [singleHost]).handlers);
+    // When: the actual rule-options hook completes its HTTP read.
+    const { result } = renderHook(() => useV1TeamMatchRuleOptions(singleHost.hostTeamId), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    // Then: current duration stays single and the independent two-half authority is preserved, including null.
+    expect(result.current.data).toMatchObject({
+      hostTeamId: 'team-mdqa141-single', competitionConfigVersionId: 'config-futsal-single-v2',
+      periods: [{ code: 'SINGLE_PERIOD', label: '단일', durationMinutes: 37, extraTime: false }],
+      twoPeriodDefaults,
     });
   });
 
@@ -98,6 +135,7 @@ describe('team-match rules shared HTTP contract', () => {
 
   it.each([
     { name: 'a single period', periods: [{ durationMinutes: 37 }], expected: [{ code: 'SINGLE_PERIOD', label: '단일', durationMinutes: 37, extraTime: false }] },
+    { name: 'the PostgreSQL integer maximum', periods: [{ durationMinutes: 2147483647 }], expected: [{ code: 'SINGLE_PERIOD', label: '단일', durationMinutes: 2147483647, extraTime: false }] },
     { name: 'two different halves', periods: [{ durationMinutes: 17 }, { durationMinutes: 23 }], expected: [{ code: 'FIRST_HALF', label: '전반', durationMinutes: 17, extraTime: false }, { code: 'SECOND_HALF', label: '후반', durationMinutes: 23, extraTime: false }] },
   ])('persists $name and reads the same pinned rules back', async ({ periods, expected }) => {
     // Given: the existing create hook and a supported host.
@@ -107,6 +145,10 @@ describe('team-match rules shared HTTP contract', () => {
     let teamMatchId = '';
     await act(async () => { teamMatchId = (await result.current.mutateAsync(payload)).teamMatchId; });
     // Then: separate detail/edit/Game reads share the persisted rule pin.
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+      expect(result.current.data).toMatchObject({ teamMatchId, gameId: expect.any(String) });
+    });
     expect(await v1Get(`/team-matches/${teamMatchId}`)).toMatchObject({ teamMatchId, periods: expected });
     const edit = await v1Get<{ competitionConfigVersionId: string; form: { periods: unknown } }>(`/team-matches/${teamMatchId}/edit`);
     expect(edit.form.periods).toEqual(periods);

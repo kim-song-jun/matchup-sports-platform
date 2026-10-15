@@ -335,6 +335,7 @@ describe('TeamMatchesController rule-options HTTP boundary', () => {
     sportId: '55555555-5555-4555-8555-555555555555',
     competitionConfigVersionId: '66666666-6666-4666-8666-666666666666',
     periods: FUTSAL_V1_CONFIG.periods.map((period) => ({ ...period })),
+    twoPeriodDefaults: FUTSAL_V1_CONFIG.periods.map((period) => ({ ...period })),
   };
   const teamMatchesService = {
     ruleOptions: jest.fn(async (actor: V1AuthUser, teamId: string) => {
@@ -411,6 +412,7 @@ describe('TeamMatchesController rule-options HTTP boundary', () => {
       .expect(200);
 
     expect(response.body).toEqual({ status: 'success', data: ruleOptions, timestamp: expect.any(String) });
+    expect(response.body.data.twoPeriodDefaults).toEqual(FUTSAL_V1_CONFIG.periods);
     expect(teamMatchesService.ruleOptions).toHaveBeenCalledWith(expect.objectContaining(owner), hostTeamId);
   });
 

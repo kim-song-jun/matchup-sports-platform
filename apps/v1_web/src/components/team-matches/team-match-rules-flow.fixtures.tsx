@@ -1,16 +1,23 @@
-import { QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider, type QueryClient } from '@tanstack/react-query';
 import { render } from '@testing-library/react';
 import { HttpResponse, http } from 'msw';
 import type { ReactElement } from 'react';
 import { createV1QueryClient } from '@/lib/query-client';
 import { server } from '@/test/msw/server';
-import type { V1TeamMatchEdit, V1TeamMatchPeriodInput } from '@/types/api';
+import { createV1TeamMatchRulesMswHandlers } from '@/test/msw/team-match-rules-handlers';
+import type { TeamMatchRulesHostFixture } from '@/test/msw/team-match-rules.fixtures';
+import type { V1TeamMatchEdit, V1TeamMatchPeriod, V1TeamMatchPeriodInput } from '@/types/api';
 import { getTeamMatchCreateViewModel } from './team-matches.view-model';
 
 export const rulesDraftKey = 'teameet:v1:team-match-draft:v3';
 export const rulesHostId = 'mdqa141-host';
 export const rulesMatchId = 'mdqa141-match';
 const api = '*/api/v1';
+const queryClients = new Set<QueryClient>();
+const halfDefaults: readonly V1TeamMatchPeriod[] = [
+  { code: 'FIRST_HALF', label: '전반', durationMinutes: 17, extraTime: false },
+  { code: 'SECOND_HALF', label: '후반', durationMinutes: 19, extraTime: false },
+];
 const ok = (data: unknown) => HttpResponse.json({ status: 'success', data, timestamp: new Date().toISOString() });
 export function rulesDraft(grade = '초보-중수') {
   return { ...getTeamMatchCreateViewModel('condition').draft,
@@ -40,6 +47,7 @@ export function installRulesFlowApi(options: { edit?: V1TeamMatchEdit; fault?: R
   let fault = options.fault ?? null;
   let editFault = options.editFault ?? null;
   server.use(
+    http.post(api + '/logs/client-error', () => new HttpResponse(null, { status: 204 })),
     http.get(api + '/me/teams', () => ok([{ teamId: rulesHostId, name: '합성 규칙 팀',
       role: 'owner', status: 'active', sport: { sportId: 'sport-futsal', name: '풋살' },
       memberCount: 8, canManage: true, canCreateTeamMatch: true,
@@ -53,8 +61,7 @@ export function installRulesFlowApi(options: { edit?: V1TeamMatchEdit; fault?: R
     http.get(api + '/teams/:teamId/team-match-rule-options', ({ params }) => fault
       ? HttpResponse.json({ status: 'error', statusCode: fault.status, code: fault.code, message: fault.message }, { status: fault.status })
       : ok({ hostTeamId: params.teamId, sportId: 'sport-futsal', competitionConfigVersionId: 'config-original',
-        periods: [{ code: 'FIRST_HALF', label: '전반', durationMinutes: 17, extraTime: false },
-          { code: 'SECOND_HALF', label: '후반', durationMinutes: 19, extraTime: false }],
+        periods: halfDefaults, twoPeriodDefaults: halfDefaults,
       })),
     http.get(api + '/team-matches/:teamMatchId/edit', ({ params }) => editFault
       ? HttpResponse.json({ status: 'error', statusCode: editFault.status, code: editFault.code, message: editFault.message }, { status: editFault.status })
@@ -76,7 +83,32 @@ export function installRulesFlowApi(options: { edit?: V1TeamMatchEdit; fault?: R
   );
   return { writes, setFault: (next: RulesApiFault) => { fault = next; }, setEditFault: (next: RulesApiFault) => { editFault = next; } };
 }
-export function renderRulesFlow(ui: ReactElement) {
-  const queryClient = createV1QueryClient();
+export function installPersistedRulesFlowApi(options: {
+  readonly periods: readonly V1TeamMatchPeriod[];
+  readonly twoPeriodDefaults: readonly V1TeamMatchPeriod[] | null;
+}) {
+  const apiFixture = installRulesFlowApi();
+  const host: TeamMatchRulesHostFixture = {
+    hostTeamId: rulesHostId, name: '합성 규칙 팀', sportId: 'sport-futsal', sportName: '풋살',
+    managerUserId: 'user-1', active: true, competitionConfigVersionId: 'config-original',
+    periods: options.periods, twoPeriodDefaults: options.twoPeriodDefaults,
+  };
+  const transport = createV1TeamMatchRulesMswHandlers([], [host]);
+  server.use(
+    http.post(api + '/team-matches', async ({ request }) => {
+      const payload = await request.clone().json() as Record<string, unknown>;
+      apiFixture.writes.push({ method: 'POST', payload });
+      return undefined;
+    }),
+    ...transport.handlers,
+  );
+  return { ...apiFixture, transport };
+}
+export function renderRulesFlow(ui: ReactElement, queryClient = createV1QueryClient()) {
+  queryClients.add(queryClient);
   return { ...render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>), queryClient };
+}
+export function clearRulesFlowQueryClients() {
+  queryClients.forEach((queryClient) => queryClient.clear());
+  queryClients.clear();
 }

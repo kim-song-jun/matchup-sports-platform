@@ -1,6 +1,7 @@
 import type { PlaceValue } from '@/lib/place';
+import { validTeamMatchPeriodMinutes } from '@/lib/team-match-periods';
 import type { TeamMatchCreateViewModel } from './team-matches.types';
-import type { V1TeamMatchEdit, V1TeamMatchPeriodInput, V1TeamMatchRuleOptions } from '@/types/api';
+import type { V1TeamMatchEdit, V1TeamMatchPeriod, V1TeamMatchPeriodInput, V1TeamMatchRuleOptions } from '@/types/api';
 
 export type TeamMatchRuleDraft = {
   hostTeamId: string;
@@ -19,7 +20,7 @@ function isPeriod(value: unknown): value is V1TeamMatchPeriodInput {
 }
 export function validTeamMatchPeriods(periods: readonly V1TeamMatchPeriodInput[] | null | undefined): boolean {
   return Boolean(periods && (periods.length === 1 || periods.length === 2)
-    && periods.every((period) => Number.isInteger(period.durationMinutes) && period.durationMinutes > 0));
+    && periods.every((period) => validTeamMatchPeriodMinutes(period.durationMinutes)));
 }
 export function readTeamMatchRuleDraft(value: unknown): TeamMatchRuleDraft | undefined {
   if (!isRecord(value) || typeof value.hostTeamId !== 'string' || typeof value.sportId !== 'string'
@@ -54,6 +55,17 @@ export function teamMatchRuleSummary(rule: TeamMatchRuleDraft | undefined): stri
   return rule.periods?.length === 1
     ? '단판 · ' + rule.periods[0].durationMinutes + '분'
     : '전후반 · 전반 ' + rule.periods?.[0].durationMinutes + '분 · 후반 ' + rule.periods?.[1].durationMinutes + '분';
+}
+export function teamMatchSavedRuleSummary(periods: readonly V1TeamMatchPeriod[] | null | undefined): string {
+  if (!periods?.length) return '저장된 경기 규칙 정보가 없어요.';
+  if (periods.length === 1 && periods[0].code === 'SINGLE_PERIOD' && !periods[0].extraTime) {
+    return '단판 · ' + periods[0].durationMinutes + '분';
+  }
+  if (periods.length === 2 && periods[0].code === 'FIRST_HALF' && periods[1].code === 'SECOND_HALF'
+    && !periods[0].extraTime && !periods[1].extraTime) {
+    return '전후반 · 전반 ' + periods[0].durationMinutes + '분 · 후반 ' + periods[1].durationMinutes + '분';
+  }
+  return periods.map((period) => period.label + ' ' + period.durationMinutes + '분').join(' · ');
 }
 export function teamMatchEditDraftKey(teamMatchId: string): string {
   return 'teameet:v1:team-match-edit-draft:v1:' + teamMatchId;

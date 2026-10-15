@@ -40,7 +40,7 @@ import {
   createTeamMatchScheduleInTx,
   syncTeamMatchScheduleInTx,
 } from '../team-schedules/team-schedules.service';
-import { readTeamMatchCompetitionConfig, readTeamMatchRuleDefaults, resolveTeamMatchCompetitionConfig, resolveTeamMatchPeriodConfig } from './resolve-team-match-competition-config';
+import { readTeamMatchCompetitionConfig, readTeamMatchRuleDefaults, readTeamMatchTwoPeriodDefaults, resolveTeamMatchCompetitionConfig, resolveTeamMatchPeriodConfig } from './resolve-team-match-competition-config';
 import { readTeamMatchRulesGame, repinTeamMatchRules, teamMatchRulesEditable } from './team-match-rule-repin';
 import { hydrateApprovedTeamMatchAwaySnapshot } from './team-match-game-snapshot';
 import { assertCreatorProfileComplete } from '../profile/creator-profile.guard';
@@ -482,7 +482,10 @@ export class TeamMatchesService {
     const defaults = await readTeamMatchRuleDefaults(this.prisma, membership.team.sportId);
     if (!defaults.current) throw new ConflictException({ code: defaults.blockedReason, message: '이 종목에 단판·전후반으로 변경할 수 있는 활성 경기 설정이 필요해요.' });
     const current = defaults.current;
-    return { hostTeamId: teamId, sportId: membership.team.sportId, competitionConfigVersionId: current.id, periods: current.config.periods };
+    return {
+      hostTeamId: teamId, sportId: membership.team.sportId, competitionConfigVersionId: current.id,
+      periods: current.config.periods, twoPeriodDefaults: await readTeamMatchTwoPeriodDefaults(this.prisma, current),
+    };
   }
 
   async applicationEligibility(

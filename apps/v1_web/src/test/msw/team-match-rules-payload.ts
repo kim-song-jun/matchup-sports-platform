@@ -10,7 +10,9 @@ function isPeriods(value: unknown): value is readonly V1TeamMatchPeriodInput[] {
     && value.every((period: unknown) => isRecord(period)
       && Object.keys(period).every(key => key === 'durationMinutes')
       && typeof period.durationMinutes === 'number'
-      && Number.isInteger(period.durationMinutes) && period.durationMinutes > 0);
+      && Number.isInteger(period.durationMinutes) && period.durationMinutes > 0
+      // The persisted competition-period trigger casts durationMinutes to PostgreSQL int4.
+      && period.durationMinutes <= 2147483647);
 }
 
 const requiredStrings = ['hostTeamId', 'sportId', 'regionId', 'title', 'startsAt', 'manualPlaceName'];
@@ -42,4 +44,20 @@ export function isTeamMatchRulesPayload(
     || !value.matchStyle.every((item: unknown) => typeof item === 'string'))) return false;
   if (value.version !== undefined && typeof value.version !== 'string') return false;
   return value.periods === undefined || isPeriods(value.periods);
+}
+
+/** Match the service date policy after DTO-shaped validation, including the edit-only elapsed deadline exception. */
+export function invalidTeamMatchRulesDateField(
+  value: V1TeamMatchMutationPayload, existingDeadlineAt?: string | null,
+): 'startsAt' | 'endsAt' | 'deadlineAt' | null {
+  const now = Date.now();
+  const startsAt = new Date(value.startsAt).getTime();
+  if (!Number.isFinite(startsAt) || startsAt <= now) return 'startsAt';
+  const endsAt = value.endsAt ? new Date(value.endsAt).getTime() : null;
+  if (endsAt !== null && (!Number.isFinite(endsAt) || endsAt <= startsAt)) return 'endsAt';
+  const deadlineAt = value.deadlineAt ? new Date(value.deadlineAt).getTime() : null;
+  const previousDeadline = existingDeadlineAt ? new Date(existingDeadlineAt).getTime() : undefined;
+  if (deadlineAt !== null && (!Number.isFinite(deadlineAt) || deadlineAt >= startsAt
+    || (deadlineAt <= now && deadlineAt !== previousDeadline))) return 'deadlineAt';
+  return null;
 }

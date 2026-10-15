@@ -1,7 +1,7 @@
 import type { TeamMatchRuleDraft } from './team-match-rules-draft';
 import type { ConfirmOptions, ConfirmReasonConfig } from '@/components/v1-ui/confirm-modal';
 import type { PlaceValue } from '@/lib/place';
-import type { V1PlaceView, V1RecentVenue, V1TeamMatchApiStatus, V1TeamMatchPeriodInput } from '@/types/api';
+import type { V1PlaceView, V1RecentVenue, V1TeamMatchApiStatus, V1TeamMatchPeriod, V1TeamMatchPeriodInput } from '@/types/api';
 
 export type TeamMatchModel = {
   id: string;
@@ -125,6 +125,8 @@ export type TeamMatchDetailMode = 'default' | 'pending' | 'approved' | 'mine' | 
 export type TeamMatchDetailViewModel = {
   match: TeamMatchModel & {
     description: string;
+    /** 현재 상세 API가 내려준 immutable 규칙. 과거 pin 부재는 null이다. */
+    readonly periods?: readonly V1TeamMatchPeriod[] | null;
     /** 서버가 내려준 장소 스냅샷(좌표 없으면 이름·주소만). */
     place: V1PlaceView | null;
     hostTeamHref?: string;
@@ -281,7 +283,7 @@ export type TeamMatchCreateStep = 'team' | 'sport' | 'info' | 'condition' | 'rul
 
 export type TeamMatchRulesControl = {
   periods: readonly V1TeamMatchPeriodInput[] | null;
-  defaultPeriods?: readonly V1TeamMatchPeriodInput[] | null;
+  twoPeriodDefaults?: readonly V1TeamMatchPeriod[] | null;
   loading?: boolean;
   error?: string | null;
   validationError?: string;

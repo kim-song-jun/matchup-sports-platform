@@ -1,5 +1,7 @@
 # Global v1 API contract
 
+Ordinary team matches accept optional `periods` on existing create/update routes. `GET /api/v1/teams/:teamId/team-match-rule-options` requires an active host owner/manager; actual current `periods` and nullable authoritative `twoPeriodDefaults` are distinct. Omitted create retains the global default; omitted edit retains the stored pin. Explicit rule edits retain the existing `version`, authorization and date gates and additionally protect gameplay/lineup history. See [the domain contract](./domains/team-matches.md#ordinary-team-match-period-rules-md-qa-141); these routes do not acquire the game-command idempotency contract below.
+
 Public `GET /tournaments/:id/standings/overall` rows include `teamLogoUrl: string | null` for both tournaments and regular leagues. Hidden participant identity returns `null` for the logo, matching the team name gate. See the [tournaments contract](./domains/tournaments.md#overall-standings--two-competition-kinds-two-row-shapes).
 
 조별 성적 기반 12강 배정은 [tournaments](./domains/tournaments.md)의 `round12-preview` / `round12-assignments` 계약을 따른다. 읽기는 support 포함, 쓰기는 mutation admin만 허용한다. 미리보기의 버전은 저장 시 다시 검증하며 성적·대진 변경은 409로 차단한다. 12자리 및 부전승·8강 직행 반영은 단일 트랜잭션이며 부분 성공 응답은 없다.

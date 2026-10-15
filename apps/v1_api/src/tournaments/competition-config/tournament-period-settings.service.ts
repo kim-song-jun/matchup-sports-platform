@@ -4,7 +4,7 @@ import { V1AuthUser } from '../../auth/v1-auth-user';
 import { AdminContextService } from '../../common/admin-context.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { competitionConfigContentHash, validateCompetitionConfig } from './competition-config';
-import { normalizeCompetitionPeriods as normalizeTournamentPeriods } from './competition-config-periods';
+import { isReusableCompetitionPeriodConfig, normalizeCompetitionPeriods as normalizeTournamentPeriods } from './competition-config-periods';
 import { UpdateTournamentPeriodSettingsDto } from './tournament-period-settings.dto';
 import { ALL_COMPETITION_KINDS, findTournamentOnSurface } from '../tournament-surface-lookup';
 import {
@@ -97,14 +97,10 @@ export class TournamentPeriodSettingsService {
       }, { preserveMissingCatalogKeys: true });
       const contentHash = competitionConfigContentHash(config);
       const existingVersion = await tx.v1CompetitionConfigVersion.findUnique({ where: { contentHash } });
-      if (
-        existingVersion &&
-        (existingVersion.sportCode !== row.competitionConfig.sportCode ||
-          existingVersion.name !== row.competitionConfig.name)
-      ) {
+      if (existingVersion && !isReusableCompetitionPeriodConfig(existingVersion, row.competitionConfig.sportCode, config)) {
         throw new ConflictException({
           code: 'COMPETITION_CONFIG_CONTENT_HASH_COLLISION',
-          message: '동일한 설정 내용이 다른 종목 계열에 있어 재사용할 수 없어요.',
+          message: '동일한 해시의 설정이 다른 종목·비활성 버전이거나 실제 내용이 달라 재사용할 수 없어요.',
         });
       }
       const version = existingVersion ?? await this.createVersion(tx, row.competitionConfig, config, user.id, admin.id, row.id);

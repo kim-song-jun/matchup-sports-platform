@@ -1,14 +1,23 @@
 import { http, HttpResponse } from 'msw';
-import type { V1TeamMatch, V1TeamMatchRuleOptions } from '@/types/api';
+import type { V1TeamMatch, V1TeamMatchMutationPayload, V1TeamMatchRuleOptions } from '@/types/api';
 import { teamMatchRulesHostFixtures, type TeamMatchRulesHostFixture } from './team-match-rules.fixtures';
-import { isTeamMatchRulesPayload } from './team-match-rules-payload';
-import { createTeamMatchRulesStore, hostRulesBlockedReason } from './team-match-rules-store';
+import { invalidTeamMatchRulesDateField, isTeamMatchRulesPayload } from './team-match-rules-payload';
+import { createTeamMatchRulesStore, hostRulesBlockedReason, periodWriteBlockedReason } from './team-match-rules-store';
 
 const api = '*/api/v1';
 const ok = (data: unknown) => HttpResponse.json({ status: 'success', data, timestamp: new Date().toISOString() });
-const fail = (statusCode: number, code: string, message: string) => HttpResponse.json(
-  { status: 'error', statusCode, code, message, timestamp: new Date().toISOString() }, { status: statusCode },
+const fail = (statusCode: number, code: string, message: string, details?: { readonly field: string }) => HttpResponse.json(
+  { status: 'error', statusCode, code, message, details, timestamp: new Date().toISOString() }, { status: statusCode },
 );
+const dateMessages = {
+  startsAt: '경기 시작 시간은 현재보다 이후여야 해요.',
+  endsAt: '경기 종료 시간은 시작 시간보다 이후여야 해요.',
+  deadlineAt: '신청 마감은 현재보다 이후이며 경기 시작 전이어야 해요.',
+} as const;
+const dateFailure = (body: V1TeamMatchMutationPayload, existingDeadlineAt?: string | null) => {
+  const field = invalidTeamMatchRulesDateField(body, existingDeadlineAt);
+  return field === null ? null : fail(400, 'VALIDATION_FAILED', dateMessages[field], { field });
+};
 
 /** Stateful MSW transport, not a substitute for the backend's transaction/permission tests. */
 export function createV1TeamMatchRulesMswHandlers(
@@ -34,6 +43,7 @@ export function createV1TeamMatchRulesMswHandlers(
       const options: V1TeamMatchRuleOptions = {
         hostTeamId: host.hostTeamId, sportId: host.sportId,
         competitionConfigVersionId: host.competitionConfigVersionId, periods: host.periods,
+        twoPeriodDefaults: host.twoPeriodDefaults,
       };
       return ok(options);
     }),
@@ -54,9 +64,9 @@ export function createV1TeamMatchRulesMswHandlers(
       const host = managedHost(body.hostTeamId, request);
       if (!host) return denied();
       if (body.sportId !== host.sportId) return fail(400, 'VALIDATION_FAILED', '호스트 팀의 종목을 선택해 주세요.');
-      const blocked = body.periods === undefined
-        ? (!host.competitionConfigVersionId ? 'COMPETITION_CONFIG_REQUIRED' : null)
-        : hostRulesBlockedReason(host);
+      const invalidDates = dateFailure(body);
+      if (invalidDates) return invalidDates;
+      const blocked = periodWriteBlockedReason(host, body.periods);
       if (blocked) return fail(409, blocked, '현재 종목의 경기 규칙을 사용할 수 없어요.');
       return ok(store.result(store.write(body, host)));
     }),
@@ -72,10 +82,10 @@ export function createV1TeamMatchRulesMswHandlers(
       if (body.hostTeamId !== record.form.hostTeamId) return fail(409, 'STATE_CONFLICT', '호스트 팀을 바꿀 수 없어요.');
       if (body.sportId !== host.sportId) return fail(400, 'VALIDATION_FAILED', '호스트 팀의 종목을 선택해 주세요.');
       if (body.sportId !== record.form.sportId) return fail(409, 'COMPETITION_CONFIG_IMMUTABLE', '경기 종목을 바꿀 수 없어요.');
-      if (body.periods !== undefined) {
-        const blocked = record.rulesLockedReason ?? hostRulesBlockedReason(host);
-        if (blocked) return fail(409, blocked, '현재 경기의 규칙을 바꿀 수 없어요.');
-      }
+      const invalidDates = dateFailure(body, record.form.deadlineAt);
+      if (invalidDates) return invalidDates;
+      const blocked = periodWriteBlockedReason(host, body.periods, record);
+      if (blocked) return fail(409, blocked, '현재 경기의 규칙을 바꿀 수 없어요.');
       const { version: _version, ...payload } = body;
       return ok(store.result(store.write(payload, host, record)));
     }),

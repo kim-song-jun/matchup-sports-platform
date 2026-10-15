@@ -13,6 +13,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Max,
   MaxLength,
   Min,
   ValidateIf,
@@ -24,12 +25,14 @@ import {
   MATCH_STYLE_MAX_ITEMS,
   UNIFORM_COLOR_MAX_LENGTH,
 } from '../team-match-conditions.constants';
+import { MAX_TEAM_MATCH_PERIOD_MINUTES } from '../team-match-periods.constants';
 
 export class TeamMatchPeriodSettingDto {
   // Preserve JSON number types instead of implicitly converting strings or booleans.
   @Transform(({ obj, key }: { obj: Record<string, unknown>; key: string }): unknown => obj[key])
   @IsInt()
   @Min(1)
+  @Max(MAX_TEAM_MATCH_PERIOD_MINUTES)
   durationMinutes!: number;
 }
 

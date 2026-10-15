@@ -198,7 +198,7 @@ describe('MD-QA #141 ordinary team-match period persistence', () => {
   });
 
   it('reads authoritative host defaults and rejects missing host permission', async () => {
-    expect(await fixture.service.ruleOptions(periodsActor, periodsCreateInput.hostTeamId)).toEqual({ hostTeamId: periodsCreateInput.hostTeamId, sportId: periodsCreateInput.sportId, competitionConfigVersionId: fixture.baseConfig.id, periods: fixture.baseConfig.periods });
+    expect(await fixture.service.ruleOptions(periodsActor, periodsCreateInput.hostTeamId)).toEqual({ hostTeamId: periodsCreateInput.hostTeamId, sportId: periodsCreateInput.sportId, competitionConfigVersionId: fixture.baseConfig.id, periods: fixture.baseConfig.periods, twoPeriodDefaults: fixture.baseConfig.periods });
     fixture.prisma.v1TeamMembership.findFirst.mockResolvedValueOnce(null);
     await expect(fixture.service.ruleOptions(periodsActor, periodsCreateInput.hostTeamId)).rejects.toMatchObject({ status: 403, response: { code: 'PERMISSION_DENIED' } });
   });
@@ -221,5 +221,184 @@ describe('MD-QA #141 ordinary team-match period persistence', () => {
     await expect(fixture.service.ruleOptions(periodsActor, periodsCreateInput.hostTeamId)).rejects.toMatchObject({ status: 409, response: { code: 'COMPETITION_PERIODS_UNAVAILABLE' } });
     await expect(fixture.service.update(periodsActor, fixture.match.id, { ...periodsCreateInput, version: fixture.match.updatedAt.toISOString(), periods: [{ durationMinutes: 30 }, { durationMinutes: 30 }] })).rejects.toMatchObject({ status: 409, response: { code: 'COMPETITION_PERIODS_UNAVAILABLE' } });
     expect(fixture.prisma.v1Game.update).not.toHaveBeenCalled();
+  });
+
+  it.each(['host first', 'tournament first'] as const)('shares immutable same-sport content across the actual host and tournament writers (%s)', async order => {
+    const originalDefault = structuredClone(fixture.baseConfig);
+    const requested = [{ durationMinutes: 37 }];
+    const saveTournament = () => fixture.tournamentService.update(periodsActor, fixture.tournament.id, {
+      expectedVersion: fixture.tournament.updatedAt.toISOString(), periods: requested,
+    });
+    if (order === 'host first') {
+      await fixture.service.create(periodsActor, { ...periodsCreateInput, periods: requested });
+      expect(fixture.configs.get(fixture.game.competitionConfigVersionId)?.name).toBe('futsal-team-match-rules-v1');
+      expect([...fixture.configs.values()].filter(row => row.name === 'futsal-v1')).toEqual([originalDefault]);
+      await saveTournament();
+    } else {
+      await saveTournament();
+      await fixture.service.create(periodsActor, { ...periodsCreateInput, periods: requested });
+    }
+    const shared = fixture.configs.get(fixture.game.competitionConfigVersionId);
+    expect(shared?.periods).toEqual([{ code: 'SINGLE_PERIOD', label: '단일', durationMinutes: 37, extraTime: false }]);
+    expect(fixture.tournament.competitionConfigVersionId).toBe(shared?.id);
+    expect(fixture.match.competitionConfigVersionId).toBe(shared?.id);
+    expect(fixture.configs.size).toBe(2);
+    expect(fixture.baseConfig).toEqual(originalDefault);
+    for (const field of ['events', 'lineup', 'result', 'tieBreak', 'visibility'] as const) {
+      expect(shared?.[field]).toEqual(originalDefault[field]);
+    }
+    const identicalSave = await saveTournament();
+    expect(identicalSave).toMatchObject({ changed: false, fixturesRepointed: 0, competitionConfigVersionId: shared?.id });
+    expect(fixture.configs.size).toBe(2);
+  });
+
+  it.each(['different-sport', 'retired'] as const)('does not make a %s host-published hash reusable by the tournament writer', async scenario => {
+    await fixture.service.create(periodsActor, { ...periodsCreateInput, periods: [{ durationMinutes: 37 }] });
+    const published = fixture.configs.get(fixture.game.competitionConfigVersionId);
+    if (!published) throw new Error('The host writer must publish its requested config');
+    if (scenario === 'different-sport') published.sportCode = 'football';
+    else published.status = V1CompetitionConfigStatus.RETIRED;
+    await expect(fixture.tournamentService.update(periodsActor, fixture.tournament.id, {
+      expectedVersion: fixture.tournament.updatedAt.toISOString(), periods: [{ durationMinutes: 37 }],
+    })).rejects.toMatchObject({ status: 409, response: { code: 'COMPETITION_CONFIG_CONTENT_HASH_COLLISION' } });
+    expect(fixture.tournament.competitionConfigVersionId).toBe(fixture.baseConfig.id);
+    expect(fixture.prisma.v1Tournament.updateMany).not.toHaveBeenCalled();
+  });
+
+  it.each(['host', 'tournament'] as const)('rejects a hash match whose actual canonical JSON differs through the %s writer', async writer => {
+    const requestedConfig = { ...structuredClone(fixture.baseConfig), periods: [{ code: 'SINGLE_PERIOD', label: '단일', durationMinutes: 37, extraTime: false }] };
+    fixture.configs.set('false-hash-match', {
+      ...requestedConfig, id: 'false-hash-match',
+      name: writer === 'host' ? 'futsal-team-match-rules-v1' : fixture.baseConfig.name,
+      version: writer === 'host' ? 1 : 2,
+      contentHash: competitionConfigContentHash({
+        periods: requestedConfig.periods, events: requestedConfig.events, lineup: requestedConfig.lineup,
+        result: requestedConfig.result, tieBreak: requestedConfig.tieBreak, visibility: requestedConfig.visibility,
+      }),
+      result: { ...requestedConfig.result, penaltyShootout: { earlyStop: false } },
+    });
+    const save = writer === 'host'
+      ? fixture.service.create(periodsActor, { ...periodsCreateInput, periods: [{ durationMinutes: 37 }] })
+      : fixture.tournamentService.update(periodsActor, fixture.tournament.id, {
+        expectedVersion: fixture.tournament.updatedAt.toISOString(), periods: [{ durationMinutes: 37 }],
+      });
+    await expect(save).rejects.toMatchObject({ status: 409, response: { code: 'COMPETITION_CONFIG_CONTENT_HASH_COLLISION' } });
+    expect(fixture.game.competitionConfigVersionId).toBe(fixture.baseConfig.id);
+    expect(fixture.match.competitionConfigVersionId).toBe(fixture.baseConfig.id);
+    expect(fixture.tournament.competitionConfigVersionId).toBe(fixture.baseConfig.id);
+    expect(fixture.prisma.v1CompetitionConfigVersion.createMany).not.toHaveBeenCalled();
+    expect(fixture.prisma.v1Tournament.updateMany).not.toHaveBeenCalled();
+  });
+
+  const addSinglePeriodDefault = (durationMinutes = 37, version = 2) => {
+    const { events, lineup, result, tieBreak, visibility } = structuredClone(fixture.baseConfig);
+    const config = { periods: [{ code: 'SINGLE_PERIOD', label: '단일', durationMinutes, extraTime: false }], events, lineup, result, tieBreak, visibility };
+    const row = { ...fixture.baseConfig, ...config, id: `single-default-v${version}`, version, contentHash: competitionConfigContentHash(config) };
+    fixture.configs.set(row.id, row);
+    return row;
+  };
+
+  it('returns a legal latest SINGLE_PERIOD global default through the real rule-options consumer', async () => {
+    const current = addSinglePeriodDefault();
+    await expect(fixture.service.ruleOptions(periodsActor, periodsCreateInput.hostTeamId)).resolves.toEqual({
+      hostTeamId: periodsCreateInput.hostTeamId, sportId: periodsCreateInput.sportId,
+      competitionConfigVersionId: current.id, periods: current.periods, twoPeriodDefaults: fixture.baseConfig.periods,
+    });
+  });
+
+  it('keeps a valid single default available and reports no two-period defaults when no ACTIVE same-sport half history exists', async () => {
+    const current = addSinglePeriodDefault();
+    fixture.configs.delete(fixture.baseConfig.id);
+    const retiredHalves = { ...structuredClone(fixture.baseConfig), id: 'retired-halves', status: V1CompetitionConfigStatus.RETIRED };
+    const otherSportHalves = {
+      ...structuredClone(fixture.baseConfig), id: 'football-halves', sportCode: 'football', name: 'football-v1',
+      periods: fixture.baseConfig.periods.map(period => ({ ...period, durationMinutes: 45 })),
+    };
+    const { periods, events, lineup, result, tieBreak, visibility } = otherSportHalves;
+    otherSportHalves.contentHash = competitionConfigContentHash({ periods, events, lineup, result, tieBreak, visibility });
+    fixture.configs.set(retiredHalves.id, retiredHalves);
+    fixture.configs.set(otherSportHalves.id, otherSportHalves);
+    await expect(fixture.service.ruleOptions(periodsActor, periodsCreateInput.hostTeamId)).resolves.toEqual({
+      hostTeamId: periodsCreateInput.hostTeamId, sportId: periodsCreateInput.sportId,
+      competitionConfigVersionId: current.id, periods: current.periods, twoPeriodDefaults: null,
+    });
+  });
+
+  it.each([37, 39])('creates a requested %i-minute match when the latest same-sport default is SINGLE_PERIOD', async durationMinutes => {
+    const current = addSinglePeriodDefault();
+    await fixture.service.create(periodsActor, { ...periodsCreateInput, periods: [{ durationMinutes }] });
+    const stored = fixture.configs.get(fixture.game.competitionConfigVersionId);
+    expect(stored?.periods).toEqual([{ code: 'SINGLE_PERIOD', label: '단일', durationMinutes, extraTime: false }]);
+    expect(fixture.match.competitionConfigVersionId).toBe(stored?.id);
+    expect(fixture.periods.map(period => period.number)).toEqual([1]);
+    expect(stored?.lineup).toEqual(current.lineup);
+    expect(stored?.events).toEqual(current.events);
+    expect(stored?.name).toBe(durationMinutes === 37 ? 'futsal-v1' : 'futsal-team-match-rules-v1');
+    expect(fixture.configs.get(current.id)).toEqual(current);
+  });
+
+  it('keeps an ACTIVE custom pin editable after the legal global default changes to SINGLE_PERIOD', async () => {
+    await fixture.service.create(periodsActor, { ...periodsCreateInput, periods: [{ durationMinutes: 41 }] });
+    addSinglePeriodDefault();
+    expect(await fixture.service.edit(periodsActor, fixture.match.id)).toMatchObject({
+      rulesEditable: true, rulesLockedReason: null, form: { periods: [{ durationMinutes: 41 }] },
+    });
+    await fixture.service.update(periodsActor, fixture.match.id, {
+      ...periodsCreateInput, version: fixture.match.updatedAt.toISOString(), periods: [{ durationMinutes: 39 }],
+    });
+    const stored = fixture.configs.get(fixture.game.competitionConfigVersionId);
+    expect(stored?.periods.map(period => period.durationMinutes)).toEqual([39]);
+    expect(fixture.match.competitionConfigVersionId).toBe(stored?.id);
+    expect(fixture.periods.map(period => period.number)).toEqual([1]);
+  });
+
+  it('expands a SINGLE_PERIOD default using authoritative same-sport historical half identities', async () => {
+    const first = fixture.baseConfig.periods[0];
+    const second = fixture.baseConfig.periods[1];
+    if (!first || !second) throw new Error('The authoritative original default must contain two halves');
+    first.label = '공식 전반'; second.label = '공식 후반';
+    const { periods, events, lineup, result, tieBreak, visibility } = fixture.baseConfig;
+    fixture.baseConfig.contentHash = competitionConfigContentHash({ periods, events, lineup, result, tieBreak, visibility });
+    // More than one query page of legal, distinct single-period publications must not hide the original halves.
+    for (let version = 2; version <= 25; version += 1) addSinglePeriodDefault(35 + version, version);
+    await fixture.service.create(periodsActor, periodsCreateInput);
+    await fixture.service.update(periodsActor, fixture.match.id, {
+      ...periodsCreateInput, version: fixture.match.updatedAt.toISOString(),
+      periods: [{ durationMinutes: 31 }, { durationMinutes: 29 }],
+    });
+    const stored = fixture.configs.get(fixture.game.competitionConfigVersionId);
+    expect(stored?.periods).toEqual([{ ...first, durationMinutes: 31 }, { ...second, durationMinutes: 29 }]);
+    expect(fixture.match.competitionConfigVersionId).toBe(stored?.id);
+    expect(fixture.periods.map(period => period.number)).toEqual([1, 2]);
+    expect(stored?.lineup).toEqual(fixture.baseConfig.lineup);
+  });
+
+  it('persists the PostgreSQL durationMinutes integer upper boundary through the direct create service', async () => {
+    await fixture.service.create(periodsActor, { ...periodsCreateInput, periods: [{ durationMinutes: 2147483647 }] });
+    expect(fixture.configs.get(fixture.game.competitionConfigVersionId)?.periods[0]?.durationMinutes).toBe(2147483647);
+    expect(fixture.match.competitionConfigVersionId).toBe(fixture.game.competitionConfigVersionId);
+  });
+
+  it('rejects the first PostgreSQL integer overflow before the direct create service mutates any aggregate', async () => {
+    const snapshot = () => structuredClone({ configs: [...fixture.configs.entries()], match: fixture.match, game: fixture.game, periods: fixture.periods, lineups: fixture.lineups, participants: fixture.participants });
+    const before = snapshot();
+    await expect(fixture.service.create(periodsActor, { ...periodsCreateInput, periods: [{ durationMinutes: 2147483648 }] }))
+      .rejects.toMatchObject({ status: 422, response: { code: 'TEAM_MATCH_PERIODS_INVALID' } });
+    expect(snapshot()).toEqual(before);
+    expect(fixture.prisma.v1CompetitionConfigVersion.createMany).not.toHaveBeenCalled();
+    expect(fixture.prisma.v1TeamMatch.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects the first PostgreSQL integer overflow before direct edit changes pins or retained DRAFT identities', async () => {
+    await fixture.service.create(periodsActor, periodsCreateInput);
+    const snapshot = () => structuredClone({ configs: [...fixture.configs.entries()], match: fixture.match, game: fixture.game, periods: fixture.periods, lineups: fixture.lineups, participants: fixture.participants });
+    const before = snapshot();
+    await expect(fixture.service.update(periodsActor, fixture.match.id, {
+      ...periodsCreateInput, version: fixture.match.updatedAt.toISOString(), periods: [{ durationMinutes: 2147483648 }],
+    })).rejects.toMatchObject({ status: 422, response: { code: 'TEAM_MATCH_PERIODS_INVALID' } });
+    expect(snapshot()).toEqual(before);
+    expect(fixture.prisma.v1CompetitionConfigVersion.createMany).not.toHaveBeenCalled();
+    expect(fixture.prisma.v1Game.update).not.toHaveBeenCalled();
+    expect(fixture.prisma.v1GamePeriod.deleteMany).not.toHaveBeenCalled();
   });
 });

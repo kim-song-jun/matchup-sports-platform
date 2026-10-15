@@ -17,11 +17,84 @@ type ConfigCountClient = {
   v1TournamentStanding: PrismaService['v1TournamentStanding'];
 };
 
-function teamMatchOwnershipWhere(kind: V1CompetitionKind | null, tournamentId: string): Prisma.V1TeamMatchWhereInput {
+export function teamMatchOwnershipWhere(kind: V1CompetitionKind | null, tournamentId: string): Prisma.V1TeamMatchWhereInput {
   if (kind === V1CompetitionKind.regular_league) {
     return { tournamentId, leagueId: tournamentId, tournamentDetails: { is: null } };
   }
   return { tournamentId, leagueId: null, tournamentDetails: { isNot: null } };
+}
+
+/**
+ * 경기 생성과 같은 대회 advisory 키를 잡고 대회 행을 잠근다. 잠금 순서(대회 → Game → TeamMatch)를 지켜야
+ * 설정을 바꾸는 동안 경기 생성이 옛 설정으로 끼어들지 못한다.
+ */
+export async function lockTournamentForConfigChange(tx: Prisma.TransactionClient, tournamentId: string) {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`league-fixture-generation:${tournamentId}`}, 0))`;
+  await tx.$queryRaw`SELECT id FROM v1_tournaments WHERE id = ${tournamentId} FOR UPDATE`;
+}
+
+/** 경기 생성(GamesService)과 같은 순서로 이 대회의 Game → TeamMatch 행을 잠근다. 대회 행은 `lockTournamentForConfigChange`로 먼저 잠근다. */
+export async function lockCompetitionFixtureRows(tx: Prisma.TransactionClient, kind: V1CompetitionKind | null, tournamentId: string) {
+  if (kind === V1CompetitionKind.regular_league) {
+    await tx.$queryRaw`SELECT g.id FROM v1_games g JOIN v1_team_matches tm ON tm.id = g.team_match_id WHERE tm.tournament_id = ${tournamentId} AND tm.league_id = ${tournamentId} AND g.source_type = 'TEAM_MATCH' ORDER BY g.id FOR UPDATE OF g`;
+    await tx.$queryRaw`SELECT tm.id FROM v1_team_matches tm WHERE tm.tournament_id = ${tournamentId} AND tm.league_id = ${tournamentId} AND NOT EXISTS (SELECT 1 FROM v1_tournament_match_details d WHERE d.team_match_id = tm.id) ORDER BY tm.id FOR UPDATE OF tm`;
+  } else {
+    await tx.$queryRaw`SELECT g.id FROM v1_games g JOIN v1_team_matches tm ON tm.id = g.team_match_id WHERE tm.tournament_id = ${tournamentId} AND tm.league_id IS NULL AND g.source_type = 'TEAM_MATCH' ORDER BY g.id FOR UPDATE OF g`;
+    await tx.$queryRaw`SELECT tm.id FROM v1_team_matches tm WHERE tm.tournament_id = ${tournamentId} AND tm.league_id IS NULL AND EXISTS (SELECT 1 FROM v1_tournament_match_details d WHERE d.team_match_id = tm.id AND d.tournament_id = tm.tournament_id) ORDER BY tm.id FOR UPDATE OF tm`;
+  }
+}
+
+const STARTED_PERIOD: Prisma.V1GamePeriodWhereInput = { OR: [{ state: { not: 'SCHEDULED' } }, { startedAt: { not: null } }, { endedAt: { not: null } }, { pausedAt: { not: null } }] };
+
+/** 아직 손대지 않은 경기(시작·이벤트·결과 없음). 라인업까지 비었는지는 호출자가 고른다. */
+export function untouchedGameWhere(allowSubmittedLineups = false): Prisma.V1GameWhereInput {
+  return {
+    sourceType: 'TEAM_MATCH', state: 'SCHEDULED',
+    ...(allowSubmittedLineups ? {} : { lineups: { none: {} } }),
+    events: { none: {} }, resultRevisions: { none: {} }, periods: { none: STARTED_PERIOD },
+  };
+}
+
+/**
+ * 끝나지 않았고 손대지 않은 경기를 새 설정 버전으로 옮기고 경기 피리어드 행 수를 맞춘다.
+ * 시작했거나 기록이 있는 경기는 만든 때의 설정 그대로 둔다.
+ * `fromVersionIds`를 주면 그 버전을 따르던 경기만 옮긴다.
+ */
+export async function repointUntouchedFixtures(
+  tx: Prisma.TransactionClient,
+  matchOwnership: Prisma.V1TeamMatchWhereInput,
+  config: { id: string; periods: Prisma.JsonValue },
+  scope: { fromVersionIds?: readonly string[]; allowSubmittedLineups?: boolean } = {},
+) {
+  const untouched = untouchedGameWhere(scope.allowSubmittedLineups);
+  const fromPin = scope.fromVersionIds ? { competitionConfigVersionId: { in: [...scope.fromVersionIds] } } : {};
+  const repointed = await tx.v1TeamMatch.updateMany({
+    where: { ...matchOwnership, ...fromPin, status: { not: 'completed' }, OR: [{ game: null }, { game: { is: untouched } }] },
+    data: { competitionConfigVersionId: config.id },
+  });
+  // TeamMatch 를 먼저 옮겼으므로 Game 은 자기 핀으로 거른다.
+  await tx.v1Game.updateMany({
+    where: { teamMatch: { is: { ...matchOwnership, status: { not: 'completed' } } }, ...untouched, ...fromPin },
+    data: { competitionConfigVersionId: config.id },
+  });
+  const untouchedGames = await tx.v1Game.findMany({
+    where: { teamMatch: { is: { ...matchOwnership, status: { not: 'completed' } } }, ...untouched, competitionConfigVersionId: config.id },
+    select: { id: true, periods: { select: { id: true, number: true }, orderBy: { number: 'asc' } } },
+  });
+  const desiredPeriodCount = computePeriodCount(config.periods);
+  for (const game of untouchedGames) {
+    if (game.periods.length < desiredPeriodCount) {
+      const existingNumbers = new Set(game.periods.map((period) => period.number));
+      await tx.v1GamePeriod.createMany({
+        data: Array.from({ length: desiredPeriodCount }, (_, index) => index + 1)
+          .filter((number) => !existingNumbers.has(number))
+          .map((number) => ({ gameId: game.id, number })),
+      });
+    } else if (game.periods.length > desiredPeriodCount) {
+      await tx.v1GamePeriod.deleteMany({ where: { gameId: game.id, number: { gt: desiredPeriodCount } } });
+    }
+  }
+  return repointed.count;
 }
 
 /** Rows the internal repair may move without crossing a history boundary. */
@@ -184,12 +257,11 @@ export class TournamentCompetitionConfig {
     const effectivePreviewHash = selected.contentHash;
 
     const updated = await this.prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`league-fixture-generation:${tournamentId}`}, 0))`;
       // Match creators use the same tournament advisory key and then lock
       // canonical rows before reading their game state. Keep this lock order
       // stable (tournament -> Game id -> TeamMatch id) so a config change
       // cannot approve a stale preview while a creator is committing.
-      await tx.$queryRaw`SELECT id FROM v1_tournaments WHERE id = ${tournamentId} FOR UPDATE`;
+      await lockTournamentForConfigChange(tx, tournamentId);
       // GamesService locks Game before resolving/locking its TeamMatch. The
       // explicit OF clause prevents the join from taking an implicit TM lock.
       const lockedTournament = await findTournamentOnSurface(tx, allowedKinds, {
@@ -203,13 +275,7 @@ export class TournamentCompetitionConfig {
         });
       }
       const matchOwnership = teamMatchOwnershipWhere(lockedTournament.kind, tournamentId);
-      if (lockedTournament.kind === V1CompetitionKind.regular_league) {
-        await tx.$queryRaw`SELECT g.id FROM v1_games g JOIN v1_team_matches tm ON tm.id = g.team_match_id WHERE tm.tournament_id = ${tournamentId} AND tm.league_id = ${tournamentId} AND g.source_type = 'TEAM_MATCH' ORDER BY g.id FOR UPDATE OF g`;
-        await tx.$queryRaw`SELECT tm.id FROM v1_team_matches tm WHERE tm.tournament_id = ${tournamentId} AND tm.league_id = ${tournamentId} AND NOT EXISTS (SELECT 1 FROM v1_tournament_match_details d WHERE d.team_match_id = tm.id) ORDER BY tm.id FOR UPDATE OF tm`;
-      } else {
-        await tx.$queryRaw`SELECT g.id FROM v1_games g JOIN v1_team_matches tm ON tm.id = g.team_match_id WHERE tm.tournament_id = ${tournamentId} AND tm.league_id IS NULL AND g.source_type = 'TEAM_MATCH' ORDER BY g.id FOR UPDATE OF g`;
-        await tx.$queryRaw`SELECT tm.id FROM v1_team_matches tm WHERE tm.tournament_id = ${tournamentId} AND tm.league_id IS NULL AND EXISTS (SELECT 1 FROM v1_tournament_match_details d WHERE d.team_match_id = tm.id AND d.tournament_id = tm.tournament_id) ORDER BY tm.id FOR UPDATE OF tm`;
-      }
+      await lockCompetitionFixtureRows(tx, lockedTournament.kind, tournamentId);
       const impact = await calculateImpact(tx, matchOwnership);
       if (impact.requiresRecalculation && (!dto.confirmRecalculation || dto.previewHash !== effectivePreviewHash)) {
         return { changed: false as const, currentCompetitionConfigVersionId: lockedTournament.competitionConfigVersionId, requestedCompetitionConfigVersionId: selected.id, expectedVersion: lockedTournament.updatedAt.toISOString(), previewHash: effectivePreviewHash, impact, confirmationRequired: true, teamMatchesRepointed: 0 };
@@ -224,50 +290,7 @@ export class TournamentCompetitionConfig {
       if (changed.count !== 1) throw new ConflictException({ code: 'TOURNAMENT_VERSION_CONFLICT', message: '대회 설정이 다른 요청에서 변경됐어요. 다시 확인해 주세요.' });
       // Existing games, periods, lineups, events and revisions stay pinned.
       // Only untouched canonical TeamMatches/games follow the new pin.
-      const repointedTeamMatches = await tx.v1TeamMatch.updateMany({
-        where: {
-          ...matchOwnership,
-          status: { not: 'completed' },
-          OR: [
-            { game: null },
-            { game: { is: { sourceType: 'TEAM_MATCH', state: 'SCHEDULED', lineups: { none: {} }, events: { none: {} }, resultRevisions: { none: {} }, periods: { none: { OR: [{ state: { not: 'SCHEDULED' } }, { startedAt: { not: null } }, { endedAt: { not: null } }, { pausedAt: { not: null } }] } } } } },
-          ],
-        },
-        data: { competitionConfigVersionId: selected.id },
-      });
-      await tx.v1Game.updateMany({
-        where: {
-          teamMatch: { is: { ...matchOwnership, status: { not: 'completed' } } },
-          sourceType: 'TEAM_MATCH',
-          state: 'SCHEDULED',
-          lineups: { none: {} },
-          events: { none: {} },
-          resultRevisions: { none: {} },
-          periods: { none: { OR: [{ state: { not: 'SCHEDULED' } }, { startedAt: { not: null } }, { endedAt: { not: null } }, { pausedAt: { not: null } }] } },
-        },
-        data: { competitionConfigVersionId: selected.id },
-      });
-      const untouchedGames = await tx.v1Game.findMany({
-        where: {
-          teamMatch: { is: { ...matchOwnership, status: { not: 'completed' } } },
-          sourceType: 'TEAM_MATCH', state: 'SCHEDULED', lineups: { none: {} }, events: { none: {} }, resultRevisions: { none: {} },
-          periods: { none: { OR: [{ state: { not: 'SCHEDULED' } }, { startedAt: { not: null } }, { endedAt: { not: null } }, { pausedAt: { not: null } }] } },
-        },
-        select: { id: true, periods: { select: { id: true, number: true }, orderBy: { number: 'asc' } } },
-      });
-      const desiredPeriodCount = computePeriodCount(selected.periods);
-      for (const game of untouchedGames) {
-        if (game.periods.length < desiredPeriodCount) {
-          const existingNumbers = new Set(game.periods.map((period) => period.number));
-          await tx.v1GamePeriod.createMany({
-            data: Array.from({ length: desiredPeriodCount }, (_, index) => index + 1)
-              .filter((number) => !existingNumbers.has(number))
-              .map((number) => ({ gameId: game.id, number })),
-          });
-        } else if (game.periods.length > desiredPeriodCount) {
-          await tx.v1GamePeriod.deleteMany({ where: { gameId: game.id, number: { gt: desiredPeriodCount } } });
-        }
-      }
+      const teamMatchesRepointed = await repointUntouchedFixtures(tx, matchOwnership, selected);
       await this.adminContext.logAdminAction(
         admin,
         {
@@ -286,7 +309,7 @@ export class TournamentCompetitionConfig {
         changed: true as const,
         updated: await findTournamentOnSurfaceOrThrow(tx, allowedKinds, { where: { id: tournamentId } }),
         impact,
-        teamMatchesRepointed: repointedTeamMatches.count,
+        teamMatchesRepointed,
       };
     });
     if (!updated.changed) return updated;

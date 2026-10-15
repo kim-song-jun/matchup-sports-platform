@@ -7,6 +7,33 @@ const fieldClass =
 
 export type RosterLimitValue = { unlimited: boolean; minPlayers: string; maxPlayers: string };
 
+export function leagueTeamCapacityError(value: string): string | null {
+  if (value.trim() === '') return null;
+  return /^\d+$/.test(value.trim()) && Number(value) >= 1 && Number(value) <= 2147483647
+    ? null
+    : '참가팀 정원은 1~2,147,483,647팀 사이의 정수로 입력해 주세요.';
+}
+
+export function LeagueTeamCapacityField({ value, onChange, disabled }: {
+  value: string;
+  onChange: (value: string) => void;
+  disabled?: boolean;
+}) {
+  const id = useId();
+  const error = leagueTeamCapacityError(value);
+  return (
+    <div>
+      <label htmlFor={id} className="mb-1 block tm-text-body-sm font-medium text-[var(--text-strong)]">참가팀 정원 (선택)</label>
+      <input id={id} type="number" inputMode="numeric" min={1} max={2147483647} step={1}
+        value={value} disabled={disabled} aria-invalid={error !== null} aria-describedby={`${id}-hint`}
+        onChange={event => onChange(event.target.value)} className={fieldClass} />
+      <p id={`${id}-hint`} className="mt-1 tm-text-caption text-[var(--text-muted)]">
+        {error ?? '비워 두면 참가팀 수에 제한이 없어요. 팀당 선수 인원과는 별개예요.'}
+      </p>
+    </div>
+  );
+}
+
 const isPlayerCount = (value: string) => /^\d+$/.test(value.trim()) && Number(value) >= 1 && Number(value) <= 50;
 
 /** 팀 명단 인원 입력의 오류 문구. 제한 없음이면 칸을 보지 않는다. */

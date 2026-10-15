@@ -36,6 +36,7 @@ import type { LeagueState } from './league-state';
 import { findPublicTournamentOnSurface } from '../tournaments/tournament-surface-lookup';
 import { isLeagueRegistrationOpen } from './league-registration-open';
 import { TOURNAMENT_VENUE_SELECT, tournamentVenueSnapshot } from '../places/tournament-venue';
+import { CAPACITY_HOLD_STATUSES, countPendingCapacityReservations, isCapacityFull } from '../tournaments/registration-capacity';
 
 const PLAYER_RECORDS_LIMIT = 30;
 const LEAGUE_LIST_DEFAULT_LIMIT = 20;
@@ -439,6 +440,7 @@ export class LeagueMatchPublicService {
 
   async detail(leagueId: string) {
     const league = await this.loadLeague(leagueId);
+    const pendingPaymentCount = await countPendingCapacityReservations(this.prisma, leagueId);
     const fixtures = await this.prisma.v1TeamMatch.findMany({
       where: publicLeagueFixtureListWhere(leagueId),
       orderBy: leagueFixtureListOrder(),
@@ -492,16 +494,21 @@ export class LeagueMatchPublicService {
               tier: true,
               seasonNo: true,
               status: true,
+              kind: true,
+              teamCount: true,
+              maxTeams: true,
+              _count: { select: { registrations: { where: { status: { in: [...CAPACITY_HOLD_STATUSES] } } } } },
               registrationDeadlineAt: true,
               scheduledAt: true,
               scheduledEndAt: true,
             },
           })
           .then((rows) =>
-            rows.map(({ status, ...rest }) => ({
+            rows.map(({ status, _count, kind, teamCount, maxTeams, ...rest }) => ({
               ...rest,
               state: LEAGUE_STATE_BY_STATUS[status],
-              registrationOpen: isLeagueRegistrationOpen(status, rest.registrationDeadlineAt),
+              registrationOpen: isLeagueRegistrationOpen(status, rest.registrationDeadlineAt)
+                && !isCapacityFull({ kind, teamCount, maxTeams }, _count.registrations),
             })),
           );
     // 신청이 마감된 리그가 "다음 회차로 신청하기"를 걸 대상 — 같은 티어의 바로 다음 시즌.
@@ -514,6 +521,9 @@ export class LeagueMatchPublicService {
       leagueId: league.id,
       title: league.title,
       rulesText: league.rulesText,
+      maxTeams: league.maxTeams,
+      confirmedCount: league.teams.length,
+      pendingPaymentCount,
       state: league.state,
       startsOn: league.startsOn,
       endsOn: league.endsOn,
@@ -530,7 +540,7 @@ export class LeagueMatchPublicService {
       // 신청을 열 수 있고 등록 서비스도 리그를 받는데(`ALL_COMPETITION_KINDS`), 그 사실이
       // 공개 응답에 실리지 않아 화면이 알 방법이 없었다.
       registrationDeadlineAt: league.registrationDeadlineAt?.toISOString() ?? null,
-      registrationOpen: league.registrationOpen,
+      registrationOpen: league.registrationOpen && !isCapacityFull(league, league.teams.length + pendingPaymentCount),
       // 시리즈에 속하지 않은 단발 리그는 셋 다 null 이다 — 화면은 null 이면 티어 뱃지를 띄우지 않는다.
       seriesId: league.seriesId,
       seriesTitle: league.series?.title ?? null,
@@ -802,6 +812,9 @@ export class LeagueMatchPublicService {
         id: true,
         title: true,
         rulesText: true,
+        kind: true,
+        teamCount: true,
+        maxTeams: true,
         status: true,
         registrationDeadlineAt: true,
         scheduledAt: true,
@@ -848,9 +861,8 @@ export class LeagueMatchPublicService {
       endsOn: scheduledEndAt,
       teams: registrations,
       registrationDeadlineAt,
-      // **신청 가능 여부는 서버가 판정해서 결과만 내려준다.** 등록 서비스가 실제로 던지는
-      // 조건(신청 마감 미도과·미종료)과 **같은 규칙**이다 — 화면이 이 판정을
-      // 복제하면 두 곳이 갈려 "버튼은 보이는데 누르면 409 `TOURNAMENT_NOT_OPEN`" 이 난다.
+      // 내부 모집 창 판정이다. 공개 상세는 확정·결제 대기 점유를 더해 정원도 함께 검사한다.
+      // 마감 미도과·미종료 조건은 등록 서비스와 같은 규칙으로 유지한다.
       // 마감이 `null` 이면 신청을 받지 않는다(league-registration-open.ts와 같은 규칙).
       registrationOpen: isLeagueRegistrationOpen(status, registrationDeadlineAt),
     };

@@ -1,5 +1,6 @@
 import { getLeagueSettings, updateLeagueSettings } from './league-settings';
 import { UpdateLeagueSettingsDto } from './dto/league-settings.dto';
+import { countPendingCapacityReservations } from '../tournaments/registration-capacity';
 import {
   BadRequestException,
   ConflictException,
@@ -250,6 +251,7 @@ export class LeagueMatchAdminService {
           // 생략한 값은 leagueMirrorCreateData 의 리그 기본값(제한 없음)을 따른다.
           ...(dto.minPlayers !== undefined ? { minPlayers: dto.minPlayers } : {}),
           ...(dto.maxPlayers !== undefined ? { maxPlayers: dto.maxPlayers } : {}),
+          ...(dto.maxTeams !== undefined ? { maxTeams: dto.maxTeams } : {}),
           ...(dto.plannedFixtureCount !== undefined ? { plannedFixtureCount: dto.plannedFixtureCount } : {}),
         },
         { leagueId: created.id, startsOn },
@@ -450,6 +452,9 @@ export class LeagueMatchAdminService {
       heldFromState: league.heldFromState,
       minPlayers: league.minPlayers,
       maxPlayers: league.maxPlayers,
+      maxTeams: league.maxTeams,
+      confirmedCount: league.teams.length,
+      pendingPaymentCount: await countPendingCapacityReservations(this.prisma, leagueId),
       plannedFixtureCount: league.plannedFixtureCount,
       // 참가 신청 상태 — 어드민이 "지금 신청을 받는가 / 마감이 언제인가" 를 보고 신청을
       // 열 수 있어야 한다. 공개 상세와 **같은 판정 함수**를 쓴다(두 화면이 갈리면 어드민은
@@ -2303,6 +2308,7 @@ export class LeagueMatchAdminService {
         // 팀 명단 인원(null = 제한 없음)·총 경기 수 계획 — 대진 생성 폼의 기본값과 화면 표시용.
         minPlayers: true,
         maxPlayers: true,
+        maxTeams: true,
         plannedFixtureCount: true,
         registrations: {
           // 로스터 = confirmed 등록. 신청만 들어온 팀은 대진 대상이 아니다.

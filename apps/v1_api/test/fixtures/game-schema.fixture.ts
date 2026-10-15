@@ -588,7 +588,10 @@ export const gameSchemaSourceManifest = {
   // 2026-10-14 Task 20261082: additive V1GameRosterRole + back-relations, backed by
   // 20261014180000_v1_game_roster_goalkeepers. Existing game columns and bound historical migration unchanged.
   // Re-pin the combined committed LF schema, retaining both additive migrations.
-  schema: '89ccedfb1f48f088a5f61ceede57e7f520a4b40a7ad9862c3d817d4cefc84ae0',
+  // 2026-10-15 MD-QA #145: additive nullable V1Tournament.maxTeams backed by
+  // 20261015180000_v1_league_optional_team_capacity. Re-pin LF schema bytes only;
+  // game models and the bound historical migration are unchanged. DB replay awaits CI.
+  schema: 'd54fe0c8c3415eabd9a363277afc8c5b20ff14a8bbae1c04fc943c1ba50df8b3',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

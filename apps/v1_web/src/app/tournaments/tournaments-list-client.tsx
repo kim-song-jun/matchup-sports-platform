@@ -33,7 +33,6 @@ import { TOURNAMENT_LIST_PAGE_SIZE, type TournamentListSeed } from '@/lib/public
 import { v1Keys } from '@/lib/query-keys';
 import { TournamentCard } from './tournament-card';
 import type { V1TournamentListItem } from '@/types/api';
-import { LocalDiscoveryGuidance } from '@/shared/ui/local-discovery-guidance';
 
 /** 이벤트 허브 진입 카드. */
 function TournamentEventHubEntry({ fromPath }: { fromPath: string }) {
@@ -331,7 +330,6 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
             지금보다 늘리지 않는 것이 이 안의 핵심" 이라고 못박았고, 줄 수가 같아야 그게
             구조적으로 성립한다. 칩 줄은 종목이 늘면 래핑돼 두 줄이 되지만 이 줄은 하나다. */}
         <CompetitionFilterSummary model={filterModel} />
-        <LocalDiscoveryGuidance kind={activeKind} />
 
         {isPending || needsPageNormalization || emptyPreviousPage ? (
           <TournamentSkeletonList />

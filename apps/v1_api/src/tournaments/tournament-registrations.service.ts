@@ -22,7 +22,7 @@ import {
   CreateRegistrationDto,
   SubmitRegistrationDto,
 } from './dto/tournament-registration.dto';
-import { capacityLimitOf, isCapacityFull } from './registration-capacity';
+import { CAPACITY_HOLD_STATUSES, capacityLimitOf, countCapacityReservations, isCapacityFull } from './registration-capacity';
 import { ALL_COMPETITION_KINDS, findTournamentOnSurface, findTournamentOnSurfaceOrThrow } from './tournament-surface-lookup';
 
 /** cancel-request로 어드민 처리가 필요한 상태(이미 운영에 반영됨). */
@@ -32,13 +32,6 @@ const CANCELLABLE_VIA_REQUEST: V1TournamentRegistration['status'][] = [
   'paid',
   'confirmed',
   'waitlisted',
-];
-
-const CAPACITY_HOLD_STATUSES: V1TournamentRegistration['status'][] = [
-  'awaiting_payment',
-  'payment_checking',
-  'paid',
-  'confirmed',
 ];
 
 /**
@@ -102,8 +95,12 @@ export class TournamentRegistrationsService {
   ) {}
 
   /** 팀장 또는 운영진(manager+)만 대회 신청을 관리할 수 있다. */
-  private async assertTeamManager(teamId: string, userId: string) {
-    const membership = await this.prisma.v1TeamMembership.findFirst({
+  private async assertTeamManager(
+    teamId: string,
+    userId: string,
+    db: Pick<Prisma.TransactionClient, 'v1TeamMembership'> = this.prisma,
+  ) {
+    const membership = await db.v1TeamMembership.findFirst({
       where: {
         teamId,
         userId,
@@ -161,16 +158,11 @@ export class TournamentRegistrationsService {
 
   private async assertCapacityAvailable(
     tournamentId: string,
-    competition: { kind: V1CompetitionKind | null; teamCount: number },
+    competition: { kind: V1CompetitionKind | null; teamCount: number; maxTeams?: number | null },
   ) {
-    // 상한이 없으면(정규 리그) 세지도 않는다 — 결과를 안 쓸 COUNT 를 날릴 이유가 없다.
+    // 상한을 설정하지 않은 리그는 결과를 안 쓸 COUNT를 생략한다.
     if (capacityLimitOf(competition) === null) return;
-    const reservedCount = await this.prisma.v1TournamentRegistration.count({
-      where: {
-        tournamentId,
-        status: { in: CAPACITY_HOLD_STATUSES },
-      },
-    });
+    const reservedCount = await countCapacityReservations(this.prisma, tournamentId);
     if (isCapacityFull(competition, reservedCount)) {
       throw new ConflictException({
         code: 'TOURNAMENT_CAPACITY_FULL',
@@ -189,7 +181,7 @@ export class TournamentRegistrationsService {
     });
     if (existing && existing.status !== 'cancelled') {
       if (existing.status === 'draft') {
-        await this.assertCapacityAvailable(tournamentId, tournament);
+        // 저장된 초안을 읽는 것은 자리를 예약하지 않는다. 정원은 실제 제출 트랜잭션에서 다시 검사한다.
         return this.serialize(existing, null, await this.countPlayers(existing.id), tournament);
       }
       const [payment, playerCount] = await Promise.all([
@@ -370,16 +362,11 @@ export class TournamentRegistrationsService {
         });
       }
 
-      // 상한이 없으면(정규 리그) 세지 않는다 — 결과를 안 쓸 COUNT 를 날릴 이유가 없다.
+      // 상한을 설정하지 않은 리그만 COUNT를 생략한다.
       const reservedCount =
         capacityLimitOf(lockedTournament) === null
           ? 0
-          : await tx.v1TournamentRegistration.count({
-              where: {
-                tournamentId,
-                status: { in: CAPACITY_HOLD_STATUSES },
-              },
-            });
+          : await countCapacityReservations(tx, tournamentId);
       if (isCapacityFull(lockedTournament, reservedCount)) {
         throw new ConflictException({
           code: 'TOURNAMENT_CAPACITY_FULL',
@@ -592,15 +579,21 @@ export class TournamentRegistrationsService {
       });
     }
 
-    const restoredStatus = registration.cancelPreviousStatus ?? 'awaiting_payment';
-
     const updated = await this.prisma.$transaction(async (tx) => {
       // R16-001: lock tournament and re-check its status; an admin-cancelled tournament
       // must not have registrations restored to an active status.
       await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${tournamentId} FOR UPDATE`;
+      const current = await tx.v1TournamentRegistration.findFirst({ where: { id: registrationId, tournamentId } });
+      if (!current || current.status !== 'cancel_requested') {
+        throw new ConflictException({
+          code: 'REGISTRATION_CANCEL_REQUEST_NOT_WITHDRAWABLE', message: '취소 요청 중인 신청만 철회할 수 있어요.',
+        });
+      }
+      await this.assertTeamManager(current.teamId, user.id, tx);
+      const restoredStatus = current.cancelPreviousStatus ?? 'awaiting_payment';
       const tournament = await findTournamentOnSurface(tx, ALL_COMPETITION_KINDS, {
         where: { id: tournamentId, deletedAt: null },
-        select: { id: true, status: true, teamCount: true, kind: true },
+        select: { id: true, status: true, teamCount: true, maxTeams: true, kind: true },
       });
       if (!tournament) {
         // **여기서 정하는 것은 "대회·리그가 통합 표면에서 조회되지 않을 때" 하나뿐이다** —
@@ -636,17 +629,11 @@ export class TournamentRegistrationsService {
 
       // R17-006: if the restored status holds a capacity slot, re-check capacity
       // before restoring so a withdrawal cannot exceed the tournament limit.
-      if (CAPACITY_HOLD_STATUSES.includes(restoredStatus as typeof CAPACITY_HOLD_STATUSES[number])) {
+      if (CAPACITY_HOLD_STATUSES.includes(restoredStatus)) {
         const reservedCount =
           capacityLimitOf(tournament) === null
             ? 0
-            : await tx.v1TournamentRegistration.count({
-                where: {
-                  tournamentId,
-                  id: { not: registrationId },
-                  status: { in: CAPACITY_HOLD_STATUSES },
-                },
-              });
+            : await countCapacityReservations(tx, tournamentId, registrationId);
         if (isCapacityFull(tournament, reservedCount)) {
           throw new ConflictException({
             code: 'TOURNAMENT_CAPACITY_FULL',
@@ -656,7 +643,7 @@ export class TournamentRegistrationsService {
       }
 
       return tx.v1TournamentRegistration.update({
-        where: { id: registrationId },
+        where: { id: registrationId, status: 'cancel_requested', updatedAt: current.updatedAt },
         data: {
           status: restoredStatus,
           cancelRequestedAt: null,
@@ -664,6 +651,13 @@ export class TournamentRegistrationsService {
           cancelReason: null,
         },
       });
+    }).catch((error: unknown) => {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        throw new ConflictException({
+          code: 'REGISTRATION_CANCEL_REQUEST_NOT_WITHDRAWABLE', message: '취소 요청 중인 신청만 철회할 수 있어요.',
+        });
+      }
+      throw error;
     });
 
     const [payment, playerCount, tournament] = await Promise.all([

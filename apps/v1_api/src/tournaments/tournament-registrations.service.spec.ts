@@ -1431,4 +1431,115 @@ describe('TournamentRegistrationsService', () => {
     await expect(service.getMyRegistrations(manager, 'tournament-1')).resolves.toEqual([]);
     expect(prisma.v1TournamentPlayer.groupBy).not.toHaveBeenCalled();
   });
+
+  describe('MD-QA #145 stale cancellation guards', () => {
+    it.each(['confirmed', 'awaiting_payment'] as const)(
+      'withdrawCancelRequest: stale cancel_requested cannot restore %s after final admin cancellation even with room',
+      async (previousStatus) => {
+        // Given: an approved cancellation commits between the team service's preload and locked transaction.
+        let currentRegistration = registrationRow({ status: 'cancel_requested', cancelPreviousStatus: previousStatus });
+        prisma.v1TournamentRegistration.findFirst.mockImplementation(async () => ({ ...currentRegistration }));
+        prisma.v1TournamentRegistration.findUnique.mockImplementation(async () => ({ ...currentRegistration }));
+        prisma.v1Tournament.findFirst.mockImplementation(kindAwareFindFirst(openTournament({
+          kind: 'regular_league', maxTeams: 3, maxPlayers: 20,
+        })));
+        prisma.v1TournamentRegistration.count.mockResolvedValue(2);
+        prisma.v1TournamentPayment.findUnique.mockResolvedValue(paymentRow({ status: 'cancelled' }));
+        prisma.v1TournamentRegistration.update.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => {
+          currentRegistration = registrationRow({ ...currentRegistration, ...data });
+          return currentRegistration;
+        });
+        prisma.$transaction.mockImplementation(async (callback: (tx: typeof prisma) => Promise<unknown>) => {
+          currentRegistration = registrationRow({ ...currentRegistration, status: 'cancelled',
+            cancelPreviousStatus: null, cancelOutcome: 'approved' });
+          return callback(prisma);
+        });
+        // When / Then: neither the captured previous status nor an available slot can resurrect the cancelled team.
+        await expect(service.withdrawCancelRequest(manager, 'tournament-1', 'reg-1')).rejects.toMatchObject({
+          status: 409, response: { code: 'REGISTRATION_CANCEL_REQUEST_NOT_WITHDRAWABLE' },
+        });
+        expect(currentRegistration.status).toBe('cancelled');
+        expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
+        expect(prisma.v1TournamentPayment.update).not.toHaveBeenCalled();
+        expect(notifications.emitNotification).not.toHaveBeenCalled();
+      },
+    );
+  });
+
+  describe('MD-QA #145 — 선택적 리그 참가팀 정원', () => {
+    it('MD-QA #145 review follow-up draft: saved nonreserving draft resumes at full capacity while submit still rejects', async () => {
+      const savedDraft = registrationRow({ id: 'saved-draft-1' });
+      prisma.v1Tournament.findFirst.mockImplementation(kindAwareFindFirst(openTournament({
+        kind: 'regular_league', registrationDeadlineAt: LEAGUE_OPEN_DEADLINE, maxTeams: 3, maxPlayers: 20,
+      })));
+      prisma.v1TournamentRegistration.findUnique.mockResolvedValue(savedDraft);
+      prisma.v1TournamentRegistration.findFirst.mockResolvedValue(savedDraft);
+      prisma.v1TournamentRegistration.count.mockResolvedValue(3);
+      prisma.v1TournamentPlayer.count.mockResolvedValue(2);
+      // Another team reserved the final place after this manager saved an unsubmitted draft.
+      const resumed = await service.create(manager, 'tournament-1', { teamId: 'team-1' });
+      expect(resumed).toMatchObject({ id: 'saved-draft-1', status: 'draft', playerCount: 2 });
+      expect(prisma.v1TournamentRegistration.create).not.toHaveBeenCalled();
+      expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
+      // Reading the draft does not reserve a place; the actual submit mutation must retain its locked capacity gate.
+      await expect(service.submit(manager, 'tournament-1', 'saved-draft-1', validSubmit)).rejects.toMatchObject({
+        response: { code: 'TOURNAMENT_CAPACITY_FULL' },
+      });
+      expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
+      expect(prisma.v1TournamentPayment.upsert).not.toHaveBeenCalled();
+      expect(managedTerms.recordTournamentDecisions).not.toHaveBeenCalled();
+    });
+
+    it('create: 선수 정원과 별개로 참가팀 정원이 찼으면 draft도 만들지 않는다', async () => {
+      // Given: seeded/promoted/paid reservations already fill a three-team league.
+      prisma.v1Tournament.findFirst.mockImplementation(kindAwareFindFirst(openTournament({
+        kind: 'regular_league', registrationDeadlineAt: LEAGUE_OPEN_DEADLINE,
+        maxTeams: 3, maxPlayers: 20,
+      })));
+      prisma.v1TournamentRegistration.findUnique.mockResolvedValue(null);
+      prisma.v1TournamentRegistration.count.mockResolvedValue(3);
+      prisma.v1TournamentRegistration.create.mockResolvedValue(registrationRow());
+      // When / Then: actual create rejects before any registration is persisted.
+      await expect(service.create(manager, 'tournament-1', { teamId: 'team-1' })).rejects.toMatchObject({
+        response: { code: 'TOURNAMENT_CAPACITY_FULL' },
+      });
+      expect(prisma.v1TournamentRegistration.create).not.toHaveBeenCalled();
+    });
+
+    it('submit: 잠근 뒤 줄어든 참가팀 정원을 재검사하고 결제·약관 결정을 쓰지 않는다', async () => {
+      // Given: the preflight had room, but another mutation lowered the cap before the lock.
+      prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+      const common = { kind: 'regular_league', registrationDeadlineAt: LEAGUE_OPEN_DEADLINE, maxPlayers: 20 };
+      prisma.v1Tournament.findFirst
+        .mockImplementationOnce(kindAwareFindFirst(openTournament({ ...common, maxTeams: 10 })))
+        .mockImplementation(kindAwareFindFirst(openTournament({ ...common, maxTeams: 3 })));
+      prisma.v1TournamentRegistration.count.mockResolvedValue(3);
+      prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'awaiting_payment' }));
+      prisma.v1TournamentPayment.upsert.mockResolvedValue(paymentRow());
+      // When / Then: the real submit uses the locked competition, rather than the earlier cap.
+      await expect(service.submit(manager, 'tournament-1', 'reg-1', validSubmit)).rejects.toMatchObject({
+        response: { code: 'TOURNAMENT_CAPACITY_FULL' },
+      });
+      expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
+      expect(prisma.v1TournamentPayment.upsert).not.toHaveBeenCalled();
+      expect(managedTerms.recordTournamentDecisions).not.toHaveBeenCalled();
+    });
+
+    it('withdrawCancelRequest: 이미 찬 리그의 점유 상태로 복원하지 않는다', async () => {
+      // Given: the cancelled request released its slot, which another team now reserves.
+      prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow({
+        status: 'cancel_requested', cancelPreviousStatus: 'confirmed',
+      }));
+      prisma.v1Tournament.findFirst.mockImplementation(kindAwareFindFirst(openTournament({
+        kind: 'regular_league', maxTeams: 3, maxPlayers: 20,
+      })));
+      prisma.v1TournamentRegistration.count.mockResolvedValue(3);
+      prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'confirmed' }));
+      // When / Then: restoring the request cannot create a fourth reservation.
+      await expect(service.withdrawCancelRequest(manager, 'tournament-1', 'reg-1')).rejects.toMatchObject({
+        response: { code: 'TOURNAMENT_CAPACITY_FULL' },
+      });
+      expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -67,7 +67,8 @@ describe('TournamentInquirySection', () => {
     expect(screen.queryByLabelText(/^이메일/)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/^전화번호/)).not.toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('문의 유형'), { target: { value: 'payment_refund' } });
+    fireEvent.click(screen.getByRole('combobox', { name: '문의 유형' }));
+    fireEvent.click(screen.getByRole('option', { name: '결제·환불' }));
     fireEvent.change(screen.getByLabelText('제목'), { target: { value: '참가비 관련 문의' } });
     fireEvent.change(screen.getByLabelText('내용'), { target: { value: '환불 규정이 궁금합니다.' } });
     fireEvent.click(screen.getByRole('button', { name: '문의 접수' }));
@@ -97,7 +98,8 @@ describe('TournamentInquirySection', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '문의하기' }));
     expect(screen.getByRole('heading', { name: '경기 문의하기' })).toBeInTheDocument();
-    expect(screen.getByRole('combobox', { name: '문의 유형' })).toHaveValue('result');
+    expect(screen.getByRole('combobox', { name: '문의 유형' })).toHaveTextContent('경기 결과 정정');
+    expect(screen.getByRole('combobox', { name: '문의 유형' })).toBeDisabled();
     fireEvent.change(screen.getByLabelText('제목'), { target: { value: '기록 정정 문의' } });
     fireEvent.change(screen.getByLabelText('내용'), { target: { value: '이 경기 기록을 확인해 주세요.' } });
     fireEvent.click(screen.getByRole('button', { name: '문의 접수' }));

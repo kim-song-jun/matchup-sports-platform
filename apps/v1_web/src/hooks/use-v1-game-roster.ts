@@ -36,6 +36,8 @@ export type V1GameRosterPerson = {
   accountLinked: boolean;
   /** 참가 명단 선수 id(등번호 저장 API 의 `:playerId`). 참가 명단 행이 없는 리그 폴백 팀원은 null. */
   participantId: string | null;
+  /** 계정 실명 — 대회 운영진에게만 온다. 다른 역할 응답에는 키 자체가 없다. */
+  realName?: string;
 };
 
 export type V1GameRosterView = {

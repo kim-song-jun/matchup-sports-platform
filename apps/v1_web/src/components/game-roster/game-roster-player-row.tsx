@@ -46,7 +46,7 @@ export interface GameRosterPlayerRowProps {
   note?: string | null;
   /** 오른쪽 조작 영역(토글·버튼). 조작 요소의 44px 터치는 호출부가 맡는다. */
   trailing?: ReactNode;
-  /** 있으면 등번호 칸이 버튼이 된다 — 눌러서 번호를 넣거나 바꾼다(빈 칸은 "번호 등록"). */
+  /** 있으면 등번호 칸이 버튼이 된다 — 눌러서 번호를 넣거나 바꾼다(빈 칸은 "No."). */
   onJerseyPress?: () => void;
 }
 
@@ -92,7 +92,7 @@ export function GameRosterPlayerRow({
           aria-label={`${displayName} 등번호 넣기`}
           style={emptyJerseyButtonStyle}
         >
-          번호 등록
+          No.
         </Button>
       ) : (
         <Button

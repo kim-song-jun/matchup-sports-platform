@@ -207,6 +207,42 @@ describe('buildGameRosterView', () => {
     expect(result.participants[0].participantId).toBeNull();
   });
 
+  it('실명 맵은 운영진에게만 — 맵이 있으면 다섯 목록 모두에 realName 을 싣고, 없으면 키 자체가 없다', () => {
+    const realNameByUserId = new Map([
+      ['u1', '김하나'],
+      ['u2', '이둘'],
+      ['u3', '박셋'],
+      ['u4', '최넷'],
+    ]);
+    const lists = (result: ReturnType<typeof view>) => [
+      ...result.base,
+      ...result.participants,
+      ...result.excluded,
+      ...result.unavailable,
+      ...result.suspended,
+    ];
+    for (const row of lists(view({ realNameByUserId }))) {
+      // 실명이 없는 선수(u5)는 빈 값을 만들지 않고 키를 두지 않는다.
+      if (row.userId === 'u5') expect(row).not.toHaveProperty('realName');
+      else expect(row.realName).toBe(realNameByUserId.get(row.userId));
+    }
+    for (const row of lists(view())) expect(row).not.toHaveProperty('realName');
+  });
+
+  it('시작된 경기의 기록 명단 행에도 실명을 싣는다 — 기록에 계정 없이 들어간 행은 제외', () => {
+    const live = { ...context, gameState: 'LIVE' as const };
+    const result = view({
+      context: live,
+      realNameByUserId: new Map([['u1', '김하나']]),
+      playedLineup: [
+        { id: 'gp-u1', userId: 'u1', displayNameSnapshot: '선수-u1', jerseyNumber: 7 },
+        { id: 'gp-guest', userId: null, displayNameSnapshot: '게스트', jerseyNumber: null },
+      ],
+    });
+    expect(result.participants.find((row) => row.userId === 'u1')?.realName).toBe('김하나');
+    expect(result.participants.find((row) => row.displayName === '게스트')).not.toHaveProperty('realName');
+  });
+
   it('등번호 원본 신청 id 는 입력값 그대로 싣는다(팀원 기준 폴백·팀장이 아닌 뷰어는 null)', () => {
     expect(view().jerseyRegistrationId).toBe('reg-1');
     expect(view({ jerseyRegistration: null }).jerseyRegistrationId).toBeNull();

@@ -15,7 +15,7 @@ const { teamId, tournamentId, registrationId, games, players } = GAME_ROSTER_MSW
 let mock: ReturnType<typeof createV1GameRosterMswHandlers>;
 let server: ReturnType<typeof setupServer>;
 let kind: 'regular_league' | 'regular_tournament';
-let role: 'owner' | 'member';
+let role: 'owner' | 'member' | 'none';
 let locked: boolean;
 const ok = (data: unknown) => HttpResponse.json({ status: 'success', data });
 beforeEach(() => {
@@ -95,6 +95,22 @@ describe('공통 명단 관리의 실제 탭·저장 흐름', () => {
     await waitFor(() => expect(screen.getByLabelText('출전을 관리할 경기')).toHaveValue(games[1].gameId));
     expect(await screen.findByRole('checkbox', { name: '김민재 이번 경기 출전' })).toBeChecked();
     expect(screen.queryByRole('button', { name: /등번호.*바꾸기/ })).not.toBeInTheDocument();
+  });
+  it('운영진(STAFF)이 열면 같은 목록에 "실명 (닉네임)" 으로 보인다', async () => {
+    role = 'member'; mock.setViewerRole('STAFF'); mock.setRealName('player-1', '김실명');
+    open();
+    expect(await screen.findByText('김실명 (김민재)')).toBeInTheDocument();
+    expect(screen.getByText('박서준')).toBeInTheDocument();
+  });
+  it('팀원이 아닌 운영진은 팀 경기 목록(403)을 부르지 않아 오류 안내 없이 열린 경기 명단만 본다', async () => {
+    role = 'none'; mock.setViewerRole('ADMIN');
+    let called = false;
+    server.use(http.get('*/api/v1/teams/:id/upcoming-games', () => { called = true; return HttpResponse.json({ message: '팀원만 볼 수 있어요.' }, { status: 403 }); }));
+    open();
+    await screen.findByRole('checkbox', { name: '김민재 이번 경기 출전' });
+    expect(called).toBe(false);
+    expect(screen.queryByText('경기 목록을 불러오지 못했어요')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('출전을 관리할 경기')).toHaveValue(games[0].gameId);
   });
   it('저장 실패 시 이동하지 않고 초안과 오류를 남긴다', async () => {
     server.use(http.post('*/api/v1/teams/:id/game-rosters/batch', () => HttpResponse.json({ message: '저장 실패' }, { status: 503 })));

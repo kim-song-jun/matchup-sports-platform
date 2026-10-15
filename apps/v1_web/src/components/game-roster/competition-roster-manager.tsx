@@ -30,8 +30,10 @@ export function CompetitionRosterManager(entry: Entry) {
   const team = useV1TeamDetail(teamId);
   const competition = useV1Tournament(competitionId);
   const manager = team.data?.viewer.role === 'owner' || team.data?.viewer.role === 'manager';
+  // 다가오는 경기 목록은 활성 팀원만 받는다(비회원은 403) — 운영 보드에서 "명단 보기"로 온 운영진은 열린 경기 하나만 본다.
+  const member = manager || team.data?.viewer.role === 'member';
   const matrix = useV1TeamGameRosters(teamId, { enabled: manager });
-  const upcoming = useV1TeamUpcomingGames(teamId, { enabled: !manager && Boolean(team.data) });
+  const upcoming = useV1TeamUpcomingGames(teamId, { enabled: !manager && member });
   const [tab, setTab] = useState<'players' | 'game'>(entry.gameId ? 'game' : 'players');
   const [selectedGame, setSelectedGame] = useState(entry.gameId ?? search.get('game') ?? '');
   const [pendingMove, setPendingMove] = useState<(() => void) | null>(null);

@@ -11,6 +11,8 @@ export interface GameRosterAccess {
   /** 쓰기 때 조정 기록에 남는 역할. null 이면 읽기만 한다. */
   readonly writeRole: GameRosterActorRole | null;
   readonly goalkeeperEditable?: boolean;
+  /** 대회 운영진(`canViewParticipantIdentity`)만 true — 선수 실명(`realName`)을 싣는 조건. 팀 역할·지원 계정은 아니다. */
+  readonly identityVisible?: boolean;
 }
 
 /**
@@ -50,6 +52,8 @@ export interface GameRosterPersonView {
   readonly accountLinked: boolean;
   /** 참가 명단 선수 id — 등번호 저장 API 의 `:playerId`. 리그 폴백 팀원은 참가 명단 행이 없어 null. */
   readonly participantId: string | null;
+  /** 계정 실명. 대회 운영진에게만 싣는다 — 다른 역할 응답에는 키 자체가 없다(운영 콘솔 명단 검인과 같은 규칙). */
+  readonly realName?: string;
 }
 
 export interface GameRosterView {
@@ -143,6 +147,8 @@ export interface GameRosterViewInput {
   readonly fixtureSnapshotUserIds: ReadonlySet<string> | null;
   readonly legacyLineupPending: boolean;
   readonly displayNameByUserId: ReadonlyMap<string, string>;
+  /** 계정 id → 실명. 운영진(`access.identityVisible`)에게만 채워 넘긴다. */
+  readonly realNameByUserId?: ReadonlyMap<string, string>;
   readonly jerseyRegistration: { readonly id: string; readonly editable: boolean } | null;
   readonly rosterRegistrationId?: string | null;
   /**
@@ -191,6 +197,11 @@ export function buildGameRosterView(input: GameRosterViewInput): GameRosterView 
     displayName: input.displayNameByUserId.get(userId) ?? '알 수 없음',
     role,
   });
+  // 실명은 운영진 응답에만 붙는다. 맵이 없으면 행을 그대로 두어 `realName` 키가 생기지 않는다.
+  const named = <T extends GameRosterPersonView>(row: T): T => {
+    const realName = input.realNameByUserId?.get(row.userId);
+    return realName === undefined ? row : { ...row, realName };
+  };
   const played = input.playedLineup === null ? null : playedPeople(input.playedLineup, input.base);
   const playedIds = new Set(played?.map((row) => row.userId) ?? []);
   // 시작된 경기에서 기록에 있는 사람은 그 뒤 생긴 결장·정지로 "빠짐"이 되지 않는다.
@@ -208,12 +219,12 @@ export function buildGameRosterView(input: GameRosterViewInput): GameRosterView 
   // 시작 뒤 기준 명단 = 기록 명단 + 사유가 있어 빠진 사람. 시작 뒤 참가 명단에 들어온 사람은 이 경기와 무관하다.
   const base: GameRosterView['base'] =
     played === null
-      ? input.base.map((entry) => ({ ...person(entry), status: statusByUser.get(entry.userId) ?? 'PARTICIPATING' }))
+      ? input.base.map((entry) => named({ ...person(entry), status: statusByUser.get(entry.userId) ?? 'PARTICIPATING' }))
       : [
-          ...played.map((row) => ({ ...row, status: 'PARTICIPATING' as const })),
+          ...played.map((row) => named({ ...row, status: 'PARTICIPATING' as const })),
           ...input.base.flatMap((entry) => {
             const status = statusByUser.get(entry.userId);
-            return status === undefined ? [] : [{ ...person(entry), status }];
+            return status === undefined ? [] : [named({ ...person(entry), status })];
           }),
         ].sort(byRosterOrder);
 
@@ -235,30 +246,31 @@ export function buildGameRosterView(input: GameRosterViewInput): GameRosterView 
     ...(input.rosterRegistrationId !== undefined ? { registrationId: input.rosterRegistrationId } : {}),
     jerseyEditable: input.jerseyRegistration?.editable ?? false,
     base,
-    participants: participants.map((row) => ({
-      ...row,
-      joinedAfterFixtureCreated: snapshot !== null && row.accountLinked && !snapshot.has(row.userId),
-    })),
-    excluded: excluded.map((row) => ({
-      ...person(row.entry),
-      adjustmentId: row.adjustmentId,
-      reason: row.reason,
-      excludedAt: row.createdAt,
-      actor: actor(row.actorUserId, row.actorRole),
-    })),
-    suspended: suspended.map((row) => ({
-      ...person(row.entry),
-      reason: row.reason,
-      remainingMatches: row.remainingMatches,
-    })),
-    unavailable: unavailable.map((row) => ({
-      ...person(row.entry),
-      unavailabilityId: row.unavailabilityId,
-      reason: row.reason,
-      startsAt: row.startsAt,
-      endsAt: row.endsAt,
-      actor: actor(row.actorUserId, row.actorRole),
-    })),
+    participants: participants.map((row) =>
+      named({ ...row, joinedAfterFixtureCreated: snapshot !== null && row.accountLinked && !snapshot.has(row.userId) }),
+    ),
+    excluded: excluded.map((row) =>
+      named({
+        ...person(row.entry),
+        adjustmentId: row.adjustmentId,
+        reason: row.reason,
+        excludedAt: row.createdAt,
+        actor: actor(row.actorUserId, row.actorRole),
+      }),
+    ),
+    suspended: suspended.map((row) =>
+      named({ ...person(row.entry), reason: row.reason, remainingMatches: row.remainingMatches }),
+    ),
+    unavailable: unavailable.map((row) =>
+      named({
+        ...person(row.entry),
+        unavailabilityId: row.unavailabilityId,
+        reason: row.reason,
+        startsAt: row.startsAt,
+        endsAt: row.endsAt,
+        actor: actor(row.actorUserId, row.actorRole),
+      }),
+    ),
     counts: {
       base: base.length,
       participating: participants.length,

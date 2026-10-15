@@ -70,6 +70,8 @@ export const TEAMS_ROUTES: RouteChromeEntry[] = [
       activeTab: 'teams',
       bottomNav: false,
       backHref: (p) => `/teams/${p.id}`,
+      // 데스크톱 폭은 상단 바가 숨겨져 뒤로가기가 없다 — 제목과 함께 머리글에 둔다.
+      desktopHead: true,
     },
   },
   {

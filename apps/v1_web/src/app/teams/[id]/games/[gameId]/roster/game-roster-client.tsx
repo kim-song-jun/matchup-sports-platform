@@ -32,7 +32,7 @@ import { gameRosterErrorMessage, isStaleGameRosterWrite } from '@/lib/game-roste
 import { gameRosterEditStateLabel } from '@/lib/v1-status-labels';
 import { formatExclusiveEndRangeShort, formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { draftToChanges, resetToRegistrationChanges, type GameRosterDraft } from '@/components/game-roster/game-roster-draft';
-import { compareRosterPlayers, GAME_ROSTER_SCOPE, GAME_ROSTER_TITLE, ROSTER_SAVE_LABEL } from '@/lib/roster-presentation';
+import { compareRosterPlayers, GAME_ROSTER_SCOPE, GAME_ROSTER_TITLE, ROSTER_SAVE_LABEL, rosterPersonLabel } from '@/lib/roster-presentation';
 
 type Notice = { tone: 'info' | 'error'; message: string };
 
@@ -311,7 +311,7 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
                 <li key={row.userId} style={rowItemStyle}>
                   <GameRosterPlayerRow
                     jerseyNumber={row.jerseyNumber}
-                    displayName={row.displayName}
+                    displayName={rosterPersonLabel(row)}
                     accountLinked={row.accountLinked}
                     status={playing ? 'PARTICIPATING' : 'EXCLUDED'}
                     reason={playing ? null : leaving?.reason ?? ('reason' in row ? row.reason : null)}
@@ -368,7 +368,7 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
                 <li key={row.userId} style={rowItemStyle}>
                   <GameRosterPlayerRow
                     jerseyNumber={row.jerseyNumber}
-                    displayName={row.displayName}
+                    displayName={rosterPersonLabel(row)}
                     accountLinked={row.accountLinked}
                     extraBadges={goalkeeperControl(row)}
                     status="EXCLUDED"
@@ -392,7 +392,7 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
               <li key={row.userId} style={rowItemStyle}>
                 <GameRosterPlayerRow
                   jerseyNumber={row.jerseyNumber}
-                  displayName={row.displayName}
+                  displayName={rosterPersonLabel(row)}
                   accountLinked={row.accountLinked}
                   extraBadges={goalkeeperControl(row)}
                   status="UNAVAILABLE"
@@ -416,7 +416,7 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
               <li key={row.userId} style={rowItemStyle}>
                 <GameRosterPlayerRow
                   jerseyNumber={row.jerseyNumber}
-                  displayName={row.displayName}
+                  displayName={rosterPersonLabel(row)}
                   accountLinked={row.accountLinked}
                   extraBadges={goalkeeperControl(row)}
                   status="SUSPENDED"

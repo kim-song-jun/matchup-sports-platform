@@ -44,7 +44,7 @@ Created: 2026-10-13
 - [x] 마지막 기간 종료 후 Game `LIVE`를 유지한다. 수동 경기 종료·결과 제출·공식 확인과 분리하고 공식 결과·revision·완료 알림을 자동 생성하지 않는다.
 - [x] 단위/소비자 검증에서 만료·서버 확인·수동 종료·오류·재시도와 단조로운 상태·버전 수락을 확인한다. 실제 alpha 화면 확인은 아래 별도 미완 게이트다.
 - [x] backend 36/36과 `e93` Web 영향 6개 파일 148/148 RED→GREEN 및 `e93` 독립 리뷰 C0/W0를 기록한다.
-- [ ] 최신 dev 통합본 API/Web 타입 검사와 committed diff gate를 확인한다.
+- [x] 최신 dev 통합본 API/Web 타입 검사와 committed diff gate를 확인한다.
 - [ ] 로컬 DB 통합 11개 검증을 수행한다(Docker OFF, NOT RUN).
 - [ ] dev PR·CI·머지·배포를 확인한다.
 - [ ] alpha 390/768/1440 이미지·console/network를 확인한다(NOT RUN).
@@ -88,3 +88,11 @@ Created: 2026-10-13
 | 통합 후 API/Web 타입 검사 | PENDING | 이전 base의 PASS로 대체하지 않는다 |
 | 로컬 DB 통합 11개 | NOT RUN — Docker OFF | 로컬 DB 통합 PASS 주장 없음 |
 | dev PR·CI·머지 및 실제 alpha | PENDING / alpha NOT RUN | alpha 390/768/1440 이미지·console/network 게이트는 열어 둔다 |
+
+### 2026-10-16 root 최종 통합 검증
+
+- dev `a2647c89982bfc6acfbdaa209b80f8d11601a6f2`를 일반 merge한 `249d276ea716490ef821d390548589622c7bbd0e`에서 API TypeScript `--noEmit --incremental false` 종료 코드 0, API surface PASS(687파일, 원시 단건 조회0·raw SQL32·리그 허용34·목록 표면1, 각 baseline 일치)를 확인했다. API 제품·회귀 소스는 이전 36/36 검증본과 동일하다.
+- 같은 통합본 Web 타입 검사에서 테스트의 지원하지 않는 `ByRoleOptions.exact` 옵션으로 TS2769가 실제 발생했다. `b5921e963`에서 해당 옵션 한 개만 제거했다. 설치된 Testing Library의 문자열 name matcher는 엄격한 동등 비교이고, dialog 범위·enabled·실제 명령 수·expectedVersion·재시도 검증은 유지함을 별도 독립 리뷰 C0/W0로 확인했다. 최초 타입 실패는 PASS로 바꾸어 기록하지 않는다.
+- 이 committed 수정본의 기간 만료 회귀 13/13 PASS(64.43초), Web TypeScript 종료 코드 0, Web pattern PASS를 확인했다. 이전 영향 범위 6개 파일 148/148 PASS(25.15초)와 API 36/36 PASS(23.828초)는 동일 제품 소스의 기존 근거로 재사용하며 새 실행으로 표기하지 않는다. 실제 로그 `mdqa142-249-api-tsc.log`, `mdqa142-249-api-surface.log`, `mdqa142-role-type-expiry-green.log`, `mdqa142-role-type-web-tsc.log`, `mdqa142-role-type-pattern.log`를 root git 제외 QA 증거에 보존한다.
+- 독립 API·frontend·문서 리뷰 및 테스트 타입 수정 재리뷰 C0/W0. 최종 PR 범위 23개 파일, diff/check·신규 debt marker·미추적 앱 import 검수를 게시 직전 최신 dev와 함께 확인한다.
+- DB 통합 11개는 Docker OFF로 NOT RUN, 최신 PR CI·정식 리뷰·머지·배포 및 alpha 390/768/1440·console/network·이미지는 대기다. 인증 IAB의 대상 화면 이동·캡처·새 탭 제어 오류는 도구 접근 차단으로 분리하며 앱 실패나 권한 거부로 단정하지 않는다. 최종 기간 `ENDED`와 Game `LIVE` 및 수동 결과 후속 계약은 그대로다.

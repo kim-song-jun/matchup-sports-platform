@@ -1,7 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import { createHash } from 'node:crypto';
 import type { SetupServerApi } from 'msw/node';
-import type { V1GameResultRevision } from '@/types/api';
+import type { V1GameResultRevision, V1GameRevisionMutationResult } from '@/types/api';
 import type { GameDetail } from '@/types/game-operations';
 
 const API = 'http://localhost/api/v1';
@@ -77,13 +77,19 @@ export function createFixture(server: SetupServerApi) {
       if (params.command === 'end') {
         const now = new Date().toISOString();
         game = { ...game, state: 'ENDED', version: game.version + 1 };
-        resultRevisions.push({
+        const revision: V1GameResultRevision = {
           id: 'result-expiry', gameId: game.id, revision: 1, state: 'SUBMITTED', score: { home: 0, away: 0 }, goalEvents: [],
           eventsHash: createHash('sha256').update('[]').digest('hex'), missingScorer: false, mvpParticipantId: null, reason: null,
           outcomeReason: 'NORMAL', outcomeNote: null, createdByActorType: 'USER', createdByUserId: 'operator-expiry',
           createdByName: null, createdBySystemActor: null, supersedesId: null, submittedAt: now, officialAt: null,
           createdAt: now, updatedAt: now, resultParticipants: [],
-        });
+        };
+        resultRevisions.push(revision);
+        const result: V1GameRevisionMutationResult = {
+          gameId: game.id, state: game.state, version: game.version, durableCommandId: 'period-command', replayed: false,
+          revisionId: revision.id, revision: revision.revision, revisionState: revision.state,
+        };
+        return success(result);
       }
       return success({ gameId: game.id, state: game.state, version: game.version, durableCommandId: 'period-command', replayed: false });
     }),

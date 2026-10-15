@@ -87,6 +87,7 @@ export function resetMobileEditorFixture() {
     })),
     http.get(`*/api/v1/admin/tournaments/${MOBILE_LEAGUE_ID}/registrations`, () => success({ items: [], truncated: false })),
     http.get(`*/api/v1/tournament-ops/tournaments/${MOBILE_LEAGUE_ID}/fields`, () => success({ items: [] })),
+    http.get(`*/api/v1/tournament-ops/tournaments/${MOBILE_LEAGUE_ID}/staff`, () => success({ items: [] })),
     http.get('*/api/v1/teams', () => success({ items: [], pageInfo: { hasNextPage: false, nextCursor: null } })),
     http.get('*/api/v1/public/integrations/kakao-maps-key', () => success({ kakaoMapsJsKey: null })),
     http.post(`*/api/v1/admin/league-matches/${MOBILE_LEAGUE_ID}/fixtures/template`, async ({ request }) => {

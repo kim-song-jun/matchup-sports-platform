@@ -3,16 +3,18 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { __resetNavigationHistoryForTests } from '@/lib/navigation-history';
 import { __resetOverlayHistoryForTests } from '@/lib/overlay-history';
+import { v1Keys } from '@/lib/query-keys';
 import { installViewport, resizeViewport } from '@/test/viewport';
 import { makeGame } from '@/test/bracket-canvas-fixtures';
-import LeagueMatchFixturesClient from './league-match-fixtures-client';
+import AdminLeagueDetailLayout from './layout';
+import AdminLeagueSchedulePage from './schedule/page';
 import {
   MOBILE_FIXTURE_ID, MOBILE_LEAGUE_ID, mobileEditorFixture, mobileEditorServer,
   mobileFixture, mobileLeague, resetMobileEditorFixture,
 } from './league-mobile-editor.fixtures';
 
 vi.mock('next/navigation', () => ({
-  usePathname: () => '/admin/league-matches/synthetic-mobile-league-138',
+  usePathname: () => '/admin/league-matches/synthetic-mobile-league-138/schedule',
   useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
 }));
@@ -44,9 +46,16 @@ afterEach(() => {
 async function renderMobileConsumer() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   clients.push(client);
-  render(<QueryClientProvider client={client}><LeagueMatchFixturesClient leagueId={MOBILE_LEAGUE_ID} /></QueryClientProvider>);
+  // 헤더·권한은 공통 셸, 일정은 하위 페이지가 소유하므로 실제 route 조합을 함께 검증해요.
+  const params = Promise.resolve({ leagueId: MOBILE_LEAGUE_ID });
+  const route = await AdminLeagueDetailLayout({
+    params,
+    children: await AdminLeagueSchedulePage({ params, searchParams: Promise.resolve({}) }),
+  });
+  render(<QueryClientProvider client={client}>{route}</QueryClientProvider>);
   await screen.findByRole('heading', { level: 1, name: '합성 모바일 리그' });
-  await screen.findByRole('button', { name: '상태 변경' });
+  await waitFor(() => expect(client.getQueryState(v1Keys.adminMe())?.status).toBe('success'));
+  if (mobileEditorFixture.canWrite) await screen.findByRole('button', { name: '상태 변경' });
 }
 
 async function openMobileSchedule() {
@@ -211,9 +220,9 @@ describe('MD-QA #138 초기 모바일 consumer → 실제 편집 → HTTP 저장
       ...mobileLeague([mobileFixture({ resultStage: 'official', gameState: 'ENDED', game: recordedOfficialGame })]),
       state: 'completed',
     };
-    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    clients.push(client);
-    render(<QueryClientProvider client={client}><LeagueMatchFixturesClient leagueId={MOBILE_LEAGUE_ID} /></QueryClientProvider>);
+    await renderMobileConsumer();
+    expect(screen.queryByRole('button', { name: '상태 변경' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '공개로 전환' })).toBeDisabled();
     // When
     fireEvent.click(await screen.findByRole('button', { name: /모바일 리그 1주차/ }));
     // Then

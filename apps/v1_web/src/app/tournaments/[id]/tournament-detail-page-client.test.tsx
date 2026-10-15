@@ -402,7 +402,7 @@ describe('TournamentDetailPageClient — 우리 팀 참가 카드(Task 180 R-1 A
     const title = await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
     const heading = await screen.findByRole('heading', { level: 2, name: '우리 팀 참가' });
     expect(title.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.getByRole('link', { name: '마포 FC 참가 명단 수정하기' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: '마포 FC 참가 선수 관리' })).toHaveAttribute(
       'href',
       `/tournaments/tournament-1/registrations/reg-1/roster?from=${encodeURIComponent('/tournaments/tournament-1')}`,
     );

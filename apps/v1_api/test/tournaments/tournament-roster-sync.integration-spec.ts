@@ -152,12 +152,13 @@ describe('대회 참가 명단 → 시작 전 대진 경기 명단 동기화', (
     await service.updatePlayerRosterSettings(f.captain, f.tournament.id, f.registration.id, player.id, { goalkeeper: true, jerseyNumber: 0 });
     await drain();
     const startedLineup = await latestLineup(f.game.id, f.side.id);
-    expect((await participantsOf(startedLineup.id)).find(row => row.userId === player.userId)).toMatchObject({ jerseyNumber: 0, position: 'GK' });
+    // GK 포지션은 종목 설정의 골키퍼 코드다 — 풋살은 'GK' 가 아니라 'GOLEIRO'.
+    expect((await participantsOf(startedLineup.id)).find(row => row.userId === player.userId)).toMatchObject({ jerseyNumber: 0, position: 'GOLEIRO' });
     await prisma.v1Game.update({ where: { id: f.game.id }, data: { state: 'LIVE' } });
     await service.updatePlayerRosterSettings(f.captain, f.tournament.id, f.registration.id, player.id, { goalkeeper: false, jerseyNumber: 9 });
     await drain();
     expect((await latestLineup(f.game.id, f.side.id)).id).toBe(startedLineup.id);
-    expect((await participantsOf(startedLineup.id)).find(row => row.userId === player.userId)).toMatchObject({ jerseyNumber: 0, position: 'GK' });
+    expect((await participantsOf(startedLineup.id)).find(row => row.userId === player.userId)).toMatchObject({ jerseyNumber: 0, position: 'GOLEIRO' });
     expect(await prisma.v1TournamentPlayer.findUniqueOrThrow({ where: { id: player.id } })).toMatchObject({ goalkeeper: false, jerseyNumber: 9 });
   });
 

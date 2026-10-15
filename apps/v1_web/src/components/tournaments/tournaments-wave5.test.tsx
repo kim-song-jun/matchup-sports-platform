@@ -249,7 +249,8 @@ describe('로스터 — 화면당 primary CTA 1개', () => {
   it('행 수정을 열면 헤더는 outline, 그 행의 "저장"만 primary 다', () => {
     renderRoster();
 
-    fireEvent.click(screen.getByRole('button', { name: '홍길동 수정' }));
+    // 목록은 경기 명단과 같은 공개 이름(닉네임)으로 부른다 — 등록 실명은 행 아래 보조 정보다.
+    fireEvent.click(screen.getByRole('button', { name: '길동이 수정' }));
 
     const save = screen.getByRole('button', { name: '저장' });
     expect(save).toHaveClass('tm-btn-primary');
@@ -260,7 +261,7 @@ describe('로스터 — 화면당 primary CTA 1개', () => {
   it('추가 칸과 행 편집이 동시에 열려도 primary 는 하나(추가 칸)뿐이다', () => {
     renderRoster();
 
-    fireEvent.click(screen.getByRole('button', { name: '홍길동 수정' }));
+    fireEvent.click(screen.getByRole('button', { name: '길동이 수정' }));
     fireEvent.click(screen.getByRole('button', { name: '선수 추가' }));
 
     expect(primaryButtons()).toHaveLength(1);

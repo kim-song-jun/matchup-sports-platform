@@ -1,5 +1,7 @@
 import { http, HttpResponse } from 'msw';
+import { createHash } from 'node:crypto';
 import type { SetupServerApi } from 'msw/node';
+import type { V1GameResultRevision } from '@/types/api';
 import type { GameDetail } from '@/types/game-operations';
 
 const API = 'http://localhost/api/v1';
@@ -22,6 +24,7 @@ export function createFixture(server: SetupServerApi) {
   let commandError = false;
   let heldRead: { readonly started: () => void; readonly wait: Promise<void>; readonly responded: () => void; readonly beforeResponse: (() => void) | undefined } | null = null;
   const commands: { readonly command: string; readonly body: unknown }[] = [];
+  const resultRevisions: V1GameResultRevision[] = [];
   const handlers = new Map<string, (payload: unknown) => void>();
   const socket = {
     connected: true,
@@ -51,6 +54,9 @@ export function createFixture(server: SetupServerApi) {
     http.get(`${API}/auth/me`, () => success({ user: { id: 'operator-expiry' } })),
     http.get(`${API}/me/tournament-staff`, () => success({ platformRole: null, items: [] })),
     http.get(`${API}/tournament-ops/tournaments/t-expiry/fixtures/:fixtureId/lineup`, ({ params }) => success({ gameId: params.fixtureId === 'f-other' ? otherGame.id : game.id, lineups: [] })),
+    http.get(`${API}/games/game-expiry/result-revisions`, () => success(resultRevisions)),
+    http.get(`${API}/games/game-expiry/lineups`, () => success([])),
+    http.get(`${API}/games/game-expiry/events`, () => success({ events: [], lastSequence: 0, gap: null })),
     http.get(`${API}/games/:gameId`, async ({ params }) => {
       if (params.gameId === otherGame.id) return success(otherGame);
       if (params.gameId !== game.id) return failure(404, '경기를 찾지 못했어요.');
@@ -68,12 +74,23 @@ export function createFixture(server: SetupServerApi) {
       if (!('expectedVersion' in body) || body.expectedVersion !== game.version) return failure(409, '경기 버전이 달라요.');
       if (commandError) return failure(503, '종료 요청의 응답을 확인하지 못했어요.');
       if (params.command === 'end-period') endPeriod();
+      if (params.command === 'end') {
+        const now = new Date().toISOString();
+        game = { ...game, state: 'ENDED', version: game.version + 1 };
+        resultRevisions.push({
+          id: 'result-expiry', gameId: game.id, revision: 1, state: 'SUBMITTED', score: { home: 0, away: 0 }, goalEvents: [],
+          eventsHash: createHash('sha256').update('[]').digest('hex'), missingScorer: false, mvpParticipantId: null, reason: null,
+          outcomeReason: 'NORMAL', outcomeNote: null, createdByActorType: 'USER', createdByUserId: 'operator-expiry',
+          createdByName: null, createdBySystemActor: null, supersedesId: null, submittedAt: now, officialAt: null,
+          createdAt: now, updatedAt: now, resultParticipants: [],
+        });
+      }
       return success({ gameId: game.id, state: game.state, version: game.version, durableCommandId: 'period-command', replayed: false });
     }),
     http.post('*/api/v1/logs/client-error', () => success({ id: 'test-error' })),
   );
   return {
-    socket, commands, endPeriod,
+    socket, commands, endPeriod, resultRevisions,
     get reads() { return reads; },
     setReadError(value: boolean) { readError = value; },
     setCommandError(value: boolean) { commandError = value; },

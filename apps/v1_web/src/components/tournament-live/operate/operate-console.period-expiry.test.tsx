@@ -41,10 +41,17 @@ async function tick(milliseconds: number) {
 async function requestManualEnd(label = '정규 시간 종료', diagnostic?: () => unknown) {
   const sentBefore = fixture.commands.length;
   fireEvent.click(screen.getByRole('button', { name: label }));
-  const dialog = await screen.findByRole('dialog');
-  fireEvent.click(within(dialog).getByRole('button', { name: label }));
-  await waitForOverlayHistory();
-  await waitFor(() => expect(fixture.commands, JSON.stringify({ message: '확인 뒤 실제 HTTP 명령이 나가야 해요.', diagnostic: diagnostic?.() })).toHaveLength(sentBefore + 1), { timeout: 2_000 });
+  const dialog = await screen.findByRole('dialog', { name: label === '경기 종료' ? '경기를 종료할까요?' : `${label}할까요?` });
+  const confirmButton = within(dialog).getByRole('button', { name: label, exact: true });
+  expect(confirmButton).toBeEnabled();
+  await act(async () => {
+    fireEvent.click(confirmButton);
+    await waitForOverlayHistory();
+  });
+  await waitFor(() => expect(fixture.commands).toHaveLength(sentBefore + 1), {
+    timeout: 2_000,
+    onTimeout: (error) => new Error(`${error.message}\n${JSON.stringify({ commands: fixture.commands, diagnostic: diagnostic?.() })}`),
+  });
 }
 
 async function holdWorkerRead(beforeResponse?: () => void) {
@@ -202,6 +209,10 @@ describe('OperateConsole — 서버가 확정하는 기간 시간 만료', () =>
       statuses: screen.queryAllByRole('status').map((element) => element.textContent),
     }));
     expect(fixture.commands[0]?.body).toMatchObject({ expectedVersion: 6 });
+    expect(fixture.commands.map(({ command }) => command)).toEqual(['end']);
+    expect(await screen.findByRole('region', { name: '결과 확정' })).toBeInTheDocument();
+    expect(queryClient.getQueryData<GameDetail>(v1Keys.game('game-expiry'))).toMatchObject({ state: 'ENDED', version: 7, currentOfficialRevisionId: null });
+    expect(fixture.resultRevisions).toMatchObject([{ state: 'SUBMITTED', officialAt: null }]);
   });
 
   it('열려 있는 일시정지 구간은 플레이 시간이나 만료 확인 요청을 늘리지 않아요', async () => {

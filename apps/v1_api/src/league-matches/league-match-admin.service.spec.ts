@@ -128,6 +128,9 @@ function createFake() {
       // 두면 서비스가 `LEAGUE_STATE_BY_STATUS[undefined]` 를 읽어 조용히 통과한다.
       findFirst: track('v1Tournament.findFirst', async () => ({
         id: 'league-1',
+        kind: 'regular_league',
+        teamCount: 8,
+        maxTeams: null,
         title: '테스트 리그',
         sportId: 'sport-futsal',
         regionId: 'region-1',
@@ -258,7 +261,9 @@ function createFake() {
           return [];
         },
       ),
-      count: track('v1TournamentRegistration.count', async (args: { where: { teamId?: string | { not: string } } }) => {
+      count: track('v1TournamentRegistration.count', async (args: { where: { teamId?: string | { not: string }; status?: string | { in: readonly string[] } } }) => {
+        // This fake stores confirmed roster registrations only; payment-stage predicates match none.
+        if (typeof args.where.status === 'object' && !args.where.status.in.includes('confirmed')) return 0;
         const teamId = args.where.teamId;
         if (typeof teamId === 'string') return state.registeredTeamIds.has(teamId) ? 1 : 0;
         if (teamId !== undefined) {
@@ -1008,6 +1013,7 @@ describe('LeagueMatchAdminService.addTeam — 형제 티어 중복 게이트', (
 
   function makePrisma(siblingLeague: { tier: number | null } | null) {
     const prisma: any = {
+      $queryRaw: jest.fn().mockResolvedValue([]),
       // BE-5: 리그 조회와 형제 티어 조회가 둘 다 통합 축(`v1Tournament.findFirst`)으로
       // 옮겨졌다. **호출 순서로 구분하지 않는다** — 경로마다 호출 횟수가 달라서 순서 기반
       // mock 은 다른 케이스에서 조용히 어긋난다. `where` 모양으로 가른다:
@@ -1025,6 +1031,7 @@ describe('LeagueMatchAdminService.addTeam — 형제 티어 중복 게이트', (
             scheduledAt: new Date('2026-09-05T00:00:00.000Z'),
             scheduledEndAt: new Date('2026-11-05T00:00:00.000Z'),
             status: 'draft',
+            kind: 'regular_league', teamCount: 8, maxTeams: null,
             registrationDeadlineAt: null,
             seriesId: SERIES_ID,
             seasonNo: 1,
@@ -1041,6 +1048,10 @@ describe('LeagueMatchAdminService.addTeam — 형제 티어 중복 게이트', (
       // 로스터와 짝이 되는 confirmed 등록(BE-3 ⑤) — `V1Team.ownerUserId` 를 읽는다.
       v1TournamentRegistration: {
         upsert: jest.fn().mockResolvedValue({}),
+        findUnique: jest.fn(async (args: { where: { tournamentId_teamId: { teamId: string } } }) =>
+          args.where.tournamentId_teamId.teamId === 'team-a' ? { id: 'reg-team-a' } : null,
+        ),
+        count: jest.fn().mockResolvedValue(1),
         // `findLeagueAdmissionBlocker` 가 "이미 이 리그에 있나" 를 여기로 본다(BE-5 이후
         // confirmed 등록 기준). 로스터를 **실제로 반영해야** 한다 — 무조건 null 을 주면
         // 중복 게이트가 항상 통과해서 ALREADY_IN_LEAGUE 를 지워도 green 이 된다.
@@ -1601,7 +1612,11 @@ describe('LeagueMatchAdminService.detail — 참가비·대표 이미지 필드'
       v1TeamMatch: { findMany: jest.fn().mockResolvedValue([]) },
       v1TournamentSlot: { findMany: jest.fn().mockResolvedValue([]) },
       v1GameOfficialFact: { findMany: jest.fn().mockResolvedValue([]) },
-      v1TournamentRegistration: { count: jest.fn().mockResolvedValue(activeCount) },
+      v1TournamentRegistration: {
+        // This fixture has no payment-stage registrations. Operational applied counts are a separate population.
+        count: jest.fn(async ({ where }: { where: Prisma.V1TournamentRegistrationWhereInput }) =>
+          where.OR === undefined ? 0 : activeCount),
+      },
     };
     const service = new LeagueMatchAdminService(
       prisma as never,
@@ -1645,7 +1660,10 @@ describe('LeagueMatchAdminService.detail — 참가비·대표 이미지 필드'
   it('활성 신청 수는 팀이 직접 낸 신청만 센다 — 운영자가 넣은 로스터(seeded·promoted)와 draft·cancelled 는 제외한다', async () => {
     const { prisma } = await detailOf({}, 1);
     // 필터 의미는 league-active-registration.spec.ts 가 행 단위로 검증한다 — 여기서는 그 단일 정의를 쓰는지만 본다.
-    expect(prisma.v1TournamentRegistration.count.mock.calls[0][0]).toEqual({ where: leagueActiveRegistrationWhere('league-1') });
+    expect(prisma.v1TournamentRegistration.count).toHaveBeenCalledWith({ where: leagueActiveRegistrationWhere('league-1') });
+    expect(prisma.v1TournamentRegistration.count).toHaveBeenCalledWith({ where: {
+      tournamentId: 'league-1', status: { in: ['awaiting_payment', 'payment_checking', 'paid'] },
+    } });
   });
 });
 

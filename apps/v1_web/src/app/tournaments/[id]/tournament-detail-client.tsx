@@ -218,14 +218,6 @@ function formatPublishedAt(dateStr: string): string {
   return `${month}월 ${day}일`;
 }
 
-function getPendingPaymentCount(tournament: Pick<V1TournamentDetail, 'pendingPaymentCount'>): number {
-  return Math.max(0, tournament.pendingPaymentCount ?? 0);
-}
-
-function getReservedTeamCount(tournament: Pick<V1TournamentDetail, 'confirmedCount' | 'pendingPaymentCount' | 'teamCount'>): number {
-  return Math.min(tournament.teamCount, tournament.confirmedCount + getPendingPaymentCount(tournament));
-}
-
 function CapacityProgressBar({
   confirmedCount,
   pendingPaymentCount,
@@ -605,42 +597,13 @@ export function TournamentDetailView({
     ? tournament.status !== 'completed' && tournament.status !== 'cancelled'
     : tournament.status === 'open';
   const isCompleted = tournament.status === 'completed';
-  const pendingPaymentCount = getPendingPaymentCount(tournament);
-  const reservedTeamCount = getReservedTeamCount(tournament);
-  /**
-   * **정원·참가비는 대회에만 그린다.**
-   *
-   * 리그에는 정원 개념이 없다 — `V1League` 모델에 `max`·`capacity` 계열 필드가 아예 없다.
-   * 그런데 거울 행은 `v1_tournaments` 에 살고 `team_count` 가 `@default(8)` 이라, 그대로
-   * 그리면 **참여할 방법이 없는 리그에 "정원 2/8팀 아직 6자리 남았어요" 가 뜬다**
-   * (alpha 실측 — #898 로 이 화면을 연 뒤 실제로 그랬다).
-   *
-   * ⚠️ **타입이 아니라 분기로 닫는다.** 상세 타입(`V1TournamentDetail.teamCount`)을
-   * optional 로 바꾸면 `my`·`apply`·`bracket` 등 **리그가 도달할 수 없는 화면 5개 20곳**이
-   * 함께 열린다(실측). 그 셋은 리그와 무관하고, 거기서 undefined 처리를 새로 짜는 것은
-   * 이 결함과 관계없는 작업이다. 목록은 리그가 섞여 들어오는 게 목적이라 타입으로 막았고,
-   * 상세는 리그 분기가 이미 있어 그 분기로 닫는다 — **판단 기준은 도달 가능성이다.**
-   *
-   * 분기는 기억에 의존하므로 **테스트로 못박는다**(`tournament-detail-client.test.ts`).
-   */
-  /**
-   * **여기서는 `isLeagueCompetition` 을 쓰면 안 된다.**
-   * ```
-   * 리그 방식 대회   format='league'  kind='regular_tournament'   ← 진짜 대회다. 정원·참가비 있다
-   * 정규 리그 시즌   kind='regular_league'                        ← 거울 행. 둘 다 없다
-   * ```
-   * `isLeagueCompetition` 은 위 둘을 **모두** true 로 준다(`format==='league' || kind===…`).
-   * 그 판정은 *"어떻게 치르나"* 를 물을 때 맞다 — 순위표를 그릴지, 대진표 대신 리그 일정을
-   * 보여줄지는 리그 방식 대회에도 같이 적용된다. 하지만 *"정원 개념이 있나"* 는 **무엇인가**의
-   * 질문이라 `kind` 만 봐야 한다. 섞으면 alpha 의 리그 방식 대회 7건이 신청 정원을 잃는다
-   * (실제로 이 스펙이 red 로 잡았다).
-   *
-   * 목록 카드는 같은 질문에 **필드 유무**(`teamCount === undefined`)로 답한다 — 서버가
-   * `kind === 'regular_league'` 일 때만 생략하므로 결과가 같고, 거기서는 타입이 계산까지
-   * 막아 준다.
-   */
+  const capacity = resolveTournamentCapacity(tournament);
+  const teamCapacity = capacity.teamCount;
+  const pendingPaymentCount = capacity.pendingPaymentCount;
+  const reservedTeamCount = capacity.reservedCount;
+  // kind에 따라 리그 maxTeams와 대회 teamCount를 고르며, 무제한 리그에 거울 정원을 노출하지 않아요.
   const isLeagueMirror = tournament.kind === 'regular_league';
-  const showsCapacity = !isLeagueMirror;
+  const showsCapacity = teamCapacity !== null;
   /* 리그는 운영자가 참가비를 확정했을 때만 그린다(0원 '무료 확정' 포함). 미설정 리그의
      `entry_fee` 는 `@default(0)` 이라 그리면 사실이 아닌 "무료" 가 뜬다. */
   const showsEntryFee = !isLeagueMirror || tournament.entryFeeConfigured;
@@ -856,7 +819,7 @@ export function TournamentDetailView({
         {/* 핵심 정보 — 하나의 카드로 통합(기존: 틴트 3카드 + 별도 info 카드로 분산).
             일정·정원·참가비는 데스크탑 우측 sticky 레일과 중복되어 모바일 전용(tm-hide-desktop). */}
         <Card pad={0}>
-          {/* 정원 진행 + 잔여 (모바일 전용) — 리그는 정원 개념이 없어 통째로 안 그린다 */}
+          {/* 유한한 참가팀 정원의 진행과 잔여 자리 (모바일 전용) */}
           {showsCapacity ? (
           <div className="tm-hide-desktop" style={{ padding: '16px 16px', borderBottom: '1px solid var(--grey100)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
@@ -866,13 +829,13 @@ export function TournamentDetailView({
                 <span className="tab-num" style={{ fontSize: 'var(--font-size-body-lg)', fontWeight: 700, color: 'var(--text-strong)' }}>
                   {reservedTeamCount}
                 </span>
-                <span style={{ fontSize: 'var(--font-size-label)', color: 'var(--text-muted)', fontWeight: 500 }}>/{tournament.teamCount}팀</span>
+                <span style={{ fontSize: 'var(--font-size-label)', color: 'var(--text-muted)', fontWeight: 500 }}>/{teamCapacity}팀</span>
               </span>
             </div>
             <CapacityProgressBar
               confirmedCount={tournament.confirmedCount}
               pendingPaymentCount={pendingPaymentCount}
-              teamCount={tournament.teamCount}
+              teamCount={teamCapacity}
               isFreeEntry={tournament.entryFee === 0}
             />
             {pendingPaymentCount > 0 ? (
@@ -882,7 +845,7 @@ export function TournamentDetailView({
               </div>
             ) : null}
             {(() => {
-              const remaining = tournament.teamCount - reservedTeamCount;
+              const remaining = Math.max(0, teamCapacity - reservedTeamCount);
               if (remaining <= 0) {
                 return <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 8 }}>정원이 가득 찼어요</div>;
               }
@@ -891,7 +854,7 @@ export function TournamentDetailView({
               if (registrationBlock === 'deadline_passed') {
                 return <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 8 }}>신청이 마감됐어요</div>;
               }
-              const pct = Math.round((reservedTeamCount / Math.max(tournament.teamCount, 1)) * 100);
+              const pct = Math.round((reservedTeamCount / Math.max(teamCapacity, 1)) * 100);
               const almostFull = pct >= 80;
               return (
                 <div className="tm-text-caption" style={{ color: almostFull ? 'var(--orange700)' : 'var(--text-muted)', marginTop: 8 }}>
@@ -937,7 +900,7 @@ export function TournamentDetailView({
       <TournamentParticipantSection
         teams={tournament.participantTeams}
         fromHref={participantFrom}
-        teamCount={showsCapacity ? tournament.teamCount : null}
+        teamCount={teamCapacity}
         status={tournament.status}
         confirmedCount={tournament.confirmedCount}
       />
@@ -990,6 +953,7 @@ export function TournamentDetailView({
   /* ── Left column body content (completed — TARGET §1~6 축약 레이아웃) ──
      헤더 → 결과 히어로 → 액션 리스트 → 참가팀 → 기본정보·상금 → (협찬) → 아코디언(규정/환불/유의사항).
      신청 안내·진행 방식·인라인 조별순위/일정·결선 대진표는 완료 상세에서 제거(중복 해소, 스크롤 감소). ── */
+  const completedVenueAddress = tournament.venueAddress?.trim();
   const completedLeftContent = (
     <>
       <section aria-label="대회 기본 정보" style={{ marginTop: 20 }}>
@@ -1011,7 +975,7 @@ export function TournamentDetailView({
       <TournamentParticipantSection
         teams={tournament.participantTeams}
         fromHref={participantFrom}
-        teamCount={showsCapacity ? tournament.teamCount : null}
+        teamCount={teamCapacity}
         status={tournament.status}
         confirmedCount={tournament.confirmedCount}
       />
@@ -1027,7 +991,7 @@ export function TournamentDetailView({
             label="참가팀"
             value={
               showsCapacity
-                ? `${tournament.confirmedCount}/${tournament.teamCount}팀 확정`
+                ? `${tournament.confirmedCount}/${teamCapacity}팀 확정`
                 : `${tournament.confirmedCount}팀 참가`
             }
           />
@@ -1035,6 +999,7 @@ export function TournamentDetailView({
           {tournament.venue ? (
             <InfoRow label="장소" value={tournament.venue} />
           ) : null}
+          {completedVenueAddress ? <InfoRow label="주소" value={completedVenueAddress} /> : null}
           <InfoRow
             label="선수단 규모"
             value={rosterLimitText(tournament.minPlayers, tournament.maxPlayers, (min, max) => `팀당 ${min}~${max}명`)}
@@ -1180,7 +1145,7 @@ export function TournamentDetailView({
   /* ── Desktop right-rail CTA card ── */
   const railCTA = isOpen ? (
     isLeagueMirror ? (
-      hasActiveRegistration ? null : (
+      hasActiveRegistration && !showsCapacity ? null : (
       <aside className="tm-tournament-rail tm-show-desktop" role="complementary" aria-label="리그 참가 신청">
         <div className="tm-text-label" style={{ color: 'var(--text-strong)', marginBottom: 2 }}>
           {hasActiveRegistration ? '내 리그 신청' : '리그 참가 신청'}
@@ -1190,7 +1155,23 @@ export function TournamentDetailView({
             신청 마감 {formatTournamentDateTimeLong(tournament.registrationDeadlineAt)}
           </div>
         ) : null}
-        <ApplyCTAButtons tournament={tournament} blockReason={registrationBlock} myRegistration={myRegistration} />
+        {showsCapacity ? (
+          <div style={{ marginBlock: 'var(--spacing-3)' }}>
+            <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>
+              정원 {reservedTeamCount}/{teamCapacity}팀
+              {pendingPaymentCount > 0
+                ? ` · 확정 ${capacity.confirmedCount}팀 · ${pendingCapacityLabel(tournament.entryFee === 0)} ${pendingPaymentCount}팀`
+                : ''}
+            </div>
+            <CapacityProgressBar
+              confirmedCount={capacity.confirmedCount}
+              pendingPaymentCount={pendingPaymentCount}
+              teamCount={teamCapacity}
+              isFreeEntry={tournament.entryFee === 0}
+            />
+          </div>
+        ) : null}
+        {!hasActiveRegistration ? <ApplyCTAButtons tournament={tournament} blockReason={registrationBlock} myRegistration={myRegistration} /> : null}
       </aside>
       )
     ) : (
@@ -1206,18 +1187,18 @@ export function TournamentDetailView({
           {hasActiveRegistration ? '참가 현황' : '참가 신청'}
         </div>
         <div className="tm-text-caption" style={{ color: 'var(--text-caption)', marginBottom: 12 }}>
-          {tournament.confirmedCount}/{tournament.teamCount}팀 확정
+          {tournament.confirmedCount}/{teamCapacity}팀 확정
           {pendingPaymentCount > 0
             ? ` · ${pendingCapacityLabel(tournament.entryFee === 0)} ${pendingPaymentCount}팀`
             : ''}
         </div>
-        <CapacityProgressBar
+        {showsCapacity ? <CapacityProgressBar
           confirmedCount={tournament.confirmedCount}
           pendingPaymentCount={pendingPaymentCount}
-          teamCount={tournament.teamCount}
+          teamCount={teamCapacity}
           height={6}
           isFreeEntry={tournament.entryFee === 0}
-        />
+        /> : null}
         {hasActiveRegistration ? null : (
           <div style={{ marginTop: 20 }}>
             <ApplyCTAButtons tournament={tournament} blockReason={registrationBlock} myRegistration={myRegistration} />
@@ -1248,7 +1229,7 @@ export function TournamentDetailView({
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>정원</span>
             <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>
-              {reservedTeamCount}/{tournament.teamCount}팀
+              {reservedTeamCount}/{teamCapacity}팀
             </span>
           </div>
         ) : null}
@@ -1290,16 +1271,13 @@ export function TournamentDetailView({
           <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>{formatTournamentDateRangeWithTime(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정'}</span>
         </div>
         <ScheduleNoticeCaption style={{ marginTop: 0 }} />
-        {/* **리그가 실제로 닿는 레일은 여기(in_progress)다.** 위 `open` 레일은 리그가
-            도달하지 못한다(거울 status 에 `open` 이 없다) — 진행 중인 리그에 "정원 2/8팀 ·
-            참가비 무료" 가 뜨던 자리가 이쪽이다. */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>
             {showsCapacity ? '정원' : '참가팀'}
           </span>
           <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>
             {showsCapacity
-              ? `${tournament.confirmedCount}/${tournament.teamCount}팀`
+              ? `${reservedTeamCount}/${teamCapacity}팀`
               : `${tournament.confirmedCount}팀`}
           </span>
         </div>
@@ -1344,8 +1322,8 @@ export function TournamentDetailView({
         </div>
         <ScheduleNoticeCaption style={{ marginTop: 0 }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>정원</span>
-          <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>{tournament.confirmedCount}/{tournament.teamCount}팀</span>
+          <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>{showsCapacity ? '정원' : '참가팀'}</span>
+          <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>{showsCapacity ? `${reservedTeamCount}/${teamCapacity}팀` : `${tournament.confirmedCount}팀`}</span>
         </div>
       </div>
     </aside>
@@ -1376,8 +1354,8 @@ export function TournamentDetailView({
         </div>
         <ScheduleNoticeCaption style={{ marginTop: 0 }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>정원</span>
-          <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>{tournament.confirmedCount}/{tournament.teamCount}팀</span>
+          <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>{showsCapacity ? '정원' : '참가팀'}</span>
+          <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>{showsCapacity ? `${reservedTeamCount}/${teamCapacity}팀` : `${tournament.confirmedCount}팀`}</span>
         </div>
       </div>
     </aside>

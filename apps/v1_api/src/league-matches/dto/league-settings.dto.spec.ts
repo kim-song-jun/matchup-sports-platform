@@ -24,3 +24,29 @@ describe('리그 수정 HTTP DTO', () => {
     await expect(parse({ ...body, ...changes })).rejects.toThrow();
   });
 });
+
+describe('UpdateLeagueSettingsDto team capacity through the HTTP validation pipe', () => {
+  it('accepts an omitted team capacity without inventing a limit', async () => {
+    const dto = await parse(body);
+
+    expect(dto.maxTeams).toBeUndefined();
+  });
+
+  it('preserves explicit null for unlimited team capacity', async () => {
+    await expect(parse({ ...body, maxTeams: null })).resolves.toMatchObject({ maxTeams: null });
+  });
+
+  it.each([1, 2, 21, 51, 2147483647])('accepts positive integer team capacity %p without a roster or template cap', async (maxTeams) => {
+    await expect(parse({ ...body, maxTeams })).resolves.toMatchObject({ maxTeams });
+  });
+
+  it.each([0, -1, 1.5, '3', true, false, 2147483648])('rejects invalid team capacity %p without coercion', async (maxTeams) => {
+    await expect(parse({ ...body, maxTeams })).rejects.toMatchObject({
+      status: 400,
+      response: {
+        code: 'VALIDATION_ERROR',
+        details: expect.arrayContaining([expect.objectContaining({ field: 'maxTeams' })]),
+      },
+    });
+  });
+});

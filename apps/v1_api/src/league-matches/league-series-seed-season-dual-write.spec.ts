@@ -15,7 +15,13 @@ const SERIES_ID = 'series-1';
 const ADMIN_ID = 'admin-1';
 
 function makeHarness() {
-  const tournamentCreate = jest.fn(async (args: { data: Record<string, unknown> }) => args.data);
+  const leagues = new Map<string, Record<string, unknown>>();
+  const tournamentCreate = jest.fn(async (args: { data: Record<string, unknown> }) => {
+    if (typeof args.data.id !== 'string') throw new Error('Created league must have an id');
+    const row = { teamCount: 8, maxTeams: null, ...args.data };
+    leagues.set(args.data.id, row);
+    return row;
+  });
   const outboxInsert = jest.fn(async () => 1);
   // upsert 다 — `(tournamentId, teamId)` @@unique 라 무조건 create 면 P2002 다.
   const registrationCreate = jest.fn(async (args: { create: Record<string, unknown> }) => args.create);
@@ -23,7 +29,13 @@ function makeHarness() {
     // BE-5 drop: `v1League` 는 사라졌다 — fake 에도 두지 않는다. 남겨 두면 서비스가 그걸
     // 부르는 회귀가 들어와도 스펙이 통과한다.
     v1Sport: { findUniqueOrThrow: jest.fn(async () => ({ code: 'futsal' })) },
-    v1Tournament: { create: tournamentCreate },
+    v1Tournament: {
+      create: tournamentCreate,
+      findFirst: jest.fn(async (args: { where: { AND: Array<Record<string, unknown>> } }) => {
+        const id = args.where.AND.find(condition => typeof condition.id === 'string')?.id;
+        return typeof id === 'string' ? leagues.get(id) ?? null : null;
+      }),
+    },
     v1LeagueSeries: { update: jest.fn() },
     // 로스터와 짝이 되는 confirmed 등록(BE-3 ⑤). owner 를 못 찾으면 서비스가 422 로
     // 던지므로 fake 도 실제처럼 owner 를 준다.
@@ -39,6 +51,7 @@ function makeHarness() {
     // `$executeRaw` 로 넣는다. fake 에 없으면 "tx.$executeRaw is not a function" 으로
     // dual-write 단언에 닿기도 전에 죽는다(이 스펙이 재는 건 거울이지 예약이 아니다).
     $executeRaw: outboxInsert,
+    $queryRaw: jest.fn(async () => []),
   };
   const prisma = {
     v1LeagueSeries: {

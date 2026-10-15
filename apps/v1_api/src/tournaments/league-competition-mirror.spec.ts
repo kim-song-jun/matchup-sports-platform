@@ -145,6 +145,15 @@ describe('leagueMirrorCreateData — 시즌 승계(inherited)', () => {
     expect(data).not.toHaveProperty('entryFeeConfiguredAt');
   });
 
+  it.each([3, null])('MD-QA #145: 같은 티어의 참가팀 정원 %s을 선수 정원과 별도로 승계한다', maxTeams => {
+    // Given: the previous tier has an explicit finite or unlimited team-cap setting.
+    const previousTier = { ...inherited, maxTeams };
+    // When: the actual season mapping prepares the next league row.
+    const data = leagueMirrorCreateData({ ...base, inherited: previousTier });
+    // Then: the persisted create data carries that setting without changing the player limit.
+    expect(data).toMatchObject({ maxTeams, minPlayers: 1, maxPlayers: null });
+  });
+
   it('inherited 가 없으면 승계 컬럼 키가 아예 없고(DB 기본값: 0원·null) 팀 명단 인원은 제한 없음이다', () => {
     const data = leagueMirrorCreateData(base);
     for (const key of ['coverImageUrl', 'entryFee', 'bankName', 'bankAccount', 'bankHolder', 'entryFeeConfiguredAt']) {

@@ -2631,6 +2631,8 @@ model V1Tournament {
   minPlayers                 Int                         @default(6) @map("min_players")
   /// 팀 등록 명단 정원. null = 제한 없음(리그 기본값 — 팀 전원이 명단·라인업에 오른다). 대회는 항상 값을 채운다.
   maxPlayers                 Int?                        @default(10) @map("max_players")
+  /// 정규 리그 참가팀 정원. null = 무제한. 선수 명단 정원(maxPlayers)·대회 정원(teamCount)과 별개다.
+  maxTeams                   Int?                        @map("max_teams")
   /// 리그를 만들 때 정한 총 경기 수(계획). 대진 생성 폼의 기본값으로만 쓰고, 실제 대진 수를 강제하지 않는다.
   plannedFixtureCount        Int?                        @map("planned_fixture_count")
   genderCategory             V1TournamentGenderCategory? @map("gender_category")

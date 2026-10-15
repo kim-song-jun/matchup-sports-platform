@@ -159,6 +159,56 @@ describe('닫힘 카드 — 마감이 지났다', () => {
   });
 });
 
+describe('참가팀 정원 마감 안내', () => {
+  const capacityNote = '참가팀 정원이 모두 차서 신청이 마감됐어요.';
+  const full = {
+    registrationOpen: false,
+    registrationDeadlineAt: '2099-10-12T14:59:00.000Z',
+    capacityReached: true,
+  } satisfies Partial<Props>;
+
+  it('정원이 차면 미래 신청 마감일을 이미 지난 마감 시각처럼 안내하지 않는다', () => {
+    renderCard(full);
+
+    expect(screen.getByText(new RegExp(capacityNote))).toBeInTheDocument();
+    expect(screen.queryByText(/10월 12일.*에 마감됐어요/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '참가 신청' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '다른 리그 둘러보기' })).toHaveAttribute('href', '/tournaments?kind=league');
+  });
+
+  it('정원이 남고 기한이 지났으면 기존 마감 시각을 안내한다', () => {
+    const expired = { ...full, capacityReached: false, registrationDeadlineAt: PAST };
+    renderCard(expired);
+
+    expect(screen.getByText(/10월 7일.*에 마감됐어요/)).toBeInTheDocument();
+    expect(screen.queryByText(new RegExp(capacityNote))).not.toBeInTheDocument();
+  });
+
+  it.each([false, true])('정원 마감 뒤 다음 회차 신청 링크는 다음 회차의 모집 여부(%s)를 따른다', (registrationOpen) => {
+    renderCard({
+      ...full,
+      nextRound: {
+        leagueId: 'lg-2',
+        title: '수요 리그 1부',
+        seasonNo: 2,
+        startsOn: '2099-12-01T00:00:00.000Z',
+        endsOn: '2100-01-31T14:59:59.000Z',
+        registrationOpen,
+        registrationDeadlineAt: '2099-11-20T14:59:00.000Z',
+      },
+    });
+
+    expect(screen.getByText(new RegExp(capacityNote))).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '참가 신청' })).not.toBeInTheDocument();
+    if (registrationOpen) {
+      expect(screen.getByRole('link', { name: '다음 회차로 신청하기' })).toHaveAttribute('href', '/tournaments/lg-2/apply');
+    } else {
+      expect(screen.queryByRole('link', { name: '다음 회차로 신청하기' })).not.toBeInTheDocument();
+      expect(screen.getByText('다음 회차 신청이 열리면 여기서 바로 신청할 수 있어요.')).toBeInTheDocument();
+    }
+  });
+});
+
 describe('마감 미설정', () => {
   const noDeadline = { registrationOpen: false, registrationDeadlineAt: null } satisfies Partial<Props>;
 

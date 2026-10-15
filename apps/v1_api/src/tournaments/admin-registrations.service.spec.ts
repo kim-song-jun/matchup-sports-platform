@@ -78,8 +78,9 @@ describe('AdminRegistrationsService', () => {
   let slots: { releaseForRegistrationInTx: jest.Mock };
   let prisma: {
     v1AdminUser: { findUnique: jest.Mock };
+    v1Team: { findFirst: jest.Mock };
     v1Tournament: { findFirst: jest.Mock };
-    v1TournamentRegistration: { findUnique: jest.Mock; findMany: jest.Mock; update: jest.Mock; count: jest.Mock };
+    v1TournamentRegistration: { findUnique: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock; update: jest.Mock; count: jest.Mock };
     v1TournamentPayment: { findUnique: jest.Mock; update: jest.Mock; updateMany: jest.Mock };
     v1TournamentPlayer: { count: jest.Mock; findMany: jest.Mock };
     $executeRaw: jest.Mock;
@@ -92,8 +93,9 @@ describe('AdminRegistrationsService', () => {
   beforeEach(async () => {
     prisma = {
       v1AdminUser: { findUnique: jest.fn() },
+      v1Team: { findFirst: jest.fn().mockResolvedValue({ id: 'team-1', sportId: 'sport-futsal' }) },
       v1Tournament: { findFirst: jest.fn() },
-      v1TournamentRegistration: { findUnique: jest.fn(), findMany: jest.fn(), update: jest.fn(), count: jest.fn().mockResolvedValue(0) },
+      v1TournamentRegistration: { findUnique: jest.fn(), findFirst: jest.fn().mockResolvedValue(null), findMany: jest.fn(), update: jest.fn(), count: jest.fn().mockResolvedValue(0) },
       v1TournamentPayment: { findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
       v1TournamentPlayer: {
         count: jest.fn().mockResolvedValue(0),
@@ -1052,5 +1054,233 @@ describe('AdminRegistrationsService', () => {
 
     expect(result.alreadyProcessed).toBe(true);
     expect(notifications.emitNotification).not.toHaveBeenCalled();
+  });
+
+  describe('MD-QA #145 stale cancellation guards', () => {
+    it.each(['confirm', 'waitlist'] as const)(
+      'confirm: current %s target reached after preload is an idempotent no-op',
+      async (decision) => {
+        const targetStatus = decision === 'confirm' ? 'confirmed' : 'waitlisted';
+        let currentRegistration = registrationRow({ status: 'payment_checking',
+          tournament: { title: '리그', kind: 'regular_league' } });
+        prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+        prisma.v1TournamentRegistration.findUnique.mockImplementation(async () => ({ ...currentRegistration }));
+        prisma.v1TournamentRegistration.findFirst.mockImplementation(async ({ where }: { where: Prisma.V1TournamentRegistrationWhereInput }) =>
+          where.id === 'reg-1' ? { ...currentRegistration } : null);
+        prisma.v1TournamentPayment.findUnique.mockResolvedValue(paymentRow({ status: 'paid' }));
+        prisma.v1Tournament.findFirst.mockImplementation(kindAwareFindFirst({
+          id: 'tournament-1', kind: 'regular_league', teamCount: 8, maxTeams: 3,
+          sportId: 'sport-futsal', seriesId: null, seasonNo: null,
+        }));
+        prisma.v1TournamentRegistration.count.mockResolvedValue(2);
+        prisma.v1TournamentRegistration.update.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => {
+          currentRegistration = registrationRow({ ...currentRegistration, ...data });
+          return currentRegistration;
+        });
+        prisma.$transaction.mockImplementation(async (callback: (tx: typeof prisma) => Promise<unknown>) => {
+          // Another valid decision already committed before this caller acquires the canonical lock.
+          currentRegistration = registrationRow({ ...currentRegistration, status: targetStatus });
+          return callback(prisma);
+        });
+        const result = await service.confirm(opsAuth, 'reg-1', { decision });
+        expect(result).toMatchObject({ status: targetStatus, alreadyProcessed: true });
+        expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
+        expect(prisma.v1TournamentPayment.update).not.toHaveBeenCalled();
+        expect(prisma.v1AdminActionLog.create).not.toHaveBeenCalled();
+        expect(prisma.v1StatusChangeLog.create).not.toHaveBeenCalled();
+        expect(notifications.emitNotification).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each([
+      ['payment_checking', 'confirm'], ['paid', 'confirm'],
+      ['payment_checking', 'waitlist'], ['paid', 'waitlist'],
+    ] as const)(
+      'confirm: stale %s cannot apply %s after final admin cancellation even with room',
+      async (sourceStatus, decision) => {
+        // Given: a valid admin decision was preloaded before a competing final cancellation committed.
+        let currentRegistration = registrationRow({ status: sourceStatus,
+          tournament: { title: '리그', kind: 'regular_league' } });
+        let currentPayment = paymentRow({ status: 'paid' });
+        prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+        prisma.v1TournamentRegistration.findUnique.mockImplementation(async () => ({ ...currentRegistration }));
+        prisma.v1TournamentRegistration.findFirst.mockImplementation(async ({ where }: { where: Prisma.V1TournamentRegistrationWhereInput }) =>
+          where.id === 'reg-1' ? { ...currentRegistration } : null);
+        prisma.v1TournamentPayment.findUnique.mockImplementation(async () => ({ ...currentPayment }));
+        prisma.v1Tournament.findFirst.mockImplementation(kindAwareFindFirst({
+          id: 'tournament-1', kind: 'regular_league', teamCount: 8, maxTeams: 3,
+          sportId: 'sport-futsal', seriesId: null, seasonNo: null,
+        }));
+        prisma.v1TournamentRegistration.count.mockResolvedValue(2);
+        prisma.v1TournamentRegistration.update.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => {
+          currentRegistration = registrationRow({ ...currentRegistration, ...data });
+          return currentRegistration;
+        });
+        prisma.$transaction.mockImplementation(async (callback: (tx: typeof prisma) => Promise<unknown>) => {
+          currentRegistration = registrationRow({ ...currentRegistration, status: 'cancelled',
+            cancelPreviousStatus: null, cancelOutcome: 'rejected' });
+          currentPayment = paymentRow({ ...currentPayment, status: 'cancelled' });
+          return callback(prisma);
+        });
+        // When / Then: available capacity must not authorize undoing the completed cancellation.
+        await expect(service.confirm(opsAuth, 'reg-1', { decision })).rejects.toMatchObject({
+          status: 409, response: { code: 'REGISTRATION_STATUS_INVALID' },
+        });
+        expect(currentRegistration.status).toBe('cancelled');
+        expect(currentPayment.status).toBe('cancelled');
+        expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
+        expect(prisma.v1TournamentPayment.update).not.toHaveBeenCalled();
+        expect(prisma.v1AdminActionLog.create).not.toHaveBeenCalled();
+        expect(prisma.v1StatusChangeLog.create).not.toHaveBeenCalled();
+        expect(notifications.emitNotification).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each(['cancel_requested', 'cancelled'] as const)(
+      'confirmPayment: stale awaiting_payment cannot resurrect %s after another team fills the last place',
+      async (cancelledStatus) => {
+        // Given: the real service preloads A's reservation and ready payment before another cancellation commits.
+        let currentRegistration = registrationRow({
+          status: 'awaiting_payment', tournament: { title: '리그', kind: 'regular_league' },
+        });
+        let currentPayment = paymentRow();
+        prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+        prisma.v1TournamentRegistration.findUnique.mockImplementation(async () => ({ ...currentRegistration }));
+        prisma.v1TournamentRegistration.findFirst.mockImplementation(async () => ({ ...currentRegistration }));
+        prisma.v1TournamentPayment.findUnique.mockImplementation(async () => ({ ...currentPayment }));
+        prisma.v1Tournament.findFirst.mockImplementation(kindAwareFindFirst({
+          id: 'tournament-1', kind: 'regular_league', teamCount: 8, maxTeams: 3,
+        }));
+        prisma.v1TournamentRegistration.count.mockResolvedValue(3);
+        prisma.v1TournamentRegistration.update.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => {
+          currentRegistration = registrationRow({ ...currentRegistration, ...data });
+          return currentRegistration;
+        });
+        prisma.v1TournamentPayment.update.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => {
+          currentPayment = paymentRow({ ...currentPayment, ...data });
+          return currentPayment;
+        });
+        prisma.$transaction.mockImplementation(async (callback: (tx: typeof prisma) => Promise<unknown>) => {
+          // Team cancel-request preserves ready payment; admin cancellation also cancels its payment.
+          currentRegistration = registrationRow({ ...currentRegistration, status: cancelledStatus,
+            cancelPreviousStatus: cancelledStatus === 'cancel_requested' ? 'awaiting_payment' : null });
+          currentPayment = paymentRow({ ...currentPayment, status: cancelledStatus === 'cancelled' ? 'cancelled' : 'ready' });
+          return callback(prisma);
+        });
+        // When / Then: the stale operation must reject, preserving cancellation and B's third reservation.
+        await expect(service.confirmPayment(opsAuth, 'reg-1', {})).rejects.toMatchObject({
+          status: 409, response: { code: 'REGISTRATION_STATUS_INVALID' },
+        });
+        expect(currentRegistration.status).toBe(cancelledStatus);
+        expect(currentPayment.status).toBe(cancelledStatus === 'cancelled' ? 'cancelled' : 'ready');
+        expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
+        expect(prisma.v1TournamentPayment.update).not.toHaveBeenCalled();
+        expect(prisma.v1AdminActionLog.create).not.toHaveBeenCalled();
+        expect(prisma.v1StatusChangeLog.create).not.toHaveBeenCalled();
+        expect(notifications.emitNotification).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each(['confirmed', 'awaiting_payment'] as const)(
+      'rejectCancelRequest: stale cancel_requested cannot restore %s after final admin cancellation even with room',
+      async (previousStatus) => {
+        // Given: the cancellation approval wins after the old cancel-request was preloaded.
+        let currentRegistration = registrationRow({ status: 'cancel_requested', cancelPreviousStatus: previousStatus,
+          tournament: { title: '리그', kind: 'regular_league' } });
+        prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+        prisma.v1TournamentRegistration.findUnique.mockImplementation(async () => ({ ...currentRegistration }));
+        prisma.v1TournamentRegistration.findFirst.mockImplementation(async () => ({ ...currentRegistration }));
+        prisma.v1TournamentPayment.findUnique.mockResolvedValue(paymentRow({ status: 'cancelled' }));
+        prisma.v1Tournament.findFirst.mockImplementation(kindAwareFindFirst({
+          id: 'tournament-1', kind: 'regular_league', teamCount: 8, maxTeams: 3,
+        }));
+        prisma.v1TournamentRegistration.count.mockResolvedValue(2);
+        prisma.v1TournamentRegistration.update.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => {
+          currentRegistration = registrationRow({ ...currentRegistration, ...data });
+          return currentRegistration;
+        });
+        prisma.$transaction.mockImplementation(async (callback: (tx: typeof prisma) => Promise<unknown>) => {
+          currentRegistration = registrationRow({ ...currentRegistration, status: 'cancelled',
+            cancelPreviousStatus: null, cancelOutcome: 'approved' });
+          return callback(prisma);
+        });
+        // When / Then: capacity availability cannot authorize undoing a completed cancellation.
+        await expect(service.rejectCancelRequest(opsAuth, 'reg-1')).rejects.toMatchObject({
+          status: 409, response: { code: 'NOT_CANCEL_REQUESTED' },
+        });
+        expect(currentRegistration.status).toBe('cancelled');
+        expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
+        expect(prisma.v1TournamentPayment.update).not.toHaveBeenCalled();
+        expect(prisma.v1AdminActionLog.create).not.toHaveBeenCalled();
+        expect(prisma.v1StatusChangeLog.create).not.toHaveBeenCalled();
+        expect(notifications.emitNotification).not.toHaveBeenCalled();
+      },
+    );
+  });
+
+  describe('MD-QA #145 — 리그 참가팀 정원', () => {
+    it('confirm: 자신의 결제 대기 예약은 중복 계산하지 않고 확정한다', async () => {
+      // Given: this payment-stage application already owns the third and final place.
+      prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+      prisma.v1TournamentRegistration.findUnique.mockResolvedValue(registrationRow({
+        status: 'payment_checking', tournament: { title: '리그', kind: 'regular_league' },
+      }));
+      prisma.v1Tournament.findFirst.mockImplementation(kindAwareFindFirst({
+        id: 'tournament-1', kind: 'regular_league', teamCount: 8, maxTeams: 3, maxPlayers: 20,
+        sportId: 'sport-futsal', seriesId: null, seasonNo: null,
+      }));
+      prisma.v1TournamentRegistration.count.mockImplementation(async ({ where }: { where: Prisma.V1TournamentRegistrationWhereInput }) =>
+        typeof where.id === 'object' && where.id.not === 'reg-1' ? 2 : 3);
+      prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'confirmed' }));
+      // When: the actual admin mutation confirms the existing reservation.
+      const result = await service.confirm(opsAuth, 'reg-1', { decision: 'confirm' });
+      // Then: it succeeds without inventing a fourth place or a capacity error.
+      expect(result).toMatchObject({ status: 'confirmed', alreadyProcessed: false });
+      expect(prisma.v1AdminActionLog.create).toHaveBeenCalledTimes(1);
+      expect(notifications.emitNotification).toHaveBeenCalledTimes(1);
+    });
+
+    it('confirm: payment-stage 예약이 찬 리그의 대기팀을 확정하지 않는다', async () => {
+      // Given: all three slots are reserved, even though only two teams are confirmed.
+      prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+      prisma.v1TournamentRegistration.findUnique.mockResolvedValue(registrationRow({
+        status: 'waitlisted', tournament: { title: '리그', kind: 'regular_league' },
+      }));
+      prisma.v1Tournament.findFirst.mockImplementation(kindAwareFindFirst({
+        id: 'tournament-1', kind: 'regular_league', teamCount: 8, maxTeams: 3, maxPlayers: 20,
+        sportId: 'sport-futsal', seriesId: null, seasonNo: null,
+      }));
+      prisma.v1TournamentRegistration.count.mockImplementation(async ({ where }: { where: Prisma.V1TournamentRegistrationWhereInput }) =>
+        where.status === 'confirmed' ? 2 : 3);
+      prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'confirmed' }));
+      // When / Then: actual confirm must reject without registration, audit or notification writes.
+      await expect(service.confirm(opsAuth, 'reg-1', { decision: 'confirm' })).rejects.toMatchObject({
+        response: { code: 'TOURNAMENT_CAPACITY_FULL' },
+      });
+      expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
+      expect(prisma.v1AdminActionLog.create).not.toHaveBeenCalled();
+      expect(notifications.emitNotification).not.toHaveBeenCalled();
+    });
+
+    it('rejectCancelRequest: 찬 리그의 확정 상태를 복원하지 않는다', async () => {
+      // Given: the request no longer holds capacity and another three teams reserve all slots.
+      prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+      prisma.v1TournamentRegistration.findUnique.mockResolvedValue(registrationRow({
+        status: 'cancel_requested', cancelPreviousStatus: 'confirmed',
+        tournament: { title: '리그', kind: 'regular_league' },
+      }));
+      prisma.v1Tournament.findFirst.mockImplementation(kindAwareFindFirst({
+        id: 'tournament-1', kind: 'regular_league', teamCount: 8, maxTeams: 3, maxPlayers: 20,
+        sportId: 'sport-futsal', seriesId: null, seasonNo: null,
+      }));
+      prisma.v1TournamentRegistration.count.mockResolvedValue(3);
+      prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'confirmed' }));
+      // When / Then: actual reject-cancel cannot create another reservation.
+      await expect(service.rejectCancelRequest(opsAuth, 'reg-1')).rejects.toMatchObject({
+        response: { code: 'TOURNAMENT_CAPACITY_FULL' },
+      });
+      expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
+      expect(prisma.v1AdminActionLog.create).not.toHaveBeenCalled();
+    });
   });
 });

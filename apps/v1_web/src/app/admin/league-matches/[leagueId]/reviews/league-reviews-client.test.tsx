@@ -13,6 +13,7 @@ const LEAGUE_ID = 'synthetic-league-47';
 const NOW = '2026-10-08T00:00:00.000Z';
 const league: V1AdminLeagueDetail = {
   leagueId: LEAGUE_ID, title: '합성 종료 리그', state: 'completed', isPublic: true, teamIds: [],
+  maxTeams: null, confirmedCount: 0, pendingPaymentCount: 0,
   startsOn: NOW, registrationDeadlineAt: null, registrationOpen: false, sportCode: 'futsal',
   coverImageUrl: null, entryFee: 0, entryFeeConfiguredAt: null, bankName: null, bankAccount: null,
   bankHolder: null, activeRegistrationCount: 0, confirmedRegistrationCount: 0, fixtures: [],

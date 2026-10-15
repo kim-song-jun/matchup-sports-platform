@@ -71,6 +71,23 @@ describe('buildSportsEventLd', () => {
     expect(buildSportsEventLd(tournament())?.location).not.toHaveProperty('address');
   });
 
+  it('실제 등록된 대회 주소를 PostalAddress 로 제공한다', () => {
+    const ld = buildSportsEventLd(tournament({ venueAddress: '  서울특별시 강남구 테헤란로 1  ' }));
+
+    expect(ld?.location).toMatchObject({
+      '@type': 'Place',
+      name: '서울 강남 풋살파크',
+      address: {
+        '@type': 'PostalAddress',
+        streetAddress: '서울특별시 강남구 테헤란로 1',
+      },
+    });
+  });
+
+  it.each([null, '', '   '])('등록 주소가 %j이면 PostalAddress 를 내보내지 않는다', (venueAddress) => {
+    expect(buildSportsEventLd(tournament({ venueAddress }))?.location).not.toHaveProperty('address');
+  });
+
   it('일정이 확정된 대회는 화면에 보이는 값 그대로 SportsEvent 를 만든다', () => {
     const ld = buildSportsEventLd(tournament());
 

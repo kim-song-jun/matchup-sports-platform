@@ -8,8 +8,8 @@
  * paid · confirmed`를 모두 정원 점유로 세므로(`tournament-registrations.service.ts`),
  * 입금대기 팀이 정원을 채운 대회는 "5 / 8"처럼 여유가 있어 보여도 실제로는 신청을 받을 수 없다.
  * 그 간극이 "왜 신청이 안 받아지냐"의 원인이었다.
- * 정규 리그는 fixture 생성 뒤에도 미래 registrationDeadlineAt까지 신청할 수 있고, 정원은
- * 신청 가능 여부를 결정하지 않는다.
+ * 정규 리그는 fixture 생성 뒤에도 미래 registrationDeadlineAt까지 신청할 수 있다.
+ * 참가팀 정원은 별도 maxTeams로 판정하며 null·미설정은 무제한이다.
  */
 
 export type TournamentRegistrationBlockReason =
@@ -18,46 +18,54 @@ export type TournamentRegistrationBlockReason =
   | 'capacity_full';
 
 export type TournamentCapacityInput = {
-  /** regular_league uses deadline/status only; other competitions use open + capacity. */
-  kind?: 'regular_league' | 'regular_tournament' | null;
   status: string;
-  teamCount: number;
+  /** 참가팀 정원. 팀당 선수 정원(maxPlayers)이나 대진 템플릿 팀 수와 별개다. */
+  maxTeams?: number | null;
   confirmedCount: number;
   pendingPaymentCount?: number | null;
   registrationDeadlineAt?: string | null;
-};
+} & (
+  | { kind: 'regular_league'; teamCount?: number }
+  | { kind?: 'regular_league' | 'regular_tournament' | null; teamCount: number }
+);
 
 export type TournamentCapacity = {
-  teamCount: number;
+  /** null은 무제한이다. 정규 대회는 기존 teamCount를 사용한다. */
+  teamCount: number | null;
   confirmedCount: number;
   pendingPaymentCount: number;
-  /** 정원을 점유한 팀 수 (확정 + 입금대기 계열). teamCount를 넘지 않게 clamp. */
+  /** 확정 + 입금대기 계열. 리그는 정원 초과 이력도 실제 점유 수로 유지한다. */
   reservedCount: number;
-  remainingCount: number;
+  remainingCount: number | null;
   isFull: boolean;
 };
 
 export function resolveTournamentCapacity(tournament: TournamentCapacityInput): TournamentCapacity {
-  const teamCount = Math.max(0, tournament.teamCount);
+  const teamCount = tournament.kind === 'regular_league'
+    ? tournament.maxTeams ?? null
+    : Math.max(0, tournament.teamCount);
   const confirmedCount = Math.max(0, tournament.confirmedCount);
   const pendingPaymentCount = Math.max(0, tournament.pendingPaymentCount ?? 0);
-  const reservedCount = Math.min(teamCount, confirmedCount + pendingPaymentCount);
+  const occupiedCount = confirmedCount + pendingPaymentCount;
+  const reservedCount = tournament.kind === 'regular_league' || teamCount === null
+    ? occupiedCount
+    : Math.min(teamCount, occupiedCount);
   return {
     teamCount,
     confirmedCount,
     pendingPaymentCount,
     reservedCount,
-    remainingCount: Math.max(0, teamCount - reservedCount),
+    remainingCount: teamCount === null ? null : Math.max(0, teamCount - reservedCount),
     // 서버와 같은 부등식(reservedCount >= teamCount)을 쓴다 — `teamCount > 0` 가드를 두면
     // 정원이 0인 대회를 프론트만 "신청 가능"으로 판정해 서버 409와 어긋난다.
-    isFull: confirmedCount + pendingPaymentCount >= teamCount,
+    isFull: teamCount !== null && occupiedCount >= teamCount,
   };
 }
 
 /**
  * 새 신청(취소 후 재신청 포함)을 막는 이유. 막을 이유가 없으면 null.
  * 일반 대회는 서버가 거절하는 순서와 같게 상태 → 마감 → 정원을 검사한다. 정규 리그는
- * 종료 상태와 마감만 검사한다.
+ * 종료 상태와 마감에 이어 선택적 참가팀 정원을 검사한다.
  */
 export function resolveTournamentRegistrationBlock(
   tournament: TournamentCapacityInput,
@@ -66,14 +74,13 @@ export function resolveTournamentRegistrationBlock(
   if (tournament.kind === 'regular_league') {
     // The API keeps league registration open while a future deadline exists, even
     // after fixture generation changes the mirror status to in_progress. Leagues
-    // have no capacity gate; only terminal status, missing deadline, and expiry
-    // block the request.
+    // reserve places independently of the registration time/status window.
     if (tournament.status === 'completed' || tournament.status === 'cancelled') return 'not_open';
     if (!tournament.registrationDeadlineAt) return 'not_open';
     const deadline = new Date(tournament.registrationDeadlineAt).getTime();
     if (!Number.isFinite(deadline)) return 'not_open';
     if (deadline < now.getTime()) return 'deadline_passed';
-    return null;
+    return resolveTournamentCapacity(tournament).isFull ? 'capacity_full' : null;
   }
   if (tournament.status !== 'open') return 'not_open';
   if (tournament.registrationDeadlineAt) {
@@ -118,7 +125,9 @@ export function describeTournamentCapacity(
   if (capacity.pendingPaymentCount > 0) {
     parts.push(`${pendingCapacityLabel(isFreeEntry)} ${capacity.pendingPaymentCount}팀`);
   }
-  return `${parts.join(' · ')} / 총 ${capacity.teamCount}팀`;
+  return capacity.teamCount === null
+    ? `${parts.join(' · ')} / 참가팀 정원 무제한`
+    : `${parts.join(' · ')} / 총 ${capacity.teamCount}팀`;
 }
 
 /** 사용자에게 보여줄 차단 이유. 정원 마감은 입금대기가 정원을 쥐고 있다는 사실까지 알려준다. */

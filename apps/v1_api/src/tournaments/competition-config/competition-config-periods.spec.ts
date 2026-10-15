@@ -18,6 +18,14 @@ describe('normalizeCompetitionPeriods', () => {
     ]);
   });
 
+  it('단판을 세 개 이상으로 나누면 단일 이름과 코드를 이어 받지 않고 새 순번을 부여한다', () => {
+    expect(normalizeCompetitionPeriods(single, [{ durationMinutes: 10 }, { durationMinutes: 10 }, { durationMinutes: 10 }])).toEqual([
+      { code: 'PERIOD_1', label: '1피리어드', durationMinutes: 10, extraTime: false },
+      { code: 'PERIOD_2', label: '2피리어드', durationMinutes: 10, extraTime: false },
+      { code: 'PERIOD_3', label: '3피리어드', durationMinutes: 10, extraTime: false },
+    ]);
+  });
+
   it('전·후반 뒤에 피리어드를 더하면 기존 둘은 유지하고 새 행만 번호로 붙인다', () => {
     expect(normalizeCompetitionPeriods(halves, [{ durationMinutes: 20 }, { durationMinutes: 20 }, { durationMinutes: 10 }])).toEqual([
       ...halves,

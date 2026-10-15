@@ -9,6 +9,7 @@ import { TeamGameKindBadge } from '@/components/teams/team-game-kind-badge';
 import { matchPhaseChip } from '@/lib/competition-status';
 import { teamGameDetailHref, teamGameRosterHref } from '@/lib/team-game-links';
 import { describeUpcomingGameTime } from '@/lib/upcoming-game-time';
+import { withFromPath } from '@/lib/session-storage';
 import type { V1HomeNextGame } from '@/types/api';
 
 /**
@@ -43,7 +44,9 @@ export function NextGameCard({ game, now = new Date() }: { game: V1HomeNextGame;
 
   // 팀장·매니저는 명단을 손보러 오고, 팀원은 경기를 확인하러 온다 — 주 버튼이 그에 맞춰 바뀐다.
   const detail = detailHref !== null ? { href: detailHref, label: '경기 상세' } : null;
-  const roster = rosterHref !== null ? { href: rosterHref, label: game.viewerCanManage ? '명단 확인' : '명단 보기' } : null;
+  const roster = rosterHref !== null ? { href: game.competitionKind === 'FRIENDLY' ? rosterHref : withFromPath(rosterHref, '/home'), label: game.competitionKind === 'FRIENDLY'
+    ? game.viewerCanManage ? '명단 확인' : '명단 보기'
+    : game.viewerCanManage ? '이번 경기 출전 관리' : '경기 출전 보기' } : null;
   const [primary, secondary] = (game.viewerCanManage ? [roster, detail] : [detail, roster]).filter((link) => link !== null);
 
   return (

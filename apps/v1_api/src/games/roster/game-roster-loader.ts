@@ -75,7 +75,8 @@ export async function loadCompetitionRosterBase(
 }
 
 /**
- * 등번호 원본 = 확정된 참가 신청. 기준 명단이 참가 명단(`REGISTRATION`)이고 뷰어가 그 팀의 팀장·매니저일 때만 준다 —
+ * 확정된 참가 신청을 찾는다. 팀장·매니저는 등번호 원본으로, 활성 팀원은 참가 명단 조회 연결로 사용한다.
+ * 호출자는 조회 id와 등번호 편집 id·권한을 분리해서 직렬화한다.
  * 등번호 저장 API(`PATCH …/players/:playerId/jersey-number`)의 권한과 같아서, 열어 줘도 저장이 403 이 되는 사람에게는 주지 않는다.
  * 기준 명단을 읽는 쿼리(`loadCompetitionRosterBase`)와 같은 조건으로 찾는다.
  * `editable` 은 저장 API 의 잠금·마감 가드(`rosterBlockReason`)와 같은 판정이다 — 잠긴 명단에 입력 칸을 열면 저장이 409 가 된다.
@@ -83,9 +84,9 @@ export async function loadCompetitionRosterBase(
 export async function loadJerseyRegistration(
   tx: Tx,
   scope: CompetitionTeamScope,
-  input: { baseSource: GameRosterBaseSource; isTeamManager: boolean },
+  input: { baseSource: GameRosterBaseSource; isTeamManager: boolean; isTeamMember?: boolean },
 ): Promise<{ id: string; editable: boolean } | null> {
-  if (!input.isTeamManager || input.baseSource !== 'REGISTRATION') return null;
+  if ((!input.isTeamManager && !input.isTeamMember) || input.baseSource !== 'REGISTRATION') return null;
   const registration = await tx.v1TournamentRegistration.findFirst({
     where: { tournamentId: scope.competitionId, teamId: scope.teamId, status: 'confirmed' },
     select: {

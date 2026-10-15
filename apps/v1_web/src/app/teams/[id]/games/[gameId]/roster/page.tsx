@@ -1,5 +1,5 @@
 import { RequireAuth } from '@/components/auth/require-auth';
-import { GameRosterClient } from './game-roster-client';
+import { CompetitionRosterManager } from '@/components/game-roster/competition-roster-manager';
 
 /** 대회·리그 경기 명단(Task 179). 알림 딥링크가 이 경로를 쓴다(`lineup-todo.service.ts` rosterScreenPath). */
 export default async function TeamGameRosterPage({
@@ -10,7 +10,7 @@ export default async function TeamGameRosterPage({
   const { id, gameId } = await params;
   return (
     <RequireAuth>
-      <GameRosterClient teamId={id} gameId={gameId} />
+      <CompetitionRosterManager teamId={id} gameId={gameId} />
     </RequireAuth>
   );
 }

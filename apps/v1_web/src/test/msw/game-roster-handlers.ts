@@ -90,6 +90,8 @@ export function createV1GameRosterMswHandlers() {
     suspensions: new Map<string, { reason: string; remainingMatches: number }>(),
     /** 대진 뒤 참가 명단에 추가돼 들어온 선수. */
     joinedAfter: new Set<string>(),
+    /** 계정 실명 — 서버처럼 운영진(ADMIN·STAFF) 응답에만 싣는다. */
+    realNames: new Map<string, string>(),
     /** 대진 수정으로 이 팀이 더는 뛰지 않는 경기 — 표에서 빠지고 일괄 저장은 404 GAME_SIDE_NOT_FOUND. */
     detached: new Set<string>(),
   };
@@ -114,6 +116,9 @@ export function createV1GameRosterMswHandlers() {
   const person = ({ participantId, ...p }: (typeof GAME_ROSTER_MSW.players)[number], gameId: string) => ({
     goalkeeper: state.goalkeepers.get(p.userId) ?? false,
     ...p,
+    ...(['ADMIN', 'STAFF'].includes(state.viewerRole) && state.realNames.has(p.userId)
+      ? { realName: state.realNames.get(p.userId) }
+      : {}),
     jerseyNumber: fallback() ? null : (state.jerseys.get(p.userId) ?? null),
     accountLinked: !fallback(),
     participantId: fallback() ? null : participantId,
@@ -178,6 +183,7 @@ export function createV1GameRosterMswHandlers() {
       baseSource: state.baseSource,
       jerseyRegistrationId:
         state.viewerRole === 'TEAM_MANAGER' && !fallback() ? GAME_ROSTER_MSW.registrationId : null,
+      registrationId: !fallback() && ['TEAM_MANAGER', 'TEAM_MEMBER'].includes(state.viewerRole) ? GAME_ROSTER_MSW.registrationId : null,
       jerseyEditable: state.viewerRole === 'TEAM_MANAGER' && !fallback() && !state.rosterLocked,
       base,
       participants,
@@ -426,6 +432,9 @@ export function createV1GameRosterMswHandlers() {
     setViewerRole(role: V1GameRosterViewerRole) {
       state.viewerRole = role;
     },
+    setRealName(userId: string, realName: string) {
+      state.realNames.set(userId, realName);
+    },
     setCompetitionKind(kind: V1GameRosterView['competitionKind']) {
       state.competitionKind = kind;
     },
@@ -439,6 +448,12 @@ export function createV1GameRosterMswHandlers() {
     /** 다른 운영진이 먼저 번호를 바꾼 것처럼 서버 상태만 바꾼다. */
     setJersey(userId: string, jerseyNumber: number | null) {
       state.jerseys.set(userId, jerseyNumber);
+    },
+    setGoalkeeper(userId: string, goalkeeper: boolean) { state.goalkeepers.set(userId, goalkeeper); },
+    readRoster(gameId = GAME_ROSTER_MSW.games[0].gameId as string) {
+      const game = findGame(gameId);
+      if (!game) throw new Error('Unknown fixture game');
+      return view(game);
     },
     /** 보기만 하는 운영자로 — 표의 `editable` 이 전부 false, 쓰기는 403. */
     setGoalkeeperWritable(value: boolean) { state.goalkeeperWritable = value; },

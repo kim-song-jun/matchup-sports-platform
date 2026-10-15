@@ -1,6 +1,6 @@
 import type { PrismaService } from '../../prisma/prisma.service';
 import type { GamesService } from '../games.service';
-import { GameRosterService } from './game-roster.service';
+import { GameRosterService, loadRealNames } from './game-roster.service';
 
 // 조정 행은 조정한 때의 사이드 팀(teamId)에 묶인다. 사이드 팀이 바뀐 뒤 옛 팀 기록이 새 팀에 새지 않는지,
 // 인가 뒤 팀이 바뀌면 쓰지 않는지를 본다. DB 경로 전체는 test/games/game-roster-adjustments 통합 스펙.
@@ -201,6 +201,23 @@ describe('GameRosterService.getTeamGameRoster — 팀·경기로 사이드 찾�
     });
   });
 
+  it('선수 실명(identityVisible)은 대회 운영 3역할만 — 팀 매니저·멤버·support 는 받지 않는다', async () => {
+    const { service } = teamGameFake({
+      memberships: { 'team-A:a-owner': 'owner', 'team-A:a-member': 'member' },
+      operators: {
+        ops: { role: 'platform_ops', canMutateLineup: true, platformAdmin: true },
+        director: { role: 'tournament_director', canMutateLineup: true, platformAdmin: false },
+        field: { role: 'field_operator', canMutateLineup: true, platformAdmin: false },
+        support: { role: 'support_readonly', canMutateLineup: false, platformAdmin: true },
+      },
+    });
+    const visible = async (id: string) =>
+      ((await service.getTeamGameRoster(viewer(id), { teamId: 'team-A', gameId: 'game-1' })) as unknown as { identityVisible?: boolean })
+        .identityVisible;
+    expect(await Promise.all(['ops', 'director', 'field'].map(visible))).toEqual([true, true, true]);
+    expect(await Promise.all(['a-owner', 'a-member', 'support'].map(visible))).toEqual([false, false, false]);
+  });
+
   it('그 경기 사이드가 아닌 팀·친선은 404 GAME_ROSTER_NOT_AVAILABLE, 없는 경기는 404 GAME_NOT_FOUND', async () => {
     const memberships = { 'team-C:c-owner': 'owner', 'team-A:a-owner': 'owner' } as const;
     const cases = [
@@ -229,5 +246,28 @@ describe('GameRosterService.getTeamGameRoster — 팀·경기로 사이드 찾�
       response: { code: 'GAME_ROSTER_NOT_AVAILABLE' },
     });
     expect(readView).not.toHaveBeenCalled();
+  });
+});
+
+describe('loadRealNames — 운영진 응답에 싣는 실명', () => {
+  it('탈퇴 계정을 조회에서 빼고, 비었거나 프로필 없는 실명은 맵에 넣지 않는다', async () => {
+    const findMany = jest.fn(async () => [
+      { id: 'u1', profile: { realName: ' 김하나 ' } },
+      { id: 'u2', profile: { realName: '   ' } },
+      { id: 'u3', profile: null },
+    ]);
+    const tx = { v1User: { findMany } };
+    const names = await loadRealNames(tx as never, ['u1', 'u2', 'u3', 'u1']);
+    expect([...names]).toEqual([['u1', '김하나']]);
+    expect(findMany).toHaveBeenCalledWith({
+      where: { id: { in: ['u1', 'u2', 'u3'] }, deletedAt: null },
+      select: { id: true, profile: { select: { realName: true } } },
+    });
+  });
+
+  it('조회할 계정이 없으면 DB 를 부르지 않는다', async () => {
+    const findMany = jest.fn();
+    expect((await loadRealNames({ v1User: { findMany } } as never, [])).size).toBe(0);
+    expect(findMany).not.toHaveBeenCalled();
   });
 });

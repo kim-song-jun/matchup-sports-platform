@@ -36,6 +36,8 @@ export type V1GameRosterPerson = {
   accountLinked: boolean;
   /** 참가 명단 선수 id(등번호 저장 API 의 `:playerId`). 참가 명단 행이 없는 리그 폴백 팀원은 null. */
   participantId: string | null;
+  /** 계정 실명 — 대회 운영진에게만 온다. 다른 역할 응답에는 키 자체가 없다. */
+  realName?: string;
 };
 
 export type V1GameRosterView = {
@@ -54,6 +56,8 @@ export type V1GameRosterView = {
   baseSource: 'REGISTRATION' | 'TEAM_MEMBERS';
   /** 등번호의 원본인 확정 참가 신청 id — 참가 명단이 기준이고 뷰어가 이 팀 팀장·매니저일 때만 온다. */
   jerseyRegistrationId: string | null;
+  /** 활성 팀원에게도 참가 선수 탭을 제공하는 조회용 신청 id. */
+  registrationId?: string | null;
   /** 그 신청의 명단이 잠겼거나 제출 마감이 지나 등번호 저장이 막히면 false. */
   jerseyEditable: boolean;
   base: (V1GameRosterPerson & { status: V1GameRosterPlayerStatus })[];

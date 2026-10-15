@@ -89,7 +89,7 @@ describe('MD-QA145 리그 설정의 실제 GET/PATCH 참가팀 정원 계약', (
   });
 
   it.each([
-    { code: 'REGISTRATION_CAPACITY_EXCEEDED', message: '현재 참가 중이거나 확정을 기다리는 팀보다 정원을 줄일 수 없어요.' },
+    { code: 'LEAGUE_CAPACITY_BELOW_OCCUPANCY', message: '참가팀 정원은 확정·입금대기 팀 수보다 작게 설정할 수 없어요.' },
     { code: 'LEAGUE_SETTINGS_STALE', message: '최신 정보를 다시 불러와 주세요.' },
   ])('$code 저장 거절은 정원 초안과 서버 실패 원인을 보존한다', async ({ code, message }) => {
     // Given: 점유 수 축소나 오래된 수정 버전은 서버가 거절해요.

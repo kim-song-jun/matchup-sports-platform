@@ -133,11 +133,12 @@ describe('MD-QA #145 — 참가팀 정원의 실제 HTTP/PostgreSQL 계약', () 
   });
 
   it('실제 PG 장벽에서 입금 확인 전 취소 요청이 커밋되면 마지막 자리를 새 신청에 돌려준다', async () => {
-    const { leagueId } = await h.makeLeague(3);
+    const { leagueId } = await h.makePaidLeague(3);
     const cancelled = await h.draft(leagueId, await h.applicant('입금 확인 취소 팀'));
     const incoming = await h.draft(leagueId, await h.applicant('반환 자리 신청 팀'));
     const submitted = await h.submit(leagueId, cancelled);
     expect(submitted.status).toBe(201);
+    await h.assertAwaitingPayment(cancelled.registrationId);
     expect(await h.countReserved(leagueId)).toBe(3);
     const auditBefore = await h.prisma.v1AdminActionLog.count({ where: {
       targetId: cancelled.registrationId, action: 'registration.confirm_payment',
@@ -165,12 +166,15 @@ describe('MD-QA #145 — 참가팀 정원의 실제 HTTP/PostgreSQL 계약', () 
   });
 
   it('실제 PG 장벽에서 최종 취소가 커밋되면 팀 철회와 관리자 잔류 처리가 둘 다 신청을 되살리지 않는다', async () => {
-    const { leagueId } = await h.makeLeague(3);
+    const { leagueId } = await h.makePaidLeague(3);
     const cancelled = await h.draft(leagueId, await h.applicant('최종 취소 경합 팀'));
     const submitted = await h.submit(leagueId, cancelled);
     expect(submitted.status).toBe(201);
+    await h.assertAwaitingPayment(cancelled.registrationId);
     await h.http().post(`/api/v1/tournaments/${leagueId}/registrations/${cancelled.registrationId}/cancel-request`)
       .set('x-v1-user-id', cancelled.ownerUserId).send({ reason: '취소 승인 대기' }).expect(201);
+    expect(await h.prisma.v1TournamentRegistration.findUniqueOrThrow({ where: { id: cancelled.registrationId } }))
+      .toMatchObject({ status: 'cancel_requested', cancelPreviousStatus: 'awaiting_payment' });
     const results = await h.behindLeagueRowLock(leagueId, [
       async () => h.http().post(`/api/v1/tournaments/${leagueId}/registrations/${cancelled.registrationId}/cancel-request/withdraw`)
         .set('x-v1-user-id', cancelled.ownerUserId).send({}),
@@ -195,12 +199,14 @@ describe('MD-QA #145 — 참가팀 정원의 실제 HTTP/PostgreSQL 계약', () 
   });
 
   it('실제 PG 장벽에서 입금 확인 뒤 최종 취소가 커밋되면 확정과 대기 처리가 모두 취소를 보존한다', async () => {
-    const { leagueId } = await h.makeLeague(3);
+    const { leagueId } = await h.makePaidLeague(3);
     const cancelled = await h.draft(leagueId, await h.applicant('확정 대기 취소 경합 팀'));
     const submitted = await h.submit(leagueId, cancelled);
     expect(submitted.status).toBe(201);
-    await h.http().patch(`/api/v1/admin/registrations/${cancelled.registrationId}/confirm-payment`)
+    await h.assertAwaitingPayment(cancelled.registrationId);
+    const paymentConfirmed = await h.http().patch(`/api/v1/admin/registrations/${cancelled.registrationId}/confirm-payment`)
       .set('x-v1-user-id', h.adminUserId).send({}).expect(200);
+    expect(paymentConfirmed.body.data).toMatchObject({ status: 'payment_checking', payment: { status: 'paid' } });
     const results = await h.behindLeagueRowLock(leagueId, [
       async () => h.http().patch(`/api/v1/admin/registrations/${cancelled.registrationId}/confirm`)
         .set('x-v1-user-id', h.adminUserId).send({ decision: 'confirm' }),

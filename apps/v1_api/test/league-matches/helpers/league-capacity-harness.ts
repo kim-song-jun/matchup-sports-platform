@@ -56,6 +56,27 @@ export async function createLeagueCapacityHarness(app: INestApplication) {
       .set('x-v1-user-id', h.adminUserId).send({ registrationDeadlineAt: '2097-12-01T00:00:00.000Z' }).expect(200);
     return { leagueId, teams };
   }
+  /** Payment-transition scenarios explicitly configure a paid league; ordinary capacity controls stay free. */
+  async function makePaidLeague(maxTeams: number | null | undefined = 3) {
+    const league = await makeLeague(maxTeams);
+    const configured = await http().patch(`/api/v1/admin/league-matches/${league.leagueId}/entry-fee`)
+      .set('x-v1-user-id', h.adminUserId).send({
+        entryFee: 120000, bankName: '검증은행', bankAccount: '145-000-000000', bankHolder: '회귀 검증',
+      }).expect(200);
+    expect(configured.body.data).toMatchObject({
+      entryFee: 120000, entryFeeConfiguredAt: expect.any(String),
+      bankName: '검증은행', bankAccount: '145-000-000000', bankHolder: '회귀 검증',
+    });
+    return league;
+  }
+  async function assertAwaitingPayment(registrationId: string) {
+    const [registration, payment] = await Promise.all([
+      h.prisma.v1TournamentRegistration.findUniqueOrThrow({ where: { id: registrationId } }),
+      h.prisma.v1TournamentPayment.findUniqueOrThrow({ where: { registrationId } }),
+    ]);
+    expect(registration).toMatchObject({ status: 'awaiting_payment' });
+    expect(payment).toMatchObject({ status: 'ready', amount: 120000, method: 'bank_transfer' });
+  }
   async function draft(leagueId: string, team: Awaited<ReturnType<typeof applicant>>) {
     const response = await http().post(`/api/v1/tournaments/${leagueId}/registrations`)
       .set('x-v1-user-id', team.ownerUserId).send({ teamId: team.id }).expect(201);
@@ -131,7 +152,7 @@ export async function createLeagueCapacityHarness(app: INestApplication) {
       return result.response;
     });
   }
-  return { ...h, http, settingsPath, settings, settingsBody, patchCapacity, applicant, makeLeague,
+  return { ...h, http, settingsPath, settings, settingsBody, patchCapacity, applicant, makeLeague, makePaidLeague, assertAwaitingPayment,
     draft, submit, seedRegistration, countReserved, behindLeagueRowLock };
 }
 

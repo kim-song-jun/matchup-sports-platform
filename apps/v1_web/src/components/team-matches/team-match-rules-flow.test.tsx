@@ -159,6 +159,70 @@ describe('MD-QA #141 current single-period default and stored half-history UI bo
   });
 });
 
+describe('MD-QA #141 authoritative persisted halves in edit', () => {
+  it.each([
+    { outcome: 'unchanged saved halves', changed: false, firstHalf: 17, secondHalf: 19 },
+    { outcome: 'changed saved halves', changed: true, firstHalf: 23, secondHalf: 29 },
+  ])('restores same-entity pinned halves after an unsaved single-period switch and saves $outcome', async ({ changed, firstHalf, secondHalf }) => {
+    // Given: an existing custom two-half pin is editable while the global default is SINGLE_PERIOD with no half-history.
+    const api = installPersistedRulesFlowApi({ periods: currentSinglePeriod, twoPeriodDefaults: null });
+    const original = api.transport.write({
+      hostTeamId: rulesHostId, sportId: 'sport-futsal', regionId: 'region-gangnam',
+      title: '서버에 저장된 현재 경기', description: '현재 경기 설명',
+      startsAt: '2030-10-10T09:00:00.000Z', endsAt: '2030-10-10T11:00:00.000Z',
+      manualPlaceName: '합성 경기장', minLevelCode: 'novice', maxLevelCode: 'intermediate',
+      matchFormat: '5:5', genderRule: '성별 무관', periods: [{ durationMinutes: 17 }, { durationMinutes: 19 }],
+    }, api.host);
+    const matchId = original.detail.id;
+    const originalEdit = await v1Get<V1TeamMatchEdit>('/team-matches/' + matchId + '/edit');
+    expect(originalEdit).toMatchObject({ teamMatchId: matchId, rulesEditable: true,
+      competitionConfigVersionId: original.pinId, form: { periods: [{ durationMinutes: 17 }, { durationMinutes: 19 }] } });
+    navigation.pathname = '/team-matches/' + matchId + '/edit/rules';
+    const user = userEvent.setup();
+    const rules = renderRulesFlow(<TeamMatchEditPageClient teamMatchId={matchId} rulesStep />);
+    expect(await screen.findByLabelText('전반 시간')).toHaveValue(17);
+    expect(screen.getByLabelText('후반 시간')).toHaveValue(19);
+
+    // When: the unsaved rules draft switches to single and back using this entity's authoritative saved halves.
+    await user.click(screen.getByRole('radio', { name: '단판' }));
+    expect(screen.getByLabelText('경기 시간')).toHaveValue(36);
+    const halves = screen.getByRole('radio', { name: '전후반' });
+    expect(halves).toBeEnabled();
+    await user.click(halves);
+    expect(await screen.findByLabelText('전반 시간')).toHaveValue(17);
+    expect(screen.getByLabelText('후반 시간')).toHaveValue(19);
+    expect(api.writes).toEqual([]);
+    if (changed) {
+      fireEvent.change(screen.getByLabelText('전반 시간'), { target: { value: String(firstHalf) } });
+      fireEvent.change(screen.getByLabelText('후반 시간'), { target: { value: String(secondHalf) } });
+    }
+    await user.click(screen.getByRole('button', { name: '설정 적용' }));
+    expect(api.writes).toEqual([]);
+    rules.unmount();
+    navigation.pathname = '/team-matches/' + matchId + '/edit';
+    renderRulesFlow(<TeamMatchEditPageClient teamMatchId={matchId} />, rules.queryClient);
+    expect(await screen.findByText(`전후반 · 전반 ${firstHalf}분 · 후반 ${secondHalf}분`)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '변경사항 저장' }));
+    await waitFor(() => expect(navigation.push).toHaveBeenCalledWith('/team-matches/' + matchId));
+
+    // Then: only the final PATCH writes, preserving the original pin or repinning actual changed values.
+    expect(api.writes).toHaveLength(1);
+    expect(api.writes[0]).toMatchObject({ method: 'PATCH', teamMatchId: matchId, payload: { version: original.version } });
+    if (changed) {
+      expect(api.writes[0].payload.periods).toEqual([{ durationMinutes: firstHalf }, { durationMinutes: secondHalf }]);
+    } else {
+      expect(api.writes[0].payload).not.toHaveProperty('periods');
+    }
+    const saved = await v1Get<V1TeamMatchEdit>('/team-matches/' + matchId + '/edit');
+    expect(saved.form.periods).toEqual([{ durationMinutes: firstHalf }, { durationMinutes: secondHalf }]);
+    if (changed) {
+      expect(saved.competitionConfigVersionId).not.toBe(original.pinId);
+    } else {
+      expect(saved.competitionConfigVersionId).toBe(original.pinId);
+    }
+  });
+});
+
 describe('MD-QA #141 actual separate rules flow entry', () => {
   it('condition next opens the separate rules route and retains entered content without a write', async () => {
     const api = installRulesFlowApi();

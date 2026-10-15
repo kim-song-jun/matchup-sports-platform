@@ -100,9 +100,14 @@ export function installPersistedRulesFlowApi(options: {
       apiFixture.writes.push({ method: 'POST', payload });
       return undefined;
     }),
+    http.patch(api + '/team-matches/:teamMatchId', async ({ request, params }) => {
+      const payload = await request.clone().json() as Record<string, unknown>;
+      apiFixture.writes.push({ method: 'PATCH', teamMatchId: String(params.teamMatchId), payload });
+      return undefined;
+    }),
     ...transport.handlers,
   );
-  return { ...apiFixture, transport };
+  return { ...apiFixture, transport, host };
 }
 export function renderRulesFlow(ui: ReactElement, queryClient = createV1QueryClient()) {
   queryClients.add(queryClient);

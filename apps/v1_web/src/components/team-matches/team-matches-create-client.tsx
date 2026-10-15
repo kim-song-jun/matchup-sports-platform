@@ -462,6 +462,9 @@ export function TeamMatchEditPageClient({ teamMatchId, rulesStep = false }: { te
   const editCtx = { hostTeamId: selectedTeamId, sportId: selectedSportId, regionId, draft, existingDeadlineAt: editQuery.data?.form.deadlineAt };
   const editMissingFields = editAttempted ? getTeamMatchMissingFields(editCtx) : [];
   const editFieldErrors = toFieldErrorMap(editMissingFields);
+  const savedHalfPeriods = editQuery.data?.teamMatchId === teamMatchId && editQuery.data.rulesEditable
+    && editQuery.data.version === version && editQuery.data.form.periods?.length === 2
+    && validTeamMatchPeriods(editQuery.data.form.periods) ? editQuery.data.form.periods : null;
 
   const model = buildCreateModel({
     step: rulesStep ? 'edit-rules' : 'edit',
@@ -474,7 +477,7 @@ export function TeamMatchEditPageClient({ teamMatchId, rulesStep = false }: { te
     regions: editRegionOptions,
     rules: {
       periods: draft.rules?.periods ?? editQuery.data?.form.periods ?? null,
-      twoPeriodDefaults: editRuleOptions.data?.twoPeriodDefaults,
+      twoPeriodDefaults: savedHalfPeriods ?? editRuleOptions.data?.twoPeriodDefaults,
       loading: editRuleOptions.isLoading,
       error: editRuleOptions.isError ? extractErrorMessage(editRuleOptions.error, '경기 규칙을 불러오지 못했어요.') : null,
       validationError: editAttempted && !validTeamMatchPeriods(draft.rules?.periods) ? TEAM_MATCH_PERIOD_MINUTES_ERROR : undefined,

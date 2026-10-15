@@ -283,7 +283,7 @@ export type TeamMatchCreateStep = 'team' | 'sport' | 'info' | 'condition' | 'rul
 
 export type TeamMatchRulesControl = {
   periods: readonly V1TeamMatchPeriodInput[] | null;
-  twoPeriodDefaults?: readonly V1TeamMatchPeriod[] | null;
+  twoPeriodDefaults?: readonly V1TeamMatchPeriodInput[] | null;
   loading?: boolean;
   error?: string | null;
   validationError?: string;

@@ -255,10 +255,6 @@ async function syncLockedGameSide(
     orderBy: { revision: 'desc' },
   });
   if (latest === null) return false;
-  if (context.isLeague && (await isUnmigratedTeamAuthoredLineup(tx, context.gameId, context.sideId, latest))) {
-    return false;
-  }
-
   if (options.readdedPlayerExclusions !== undefined) {
     const reset = options.readdedPlayerExclusions;
     // 경기 잠금 후 현재 사이드·상태를 확인한 범위만. 감사 행은 남기고 재추가 전에 캡처한
@@ -280,6 +276,10 @@ async function syncLockedGameSide(
       loaded = await loadGameRosterForContext(tx, context, preloaded);
       if (loaded === null) return false;
     }
+  }
+  // 미이관 팀 제출본은 재작성하지 않는다. 재추가 전 제외의 되돌림은 명단 이관과 별개다.
+  if (context.isLeague && (await isUnmigratedTeamAuthoredLineup(tx, context.gameId, context.sideId, latest))) {
+    return false;
   }
   const { computation } = loaded;
 

@@ -56,3 +56,7 @@ Phase A owner: v1 규칙·현재 소스를 읽고 exact owned production/test �
 - GREEN/타입/통합 검증은 root 단일 슬롯 대기. 작업자 테스트·Git mutation·runtime/browser 실행 없음.
 
 - 2026-10-15 root final committed gate: HEAD80a2c4acab7140bcbb9c050c3e0af225f3a718b2 integrateddev a264, independent9/9 C0/W0 with production/spec fingerprints unchanged. Actual re-add7 plus existing players spec2files129/129PASS143.752s; API tsc --noEmit --incremental false exit0; surface683/rawSQL32 baseline32/directlookup0/leagueallow34 PASS after correcting Windows FIND executable selection. Initial surface enumeration failure is NOTPASS and retained. New source has no added debt markers/untracked app imports. Root prepares dev PR; actual PostgreSQL race/CI/deployment/alpha390/768/1440/comments/images remain pending, never inferred from unit/type PASS.
+- PR #1944 P2 재리뷰: 미이관 팀 제출 명단의 조기 반환이 캡처된 제외 되돌림까지 건너뛰는 순서 결함을 실제 서비스·이관 계약과 대조했다. 제외/되돌리기는 미이관 상태에서도 허용되며 이관은 활성 제외를 입력으로 보존한다.
+- root actual P2 RED: `mdqa156-legacy-guard-red.log`, 8 cases = 1 FAIL / 7 PASS, 128.117s, exit 1. `미이관 팀 제출 명단은 그대로 두고 재추가 전의 캡처된 빠짐만 되돌린다`에서 기대 `revokedAt=NOW`, `revokedByRole=SYSTEM` 대비 실제 `null/null`로 정확히 실패했다.
+- 승인된 최소 P2 수정: `game-roster-sync.ts`에서 기존 미이관 명단 반환만 캡처 ID 되돌림 뒤로 옮겼다. context/state/base/currentOfficial·현재 game/side/team/user·고정 ID 조건과 잠금 순서는 유지한다. 기존 팀 제출 명단·참가자·감사 기록은 다시 쓰지 않고, 새 제외 ID 및 과거·공식 경기 보호를 유지한다.
+- P2 GREEN·타입·독립 재리뷰·Git은 root 단일 슬롯 대기, 작업자 실행 없음. P2 작업자 변경 범위는 기존 회귀 spec, `game-roster-sync.ts`, 이 Progress Snapshot뿐이다.

@@ -22,6 +22,12 @@ interface LineupRow {
   readonly invalidatedAt: null;
 }
 
+interface AuditRow {
+  readonly id: string;
+  readonly requestId: string;
+  readonly action: string;
+}
+
 function emptyDate(): Date | null { return null; }
 function emptyRole(): string | null { return null; }
 
@@ -87,7 +93,11 @@ function exclusion(id: string, target: ReturnType<typeof game>, userId = 'return
   };
 }
 
-async function setup(options: { readonly managerRole?: string; readonly registrationStatus?: string } = {}) {
+async function setup(options: {
+  readonly managerRole?: string;
+  readonly registrationStatus?: string;
+  readonly unmigratedLineupGameIds?: readonly string[];
+} = {}) {
   const players = [player('returning'), player('other')];
   const games = [game('scheduled'), game('another'), game('live', V1GameState.LIVE), game('ended', V1GameState.ENDED),
     game('cancelled', V1GameState.CANCELLED), game('other-competition', V1GameState.SCHEDULED, 'another-league'),
@@ -114,6 +124,9 @@ async function setup(options: { readonly managerRole?: string; readonly registra
     id: `lineup-${target.id}`, gameId: target.id, sideId: `side-${target.id}`, revision: 1,
     state: 'SUBMITTED', formation: null, supersedesId: null, invalidatedAt: null,
   }]));
+  const operationAudits: AuditRow[] = [...latestLineups.values()]
+    .filter((lineup) => !options.unmigratedLineupGameIds?.includes(lineup.gameId))
+    .map((lineup) => ({ id: `sync-${lineup.id}`, requestId: `${lineup.gameId}:${lineup.id}`, action: 'LEAGUE_ROSTER_SYNCED' }));
   const participants: Array<{ id: string; gameId: string; sideId: string; lineupId: string; userId: string | null;
     displayNameSnapshot: string; jerseyNumber: number | null; position: string | null; arrivedAt: Date | null }> = [];
   const db = {
@@ -209,7 +222,14 @@ async function setup(options: { readonly managerRole?: string; readonly registra
     },
     v1ParticipantIdentityLinkCurrent: { findMany: async () => [], createMany: async () => ({ count: 0 }) },
     v1ParticipantIdentityLinkEvent: { createManyAndReturn: async () => [] },
-    v1OperationAudit: { findFirst: async () => ({ id: 'system-generated-lineup' }), create: async () => ({ id: 'audit' }) },
+    v1OperationAudit: {
+      findFirst: async ({ where }: { where: unknown }) => operationAudits.find((row) => matches(row, where)) ?? null,
+      create: async ({ data }: { data: { requestId: string; action: string } }) => {
+        const row = { id: `audit-${operationAudits.length}`, requestId: data.requestId, action: data.action };
+        operationAudits.push(row);
+        return row;
+      },
+    },
   };
   const module = await Test.createTestingModule({ providers: [TournamentPlayersService, AdminContextService,
     { provide: PrismaService, useValue: { ...db, $transaction: async (callback: (tx: typeof db) => Promise<unknown>) => callback(db) } }],
@@ -225,7 +245,7 @@ async function setup(options: { readonly managerRole?: string; readonly registra
     await drain();
     await service.addPlayer(MANAGER, 'league', 'registration', { userId: 'returning', realName: '선수' });
   };
-  return { module, prisma, service, players, games, adjustments, events, writes, participants, latestLineups, stateOnNextLock,
+  return { module, prisma, service, players, games, adjustments, events, writes, participants, latestLineups, stateOnNextLock, operationAudits,
     drain, roster, removeAndReadd, scheduled };
 }
 
@@ -243,6 +263,39 @@ describe('MD-QA156 참가 명단 제외 후 재추가 — 서비스, outbox work
       const latest = fixture.latestLineups.get('scheduled');
       expect(fixture.participants.filter((row) => row.lineupId === latest?.id).map((row) => row.userId)).toContain('returning');
       expect(fixture.adjustments.find((row) => row.id === 'excluded-scheduled')).toMatchObject({ revokedByRole: 'SYSTEM' });
+    } finally { await fixture.module.close(); }
+  });
+
+  it('미이관 팀 제출 명단은 그대로 두고 재추가 전의 캡처된 빠짐만 되돌린다', async () => {
+    const fixture = await setup({ unmigratedLineupGameIds: ['scheduled'] });
+    try {
+      const originalLineup = fixture.latestLineups.get('scheduled');
+      if (originalLineup === undefined) throw new TypeError('Missing legacy lineup fixture');
+      const originalParticipant = {
+        id: 'legacy-returning', gameId: 'scheduled', sideId: 'side-scheduled', lineupId: originalLineup.id,
+        userId: 'returning', displayNameSnapshot: 'returning', jerseyNumber: null, position: null, arrivedAt: null,
+      };
+      fixture.participants.push(originalParticipant);
+      await fixture.removeAndReadd();
+      const another = fixture.games.find((row) => row.id === 'another');
+      const previousAnother = fixture.adjustments.find((row) => row.id === 'excluded-another');
+      if (another === undefined || previousAnother === undefined) throw new TypeError('Missing another game fixture');
+      previousAnother.revokedAt = NOW;
+      fixture.adjustments.push(exclusion('fresh-after-readd', another));
+      await fixture.drain();
+
+      expect(fixture.adjustments.find((row) => row.id === 'excluded-scheduled')).toMatchObject({
+        revokedAt: NOW, revokedByUserId: null, revokedByRole: 'SYSTEM',
+      });
+      expect((await fixture.roster())?.computation.participants.map((row) => row.userId)).toContain('returning');
+      expect(fixture.latestLineups.get('scheduled')).toBe(originalLineup);
+      expect(fixture.participants.filter((row) => row.gameId === 'scheduled')).toEqual([originalParticipant]);
+      expect(fixture.operationAudits.filter((row) => row.requestId.startsWith('scheduled:'))).toEqual([]);
+      expect(fixture.writes).toEqual(['excluded-scheduled']);
+      expect(fixture.adjustments.filter((row) => row.revokedAt === null).map((row) => row.id)).toEqual(expect.arrayContaining([
+        'fresh-after-readd', 'other-player', 'excluded-live', 'excluded-ended', 'excluded-cancelled',
+        'excluded-other-team', 'excluded-other-competition', 'excluded-scheduled-official',
+      ]));
     } finally { await fixture.module.close(); }
   });
 

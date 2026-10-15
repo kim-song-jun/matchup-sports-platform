@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { ClipboardList, Download, Lock, Unlock, Check, X, Users, User, Clock, AlertCircle, Undo2, Timer, TimerOff, ListChecks } from 'lucide-react';
 import { useV1AdminTournamentRegistrations, useV1ConfirmPayment, useV1ConfirmRegistration, useV1CancelRegistrationAdmin, useV1RejectCancelRequest, useV1RosterLock, useV1RosterUnlock, useV1RosterDeadlineOverrideGrant, useV1RosterDeadlineOverrideRevoke, useV1ExportRosterCsv, useV1ExportTournamentRosterCsv, useV1AdminTournamentPlayers, useV1UpdatePlayerEligibility, useV1AdminAddPlayer, useV1AdminRemovePlayer, useV1AdminRosterEligibleMembers } from '@/hooks/use-v1-api';
 import type { V1AdminTournamentRegistration } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { registrationCancelOutcomeLabel } from '@/lib/v1-status-labels';
 import { V1ApiError } from '@/lib/api-client';
+import { v1Keys } from '@/lib/query-keys';
 import { AdminCardList, AdminEmpty } from '@/components/admin';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useUnsavedChangesGuard } from '@/components/v1-ui/use-unsaved-changes-guard';
@@ -43,15 +45,25 @@ export function RosterModal({
   showToast: (msg: string, v?: 'success' | 'error') => void;
   canWrite: boolean;
 }) {
+  const queryClient = useQueryClient();
   const visibleRegistrationId = open ? registration?.id ?? '' : '';
+  const previousVisibleRegistrationId = useRef('');
   const { data, isPending, isError, error, refetch } = useV1AdminTournamentPlayers(
     visibleRegistrationId,
   );
   // 모달은 닫혀도 마운트되어 있어 같은 신청을 재열면 캐시만 남는다.
   // 보이는 신청만 관찰하고, 열릴 때마다 현재 프로필이 반영된 명단을 다시 받는다.
   useEffect(() => {
+    const previousRegistrationId = previousVisibleRegistrationId.current;
+    previousVisibleRegistrationId.current = visibleRegistrationId;
+    if (previousRegistrationId && previousRegistrationId !== visibleRegistrationId) {
+      void queryClient.cancelQueries({
+        queryKey: v1Keys.adminTournamentRoster(previousRegistrationId),
+        exact: true,
+      });
+    }
     if (visibleRegistrationId) void refetch({ cancelRefetch: false });
-  }, [visibleRegistrationId, refetch]);
+  }, [visibleRegistrationId, refetch, queryClient]);
   const updateEligibility = useV1UpdatePlayerEligibility(registration?.id ?? '');
   const addPlayer = useV1AdminAddPlayer(registration?.id ?? '');
   const removePlayer = useV1AdminRemovePlayer(registration?.id ?? '');

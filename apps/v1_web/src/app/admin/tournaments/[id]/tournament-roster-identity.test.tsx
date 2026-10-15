@@ -1,5 +1,6 @@
+import { transferableAbortController } from 'node:util';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -89,10 +90,10 @@ async function closeRoster(user: ReturnType<typeof userEvent.setup>) {
 }
 
 function deferredResponse() {
-  let resolve: (response: HttpResponse) => void = () => {
+  let resolve: (response: Response) => void = () => {
     throw new Error('보류한 명단 응답이 준비되지 않았어요.');
   };
-  const promise = new Promise<HttpResponse>((complete) => { resolve = complete; });
+  const promise = new Promise<Response>((complete) => { resolve = complete; });
   return { promise, resolve };
 }
 
@@ -103,9 +104,14 @@ afterEach(() => {
   clients.splice(0).forEach((client) => client.clear());
   server.resetHandlers();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   vi.unstubAllEnvs();
 });
 beforeEach(() => {
+  // MSW의 Node Request에는 jsdom 대신 Node 호환 AbortSignal을 전달해요.
+  vi.stubGlobal('AbortController', function NativeAbortController() {
+    return transferableAbortController();
+  });
   vi.stubEnv('NEXT_PUBLIC_API_URL', 'http://localhost/api/v1');
   players = [player(), player({ id: 'player-captain', userId: 'captain', realName: '김팀장', nickname: '푸른 주장', jerseyNumber: 7, isTeamCaptain: true })];
   otherPlayers = [player({ id: 'other-player', userId: 'other-member', realName: '이두번째', nickname: '다른 팀 선수' })];
@@ -287,6 +293,65 @@ describe('MD-QA #140 실제 신청 탭에서 명단을 다시 열 때 현재 프
     expect(within(returnedDialog).queryByText('이두번째')).not.toBeInTheDocument();
   });
 
+  it.each([
+    { cached: false, phase: '캐시 없는 최초 조회', nickname: '다시 연 현재 닉네임', expected: '닉네임 다시 연 현재 닉네임' },
+    { cached: true, phase: '성공 캐시가 있는 재조회', nickname: null, expected: '닉네임 미등록' },
+  ])('$phase 중 닫았다 같은 신청을 다시 열면 이전 진행 중 응답 대신 새 프로필을 조회해요', async ({ cached, nickname, expected }) => {
+    const user = userEvent.setup();
+    const client = openRegistrationTab();
+    if (cached) {
+      const firstDialog = await reviewTeam(user);
+      expect(await within(firstDialog).findByText('닉네임 번개 선수')).toBeInTheDocument();
+      await waitFor(() => expect(client.isFetching()).toBe(0));
+      await closeRoster(user);
+    }
+
+    const held = deferredResponse();
+    const previousSnapshot = success({
+      registrationId: registration.id, teamId: registration.teamId, teamName: registration.teamName ?? '',
+      rosterLockedAt: null, belowMinimum: false, players: [player({ nickname: '닫기 전 조회 닉네임' })],
+    } satisfies V1AdminTournamentRosterResponse);
+    let previousRequest: Request | undefined;
+    server.use(http.get(`http://localhost/api/v1/admin/registrations/${registration.id}/players`, ({ request }) => {
+      rosterRequests.push(registration.id);
+      if (!previousRequest) {
+        previousRequest = request;
+        return held.promise.then((response) => response.clone());
+      }
+      return success({
+        registrationId: registration.id, teamId: registration.teamId, teamName: registration.teamName ?? '',
+        rosterLockedAt: null, belowMinimum: false, players,
+      } satisfies V1AdminTournamentRosterResponse);
+    }));
+
+    try {
+      await reviewTeam(user);
+      const previousRequestCount = cached ? 2 : 1;
+      await waitFor(() => expect(rosterRequests).toHaveLength(previousRequestCount));
+      expect(client.isFetching({ queryKey: v1Keys.adminTournamentRoster(registration.id) })).toBe(1);
+      if (!cached) {
+        expect(client.getQueryData(v1Keys.adminTournamentRoster(registration.id))).toBeUndefined();
+      }
+      await closeRoster(user);
+      players = [player({ nickname })];
+
+      const reopened = await reviewTeam(user);
+      held.resolve(previousSnapshot);
+      await waitFor(() => expect(client.isFetching()).toBe(0));
+      expect(rosterRequests).toEqual(Array.from({ length: previousRequestCount + 1 }, () => registration.id));
+      expect(await within(reopened).findByText(expected)).toBeInTheDocument();
+      expect(within(reopened).queryByText('닉네임 닫기 전 조회 닉네임')).not.toBeInTheDocument();
+      expect(within(reopened).queryByText('닉네임 번개 선수')).not.toBeInTheDocument();
+      expect(client.getQueryData<V1AdminTournamentRosterResponse>(v1Keys.adminTournamentRoster(registration.id))?.players[0]?.nickname).toBe(nickname);
+      expect(within(reopened).getByRole('combobox', { name: '홍길동 자격 상태' })).toBeDisabled();
+      expect(eligibleRequests).toBe(0);
+      expect(eligibilityRequests).toEqual([]);
+      expect(removedPlayers).toEqual([]);
+    } finally {
+      held.resolve(previousSnapshot);
+    }
+  });
+
   it('60초 캐시가 만료된 명단을 재열 때 자동 재조회와 열림 재조회가 한 GET으로 합쳐져요', async () => {
     const user = userEvent.setup();
     const client = openRegistrationTab();
@@ -313,7 +378,7 @@ describe('MD-QA #140 실제 신청 탭에서 명단을 다시 열 때 현재 프
     expect(rosterRequests).toEqual([registration.id, registration.id]);
   });
 
-  it('실제 조회 캐시가 있는 모달의 StrictMode effect 재실행도 같은 진행 중 GET을 기다려요', async () => {
+  it('실제 조회 캐시가 있는 모달의 StrictMode 재마운트는 취소된 GET을 버리고 현재 GET 하나만 기다려요', async () => {
     const user = userEvent.setup();
     const client = openRegistrationTab();
     const firstDialog = await reviewTeam(user);
@@ -321,26 +386,59 @@ describe('MD-QA #140 실제 신청 탭에서 명단을 다시 열 때 현재 프
     await waitFor(() => expect(client.isFetching()).toBe(0));
     cleanup();
 
-    const held = deferredResponse();
-    server.use(http.get(`http://localhost/api/v1/admin/registrations/${registration.id}/players`, () => {
-      rosterRequests.push(registration.id);
-      return held.promise.then((response) => response.clone());
-    }));
-    render(
-      <StrictMode>
-        <QueryClientProvider client={client}>
-          <RosterModal open onClose={() => undefined} registration={registration} showToast={() => undefined} canWrite={false} />
-        </QueryClientProvider>
-      </StrictMode>,
-    );
-    await waitFor(() => expect(rosterRequests.length).toBeGreaterThan(1));
-    held.resolve(success({
+    const pendingRequests: Array<{ request: Request; response: ReturnType<typeof deferredResponse> }> = [];
+    const currentRoster: V1AdminTournamentRosterResponse = {
       registrationId: registration.id, teamId: registration.teamId, teamName: registration.teamName ?? '',
       rosterLockedAt: null, belowMinimum: false, players: [player({ nickname: 'StrictMode 현재 닉네임' })],
-    } satisfies V1AdminTournamentRosterResponse));
-    expect(await screen.findByText('닉네임 StrictMode 현재 닉네임')).toBeInTheDocument();
-    await waitFor(() => expect(client.isFetching()).toBe(0));
-    expect(rosterRequests).toEqual([registration.id, registration.id]);
+    };
+    const oldResponse = success({
+      ...currentRoster, players: [player({ nickname: 'StrictMode 취소된 조회 닉네임' })],
+    } satisfies V1AdminTournamentRosterResponse);
+    server.use(http.get(`http://localhost/api/v1/admin/registrations/${registration.id}/players`, ({ request }) => {
+      const response = deferredResponse();
+      rosterRequests.push(registration.id);
+      pendingRequests.push({ request, response });
+      return response.promise.then((result) => result.clone());
+    }));
+    try {
+      render(
+        <StrictMode>
+          <QueryClientProvider client={client}>
+            <RosterModal open onClose={() => undefined} registration={registration} showToast={() => undefined} canWrite={false} />
+          </QueryClientProvider>
+        </StrictMode>,
+      );
+      await waitFor(() => {
+        expect(pendingRequests.filter(({ request }) => request.signal.aborted)).toHaveLength(1);
+        expect(pendingRequests.filter(({ request }) => !request.signal.aborted)).toHaveLength(1);
+        expect(client.isFetching({ queryKey: v1Keys.adminTournamentRoster(registration.id), exact: true })).toBe(1);
+      });
+      const currentRequest = pendingRequests.find(({ request }) => !request.signal.aborted);
+      if (!currentRequest) throw new Error('현재 명단 요청이 없어요.');
+      currentRequest.response.resolve(success(currentRoster));
+      expect(await screen.findByText('닉네임 StrictMode 현재 닉네임')).toBeInTheDocument();
+      await waitFor(() => expect(client.isFetching()).toBe(0));
+
+      const canceledRequests = pendingRequests.filter(({ request }) => request.signal.aborted);
+      await act(async () => {
+        canceledRequests.forEach(({ response }) => response.resolve(oldResponse));
+        await Promise.all(canceledRequests.map(({ response }) => response.promise));
+      });
+      expect(screen.getByText('닉네임 StrictMode 현재 닉네임')).toBeInTheDocument();
+      expect(screen.queryByText('닉네임 StrictMode 취소된 조회 닉네임')).not.toBeInTheDocument();
+      expect(screen.queryByText('닉네임 번개 선수')).not.toBeInTheDocument();
+      expect(client.getQueryData<V1AdminTournamentRosterResponse>(v1Keys.adminTournamentRoster(registration.id))?.players[0]?.nickname).toBe('StrictMode 현재 닉네임');
+      expect(currentRequest.request.signal.aborted).toBe(false);
+      expect(rosterRequests).toEqual([registration.id, registration.id, registration.id]);
+      expect(pendingRequests.filter(({ request }) => request.signal.aborted)).toHaveLength(1);
+      expect(pendingRequests.filter(({ request }) => !request.signal.aborted)).toHaveLength(1);
+      expect(screen.getByRole('combobox', { name: '홍길동 자격 상태' })).toBeDisabled();
+      expect(eligibleRequests).toBe(0);
+      expect(eligibilityRequests).toEqual([]);
+      expect(removedPlayers).toEqual([]);
+    } finally {
+      pendingRequests.forEach(({ response }) => response.resolve(oldResponse));
+    }
   });
 });
 

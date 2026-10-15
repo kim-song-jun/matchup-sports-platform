@@ -1,9 +1,28 @@
-import { render, screen, within } from '@testing-library/react';
+import { QueryClientProvider, type QueryClient } from '@tanstack/react-query';
+import { cleanup, render as renderWithProviders, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useState } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { useState, type ReactElement, type PropsWithChildren } from 'react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createV1QueryClient } from '@/lib/query-client';
 import type { V1AdminTournamentRegistration } from '@/types/api';
 import { RosterModal } from './registrations-tab';
+
+const clients: QueryClient[] = [];
+
+function render(ui: ReactElement) {
+  const client = createV1QueryClient();
+  clients.push(client);
+  return renderWithProviders(ui, {
+    wrapper: ({ children }: PropsWithChildren) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    ),
+  });
+}
+
+afterEach(() => {
+  cleanup();
+  clients.splice(0).forEach((client) => client.clear());
+});
 
 const refetch = vi.fn();
 const updateEligibility = vi.fn();

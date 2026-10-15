@@ -332,8 +332,11 @@ arbitrary regions.
 `payment_checking`·`paid`가 자리를 점유하며 `applied`·`seeded`·`promoted` 등 유입 출처를
 가리지 않는다. `draft`·`submitted`·`waitlisted`·`cancel_requested`·`cancelled`는 점유하지
 않는다. 신청 전용 `activeRegistrationCount`·`confirmedRegistrationCount`를 정원 검사에
-대신 쓰지 않는다. `registrationOpen`은 수명주기와 신청 마감만 판정하므로 `true`여도
-정원이 가득 찼을 수 있다.
+대신 쓰지 않는다. 공개 리그 상세의 `registrationOpen`과 `nextRound.registrationOpen`은
+수명주기·신청 마감에 더해 모든 출처의 확정·결제 대기 점유를 `maxTeams`와 비교한다.
+유한 정원이 가득 차면 `false`이며 `maxTeams: null`은 정원 때문에 닫히지 않는다.
+관리자 상세와 모집 열기 응답의 `registrationOpen`은 기존 모집 창 판정으로 유지하므로,
+공개 상세의 정원 포함 판정과 구분한다.
 
 신청 생성·제출, 운영자 직접 팀 추가, 참가 확정·대기 승격, 취소 요청 철회·잔류 처리에
 공통 정원을 적용한다. 한도를 채운 리그에서 자리를 새로 차지하려 하면

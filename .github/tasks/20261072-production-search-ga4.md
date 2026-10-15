@@ -1,10 +1,43 @@
 # Task 20261072: 운영 검색 노출 및 홈 GA4 계측 정정
 
-Status: Oct 16 local-discovery release deployed and verified; generic-search and AI visibility monitoring continues
+Status: Oct 16 follow-up active — remove intrusive discovery copy, diagnose generic search gaps and repair GitHub AI security execution
 **Owner**: Codex main; explicit Luna implementation and Sol independent review
 **Created**: 2026-10-12
 
-## Current Cursor — 2026-10-16 00:55 KST
+## Current Cursor — 2026-10-16 01:23 KST
+
+User explicitly requested repair of the GitHub AI security model failure, deeper evidence-based diagnosis/improvement for 동네 풋살 / 풋살 대회 organic and AI discovery, and site-wide cleanup of awkward search-oriented prose. Existing pages only; Alpha validation then scoped main deployment is already authorized. Do not hide keyword text with CSS or crawler-specific rendering. Remove unhelpful explanation and preserve useful facts/navigation in ordinary headings, cards/details and existing navigation. No new route, DB/auth/privacy/key/native/store/operating-data change or unrelated dev promotion.
+
+Scope: frontend existing public discovery and the demonstrated GitHub AI security configuration; docs/release artifacts. Reuse the owned checkout, no branch switch/new worktree. Baseline dev57c6097; production63d02/runtime1.9.3. Shared-root bracket WIP untouched. Host load40.04/32.23/27.73,12cores,swap4.81GB,node65/browser21/MCP14: continue authorized work with serial narrow verification; no local web server or full-suite duplication.
+
+Phases and ownership:
+1. Root: actual browser baseline/site-wide inventory and current task/status record. Luna: read-only GitHub failure/configuration trace and separate read-only SEO/AI retrieval diagnosis. No overlapping edits.
+2. Root consolidates demonstrated defects into bounded existing-view changes. Assign explicit Luna owned files after audit; no speculation-driven keyword expansion or invented neighborhood capabilities.
+3. Correct the actual AI security model/configuration source using supported repository/service controls; do not disable analysis, pretend CodeQL replaces it, or change billing/providers/secrets as an implicit workaround.
+4. Independent Sol diff/evidence review; narrow meaningful tests, committed-tree check and exact PR CI.
+5. Latest matching dev/Alpha SHA, actual390/768/1440 user flow, bottom content, console/network and crawler boundary verification.
+6. Scoped main release and live SHA/HTML/health/UI verification; report actual search/indexing/citation independently, update monitor and reclaim owned browser/processes.
+
+Exit proof:
+- [ ] Inventory every relevant existing public discovery surface; report processed M/N, affected filler locations and retained useful information.
+- [ ] Intrusive search-copy block is removed/reworked with no hidden keyword text, dead component/export/test or navigation regression; actual settled before/after evidence at390/768/1440.
+- [ ] Organic/AI discovery gaps traced to specific source/live/search evidence; only justified existing-page fixes are applied, with factual data and crawler/ordinary-user parity.
+- [ ] GitHub AI security error's owning configuration identified and corrected; a fresh real analysis run succeeds, or the exact externally blocked control/action is explicitly documented without a false pass.
+- [ ] Meaningful narrow tests, independent Sol review and exact-head API/Web/Gates pass; Alpha and production actual served SHAs are verified separately.
+- [ ] Main includes only approved scope; Alpha noindex/publication exclusions preserved, operating data and unrelated dev work untouched.
+- [ ] Actual indexing/rank/AI citations recorded without guarantees; monitor active-work cursor cleared and own browser/processes/agents reclaimed.
+
+Progress 2026-10-16 01:43 KST (source-ready):
+- Full guest first-HTML audit315/315 sitemap URLs across30 route patterns at stable main63d02: HTTP/canonical/indexability errors0. Four intrusive paragraphs found, exactly /teams and the three all/tournament/league list variants. No implementation-facing SEO/AI paragraph matched in the other published bodies. This is HTTP coverage, not315visual reviews. Receipt `cleanup-public-html-before-20261016.json`.
+- Luna removed all LocalDiscoveryGuidance source/test and both consumers; existing shell navigation retains team/match/competition links. Initial actual Alpha1b961 settled12top/footer cases at390/768/1440 passed with guidance present, no errors/overflow/coveredcontent (`cleanup-alpha-before-20261016.json`). TaskSpace63p1Alpha,p2GitHub settings; approvedDefaultprofile. No other session's browser touched.
+- Concrete structured-data gap: actual public6competitions include one address-bearing in_progress Suwon league, whose SportsEvent omits its public street address; five records including Oct24mixedcup have null address. Luna now emits only real trimmed tournament venueAddress as PostalAddress. Personal/team-match/fixture exact-address privacy rules unchanged. Structured-data RED1failed28passed -> GREEN29passed.
+- Sol initially missed indirect noncompleted VenuePrep->PlaceCard address rendering and retracted that broad finding after root traced callers. A real completed-only parity gap was fixed by adding an actual address row within existing completed basic info. Real serverpage->client first-HTML test strips scripts: RED1failed8passed -> GREEN9passed (registered address visible, null/blank omitted). Focused Sol re-reviewPASS0remainingblockers. TeamListPageView existing contract tests14passed/66outside-scope skipped. Aggregate52focusedtests; no full local build/typecheck duplicated under host pressure. ExactheadCI remains required.
+- AI Scan root cause is GitHub-managed dynamic/agents/github-advanced-security, not tracked YAML. Latest existing runs38767629951/38767323756 show autofind0.1.159, client github/code-scanning, internal sweagent-capi:claude-opus-5 session.create unavailable beforeanalysis. Repository UI exposes only enablement, not model selection; API reports enabled. An inspection click briefly toggled itOff; restored immediately and actual API enabled reconfirmed, not used as bypass. Support draft `github-ai-scan-support-20261016.html` prepared; explicit external-message authorization requested, pending. No provider/billing/model policy changes. A fresh actual run after own PR will determine current recovery; no AI-analysis pass claimed.
+- User subsequently authorized current devPR handling. Read-only Sol triage:1939 latesthead974a969 has freshCIpending and prior reviewoldhead;1936 gatefailed reviewedCHECKallowlist;1938 API2assertionsfailed+P1/P2threads;1858 conflicts+8threads+incompleteAlphaQA. ExistingPRs attached; Copilot requested1939. Do not overwrite active other-author branches or promote their changes in this scoped main release. Re-evaluate latestheads before merge.
+- Previous artifact-only dev57c6097 CI38766381129 and Alpha38766381148 both succeeded; actual observed Alpha remains1b961 source-equivalent, so don't infer liveSHA57 from workflow success. Current source follows latest matching deployment and served header, not historical green.
+- User explicitly approved sending the prepared public-log support request to GitHub Support; browser submission/result receipt remains pending. No additional message approval is needed for that exact support content.
+
+## Historical Cursor — 2026-10-16 00:55 KST
 
 User-authorized existing-page locality guidance and the Alpha CI repair are deployed. Source PR #1934 merged as `434f1a91faac9ad39116df78b4d47d351fe90082`. Scoped main PR #1935 merged as `63d02c11a5a963e30b763682bd86b16a9d59ad42`; production run `38758889378` completed API/Web/Gates, immutable images and Deploy successfully. Actual production headers at 00:45 KST reported that main SHA and runtime **1.9.3**. Fixed package manifests are 1.9.2 under the existing resolver; runtime was measured, not inferred. Main CodeQL `38758889943` passed all three languages.
 

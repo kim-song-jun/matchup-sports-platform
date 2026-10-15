@@ -1,8 +1,15 @@
+import { ForbiddenException, type INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import request = require('supertest');
 import { OptionalV1AuthGuard } from '../auth/optional-v1-auth.guard';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
+import type { V1AuthUser } from '../auth/v1-auth-user';
+import { createGlobalValidationPipe } from '../common/global-validation-pipe';
+import { TransformInterceptor } from '../common/interceptors/transform.interceptor';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatorProfileGuard } from '../profile/creator-profile.guard';
+import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
+import { FUTSAL_V1_CONFIG } from '../tournaments/competition-config/competition-config.presets';
 import { TeamMatchesController } from './team-matches.controller';
 import { TeamMatchLineupService } from './team-match-lineup.service';
 import { TeamMatchesService } from './team-matches.service';
@@ -305,5 +312,134 @@ describe('TeamMatchesController', () => {
       items: [{ teamMatchId: 'team-match-1', relation: 'host_team' }],
       pageInfo: { nextCursor: null, hasNext: false },
     });
+  });
+});
+
+describe('TeamMatchesController rule-options HTTP boundary', () => {
+  const hostTeamId = '11111111-1111-4111-8111-111111111111';
+  const otherTeamId = '22222222-2222-4222-8222-222222222222';
+  const owner: V1AuthUser = {
+    id: '33333333-3333-4333-8333-333333333333',
+    email: 'rule-owner@teameet.v1',
+    accountStatus: 'active',
+    onboardingStatus: 'completed',
+  };
+  const outsider: V1AuthUser = {
+    id: '44444444-4444-4444-8444-444444444444',
+    email: 'rule-outsider@teameet.v1',
+    accountStatus: 'active',
+    onboardingStatus: 'completed',
+  };
+  const ruleOptions = {
+    hostTeamId,
+    sportId: '55555555-5555-4555-8555-555555555555',
+    competitionConfigVersionId: '66666666-6666-4666-8666-666666666666',
+    periods: FUTSAL_V1_CONFIG.periods.map((period) => ({ ...period })),
+  };
+  const teamMatchesService = {
+    ruleOptions: jest.fn(async (actor: V1AuthUser, teamId: string) => {
+      if (actor.id !== owner.id || teamId !== hostTeamId) {
+        throw new ForbiddenException({
+          code: 'PERMISSION_DENIED',
+          message: '팀 관리 권한이 필요해요.',
+        });
+      }
+      return ruleOptions;
+    }),
+  };
+  let app: INestApplication;
+
+  beforeAll(async () => {
+    const moduleRef = await Test.createTestingModule({
+      controllers: [TeamMatchesController],
+      providers: [
+        { provide: TeamMatchesService, useValue: teamMatchesService },
+        { provide: TeamMatchLineupService, useValue: {} },
+        {
+          provide: PrismaService,
+          useValue: {
+            v1User: {
+              findFirst: jest.fn(async ({ where }: { where: { id?: string; email?: string } }) => {
+                const actor = [owner, outsider].find(
+                  (candidate) => candidate.id === where.id || candidate.email === where.email,
+                );
+                return actor
+                  ? { ...actor, phoneVerifiedAt: new Date('2026-10-13T00:00:00.000Z'), adminUser: null }
+                  : null;
+              }),
+            },
+          },
+        },
+        {
+          provide: ManagedTermsRuntimeService,
+          useValue: {
+            signupCompliance: jest.fn(async () => ({
+              compliant: true,
+              pendingRequiredDocumentIds: [],
+              nextRoute: null,
+            })),
+          },
+        },
+        V1AuthGuard,
+      ],
+    })
+      .overrideGuard(OptionalV1AuthGuard)
+      .useValue({ canActivate: () => true })
+      .overrideGuard(CreatorProfileGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
+
+    app = moduleRef.createNestApplication();
+    app.setGlobalPrefix('api/v1');
+    app.useGlobalPipes(createGlobalValidationPipe());
+    app.useGlobalInterceptors(new TransformInterceptor());
+    await app.init();
+  });
+
+  beforeEach(() => {
+    teamMatchesService.ruleOptions.mockClear();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('returns the authenticated host owner authoritative sport rules in the success envelope', async () => {
+    const response = await request(app.getHttpServer())
+      .get(`/api/v1/teams/${hostTeamId}/team-match-rule-options`)
+      .set('x-v1-user-id', owner.id)
+      .expect(200);
+
+    expect(response.body).toEqual({ status: 'success', data: ruleOptions, timestamp: expect.any(String) });
+    expect(teamMatchesService.ruleOptions).toHaveBeenCalledWith(expect.objectContaining(owner), hostTeamId);
+  });
+
+  it('rejects a rule-options request without an authenticated identity', async () => {
+    const response = await request(app.getHttpServer())
+      .get(`/api/v1/teams/${hostTeamId}/team-match-rule-options`)
+      .expect(401);
+
+    expect(response.body).toMatchObject({ code: 'UNAUTHENTICATED' });
+    expect(teamMatchesService.ruleOptions).not.toHaveBeenCalled();
+  });
+
+  it('passes the authenticated outsider identity to the host permission boundary', async () => {
+    const response = await request(app.getHttpServer())
+      .get(`/api/v1/teams/${hostTeamId}/team-match-rule-options`)
+      .set('x-v1-user-id', outsider.id)
+      .expect(403);
+
+    expect(response.body).toMatchObject({ code: 'PERMISSION_DENIED' });
+    expect(teamMatchesService.ruleOptions).toHaveBeenCalledWith(expect.objectContaining(outsider), hostTeamId);
+  });
+
+  it('passes the requested host team to the permission boundary instead of another team', async () => {
+    const response = await request(app.getHttpServer())
+      .get(`/api/v1/teams/${otherTeamId}/team-match-rule-options`)
+      .set('x-v1-user-id', owner.id)
+      .expect(403);
+
+    expect(response.body).toMatchObject({ code: 'PERMISSION_DENIED' });
+    expect(teamMatchesService.ruleOptions).toHaveBeenCalledWith(expect.objectContaining(owner), otherTeamId);
   });
 });

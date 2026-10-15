@@ -1,5 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { writeExpiringDraft } from '@/lib/expiring-draft';
 import { trackEvent } from '@/lib/analytics';
 import { toKstDateString } from '@/lib/kst-calendar';
 import type { TeamMatchCreateViewModel } from './team-matches.types';
@@ -30,8 +31,8 @@ const {
   teamMatchEditData: {
     teamMatchId: 'team-match-edit-1',
     editable: true,
-    lockedReason: null,
-    form: {
+    lockedReason: null, rulesEditable: false, rulesLockedReason: 'COMPETITION_CONFIG_REQUIRED' as const, competitionConfigVersionId: null,
+    form: { periods: null,
       hostTeamId: 'team-1',
       sportId: 'sport-futsal',
       regionId: 'region-gangnam',
@@ -93,6 +94,8 @@ vi.mock('@/hooks/use-v1-api', () => ({
   }),
   useV1CreateTeamMatch: () => ({ mutate: createTeamMatchMutate, isPending: false }),
   useV1UploadImages: () => ({ mutateAsync: uploadImagesMutateAsync, isPending: false }),
+  useV1TeamMatchRuleOptions: () => ({ data: { hostTeamId: 'team-1', sportId: 'sport-futsal', competitionConfigVersionId: 'fixture-config',
+    periods: [{ code: 'FIRST_HALF', label: '전반', durationMinutes: 17, extraTime: false }, { code: 'SECOND_HALF', label: '후반', durationMinutes: 19, extraTime: false }] }, isLoading: false, isFetching: false, isError: false, refetch: vi.fn() }),
   useV1TeamRecentVenues: () => ({ data: undefined }),
   useV1PlaceSearch: () => ({ data: undefined, error: null, isFetching: false, isError: false, refetch: vi.fn() }),
   useV1PublicKakaoMapsKey: () => ({ data: undefined }),
@@ -147,6 +150,9 @@ describe('TeamMatchCreatePageClient — GA events', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.clear();
+    writeExpiringDraft('teameet:v1:team-match-draft:v3', { ...getTeamMatchCreateViewModel('confirm').draft,
+      rules: { hostTeamId: 'team-1', sportId: 'sport-futsal', competitionConfigVersionId: 'fixture-config', mode: 'custom',
+        periods: [{ durationMinutes: 17 }, { durationMinutes: 19 }], confirmed: true } });
     createTeamMatchMutate.mockImplementation((_payload, { onSuccess }) => {
       onSuccess({ teamMatchId: 'team-match-new', detailRoute: '/team-matches/team-match-new' });
     });
@@ -238,8 +244,8 @@ describe('team match edit hydration', () => {
     const draft = draftFromTeamMatchEdit({
       teamMatchId: 'team-match-kst',
       editable: true,
-      lockedReason: null,
-      form: {
+      lockedReason: null, rulesEditable: false, rulesLockedReason: 'COMPETITION_CONFIG_REQUIRED' as const, competitionConfigVersionId: null,
+      form: { periods: null,
         hostTeamId: 'team-real',
         sportId: 'sport-futsal',
         regionId: 'region-gangnam',
@@ -269,8 +275,8 @@ describe('team match edit hydration', () => {
     const draft = draftFromTeamMatchEdit({
       teamMatchId: 'team-match-real',
       editable: true,
-      lockedReason: null,
-      form: {
+      lockedReason: null, rulesEditable: false, rulesLockedReason: 'COMPETITION_CONFIG_REQUIRED' as const, competitionConfigVersionId: null,
+      form: { periods: null,
         hostTeamId: 'team-real',
         sportId: 'sport-futsal',
         regionId: 'region-gangnam',
@@ -291,8 +297,8 @@ describe('team match edit hydration', () => {
     startsAt.setHours(19, 0, 0, 0);
     const deadlineAt = new Date(startsAt.getTime() - 24 * 60 * 60 * 1000);
     const edit = {
-      teamMatchId: 'team-match-image', editable: true, lockedReason: null,
-      form: {
+      teamMatchId: 'team-match-image', editable: true, lockedReason: null, rulesEditable: false, rulesLockedReason: 'COMPETITION_CONFIG_REQUIRED' as const, competitionConfigVersionId: null,
+      form: { periods: null,
         hostTeamId: 'team-1', sportId: 'sport-futsal', regionId: 'region-gangnam',
         title: '이미지 팀매치', imageUrl: '/uploads/team-match-cover.webp',
         listImageUrl: '/uploads/team-match-list.webp',
@@ -330,8 +336,8 @@ describe('team match edit hydration', () => {
     const draft = draftFromTeamMatchEdit({
       teamMatchId: 'team-match-legacy-mid-blank',
       editable: true,
-      lockedReason: null,
-      form: {
+      lockedReason: null, rulesEditable: false, rulesLockedReason: 'COMPETITION_CONFIG_REQUIRED' as const, competitionConfigVersionId: null,
+      form: { periods: null,
         hostTeamId: 'team-real',
         sportId: 'sport-futsal',
         regionId: 'region-gangnam',
@@ -394,7 +400,7 @@ describe('team-match place payload', () => {
 
   it('좌표가 있는 수정 응답은 핀이 있는 장소로, 없는 옛 응답은 직접 입력 장소로 복원한다', () => {
     const form = { ...teamMatchEditData.form, manualPlaceName: '망원한강공원 풋살장', addressText: '서울 마포구 마포나루길 467' };
-    expect(draftFromTeamMatchEdit({ ...teamMatchEditData, status: 'recruiting' as const, form: { ...form, placeLatitude: 37.5558, placeLongitude: 126.8985, placeProvider: 'kakao', placeProviderId: 'k-1' } }).place)
+    expect(draftFromTeamMatchEdit({ ...teamMatchEditData, status: 'recruiting' as const, form: { periods: null, ...form, placeLatitude: 37.5558, placeLongitude: 126.8985, placeProvider: 'kakao', placeProviderId: 'k-1' } }).place)
       .toMatchObject({ kind: 'picked', providerPlaceId: 'k-1' });
     expect(draftFromTeamMatchEdit({ ...teamMatchEditData, status: 'recruiting' as const, form }).place)
       .toEqual({ kind: 'manual', name: '망원한강공원 풋살장', address: '서울 마포구 마포나루길 467' });

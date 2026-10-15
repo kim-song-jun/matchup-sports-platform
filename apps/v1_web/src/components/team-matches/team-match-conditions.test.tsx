@@ -39,6 +39,8 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1UpdateTeamMatch: () => ({ mutate: state.update, isPending: false }),
   useV1CancelTeamMatch: () => ({ mutate: vi.fn(), isPending: false }),
   useV1UploadImages: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useV1TeamMatchRuleOptions: () => ({ data: { hostTeamId: 'conditions-host', sportId: 'sport-futsal', competitionConfigVersionId: 'conditions-config',
+    periods: [{ code: 'FIRST_HALF', label: '전반', durationMinutes: 17, extraTime: false }, { code: 'SECOND_HALF', label: '후반', durationMinutes: 19, extraTime: false }] }, isLoading: false, isFetching: false, isError: false, refetch: vi.fn() }),
   useV1TeamRecentVenues: () => ({ data: { items: [] } }),
   useV1PlaceSearch: () => ({ data: undefined, error: null, isFetching: false, isError: false, refetch: vi.fn() }),
   useV1PublicKakaoMapsKey: () => ({ data: undefined }),
@@ -58,8 +60,8 @@ function storedDraft(grade = '', gender = '성별 무관') {
 }
 function editFixture(minLevelCode: string | null, maxLevelCode: string | null, genderRule = '성별 무관'): V1TeamMatchEdit {
   return {
-    teamMatchId: 'conditions-match', editable: true, lockedReason: null, status: 'recruiting', version: 'v1',
-    form: {
+    teamMatchId: 'conditions-match', editable: true, lockedReason: null, rulesEditable: false, rulesLockedReason: 'COMPETITION_CONFIG_REQUIRED', competitionConfigVersionId: null, status: 'recruiting', version: 'v1',
+    form: { periods: null,
       hostTeamId: 'conditions-host', sportId: 'sport-futsal', regionId: 'region-gangnam',
       title: '합성 수정 팀매치', description: '저장된 설명', startsAt: '2030-10-10T09:00:00.000Z',
       endsAt: null, deadlineAt: null, manualPlaceName: '합성 풋살장',
@@ -87,8 +89,13 @@ describe('#1599 actual team-match create/edit conditions', () => {
     await user.selectOptions(screen.getByLabelText('최대 등급'), 'intermediate');
     await user.click(screen.getByRole('button', { name: '혼성' }));
     await user.click(screen.getByRole('button', { name: '다음' }));
+    expect(state.push).toHaveBeenCalledWith('/team-matches/new/rules');
+    first.unmount(); state.pathname = '/team-matches/new/rules';
+    const rules = renderClient(<TeamMatchCreatePageClient step="rules" />);
+    await screen.findByLabelText('전반 시간');
+    await user.click(screen.getByRole('button', { name: '다음' }));
     expect(state.push).toHaveBeenCalledWith('/team-matches/new/place-time');
-    first.unmount(); state.pathname = '/team-matches/new/confirm';
+    rules.unmount(); state.pathname = '/team-matches/new/confirm';
     renderClient(<TeamMatchCreatePageClient step="confirm" />);
     expect(screen.getAllByText(/입문-중수/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/혼성/).length).toBeGreaterThan(0);
@@ -173,7 +180,7 @@ describe('#1599 actual team-match create/edit conditions', () => {
     await user.selectOptions(screen.getByLabelText('최소 등급'), 'novice');
     await user.selectOptions(screen.getByLabelText('최대 등급'), 'advanced');
     await user.click(screen.getByRole('button', { name: '다음' }));
-    expect(state.push).toHaveBeenCalledWith('/team-matches/new/place-time');
+    expect(state.push).toHaveBeenCalledWith('/team-matches/new/rules');
     expect(readExpiringDraft<{ grade: string }>(draftKey)?.grade).toBe('초보-고수');
   });
 
@@ -187,7 +194,7 @@ describe('#1599 actual team-match create/edit conditions', () => {
     await user.selectOptions(screen.getByLabelText('최소 등급'), 'novice');
     await user.selectOptions(screen.getByLabelText('최대 등급'), 'intermediate');
     await user.click(screen.getByRole('button', { name: '다음' }));
-    expect(state.push).toHaveBeenCalledWith('/team-matches/new/place-time');
+    expect(state.push).toHaveBeenCalledWith('/team-matches/new/rules');
     expect(readExpiringDraft<{ grade: string }>(draftKey)?.grade).toBe('초보-중수');
   });
 

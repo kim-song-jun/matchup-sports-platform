@@ -4,44 +4,14 @@ import { V1AuthUser } from '../../auth/v1-auth-user';
 import { AdminContextService } from '../../common/admin-context.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { competitionConfigContentHash, validateCompetitionConfig } from './competition-config';
+import { normalizeCompetitionPeriods as normalizeTournamentPeriods } from './competition-config-periods';
 import { UpdateTournamentPeriodSettingsDto } from './tournament-period-settings.dto';
 import { ALL_COMPETITION_KINDS, findTournamentOnSurface } from '../tournament-surface-lookup';
 
 type StoredPeriod = { code: string; label: string; durationMinutes: number; extraTime: boolean };
 type PeriodRead = { periods: StoredPeriod[] | null; legacyPeriodCount: number | null };
 
-export function normalizeTournamentPeriods(
-  current: readonly StoredPeriod[],
-  requested: readonly { durationMinutes: number }[],
-): StoredPeriod[] {
-  if (requested.length === 0) {
-    throw new UnprocessableEntityException({ code: 'TOURNAMENT_PERIODS_REQUIRED', message: '피리어드는 하나 이상 필요해요.' });
-  }
-  const usedCodes = new Set(current.map((period) => period.code));
-  if (usedCodes.size !== current.length) {
-    throw new UnprocessableEntityException({
-      code: 'COMPETITION_PERIODS_UNAVAILABLE',
-      message: '현재 대회의 피리어드 코드가 중복돼 있어요. 먼저 유효한 경기 설정 버전을 연결해 주세요.',
-    });
-  }
-  const shrinkingStandardHalves = requested.length === 1 && current.length >= 2 && current[0]?.code === 'FIRST_HALF' && current[1]?.code === 'SECOND_HALF';
-  return requested.map((period, index) => {
-    const previous = current[index];
-    let code = previous?.code;
-    if (!code) {
-      let suffix = index + 1;
-      code = `PERIOD_${suffix}`;
-      while (usedCodes.has(code)) code = `PERIOD_${++suffix}`;
-      usedCodes.add(code);
-    }
-    return {
-      code: shrinkingStandardHalves ? 'SINGLE_PERIOD' : code,
-      label: shrinkingStandardHalves ? '단일' : (previous?.label ?? `${index + 1}피리어드`),
-      durationMinutes: period.durationMinutes,
-      extraTime: previous?.extraTime ?? false,
-    };
-  });
-}
+export { normalizeCompetitionPeriods as normalizeTournamentPeriods } from './competition-config-periods';
 
 function periodsEqual(left: readonly StoredPeriod[], right: readonly StoredPeriod[]) {
   return JSON.stringify(left) === JSON.stringify(right);

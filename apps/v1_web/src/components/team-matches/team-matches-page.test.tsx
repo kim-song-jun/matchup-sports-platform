@@ -670,7 +670,7 @@ describe('TeamMatchCreatePageView — 단계 h1(질문형)과 캡션(단계 이�
     expect(screen.queryByRole('heading', { level: 1, name: '경기조건' })).not.toBeInTheDocument();
   });
 
-  it('5단계(장소와 시간): 캡션은 "장소와 시간", h1 은 질문형 "언제, 어디서 하나요?"', () => {
+  it('6단계(장소와 시간): 캡션은 "장소와 시간", h1 은 질문형 "언제, 어디서 하나요?"', () => {
     renderPage(<TeamMatchCreatePageView model={getTeamMatchCreateViewModel('place-time')} />);
 
     expect(screen.getByRole('heading', { level: 1, name: '언제, 어디서 하나요?' })).toBeInTheDocument();
@@ -710,7 +710,7 @@ describe('팀매치 만들기 진행 표시줄 — 클릭 이동', () => {
     expect(screen.getByRole('button', { name: '3단계 매치 정보로 이동' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '4단계 경기조건으로 이동' })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: '5단계 장소와 시간으로 이동' }));
+    fireEvent.click(screen.getByRole('button', { name: '6단계 장소와 시간으로 이동' }));
     expect(onGoToStep).toHaveBeenCalledWith('place-time');
   });
 

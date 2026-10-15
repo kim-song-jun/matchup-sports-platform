@@ -201,3 +201,21 @@ describe('결과 라우트 기본 제목 — 리그 대진에 없는 행동을 �
     });
   }
 });
+
+
+describe('MD-QA #141 separate team-match rules route chrome', () => {
+  it('creation rules retains the matches shell and returns to the actual previous condition step', () => {
+    const resolved = resolveRouteChrome('/team-matches/new/rules');
+    expect(resolved?.chrome).toMatchObject({ title: '경기 규칙 설정', activeTab: 'matches', bottomNav: false, desktopHead: true, backHref: '/team-matches/new/condition' });
+    expect(resolved?.params).toEqual({});
+  });
+  it('edit rules retains its current entity in the shell back link', () => {
+    const resolved = resolveRouteChrome('/team-matches/mdqa141-current/edit/rules');
+    expect(resolved?.chrome).toMatchObject({ title: '경기 규칙 설정', activeTab: 'matches', bottomNav: false, desktopHead: true });
+    const back = resolved?.chrome.backHref;
+    expect(typeof back).toBe('function');
+    expect(typeof back === 'function' ? back(resolved!.params) : back).toBe('/team-matches/mdqa141-current/edit');
+    expect(resolveRouteChrome('/team-matches/new/condition')?.params).toEqual({});
+    expect(resolveRouteChrome('/team-matches/mdqa141-current/edit')?.chrome.title).toBe('팀매치 수정');
+  });
+});

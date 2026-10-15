@@ -167,6 +167,7 @@ import type {
   V1TeamMatchApplicationResult,
   V1TeamMatchApplicationsPage,
   V1TeamMatchEdit,
+  V1TeamMatchRuleOptions,
   V1TeamMatchEligibility,
   V1TeamMatchLineup,
   V1TeamMatchLineupChangeRequestResult,
@@ -1776,6 +1777,16 @@ export function useV1TeamMatchEdit(teamMatchId: string) {
   });
 }
 
+export function useV1TeamMatchRuleOptions(hostTeamId: string, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: [...v1Keys.team(hostTeamId), 'team-match-rule-options'] as const,
+    queryFn: () => v1Get<V1TeamMatchRuleOptions>(`/teams/${hostTeamId}/team-match-rule-options`),
+    enabled: Boolean(hostTeamId) && (options?.enabled ?? true),
+    // 새 생성 여정에서는 현재 팀 권한과 활성 기본 설정을 다시 확인해야 한다.
+    staleTime: 0,
+  });
+}
+
 export function useV1TeamMatchEligibility(teamMatchId: string, filters?: ListFilters, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: [...v1Keys.teamMatch(teamMatchId), 'application-eligibility', filters ?? {}] as const,
@@ -1790,7 +1801,7 @@ export function useV1CreateTeamMatch() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: V1TeamMatchMutationPayload) => v1Post<V1TeamMatchMutationResult>('/team-matches', body),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.teamMatches() }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.teamMatchesAll() }),
   });
 }
 
@@ -1798,9 +1809,13 @@ export function useV1UpdateTeamMatch(teamMatchId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: V1TeamMatchUpdatePayload) => v1Patch<V1TeamMatchMutationResult>(`/team-matches/${teamMatchId}`, body),
-    onSuccess: () => {
+    onSuccess: (result, body) => {
       queryClient.invalidateQueries({ queryKey: v1Keys.teamMatch(teamMatchId) });
-      queryClient.invalidateQueries({ queryKey: v1Keys.teamMatches() });
+      queryClient.invalidateQueries({ queryKey: v1Keys.teamMatchesAll() });
+      // 규칙 repin은 별도 Game/운영 콘솔 캐시에도 영향을 준다. 응답의 실제 경기만 갱신한다.
+      if (body.periods !== undefined && result.gameId) {
+        queryClient.invalidateQueries({ queryKey: v1Keys.game(result.gameId) });
+      }
     },
   });
 }

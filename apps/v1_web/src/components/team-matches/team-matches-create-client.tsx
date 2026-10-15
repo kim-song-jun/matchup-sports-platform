@@ -14,6 +14,7 @@ import {
   useV1MasterSports,
   useV1MyTeams,
   useV1TeamMatchEdit,
+  useV1TeamMatchRuleOptions,
   useV1TeamRecentVenues,
   useV1UpdateTeamMatch,
   useV1UploadImages,
@@ -21,6 +22,10 @@ import {
 import { trackEvent } from '@/lib/analytics';
 import { clearExpiringDraft, draftStorageAvailable, readExpiringDraft, writeExpiringDraft } from '@/lib/expiring-draft';
 import { extractErrorMessage } from '@/lib/error-message';
+import { V1ApiError } from '@/lib/api-client';
+import { ErrorState } from '@/components/v1-ui/primitives';
+import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
+import { readTeamMatchRuleDraft, ruleDraftForOptions, ruleDraftForEdit, ruleDraftMatches, validTeamMatchPeriods, teamMatchEditDraftKey, readTeamMatchEditDraft } from './team-match-rules-draft';
 import { placeFromEditForm, type PlaceValue } from '@/lib/place';
 import { getCreatorProfilePrompt, profileEditHref } from '@/lib/creator-profile';
 import { formatTeamMatchLevelRange } from '@/lib/team-match-level-range';
@@ -42,7 +47,7 @@ import {
 } from './team-matches.validation';
 import { getTeamMatchCreateViewModel } from './team-matches.view-model';
 
-const CREATE_STEP_ORDER: TeamMatchCreateStep[] = ['team', 'sport', 'info', 'condition', 'place-time'];
+const CREATE_STEP_ORDER: TeamMatchCreateStep[] = ['team', 'sport', 'info', 'condition', 'rules', 'place-time'];
 // 진행 표시줄 클릭 이동에서 앞/뒤 판정에 쓴다 — confirm은 필수 필드가 없어
 // CREATE_STEP_ORDER(스텝 게이팅 대상)에는 없지만 이동 순서상 마지막 스텝이다.
 const FULL_STEP_ORDER: TeamMatchCreateStep[] = [...CREATE_STEP_ORDER, 'confirm'];
@@ -53,7 +58,7 @@ const selectionKey = 'teameet:v1:team-match-selection';
 type TeamMatchDraft = TeamMatchCreateViewModel['draft'];
 type TeamMatchSelection = { teamId: string; sportId: string; regionId: string };
 
-export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCreateStep, 'edit'> }) {
+export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCreateStep, 'edit' | 'edit-rules'> }) {
   const router = useRouter();
   // 마법사에 들어온 출처(예: 팀 상세)를 단계 사이에 실어 나른다 — 첫 단계 취소가 그 출처로 돌아간다.
   const from = sanitizeRedirectPath(useSearchParams().get('from'));
@@ -62,6 +67,7 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
   const sports = useV1MasterSports();
   const regions = useV1MasterRegions();
   const createTeamMatch = useV1CreateTeamMatch();
+  const createSubmissionRef = useRef(false);
   const uploadImages = useV1UploadImages();
   const [imageUploading, setImageUploading] = useState(false);
   const [draft, setDraft] = usePersistedDraft();
@@ -139,24 +145,36 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
   // #3 1단계: 이 팀이 확정되기 전(team 스텝 hydrate 이전)엔 훅 내부 enabled 게이트로 대기.
   const recentVenues = useV1TeamRecentVenues(selectedTeamId);
   const updateSelection = (updater: (current: TeamMatchSelection) => TeamMatchSelection) => {
-    setSelection((current) => {
-      const next = updater(current);
-      writeExpiringDraft(selectionKey, next);
-      return next;
-    });
+    const next = updater(selection);
+    if (next.teamId !== selection.teamId || next.sportId !== selection.sportId) {
+      setDraft((current) => ({ ...current, rules: undefined }));
+    }
+    writeExpiringDraft(selectionKey, next);
+    setSelection(next);
   };
+  const rulesScreen = step === 'rules' || step === 'confirm';
+  const ruleOptions = useV1TeamMatchRuleOptions(selectedTeamId, { enabled: selectionHydrated && rulesScreen });
+  const ruleDraft = ruleDraftMatches(draft.rules, selectedTeamId, selectedSportId) ? draft.rules : undefined;
+  const defaultOnly = ruleOptions.error instanceof V1ApiError && ruleOptions.error.code === 'COMPETITION_PERIODS_UNAVAILABLE';
+  useEffect(() => {
+    const options = ruleOptions.data;
+    if (step !== 'rules' || !options || options.hostTeamId !== selectedTeamId || options.sportId !== selectedSportId) return;
+    if (!ruleDraft || ruleDraft.mode !== 'custom' || ruleDraft.competitionConfigVersionId !== options.competitionConfigVersionId) {
+      setDraft((current) => ({ ...current, rules: ruleDraftForOptions(options) }));
+    }
+  }, [step, ruleOptions.data, selectedTeamId, selectedSportId, ruleDraft, setDraft]);
 
   // #1·#2 결정의 공유 소스: 이 ctx로 스텝 게이팅과 최종 제출 결측 필드 안내를 둘 다 계산한다.
   const hasEligibleSelectedTeam = creatableTeams.some((team) => team.teamId === selectedTeamId);
-  const validationCtx = { hostTeamId: hasEligibleSelectedTeam ? selectedTeamId : '', sportId: selectedSportId, regionId, draft };
+  const validationCtx = { hostTeamId: hasEligibleSelectedTeam ? selectedTeamId : '', sportId: selectedSportId, regionId, draft, requireRules: true };
   const fieldErrors = attempted ? getTeamMatchStepErrors(validationCtx, step) : {};
   const missingFields = attempted && step === 'confirm' ? getTeamMatchMissingFields(validationCtx) : [];
   const completeSteps = getCompleteTeamMatchSteps(validationCtx, CREATE_STEP_ORDER);
 
   useEffect(() => {
     if (!pendingFocusField) return;
-    const el = pendingFocusField === 'grade'
-      ? document.querySelector<HTMLElement>('[data-team-match-field="grade"]')
+    const el = pendingFocusField === 'grade' || pendingFocusField === 'rules'
+      ? document.querySelector<HTMLElement>(`[data-team-match-field="${pendingFocusField}"]`)
       : document.getElementById(`field-${pendingFocusField}`);
     el?.focus();
     setPendingFocusField(null);
@@ -207,6 +225,26 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
     completeSteps,
     recentVenues: recentVenues.data?.items,
     submitting: createTeamMatch.isPending || imageUploading,
+    primaryBlocked: rulesScreen && (ruleOptions.isFetching || (!ruleOptions.data && !defaultOnly)
+      || (ruleOptions.isError && !(defaultOnly && ruleDraft?.mode === 'default'))),
+    rules: {
+      periods: ruleDraft?.periods ?? null,
+      defaultPeriods: ruleOptions.data?.periods,
+      loading: ruleOptions.isLoading,
+      error: ruleOptions.isError ? extractErrorMessage(ruleOptions.error, '경기 규칙을 불러오지 못했어요.') : null,
+      validationError: fieldErrors.rules,
+      allowDefaultChoice: defaultOnly,
+      defaultSelected: ruleDraft?.mode === 'default',
+      onKeepDefault: () => setDraft((current) => ({ ...current, rules: { hostTeamId: selectedTeamId, sportId: selectedSportId,
+        competitionConfigVersionId: null, mode: 'default', periods: null, confirmed: false } })),
+      retryPending: ruleOptions.isFetching,
+      onRetry: () => { void ruleOptions.refetch(); },
+      onChange: (periods) => {
+        const options = ruleOptions.data;
+        if (!options || options.hostTeamId !== selectedTeamId || options.sportId !== selectedSportId) return;
+        setDraft((current) => ({ ...current, rules: { ...ruleDraftForOptions(options), periods, confirmed: false } }));
+      },
+    },
     imageUploading,
     uploadImage: async (file) => {
       setImageUploading(true);
@@ -252,6 +290,19 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
     },
     onGoToStep: handleGoToStep,
     onNext: () => {
+      if (step === 'rules') {
+        const supported = ruleDraft?.mode === 'custom' && validTeamMatchPeriods(ruleDraft.periods)
+          && ruleOptions.data?.competitionConfigVersionId === ruleDraft.competitionConfigVersionId && !ruleOptions.isError;
+        const preserveDefault = defaultOnly && ruleDraft?.mode === 'default';
+        if (!ruleDraft || (!supported && !preserveDefault) || ruleOptions.isFetching) {
+          setAttempted(true);
+          setPendingFocusField('rules');
+          return;
+        }
+        setDraft((current) => ({ ...current, rules: { ...ruleDraft, confirmed: true } }));
+        router.push(withFromPath(nextHref(step), from));
+        return;
+      }
       // 팀 스텝의 데이터 준비·권한 게이트는 TeamMatchCreatePageView의 disabled CTA와
       // 이 방어 가드가 함께 보장한다. 그 외 스텝은 클릭 시 필수 필드를 로컬 검증한다.
       const errors = getTeamMatchStepErrors(validationCtx, step);
@@ -264,18 +315,24 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
       router.push(withFromPath(nextHref(step), from));
     },
     onSubmit: () => {
-      // 로딩 중 재클릭 시 중복 제출 방지 — isPending 은 disabled 속성과 동일하게 리렌더
-      // 이후에나 반영되는 값이라 동시 클릭까지 막지는 못하지만, 스피너가 보이는 동안의
-      // 재클릭은 막는다(동시 클릭 방지가 필요하면 ref 락을 따로 둔다).
-      if (createTeamMatch.isPending) return;
+      // 상태가 갱신되기 전 연속 클릭도 같은 저장 요청으로 묶어요.
+      if (createSubmissionRef.current || createTeamMatch.isPending || ruleOptions.isFetching || imageUploading) return;
+      const ruleCurrent = ruleDraft?.mode === 'custom' && ruleOptions.data?.competitionConfigVersionId === ruleDraft.competitionConfigVersionId
+        && !ruleOptions.isError;
+      if (!ruleCurrent && !(defaultOnly && ruleDraft?.mode === 'default')) {
+        setAttempted(true);
+        setError(ruleOptions.isError ? extractErrorMessage(ruleOptions.error, '경기 규칙을 확인해 주세요.') : '경기 규칙을 다시 확인해 주세요.');
+        return;
+      }
       setError(null);
-      const payloadResult = buildTeamMatchPayloadResult(draft, selectedTeamId, selectedSportId, regionId);
+      const payloadResult = buildTeamMatchPayloadResult(draft, selectedTeamId, selectedSportId, regionId, undefined, true);
       if (payloadResult.missingFields) {
         // #2: 하드코딩된 고정 문구 대신 실제 결측 필드만 지목 — model.form.missingFields로 전달되고
         // ConfirmStep이 각 항목을 해당 스텝 링크와 함께 렌더링한다.
         setAttempted(true);
         return;
       }
+      createSubmissionRef.current = true;
       createTeamMatch.mutate(payloadResult.payload, {
         onSuccess: (result) => {
           clearExpiringDraft(storageKey);
@@ -284,6 +341,7 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
           router.push(result.detailRoute || `/team-matches/${result.teamMatchId}`);
         },
         onError: (err) => {
+          createSubmissionRef.current = false;
           const prompt = getCreatorProfilePrompt(err, '팀매치');
           if (prompt) {
             setError(prompt);
@@ -312,7 +370,7 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
   );
 }
 
-export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }) {
+export function TeamMatchEditPageClient({ teamMatchId, rulesStep = false }: { teamMatchId: string; rulesStep?: boolean }) {
   const router = useRouter();
   // 상세가 넘긴 출처(자기 ?from= 포함)가 있으면 취소·저장 뒤 그 상세로 돌아가 체인을 잇는다.
   const fromDetail = sanitizeRedirectPath(useSearchParams().get('from'));
@@ -323,6 +381,7 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
   const sports = useV1MasterSports();
   const regions = useV1MasterRegions();
   const updateTeamMatch = useV1UpdateTeamMatch(teamMatchId);
+  const editSubmissionRef = useRef(false);
   const cancelTeamMatch = useV1CancelTeamMatch(teamMatchId);
   const uploadImages = useV1UploadImages();
   const [imageUploading, setImageUploading] = useState(false);
@@ -335,7 +394,24 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
   // "변경사항 저장"을 한 번이라도 눌러본 뒤에만 인라인 에러를 보여준다(#1과 동일한 UX 원칙).
   const [editAttempted, setEditAttempted] = useState(false);
   const [editTouched, setEditTouched] = useState(false);
-  const { UnsavedChangesModal, confirmLeave } = useUnsavedChangesGuard(editTouched);
+  const { UnsavedChangesModal, confirmLeave } = useUnsavedChangesGuard(editTouched,
+    { scope: '/team-matches/' + teamMatchId + '/edit', draftSaved: true });
+  const [editRulesChanged, setEditRulesChanged] = useState(false);
+  const editDraftRef = useRef(draft);
+  const editIdentityRef = useRef('');
+  const editStorageKey = teamMatchEditDraftKey(teamMatchId);
+  const editRuleOptions = useV1TeamMatchRuleOptions(editQuery.data?.form.hostTeamId ?? '',
+    { enabled: rulesStep && editQuery.data?.teamMatchId === teamMatchId && editQuery.data.rulesEditable });
+  const persistEditDraft = (nextDraft: TeamMatchDraft, nextRegion = regionId, rulesChanged = editRulesChanged, touched = true) => {
+    editDraftRef.current = nextDraft;
+    setDraft(nextDraft);
+    setEditTouched(touched);
+    setEditRulesChanged(rulesChanged);
+    if (!editQuery.data || editQuery.data.teamMatchId !== teamMatchId || !version) return;
+    writeExpiringDraft(editStorageKey, { teamMatchId, version,
+      competitionConfigVersionId: editQuery.data.competitionConfigVersionId,
+      regionId: nextRegion, draft: nextDraft, rulesChanged, touched });
+  };
   const myTeams = normalizeMyTeams(teams.data) ?? [];
   const currentTeam = myTeams.find((team) => team.teamId === editQuery.data?.form.hostTeamId);
   const teamOptions = editQuery.data
@@ -359,13 +435,24 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
       : [];
 
   useEffect(() => {
-    if (!editQuery.data) return;
-    setDraft(draftFromTeamMatchEdit(editQuery.data));
-    setSelectedTeamId(editQuery.data.form.hostTeamId);
-    setSelectedSportId(editQuery.data.form.sportId);
-    setRegionId(editQuery.data.form.regionId);
-    setVersion(editQuery.data.version);
-  }, [editQuery.data]);
+    const edit = editQuery.data;
+    if (!edit || edit.teamMatchId !== teamMatchId) return;
+    const identity = edit.teamMatchId + ':' + edit.version + ':' + edit.competitionConfigVersionId;
+    if (editIdentityRef.current === identity) return;
+    const stored = readExpiringDraft<unknown>(editStorageKey);
+    const restored = readTeamMatchEditDraft(stored, edit);
+    if (stored !== null && !restored) clearExpiringDraft(editStorageKey);
+    const nextDraft = restored?.draft ?? draftFromTeamMatchEdit(edit);
+    editDraftRef.current = nextDraft;
+    editIdentityRef.current = identity;
+    setDraft(nextDraft);
+    setSelectedTeamId(edit.form.hostTeamId);
+    setSelectedSportId(edit.form.sportId);
+    setRegionId(restored?.regionId ?? edit.form.regionId);
+    setVersion(edit.version);
+    setEditRulesChanged(restored?.rulesChanged ?? false);
+    setEditTouched(restored?.touched ?? false);
+  }, [editQuery.data, editStorageKey, teamMatchId]);
 
   // #2: edit 화면은 스텝 구분이 없는 한 화면이라 getTeamMatchMissingFields 를 그대로
   // 평탄화(toFieldErrorMap)해서 각 CreateField 아래 인라인 에러로 붙인다.
@@ -374,7 +461,7 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
   const editFieldErrors = toFieldErrorMap(editMissingFields);
 
   const model = buildCreateModel({
-    step: 'edit',
+    step: rulesStep ? 'edit-rules' : 'edit',
     draft,
     selectedTeamId,
     selectedSportId,
@@ -382,6 +469,29 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
     teams: teamOptions,
     sports: sportOptions,
     regions: editRegionOptions,
+    rules: {
+      periods: draft.rules?.periods ?? editQuery.data?.form.periods ?? null,
+      defaultPeriods: editRuleOptions.data?.periods,
+      loading: editRuleOptions.isLoading,
+      error: editRuleOptions.isError ? extractErrorMessage(editRuleOptions.error, '경기 규칙을 불러오지 못했어요.') : null,
+      validationError: editAttempted && !validTeamMatchPeriods(draft.rules?.periods) ? '경기 시간은 1분 이상의 정수로 입력해 주세요.' : undefined,
+      lockedReason: editQuery.data?.rulesEditable === false ? ruleLockedMessage(editQuery.data.rulesLockedReason) : null,
+      retryPending: editRuleOptions.isFetching,
+      onRetry: () => { void editRuleOptions.refetch(); },
+      onChange: (periods) => {
+        if (!editQuery.data?.rulesEditable || !draft.rules) return;
+        const rules = { ...draft.rules, periods, confirmed: false };
+        const changed = JSON.stringify(periods) !== JSON.stringify(editQuery.data.form.periods);
+        persistEditDraft({ ...editDraftRef.current, rules }, regionId, changed);
+      },
+    },
+    primaryBlocked: rulesStep && editQuery.data?.rulesEditable === true
+      && (editRuleOptions.isFetching || editRuleOptions.isError || !editRuleOptions.data),
+    onOpenRules: () => {
+      if (!editQuery.data || editQuery.data.teamMatchId !== teamMatchId || !version) return;
+      persistEditDraft(editDraftRef.current, regionId, editRulesChanged, editTouched);
+      router.push(withFromPath('/team-matches/' + teamMatchId + '/edit/rules', fromDetail));
+    },
     error: editQuery.isError ? '수정 권한이 없거나 팀매치를 불러오지 못했어요.' : error,
     lockedReason: editQuery.data?.editable === false
       ? lockedReasonLabel(editQuery.data.lockedReason ?? '')
@@ -402,27 +512,46 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
     },
     onSelectTeam: () => undefined,
     onSelectSport: () => undefined,
-    onFieldChange: (field, value) => {
-      setEditTouched(true);
-      setDraft((current) => ({ ...current, [field]: value }));
-    },
+    onFieldChange: (field, value) => persistEditDraft({ ...editDraftRef.current, [field]: value }),
     onRegionChange: (value) => {
-      setEditTouched(true);
       setRegionId(value);
+      persistEditDraft(editDraftRef.current, value);
     },
     onBack: () => {
+      if (rulesStep) {
+        router.push(withFromPath('/team-matches/' + teamMatchId + '/edit', fromDetail));
+        return;
+      }
       void confirmLeave().then((leave) => {
-        if (leave) router.push(detailHref);
+        if (leave) { clearExpiringDraft(editStorageKey); router.push(detailHref); }
       });
     },
-    onNext: () => undefined,
+    onNext: () => {
+      if (!editQuery.data?.rulesEditable) {
+        router.push(withFromPath('/team-matches/' + teamMatchId + '/edit', fromDetail));
+        return;
+      }
+      if (!draft.rules || !validTeamMatchPeriods(draft.rules.periods) || editRuleOptions.isError
+        || !editRuleOptions.data || editRuleOptions.data.hostTeamId !== editQuery.data.form.hostTeamId
+        || editRuleOptions.data.sportId !== editQuery.data.form.sportId
+        || draft.rules.competitionConfigVersionId !== editQuery.data.competitionConfigVersionId || editRuleOptions.isFetching) {
+        setEditAttempted(true);
+        return;
+      }
+      persistEditDraft({ ...editDraftRef.current, rules: { ...draft.rules, confirmed: true } });
+      router.push(withFromPath('/team-matches/' + teamMatchId + '/edit', fromDetail));
+    },
     onSubmit: () => {
-      // 로딩 중 재클릭 시 중복 제출 방지 — isPending 은 disabled 속성과 동일하게 리렌더
-      // 이후에나 반영되는 값이라 동시 클릭까지 막지는 못하지만, 스피너가 보이는 동안의
-      // 재클릭은 막는다(동시 클릭 방지가 필요하면 ref 락을 따로 둔다).
-      if (updateTeamMatch.isPending || cancelTeamMatch.isPending) return;
+      // 상태가 갱신되기 전 연속 클릭도 같은 저장 요청으로 묶어요.
+      if (editSubmissionRef.current || updateTeamMatch.isPending || cancelTeamMatch.isPending || imageUploading) return;
       setError(null);
-      const payloadResult = buildTeamMatchPayloadResult(draft, selectedTeamId, selectedSportId, regionId, editQuery.data?.form.deadlineAt);
+      if (!editQuery.data || editQuery.data.teamMatchId !== teamMatchId || version !== editQuery.data.version
+        || (editRulesChanged && !editQuery.data.rulesEditable)) {
+        setError('최신 경기 정보와 수정 가능 여부를 확인해 주세요.');
+        return;
+      }
+      const payloadDraft = editRulesChanged ? draft : { ...draft, rules: undefined };
+      const payloadResult = buildTeamMatchPayloadResult(payloadDraft, selectedTeamId, selectedSportId, regionId, editQuery.data.form.deadlineAt);
       if (payloadResult.missingFields || !version) {
         // #2: 실제 결측 필드만 지목 — 각 CreateField 아래 인라인 에러로 표시되고,
         // 상단 배너는 몇 개가 비어 있는지만 간단히 안내한다(중복 문구 방지).
@@ -434,11 +563,12 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
         );
         return;
       }
+      editSubmissionRef.current = true;
       updateTeamMatch.mutate(
         { ...payloadResult.payload, version },
         {
-          onSuccess: (result) => router.push(fromDetail ?? (result.detailRoute || `/team-matches/${teamMatchId}`)),
-          onError: (err) => setError(extractErrorMessage(err, '팀매치를 수정할 수 없어요. 다시 시도해 주세요.')),
+          onSuccess: (result) => { clearExpiringDraft(editStorageKey); router.push(fromDetail ?? (result.detailRoute || `/team-matches/${teamMatchId}`)); },
+          onError: (err) => { editSubmissionRef.current = false; setError(extractErrorMessage(err, '팀매치를 수정할 수 없어요. 다시 시도해 주세요.')); },
         },
       );
     },
@@ -453,14 +583,20 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
       cancelTeamMatch.mutate(
         { reason: reason || null },
         {
-          onSuccess: () => router.push(detailHref),
+          onSuccess: () => { clearExpiringDraft(editStorageKey); router.push(detailHref); },
           onError: (err) => setError(extractErrorMessage(err, '팀매치를 취소할 수 없어요. 다시 시도해 주세요.')),
         },
       );
     },
-    submitLabel: '변경사항 저장',
+    submitLabel: rulesStep ? editQuery.data?.rulesEditable ? '설정 적용' : '수정 화면으로' : '변경사항 저장',
     backHref: detailHref,
   });
+
+  if (editQuery.isLoading || (!editQuery.data && !editQuery.isError)) return <PageSkeleton variant="form" />;
+  if (editQuery.isError || editQuery.data?.teamMatchId !== teamMatchId) {
+    return <ErrorState title="팀매치를 불러오지 못했어요" message={extractErrorMessage(editQuery.error, '수정 권한과 경기 정보를 확인해 주세요.')}
+      onRetry={() => { void editQuery.refetch(); }} retryPending={editQuery.isFetching} back={{ href: detailHref, label: '경기 상세로' }} />;
+  }
 
   return (
     <>
@@ -502,6 +638,9 @@ function buildCreateModel({
   completeSteps,
   recentVenues,
   teamLoadError,
+  rules,
+  onOpenRules,
+  primaryBlocked,
 }: {
   step: TeamMatchCreateStep;
   draft: TeamMatchDraft;
@@ -509,6 +648,9 @@ function buildCreateModel({
   selectedSportId: string;
   regionId: string;
   isLoadingTeams?: boolean;
+  rules?: TeamMatchCreateViewModel['rules'];
+  onOpenRules?: () => void;
+  primaryBlocked?: boolean;
   teamLoadError?: { message: string; onRetry: () => void };
   teams: Array<{ id: string; name: string; sport: string; members: number; role: string; disabled?: boolean }>;
   sports: Array<{ id: string; name: string }>;
@@ -545,6 +687,8 @@ function buildCreateModel({
   return {
     ...fallback,
     backHref,
+    rules,
+    onOpenRules,
     selectedTeam: selectedTeam?.name ?? '',
     selectedSport: selectedSport?.name ?? '',
     isLoadingTeams,
@@ -568,6 +712,7 @@ function buildCreateModel({
       onCancel,
       submitLabel,
       submitting,
+      primaryBlocked,
       imageUploading,
       uploadImage,
       error,
@@ -601,7 +746,7 @@ function usePersistedDraft() {
     const { venue: legacyVenue, address: legacyAddress, ...current } = stored;
     const legacyName = legacyVenue?.trim();
     const place = current.place ?? (legacyName ? { kind: 'manual' as const, name: legacyName, address: legacyAddress?.trim() || null } : null);
-    const hydrated = normalizeDraftDate({ ...defaults, ...current, place, grade });
+    const hydrated = normalizeDraftDate({ ...defaults, ...current, place, grade, rules: readTeamMatchRuleDraft(current.rules) });
     draftRef.current = hydrated;
     setDraft(hydrated);
   }, []);
@@ -665,6 +810,7 @@ export function draftFromTeamMatchEdit(edit: V1TeamMatchEdit): TeamMatchDraft {
   const legacy = hasStructuredConditions ? null : parseLegacyConditions(edit.form.rulesText);
 
   return {
+    rules: ruleDraftForEdit(edit),
     ...buildDefaultDraft(),
     title: edit.form.title,
     description: edit.form.description ?? '',
@@ -739,7 +885,8 @@ function previousHref(step: TeamMatchCreateStep) {
   if (step === 'sport') return '/team-matches/new/team';
   if (step === 'info') return '/team-matches/new/sport';
   if (step === 'condition') return '/team-matches/new/info';
-  if (step === 'place-time') return '/team-matches/new/condition';
+  if (step === 'rules') return '/team-matches/new/condition';
+  if (step === 'place-time') return '/team-matches/new/rules';
   return '/team-matches/new/place-time';
 }
 
@@ -747,11 +894,18 @@ function nextHref(step: TeamMatchCreateStep) {
   if (step === 'team') return '/team-matches/new/sport';
   if (step === 'sport') return '/team-matches/new/info';
   if (step === 'info') return '/team-matches/new/condition';
-  if (step === 'condition') return '/team-matches/new/place-time';
+  if (step === 'condition') return '/team-matches/new/rules';
+  if (step === 'rules') return '/team-matches/new/place-time';
   return '/team-matches/new/confirm';
 }
 
 function normalizeMyTeams(data: ReturnType<typeof useV1MyTeams>['data']): V1MyTeam[] | undefined {
   if (!data) return undefined;
   return 'items' in data ? data.items : data;
+}
+
+function ruleLockedMessage(reason: V1TeamMatchEdit['rulesLockedReason']): string {
+  if (reason === 'COMPETITION_CONFIG_REQUIRED') return '이 경기의 저장된 규칙을 찾을 수 없어 경기 시간을 바꿀 수 없어요.';
+  if (reason === 'COMPETITION_PERIODS_UNAVAILABLE') return '현재 경기 규칙은 이 화면에서 편집할 수 없어요. 저장된 규칙을 유지해요.';
+  return '경기가 진행됐거나 보호된 기록이 있어 경기 규칙을 바꿀 수 없어요.';
 }

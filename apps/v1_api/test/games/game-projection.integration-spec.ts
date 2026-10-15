@@ -188,9 +188,12 @@ describe('Task 9 game projection real-database contract', () => {
     const takeoverOwner = auditWorker();
     const expiredClaim = await expiredOwner.claimOne();
     expect(expiredClaim?.id).toBe(takeoverJob);
+    // Recovery adds the attempt-one retry delay to the expired lease. Keep
+    // this takeover fixture safely past that boundary; exact retry is asserted above.
+    const expiredLeaseAgeMs = GAME_OPERATION_RETRY_DELAYS_MS[0] + 1_000;
     await prisma.$executeRaw`
       UPDATE v1_outbox_events
-      SET lease_until = CURRENT_TIMESTAMP - INTERVAL '1 second',
+      SET lease_until = CURRENT_TIMESTAMP - (${expiredLeaseAgeMs} * INTERVAL '1 millisecond'),
           version = version + 1,
           updated_at = CURRENT_TIMESTAMP
       WHERE id = ${takeoverJob}

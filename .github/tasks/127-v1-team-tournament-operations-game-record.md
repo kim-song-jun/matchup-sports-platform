@@ -1896,3 +1896,11 @@ Validation:
 - [x] 대회·정규 리그 라우트와 A → B 선택 회귀 테스트 추가
 - [x] 관련 Web 테스트 128건, `tsc --noEmit`, v1 패턴 검사 통과
 - [ ] PR CI와 머지 후 Alpha 복귀 동선 확인
+
+## Follow-up — 만료 lease 회수 테스트의 retry 경계 (2026-10-15)
+
+- Canonical lane: `fix/ci-expired-lease-boundary`, base `origin/dev` `d77f8e3176ffa03ad39a32f0f6a04c19e7a75bcb`.
+- 실제 dev CI `38744066123`에서 `game-projection.integration-spec.ts`의 만료 lease takeover 단언이 실패했다. Alpha `38744066281`은 matching-CI gate에서 중단되어 새 이미지/런타임을 활성화하지 않았다.
+- attempt 1의 만료 lease 복구는 `lease_until + retry delay(1초)` 이후 claim 가능하다. 테스트가 lease를 정확히 1초 전으로 설정해 timestamp 정밀도 경계에 걸린 원인을 확인했다. 생산 worker 정책과 CAS는 변경하지 않고, 실제 정책 delay에 1초 여유를 더한 시점으로 fixture만 옮긴다.
+- 동일 테스트의 exact retry delay·one-winner·poison·stale owner CAS 단언은 유지한다. 임의 sleep, 재시도 루프, 검사 완화는 추가하지 않는다.
+- Acceptance: 실제 PostgreSQL integration 및 최신 PR CI가 통과하고 기존 만료 owner의 complete가 거부되어야 한다. Docker daemon OFF로 로컬 DB 검증은 NOT RUN이며, 독립 리뷰·committed API 타입·새 PR CI와 정상 alpha 배포는 PENDING이다.

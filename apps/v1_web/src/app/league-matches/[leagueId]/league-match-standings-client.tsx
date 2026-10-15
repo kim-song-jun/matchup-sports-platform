@@ -700,6 +700,7 @@ export default function LeagueMatchStandingsClient({
         state={series.state}
         registrationOpen={series.registrationOpen}
         registrationDeadlineAt={series.registrationDeadlineAt}
+        capacityReached={series.maxTeams != null && series.confirmedCount + series.pendingPaymentCount >= series.maxTeams}
         entryFee={series.entryFee}
         entryFeeConfigured={series.entryFeeConfigured}
         nextRound={series.nextRound ?? null}

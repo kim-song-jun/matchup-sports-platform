@@ -13,6 +13,8 @@ interface LeagueJoinGuideCardProps {
   state: 'draft' | 'active' | 'completed' | 'on_hold';
   registrationOpen: boolean;
   registrationDeadlineAt: string | null;
+  /** 확정·입금 대기 팀이 참가팀 정원을 모두 점유했는지. 모집 여부는 registrationOpen이 결정한다. */
+  capacityReached?: boolean;
   entryFee: number;
   entryFeeConfigured: boolean;
   /** 같은 티어의 다음 시즌. 없으면(단발 리그 포함) 마감 카드가 "다음 회차에 신청해 주세요"만 적는다. */
@@ -25,7 +27,7 @@ interface LeagueJoinGuideCardProps {
  * | 조건(위에서부터 첫 일치)              | 그리는 것    |
  * | 내 팀이 이미 신청 / 다음 회차 없는 끝난 리그 | 없음  |
  * | 신청 받는 중                          | 열림 카드    |
- * | 마감이 지났다 / 다음 회차 있는 끝난 리그 | 닫힘 카드 |
+ * | 마감이 지났다 / 정원이 찼다 / 다음 회차 있는 끝난 리그 | 닫힘 카드 |
  * | 마감 미설정 + 참가비 확정             | 안내 전용    |
  * | 마감 미설정 + 참가비 미설정           | 없음         |
  *
@@ -37,6 +39,7 @@ export function LeagueJoinGuideCard({
   state,
   registrationOpen,
   registrationDeadlineAt,
+  capacityReached = false,
   entryFee,
   entryFeeConfigured,
   nextRound = null,
@@ -49,8 +52,8 @@ export function LeagueJoinGuideCard({
     setHasSessionHint(hasStoredV1Session());
   }, []);
 
-  const hasClosed = registrationDeadlineAt !== null;
-  const needsMyRegistration = (registrationOpen || hasClosed) && state !== 'completed';
+  const hasDeadline = registrationDeadlineAt !== null;
+  const needsMyRegistration = (registrationOpen || hasDeadline || capacityReached) && state !== 'completed';
   const lookupEnabled = needsMyRegistration && hasSessionHint;
   const myRegistrations = useV1MyRegistrations(leagueId, { enabled: lookupEnabled });
   // 조회 실패(isError)는 "신청 없음"으로 본다.
@@ -68,7 +71,7 @@ export function LeagueJoinGuideCard({
     const rows: { label: string; value: string }[] = [];
     if (feeLabel !== null) rows.push({ label: '참가비', value: feeLabel });
     if (showsPaymentMethod) rows.push({ label: '입금 방법', value: '계좌이체 · 신청 후 안내해요' });
-    if (hasClosed) rows.push({ label: '신청 마감', value: formatTournamentDateTimeLong(registrationDeadlineAt) });
+    if (hasDeadline) rows.push({ label: '신청 마감', value: formatTournamentDateTimeLong(registrationDeadlineAt) });
     return (
       <section className="mt-3" aria-labelledby={headingId}>
         <Card pad={16}>
@@ -95,9 +98,11 @@ export function LeagueJoinGuideCard({
     );
   }
 
-  if (hasClosed || nextRound !== null) {
+  if (hasDeadline || capacityReached || nextRound !== null) {
     if (lookupPending) return null;
-    const closedNote = hasClosed ? `${formatTournamentDateTimeLong(registrationDeadlineAt)}에 마감됐어요.` : null;
+    const closedNote = capacityReached
+      ? '참가팀 정원이 모두 차서 신청이 마감됐어요.'
+      : hasDeadline ? `${formatTournamentDateTimeLong(registrationDeadlineAt)}에 마감됐어요.` : null;
     const nextRows: { label: string; value: string }[] = nextRound === null ? [] : [
       { label: '다음 회차', value: `${nextRound.seasonNo}시즌 · ${nextRound.title}` },
       { label: '리그 기간', value: formatTournamentDateRangeShort(nextRound.startsOn, nextRound.endsOn) ?? '' },

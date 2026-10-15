@@ -53,6 +53,19 @@ describe('TournamentPeriodSettingsEditor', () => {
     );
   });
 
+  it.each([[3, '피리어드 설정을 저장했어요. 시작 전 경기 3개에도 적용했어요.'], [0, '피리어드 설정을 저장했어요.']])(
+    '저장 토스트는 실제로 옮긴 시작 전 경기 수(%i)만 말한다', (fixturesRepointed, message) => {
+      state.mutate.mockClear();
+      const showToast = vi.fn();
+      render(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={showToast} />);
+      fireEvent.click(screen.getByRole('button', { name: '수정' }));
+      fireEvent.click(screen.getByRole('button', { name: '저장' }));
+      const [, callbacks] = state.mutate.mock.calls[0] as [unknown, { onSuccess: (data: { fixturesRepointed: number }) => void }];
+      act(() => callbacks.onSuccess({ fixturesRepointed }));
+      expect(showToast).toHaveBeenCalledWith(message, 'success');
+    },
+  );
+
   it('keeps the draft and query data when a generic server save fails', () => {
     state.settings = {
       ...state.settings,

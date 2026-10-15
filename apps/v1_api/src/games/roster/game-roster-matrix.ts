@@ -28,6 +28,7 @@ export interface TeamRosterMatrixGame {
   readonly opponentName: string | null;
   readonly scheduledAt: Date | null;
   readonly gameState: V1GameState;
+  readonly goalkeeperEditable?: boolean;
 }
 
 export type TeamRosterCellStatus = 'PARTICIPATING' | 'EXCLUDED' | 'UNAVAILABLE' | 'SUSPENDED' | 'NOT_IN_ROSTER';
@@ -40,6 +41,7 @@ export interface TeamRosterCell {
   readonly adjustmentId: string | null;
   readonly unavailabilityId: string | null;
   readonly remainingMatches: number | null;
+  readonly goalkeeper?: boolean;
 }
 
 export interface TeamRosterMatrix {
@@ -105,6 +107,10 @@ export function buildTeamRosterMatrix(input: {
         remainingMatches: row.remainingMatches,
       });
     }
+    for (const entry of loaded.base) {
+      const cell = cells.get(entry.userId);
+      if (cell) cells.set(entry.userId, { ...cell, goalkeeper: entry.goalkeeper ?? false });
+    }
     return cells;
   });
 
@@ -112,6 +118,7 @@ export function buildTeamRosterMatrix(input: {
     games: input.columns.map(({ game, loaded }) => ({
       ...game,
       editable: input.canWrite && loaded !== null && game.gameState === 'SCHEDULED',
+      goalkeeperEditable: game.goalkeeperEditable !== false && input.canWrite && loaded !== null && game.gameState === 'SCHEDULED',
       summary: loaded === null ? null : summarizeGameRoster(loaded.computation),
     })),
     // 대회·리그마다 등번호가 달라 한 번호로 줄 세울 수 없다 — 이름순.

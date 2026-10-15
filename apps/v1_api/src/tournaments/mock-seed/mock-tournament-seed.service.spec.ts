@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { MockTournamentSeedService, readLineupMinPlayers } from './mock-tournament-seed.service';
 import type { V1AuthUser } from '../../auth/v1-auth-user';
+import { competitionFieldDelegate } from '../../../test/helpers/competition-field-delegate';
 
 /**
  * schema.prisma 원문에서 모델별 필드 맵을 만든다.
@@ -72,6 +73,7 @@ function makeWorld(teamCount = 4) {
   const actorContexts: Array<Record<string, unknown>> = [];
   const registrationTeams = new Map<string, string>();
   const tx = {
+    v1TournamentField: competitionFieldDelegate(),
     v1Tournament: { create: jest.fn(async ({ data }: never) => ({ ...(data as object), id: 'tour-1' })) },
     v1TournamentRegistration: {
       create: jest.fn(async ({ data }: never) => {
@@ -356,11 +358,14 @@ describe('MockTournamentSeedService', () => {
   });
 
   it('canonical TeamMatch와 TEAM_MATCH Game을 같은 config pin으로 만든다', async () => {
-    const { service, teamMatches, games, gamesService, actorContexts } = makeWorld(4);
+    const { service, tx, teamMatches, games, gamesService, actorContexts } = makeWorld(4);
 
     const result = await service.createTournament(user, { format: 'league', teamCount: 4 });
 
     expect(teamMatches).toHaveLength(6);
+    const fields = await tx.v1TournamentField.findMany({ where: { tournamentId: 'tour-1' } });
+    expect(fields).toHaveLength(1);
+    expect(teamMatches.every((match) => match.fieldId === fields[0].id)).toBe(true);
     expect(games).toHaveLength(6);
     expect(gamesService.createFromSourceInTransaction).toHaveBeenCalledTimes(6);
     expect(actorContexts).toHaveLength(6);

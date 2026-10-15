@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   grantMutate: vi.fn(),
   revokeMutate: vi.fn(),
   createFieldMutate: vi.fn(),
+  importFieldPlacesMutate: vi.fn(),
   // 테스트마다 필드 목록을 바꿀 수 있게 한다(빈 목록 케이스가 이 이슈의 핵심).
   fieldsResult: vi.fn(() => ({ data: { items: [{ id: 'field-1', name: '1번 코트' }] } })),
   // 스태프 배정 후보 검색. 배정 폼이 UUID 직접 입력에서 닉네임 검색으로 바뀌며 추가됐다.
@@ -53,6 +54,7 @@ const FIELD_OPERATOR_ROW: V1TournamentStaffAssignment = {
 };
 
 vi.mock('@/hooks/use-v1-api', () => ({
+  useV1ImportTournamentFieldPlaces: () => ({ mutate: mocks.importFieldPlacesMutate, isPending: false }),
   useV1TournamentStaffAssignments: () => ({
     isPending: false,
     isError: false,
@@ -91,12 +93,34 @@ describe('StaffClient', () => {
     mocks.grantMutate.mockReset();
     mocks.revokeMutate.mockReset();
     mocks.createFieldMutate.mockReset();
+    mocks.importFieldPlacesMutate.mockReset();
     mocks.fieldsResult.mockReturnValue({ data: { items: [{ id: 'field-1', name: '1번 코트' }] } });
     mocks.candidateSearchResult.mockReturnValue({
       data: { items: [{ id: 'user-seungmin', nickname: '이승민', displayName: null, maskedEmail: 'se***@example.com' }] },
       isError: false,
       isFetching: false,
     });
+  });
+
+  it('스태프 배정 아래에서 기존 경기 장소를 가져오고 실제 결과 수를 표시한다', async () => {
+    setRole('PLATFORM_OPS');
+    mocks.importFieldPlacesMutate.mockImplementation((_body, options) => options.onSuccess({ addedCount: 2, existingCount: 1 }));
+    const user = userEvent.setup();
+    render(<StaffClient tournamentId="t-1" />);
+    const heading = screen.getByRole('heading', { name: '경기장(필드)' });
+    expect(screen.getAllByText('디렉터윤')[0].compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: '기존 경기 장소 추가' }));
+    expect(screen.getByRole('status')).toHaveTextContent('경기 장소 2개를 추가했어요. 이미 등록된 장소는 1개예요.');
+  });
+
+  it('가져오기 실패를 완료로 표시하지 않는다', async () => {
+    setRole('PLATFORM_OPS');
+    mocks.importFieldPlacesMutate.mockImplementation((_body, options) => options.onError(new Error('합성 가져오기 실패')));
+    const user = userEvent.setup();
+    render(<StaffClient tournamentId="t-1" />);
+    await user.click(screen.getByRole('button', { name: '기존 경기 장소 추가' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('합성 가져오기 실패');
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
   // 표가 담당자를 userId 앞 8자로만 보여줘 누가 누구인지 알 수 없었다. 닉네임이 있으면
@@ -307,7 +331,7 @@ describe('StaffClient', () => {
     await user.type(screen.getByLabelText('경기장 이름'), 'A구장');
     await user.click(screen.getByRole('button', { name: '경기장 추가' }));
 
-    // 등록한 경기장은 고칠 수도 지울 수도 없어서 확인을 한 번 받는다(웨이브 8).
+    // 등록 전에 경기장 이름을 확인한다.
     expect(mocks.createFieldMutate).not.toHaveBeenCalled();
     await user.click(await screen.findByRole('button', { name: '등록하기' }));
 
@@ -316,8 +340,7 @@ describe('StaffClient', () => {
   });
 
   /**
-   * finding #76: 필드 이름에는 서버 유일성 제약도 수정·삭제 경로도 없어서, 같은
-   * 이름으로 두 번 등록하면 두 개(F1/F2)가 그대로 생기고 되돌릴 수 없었다. 클라이언트
+   * 같은 이름으로 두 번 등록하지 않도록 클라이언트와 서버의 기준을 맞춘다. 클라이언트
    * 단계에서 이름 중복(대소문자·앞뒤 공백 무시)을 먼저 막아 그 사고 지점을 없앤다.
    */
   it('이미 있는 이름(대소문자·공백만 다름)으로는 경기장을 등록할 수 없다', async () => {

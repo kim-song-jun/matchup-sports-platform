@@ -1,4 +1,9 @@
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { TournamentOperationsFieldsService } from '../../src/tournament-operations/fields/tournament-operations-fields.service';
+import { OperationAuditWriterService } from '../../src/common/audit/operation-audit-writer.service';
+import { PLACE_SELECT } from '../../src/places/place-select';
 import { PublicTournamentRecordsService } from '../../src/games/public-records/public-tournament-records.service';
 import { TournamentOperationsBoardService } from '../../src/tournament-operations/board/tournament-operations-board.service';
 import { TournamentOperationsStaffService } from '../../src/tournament-operations/staff/tournament-operations-staff.service';
@@ -140,6 +145,7 @@ describe('운영 콘솔 목록 — 정규 리그', () => {
           sportId: ids.sport,
           regionId: ids.region,
           leagueId: ids.league,
+          tournamentId: ids.league,
           createdByUserId: ids.adminUser,
           hostTeamId: teamId(((n - 1) % TEAMS) + 1),
           approvedApplicantTeamId: teamId((n % TEAMS) + 1),
@@ -290,6 +296,49 @@ describe('운영 콘솔 목록 — 정규 리그', () => {
       query({ limit: 50, fieldId: 'b7000000-0000-4000-8000-000000000099' }),
     );
     expect(result.items).toEqual([]);
+  });
+
+  it('장소 backfill/import는 미배정만 연결하고 필드 선택은 공개 장소까지 원자적으로 바꾼다 (Task 20261082)', async () => {
+    const rollback = new Error('rollback-field-place-integration');
+    await expect(prisma.$transaction(async (tx) => {
+      const existingField = await tx.v1TournamentField.create({ data: {
+        tournamentId: ids.league, scopeKey: 'existing-venue', name: '검증 구장', version: 7,
+      } });
+      await tx.v1TeamMatch.update({ where: { id: matchId(2) }, data: {
+        placeName: '등록 별도 구장', placeAddress: '서울 테스트 주소', placeLatitude: 37.5, placeLongitude: 126.9,
+        placeProvider: 'kakao', placeProviderId: 'synthetic-place',
+      } });
+      const before = await tx.v1TeamMatch.findMany({ where: { leagueId: ids.league }, orderBy: { id: 'asc' }, select: { id: true, fieldId: true, ...PLACE_SELECT } });
+      const migration = readFileSync(join(__dirname, '../../prisma/migrations/20261014000100_v1_competition_field_places/migration.sql'), 'utf8');
+      // The schema column already exists in the replayed test DB. Execute the real data statements.
+      for (const statement of migration.split(';').slice(1).filter((value) => value.trim())) await tx.$executeRawUnsafe(statement);
+      const after = await tx.v1TeamMatch.findMany({ where: { leagueId: ids.league }, orderBy: { id: 'asc' }, select: { id: true, fieldId: true, ...PLACE_SELECT } });
+      expect(after.map(({ fieldId: _fieldId, ...row }) => row)).toEqual(before.map(({ fieldId: _fieldId, ...row }) => row));
+      expect(after.every((row) => row.fieldId !== null)).toBe(true);
+      const catalogue = await tx.v1TournamentField.findMany({ where: { tournamentId: ids.league } });
+      expect(catalogue.map((field) => field.name).sort()).toEqual(['검증 구장', '등록 별도 구장']);
+      expect(catalogue.find((field) => field.id === existingField.id)).toMatchObject({
+        version: 8, placeSnapshot: { name: '검증 구장' },
+      });
+      // A second execution must neither advance the enriched field version nor change assignments.
+      for (const statement of migration.split(';').slice(1).filter((value) => value.trim())) await tx.$executeRawUnsafe(statement);
+      expect(await tx.v1TournamentField.findUnique({ where: { id: existingField.id } })).toMatchObject({ version: 8 });
+      // The service's nested transaction boundary shares this real DB transaction; all writes roll back below.
+      const transactional = new Proxy(tx, { get: (target, key) => key === '$transaction'
+        ? async (callback: (client: typeof tx) => Promise<unknown>) => callback(tx) : Reflect.get(target, key) }) as unknown as PrismaService;
+      const access = new TournamentStaffAccessService(transactional);
+      const fields = new TournamentOperationsFieldsService(transactional, access, new OperationAuditWriterService());
+      await expect(fields.importFixturePlaces(ids.adminUser, ids.league, { requestId: 'integration-field-import' })).resolves.toEqual({ addedCount: 0, existingCount: 2, updatedCount: 0 });
+      const chosen = catalogue.find((field) => field.name === '등록 별도 구장')!;
+      await fields.assignFixtureField(ids.adminUser, ids.league, matchId(1), { fieldId: chosen.id }, { requestId: 'integration-field-place-assign' });
+      expect(await tx.v1TeamMatch.findUnique({ where: { id: matchId(1) }, select: { fieldId: true, ...PLACE_SELECT } })).toMatchObject({
+        fieldId: chosen.id, placeName: '등록 별도 구장', placeAddress: '서울 테스트 주소', placeLatitude: 37.5, placeLongitude: 126.9,
+      });
+      const records = new PublicTournamentRecordsService(transactional, access);
+      const schedule = await records.getSchedule(ids.league, {} as never);
+      expect(schedule.items.find((item) => item.fixtureId === matchId(1))).toMatchObject({ venue: '등록 별도 구장', fieldId: chosen.id, fieldName: chosen.name });
+      throw rollback;
+    }, { timeout: 30_000 })).rejects.toBe(rollback);
   });
 
   it('리그 페이지도 쿼리 수가 페이지 크기와 무관하다 — 등록 조회가 N+1 이면 여기서 터진다', async () => {

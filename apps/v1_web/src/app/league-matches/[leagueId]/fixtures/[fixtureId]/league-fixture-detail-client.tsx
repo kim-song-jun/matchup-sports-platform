@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { normalizeLeagueDetailHref } from '@/lib/fixture-detail-route';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { useV1LeagueMatch, useV1LeagueMatchStandings, useV1ResolveChatRoom, useV1TeamMatch } from '@/hooks/use-v1-api';
@@ -99,10 +100,11 @@ function getViewerState(match: V1TeamMatch | undefined): V1TeamMatchViewerState 
 
 export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { leagueId: string; fixtureId: string }) {
   // 활동 기록·팀 전적처럼 리그 화면이 아닌 곳에서 들어왔으면 그 화면으로 돌아간다.
-  const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
+  const sourcePath = sanitizeRedirectPath(useSearchParams().get('from'));
+  const fromPath = sourcePath ? normalizeLeagueDetailHref(sourcePath) : null;
   // 선수·팀 상세로 넘길 출처에는 현재 query와 이벤트 앵커까지 보존한다.
   const selfHref = useCurrentHref() ?? undefined;
-  const leagueHref = `/league-matches/${leagueId}`;
+  const leagueHref = `/tournaments/${leagueId}`;
   // 같은 리그의 필터/query/hash는 복귀 주소다. 다른 출처는 기존 상위 체인으로 잇는다.
   const parentHref = fromPath?.split(/[?#]/, 1)[0] === leagueHref
     ? fromPath

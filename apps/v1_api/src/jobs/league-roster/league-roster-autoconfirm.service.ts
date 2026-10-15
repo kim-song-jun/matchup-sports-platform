@@ -220,7 +220,7 @@ export class LeagueRosterReminderService {
           targetId: league.id,
           title: '리그 명단을 제출해 주세요',
           body: `"${league.title}" 시작까지 24시간 남았어요. 명단을 제출하지 않으면 등록 가능한 팀원으로 자동 확정돼요.`,
-          deepLink: `/leagues/${league.id}`,
+          deepLink: `/tournaments/${league.id}?kind=league`,
           businessKey: `league-roster-reminder:${registration.id}:${userId}`,
         })),
         skipDuplicates: true,

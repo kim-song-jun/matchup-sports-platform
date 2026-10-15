@@ -1,4 +1,5 @@
 import type { Prisma, V1GameState } from '@prisma/client';
+import { parseLineupCatalog } from '../../tournaments/competition-config/competition-config.parse';
 import { compareRosterOrder } from '../../common/roster-order';
 import { leagueTeamRosterBase, readLeagueTeamRosters } from '../../league-matches/league-fixture-creation';
 import { readSuspensionVerdicts, type OrderedCompetitionGame } from '../../tournaments/discipline/suspension-verdicts';
@@ -51,6 +52,7 @@ export async function loadCompetitionRosterBase(
         select: {
           id: true,
           userId: true,
+          goalkeeper: true,
           user: { select: { profile: { select: { nickname: true, displayName: true } } } },
         },
         orderBy: { id: 'asc' },
@@ -67,12 +69,14 @@ export async function loadCompetitionRosterBase(
       displayNameSnapshot: participantDisplayName(player),
       jerseyNumber: jerseys.get(player.id) ?? null,
       sourceParticipantId: player.id,
+      goalkeeper: player.goalkeeper,
     })).sort(rosterOrder),
   };
 }
 
 /**
- * 등번호 원본 = 확정된 참가 신청. 기준 명단이 참가 명단(`REGISTRATION`)이고 뷰어가 그 팀의 팀장·매니저일 때만 준다 —
+ * 확정된 참가 신청을 찾는다. 팀장·매니저는 등번호 원본으로, 활성 팀원은 참가 명단 조회 연결로 사용한다.
+ * 호출자는 조회 id와 등번호 편집 id·권한을 분리해서 직렬화한다.
  * 등번호 저장 API(`PATCH …/players/:playerId/jersey-number`)의 권한과 같아서, 열어 줘도 저장이 403 이 되는 사람에게는 주지 않는다.
  * 기준 명단을 읽는 쿼리(`loadCompetitionRosterBase`)와 같은 조건으로 찾는다.
  * `editable` 은 저장 API 의 잠금·마감 가드(`rosterBlockReason`)와 같은 판정이다 — 잠긴 명단에 입력 칸을 열면 저장이 409 가 된다.
@@ -80,9 +84,9 @@ export async function loadCompetitionRosterBase(
 export async function loadJerseyRegistration(
   tx: Tx,
   scope: CompetitionTeamScope,
-  input: { baseSource: GameRosterBaseSource; isTeamManager: boolean },
+  input: { baseSource: GameRosterBaseSource; isTeamManager: boolean; isTeamMember?: boolean },
 ): Promise<{ id: string; editable: boolean } | null> {
-  if (!input.isTeamManager || input.baseSource !== 'REGISTRATION') return null;
+  if ((!input.isTeamManager && !input.isTeamMember) || input.baseSource !== 'REGISTRATION') return null;
   const registration = await tx.v1TournamentRegistration.findFirst({
     where: { tournamentId: scope.competitionId, teamId: scope.teamId, status: 'confirmed' },
     select: {
@@ -106,6 +110,7 @@ function rosterOrder(a: GameRosterBaseEntry, b: GameRosterBaseEntry): number {
 }
 
 export interface GameRosterSideContext extends CompetitionTeamScope {
+  readonly goalkeeperPositionCode?: string;
   readonly gameId: string;
   readonly sideId: string;
   readonly gameState: V1GameState;
@@ -152,6 +157,7 @@ export async function loadGameRosterContext(
     select: {
       id: true,
       state: true,
+      competitionConfig: { select: { lineup: true } },
       teamMatch: { select: { id: true, tournamentId: true, leagueId: true, startAt: true } },
       sides: { where: { id: target.sideId }, select: { id: true, teamId: true } },
     },
@@ -168,6 +174,7 @@ export async function loadGameRosterContext(
     competitionId,
     isLeague: teamMatch.leagueId !== null,
     teamId: side.teamId,
+    goalkeeperPositionCode: parseLineupCatalog(game.competitionConfig?.lineup ?? null).positions.find((position) => position.goalkeeper)?.code ?? "GK",
     gameId: game.id,
     sideId: side.id,
     gameState: game.state,
@@ -191,6 +198,13 @@ export async function loadGameRosterForContext(
 ): Promise<LoadedGameRoster | null> {
   const base = preloaded.base !== undefined ? preloaded.base : await loadCompetitionRosterBase(tx, context);
   if (base === null) return null;
+
+  const roles = await tx.v1GameRosterRole.findMany({
+    where: { gameId: context.gameId, sideId: context.sideId, teamId: context.teamId },
+    select: { userId: true, goalkeeper: true },
+  });
+  const goalkeeperByUser = new Map(roles.map((row) => [row.userId, row.goalkeeper]));
+  const entries = base.entries.map((entry) => ({ ...entry, goalkeeper: entry.goalkeeper ?? goalkeeperByUser.get(entry.userId) ?? false }));
 
   // 사이드 팀이 바뀌었으면 옛 팀의 조정은 이 팀 명단과 무관하다.
   const adjustments = await tx.v1GameRosterAdjustment.findMany({
@@ -232,9 +246,9 @@ export async function loadGameRosterForContext(
   return {
     context,
     baseSource: base.source,
-    base: base.entries,
+    base: entries,
     computation: computeGameRoster({
-      base: base.entries,
+      base: entries,
       adjustments,
       unavailabilities,
       gameStartAt: context.startAt,

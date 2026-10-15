@@ -87,14 +87,6 @@ export type V1FoundAccount = {
   hasPassword: boolean;
 };
 
-/** 소셜 가입 대기 계정이 번호 주인의 기존 계정에 연결되기 전 확인용 요약. */
-export type V1SocialLinkPreview = {
-  maskedEmail: string | null;
-  providers: ('kakao' | 'apple' | 'email' | 'naver')[];
-  hasPassword: boolean;
-  linkingProvider: 'kakao' | 'apple';
-};
-
 export type V1AuthMe = {
   /**
    * 카카오 가입 진행 중에만 채워진다 — 카카오 동의항목이 승인된 앱에서만 값이 오고,
@@ -4210,7 +4202,10 @@ export type V1TournamentPlayer = {
  * `eligibilityNote`(어드민 심사 메모)는 팀장·매니저 응답에만 값이 있다.
  */
 export type V1TournamentRosterPlayer = Omit<V1TournamentPlayer, 'realName'> & {
+  goalkeeper?: boolean;
   realName: string | null;
+  /** 경기 명단과 같은 공개 표시 이름. 구버전 서버 응답에는 없을 수 있다. */
+  displayName?: string;
   /** 프로필이 없으면 null — 실명으로 대체하지 않는다. */
   nickname: string | null;
   /** false 면 이 행의 개인정보 세 필드는 "미입력"이 아니라 가려진 것이다. */
@@ -4276,6 +4271,7 @@ export type V1AdminBracketGroupTeam = {
 };
 
 export type V1AdminBracketFixture = {
+  fieldId?: string | null;
   bracketSources?: V1BracketSource[];
   id: string;
   tournamentId: string;
@@ -4432,6 +4428,8 @@ export interface V1GenerateLeagueFixturesResponse {
  */
 interface V1LeagueOverallStandingRowBase {
   teamName: string;
+  /** 팀의 현재 로고. 기존 응답/fixture 호환을 위해 optional이며 미등록은 null. */
+  teamLogoUrl?: string | null;
   position: number | null;
   points: number;
   wins: number;
@@ -4759,6 +4757,7 @@ export type V1CreateGroupTeamPayload = {
 };
 
 export type V1UpdateFixturePayload = {
+  fieldId?: string | null;
   fixtureNumber?: number;
   scheduledAt?: string;
   venue?: string;
@@ -5249,6 +5248,7 @@ export type V1TournamentField = {
   sortOrder: number;
   active: boolean;
   version: number;
+  place?: V1PlaceView | null;
 };
 
 export type V1TournamentFieldListResponse = {

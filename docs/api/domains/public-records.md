@@ -272,8 +272,15 @@ for a `scheduled` game from 15 minutes before `scheduledAt` until 3 hours after 
 (`publicLivePollDelay` in `apps/v1_web/src/lib/public-live-polling.ts`); before that
 window it re-checks at most every 15 minutes, so a page opened before kickoff picks
 up the start without a reload. All positive polling delays keep the 10-second
-floor, including the countdown immediately before the window opens. Ended,
-cancelled and time-unset detail pages do not poll. The bracket hub loads cursor pages
+floor, including the countdown immediately before the window opens. An `ended`
+match or league fixture record whose `resultState` is still `pending` keeps polling
+until the official result (or void) arrives; otherwise ended, cancelled and
+time-unset detail pages do not poll. The public league detail
+(`GET /league-matches/:leagueId`, `useV1LeagueMatch`) polls with the same rule over
+its fixtures (`leagueFixturesPollDelay`: live, paused, or ended-but-unconfirmed ->
+10 seconds; scheduled -> the kickoff window), and whenever its response changes it
+refetches the league standings and player records, which carry no fixture state of
+their own. The bracket hub loads cursor pages
 sequentially and displays all live entries first, then groups A/B/C and knockout
 rounds in competition order; live entries do not also appear in the regular list. A public,
 potentially-hundreds-of-viewers surface deliberately does not reuse the

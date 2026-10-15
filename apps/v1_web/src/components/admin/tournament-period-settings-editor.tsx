@@ -99,9 +99,11 @@ function PeriodSettingsEditor({
       updateSettings.mutate(
         { expectedVersion, periods },
         {
-          onSuccess: () => {
+          onSuccess: (saved) => {
             setEditing(false);
-            showToast('피리어드 설정을 저장했어요. 새로 만드는 경기부터 적용돼요.', 'success');
+            // 다른 규칙 버전에 남은 경기는 옮기지 않으므로, 실제로 옮긴 수만 말한다.
+            const repointed = saved?.fixturesRepointed ?? 0;
+            showToast(repointed > 0 ? `피리어드 설정을 저장했어요. 시작 전 경기 ${repointed}개에도 적용했어요.` : '피리어드 설정을 저장했어요.', 'success');
           },
           onError: async (error) => {
             if (extractErrorCode(error) === 'TOURNAMENT_VERSION_CONFLICT') {
@@ -164,7 +166,7 @@ function PeriodSettingsEditor({
 
       {editing && (
         <div className="mt-4 border-t border-[var(--border)] pt-4">
-          <p className="text-[length:var(--font-size-body-sm)] text-[var(--text-muted)]">새로 만드는 경기부터 적용돼요. 이미 생성된 경기의 기록은 바뀌지 않아요.</p>
+          <p className="text-[length:var(--font-size-body-sm)] text-[var(--text-muted)]">새로 만들 경기와 아직 시작하지 않은 경기에 적용돼요. 이미 시작했거나 끝난 경기는 그대로예요.</p>
           <div className="mt-3 flex flex-col gap-2">
             {draft.map((duration, index) => (
               <div key={`period-${index}`} className="flex items-center gap-2">

@@ -49,9 +49,9 @@ vi.mock('@/hooks/use-v1-game-operations', () => ({
 vi.mock('@/hooks/use-v1-game-roster', () => ({
   useV1TeamGameRoster: (...args: unknown[]) => mocks.useV1TeamGameRoster(...args),
 }));
-vi.mock('@/hooks/use-v1-game-operations-console', () => ({
+vi.mock('@/hooks/use-v1-game-operations-console', async (importOriginal) => ({
   useV1GameOperationsConsole: () => mocks.useV1GameOperationsConsole(),
-  gameOperationsErrorMessage: (code: string) => `오류(${code})`,
+  gameOperationsErrorMessage: (await importOriginal<typeof import('@/hooks/use-v1-game-operations-console')>()).gameOperationsErrorMessage,
   isRetryableGameOperationsErrorCode: () => true,
 }));
 // 종료 직후 콘솔이 끼우는 결과 확정 카드 — 카드 자체(권한별 표시·확정 흐름)는 패널 스위트가 검증한다.
@@ -230,6 +230,17 @@ describe('OperateConsole — 기록된 이벤트 / 전송 상태 분리', () => 
     const list = screen.getByRole('list', { name: '기록된 이벤트 목록' });
     expect(within(list).getAllByRole('listitem')).toHaveLength(1);
     expect(list).toHaveTextContent('정우진');
+  });
+
+  it('필드 범위 밖 경기 접근의 REST 오류를 한국어로 안내한다', () => {
+    mocks.useV1FixtureLineup.mockReturnValue({
+      data: undefined, isLoading: false, isError: true,
+      error: new V1ApiError({ status: 'error', message: 'Tournament staff scope is denied', statusCode: 403, code: 'STAFF_SCOPE_DENIED', timestamp: '2026-10-14T01:00:00Z' }),
+      refetch: vi.fn(),
+    });
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    expect(screen.getByText('이 경기를 운영할 권한이 없어요.')).toBeInTheDocument();
+    expect(screen.queryByText('Tournament staff scope is denied')).not.toBeInTheDocument();
   });
 
   // Task 180 G6(F76) — 콘솔에서는 방금 한 일이 맨 위여야 어시스트를 잘못된 골에 다는 사고가 없다.

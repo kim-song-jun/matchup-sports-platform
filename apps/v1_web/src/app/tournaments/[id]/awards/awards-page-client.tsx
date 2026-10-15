@@ -768,7 +768,7 @@ export function ReviewFormModal({
 
 /* ── 후기 카드 (임베드 목록 · 전체보기 페이지 공용) ── */
 export function ReviewCard({ review }: { review: V1TournamentReview }) {
-  const date = new Date(review.createdAt).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' });
+  const date = new Date(review.createdAt).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', month: 'long', day: 'numeric' });
   const photoUrls = review.photoUrls ?? [];
 
   return (

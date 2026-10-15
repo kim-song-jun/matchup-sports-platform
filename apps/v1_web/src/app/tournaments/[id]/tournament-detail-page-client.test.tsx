@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackEvent } from '@/lib/analytics';
 import type { V1TournamentDetail } from '@/types/api';
 import { TournamentDetailPageClient } from './tournament-detail-client';
+import { queryImageBySrc } from '@/test/next-image';
 
 function render(ui: ReactElement) {
   const queryClient = new QueryClient({
@@ -130,6 +131,19 @@ describe('TournamentDetailPageClient GA events', () => {
       isFetching: false,
       refetch: vi.fn(),
     });
+  });
+
+  it.each(['in_progress', 'completed'] as const)('리그 %s 상세에서 저장된 대표 이미지를 본문에 표시한다', async (status) => {
+    tournamentApiMocks.useV1Tournament.mockReturnValue({
+      data: makeTournament({ kind: 'regular_league', status, coverImageUrl: '/uploads/leagues/cover.webp' }),
+      isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    });
+    const { container } = render(<TournamentDetailPageClient tournamentId="tournament-1" />);
+    await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
+    const image = queryImageBySrc(container, '/uploads/leagues/cover.webp');
+    expect(image).not.toBeNull();
+    expect(image).toHaveAttribute('alt', '테스트 대회 대표 이미지');
+    expect(image).toHaveClass('object-contain');
   });
 
   it('tracks tournament_view once the tournament detail loads', async () => {
@@ -388,7 +402,7 @@ describe('TournamentDetailPageClient — 우리 팀 참가 카드(Task 180 R-1 A
     const title = await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
     const heading = await screen.findByRole('heading', { level: 2, name: '우리 팀 참가' });
     expect(title.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.getByRole('link', { name: '마포 FC 참가 명단 수정하기' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: '마포 FC 참가 선수 관리' })).toHaveAttribute(
       'href',
       `/tournaments/tournament-1/registrations/reg-1/roster?from=${encodeURIComponent('/tournaments/tournament-1')}`,
     );

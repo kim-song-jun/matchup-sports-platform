@@ -1027,7 +1027,7 @@ describe('TournamentApplyPageClient GA events', () => {
       render(<TournamentApplyPageClient tournamentId="tournament-1" />);
 
       const cta = await screen.findByRole('link', { name: '리그 상세로 돌아가기' });
-      expect(cta).toHaveAttribute('href', `/league-matches/tournament-1?from=${encodeURIComponent('/home')}`);
+      expect(cta).toHaveAttribute('href', `/tournaments/tournament-1?from=${encodeURIComponent('/home')}`);
       expect(screen.queryByText(/대회 상세로 돌아가기/)).not.toBeInTheDocument();
     });
 
@@ -1047,7 +1047,7 @@ describe('TournamentApplyPageClient GA events', () => {
       render(<TournamentApplyPageClient tournamentId="tournament-1" />);
 
       expect(await screen.findByText(/리그 신청은 휴대폰 본인인증을 마친 계정만/)).toBeInTheDocument();
-      expect(screen.getByRole('link', { name: '리그 상세로 돌아가기' })).toHaveAttribute('href', '/league-matches/tournament-1');
+      expect(screen.getByRole('link', { name: '리그 상세로 돌아가기' })).toHaveAttribute('href', '/tournaments/tournament-1');
     });
   });
 

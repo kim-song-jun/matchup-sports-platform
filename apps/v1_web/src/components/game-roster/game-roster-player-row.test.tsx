@@ -59,7 +59,10 @@ describe('GameRosterPlayerRow — 등번호 칸', () => {
     expect(onPress).toHaveBeenCalledTimes(1);
 
     rerender(<GameRosterPlayerRow {...base} jerseyNumber={null} status="PARTICIPATING" onJerseyPress={onPress} />);
-    fireEvent.click(screen.getByRole('button', { name: '박서준 등번호 넣기' }));
+    const empty = screen.getByRole('button', { name: '박서준 등번호 넣기' });
+    // 빈 번호 칸은 "번호 등록" 같은 긴 말 대신 "No." — 번호 열 머리글과 같은 말이라 따로 설명이 필요 없다.
+    expect(empty).toHaveTextContent(/^No\.$/);
+    fireEvent.click(empty);
     expect(onPress).toHaveBeenCalledTimes(2);
   });
 

@@ -245,6 +245,23 @@ describe('TournamentCard — 리그는 정원을 그리지 않는다', () => {
     return item;
   };
 
+  it.each([
+    '/tournaments?kind=league',
+    '/tournaments?kind=league&sport=futsal&status=open&page=2',
+  ])('리그 카드는 이전 상세로 이동하고 목록 복귀 경로 %s를 보존한다', (fromPath) => {
+    const item = leagueItem();
+    render(<TournamentCard item={item} fromPath={fromPath} />);
+    const detailUrl = new URL(screen.getByRole('link').getAttribute('href')!, 'https://alpha.teameet.co.kr');
+    expect(detailUrl.pathname).toBe(`/tournaments/${item.id}`);
+    expect(detailUrl.searchParams.get('from')).toBe(fromPath);
+  });
+
+  it('목록 복귀 경로가 없어도 리그 카드는 이전 상세로 간다', () => {
+    const item = leagueItem();
+    render(<TournamentCard item={item} />);
+    expect(screen.getByRole('link')).toHaveAttribute('href', `/tournaments/${item.id}`);
+  });
+
   it('리그 카드에 정원 진행바가 없다', () => {
     render(<TournamentCard item={leagueItem()} />);
     expect(screen.queryByRole('progressbar')).toBeNull();

@@ -7,7 +7,7 @@ import { FeaturedSlotSkeleton } from './featured-slot-skeleton';
 import { TrophyIcon } from '@/components/v1-ui/icons';
 import { cssUrl } from '@/lib/assets';
 import { getSortedTournamentPromos, resolveTournamentImage } from '@/lib/tournament-promo';
-import { withFromPath } from '@/lib/session-storage';
+import { competitionDetailHref } from '@/lib/fixture-detail-route';
 import { resolveTournamentRegistrationBlock } from '@/lib/tournament-registration-availability';
 import type { V1TournamentListItem } from '@/types/api';
 
@@ -80,7 +80,7 @@ export function TournamentHeroCard({ items, loading = false }: { items: V1Tourna
             className="tm-featured-link tm-pressable"
             href={featured.campaignSlug
               ? `/tournaments/campaigns/${featured.campaignSlug}`
-              : withFromPath(`/tournaments/${featured.id}`, '/home')}
+              : competitionDetailHref({ isRegularLeague: featured.kind === 'regular_league', competitionId: featured.id, fromHref: '/home' })}
             aria-label={`대회 상세 — ${cardTitle} — ${ctaLabel}`}
           >
             <Card pad={0} className="tm-featured-card" style={{ overflow: 'hidden' }}>

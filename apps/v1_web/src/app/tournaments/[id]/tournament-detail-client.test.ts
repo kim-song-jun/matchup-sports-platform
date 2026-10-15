@@ -29,6 +29,7 @@ import type {
   V1TournamentFixtureResult,
   V1TournamentGroup,
   V1TournamentParticipantTeam,
+  V1TournamentRegistration,
   V1TournamentSponsor,
 } from '@/types/api';
 
@@ -1386,5 +1387,72 @@ describe('정원 표시 — 무료 대회의 대기 낱말', () => {
       .map((el) => el.getAttribute('aria-label') ?? '')
       .filter((label) => label.includes('정원'));
     expect(capacity.some((label) => label.includes('입금대기'))).toBe(true);
+  });
+});
+
+function makeRegistration(overrides: Partial<V1TournamentRegistration> = {}): V1TournamentRegistration {
+  return {
+    id: 'registration-1',
+    tournamentId: 'tournament-1',
+    teamId: 'team-1',
+    teamName: '성수 풋살 크루',
+    appliedByUserId: 'user-1',
+    status: 'confirmed',
+    depositorName: '홍길동',
+    agreedRules: true,
+    agreedPrivacy: true,
+    agreedRefund: true,
+    agreedMediaConsent: false,
+    confirmedAt: '2026-07-01T00:00:00.000Z',
+    rosterLockedAt: null,
+    rosterDeadlineOverrideAt: null,
+    cancelRequestedAt: null,
+    cancelReason: null,
+    adminCancelReason: null,
+    cancelOutcome: null,
+    playerCount: 0,
+    payment: null,
+    paymentInstructions: null,
+    createdAt: '2026-06-30T00:00:00.000Z',
+    updatedAt: '2026-07-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+describe('진행 중인 정규 리그의 공개 상단 진입', () => {
+  it.each([null, 'confirmed', 'draft', 'cancelled'] as const)(
+    '참가 상태 %s에서도 웹·모바일 상단에서 경기 일정·라이브 화면으로 이동한다',
+    (registrationStatus) => {
+      const tournament = makeTournament({
+        id: 'league-live', status: 'in_progress', format: 'group_knockout', kind: 'regular_league',
+      });
+      render(createElement(TournamentDetailView, {
+        tournament,
+        myRegistration: registrationStatus === null ? null : makeRegistration({ status: registrationStatus }),
+      }));
+      const link = screen.getByRole('link', { name: '진행 중인 리그 보기' });
+      expect(link).toHaveAttribute('href', '/tournaments/league-live/bracket');
+      expect(link.closest('.tm-hide-desktop, .tm-show-desktop')).toBeNull();
+      const title = screen.getByRole('heading', { level: 1, name: tournament.title });
+      expect(link.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(within(link).getByText('LIVE')).toBeInTheDocument();
+    },
+  );
+
+  it('모집 중인 일반 대회는 기존 신청 우선 표시를 유지한다', () => {
+    render(createElement(TournamentDetailView, {
+      tournament: makeTournament({ id: 'recruiting', status: 'open', format: 'league', kind: 'regular_tournament' }),
+      myRegistration: null,
+    }));
+    expect(screen.queryByRole('link', { name: '진행 중인 리그 보기' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '대진표 · 일정 보기' })).not.toBeInTheDocument();
+  });
+
+  it.each(['completed', 'cancelled'] as const)('리그 상태 %s는 진행 중으로 표시하지 않는다', (status) => {
+    render(createElement(TournamentDetailView, {
+      tournament: makeTournament({ id: 'inactive', status, format: 'group_knockout', kind: 'regular_league' }),
+      myRegistration: null,
+    }));
+    expect(screen.queryByRole('link', { name: '진행 중인 리그 보기' })).not.toBeInTheDocument();
   });
 });

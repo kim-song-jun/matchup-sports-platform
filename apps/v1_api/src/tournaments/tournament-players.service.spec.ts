@@ -156,6 +156,7 @@ describe('TournamentPlayersService', () => {
     v1AdminUser: { findUnique: jest.Mock };
     v1AdminActionLog: { create: jest.Mock; findFirst: jest.Mock };
     v1StatusChangeLog: { create: jest.Mock };
+    v1OperationAudit: { create: jest.Mock };
     $transaction: jest.Mock;
     $queryRaw: jest.Mock;
     $executeRaw: jest.Mock;
@@ -187,6 +188,7 @@ describe('TournamentPlayersService', () => {
         findFirst: jest.fn().mockResolvedValue(null),
       },
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'status-log-1' }) },
+      v1OperationAudit: { create: jest.fn().mockResolvedValue({ id: 'operation-audit-1' }) },
       $transaction: jest.fn(),
       // Prisma 의 `$queryRaw` 는 **행 배열**을 준다. `undefined` 로 두면 결과를 순회하는
       // 코드가 mock 에서만 터진다 — 등번호 조회(raw)가 실제로 그랬다.
@@ -214,6 +216,58 @@ describe('TournamentPlayersService', () => {
   });
 
   afterEach(() => jest.clearAllMocks());
+
+  describe('참가 선수 공통 번호·GK 설정', () => {
+    beforeEach(() => {
+      prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+      prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+      prisma.v1Tournament.findFirst.mockImplementation(kindAwareFindFirst(tournamentRow({ kind: 'regular_league' })));
+      prisma.v1TournamentPlayer.findFirst.mockResolvedValue(playerRow({ goalkeeper: false }));
+      prisma.v1TournamentPlayer.update.mockImplementation(async ({ data }) => playerRow({ ...data }));
+    });
+    it.each(['regular_league', 'regular_tournament'])('%s는 경기가 없어도 GK를 저장하고 해당 팀의 시작 전 경기만 재계산한다', async kind => {
+      prisma.v1Tournament.findFirst.mockImplementation(kindAwareFindFirst(tournamentRow({ kind })));
+      const result = await service.updatePlayerRosterSettings(manager, 'tournament-1', 'reg-1', 'player-1', { goalkeeper: true });
+      expect(result).toMatchObject({ id: 'player-1', goalkeeper: true, eligibilityStatus: 'needs_review' });
+      expect(prisma.v1TournamentPlayer.update).toHaveBeenCalledWith({ where: { id: 'player-1' }, data: { goalkeeper: true } });
+      expect(prisma.v1OperationAudit.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({
+        actorUserId: manager.id, action: 'COMPETITION_ROSTER_GOALKEEPER_CHANGED',
+        before: { goalkeeper: false }, after: { goalkeeper: true, scope: 'COMPETITION' },
+      }) }));
+      expect(rosterResyncEvents(prisma.$executeRaw)).toContainEqual({ scope: 'competitionTeam', competitionId: 'tournament-1', teamId: 'team-1' });
+    });
+    it('번호 0과 GK를 함께 저장하고 자격 심사를 덮어쓰지 않는다', async () => {
+      prisma.$queryRaw.mockImplementation(async (sql: TemplateStringsArray) => sql.join('').includes('SELECT id, jersey_number') ? [{ id: 'player-1', jersey_number: 0 }] : []);
+      await expect(service.updatePlayerRosterSettings(manager, 'tournament-1', 'reg-1', 'player-1', { goalkeeper: true, jerseyNumber: 0 })).resolves.toMatchObject({ goalkeeper: true, jerseyNumber: 0 });
+      const write = prisma.v1TournamentPlayer.update.mock.calls[0][0];
+      expect(write.data).toEqual({ goalkeeper: true });
+      expect(prisma.$executeRaw.mock.calls.some(call => call.includes(0))).toBe(true);
+    });
+    it('일반 팀원은 설정을 저장할 수 없다', async () => {
+      prisma.v1TeamMembership.findFirst.mockResolvedValue(null);
+      await expect(service.updatePlayerRosterSettings(nonManager, 'tournament-1', 'reg-1', 'player-1', { goalkeeper: true })).rejects.toThrow(ForbiddenException);
+      expect(prisma.v1TournamentPlayer.update).not.toHaveBeenCalled();
+    });
+    it.each([
+      { registration: { rosterLockedAt: new Date() }, tournament: {}, code: 'ROSTER_LOCKED' },
+      { registration: {}, tournament: { rosterDeadlineAt: new Date('2000-01-01') }, code: 'ROSTER_DEADLINE_PASSED' },
+      { registration: {}, tournament: { status: 'completed' }, code: 'TOURNAMENT_ROSTER_NOT_MUTABLE' },
+    ])('잠금·마감·종료($code)는 트랜잭션 안에서도 저장을 막는다', async row => {
+      prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow(row.registration));
+      prisma.v1Tournament.findFirst.mockImplementation(kindAwareFindFirst(tournamentRow({ kind: 'regular_league', ...row.tournament })));
+      await expect(service.updatePlayerRosterSettings(manager, 'tournament-1', 'reg-1', 'player-1', { goalkeeper: true })).rejects.toMatchObject({ response: { code: row.code } });
+      expect(prisma.v1TournamentPlayer.update).not.toHaveBeenCalled();
+    });
+    it('삭제되거나 다른 신청의 선수는 수정할 수 없다', async () => {
+      prisma.v1TournamentPlayer.findFirst.mockResolvedValue(null);
+      await expect(service.updatePlayerRosterSettings(manager, 'tournament-1', 'reg-1', 'other', { goalkeeper: true })).rejects.toMatchObject({ response: { code: 'PLAYER_NOT_FOUND' } });
+    });
+    it('중복 번호가 있으면 GK도 함께 저장하지 않는다', async () => {
+      prisma.$queryRaw.mockResolvedValue([{ id: 'another-player' }]);
+      await expect(service.updatePlayerRosterSettings(manager, 'tournament-1', 'reg-1', 'player-1', { goalkeeper: true, jerseyNumber: 7 })).rejects.toThrow(ConflictException);
+      expect(prisma.v1TournamentPlayer.update).not.toHaveBeenCalled();
+    });
+  });
 
   // ─── 1. manager+ 게이트 ─────────────────────────────────────────────────────
 
@@ -802,6 +856,19 @@ describe('TournamentPlayersService', () => {
   });
 
   // ─── 8-1. 명단 조회의 개인정보 — 팀장·매니저와 본인 행만 실명·생년월일·성별을 본다 ────
+  it('참가 명단의 표시 이름도 경기 명단 규칙을 쓰고 실명으로 대체하지 않는다', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'owner' });
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
+    prisma.v1TournamentPlayer.findMany.mockResolvedValue([
+      playerRow({ user: { profile: { nickname: '경기닉네임', displayName: '프로필표시이름' } } }),
+      playerRow({ id: 'p2', userId: 'u2', user: { profile: { nickname: null, displayName: '프로필표시이름' } } }),
+      playerRow({ id: 'p3', userId: 'u3', user: { profile: null } }),
+    ]);
+    const result = await service.listPlayers(manager, 'tournament-1', 'reg-1');
+    expect(result.players.map((player) => player.displayName)).toEqual(['경기닉네임', '프로필표시이름', '팀원']);
+    expect(result.players[0].realName).toBe('홍길동');
+  });
   //
   // 한 팀에 owner·manager·member 를 모두 두고 **같은 명단**을 조회한다. 좁히는 변경이라
   // 대조군이 없으면 "member 가 못 받는다" 단언이 게이트를 과하게 좁혀도(팀장까지 가려도)

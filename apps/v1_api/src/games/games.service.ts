@@ -348,6 +348,15 @@ function hasTeamScope(actor: { readonly role: string; readonly teamId?: string |
   return (isTeamScopedActorRole(actor.role) || actor.role === 'support_readonly') && typeof actor.teamId === 'string' && actor.teamId.length > 0;
 }
 
+/** Keep the operations participant lookup aligned with the existing event_append authority. */
+function canRecordHostTeamMatch(
+  actor: { readonly role: string; readonly teamId?: string | null },
+  hostTeamId: string | null,
+): boolean {
+  return actor.role === 'platform_ops' ||
+    (hostTeamId !== null && actor.teamId === hostTeamId && (actor.role === 'team_owner' || actor.role === 'team_manager'));
+}
+
 function requiresTeamScope(actor: { readonly role: string; readonly teamId?: string | null }): boolean {
   return isTeamScopedActorRole(actor.role) || (actor.role === 'support_readonly' && actor.teamId !== undefined);
 }
@@ -2620,7 +2629,7 @@ export class GamesService {
       const game = await tx.v1Game.findUnique({ where: { id: gameId }, select: {
         state: true,
         visibilityPolicy: { select: { lineupAt: true } },
-        teamMatch: { select: { startAt: true } },
+        teamMatch: { select: { startAt: true, hostTeamId: true } },
       } });
       if (game === null) throw this.notFound();
       const ownSideId = hasTeamScope(actor)
@@ -2637,9 +2646,14 @@ export class GamesService {
         { lineupAt: game.visibilityPolicy?.lineupAt ?? null, scheduledAt: game.teamMatch.startAt },
         new Date(),
       );
+      const canRecordPublishedOpponentDefaults = game.state === V1GameState.LIVE && lineupPublished &&
+        game.teamMatch !== null && canRecordHostTeamMatch(actor, game.teamMatch.hostTeamId);
+      const effectivePreviewSideIds = canRecordPublishedOpponentDefaults
+        ? new Set([...previewSideIds, ...lineups.map((lineup) => lineup.sideId)])
+        : previewSideIds;
       const participants = await this.loadEffectiveLineupParticipants(
-        tx, gameId, lineups, previewSideIds,
-        teamScopedReader ? { ownSideId, lineupPublished } : null,
+        tx, gameId, lineups, effectivePreviewSideIds,
+        teamScopedReader ? { ownSideId, lineupPublished, canRecordPublishedOpponentDefaults } : null,
       );
       const participantsByLineupId = groupParticipantsByLineupId(participants);
       const flatParticipants = lineups.flatMap((lineup) => participantsByLineupId.get(lineup.id) ?? []);
@@ -2670,7 +2684,7 @@ export class GamesService {
     gameId: string,
     lineups: readonly { readonly id: string; readonly sideId: string; readonly revision: number; readonly state: V1GameLineupState; readonly invalidatedAt?: Date | null }[],
     previewSideIds: ReadonlySet<string>,
-    teamReader: { readonly ownSideId: string; readonly lineupPublished: boolean } | null = null,
+    teamReader: { readonly ownSideId: string; readonly lineupPublished: boolean; readonly canRecordPublishedOpponentDefaults?: boolean } | null = null,
   ): Promise<V1GameParticipant[]> {
     const lineupIds = lineups.map((lineup) => lineup.id);
     const [persisted, effective] = await Promise.all([
@@ -2689,7 +2703,10 @@ export class GamesService {
     if (teamReader?.lineupPublished === true) {
       if (effective !== null) {
         for (const side of effective.sides) {
-          if (side.sideId !== teamReader.ownSideId && side.source === 'MANUAL' && side.lineup !== null) {
+          if (side.sideId !== teamReader.ownSideId && side.lineup !== null &&
+            (side.source === 'MANUAL' ||
+              (teamReader.canRecordPublishedOpponentDefaults === true &&
+                (side.source === 'DEFAULT_PREVIEW' || side.source === 'DEFAULT_FROZEN')))) {
             publishedOpponentLineupIds.add(side.lineup.id);
           }
         }
@@ -5641,7 +5658,7 @@ export class GamesService {
       // numbers against the host; disputes belong to the existing result
       // approve/change_request decision surface, not a second event writer.
       const hostRole = managerRole(hostMembership);
-      if (hostRole === null || match.hostTeamId === null) {
+      if (hostRole === null || !canRecordHostTeamMatch({ role: hostRole, teamId: match.hostTeamId }, match.hostTeamId)) {
         throw this.forbidden();
       }
       return {

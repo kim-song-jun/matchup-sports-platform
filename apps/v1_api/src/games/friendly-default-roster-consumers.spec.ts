@@ -163,6 +163,47 @@ describe('MD-QA #146: actual generic lineup GET → event consumer', () => {
     } finally { await fixture.close(); }
   });
 
+  it('lets the live host recorder select a published opponent default UUID accepted by event_append', async () => {
+    const fixture = await consumerFixture({ teamActor: true, startAt: new Date(Date.now() - 2 * 60 * 60 * 1000) });
+    try {
+      fixture.game.visibilityPolicy.lineupAt = new Date(Date.now() - 60 * 60 * 1000);
+      const rows = await fixture.service.listOperationsLineups(reader, ids.game);
+      const away = rows.find((lineup) => lineup.sideId === ids.away)?.participants[0];
+      if (away === undefined) throw new Error('The published effective opponent roster must be selectable by the host recorder.');
+
+      const grant = await fixture.service.requestTakeover(reader, ids.game, { clientInstanceId: 'host-record-client', lastSequence: 0 });
+      const commandId = randomUUID();
+      await fixture.service.appendEvent(reader, ids.game, commandId, {
+        clientEventId: commandId, expectedVersion: 0, takeoverToken: grant.takeoverToken,
+        type: 'GOAL', sideId: ids.away, participantId: away.id, period: 1, clockMs: 0,
+        occurredAt: new Date().toISOString(), payload: {},
+      });
+
+      expect(fixture.events).toEqual([expect.objectContaining({ participantId: away.id, sideId: ids.away })]);
+      const frozenAway = fixture.lineups.find((lineup) => lineup.sideId === ids.away && lineup.revision === 2);
+      const frozenHome = fixture.lineups.find((lineup) => lineup.sideId === ids.home && lineup.revision === 2);
+      if (frozenAway === undefined || frozenHome === undefined) throw new Error('The first event must append one frozen revision for each default side.');
+      expect(fixture.participants).toHaveLength(4);
+      expect(fixture.participants.find((participant) => participant.id === away.id)).toMatchObject({ lineupId: frozenAway.id, sideId: ids.away });
+      expect(fixture.participants.find((participant) => participant.sideId === ids.home && participant.lineupId === frozenHome.id)).toBeDefined();
+      expect(fixture.audits).toHaveLength(2);
+      expect(fixture.audits).toEqual(expect.arrayContaining([
+        expect.objectContaining({ actorType: 'SYSTEM', systemActor: 'FRIENDLY_DEFAULT_ROSTER_FROZEN', action: 'FRIENDLY_DEFAULT_ROSTER_FROZEN', after: expect.objectContaining({ sideId: ids.away, lineupId: frozenAway.id }) }),
+        expect.objectContaining({ actorType: 'SYSTEM', systemActor: 'FRIENDLY_DEFAULT_ROSTER_FROZEN', action: 'FRIENDLY_DEFAULT_ROSTER_FROZEN', after: expect.objectContaining({ sideId: ids.home, lineupId: frozenHome.id }) }),
+      ]));
+    } finally { await fixture.close(); }
+  });
+
+  it('keeps a live host recorder from selecting an opponent default before its explicit publication time', async () => {
+    const fixture = await consumerFixture({ teamActor: true, startAt: new Date(Date.now() - 2 * 60 * 60 * 1000) });
+    try {
+      const rows = await fixture.service.listOperationsLineups(reader, ids.game);
+
+      expect(rows.find((lineup) => lineup.sideId === ids.away)?.participants).toEqual([]);
+      expect(rows.find((lineup) => lineup.sideId === ids.home)?.participants).toHaveLength(1);
+    } finally { await fixture.close(); }
+  });
+
   it('keeps scheduled team-manager GET limited to the own side and omits operator identity fields', async () => {
     // Given: a team actor opens the scheduled console before either team has submitted.
     const fixture = await consumerFixture({ scheduled: true, teamActor: true });

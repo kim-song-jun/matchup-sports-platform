@@ -12,22 +12,24 @@ const teamMatchId = 'lineup-cache-match';
 const gameId = 'lineup-cache-game';
 const unrelatedGameId = 'unrelated-lineup-cache-game';
 let revision = 1;
+let lineupId = 'lineup-1';
+let state: 'DRAFT' | 'SUBMITTED' = 'DRAFT';
 let gameLineupReads = 0;
 let unrelatedReads = 0;
 const clients: QueryClient[] = [];
 const ok = (data: unknown) => HttpResponse.json({ status: 'success', data });
 const lineupsFor = () => [{
-  id: `lineup-revision-${revision}`,
+  id: lineupId,
   gameId,
   sideId: 'side-home',
   revision,
-  state: 'DRAFT',
+  state,
   participants: [{ id: `participant-revision-${revision}`, displayNameSnapshot: `선수 ${revision}`, userId: `user-${revision}` }],
 }];
 const server = setupServer(
   http.get(`${api}/team-matches/${teamMatchId}/lineup`, () => ok({
-    teamMatchId, gameId, sideId: 'side-home', role: 'team_owner', lineupId: 'lineup-1', revision,
-    state: 'DRAFT', version: revision, formation: null, publicLineupAt: null, starters: [], bench: [],
+    teamMatchId, gameId, sideId: 'side-home', role: 'team_owner', lineupId, revision,
+    state, version: revision, formation: null, publicLineupAt: null, starters: [], bench: [],
   })),
   http.get(`${api}/games/${gameId}/lineups`, () => {
     gameLineupReads += 1;
@@ -39,11 +41,12 @@ const server = setupServer(
   }),
   http.put(`${api}/team-matches/${teamMatchId}/lineup`, () => {
     revision += 1;
-    return ok({ teamMatchId, gameId, sideId: 'side-home', lineupId: `lineup-${revision}`, revision, replayed: false });
+    lineupId = `lineup-${revision}`;
+    return ok({ teamMatchId, gameId, sideId: 'side-home', lineupId, revision, state, version: revision, replayed: false });
   }),
   http.post(`${api}/team-matches/${teamMatchId}/lineup/submit`, () => {
-    revision += 1;
-    return ok({ teamMatchId, gameId, sideId: 'side-home', lineupId: `lineup-${revision}`, revision });
+    state = 'SUBMITTED';
+    return ok({ teamMatchId, gameId, sideId: 'side-home', lineupId, revision, state, version: revision, publicLineupAt: null });
   }),
   http.post('*/api/v1/logs/client-error', () => new HttpResponse(null, { status: 204 })),
 );
@@ -51,6 +54,8 @@ const server = setupServer(
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(() => {
   revision = 1;
+  lineupId = 'lineup-1';
+  state = 'DRAFT';
   gameLineupReads = 0;
   unrelatedReads = 0;
   vi.stubEnv('NEXT_PUBLIC_API_URL', api);
@@ -85,14 +90,20 @@ describe('team-match lineup mutation cache boundary', () => {
     await act(async () => {
       await result.current.save.mutateAsync({ idempotencyKey: 'save-lineup-1', payload: savePayload });
     });
-    await waitFor(() => expect(result.current.gameLineups.data?.[0]?.id).toBe('lineup-revision-2'));
+    await waitFor(() => expect(result.current.gameLineups.data?.[0]).toMatchObject({
+      id: 'lineup-2', revision: 2, state: 'DRAFT',
+    }));
+    expect(result.current.teamLineup.data).toMatchObject({ lineupId: 'lineup-2', revision: 2, state: 'DRAFT' });
     expect(gameLineupReads).toBe(2);
     expect(unrelatedReads).toBe(1);
 
     await act(async () => {
       await result.current.submit.mutateAsync({ idempotencyKey: 'submit-lineup-2', expectedVersion: 2 });
     });
-    await waitFor(() => expect(result.current.gameLineups.data?.[0]?.id).toBe('lineup-revision-3'));
+    await waitFor(() => expect(result.current.gameLineups.data?.[0]).toMatchObject({
+      id: 'lineup-2', revision: 2, state: 'SUBMITTED',
+    }));
+    expect(result.current.teamLineup.data).toMatchObject({ lineupId: 'lineup-2', revision: 2, state: 'SUBMITTED' });
     expect(gameLineupReads).toBe(3);
     expect(unrelatedReads).toBe(1);
   });

@@ -453,6 +453,13 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
   const needsRecordingRoster = isHost && !teamMatch.data?.league &&
     lineup.data?.effectiveRosterSource === 'DEFAULT_PREVIEW' && lineup.data.hasSavedDraft === true;
   const recordingLineups = useV1GameLineups(gameId, { enabled: needsRecordingRoster });
+  const recordingLineup = recordingLineups.data
+    ?.filter((row) => row.sideId === lineup.data?.sideId && row.invalidatedAt === null)
+    .sort((a, b) => b.revision - a.revision)[0];
+  const hasUsableRecordingLineup = recordingLineup !== undefined &&
+    recordingLineup.id === lineup.data?.lineupId &&
+    recordingLineup.revision === lineup.data?.revision &&
+    recordingLineup.participants.length > 0;
   // 로딩·에러 중에는 리그인지 알 수 없다 — 그때 "입력"을 띄우면 리그 참가팀에게 서버가
   // 403 으로 막는 행동을 약속하게 된다. 친선으로 확인된 뒤에만 제목을 올린다.
   useShellOverride({ title: teamMatch.data && !teamMatch.data.league ? '경기 결과 입력' : '경기 결과' });
@@ -584,7 +591,13 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
     setCardDrafts((prev) => prev.filter((card) => card.key !== key));
   }
 
-  if (isError || (needsRecordingRoster && recordingLineups.isError)) {
+  // Keep a usable cached roster on screen; wait only when the dependent data is
+  // missing or stale while its background refresh is still in progress.
+  if (needsRecordingRoster && recordingLineups.isFetching && !hasUsableRecordingLineup) {
+    return <PageSkeleton variant="detail" />;
+  }
+
+  if (isError || (needsRecordingRoster && recordingLineups.isError && !recordingLineups.isFetching)) {
     return (
       <>
         <ErrorState
@@ -632,13 +645,7 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
 
   const homeSide = game.data?.sides.find((side) => side.sideKey === 'HOME');
   const awaySide = game.data?.sides.find((side) => side.sideKey === 'AWAY');
-  const recordingLineup = recordingLineups.data
-    ?.filter((row) => row.sideId === lineup.data?.sideId && row.invalidatedAt === null)
-    .sort((a, b) => b.revision - a.revision)[0];
-  if (needsRecordingRoster && (
-    recordingLineup === undefined || recordingLineup.id !== lineup.data?.lineupId ||
-    recordingLineup.revision !== lineup.data?.revision || recordingLineup.participants.length === 0
-  )) {
+  if (needsRecordingRoster && !hasUsableRecordingLineup) {
     return <ErrorState message="기록용 참석명단을 확인할 수 없어요. 명단을 다시 불러와 주세요." onRetry={() => retryAll(lineup, recordingLineups)} />;
   }
   const recordingRoster: ResultRosterRow[] = recordingLineup?.participants.map((row) => ({

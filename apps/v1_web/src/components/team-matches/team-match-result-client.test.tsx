@@ -141,6 +141,7 @@ function revision(overrides: Partial<V1GameResultRevision> = {}): V1GameResultRe
 }
 
 const settledQuery = <T,>(data: T) => ({ data, isError: false, isLoading: false, isFetching: false, refetch: vi.fn() });
+const lineupRefreshError = '기록용 참석명단을 확인할 수 없어요. 명단을 다시 불러와 주세요.';
 
 describe('TeamMatchResultPageClient — 호스트 결과 입력', () => {
   beforeEach(() => {
@@ -159,6 +160,66 @@ describe('TeamMatchResultPageClient — 호스트 결과 입력', () => {
     // text nodes (`{'#7 '}{displayName}`), so an exact-string matcher never
     // matches. Asserting on the combined label proves both are rendered.
     expect(screen.getByText(/#7\s*김민준/)).toBeInTheDocument();
+  });
+
+  it('shows loading while a stale cached recording lineup is being refreshed, then keeps a settled mismatch visible', () => {
+    useV1TeamMatchLineupMock.mockReturnValue(settledQuery(lineup({
+      lineupId: 'saved-lineup-2', revision: 2, version: 2,
+      effectiveRosterSource: 'DEFAULT_PREVIEW', hasSavedDraft: true,
+    })));
+    const participant = {
+      id: 'participant-1', gameId: 'game-1', sideId: 'side-home', lineupId: 'stale-lineup-1',
+      userId: 'user-1', displayNameSnapshot: '김민준', jerseyNumber: 7, position: null,
+      positionX: null, positionY: null, started: true, arrivedAt: null,
+      createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
+    };
+    const staleLineup: GameLineup = {
+      id: 'stale-lineup-1', gameId: 'game-1', sideId: 'side-home', revision: 1,
+      state: 'DRAFT', version: 1, submittedAt: null, supersedesId: null, formation: null,
+      createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
+      invalidatedAt: null, participants: [participant],
+    };
+    useV1GameLineupsMock.mockReturnValue({
+      ...settledQuery([staleLineup]), isFetching: true,
+    });
+
+    const { rerender } = render(<TeamMatchResultPageClient teamMatchId="tm-1" />);
+
+    expect(screen.queryByText(lineupRefreshError)).not.toBeInTheDocument();
+    expect(screen.queryByText('결과 작성 완료')).not.toBeInTheDocument();
+
+    useV1GameLineupsMock.mockReturnValue(settledQuery([staleLineup]));
+    rerender(<TeamMatchResultPageClient teamMatchId="tm-1" />);
+
+    expect(screen.getByText(lineupRefreshError)).toBeInTheDocument();
+    expect(screen.getByText('결과 작성 완료')).not.toBeInTheDocument();
+  });
+
+  it('keeps the result form visible while a matching cached recording lineup refreshes', () => {
+    useV1TeamMatchLineupMock.mockReturnValue(settledQuery(lineup({
+      lineupId: 'saved-lineup-2', revision: 2, version: 2,
+      effectiveRosterSource: 'DEFAULT_PREVIEW', hasSavedDraft: true,
+    })));
+    const participant = {
+      id: 'participant-2', gameId: 'game-1', sideId: 'side-home', lineupId: 'saved-lineup-2',
+      userId: 'user-2', displayNameSnapshot: '박민준', jerseyNumber: 9, position: null,
+      positionX: null, positionY: null, started: true, arrivedAt: null,
+      createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
+    };
+    const matchingLineup: GameLineup = {
+      id: 'saved-lineup-2', gameId: 'game-1', sideId: 'side-home', revision: 2,
+      state: 'DRAFT', version: 2, submittedAt: null, supersedesId: 'saved-lineup-1', formation: null,
+      createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
+      invalidatedAt: null, participants: [participant],
+    };
+    useV1GameLineupsMock.mockReturnValue({
+      ...settledQuery([matchingLineup]), isFetching: true,
+    });
+
+    render(<TeamMatchResultPageClient teamMatchId="tm-1" />);
+
+    expect(screen.getByText('결과 작성 완료')).toBeInTheDocument();
+    expect(screen.getByText(/#9\s*박민준/)).toBeInTheDocument();
   });
 
   it('매니저 권한(manageableHostTeam)도 동일하게 결과 작성 폼을 볼 수 있다', () => {

@@ -31,6 +31,21 @@ describe('listTournamentIds cursor validation', () => {
 });
 
 describe('MD-QA #145 public list capacity SQL binding', () => {
+  it('MD-QA #145 review follow-up draft rank: actual SQL applies capacity before ranking a league draft as recruiting', async () => {
+    const statements: Prisma.Sql[] = [];
+    const queryRaw = jest.fn(async (strings: TemplateStringsArray, ...values: unknown[]) => {
+      statements.push(Prisma.sql(strings, ...values));
+      return [];
+    });
+    await listTournamentIds({ $queryRaw: queryRaw } as never, { kind: 'league' }, { limit: 5 });
+    const statement = statements[0];
+    if (statement === undefined) throw new Error('The actual public list query was not built');
+    const draftRankClause = statement.text.match(/WHEN 'draft' THEN([\s\S]*?)WHEN 'open'/)?.[1];
+    // Actual generated SQL is the database consumer contract; this does not claim PostgreSQL ordering execution.
+    expect(draftRankClause).toMatch(/CASE WHEN[\s\S]*t\.max_teams[\s\S]*THEN 2 ELSE 1 END/);
+    expect(statement.values).toEqual(expect.arrayContaining(['confirmed', 'awaiting_payment', 'payment_checking', 'paid']));
+  });
+
   it('binds league maxTeams independently from tournament teamCount and counts every reservation source', async () => {
     // This checks the actual query builder contract; PostgreSQL ordering is covered by the integration spec.
     const statements: Prisma.Sql[] = [];

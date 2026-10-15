@@ -181,7 +181,7 @@ export class TournamentRegistrationsService {
     });
     if (existing && existing.status !== 'cancelled') {
       if (existing.status === 'draft') {
-        await this.assertCapacityAvailable(tournamentId, tournament);
+        // 저장된 초안을 읽는 것은 자리를 예약하지 않는다. 정원은 실제 제출 트랜잭션에서 다시 검사한다.
         return this.serialize(existing, null, await this.countPlayers(existing.id), tournament);
       }
       const [payment, playerCount] = await Promise.all([

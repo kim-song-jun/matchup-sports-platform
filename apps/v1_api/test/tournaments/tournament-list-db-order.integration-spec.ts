@@ -257,6 +257,7 @@ describe('대회 공개 목록 DB 정렬·페이지 계약', () => {
     const team = await db.v1Team.create({ data: { ...originalTeam, sportId: sport.id, name: `정원 ${held}` } });
     type CapacitySeed = {
       name: string; kind: 'regular_league' | 'regular_tournament' | null; maxTeams: number | null; teamCount: number;
+      status?: 'draft' | 'open';
       held: typeof held | 'waitlisted' | 'cancel_requested' | 'cancelled';
     };
     const capacitySeeds: CapacitySeed[] = [
@@ -270,10 +271,13 @@ describe('대회 공개 목록 DB 정렬·페이지 계약', () => {
       { name: 'tournament-full', kind: 'regular_tournament', maxTeams: null, teamCount: 1, held },
       { name: 'legacy-null-full', kind: null, maxTeams: 20, teamCount: 1, held },
       { name: 'tournament-room', kind: 'regular_tournament', maxTeams: 1, teamCount: 2, held },
+      { name: 'league-draft-full', kind: 'regular_league', maxTeams: 1, teamCount: 8, status: 'draft', held },
+      { name: 'league-draft-room', kind: 'regular_league', maxTeams: 2, teamCount: 1, status: 'draft', held },
+      { name: 'league-draft-unlimited', kind: 'regular_league', maxTeams: null, teamCount: 1, status: 'draft', held },
     ];
     for (const [index, seed] of capacitySeeds.entries()) {
       const tournament = await db.v1Tournament.create({ data: {
-        title: seed.name, sportId: sport.id, kind: seed.kind, status: 'open', isPublic: true,
+        title: seed.name, sportId: sport.id, kind: seed.kind, status: seed.status ?? 'open', isPublic: true,
         maxTeams: seed.maxTeams, teamCount: seed.teamCount, maxPlayers: 20, scheduledAt: day(index + 1),
       } });
       await db.v1TournamentRegistration.create({ data: {
@@ -284,7 +288,8 @@ describe('대회 공개 목록 DB 정렬·페이지 계약', () => {
     const actual = await read.list({ sportId: sport.id, kind: 'all', limit: 50 });
     expect(actual.items.map(item => item.title)).toEqual([
       'league-unlimited', 'league-room', 'league-waitlisted', 'league-cancel-requested', 'league-cancelled',
-      'tournament-room', 'league-full', 'tournament-full', 'legacy-null-full',
+      'tournament-room', 'league-draft-room', 'league-draft-unlimited',
+      'league-full', 'tournament-full', 'legacy-null-full', 'league-draft-full',
     ]);
   });
 

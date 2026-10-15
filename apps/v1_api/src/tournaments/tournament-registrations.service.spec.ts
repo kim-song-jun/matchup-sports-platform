@@ -1467,6 +1467,29 @@ describe('TournamentRegistrationsService', () => {
   });
 
   describe('MD-QA #145 — 선택적 리그 참가팀 정원', () => {
+    it('MD-QA #145 review follow-up draft: saved nonreserving draft resumes at full capacity while submit still rejects', async () => {
+      const savedDraft = registrationRow({ id: 'saved-draft-1' });
+      prisma.v1Tournament.findFirst.mockImplementation(kindAwareFindFirst(openTournament({
+        kind: 'regular_league', registrationDeadlineAt: LEAGUE_OPEN_DEADLINE, maxTeams: 3, maxPlayers: 20,
+      })));
+      prisma.v1TournamentRegistration.findUnique.mockResolvedValue(savedDraft);
+      prisma.v1TournamentRegistration.findFirst.mockResolvedValue(savedDraft);
+      prisma.v1TournamentRegistration.count.mockResolvedValue(3);
+      prisma.v1TournamentPlayer.count.mockResolvedValue(2);
+      // Another team reserved the final place after this manager saved an unsubmitted draft.
+      const resumed = await service.create(manager, 'tournament-1', { teamId: 'team-1' });
+      expect(resumed).toMatchObject({ id: 'saved-draft-1', status: 'draft', playerCount: 2 });
+      expect(prisma.v1TournamentRegistration.create).not.toHaveBeenCalled();
+      expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
+      // Reading the draft does not reserve a place; the actual submit mutation must retain its locked capacity gate.
+      await expect(service.submit(manager, 'tournament-1', 'saved-draft-1', validSubmit)).rejects.toMatchObject({
+        response: { code: 'TOURNAMENT_CAPACITY_FULL' },
+      });
+      expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
+      expect(prisma.v1TournamentPayment.upsert).not.toHaveBeenCalled();
+      expect(managedTerms.recordTournamentDecisions).not.toHaveBeenCalled();
+    });
+
     it('create: 선수 정원과 별개로 참가팀 정원이 찼으면 draft도 만들지 않는다', async () => {
       // Given: seeded/promoted/paid reservations already fill a three-team league.
       prisma.v1Tournament.findFirst.mockImplementation(kindAwareFindFirst(openTournament({

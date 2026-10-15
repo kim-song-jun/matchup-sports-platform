@@ -61,10 +61,10 @@ async function main() {
       await page.setViewportSize({ width, height: 1000 });
       await page.waitForTimeout(350);
       await page.screenshot({ path: path.join(output, `detail-${width}.png`), fullPage: true });
-      evidence.viewports.push({ width, route: page.url(), editEntry: await page.getByRole('link', { name: '리그 수정', exact: true }).count(), overflow: await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth) });
+      evidence.viewports.push({ width, route: page.url(), editEntry: await page.getByRole('link', { name: '리그 정보', exact: true }).count(), overflow: await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth) });
     }
     if (evidence.stage === 'after') {
-      await page.getByRole('link', { name: '리그 수정', exact: true }).click();
+      await page.getByRole('link', { name: '리그 정보', exact: true }).click();
       await page.getByLabel('리그명', { exact: true }).waitFor();
       for (const width of [390, 768, 1440]) {
         await page.setViewportSize({ width, height: 1000 });
@@ -130,7 +130,7 @@ async function main() {
         evidence.staleDraftPreserved = (await stalePage.getByLabel('리그명', { exact: true }).inputValue()).endsWith('오래된 초안');
         await stalePage.screenshot({ path: path.join(output, 'stale-draft-1440.png'), fullPage: true });
         await stalePage.close();
-        await page.getByRole('link', { name: '리그 수정', exact: true }).click();
+        await page.getByRole('link', { name: '리그 정보', exact: true }).click();
         await page.getByLabel('리그명', { exact: true }).waitFor();
         await page.getByLabel('리그명', { exact: true }).fill(original.title);
         await page.getByLabel('설명·운영 안내', { exact: true }).fill(original.rulesText);

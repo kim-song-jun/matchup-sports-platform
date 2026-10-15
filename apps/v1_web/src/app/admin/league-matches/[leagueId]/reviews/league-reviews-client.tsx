@@ -1,7 +1,6 @@
 'use client';
 
-import Link from 'next/link';
-import { AdminEmpty, AdminListSkeleton, AdminPageHeader, AdminToasts, useAdminToast } from '@/components/admin';
+import { AdminEmpty, AdminListSkeleton, AdminToasts, useAdminToast } from '@/components/admin';
 import { useV1AdminLeagueMatch, useV1AdminMe } from '@/hooks/use-v1-api';
 import { canWriteTournamentAdmin, deriveTournamentAdminRole } from '@/lib/admin-tournament-role';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -29,18 +28,6 @@ export default function LeagueReviewsClient({ leagueId }: { leagueId: string }) 
 
   return (
     <div className="tm-content-enter">
-      <AdminPageHeader
-        eyebrow="플랫폼 · 리그"
-        title={league.data ? `${league.data.title} 후기 관리` : '리그 후기 관리'}
-        action={
-          <Link
-            href={`/admin/league-matches/${encodeURIComponent(leagueId)}`}
-            className="inline-flex min-h-[var(--size-touch-min)] items-center rounded-xl border border-[var(--border-strong)] px-4 text-[length:var(--font-size-label)] font-semibold text-[var(--text-strong)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-          >
-            리그 상세로
-          </Link>
-        }
-      />
       {league.isPending || admin.isPending ? (
         <div>
           <p className="sr-only" role="status">후기 관리 정보를 불러오는 중이에요.</p>

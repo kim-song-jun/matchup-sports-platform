@@ -2,7 +2,7 @@
 
 import { useId, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AdminEmpty, AdminPageHeader, AdminPageSkeleton } from '@/components/admin';
+import { AdminEmpty, AdminPageSkeleton } from '@/components/admin';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
 import { useLeagueSettings, useUpdateLeagueSettings } from '@/hooks/use-league-settings';
@@ -83,8 +83,7 @@ function SettingsForm({ leagueId, initial, reload }: { leagueId: string; initial
     } catch (cause) { setError(extractErrorMessage(cause, '리그 정보를 저장하지 못했어요.')); }
     finally { lock.current = false; }
   };
-  return <div className="tm-content-enter mx-auto max-w-2xl">
-    <AdminPageHeader eyebrow="플랫폼 · 리그" title="리그 수정" description={`${snapshot.title} · ${snapshot.sportName}`} />
+  return <div className="tm-content-enter max-w-2xl">
     {!canWrite && <p role="status">조회 권한으로 접속했어요. 기본 정보를 수정하려면 쓰기 권한이 필요해요.</p>}
     {ended && <p role="status">끝났거나 취소된 리그는 기본 정보를 수정할 수 없어요.</p>}
     <form onSubmit={submit} className="space-y-5" aria-busy={busy}>

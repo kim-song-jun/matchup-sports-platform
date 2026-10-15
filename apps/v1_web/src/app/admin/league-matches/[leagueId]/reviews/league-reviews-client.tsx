@@ -30,20 +30,20 @@ export default function LeagueReviewsClient({ leagueId }: { leagueId: string }) 
     <div className="tm-content-enter">
       {league.isPending || admin.isPending ? (
         <div>
-          <p className="sr-only" role="status">후기 관리 정보를 불러오는 중이에요.</p>
+          <p className="sr-only" role="status">리뷰 관리 정보를 불러오는 중이에요.</p>
           <AdminListSkeleton />
         </div>
       ) : league.isError || admin.isError ? (
         <AdminEmpty
           role="alert"
-          title="후기 관리 정보를 불러오지 못했어요"
+          title="리뷰 관리 정보를 불러오지 못했어요"
           description={extractErrorMessage(admin.isError ? admin.error : league.error, '잠시 후 다시 시도해 주세요.')}
           action={retryButton}
         />
       ) : !league.data || !admin.data ? (
-        <AdminEmpty role="alert" title="후기 관리 정보를 확인할 수 없어요" description="리그와 관리자 정보를 다시 불러와 주세요." action={retryButton} />
+        <AdminEmpty role="alert" title="리뷰 관리 정보를 확인할 수 없어요" description="리그와 관리자 정보를 다시 불러와 주세요." action={retryButton} />
       ) : (
-        // 후기 API는 리그도 지원하지만 대회 전용 셸은 리그를 조회하지 못하므로 리그 엔티티 확인 후 공유 탭만 사용한다.
+        // 리뷰 API는 리그도 지원하지만 대회 전용 셸은 리그를 조회하지 못하므로 리그 엔티티 확인 후 공유 탭만 사용한다.
         <ReviewsTab tournamentId={leagueId} canWrite={canWriteTournamentAdmin(role)} showToast={showToast} />
       )}
       <AdminToasts toasts={toasts} />

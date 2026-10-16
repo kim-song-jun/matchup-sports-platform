@@ -19,4 +19,4 @@
 - [x] 정규 리그 거울 행의 리그 안내 유지
 - [x] 관련 테스트 172건, 웹 타입·패턴 검사 통과
 - [x] 390/768/1440 구성요소 화면 확인 및 전후 이미지 준비 (근거와 한계: docs/screenshots/tournament-format-guide/README.md)
-- [ ] dev 대상 PR 생성
+- [x] dev 대상 PR #1956 생성 및 전후 이미지 본문 첨부

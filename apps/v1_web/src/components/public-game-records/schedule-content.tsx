@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Film, MapPin } from 'lucide-react';
 import { Card, EmptyState } from '@/components/v1-ui/primitives';
@@ -634,6 +634,28 @@ function ScheduleGroupBlock({
   );
 }
 
+function ScheduleFilterControls({ filters, activeFilter, onSelectFilter, action }: {
+  filters: ScheduleFilter[];
+  activeFilter: string;
+  onSelectFilter: (key: string) => void;
+  action?: ReactNode;
+}) {
+  return (
+    <div aria-label="일정 필터" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--spacing-3)' }}>
+      <div role="tablist" aria-label="경기 일정 보기" style={{ display: 'flex', gap: 'var(--spacing-2)', minWidth: 0, overflowX: 'auto' }}>
+        {filters.map((option) => (
+          <button key={option.key} type="button" role="tab" aria-selected={activeFilter === option.key}
+            className={`tm-chip${activeFilter === option.key ? ' tm-chip-active' : ''}`}
+            style={{ flexShrink: 0 }}
+            onClick={() => onSelectFilter(option.key)}>
+            {option.label}
+          </button>
+        ))}
+      </div>
+      {action}
+    </div>
+  );
+}
 /**
  * 단계(조별리그/결선) → 조·라운드 두 겹으로 묶어 보여준다. 예전에는 서버 순서대로 한
  * 목록에 쏟아부었고, 데스크톱 2열에서 A조·B조·결승·4강이 좌우로 뒤섞였다(오너 지적).
@@ -690,22 +712,8 @@ function ScheduleSections({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {filters.length > 1 ? (
-        <div role="tablist" aria-label="경기 일정 보기" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {filters.map((option) => (
-            <button
-              key={option.key}
-              type="button"
-              role="tab"
-              aria-selected={activeFilter === option.key}
-              className={`tm-chip${activeFilter === option.key ? ' tm-chip-active' : ''}`}
-              onClick={() => onSelectFilter(option.key)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
+        <ScheduleFilterControls filters={filters} activeFilter={activeFilter} onSelectFilter={onSelectFilter} />
       ) : null}
-
       {visiblePhases.length === 0 ? (
         <EmptyState title="해당하는 경기가 없어요" sub="다른 보기를 선택해 주세요." />
       ) : (
@@ -761,6 +769,8 @@ export function ScheduleContent({
   myFixtures,
   myTeamIds,
   showScheduleHeading = true,
+  filterAction,
+  filterSummary,
   isRegularLeague = false,
   fromHref,
 }: {
@@ -790,6 +800,9 @@ export function ScheduleContent({
   myTeamIds?: ReadonlySet<string>;
   /** An enclosing filter header already owns this heading. */
   showScheduleHeading?: boolean;
+  /** Membership controls share the phase-filter row, before live and scheduled games. */
+  filterAction?: ReactNode;
+  filterSummary?: ReactNode;
   /** 이 일정 화면 자신의 URL(`useCurrentHref()`) — 경기 상세의 셸 뒤로가기가 여기로 돌아오게 한다. */
   fromHref?: string | null;
 }) {
@@ -913,6 +926,12 @@ export function ScheduleContent({
 
   return (
     <div style={{ padding: '16px 20px 40px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {filterAction !== undefined ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-2)' }}>
+          <ScheduleFilterControls filters={filters} activeFilter={activeFilter} onSelectFilter={setFilter} action={filterAction} />
+          {filterSummary}
+        </div>
+      ) : null}
       {live.length > 0 ? (
         <section aria-label="진행 중인 경기">
           <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>진행 중인 경기</h3>
@@ -990,7 +1009,7 @@ export function ScheduleContent({
             tournamentId={tournamentId}
             entries={data.items}
             myFixtureIds={myFixtureIds}
-            filters={filters}
+            filters={filterAction === undefined ? filters : []}
             activeFilter={activeFilter}
             onSelectFilter={setFilter}
             phaseLabels={phaseLabels}

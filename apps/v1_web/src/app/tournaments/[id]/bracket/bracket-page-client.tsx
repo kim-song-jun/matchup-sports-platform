@@ -513,11 +513,14 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
   // 라이브 폴링까지 하며 들고 있을 이유가 없다. `enabled` 로 끄는 이유이고, 빈 id 를
   // 넘겨 끄는 방식은 쓰지 않는다(캐시 키가 오염되고 조용히 잘못된 요청이 갈 수 있다).
   // 리그일 때는 형제 탭과 **같은 쿼리 키**라 React Query 가 합친다 — 왕복이 안 는다.
+  // 브라우저에만 남아 있는 순위 캐시는 첫 HTML과 다를 수 있어 마운트 후에 반영한다.
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
   const leagueSchedule = usePublicTournamentSchedule(tournament.id, {}, { enabled: isRegularLeague });
-  const leagueScheduleStandings = isRegularLeague
+  const leagueScheduleStandings = isRegularLeague && hydrated
     ? (leagueSchedule.data?.pages[0]?.standings ?? [])
     : [];
-  const leagueScheduleItemCount = isRegularLeague
+  const leagueScheduleItemCount = isRegularLeague && hydrated
     ? (leagueSchedule.data?.pages.reduce((sum, page) => sum + page.items.length, 0) ?? 0)
     : 0;
   const stages = buildTournamentStages(tournament);
@@ -525,10 +528,6 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
   const [activeTab, setActiveTab] = useState<'standings' | 'schedule'>(() =>
     searchParams.get('tab') === 'standings' ? 'standings' : 'schedule',
   );
-  // 닫힌 순위 패널은 서버 HTML·하이드레이션에만 싣고 그 뒤엔 내린다 — 라이브 폴링마다 보이지 않는
-  // 대진표를 다시 그리지 않게. 서버와 첫 클라이언트 렌더가 같아야 해서 effect 로 넘긴다.
-  const [hydrated, setHydrated] = useState(false);
-  useEffect(() => setHydrated(true), []);
   // 화면 뒤로가기는 이 컴포넌트를 새로 만든다. 선택한 보기를 출처에 실어 순위표를 복원한다.
   let bracketSelfHref = useCurrentHref();
   if (bracketSelfHref) {
@@ -595,7 +594,7 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
    */
   const leagueScheduleSettled = isRegularLeague
     // 추가 페이지 오류는 이미 받은 순위를 없애지 않는다. 펼친 전적에서 재시도를 제공한다.
-    ? !leagueSchedule.isLoading && (!leagueSchedule.isError || leagueSchedule.isFetchNextPageError)
+    ? hydrated && !leagueSchedule.isLoading && (!leagueSchedule.isError || leagueSchedule.isFetchNextPageError)
     : true;
   /**
    * 순위표 제목. 사용자 확정값은 **"tierLabel(1부/2부)을 쓰고 없으면 '리그 순위'"** 인데
@@ -745,11 +744,11 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
             <div className="tm-tourn-sub-col" style={{ padding: '20px 20px 0' }}>
               {isLeague && (
                 <section>
-                  <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>
+                  {!isRegularLeague || (hydrated && leagueStandingsHeading !== '리그 순위') ? <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>
                     {leagueStandingsHeading}
-                  </h3>
+                  </h3> : null}
                   {isRegularLeague && !leagueScheduleSettled ? (
-                    leagueSchedule.isError ? (
+                    hydrated && leagueSchedule.isError ? (
                       <ErrorState message="순위를 불러오지 못했어요." onRetry={() => void leagueSchedule.refetch()} />
                     ) : (
                       <div

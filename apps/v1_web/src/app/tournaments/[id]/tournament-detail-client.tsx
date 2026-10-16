@@ -2092,7 +2092,7 @@ function InfoRow({
       className="tm-info-row"
       style={{ padding: '0 16px', ...(isLast ? { borderBottom: 'none' } : {}) }}
     >
-      <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>
+      <div className="tm-text-caption" style={{ color: 'var(--text-caption)', flexShrink: 0 }}>
         {label}
       </div>
       <div

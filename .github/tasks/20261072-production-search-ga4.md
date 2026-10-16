@@ -263,6 +263,9 @@ robots Disallow와 noindex 충돌 및 홈 계측 누락은 정정·운영 배포
 4. 검색 결과 재측정은 실제 운영 배포일 +14일/+30일 기준으로 한다. 자동 예약은 만들지 않았다.
 
 ## Evidence
+- 2026-10-16 long-address follow-up: existing actual completed-address single-line/null Alpha proof did not exercise wrapping. Root created one separate free, empty Alpha QA tournament `9c68db5f-a8be-40a0-ae5e-98e1bf98d05c` via supported admin create and forward status transitions; 113-character synthetic venueAddress is persisted, status completed, participants/fixtures both zero. Existing entities and production data are untouched. Cleanup: hide only this owned QA ID after verification and retain its audit.
+- Actual before screenshots at 390/768 CSS px reproduce the `주소` label shrinking to 10.4px wide and wrapping into `주`/`소`, while the full address value spans four/three lines. Desktop already protects the label with a nonshrinking first-child rule; mobile/tablet do not. Owned fix is limited to the shared detail InfoRow label's flex-shrink behavior plus its patch Changeset. No global CSS, new search page, API/DB/auth/native/store behavior change.
+- Exit gates: independent gpt-6-sol source/actual-screenshot review; narrow existing detail first-HTML contract test once, exact-head CI, real deployed Alpha 390/768/1440 after captures with same persisted value and true scroll bottoms; only then explicitly authorized scoped main promotion. Do not promote unrelated dev changes. QA/deployment receipts and current Naver two-query comparison are under `/Users/sungjun/.cache/teameet-seo-release/ACTIVE-20261016-1232.md`; source implementation is not live proof.
 - ego space 236은 `finish({ keep: [] })` 성공으로 모든 작업 페이지를 닫았다. 로컬 서버를 띄우지 않았고 테스트 PID는 모두 종료 확인했다.
 - 로컬 증거 폴더: `/tmp/teameet-seo-ga4-20261012/`.
 - `naver-sitemap-submitted.png`, `naver-rss-submitted.png`, `naver-landing-crawl-requested.png`: 각 등록 목록.

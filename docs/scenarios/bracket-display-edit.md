@@ -22,6 +22,7 @@ Persona: owner/ops 쓰기, support 읽기, 일반 사용자 쓰기 거절.
 - main/dev 모두 `serializeTournamentTeamMatchBracket`에서 TeamMatch.startAt/placeName/fieldId를 조회한다. 별도 canvas 저장소는 없다.
 - 원인: 그림 카드의 일정 footer 누락, 목록·desktop panel의 빈 시각 PATCH 누락. 하나의 canonical 값을 표시하고 null을 명시적으로 저장하도록 수정했다.
 - API DTO/문구 저장·슬롯 직렬화 44/44 PASS. API 합계 269개, Web 대진 관련 566개 계약 검증 PASS(중간 실패를 수정하고 해당 파일 재실행). 양쪽 타입, Web pattern, API surface PASS. 상세 실행 범위는 task의 Progress Snapshot 참고.
+- committed-tree expand-contract gate PASS, 릴리스 해시·historical manifest 회귀 7/7 PASS.
 - 실제 DB integration: 로컬 Docker daemon 미가동으로 미실행. additive migration은 CI DB integration 대상이다.
 - 실제 alpha 변경 후 UI QA: 0/3, PR 미배포. 스크린샷/console/network/실제 결과 진출 검증 및 cleanup 기록은 alpha 배포 후 이 문서에 추가한다. 컴포넌트 테스트는 실제 브라우저 QA로 계산하지 않는다.
 - 기존 사용자 데이터·결과를 변경하거나 seed/reset을 실행하지 않았다.

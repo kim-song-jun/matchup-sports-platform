@@ -227,6 +227,8 @@ Campaign admin routes inherit `V1AuthGuard`. Production accepts only the signed 
 
 Admin-created tournaments require `teamCount` per tournament. The API does not treat an omitted team count as unlimited; missing `teamCount` is rejected with `400 TOURNAMENT_TEAM_COUNT_REQUIRED`. Public capacity, registration blocking, and progress bars must use the saved tournament `teamCount`, not a hard-coded default.
 
+After creation, the response's `competitionConfigVersionId`, lineup size, and substitution policy describe the configuration version actually pinned to the new tournament. The lineup and substitution values are read from that saved version; they are `null` when no version is pinned. This lets the create flow continue from the server's persisted state.
+
 정규 리그(`kind=regular_league`)는 별도 [리그 생성·정원 계약](./league-matches.md#participant-team-capacity-참가팀-정원)을
 따른다. 참가팀 정원은 nullable `maxTeams`이며 `maxPlayers`는 팀당 선수 명단 정원이다.
 일반 대회(`kind=regular_tournament` 및 기존 `kind=null` 행)와 리그 방식 일반 대회

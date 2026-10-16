@@ -25,7 +25,7 @@ import type {
   TournamentCreateAction,
   TournamentCreateState,
 } from './tournament-create-model';
-import type { V1Tournament } from '@/types/api';
+import type { V1CreateTournamentPayload, V1Tournament } from '@/types/api';
 
 const routerPush = vi.fn();
 const routerReplace = vi.fn();
@@ -198,6 +198,68 @@ function fakeDraftTournament(overrides: Partial<V1Tournament> = {}): V1Tournamen
   };
 }
 
+function fakeDraftResponseForPayload(
+  payload: Partial<V1CreateTournamentPayload>,
+  overrides: Partial<V1Tournament> = {},
+): V1Tournament {
+  return fakeDraftTournament({
+    title: payload.title ?? '2026 서울 풋살 오픈',
+    sportId: payload.sportId ?? 'sport-futsal',
+    format: payload.format ?? 'group_knockout',
+    scheduledAt: payload.scheduledAt ?? '2026-08-15T00:00:00.000Z',
+    scheduledEndAt: payload.scheduledEndAt ?? null,
+    registrationDeadlineAt: payload.registrationDeadlineAt ?? null,
+    rosterDeadlineAt: payload.rosterDeadlineAt ?? null,
+    venue: payload.venue ?? null,
+    venueAddress: payload.venueAddress ?? null,
+    coverImageUrl: payload.coverImageUrl ?? null,
+    teamCount: payload.teamCount ?? 8,
+    minPlayers: payload.minPlayers ?? 6,
+    maxPlayers: payload.maxPlayers ?? 10,
+    lineupMaxPlayers: payload.lineupMaxPlayers ?? null,
+    substitutionMode: payload.substitutionMode ?? null,
+    maxSubstitutions: payload.maxSubstitutions ?? null,
+    genderCategory: payload.genderCategory ?? 'mixed',
+    genderMinMale: payload.genderMinMale ?? null,
+    genderMaxMale: payload.genderMaxMale ?? null,
+    genderMinFemale: payload.genderMinFemale ?? null,
+    genderMaxFemale: payload.genderMaxFemale ?? null,
+    minMatchesPerTeam: payload.minMatchesPerTeam ?? null,
+    entryFee: payload.entryFee ?? 0,
+    bankName: payload.bankName ?? null,
+    bankAccount: payload.bankAccount ?? null,
+    bankHolder: payload.bankHolder ?? null,
+    prizePool: payload.prizePool ?? null,
+    prizeSummary: payload.prizeSummary ?? null,
+    prizeBreakdown: payload.prizeBreakdown ?? null,
+    promoHomeEnabled: payload.promoHomeEnabled ?? false,
+    promoHomeTitle: payload.promoHomeTitle ?? null,
+    promoHomeSubtitle: payload.promoHomeSubtitle ?? null,
+    promoHomeImageUrl: payload.promoHomeImageUrl ?? null,
+    promoHomeBadgeText: payload.promoHomeBadgeText ?? null,
+    promoHomeDateText: payload.promoHomeDateText ?? null,
+    promoHomeTeamsText: payload.promoHomeTeamsText ?? null,
+    promoHomeLocationText: payload.promoHomeLocationText ?? null,
+    promoHomePrizeText: payload.promoHomePrizeText ?? null,
+    promoHomePriority: payload.promoHomePriority ?? 0,
+    promoListEnabled: payload.promoListEnabled ?? false,
+    promoListTitle: payload.promoListTitle ?? null,
+    promoListSubtitle: payload.promoListSubtitle ?? null,
+    promoListImageUrl: payload.promoListImageUrl ?? null,
+    promoListBadgeText: payload.promoListBadgeText ?? null,
+    promoListDateText: payload.promoListDateText ?? null,
+    promoListTeamsText: payload.promoListTeamsText ?? null,
+    promoListLocationText: payload.promoListLocationText ?? null,
+    promoListPrizeText: payload.promoListPrizeText ?? null,
+    promoListPriority: payload.promoListPriority ?? 0,
+    yellowAccumulationLimit: payload.yellowAccumulationLimit ?? null,
+    redCardSuspensionMatches: payload.redCardSuspensionMatches ?? null,
+    rulesText: payload.rulesText ?? null,
+    refundPolicyText: payload.refundPolicyText ?? null,
+    ...overrides,
+  });
+}
+
 function goToParticipationStep() {
   goToScheduleStep();
   fillScheduleStep();
@@ -271,29 +333,6 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
     });
   });
 
-  it.each([
-    ['group_knockout', 'league', '대회 리그전', '풀리그', '결선 진출'],
-    ['league', 'knockout', '토너먼트만', '대진 편성', '순위 집계'],
-    ['knockout', 'group_knockout', '조별리그 + 토너먼트', '결선 진출', '순위 집계'],
-  ] as const)('초안의 %s를 %s로 바꾸면 저장 전 공개 확인을 건너뛸 수 없다', async (savedFormat, nextFormat, radioLabel, expectedStep, absentStep) => {
-    searchParamsValue = new URLSearchParams('draftId=draft-1');
-    useV1AdminTournamentMock.mockReturnValue({ data: fakeDraftTournament({ format: savedFormat, registrationDeadlineAt: '2026-08-12T14:59:00.000Z' }), isPending: false });
-    updateMutate.mockImplementationOnce((payload: { format: V1Tournament['format'] }, opts: { onSuccess: (t: V1Tournament) => void }) => {
-      opts.onSuccess(fakeDraftTournament({ format: payload.format }));
-    });
-    renderPage();
-    await screen.findByRole('button', { name: '접수 시작하기' });
-    fireEvent.click(screen.getByRole('button', { name: /1단계 기본 정보/ }));
-    fireEvent.click(screen.getByRole('radio', { name: new RegExp('^' + radioLabel.replace('+', '\\+')) }));
-    fireEvent.click(screen.getByRole('button', { name: /5단계 공개 확인/ }));
-    expect(screen.queryByRole('button', { name: '접수 시작하기' })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '저장하고 계속하기' }));
-    expect(updateMutate).toHaveBeenCalledWith(expect.objectContaining({ format: nextFormat }), expect.any(Object));
-    const flow = screen.getByRole('region', { name: '대회 진행 방식' });
-    expect(within(flow).getByText(expectedStep, { exact: true })).toBeInTheDocument();
-    expect(within(flow).queryByText(absentStep, { exact: true })).not.toBeInTheDocument();
-  });
-
   it('T1 keeps basic fields after moving forward and back', () => {
     renderPage();
     goToScheduleStep();
@@ -303,6 +342,85 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
     expect(screen.getByLabelText(/종목/)).toHaveValue('sport-futsal');
     expect(screen.getByLabelText(/대회명/)).toHaveValue('2026 서울 풋살 오픈');
     expect(screen.getByLabelText('혼성')).toBeChecked();
+  });
+
+  it('미저장된 진행 방식 변경은 공개 확인 진입을 막고 저장 뒤 허용한다', async () => {
+    searchParamsValue = new URLSearchParams('draftId=draft-1');
+    useV1AdminTournamentMock.mockReturnValue({ data: fakeDraftTournament({ registrationDeadlineAt: '2026-08-12T14:59:00.000Z' }), isPending: false });
+    updateMutate.mockImplementationOnce((payload: Partial<V1Tournament>, opts: { onSuccess: (tournament: V1Tournament) => void }) => {
+      const persistedFields = Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined));
+      opts.onSuccess(fakeDraftTournament({ ...persistedFields, registrationDeadlineAt: '2026-08-12T14:59:00.000Z', updatedAt: '2026-08-02T00:00:00.000Z' }));
+    });
+    renderPage();
+    await screen.findByRole('button', { name: '접수 시작하기' });
+    fireEvent.click(screen.getByRole('button', { name: /1단계 기본 정보/ }));
+    fireEvent.click(screen.getByRole('radio', { name: '대회 리그전' }));
+    fireEvent.click(screen.getByRole('button', { name: /5단계 공개 확인/ }));
+    expect(screen.queryByRole('button', { name: '접수 시작하기' })).not.toBeInTheDocument();
+    expect(screen.getByText('저장하지 않은 대회 정보가 있어요. 저장하고 계속하기를 눌러 반영해 주세요.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '저장하고 계속하기' }));
+    expect(updateMutate).toHaveBeenCalledWith(expect.objectContaining({ format: 'league' }), expect.any(Object));
+    expect(await screen.findByRole('button', { name: '접수 시작하기' })).toBeEnabled();
+  });
+
+  it('미저장된 대회명 변경은 저장 성공 후 확인 단계를 연다', async () => {
+    searchParamsValue = new URLSearchParams('draftId=draft-1');
+    useV1AdminTournamentMock.mockReturnValue({ data: fakeDraftTournament({ registrationDeadlineAt: '2026-08-12T14:59:00.000Z' }), isPending: false });
+    updateMutate.mockImplementationOnce(
+      (payload: Partial<V1CreateTournamentPayload>, opts: { onSuccess: (tournament: V1Tournament) => void }) =>
+        opts.onSuccess(fakeDraftResponseForPayload(payload, { registrationDeadlineAt: '2026-08-12T14:59:00.000Z' })),
+    );
+    renderPage();
+    await screen.findByRole('button', { name: '접수 시작하기' });
+    fireEvent.click(screen.getByRole('button', { name: /1단계 기본 정보/ }));
+    fireEvent.change(screen.getByLabelText(/대회명/), { target: { value: '저장한 새 대회명' } });
+    fireEvent.click(screen.getByRole('button', { name: /5단계 공개 확인/ }));
+    expect(screen.queryByRole('button', { name: '접수 시작하기' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '저장하고 계속하기' }));
+    expect(updateMutate).toHaveBeenCalledWith(expect.objectContaining({ title: '저장한 새 대회명' }), expect.any(Object));
+    expect(await screen.findByRole('button', { name: '접수 시작하기' })).toBeEnabled();
+  });
+
+  it('미저장된 비진행방식 필드가 있으면 확인 진입과 접수 시작을 막고 저장 실패 후에도 유지한다', async () => {
+    searchParamsValue = new URLSearchParams('draftId=draft-1');
+    useV1AdminTournamentMock.mockReturnValue({ data: fakeDraftTournament({ registrationDeadlineAt: '2026-08-12T14:59:00.000Z' }), isPending: false });
+    renderPage();
+    await screen.findByRole('button', { name: '접수 시작하기' });
+    fireEvent.click(screen.getByRole('button', { name: /1단계 기본 정보/ }));
+    fireEvent.change(screen.getByLabelText(/대회명/), { target: { value: '수정된 대회명' } });
+    fireEvent.click(screen.getByRole('button', { name: /5단계 공개 확인/ }));
+    expect(screen.queryByRole('button', { name: '접수 시작하기' })).not.toBeInTheDocument();
+    expect(changeStatusMutate).not.toHaveBeenCalled();
+    updateMutate.mockImplementationOnce((_payload: unknown, opts: { onError: (error: Error) => void }) => opts.onError(new Error('저장 실패')));
+    fireEvent.click(screen.getByRole('button', { name: '저장하고 계속하기' }));
+    expect(updateMutate).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: /5단계 공개 확인/ }));
+    expect(screen.queryByRole('button', { name: '접수 시작하기' })).not.toBeInTheDocument();
+    expect(changeStatusMutate).not.toHaveBeenCalled();
+  });
+
+  it('저장 요청 중 추가로 바뀐 필드가 있으면 이전 응답으로 확인 단계에 들어가지 않는다', async () => {
+    searchParamsValue = new URLSearchParams('draftId=draft-1');
+    useV1AdminTournamentMock.mockReturnValue({ data: fakeDraftTournament({ registrationDeadlineAt: '2026-08-12T14:59:00.000Z' }), isPending: false });
+    let savedPayload: Partial<V1Tournament> | undefined;
+    let saveSuccess: ((tournament: V1Tournament) => void) | undefined;
+    updateMutate.mockImplementationOnce((payload: Partial<V1Tournament>, opts: { onSuccess: (tournament: V1Tournament) => void }) => {
+      savedPayload = payload;
+      saveSuccess = opts.onSuccess;
+    });
+    renderPage();
+    await screen.findByRole('button', { name: '접수 시작하기' });
+    fireEvent.click(screen.getByRole('button', { name: /1단계 기본 정보/ }));
+    fireEvent.change(screen.getByLabelText(/대회명/), { target: { value: '저장 요청에 포함된 이름' } });
+    fireEvent.click(screen.getByRole('button', { name: /5단계 공개 확인/ }));
+    fireEvent.click(screen.getByRole('button', { name: '저장하고 계속하기' }));
+    fireEvent.click(screen.getByRole('button', { name: /1단계 기본 정보/ }));
+    fireEvent.change(screen.getByLabelText(/대회명/), { target: { value: '저장 중 다시 바꾼 이름' } });
+    const persistedFields = Object.fromEntries(Object.entries(savedPayload ?? {}).filter(([, value]) => value !== undefined));
+    saveSuccess?.(fakeDraftTournament({ ...persistedFields, registrationDeadlineAt: '2026-08-12T14:59:00.000Z' }));
+    fireEvent.click(screen.getByRole('button', { name: /5단계 공개 확인/ }));
+    expect(screen.queryByRole('button', { name: '접수 시작하기' })).not.toBeInTheDocument();
+    expect(changeStatusMutate).not.toHaveBeenCalled();
   });
 
   // "출전 인원"(라인업 상한) 선택지 — 서버가 종목의 canonical 포메이션에서 파생해
@@ -351,7 +469,8 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
 
   it('경기 시간: 기본값 그대로 만들면 피리어드 설정을 따로 저장하지 않는다', () => {
     createMutate.mockImplementationOnce(
-      (_payload: unknown, opts: { onSuccess: (t: V1Tournament) => void }) => opts.onSuccess(fakeDraftTournament()),
+      (payload: Partial<V1CreateTournamentPayload>, opts: { onSuccess: (t: V1Tournament) => void }) =>
+        opts.onSuccess(fakeDraftResponseForPayload(payload)),
     );
     renderPage();
     goToPresentationStep();
@@ -359,6 +478,7 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
 
     expect(createMutate).toHaveBeenCalledTimes(1);
     expect(savePeriodsMutate).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: '접수 시작하기' })).toBeEnabled();
   });
 
   it('경기 시간: 피리어드 저장이 끝나기 전에는 공개 확인과 접수 시작을 열지 않는다', () => {
@@ -382,8 +502,8 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
     const updatedVersion = '2026-08-01T00:01:00.000Z';
     const periodsVersion = '2026-08-01T00:02:00.000Z';
     createMutate.mockImplementationOnce(
-      (_payload: unknown, opts: { onSuccess: (t: V1Tournament) => void }) =>
-        opts.onSuccess(fakeDraftTournament({ updatedAt: createdVersion })),
+      (payload: Partial<V1CreateTournamentPayload>, opts: { onSuccess: (t: V1Tournament) => void }) =>
+        opts.onSuccess(fakeDraftResponseForPayload(payload, { updatedAt: createdVersion })),
     );
     savePeriodsMutate.mockImplementationOnce(
       (_payload: unknown, opts: { onError: (error: Error) => void }) => opts.onError(new Error('경기 시간 저장 실패')),
@@ -403,8 +523,8 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
     fireEvent.click(screen.getByRole('button', { name: /다음/ }));
 
     updateMutate.mockImplementationOnce(
-      (_payload: unknown, opts: { onSuccess: (t: V1Tournament) => void }) =>
-        opts.onSuccess(fakeDraftTournament({ updatedAt: updatedVersion })),
+      (payload: Partial<V1CreateTournamentPayload>, opts: { onSuccess: (t: V1Tournament) => void }) =>
+        opts.onSuccess(fakeDraftResponseForPayload(payload, { updatedAt: updatedVersion })),
     );
     savePeriodsMutate.mockImplementationOnce(
       (_payload: unknown, opts: { onSuccess: (result: { expectedVersion: string }) => void }) =>
@@ -895,8 +1015,8 @@ describe('AdminTournamentsNewPage — 4단계(공개 확인)', () => {
 
   it('상금·홍보 단계에서 대회를 만들면 관리 화면으로 튕기지 않고 확인 단계(5/5)로 진행한다', () => {
     createMutate.mockImplementation(
-      (_payload: unknown, opts: { onSuccess: (t: V1Tournament) => void }) =>
-        opts.onSuccess(fakeDraftTournament()),
+      (payload: Partial<V1CreateTournamentPayload>, opts: { onSuccess: (t: V1Tournament) => void }) =>
+        opts.onSuccess(fakeDraftResponseForPayload(payload)),
     );
     renderPage();
     goToPresentationStep();
@@ -915,12 +1035,14 @@ describe('AdminTournamentsNewPage — 4단계(공개 확인)', () => {
   });
 
   it('확인 단계에서 이전으로 돌아가 다시 저장해도 새로 만들지 않고 수정만 한다 — 중복 생성 방지', () => {
-    const draft = fakeDraftTournament();
+    const draft = { updatedAt: fakeDraftTournament().updatedAt };
     createMutate.mockImplementation(
-      (_payload: unknown, opts: { onSuccess: (t: V1Tournament) => void }) => opts.onSuccess(draft),
+      (payload: Partial<V1CreateTournamentPayload>, opts: { onSuccess: (t: V1Tournament) => void }) =>
+        opts.onSuccess(fakeDraftResponseForPayload(payload, draft)),
     );
     updateMutate.mockImplementation(
-      (_payload: unknown, opts: { onSuccess: (t: V1Tournament) => void }) => opts.onSuccess(draft),
+      (payload: Partial<V1CreateTournamentPayload>, opts: { onSuccess: (t: V1Tournament) => void }) =>
+        opts.onSuccess(fakeDraftResponseForPayload(payload, draft)),
     );
     renderPage();
     goToPresentationStep();
@@ -940,8 +1062,8 @@ describe('AdminTournamentsNewPage — 4단계(공개 확인)', () => {
 
   it('확인 단계의 "접수 시작하기"는 확인 모달을 거쳐야만 실제로 상태를 바꾼다', async () => {
     createMutate.mockImplementation(
-      (_payload: unknown, opts: { onSuccess: (t: V1Tournament) => void }) =>
-        opts.onSuccess(fakeDraftTournament()),
+      (payload: Partial<V1CreateTournamentPayload>, opts: { onSuccess: (t: V1Tournament) => void }) =>
+        opts.onSuccess(fakeDraftResponseForPayload(payload)),
     );
     renderPage();
     goToPresentationStep();

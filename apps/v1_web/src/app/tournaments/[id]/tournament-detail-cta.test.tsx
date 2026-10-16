@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render as rtlRender, screen, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApplyCTA, TournamentDetailView, getBracketEntryCtaLabel } from './tournament-detail-client';
 import type { V1TournamentDetail, V1TournamentGroup, V1TournamentRegistration, V1TournamentStatus } from '@/types/api';
 
@@ -360,5 +360,60 @@ describe('대회 상세 — 신청한 팀의 입구는 카드 하나', () => {
     const tournament = makeTournament({ id: 't-r1', status: 'open', format: 'knockout' });
     render(<ApplyCTA tournament={tournament} myRegistration={registration('cancelled')} />);
     expect(screen.getByRole('link', { name: '대회 다시 신청하기' })).toBeInTheDocument();
+  });
+});
+
+describe('참가팀 상세 우측 정보와 반응형 참가 카드', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  function viewport(desktop: boolean) {
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: desktop && query === '(min-width: 1024px)', media: query,
+      addEventListener: vi.fn(), removeEventListener: vi.fn(),
+    }));
+  }
+  const registration = { id: 'reg-1', teamId: 'team-a', status: 'confirmed' } as V1TournamentRegistration;
+  const entry = <section aria-label="우리 팀 참가"><a href="/tournaments/t-sidebar/registrations/reg-1/roster">참가 명단 보기</a></section>;
+  const league = (overrides: Partial<V1TournamentDetail> = {}) => makeTournament({
+    id: 't-sidebar', status: 'closed', format: 'league', kind: 'regular_league',
+    maxTeams: null, announcements: [], refundPolicyText: null, ...overrides,
+  });
+
+  it.each(['open', 'closed', 'in_progress'] as const)('%s 참가 리그에 공지·환불 정책·정원이 없어도 우측 안내와 참가 명단 링크가 남는다', (status) => {
+    viewport(true);
+    const { container } = render(<TournamentDetailView tournament={league({ status })} myRegistration={registration} entrySection={entry} />);
+    const aside = container.querySelector('.tm-tournament-detail-aside') as HTMLElement;
+    const notice = within(aside).getByRole('region', { name: '참가 전 꼭 확인해 주세요' });
+    expect(aside).not.toBeNull();
+    for (const label of ['신청 확정', '환불 불가', '주최 취소', '노쇼 실격', '허위 정보', '본인 확인', '부상 책임', '현장 촬영']) {
+      expect(within(notice).getByText(label)).toBeInTheDocument();
+    }
+    expect(within(aside).getByRole('link', { name: '참가 명단 보기' })).toHaveAttribute('href', '/tournaments/t-sidebar/registrations/reg-1/roster');
+    expect(screen.getAllByRole('region', { name: '우리 팀 참가' })).toHaveLength(1);
+    expect(screen.getByRole('region', { name: '대회 기본 정보' })).not.toContainElement(screen.getByRole('region', { name: '우리 팀 참가' }));
+  });
+
+  it('모바일에서는 참가 카드를 제목 아래에 한 번만 표시한다', () => {
+    viewport(false);
+    render(<TournamentDetailView tournament={league()} myRegistration={registration} entrySection={entry} />);
+    const card = screen.getByRole('region', { name: '우리 팀 참가' });
+    expect(screen.getByRole('region', { name: '대회 기본 정보' })).toContainElement(card);
+    expect(screen.getAllByRole('link', { name: '참가 명단 보기' })).toHaveLength(1);
+  });
+
+  it('커스텀 환불 정책과 모순되는 기본 문구를 오른쪽에도 표시하지 않는다', () => {
+    viewport(true);
+    const { container } = render(<TournamentDetailView tournament={league({ refundPolicyText: '개막 7일 전까지 전액 환불' })} myRegistration={registration} entrySection={entry} />);
+    const notice = within(container.querySelector('.tm-tournament-detail-aside') as HTMLElement).getByRole('region', { name: '참가 전 꼭 확인해 주세요' });
+    expect(within(notice).queryByText('환불 불가')).not.toBeInTheDocument();
+    expect(within(notice).getByText('본인 확인')).toBeInTheDocument();
+    expect(screen.getByText('개막 7일 전까지 전액 환불')).toBeInTheDocument();
+  });
+
+  it('종료 대회는 기존 본문의 참가 카드와 유의사항 아코디언을 유지한다', () => {
+    viewport(true);
+    render(<TournamentDetailView tournament={league({ status: 'completed' })} myRegistration={registration} entrySection={entry} />);
+    expect(screen.getByRole('region', { name: '대회 기본 정보' })).toContainElement(screen.getByRole('region', { name: '우리 팀 참가' }));
+    expect(screen.queryByRole('region', { name: '참가 전 꼭 확인해 주세요' })).not.toBeInTheDocument();
   });
 });

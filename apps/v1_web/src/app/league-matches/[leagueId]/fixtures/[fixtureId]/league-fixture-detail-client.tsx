@@ -109,6 +109,7 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
   const parentHref = fromPath?.split(/[?#]/, 1)[0] === leagueHref
     ? fromPath
     : withFromPath(leagueHref, fromPath);
+  const standingsHref = withFromPath(`/tournaments/${leagueId}/bracket?tab=standings`, fromPath);
   const router = useRouter();
   const seriesQuery = useV1LeagueMatch(leagueId);
   const standingsQuery = useV1LeagueMatchStandings(leagueId);
@@ -193,7 +194,7 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
           message="이 리그에서 해당 경기를 찾을 수 없어요. 대진이 재생성되었을 수 있어요."
           onRetry={() => void seriesQuery.refetch()}
         />
-        <Link href={parentHref} className="tm-btn tm-btn-lg tm-btn-neutral mt-4 w-full">
+        <Link href={standingsHref} className="tm-btn tm-btn-lg tm-btn-neutral mt-4 w-full">
           리그 순위표·일정으로 이동
         </Link>
       </div>
@@ -425,7 +426,7 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
         </Card>
       )}
 
-      <Link href={parentHref} className="tm-btn tm-btn-lg tm-btn-primary w-full">
+      <Link href={standingsHref} className="tm-btn tm-btn-lg tm-btn-primary w-full">
         전체 순위표·일정 보기
       </Link>
     </div>

@@ -635,3 +635,13 @@ All team roster mutations lock the registration row and re-read `rosterLockedAt`
 4. `completed` - most recently finished first (`scheduledEndAt` descending, falling back to `scheduledAt`)
 
 Rows without a date sort last inside their group. `page` is an offset into the same order, so page-number paging uses the same sorted rows. Passing `status` filters the stored lifecycle status; an `open` result or regular-league `draft` result can still span recruiting and recruitment-closed display groups. Regular tournament `draft`/`cancelled` rows stay hidden, while regular-league `draft` rows remain public with their capacity-derived display group.
+
+## Bracket presentation overrides (2026-10-17)
+
+`PATCH /admin/fixtures/:fixtureId` accepts `homeDisplayLabel` / `awayDisplayLabel`: optional nullable strings, trimmed, maximum 120 characters. Omission preserves the override; null or whitespace restores automatic text. Only presentation changes: registration IDs, fixture ID, advancement edges and results remain unchanged. Text-only requests use the existing mutation-admin gate and competition/fixture locks, and append a display-label audit action without invoking roster/result synchronization. Support/non-admin writes remain forbidden.
+
+Admin bracket fixtures expose both nullable overrides. Slots expose `automaticLabel`, nullable `displayLabel`, and effective `label`. A BYE override is stored only on its slot; the linked quarter-final side reads/writes that same value. Assigned team names take display priority; BYE text remains secondary. Automatic source labels use the current source fixture number, while a custom override remains unchanged. Responses sort by phase/group order, fixture number, leg, stable ID; labels never affect ordering.
+
+List/canvas/mobile share the same TeamMatch `startAt` (response `scheduledAt`), place snapshot and `fieldId`. Existing values require no migration or reentry. `scheduledAt: null` clears time; omission preserves it. Registered-field assignment sends `fieldId` without a simultaneous place replacement. Unassignment sends `fieldId: null` and `venue: ''` to clear the previous snapshot. BYE slots have no independent fixture number/time/field; edit those on the actual quarter-final. Slot team assignment still uses the existing slot endpoint and started/result lock. Saving labels and assigning a BYE team are separate explicit actions.
+
+Schema migration `20261017010000_bracket_display_labels` adds nullable varchar(120) presentation columns without changing existing data. Regression and pending alpha evidence: [scenario](../../scenarios/bracket-display-edit.md).

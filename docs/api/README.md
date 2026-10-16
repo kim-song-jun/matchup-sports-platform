@@ -95,3 +95,5 @@ Current Kakao signup and existing-account linking use the [provider contact conf
 - Public league notification detail links use `/tournaments/:id?kind=league` (the kind query preserves the league icon/category) (2026-10-14). Historical `/league-matches/:id` and `/leagues/:id` links redirect to the same detail; fixture and API routes retain their existing paths.
 
 - Task 20261083: 대회 참가 명단 GK 유지, 어드민 출전 표 GK 관리와 batch affectedGames 캐시 범위는 [games](domains/games.md)와 [teams](domains/teams.md) 참조.
+
+2026-10-17: Tournament fixture presentation overrides and shared list/canvas schedule semantics are documented in [tournaments](./domains/tournaments.md#bracket-presentation-overrides-2026-10-17).

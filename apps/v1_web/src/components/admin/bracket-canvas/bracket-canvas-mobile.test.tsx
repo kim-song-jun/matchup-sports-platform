@@ -19,6 +19,8 @@ const { assignSlot, quickMutate, updateFixture, assignField } = vi.hoisted(() =>
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }) }));
 vi.mock('@/hooks/use-v1-api', () => ({
+  useV1PlaceSearch: () => ({ data: undefined, isFetching: false, isError: false }),
+  useV1PublicKakaoMapsKey: () => ({ data: { kakaoMapsJsKey: null }, isLoading: false }),
   useV1TournamentFields: () => ({ data: { items: [{ id: 'field-a', name: '등록 A구장', active: true }] }, isPending: false, isError: false }),
   useV1AssignFixtureField: () => ({ mutate: assignField, isPending: false }),
   useV1ClearFixtureField: () => ({ mutate: vi.fn(), isPending: false }),

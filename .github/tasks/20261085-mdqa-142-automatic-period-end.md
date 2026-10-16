@@ -96,3 +96,10 @@ Created: 2026-10-13
 - 이 committed 수정본의 기간 만료 회귀 13/13 PASS(64.43초), Web TypeScript 종료 코드 0, Web pattern PASS를 확인했다. 이전 영향 범위 6개 파일 148/148 PASS(25.15초)와 API 36/36 PASS(23.828초)는 동일 제품 소스의 기존 근거로 재사용하며 새 실행으로 표기하지 않는다. 실제 로그 `mdqa142-249-api-tsc.log`, `mdqa142-249-api-surface.log`, `mdqa142-role-type-expiry-green.log`, `mdqa142-role-type-web-tsc.log`, `mdqa142-role-type-pattern.log`를 root git 제외 QA 증거에 보존한다.
 - 독립 API·frontend·문서 리뷰 및 테스트 타입 수정 재리뷰 C0/W0. 최종 PR 범위 23개 파일, diff/check·신규 debt marker·미추적 앱 import 검수를 게시 직전 최신 dev와 함께 확인한다.
 - DB 통합 11개는 Docker OFF로 NOT RUN, 최신 PR CI·정식 리뷰·머지·배포 및 alpha 390/768/1440·console/network·이미지는 대기다. 인증 IAB의 대상 화면 이동·캡처·새 탭 제어 오류는 도구 접근 차단으로 분리하며 앱 실패나 권한 거부로 단정하지 않는다. 최종 기간 `ENDED`와 Game `LIVE` 및 수동 결과 후속 계약은 그대로다.
+
+### 2026-10-16 실제 CI 실패와 동일 PR 수정
+
+- PR1946 head af74의 CI 38791007533/API job116615228981은 실제 친선 시작→공동 기록 회귀에서 fixture의 v1TeamMatch.create가 PostgreSQL 23514 v1_team_matches_friendly_required_ck에 걸렸다. 결과 1 FAIL/1233 PASS/3 SKIP, 168 suites, 407.633초이며 외부 모델 오류와 다르다. 기존 로컬 DB NOTRUN 기록은 유지하고 실패를 통과로 바꾸지 않는다.
+- 기존 mdqa-142-automatic-period-end checkout은 실제 경로와 git worktree 목록에서 사라져 있었다. managed 도구로 같은 PR head를 mdqa-142-ci-resume 경로에 복구했고, 기존 fix/mdqa-142-automatic-period-end branch를 이어 사용했다. attachment 등록은 identity100 한도 때문에 실패했으나 실제 checkout은 보존했다. 최신 dev e895를 충돌 없이 일반 merge한 22b2f457에서 계속한다.
+- 독립 backend-data owner가 실제 migration 조건을 대조했다. 대회·리그 ID가 없는 친선에는 생성자·호스트/플랫폼·지역·장소명·시작이 필요하며 fixture는 장소명만 누락했다. 소유 파일 test/fixtures/game-clock-expiry.fixture.ts에 placeName: input.friendly ? 'Clock expiry ground' : null 한 줄을 추가했다. 대회 NULL, 실제 start/shared-record 동작, 확인 상태와 모든 assertion을 유지하고 스키마·migration·제품 로직은 바꾸지 않는다.
+- 새 committed tree 독립 재리뷰·좁은 실제 PostgreSQL 통합 및 API 타입·surface·같은 PR 일반 push·새 head CI는 이어 수행한다. 다른 프로젝트 Docker/DB는 건드리지 않으며 승인된 격리 DB가 확인되지 않으면 정확한 blocker로 남긴다. 실제 alpha는 여전히 NOTRUN이다.

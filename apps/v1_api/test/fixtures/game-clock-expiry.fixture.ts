@@ -99,6 +99,7 @@ export async function createClockExpiryGame(
       sportId: fixture.sportId,
       regionId: fixture.regionId,
       title: `Clock expiry ${randomUUID()}`,
+      placeName: input.friendly ? 'Clock expiry ground' : null,
       status: 'matched',
       startAt: new Date(Date.now() - 2 * CLOCK_EXPIRY_PERIOD_MS),
       endAt: input.scheduledEndAt ?? new Date(Date.now() + CLOCK_EXPIRY_PERIOD_MS),

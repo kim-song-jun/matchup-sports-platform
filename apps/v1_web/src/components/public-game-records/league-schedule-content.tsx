@@ -1,8 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { EmptyState, ErrorState, SectionTitle } from '@/components/v1-ui/primitives';
-import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
+import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { useV1MyTeams } from '@/hooks/use-v1-api';
 import { isUnauthenticatedError } from '@/lib/api-client';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -82,9 +81,27 @@ export function LeagueScheduleContent({ tournamentId, data, fromHref, hasNextPag
   const identityHidden = [...data.items, ...data.unscheduled].some((entry) =>
     (entry.home !== null && entry.home.teamId === null) || (entry.away !== null && entry.away.teamId === null)) ||
     data.standings.some((row) => row.teamId === null);
+  const hasOwnGames = [...data.items, ...data.unscheduled].some(isMine);
+  const hideTeamSwitch = scope === 'all' && sessionReady && hasSession && !teams.isPending && !teams.isError && !hasNextPage && !identityHidden && !participates && !hasOwnGames;
   const redirect = currentHref ?? `/tournaments/${encodeURIComponent(tournamentId)}/bracket?teamScope=mine`;
   const pendingMine = scope === 'mine' && (!sessionReady || (!needsLogin && (teams.isPending || hasNextPage)));
 
+  const canCount = data.bracketPublished && (scope === 'all' || (!pendingMine && !needsLogin && !teams.isError && !identityHidden));
+  const teamSwitch = !hideTeamSwitch ? <button
+          type="button"
+          role="switch"
+          aria-checked={scope === 'mine'}
+          onClick={() => selectScope(scope === 'mine' ? 'all' : 'mine')}
+          className="tm-text-label"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--spacing-2)', minHeight: 'var(--size-control-lg)', padding: 0, border: 0, background: 'transparent', color: 'var(--text-caption)', cursor: 'pointer', flexShrink: 0 }}
+        >
+          내 팀만
+          <span aria-hidden="true" className={`tm-toggle${scope === 'mine' ? ' tm-toggle-on' : ''}`} />
+        </button> : null;
+  const summary = canCount ? <p className="tm-text-caption" role="status" style={{ margin: 0 }}>
+    {hasNextPage ? `불러온 ${count}경기 · 나머지 일정 불러오는 중` : `총 ${count}경기`}
+  </p> : null;
+  let hasScheduleControls = false;
   let content;
   if (!data.bracketPublished) {
     content = <ScheduleContent tournamentId={tournamentId} data={data} isRegularLeague showStandings={false} />;
@@ -106,21 +123,18 @@ export function LeagueScheduleContent({ tournamentId, data, fromHref, hasNextPag
       sub={identityHidden ? '지금은 전체 경기 일정을 확인해 주세요.' : participates ? '대진이 배정되면 여기에서 확인할 수 있어요.' : '다른 팀의 경기 일정도 확인해 보세요.'}
       cta="전체 일정 보기" onCta={() => selectScope('all')} />;
   } else {
+    hasScheduleControls = true;
     content = <ScheduleContent tournamentId={tournamentId} data={filtered} isRegularLeague prioritizeLiveGames
-      showStandings={false} showScheduleHeading={false} myTeamIds={myTeamIds} fromHref={currentHref}
+      showStandings={false} showScheduleHeading={false} filterAction={teamSwitch} filterSummary={summary} myTeamIds={myTeamIds} fromHref={currentHref}
       hasNextPage={hasNextPage} isFetchingNextPage={isFetchingNextPage} onLoadMore={onLoadMore} />;
   }
 
-  const canCount = data.bracketPublished && (scope === 'all' || (!pendingMine && !needsLogin && !teams.isError && !identityHidden));
   return <>
-    <div style={{ padding: 'var(--spacing-4) var(--spacing-5) 0', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-3)' }}>
-      <div role="heading" aria-level={3}><SectionTitle title="경기 일정" /></div>
-      <SegmentedTabs items={[{ id: 'all', label: '전체' }, { id: 'mine', label: '내 팀' }]}
-        activeId={scope} onSelect={(id) => selectScope(id === 'mine' ? 'mine' : 'all')} ariaLabel="경기 일정 팀 필터" role="tablist" />
-      {canCount ? <p className="tm-text-caption" role="status" style={{ margin: 0 }}>
-        {hasNextPage ? `불러온 ${count}경기 · 나머지 일정 불러오는 중` : `총 ${count}경기`}
-      </p> : null}
-    </div>
+    {!hasScheduleControls ? (
+      <div style={{ padding: 'var(--spacing-4) var(--spacing-5) 0', display: 'flex', justifyContent: 'flex-end' }}>
+        {teamSwitch}
+      </div>
+    ) : null}
     {content}
   </>;
 }

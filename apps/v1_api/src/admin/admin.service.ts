@@ -60,6 +60,7 @@ import {
   UpdateAdminPopupDto,
   UpdateAdminDto,
 } from './dto/admin.dto';
+import { SetMatchOnlineDto } from './dto/set-match-online.dto';
 
 type ActiveAdmin = {
   id: string;
@@ -531,6 +532,38 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         },
         tx,
       );
+    });
+  }
+
+  async setMatchOnline(user: V1AuthUser, matchId: string, dto: SetMatchOnlineDto) {
+    const admin = await this.getMutationAdmin(user.id);
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "v1_matches" WHERE id = ${matchId} FOR UPDATE`;
+      const target = await tx.v1Match.findUnique({
+        where: { id: matchId },
+        select: { id: true, isOnline: true, deletedAt: true },
+      });
+      if (!target || target.deletedAt) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Match was not found' });
+      if (target.isOnline === dto.isOnline) {
+        return { matchId, isOnline: target.isOnline, changed: false };
+      }
+
+      const updated = await tx.v1Match.update({
+        where: { id: matchId },
+        data: { isOnline: dto.isOnline },
+        select: { id: true, isOnline: true },
+      });
+      await tx.v1AdminActionLog.create({
+        data: {
+          adminUserId: admin.id,
+          action: 'match.online.update',
+          targetType: 'match',
+          targetId: matchId,
+          beforeJson: { isOnline: target.isOnline },
+          afterJson: { isOnline: updated.isOnline },
+        },
+      });
+      return { matchId, isOnline: updated.isOnline, changed: true };
     });
   }
 

@@ -303,6 +303,7 @@ export class MatchesService {
       sport: { sportId: match.sport.id, name: match.sport.name },
       region: match.region ? { regionId: match.region.id, name: match.region.name } : null,
       place: toPlaceView(match),
+      isOnline: match.isOnline,
       startsAt: match.startAt,
       endsAt: match.endAt,
       deadlineAt: match.deadlineAt,

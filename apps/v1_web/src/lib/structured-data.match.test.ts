@@ -101,6 +101,12 @@ describe('buildMatchEventLd', () => {
     expect(buildMatchEventLd(match(), 'match-1')?.location).not.toHaveProperty('geo');
   });
 
+  it('온라인 매치는 실제 경기 이벤트가 아니므로 SportsEvent 구조화 데이터를 내보내지 않는다', () => {
+    const onlineMatch = { ...match(), isOnline: true } as V1Match;
+
+    expect(buildMatchEventLd(onlineMatch, 'match-1')).toBeNull();
+  });
+
   it('지역을 모르면 구장 이름만 싣고, 지역 미정 문구를 주소로 만들지 않는다', () => {
     const ld = buildMatchEventLd(match({ region: null, regionName: null }), 'match-1');
 

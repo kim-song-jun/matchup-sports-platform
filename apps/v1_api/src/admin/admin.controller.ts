@@ -46,6 +46,7 @@ import {
   UpdateAdminPopupDto,
   UpdateAdminDto,
 } from './dto/admin.dto';
+import { SetMatchOnlineDto } from './dto/set-match-online.dto';
 import { AdminService } from './admin.service';
 import { UploadsService } from '../uploads/uploads.service';
 import '../uploads/multer.types';
@@ -102,6 +103,15 @@ export class AdminController {
     @Body() dto: ChangeMatchStatusDto,
   ) {
     return this.adminService.changeMatchStatus(user, matchId, dto);
+  }
+
+  @Patch('matches/:matchId/online')
+  setMatchOnline(
+    @CurrentUser() user: V1AuthUser,
+    @Param('matchId') matchId: string,
+    @Body() dto: SetMatchOnlineDto,
+  ) {
+    return this.adminService.setMatchOnline(user, matchId, dto);
   }
 
   @Post('teams/:teamId/status')

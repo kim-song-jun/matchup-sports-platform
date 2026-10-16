@@ -1213,6 +1213,7 @@ model V1Match {
   imageUrl        String?       @map("image_url")
   placeName       String        @map("place_name")
   placeAddress    String?       @map("place_address")
+  isOnline        Boolean       @default(false) @map("is_online")
   // 장소 검색으로 고른 장소의 스냅샷(src/places/place-snapshot.ts). 직접 입력한 장소는 넷 다 null 이다.
   placeLatitude   Float?        @map("place_latitude")
   placeLongitude  Float?        @map("place_longitude")

@@ -1,8 +1,9 @@
 import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render as rtlRender, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render as rtlRender, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackEvent } from '@/lib/analytics';
+import { V1ApiError, v1Get } from '@/lib/api-client';
 import type { V1TournamentDetail } from '@/types/api';
 import { TournamentDetailPageClient } from './tournament-detail-client';
 import { queryImageBySrc } from '@/test/next-image';
@@ -35,6 +36,11 @@ vi.mock('@/hooks/use-v1-api', async (importOriginal) => ({
 
 vi.mock('@/lib/analytics', () => ({
   trackEvent: vi.fn(),
+}));
+
+vi.mock('@/lib/api-client', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/api-client')>()),
+  v1Get: vi.fn().mockResolvedValue({ items: [] }),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -590,5 +596,91 @@ describe('TournamentDetailPageClient — 신청 마감은 시각까지 보여요
     await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
     const rail = screen.getByRole('complementary', { name: '리그 참가 신청' });
     expect(within(rail).getByText('신청 마감 2099년 8월 10일 (월) 오후 11:59')).toBeInTheDocument();
+  });
+});
+
+describe('TournamentDetailPageClient — 새로고침 실패에서도 서버 seed를 안전하게 쓴다', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    tournamentApiMocks.useV1MyRegistrations.mockReturnValue({ data: [] });
+    tournamentApiMocks.useV1Reviews.mockReturnValue({
+      data: undefined, isError: false, isPending: false, isFetching: false, refetch: vi.fn(),
+    });
+  });
+
+  async function useRealTournamentQuery() {
+    const actual = await vi.importActual<typeof import('@/hooks/use-v1-api')>('@/hooks/use-v1-api');
+    tournamentApiMocks.useV1Tournament.mockImplementation(actual.useV1Tournament as never);
+  }
+
+  function apiError(statusCode: number) {
+    return new V1ApiError({
+      status: 'error',
+      statusCode,
+      code: statusCode === 0 ? 'NETWORK_ERROR' : statusCode === 404 ? 'NOT_FOUND' : 'REQUEST_FAILED',
+      message: `조회 실패 ${statusCode}`,
+      timestamp: '2026-10-17T00:00:00.000Z',
+    });
+  }
+
+  it.each([503, 0])('일시 오류 %s 에서는 같은 대회 seed를 유지하고 직접 재시도할 수 있다', async (statusCode) => {
+    await useRealTournamentQuery();
+    vi.mocked(v1Get).mockRejectedValue(apiError(statusCode));
+    const seed = makeTournament({ title: '실제 풋살 대회', venue: '정릉 풋살장' });
+
+    render(<TournamentDetailPageClient tournamentId="tournament-1" seed={seed} />);
+
+    await screen.findByRole('alert');
+    expect(screen.getByRole('heading', { level: 1, name: '실제 풋살 대회' })).toBeInTheDocument();
+    expect(screen.getAllByText('정릉 풋살장').length).toBeGreaterThan(0);
+    expect(screen.getByRole('alert').closest('[data-nosnippet]')).not.toBeNull();
+    expect(screen.getByRole('heading', { level: 1, name: '실제 풋살 대회' }).closest('[data-nosnippet]')).toBeNull();
+    const retry = screen.getByRole('button', { name: '다시 시도하기' });
+    vi.mocked(v1Get).mockResolvedValue(makeTournament({ title: '갱신된 풋살 대회', venue: '새 정릉 풋살장' }));
+    fireEvent.click(retry);
+
+    expect(await screen.findByRole('heading', { level: 1, name: '갱신된 풋살 대회' })).toBeInTheDocument();
+    expect(screen.getAllByText('새 정릉 풋살장').length).toBeGreaterThan(0);
+    expect(screen.queryByText(/조회 실패/)).not.toBeInTheDocument();
+  });
+
+  it.each([401, 403, 404])('권한·삭제 응답 %s 에서는 seed 본문을 다시 보여 주지 않는다', async (statusCode) => {
+    await useRealTournamentQuery();
+    vi.mocked(v1Get).mockRejectedValue(apiError(statusCode));
+
+    render(<TournamentDetailPageClient
+      tournamentId="tournament-1"
+      seed={makeTournament({ title: '보이면 안 되는 오래된 대회', venue: '옛 경기장' })}
+    />);
+
+    await screen.findByRole('alert');
+    expect(screen.queryByRole('heading', { level: 1, name: '보이면 안 되는 오래된 대회' })).not.toBeInTheDocument();
+    expect(screen.queryByText('옛 경기장')).not.toBeInTheDocument();
+  });
+
+  it('다른 대회 ID의 seed는 본문에 사용하지 않고 조회 오류를 보여 준다', async () => {
+    await useRealTournamentQuery();
+    vi.mocked(v1Get).mockRejectedValue(apiError(404));
+
+    render(<TournamentDetailPageClient
+      tournamentId="tournament-2"
+      seed={makeTournament({ title: '다른 대회의 내용', venue: '다른 경기장' })}
+    />);
+
+    await screen.findByRole('alert');
+    expect(screen.queryByRole('heading', { level: 1, name: '다른 대회의 내용' })).not.toBeInTheDocument();
+    expect(screen.queryByText('다른 경기장')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '다시 시도하기' })).toBeInTheDocument();
+  });
+
+  it('seed가 없고 첫 조회도 실패하면 전체 오류와 재시도 안내를 보여 준다', async () => {
+    await useRealTournamentQuery();
+    vi.mocked(v1Get).mockRejectedValue(apiError(503));
+
+    render(<TournamentDetailPageClient tournamentId="tournament-1" />);
+
+    await screen.findByRole('alert');
+    expect(screen.queryByRole('heading', { level: 1, name: '테스트 대회' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '다시 시도하기' })).toBeInTheDocument();
   });
 });

@@ -2,6 +2,8 @@
 
 # Teameet v1 API contracts
 
+Personal-match online place classification: public detail includes `isOnline`; the authenticated, audited `PATCH /admin/matches/:matchId/online` sets that factual value without changing publication or search visibility. See [matches](./domains/matches.md) and [admin/ops](./domains/admin-and-ops.md).
+
 Public competition overall standings include nullable `teamLogoUrl` under the existing team-identity visibility gate; see [tournaments](./domains/tournaments.md#overall-standings--two-competition-kinds-two-row-shapes).
 
 This directory is the single indexed contract tree for `apps/v1_api` and `apps/v1_web`. Swagger is reference material; the controller, DTO, service gates, integration tests, frontend hooks/types, and these canonical contracts must agree.

@@ -183,6 +183,19 @@ export class CreateFixtureDto {
 }
 
 export class UpdateFixtureDto {
+  /** Presentation only. Omission preserves the override; null/blank restores automatic text. */
+  @IsOptional()
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() || null : value)
+  @IsString()
+  @MaxLength(120)
+  homeDisplayLabel?: string | null;
+
+  @IsOptional()
+  @Transform(({ value }) => typeof value === 'string' ? value.trim() || null : value)
+  @IsString()
+  @MaxLength(120)
+  awayDisplayLabel?: string | null;
+
   @IsOptional()
   @IsUUID()
   fieldId?: string | null;

@@ -413,6 +413,26 @@ describe('TournamentBracketService', () => {
     service = module.get(TournamentBracketService);
   });
 
+  it('display labels on an official fixture never rewrite teams, results or edges', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    const row = canonicalDetailsRow();
+    row.teamMatch.game.state = 'ENDED';
+    row.teamMatch.game.currentOfficialRevision = { state: 'OFFICIAL' } as never;
+    const detail = { ...row, homeDisplayLabel: null, awayDisplayLabel: null, teamMatch: { ...row.teamMatch, homeSlot: null, awaySlot: null } };
+    prisma.v1TournamentMatchDetails.findUnique.mockResolvedValue(detail);
+    prisma.v1TournamentMatchDetails.findUniqueOrThrow.mockResolvedValue(detail);
+    const result = await service.updateFixture(ownerUser, 'fixture-1', { homeDisplayLabel: '준결승 A 승자' });
+    expect(result).toMatchObject({ id: 'fixture-1', homeDisplayLabel: '준결승 A 승자', startedTeamChange: null });
+    expect(prisma.v1TournamentMatchDetails.update).toHaveBeenCalledWith({ where: { teamMatchId: 'fixture-1' }, data: { homeDisplayLabel: '준결승 A 승자' } });
+    expect(prisma.v1TeamMatch.update).not.toHaveBeenCalled();
+    expect(prisma.v1Game.update).not.toHaveBeenCalled();
+    expect(prisma.v1GameSide.update).not.toHaveBeenCalled();
+  });
+  it.each([supportUser, nonAdminUser])('display-label mutation obeys the existing write gate for $id', async user => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(user.id === supportUser.id ? supportAdmin : null);
+    await expect(service.updateFixture(user, 'fixture-1', { homeDisplayLabel: '수정' })).rejects.toThrow(ForbiddenException);
+    expect(prisma.v1TournamentMatchDetails.update).not.toHaveBeenCalled();
+  });
   afterEach(() => jest.clearAllMocks());
 
   // ─── admin role gates ──────────────────────────────────────────────────────
@@ -3307,8 +3327,8 @@ describe('TournamentBracketService', () => {
       const result = await service.getBracket(ownerUser, 'tournament-1');
 
       expect(result.slots).toEqual([
-        { id: 'slot-1', kind: 'ENTRY', groupId: 'group-1', sourceGroupId: null, position: 1, byeSortOrder: null, label: 'A조 1번', registrationId: 'reg-1', teamName: '서울 FC' },
-        { id: 'slot-2', kind: 'GROUP_RANK', groupId: 'group-f', sourceGroupId: 'group-1', position: 1, byeSortOrder: null, label: 'A조 1위', registrationId: null, teamName: null },
+        { id: 'slot-1', kind: 'ENTRY', groupId: 'group-1', sourceGroupId: null, position: 1, byeSortOrder: null, label: 'A조 1번', automaticLabel: 'A조 1번', displayLabel: null, registrationId: 'reg-1', teamName: '서울 FC' },
+        { id: 'slot-2', kind: 'GROUP_RANK', groupId: 'group-f', sourceGroupId: 'group-1', position: 1, byeSortOrder: null, label: 'A조 1위', automaticLabel: 'A조 1위', displayLabel: null, registrationId: null, teamName: null },
       ]);
       expect(prisma.v1TournamentSlot.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { tournamentId: 'tournament-1' } }));
     });

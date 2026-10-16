@@ -1,3 +1,7 @@
+## 2026-10-17 — 대진 표시 문구·경기 정보 편집
+
+[시나리오](./bracket-display-edit.md) · [Task 20261057](../../.github/tasks/20261057-admin-bracket-canvas.md). 목록/그림/모바일 공통 저장과 12강 부전승 편집. 변경 후 alpha 실측 0/3(PR 미배포), DB integration 미실행(Docker 미가동). 자동 회귀 결과는 task 최신 기록 참고.
+
 리그 목록/상세 이미지 분리(2026-10-16): [후속 QA](./league-detail-media.md). API85/Web10·타입/패턴 PASS, DB integration은 Docker 미실행, alpha 3폭은 미배포로 0/3.
 
 ## 2026-10-14 — 리그 상세 대표 이미지·통합 순위 팀 마크

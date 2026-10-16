@@ -21,6 +21,8 @@ export const tournamentTeamMatchBracketInclude = {
       updatedAt: true,
       homeSlotId: true,
       awaySlotId: true,
+      homeSlot: { select: { kind: true, displayLabel: true } },
+      awaySlot: { select: { kind: true, displayLabel: true } },
       videos: { orderBy: { sortOrder: 'asc' }, select: { id: true, title: true, url: true, sortOrder: true } },
       game: {
         select: {
@@ -79,6 +81,8 @@ export function serializeTournamentTeamMatchBracket(row: TournamentTeamMatchBrac
     awayRegistrationId: row.awayRegistrationId,
     homeSlotId: match.homeSlotId,
     awaySlotId: match.awaySlotId,
+    homeDisplayLabel: (match.homeSlot?.kind === 'BYE' ? match.homeSlot.displayLabel : row.homeDisplayLabel) ?? null,
+    awayDisplayLabel: (match.awaySlot?.kind === 'BYE' ? match.awaySlot.displayLabel : row.awayDisplayLabel) ?? null,
     scheduledAt: match.startAt?.toISOString() ?? null,
     venue: match.placeName,
     fieldId: match.fieldId,

@@ -1,5 +1,37 @@
 # Task 20261057: 어드민 대진 그림 편집기 — 그림 먼저, 팀은 자리에, 결과는 칸에서
 
+## 2026-10-17 후속 — 목록·그림 표시 문구와 경기 정보 편집 통일
+Status: Implementation complete; draft PR / alpha QA pending
+
+### Context / Goal / Original Conditions
+사용자가 기존 목록 수정 창·그림 패널·모바일 BottomSheet에서 번호/홈·원정 문구/시각/등록 경기장을 편집하고, 팀이 없는 12강 부전승 자체를 클릭해 문구·팀을 편집하도록 요청했다. 표시만 바꾸며 경기 ID·실제 팀·승자/패자 연결은 보존한다. 이번 요청은 구현·dev 대상 PR 게시이며 머지/main 배포는 포함하지 않는다.
+
+### User / Test Scenarios / Acceptance Criteria
+- [ ] 목록↔그림에서 번호·문구·시각·등록 경기장 저장/새로고침이 같은 값을 사용한다.
+- [ ] main/dev 조회·표시 경로 비교; 기존 시각/경기장 재입력 없이 카드와 패널에서 표시한다.
+- [ ] 문구 빈 값/복원은 최신 자동 문구; 출처 번호 변경 시 자동만 갱신하고 사용자 문구는 보존한다.
+- [ ] 시각 null과 경기장 미배정을 실제 저장하고 양쪽에서 미정으로 표시한다.
+- [ ] 번호/문구 변경은 실제 팀·진출 연결을 보존하며 단계/조→번호→차전→ID로 안정 정렬한다.
+- [ ] 빈 부전승도 그림에서 편집 가능; 연결된8강과 문구·배정팀 공유, 별도 경기 번호/시각/경기장 생성 금지.
+- [ ] 확정 팀 이름 우선, 부전승 문구 보조; 실패 시 입력 유지·실제 오류 표시.
+- [ ] desktop/tablet/mobile 회귀; API/DTO/fixture/MSW/docs/schema pin 동기화.
+
+### Responsibilities / Ownership / Dependencies
+단일 에이전트 순차. Phase A: v1 DB/DTO/서비스/조회·타입·fixture 계약. Phase B: 공유 편집 폼, 목록·그림·모바일, 부전승 노드. Phase C: 회귀·타입·리뷰·PR.
+Owned: 대진 표시/편집 관련 v1 API/Web, additive migration 및 해시 바인딩, API/task/scenario 문서·tests. Forbidden: 다른 WIP, main 쓰기, 실제 결과/진출 규칙 변경, destructive seed/reset.
+
+### Security / Risks / Ambiguity Log
+사용자 지정 문구는 최대120자 plain text·trim/빈 값=null, 입력 검증·기존 admin 쓰기 권한·감사/잠금을 유지한다. BYE 문구는 슬롯 하나에 저장하며 연결된8강은 이를 읽고 쓴다. 실제 배정 변경은 기존 슬롯 API·결과 잠금 계약을 따른다.
+사용자가 기존 UI 확장과 모바일 BottomSheet를 구체적으로 고정했으므로 해당 패턴을 구현한다. alpha 시각 QA는 PR 미배포 상태와 구분하고, 로그인/배포 제약을 기록한다.
+
+### Progress Snapshot / Tech Debt Resolved
+Base origin/dev=`ae24a67e9`, branch=`feat/bracket-display-edit`, worktree=`tmp/worktrees/bracket-display-edit`.
+Phase A/B 완료. main/dev의 canonical serializer는 TeamMatch.startAt/placeName/fieldId를 동일하게 읽는다. 그림 카드 일정 미표시 및 목록/desktop panel의 빈 시각 PATCH 누락을 수정했다. 문구는 일반 경기 side override, BYE는 shared slot override 한 곳에만 저장한다. 경기 ID/진출 edge/배정은 문구 수정 시 그대로 유지된다.
+Phase C: API 관련 269개 계약과 Web 대진 관련 566개 계약 검증(중간 실패 후 해당 파일 재검증 포함); 양쪽 TypeScript, Web pattern, API surface PASS. API 새 DTO/순수 저장 44, 서비스/공통 조회 213, 기존 일정·bye-side 12. Web 전체 관련 566 중 mock export 누락 2건을 고친 뒤 해당 mobile/node 68 재실행 PASS. 슬롯 응답 exact mock에 automaticLabel/displayLabel 동기화. 기존 MSW에는 admin bracket PATCH/GET handler가 없으며 실제 공용 test fixture를 갱신했다.
+Schema LF SHA=96cf396f434e0fba80e9c2fa84e79ee347471ae56387ca6493b6d11f09c93a42. nullable varchar(120) 3개만 추가, 기존값 변경 없음. Docker/fixture/binder/manifest pin 갱신, 과거 manifest 허용 유지. Windows CRLF worktree의 M11 digest 때문에 바인더 회귀는 저장소 LF export에서 재검증한다.
+직접 코드 리뷰: null/omission, 최신 자동 문구, BYE 단일 정본, 공식 결과 문구 수정의 roster/result 무변경, 권한/감사/잠금, 실패 draft 유지, 단계/조→번호→leg→ID 정렬 확인. touched paths TODO/FIXME/HACK/XXX 없음. 실제 alpha QA 0/3 및 DB integration 미실행(Docker daemon 미가동): 완료/배포 가능으로 주장하지 않고 draft PR에 명시한다.
+사용자 요청에 따라 구현/PR만 진행하며 dev/main 머지·배포 및 실제 대회 데이터 수정은 하지 않았다. GitHub CLI 표준 device login 대기; Git credential token 추출은 사용하지 않는다.
+
 ## 2026-10-16 후속 — 부전승 홈·어웨이와 저장 배치 일치
 
 Status: In Progress

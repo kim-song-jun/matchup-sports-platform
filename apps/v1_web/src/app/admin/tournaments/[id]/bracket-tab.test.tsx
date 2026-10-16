@@ -155,6 +155,7 @@ function noopMutation() {
 }
 
 vi.mock('@/hooks/use-v1-api', () => ({
+  useV1TournamentFields: () => ({ data: { items: [{ id: 'field-a', name: 'A구장', active: true }] }, isPending: false, isError: false }),
   useV1PlaceSearch: () => ({ data: undefined, isFetching: false, isError: false, error: null }),
   useV1PublicKakaoMapsKey: () => ({ data: { kakaoMapsJsKey: null }, isLoading: false }),
   useV1AdminBracket: () => ({
@@ -930,5 +931,21 @@ describe('BracketTab — 팀 배정 전 대진 자동 생성 안내', () => {
     expect(screen.queryByText(HINT)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '대진 자동 생성' }));
     expect(screen.getByRole('dialog', { name: '조별리그 대진 자동 생성' })).toBeInTheDocument();
+  });
+});
+
+describe('BracketTab — 공통 경기 정보', () => {
+  beforeEach(() => { bracketGroups = bracket.groups; bracketSlots = []; bracketFixtures = [fixtureRow({ scheduledAt: '2026-10-25T05:00:00.000Z', fieldId: 'field-a', venue: 'A구장', homeDisplayLabel: '준결승 A 승자' })]; updateFixtureMutate.mockReset(); });
+  it('기존 시각·경기장·문구를 채우고 시각과 문구를 명시적으로 비운다', async () => {
+    renderTab();
+    fireEvent.click(screen.getAllByRole('button', { name: 'A조 · 조별리그 1라운드 1번 경기 수정' })[0]);
+    const dialog = await screen.findByRole('dialog', { name: '경기 수정' });
+    expect(within(dialog).getByLabelText('경기 일시')).toHaveValue('2026-10-25T14:00');
+    expect(within(dialog).getByLabelText('등록된 경기장(필드)')).toHaveValue('field-a');
+    expect(within(dialog).getByLabelText('홈 표시 문구')).toHaveValue('준결승 A 승자');
+    fireEvent.click(within(dialog).getByRole('button', { name: '시각 비우기' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '홈 자동 문구 복원' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+    expect(updateFixtureMutate.mock.calls[0][0]).toEqual({ fixtureId: 'fx-1', scheduledAt: null, homeDisplayLabel: null });
   });
 });

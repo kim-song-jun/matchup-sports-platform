@@ -44,6 +44,8 @@ import {
   buildTournamentCreatePayload,
   buildTournamentPreviewItem,
   canSubmitTournamentCreate,
+  hasUnsavedTournamentChanges,
+  mapTournamentToWizardFields,
   hasPromoFactEdits,
   tournamentCreateReducer,
   isShortLeadTime,
@@ -75,6 +77,8 @@ export default function AdminTournamentsNewPage() {
     tournamentCreateReducer,
     INITIAL_TOURNAMENT_CREATE_STATE,
   );
+  const latestStateRef = useRef(state);
+  latestStateRef.current = state;
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [promoUploadingSlot, setPromoUploadingSlot] = useState<'promoHome' | 'promoList' | null>(
     null,
@@ -202,9 +206,9 @@ export default function AdminTournamentsNewPage() {
     // 스텝 버튼을 직접 눌러 건너뛸 수 있으면, 대회가 없는 채로 "접수 시작하기"를 누르는
     // 상황이 생긴다(잠김 상태, 스테퍼 버튼도 이 조건으로 disabled 처리).
     if (nextStep === CONFIRM_STEP_INDEX && (!state.draftId || state.periodMinutesDirty || pending)) return;
-    if (nextStep === CONFIRM_STEP_INDEX && state.format !== state.draftFormat) {
+    if (nextStep === CONFIRM_STEP_INDEX && hasUnsavedTournamentChanges(state)) {
       dispatch({ type: 'set-step', step: LAST_INPUT_STEP_INDEX });
-      showToast('진행 방식을 변경했어요. 저장하고 계속하기를 눌러 반영해 주세요.', 'error');
+      showToast('저장하지 않은 대회 정보가 있어요. 저장하고 계속하기를 눌러 반영해 주세요.', 'error');
       return;
     }
     if (nextStep < state.step) {
@@ -297,7 +301,10 @@ export default function AdminTournamentsNewPage() {
       // 생성 ID는 즉시 유지하되 두 저장이 모두 끝나야 공개 확인을 허용한다.
       dispatch({ type: 'draft-saved', tournament });
       if (!state.periodMinutesDirty) {
-        dispatch({ type: 'draft-created', tournament });
+        const savedPayload = mapTournamentToWizardFields(tournament).savedPayload;
+        if (!hasUnsavedTournamentChanges(latestStateRef.current, savedPayload)) {
+          dispatch({ type: 'draft-created', tournament });
+        }
         return;
       }
       savePeriods.mutate(
@@ -313,7 +320,11 @@ export default function AdminTournamentsNewPage() {
               return;
             }
             dispatch({ type: 'periods-saved', updatedAt: result.expectedVersion });
-            dispatch({ type: 'draft-created', tournament: { ...tournament, updatedAt: result.expectedVersion } });
+            const updatedTournament = { ...tournament, updatedAt: result.expectedVersion };
+            const savedPayload = mapTournamentToWizardFields(updatedTournament).savedPayload;
+            if (!hasUnsavedTournamentChanges(latestStateRef.current, savedPayload)) {
+              dispatch({ type: 'draft-created', tournament: updatedTournament });
+            }
           },
           onError: (error) => {
             showToast(extractErrorMessage(error, '대회는 초안으로 저장했지만 경기 시간을 저장하지 못했어요. 저장하고 계속하기로 다시 시도해 주세요.'), 'error');
@@ -363,7 +374,7 @@ export default function AdminTournamentsNewPage() {
   /** "확인" 단계의 주 CTA — 되돌리기 어려운 전환(초안 → 접수 중)이라 확인 모달을 거친다. */
   const handleStartRegistration = async () => {
     if (!state.draftId || state.periodMinutesDirty || pending) return;
-    if (state.format !== state.draftFormat) {
+    if (hasUnsavedTournamentChanges(state)) {
       goToStep(CONFIRM_STEP_INDEX);
       return;
     }

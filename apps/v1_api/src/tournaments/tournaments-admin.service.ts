@@ -328,6 +328,9 @@ export class TournamentsAdminService {
       substitutionMode: dto.substitutionMode,
       maxSubstitutions: dto.maxSubstitutions,
     });
+    // Read the immutable config before the write transaction. A read failure must not return an
+    // error after the tournament and audit row have already committed.
+    const lineup = await this.loadLineupInfo(sport.code, competitionConfigVersionId);
 
     const created = await this.prisma.$transaction(async (tx) => {
       const tournament = await tx.v1Tournament.create({
@@ -398,7 +401,7 @@ export class TournamentsAdminService {
       return tournament;
     });
 
-    return this.serialize(created, 0);
+    return this.serialize(created, 0, undefined, lineup);
   }
 
   async update(user: V1AuthUser, tournamentId: string, dto: UpdateTournamentDto) {
@@ -1370,8 +1373,8 @@ export class TournamentsAdminService {
       maxPlayers: row.maxPlayers,
       // "출전 인원"(라인업 상한) — 위 minPlayers/maxPlayers("등록" 로스터 크기)와는 다른
       // 값이다. competitionConfigVersionId는 목록/생성 응답에도 항상 있는 스칼라라 비용
-      // 없이 노출하지만, lineupMaxPlayers/lineupMinPlayers/lineupSizeOptions는 조인이
-      // 필요해 get()(대회 상세·수정 화면)에서만 채운다 — 그 외에는 null/[]로 둔다.
+      // 없이 노출한다. lineupMaxPlayers/lineupMinPlayers와 교체 설정은 pinned config 조인이
+      // 필요해 상세 및 생성 응답에서만 채우고, 그 외 응답은 null/[]로 둔다.
       competitionConfigVersionId: row.competitionConfigVersionId,
       // 공개 여부 — false 면 일반 사용자 화면에서 숨겨져 있다(관리 화면의 공개 설정이 읽는다).
       isPublic: row.isPublic,

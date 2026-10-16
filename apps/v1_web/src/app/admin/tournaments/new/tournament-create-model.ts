@@ -45,8 +45,8 @@ export type TournamentCreateState = {
   /** draftId가 가리키는 대회의 마지막으로 알려진 updatedAt — PATCH 시 expectedVersion으로
    * 그대로 되돌려 보낸다(동시 편집 CAS). draft-created/hydrate-from-draft가 채운다. */
   draftUpdatedAt: string | null;
-  /** 마지막으로 서버에 저장한 진행 방식. 공개 확인 전에 미저장 변경을 확인한다. */
-  draftFormat: V1TournamentFormat | null;
+  /** Canonical server-saved create/update fields; UI state and period settings are excluded. */
+  savedPayload: V1CreateTournamentPayload | null;
   sportId: string;
   title: string;
   format: V1TournamentFormat;
@@ -120,7 +120,7 @@ export const INITIAL_TOURNAMENT_CREATE_STATE: TournamentCreateState = {
   step: 0,
   draftId: null,
   draftUpdatedAt: null,
-  draftFormat: null,
+  savedPayload: null,
   sportId: '',
   title: '',
   format: 'group_knockout',
@@ -172,7 +172,7 @@ export const INITIAL_TOURNAMENT_CREATE_STATE: TournamentCreateState = {
 
 type FormField = Exclude<
   keyof TournamentCreateState,
-  'step' | 'draftFormat' | 'prizeRows' | 'promoHome' | 'promoList' | 'promoFactsDirty' | 'periodMinutes' | 'periodMinutesDirty'
+  'step' | 'savedPayload' | 'prizeRows' | 'promoHome' | 'promoList' | 'promoFactsDirty' | 'periodMinutes' | 'periodMinutesDirty'
 >;
 
 export type TournamentCreateAction =
@@ -277,15 +277,20 @@ export function tournamentCreateReducer(
       };
     case 'draft-saved':
       // 피리어드 저장 실패 후에도 같은 초안으로 재시도하고 입력 단계는 유지한다.
-      return { ...state, draftId: action.tournament.id, draftUpdatedAt: action.tournament.updatedAt, draftFormat: action.tournament.format };
-    case 'draft-created':
-      // 저장된 진행 방식도 기억해 다음 편집에서 공개 확인을 건너뛰지 못하게 한다.
-      // updatedAt은 다음 PATCH의 expectedVersion으로 쓰인다.
       return {
         ...state,
         draftId: action.tournament.id,
         draftUpdatedAt: action.tournament.updatedAt,
-        draftFormat: action.tournament.format,
+        savedPayload: mapTournamentToWizardFields(action.tournament).savedPayload,
+      };
+    case 'draft-created':
+      // 지금 폼에 입력된 값은 이미 서버에 그대로 반영됐다 — id·updatedAt만 고정하고
+      // 확인 단계로 이동한다. updatedAt은 다음 PATCH의 expectedVersion으로 쓰인다.
+      return {
+        ...state,
+        draftId: action.tournament.id,
+        draftUpdatedAt: action.tournament.updatedAt,
+        savedPayload: mapTournamentToWizardFields(action.tournament).savedPayload,
         step: CONFIRM_STEP_INDEX,
       };
     case 'hydrate-from-draft':
@@ -387,7 +392,6 @@ export function mapTournamentToWizardFields(tournament: V1Tournament): Tournamen
     ...INITIAL_TOURNAMENT_CREATE_STATE,
     draftId: tournament.id,
     draftUpdatedAt: tournament.updatedAt,
-    draftFormat: tournament.format,
     sportId: tournament.sportId,
     title: tournament.title,
     format: tournament.format,
@@ -459,7 +463,7 @@ export function mapTournamentToWizardFields(tournament: V1Tournament): Tournamen
   };
 
   const defaults = buildTournamentPromoFactDefaults({ ...restored, venue: restored.venue?.name });
-  return syncPromoFacts({
+  const mapped = syncPromoFacts({
     ...restored,
     promoFactsDirty: {
       promoHome: dirtyFromSavedPromo(
@@ -480,6 +484,18 @@ export function mapTournamentToWizardFields(tournament: V1Tournament): Tournamen
       ),
     },
   });
+  return { ...mapped, savedPayload: normalizeTournamentPayload(buildTournamentCreatePayload(mapped)) };
+}
+
+export function hasUnsavedTournamentChanges(
+  state: TournamentCreateState,
+  savedPayload = state.savedPayload,
+) {
+  return (
+    savedPayload !== null &&
+    JSON.stringify(normalizeTournamentPayload(buildTournamentCreatePayload(state))) !==
+      JSON.stringify(savedPayload)
+  );
 }
 
 /**
@@ -769,6 +785,21 @@ export function buildTournamentCreatePayload(
   }
 
   return payload;
+}
+
+function normalizeTournamentPayload(payload: V1CreateTournamentPayload): V1CreateTournamentPayload {
+  const normalize = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(normalize);
+    if (value && typeof value === 'object') {
+      return Object.fromEntries(
+        Object.entries(value)
+          .sort(([left], [right]) => left.localeCompare(right))
+          .map(([key, item]) => [key, normalize(item)]),
+      );
+    }
+    return value;
+  };
+  return normalize(payload) as V1CreateTournamentPayload;
 }
 
 function parsePromoPriority(value: string): number | null {

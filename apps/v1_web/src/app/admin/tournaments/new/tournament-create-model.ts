@@ -45,8 +45,8 @@ export type TournamentCreateState = {
   /** draftId가 가리키는 대회의 마지막으로 알려진 updatedAt — PATCH 시 expectedVersion으로
    * 그대로 되돌려 보낸다(동시 편집 CAS). draft-created/hydrate-from-draft가 채운다. */
   draftUpdatedAt: string | null;
-  /** 마지막으로 서버에 저장한 진행 방식. 공개 확인 전에 미저장 변경을 확인한다. */
-  draftFormat: V1TournamentFormat | null;
+  /** Canonical server-saved create/update fields; UI state and period settings are excluded. */
+  savedPayload: V1CreateTournamentPayload | null;
   sportId: string;
   title: string;
   format: V1TournamentFormat;
@@ -120,7 +120,7 @@ export const INITIAL_TOURNAMENT_CREATE_STATE: TournamentCreateState = {
   step: 0,
   draftId: null,
   draftUpdatedAt: null,
-  draftFormat: null,
+  savedPayload: null,
   sportId: '',
   title: '',
   format: 'group_knockout',
@@ -172,7 +172,7 @@ export const INITIAL_TOURNAMENT_CREATE_STATE: TournamentCreateState = {
 
 type FormField = Exclude<
   keyof TournamentCreateState,
-  'step' | 'draftFormat' | 'prizeRows' | 'promoHome' | 'promoList' | 'promoFactsDirty' | 'periodMinutes' | 'periodMinutesDirty'
+  'step' | 'savedPayload' | 'prizeRows' | 'promoHome' | 'promoList' | 'promoFactsDirty' | 'periodMinutes' | 'periodMinutesDirty'
 >;
 
 export type TournamentCreateAction =
@@ -277,15 +277,20 @@ export function tournamentCreateReducer(
       };
     case 'draft-saved':
       // 피리어드 저장 실패 후에도 같은 초안으로 재시도하고 입력 단계는 유지한다.
-      return { ...state, draftId: action.tournament.id, draftUpdatedAt: action.tournament.updatedAt, draftFormat: action.tournament.format };
-    case 'draft-created':
-      // 저장된 진행 방식도 기억해 다음 편집에서 공개 확인을 건너뛰지 못하게 한다.
-      // updatedAt은 다음 PATCH의 expectedVersion으로 쓰인다.
       return {
         ...state,
         draftId: action.tournament.id,
         draftUpdatedAt: action.tournament.updatedAt,
-        draftFormat: action.tournament.format,
+        savedPayload: mapTournamentToWizardFields(action.tournament).savedPayload,
+      };
+    case 'draft-created':
+      // 지금 폼에 입력된 값은 이미 서버에 그대로 반영됐다 — id·updatedAt만 고정하고
+      // 확인 단계로 이동한다. updatedAt은 다음 PATCH의 expectedVersion으로 쓰인다.
+      return {
+        ...state,
+        draftId: action.tournament.id,
+        draftUpdatedAt: action.tournament.updatedAt,
+        savedPayload: mapTournamentToWizardFields(action.tournament).savedPayload,
         step: CONFIRM_STEP_INDEX,
       };
     case 'hydrate-from-draft':
@@ -381,13 +386,12 @@ export function mapTournamentToWizardFields(tournament: V1Tournament): Tournamen
         label: row.label,
         value: row.amount,
       }))
-    : INITIAL_TOURNAMENT_CREATE_STATE.prizeRows;
+    : [];
 
   const restored: TournamentCreateState = {
     ...INITIAL_TOURNAMENT_CREATE_STATE,
     draftId: tournament.id,
     draftUpdatedAt: tournament.updatedAt,
-    draftFormat: tournament.format,
     sportId: tournament.sportId,
     title: tournament.title,
     format: tournament.format,
@@ -408,17 +412,32 @@ export function mapTournamentToWizardFields(tournament: V1Tournament): Tournamen
     // 경기 시간은 대회 응답에 없다 — 화면이 초안의 피리어드 설정을 읽어 채운다(prefill-period-minutes).
     periodMinutes: [],
     periodMinutesDirty: false,
-    genderMinMale: tournament.genderMinMale !== null ? String(tournament.genderMinMale) : '',
-    genderMaxMale: tournament.genderMaxMale !== null ? String(tournament.genderMaxMale) : '',
-    genderMinFemale: tournament.genderMinFemale !== null ? String(tournament.genderMinFemale) : '',
-    genderMaxFemale: tournament.genderMaxFemale !== null ? String(tournament.genderMaxFemale) : '',
+    genderMinMale:
+      tournament.genderMinMale === null || tournament.genderMinMale === undefined
+        ? ''
+        : String(tournament.genderMinMale),
+    genderMaxMale:
+      tournament.genderMaxMale === null || tournament.genderMaxMale === undefined
+        ? ''
+        : String(tournament.genderMaxMale),
+    genderMinFemale:
+      tournament.genderMinFemale === null || tournament.genderMinFemale === undefined
+        ? ''
+        : String(tournament.genderMinFemale),
+    genderMaxFemale:
+      tournament.genderMaxFemale === null || tournament.genderMaxFemale === undefined
+        ? ''
+        : String(tournament.genderMaxFemale),
     minMatchesPerTeam:
-      tournament.minMatchesPerTeam !== null ? String(tournament.minMatchesPerTeam) : '',
+      tournament.minMatchesPerTeam === null || tournament.minMatchesPerTeam === undefined
+        ? ''
+        : String(tournament.minMatchesPerTeam),
     entryFee: String(tournament.entryFee),
     bankName: tournament.bankName ?? '',
     bankAccount: tournament.bankAccount ?? '',
     bankHolder: tournament.bankHolder ?? '',
-    prizePool: tournament.prizePool !== null ? String(tournament.prizePool) : '',
+    prizePool:
+      tournament.prizePool === null || tournament.prizePool === undefined ? '' : String(tournament.prizePool),
     prizeSummary: tournament.prizeSummary ?? '',
     prizeRows,
     yellowAccumulationLimit:
@@ -459,7 +478,7 @@ export function mapTournamentToWizardFields(tournament: V1Tournament): Tournamen
   };
 
   const defaults = buildTournamentPromoFactDefaults({ ...restored, venue: restored.venue?.name });
-  return syncPromoFacts({
+  const mapped = syncPromoFacts({
     ...restored,
     promoFactsDirty: {
       promoHome: dirtyFromSavedPromo(
@@ -480,6 +499,18 @@ export function mapTournamentToWizardFields(tournament: V1Tournament): Tournamen
       ),
     },
   });
+  return { ...mapped, savedPayload: normalizeTournamentPayload(buildTournamentCreatePayload(mapped)) };
+}
+
+export function hasUnsavedTournamentChanges(
+  state: TournamentCreateState,
+  savedPayload = state.savedPayload,
+) {
+  return (
+    savedPayload !== null &&
+    JSON.stringify(normalizeTournamentPayload(buildTournamentCreatePayload(state))) !==
+      JSON.stringify(savedPayload)
+  );
 }
 
 /**
@@ -723,7 +754,7 @@ export function buildTournamentCreatePayload(
     registrationDeadlineAt: kstDatetimeLocalToIso(state.registrationDeadlineAt) ?? undefined,
     // 비우면 null 을 보낸다 — 초안을 이어 고칠 때(PATCH) 지운 마감이 서버에 남지 않게.
     rosterDeadlineAt: kstDatetimeLocalToIso(state.rosterDeadlineAt),
-    ...toVenuePayload(state.venue),
+    ...(state.venue ? toVenuePayload(state.venue) : { venue: null }),
     coverImageUrl: state.coverImageUrl,
     teamCount: Number(state.teamCount),
     minPlayers: Number(state.minPlayers),
@@ -737,38 +768,52 @@ export function buildTournamentCreatePayload(
       state.substitutionMode === 'limited' && state.maxSubstitutions.trim() !== ''
         ? Number(state.maxSubstitutions.trim())
         : undefined,
-    // 빈 값이면 아예 보내지 않는다 — 0이나 빈 문자열을 보내면 서버 @IsInt @Min(1)이 422로
-    // 거절한다(관리자가 아무것도 입력하지 않았는데 검증 요청이 되는 사고).
-    minMatchesPerTeam: state.minMatchesPerTeam.trim() !== '' ? Number(state.minMatchesPerTeam.trim()) : undefined,
+    // 빈 값은 null로 보내 초안을 이어 수정할 때 기존 최소 경기 수를 지운다.
+    minMatchesPerTeam: state.minMatchesPerTeam.trim() !== '' ? Number(state.minMatchesPerTeam.trim()) : null,
     entryFee: Number(state.entryFee || '0'),
-    bankName: state.bankName.trim() || undefined,
-    bankAccount: state.bankAccount.trim() || undefined,
-    bankHolder: state.bankHolder.trim() || undefined,
-    prizePool: state.prizePool ? Number(state.prizePool) : undefined,
-    prizeSummary: state.prizeSummary.trim() || undefined,
-    prizeBreakdown: serializeTournamentPrizeRows(state.prizeRows) || undefined,
-    // 빈 문자열은 undefined 로 보낸다(= 값을 건드리지 않음). 규정을 **끄려면**
-    // 화면에서 비우는 것만으로는 부족하고 null 을 명시해야 하는데, 생성 폼에는
-    // 끌 대상이 없으므로 여기서는 undefined 로 충분하다.
-    // numeric() 재사용 — 직접 Number() 를 쓰면 비정상 입력이 NaN 이 되고, JSON
-    // 직렬화에서 null 로 바뀌어 서버에 "규정 끔"으로 전달된다(Copilot 리뷰 지적).
-    // numeric() 은 유한수가 아니면 null 을 주므로, ?? undefined 로 "안 보냄"으로 바꾼다.
-    yellowAccumulationLimit: numeric(state.yellowAccumulationLimit) ?? undefined,
-    redCardSuspensionMatches: numeric(state.redCardSuspensionMatches) ?? undefined,
-    rulesText: state.rulesText.trim() || undefined,
-    refundPolicyText: state.refundPolicyText.trim() || undefined,
+    bankName: state.bankName.trim() || null,
+    bankAccount: state.bankAccount.trim() || null,
+    bankHolder: state.bankHolder.trim() || null,
+    prizePool: state.prizePool.trim() ? Number(state.prizePool.trim()) : null,
+    prizeSummary: state.prizeSummary.trim() || null,
+    prizeBreakdown: serializeTournamentPrizeRows(state.prizeRows) || null,
+    yellowAccumulationLimit:
+      state.yellowAccumulationLimit.trim() === ''
+        ? null
+        : numeric(state.yellowAccumulationLimit) ?? undefined,
+    redCardSuspensionMatches:
+      state.redCardSuspensionMatches.trim() === ''
+        ? null
+        : numeric(state.redCardSuspensionMatches) ?? undefined,
+    rulesText: state.rulesText.trim() || null,
+    refundPolicyText: state.refundPolicyText.trim() || null,
     ...promoPayload('promoHome', state.promoHome),
     ...promoPayload('promoList', state.promoList),
   };
 
   if (state.genderCategory === 'mixed') {
-    payload.genderMinMale = optionalNumeric(state.genderMinMale) ?? undefined;
-    payload.genderMaxMale = optionalNumeric(state.genderMaxMale) ?? undefined;
-    payload.genderMinFemale = optionalNumeric(state.genderMinFemale) ?? undefined;
-    payload.genderMaxFemale = optionalNumeric(state.genderMaxFemale) ?? undefined;
+    payload.genderMinMale = state.genderMinMale.trim() === '' ? null : optionalNumeric(state.genderMinMale) ?? undefined;
+    payload.genderMaxMale = state.genderMaxMale.trim() === '' ? null : optionalNumeric(state.genderMaxMale) ?? undefined;
+    payload.genderMinFemale = state.genderMinFemale.trim() === '' ? null : optionalNumeric(state.genderMinFemale) ?? undefined;
+    payload.genderMaxFemale = state.genderMaxFemale.trim() === '' ? null : optionalNumeric(state.genderMaxFemale) ?? undefined;
   }
 
   return payload;
+}
+
+function normalizeTournamentPayload(payload: V1CreateTournamentPayload): V1CreateTournamentPayload {
+  const normalize = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(normalize);
+    if (value && typeof value === 'object') {
+      return Object.fromEntries(
+        Object.entries(value)
+          .sort(([left], [right]) => left.localeCompare(right))
+          .map(([key, item]) => [key, normalize(item)]),
+      );
+    }
+    return value;
+  };
+  return normalize(payload) as V1CreateTournamentPayload;
 }
 
 function parsePromoPriority(value: string): number | null {

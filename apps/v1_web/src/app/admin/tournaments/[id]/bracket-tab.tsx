@@ -760,6 +760,8 @@ export function BracketTab({
               {canWrite && tournamentFormat === 'group_knockout' && group.phase === 'round12' && groups.filter((item) => item.phase === 'group').length === 5
                 ? <div className="flex justify-end"><Button variant="outline" size="md" onClick={() => setRound12AutoOpen(true)}>12강 진출팀 자동 배정</Button></div> : null}
               <BracketGroupCard
+                tournamentId={tournamentId}
+                slots={bracket?.slots ?? []}
                 group={group}
                 managedEntrySlots={(bracket?.slots ?? []).some((slot) => slot.kind === 'ENTRY' && slot.groupId === group.id)}
                 allGroups={groups}

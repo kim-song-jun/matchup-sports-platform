@@ -6,6 +6,7 @@ import { GamesService } from '../../src/games/games.service';
 import { GameTakeoverService } from '../../src/games/game-takeover.service';
 import { TournamentBracketService } from '../../src/tournaments/tournament-bracket.service';
 import { createEmptyTournamentFixtureInTx, createGroupInTx } from '../../src/tournaments/tournament-bracket-tx';
+import { updateTournamentMatchInTx } from '../../src/tournaments/tournament-match-update';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from '../../src/tournaments/tournament-surface-lookup';
 import type { Prisma } from '@prisma/client';
 import { competitionConfigFixture as ids, seedCompetitionConfigFixture } from '../fixtures/competition-config.fixture';
@@ -165,6 +166,24 @@ describe('대진 …InTx 함수 (PostgreSQL)', () => {
       expect((await prisma.v1TournamentMatchDetails.findUniqueOrThrow({ where: { teamMatchId: id } })).awayRegistrationId).toBe(reg1);
     });
 
+    it('홈·어웨이 팀 교환 뒤에도 양 팀의 일정은 같은 시각에 활성 상태로 남는다', async () => {
+      const { id } = await emptyFixture(7042, null, null);
+      const scheduledAt = new Date('2026-10-20T10:00:00Z');
+      await prisma.$transaction((tx) => updateTournamentMatchInTx(tx, {
+        teamMatchId: id, homeRegistrationId: reg0, awayRegistrationId: reg1, scheduledAt,
+      }));
+      const before = await prisma.v1TeamSchedule.findMany({ where: { teamMatchId: id }, orderBy: { teamId: 'asc' } });
+      expect(before).toHaveLength(2);
+      await prisma.$transaction((tx) => updateTournamentMatchInTx(tx, {
+        teamMatchId: id, homeRegistrationId: reg1, awayRegistrationId: reg0,
+      }));
+      const after = await prisma.v1TeamSchedule.findMany({ where: { teamMatchId: id }, orderBy: { teamId: 'asc' } });
+      expect(after.map(({ id: scheduleId, teamId, state, cancelReason, startAt }) => ({ id: scheduleId, teamId, state, cancelReason, startAt })))
+        .toEqual(before.map((row) => ({ id: row.id, teamId: row.teamId, state: 'SCHEDULED', cancelReason: null, startAt: scheduledAt })));
+      expect(await prisma.v1TournamentMatchDetails.findUniqueOrThrow({ where: { teamMatchId: id } }))
+        .toMatchObject({ homeRegistrationId: reg1, awayRegistrationId: reg0 });
+    });
+
     it('getBracket 은 자리 목록과 경기별 슬롯 id·game 블록을 실DB 에서 내고, 확정 결과 경기의 최신 리비전은 OFFICIAL 이다', async () => {
       const slot = await slotOf(31);
       const { id } = await emptyFixture(7041, slot.id, null);
@@ -172,7 +191,7 @@ describe('대진 …InTx 함수 (PostgreSQL)', () => {
       const view = await bracket.getBracket(user, ids.tournamentId);
 
       expect(view.slots.find((candidate) => candidate.id === slot.id)).toEqual({
-        id: slot.id, kind: 'ENTRY', groupId, sourceGroupId: null, position: 31, label: 'empty-fixtures 31번', registrationId: null, teamName: null,
+        id: slot.id, kind: 'ENTRY', groupId, sourceGroupId: null, position: 31, byeSortOrder: null, label: 'empty-fixtures 31번', registrationId: null, teamName: null,
       });
       expect(view.fixtures.find((fixture) => fixture.id === id)).toMatchObject({
         homeSlotId: slot.id, awaySlotId: null,

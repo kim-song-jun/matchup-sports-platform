@@ -4384,6 +4384,8 @@ export type V1AdminBracketSlot = {
   groupId: string | null;
   sourceGroupId: string | null;
   position: number;
+  /** 부전승의 0-based 표시 위치. 슬롯 식별 번호 position과 구분한다. */
+  byeSortOrder?: number | null;
   label: string;
   registrationId: string | null;
   teamName: string | null;

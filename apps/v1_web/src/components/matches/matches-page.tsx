@@ -419,7 +419,7 @@ export function MatchDetailPageView({ model, lifecyclePanel }: { model: MatchDet
             <InfoRow label="지역" value={match.region} />
             <InfoRow label="날짜와 시간" value={`${match.date} ${timeRange}`} />
             <InfoRow label="신청 마감" value={match.deadlineDetail ?? match.deadline} sub={match.deadline} />
-            <DetailPlace place={match.place} fallbackName={match.venue} />
+            <DetailPlace place={match.place} fallbackName={match.venue} isOnline={match.isOnline} />
             {/* [P1 숫자:단위 2:1 + tabular-nums] 인원 — 숫자(subhead/heading 크기) + 단위(body) 2:1 비율 */}
             <CapacityRow current={match.current} capacity={match.capacity} settled={capacitySettled} />
             <InfoRow label="레벨" value={match.level} />
@@ -515,7 +515,7 @@ export function MatchDetailPageView({ model, lifecyclePanel }: { model: MatchDet
           <InfoRow label="지역" value={match.region} />
           <InfoRow label="날짜와 시간" value={`${match.date} ${timeRange}`} />
           <InfoRow label="신청 마감" value={match.deadlineDetail ?? match.deadline} sub={match.deadline} />
-          <DetailPlace place={match.place} fallbackName={match.venue} />
+          <DetailPlace place={match.place} fallbackName={match.venue} isOnline={match.isOnline} />
           {/* [P1 숫자:단위 2:1 + tabular-nums] 인원 (모바일) */}
           <CapacityRow current={match.current} capacity={match.capacity} settled={capacitySettled} />
           <InfoRow label="레벨" value={match.level} />
@@ -1321,8 +1321,9 @@ function PlaceTimeFields({ model }: { model: MatchCreateViewModel }) {
 }
 
 /** 일정·장소 그룹 안의 장소 행. 이름·주소는 카드가 보여 주므로 InfoRow 와 겹쳐 그리지 않는다. */
-function DetailPlace({ place, fallbackName }: { place: V1PlaceView | null; fallbackName: string }) {
+function DetailPlace({ place, fallbackName, isOnline }: { place: V1PlaceView | null; fallbackName: string; isOnline: boolean }) {
   if (!place) return <InfoRow label="장소" value={fallbackName} />;
+  if (isOnline) return <InfoRow label="장소" value={place.name} sub={place.address ?? undefined} />;
   return (
     // 개인 매치 상세는 카드 없이 행을 나열해 행 좌우 여백이 0 이다(팀매치 상세의 카드형 그룹과 다르다).
     <div className="tm-info-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 4, padding: '14px 0' }}>

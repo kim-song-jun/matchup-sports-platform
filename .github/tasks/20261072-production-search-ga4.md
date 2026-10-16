@@ -1,10 +1,56 @@
 # Task 20261072: 운영 검색 노출 및 홈 GA4 계측 정정
 
-Status: SEO runtime deployed and verified; external search/AI Scan outcomes and artifact-only dev integration pending
+Status: In Progress — existing detail SSR, main/Alpha index boundary and factual Event follow-up (2026-10-17)
 **Owner**: Codex main; explicit Luna implementation and Sol independent review
 **Created**: 2026-10-12
 
-## Current Cursor — 2026-10-16 final deployment verification
+## Current Follow-up — 2026-10-17
+
+User explicitly authorizes repairing existing fixture body SSR, online/test structured-data and indexing problems, Naver stale error snippets, then exact PR review/CI, Alpha QA and scoped main deployment. No new search pages, hidden keyword blocks, unrelated dev promotion, normal-event bulk hiding or destructive data changes.
+
+### Original Conditions
+
+- [ ] Render existing fixture facts in initial HTML using the current UI and server seed contracts.
+- [ ] Correct truthful online location/attendance output through explicit stored classification; do not infer it from titles or IDs.
+- [ ] User confirmed main public data all indexable, including demonstrations; Alpha entire host stays excluded. Do not add a test-discovery flag, filter, deletion or normal past-event exclusion.
+- [ ] Preserve seeded tournament details if background refresh fails while exposing a meaningful retry/error signal.
+- [ ] Use factual existing tournament copy/metadata for 풋살 대회; no new pages or keyword stuffing.
+- [ ] Verify latest PR reviews and exact-SHA CI; live Alpha 390/768/1440 and console/network must pass before scoped main promotion.
+- [ ] Verify actual production SHA/release plus raw HTML/JSON-LD/sitemap after deployment; distinguish external Naver/Google/AI refresh from code completion.
+
+### Ownership / Sequence
+
+1. Root: this task document, cache status/release artifacts, scoped Git integration and release gates.
+2. Fixture implementer: only existing fixture page/client and colocated actual-render contract tests. Existing hook seed APIs require no shared hook edits.
+3. Online-place contract implementer: additive V1Match.isOnline and authenticated/audited operator classification plus detail serialization; frontend builder/UI consumes explicit value, normal lists and indexability unchanged. No new page or online product creation flow.
+4. Independent gpt-6-sol: immutable source review, adversarial contract checks and Alpha evidence review; no implementation ownership.
+5. Browser owner: one approved Default/성준 Ego space for before/after Alpha, changed-URL provider verification and production QA, close with keep[] once.
+
+### Acceptance / Validation
+
+- Actual render-to-HTML of real fixture client contains event/team/date/place facts outside JSON-LD and no loading-only shell; existing visual layout preserved.
+- Genuine 404 remains 404; upstream failure is not indexed as successful invented content.
+- Main public records remain in discovery; Alpha noindex and sitemap/AI-publication exclusions remain. Demonstrations are not silently hidden by label/ID.
+- No invented coordinates, street address or online venue. Online sample contradiction is removed using explicit source policy.
+- Current [Google Event content guidelines](https://developers.google.com/search/docs/appearance/structured-data/event?hl=en) exclude non-events and virtual-only experiences. Explicit online personal matches therefore keep their indexable factual page but omit the physical SportsEvent feature; no invented VirtualLocation URL or physical address.
+- Narrow RED→GREEN tests, serial low-worker preflight; committed-tree and exact-head CI, Copilot current review, independent review; before/after Alpha actual viewports and main-only index controls.
+- Naver stale snippet is not considered resolved until provider result itself changes. One changed-content collection request may be made; unchanged ranking alone does not justify repeats. CAPTCHA remains user-handled.
+
+### Risks / Ambiguity Log
+
+- Latest dev ae24a67e includes unrelated features/migrations; main6a0c3f91. Only this follow-up's reviewed source/release delta may enter main.
+- User clarified the durable index policy: main public data all indexable; Alpha excluded. No UUID/title blacklist or soft-delete assumption. V1Match has no explicit online field; additive isOnline classification addresses factual place metadata only, without changing publication or index scope.
+- UI seed hydration reuses the existing layout. User approved A: existing compact ErrorState above preserved valid tournament details on background-refetch failure. No custom notice design or additional search prose.
+- No source changes started before discovery; primary shared tree40a9633d and four bracket WIP files/release-files preserved. Existing owned checkout fast-forwarded cleanly from ebfac to ae24a67e with no new local branch/worktree.
+
+### Progress Snapshot
+
+- Source discovery complete: fixture seeds supported but not passed; tournament background refetch checks isError even when seeded data exists. Match builder hardcodes offline attendance; existing match model has no first-class discovery/online control. Read-only evidence at cache search-recheck-final-20261017.json.
+- Fixture implementation and narrow RED/GREEN completed initial success path; independent Sol found league-failure P1 and standings-name P2 plus missing edge regressions. Repairs in progress. Tournament repair approved; online metadata contract assigned. PR/CI/Alpha/main pending. Runtime task board: cache ACTIVE-20261017-search-repair.md.
+
+Source-ready 2026-10-17: final fixture11 tests, tournament7 focused tests and onlinefrontend109 unique tests passed; backend12 focused runtime tests passed with actual global ValidationPipe strictboolean/deleted-target fixes. Total139 disjoint tests. Independent actual gpt-6-sol frozen-source review PASS with zero P1/P2. Backend normal diagnostics are blocked by the pre-existing shared generated-client maxPlayers mismatch; no shared Prisma generation was performed, and exact committed CI must generate/check/integrate the real schema. Web tsc passed after adding the required physical fixture value; two pattern errors were corrected to 해요체 and their two upstream-error assertions rechecked. No new route, test-exclusion flag, hidden keyword text, public visibility change or data mutation. PR/CI/Alpha/main and audited online classification remain pending.
+
+## Historical Cursor — 2026-10-16 final deployment verification
 
 The requested existing-page cleanup and factual Event corrections are deployed through source dev PRs #1940/#1942 and scoped main PR #1941. Production serves `1955a2b35f6bb35af2458ed9d40b60b9ddd5c3d7`, measured runtime `1.9.4`; CI/deploy38783510227 and CodeQL38783508884 succeeded. Source-bearing latest Alpha `a2647c89982bfc6acfbdaa209b80f8d11601a6f2` passed matching CI38779670635/Alpha38779670529 and actual10/10HTTP/schema/noindex checks. Unrelated dev features were excluded from main.
 

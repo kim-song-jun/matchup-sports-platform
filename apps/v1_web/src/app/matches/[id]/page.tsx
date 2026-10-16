@@ -8,7 +8,7 @@ import type { V1Match } from '@/types/api';
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
-  const match = await fetchPublicV1<V1Match>(`/matches/${encodeURIComponent(id)}`);
+  const match = await fetchPublicV1<V1Match>(`/matches/${encodeURIComponent(id)}`, { cache: 'no-store' });
   if (!match) return buildNoIndexMetadata('매치를 찾을 수 없어요');
 
   return buildPublicMetadata({
@@ -27,7 +27,7 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ id
   // 존재 확인을 위해 어차피 기다리는 응답이다 — 버리지 않고 첫 표시값으로 넘긴다.
   // 추가 요청이 아니므로 TTFB 는 그대로고, 딥링크·푸시·새로고침 진입에서 첫 화면이
   // 비어 있던 구간이 사라진다.
-  const match = await fetchPublicV1<V1Match>(`/matches/${encodeURIComponent(id)}`);
+  const match = await fetchPublicV1<V1Match>(`/matches/${encodeURIComponent(id)}`, { cache: 'no-store' });
   if (!match) notFound();
   const eventLd = buildMatchEventLd(match, id);
   return (

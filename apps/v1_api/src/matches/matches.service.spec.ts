@@ -61,6 +61,7 @@ function matchRow(overrides: Record<string, unknown> = {}) {
     imageUrl: null,
     placeName: '강남역',
     placeAddress: null,
+    isOnline: false,
     placeLatitude: null,
     placeLongitude: null,
     placeProvider: null,
@@ -1023,6 +1024,22 @@ describe('MatchesService', () => {
 
     prisma.v1Match.findFirst.mockResolvedValue(row);
     expect((await service.detail(null, 'match-1')).rulesText).toBeNull();
+  });
+
+  it('detail: physical matches default to isOnline=false and explicitly online matches expose true', async () => {
+    const physical = matchRow({
+      isOnline: false,
+      sport: { id: 'sport-1', name: '풋살' },
+      region: null,
+      participants: [],
+      hostUser: { id: host.id, profile: null, reputationSummary: null },
+    });
+    prisma.v1Match.findFirst.mockResolvedValue(physical);
+
+    expect((await service.detail(null, 'match-1') as Record<string, unknown>).isOnline).toBe(false);
+
+    prisma.v1Match.findFirst.mockResolvedValue({ ...physical, isOnline: true });
+    expect((await service.detail(null, 'match-1') as Record<string, unknown>).isOnline).toBe(true);
   });
 
   it('edit: costNote를 폼에 포함해 반환한다', async () => {

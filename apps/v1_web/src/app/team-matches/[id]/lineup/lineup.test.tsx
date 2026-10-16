@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { V1ApiError } from '@/lib/api-client';
-import type { V1TeamMatchLineup } from '@/types/api';
+import type { V1TeamMatchLineup, V1TeamMatchLineupSubmitResult } from '@/types/api';
 import type { FormationSlot } from '@/components/lineup/formation-slots';
 import {
   addGuestToLineup,
@@ -513,6 +513,13 @@ function baseLineup(overrides: Partial<V1TeamMatchLineup> = {}): V1TeamMatchLine
     starters: [],
     bench: [],
     ...overrides,
+  };
+}
+
+function submitReply(revision: number): V1TeamMatchLineupSubmitResult {
+  return {
+    teamMatchId: 'tm-1', gameId: 'game-1', sideId: 'side-host', lineupId: `submitted-lineup-${revision}`,
+    revision, state: 'SUBMITTED', version: 1, replayed: false, publicLineupAt: null,
   };
 }
 
@@ -1354,7 +1361,7 @@ describe('TeamMatchLineupPageClient — 프리셋 저장 (L9)', () => {
     // 변경 없이 곧바로 제출하면 저장 없이 제출로 이어진다 — 저장이 먼저 필요하면 그 ack 뒤에 제출된다.
     fireEvent.click(screen.getByRole('button', { name: '참석명단 제출하기' }));
     act(() => hoisted.saveMutate.mock.calls[0][1].onSuccess({ revision: 4 }));
-    act(() => hoisted.submitMutate.mock.calls[0][1].onSuccess());
+    act(() => hoisted.submitMutate.mock.calls[0][1].onSuccess(submitReply(4)));
 
     expect(screen.queryByText("'평일 멤버' 프리셋으로 저장했어요.")).not.toBeInTheDocument();
   });
@@ -2057,6 +2064,54 @@ describe('TeamMatchLineupPageClient — 낸 뒤엔 다시 제출만 (Task 180 R-
     hoisted.useV1TeamLineupHistoryMock.mockReturnValue({ data: undefined, isLoading: false });
   });
 
+  it.each([1, 2])('저장한 사용자 초안 revision %s는 선택한 부분 명단을 기본 참석명단으로 안내하지 않는다 (MD-QA146)', (revision) => {
+    hoisted.useV1TeamMembersMock.mockReturnValue({
+      data: { items: starters.map((row) => ({ userId: row.userId, displayName: row.displayName, role: 'member', status: 'active' })) },
+      isLoading: false,
+    });
+    renderLineup(baseLineup({
+      state: 'DRAFT', revision, version: 1,
+      effectiveRosterSource: 'DEFAULT_PREVIEW', hasSavedDraft: true,
+      starters: starters.slice(0, 1),
+      eligibleMembers: starters.map((row) => ({ userId: row.userId, displayName: row.displayName, jerseyNumber: row.jerseyNumber, attending: true })),
+    }));
+
+    expect(screen.getByText('참석명단 (1)')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '홍길동 참석명단에서 빼기' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '김철수 참석명단에서 빼기' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '김철수 참석명단에 추가' })).toBeInTheDocument();
+    expect(screen.getByText('초안')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '참석명단 제출하기' })).toBeEnabled();
+    expect(screen.queryByText('기본 참석명단이에요.')).not.toBeInTheDocument();
+  });
+
+  it('기본 미리보기 첫 제출 응답의 새 revision을 다음 편집 저장에 사용한다 (MD-QA146)', () => {
+    hoisted.useV1TeamMatchLineupMock.mockReturnValue({
+      data: baseLineup({ state: 'DRAFT', revision: 1, version: 1, effectiveRosterSource: 'DEFAULT_PREVIEW', starters }),
+      isLoading: false, isError: false, error: null, refetch: hoisted.refetchLineup,
+    });
+    const { rerender } = render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '참석명단 제출하기' }));
+    expect(hoisted.submitMutate.mock.calls[0][0]).toMatchObject({ expectedVersion: 1 });
+
+    act(() => hoisted.submitMutate.mock.calls[0][1].onSuccess({
+      teamMatchId: 'tm-1', gameId: 'game-1', sideId: 'side-host', lineupId: 'submitted-lineup-2',
+      revision: 2, state: 'SUBMITTED', version: 1, replayed: false, publicLineupAt: futureIso(120),
+    }));
+    serveAndRerender(rerender, baseLineup({
+      lineupId: 'submitted-lineup-2', state: 'SUBMITTED', revision: 2, version: 1,
+      effectiveRosterSource: 'MANUAL', starters,
+    }));
+    fireEvent.click(screen.getByRole('button', { name: '김철수 참석명단에서 빼기' }));
+    fireEvent.click(screen.getByRole('button', { name: '다시 제출하기' }));
+
+    expect(hoisted.saveMutate).toHaveBeenCalledTimes(1);
+    expect(hoisted.saveMutate.mock.calls[0][0].payload).toMatchObject({
+      expectedVersion: 2,
+      participants: [expect.objectContaining({ userId: 'user-1' })],
+    });
+  });
+
   it('낸 명단에는 [저장]이 없고, 고칠 게 없으면 [변경 취소]·[제출 완료]가 모두 쉰다', () => {
     renderLineup(submittedLineup());
 
@@ -2122,7 +2177,7 @@ describe('TeamMatchLineupPageClient — 낸 뒤엔 다시 제출만 (Task 180 R-
     fireEvent.click(screen.getByRole('button', { name: '참석명단 제출하기' }));
     expect(hoisted.submitMutate).toHaveBeenCalledWith(expect.objectContaining({ expectedVersion: 4 }), expect.anything());
 
-    act(() => hoisted.submitMutate.mock.calls[0][1].onSuccess());
+    act(() => hoisted.submitMutate.mock.calls[0][1].onSuccess(submitReply(4)));
 
     expect(screen.queryByRole('button', { name: /^저장/ })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '변경 취소' })).toBeDisabled();
@@ -2139,7 +2194,7 @@ describe('TeamMatchLineupPageClient — 낸 뒤엔 다시 제출만 (Task 180 R-
     hoisted.useV1TeamMatchLineupMock.mockReturnValue({ data: draftLineup(), isLoading: false, isError: false, error: null, refetch: hoisted.refetchLineup });
     const { rerender } = render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
     fireEvent.click(screen.getByRole('button', { name: '참석명단 제출하기' }));
-    act(() => hoisted.submitMutate.mock.calls[0][1].onSuccess());
+    act(() => hoisted.submitMutate.mock.calls[0][1].onSuccess(submitReply(4)));
     expect(screen.getByRole('button', { name: '제출 완료' })).toBeDisabled();
 
     serveAndRerender(rerender, baseLineup({ state: 'DRAFT', revision: 5, version: 5, starters }));
@@ -2152,7 +2207,7 @@ describe('TeamMatchLineupPageClient — 낸 뒤엔 다시 제출만 (Task 180 R-
     hoisted.useV1TeamMatchLineupMock.mockReturnValue({ data: draftLineup(), isLoading: false, isError: false, error: null, refetch: hoisted.refetchLineup });
     const { rerender } = render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
     fireEvent.click(screen.getByRole('button', { name: '참석명단 제출하기' }));
-    act(() => hoisted.submitMutate.mock.calls[0][1].onSuccess());
+    act(() => hoisted.submitMutate.mock.calls[0][1].onSuccess(submitReply(4)));
 
     serveAndRerender(rerender, draftLineup());
 
@@ -2177,7 +2232,7 @@ describe('TeamMatchLineupPageClient — 낸 뒤엔 다시 제출만 (Task 180 R-
     fireEvent.click(screen.getByRole('button', { name: '홍길동을 골키퍼로 지정' }));
     fireEvent.click(screen.getByRole('button', { name: '참석명단 제출하기' }));
     act(() => hoisted.saveMutate.mock.calls[1][1].onSuccess({ revision: 7, state: 'DRAFT' }));
-    act(() => hoisted.submitMutate.mock.calls[0][1].onSuccess());
+    act(() => hoisted.submitMutate.mock.calls[0][1].onSuccess(submitReply(7)));
 
     expect(hoisted.submitMutate.mock.calls[0][0]).toMatchObject({ expectedVersion: 7 });
     expect(screen.getByRole('button', { name: '제출 완료' })).toBeDisabled();

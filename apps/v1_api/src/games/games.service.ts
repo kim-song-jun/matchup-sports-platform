@@ -35,6 +35,7 @@ import { OperationAuditWriterService } from '../common/audit/operation-audit-wri
 import { PrismaService } from '../prisma/prisma.service';
 import { persistCanonicalGameAggregate } from './game-source-aggregate';
 import { completeTeamMatchAtResultBoundary } from './team-match-result-boundary';
+import { freezeFriendlyEffectiveRoster, readFriendlyEffectiveRoster, writeFriendlyDefaultArrivals } from './roster/friendly-team-match-default-roster';
 import {
   parseLineupCatalog,
   parseLineupConfigForResponse,
@@ -44,11 +45,7 @@ import {
 import { FORFEIT_LOSER_SCORE, FORFEIT_WINNER_SCORE } from '../league-matches/league-forfeit-result';
 import { promoteLeagueOnGameActivityInTx } from '../league-matches/league-slot-status';
 import { assertPenaltyShootoutPersistable } from './core/penalty-shootout-outcome';
-import {
-  areLatestTeamMatchLineupsSubmitted,
-  isTeamMatchRosterDependentEventType,
-  latestTeamMatchLineupBySide,
-} from './core/team-match-lineup-window';
+import { isTeamMatchRosterDependentEventType } from './core/team-match-lineup-window';
 import { isCommandConcurrencyConflict } from './command-concurrency-error';
 import {
   assertBracketResolvable,
@@ -62,7 +59,7 @@ import {
   loadParticipantConsentEligibility,
 } from './public-records/public-consent';
 import { isPublicLiveEnabled } from './public-records/public-live-flag';
-import { effectivePublicVisibilityMode } from './public-records/public-visibility';
+import { effectivePublicVisibilityMode, isLineupPublished } from './public-records/public-visibility';
 import {
   loadParticipantNameProfiles,
   resolveParticipantDisplayName,
@@ -340,10 +337,28 @@ export function gameAuthorizationAction(action: string): GameAuthorizationAction
 
 /**
  * 팀에 묶인 액터 — 응답은 자기 팀 사이드로만 좁혀지고 스태프 취급을 받지 않는다.
- * 새 역할을 이 집합에 넣지 않으면 상대팀 라인업까지 보이는 쪽으로 기본값이 기운다.
+ * `support_readonly`는 대회 스태프와 팀 멤버가 공유하는 role이라 actor.teamId까지 확인하는
+ * `hasTeamScope`에서만 분류한다. role만 보는 다른 authorization/audit 소비자의 staff 경계를 보존한다.
  */
 export function isTeamScopedActorRole(role: string): boolean {
   return role === 'team_manager' || role === 'team_owner' || role === 'team_member';
+}
+
+function hasTeamScope(actor: { readonly role: string; readonly teamId?: string | null }): boolean {
+  return (isTeamScopedActorRole(actor.role) || actor.role === 'support_readonly') && typeof actor.teamId === 'string' && actor.teamId.length > 0;
+}
+
+/** Keep the operations participant lookup aligned with the existing event_append authority. */
+function canRecordHostTeamMatch(
+  actor: { readonly role: string; readonly teamId?: string | null },
+  hostTeamId: string | null,
+): boolean {
+  return actor.role === 'platform_ops' ||
+    (hostTeamId !== null && actor.teamId === hostTeamId && (actor.role === 'team_owner' || actor.role === 'team_manager'));
+}
+
+function requiresTeamScope(actor: { readonly role: string; readonly teamId?: string | null }): boolean {
+  return isTeamScopedActorRole(actor.role) || (actor.role === 'support_readonly' && actor.teamId !== undefined);
 }
 
 /**
@@ -806,6 +821,7 @@ async function appendIdentityEvent(
           | 'LEAGUE_ROSTER_SYNC'
           // 시작 전 대회 경기 명단을 다시 계산할 때(games/roster/game-roster-sync.ts).
           | 'TOURNAMENT_ROSTER_SYNC'
+          | 'FRIENDLY_DEFAULT_ROSTER_FROZEN'
           // 친선 팀 매치의 상대팀 신청이 승인되어 그 팀의 초기 라인업 스냅샷이
           // 자동 생성될 때(team-matches.service.ts hydrateApprovedAwaySnapshot).
           // 승인을 실행하는 사람은 호스트 팀장이라 그 이름으로 "이 사람은 상대팀의
@@ -868,6 +884,7 @@ export async function createRosterAssertedIdentityLink(
           | 'LINEUP_REVISION_COPY'
           | 'LEAGUE_ROSTER_SYNC'
           | 'TOURNAMENT_ROSTER_SYNC'
+          | 'FRIENDLY_DEFAULT_ROSTER_FROZEN'
           | 'TEAM_MATCH_AWAY_ROSTER_SYNC';
       },
   reason: string,
@@ -2027,7 +2044,8 @@ export class GamesService {
           isTeamMatchRosterDependentEventType(dto.type) &&
           (await this.resolveTeamMatchCompetitionContext(tx, game.teamMatchId)) === null
         ) {
-          await this.assertFriendlyTeamMatchLineupsReady(tx, game.id);
+          await this.assertFriendlyTeamMatchLineupsReady(tx, game.id, [dto.participantId, dto.assistParticipantId,
+            dto.type === V1GameEventType.SUBSTITUTION && typeof dto.payload.outParticipantId === 'string' ? dto.payload.outParticipantId : undefined]);
         }
         const references = await this.assertEventReferences(tx, game, dto);
         const sequence = game.lastSequence + 1;
@@ -2196,7 +2214,8 @@ export class GamesService {
             isTeamMatchRosterDependentEventType(dto.type) &&
             (await this.resolveTeamMatchCompetitionContext(tx, game.teamMatchId)) === null
           ) {
-            await this.assertFriendlyTeamMatchLineupsReady(tx, game.id);
+            await this.assertFriendlyTeamMatchLineupsReady(tx, game.id, [dto.participantId, dto.assistParticipantId,
+              dto.type === V1GameEventType.SUBSTITUTION && typeof dto.payload.outParticipantId === 'string' ? dto.payload.outParticipantId : undefined]);
           }
           const references = await this.assertEventReferences(tx, game, dto);
           const sequence = game.lastSequence + 1;
@@ -2574,30 +2593,26 @@ export class GamesService {
    * carries -- `V1GameParticipant` has no Prisma relation back to
    * `V1GameLineup` (see schema), so this is a second bounded query (by
    * `lineupId IN (...)`, not per-row N+1) rather than a nested `include`.
-   * Purely additive to the response shape: every field this method already
-   * returned is unchanged, `participants` is a new array appended per row.
+   * Lineup revisions/states remain unchanged. Untouched friendly defaults expose
+   * current qualified participants with the same IDs persisted by the first record.
    */
   async listLineups(user: V1AuthUser, gameId: string) {
-    const actor = await this.resolveActor(this.prisma, gameId, user.id, 'read');
-    // 참가팀 액터는 상대팀 라인업을 미리 볼 수 없다 — team-match 전용 라인업
-    // 서비스(getLineup)가 항상 ownSideId로만 조회하는 것과 동일한 공정성 원칙을
-    // 여기서도 지킨다. 스태프/platform_ops는 기존대로 양쪽 다 본다.
-    const ownSideId = isTeamScopedActorRole(actor.role)
-      ? (await this.prisma.v1GameSide.findFirst({ where: { gameId, teamId: actor.teamId } }))?.id ?? null
-      : null;
-    const lineups = await this.prisma.v1GameLineup.findMany({
-      where: { gameId, invalidatedAt: null, ...(ownSideId !== null ? { sideId: ownSideId } : {}) },
-      orderBy: [{ sideId: 'asc' }, { revision: 'desc' }],
-    });
-    const participants = await this.prisma.v1GameParticipant.findMany({
-      where: { lineupId: { in: lineups.map((lineup) => lineup.id) } },
-      orderBy: [{ jerseyNumber: 'asc' }, { createdAt: 'asc' }],
-    });
-    const participantsByLineupId = groupParticipantsByLineupId(participants);
-    return lineups.map((lineup) => ({
-      ...lineup,
-      participants: participantsByLineupId.get(lineup.id) ?? [],
-    }));
+    return this.prisma.$transaction(async (tx) => {
+      const actor = await this.resolveActor(tx, gameId, user.id, 'read');
+      if (requiresTeamScope(actor) && !hasTeamScope(actor)) throw this.forbidden();
+      const ownSideId = hasTeamScope(actor)
+        ? (await tx.v1GameSide.findFirst({ where: { gameId, teamId: actor.teamId } }))?.id ?? null
+        : null;
+      if (hasTeamScope(actor) && ownSideId === null) throw this.notFound('GAME_SIDE_NOT_FOUND');
+      const lineups = await tx.v1GameLineup.findMany({
+        where: { gameId, invalidatedAt: null, ...(ownSideId !== null ? { sideId: ownSideId } : {}) },
+        orderBy: [{ sideId: 'asc' }, { revision: 'desc' }],
+      });
+      const previewSideIds = this.authorizedPreviewSideIds(actor, ownSideId, lineups.map((lineup) => lineup.sideId));
+      const participants = await this.loadEffectiveLineupParticipants(tx, gameId, lineups, previewSideIds);
+      const participantsByLineupId = groupParticipantsByLineupId(participants);
+      return lineups.map((lineup) => ({ ...lineup, participants: participantsByLineupId.get(lineup.id) ?? [] }));
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
   }
 
   /**
@@ -2608,51 +2623,124 @@ export class GamesService {
    * 사이드만" 으로 대체 보존한다 — 킥오프 전 상대 전술을 미리 볼 수 없게.
    */
   async listOperationsLineups(user: V1AuthUser, gameId: string) {
-    const actor = await this.resolveActor(this.prisma, gameId, user.id, 'read');
-    const game = await this.prisma.v1Game.findUnique({ where: { id: gameId }, select: { state: true } });
-    if (game === null) {
-      throw this.notFound();
-    }
-    const ownSideId =
-      game.state === V1GameState.SCHEDULED && isTeamScopedActorRole(actor.role)
-        ? (await this.prisma.v1GameSide.findFirst({ where: { gameId, teamId: actor.teamId } }))?.id ?? null
+    return this.prisma.$transaction(async (tx) => {
+      const actor = await this.resolveActor(tx, gameId, user.id, 'read');
+      if (requiresTeamScope(actor) && !hasTeamScope(actor)) throw this.forbidden();
+      const game = await tx.v1Game.findUnique({ where: { id: gameId }, select: {
+        state: true,
+        visibilityPolicy: { select: { lineupAt: true } },
+        teamMatch: { select: { startAt: true, hostTeamId: true } },
+      } });
+      if (game === null) throw this.notFound();
+      const ownSideId = hasTeamScope(actor)
+        ? (await tx.v1GameSide.findFirst({ where: { gameId, teamId: actor.teamId } }))?.id ?? null
         : null;
-    const lineups = await this.prisma.v1GameLineup.findMany({
-      where: { gameId, invalidatedAt: null, ...(ownSideId !== null ? { sideId: ownSideId } : {}) },
-      orderBy: [{ sideId: 'asc' }, { revision: 'desc' }],
-    });
-    const participants = await this.prisma.v1GameParticipant.findMany({
-      where: { lineupId: { in: lineups.map((lineup) => lineup.id) } },
-      orderBy: [{ jerseyNumber: 'asc' }, { createdAt: 'asc' }],
-    });
-    const participantsByLineupId = groupParticipantsByLineupId(participants);
-    // 운영진에게만 실명·전화번호를 실어 보낸다. 다른 역할 응답에는 `identity` 키 자체가 없다 — null 이
-    // 아니라 "없음"이어야 팀 매니저 화면이 빈 값을 만들어 내지도, 어떤 값이 있는지 짐작하지도 못한다.
-    const identityByUserId = canViewParticipantIdentity(actor.role)
-      ? await this.loadParticipantIdentities(participants)
-      : null;
-    return lineups.map((lineup) => ({
-      ...lineup,
-      participants: (participantsByLineupId.get(lineup.id) ?? []).map((participant) =>
-        identityByUserId === null
+      if (hasTeamScope(actor) && ownSideId === null) throw this.notFound('GAME_SIDE_NOT_FOUND');
+      const lineups = await tx.v1GameLineup.findMany({
+        where: { gameId, invalidatedAt: null, ...(game.state === V1GameState.SCHEDULED && ownSideId !== null ? { sideId: ownSideId } : {}) },
+        orderBy: [{ sideId: 'asc' }, { revision: 'desc' }],
+      });
+      const previewSideIds = this.authorizedPreviewSideIds(actor, ownSideId, lineups.map((lineup) => lineup.sideId));
+      const teamScopedReader = hasTeamScope(actor) && ownSideId !== null;
+      const lineupPublished = game.teamMatch !== null && isLineupPublished(
+        { lineupAt: game.visibilityPolicy?.lineupAt ?? null, scheduledAt: game.teamMatch.startAt },
+        new Date(),
+      );
+      const canRecordPublishedOpponentDefaults = game.state === V1GameState.LIVE && lineupPublished &&
+        game.teamMatch !== null && canRecordHostTeamMatch(actor, game.teamMatch.hostTeamId);
+      const effectivePreviewSideIds = canRecordPublishedOpponentDefaults
+        ? new Set([...previewSideIds, ...lineups.map((lineup) => lineup.sideId)])
+        : previewSideIds;
+      const participants = await this.loadEffectiveLineupParticipants(
+        tx, gameId, lineups, effectivePreviewSideIds,
+        teamScopedReader ? { ownSideId, lineupPublished, canRecordPublishedOpponentDefaults } : null,
+      );
+      const participantsByLineupId = groupParticipantsByLineupId(participants);
+      const flatParticipants = lineups.flatMap((lineup) => participantsByLineupId.get(lineup.id) ?? []);
+      const identityByUserId = canViewParticipantIdentity(actor.role) ? await this.loadParticipantIdentities(tx, flatParticipants) : null;
+      return lineups.map((lineup) => ({
+        ...lineup,
+        participants: (participantsByLineupId.get(lineup.id) ?? []).map((participant) => identityByUserId === null
           ? participant
-          : {
-              ...participant,
-              identity: participant.userId === null ? null : (identityByUserId.get(participant.userId) ?? null),
-            },
-      ),
-    }));
+          : { ...participant, identity: participant.userId === null ? null : (identityByUserId.get(participant.userId) ?? null) }),
+      }));
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
+  }
+
+  private authorizedPreviewSideIds(
+    actor: { readonly role: string; readonly teamId?: string | null },
+    ownSideId: string | null,
+    visibleSideIds: readonly string[],
+  ): ReadonlySet<string> {
+    if (hasTeamScope(actor)) return new Set(ownSideId === null ? [] : [ownSideId]);
+    if (actor.role === 'platform_ops' || actor.role === 'tournament_director' || actor.role === 'field_operator' ||
+      (actor.role === 'support_readonly' && actor.teamId === undefined)) return new Set(visibleSideIds);
+    return new Set();
+  }
+
+  /** Read persisted rows and defaults from one repeatable snapshot; only authorized sides may expose previews. */
+  private async loadEffectiveLineupParticipants(
+    tx: Transaction,
+    gameId: string,
+    lineups: readonly { readonly id: string; readonly sideId: string; readonly revision: number; readonly state: V1GameLineupState; readonly invalidatedAt?: Date | null }[],
+    previewSideIds: ReadonlySet<string>,
+    teamReader: { readonly ownSideId: string; readonly lineupPublished: boolean; readonly canRecordPublishedOpponentDefaults?: boolean } | null = null,
+  ): Promise<V1GameParticipant[]> {
+    const lineupIds = lineups.map((lineup) => lineup.id);
+    const [persisted, effective] = await Promise.all([
+      tx.v1GameParticipant.findMany({
+        where: { lineupId: { in: [...lineupIds] } },
+        orderBy: [{ jerseyNumber: 'asc' }, { createdAt: 'asc' }],
+      }),
+      readFriendlyEffectiveRoster(tx, gameId),
+    ]);
+    const visibleLineupIds = new Set(lineupIds);
+    const defaultPreviewSides = effective?.sides.filter((side) =>
+      side.source === 'DEFAULT_PREVIEW' && side.lineup !== null && visibleLineupIds.has(side.lineup.id)) ?? [];
+    const defaultPreviewLineupIds = new Set(defaultPreviewSides.flatMap((side) => side.lineup === null ? [] : [side.lineup.id]));
+    const previews = defaultPreviewSides.filter((side) => previewSideIds.has(side.sideId));
+    const publishedOpponentLineupIds = new Set<string>();
+    if (teamReader?.lineupPublished === true) {
+      if (effective !== null) {
+        for (const side of effective.sides) {
+          if (side.sideId !== teamReader.ownSideId && side.lineup !== null &&
+            (side.source === 'MANUAL' ||
+              (teamReader.canRecordPublishedOpponentDefaults === true &&
+                (side.source === 'DEFAULT_PREVIEW' || side.source === 'DEFAULT_FROZEN')))) {
+            publishedOpponentLineupIds.add(side.lineup.id);
+          }
+        }
+      } else {
+        const latestLineupBySide = new Map<string, (typeof lineups)[number]>();
+        for (const lineup of lineups) {
+          if (lineup.invalidatedAt != null || (lineup.state !== V1GameLineupState.SUBMITTED && lineup.state !== V1GameLineupState.LOCKED)) continue;
+          const current = latestLineupBySide.get(lineup.sideId);
+          if (current === undefined || lineup.revision > current.revision) latestLineupBySide.set(lineup.sideId, lineup);
+        }
+        for (const [sideId, lineup] of latestLineupBySide) {
+          if (sideId !== teamReader.ownSideId) publishedOpponentLineupIds.add(lineup.id);
+        }
+      }
+    }
+    return [
+      ...persisted.filter((participant) => {
+        if (defaultPreviewLineupIds.has(participant.lineupId)) return false;
+        return teamReader === null || participant.sideId === teamReader.ownSideId || publishedOpponentLineupIds.has(participant.lineupId);
+      }),
+      ...previews.flatMap((side) => [...side.participants]),
+    ];
   }
 
   /** 참가자들의 계정(`userId`)을 한 번에 조회해 실명·전화번호를 모은다(N+1 금지). 탈퇴 회원은 싣지 않는다. */
   private async loadParticipantIdentities(
+    tx: Transaction,
     participants: readonly V1GameParticipant[],
   ): Promise<ReadonlyMap<string, GameParticipantIdentity>> {
     const userIds = Array.from(
       new Set(participants.map((participant) => participant.userId).filter((id): id is string => id !== null)),
     );
     if (userIds.length === 0) return new Map();
-    const users = await this.prisma.v1User.findMany({
+    const users = await tx.v1User.findMany({
       where: { id: { in: userIds }, deletedAt: null },
       select: { id: true, phone: true, profile: { select: { realName: true } } },
     });
@@ -2687,13 +2775,28 @@ export class GamesService {
     // 매니저/오너를 통과시킨다 — 명단 검인을 할 수 있어야 하는 사람과 정확히 같은 집합이다.
     const actor = await this.resolveActor(this.prisma, gameId, user.id, 'lineup_mutate');
     return this.prisma.$transaction(async (tx) => {
-      // 명단 재계산이 경기 행을 FOR UPDATE 로 잡고 새 리비전을 쓴다 — 같은 행을 잡아 그 앞이나 뒤에만 판정한다.
-      await tx.$queryRaw`SELECT id FROM v1_games WHERE id = ${gameId} FOR SHARE`;
+      // Serialize default arrival sequences with membership snapshots and first-record freeze.
+      await tx.$queryRaw`SELECT id FROM v1_games WHERE id = ${gameId} FOR UPDATE`;
+      const effective = await readFriendlyEffectiveRoster(tx, gameId);
+      const previewSide = effective?.sides.find((side) => side.source === 'DEFAULT_PREVIEW' && side.participants.some((row) => row.id === participantId));
+      if (effective !== null && previewSide !== undefined) {
+        const currentActor = await this.resolveActor(tx, gameId, user.id, 'lineup_mutate');
+        if ((currentActor.role === 'team_manager' || currentActor.role === 'team_owner') && currentActor.teamId !== previewSide.teamId) throw this.forbidden();
+        const result = await writeFriendlyDefaultArrivals(tx, effective, previewSide, [participantId], arrived, {
+          type: currentActor.role === 'platform_ops' ? 'PLATFORM_OPS' : 'TEAM_MANAGER', id: user.id,
+        });
+        const participant = result.participants.find((row) => row.id === participantId);
+        if (participant === undefined) throw this.notFound('GAME_PARTICIPANT_NOT_FOUND');
+        return participant;
+      }
       const participant = await tx.v1GameParticipant.findFirst({
         where: { id: participantId, gameId },
         select: { id: true, sideId: true, lineupId: true, arrivedAt: true },
       });
       if (participant === null) {
+        throw this.notFound('GAME_PARTICIPANT_NOT_FOUND');
+      }
+      if (effective?.sides.some((side) => side.sideId === participant.sideId && side.source === 'DEFAULT_PREVIEW')) {
         throw this.notFound('GAME_PARTICIPANT_NOT_FOUND');
       }
       // 팀 액터는 자기 팀 사이드만 검인할 수 있다 — saveLineup 과 같은 규칙이다.
@@ -2741,7 +2844,10 @@ export class GamesService {
   async confirmSideArrival(user: V1AuthUser, gameId: string, sideId: string) {
     const actor = await this.resolveActor(this.prisma, gameId, user.id, 'lineup_mutate');
     return this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM v1_games WHERE id = ${gameId} FOR SHARE`;
+      await tx.$queryRaw`SELECT id FROM v1_games WHERE id = ${gameId} FOR UPDATE`;
+      const effective = await readFriendlyEffectiveRoster(tx, gameId);
+      const previewSide = effective?.sides.find((row) => row.sideId === sideId && row.source === 'DEFAULT_PREVIEW');
+      const currentActor = previewSide === undefined ? actor : await this.resolveActor(tx, gameId, user.id, 'lineup_mutate');
       const side = await tx.v1GameSide.findFirst({
         where: { id: sideId, gameId },
         select: { id: true, teamId: true },
@@ -2749,8 +2855,14 @@ export class GamesService {
       if (side === null) {
         throw this.notFound('GAME_SIDE_NOT_FOUND');
       }
-      if ((actor.role === 'team_manager' || actor.role === 'team_owner') && actor.teamId !== side.teamId) {
+      if ((currentActor.role === 'team_manager' || currentActor.role === 'team_owner') && currentActor.teamId !== side.teamId) {
         throw this.forbidden();
+      }
+      if (effective !== null && previewSide !== undefined) {
+        const result = await writeFriendlyDefaultArrivals(tx, effective, previewSide, previewSide.participants.map((participant) => participant.id), true, {
+          type: currentActor.role === 'platform_ops' ? 'PLATFORM_OPS' : 'TEAM_MANAGER', id: user.id,
+        });
+        return { sideId, participantCount: previewSide.participants.length, newlyArrivedCount: result.changedCount };
       }
       const [lineups, participants] = await Promise.all([
         tx.v1GameLineup.findMany({
@@ -3199,9 +3311,11 @@ export class GamesService {
     ) {
       throw this.forbidden();
     }
-    const mySideId = isTeamScopedActorRole(actor.role)
+    if (requiresTeamScope(actor) && !hasTeamScope(actor)) throw this.forbidden();
+    const mySideId = hasTeamScope(actor)
       ? (sides.find((side) => side.teamId === actor.teamId)?.id ?? null)
       : null;
+    if (hasTeamScope(actor) && mySideId === null) throw this.notFound('GAME_SIDE_NOT_FOUND');
     // F61/F62: `isStaff`만으로는 SUPPORT_READONLY(조회 전용)와 실제로 lineup_mutate
     // 권한이 있는 스태프(field_operator/tournament_director/platform_ops)를 구분할 수
     // 없었다 — 그 결과 SUPPORT_READONLY도 매니저와 동일한 편집기를 받고 저장을 눌러야만
@@ -3220,7 +3334,7 @@ export class GamesService {
     return {
       gameId,
       mySideId,
-      isStaff: !isTeamScopedActorRole(actor.role),
+      isStaff: !hasTeamScope(actor),
       // F61/F62 fix: 프론트가 "조회 전용 스태프에게는 편집기를 열지 않는다"를 판단할 수
       // 있도록 실제 lineup_mutate 인가 결과를 노출한다. mySideId가 있는(=팀 매니저/오너)
       // 경우도 true다.
@@ -3560,7 +3674,7 @@ export class GamesService {
       },
       async (tx, game, context) => {
         await this.assertTeamMatchMatched(tx, game.teamMatchId);
-        if (isFriendlyTeamMatch) await this.assertFriendlyTeamMatchLineupsReady(tx, gameId);
+        if (isFriendlyTeamMatch) await this.assertFriendlyTeamMatchLineupsReady(tx, gameId, dto.actualParticipants.map((participant) => participant.participantId));
         // 친선 팀매치는 양 팀이 서로 다른 화면에서 명단을 관리하지만 결과 초안은
         // 호스트만 만든다. 클라이언트가 자기 팀 선수만 보내더라도 상대팀의 출전·승패
         // 기록이 사라지지 않도록, 사이드별 최신 유효 명단을 결과 참가자에 합친다.
@@ -5544,7 +5658,8 @@ export class GamesService {
       // numbers against the host; disputes belong to the existing result
       // approve/change_request decision surface, not a second event writer.
       const hostRole = managerRole(hostMembership);
-      if (hostRole === null || match.hostTeamId === null) {
+      if (hostRole === null || match.hostTeamId === null ||
+        !canRecordHostTeamMatch({ role: hostRole, teamId: match.hostTeamId }, match.hostTeamId)) {
         throw this.forbidden();
       }
       return {
@@ -5961,40 +6076,19 @@ export class GamesService {
     );
   }
 
-  private async assertFriendlyTeamMatchLineupsReady(tx: Transaction, gameId: string): Promise<void> {
-    const [sides, lineups] = await Promise.all([
-      tx.v1GameSide.findMany({ where: { gameId, teamId: { not: null } }, select: { id: true } }),
-      tx.v1GameLineup.findMany({
-        where: { gameId, invalidatedAt: null },
-        select: { id: true, sideId: true, revision: true, state: true },
-      }),
-    ]);
-    const sideIds = sides.map((side) => side.id);
-    const latestBySide = latestTeamMatchLineupBySide(lineups);
-    if (!areLatestTeamMatchLineupsSubmitted(sideIds, lineups)) {
+  private async assertFriendlyTeamMatchLineupsReady(tx: Transaction, gameId: string, participantIds: readonly (string | null | undefined)[] = []): Promise<void> {
+    const roster = await readFriendlyEffectiveRoster(tx, gameId);
+    if (roster === null || !roster.ready) {
       throw new ConflictException({
         code: 'ROSTER_INCOMPLETE',
-        message: '양 팀의 참석명단이 모두 제출되어야 경기 결과를 입력할 수 있어요.',
+        message: '양 팀의 출전 가능한 기본 명단 또는 제출 명단이 필요해요.',
       });
     }
-    const participantSides = new Set(
-      (await tx.v1GameParticipant.findMany({
-        where: {
-          gameId,
-          lineupId: { in: sideIds.flatMap((sideId) => {
-            const lineup = latestBySide.get(sideId);
-            return lineup === undefined ? [] : [lineup.id];
-          }) },
-        },
-        select: { sideId: true },
-      })).map((participant) => participant.sideId),
-    );
-    if (sides.length < 2 || sides.some((side) => !participantSides.has(side.id))) {
-      throw new ConflictException({
-        code: 'ROSTER_INCOMPLETE',
-        message: '양 팀의 참석명단이 모두 제출되어야 경기 결과를 입력할 수 있어요.',
-      });
+    const currentIds = new Set(roster.participants.map((participant) => participant.id));
+    if (participantIds.some((id) => id != null && !currentIds.has(id))) {
+      throw new UnprocessableEntityException({ code: 'PARTICIPANT_INVALID', message: '현재 출전 명단의 선수를 선택해 주세요.' });
     }
+    await freezeFriendlyEffectiveRoster(tx, roster);
   }
 
   private async nextGameRevisionNumber(tx: Transaction, gameId: string): Promise<number> {

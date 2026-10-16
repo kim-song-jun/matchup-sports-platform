@@ -48,8 +48,14 @@ git push origin <current-branch>  # 항상 현재 브랜치 (브랜치 생성/�
 gh pr edit <N> --add-reviewer copilot-pull-request-reviewer
 ```
 
-- ⚠️ REST `requested_reviewers`는 봇에 대해 **422 "not a collaborator"**로 실패. 반드시 위 `gh pr edit` (GraphQL requestReviewsByLogin 경로) 사용.
+- 공식 REST 요청도 지원한다. 2026-10-16 실제로 다음 요청이 접수되고 해당 head의 리뷰 workflow가 실행됐다. 이전의 “REST는 항상422” 관찰은 현재 절차가 아니다.
+  ```bash
+  gh api repos/<owner>/<repo>/pulls/<N>/requested_reviewers --method POST \
+    -f 'reviewers[]=copilot-pull-request-reviewer[bot]'
+  ```
+  `requested_reviewers` 응답 배열이 비어 있어도 접수될 수 있으므로 실제 workflow와 최신 head 리뷰를 확인한다. [GitHub 공식 문서](https://docs.github.com/en/copilot/how-tos/copilot-on-github/use-copilot-agents/copilot-code-review).
 - 리뷰는 **비동기 ~3–8분 후** 도착. 새 코드 push마다 재요청.
+- `429 rate_limit` 또는 모델 세션 생성 실패는 리뷰가 아니다. 오류의 재설정 시각·run·head를 기록하고 그 시각 전 반복 요청하지 않는다. 모델·계정·요금제·머지 규칙 변경이나 이전 head/독립 리뷰로 최신 Copilot clean을 대체하지 않는다. 재개 후에도 §2.2-a의 다섯 게이트를 적용한다.
 
 ### 2.2 도착 폴링 (백그라운드)
 

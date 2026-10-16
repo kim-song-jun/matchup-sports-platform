@@ -657,6 +657,7 @@ describe('GamesService.confirmSideArrival', () => {
   } = {}) {
     const tx = {
       $queryRaw: jest.fn().mockResolvedValue([]),
+      v1Game: { findUnique: jest.fn().mockResolvedValue({ teamMatch: null }) },
       v1GameSide: {
         findFirst: jest.fn().mockResolvedValue(
           options.side === undefined ? { id: 'side-home', teamId: 'team-home' } : options.side,
@@ -866,8 +867,8 @@ describe('GamesService.listOperationsLineups — 운영진 전용 본인 확인 
   const USER = { id: 'user-1' } as V1AuthUser;
 
   function build(role: string) {
-    const prisma = {
-      v1Game: { findUnique: jest.fn().mockResolvedValue({ state: V1GameState.LIVE }) },
+    const transactionClient = {
+      v1Game: { findUnique: jest.fn().mockResolvedValue({ state: V1GameState.LIVE, teamMatch: null }) },
       v1GameSide: { findFirst: jest.fn().mockResolvedValue({ id: 'side-home' }) },
       v1GameLineup: {
         findMany: jest.fn().mockResolvedValue([{ id: 'lineup-1', sideId: 'side-home', revision: 1, state: 'SUBMITTED' }]),
@@ -884,6 +885,10 @@ describe('GamesService.listOperationsLineups — 운영진 전용 본인 확인 
           { id: 'user-a', phone: '01030101000', profile: { realName: ' 김철수 ' } },
         ]),
       },
+    };
+    const prisma = {
+      ...transactionClient,
+      $transaction: jest.fn(async (callback: (tx: typeof transactionClient) => Promise<unknown>) => callback(transactionClient)),
     };
     const service = new GamesService(prisma as never, {} as never, {} as never);
     jest.spyOn(service as never, 'resolveActor' as never).mockResolvedValue({ role, teamId: 'team-home' } as never);

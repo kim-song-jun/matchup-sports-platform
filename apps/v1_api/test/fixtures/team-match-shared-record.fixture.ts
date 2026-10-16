@@ -4,7 +4,11 @@ import { FUTSAL_V1_CONFIG } from '../../src/tournaments/competition-config/compe
 import { competitionConfigContentHash } from '../../src/tournaments/competition-config/competition-config.validator';
 
 /** Fresh, isolated friendly game with ordinary players on both submitted lineups. No global seed/reset. */
-export async function createSharedRecordFixture(prisma: PrismaClient, startsInMs = -30 * 60_000) {
+export async function createSharedRecordFixture(
+  prisma: PrismaClient,
+  startsInMs = -30 * 60_000,
+  options: { readonly lineupState?: 'DRAFT' | 'SUBMITTED' } = {},
+) {
   const userIds = Array.from({ length: 5 }, () => randomUUID());
   const names = ['김민수', '박지훈', '이서준', '최도윤', '관람 사용자'];
   for (const [i, id] of userIds.entries()) await prisma.v1User.create({ data: {
@@ -33,7 +37,11 @@ export async function createSharedRecordFixture(prisma: PrismaClient, startsInMs
   for (let i = 0; i < 2; i++) {
     const side = await prisma.v1GameSide.create({ data: { gameId: game.id, sideKey: i === 0 ? 'HOME' : 'AWAY', teamId: teams[i].id, displayNameSnapshot: teams[i].name } });
     sides.push(side);
-    const lineup = await prisma.v1GameLineup.create({ data: { gameId: game.id, sideId: side.id, revision: 1, state: 'SUBMITTED', submittedAt: new Date() } });
+    const lineup = await prisma.v1GameLineup.create({ data: {
+      gameId: game.id, sideId: side.id, revision: 1,
+      state: options.lineupState ?? 'SUBMITTED',
+      submittedAt: options.lineupState === 'DRAFT' ? null : new Date(),
+    } });
     for (let j = 0; j < 2; j++) participants.push(await prisma.v1GameParticipant.create({ data: { gameId: game.id, sideId: side.id, lineupId: lineup.id, userId: userIds[i * 2 + j], displayNameSnapshot: names[i * 2 + j], jerseyNumber: j === 0 ? 7 : 10 } }));
   }
   await prisma.v1GameVisibilityPolicy.create({ data: { gameId: game.id, mode: 'LIVE' } });

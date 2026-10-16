@@ -66,7 +66,9 @@ export interface LeagueFixtureTeam {
   id: string;
   name: string;
   memberships: Array<{ id: string; userId: string; user: { profile: ParticipantProfile | null } }>;
-  /** 이 리그의 참가 명단(confirmed 신청에서 제외되지 않은 선수). 비어 있으면 명단 미제출이다. */
+  /** 제거된 선수를 포함한 등록 행 수. 전원 제거한 등록과 한 번도 등록하지 않은 팀을 구분한다. */
+  readonly registeredPlayerCount: number;
+  /** 이 리그의 현재 참가 명단(confirmed 신청에서 제외되지 않은 선수). */
   registeredPlayers: Array<{
     id: string;
     userId: string;
@@ -135,7 +137,7 @@ export function leagueTeamRosterEntries(team: LeagueFixtureTeam, goalkeeperCode 
  * false 라 여전히 userId 가 실리지 않는다(위 주석의 이유 그대로).
  */
 export function leagueTeamRosterBase(team: LeagueFixtureTeam): GameRosterBaseEntry[] {
-  if (team.registeredPlayers.length > 0) {
+  if (team.registeredPlayerCount > 0) {
     return team.registeredPlayers.map((player) => ({
       userId: player.userId,
       accountLinked: true,
@@ -236,6 +238,7 @@ export async function readLeagueTeamRosters(
     where: { tournamentId: leagueId, teamId: { in: [...teamIds] }, status: 'confirmed' },
     select: {
       teamId: true,
+      _count: { select: { players: true } },
       players: {
         where: { removedAt: null },
         orderBy: { id: 'asc' },
@@ -243,9 +246,16 @@ export async function readLeagueTeamRosters(
       },
     },
   });
-  const playersByTeam = new Map(registrations.map((row) => [row.teamId, row.players]));
+  const registrationByTeam = new Map(registrations.map((row) => [row.teamId, row]));
   return new Map(
-    teams.map((team) => [team.id, { ...team, registeredPlayers: playersByTeam.get(team.id) ?? [] }]),
+    teams.map((team) => {
+      const registration = registrationByTeam.get(team.id);
+      return [team.id, {
+        ...team,
+        registeredPlayerCount: registration?._count.players ?? 0,
+        registeredPlayers: registration?.players ?? [],
+      }] as const;
+    }),
   );
 }
 

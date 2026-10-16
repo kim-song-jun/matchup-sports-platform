@@ -94,3 +94,11 @@ Status: Review. Canonical task는 이 문서이며 같은 번호의 schedule/sta
 - 새 nullable 컬럼만 채우고 원본 이미지·업로드·일반 대회·다른 컬럼은 보존하는 기존 SQL을 검토했다. 정확한 (파일, 정규화 SQL) 한 쌍에만 롤링 배포/애플리케이션 롤백 호환 근거를 등록했다. migration SQL과 일반 additivity 판정은 변경하지 않았다.
 - self-test에 실제 migration 승인 및 다른 파일/리그 종류/목적 컬럼의 거절 대조군을 추가했다. self-test 전체 PASS, 실제 origin/dev→PR head 게이트 RED→GREEN, diff check PASS, 새 debt marker 0. 제품 코드는 변경하지 않아 이미 green인 API/Web 전체 검증을 로컬에서 반복하지 않았다.
 - #1957 확인: 최신 head `7f618a2d6`의 Gates/API/Web SUCCESS, PR open·미머지, 제출된 리뷰 0건, 자동 리뷰 작업 failure. Alpha health의 실제 commit=`ebfac9aeecbcca0a33b435d514d828aa76052dc9`, release=`1.9.5-alpha.20261016.gebfac9aeecbc`, DB=true. #1957 미배포이므로 새 홈·어웨이 관리자 저장 및 390/768/1440 after QA를 현재 alpha에서 완료했다고 주장하지 않는다.
+
+### 사용자 승인 순차 dev/alpha 반영 (2026-10-16)
+- 사용자 “그렇게 진행해줘” 승인: #1957 dev 반영/alpha 확인 → #1955 최신 dev 통합·결합 스키마 검증 → CI 후 두 번째 반영 → alpha QA. main 승격은 범위 밖이다. 자동 Copilot 실행 실패는 계속 기록하며 clean 리뷰로 표시하지 않는다.
+- #1957: 승인된 head와 같은 Git tree의 dev 병합 커밋 `9cd5777aad24981262e4d67fa2fabc249c1f4586`; GitHub PR Merged 확인. dev CI=`38913930851`, alpha=`38913931180` 실행 중. 로컬 dev를 내용 원복 없이 stat refresh 후 ff-only 동기화했으며 원본 바이트는 `tmp/dev-sync-1957-backup`에 보존했다.
+- #1955: 위 dev를 통합하며 충돌 6개 해소. listImageUrl/byeSortOrder와 두 migration의 검토 기록을 모두 보존했다. 결합 LF schema SHA=`889825d76c637af8da4caa57542578363b8d08c6bec6a0eb43813c2416445f78`를 Docker/fixture/binder/manifest에 반영하고 이전 두 PR 해시의 manifest 허용도 유지했다.
+- 결합 검증: API6 suites300 tests, Web3 files24 tests, API/Web tsc PASS. 안전 게이트 self-test(실제 이미지 migration·부정 대조군 포함), LF 바인딩7개 및 실제 manifest 생성 self-test PASS. 자동 생성 클라이언트는 격리 작업트리에서만 갱신했다.
+- 사용자 로그인 후 별도 headed Chrome에서 `/api/v1/admin/me`200·ops 확인. 브라우저 helper PID20016/parent10548, Chrome8648. alpha after QA는 실제 배포 SHA 확인 후 실행한다.
+- 남은 단계: 결합 head PR CI → #1957 alpha 성공/실측 → #1955 dev 반영·로컬 동기화 → 두 번째 alpha/관리자 저장·제거 및 공개 화면390/768/1440 QA → owned 브라우저 cleanup.

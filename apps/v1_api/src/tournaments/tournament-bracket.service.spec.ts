@@ -821,7 +821,7 @@ describe('TournamentBracketService', () => {
         prisma.v1TournamentGroupTeam.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({ ...placed, registrationId: 'reg-B' }); // 중복 검사 → 위임 뒤 재조회
         const result = await service.createBye(ownerUser, 'tournament-1', { groupId: 'group-1', byeId: 'gt-1', sortOrder: 0, registrationId: 'reg-B' });
         expect(mockAssignSlotInTx).toHaveBeenCalledWith(expect.anything(), expect.anything(), 'slot-bye-1', 'reg-B');
-        expect(prisma.v1TournamentSlot.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { groupId: 'group-1', kind: 'BYE', position: 1 } }));
+        expect(prisma.v1TournamentSlot.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { groupId: 'group-1', kind: 'BYE', byeSortOrder: 0 } }));
         expect(prisma.v1TournamentGroupTeam.update).not.toHaveBeenCalled();
         expect(result).toMatchObject({ id: 'gt-1', registrationId: 'reg-B', isBye: true, sortOrder: 0 });
       });
@@ -832,6 +832,21 @@ describe('TournamentBracketService', () => {
         expect(mockAssignSlotInTx).toHaveBeenCalledWith(expect.anything(), expect.anything(), 'slot-bye-1', null);
         expect(prisma.v1TournamentGroupTeam.delete).not.toHaveBeenCalled();
         expect(result).toMatchObject({ id: 'gt-1', registrationId: null, isBye: true, sortOrder: 0 });
+      });
+      it.each([1, 2, 3, 5, 6])('홈·어웨이 교환 후 표시 위치 %i에서도 연결된 자리로 팀 변경을 위임한다', async (sortOrder) => {
+        const moved = { ...placed, sortOrder };
+        prisma.v1TournamentGroupTeam.findMany.mockResolvedValue([moved]);
+        prisma.v1TournamentSlot.findFirst.mockImplementation(async ({ where }) =>
+          where.byeSortOrder === sortOrder ? linkedSlot : null);
+        prisma.v1TournamentGroupTeam.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({ ...moved, registrationId: 'reg-B' });
+
+        const result = await service.createBye(ownerUser, 'tournament-1', {
+          groupId: 'group-1', byeId: 'gt-1', sortOrder, registrationId: 'reg-B',
+        });
+
+        expect(mockAssignSlotInTx).toHaveBeenCalledWith(expect.anything(), expect.anything(), linkedSlot.id, 'reg-B');
+        expect(prisma.v1TournamentGroupTeam.update).not.toHaveBeenCalled();
+        expect(result).toMatchObject({ registrationId: 'reg-B', sortOrder });
       });
       it('연결된 부전승을 다른 위치로 옮기면 409 SLOT_LINKED 이고 아무것도 바꾸지 않는다', async () => {
         await expect(service.createBye(ownerUser, 'tournament-1', { groupId: 'group-1', byeId: 'gt-1', sortOrder: 3, registrationId: 'reg-A' }))
@@ -2854,7 +2869,7 @@ describe('TournamentBracketService', () => {
         }));
         prisma.v1TournamentSlot.findFirst.mockResolvedValue({ id: 'slot-bye-2' });
         await expect(service.removeGroupTeam(ownerUser, 'gt-1')).rejects.toMatchObject({ response: { code: 'SLOT_LINKED' } });
-        expect(prisma.v1TournamentSlot.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { groupId: 'group-1', kind: 'BYE', position: 2 } }));
+        expect(prisma.v1TournamentSlot.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { groupId: 'group-1', kind: 'BYE', byeSortOrder: 3 } }));
         expect(prisma.v1TournamentGroupTeam.delete).not.toHaveBeenCalled();
       });
 
@@ -3270,7 +3285,7 @@ describe('TournamentBracketService', () => {
 
   describe('getBracket — 자리·게임 블록', () => {
     const slotRow = (overrides: Record<string, unknown>) => ({
-      id: 'slot-x', tournamentId: 'tournament-1', kind: 'ENTRY', groupId: null, position: 1, sourceGroupId: null, registrationId: null,
+      id: 'slot-x', tournamentId: 'tournament-1', kind: 'ENTRY', groupId: null, position: 1, byeSortOrder: null, sourceGroupId: null, registrationId: null,
       createdAt: new Date('2026-06-14T00:00:00Z'), updatedAt: new Date('2026-06-14T00:00:00Z'),
       group: null, sourceGroup: null, registration: null, ...overrides,
     });
@@ -3292,8 +3307,8 @@ describe('TournamentBracketService', () => {
       const result = await service.getBracket(ownerUser, 'tournament-1');
 
       expect(result.slots).toEqual([
-        { id: 'slot-1', kind: 'ENTRY', groupId: 'group-1', sourceGroupId: null, position: 1, label: 'A조 1번', registrationId: 'reg-1', teamName: '서울 FC' },
-        { id: 'slot-2', kind: 'GROUP_RANK', groupId: 'group-f', sourceGroupId: 'group-1', position: 1, label: 'A조 1위', registrationId: null, teamName: null },
+        { id: 'slot-1', kind: 'ENTRY', groupId: 'group-1', sourceGroupId: null, position: 1, byeSortOrder: null, label: 'A조 1번', registrationId: 'reg-1', teamName: '서울 FC' },
+        { id: 'slot-2', kind: 'GROUP_RANK', groupId: 'group-f', sourceGroupId: 'group-1', position: 1, byeSortOrder: null, label: 'A조 1위', registrationId: null, teamName: null },
       ]);
       expect(prisma.v1TournamentSlot.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { tournamentId: 'tournament-1' } }));
     });

@@ -17,6 +17,7 @@ export type AdminBracketSlot = {
   groupId: string | null;
   sourceGroupId: string | null;
   position: number;
+  byeSortOrder: number | null;
   label: string;
   registrationId: string | null;
   teamName: string | null;
@@ -29,6 +30,7 @@ export function serializeAdminBracketSlot(row: AdminBracketSlotRow): AdminBracke
     groupId: row.groupId,
     sourceGroupId: row.sourceGroupId,
     position: row.position,
+    byeSortOrder: row.byeSortOrder ?? null,
     label: slotLabelFromRow(row),
     registrationId: row.registrationId,
     teamName: row.registration?.team.name ?? null,

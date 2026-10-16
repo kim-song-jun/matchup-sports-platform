@@ -76,9 +76,15 @@ export function buildBracketGraph(rounds: BracketGraphRound[], groups: V1Tournam
     });
     return { nodes, edges, height };
   }
-  // Traverse each destination backwards in HOME/AWAY order. Every pair shares
-  // its own junction; there is no common spine connecting unrelated matches.
+  // Stored entry order is canonical. Connections determine the centres of
+  // later rounds, never silently reorder the first-round matches/byes.
   let cursor = 0;
+  for (const node of [...nodes].filter((candidate) => !edges.some((edge) => edge.target === candidate.id))
+    .sort((a, b) => rank.get(a.id)! - rank.get(b.id)!)) {
+    const height = node.bye ? 80 : 144;
+    node.y = cursor + height / 2;
+    cursor += height;
+  }
   const visited = new Set<string>();
   const position = (node: BracketGraphNode): number => {
     if (visited.has(node.id)) return node.y;
@@ -87,19 +93,11 @@ export function buildBracketGraph(rounds: BracketGraphRound[], groups: V1Tournam
     if (parents.length) {
       const ys = parents.map(position);
       node.y = (Math.min(...ys) + Math.max(...ys)) / 2;
-    } else {
-      const height = node.bye ? 80 : 144;
-      node.y = cursor + height / 2;
-      cursor += height;
     }
     return node.y;
   };
-  const rootRank = (node: BracketGraphNode): number => {
-    const parents = edges.filter((edge) => edge.target === node.id).map((edge) => byId.get(edge.source)!);
-    return parents.length ? Math.min(...parents.map(rootRank)) : rank.get(node.id)!;
-  };
   const roots = nodes.filter((node) => !edges.some((edge) => edge.source === node.id));
-  roots.sort((a, b) => rootRank(a) - rootRank(b)).forEach(position);
+  roots.forEach(position);
   return { nodes, edges, height: Math.max(cursor, 144) };
 }
 

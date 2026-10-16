@@ -4,6 +4,8 @@
 
 # Teameet v1 API contracts
 
+12강 부전승 홈·어웨이 교환은 [Tournaments 계약](./domains/tournaments.md)의 `PUT /admin/tournament-slots/:slotId/bye-side`를 따른다. 저장 배치와 승자 연결을 함께 변경한다.
+
 Ordinary team-match period rules (MD-QA #141): host-authorized defaults, separate single/two-period selection, immutable pins and pre-play edit gates are documented in [team matches](./domains/team-matches.md#ordinary-team-match-period-rules-md-qa-141).
 
 Public competition overall standings include nullable `teamLogoUrl` under the existing team-identity visibility gate; see [tournaments](./domains/tournaments.md#overall-standings--two-competition-kinds-two-row-shapes).

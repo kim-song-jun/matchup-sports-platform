@@ -24,6 +24,11 @@ function build(admin: ReturnType<typeof adminRow> | null) {
 }
 
 describe('TournamentSlotService.assignSlot 권한·존재 확인', () => {
+  it.each([adminRow('support'), null])('부전승 위치도 쓰기 권한 없으면 조회 전에 거절한다', async (admin) => {
+    const { prisma, service } = build(admin);
+    await expect(service.setByeSide(user, 's-1', 'AWAY', 'HOME')).rejects.toMatchObject({ response: { code: 'PERMISSION_DENIED' } });
+    expect(prisma.v1TournamentSlot.findUnique).not.toHaveBeenCalled();
+  });
   it('support 어드민은 403 이고 자리 조회나 트랜잭션에 닿지 않는다', async () => {
     const { prisma, service } = build(adminRow('support'));
     await expect(service.assignSlot(user, 's-1', null)).rejects.toMatchObject({ response: { code: 'PERMISSION_DENIED' } });

@@ -593,7 +593,8 @@ export const gameSchemaSourceManifest = {
   // game models and the bound historical migration are unchanged. DB replay awaits CI.
   // 2026-10-16: nullable V1Tournament.listImageUrl, backed by
   // 20261016070000_league_list_image. Historical game migration stays unchanged.
-  schema: '1f217e10790894fd23fb206aa4b8693c9fb8c35ceadd2e99e60a4a5731b33970',
+  // Combined with PR #1957 nullable V1TournamentSlot.byeSortOrder.
+  schema: '889825d76c637af8da4caa57542578363b8d08c6bec6a0eb43813c2416445f78',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

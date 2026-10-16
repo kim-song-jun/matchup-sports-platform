@@ -49,6 +49,37 @@ const REVIEWED_NON_ADDITIVE = [
     reason: 'PR #1955 (2026-10-16): initialize only the nullable list_image_url column added immediately before this UPDATE in the same migration. Existing regular-league images must initially serve both list and detail. The source cover_image_url, uploaded files, tournament rows and every pre-existing column are unchanged; leagues without an image remain NULL. Older application instances ignore list_image_url and continue reading/writing cover_image_url, so this one-time copy does not prevent an application rollback. Subsequent PATCH requests deliberately edit only the supplied image field. This exact file/statement was verified by the real migration image-preservation integration test in API CI 38907223065; do not allow arbitrary UPDATE statements or edits to the migration.',
   },
   {
+    file: "apps/v1_api/prisma/migrations/20261016090000_bye_side_layout/migration.sql",
+    statement: "CREATE TEMP TABLE bye_layout_mapping ON COMMIT DROP AS SELECT s.id, s.group_id, (ARRAY[0,3,4,7])[s.position] AS old_order, (s.position - 1) * 2 + CASE WHEN m.away_slot_id = s.id THEN 1 ELSE 0 END AS new_order FROM v1_tournament_slots s JOIN v1_tournament_groups g ON g.id = s.group_id AND g.phase = 'round12' JOIN v1_team_matches m ON (m.home_slot_id = s.id OR m.away_slot_id = s.id) AND m.deleted_at IS NULL WHERE s.kind = 'BYE' AND s.position BETWEEN 1 AND 4",
+    reason: "PR #1957: snapshots only round12 BYE slot identities and persisted nondeleted fixture sides in a connection-local TEMP table. ON COMMIT DROP removes the mapping; no persistent table, competition, opponent, result or advancement edge is changed.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20261016090000_bye_side_layout/migration.sql",
+    statement: "UPDATE v1_tournament_slots s SET bye_sort_order = b.new_order FROM bye_layout_mapping b WHERE s.id = b.id",
+    reason: "PR #1957: backfills only newly added nullable bye_sort_order from that exact source-slot mapping. Existing slot IDs, positions, registrations and fixture edges are unchanged; older readers ignore the additive column.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20261016090000_bye_side_layout/migration.sql",
+    statement: "UPDATE v1_tournament_bye_slots r SET sort_order = -100 - b.new_order FROM bye_layout_mapping b WHERE r.group_id = b.group_id AND r.sort_order = b.old_order",
+    reason: "PR #1957: stages only mapped empty BYE display coordinates at negative positions to avoid group/order unique collisions. No row is deleted and no identity, team, opponent, result or advancement edge changes. The transaction commits only after both final-coordinate updates succeed.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20261016090000_bye_side_layout/migration.sql",
+    statement: "UPDATE v1_tournament_group_teams r SET sort_order = -100 - b.new_order FROM bye_layout_mapping b WHERE r.group_id = b.group_id AND r.is_bye AND r.sort_order = b.old_order",
+    reason: "PR #1957: stages only mapped is_bye group-team display coordinates. Registration IDs, ordinary group members and fixture/result/advancement data are preserved; any failed final placement rolls back all staging.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20261016090000_bye_side_layout/migration.sql",
+    statement: "UPDATE v1_tournament_bye_slots r SET sort_order = b.new_order FROM bye_layout_mapping b WHERE r.group_id = b.group_id AND r.sort_order = -100 - b.new_order",
+    reason: "PR #1957: finalizes only exact staged empty BYE display coordinates from persisted HOME/AWAY fixture links, preserving IDs and opponents. This user-requested layout correction needs the matching API: earlier APIs read arbitrary sort_order but fixed-index BYE assignment writers must not be restored after backfill; use a forward fix.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20261016090000_bye_side_layout/migration.sql",
+    statement: "UPDATE v1_tournament_group_teams r SET sort_order = b.new_order FROM bye_layout_mapping b WHERE r.group_id = b.group_id AND r.is_bye AND r.sort_order = -100 - b.new_order",
+    reason: "PR #1957: finalizes only mapped is_bye group-team display coordinates in the same transaction as empty positions and slot backfill. Registrations, slot/fixture IDs, opponents, results and advancement edges are unchanged. Earlier fixed-index BYE assignment writers must not be restored after conversion; deploy the matching API or a forward fix.",
+  },
+
+  {
     file: "apps/v1_api/prisma/migrations/20261015180000_v1_league_optional_team_capacity/migration.sql",
     statement: 'ALTER TABLE "v1_tournaments" ADD CONSTRAINT "v1_tournaments_max_teams_positive" CHECK ("max_teams" IS NULL OR "max_teams" > 0)',
     reason: 'MD-QA #145 adds nullable v1_tournaments.max_teams INTEGER immediately before this CHECK in the same migration, without DEFAULT, NOT NULL, or backfill. Pre-existing rows therefore have NULL, which this exact positive-or-NULL predicate accepts; old application writes omit the new column and remain compatible, including application rollback. The CHECK reads no pre-existing column, preserves NULL as unlimited and all positive capacities, and rejects zero or negative values even through direct SQL writes that bypass DTO validation. Keep the constraint and SQL unchanged.',

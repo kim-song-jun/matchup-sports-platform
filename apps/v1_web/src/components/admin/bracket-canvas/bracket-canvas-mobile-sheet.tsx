@@ -23,6 +23,7 @@ import { TEAM_IN_OTHER_GROUP_HIDDEN_NOTE, applyGroupRule, registrationIdsBlocked
 import type { V1AdminBracketFixture, V1AdminBracketGroup, V1AdminBracketSlot } from '@/types/api';
 import { BracketQuickResultForm } from './bracket-quick-result-form';
 import { BracketResultActions } from './bracket-result-actions';
+import { ByeSideControl } from './bye-side-control';
 import type { RegistrationsLoadState } from './bracket-team-tray';
 import { useLeagueResultToast } from './use-league-result-toast';
 
@@ -410,6 +411,10 @@ export function MobileNodeSheetBody(props: MobileNodeSheetBodyProps) {
         <SideRow label="어웨이" side={node.away} canPick={pickKind(node.away) !== null} onPick={() => onViewChange({ kind: 'pick', side: 'AWAY' })} />
       </ul>
       {hasRankSlot ? <Note>조 순위가 정해지면 큰 화면에서 순위대로 채워요.</Note> : null}
+      {scope === 'tournament' && props.fixtures?.find((fixture) => fixture.id === node.fixtureId) ? (
+        <ByeSideControl tournamentId={props.competitionId} fixture={props.fixtures.find((fixture) => fixture.id === node.fixtureId)!}
+          slots={props.slots} canWrite={canWrite} showToast={props.showToast} onSaved={props.onDone} />
+      ) : null}
       {canWrite && node.state !== 'cancelled' ? <MobileFieldSetting key={node.fixtureId} {...props} /> : null}
       <ResultSection {...props} />
     </div>

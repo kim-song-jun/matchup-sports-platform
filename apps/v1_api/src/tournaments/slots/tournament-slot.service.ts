@@ -12,6 +12,7 @@ import { assertNotInOtherGroupInTx, assignTournamentFixtureSideInTx, releaseUnus
 import { adminBracketSlotInclude, serializeAdminBracketSlot } from './admin-bracket-view';
 import { ALL_COMPETITION_KINDS, findTournamentOnSurface } from '../tournament-surface-lookup';
 import { syncByeSlotInTx } from './bye-slot-sync';
+import { setByeSideInTx } from './bye-side';
 import { lockCompetitionForBracketMutationInTx, lockCompetitionForSlotReleaseInTx } from './competition-bracket-lock';
 import { fillSlotsFromStandings, previewGroupRankStandings, type FillOverride } from './group-rank-fill';
 import { pickRandomAssignments } from './random-assignment';
@@ -97,7 +98,7 @@ async function assignSlotCore(
 ): Promise<{ tournamentId: string; fixtureIds: string[] }> {
   const slot = await tx.v1TournamentSlot.findUnique({
     where: { id: slotId },
-    select: { id: true, tournamentId: true, kind: true, groupId: true, position: true, registrationId: true },
+    select: { id: true, tournamentId: true, kind: true, groupId: true, position: true, byeSortOrder: true, registrationId: true },
   });
   if (slot === null) throw slotNotFound();
   const competition = await findTournamentOnSurface(tx, ALL_COMPETITION_KINDS, {
@@ -289,6 +290,17 @@ export class TournamentSlotService {
       const affectedTeamMatchIds = await assignSlotInTx(tx, this.context(admin), slotId, registrationId);
       const row = await tx.v1TournamentSlot.findUniqueOrThrow({ where: { id: slotId }, include: adminBracketSlotInclude });
       return { slot: serializeAdminBracketSlot(row), affectedTeamMatchIds };
+    }, SLOT_TRANSACTION_OPTIONS);
+  }
+
+  async setByeSide(user: V1AuthUser, slotId: string, side: 'HOME' | 'AWAY', expectedSide: 'HOME' | 'AWAY') {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const slot = await this.prisma.v1TournamentSlot.findUnique({ where: { id: slotId }, select: { tournamentId: true } });
+    if (!slot) throw slotNotFound();
+    const competition = await this.loadCompetition(this.prisma, slot.tournamentId);
+    return this.prisma.$transaction(async (tx) => {
+      await lockCompetitionForBracketMutationInTx(tx, competition);
+      return setByeSideInTx(tx, this.context(admin), competition.id, slotId, side, expectedSide);
     }, SLOT_TRANSACTION_OPTIONS);
   }
 

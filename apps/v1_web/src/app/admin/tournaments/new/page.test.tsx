@@ -271,6 +271,29 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
     });
   });
 
+  it.each([
+    ['group_knockout', 'league', '대회 리그전', '풀리그', '결선 진출'],
+    ['league', 'knockout', '토너먼트만', '대진 편성', '순위 집계'],
+    ['knockout', 'group_knockout', '조별리그 + 토너먼트', '결선 진출', '순위 집계'],
+  ] as const)('초안의 %s를 %s로 바꾸면 저장 전 공개 확인을 건너뛸 수 없다', async (savedFormat, nextFormat, radioLabel, expectedStep, absentStep) => {
+    searchParamsValue = new URLSearchParams('draftId=draft-1');
+    useV1AdminTournamentMock.mockReturnValue({ data: fakeDraftTournament({ format: savedFormat, registrationDeadlineAt: '2026-08-12T14:59:00.000Z' }), isPending: false });
+    updateMutate.mockImplementationOnce((payload: { format: V1Tournament['format'] }, opts: { onSuccess: (t: V1Tournament) => void }) => {
+      opts.onSuccess(fakeDraftTournament({ format: payload.format }));
+    });
+    renderPage();
+    await screen.findByRole('button', { name: '접수 시작하기' });
+    fireEvent.click(screen.getByRole('button', { name: /1단계 기본 정보/ }));
+    fireEvent.click(screen.getByRole('radio', { name: new RegExp('^' + radioLabel.replace('+', '\\+')) }));
+    fireEvent.click(screen.getByRole('button', { name: /5단계 공개 확인/ }));
+    expect(screen.queryByRole('button', { name: '접수 시작하기' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '저장하고 계속하기' }));
+    expect(updateMutate).toHaveBeenCalledWith(expect.objectContaining({ format: nextFormat }), expect.any(Object));
+    const flow = screen.getByRole('region', { name: '대회 진행 방식' });
+    expect(within(flow).getByText(expectedStep, { exact: true })).toBeInTheDocument();
+    expect(within(flow).queryByText(absentStep, { exact: true })).not.toBeInTheDocument();
+  });
+
   it('T1 keeps basic fields after moving forward and back', () => {
     renderPage();
     goToScheduleStep();

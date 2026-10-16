@@ -4590,7 +4590,7 @@ export type V1CreateTournamentPayload = {
   rosterDeadlineAt?: string | null;
   scheduledAt?: string;
   scheduledEndAt?: string | null;
-  venue?: string;
+  venue?: string | null;
   venueAddress?: string | null;
   venueLatitude?: number | null;
   venueLongitude?: number | null;
@@ -4609,16 +4609,16 @@ export type V1CreateTournamentPayload = {
    * 400으로 거절된다. */
   maxSubstitutions?: number;
   genderCategory?: V1TournamentGenderCategory;
-  genderMinMale?: number;
-  genderMaxMale?: number;
-  genderMinFemale?: number;
-  genderMaxFemale?: number;
-  /** 리그(format==='league') 대회에서 각 팀이 보장받아야 할 최소 경기 수. 생략하면 검증하지 않는다. */
-  minMatchesPerTeam?: number;
+  genderMinMale?: number | null;
+  genderMaxMale?: number | null;
+  genderMinFemale?: number | null;
+  genderMaxFemale?: number | null;
+  /** 리그 대회에서 각 팀이 보장받아야 할 최소 경기 수. null은 저장된 제한을 지운다. */
+  minMatchesPerTeam?: number | null;
   entryFee?: number;
-  prizePool?: number;
-  prizeSummary?: string;
-  prizeBreakdown?: string;
+  prizePool?: number | null;
+  prizeSummary?: string | null;
+  prizeBreakdown?: string | null;
   promoHomeEnabled?: boolean;
   promoHomeTitle?: string;
   promoHomeSubtitle?: string;
@@ -4639,15 +4639,15 @@ export type V1CreateTournamentPayload = {
   promoListLocationText?: string;
   promoListPrizeText?: string;
   promoListPriority?: number;
-  bankName?: string;
-  bankAccount?: string;
-  bankHolder?: string;
+  bankName?: string | null;
+  bankAccount?: string | null;
+  bankHolder?: string | null;
   /** 경고 누적 출전정지 기준(장). 생략·null = 미적용. */
   yellowAccumulationLimit?: number | null;
   /** 퇴장 1장당 출전정지 경기 수. 생략·null = 미적용. */
   redCardSuspensionMatches?: number | null;
-  rulesText?: string;
-  refundPolicyText?: string;
+  rulesText?: string | null;
+  refundPolicyText?: string | null;
 };
 
 export type V1UpdateTournamentPayload = Omit<

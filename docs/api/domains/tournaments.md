@@ -227,7 +227,11 @@ Campaign admin routes inherit `V1AuthGuard`. Production accepts only the signed 
 
 Admin-created tournaments require `teamCount` per tournament. The API does not treat an omitted team count as unlimited; missing `teamCount` is rejected with `400 TOURNAMENT_TEAM_COUNT_REQUIRED`. Public capacity, registration blocking, and progress bars must use the saved tournament `teamCount`, not a hard-coded default.
 
+The create response returns `minMatchesPerTeam` from the saved tournament row, including `null` when no minimum is configured. Send `null` to clear a previously configured minimum; omitting the field leaves it unchanged on update.
+
 After creation, the response's `competitionConfigVersionId`, lineup size, and substitution policy describe the configuration version actually pinned to the new tournament. The lineup and substitution values are read from that saved version; they are `null` when no version is pinned. This lets the create flow continue from the server's persisted state.
+
+On update, `null` clears nullable bank details when the resulting `entryFee` is zero (paid tournaments still require complete bank details), card-suspension limits, rules and refund text, prize fields, mixed-gender quotas, or the minimum-match setting; omitting a field preserves its current value. Sending `venue: null` clears the complete saved venue snapshot, including its address and map pin. On create, omitted or `null` values for these optional fields are stored as empty (`null`) values where applicable.
 
 경기 시간(피리어드): `GET /api/v1/admin/competition-configs/lineup-size-options?sportId=` 응답의 `defaultPeriods`(`[{ label, durationMinutes }]`, 연장 제외)가 종목 기본값이다 — 축구 전반 45·후반 45, 풋살 20·20, 미지원 종목 `[]`. 생성 마법사는 이 값을 채워 두고 전·후반 또는 단판(피리어드 1개)으로 고칠 수 있게 하며, 고친 경우에만 대회 생성/수정 직후 `PATCH /api/v1/admin/tournaments/:tournamentId/periods`(피리어드 설정)로 저장한다. 생성 API 자체는 종목 기본 피리어드로 만든다.
 

@@ -2,11 +2,205 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   buildTournamentCreatePayload,
+  hasUnsavedTournamentChanges,
   INITIAL_TOURNAMENT_CREATE_STATE,
   isShortLeadTime,
+  mapTournamentToWizardFields,
   tournamentCreateReducer,
   validateTournamentCreateStep,
 } from './tournament-create-model';
+import type { V1Tournament } from '@/types/api';
+
+function draftWithMinimumMatches(
+  minMatchesPerTeam: number | null | undefined,
+  overrides: Partial<V1Tournament> = {},
+): V1Tournament {
+  return {
+    id: 'draft-league',
+    sportId: 'sport-futsal',
+    title: '초안 리그',
+    status: 'draft',
+    format: 'league',
+    registrationDeadlineAt: null,
+    rosterDeadlineAt: null,
+    bracketPublishedAt: null,
+    bracketPublishScheduledAt: null,
+    scheduledAt: '2026-11-01T00:00:00.000Z',
+    scheduledEndAt: null,
+    venue: null,
+    latitude: null,
+    longitude: null,
+    coverImageUrl: null,
+    teamCount: 8,
+    minPlayers: 6,
+    maxPlayers: 10,
+    competitionConfigVersionId: null,
+    lineupMaxPlayers: null,
+    lineupMinPlayers: null,
+    lineupSizeOptions: [],
+    substitutionMode: null,
+    maxSubstitutions: null,
+    substitutionModeOptions: [],
+    genderCategory: 'mixed',
+    genderMinMale: null,
+    genderMaxMale: null,
+    genderMinFemale: null,
+    genderMaxFemale: null,
+    minMatchesPerTeam: minMatchesPerTeam as number | null,
+    entryFee: 0,
+    prizePool: null,
+    prizeSummary: null,
+    prizeBreakdown: null,
+    promoHomeEnabled: false,
+    promoHomeTitle: null,
+    promoHomeSubtitle: null,
+    promoHomeImageUrl: null,
+    promoHomeBadgeText: null,
+    promoHomeDateText: null,
+    promoHomeTeamsText: null,
+    promoHomeLocationText: null,
+    promoHomePrizeText: null,
+    promoHomePriority: 0,
+    promoListEnabled: false,
+    promoListTitle: null,
+    promoListSubtitle: null,
+    promoListImageUrl: null,
+    promoListBadgeText: null,
+    promoListDateText: null,
+    promoListTeamsText: null,
+    promoListLocationText: null,
+    promoListPrizeText: null,
+    promoListPriority: 0,
+    bankName: null,
+    bankAccount: null,
+    bankHolder: null,
+    yellowAccumulationLimit: null,
+    redCardSuspensionMatches: null,
+    rulesText: null,
+    refundPolicyText: null,
+    registrationCount: 0,
+    createdAt: '2026-10-01T00:00:00.000Z',
+    updatedAt: '2026-10-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+describe('league minimum matches draft roundtrip', () => {
+  it('hydrates nullable values as blank and sends null when clearing a saved limit', () => {
+    const savedLimit = mapTournamentToWizardFields(draftWithMinimumMatches(1));
+    expect(savedLimit.minMatchesPerTeam).toBe('1');
+    expect(buildTournamentCreatePayload(savedLimit).minMatchesPerTeam).toBe(1);
+
+    const cleared = { ...savedLimit, minMatchesPerTeam: '' };
+    expect(buildTournamentCreatePayload(cleared).minMatchesPerTeam).toBeNull();
+    expect(hasUnsavedTournamentChanges(cleared)).toBe(true);
+
+    const savedClear = mapTournamentToWizardFields(draftWithMinimumMatches(null));
+    expect(savedClear.minMatchesPerTeam).toBe('');
+    expect(hasUnsavedTournamentChanges(cleared, savedClear.savedPayload)).toBe(false);
+  });
+
+  it('clears every optional persisted wizard field with null and matches the refreshed server baseline', () => {
+    const savedDraft = draftWithMinimumMatches(1, {
+      venue: '서울 풋살장',
+      venueAddress: '서울시 주소',
+      latitude: 37.5,
+      longitude: 127,
+      venueProvider: 'kakao',
+      venueProviderId: 'place-1',
+      genderMinMale: 1,
+      genderMaxMale: 5,
+      genderMinFemale: 1,
+      genderMaxFemale: 5,
+      prizePool: 100000,
+      prizeSummary: '우승 상금',
+      prizeBreakdown: '1위 100,000원',
+      bankName: '국민은행',
+      bankAccount: '123-456',
+      bankHolder: '운영자',
+      yellowAccumulationLimit: 3,
+      redCardSuspensionMatches: 1,
+      rulesText: '대회 규정',
+      refundPolicyText: '환불 규정',
+    });
+    const saved = mapTournamentToWizardFields(savedDraft);
+    const cleared = {
+      ...saved,
+      minMatchesPerTeam: '',
+      venue: null,
+      genderMinMale: '',
+      genderMaxMale: '',
+      genderMinFemale: '',
+      genderMaxFemale: '',
+      prizePool: '',
+      prizeSummary: '',
+      prizeRows: [],
+      bankName: '',
+      bankAccount: '',
+      bankHolder: '',
+      yellowAccumulationLimit: '',
+      redCardSuspensionMatches: '',
+      rulesText: '',
+      refundPolicyText: '',
+    };
+    const payload = buildTournamentCreatePayload(cleared);
+
+    expect(payload).toMatchObject({
+      venue: null,
+      minMatchesPerTeam: null,
+      genderMinMale: null,
+      genderMaxMale: null,
+      genderMinFemale: null,
+      genderMaxFemale: null,
+      prizePool: null,
+      prizeSummary: null,
+      prizeBreakdown: null,
+      bankName: null,
+      bankAccount: null,
+      bankHolder: null,
+      yellowAccumulationLimit: null,
+      redCardSuspensionMatches: null,
+      rulesText: null,
+      refundPolicyText: null,
+    });
+    expect(hasUnsavedTournamentChanges(cleared)).toBe(true);
+
+    const serverCleared = mapTournamentToWizardFields({
+      ...savedDraft,
+      venue: null,
+      latitude: null,
+      longitude: null,
+      venueAddress: null,
+      venueProvider: null,
+      venueProviderId: null,
+      minMatchesPerTeam: null,
+      genderMinMale: null,
+      genderMaxMale: null,
+      genderMinFemale: null,
+      genderMaxFemale: null,
+      prizePool: null,
+      prizeSummary: null,
+      prizeBreakdown: null,
+      bankName: null,
+      bankAccount: null,
+      bankHolder: null,
+      yellowAccumulationLimit: null,
+      redCardSuspensionMatches: null,
+      rulesText: null,
+      refundPolicyText: null,
+    });
+    expect(serverCleared.venue).toBeNull();
+    expect(buildTournamentCreatePayload(cleared)).toEqual(serverCleared.savedPayload);
+    expect(hasUnsavedTournamentChanges(cleared, serverCleared.savedPayload)).toBe(false);
+  });
+
+  it('treats an absent legacy response value as blank instead of the string undefined', () => {
+    const hydrated = mapTournamentToWizardFields(draftWithMinimumMatches(undefined));
+
+    expect(hydrated.minMatchesPerTeam).toBe('');
+    expect(buildTournamentCreatePayload(hydrated).minMatchesPerTeam).toBeNull();
+  });
+});
 
 /**
  * 대회 마감 일시의 **자동 제안과 검증**에 하한이 없어서, 시작이 임박한 대회를 만들면
@@ -276,7 +470,7 @@ describe('대회 생성 — 장소 스냅샷', () => {
     expect(Object.keys(manual).filter((key) => key.startsWith('venue'))).toEqual(['venue']);
 
     const none = buildTournamentCreatePayload(INITIAL_TOURNAMENT_CREATE_STATE);
-    expect(Object.keys(none)).not.toContain('venue');
+    expect(none.venue).toBeNull();
   });
 
   it('장소를 고르면 홍보 카드 장소 문구가 그 이름으로 자동 채워진다', () => {

@@ -227,8 +227,8 @@ export class TournamentsAdminService {
   }
 
   /**
-   * `get()` 전용 — 대회 상세/수정 화면이 "출전 인원"·"교체 방식/횟수" 선택지와 현재
-   * pin된 값을 함께 보여주는 데 쓴다. `sportCode`가 경기 설정 카탈로그에 없는 종목이면
+   * 대회 상세(`get()`)와 생성(`create()`) 응답에서 "출전 인원"·"교체 방식/횟수"
+   * 선택지와 현재 pin된 값을 함께 보여주는 데 쓴다. `sportCode`가 경기 설정 카탈로그에 없는 종목이면
    * `sizeOptions`는 빈 배열이고(선택지를 지어내지 않는다), `competitionConfigVersionId`가
    * 아직 null이면 `pinned`도 null이다(아직 어떤 값도 pin되지 않음 — 미지원 종목이거나
    * 레거시 대회).
@@ -1371,6 +1371,7 @@ export class TournamentsAdminService {
       teamCount: row.teamCount,
       minPlayers: row.minPlayers,
       maxPlayers: row.maxPlayers,
+      minMatchesPerTeam: row.minMatchesPerTeam,
       // "출전 인원"(라인업 상한) — 위 minPlayers/maxPlayers("등록" 로스터 크기)와는 다른
       // 값이다. competitionConfigVersionId는 목록/생성 응답에도 항상 있는 스칼라라 비용
       // 없이 노출한다. lineupMaxPlayers/lineupMinPlayers와 교체 설정은 pinned config 조인이

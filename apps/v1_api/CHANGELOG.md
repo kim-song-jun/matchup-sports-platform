@@ -1,5 +1,11 @@
 # v1_api
 
+## 1.9.5
+
+### Patch Changes
+
+- v1_web과 고정 버전을 동기화합니다. API 동작 변경은 없습니다.
+
 ## 1.9.4
 
 ### Patch Changes

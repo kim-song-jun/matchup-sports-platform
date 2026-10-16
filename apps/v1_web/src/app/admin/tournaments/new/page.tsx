@@ -35,6 +35,7 @@ import { PlacePicker } from '@/components/v1-ui/place-picker';
 import { PLACE_NAME_MAX_LENGTH } from '@/lib/place';
 import { revealWizardControl, revealWizardStage } from './wizard-stage-viewport';
 import { TournamentCard } from '@/app/tournaments/tournament-card';
+import { TournamentFlowSection } from '@/components/tournaments/tournament-flow-section';
 import {
   CONFIRM_STEP_INDEX,
   INITIAL_TOURNAMENT_CREATE_STATE,
@@ -201,6 +202,11 @@ export default function AdminTournamentsNewPage() {
     // 스텝 버튼을 직접 눌러 건너뛸 수 있으면, 대회가 없는 채로 "접수 시작하기"를 누르는
     // 상황이 생긴다(잠김 상태, 스테퍼 버튼도 이 조건으로 disabled 처리).
     if (nextStep === CONFIRM_STEP_INDEX && (!state.draftId || state.periodMinutesDirty || pending)) return;
+    if (nextStep === CONFIRM_STEP_INDEX && state.format !== state.draftFormat) {
+      dispatch({ type: 'set-step', step: LAST_INPUT_STEP_INDEX });
+      showToast('진행 방식을 변경했어요. 저장하고 계속하기를 눌러 반영해 주세요.', 'error');
+      return;
+    }
     if (nextStep < state.step) {
       dispatch({ type: 'set-step', step: nextStep });
       setErrors({});
@@ -357,6 +363,10 @@ export default function AdminTournamentsNewPage() {
   /** "확인" 단계의 주 CTA — 되돌리기 어려운 전환(초안 → 접수 중)이라 확인 모달을 거친다. */
   const handleStartRegistration = async () => {
     if (!state.draftId || state.periodMinutesDirty || pending) return;
+    if (state.format !== state.draftFormat) {
+      goToStep(CONFIRM_STEP_INDEX);
+      return;
+    }
     const ok = await confirm({
       title: '접수를 시작할까요?',
       message:
@@ -1517,6 +1527,7 @@ function ConfirmStep({
         <p className="tm-on-tint mb-3 text-xs font-bold text-[var(--text-caption)]">참가자에게 이렇게 보여요</p>
         <div className="mx-auto max-w-sm">
           <TournamentCard item={previewItem} interactive={false} />
+          <TournamentFlowSection tournament={previewItem} />
         </div>
       </div>
       <div className="rounded-xl bg-[var(--blue50)] p-4 text-sm leading-6 text-[var(--blue700)]">

@@ -2,8 +2,8 @@ import 'reflect-metadata';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { MATCH_STYLE_MAX_ITEMS } from '../team-match-conditions.constants';
-import { MutateTeamMatchDto } from './mutate-team-match.dto';
-import { CreateAdminTeamMatchRecruitmentDto } from './admin-team-match-recruitment.dto';
+import { MutateTeamMatchDto, UpdateTeamMatchDto } from './mutate-team-match.dto';
+import { CreateAdminTeamMatchRecruitmentDto, UpdateAdminTeamMatchRecruitmentDto } from './admin-team-match-recruitment.dto';
 
 /**
  * 경기 스타일(matchStyle) 다중선택 상한 검증. 사용자 확정 결정(3개, 상충 조합/배지 정리
@@ -87,5 +87,35 @@ describe('MutateTeamMatchDto matchStyle cap', () => {
     const regionIdError = errors.find((error) => error.property === 'regionId');
 
     expect(regionIdError?.constraints).toHaveProperty('isNotEmpty');
+  });
+});
+
+/**
+ * MD-QA #163 — 개인 매치와 같은 경계 결함. 웹 폼(사용자·어드민)은 title.trim() 으로
+ * 막지만 서버는 빈 제목(사용자 DTO)·공백 제목(두 DTO 모두)을 받아 alpha 에 제목 없는
+ * 팀매치가 201 로 생성됐다. 사용자 생성·수정과 어드민 모집 생성·수정이 같은 규칙을 써야 한다.
+ */
+describe('team match title', () => {
+  const { hostTeamId, ...shared } = basePayload;
+  const cases = [
+    ['MutateTeamMatchDto', MutateTeamMatchDto, { ...shared, hostTeamId }],
+    ['UpdateTeamMatchDto', UpdateTeamMatchDto, { ...shared, hostTeamId, version: '2026-10-16T00:00:00.000Z' }],
+    ['CreateAdminTeamMatchRecruitmentDto', CreateAdminTeamMatchRecruitmentDto, { ...shared, clientCommandId: hostTeamId }],
+    ['UpdateAdminTeamMatchRecruitmentDto', UpdateAdminTeamMatchRecruitmentDto, { ...shared, clientCommandId: hostTeamId, version: '2026-10-16T00:00:00.000Z' }],
+  ] as const;
+
+  it.each(cases.flatMap(([name, Dto, payload]) => [
+    [name, 'empty', Dto, payload, ''],
+    [name, 'whitespace only', Dto, payload, '   '],
+  ] as const))('%s rejects a %s title', async (_name, _label, Dto, payload, title) => {
+    const errors = await validate(plainToInstance(Dto as typeof MutateTeamMatchDto, { ...payload, title }));
+    expect(errors.some((error) => error.property === 'title')).toBe(true);
+  });
+
+  it.each(cases)('%s trims surrounding whitespace from the title', async (_name, Dto, payload) => {
+    const dto = plainToInstance(Dto as typeof MutateTeamMatchDto, { ...payload, title: '  토요일 풋살  ' });
+    const errors = await validate(dto);
+    expect(errors.some((error) => error.property === 'title')).toBe(false);
+    expect(dto.title).toBe('토요일 풋살');
   });
 });

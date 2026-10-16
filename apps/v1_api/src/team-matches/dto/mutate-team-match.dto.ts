@@ -50,7 +50,11 @@ export class MutateTeamMatchDto {
   @IsNotEmpty()
   regionId!: string;
 
+  // 웹 폼은 title.trim() 으로 막지만 서버가 받아 주면 API 직접 호출로 제목 없는
+  // 팀매치가 만들어진다(MD-QA #163). 경계에서 trim 한 뒤 빈 값을 거절한다.
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
+  @IsNotEmpty({ message: '매치 제목을 입력해 주세요.' })
   @MaxLength(100)
   title!: string;
 

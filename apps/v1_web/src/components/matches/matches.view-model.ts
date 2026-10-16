@@ -276,6 +276,7 @@ export function getMatchDetailViewModel(mode: MatchDetailViewModel['mode'] = 'de
     match: {
       ...match,
       ...description,
+      isOnline: false,
       place: { name: match.venue, address, latitude: null, longitude: null, provider: null, providerPlaceId: null },
     },
   };

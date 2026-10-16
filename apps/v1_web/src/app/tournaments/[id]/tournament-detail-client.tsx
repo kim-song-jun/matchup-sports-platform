@@ -14,7 +14,7 @@ import { TournamentCampaignMedia } from '@/components/tournaments/tournament-cam
 import { Trophy, Goal, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useV1Tournament, useV1MyRegistrations } from '@/hooks/use-v1-api';
 import { useMediaQuery } from '@/hooks/use-media-query';
-import { v1Get } from '@/lib/api-client';
+import { isTransientFailure, v1Get } from '@/lib/api-client';
 import { placeFromVenueFields, placeToView } from '@/lib/place';
 import { publicFixtureSideLabel } from '@/lib/public-fixture-side-label';
 import {
@@ -502,12 +502,14 @@ export function TournamentDetailPageClient({
   const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
   const chainFrom = fromPath ? withFromPath(`/tournaments/${tournamentId}`, fromPath) : null;
   const [hasSessionHint, setHasSessionHint] = useState(false);
-  const { data, isPending, isError, error, refetch } = useV1Tournament(tournamentId, { seed });
+  const { data, isPending, isError, error, refetch, isFetching } = useV1Tournament(tournamentId, { seed });
+  const displayData = (isError && !isTransientFailure(error) ? undefined : data?.id === tournamentId ? data : undefined)
+    ?? (isError && isTransientFailure(error) && seed?.id === tournamentId ? seed : undefined);
   const { data: myRegistrations = [] } = useV1MyRegistrations(tournamentId, {
     enabled: hasSessionHint,
   });
   const hasCompletedFixture =
-    data?.fixtures.some((fixture) => fixture.status === 'completed' && fixture.result !== null) ?? false;
+    displayData?.fixtures.some((fixture) => fixture.status === 'completed' && fixture.result !== null) ?? false;
   const myRegistration =
     myRegistrations.find((registration) => registration.status !== 'cancelled') ??
     myRegistrations[0] ??
@@ -519,24 +521,24 @@ export function TournamentDetailPageClient({
   }, []);
 
   useEffect(() => {
-    if (!data || trackedViewRef.current === tournamentId) return;
+    if (!displayData || trackedViewRef.current === tournamentId) return;
     trackedViewRef.current = tournamentId;
     trackEvent('tournament_view', { tournamentId });
-  }, [data, tournamentId]);
+  }, [displayData, tournamentId]);
 
   // fetch된 대회명이 있을 때만 덮어쓴다 — 로딩/에러 중엔 테이블의 "대회 상세" 기본값이
   // 그대로 쓰인다(§1.9 "fetch된 제목" 하위유형). desktopHead:false는 TournamentDetailView가
   // 자기 desktop head를 직접 그리기 때문(§1.9 R3, :1321 참조) — 로딩/에러 분기의
   // 제너릭 desktop head(테이블 desktopHead:true)와 중복 렌더를 막는다.
   useShellOverride(
-    data
+    displayData
       ? {
-          title: data.title,
+          title: displayData.title,
           desktopHead: false,
           // 셸이 이 슬롯을 페이지 트리 밖에 그리므로 체인 출처를 따로 감싼다.
           floatingSlot: (
             <DetailChainFromContext.Provider value={chainFrom}>
-              <ApplyCTA tournament={data} myRegistration={myRegistration} />
+              <ApplyCTA tournament={displayData} myRegistration={myRegistration} />
             </DetailChainFromContext.Provider>
           ),
         }
@@ -545,30 +547,44 @@ export function TournamentDetailPageClient({
 
   // isLoading 이 아니라 isPending — 서버 렌더에서는 fetch 가 없어 isLoading 이 false 로 남아
   // 오류 분기로 떨어지고, 크롤러와 첫 화면이 "불러오지 못했어요"를 받는다.
-  if (isPending) {
+  if (isPending && !displayData) {
     return <TournamentDetailSkeleton />;
   }
 
-  if (isError || !data) {
+  if (!displayData) {
     const msg = extractErrorMessage(error, '대회 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
     return (
       <div style={{ padding: '48px 20px 0' }}>
-        <ErrorState
-          message={msg}
-          onRetry={() => void refetch()}
-        />
+        <div data-nosnippet>
+          <ErrorState
+            message={msg}
+            onRetry={() => void refetch()}
+          />
+        </div>
       </div>
     );
   }
 
   return (
     <DetailChainFromContext.Provider value={chainFrom}>
+      {isError && (
+        <div style={{ padding: '16px 20px 0' }}>
+          <div data-nosnippet>
+            <ErrorState
+              message={extractErrorMessage(error, '대회 정보를 새로고침하지 못했어요. 다시 시도해 주세요.')}
+              onRetry={() => void refetch()}
+              retryPending={isFetching}
+              compact
+            />
+          </div>
+        </div>
+      )}
       <TournamentDetailView
-        tournament={data}
+        tournament={displayData}
         myRegistration={myRegistration}
         backHref="/tournaments"
         entrySection={
-          <CompetitionEntrySection competitionId={tournamentId} competition={data} headingLevel={2} style={{ marginBottom: 16 }} />
+          <CompetitionEntrySection competitionId={tournamentId} competition={displayData} headingLevel={2} style={{ marginBottom: 16 }} />
         }
       />
     </DetailChainFromContext.Provider>

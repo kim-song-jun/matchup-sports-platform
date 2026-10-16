@@ -1,5 +1,7 @@
 # Global v1 API contract
 
+Personal-match detail exposes the stored `isOnline` boolean (default `false`). `PATCH /api/v1/admin/matches/:matchId/online` accepts a strict boolean and requires mutation-admin authority; it atomically updates classification and its before/after audit, returning `{matchId,isOnline,changed}`. Repeating the same classification returns `changed:false`. This metadata mutation does not acquire the versioned game-command contract below and does not alter public-list access, canonical URLs or indexability. See [matches](./domains/matches.md) and [admin/ops](./domains/admin-and-ops.md).
+
 부전승 위치 교환(`PUT /admin/tournament-slots/:slotId/bye-side`)은 mutation admin만 가능하며 팀·슬롯·승자 연결·표시 위치를 원자적으로 저장한다. 대상 및 후속 경기의 시작/기록/결과를 보호하고 부분 성공을 반환하지 않는다. [Tournaments 계약](./domains/tournaments.md)을 따른다.
 
 Ordinary team matches accept optional `periods` on existing create/update routes. `GET /api/v1/teams/:teamId/team-match-rule-options` requires an active host owner/manager; actual current `periods` and nullable authoritative `twoPeriodDefaults` are distinct. Omitted create retains the global default; omitted edit retains the stored pin. Explicit rule edits retain the existing `version`, authorization and date gates and additionally protect gameplay/lineup history. See [the domain contract](./domains/team-matches.md#ordinary-team-match-period-rules-md-qa-141); these routes do not acquire the game-command idempotency contract below.

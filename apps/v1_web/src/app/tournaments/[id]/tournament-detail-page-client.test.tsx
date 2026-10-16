@@ -37,6 +37,22 @@ vi.mock('@/lib/analytics', () => ({
   trackEvent: vi.fn(),
 }));
 
+vi.mock('@/lib/api-client', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/api-client')>()),
+  v1Get: vi.fn((path: string) => Promise.resolve(
+    path.endsWith('/standings/overall')
+      ? {
+          standings: [],
+          progress: { total: 0, played: 0, remaining: 0, percent: 0 },
+          magicNumber: null,
+          recalculatedAt: null,
+          champions: [],
+          tieBreakGroups: [],
+        }
+      : { items: [] },
+  )),
+}));
+
 vi.mock('next/navigation', () => ({
   usePathname: () => '/tournaments/tournament-1',
   useRouter: () => ({

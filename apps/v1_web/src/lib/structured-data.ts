@@ -254,6 +254,8 @@ export function teamReference(teamId: string | null | undefined, name: string | 
  * 사용자가 연 매치를 Teameet 이 주최했다고 쓰면 틀린 사실이다.
  */
 export function buildMatchEventLd(match: V1Match, id: string): JsonLdNode | null {
+  // 온라인 앱 경험은 실제 경기 이벤트가 아니므로 SportsEvent 구조화 데이터 대상이 아니에요.
+  if (match.isOnline === true) return null;
   const node = buildMatchEventBase(match, `/matches/${id}`);
   if (!node) return null;
   if (match.platformManaged) node.organizer = { '@id': organizationId() };

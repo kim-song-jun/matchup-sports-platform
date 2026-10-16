@@ -42,6 +42,7 @@ function tournamentRow(overrides: Record<string, unknown> = {}) {
     teamCount: 8,
     minPlayers: 6,
     maxPlayers: 10,
+    minMatchesPerTeam: null,
     genderCategory: null,
     genderMinMale: null,
     genderMaxMale: null,
@@ -1595,7 +1596,23 @@ describe('TournamentsAdminService', () => {
     });
   });
 
-  it('create: config read failure occurs before tournament creation and audit', async () => {
+  it.each([null, 4])('create: returns the persisted minMatchesPerTeam value (%s)', async (minMatchesPerTeam) => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Sport.findUnique.mockResolvedValue({ id: 'sport-1' });
+    prisma.v1Tournament.create.mockResolvedValue(tournamentRow({ minMatchesPerTeam }));
+
+    const result = await service.create(ownerAuthUser, {
+      sportId: 'sport-1',
+      title: '리그 방식 대회',
+      format: 'league',
+      teamCount: 8,
+      minMatchesPerTeam,
+    });
+
+    expect(result.minMatchesPerTeam).toBe(minMatchesPerTeam);
+  });
+
+  it('create: fails config reads before writing a tournament or audit row', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     prisma.v1Sport.findUnique.mockResolvedValue({ id: 'sport-1', code: 'futsal' });
     prisma.v1CompetitionConfigVersion.findFirst.mockResolvedValue({

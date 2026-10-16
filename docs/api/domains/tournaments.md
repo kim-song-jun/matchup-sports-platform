@@ -227,7 +227,11 @@ Campaign admin routes inherit `V1AuthGuard`. Production accepts only the signed 
 
 Admin-created tournaments require `teamCount` per tournament. The API does not treat an omitted team count as unlimited; missing `teamCount` is rejected with `400 TOURNAMENT_TEAM_COUNT_REQUIRED`. Public capacity, registration blocking, and progress bars must use the saved tournament `teamCount`, not a hard-coded default.
 
+The create response returns `minMatchesPerTeam` from the saved tournament row, including `null` when no minimum is configured. Send `null` to clear a previously configured minimum; omitting the field leaves it unchanged on update.
+
 After creation, the response's `competitionConfigVersionId`, lineup size, and substitution policy describe the configuration version actually pinned to the new tournament. The lineup and substitution values are read from that saved version; they are `null` when no version is pinned. This lets the create flow continue from the server's persisted state.
+
+On update, `null` clears nullable bank details when the resulting `entryFee` is zero (paid tournaments still require complete bank details), card-suspension limits, rules and refund text, prize fields, mixed-gender quotas, or the minimum-match setting; omitting a field preserves its current value. Sending `venue: null` clears the complete saved venue snapshot, including its address and map pin. On create, omitted or `null` values for these optional fields are stored as empty (`null`) values where applicable.
 
 정규 리그(`kind=regular_league`)는 별도 [리그 생성·정원 계약](./league-matches.md#participant-team-capacity-참가팀-정원)을
 따른다. 참가팀 정원은 nullable `maxTeams`이며 `maxPlayers`는 팀당 선수 명단 정원이다.

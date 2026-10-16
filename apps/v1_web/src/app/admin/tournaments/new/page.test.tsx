@@ -415,7 +415,9 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
     fireEvent.click(screen.getByRole('button', { name: '저장하고 계속하기' }));
     fireEvent.click(screen.getByRole('button', { name: /1단계 기본 정보/ }));
     fireEvent.change(screen.getByLabelText(/대회명/), { target: { value: '저장 중 다시 바꾼 이름' } });
-    const persistedFields = Object.fromEntries(Object.entries(savedPayload ?? {}).filter(([, value]) => value !== undefined));
+    const persistedFields = Object.fromEntries(
+      Object.entries(savedPayload ?? {}).filter(([, value]) => value !== undefined),
+    ) as Partial<V1CreateTournamentPayload>;
     saveSuccess?.(fakeDraftResponseForPayload(persistedFields, { registrationDeadlineAt: '2026-08-12T14:59:00.000Z' }));
     fireEvent.click(screen.getByRole('button', { name: /5단계 공개 확인/ }));
     expect(screen.queryByRole('button', { name: '접수 시작하기' })).not.toBeInTheDocument();
@@ -834,7 +836,7 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
     expect(rolling.maxSubstitutions).toBeUndefined();
   });
 
-  it('T6c omits minMatchesPerTeam from the payload when left blank', () => {
+  it('T6c clears a saved minMatchesPerTeam by sending null when left blank', () => {
     const payload = buildTournamentCreatePayload({
       ...INITIAL_TOURNAMENT_CREATE_STATE,
       sportId: 'sport-futsal',
@@ -842,11 +844,9 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
       format: 'league',
       minMatchesPerTeam: '',
     });
-    expect(payload.minMatchesPerTeam).toBeUndefined();
-    // undefined 값은 JSON.stringify에서 키 자체가 사라진다 — 실제로 서버에 전송되지
-    // 않는다는 것을 axios가 쓰는 것과 같은 직렬화 경로로 증명한다(0/빈 문자열이 실려
-    // @IsInt @Min(1)에 422로 거절되는 걸 막는 게 이 필드의 핵심 계약이다).
-    expect(JSON.parse(JSON.stringify(payload))).not.toHaveProperty('minMatchesPerTeam');
+    expect(payload.minMatchesPerTeam).toBeNull();
+    // Axios JSON 직렬화가 서버까지 명시적 초기화(null)를 보존하는지 확인한다.
+    expect(JSON.parse(JSON.stringify(payload))).toHaveProperty('minMatchesPerTeam', null);
   });
 
   it('T6d serializes minMatchesPerTeam as a number when set', () => {

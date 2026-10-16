@@ -365,7 +365,12 @@ export function buildAlphaTournamentCampaignContent(
           hour: 'numeric',
           minute: '2-digit',
           hour12: true,
-        }).format(registrationDeadlineAt)} (한국 시간)`,
+        }).formatToParts(registrationDeadlineAt).map((part) => {
+          // ICU의 요일 구분 기호와 무관하게 상세 화면과 같은 괄호 표기를 유지한다.
+          if (part.type === 'weekday') return `(${part.value})`;
+          if (part.type === 'literal') return part.value.replace(/[()]/g, '');
+          return part.value;
+        }).join('')} (한국 시간)`,
       },
       { question: '이 데이터는 프로덕션으로 이동하나요?', answer: '아니요. alpha 데이터베이스에서만 유지되고 프로덕션으로 역동기화되지 않습니다.' },
     ],

@@ -1,10 +1,44 @@
 # Task 20261072: 운영 검색 노출 및 홈 GA4 계측 정정
 
-Status: Oct 16 follow-up active — remove intrusive discovery copy, diagnose generic search gaps and repair GitHub AI security execution
+Status: SEO runtime deployed and verified; external search/AI Scan outcomes and artifact-only dev integration pending
 **Owner**: Codex main; explicit Luna implementation and Sol independent review
 **Created**: 2026-10-12
 
-## Current Cursor — 2026-10-16 01:23 KST
+## Current Cursor — 2026-10-16 final deployment verification
+
+The requested existing-page cleanup and factual Event corrections are deployed through source dev PRs #1940/#1942 and scoped main PR #1941. Production serves `1955a2b35f6bb35af2458ed9d40b60b9ddd5c3d7`, measured runtime `1.9.4`; CI/deploy38783510227 and CodeQL38783508884 succeeded. Source-bearing latest Alpha `a2647c89982bfc6acfbdaa209b80f8d11601a6f2` passed matching CI38779670635/Alpha38779670529 and actual10/10HTTP/schema/noindex checks. Unrelated dev features were excluded from main.
+
+No new search-only pages or hidden keyword text were added. All LocalDiscoveryGuidance consumers, source and tests were removed. Four actual list paragraphs disappeared while existing navigation, real headings/cards and filters remain. A registered nonblank competition venueAddress now reaches truthful PostalAddress and completed-view basic info. Five of six current public competitions lack registered street addresses; none was invented. Personal/team-match/fixture privacy, canonical and visible parent navigation remain unchanged. Orphan ID-only superEvent references were removed from both fixture builders after a real Google LIVE test demonstrated a second invalid Event.
+
+Verification: 52 focused cleanup/address tests and27 unique orphan/SSR regressions passed, with meaningful RED→GREEN evidence; exact source/candidate API/Web/Gates and independent gpt-6-sol review passed. Production guest first-HTML audit315/315 URLs across30 patterns at one stable SHA found0HTTP/canonical/indexability/orphan/prose failures. Representative HTTP8/8 and robots/sitemap/llms/health checks passed. Four lists×390/768/1440 were checked at top and actual footer (24 screenshots). The detailed per-view tool JSON was truncated; no lost metric is invented. Intentional promotion overlay was dismissed normally and three clean Teams widths were rechecked with6extra screenshots. Actual category→league, filter open/close and global Teams navigation passed; no unperformed filter-selection or315visual-review claim.
+
+Google actual production fixture LIVE crawl at03:37:15KST reads one valid Event, no unnamed orphan or critical errors, four optional warnings. Canonical Suwon detail LIVE also has one valid Event; its updated-address reindex request was acknowledged once. Historical location/name/startDate issue validations each entered `Started` once. Those are not final validation success or proof that all updated content is indexed. Existing priority URLs were already indexed; sitemap success is a separate dated report (318 discovered vs current315 sitemap entries).
+
+Fresh explicit gpt-6-luna measurement at03:54–03:55KST found0Teameet-domain results in six organic query samples (9/8/9/9/9/9 inspected cards), and0brand mentions/citations in three completed Google AI Mode answers. Organic pages explicitly reported personalization and 방배동/서울서초 previous-activity location; AI personalization was not established. No causal rank change, broad absence beyond inspected cards or AEO success is claimed. Daily09:00KST `teameet-ai-luna` monitoring remains active; unchanged rankings do not justify duplicate crawl requests or speculative copy churn.
+
+Fresh Naver follow-up04:05–04:07KST: `/tournaments` appeared for 동네 풋살대회 at observed mixed integrated-result module5 with exact teameet.co.kr URL/title/snippet. This is a bounded observed module order, not universal web rank or proof of the new release causing exposure. 풋살 리그/풋살 대회 had no exact domain result in inspected10 non-ad modules per query. Naver sign-in/personalization/location were not established. Search Advisor redirected to login, so current crawl/index/SEO counts are unavailable; Oct14 indexed1/SEO0 remains only a dated prior report. Evidence `evidence/cleanup-naver-final-20261016.json` and4screenshots; no duplicate collection request or settings change.
+
+Final read-only GSC observation04:39KST: all-known-pages coverage report is datedOct12, with15indexed/270notindexed (10noindex,2notfound,252discovered-not-indexed,6crawled-not-indexed). Those dated285known pages are not the same verified cohort as today's315publicHTML URLs. Web performance forSep25–Oct13 shows18clicks/379impressions,4.7%CTR/aggregateposition5.5; none of four visible top-query rows were 풋살 terms. That is not zero 풋살 impressions or a keyword-specific rank. Evidence `evidence/cleanup-gsc-performance-final-20261016.json`; root separately verified correct property/date/counts in the actual UI. No additional inspection/collection/validation request was sent.
+
+GitHub AI Scan remains enabled but the GitHub-managed dynamic workflow fails before analysis with internal `claude-opus-5` unavailable. There is no tracked YAML or exposed model selector to repair locally. User-approved public-log draft was actually sent once as [Support4863223](https://help.github.com/ticket/personal/0/4863223), Open with one own comment and no reply at final read. No model/provider/billing/key change or analysis bypass was used. CodeQL is separate and does not substitute for an AI Scan pass.
+
+Local evidence root: `/Users/sungjun/.cache/teameet-seo-release/`. Receipts: `cleanup-public-html-after-20261016.json`, `cleanup-production-http-20261016.json`, `cleanup-production-crawler-health-20261016.json`, `cleanup-production-browser-after-20261016.json`, `cleanup-production-clean-teams-20261016.json`, `cleanup-production-flow-20261016.json`, `cleanup-gsc-live-event-after-20261016.json`, `cleanup-gsc-canonical-request-20261016.json`, `cleanup-gsc-issue-validation-20261016.json`, `evidence/cleanup-postrelease-search-20261016-results.json`.
+
+Exit proof:
+- [x] Inventory315/315 published URLs/30patterns; four affected list paragraphs identified, useful navigation retained.
+- [x] Intrusive prose/dead component removed without hidden keywords; settled before/after390/768/1440 evidence retained.
+- [x] Demonstrated address and orphan Event gaps corrected with truthful crawler/user parity; missing source data not fabricated.
+- [x] AI security owning service identified; exact external blocker and approved Support submission recorded without false pass.
+- [x] Narrow meaningful tests, independent Sol review, exact-head CI and separately measured Alpha/production SHAs passed.
+- [x] Main contains approved scope only; Alpha publication exclusions/private boundaries and operating data preserved.
+- [x] Actual indexing/rank/AI outcomes recorded; owned EgoSpace63 closed with keep[] (p1/p2/p3, no unmanaged tabs preserved), and no local server/build/DB started for this follow-up.
+- [ ] Release-artifact-only main→dev integration still requires its own exact CI and current Copilot clean result. Copilot429 is an external hold, not a passed or waived gate; final status is recorded in STATUS.md/MONITOR.md and PR receipts.
+
+Separate authorized dev work: #1936/#1939 merged earlier. #1938 repair candidate `de7fa2a78f4a1c9e7e0056917eb9884f30299283` has independent cumulative37-path/delta static C0/W0 but freshCI38795757399 is pending; latest Copilot is rate-limited and Alpha source/full-role QA is NOTRUN before merge. #1858 remains conflicting with8unresolved reviews and unfinished Alpha QA; another session's bracket WIP was not overwritten. These features are excluded from SEO main1955. New unrelated dev PRs are not silently added to this release.
+
+Remaining outcomes: Google issue validation/recrawl, generic ranking and AI citations, and GitHub AI Scan service recovery are pending external observations. Do not reopen or resubmit identical requests solely because those outcomes have not changed.
+
+## Historical Cursor — 2026-10-16 01:23 KST
 
 User explicitly requested repair of the GitHub AI security model failure, deeper evidence-based diagnosis/improvement for 동네 풋살 / 풋살 대회 organic and AI discovery, and site-wide cleanup of awkward search-oriented prose. Existing pages only; Alpha validation then scoped main deployment is already authorized. Do not hide keyword text with CSS or crawler-specific rendering. Remove unhelpful explanation and preserve useful facts/navigation in ordinary headings, cards/details and existing navigation. No new route, DB/auth/privacy/key/native/store/operating-data change or unrelated dev promotion.
 

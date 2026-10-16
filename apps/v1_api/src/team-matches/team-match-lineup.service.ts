@@ -18,6 +18,7 @@ import {
   type TeamMatchLineupLockReason,
 } from '../games/core/team-match-lineup-window';
 import { PrismaService } from '../prisma/prisma.service';
+import { FRIENDLY_DEFAULT_ROSTER_FROZEN, FRIENDLY_LINEUP_DRAFT_SAVED, readFriendlyEffectiveRoster, type FriendlyEffectiveSide } from '../games/roster/friendly-team-match-default-roster';
 import { parseLineupCatalog, parseLineupConfigForResponse } from '../tournaments/competition-config/competition-config.parse';
 import { findRejectedLineupPosition, rejectedLineupPositionMessage } from '../games/core/lineup-position';
 import {
@@ -32,6 +33,7 @@ import {
   SubmitTeamMatchLineupDto,
   TeamMatchLineupParticipantDto,
 } from './dto/team-match-lineup.dto';
+import { resolvePublicLineupAt } from './public-lineup-visibility';
 
 type Transaction = Prisma.TransactionClient;
 
@@ -61,9 +63,6 @@ export async function enqueueLineupIncludedNotice(tx: Transaction, lineupId: str
     skipDuplicates: true,
   });
 }
-
-/** 상대 팀에게 참석명단이 공개되는 기본 시각 — 킥오프 1시간 전(D-02). */
-const DEFAULT_PUBLIC_LINEUP_LEAD_MS = 60 * 60 * 1000;
 
 /** 팀 일정 응답(RSVP) — 참석명단 후보 행의 읽기 전용 칩. 명단 자격과 무관하다(H5 결정 A). */
 export type TeamMatchLineupRsvpStatus = 'GOING' | 'MAYBE' | 'NOT_GOING' | 'WAITLISTED' | 'NO_RESPONSE';
@@ -159,6 +158,8 @@ export class TeamMatchLineupService {
     return this.prisma.$transaction(async (tx) => {
       const context = await this.loadContext(tx, teamMatchId, user.id);
       const lineup = await this.latestLineup(tx, context.gameId, context.ownSideId);
+      const effective = context.isCompetition ? null : await readFriendlyEffectiveRoster(tx, context.gameId);
+      const ownEffective = effective?.sides.find((side) => side.sideId === context.ownSideId);
       const { lockReason, lateAdditionAllowed } = await this.lineupWindow(tx, context);
       const visibility = await tx.v1GameVisibilityPolicy.findUnique({
         where: { gameId: context.gameId },
@@ -171,7 +172,11 @@ export class TeamMatchLineupService {
         select: { lineup: true },
       });
       return {
-        ...(await this.serializeLineup(tx, context, lineup, visibility?.lineupAt ?? null, lockReason)),
+        ...(await this.serializeLineup(tx, context, lineup, visibility?.lineupAt ?? null, lockReason, ownEffective)),
+        ...(ownEffective === undefined ? {} : {
+          effectiveRosterSource: ownEffective.source,
+          hasSavedDraft: ownEffective.hasSavedDraft,
+        }),
         gameState: context.gameState,
         /** @deprecated `editable`/`lockReason`을 사용한다. */
         hasRecordedEvents: lockReason === 'records_exist',
@@ -273,6 +278,13 @@ export class TeamMatchLineupService {
           }
 
           const entries = await this.resolveEntries(tx, context, dto);
+          const effectiveSide = (await readFriendlyEffectiveRoster(tx, context.gameId))?.sides.find((side) => side.sideId === context.ownSideId);
+          const previewArrivals = new Map<string, Date | null>(effectiveSide?.source === 'DEFAULT_PREVIEW'
+            ? effectiveSide.participants.flatMap((participant) => participant.userId === null ? [] : [[participant.userId, participant.arrivedAt] as const])
+            : []);
+          if (effectiveSide?.source === 'DEFAULT_PREVIEW' && entries.some((entry) => entry.userId !== null && !previewArrivals.has(entry.userId))) {
+            throw new UnprocessableEntityException({ code: 'LINEUP_PARTICIPANT_INELIGIBLE', message: '현재 출전할 수 없는 팀원이 포함되어 있어요. 명단을 다시 확인해 주세요.' });
+          }
           // 직전 리비전에서 본인이 켜 둔 **참가자 단위 공개 제외**(REVOKED)를 미리 읽어
           // 둔다. 저장은 매번 새 participant 행과 새 연결(linkId)을 만드는데, 공개 자격
           // 판정은 스냅샷을 **현재 연결의 linkId 로만** 읽는다
@@ -319,6 +331,7 @@ export class TeamMatchLineupService {
                 // (그래서 이 줄을 지우는 변이는 지금 green 이다 — 기본값이 같은 값이라
                 //  관측 결과가 안 변한다. red 로 잡히는 것은 `false` 를 넣는 변이다.)
                 started: true,
+                arrivedAt: entry.userId === null ? null : previewArrivals.get(entry.userId) ?? null,
                 positionX: entry.positionX ?? null,
                 positionY: entry.positionY ?? null,
               },
@@ -356,6 +369,16 @@ export class TeamMatchLineupService {
             // submitLineup 과 같은 부수효과 — 공개 시각은 이미 박혀 있으면 그대로, 포함 알림은 워커가 받은 사람을 거른다.
             await this.ensureDefaultPublicLineupTime(tx, context.gameId, context.startAt);
             await enqueueLineupIncludedNotice(tx, lineup.id);
+          } else {
+            // A supported recovery save can create revision 1. Persist its human provenance
+            // so a later read never mistakes that saved draft for the automatic snapshot.
+            await this.operationAuditWriter.create(tx, {
+              actor: { type: 'TEAM_MANAGER', id: user.id },
+              requestId: `${context.gameId}:draft-save:${lineup.id}`,
+              action: FRIENDLY_LINEUP_DRAFT_SAVED,
+              targetType: 'GAME', targetId: context.gameId, occurredAt: new Date(),
+              before: null, after: { lineupId: lineup.id, sideId: context.ownSideId },
+            });
           }
           return {
             teamMatchId,
@@ -422,14 +445,51 @@ export class TeamMatchLineupService {
               publicLineupAt: visibility?.lineupAt?.toISOString() ?? null,
             };
           }
-          const submitted = await tx.v1GameLineup.update({
-            where: { id: lineup.id },
-            data: {
-              state: V1GameLineupState.SUBMITTED,
-              submittedAt: new Date(),
-              version: { increment: 1 },
-            },
-          });
+          const effectiveSide = (await readFriendlyEffectiveRoster(tx, context.gameId))?.sides.find((side) => side.sideId === context.ownSideId);
+          let submitted: typeof lineup;
+          if (effectiveSide?.source === 'DEFAULT_PREVIEW' && !effectiveSide.hasSavedDraft) {
+            // This is an actual authorized human submission of the displayed current default.
+            // Append its snapshot: moving old participant rows would rewrite historical IDs.
+            const carried = await loadRevokedConsentByUserId(tx, lineup.id);
+            submitted = await tx.v1GameLineup.create({ data: {
+              gameId: context.gameId, sideId: context.ownSideId, revision: lineup.revision + 1,
+              supersedesId: lineup.id, formation: lineup.formation,
+              state: V1GameLineupState.SUBMITTED, submittedAt: new Date(),
+            } });
+            for (const participant of effectiveSide.participants) {
+              const created = await tx.v1GameParticipant.create({ data: {
+                id: participant.id, gameId: context.gameId, sideId: context.ownSideId, lineupId: submitted.id,
+                userId: participant.userId, displayNameSnapshot: participant.displayNameSnapshot,
+                jerseyNumber: participant.jerseyNumber, position: participant.position,
+                positionX: participant.positionX, positionY: participant.positionY, started: true, arrivedAt: participant.arrivedAt,
+              } });
+              if (participant.userId !== null) {
+                await createRosterAssertedIdentityLink(tx, created.id, participant.userId, { actorType: 'USER', actorUserId: user.id }, 'roster');
+                await carryRevokedConsent(tx, created.id, carried.get(participant.userId));
+              }
+            }
+          } else {
+            const participants = await tx.v1GameParticipant.findMany({ where: { lineupId: lineup.id } });
+            const previewArrivals = new Map<string, Date | null>(effectiveSide?.source === 'DEFAULT_PREVIEW'
+              ? effectiveSide.participants.flatMap((participant) => participant.userId === null ? [] : [[participant.userId, participant.arrivedAt] as const])
+              : []);
+            for (const participant of participants) {
+              if (participant.userId === null) continue;
+              await this.resolveEntry(tx, context, { userId: participant.userId }, participant.position);
+              if (effectiveSide?.source !== 'DEFAULT_PREVIEW') continue;
+              if (!previewArrivals.has(participant.userId)) {
+                throw new UnprocessableEntityException({ code: 'LINEUP_PARTICIPANT_INELIGIBLE', message: '현재 출전할 수 없는 팀원이 포함되어 있어요. 명단을 다시 확인해 주세요.' });
+              }
+              const arrivedAt = previewArrivals.get(participant.userId) ?? null;
+              if (participant.arrivedAt?.getTime() !== arrivedAt?.getTime()) {
+                await tx.v1GameParticipant.updateMany({ where: { lineupId: lineup.id, userId: participant.userId }, data: { arrivedAt } });
+              }
+            }
+            submitted = await tx.v1GameLineup.update({
+              where: { id: lineup.id },
+              data: { state: V1GameLineupState.SUBMITTED, submittedAt: new Date(), version: { increment: 1 } },
+            });
+          }
           const publicLineupAt = await this.ensureDefaultPublicLineupTime(
             tx,
             context.gameId,
@@ -752,7 +812,7 @@ export class TeamMatchLineupService {
 
   /** 공개 시각 — 정책에 값이 없으면 킥오프 1시간 전(제출 때 정책에 같은 값이 박힌다). */
   private effectivePublicLineupAt(context: TeamMatchLineupContext, policyLineupAt: Date | null): Date {
-    return policyLineupAt ?? new Date(context.startAt.getTime() - DEFAULT_PUBLIC_LINEUP_LEAD_MS);
+    return resolvePublicLineupAt(context.startAt, policyLineupAt);
   }
 
   /** 공개 전에는 제출 여부만, 공개 뒤에는 인원까지 — 명단 내용은 `getOpponentLineup` 이 준다. */
@@ -986,7 +1046,7 @@ export class TeamMatchLineupService {
   private async loadEligibleMembers(tx: Transaction, context: TeamMatchLineupContext) {
     const [memberships, schedule] = await Promise.all([
       tx.v1TeamMembership.findMany({
-        where: { teamId: context.ownTeamId, status: 'active' },
+        where: { teamId: context.ownTeamId, status: 'active', user: { accountStatus: 'active', deletedAt: null } },
         select: {
           userId: true,
           jerseyNumber: true,
@@ -1083,12 +1143,19 @@ export class TeamMatchLineupService {
         recordEvent !== null || resultRevision !== null || sharedRecord !== null,
     });
     const ownLatest = latestTeamMatchLineupBySide(lineups).get(context.ownSideId);
+    const frozenDefault = !context.isCompetition && ownLatest?.state === 'DRAFT' && await tx.v1OperationAudit.findFirst({
+      where: {
+        resourceType: 'GAME', resourceId: context.gameId, actorType: 'SYSTEM',
+        action: FRIENDLY_DEFAULT_ROSTER_FROZEN, systemActor: FRIENDLY_DEFAULT_ROSTER_FROZEN,
+        requestId: `${context.gameId}:${ownLatest.id}`,
+      }, select: { id: true },
+    }) !== null;
     return {
       lockReason,
       lateAdditionAllowed:
         (lockReason === 'records_exist' || lockReason === 'active_lineups_complete') &&
         resultRevision === null &&
-        isSubmittedLineupState(ownLatest?.state),
+        (isSubmittedLineupState(ownLatest?.state) || frozenDefault),
     };
   }
 
@@ -1250,7 +1317,7 @@ export class TeamMatchLineupService {
       };
     }
     const membership = await tx.v1TeamMembership.findFirst({
-      where: { teamId: context.ownTeamId, userId: entry.userId, status: 'active' },
+      where: { teamId: context.ownTeamId, userId: entry.userId, status: 'active', user: { accountStatus: 'active', deletedAt: null } },
       select: {
         userId: true,
         user: { select: { profile: { select: { nickname: true, displayName: true } } } },
@@ -1294,9 +1361,12 @@ export class TeamMatchLineupService {
     } | null,
     publicLineupAt: Date | null,
     lockReason: TeamMatchLineupLockReason,
+    effectiveSide?: FriendlyEffectiveSide,
   ) {
     const participants =
-      lineup === null
+      (effectiveSide?.source === 'DEFAULT_PREVIEW' && !effectiveSide.hasSavedDraft) || effectiveSide?.source === 'DEFAULT_FROZEN'
+        ? effectiveSide.participants
+        : lineup === null
         ? []
         : await tx.v1GameParticipant.findMany({
             where: { lineupId: lineup.id },

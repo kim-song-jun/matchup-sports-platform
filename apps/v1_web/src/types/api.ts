@@ -1907,6 +1907,10 @@ export type V1TeamMatchLineup = {
   // 새 행으로 supersede되므로 row 자체의 `version`과는 별개다 — team-match-lineup.service.ts 참조.
   revision: number;
   state: V1TeamMatchLineupState;
+  /** 친선 자체 명단의 실제 기록 출처. 상대/대회/구버전 응답은 생략할 수 있다. */
+  effectiveRosterSource?: 'MANUAL' | 'DEFAULT_PREVIEW' | 'DEFAULT_FROZEN' | 'BLOCKED';
+  /** 미제출 저장 초안은 편집용으로 보존하며, 기록에는 제출 전 기본 명단이 사용된다. */
+  hasSavedDraft?: boolean;
   /** 서버가 실제 경기 상태, 양 팀 최신 revision, 기록 존재 여부를 함께 판정한 값. */
   editable?: boolean;
   /** optional은 API/Web 순차 배포 창의 구버전 응답 호환용이다. 누락 시 화면은 잠근다. */

@@ -10,6 +10,7 @@ import {
   useV1CreateGameResultRevision,
   useV1DecideGameResultRevision,
   useV1Game,
+  useV1GameLineups,
   useV1GameResultRevisions,
   useV1SubmitGameResultRevision,
   useV1TeamMatch,
@@ -446,6 +447,19 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
   const { teamMatch, game, revisions, lineup, isError, isLoading, gameId } = useResultScreenBase(teamMatchId, {
     needsOwnLineup: true,
   });
+  const isHost = teamMatch.data?.viewer?.manageableHostTeam === true;
+  // 저장한 미제출 초안은 편집용 명단이다. 실제 기록은 현재 자격 기본 명단을 사용하므로
+  // 서버가 기록용 조회에서 돌려준 참가자 UUID를 사용해야 한다.
+  const needsRecordingRoster = isHost && !teamMatch.data?.league &&
+    lineup.data?.effectiveRosterSource === 'DEFAULT_PREVIEW' && lineup.data.hasSavedDraft === true;
+  const recordingLineups = useV1GameLineups(gameId, { enabled: needsRecordingRoster });
+  const recordingLineup = recordingLineups.data
+    ?.filter((row) => row.sideId === lineup.data?.sideId && row.invalidatedAt === null)
+    .sort((a, b) => b.revision - a.revision)[0];
+  const hasUsableRecordingLineup = recordingLineup !== undefined &&
+    recordingLineup.id === lineup.data?.lineupId &&
+    recordingLineup.revision === lineup.data?.revision &&
+    recordingLineup.participants.length > 0;
   // 로딩·에러 중에는 리그인지 알 수 없다 — 그때 "입력"을 띄우면 리그 참가팀에게 서버가
   // 403 으로 막는 행동을 약속하게 된다. 친선으로 확인된 뒤에만 제목을 올린다.
   useShellOverride({ title: teamMatch.data && !teamMatch.data.league ? '경기 결과 입력' : '경기 결과' });
@@ -577,20 +591,26 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
     setCardDrafts((prev) => prev.filter((card) => card.key !== key));
   }
 
-  const isHost = teamMatch.data?.viewer?.manageableHostTeam === true;
+  // Keep a usable cached roster on screen; wait only when the dependent data is
+  // missing or stale while its background refresh is still in progress.
+  if (needsRecordingRoster && recordingLineups.isFetching && !hasUsableRecordingLineup) {
+    return <PageSkeleton variant="detail" />;
+  }
 
-  if (isError) {
+  if (isError || (needsRecordingRoster && recordingLineups.isError && !recordingLineups.isFetching)) {
     return (
       <>
         <ErrorState
-          message="결과 정보를 불러오지 못했어요."
-          onRetry={() => retryAll(teamMatch, game, revisions, lineup)}
+          message={needsRecordingRoster && recordingLineups.isError
+            ? extractErrorMessage(recordingLineups.error, '기록용 참석명단을 불러오지 못했어요.')
+            : '결과 정보를 불러오지 못했어요.'}
+          onRetry={() => retryAll(teamMatch, game, revisions, lineup, ...(needsRecordingRoster ? [recordingLineups] : []))}
         />
       </>
     );
   }
 
-  if (isLoading || !teamMatch.data) {
+  if (isLoading || !teamMatch.data || (needsRecordingRoster && recordingLineups.data === undefined)) {
     return (
       <>
         <PageSkeleton variant="detail" />
@@ -625,7 +645,17 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
 
   const homeSide = game.data?.sides.find((side) => side.sideKey === 'HOME');
   const awaySide = game.data?.sides.find((side) => side.sideKey === 'AWAY');
-  const roster = toResultRosterRows(lineup.data?.starters ?? [], lineup.data?.bench ?? []);
+  if (needsRecordingRoster && !hasUsableRecordingLineup) {
+    return <ErrorState message="기록용 참석명단을 확인할 수 없어요. 명단을 다시 불러와 주세요." onRetry={() => retryAll(lineup, recordingLineups)} />;
+  }
+  const recordingRoster: ResultRosterRow[] = recordingLineup?.participants.map((row) => ({
+    participantId: row.id,
+    displayName: row.displayNameSnapshot,
+    jerseyNumber: row.jerseyNumber,
+    goalkeeper: row.position === 'GK',
+    started: row.started,
+  })) ?? [];
+  const roster = needsRecordingRoster ? recordingRoster : toResultRosterRows(lineup.data?.starters ?? [], lineup.data?.bench ?? []);
   // 득점자·카드·MVP를 고를 수 있는 대상이자 결과에 실릴 대상 — 선발 전원 + 교체 투입으로
   // 체크된 벤치 선수. 출전하지 않은 선수에게 골을 붙일 수 있으면 그 자체가 모순이므로
   // 드롭다운도 이 목록만 쓴다.

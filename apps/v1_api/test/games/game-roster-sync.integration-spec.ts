@@ -740,13 +740,11 @@ describe('경기 명단 계산 동기화 (Task 179)', () => {
       expect(rows.map((row) => row.displayNameSnapshot)).not.toContain(excludedName);
     });
 
-    it('팀원 폴백 팀은 멤버십이 바뀐 뒤(teamMembers 이벤트) 시작 전 경기 명단에서 나간 팀원이 빠진다', async () => {
+    it('선수 등록 이력이 없는 팀원 폴백 명단은 멤버십 이벤트 뒤 시작 전 경기에서 나간 팀원을 뺀다', async () => {
       const f = await seedLeague({ eligibleA: false });
       const [m1, m2] = f.teamA.members;
       const names = async (userIds: readonly string[]) =>
         (await prisma.v1UserProfile.findMany({ where: { userId: { in: [...userIds] } } })).map((row) => `name:${row.nickname}`).sort();
-      // 지운 선수 행만 있는 신청은 여전히 명단이 없는 팀(폴백)이다.
-      await prisma.v1TournamentPlayer.create({ data: { registrationId: f.registration.id, userId: m2, realName: '지운 선수', removedAt: new Date() } });
       const l1 = leagueSide(f, 'L1', f.teamA.id);
       const l2 = leagueSide(f, 'L2', f.teamA.id);
       const l1B = leagueSide(f, 'L1', f.teamB.id);
@@ -759,6 +757,34 @@ describe('경기 명단 계산 동기화 (Task 179)', () => {
 
       for (const target of [l1, l2]) expect(await rosterOf(target.gameId, target.sideId)).toEqual(await names([f.teamA.ownerId, m2]));
       expect((await latestLineup(l1B.gameId, l1B.sideId)).id).toBe(l1BBefore.id);
+    });
+
+    it('removed player registration history suppresses team-member fallback resync', async () => {
+      const f = await seedLeague({ eligibleA: false });
+      const [m1, m2] = f.teamA.members;
+      await prisma.v1TournamentPlayer.create({
+        data: { registrationId: f.registration.id, userId: m2, realName: '지운 선수', removedAt: new Date() },
+      });
+      const targets = [leagueSide(f, 'L1', f.teamA.id), leagueSide(f, 'L2', f.teamA.id)];
+      const before = await Promise.all(targets.map(async (target) => ({
+        lineup: await latestLineup(target.gameId, target.sideId),
+        roster: await rosterOf(target.gameId, target.sideId),
+      })));
+      const names = async (userIds: readonly string[]) =>
+        (await prisma.v1UserProfile.findMany({ where: { userId: { in: [...userIds] } } })).map((row) => `name:${row.nickname}`).sort();
+      expect(before.map((entry) => entry.roster)).toEqual([
+        await names([f.teamA.ownerId, m1, m2]),
+        await names([f.teamA.ownerId, m1, m2]),
+      ]);
+
+      await prisma.v1TeamMembership.updateMany({ where: { teamId: f.teamA.id, userId: m1 }, data: { status: 'left', leftAt: new Date() } });
+      await inTx((client) => enqueueRosterResync(client, teamMembersTargets([f.teamA.id])));
+      await drainWorker();
+
+      for (const [index, target] of targets.entries()) {
+        expect((await latestLineup(target.gameId, target.sideId)).id).toBe(before[index]?.lineup.id);
+        expect(await rosterOf(target.gameId, target.sideId)).toEqual(before[index]?.roster);
+      }
     });
 
     it('경기 시각을 결장 기간 안으로 옮기면(updateFixture) 그 경기에서만 빠진다', async () => {

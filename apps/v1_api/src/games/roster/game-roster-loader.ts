@@ -38,7 +38,7 @@ export async function loadCompetitionRosterBase(
     const team = (await readLeagueTeamRosters(tx, scope.competitionId, [scope.teamId])).get(scope.teamId);
     if (team === undefined) return null;
     return {
-      source: team.registeredPlayers.length > 0 ? 'REGISTRATION' : 'TEAM_MEMBERS',
+      source: team.registeredPlayerCount > 0 ? 'REGISTRATION' : 'TEAM_MEMBERS',
       entries: leagueTeamRosterBase(team).sort(rosterOrder),
     };
   }

@@ -1999,8 +1999,9 @@ export function useV1SaveTeamMatchLineup(teamMatchId: string) {
       v1Put<V1TeamMatchLineupSaveResult>(`/team-matches/${teamMatchId}/lineup`, vars.payload, {
         headers: { 'Idempotency-Key': vars.idempotencyKey },
       }),
-    onSuccess: () => {
+    onSuccess: (lineup) => {
       queryClient.invalidateQueries({ queryKey: [...v1Keys.teamMatch(teamMatchId), 'lineup'] });
+      if (lineup?.gameId) queryClient.invalidateQueries({ queryKey: v1Keys.gameLineups(lineup.gameId) });
     },
   });
 }
@@ -2573,8 +2574,9 @@ export function useV1SubmitTeamMatchLineup(teamMatchId: string) {
         { expectedVersion: vars.expectedVersion },
         { headers: { 'Idempotency-Key': vars.idempotencyKey } },
       ),
-    onSuccess: () => {
+    onSuccess: (lineup) => {
       queryClient.invalidateQueries({ queryKey: [...v1Keys.teamMatch(teamMatchId), 'lineup'] });
+      if (lineup?.gameId) queryClient.invalidateQueries({ queryKey: v1Keys.gameLineups(lineup.gameId) });
     },
   });
 }

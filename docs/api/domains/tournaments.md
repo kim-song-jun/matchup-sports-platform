@@ -7,6 +7,7 @@
 - 12강 BYE 슬롯과 WINNER 연결 하나를 가진 8강 경기만 허용한다. 다른 경기로 이동하거나 상대를 바꾸지 않는다.
   슬롯 FK, 실제 경기/게임의 홈·어웨이 팀, 승자 edge의 targetSide, 부전승 sortOrder를 대회 잠금+게임 행 잠금 안의 단일 트랜잭션으로 교환한다.
   이후 4강 진출 edge 및 원천 12강 경기 ID는 유지한다. 12강 결과가 이미 있어도 8강과 이후 경기가 시작 전이면 이동할 수 있다.
+  홈·어웨이를 교환해도 양 팀의 같은 경기 일정은 활성 상태와 기존 시각을 유지한다. 팀 교체 시에는 경기에서 빠진 팀의 일정만 취소한다.
 - 응답 data: `{ affectedTeamMatchIds: string[], side, sortOrder }`. `sortOrder`는 0부터 시작하는 표시 위치다.
   어드민 slot의 `position`은 고유 순번, 신규 `byeSortOrder: number | null`은 표시 위치다. 다른 슬롯 종류는 null.
 - 409: `BYE_SIDE_INVALID`(구조/소속 불일치), `BYE_SIDE_STALE`(현재 방향 불일치), `SLOT_LOCKED`(대상 또는 후속 경기 시작·기록·미무효 결과),

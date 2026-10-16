@@ -44,6 +44,13 @@ API/Web tsc 통과. POSIX 명령 기반 lint가 Windows 기본 셸에서 실행 
 alpha 변경 전 공개 그림 390/768/1440 캡처(`tmp/bye-side-before`), pageerror/HTTP 5xx 0. 관리자 인증 세션은 확보되지 않음.
 브라우저 PID 66092(부모55640), 스크립트 finally에서 종료. DB Docker 미가동으로 migration replay/통합 검증은 PR CI에서 수행한다.
 
+### PR #1957 리뷰 수정 (2026-10-16)
+- [x] 팀 이동·교환 시 같은 경기의 잔류 팀 일정은 취소하지 않는다. 단위 회귀 테스트에서 수정 전 교환/이동 2건 실패 → 수정 후 관련 52개 통과.
+- [x] `byeSortOrder: null` 응답을 기존 실DB 슬롯 응답 기대값에 반영하고, 양 팀 일정 ID·활성 상태·시각을 확인하는 실DB 교환 회귀 테스트 추가.
+- [x] Git LF 정본 스키마 해시 `8776cccbf35b17cca2bd962cd44fe09fa98542c0395304b109e2a00f04684d0b`로 fixture·릴리스 바인더·Docker 정본 클라이언트 증명·매니페스트 생성/검증 동기화. 이전 릴리스 허용 해시는 보존.
+- [x] API tsc 통과. 임시 LF 복사본에서 스키마 바인딩 7개와 릴리스 매니페스트 self-test 통과. WSL에 없는 jq는 공식 릴리스 체크섬 검증 후 임시 경로에서 사용·자동 삭제.
+- [ ] PostgreSQL 실DB 통합 테스트와 migration replay는 로컬 Docker 미가동으로 갱신된 PR CI에서 확인한다. 기존 alpha 관리자 클릭/3개 viewport QA는 여전히 미완료이며 이번 수정은 UI를 바꾸지 않는다.
+
 ## 2026-10-12 후속 기획 — 5조·20팀에서 12강 진출팀 자동 배치
 
 Status: Implemented / Validation in progress — Alpha 배포·실제 화면 검증 대기 (이 후속 범위만)

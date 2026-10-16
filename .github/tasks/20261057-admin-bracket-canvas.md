@@ -49,6 +49,8 @@ alpha 변경 전 공개 그림 390/768/1440 캡처(`tmp/bye-side-before`), pagee
 - [x] `byeSortOrder: null` 응답을 기존 실DB 슬롯 응답 기대값에 반영하고, 양 팀 일정 ID·활성 상태·시각을 확인하는 실DB 교환 회귀 테스트 추가.
 - [x] Git LF 정본 스키마 해시 `8776cccbf35b17cca2bd962cd44fe09fa98542c0395304b109e2a00f04684d0b`로 fixture·릴리스 바인더·Docker 정본 클라이언트 증명·매니페스트 생성/검증 동기화. 이전 릴리스 허용 해시는 보존.
 - [x] API tsc 통과. 임시 LF 복사본에서 스키마 바인딩 7개와 릴리스 매니페스트 self-test 통과. WSL에 없는 jq는 공식 릴리스 체크섬 검증 후 임시 경로에서 사용·자동 삭제.
+- [x] CI가 다음 단계에서 발견한 expand-contract 보정 SQL 미등록 해결: 기존 migration 여섯 문장에만 파일·정규화 SQL 일치 기준의 검토 사유를 등록. 게이트 self-test(미등록/다른 파일 거부 포함) 및 실제 PR diff 게이트 통과. migration 내용과 일반 판정 규칙은 유지.
+- 배포 제약: 표시 좌표 보정 후에는 기존 고정 인덱스 부전승 배정 API로 롤백하지 않는다. 이 migration과 대응하는 API를 함께 배포하고 장애 시 forward fix한다. 이전 릴리스 조회용 해시 허용은 이 쓰기 호환성을 보장하지 않는다.
 - [ ] PostgreSQL 실DB 통합 테스트와 migration replay는 로컬 Docker 미가동으로 갱신된 PR CI에서 확인한다. 기존 alpha 관리자 클릭/3개 viewport QA는 여전히 미완료이며 이번 수정은 UI를 바꾸지 않는다.
 
 ## 2026-10-12 후속 기획 — 5조·20팀에서 12강 진출팀 자동 배치

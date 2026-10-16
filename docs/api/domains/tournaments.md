@@ -14,6 +14,7 @@
   `BYE_POSITION_OCCUPIED`(위치 충돌), `COMMAND_CONCURRENCY_CONFLICT`(게임 잠금 경합). 잘못된 DTO/추가 필드는 400, 없는 슬롯은 404.
   실패하면 전체 롤백한다. 감사 action은 `tournament.bracket.bye.side`이며 이전/이후 방향·위치·대상/원천 경기 ID를 남긴다.
 - 새 12강 템플릿은 부전승 표시 위치 1·3·5·7(저장 0·2·4·6), 8강 HOME 배정으로 시작한다. 기존 템플릿은 migration에서 연결된 HOME/AWAY에 맞춰 표시 위치만 보정한다.
+  표시 좌표 보정 후에는 대응 API를 함께 배포해야 한다. 이전 고정 인덱스 부전승 배정 API로 롤백하면 쓰기 좌표가 어긋나므로 장애 시 forward fix한다.
   공개 그림은 저장된 첫 라운드 순서를 유지한다. 연결된 부전승의 임의 숫자 이동/삭제는 계속 거절하고 어드민 그림·목록의 홈·어웨이 선택기를 사용한다.
 - 검증: API `slots/bye-side.spec.ts`, `test/tournaments/tournament-slots.integration-spec.ts`, 웹 `bye-side-control.test.tsx`와 `tournament-bracket-graph.test.ts`.
 

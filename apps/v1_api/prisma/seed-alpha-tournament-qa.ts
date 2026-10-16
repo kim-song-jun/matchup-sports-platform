@@ -368,6 +368,8 @@ export function buildAlphaTournamentCampaignContent(
         }).formatToParts(registrationDeadlineAt).map((part) => {
           // ICU의 요일 구분 기호와 무관하게 상세 화면과 같은 괄호 표기를 유지한다.
           if (part.type === 'weekday') return `(${part.value})`;
+          if (part.type === 'dayPeriod' && part.value === 'AM') return '오전';
+          if (part.type === 'dayPeriod' && part.value === 'PM') return '오후';
           if (part.type === 'literal') return part.value.replace(/[()]/g, '');
           return part.value;
         }).join('')} (한국 시간)`,

@@ -57,7 +57,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 // league-matches.ts)이 정적으로 그린다. backHref는 이 경기가 속한 리그의 순위표/일정
 // 화면 — 딥링크(알림·리다이렉트)로 바로 들어와도 리그로 나갈 수 있다.
 export default async function LeagueFixturePage({ params }: Props) {
-  const { leagueId, fixtureId } = await params;
+  const { fixtureId } = await params;
   const fixture = await loadPublic<V1TeamMatch>(fixtureApiPath(fixtureId));
   if (!fixture.ok) {
     throw new Error('리그 경기 상세에 필요한 공개 경기 정보를 불러오지 못했어요');
@@ -68,42 +68,34 @@ export default async function LeagueFixturePage({ params }: Props) {
   // 존재하는 친선 팀매치가 잘못된 리그 fixture URL로 들어온 것은 upstream 장애가 아니라 route 404다.
   if (!detail.league) notFound();
   // 이미 공개 경기에서 확인한 실제 소속 리그를 기준으로 상세와 관련 공개 응답을 함께 seed 한다.
-  const actualLeagueId = detail?.league?.leagueId ?? leagueId;
-  let leagueDetail: V1PublicLeagueDetail | null = null;
-  let standings: V1LeagueStandingsResponse | null = null;
-  if (detail?.league) {
-    const leagueResult = await loadPublic<V1PublicLeagueDetail>(leaguePath(actualLeagueId));
-    if (!leagueResult.ok || !leagueResult.data) {
-      throw new Error('리그 경기 상세에 필요한 공개 리그 정보를 불러오지 못했어요');
-    }
-    leagueDetail = leagueResult.data;
-    const standingsResult = await loadPublic<V1LeagueStandingsResponse>(`${leaguePath(actualLeagueId)}/standings`);
-    standings = standingsResult.ok ? standingsResult.data : null;
+  const league = detail.league;
+  const actualLeagueId = league.leagueId;
+  const leagueResult = await loadPublic<V1PublicLeagueDetail>(leaguePath(actualLeagueId));
+  if (!leagueResult.ok || !leagueResult.data) {
+    throw new Error('리그 경기 상세에 필요한 공개 리그 정보를 불러오지 못했어요');
   }
+  const leagueDetail = leagueResult.data;
+  const standingsResult = await loadPublic<V1LeagueStandingsResponse>(`${leaguePath(actualLeagueId)}/standings`);
+  const standings = standingsResult.ok ? standingsResult.data : null;
   // 이벤트 canonical 은 실제 소속 리그 경로를 우선하고, 상위 리그 탐색은 아래 breadcrumb 로 제공한다.
-  const league = detail?.league ?? null;
-  const title = detail ? resolveFixtureTitle(detail, leagueDetail, fixtureId) : '';
-  const eventLd = detail
-    ? buildTeamMatchEventLd(
-        { ...detail, title },
-        fixtureId,
-        { path: fixturePath(league?.leagueId ?? leagueId, fixtureId) },
-      )
-    : null;
+  const title = resolveFixtureTitle(detail, leagueDetail, fixtureId);
+  const eventLd = buildTeamMatchEventLd(
+    { ...detail, title },
+    fixtureId,
+    { path: fixturePath(league.leagueId, fixtureId) },
+  );
 
   return (
     <>
       {eventLd ? <JsonLd data={eventLd} /> : null}
-      {detail && league ? (
-        <JsonLd
-          data={buildBreadcrumbLd([
-            { name: '대회', path: '/tournaments' },
-            { name: '정규 리그', path: '/tournaments?kind=league' },
-            { name: league.title, path: `/tournaments/${encodeURIComponent(league.leagueId)}` },
-            { name: title, path: fixturePath(league.leagueId, fixtureId) },
-          ])}
-        />
-      ) : null}
+      <JsonLd
+        data={buildBreadcrumbLd([
+          { name: '대회', path: '/tournaments' },
+          { name: '정규 리그', path: '/tournaments?kind=league' },
+          { name: league.title, path: `/tournaments/${encodeURIComponent(league.leagueId)}` },
+          { name: title, path: fixturePath(league.leagueId, fixtureId) },
+        ])}
+      />
       <LeagueFixtureDetailClient
         leagueId={actualLeagueId}
         fixtureId={fixtureId}

@@ -1,3 +1,5 @@
+리그 목록/상세 이미지 분리(2026-10-16): [후속 QA](./league-detail-media.md). API85/Web10·타입/패턴 PASS, DB integration은 Docker 미실행, alpha 3폭은 미배포로 0/3.
+
 ## 2026-10-14 — 리그 상세 대표 이미지·통합 순위 팀 마크
 
 [시나리오](./league-detail-media.md) · [Task 20261081](../../.github/tasks/20261081-league-detail-media.md). Web49/API40·양쪽 타입/패턴 PASS. 실제 alpha before 3폭 확인, after 배포 검증 대기. 제공 리그의 저장 대표 이미지는 null이며 참가 명단은 등록 선수 6/6/5명이다.

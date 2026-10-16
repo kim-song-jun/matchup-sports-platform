@@ -44,6 +44,11 @@ class UnparsableSqlError extends Error {}
 // weakens the gate for exactly one (file, statement) pair and nothing else.
 const REVIEWED_NON_ADDITIVE = [
   {
+    file: 'apps/v1_api/prisma/migrations/20261016070000_league_list_image/migration.sql',
+    statement: 'UPDATE "v1_tournaments" SET "list_image_url" = "cover_image_url" WHERE "kind" = \'regular_league\' AND "cover_image_url" IS NOT NULL',
+    reason: 'PR #1955 (2026-10-16): initialize only the nullable list_image_url column added immediately before this UPDATE in the same migration. Existing regular-league images must initially serve both list and detail. The source cover_image_url, uploaded files, tournament rows and every pre-existing column are unchanged; leagues without an image remain NULL. Older application instances ignore list_image_url and continue reading/writing cover_image_url, so this one-time copy does not prevent an application rollback. Subsequent PATCH requests deliberately edit only the supplied image field. This exact file/statement was verified by the real migration image-preservation integration test in API CI 38907223065; do not allow arbitrary UPDATE statements or edits to the migration.',
+  },
+  {
     file: "apps/v1_api/prisma/migrations/20261016090000_bye_side_layout/migration.sql",
     statement: "CREATE TEMP TABLE bye_layout_mapping ON COMMIT DROP AS SELECT s.id, s.group_id, (ARRAY[0,3,4,7])[s.position] AS old_order, (s.position - 1) * 2 + CASE WHEN m.away_slot_id = s.id THEN 1 ELSE 0 END AS new_order FROM v1_tournament_slots s JOIN v1_tournament_groups g ON g.id = s.group_id AND g.phase = 'round12' JOIN v1_team_matches m ON (m.home_slot_id = s.id OR m.away_slot_id = s.id) AND m.deleted_at IS NULL WHERE s.kind = 'BYE' AND s.position BETWEEN 1 AND 4",
     reason: "PR #1957: snapshots only round12 BYE slot identities and persisted nondeleted fixture sides in a connection-local TEMP table. ON COMMIT DROP removes the mapping; no persistent table, competition, opponent, result or advancement edge is changed.",
@@ -2426,6 +2431,31 @@ function selfTest() {
   }
   if (runReviewed([{ file: 'other.sql', statement: 'CREATE UNIQUE INDEX "X_a_b_key" ON "X"("a", "b")' }]).length !== 1) {
     fail('the allowlist must be scoped to its exact file, not match the same statement elsewhere');
+  }
+
+  // Exercise the actual league-image migration and its production review entry.
+  // A different predicate, destination column or file must not inherit approval.
+  {
+    const file = 'apps/v1_api/prisma/migrations/20261016070000_league_list_image/migration.sql';
+    const sql = readFileSync(new URL(`../../${file}`, import.meta.url), 'utf8');
+    const statements = parseStatements(sql, file).map((statement) => ({ file, statement }));
+    const check = (input) => {
+      const messages = [];
+      runAdditivityCheck(input, baseFunctionNames, (message) => messages.push(message));
+      return messages;
+    };
+    if (check(statements).length !== 0) fail('the real league-image migration must pass its exact review');
+    const backfill = statements.find(({ statement }) => /^UPDATE\s/.test(statement));
+    if (!backfill) fail('league-image migration backfill is missing');
+    const negatives = [
+      { ...backfill, file: 'other.sql' },
+      { ...backfill, statement: backfill.statement.replace("'regular_league'", "'regular_tournament'") },
+      { ...backfill, statement: backfill.statement.replace('"list_image_url"', '"cover_image_url"') },
+    ];
+    if (negatives.some((statement) => check([statement]).length !== 1)) {
+      fail('league-image approval must reject other files, scopes and destination columns');
+    }
+    console.log('[expand-contract-sql-v1] league-image migration review controls passed');
   }
 
   // **allowlist 의 객체가 닫혔는지 본다.** 이 파일은 한 배열에 항목을 모으는데, 양쪽

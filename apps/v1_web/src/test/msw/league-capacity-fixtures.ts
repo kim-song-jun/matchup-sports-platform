@@ -56,7 +56,7 @@ export function leagueCapacityPublicDetail(row: CapacityLeagueRow): V1PublicLeag
     minPlayers: detail.minPlayers, maxPlayers: detail.maxPlayers, maxTeams: detail.maxTeams,
     confirmedCount: detail.confirmedCount, pendingPaymentCount: detail.pendingPaymentCount,
     registrationDeadlineAt: detail.registrationDeadlineAt, registrationOpen: detail.registrationOpen,
-    sportCode: detail.sportCode, coverImageUrl: detail.coverImageUrl, entryFee: detail.entryFee,
+    sportCode: detail.sportCode, coverImageUrl: detail.coverImageUrl ?? detail.listImageUrl ?? null, listImageUrl: detail.listImageUrl, entryFee: detail.entryFee,
     entryFeeConfigured: detail.entryFeeConfiguredAt !== null, rulesText: row.settings.rulesText,
     plannedFixtureCount: detail.plannedFixtureCount, fixtures: detail.fixtures, seriesSiblings: [],
   };
@@ -76,7 +76,7 @@ export function createCapacityLeagueRow(input: V1CreateLeaguePayload & { readonl
       minPlayers: input.minPlayers ?? 1, maxPlayers: input.maxPlayers ?? null, maxTeams: input.maxTeams ?? null,
       plannedFixtureCount: input.plannedFixtureCount ?? null,
       confirmedCount: 0, pendingPaymentCount: 0, registrationDeadlineAt: null, registrationOpen: false,
-      sportCode: 'futsal', coverImageUrl: null, entryFee: 0, entryFeeConfiguredAt: null,
+      sportCode: 'futsal', coverImageUrl: null, listImageUrl: null, entryFee: 0, entryFeeConfiguredAt: null,
       bankName: null, bankAccount: null, bankHolder: null,
       activeRegistrationCount: 0, confirmedRegistrationCount: 0, fixtures: [],
     },

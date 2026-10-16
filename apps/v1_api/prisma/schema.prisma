@@ -2627,6 +2627,7 @@ model V1Tournament {
   venueProvider              String?                     @map("venue_provider")
   venueProviderId            String?                     @map("venue_provider_id")
   coverImageUrl              String?                     @map("cover_image_url")
+  listImageUrl               String?                     @map("list_image_url")
   teamCount                  Int                         @default(8) @map("team_count")
   minPlayers                 Int                         @default(6) @map("min_players")
   /// 팀 등록 명단 정원. null = 제한 없음(리그 기본값 — 팀 전원이 명단·라인업에 오른다). 대회는 항상 값을 채운다.

@@ -704,6 +704,7 @@ export class LeagueSeriesAdminService {
           select: {
             tier: true,
             coverImageUrl: true,
+            listImageUrl: true,
             entryFee: true,
             bankName: true,
             bankAccount: true,

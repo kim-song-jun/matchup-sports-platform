@@ -69,4 +69,3 @@ export function TournamentFlowSection({ tournament }: { tournament: FlowCompetit
     </section>
   );
 }
-

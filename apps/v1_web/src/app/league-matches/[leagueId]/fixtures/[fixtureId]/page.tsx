@@ -20,15 +20,13 @@ const fixturePath = (leagueId: string, fixtureId: string) =>
   `${leaguePath(leagueId)}/fixtures/${encodeURIComponent(fixtureId)}`;
 
 // 저장된 대진 제목의 주차는 생성 시점 값이라 현재 일정에서 다시 파생한다.
-function resolveFixtureTitle(fixture: V1TeamMatch, league: V1PublicLeagueDetail | null, fixtureId: string): string {
-  if (!league) return fixture.title;
+function resolveFixtureTitle(fixture: V1TeamMatch, league: V1PublicLeagueDetail, fixtureId: string): string {
   const target = league.fixtures.find((item) => item.teamMatchId === fixtureId);
   return target ? withDerivedWeek(fixture.title, leagueFixtureWeekNumber(league.fixtures, target)) : fixture.title;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { leagueId, fixtureId } = await params;
-  const path = fixturePath(leagueId, fixtureId);
+  const { fixtureId } = await params;
   const fixture = await loadPublic<V1TeamMatch>(fixtureApiPath(fixtureId));
   if (!fixture.ok) {
     return buildNoIndexMetadata('리그 경기 정보를 확인할 수 없어요');
@@ -44,8 +42,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const leagueDetail = leagueResult.data;
   const title = resolveFixtureTitle(fixture.data, leagueDetail, fixtureId);
   // 주소의 leagueId 가 틀려도(깨진 링크) canonical 은 경기가 실제로 속한 리그를 가리킨다.
-  const canonical = leagueRef ? fixturePath(leagueRef.leagueId, fixtureId) : path;
-  const parts = [leagueRef?.title ?? '정규 리그', formatTournamentDateTimeLong(startsAt), place?.name].filter(Boolean);
+  const canonical = fixturePath(leagueRef.leagueId, fixtureId);
+  const parts = [leagueRef.title, formatTournamentDateTimeLong(startsAt), place?.name].filter(Boolean);
   return buildPublicMetadata({
     title,
     description: `${parts.join(' · ')}. 리그 경기의 일정과 결과를 확인해 보세요.`,

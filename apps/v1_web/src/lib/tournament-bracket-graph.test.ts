@@ -5,6 +5,20 @@ const fixture = (id: string, sources: V1TournamentFixture['bracketSources'] = []
 const source = (fixtureId: string, side: 'HOME' | 'AWAY') => ({ fixtureId, side, outcome: 'WINNER' as const });
 
 describe('경기별 진출 그래프', () => {
+  it('연결 완료 여부와 무관하게 저장한 부전승 위아래 순서를 유지한다', () => {
+    for (const away of [false, true]) {
+      const groups = [{ phase: 'round12', groupTeams: [{ id: 'bye', registrationId: 'team', isBye: true, sortOrder: away ? 1 : 0 }] }] as V1TournamentGroup[];
+      const rounds = [
+        { key: 'round12', label: '12강', fixtures: [fixture('r1')] },
+        { key: 'quarter', label: '8강', fixtures: [{ ...fixture('q1', [source('r1', away ? 'HOME' : 'AWAY')]),
+          homeRegistrationId: away ? null : 'team', awayRegistrationId: away ? 'team' : null }] },
+      ];
+      const graph = buildBracketGraph(rounds, groups);
+      const order = graph.nodes.filter((node) => node.round === 'round12').sort((a, b) => a.y - b.y).map((node) => node.id);
+      expect(order).toEqual(away ? ['r1', 'bye-slot:bye'] : ['bye-slot:bye', 'r1']);
+      expect(graph.edges.find((edge) => edge.outcome === 'BYE')?.side).toBe(away ? 'AWAY' : 'HOME');
+    }
+  });
   it('8강 네 경기를 각각의 4강과 결승에 연결하며 교차 없이 부모를 가운데 배치한다', () => {
     const graph = buildBracketGraph([
       { key: 'quarter', label: '8강', fixtures: [fixture('q1'), fixture('q2'), fixture('q3'), fixture('q4')] },

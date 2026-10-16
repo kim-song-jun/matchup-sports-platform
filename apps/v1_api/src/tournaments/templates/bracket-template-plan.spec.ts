@@ -93,9 +93,9 @@ describe('planBracketTemplate — 12강 배선(스펙 S2)', () => {
   const p = plan({ kind: 'knockout', size: 12, thirdPlace: true });
   const fixture = (key: string) => p.fixtures.find((f) => f.key === key)!;
 
-  it('BYE 자리 position 1~4 는 ByeSlot sortOrder 0,3,4,7 에 대응한다', () => {
-    expect(ROUND12_BYE_SORT_ORDERS).toEqual([0, 3, 4, 7]);
-    expect(p.byeSlots).toEqual([0, 3, 4, 7].map((sortOrder) => ({ groupKey: 'round12', sortOrder })));
+  it('BYE 자리 position 1~4 는 기본 홈 배치 sortOrder 0,2,4,6 에 대응한다', () => {
+    expect(ROUND12_BYE_SORT_ORDERS).toEqual([0, 2, 4, 6]);
+    expect(p.byeSlots).toEqual([0, 2, 4, 6].map((sortOrder) => ({ groupKey: 'round12', sortOrder })));
     expect(p.slots.filter((s) => s.kind === 'BYE').map((s) => [s.position, s.groupKey])).toEqual(
       [1, 2, 3, 4].map((n) => [n, 'round12']),
     );

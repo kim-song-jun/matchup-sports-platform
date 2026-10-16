@@ -4069,6 +4069,7 @@ model V1TournamentSlot {
   kind           V1TournamentSlotKind @default(ENTRY)
   groupId        String?              @map("group_id")
   position       Int
+  byeSortOrder   Int?                 @map("bye_sort_order")
   sourceGroupId  String?              @map("source_group_id")
   registrationId String?              @map("registration_id")
   createdAt      DateTime             @default(now()) @map("created_at")

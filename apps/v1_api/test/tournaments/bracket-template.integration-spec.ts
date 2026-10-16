@@ -49,13 +49,13 @@ describe('대진 템플릿 실행기 (PostgreSQL)', () => {
     expect([quarter1.homeSlot?.kind, quarter1.homeSlot?.position, quarter1.awaySlot?.position]).toEqual(['ENTRY', 1, 2]);
   });
 
-  it('토너먼트 12강 + 3·4위전: BYE 자리 4 ↔ ByeSlot sortOrder 0,3,4,7, 8강 i번 홈 = BYE i · 어웨이 = 12강 i번 WINNER', async () => {
+  it('토너먼트 12강 + 3·4위전: BYE 자리 4 ↔ ByeSlot sortOrder 0,2,4,6, 8강 i번 홈 = BYE i · 어웨이 = 12강 i번 WINNER', async () => {
     const { tournamentId } = await seedBracketTournament(prisma, { label: 'ko12', format: 'knockout', teamCount: 0 });
     await expect(templates.apply(user, tournamentId, { kind: 'knockout', size: 12, thirdPlace: true }))
       .resolves.toEqual({ groups: 5, slots: 12, fixtures: 12, edges: 12 });
 
     const byes = await prisma.v1TournamentByeSlot.findMany({ where: { group: { tournamentId } }, include: { group: true }, orderBy: { sortOrder: 'asc' } });
-    expect(byes.map((b) => [b.group.phase, b.sortOrder])).toEqual([['round12', 0], ['round12', 3], ['round12', 4], ['round12', 7]]);
+    expect(byes.map((b) => [b.group.phase, b.sortOrder])).toEqual([['round12', 0], ['round12', 2], ['round12', 4], ['round12', 6]]);
 
     const fixtures = await liveFixtures(tournamentId);
     const round12 = fixtures.filter((f) => f.round === '12강');

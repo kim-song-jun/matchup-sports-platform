@@ -9,7 +9,7 @@ describe('serializeAdminBracketSlot', () => {
 
   it('배정된 자리는 팀 이름과 등록 id 를, 빈 자리는 둘 다 null 을 낸다', () => {
     expect(serializeAdminBracketSlot(row({ registrationId: 'reg-1', registration: { team: { name: '서울 FC' } } }))).toEqual({
-      id: 'slot-1', kind: 'ENTRY', groupId: 'g-a', sourceGroupId: null, position: 2, label: 'A조 2번', registrationId: 'reg-1', teamName: '서울 FC',
+      id: 'slot-1', kind: 'ENTRY', groupId: 'g-a', sourceGroupId: null, position: 2, byeSortOrder: null, label: 'A조 2번', registrationId: 'reg-1', teamName: '서울 FC',
     });
     expect(serializeAdminBracketSlot(row({}))).toMatchObject({ registrationId: null, teamName: null });
   });

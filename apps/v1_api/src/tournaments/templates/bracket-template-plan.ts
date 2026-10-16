@@ -18,7 +18,7 @@ export type BracketTemplatePlan = { groups: PlanGroup[]; slots: PlanSlot[]; fixt
 export const BRACKET_TEMPLATE_MAX_FIXTURES = 240;
 
 /** BYE 자리 position(1부터) → 12강 그룹 `V1TournamentByeSlot.sortOrder`. 공개 그래프의 12강 기본 부전승 위치와 같다. */
-export const ROUND12_BYE_SORT_ORDERS = [0, 3, 4, 7] as const;
+export const ROUND12_BYE_SORT_ORDERS = [0, 2, 4, 6] as const;
 
 function unsupported(message: string): never {
   throw new UnprocessableEntityException({ code: 'BRACKET_TEMPLATE_UNSUPPORTED', message });

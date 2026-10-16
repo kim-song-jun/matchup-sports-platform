@@ -189,6 +189,7 @@ export class BracketTemplateService {
           kind: slot.kind,
           groupId: slot.groupKey === null ? null : lookup(groupIds, slot.groupKey, 'group'),
           position: slot.position,
+          byeSortOrder: slot.kind === 'BYE' ? (slot.position - 1) * 2 : null,
           sourceGroupId: slot.sourceGroupKey === null ? null : lookup(groupIds, slot.sourceGroupKey, 'group'),
         };
       }),

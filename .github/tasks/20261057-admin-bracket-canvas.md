@@ -1,5 +1,49 @@
 # Task 20261057: 어드민 대진 그림 편집기 — 그림 먼저, 팀은 자리에, 결과는 칸에서
 
+## 2026-10-16 후속 — 부전승 홈·어웨이와 저장 배치 일치
+
+Status: In Progress
+
+### Context / Goal
+12강 템플릿은 부전승 sortOrder 0·3·4·7, 8강 연결은 모두 HOME으로 저장해 공개 그림이 1·3·5·7로 재배열됐다.
+부전승의 슬롯 식별 번호와 표시 위치를 분리하고, 그림·목록·편집·승자 진출 자리를 같은 저장 상태로 맞춘다.
+
+### Original Conditions / User Scenarios
+- [ ] 어드민 그림의 8강 경기에서 부전승 홈(위)·어웨이(아래)를 선택한다.
+- [ ] 해당 경기 안에서만 부전승과 12강 승자 자리를 맞교환한다. 상대 및 이후 진출 연결은 유지한다.
+- [ ] 기존 대진의 표시 위치를 현재 연결에 맞게 migration으로 보정한다.
+- [ ] 경기 시작·결과·이벤트가 있는 대상 및 후속 경기는 거절한다.
+- [ ] 실패는 전체 롤백하며 비관리자/support 쓰기는 거절한다.
+
+### Test Scenarios / Acceptance Criteria
+- [ ] 빈 팀/배정된 팀/12강 승자 확정 후의 교환 및 재요청.
+- [ ] 반대 방향 교환, 이후 부전승 팀 교체, 조간 자동 배정 호환.
+- [ ] 그림·목록·편집·공개 화면의 순서와 홈·어웨이 일치.
+- [ ] 관련 API·DTO·UI·레이아웃 테스트, 타입 검사, migration replay.
+- [ ] alpha 실제 화면 검증 390/768/1440; 배포 전에는 완료로 표시하지 않는다.
+
+### Parallel Work Breakdown / Owned Files
+단일 에이전트 순차 실행. API 슬롯·템플릿·migration → 웹 공용 편집 컨트롤·목록·그래프 → 검증·문서.
+전용 작업트리 `_worktrees/bye-side-consistency`, base `origin/dev` a8bd190a9. 다른 작업트리/사용자 WIP 수정 금지.
+
+### Tech Debt Resolved / Security Notes
+slot position을 화면 순서로 역산하던 결합 제거. 대회 잠금과 게임 행 잠금, 서버 권한/소속/결과 검사, 감사로그 유지.
+
+### Risks & Dependencies / Ambiguity Log
+사용자가 승인한 UI는 기존 그림 상세 패널의 홈·어웨이 선택이다. 새 화면이나 다른 경기로 이동은 범위 밖.
+기존 대진 보정은 연결·상대를 바꾸지 않으며 migration 배포가 필요하다. Docker 미가동 시 DB replay 증거는 별도 확보해야 한다.
+
+### Progress Snapshot
+- [x] 최신 dev 조사, 전용 worktree 생성, 구현 범위 확정.
+- [x] API/저장 배치 구현 및 단위 테스트. PostgreSQL 통합 실행은 CI 대기.
+- [x] 웹·목록·공개 표시와 fixture 동기화.
+- [ ] 검증 및 alpha 배포/실측.
+
+검증 기록: API 관련 100개 통과 후 추가 권한/DTO 포함 28개 통과. 웹 관련 124개 통과 후 추가 표시 계약 포함 16개 통과.
+API/Web tsc 통과. POSIX 명령 기반 lint가 Windows 기본 셸에서 실행 실패했으나 Git Bash로 두 패턴 게이트를 재실행해 통과.
+alpha 변경 전 공개 그림 390/768/1440 캡처(`tmp/bye-side-before`), pageerror/HTTP 5xx 0. 관리자 인증 세션은 확보되지 않음.
+브라우저 PID 66092(부모55640), 스크립트 finally에서 종료. DB Docker 미가동으로 migration replay/통합 검증은 PR CI에서 수행한다.
+
 ## 2026-10-12 후속 기획 — 5조·20팀에서 12강 진출팀 자동 배치
 
 Status: Implemented / Validation in progress — Alpha 배포·실제 화면 검증 대기 (이 후속 범위만)

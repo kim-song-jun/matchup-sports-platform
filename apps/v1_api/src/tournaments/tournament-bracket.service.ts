@@ -1368,7 +1368,8 @@ export class TournamentBracketService {
         groupTeams: [...g.groupTeams.map((gt) => ({
           ...this.serializeGroupTeam(gt),
           teamName: gt.registration.team.name,
-        })), ...(g.byeSlots ?? []).map((slot) => ({ ...this.serializeGroupTeam({ ...slot, registrationId: null, isBye: true }), teamName: null }))],
+        })), ...(g.byeSlots ?? []).map((slot) => ({ ...this.serializeGroupTeam({ ...slot, registrationId: null, isBye: true }), teamName: null }))]
+          .sort((a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id)),
       })),
       fixtures: [...fixtureRows.values()].sort((a, b) =>
         a.round.localeCompare(b.round) || a.fixtureNumber - b.fixtureNumber || a.legNumber - b.legNumber),

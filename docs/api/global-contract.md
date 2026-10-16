@@ -1,5 +1,7 @@
 # Global v1 API contract
 
+Personal-match detail exposes the stored `isOnline` boolean (default `false`). `PATCH /api/v1/admin/matches/:matchId/online` accepts a strict boolean and requires mutation-admin authority; it atomically updates classification and its before/after audit, returning `{matchId,isOnline,changed}`. Repeating the same classification returns `changed:false`. This metadata mutation does not acquire the versioned game-command contract below and does not alter public-list access, canonical URLs or indexability. See [matches](./domains/matches.md) and [admin/ops](./domains/admin-and-ops.md).
+
 Public `GET /tournaments/:id/standings/overall` rows include `teamLogoUrl: string | null` for both tournaments and regular leagues. Hidden participant identity returns `null` for the logo, matching the team name gate. See the [tournaments contract](./domains/tournaments.md#overall-standings--two-competition-kinds-two-row-shapes).
 
 조별 성적 기반 12강 배정은 [tournaments](./domains/tournaments.md)의 `round12-preview` / `round12-assignments` 계약을 따른다. 읽기는 support 포함, 쓰기는 mutation admin만 허용한다. 미리보기의 버전은 저장 시 다시 검증하며 성적·대진 변경은 409로 차단한다. 12자리 및 부전승·8강 직행 반영은 단일 트랜잭션이며 부분 성공 응답은 없다.

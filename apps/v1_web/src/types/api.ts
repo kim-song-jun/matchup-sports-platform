@@ -455,6 +455,8 @@ export type V1VenueSnapshotPayload = {
 };
 
 export type V1Match = {
+  /** 공개 목록에는 없고 상세 응답에만 포함돼요. 값이 없으면 기존 오프라인 매치예요. */
+  isOnline?: boolean;
   canComplete?: boolean;
   canWithdraw?: boolean;
   completedAt?: string | null;

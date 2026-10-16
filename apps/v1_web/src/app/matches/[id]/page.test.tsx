@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fetchPublicV1 } from '@/lib/seo';
+import { buildNoIndexMetadata, buildPublicMetadata, fetchPublicV1 } from '@/lib/seo';
 import { buildMatchEventLd } from '@/lib/structured-data';
-import MatchDetailPage from './page';
+import MatchDetailPage, { generateMetadata } from './page';
 
 vi.mock('next/navigation', () => ({
   notFound: vi.fn(() => {
@@ -11,12 +11,15 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/lib/seo', () => ({
   fetchPublicV1: vi.fn(),
-  buildNoIndexMetadata: vi.fn(),
-  buildPublicMetadata: vi.fn(),
+  buildNoIndexMetadata: vi.fn(() => ({ robots: { index: false, follow: false } })),
+  buildPublicMetadata: vi.fn(() => ({ robots: { index: true, follow: true }, alternates: { canonical: 'https://teameet.co.kr/matches/match-1' } })),
+  matchDescriptionFallback: vi.fn(() => '온라인 풋살 매치예요.'),
   metadataDescription: vi.fn(),
 }));
 
-vi.mock('@/lib/structured-data', () => ({ buildMatchEventLd: vi.fn(() => ({ '@type': 'SportsEvent' })) }));
+vi.mock('@/lib/structured-data', () => ({
+  buildMatchEventLd: vi.fn((match: { isOnline?: boolean }) => match.isOnline ? null : ({ '@type': 'SportsEvent' })),
+}));
 vi.mock('@/components/seo/json-ld', () => ({ JsonLd: () => null }));
 vi.mock('@/components/matches/matches-client', () => ({
   MatchDetailPageClient: () => null,
@@ -49,16 +52,45 @@ describe('MatchDetailPage (server)', () => {
     const element = await MatchDetailPage({ params: Promise.resolve({ id: 'match-1' }) });
 
     expect(findProps(element, 'matchId')).toMatchObject({ matchId: 'match-1', seed: match });
+    expect(fetchPublicV1Mock).toHaveBeenCalledWith('/matches/match-1', { cache: 'no-store' });
   });
 
   it('같은 응답으로 만든 SportsEvent 구조화 데이터를 함께 렌더한다', async () => {
-    const match = { id: 'match-1', title: '주말 풋살' };
+    const match = { id: 'match-1', title: '주말 풋살', isOnline: false };
     fetchPublicV1Mock.mockResolvedValue(match as never);
 
     const element = await MatchDetailPage({ params: Promise.resolve({ id: 'match-1' }) });
 
     expect(vi.mocked(buildMatchEventLd)).toHaveBeenCalledWith(match, 'match-1');
     expect(findProps(element, 'data')).toEqual({ data: { '@type': 'SportsEvent' } });
+  });
+
+  it('온라인 장소 매치도 공개 상세 메타데이터 경로를 유지한다', async () => {
+    fetchPublicV1Mock.mockResolvedValue({
+      id: 'match-1', title: '온라인 풋살 경기 안내', sportName: '풋살', placeName: '온라인 경기장', isOnline: true,
+    } as never);
+
+    const metadata = await generateMetadata({ params: Promise.resolve({ id: 'match-1' }) });
+
+    expect(fetchPublicV1Mock).toHaveBeenCalledWith('/matches/match-1', { cache: 'no-store' });
+    expect(vi.mocked(buildPublicMetadata)).toHaveBeenCalledWith(expect.objectContaining({ path: '/matches/match-1' }));
+    expect(vi.mocked(buildNoIndexMetadata)).not.toHaveBeenCalled();
+    expect(metadata).toMatchObject({
+      robots: { index: true, follow: true },
+      alternates: { canonical: 'https://teameet.co.kr/matches/match-1' },
+    });
+  });
+
+  it('온라인 매치도 상세 응답 seed 를 유지하고 SportsEvent JSON-LD 만 생략한다', async () => {
+    const match = { id: 'match-1', matchId: 'match-1', title: '온라인 풋살', isOnline: true };
+    fetchPublicV1Mock.mockResolvedValue(match as never);
+
+    const element = await MatchDetailPage({ params: Promise.resolve({ id: 'match-1' }) });
+
+    expect(findProps(element, 'matchId')).toMatchObject({ matchId: 'match-1', seed: match });
+    expect(vi.mocked(buildMatchEventLd)).toHaveBeenCalledWith(match, 'match-1');
+    expect(findProps(element, 'data')).toBeUndefined();
+    expect(fetchPublicV1Mock).toHaveBeenCalledWith('/matches/match-1', { cache: 'no-store' });
   });
 
   it('없는 매치는 notFound 로 끝난다', async () => {

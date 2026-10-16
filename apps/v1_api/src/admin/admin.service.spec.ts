@@ -530,6 +530,63 @@ describe('AdminService.changeMatchStatus — 이전 상태를 트랜잭션 안�
   });
 });
 
+describe('AdminService.setMatchOnline', () => {
+  function setup(adminRecord: unknown = actorAdminRecord, deletedAt: Date | null = null) {
+    let match = { id: 'match-1', isOnline: false, deletedAt };
+    const prisma = {
+      v1AdminUser: { findUnique: jest.fn().mockResolvedValue(adminRecord) },
+      v1Match: {
+        findUnique: jest.fn().mockImplementation(async () => match),
+        update: jest.fn().mockImplementation(async ({ data }: { data: { isOnline: boolean } }) => {
+          match = { ...match, ...data };
+          return match;
+        }),
+      },
+      v1AdminActionLog: { create: jest.fn().mockResolvedValue({ id: 'audit-1' }) },
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      $transaction: jest.fn(),
+    };
+    prisma.$transaction.mockImplementation((callback: (tx: unknown) => Promise<unknown>) => callback(prisma));
+    return { service: new AdminService(prisma as never), prisma };
+  }
+
+  it('locks, updates and records before/after values once; repeating the same value is idempotent', async () => {
+    const { service, prisma } = setup();
+
+    await expect(service.setMatchOnline(actorAuthUser, 'match-1', { isOnline: true })).resolves.toMatchObject({
+      matchId: 'match-1', isOnline: true, changed: true,
+    });
+    await expect(service.setMatchOnline(actorAuthUser, 'match-1', { isOnline: true })).resolves.toMatchObject({
+      matchId: 'match-1', isOnline: true, changed: false,
+    });
+
+    expect(prisma.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(prisma.v1Match.findUnique.mock.invocationCallOrder[0]);
+    expect(prisma.v1Match.update).toHaveBeenCalledTimes(1);
+    expect(prisma.v1AdminActionLog.create).toHaveBeenCalledTimes(1);
+    expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        action: 'match.online.update', targetType: 'match', targetId: 'match-1',
+        beforeJson: { isOnline: false }, afterJson: { isOnline: true },
+      }),
+    }));
+  });
+
+  it('requires an active authorized admin before starting the transaction', async () => {
+    const { service, prisma } = setup(null);
+
+    await expect(service.setMatchOnline(actorAuthUser, 'match-1', { isOnline: true })).rejects.toMatchObject({ status: 403 });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('treats a soft-deleted match as missing and does not mutate or audit it', async () => {
+    const { service, prisma } = setup(actorAdminRecord, new Date('2026-10-01T00:00:00.000Z'));
+
+    await expect(service.setMatchOnline(actorAuthUser, 'match-1', { isOnline: true })).rejects.toMatchObject({ status: 404 });
+    expect(prisma.v1Match.update).not.toHaveBeenCalled();
+    expect(prisma.v1AdminActionLog.create).not.toHaveBeenCalled();
+  });
+});
+
 
 
 describe('AdminService.changeTeamMatchStatus — competition ownership', () => {

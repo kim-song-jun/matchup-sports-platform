@@ -588,7 +588,8 @@ export const gameSchemaSourceManifest = {
   // 2026-10-14 Task 20261082: additive V1GameRosterRole + back-relations, backed by
   // 20261014180000_v1_game_roster_goalkeepers. Existing game columns and bound historical migration unchanged.
   // Re-pin the combined committed LF schema, retaining both additive migrations.
-  schema: '89ccedfb1f48f088a5f61ceede57e7f520a4b40a7ad9862c3d817d4cefc84ae0',
+  // 2026-10-17: additive V1Match.isOnline; historical game migration unchanged.
+  schema: 'f24a600c8720322b3222aa7563a92e7122620ed8b7ff9cdc7ef2e54b989ca04d',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

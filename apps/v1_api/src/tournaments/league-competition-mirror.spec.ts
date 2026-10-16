@@ -131,6 +131,7 @@ describe('leagueMirrorCreateData — 시즌 승계(inherited)', () => {
   };
   const inherited = {
     coverImageUrl: '/uploads/2026/10/cover.webp',
+    listImageUrl: '/uploads/2026/10/list.webp',
     entryFee: 70000,
     bankName: '국민은행',
     bankAccount: '123-456-789012',

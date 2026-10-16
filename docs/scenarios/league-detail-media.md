@@ -17,3 +17,10 @@ Task: [20261081](../../.github/tasks/20261081-league-detail-media.md)
 - Web 49/API 40 회귀 통과, 양쪽 타입·패턴 검사 통과.
 - After: dev 배포 후 실제 3폭 검증 대기. 단위 테스트를 alpha 화면 PASS로 표현하지 않는다.
 - 추가 실제 이미지 시나리오: 완료 리그 `/tournaments/85a7c32f-17c7-485c-9d27-128406ebaa91`의 API는 coverImageUrl을 반환하지만 before 390/768/1440에서 coverVisible=false. 해당 리그를 이미지 after QA에 사용한다.
+
+## 목록/상세 이미지 분리 후속 QA (2026-10-16)
+- 관리자 owner/ops: 목록 A·상세 B 저장 후 새로고침해 독립 보존 확인. 한쪽 제거 시 다른 저장값은 유지하고 공개 화면은 남은 이미지를 공유. support는 변경 금지.
+- 기존 이미지 보유 리그: migration 후 두 DB 필드가 기존 URL과 동일한지 확인. 일반 대회와 이미지 없는 리그는 영향 없음. 다음 시즌은 두 필드를 승계.
+- 로컬 검증: API 85 / Web 10 단위 테스트, API/Web 타입·패턴 검사 PASS. 공개 상세 MSW fallback 보완.
+- DB integration: Docker daemon 미실행으로 미검증. migration 파일을 임시 테이블에 실행하는 보존 회귀 테스트 포함, CI/DB 실행 필요.
+- Alpha 390/768/1440: 0/3, 아직 feature branch 미배포. dev 머지 후 admin 편집·공개 목록/상세 클릭, screenshot·console/network·cleanup 증거 필요. 기존 상세 미디어 before 기록을 이번 두 이미지 편집의 after로 간주하지 않음.

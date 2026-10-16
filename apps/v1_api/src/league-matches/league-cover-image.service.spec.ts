@@ -5,18 +5,18 @@ import type { PrismaService } from '../prisma/prisma.service';
 import { LeagueCoverImageService } from './league-cover-image.service';
 
 const user = { id: 'admin-1' } as V1AuthUser;
-type Row = { id: string; coverImageUrl: string | null; deletedAt: Date | null };
+type Row = { id: string; coverImageUrl: string | null; listImageUrl?: string | null; deletedAt: Date | null };
 
 function setup(rows: Row[]) {
   const logAdminAction = jest.fn();
   const getMutationAdmin = jest.fn(async () => ({ userId: 'admin-1' }));
   const tx = {
     // kind 필터는 SQL 쪽 — 대회 id 는 행이 없는 것으로 흉내낸다.
-    $queryRaw: jest.fn(async (_strings: TemplateStringsArray, id: string) => rows.filter((r) => r.id === id).map((r) => ({ ...r }))),
+    $queryRaw: jest.fn(async (_strings: TemplateStringsArray, id: string) => rows.filter((r) => r.id === id).map((r) => ({ listImageUrl: null, ...r }))),
     v1Tournament: {
-      update: jest.fn(async ({ where, data }: { where: { id: string }; data: { coverImageUrl: string | null } }) => {
+      update: jest.fn(async ({ where, data }: { where: { id: string }; data: { coverImageUrl: string | null; listImageUrl: string | null } }) => {
         const row = rows.find((r) => r.id === where.id)!;
-        row.coverImageUrl = data.coverImageUrl;
+        Object.assign(row, data);
       }),
     },
   };
@@ -47,14 +47,14 @@ describe('LeagueCoverImageService.update', () => {
       { id: 'l2', coverImageUrl: A, deletedAt: null },
     ]);
     await expect(service.update(user, 'l1', { coverImageUrl: B })).resolves.toEqual({
-      leagueId: 'l1', coverImageUrl: B, alreadyProcessed: false,
+      leagueId: 'l1', coverImageUrl: B, listImageUrl: null, alreadyProcessed: false,
     });
     expect(rows.map((r) => r.coverImageUrl)).toEqual([B, A]);
     expect(logAdminAction).toHaveBeenCalledWith(
       { userId: 'admin-1' },
       {
         action: 'league_match.cover_image_updated', targetType: 'league_match', targetId: 'l1',
-        reason: null, beforeJson: { coverImageUrl: A }, afterJson: { coverImageUrl: B },
+        reason: null, beforeJson: { coverImageUrl: A, listImageUrl: null }, afterJson: { coverImageUrl: B, listImageUrl: null },
       },
       tx,
     );
@@ -71,10 +71,22 @@ describe('LeagueCoverImageService.update', () => {
   it.each([A, null])('같은 값(%p)은 쓰기·감사 없이 alreadyProcessed 다', async (value) => {
     const { service, tx, logAdminAction } = setup([{ id: 'l1', coverImageUrl: value, deletedAt: null }]);
     await expect(service.update(user, 'l1', { coverImageUrl: value })).resolves.toEqual({
-      leagueId: 'l1', coverImageUrl: value, alreadyProcessed: true,
+      leagueId: 'l1', coverImageUrl: value, listImageUrl: null, alreadyProcessed: true,
     });
     expect(tx.v1Tournament.update).not.toHaveBeenCalled();
     expect(logAdminAction).not.toHaveBeenCalled();
+  });
+
+  it('목록/상세를 독립적으로 저장·제거하고 생략한 값은 보존한다', async () => {
+    const { service, rows } = setup([{ id: 'l1', coverImageUrl: A, listImageUrl: A, deletedAt: null }]);
+    await service.update(user, 'l1', { listImageUrl: B });
+    expect(rows[0]).toMatchObject({ coverImageUrl: A, listImageUrl: B });
+    await service.update(user, 'l1', { coverImageUrl: null });
+    expect(rows[0]).toMatchObject({ coverImageUrl: null, listImageUrl: B });
+    await service.update(user, 'l1', { listImageUrl: null });
+    expect(rows[0]).toMatchObject({ coverImageUrl: null, listImageUrl: null });
+    await service.update(user, 'l1', { listImageUrl: A, coverImageUrl: B });
+    expect(rows[0]).toMatchObject({ coverImageUrl: B, listImageUrl: A });
   });
 
   it('행이 없으면(대회 id 포함) 404, 소프트삭제는 409 LEAGUE_MIRROR_MISSING', async () => {

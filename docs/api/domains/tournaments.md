@@ -2,6 +2,8 @@
 
 ## Read Endpoints
 
+Regular-league list cards expose the effective list image as `coverImageUrl` (`listImageUrl ?? coverImageUrl` in storage). Detail exposes the effective detail image as `coverImageUrl` and the stored `listImageUrl`; a missing detail image uses the list image. Regular-tournament images are unchanged. See [league image mutations](./league-matches.md#cover-image-목록상세-이미지).
+
 Publication of both regular tournaments and regular leagues is independently
 controlled by `V1Tournament.isPublic` (default `true`). Unpublished competitions are
 excluded from public tournament lists (every `kind`), direct detail, overall standings,

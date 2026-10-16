@@ -470,6 +470,7 @@ export class LeagueMatchAdminService {
       redCardSuspensionMatches: league.redCardSuspensionMatches,
       sportCode: league.sportCode,
       coverImageUrl: league.coverImageUrl,
+      listImageUrl: league.listImageUrl,
       defaultPlace: tournamentVenueSnapshot(league),
       entryFee: league.entryFee,
       entryFeeConfiguredAt: league.entryFeeConfiguredAt,
@@ -2295,6 +2296,7 @@ export class LeagueMatchAdminService {
         redCardSuspensionMatches: true,
         // 대표 이미지·참가비 카드용(어드민 응답 전용 — 계좌는 공개 서비스에서 절대 select 하지 않는다).
         coverImageUrl: true,
+        listImageUrl: true,
         ...TOURNAMENT_VENUE_SELECT,
         entryFee: true,
         entryFeeConfiguredAt: true,

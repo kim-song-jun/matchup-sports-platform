@@ -389,9 +389,11 @@ Global rules inherited from `~/.codex/AGENTS.md`:
   `scripts/release/`·루트 매니페스트 변경이고, `.md`·테스트·fixtures·`docs/`·`e2e/`·`.github/tasks/`·`scripts/qa/`·`scripts/docs/`는
   제외다(`scripts/release/check-changeset-policy.mjs`). 빠지면 dev-push CI가 실패하고 alpha 배포가 막힌다.
 - **Copilot 리뷰는 `generated no new comments`가 나올 때까지 반복한다.** 요청은
-  `gh pr edit <N> --add-reviewer copilot-pull-request-reviewer`(REST `requested_reviewers`는 422). 도착은 비동기 ~3–8분.
+  `gh pr edit <N> --add-reviewer copilot-pull-request-reviewer` 또는 공식 REST `requested_reviewers`에
+  `reviewers: ["copilot-pull-request-reviewer[bot]"]`를 전달한다(2026-10-16 실제 접수·실행 확인). 도착은 비동기 ~3–8분.
   각 finding은 **적대적으로 검증해 real만 수정**한다 — Copilot도 틀린다. 스레드는 GraphQL
   `addPullRequestReviewThreadReply` + `resolveReviewThread`로 답변·resolve한다. **늦은 라운드에 나온 게 더 치명적일 수 있다.**
+  `429 rate_limit`·모델 세션 생성 실패는 분석 결과가 아니다. 재설정 전 반복 요청이나 모델·계정·요금제·머지 규칙 변경 없이 외부 차단을 기록하고, 이전 head/독립 리뷰를 최신 Copilot clean으로 표시하지 않는다.
 - 머지 준비 = `MERGEABLE/CLEAN` + 미해결 스레드 0 + CI pass. 변경 파일 300개 초과 PR은 Copilot 리뷰 대상이 아니다.
 - CI flake(Postgres `40P01 deadlock` 등)는 내 변경과 무관함을 확인한 뒤 `gh run rerun <id> --failed`.
 - **로컬 tsc 통과 ≠ CI 빌드 통과.** CI는 **커밋본**을 빌드한다. push 전 커밋본 기준으로 확인하라.

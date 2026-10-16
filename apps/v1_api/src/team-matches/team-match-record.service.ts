@@ -19,9 +19,11 @@ import {
   type ParticipantConsentEligibility,
 } from '../games/public-records/public-consent';
 import { regularPeriodCount } from '../tournaments/competition-config/competition-config.parse';
+import { resolvePublicLineupAt } from './public-lineup-visibility';
 import { MutateTeamMatchRecordDto } from './dto/team-match-record.dto';
 import { friendlyResultCorrector, platformMatchOperator } from './platform-match-operator';
 import { assertRevisionSupersession, assertRevisionTransition } from '../games/core/revision-state-machine';
+import { freezeFriendlyEffectiveRoster, loadFriendlyEffectiveRoster, type FriendlyEffectiveRoster } from '../games/roster/friendly-team-match-default-roster';
 import { isMinuteUnknown, isPeriodUnknown, parseTournamentFixtureOfficialScore, parseTournamentFixtureRevisionGoals } from '../tournaments/tournament-fixture-official-result';
 
 type Tx = Prisma.TransactionClient;
@@ -43,7 +45,7 @@ const include = {
   currentOfficialRevision: true,
   competitionConfig: { select: { periods: true } },
 } satisfies Prisma.V1GameInclude;
-type Loaded = Prisma.V1GameGetPayload<{ include: typeof include }>;
+type Loaded = Prisma.V1GameGetPayload<{ include: typeof include }> & { readonly effectiveRoster?: FriendlyEffectiveRoster | null };
 
 @Injectable()
 export class TeamMatchRecordService {
@@ -62,7 +64,7 @@ export class TeamMatchRecordService {
   private async load(tx: Tx, teamMatchId: string): Promise<Loaded> {
     const game = await tx.v1Game.findUnique({ where: { teamMatchId }, include });
     if (!game?.teamMatch || game.teamMatch.deletedAt) throw new NotFoundException({ code: 'TEAM_MATCH_NOT_FOUND', message: '경기를 찾을 수 없어요.' });
-    return game;
+    return { ...game, effectiveRoster: await loadFriendlyEffectiveRoster(tx, game) };
   }
 
   private async assertVisible(tx: Tx, game: Loaded, user: V1AuthUser | null) {
@@ -74,6 +76,7 @@ export class TeamMatchRecordService {
   }
 
   private roster(game: Loaded) {
+    if (game.effectiveRoster !== null && game.effectiveRoster !== undefined) return game.effectiveRoster.participants;
     const latest = new Map<string, string>();
     for (const lineup of game.lineups) {
       if (!latest.has(lineup.sideId)) latest.set(lineup.sideId, lineup.invalidatedAt || lineup.state === 'DRAFT' ? '' : lineup.id);
@@ -86,7 +89,7 @@ export class TeamMatchRecordService {
     const missingSides = game.sides
       .filter((side) => side.teamId !== null && !roster.some((participant) => participant.sideId === side.id))
       .map((side) => ({ sideId: side.id, sideKey: side.sideKey, teamName: side.displayNameSnapshot }));
-    return { lineupReady: missingSides.length === 0, missingSides };
+    return { lineupReady: game.effectiveRoster?.ready ?? missingSides.length === 0, missingSides };
   }
 
   private async viewerSideId(tx: Tx, game: Loaded, user: V1AuthUser | null, actorSideId: string | null) {
@@ -303,7 +306,15 @@ export class TeamMatchRecordService {
         : []
       : phase === 'official' ? await this.publicGoalEvents(tx, game, goals, showScore) : [];
     const changes = privateView ? await tx.v1TeamMatchRecordChange.findMany({ where: { gameId: game.id }, orderBy: { version: 'desc' }, take: 100 }) : [];
-    const participants = privateView ? await this.participantViews(tx, game) : [];
+    const privateParticipants = privateView ? await this.participantViews(tx, game) : [];
+    const kickoff = game.teamMatch?.startAt;
+    const publicLineupAt = kickoff == null
+      ? game.visibilityPolicy?.lineupAt ?? null
+      : resolvePublicLineupAt(kickoff, game.visibilityPolicy?.lineupAt ?? null);
+    const participants = publicLineupAt !== null && publicLineupAt.getTime() <= Date.now()
+      ? privateParticipants
+      : privateParticipants.filter((participant) => participant.sideId === ownSideId || !game.effectiveRoster?.sides.some((side) =>
+        side.sideId === participant.sideId && (side.source === 'DEFAULT_PREVIEW' || side.source === 'DEFAULT_FROZEN')));
     return {
       teamMatchId: game.teamMatchId, title: game.teamMatch!.title, startsAt: game.teamMatch!.startAt,
       leagueId: game.teamMatch!.leagueId, tournamentId: game.teamMatch!.tournamentId,
@@ -417,6 +428,7 @@ export class TeamMatchRecordService {
         }
       }
 
+      if (game.effectiveRoster !== null && game.effectiveRoster !== undefined) await freezeFriendlyEffectiveRoster(tx, game.effectiveRoster);
       const official = !correcting && confirmations.length === 2 && new Set(confirmations.map((c) => c.sideId)).size === 2;
       const version = (record?.version ?? 0) + 1;
       const officialAt = correcting ? record!.officialAt : official ? new Date() : null;

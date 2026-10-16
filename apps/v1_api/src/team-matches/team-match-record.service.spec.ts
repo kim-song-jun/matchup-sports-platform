@@ -4,14 +4,44 @@
  * 판정의 대조군(명단 밖 멤버·상대 팀장·양 팀 겸직·대회 경기)을 가짜 tx 로 빠르게 가른다.
  */
 import { randomUUID } from 'node:crypto';
-import type { Prisma } from '@prisma/client';
+import type { Prisma, V1GameParticipant } from '@prisma/client';
 import type { PrismaService } from '../prisma/prisma.service';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import { TeamMatchRecordService } from './team-match-record.service';
 
 const user = (id: string): V1AuthUser => ({ id, email: null, accountStatus: 'active', onboardingStatus: 'completed' });
 
-type Membership = { userId: string; teamId: string; role: 'owner' | 'manager' | 'member' };
+type Membership = {
+  userId: string;
+  teamId: string;
+  role: 'owner' | 'manager' | 'member';
+  status?: 'active' | 'left' | 'removed';
+  displayName?: string;
+  accountStatus?: 'active' | 'suspended' | 'deleted';
+};
+
+type MembershipQuery = {
+  where: {
+    userId?: string;
+    teamId?: string | { in: string[] };
+    role?: { in: string[] };
+    status?: string;
+    user?: { accountStatus?: string; deletedAt?: null };
+  };
+};
+
+function matchingMemberships(memberships: readonly Membership[], query: MembershipQuery) {
+  const { where } = query;
+  return memberships.filter((row) => {
+    const teamMatches = where.teamId === undefined || (typeof where.teamId === 'string' ? row.teamId === where.teamId : where.teamId.in.includes(row.teamId));
+    return teamMatches &&
+      (where.userId === undefined || row.userId === where.userId) &&
+      (where.role === undefined || where.role.in.includes(row.role)) &&
+      (where.status === undefined || (row.status ?? 'active') === where.status) &&
+      (where.user?.accountStatus === undefined || (row.accountStatus ?? 'active') === where.user.accountStatus) &&
+      (where.user?.deletedAt === undefined || row.accountStatus !== 'deleted');
+  });
+}
 
 type Revision = { id: string; gameId: string; revision: number; state: string; supersedesId?: string | null; reason?: string };
 type FakeRecord = { version: number; goals: unknown[]; subMatches: unknown[]; confirmations: unknown[]; officialAt: Date | null };
@@ -35,14 +65,22 @@ function createFake(options: {
   admins?: string[];
   official?: boolean;
   configPeriods?: unknown;
+  revokedDefaultUserId?: string;
 }) {
   const changes: Array<{ version: number; actorUserId: string; actorName: string; action: string }> = [];
+  const audits: Prisma.V1OperationAuditUncheckedCreateInput[] = [];
+  const identityLinks: Array<{ participantId: string; userId: string; linkId: string }> = [];
+  const consentSnapshots: Array<{ participantId: string; linkId: string; state: 'REVOKED'; policyHash: string; actorUserId: string; consentVersion: number }> = [];
   const writes = {
     revisionUpdates: [] as Array<Record<string, unknown>>,
     participants: [] as Array<{ resultRevisionId: string; participantId: string; goals: number }>,
     outbox: [] as Array<{ businessKey: string; type: string; revisionId: string }>,
     adminLogs: [] as Array<{ action: string; beforeJson: Record<string, unknown>; afterJson: Record<string, unknown> }>,
   };
+  const participants: Array<Pick<V1GameParticipant, 'id' | 'sideId' | 'lineupId' | 'userId' | 'displayNameSnapshot' | 'jerseyNumber' | 'position' | 'started'>> = [
+    { id: 'p-home', sideId: 'side-home', lineupId: 'lineup-home', userId: 'home-player', displayNameSnapshot: '홈 선수', jerseyNumber: 7, position: null, started: true },
+    { id: 'p-away', sideId: 'side-away', lineupId: 'lineup-away', userId: 'away-player', displayNameSnapshot: '원정 선수', jerseyNumber: 9, position: null, started: true },
+  ];
   const game = {
     id: 'game-1',
     teamMatchId: 'tm-1',
@@ -61,16 +99,18 @@ function createFake(options: {
       { id: 'lineup-home', sideId: 'side-home', revision: 2, state: 'SUBMITTED', invalidatedAt: null },
       { id: 'lineup-away', sideId: 'side-away', revision: 2, state: 'SUBMITTED', invalidatedAt: null },
     ],
-    participants: [
-      { id: 'p-home', sideId: 'side-home', lineupId: 'lineup-home', userId: 'home-player', displayNameSnapshot: '홈 선수', jerseyNumber: 7, position: null, started: true },
-      { id: 'p-away', sideId: 'side-away', lineupId: 'lineup-away', userId: 'away-player', displayNameSnapshot: '원정 선수', jerseyNumber: 9, position: null, started: true },
-    ],
+    participants,
     sharedRecord: (options.official ? OFFICIAL_RECORD() : null) as null | FakeRecord,
     visibilityPolicy: { mode: 'LIVE' },
     events: [],
     competitionConfig: { periods: options.configPeriods ?? [{ extraTime: false }, { extraTime: false }] },
     resultRevisions: (options.official ? [{ id: 'rev-1', gameId: 'game-1', revision: 1, state: 'OFFICIAL' }] : []) as Revision[],
   };
+  const revokedParticipant = game.participants.find((participant) => participant.userId === options.revokedDefaultUserId);
+  if (revokedParticipant !== undefined && revokedParticipant.userId !== null) {
+    identityLinks.push({ participantId: revokedParticipant.id, userId: revokedParticipant.userId, linkId: 'original-revoked-link' });
+    consentSnapshots.push({ participantId: revokedParticipant.id, linkId: 'original-revoked-link', state: 'REVOKED', policyHash: 'original-policy', actorUserId: revokedParticipant.userId, consentVersion: 1 });
+  }
   const tx = {
     $queryRaw: async () => [],
     v1Game: {
@@ -101,15 +141,66 @@ function createFake(options: {
     },
     v1OutboxEvent: { create: async (args: { data: (typeof writes.outbox)[number] }) => writes.outbox.push(args.data) },
     v1AdminActionLog: { create: async (args: { data: (typeof writes.adminLogs)[number] }) => writes.adminLogs.push(args.data) },
-    v1ParticipantIdentityLinkCurrent: { findMany: async () => [] },
+    v1GameLineup: {
+      create: async ({ data }: { data: Prisma.V1GameLineupUncheckedCreateInput }) => {
+        const row = { ...data, id: data.id ?? randomUUID(), sideId: data.sideId, revision: data.revision, state: data.state ?? 'DRAFT', invalidatedAt: null };
+        game.lineups.unshift(row);
+        return row;
+      },
+    },
+    v1GameParticipant: {
+      findMany: async ({ where }: { where: { lineupId: string } }) => game.participants.filter((participant) => participant.lineupId === where.lineupId),
+      createMany: async ({ data }: { data: Prisma.V1GameParticipantCreateManyInput[] }) => {
+        for (const row of data) game.participants.push({
+          id: row.id ?? randomUUID(), sideId: row.sideId, lineupId: row.lineupId, userId: row.userId ?? null,
+          displayNameSnapshot: row.displayNameSnapshot, jerseyNumber: row.jerseyNumber ?? null, position: row.position ?? null, started: row.started ?? true,
+        });
+        return { count: data.length };
+      },
+    },
+    v1GameEvent: { findFirst: async () => game.events[0] ?? null },
+    v1OperationAudit: {
+      findMany: async () => audits,
+      create: async ({ data }: { data: Prisma.V1OperationAuditUncheckedCreateInput }) => {
+        audits.push(data);
+        return { id: data.id ?? randomUUID() };
+      },
+    },
+    v1ParticipantIdentityLinkEvent: {
+      createManyAndReturn: async ({ data }: { data: Array<{ participantId: string; userId: string; linkId: string }> }) =>
+        data.map((event) => ({ ...event, effectiveAt: new Date() })),
+    },
+    v1ParticipantIdentityLinkCurrent: {
+      findMany: async ({ where }: { where: { participantId?: { in: string[] }; userId?: string } }) => identityLinks.filter((link) =>
+        (where.participantId === undefined || where.participantId.in.includes(link.participantId)) && (where.userId === undefined || where.userId === link.userId)),
+      createMany: async ({ data }: { data: typeof identityLinks }) => { identityLinks.push(...data); return { count: data.length }; },
+      findUniqueOrThrow: async ({ where }: { where: { participantId: string } }) => {
+        const link = identityLinks.find((row) => row.participantId === where.participantId);
+        if (link === undefined) throw new Error('The participant identity link does not exist.');
+        return link;
+      },
+    },
+    v1ParticipantConsentSnapshot: {
+      findMany: async ({ where }: { where: { linkId: { in: string[] } } }) => consentSnapshots.filter((snapshot) => where.linkId.in.includes(snapshot.linkId)),
+      create: async ({ data }: { data: (typeof consentSnapshots)[number] }) => { consentSnapshots.push(data); return data; },
+    },
     v1UserProfile: { findMany: async () => [] },
     v1TeamMembership: {
-      findMany: async (args: { where: { userId: string; teamId: { in: string[] }; role: { in: string[] } } }) =>
-        options.memberships
-          .filter((row) => row.userId === args.where.userId && args.where.teamId.in.includes(row.teamId) && args.where.role.in.includes(row.role))
-          .map((row) => ({ teamId: row.teamId, user: { profile: { nickname: `${row.userId} 님`, displayName: null } } })),
-      findFirst: async (args: { where: { userId: string; teamId: { in: string[] }; role: { in: string[] } } }) =>
-        options.memberships.find((row) => row.userId === args.where.userId && args.where.teamId.in.includes(row.teamId) && args.where.role.in.includes(row.role)) ?? null,
+      findMany: async (args: MembershipQuery) =>
+        matchingMemberships(options.memberships, args).map((row) => ({
+          id: `membership-${row.teamId}-${row.userId}`,
+          teamId: row.teamId,
+          userId: row.userId,
+          role: row.role,
+          status: row.status ?? 'active',
+          jerseyNumber: null,
+          user: {
+            accountStatus: row.accountStatus ?? 'active',
+            deletedAt: row.accountStatus === 'deleted' ? new Date('2026-10-01T00:00:00Z') : null,
+            profile: { nickname: row.displayName ?? `${row.userId} 님`, displayName: null },
+          },
+        })),
+      findFirst: async (args: MembershipQuery) => matchingMemberships(options.memberships, args)[0] ?? null,
     },
     v1AdminUser: {
       findFirst: async (args: { where: { userId: string } }) =>
@@ -132,7 +223,7 @@ function createFake(options: {
     },
   };
   const prisma = { $transaction: async <T>(fn: (client: typeof tx) => Promise<T>) => fn(tx) } as unknown as PrismaService;
-  return { service: new TeamMatchRecordService(prisma), changes, game, writes };
+  return { service: new TeamMatchRecordService(prisma), changes, game, writes, audits, identityLinks, consentSnapshots };
 }
 
 it.each(['cancelled', 'archived'])('%s record is absent for guests/team managers, while active admins retain the record', async (status) => {
@@ -146,6 +237,189 @@ it.each(['cancelled', 'archived'])('%s record is absent for guests/team managers
 
 const addGoal = (sideId: string) => ({ action: 'add' as const, expectedVersion: 0, commandId: randomUUID(), sideId });
 const confirm = () => ({ action: 'confirm' as const, expectedVersion: 0, commandId: randomUUID() });
+
+describe('MD-QA #146: TeamMatchRecordService automatic current default', () => {
+  const memberships = (): Membership[] => [
+    { userId: 'coach', teamId: 'team-home', role: 'owner', displayName: '현재 홈 팀장' },
+    { userId: 'home-player', teamId: 'team-home', role: 'member', displayName: '현재 홈 선수' },
+    { userId: 'away-player', teamId: 'team-away', role: 'member', displayName: '현재 원정 선수' },
+  ];
+
+  function automatic(options: Membership[] = memberships()) {
+    const fixture = createFake({ memberships: options });
+    for (const lineup of fixture.game.lineups) {
+      lineup.revision = 1;
+      lineup.state = 'DRAFT';
+    }
+    return fixture;
+  }
+
+  it('reads untouched automatic drafts as current qualified defaults with stable UUID preview ids and no writes', async () => {
+    // Given: automatic creation snapshots exist, but nobody has submitted a manual roster.
+    const { service, game, changes } = automatic();
+    const before = JSON.stringify({ lineups: game.lineups, participants: game.participants, record: game.sharedRecord });
+
+    // When: the actual record service reads the same effective roster twice.
+    const first = await service.read(user('coach'), 'tm-1');
+    const repeated = await service.read(user('coach'), 'tm-1');
+
+    // Then: current names and membership are authoritative, identifiers are stable, and GET does not persist.
+    expect(first).toMatchObject({ lineupReady: true, canEdit: true, missingSides: [] });
+    expect(first.participants.map((participant) => participant.name).sort()).toEqual(['현재 홈 팀장', '현재 홈 선수', '현재 원정 선수'].sort());
+    expect(repeated.participants.map((participant) => participant.id)).toEqual(first.participants.map((participant) => participant.id));
+    for (const participant of first.participants) expect(participant.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+    expect(JSON.stringify({ lineups: game.lineups, participants: game.participants, record: game.sharedRecord })).toBe(before);
+    expect(changes).toEqual([]);
+  });
+
+  it('uses a late join and excludes departed or suspended members before the first real record', async () => {
+    // Given: the creation snapshot is stale and current membership/account status has changed.
+    const { service } = automatic([
+      ...memberships().map((row) => row.userId === 'home-player' ? { ...row, status: 'left' as const } : row),
+      { userId: 'late-player', teamId: 'team-home', role: 'member', displayName: '새 홈 선수' },
+      { userId: 'suspended-player', teamId: 'team-home', role: 'member', displayName: '출전 불가 선수', accountStatus: 'suspended' },
+    ]);
+
+    // When: the actual read path calculates the current default roster.
+    const view = await service.read(user('coach'), 'tm-1');
+
+    // Then: eligible current members replace the stale initial snapshot without including excluded accounts.
+    expect(view).toMatchObject({ lineupReady: true });
+    expect(view.participants.map((participant) => participant.name).sort()).toEqual(['현재 홈 팀장', '새 홈 선수', '현재 원정 선수'].sort());
+  });
+
+  it('uses current defaults when a saved manual draft has never been submitted', async () => {
+    // Given: a saved DRAFT exists, but there is no submitted or locked revision in either side's history.
+    const { service, game } = automatic();
+    game.lineups.unshift({ ...game.lineups[0], id: 'never-submitted-home-draft', revision: 2 });
+
+    // When: the actual record service reads the effective participants.
+    const view = await service.read(user('coach'), 'tm-1');
+
+    // Then: a never-submitted draft does not erase the agreed current-members default.
+    expect(view).toMatchObject({ lineupReady: true });
+    expect(view.participants.map((participant) => participant.name).sort()).toEqual(['현재 홈 팀장', '현재 홈 선수', '현재 원정 선수'].sort());
+  });
+
+  it('allows the first actual authorized record without a separate preparation read or fabricated human submission', async () => {
+    // Given: both sides only have untouched automatic DRAFT revisions.
+    const { service, game, changes } = automatic();
+
+    // When: a real record mutation is the first user action.
+    const view = await service.mutate(user('coach'), 'tm-1', addGoal('side-home'));
+
+    // Then: the record succeeds and automatic defaults remain distinguishable from a human submission.
+    expect(view).toMatchObject({ version: 1, lineupReady: true });
+    expect(view.participants).toHaveLength(3);
+    expect(changes).toEqual([expect.objectContaining({ action: 'add', actorUserId: 'coach' })]);
+    expect(game.lineups.some((lineup) => lineup.state === 'SUBMITTED' || lineup.state === 'LOCKED')).toBe(false);
+  });
+
+  it('still blocks a reopened DRAFT after a previous real submitted roster', async () => {
+    // Given: a real submitted roster has been reopened for review.
+    const { service, game, changes } = createFake({ memberships: memberships() });
+    game.lineups.unshift({ ...game.lineups[0], id: 'reopened-home-draft', revision: 3, state: 'DRAFT' });
+
+    // When: the captain attempts to confirm while the replacement is still pending.
+    await expect(service.mutate(user('coach'), 'tm-1', confirm())).rejects.toMatchObject({ status: 409, response: { code: 'ROSTER_INCOMPLETE' } });
+
+    // Then: the automatic default cannot bypass the existing human review lock.
+    expect(changes).toEqual([]);
+  });
+
+  it.each([
+    { viewer: 'coach', dto: { ...addGoal('side-home'), expectedVersion: 9 }, status: 409, code: 'VERSION_CONFLICT' },
+    { viewer: 'spectator', dto: addGoal('side-home'), status: 403, code: 'RECORD_PARTICIPANT_REQUIRED' },
+    { viewer: 'coach', dto: { ...addGoal('side-home'), participantId: 'p-home' }, status: 422, code: 'PARTICIPANT_INVALID' },
+  ])('does not freeze or write a roster for rejected $code commands', async ({ viewer, dto, status, code }) => {
+    // Given: automatic default previews exist and the requested command is invalid or unauthorized.
+    const { service, game, changes, audits, identityLinks } = automatic();
+    const before = JSON.stringify({ lineups: game.lineups, participants: game.participants });
+
+    // When: the actual mutation rejects before committing a real record.
+    await expect(service.mutate(user(viewer), 'tm-1', dto)).rejects.toMatchObject({ status, response: { code } });
+
+    // Then: failures do not manufacture snapshots, identity assertions or audit success.
+    expect(JSON.stringify({ lineups: game.lineups, participants: game.participants })).toBe(before);
+    expect(changes).toEqual([]);
+    expect(audits).toEqual([]);
+    expect(identityLinks).toEqual([]);
+  });
+
+  it('rejects a preview scorer who departed before the actual mutation without persisting a snapshot', async () => {
+    // Given: the client read a valid current preview, then the selected member left.
+    const currentMembers = memberships();
+    const { service, changes, audits } = automatic(currentMembers);
+    const preview = await service.read(user('coach'), 'tm-1');
+    const scorer = preview.participants.find((participant) => participant.name === '현재 홈 선수');
+    if (scorer === undefined) throw new Error('The initial current roster must contain the scorer.');
+    const membership = currentMembers.find((member) => member.userId === 'home-player');
+    if (membership === undefined) throw new Error('The scorer must have a membership to leave.');
+    membership.status = 'left';
+
+    // When: the old preview identifier is submitted after that qualification change.
+    await expect(service.mutate(user('coach'), 'tm-1', { ...addGoal('side-home'), participantId: scorer.id })).rejects.toMatchObject({ status: 422, response: { code: 'PARTICIPANT_INVALID' } });
+
+    // Then: the stale client cannot turn a departed member into an actual appearance.
+    expect(changes).toEqual([]);
+    expect(audits).toEqual([]);
+  });
+
+  it('preserves a manual side while freezing only the other side current default', async () => {
+    // Given: HOME submitted an explicit subset; AWAY never submitted its automatic draft.
+    const { service, game, audits } = createFake({ memberships: memberships() });
+    game.lineups[1].revision = 1;
+    game.lineups[1].state = 'DRAFT';
+
+    // When: the captain records the first actual goal.
+    const view = await service.mutate(user('coach'), 'tm-1', addGoal('side-home'));
+
+    // Then: HOME's original participant id and subset survive; only AWAY gets a system snapshot.
+    expect(view.participants.find((participant) => participant.sideId === 'side-home')).toMatchObject({ id: 'p-home', name: '홈 선수' });
+    expect(view.participants).toHaveLength(2);
+    expect(audits).toHaveLength(1);
+    expect(audits[0]).toMatchObject({ actorType: 'SYSTEM', systemActor: 'FRIENDLY_DEFAULT_ROSTER_FROZEN', resourceType: 'GAME', resourceId: 'game-1', after: { sideId: 'side-away' } });
+    expect(game.lineups.filter((lineup) => lineup.sideId === 'side-home')).toHaveLength(1);
+  });
+
+  it('keeps frozen default participants unchanged when memberships change after the first actual record', async () => {
+    // Given: the first real record has established the default appearance snapshot.
+    const currentMembers = memberships();
+    const { service, game, audits } = automatic(currentMembers);
+    const recorded = await service.mutate(user('coach'), 'tm-1', addGoal('side-home'));
+    const ids = recorded.participants.map((participant) => participant.id);
+    currentMembers.push({ userId: 'late-player', teamId: 'team-home', role: 'member', displayName: '기록 후 합류' });
+    const departing = currentMembers.find((member) => member.userId === 'home-player');
+    if (departing === undefined) throw new Error('The recorded participant must have a membership.');
+    departing.status = 'left';
+
+    // When: the actual record reader opens the game again.
+    const view = await service.read(user('coach'), 'tm-1');
+
+    // Then: later roster membership cannot rewrite recorded appearance identities or append another snapshot.
+    expect(view.participants.map((participant) => participant.id)).toEqual(ids);
+    expect(view.participants.map((participant) => participant.name)).toContain('현재 홈 선수');
+    expect(view.participants.map((participant) => participant.name)).not.toContain('기록 후 합류');
+    expect(audits).toHaveLength(2);
+    expect(game.lineups).toHaveLength(4);
+  });
+
+  it('carries a revoked participant consent to the new system snapshot without deleting the original history', async () => {
+    // Given: the automatic creation participant had already opted out of this game's public record.
+    const fixture = createFake({ memberships: memberships(), revokedDefaultUserId: 'home-player' });
+    for (const lineup of fixture.game.lineups) { lineup.revision = 1; lineup.state = 'DRAFT'; }
+
+    // When: an authorized first record freezes the current effective default.
+    const view = await fixture.service.mutate(user('coach'), 'tm-1', addGoal('side-home'));
+
+    // Then: a new identity link preserves the original actor/policy REVOKED decision and old participant row.
+    const current = view.participants.find((participant) => participant.name === '현재 홈 선수');
+    if (current === undefined) throw new Error('The frozen default must include the current player.');
+    expect(fixture.consentSnapshots.find((snapshot) => snapshot.participantId === current.id)).toMatchObject({ state: 'REVOKED', actorUserId: 'home-player', policyHash: 'original-policy' });
+    expect(fixture.consentSnapshots.find((snapshot) => snapshot.participantId === 'p-home')).toMatchObject({ state: 'REVOKED' });
+    expect(fixture.game.participants.some((participant) => participant.id === 'p-home')).toBe(true);
+  });
+});
 
 describe('TeamMatchRecordService — 명단 밖 팀장 권한 (H5 결정 A, 친선만)', () => {
   it('명단 밖 팀장은 친선에서 기록하고, 이력에 "팀장 권한"으로 남는다', async () => {
@@ -434,6 +708,7 @@ function createExistingResultFake(options: {
     v1TeamMembership: { findMany: async () => [], findFirst: async () => null },
     v1AdminUser: { findFirst: async () => null },
     v1GameOperationFlag: { findUnique: async () => ({ value: options.liveEnabled ? 'on' : 'off' }) },
+    v1OperationAudit: { findMany: async () => [] },
     v1TeamMatchRecordChange: { findMany: async () => [], findUnique: async () => null },
   };
   const prisma = { $transaction: async <T>(fn: (client: typeof tx) => Promise<T>, transaction: unknown) => {

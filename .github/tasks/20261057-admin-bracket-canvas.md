@@ -4,6 +4,12 @@
 
 Status: In Progress
 
+### PR #1957 순차 수정 — 2026-10-16
+- 최신 `origin/dev=ebfac9aee`를 통합한 격리 작업트리에서 API 실패 3건을 재현했다. `tournament-bracket.service.spec.ts`의 이전 position 조회 단언 2건과 slots 응답 필드 누락 1건이다.
+- 조회 기대값을 실제 `byeSortOrder` 계약으로 갱신하고 mock 슬롯에 nullable 필드를 명시했다. 교환 후 표시 위치 1·2·3·5·6에서 팀 변경이 연결된 자리 트랜잭션으로 위임되는 회귀 5건을 추가했다.
+- RED: 소비자 테스트 394개 중 3개 실패. GREEN: 수정된 대진 서비스 207/207 PASS; 별도 슬롯·템플릿·일정 관련 296/296 및 나머지 소비자 192/192 PASS. API `tsc --noEmit` PASS. Windows 기본 find와 Unix find 충돌로 surface 검사 첫 실행 실패; Git Unix 도구 경로로 재실행 PASS(686개 파일).
+- 이번 수정은 테스트/문서만 변경하며 UI/API/migration 내용은 유지한다. 로컬 Docker 미가동으로 실DB 재실행은 하지 않았고, 최신 PR CI 및 기존에 남은 alpha 관리자 저장/3폭 QA는 별도 확인 대상이다.
+
 ### Context / Goal
 12강 템플릿은 부전승 sortOrder 0·3·4·7, 8강 연결은 모두 HOME으로 저장해 공개 그림이 1·3·5·7로 재배열됐다.
 부전승의 슬롯 식별 번호와 표시 위치를 분리하고, 그림·목록·편집·승자 진출 자리를 같은 저장 상태로 맞춘다.

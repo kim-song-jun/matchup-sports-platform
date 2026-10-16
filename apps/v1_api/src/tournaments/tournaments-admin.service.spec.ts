@@ -42,6 +42,7 @@ function tournamentRow(overrides: Record<string, unknown> = {}) {
     teamCount: 8,
     minPlayers: 6,
     maxPlayers: 10,
+    minMatchesPerTeam: null,
     genderCategory: null,
     genderMinMale: null,
     genderMaxMale: null,
@@ -1555,6 +1556,81 @@ describe('TournamentsAdminService', () => {
         data: expect.objectContaining({ competitionConfigVersionId: 'default-futsal-config-version' }),
       }),
     );
+  });
+
+  it('create: returns the saved futsal lineup and substitution policy from its pinned config version', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Sport.findUnique.mockResolvedValue({ id: 'sport-1', code: 'futsal' });
+    prisma.v1CompetitionConfigVersion.findFirst.mockResolvedValue({
+      id: 'futsal-lineup-6-limited-4',
+      version: 2,
+      contentHash: 'hash-futsal-lineup-6-limited-4',
+    });
+    prisma.v1Tournament.create.mockResolvedValue(tournamentRow({
+      competitionConfigVersionId: 'futsal-lineup-6-limited-4',
+    }));
+    prisma.v1CompetitionConfigVersion.findUnique.mockResolvedValue({
+      lineup: {
+        minPlayers: 3,
+        maxPlayers: 6,
+        substitutions: 'limited',
+        maxSubstitutions: 4,
+      },
+    });
+
+    const result = await service.create(ownerAuthUser, {
+      sportId: 'sport-1',
+      title: '풋살 대회',
+      teamCount: 8,
+      lineupMaxPlayers: 6,
+      substitutionMode: 'limited',
+      maxSubstitutions: 4,
+    });
+
+    expect(result).toMatchObject({
+      competitionConfigVersionId: 'futsal-lineup-6-limited-4',
+      lineupMaxPlayers: 6,
+      lineupMinPlayers: 3,
+      substitutionMode: 'limited',
+      maxSubstitutions: 4,
+    });
+  });
+
+  it.each([null, 4])('create: returns the persisted minMatchesPerTeam value (%s)', async (minMatchesPerTeam) => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Sport.findUnique.mockResolvedValue({ id: 'sport-1' });
+    prisma.v1Tournament.create.mockResolvedValue(tournamentRow({ minMatchesPerTeam }));
+
+    const result = await service.create(ownerAuthUser, {
+      sportId: 'sport-1',
+      title: '리그 방식 대회',
+      format: 'league',
+      teamCount: 8,
+      minMatchesPerTeam,
+    });
+
+    expect(result.minMatchesPerTeam).toBe(minMatchesPerTeam);
+  });
+
+  it('create: fails config reads before writing a tournament or audit row', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Sport.findUnique.mockResolvedValue({ id: 'sport-1', code: 'futsal' });
+    prisma.v1CompetitionConfigVersion.findFirst.mockResolvedValue({
+      id: 'futsal-lineup-6',
+      version: 1,
+      contentHash: 'hash-futsal-lineup-6',
+    });
+    prisma.v1CompetitionConfigVersion.findUnique.mockRejectedValue(new Error('config read failed'));
+
+    await expect(service.create(ownerAuthUser, {
+      sportId: 'sport-1',
+      title: '풋살 대회',
+      teamCount: 8,
+      lineupMaxPlayers: 6,
+    })).rejects.toThrow('config read failed');
+
+    expect(prisma.v1Tournament.create).not.toHaveBeenCalled();
+    expect(prisma.v1AdminActionLog.create).not.toHaveBeenCalled();
   });
 
   it('update: lineupMaxPlayers on an in_progress tournament → 409 TOURNAMENT_LINEUP_SIZE_LOCKED, no reads/writes', async () => {

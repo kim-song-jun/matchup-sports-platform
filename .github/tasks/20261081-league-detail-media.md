@@ -87,3 +87,10 @@ Status: Review. Canonical task는 이 문서이며 같은 번호의 schedule/sta
 - GREEN: API 이미지·공개 조회·시즌 상속 86/86, Web 이미지 컨트롤 10/10; API/Web tsc 및 surface/pattern PASS. 실제 fixture snapshot 검증 PASS. LF 임시 복사본에서 바인딩 7/7(현재·과거 manifest 허용, 변조·클라이언트 불일치 거절) 및 manifest self-test PASS. jq는 공식 1.8.1 checksum 검증한 임시 바이너리만 사용했다.
 - 실DB: Docker 미가동으로 migration replay/HTTP integration은 새 PR CI 확인 대상이다. Alpha 3폭과 관리자 쓰기 QA는 feature 미배포로 기존 미완료 상태를 유지한다.
 - 두 PR은 독립적으로 같은 dev를 기반으로 한다. #1957의 byeSortOrder와 #1955의 listImageUrl이 모두 포함된 최종 스키마는 다른 해시이므로, 첫 PR 머지 후 두 번째 PR에서 최신 dev 통합과 결합 LF 해시 재계산이 필요하다. 서로의 스키마 pin을 그대로 채택하면 안 된다.
+
+### PR #1955 후속 Gates 수정 (2026-10-16)
+- CI `38907223065`의 API/Web은 SUCCESS: migration replay+drift, API/Web unit/type/build, HTTP/DB evidence 단계를 통과했다. 앞 절에서 대기했던 실DB 검증은 이 CI 증거로 갱신한다.
+- 남은 Gates 실패는 `Expand-contract migration gate (PR)`였다. 실제 PR diff를 로컬 게이트에 넣어 `20261016070000_league_list_image/migration.sql`의 이미지 복사 UPDATE 거절을 재현했다. 스키마 바인딩 검사는 이미 통과한 상태다.
+- 새 nullable 컬럼만 채우고 원본 이미지·업로드·일반 대회·다른 컬럼은 보존하는 기존 SQL을 검토했다. 정확한 (파일, 정규화 SQL) 한 쌍에만 롤링 배포/애플리케이션 롤백 호환 근거를 등록했다. migration SQL과 일반 additivity 판정은 변경하지 않았다.
+- self-test에 실제 migration 승인 및 다른 파일/리그 종류/목적 컬럼의 거절 대조군을 추가했다. self-test 전체 PASS, 실제 origin/dev→PR head 게이트 RED→GREEN, diff check PASS, 새 debt marker 0. 제품 코드는 변경하지 않아 이미 green인 API/Web 전체 검증을 로컬에서 반복하지 않았다.
+- #1957 확인: 최신 head `7f618a2d6`의 Gates/API/Web SUCCESS, PR open·미머지, 제출된 리뷰 0건, 자동 리뷰 작업 failure. Alpha health의 실제 commit=`ebfac9aeecbcca0a33b435d514d828aa76052dc9`, release=`1.9.5-alpha.20261016.gebfac9aeecbc`, DB=true. #1957 미배포이므로 새 홈·어웨이 관리자 저장 및 390/768/1440 after QA를 현재 alpha에서 완료했다고 주장하지 않는다.

@@ -44,6 +44,11 @@ class UnparsableSqlError extends Error {}
 // weakens the gate for exactly one (file, statement) pair and nothing else.
 const REVIEWED_NON_ADDITIVE = [
   {
+    file: 'apps/v1_api/prisma/migrations/20261016070000_league_list_image/migration.sql',
+    statement: 'UPDATE "v1_tournaments" SET "list_image_url" = "cover_image_url" WHERE "kind" = \'regular_league\' AND "cover_image_url" IS NOT NULL',
+    reason: 'PR #1955 (2026-10-16): initialize only the nullable list_image_url column added immediately before this UPDATE in the same migration. Existing regular-league images must initially serve both list and detail. The source cover_image_url, uploaded files, tournament rows and every pre-existing column are unchanged; leagues without an image remain NULL. Older application instances ignore list_image_url and continue reading/writing cover_image_url, so this one-time copy does not prevent an application rollback. Subsequent PATCH requests deliberately edit only the supplied image field. This exact file/statement was verified by the real migration image-preservation integration test in API CI 38907223065; do not allow arbitrary UPDATE statements or edits to the migration.',
+  },
+  {
     file: "apps/v1_api/prisma/migrations/20261015180000_v1_league_optional_team_capacity/migration.sql",
     statement: 'ALTER TABLE "v1_tournaments" ADD CONSTRAINT "v1_tournaments_max_teams_positive" CHECK ("max_teams" IS NULL OR "max_teams" > 0)',
     reason: 'MD-QA #145 adds nullable v1_tournaments.max_teams INTEGER immediately before this CHECK in the same migration, without DEFAULT, NOT NULL, or backfill. Pre-existing rows therefore have NULL, which this exact positive-or-NULL predicate accepts; old application writes omit the new column and remain compatible, including application rollback. The CHECK reads no pre-existing column, preserves NULL as unlimited and all positive capacities, and rejects zero or negative values even through direct SQL writes that bypass DTO validation. Keep the constraint and SQL unchanged.',
@@ -2395,6 +2400,31 @@ function selfTest() {
   }
   if (runReviewed([{ file: 'other.sql', statement: 'CREATE UNIQUE INDEX "X_a_b_key" ON "X"("a", "b")' }]).length !== 1) {
     fail('the allowlist must be scoped to its exact file, not match the same statement elsewhere');
+  }
+
+  // Exercise the actual league-image migration and its production review entry.
+  // A different predicate, destination column or file must not inherit approval.
+  {
+    const file = 'apps/v1_api/prisma/migrations/20261016070000_league_list_image/migration.sql';
+    const sql = readFileSync(new URL(`../../${file}`, import.meta.url), 'utf8');
+    const statements = parseStatements(sql, file).map((statement) => ({ file, statement }));
+    const check = (input) => {
+      const messages = [];
+      runAdditivityCheck(input, baseFunctionNames, (message) => messages.push(message));
+      return messages;
+    };
+    if (check(statements).length !== 0) fail('the real league-image migration must pass its exact review');
+    const backfill = statements.find(({ statement }) => /^UPDATE\s/.test(statement));
+    if (!backfill) fail('league-image migration backfill is missing');
+    const negatives = [
+      { ...backfill, file: 'other.sql' },
+      { ...backfill, statement: backfill.statement.replace("'regular_league'", "'regular_tournament'") },
+      { ...backfill, statement: backfill.statement.replace('"list_image_url"', '"cover_image_url"') },
+    ];
+    if (negatives.some((statement) => check([statement]).length !== 1)) {
+      fail('league-image approval must reject other files, scopes and destination columns');
+    }
+    console.log('[expand-contract-sql-v1] league-image migration review controls passed');
   }
 
   // **allowlist 의 객체가 닫혔는지 본다.** 이 파일은 한 배열에 항목을 모으는데, 양쪽

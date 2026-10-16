@@ -25,3 +25,4 @@ Task: [20261081](../../.github/tasks/20261081-league-detail-media.md)
 - DB integration: Docker daemon 미실행으로 미검증. migration 파일을 임시 테이블에 실행하는 보존 회귀 테스트 포함, CI/DB 실행 필요.
 - Alpha 390/768/1440: 0/3, 아직 feature branch 미배포. dev 머지 후 admin 편집·공개 목록/상세 클릭, screenshot·console/network·cleanup 증거 필요. 기존 상세 미디어 before 기록을 이번 두 이미지 편집의 after로 간주하지 않음.
 - PR #1955 수정 검증(2026-10-16): 누락된 schema pin을 fixture/Docker/릴리스 binder/manifest에 동기화. API86/Web10, 양 앱 타입·패턴, 실제 source snapshot, release binding7 및 manifest self-test PASS. Docker 미가동으로 실DB 검증은 새 CI 대기이며 alpha 0/3 상태는 유지한다. #1957과 순차 머지 시 두 필드가 포함된 스키마 해시를 다시 계산한다.
+- 후속 CI38907223065: API/Web SUCCESS, migration replay+drift 및 HTTP/DB 검사 SUCCESS. 남은 Gates의 이미지 복사 UPDATE 미등록을 실제 diff로 재현하고 정확한 파일/SQL 검토 근거를 등록했다. 실제 migration 승인·다른 파일/종류/목적 컬럼 거절 self-test와 PR diff gate PASS. Alpha 0/3은 미배포로 유지한다.

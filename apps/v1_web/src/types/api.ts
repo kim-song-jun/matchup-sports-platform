@@ -4020,6 +4020,8 @@ export type V1TournamentDetail = {
   venueProvider?: 'kakao' | null;
   venueProviderId?: string | null;
   coverImageUrl: string | null;
+  /** 정규 리그 목록용 이미지. coverImageUrl은 상세용이다. */
+  listImageUrl?: string | null;
   teamCount: number;
   minPlayers: number;
   /** null = 팀당 선수 인원 제한 없음(리그). 참가팀 정원(maxTeams)과 별개다. */

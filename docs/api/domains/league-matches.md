@@ -204,10 +204,10 @@ are rejected with 400 instead of being coerced to a free league. `reason` is opt
 Response `data`: `{ leagueId, entryFee, entryFeeConfiguredAt, bankName, bankAccount, bankHolder, alreadyProcessed }`.
 Example payload (fake values): `{ "entryFee": 150000, "bankName": "국민은행", "bankAccount": "123-456-789012", "bankHolder": "팀밋", "reason": "참가비 조정" }`.
 
-## Cover image (대표 이미지)
+## Cover image (목록/상세 이미지)
 
 `PATCH /api/v1/admin/league-matches/:leagueId/cover-image` takes
-`{ "coverImageUrl": string | null }`. The key is required; `null` removes the image.
+`{ "coverImageUrl"?: string | null, "listImageUrl"?: string | null }`. At least one key is required. `coverImageUrl` is the detail image; `listImageUrl` is the list image. Omitted keys are preserved; `null` removes only the specified image. Both may be updated atomically.
 Only paths created by the upload endpoint are accepted (`/uploads/…`, max 1000 chars);
 external URLs, `javascript:`, `..` segments and empty strings return 400. The check is
 the shared `common/safe-image-url.ts` validator (campaign and sponsor behaviour is
@@ -215,9 +215,11 @@ unchanged). Allowed in every status including `on_hold`, `completed` and `cancel
 Last write wins. The old file is never deleted because the next season may have
 inherited the same URL. A value equal to the stored one returns
 `alreadyProcessed: true` without audit. Response `data`:
-`{ leagueId, coverImageUrl, alreadyProcessed }`; errors `404 LEAGUE_NOT_FOUND`,
+`{ leagueId, coverImageUrl, listImageUrl, alreadyProcessed }`; errors `404 LEAGUE_NOT_FOUND`,
 `409 LEAGUE_MIRROR_MISSING`. Audit action `league_match.cover_image_updated`
-(before/after `coverImageUrl`).
+(before/after both image fields).
+
+Existing regular-league cover images are copied into `list_image_url` by migration; the original detail value is unchanged. Admin league detail returns both stored values. Public detail resolves `coverImageUrl` from the detail image, falling back to the list image; list cards prefer the list image and fall back to the detail image, matching team-match behavior. The tournament list card response keeps its existing `coverImageUrl` display contract, sourced from `listImageUrl` for regular leagues. Public tournament detail retains the detail cover and additionally exposes `listImageUrl` for leagues. Next-season creation inherits both independently.
 
 ## Default venue (기본 장소)
 

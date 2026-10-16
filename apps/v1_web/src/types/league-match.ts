@@ -225,6 +225,7 @@ export interface V1AdminLeagueDetail {
   /** 대표 이미지의 종목 그래픽 폴백(`CompetitionThumbnail`)에 쓴다. */
   sportCode: string;
   coverImageUrl: string | null;
+  listImageUrl?: string | null;
   /** 리그 기본 장소(새 경기가 상속한다). 경기 상세의 "이 경기만 장소가 달라요" 판정 기준이다. */
   defaultPlace?: V1PlaceView | null;
   entryFee: number;
@@ -348,13 +349,15 @@ export interface V1UpdateLeagueEntryFeeResult {
 }
 
 export interface V1UpdateLeagueCoverImagePayload {
-  /** `null` = 대표 이미지 제거. */
-  coverImageUrl: string | null;
+  /** 생략은 유지, `null`은 해당 이미지만 제거. 최소 하나의 키를 전달한다. */
+  coverImageUrl?: string | null;
+  listImageUrl?: string | null;
 }
 
 export interface V1UpdateLeagueCoverImageResult {
   leagueId: string;
   coverImageUrl: string | null;
+  listImageUrl?: string | null;
   alreadyProcessed: boolean;
 }
 

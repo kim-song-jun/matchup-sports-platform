@@ -26,6 +26,7 @@ import type {
 import { fixtureTitle } from './bracket-canvas';
 import { BracketQuickResultForm } from './bracket-quick-result-form';
 import { BracketResultActions } from './bracket-result-actions';
+import { ByeSideControl } from './bye-side-control';
 import { useStartedTeamChangeReason } from './use-started-team-change-reason';
 
 export type BracketNodePanelProps = {
@@ -382,6 +383,7 @@ export function BracketNodePanel({
         <h3 className={sectionTitle} style={{ color: 'var(--text-strong)' }}>팀 자리</h3>
         {renderSide('HOME')}
         {renderSide('AWAY')}
+        <ByeSideControl tournamentId={tournamentId} fixture={fixture} slots={slots} canWrite={canWrite} showToast={showToast} onSaved={onClose} />
         {hidesOtherGroupTeams ? (
           <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>{TEAM_IN_OTHER_GROUP_HIDDEN_NOTE}</p>
         ) : null}

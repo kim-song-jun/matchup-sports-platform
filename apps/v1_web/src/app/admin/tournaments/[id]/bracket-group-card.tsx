@@ -8,7 +8,8 @@ import { byeRound } from '@/lib/tournament-bracket-rounds';
 import { extractErrorMessage } from '@/lib/error-message';
 import { registrationIdsBlockedForGroup, registrationIdsInOppositeFinalStage } from '@/lib/bracket-group-enrollment';
 import type { useV1AssignGroupTeam, useV1CreateFixture, useV1CreateBracketBye } from '@/hooks/use-v1-api';
-import type { V1AdminBracketFixture, V1AdminBracketGroup, V1AdminBracketStanding } from '@/types/api';
+import type { V1AdminBracketFixture, V1AdminBracketGroup, V1AdminBracketStanding, V1AdminBracketSlot } from '@/types/api';
+import { ByeSideControl } from '@/components/admin/bracket-canvas/bye-side-control';
 import { computeQualifyingShortlist, isGroupReady } from './bracket-group-helpers';
 import { inputCls, submitBtnCls } from './bracket-shared-styles';
 
@@ -144,6 +145,8 @@ function TeamStagingPicker({
 // ── 조 카드 ────────────────────────────────────────────────────────────────
 
 interface BracketGroupCardProps {
+  tournamentId?: string;
+  slots?: V1AdminBracketSlot[];
   group: V1AdminBracketGroup;
   allGroups: V1AdminBracketGroup[];
   allStandings: V1AdminBracketStanding[];
@@ -166,6 +169,8 @@ interface BracketGroupCardProps {
 }
 
 export function BracketGroupCard({
+  tournamentId,
+  slots = [],
   group,
   allGroups,
   allStandings,
@@ -193,6 +198,9 @@ export function BracketGroupCard({
   const [entryType, setEntryType] = useState<'match' | 'bye'>('match');
   const [byePosition, setByePosition] = useState('1');
   const [editingByeId, setEditingByeId] = useState<string | undefined>();
+  const editingBye = group.groupTeams.find((team) => team.id === editingByeId);
+  const linkedBye = slots.find((slot) => slot.kind === 'BYE' && slot.groupId === group.id && slot.byeSortOrder === editingBye?.sortOrder);
+  const linkedByeFixture = linkedBye && fixtures.find((fixture) => fixture.homeSlotId === linkedBye.id || fixture.awaySlotId === linkedBye.id);
   const [manualFixtureOpen, setManualFixtureOpen] = useState(false);
   const [fixtureRound, setFixtureRound] = useState('');
   const [fixtureNumber, setFixtureNumber] = useState('1');
@@ -393,7 +401,7 @@ export function BracketGroupCard({
                     className="inline-flex items-center gap-1 pl-3 pr-1 py-0.5 rounded-full bg-[var(--surface-soft)] text-xs text-[var(--text-body)]"
                   >
                     {gt.teamName ?? gt.registrationId ?? '팀 미정'}
-                    {gt.isBye && <span> · {byeRound(group.phase)?.label} 부전승 · {byeRound(group.phase)?.nextLabel} 직행</span>}
+                    {gt.isBye && <span> · {gt.sortOrder + 1}번 위치 · {byeRound(group.phase)?.label} 부전승 · {byeRound(group.phase)?.nextLabel} 직행</span>}
                     {gt.isBye && createBye && <button type="button" aria-label={`부전승 ${gt.sortOrder + 1}번 자리 수정`}
                       onClick={() => { setEditingByeId(gt.id); setFixtureRound(byeRound(group.phase)?.label ?? ''); setEntryType('bye'); setByePosition(String(gt.sortOrder + 1)); setFixtureHomeRegId(gt.registrationId ?? ''); setFixtureAwayRegId(''); setManualFixtureOpen(true); }}
                       className="inline-flex items-center justify-center w-[44px] h-[44px] rounded-lg text-[var(--text-muted)] hover:text-[var(--blue700)]"><Pencil size={14} aria-hidden="true" /></button>}
@@ -498,7 +506,9 @@ export function BracketGroupCard({
                 {entryType === 'bye' && <div className="flex flex-col gap-1">
                   <label htmlFor={'bye-position-' + group.id}>대진표 위치</label>
                   <input id={'bye-position-' + group.id} type="number" min="1" max={byeMaxPosition} step="1" value={byePosition}
-                    onChange={(event) => setByePosition(event.target.value)} disabled={byePending} className={inputCls} />
+                    onChange={(event) => setByePosition(event.target.value)} disabled={byePending || !!linkedBye} className={inputCls} />
+                  {linkedByeFixture && tournamentId ? <ByeSideControl tournamentId={tournamentId} fixture={linkedByeFixture} slots={slots}
+                    canWrite={!!createBye} showToast={showToast} onSaved={() => { setManualFixtureOpen(false); setEditingByeId(undefined); }} /> : null}
                   <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">경기와 부전승을 합친 위에서부터의 순서예요. 다음 라운드의 진출 자리가 정해지면 그 자리로 연결돼요.</p>
                 </div>}
                 {entryType === 'match' && <>

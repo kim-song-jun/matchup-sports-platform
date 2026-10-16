@@ -57,6 +57,7 @@ export function makeSlot(overrides: Partial<V1AdminBracketSlot> & Pick<V1AdminBr
     sourceGroupId: null,
     position: 1,
     label: '1번 자리',
+    byeSortOrder: null,
     registrationId: null,
     teamName: null,
     ...overrides,

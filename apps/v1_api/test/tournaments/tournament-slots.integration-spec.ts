@@ -242,6 +242,26 @@ describe('자리 배정 (PostgreSQL)', () => {
   });
 
   describe('BYE 자리 (12강)', () => {
+    it('홈→어웨이 교환 후 재배정·위치·연결을 유지하고 후속 경기 시작 시 거절한다', async () => {
+      const { tournamentId, registrationIds, teamIds } = await ko12('bye-side');
+      const bye = await slotAt(tournamentId, 2, 'BYE');
+      await slots.assignSlot(user, bye.id, registrationIds[0]);
+      const match = (await fixturesUsing(bye.id))[0];
+      const incoming = await prisma.v1TournamentMatchAdvancementEdge.findFirstOrThrow({ where: { targetTeamMatchId: match.id } });
+      const outgoing = await prisma.v1TournamentMatchAdvancementEdge.findFirstOrThrow({ where: { sourceTeamMatchId: match.id } });
+      await slots.setByeSide(user, bye.id, 'AWAY', 'HOME');
+      expect((await fixturesUsing(bye.id))[0]).toMatchObject({ homeSlotId: null, awaySlotId: bye.id, hostTeamId: null, approvedApplicantTeamId: teamIds[0] });
+      expect(await prisma.v1TournamentMatchAdvancementEdge.findUniqueOrThrow({ where: { id: incoming.id } })).toMatchObject({ targetSide: 'HOME', sourceTeamMatchId: incoming.sourceTeamMatchId });
+      expect(await prisma.v1TournamentMatchAdvancementEdge.findUniqueOrThrow({ where: { id: outgoing.id } })).toEqual(outgoing);
+      expect(await byeRows(tournamentId)).toEqual({ empty: [0, 4, 6], team: [[registrationIds[0], 3]] });
+      await slots.assignSlot(user, bye.id, registrationIds[1]);
+      expect((await fixturesUsing(bye.id))[0].approvedApplicantTeamId).toBe(teamIds[1]);
+      expect(await byeRows(tournamentId)).toEqual({ empty: [0, 4, 6], team: [[registrationIds[1], 3]] });
+      await prisma.v1Game.updateMany({ where: { teamMatchId: outgoing.targetTeamMatchId }, data: { state: 'LIVE' } });
+      await expect(slots.setByeSide(user, bye.id, 'HOME', 'AWAY')).rejects.toMatchObject({ response: { code: 'SLOT_LOCKED' } });
+      expect((await fixturesUsing(bye.id))[0].awaySlotId).toBe(bye.id);
+      expect(await prisma.v1TournamentMatchAdvancementEdge.findUniqueOrThrow({ where: { id: incoming.id } })).toMatchObject({ targetSide: 'HOME' });
+    });
     async function ko12(label: string, teamCount = 3) {
       const seeded = await seedBracketTournament(prisma, { label, format: 'knockout', teamCount });
       await templates.apply(user, seeded.tournamentId, { kind: 'knockout', size: 12, thirdPlace: false });
@@ -260,7 +280,7 @@ describe('자리 배정 (PostgreSQL)', () => {
 
       await slots.assignSlot(user, bye1.id, registrationIds[0]);
 
-      expect(await byeRows(tournamentId)).toEqual({ empty: [3, 4, 7], team: [[registrationIds[0], 0]] });
+      expect(await byeRows(tournamentId)).toEqual({ empty: [2, 4, 6], team: [[registrationIds[0], 0]] });
       const promoted = await prisma.v1TournamentGroupTeam.findFirstOrThrow({ where: { group: { tournamentId }, isBye: true } });
       expect(promoted.id).toBe(before.id); // createBye 와 같이 id 를 승계한다
       const [quarter1] = await fixturesUsing(bye1.id);
@@ -269,7 +289,7 @@ describe('자리 배정 (PostgreSQL)', () => {
 
       await slots.assignSlot(user, bye1.id, null);
 
-      expect(await byeRows(tournamentId)).toEqual({ empty: [0, 3, 4, 7], team: [] });
+      expect(await byeRows(tournamentId)).toEqual({ empty: [0, 2, 4, 6], team: [] });
       expect((await fixturesUsing(bye1.id))[0].hostTeamId).toBeNull();
     });
 
@@ -278,13 +298,13 @@ describe('자리 배정 (PostgreSQL)', () => {
       const bye2 = await slotAt(tournamentId, 2, 'BYE');
       await slots.assignSlot(user, bye2.id, registrationIds[0]);
       await slots.assignSlot(user, bye2.id, registrationIds[1]);
-      expect(await byeRows(tournamentId)).toEqual({ empty: [0, 4, 7], team: [[registrationIds[1], 3]] });
+      expect(await byeRows(tournamentId)).toEqual({ empty: [0, 4, 6], team: [[registrationIds[1], 2]] });
     });
 
     describe('기존 부전승 API(createBye·removeGroupTeam) 와 자리의 일관성', () => {
       const bye = (tournamentId: string, position: number) =>
         prisma.v1TournamentGroup.findFirstOrThrow({ where: { tournamentId, phase: 'round12' } }).then(async (group) => ({
-          group, sortOrder: [0, 3, 4, 7][position - 1],
+          group, sortOrder: [0, 2, 4, 6][position - 1],
         }));
       const rowAt = async (groupId: string, sortOrder: number) =>
         (await prisma.v1TournamentGroupTeam.findFirst({ where: { groupId, isBye: true, sortOrder } }))
@@ -739,7 +759,7 @@ describe('자리 배정 (PostgreSQL)', () => {
         .resolves.toEqual({ groups: 5, slots: 12, fixtures: 12, edges: 12 });
 
       expect(await placedBySlot(tournamentId)).toEqual([]);
-      expect((await prisma.v1TournamentByeSlot.findMany({ where: { group: { tournamentId } }, orderBy: { sortOrder: 'asc' } })).map((b) => b.sortOrder)).toEqual([0, 3, 4, 7]);
+      expect((await prisma.v1TournamentByeSlot.findMany({ where: { group: { tournamentId } }, orderBy: { sortOrder: 'asc' } })).map((b) => b.sortOrder)).toEqual([0, 2, 4, 6]);
       expect(await prisma.v1TournamentGroupTeam.count({ where: { group: { tournamentId } } })).toBe(0);
       for (const fixture of await prisma.v1TeamMatch.findMany({ where: { tournamentId, deletedAt: null } })) {
         expect([fixture.hostTeamId, fixture.approvedApplicantTeamId]).toEqual([null, null]);

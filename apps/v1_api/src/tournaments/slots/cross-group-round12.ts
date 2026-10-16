@@ -7,7 +7,6 @@ import type { PrismaService } from '../../prisma/prisma.service';
 import type { GamesService } from '../../games/games.service';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from '../tournament-surface-lookup';
 import { loadCanonicalStandingsSource } from '../tournament-standings-source';
-import { ROUND12_BYE_SORT_ORDERS } from '../templates/bracket-template-plan';
 import { loadGroupRankSources } from './load-group-rank-preview';
 import { resolveGroupRank } from './group-rank-preview';
 import { assignSlotsBatchInTx } from './tournament-slot.service';
@@ -78,7 +77,7 @@ async function loadPreview(tx: Tx, tournamentId: string): Promise<CrossGroupPrev
   const byes = await tx.v1TournamentByeSlot.findMany({ where: { groupId: round12[0].id }, orderBy: { sortOrder: 'asc' } });
   const byeTeams = await tx.v1TournamentGroupTeam.findMany({ where: { groupId: round12[0].id, isBye: true }, orderBy: { sortOrder: 'asc' } });
   const byeOrders = [...byes, ...byeTeams].map((bye) => bye.sortOrder).sort((a, b) => a - b);
-  if (JSON.stringify(byeOrders) !== JSON.stringify([...ROUND12_BYE_SORT_ORDERS])) conflict('12강 부전승 4자리의 위치를 확인해 주세요. 템플릿으로 생성하면 자동 연결돼요.');
+  if (byeOrders.length !== 4 || new Set(byeOrders).size !== 4) conflict('12강 부전승 4자리의 위치를 확인해 주세요.');
   const targets: CrossGroupTarget[] = [];
   const matchSeeds = [[8, 9], [5, 12], [6, 11], [7, 10]];
   const byeSeeds = [1, 4, 3, 2];
@@ -96,7 +95,8 @@ async function loadPreview(tx: Tx, tournamentId: string): Promise<CrossGroupPrev
       if (slotId !== null && (slot === undefined || slot.tournamentId !== tournamentId || slot.groupId !== round12[0].id || slot.registrationId !== current ||
         (byePosition === null && slot.kind !== 'ENTRY' && slot.kind !== 'GROUP_RANK') ||
         (byePosition !== null && (slot.kind !== 'BYE' || slot.position !== byePosition)))) conflict('자리와 경기의 팀 연결을 먼저 확인해 주세요.');
-      if (byePosition !== null && (byeTeams.find((team) => team.sortOrder === ROUND12_BYE_SORT_ORDERS[byePosition - 1])?.registrationId ?? null) !== current) {
+      const byeSortOrder = slot?.byeSortOrder ?? (byePosition === null ? null : byeOrders[byePosition - 1]);
+      if (byePosition !== null && (byeTeams.find((team) => team.sortOrder === byeSortOrder)?.registrationId ?? null) !== current) {
         conflict('부전승팀과 8강 직행 자리의 팀이 달라요. 두 배정을 먼저 맞춰 주세요.');
       }
       targets.push({ seed, label: byePosition !== null ? `${seed}번 시드 · 부전승 → 8강 #${row.fixtureNumber}` : `${seed}번 시드 · 12강 #${row.fixtureNumber} ${side === 'HOME' ? '홈' : '원정'}`,
@@ -148,6 +148,26 @@ export async function applyCrossGroupRound12(deps: Dependencies, user: V1AuthUse
     const preview = await loadPreview(tx, tournamentId);
     if (preview.version !== input.version) throw new ConflictException({ code: 'ROUND12_PREVIEW_STALE', message: '결과나 대진이 바뀌었어요. 다시 계산하고 확인해 주세요.' });
     validateCrossGroupSelection(preview, input);
+    // A manually built bracket may still use the old 1/4/5/8 positions.
+    // Normalize only display order, preserving the existing opponent/side.
+    const byeTargets = preview.targets.filter((target) => target.byePosition !== null);
+    const byeGroupId = byeTargets[0].groupId;
+    const byeRows = [...await tx.v1TournamentByeSlot.findMany({ where: { groupId: byeGroupId } }),
+      ...await tx.v1TournamentGroupTeam.findMany({ where: { groupId: byeGroupId, isBye: true } })]
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+    const byeSlots = await tx.v1TournamentSlot.findMany({ where: { groupId: byeGroupId, kind: 'BYE' } });
+    const movements = byeTargets.map((target) => ({
+      oldOrder: byeSlots.find((slot) => slot.id === target.slotId)?.byeSortOrder ?? byeRows[target.byePosition! - 1].sortOrder,
+      newOrder: (target.byePosition! - 1) * 2 + (target.side === 'AWAY' ? 1 : 0),
+    })).filter((move) => move.oldOrder !== move.newOrder);
+    for (const move of movements) {
+      await tx.v1TournamentGroupTeam.updateMany({ where: { groupId: byeGroupId, isBye: true, sortOrder: move.oldOrder }, data: { sortOrder: -100 - move.newOrder } });
+      await tx.v1TournamentByeSlot.updateMany({ where: { groupId: byeGroupId, sortOrder: move.oldOrder }, data: { sortOrder: -100 - move.newOrder } });
+    }
+    for (const move of movements) {
+      await tx.v1TournamentGroupTeam.updateMany({ where: { groupId: byeGroupId, isBye: true, sortOrder: -100 - move.newOrder }, data: { sortOrder: move.newOrder } });
+      await tx.v1TournamentByeSlot.updateMany({ where: { groupId: byeGroupId, sortOrder: -100 - move.newOrder }, data: { sortOrder: move.newOrder } });
+    }
     const changes = [];
     for (const [index, target] of preview.targets.entries()) {
       let slotId = target.slotId;
@@ -155,12 +175,15 @@ export async function applyCrossGroupRound12(deps: Dependencies, user: V1AuthUse
         const slot = await tx.v1TournamentSlot.create({ data: {
           tournamentId, groupId: target.groupId, kind: target.byePosition !== null ? 'BYE' : 'GROUP_RANK',
           position: target.byePosition ?? target.seed,
+          byeSortOrder: target.byePosition === null ? null : (target.byePosition - 1) * 2 + (target.side === 'AWAY' ? 1 : 0),
         } });
         slotId = slot.id;
         await tx.v1TeamMatch.update({ where: { id: target.fixtureId }, data: target.side === 'HOME' ? { homeSlotId: slotId } : { awaySlotId: slotId } });
       } else if (target.byePosition === null) {
         // 수동 대진/단독 템플릿의 ENTRY도 조별 참가 자리와 분리된 결선 진출 자리로 전환한다.
         await tx.v1TournamentSlot.update({ where: { id: slotId }, data: { kind: 'GROUP_RANK', sourceGroupId: null } });
+      } else {
+        await tx.v1TournamentSlot.update({ where: { id: slotId }, data: { byeSortOrder: (target.byePosition - 1) * 2 + (target.side === 'AWAY' ? 1 : 0) } });
       }
       changes.push({ slotId, registrationId: input.assignments[index] });
     }

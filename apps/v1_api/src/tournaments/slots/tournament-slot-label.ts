@@ -3,6 +3,7 @@ import type { V1TournamentGroupPhase, V1TournamentSlotKind } from '@prisma/clien
 export type TournamentSlotLabelInput = {
   kind: V1TournamentSlotKind;
   position: number;
+  byeSortOrder?: number | null;
   groupName: string | null;
   groupPhase: V1TournamentGroupPhase | null;
   sourceGroupName: string | null;
@@ -15,7 +16,7 @@ export type TournamentSlotLabelInput = {
 export function tournamentSlotLabel(input: TournamentSlotLabelInput): string {
   switch (input.kind) {
     case 'BYE':
-      return `부전승 ${input.position}`;
+      return input.byeSortOrder == null ? `부전승 ${input.position}` : `부전승 · ${input.byeSortOrder + 1}번 위치`;
     case 'GROUP_RANK':
       return input.sourceGroupName === null && input.groupPhase === 'round12' ? `결선 ${input.position}번 자리`
         : input.sourceGroupName === null ? `${input.position}위` : `${input.sourceGroupName} ${input.position}위`;
@@ -30,6 +31,7 @@ export function tournamentSlotLabel(input: TournamentSlotLabelInput): string {
 export const SLOT_LABEL_SELECT = {
   kind: true,
   position: true,
+  byeSortOrder: true,
   group: { select: { name: true, phase: true } },
   sourceGroup: { select: { name: true } },
 } as const;
@@ -37,6 +39,7 @@ export const SLOT_LABEL_SELECT = {
 export type SlotLabelRow = {
   kind: V1TournamentSlotKind;
   position: number;
+  byeSortOrder?: number | null;
   group: { name: string; phase: V1TournamentGroupPhase } | null;
   sourceGroup: { name: string } | null;
 };
@@ -45,6 +48,7 @@ export function slotLabelFromRow(row: SlotLabelRow): string {
   return tournamentSlotLabel({
     kind: row.kind,
     position: row.position,
+    byeSortOrder: row.byeSortOrder,
     groupName: row.group?.name ?? null,
     groupPhase: row.group?.phase ?? null,
     sourceGroupName: row.sourceGroup?.name ?? null,

@@ -119,7 +119,7 @@ async function setup(options: {
     maxPlayers: 20, minPlayers: 1, rosterDeadlineAt: null, genderCategory: null,
     yellowAccumulationLimit: null, redCardSuspensionMatches: null };
   const activePlayers = () => players.filter((row) => row.removedAt === null);
-  const currentRegistration = () => ({ ...registration, players: activePlayers() });
+  const currentRegistration = () => ({ ...registration, players: activePlayers(), _count: { players: players.length } });
   const latestLineups = new Map<string, LineupRow>(games.map((target) => [target.id, {
     id: `lineup-${target.id}`, gameId: target.id, sideId: `side-${target.id}`, revision: 1,
     state: 'SUBMITTED', formation: null, supersedesId: null, invalidatedAt: null,

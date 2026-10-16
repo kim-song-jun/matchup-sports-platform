@@ -62,3 +62,6 @@ Phase A owner: v1 규칙·현재 소스를 읽고 exact owned production/test �
 - P2 GREEN·타입·독립 재리뷰·Git은 root 단일 슬롯 대기, 작업자 실행 없음. P2 작업자 변경 범위는 기존 회귀 spec, `game-roster-sync.ts`, 이 Progress Snapshot뿐이다.
 
 - root P2 committed gate: 수정 커밋 f4a848706의 실제 service→outbox→worker→loader 회귀 8/8 PASS(93.752초), API TypeScript --noEmit --incremental false 종료 코드0, surface683 기존 baseline 일치 PASS. 기존08 통합본129/129 PASS는 이전 검증 이력이며 이8건과 합쳐 같은 실행의130건으로 표시하지 않는다. 구현자 외 적대적 재리뷰 C0/W0, 정확한 source/spec fingerprints는 mdqa156-legacy-guard-review.md에 보존한다. 명단 이관·현재 저장 스냅샷 쓰기를 확대하지 않았고 이후 명시적 이관이 새 제외 ID를 만들 수 있는 기존 정책은 보호한다. 최신 PR CI·정식 재리뷰·실제 alpha는 대기다.
+
+- 2026-10-16 root: 원격 d186 PR1944에 최신 dev e895를 정상 merge해 1eda59878을 만들었다. games.md의 유일한 충돌은 #156 재추가 문단과 #146 미제출 친선 명단 문서를 함께 보존하고 폐기된 제출 필수 설명만 제거했다. 9개 intended 파일과 diff-check를 확인했다.
+- 별도 독립 리뷰가 1eda의 9/9 파일에서 inline registration mock의 _count.players 누락을 실제 결함(C1)으로 찾았다. 같은 committed tree의 실제 서비스→outbox→loader 회귀는 5 FAIL/3 PASS/8, 30.887초, exit1로 실패했다. 누락 필드를 optional fallback으로 우회하지 않고 실제 relation count 계약대로 제거 이력까지 포함한 players.length를 mock에 제공하는 한 줄만 고쳤다. 기존 captured EXCLUDE ID·시작/공식 결과/팀/사이드/멱등 계약과 모든 기대값은 유지한다. 초기 공유 .bin 상대 경로 launch 실패는 NOTRUN 별도 보존했으며 RED로 계산하지 않았다. 새 immutable head의 GREEN·독립 재리뷰·같은 PR normal push를 이어 수행한다.

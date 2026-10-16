@@ -126,6 +126,28 @@
   }
 }
 
+/* The live entry shares the detail grid's outer edge; mobile keeps its gutters. */
+.tm-tournament-detail-entry {
+  position: sticky;
+  top: 0;
+  z-index: 15;
+  background: var(--bg);
+  padding: 8px 20px 12px;
+}
+
+@media (min-width: 1024px) {
+  .tm-tournament-detail-entry {
+    max-width: calc(640px + 340px + 32px);
+    margin-inline: auto;
+    padding-right: 0;
+  }
+}
+
+@media (min-width: 1440px) {
+  .tm-tournament-detail-entry {
+    max-width: calc(680px + 360px + 40px);
+  }
+}
 /* .tm-tournament-rail */
 .tm-tournament-rail {
   /* Mobile: static, in normal flow */

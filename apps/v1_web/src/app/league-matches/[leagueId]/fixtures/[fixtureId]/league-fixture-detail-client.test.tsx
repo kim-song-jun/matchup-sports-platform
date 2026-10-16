@@ -611,29 +611,40 @@ describe('LeagueFixtureDetailClient', () => {
     render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="no-such" />);
 
     expect(screen.getByText(/해당 경기를 찾을 수 없어요/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '리그 순위표·일정으로 이동' })).toHaveAttribute('href', '/tournaments/lg-1');
+    expect(screen.getByRole('link', { name: '리그 순위표·일정으로 이동' })).toHaveAttribute('href', '/tournaments/lg-1/bracket?tab=standings');
     // Wave 5 — 대진이 방금 재생성돼 목록이 갱신됐을 수 있으니 재시도 버튼도 함께 준다.
     expect(screen.getByRole('button', { name: '다시 시도하기' })).toBeInTheDocument();
   });
 
-  it('받은 from 이 리그 상세를 가리키면(자기 위 체인 포함) 그 값으로 돌아간다', () => {
+  it('리그 상세에서 왔어도 순위 탭으로 이동하고 복귀 체인을 보존한다', () => {
     navigation.searchParams = new URLSearchParams('from=%2Fleague-matches%2Flg-1%3Ffrom%3D%252Fhome');
     mockLeague();
     mockViewer('none');
     render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
 
-    const parentWithChain = '/tournaments/lg-1?from=%2Fhome';
+    const parentWithChain = '/tournaments/lg-1/bracket?tab=standings&from=%2Ftournaments%2Flg-1%3Ffrom%3D%252Fhome';
     expect(screen.getByRole('link', { name: '전체 순위표·일정 보기' })).toHaveAttribute('href', parentWithChain);
     navigation.searchParams = new URLSearchParams();
   });
 
-  it('받은 from 이 리그 상세가 아니면 리그 상세로 가면서 그 출처를 잇는다', () => {
+  it('홈에서 들어온 경기의 전체 순위표 버튼은 진행 화면의 리그 순위 탭을 연다', () => {
+    navigation.searchParams = new URLSearchParams('from=%2Fhome');
+    mockLeague();
+    mockViewer('none');
+    render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
+
+    expect(screen.getByRole('link', { name: '전체 순위표·일정 보기' })).toHaveAttribute(
+      'href', '/tournaments/lg-1/bracket?tab=standings&from=%2Fhome',
+    );
+    navigation.searchParams = new URLSearchParams();
+  });
+  it('다른 화면에서 왔어도 순위 탭으로 이동하고 그 출처를 잇는다', () => {
     navigation.searchParams = new URLSearchParams('from=%2Fusers%2Fu1%2Frecords');
     mockLeague();
     mockViewer('none');
     render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
 
-    expect(screen.getByRole('link', { name: '전체 순위표·일정 보기' })).toHaveAttribute('href', '/tournaments/lg-1?from=%2Fusers%2Fu1%2Frecords');
+    expect(screen.getByRole('link', { name: '전체 순위표·일정 보기' })).toHaveAttribute('href', '/tournaments/lg-1/bracket?tab=standings&from=%2Fusers%2Fu1%2Frecords');
     navigation.searchParams = new URLSearchParams();
   });
 });

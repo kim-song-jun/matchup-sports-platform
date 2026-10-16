@@ -12,6 +12,7 @@ import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { TournamentCampaignMedia } from '@/components/tournaments/tournament-campaign-media';
 import { Trophy, Goal, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useV1Tournament, useV1MyRegistrations } from '@/hooks/use-v1-api';
+import { useMediaQuery } from '@/hooks/use-media-query';
 import { v1Get } from '@/lib/api-client';
 import { placeFromVenueFields, placeToView } from '@/lib/place';
 import { publicFixtureSideLabel } from '@/lib/public-fixture-side-label';
@@ -587,9 +588,10 @@ export function TournamentDetailView({
   tournament: V1TournamentDetail;
   myRegistration: V1TournamentRegistration | null;
   backHref?: string;
-  /** 제목 바로 아래 "우리 팀 참가" 카드 — 데이터 훅을 쓰므로 바깥(PageClient)에서 만들어 넘긴다. */
+  /** 모바일은 제목 아래, 데스크톱 참가팀은 우측에 표시하는 카드. */
   entrySection?: ReactNode;
 }) {
+  const isDesktop = useMediaQuery('(min-width: 1024px)');
   const childHref = useChildHref();
   const participantFrom = useContext(DetailChainFromContext) ?? `/tournaments/${tournament.id}`;
   const sportAccent = getSportAccent(tournament.sport.code);
@@ -618,6 +620,7 @@ export function TournamentDetailView({
   const hasPrize = prizeText.length > 0;
   const hasActiveRegistration =
     myRegistration !== null && myRegistration.status !== 'cancelled';
+  const entryInAside = isDesktop && !isCompleted && hasActiveRegistration;
   /** 하단 고정 신청 CTA 가 뜨는가 — 신청한 팀은 "우리 팀 참가" 카드가 그 자리를 맡아 뜨지 않는다(ApplyCTA 와 같은 조건). */
   const showsApplyCta = isOpen && !hasActiveRegistration;
   const showsPublicLeagueLiveCta = isLeagueMirror && tournament.status === 'in_progress';
@@ -814,7 +817,7 @@ export function TournamentDetailView({
       {/* ── Section 1: Header ── */}
       <section aria-label="대회 기본 정보" style={{ marginTop: 20 }}>
         {headerIdentitySection}
-        {entrySection}
+        {!entryInAside ? entrySection : null}
 
         {/* 핵심 정보 — 하나의 카드로 통합(기존: 틴트 3카드 + 별도 info 카드로 분산).
             일정·정원·참가비는 데스크탑 우측 sticky 레일과 중복되어 모바일 전용(tm-hide-desktop). */}
@@ -1392,14 +1395,7 @@ export function TournamentDetailView({
           방문자에게 제공한다. 데스크톱도 리그 신청 rail을 쓰므로 이 상단 진입을 함께 표시한다. */}
       {bracketCtaLabel && (!showsApplyCta || showsPublicLeagueLiveCta) ? (
         <div
-          className={showsPublicLeagueLiveCta ? undefined : 'tm-hide-desktop'}
-          style={{
-            position: 'sticky',
-            top: 0,
-            zIndex: 15,
-            background: 'var(--bg)',
-            padding: '8px 20px 12px',
-          }}
+          className={`tm-tournament-detail-entry${showsPublicLeagueLiveCta ? '' : ' tm-hide-desktop'}`}
         >
           <BracketEntryCtaButton tournament={tournament} />
         </div>
@@ -1414,8 +1410,9 @@ export function TournamentDetailView({
         {/* Right column: sticky CTA rail (desktop, open only) + 공지/환불.
             On desktop these fill the area below the short rail and balance the 2-col;
             on mobile the rail is hidden (.tm-show-desktop) and 공지/환불 flow naturally. */}
-        {(railCTA || hasAnnouncements || tournament.refundPolicyText) ? (
+        {((isDesktop && !isCompleted) || railCTA || hasAnnouncements || tournament.refundPolicyText) ? (
           <div className="tm-tournament-detail-aside-boundary"><div className="tm-tournament-detail-aside">
+            {entryInAside ? entrySection : null}
             {railCTA}
             {asideExtra}
           </div></div>

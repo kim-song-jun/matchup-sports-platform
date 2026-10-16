@@ -79,3 +79,11 @@ Status: Review. Canonical task는 이 문서이며 같은 번호의 schedule/sta
 - DB: V1Tournament / v1_tournaments.list_image_url nullable TEXT 추가. 기존 regular_league.cover_image_url을 복사하는 additive migration. Docker daemon 미실행으로 HTTP/DB integration 및 migration replay는 미실행이며 CI 확인 필요.
 - Alpha: 아직 feature branch로 미배포. 저장소 규칙상 dev 머지/alpha 배포 후 admin 이미지 변경·제거, 공개 목록/상세를 390/768/1440에서 확인하고 PR에 갤러리를 게시해야 함. 로컬 검증은 화면 PASS가 아님.
 - Phase 4 PR: dev 대상 PR 생성/리뷰 진행. 사용자 요청 범위는 PR 게시이며 머지/배포하지 않음.
+
+### PR #1955 순차 수정 (2026-10-16)
+- #1957 수정 push 후 착수. 최신 `origin/dev=ebfac9aee`와 기존 PR head를 격리 작업트리에 통합했다. 기존 공유 트리의 WIP/Prisma 생성물은 보존했다.
+- RED: CI API의 game-schema source snapshot 불일치와 Gates의 current/historical binding 실패를 확인했다. Git 정본 LF 스키마 해시 `1f217e10790894fd23fb206aa4b8693c9fb8c35ceadd2e99e60a4a5731b33970`가 fixture/배포의 기존 `d54fe0...` pin과 다른 것을 로컬에서도 재현했다.
+- Fix: Docker 생성 클라이언트 증명, final 릴리스 바인더, 매니페스트 생성/검증 및 game-schema fixture를 새 해시로 동기화했다. 기존 manifest 허용 해시와 역사 migration은 유지했다. 추가 schema/migration/API/UI 변경은 없다.
+- GREEN: API 이미지·공개 조회·시즌 상속 86/86, Web 이미지 컨트롤 10/10; API/Web tsc 및 surface/pattern PASS. 실제 fixture snapshot 검증 PASS. LF 임시 복사본에서 바인딩 7/7(현재·과거 manifest 허용, 변조·클라이언트 불일치 거절) 및 manifest self-test PASS. jq는 공식 1.8.1 checksum 검증한 임시 바이너리만 사용했다.
+- 실DB: Docker 미가동으로 migration replay/HTTP integration은 새 PR CI 확인 대상이다. Alpha 3폭과 관리자 쓰기 QA는 feature 미배포로 기존 미완료 상태를 유지한다.
+- 두 PR은 독립적으로 같은 dev를 기반으로 한다. #1957의 byeSortOrder와 #1955의 listImageUrl이 모두 포함된 최종 스키마는 다른 해시이므로, 첫 PR 머지 후 두 번째 PR에서 최신 dev 통합과 결합 LF 해시 재계산이 필요하다. 서로의 스키마 pin을 그대로 채택하면 안 된다.

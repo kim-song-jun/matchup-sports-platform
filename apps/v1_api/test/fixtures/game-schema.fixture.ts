@@ -591,7 +591,9 @@ export const gameSchemaSourceManifest = {
   // 2026-10-15 MD-QA #145: additive nullable V1Tournament.maxTeams backed by
   // 20261015180000_v1_league_optional_team_capacity. Re-pin LF schema bytes only;
   // game models and the bound historical migration are unchanged. DB replay awaits CI.
-  schema: 'd54fe0c8c3415eabd9a363277afc8c5b20ff14a8bbae1c04fc943c1ba50df8b3',
+  // 2026-10-16: nullable V1Tournament.listImageUrl, backed by
+  // 20261016070000_league_list_image. Historical game migration stays unchanged.
+  schema: '1f217e10790894fd23fb206aa4b8693c9fb8c35ceadd2e99e60a4a5731b33970',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

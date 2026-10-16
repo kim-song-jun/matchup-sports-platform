@@ -24,3 +24,4 @@ Task: [20261081](../../.github/tasks/20261081-league-detail-media.md)
 - 로컬 검증: API 85 / Web 10 단위 테스트, API/Web 타입·패턴 검사 PASS. 공개 상세 MSW fallback 보완.
 - DB integration: Docker daemon 미실행으로 미검증. migration 파일을 임시 테이블에 실행하는 보존 회귀 테스트 포함, CI/DB 실행 필요.
 - Alpha 390/768/1440: 0/3, 아직 feature branch 미배포. dev 머지 후 admin 편집·공개 목록/상세 클릭, screenshot·console/network·cleanup 증거 필요. 기존 상세 미디어 before 기록을 이번 두 이미지 편집의 after로 간주하지 않음.
+- PR #1955 수정 검증(2026-10-16): 누락된 schema pin을 fixture/Docker/릴리스 binder/manifest에 동기화. API86/Web10, 양 앱 타입·패턴, 실제 source snapshot, release binding7 및 manifest self-test PASS. Docker 미가동으로 실DB 검증은 새 CI 대기이며 alpha 0/3 상태는 유지한다. #1957과 순차 머지 시 두 필드가 포함된 스키마 해시를 다시 계산한다.

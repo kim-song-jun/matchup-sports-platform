@@ -594,7 +594,9 @@ export const gameSchemaSourceManifest = {
   // 2026-10-16: nullable V1Tournament.listImageUrl, backed by
   // 20261016070000_league_list_image. Historical game migration stays unchanged.
   // Combined with PR #1957 nullable V1TournamentSlot.byeSortOrder.
-  schema: '889825d76c637af8da4caa57542578363b8d08c6bec6a0eb43813c2416445f78',
+  // 2026-10-17: additive V1Match.isOnline backed by
+  // 20261017100000_v1_match_online_classification. Game operations migration is unchanged.
+  schema: 'b4894d0eb9010482a1e4e7d0d142160e41e395826de0fbbb09402a4443a8abeb',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

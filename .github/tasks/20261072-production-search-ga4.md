@@ -45,6 +45,9 @@ User explicitly authorizes repairing existing fixture body SSR, online/test stru
 
 ### Progress Snapshot
 
+- Dev PR #1961 initial head `24510c3d56bf9c00fb61b78f315710a0945dee63` failed exact CI `38935150979`; not merged or deployed. Fixed affected full-file test isolation and real overall-standings response (43/43 Web tests), exact current schema binding (7/7 release-binding tests), and current game-source snapshot metadata (5/5 source tests). Historical migration and Stage B pins stay unchanged. The shared generated-client baseline is not accepted as CI proof.
+- Copilot found one real missing Korean label for `match.online.update`; added it. Fix commit, current-head CI and fresh clean review remain gates. Main release is prepared separately from main `6a0c3f91e6e561297453fcff7f6d12e62c27266d`; unrelated 411-file dev gap is excluded. Main schema pins must use its own exact schema digest, not the dev digest.
+
 - Source discovery complete: fixture seeds supported but not passed; tournament background refetch checks isError even when seeded data exists. Match builder hardcodes offline attendance; existing match model has no first-class discovery/online control. Read-only evidence at cache search-recheck-final-20261017.json.
 - Fixture implementation and narrow RED/GREEN completed initial success path; independent Sol found league-failure P1 and standings-name P2 plus missing edge regressions. Repairs in progress. Tournament repair approved; online metadata contract assigned. PR/CI/Alpha/main pending. Runtime task board: cache ACTIVE-20261017-search-repair.md.
 

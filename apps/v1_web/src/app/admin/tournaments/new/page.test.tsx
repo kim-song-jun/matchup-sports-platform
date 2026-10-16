@@ -347,9 +347,8 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
   it('미저장된 진행 방식 변경은 공개 확인 진입을 막고 저장 뒤 허용한다', async () => {
     searchParamsValue = new URLSearchParams('draftId=draft-1');
     useV1AdminTournamentMock.mockReturnValue({ data: fakeDraftTournament({ registrationDeadlineAt: '2026-08-12T14:59:00.000Z' }), isPending: false });
-    updateMutate.mockImplementationOnce((payload: Partial<V1Tournament>, opts: { onSuccess: (tournament: V1Tournament) => void }) => {
-      const persistedFields = Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined));
-      opts.onSuccess(fakeDraftTournament({ ...persistedFields, registrationDeadlineAt: '2026-08-12T14:59:00.000Z', updatedAt: '2026-08-02T00:00:00.000Z' }));
+    updateMutate.mockImplementationOnce((payload: Partial<V1CreateTournamentPayload>, opts: { onSuccess: (tournament: V1Tournament) => void }) => {
+      opts.onSuccess(fakeDraftResponseForPayload(payload, { registrationDeadlineAt: '2026-08-12T14:59:00.000Z', updatedAt: '2026-08-02T00:00:00.000Z' }));
     });
     renderPage();
     await screen.findByRole('button', { name: '접수 시작하기' });
@@ -402,9 +401,9 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
   it('저장 요청 중 추가로 바뀐 필드가 있으면 이전 응답으로 확인 단계에 들어가지 않는다', async () => {
     searchParamsValue = new URLSearchParams('draftId=draft-1');
     useV1AdminTournamentMock.mockReturnValue({ data: fakeDraftTournament({ registrationDeadlineAt: '2026-08-12T14:59:00.000Z' }), isPending: false });
-    let savedPayload: Partial<V1Tournament> | undefined;
+    let savedPayload: Partial<V1CreateTournamentPayload> | undefined;
     let saveSuccess: ((tournament: V1Tournament) => void) | undefined;
-    updateMutate.mockImplementationOnce((payload: Partial<V1Tournament>, opts: { onSuccess: (tournament: V1Tournament) => void }) => {
+    updateMutate.mockImplementationOnce((payload: Partial<V1CreateTournamentPayload>, opts: { onSuccess: (tournament: V1Tournament) => void }) => {
       savedPayload = payload;
       saveSuccess = opts.onSuccess;
     });
@@ -417,7 +416,7 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
     fireEvent.click(screen.getByRole('button', { name: /1단계 기본 정보/ }));
     fireEvent.change(screen.getByLabelText(/대회명/), { target: { value: '저장 중 다시 바꾼 이름' } });
     const persistedFields = Object.fromEntries(Object.entries(savedPayload ?? {}).filter(([, value]) => value !== undefined));
-    saveSuccess?.(fakeDraftTournament({ ...persistedFields, registrationDeadlineAt: '2026-08-12T14:59:00.000Z' }));
+    saveSuccess?.(fakeDraftResponseForPayload(persistedFields, { registrationDeadlineAt: '2026-08-12T14:59:00.000Z' }));
     fireEvent.click(screen.getByRole('button', { name: /5단계 공개 확인/ }));
     expect(screen.queryByRole('button', { name: '접수 시작하기' })).not.toBeInTheDocument();
     expect(changeStatusMutate).not.toHaveBeenCalled();
@@ -440,8 +439,8 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
 
   it('경기 시간: 종목 기본 전·후반이 채워지고, 단판으로 바꿔 고치면 대회를 만든 직후 피리어드 설정으로 저장한다', () => {
     createMutate.mockImplementationOnce(
-      (_payload: unknown, opts: { onSuccess: (t: V1Tournament) => void }) =>
-        opts.onSuccess(fakeDraftTournament({ updatedAt: '2026-08-01T00:00:00.000Z' })),
+      (payload: Partial<V1CreateTournamentPayload>, opts: { onSuccess: (t: V1Tournament) => void }) =>
+        opts.onSuccess(fakeDraftResponseForPayload(payload, { updatedAt: '2026-08-01T00:00:00.000Z' })),
     );
     renderPage();
     goToParticipationStep();
@@ -483,7 +482,8 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
 
   it('경기 시간: 피리어드 저장이 끝나기 전에는 공개 확인과 접수 시작을 열지 않는다', () => {
     createMutate.mockImplementationOnce(
-      (_payload: unknown, opts: { onSuccess: (t: V1Tournament) => void }) => opts.onSuccess(fakeDraftTournament()),
+      (payload: Partial<V1CreateTournamentPayload>, opts: { onSuccess: (t: V1Tournament) => void }) =>
+        opts.onSuccess(fakeDraftResponseForPayload(payload)),
     );
     renderPage();
     goToParticipationStep();
@@ -699,8 +699,8 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
       // API 응답 callback은 합성 fixture다. 아래는 실제 wizard/editor state와 outgoing
       // payload 계약을 검증하며 서버 저장·새로고침 roundtrip을 증명하지 않는다.
       createMutate.mockImplementationOnce(
-        (_payload: unknown, opts: { onSuccess: (value: V1Tournament) => void }) =>
-          opts.onSuccess(fakeDraftTournament()),
+        (payload: Partial<V1CreateTournamentPayload>, opts: { onSuccess: (value: V1Tournament) => void }) =>
+          opts.onSuccess(fakeDraftResponseForPayload(payload)),
       );
       renderPage();
       goToPresentationStep();
@@ -1084,8 +1084,8 @@ describe('AdminTournamentsNewPage — 4단계(공개 확인)', () => {
 
   it('확인 단계의 "취소"를 누르면 모달만 닫히고 상태는 바뀌지 않는다', async () => {
     createMutate.mockImplementation(
-      (_payload: unknown, opts: { onSuccess: (t: V1Tournament) => void }) =>
-        opts.onSuccess(fakeDraftTournament()),
+      (payload: Partial<V1CreateTournamentPayload>, opts: { onSuccess: (t: V1Tournament) => void }) =>
+        opts.onSuccess(fakeDraftResponseForPayload(payload)),
     );
     renderPage();
     goToPresentationStep();
@@ -1101,8 +1101,8 @@ describe('AdminTournamentsNewPage — 4단계(공개 확인)', () => {
 
   it('"나중에 하기"는 상태를 바꾸지 않고 관리 화면으로만 이동한다', () => {
     createMutate.mockImplementation(
-      (_payload: unknown, opts: { onSuccess: (t: V1Tournament) => void }) =>
-        opts.onSuccess(fakeDraftTournament()),
+      (payload: Partial<V1CreateTournamentPayload>, opts: { onSuccess: (t: V1Tournament) => void }) =>
+        opts.onSuccess(fakeDraftResponseForPayload(payload)),
     );
     renderPage();
     goToPresentationStep();

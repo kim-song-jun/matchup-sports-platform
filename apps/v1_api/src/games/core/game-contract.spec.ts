@@ -209,6 +209,21 @@ describe('Game core contract', () => {
     );
   });
 
+  it('accepts only the registered clock system actor and rejects untrusted system actor names', () => {
+    const input = {
+      actor: { actorType: 'SYSTEM', systemActor: 'GAME_CLOCK_EXPIRY' } as const,
+      expectedVersion: 4, currentVersion: 4,
+      headerIdempotencyKey: 'clock-expiry-1', bodyClientCommandId: 'clock-expiry-1', payloadHash: 'a'.repeat(64),
+    };
+    expect(assertGameCommandContext(input)).toEqual(expect.objectContaining({ actor: input.actor }));
+    for (const systemActor of ['', 'UNKNOWN', 'game_clock_expiry']) {
+      // Deliberately model a runtime payload outside the compile-time actor union.
+      const untrusted = { ...input, actor: { actorType: 'SYSTEM', systemActor } };
+      expect(() => Reflect.apply(assertGameCommandContext, undefined, [untrusted]))
+        .toThrow(expect.objectContaining({ code: 'INVALID_ACTOR_SCOPE' }));
+    }
+  });
+
   it('freezes revision content at submit and rejects every mutation of terminal revisions', () => {
     expect(() =>
       assertRevisionTransition({

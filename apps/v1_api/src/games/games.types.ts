@@ -37,7 +37,7 @@ export type GameActorScope =
     }
   | {
       actorType: 'SYSTEM';
-      systemActor: 'GAME_END_DERIVER' | 'GAME_BACKFILL' | 'PROJECTION_REPAIR';
+      systemActor: 'GAME_END_DERIVER' | 'GAME_BACKFILL' | 'PROJECTION_REPAIR' | 'GAME_CLOCK_EXPIRY';
     };
 
 export interface GameCommandContextInput {

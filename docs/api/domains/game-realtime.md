@@ -17,6 +17,35 @@
 
 <!-- API_CONTRACT_SECTION_END:Frozen realtime contract -->
 
+## 경기 시간 만료 확인 (MD-QA #142)
+
+서버 worker의 자동 기간 종료는 [Game 기간 종료 계약](./games.md#실제-경기-시간-만료와-기간-종료-md-qa-142)을
+따른다. 이 내부 처리를 위한 client/server Socket event나 payload는 추가하지 않는다. 기존
+`game.snapshot`에는 기간 상세가 없고 standalone worker에는 room broadcast delegate도 없으므로,
+Socket 연결이나 snapshot만으로 worker의 기간 종료가 즉시 전달된다고 가정하지 않는다.
+
+- 콘솔의 시계는 서버 offset을 적용하고 완료된 정지 및 진행 중 정지를 제외해 경과 시간을
+  표시한다. 진행 중인 기간의 설정 시간에 도달하고 일시정지가 아닐 때만 만료 안내를 보여 준다.
+  브라우저의 만료 판단은 안내와 조회를 시작할 뿐, `end-period`·`end`나 결과 제출을 자동 전송하지 않는다.
+- 일반 Game 상세 조회가 현재 경기와 일치하고 운영 snapshot보다 더 높은 버전을 반환하면,
+  같은 응답의 `state`/`version`을 기존 수락 경계로 함께 반영해 운영 상태·버전을 최신으로 올린다.
+  같은 React batch에서 더 최신 Socket 버전이 이미 수락됐으면 오래된 상세는 거부한다.
+  이 동기화는 상세 캐시를 다시 쓰지 않는다.
+- 만료 안내 중이거나 상세 조회의 `version`이 콘솔이 이미 수락한 `version`보다 뒤처지면
+  `GET /api/v1/games/:gameId`를 즉시 읽고 이후 5초 간격으로 다시 확인한다. 버전 지연 복구는
+  일시정지 중이거나 아직 만료되지 않은 기간에도 적용하고 ‘최신 경기 진행 상태를 확인하고 있어요’를
+  표시한다. 두 조건이 모두 해소되면 이 재조회를 멈춘다.
+- 같은 조회 범위에서 요청을 겹쳐 보내지 않으며 시간 초과나 범위 종료 시 진행 중인 요청을
+  취소한다. 경기·사용자·현재 기간·기간 시작/정지 정보·경기 상태가 바뀌면 이전 범위의 응답은
+  적용하지 않는다. 응답의 Game ID가 현재 경기와 같고, 현재 캐시 및 콘솔이 이미 수락한
+  버전보다 오래되지 않았을 때만 기간 상세와 `state`/`version`을 함께 반영한다. 이후 운영
+  명령은 새 버전을 기준으로 보낸다. worker의 기간 종료를 확인하면 `HALFTIME` 또는 마지막
+  기간 종료 화면으로 전환하고, 다음 기간 시작이나 경기 종료/결과 제출은 운영자가 기존 흐름으로 진행한다.
+- 조회 실패는 오류와 ‘종료 상태 다시 확인’을 표시하고 재조회할 수 있게 한다. 서버 확인을
+  기다리는 동안 기존 수동 기간 종료도 유지하며, 운영 권한과 version 충돌 오류는 기존 HTTP
+  계약을 따른다. 버전 지연 복구 중의 조회 실패도 같은 오류·재확인 경로를 사용한다.
+  5초 조회 주기는 서버의 확정 처리 시한을 뜻하지 않는다.
+
 ## Account withdrawal
 
 - A successful withdrawal commits `withdrawal_pending` before disconnecting the user's active user-room sockets. New connections for a pending account are rejected, and the user-room join path checks the current account state again after joining to close the race with a concurrent withdrawal commit.

@@ -43,7 +43,7 @@ raw roster identity fields.
 |---|---|---|---|
 | `GET` | `/api/v1/games/:gameId/visibility` | optional auth; public visibility policy | Returns the serialized `live`, `status_only` or `official_only` projection. A missing game or policy is `404`; `PUBLIC_LIVE=off` demotes `live` to `official_only` (confirmed results stay public). The stored policy is mapped through the same `effectivePublicVisibilityMode` helper the public-records lanes use (`docs/api/domains/public-records.md`), so all four stored modes resolve the same way on both surfaces. `OFFICIAL_ONLY` serves the official score and official events with `lineup: null` and never the in-progress score or live events; `HIDDEN` is an absolute deny (D-06) answered with `404 GAME_NOT_FOUND`, the same answer the public-records lanes give, so a hidden game is indistinguishable from one that does not exist. |
 | `GET` | `/api/v1/games/:gameId` | authenticated; source-scoped reader | Returns game, sides, periods, lineups, current version/sequence and current official revision reference. **Live-substitution addition**: also returns `substitutionPolicy: { mode: 'limited' \| 'rolling'; maxSubstitutions: number \| null }`, resolved from the pinned `V1CompetitionConfigVersion.lineup` — the live console uses `mode` (never a hardcoded sport name) to decide whether to surface the substitution action at all, and `maxSubstitutions` to show a remaining-count. **Task 166**: `'rolling'` 이면 콘솔이 교체 액션을 **아예 그리지 않는다**(롤링 전용이던 quick-substitution 모드도 함께 삭제됐다) — 서버가 그 명령을 거부하므로 버튼을 남기면 누를 수 있는데 항상 실패하는 액션이 된다. **Penalty-shootout-entry addition**: also returns `isKnockoutFixture: boolean`, computed with the same `GamesService#isKnockoutFixture` check `applyPenalties` already enforces server-side (`V1TournamentFixture.group.phase !== 'group'`; a fixture with no group is `false`). The live console gates its "승부차기 시작" (start penalty shootout) affordance on this field so it never offers a shootout entry step that would fail at `end` submission with `409 TOURNAMENT_PENALTY_NOT_ALLOWED`. |
-| `POST` | `/api/v1/games/:gameId/commands/:command` | authenticated tournament command actor | `GameCommandDto`; `command` is `start`, `pause`, `resume`, `end`, `end-period`, `start-period`, or `revert-period`. Team-match use is `409 TEAM_MATCH_GENERIC_COMMAND_FORBIDDEN`; tournament `end` derives its result revision in the same transaction. **Cancelled fixture (Task 180 W4-V14)**: when the game's league/tournament team match is already `cancelled` (a fixture cancelled while its game was running), `end` — normal or with a forfeit/abandon `outcomeReason` — closes the game as `CANCELLED` instead: open periods are ended, visibility drops to `STATUS_ONLY`, and no result revision or team-match completion is written (the response `state` is `CANCELLED`). `TEAM_MATCH_NOT_MATCHED` from the result boundary now carries a Korean message. `start` on a league/tournament fixture that is already `cancelled` returns `409 TOURNAMENT_MATCH_CANCELLED` (fixture cancellation does not touch the game, so a console left open could otherwise start it); friendly team matches are unaffected — their cancellation already cancels the scheduled game. **Penalty shootout**: `end`'s `payload.penalties?: { home: number; away: number }` (parsed by `extractEndPenalties`) records a knockout-fixture shootout score alongside the regulation score — rejected with `422 TOURNAMENT_PENALTY_INVALID` if not decisive (`home === away`) or malformed, and `409 TOURNAMENT_PENALTY_NOT_ALLOWED` if the fixture isn't a knockout-phase fixture or regulation didn't end level. The live console's penalty-shootout-entry panel (`operate-console.tsx`) only ever sends the final tally here — no per-kick record is persisted anywhere (see `apps/v1_web/src/lib/penalty-shootout.ts` doc for that trade-off). |
+| `POST` | `/api/v1/games/:gameId/commands/:command` | authenticated tournament command actor | `GameCommandDto`; `command` is `start`, `pause`, `resume`, `end`, `end-period`, `start-period`, or `revert-period`. Friendly team-match `end` is `409 TEAM_MATCH_GENERIC_COMMAND_FORBIDDEN`; canonical competition `TEAM_MATCH` games use the existing operational commands, and their `end` derives its result revision in the same transaction. Automatic clock expiry only ends a period as described below. **Cancelled fixture (Task 180 W4-V14)**: when the game's league/tournament team match is already `cancelled` (a fixture cancelled while its game was running), `end` — normal or with a forfeit/abandon `outcomeReason` — closes the game as `CANCELLED` instead: open periods are ended, visibility drops to `STATUS_ONLY`, and no result revision or team-match completion is written (the response `state` is `CANCELLED`). `TEAM_MATCH_NOT_MATCHED` from the result boundary now carries a Korean message. `start` on a league/tournament fixture that is already `cancelled` returns `409 TOURNAMENT_MATCH_CANCELLED` (fixture cancellation does not touch the game, so a console left open could otherwise start it); friendly team matches are unaffected — their cancellation already cancels the scheduled game. **Penalty shootout**: `end`'s `payload.penalties?: { home: number; away: number }` (parsed by `extractEndPenalties`) records a knockout-fixture shootout score alongside the regulation score — rejected with `422 TOURNAMENT_PENALTY_INVALID` if not decisive (`home === away`) or malformed, and `409 TOURNAMENT_PENALTY_NOT_ALLOWED` if the fixture isn't a knockout-phase fixture or regulation didn't end level. The live console's penalty-shootout-entry panel (`operate-console.tsx`) only ever sends the final tally here — no per-kick record is persisted anywhere (see `apps/v1_web/src/lib/penalty-shootout.ts` doc for that trade-off). |
 | `POST` | `/api/v1/games/:gameId/cancel` | authenticated source-scoped cancel actor | `CancelGameDto`; transitions to `CANCELLED` and makes visibility status-only. |
 | `GET` | `/api/v1/games/:gameId/events?afterSequence=N` | authenticated; source-scoped reader | `ListGameEventsQueryDto`; `N` defaults to `0` and otherwise accepts ASCII digits for a safe non-negative integer only. Returns ascending events with `N < sequence <= lastSequence`, the coherent `lastSequence` watermark, and `gap: null` or the first observed `{ expectedSequence, availableFrom }`. Invalid, empty, repeated, exponent, hex, signed, fractional, or unsafe cursors return `400 VALIDATION_ERROR`. |
 | `POST` | `/api/v1/games/:gameId/events` | authenticated event actor with takeover token | `AppendGameEventDto`; appends one sequenced event. Terminal games reject mutation with `409 TERMINAL_GAME_IMMUTABLE`. `type` accepts any `V1GameEventType` including `CORRECTION` -- this endpoint does not require `reversesEventId` and never sets it; only `/events/:eventId/reverse` below does. **Task 21 note**: the live operations console's foul secondary action currently posts `type: CORRECTION` here (not via `/reverse`) with an ad hoc `payload.kind: 'FOUL'` marker, purely as an annotation -- `deriveTournamentRevision()`'s score/card tally ignores it. A `CORRECTION` row from this route therefore always has `reversesEventId: null`; a real reversal always has it set. Any reader must key off `payload.kind`/`reversesEventId`, never `type` alone, to tell the two apart. This is a known, frozen-schema workaround (no dedicated `FOUL` enum value exists yet) pending a future migration. **Live-substitution addition**: `type: 'SUBSTITUTION'` requires `sideId` + `participantId` (the INCOMING participant) + a string `payload.outParticipantId` (the OUTGOING participant) — both must belong to `sideId`, the outgoing participant must currently be on the pitch and the incoming one must not be (derived by folding `V1GameParticipant.started` with every non-reversed prior `SUBSTITUTION` event in `sequence` order — see `GamesService#assertSubstitution` / `games/core/substitution.ts`). Violations return `422` with `SUBSTITUTION_INVALID`, `PARTICIPANT_SIDE_MISMATCH`, `SUBSTITUTION_OUT_NOT_ON_PITCH`, `SUBSTITUTION_IN_ALREADY_ON_PITCH`, or (when the config's `lineup.substitutions === 'limited'` and the side has used its `maxSubstitutions`) `SUBSTITUTION_LIMIT_REACHED`. **Task 166**: `lineup.substitutions === 'rolling'` 이면 교체 기록 자체가 `422 SUBSTITUTION_NOT_TRACKED` 로 **거부된다**(정본 §3 — 롤링 종목은 교체 기록이 없다). 그 검사는 다른 모든 검사보다 **먼저** 걸린다 — 롤링 경기에서는 "같은 팀인가·피치 위인가" 라는 질문 자체가 의미 없고, 그것들이 먼저 걸리면 운영자가 "선수를 잘못 골랐다" 로 읽는다. 대회·친선을 가르지 않는다(종목 설정으로만 갈린다). **이미 기록된 SUBSTITUTION 이벤트는 그대로 읽힌다** — 이 가드는 새 기록만 막는다. On success the incoming participant's `position`/`positionX`/`positionY` are overwritten with the outgoing participant's — the only other write this route performs besides the event row and `V1Game.lastSequence`/`version`. |
@@ -108,6 +108,43 @@ upper limit; an automatic conclusion then requires both teams to have completed 
 sudden-death round and the scores to differ. The frontend previews this rule, but the API
 re-evaluates the same kick counts before persisting the result.
 
+### 실제 경기 시간 만료와 기간 종료 (MD-QA #142)
+
+자동 종료의 단위는 진행 중인 **기간**이다. `V1GameOperationsWorkerService`가 브라우저 연결과
+무관하게 저장된 시계를 확인하고, 운영자의 `end-period`와 같은 `endLiveGamePeriod` 경계를 사용한다.
+새 HTTP endpoint나 client command는 추가하지 않는다.
+
+- 대상은 `sourceType=TEAM_MATCH`, `Game.state=LIVE`, 삭제되지 않은 연결 TeamMatch이며,
+  현재 기간도 `LIVE`, `startedAt` 존재, `pausedAt=null`이어야 한다. 과거
+  `TOURNAMENT_FIXTURE` 행과 시작하지 않은 기간은 대상이 아니다. 공동 기록이 있어도 이미
+  시작된 시계는 계속 처리하지만, 공동 기록을 위해 시계를 새로 시작하거나 만들어 내지는 않는다.
+- 만료는 `now - startedAt - max(0, pausedTotalMs) >= durationMinutes * 60_000`이다.
+  완료된 일시정지는 누적으로 빼고, 열린 일시정지 중에는 종료하지 않는다. 재개 시 열린 정지가
+  `pausedTotalMs`에 합산된 뒤 다시 판단한다. 기준 시간은 Game에 고정된 설정의 현재 기간
+  (`periods[number - 1]`)에서 읽는다. `extraTime`은 별도 연장 기간을 나타내는 boolean이며
+  추가 분 수가 아니다. 연장도 그 항목의 `durationMinutes`를 한 번만 적용한다. 설정을 읽을 수
+  없거나 유효한 기간 시간이 없으면 자동 종료하지 않고, 예정 일정의 `endAt`으로 추정하지 않는다.
+- 만료되면 현재 기간만 `ENDED`와 `endedAt`을 저장하고 Game `version`을 1 올린다. 다음
+  기간이 있으면 그 기간은 `HALFTIME`으로 두며 시작은 운영자의 `start-period`가 맡는다.
+  마지막 기간이 끝나도 **Game은 `LIVE`를 유지**한다. 운영자의 기존 경기 종료/결과 제출과
+  결과 확인 절차가 뒤따르며, 만료 처리 자체는 결과 revision·제출·공식 확정·완료 알림을 만들지 않는다.
+- 운영자 명령과 같은 canonical Game 행을 `FOR UPDATE`로 잠근 뒤 상태·기간·버전·시계를
+  새로 읽고 `Serializable` transaction에서 처리한다. Game/기간/버전으로 고정한 command ID와
+  payload hash를 기존 idempotency 저장소에 기록하고, 같은 transaction에
+  `actorType=SYSTEM`, `systemActor=GAME_CLOCK_EXPIRY`, `action=GAME_END_PERIOD` 감사를 남긴다.
+  운영자와 경합하거나 반복 스캔해도 이미 끝난 기간을 다시 종료하지 않는다. 운영자의
+  `end-period`에는 기존 권한·takeover·DTO·version·idempotency 및 `PERIOD_NOT_STARTED` 오류가
+  그대로 적용되며, 내부 system actor를 요청 payload로 지정하는 경로는 없다.
+- 스캔은 ID cursor로 한 번에 최대 20개를 읽고, 최소 1초 간격으로 한 번만 시작하며 한 스캔에서
+  잠금을 잡는 종료 시도는 최대 1건이다. 만료 처리 여부나 스캔 오류와 별개로 기존 outbox 작업도
+  계속 처리한다. 경기 수·DB 경합·worker 상태에 따라 지연될 수 있으므로 만료 시각 직후의
+  확정 처리 시간을 보장하지 않는다. 콘솔은 만료 안내와 기존 수동 기간 종료를 함께 제공한다.
+
+`GET /api/v1/games/:gameId`의 `periods`, nullable `periodDurations`, `state`, `version`이
+운영 콘솔의 확인 기준이다. 기간 자동 종료는 `V1GameEvent`나 새 sequence를 만들지 않으며,
+콘솔의 일반 상세 상태·버전 수락, 만료·상세 버전 지연 복구와 오류 재확인 계약은
+[game realtime contract](./game-realtime.md#경기-시간-만료-확인-md-qa-142)를 따른다.
+
 ### Mutation, version, and history rules
 
 Every Game mutation requires `expectedVersion`, an `Idempotency-Key` header, and the matching
@@ -150,15 +187,16 @@ scorer policy is required; the ordinary team-match policy permits a missing scor
 explicit warning marker. No fixture or game source may be created without an active immutable
 competition-config pin: `409 COMPETITION_CONFIG_REQUIRED` leaves no partial source/Game rows.
 
-**Task 17 note:** `POST /api/v1/games/:gameId/result-revisions` derives its score/goal/card cross-check
-purely from `V1GameEvent` rows (see the invariant paragraph above). `event_append`/`event_reverse`
-is authorized only for tournament staff (never for a team-match host/opponent), so a `TEAM_MATCH`
-game can never accumulate events. In the current contract this means any `score` other than
-`{home:0, away:0}` (or any nonzero `actualParticipants[].goals|cards`) fails
-`422 SCORE_EVENT_MISMATCH` for every team match, with no event-capture path to satisfy it. Task 16's
-own integration suite only ever submits `{home:0, away:0}`, so this was never exercised end to end.
-Closing this gap is a deliberate scope decision (team-match event-append allowance, or an
-invariant carve-out for `TEAM_MATCH` sources with zero events) that a future task must make.
+**Task 17 현재 계약:** `TEAM_MATCH` 자체는 이벤트 금지 조건이 아니다. 공동 기록이 없는 친선은
+호스트 팀 owner·manager와 활성 `platform_ops`가 기존 명단·권한 검증 아래 이벤트를 기록·취소할 수
+있으며, 상대 팀 매니저는 기록 주체가 아니다. 공동 기록이 시작되면 기존 결과·이벤트·진행 명령은
+`SHARED_RECORD_REQUIRED`로 차단된다. 대회·리그의 canonical competition `TEAM_MATCH`는
+쓰기 권한이 있는 배정 스태프와 `platform_ops`가 기존 운영 권한으로 기록한다.
+결과 검증은 `TEAM_MATCH`이며 이벤트가 0건일 때 이벤트 기반 대조(점수·선수 통계·`missingScorer`)만
+생략한다. 이벤트가 있으면 이 대조와 `422 SCORE_EVENT_MISMATCH`가 적용되며,
+다른 명단·참가자·값 검증은 계속 적용된다. 근거:
+[GamesService.resolveActor·withCommand·appendEvent](../../../apps/v1_api/src/games/games.service.ts),
+[validateGameResultInvariants](../../../apps/v1_api/src/games/core/game-invariants.ts).
 
 This is a real v1 persistence contract, not a mock-success flow. Fixture data is deterministic
 test data only and must not be rendered as verified player, score, or standings evidence.

@@ -1,5 +1,11 @@
 # v1_api
 
+## 1.9.8
+
+### Patch Changes
+
+- v1_web 팀 검색 정보 개선과 고정 버전 그룹을 함께 릴리스합니다. API 동작 변경은 없습니다.
+
 ## 1.9.7
 
 ### Patch Changes

@@ -29,7 +29,7 @@ import { useCursorPagination, useCursorPaginationSnapshot } from '@/hooks/use-cu
 import { PaginationBar } from '@/components/v1-ui/pagination-bar';
 import { extractErrorMessage } from '@/lib/error-message';
 import { withFromPath } from '@/lib/session-storage';
-import { TOURNAMENT_LIST_PAGE_SIZE, type TournamentListSeed } from '@/lib/public-list-seed';
+import { TOURNAMENT_LIST_PAGE_SIZE, tournamentListSeedPath, type TournamentListSeed } from '@/lib/public-list-seed';
 import { v1Keys } from '@/lib/query-keys';
 import { TournamentCard } from './tournament-card';
 import type { V1TournamentListItem } from '@/types/api';
@@ -170,7 +170,7 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
   const filterSheetOpen = searchParams.get('filter') === '1';
 
   /* D3: 데이터드리븐 종목 필터 — DB seed 기준 유효한 종목만 노출 (하드코딩 제거) */
-  const { data: sportsData } = useV1MasterSports();
+  const { data: sportsData } = useV1MasterSports({ seed: seed?.sports });
   const filterSports: Array<{ id: string; label: string }> = (sportsData ?? [])
     .filter((s) => s.id)
     .map((s) => ({ id: s.id, label: s.name }));
@@ -198,12 +198,14 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
     (savedCursor) => v1Keys.tournaments((savedCursor ? { ...mobileFilters, cursor: savedCursor } : mobileFilters) as Record<string, unknown>),
   );
 
-  // 서버 seed 는 무필터 첫 페이지다 — 같은 유형의 첫 화면 요청일 때만 쓴다.
+  const seedQuery = tournamentListSeedPath(activeKind, {
+    status: knownStatus,
+    sportId: querySportId,
+    genderCategory: knownGenderCategory,
+  }, sportsData ?? seed?.sports ?? []);
+  // Accept a server seed only while the effective query and pagination still match its request.
   const seedMatches = seed !== undefined
-    && seed.kind === activeKind
-    && querySportId === undefined
-    && knownStatus === undefined
-    && knownGenderCategory === undefined
+    && seed.query === seedQuery
     && page === 1
     && cursor === undefined;
   // 로딩 판정은 isPending(데이터 없음)이다 — isLoading 은 서버·하이드레이션 첫 렌더(persist 복원 중,

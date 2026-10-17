@@ -31,10 +31,18 @@ function item(id: string, title: string): V1TournamentListItem {
 
 const requested: string[] = [];
 
+function requestedPath(path: string): boolean {
+  return requested.some((url) => new URL(url).pathname + new URL(url).search === `/api/v1${path}`);
+}
+
 function stubApi(respond: (url: string) => Response) {
   vi.stubGlobal('fetch', vi.fn(async (input: string | URL) => {
     const url = String(input);
     requested.push(url);
+    if (url.includes('/master/sports')) {
+      const response = respond(url);
+      return response.ok ? envelope([{ id: 'sport-futsal', name: '풋살', code: 'futsal' }]) : response;
+    }
     return respond(url);
   }));
 }
@@ -124,15 +132,57 @@ describe('/tournaments 서버 렌더', () => {
     expect(html).not.toContain('application/ld+json');
   });
 
-  it('필터가 걸린 주소는 무필터 첫 페이지를 받지 않는다', async () => {
-    stubApi(() => envelope({ items: [item('t-1', '서울 풋살 오픈')], pageInfo: { nextCursor: null, hasNext: false } }));
+  it('유효한 현재 필터와 같은 첫 페이지 seed를 서버 HTML에 렌더하고 filtered ItemList는 생략한다', async () => {
+    stubApi((url) => {
+      if (url.includes('/master/sports')) return envelope([{ id: 'sport-futsal', name: '풋살', code: 'futsal' }]);
+      return envelope({ items: [item('t-filtered', '풋살 필터 대회')], pageInfo: { nextCursor: null, hasNext: false } });
+    });
 
-    const html = await serverHtml('status=open');
+    const html = await serverHtml('kind=tournament&status=in_progress&sportId=sport-futsal&genderCategory=mixed');
 
-    expect(requested.filter((url) => url.includes('/tournaments?'))).toEqual([]);
-    expect(markup(html)).not.toContain('서울 풋살 오픈');
-    // seed 가 없어도 첫 HTML 은 "조건에 맞는 대회가 없어요"가 아니라 로딩이어야 한다.
-    expect(html).toContain('대회 목록 불러오는 중');
+    expect(requestedPath('/tournaments?limit=20&kind=tournament&status=in_progress&sportId=sport-futsal&genderCategory=mixed')).toBe(true);
+    expect(markup(html)).toContain('풋살 필터 대회');
+    expect(itemListNames(html)).toEqual([]);
+    expect(html).not.toContain('application/ld+json');
+    expect(html).not.toContain('대회 목록 불러오는 중');
+  });
+
+  it('무시되는 비어 있지 않은 필터도 base 목록을 seed 하되 ItemList는 생략한다', async () => {
+    stubApi((url) => {
+      if (url.includes('/master/sports')) return envelope([{ id: 'sport-futsal', name: '풋살', code: 'futsal' }]);
+      return envelope({ items: [item('t-normalized', '정규화된 전체 목록 대회')], pageInfo: { nextCursor: null, hasNext: false } });
+    });
+
+    const html = await serverHtml('kind=unknown&status=open&genderCategory=unknown&sportId=unknown-sport');
+
+    expect(requestedPath('/tournaments?limit=20&kind=all')).toBe(true);
+    expect(requested.some((url) => url.includes('status=open') || url.includes('genderCategory=unknown') || url.includes('sportId=unknown-sport'))).toBe(false);
+    expect(markup(html)).toContain('정규화된 전체 목록 대회');
+    expect(itemListNames(html)).toEqual([]);
+    expect(html).not.toContain('application/ld+json');
+  });
+
+  it('마스터 종목이 도착하지 않으면 종목 필터가 유효하지 않다고 간주해 무필터 seed를 내지 않는다', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    stubApi((url) => {
+      if (url.includes('/master/sports')) return new Response('unavailable', { status: 503 });
+      return envelope({ items: [item('t-unfiltered', '필터와 무관한 전체 대회')], pageInfo: { nextCursor: null, hasNext: false } });
+    });
+
+    const html = await serverHtml('sportId=sport-futsal');
+
+    expect(requested.some((url) => url.includes('/tournaments?'))).toBe(false);
+    expect(markup(html)).not.toContain('필터와 무관한 전체 대회');
+    expect(itemListNames(html)).toEqual([]);
+  });
+
+  it('kind별로 유효하지 않은 상태 값은 API에 보내지 않는다', async () => {
+    stubApi(() => envelope({ items: [item('t-kind-invalid', '정규 대회 전체')], pageInfo: { nextCursor: null, hasNext: false } }));
+
+    await serverHtml('kind=tournament&status=draft');
+
+    expect(requestedPath('/tournaments?limit=20&kind=tournament')).toBe(true);
+    expect(requested.some((url) => url.includes('status=draft'))).toBe(false);
   });
 
   it.each(['page=2', 'kind=league&page=3'])('첫 페이지가 아닌 %s의 서버 HTML은 첫 페이지 ItemList를 내지 않는다', async (query) => {

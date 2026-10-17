@@ -1,5 +1,38 @@
 # Task 20261072: 운영 검색 노출 및 홈 GA4 계측 정정
 
+## Current direct-site follow-up — 2026-10-17 22:05 KST
+
+User explicitly requests actual owned-site discovery for `풋살 팀` and `풋살 대회`, including Google AI links to Teameet rather than Instagram, continued exact Naver stale-snippet checks, existing-page improvements, Alpha/current PR review/scoped main release, maintained local report and Alpha exclusion. Earlier below-fold ordinary and historical AI observations do not establish current broad-query visibility success.
+
+### Current cursor and ownership
+
+- Prior source/release work is live: dev #1965 + scoped main #1966, main `9a289400e87991ed576a9cc0fdffa6708c1ee62b`, runtime1.9.9; release-artifact reconciliation #1967 is dev `ff673553f25c4ac128f8d8fd376b956ebc3d1a59`. The earlier unchecked main/provider gates below are historical and superseded by cache STATUS.md plus exact deployment/provider receipts.
+- Existing owned checkout is reused with no branch switch/new worktree. Root owns this task, integration/release metadata/cache/browser lifecycle. Actual Luna public observer owns only p1 in Default task84 and direct-site-search evidence; separate actual Luna audits current existing list SSR/filter/discovery contracts. Actual Sol independently reviews diagnosis/source/evidence. Primary bracket WIP and three pre-existing node_modules symlinks are forbidden.
+- Selected source change is existing-filter SSR parity, preserving the actual API query, current layout, canonical/indexing scope and route. New pagination URL/navigation patterns are separate product scope and are not selected. No new search page, hidden keyword paragraph, arbitrary rewording, DB/member/key/store mutation or repeated unchanged provider requests.
+
+### Exit proof
+
+- [x] Fresh bounded exact-query Google/Naver ordinary and completed independent Google AI observations; first-page eligible links, actual next-page observation, deeper loaded positions and owned-site/prose/social/citation distinctions recorded. Exact first10 ordinal/rank is not verified. Naver exact22cad league/cup and generic unbound widget errors stay separate.
+- [x] Establish an actual existing-page data/SSR contract gap; implement only the smallest authorized source change with exact path ownership and a meaningful narrow regression test. If source is already correct, do not invent a patch to imply rankings can be forced.
+- [ ] Actual Sol frozen-source review/current GitHub PR review, committed-tree CI, exact Alpha deployment and real390/768/1440 before/after flow/runtime/network verification. Noindex remains on Alpha.
+- [ ] Only reviewed source plus required release artifacts reach main; exact CI/deploy/runtime proof excludes unrelated dev. Keep ranking/AI observations separate from source/deployment completion.
+- [ ] Update stable search-query-catalog.html/.json and cache STATUS/MONITOR with honest current/history bounds; close task84 keep[], terminal agents and owned processes. Final inline outcome with evidence and remaining search gaps.
+
+Active runtime board: `/Users/sungjun/.cache/teameet-seo-release/ACTIVE-20261017-direct-site-discovery.md`.
+
+Selected contract checkpoint — 22:14 KST: actual Luna production probes confirm existing futsal-filtered team API20/94 and tournamentAPI7 while both first HTMLs have0cardlinks. Source server skips filtered seed and client rejects it. Independent actual Sol supports same-normalized-filter first-page SSR parity with mismatch guard, not a ranking-cause claim. Root Alpha before probe at13:14:46Z confirms exactff673/noindex, API20/139teams and20tournaments while bothfilteredHTMLs have0cards. Actual Luna frontend implementation is limited to aligned filter/seed contract and focused tests; current copy/layout/canonical/filtered-ItemList omission/page>1 behavior remain. Pagination href/URL changes are excluded. Production health13:14:03Z is main9a/runtime1.9.9/DBtrue.
+
+Implementation/review checkpoint — 22:33 KST: shared normalized effective queries now seed matching team/tournament first-page HTML and reject mismatched client seeds. Actual Luna initial five-file contracts passed61tests; actual Sol identified filtered ItemList policy drift and both valid/invalid raw-filter cases were repaired, with healthy first-HTML cards asserted independently of JSON-LD absence. Follow-up route contracts passed43tests, then raw-filter boundary contracts passed21tests, serial/max1worker. Root final lint found a new test master-sport fixture missing required levels; this is corrected before rerunning lint. No source or release is committed/merged at this checkpoint. Root before Alpha screenshots cover both filtered routes at390/768/1440, top and true scroll-container bottom,20hydratedcards each, no horizontal overflow/runtime or resource errors. First HTML still0cards before release.
+
+Fresh search checkpoint — 22:26 KST: actual Luna checked8surfaces with12public screenshots. Google ordinary exact 풋살 대회/풋살 팀 each inspected page1 (8eligible document links) and actual next page; no exact teameet.co.kr result in the inspected bounds. Exact first10 ordinal/rank is not verified. Both independent completed Google AI answers also had no owned-site link. Naver 풋살 대회 has own /tournaments deeper in loaded mixed results; 풋살 팀 and 수원 풋살 대회 have no observed own tile in the loaded bounds; 수원 풋살 리그 has exact22cad normal date/venue snippet deeper. Optional DOM ancestry/rank extraction failed twice and is excluded, not converted into a fabricated rank. Competitor amfutsalhub URLs and unrelated 오류FC text are not Teameet or its stale error snippet. This remains a search visibility gap, not a completed ranking goal.
+
+Frozen source checkpoint — 22:36 KST: actual gpt-6-sol terminal source/fixture re-review PASS with zero remaining P1/P2. Root final `pnpm --filter v1_web lint` rerun exited0 after the valid master fixture correction; TypeScript and v1 pattern checks pass. Focused RED/GREEN, exact source path scope, existing untracked symlinks preserved, and `git diff --check` are verified. Current proof is source-level only; exact-head CI, current PR review, matching Alpha after screenshots and scoped main deployment remain pending.
+
+Current PR review checkpoint — 22:44 KST: devPR1968 source4277368 has completed GitHub Codex code/security reviews with no findings. Actual Copilot reviewed that exact head and found one low-severity stale CursorListSeed comment; Luna corrected only the comment, distinguishing filtered team seed/current normalized query from baseline match/team-match seed. No behavior/type/import/test change. Task measurement wording now explicitly limits Google observations to page1 eligible8links plus actual next-page inspection, without claiming a verified first10 rank. Original desktop bottom clip screenshots were invalid; two default viewport recaptures at13:41:04Z prove actual1440×1000/scroll601 and2129.5/footer907–1000, independently accepted by Sol. No source release is merged yet.
+
+
+## Preserved main release history
+
 ## Current Follow-up — broad discovery implementation, 2026-10-17 17:22 KST
 
 User explicitly requests implementation for `풋살 대회`, `아마추어 풋살`, and `풋살 팀`, checking an unindexed team and releasing after Alpha validation and PR review. Existing routes only. The current main release is `a0dd46583e7d007d9fa95a0d0adcc1d3de0c7552` (measured runtime1.9.8); dev is `9d75cfbf363ddb3958a663bf25ecd090f7f4a8a6`. Prior fixture/online/refetch changes below are already deployed via #1961/#1962, not pending work.

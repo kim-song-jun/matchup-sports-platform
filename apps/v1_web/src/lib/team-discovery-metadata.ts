@@ -3,6 +3,7 @@ import { teamDescriptionFallback } from '@/lib/seo';
 
 const TITLE_LIMIT = 60;
 const DESCRIPTION_LIMIT = 155;
+const MIN_TEAM_INTRODUCTION_LENGTH = 15;
 
 /** Build search snippets only from the public team detail fields already shown in the product. */
 export function buildTeamDiscoveryMetadata(team: V1TeamDetail): { title: string; description: string } {
@@ -10,18 +11,26 @@ export function buildTeamDiscoveryMetadata(team: V1TeamDetail): { title: string;
   const sport = normalize(team.sport?.name ?? team.sportName);
   const region = normalize(team.regionName ?? (team.region ? [team.region.parentName, team.region.name].filter(Boolean).join(' ') : null));
   const normalizedIntroduction = normalize(team.profile?.introduction);
-  const introduction = normalizedIntroduction.length >= 15 ? normalizedIntroduction : '';
+  const introduction = normalizedIntroduction.length >= MIN_TEAM_INTRODUCTION_LENGTH ? normalizedIntroduction : '';
   const activity = normalize(team.profile?.activitySummary);
   const level = normalize(team.profile?.levelLabel ?? team.profile?.skillLevelText);
 
-  const titleParts = [name];
-  if (sport && !name.includes(sport)) titleParts.push(sport);
-  if (region && !name.includes(region)) titleParts.push(region);
-  const title = limit(`${titleParts.join(' · ')} 팀`, TITLE_LIMIT);
+  const titleContext = [sport, region].filter((value) => value && !name.includes(value));
+  const rawContextTail = titleContext.length ? ` · ${titleContext.join(' · ')}` : '';
+  const contextTail = limit(rawContextTail, TITLE_LIMIT - 4);
+  let entitySuffix = name.endsWith('팀') ? '' : ' 팀';
+  let nameBudget = TITLE_LIMIT - contextTail.length - entitySuffix.length;
+  if (name.length > nameBudget && name.endsWith('팀')) {
+    entitySuffix = ' 팀';
+    nameBudget = TITLE_LIMIT - contextTail.length - entitySuffix.length;
+  }
+  const titleName = limit(name, Math.max(2, nameBudget));
+  const title = `${titleName}${contextTail}${entitySuffix}`;
 
   const context = [sport, region].filter(Boolean).join(' · ');
+  const entityName = name.endsWith('팀') ? name : `${name} 팀`;
   const descriptionLead = introduction
-    ? `${name} 팀${context ? ` · ${context}` : ''}: ${introduction}`
+    ? `${entityName}${context ? ` · ${context}` : ''}: ${introduction}`
     : teamDescriptionFallback(name, sport, region);
   const clauses = [descriptionLead];
   if (team.profile?.joinPolicy === 'approval_required') clauses.push('가입은 운영진 승인 방식이에요.');

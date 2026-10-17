@@ -120,10 +120,11 @@ export function teamDescriptionFallback(
 ): string {
   const sport = sportName?.trim();
   const region = regionName?.trim();
-  if (sport && region) return `${sport} · ${region}에서 활동하는 ${teamName} 팀을 만나보세요.`;
-  if (region) return `${region}에서 활동하는 ${teamName} 팀을 만나보세요.`;
-  if (sport) return `${sport}을 함께할 ${teamName} 팀을 만나보세요.`;
-  return `${teamName} 팀을 만나보세요.`;
+  const entityName = teamName.trim().endsWith('팀') ? teamName.trim() : `${teamName.trim()} 팀`;
+  if (sport && region) return `${sport} · ${region}에서 활동하는 ${entityName}을 만나보세요.`;
+  if (region) return `${region}에서 활동하는 ${entityName}을 만나보세요.`;
+  if (sport) return `${sport}을 함께할 ${entityName}을 만나보세요.`;
+  return `${entityName}을 만나보세요.`;
 }
 
 /**

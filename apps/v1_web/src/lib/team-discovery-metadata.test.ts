@@ -95,6 +95,63 @@ describe('buildTeamDiscoveryMetadata', () => {
     expect(metadata.description).not.toMatch(/\s{2,}|undefined|null/);
   });
 
+  it('reserves title space for the real sport and region when the valid team name is 50 characters', () => {
+    const metadata = buildTeamDiscoveryMetadata(teamFixture({ name: '가'.repeat(50), sport: { sportId: 'futsal', name: '풋살' } }));
+
+    expect(metadata.title).toHaveLength(60);
+    expect(metadata.title).toContain('풋살');
+    expect(metadata.title).toContain('서울 성동구');
+    expect(metadata.title).toMatch(/… · 풋살 · 서울 성동구 팀$/);
+  });
+
+  it('retains the entity label when truncating a 50-character name that already ends with 팀', () => {
+    const metadata = buildTeamDiscoveryMetadata(teamFixture({
+      name: `${'가'.repeat(49)}팀`,
+      sport: { sportId: 'futsal', name: '풋살' },
+    }));
+
+    expect(metadata.title.length).toBeLessThanOrEqual(60);
+    expect(metadata.title).toContain('풋살');
+    expect(metadata.title).toContain('서울 성동구');
+    expect(metadata.title).toMatch(/… · 풋살 · 서울 성동구 팀$/);
+  });
+
+  it('bounds unusually long sport and region context while leaving a nonempty team name', () => {
+    const metadata = buildTeamDiscoveryMetadata(teamFixture({
+      sport: { sportId: 'long-sport', name: '풋살'.repeat(30) },
+      regionName: '서울 성동구'.repeat(20),
+    }));
+
+    expect(metadata.title).toHaveLength(60);
+    expect(metadata.title).toMatch(/^성…/);
+    expect(metadata.title).toContain('풋살');
+    expect(metadata.title).toContain('…');
+  });
+
+  it('does not duplicate the team suffix with or without an introduction', () => {
+    const withIntroduction = buildTeamDiscoveryMetadata(teamFixture({ name: '새 풋살 팀', sport: { sportId: 'futsal', name: '풋살' } }));
+    const withoutIntroduction = buildTeamDiscoveryMetadata(teamFixture({
+      name: '새 풋살 팀',
+      sport: { sportId: 'futsal', name: '풋살' },
+      profile: { ...teamFixture().profile, introduction: null },
+    }));
+
+    expect(withIntroduction.title).toBe('새 풋살 팀 · 서울 성동구');
+    expect(withIntroduction.description).toContain('새 풋살 팀 · 풋살 · 서울 성동구:');
+    expect(withIntroduction.description).not.toContain('팀 팀');
+    expect(withoutIntroduction.description).toContain('새 풋살 팀을 만나보세요.');
+    expect(withoutIntroduction.description).not.toContain('팀 팀');
+  });
+
+  it('uses the existing fallback for a short introduction and retains one at the 15-character threshold', () => {
+    const short = buildTeamDiscoveryMetadata(teamFixture({ profile: { ...teamFixture().profile, introduction: '가'.repeat(14) } }));
+    const accepted = buildTeamDiscoveryMetadata(teamFixture({ profile: { ...teamFixture().profile, introduction: '가'.repeat(15) } }));
+
+    expect(short.description).not.toContain('가'.repeat(14));
+    expect(short.description).toContain('서울 성동구');
+    expect(accepted.description).toContain('가'.repeat(15));
+  });
+
   it('keeps sport and region context while fitting a long public introduction into the description limit', () => {
     const intro = '성수 한강공원에서 주말마다 초보자와 함께 천천히 달리는 모임입니다. '.repeat(8);
     const metadata = buildTeamDiscoveryMetadata(teamFixture({

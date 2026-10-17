@@ -6,9 +6,8 @@ import {
   buildNoIndexMetadata,
   buildPublicMetadata,
   fetchPublicV1,
-  metadataDescription,
-  teamDescriptionFallback,
 } from '@/lib/seo';
+import { buildTeamDiscoveryMetadata } from '@/lib/team-discovery-metadata';
 import { buildBreadcrumbLd, buildSportsTeamLd, displayRegionName } from '@/lib/structured-data';
 import type { V1TeamDetail } from '@/types/api';
 
@@ -22,16 +21,14 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   // 해체된 팀은 지난 경기 링크를 위해 읽기 전용으로 남을 뿐이다 — 검색에는 내보내지 않는다.
   if (team.dissolution) return buildNoIndexMetadata(`${team.name} (해체된 팀)`);
 
-  const sportName = team.sport?.name ?? team.sportName;
-  // 구조화 데이터와 같은 규칙으로 표시용 지역명을 만든다 — 둘이 갈리면 화면·메타·LD 가 어긋난다.
-  const regionName = displayRegionName(team);
+  const discovery = buildTeamDiscoveryMetadata({
+    ...team,
+    regionName: displayRegionName(team),
+  });
 
   return buildPublicMetadata({
-    title: team.name,
-    description: metadataDescription(
-      team.profile?.introduction,
-      teamDescriptionFallback(team.name, sportName, regionName),
-    ),
+    title: discovery.title,
+    description: discovery.description,
     path: `/teams/${id}`,
     image: team.profile?.coverImageUrl || team.profile?.logoUrl,
     squareImage: !team.profile?.coverImageUrl && Boolean(team.profile?.logoUrl),

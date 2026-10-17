@@ -1,5 +1,40 @@
 # Task 20261072: 운영 검색 노출 및 홈 GA4 계측 정정
 
+## Current Follow-up — broad discovery implementation, 2026-10-17 17:22 KST
+
+User explicitly requests implementation for `풋살 대회`, `아마추어 풋살`, and `풋살 팀`, checking an unindexed team and releasing after Alpha validation and PR review. Existing routes only. The current main release is `a0dd46583e7d007d9fa95a0d0adcc1d3de0c7552` (measured runtime1.9.8); dev is `9d75cfbf363ddb3958a663bf25ecd090f7f4a8a6`. Prior fixture/online/refetch changes below are already deployed via #1961/#1962, not pending work.
+
+### Scope and ownership
+
+1. Root owns this task, cache status/evidence, exact pathspec commits, dev PR integration, provider checks and scoped main release. Reuse the existing `mdqa-127-kakao-talk-login` checkout; no branch switch/new worktree. Preserve unrelated primary-tree bracket WIP and untracked node_modules symlinks.
+2. Actual gpt-6-luna team implementer owns existing team list/detail metadata and focused tests plus the non-route team metadata helper. Use actual public sport, region, activity and join policy; do not infer amateur eligibility, open slots or verified skill. No new visible search paragraphs or owner/member/contact data.
+3. Actual gpt-6-luna tournament implementer owns only existing tournament-list metadata and its test. Inspect latest9d75 first; preserve existing sport-aware copy and per-kind canonical. Any amateur wording describes a search use case without asserting all competitions admit amateurs. No new route or visible-copy change.
+4. Separate actual gpt-6-sol reviewer owns read-only independent source/contract/evidence review. Root serializes tests and owns the single Default/성준 Ego workspace, closing it with `finish({keep:[]})`.
+
+### Sequence and exit proof
+
+- [ ] Improve factual existing-page metadata without new body blocks, keyword repetition, hidden text, route or indexing-scope changes.
+- [ ] Narrow tests prove actual generated metadata, optional/multisport values and missing/dissolved-team boundaries; host preflight and serial minimal workers. Verify committed imports/diff scope and current-head CI/review, not dirty-tree green alone.
+- [ ] Independent Sol review has no unresolved actionable findings; current Copilot review checked separately from the known GitHub AI Scan upstream model failure.
+- [ ] Dev merge and matching deployment are verified separately; Alpha served SHA includes the exact candidate, noindex remains, and existing list/detail UI passes actual390/768/1440 top/bottom, console/network and metadata checks.
+- [ ] Scoped main contains only reviewed source plus required release metadata. Verify exact CI/deploy, actual production SHA/health, public metadata/canonical/sitemap and Alpha exclusion.
+- [ ] Inspect FC하깡 `abfc5432-9ef7-47fa-acbb-40ca6b86c873` live eligibility after release and make at most one justified indexing request. Record cached indexing, live eligibility, request acceptance, general search rank and AI citation separately. Naver stale22cad snippets are provider evidence, not proof of current service failure; do not repeat unchanged collection requests.
+- [ ] Update STATUS/MONITOR and inline release report; close own browser/processes/agents. Broad query visibility remains unproven until observed; no ranking or AI inclusion guarantee.
+
+### Baseline / risks
+
+Current public HTML/robots/canonical/sitemap is technically reachable. Google cached `/teams`, `/tournaments` and 골때리네FC detail are indexed; FC하깡 is unknown despite current200 and sitemap inclusion, with no public creation timestamp to date the gap. The latest broad-query sample has no own-domain Google eligible links and one later Naver listing; AI 풋살대회 has a partial own-URL observation. These facts motivate factual clarity and crawl verification, not a fabricated universal technical diagnosis. No DB/member/key/payment/store/provider-setting changes are included.
+
+### Implementation checkpoint — 2026-10-17 18:40 KST
+
+- Team list head title now names region-based 풋살·축구 team discovery; detail metadata includes actual sport/region and retains distinctive public introduction, with bounded optional activity/level/join-policy facts. Existing body, canonical, images and missing/dissolved noindex are preserved. Tournament current metadata already covers actual sports/location/conditions and kind-specific canonical; no speculative amateur-eligibility wording or visible-copy patch was added.
+- Actual gpt-6-sol source review found introduction loss and an unused fallback; both corrected and re-reviewed PASS with zero remaining P1/P2. Narrow tests10 pass. Typecheck found a fixture TrustState mismatch and pattern lint found two formal-register phrases; corrected to the actual sample state and 해요체, final validation pending below.
+- Root cached Google inspection at09:39:11Z now reports FC하깡 `발견됨 - 현재 색인이 생성되지 않음` and detects sitemap.xml, with no crawl timestamp. Previous unknown state has changed; still not indexed. Actual initial `/teams` HTML already contains this target link among20links, and sitemap contains105teamURLs. Later client-only pagination is a limitation but not evidence explaining this target's deferral. No provider request sent yet.
+- Worker checkout error was isolated: tournament worker initially used primary40a963; its source was restored and its own temporary test removed, leaving primary other-session WIP unchanged. All final product edits are in the assigned9d75 checkout. Browser75Default remains root-owned for before/after and provider checks. Early baseline screenshots reached loading UI; final after QA must wait for settled content and actual viewport/bottom rather than treating those as a final visual pass.
+
+
+## Preserved main release history
+
 Status: Oct 16 follow-up active — remove intrusive discovery copy, diagnose generic search gaps and repair GitHub AI security execution
 **Owner**: Codex main; explicit Luna implementation and Sol independent review
 **Created**: 2026-10-12

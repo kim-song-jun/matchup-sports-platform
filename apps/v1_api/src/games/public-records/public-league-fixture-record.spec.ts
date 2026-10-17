@@ -106,6 +106,12 @@ function buildService(options: {
 }
 
 describe('PublicTournamentRecordsService.getLeagueFixtureRecord', () => {
+  it.each(['SCHEDULED', 'LIVE', 'ENDED'])('취소 경기 기록은 게임이 %s여도 취소 상태를 유지한다', async (state) => {
+    const service = buildService({ fixture: makeFixtureRow({ status: 'cancelled', game: makeGame({ state }) }) });
+    const result = await service.getLeagueFixtureRecord(LEAGUE_ID, TEAM_MATCH_ID);
+    expect(result.status).toBe('cancelled');
+  });
+
   it('리그가 없으면 404 (LEAGUE_FIXTURE_NOT_FOUND)', async () => {
     const service = buildService({ league: null });
     await expect(service.getLeagueFixtureRecord(LEAGUE_ID, TEAM_MATCH_ID)).rejects.toThrow(NotFoundException);

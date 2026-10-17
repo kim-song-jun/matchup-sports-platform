@@ -67,6 +67,7 @@ Public team-match list/detail include the assigned field's name. For league/tour
 - 상대 확정 + 시작 시각 경과는 조회 시 서버 시각으로 판단한다. API 목록/상세 `isLive`는 표시용 파생값이며
   DB status `matched`의 신청/권한 의미는 바꾸지 않는다. 종료 예정 시각만으로 결과를 확정하지 않는다.
 - 기본/추천 목록은 진행 중인 matched 경기까지 유지한다. 명시적 recruiting 필터는 기존 모집 조건을 유지한다.
+- 단, 일반 팀매치(리그 대진 제외)는 공개 목록(`GET /team-matches`의 모든 정렬·필터와 건수)에서 두 가지를 뺀다. ① 경기 기록(`V1Game`)이 `CANCELLED`인 매치. 게임만 취소하는 `POST /games/:gameId/cancel`은 팀매치 상태를 바꾸지 않는다. ② `matched`인데 끝날 시각(`endAt`, 없으면 `startAt`)이 지나도록 게임이 `SCHEDULED`(또는 게임 없음)인 매치. 기록을 하나라도 남기면 게임이 `LIVE`가 되므로, 진행 중·일시중지·종료(결과 대기) 경기와 완료 7일 노출은 그대로다. 상세 주소는 계속 열린다.
 - UI는 진행 중 2초, 경기 전 15초 polling 및 창 focus 시 재조회. 자동 저장 성공을 시뮬레이션하지 않는다.
 - 참가자는 상세 진입 시 `/team-matches/:id/record`로 이동. `?view=detail`로 장소/라인업 상세 복귀.
   기존 `/result`, `/result/approval`도 신규 친선 경기에서는 공동 기록을 연다.

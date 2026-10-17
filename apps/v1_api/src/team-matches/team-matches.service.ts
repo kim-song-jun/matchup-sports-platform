@@ -276,6 +276,7 @@ export class TeamMatchesService {
         },
         // 취소·보관된 모집은 status 필터를 직접 지정해도 공개 검색에 노출하지 않는다.
         { status: { notIn: ['cancelled', 'archived'] } },
+        ...staleFriendlyTeamMatchWhere(now),
       ],
       ...(status === 'expired'
         ? { startAt: { lt: now } }
@@ -2396,6 +2397,28 @@ type TeamMatchOperationalFields = {
   hostTeamId: string | null;
   startAt: Date | null;
 };
+
+/**
+ * 일반 팀매치(리그 대진은 제외)의 공개 목록에서 끝난 일정을 정리한다. 진행 중·일시중지·종료(결과 대기)
+ * 경기와 완료 7일 노출은 그대로 둔다.
+ * - 경기 기록이 취소된 매치 — 게임만 취소하는 경로(`POST /games/:id/cancel`)는 팀매치를 matched 로 남긴다.
+ * - 상대 확정 뒤 끝날 시각(없으면 시작 시각)이 지나도록 아무도 시작하지 않은 매치(게임 SCHEDULED).
+ *   기록을 하나라도 남기면 게임이 LIVE 로 바뀌므로 SCHEDULED 는 실제로 아무 일도 없었던 경기다.
+ */
+function staleFriendlyTeamMatchWhere(now: Date): Prisma.V1TeamMatchWhereInput[] {
+  return [
+    { OR: [{ leagueId: { not: null } }, { NOT: { game: { is: { state: 'CANCELLED' } } } }] },
+    {
+      OR: [
+        { leagueId: { not: null } },
+        { status: { not: 'matched' } },
+        { game: { is: { state: { in: ['LIVE', 'PAUSED', 'ENDED'] } } } },
+        { endAt: { gte: now } },
+        { endAt: null, OR: [{ startAt: null }, { startAt: { gte: now } }] },
+      ],
+    },
+  ];
+}
 
 function deadlineAwareStatusWhere(
   status: 'recruiting' | 'closed',

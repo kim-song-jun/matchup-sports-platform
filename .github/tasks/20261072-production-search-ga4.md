@@ -6,7 +6,7 @@ Status: In Progress — factual team and competition discovery metadata, unknown
 
 ## Current Follow-up — broad discovery implementation, 2026-10-17 17:22 KST
 
-User explicitly requests implementation for `풋살 대회`, `아마추어 풋살`, and `풋살 팀`, checking an unindexed team and releasing after Alpha validation and PR review. Existing routes only. The current main release is `a0dd46583e7d007d9fa95a0d0adcc1d3de0c7552` (measured runtime1.9.8); dev is `9d75cfbf363ddb3958a663bf25ecd090f7f4a8a6`. Prior fixture/online/refetch changes below are already deployed via #1961/#1962, not pending work.
+User explicitly requests implementation for `풋살 대회`, `아마추어 풋살`, and `풋살 팀`, checking an unindexed team and releasing after Alpha validation and PR review. Existing routes only. At this historical 17:22 checkpoint, main served `a0dd46583e7d007d9fa95a0d0adcc1d3de0c7552` (measured runtime1.9.8) and dev was `9d75cfbf363ddb3958a663bf25ecd090f7f4a8a6`; the current release cursor is recorded below. Prior fixture/online/refetch changes are already deployed via #1961/#1962.
 
 ### Scope and ownership
 
@@ -17,10 +17,10 @@ User explicitly requests implementation for `풋살 대회`, `아마추어 풋�
 
 ### Sequence and exit proof
 
-- [ ] Improve factual existing-page metadata without new body blocks, keyword repetition, hidden text, route or indexing-scope changes.
-- [ ] Narrow tests prove actual generated metadata, optional/multisport values and missing/dissolved-team boundaries; host preflight and serial minimal workers. Verify committed imports/diff scope and current-head CI/review, not dirty-tree green alone.
-- [ ] Independent Sol review has no unresolved actionable findings; current Copilot review checked separately from the known GitHub AI Scan upstream model failure.
-- [ ] Dev merge and matching deployment are verified separately; Alpha served SHA includes the exact candidate, noindex remains, and existing list/detail UI passes actual390/768/1440 top/bottom, console/network and metadata checks.
+- [x] Improve factual existing-page metadata without new body blocks, keyword repetition, hidden text, route or indexing-scope changes.
+- [x] Narrow tests prove actual generated metadata, optional/multisport values and missing/dissolved-team boundaries; host preflight and serial minimal workers. Verify committed imports/diff scope and current-head CI/review, not dirty-tree green alone.
+- [x] Independent Sol review has no unresolved actionable findings; current Copilot review checked separately from the known GitHub AI Scan upstream model failure.
+- [x] Dev merge and matching deployment are verified separately; Alpha served SHA includes the exact candidate, noindex remains, and existing list/detail UI passes actual390/768/1440 top/bottom, console/network and metadata checks.
 - [ ] Scoped main contains only reviewed source plus required release metadata. Verify exact CI/deploy, actual production SHA/health, public metadata/canonical/sitemap and Alpha exclusion.
 - [ ] Inspect FC하깡 `abfc5432-9ef7-47fa-acbb-40ca6b86c873` live eligibility after release and make at most one justified indexing request. Record cached indexing, live eligibility, request acceptance, general search rank and AI citation separately. Naver stale22cad snippets are provider evidence, not proof of current service failure; do not repeat unchanged collection requests.
 - [ ] Update STATUS/MONITOR and inline release report; close own browser/processes/agents. Broad query visibility remains unproven until observed; no ranking or AI inclusion guarantee.
@@ -40,7 +40,13 @@ Current public HTML/robots/canonical/sitemap is technically reachable. Google ca
 
 DevPR1965 initial862335 exactCI39022143928 passed Gates/API/Web, but was not merged: actual GitHub Codex review found long-name title context truncation and duplicated `팀`; Copilot requested a named introduction threshold. Luna repairs reserve sport/region before an explicit ellipsis in the name, preserve one team label even when a long registered name's suffix is truncated, cap unusually long context, and fix shared `teamDescriptionFallback` itself. Boundary tests cover actual50-character names, existing suffixes,14/15-character introduction threshold and extreme context. Initial repair40tests passed; final two boundary cases and final lint/source rereview remain gates. Main draftPR1966 f348 is superseded until matching repairs and latest exact checks are applied.
 
-Root read all252examples in the Google discovered-not-indexed report:100teamURLs,99 matching current105publicteams; the aggregate report explicitly last updated2026-10-12. This is a dated cohort, not current105per-URL inspection or an assertion99 remain unindexed today. FC하깡's current individual cached inspection differs from that report and shows discovery through sitemap but no crawl. Existing UI baseline is finally measured using actual mobile/tablet MAIN.tm-scroll-area and desktop document scrolling; all6route/width cases reached true bottom without horizontal overflow. Earlier document-only mobile checks were discarded. No source merge, Alpha deployment, main deployment or new provider request has happened yet.
+Root read all252examples in the Google discovered-not-indexed report:100teamURLs,99 matching current105publicteams; the aggregate report explicitly last updated2026-10-12. This is a dated cohort, not current105per-URL inspection or an assertion99 remain unindexed today. FC하깡's current individual cached inspection differs from that report and shows discovery through sitemap but no crawl. Existing UI baseline is finally measured using actual mobile/tablet MAIN.tm-scroll-area and desktop document scrolling; all6route/width cases reached true bottom without horizontal overflow. Earlier document-only mobile checks were discarded. At this checkpoint, source merge, Alpha deployment, main deployment and provider request were still pending; see the later release checkpoint below.
+
+### Release checkpoint — 2026-10-17 10:33Z
+
+- Source PR #1965 merged to dev at `ab0571061fc6f0359640353168b4abe68d800a86`. Matching exact-head CI `39024007007` passed API/Web/Gates; matching Alpha deployment `39024007202` succeeded. Root and independent Sol completed the actual Alpha checks: 6/6 cases passed and Alpha noindex remained in place.
+- Scoped main PR #1966 merged as `9a289400e879` at 2026-10-17 10:33:37Z. Production deployment is **pending**; no production completion, served-SHA, health, metadata or post-release provider claim is made here.
+- Release-artifact reconciliation is limited to the two Changesets already consumed in main history: `factual-fixture-first-html.md` in 1.9.7 (#1962) and `tournament-format-guide.md` in 1.9.5. The 14 other unreleased dev Changesets remain untouched. The factual team discovery Changeset was consumed by the current 1.9.8 release artifact.
 
 ## Historical implementation cursor — earlier 2026-10-17 (deployed #1961/#1962)
 

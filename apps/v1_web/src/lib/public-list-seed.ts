@@ -23,7 +23,7 @@ export type TournamentListSeed = {
 
 export type EventCampaignSeed = V1TournamentCampaignList;
 
-/** 매치·팀매치·팀 목록의 무필터 첫 페이지와 종목 칩용 마스터 종목. */
+/** 팀은 현재 URL 필터를 정규화한 첫 페이지, 매치·팀매치는 무필터 첫 페이지를 seed 한다. query는 기존 호출과의 호환을 위해 선택사항이다. */
 export type CursorListSeed<T> = {
   readonly page: CursorPage<T>;
   readonly sports: V1Sport[];

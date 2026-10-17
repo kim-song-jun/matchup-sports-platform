@@ -48,6 +48,36 @@ describe('GET /league-matches/:leagueId/standings', () => {
 
   afterAll(async () => cleanup?.());
 
+  it('공개 일정의 취소 경기 링크는 상세에서도 열리고 비공개·삭제 뒤에는 차단된다', async () => {
+    const teams = await Promise.all(['a', 'b'].map((suffix) => prisma.v1Team.create({
+      data: { ownerUserId, sportId, regionId, name: `cancel-detail-${suffix}-${suiteId}` },
+    })));
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/admin/league-matches').set('x-v1-user-id', ownerUserId)
+      .send({ title: '취소 경기 상세 리그', sportId, regionId,
+        startsOn: new Date().toISOString(), endsOn: new Date(Date.now() + 7 * 86_400_000).toISOString(),
+        teamIds: teams.map((team) => team.id) }).expect(201);
+    const leagueId = created.body.data.leagueId;
+    const generated = await request(app.getHttpServer())
+      .post(`/api/v1/admin/league-matches/${leagueId}/fixtures`).set('x-v1-user-id', ownerUserId)
+      .send({ weeksCount: 1 }).expect(201);
+    const teamMatchId = generated.body.data.teamMatchIds[0];
+    await prisma.v1TeamMatch.update({ where: { id: teamMatchId }, data: { status: 'cancelled', cancelledAt: new Date() } });
+
+    const league = await request(app.getHttpServer()).get(`/api/v1/league-matches/${leagueId}`).expect(200);
+    expect(league.body.data.fixtures).toEqual(expect.arrayContaining([
+      expect.objectContaining({ teamMatchId, status: 'cancelled' }),
+    ]));
+    const detail = await request(app.getHttpServer()).get(`/api/v1/team-matches/${teamMatchId}`).expect(200);
+    expect(detail.body.data).toMatchObject({ status: 'cancelled', league: { leagueId } });
+
+    await prisma.v1Tournament.update({ where: { id: leagueId }, data: { isPublic: false } });
+    await request(app.getHttpServer()).get(`/api/v1/team-matches/${teamMatchId}`).expect(404);
+    await prisma.v1Tournament.update({ where: { id: leagueId }, data: { isPublic: true } });
+    await prisma.v1TeamMatch.update({ where: { id: teamMatchId }, data: { deletedAt: new Date() } });
+    await request(app.getHttpServer()).get(`/api/v1/team-matches/${teamMatchId}`).expect(404);
+  });
+
   it('공식 결과가 없으면 순위는 비고 pendingFixtures에 잡히며, 공식 결과가 확정되면 순위표에 반영된다', async () => {
     const teamA = await prisma.v1Team.create({ data: { ownerUserId, sportId, regionId, name: `pub-team-a-${suiteId}` } });
     const teamB = await prisma.v1Team.create({ data: { ownerUserId, sportId, regionId, name: `pub-team-b-${suiteId}` } });

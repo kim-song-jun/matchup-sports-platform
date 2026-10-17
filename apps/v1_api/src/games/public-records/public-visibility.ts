@@ -116,15 +116,17 @@ const GAME_STATE_TO_PUBLIC_STATUS: Record<V1GameState, PublicFixtureStatus> = {
 
 /**
  * The fixture-level lifecycle label shown under `hidden`/`status_only`
- * modes (matrix column "Bracket/status": "lifecycle only"). Prefers the
- * live `V1Game.state` once a game exists (it is authoritative the moment
- * the game starts); falls back to the fixture's own status before a game
+ * modes (matrix column "Bracket/status": "lifecycle only"). Cancellation wins;
+ * otherwise prefer live `V1Game.state` once a game exists (authoritative when
+ * the game starts). Fall back to the fixture's own status before a game
  * has been created for it.
  */
 export function publicFixtureStatus(input: {
   readonly gameState: V1GameState | null;
   readonly fixtureStatus: FixtureStatus;
 }): PublicFixtureStatus {
+  // 운영자가 취소한 대진은 남아 있는 게임 진행 상태로 되살리지 않는다.
+  if (input.fixtureStatus === 'cancelled') return 'cancelled';
   if (input.gameState !== null) return GAME_STATE_TO_PUBLIC_STATUS[input.gameState];
   return FIXTURE_STATUS_TO_PUBLIC_STATUS[input.fixtureStatus];
 }

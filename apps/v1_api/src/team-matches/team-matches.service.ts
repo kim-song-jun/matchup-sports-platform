@@ -314,7 +314,7 @@ export class TeamMatchesService {
 
   async detail(user: V1AuthUser | null, teamMatchId: string) {
     const now = new Date();
-    const teamMatch = await this.getPublicTeamMatch(teamMatchId, user, { includeTrust: true });
+    const teamMatch = await this.getPublicTeamMatch(teamMatchId, user, { includeTrust: true, includeCancelledLeague: true });
     const participantTeamIds = [teamMatch.hostTeamId, teamMatch.approvedApplicantTeamId]
       .filter((teamId): teamId is string => teamId !== null);
     const [winsByTeam, ratingsByTeam] = await Promise.all([
@@ -1933,15 +1933,22 @@ export class TeamMatchesService {
   private async getPublicTeamMatch(
     teamMatchId: string,
     user: V1AuthUser | null,
-    options: { includeTrust?: boolean } = {},
+    options: { includeTrust?: boolean; includeCancelledLeague?: boolean } = {},
   ) {
     const teamMatch = await this.prisma.v1TeamMatch.findFirst({
       where: {
         id: teamMatchId,
         deletedAt: null,
-        status: { notIn: ['cancelled', 'archived'] },
+        status: { notIn: ['archived'] },
         OR: [{ tournamentId: null }, { leagueId: { not: null } }],
         AND: [{
+          // 공개 일정에 남기는 취소 리그 경기는 상세에서도 읽는다. 모집 신청 등 다른
+          // 읽기 경로와 일반 친선 모집은 기존 취소 차단을 유지한다.
+          OR: [
+            { status: { not: 'cancelled' } },
+            ...(options.includeCancelledLeague ? [{ leagueId: { not: null } }] : []),
+          ],
+        }, {
           OR: [{ leagueId: null }, { league: { is: { isPublic: true } } }],
         }, {
           OR: [
@@ -1952,7 +1959,10 @@ export class TeamMatchesService {
       },
       include: this.teamMatchInclude(user),
     });
-    if (!teamMatch || ['cancelled', 'archived'].includes(teamMatch.status)) throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: 'Team match was not found' });
+    if (!teamMatch || teamMatch.status === 'archived' ||
+      (teamMatch.status === 'cancelled' && (!options.includeCancelledLeague || !teamMatch.leagueId))) {
+      throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: 'Team match was not found' });
+    }
     assertTeamMatchPublicInvariant(teamMatch);
 
     // 양 팀 신뢰점수는 detail() 응답에만 노출된다. applicationEligibility()/createApplication()은

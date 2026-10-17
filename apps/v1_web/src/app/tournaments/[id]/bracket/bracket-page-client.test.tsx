@@ -1220,6 +1220,31 @@ describe('BracketPageContent — 정규 리그 거울 행(format=group_knockout,
     expect(screen.queryByRole('table', { name: '리그 순위표' })).not.toBeInTheDocument();
   });
 
+  it('같은 화면에서 순위 query로 진입했다가 원래 URL로 돌아오면 일정 탭도 복원한다', () => {
+    const tournament = mirrorLeague();
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+    queryClient.setQueryData(publicGameRecordsKeys.schedule(tournament.id, {}), {
+      pages: [leagueSchedule()], pageParams: [null],
+    });
+    const view = () => (
+      <QueryClientProvider client={queryClient}>
+        <BracketPageContent tournament={tournament} />
+      </QueryClientProvider>
+    );
+    const page = render(view());
+    expect(screen.getByRole('tab', { name: '경기 일정' })).toHaveAttribute('aria-selected', 'true');
+
+    setMockSearchParams(new URLSearchParams({ tab: 'standings' }));
+    page.rerender(view());
+    expect(screen.getByRole('tab', { name: '리그 순위' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('table', { name: '리그 순위표' })).toBeVisible();
+
+    setMockSearchParams(new URLSearchParams());
+    page.rerender(view());
+    expect(screen.getByRole('tab', { name: '경기 일정' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByRole('table', { name: '리그 순위표' })).not.toBeInTheDocument();
+  });
+
   it.each(['schedule', 'unknown', 'https://external.invalid'])('허용되지 않은 순위 탭 값 %s는 경기 일정으로 직접 진입한다', (tab) => {
     setMockSearchParams(new URLSearchParams({ tab }));
     renderBracketPage(mirrorLeague(), leagueSchedule());

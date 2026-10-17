@@ -482,7 +482,37 @@ export class TournamentPlayersService {
       if (dto.jerseyNumber !== undefined) {
         await writeJerseyNumber(tx, saved.id, dto.jerseyNumber);
       }
-      await enqueueRosterResync(tx, competitionTeamTargets(tournamentId, [current.registration.teamId]));
+      // 재추가는 이전 참가 기간의 경기별 제외를 이어받지 않는다. 여기서는 ID만 읽는다 —
+      // 신청·멤버십을 쥔 채 경기를 잠그면 kickoff/명단 조정과 잠금 순서가 뒤집힌다.
+      // 고정 ID를 넘겨야 늦게 처리된 이벤트가 재추가 뒤의 새 제외를 취소하지 않는다.
+      const previousExclusions = existingRow === null ? [] : await tx.v1GameRosterAdjustment.findMany({
+        where: {
+          teamId: current.registration.teamId,
+          userId: dto.userId,
+          action: 'EXCLUDE',
+          revokedAt: null,
+          game: {
+            state: 'SCHEDULED',
+            currentOfficialRevisionId: null,
+            teamMatch: {
+              deletedAt: null,
+              status: { not: 'cancelled' },
+              OR: [{ leagueId: tournamentId }, { tournamentId, leagueId: null }],
+            },
+          },
+        },
+        select: { id: true },
+        orderBy: { id: 'asc' },
+      });
+      await enqueueRosterResync(tx, previousExclusions.length === 0
+        ? competitionTeamTargets(tournamentId, [current.registration.teamId])
+        : [{
+            scope: 'competitionPlayerReadded',
+            competitionId: tournamentId,
+            teamId: current.registration.teamId,
+            userId: dto.userId,
+            adjustmentIds: previousExclusions.map((row) => row.id),
+          }]);
       return saved;
     });
   }

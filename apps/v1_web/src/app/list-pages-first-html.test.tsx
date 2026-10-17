@@ -82,7 +82,9 @@ function healthyApi(path: string): Response {
   if (path === '/master/sports') return envelope([FUTSAL]);
   if (path === '/matches') return envelope(pageOf([CLOSED_MATCH, MATCH]));
   if (path === '/team-matches') return envelope(pageOf([TEAM_MATCH]));
-  if (path === TEAM_LIST_SEED_PATH) return envelope(pageOf([TEAM]));
+  if (path === TEAM_LIST_SEED_PATH || path.startsWith('/teams?sportId=sport-futsal-uuid&')) {
+    return envelope(pageOf([TEAM]));
+  }
   if (path.startsWith('/tournaments/campaigns?')) return envelope(pageOf([]));
   if (path.startsWith('/tournaments?')) return envelope(pageOf([]));
   if (path === '/notices') return envelope({ notices: [] });
@@ -209,17 +211,19 @@ describe('공개 목록 첫 HTML — seed 성공', () => {
   it.each([
     ['/matches', MatchesPage, 'regionId=region-1'],
     ['/team-matches', TeamMatchesPage, 'kind=friendly'],
-    ['/teams', TeamsPage, 'sportId=sport-futsal-uuid'],
   ] as const)('%s 는 필터가 걸린 주소에서 ItemList 를 내지 않는다', async (_path, page, query) => {
     const html = await serverHtml(page, query);
 
     expect(html).not.toContain('application/ld+json');
   });
 
-  // 팀 목록은 필터가 걸리면 클라이언트가 seed 를 버린다 — 매치·팀매치는 무필터 전체 목록 쿼리가 seed 를 계속 쓴다.
-  it('/teams 는 필터가 걸린 주소에서 버려질 목록 seed 를 요청하지 않는다', async () => {
-    await serverHtml(TeamsPage, 'sportId=sport-futsal-uuid');
-    expect(requested).not.toContain(TEAM_LIST_SEED_PATH);
+  it('/teams 는 필터된 첫 페이지 카드를 렌더하고 필터 URL 에 ItemList 를 내지 않는다', async () => {
+    const html = await serverHtml(TeamsPage, 'sportId=sport-futsal-uuid');
+
+    expect(requested).toContain('/teams?sportId=sport-futsal-uuid&limit=20&includeFacets=true');
+    expect(html).toContain('href="/teams/team-1?from=');
+    expect(html).toContain('강남 유나이티드');
+    expect(itemList(html)).toBeNull();
   });
 
   it('/matches 는 필터가 걸려도 전체 목록 쿼리용 seed 를 받는다', async () => {

@@ -122,7 +122,7 @@ function CompetitionEntryCard({
         <span className={`tm-badge tm-badge-sm ${status.badgeClass}`}>{status.label}</span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
-        <TeamAvatar seed={registration.teamId} name={teamName} logoUrl={team?.logoUrl ?? null} size="sm" />
+        <TeamAvatar teamId={registration.teamId} name={teamName} logoUrl={team?.logoUrl ?? null} size="sm" />
         <span className="tm-text-label" style={{ fontWeight: 700, minWidth: 0, overflowWrap: 'anywhere' }}>
           {teamName}
         </span>

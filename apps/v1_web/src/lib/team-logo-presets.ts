@@ -11,6 +11,26 @@ export function getRandomTeamLogoPreset(random: () => number = Math.random) {
   return TEAM_LOGO_PRESETS[index];
 }
 
+export function resolveTeamLogoUrl({
+  teamId,
+  logoUrl,
+}: {
+  teamId?: string | null;
+  logoUrl?: string | null;
+}): string | null {
+  const savedLogoUrl = logoUrl?.trim();
+  if (savedLogoUrl) return savedLogoUrl;
+
+  const stableTeamId = teamId?.trim();
+  if (!stableTeamId) return null;
+
+  let hash = 2166136261;
+  for (let index = 0; index < stableTeamId.length; index += 1) {
+    hash = Math.imul(hash ^ stableTeamId.charCodeAt(index), 16777619);
+  }
+  return TEAM_LOGO_PRESETS[(hash >>> 0) % TEAM_LOGO_PRESETS.length];
+}
+
 export function isTeamLogoPreset(url: string | null | undefined): url is string {
   return Boolean(url && TEAM_LOGO_PRESETS.includes(url));
 }

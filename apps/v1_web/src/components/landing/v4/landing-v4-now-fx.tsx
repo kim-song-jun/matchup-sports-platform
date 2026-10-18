@@ -97,8 +97,8 @@ export function LandingV4MatchCard({ match, clone }: { match: LandingLiveTeamMat
         onClick={() => trackEvent('landing_cta_click', { cta: 'live_open_team_match' })}
       >
         <span className="tm-landing-v4-mcard-logos">
-          <TeamAvatar seed={match.hostName} name={match.hostName} logoUrl={match.hostLogoUrl} size="sm" />
-          <TeamAvatar seed={match.opponentName} name={match.opponentName} logoUrl={match.opponentLogoUrl} size="sm" />
+          <TeamAvatar name={match.hostName} logoUrl={match.hostLogoUrl} size="sm" />
+          <TeamAvatar name={match.opponentName} logoUrl={match.opponentLogoUrl} size="sm" />
         </span>
         <b>{match.hostName} <span className="tm-landing-v4-mcard-vs">vs</span> {match.opponentName}</b>
         <small>{[where, match.dateTimeText].filter(Boolean).join(' · ')}</small>

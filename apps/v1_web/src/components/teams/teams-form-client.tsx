@@ -18,6 +18,7 @@ import { labelToLevelCode } from '@/lib/v1-levels';
 import { formatProvinceWide, toTeamRegionOptions } from '@/lib/v1-regions';
 import type { V1TeamMutationPayload } from '@/types/api';
 import { TeamDetailPageSkeleton, TeamFormPageView } from './teams-page';
+import { getRandomTeamLogoPreset } from '@/lib/team-logo-presets';
 import type { TeamFormViewModel } from './teams.types';
 import { getTeamFormViewModel } from './teams.view-model';
 
@@ -73,6 +74,7 @@ export function TeamCreatePageClient() {
     const vm = getTeamFormViewModel('create').team;
     return vm;
   });
+  const defaultLogoAssignedRef = useRef(false);
   const [sportId, setSportId] = useState('');
   const [regionId, setRegionId] = useState('');
   const [joinPolicy, setJoinPolicy] = useState<'approval_required' | 'closed'>('approval_required');
@@ -109,6 +111,12 @@ export function TeamCreatePageClient() {
   // 온보딩에서 고른 내 지역으로 채운다(F23) — 프로필이 올 때까지 기다려야 첫 지역이 먼저 박히지 않는다.
   const profilePending = profile.isPending;
   const profileRegions = profile.data?.regions;
+  useEffect(() => {
+    if (defaultLogoAssignedRef.current) return;
+    defaultLogoAssignedRef.current = true;
+    const defaultLogoUrl = getRandomTeamLogoPreset();
+    setDraft((current) => current.logoUrl?.trim() ? current : { ...current, logoUrl: defaultLogoUrl });
+  }, []);
   useEffect(() => {
     if (regionId || !regionOptions[0] || profilePending) return;
     const mine = profileRegions?.find((region) => region.primary) ?? profileRegions?.[0];
@@ -348,6 +356,7 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
     <>
       <TeamFormPageView
         model={sports.isPending && sports.data === undefined ? { ...model, form: undefined } : model}
+        teamId={teamId}
         cancelHref={cancelHref}
       />
       {UnsavedChangesModal}

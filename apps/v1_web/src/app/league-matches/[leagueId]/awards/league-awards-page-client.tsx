@@ -83,7 +83,7 @@ function ChampionsHero({ champions }: { champions: V1LeagueChampionTeam[] }) {
               href={withFromPath(`/teams/${team.teamId}`, from)}
               className="tm-pressable flex flex-col items-center gap-2"
             >
-              <TeamAvatar seed={team.teamId} name={team.teamName} logoUrl={team.teamLogoUrl} size="lg" />
+              <TeamAvatar teamId={team.teamId} name={team.teamName} logoUrl={team.teamLogoUrl} size="lg" />
               <span className="inline-flex items-center gap-1 text-sm font-bold text-[var(--text-strong)]">
                 <Trophy size={14} className="tm-medal-gold" aria-hidden="true" />
                 {team.teamName}
@@ -141,7 +141,7 @@ function FinalStandingsSection({
                 className="tm-pressable tm-list-row-interactive flex min-h-[44px] items-center gap-2 px-3 py-2"
               >
               <span className="w-5 shrink-0 text-[var(--text-muted)]">{row.position}</span>
-              <TeamAvatar seed={row.teamId} name={row.teamName} logoUrl={row.teamLogoUrl} size="sm" />
+              <TeamAvatar teamId={row.teamId} name={row.teamName} logoUrl={row.teamLogoUrl} size="sm" />
               <span className="flex min-w-0 flex-1 items-center gap-2">
                 <span className="truncate text-[var(--text-strong)]">{row.teamName}</span>
                 {championTeamIds.has(row.teamId) && (

@@ -336,7 +336,7 @@ function AggregateMatchCard({ matchup }: { matchup: AggregateMatchup }) {
         data-winner={winner === 'home' ? 'true' : undefined}
         data-loser={isDone && winner === 'away' ? 'true' : undefined}
       >
-        <TeamAvatar seed={homeTeamId ?? home.label} name={home.label} logoUrl={homeTeamLogoUrl} size="sm" />
+        <TeamAvatar teamId={home.isPlaceholder ? null : homeTeamId} name={home.label} logoUrl={home.isPlaceholder ? null : homeTeamLogoUrl} size="sm" />
         <span className="tm-bk2-name" style={home.isPlaceholder ? { color: 'var(--text-caption)' } : undefined}>{home.label}</span>
         <span className="tm-bk2-score tab-num">{homeAggScore}</span>
       </div>
@@ -346,7 +346,7 @@ function AggregateMatchCard({ matchup }: { matchup: AggregateMatchup }) {
         data-winner={winner === 'away' ? 'true' : undefined}
         data-loser={isDone && winner === 'home' ? 'true' : undefined}
       >
-        <TeamAvatar seed={awayTeamId ?? away.label} name={away.label} logoUrl={awayTeamLogoUrl} size="sm" />
+        <TeamAvatar teamId={away.isPlaceholder ? null : awayTeamId} name={away.label} logoUrl={away.isPlaceholder ? null : awayTeamLogoUrl} size="sm" />
         <span className="tm-bk2-name" style={away.isPlaceholder ? { color: 'var(--text-caption)' } : undefined}>{away.label}</span>
         <span className="tm-bk2-score tab-num">{awayAggScore}</span>
       </div>
@@ -408,7 +408,7 @@ function MatchTeamRow({
       data-loser={isLoser ? 'true' : undefined}
       data-bracket-team-row
     >
-      <TeamAvatar seed={teamId ?? label} name={label} logoUrl={isPending ? null : logoUrl} size="sm" />
+      <TeamAvatar teamId={isPending || isPlaceholder ? null : teamId} name={label} logoUrl={isPending || isPlaceholder ? null : logoUrl} size="sm" />
       <span className="tm-bk2-name" style={!decided ? { color: 'var(--text-caption)' } : undefined}>{label}</span>
       {score !== null && <span className="tm-bk2-score tab-num">{score}</span>}
       {score === null && decided && <span className="tm-bk2-score" style={{ opacity: 0.25 }}>-</span>}
@@ -730,13 +730,17 @@ function ConnectedBracket({ rounds, groups, champion }: { rounds: BracketGraphRo
         <div style={{ height: HEAD_H, display: 'flex', justifyContent: 'center', alignItems: 'center' }}><span className="tm-bk2-pill">{round.label}</span></div>
         {graph.nodes.filter((node) => node.round === round.key).map((node) => {
           const fixture = node.fixture;
+          const byeName = node.bye
+            ? teamDisplayName(node.bye.registrationId === null ? 'TBD' : node.bye.teamName)
+            : null;
+          const byeHasPublicTeam = node.bye !== undefined && node.bye.registrationId !== null && byeName !== null && !byeName.isPlaceholder;
           return <div key={node.id} data-bracket-node={node.id} style={{ position: 'absolute', width: COL_W, top: HEAD_H + node.y, transform: 'translateY(-50%)' }}>
             {fixture ? <>
               <p className="tm-text-micro" style={{ marginBottom: 4, color: 'var(--text-caption)' }}>{fixture.fixtureNumber}번 경기</p>
               <MatchCard fixture={withBracketSourceNames(fixture, rounds)} />
             </> : node.bye ? <div className="tm-bk2-card" role="region" aria-label={`${byeRound(node.round)?.label} 부전승`} style={{ padding: 12 }}>
               <div className="tm-text-caption-strong" style={{ color: 'var(--blue700)', marginBottom: 8 }}>부전승 · {byeRound(node.round)?.nextLabel} 직행</div>
-              <div className="flex items-center gap-2"><TeamAvatar seed={node.bye.teamId ?? node.bye.registrationId ?? node.bye.id} name={teamDisplayName(node.bye.registrationId === null ? 'TBD' : node.bye.teamName).label} logoUrl={node.bye.teamLogoUrl} size="sm" /><span className="tm-text-caption-strong">{teamDisplayName(node.bye.registrationId === null ? 'TBD' : node.bye.teamName).label}</span></div>
+              <div className="flex items-center gap-2"><TeamAvatar teamId={byeHasPublicTeam ? node.bye.teamId : null} name={byeName!.label} logoUrl={byeHasPublicTeam ? node.bye.teamLogoUrl : null} size="sm" /><span className="tm-text-caption-strong">{byeName!.label}</span></div>
             </div> : null}
           </div>;
         })}

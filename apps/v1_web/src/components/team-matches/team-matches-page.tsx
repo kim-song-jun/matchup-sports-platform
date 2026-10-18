@@ -473,7 +473,7 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
   const hostTeamCardContent = (
     <>
       {/* 팀 로고 아바타 — 원본은 48px였으나 TeamAvatar 표준 사이즈 중 가장 근접한 md(40px)로 통일 */}
-      <TeamAvatar seed={match.hostTeamId ?? match.hostTeam} name={match.hostTeam} logoUrl={match.hostTeamLogoUrl} size="md" />
+      <TeamAvatar teamId={match.hostTeamId} name={match.hostTeam} logoUrl={match.hostTeamLogoUrl} size="md" />
       {/* 팀 정보 */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>{hasAssignedHostTeam ? '홈팀 정보' : '운영 주관'}</div>
@@ -528,7 +528,7 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
           aria-label={`${team.name} 팀 보기`}
           style={{ display: 'flex', alignItems: 'center', gap: 16, padding: 16 }}
         >
-          <TeamAvatar seed={team.teamId ?? team.applicationId ?? team.name} name={team.name} logoUrl={team.logoUrl} size="md" />
+          <TeamAvatar teamId={team.teamId} name={team.name} logoUrl={team.logoUrl} size="md" />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>
               {team.status === '승인 완료' ? '어웨이팀 정보' : '신청팀 정보'}

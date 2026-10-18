@@ -194,8 +194,7 @@ function liveTournaments(items: readonly V1TournamentListItem[], now: Date): Lan
           ? resolveTournamentCapacity(item as V1TournamentListItem & { teamCount: number })
           : null;
       const slots =
-        capacity && capacity.teamCount !== null && Number.isFinite(capacity.teamCount) && capacity.teamCount > 0
-          && capacity.remainingCount !== null
+        capacity && Number.isFinite(capacity.teamCount) && capacity.teamCount > 0
           ? { confirmed: capacity.confirmedCount, total: capacity.teamCount, remaining: capacity.remainingCount }
           : null;
 

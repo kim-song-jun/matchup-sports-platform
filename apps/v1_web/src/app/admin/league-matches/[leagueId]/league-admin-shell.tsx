@@ -18,6 +18,7 @@ import { useV1AdminLeagueMatch } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { sanitizeRedirectPath } from '@/lib/session-storage';
 import { LeagueStateModal } from './league-state-modal';
+import { Button } from '@/components/v1-ui/button';
 import { LeagueVisibilityControl } from './league-visibility-control';
 
 /**
@@ -33,6 +34,7 @@ export function LeagueAdminShell({ leagueId, children }: { leagueId: string; chi
   const { toasts, showToast } = useAdminToast();
   // 상태 변경 모달 — 상태 버튼이 상황마다 흩어져 있던 것(보류 카드·되돌리기·종료)을 하나로 모았다.
   const [stateModalOpen, setStateModalOpen] = useState(false);
+  const [starting, setStarting] = useState(false);
   const pathname = usePathname();
   // 목록에서 넘어온 출처(`?from=`) — 값이 하나이고 로컬 경로일 때만 믿는다. 섹션을 옮겨도 이어지도록
   // 섹션 링크에도 붙인다.
@@ -113,11 +115,16 @@ export function LeagueAdminShell({ leagueId, children }: { leagueId: string; chi
         description={`${series.teamIds.length}팀 참가 · 대진 ${series.fixtures.length}경기`}
         action={
           <div className="flex flex-wrap items-center gap-2">
-            <AdminLeagueStatePill state={series.state} />
+            <AdminLeagueStatePill state={series.state} lifecycleStatus={series.lifecycleStatus} registrationOpen={series.registrationOpen} />
+            {canWrite && series.state === 'draft' && (
+              <Button variant="primary" onClick={() => { setStarting(true); setStateModalOpen(true); }}>
+                리그 시작하기
+              </Button>
+            )}
             {canWrite && (
               <button
                 type="button"
-                onClick={() => setStateModalOpen(true)}
+                onClick={() => { setStarting(false); setStateModalOpen(true); }}
                 className="inline-flex min-h-[var(--size-touch-min)] items-center rounded-xl border border-[var(--border-strong)] px-4 text-[length:var(--font-size-label)] font-semibold text-[var(--text-strong)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
               >
                 상태 변경
@@ -128,7 +135,7 @@ export function LeagueAdminShell({ leagueId, children }: { leagueId: string; chi
       />
 
       {stateModalOpen && (
-        <LeagueStateModal leagueId={leagueId} series={series} onClose={() => setStateModalOpen(false)} showToast={showToast} />
+        <LeagueStateModal leagueId={leagueId} startOnly={starting} series={series} onClose={() => setStateModalOpen(false)} showToast={showToast} />
       )}
       {/* 보류 중에는 공개 설정을 따로 바꾸지 않는다 — 보류 해제가 공개 여부까지 되돌린다(서버도 409). */}
       {series.state === 'on_hold' ? null : <LeagueVisibilityControl leagueId={leagueId} isPublic={series.isPublic} />}

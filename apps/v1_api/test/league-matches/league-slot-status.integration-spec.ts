@@ -34,7 +34,7 @@ describe('promoteLeagueWhenSlotsFilledInTx', () => {
     expect(await statusOf(leagueId)).toBe('draft');
   });
 
-  it('promotes draft/open/closed to in_progress once every slot fixture is filled', async () => {
+  it('promotes existing draft/open/closed to in_progress once every slot fixture is filled', async () => {
     for (const from of ['draft', 'open', 'closed'] as const) {
       const { leagueId, teamA, teamB, s1, s2 } = await slotLeague(from);
       await h.createFixture(leagueId, { homeTeamId: teamA.id, awayTeamId: teamB.id, homeSlotId: s1.id, awaySlotId: s2.id });
@@ -52,6 +52,14 @@ describe('promoteLeagueWhenSlotsFilledInTx', () => {
       expect(await promote(leagueId)).toBe(false);
       expect(await statusOf(leagueId)).toBe(status);
     }
+  });
+
+  it('new explicit-start league stays closed even with every slot filled', async () => {
+    const { leagueId, teamA, teamB, s1, s2 } = await slotLeague('closed');
+    await h.prisma.v1Tournament.update({ where: { id: leagueId }, data: { requiresExplicitStart: true } });
+    await h.createFixture(leagueId, { homeTeamId: teamA.id, awayTeamId: teamB.id, homeSlotId: s1.id, awaySlotId: s2.id });
+    expect(await promote(leagueId)).toBe(false);
+    expect(await statusOf(leagueId)).toBe('closed');
   });
 
   it('ignores cancelled empty fixtures — cancelling the last empty one triggers promotion', async () => {

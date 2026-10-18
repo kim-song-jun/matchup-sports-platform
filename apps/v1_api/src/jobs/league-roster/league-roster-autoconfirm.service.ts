@@ -62,7 +62,8 @@ export async function createLeagueMirrorWithRosterSchedule(
   data: Prisma.V1TournamentUncheckedCreateInput,
   schedule: { leagueId: string; startsOn: Date },
 ): Promise<void> {
-  await tx.v1Tournament.create({ data });
+  // 신규 시즌은 모집 마감에서 운영자의 명시적 시작을 기다린다. 기존 행은 변경하지 않는다.
+  await tx.v1Tournament.create({ data: { ...data, status: data.status === 'draft' ? 'closed' : data.status, requiresExplicitStart: true } });
   await scheduleLeagueRosterAutoConfirm(tx, schedule);
 }
 

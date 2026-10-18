@@ -1,3 +1,5 @@
+신규 리그 모집 마감 생성·명시적 시작(2026-10-18): [시나리오](./league-explicit-start.md). PR 호환성 보강: API192·DB68 assertion PASS, 신규 migration 단독 회귀 exit 0. Web38·양쪽 타입·표면/패턴 PASS. 전체 DB runner 종료 대기는 별도 기록, CI 확인과 미배포 alpha 0/3이 후속.
+
 ## 2026-10-17 — 대진 표시 문구·경기 정보 편집
 
 [시나리오](./bracket-display-edit.md) · [Task 20261057](../../.github/tasks/20261057-admin-bracket-canvas.md). 목록/그림/모바일 공통 저장과 12강 부전승 편집. 변경 후 alpha 실측 0/3(PR 미배포), DB integration 미실행(Docker 미가동). 자동 회귀 결과는 task 최신 기록 참고.

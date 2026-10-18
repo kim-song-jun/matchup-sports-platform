@@ -272,8 +272,12 @@ const LEAGUE_STATE_PILL_KEY: Record<LeagueStateKey, string> = {
   on_hold: 'league_on_hold',
 };
 
-export function AdminLeagueStatePill({ state }: { state: LeagueStateKey }) {
-  return <AdminStatusPill status={LEAGUE_STATE_PILL_KEY[state]} label={leagueStateLabel(state)} />;
+export function AdminLeagueStatePill({ state, lifecycleStatus, registrationOpen = false }: { state: LeagueStateKey; lifecycleStatus?: string; registrationOpen?: boolean }) {
+  const waitingForStart = lifecycleStatus === 'closed';
+  return <AdminStatusPill
+    status={waitingForStart ? (registrationOpen ? 'open' : 'closed') : LEAGUE_STATE_PILL_KEY[state]}
+    label={waitingForStart ? (registrationOpen ? '모집 중' : '모집 마감') : leagueStateLabel(state)}
+  />;
 }
 
 const MATCH_PHASE_PILL_KEY: Record<PreResultMatchPhase, string> = {

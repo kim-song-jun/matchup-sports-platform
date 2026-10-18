@@ -1,3 +1,5 @@
+신규 리그는 모집 마감(`closed`)으로 생성하고 운영자가 명시적으로 시작한다. 관리자 목록·상세는 `lifecycleStatus`를 제공하며, 시작 전 경기 시작은 `409 LEAGUE_NOT_STARTED`다. [리그 계약](./domains/league-matches.md#new-league-lifecycle-2026-10-18)을 따른다.
+
 # Global v1 API contract
 
 대회 형식 수정은 mutation admin + `expectedVersion` CAS를 요구한다. 조/대진 생성 이후 또는 진행·완료 상태의 실제 형식 변경은 `409 TOURNAMENT_FORMAT_LOCKED`이며, 관리자 상세의 `formatChangeBlockedReason`으로 제한 사유를 미리 표시한다. 동일 형식 재전송과 다른 필드 수정은 허용한다. [Tournaments 계약](./domains/tournaments.md)을 따른다.

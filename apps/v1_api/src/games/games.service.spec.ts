@@ -822,7 +822,7 @@ describe('GamesService.confirmSideArrival', () => {
 // W4-V14 — 대진 취소는 게임을 건드리지 않는다. 열어 둔 콘솔이 취소된 대진의 경기를 시작하면 결과 없이
 // 진행 중으로 남으므로 시작에서 막는다.
 describe('GamesService start — 취소된 대진의 경기', () => {
-  function makeTx(teamMatchStatus: string) {
+  function makeTx(teamMatchStatus: string, lifecycleStatus = 'in_progress', requiresExplicitStart = true) {
     return {
       v1TeamMatch: {
         findUnique: jest.fn().mockResolvedValue({
@@ -830,8 +830,8 @@ describe('GamesService start — 취소된 대진의 경기', () => {
           tournamentId: 'league-1',
           leagueId: 'league-1',
           status: teamMatchStatus,
-          tournament: { kind: 'regular_league' },
-          league: { kind: 'regular_league' },
+          tournament: { kind: 'regular_league', status: lifecycleStatus, requiresExplicitStart },
+          league: { kind: 'regular_league', status: lifecycleStatus, requiresExplicitStart },
           tournamentDetails: null,
         }),
         findUniqueOrThrow: jest.fn().mockResolvedValue({ hostTeamId: 'team-h', approvedApplicantTeamId: 'team-a' }),
@@ -856,6 +856,16 @@ describe('GamesService start — 취소된 대진의 경기', () => {
     await expect(assertStartable(makeTx('cancelled'))).rejects.toMatchObject({
       response: expect.objectContaining({ code: 'TOURNAMENT_MATCH_CANCELLED' }),
     });
+  });
+
+  it('모집 마감 상태에서는 대진 양 팀이 있어도 리그 시작 전 경기를 시작할 수 없다', async () => {
+    await expect(assertStartable(makeTx('matched', 'closed'))).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'LEAGUE_NOT_STARTED' }),
+    });
+  });
+
+  it.each(['draft', 'open', 'closed'])('기존 %s 리그는 새 시작 조건으로 차단하지 않는다', async (status) => {
+    await expect(assertStartable(makeTx('matched', status, false))).resolves.toBeUndefined();
   });
 
   it('양 팀이 확정된 매칭 대진은 그대로 시작할 수 있다', async () => {

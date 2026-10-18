@@ -84,6 +84,9 @@ describe('리그 몰수패·부전승 결과 입력 (R11)', () => {
         teamIds: [teamA.id, teamB.id],
       });
     const leagueId = createRes.body.data.leagueId;
+    // 신규 리그는 대진 준비와 별개로 운영자가 명시적으로 시작한다.
+    await request(app.getHttpServer()).post(`/api/v1/admin/league-matches/${leagueId}/state`)
+      .set('x-v1-user-id', ownerUserId).send({ state: 'active' }).expect(200);
     const fixturesRes = await request(app.getHttpServer())
       .post(`/api/v1/admin/league-matches/${leagueId}/fixtures`)
       .set('x-v1-user-id', ownerUserId)

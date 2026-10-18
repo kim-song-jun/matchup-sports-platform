@@ -255,3 +255,7 @@ GK 저장/해제는 해당 참가 등록(대회·팀)의 선수 값에 보관한
 일괄 응답은 `{teamId,results,affectedGames:[{gameId,sideId}]}`. 클라이언트는 전파 대상 경기의 명단·라인업·공개 기록 캐시를 모두 무효화한다. 어드민 출전 표의 선수 셀은 `goalkeeper:boolean`, 경기 열은 `goalkeeperEditable:boolean`을 포함한다. support/read-only 스태프는 조회만 한다. 어드민 GK 열은 EXCLUDE/REVOKE와 함께 동일 batch로 저장하고 일반 실패는 GK 초안을 보존한다.
 
 한 경기만 담당하는 현장 스태프는 경기별 출전 조정만 가능하다. 대회 공통 GK는 대회 전체 lineup_mutate 권한이 필요하고, 경기 명단 응답의 `goalkeeperEditable:false`로 GK 편집을 노출하지 않는다.
+
+## League start prerequisite (2026-10-18)
+
+Game `start` in a regular league with `requiresExplicitStart=true` and stored as `draft`, `open`, or `closed` returns `409 LEAGUE_NOT_STARTED` before game state changes. An authorized admin starts the league through the existing league state endpoint first; friendly matches and regular tournaments retain their current rules. See [league lifecycle](./league-matches.md#new-league-lifecycle-2026-10-18).

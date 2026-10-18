@@ -132,6 +132,9 @@ describe('리그 자동 completed 전이 (R6)', () => {
         teamIds: [teamA.id, teamB.id],
       });
     const leagueId = createRes.body.data.leagueId;
+    // 신규 리그는 대진 준비와 별개로 운영자가 명시적으로 시작한다.
+    await request(app.getHttpServer()).post(`/api/v1/admin/league-matches/${leagueId}/state`)
+      .set('x-v1-user-id', ownerUserId).send({ state: 'active' }).expect(200);
     const fixturesRes = await request(app.getHttpServer())
       .post(`/api/v1/admin/league-matches/${leagueId}/fixtures`)
       .set('x-v1-user-id', ownerUserId)
@@ -139,7 +142,7 @@ describe('리그 자동 completed 전이 (R6)', () => {
     expect(fixturesRes.body.data.teamMatchIds).toHaveLength(2);
     const [fixture1Id, fixture2Id] = fixturesRes.body.data.teamMatchIds;
 
-    // 대진 생성 자체가 이미 리그를 active로 전이시킨다(league-match-admin.service.ts).
+    // 위에서 명시적으로 시작했으므로 대진 준비 뒤에도 진행 중이다.
     expect(await mirrorOf(leagueId)).toEqual({ kind: 'regular_league', status: 'in_progress' });
     expect(await mirrorOf(leagueId)).toEqual({ kind: 'regular_league', status: 'in_progress' });
 
@@ -179,6 +182,9 @@ describe('리그 자동 completed 전이 (R6)', () => {
         teamIds: [teamA.id, teamB.id],
       });
     const leagueId = createRes.body.data.leagueId;
+    // 신규 리그는 대진 준비와 별개로 운영자가 명시적으로 시작한다.
+    await request(app.getHttpServer()).post(`/api/v1/admin/league-matches/${leagueId}/state`)
+      .set('x-v1-user-id', ownerUserId).send({ state: 'active' }).expect(200);
     const fixturesRes = await request(app.getHttpServer())
       .post(`/api/v1/admin/league-matches/${leagueId}/fixtures`)
       .set('x-v1-user-id', ownerUserId)
@@ -210,6 +216,9 @@ describe('리그 자동 completed 전이 (R6)', () => {
         teamIds: [teamA.id, teamB.id],
       });
     const leagueId = createRes.body.data.leagueId;
+    // 신규 리그는 대진 준비와 별개로 운영자가 명시적으로 시작한다.
+    await request(app.getHttpServer()).post(`/api/v1/admin/league-matches/${leagueId}/state`)
+      .set('x-v1-user-id', ownerUserId).send({ state: 'active' }).expect(200);
     const fixturesRes = await request(app.getHttpServer())
       .post(`/api/v1/admin/league-matches/${leagueId}/fixtures`)
       .set('x-v1-user-id', ownerUserId)

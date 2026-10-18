@@ -3,6 +3,21 @@
 League creation is exposed under `/api/v1/admin/league-matches` and public
 league reads under `/api/v1/league-matches`.
 
+## New league lifecycle (2026-10-18)
+
+New independent leagues and new series seasons are stored as `closed` (모집 마감), with
+no registration deadline. No existing rows are backfilled. Admin list/detail include
+`lifecycleStatus` and authoritative `registrationOpen` alongside the compatible `state` (`closed` still maps to `draft`).
+The admin header shows 모집 마감 and 리그 시작하기. Confirming the existing state
+endpoint with `{ "state": "active" }` starts the league with the existing mutation-admin
+permission and `league_match.start` audit. Normal error handling and query invalidation apply.
+For new explicit-start leagues, fixture generation/regeneration, slot assignment and result
+activity never promote the pre-start `draft`/`open`/`closed` stage. Starting a game of a new explicit-start league in `draft`, `open`, or `closed` returns `409 LEAGUE_NOT_STARTED` inside
+the command transaction, before any game-state write. Once explicitly started, games use
+normal start rules. Existing `draft`/`open`/`closed` automatic promotion is retained when `requiresExplicitStart=false`; only new rows explicitly set it to `true`. Explicit
+registration reopening still uses the existing deadline contract independently of lifecycle.
+An additive migration adds `requiresExplicitStart` (database default `false`). Existing rows and writes from old application versions keep `false`, preserving all existing lifecycle behavior, including stored `closed`. Only the new league creation boundary opts in with `true`; create/edit DTOs do not accept this internal flag. Deploy the migration before the new application; rollback keeps the column and requires no data rewrite.
+
 ## Public visibility
 
 `V1Tournament.isPublic` (`v1_tournaments.is_public`) controls publication separately
@@ -42,7 +57,7 @@ them has an official result). The automatic transition additionally waits for th
 stays `active` even if every existing fixture is official (so a league built one fixture at a time is not
 closed after each game). Manual completion ignores `plannedFixtureCount`.
 
-A `draft` league (stored `draft`/`open`/`closed`) moves to `active` on its own when one of its games is
+An existing `draft` league (stored `draft`/`open`/`closed`, with `requiresExplicitStart=false`) moves to `active` on its own when one of its games is
 started (after the start command commits; status-change reason `game_started`) or when a result becomes
 official (quick result, forfeit or console end + confirm; reason `result_confirmed`). `on_hold` and
 `completed` leagues are never touched. Automatic completion only runs on result confirmation and fixture

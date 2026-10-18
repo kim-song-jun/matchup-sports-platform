@@ -66,7 +66,7 @@ interface FakeState {
   /** 이 트랜잭션에서 실제로 실행된 statement 이름(`모델.메서드`) 순서대로. */
   calls: string[];
   /** dual-write 가 통합 축 거울에 보낸 `updateMany` 인자 — where·data 를 그대로 본다. */
-  mirrorUpdates: Array<{ where: { id: string; kind: string }; data: { status: string } }>;
+  mirrorUpdates: Array<{ where: { id: string; kind: string; requiresExplicitStart?: boolean; status?: { in: string[] } }; data: { status: string } }>;
   /** 수동 대진의 주차 파생이 읽는 형제 대진 시작 시각. 테스트가 갈아끼운다. */
   siblingStartAts: Date[];
   /** `v1TeamMatch.create` 에 실린 data — 제목·시각·장소를 그대로 본다. */
@@ -446,6 +446,32 @@ async function createModule(prisma: PrismaService, games: GamesService) {
 }
 
 describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신원 연결', () => {
+  it.each([
+    ['generateFixtures', 'closed', true], ['regenerateFixtures', 'closed', true],
+    ['generateFixtures', 'closed', false], ['regenerateFixtures', 'closed', false],
+    ['generateFixtures', 'draft', false], ['regenerateFixtures', 'draft', false],
+    ['generateFixtures', 'draft', true], ['regenerateFixtures', 'draft', true],
+  ] as const)('%s: %s 리그의 명시적 시작 모드 %s를 보존한다', async (action, initialStatus, requiresExplicitStart) => {
+    const fake = createFake();
+    Object.assign(fake.tx, { v1TournamentSlot: { count: async () => 0 } });
+    Object.assign(fake.tx.v1TeamMatch, { updateMany: async () => ({ count: 0 }) });
+    let status: string = initialStatus;
+    const read = fake.tx.v1Tournament.findFirst;
+    fake.tx.v1Tournament.findFirst = async () => ({ ...(await read()), status, requiresExplicitStart });
+    fake.tx.v1Tournament.updateMany = async ({ where, data }) => {
+      if ((where.requiresExplicitStart !== undefined && where.requiresExplicitStart !== requiresExplicitStart) ||
+          (where.status && !where.status.in.includes(status))) return { count: 0 };
+      status = data.status;
+      return { count: 1 };
+    };
+    fake.tx.v1TeamMatch.findMany = async () => [];
+    const service = await createModule(fake.prisma, fake.games);
+    const result = await service[action](adminUser, 'league-1', { weeksCount: 1, reason: '일정 준비' });
+    expect(result.createdCount).toBeGreaterThan(0);
+    expect(fake.state.teamMatchCreates.length).toBeGreaterThan(0);
+    expect(status).toBe(requiresExplicitStart ? initialStatus : 'in_progress');
+  });
+
   it.each(['generateFixtures', 'regenerateFixtures'] as const)('보류 중 %s 호출은 대진이나 상태를 바꾸지 않는다', async (action) => {
     const fake = createFake();
     const findFirst = fake.tx.v1Tournament.findFirst;
@@ -639,7 +665,7 @@ describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신�
     // 호출 여부만 보지 않는다 — `where` 에서 `kind` 가드가 빠지면 같은 id 의 **진짜 대회**를
     // 덮어쓸 수 있는데, 호출됐다는 것만으로는 그게 안 보인다.
     expect(state.mirrorUpdates).toEqual([
-      { where: { id: 'league-1', kind: 'regular_league' }, data: { status: 'in_progress' } },
+      { where: { id: 'league-1', kind: 'regular_league', requiresExplicitStart: false, status: { in: ['draft', 'open', 'closed'] } }, data: { status: 'in_progress' } },
     ]);
   });
 
@@ -1783,6 +1809,7 @@ describe('LeagueMatchAdminService.list — visibility filter', () => {
     title: id,
     isPublic: id.startsWith('pub'),
     status: 'draft',
+    registrationDeadlineAt: null,
     scheduledAt: day,
     scheduledEndAt: day,
     regionId: 'region-1',

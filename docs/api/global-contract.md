@@ -1,5 +1,7 @@
 # Global v1 API contract
 
+대회 형식 수정은 mutation admin + `expectedVersion` CAS를 요구한다. 조/대진 생성 이후 또는 진행·완료 상태의 실제 형식 변경은 `409 TOURNAMENT_FORMAT_LOCKED`이며, 관리자 상세의 `formatChangeBlockedReason`으로 제한 사유를 미리 표시한다. 동일 형식 재전송과 다른 필드 수정은 허용한다. [Tournaments 계약](./domains/tournaments.md)을 따른다.
+
 Personal-match detail exposes the stored `isOnline` boolean (default `false`). `PATCH /api/v1/admin/matches/:matchId/online` accepts a strict boolean and requires mutation-admin authority; it atomically updates classification and its before/after audit, returning `{matchId,isOnline,changed}`. Repeating the same classification returns `changed:false`. This metadata mutation does not acquire the versioned game-command contract below and does not alter public-list access, canonical URLs or indexability. See [matches](./domains/matches.md) and [admin/ops](./domains/admin-and-ops.md).
 
 부전승 위치 교환(`PUT /admin/tournament-slots/:slotId/bye-side`)은 mutation admin만 가능하며 팀·슬롯·승자 연결·표시 위치를 원자적으로 저장한다. 대상 및 후속 경기의 시작/기록/결과를 보호하고 부분 성공을 반환하지 않는다. [Tournaments 계약](./domains/tournaments.md)을 따른다.

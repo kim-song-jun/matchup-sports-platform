@@ -268,6 +268,8 @@ On update, `null` clears nullable bank details when the resulting `entryFee` is 
 
 출전 인원·교체 설정만 보내는 PATCH도 제목 등 다른 필드가 필요하지 않다. 동일 설정 재저장에도 원자적 CAS와 감사 로그를 적용하고 새 `updatedAt`을 반환한다. 후속 요청은 이 버전을 사용해야 하며 이전 버전은 `409 TOURNAMENT_VERSION_CONFLICT`로 거절한다.
 
+대회 형식 변경: 관리자 상세 응답의 `formatChangeBlockedReason`은 변경 가능하면 `null`, 제한 중이면 한국어 사유다. `PATCH /api/v1/admin/tournaments/:tournamentId`의 `format`은 `league` / `knockout` / `group_knockout`을 받으며, 참가 신청만 있으면 변경 가능하다. 조 또는 삭제되지 않은 경기가 있거나 상태가 `in_progress` / `completed`이면 실제 형식 변경은 `409 TOURNAMENT_FORMAT_LOCKED`로 거절한다. 같은 형식 재전송과 다른 정보 수정은 허용한다. 조/대진 생성과 같은 잠금 안에서 구조를 재검사하고 CAS로 저장하며 감사 로그의 before/after에 형식을 남긴다. 형식 변경은 대진을 자동 삭제·변환하지 않는다.
+
 종목 변경: `PATCH /api/v1/admin/tournaments/:tournamentId`에 현재와 다른 `sportId`를 보내면 같은 CAS 트랜잭션에서 `competitionConfigVersionId`를 새 종목의 기본 규정 버전(생성과 같은 경로, 규정을 쓰지 않는 종목은 `null`)으로 다시 연결하고, 감사 로그(`tournament.update`)의 before/after에 `sportId`·`competitionConfigVersionId`를 남긴다. 직전에 고친 경기 시간·출전 인원은 새 종목 기본값으로 돌아간다. 대진이 하나라도 있거나 상태가 `in_progress`/`completed`이면 `409 TOURNAMENT_SPORT_LOCKED`(변경 없음). 같은 종목 재전송은 pin을 건드리지 않는다. 출전 인원·교체 필드와 함께 보내면 `400 TOURNAMENT_LINEUP_SIZE_SPORT_CHANGE_CONFLICT`이므로 종목을 먼저 저장한 뒤 설정한다.
 
 생성 마법사의 전체 폼 재시도에는 변경하지 않은 `sportId`도 포함할 수 있다. 동일 종목의 초안 재저장은 정상 저장하며, 실제 종목 변경은 존재 여부 검증 후 처리한다. 종목 ID는 원자적 CAS `updateMany`에 scalar FK로 전달한다(중첩 relation `connect`는 이 연산에서 지원하지 않는다). 전체 폼 재저장도 사용자 지정 피리어드와 최신 버전·감사로그 계약을 유지한다.

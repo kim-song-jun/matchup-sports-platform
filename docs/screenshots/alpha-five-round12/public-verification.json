@@ -1,0 +1,222 @@
+[
+  {
+    "id": "d5202610-1018-4000-8000-000000000001",
+    "title": "(테스트) 20팀·8명 12강 · 조별 1경기 남음 01",
+    "teams": 20,
+    "fixtures": 41,
+    "groups": [
+      {
+        "name": "A조",
+        "teams": 4,
+        "completed": 5,
+        "remaining": 1,
+        "standings": 4
+      },
+      {
+        "name": "B조",
+        "teams": 4,
+        "completed": 5,
+        "remaining": 1,
+        "standings": 4
+      },
+      {
+        "name": "C조",
+        "teams": 4,
+        "completed": 5,
+        "remaining": 1,
+        "standings": 4
+      },
+      {
+        "name": "D조",
+        "teams": 4,
+        "completed": 5,
+        "remaining": 1,
+        "standings": 4
+      },
+      {
+        "name": "E조",
+        "teams": 4,
+        "completed": 5,
+        "remaining": 1,
+        "standings": 4
+      }
+    ],
+    "byeTargets": 4
+  },
+  {
+    "id": "d5202610-1018-4000-8000-000000000002",
+    "title": "(테스트) 20팀·8명 12강 · 조별 1경기 남음 02",
+    "teams": 20,
+    "fixtures": 41,
+    "groups": [
+      {
+        "name": "A조",
+        "teams": 4,
+        "completed": 5,
+        "remaining": 1,
+        "standings": 4
+      },
+      {
+        "name": "B조",
+        "teams": 4,
+        "completed": 5,
+        "remaining": 1,
+        "standings": 4
+      },
+      {
+        "name": "C조",
+        "teams": 4,
+        "completed": 5,
+        "remaining": 1,
+        "standings": 4
+      },
+      {
+        "name": "D조",
+        "teams": 4,
+        "completed": 5,
+        "remaining": 1,
+        "standings": 4
+      },
+      {
+        "name": "E조",
+        "teams": 4,
+        "completed": 5,
+        "remaining": 1,
+        "standings": 4
+      }
+    ],
+    "byeTargets": 4
+  },
+  {
+    "id": "d5202610-1018-4000-8000-000000000003",
+    "title": "(테스트) 20팀·8명 12강 · 조별 1경기 남음 03",
+    "teams": 20,
+    "fixtures": 41,
+    "groups": [
+      {
+        "name": "A조",
+        "teams": 4,
+        "completed": 5,
+        "remaining": 1,
+        "standings": 4
+      },
+      {
+        "name": "B조",
+        "teams": 4,
+        "completed": 5,
+        "remaining": 1,
+        "standings": 4
+      },
+      {
+        "name": "C조",
+        "teams": 4,
+        "completed": 5,
+        "remaining": 1,
+        "standings": 4
+      },
+      {
+        "name": "D조",
+        "teams": 4,
+        "completed": 5,
+        "remaining": 1,
+        "standings": 4
+      },
+      {
+        "name": "E조",
+        "teams": 4,
+        "completed": 5,
+        "remaining": 1,
+        "standings": 4
+      }
+    ],
+    "byeTargets": 4
+  },
+  {
+    "id": "d5202610-1018-4000-8000-000000000004",
+    "title": "(테스트) 20팀·8명 12강 · 조별 1경기 남음 04",
+    "teams": 20,
+    "fixtures": 41,
+    "groups": [
+      {
+        "name": "A조",
+        "teams": 4,
+        "completed": 5,
+        "remaining": 1,
+        "standings": 4
+      },
+      {
+        "name": "B조",
+        "teams": 4,
+        "completed": 5,
+        "remaining": 1,
+        "standings": 4
+      },
+      {
+        "name": "C조",
+        "teams": 4,
+        "completed": 5,
+        "remaining": 1,
+        "standings": 4
+      },
+      {
+        "name": "D조",
+        "teams": 4,
+        "completed": 5,
+        "remaining": 1,
+        "standings": 4
+      },
+      {
+        "name": "E조",
+        "teams": 4,
+        "completed": 5,
+        "remaining": 1,
+        "standings": 4
+      }
+    ],
+    "byeTargets": 4
+  },
+  {
+    "id": "d5202610-1018-4000-8000-000000000005",
+    "title": "(테스트) 20팀·8명 12강 · 조별 1경기 남음 05",
+    "teams": 20,
+    "fixtures": 41,
+    "groups": [
+      {
+        "name": "A조",
+        "teams": 4,
+        "completed": 5,
+        "remaining": 1,
+        "standings": 4
+      },
+      {
+        "name": "B조",
+        "teams": 4,
+        "completed": 5,
+        "remaining": 1,
+        "standings": 4
+      },
+      {
+        "name": "C조",
+        "teams": 4,
+        "completed": 5,
+        "remaining": 1,
+        "standings": 4
+      },
+      {
+        "name": "D조",
+        "teams": 4,
+        "completed": 5,
+        "remaining": 1,
+        "standings": 4
+      },
+      {
+        "name": "E조",
+        "teams": 4,
+        "completed": 5,
+        "remaining": 1,
+        "standings": 4
+      }
+    ],
+    "byeTargets": 4
+  }
+]

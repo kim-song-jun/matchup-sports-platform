@@ -1,0 +1,97 @@
+{
+  "browserPid": 60126,
+  "parentPid": 60105,
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "tournaments": [
+    {
+      "id": "d5202610-1018-4000-8000-000000000001",
+      "adminTeams": 20,
+      "playersPerTeam": 8,
+      "adminFixtures": 41,
+      "completed": 25,
+      "remainingGameLineups": [
+        8,
+        8
+      ],
+      "sampleRoster": 8,
+      "adminPage": true
+    },
+    {
+      "id": "d5202610-1018-4000-8000-000000000002",
+      "adminTeams": 20,
+      "playersPerTeam": 8,
+      "adminFixtures": 41,
+      "completed": 25,
+      "remainingGameLineups": [
+        8,
+        8
+      ],
+      "sampleRoster": 8,
+      "adminPage": true
+    },
+    {
+      "id": "d5202610-1018-4000-8000-000000000003",
+      "adminTeams": 20,
+      "playersPerTeam": 8,
+      "adminFixtures": 41,
+      "completed": 25,
+      "remainingGameLineups": [
+        8,
+        8
+      ],
+      "sampleRoster": 8,
+      "adminPage": true
+    },
+    {
+      "id": "d5202610-1018-4000-8000-000000000004",
+      "adminTeams": 20,
+      "playersPerTeam": 8,
+      "adminFixtures": 41,
+      "completed": 25,
+      "remainingGameLineups": [
+        8,
+        8
+      ],
+      "sampleRoster": 8,
+      "adminPage": true
+    },
+    {
+      "id": "d5202610-1018-4000-8000-000000000005",
+      "adminTeams": 20,
+      "playersPerTeam": 8,
+      "adminFixtures": 41,
+      "completed": 25,
+      "remainingGameLineups": [
+        8,
+        8
+      ],
+      "sampleRoster": 8,
+      "adminPage": true
+    }
+  ],
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 400 ()",
+    "Failed to load resource: the server responded with a status of 400 ()",
+    "Failed to load resource: the server responded with a status of 400 ()"
+  ],
+  "pageErrors": [],
+  "httpErrors": [
+    {
+      "status": 400,
+      "path": "/_next/image"
+    },
+    {
+      "status": 400,
+      "path": "/_next/image"
+    },
+    {
+      "status": 400,
+      "path": "/_next/image"
+    }
+  ],
+  "publicByeConnections": 4,
+  "browserClosed": true
+}

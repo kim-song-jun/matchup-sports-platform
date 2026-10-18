@@ -1,0 +1,267 @@
+{
+  "ssmCommandId": "5820cb94-1d09-4230-9b0d-62df600527b1",
+  "ssmStatus": "Success",
+  "existingTeamsAndMembershipsUnchanged": true,
+  "created": [
+    {
+      "preserved": false,
+      "id": "d5202610-1018-4000-8000-000000000001",
+      "title": "(테스트) 20팀·8명 12강 · 조별 1경기 남음 01",
+      "teams": 20,
+      "players": 160,
+      "uniquePlayers": 160,
+      "groups": [
+        {
+          "name": "A조",
+          "teams": 4,
+          "completed": 5,
+          "remaining": 1,
+          "standings": 4
+        },
+        {
+          "name": "B조",
+          "teams": 4,
+          "completed": 5,
+          "remaining": 1,
+          "standings": 4
+        },
+        {
+          "name": "E조",
+          "teams": 4,
+          "completed": 5,
+          "remaining": 1,
+          "standings": 4
+        },
+        {
+          "name": "C조",
+          "teams": 4,
+          "completed": 5,
+          "remaining": 1,
+          "standings": 4
+        },
+        {
+          "name": "D조",
+          "teams": 4,
+          "completed": 5,
+          "remaining": 1,
+          "standings": 4
+        }
+      ],
+      "knockoutFixtures": 11,
+      "knockoutAssigned": 0,
+      "byeSlots": 4,
+      "edges": 10,
+      "overallStandings": 20,
+      "rosterSizeCorrect": true,
+      "gameRosterSizesCorrect": true
+    },
+    {
+      "preserved": false,
+      "id": "d5202610-1018-4000-8000-000000000002",
+      "title": "(테스트) 20팀·8명 12강 · 조별 1경기 남음 02",
+      "teams": 20,
+      "players": 160,
+      "uniquePlayers": 160,
+      "groups": [
+        {
+          "name": "A조",
+          "teams": 4,
+          "completed": 5,
+          "remaining": 1,
+          "standings": 4
+        },
+        {
+          "name": "B조",
+          "teams": 4,
+          "completed": 5,
+          "remaining": 1,
+          "standings": 4
+        },
+        {
+          "name": "C조",
+          "teams": 4,
+          "completed": 5,
+          "remaining": 1,
+          "standings": 4
+        },
+        {
+          "name": "D조",
+          "teams": 4,
+          "completed": 5,
+          "remaining": 1,
+          "standings": 4
+        },
+        {
+          "name": "E조",
+          "teams": 4,
+          "completed": 5,
+          "remaining": 1,
+          "standings": 4
+        }
+      ],
+      "knockoutFixtures": 11,
+      "knockoutAssigned": 0,
+      "byeSlots": 4,
+      "edges": 10,
+      "overallStandings": 20,
+      "rosterSizeCorrect": true,
+      "gameRosterSizesCorrect": true
+    },
+    {
+      "preserved": false,
+      "id": "d5202610-1018-4000-8000-000000000003",
+      "title": "(테스트) 20팀·8명 12강 · 조별 1경기 남음 03",
+      "teams": 20,
+      "players": 160,
+      "uniquePlayers": 160,
+      "groups": [
+        {
+          "name": "E조",
+          "teams": 4,
+          "completed": 5,
+          "remaining": 1,
+          "standings": 4
+        },
+        {
+          "name": "A조",
+          "teams": 4,
+          "completed": 5,
+          "remaining": 1,
+          "standings": 4
+        },
+        {
+          "name": "B조",
+          "teams": 4,
+          "completed": 5,
+          "remaining": 1,
+          "standings": 4
+        },
+        {
+          "name": "C조",
+          "teams": 4,
+          "completed": 5,
+          "remaining": 1,
+          "standings": 4
+        },
+        {
+          "name": "D조",
+          "teams": 4,
+          "completed": 5,
+          "remaining": 1,
+          "standings": 4
+        }
+      ],
+      "knockoutFixtures": 11,
+      "knockoutAssigned": 0,
+      "byeSlots": 4,
+      "edges": 10,
+      "overallStandings": 20,
+      "rosterSizeCorrect": true,
+      "gameRosterSizesCorrect": true
+    },
+    {
+      "preserved": false,
+      "id": "d5202610-1018-4000-8000-000000000004",
+      "title": "(테스트) 20팀·8명 12강 · 조별 1경기 남음 04",
+      "teams": 20,
+      "players": 160,
+      "uniquePlayers": 160,
+      "groups": [
+        {
+          "name": "A조",
+          "teams": 4,
+          "completed": 5,
+          "remaining": 1,
+          "standings": 4
+        },
+        {
+          "name": "B조",
+          "teams": 4,
+          "completed": 5,
+          "remaining": 1,
+          "standings": 4
+        },
+        {
+          "name": "C조",
+          "teams": 4,
+          "completed": 5,
+          "remaining": 1,
+          "standings": 4
+        },
+        {
+          "name": "D조",
+          "teams": 4,
+          "completed": 5,
+          "remaining": 1,
+          "standings": 4
+        },
+        {
+          "name": "E조",
+          "teams": 4,
+          "completed": 5,
+          "remaining": 1,
+          "standings": 4
+        }
+      ],
+      "knockoutFixtures": 11,
+      "knockoutAssigned": 0,
+      "byeSlots": 4,
+      "edges": 10,
+      "overallStandings": 20,
+      "rosterSizeCorrect": true,
+      "gameRosterSizesCorrect": true
+    },
+    {
+      "preserved": false,
+      "id": "d5202610-1018-4000-8000-000000000005",
+      "title": "(테스트) 20팀·8명 12강 · 조별 1경기 남음 05",
+      "teams": 20,
+      "players": 160,
+      "uniquePlayers": 160,
+      "groups": [
+        {
+          "name": "A조",
+          "teams": 4,
+          "completed": 5,
+          "remaining": 1,
+          "standings": 4
+        },
+        {
+          "name": "B조",
+          "teams": 4,
+          "completed": 5,
+          "remaining": 1,
+          "standings": 4
+        },
+        {
+          "name": "C조",
+          "teams": 4,
+          "completed": 5,
+          "remaining": 1,
+          "standings": 4
+        },
+        {
+          "name": "D조",
+          "teams": 4,
+          "completed": 5,
+          "remaining": 1,
+          "standings": 4
+        },
+        {
+          "name": "E조",
+          "teams": 4,
+          "completed": 5,
+          "remaining": 1,
+          "standings": 4
+        }
+      ],
+      "knockoutFixtures": 11,
+      "knockoutAssigned": 0,
+      "byeSlots": 4,
+      "edges": 10,
+      "overallStandings": 20,
+      "rosterSizeCorrect": true,
+      "gameRosterSizesCorrect": true
+    }
+  ]
+}

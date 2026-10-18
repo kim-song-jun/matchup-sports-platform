@@ -1,3 +1,7 @@
+## 2026-10-18 — 기존 팀·선수 20팀 12강 연습 대회 5개 생성
+
+[시나리오·운영 URL](./alpha-five-round12-test-tournaments.md) · [Task20261090](../../.github/tasks/archive/20261090-alpha-five-round12-ready.md). 생성5/5·대회별20팀×8명·조별25완료/5남음·결선11미정/BYE4. 공개 API/관리자 화면 조회5/5, 기존팀·회원 변경0. 기존팀 로고 이미지400 3건은 별도 잔존 기록.
+
 ## 2026-10-17 — 대진 표시 문구·경기 정보 편집
 
 [시나리오](./bracket-display-edit.md) · [Task 20261057](../../.github/tasks/20261057-admin-bracket-canvas.md). 목록/그림/모바일 공통 저장과 12강 부전승 편집. 변경 후 alpha 실측 0/3(PR 미배포), DB integration 미실행(Docker 미가동). 자동 회귀 결과는 task 최신 기록 참고.

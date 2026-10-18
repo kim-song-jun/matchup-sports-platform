@@ -43,3 +43,14 @@ Persona: owner/ops 쓰기, support 읽기, 일반 사용자 쓰기 거절.
 
 - `5444656fac`에서 결과 시나리오 PASS: 사용자 문구는 출처99번 변경 후 유지, 자동 복원은 최신99번 표시. 의도적503 한 번 후 입력 유지/재시도 성공. 공식 결과로 승자→결승·패자→3위전 및 12강121번→8강 진출, ID/edge 보존, 팀 이름 우선 확인. 503은 QA interception 한 건이며 그 외 JS/network 오류 없음.
 - BYE UI의 조별 ENTRY 전역 제외 결함은 [후속 PR #1971](https://github.com/kim-song-jun/matchup-sports-platform/pull/1971)로 수정 중이다. `bye-failure` 상태에서 문구를 원래 값으로 복원했고 팀·결과는 변경하지 않았다. BYE 후속 3폭 QA는 미완료다.
+## 2026-10-18 — alpha 후속: 조별 ENTRY 팀의 부전승 후보
+
+- PR #1960 배포 SHA `5444656fac`에서 metadata 1440/768/390 3/3 PASS, 실제 승자·패자 및 12강→8강 진출 PASS.
+- 빈 BYE의 팀 선택은 조별 ENTRY 20팀을 이미 배정된 팀으로 모두 제외해 실패했다. 문구는 검증 직전 값으로 복원했다. 이 실패를 완료로 표시하지 않는다.
+- 공통 후보 계산을 서버 `assertPlaceable`의 kind별 예외와 맞춘다. BYE는 조별 ENTRY 팀을 선택할 수 있고 결선 ENTRY/BYE/GROUP_RANK 중복은 제외한다. 목록 8강·desktop panel·mobile picker·독립 BYE 편집기가 같은 계산을 사용한다.
+- 실제 후보 선택 회귀 RED 2건 → 관련 170 tests GREEN. 후속 PR/alpha 배포 후 BYE 3폭 저장과 원복을 다시 실행한다.
+
+### 2026-10-18 09:51 UTC — #1971 dev 머지
+
+- PR CI `39116140082` Gates/API/Web 전체 PASS, MERGEABLE/CLEAN, review threads 0. 사용자 승인 Copilot 예외를 PR 본문에 기록했다.
+- dev merge `e60c8576c41f6e149c014c6caed2489986a15f42`; 즉시 로컬 dev FF 완료. dev CI `39116929627`, alpha `39116929623` 실행 중. 부전승 후속 QA는 새 served SHA 확인 후 진행한다.

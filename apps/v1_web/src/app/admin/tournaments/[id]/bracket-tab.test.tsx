@@ -564,7 +564,7 @@ describe('BracketTab — 경기 수정: 팀 해제(TBD) 전송', () => {
 });
 
 describe('BracketTab — 경기 수정: 한 팀 한 조', () => {
-  const groupWith = (id: string, name: string, phase: 'group' | 'semi', sortOrder: number, teams: string[]) => ({
+  const groupWith = (id: string, name: string, phase: V1AdminTournamentBracket['groups'][number]['phase'], sortOrder: number, teams: string[]) => ({
     ...bracket.groups[0], id, name, phase, sortOrder,
     groupTeams: teams.map((registrationId, index) => ({ id: `gt-${registrationId}`, groupId: id, registrationId, teamName: registrationId, sortOrder: index })),
   }) as unknown as typeof bracket.groups[number];
@@ -621,6 +621,17 @@ describe('BracketTab — 경기 수정: 한 팀 한 조', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: '선택 해제' }));
     fireEvent.change(within(dialog).getByPlaceholderText('홈 팀 검색'), { target: { value: '송파' } });
     expect(screen.queryAllByRole('option').some((option) => option.textContent?.includes('송파FC'))).toBe(false);
+  });
+
+  it('8강의 부전승 자리에는 조별 ENTRY 팀을 고를 수 있다', async () => {
+    bracketGroups = [groupWith('group-a', 'A조', 'group', 0, ['r1', 'r3']), groupWith('r12', '12강', 'round12', 0, []), groupWith('quarter', '8강', 'quarter', 0, [])];
+    bracketSlots = [makeSlot({ id: 'bye-home', kind: 'BYE', groupId: 'r12' }), makeSlot({ id: 'stage-r3', kind: 'ENTRY', groupId: 'group-a', registrationId: 'r3' })];
+    bracketFixtures = [fixtureRow({ id: 'fx-1', groupId: 'quarter', round: '8강', fixtureNumber: 1, homeRegistrationId: null, homeSlotId: 'bye-home', awayRegistrationId: null })];
+    renderTab(vi.fn(), registrations());
+    fireEvent.click(screen.getAllByRole('button', { name: '8강 1번 경기 수정' })[0]);
+    const dialog = await screen.findByRole('dialog', { name: '경기 수정' });
+    fireEvent.change(within(dialog).getByPlaceholderText('홈 팀 검색'), { target: { value: '송파' } });
+    expect(screen.getByRole('option', { name: '송파FC' })).toBeInTheDocument();
   });
 
   it('반대편에 선택한 팀은 후보에서 빠져 홈·어웨이에 같은 팀을 고를 수 없다', async () => {

@@ -33,7 +33,7 @@ Schema LF SHA=96cf396f434e0fba80e9c2fa84e79ee347471ae56387ca6493b6d11f09c93a42. 
 직접 코드 리뷰: null/omission, 최신 자동 문구, BYE 단일 정본, 공식 결과 문구 수정의 roster/result 무변경, 권한/감사/잠금, 실패 draft 유지, 단계/조→번호→leg→ID 정렬 확인. touched paths TODO/FIXME/HACK/XXX 없음. 실제 alpha QA 0/3 및 DB integration 미실행(Docker daemon 미가동): 완료/배포 가능으로 주장하지 않고 draft PR에 명시한다.
 사용자 요청에 따라 구현/PR만 진행하며 dev/main 머지·배포 및 실제 대회 데이터 수정은 하지 않았다. GitHub CLI 표준 device login 대기; Git credential token 추출은 사용하지 않는다.
 
-### PR #1960 완료 진행 — 2026-10-18
+### PR #1960 초기 진행 기록 — 2026-10-18 (최신 상태는 아래/후속 snapshot 참조)
 - 사용자 승인 범위: 기존 PR 수정·리뷰·검증·dev 머지·alpha 배포 후 1440/768/390 실측. main 승격 제외.
 - 단일 에이전트 순차 실행, 전용 작업트리 `/tmp/teameet-pr1960-complete`. 다른 작업트리/WIP 수정 금지.
 - [x] 최신 dev `5a5de5662`와 PR `bff8ec8f9` 통합. nullable 문구 3필드와 기존 온라인 분류를 함께 포함한 스키마 바인딩 충돌 5곳 해결.
@@ -857,3 +857,32 @@ PR 은 순서대로 dev 에 머지하고 매번 alpha 에서 확인한다(dev �
 - 실제 후보 선택 회귀 2건 RED → 관련 170 tests GREEN, Web lint PASS. PR #1971 head `e99ca5714`, CI `39116140082` 진행 중.
 - Copilot `39116142932`도 동일 모델 사용 불가로 분석 전 실패했다. 사용자가 **#1971도 예외 승인 후 진행**을 명시했다. CI 전체 통과 후 dev 머지·alpha 재배포와 BYE 3폭 검증을 진행한다.
 - metadata 3/3 및 실제 승자·패자/12강→8강 진출은 `5444656fac`에서 PASS. BYE 팀 경로는 아직 실패/미완료이며 이 checkpoint를 최종 완료로 해석하지 않는다.
+### PR #1960 초기 진행 기록 — 2026-10-18 (최신 상태는 아래/후속 snapshot 참조)
+- 사용자 승인 범위: 기존 PR 수정·리뷰·검증·dev 머지·alpha 배포 후 1440/768/390 실측. main 승격 제외.
+- 단일 에이전트 순차 실행, 전용 작업트리 `/tmp/teameet-pr1960-complete`. 다른 작업트리/WIP 수정 금지.
+- [x] 최신 dev `5a5de5662`와 PR `bff8ec8f9` 통합. nullable 문구 3필드와 기존 온라인 분류를 함께 포함한 스키마 바인딩 충돌 5곳 해결.
+- [x] CI RED 확인: PostgreSQL 168 suites 중 167 PASS, 1240 tests PASS / 1 FAIL. 실패는 슬롯 응답의 automaticLabel/displayLabel 기대값 누락. 두 필드를 정확히 단언하도록 수정.
+- [ ] 통합 변경 코드·보안·디자인 검토 및 좁은 검증.
+- [ ] 최신 head CI 및 Copilot clean 확인.
+- [ ] dev 머지·로컬 dev FF·alpha 배포 SHA 확인.
+- [ ] alpha 3폭 UI/저장/새로고침/실제 진출 QA·갤러리·정리 기록.
+- 검증: API 관련 5 files/257 tests PASS, Web 편집·목록·모바일·레이아웃 6 files/203 tests PASS. API/Web tsc PASS. surface/pattern 게이트의 sandbox spawn EPERM은 앱 경로에서 권한 있는 동일 명령으로 재실행한다.
+- 실DB 회귀 2개 추가: 기존 TeamMatch 일정·필드 무입력 조회 → 번호/문구 편집 → 출처 번호 편집 → null 비우기; 빈 BYE 문구 → 팀 배정 → 8강 공유 조회 → 문구 복원 및 edge/팀 보존. 로컬 Docker daemon 부재로 CI에서 실행한다.
+
+### 2026-10-18 alpha 결함 — 부전승 후보가 조별 ENTRY와 충돌
+Status: Fix in progress
+- 재현: alpha `5444656fac`, 20팀/5조 대회에서 빈 BYE 편집의 팀 옵션이 0개. 서버는 조별 ENTRY 팀의 BYE 진출을 허용하지만 웹은 모든 ENTRY를 이미 배정된 팀으로 제거했다. 동일 필터가 목록 8강·desktop panel·mobile picker에도 있다.
+- 기존 대상의 문구는 실행 직전 값으로 복원했고 실제 팀·결과는 아직 변경하지 않았다. metadata 3폭 QA는 PASS이며 BYE team QA는 실패로 기록한다.
+- Owned: `src/lib/bracket-slot-candidates.ts`, 관련 model/helper 테스트, BYE editor·목록·node panel·mobile picker 소비자, task/scenario/API gotcha 문서와 Changeset. Backend/schema/진출 규칙 변경 금지. 다른 WIP 금지.
+- 서버 `assertPlaceable`의 kind/조별 ENTRY 예외를 공용 후보 계산으로 맞춘다. BYE는 조별 ENTRY와 중복 진출을 허용하지만 결선 ENTRY/BYE/GROUP_RANK 중복은 계속 막는다. 현재 자리의 팀은 유지한다.
+- [ ] 실제 사용자 후보 선택 경로 RED → GREEN.
+- [ ] Web 관련 회귀·타입·pattern 및 PR CI.
+- [ ] 후속 PR/배포·alpha BYE 3폭 및 실제 진출 재검증.
+- RED: 빈 부전승 편집과 연결된 8강 목록의 실제 후보 선택 회귀 2건 모두 FAIL(후보 option 누락), 기존 44 PASS. GREEN: 공통 슬롯 kind/조별 ENTRY 예외 계산을 목록·desktop panel·mobile picker·BYE editor로 연결한 뒤 관련 6 files/170 tests PASS.
+- 같은 alpha `5444656fac`의 독립 QA: 출처99번 변경→사용자 문구 유지/최신 자동 복원, 의도적503 입력 유지·실제 재시도, 공식 점수 확정→승자 결승/패자 3위전, 12강121번→8강 진출 모두 PASS. 경기 ID·진출 edge 유지, 실제 팀 이름 우선. 실패503은 QA가 한 번 의도적으로 주입한 응답이며 다른 pageerror/HTTP 실패 없음.
+- Web lint(tsc + pattern) PASS. 신규 테스트 fixture의 단계 union·필수 이름 타입 오류를 수정한 후 통과. 제품 API/schema/진출 동작 변경 없음. 변경 경로 debt marker 없음, `git diff --check` PASS.
+
+### 2026-10-18 09:51 UTC — #1971 dev 머지
+
+- PR CI `39116140082` Gates/API/Web 전체 PASS, MERGEABLE/CLEAN, review threads 0. 사용자 승인 Copilot 예외를 PR 본문에 기록했다.
+- dev merge `e60c8576c41f6e149c014c6caed2489986a15f42`; 즉시 로컬 dev FF 완료. dev CI `39116929627`, alpha `39116929623` 실행 중. 부전승 후속 QA는 새 served SHA 확인 후 진행한다.

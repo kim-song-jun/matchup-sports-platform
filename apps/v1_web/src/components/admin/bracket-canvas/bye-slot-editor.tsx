@@ -27,7 +27,7 @@ export function ByeSlotEditor({ tournamentId, slot, fixture, groups, slots, cand
   const home = fixture.homeSlotId === slot.id;
   const pending = update.isPending || assign.isPending;
   const locked = isFixtureLocked(fixture);
-  const options = pickableCandidates(candidates, slots, slot);
+  const options = pickableCandidates(candidates, slots, slot, groups);
   return <section aria-label="부전승 자리 편집" className="flex flex-col gap-3 p-4">
     <div className="flex items-center justify-between gap-2"><h2 className="tm-text-body-lg font-bold">12강 부전승</h2>{onClose ? <button type="button" className="tm-btn tm-btn-sm tm-btn-ghost min-h-[44px]" onClick={onClose}>닫기</button> : null}</div>
     <p className="tm-text-caption text-[var(--text-muted)]">연결 위치: {fixtureTitle(fixture, groups)} · {home ? '홈' : '어웨이'}</p>

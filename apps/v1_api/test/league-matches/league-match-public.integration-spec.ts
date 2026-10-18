@@ -714,7 +714,7 @@ describe('GET /league-matches (list, R5)', () => {
   // 경기 설정이 있는 종목(futsal)을 요구한다. 그래서 격리를 `regionId` 로 한다 — 지역은
   // 시나리오마다 새로 만들어지므로 이 테스트의 리그만 걸린다. 이 테스트의 계약은 **상태**
   // 필터이지 종목 필터가 아니므로 무엇으로 좁히든 계약은 그대로다.
-  it('state 필터가 draft/active를 구분한다 -- 대진 생성 전은 draft, 생성 후는 active', async () => {
+  it('state 필터가 draft/active를 구분한다 -- 대진 생성 후에도 draft, 리그 시작 후는 active', async () => {
     const scenario = await createLeagueScenario({ title: `T5 상태 ${suiteId}`, startsOn: '2026-09-05T00:00:00.000Z', endsOn: '2026-09-30T00:00:00.000Z' });
 
     const draftBefore = await request(app.getHttpServer()).get(`/api/v1/league-matches?regionId=${scenario.regionId}&state=draft`);
@@ -727,6 +727,16 @@ describe('GET /league-matches (list, R5)', () => {
       .set('x-v1-user-id', listOwnerUserId)
       .send({ weeksCount: 1 })
       .expect(201);
+
+    const prepared = await request(app.getHttpServer()).get(`/api/v1/league-matches?regionId=${scenario.regionId}&state=draft`);
+    expect(prepared.body.data.items.map((item: { leagueId: string }) => item.leagueId)).toEqual([scenario.leagueId]);
+    const notStarted = await request(app.getHttpServer()).get(`/api/v1/league-matches?regionId=${scenario.regionId}&state=active`);
+    expect(notStarted.body.data.items).toEqual([]);
+    await request(app.getHttpServer())
+      .post(`/api/v1/admin/league-matches/${scenario.leagueId}/state`)
+      .set('x-v1-user-id', listOwnerUserId)
+      .send({ state: 'active' })
+      .expect(200);
 
     const activeAfter = await request(app.getHttpServer()).get(`/api/v1/league-matches?regionId=${scenario.regionId}&state=active`);
     expect(activeAfter.body.data.items.map((item: { leagueId: string }) => item.leagueId)).toEqual([scenario.leagueId]);

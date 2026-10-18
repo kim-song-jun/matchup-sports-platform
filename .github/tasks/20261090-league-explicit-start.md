@@ -79,3 +79,12 @@ UI는 사용자가 승인한 기존 대회 방식이며 기존 헤더 Button·�
 - DB integration 7개 suite 68개 assertion PASS. 해당 로컬 Jest가 종료 대기에 남아 명령을 확인한 소유 PID만 SIGTERM으로 정리했다. command exit를 PASS로 바꾸거나 forceExit로 숨기지 않는다. 신규 migration 단독 DB 회귀는 1/1 PASS, 정상 exit 0이며 기존 데이터 snapshot과 구버전 INSERT를 검증했다.
 - API 타입 검사 PASS. 표면 검사가 불필요하게 추가된 raw 잠금 1곳을 검출해 제거했다. 상태 UPDATE의 기존 CAS를 유지하며, API surface는 baseline 32/32로 PASS다. 관련 상태 unit을 다시 확인한다.
 - 최종 Web38·양쪽 타입·API surface·Web patterns 모두 PASS. 신규 marker 0, git diff --check PASS, exact pathspec 34개 파일 확인. 작업 소유 PostgreSQL 컨테이너·볼륨은 제거했고 테스트 프로세스도 종료됐다. 커밋 SHA 기준 migration/changeset 게이트와 PR/CI가 후속이다.
+
+### PR #1977 CI follow-up (2026-10-18)
+- Head 613a3dded의 CI run 39129731346: Web PASS, Gates/API FAIL. 실패 원인은 스키마 체크섬 미동기화와 신규 리그를 자동 시작으로 가정한 기존 통합 스펙 4곳이다.
+- 실제 신규 스키마 SHA-256 23d87a502b12225fce2a6c5926cc272c14212da9da957cf4f5c26fb26b076644로 현재 binder·Docker client attestation·game snapshot을 갱신하고, manifest 생성·검증에는 기존 허용 체크섬을 보존하며 추가한다. M11·StageB 고정 계약은 바꾸지 않는다.
+- 공개 상태 필터는 대진 생성 후 draft 유지, 실제 시작 API 후 active를 모두 단언한다. 시즌 승계·경합 fixture는 실제 시작 API를 거쳐 원래 검증 목적을 유지한다. 생성 dual-write 스펙은 closed+명시적 시작 모드를 확인한다.
+- final-schema-binding 7/7 PASS. 첫 로컬 실행의 manifest 실패는 jq 미설치 때문이며, 공식 jq 임시 도구 설치 후 동일 계약·부정 테스트까지 통과했다.
+- GitHub Advanced Security run 39129735820은 `session.create failed: Model "claude-opus-5" is not available`로 분석 시작에 실패했다. 코드 finding/clean 리뷰가 아니며 모델·계정 설정을 바꾸거나 반복 요청하지 않는다. Copilot 제출 리뷰·inline comment는 현재 0건이다.
+- CI에서 실패한 5개 DB suite + 기존 데이터 migration 회귀 1개를 전용 DB에서 직렬 재검증: 6 suites/30 tests PASS, 정상 exit 0. 전체 migration deploy도 PASS. bash syntax·git diff --check PASS. 전용 DB/볼륨 정리 후 보완 커밋을 push하고 새 CI를 확인한다.
+- 보완 API 타입 검사 exit 0. 이미지 빌더 client attestation과 release manifest 생성 허용 목록까지 canonical SHA와 5곳 일치 확인.

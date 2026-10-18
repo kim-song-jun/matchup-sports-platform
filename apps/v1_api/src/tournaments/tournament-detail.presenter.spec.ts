@@ -56,6 +56,8 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
     createdAt?: Date;
     updatedAt?: Date;
     fieldId?: string | null;
+    homeDisplayLabel?: string | null;
+    awayDisplayLabel?: string | null;
     status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
     homeRegistrationId: string | null;
     awayRegistrationId: string | null;
@@ -88,6 +90,8 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
       parentTeamMatchId: fixture.parentFixtureId ?? null,
       homeRegistrationId: fixture.homeRegistrationId ?? null,
       awayRegistrationId: fixture.awayRegistrationId ?? null,
+      homeDisplayLabel: fixture.homeDisplayLabel ?? null,
+      awayDisplayLabel: fixture.awayDisplayLabel ?? null,
       homeRegistration: fixture.homeRegistration,
       awayRegistration: fixture.awayRegistration,
       createdAt: fixture.createdAt ?? new Date('2026-06-01T00:00:00Z'),
@@ -220,6 +224,12 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
       expect(present({ awayRegistrationId: null, awayRegistration: null, homeSlot: entry, awaySlot: groupRank })).toMatchObject({
         homeSlotLabel: null, awaySlotLabel: 'A조 1위', homeTeamName: '서울 FC', awayTeamName: 'TBD',
       });
+    });
+
+    it('관리자 문구를 공개 빈 사이드에 반영하고 BYE 슬롯 정본과 확정 팀을 우선한다', () => {
+      expect(present({ ...empty, homeSlot: groupRank, homeDisplayLabel: '조 1위 중 5위', awayDisplayLabel: '준결승 A 승자' })).toMatchObject({ homeSlotLabel: '조 1위 중 5위', awaySlotLabel: '준결승 A 승자' });
+      expect(present({ ...empty, homeSlot: { ...entry, kind: 'BYE', displayLabel: '부전승 직접 문구' }, homeDisplayLabel: '오래된 복사' })).toMatchObject({ homeSlotLabel: '부전승 직접 문구' });
+      expect(present({ homeDisplayLabel: '숨길 문구', homeSlot: entry })).toMatchObject({ homeSlotLabel: null, homeTeamName: '서울 FC' });
     });
 
     it('자리에 연결되지 않은 기존 빈 경기는 라벨이 null 이고 TBD 그대로다', () => {

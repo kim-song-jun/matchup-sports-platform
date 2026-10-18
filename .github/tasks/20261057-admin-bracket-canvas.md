@@ -854,3 +854,14 @@ Status: Fix in progress
 - RED: 빈 부전승 편집과 연결된 8강 목록의 실제 후보 선택 회귀 2건 모두 FAIL(후보 option 누락), 기존 44 PASS. GREEN: 공통 슬롯 kind/조별 ENTRY 예외 계산을 목록·desktop panel·mobile picker·BYE editor로 연결한 뒤 관련 6 files/170 tests PASS.
 - 같은 alpha `5444656fac`의 독립 QA: 출처99번 변경→사용자 문구 유지/최신 자동 복원, 의도적503 입력 유지·실제 재시도, 공식 점수 확정→승자 결승/패자 3위전, 12강121번→8강 진출 모두 PASS. 경기 ID·진출 edge 유지, 실제 팀 이름 우선. 실패503은 QA가 한 번 의도적으로 주입한 응답이며 다른 pageerror/HTTP 실패 없음.
 - Web lint(tsc + pattern) PASS. 신규 테스트 fixture의 단계 union·필수 이름 타입 오류를 수정한 후 통과. 제품 API/schema/진출 동작 변경 없음. 변경 경로 debt marker 없음, `git diff --check` PASS.
+
+## 2026-10-18 후속 — 사용자 대진 문구·일정 표시 불일치
+
+Status: In Progress
+- 사용자 재현: alpha `/admin/tournaments/ad200600-0000-4000-8000-000000000003/bracket`에서 홈/어웨이 문구 수정 후 사용자 화면 미반영, 목록에서 수정한 시각/경기장이 그림과 불일치.
+- 발견: 공개 상세와 공개 일정 projection이 details의 side override 및 BYE slot displayLabel을 읽지 않고 자동 slotLabel만 만든다. 공개 그림 카드는 venue를 표시하지 않는다. 관리자 목록/그림의 실제 같은 ID 응답을 추가 대조한다.
+- Owned: v1 공개 대진/일정 조회·presenter·회귀, 공용 문구 해석, 공개 그림 카드, 관련 API/QA/task docs 및 Changeset. Forbidden: 타 세션 WIP·사용자 저장값 덮기·진출 규칙/schema 변경·main 승격.
+- AC: 관리자 저장 문구→사용자 상세/일정/그림 동일, 실제 팀명 우선·BYE 보조 유지, 자동 복원, 동일 ID 시각·등록 필드 동기화, desktop/tablet/mobile alpha 실측.
+- 단일 에이전트 순차. 좁은 RED→GREEN, 타입/CI, PR 리뷰, dev/alpha 검증 순서. 이전 Copilot 예외는 #1960/#1971에만 해당한다.
+- 재현 실측: 같은42개 ID의 admin/public scheduledAt·venue 차이0, admin31번 카드10/19 20:33 확인. 31번 fieldId/venue는 현재null이며 실제로 미배정. public GET31번은 자동 결선5번 문구지만 admin은 `ddddd`, BYE35번은 admin `dd`가 public 자동값으로 누락. 공개 그림의 venue 렌더 누락 확인.
+- 수정: 공개 상세/일정의 custom/BYE shared slot label 공용 해석, BYE 타일 보조 문구·fieldId, 등록 field 이름 우선, public 카드 venue·미정 표시·간격176/112 확보. API84 tests 및 신규field-name1 PASS, Web 화면/그룹33 PASS. 양쪽 tsc·Web pattern PASS. 그래프 좌표 회귀는 새 정보 높이에 맞춰 업데이트. 실DB public presenter 경로2건을 기존 통합 시나리오에 추가(CI 대상).

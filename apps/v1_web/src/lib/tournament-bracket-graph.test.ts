@@ -111,9 +111,9 @@ it('미정 12강 4경기·부전승 4자리와 8강4·4강2·결승1·3위전1�
   expect(new Set(graph.nodes.map((node) => node.id)).size).toBe(16);
   expect(graph.edges).toEqual([]);
   expect(graph.nodes.filter((node) => node.round === 'round12').sort((a,b) => a.y-b.y).map((node) => node.id)).toEqual(['bye-slot:slot-0', 'round120', 'round121', 'bye-slot:slot-1', 'bye-slot:slot-2', 'round122', 'round123', 'bye-slot:slot-3']);
-  expect(graph.height).toBe(896);
-  expect(graph.nodes.filter((node) => node.round === 'quarter').map((node) => node.y)).toEqual([112, 336, 560, 784]);
-  expect(graph.nodes.find((node) => node.round === 'final')?.y).toBe(448);
+  expect(graph.height).toBe(1152);
+  expect(graph.nodes.filter((node) => node.round === 'quarter').map((node) => node.y)).toEqual([144, 432, 720, 1008]);
+  expect(graph.nodes.find((node) => node.round === 'final')?.y).toBe(576);
   groups[0].groupTeams[0].registrationId = 'assigned-team';
   expect(buildBracketGraph(rounds, groups).nodes.find((node) => node.id === 'bye-slot:slot-0')?.bye?.registrationId).toBe('assigned-team');
 });
@@ -134,17 +134,17 @@ it('부전승팀만 8강에 배정해도 미연결 경기들이 아래로 밀리
     fixtures: round.fixtures.map((item, index) => ({ ...item, homeRegistrationId: `b${index}`, awayRegistrationId: `playing-${index}` })),
   });
   const after = buildBracketGraph(assigned, groups);
-  expect(before.height).toBe(896);
+  expect(before.height).toBe(1152);
   expect(after.height).toBe(before.height);
   expect(after.edges).toHaveLength(4);
   expect(after.edges.every((edge) => edge.outcome === 'BYE')).toBe(true);
   expect(after.nodes.map((node) => [node.id, node.y])).toEqual(before.nodes.map((node) => [node.id, node.y]));
-  expect(after.nodes.filter((node) => node.round === 'quarter').map((node) => node.y)).toEqual([112, 336, 560, 784]);
+  expect(after.nodes.filter((node) => node.round === 'quarter').map((node) => node.y)).toEqual([144, 432, 720, 1008]);
   for (const round of rounds) {
     const column = after.nodes.filter((node) => node.round === round.key).sort((a, b) => a.y - b.y);
     for (let index = 1; index < column.length; index++) {
-      const previousHalf = column[index - 1].bye ? 40 : 72;
-      const currentHalf = column[index].bye ? 40 : 72;
+      const previousHalf = column[index - 1].bye ? 56 : 88;
+      const currentHalf = column[index].bye ? 56 : 88;
       expect(column[index].y - column[index - 1].y).toBeGreaterThanOrEqual(previousHalf + currentHalf);
     }
   }

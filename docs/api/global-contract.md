@@ -186,3 +186,5 @@ Team matches do not expose `on_hold`: unmatched recruitment with an elapsed dead
 The [league image endpoint](./domains/league-matches.md#cover-image-목록상세-이미지) requires at least one of `coverImageUrl` (detail) and `listImageUrl`. Omitted fields are preserved; explicit null clears only that stored field. Public display uses the other image if only one remains. This does not change the global validation or upload URL policy.
 
 2026-10-17: Tournament fixture presentation overrides and shared list/canvas schedule semantics are documented in [tournaments](./domains/tournaments.md#bracket-presentation-overrides-2026-10-17).
+
+- 2026-10-18: 공개 대진/일정의 사용자 지정 사이드 문구·BYE 공유 문구 및 canonical 경기장 표시를 동기화했다. 상세 계약은 [tournaments](./domains/tournaments.md) 참고.

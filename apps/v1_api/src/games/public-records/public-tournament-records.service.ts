@@ -59,7 +59,7 @@ import {
 } from '../../league-matches/league-fixture-list-source';
 import { excludeUnfilledSlotFixturesWhere } from '../../common/competition/unfilled-slot-gate';
 import { LEAGUE_TIE_BREAK_ORDER } from '../../league-matches/league-tie-break';
-import { SLOT_LABEL_SELECT, slotLabelFromRow } from '../../tournaments/slots/tournament-slot-label';
+import { SLOT_LABEL_SELECT, publicFixtureSideLabel } from '../../tournaments/slots/tournament-slot-label';
 import { PUBLIC_COMPETITION_STATUS_WHERE } from '../../tournaments/tournaments-read.query';
 import { regularPeriodCount } from '../../tournaments/competition-config/competition-config.parse';
 import { PLACE_SELECT } from '../../places/place-select';
@@ -175,6 +175,8 @@ const CANONICAL_SCHEDULE_SELECT = {
   legNumber: true,
   homeRegistrationId: true,
   awayRegistrationId: true,
+  homeDisplayLabel: true,
+  awayDisplayLabel: true,
   group: { select: { name: true } },
   homeRegistration: { select: { team: { select: { id: true, name: true } } } },
   awayRegistration: { select: { team: { select: { id: true, name: true } } } },
@@ -216,6 +218,8 @@ type FixtureScheduleRow = {
   awayRegistration: CanonicalScheduleRow['awayRegistration'];
   group: CanonicalScheduleRow['group'];
   field: CanonicalScheduleRow['teamMatch']['field'];
+  homeDisplayLabel: string | null;
+  awayDisplayLabel: string | null;
   homeSlot: CanonicalScheduleRow['teamMatch']['homeSlot'];
   awaySlot: CanonicalScheduleRow['teamMatch']['awaySlot'];
   videos: CanonicalScheduleRow['teamMatch']['videos'];
@@ -230,7 +234,7 @@ function presentCanonicalSchedule(row: CanonicalScheduleRow): FixtureScheduleRow
     legNumber: row.legNumber,
     groupId: row.groupId,
     scheduledAt: row.teamMatch.startAt,
-    venue: toPlaceView(row.teamMatch)?.name ?? null,
+    venue: row.teamMatch.field?.name ?? toPlaceView(row.teamMatch)?.name ?? null,
     place: toPlaceView(row.teamMatch),
     status: canonicalFixtureStatus(row.teamMatch.status),
     homeRegistrationId: row.homeRegistrationId,
@@ -239,6 +243,8 @@ function presentCanonicalSchedule(row: CanonicalScheduleRow): FixtureScheduleRow
     awayRegistration: row.awayRegistration,
     group: row.group,
     field: row.teamMatch.field,
+    homeDisplayLabel: row.homeDisplayLabel,
+    awayDisplayLabel: row.awayDisplayLabel,
     homeSlot: row.teamMatch.homeSlot,
     awaySlot: row.teamMatch.awaySlot,
     videos: row.teamMatch.videos,
@@ -2297,6 +2303,8 @@ function toLeagueScheduleRow(
     awayRegistration: fixture.approvedApplicantTeam === null ? null : { team: fixture.approvedApplicantTeam },
     group: null,
     field: fixture.field,
+    homeDisplayLabel: null,
+    awayDisplayLabel: null,
     homeSlot: null,
     awaySlot: null,
     videos: fixture.videos,
@@ -2465,8 +2473,8 @@ function presentScheduleEntry(
     home: presentSide(fixture.homeRegistrationId, fixture.homeRegistration, hideIdentity),
     away: presentSide(fixture.awayRegistrationId, fixture.awayRegistration, hideIdentity),
     // Shown instead of "TBD" when a side has no team yet; null once a team exists.
-    homeSlotLabel: fixture.homeRegistration === null && fixture.homeSlot ? slotLabelFromRow(fixture.homeSlot) : null,
-    awaySlotLabel: fixture.awayRegistration === null && fixture.awaySlot ? slotLabelFromRow(fixture.awaySlot) : null,
+    homeSlotLabel: fixture.homeRegistration === null ? publicFixtureSideLabel(fixture.homeSlot, fixture.homeDisplayLabel) : null,
+    awaySlotLabel: fixture.awayRegistration === null ? publicFixtureSideLabel(fixture.awaySlot, fixture.awayDisplayLabel) : null,
     visibilityMode: mode as EffectiveMode,
     status,
     resultState: resolveResultState({

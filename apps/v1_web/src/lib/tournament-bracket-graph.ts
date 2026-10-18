@@ -5,6 +5,10 @@ export type BracketGraphRound = { key: string; label: string; fixtures: V1Tourna
 export type BracketGraphNode = { id: string; round: string; y: number; fixture?: V1TournamentFixture; bye?: V1TournamentGroupTeam };
 export type BracketGraphEdge = { source: string; target: string; side: 'HOME' | 'AWAY'; outcome: 'WINNER' | 'LOSER' | 'BYE' };
 
+// Reserve room for the shared time/venue footer and BYE label.
+const MATCH_HEIGHT = 176;
+const BYE_HEIGHT = 112;
+
 /** Edges come from stored advancement sources or an explicitly assigned bye team. */
 export function buildBracketGraph(rounds: BracketGraphRound[], groups: V1TournamentGroup[]) {
   const nodes: BracketGraphNode[] = rounds.flatMap((round) => round.fixtures.map((fixture) => ({ id: fixture.id, round: round.key, fixture, y: 0 })));
@@ -63,13 +67,13 @@ export function buildBracketGraph(rounds: BracketGraphRound[], groups: V1Tournam
     && new Set(edges.filter((edge) => edge.target === node.id).map((edge) => edge.side)).size < 2);
   if (edges.length === 0 || hasUnlinkedSides) {
     const columns = rounds.map((round) => nodes.filter((node) => node.round === round.key).sort((a, b) => rank.get(a.id)! - rank.get(b.id)!));
-    const columnHeights = columns.map((column) => column.reduce((sum, node) => sum + (node.bye ? 80 : 144), 0));
-    const height = Math.max(144, ...columnHeights);
+    const columnHeights = columns.map((column) => column.reduce((sum, node) => sum + (node.bye ? BYE_HEIGHT : MATCH_HEIGHT), 0));
+    const height = Math.max(MATCH_HEIGHT, ...columnHeights);
     columns.forEach((column, index) => {
       const gap = column.length ? (height - columnHeights[index]) / column.length : 0;
       let cursor = 0;
       for (const node of column) {
-        const slotHeight = (node.bye ? 80 : 144) + gap;
+        const slotHeight = (node.bye ? BYE_HEIGHT : MATCH_HEIGHT) + gap;
         node.y = cursor + slotHeight / 2;
         cursor += slotHeight;
       }
@@ -81,7 +85,7 @@ export function buildBracketGraph(rounds: BracketGraphRound[], groups: V1Tournam
   let cursor = 0;
   for (const node of [...nodes].filter((candidate) => !edges.some((edge) => edge.target === candidate.id))
     .sort((a, b) => rank.get(a.id)! - rank.get(b.id)!)) {
-    const height = node.bye ? 80 : 144;
+    const height = node.bye ? BYE_HEIGHT : MATCH_HEIGHT;
     node.y = cursor + height / 2;
     cursor += height;
   }
@@ -98,7 +102,7 @@ export function buildBracketGraph(rounds: BracketGraphRound[], groups: V1Tournam
   };
   const roots = nodes.filter((node) => !edges.some((edge) => edge.source === node.id));
   roots.forEach(position);
-  return { nodes, edges, height: Math.max(cursor, 144) };
+  return { nodes, edges, height: Math.max(cursor, MATCH_HEIGHT) };
 }
 
 export function bracketConnectionPath(start: { x: number; y: number }, end: { x: number; y: number }, side: 'HOME' | 'AWAY') {

@@ -33,3 +33,10 @@ Persona: owner/ops 쓰기, support 읽기, 일반 사용자 쓰기 거절.
 - 빈 BYE의 팀 선택은 조별 ENTRY 20팀을 이미 배정된 팀으로 모두 제외해 실패했다. 문구는 검증 직전 값으로 복원했다. 이 실패를 완료로 표시하지 않는다.
 - 공통 후보 계산을 서버 `assertPlaceable`의 kind별 예외와 맞춘다. BYE는 조별 ENTRY 팀을 선택할 수 있고 결선 ENTRY/BYE/GROUP_RANK 중복은 제외한다. 목록 8강·desktop panel·mobile picker·독립 BYE 편집기가 같은 계산을 사용한다.
 - 실제 후보 선택 회귀 RED 2건 → 관련 170 tests GREEN. 후속 PR/alpha 배포 후 BYE 3폭 저장과 원복을 다시 실행한다.
+
+
+## 2026-10-18 사용자 재현 후속 — 공개 문구·그림 장소
+
+기존 완료 기록의 범위 공백: 관리자 3폭 검증 뒤 사용자 공개 projection의 side override 누락을 확인하지 못했다. alpha 원 대회31번 홈 `ddddd`·35번 BYE `dd`가 admin GET에는 있지만 public GET은 자동 문구였다. 동일42개 ID의 scheduledAt/venue는 양 API에서 모두 일치하며 관리자31번 카드도10/19 20:33이었다. 사용자 그림 MatchCard에는 venue 렌더가 없었다. 사용자 저장 데이터는 변경하지 않았다.
+
+후속 AC: side/빈 BYE 문구→공개 상세/일정/그림, 팀명 우선·BYE 보조, 등록 경기장 이름·시각·미정 표시·3폭 간격, 새로고침. API label RED1 / Web 장소·BYE RED2 확보. 공개 projection 공용 해석과 그림 metadata 및 간격 수정, PR/alpha 재검증 진행 중. 기존 Copilot 예외는 이 후속 PR에 적용하지 않는다.

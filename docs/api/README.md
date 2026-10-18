@@ -99,3 +99,5 @@ Current Kakao signup and existing-account linking use the [provider contact conf
 - Task 20261083: 대회 참가 명단 GK 유지, 어드민 출전 표 GK 관리와 batch affectedGames 캐시 범위는 [games](domains/games.md)와 [teams](domains/teams.md) 참조.
 
 2026-10-17: Tournament fixture presentation overrides and shared list/canvas schedule semantics are documented in [tournaments](./domains/tournaments.md#bracket-presentation-overrides-2026-10-17).
+
+- 2026-10-18: 공개 대진/일정의 사용자 지정 사이드 문구·BYE 공유 문구 및 canonical 경기장 표시를 동기화했다. 상세 계약은 [tournaments](./domains/tournaments.md) 참고.

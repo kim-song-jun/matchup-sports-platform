@@ -4,6 +4,30 @@ Status: In Progress — factual team and competition discovery metadata, unknown
 **Owner**: Codex main; explicit Luna implementation and Sol independent review
 **Created**: 2026-10-12
 
+## Current guest-led improvement — 2026-10-18 23:33 KST
+
+User explicitly requests implementation, not monitoring alone: diagnose broad `풋살 대회`, `아마추어 풋살`, `풋살 팀` non-observation in a newly opened existing guest profile space; improve existing pages, Alpha verification, current PR review and scoped main deployment, then guest recheck and local report update. No new service page, hidden keyword copy, assumed amateur eligibility, DB/member/key/store change or blanket exclusion of main test data. Alpha remains excluded. Ordinary rank, indexed eligibility, AI mention/prose link/source and release completion are separate.
+
+### Resume cursor and ownership
+
+- Fresh remote fetch: main `edb7ecd31e1af53725f12320be10e35400a8d062`, dev `ef706121bf946c3af230f375c64552a775db296d`. Existing owned `mdqa-127-kakao-talk-login` checkout was clean except the three pre-existing dependency symlinks and fast-forwarded from `5a5de566` to this dev. No branch switch/new branch/worktree, stash or primary shared-checkout edit. Primary unrelated bracket WIP is forbidden.
+- Root owns this task, integration/release/evidence/status/report/lifecycle; actual Luna observer owns new guest128/p1 search evidence only, actual Luna source auditor is read-only until exact implementation paths are assigned; actual Sol independently verifies the eventual immutable diff and evidence. Existing closed109 is never resumed. Guest/Profile3 is persistent and signed-out, not a zero-history incognito claim.
+- Runtime board: `/Users/sungjun/.cache/teameet-seo-release/ACTIVE-20261018-guest-improvement.md`. Initial source diagnosis is pending; broad search absence alone is not proof of a new code defect. Do not manufacture a keyword-only patch or duplicate already deployed fixes.
+
+### Exit proof (required before completion)
+
+- [x] New guest primary3 queries × ordinary Google/Naver/actual completed AI =9 surfaces collected before any Teameet destination visit; exact Naver22cad two-query snippet and both Alpha site-query scopes recorded separately. No confirmed Teameet direct link in this bounded primary set; the AI Matchup citation actually resolves to match-up.co.kr, not Teameet. Naver exact22cad absent is not proof of normal snippet replacement.
+- [x] Reproduce an actual existing-page technical/information contract gap with source plus runtime evidence; keep the smallest approved fix and meaningful narrow RED/GREEN regression tests. Landing22 tests: RED2 real assertions, GREEN22. Team rendered/model tests: RED3 real assertions, GREEN22. Production source scope: landing data summarizer and existing team client/card model; focused tests and two patch Changesets only. No schema/data/route/filter/style change.
+- [ ] Independent Sol review and latest-head GitHub PR reviews, unresolved threads0, exact committed-head CI; meaningful findings corrected and re-reviewed. Known upstream model failure is never called a clean review.
+- [ ] Matching dev merge/Alpha deployment, real guest Alpha390/768/1440 before/after and affected flow/network/runtime checks; noindex maintained, no Alpha sitemap/AI discovery exposure.
+- [ ] Only reviewed source and required release metadata promoted to main under the user's explicit approval. Exact main CI/deploy and actual runtime changed behavior verified; no unrelated dev/DB change promoted.
+- [ ] New guest post-release search observations kept separate from pre-visit baseline; stable HTML/JSON report and STATUS/MONITOR refreshed. No instant ranking/AI success promise; required Naver snippet remains unverified when exact tile is absent.
+- [ ] Owned browser128/p1 finished keep[], only owned runtime PID tree reclaimed, agents terminal and process comparison recorded; no unowned process cleanup.
+
+Selected contracts — 23:51 KST: (1) main edb7 first HTML `/teams` falsely exposes 전체20/풋살18/축구2 while the same deployed public API returns total105/facets94+11. Existing facet data now supplies chip counts; selected-sport 전체 remains the sum of facets excluding only the sport filter, and unknown/incomplete lists without facets never advertise partial counts as totals. Existing labels/links/layout stay intact. (2) actual Alpha ef7061 `/landing` exposes the existing September-expired raw-open promo as 모집 중/남은 자리4 across390/768/1440. Landing first-render status/count/slot data now reuse the existing registration gate for raw-open non-league tournaments. Regular-league and in-progress lifecycle displays are unchanged. This fixes request-time public HTML; it does not add background polling to already-open landing tabs. Current main promo was still before its23:59 deadline when initially inspected, so Alpha reproduction is not misreported as then-current main staleness. Neither defect establishes search-ranking causation.
+
+Pre-commit gate — 23:53 KST: both narrow suites are GREEN (landing22 + team22), frontend `tsc --noEmit` and v1 pattern check completed exit0. No whole-suite/build/local server. Next is exact committed diff review and CI, followed by matching deployed Alpha evidence; local green does not complete those gates.
+
 ## Current direct-site follow-up — 2026-10-17 22:05 KST
 
 User explicitly requests actual owned-site discovery for `풋살 팀` and `풋살 대회`, including Google AI links to Teameet rather than Instagram, continued exact Naver stale-snippet checks, existing-page improvements, Alpha/current PR review/scoped main release, maintained local report and Alpha exclusion. Earlier below-fold ordinary and historical AI observations do not establish current broad-query visibility success.

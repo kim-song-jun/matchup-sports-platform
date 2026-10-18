@@ -7,6 +7,7 @@ import { fetchSeoSeed } from '@/lib/seo-list';
 import { getStatus } from '@/components/team-matches/team-matches.card-model';
 import { formatCardDate, formatCardTime, formatTournamentDateMedium } from '@/lib/date-utils';
 import { competitionFormatLabel } from '@/lib/competition-kind';
+import { resolveTournamentRegistrationBlock } from '@/lib/tournament-registration-availability';
 import type { CursorPage, PageInfo, V1Team, V1TeamMatch, V1TournamentListItem, V1TournamentListPage } from '@/types/api';
 
 const LIST_LIMIT = 50;
@@ -143,7 +144,7 @@ export function summarizeLandingData(
   if (tournamentsPage) for (const item of tournaments) bump(item.sport?.name, 'tournaments');
   if (teamsPage) for (const item of teams) bump(item.sport?.name ?? item.sportName, 'teams');
 
-  const openCount = tournaments.filter((item) => item.status === 'open').length;
+  const openCount = tournaments.filter((item) => landingTournamentStatus(item, now) === 'open').length;
 
   return {
     counts: {
@@ -156,7 +157,7 @@ export function summarizeLandingData(
     },
     bySport,
     hasAnyData: teamMatchesPage !== null || tournamentsPage !== null || teamsPage !== null,
-    tournaments: liveTournaments(tournaments),
+    tournaments: liveTournaments(tournaments, now),
     teamMatches: liveTeamMatches(teamMatches, now),
   };
 }
@@ -166,9 +167,24 @@ function toCount(page: { pageInfo?: { hasNext: boolean } } | null, length: numbe
   return { value: length, more: page.pageInfo?.hasNext ?? false };
 }
 
-function liveTournaments(items: readonly V1TournamentListItem[]): LandingLiveTournament[] {
+function landingTournamentStatus(item: V1TournamentListItem, now: Date): LandingTournamentLiveStatus | null {
+  if (!isLiveStatus(item.status)) return null;
+  if (item.status !== 'open' || item.kind === 'regular_league') return item.status;
+
+  // Only regular tournaments (including legacy null-kind tournament rows) derive their
+  // recruitment label from the same deadline/capacity contract as registration.
+  // The API omits teamCount for league rows; after excluding leagues, this field is
+  // present for tournament cards, including a legitimate zero-capacity event.
+  const tournamentWithCapacity = item as V1TournamentListItem & { teamCount: number };
+  return resolveTournamentRegistrationBlock(tournamentWithCapacity, now) === null ? 'open' : 'closed';
+}
+
+function liveTournaments(items: readonly V1TournamentListItem[], now: Date): LandingLiveTournament[] {
   return items
-    .flatMap((item) => (item.promoHomeEnabled && isLiveStatus(item.status) ? [{ item, status: item.status }] : []))
+    .flatMap((item) => {
+      const status = landingTournamentStatus(item, now);
+      return item.promoHomeEnabled && status !== null ? [{ item, status }] : [];
+    })
     .sort((a, b) =>
       TOURNAMENT_STATUS_PRIORITY[a.status] - TOURNAMENT_STATUS_PRIORITY[b.status] || a.item.promoHomePriority - b.item.promoHomePriority,
     )

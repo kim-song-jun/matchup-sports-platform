@@ -52,9 +52,9 @@ function rosterData(counts: { excluded: number; unavailable: number; suspended: 
   return { data: { counts: { base: 10, participating: 8, ...counts } }, isPending: false, isError: false };
 }
 
-function renderChecklist(props: { lineups: GameLineup[] }) {
+function renderChecklist(props: { lineups: GameLineup[]; disabled?: boolean }) {
   return render(
-    <KickoffChecklist gameId="g-1" sides={SIDES} lineups={props.lineups} onToggleArrival={vi.fn()} onConfirmSide={vi.fn()} onRosterError={vi.fn()} />,
+    <KickoffChecklist gameId="g-1" sides={SIDES} lineups={props.lineups} disabled={props.disabled} onToggleArrival={vi.fn()} onConfirmSide={vi.fn()} onRosterError={vi.fn()} />,
   );
 }
 
@@ -157,6 +157,17 @@ describe('KickoffChecklist — 킥오프 준비', () => {
     expect(status).toHaveTextContent('도착을 확인하지 못한 선수가 1명 있어요');
     expect(status).toHaveTextContent('그래도 ‘경기 시작’은 누를 수 있어요');
     expect(status).not.toHaveTextContent('준비가 끝났어요');
+  });
+
+  it.each([
+    ['전원 도착', ARRIVED, '모든 선수의 도착을 확인했어요.'],
+    ['미확인 남음', NOT_YET, '아직 도착을 확인하지 못한 선수가 1명 있어요.'],
+  ])('경기를 시작할 수 없는 사람(조회 전용 스태프 등)에게는 경기 시작 안내 없이 도착 현황만 말한다 — %s', (_, away, text) => {
+    renderChecklist({ lineups: lineups(ARRIVED, away), disabled: true });
+
+    const status = screen.getByRole('status');
+    expect(status).toHaveTextContent(text);
+    expect(status).not.toHaveTextContent('경기 시작');
   });
 
   it('명단이 없으면 준비 완료 문구를 지어내지 않는다', () => {

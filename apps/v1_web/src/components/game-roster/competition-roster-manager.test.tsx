@@ -114,6 +114,14 @@ describe('공통 명단 관리의 실제 탭·저장 흐름', () => {
     expect(screen.queryByText('경기 목록을 불러오지 못했어요')).not.toBeInTheDocument();
     expect(screen.getByLabelText('출전을 관리할 경기')).toHaveValue(games[0].gameId);
   });
+  it('팀원이 아닌 운영진은 참가 선수 탭 대신 경기 출전에서 바로 GK를 정한다', async () => {
+    role = 'none'; mock.setViewerRole('STAFF');
+    open();
+    fireEvent.click(await screen.findByRole('button', { name: '김민재 골키퍼로 지정' }));
+    expect(screen.queryByText('번호·GK는 참가 선수 탭의 공통 설정이에요.', { exact: false })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /변경사항 저장/ }));
+    await waitFor(() => expect(mock.readRoster().participants.find(p => p.userId === 'player-1')).toMatchObject({ goalkeeper: true }));
+  });
   it('저장 실패 시 이동하지 않고 초안과 오류를 남긴다', async () => {
     server.use(http.post('*/api/v1/teams/:id/game-rosters/batch', () => HttpResponse.json({ message: '저장 실패' }, { status: 503 })));
     open(); await screen.findByRole('checkbox', { name: '김민재 이번 경기 출전' });

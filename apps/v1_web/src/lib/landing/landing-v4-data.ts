@@ -172,7 +172,7 @@ function landingTournamentStatus(item: V1TournamentListItem, now: Date): Landing
   if (item.status !== 'open') return item.status;
 
   // An API `open` status can remain after admission stops. The shared resolver also
-  // preserves the league's distinct deadline/maxTeams contract and treats a missing
+  // preserves the host's league admission contract and treats a missing
   // league deadline as unavailable; do not derive labels from stored status alone.
   const tournamentWithCapacity = item as V1TournamentListItem & { teamCount: number };
   return resolveTournamentRegistrationBlock(tournamentWithCapacity, now) === null ? 'open' : 'closed';

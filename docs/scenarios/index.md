@@ -1,6 +1,6 @@
-## 2026-10-17 — 대진 표시 문구·경기 정보 편집
+## 2026-10-18 — 대진 표시 문구·경기 정보 편집
 
-[시나리오](./bracket-display-edit.md) · [Task 20261057](../../.github/tasks/20261057-admin-bracket-canvas.md). 목록/그림/모바일 공통 저장과 12강 부전승 편집. 변경 후 alpha 실측 0/3(PR 미배포), DB integration 미실행(Docker 미가동). 자동 회귀 결과는 task 최신 기록 참고.
+[시나리오](./bracket-display-edit.md) · [Task 20261057](../../.github/tasks/20261057-admin-bracket-canvas.md). #1960·#1971 dev 머지/alpha 배포 SHA `e60c8576c` 및 CI PASS. 목록↔그림 metadata·빈 부전승/8강 공유 편집·원복 각3/3, 실제 승자/패자·12강→8강 진출 및 재배포 유지 PASS. 기존42경기/전체 자리 데이터 원복 일치. Copilot 외부 모델 장애는 PR별 사용자 예외 승인. 신규 QA 대회는 비공개 유지, main 승격 없음.
 
 리그 목록/상세 이미지 분리(2026-10-16): [후속 QA](./league-detail-media.md). API85/Web10·타입/패턴 PASS, DB integration은 Docker 미실행, alpha 3폭은 미배포로 0/3.
 

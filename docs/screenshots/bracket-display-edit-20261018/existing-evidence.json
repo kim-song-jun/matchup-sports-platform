@@ -1,0 +1,37 @@
+{
+  "evidence": [
+    {
+      "viewport": 1440,
+      "checkedCards": 42,
+      "existingFields": 42,
+      "totalFixtures": 42,
+      "scheduledFixtures": 0,
+      "overflow": 0,
+      "overlaps": [],
+      "verdict": "PASS"
+    },
+    {
+      "viewport": 768,
+      "checkedCards": 42,
+      "existingFields": 42,
+      "totalFixtures": 42,
+      "scheduledFixtures": 0,
+      "overflow": 0,
+      "overlaps": [],
+      "verdict": "PASS"
+    },
+    {
+      "viewport": 390,
+      "checkedCards": 4,
+      "existingFields": 42,
+      "totalFixtures": 42,
+      "scheduledFixtures": 0,
+      "overflow": 0,
+      "overlaps": [],
+      "verdict": "PASS"
+    }
+  ],
+  "pageErrors": [],
+  "consoleErrors": [],
+  "httpErrors": []
+}

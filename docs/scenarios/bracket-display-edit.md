@@ -17,40 +17,29 @@ Persona: owner/ops 쓰기, support 읽기, 일반 사용자 쓰기 거절.
 9. 번호·문구 변경 전후 TeamMatch ID, 슬롯 ID, 진출 edge가 유지되는지 확인한다. 실제 12강 결과 확정→8강 및 승자/패자 후속 경기 진출도 확인한다.
 10. support는 읽기 전용, 일반 사용자는 관리자 PATCH 거절인지 확인한다. 시작/결과가 있는 경기의 슬롯 팀 변경 잠금을 유지해야 한다.
 
-## 검증 기록
+## 최종 검증 — 2026-10-18
 
-- main/dev 모두 `serializeTournamentTeamMatchBracket`에서 TeamMatch.startAt/placeName/fieldId를 조회한다. 별도 canvas 저장소는 없다.
-- 원인: 그림 카드의 일정 footer 누락, 목록·desktop panel의 빈 시각 PATCH 누락. 하나의 canonical 값을 표시하고 null을 명시적으로 저장하도록 수정했다.
-- API DTO/문구 저장·슬롯 직렬화 44/44 PASS. API 합계 269개, Web 대진 관련 566개 계약 검증 PASS(중간 실패를 수정하고 해당 파일 재실행). 양쪽 타입, Web pattern, API surface PASS. 상세 실행 범위는 task의 Progress Snapshot 참고.
-- committed-tree expand-contract gate PASS, 릴리스 해시·historical manifest 회귀 7/7 PASS.
-- 실제 DB integration: 로컬 Docker daemon 미가동으로 미실행. additive migration은 CI DB integration 대상이다.
-- 실제 alpha 변경 후 UI QA: 0/3, PR 미배포. 스크린샷/console/network/실제 결과 진출 검증 및 cleanup 기록은 alpha 배포 후 이 문서에 추가한다. 컴포넌트 테스트는 실제 브라우저 QA로 계산하지 않는다.
-- 기존 사용자 데이터·결과를 변경하거나 seed/reset을 실행하지 않았다.
+[#1960](https://github.com/kim-song-jun/matchup-sports-platform/pull/1960) 및 alpha에서 발견한 후보 결함의 [#1971](https://github.com/kim-song-jun/matchup-sports-platform/pull/1971)을 dev에 머지했다. 최종 alpha SHA `e60c8576c41f6e149c014c6caed2489986a15f42`. [dev CI](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/39116929627) / [배포](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/39116929623) SUCCESS, served header 및 DB health 확인. main 승격 없음.
 
+| 흐름 | 1440 | 768 | 390 | 증거 |
+|---|---|---|---|---|
+| 목록↔그림 번호·문구·시각·등록 필드 / 자동 복원·비우기·새로고침 | PASS | PASS | PASS | [metadata](../screenshots/bracket-display-edit-20261018/metadata-evidence.json) |
+| 빈 BYE 문구·팀 / 연결8강 목록 공유 / 원복 | PASS | PASS | PASS | [BYE](../screenshots/bracket-display-edit-20261018/bye-evidence.json) |
+| 기존 저장 경기장 표시·가로 넘침/카드 겹침 없음 | 42경기 PASS | 42경기 PASS | 12강4+BYE4 PASS | [기존 대회](../screenshots/bracket-display-edit-20261018/existing-evidence.json) |
+| 새 배포 후 팀 이름 우선·metadata null·진출 유지 | PASS | PASS | PASS | [재배포 유지](../screenshots/bracket-display-edit-20261018/persistence-evidence.json) |
 
-## 2026-10-18 — PR #1960 재개 및 dev 머지
+실제 점수 확정으로 승자→결승·패자→3위전, 12강→8강 진출을 확인했다. 출처99번 변경 후 직접 입력 문구 유지, 자동 문구 최신화, ID/edge 보존, 의도적 저장503의 입력 유지/재시도 PASS. [결과 증거](../screenshots/bracket-display-edit-20261018/result-evidence.json). BYE는 슬롯 팀 저장 성공 뒤 경기 PATCH503을 의도적으로 주입해 부분 실패 안내와 입력 유지·재시도까지 확인했다. 두 의도적503 외 예상치 못한 제품 JS/network 오류는 없었다. 마지막 추가 확인 중 CloudFront HTML403이 발생했으나 요청 휴식 후 공개200으로 회복했다. BYE 자동 복원 버튼도3폭 PASS: 공유 문구null·팀 유지. 모바일 진입 ERR_ABORTED는 새 headed 세션에서 PASS했다. [복원 버튼 증거](../screenshots/bracket-display-edit-20261018/bye-restore-evidence.json).
 
-- PR: [#1960](https://github.com/kim-song-jun/matchup-sports-platform/pull/1960), dev merge `5444656fac646a8dd65c22a9032d3415a34b8d9e`.
-- 최신 dev를 통합하고 슬롯 응답 exact 기대값의 `automaticLabel`/`displayLabel` 누락을 수정했다. 추가 실DB 회귀는 기존 TeamMatch 시각/경기장 보존·비우기 및 BYE/8강 문구·팀 공유를 검증한다.
-- [PR CI](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/39112697076): Gates/API/Web PASS. PostgreSQL 169 suites, 1,248 PASS/3 skip; API unit 427 suites/6,497 PASS; Web 804 files/9,422 PASS 및 build PASS. 타입·surface/pattern·schema binding 7/7 PASS.
-- Copilot [실행](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/39112698806)은 모델 사용 불가로 분석 전 실패했다. 사용자가 이번 PR에만 예외를 명시 승인했다. 리뷰 clean으로 표기하지 않으며 다른 PR에 확대하지 않는다.
-- 변경 전 관리자 로그인 및 1440/768/390 capture 완료. 기존 대상 42경기의 fieldId는 모두 저장돼 있었고 scheduledAt은 현재 모두 null이었다. 저장된 시각 표시 증명은 별도 비공개 QA 대회의 기존 경기 및 배포 전에 기존 API로 저장한 결승(10/25 14:00 KST)을 사용한다.
-- 별도 QA 대회에 승자·패자 및 12강→8강 연결을 준비했다. 실제 결과는 이 대회에서만 확정한다. 기존 테스트 대회의 부전승 문구·팀은 검증 직전 값을 기록하고 검증 후 같은 값으로 복원한다.
-- 로컬 dev FF 동기화 성공. 원격과 로컬 dev 모두 `5444656fac`, 타 세션 WIP 변경 없음.
-- alpha [배포](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/39113836770) 대기. 변경 후 UI QA는 아직 0/3이다.
+main/dev 모두 `serializeTournamentTeamMatchBracket`의 TeamMatch.startAt/placeName/fieldId를 조회한다. 원인은 그림 카드 일정 footer 누락과 빈 시각 PATCH 누락이었다. 별도 canvas 저장소 없이 canonical 값을 표시하고 null을 명시 저장한다. 기존 대상은 field42/42·시각0/42이므로 저장 시각 무입력 표시는 별도 QA 대회에 배포 전 저장된 시각으로 검증했다.
 
-- 배포 후 번호/문구/시각/등록 필드 양방향 편집·새로고침·null 비우기·자동 복원: 1440/768/390 **3/3 PASS**, 페이지 가로 overflow 0, console/pageerror/HTTP 실패 0. 실제 alpha 저장 후 GET으로 같은 ID와 edge 보존을 확인했다. QA 선택자 타입·중복 live status를 수정한 뒤 완료했으며 제품 코드 수정은 없었다.
+후속 결함: 조별 ENTRY의20팀을 모든 자리 후보에서 전역 제외해 빈 BYE 후보가0개였다. 서버 `assertPlaceable` 기준 공용 계산으로 목록·패널·mobile·BYE를 맞췄다. 실제 후보 선택 회귀2건 RED→관련170 tests GREEN, tsc/pattern PASS. PR1971 CI에서 DB169 suites/1,249 PASS(3 skip), API427 suites/6,520 PASS, Web805 files/9,427 tests 및 build PASS. 기존 auth/잠금은 변경하지 않았고 권한 회귀는 자동 테스트로 확인했다(별도 support 계정 수동 로그인은 실행하지 않음).
 
-- `5444656fac`에서 결과 시나리오 PASS: 사용자 문구는 출처99번 변경 후 유지, 자동 복원은 최신99번 표시. 의도적503 한 번 후 입력 유지/재시도 성공. 공식 결과로 승자→결승·패자→3위전 및 12강121번→8강 진출, ID/edge 보존, 팀 이름 우선 확인. 503은 QA interception 한 건이며 그 외 JS/network 오류 없음.
-- BYE UI의 조별 ENTRY 전역 제외 결함은 [후속 PR #1971](https://github.com/kim-song-jun/matchup-sports-platform/pull/1971)로 수정 중이다. `bye-failure` 상태에서 문구를 원래 값으로 복원했고 팀·결과는 변경하지 않았다. BYE 후속 3폭 QA는 미완료다.
-## 2026-10-18 — alpha 후속: 조별 ENTRY 팀의 부전승 후보
+Copilot은 두 PR 모두 GitHub 모델 사용 불가로 분석 전에 실패했다. 사용자가 #1960과 #1971 각각 예외를 승인했다. clean 리뷰로 표기하지 않는다.
 
-- PR #1960 배포 SHA `5444656fac`에서 metadata 1440/768/390 3/3 PASS, 실제 승자·패자 및 12강→8강 진출 PASS.
-- 빈 BYE의 팀 선택은 조별 ENTRY 20팀을 이미 배정된 팀으로 모두 제외해 실패했다. 문구는 검증 직전 값으로 복원했다. 이 실패를 완료로 표시하지 않는다.
-- 공통 후보 계산을 서버 `assertPlaceable`의 kind별 예외와 맞춘다. BYE는 조별 ENTRY 팀을 선택할 수 있고 결선 ENTRY/BYE/GROUP_RANK 중복은 제외한다. 목록 8강·desktop panel·mobile picker·독립 BYE 편집기가 같은 계산을 사용한다.
-- 실제 후보 선택 회귀 RED 2건 → 관련 170 tests GREEN. 후속 PR/alpha 배포 후 BYE 3폭 저장과 원복을 다시 실행한다.
+## Cleanup / 재현 메모
 
-### 2026-10-18 09:51 UTC — #1971 dev 머지
-
-- PR CI `39116140082` Gates/API/Web 전체 PASS, MERGEABLE/CLEAN, review threads 0. 사용자 승인 Copilot 예외를 PR 본문에 기록했다.
-- dev merge `e60c8576c41f6e149c014c6caed2489986a15f42`; 즉시 로컬 dev FF 완료. dev CI `39116929627`, alpha `39116929623` 실행 중. 부전승 후속 QA는 새 served SHA 확인 후 진행한다.
+- 기존 대회42경기와 전체 슬롯의 번호·시각·필드·팀·문구·진출 연결은 최초 snapshot과 동일하다. BYE 임시 변경은 각 실행 finally에서 원복했다.
+- 신규 비공개 QA 대회 `1705ff18-f181-4c6c-96d9-d448d6d2b546`에만 결과를 확정했다. 이력 보존을 위해 삭제/seed/reset 없이 비공개로 유지한다.
+- headed Chromium PID/PPID 기록, 각 finally에서 브라우저 종료. 인증정보는 저장소/PR에 기록하지 않았다.
+- 768 sheet의 중복 aria label, EntityPicker 검색 메뉴가 열린 상태의 버튼 가림은 QA 선택자/동작을 수정한 뒤 실제 클릭으로 검증을 완료했다. 실패를 강제 클릭으로 숨기지 않았다.
+- before/after PNG 및 JSON은 [증거 폴더](../screenshots/bracket-display-edit-20261018/)에 있다. 갤러리는 원 PR에 SHA 고정 raw URL의200 확인 후 게시한다.

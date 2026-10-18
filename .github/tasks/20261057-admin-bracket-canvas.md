@@ -1,20 +1,20 @@
 # Task 20261057: 어드민 대진 그림 편집기 — 그림 먼저, 팀은 자리에, 결과는 칸에서
 
 ## 2026-10-17 후속 — 목록·그림 표시 문구와 경기 정보 편집 통일
-Status: Merged into dev and alpha deployed; manual QA in progress
+Status: Done — PR #1960/#1971 dev merged; alpha manual QA complete (2026-10-18)
 
 ### Context / Goal / Original Conditions
 사용자가 기존 목록 수정 창·그림 패널·모바일 BottomSheet에서 번호/홈·원정 문구/시각/등록 경기장을 편집하고, 팀이 없는 12강 부전승 자체를 클릭해 문구·팀을 편집하도록 요청했다. 표시만 바꾸며 경기 ID·실제 팀·승자/패자 연결은 보존한다. 초기 범위는 구현·PR 게시였으며, 2026-10-18 추가 사용자 요청으로 리뷰·검증·dev 머지·alpha 배포/실측까지 확장했다. main 승격은 제외한다.
 
 ### User / Test Scenarios / Acceptance Criteria
-- [ ] 목록↔그림에서 번호·문구·시각·등록 경기장 저장/새로고침이 같은 값을 사용한다.
-- [ ] main/dev 조회·표시 경로 비교; 기존 시각/경기장 재입력 없이 카드와 패널에서 표시한다.
-- [ ] 문구 빈 값/복원은 최신 자동 문구; 출처 번호 변경 시 자동만 갱신하고 사용자 문구는 보존한다.
-- [ ] 시각 null과 경기장 미배정을 실제 저장하고 양쪽에서 미정으로 표시한다.
-- [ ] 번호/문구 변경은 실제 팀·진출 연결을 보존하며 단계/조→번호→차전→ID로 안정 정렬한다.
-- [ ] 빈 부전승도 그림에서 편집 가능; 연결된8강과 문구·배정팀 공유, 별도 경기 번호/시각/경기장 생성 금지.
-- [ ] 확정 팀 이름 우선, 부전승 문구 보조; 실패 시 입력 유지·실제 오류 표시.
-- [ ] desktop/tablet/mobile 회귀; API/DTO/fixture/MSW/docs/schema pin 동기화.
+- [x] 목록↔그림에서 번호·문구·시각·등록 경기장 저장/새로고침이 같은 값을 사용한다.
+- [x] main/dev 조회·표시 경로 비교; 기존 시각/경기장 재입력 없이 카드와 패널에서 표시한다.
+- [x] 문구 빈 값/복원은 최신 자동 문구; 출처 번호 변경 시 자동만 갱신하고 사용자 문구는 보존한다.
+- [x] 시각 null과 경기장 미배정을 실제 저장하고 양쪽에서 미정으로 표시한다.
+- [x] 번호/문구 변경은 실제 팀·진출 연결을 보존하며 단계/조→번호→차전→ID로 안정 정렬한다.
+- [x] 빈 부전승도 그림에서 편집 가능; 연결된8강과 문구·배정팀 공유, 별도 경기 번호/시각/경기장 생성 금지.
+- [x] 확정 팀 이름 우선, 부전승 문구 보조; 실패 시 입력 유지·실제 오류 표시.
+- [x] desktop/tablet/mobile 회귀; API/DTO/fixture/MSW/docs/schema pin 동기화.
 
 ### Responsibilities / Ownership / Dependencies
 단일 에이전트 순차. Phase A: v1 DB/DTO/서비스/조회·타입·fixture 계약. Phase B: 공유 편집 폼, 목록·그림·모바일, 부전승 노드. Phase C: 회귀·타입·리뷰·PR.
@@ -38,10 +38,10 @@ Schema LF SHA=96cf396f434e0fba80e9c2fa84e79ee347471ae56387ca6493b6d11f09c93a42. 
 - 단일 에이전트 순차 실행, 전용 작업트리 `/tmp/teameet-pr1960-complete`. 다른 작업트리/WIP 수정 금지.
 - [x] 최신 dev `5a5de5662`와 PR `bff8ec8f9` 통합. nullable 문구 3필드와 기존 온라인 분류를 함께 포함한 스키마 바인딩 충돌 5곳 해결.
 - [x] CI RED 확인: PostgreSQL 168 suites 중 167 PASS, 1240 tests PASS / 1 FAIL. 실패는 슬롯 응답의 automaticLabel/displayLabel 기대값 누락. 두 필드를 정확히 단언하도록 수정.
-- [ ] 통합 변경 코드·보안·디자인 검토 및 좁은 검증.
-- [ ] 최신 head CI 및 Copilot clean 확인.
-- [ ] dev 머지·로컬 dev FF·alpha 배포 SHA 확인.
-- [ ] alpha 3폭 UI/저장/새로고침/실제 진출 QA·갤러리·정리 기록.
+- [x] 통합 변경 코드·보안·디자인 검토 및 좁은 검증.
+- [x] 최신 head CI 확인; Copilot 모델 장애는 #1960/#1971 각각 사용자 예외 승인(클린 리뷰 아님).
+- [x] dev 머지·로컬 dev FF·alpha 배포 SHA 확인.
+- [x] alpha 3폭 UI/저장/새로고침/실제 진출 QA·갤러리·정리 기록.
 - 검증: API 관련 5 files/257 tests PASS, Web 편집·목록·모바일·레이아웃 6 files/203 tests PASS. API/Web tsc PASS. surface/pattern 게이트의 sandbox spawn EPERM은 앱 경로에서 권한 있는 동일 명령으로 재실행한다.
 - 실DB 회귀 2개 추가: 기존 TeamMatch 일정·필드 무입력 조회 → 번호/문구 편집 → 출처 번호 편집 → null 비우기; 빈 BYE 문구 → 팀 배정 → 8강 공유 조회 → 문구 복원 및 edge/팀 보존. 로컬 Docker daemon 부재로 CI에서 실행한다.
 - CI `39112697076` (head `11194974c`): Gates/API/Web 모두 PASS. migration chain replay + schema drift 0 + PostgreSQL integration(추가 2건 포함)·API unit·build·literal HTTP 완료.
@@ -886,3 +886,17 @@ Status: Fix in progress
 
 - PR CI `39116140082` Gates/API/Web 전체 PASS, MERGEABLE/CLEAN, review threads 0. 사용자 승인 Copilot 예외를 PR 본문에 기록했다.
 - dev merge `e60c8576c41f6e149c014c6caed2489986a15f42`; 즉시 로컬 dev FF 완료. dev CI `39116929627`, alpha `39116929623` 실행 중. 부전승 후속 QA는 새 served SHA 확인 후 진행한다.
+
+### 최종 alpha 실측 — 2026-10-18 (#1960 + #1971)
+
+- 후속 dev CI [39116929627](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/39116929627) 및 alpha [39116929623](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/39116929623) SUCCESS. served SHA `e60c8576c41f6e149c014c6caed2489986a15f42`, release `1.10.0-alpha.20261018.ge60c8576c41f`, DB health true (10:10 UTC). 로컬 dev도 동일 SHA로 FF 완료.
+- PR #1971 CI: DB 169 suites/1,249 PASS·3 skip, API 427 suites/6,520 PASS, Web 805 files/9,427 tests 및 build PASS. 좁은 후보 회귀 170 tests·tsc/pattern PASS. #1960/#1971 Copilot은 각각 외부 모델 장애로 분석 전 실패, 사용자 개별 예외 승인. clean 리뷰로 표시하지 않는다.
+- Alpha owner 계정의 headed Chromium: 1440×1000 / 768×1024 / 390×844. 번호·홈/원정 문구·시각·등록 경기장 목록↔그림 편집, 기존 저장값 무입력 표시, null 비우기·자동 문구·새로고침 **3/3 PASS**. 출처99번 변경 후 사용자 문구 유지·최신 자동 문구 복원 PASS. 실제 결과 확정으로 승자→결승/패자→3위전 및 12강121번→8강 진출 PASS. ID/edge 보존, 실제 팀 이름 우선 PASS.
+- #1971 배포 후 빈 BYE 클릭·문구·조별 ENTRY 팀 선택·8강 공유 편집·새로고침·원복 **3/3 PASS**. 별도 번호/시각 입력 없음, 연결35번 HOME 확인, 팀 배정 후 BYE 문구 보조 유지. 그림에서 팀0→목록에서 팀1 변경을 실제 저장. 의도적503으로 슬롯 저장 성공/문구 저장 실패를 만든 뒤 부분 실패 안내·입력 유지·재시도 성공 확인.
+- 기존 대회 **42/42 경기 및 전체 슬롯**의 번호/시각/필드/배정/문구/진출 edge는 최초 snapshot과 동일(새 nullable 필드의 과거 omission은 null로 비교). 저장된 field42/42 모두 그림에 표시. 기존 대회의 시각은 원래0/42이므로 무입력 시각 표시는 비공개 QA 대회의 배포 전 저장값으로 증명했다.
+- 기존 그림: desktop42·tablet42·mobile 현재12강4경기+4BYE 확인, 각 폭 페이지 overflow0·카드 겹침0, console/pageerror/HTTP error0. 결과·metadata null 및 실제 팀명은 새 배포에서도3폭 유지 확인.
+- 의도적503은 결과 저장 실패1건, BYE 부분 실패1건이며 해당 시나리오의 console/network에만 기록. 그 외 제품 JS 오류 없음. 수동 QA 재시도의 선택자 충돌·열린 검색 메뉴는 harness를 수정하고 실제 클릭으로 완료했다. 마지막 추가 복원 버튼 확인 중 CloudFront HTML403이 발생해 연속 요청을 멈췄다(로그인 오류로 단정하지 않음).
+- Cleanup: 기존 대회 BYE 문구·팀은 정확히 원복. 신규 QA 대회 `1705ff18-f181-4c6c-96d9-d448d6d2b546`는 비공개이며 공식 결과 이력 보존 때문에 삭제/seed/reset 없이 유지. 인증정보는 커밋/PR에 포함하지 않음. 시작한 headed browser는 각 finally에서 종료, PID/PPID 기록. main/production 승격 없음.
+- 증거: [시나리오](../../docs/scenarios/bracket-display-edit.md), `docs/screenshots/bracket-display-edit-20261018/`의 JSON 및 3폭 before/after. 최종 갤러리는 원 PR #1960/#1971에 SHA 고정 URL로 게시한다.
+
+- 최종 추가 검증: CloudFront 차단은 요청 휴식 뒤 공개200으로 회복. BYE 자동 복원 버튼1440/768 PASS, 모바일 진입 ERR_ABORTED 뒤 새 headed390 세션 PASS. 공유 문구 null 저장·팀 보존3/3, finally 원복. [증거](../../docs/screenshots/bracket-display-edit-20261018/bye-restore-evidence.json). 이 snapshot이 위의 배포/QA 대기 기록을 대체한다.

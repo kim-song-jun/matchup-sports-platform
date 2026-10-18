@@ -1,0 +1,28 @@
+{
+  "evidence": [
+    {
+      "viewport": 1440,
+      "automaticRestoreButton": "PASS",
+      "sharedNullStored": "PASS",
+      "teamPreserved": "PASS",
+      "execution": "first run: observed stdout PASS before mobile navigation aborted"
+    },
+    {
+      "viewport": 768,
+      "automaticRestoreButton": "PASS",
+      "sharedNullStored": "PASS",
+      "teamPreserved": "PASS",
+      "execution": "first run: observed stdout PASS before mobile navigation aborted"
+    },
+    {
+      "viewport": 390,
+      "automaticRestoreButton": "PASS",
+      "sharedNullStored": "PASS",
+      "teamPreserved": "PASS"
+    }
+  ],
+  "pageErrors": [],
+  "consoleErrors": [],
+  "httpErrors": [],
+  "retryNote": "First run PASS at 1440/768; mobile navigation ERR_ABORTED before editing. Fresh headed 390 session PASS. Each finally restored original label/team."
+}

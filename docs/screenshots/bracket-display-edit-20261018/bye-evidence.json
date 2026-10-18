@@ -1,0 +1,41 @@
+{
+  "evidence": [
+    {
+      "viewport": 1440,
+      "emptyByeClick": "PASS",
+      "ownScheduleAbsent": "PASS",
+      "sharedLabelAndTeam": "PASS",
+      "listToCanvas": "PASS",
+      "refresh": "PASS",
+      "originalStateRestored": "PASS"
+    },
+    {
+      "viewport": 768,
+      "emptyByeClick": "PASS",
+      "ownScheduleAbsent": "PASS",
+      "sharedLabelAndTeam": "PASS",
+      "listToCanvas": "PASS",
+      "refresh": "PASS",
+      "originalStateRestored": "PASS"
+    },
+    {
+      "viewport": 390,
+      "emptyByeClick": "PASS",
+      "ownScheduleAbsent": "PASS",
+      "sharedLabelAndTeam": "PASS",
+      "listToCanvas": "PASS",
+      "refresh": "PASS",
+      "originalStateRestored": "PASS"
+    }
+  ],
+  "pageErrors": [],
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  ],
+  "httpErrors": [
+    {
+      "path": "/api/v1/admin/fixtures/3db67aa5-d915-5920-a765-9ee7662e9283",
+      "status": 503
+    }
+  ]
+}

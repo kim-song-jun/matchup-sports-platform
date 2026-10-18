@@ -118,7 +118,7 @@ function FixtureTeamLabel({
     // HTML 이 무효가 되고 브라우저가 바깥 <a> 를 조기에 닫는다(같은 이유로 리그 배지도
     // button + router.push 를 쓴다). 경기 행에서 기대되는 목적지도 팀이 아니라 그 경기다.
     <span className="inline-flex items-center gap-2">
-      <TeamAvatar seed={teamId ?? fallback} name={name} logoUrl={entry?.logoUrl ?? null} size="sm" />
+      <TeamAvatar teamId={teamId} name={name} logoUrl={entry?.logoUrl ?? null} size="sm" />
       <span className="text-[var(--text-strong)]">{name}</span>
     </span>
   );
@@ -181,7 +181,7 @@ function ParticipantTeamList({
             className="tm-list-row-interactive flex min-h-[44px] items-center gap-2 px-3 py-2"
             from={from}
           >
-            <TeamAvatar seed={team.teamId} name={team.teamName} logoUrl={team.teamLogoUrl} size="sm" />
+            <TeamAvatar teamId={team.teamId} name={team.teamName} logoUrl={team.teamLogoUrl} size="sm" />
             <span className="text-[var(--text-strong)]">{team.teamName}</span>
           </TeamNameLink>
         </li>
@@ -829,7 +829,7 @@ export default function LeagueMatchStandingsClient({
                     <td className="py-2 text-[var(--text-strong)]">{row.position}</td>
                     <th scope="row" className="text-left font-normal text-[var(--text-strong)]">
                       <TeamNameLink teamId={row.teamId} className="flex items-center gap-2" from={selfHref}>
-                        <TeamAvatar seed={row.teamId} name={row.teamName} logoUrl={row.teamLogoUrl} size="sm" />
+                        <TeamAvatar teamId={row.teamId} name={row.teamName} logoUrl={row.teamLogoUrl} size="sm" />
                         <span className="flex flex-col">
                           <span>{row.teamName}</span>
                           {

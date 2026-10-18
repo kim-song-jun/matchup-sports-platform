@@ -163,7 +163,7 @@ export function TeamMatchApplyTeamSheet({ picker, opponentCost, onClose, onAppli
                   disabled={!team.eligible}
                   onChange={() => setTeamId(team.teamId)}
                 />
-                <TeamAvatar seed={team.teamId} name={team.name} logoUrl={team.logoUrl} size="md" />
+                <TeamAvatar teamId={team.teamId} name={team.name} logoUrl={team.logoUrl} size="md" />
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span className="tm-text-label" style={{ display: 'block', color: team.eligible ? 'var(--text-strong)' : 'var(--text-caption)' }}>{team.name}</span>
                   <span className="tm-text-micro" style={{ display: 'block', marginTop: 2, color: 'var(--text-muted)' }}>

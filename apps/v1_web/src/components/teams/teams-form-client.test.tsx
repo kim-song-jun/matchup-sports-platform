@@ -1,7 +1,11 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { StrictMode } from 'react';
+import { hydrateRoot } from 'react-dom/client';
+import { renderToString } from 'react-dom/server';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
+import { TEAM_LOGO_PRESETS } from '@/lib/team-logo-presets';
 import type { TeamFormViewModel } from './teams.types';
 import { TeamCreatePageClient, TeamEditPageClient } from './teams-form-client';
 
@@ -172,18 +176,53 @@ describe('Team form client contracts', () => {
     });
   });
 
-  it('keeps an unselected logo empty instead of silently assigning a random image', async () => {
-    render(<TeamCreatePageClient />);
+  it('selects one bundled local logo and submits that same default for a new team', async () => {
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.4);
+    render(<StrictMode><TeamCreatePageClient /></StrictMode>);
 
     await waitFor(() => {
-      expect(screen.getByTestId('team-logo-url').textContent).toBe('');
+      expect(TEAM_LOGO_PRESETS).toContain(screen.getByTestId('team-logo-url').textContent);
     });
+    expect(random).toHaveBeenCalledTimes(1);
+    const selectedLogoUrl = screen.getByTestId('team-logo-url').textContent;
 
+    // Updating another draft field must not choose a different random logo.
     fireEvent.change(screen.getByLabelText('팀 이름'), { target: { value: '프리셋 저장 팀' } });
+    expect(screen.getByTestId('team-logo-url').textContent).toBe(selectedLogoUrl);
     fireEvent.click(screen.getByRole('button', { name: '팀 만들기' }));
 
     await waitFor(() => {
       expect(createTeamMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ logoUrl: selectedLogoUrl }),
+      );
+    });
+    random.mockRestore();
+  });
+
+  it('chooses the create default after hydration so server and first client render agree', async () => {
+    const element = <TeamCreatePageClient />;
+    const container = document.createElement('div');
+    container.innerHTML = renderToString(element);
+    expect(TEAM_LOGO_PRESETS.some((url) => container.innerHTML.includes(url))).toBe(false);
+
+    const recoverableErrors: unknown[] = [];
+    let root: ReturnType<typeof hydrateRoot> | null = null;
+    await act(async () => {
+      root = hydrateRoot(container, element, { onRecoverableError: (error) => recoverableErrors.push(error) });
+    });
+    expect(TEAM_LOGO_PRESETS).toContain(container.querySelector('[data-testid="team-logo-url"]')?.textContent);
+    expect(recoverableErrors).toEqual([]);
+    await act(async () => root?.unmount());
+  });
+
+  it('keeps a null saved logo null while editing a team', async () => {
+    render(<TeamEditPageClient teamId="team-futsal" />);
+    await waitFor(() => expect(screen.getByTestId('team-logo-url')).toHaveTextContent(''));
+
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+
+    await waitFor(() => {
+      expect(updateTeamMutateAsync).toHaveBeenCalledWith(
         expect.objectContaining({ logoUrl: null }),
       );
     });

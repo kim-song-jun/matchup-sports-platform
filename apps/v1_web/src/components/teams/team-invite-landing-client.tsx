@@ -48,7 +48,7 @@ export function TeamInviteLandingClient({ token }: { token: string }) {
         <div className="tm-text-caption">팀 초대</div>
         <h2 className="tm-text-heading" style={{ marginTop: 4 }}>{team.name} 팀에서<br />함께 뛰자고 초대했어요</h2>
         <Card pad={16} style={{ marginTop: 20, display: 'flex', alignItems: 'center', gap: 12 }}>
-          <TeamAvatar seed={team.id} name={team.name} logoUrl={team.logoUrl} size="lg" />
+          <TeamAvatar teamId={team.id} name={team.name} logoUrl={team.logoUrl} size="lg" />
           <div style={{ minWidth: 0 }}>
             <div className="tm-text-body-lg" style={{ fontWeight: 700, color: 'var(--text-strong)' }}>{team.name}</div>
             <div className="tm-text-caption" style={{ marginTop: 4 }}>{[team.sportName, team.regionName].filter(Boolean).join(' · ')}</div>

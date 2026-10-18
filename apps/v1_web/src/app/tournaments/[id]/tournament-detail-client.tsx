@@ -9,7 +9,6 @@ import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { TournamentFlowSection } from '@/components/tournaments/tournament-flow-section';
 import { FormattedText } from '@/components/v1-ui/formatted-text';
 import { BlockedAction } from '@/components/v1-ui/blocked-action';
-import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { TournamentCampaignMedia } from '@/components/tournaments/tournament-campaign-media';
 import { Trophy, Goal, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useV1Tournament, useV1MyRegistrations } from '@/hooks/use-v1-api';

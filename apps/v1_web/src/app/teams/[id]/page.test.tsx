@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildNoIndexMetadata, buildPublicMetadata, fetchPublicV1 } from '@/lib/seo';
+import { TEAM_LOGO_PRESETS } from '@/lib/team-logo-presets';
 import TeamDetailPage, { generateMetadata } from './page';
 
 vi.mock('next/navigation', () => ({
@@ -74,6 +75,21 @@ describe('TeamDetailPage (server)', () => {
     expect(vi.mocked(buildPublicMetadata)).toHaveBeenLastCalledWith(
       expect.objectContaining({ image: '/uploads/cover.png', squareImage: false }),
     );
+  });
+
+  it('저장 로고가 없는 공개 팀도 실제 로컬 엠블럼을 대표 이미지와 SportsTeam 로고로 공유한다', async () => {
+    const params = Promise.resolve({ id: 'team-no-logo' });
+    fetchPublicV1Mock.mockResolvedValue({
+      id: 'team-no-logo', teamId: 'team-no-logo', name: '성수 러너스', profile: { logoUrl: null, coverImageUrl: null },
+    } as never);
+
+    const metadata = await generateMetadata({ params });
+    const publicMetadata = vi.mocked(buildPublicMetadata).mock.calls.at(-1)?.[0];
+    const generatedLocalLogo = publicMetadata?.image;
+
+    expect(TEAM_LOGO_PRESETS).toContain(generatedLocalLogo);
+    expect(publicMetadata?.squareImage).toBe(true);
+    expect(metadata.openGraph?.images).toContainEqual(expect.objectContaining({ url: generatedLocalLogo }));
   });
 
   it('공개 팀의 실제 종목·지역·활동·수준을 검색 메타에 전달하고 기존 canonical/image 흐름을 보존한다', async () => {

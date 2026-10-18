@@ -148,6 +148,17 @@ describe('TeamRecordsPageClient', () => {
     expect(lastOverrideTitle()).toBe('강남 러닝 크루 전적');
   });
 
+  it('uses a server seed only for its original season/type key and drops it after a filter change', () => {
+    const seed = page('강남 러닝 크루');
+    mocks.usePublicTeamRecords.mockReturnValue(loaded('강남 러닝 크루'));
+
+    render(<TeamRecordsPageClient teamId="team-1" seed={seed} />);
+
+    expect(mocks.usePublicTeamRecords).toHaveBeenLastCalledWith('team-1', undefined, undefined, { seed });
+    fireEvent.click(screen.getByRole('button', { name: '대회' }));
+    expect(mocks.usePublicTeamRecords).toHaveBeenLastCalledWith('team-1', undefined, 'tournament', { seed: undefined });
+  });
+
   // 로딩 중에는 팀명을 모른다. 모르는 값을 지어내지 않고 제네릭 문구로 남는 것이 맞다.
   it('keeps the generic heading while the team name is still unknown', () => {
     mocks.usePublicTeamRecords.mockReturnValue({
@@ -177,13 +188,13 @@ describe('TeamRecordsPageClient', () => {
     render(<TeamRecordsPageClient teamId="team-1" />);
 
     // 초기 렌더 -- '전체' 탭이라 type 은 undefined 여야 한다.
-    expect(mocks.usePublicTeamRecords).toHaveBeenLastCalledWith('team-1', undefined, undefined);
+    expect(mocks.usePublicTeamRecords).toHaveBeenLastCalledWith('team-1', undefined, undefined, { seed: undefined });
 
     fireEvent.click(screen.getByRole('button', { name: '정규 리그' }));
-    expect(mocks.usePublicTeamRecords).toHaveBeenLastCalledWith('team-1', undefined, 'league');
+    expect(mocks.usePublicTeamRecords).toHaveBeenLastCalledWith('team-1', undefined, 'league', { seed: undefined });
 
     fireEvent.click(screen.getByRole('button', { name: '대회' }));
-    expect(mocks.usePublicTeamRecords).toHaveBeenLastCalledWith('team-1', undefined, 'tournament');
+    expect(mocks.usePublicTeamRecords).toHaveBeenLastCalledWith('team-1', undefined, 'tournament', { seed: undefined });
   });
 
   // 시즌 드롭다운 선택도 탭과 같은 방식(서버 재요청)이어야 한다 -- usePublicTeamRecords
@@ -194,12 +205,12 @@ describe('TeamRecordsPageClient', () => {
     render(<TeamRecordsPageClient teamId="team-1" />);
 
     // 초기 렌더 -- '전체 시즌' 이라 season 은 undefined 여야 한다.
-    expect(mocks.usePublicTeamRecords).toHaveBeenLastCalledWith('team-1', undefined, undefined);
+    expect(mocks.usePublicTeamRecords).toHaveBeenLastCalledWith('team-1', undefined, undefined, { seed: undefined });
 
     fireEvent.click(screen.getByRole('button', { name: '2025시즌' }));
-    expect(mocks.usePublicTeamRecords).toHaveBeenLastCalledWith('team-1', '2025', undefined);
+    expect(mocks.usePublicTeamRecords).toHaveBeenLastCalledWith('team-1', '2025', undefined, { seed: undefined });
 
     fireEvent.click(screen.getByRole('button', { name: '전체 시즌' }));
-    expect(mocks.usePublicTeamRecords).toHaveBeenLastCalledWith('team-1', undefined, undefined);
+    expect(mocks.usePublicTeamRecords).toHaveBeenLastCalledWith('team-1', undefined, undefined, { seed: undefined });
   });
 });

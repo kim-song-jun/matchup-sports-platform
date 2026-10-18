@@ -8,6 +8,7 @@ import {
   fetchPublicV1,
 } from '@/lib/seo';
 import { buildTeamDiscoveryMetadata } from '@/lib/team-discovery-metadata';
+import { resolveTeamLogoUrl } from '@/lib/team-logo-presets';
 import { buildBreadcrumbLd, buildSportsTeamLd, displayRegionName } from '@/lib/structured-data';
 import type { V1TeamDetail } from '@/types/api';
 
@@ -25,13 +26,15 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     ...team,
     regionName: displayRegionName(team),
   });
+  const logoUrl = resolveTeamLogoUrl({ teamId: team.id ?? team.teamId ?? id, logoUrl: team.profile?.logoUrl });
+  const coverImageUrl = team.profile?.coverImageUrl || undefined;
 
   return buildPublicMetadata({
     title: discovery.title,
     description: discovery.description,
     path: `/teams/${id}`,
-    image: team.profile?.coverImageUrl || team.profile?.logoUrl,
-    squareImage: !team.profile?.coverImageUrl && Boolean(team.profile?.logoUrl),
+    image: coverImageUrl || logoUrl || undefined,
+    squareImage: !coverImageUrl && Boolean(logoUrl),
   });
 }
 

@@ -81,7 +81,7 @@ function TeamSide({ teamId, name, logoUrl, record, align, from }: {
 }) {
   const body = (
     <span className={`flex flex-col gap-2 ${align === 'right' ? 'items-end text-right' : 'items-start text-left'}`}>
-      <TeamAvatar seed={teamId ?? name} name={name} logoUrl={logoUrl} size="md" />
+      <TeamAvatar teamId={teamId} name={name} logoUrl={logoUrl} size="md" />
       <span className="tm-text-body-lg text-[var(--text-strong)]">{name}</span>
       {record ? <span className="text-xs text-[var(--text-muted)]">{record}</span> : null}
     </span>
@@ -333,7 +333,7 @@ export default function LeagueFixtureDetailClient({
                         className="tm-pressable tm-list-row-interactive flex min-h-[44px] items-center justify-between gap-2 rounded-lg px-2 text-sm"
                       >
                         <span className="inline-flex items-center gap-2">
-                          <TeamAvatar seed={side.teamId} name={side.name} logoUrl={side.row?.teamLogoUrl ?? null} size="sm" />
+                          <TeamAvatar teamId={side.teamId} name={side.name} logoUrl={side.row?.teamLogoUrl ?? null} size="sm" />
                           <span className="text-[var(--text-strong)]">{side.name}</span>
                         </span>
                         <span className="text-[var(--text-muted)]">{recordLine(side.row)}</span>

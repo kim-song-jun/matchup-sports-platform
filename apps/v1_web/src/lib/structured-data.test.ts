@@ -4,6 +4,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { expectNoNonFootballCompetitionClaim } from '@/test/public-claims';
+import { TEAM_LOGO_PRESETS } from './team-logo-presets';
 import {
   buildBreadcrumbLd,
   buildSiteIdentityLd,
@@ -201,6 +202,14 @@ describe('buildSportsTeamLd', () => {
     expect(ld.logo).toBe('https://teameet.co.kr/a.png');
   });
 
+  it('저장 로고가 없는 팀도 metadata와 같은 로컬 엠블럼을 SportsTeam 로고와 이미지로 쓴다', () => {
+    const ld = buildSportsTeamLd(team());
+
+    expect(ld.logo).toBeTypeOf('string');
+    expect(TEAM_LOGO_PRESETS).toContain(new URL(ld.logo as string).pathname);
+    expect(ld.image).toBe(ld.logo);
+  });
+
   it('팀 화면의 종목·지역을 SportsTeam 으로 옮긴다', () => {
     const ld = buildSportsTeamLd(team());
 
@@ -234,12 +243,6 @@ describe('buildSportsTeamLd', () => {
     expect(ld).not.toHaveProperty('location');
   });
 
-  it('이미지가 없으면 image/logo 를 아예 넣지 않는다', () => {
-    const ld = buildSportsTeamLd(team());
-
-    expect(ld).not.toHaveProperty('logo');
-    expect(ld).not.toHaveProperty('image');
-  });
 });
 
 describe('buildSiteIdentityLd', () => {

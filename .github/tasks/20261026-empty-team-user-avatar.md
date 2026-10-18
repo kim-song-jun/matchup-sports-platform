@@ -1,5 +1,9 @@
 # Task 20261026: 빈 팀·유저 아바타 전체 점검 및 기본 아이콘 통일
 
+## Current team-emblem follow-up — 2026-10-19
+
+The user's current instruction supersedes the original neutral-team-icon choice: actual teams without a saved logo use one of the existing ten local team emblems. GitHub-style mirrored grids and GitHub-hosted product defaults remain forbidden. Stored uploads and user avatars keep their existing behavior; unknown, masked and example identities remain neutral. The landing team-match projection now carries its actual host/opponent team IDs through the existing moving-card and stage renderers, so those teams use the same emblem as their other public views. Projection and actual-render regressions failed before that correction and pass afterward; the two IDs resolve to distinct expected presets, uploads win, and unknown/example identities stay neutral. Exact-SHA CI and live Alpha verification remain release gates.
+
 Status: Implemented — review / alpha pending
 Owner: Codex (single agent)
 Created: 2026-10-05
@@ -106,3 +110,12 @@ origin/dev 9d7869721에서 격리 branch fix/team-user-empty-avatar-consistency 
 - 공용 후기 회귀 RED 1 → GREEN 1; 후기 팀 우선/빈 상태 8 tests PASS. 총 unique 205 tests across 11 suites PASS. 추가 후 tsc PASS / pattern PASS.
 
 - CI Web 6418/6419 PASS; remaining failure was the old TeamMembersSection initials contract, intentionally superseded by user-requested person icon. Updated to verify neutral person glyph plus unchanged full display names; 3 member tests PASS.
+
+
+## 2026-10-19 team thumbnail follow-up
+
+- 사용자 결정: 팀 썸네일은 저장소에 이미 포함된 10개 로컬 엠블럼만 사용한다. GitHub 호스팅 이미지와 GitHub 스타일 격자 identicon은 사용하지 않는다. 사용자 프로필 아바타 정책은 이번 변경 대상이 아니다.
+- 저장된 유효 로고 URL은 그대로 표시한다. 로고가 비어 있는 실제 팀은 팀 식별자를 기준으로 같은 로컬 엠블럼을 list/detail/edit preview에서 본다. 기존 null 값은 DB에 쓰지 않으며 편집 저장에서도 null로 유지한다.
+- 실제 팀 식별자가 없는 데모, TBD, bye, 알려지지 않은 상대는 중립 팀 아이콘을 표시한다. application, registration, game, 이름 등 대체 식별자는 엠블럼 선택에 사용하지 않는다. 깨진 저장 URL은 기존 중립 오류 표시를 유지한다.
+- 팀 생성에서는 수화 후 한 번 무작위 로컬 엠블럼을 선택하고 저장 payload에 포함한다. 편집 및 로고 업로드/선택은 이를 덮어쓰지 않는다.
+- 회귀 범위: 프리셋 선택 helper, TeamAvatar URL/error 전환, create StrictMode 및 저장 payload, null 로고 edit payload, 기존 팀 edit preview와 detail/list의 엠블럼 일치. 검증은 이 변경 경로의 좁은 테스트부터 수행한다.

@@ -1,6 +1,38 @@
 # Task 20261072: 운영 검색 노출 및 홈 GA4 계측 정정
 
+Status: In Progress — factual team and competition discovery metadata, unknown-team crawl verification, Alpha and scoped main release (2026-10-17)
+**Owner**: Codex main; explicit Luna implementation and Sol independent review
+**Created**: 2026-10-12
+
+## Current guest-led improvement — 2026-10-18 23:33 KST
+
+User explicitly requests implementation, not monitoring alone: diagnose broad `풋살 대회`, `아마추어 풋살`, `풋살 팀` non-observation in a newly opened existing guest profile space; improve existing pages, Alpha verification, current PR review and scoped main deployment, then guest recheck and local report update. No new service page, hidden keyword copy, assumed amateur eligibility, DB/member/key/store change or blanket exclusion of main test data. Alpha remains excluded. Ordinary rank, indexed eligibility, AI mention/prose link/source and release completion are separate.
+
+### Resume cursor and ownership
+
+- Fresh remote fetch: main `edb7ecd31e1af53725f12320be10e35400a8d062`, dev `ef706121bf946c3af230f375c64552a775db296d`. Existing owned `mdqa-127-kakao-talk-login` checkout was clean except the three pre-existing dependency symlinks and fast-forwarded from `5a5de566` to this dev. No branch switch/new branch/worktree, stash or primary shared-checkout edit. Primary unrelated bracket WIP is forbidden.
+- Root owns this task, integration/release/evidence/status/report/lifecycle; actual Luna observer owns new guest128/p1 search evidence only, actual Luna source auditor is read-only until exact implementation paths are assigned; actual Sol independently verifies the eventual immutable diff and evidence. Existing closed109 is never resumed. Guest/Profile3 is persistent and signed-out, not a zero-history incognito claim.
+- Runtime board: `/Users/sungjun/.cache/teameet-seo-release/ACTIVE-20261018-guest-improvement.md`. Initial source diagnosis is pending; broad search absence alone is not proof of a new code defect. Do not manufacture a keyword-only patch or duplicate already deployed fixes.
+
+### Exit proof (required before completion)
+
+- [x] New guest primary3 queries × ordinary Google/Naver/actual completed AI =9 surfaces collected before any Teameet destination visit; exact Naver22cad two-query snippet and both Alpha site-query scopes recorded separately. No confirmed Teameet direct link in this bounded primary set; the AI Matchup citation actually resolves to match-up.co.kr, not Teameet. Naver exact22cad absent is not proof of normal snippet replacement.
+- [x] Reproduce an actual existing-page technical/information contract gap with source plus runtime evidence; keep the smallest approved fix and meaningful narrow RED/GREEN regression tests. Landing22 tests: RED2 real assertions, GREEN22. Team rendered/model tests: RED3 real assertions, GREEN22. Production source scope: landing data summarizer and existing team client/card model; focused tests and two patch Changesets only. No schema/data/route/filter/style change.
+- [ ] Independent Sol review and latest-head GitHub PR reviews, unresolved threads0, exact committed-head CI; meaningful findings corrected and re-reviewed. Known upstream model failure is never called a clean review.
+- [ ] Matching dev merge/Alpha deployment, real guest Alpha390/768/1440 before/after and affected flow/network/runtime checks; noindex maintained, no Alpha sitemap/AI discovery exposure.
+- [ ] Only reviewed source and required release metadata promoted to main under the user's explicit approval. Exact main CI/deploy and actual runtime changed behavior verified; no unrelated dev/DB change promoted.
+- [ ] New guest post-release search observations kept separate from pre-visit baseline; stable HTML/JSON report and STATUS/MONITOR refreshed. No instant ranking/AI success promise; required Naver snippet remains unverified when exact tile is absent.
+- [ ] Owned browser128/p1 finished keep[], only owned runtime PID tree reclaimed, agents terminal and process comparison recorded; no unowned process cleanup.
+
+Selected contracts — 23:51 KST: (1) main edb7 first HTML `/teams` falsely exposes 전체20/풋살18/축구2 while the same deployed public API returns total105/facets94+11. Existing facet data now supplies chip counts; selected-sport 전체 remains the sum of facets excluding only the sport filter, and unknown/incomplete lists without facets never advertise partial counts as totals. Existing labels/links/layout stay intact. (2) actual Alpha ef7061 `/landing` exposes the existing September-expired raw-open promo as 모집 중/남은 자리4 across390/768/1440. Landing first-render status/count/slot data now reuse the existing registration gate for raw-open non-league tournaments. Regular-league and in-progress lifecycle displays are unchanged. This fixes request-time public HTML; it does not add background polling to already-open landing tabs. Current main promo was still before its23:59 deadline when initially inspected, so Alpha reproduction is not misreported as then-current main staleness. Neither defect establishes search-ranking causation.
+
+Pre-commit gate — 23:53 KST: both narrow suites are GREEN (landing22 + team22), frontend `tsc --noEmit` and v1 pattern check completed exit0. No whole-suite/build/local server. Next is exact committed diff review and CI, followed by matching deployed Alpha evidence; local green does not complete those gates.
+
+Independent-review revision — 2026-10-19 00:01 KST: Sol found two real boundaries in initial commit `d8535286f`; its review is not a final PASS. The raw-open league exclusion and its misleading expected-open test were corrected: every raw-open event now uses the existing host admission resolver, while an in-progress league keeps its progress label. Side-card remaining places now subtract pending occupancy via `resolveTournamentCapacity`; confirmed counts remain actual confirmed counts. Actual rendered side-card and expired-league counterexamples were RED (4 assertions/38 tests) before the fix, then all38 landing data/page tests passed. Team22 tests remain unchanged and green, for60 relevant tests total. Current frontend typecheck/pattern check is running again because production source changed. Existing motion-test act warnings are a recorded baseline, not a new successful-flow claim. At14:59:48Z main itself crossed the mixed-cup cutoff but still advertised 모집 중; the factual production counterexample is now captured separately from the earlier pre-cutoff correct state. No operating data was edited. This revision supersedes the initial non-league-only scope; no backend/helper/schema/league operating policy is promoted.
+
 ## Current direct-site follow-up — 2026-10-17 22:05 KST
+
+Latest pre-push gate for the 2026-10-19 revision: frontend `tsc --noEmit` and v1 pattern check completed exit0 again after both reviewed fixes. Relevant immutable candidate coverage is60 tests (landing38 + unchanged team22); exact-head CI/current automated reviews and deployed Alpha remain required.
 
 User explicitly requests actual owned-site discovery for `풋살 팀` and `풋살 대회`, including Google AI links to Teameet rather than Instagram, continued exact Naver stale-snippet checks, existing-page improvements, Alpha/current PR review/scoped main release, maintained local report and Alpha exclusion. Earlier below-fold ordinary and historical AI observations do not establish current broad-query visibility success.
 
@@ -30,12 +62,9 @@ Frozen source checkpoint — 22:36 KST: actual gpt-6-sol terminal source/fixture
 
 Current PR review checkpoint — 22:44 KST: devPR1968 source4277368 has completed GitHub Codex code/security reviews with no findings. Actual Copilot reviewed that exact head and found one low-severity stale CursorListSeed comment; Luna corrected only the comment, distinguishing filtered team seed/current normalized query from baseline match/team-match seed. No behavior/type/import/test change. Task measurement wording now explicitly limits Google observations to page1 eligible8links plus actual next-page inspection, without claiming a verified first10 rank. Original desktop bottom clip screenshots were invalid; two default viewport recaptures at13:41:04Z prove actual1440×1000/scroll601 and2129.5/footer907–1000, independently accepted by Sol. No source release is merged yet.
 
-
-## Preserved main release history
-
 ## Current Follow-up — broad discovery implementation, 2026-10-17 17:22 KST
 
-User explicitly requests implementation for `풋살 대회`, `아마추어 풋살`, and `풋살 팀`, checking an unindexed team and releasing after Alpha validation and PR review. Existing routes only. The current main release is `a0dd46583e7d007d9fa95a0d0adcc1d3de0c7552` (measured runtime1.9.8); dev is `9d75cfbf363ddb3958a663bf25ecd090f7f4a8a6`. Prior fixture/online/refetch changes below are already deployed via #1961/#1962, not pending work.
+User explicitly requests implementation for `풋살 대회`, `아마추어 풋살`, and `풋살 팀`, checking an unindexed team and releasing after Alpha validation and PR review. Existing routes only. At this historical 17:22 checkpoint, main served `a0dd46583e7d007d9fa95a0d0adcc1d3de0c7552` (measured runtime1.9.8) and dev was `9d75cfbf363ddb3958a663bf25ecd090f7f4a8a6`; the current release cursor is recorded below. Prior fixture/online/refetch changes are already deployed via #1961/#1962.
 
 ### Scope and ownership
 
@@ -46,10 +75,10 @@ User explicitly requests implementation for `풋살 대회`, `아마추어 풋�
 
 ### Sequence and exit proof
 
-- [ ] Improve factual existing-page metadata without new body blocks, keyword repetition, hidden text, route or indexing-scope changes.
-- [ ] Narrow tests prove actual generated metadata, optional/multisport values and missing/dissolved-team boundaries; host preflight and serial minimal workers. Verify committed imports/diff scope and current-head CI/review, not dirty-tree green alone.
-- [ ] Independent Sol review has no unresolved actionable findings; current Copilot review checked separately from the known GitHub AI Scan upstream model failure.
-- [ ] Dev merge and matching deployment are verified separately; Alpha served SHA includes the exact candidate, noindex remains, and existing list/detail UI passes actual390/768/1440 top/bottom, console/network and metadata checks.
+- [x] Improve factual existing-page metadata without new body blocks, keyword repetition, hidden text, route or indexing-scope changes.
+- [x] Narrow tests prove actual generated metadata, optional/multisport values and missing/dissolved-team boundaries; host preflight and serial minimal workers. Verify committed imports/diff scope and current-head CI/review, not dirty-tree green alone.
+- [x] Independent Sol review has no unresolved actionable findings; current Copilot review checked separately from the known GitHub AI Scan upstream model failure.
+- [x] Dev merge and matching deployment are verified separately; Alpha served SHA includes the exact candidate, noindex remains, and existing list/detail UI passes actual390/768/1440 top/bottom, console/network and metadata checks.
 - [ ] Scoped main contains only reviewed source plus required release metadata. Verify exact CI/deploy, actual production SHA/health, public metadata/canonical/sitemap and Alpha exclusion.
 - [ ] Inspect FC하깡 `abfc5432-9ef7-47fa-acbb-40ca6b86c873` live eligibility after release and make at most one justified indexing request. Record cached indexing, live eligibility, request acceptance, general search rank and AI citation separately. Naver stale22cad snippets are provider evidence, not proof of current service failure; do not repeat unchanged collection requests.
 - [ ] Update STATUS/MONITOR and inline release report; close own browser/processes/agents. Broad query visibility remains unproven until observed; no ranking or AI inclusion guarantee.
@@ -69,16 +98,98 @@ Current public HTML/robots/canonical/sitemap is technically reachable. Google ca
 
 DevPR1965 initial862335 exactCI39022143928 passed Gates/API/Web, but was not merged: actual GitHub Codex review found long-name title context truncation and duplicated `팀`; Copilot requested a named introduction threshold. Luna repairs reserve sport/region before an explicit ellipsis in the name, preserve one team label even when a long registered name's suffix is truncated, cap unusually long context, and fix shared `teamDescriptionFallback` itself. Boundary tests cover actual50-character names, existing suffixes,14/15-character introduction threshold and extreme context. Initial repair40tests passed; final two boundary cases and final lint/source rereview remain gates. Main draftPR1966 f348 is superseded until matching repairs and latest exact checks are applied.
 
-Root read all252examples in the Google discovered-not-indexed report:100teamURLs,99 matching current105publicteams; the aggregate report explicitly last updated2026-10-12. This is a dated cohort, not current105per-URL inspection or an assertion99 remain unindexed today. FC하깡's current individual cached inspection differs from that report and shows discovery through sitemap but no crawl. Existing UI baseline is finally measured using actual mobile/tablet MAIN.tm-scroll-area and desktop document scrolling; all6route/width cases reached true bottom without horizontal overflow. Earlier document-only mobile checks were discarded. No source merge, Alpha deployment, main deployment or new provider request has happened yet.
+Root read all252examples in the Google discovered-not-indexed report:100teamURLs,99 matching current105publicteams; the aggregate report explicitly last updated2026-10-12. This is a dated cohort, not current105per-URL inspection or an assertion99 remain unindexed today. FC하깡's current individual cached inspection differs from that report and shows discovery through sitemap but no crawl. Existing UI baseline is finally measured using actual mobile/tablet MAIN.tm-scroll-area and desktop document scrolling; all6route/width cases reached true bottom without horizontal overflow. Earlier document-only mobile checks were discarded. At this checkpoint, source merge, Alpha deployment, main deployment and provider request were still pending; see the later release checkpoint below.
 
+### Release checkpoint — 2026-10-17 10:33Z
 
-## Preserved main release history
+- Source PR #1965 merged to dev at `ab0571061fc6f0359640353168b4abe68d800a86`. Matching exact-head CI `39024007007` passed API/Web/Gates; matching Alpha deployment `39024007202` succeeded. Root and independent Sol completed the actual Alpha checks: 6/6 cases passed and Alpha noindex remained in place.
+- Scoped main PR #1966 merged as `9a289400e879` at 2026-10-17 10:33:37Z. Production deployment is **pending**; no production completion, served-SHA, health, metadata or post-release provider claim is made here.
+- Release-artifact reconciliation is limited to the two Changesets already consumed in main history: `factual-fixture-first-html.md` in 1.9.7 (#1962) and `tournament-format-guide.md` in 1.9.5. The 14 other unreleased dev Changesets remain untouched. The factual team discovery Changeset was consumed by the current 1.9.8 release artifact.
 
-Status: Oct 16 follow-up active — remove intrusive discovery copy, diagnose generic search gaps and repair GitHub AI security execution
-**Owner**: Codex main; explicit Luna implementation and Sol independent review
-**Created**: 2026-10-12
+## Historical implementation cursor — earlier 2026-10-17 (deployed #1961/#1962)
 
-## Current Cursor — 2026-10-16 01:23 KST
+User explicitly authorizes repairing existing fixture body SSR, online/test structured-data and indexing problems, Naver stale error snippets, then exact PR review/CI, Alpha QA and scoped main deployment. No new search pages, hidden keyword blocks, unrelated dev promotion, normal-event bulk hiding or destructive data changes.
+
+### Original Conditions
+
+- [ ] Render existing fixture facts in initial HTML using the current UI and server seed contracts.
+- [ ] Correct truthful online location/attendance output through explicit stored classification; do not infer it from titles or IDs.
+- [ ] User confirmed main public data all indexable, including demonstrations; Alpha entire host stays excluded. Do not add a test-discovery flag, filter, deletion or normal past-event exclusion.
+- [ ] Preserve seeded tournament details if background refresh fails while exposing a meaningful retry/error signal.
+- [ ] Use factual existing tournament copy/metadata for 풋살 대회; no new pages or keyword stuffing.
+- [ ] Verify latest PR reviews and exact-SHA CI; live Alpha 390/768/1440 and console/network must pass before scoped main promotion.
+- [ ] Verify actual production SHA/release plus raw HTML/JSON-LD/sitemap after deployment; distinguish external Naver/Google/AI refresh from code completion.
+
+### Ownership / Sequence
+
+1. Root: this task document, cache status/release artifacts, scoped Git integration and release gates.
+2. Fixture implementer: only existing fixture page/client and colocated actual-render contract tests. Existing hook seed APIs require no shared hook edits.
+3. Online-place contract implementer: additive V1Match.isOnline and authenticated/audited operator classification plus detail serialization; frontend builder/UI consumes explicit value, normal lists and indexability unchanged. No new page or online product creation flow.
+4. Independent gpt-6-sol: immutable source review, adversarial contract checks and Alpha evidence review; no implementation ownership.
+5. Browser owner: one approved Default/성준 Ego space for before/after Alpha, changed-URL provider verification and production QA, close with keep[] once.
+
+### Acceptance / Validation
+
+- Actual render-to-HTML of real fixture client contains event/team/date/place facts outside JSON-LD and no loading-only shell; existing visual layout preserved.
+- Genuine 404 remains 404; upstream failure is not indexed as successful invented content.
+- Main public records remain in discovery; Alpha noindex and sitemap/AI-publication exclusions remain. Demonstrations are not silently hidden by label/ID.
+- No invented coordinates, street address or online venue. Online sample contradiction is removed using explicit source policy.
+- Current [Google Event content guidelines](https://developers.google.com/search/docs/appearance/structured-data/event?hl=en) exclude non-events and virtual-only experiences. Explicit online personal matches therefore keep their indexable factual page but omit the physical SportsEvent feature; no invented VirtualLocation URL or physical address.
+- Narrow RED→GREEN tests, serial low-worker preflight; committed-tree and exact-head CI, Copilot current review, independent review; before/after Alpha actual viewports and main-only index controls.
+- Naver stale snippet is not considered resolved until provider result itself changes. One changed-content collection request may be made; unchanged ranking alone does not justify repeats. CAPTCHA remains user-handled.
+
+### Risks / Ambiguity Log
+
+- Latest dev ae24a67e includes unrelated features/migrations; main6a0c3f91. Only this follow-up's reviewed source/release delta may enter main.
+- User clarified the durable index policy: main public data all indexable; Alpha excluded. No UUID/title blacklist or soft-delete assumption. V1Match has no explicit online field; additive isOnline classification addresses factual place metadata only, without changing publication or index scope.
+- UI seed hydration reuses the existing layout. User approved A: existing compact ErrorState above preserved valid tournament details on background-refetch failure. No custom notice design or additional search prose.
+- No source changes started before discovery; primary shared tree40a9633d and four bracket WIP files/release-files preserved. Existing owned checkout fast-forwarded cleanly from ebfac to ae24a67e with no new local branch/worktree.
+
+### Progress Snapshot
+
+- Dev PR #1961 initial head `24510c3d56bf9c00fb61b78f315710a0945dee63` failed exact CI `38935150979`; not merged or deployed. Fixed affected full-file test isolation and real overall-standings response (43/43 Web tests), exact current schema binding (7/7 release-binding tests), and current game-source snapshot metadata (5/5 source tests). Historical migration and Stage B pins stay unchanged. The shared generated-client baseline is not accepted as CI proof.
+- Copilot found one real missing Korean label for `match.online.update`; added it. Fix commit, current-head CI and fresh clean review remain gates. Main release is prepared separately from main `6a0c3f91e6e561297453fcff7f6d12e62c27266d`; unrelated 411-file dev gap is excluded. Main schema pins must use its own exact schema digest, not the dev digest.
+
+- Source discovery complete: fixture seeds supported but not passed; tournament background refetch checks isError even when seeded data exists. Match builder hardcodes offline attendance; existing match model has no first-class discovery/online control. Read-only evidence at cache search-recheck-final-20261017.json.
+- Fixture implementation and narrow RED/GREEN completed initial success path; independent Sol found league-failure P1 and standings-name P2 plus missing edge regressions. Repairs in progress. Tournament repair approved; online metadata contract assigned. PR/CI/Alpha/main pending. Runtime task board: cache ACTIVE-20261017-search-repair.md.
+
+Source-ready 2026-10-17: final fixture11 tests, tournament7 focused tests and onlinefrontend109 unique tests passed; backend12 focused runtime tests passed with actual global ValidationPipe strictboolean/deleted-target fixes. Total139 disjoint tests. Independent actual gpt-6-sol frozen-source review PASS with zero P1/P2. Backend normal diagnostics are blocked by the pre-existing shared generated-client maxPlayers mismatch; no shared Prisma generation was performed, and exact committed CI must generate/check/integrate the real schema. Web tsc passed after adding the required physical fixture value; two pattern errors were corrected to 해요체 and their two upstream-error assertions rechecked. No new route, test-exclusion flag, hidden keyword text, public visibility change or data mutation. PR/CI/Alpha/main and audited online classification remain pending.
+
+## Historical Cursor — 2026-10-16 final deployment verification
+
+The requested existing-page cleanup and factual Event corrections are deployed through source dev PRs #1940/#1942 and scoped main PR #1941. Production serves `1955a2b35f6bb35af2458ed9d40b60b9ddd5c3d7`, measured runtime `1.9.4`; CI/deploy38783510227 and CodeQL38783508884 succeeded. Source-bearing latest Alpha `a2647c89982bfc6acfbdaa209b80f8d11601a6f2` passed matching CI38779670635/Alpha38779670529 and actual10/10HTTP/schema/noindex checks. Unrelated dev features were excluded from main.
+
+No new search-only pages or hidden keyword text were added. All LocalDiscoveryGuidance consumers, source and tests were removed. Four actual list paragraphs disappeared while existing navigation, real headings/cards and filters remain. A registered nonblank competition venueAddress now reaches truthful PostalAddress and completed-view basic info. Five of six current public competitions lack registered street addresses; none was invented. Personal/team-match/fixture privacy, canonical and visible parent navigation remain unchanged. Orphan ID-only superEvent references were removed from both fixture builders after a real Google LIVE test demonstrated a second invalid Event.
+
+Verification: 52 focused cleanup/address tests and27 unique orphan/SSR regressions passed, with meaningful RED→GREEN evidence; exact source/candidate API/Web/Gates and independent gpt-6-sol review passed. Production guest first-HTML audit315/315 URLs across30 patterns at one stable SHA found0HTTP/canonical/indexability/orphan/prose failures. Representative HTTP8/8 and robots/sitemap/llms/health checks passed. Four lists×390/768/1440 were checked at top and actual footer (24 screenshots). The detailed per-view tool JSON was truncated; no lost metric is invented. Intentional promotion overlay was dismissed normally and three clean Teams widths were rechecked with6extra screenshots. Actual category→league, filter open/close and global Teams navigation passed; no unperformed filter-selection or315visual-review claim.
+
+Google actual production fixture LIVE crawl at03:37:15KST reads one valid Event, no unnamed orphan or critical errors, four optional warnings. Canonical Suwon detail LIVE also has one valid Event; its updated-address reindex request was acknowledged once. Historical location/name/startDate issue validations each entered `Started` once. Those are not final validation success or proof that all updated content is indexed. Existing priority URLs were already indexed; sitemap success is a separate dated report (318 discovered vs current315 sitemap entries).
+
+Fresh explicit gpt-6-luna measurement at03:54–03:55KST found0Teameet-domain results in six organic query samples (9/8/9/9/9/9 inspected cards), and0brand mentions/citations in three completed Google AI Mode answers. Organic pages explicitly reported personalization and 방배동/서울서초 previous-activity location; AI personalization was not established. No causal rank change, broad absence beyond inspected cards or AEO success is claimed. Daily09:00KST `teameet-ai-luna` monitoring remains active; unchanged rankings do not justify duplicate crawl requests or speculative copy churn.
+
+Fresh Naver follow-up04:05–04:07KST: `/tournaments` appeared for 동네 풋살대회 at observed mixed integrated-result module5 with exact teameet.co.kr URL/title/snippet. This is a bounded observed module order, not universal web rank or proof of the new release causing exposure. 풋살 리그/풋살 대회 had no exact domain result in inspected10 non-ad modules per query. Naver sign-in/personalization/location were not established. Search Advisor redirected to login, so current crawl/index/SEO counts are unavailable; Oct14 indexed1/SEO0 remains only a dated prior report. Evidence `evidence/cleanup-naver-final-20261016.json` and4screenshots; no duplicate collection request or settings change.
+
+Final read-only GSC observation04:39KST: all-known-pages coverage report is datedOct12, with15indexed/270notindexed (10noindex,2notfound,252discovered-not-indexed,6crawled-not-indexed). Those dated285known pages are not the same verified cohort as today's315publicHTML URLs. Web performance forSep25–Oct13 shows18clicks/379impressions,4.7%CTR/aggregateposition5.5; none of four visible top-query rows were 풋살 terms. That is not zero 풋살 impressions or a keyword-specific rank. Evidence `evidence/cleanup-gsc-performance-final-20261016.json`; root separately verified correct property/date/counts in the actual UI. No additional inspection/collection/validation request was sent.
+
+GitHub AI Scan remains enabled but the GitHub-managed dynamic workflow fails before analysis with internal `claude-opus-5` unavailable. There is no tracked YAML or exposed model selector to repair locally. User-approved public-log draft was actually sent once as [Support4863223](https://help.github.com/ticket/personal/0/4863223), Open with one own comment and no reply at final read. No model/provider/billing/key change or analysis bypass was used. CodeQL is separate and does not substitute for an AI Scan pass.
+
+Local evidence root: `/Users/sungjun/.cache/teameet-seo-release/`. Receipts: `cleanup-public-html-after-20261016.json`, `cleanup-production-http-20261016.json`, `cleanup-production-crawler-health-20261016.json`, `cleanup-production-browser-after-20261016.json`, `cleanup-production-clean-teams-20261016.json`, `cleanup-production-flow-20261016.json`, `cleanup-gsc-live-event-after-20261016.json`, `cleanup-gsc-canonical-request-20261016.json`, `cleanup-gsc-issue-validation-20261016.json`, `evidence/cleanup-postrelease-search-20261016-results.json`.
+
+Exit proof:
+- [x] Inventory315/315 published URLs/30patterns; four affected list paragraphs identified, useful navigation retained.
+- [x] Intrusive prose/dead component removed without hidden keywords; settled before/after390/768/1440 evidence retained.
+- [x] Demonstrated address and orphan Event gaps corrected with truthful crawler/user parity; missing source data not fabricated.
+- [x] AI security owning service identified; exact external blocker and approved Support submission recorded without false pass.
+- [x] Narrow meaningful tests, independent Sol review, exact-head CI and separately measured Alpha/production SHAs passed.
+- [x] Main contains approved scope only; Alpha publication exclusions/private boundaries and operating data preserved.
+- [x] Actual indexing/rank/AI outcomes recorded; owned EgoSpace63 closed with keep[] (p1/p2/p3, no unmanaged tabs preserved), and no local server/build/DB started for this follow-up.
+- [ ] Release-artifact-only main→dev integration still requires its own exact CI and current Copilot clean result. Copilot429 is an external hold, not a passed or waived gate; final status is recorded in STATUS.md/MONITOR.md and PR receipts.
+
+Separate authorized dev work: #1936/#1939 merged earlier. #1938 repair candidate `de7fa2a78f4a1c9e7e0056917eb9884f30299283` has independent cumulative37-path/delta static C0/W0 but freshCI38795757399 is pending; latest Copilot is rate-limited and Alpha source/full-role QA is NOTRUN before merge. #1858 remains conflicting with8unresolved reviews and unfinished Alpha QA; another session's bracket WIP was not overwritten. These features are excluded from SEO main1955. New unrelated dev PRs are not silently added to this release.
+
+Remaining outcomes: Google issue validation/recrawl, generic ranking and AI citations, and GitHub AI Scan service recovery are pending external observations. Do not reopen or resubmit identical requests solely because those outcomes have not changed.
+
+## Historical Cursor — 2026-10-16 01:23 KST
 
 User explicitly requested repair of the GitHub AI security model failure, deeper evidence-based diagnosis/improvement for 동네 풋살 / 풋살 대회 organic and AI discovery, and site-wide cleanup of awkward search-oriented prose. Existing pages only; Alpha validation then scoped main deployment is already authorized. Do not hide keyword text with CSS or crawler-specific rendering. Remove unhelpful explanation and preserve useful facts/navigation in ordinary headings, cards/details and existing navigation. No new route, DB/auth/privacy/key/native/store/operating-data change or unrelated dev promotion.
 

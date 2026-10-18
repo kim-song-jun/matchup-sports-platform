@@ -40,3 +40,14 @@ Persona: owner/ops 쓰기, support 읽기, 일반 사용자 쓰기 거절.
 기존 완료 기록의 범위 공백: 관리자 3폭 검증 뒤 사용자 공개 projection의 side override 누락을 확인하지 못했다. alpha 원 대회31번 홈 `ddddd`·35번 BYE `dd`가 admin GET에는 있지만 public GET은 자동 문구였다. 동일42개 ID의 scheduledAt/venue는 양 API에서 모두 일치하며 관리자31번 카드도10/19 20:33이었다. 사용자 그림 MatchCard에는 venue 렌더가 없었다. 사용자 저장 데이터는 변경하지 않았다.
 
 후속 AC: side/빈 BYE 문구→공개 상세/일정/그림, 팀명 우선·BYE 보조, 등록 경기장 이름·시각·미정 표시·3폭 간격, 새로고침. API label RED1 / Web 장소·BYE RED2 확보. 공개 projection 공용 해석과 그림 metadata 및 간격 수정, PR/alpha 재검증 진행 중. 기존 Copilot 예외는 이 후속 PR에 적용하지 않는다.
+
+
+## 2026-10-18 공개 부전승 연결선 후속
+
+- 빈 부전승 → 저장된 8강 HOME/AWAY 연결선 확인. 팀 배정/문구 수정/새로고침 후에도 같은 경기·자리로 연결된다.
+- 명시적 슬롯 연결이 있으면 같은 팀이 들어간 다른 경기에 추정 선을 추가하지 않는다. 연결 없는 수동 대진은 선을 만들지 않는다.
+- 팀명 우선·부전승 보조, 별도 경기 번호/시각/경기장 없음, 기존 승자/패자 연결 유지 확인.
+- 1440/768/390 alpha after 및 console/network 검증은 PR 머지·배포 후 기록한다. 미배포 코드 테스트를 alpha PASS로 표시하지 않는다.
+
+- 수정 전 alpha 실측: 1440/768/390 모두 부전승 카드 4개·BYE 선 0개, console/pageerror/HTTP 오류 0. [증거 JSON](../screenshots/public-bye-connectors/before/evidence.json). 변경 후 alpha는 미배포로 대기.
+- 계약 검증: Web graph/renderer/label 50, API presenter 50 PASS. 빈 HOME/AWAY 연결 및 비공개 게이트 포함.

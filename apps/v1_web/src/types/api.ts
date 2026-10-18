@@ -3804,6 +3804,8 @@ export type V1Tournament = {
  * 'TBD' 같은 별도 문자열로 구분된다.
  */
 export type V1TournamentGroupTeam = {
+  /** Stored BYE slot destination, independent of team assignment and display text. */
+  byeTarget?: { fixtureId: string; side: 'HOME' | 'AWAY' } | null;
   /** Saved BYE label shared with its linked quarter-final. */
   displayLabel?: string | null;
   /** 명시적으로 지정된 12강 부전승. 미배정 상대와 구분한다. */

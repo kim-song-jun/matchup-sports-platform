@@ -865,3 +865,23 @@ Status: In Progress
 - 단일 에이전트 순차. 좁은 RED→GREEN, 타입/CI, PR 리뷰, dev/alpha 검증 순서. 이전 Copilot 예외는 #1960/#1971에만 해당한다.
 - 재현 실측: 같은42개 ID의 admin/public scheduledAt·venue 차이0, admin31번 카드10/19 20:33 확인. 31번 fieldId/venue는 현재null이며 실제로 미배정. public GET31번은 자동 결선5번 문구지만 admin은 `ddddd`, BYE35번은 admin `dd`가 public 자동값으로 누락. 공개 그림의 venue 렌더 누락 확인.
 - 수정: 공개 상세/일정의 custom/BYE shared slot label 공용 해석, BYE 타일 보조 문구·fieldId, 등록 field 이름 우선, public 카드 venue·미정 표시·간격176/112 확보. API84 tests 및 신규field-name1 PASS, Web 화면/그룹33 PASS. 양쪽 tsc·Web pattern PASS. 그래프 좌표 회귀는 새 정보 높이에 맞춰 업데이트. 실DB public presenter 경로2건을 기존 통합 시나리오에 추가(CI 대상).
+
+
+### 2026-10-18 공개 부전승 → 8강 연결선 후속
+
+Status: In Progress
+- Context/Goal: 팀 미배정 부전승도 저장된 BYE 슬롯과 연결된 8강 HOME/AWAY까지 공개 그림에 표시한다.
+- Original Conditions/AC: 팀 배정·문구와 무관한 연결 유지, 실제 팀 이름 우선/부전승 보조 유지, 별도 경기 생성 없음, 수동 미연결 대진의 관계 추정 금지.
+- User/Test Scenarios: 빈 HOME/AWAY 부전승 → 팀 배정 → 문구 수정 → 새로고침에도 같은 대상. 명시적 슬롯 연결이 같은 팀 추정보다 우선. 기존 승자/패자·legacy 배정 연결 유지.
+- Parallel Work Breakdown: 단일 실행. Owned: public presenter/query/types, graph 및 회귀, API 문서/시나리오/changeset. API 저장·DB 스키마·관리자 이름 수정은 제외.
+- Security Notes: 대진 공개 게이트 그대로, 사용자 대회 데이터 변경 없음. 공개 구조 정보만 추가한다.
+- Tech Debt Resolved: 팀 registrationId 일치에 의존해 빈 부전승 연결이 누락되던 공개 그래프.
+- Risks & Dependencies: alpha after 3폭/console/network 검증은 dev 머지·배포 이후 가능. 이번 요청은 PR 생성까지이며 미배포 상태를 명시한다.
+- Ambiguity Log: 사용자가 승인한 기존 연결선 복구로 디자인 변경안 재선택 없음. 신규 슬롯 연결은 API로 명시하고 기존 슬롯 없는 배정 방식은 호환 유지.
+- Progress Snapshot: origin/dev e4e2d01a3에서 fix/public-bye-connectors 분기. 분석 완료, 회귀 테스트 작성 중.
+
+- RED: 공개 그래프 3건(빈 HOME/AWAY·명시 연결 우선), API 2건(빈 HOME/AWAY 대상 직렬화) 실패를 먼저 확인. GREEN: Web 3파일 50/50, API presenter 50/50 PASS.
+- Alpha before: 원 대회 ad200600-0000-4000-8000-000000000003 공개 그림에서 1440/768/390 모두 부전승 4카드·BYE 연결선 0개로 재현. console/pageerror/HTTP 오류 0. 로그인·원격 쓰기 없음. headed PID49359/PPID49314 정상 종료. 증거: docs/screenshots/public-bye-connectors/before/.
+- Web tsc PASS. 패턴 검사는 sandbox spawnSync EPERM으로 중단되어 해당 단계만 권한 있는 셸에서 재실행 PASS. API lint 결과 및 PR/CI는 아래에 기록한다.
+
+- API tsc/surface PASS. Web 패턴 PASS. diff whitespace/debt marker 검사 PASS. 새 응답 타입은 optional로 추가해 기존 MSW/수동 대진 호환을 유지했다. PR에는 수정 전 3폭을 포함하고 after 갤러리는 머지·alpha 배포 뒤 채운다.

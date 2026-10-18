@@ -236,3 +236,16 @@ it('미배정 부전승은 지정 문구를 표시하고 팀 확정 뒤에도 �
   expect(screen.getByText('확정 팀')).toBeInTheDocument();
   expect(screen.getByText('조 1위 중 6위')).toBeInTheDocument();
 });
+
+
+it.each(['HOME', 'AWAY'] as const)('빈 부전승 타일에서 연결된 8강 %s 팀 줄까지 SVG 선을 렌더한다', (side) => {
+  const { container } = render(<TournamentBracket fixtures={[makeFixture({ id: 'quarter', round: 'quarter', fixtureNumber: 5, homeTeamName: 'TBD', awayTeamName: 'TBD' })]}
+    groups={[{ id: 'r12', name: '12강', phase: 'round12', sortOrder: 0, advanceCount: null, standings: [], qualification: null,
+      groupTeams: [{ id: 'bye', registrationId: null, teamId: null, teamName: null, teamLogoUrl: null, sortOrder: 0, isBye: true,
+        byeTarget: { fixtureId: 'quarter', side } }] }]} />);
+  const label = `부전승 → 5번 경기 ${side === 'HOME' ? '홈' : '어웨이'}`;
+  const path = Array.from(container.querySelectorAll('svg path')).find(path => path.querySelector('title')?.textContent === label);
+  expect(path).toBeDefined();
+  expect(path?.getAttribute('d')).toMatch(/^M /);
+  expect(screen.getByRole('region', { name: '12강 부전승' })).toHaveTextContent('미정');
+});

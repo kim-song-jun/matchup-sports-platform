@@ -214,3 +214,13 @@ DB: `V1Tournament.entryFeeConfiguredAt DateTime?` 한 줄 + `ADD COLUMN IF NOT E
 - 일반 브라우저 추가 증거: `/tmp/teameet-debug-final.png`에서 우측 초대와 버튼 표시, runtime 오류 없음·비로그인 auth 401만 확인. 역할 기반 가시성 대기 1회 timeout은 있었으나 뒤의 실제 DOM/스크린샷에는 안내가 존재해 사용자 누락 재현으로 확정하지 않는다. 로컬 SW가 해시 없는 개발 JS도 7일 캐시하는 코드를 확인해, 기존 localhost 캐시와 분리되는 127.0.0.1 미리보기 주소도 제공한다(캐시 원인은 사용자 브라우저에서 미확정).
 
 - PR 준비: 최신 origin/dev `84a2c092e`에서 격리한 브랜치 `fix/league-next-registration-invite`. 이번 변경 7개 파일만 포함하며 backend/admin/데이터 변경 없음. TypeScript·v1 패턴 검사 PASS, 관련 4개 suite는 단일 워커로 실행 중이며 최종 결과는 PR 본문에 기록한다. 사용자 요청 범위는 PR 생성까지로, 머지·배포와 alpha 3폭 갤러리는 미실행이다.
+
+## 2026-10-18 PR #1975 alpha 배포 후 검증
+
+- 사용자 배포 요청과 리뷰 생략 지시에 따라 dev 머지: `e4e2d01a307875faa3a9ad54e120a597183a95df`. PR CI `39124257980`·머지 CI `39125261193`의 Gates/API/Web 모두 성공.
+- Alpha 배포 `39125261181` 성공. 실제 `x-teameet-commit`이 머지 SHA와 일치하고 `/api/v1/health`의 `checks.db=true` 확인. Production 승격은 수행하지 않았다.
+- 공개 리그 상세를 비로그인으로 headed 브라우저에서 390/768/1440 검증, 3/3 PASS. 모바일·태블릿 하단 초대 고정 표시, 웹 상단 진행 배너 숨김·우측 진행/초대 표시, 가로 넘침 없음. 예상된 auth/me 401을 제외한 API 오류·console 오류·runtime 오류 없음.
+- 클릭 검증: 390 초대 → 실제 `/tournaments?kind=league` 목록, 1440 진행 버튼 → 실제 `/tournaments/:id/bracket` 이동 PASS. 현재 리그에는 다음 시즌이 없어 직접 다음 시즌 신청은 로컬 회귀 테스트로 검증했으며 alpha에서 시즌을 생성하지 않았다.
+- 시각 증거: `docs/visual-qa/pr1975-league-invite/{before,after}/{390,768,1440}/league-detail.png`, 판정 `verification.json`. 실제 before(84a2c092)와 after(e4e2d01)를 비교했다.
+- Cleanup: QA용 headed 브라우저/launch server 종료, 서버 데이터 변경 없음. 사용자 로컬 미리보기 서버는 유지.
+- 공유 로컬 dev 동기화는 다른 미커밋 변경과 충돌해 FF 거부. 원본을 보존하고 관련 내용 변경 파일 19개를 `/tmp/teameet-pr1975-local-wip-backup`에 백업했다. 격리 작업트리와 원격 배포는 정상이다.

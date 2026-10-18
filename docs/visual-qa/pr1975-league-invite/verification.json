@@ -1,0 +1,67 @@
+{
+  "releaseSha": "e4e2d01a307875faa3a9ad54e120a597183a95df",
+  "beforeReleaseSha": "84a2c092ee8deaebc5043b2bbb5635e52f1fcdc2",
+  "url": "https://alpha.teameet.co.kr/tournaments/bf369f50-e188-46b2-81d8-83ceec949a66",
+  "health": {
+    "db": true
+  },
+  "before": [
+    {
+      "width": 390,
+      "status": 200,
+      "errors": [],
+      "failed": []
+    },
+    {
+      "width": 768,
+      "status": 200,
+      "errors": [],
+      "failed": []
+    },
+    {
+      "width": 1440,
+      "status": 200,
+      "errors": [],
+      "failed": []
+    }
+  ],
+  "after": [
+    {
+      "width": 390,
+      "viewportHeight": 900,
+      "persona": "anonymous",
+      "status": 200,
+      "result": "PASS",
+      "overflow": false,
+      "errors": [],
+      "failed": [],
+      "consoleErrors": [],
+      "navigation": "league_list"
+    },
+    {
+      "width": 768,
+      "viewportHeight": 900,
+      "persona": "anonymous",
+      "status": 200,
+      "result": "PASS",
+      "overflow": false,
+      "errors": [],
+      "failed": [],
+      "consoleErrors": [],
+      "navigation": "not_run"
+    },
+    {
+      "width": 1440,
+      "viewportHeight": 900,
+      "persona": "anonymous",
+      "status": 200,
+      "result": "PASS",
+      "overflow": false,
+      "errors": [],
+      "failed": [],
+      "consoleErrors": [],
+      "navigation": "progress_bracket"
+    }
+  ],
+  "cleanup": "Owned headed browser PID 47701 (PPID 47555) and launch server closed. No server data changed."
+}

@@ -53,8 +53,15 @@ function records(overrides: Partial<PublicTeamRecordsResponse> = {}): PublicTeam
   };
 }
 
-async function renderPage(searchParams?: { type: string; season: string }) {
-  navigation.search = searchParams ? `?type=${searchParams.type}&season=${searchParams.season}` : '';
+type QueryValues = string | string[];
+
+async function renderPage(searchParams?: { type: QueryValues; season: QueryValues }) {
+  const query = new URLSearchParams();
+  for (const [key, rawValues] of Object.entries(searchParams ?? {})) {
+    for (const value of Array.isArray(rawValues) ? rawValues : [rawValues]) query.append(key, value);
+  }
+  const serializedQuery = query.toString();
+  navigation.search = serializedQuery ? `?${serializedQuery}` : '';
   const page = await TeamRecordsPage({
     params: Promise.resolve({ id: 'team-real-2041' }),
     ...(searchParams ? { searchParams: Promise.resolve(searchParams) } : {}),
@@ -113,6 +120,31 @@ describe('TeamRecordsPage first HTML', () => {
 
     expect(vi.mocked(fetchPublicV1)).toHaveBeenCalledWith(expect.stringContaining('type=tournament'));
     expect(vi.mocked(fetchPublicV1)).toHaveBeenCalledWith(expect.stringContaining('season=2026'));
+    expect(html).toContain('LAW OB 대회 기록');
+    expect(html).toContain('0·1·0');
+    expect(html).toContain('2026 풋살컵');
+    expect(html).not.toContain('실제 풋살컵');
+    expect(html).not.toContain('tm-skeleton');
+  });
+
+  it('uses first repeated type and season query values for the server seed and client state', async () => {
+    vi.mocked(fetchPublicV1).mockImplementation(async (path) => {
+      const url = new URL(path, 'http://localhost');
+      return (url.searchParams.get('type') === 'tournament' && url.searchParams.get('season') === '2026'
+        ? filteredTournamentRecords
+        : allRecords) as never;
+    });
+    api.get.mockImplementation(async (path: string, params?: Record<string, string>) => {
+      const requested = new URLSearchParams(path.split('?')[1] ?? '');
+      return (params?.type === 'tournament' && params.season === '2026'
+        || requested.get('type') === 'tournament' && requested.get('season') === '2026'
+        ? filteredTournamentRecords
+        : allRecords);
+    });
+
+    const html = await renderPage({ type: ['tournament', 'league'], season: ['2026', '2025'] });
+
+    expect(vi.mocked(fetchPublicV1)).toHaveBeenCalledWith('/teams/team-real-2041/records?season=2026&type=tournament');
     expect(html).toContain('LAW OB 대회 기록');
     expect(html).toContain('0·1·0');
     expect(html).toContain('2026 풋살컵');

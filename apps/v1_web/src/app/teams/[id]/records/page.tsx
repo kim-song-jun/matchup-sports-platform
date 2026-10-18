@@ -6,11 +6,15 @@ import type { PublicTeamRecordsResponse, TeamRecordCategory } from '@/components
 
 type RecordsSearchParams = Record<string, string | string[] | undefined>;
 
+function firstSearchParam(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
 function normalizeRecordsFilters(searchParams: RecordsSearchParams | undefined) {
-  const rawType = typeof searchParams?.type === 'string' ? searchParams.type : undefined;
+  const rawType = firstSearchParam(searchParams?.type);
   const type: TeamRecordCategory | undefined =
     rawType === 'league' || rawType === 'tournament' || rawType === 'friendly' ? rawType : undefined;
-  const rawSeason = typeof searchParams?.season === 'string' ? searchParams.season : undefined;
+  const rawSeason = firstSearchParam(searchParams?.season);
   const season = rawSeason && /^[0-9]{4}$/.test(rawSeason) ? rawSeason : undefined;
   return { season, type };
 }

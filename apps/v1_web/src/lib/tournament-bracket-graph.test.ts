@@ -149,3 +149,29 @@ it('부전승팀만 8강에 배정해도 미연결 경기들이 아래로 밀리
     }
   }
 });
+
+
+describe('저장된 부전승 슬롯 연결', () => {
+  it.each(['HOME', 'AWAY'] as const)('팀 없는 부전승도 8강 %s까지 연결하며 팀·문구 변경 후 유지한다', (side) => {
+    const rounds = [
+      { key: 'round12', label: '12강', fixtures: [fixture('r1')] },
+      { key: 'quarter', label: '8강', fixtures: [fixture('q1', [source('r1', side === 'HOME' ? 'AWAY' : 'HOME')])] },
+    ];
+    const groups = [{ phase: 'round12', groupTeams: [{ id: 'bye', isBye: true, registrationId: null, sortOrder: 0,
+      byeTarget: { fixtureId: 'q1', side } }] }] as V1TournamentGroup[];
+    const expected = { source: 'bye-slot:bye', target: 'q1', side, outcome: 'BYE' };
+    expect(buildBracketGraph(rounds, groups).edges).toContainEqual(expected);
+    groups[0].groupTeams[0].registrationId = 'assigned';
+    groups[0].groupTeams[0].displayLabel = '조 1위 중 1위';
+    expect(buildBracketGraph(rounds, groups).edges).toContainEqual(expected);
+  });
+
+  it('명시적 연결이 있으면 같은 팀의 다른 8강 자리에 추정 연결을 추가하지 않는다', () => {
+    const graph = buildBracketGraph([
+      { key: 'round12', label: '12강', fixtures: [] },
+      { key: 'quarter', label: '8강', fixtures: [fixture('q1'), { ...fixture('q2'), homeRegistrationId: 'team' }] },
+    ], [{ phase: 'round12', groupTeams: [{ id: 'bye', isBye: true, registrationId: 'team', sortOrder: 0,
+      byeTarget: { fixtureId: 'q1', side: 'AWAY' } }] }] as V1TournamentGroup[]);
+    expect(graph.edges).toEqual([{ source: 'bye-slot:bye', target: 'q1', side: 'AWAY', outcome: 'BYE' }]);
+  });
+});

@@ -9,7 +9,7 @@ export type BracketGraphEdge = { source: string; target: string; side: 'HOME' | 
 const MATCH_HEIGHT = 176;
 const BYE_HEIGHT = 112;
 
-/** Edges come from stored advancement sources or an explicitly assigned bye team. */
+/** Prefer saved advancement/slot links; retain assigned-team links for older brackets. */
 export function buildBracketGraph(rounds: BracketGraphRound[], groups: V1TournamentGroup[]) {
   const nodes: BracketGraphNode[] = rounds.flatMap((round) => round.fixtures.map((fixture) => ({ id: fixture.id, round: round.key, fixture, y: 0 })));
   const byId = new Map(nodes.map((node) => [node.id, node]));
@@ -35,7 +35,10 @@ export function buildBracketGraph(rounds: BracketGraphRound[], groups: V1Tournam
       for (const target of nodes.filter((candidate) => candidate.round === meta.next && candidate.fixture)) {
         for (const side of ['HOME', 'AWAY'] as const) {
           const registration = side === 'HOME' ? target.fixture!.homeRegistrationId : target.fixture!.awayRegistrationId;
-          if (bye.registrationId && registration === bye.registrationId && !edges.some((edge) => edge.target === target.id && edge.side === side)) edges.push({ source: node.id, target: target.id, side, outcome: 'BYE' });
+          const connected = bye.byeTarget
+            ? bye.byeTarget.fixtureId === target.id && bye.byeTarget.side === side
+            : Boolean(bye.registrationId && registration === bye.registrationId);
+          if (connected && !edges.some((edge) => edge.target === target.id && edge.side === side)) edges.push({ source: node.id, target: target.id, side, outcome: 'BYE' });
         }
       }
     }

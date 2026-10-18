@@ -200,6 +200,22 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
     };
   }
 
+  it.each(['HOME', 'AWAY'] as const)('빈 부전승의 저장된 슬롯 연결을 공개 %s 대상으로 직렬화한다', (side) => {
+    const row = baseRow({ detailSeeds: [fixtureRow(null, 'scheduled')] });
+    const detail = row.tournamentMatchDetails[0];
+    Object.assign(detail.teamMatch, { homeSlotId: side === 'HOME' ? 'bye-slot' : null, awaySlotId: side === 'AWAY' ? 'bye-slot' : null });
+    Object.assign(detail, { round: 'quarter', homeRegistrationId: null, awayRegistrationId: null, homeRegistration: null, awayRegistration: null });
+    row.groups = [{ id: 'r12', name: '12강', phase: 'round12', sortOrder: 0, advanceCount: null,
+      groupTeams: [], standings: [], byeSlots: [{ id: 'empty-bye', sortOrder: 3 }],
+      slots: [{ id: 'bye-slot', kind: 'BYE', byeSortOrder: 3, displayLabel: '상위 시드' }],
+    }] as unknown as TournamentDetailRow['groups'];
+    const result = presentTournamentDetail(row, true);
+    expect(result.groups[0].groupTeams[0]).toMatchObject({ registrationId: null, displayLabel: '상위 시드',
+      byeTarget: { fixtureId: detail.teamMatchId, side } });
+    const hidden = presentTournamentDetail({ ...row, bracketPublishedAt: null, bracketPublishScheduledAt: null }, false);
+    expect(hidden.groups).toEqual([]);
+  });
+
   describe('자리 라벨 (homeSlotLabel / awaySlotLabel)', () => {
     const game = { state: 'SCHEDULED', sides: [], participants: [], events: [], currentOfficialRevision: null };
     const groupRank = { kind: 'GROUP_RANK', position: 1, group: { name: '4강', phase: 'semi' }, sourceGroup: { name: 'A조' } };

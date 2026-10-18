@@ -451,18 +451,25 @@ export function presentTournamentDetail(
       sortOrder: group.sortOrder,
       advanceCount: group.advanceCount,
       qualification: groupStandingSummaries.get(group.id)?.qualification ?? null,
-      groupTeams: [...group.groupTeams, ...(group.byeSlots ?? []).map((slot) => ({ ...slot, registrationId: null, registration: null, isBye: true }))].map((groupTeam) => ({
-        id: groupTeam.id,
-        registrationId: groupTeam.registrationId,
-        teamId: hideIdentity ? null : (groupTeam.registration?.team.id ?? null),
-        teamName: hideIdentity ? null : (groupTeam.registration?.team.name ?? null),
-        // 순위 행이 아직 없을 때 이 편성 목록만으로 순위표를 그리므로(#374), 순위 행과
-        // 같은 아바타가 나오도록 로고도 함께 내려 준다.
-        teamLogoUrl: hideIdentity ? null : (groupTeam.registration?.team.profile?.logoUrl ?? null),
-        sortOrder: groupTeam.sortOrder,
-        isBye: groupTeam.isBye,
-        displayLabel: groupTeam.isBye ? group.slots?.find(slot => slot.kind === 'BYE' && slot.byeSortOrder === groupTeam.sortOrder)?.displayLabel ?? null : null,
-      })),
+      groupTeams: [...group.groupTeams, ...(group.byeSlots ?? []).map((slot) => ({ ...slot, registrationId: null, registration: null, isBye: true }))].map((groupTeam) => {
+        const slot = groupTeam.isBye ? group.slots?.find(candidate => candidate.kind === 'BYE' && candidate.byeSortOrder === groupTeam.sortOrder) : undefined;
+        // The stored slot link survives an empty/reassigned team and custom labels.
+        // Never infer an unassigned BYE target from fixture numbers or visual order.
+        const target = slot ? row.tournamentMatchDetails.find(detail => detail.teamMatch.homeSlotId === slot.id || detail.teamMatch.awaySlotId === slot.id) : undefined;
+        return {
+          id: groupTeam.id,
+          registrationId: groupTeam.registrationId,
+          teamId: hideIdentity ? null : (groupTeam.registration?.team.id ?? null),
+          teamName: hideIdentity ? null : (groupTeam.registration?.team.name ?? null),
+          // 순위 행이 아직 없을 때 이 편성 목록만으로 순위표를 그리므로(#374), 순위 행과
+          // 같은 아바타가 나오도록 로고도 함께 내려 준다.
+          teamLogoUrl: hideIdentity ? null : (groupTeam.registration?.team.profile?.logoUrl ?? null),
+          sortOrder: groupTeam.sortOrder,
+          isBye: groupTeam.isBye,
+          displayLabel: slot?.displayLabel ?? null,
+          byeTarget: target && slot ? { fixtureId: target.teamMatchId, side: target.teamMatch.homeSlotId === slot.id ? 'HOME' as const : 'AWAY' as const } : null,
+        };
+      }),
       standings: group.standings.map((standing) => ({
         registrationId: standing.registrationId,
         teamId: hideIdentity ? null : standing.registration.team.id,

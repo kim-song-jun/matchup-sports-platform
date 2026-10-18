@@ -296,7 +296,7 @@ export function MyInvitationsPageView({ model }: { model: MyInvitationsViewModel
             {model.invitations.map((invitation) => (
               <div key={invitation.invitationId} className="tm-invitation-card">
                 <div className="tm-invitation-card-head">
-                  <TeamAvatar seed={invitation.teamId} name={invitation.teamName} logoUrl={invitation.logoUrl} size="lg" />
+                  <TeamAvatar teamId={invitation.teamId} name={invitation.teamName} logoUrl={invitation.logoUrl} size="lg" />
                   <div className="tm-invitation-meta">
                     <div className="tm-invitation-meta-name">{invitation.teamName}</div>
                     <div className="tm-invitation-meta-sub">{invitation.invitedByName}님이 초대했어요</div>
@@ -382,7 +382,7 @@ export function MyJoinApplicationsPageView({ model }: { model: MyJoinApplication
             {model.applications.map((application) => (
               <div key={application.applicationId} className="tm-invitation-card tm-join-application-card">
                 <div className="tm-invitation-card-head">
-                  <TeamAvatar seed={application.teamId} name={application.teamName} logoUrl={application.logoUrl} size="lg" />
+                  <TeamAvatar teamId={application.teamId} name={application.teamName} logoUrl={application.logoUrl} size="lg" />
                   <div className="tm-invitation-meta">
                     <Link className="tm-invitation-meta-name tm-join-application-team-link" href={withFromPath(`/teams/${application.teamId}`, '/my/join-applications')}>
                       {application.teamName}
@@ -578,7 +578,7 @@ function MyTeamCard({ team }: { team: MyTeam }) {
   const badgeClass = isOwner || isManager ? 'tm-badge tm-badge-blue' : 'tm-badge tm-badge-grey';
   return (
     <Link className="tm-my-team-card tm-pressable" href={withFromPath(`/teams/${team.id}`, '/my/teams')}>
-      <TeamAvatar seed={team.id} name={team.name} logoUrl={team.logoUrl} size="lg" />
+      <TeamAvatar teamId={team.id} name={team.name} logoUrl={team.logoUrl} size="lg" />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="tm-my-card-head">
           <div className="tm-text-body-lg">{team.name}</div>

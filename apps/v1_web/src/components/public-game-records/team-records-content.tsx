@@ -248,7 +248,7 @@ function TeamRecordRow({
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, minWidth: 0 }}>
-          <TeamAvatar seed={teamId} name={teamName} logoUrl={teamLogoUrl} size="sm" />
+          <TeamAvatar teamId={teamId} name={teamName} logoUrl={teamLogoUrl} size="sm" />
           <span
             className="tm-text-caption"
             style={{ fontWeight: 600, color: 'var(--text-strong)', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
@@ -279,7 +279,7 @@ function TeamRecordRow({
           ) : null}
         </div>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, minWidth: 0 }}>
-          <TeamAvatar seed={item.opponentTeamId ?? item.gameId} name={item.opponentTeamName ?? '상대 미상'} logoUrl={item.opponentTeamLogoUrl} size="sm" />
+          <TeamAvatar teamId={item.opponentTeamId} name={item.opponentTeamName ?? '상대 미상'} logoUrl={item.opponentTeamLogoUrl} size="sm" />
           <span
             className="tm-text-caption"
             style={{ fontWeight: 600, color: 'var(--text-strong)', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}

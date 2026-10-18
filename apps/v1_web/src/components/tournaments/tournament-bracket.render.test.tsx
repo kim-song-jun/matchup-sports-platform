@@ -186,6 +186,24 @@ it('3·4위전의 미정 두 자리에 저장된 4강 패자 출처를 표시한
   expect(within(card).getByText('4강 2경기 패자')).toBeVisible();
 });
 describe('공개 대진표 — 자리 라벨', () => {
+  it('보류 중인 슬롯은 알려진 팀 ID가 있어도 엠블럼 없이 중립 표시한다', () => {
+    render(<TournamentBracket groups={[]} fixtures={[
+      makeFixture({
+        id: 'pending-known-team',
+        round: 'semi',
+        fixtureNumber: 1,
+        homeTeamId: 'known-team-for-pending-slot',
+        homeTeamName: 'TBD',
+        homeSlotLabel: 'A조 1위',
+      }),
+    ]} />);
+
+    const card = screen.getByRole('group', { name: 'A조 1위 대 블루FC' });
+    const pendingRow = card.querySelector('.tm-bk2-row');
+    expect(pendingRow).toHaveTextContent('A조 1위');
+    expect(pendingRow?.querySelector('img')).toBeNull();
+  });
+
   it('TBD 사이드에 자리 라벨이 있으면 라벨을 보여 주고 대기 모양으로 그린다', () => {
     render(<TournamentBracket groups={[]} fixtures={[
       makeFixture({ id: 'rank-one', round: 'semi', fixtureNumber: 1, homeTeamName: 'TBD', homeSlotLabel: 'A조 1위', awayTeamName: 'TBD', awaySlotLabel: 'B조 2위' }),

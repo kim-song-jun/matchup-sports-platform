@@ -2,7 +2,8 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { queryImageBySrc } from '@/test/next-image';
+import { queryImageBySrc, resolveNextImageSrc } from '@/test/next-image';
+import { TEAM_LOGO_PRESETS } from '@/lib/team-logo-presets';
 import { TeamMatchCreatePageView, TeamMatchDetailPageView, TeamMatchListPageView } from './team-matches-page';
 import { getTeamMatchCreateViewModel, getTeamMatchDetailViewModel, getTeamMatchListViewModel } from './team-matches.view-model';
 import { TEAM_MATCH_WITHDRAW_CONFIRM } from './team-match-cancel-confirm';
@@ -2173,9 +2174,8 @@ describe('TeamMatchDetailPageView — 여러 팀 팀장의 신청 팀 선택 시
     await waitFor(() => expect(screen.queryByRole('dialog', { name: '어느 팀으로 신청할까요?' })).not.toBeInTheDocument());
   });
 
-  // 시트가 TeamAvatar 에 엠블럼을 안 넘기던 때는 팀이 등록한 엠블럼·기본 제공 엠블럼이 있어도
-  // 전부 팀 id 로 만든 임시 무늬(identicon)로만 보였다(2026-10-04 사용자 제보).
-  it('팀 행에 팀의 엠블럼을 그린다 — 엠블럼이 없는 팀만 임시 무늬로 남는다', async () => {
+  // 업로드·선택 로고는 유지하고, 저장 로고가 없는 기존 팀은 로컬 프리셋을 본다.
+  it('팀 행에 저장 로고 또는 실제 팀 id의 로컬 기본 엠블럼을 그린다', async () => {
     const model = getTeamMatchDetailViewModel('default');
     model.applyLabel = '신청하기';
     model.applyTeamPicker = {
@@ -2195,7 +2195,9 @@ describe('TeamMatchDetailPageView — 여러 팀 팀장의 신청 팀 선택 시
 
     expect(queryImageBySrc(rowOf(/업로드 엠블럼 팀/), '/uploads/emblem.png')).not.toBeNull();
     expect(queryImageBySrc(rowOf(/기본 엠블럼 팀/), '/images/team-logos/team-logo-03.jpg')).not.toBeNull();
-    expect(rowOf(/엠블럼 없는 팀/).querySelector('img')).toBeNull();
+    const defaultLogo = resolveNextImageSrc(rowOf(/엠블럼 없는 팀/).querySelector('img'));
+    expect(TEAM_LOGO_PRESETS).toContain(defaultLogo);
+    expect(defaultLogo).toMatch(/^\/images\/team-logos\/team-logo-\d{2}\.jpg$/);
   });
 
   it('신청이 실패하면 시트를 닫지 않고 이유를 보여 준다', async () => {

@@ -24,7 +24,7 @@ export function DissolvedTeamView({ team, selfHref, refreshError }: { team: V1Te
       {refreshError}
       <Card pad={20}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <TeamAvatar seed={team.teamId} name={team.name} logoUrl={team.profile.logoUrl} size="lg" />
+          <TeamAvatar teamId={team.teamId} name={team.name} logoUrl={team.profile.logoUrl} size="lg" />
           <div style={{ minWidth: 0 }}>
             <span className="tm-badge tm-badge-grey" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
               <Archive size={12} aria-hidden="true" />

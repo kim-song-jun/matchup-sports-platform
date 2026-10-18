@@ -8,7 +8,7 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { withFromPath, sanitizeRedirectPath } from '@/lib/session-storage';
 import { usePublicTeamRecords } from '@/components/public-game-records/use-public-game-records';
 import { TeamRecordsContent } from '@/components/public-game-records/team-records-content';
-import type { TeamRecordTypeFilter } from '@/components/public-game-records/types';
+import type { PublicTeamRecordsResponse, TeamRecordCategory, TeamRecordTypeFilter } from '@/components/public-game-records/types';
 
 function RecordsSkeleton() {
   return (
@@ -27,7 +27,17 @@ function recordSeasonFromQuery(value: string | null): string | undefined {
   return value !== null && /^[0-9]{4}$/.test(value) ? value : undefined;
 }
 
-export function TeamRecordsPageClient({ teamId }: { teamId: string }) {
+export function TeamRecordsPageClient({
+  teamId,
+  seed,
+  seedSeason,
+  seedType,
+}: {
+  teamId: string;
+  seed?: PublicTeamRecordsResponse;
+  seedSeason?: string;
+  seedType?: TeamRecordCategory;
+}) {
   const searchParams = useSearchParams();
   const queryString = searchParams.toString();
   const urlType = recordTypeFromQuery(searchParams.get('type'));
@@ -37,6 +47,13 @@ export function TeamRecordsPageClient({ teamId }: { teamId: string }) {
   const activeType = selection.teamId === teamId ? selection.type : urlType;
   // '전체 시즌'은 서버 season을 생략하는 상태다. 두 조건을 함께 보관해야 연속 선택도 유지된다.
   const activeSeason = selection.teamId === teamId ? selection.season : urlSeason;
+  const activeQueryType = activeType === 'all' ? undefined : activeType;
+  const matchingSeed = seed
+    && seed.teamId === teamId
+    && seedSeason === activeSeason
+    && seedType === activeQueryType
+    ? seed
+    : undefined;
   useEffect(() => {
     // 이전 query가 늦게 반영돼도 URL에 이미 저장한 최신 선택을 되돌리지 않는다.
     if (window.location.pathname === recordsPath && new URLSearchParams(window.location.search).toString() !== queryString) return;
@@ -62,7 +79,7 @@ export function TeamRecordsPageClient({ teamId }: { teamId: string }) {
   };
 
   const { data, isPending, isError, error, refetch, hasNextPage, isFetchingNextPage, fetchNextPage } =
-    usePublicTeamRecords(teamId, activeSeason, activeType === 'all' ? undefined : activeType);
+    usePublicTeamRecords(teamId, activeSeason, activeQueryType, { initialData: matchingSeed });
 
   const firstPage = data?.pages[0];
 

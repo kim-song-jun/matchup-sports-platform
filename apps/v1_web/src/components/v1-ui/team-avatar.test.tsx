@@ -1,32 +1,47 @@
 import { fireEvent, render, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { publicAssetPath } from '@/lib/assets';
+import { TEAM_LOGO_PRESETS } from '@/lib/team-logo-presets';
 import { resolveNextImageSrc } from '@/test/next-image';
 import { TeamAvatar } from './team-avatar';
 
 describe('TeamAvatar', () => {
-  it.each(['sm', 'md', 'lg', 'xl'] as const)('uses a neutral team icon at %s without a logo', (size) => {
-    const { container } = render(<TeamAvatar seed="team-1" name="팀" size={size} />);
+  it.each(['sm', 'md', 'lg', 'xl'] as const)('uses a neutral team icon at %s without a team identity', (size) => {
+    const { container } = render(<TeamAvatar name="팀" size={size} />);
     expect(container.querySelector('svg')).toHaveClass('lucide-users-round');
     expect(container.querySelector('svg rect')).toBeNull();
     expect(container.firstElementChild).toHaveStyle({ background: 'var(--grey150)' });
   });
 
   it.each([null, '', '   '])('treats %j as an absent logo', (logoUrl) => {
-    const { container } = render(<TeamAvatar seed="team-1" name="팀" logoUrl={logoUrl} />);
+    const { container } = render(<TeamAvatar name="팀" logoUrl={logoUrl} />);
     expect(container.querySelector('img')).toBeNull();
     expect(container.querySelector('svg')).toHaveClass('lucide-users-round');
   });
 
-  it('uses the same default icon for different team identities', () => {
-    const { container, rerender } = render(<TeamAvatar seed="team-a" name="A팀" />);
+  it('uses the neutral icon when a team identity is unavailable', () => {
+    const { container, rerender } = render(<TeamAvatar name="A팀" />);
     const original = container.innerHTML;
-    rerender(<TeamAvatar seed="team-b" name="B팀" />);
+    rerender(<TeamAvatar name="B팀" />);
     expect(container.innerHTML).toBe(original);
   });
 
+  it('shows the same bundled local emblem for a real team without a saved logo', () => {
+    const { container: first } = render(<TeamAvatar teamId="team-stable-42" name="A팀" logoUrl={null} />);
+    const { container: second } = render(<TeamAvatar teamId="team-stable-42" name="A팀 이름 변경" logoUrl={null} />);
+
+    const firstImage = first.querySelector('img');
+    const secondImage = second.querySelector('img');
+    const firstSource = resolveNextImageSrc(firstImage);
+
+    expect(firstSource).not.toBeNull();
+    expect(TEAM_LOGO_PRESETS).toContain(firstSource);
+    expect(resolveNextImageSrc(secondImage)).toBe(firstSource);
+    expect(firstSource).toMatch(/^\/images\/team-logos\/team-logo-\d{2}\.jpg$/);
+  });
+
   it('shows the uploaded logo only after it loads and uses a solid image surface', async () => {
-    const { container } = render(<TeamAvatar seed="team-1" name="팀" logoUrl="/uploads/logo.png" />);
+    const { container } = render(<TeamAvatar teamId="team-1" name="팀" logoUrl="/uploads/logo.png" />);
     const img = container.querySelector('img') as HTMLImageElement;
     expect(resolveNextImageSrc(img)).toBe(publicAssetPath('/uploads/logo.png'));
     expect(container.querySelector('svg')).not.toBeNull();
@@ -37,18 +52,17 @@ describe('TeamAvatar', () => {
   });
 
   it('resets the fallback when a loaded logo changes, recovers after failure, and clears a removed logo', async () => {
-    const { container, rerender } = render(<TeamAvatar seed="team-1" name="팀" logoUrl="/uploads/first.png" />);
+    const { container, rerender } = render(<TeamAvatar teamId="team-1" name="팀" logoUrl="/uploads/first.png" />);
     fireEvent.load(container.querySelector('img') as HTMLImageElement);
     await waitFor(() => expect(container.querySelector('svg')).toBeNull());
-    rerender(<TeamAvatar seed="team-1" name="팀" logoUrl="/uploads/broken.png" />);
+    rerender(<TeamAvatar teamId="team-1" name="팀" logoUrl="/uploads/broken.png" />);
     expect(container.querySelector('svg')).toHaveClass('lucide-users-round');
     fireEvent.error(container.querySelector('img') as HTMLImageElement);
     expect(container.querySelector('img')).toBeNull();
-    rerender(<TeamAvatar seed="team-1" name="팀" logoUrl="/uploads/fixed.png" />);
+    rerender(<TeamAvatar teamId="team-1" name="팀" logoUrl="/uploads/fixed.png" />);
     fireEvent.load(container.querySelector('img') as HTMLImageElement);
     await waitFor(() => expect(container.querySelector('svg')).toBeNull());
-    rerender(<TeamAvatar seed="team-1" name="팀" logoUrl={null} />);
-    expect(container.querySelector('img')).toBeNull();
-    expect(container.querySelector('svg')).toHaveClass('lucide-users-round');
+    rerender(<TeamAvatar teamId="team-1" name="팀" logoUrl={null} />);
+    expect(resolveNextImageSrc(container.querySelector('img'))).toMatch(/^\/images\/team-logos\/team-logo-\d{2}\.jpg$/);
   });
 });

@@ -1,5 +1,11 @@
 # Task 20261072: 운영 검색 노출 및 홈 GA4 계측 정정
 
+## Active records freshness and landing identity review fixes — 2026-10-19
+
+PR #1985 review found two additional same-scope defects before either source or main merge. The server records seed used `initialData`, which the actual production QueryClient considered fresh for 60 seconds despite the server cache; the team-records hook now uses the existing `seed`/`placeholderData` pattern, preserving the first HTML while allowing its normal mount refresh. A test with the actual production QueryClient and controlled public API response reproduced zero mount requests before the fix and now proves immediate seed display, the request and replacement by fresh data. Matching team/season/type, repeated-filter semantics, cursor behavior and existing navigation checks remain in place.
+
+Landing team matches also discarded actual host/opponent IDs before their avatar renderers. Existing projection and renderers now retain those IDs, while demos and unknown opponents have no identity. Actual projection/render tests reproduced four failures before the fix and pass afterward. The six-file local verification covers 47 cases: 46 passed on the first run; one existing Next return-flow case exceeded its five-second budget and passed unchanged in an isolated retry (580 ms, temporary CLI budget 15 seconds). No test timeout setting was committed, and final standard CI is still required. These source corrections do not establish search ranking, AI citation or live deployment; matching Alpha and current main-PR gates remain pending.
+
 Status: In Progress — factual team and competition discovery metadata, unknown-team crawl verification, Alpha and scoped main release (2026-10-17)
 **Owner**: Codex main; explicit Luna implementation and Sol independent review
 **Created**: 2026-10-12

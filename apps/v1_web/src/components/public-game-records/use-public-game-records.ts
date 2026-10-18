@@ -179,7 +179,7 @@ export function usePublicTeamRecords(
   teamId: string,
   season?: string,
   type?: TeamRecordCategory,
-  options: { initialData?: PublicTeamRecordsResponse } = {},
+  options: { seed?: PublicTeamRecordsResponse } = {},
 ) {
   return useInfiniteQuery({
     queryKey: publicGameRecordsKeys.teamRecords(teamId, season, type ?? null),
@@ -190,10 +190,10 @@ export function usePublicTeamRecords(
         ...(pageParam ? { cursor: pageParam } : {}),
       }),
     initialPageParam: null as string | null,
-    // The route's first public response is safe to seed only under this exact query key. The
-    // caller matches its normalized season/type before passing it; later filter keys fetch normally.
-    ...(options.initialData
-      ? { initialData: { pages: [options.initialData], pageParams: [null] } }
+    // Server HTML can show this response immediately, but it remains a placeholder so the
+    // client refreshes it under the normal query-client freshness policy.
+    ...(options.seed
+      ? { placeholderData: { pages: [options.seed], pageParams: [null] } }
       : {}),
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     enabled: Boolean(teamId),

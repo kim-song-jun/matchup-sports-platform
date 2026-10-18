@@ -967,6 +967,17 @@ describe('TeamMatchesService', () => {
         ],
       },
       { status: { notIn: ['cancelled', 'archived'] } },
+      // 일반 팀매치만: 경기 기록이 취소된 매치와 끝날 시각이 지나도록 시작하지 않은 상대 확정 매치는 뺀다.
+      { OR: [{ leagueId: { not: null } }, { NOT: { game: { is: { state: 'CANCELLED' } } } }] },
+      {
+        OR: [
+          { leagueId: { not: null } },
+          { status: { not: 'matched' } },
+          { game: { is: { state: { in: ['LIVE', 'PAUSED', 'ENDED'] } } } },
+          { endAt: { gte: expect.any(Date) } },
+          { endAt: null, OR: [{ startAt: null }, { startAt: { gte: expect.any(Date) } }] },
+        ],
+      },
     ]);
   });
 

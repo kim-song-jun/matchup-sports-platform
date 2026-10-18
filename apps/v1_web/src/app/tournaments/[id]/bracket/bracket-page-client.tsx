@@ -525,10 +525,16 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
     : 0;
   const stages = buildTournamentStages(tournament);
   const searchParams = useSearchParams();
+  const tabFromUrl = searchParams.get('tab');
   const [activeTab, setActiveTab] = useState<'standings' | 'schedule'>(() =>
-    searchParams.get('tab') === 'standings' ? 'standings' : 'schedule',
+    tabFromUrl === 'standings' ? 'standings' : 'schedule',
   );
-  // 화면 뒤로가기는 이 컴포넌트를 새로 만든다. 선택한 보기를 출처에 실어 순위표를 복원한다.
+  // App Router는 같은 경로의 query 이동에서 컴포넌트를 재사용한다. 뒤로가기·앞으로가기도
+  // URL의 선택을 복원하되, query가 그대로인 화면 내 탭 클릭은 유지한다.
+  useEffect(() => {
+    setActiveTab(tabFromUrl === 'standings' ? 'standings' : 'schedule');
+  }, [tabFromUrl]);
+  // 선택한 보기를 출처에 실어 순위표를 복원한다.
   let bracketSelfHref = useCurrentHref();
   if (bracketSelfHref) {
     const hashIndex = bracketSelfHref.indexOf('#');

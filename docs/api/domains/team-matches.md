@@ -273,6 +273,12 @@ Rules:
   - `platformManaged`, league membership, and match sport/level remain match-level fields and must not be presented as attributes of either team.
 - `GET /team-matches/:teamMatchId/applications` returns the same team-card fields (`sportName`, `levelLabel`, `ratingScore`, `ratingCount`, `wins`) for each applicant. Legacy `score`/`matchCount` remain response-compatible but are not the detail card's team-rating/win source.
 
+## GET /team-matches/:teamMatchId — 취소 리그 경기 공개
+
+공개 일정에 남는 취소 리그 경기(`leagueId`가 있는 `cancelled` 경기)는 상세도 `200`으로 제공하며 `status=cancelled`를 유지한다. 일반 친선 모집 취소와 보관 경기, 비공개 리그, 삭제 경기, 미배정 대진은 기존 `404` 차단을 유지한다. 이 예외는 상세 조회에만 적용하며 신청 자격·신청 및 참석명단·경기 기록의 취소 차단을 완화하지 않는다. 리그 상세의 `lifecycle.canEdit`·`canDelete`는 `false`다.
+
+공개 일정과 공개 경기 기록의 상태는 대진 취소를 게임의 `SCHEDULED`·`LIVE`·`ENDED`보다 우선해 `cancelled`로 반환한다. 취소 이외 상태의 게임 우선 매핑은 유지한다.
+
 ## POST /team-matches
 
 Body: `CreateTeamMatchDto`

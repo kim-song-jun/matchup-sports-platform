@@ -2135,8 +2135,8 @@ export class PublicTournamentRecordsService {
 const KST_DAY = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' });
 
 /**
- * 팀매치(리그 대진)의 공개 진행 상태 — `publicFixtureStatus` 와 같은 "게임 상태 우선"
- * 규칙이되, 폴백 축이 TournamentFixtureStatus 가 아니라 V1TeamMatchStatus 다.
+ * 팀매치(리그 대진)의 공개 진행 상태 — 취소를 먼저 반영한 뒤 게임 상태를 따른다.
+ * 게임이 없을 때의 축만 TournamentFixtureStatus 대신 V1TeamMatchStatus 다.
  * 리그 대진은 생성 즉시 V1Game 이 붙으므로 이 폴백은 방어용이다(pre-Task-6 행 등).
  */
 const TEAM_MATCH_STATUS_TO_PUBLIC_STATUS: Record<V1TeamMatchStatus, 'scheduled' | 'live' | 'ended' | 'cancelled'> = {
@@ -2151,9 +2151,10 @@ const TEAM_MATCH_STATUS_TO_PUBLIC_STATUS: Record<V1TeamMatchStatus, 'scheduled' 
 
 function publicTeamMatchStatus(gameState: V1GameState | null, teamMatchStatus: V1TeamMatchStatus) {
   if (gameState !== null) {
-    // 게임이 있으면 publicFixtureStatus 와 완전히 같은 매핑을 탄다 — fixtureStatus
-    // 인자는 gameState 가 null 이 아닌 한 읽히지 않는다(public-visibility.ts).
-    return publicFixtureStatus({ gameState, fixtureStatus: 'scheduled' });
+    return publicFixtureStatus({
+      gameState,
+      fixtureStatus: teamMatchStatus === 'cancelled' ? 'cancelled' : 'scheduled',
+    });
   }
   return TEAM_MATCH_STATUS_TO_PUBLIC_STATUS[teamMatchStatus] ?? 'scheduled';
 }
@@ -2196,8 +2197,8 @@ function presentSide(
  * `archived` 는 **끝난 경기의 보관** 이므로 `completed` 다 -- `cancelled` 로 보내면 순위에서
  * 빠진 것처럼 읽힌다.
  *
- * ⚠️ 이 매핑이 실제로 쓰이는 경우는 드물다: `publicFixtureStatus` 는 게임이 있으면
- * `gameState` 를 먼저 보고, 리그 대진은 **생성 즉시 게임이 붙는다**. 그래도 정확해야 한다 --
+ * 취소 상태는 게임 유무와 무관하게 우선한다. 나머지는 `publicFixtureStatus` 가 게임이
+ * 있으면 `gameState` 를 보고, 리그 대진은 **생성 즉시 게임이 붙는다**. 그래도 정확해야 한다 --
  * 게임 생성 전 창이 존재하고, 그 창의 화면이 틀리면 원인을 찾기 어렵다.
  */
 const LEAGUE_STATUS_TO_FIXTURE_STATUS: Record<V1TeamMatchStatus, TournamentFixtureStatus> = {

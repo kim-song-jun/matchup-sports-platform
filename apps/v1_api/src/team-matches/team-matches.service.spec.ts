@@ -1579,6 +1579,20 @@ describe('TeamMatchesService', () => {
     expect(result.displayState).toBe(expectedDisplayState);
   });
 
+  it('detail: 공개 일정에 남는 리그 취소 경기의 상세는 취소 상태로 제공한다', async () => {
+    prisma.v1TeamMatch.findFirst.mockResolvedValue({
+      ...publicTeamMatchDetailRow({ status: 'cancelled', leagueId: 'league-1' }),
+      league: { id: 'league-1', title: '공개 리그' },
+    });
+    prisma.v1Team.findMany.mockResolvedValue([]);
+
+    const result = await service.detail(null, 'tm-1');
+
+    expect(result).toMatchObject({ status: 'cancelled', league: { leagueId: 'league-1' } });
+    expect(result.lifecycle.canEdit).toBe(false);
+    expect(result.lifecycle.canDelete).toBe(false);
+  });
+
   it.each(['cancelled', 'archived'])('detail: %s is absent for guests and the original host', async (status) => {
     prisma.v1TeamMatch.findFirst.mockResolvedValue(publicTeamMatchDetailRow({ status }));
     for (const viewer of [null, manager]) {

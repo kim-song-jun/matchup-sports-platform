@@ -26,3 +26,10 @@ Persona: owner/ops 쓰기, support 읽기, 일반 사용자 쓰기 거절.
 - 실제 DB integration: 로컬 Docker daemon 미가동으로 미실행. additive migration은 CI DB integration 대상이다.
 - 실제 alpha 변경 후 UI QA: 0/3, PR 미배포. 스크린샷/console/network/실제 결과 진출 검증 및 cleanup 기록은 alpha 배포 후 이 문서에 추가한다. 컴포넌트 테스트는 실제 브라우저 QA로 계산하지 않는다.
 - 기존 사용자 데이터·결과를 변경하거나 seed/reset을 실행하지 않았다.
+
+## 2026-10-18 — alpha 후속: 조별 ENTRY 팀의 부전승 후보
+
+- PR #1960 배포 SHA `5444656fac`에서 metadata 1440/768/390 3/3 PASS, 실제 승자·패자 및 12강→8강 진출 PASS.
+- 빈 BYE의 팀 선택은 조별 ENTRY 20팀을 이미 배정된 팀으로 모두 제외해 실패했다. 문구는 검증 직전 값으로 복원했다. 이 실패를 완료로 표시하지 않는다.
+- 공통 후보 계산을 서버 `assertPlaceable`의 kind별 예외와 맞춘다. BYE는 조별 ENTRY 팀을 선택할 수 있고 결선 ENTRY/BYE/GROUP_RANK 중복은 제외한다. 목록 8강·desktop panel·mobile picker·독립 BYE 편집기가 같은 계산을 사용한다.
+- 실제 후보 선택 회귀 RED 2건 → 관련 170 tests GREEN. 후속 PR/alpha 배포 후 BYE 3폭 저장과 원복을 다시 실행한다.

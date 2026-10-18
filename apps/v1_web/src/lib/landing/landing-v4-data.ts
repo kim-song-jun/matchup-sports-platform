@@ -7,7 +7,7 @@ import { fetchSeoSeed } from '@/lib/seo-list';
 import { getStatus } from '@/components/team-matches/team-matches.card-model';
 import { formatCardDate, formatCardTime, formatTournamentDateMedium } from '@/lib/date-utils';
 import { competitionFormatLabel } from '@/lib/competition-kind';
-import { resolveTournamentRegistrationBlock } from '@/lib/tournament-registration-availability';
+import { resolveTournamentCapacity, resolveTournamentRegistrationBlock } from '@/lib/tournament-registration-availability';
 import type { CursorPage, PageInfo, V1Team, V1TeamMatch, V1TournamentListItem, V1TournamentListPage } from '@/types/api';
 
 const LIST_LIMIT = 50;
@@ -31,8 +31,8 @@ export type LandingLiveTournament = {
   readonly prizeText: string | null;
   readonly imageUrl: string | null;
   readonly formatLabel: string;
-  /** 정원이 있는 모집 중 대회만 — 리그는 정원 개념이 없다(teamCount 부재). */
-  readonly slots: { readonly confirmed: number; readonly total: number } | null;
+  /** 랜딩 정원 표시는 모집 중인 정규 대회 카드에만 제공한다. 리그 카드는 별도 상태 안내를 유지한다. */
+  readonly slots: { readonly confirmed: number; readonly total: number; readonly remaining: number } | null;
   readonly href: string;
 };
 
@@ -150,7 +150,7 @@ export function summarizeLandingData(
     counts: {
       teamMatches: toCount(teamMatchesPage, teamMatches.length),
       tournaments: toCount(tournamentsPage, tournaments.length),
-      // 이 페이지(최대 50건) 안의 모집 중 개수다. hasNext 는 "더 있을 수도" 라는 신호를
+      // 조회한 목록 안의 모집 중 개수다. hasNext 는 "더 있을 수도" 라는 신호를
       // 그대로 물려받는다(다음 페이지에 모집 중이 더 있을 수 있다는 뜻으로만 쓴다).
       tournamentsOpen: tournamentsPage ? { value: openCount, more: openCount > 0 && tournamentsPage.pageInfo.hasNext } : null,
       teams: toCount(teamsPage, teams.length),
@@ -169,12 +169,11 @@ function toCount(page: { pageInfo?: { hasNext: boolean } } | null, length: numbe
 
 function landingTournamentStatus(item: V1TournamentListItem, now: Date): LandingTournamentLiveStatus | null {
   if (!isLiveStatus(item.status)) return null;
-  if (item.status !== 'open' || item.kind === 'regular_league') return item.status;
+  if (item.status !== 'open') return item.status;
 
-  // Only regular tournaments (including legacy null-kind tournament rows) derive their
-  // recruitment label from the same deadline/capacity contract as registration.
-  // The API omits teamCount for league rows; after excluding leagues, this field is
-  // present for tournament cards, including a legitimate zero-capacity event.
+  // An API `open` status can remain after admission stops. The shared resolver also
+  // preserves the league's distinct deadline/maxTeams contract and treats a missing
+  // league deadline as unavailable; do not derive labels from stored status alone.
   const tournamentWithCapacity = item as V1TournamentListItem & { teamCount: number };
   return resolveTournamentRegistrationBlock(tournamentWithCapacity, now) === null ? 'open' : 'closed';
 }
@@ -189,25 +188,33 @@ function liveTournaments(items: readonly V1TournamentListItem[], now: Date): Lan
       TOURNAMENT_STATUS_PRIORITY[a.status] - TOURNAMENT_STATUS_PRIORITY[b.status] || a.item.promoHomePriority - b.item.promoHomePriority,
     )
     .slice(0, TOURNAMENT_LIMIT)
-    .map(({ item, status }) => ({
-      kind: 'tournament' as const,
-      id: item.id,
-      title: item.title,
-      status,
-      statusLabel: TOURNAMENT_STATUS_LABEL[status],
-      dateText: item.promoHomeDateText ?? formatTournamentDateMedium(item.scheduledAt),
-      location: item.promoHomeLocationText,
-      teamsText: item.promoHomeTeamsText,
-      prizeText: item.promoHomePrizeText,
-      imageUrl: item.promoHomeImageUrl ?? item.coverImageUrl ?? null,
-      formatLabel: competitionFormatLabel(item),
-      // 정원 유무는 kind 로만 가른다 — format='league' 인 리그 방식 대회는 진짜 정원이 있다(competition-kind.ts).
-      slots:
-        status === 'open' && item.kind !== 'regular_league' && typeof item.teamCount === 'number' && item.teamCount > 0
-          ? { confirmed: Math.min(item.confirmedCount, item.teamCount), total: item.teamCount }
-          : null,
-      href: `/tournaments/${item.id}`,
-    }));
+    .map(({ item, status }) => {
+      const capacity =
+        status === 'open' && item.kind !== 'regular_league' && typeof item.teamCount === 'number'
+          ? resolveTournamentCapacity(item as V1TournamentListItem & { teamCount: number })
+          : null;
+      const slots =
+        capacity && capacity.teamCount !== null && Number.isFinite(capacity.teamCount) && capacity.teamCount > 0
+          && capacity.remainingCount !== null
+          ? { confirmed: capacity.confirmedCount, total: capacity.teamCount, remaining: capacity.remainingCount }
+          : null;
+
+      return {
+        kind: 'tournament' as const,
+        id: item.id,
+        title: item.title,
+        status,
+        statusLabel: TOURNAMENT_STATUS_LABEL[status],
+        dateText: item.promoHomeDateText ?? formatTournamentDateMedium(item.scheduledAt),
+        location: item.promoHomeLocationText,
+        teamsText: item.promoHomeTeamsText,
+        prizeText: item.promoHomePrizeText,
+        imageUrl: item.promoHomeImageUrl ?? item.coverImageUrl ?? null,
+        formatLabel: competitionFormatLabel(item),
+        slots,
+        href: `/tournaments/${item.id}`,
+      };
+    });
 }
 
 function liveTeamMatches(items: readonly V1TeamMatch[], now: Date): LandingLiveTeamMatch[] {

@@ -3864,6 +3864,8 @@ export type V1TournamentFixtureGoal = {
    * 폴백 결과일 때는 null. 어드민 대진 응답(V1AdminBracketResult)에서만 채워진다.
    */
   playerUserId: string | null;
+  /** 득점자 계정 실명 — 어드민 대진 응답을 대회 운영진이 볼 때만 온다. 그 밖에는 키 자체가 없다. */
+  playerRealName?: string;
   minute: number | null;
   ownGoal?: boolean;
 };

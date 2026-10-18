@@ -196,6 +196,19 @@ describe('KickoffChecklist — 킥오프 준비', () => {
       isError: false,
     });
 
+    it.each([
+      ['운영진(실명 있음)', { realName: '김실명' }, '김실명 (김선수)'],
+      ['운영진 — 실명과 닉네임이 같아도 둘 다', { realName: '김선수' }, '김선수 (김선수)'],
+      ['권한 없음(realName 키 없음)', {}, '김선수'],
+    ])('선수 이름은 운영 콘솔과 같은 규칙이고 자르지 않는다: %s', (_, extra, name) => {
+      mocks.useV1TeamGameRoster.mockReturnValue(leagueRoster([{ userId: 'u1', displayName: '김선수', status: 'PARTICIPATING', ...extra }]));
+      renderChecklist({ lineups: lineups(NOT_YET, NOT_YET) });
+
+      expect(screen.getAllByRole('switch', { name: `${name} — 출전, 누르면 이번 경기에서 빼요` }).length).toBeGreaterThan(0);
+      const label = screen.getAllByText(name)[0];
+      expect(label).not.toHaveClass('truncate');
+    });
+
     it('도착 확인 대신 팀원 전원이 출전으로 체크돼 있고, 누르면 이번 경기에서 뺀다', async () => {
       mocks.setParticipation.mockReset().mockResolvedValue({});
       mocks.useV1TeamGameRoster.mockReturnValue(leagueRoster([

@@ -6,6 +6,7 @@ import { formatMatchClock } from '@/lib/game-operations-clock';
 import { periodPrefix } from './period-label';
 import type { GameEventRecord, GameLineup } from '@/types/game-operations';
 import { formatPlayerLabel } from './player-label';
+import { participantIdentityName } from './participant-identity';
 
 /**
  * 이벤트 행 왼쪽의 "전반 12:00" 뱃지 문구.
@@ -141,7 +142,7 @@ export function RecordedEventList({
     lineups.flatMap((lineup) =>
       lineup.participants.map((participant) => [
         participant.id,
-        formatPlayerLabel(participant.jerseyNumber, participant.displayNameSnapshot),
+        formatPlayerLabel(participant.jerseyNumber, participantIdentityName(participant)),
       ]),
     ),
   );
@@ -208,36 +209,12 @@ export function RecordedEventList({
                   aria-hidden="true"
                   className={`h-2.5 w-2.5 shrink-0 rounded-full ${eventDotClass(event)}`}
                 />
-                {/* 좁은 컨테이너에서는 **자르지 말고 줄을 늘린다**(`line-clamp-2`).
-                    줄을 나누는 것만으로는 부족했다 — 2026-08-20 alpha 실측: 1024px 에서
-                    사이드바 컨테이너가 **202px** 로 전 구간 중 가장 좁고(390 모바일의 292px
-                    보다도 좁다), 같은 줄의 시계 배지가 ~80px 를 먹어 이 문단에 114px 만 남는다.
-                    그 폭에서는 `교체 · 김민수 → 박지성`(127px)·`골 · 10 김민수 (도움 7 박지성)`
-                    (166px) 같은 **평범한 라벨이 이벤트 종류와 무관하게 잘린다.**
-
-                    이 목록에서 가장 중요한 정보가 "무엇을·누가"인데 그게 제일 먼저 사라지는
-                    셈이라, 한 줄을 고집하는 대신 두 줄까지 허용한다. 행 높이가 최대 한 줄
-                    변하는 대가로 정보가 보존된다.
-
-                    **폭에 따라 `truncate` 로 되돌리지 않는다.** `.line-clamp-2` 는 Tailwind
-                    유틸이 아니라 `globals.css` 의 커스텀 클래스(`display:-webkit-box` +
-                    `-webkit-line-clamp:2`)라, `@md:truncate` 로는 그 두 선언이 지워지지 않아
-                    넓은 폭에서도 클램프가 남는다(Copilot 리뷰 지적). 모드를 하나로 두는 편이
-                    단순하고 예측 가능하다.
-
-                    ⚠️ **"넓으면 어차피 한 줄"이 아니다**(2026-08-20 alpha 실측으로 정정).
-                    이 목록은 어느 뷰포트에서도 넉넉한 적이 없다 — 문단 가용폭이
-                    390:205 · **1024:114** · **1280:213** · 1440:274 · 1920:280 px 이고,
-                    **1280 은 모바일 390(205px)과 사실상 같다.** 한 줄 임계는 1280 에서 204px 라,
-                    이 파일이 실제로 만드는 문법인
-                    `골 · 10 {이름} (도움 7 {이름})` 은 이름이 5자만 돼도(213px) **1280 에서 두 줄**이
-                    된다. 즉 두 줄 행은 좁은 폭의 예외가 아니라 **정상 동작**이다.
-
-                    남는 한계: 1024(가용 114px)에서 두 줄 수용폭은 228px 이므로, 그보다 긴 라벨
-                    (예: 6자 이름 둘 + 어시스트 = 238px)은 **여전히 잘린다**. `truncate` 시절보다
-                    덜 잃을 뿐 0 은 아니다. 근본 원인은 이 폭의 사이드바 컬럼이 202px 로
-                    모바일(292px)보다도 좁다는 레이아웃 쪽에 있다. */}
-                <p className="line-clamp-2 text-sm font-medium text-[var(--text-strong)]">
+                {/* 좁은 컨테이너에서는 **자르지 말고 줄을 늘린다.** 이 목록에서 가장 중요한 정보가
+                    "무엇을·누가"인데, 문단 가용폭이 390:205 · 1024:114 · 1280:213 px 라(2026-08-20 alpha 실측)
+                    평범한 `골 · 10 {이름} (도움 7 {이름})` 도 두 줄이 정상이다. 예전엔 두 줄까지만 허용했지만
+                    (`line-clamp-2`), 운영진에게 `실명 (닉네임)` 으로 이름이 길어지면서(2026-10-18) 두 줄로도
+                    잘려 줄 수 제한을 없앴다 — 행이 길어지는 대가로 이름을 잃지 않는다. */}
+                <p className="min-w-0 break-words text-sm font-medium text-[var(--text-strong)]">
                   {eventTypeLabel(event)}
                   {isReversed ? <span className="font-semibold text-[var(--text-muted)]"> · 취소된 기록</span> : null}
                   {event.type === 'SUBSTITUTION'

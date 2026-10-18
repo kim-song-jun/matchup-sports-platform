@@ -7,6 +7,7 @@ import { GameCommandDto } from './dto/game-command.dto';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import {
   canonicalGameCommandPayloadHash,
+  canAdminViewParticipantIdentity,
   canViewParticipantIdentity,
   applyForfeitScore,
   extractEndForfeitSideId,
@@ -873,7 +874,8 @@ describe('GamesService start — 취소된 대진의 경기', () => {
   });
 });
 
-describe('GamesService.listOperationsLineups — 운영진 전용 본인 확인 정보(실명·전화번호)', () => {
+// 운영 콘솔·결과 확인·정정은 `listLineups`, 팀매치 콘솔은 `listOperationsLineups` 를 읽는다 — 둘이 같은 규칙이어야 한다.
+describe.each(['listLineups', 'listOperationsLineups'] as const)('GamesService.%s — 운영진 전용 본인 확인 정보(실명·전화번호)', (method) => {
   const USER = { id: 'user-1' } as V1AuthUser;
 
   function build(role: string) {
@@ -908,7 +910,7 @@ describe('GamesService.listOperationsLineups — 운영진 전용 본인 확인 
   it.each(['platform_ops', 'tournament_director', 'field_operator'])('%s 에게는 참가자마다 실명·전화번호(identity)를 싣는다', async (role) => {
     const { service } = build(role);
 
-    const [lineup] = await service.listOperationsLineups(USER, 'game-1');
+    const [lineup] = await service[method](USER, 'game-1');
 
     const byId = Object.fromEntries(lineup.participants.map((p) => [p.id, p]));
     expect(byId['p-1']).toMatchObject({ displayNameSnapshot: 'E2E선수01', identity: { realName: '김철수', phone: '01030101000' } });
@@ -922,7 +924,7 @@ describe('GamesService.listOperationsLineups — 운영진 전용 본인 확인 
     async (role) => {
       const { service, prisma } = build(role);
 
-      const [lineup] = await service.listOperationsLineups(USER, 'game-1');
+      const [lineup] = await service[method](USER, 'game-1');
 
       for (const p of lineup.participants) expect(p).not.toHaveProperty('identity');
       expect(prisma.v1User.findMany).not.toHaveBeenCalled();
@@ -932,13 +934,18 @@ describe('GamesService.listOperationsLineups — 운영진 전용 본인 확인 
   it('계정 조회는 탈퇴하지 않은 참가자 계정만, 한 번에 가져온다', async () => {
     const { service, prisma } = build('platform_ops');
 
-    await service.listOperationsLineups(USER, 'game-1');
+    await service[method](USER, 'game-1');
 
     expect(prisma.v1User.findMany).toHaveBeenCalledTimes(1);
     expect(prisma.v1User.findMany).toHaveBeenCalledWith({
       where: { id: { in: ['user-a', 'user-gone'] }, deletedAt: null },
       select: { id: true, phone: true, profile: { select: { realName: true } } },
     });
+  });
+
+  it('canAdminViewParticipantIdentity 는 owner·ops 만 통과시킨다 — support 는 조회 전용과 같다', () => {
+    expect(['owner', 'ops'].every(canAdminViewParticipantIdentity)).toBe(true);
+    expect(['support', 'x'].some(canAdminViewParticipantIdentity)).toBe(false);
   });
 
   it('canViewParticipantIdentity 는 대회 운영 역할만 통과시킨다', () => {

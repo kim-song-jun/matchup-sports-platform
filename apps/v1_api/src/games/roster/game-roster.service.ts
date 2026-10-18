@@ -56,6 +56,8 @@ export interface GameRosterHistoryEvent {
   readonly adjustmentId: string;
   readonly userId: string;
   readonly displayName: string;
+  /** 빠진 선수의 계정 실명 — 대회 운영진에게만, 값이 있을 때만 실린다(그 밖에는 키 자체가 없다). */
+  readonly realName?: string;
   readonly reason: string | null;
   /** 사이드 팀이 바뀌어 자동으로 되돌린 기록은 userId null · role SYSTEM. */
   readonly actor: { userId: string | null; displayName: string; role: string | null };
@@ -157,7 +159,7 @@ export class GameRosterService {
 
   listAdjustments(user: V1AuthUser, target: SideTarget) {
     return this.prisma.$transaction(async (tx) => {
-      const { teamId } = await this.authorizeSide(tx, user.id, target, 'read');
+      const { teamId, identityVisible } = await this.authorizeSide(tx, user.id, target, 'read');
       const rows = await tx.v1GameRosterAdjustment.findMany({
         where: { gameId: target.gameId, sideId: target.sideId, teamId },
         orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
@@ -167,9 +169,18 @@ export class GameRosterService {
         rows.flatMap((row) => [row.userId, row.actorUserId, ...(row.revokedByUserId === null ? [] : [row.revokedByUserId])]),
       );
       const name = (userId: string) => names.get(userId) ?? '알 수 없음';
+      // 경기 명단 화면(`readView`)과 같은 규칙 — 팀 매니저·멤버·지원 계정에게는 실명 키도, 계정 조회도 없다.
+      const realNames = identityVisible ? await loadRealNames(tx, rows.map((row) => row.userId)) : null;
       const events: GameRosterHistoryEvent[] = [];
       for (const row of rows) {
-        const common = { adjustmentId: row.id, userId: row.userId, displayName: name(row.userId), reason: row.reason };
+        const realName = realNames?.get(row.userId);
+        const common = {
+          adjustmentId: row.id,
+          userId: row.userId,
+          displayName: name(row.userId),
+          ...(realName === undefined ? {} : { realName }),
+          reason: row.reason,
+        };
         events.push({
           ...common,
           type: 'EXCLUDE',

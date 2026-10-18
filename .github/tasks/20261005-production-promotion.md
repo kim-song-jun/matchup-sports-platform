@@ -2,6 +2,25 @@
 
 Status: Review
 
+## Current preparation — 2026-10-18
+
+The user requests a main-promotion PR. This snapshot supersedes historical release coordinates below.
+
+- Verified dev/alpha baseline: ef706121bf946c3af230f375c64552a775db296d, dev CI 39132737481 and Alpha 39132737476 SUCCESS; alpha commit header matches and DB health is true. Main baseline: edb7ecd31.
+- Official Changesets CLI 2.30.0 via promote-main.sh --prepare-only consumes 25 pending Changesets and raises both fixed app source versions from 1.9.9 to 1.10.0. Both changelogs preserve production history. No dependency, application source, schema or migration change is introduced by this version preparation.
+- prepare-only main-promotion gate and git diff --check PASS. The existing resolver uses patch advancement with zero pending Changesets, so the prepared source version 1.10.0 yields a 1.10.1-alpha artifact; this is the existing release contract, not a second source bump.
+- Main has 27 commits absent from dev ancestry. A separate isolated integration checkout identified 10 conflict files. Read-only resolution proof confirms that resolving the 9 runtime/API-doc conflicts to the reviewed dev bytes leaves those files exactly identical to verified dev; the remaining task-log conflict must retain both records.
+- Automatic approval rejected a batch regex conflict resolution plus immediate commit. No resolution was executed. The user was asked to approve the concrete main-to-dev resolution; that approval remains required before dependent integration work. No workaround or main write is performed.
+- Local main/dev WIP and authenticated QA screenshot branches are excluded. Only release manifests/changelogs, consumed Changesets and this status record are owned by the version preparation.
+
+Acceptance criteria:
+- [x] Prepare fixed version metadata and consume all current Changesets.
+- [x] Verify local release-preparation contract and whitespace.
+- [ ] Approved main ancestry integration, preserving reviewed dev runtime and main release history.
+- [ ] Preparation PR exact-head CI/review; new dev CI and Alpha after merge.
+- [ ] main-promotion PR with current main/dev diff and explicit user-only production merge.
+
+
 ## Final preparation refresh — 2026-10-14
 
 This snapshot supersedes the preparation snapshots below.

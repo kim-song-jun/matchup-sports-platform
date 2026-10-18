@@ -14,6 +14,51 @@ function team(sportName: string, id = sportName): V1Team {
 }
 
 describe('buildTeamSportChips', () => {
+  it('첫 페이지 일부 팀만 있어도 응답 facet의 전체·종목별 건수를 쓴다', () => {
+    const sports = [
+      { id: 'sport-futsal', name: '풋살' },
+      { id: 'sport-soccer', name: '축구' },
+    ];
+    const teams = [
+      ...Array.from({ length: 18 }, (_, index) => team('풋살', `futsal-${index}`)),
+      ...Array.from({ length: 2 }, (_, index) => team('축구', `soccer-${index}`)),
+    ];
+    const facets = { sports: [{ sportId: 'sport-futsal', count: 94 }, { sportId: 'sport-soccer', count: 11 }] };
+
+    const chips = buildTeamSportChips(teams, base, new URLSearchParams(), undefined, sports, false, facets);
+
+    expect(chips.map(({ label, count }) => ({ label, count }))).toEqual([
+      { label: '전체', count: 105 },
+      { label: '풋살', count: 94 },
+      { label: '축구', count: 11 },
+    ]);
+  });
+
+  it('종목을 선택해도 전체 칩은 선택 종목 total이 아니라 sportId 필터를 뺀 facet 합계를 쓴다', () => {
+    const sports = [
+      { id: 'sport-futsal', name: '풋살' },
+      { id: 'sport-soccer', name: '축구' },
+    ];
+    const onlySelectedSport = Array.from({ length: 20 }, (_, index) => team('풋살', `futsal-${index}`));
+    const facets = { sports: [{ sportId: 'sport-futsal', count: 94 }, { sportId: 'sport-soccer', count: 11 }] };
+
+    const chips = buildTeamSportChips(
+      onlySelectedSport,
+      base,
+      new URLSearchParams('sportId=sport-futsal'),
+      'sport-futsal',
+      sports,
+      false,
+      facets,
+    );
+
+    expect(chips.map(({ label, count }) => ({ label, count }))).toEqual([
+      { label: '전체', count: 105 },
+      { label: '풋살', count: 94 },
+      { label: '축구', count: 11 },
+    ]);
+  });
+
   it('마스터 종목이 있으면 그 ID 로 필터 링크를 만든다', () => {
     const sports = [{ id: 'uuid-futsal', name: '풋살', levels: [] }] as unknown as V1Sport[];
 

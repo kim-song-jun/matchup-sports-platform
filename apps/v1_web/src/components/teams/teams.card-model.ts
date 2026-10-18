@@ -6,7 +6,7 @@
  * 그려야 한다.
  */
 import type { TeamListViewModel, TeamModel } from './teams.types';
-import type { V1Team } from '@/types/api';
+import type { ListFacets, V1Team } from '@/types/api';
 import { formatProvinceWide } from '@/lib/v1-regions';
 import { teamGenderRuleLabel, teamRecruitmentLabel } from '@/lib/v1-status-labels';
 
@@ -81,6 +81,7 @@ export function buildTeamSportChips(
   selectedSportId?: string,
   masterSports?: Array<{ id: string; name: string }>,
   showCounts = true,
+  facets?: Pick<ListFacets, 'sports'>,
 ) {
   // 마스터 종목 목록이 있으면 그것이 정답이다 — 링크에 실을 **종목 ID** 가 거기에만 있다.
   //
@@ -91,22 +92,29 @@ export function buildTeamSportChips(
   const fixedSports: Array<{ id?: string; name: string }> = masterSports?.length
     ? masterSports.slice(0, 4).map((sport) => ({ id: sport.id, name: sport.name }))
     : topSportNames(items).map((name) => ({ name }));
+  const facetCounts = facets ? new Map(facets.sports.map(({ sportId, count }) => [sportId, count] as const)) : null;
+  const totalFacetCount = facetCounts ? [...facetCounts.values()].reduce((sum, count) => sum + count, 0) : undefined;
+  const countForSport = (sport: { id?: string; name: string }): number | undefined => {
+    if (facetCounts) return sport.id === undefined ? undefined : facetCounts.get(sport.id) ?? 0;
+    if (!showCounts) return undefined;
+    return items.filter((team) => {
+      const teamSport = team.sport;
+      return (sport.id !== undefined && teamSport?.sportId === sport.id) || teamSport?.name === sport.name || team.sportName === sport.name;
+    }).length;
+  };
+  const totalCount = facetCounts ? totalFacetCount : showCounts ? items.length : undefined;
 
   return [
-    { label: fallback.chips[0]?.label.replace(/\s+\d+$/, '') ?? '전체', ...(showCounts ? { count: items.length } : {}), active: !selectedSportId, href: buildTeamHref(params, { sportId: null }) },
-    ...fixedSports.map((sport) => ({
-      label: sport.name,
-      ...(showCounts
-        ? {
-            count: items.filter((team) => {
-              const teamSport = team.sport;
-              return (sport.id !== undefined && teamSport?.sportId === sport.id) || teamSport?.name === sport.name || team.sportName === sport.name;
-            }).length,
-          }
-        : {}),
-      active: sport.id !== undefined && selectedSportId === sport.id,
-      ...(sport.id === undefined ? {} : { href: buildTeamHref(params, { sportId: sport.id }) }),
-    })),
+    { label: fallback.chips[0]?.label.replace(/\s+\d+$/, '') ?? '전체', ...(totalCount === undefined ? {} : { count: totalCount }), active: !selectedSportId, href: buildTeamHref(params, { sportId: null }) },
+    ...fixedSports.map((sport) => {
+      const count = countForSport(sport);
+      return {
+        label: sport.name,
+        ...(count === undefined ? {} : { count }),
+        active: sport.id !== undefined && selectedSportId === sport.id,
+        ...(sport.id === undefined ? {} : { href: buildTeamHref(params, { sportId: sport.id }) }),
+      };
+    }),
   ];
 }
 

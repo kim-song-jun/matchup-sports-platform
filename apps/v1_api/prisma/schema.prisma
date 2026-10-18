@@ -1907,6 +1907,8 @@ model V1TournamentMatchDetails {
   parentTeamMatchId    String?  @map("parent_team_match_id")
   homeRegistrationId   String?  @map("home_registration_id")
   awayRegistrationId   String?  @map("away_registration_id")
+  homeDisplayLabel     String?  @map("home_display_label") @db.VarChar(120)
+  awayDisplayLabel     String?  @map("away_display_label") @db.VarChar(120)
   createdAt            DateTime @default(now()) @map("created_at")
   updatedAt            DateTime @updatedAt @map("updated_at")
 
@@ -4072,6 +4074,7 @@ model V1TournamentSlot {
   groupId        String?              @map("group_id")
   position       Int
   byeSortOrder   Int?                 @map("bye_sort_order")
+  displayLabel   String?              @map("display_label") @db.VarChar(120)
   sourceGroupId  String?              @map("source_group_id")
   registrationId String?              @map("registration_id")
   createdAt      DateTime             @default(now()) @map("created_at")

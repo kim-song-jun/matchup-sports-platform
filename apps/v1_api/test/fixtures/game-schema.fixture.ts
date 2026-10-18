@@ -596,7 +596,7 @@ export const gameSchemaSourceManifest = {
   // Combined with PR #1957 nullable V1TournamentSlot.byeSortOrder.
   // 2026-10-17: additive V1Match.isOnline backed by
   // 20261017100000_v1_match_online_classification. Game operations migration is unchanged.
-  schema: 'b4894d0eb9010482a1e4e7d0d142160e41e395826de0fbbb09402a4443a8abeb',
+  schema: '887da0ea94d64d5c0ee6b51927f82a9022bfff97878b2e5094ad0d88ea05eaf3',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

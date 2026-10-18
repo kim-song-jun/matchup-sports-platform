@@ -184,3 +184,5 @@ Team matches do not expose `on_hold`: unmatched recruitment with an elapsed dead
 ## Independent league image PATCH fields
 
 The [league image endpoint](./domains/league-matches.md#cover-image-목록상세-이미지) requires at least one of `coverImageUrl` (detail) and `listImageUrl`. Omitted fields are preserved; explicit null clears only that stored field. Public display uses the other image if only one remains. This does not change the global validation or upload URL policy.
+
+2026-10-17: Tournament fixture presentation overrides and shared list/canvas schedule semantics are documented in [tournaments](./domains/tournaments.md#bracket-presentation-overrides-2026-10-17).

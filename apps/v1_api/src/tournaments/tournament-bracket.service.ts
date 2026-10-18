@@ -60,6 +60,7 @@ import { assignSlotInTx } from './slots/tournament-slot.service';
 import { adminBracketSlotInclude, serializeAdminBracketSlot } from './slots/admin-bracket-view';
 import { tournamentTeamMatchBracketInclude, serializeTournamentTeamMatchBracket } from './tournament-team-match-bracket.query';
 import { competitionMatchLabel } from './tournament-round-label';
+import { updateFixtureDisplayLabelsInTx } from './fixture-display-label';
 import { acceptsBracketSource } from './tournament-bracket-phases';
 import { PLACE_SELECT } from '../places/place-select';
 import { rejectPartialPlaceUpdate, resolvePlaceSnapshot, toPlaceView, type PlaceView } from '../places/place-snapshot';
@@ -1024,6 +1025,14 @@ export class TournamentBracketService {
       if (canonical.teamMatch.game === null || canonical.teamMatch.game.sourceType !== V1GameSourceType.TEAM_MATCH) {
         throw new ConflictException({ code: 'TOURNAMENT_MATCH_GAME_MISSING', message: '대회 경기의 정본 게임을 찾을 수 없어요.' });
       }
+      const changesLabels = dto.homeDisplayLabel !== undefined || dto.awayDisplayLabel !== undefined;
+      const labelsOnly = changesLabels && [dto.fixtureNumber, dto.scheduledAt, dto.fieldId, dto.venue, dto.homeRegistrationId, dto.awayRegistrationId].every(value => value === undefined);
+      if (labelsOnly) return this.prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`league-fixture-generation:${canonical.tournamentId}`}, 0))`;
+        const labels = await updateFixtureDisplayLabelsInTx(tx, this.adminContext, admin, fixtureId, dto);
+        const fresh = await tx.v1TournamentMatchDetails.findUniqueOrThrow({ where: { teamMatchId: fixtureId }, include: { teamMatch: true } });
+        return { ...this.serializeCanonicalFixture({ ...fresh.teamMatch, ...fresh, id: fixtureId }, toPlaceView(fresh.teamMatch)), ...labels, startedTeamChange: null };
+      });
       assertSidesNotSlotLinked(
         {
           homeSlotId: canonical.teamMatch.homeSlotId,
@@ -1077,7 +1086,7 @@ export class TournamentBracketService {
         // Same lock as assignment/creation: a concurrent bye designation cannot
         // race between the participant check and the canonical match update.
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`league-fixture-generation:${canonical.tournamentId}`}, 0))`;
-        return updateTournamentFixtureInTx(tx, admin, {
+        const row = await updateTournamentFixtureInTx(tx, admin, {
           fixtureId,
           tournamentId: canonical.tournamentId,
           groupId: canonical.groupId,
@@ -1090,6 +1099,8 @@ export class TournamentBracketService {
           allowStartedTeamChange: true,
           teamChangeReason: dto.teamChangeReason,
         });
+        if (changesLabels) await updateFixtureDisplayLabelsInTx(tx, this.adminContext, admin, fixtureId, dto);
+        return row;
       });
       const startedTeamChange = updated.startedTeamChange === null
         ? null
@@ -1362,8 +1373,11 @@ export class TournamentBracketService {
       });
     }
 
+    const phaseOrder: Record<string, number> = { group: 0, round16: 1, round12: 2, quarter: 3, semi: 4, final: 5, third_place: 6 };
+    const orderedGroups = [...groups].sort((a, b) => (phaseOrder[a.phase] ?? 99) - (phaseOrder[b.phase] ?? 99) || a.sortOrder - b.sortOrder || a.id.localeCompare(b.id));
+    const groupOrder = new Map(orderedGroups.map((group, index) => [group.id, index]));
     return {
-      groups: groups.map((g) => ({
+      groups: orderedGroups.map((g) => ({
         ...this.serializeGroup(g),
         groupTeams: [...g.groupTeams.map((gt) => ({
           ...this.serializeGroupTeam(gt),
@@ -1372,7 +1386,7 @@ export class TournamentBracketService {
           .sort((a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id)),
       })),
       fixtures: [...fixtureRows.values()].sort((a, b) =>
-        a.round.localeCompare(b.round) || a.fixtureNumber - b.fixtureNumber || a.legNumber - b.legNumber),
+        (groupOrder.get(a.groupId ?? '') ?? 999999) - (groupOrder.get(b.groupId ?? '') ?? 999999) || a.fixtureNumber - b.fixtureNumber || a.legNumber - b.legNumber || a.id.localeCompare(b.id)),
       standings: standings.map((s) => ({
         ...this.serializeStanding(s),
         teamName: s.registration.team.name,

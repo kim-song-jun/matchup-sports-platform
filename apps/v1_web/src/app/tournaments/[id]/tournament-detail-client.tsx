@@ -1277,7 +1277,7 @@ export function TournamentDetailView({
     <aside className="tm-tournament-rail tm-show-desktop" role="complementary" aria-label={isLeagueMirror ? '리그 진행 상태' : '대회 진행 상태'}>
       {/* Live CTA */}
       <Link
-        aria-label={getBracketEntryCtaLabel(tournament.status, isLeagueMirror) ?? undefined}
+        aria-label={isLeagueMirror ? getBracketEntryCtaLabel(tournament.status, true) ?? undefined : undefined}
         href={childHref(`/tournaments/${tournament.id}/bracket`)}
         style={{
           display: 'flex', alignItems: 'center', gap: 12,

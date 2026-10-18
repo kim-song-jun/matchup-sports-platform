@@ -1,5 +1,6 @@
 import { IsPlaceLatitude, IsPlaceLongitude, IsPlaceProvider, IsPlaceProviderId } from '../../places/place-snapshot';
 import { GENDER_RULES } from '../../common/gender-rule';
+import { Transform } from 'class-transformer';
 import { ArrayMaxSize, IsArray, IsDateString, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength, IsIn } from 'class-validator';
 import {
   MATCH_FORMAT_MAX_LENGTH,
@@ -19,8 +20,10 @@ export class CreateAdminTeamMatchRecruitmentDto {
   @IsNotEmpty()
   regionId!: string;
 
+  // 사용자 팀매치(MutateTeamMatchDto)와 같은 규칙 — 공백뿐인 제목도 빈 값으로 본다(MD-QA #163).
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
-  @IsNotEmpty()
+  @IsNotEmpty({ message: '매치 제목을 입력해 주세요.' })
   @MaxLength(100)
   title!: string;
 

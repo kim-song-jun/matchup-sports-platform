@@ -171,6 +171,7 @@ Required body:
 - `sportId` (활성 종목)
 - `regionId` (활성 시·군·구)
 - `title`, `startsAt`, `manualPlaceName`
+  - `title` 은 앞뒤 공백을 지우고 저장해요. 비었거나 공백뿐이면 `400 VALIDATION_ERROR`(`field=title`). 수정도 같은 규칙이에요.
 
 Optional body: `description`, `imageUrl`, `listImageUrl`, `endsAt`, `deadlineAt`, `addressText`, `placeLatitude`, `placeLongitude`, `placeProvider`, `placeProviderId`, `costNote`, `rulesText`, `minLevelCode`, `maxLevelCode`, `genderRule`, `matchFormat`, `matchStyle`, `uniformColor`.
 
@@ -283,6 +284,7 @@ Required:
 - `regionId`
   - Required non-empty string; accepts stable catalog slugs such as `region-seoul-jongno`.
 - `title`
+  - Required, ≤100자. 앞뒤 공백을 지우고 저장하며, 비었거나 공백뿐이면 `400 VALIDATION_ERROR`(`field=title`). `PATCH` 도 같은 규칙.
 - `startsAt`
 - `manualPlaceName`
 

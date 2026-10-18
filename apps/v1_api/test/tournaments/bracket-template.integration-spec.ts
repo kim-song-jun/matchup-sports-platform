@@ -90,6 +90,8 @@ describe('대진 템플릿 실행기 (PostgreSQL)', () => {
     const after = (await bracket.getBracket(user, tournamentId)).fixtures.find(row => row.id === target.teamMatchId)!;
     expect(after).toMatchObject({ id: before.id, fixtureNumber: 30, scheduledAt: before.scheduledAt, fieldId: field.id, venue: 'A구장', homeDisplayLabel: '준결승 A 승자', awayDisplayLabel: '준결승 B 승자', bracketSources: before.bracketSources });
     expect(after.bracketSources).toHaveLength(2);
+    await prisma.v1Tournament.update({ where: { id: tournamentId }, data: { bracketPublishedAt: new Date() } });
+    await prisma.v1GameVisibilityPolicy.updateMany({ where: { game: { teamMatch: { tournamentId } } }, data: { mode: 'LIVE' } });
     const publicRow = await prisma.v1Tournament.findUniqueOrThrow({ where: { id: tournamentId }, include: TOURNAMENT_DETAIL_INCLUDE });
     expect(presentTournamentDetail(publicRow, true).fixtures.find(row => row.id === target.teamMatchId)).toMatchObject({ id: before.id, scheduledAt: before.scheduledAt, fieldId: field.id, venue: 'A구장', homeSlotLabel: '준결승 A 승자', awaySlotLabel: '준결승 B 승자', bracketSources: before.bracketSources });
     await bracket.updateFixture(user, after.bracketSources[0].fixtureId, { fixtureNumber: 31 });
@@ -110,6 +112,8 @@ describe('대진 템플릿 실행기 (PostgreSQL)', () => {
     const quarter = before.fixtures.find(row => row.homeSlotId === bye.id)!;
     expect(bye.registrationId).toBeNull();
     await bracket.updateFixture(user, quarter.id, { homeDisplayLabel: '조 1위 중 5위' });
+    await prisma.v1Tournament.update({ where: { id: tournamentId }, data: { bracketPublishedAt: new Date() } });
+    await prisma.v1GameVisibilityPolicy.updateMany({ where: { game: { teamMatch: { tournamentId } } }, data: { mode: 'LIVE' } });
     const emptyPublic = presentTournamentDetail(await prisma.v1Tournament.findUniqueOrThrow({ where: { id: tournamentId }, include: TOURNAMENT_DETAIL_INCLUDE }), true);
     expect(emptyPublic.fixtures.find(row => row.id === quarter.id)?.homeSlotLabel).toBe('조 1위 중 5위');
     expect(emptyPublic.groups.flatMap(group => group.groupTeams).find(row => row.isBye && row.sortOrder === bye.byeSortOrder)?.displayLabel).toBe('조 1위 중 5위');

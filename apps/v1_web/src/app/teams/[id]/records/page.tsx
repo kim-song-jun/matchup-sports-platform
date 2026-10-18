@@ -29,7 +29,7 @@ function recordsPath(id: string, filters: { season?: string; type?: TeamRecordCa
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
-  const records = await fetchPublicV1<PublicTeamRecordsResponse>(`/teams/${encodeURIComponent(id)}/records`);
+  const records = await fetchPublicV1<PublicTeamRecordsResponse>(`/teams/${encodeURIComponent(id)}/records`, { cache: 'no-store' });
   if (!records) return buildNoIndexMetadata('팀 전적을 찾을 수 없어요');
   return buildPublicMetadata({
     title: `${records.teamName} 전적`,
@@ -47,7 +47,7 @@ export default async function TeamRecordsPage({
 }) {
   const { id } = await params;
   const filters = normalizeRecordsFilters(searchParams ? await searchParams : undefined);
-  const records = await fetchPublicV1<PublicTeamRecordsResponse>(recordsPath(id, filters));
+  const records = await fetchPublicV1<PublicTeamRecordsResponse>(recordsPath(id, filters), { cache: 'no-store' });
   if (!records) notFound();
   return <TeamRecordsPageClient teamId={id} seed={records} seedSeason={filters.season} seedType={filters.type} />;
 }

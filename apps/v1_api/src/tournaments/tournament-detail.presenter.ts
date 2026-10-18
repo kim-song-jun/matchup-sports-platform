@@ -8,7 +8,7 @@ import type { LeagueFixtureListItem } from '../league-matches/league-fixture-lis
 import type { TournamentDetailRow } from './tournaments-read.query';
 import { resolveTournamentFixtureOfficialResult } from './tournament-fixture-official-result';
 import type { PublicRosterPlayer } from './public-roster';
-import { slotLabelFromRow } from './slots/tournament-slot-label';
+import { publicFixtureSideLabel } from './slots/tournament-slot-label';
 import type { GroupStandingSummary } from './slots/group-rank-preview';
 import { toPlaceView, type PlaceView } from '../places/place-snapshot';
 
@@ -204,11 +204,11 @@ function presentCanonicalFixture(
     awayRegistrationId: details.awayRegistrationId,
     scheduledAt: match.startAt,
     fieldId: match.fieldId,
-    venue: match.placeName,
+    venue: match.field?.name ?? match.placeName,
     place: toPlaceView(match),
     // The label replaces 'TBD' only when a side has no team, so it is null whenever a team exists.
-    homeSlotLabel: details.homeRegistration === null && match.homeSlot ? slotLabelFromRow(match.homeSlot) : null,
-    awaySlotLabel: details.awayRegistration === null && match.awaySlot ? slotLabelFromRow(match.awaySlot) : null,
+    homeSlotLabel: details.homeRegistration === null ? publicFixtureSideLabel(match.homeSlot, details.homeDisplayLabel) : null,
+    awaySlotLabel: details.awayRegistration === null ? publicFixtureSideLabel(match.awaySlot, details.awayDisplayLabel) : null,
     status: fixtureStatusFromTeamMatch(match.status),
     homeRegistration: details.homeRegistration,
     awayRegistration: details.awayRegistration,
@@ -461,6 +461,7 @@ export function presentTournamentDetail(
         teamLogoUrl: hideIdentity ? null : (groupTeam.registration?.team.profile?.logoUrl ?? null),
         sortOrder: groupTeam.sortOrder,
         isBye: groupTeam.isBye,
+        displayLabel: groupTeam.isBye ? group.slots?.find(slot => slot.kind === 'BYE' && slot.byeSortOrder === groupTeam.sortOrder)?.displayLabel ?? null : null,
       })),
       standings: group.standings.map((standing) => ({
         registrationId: standing.registrationId,
@@ -489,6 +490,7 @@ export function presentTournamentDetail(
       bracketSources: fixture.bracketSources,
       scheduledAt: fixture.scheduledAt?.toISOString() ?? null,
       venue: fixture.venue,
+      fieldId: fixture.fieldId,
       place: fixture.place,
       status: fixture.status,
       /**

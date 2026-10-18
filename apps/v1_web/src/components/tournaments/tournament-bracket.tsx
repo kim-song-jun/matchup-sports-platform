@@ -337,7 +337,7 @@ function AggregateMatchCard({ matchup }: { matchup: AggregateMatchup }) {
         data-loser={isDone && winner === 'away' ? 'true' : undefined}
       >
         <TeamAvatar seed={homeTeamId ?? home.label} name={home.label} logoUrl={homeTeamLogoUrl} size="sm" />
-        <span className="tm-bk2-name" style={home.isPlaceholder ? { color: 'var(--text-caption)' } : undefined}>{home.label}</span>
+        <span className="tm-bk2-name" title={label} style={home.isPlaceholder ? { color: 'var(--text-caption)' } : undefined}>{home.label}</span>
         <span className="tm-bk2-score tab-num">{homeAggScore}</span>
       </div>
       <div className="tm-bk2-divider" aria-hidden="true" />
@@ -347,7 +347,7 @@ function AggregateMatchCard({ matchup }: { matchup: AggregateMatchup }) {
         data-loser={isDone && winner === 'home' ? 'true' : undefined}
       >
         <TeamAvatar seed={awayTeamId ?? away.label} name={away.label} logoUrl={awayTeamLogoUrl} size="sm" />
-        <span className="tm-bk2-name" style={away.isPlaceholder ? { color: 'var(--text-caption)' } : undefined}>{away.label}</span>
+        <span className="tm-bk2-name" title={label} style={away.isPlaceholder ? { color: 'var(--text-caption)' } : undefined}>{away.label}</span>
         <span className="tm-bk2-score tab-num">{awayAggScore}</span>
       </div>
       {isLive && <div className="tm-bk2-badge tm-bk2-badge-live">● LIVE</div>}
@@ -409,7 +409,7 @@ function MatchTeamRow({
       data-bracket-team-row
     >
       <TeamAvatar seed={teamId ?? label} name={label} logoUrl={isPending ? null : logoUrl} size="sm" />
-      <span className="tm-bk2-name" style={!decided ? { color: 'var(--text-caption)' } : undefined}>{label}</span>
+      <span className="tm-bk2-name" title={label} style={!decided ? { color: 'var(--text-caption)' } : undefined}>{label}</span>
       {score !== null && <span className="tm-bk2-score tab-num">{score}</span>}
       {score === null && decided && <span className="tm-bk2-score" style={{ opacity: 0.25 }}>-</span>}
     </div>
@@ -459,6 +459,8 @@ function MatchCard({ fixture }: { fixture: V1TournamentFixture }) {
         isPending={fixture.awayRegistrationId === null && (fixture.bracketSources?.some((source) => source.side === 'AWAY') || fixture.awaySlotLabel !== null)}
         isWinner={winner === 'away'} isLoser={isDone && winner === 'home'}
       />
+      <div className="tm-text-micro truncate px-3 py-1 text-[var(--text-caption)]" title={fixture.venue ?? undefined}>{fixture.venue || '경기장 미정'}</div>
+      {!timeLabel && <div className="tm-text-micro px-3 pb-1 text-[var(--text-caption)]">시간 미정</div>}
       {badges.length === 1 && <div className={badges[0].className}>{badges[0].label}</div>}
       {badges.length > 1 && (
         <div className="tm-bk2-badge-row">
@@ -736,7 +738,8 @@ function ConnectedBracket({ rounds, groups, champion }: { rounds: BracketGraphRo
               <MatchCard fixture={withBracketSourceNames(fixture, rounds)} />
             </> : node.bye ? <div className="tm-bk2-card" role="region" aria-label={`${byeRound(node.round)?.label} 부전승`} style={{ padding: 12 }}>
               <div className="tm-text-caption-strong" style={{ color: 'var(--blue700)', marginBottom: 8 }}>부전승 · {byeRound(node.round)?.nextLabel} 직행</div>
-              <div className="flex items-center gap-2"><TeamAvatar seed={node.bye.teamId ?? node.bye.registrationId ?? node.bye.id} name={teamDisplayName(node.bye.registrationId === null ? 'TBD' : node.bye.teamName).label} logoUrl={node.bye.teamLogoUrl} size="sm" /><span className="tm-text-caption-strong">{teamDisplayName(node.bye.registrationId === null ? 'TBD' : node.bye.teamName).label}</span></div>
+              <div className="flex items-center gap-2"><TeamAvatar seed={node.bye.teamId ?? node.bye.registrationId ?? node.bye.id} name={teamDisplayName(node.bye.registrationId === null ? node.bye.displayLabel ?? 'TBD' : node.bye.teamName).label} logoUrl={node.bye.teamLogoUrl} size="sm" /><span className="tm-text-caption-strong min-w-0 truncate">{teamDisplayName(node.bye.registrationId === null ? node.bye.displayLabel ?? 'TBD' : node.bye.teamName).label}</span></div>
+              {node.bye.registrationId !== null && node.bye.displayLabel ? <p className="tm-text-micro mt-1 truncate text-[var(--text-caption)]" title={node.bye.displayLabel}>{node.bye.displayLabel}</p> : null}
             </div> : null}
           </div>;
         })}

@@ -58,6 +58,8 @@ type FakeFixture = {
 };
 
 type FakeCanonicalScheduleRow = {
+  homeDisplayLabel?: string | null;
+  awayDisplayLabel?: string | null;
   teamMatchId: string;
   tournamentId: string;
   groupId: null;
@@ -1084,6 +1086,14 @@ describe('PublicTournamentRecordsService.getSchedule -- 자리 라벨 (homeSlotL
     );
     expect(result.items[0]).toMatchObject({ homeSlotLabel: null, awaySlotLabel: 'A조 1위' });
     expect(result.items[0].home).toMatchObject({ teamName: '홈팀' });
+  });
+
+  it('저장된 사이드 문구와 BYE 슬롯 문구를 공개 일정에 반영한다', async () => {
+    const result = await scheduleWith(
+      { homeRegistrationId: null, homeRegistration: null, awayRegistrationId: null, awayRegistration: null, homeDisplayLabel: '조 1위 중 5위', awayDisplayLabel: '오래된 복사' },
+      { homeSlot: groupRank, awaySlot: { ...entry, kind: 'BYE', displayLabel: '직접 정한 부전승' } },
+    );
+    expect(result.items[0]).toMatchObject({ homeSlotLabel: '조 1위 중 5위', awaySlotLabel: '직접 정한 부전승' });
   });
 
   it('자리에 연결되지 않은 기존 빈 경기는 라벨이 null 이다', async () => {

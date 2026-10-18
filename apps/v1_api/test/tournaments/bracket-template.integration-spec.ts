@@ -1,3 +1,5 @@
+import { TOURNAMENT_DETAIL_INCLUDE } from '../../src/tournaments/tournaments-read.query';
+import { presentTournamentDetail } from '../../src/tournaments/tournament-detail.presenter';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { AdminContextService } from '../../src/common/admin-context.service';
 import { OperationAuditWriterService } from '../../src/common/audit/operation-audit-writer.service';
@@ -88,6 +90,8 @@ describe('대진 템플릿 실행기 (PostgreSQL)', () => {
     const after = (await bracket.getBracket(user, tournamentId)).fixtures.find(row => row.id === target.teamMatchId)!;
     expect(after).toMatchObject({ id: before.id, fixtureNumber: 30, scheduledAt: before.scheduledAt, fieldId: field.id, venue: 'A구장', homeDisplayLabel: '준결승 A 승자', awayDisplayLabel: '준결승 B 승자', bracketSources: before.bracketSources });
     expect(after.bracketSources).toHaveLength(2);
+    const publicRow = await prisma.v1Tournament.findUniqueOrThrow({ where: { id: tournamentId }, include: TOURNAMENT_DETAIL_INCLUDE });
+    expect(presentTournamentDetail(publicRow, true).fixtures.find(row => row.id === target.teamMatchId)).toMatchObject({ id: before.id, scheduledAt: before.scheduledAt, fieldId: field.id, venue: 'A구장', homeSlotLabel: '준결승 A 승자', awaySlotLabel: '준결승 B 승자', bracketSources: before.bracketSources });
     await bracket.updateFixture(user, after.bracketSources[0].fixtureId, { fixtureNumber: 31 });
     expect((await bracket.getBracket(user, tournamentId)).fixtures.find(row => row.id === target.teamMatchId)?.homeDisplayLabel).toBe('준결승 A 승자');
     await bracket.updateFixture(user, target.teamMatchId, { scheduledAt: null, fieldId: null, venue: '', homeDisplayLabel: '', awayDisplayLabel: null });
@@ -106,10 +110,16 @@ describe('대진 템플릿 실행기 (PostgreSQL)', () => {
     const quarter = before.fixtures.find(row => row.homeSlotId === bye.id)!;
     expect(bye.registrationId).toBeNull();
     await bracket.updateFixture(user, quarter.id, { homeDisplayLabel: '조 1위 중 5위' });
+    const emptyPublic = presentTournamentDetail(await prisma.v1Tournament.findUniqueOrThrow({ where: { id: tournamentId }, include: TOURNAMENT_DETAIL_INCLUDE }), true);
+    expect(emptyPublic.fixtures.find(row => row.id === quarter.id)?.homeSlotLabel).toBe('조 1위 중 5위');
+    expect(emptyPublic.groups.flatMap(group => group.groupTeams).find(row => row.isBye && row.sortOrder === bye.byeSortOrder)?.displayLabel).toBe('조 1위 중 5위');
     await slots.assignSlot(user, bye.id, registrationIds[0]);
     const after = await bracket.getBracket(user, tournamentId);
     expect(after.slots.find(row => row.id === bye.id)).toMatchObject({ displayLabel: '조 1위 중 5위', label: '조 1위 중 5위', registrationId: registrationIds[0], automaticLabel: bye.automaticLabel });
     expect(after.fixtures.find(row => row.id === quarter.id)).toMatchObject({ homeDisplayLabel: '조 1위 중 5위', homeRegistrationId: registrationIds[0], homeSlotId: bye.id, bracketSources: quarter.bracketSources });
+    const assignedPublic = presentTournamentDetail(await prisma.v1Tournament.findUniqueOrThrow({ where: { id: tournamentId }, include: TOURNAMENT_DETAIL_INCLUDE }), true);
+    expect(assignedPublic.fixtures.find(row => row.id === quarter.id)?.homeSlotLabel).toBeNull();
+    expect(assignedPublic.groups.flatMap(group => group.groupTeams).find(row => row.isBye && row.registrationId === registrationIds[0])?.displayLabel).toBe('조 1위 중 5위');
     // Only the shared BYE slot stores the override; no duplicate side text.
     expect(await prisma.v1TournamentMatchDetails.findUniqueOrThrow({ where: { teamMatchId: quarter.id } })).toMatchObject({ homeDisplayLabel: null });
     await bracket.updateFixture(user, quarter.id, { homeDisplayLabel: '   ' });

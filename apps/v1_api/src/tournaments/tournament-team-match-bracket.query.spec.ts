@@ -15,6 +15,11 @@ describe('shared bracket fixture query', () => {
     const result = serializeTournamentTeamMatchBracket(row() as unknown as TournamentTeamMatchBracketRow);
     expect(result).toMatchObject({ id: 'match', scheduledAt: '2026-10-25T05:00:00.000Z', venue: 'A구장', fieldId: 'field-a', homeDisplayLabel: '조 1위 중 5위' });
   });
+  it('uses the registered field name when the place snapshot is stale', () => {
+    const input = row();
+    const result = serializeTournamentTeamMatchBracket({ ...input, teamMatch: { ...input.teamMatch, field: { name: '등록 B구장' } } } as unknown as TournamentTeamMatchBracketRow);
+    expect(result).toMatchObject({ fieldId: 'field-a', venue: '등록 B구장', scheduledAt: '2026-10-25T05:00:00.000Z' });
+  });
   it('reads a BYE override from the shared slot, and clearing it restores automatic behavior', () => {
     const input = row();
     input.homeDisplayLabel = 'stale side copy' as never;

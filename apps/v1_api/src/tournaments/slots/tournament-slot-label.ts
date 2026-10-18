@@ -30,6 +30,7 @@ export function tournamentSlotLabel(input: TournamentSlotLabelInput): string {
 /** Prisma select 조각 — 공개 상세·어드민 응답이 같은 모양으로 읽어 `slotLabelFromRow` 에 넘긴다. */
 export const SLOT_LABEL_SELECT = {
   kind: true,
+  displayLabel: true,
   position: true,
   byeSortOrder: true,
   group: { select: { name: true, phase: true } },
@@ -37,6 +38,7 @@ export const SLOT_LABEL_SELECT = {
 } as const;
 
 export type SlotLabelRow = {
+  displayLabel?: string | null;
   kind: V1TournamentSlotKind;
   position: number;
   byeSortOrder?: number | null;
@@ -53,4 +55,10 @@ export function slotLabelFromRow(row: SlotLabelRow): string {
     groupPhase: row.group?.phase ?? null,
     sourceGroupName: row.sourceGroup?.name ?? null,
   });
+}
+
+/** Public placeholder uses the same override authority as the admin fixture. */
+export function publicFixtureSideLabel(slot: SlotLabelRow | null, sideOverride: string | null | undefined): string | null {
+  const override = slot?.kind === 'BYE' ? slot.displayLabel : sideOverride;
+  return override ?? (slot ? slotLabelFromRow(slot) : null);
 }

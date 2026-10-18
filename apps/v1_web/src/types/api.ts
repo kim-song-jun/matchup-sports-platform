@@ -3802,6 +3802,8 @@ export type V1Tournament = {
  * 'TBD' 같은 별도 문자열로 구분된다.
  */
 export type V1TournamentGroupTeam = {
+  /** Saved BYE label shared with its linked quarter-final. */
+  displayLabel?: string | null;
   /** 명시적으로 지정된 12강 부전승. 미배정 상대와 구분한다. */
   isBye?: boolean;
   id: string;
@@ -3890,6 +3892,7 @@ export type V1TournamentFixtureVideo = {
 export type V1BracketSource = { fixtureId: string; outcome: 'WINNER' | 'LOSER'; side: 'HOME' | 'AWAY' };
 
 export type V1TournamentFixture = {
+  fieldId?: string | null;
   bracketSources?: V1BracketSource[];
   id: string;
   groupId: string | null;
@@ -3923,7 +3926,7 @@ export type V1TournamentFixture = {
   awayTeamId: string | null;
   awayTeamName: string | null;
   awayTeamLogoUrl: string | null;
-  /** Slot label ("A조 1위") for a side with no team yet; null once a team exists or when there is no slot. */
+  /** Custom placeholder or automatic slot label for a side with no team; null once assigned. */
   homeSlotLabel: string | null;
   awaySlotLabel: string | null;
   result: V1TournamentFixtureResult | null;

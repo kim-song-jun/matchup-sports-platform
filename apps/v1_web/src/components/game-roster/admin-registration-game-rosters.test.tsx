@@ -74,6 +74,20 @@ function batchBodies() {
 const cell = (player: string, opponent: string, state: string) =>
   screen.findByRole('button', { name: new RegExp(`^${player} .* vs ${opponent} ${state}, `) });
 
+describe('어드민 경기별 명단 — 운영진 실명', () => {
+  it.each([
+    ['운영진(실명 있음)', '김실명', '김실명 (김민재)'],
+    ['권한 없음(realName 키 없음)', undefined, '김민재'],
+  ])('%s — 선수 행·칸 버튼·결장 기간 선택이 같은 이름 규칙을 따른다', async (_, realName, name) => {
+    if (realName !== undefined) mock.setRealName('player-1', realName);
+    renderPanel();
+
+    expect(await screen.findByRole('rowheader', { name })).toBeInTheDocument();
+    expect(await cell(name.replace(/[()]/g, '\\$&'), G1.opponentName, '출전')).toBeInTheDocument();
+    expect(screen.getByRole('option', { name })).toBeInTheDocument();
+  });
+});
+
 describe('어드민 경기별 명단 — 칸 토글과 저장', () => {
   it('칸을 누르면 그 경기·그 선수 빠짐이 팀 일괄 요청 한 건이 되고, 표에 "운영자"로 남는다', async () => {
     renderPanel();

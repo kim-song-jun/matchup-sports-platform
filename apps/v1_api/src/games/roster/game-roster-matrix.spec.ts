@@ -184,3 +184,22 @@ it('GK는 출전 제외와 독립적으로 어드민 셀에 표시된다', () =>
   const matrix = buildTeamRosterMatrix({ canWrite: true, columns: [{ game: game('g1'), loaded: loaded(base, { adjustments: [{ id: 'x', userId: 'gk', reason: null, actorUserId: 'admin', actorRole: 'ADMIN', createdAt: KICKOFF, revokedAt: null }] }) }] });
   expect(matrix.players[0].cells[0]).toMatchObject({ status: 'EXCLUDED', goalkeeper: true });
 });
+
+describe('buildTeamRosterMatrix — 운영진 실명', () => {
+  it.each([
+    ['운영진 — 실명이 있는 선수에게만 realName 키를 싣는다', new Map([['u1', '김실명']]), { u1: '김실명', u2: undefined }],
+    ['권한 없음 — realName 키 자체가 없다', undefined, { u1: undefined, u2: undefined }],
+  ])('%s', (_, realNameByUserId, expected) => {
+    const matrix = buildTeamRosterMatrix({
+      canWrite: false,
+      columns: [{ game: game('g1'), loaded: loaded([entry('u1'), entry('u2')]) }],
+      realNameByUserId,
+    });
+
+    for (const player of matrix.players) {
+      const realName = expected[player.userId as 'u1' | 'u2'];
+      if (realName === undefined) expect(player).not.toHaveProperty('realName');
+      else expect(player).toMatchObject({ displayName: `선수-${player.userId}`, realName });
+    }
+  });
+});

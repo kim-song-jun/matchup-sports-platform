@@ -507,3 +507,34 @@ describe('ActionTargetPicker — SUBSTITUTION (나갈 선수 → 들어올 선�
     expect(dialog.contains(document.activeElement)).toBe(true);
   });
 });
+
+describe('ActionTargetPicker — 교체 문구의 운영진 실명', () => {
+  it.each([
+    ['운영진(실명 있음)', { realName: '김실명', phone: null }, '김실명 (정우진) 선수와 교체'],
+    ['권한 없음(identity 키 없음)', undefined, '정우진 선수와 교체'],
+  ])('%s', async (_, identity, text) => {
+    const [home, away] = SUB_LINEUPS;
+    const lineups = [
+      { ...home, participants: home.participants.map((p) => (identity === undefined || p.id !== 'p-out' ? p : { ...p, identity })) },
+      away,
+    ];
+    render(
+      <ActionTargetPicker
+        open
+        actionLabel="교체"
+        actionType="SUBSTITUTION"
+        frozen={FROZEN}
+        sides={SIDES}
+        lineups={lineups}
+        allowTeamOnly={false}
+        onPitchParticipantIds={SUB_ON_PITCH}
+        onCommit={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: /정우진/ }));
+
+    expect(screen.getByText(text)).toBeInTheDocument();
+  });
+});

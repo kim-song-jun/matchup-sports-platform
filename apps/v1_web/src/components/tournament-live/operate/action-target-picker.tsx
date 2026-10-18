@@ -6,6 +6,7 @@ import { Button } from '@/components/v1-ui/button';
 import { formatMatchClock } from '@/lib/game-operations-clock';
 import type { FrozenEventCapture } from '@/lib/game-operations-clock';
 import { LineupGrid } from './lineup-grid';
+import { participantIdentityName } from './participant-identity';
 import { periodPrefix } from './period-label';
 import { FOCUSABLE_SELECTOR, useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import type {
@@ -231,7 +232,7 @@ export function ActionTargetPicker({
             </h2>
             {isSubstitution && substitutionOut !== null ? (
               <p className="mt-0.5 text-xs font-medium text-[var(--text-muted)]">
-                {substitutionOut.participant.displayNameSnapshot} 선수와 교체
+                {participantIdentityName(substitutionOut.participant)} 선수와 교체
               </p>
             ) : null}
             {/* 액션 탭 시점을 얼린 값 — 선수를 고르는 동안 흘러가지 않는다. */}

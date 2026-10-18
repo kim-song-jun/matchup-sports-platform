@@ -373,6 +373,14 @@ export function canViewParticipantIdentity(role: string): boolean {
   return role === 'platform_ops' || role === 'tournament_director' || role === 'field_operator';
 }
 
+/**
+ * 플랫폼 어드민 등급으로 같은 판정을 한다 — owner·ops 는 경기 인가의 `platform_ops`, support 는 `support_readonly` 와 같다
+ * (`resolveCompetitionOperator`). 어드민 전용 응답(출전 표·대진)이 등급을 다시 해석하지 않게 여기 한 곳에 둔다.
+ */
+export function canAdminViewParticipantIdentity(adminRole: string): boolean {
+  return canViewParticipantIdentity(adminRole === 'owner' || adminRole === 'ops' ? 'platform_ops' : 'support_readonly');
+}
+
 /** 운영 콘솔 명단 검인 줄에 붙는, 운영진 전용 본인 확인 정보. 계정이 없는 참가자·탈퇴 회원은 null 이다. */
 export interface GameParticipantIdentity {
   realName: string | null;
@@ -2612,8 +2620,7 @@ export class GamesService {
       });
       const previewSideIds = this.authorizedPreviewSideIds(actor, ownSideId, lineups.map((lineup) => lineup.sideId));
       const participants = await this.loadEffectiveLineupParticipants(tx, gameId, lineups, previewSideIds);
-      const participantsByLineupId = groupParticipantsByLineupId(participants);
-      return lineups.map((lineup) => ({ ...lineup, participants: participantsByLineupId.get(lineup.id) ?? [] }));
+      return this.withParticipantIdentities(tx, actor.role, lineups, participants);
     }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
   }
 
@@ -2657,16 +2664,35 @@ export class GamesService {
         tx, gameId, lineups, effectivePreviewSideIds,
         teamScopedReader ? { ownSideId, lineupPublished, canRecordPublishedOpponentDefaults } : null,
       );
-      const participantsByLineupId = groupParticipantsByLineupId(participants);
-      const flatParticipants = lineups.flatMap((lineup) => participantsByLineupId.get(lineup.id) ?? []);
-      const identityByUserId = canViewParticipantIdentity(actor.role) ? await this.loadParticipantIdentities(tx, flatParticipants) : null;
-      return lineups.map((lineup) => ({
-        ...lineup,
-        participants: (participantsByLineupId.get(lineup.id) ?? []).map((participant) => identityByUserId === null
-          ? participant
-          : { ...participant, identity: participant.userId === null ? null : (identityByUserId.get(participant.userId) ?? null) }),
-      }));
+      return this.withParticipantIdentities(tx, actor.role, lineups, participants);
     }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
+  }
+
+  /**
+   * 라인업에 참가자를 붙이고, 대회 운영진(`canViewParticipantIdentity`)에게만 참가자마다 `identity`(실명·전화번호)를 싣는다.
+   * 운영 콘솔(`listLineups` 경유 대진 라인업)·결과 확인·정정(`listLineups`)·팀매치 콘솔(`listOperationsLineups`)이
+   * 같은 규칙을 쓴다 — 권한이 없으면 키 자체가 없고 계정도 조회하지 않는다.
+   */
+  private async withParticipantIdentities<L extends { id: string }>(
+    tx: Transaction,
+    role: string,
+    lineups: readonly L[],
+    participants: readonly V1GameParticipant[],
+  ) {
+    const participantsByLineupId = groupParticipantsByLineupId(participants);
+    if (!canViewParticipantIdentity(role)) {
+      return lineups.map((lineup) => ({ ...lineup, participants: participantsByLineupId.get(lineup.id) ?? [] }));
+    }
+    const identityByUserId = await this.loadParticipantIdentities(
+      tx, lineups.flatMap((lineup) => participantsByLineupId.get(lineup.id) ?? []),
+    );
+    return lineups.map((lineup) => ({
+      ...lineup,
+      participants: (participantsByLineupId.get(lineup.id) ?? []).map((participant) => ({
+        ...participant,
+        identity: participant.userId === null ? null : (identityByUserId.get(participant.userId) ?? null),
+      })),
+    }));
   }
 
   private authorizedPreviewSideIds(

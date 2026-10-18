@@ -1,11 +1,14 @@
 import type { V1GameRosterHistoryEvent } from '@/hooks/use-v1-game-roster';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
+import { rosterPersonLabel } from '@/lib/roster-presentation';
 import { gameRosterActorRoleLabel, gameRosterReasonLabel } from '@/lib/v1-status-labels';
 
 export function gameRosterHistoryTitle(event: V1GameRosterHistoryEvent): string {
-  if (event.type === 'REVOKE') return `${event.displayName} 출전으로 되돌림`;
+  // 운영진에게는 빠진 선수의 실명이 함께 온다(`realName`) — 다른 운영 화면과 같은 `실명 (닉네임)`.
+  const name = rosterPersonLabel(event);
+  if (event.type === 'REVOKE') return `${name} 출전으로 되돌림`;
   const reason = gameRosterReasonLabel(event.reason);
-  return reason === null ? `${event.displayName} 빠짐` : `${event.displayName} 빠짐 · ${reason}`;
+  return reason === null ? `${name} 빠짐` : `${name} 빠짐 · ${reason}`;
 }
 
 /** 시각 · 누가. 사람이 없는 기록(대진이 바뀌어 자동으로 되돌림)은 이름 대신 역할 라벨("자동")만. */

@@ -20,7 +20,7 @@ interface AdjustmentRow {
   revokedByRole: string | null;
 }
 
-function fakeTx(input: { sideTeamId: string; adjustments: AdjustmentRow[] }) {
+function fakeTx(input: { sideTeamId: string; adjustments: AdjustmentRow[]; operatorRole?: string }) {
   const tx = {
     v1Game: {
       findUnique: jest.fn(async () => ({
@@ -30,7 +30,8 @@ function fakeTx(input: { sideTeamId: string; adjustments: AdjustmentRow[] }) {
       })),
     },
     v1GameSide: { findUnique: jest.fn(async () => ({ teamId: input.sideTeamId })) },
-    v1TeamMembership: { findUnique: jest.fn(async () => ({ role: 'owner', status: 'active' })) },
+    // operatorRole 을 주면 팀원이 아닌 대회 운영진으로 본다.
+    v1TeamMembership: { findUnique: jest.fn(async () => (input.operatorRole === undefined ? { role: 'owner', status: 'active' } : null)) },
     v1GameRosterAdjustment: {
       findMany: jest.fn(async ({ where }: { where: { teamId?: string } }) =>
         input.adjustments.filter((row) => where.teamId === undefined || row.teamId === where.teamId),
@@ -44,12 +45,17 @@ function fakeTx(input: { sideTeamId: string; adjustments: AdjustmentRow[] }) {
     },
     v1User: {
       findMany: jest.fn(async ({ where }: { where: { id: { in: string[] } } }) =>
-        where.id.in.map((id) => ({ id, profile: { nickname: `닉-${id}`, displayName: null } })),
+        where.id.in.map((id) => ({ id, profile: { nickname: `닉-${id}`, displayName: null, realName: `실명-${id}` } })),
       ),
     },
   };
   const prisma = { $transaction: jest.fn(async (fn: (client: unknown) => unknown) => fn(tx)) };
-  const service = new GameRosterService(prisma as unknown as PrismaService, {} as GamesService);
+  const games = {
+    resolveCompetitionOperator: jest.fn(async () =>
+      input.operatorRole === undefined ? null : { role: input.operatorRole, canMutateLineup: true, platformAdmin: input.operatorRole === 'platform_ops' },
+    ),
+  };
+  const service = new GameRosterService(prisma as unknown as PrismaService, games as unknown as GamesService);
   return { service, tx };
 }
 
@@ -83,6 +89,28 @@ describe('GameRosterService.listAdjustments — 지금 사이드 팀의 기록�
       ['REVOKE', 'c1', 'ops', 'ADMIN', '닉-ops'],
       ['REVOKE', 'c2', null, 'SYSTEM', '시스템'],
     ]);
+  });
+});
+
+describe('GameRosterService.listAdjustments — 빠진 선수의 운영진 실명', () => {
+  const adjustments = [row({ id: 'c-1', teamId: 'team-C', userId: 'c1' })];
+
+  it.each(['platform_ops', 'tournament_director', 'field_operator'])('%s 에게는 빠진 선수의 실명을 싣는다(행위자는 그대로)', async (operatorRole) => {
+    const { service } = fakeTx({ sideTeamId: 'team-C', adjustments, operatorRole });
+
+    const [event] = (await service.listAdjustments(USER, TARGET)).events;
+
+    expect(event).toMatchObject({ userId: 'c1', displayName: '닉-c1', realName: '실명-c1' });
+    expect(event.actor).not.toHaveProperty('realName');
+  });
+
+  it.each([['팀장', undefined], ['조회 전용 스태프', 'support_readonly']])('%s 에게는 realName 키가 없다', async (_, operatorRole) => {
+    const { service } = fakeTx({ sideTeamId: 'team-C', adjustments, operatorRole });
+
+    const [event] = (await service.listAdjustments(USER, TARGET)).events;
+
+    expect(event).toMatchObject({ userId: 'c1', displayName: '닉-c1' });
+    expect(event).not.toHaveProperty('realName');
   });
 });
 

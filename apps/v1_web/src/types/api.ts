@@ -3688,6 +3688,8 @@ export type V1TournamentListItem = {
 
 /** Serialized by TournamentsAdminService.serialize — admin view (includes bank / player range) */
 export type V1Tournament = {
+  /** 관리자 상세 응답: null이면 형식 변경 가능. */
+  formatChangeBlockedReason?: string | null;
   id: string;
   sportId: string;
   title: string;

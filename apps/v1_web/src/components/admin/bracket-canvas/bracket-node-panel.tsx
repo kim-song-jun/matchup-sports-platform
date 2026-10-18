@@ -9,6 +9,7 @@ import { useV1DeleteFixture, useV1UpdateFixture } from '@/hooks/use-v1-api';
 import { useV1AssignTournamentSlot, useV1QuickResult, useV1SetBracketSources } from '@/hooks/use-v1-bracket-canvas';
 import { bracketSourceCandidates, bracketSourceSideOptions, isFixtureLinkable } from '@/lib/bracket-fixture-tools';
 import { TEAM_IN_OTHER_GROUP_HIDDEN_NOTE, applyGroupRule, registrationIdsBlockedForGroup, registrationIdsInOppositeFinalStage } from '@/lib/bracket-group-enrollment';
+import { placedRegistrationIdsForSlot } from '@/lib/bracket-slot-candidates';
 import { describeBracketCanvasError } from '@/lib/bracket-canvas-errors';
 import { classifyFixtureSide, fixtureTeamChangeAccess, isFixtureLocked, isSlotAssignable, type SideKey } from '@/lib/bracket-canvas-layout';
 import type {
@@ -77,7 +78,6 @@ export function BracketNodePanel({
   const isKnockout = group !== undefined && group.phase !== 'group';
   const slotsById = new Map(slots.map((slot) => [slot.id, slot]));
   const confirmed = registrations.filter((registration) => registration.status === 'confirmed');
-  const placedIds = new Set(slots.filter((slot) => slot.kind !== 'GROUP_RANK' && slot.registrationId !== null).map((slot) => slot.registrationId));
   const game = fixture.game;
   const sourceCandidates = bracketSourceCandidates({ target: fixture, groups, fixtures });
   const sourceOptions = (side: SideKey) => {
@@ -149,13 +149,15 @@ export function BracketNodePanel({
     );
   };
 
-  const slotCandidates = (slot: V1AdminBracketSlot) =>
-    applyGroupRule(
+  const slotCandidates = (slot: V1AdminBracketSlot) => {
+    const placedIds = placedRegistrationIdsForSlot(slots, slot, groups);
+    return applyGroupRule(
       confirmed.filter((registration) => registration.id === slot.registrationId || !placedIds.has(registration.id)),
       (registration) => registration.id,
       registrationIdsBlockedForGroup(groups, slot.groupId),
       slot.registrationId,
     );
+  };
 
   // 선택창을 실제로 그리는 쪽과 같은 후보 계산에서 다른 조 팀 때문에 후보가 줄었는지 읽는다.
   const hidesOtherGroupTeams = (['HOME', 'AWAY'] as const).some((side) => {

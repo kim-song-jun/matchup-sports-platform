@@ -37,6 +37,7 @@ import { FixtureLabelFields, fixtureLabelDraft, fixtureLabelPatch, type LabelDra
 import { PlacePicker } from '@/components/v1-ui/place-picker';
 import { PLACE_NAME_MAX_LENGTH } from '@/lib/place';
 import type { PlaceValue } from '@/lib/place';
+import { placedRegistrationIdsForSlot } from '@/lib/bracket-slot-candidates';
 import { buildSideLabelContext, fixtureSideLabel } from '@/lib/bracket-canvas-layout';
 import { formatKstDateShort, formatKstTime } from '@/lib/date-utils';
 import { fixtureVenuePatch, fixtureVenueValue } from '@/components/admin/bracket-canvas/fixture-venue-patch';
@@ -221,10 +222,14 @@ export function BracketTab({
     ...registrationIdsBlockedForGroup(bracket?.groups ?? [], editFixture?.groupId ?? null),
     ...registrationIdsInOppositeFinalStage(bracket?.groups ?? [], bracket?.fixtures ?? [], editFixture?.groupId ?? null),
   ]);
-  const slotPlacedIds = new Set((bracket?.slots ?? []).filter((slot) => slot.kind !== 'GROUP_RANK' && slot.registrationId !== null).map((slot) => slot.registrationId));
-  const editPickerItems = (selectedId: string, otherSideSelectedId: string, sideSlotId: string | null) => editFixtureTeamItems.filter((it) =>
-    it.id === selectedId || (it.id !== otherSideSelectedId && !editBlockedIds.has(it.id) && (sideSlotId === null || !slotPlacedIds.has(it.id))),
-  );
+  const editPickerItems = (selectedId: string, otherSideSelectedId: string, sideSlotId: string | null) => {
+    const slots = bracket?.slots ?? [];
+    const target = slots.find(slot => slot.id === sideSlotId);
+    const placed = placedRegistrationIdsForSlot(slots, target, bracket?.groups ?? []);
+    return editFixtureTeamItems.filter(item => item.id === selectedId || (
+      item.id !== otherSideSelectedId && !editBlockedIds.has(item.id) && (sideSlotId === null || !placed.has(item.id))
+    ));
+  };
 
   const editFixtureAccess = editFixture ? fixtureTeamChangeAccess(editFixture) : 'free';
   const editFixtureTeamsLocked = editFixtureAccess === 'official' || editFixtureAccess === 'cancelled';

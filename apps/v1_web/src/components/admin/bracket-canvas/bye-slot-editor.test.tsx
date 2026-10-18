@@ -39,6 +39,25 @@ describe('BYE slot editing', () => {
     fireEvent.click(screen.getByRole('button', { name: '팀 저장' }));
     await waitFor(() => expect(mocks.assign).toHaveBeenCalledWith({ slotId: 'bye', registrationId: 'r1' }));
   });
+  it('offers a group-stage ENTRY team for the BYE while excluding already selected knockout teams', async () => {
+    const stage = makeGroup({ id: 'stage', phase: 'group', name: 'A조' });
+    const allSlots = [slot,
+      makeSlot({ id: 'stage-team', groupId: stage.id, kind: 'ENTRY', registrationId: 'r1' }),
+      makeSlot({ id: 'other-bye', groupId: 'r12', kind: 'BYE', registrationId: 'r2' }),
+      makeSlot({ id: 'other-rank', groupId: 'r12', kind: 'GROUP_RANK', registrationId: 'r3' }),
+    ];
+    render(<ByeSlotEditor {...common} groups={[stage, ...groups]} slots={allSlots} candidates={[
+      { registrationId: 'r1', teamName: '조별 A팀' },
+      { registrationId: 'r2', teamName: '다른 부전승팀' },
+      { registrationId: 'r3', teamName: '이미 결선에 배정된 팀' },
+    ]} />);
+    expect(screen.getByRole('option', { name: '조별 A팀' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: '다른 부전승팀' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: '이미 결선에 배정된 팀' })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('배정팀'), { target: { value: 'r1' } });
+    fireEvent.click(screen.getByRole('button', { name: '팀 저장' }));
+    await waitFor(() => expect(mocks.assign).toHaveBeenCalledWith({ slotId: 'bye', registrationId: 'r1' }));
+  });
   it('opens the same BYE editor in the mobile BottomSheet instead of the real match editor', async () => {
     render(<BracketCanvasMobile competitionId="t-1" scope="tournament" rounds={buildBracketMobileRounds({ groups, fixtures, slots: [slot] })} slots={[slot]} groups={groups} fixtures={fixtures} candidates={common.candidates} canWrite registrationsState={{ status: 'success', truncated: false, refetchFailed: false, error: null, onRetry: vi.fn() }} showToast={vi.fn()} />);
     fireEvent.click(screen.getByRole('tab', { name: '12강' }));

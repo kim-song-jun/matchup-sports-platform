@@ -841,3 +841,16 @@ PR 은 순서대로 dev 에 머지하고 매번 alpha 에서 확인한다(dev �
 - [ ] alpha 3폭 UI/저장/새로고침/실제 진출 QA·갤러리·정리 기록.
 - 검증: API 관련 5 files/257 tests PASS, Web 편집·목록·모바일·레이아웃 6 files/203 tests PASS. API/Web tsc PASS. surface/pattern 게이트의 sandbox spawn EPERM은 앱 경로에서 권한 있는 동일 명령으로 재실행한다.
 - 실DB 회귀 2개 추가: 기존 TeamMatch 일정·필드 무입력 조회 → 번호/문구 편집 → 출처 번호 편집 → null 비우기; 빈 BYE 문구 → 팀 배정 → 8강 공유 조회 → 문구 복원 및 edge/팀 보존. 로컬 Docker daemon 부재로 CI에서 실행한다.
+
+### 2026-10-18 alpha 결함 — 부전승 후보가 조별 ENTRY와 충돌
+Status: Fix in progress
+- 재현: alpha `5444656fac`, 20팀/5조 대회에서 빈 BYE 편집의 팀 옵션이 0개. 서버는 조별 ENTRY 팀의 BYE 진출을 허용하지만 웹은 모든 ENTRY를 이미 배정된 팀으로 제거했다. 동일 필터가 목록 8강·desktop panel·mobile picker에도 있다.
+- 기존 대상의 문구는 실행 직전 값으로 복원했고 실제 팀·결과는 아직 변경하지 않았다. metadata 3폭 QA는 PASS이며 BYE team QA는 실패로 기록한다.
+- Owned: `src/lib/bracket-slot-candidates.ts`, 관련 model/helper 테스트, BYE editor·목록·node panel·mobile picker 소비자, task/scenario/API gotcha 문서와 Changeset. Backend/schema/진출 규칙 변경 금지. 다른 WIP 금지.
+- 서버 `assertPlaceable`의 kind/조별 ENTRY 예외를 공용 후보 계산으로 맞춘다. BYE는 조별 ENTRY와 중복 진출을 허용하지만 결선 ENTRY/BYE/GROUP_RANK 중복은 계속 막는다. 현재 자리의 팀은 유지한다.
+- [ ] 실제 사용자 후보 선택 경로 RED → GREEN.
+- [ ] Web 관련 회귀·타입·pattern 및 PR CI.
+- [ ] 후속 PR/배포·alpha BYE 3폭 및 실제 진출 재검증.
+- RED: 빈 부전승 편집과 연결된 8강 목록의 실제 후보 선택 회귀 2건 모두 FAIL(후보 option 누락), 기존 44 PASS. GREEN: 공통 슬롯 kind/조별 ENTRY 예외 계산을 목록·desktop panel·mobile picker·BYE editor로 연결한 뒤 관련 6 files/170 tests PASS.
+- 같은 alpha `5444656fac`의 독립 QA: 출처99번 변경→사용자 문구 유지/최신 자동 복원, 의도적503 입력 유지·실제 재시도, 공식 점수 확정→승자 결승/패자 3위전, 12강121번→8강 진출 모두 PASS. 경기 ID·진출 edge 유지, 실제 팀 이름 우선. 실패503은 QA가 한 번 의도적으로 주입한 응답이며 다른 pageerror/HTTP 실패 없음.
+- Web lint(tsc + pattern) PASS. 신규 테스트 fixture의 단계 union·필수 이름 타입 오류를 수정한 후 통과. 제품 API/schema/진출 동작 변경 없음. 변경 경로 debt marker 없음, `git diff --check` PASS.

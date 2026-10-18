@@ -1,3 +1,4 @@
+import { placedRegistrationIdsForSlot } from '@/lib/bracket-slot-candidates';
 import { buildLeagueGrid } from '@/lib/bracket-league-grid-model';
 import {
   buildSideLabelContext,
@@ -182,13 +183,10 @@ export function pickableCandidates(
   candidates: MobilePickCandidate[],
   slots: V1AdminBracketSlot[],
   target: V1AdminBracketSlot,
+  groups: readonly V1AdminBracketGroup[] = [],
 ): MobilePickCandidate[] {
-  const placed = new Set(
-    slots
-      .filter((s) => s.id !== target.id && s.kind !== 'GROUP_RANK' && s.registrationId !== null)
-      .map((s) => s.registrationId),
-  );
-  return candidates.filter((c) => !placed.has(c.registrationId));
+  const placed = placedRegistrationIdsForSlot(slots, target, groups);
+  return candidates.filter(candidate => candidate.registrationId === target.registrationId || !placed.has(candidate.registrationId));
 }
 
 // 3·4위전은 결승과 같은 탭에 둔다 — 탭이 6개를 넘으면 390 폭에서 한 칸이 너무 좁아진다.

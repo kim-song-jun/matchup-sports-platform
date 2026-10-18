@@ -283,7 +283,7 @@ function SlotTeamPicker({
 }: PickerCommon & { slot: V1AdminBracketSlot; slots: V1AdminBracketSlot[]; groups: readonly V1AdminBracketGroup[]; candidates: MobilePickCandidate[]; scope: 'tournament' | 'league' }) {
   const assign = useV1AssignTournamentSlot(common.competitionId, scope);
   const { shown, hidesOtherGroupTeams } = applyGroupRule(
-    pickableCandidates(candidates, slots, slot),
+    pickableCandidates(candidates, slots, slot, groups),
     (candidate) => candidate.registrationId,
     registrationIdsBlockedForGroup(groups, slot.groupId),
     slot.registrationId,

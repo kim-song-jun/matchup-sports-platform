@@ -45,6 +45,7 @@ import {
   TournamentVenuePrepSection,
 } from '@/components/tournaments/tournament-venue-retention-sections';
 import { TournamentSponsorSection } from '@/components/tournaments/tournament-sponsor-section';
+import { LeagueNextRegistrationInvite } from '@/components/tournaments/league-next-registration-invite';
 import { CompetitionEntrySection } from '@/components/tournaments/competition-entry-card';
 import { TournamentInquirySection } from '@/components/tournaments/tournament-inquiry-section';
 import { getTournamentAnnouncementCategoryLabel } from '@/components/tournaments/tournament-announcement-category';
@@ -415,12 +416,14 @@ export function ApplyCTA({
   return (
     /* Mobile-only fixed CTA — hidden on desktop via .tm-hide-desktop */
     <div className="tm-fixed-cta tm-hide-desktop">
-      <ApplyCTAButtons tournament={tournament} blockReason={blockReason} myRegistration={myRegistration} />
+      {tournament.kind === 'regular_league' && blockReason !== null
+        ? <LeagueNextRegistrationInvite leagueId={tournament.id} />
+        : <ApplyCTAButtons tournament={tournament} blockReason={blockReason} myRegistration={myRegistration} />}
     </div>
   );
 }
 
-/* ── Unified bracket-entry CTA — 진행 중인 정규 리그는 모든 화면 폭에서 상단에 표시.
+/* ── Unified bracket-entry CTA — 모바일 진행 입구는 상단, 데스크톱은 우측 레일에 표시.
    일반 대회는 mobile/tablet 상단 진입과 desktop sticky rail을 사용한다. ── */
 
 function BracketEntryCtaButton({ tournament }: { tournament: V1TournamentDetail }) {
@@ -1163,7 +1166,15 @@ export function TournamentDetailView({
   );
 
   /* ── Desktop right-rail CTA card ── */
-  const railCTA = isOpen ? (
+  // 리그도 대회와 같은 우측 레일에 진행 입구와 핵심 정보를 모은다.
+  const leagueApplicationCta = isLeagueMirror && registrationBlock === null && !hasActiveRegistration
+    ? <div className="mt-4"><ApplyCTAButtons tournament={tournament} blockReason={null} myRegistration={myRegistration} /></div>
+    : null;
+  const nextLeagueInvite = isLeagueMirror && registrationBlock !== null
+    ? <div className="mb-4"><LeagueNextRegistrationInvite leagueId={tournament.id} variant="sidebar" /></div>
+    : null;
+  const leagueUsesProgressRail = isLeagueMirror && (tournament.status === 'in_progress' || tournament.status === 'closed');
+  const railCTA = isOpen && !leagueUsesProgressRail ? (
     isLeagueMirror ? (
       hasActiveRegistration && !showsCapacity ? null : (
       <aside className="tm-tournament-rail tm-show-desktop" role="complementary" aria-label="리그 참가 신청">
@@ -1263,9 +1274,10 @@ export function TournamentDetailView({
     </aside>
     )
   ) : tournament.status === 'in_progress' ? (
-    <aside className="tm-tournament-rail tm-show-desktop" role="complementary" aria-label="대회 진행 상태">
+    <aside className="tm-tournament-rail tm-show-desktop" role="complementary" aria-label={isLeagueMirror ? '리그 진행 상태' : '대회 진행 상태'}>
       {/* Live CTA */}
       <Link
+        aria-label={getBracketEntryCtaLabel(tournament.status, isLeagueMirror) ?? undefined}
         href={childHref(`/tournaments/${tournament.id}/bracket`)}
         style={{
           display: 'flex', alignItems: 'center', gap: 12,
@@ -1284,6 +1296,7 @@ export function TournamentDetailView({
         <span style={{ flex: 1, fontSize: 'var(--font-size-body-lg)', fontWeight: 800, color: '#fff', letterSpacing: '-0.01em' }}>{getBracketEntryCtaLabel(tournament.status, isLeagueMirror)}</span>
         <ChevronRight size={17} strokeWidth={2.5} style={{ color: 'rgba(255,255,255,0.65)', flexShrink: 0 }} aria-hidden="true" />
       </Link>
+      {nextLeagueInvite}
       {/* Key facts */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1308,6 +1321,7 @@ export function TournamentDetailView({
           </div>
         ) : null}
       </div>
+      {leagueApplicationCta}
     </aside>
   ) : tournament.status === 'closed' ? (
     /* closed(모집 마감·시작 전="예정") — 예전엔 이 상태에서 데스크탑 레일이 비어
@@ -1335,6 +1349,7 @@ export function TournamentDetailView({
         <span style={{ flex: 1, fontSize: 'var(--font-size-body-lg)', fontWeight: 800, color: 'var(--text-strong)', letterSpacing: '-0.01em' }}>{getBracketEntryCtaLabel(tournament.status, isLeagueMirror)}</span>
         <ChevronRight size={17} strokeWidth={2.5} style={{ color: 'var(--text-caption)', flexShrink: 0 }} aria-hidden="true" />
       </Link>
+      {nextLeagueInvite}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>일정</span>
@@ -1346,6 +1361,7 @@ export function TournamentDetailView({
           <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>{showsCapacity ? `${reservedTeamCount}/${teamCapacity}팀` : `${tournament.confirmedCount}팀`}</span>
         </div>
       </div>
+      {leagueApplicationCta}
     </aside>
   ) : tournament.status === 'completed' ? (
     <aside className="tm-tournament-rail tm-show-desktop" role="complementary" aria-label="대회 결과">
@@ -1409,10 +1425,10 @@ export function TournamentDetailView({
           §isOpen 분기), 동일하게 여기서도 렌더 자체를 건너뛰어 "참가 신청하기" 하나만
           1차 CTA로 남긴다(토스 루브릭: 카드당 주요 CTA 1개).
           진행 중인 정규 리그는 신청 가능 여부와 별개로 경기 일정·라이브 진입을 모든
-          방문자에게 제공한다. 데스크톱도 리그 신청 rail을 쓰므로 이 상단 진입을 함께 표시한다. */}
+          방문자에게 제공한다. 데스크톱은 대회와 같은 우측 진행 레일을 사용한다. */}
       {bracketCtaLabel && (!showsApplyCta || showsPublicLeagueLiveCta) ? (
         <div
-          className={`tm-tournament-detail-entry${showsPublicLeagueLiveCta ? '' : ' tm-hide-desktop'}`}
+          className="tm-tournament-detail-entry tm-hide-desktop"
         >
           <BracketEntryCtaButton tournament={tournament} />
         </div>

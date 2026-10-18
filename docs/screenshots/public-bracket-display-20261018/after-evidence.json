@@ -1,0 +1,35 @@
+{
+  "sameIdFixtures": 42,
+  "evidence": [
+    {
+      "viewport": 1440,
+      "publicLabels": "PASS",
+      "sharedByeLabel": "PASS",
+      "metadata": "PASS",
+      "refresh": "PASS",
+      "overflow": 0,
+      "overlaps": []
+    },
+    {
+      "viewport": 768,
+      "publicLabels": "PASS",
+      "sharedByeLabel": "PASS",
+      "metadata": "PASS",
+      "refresh": "PASS",
+      "overflow": 0,
+      "overlaps": []
+    },
+    {
+      "viewport": 390,
+      "publicLabels": "PASS",
+      "sharedByeLabel": "PASS",
+      "metadata": "PASS",
+      "refresh": "PASS",
+      "overflow": 0,
+      "overlaps": []
+    }
+  ],
+  "pageErrors": [],
+  "consoleErrors": [],
+  "httpErrors": []
+}

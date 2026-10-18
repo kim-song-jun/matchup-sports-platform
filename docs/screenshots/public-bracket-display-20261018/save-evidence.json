@@ -1,0 +1,29 @@
+{
+  "evidence": [
+    {
+      "viewport": 1440,
+      "savedCustomLabel": "PASS",
+      "timeField": "PASS",
+      "realTeamPriority": "PASS"
+    },
+    {
+      "viewport": 768,
+      "savedCustomLabel": "PASS",
+      "timeField": "PASS",
+      "realTeamPriority": "PASS"
+    },
+    {
+      "viewport": 390,
+      "savedCustomLabel": "PASS",
+      "timeField": "PASS",
+      "realTeamPriority": "PASS"
+    }
+  ],
+  "automaticRestore": "PASS",
+  "clearTimeField": "PASS",
+  "idsAndEdges": "PASS",
+  "originalTournamentWrites": 0,
+  "pageErrors": [],
+  "consoleErrors": [],
+  "httpErrors": []
+}

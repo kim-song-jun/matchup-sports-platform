@@ -857,7 +857,7 @@ Status: Fix in progress
 
 ## 2026-10-18 후속 — 사용자 대진 문구·일정 표시 불일치
 
-Status: In Progress
+Status: Done — #1973 dev/alpha 배포 및 사용자 화면3폭 완료
 - 사용자 재현: alpha `/admin/tournaments/ad200600-0000-4000-8000-000000000003/bracket`에서 홈/어웨이 문구 수정 후 사용자 화면 미반영, 목록에서 수정한 시각/경기장이 그림과 불일치.
 - 발견: 공개 상세와 공개 일정 projection이 details의 side override 및 BYE slot displayLabel을 읽지 않고 자동 slotLabel만 만든다. 공개 그림 카드는 venue를 표시하지 않는다. 관리자 목록/그림의 실제 같은 ID 응답을 추가 대조한다.
 - Owned: v1 공개 대진/일정 조회·presenter·회귀, 공용 문구 해석, 공개 그림 카드, 관련 API/QA/task docs 및 Changeset. Forbidden: 타 세션 WIP·사용자 저장값 덮기·진출 규칙/schema 변경·main 승격.
@@ -865,3 +865,14 @@ Status: In Progress
 - 단일 에이전트 순차. 좁은 RED→GREEN, 타입/CI, PR 리뷰, dev/alpha 검증 순서. 이전 Copilot 예외는 #1960/#1971에만 해당한다.
 - 재현 실측: 같은42개 ID의 admin/public scheduledAt·venue 차이0, admin31번 카드10/19 20:33 확인. 31번 fieldId/venue는 현재null이며 실제로 미배정. public GET31번은 자동 결선5번 문구지만 admin은 `ddddd`, BYE35번은 admin `dd`가 public 자동값으로 누락. 공개 그림의 venue 렌더 누락 확인.
 - 수정: 공개 상세/일정의 custom/BYE shared slot label 공용 해석, BYE 타일 보조 문구·fieldId, 등록 field 이름 우선, public 카드 venue·미정 표시·간격176/112 확보. API84 tests 및 신규field-name1 PASS, Web 화면/그룹33 PASS. 양쪽 tsc·Web pattern PASS. 그래프 좌표 회귀는 새 정보 높이에 맞춰 업데이트. 실DB public presenter 경로2건을 기존 통합 시나리오에 추가(CI 대상).
+- 최신 source head `5042e2212`, PR #1973. CI `39120703746` Gates/API/Web SUCCESS: PostgreSQL169 suites/1,249 PASS(3 skip), API427 suites/6,523 PASS, Web805 files/9,429 PASS + build. 초기 tooltip 범위 타입 오류2개를 제거하고 Web lint 재통과. 기본/그림 회귀45 PASS. API surface PASS.
+- 사용자 추가 확인: 경기장은 괜찮고 문구가 이상함. 핵심은 공개 문구 누락으로 고정, 별도 저장 분리 결함이라고 보고하지 않음.
+- Copilot `39120705077`은 `Model "claude-opus-5" is not available`로 분석 전 실패. 리뷰/스레드0, clean 아님. 이전 예외는 #1960/#1971만 해당하므로 #1973 예외 승인 요청 중. dev 머지·alpha after QA 미실행. PR 본문에 같은 상태 기록.
+- 재개: 전용 `/tmp/teameet-public-bracket-labels`; before3폭 PNG `/tmp/public-bracket-before-{1440,768,390}.png`, 실제 admin31 카드10/19 20:33 캡처. headed브라우저 모두 finally 종료. QA 임시 스크립트는 scripts/qa/public-bracket-{inspect,before,after}.cjs (제품 import 없음), 인증 파일은 /tmp 비공개0600. 사용자 기존 대회 쓰기 없음.
+- 2026-10-18 사용자 “배포해줘” 지시로 #1973 Copilot 예외 승인 후 dev 머지. merge `84a2c092ee8deaebc5043b2bbb5635e52f1fcdc2`, dev CI `39122213237`, alpha `39122213250` 진행 중. 직후 로컬 dev FF는 다른 세션의 public-tournament-records.service.ts 미커밋 변경과 충돌해 중단했다. 해당 WIP는 보존했고 `/tmp/pr1973-main-dev-sync-backup`에 충돌 파일 백업만 생성, 원복/stash/reset 없음. 배포 후 재확인한다.
+- Alpha `39122213250` SUCCESS, dev CI `39122213237` SUCCESS. served SHA `84a2c092ee8deaebc5043b2bbb5635e52f1fcdc2`, release `1.10.0-alpha.20261018.g84a2c092ee8d`, DB health true (11:32 UTC). 서버 교체 중 관찰된503은 정상 응답으로 회복했다.
+- 실제 비로그인 사용자 브라우저1440/768/390: 원 대회31번 `ddddd` 및35번 BYE `dd`, 시각/등록 경기장, 새로고침3/3 PASS. 같은42개 ID의 공개/관리자 시간·필드ID·장소 비교 PASS, 문구 override 비교 PASS. overflow0·카드 겹침0, pageerror/console/API HTTP error0. 기존 대회 데이터 쓰기0. 증거 `docs/screenshots/public-bracket-display-20261018/after-evidence.json`.
+
+- 별도 QA 대회에서 관리자 그림으로 원정 문구·시각·등록 필드 저장→비로그인 사용자 그림3폭 확인 PASS. 실제 확정 홈 팀명 우선 PASS. 자동 문구 복원·시각/필드 비우기·새로고침·same ID/edge 유지 PASS. pageerror/console/API HTTP error0. 테스트 문구·시간·필드와 isPublic=false 원복 완료, 원 대회 쓰기0.
+- 로컬 dev FF 재확인도 타 세션 WIP14경로 충돌로 중단(원복/stash/reset 없음). 최초 겹친 service 파일 백업 `/tmp/pr1973-main-dev-sync-backup`; 원격 dev와 alpha 배포는 정상이다. 로컬은 미동기화 상태로 사용자에게 보고한다.
+- 작업 중 임시 worktree Git metadata가 사라진 것을 발견했다. 파일은 보존됐고 repair는 복구하지 못해, fetch 직후 origin/dev에서 새 격리 증거 트리를 만들어 문서·캡처만 복구했다. 제품 코드/다른 WIP 복구·수정 없음. 최종 증거 브랜치 `docs/pr1973-final-evidence`.

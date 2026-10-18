@@ -1,3 +1,7 @@
+## 2026-10-18 — 관리자 문구의 사용자 대진 반영 후속
+
+[#1973](https://github.com/kim-song-jun/matchup-sports-platform/pull/1973) dev/alpha `84a2c092e` 배포 완료, 전체 CI PASS. 공개 projection의 side/BYE 문구 누락 수정. 원 대회31번 ddddd·35번 dd 및 새로고침3/3, 별도 QA의 저장→사용자 화면·자동 복원/비우기 PASS. 원 대회 쓰기0, QA 비공개/metadata 원복, console/network/넘침/카드 겹침0. [실행 기록](./bracket-display-edit.md#1973-최종-검증--2026-10-18). Copilot 외부 장애는 이번 PR 사용자 승인, main 승격 없음.
+
 ## 2026-10-17 — 대진 표시 문구·경기 정보 편집
 
 [시나리오](./bracket-display-edit.md) · [Task 20261057](../../.github/tasks/20261057-admin-bracket-canvas.md). 목록/그림/모바일 공통 저장과 12강 부전승 편집. 변경 후 alpha 실측 0/3(PR 미배포), DB integration 미실행(Docker 미가동). 자동 회귀 결과는 task 최신 기록 참고.

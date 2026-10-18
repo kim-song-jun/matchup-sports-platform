@@ -1,0 +1,24 @@
+{
+  "environment": "alpha before PR1973",
+  "comparedFixtures": 42,
+  "sameIdTimeVenueDifferences": 0,
+  "reproduced": [
+    {
+      "fixtureId": "c048c6d0-5ff2-5095-8283-6db2ac8fce67",
+      "fixtureNumber": 31,
+      "adminHomeLabel": "ddddd",
+      "publicHomeLabel": "결선 5번 자리",
+      "scheduledAt": "2026-10-19T11:33:00.000Z",
+      "venue": null
+    },
+    {
+      "fixtureId": "3db67aa5-d915-5920-a765-9ee7662e9283",
+      "fixtureNumber": 35,
+      "adminHomeLabel": "dd",
+      "publicHomeLabel": "부전승 · 1번 위치",
+      "scheduledAt": null,
+      "venue": "(테스트) 서울 풋살장"
+    }
+  ],
+  "originalTournamentWrites": 0
+}

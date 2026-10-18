@@ -40,3 +40,23 @@ Persona: owner/ops 쓰기, support 읽기, 일반 사용자 쓰기 거절.
 기존 완료 기록의 범위 공백: 관리자 3폭 검증 뒤 사용자 공개 projection의 side override 누락을 확인하지 못했다. alpha 원 대회31번 홈 `ddddd`·35번 BYE `dd`가 admin GET에는 있지만 public GET은 자동 문구였다. 동일42개 ID의 scheduledAt/venue는 양 API에서 모두 일치하며 관리자31번 카드도10/19 20:33이었다. 사용자 그림 MatchCard에는 venue 렌더가 없었다. 사용자 저장 데이터는 변경하지 않았다.
 
 후속 AC: side/빈 BYE 문구→공개 상세/일정/그림, 팀명 우선·BYE 보조, 등록 경기장 이름·시각·미정 표시·3폭 간격, 새로고침. API label RED1 / Web 장소·BYE RED2 확보. 공개 projection 공용 해석과 그림 metadata 및 간격 수정, PR/alpha 재검증 진행 중. 기존 Copilot 예외는 이 후속 PR에 적용하지 않는다.
+
+### #1973 배포 진행 — 2026-10-18
+
+사용자 “배포해줘”로 이번 PR의 Copilot 예외 승인·dev/alpha 진행 확인. source `5042e2212`, dev merge `84a2c092ee8deaebc5043b2bbb5635e52f1fcdc2`. PR CI `39120703746` 전체 PASS(DB1249/API6523/Web9429 및 build). dev CI `39122213237`·alpha `39122213250` 진행 중. before3폭 및 정확한 문구 차이는 `docs/screenshots/public-bracket-display-20261018/`에 보존했다. 기존 대회는 읽기만 수행했다. 로컬 dev FF는 타 세션 service WIP 때문에 중단, 변경 보존 및 `/tmp/pr1973-main-dev-sync-backup` 백업만 수행.
+
+
+### #1973 최종 검증 — 2026-10-18
+
+[alpha 배포](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/39122213250) / [dev CI](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/39122213237) SUCCESS. Served `84a2c092ee8deaebc5043b2bbb5635e52f1fcdc2`, DB true. 배포 중 일시503은 서버 적용 뒤 회복했다.
+
+| 실제 흐름 | 1440 | 768 | 390 |
+|---|---|---|---|
+| 원 대회31번 ddddd·35번 BYE dd / 새로고침 | PASS | PASS | PASS |
+| 관리자와 같은 ID의 시각·필드·장소 / 넘침·겹침 없음 | PASS | PASS | PASS |
+| 별도 QA 대회에서 관리자 문구·시각·필드 저장→비로그인 사용자 그림 | PASS | PASS | PASS |
+| 실제 팀 이름 우선 | PASS | PASS | PASS |
+
+원 대회42개 ID의 metadata와 직접 입력 문구를 공개 API와 비교했다. 공개 그림은 새 문구를 유지하며 BYE 타일/연결8강이 같은 값을 표시한다. 별도 QA에서 자동 문구 복원·시각/필드 비우기 뒤 최신 출처12경기 승자·미정 표시와 null 재조회를 확인했다. ID·팀 배정·edge 유지, console/pageerror/API HTTP 오류0. [원 대회 증거](../screenshots/public-bracket-display-20261018/after-evidence.json) · [저장/복원 증거](../screenshots/public-bracket-display-20261018/save-evidence.json).
+
+Cleanup: 원 대회 쓰기0, 새 QA 대회 문구·시각·필드·isPublic=false 원복. 브라우저는 PID/PPID를 기록하고 finally 종료했다. Before는 로그인 owner의 공개 화면, after는 비로그인 사용자 화면이며 같은 in_progress 대회다. 이전 완료 검증에서 공개 projection을 놓친 공백을 이번 회귀와 실측으로 메웠다. main 승격 없음. 로컬 dev FF는 타 세션 WIP 때문에 중단했으며 원격 dev/alpha에는 영향 없음.

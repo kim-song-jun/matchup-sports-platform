@@ -32,9 +32,13 @@ import { BracketGroupCard } from './bracket-group-card';
 import { isGroupReady } from './bracket-group-helpers';
 import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-picker';
 import { formatDate } from './tournament-admin-shared';
+import { CompetitionFieldPicker } from '@/components/admin/competition-field-picker';
+import { FixtureLabelFields, fixtureLabelDraft, fixtureLabelPatch, type LabelDraft } from '@/components/admin/bracket-canvas/fixture-metadata-editor';
 import { PlacePicker } from '@/components/v1-ui/place-picker';
 import { PLACE_NAME_MAX_LENGTH } from '@/lib/place';
 import type { PlaceValue } from '@/lib/place';
+import { buildSideLabelContext, fixtureSideLabel } from '@/lib/bracket-canvas-layout';
+import { formatKstDateShort, formatKstTime } from '@/lib/date-utils';
 import { fixtureVenuePatch, fixtureVenueValue } from '@/components/admin/bracket-canvas/fixture-venue-patch';
 import {
   SimpleModal,
@@ -174,6 +178,9 @@ export function BracketTab({
   const [editFixture, setEditFixture] = useState<V1AdminBracketFixture | null>(null);
   const editNumberId = useId();
   const [editFxNumber, setEditFxNumber] = useState('');
+  const [editFxLabels, setEditFxLabels] = useState<LabelDraft>({ homeDisplayLabel: '', awayDisplayLabel: '' });
+  const [editFxFieldId, setEditFxFieldId] = useState('');
+  const [editFxError, setEditFxError] = useState<string | null>(null);
   const [editFxScheduledAt, setEditFxScheduledAt] = useState('');
   const [editFxVenue, setEditFxVenue] = useState<PlaceValue | null>(null);
   const [editFxHomeRegId, setEditFxHomeRegId] = useState('');
@@ -245,7 +252,12 @@ export function BracketTab({
     // Asia/Seoul로 채워 넣는다) — new Date(value).toISOString()로 바로 변환하면 브라우저
     // 로컬 타임존으로 잘못 해석된다. 대칭 함수 kstDatetimeLocalToIso 로 KST 오프셋을 고정해야
     // 값을 안 건드리고 저장만 눌러도 킥오프가 밀리지 않는다.
+    setEditFxError(null);
     const scheduledAtIso = editFxScheduledAt ? kstDatetimeLocalToIso(editFxScheduledAt) : null;
+    if (editFxScheduledAt && scheduledAtIso === null) { setEditFxError('경기 시각을 다시 확인해 주세요.'); return; }
+    const labelsPatch = fixtureLabelPatch(editFxLabels, editFixture);
+    const placePatch = editFxFieldId ? (editFxFieldId === editFixture.fieldId ? {} : { fieldId: editFxFieldId })
+      : { ...(editFixture.fieldId ? { fieldId: null } : {}), ...fixtureVenuePatch(editFxVenue, editFixture) };
     // 시작된 경기의 팀 교체는 옛 팀 명단·기록이 지워지므로 확인과 사유를 먼저 받는다.
     const changedSides = [homeChanged ? editFixture.homeTeamName : null, awayChanged ? editFixture.awayTeamName : null].filter((side): side is string => side !== null);
     const teamChangeReason = changedSides.length > 0 && editFixtureAccess === 'started' ? await requestReason(changedSides) : undefined;
@@ -263,7 +275,7 @@ export function BracketTab({
     });
     const directHomeChanged = homeChanged && editFixture.homeSlotId === null && !sourceSides.has('HOME');
     const directAwayChanged = awayChanged && editFixture.awaySlotId === null && !sourceSides.has('AWAY');
-    const metadataChanged = fixtureNumber !== editFixture.fixtureNumber || scheduledAtIso !== null || Object.keys(fixtureVenuePatch(editFxVenue, editFixture)).length > 0;
+    const metadataChanged = fixtureNumber !== editFixture.fixtureNumber || editFxScheduledAt !== isoToKstDatetimeLocal(editFixture.scheduledAt) || Object.keys(placePatch).length > 0 || Object.keys(labelsPatch).length > 0;
     setSavingFixtureEdit(true);
     const assignedSides: string[] = [];
     try {
@@ -284,6 +296,7 @@ export function BracketTab({
       const reportFailure = (err: unknown) => {
         void refetch().finally(() => {
           const errorMessage = extractErrorMessage(err, '경기 수정에 실패했어요.');
+          setEditFxError(assignedSides.length ? `${assignedSides.join('·')} 자리 배정은 저장됐어요. 나머지 수정은 실패했어요: ${errorMessage}` : errorMessage);
           showToast(
             assignedSides.length > 0
               ? `${assignedSides.join('·')} 자리 배정은 저장됐어요. 나머지 수정은 실패했어요: ${errorMessage}`
@@ -299,8 +312,9 @@ export function BracketTab({
             fixtureId: editFixture.id,
             ...(teamChangeReason === undefined ? {} : { teamChangeReason }),
             ...(fixtureNumber !== editFixture.fixtureNumber ? { fixtureNumber } : {}),
-            ...(scheduledAtIso ? { scheduledAt: scheduledAtIso } : {}),
-            ...fixtureVenuePatch(editFxVenue, editFixture),
+            ...(scheduledAtIso !== editFixture.scheduledAt ? { scheduledAt: scheduledAtIso } : {}),
+            ...placePatch,
+            ...labelsPatch,
             ...(directHomeChanged ? { homeRegistrationId: editFxHomeRegId || null } : {}),
             ...(directAwayChanged ? { awayRegistrationId: editFxAwayRegId || null } : {}),
           },
@@ -313,6 +327,7 @@ export function BracketTab({
       setSavingFixtureEdit(false);
       await refetch();
       const errorMessage = extractErrorMessage(err, '경기 수정에 실패했어요.');
+          setEditFxError(assignedSides.length ? `${assignedSides.join('·')} 자리 배정은 저장됐어요. 나머지 수정은 실패했어요: ${errorMessage}` : errorMessage);
       showToast(
         assignedSides.length > 0
           ? `${assignedSides.join('·')} 자리 배정은 저장됐어요. 나머지 수정은 실패했어요: ${errorMessage}`
@@ -551,6 +566,7 @@ export function BracketTab({
 
   const groups: V1AdminBracketGroup[] = bracket?.groups ?? [];
   const fixtures: V1AdminBracketFixture[] = bracket?.fixtures ?? [];
+  const sideLabelContext = buildSideLabelContext(groups, fixtures, bracket?.slots ?? []);
   const allStandings = bracket?.standings ?? [];
   const readyGroupCount = groups.filter((g) => isGroupReady(g, fixtures)).length;
 
@@ -786,7 +802,7 @@ export function BracketTab({
                   setEditFixture(fixture);
                   setEditFxNumber(String(fixture.fixtureNumber));
                   setEditFxScheduledAt(isoToKstDatetimeLocal(fixture.scheduledAt));
-                  setEditFxVenue(fixtureVenueValue(fixture));
+                  setEditFxVenue(fixtureVenueValue(fixture)); setEditFxLabels(fixtureLabelDraft(fixture)); setEditFxFieldId(fixture.fieldId ?? ''); setEditFxError(null);
                   setEditFxHomeRegId(fixture.homeRegistrationId ?? '');
                   setEditFxAwayRegId(fixture.awayRegistrationId ?? '');
                 }}
@@ -832,15 +848,20 @@ export function BracketTab({
                 key: 'homeTeamName',
                 header: '홈',
                 render: (f) => (
-                  <span className="font-medium text-[var(--text-strong)] break-keep">{f.homeTeamName ?? '—'}</span>
+                  <span className="font-medium text-[var(--text-strong)] break-keep">{fixtureSideLabel(f, 'HOME', sideLabelContext)}</span>
                 ),
               },
               {
                 key: 'awayTeamName',
                 header: '어웨이',
                 render: (f) => (
-                  <span className="font-medium text-[var(--text-strong)] break-keep">{f.awayTeamName ?? '—'}</span>
+                  <span className="font-medium text-[var(--text-strong)] break-keep">{fixtureSideLabel(f, 'AWAY', sideLabelContext)}</span>
                 ),
+              },
+              {
+                key: 'scheduledAt',
+                header: '시각 · 경기장',
+                render: (f) => <span className="tm-text-caption text-[var(--text-muted)]">{f.scheduledAt ? `${formatKstDateShort(f.scheduledAt)} ${formatKstTime(f.scheduledAt)}` : '시간 미정'} · {f.venue || '경기장 미정'}</span>,
               },
               {
                 key: 'result',
@@ -884,7 +905,7 @@ export function BracketTab({
                       setEditFixture(f);
                       setEditFxNumber(String(f.fixtureNumber));
                       setEditFxScheduledAt(isoToKstDatetimeLocal(f.scheduledAt));
-                      setEditFxVenue(fixtureVenueValue(f));
+                      setEditFxVenue(fixtureVenueValue(f)); setEditFxLabels(fixtureLabelDraft(f)); setEditFxFieldId(f.fieldId ?? ''); setEditFxError(null);
                       setEditFxHomeRegId(f.homeRegistrationId ?? '');
                       setEditFxAwayRegId(f.awayRegistrationId ?? '');
                     }}
@@ -994,6 +1015,7 @@ export function BracketTab({
               value={editFxNumber} onChange={(e) => setEditFxNumber(e.target.value)}
               disabled={updateFixture.isPending} className={inputCls} />
           </div>
+          {editFixture ? <FixtureLabelFields fixture={editFixture} groups={groups} fixtures={bracket?.fixtures ?? []} slots={bracket?.slots ?? []} value={editFxLabels} onChange={setEditFxLabels} disabled={savingFixtureEdit || updateFixture.isPending} /> : null}
           <div className="flex flex-col gap-1">
             <label htmlFor="edit-fx-scheduled" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">경기 일시</label>
             <input
@@ -1005,7 +1027,9 @@ export function BracketTab({
               className={inputCls}
             />
           </div>
-          <PlacePicker
+          <button type="button" className="tm-btn tm-btn-sm tm-btn-ghost self-start min-h-[44px]" disabled={savingFixtureEdit || updateFixture.isPending || !editFxScheduledAt} onClick={() => setEditFxScheduledAt('')}>시각 비우기</button>
+          <CompetitionFieldPicker tournamentId={tournamentId} value={editFxFieldId} onChange={value => { setEditFxFieldId(value); if (!value) setEditFxVenue(null); }} allowNew={false} allowEmpty emptyLabel="경기장 미정" disabled={savingFixtureEdit || updateFixture.isPending} />
+          {!editFxFieldId ? <PlacePicker
             maxLength={PLACE_NAME_MAX_LENGTH.tournament}
             id="edit-fx-venue"
             label="장소"
@@ -1013,7 +1037,8 @@ export function BracketTab({
             onChange={setEditFxVenue}
             disabled={updateFixture.isPending}
             placeholder="예: 성산 풋살파크 A구장"
-          />
+          /> : null}
+          {editFxError ? <p role="alert" className="tm-text-caption text-[var(--red700)]">{editFxError}</p> : null}
           <div className="flex flex-col gap-3 sm:flex-row">
             <div className="flex min-w-0 flex-col gap-1 flex-1">
               <label htmlFor="edit-fx-home" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">홈 팀</label>

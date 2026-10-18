@@ -3,6 +3,8 @@ import { AdminContextService } from '../../src/common/admin-context.service';
 import { OperationAuditWriterService } from '../../src/common/audit/operation-audit-writer.service';
 import { GamesService } from '../../src/games/games.service';
 import { GameTakeoverService } from '../../src/games/game-takeover.service';
+import { TournamentBracketService } from '../../src/tournaments/tournament-bracket.service';
+import { TournamentSlotService } from '../../src/tournaments/slots/tournament-slot.service';
 import { BracketTemplateService } from '../../src/tournaments/templates/bracket-template.service';
 import { competitionConfigFixture as ids, seedCompetitionConfigFixture } from '../fixtures/competition-config.fixture';
 import { seedBracketTournament, seedSupportAdmin } from '../helpers/bracket-canvas-fixture';
@@ -68,6 +70,52 @@ describe('대진 템플릿 실행기 (PostgreSQL)', () => {
       expect(incoming).toHaveLength(1);
       expect(incoming[0]).toMatchObject({ sourceTeamMatchId: round12[index].teamMatchId, sourceOutcome: 'WINNER', targetSide: 'AWAY' });
     }
+  });
+
+  it('기존 일정·경기장을 재입력 없이 읽고 번호·문구 수정과 비우기를 같은 경기 ID에 저장한다', async () => {
+    const { tournamentId } = await seedBracketTournament(prisma, { label: 'display-metadata', format: 'knockout', teamCount: 0 });
+    await templates.apply(user, tournamentId, { kind: 'knockout', size: 4, thirdPlace: true });
+    const bracket = new TournamentBracketService(prisma, new AdminContextService(prisma), games);
+    const rows = await liveFixtures(tournamentId);
+    const target = rows.find(row => row.round === '결승')!;
+    const field = await prisma.v1TournamentField.create({ data: { tournamentId, scopeKey: 'display-a', name: 'A구장' } });
+    const startAt = new Date('2026-10-25T05:00:00.000Z');
+    // Existing list data lives on TeamMatch, before any display-label write.
+    await prisma.v1TeamMatch.update({ where: { id: target.teamMatchId }, data: { startAt, fieldId: field.id, placeName: field.name } });
+    const before = (await bracket.getBracket(user, tournamentId)).fixtures.find(row => row.id === target.teamMatchId)!;
+    expect(before).toMatchObject({ scheduledAt: startAt.toISOString(), fieldId: field.id, venue: 'A구장' });
+    await bracket.updateFixture(user, target.teamMatchId, { fixtureNumber: 30, homeDisplayLabel: '준결승 A 승자', awayDisplayLabel: '준결승 B 승자' });
+    const after = (await bracket.getBracket(user, tournamentId)).fixtures.find(row => row.id === target.teamMatchId)!;
+    expect(after).toMatchObject({ id: before.id, fixtureNumber: 30, scheduledAt: before.scheduledAt, fieldId: field.id, venue: 'A구장', homeDisplayLabel: '준결승 A 승자', awayDisplayLabel: '준결승 B 승자', bracketSources: before.bracketSources });
+    expect(after.bracketSources).toHaveLength(2);
+    await bracket.updateFixture(user, after.bracketSources[0].fixtureId, { fixtureNumber: 31 });
+    expect((await bracket.getBracket(user, tournamentId)).fixtures.find(row => row.id === target.teamMatchId)?.homeDisplayLabel).toBe('준결승 A 승자');
+    await bracket.updateFixture(user, target.teamMatchId, { scheduledAt: null, fieldId: null, venue: '', homeDisplayLabel: '', awayDisplayLabel: null });
+    expect((await bracket.getBracket(user, tournamentId)).fixtures.find(row => row.id === target.teamMatchId)).toMatchObject({ id: before.id, scheduledAt: null, fieldId: null, venue: null, homeDisplayLabel: null, awayDisplayLabel: null, bracketSources: before.bracketSources });
+    expect(await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: target.teamMatchId } })).toMatchObject({ startAt: null, fieldId: null, placeName: null });
+  });
+
+  it('빈 12강 부전승 문구와 팀은 연결된 8강과 공유하며 복원해도 실제 진출 연결은 보존한다', async () => {
+    const { tournamentId, registrationIds } = await seedBracketTournament(prisma, { label: 'display-bye', format: 'knockout', teamCount: 1 });
+    await templates.apply(user, tournamentId, { kind: 'knockout', size: 12, thirdPlace: false });
+    const context = new AdminContextService(prisma);
+    const bracket = new TournamentBracketService(prisma, context, games);
+    const slots = new TournamentSlotService(prisma, context, games);
+    const before = await bracket.getBracket(user, tournamentId);
+    const bye = before.slots.find(row => row.kind === 'BYE')!;
+    const quarter = before.fixtures.find(row => row.homeSlotId === bye.id)!;
+    expect(bye.registrationId).toBeNull();
+    await bracket.updateFixture(user, quarter.id, { homeDisplayLabel: '조 1위 중 5위' });
+    await slots.assignSlot(user, bye.id, registrationIds[0]);
+    const after = await bracket.getBracket(user, tournamentId);
+    expect(after.slots.find(row => row.id === bye.id)).toMatchObject({ displayLabel: '조 1위 중 5위', label: '조 1위 중 5위', registrationId: registrationIds[0], automaticLabel: bye.automaticLabel });
+    expect(after.fixtures.find(row => row.id === quarter.id)).toMatchObject({ homeDisplayLabel: '조 1위 중 5위', homeRegistrationId: registrationIds[0], homeSlotId: bye.id, bracketSources: quarter.bracketSources });
+    // Only the shared BYE slot stores the override; no duplicate side text.
+    expect(await prisma.v1TournamentMatchDetails.findUniqueOrThrow({ where: { teamMatchId: quarter.id } })).toMatchObject({ homeDisplayLabel: null });
+    await bracket.updateFixture(user, quarter.id, { homeDisplayLabel: '   ' });
+    const restored = await bracket.getBracket(user, tournamentId);
+    expect(restored.slots.find(row => row.id === bye.id)).toMatchObject({ displayLabel: null, label: bye.automaticLabel, registrationId: registrationIds[0] });
+    expect(restored.fixtures.find(row => row.id === quarter.id)).toMatchObject({ homeDisplayLabel: null, homeRegistrationId: registrationIds[0], bracketSources: quarter.bracketSources });
   });
 
   it('리그 방식 대회 6팀 2회전: 조 "리그" 1 · 자리 6 · 경기 30, 자리마다 10개 사이드에서 쓰인다', async () => {

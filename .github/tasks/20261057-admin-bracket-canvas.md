@@ -1,5 +1,37 @@
 # Task 20261057: 어드민 대진 그림 편집기 — 그림 먼저, 팀은 자리에, 결과는 칸에서
 
+## 2026-10-17 후속 — 목록·그림 표시 문구와 경기 정보 편집 통일
+Status: Implementation complete; draft PR / alpha QA pending
+
+### Context / Goal / Original Conditions
+사용자가 기존 목록 수정 창·그림 패널·모바일 BottomSheet에서 번호/홈·원정 문구/시각/등록 경기장을 편집하고, 팀이 없는 12강 부전승 자체를 클릭해 문구·팀을 편집하도록 요청했다. 표시만 바꾸며 경기 ID·실제 팀·승자/패자 연결은 보존한다. 이번 요청은 구현·dev 대상 PR 게시이며 머지/main 배포는 포함하지 않는다.
+
+### User / Test Scenarios / Acceptance Criteria
+- [ ] 목록↔그림에서 번호·문구·시각·등록 경기장 저장/새로고침이 같은 값을 사용한다.
+- [ ] main/dev 조회·표시 경로 비교; 기존 시각/경기장 재입력 없이 카드와 패널에서 표시한다.
+- [ ] 문구 빈 값/복원은 최신 자동 문구; 출처 번호 변경 시 자동만 갱신하고 사용자 문구는 보존한다.
+- [ ] 시각 null과 경기장 미배정을 실제 저장하고 양쪽에서 미정으로 표시한다.
+- [ ] 번호/문구 변경은 실제 팀·진출 연결을 보존하며 단계/조→번호→차전→ID로 안정 정렬한다.
+- [ ] 빈 부전승도 그림에서 편집 가능; 연결된8강과 문구·배정팀 공유, 별도 경기 번호/시각/경기장 생성 금지.
+- [ ] 확정 팀 이름 우선, 부전승 문구 보조; 실패 시 입력 유지·실제 오류 표시.
+- [ ] desktop/tablet/mobile 회귀; API/DTO/fixture/MSW/docs/schema pin 동기화.
+
+### Responsibilities / Ownership / Dependencies
+단일 에이전트 순차. Phase A: v1 DB/DTO/서비스/조회·타입·fixture 계약. Phase B: 공유 편집 폼, 목록·그림·모바일, 부전승 노드. Phase C: 회귀·타입·리뷰·PR.
+Owned: 대진 표시/편집 관련 v1 API/Web, additive migration 및 해시 바인딩, API/task/scenario 문서·tests. Forbidden: 다른 WIP, main 쓰기, 실제 결과/진출 규칙 변경, destructive seed/reset.
+
+### Security / Risks / Ambiguity Log
+사용자 지정 문구는 최대120자 plain text·trim/빈 값=null, 입력 검증·기존 admin 쓰기 권한·감사/잠금을 유지한다. BYE 문구는 슬롯 하나에 저장하며 연결된8강은 이를 읽고 쓴다. 실제 배정 변경은 기존 슬롯 API·결과 잠금 계약을 따른다.
+사용자가 기존 UI 확장과 모바일 BottomSheet를 구체적으로 고정했으므로 해당 패턴을 구현한다. alpha 시각 QA는 PR 미배포 상태와 구분하고, 로그인/배포 제약을 기록한다.
+
+### Progress Snapshot / Tech Debt Resolved
+Base origin/dev=`ae24a67e9`, branch=`feat/bracket-display-edit`, worktree=`tmp/worktrees/bracket-display-edit`.
+Phase A/B 완료. main/dev의 canonical serializer는 TeamMatch.startAt/placeName/fieldId를 동일하게 읽는다. 그림 카드 일정 미표시 및 목록/desktop panel의 빈 시각 PATCH 누락을 수정했다. 문구는 일반 경기 side override, BYE는 shared slot override 한 곳에만 저장한다. 경기 ID/진출 edge/배정은 문구 수정 시 그대로 유지된다.
+Phase C: API 관련 269개 계약과 Web 대진 관련 566개 계약 검증(중간 실패 후 해당 파일 재검증 포함); 양쪽 TypeScript, Web pattern, API surface PASS. API 새 DTO/순수 저장 44, 서비스/공통 조회 213, 기존 일정·bye-side 12. Web 전체 관련 566 중 mock export 누락 2건을 고친 뒤 해당 mobile/node 68 재실행 PASS. 슬롯 응답 exact mock에 automaticLabel/displayLabel 동기화. 기존 MSW에는 admin bracket PATCH/GET handler가 없으며 실제 공용 test fixture를 갱신했다.
+Schema LF SHA=96cf396f434e0fba80e9c2fa84e79ee347471ae56387ca6493b6d11f09c93a42. nullable varchar(120) 3개만 추가, 기존값 변경 없음. Docker/fixture/binder/manifest pin 갱신, 과거 manifest 허용 유지. 커밋된 LF export와 공식 체크섬으로 검증한 jq를 사용해 릴리스 바인딩/과거 manifest 호환성 7/7 PASS. expand-contract migration gate PASS. Windows CRLF/M11 digest 및 WSL jq 미설치로 발생한 로컬 도구 문제는 격리된 LF export/작업 폴더 도구로 해결했으며 게이트는 완화하지 않았다.
+직접 코드 리뷰: null/omission, 최신 자동 문구, BYE 단일 정본, 공식 결과 문구 수정의 roster/result 무변경, 권한/감사/잠금, 실패 draft 유지, 단계/조→번호→leg→ID 정렬 확인. touched paths TODO/FIXME/HACK/XXX 없음. 실제 alpha QA 0/3 및 DB integration 미실행(Docker daemon 미가동): 완료/배포 가능으로 주장하지 않고 draft PR에 명시한다.
+사용자 요청에 따라 구현/PR만 진행하며 dev/main 머지·배포 및 실제 대회 데이터 수정은 하지 않았다. GitHub CLI 표준 device login 대기; Git credential token 추출은 사용하지 않는다.
+
 ## 2026-10-16 후속 — 부전승 홈·어웨이와 저장 배치 일치
 
 Status: In Progress
@@ -797,3 +829,15 @@ PR 은 순서대로 dev 에 머지하고 매번 alpha 에서 확인한다(dev �
 | 2026-10-10 | 사용자 | 옛 리그(라운드 번호 없음)에서 라운드 고르기 — 결정 3 | **B** — 격자 규칙 통일: 옛 경기의 조별 k번째 끊음 묶음(`max(1, floor(팀수/2))` 경기씩, 경기 번호 순)을 k라운드로 읽고, 새로 넣는 경기는 `league_r{k}` 로 저장해 같은 줄에 합친다. 옛 리그도 「1~N라운드 / 새 라운드」를 고른다. 데이터 백필 없음. 근거: alpha 리그 방식 7개 중 5개가 옛 리그. 대가: 옛 경기를 지운 적 있는 대회는 추정 라운드가 실제와 어긋날 수 있다(지금 화면도 같은 추정). 결선 단계 코드(`final` 등)나 한국어 이름으로 쓴 round 도 번호가 아니면 예외 없이 옛 경기로 끊는다 — 사용자 문구(번호 없는 옛 경기는 끊는다)를 그대로 따른다. 리그 조에 그런 round 가 들어가는 것은 수동 입력뿐이고 그 경기는 k번째 묶음 라운드 칸에 합쳐진다(2026-10-10 계획 비평 반영). |
 | 2026-10-10 | 사용자 | 한 팀이 두 조에 들어가는 문제 — 결정 4 | **A** — 조별 단계(`phase=group`) 경기에 **다른 조별 단계 조에 이미 있는** 팀을 넣으면 서버가 `409 TEAM_IN_OTHER_GROUP`, 어느 조에도 없는 팀은 지금처럼 그 조에 자동 편성. 칸 패널·탭/끌어놓기·모바일 선택창 후보에서 다른 조 팀을 뺀다. 리그 방식·조별+결선의 조별 경기 모두 적용. 근거: alpha 2개 대회에서 7팀이 이미 두 조에 동시 편성(순위표 중복). 이미 겹친 데이터는 그대로 |
 | 2026-10-11 | 사용자 | 동률 조의 공개 순위표 진출 표시 | **A** — 공개 「순위·대진표」 조별 순위표의 진출 색·「진출」 배지는 결선 경기에 실제로 들어간 그 조 팀만 칠한다(아무도 안 들어갔으면 순위로 정해진 자리만, 동률로 안 정해진 자리는 칠하지 않고 「동률 — 운영자가 진출 팀을 정해요」). §5 로 끝까지 안 갈린 팀은 「공동 n위」(n = 그 묶음의 저장 순위 최솟값), 판정은 어드민 「순위대로 채우기」와 같은 `group-rank-preview.ts` 에서 나온다. 같은 조 표가 탭마다 달라 보이지 않게 「경기 일정」 탭 조별 순위에도 「공동」을 싣는다. 순위 계산·동점 규칙·어드민·`format=league`·정규 리그 불변, 스키마 무변경. 기각: B(고른 순서 저장 — §6 공동 순위와 충돌·스키마 변경), C(안내만) |
+
+### PR #1960 완료 진행 — 2026-10-18
+- 사용자 승인 범위: 기존 PR 수정·리뷰·검증·dev 머지·alpha 배포 후 1440/768/390 실측. main 승격 제외.
+- 단일 에이전트 순차 실행, 전용 작업트리 `/tmp/teameet-pr1960-complete`. 다른 작업트리/WIP 수정 금지.
+- [x] 최신 dev `5a5de5662`와 PR `bff8ec8f9` 통합. nullable 문구 3필드와 기존 온라인 분류를 함께 포함한 스키마 바인딩 충돌 5곳 해결.
+- [x] CI RED 확인: PostgreSQL 168 suites 중 167 PASS, 1240 tests PASS / 1 FAIL. 실패는 슬롯 응답의 automaticLabel/displayLabel 기대값 누락. 두 필드를 정확히 단언하도록 수정.
+- [ ] 통합 변경 코드·보안·디자인 검토 및 좁은 검증.
+- [ ] 최신 head CI 및 Copilot clean 확인.
+- [ ] dev 머지·로컬 dev FF·alpha 배포 SHA 확인.
+- [ ] alpha 3폭 UI/저장/새로고침/실제 진출 QA·갤러리·정리 기록.
+- 검증: API 관련 5 files/257 tests PASS, Web 편집·목록·모바일·레이아웃 6 files/203 tests PASS. API/Web tsc PASS. surface/pattern 게이트의 sandbox spawn EPERM은 앱 경로에서 권한 있는 동일 명령으로 재실행한다.
+- 실DB 회귀 2개 추가: 기존 TeamMatch 일정·필드 무입력 조회 → 번호/문구 편집 → 출처 번호 편집 → null 비우기; 빈 BYE 문구 → 팀 배정 → 8강 공유 조회 → 문구 복원 및 edge/팀 보존. 로컬 Docker daemon 부재로 CI에서 실행한다.

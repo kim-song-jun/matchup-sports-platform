@@ -191,7 +191,7 @@ describe('대진 …InTx 함수 (PostgreSQL)', () => {
       const view = await bracket.getBracket(user, ids.tournamentId);
 
       expect(view.slots.find((candidate) => candidate.id === slot.id)).toEqual({
-        id: slot.id, kind: 'ENTRY', groupId, sourceGroupId: null, position: 31, byeSortOrder: null, label: 'empty-fixtures 31번', registrationId: null, teamName: null,
+        id: slot.id, kind: 'ENTRY', groupId, sourceGroupId: null, position: 31, byeSortOrder: null, automaticLabel: 'empty-fixtures 31번', displayLabel: null, label: 'empty-fixtures 31번', registrationId: null, teamName: null,
       });
       expect(view.fixtures.find((fixture) => fixture.id === id)).toMatchObject({
         homeSlotId: slot.id, awaySlotId: null,

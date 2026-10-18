@@ -4318,6 +4318,8 @@ export type V1AdminBracketGroupTeam = {
 };
 
 export type V1AdminBracketFixture = {
+  homeDisplayLabel?: string | null;
+  awayDisplayLabel?: string | null;
   fieldId?: string | null;
   bracketSources?: V1BracketSource[];
   id: string;
@@ -4383,6 +4385,8 @@ export type V1AdminBracketSlotKind = 'ENTRY' | 'BYE' | 'GROUP_RANK';
 
 /** 팀이 들어갈 칸. 라벨("A조 1번", "부전승 1")은 서버가 계산해서 준다. */
 export type V1AdminBracketSlot = {
+  automaticLabel?: string;
+  displayLabel?: string | null;
   id: string;
   kind: V1AdminBracketSlotKind;
   groupId: string | null;
@@ -4806,9 +4810,11 @@ export type V1CreateGroupTeamPayload = {
 };
 
 export type V1UpdateFixturePayload = {
+  homeDisplayLabel?: string | null;
+  awayDisplayLabel?: string | null;
   fieldId?: string | null;
   fixtureNumber?: number;
-  scheduledAt?: string;
+  scheduledAt?: string | null;
   venue?: string;
   venueAddress?: string | null;
   venueLatitude?: number | null;

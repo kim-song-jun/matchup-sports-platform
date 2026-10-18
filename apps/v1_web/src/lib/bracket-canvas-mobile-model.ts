@@ -4,6 +4,7 @@ import {
   classifyFixtureSide,
   fixtureNodeState,
   fixtureSideLabel,
+  fixtureSideDisplayLabel,
   type FixtureNodeState,
   type SideKey,
   type SideSource,
@@ -22,6 +23,7 @@ import type {
 import type { V1AdminLeagueTeam, V1LeagueFixture } from '@/types/league-match';
 
 export interface MobileSide {
+  byeLabel?: string;
   slotId: string | null;
   slotKind: V1AdminBracketSlot['kind'] | null;
   /** 데스크톱 칸 패널과 같은 분류 — 자리(slot)·앞 경기 결과(feeder)·경기에 직접 지정(direct). */
@@ -32,6 +34,8 @@ export interface MobileSide {
 }
 
 export interface MobileNode {
+  key?: string;
+  byeSlotId?: string;
   fieldId?: string | null;
   fixtureId: string;
   /** 조별 단계 후보 제외에만 쓴다. 리그 매치(scope 'league')는 대회 조가 없어 null. */
@@ -85,6 +89,7 @@ export function bracketMobileSide(fixture: V1AdminBracketFixture, side: SideKey,
     registrationId,
     teamName: registrationId === null ? null : side === 'HOME' ? fixture.homeTeamName : fixture.awayTeamName,
     slotLabel: registrationId === null ? fixtureSideLabel(fixture, side, labels) : null,
+    ...(registrationId !== null && slotId && labels.slotsById.get(slotId)?.kind === 'BYE' ? { byeLabel: fixtureSideDisplayLabel(fixture, side, labels) } : {}),
   };
 }
 
@@ -197,8 +202,8 @@ const PHASE_BUCKET: Record<V1TournamentGroupPhase, { key: string; label: string 
   third_place: { key: 'final', label: '결승' },
 };
 
-type FixtureOrder = { fixtureNumber: number; legNumber: number };
-const byFixtureOrder = (a: FixtureOrder, b: FixtureOrder) => a.fixtureNumber - b.fixtureNumber || a.legNumber - b.legNumber;
+type FixtureOrder = { id: string; fixtureNumber: number; legNumber: number };
+const byFixtureOrder = (a: FixtureOrder, b: FixtureOrder) => a.fixtureNumber - b.fixtureNumber || a.legNumber - b.legNumber || a.id.localeCompare(b.id);
 
 export function buildBracketMobileRounds(input: {
   groups: V1AdminBracketGroup[];
@@ -207,7 +212,8 @@ export function buildBracketMobileRounds(input: {
 }): MobileRound[] {
   const labels = buildSideLabelContext(input.groups, input.fixtures, input.slots);
   const groupIds = new Set(input.groups.map((group) => group.id));
-  const groups = [...input.groups].sort((a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id));
+  const order: Record<string, number> = { group: 0, round16: 1, round12: 2, quarter: 3, semi: 4, final: 5, third_place: 6 };
+  const groups = [...input.groups].sort((a, b) => (order[a.phase] ?? 99) - (order[b.phase] ?? 99) || a.sortOrder - b.sortOrder || a.id.localeCompare(b.id));
   const rounds: MobileRound[] = [];
   const roundByKey = new Map<string, MobileRound>();
   const thirdPlaceSectionKeys = new Set<string>();
@@ -217,6 +223,19 @@ export function buildBracketMobileRounds(input: {
       .filter((f) => f.groupId === group.id)
       .sort(byFixtureOrder)
       .map((f) => bracketMobileNode(f, group.name, group.phase !== 'group', labels));
+    if (group.phase === 'round12') {
+      for (const slot of input.slots.filter(slot => slot.kind === 'BYE' && slot.groupId === group.id).sort((a, b) => (a.byeSortOrder ?? a.position) - (b.byeSortOrder ?? b.position) || a.id.localeCompare(b.id))) {
+        const target = input.fixtures.find(f => f.homeSlotId === slot.id || f.awaySlotId === slot.id);
+        if (!target) continue;
+        const home = target.homeSlotId === slot.id;
+        const node = bracketMobileNode(target, null, true, labels);
+        node.key = 'bye:' + slot.id; node.byeSlotId = slot.id; node.title = '12강 부전승'; node.groupId = group.id;
+        node.home = bracketMobileSide(target, home ? 'HOME' : 'AWAY', labels); node.scheduledAt = null; node.venue = null; node.scoreText = null; node.quickEntered = false;
+        const sourceId = target.bracketSources?.find(source => source.side === (home ? 'AWAY' : 'HOME'))?.fixtureId;
+        const index = nodes.findIndex(node => node.fixtureId === sourceId);
+        nodes.splice(index < 0 ? nodes.length : index + (home ? 0 : 1), 0, node);
+      }
+    }
     if (nodes.length === 0) continue;
 
     const bucket = PHASE_BUCKET[group.phase as V1TournamentGroupPhase] ?? { key: `phase:${group.phase}`, label: group.name };

@@ -1,5 +1,6 @@
 'use client';
 
+import { formatKstDateShort, formatKstTime } from '@/lib/date-utils';
 import { Zap } from 'lucide-react';
 import type { DragEvent } from 'react';
 import { StatusChip } from '@/components/v1-ui/status-chip';
@@ -66,6 +67,7 @@ export function BracketCanvasNode({
   const score = voided ? null : (revision?.score ?? null);
   const quick = !voided && revision?.entryMethod === 'quick';
   const penalty = score?.penalties ? `승부차기 ${score.penalties.home}:${score.penalties.away}` : null;
+  const when = `${fixture.scheduledAt ? `${formatKstDateShort(fixture.scheduledAt)} ${formatKstTime(fixture.scheduledAt)}` : '시간 미정'} · ${fixture.venue || '경기장 미정'}`;
   const footer = [voided ? '무효 처리됨' : quick ? '어드민 빠른 입력' : null, penalty].filter((part): part is string => part !== null);
 
   const resolvedSlots = new Map([slots.HOME, slots.AWAY].filter((slot): slot is V1AdminBracketSlot => slot !== null).map((slot) => [slot.id, slot]));
@@ -106,6 +108,7 @@ export function BracketCanvasNode({
             style={{ color: filled || placing ? 'var(--text-strong)' : 'var(--text-muted)' }}
           >
             {sideLabels[side]}
+            {filled && slot?.kind === 'BYE' ? <span className="tm-text-caption block truncate font-normal text-[var(--text-muted)]">{slot.label}</span> : null}
           </span>
           {placing ? (
             <span className="tm-text-caption-strong shrink-0" style={{ color: 'var(--blue700)' }}>
@@ -152,11 +155,11 @@ export function BracketCanvasNode({
       {renderSide('HOME')}
       {renderSide('AWAY')}
       <div
-        className="tm-text-caption flex items-center gap-1 border-t border-[var(--border)] px-3"
+        className="tm-text-caption flex flex-col justify-center items-start gap-0 border-t border-[var(--border)] px-3"
         style={{ height: CANVAS_FOOTER_HEIGHT, color: 'var(--text-muted)' }}
       >
-        {quick ? <Zap size={12} aria-hidden="true" /> : null}
-        <span className="truncate">{footer.join(' · ')}</span>
+        <span className="w-full truncate">{when}</span>
+        {footer.length ? <span className="flex min-w-0 w-full items-center gap-1">{quick ? <Zap size={12} aria-hidden="true" /> : null}<span className="truncate">{footer.join(' · ')}</span></span> : null}
       </div>
     </div>
   );

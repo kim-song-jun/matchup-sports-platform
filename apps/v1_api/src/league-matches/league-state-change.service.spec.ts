@@ -50,8 +50,8 @@ function setup(league: Partial<Row> = {}, opts: { startedGames?: number } = {}) 
 const admin = { id: 'admin-1' } as V1AuthUser;
 
 describe('LeagueMatchAdminService.changeState', () => {
-  it('준비 중 리그를 진행 중으로 시작한다', async () => {
-    const { service, row } = setup({ status: 'open' });
+  it('모집 마감 리그를 운영자가 진행 중으로 시작한다', async () => {
+    const { service, row } = setup({ status: 'closed' });
     await expect(service.changeState(admin, 'league-1', { state: 'active' }))
       .resolves.toEqual({ leagueId: 'league-1', state: 'active', alreadyProcessed: false });
     expect(row.status).toBe('in_progress');

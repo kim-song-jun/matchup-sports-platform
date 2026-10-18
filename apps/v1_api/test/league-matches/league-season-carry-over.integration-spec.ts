@@ -88,6 +88,8 @@ describe('리그 시즌 승계 — 같은 티어 값 복사', () => {
     await prisma.v1Tournament.update({ where: { id: leagueIds[1] }, data: { ...TIER2, entryFeeConfiguredAt: new Date() } });
 
     for (const leagueId of leagueIds) {
+      await asAdmin(http().post(`/api/v1/admin/league-matches/${leagueId}/state`))
+        .send({ state: 'active' }).expect(200);
       const fixtures = await asAdmin(http().post(`/api/v1/admin/league-matches/${leagueId}/fixtures`)).send({ weeksCount: 1 }).expect(201);
       for (const teamMatchId of fixtures.body.data.teamMatchIds as string[]) await officializeFixture(teamMatchId, { home: 3, away: 0 });
     }

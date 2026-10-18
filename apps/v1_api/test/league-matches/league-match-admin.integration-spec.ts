@@ -101,6 +101,8 @@ describe('POST /admin/league-matches + fixtures', () => {
       });
     expect(createRes.status).toBe(201);
     const leagueId = createRes.body.data.leagueId;
+    expect((await prisma.v1Tournament.findUniqueOrThrow({ where: { id: leagueId } })).status).toBe('closed');
+    expect((await prisma.v1Tournament.findUniqueOrThrow({ where: { id: leagueId } })).requiresExplicitStart).toBe(true);
 
     const fixturesRes = await request(app.getHttpServer())
       .post(`/api/v1/admin/league-matches/${leagueId}/fixtures`)
@@ -108,6 +110,15 @@ describe('POST /admin/league-matches + fixtures', () => {
       .send({ weeksCount: 1 });
     expect(fixturesRes.status).toBe(201);
     expect(fixturesRes.body.data.teamMatchIds).toHaveLength(1);
+    expect((await prisma.v1Tournament.findUniqueOrThrow({ where: { id: leagueId } })).status).toBe('closed');
+    const beforeStart = await request(app.getHttpServer()).get(`/api/v1/admin/league-matches/${leagueId}`)
+      .set('x-v1-user-id', ownerUserId).expect(200);
+    expect(beforeStart.body.data).toMatchObject({ state: 'draft', lifecycleStatus: 'closed', registrationOpen: false });
+    await request(app.getHttpServer()).post(`/api/v1/admin/league-matches/${leagueId}/state`)
+      .set('x-v1-user-id', regularUserId).send({ state: 'active' }).expect(403);
+    await request(app.getHttpServer()).post(`/api/v1/admin/league-matches/${leagueId}/state`)
+      .set('x-v1-user-id', ownerUserId).send({ state: 'active' }).expect(200);
+    expect((await prisma.v1Tournament.findUniqueOrThrow({ where: { id: leagueId } })).status).toBe('in_progress');
 
     const teamMatch = await prisma.v1TeamMatch.findUniqueOrThrow({
       where: { id: fixturesRes.body.data.teamMatchIds[0] },

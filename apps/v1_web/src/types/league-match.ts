@@ -5,6 +5,9 @@ export interface V1AdminLeagueListItem {
   title: string;
   isPublic: boolean;
   state: 'draft' | 'active' | 'completed' | 'on_hold';
+  /** 저장된 리그 단계. closed는 운영자 시작 전 모집 마감이다. */
+  lifecycleStatus?: import('./api').V1TournamentStatus | 'on_hold';
+  registrationOpen?: boolean;
   teamCount: number;
   fixtureCount: number;
   startsOn: string;
@@ -175,6 +178,8 @@ export interface V1LeagueFixture {
 export interface V1AdminLeagueDetail {
   leagueId: string;
   title: string;
+  /** 기존 state에서 합쳐진 draft/open/closed를 구분한다. */
+  lifecycleStatus?: import('./api').V1TournamentStatus | 'on_hold';
   state: 'draft' | 'active' | 'completed' | 'on_hold';
   /** 공개 리그 목록·상세에 노출되는지 여부. 관리자 상세는 항상 값을 내려준다. */
   isPublic: boolean;

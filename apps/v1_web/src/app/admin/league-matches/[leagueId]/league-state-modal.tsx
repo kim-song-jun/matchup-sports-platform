@@ -74,18 +74,20 @@ export function leagueStateOptions(series: Pick<V1AdminLeagueDetail, 'state' | '
 /** 리그 상태를 한 곳에서 바꾼다 — 예전에는 보류 카드·되돌리기·종료 버튼이 상황마다 따로 나타났다. */
 export function LeagueStateModal({
   leagueId,
+  startOnly = false,
   series,
   onClose,
   showToast,
 }: {
   leagueId: string;
-  series: Pick<V1AdminLeagueDetail, 'state' | 'heldFromState' | 'fixtures'>;
+  startOnly?: boolean;
+  series: Pick<V1AdminLeagueDetail, 'state' | 'heldFromState' | 'fixtures' | 'lifecycleStatus'>;
   onClose: () => void;
   showToast: (message: string, variant?: 'success' | 'error') => void;
 }) {
   const reasonId = useId();
   const changeState = useV1ChangeLeagueState(leagueId);
-  const options = leagueStateOptions(series);
+  const options = leagueStateOptions(series).filter((option) => !startOnly || option.state === 'active');
   const [target, setTarget] = useState<V1LeagueStateValue | null>(options.find((option) => option.disabledReason === null)?.state ?? null);
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -114,12 +116,12 @@ export function LeagueStateModal({
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-label="상태 변경"
+        aria-label={startOnly ? '리그 시작하기' : '상태 변경'}
         className="flex max-h-[90vh] w-full max-w-[440px] flex-col gap-4 overflow-y-auto rounded-t-2xl bg-[var(--card-surface)] p-5 sm:rounded-2xl"
       >
         <div>
-          <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">상태 변경</h2>
-          <p className="mt-0.5 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">지금은 {STATE_NOW[series.state]}.</p>
+          <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">{startOnly ? '리그를 시작할까요?' : '상태 변경'}</h2>
+          <p className="mt-0.5 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">지금은 {series.lifecycleStatus === 'closed' ? '리그 시작 전이에요' : STATE_NOW[series.state]}.</p>
         </div>
         <fieldset className="flex flex-col gap-2">
           <legend className="sr-only">바꿀 상태</legend>
@@ -179,7 +181,7 @@ export function LeagueStateModal({
             취소
           </Button>
           <Button variant="primary" block onClick={submit} disabled={!canSubmit} loading={changeState.isPending}>
-            바꾸기
+            {startOnly ? '리그 시작하기' : '바꾸기'}
           </Button>
         </div>
       </div>

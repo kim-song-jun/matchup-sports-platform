@@ -2607,6 +2607,8 @@ model V1Tournament {
   title                      String
   isPublic                   Boolean                     @default(true) @map("is_public")
   status                     V1TournamentStatus          @default(draft)
+  /// 신규 정규 리그만 명시적 시작을 요구한다. 기존 행·구버전 생성 행은 false로 기존 수명주기를 유지한다.
+  requiresExplicitStart      Boolean                     @default(false) @map("requires_explicit_start")
   /// 리그 보류(on_hold) 직전 상태·공개 여부 — 보류 해제가 되돌린다. 보류 중이 아니면 null.
   heldFromStatus             V1TournamentStatus?         @map("held_from_status")
   heldFromPublic             Boolean?                    @map("held_from_public")

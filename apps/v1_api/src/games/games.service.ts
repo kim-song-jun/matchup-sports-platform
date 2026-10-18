@@ -192,6 +192,8 @@ type TeamMatchCompetitionContext = {
   competitionId: string;
   teamMatchId: string;
   isLeague: boolean;
+  lifecycleStatus: string | null;
+  requiresExplicitStart: boolean;
   status: V1TeamMatchStatus;
   homeRegistration: { id: string; teamId: string } | null;
   awayRegistration: { id: string; teamId: string } | null;
@@ -5075,6 +5077,12 @@ export class GamesService {
       if (game.teamMatchId === null) return;
       const competition = await this.resolveTeamMatchCompetitionContext(tx, game.teamMatchId);
       if (competition === null) return;
+      if (competition.isLeague && competition.requiresExplicitStart && ['draft', 'open', 'closed'].includes(competition.lifecycleStatus ?? '')) {
+        throw new ConflictException({
+          code: 'LEAGUE_NOT_STARTED',
+          message: '리그가 아직 시작되지 않았어요. 리그 관리에서 리그 시작하기를 먼저 눌러 주세요.',
+        });
+      }
       if (competition.status === V1TeamMatchStatus.cancelled) {
         throw new ConflictException({ code: 'TOURNAMENT_MATCH_CANCELLED', message: '취소된 대진이라 경기를 시작할 수 없어요.' });
       }
@@ -5157,8 +5165,8 @@ export class GamesService {
         tournamentId: true,
         leagueId: true,
         status: true,
-        tournament: { select: { kind: true } },
-        league: { select: { kind: true } },
+        tournament: { select: { kind: true, status: true, requiresExplicitStart: true } },
+        league: { select: { kind: true, status: true, requiresExplicitStart: true } },
         tournamentDetails: {
           select: {
             teamMatchId: true,
@@ -5186,6 +5194,8 @@ export class GamesService {
       competitionId,
       teamMatchId: teamMatch.id,
       isLeague: teamMatch.tournament?.kind === 'regular_league' || teamMatch.league?.kind === 'regular_league',
+      lifecycleStatus: teamMatch.tournament?.status ?? teamMatch.league?.status ?? null,
+      requiresExplicitStart: teamMatch.tournament?.requiresExplicitStart ?? teamMatch.league?.requiresExplicitStart ?? false,
       status: teamMatch.status,
       homeRegistration: teamMatch.tournamentDetails?.homeRegistration ?? null,
       awayRegistration: teamMatch.tournamentDetails?.awayRegistration ?? null,

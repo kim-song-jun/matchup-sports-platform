@@ -305,6 +305,7 @@ export class LeagueMatchAdminService {
         title: true,
         isPublic: true,
         status: true,
+        registrationDeadlineAt: true,
         scheduledAt: true,
         scheduledEndAt: true,
         // 목록에 싣지는 않지만 `isCompleteLeagueMirror` 가 본다 — 지역이 빈 거울은 깨진 것이다.
@@ -345,6 +346,8 @@ export class LeagueMatchAdminService {
         title: row.title,
         isPublic: row.isPublic,
         state: LEAGUE_STATE_BY_STATUS[row.status],
+        lifecycleStatus: row.status,
+        registrationOpen: isLeagueRegistrationOpen(row.status, row.registrationDeadlineAt),
         teamCount: row._count.registrations,
         fixtureCount: fixtureCountByLeagueId.get(row.id) ?? 0,
         startsOn: row.scheduledAt,
@@ -444,6 +447,7 @@ export class LeagueMatchAdminService {
       title: league.title,
       isPublic: league.isPublic,
       state: league.state,
+      lifecycleStatus: league.lifecycleStatus,
       // **대진 일정 폼이 요일을 날짜로 전개하는 기준일이다.** BE-2 이후 서버는 요일을 모르고
       // `schedule.dates` 를 받으므로, 화면이 "리그 시작일 이후 매주 그 요일" 을 직접 펼쳐야
       // 한다 — 그 기준일이 응답에 없어서 화면은 계산할 수가 없었다(요일을 고르면 옛 형태를
@@ -668,7 +672,7 @@ export class LeagueMatchAdminService {
         //   · `upsert` 는 `where` 에 unique 필드만 받아 `kind` 를 못 건다 — 같은 id 의 **진짜
         //     대회**가 있으면 덮어쓴다. 그 위험을 지우려면 이 형태여야 한다.
         await tx.v1Tournament.updateMany({
-          where: { id: league.id, kind: 'regular_league' },
+          where: { id: league.id, kind: 'regular_league', requiresExplicitStart: false, status: { in: ['draft', 'open', 'closed'] } },
           data: { status: STATUS_BY_LEAGUE_STATE.active },
         });
       }
@@ -1224,14 +1228,14 @@ export class LeagueMatchAdminService {
         timing,
       });
       if (ids.length > 0) {
-        // draft 리그는 첫 대진이 생기면 active 가 된다. completed·cancelled 는 위 가드(LEAGUE_ENDED)가
+        // 기존 모드의 draft/open/closed 리그만 첫 대진에서 active가 된다. 신규 리그는 명시적 시작을 기다린다. completed·cancelled 는 위 가드(LEAGUE_ENDED)가
         // 먼저 거부하므로 여기까지 오지 않는다.
         // BE-5 drop: 통합 축이 정본이라 이 update 하나가 상태 전이 전부다(예전엔 레거시
         // 테이블을 먼저 고치고 거울을 따라 고쳤다). `updateMany` + `kind` 가드인 이유:
         //   · `upsert` 는 `where` 에 unique 필드만 받아 `kind` 를 못 건다 — 같은 id 의 **진짜
         //     대회**가 있으면 덮어쓴다. 그 위험을 지우려면 이 형태여야 한다.
         await tx.v1Tournament.updateMany({
-          where: { id: league.id, kind: 'regular_league' },
+          where: { id: league.id, kind: 'regular_league', requiresExplicitStart: false, status: { in: ['draft', 'open', 'closed'] } },
           data: { status: STATUS_BY_LEAGUE_STATE.active },
         });
       }
@@ -2343,6 +2347,7 @@ export class LeagueMatchAdminService {
       sportCode: sport.code,
       entryFeeConfiguredAt: entryFeeConfiguredAt?.toISOString() ?? null,
       state: LEAGUE_STATE_BY_STATUS[status],
+      lifecycleStatus: status,
       startsOn: scheduledAt,
       teams: registrations,
       // `state`(draft/active/completed)로는 신청 여부를 알 수 없다 — 거울의 원시 `status`

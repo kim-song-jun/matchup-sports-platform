@@ -1,3 +1,5 @@
+신규 리그는 모집 마감(`closed`)으로 생성하고 운영자가 명시적으로 시작한다. 관리자 목록·상세는 `lifecycleStatus`를 제공하며, 시작 전 경기 시작은 `409 LEAGUE_NOT_STARTED`다. [리그 계약](./domains/league-matches.md#new-league-lifecycle-2026-10-18)을 따른다.
+
 리그 목록/상세 이미지 독립 저장 및 기존 이미지 보존: [이미지 계약](./domains/league-matches.md#cover-image-목록상세-이미지).
 
 경기별 골키퍼 지정 (2026-10-14): 명단 조회에 `goalkeeper`를 추가하고 팀 일괄 명단 API에 복수 지정 `SET_GOALKEEPER`를 지원한다. [Games 계약](./domains/games.md#경기-명단-gk-지정-task-20261082)을 확인한다.

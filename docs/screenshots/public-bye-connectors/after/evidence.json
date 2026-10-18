@@ -1,0 +1,211 @@
+{
+  "url": "https://alpha.teameet.co.kr/tournaments/ad200600-0000-4000-8000-000000000003/bracket",
+  "persona": "anonymous",
+  "browserPid": 56033,
+  "parentPid": 56021,
+  "viewports": [
+    {
+      "width": 1440,
+      "screenshot": "1440.png",
+      "overflow": false,
+      "endpoints": [
+        {
+          "source": "ae09296b-88ca-460b-848d-ed3ef1c9da2c",
+          "fixtureId": "3db67aa5-d915-5920-a765-9ee7662e9283",
+          "side": "HOME",
+          "path": "M 180 96 H 196.4 V 133.5 H 221",
+          "verified": true
+        },
+        {
+          "source": "e4c848d1-8b96-4819-9fc3-5a67245852fe",
+          "fixtureId": "6ee2f231-4c2c-5f48-9f8c-bda98618ec12",
+          "side": "HOME",
+          "path": "M 180 384 H 196.4 V 421.5 H 221",
+          "verified": true
+        },
+        {
+          "source": "2045effc-37be-4034-8bba-62052003f023",
+          "fixtureId": "8359dace-e406-54a5-bd64-0e0215ebf3ef",
+          "side": "HOME",
+          "path": "M 180 672 H 196.4 V 709.5 H 221",
+          "verified": true
+        },
+        {
+          "source": "cfa2da26-270f-45f5-adfc-2ef85b798a65",
+          "fixtureId": "186029e0-2bcb-5999-9903-64e4d2084a09",
+          "side": "HOME",
+          "path": "M 180 960 H 196.4 V 997.5 H 221",
+          "verified": true
+        }
+      ],
+      "byeCards": 4,
+      "byeConnections": [
+        "부전승 → 1번 경기 홈",
+        "부전승 → 2번 경기 홈",
+        "부전승 → 3번 경기 홈",
+        "부전승 → 4번 경기 홈"
+      ],
+      "connections": [
+        "1번 경기 승자 → 1번 경기 어웨이",
+        "2번 경기 승자 → 2번 경기 어웨이",
+        "3번 경기 승자 → 3번 경기 어웨이",
+        "4번 경기 승자 → 4번 경기 어웨이",
+        "1번 경기 승자 → 1번 경기 홈",
+        "2번 경기 승자 → 1번 경기 어웨이",
+        "3번 경기 승자 → 2번 경기 홈",
+        "4번 경기 승자 → 2번 경기 어웨이",
+        "1번 경기 승자 → 41번 경기 홈",
+        "2번 경기 승자 → 41번 경기 어웨이",
+        "부전승 → 1번 경기 홈",
+        "부전승 → 2번 경기 홈",
+        "부전승 → 3번 경기 홈",
+        "부전승 → 4번 경기 홈",
+        "결승 승자 → 우승"
+      ]
+    },
+    {
+      "width": 768,
+      "screenshot": "768.png",
+      "overflow": false,
+      "endpoints": [
+        {
+          "source": "ae09296b-88ca-460b-848d-ed3ef1c9da2c",
+          "fixtureId": "3db67aa5-d915-5920-a765-9ee7662e9283",
+          "side": "HOME",
+          "path": "M 180 96 H 196.4 V 133.5 H 221",
+          "verified": true
+        },
+        {
+          "source": "e4c848d1-8b96-4819-9fc3-5a67245852fe",
+          "fixtureId": "6ee2f231-4c2c-5f48-9f8c-bda98618ec12",
+          "side": "HOME",
+          "path": "M 180 384 H 196.4 V 421.5 H 221",
+          "verified": true
+        },
+        {
+          "source": "2045effc-37be-4034-8bba-62052003f023",
+          "fixtureId": "8359dace-e406-54a5-bd64-0e0215ebf3ef",
+          "side": "HOME",
+          "path": "M 180 672 H 196.4 V 709.5 H 221",
+          "verified": true
+        },
+        {
+          "source": "cfa2da26-270f-45f5-adfc-2ef85b798a65",
+          "fixtureId": "186029e0-2bcb-5999-9903-64e4d2084a09",
+          "side": "HOME",
+          "path": "M 180 960 H 196.4 V 997.5 H 221",
+          "verified": true
+        }
+      ],
+      "byeCards": 4,
+      "byeConnections": [
+        "부전승 → 1번 경기 홈",
+        "부전승 → 2번 경기 홈",
+        "부전승 → 3번 경기 홈",
+        "부전승 → 4번 경기 홈"
+      ],
+      "connections": [
+        "1번 경기 승자 → 1번 경기 어웨이",
+        "2번 경기 승자 → 2번 경기 어웨이",
+        "3번 경기 승자 → 3번 경기 어웨이",
+        "4번 경기 승자 → 4번 경기 어웨이",
+        "1번 경기 승자 → 1번 경기 홈",
+        "2번 경기 승자 → 1번 경기 어웨이",
+        "3번 경기 승자 → 2번 경기 홈",
+        "4번 경기 승자 → 2번 경기 어웨이",
+        "1번 경기 승자 → 41번 경기 홈",
+        "2번 경기 승자 → 41번 경기 어웨이",
+        "부전승 → 1번 경기 홈",
+        "부전승 → 2번 경기 홈",
+        "부전승 → 3번 경기 홈",
+        "부전승 → 4번 경기 홈",
+        "결승 승자 → 우승"
+      ]
+    },
+    {
+      "width": 390,
+      "screenshot": "390.png",
+      "overflow": false,
+      "endpoints": [
+        {
+          "source": "ae09296b-88ca-460b-848d-ed3ef1c9da2c",
+          "fixtureId": "3db67aa5-d915-5920-a765-9ee7662e9283",
+          "side": "HOME",
+          "path": "M 180 96 H 196.4 V 133.5 H 221",
+          "verified": true
+        },
+        {
+          "source": "e4c848d1-8b96-4819-9fc3-5a67245852fe",
+          "fixtureId": "6ee2f231-4c2c-5f48-9f8c-bda98618ec12",
+          "side": "HOME",
+          "path": "M 180 384 H 196.4 V 421.5 H 221",
+          "verified": true
+        },
+        {
+          "source": "2045effc-37be-4034-8bba-62052003f023",
+          "fixtureId": "8359dace-e406-54a5-bd64-0e0215ebf3ef",
+          "side": "HOME",
+          "path": "M 180 672 H 196.4 V 709.5 H 221",
+          "verified": true
+        },
+        {
+          "source": "cfa2da26-270f-45f5-adfc-2ef85b798a65",
+          "fixtureId": "186029e0-2bcb-5999-9903-64e4d2084a09",
+          "side": "HOME",
+          "path": "M 180 960 H 196.4 V 997.5 H 221",
+          "verified": true
+        }
+      ],
+      "byeCards": 4,
+      "byeConnections": [
+        "부전승 → 1번 경기 홈",
+        "부전승 → 2번 경기 홈",
+        "부전승 → 3번 경기 홈",
+        "부전승 → 4번 경기 홈"
+      ],
+      "connections": [
+        "1번 경기 승자 → 1번 경기 어웨이",
+        "2번 경기 승자 → 2번 경기 어웨이",
+        "3번 경기 승자 → 3번 경기 어웨이",
+        "4번 경기 승자 → 4번 경기 어웨이",
+        "1번 경기 승자 → 1번 경기 홈",
+        "2번 경기 승자 → 1번 경기 어웨이",
+        "3번 경기 승자 → 2번 경기 홈",
+        "4번 경기 승자 → 2번 경기 어웨이",
+        "1번 경기 승자 → 41번 경기 홈",
+        "2번 경기 승자 → 41번 경기 어웨이",
+        "부전승 → 1번 경기 홈",
+        "부전승 → 2번 경기 홈",
+        "부전승 → 3번 경기 홈",
+        "부전승 → 4번 경기 홈",
+        "결승 승자 → 우승"
+      ]
+    }
+  ],
+  "savedByeTargets": [
+    {
+      "id": "ae09296b-88ca-460b-848d-ed3ef1c9da2c",
+      "fixtureId": "3db67aa5-d915-5920-a765-9ee7662e9283",
+      "side": "HOME"
+    },
+    {
+      "id": "e4c848d1-8b96-4819-9fc3-5a67245852fe",
+      "fixtureId": "6ee2f231-4c2c-5f48-9f8c-bda98618ec12",
+      "side": "HOME"
+    },
+    {
+      "id": "2045effc-37be-4034-8bba-62052003f023",
+      "fixtureId": "8359dace-e406-54a5-bd64-0e0215ebf3ef",
+      "side": "HOME"
+    },
+    {
+      "id": "cfa2da26-270f-45f5-adfc-2ef85b798a65",
+      "fixtureId": "186029e0-2bcb-5999-9903-64e4d2084a09",
+      "side": "HOME"
+    }
+  ],
+  "consoleErrors": [],
+  "pageErrors": [],
+  "failedResponses": [],
+  "browserClosed": true
+}

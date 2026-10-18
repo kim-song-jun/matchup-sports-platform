@@ -885,3 +885,16 @@ Status: In Progress
 - Web tsc PASS. 패턴 검사는 sandbox spawnSync EPERM으로 중단되어 해당 단계만 권한 있는 셸에서 재실행 PASS. API lint 결과 및 PR/CI는 아래에 기록한다.
 
 - API tsc/surface PASS. Web 패턴 PASS. diff whitespace/debt marker 검사 PASS. 새 응답 타입은 optional로 추가해 기존 MSW/수동 대진 호환을 유지했다. PR에는 수정 전 3폭을 포함하고 after 갤러리는 머지·alpha 배포 뒤 채운다.
+
+
+#### PR #1976 dev/alpha 배포 기록
+- 사용자 지시: “dev에 배포해줘 리뷰 없어도 괜찮아”. 이번 PR만 Copilot 예외 승인. 모델 사용 불가 run39127378589를 clean 리뷰로 계산하지 않았다.
+- PR CI39127375238 PASS: API unit428 suites/6536 tests, DB integration169 suites/1249 PASS·3 skip, Web/Gates PASS. 영향 범위 로컬146 tests 및 양쪽 타입/규칙 PASS.
+- dev 머지: d276dcd72e9ed5cadeb5ae7e00474b9a4993226d (2026-10-18T12:42:21Z). post-merge CI39128404876 PASS. alpha39128404820 추적.
+- 메인 작업트리 FF는 미커밋/미추적 충돌로 안전 중단. 내용 변경 없이 /tmp/pr1976-local-dev-sync-backup에 34개 후보 파일과 SHA256 manifest 백업. 기존 WIP를 원복/stash/reset하지 않았다. 원격 dev 배포와 독립이다.
+- after QA는 아래 최종 결과로 기록한다. evidence 브랜치는 docs/pr1976-alpha-evidence이며 제품 코드 추가 변경 없음.
+
+- 최종: alpha39128404820 SUCCESS, release 1.10.0-alpha.20261018.gd276dcd72e9e 및 DB true 확인. 전환 중 일시503은 정상화 후 검증했다.
+- 공개 원 대회 읽기 전용 after 1440/768/390 **3/3 PASS**: 각 BYE선4, 저장된 HOME 끝점4개(총12) 오차0.5px 이내, 문서overflow0, console/pageerror/HTTP오류0. 기존42개 fixture 전체 응답(ID·진출·일정·문구 포함) 변화0. 신규 경기/팀 배정/점수/문구 저장 없음.
+- Headed 최종 PID56033/PPID56021 및 진단 세션 모두 종료. 초기 캡처는 탭 hydration 경합으로 region timeout, networkidle 진단도 polling으로 timeout. 실제 화면 진단4BYE 확인 후 SSR 숨김 트리 unmount 대기로 수정해 최종3폭 PASS. 실패는 after/first-attempt.json에 보존.
+- baseline 제한: desktop before는 그림 비교 가능. tablet/mobile before는 내부 스크롤의 초기 순위표만 담아 그림 before 비교 불가이며, 재배포/합성 이미지로 대체하지 않았다. after는 실제 그림으로 스크롤해 촬영했다. 증거: docs/screenshots/public-bye-connectors/after/.

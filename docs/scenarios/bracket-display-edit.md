@@ -51,3 +51,14 @@ Persona: owner/ops 쓰기, support 읽기, 일반 사용자 쓰기 거절.
 
 - 수정 전 alpha 실측: 1440/768/390 모두 부전승 카드 4개·BYE 선 0개, console/pageerror/HTTP 오류 0. [증거 JSON](../screenshots/public-bye-connectors/before/evidence.json). 변경 후 alpha는 미배포로 대기.
 - 계약 검증: Web graph/renderer/label 50, API presenter 50 PASS. 빈 HOME/AWAY 연결 및 비공개 게이트 포함.
+
+
+## 2026-10-18 PR #1976 — 공개 부전승 연결선 배포 검증 완료
+
+- dev `d276dcd72e9ed5cadeb5ae7e00474b9a4993226d`, alpha `1.10.0-alpha.20261018.gd276dcd72e9e`. PR CI39127375238·dev CI39128404876·alpha39128404820 SUCCESS. 사용자 승인으로 이번 Copilot 모델 장애 리뷰만 예외 적용.
+- 익명 원 대회 `/tournaments/ad200600-0000-4000-8000-000000000003/bracket`에서 1440/768/390 **3/3 PASS**. 각 부전승4자리→실제 8강 HOME4줄의 연결선4개, 총12끝점 오차0.5px 이내. 원 대회의 부전승은 모두 빈 HOME이며 AWAY는 API/renderer 회귀로 검증했다.
+- 화면 이동: 일정 SSR의 숨김 대진 트리가 hydration 후 사라진 것을 확인 → 순위·대진표 탭 클릭 → 연결선 확인 → 내부 스크롤을 그림으로 이동 → 캡처. viewport별 새로고침으로 반복했다.
+- console/pageerror/HTTP 실패0, document 가로 overflow0. 42개 경기 전체 응답을 배포 전후 비교해 ID·승자/패자 source·시각·경기장·문구 변화0. 원 대회 쓰기 없음, 브라우저 모두 종료.
+- 초기 QA region timeout 및 networkidle timeout은 완료 증거로 계산하지 않았다. polling 화면의 networkidle 대신 실제 hydration/영역 준비 상태로 대기해 최종 재실행 PASS. [초기 실패](../screenshots/public-bye-connectors/after/first-attempt.json), [최종 UI 증거](../screenshots/public-bye-connectors/after/evidence.json), [데이터 비교](../screenshots/public-bye-connectors/after/comparison.json).
+- before: desktop 그림 캡처 유효. tablet/mobile before는 앱 내부 스크롤의 초기 순위표만 담아 그림 영역의 before 비교 불가. after는 실제 그림이 보이도록 스크롤해 촬영했다. 원 배포를 되돌려 before를 재현하거나 합성 이미지를 사용하지 않았다.
+- 공유 로컬 dev FF는 기존 WIP로 중단, `/tmp/pr1976-local-dev-sync-backup`에 보존. 원격 dev/alpha 배포 완료와 독립이다.

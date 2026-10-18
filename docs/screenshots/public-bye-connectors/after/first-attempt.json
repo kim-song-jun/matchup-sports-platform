@@ -1,0 +1,31 @@
+{
+  "url": "https://alpha.teameet.co.kr/tournaments/ad200600-0000-4000-8000-000000000003/bracket",
+  "persona": "anonymous",
+  "browserPid": 54880,
+  "parentPid": 54853,
+  "viewports": [],
+  "savedByeTargets": [
+    {
+      "id": "ae09296b-88ca-460b-848d-ed3ef1c9da2c",
+      "fixtureId": "3db67aa5-d915-5920-a765-9ee7662e9283",
+      "side": "HOME"
+    },
+    {
+      "id": "e4c848d1-8b96-4819-9fc3-5a67245852fe",
+      "fixtureId": "6ee2f231-4c2c-5f48-9f8c-bda98618ec12",
+      "side": "HOME"
+    },
+    {
+      "id": "2045effc-37be-4034-8bba-62052003f023",
+      "fixtureId": "8359dace-e406-54a5-bd64-0e0215ebf3ef",
+      "side": "HOME"
+    },
+    {
+      "id": "cfa2da26-270f-45f5-adfc-2ef85b798a65",
+      "fixtureId": "186029e0-2bcb-5999-9903-64e4d2084a09",
+      "side": "HOME"
+    }
+  ],
+  "browserClosed": true,
+  "error": "Initial capture timed out waiting for the BYE region after an early tab click. Separate diagnostic observed 4 BYE paths and no console/network errors; networkidle was unsuitable for the polling page."
+}

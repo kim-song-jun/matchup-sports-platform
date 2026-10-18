@@ -1,0 +1,34 @@
+{
+  "evidence": [
+    {
+      "viewport": 1440,
+      "metadata": "PASS",
+      "refresh": "PASS",
+      "clearTimeAndField": "PASS",
+      "restoreLabels": "PASS",
+      "stableIdAndEdges": "PASS",
+      "overflow": 0
+    },
+    {
+      "viewport": 768,
+      "metadata": "PASS",
+      "refresh": "PASS",
+      "clearTimeAndField": "PASS",
+      "restoreLabels": "PASS",
+      "stableIdAndEdges": "PASS",
+      "overflow": 0
+    },
+    {
+      "viewport": 390,
+      "metadata": "PASS",
+      "refresh": "PASS",
+      "clearTimeAndField": "PASS",
+      "restoreLabels": "PASS",
+      "stableIdAndEdges": "PASS",
+      "overflow": 0
+    }
+  ],
+  "consoleErrors": [],
+  "pageErrors": [],
+  "httpErrors": []
+}

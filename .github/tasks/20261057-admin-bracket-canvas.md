@@ -1,10 +1,10 @@
 # Task 20261057: 어드민 대진 그림 편집기 — 그림 먼저, 팀은 자리에, 결과는 칸에서
 
 ## 2026-10-17 후속 — 목록·그림 표시 문구와 경기 정보 편집 통일
-Status: Implementation complete; draft PR / alpha QA pending
+Status: Merged into dev and alpha deployed; manual QA in progress
 
 ### Context / Goal / Original Conditions
-사용자가 기존 목록 수정 창·그림 패널·모바일 BottomSheet에서 번호/홈·원정 문구/시각/등록 경기장을 편집하고, 팀이 없는 12강 부전승 자체를 클릭해 문구·팀을 편집하도록 요청했다. 표시만 바꾸며 경기 ID·실제 팀·승자/패자 연결은 보존한다. 이번 요청은 구현·dev 대상 PR 게시이며 머지/main 배포는 포함하지 않는다.
+사용자가 기존 목록 수정 창·그림 패널·모바일 BottomSheet에서 번호/홈·원정 문구/시각/등록 경기장을 편집하고, 팀이 없는 12강 부전승 자체를 클릭해 문구·팀을 편집하도록 요청했다. 표시만 바꾸며 경기 ID·실제 팀·승자/패자 연결은 보존한다. 초기 범위는 구현·PR 게시였으며, 2026-10-18 추가 사용자 요청으로 리뷰·검증·dev 머지·alpha 배포/실측까지 확장했다. main 승격은 제외한다.
 
 ### User / Test Scenarios / Acceptance Criteria
 - [ ] 목록↔그림에서 번호·문구·시각·등록 경기장 저장/새로고침이 같은 값을 사용한다.
@@ -24,13 +24,33 @@ Owned: 대진 표시/편집 관련 v1 API/Web, additive migration 및 해시 바
 사용자 지정 문구는 최대120자 plain text·trim/빈 값=null, 입력 검증·기존 admin 쓰기 권한·감사/잠금을 유지한다. BYE 문구는 슬롯 하나에 저장하며 연결된8강은 이를 읽고 쓴다. 실제 배정 변경은 기존 슬롯 API·결과 잠금 계약을 따른다.
 사용자가 기존 UI 확장과 모바일 BottomSheet를 구체적으로 고정했으므로 해당 패턴을 구현한다. alpha 시각 QA는 PR 미배포 상태와 구분하고, 로그인/배포 제약을 기록한다.
 
-### Progress Snapshot / Tech Debt Resolved
+### 초기 구현 이력 / Tech Debt Resolved
+아래 초기 draft 상태는 2026-10-18 완료 진행 기록으로 대체한다.
 Base origin/dev=`ae24a67e9`, branch=`feat/bracket-display-edit`, worktree=`tmp/worktrees/bracket-display-edit`.
 Phase A/B 완료. main/dev의 canonical serializer는 TeamMatch.startAt/placeName/fieldId를 동일하게 읽는다. 그림 카드 일정 미표시 및 목록/desktop panel의 빈 시각 PATCH 누락을 수정했다. 문구는 일반 경기 side override, BYE는 shared slot override 한 곳에만 저장한다. 경기 ID/진출 edge/배정은 문구 수정 시 그대로 유지된다.
 Phase C: API 관련 269개 계약과 Web 대진 관련 566개 계약 검증(중간 실패 후 해당 파일 재검증 포함); 양쪽 TypeScript, Web pattern, API surface PASS. API 새 DTO/순수 저장 44, 서비스/공통 조회 213, 기존 일정·bye-side 12. Web 전체 관련 566 중 mock export 누락 2건을 고친 뒤 해당 mobile/node 68 재실행 PASS. 슬롯 응답 exact mock에 automaticLabel/displayLabel 동기화. 기존 MSW에는 admin bracket PATCH/GET handler가 없으며 실제 공용 test fixture를 갱신했다.
 Schema LF SHA=96cf396f434e0fba80e9c2fa84e79ee347471ae56387ca6493b6d11f09c93a42. nullable varchar(120) 3개만 추가, 기존값 변경 없음. Docker/fixture/binder/manifest pin 갱신, 과거 manifest 허용 유지. 커밋된 LF export와 공식 체크섬으로 검증한 jq를 사용해 릴리스 바인딩/과거 manifest 호환성 7/7 PASS. expand-contract migration gate PASS. Windows CRLF/M11 digest 및 WSL jq 미설치로 발생한 로컬 도구 문제는 격리된 LF export/작업 폴더 도구로 해결했으며 게이트는 완화하지 않았다.
 직접 코드 리뷰: null/omission, 최신 자동 문구, BYE 단일 정본, 공식 결과 문구 수정의 roster/result 무변경, 권한/감사/잠금, 실패 draft 유지, 단계/조→번호→leg→ID 정렬 확인. touched paths TODO/FIXME/HACK/XXX 없음. 실제 alpha QA 0/3 및 DB integration 미실행(Docker daemon 미가동): 완료/배포 가능으로 주장하지 않고 draft PR에 명시한다.
 사용자 요청에 따라 구현/PR만 진행하며 dev/main 머지·배포 및 실제 대회 데이터 수정은 하지 않았다. GitHub CLI 표준 device login 대기; Git credential token 추출은 사용하지 않는다.
+
+### PR #1960 완료 진행 — 2026-10-18
+- 사용자 승인 범위: 기존 PR 수정·리뷰·검증·dev 머지·alpha 배포 후 1440/768/390 실측. main 승격 제외.
+- 단일 에이전트 순차 실행, 전용 작업트리 `/tmp/teameet-pr1960-complete`. 다른 작업트리/WIP 수정 금지.
+- [x] 최신 dev `5a5de5662`와 PR `bff8ec8f9` 통합. nullable 문구 3필드와 기존 온라인 분류를 함께 포함한 스키마 바인딩 충돌 5곳 해결.
+- [x] CI RED 확인: PostgreSQL 168 suites 중 167 PASS, 1240 tests PASS / 1 FAIL. 실패는 슬롯 응답의 automaticLabel/displayLabel 기대값 누락. 두 필드를 정확히 단언하도록 수정.
+- [ ] 통합 변경 코드·보안·디자인 검토 및 좁은 검증.
+- [ ] 최신 head CI 및 Copilot clean 확인.
+- [ ] dev 머지·로컬 dev FF·alpha 배포 SHA 확인.
+- [ ] alpha 3폭 UI/저장/새로고침/실제 진출 QA·갤러리·정리 기록.
+- 검증: API 관련 5 files/257 tests PASS, Web 편집·목록·모바일·레이아웃 6 files/203 tests PASS. API/Web tsc PASS. surface/pattern 게이트의 sandbox spawn EPERM은 앱 경로에서 권한 있는 동일 명령으로 재실행한다.
+- 실DB 회귀 2개 추가: 기존 TeamMatch 일정·필드 무입력 조회 → 번호/문구 편집 → 출처 번호 편집 → null 비우기; 빈 BYE 문구 → 팀 배정 → 8강 공유 조회 → 문구 복원 및 edge/팀 보존. 로컬 Docker daemon 부재로 CI에서 실행한다.
+- CI `39112697076` (head `11194974c`): Gates/API/Web 모두 PASS. migration chain replay + schema drift 0 + PostgreSQL integration(추가 2건 포함)·API unit·build·literal HTTP 완료.
+- Copilot `39112698806`: 분석 전 `Model "claude-opus-5" is not available`로 실패, 최신 리뷰 0/스레드 0. 사용자가 2026-10-18 **이번 PR만 예외 승인 후 진행**을 명시. 다른 PR에 일반화하지 않음.
+- PR #1960 → dev 머지 `5444656fac646a8dd65c22a9032d3415a34b8d9e` (2026-10-18 09:03:24 UTC). alpha `39113836770`, matching dev CI `39113836780` 대기.
+- 관리자 실제 로그인 성공(초기 이메일 오타 정정). 인증정보는 저장소/PR에 기록하지 않음. 읽기 전용 baseline: 기존 대상 42경기, fieldId 42/42·scheduledAt 0/42; 1440/768/390 관리자 화면 캡처 `/tmp/pr1960-before/`.
+- 기존 사용자 결과 변경을 피하려고 새 비공개 목업 QA 대회(이름 꼬리표 `PR1960 표시 편집 QA 1018`)를 추가하고 승자/패자 연결을 준비했다. 별도 대회의 원래 경기 2개는 배포 전부터 시각·등록 경기장이 저장되어 있으며, 결승도 기존 API로 10/25 14:00 KST·등록 필드를 미리 저장했다. 삭제/seed/reset은 실행하지 않음.
+- 로컬 dev FF를 머지 직후 시도했으나 다른 세션의 tracked 16개·untracked 3개와 충돌해 Git이 거절했다. 타 세션 변경을 덮거나 stash/reset하지 않고 보존. 원격 dev 머지/alpha에는 영향 없음.
+- 로컬 dev 동기화 후속: 다른 세션의 dev 갱신 후 충돌 교집합 0개 확인, `git merge --ff-only origin/dev` 재시도 성공. 로컬/원격 dev 모두 `5444656fac` 일치. 다른 세션 WIP 원복·stash/reset 없이 완료(별도 파일 백업 필요 없음).
 
 ## 2026-10-16 후속 — 부전승 홈·어웨이와 저장 배치 일치
 
@@ -830,14 +850,10 @@ PR 은 순서대로 dev 에 머지하고 매번 alpha 에서 확인한다(dev �
 | 2026-10-10 | 사용자 | 한 팀이 두 조에 들어가는 문제 — 결정 4 | **A** — 조별 단계(`phase=group`) 경기에 **다른 조별 단계 조에 이미 있는** 팀을 넣으면 서버가 `409 TEAM_IN_OTHER_GROUP`, 어느 조에도 없는 팀은 지금처럼 그 조에 자동 편성. 칸 패널·탭/끌어놓기·모바일 선택창 후보에서 다른 조 팀을 뺀다. 리그 방식·조별+결선의 조별 경기 모두 적용. 근거: alpha 2개 대회에서 7팀이 이미 두 조에 동시 편성(순위표 중복). 이미 겹친 데이터는 그대로 |
 | 2026-10-11 | 사용자 | 동률 조의 공개 순위표 진출 표시 | **A** — 공개 「순위·대진표」 조별 순위표의 진출 색·「진출」 배지는 결선 경기에 실제로 들어간 그 조 팀만 칠한다(아무도 안 들어갔으면 순위로 정해진 자리만, 동률로 안 정해진 자리는 칠하지 않고 「동률 — 운영자가 진출 팀을 정해요」). §5 로 끝까지 안 갈린 팀은 「공동 n위」(n = 그 묶음의 저장 순위 최솟값), 판정은 어드민 「순위대로 채우기」와 같은 `group-rank-preview.ts` 에서 나온다. 같은 조 표가 탭마다 달라 보이지 않게 「경기 일정」 탭 조별 순위에도 「공동」을 싣는다. 순위 계산·동점 규칙·어드민·`format=league`·정규 리그 불변, 스키마 무변경. 기각: B(고른 순서 저장 — §6 공동 순위와 충돌·스키마 변경), C(안내만) |
 
-### PR #1960 완료 진행 — 2026-10-18
-- 사용자 승인 범위: 기존 PR 수정·리뷰·검증·dev 머지·alpha 배포 후 1440/768/390 실측. main 승격 제외.
-- 단일 에이전트 순차 실행, 전용 작업트리 `/tmp/teameet-pr1960-complete`. 다른 작업트리/WIP 수정 금지.
-- [x] 최신 dev `5a5de5662`와 PR `bff8ec8f9` 통합. nullable 문구 3필드와 기존 온라인 분류를 함께 포함한 스키마 바인딩 충돌 5곳 해결.
-- [x] CI RED 확인: PostgreSQL 168 suites 중 167 PASS, 1240 tests PASS / 1 FAIL. 실패는 슬롯 응답의 automaticLabel/displayLabel 기대값 누락. 두 필드를 정확히 단언하도록 수정.
-- [ ] 통합 변경 코드·보안·디자인 검토 및 좁은 검증.
-- [ ] 최신 head CI 및 Copilot clean 확인.
-- [ ] dev 머지·로컬 dev FF·alpha 배포 SHA 확인.
-- [ ] alpha 3폭 UI/저장/새로고침/실제 진출 QA·갤러리·정리 기록.
-- 검증: API 관련 5 files/257 tests PASS, Web 편집·목록·모바일·레이아웃 6 files/203 tests PASS. API/Web tsc PASS. surface/pattern 게이트의 sandbox spawn EPERM은 앱 경로에서 권한 있는 동일 명령으로 재실행한다.
-- 실DB 회귀 2개 추가: 기존 TeamMatch 일정·필드 무입력 조회 → 번호/문구 편집 → 출처 번호 편집 → null 비우기; 빈 BYE 문구 → 팀 배정 → 8강 공유 조회 → 문구 복원 및 edge/팀 보존. 로컬 Docker daemon 부재로 CI에서 실행한다.
+- Alpha 배포 `39113836770` SUCCESS. served header SHA `5444656fac646a8dd65c22a9032d3415a34b8d9e`, release `1.10.0-alpha.20261018.g5444656fac64`; API health `data.checks.db=true` (2026-10-18 09:28 UTC). 머지 SHA CI `39113836780` 전체 PASS. 변경 후 실측 시작.
+
+### PR #1971 후속 상태 — 2026-10-18
+- Alpha BYE 팀 후보 실패를 공통 계산으로 수정: source ENTRY는 허용하고 결선 ENTRY/BYE/GROUP_RANK 중복은 제외. 목록·desktop·mobile·독립 BYE 소비자를 같은 계산으로 맞췄다.
+- 실제 후보 선택 회귀 2건 RED → 관련 170 tests GREEN, Web lint PASS. PR #1971 head `e99ca5714`, CI `39116140082` 진행 중.
+- Copilot `39116142932`도 동일 모델 사용 불가로 분석 전 실패했다. 사용자가 **#1971도 예외 승인 후 진행**을 명시했다. CI 전체 통과 후 dev 머지·alpha 재배포와 BYE 3폭 검증을 진행한다.
+- metadata 3/3 및 실제 승자·패자/12강→8강 진출은 `5444656fac`에서 PASS. BYE 팀 경로는 아직 실패/미완료이며 이 checkpoint를 최종 완료로 해석하지 않는다.

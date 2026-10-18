@@ -26,3 +26,20 @@ Persona: owner/ops 쓰기, support 읽기, 일반 사용자 쓰기 거절.
 - 실제 DB integration: 로컬 Docker daemon 미가동으로 미실행. additive migration은 CI DB integration 대상이다.
 - 실제 alpha 변경 후 UI QA: 0/3, PR 미배포. 스크린샷/console/network/실제 결과 진출 검증 및 cleanup 기록은 alpha 배포 후 이 문서에 추가한다. 컴포넌트 테스트는 실제 브라우저 QA로 계산하지 않는다.
 - 기존 사용자 데이터·결과를 변경하거나 seed/reset을 실행하지 않았다.
+
+
+## 2026-10-18 — PR #1960 재개 및 dev 머지
+
+- PR: [#1960](https://github.com/kim-song-jun/matchup-sports-platform/pull/1960), dev merge `5444656fac646a8dd65c22a9032d3415a34b8d9e`.
+- 최신 dev를 통합하고 슬롯 응답 exact 기대값의 `automaticLabel`/`displayLabel` 누락을 수정했다. 추가 실DB 회귀는 기존 TeamMatch 시각/경기장 보존·비우기 및 BYE/8강 문구·팀 공유를 검증한다.
+- [PR CI](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/39112697076): Gates/API/Web PASS. PostgreSQL 169 suites, 1,248 PASS/3 skip; API unit 427 suites/6,497 PASS; Web 804 files/9,422 PASS 및 build PASS. 타입·surface/pattern·schema binding 7/7 PASS.
+- Copilot [실행](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/39112698806)은 모델 사용 불가로 분석 전 실패했다. 사용자가 이번 PR에만 예외를 명시 승인했다. 리뷰 clean으로 표기하지 않으며 다른 PR에 확대하지 않는다.
+- 변경 전 관리자 로그인 및 1440/768/390 capture 완료. 기존 대상 42경기의 fieldId는 모두 저장돼 있었고 scheduledAt은 현재 모두 null이었다. 저장된 시각 표시 증명은 별도 비공개 QA 대회의 기존 경기 및 배포 전에 기존 API로 저장한 결승(10/25 14:00 KST)을 사용한다.
+- 별도 QA 대회에 승자·패자 및 12강→8강 연결을 준비했다. 실제 결과는 이 대회에서만 확정한다. 기존 테스트 대회의 부전승 문구·팀은 검증 직전 값을 기록하고 검증 후 같은 값으로 복원한다.
+- 로컬 dev FF 동기화 성공. 원격과 로컬 dev 모두 `5444656fac`, 타 세션 WIP 변경 없음.
+- alpha [배포](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/39113836770) 대기. 변경 후 UI QA는 아직 0/3이다.
+
+- 배포 후 번호/문구/시각/등록 필드 양방향 편집·새로고침·null 비우기·자동 복원: 1440/768/390 **3/3 PASS**, 페이지 가로 overflow 0, console/pageerror/HTTP 실패 0. 실제 alpha 저장 후 GET으로 같은 ID와 edge 보존을 확인했다. QA 선택자 타입·중복 live status를 수정한 뒤 완료했으며 제품 코드 수정은 없었다.
+
+- `5444656fac`에서 결과 시나리오 PASS: 사용자 문구는 출처99번 변경 후 유지, 자동 복원은 최신99번 표시. 의도적503 한 번 후 입력 유지/재시도 성공. 공식 결과로 승자→결승·패자→3위전 및 12강121번→8강 진출, ID/edge 보존, 팀 이름 우선 확인. 503은 QA interception 한 건이며 그 외 JS/network 오류 없음.
+- BYE UI의 조별 ENTRY 전역 제외 결함은 [후속 PR #1971](https://github.com/kim-song-jun/matchup-sports-platform/pull/1971)로 수정 중이다. `bye-failure` 상태에서 문구를 원래 값으로 복원했고 팀·결과는 변경하지 않았다. BYE 후속 3폭 QA는 미완료다.

@@ -1,0 +1,22 @@
+{
+  "sourceRenumber": "PASS",
+  "customTextPreserved": "PASS",
+  "latestAutomaticRestore": "PASS",
+  "failedDraftRetry": "PASS",
+  "round12ToQuarter": "PASS",
+  "officialResult": "PASS",
+  "winnerAdvanced": "PASS",
+  "loserAdvanced": "PASS",
+  "stableIdsAndEdges": "PASS",
+  "realTeamNamePriority": "PASS",
+  "pageErrors": [],
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+  ],
+  "httpErrors": [
+    {
+      "path": "/api/v1/admin/fixtures/7a13e06d-cbbb-5b1f-aed3-0feea85759ab",
+      "status": 503
+    }
+  ]
+}

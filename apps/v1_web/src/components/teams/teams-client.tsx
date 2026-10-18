@@ -147,6 +147,11 @@ export function TeamListPageClient({ seed }: { readonly seed?: CursorListSeed<V1
   if (query.isError && !hasPages) return <TeamStatePageView model={getTeamStateViewModel('error')} />;
   const firstPage = query.data?.pages[0];
   const total = firstPage?.pageInfo?.totalCount ?? visibleItems.length;
+  const allTeamPagesLoaded = Boolean(
+    query.data?.pages.length
+      && query.hasNextPage === false
+      && query.data.pages[query.data.pages.length - 1]?.pageInfo?.hasNext === false,
+  );
   // isLoading 은 서버·하이드레이션 첫 렌더(persist 복원 중)에 false 라 데이터 없음(isPending)으로 판정한다.
   const isListLoading = query.isPending;
   const searchModel: NonNullable<TeamListViewModel['search']> = {
@@ -172,7 +177,15 @@ export function TeamListPageClient({ seed }: { readonly seed?: CursorListSeed<V1
     search: searchModel,
     filterHref: buildTeamHref(searchParams, { filter: '1' }),
     filterSheet: buildTeamFilterSheet(searchParams, selectedSort, selectedGenderRule, selectedLevels, selectedRegionId, regions.data ?? [], filterOpen),
-    chips: buildTeamSportChips(visibleItems, base, searchParams, selectedSportId, sports.data, !selectedSportId && !query.hasNextPage),
+    chips: buildTeamSportChips(
+      visibleItems,
+      base,
+      searchParams,
+      selectedSportId,
+      sports.data,
+      !selectedSportId && allTeamPagesLoaded,
+      firstPage?.facets,
+    ),
     teams: visibleTeams,
     listLoading: isListLoading,
     hasNextPage: query.hasNextPage,

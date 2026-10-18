@@ -53,6 +53,7 @@ function seedTeam(index: number): V1Team {
 }
 
 const seedSport = { id: 'sport-futsal', name: '풋살', code: 'futsal' } as unknown as V1Sport;
+const seedSoccer = { id: 'sport-soccer', name: '축구', code: 'soccer' } as unknown as V1Sport;
 
 describe('TeamListPageClient — 서버 seed 연결', () => {
   beforeEach(() => {
@@ -79,6 +80,58 @@ describe('TeamListPageClient — 서버 seed 연결', () => {
     expect(teamsOptions.seed).toEqual(page);
     const [sportsOptions] = hookMocks.useV1MasterSports.mock.calls[0] as [{ seed?: unknown }];
     expect(sportsOptions.seed).toEqual(seed.sports);
+  });
+
+  it('SSR 첫 페이지 20팀과 hasNextPage 미정 상태에서도 전체 105·풋살 94·축구 11의 facet 건수를 보인다', () => {
+    const page = {
+      items: [
+        ...Array.from({ length: 18 }, (_, index) => ({ ...seedTeam(index), sport: { sportId: 'sport-futsal', name: '풋살' } } as V1Team)),
+        ...Array.from({ length: 2 }, (_, index) => ({ ...seedTeam(index + 18), sport: { sportId: 'sport-soccer', name: '축구' }, sportName: '축구' } as V1Team)),
+      ],
+      nextCursor: 'seed-1',
+      pageInfo: { nextCursor: 'seed-1', hasNext: true, totalCount: 105 },
+      facets: { sports: [{ sportId: 'sport-futsal', count: 94 }, { sportId: 'sport-soccer', count: 11 }] },
+    };
+    const seed = { page, sports: [seedSport, seedSoccer], query: TEAM_LIST_SEED_PATH };
+    hookMocks.useV1TeamPages.mockReturnValue({
+      data: { pages: [page] },
+      isPending: false,
+      isError: false,
+      hasNextPage: undefined,
+      isFetchingNextPage: false,
+      isPlaceholderData: false,
+      fetchNextPage: vi.fn(),
+    });
+    hookMocks.useV1MasterSports.mockReturnValue({ data: seed.sports });
+
+    render(<TeamListPageClient seed={seed} />);
+
+    const links = Array.from(screen.getByRole('group', { name: '종목 필터' }).querySelectorAll('a'));
+    expect(links.map((link) => link.textContent?.replace(/\s+/g, '').trim())).toEqual(['전체105', '풋살94', '축구11']);
+  });
+
+  it('facet가 없고 SSR의 다음 페이지 여부가 미정이면 부분 목록 건수를 숨긴다', () => {
+    const page = {
+      items: [seedTeam(0), seedTeam(1)],
+      nextCursor: 'seed-1',
+      pageInfo: { nextCursor: 'seed-1', hasNext: true, totalCount: 52 },
+    };
+    const seed = { page, sports: [seedSport], query: TEAM_LIST_SEED_PATH };
+    hookMocks.useV1TeamPages.mockReturnValue({
+      data: { pages: [page] },
+      isPending: false,
+      isError: false,
+      hasNextPage: undefined,
+      isFetchingNextPage: false,
+      isPlaceholderData: false,
+      fetchNextPage: vi.fn(),
+    });
+    hookMocks.useV1MasterSports.mockReturnValue({ data: seed.sports });
+
+    render(<TeamListPageClient seed={seed} />);
+
+    const links = Array.from(screen.getByRole('group', { name: '종목 필터' }).querySelectorAll('a'));
+    expect(links.map((link) => link.textContent?.replace(/\s+/g, '').trim())).toEqual(['전체', '풋살']);
   });
 
   it('유효한 종목 필터와 같은 query seed를 첫 렌더에 쓴다', () => {

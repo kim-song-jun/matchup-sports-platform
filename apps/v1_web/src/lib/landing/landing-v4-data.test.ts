@@ -11,7 +11,12 @@ function tournament(overrides: Partial<V1TournamentListItem>): V1TournamentListI
     id: 't-default',
     title: '기본 대회',
     status: 'open',
+    kind: 'regular_tournament',
     scheduledAt: FUTURE,
+    registrationDeadlineAt: null,
+    teamCount: 4,
+    confirmedCount: 0,
+    pendingPaymentCount: 0,
     sport: { code: 'futsal', name: '풋살' },
     promoHomeEnabled: false,
     promoHomePriority: 0,
@@ -133,6 +138,107 @@ describe('summarizeLandingData', () => {
     expect(data.counts.tournamentsOpen).toEqual({ value: 2, more: false });
   });
 
+  it('신청 마감 시각이 지난 raw open 홍보 대회는 마감으로 보이고 모집 중 개수와 정원 칸에서 빠진다', () => {
+    const expired = tournament({
+      id: 'expired',
+      status: 'open',
+      kind: 'regular_tournament',
+      promoHomeEnabled: true,
+      registrationDeadlineAt: new Date(NOW.getTime() - 1).toISOString(),
+      teamCount: 4,
+      confirmedCount: 1,
+      pendingPaymentCount: 0,
+    });
+    const data = summarizeLandingData(null, tournamentPage([expired]), null, NOW);
+
+    expect(data.tournaments[0]).toMatchObject({ status: 'closed', statusLabel: '모집 마감', slots: null });
+    expect(data.counts.tournamentsOpen).toEqual({ value: 0, more: false });
+  });
+
+  it('입금 대기가 정원을 채운 raw open 홍보 대회는 마감으로 보이고 모집 중 개수와 정원 칸에서 빠진다', () => {
+    const full = tournament({
+      id: 'full',
+      status: 'open',
+      kind: 'regular_tournament',
+      promoHomeEnabled: true,
+      registrationDeadlineAt: FUTURE,
+      teamCount: 4,
+      confirmedCount: 3,
+      pendingPaymentCount: 1,
+    });
+    const data = summarizeLandingData(null, tournamentPage([full]), null, NOW);
+
+    expect(data.tournaments[0]).toMatchObject({ status: 'closed', statusLabel: '모집 마감', slots: null });
+    expect(data.counts.tournamentsOpen).toEqual({ value: 0, more: false });
+  });
+
+  it('마감되지 않고 정원에 여유가 있는 raw open 대회는 모집 중으로 유지한다', () => {
+    const open = tournament({
+      id: 'open',
+      status: 'open',
+      kind: 'regular_tournament',
+      promoHomeEnabled: true,
+      registrationDeadlineAt: FUTURE,
+      teamCount: 4,
+      confirmedCount: 1,
+      pendingPaymentCount: 1,
+    });
+    const data = summarizeLandingData(null, tournamentPage([open]), null, NOW);
+
+    expect(data.tournaments[0]).toMatchObject({ status: 'open', statusLabel: '모집 중', slots: { confirmed: 1, total: 4, remaining: 2 } });
+    expect(data.counts.tournamentsOpen).toEqual({ value: 1, more: false });
+  });
+
+  it('정규 리그의 모집 중이 아닌 진행 상태는 마감 계산으로 다시 라벨링하지 않는다', () => {
+    const inProgressLeague = tournament({
+      id: 'league-in-progress',
+      status: 'in_progress',
+      kind: 'regular_league',
+      promoHomeEnabled: true,
+      registrationDeadlineAt: FUTURE,
+      teamCount: 4,
+      confirmedCount: 4,
+      pendingPaymentCount: 0,
+    });
+    const data = summarizeLandingData(null, tournamentPage([inProgressLeague]), null, NOW);
+
+    expect(data.tournaments[0]).toMatchObject({ status: 'in_progress', statusLabel: '진행 중', slots: null });
+  });
+
+  it('신청 마감 시각이 지난 raw open 정규 리그도 모집 마감으로 보인다', () => {
+    const expiredLeague = tournament({
+      id: 'expired-league',
+      status: 'open',
+      kind: 'regular_league',
+      promoHomeEnabled: true,
+      registrationDeadlineAt: new Date(NOW.getTime() - 1).toISOString(),
+      teamCount: 4,
+      confirmedCount: 1,
+      pendingPaymentCount: 0,
+    });
+    const data = summarizeLandingData(null, tournamentPage([expiredLeague]), null, NOW);
+
+    expect(data.tournaments[0]).toMatchObject({ status: 'closed', statusLabel: '모집 마감', slots: null });
+    expect(data.counts.tournamentsOpen).toEqual({ value: 0, more: false });
+  });
+
+  it('마감 전 raw open 정규 리그는 모집 중 상태를 유지한다', () => {
+    const openLeague = tournament({
+      id: 'open-league',
+      status: 'open',
+      kind: 'regular_league',
+      promoHomeEnabled: true,
+      registrationDeadlineAt: FUTURE,
+      teamCount: 4,
+      confirmedCount: 1,
+      pendingPaymentCount: 0,
+    });
+    const data = summarizeLandingData(null, tournamentPage([openLeague]), null, NOW);
+
+    expect(data.tournaments[0]).toMatchObject({ status: 'open', statusLabel: '모집 중', slots: null });
+    expect(data.counts.tournamentsOpen).toEqual({ value: 1, more: false });
+  });
+
   it('팀매치는 최대 6개까지 남기고, 로고·장소·형식·수준을 싣는다(없는 값은 null)', () => {
     const items = Array.from({ length: 7 }, (_, i) =>
       teamMatch({ id: `m${i}`, startsAt: `2026-10-0${i + 1}T09:00:00.000Z` }),
@@ -174,8 +280,8 @@ describe('summarizeLandingData', () => {
     const leagueFormat = tournament({ id: 'leagueFormat', status: 'open', promoHomeEnabled: true, teamCount: 8, confirmedCount: 2, format: 'league', kind: 'regular_tournament' });
     const mirror = tournament({ id: 'mirror', status: 'open', promoHomeEnabled: true, teamCount: 8, confirmedCount: 0, format: 'group_knockout', kind: 'regular_league' });
     const byId = Object.fromEntries(summarizeLandingData(null, tournamentPage([open, leagueFormat, mirror]), null, NOW).tournaments.map((t) => [t.id, t]));
-    expect(byId.open.slots).toEqual({ confirmed: 1, total: 4 });
-    expect(byId.leagueFormat.slots).toEqual({ confirmed: 2, total: 8 });
+    expect(byId.open.slots).toEqual({ confirmed: 1, total: 4, remaining: 3 });
+    expect(byId.leagueFormat.slots).toEqual({ confirmed: 2, total: 8, remaining: 6 });
     expect(byId.mirror.slots).toBeNull();
 
     const live = tournament({ id: 'live', status: 'in_progress', promoHomeEnabled: true, teamCount: 4, confirmedCount: 4, format: 'knockout', kind: null });

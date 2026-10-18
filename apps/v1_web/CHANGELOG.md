@@ -1,5 +1,11 @@
 # v1_web
 
+## 1.9.11
+
+### Patch Changes
+
+- 공개 팀의 기본 엠블럼과 팀 전적 첫 HTML 렌더링을 개선합니다.
+
 ## 1.9.10
 
 ### Patch Changes

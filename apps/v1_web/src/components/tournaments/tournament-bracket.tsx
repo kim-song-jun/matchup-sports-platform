@@ -337,7 +337,7 @@ function AggregateMatchCard({ matchup }: { matchup: AggregateMatchup }) {
         data-loser={isDone && winner === 'away' ? 'true' : undefined}
       >
         <TeamAvatar seed={homeTeamId ?? home.label} name={home.label} logoUrl={homeTeamLogoUrl} size="sm" />
-        <span className="tm-bk2-name" title={label} style={home.isPlaceholder ? { color: 'var(--text-caption)' } : undefined}>{home.label}</span>
+        <span className="tm-bk2-name" style={home.isPlaceholder ? { color: 'var(--text-caption)' } : undefined}>{home.label}</span>
         <span className="tm-bk2-score tab-num">{homeAggScore}</span>
       </div>
       <div className="tm-bk2-divider" aria-hidden="true" />
@@ -347,7 +347,7 @@ function AggregateMatchCard({ matchup }: { matchup: AggregateMatchup }) {
         data-loser={isDone && winner === 'home' ? 'true' : undefined}
       >
         <TeamAvatar seed={awayTeamId ?? away.label} name={away.label} logoUrl={awayTeamLogoUrl} size="sm" />
-        <span className="tm-bk2-name" title={label} style={away.isPlaceholder ? { color: 'var(--text-caption)' } : undefined}>{away.label}</span>
+        <span className="tm-bk2-name" style={away.isPlaceholder ? { color: 'var(--text-caption)' } : undefined}>{away.label}</span>
         <span className="tm-bk2-score tab-num">{awayAggScore}</span>
       </div>
       {isLive && <div className="tm-bk2-badge tm-bk2-badge-live">● LIVE</div>}

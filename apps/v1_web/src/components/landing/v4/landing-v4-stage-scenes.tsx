@@ -11,11 +11,13 @@ import { CardScreenBody } from '../landing-competition-screens';
 export const EXAMPLE_TEAM_MATCHES: readonly LandingLiveTeamMatch[] = [
   {
     kind: 'team_match', id: 'example-1', hostName: 'FC 한강', opponentName: '성수 러너스',
+    hostTeamId: null, opponentTeamId: null,
     hostLogoUrl: null, opponentLogoUrl: null, region: '성동구', place: '성수 풋살장',
     dateTimeText: '토요일 19:00', formatText: '5:5', levelLabel: '입문', isLeague: false, href: '/team-matches',
   },
   {
     kind: 'team_match', id: 'example-2', hostName: '망원 FC', opponentName: '합정 SC',
+    hostTeamId: null, opponentTeamId: null,
     hostLogoUrl: null, opponentLogoUrl: null, region: '마포구', place: null,
     dateTimeText: '일요일 10:00', formatText: null, levelLabel: null, isLeague: true, href: '/team-matches',
   },
@@ -32,8 +34,8 @@ function matchTag(match: LandingLiveTeamMatch): { tone: 'blue' | 'green'; label:
 function Logos({ match }: { match: LandingLiveTeamMatch }) {
   return (
     <span className="tm-landing-v4-sm-logos">
-      <TeamAvatar name={match.hostName} logoUrl={match.hostLogoUrl} size="sm" />
-      <TeamAvatar name={match.opponentName} logoUrl={match.opponentLogoUrl} size="sm" />
+      <TeamAvatar teamId={match.hostTeamId} name={match.hostName} logoUrl={match.hostLogoUrl} size="sm" />
+      <TeamAvatar teamId={match.opponentTeamId} name={match.opponentName} logoUrl={match.opponentLogoUrl} size="sm" />
     </span>
   );
 }

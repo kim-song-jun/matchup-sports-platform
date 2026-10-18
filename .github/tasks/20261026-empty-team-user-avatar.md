@@ -1,5 +1,9 @@
 # Task 20261026: 빈 팀·유저 아바타 전체 점검 및 기본 아이콘 통일
 
+## Current team-emblem follow-up — 2026-10-19
+
+The user's current instruction supersedes the original neutral-team-icon choice: actual teams without a saved logo use one of the existing ten local team emblems. GitHub-style mirrored grids and GitHub-hosted product defaults remain forbidden. Stored uploads and user avatars keep their existing behavior; unknown, masked and example identities remain neutral. The landing team-match projection now carries its actual host/opponent team IDs through the existing moving-card and stage renderers, so those teams use the same emblem as their other public views. Projection and actual-render regressions failed before that correction and pass afterward; the two IDs resolve to distinct expected presets, uploads win, and unknown/example identities stay neutral. Exact-SHA CI and live Alpha verification remain release gates.
+
 Status: Implemented — review / alpha pending
 Owner: Codex (single agent)
 Created: 2026-10-05

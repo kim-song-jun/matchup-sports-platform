@@ -39,6 +39,8 @@ export type LandingLiveTournament = {
 export type LandingLiveTeamMatch = {
   readonly kind: 'team_match';
   readonly id: string;
+  readonly hostTeamId?: string | null;
+  readonly opponentTeamId?: string | null;
   readonly hostName: string;
   readonly opponentName: string;
   readonly hostLogoUrl: string | null;
@@ -233,6 +235,8 @@ function liveTeamMatches(items: readonly V1TeamMatch[], now: Date): LandingLiveT
     .map(({ item, host, opponent }) => ({
       kind: 'team_match' as const,
       id: item.teamMatchId ?? item.id,
+      hostTeamId: host.teamId ?? null,
+      opponentTeamId: opponent.teamId ?? null,
       hostName: host.name,
       opponentName: opponent.name,
       hostLogoUrl: host.logoUrl ?? null,

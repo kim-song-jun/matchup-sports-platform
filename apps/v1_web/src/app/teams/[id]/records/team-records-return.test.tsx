@@ -123,7 +123,7 @@ describe('팀 전적의 실제 필터·경기 상세·화면 뒤로가기 계약
 
     renderRecords();
     selected('리그', '2026'); count(1);
-    expect(boundary.records).toHaveBeenLastCalledWith('team-1', '2026', 'league', { initialData: undefined });
+    expect(boundary.records).toHaveBeenLastCalledWith('team-1', '2026', 'league', { seed: undefined });
     expect(url().searchParams.get('type')).toBe('league');
     expect(url().searchParams.get('season')).toBe('2026');
     expect(url().searchParams.get('from')).toBe(bracketPath);
@@ -137,7 +137,7 @@ describe('팀 전적의 실제 필터·경기 상세·화면 뒤로가기 계약
     window.history.replaceState(null, '', `${recordsPath}?type=${type}&season=2025&from=${encodeURIComponent(bracketPath)}`);
     renderRecords();
     selected(labels[type], '2025'); count(1);
-    expect(boundary.records).toHaveBeenLastCalledWith('team-1', '2025', type, { initialData: undefined });
+    expect(boundary.records).toHaveBeenLastCalledWith('team-1', '2025', type, { seed: undefined });
     const returnHref = url(recordLinks()[0]?.getAttribute('href') ?? '').searchParams.get('from');
     if (!returnHref) throw new Error('복귀 주소가 없어요.');
     expect(url(returnHref).searchParams.get('type')).toBe(type);
@@ -170,7 +170,7 @@ describe('팀 전적의 실제 필터·경기 상세·화면 뒤로가기 계약
     window.history.replaceState(null, '', `${recordsPath}?type=personal&season=2026bad&from=https%3A%2F%2Fevil.invalid`);
     renderRecords();
     selected('전체'); count(6);
-    expect(boundary.records).toHaveBeenLastCalledWith('team-1', undefined, undefined, { initialData: undefined });
+    expect(boundary.records).toHaveBeenLastCalledWith('team-1', undefined, undefined, { seed: undefined });
     const returnHref = url(recordLinks()[0]?.getAttribute('href') ?? '').searchParams.get('from');
     expect(returnHref).toBe(recordsPath);
   });
@@ -197,11 +197,11 @@ describe('팀 전적의 실제 필터·경기 상세·화면 뒤로가기 계약
     boundary.searchOverride = `type=tournament&season=2025&from=${encodeURIComponent(bracketPath)}`;
     view.rerender(<TeamRecordsPageClient teamId="team-1" />);
     selected('리그', '2026'); count(1);
-    expect(boundary.records).toHaveBeenLastCalledWith('team-1', '2026', 'league', { initialData: undefined });
+    expect(boundary.records).toHaveBeenLastCalledWith('team-1', '2026', 'league', { seed: undefined });
     window.history.replaceState(null, '', `${recordsPath}?type=friendly&season=2025`);
     boundary.searchOverride = undefined;
     view.rerender(<TeamRecordsPageClient teamId="team-1" />);
     selected('친선', '2025'); count(1);
-    expect(boundary.records).toHaveBeenLastCalledWith('team-1', '2025', 'friendly', { initialData: undefined });
+    expect(boundary.records).toHaveBeenLastCalledWith('team-1', '2025', 'friendly', { seed: undefined });
   });
 });

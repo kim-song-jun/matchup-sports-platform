@@ -79,7 +79,7 @@ export function TeamRecordsPageClient({
   };
 
   const { data, isPending, isError, error, refetch, hasNextPage, isFetchingNextPage, fetchNextPage } =
-    usePublicTeamRecords(teamId, activeSeason, activeQueryType, { initialData: matchingSeed });
+    usePublicTeamRecords(teamId, activeSeason, activeQueryType, { seed: matchingSeed });
 
   const firstPage = data?.pages[0];
 

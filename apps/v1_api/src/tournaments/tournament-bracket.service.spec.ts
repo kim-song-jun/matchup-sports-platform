@@ -22,7 +22,7 @@ import {
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminContextService } from '../common/admin-context.service';
-import { TournamentBracketService } from './tournament-bracket.service';
+import { TournamentBracketService, withScorerRealNames } from './tournament-bracket.service';
 import { GamesService } from '../games/games.service';
 import { FOOTBALL_V1_CONFIG } from './competition-config/competition-config';
 import { kindAwareFindFirst } from '../../test/helpers/kind-aware-find-first';
@@ -3377,4 +3377,20 @@ describe('TournamentBracketService', () => {
 
   // ─── …InTx 추출 함수 끝 (새 describe 는 이 줄 위에 추가한다) ───
 
+});
+
+describe('withScorerRealNames — 어드민 득점 순위의 운영진 실명', () => {
+  const goals = [
+    { id: 'g1', playerUserId: 'u1', playerName: '골잡이' },
+    { id: 'g2', playerUserId: 'u2', playerName: '실명없음' },
+    { id: 'g3', playerUserId: null, playerName: '게스트' },
+  ];
+
+  it('실명이 있는 득점자에게만 playerRealName 을 붙이고, 나머지는 키를 만들지 않는다', () => {
+    const [linked, noRealName, guest] = withScorerRealNames(goals, new Map([['u1', '김실명']]));
+
+    expect(linked).toEqual({ id: 'g1', playerUserId: 'u1', playerName: '골잡이', playerRealName: '김실명' });
+    expect(noRealName).not.toHaveProperty('playerRealName');
+    expect(guest).not.toHaveProperty('playerRealName');
+  });
 });

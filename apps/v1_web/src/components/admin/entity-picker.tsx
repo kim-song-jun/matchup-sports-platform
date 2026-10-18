@@ -178,11 +178,12 @@ export function EntityPicker({
   }
 
   // ── Selected state — chip display + clear button ──────────────────────────
+  // 고른 값은 자르지 않고 줄을 바꾼다 — 수상자 `실명 (닉네임)` 처럼 긴 라벨이 반 폭 칸(모바일 2열)에서 잘리던 자리다.
   if (value) {
     return (
-      <div className="flex items-center justify-between h-[44px] px-3 bg-[var(--blue50)] border border-[var(--tint-blue-border)] rounded-xl">
+      <div className="flex items-center justify-between min-h-[44px] px-3 bg-[var(--blue50)] border border-[var(--tint-blue-border)] rounded-xl">
         <div className="flex flex-col min-w-0">
-          <span className="text-[length:var(--font-size-label)] font-semibold text-[var(--blue700)] truncate">
+          <span className="text-[length:var(--font-size-label)] font-semibold text-[var(--blue700)] break-words">
             {value.label}
           </span>
           {value.description && (

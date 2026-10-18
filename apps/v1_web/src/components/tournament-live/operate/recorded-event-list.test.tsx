@@ -443,3 +443,22 @@ describe('현장 운영 콘솔 가독성 하한', () => {
     expect(offenders).toEqual([]);
   });
 });
+
+describe('RecordedEventList — 운영진 실명', () => {
+  it.each([
+    ['운영진(실명 있음)', { realName: '김실명', phone: null }, '골 · 10 김실명 (정우진)'],
+    ['권한 없음(identity 키 없음)', undefined, '골 · 10 정우진'],
+  ])('%s', (_, identity, text) => {
+    const [home, away] = LINEUPS;
+    const lineups = [
+      { ...home, participants: home.participants.map((p) => (identity === undefined ? p : { ...p, identity })) },
+      away,
+    ];
+    render(<RecordedEventList events={[goal(1, HOME_SIDE_ID, 'p-jung', 60000)]} sides={SIDES} lineups={lineups} />);
+
+    const row = within(screen.getByRole('list', { name: '기록된 이벤트 목록' })).getByRole('listitem');
+    expect(row).toHaveTextContent(text);
+    // 이름이 길어져도 두 줄에서 자르지 않는다.
+    expect(screen.getByText(new RegExp(text.replace(/[()]/g, '\\$&'))).closest('p')).not.toHaveClass('line-clamp-2');
+  });
+});

@@ -42,9 +42,11 @@ import { CompetitionConfigRegistry } from './competition-config/competition-conf
 import { LineupSizeConfigResolver } from './competition-config/lineup-size-config-resolver';
 import { canonicalCompetitionConfigForSport } from './competition-config/lineup-size';
 import { TournamentCompetitionConfig } from './competition-config/tournament-competition-config';
-import { canonicalGameCommandPayloadHash, GamesService } from '../games/games.service';
+import { canAdminViewParticipantIdentity, canonicalGameCommandPayloadHash, GamesService } from '../games/games.service';
+import { loadRealNames } from '../games/roster/game-roster.service';
 import {
   resolveTournamentFixtureOfficialResult,
+  type TournamentFixtureOfficialGoal,
   type TournamentFixtureGameForResult,
 } from './tournament-fixture-official-result';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
@@ -79,13 +81,25 @@ type AdminBracketResult = {
   recordedAt: string;
   createdAt: string;
   updatedAt: string;
-  goals: unknown[];
+  /** `playerRealName` 은 대회 운영진에게만, 득점자 계정 실명이 있을 때만 실린다(`getBracket`). */
+  goals: (TournamentFixtureOfficialGoal & { playerRealName?: string })[];
 } | null;
 
 type AdminBracketFixture = ReturnType<typeof serializeTournamentTeamMatchBracket> & {
   result: AdminBracketResult;
   videos: Array<{ id: string; title: string | null; url: string; sortOrder: number }>;
 };
+
+/** 득점자 계정 실명을 붙인다. 실명이 없는(계정 없음·미입력) 득점은 키를 만들지 않는다. */
+export function withScorerRealNames<G extends { playerUserId: string | null }>(
+  goals: readonly G[],
+  realNameByUserId: ReadonlyMap<string, string>,
+): (G & { playerRealName?: string })[] {
+  return goals.map((goal) => {
+    const playerRealName = goal.playerUserId === null ? undefined : realNameByUserId.get(goal.playerUserId);
+    return playerRealName === undefined ? goal : { ...goal, playerRealName };
+  });
+}
 
 const FIXTURE_CLIENT_CREATE_ACTION = 'tournament_fixture_client_create';
 // 전역 멱등 계약(docs/api/global-contract.md)의 보관 기간과 같다.
@@ -1277,7 +1291,7 @@ export class TournamentBracketService {
   // ─── bracket view ─────────────────────────────────────────────────────────
 
   async getBracket(user: V1AuthUser, tournamentId: string) {
-    await this.adminContext.getActiveAdmin(user.id);
+    const admin = await this.adminContext.getActiveAdmin(user.id);
     const tournament = await this.loadTournament(tournamentId);
 
     const [groups, standings, canonicalMatches, canonicalTeamMatchCandidates, slots] = await Promise.all([
@@ -1371,6 +1385,17 @@ export class TournamentBracketService {
         result: this.serializeOfficialResult(match.teamMatchId, game),
         videos: match.teamMatch.videos,
       });
+    }
+
+    // 득점자 실명은 대회 운영진(플랫폼 운영자)에게만 싣는다 — support 어드민은 닉네임만(경기 명단·라인업과 같은 규칙).
+    if (canAdminViewParticipantIdentity(admin.adminRole)) {
+      const realNames = await loadRealNames(
+        this.prisma,
+        [...fixtureRows.values()].flatMap((row) => (row.result?.goals ?? []).flatMap((goal) => (goal.playerUserId === null ? [] : [goal.playerUserId]))),
+      );
+      for (const [id, row] of fixtureRows) {
+        if (row.result !== null) fixtureRows.set(id, { ...row, result: { ...row.result, goals: withScorerRealNames(row.result.goals, realNames) } });
+      }
     }
 
     const phaseOrder: Record<string, number> = { group: 0, round16: 1, round12: 2, quarter: 3, semi: 4, final: 5, third_place: 6 };

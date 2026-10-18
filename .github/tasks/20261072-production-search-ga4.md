@@ -1,5 +1,11 @@
 # Task 20261072: 운영 검색 노출 및 홈 GA4 계측 정정
 
+## Active records visibility cache review fix — 2026-10-19
+
+The additional Codex Security review of main PR #1985 found that the new server-rendered records seed used the shared helper's five-minute Next Data Cache. The current API correctly excludes hidden games and redacts status-only scores/events, but cached first HTML could retain an earlier response. Both existing records-route requests (metadata and page seed) now explicitly use the helper's `no-store` option; other routes and client cache policies are unchanged.
+
+A regression through the actual `fetchPublicV1` helper and actual records renderer first exposed the `next.revalidate: 300` request directive. It also checks a current hidden/redacted response yields empty records HTML without prior cup, opponent or score details. The first test attempt failed due to incorrect empty-state expectations and is retained as fixture-correction history, not regression evidence. Exact CI, independent review and matching Alpha remain required before the already-authorized scoped main deployment. No operating data, new route, GitHub image/default identicon, or unrelated dev feature is included.
+
 ## Active records freshness and landing identity review fixes — 2026-10-19
 
 PR #1985 review found two additional same-scope defects before either source or main merge. The server records seed used `initialData`, which the actual production QueryClient considered fresh for 60 seconds despite the server cache; the team-records hook now uses the existing `seed`/`placeholderData` pattern, preserving the first HTML while allowing its normal mount refresh. A test with the actual production QueryClient and controlled public API response reproduced zero mount requests before the fix and now proves immediate seed display, the request and replacement by fresh data. Matching team/season/type, repeated-filter semantics, cursor behavior and existing navigation checks remain in place.

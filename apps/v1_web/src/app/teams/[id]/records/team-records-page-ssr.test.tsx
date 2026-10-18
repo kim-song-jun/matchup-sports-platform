@@ -5,7 +5,7 @@ import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PublicTeamRecordsResponse } from '@/components/public-game-records/types';
 import { fetchPublicV1 } from '@/lib/seo';
-import TeamRecordsPage from './page';
+import TeamRecordsPage, { generateMetadata } from './page';
 import { TeamRecordsPageClient } from './team-records-page-client';
 
 const navigation = vi.hoisted(() => ({ search: '' }));
@@ -118,8 +118,8 @@ describe('TeamRecordsPage first HTML', () => {
 
     const html = await renderPage({ type: 'tournament', season: '2026' });
 
-    expect(vi.mocked(fetchPublicV1)).toHaveBeenCalledWith(expect.stringContaining('type=tournament'));
-    expect(vi.mocked(fetchPublicV1)).toHaveBeenCalledWith(expect.stringContaining('season=2026'));
+    expect(vi.mocked(fetchPublicV1)).toHaveBeenCalledWith(expect.stringContaining('type=tournament'), { cache: 'no-store' });
+    expect(vi.mocked(fetchPublicV1)).toHaveBeenCalledWith(expect.stringContaining('season=2026'), { cache: 'no-store' });
     expect(html).toContain('LAW OB 대회 기록');
     expect(html).toContain('0·1·0');
     expect(html).toContain('2026 풋살컵');
@@ -144,12 +144,53 @@ describe('TeamRecordsPage first HTML', () => {
 
     const html = await renderPage({ type: ['tournament', 'league'], season: ['2026', '2025'] });
 
-    expect(vi.mocked(fetchPublicV1)).toHaveBeenCalledWith('/teams/team-real-2041/records?season=2026&type=tournament');
+    expect(vi.mocked(fetchPublicV1)).toHaveBeenCalledWith('/teams/team-real-2041/records?season=2026&type=tournament', { cache: 'no-store' });
     expect(html).toContain('LAW OB 대회 기록');
     expect(html).toContain('0·1·0');
     expect(html).toContain('2026 풋살컵');
     expect(html).not.toContain('실제 풋살컵');
     expect(html).not.toContain('tm-skeleton');
+  });
+
+  it('bypasses the Next data cache for visibility-gated metadata and server records seeds', async () => {
+    const actualSeo = await vi.importActual<typeof import('@/lib/seo')>('@/lib/seo');
+    vi.mocked(fetchPublicV1).mockImplementation((path, options) => actualSeo.fetchPublicV1(path, options));
+
+    const redactedRecords = records({
+      teamName: '비공개 팀',
+      summary: summary(0, 0, 0, 0, 0, 0),
+      items: [],
+    });
+    const originalFetch = globalThis.fetch;
+    const upstreamFetch = vi.fn()
+      .mockResolvedValueOnce({ status: 404, ok: false })
+      .mockResolvedValueOnce({
+        status: 200,
+        ok: true,
+        json: async () => ({ data: redactedRecords }),
+      });
+    globalThis.fetch = upstreamFetch as unknown as typeof fetch;
+    api.get.mockResolvedValue(redactedRecords);
+
+    try {
+      const metadata = await generateMetadata({ params: Promise.resolve({ id: 'team-real-2041' }) });
+      const html = await renderPage();
+
+      expect(metadata.robots).toMatchObject({ index: false, follow: false, nocache: true });
+      expect(html).toContain('아직 공식 경기 기록이 없어요');
+      expect(html).not.toContain('LAW OB');
+      expect(html).not.toContain('실제 풋살컵');
+      expect(html).not.toContain('부산 FC');
+      expect(html).not.toContain('2 : 1');
+      expect(upstreamFetch).toHaveBeenCalledTimes(2);
+      for (const [input, init] of upstreamFetch.mock.calls) {
+        expect(String(input)).toContain('/api/v1/teams/team-real-2041/records');
+        expect(init).toMatchObject({ cache: 'no-store' });
+        expect(init).not.toHaveProperty('next.revalidate');
+      }
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 
   it('renders the real zero-record response as an empty state with zero totals', async () => {

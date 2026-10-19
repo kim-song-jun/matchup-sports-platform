@@ -2,6 +2,25 @@
 
 Status: Review
 
+## PR #1979 merge readiness — 2026-10-19
+
+This snapshot supersedes the preparation coordinates below. The user explicitly requested fixing and merging existing PR #1979, with all updates confined to its existing remote branch `chore/release-version-20261018` and base `dev`.
+
+- Owned checkout: `/private/tmp/teameet-pr1979-repair-20261019`, isolated from the shared working tree. No shared WIP, other PR branch, main ref, runtime source, deployment workflow or DB is changed.
+- Current baselines: dev `95bd72502bcd67dac4da2319ce95fb4139468ae0` (#1991), main `34c396ffb42e539f1087df35ba9224f4b4793585`; Copilot conflict-resolution head `73da52105c1718f19e7ee83c461f94563fb40e14` includes both histories.
+- The diff against current dev is 34 release-preparation paths: 29 remaining Changeset deletions, both app manifests/changelogs and this existing task. Earlier 33-Changeset counts describe the older dev baseline; #1991 already consumed additional release artifacts. Both prepared source versions remain 1.10.0, with no pending Changesets.
+- CI run [39202896468](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/39202896468) on the Copilot head ended `action_required` without check runs. The fork-workflow approval endpoint rejected approval because this run is not awaiting fork approval. This record update produces a fresh PR event; no workflow or policy bypass is introduced.
+- Verification scope: exact committed release diff, preparation/promotion policies, versioning contract tests, current-head Gates/API/Web and independent Copilot review. No runtime/UI change is introduced, so this task does not claim new browser-flow coverage or clear earlier #1990 QA limitations.
+- Observed local verification: preparation policy PASS; main-promotion policy PASS against main 1.9.11 using consumed-Changeset history receipts; `node --test --test-concurrency=1 scripts/release/versioning.contract.test.mjs` exited 0. Only the focused release contract tests ran locally; full app checks belong to exact-head CI.
+
+### Current execution checklist
+
+- [x] Inspect latest PR/base refs, conflicts and release-only scope; preserve shared WIP.
+- [x] Verify release policies and versioning contracts; publication is limited to this branch.
+- [ ] Observe exact-head CI and independent review, fix actionable findings, then merge #1979 into dev.
+- [ ] Verify resulting dev CI/Alpha and actual deployed commit/version/DB; report shared-tree synchronization and process cleanup.
+- [ ] User-operated dev-to-main promotion and production approval remain outside this request.
+
 ## Latest preparation refresh — 2026-10-19 after PR #1990
 
 This snapshot supersedes the older preparation coordinates below. Scope: release metadata and this existing task; refresh existing PR #1979 targeting dev. The user will promote all reviewed dev changes to main. Main PR creation/merge and production approval remain user-operated.

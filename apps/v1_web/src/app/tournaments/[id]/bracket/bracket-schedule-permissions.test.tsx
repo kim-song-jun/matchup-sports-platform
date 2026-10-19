@@ -4,18 +4,11 @@ import { BracketScheduleTab } from './bracket-page-client';
 
 const scheduleMock = vi.fn();
 const myFixturesMock = vi.fn();
+const playerRecordsMock = vi.fn();
 
 vi.mock('@/components/public-game-records/use-public-game-records', () => ({
   usePublicTournamentSchedule: (...args: unknown[]) => scheduleMock(...args),
-  // 선수 기록 섹션이 `/schedule` 에서 이 탭으로 옮겨왔다. 이 스펙의 관심사는 아니라
-  // 빈 상태로 둔다(`emptyBehavior="hide"` 라 아무것도 그리지 않는다).
-  usePublicTournamentPlayerRecords: () => ({
-    data: undefined,
-    isLoading: false,
-    isError: false,
-    error: null,
-    refetch: vi.fn(),
-  }),
+  usePublicTournamentPlayerRecords: (...args: unknown[]) => playerRecordsMock(...args),
 }));
 
 vi.mock('@/hooks/use-v1-api', () => ({
@@ -25,6 +18,19 @@ vi.mock('@/hooks/use-v1-api', () => ({
 
 describe('BracketScheduleTab — 내 팀 경기와 라인업 권한', () => {
   beforeEach(() => {
+    playerRecordsMock.mockClear();
+    playerRecordsMock.mockReturnValue({
+      data: {
+        tournamentId: 'tour-1',
+        goals: [{ userId: 'user-1', nickname: '득점선수', profileHref: '/users/user-1', goals: 3, assists: 0 }],
+        assists: [],
+        hiddenByEligibility: false,
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
     scheduleMock.mockReturnValue({
       data: {
         pages: [{
@@ -102,5 +108,13 @@ describe('BracketScheduleTab — 내 팀 경기와 라인업 권한', () => {
     // 대회 축엔 라인업 제출 단계가 없다 — 여기 뱃지가 뜨면 팀장에게 할 수 없는 일을
     // 안 했다고 말하는 것이고, 끝난 경기 위에도 남았다(alpha 실측).
     expect(within(myCard as HTMLElement).queryByText('라인업 미작성')).not.toBeInTheDocument();
+  });
+
+  it('공개 순위·브래킷 일정 탭에서는 개인 득점 순위를 조회하거나 표시하지 않는다', () => {
+    render(<BracketScheduleTab tournamentId="tour-1" />);
+
+    expect(playerRecordsMock).not.toHaveBeenCalled();
+    expect(screen.queryByRole('heading', { name: '득점 순위' })).not.toBeInTheDocument();
+    expect(screen.queryByText('득점선수')).not.toBeInTheDocument();
   });
 });

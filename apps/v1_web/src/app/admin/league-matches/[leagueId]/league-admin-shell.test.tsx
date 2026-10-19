@@ -124,7 +124,7 @@ describe('LeagueAdminShell', () => {
     it('모집 마감에서 리그 시작하기를 확인하면 실제 상태 변경을 요청하고 실패를 표시한다', async () => {
       query.value = loaded({ state: 'draft', lifecycleStatus: 'closed' });
       renderShell();
-      expect(screen.getByText('모집 마감')).toBeInTheDocument();
+      expect(screen.getByText('모집완료')).toBeInTheDocument();
       fireEvent.click(screen.getByRole('button', { name: '리그 시작하기' }));
       const dialog = screen.getByRole('dialog', { name: '리그 시작하기' });
       expect(within(dialog).getByRole('radio', { name: /진행 중/ })).toBeChecked();
@@ -139,7 +139,8 @@ describe('LeagueAdminShell', () => {
     it('운영자가 신청을 다시 열어도 시작 전 상태와 모집 표시는 구분한다', () => {
       query.value = loaded({ state: 'draft', lifecycleStatus: 'closed', registrationOpen: true });
       renderShell();
-      expect(screen.getByText('모집 중')).toBeInTheDocument();
+      expect(screen.getByText('모집완료')).toBeInTheDocument();
+      expect(screen.queryByText('모집 중', { exact: true })).not.toBeInTheDocument();
       expect(screen.getByRole('button', { name: '리그 시작하기' })).toBeInTheDocument();
     });
 

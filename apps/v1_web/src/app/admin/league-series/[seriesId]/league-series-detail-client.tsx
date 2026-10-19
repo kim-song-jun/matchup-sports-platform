@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { AdminEmpty, AdminPageHeader, AdminPageSkeleton, AdminStatusPill, AdminToasts, useAdminToast } from '@/components/admin';
+import { AdminEmpty, AdminPageHeader, AdminPageSkeleton, AdminLeagueStatePill, AdminStatusPill, AdminToasts, useAdminToast } from '@/components/admin';
 import { PromotionCommitPanel } from '@/components/admin/promotion-commit-panel';
 import { SeasonSeedPanel } from '@/components/admin/season-seed-panel';
 import {
@@ -206,7 +206,7 @@ export default function LeagueSeriesDetailClient({ seriesId }: { seriesId: strin
                       <span className="rounded-md bg-blue-100 px-2 py-0.5 text-2xs font-bold text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
                         {tier.tierLabel ?? '단일'}
                       </span>
-                      <AdminStatusPill status={tier.state} />
+                      <AdminLeagueStatePill state={tier.state} />
                     </div>
                     <Link
                       href={`/admin/league-matches/${tier.leagueId}`}

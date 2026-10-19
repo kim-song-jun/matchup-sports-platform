@@ -16,7 +16,8 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1PreviewLeaguePromotions: vi.fn(),
   useV1SeedLeagueSeason: vi.fn(),
 }));
-vi.mock('@/components/admin', () => ({
+vi.mock('@/components/admin', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/components/admin')>()),
   AdminEmpty: ({ title, description, action }: { title: string; description: string; action?: ReactNode }) => <div>{title}{description}{action}</div>,
   AdminPageHeader: ({ title }: { title: string }) => <h1>{title}</h1>,
   AdminPageSkeleton: () => <div>loading</div>,
@@ -61,6 +62,21 @@ function setup() {
 }
 
 describe('LeagueSeriesDetailClient promotion state', () => {
+  it('시즌 티어의 실제 공통 pill은 네 리그 상태를 같은 용어로 표시한다', () => {
+    setup();
+    useSeries.mockReturnValue({
+      data: { ...SERIES, seasons: [{ seasonNo: 1, allCompleted: false,
+        tiers: (['draft', 'active', 'on_hold', 'completed'] as const).map((state, index) => ({
+          ...SERIES.seasons[0].tiers[0], leagueId: `league-${index}`, state,
+        })),
+      }] }, isPending: false, isError: false, refetch: vi.fn(),
+    } as never);
+    render(<LeagueSeriesDetailClient seriesId="series-1" />);
+    for (const label of ['모집완료', '시즌 진행 중', '보류', '종료']) {
+      expect(screen.getByText(label)).toBeInTheDocument();
+    }
+  });
+
   it('does not mount an actionable panel when preview reports an already-decided season', () => {
     const refetch = setup();
     const previewMutate = vi.fn((_seasonNo, options) => options.onSuccess({ alreadyDecided: true }));

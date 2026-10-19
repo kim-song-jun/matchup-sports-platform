@@ -1999,7 +1999,7 @@ export class LeagueMatchAdminService {
         if (current === 'completed') {
           throw new ConflictException({
             code: 'LEAGUE_NOT_ACTIVE',
-            message: '종료된 리그는 먼저 진행 중으로 되돌린 뒤 준비 중으로 바꿀 수 있어요.',
+            message: '종료된 리그는 먼저 진행 중으로 되돌린 뒤 모집완료로 바꿀 수 있어요.',
           });
         }
         return this.moveBetweenDraftAndActive(user, leagueId, 'draft', reason);
@@ -2020,7 +2020,7 @@ export class LeagueMatchAdminService {
         if (startedGames > 0) {
           throw new ConflictException({
             code: 'LEAGUE_HAS_STARTED_GAMES',
-            message: '이미 시작한 경기가 있어 모집 마감으로 돌릴 수 없어요. 리그를 멈추려면 보류를 써 주세요.',
+            message: '이미 시작한 경기가 있어 시작을 취소할 수 없어요. 리그를 멈추려면 보류를 써 주세요.',
           });
         }
       }

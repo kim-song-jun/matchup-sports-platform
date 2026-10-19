@@ -1,9 +1,9 @@
 # Task 20261090: 신규 리그 모집 마감·명시적 시작과 기존 데이터 호환성
 
-Status: Review (local verification passed; PR/CI and alpha follow-up)
+Status: In Progress (draft PR #1990; Alpha QA pending; current CI tracked in PR checks)
 **Created**: 2026-10-18
-**Canonical branch**: `fix/league-explicit-start` (base `origin/dev` e4e2d01a3)
-**Canonical worktree**: `/tmp/teameet-league-explicit-start`
+**Canonical branch**: `audit/league-state-consistency` (base `origin/dev` d51227083; prior implementation: PR #1977 and #1988)
+**Canonical worktree**: `_worktrees/league-state-audit`
 
 ## Context
 리그를 만든 뒤 대진 준비만으로 진행 중으로 보이는 문제. 사용자는 생성 → 모집 마감 → 리그 시작하기를 승인했고, 후속으로 PR 생성과 기존 데이터 무회귀를 요청했다.
@@ -68,6 +68,114 @@ UI는 사용자가 승인한 기존 대회 방식이며 기존 헤더 Button·�
 
 ## Progress Snapshot
 
+### 2026-10-19: 리그 상태 전체 감사·준비 중 진입 경로 (audit/league-state-consistency)
+- 사용자 요청: 리그 상태 전체를 정리하고 준비 중이 언제·어떻게 접근되는지 확인한다.
+- Scope: backend + frontend + docs. Phase 1(진행 중): 상태 저장·생성·전이·투영·필터·권한·화면 소비처 전수 목록화. Phase 2(대기): 의미·표시 불일치와 기존 호환성 영향 정리. Phase 3(대기): 사용자에게 상태표·전환도·노출 경로와 정리안을 제시한다. 새 상태 체계/화면 정보구조 변경은 A/B/C 선택 전에 구현하지 않는다.
+- Owned: v1 리그 상태 관련 소스·테스트와 본 task. Forbidden: 기존 운영 데이터 백필/상태 변경, 무관한 공유 WIP, main. 병렬 에이전트 없음.
+- Acceptance Criteria: [x] 상태 writer/reader 전체 경계 확인; [x] 준비 중 신규/기존/보류 복원/화면 진입 경로 명시; [x] 신청 마감·공개·경기 상태 분리; [x] 관리자/사용자 표시 차이와 종료 조건 대조; [x] 코드 근거와 잔여 검증 범위 보고.
+- Security: 코드·정본 중심 감사. 이전 Alpha QA 접근은 자동 승인 검토가 대상 리그 미지정을 사유로 차단했으므로 임의의 관리자 리그 열람·변경을 재시도하지 않는다. 계정·비밀번호·토큰은 파일에 기록하지 않는다.
+- 기존 PR #1988은 dev에 b7563a59c로 머지됐고 Alpha run 39183981501 SUCCESS, 서빙 SHA 일치·HTTP 200·DB true를 확인했다. 이전 항목의 PR/배포 대기는 이 기록으로 supersede한다. 관리자 스크린샷 0/3과 Copilot 모델 세션 오류는 미해결 검증 제한으로 남는다.
+
+#### 상태 모델: 저장·호환 API·표시는 서로 다르다 (b7563a59c 감사 시점)
+
+정본 소스: `apps/v1_api/src/tournaments/league-competition-mirror.ts`, `apps/v1_api/src/league-matches/league-state.ts`, `apps/v1_web/src/lib/v1-status-labels.ts`, `apps/v1_web/src/components/admin/admin-status-pill.tsx`.
+
+| 저장 status | 리그 응답 state | 현재 의미·유입 | Alpha 공개 건수 |
+|---|---|---|---:|
+| draft | draft | 이전 v1 리그, QA seed, 복원 이력 누락 시 보류 해제의 기본값. 신규 정상 생성은 사용하지 않음 | 18 |
+| open | draft | 예전 저장값 호환. 현재 모집 열기는 이 값으로 바꾸지 않고 마감 시각만 갱신 | 0 |
+| closed | draft | 신규 리그 생성 및 진행 중에서 시작 취소 후 복귀 | 2 |
+| in_progress | active | 운영자가 시작함. 기존 모드는 대진·슬롯·경기 활동으로도 자동 시작 | 26 |
+| completed | completed | 유효 경기 공식 확정 조건을 충족해 자동/수동 종료 | 15 |
+| on_hold | on_hold | 보류 전 상태·공개 여부 보존 후 비공개. 보류 해제로 원상태 복귀 | 비공개로 공개 목록에 없음 |
+| cancelled | completed | 호환 매핑의 방어값. 리그 취소 정상 액션은 없고 보류를 사용 | 공개 목록 대상 아님 |
+
+`draft` 응답이 곧 DB `draft`라는 뜻은 아니다. `draft/open/closed` 셋을 접은 **시작 전 그룹**이다. 현재 사용자 칩은 이 차이를 잃고 전부 준비 중으로 표시한다. 관리자 목록/상세는 lifecycleStatus=closed만 특별 처리해 모집 중/모집 마감으로 표시한다.
+
+#### 실제 전이 경계: 14/14 확인
+
+| # | 경계 | 저장 결과·조건 |
+|---|---|---|
+| 1 | 관리자 독립 리그 생성 | closed + requiresExplicitStart=true |
+| 2 | 체계 첫 시즌 생성 | 공통 생성 함수 경유, closed + requiresExplicitStart=true |
+| 3 | 승강 확정 후 다음 시즌 생성 | 같은 공통 생성 함수 경유, closed + requiresExplicitStart=true |
+| 4 | 리그 시작하기 / state=active | draft/open/closed → in_progress. mutation-admin 필요 |
+| 5 | 시작 취소 / state=draft | in_progress → closed. LIVE/PAUSED/ENDED 경기 있으면 409 |
+| 6 | 보류 | 사유 필수. on_hold + isPublic=false, 이전 status/isPublic 기억 |
+| 7 | 보류 해제 | 기억한 원시 status·공개 여부 복원. active 복귀면 종료 조건 재판정 |
+| 8 | 관리자 수동 종료 | active만 가능. 취소·VOID 제외 유효 경기 1개 이상, 전부 OFFICIAL. plannedFixtureCount는 수동 종료에 적용하지 않음 |
+| 9 | 종료 되돌리기 | completed → in_progress. 이 액션 자체에서 즉시 자동 종료 재판정하지 않음 |
+| 10 | 대진 생성 | requiresExplicitStart=false 기존 모드만 자동 in_progress |
+| 11 | 대진 재생성 | 위와 동일. 신규 명시적 시작 리그는 closed 유지 |
+| 12 | 슬롯 팀 배정 완료 | 기존 모드만 빈 자리 없는 슬롯 대진 존재 시 자동 in_progress |
+| 13 | 경기 시작/공식 결과 활동 | 기존 모드만 자동 in_progress. 신규 시작 전 게임 start는 LEAGUE_NOT_STARTED |
+| 14 | 자동 종료 투영 | active이며 유효 경기 전부 OFFICIAL, plannedFixtureCount가 있으면 그 수도 충족 |
+
+소스: `league-match-admin.service.ts`, `league-series-admin.service.ts`, `jobs/league-roster/league-roster-autoconfirm.service.ts`, `league-slot-status.ts`, `league-completion-projection.service.ts`, `league-lifecycle-rules.ts`, `games/games.service.ts`.
+
+- 일정 시작일·종료일이 지났다는 이유만으로 리그 상태가 자동 전환되지는 않는다. 명단 자동 확정 job은 명단을 채우며 리그 시작 명령을 대신하지 않는다.
+- 대진이 없거나 취소/무효 경기만 남은 리그는 자동/수동 종료의 유효 경기 조건을 충족하지 못한다.
+- 새로 만들기와 시작 취소에서는 실제 draft를 만들지 않는다. 공통 대회 관리자 상태 변경은 TOURNAMENT_KINDS로 제한되어 리그를 draft로 바꾸는 우회 입구가 아니다.
+- QA 전용 `prisma/seed-alpha-league-qa.ts`에는 시즌 티어를 raw draft로 직접 만드는 코드가 남아 있다. 일반 관리자 생성 경로와 분리해서 보아야 한다. seed 실행·데이터 변경은 하지 않았다.
+
+#### 준비 중의 생성·복원·화면 접근
+
+1. **기존 raw draft 리그**: 공개 여부가 true이면 `/tournaments?kind=league&status=draft`의 준비 중 필터에서 접근할 수 있다. 현재 18건이 실제 공개 조회된다.
+2. **새 closed 리그**: 공통 상세는 closed지만 전용 리그 API에서는 state=draft다. 내 리그·리그 전용 상세·경기 상세·형제 티어 칩은 이 응답을 준비 중으로 그린다. 새 리그도 준비 중으로 보이는 경로가 존재한다.
+3. **보류 해제**: 원래 draft였다면 실제 draft로 복귀한다. 원래 closed였다면 DB는 closed로 복귀하지만 모달의 heldFromState는 draft라 준비 중이라고 안내할 수 있다. heldFromStatus가 없으면 서버는 실제 draft로 복원하는 fallback을 쓴다.
+4. **종료 리그의 상태 변경 모달**: 준비 중 선택지가 보이지만 비활성화되어 직접 진입할 수 없다. 진행 중으로 먼저 복귀해야 하며, 실제 시작한 경기가 있으면 모집 마감 복귀도 차단된다.
+5. **진행 중 리그의 상태 변경 모달**: PR #1988 이후에는 준비 중이 아니라 모집 마감으로 표시하고 실제 closed로 저장한다. 이 경로로 DB draft를 만들 수 없다.
+6. `/league-matches?state=draft`는 `/tournaments?kind=league&status=draft`로 redirect한다. 전용 API의 draft 그룹은 20건인데 도착하는 통합 필터는 raw draft 18건만 조회한다. 같은 이름의 필터가 다른 범위를 가리킨다.
+
+#### 표시·진입 표면: 15/15 정적 확인
+
+| # | 표면 | 현재 표시·관찰 |
+|---|---|---|
+| 1 | `/tournaments?kind=league` 및 상태 필터/옛 목록 redirect | draft=준비 중, closed 카드는 모집 마감. 준비 중 필터는 raw draft만 포함 |
+| 2 | `/tournaments/:id` 공통 상세 | raw closed를 공통 helper로 마감이라고 표시. 카드·관리자와 용어 불일치 |
+| 3 | `/league-matches/:id` 상세·형제 티어 | state=draft를 준비 중으로 표시. 현재 page.tsx는 실제 전용 client를 렌더함(redirect라는 인접 주석은 낡음) |
+| 4 | `/league-matches/:id/fixtures/:fixtureId` | 리그 · 준비 중 칩. 경기 자체의 예정/진행/종료와 별도 축 |
+| 5 | `/league-matches/:id/awards` | 같은 draft 칩. 종료 전 접근은 해당 화면의 비종료 안내로 처리 |
+| 6 | `/my/leagues` | 내 리그 카드에 준비 중, 링크는 공통 `/tournaments/:id`로 이동 |
+| 7 | `/admin/league-matches` 개별 리그 목록 | closed만 lifecycleStatus + registrationOpen으로 모집 중/모집 마감 |
+| 8 | `/admin/league-matches/:id/*` 공통 헤더 | 목록과 같은 pill, state=draft면 시작하기 노출 |
+| 9 | 관리자 상태 변경 모달 | active → draft만 모집 마감 특례. 보류 복원·종료 선택·toast에는 준비 중이 남음 |
+| 10 | `/admin/league-series/:id` 시즌 티어 카드 | generic AdminStatusPill(tier.state) 사용. draft는 초안, active는 활성으로 표시되어 리그 전용 용어와 다름 |
+| 11 | `/admin/ops/tournaments` 현장 운영 선택 | state만 전달하며 lifecycleStatus/registrationOpen을 버림. 새 closed도 준비 중으로 표시 |
+| 12 | 마이의 대회·리그 운영 스태프 카드 | raw status 공통 helper 사용. closed는 마감 |
+| 13 | 팀 상세의 대회·리그 참가 섹션 | 주 배지는 참가 신청 상태. 리그 수명주기와 구분해야 하며 종료 사유 일부만 공통 helper로 표시 |
+| 14 | 홈 대회·리그 추천 | 실제 신청 가능 여부로 추천을 거름. 준비 중 수명주기 칩을 직접 표시하는 표면은 아님 |
+| 15 | `/llms-full.txt` 리그 요약 | state만 leagueStateLabel에 넣어 시작 전 그룹을 준비 중으로 표현 |
+
+핵심 source: `competition-status.ts`, `v1-status-labels.ts`, `v1-tournament-status.ts`, `competition-filter-model.ts`, `tournament-list-query.ts`, `league-match-public.service.ts`, `admin-status-pill.tsx`, 각 표면의 client 파일.
+
+#### 세 축을 섞으면 안 되는 이유
+
+- **수명주기**: 시작 전 / 진행 / 종료 / 보류. 현재 호환 API는 draft / active / completed / on_hold다.
+- **모집**: 명시적 registrationDeadlineAt 기준. null 또는 지남은 안 받음, 같은 시각까지는 받음. 진행 중에도 열 수 있고, 시작 취소를 해도 마감 시각은 바뀌지 않는다. 정원·참가비 설정·팀 권한 등의 신청 자격 게이트는 별도다.
+- **공개**: isPublic. 비공개와 준비 중은 동의어가 아니다. 공개 draft 리그는 정상적으로 목록/상세에 노출된다. 보류는 isPublic=false를 동반한다.
+- **경기**: SCHEDULED/LIVE/PAUSED/ENDED/CANCELLED 및 결과 확정 단계는 리그 단계와 별도다. 진행 중 리그에 아직 시작하지 않은 경기가 있을 수 있다.
+- 추가 정책 경계: `isLeagueRegistrationOpen`과 등록 서비스의 리그 신청 판정은 on_hold를 직접 차단하지 않고 completed/cancelled만 차단한다. 보류를 모집 중단까지 의미하게 바꿀지는 별도 결정이 필요하며, 이번 감사에서는 API 쓰기로 재현하거나 정책을 임의로 바꾸지 않았다.
+
+#### Alpha 공개 실측과 한계
+
+- 배포 SHA: b7563a59ca7f9ff1d556b1e7b66a480af9519686. 인증 없는 공개 GET만 수행했다.
+- `GET /api/v1/tournaments?kind=league&status={...}&limit=1&page=1`: draft 18 / open 0 / closed 2 / in_progress 26 / completed 15, 공개 합계 61. 비공개·보류·삭제 데이터의 전체 DB 분포를 뜻하지 않는다.
+- `GET /api/v1/league-matches?state=draft&limit=50`: 20건, hasNext=false. 통합 준비 중 필터 18건과 2건 차이.
+- 공개 목록에 이미 노출된 리그 `8a91fb89-f5b6-4222-a6ff-2f8629fe3c3f`는 전용 API state=draft, 공통 상세 API status=closed, registrationDeadlineAt=null임을 대조했다. 실제 데이터에서도 두 어휘가 갈린다.
+- 관리자 UI의 실제 클릭·저장·3폭 캡처는 미실행. 앞선 자동 승인 검토의 대상 미지정 제한을 우회하지 않았으며 비공개 데이터·계정·토큰을 기록하지 않았다.
+- 감사 시점에는 runtime 소스·schema·데이터 변경 없이 문서만 수정했다. 아래 후속 구현은 4상태 결정을 반영한다. 런타임 테스트/전체 build를 반복 실행하지 않고 근거 검색·공개 CLI 조회·diff check로 감사 결과를 확인한다.
+
+#### 최초 제안 (아래 4상태 최종 결정으로 대체됨)
+
+| 안 | 원칙 | 장점 | 단점 |
+|---|---|---|---|
+| A | 준비 중 유지, lifecycleStatus/모집 정보를 소비처까지 전달해 화면 간 표시 일치 | 기존 의미·호환성 보존 | 준비 중과 모집 마감의 차이를 계속 설명해야 함 |
+| B (추천) | 내부 draft는 호환용으로 두고 화면을 모집 중·모집 마감·진행 중·보류·종료로 통일 | 현행 운영 흐름에 맞는 단순한 어휘 | 실제 모집/진행 조합은 별도 계약으로 보존해야 함 |
+| C | 시작 전·진행 중·종료·보류와 모집 열림/닫힘을 별도 표시 | 실제로 독립인 두 축을 가장 정확하게 표현 | 배지·필터·모달의 정보구조가 더 복잡해짐 |
+
+`CLAUDE.md` UI 착수 규칙에 따라 화면 정보구조/어휘의 변경은 사용자의 A/B/C 선택 후 구현한다. 최초 B 선택 뒤 사용자가 4상태로 정정했다. 기존 데이터 백필·모집 중단 정책·경기 게이트 변경까지 자동 승인된 것으로 해석하지 않는다.
+
 ### 2026-10-19: 시작 취소 후 모집 마감 복귀 (fix/league-status-rollback)
 - Context / Goal: 진행 중을 모집 마감으로 되돌리고 dev 대상 PR을 생성한다. 머지·배포는 범위 밖이다.
 - Owned: 리그 상태 서비스·모달·관련 회귀 테스트·API 계약·changeset·본 작업 문서. Forbidden: 운영 DB 변경, 다른 작업트리, main.
@@ -106,3 +214,29 @@ UI는 사용자가 승인한 기존 대회 방식이며 기존 헤더 Button·�
 - GitHub Advanced Security run 39129735820은 `session.create failed: Model "claude-opus-5" is not available`로 분석 시작에 실패했다. 코드 finding/clean 리뷰가 아니며 모델·계정 설정을 바꾸거나 반복 요청하지 않는다. Copilot 제출 리뷰·inline comment는 현재 0건이다.
 - CI에서 실패한 5개 DB suite + 기존 데이터 migration 회귀 1개를 전용 DB에서 직렬 재검증: 6 suites/30 tests PASS, 정상 exit 0. 전체 migration deploy도 PASS. bash syntax·git diff --check PASS. 전용 DB/볼륨 정리 후 보완 커밋을 push하고 새 CI를 확인한다.
 - 보완 API 타입 검사 exit 0. 이미지 빌더 client attestation과 release manifest 생성 허용 목록까지 canonical SHA와 5곳 일치 확인.
+
+
+### 2026-10-19: 최종 4상태 정리 (사용자 정정 반영)
+- 최종 승인: 모집완료·진행 중·보류·종료. 앞선 B의 5상태 제안을 supersede한다. 모집 가능 여부는 별도 정보이며 이번 변경에서 모집 창·정원 정책을 바꾸지 않는다.
+- Phase 1 [x]: writer 14개 경계·화면 15개 감사. 추가 확인한 참가 명단 상태 카드 1개까지 표시 경계 16/16을 처리한다. 결산 화면은 종료 전 안내를 먼저 반환하므로 준비 중 칩이 렌더되는 곳은 아니었다.
+- Phase 2 [x]: 공통 라벨·관리자 pill/보류 복원/모달/toast·시즌 티어·공통 목록/상세·선수 명단·담당 대회 연결. 리그 API draft 호환 값과 raw draft/open/closed 매핑은 유지한다. 현장 운영 선택·내 리그·전용 상세/경기·형제 티어·llms는 기존 공통 라벨을 통해 일치한다.
+- Phase 2 [x]: 공개 목록 status=draft를 raw draft/open/closed 전체로 보완해 옛 목록 redirect와 전용 API 그룹을 일치시킨다. 일반 대회 draft 노출 차단은 유지한다. 담당 대회 API에 tournamentKind만 추가한다.
+- Phase 3 [x]: 좁은 회귀·양쪽 타입/surface·diff·문서 동기화 검증. DB integration은 Docker daemon 미기동으로 CI 검증 대상으로 남는다.
+- Phase 4 [x]: 검토 가능한 커밋/초안 PR #1990 생성과 잔여 Alpha QA 보고. Alpha 관리자 화면 0/3이며 특정 비공개 리그 대상이 미지정된 기존 자동 승인 제한을 우회하지 않는다.
+- 저장소 schema·migration·실제 DB 변경 없음. 이전 5상태 구현 중 추가한 모집 집계/응답/필터는 제거했다. 일괄 파일 복원 시도는 auto-review가 미커밋 작업 덮어쓰기 위험으로 거절했으며, 이후 파일 전체 복원 없이 이번 작업의 명시적 변경 부분만 수정했다.
+- 통합 cursor: PR #1989로 추가된 origin/dev d51227083을 기능 브랜치에 merge했다. LIVE 당일 노출·시즌 진행 중 문구를 보존하며 신규 표시 상태를 추가하지 않는다. 충돌 4곳을 수동 통합했고 API 범위는 dev 변경에 영향이 없었다.
+- 검증 중간 결과: API 3 suites/36 tests PASS, API 타입·surface PASS. 최초 API unit은 /tmp 전용 tsconfig의 Jest 타입 탐색 링크 누락으로 0 tests 실패했으며 링크 보완 뒤 정상 exit 0으로 통과했다. 공유 의존성·Prisma client는 변경하지 않았다.
+- Web 4 suites/80 tests PASS. 추가 화면 139개 중 기존 '무제한 리그=모집 중' 기대값 1개만 실패해 새 4상태 계약에 맞춰 수정했다. 나머지 화면 138개는 PASS. dev 통합으로 바뀐 공통 라벨 영향 범위를 좁혀 재검증 중이다.
+- 최종 검증: Web 10개 파일 고유 225개 + API 3개 suite 고유 36개, 총 261개 PASS. 최신 dev 통합 뒤 영향을 받는 6개 Web 파일 148개는 정상 exit 0으로 재검증했다. 최종 select.kind 단언을 추가한 API 담당 리그 선택 테스트 2개도 정상 exit 0이다(고유 합계에 중복 가산하지 않음).
+- API 타입·surface, Web 타입·patterns PASS. Web 전체 타입 검사 후 마지막 검토에서 담당 리그 on_hold 타입 누락을 발견해 같은 변경에 보완하고 증분 타입 검사를 추가로 통과했다. git diff --check 및 PR touched path debt/conflict marker 검사 PASS. 스키마 변경·운영 DB 쓰기·개발 서버/브라우저 실행 없음.
+- docs 전용 계약 트리 스크립트는 마이그레이션 plan 입력을 요구해 일반 문서 lint로 실행할 수 없었다. PASS로 계산하지 않으며 도메인/README/global-contract/디자인 결정과 링크를 직접 대조했다. DB integration·새 Alpha UI 캡처·외부 리뷰/CI는 아직 성공 증거가 없다.
+
+- [PR #1990](https://github.com/kim-song-jun/matchup-sports-platform/pull/1990), base=dev·draft 확인. 검증한 코드 cursor는 f31477c5d이며 후속 변경은 이 작업 문서의 진행 상태뿐이다. 코드·회귀는 261개와 양쪽 정적 검사로 검증했고, CI/외부 리뷰·Alpha 화면은 미완료이므로 PR-ready·배포 완료로 보고하지 않는다. 운영 DB·main·무관한 공유 WIP 변경 없음.
+
+### 2026-10-19: PR #1990 정리·Web CI 보완
+- 사용자 요청: 해당 PR을 정리한다. Owned: 실패한 Web 테스트 3개와 본 task. 기능 코드·API·스키마·배포 정책은 이번 보완에서 변경하지 않는다.
+- CI baseline b5e2b7cac / run 39189672045: Gates·API SUCCESS, Web FAILURE. API 실제 DB integration 170 suites/1252 PASS·3 skipped(신규 목록 필터 회귀 포함), unit 430 suites/6580 PASS, migration 전체 replay·zero drift PASS다. 이전 항목의 DB CI 대기는 이 증거로 대체한다.
+- Web 원인 9건/3파일: 정원 소비자 카드의 이전 모집 중/마감 기대값 4건, 시즌 티어 공통 pill mock 누락 4건, 참가 명단 페이지의 이전 진행 문구 기대값 1건. 정원·신청 차단 검증은 유지하며 상태 표시 기대값만 최종 4상태 계약에 맞췄다.
+- 시즌 티어 mock은 실제 AdminLeagueStatePill을 사용하는 partial mock으로 보완하고, 실제 화면에 네 상태 라벨이 모두 보이는 회귀 1건을 추가했다. 단순 placeholder 컴포넌트로 통과시키지 않았다.
+- 로컬 좁은 재검증: 해당 3개 파일 97/97 PASS, 최소 worker 1, 정상 exit 0. diff --check·후속 touched path debt marker PASS. 기존 225개와 중복 없는 추가 검증이며 전체 테스트/빌드/타입 반복 실행은 CI에 맡긴다.
+- 최신 CI/외부 리뷰 상태는 [PR Checks](https://github.com/kim-song-jun/matchup-sports-platform/pull/1990/checks)에서 추적하고 PR 본문에 반영한다. Alpha 수동 화면 검증은 여전히 0/3이며 초안·미머지·미배포 상태다.

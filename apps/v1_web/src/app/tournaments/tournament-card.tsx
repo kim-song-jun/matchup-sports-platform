@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { TournamentTitle } from '@/components/tournaments/tournament-title';
 import { Trophy } from 'lucide-react';
 import { pendingCapacityLabel, resolveTournamentCapacity, resolveTournamentRegistrationBlock, type TournamentCapacityInput } from '@/lib/tournament-registration-availability';
-import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
+import { getLeagueStatusConfig, getTournamentStatusConfig } from '@/lib/v1-tournament-status';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { formatTournamentDateRangeShort, formatEntryFee } from '@/lib/date-utils';
 import { resolveTournamentImage } from '@/lib/tournament-promo';
@@ -117,7 +117,7 @@ export function TournamentCard({
   }, [hasUpcomingDeadline]);
 
   const isNearlyFull = teamCapacity !== null && teamCapacity > 0 && reservedTeamCount / teamCapacity >= 0.8;
-  const status = item.status === 'closed'
+  const status = isLeague ? getLeagueStatusConfig(item.status) : item.status === 'closed'
     ? { ...getTournamentStatusConfig('closed'), label: '모집 마감' }
     : item.status === 'open' && !registrationBlocked && isNearlyFull
       ? { badgeClass: 'tm-badge-orange', label: '거의 마감' }

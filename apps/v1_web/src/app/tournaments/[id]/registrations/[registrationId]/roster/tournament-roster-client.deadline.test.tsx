@@ -886,14 +886,14 @@ describe('TournamentRosterPageClient — 정규 리그 표시', () => {
     } as unknown as ReturnType<typeof useV1Tournament>);
   }
 
-  it('진행 중 리그: 리그 기간과 "진행 중" 이 보이고 종료·일정 미정 문구는 없다', () => {
+  it('진행 중 리그: 리그 기간과 "시즌 진행 중" 이 보이고 종료·일정 미정 문구는 없다', () => {
     mockCompetition('regular_league', 'in_progress');
 
     const { container } = render(<TournamentRosterPageClient tournamentId="league-1" registrationId="reg-1" />);
 
     expect(screen.getByText('리그 기간')).toBeInTheDocument();
     expect(screen.getByText('2026년 9월 30일 (수) ~ 2026년 11월 30일 (월)')).toBeInTheDocument();
-    expect(screen.getByText('진행 중')).toBeInTheDocument();
+    expect(screen.getByText('시즌 진행 중')).toBeInTheDocument();
     expect(container.textContent).not.toContain('일정 미정');
     expect(container.textContent).not.toContain('종료');
     expect(container.textContent).not.toContain('대회 신청 마감');

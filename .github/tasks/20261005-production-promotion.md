@@ -2,6 +2,28 @@
 
 Status: Review
 
+## Latest preparation refresh — 2026-10-19 after PR #1990
+
+This snapshot supersedes the older preparation coordinates below. Scope: release metadata and this existing task; refresh existing PR #1979 targeting dev. The user will promote all reviewed dev changes to main. Main PR creation/merge and production approval remain user-operated.
+
+- Baselines: dev `9c1186e063cc950df348296ce1496d594faa4196`; main `34c396ffb` (#1985); prior preparation `e543f479c`. Owned isolated worktree `_worktrees/release-1979-final`, branch `chore/release-1979-final`; publish a normal fast-forward update to existing `chore/release-version-20261018`. Other worktrees and WIP are untouched.
+- Phase 1 complete: preserve existing PR ancestry and integrate current main history. Six conflicts inspected: retain current dev bracket tooltip/bye display-label behavior and SEO evidence; use main 1.9.11 package/changelog inputs. All runtime, schema, migration, API documentation, deploy and workflow bytes remain identical to dev. No new runtime change is introduced.
+- Phase 2 complete: official Changesets CLI 2.30.0 regenerated API/Web source versions from 1.9.11 to 1.10.0 with all 33 current dev Changesets consumed (previous preparation consumed 28). Includes #1988 rollback, #1989 season/LIVE wording, #1990 four-state presentation and current team-record cache corrections. Production 1.9.11 history is preserved. Pending Changesets: 0. Native CLI plus the official preparation and promotion policy entry points were used; the Bash wrapper was not executed.
+- Local preparation policy PASS; final main-promotion policy PASS against both main versions 1.9.11; whitespace PASS. Current resolver plans stable artifact 1.10.1 / Alpha 1.10.1-alpha.<date>.g<SHA> from prepared source 1.10.0 with zero pending Changesets. This existing artifact rule is not changed or presented as a second source-version bump.
+- Baseline runtime evidence: public Alpha landing HTTP 200, exact dev commit `9c1186e063cc950df348296ce1496d594faa4196`, release `1.10.0-alpha.20261019.g9c1186e063cc`, DB=true. Dev CI [39194739475](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/39194739475) and Alpha [39194739521](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/39194739521) succeeded. This verifies the baseline, not a future preparation merge.
+- Main promotion includes five migrations already present in dev: optional team capacity (+positive check), list-image column with existing-cover copy, bye-side display order (+transactional historical row remapping), bracket display-label columns, and explicit league-start flag (default false). No DROP/reset/seed is added. Bye-side remapping changes existing data; rollback images do not undo these updates. Existing production migrate-deploy and migration/drift gates remain mandatory; no DB mutation was performed for this preparation.
+- Phase 3: publish current-head release-only diff and request review, then wait for exact-head Gates/API/Web. Prior PR CI success does not prove the refreshed head. No repeated local full build/tests: host CPU 7%, ~8 GiB free; Docker unavailable; no service started. Remote exact-head CI owns full checks.
+- Known retained QA limitation: #1990 public HTTP/SSR checks passed, but authenticated admin click QA and 390/768/1440 screenshots were not completed because browser automation could not start. This release-only refresh introduces no UI changes and does not convert that gap into a PASS.
+
+### Current acceptance and remaining handoff
+
+- [x] Preserve latest dev runtime and main ancestry/release history.
+- [x] Prepare both source versions at 1.10.0, consume 33/33 Changesets, and pass local preparation/promotion policy checks.
+- [ ] Publish #1979 updated head; exact-head CI and required review complete.
+- [ ] Merge preparation to dev after gates; synchronize local dev and verify new dev CI/Alpha SHA/version/DB.
+- [ ] User opens dev-to-main PR from https://github.com/kim-song-jun/matchup-sports-platform/compare/main...dev?expand=1 after dev verification. Recheck current head CI/CodeQL/review/unresolved threads and no new Changesets before user main merge.
+- [ ] User production environment approval; verify actual production commit/version/DB after deployment. Task168 Stage A/B is only required if the current production deployment guard reports an incomplete transition; do not repeat an already completed transition based on old task text.
+
 ## Current preparation refresh — 2026-10-19
 
 This snapshot supersedes the 2026-10-18 approval and release-baseline notes below.

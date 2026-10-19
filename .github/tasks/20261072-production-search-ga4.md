@@ -465,3 +465,16 @@ robots Disallow와 noindex 충돌 및 홈 계측 누락은 정정·운영 배포
 - `sitemap-live-fetch-success.png`: Google 실제 URL 테스트의 페이지 가져오기 성공.
 - `google-sitemap-success.png`: 후속 사이트맵 보고서 성공 및 271 URL 발견. 웹 패턴 검사도 통과했다.
 - `ga4-dimensions.png`, `ga4-landing-cta.png`, `ga4-existing-kakao-referral-rules.png`: 맞춤 정의·실제 운영 보고서·기존 추천 제외 규칙.
+
+### 2026-10-19 main release bookkeeping checkpoint
+
+- Approved main PR (root-provided): https://github.com/kim-song-jun/matchup-sports-platform/pull/1985
+- Successful main release SHA: `34c396ffb42e539f1087df35ba9224f4b4793585`
+- Main release proof (root-provided): Actual CI/Deploy39184125210 SUCCESS and CodeQL39184125001 SUCCESS; public Web and API health at2026-10-19T04:37:38Z both HTTP200 exact main34c396ffb42e539f1087df35ba9224f4b4793585/release1.9.12/DBtrue. Receipt evidence/team-default-20261019-main-release-proof.json.
+- Reviewed source commit on dev: `f2d840e38ddd93a50ac0bacaf79d96cc1ad9da32`
+- Dev bookkeeping base: `9c1186e063cc950df348296ce1496d594faa4196`; prepared commit remains pending its normal fast-forward push and CI.
+- Passed gate (root-provided): Source f2 hook/SSR10 tests and frontend checks passed; independent Sol source/main-port review passed.
+- Passed gate (root-provided): Current b84 exact CI39180889354/CodeQL39180885852 and Codex code6257149586/security6257148161 completed with no findings; four review threads resolved.
+- Passed gate (root-provided): Final Alpha63 CI39181762333/deploy39181762197 and actual guest159 first HTML/API/cache-filter second GET/local08/CTA/noindex/cleanup passed; Sol technical gate passed with explicit evidence limits.
+- Passed gate (root-provided): Fresh expected-head MERGE PR1985 and merged-main exact CI/Deploy39184125210 plus CodeQL39184125001 succeeded; actual production Web/API healthy matching main34/release1.9.12.
+- The four reviewed Changesets are consumed; all 29 unrelated pending Changesets are retained byte-for-byte.

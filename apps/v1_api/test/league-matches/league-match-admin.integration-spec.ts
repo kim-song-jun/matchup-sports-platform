@@ -380,7 +380,7 @@ describe('POST /admin/league-matches + fixtures', () => {
     expect(await prisma.v1TeamMatch.count({ where: { leagueId } })).toBe(0);
   });
 
-  it('상태 변경 하나로 시작·보류·해제·준비 중 되돌리기를 처리한다', async () => {
+  it('상태 변경 하나로 시작·보류·해제·모집 마감 복귀·재시작을 처리한다', async () => {
     const createRes = await request(app.getHttpServer())
       .post('/api/v1/admin/league-matches')
       .set('x-v1-user-id', ownerUserId)
@@ -403,7 +403,15 @@ describe('POST /admin/league-matches + fixtures', () => {
     expect((await change({ state: 'active' })).body.data).toMatchObject({ state: 'active' });
     expect((await change({ state: 'draft' })).body.data).toMatchObject({ state: 'draft' });
     const league = await prisma.v1Tournament.findUniqueOrThrow({ where: { id: leagueId }, select: { status: true } });
-    expect(league.status).toBe('draft');
+    expect(league.status).toBe('closed');
+    const detail = await request(app.getHttpServer())
+      .get(`/api/v1/admin/league-matches/${leagueId}`)
+      .set('x-v1-user-id', ownerUserId);
+    expect(detail.status).toBe(200);
+    expect(detail.body.data).toMatchObject({ state: 'draft', lifecycleStatus: 'closed', registrationOpen: false });
+    expect((await change({ state: 'draft' })).body.data).toMatchObject({ alreadyProcessed: true });
+    expect((await change({ state: 'active' })).body.data).toMatchObject({ state: 'active', alreadyProcessed: false });
+    expect((await prisma.v1Tournament.findUniqueOrThrow({ where: { id: leagueId } })).status).toBe('in_progress');
   });
 
   it('요일·시각·장소 템플릿을 지정하지 않으면 기존 동작(시작일 그대로, 장소 미정)을 유지한다', async () => {

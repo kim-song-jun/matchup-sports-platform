@@ -1956,7 +1956,7 @@ export class LeagueMatchAdminService {
 
   /**
    * 리그 상태 변경 — 화면의 '상태 변경' 버튼 하나가 고른 목표 상태를 보낸다. 전이마다 이미 있는 규칙을 그대로 쓴다:
-   * 보류(사유 필수)·보류 해제(보류 전 상태로만)·종료(취소 제외 전 경기 확정)·종료 되돌리기. 준비 중 ↔ 진행 중만 새로 연다.
+   * 보류(사유 필수)·보류 해제(보류 전 상태로만)·종료(취소 제외 전 경기 확정)·종료 되돌리기. 시작 취소는 모집 마감으로 돌아간다.
    */
   async changeState(user: V1AuthUser, leagueId: string, dto: ChangeLeagueStateDto) {
     // 위임하는 각 전이도 다시 확인하지만, 멱등 응답·409 로 먼저 끝나는 경로가 권한 확인 없이 상태를 알려 주지 않게 여기서 막는다.
@@ -2007,8 +2007,8 @@ export class LeagueMatchAdminService {
   }
 
   /**
-   * 준비 중 ↔ 진행 중. 지금까지는 대진을 만들 때만 진행 중이 됐다. 준비 중으로 돌리는 것은 아직 시작한 경기가
-   * 없을 때만 연다 — 이미 치른 경기가 있으면 '보류'가 맞다(치른 경기가 있는 리그를 '준비 중'으로 보이면 공개 화면이 거짓말을 한다).
+   * 시작 전 ↔ 진행 중. 호환 API의 draft 요청은 모집 마감(closed)으로 복귀한다.
+   * 아직 시작한 경기가 없을 때만 되돌린다 — 이미 치른 경기가 있으면 보류를 사용한다.
    */
   private async moveBetweenDraftAndActive(user: V1AuthUser, leagueId: string, target: 'draft' | 'active', reason: string | undefined) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
@@ -2020,7 +2020,7 @@ export class LeagueMatchAdminService {
         if (startedGames > 0) {
           throw new ConflictException({
             code: 'LEAGUE_HAS_STARTED_GAMES',
-            message: '이미 시작한 경기가 있어 준비 중으로 돌릴 수 없어요. 리그를 멈추려면 보류를 써 주세요.',
+            message: '이미 시작한 경기가 있어 모집 마감으로 돌릴 수 없어요. 리그를 멈추려면 보류를 써 주세요.',
           });
         }
       }
@@ -2028,7 +2028,8 @@ export class LeagueMatchAdminService {
         target === 'active' ? { in: ['draft', 'open', 'closed'] } : 'in_progress';
       const moved = await tx.v1Tournament.updateMany({
         where: { id: leagueId, kind: 'regular_league', deletedAt: null, status: fromStatuses },
-        data: { status: STATUS_BY_LEAGUE_STATE[target] },
+        // 시작을 되돌리면 신규 리그와 같은 모집 마감 단계로 복귀한다. draft는 호환용 API 상태다.
+        data: { status: target === 'draft' ? 'closed' : STATUS_BY_LEAGUE_STATE[target] },
       });
       if (moved.count !== 1) {
         throw new ConflictException({ code: 'LEAGUE_STATE_CHANGED', message: '리그 상태가 방금 바뀌었어요. 새로고침한 뒤 다시 시도해 주세요.' });

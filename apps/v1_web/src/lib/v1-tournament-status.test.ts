@@ -3,6 +3,10 @@ import type { V1TournamentStatus } from '@/types/api';
 import { getTournamentStatusConfig } from './v1-tournament-status';
 
 describe('getTournamentStatusConfig', () => {
+  it('정규 리그의 진행 상태만 시즌 문구로 구분해요', () => {
+    expect(getTournamentStatusConfig('in_progress', false, true).label).toBe('시즌 진행 중');
+    expect(getTournamentStatusConfig('in_progress', false, false).label).toBe('진행 중');
+  });
   it('아는 상태는 라벨과 뱃지를 그대로 돌려줘요', () => {
     expect(getTournamentStatusConfig('open')).toEqual({ badgeClass: 'tm-badge-blue', label: '모집 중' });
     expect(getTournamentStatusConfig('cancelled')).toEqual({ badgeClass: 'tm-badge-red', label: '취소' });

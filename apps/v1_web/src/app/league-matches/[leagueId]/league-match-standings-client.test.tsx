@@ -284,7 +284,7 @@ describe('LeagueMatchStandingsClient', () => {
     );
 
     // R7: 리그 상태 배지
-    await waitFor(() => expect(screen.getByText('진행 중')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('시즌 진행 중')).toBeInTheDocument());
 
     // R1: 경기 일정 행 — 팀 이름은 standings 매핑으로 채워지고, 행 전체가 team-matches 링크다.
     const scheduled = container.querySelector('a[href="/league-matches/league-1/fixtures/tm-10"]');

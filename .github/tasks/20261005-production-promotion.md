@@ -15,6 +15,7 @@ This snapshot supersedes the 2026-10-18 approval and release-baseline notes belo
 - Phase 3 in progress: publish the reviewed release-only diff to existing PR #1979; current-head CI/review pending. New dev CI/Alpha must pass after any eventual merge.
 - Baseline evidence: current dev Alpha deployment SUCCESS, public HTTP 200, exact commit 1f708958c and DB=true. Source 1.10.0 with zero pending Changesets resolves to a 1.10.1 artifact under the existing resolver.
 - Validation scope: final runtime/DB/API documentation trees identical to dev; only release metadata and this task differ. No new UI screenshots or duplicate local full test suites; exact committed-head CI owns tests/typecheck/build. Temporary official jq 1.7.1 binary checksum verified; no global install.
+- First refreshed CI 39179363896 used stale GitHub PR base 3309e7ed (rather than current dev 1f708958c), so Gates incorrectly included already-merged source changes and rejected the consumed-Changeset tree. Reapplying PR base=dev refreshed baseRefOid to 1f708958c; record-only follow-up triggers a fresh PR event. No gate bypass or workflow modification.
 - Final dev-to-main PR creation/merge and production environment approval remain user-operated under CLAUDE.md. No production promotion is performed by this preparation.
 
 ## Current preparation — 2026-10-18

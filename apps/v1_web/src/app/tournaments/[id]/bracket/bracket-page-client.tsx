@@ -22,10 +22,8 @@ import {
   partitionTournamentSections,
   isGroupStageComplete,
 } from '@/app/tournaments/[id]/tournament-detail-client';
-import { usePublicTournamentPlayerRecords, usePublicTournamentSchedule } from '@/components/public-game-records/use-public-game-records';
-import { TournamentPlayerRecordsSections } from '@/components/public-game-records/player-records-sections';
+import { usePublicTournamentSchedule } from '@/components/public-game-records/use-public-game-records';
 import { LeagueScheduleContent } from '@/components/public-game-records/league-schedule-content';
-import type { PublicTournamentPlayerRecordRow } from '@/components/public-game-records/types';
 // ⚠️ 이 파일에도 동명 지역 함수가 있다(대회 상세 `V1TournamentStanding` 용). 별칭으로 갈라
 // 둔다 — 같은 이름 두 개가 서로 다른 입력을 받으면 다음 사람이 아무거나 집는다.
 import {
@@ -363,11 +361,6 @@ function BracketEmpty({
   );
 }
 
-// 서버는 bare `/users/:id` 를 준다 — 프로필의 뒤로가기가 이 화면으로 돌아오도록 출처를 붙인다.
-function withProfileFrom(rows: readonly PublicTournamentPlayerRecordRow[] | undefined, from: string | null | undefined) {
-  return rows?.map((row) => ({ ...row, profileHref: withFromPath(row.profileHref, from) }));
-}
-
 /**
  * §B-6 — 이 화면에서 경기 일정도 볼 수 있게 한다. 탭으로 나눈 이유: "순위·대진표"와
  * "경기 일정"은 둘 다 화면 하나를 다 채울 만큼 정보량이 많아(특히 조별리그 대회는
@@ -409,9 +402,6 @@ export function BracketScheduleTab({
     setHasSessionHint(hasStoredV1Session());
   }, []);
   const myFixtures = useV1MyTournamentFixtures(tournamentId, { enabled: hasSessionHint && !isRegularLeague });
-  // 리그는 조회조차 하지 않는다 — 위 섹션 주석 참조.
-  const playerRecords = usePublicTournamentPlayerRecords(tournamentId, { enabled: !isRegularLeague });
-
   // A live game can be on any cursor page; load them sequentially before claiming all live games are shown.
   useEffect(() => {
     if (hasNextPage && !isFetching && !isError) void fetchNextPage();
@@ -444,41 +434,21 @@ export function BracketScheduleTab({
       hasNextPage={hasNextPage} isFetchingNextPage={isFetchingNextPage} onLoadMore={() => void fetchNextPage()} />;
   }
 
+  // 순위표는 옆 탭("순위 · 대진표")이 이미 그린다 — 여기서 또 그리면 탭만 바꿔도
+  // 같은 표가 두 번 나온다(오너 지적: "중복되는 정보도 많고").
   return (
-    <>
-      <ScheduleContent
-        tournamentId={tournamentId}
-        prioritizeLiveGames
-        isRegularLeague={isRegularLeague}
-        data={combined}
-        hasNextPage={hasNextPage}
-        isFetchingNextPage={isFetchingNextPage}
-        onLoadMore={() => void fetchNextPage()}
-        myFixtures={myFixtures.data}
-        fromHref={fromHref}
-        /* 순위표는 옆 탭("순위 · 대진표")이 이미 그린다 — 여기서 또 그리면 탭만 바꿔도
-           같은 표가 두 번 나온다(오너 지적: "중복되는 정보도 많고"). */
-        showStandings={false}
-      />
-      {/* 개인 득점·도움 랭킹. `/schedule` 이 여기로 접히면서 함께 옮겼다 — 같은 섹션이
-          `/awards` 에도 있지만 그 입구는 "대회 종료 후 공개"라, 이게 없으면 **진행 중에는
-          선수 기록을 볼 화면이 없어진다.**
-          리그에서는 그리지 않는다: 리그 참가자는 `userId` 로 이어져 있지 않아 사람 단위
-          집계 자체가 불가능하고, 빈 표는 "아직 기록이 없다"로 잘못 읽힌다. */}
-      {isRegularLeague ? null : (
-        <TournamentPlayerRecordsSections
-          goals={withProfileFrom(playerRecords.data?.goals, fromHref)}
-          assists={withProfileFrom(playerRecords.data?.assists, fromHref)}
-          hiddenByEligibility={playerRecords.data?.hiddenByEligibility ?? false}
-          isLoading={playerRecords.isLoading}
-          isError={playerRecords.isError}
-          errorMessage={extractErrorMessage(playerRecords.error, '기록을 불러오지 못했어요.')}
-          onRetry={() => void playerRecords.refetch()}
-          emptyBehavior="hide"
-          containerStyle={{ padding: '0 20px 40px', display: 'flex', flexDirection: 'column', gap: 20 }}
-        />
-      )}
-    </>
+    <ScheduleContent
+      tournamentId={tournamentId}
+      prioritizeLiveGames
+      isRegularLeague={isRegularLeague}
+      data={combined}
+      hasNextPage={hasNextPage}
+      isFetchingNextPage={isFetchingNextPage}
+      onLoadMore={() => void fetchNextPage()}
+      myFixtures={myFixtures.data}
+      fromHref={fromHref}
+      showStandings={false}
+    />
   );
 }
 

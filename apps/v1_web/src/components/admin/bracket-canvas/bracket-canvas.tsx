@@ -106,9 +106,8 @@ export function BracketCanvas({
         {layout.byeNodes.map(position => {
           const slot = slotsById.get(position.slotId);
           if (!slot) return null;
-          return <button key={slot.id} type="button" aria-label={`12강 부전승 ${slot.teamName ?? slot.label} 편집`} onClick={() => onSelectBye ? onSelectBye(slot.id) : onSelectFixture(position.fixtureId)} className="absolute flex flex-col justify-center gap-1 rounded-2xl border border-[var(--border-strong)] bg-[var(--card-surface)] p-3 text-left focus-visible:outline-2 focus-visible:outline-blue-500" style={{ left: position.x, top: position.y, width: position.width, height: position.height }}>
+          return <button key={slot.id} type="button" aria-label={`12강 부전승 ${slot.teamName ?? slot.label} 편집`} onClick={() => onSelectBye ? onSelectBye(slot.id) : onSelectFixture(position.fixtureId)} className="tm-on-tint absolute flex flex-col justify-center gap-1 rounded-2xl border border-[var(--border-strong)] bg-[var(--card-surface)] p-3 text-left focus-visible:outline-2 focus-visible:outline-blue-500" style={{ left: position.x, top: position.y, width: position.width, height: position.height, background: slot.registrationId !== null ? 'var(--blue50)' : undefined }}>
             <span className="tm-text-caption text-[var(--text-muted)]">12강 부전승</span><span className="tm-text-label truncate font-semibold">{slot.teamName ?? slot.label}</span>
-            {slot.teamName ? <span className="tm-text-caption truncate text-[var(--text-muted)]">{slot.label}</span> : null}
           </button>;
         })}
         {layout.nodes.map((position) => {

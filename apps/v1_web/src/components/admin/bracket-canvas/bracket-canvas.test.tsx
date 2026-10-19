@@ -196,3 +196,20 @@ describe('BracketCanvas — 조별+결선 조 편성 블록', () => {
     expect(screen.queryByText(/조 순위로 올라오는 곳/)).not.toBeInTheDocument();
   });
 });
+
+
+it.each([null, 'r1'])('부전승 타일은 배정 후 시드 문구를 숨기고 배경을 강조한다 (%s)', (registrationId) => {
+  renderCanvas({
+    groups: [makeGroup({ id: 'r12', phase: 'round12', name: '12강' }), makeGroup({ id: 'q', phase: 'quarter', name: '8강' })],
+    slots: [makeSlot({ id: 'bye', kind: 'BYE', groupId: 'r12', label: '5번 시드', registrationId, teamName: registrationId ? '확정팀' : null })],
+    fixtures: [makeFixture({ id: 'quarter', fixtureNumber: 1, groupId: 'q', round: '8강', homeSlotId: 'bye', homeRegistrationId: registrationId, homeTeamName: registrationId ? '확정팀' : 'TBD' })],
+  });
+  const tile = screen.getByRole('button', { name: `12강 부전승 ${registrationId ? '확정팀' : '5번 시드'} 편집` });
+  if (registrationId) {
+    expect(tile).not.toHaveTextContent('5번 시드');
+    expect(tile).toHaveStyle({ background: 'var(--blue50)' });
+  } else {
+    expect(tile).toHaveTextContent('5번 시드');
+    expect(tile).not.toHaveStyle({ background: 'var(--blue50)' });
+  }
+});

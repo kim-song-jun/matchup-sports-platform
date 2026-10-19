@@ -1,0 +1,240 @@
+{
+  "phase": "after",
+  "persona": "anonymous",
+  "browserPid": 10508,
+  "parentPid": 33408,
+  "issues": [
+    {
+      "kind": "http",
+      "status": 400,
+      "path": "/_next/image"
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "kind": "http",
+      "status": 400,
+      "path": "/_next/image"
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "kind": "http",
+      "status": 400,
+      "path": "/_next/image"
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "kind": "http",
+      "status": 400,
+      "path": "/_next/image"
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "kind": "http",
+      "status": 400,
+      "path": "/_next/image"
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "kind": "http",
+      "status": 400,
+      "path": "/_next/image"
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "kind": "http",
+      "status": 400,
+      "path": "/_next/image"
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "kind": "http",
+      "status": 400,
+      "path": "/_next/image"
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "kind": "http",
+      "status": 400,
+      "path": "/_next/image"
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "kind": "http",
+      "status": 400,
+      "path": "/_next/image"
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "kind": "http",
+      "status": 400,
+      "path": "/_next/image"
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "kind": "http",
+      "status": 400,
+      "path": "/_next/image"
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "kind": "http",
+      "status": 400,
+      "path": "/_next/image"
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "kind": "http",
+      "status": 400,
+      "path": "/_next/image"
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "kind": "http",
+      "status": 400,
+      "path": "/_next/image"
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "kind": "http",
+      "status": 400,
+      "path": "/_next/image"
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "kind": "http",
+      "status": 400,
+      "path": "/_next/image"
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "kind": "http",
+      "status": 400,
+      "path": "/_next/image"
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "kind": "http",
+      "status": 400,
+      "path": "/_next/image"
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "kind": "http",
+      "status": 400,
+      "path": "/_next/image"
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "kind": "http",
+      "status": 400,
+      "path": "/_next/image"
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "kind": "http",
+      "status": 400,
+      "path": "/_next/image"
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "kind": "http",
+      "status": 400,
+      "path": "/_next/image"
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "kind": "http",
+      "status": 400,
+      "path": "/_next/image"
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 400 ()"
+    }
+  ],
+  "viewports": [
+    {
+      "width": 390,
+      "verdict": "PASS"
+    },
+    {
+      "width": 768,
+      "verdict": "PASS"
+    },
+    {
+      "width": 1440,
+      "verdict": "PASS"
+    }
+  ],
+  "commit": "6ac17922b4a95faeb65516b5322658aeeca753a3",
+  "cleanup": "Owned browser closed"
+}

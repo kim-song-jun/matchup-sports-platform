@@ -2,6 +2,43 @@
 
 Status: Review
 
+## Current preparation refresh — 2026-10-19
+
+This snapshot supersedes the 2026-10-18 approval and release-baseline notes below.
+
+- User requested refreshing main/dev, confirmed preparation PR #1979, then explicitly instructed proceeding with latest-dev conflict resolution and main-to-dev integration.
+- Baselines: dev `1f708958c67bb59442215f1aae3137304fd314ed`; main `782e5aa5a8274d34e56c80fd11f47f20314a7fed`; original PR head `b6f4ec03248fadb9bd5fbd22ea434066a3bf45a1`.
+- Owned isolated worktree `_worktrees/pr1979-refresh`, branch `fix/pr1979-refresh`; update existing remote `chore/release-version-20261018` by normal fast-forward push. Shared worktrees, main mutation and production approval are excluded.
+- Phase 1 complete: merge preparation ancestry into latest dev, restore release inputs from dev 1.9.10 to avoid double versioning, then absorb main ancestry. Twelve main conflicts reviewed: team metadata/tests retain actual local emblems, tournament detail retains current league capacity/navigation, schema bindings retain current schema plus historical hashes, API docs retain current contracts, SEO task retains deployed main evidence already recorded on dev.
+- Exact index comparison proves application, deployment, release scripts, API docs and SEO task are byte-identical to latest dev after integration. No new runtime or DB change is introduced by this refresh.
+- Phase 2 complete: official Changesets CLI 2.30.0 via prepare-only regenerated both apps from 1.9.10 to 1.10.0, consuming all 28 pending Changesets; production release history preserved. The explicit alpha baseline was origin/dev (runtime-identical to the integration tree). Release promotion gate and diff whitespace PASS.
+- Phase 3 in progress: publish the reviewed release-only diff to existing PR #1979; current-head CI/review pending. New dev CI/Alpha must pass after any eventual merge.
+- Baseline evidence: current dev Alpha deployment SUCCESS, public HTTP 200, exact commit 1f708958c and DB=true. Source 1.10.0 with zero pending Changesets resolves to a 1.10.1 artifact under the existing resolver.
+- Validation scope: final runtime/DB/API documentation trees identical to dev; only release metadata and this task differ. No new UI screenshots or duplicate local full test suites; exact committed-head CI owns tests/typecheck/build. Temporary official jq 1.7.1 binary checksum verified; no global install.
+- First refreshed CI 39179363896 used stale GitHub PR base 3309e7ed (rather than current dev 1f708958c), so Gates incorrectly included already-merged source changes and rejected the consumed-Changeset tree. Reapplying PR base=dev refreshed baseRefOid to 1f708958c; record-only follow-up triggers a fresh PR event. No gate bypass or workflow modification.
+- Final dev-to-main PR creation/merge and production environment approval remain user-operated under CLAUDE.md. No production promotion is performed by this preparation.
+
+## Current preparation — 2026-10-18
+
+The user requests a main-promotion PR. This snapshot supersedes historical release coordinates below.
+
+Update: the user additionally requested inclusion of PR #1978. It passed Gates/API/Web and same-head manual review with no blocking issue/threads, then merged into dev as 3309e7ed80792401bb6968e80a88dc82c38b96f5. This preparation branch includes that exact dev merge. Official Changesets CLI regenerated 1.10.0 from latest dev source 1.9.9 plus all 26 Changesets, including admin-player-realname; it did not double-bump the prepared version. Runtime/API docs match latest dev byte-for-byte. New dev CI 39137871091 and Alpha 39137871074 are pending; previous #1979 CI 39136750796 passed on 6c0528b12, not the refreshed head. main conflict resolution and agent-created main PR still require their previously requested approvals.
+
+- Verified dev/alpha baseline: ef706121bf946c3af230f375c64552a775db296d, dev CI 39132737481 and Alpha 39132737476 SUCCESS; alpha commit header matches and DB health is true. Main baseline: edb7ecd31.
+- Official Changesets CLI 2.30.0 via promote-main.sh --prepare-only consumes 26 pending Changesets and raises both fixed app source versions from 1.9.9 to 1.10.0. Both changelogs preserve production history. No dependency, application source, schema or migration change is introduced by this version preparation.
+- prepare-only main-promotion gate and git diff --check PASS. The existing resolver uses patch advancement with zero pending Changesets, so the prepared source version 1.10.0 yields a 1.10.1-alpha artifact; this is the existing release contract, not a second source bump.
+- Main has 27 commits absent from dev ancestry. A separate isolated integration checkout identified 10 conflict files. Read-only resolution proof confirms that resolving the 9 runtime/API-doc conflicts to the reviewed dev bytes leaves those files exactly identical to verified dev; the remaining task-log conflict must retain both records.
+- Automatic approval rejected a batch regex conflict resolution plus immediate commit. No resolution was executed. The user was asked to approve the concrete main-to-dev resolution; that approval remains required before dependent integration work. No workaround or main write is performed.
+- Local main/dev WIP and authenticated QA screenshot branches are excluded. Only release manifests/changelogs, consumed Changesets and this status record are owned by the version preparation.
+
+Acceptance criteria:
+- [x] Prepare fixed version metadata and consume all current Changesets.
+- [x] Verify local release-preparation contract and whitespace.
+- [ ] Approved main ancestry integration, preserving reviewed dev runtime and main release history.
+- [ ] Preparation PR exact-head CI/review; new dev CI and Alpha after merge.
+- [ ] main-promotion PR with current main/dev diff and explicit user-only production merge.
+
+
 ## Final preparation refresh — 2026-10-14
 
 This snapshot supersedes the preparation snapshots below.

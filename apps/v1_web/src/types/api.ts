@@ -5263,6 +5263,7 @@ export type V1MyTournamentStaffGroup = {
   tournamentId: string;
   tournamentTitle: string;
   tournamentStatus: V1TournamentStatus;
+  tournamentKind?: string | null;
   assignments: V1MyTournamentStaffAssignment[];
   fixtures: V1MyTournamentStaffFixture[];
 };

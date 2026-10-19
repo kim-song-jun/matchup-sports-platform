@@ -46,12 +46,12 @@ All routes below are under `/api/v1`, require `V1AuthGuard` (authenticated user)
 
 `MyTournamentStaffController` (same directory) → `TournamentOperationsStaffService.myAssignments()`. Guarded by `V1AuthGuard` only, **not** `TournamentStaffGuard`: the route carries no tournament path parameter and its result set is closed to the caller (`where.userId` comes from the authenticated principal; there is no request field that can name another user). Returns only assignments that are neither revoked nor expired.
 
-Response: `{platformRole, items[]}`.
+Response: `{platformRole, items[]}`. Each group includes `tournamentKind` (stored competition kind, nullable for legacy tournaments); league rows use the four-state league labels instead of generic tournament labels.
 
 | Field | Meaning |
 |---|---|
 | `platformRole` | `'PLATFORM_OPS'` for an active `owner`/`ops` admin with an active account, otherwise `null` |
-| `items[]` — `{tournamentId,tournamentTitle,tournamentStatus,assignments[],fixtures[]}` | one entry per tournament (several assignments in one tournament collapse into one), in-progress tournaments first |
+| `items[]` — `{tournamentId,tournamentTitle,tournamentStatus,tournamentKind,assignments[],fixtures[]}` | one entry per tournament (several assignments in one tournament collapse into one), in-progress tournaments first |
 | `assignments[]` — `{id,role,fieldId,fieldName,version,expiresAt,fixtureIds}` | the assignment itself; `fixtureIds` is its fixture scope (empty for a field-only scope) |
 | `version` | the assignment's optimistic-lock version. The `/game-operations` socket handshake must present this value or `game.subscribe`/`game.takeover.request` deny it as stale (`RealtimeGateway`). The web console used to read it from the tournament-wide staff list — which a `FIELD_OPERATOR` is always denied, so that role presented `0` and its live subscription broke as soon as its assignment version moved past `0`. This route is now that value's single source for every role (`useMyTournamentStaffAssignmentVersion`). |
 | `fixtures[]` — `{fixtureId,gameId,tournamentId,title,homeTeamName,awayTeamName,scheduledAt,status,gameState,round,fixtureNumber,legNumber,groupName,fieldId,fieldName}` | **`FIELD_OPERATOR` scopes only.** The canonical team matches those assignments cover, earliest first; other roles get `[]` and no fixture query runs. `groupName` is `V1TournamentGroup.name`, `null` outside any group (knockout etc.) — the web names the match with `competitionMatchLabel` ("A조 · 조별리그 2라운드"). `title` is the bracket-generated label and carries no team names; `homeTeamName`/`awayTeamName` come from the game sides (`V1GameSide.displayNameSnapshot`, what the operate console shows) and are `null` until a side exists. |

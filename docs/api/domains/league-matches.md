@@ -3,12 +3,26 @@
 League creation is exposed under `/api/v1/admin/league-matches` and public
 league reads under `/api/v1/league-matches`.
 
+
+## League display states (2026-10-19)
+
+The user-facing lifecycle has exactly four states: **모집완료 · 진행 중 · 보류 · 종료**.
+Compatible API values remain `draft | active | on_hold | completed`.
+Stored `draft`, `open`, and `closed` all map to `draft` and display **모집완료**;
+`in_progress` displays 진행 중, `on_hold` 보류, and `completed`/`cancelled` 종료.
+There is no separate 준비 중 or 모집 중 lifecycle state. Shared labels cover common/public
+detail, fixtures, my leagues, admin lists/header/modal, season tiers, roster and staff entry.
+Registration availability/deadline and publication remain separate facts; changing a label does
+not close registration, change `isPublic`, start a game, or rewrite historical rows.
+The public list's compatible `status=draft` filter selects all three pre-start storage values,
+matching `GET /league-matches?state=draft`; ordinary tournament drafts remain hidden.
+
 ## New league lifecycle (2026-10-18)
 
-New independent leagues and new series seasons are stored as `closed` (모집 마감), with
+New independent leagues and new series seasons are stored as `closed` (모집완료), with
 no registration deadline. No existing rows are backfilled. Admin list/detail include
 `lifecycleStatus` and authoritative `registrationOpen` alongside the compatible `state` (`closed` still maps to `draft`).
-The admin header shows 모집 마감 and 리그 시작하기. Confirming the existing state
+The admin header shows 모집완료 and 리그 시작하기. Confirming the existing state
 endpoint with `{ "state": "active" }` starts the league with the existing mutation-admin
 permission and `league_match.start` audit. Normal error handling and query invalidation apply.
 For new explicit-start leagues, fixture generation/regeneration, slot assignment and result
@@ -80,12 +94,12 @@ endpoints below instead of adding new ones:
 - `active` from `completed` → revert completion. `active` from `draft` (stored `draft`/`open`/`closed`)
   starts the league (stored `in_progress`, audit `league_match.start`). Before this, only fixture
   generation moved a league to active.
-- `draft` from `active` returns to stored `closed` (모집 마감; compatible response state remains `draft`, audit `league_match.revert_to_draft`) only while no
+- `draft` from `active` returns to stored `closed` (모집완료; compatible response state remains `draft`, audit `league_match.revert_to_draft`) only while no
   game has started (`LIVE`/`PAUSED`/`ENDED`); otherwise `409 LEAGUE_HAS_STARTED_GAMES`. `draft` from
   `completed` returns `409 LEAGUE_NOT_ACTIVE` (revert to active first).
 - Asking for the current state returns `alreadyProcessed: true`.
 
-The admin modal labels the `active` → `draft` target 모집 마감. Fixtures, teams, publication and registration deadline remain unchanged;
+The admin modal labels the `active` → `draft` target 시작 취소 → 모집완료. Fixtures, teams, publication and registration deadline remain unchanged;
 registration availability still follows the deadline independently. The league can be explicitly started again with `active`.
 
 Returns `{ leagueId, state, alreadyProcessed }`. The individual `hold`/`resume`/`complete`/`revert-completion`

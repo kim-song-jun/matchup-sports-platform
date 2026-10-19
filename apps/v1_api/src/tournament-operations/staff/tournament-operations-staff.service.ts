@@ -104,6 +104,7 @@ export type MyTournamentStaffGroup = {
   readonly tournamentId: string;
   readonly tournamentTitle: string;
   readonly tournamentStatus: V1TournamentStatus;
+  readonly tournamentKind?: string | null;
   readonly assignments: readonly MyTournamentStaffAssignmentItem[];
   /**
    * Canonical fixture summaries covered by this user's active assignments. This is deliberately
@@ -193,7 +194,7 @@ export class TournamentOperationsStaffService {
         fieldId: true,
         version: true,
         expiresAt: true,
-        tournament: { select: { title: true, status: true } },
+        tournament: { select: { title: true, status: true, kind: true } },
         field: { select: { name: true } },
         // 담당 경기 식별자 — 필드 담당자(FIELD_OPERATOR)가 대회 셸을 거치지 않고 자기 경기
         // 콘솔로 바로 들어갈 때 진입 판정에 쓴다. 이 역할은 대회 전역 리소스를 읽을 권한이
@@ -210,7 +211,7 @@ export class TournamentOperationsStaffService {
     // 단위로 묶어 진입 경로가 대회당 하나만 노출되게 한다(중복 카드 방지).
     const groups = new Map<
       string,
-      { tournamentId: string; tournamentTitle: string; tournamentStatus: V1TournamentStatus; assignments: MyTournamentStaffAssignmentItem[]; fixtures: MyTournamentStaffFixtureItem[] }
+      { tournamentId: string; tournamentTitle: string; tournamentStatus: V1TournamentStatus; tournamentKind?: string | null; assignments: MyTournamentStaffAssignmentItem[]; fixtures: MyTournamentStaffFixtureItem[] }
     >();
     for (const assignment of assignments) {
       let group = groups.get(assignment.tournamentId);
@@ -219,6 +220,7 @@ export class TournamentOperationsStaffService {
           tournamentId: assignment.tournamentId,
           tournamentTitle: assignment.tournament.title,
           tournamentStatus: assignment.tournament.status,
+          tournamentKind: assignment.tournament.kind,
           assignments: [],
           fixtures: [],
         };

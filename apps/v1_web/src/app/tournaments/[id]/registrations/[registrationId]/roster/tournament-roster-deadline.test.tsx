@@ -165,6 +165,15 @@ describe('TournamentRosterDeadlineCard', () => {
 
   // F98: 정규 리그에는 신청 마감이 없다. 예전엔 그 자리가 항상 "일정 미정 · 일정 미정" 이었다.
   describe('정규 리그(season)', () => {
+    it.each(['draft', 'open', 'closed'] as const)('%s 리그 명단 카드도 모집완료를 표시한다', (status) => {
+      render(<TournamentRosterDeadlineCard deadlineAt={null}
+        season={{ startAt: null, endAt: null, status }}
+        tournamentStatus={status} isRosterLocked={false}
+        isRosterEditBlockedByStatus={false} isRosterDeadlineBlocked={false} />);
+      expect(screen.getByText('모집완료')).toBeInTheDocument();
+      expect(screen.queryByText('준비 중')).not.toBeInTheDocument();
+    });
+
     const season = (status: 'in_progress' | 'completed' | 'cancelled') => ({
       // KST 2026-09-30 00:00 ~ 2026-11-30 23:59 — 서버가 내려주는 시즌 기간 그대로다.
       startAt: '2026-09-29T15:00:00.000Z',

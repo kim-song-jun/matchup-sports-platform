@@ -115,7 +115,7 @@ export function LeagueAdminShell({ leagueId, children }: { leagueId: string; chi
         description={`${series.teamIds.length}팀 참가 · 대진 ${series.fixtures.length}경기`}
         action={
           <div className="flex flex-wrap items-center gap-2">
-            <AdminLeagueStatePill state={series.state} lifecycleStatus={series.lifecycleStatus} registrationOpen={series.registrationOpen} />
+            <AdminLeagueStatePill state={series.state} />
             {canWrite && series.state === 'draft' && (
               <Button variant="primary" onClick={() => { setStarting(true); setStateModalOpen(true); }}>
                 리그 시작하기

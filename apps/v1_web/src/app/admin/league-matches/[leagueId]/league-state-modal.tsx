@@ -4,19 +4,13 @@ import { useId, useState } from 'react';
 import { Button } from '@/components/v1-ui/button';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { useV1ChangeLeagueState } from '@/hooks/use-v1-api';
+import { leagueStateLabel } from '@/lib/v1-status-labels';
 import { extractErrorMessage } from '@/lib/error-message';
 import type { V1AdminLeagueDetail, V1LeagueStateValue } from '@/types/league-match';
 
-const STATE_LABEL: Record<V1LeagueStateValue, string> = {
-  draft: '준비 중',
-  active: '진행 중',
-  on_hold: '보류',
-  completed: '종료',
-};
-
 // "지금은 ○○" 문장 — 라벨에 조사를 붙이면 '보류이에요'·'종료이에요'가 된다.
 const STATE_NOW: Record<V1LeagueStateValue, string> = {
-  draft: '준비 중이에요',
+  draft: '모집완료 상태예요',
   active: '진행 중이에요',
   on_hold: '보류 중이에요',
   completed: '종료됐어요',
@@ -36,12 +30,12 @@ export function leagueStateOptions(series: Pick<V1AdminLeagueDetail, 'state' | '
   const holdRestore = series.heldFromState ?? 'draft';
   const reasonFor = (target: V1LeagueStateValue): string | null => {
     if (state === 'on_hold') {
-      return target === holdRestore ? null : `보류 중에는 보류 전 상태(${STATE_LABEL[holdRestore]})로만 돌아갈 수 있어요.`;
+      return target === holdRestore ? null : `보류 중에는 보류 전 상태(${leagueStateLabel(holdRestore)})로만 돌아갈 수 있어요.`;
     }
     switch (target) {
       case 'draft':
         if (state === 'completed') return '종료된 리그는 먼저 진행 중으로 돌린 뒤 바꿀 수 있어요.';
-        return startedGames ? '이미 시작한 경기가 있어 모집 마감으로 돌릴 수 없어요. 멈추려면 보류를 써 주세요.' : null;
+        return startedGames ? '이미 시작한 경기가 있어 시작을 취소할 수 없어요. 멈추려면 보류를 써 주세요.' : null;
       case 'active':
         return null;
       case 'on_hold':
@@ -56,9 +50,9 @@ export function leagueStateOptions(series: Pick<V1AdminLeagueDetail, 'state' | '
     if (state === 'on_hold' && target === holdRestore) return '보류를 풀고 보류 전 상태와 공개 설정으로 돌아가요.';
     switch (target) {
       case 'draft':
-        if (state === 'active') return '리그 시작을 취소하고 모집 마감으로 돌아가요. 대진·참가 팀은 그대로 남고, 참가 신청은 신청 마감 설정을 따라요.';
-        // 신청 여부는 상태가 아니라 신청 마감이 정한다(isLeagueRegistrationOpen) — 준비 중으로 돌린다고 신청이 열리지 않는다.
-        return '공개 화면에서 준비 중으로 보여요. 참가 신청은 상태와 관계없이 신청 마감까지 받아요.';
+        if (state === 'active') return '리그 시작을 취소하고 모집완료로 돌아가요. 대진·참가 팀은 그대로 남고, 참가 신청은 신청 마감 설정을 따라요.';
+        // 시작 취소는 기존 신청 마감·정원 설정을 유지한다.
+        return '모집완료로 돌아가요. 참가 신청은 별도 신청 마감 설정을 따라요.';
       case 'active':
         return state === 'completed' ? '종료를 풀고 다시 진행 중으로 돌려요. 남은 경기가 모두 확정되면(총 경기 수를 정했으면 그 수를 채우면) 다시 자동으로 종료돼요.' : '리그를 시작해요.';
       case 'on_hold':
@@ -94,7 +88,7 @@ export function LeagueStateModal({
   const [error, setError] = useState<string | null>(null);
   const { dialogRef, onBackdropClick } = useModalA11y<HTMLElement, HTMLDivElement>({ open: true, onClose, pending: changeState.isPending });
   const reasonRequired = target === 'on_hold';
-  const targetLabel = (state: V1LeagueStateValue) => series.state === 'active' && state === 'draft' ? '모집 마감' : STATE_LABEL[state];
+  const targetLabel = leagueStateLabel;
   const canSubmit = target !== null && (!reasonRequired || reason.trim().length > 0);
 
   const submit = () => {
@@ -123,7 +117,7 @@ export function LeagueStateModal({
       >
         <div>
           <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">{startOnly ? '리그를 시작할까요?' : '상태 변경'}</h2>
-          <p className="mt-0.5 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">지금은 {series.lifecycleStatus === 'closed' ? '리그 시작 전이에요' : STATE_NOW[series.state]}.</p>
+          <p className="mt-0.5 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">지금은 {STATE_NOW[series.state]}.</p>
         </div>
         <fieldset className="flex flex-col gap-2">
           <legend className="sr-only">바꿀 상태</legend>
@@ -149,7 +143,7 @@ export function LeagueStateModal({
                 />
                 <span className="min-w-0">
                   <span className="block text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-strong)]">
-                    {series.state === 'on_hold' && !disabled ? `보류 해제 → ${STATE_LABEL[option.state]}` : targetLabel(option.state)}
+                    {series.state === 'on_hold' && !disabled ? `보류 해제 → ${targetLabel(option.state)}` : option.state === 'draft' && series.state === 'active' ? `시작 취소 → ${targetLabel(option.state)}` : targetLabel(option.state)}
                   </span>
                   <span className="mt-0.5 block text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
                     {option.disabledReason ?? option.description}

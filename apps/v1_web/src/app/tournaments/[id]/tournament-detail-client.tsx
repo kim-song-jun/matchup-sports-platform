@@ -24,7 +24,7 @@ import { trackEvent } from '@/lib/analytics';
 import { extractErrorMessage } from '@/lib/error-message';
 import { hasStoredV1Session, sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { getSportAccent } from '@/lib/v1-sport-accent';
-import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
+import { getLeagueStatusConfig, getTournamentStatusConfig } from '@/lib/v1-tournament-status';
 import { KNOCKOUT_PHASES, competitionMatchLabel, tournamentRoundLabel } from '@/lib/tournament-round-label';
 import { compareTournamentGroupNames } from '@/lib/tournament-display-order';
 import { splitPrizeSegments, isPrizeAmountValue, formatPrizeRowValue } from '@/lib/prize-breakdown';
@@ -632,7 +632,8 @@ export function TournamentDetailView({
      판정을 공유한다. status만 보던 예전 로직은 신청 마감이 지난 open 대회에서도
      '참가 신청하기'를 활성으로 그렸다. */
   const registrationBlock = resolveTournamentRegistrationBlock(tournament);
-  const status = getTournamentStatusConfig(tournament.status, registrationBlock !== null);
+  const status = isLeagueMirror ? getLeagueStatusConfig(tournament.status)
+    : getTournamentStatusConfig(tournament.status, registrationBlock !== null);
   const prizeText = tournament.prizeSummary?.trim() ?? '';
   const genderCategoryLabel = getGenderCategoryLabel(tournament.genderCategory);
   const genderQuotaLabel = getGenderQuotaLabel(tournament);

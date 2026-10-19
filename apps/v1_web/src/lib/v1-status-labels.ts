@@ -308,7 +308,7 @@ export function gameRosterStatusLabel(status: string, remainingMatches?: number 
 export type LeagueStateKey = 'draft' | 'active' | 'completed' | 'on_hold';
 
 const LEAGUE_STATE_LABEL: Record<LeagueStateKey, string> = {
-  draft: '준비 중',
+  draft: '모집완료',
   active: '진행 중',
   completed: '종료',
   // 리그 취소 대신 쓰는 보류 — 공개 화면에선 숨겨져 있고 관리자가 다시 열 수 있다.

@@ -227,6 +227,15 @@ describe('TournamentCard — 커버 이미지 fallback', () => {
 
 /** 무제한 리그는 거울 teamCount를 정원으로 쓰지 않고 진행바도 그리지 않는다. */
 describe('TournamentCard — 무제한 리그는 정원 진행바를 그리지 않는다', () => {
+  it.each(['draft', 'open', 'closed'] as const)('%s 리그는 신청 가능 여부와 별개로 모집완료를 표시한다', (status) => {
+    const item = buildItem({ kind: 'regular_league', status, registrationDeadlineAt: '2099-01-01T00:00:00.000Z' });
+    render(<TournamentCard item={item} />);
+    expect(screen.getByRole('link')).toHaveAccessibleName(expect.stringContaining('— 모집완료'));
+    expect(screen.getByText('모집완료', { exact: true })).toBeInTheDocument();
+    expect(screen.queryByText('준비 중', { exact: true })).not.toBeInTheDocument();
+    expect(screen.queryByText('모집 중', { exact: true })).not.toBeInTheDocument();
+  });
+
   /** 리그의 참가팀 정원은 nullable maxTeams로 말한다. */
   const leagueItem = () => {
     const item = buildItem({ kind: 'regular_league', maxTeams: null, confirmedCount: 2 });
@@ -312,13 +321,13 @@ describe('TournamentCard — 정원이 다 찼으면 상태가 open이어도 마
     expect(text).toContain('모집 중');
   });
 
-  it('무제한 리그는 미래 신청 마감까지 모집 중으로 표시한다', () => {
+  it('무제한 리그도 미래 신청 마감과 별개로 모집완료로 표시한다', () => {
     const item = buildItem({ kind: 'regular_league', status: 'open', maxTeams: null,
       registrationDeadlineAt: '2099-08-10T14:59:00.000Z', confirmedCount: 2 });
     delete item.teamCount;
     const { container } = render(<TournamentCard item={item} />);
     const text = (container.textContent ?? '').replace(/\s+/g, ' ');
-    expect(text).toContain('모집 중');
+    expect(text).toContain('모집완료');
   });
 });
 

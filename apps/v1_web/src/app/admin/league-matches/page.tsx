@@ -296,7 +296,7 @@ function LeagueListTable({
               </span>
             ),
         },
-        { key: 'state', header: '상태', render: (row) => <AdminLeagueStatePill state={row.state} lifecycleStatus={row.lifecycleStatus} registrationOpen={row.registrationOpen} /> },
+        { key: 'state', header: '상태', render: (row) => <AdminLeagueStatePill state={row.state} /> },
         { key: 'visibility', header: '공개', render: (row) => <AdminVisibilityBadge isPublic={row.isPublic} /> },
         { key: 'teamCount', header: '참가 팀', render: (row) => `${row.teamCount}팀` },
         { key: 'fixtureCount', header: '대진 수', render: (row) => `${row.fixtureCount}경기` },

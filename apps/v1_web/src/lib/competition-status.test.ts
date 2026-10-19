@@ -71,7 +71,7 @@ describe('리그 상태 × 경기 상태 — 한 화면에 함께면 대상을 �
   });
 
   it.each([
-    ['draft', '준비 중'],
+    ['draft', '모집완료'],
     ['active', '진행 중'],
     ['completed', '종료'],
   ] as const)('리그 %s 는 대상 없이 "%s"', (state, label) => {

@@ -6,7 +6,9 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
+import { setupServer } from 'msw/node';
 import { server } from '@/test/msw/server';
+import { saveStoredV1Session, V1_USER_ID_KEY, V1_USER_EMAIL_KEY } from '@/lib/session-storage';
 import { renderBracketPage, renderBracketStandingsTab } from './bracket-test-utils';
 import { AppBackLink } from '@/components/v1-ui/app-back-link';
 import { __resetNavigationHistoryForTests } from '@/lib/navigation-history';
@@ -38,6 +40,8 @@ vi.mock('next/navigation', async (importOriginal) => ({
 
 afterEach(() => {
   window.localStorage.removeItem('teameet.v1.session');
+  window.localStorage.removeItem(V1_USER_ID_KEY);
+  window.localStorage.removeItem(V1_USER_EMAIL_KEY);
   setMockSearchParams(new URLSearchParams());
   setMockPathname('/tournaments/tour-1/bracket');
   replace.mockClear();
@@ -1364,17 +1368,28 @@ describe('BracketPageContent — 대회 상세로 돌아가는 링크는 받은 
 });
 
 
-it.each([true, false])('소속 팀이 있는 조만 상단에 모으고 표시한다 (로그인=%s)', async (loggedIn) => {
-  if (loggedIn) window.localStorage.setItem('teameet.v1.session', 'active');
-  server.use(http.get('*/me/teams', () => HttpResponse.json({ status: 'success', data: { items: [{ teamId: 'my-team' }] } })));
-  const groups = ['A조', 'B조', 'C조'].map((name, index) => makeGroup({
-    id: `group-${index}`, name, phase: 'group', sortOrder: index,
-    groupTeams: [{ id: `gt-${index}`, registrationId: `r-${index}`, teamId: index > 0 ? 'my-team' : 'other', teamName: name, teamLogoUrl: null, sortOrder: 0 }],
-  }));
-  renderBracketStandingsTab(makeTournament({ id: 'mine', status: 'in_progress', format: 'group_knockout', groups }));
-  if (loggedIn) expect(await screen.findAllByText('*) 우리팀이 속한 조에요')).toHaveLength(2);
-  else expect(screen.queryByText('*) 우리팀이 속한 조에요')).not.toBeInTheDocument();
-  const sections = screen.getAllByRole('region', { name: /^[ABC]조 순위$/ });
-  expect(sections.map((section) => section.getAttribute('aria-label'))).toEqual(loggedIn ? ['B조 순위', 'C조 순위', 'A조 순위'] : ['A조 순위', 'B조 순위', 'C조 순위']);
-  window.localStorage.removeItem('teameet.v1.session');
+describe('BracketPageContent — 소속 팀 조 우선 표시', () => {
+  const server = setupServer(
+    http.get('*/api/v1/me/teams', () => HttpResponse.json({ status: 'success', data: { items: [{ teamId: 'my-team' }] } })),
+  );
+  afterEach(() => {
+    server.close();
+    vi.unstubAllEnvs();
+  });
+
+  it.each([true, false])('소속 팀이 있는 조만 상단에 모으고 표시한다 (로그인=%s)', async (loggedIn) => {
+    vi.stubEnv('NEXT_PUBLIC_API_URL', 'http://localhost/api/v1');
+    server.listen({ onUnhandledRequest: 'bypass' });
+    if (loggedIn) saveStoredV1Session({ userId: 'bracket-member' });
+    const groups = ['A조', 'B조', 'C조'].map((name, index) => makeGroup({
+      id: `group-${index}`, name, phase: 'group', sortOrder: index,
+      groupTeams: [{ id: `gt-${index}`, registrationId: `r-${index}`, teamId: index > 0 ? 'my-team' : 'other', teamName: name, teamLogoUrl: null, sortOrder: 0 }],
+    }));
+    renderBracketStandingsTab(makeTournament({ id: 'mine', status: 'in_progress', format: 'group_knockout', groups }));
+    if (loggedIn) expect(await screen.findAllByText('*) 우리팀이 속한 조에요')).toHaveLength(2);
+    else expect(screen.queryByText('*) 우리팀이 속한 조에요')).not.toBeInTheDocument();
+    const sections = screen.getAllByRole('region', { name: /^[ABC]조 순위$/ });
+    expect(sections.map((section) => section.getAttribute('aria-label'))).toEqual(loggedIn ? ['B조 순위', 'C조 순위', 'A조 순위'] : ['A조 순위', 'B조 순위', 'C조 순위']);
+    window.localStorage.removeItem('teameet.v1.session');
+  });
 });

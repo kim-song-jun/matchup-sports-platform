@@ -42,3 +42,7 @@ alpha는 dev 머지 후 변경을 반영하므로 PR 단계에서는 브라우�
 - 구현 완료. 타입 검사 및 패턴 검사 통과.
 - 어드민 그림 39개 + 공개 대진표 20개 테스트 통과. 사용자 순위/모바일 테스트 진행 중.
 - dev PR 생성 후 CI/Copilot 리뷰 확인. alpha 시각 검증은 머지 후 남음.
+- PR #1994 배포 준비: CI Web 실패는 새 조 정렬 테스트의 세션 설정 및 MSW 서버 미시작으로 확인.
+- `saveStoredV1Session`과 독립 MSW 서버 수명주기를 적용한 뒤 해당 파일 46/46 통과(WSL, worker 1).
+- 기존 Copilot 실행 39219602283은 `Model "claude-opus-5" is not available`로 세션 생성 실패. 최신 수정 push 후 재요청 결과 확인 필요. 외부 오류를 clean으로 간주하지 않는다.
+- 로컬 main/origin/main `132e95e5a`, dev/origin/dev `7a17ec825` 최신화. 충돌 WIP는 사용자 허용 후 `tmp/backups/pre-dev-sync-20261019-195629`에 보존.

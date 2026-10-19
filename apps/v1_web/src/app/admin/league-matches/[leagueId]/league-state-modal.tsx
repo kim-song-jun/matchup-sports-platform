@@ -41,7 +41,7 @@ export function leagueStateOptions(series: Pick<V1AdminLeagueDetail, 'state' | '
     switch (target) {
       case 'draft':
         if (state === 'completed') return '종료된 리그는 먼저 진행 중으로 돌린 뒤 바꿀 수 있어요.';
-        return startedGames ? '이미 시작한 경기가 있어 준비 중으로 돌릴 수 없어요. 멈추려면 보류를 써 주세요.' : null;
+        return startedGames ? '이미 시작한 경기가 있어 모집 마감으로 돌릴 수 없어요. 멈추려면 보류를 써 주세요.' : null;
       case 'active':
         return null;
       case 'on_hold':
@@ -56,6 +56,7 @@ export function leagueStateOptions(series: Pick<V1AdminLeagueDetail, 'state' | '
     if (state === 'on_hold' && target === holdRestore) return '보류를 풀고 보류 전 상태와 공개 설정으로 돌아가요.';
     switch (target) {
       case 'draft':
+        if (state === 'active') return '리그 시작을 취소하고 모집 마감으로 돌아가요. 대진·참가 팀은 그대로 남고, 참가 신청은 신청 마감 설정을 따라요.';
         // 신청 여부는 상태가 아니라 신청 마감이 정한다(isLeagueRegistrationOpen) — 준비 중으로 돌린다고 신청이 열리지 않는다.
         return '공개 화면에서 준비 중으로 보여요. 참가 신청은 상태와 관계없이 신청 마감까지 받아요.';
       case 'active':
@@ -93,6 +94,7 @@ export function LeagueStateModal({
   const [error, setError] = useState<string | null>(null);
   const { dialogRef, onBackdropClick } = useModalA11y<HTMLElement, HTMLDivElement>({ open: true, onClose, pending: changeState.isPending });
   const reasonRequired = target === 'on_hold';
+  const targetLabel = (state: V1LeagueStateValue) => series.state === 'active' && state === 'draft' ? '모집 마감' : STATE_LABEL[state];
   const canSubmit = target !== null && (!reasonRequired || reason.trim().length > 0);
 
   const submit = () => {
@@ -102,7 +104,7 @@ export function LeagueStateModal({
       { state: target, reason: reason.trim() || undefined },
       {
         onSuccess: (result) => {
-          showToast(result.alreadyProcessed ? `이미 ${STATE_LABEL[result.state]} 상태예요.` : `리그를 ${STATE_LABEL[result.state]} 상태로 바꿨어요.`, 'success');
+          showToast(result.alreadyProcessed ? `이미 ${targetLabel(result.state)} 상태예요.` : `리그를 ${targetLabel(result.state)} 상태로 바꿨어요.`, 'success');
           onClose();
         },
         onError: (err) => setError(extractErrorMessage(err, '리그 상태를 바꾸지 못했어요.')),
@@ -147,7 +149,7 @@ export function LeagueStateModal({
                 />
                 <span className="min-w-0">
                   <span className="block text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-strong)]">
-                    {series.state === 'on_hold' && !disabled ? `보류 해제 → ${STATE_LABEL[option.state]}` : STATE_LABEL[option.state]}
+                    {series.state === 'on_hold' && !disabled ? `보류 해제 → ${STATE_LABEL[option.state]}` : targetLabel(option.state)}
                   </span>
                   <span className="mt-0.5 block text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
                     {option.disabledReason ?? option.description}

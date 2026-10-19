@@ -80,10 +80,13 @@ endpoints below instead of adding new ones:
 - `active` from `completed` → revert completion. `active` from `draft` (stored `draft`/`open`/`closed`)
   starts the league (stored `in_progress`, audit `league_match.start`). Before this, only fixture
   generation moved a league to active.
-- `draft` from `active` moves back to stored `draft` (audit `league_match.revert_to_draft`) only while no
+- `draft` from `active` returns to stored `closed` (모집 마감; compatible response state remains `draft`, audit `league_match.revert_to_draft`) only while no
   game has started (`LIVE`/`PAUSED`/`ENDED`); otherwise `409 LEAGUE_HAS_STARTED_GAMES`. `draft` from
   `completed` returns `409 LEAGUE_NOT_ACTIVE` (revert to active first).
 - Asking for the current state returns `alreadyProcessed: true`.
+
+The admin modal labels the `active` → `draft` target 모집 마감. Fixtures, teams, publication and registration deadline remain unchanged;
+registration availability still follows the deadline independently. The league can be explicitly started again with `active`.
 
 Returns `{ leagueId, state, alreadyProcessed }`. The individual `hold`/`resume`/`complete`/`revert-completion`
 endpoints stay for compatibility.

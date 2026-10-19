@@ -1,6 +1,6 @@
 # Task 20261090: 신규 리그 모집 마감·명시적 시작과 기존 데이터 호환성
 
-Status: In Progress (draft PR #1990; CI and Alpha QA pending)
+Status: In Progress (draft PR #1990; Alpha QA pending; current CI tracked in PR checks)
 **Created**: 2026-10-18
 **Canonical branch**: `audit/league-state-consistency` (base `origin/dev` d51227083; prior implementation: PR #1977 and #1988)
 **Canonical worktree**: `_worktrees/league-state-audit`
@@ -232,3 +232,11 @@ UI는 사용자가 승인한 기존 대회 방식이며 기존 헤더 Button·�
 - docs 전용 계약 트리 스크립트는 마이그레이션 plan 입력을 요구해 일반 문서 lint로 실행할 수 없었다. PASS로 계산하지 않으며 도메인/README/global-contract/디자인 결정과 링크를 직접 대조했다. DB integration·새 Alpha UI 캡처·외부 리뷰/CI는 아직 성공 증거가 없다.
 
 - [PR #1990](https://github.com/kim-song-jun/matchup-sports-platform/pull/1990), base=dev·draft 확인. 검증한 코드 cursor는 f31477c5d이며 후속 변경은 이 작업 문서의 진행 상태뿐이다. 코드·회귀는 261개와 양쪽 정적 검사로 검증했고, CI/외부 리뷰·Alpha 화면은 미완료이므로 PR-ready·배포 완료로 보고하지 않는다. 운영 DB·main·무관한 공유 WIP 변경 없음.
+
+### 2026-10-19: PR #1990 정리·Web CI 보완
+- 사용자 요청: 해당 PR을 정리한다. Owned: 실패한 Web 테스트 3개와 본 task. 기능 코드·API·스키마·배포 정책은 이번 보완에서 변경하지 않는다.
+- CI baseline b5e2b7cac / run 39189672045: Gates·API SUCCESS, Web FAILURE. API 실제 DB integration 170 suites/1252 PASS·3 skipped(신규 목록 필터 회귀 포함), unit 430 suites/6580 PASS, migration 전체 replay·zero drift PASS다. 이전 항목의 DB CI 대기는 이 증거로 대체한다.
+- Web 원인 9건/3파일: 정원 소비자 카드의 이전 모집 중/마감 기대값 4건, 시즌 티어 공통 pill mock 누락 4건, 참가 명단 페이지의 이전 진행 문구 기대값 1건. 정원·신청 차단 검증은 유지하며 상태 표시 기대값만 최종 4상태 계약에 맞췄다.
+- 시즌 티어 mock은 실제 AdminLeagueStatePill을 사용하는 partial mock으로 보완하고, 실제 화면에 네 상태 라벨이 모두 보이는 회귀 1건을 추가했다. 단순 placeholder 컴포넌트로 통과시키지 않았다.
+- 로컬 좁은 재검증: 해당 3개 파일 97/97 PASS, 최소 worker 1, 정상 exit 0. diff --check·후속 touched path debt marker PASS. 기존 225개와 중복 없는 추가 검증이며 전체 테스트/빌드/타입 반복 실행은 CI에 맡긴다.
+- 최신 CI/외부 리뷰 상태는 [PR Checks](https://github.com/kim-song-jun/matchup-sports-platform/pull/1990/checks)에서 추적하고 PR 본문에 반영한다. Alpha 수동 화면 검증은 여전히 0/3이며 초안·미머지·미배포 상태다.

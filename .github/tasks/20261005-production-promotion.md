@@ -11,8 +11,10 @@ This snapshot supersedes the 2026-10-18 approval and release-baseline notes belo
 - Owned isolated worktree `_worktrees/pr1979-refresh`, branch `fix/pr1979-refresh`; update existing remote `chore/release-version-20261018` by normal fast-forward push. Shared worktrees, main mutation and production approval are excluded.
 - Phase 1 complete: merge preparation ancestry into latest dev, restore release inputs from dev 1.9.10 to avoid double versioning, then absorb main ancestry. Twelve main conflicts reviewed: team metadata/tests retain actual local emblems, tournament detail retains current league capacity/navigation, schema bindings retain current schema plus historical hashes, API docs retain current contracts, SEO task retains deployed main evidence already recorded on dev.
 - Exact index comparison proves application, deployment, release scripts, API docs and SEO task are byte-identical to latest dev after integration. No new runtime or DB change is introduced by this refresh.
-- Phase 2 in progress: official Changesets regeneration from all latest pending changes; preserve both production changelogs and fixed API/Web versions.
-- Phase 3 pending: release policy, committed-tree diff, current-head CI/review, preparation PR update. New dev CI/Alpha must pass after any eventual merge.
+- Phase 2 complete: official Changesets CLI 2.30.0 via prepare-only regenerated both apps from 1.9.10 to 1.10.0, consuming all 28 pending Changesets; production release history preserved. The explicit alpha baseline was origin/dev (runtime-identical to the integration tree). Release promotion gate and diff whitespace PASS.
+- Phase 3 in progress: publish the reviewed release-only diff to existing PR #1979; current-head CI/review pending. New dev CI/Alpha must pass after any eventual merge.
+- Baseline evidence: current dev Alpha deployment SUCCESS, public HTTP 200, exact commit 1f708958c and DB=true. Source 1.10.0 with zero pending Changesets resolves to a 1.10.1 artifact under the existing resolver.
+- Validation scope: final runtime/DB/API documentation trees identical to dev; only release metadata and this task differ. No new UI screenshots or duplicate local full test suites; exact committed-head CI owns tests/typecheck/build. Temporary official jq 1.7.1 binary checksum verified; no global install.
 - Final dev-to-main PR creation/merge and production environment approval remain user-operated under CLAUDE.md. No production promotion is performed by this preparation.
 
 ## Current preparation — 2026-10-18

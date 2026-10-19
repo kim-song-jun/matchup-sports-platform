@@ -1425,6 +1425,8 @@ describe('진행 중인 정규 리그의 공개 상단 진입', () => {
     (registrationStatus) => {
       const tournament = makeTournament({
         id: 'league-live', status: 'in_progress', format: 'group_knockout', kind: 'regular_league',
+        leagueFixtures: [{ teamMatchId: 'today', title: '1R', homeTeamId: 'a', awayTeamId: 'b',
+          startAt: new Date().toISOString(), placeName: '구장', status: 'matched' }],
       });
       render(createElement(TournamentDetailView, {
         tournament,

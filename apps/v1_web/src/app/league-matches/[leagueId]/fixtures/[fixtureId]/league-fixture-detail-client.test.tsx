@@ -262,7 +262,7 @@ describe('LeagueFixtureDetailClient', () => {
     expect(screen.getByRole('link', { name: /왕십리 유나이티드 팀 상세로 이동/ })).toHaveAttribute('href', '/teams/t2?from=%2Fleague-matches%2Flg-1%2Ffixtures%2Ffx-1');
     expect(screen.getByText('1위 · 1승 1무 0패')).toBeInTheDocument();
     // F59 — 리그 상태와 경기 상태를 대상이 적힌 칩 둘로 가른다. 대상 없는 "진행 중"은 남지 않는다.
-    expect(screen.getByText('리그 · 진행 중')).toBeInTheDocument();
+    expect(screen.getByText('리그 · 시즌 진행 중')).toBeInTheDocument();
     expect(screen.getByText('경기 · 예정')).toBeInTheDocument();
     expect(screen.queryByText('진행 중')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: '가을 리그' })).toHaveAttribute('href', '/tournaments/lg-1');

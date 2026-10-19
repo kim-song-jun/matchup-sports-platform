@@ -5,7 +5,7 @@ import { leagueStateChip } from './competition-status';
 describe('리그 표시 상태는 네 가지로 통일한다', () => {
   it.each([
     ['draft', '모집완료'], ['open', '모집완료'], ['closed', '모집완료'],
-    ['in_progress', '진행 중'], ['on_hold', '보류'],
+    ['in_progress', '시즌 진행 중'], ['on_hold', '보류'],
     ['completed', '종료'], ['cancelled', '종료'],
   ])('%s 저장 상태를 %s로 표시한다', (status, label) => {
     expect(getLeagueStatusConfig(status).label).toBe(label);

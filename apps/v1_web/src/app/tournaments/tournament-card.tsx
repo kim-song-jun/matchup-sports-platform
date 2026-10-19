@@ -121,7 +121,7 @@ export function TournamentCard({
     ? { ...getTournamentStatusConfig('closed'), label: '모집 마감' }
     : item.status === 'open' && !registrationBlocked && isNearlyFull
       ? { badgeClass: 'tm-badge-orange', label: '거의 마감' }
-      : getTournamentStatusConfig(item.status, registrationBlocked);
+      : getTournamentStatusConfig(item.status, registrationBlocked, item.kind === 'regular_league');
   // 커버가 없는 대회도 홍보용으로 등록한 실사진이 있으면 아이콘 대신 그 사진을 썸네일로
   // 재사용한다 (셋 다 없으면 종목색 그라디언트+아이콘 폴백).
   const thumbnailImageUrl = resolveTournamentImage(item, 'cover');

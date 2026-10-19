@@ -54,6 +54,19 @@ function buildItem(overrides: Partial<V1TournamentListItem> = {}): V1TournamentL
   };
 }
 
+describe('TournamentCard — 리그와 대회의 진행 상태', () => {
+  it.each([
+    ['regular_league', 'group_knockout', '시즌 진행 중'],
+    ['regular_tournament', 'league', '진행 중'],
+    ['regular_tournament', 'knockout', '진행 중'],
+  ] as const)('%s/%s 카드에는 %s을 표시해요', (kind, format, label) => {
+    const item = buildItem({ kind, format, status: 'in_progress' });
+    render(<TournamentCard item={item} />);
+    expect(screen.getByText(label, { exact: true })).toBeInTheDocument();
+    expect(screen.getByRole('link')).toHaveAccessibleName(`${item.title} — 풋살 — ${label}`);
+  });
+});
+
 describe('TournamentCard — 신청 마감 계약', () => {
   const deadline = '2026-10-08T00:00:00.000Z';
 

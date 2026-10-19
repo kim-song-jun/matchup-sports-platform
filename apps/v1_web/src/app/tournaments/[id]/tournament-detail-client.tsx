@@ -76,6 +76,7 @@ import type {
   V1TournamentStatus,
 } from '@/types/api';
 import { rosterLimitText } from '@/lib/roster-limit';
+import { DAY_MS, kstMidnightMs, toKstDateString } from '@/lib/kst-calendar';
 
 export { getParticipantTeamBuckets } from '@/components/tournaments/tournament-event-hub-sections';
 
@@ -117,7 +118,8 @@ export function getBracketEntryCtaLabel(
   /**
    * **정규 리그 시즌인가(`kind === 'regular_league'`).** 리그엔 대진표가 없어 대회 문구가
    * 그대로 거짓이 된다. 2026-09-01 사용자 확정 — 리그 문구는 상태별로
-   * '진행 중인 리그 보기' / '최종 순위 보기' / '일정 보기' 이고, **대회 문구는 그대로 둔다.**
+   * 경기 당일에만 '진행 중인 리그 보기', 그 외 진행 중에는 '일정 보기'다.
+   * 종료 후에는 '최종 순위 보기'이고, 대회 문구는 그대로 둔다.
    *
    * ⚠️ `isLeagueCompetition` 으로 묻지 않는다 — 그건 `format === 'league'` 인 리그 방식
    * **대회**(alpha 62건 중 7건)도 true 라 그 대회들의 문구까지 바꾼다.
@@ -127,10 +129,11 @@ export function getBracketEntryCtaLabel(
    * 조용히 새어 나온다.
    */
   isRegularLeague = false,
+  isMatchDay = false,
 ): string | null {
   switch (status) {
     case 'in_progress':
-      return isRegularLeague ? '진행 중인 리그 보기' : '진행 중인 대회 보기';
+      return isRegularLeague ? (isMatchDay ? '진행 중인 리그 보기' : '일정 보기') : '진행 중인 대회 보기';
     case 'completed':
       return isRegularLeague ? '최종 순위 보기' : '경기 결과 · 대진표 보기';
     case 'open':
@@ -425,11 +428,43 @@ export function ApplyCTA({
 /* ── Unified bracket-entry CTA — 모바일 진행 입구는 상단, 데스크톱은 우측 레일에 표시.
    일반 대회는 mobile/tablet 상단 진입과 desktop sticky rail을 사용한다. ── */
 
-function BracketEntryCtaButton({ tournament }: { tournament: V1TournamentDetail }) {
+/** 시즌 상태와 경기 당일은 다르다. 해외 접속도 한국 달력의 날짜로 판정한다. */
+export function isTournamentEntryLive(tournament: V1TournamentDetail, today: string): boolean {
+  if (tournament.status !== 'in_progress') return false;
+  if (tournament.kind !== 'regular_league') return true;
+  return tournament.leagueFixtures.some((fixture) => {
+    if (fixture.status === 'cancelled' || fixture.gameState === 'CANCELLED') return false;
+    const startAt = new Date(fixture.startAt);
+    return Number.isFinite(startAt.getTime()) && toKstDateString(startAt) === today;
+  });
+}
+
+function useKstToday(): string {
+  const [today, setToday] = useState(() => toKstDateString(new Date()));
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const refresh = () => {
+      clearTimeout(timer);
+      const now = new Date();
+      const date = toKstDateString(now);
+      setToday(date);
+      timer = setTimeout(refresh, kstMidnightMs(date) + DAY_MS - now.getTime());
+    };
+    refresh();
+    // 백그라운드 탭에서 타이머가 지연돼도 돌아오는 즉시 갱신한다.
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, []);
+  return today;
+}
+
+function BracketEntryCtaButton({ tournament, isLive }: { tournament: V1TournamentDetail; isLive: boolean }) {
   const childHref = useChildHref();
-  const label = getBracketEntryCtaLabel(tournament.status, tournament.kind === 'regular_league');
+  const label = getBracketEntryCtaLabel(tournament.status, tournament.kind === 'regular_league', isLive);
   if (!label) return null;
-  const isLive = tournament.status === 'in_progress';
 
   return (
     <Link
@@ -624,6 +659,8 @@ export function TournamentDetailView({
   const reservedTeamCount = capacity.reservedCount;
   // kind에 따라 리그 maxTeams와 대회 teamCount를 고르며, 무제한 리그에 거울 정원을 노출하지 않아요.
   const isLeagueMirror = tournament.kind === 'regular_league';
+  const today = useKstToday();
+  const isEntryLive = isTournamentEntryLive(tournament, today);
   const showsCapacity = teamCapacity !== null;
   /* 리그는 운영자가 참가비를 확정했을 때만 그린다(0원 '무료 확정' 포함). 미설정 리그의
      `entry_fee` 는 `@default(0)` 이라 그리면 사실이 아닌 "무료" 가 뜬다. */
@@ -632,7 +669,7 @@ export function TournamentDetailView({
      판정을 공유한다. status만 보던 예전 로직은 신청 마감이 지난 open 대회에서도
      '참가 신청하기'를 활성으로 그렸다. */
   const registrationBlock = resolveTournamentRegistrationBlock(tournament);
-  const status = getTournamentStatusConfig(tournament.status, registrationBlock !== null);
+  const status = getTournamentStatusConfig(tournament.status, registrationBlock !== null, isLeagueMirror);
   const prizeText = tournament.prizeSummary?.trim() ?? '';
   const genderCategoryLabel = getGenderCategoryLabel(tournament.genderCategory);
   const genderQuotaLabel = getGenderQuotaLabel(tournament);
@@ -693,7 +730,7 @@ export function TournamentDetailView({
      railCTA가 대신한다. [P2] 페이지 맨 끝에 같은 CTA(같은 href /bracket)를 하나 더
      두고 IntersectionObserver로 서로 안 겹치게 껐었는데, 하단 CTA를 없애 그 관측
      로직째로 지운다 — 오너 요구("CTA 동시 노출 금지")는 하나만 있으면 자동으로 지켜진다. */
-  const bracketCtaLabel = getBracketEntryCtaLabel(tournament.status, isLeagueMirror);
+  const bracketCtaLabel = getBracketEntryCtaLabel(tournament.status, isLeagueMirror, isEntryLive);
 
   /* ── Prize card — rendered in left column just after metric strip ── */
   // 상금 칩 분리: '/'·개행·콤마 구분 지원. 단 "600,000" 같은 천단위 콤마(양옆이 숫자)는
@@ -1272,11 +1309,11 @@ export function TournamentDetailView({
       </div>
     </aside>
     )
-  ) : tournament.status === 'in_progress' ? (
+  ) : isEntryLive ? (
     <aside className="tm-tournament-rail tm-show-desktop" role="complementary" aria-label={isLeagueMirror ? '리그 진행 상태' : '대회 진행 상태'}>
       {/* Live CTA */}
       <Link
-        aria-label={isLeagueMirror ? getBracketEntryCtaLabel(tournament.status, true) ?? undefined : undefined}
+        aria-label={isLeagueMirror ? bracketCtaLabel ?? undefined : undefined}
         href={childHref(`/tournaments/${tournament.id}/bracket`)}
         style={{
           display: 'flex', alignItems: 'center', gap: 12,
@@ -1292,7 +1329,7 @@ export function TournamentDetailView({
           <span style={{ fontSize: 'var(--font-size-caption)', fontWeight: 800, color: '#fff', letterSpacing: '0.02em' }}>LIVE</span>
         </span>
         {/* 라벨: getBracketEntryCtaLabel과 단일 소스 — 모바일 상단/하단 CTA와 동일 문구("진행 중인 대회 보기")를 쓴다. */}
-        <span style={{ flex: 1, fontSize: 'var(--font-size-body-lg)', fontWeight: 800, color: '#fff', letterSpacing: '-0.01em' }}>{getBracketEntryCtaLabel(tournament.status, isLeagueMirror)}</span>
+        <span style={{ flex: 1, fontSize: 'var(--font-size-body-lg)', fontWeight: 800, color: '#fff', letterSpacing: '-0.01em' }}>{bracketCtaLabel}</span>
         <ChevronRight size={17} strokeWidth={2.5} style={{ color: 'rgba(255,255,255,0.65)', flexShrink: 0 }} aria-hidden="true" />
       </Link>
       {nextLeagueInvite}
@@ -1322,12 +1359,14 @@ export function TournamentDetailView({
       </div>
       {leagueApplicationCta}
     </aside>
-  ) : tournament.status === 'closed' ? (
-    /* closed(모집 마감·시작 전="예정") — 예전엔 이 상태에서 데스크탑 레일이 비어
+  ) : tournament.status === 'closed' || (isLeagueMirror && tournament.status === 'in_progress') ? (
+    /* 경기 없는 날의 정규 리그도 일정 진입을 유지한다.
+       closed(모집 마감·시작 전="예정") — 예전엔 이 상태에서 데스크탑 레일이 비어
        있었다(모바일만 새 통합 CTA를 받고 데스크탑은 그대로면 반응형 불일치라 함께
        채운다). in_progress 레일과 동일 구조에서 LIVE 배지·강조색만 뺀 중립 톤. */
-    <aside className="tm-tournament-rail tm-show-desktop" role="complementary" aria-label="대진표·일정">
+    <aside className="tm-tournament-rail tm-show-desktop" role="complementary" aria-label={isLeagueMirror ? '리그 진행 상태' : '대진표·일정'}>
       <Link
+        aria-label={isLeagueMirror ? bracketCtaLabel ?? undefined : undefined}
         href={childHref(`/tournaments/${tournament.id}/bracket`)}
         style={{
           display: 'flex', alignItems: 'center', gap: 12,
@@ -1345,7 +1384,7 @@ export function TournamentDetailView({
         >
           <Goal size={16} color="var(--text-strong)" strokeWidth={2.2} />
         </span>
-        <span style={{ flex: 1, fontSize: 'var(--font-size-body-lg)', fontWeight: 800, color: 'var(--text-strong)', letterSpacing: '-0.01em' }}>{getBracketEntryCtaLabel(tournament.status, isLeagueMirror)}</span>
+        <span style={{ flex: 1, fontSize: 'var(--font-size-body-lg)', fontWeight: 800, color: 'var(--text-strong)', letterSpacing: '-0.01em' }}>{bracketCtaLabel}</span>
         <ChevronRight size={17} strokeWidth={2.5} style={{ color: 'var(--text-caption)', flexShrink: 0 }} aria-hidden="true" />
       </Link>
       {nextLeagueInvite}
@@ -1429,7 +1468,7 @@ export function TournamentDetailView({
         <div
           className="tm-tournament-detail-entry tm-hide-desktop"
         >
-          <BracketEntryCtaButton tournament={tournament} />
+          <BracketEntryCtaButton tournament={tournament} isLive={isEntryLive} />
         </div>
       ) : null}
 

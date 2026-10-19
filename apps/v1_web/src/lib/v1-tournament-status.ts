@@ -1,4 +1,5 @@
 import type { V1TournamentStatus } from '@/types/api';
+import { leagueStateLabel } from './v1-status-labels';
 
 export type TournamentStatusConfig = { badgeClass: string; label: string };
 
@@ -9,6 +10,7 @@ export type TournamentStatusConfig = { badgeClass: string; label: string };
 export function getTournamentStatusConfig(
   status: V1TournamentStatus,
   registrationBlocked = false,
+  isRegularLeague = false,
 ): TournamentStatusConfig {
   // open은 저장된 대회 단계라 마감일·정원으로 신청이 막혀도 그대로일 수 있다.
   // 화면의 기존 신청 게이트 결과를 받아 배지를 맞추되 진행·종료 단계는 유지한다.
@@ -21,7 +23,7 @@ export function getTournamentStatusConfig(
     case 'open':
       return { badgeClass: 'tm-badge-blue', label: '모집 중' };
     case 'in_progress':
-      return { badgeClass: 'tm-badge-green', label: '진행 중' };
+      return { badgeClass: 'tm-badge-green', label: isRegularLeague ? leagueStateLabel('active') : '진행 중' };
     case 'completed':
       return { badgeClass: 'tm-badge-grey', label: '종료' };
     case 'closed':

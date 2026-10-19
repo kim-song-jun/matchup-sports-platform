@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render as rtlRender, screen, within } from '@testing-library/react';
+import { act, render as rtlRender, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApplyCTA, TournamentDetailView, getBracketEntryCtaLabel } from './tournament-detail-client';
 import type { V1TournamentDetail, V1TournamentGroup, V1TournamentRegistration, V1TournamentStatus } from '@/types/api';
@@ -125,7 +125,8 @@ function makeGroup(overrides: Partial<V1TournamentGroup> & Pick<V1TournamentGrou
  */
 describe('getBracketEntryCtaLabel — 정규 리그 문구', () => {
   it('in_progress: 진행 중인 리그 보기', () => {
-    expect(getBracketEntryCtaLabel('in_progress', true)).toBe('진행 중인 리그 보기');
+    expect(getBracketEntryCtaLabel('in_progress', true, true)).toBe('진행 중인 리그 보기');
+    expect(getBracketEntryCtaLabel('in_progress', true, false)).toBe('일정 보기');
   });
 
   it('completed: 최종 순위 보기 — 리그엔 대진표가 없다', () => {
@@ -180,7 +181,74 @@ describe('getBracketEntryCtaLabel — 상태별 통합 진입 CTA 문구', () =>
   });
 });
 
+describe('정규 리그 LIVE — 한국 시간 경기 당일', () => {
+  afterEach(() => vi.useRealTimers());
+
+  function league(startAt: string | null, status = 'matched', gameState?: 'CANCELLED') {
+    return makeTournament({
+      id: 'league-day', status: 'in_progress', format: 'group_knockout', kind: 'regular_league',
+      leagueFixtures: startAt === null ? [] : [{
+        teamMatchId: 'fixture-day', title: '1R', homeTeamId: 'a', awayTeamId: 'b',
+        startAt, status, gameState, placeName: '구장',
+      }],
+    });
+  }
+
+  it.each([
+    ['2026-10-19T14:59:59.000Z', true], // KST 19일 23:59
+    ['2026-10-19T15:00:00.000Z', false], // KST 20일 00:00
+    ['2026-10-18T15:00:00.000Z', true], // KST 19일 00:00
+    ['2026-10-18T14:59:59.000Z', false],
+    [null, false],
+    ['invalid', false],
+  ])('경기 시각 %s: 모바일·데스크톱 LIVE %s', (startAt, live) => {
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-19T03:00:00Z') });
+    render(<TournamentDetailView tournament={league(startAt)} myRegistration={null} />);
+    expect(screen.queryAllByText('LIVE')).toHaveLength(live ? 2 : 0);
+    expect(screen.getAllByRole('link', { name: live ? '진행 중인 리그 보기' : '일정 보기' })).toHaveLength(2);
+    for (const link of screen.getAllByRole('link', { name: live ? '진행 중인 리그 보기' : '일정 보기' })) {
+      expect(link).toHaveAttribute('href', '/tournaments/league-day/bracket');
+    }
+  });
+
+  it.each([['cancelled', undefined], ['matched', 'CANCELLED']] as const)(
+    '당일 경기라도 취소 상태 %s/%s이면 LIVE를 표시하지 않는다', (status, gameState) => {
+      vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-19T03:00:00Z') });
+      render(<TournamentDetailView tournament={league('2026-10-19T05:00:00Z', status, gameState)} myRegistration={null} />);
+      expect(screen.queryByText('LIVE')).not.toBeInTheDocument();
+      expect(screen.getAllByRole('link', { name: '일정 보기' })).toHaveLength(2);
+    },
+  );
+
+  it('열린 화면도 한국 자정에 LIVE로 바뀌고 다음 자정에 일정 보기로 돌아온다', () => {
+    vi.useFakeTimers({ now: new Date('2026-10-18T14:59:59Z') });
+    const schedule = vi.spyOn(globalThis, 'setTimeout');
+    const cancel = vi.spyOn(globalThis, 'clearTimeout');
+    const { unmount } = render(<TournamentDetailView tournament={league('2026-10-19T05:00:00Z')} myRegistration={null} />);
+    expect(screen.queryByText('LIVE')).not.toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(1000));
+    expect(screen.getAllByText('LIVE')).toHaveLength(2);
+    act(() => vi.advanceTimersByTime(24 * 60 * 60 * 1000));
+    expect(screen.queryByText('LIVE')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: '일정 보기' })).toHaveLength(2);
+    const midnightCall = schedule.mock.calls.findLastIndex(([, delay]) => delay === 24 * 60 * 60 * 1000);
+    const midnightTimer = schedule.mock.results[midnightCall].value;
+    unmount();
+    expect(cancel).toHaveBeenCalledWith(midnightTimer);
+    schedule.mockRestore();
+    cancel.mockRestore();
+  });
+});
+
 describe('TournamentDetailView — 통합 CTA가 실제 화면에 상태별로 반영된다', () => {
+  it.each([
+    ['regular_league', '시즌 진행 중'],
+    ['regular_tournament', '진행 중'],
+  ] as const)('%s 상세의 상태 배지는 %s이다', (kind, label) => {
+    const tournament = makeTournament({ id: 'status-label', status: 'in_progress', format: 'knockout', kind });
+    render(<TournamentDetailView tournament={tournament} myRegistration={null} />);
+    expect(screen.getByText(label, { exact: true })).toBeInTheDocument();
+  });
   it('in_progress 대회는 화면에 "진행 중인 대회 보기" CTA를 보여준다', () => {
     const tournament = makeTournament({ id: 't-live', status: 'in_progress', format: 'knockout' });
     render(<TournamentDetailView tournament={tournament} myRegistration={null} />);

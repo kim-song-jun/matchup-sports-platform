@@ -202,6 +202,16 @@ export class TournamentCompetitionConfig {
     return this.changeWithKinds(user, tournamentId, dto, TOURNAMENT_KINDS);
   }
 
+  /** Compose config repinning with other tournament mutations in one transaction. */
+  async changeInTransaction(
+    transaction: Prisma.TransactionClient,
+    user: V1AuthUser,
+    tournamentId: string,
+    dto: ChangeTournamentCompetitionConfigDto,
+  ) {
+    return this.changeWithKinds(user, tournamentId, dto, TOURNAMENT_KINDS, transaction);
+  }
+
   /**
    * The repair runner is an internal, all-competition-kind operation. Keep it
    * separate from the public tournament PATCH so regular leagues cannot gain
@@ -220,9 +230,11 @@ export class TournamentCompetitionConfig {
     tournamentId: string,
     dto: ChangeTournamentCompetitionConfigDto,
     allowedKinds: readonly V1CompetitionKind[],
+    transaction?: Prisma.TransactionClient,
   ) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
-    const tournament = await findTournamentOnSurface(this.prisma, allowedKinds, {
+    const db = transaction ?? this.prisma;
+    const tournament = await findTournamentOnSurface(db, allowedKinds, {
       where: { id: tournamentId, deletedAt: null },
       include: { sport: true },
     });
@@ -238,7 +250,7 @@ export class TournamentCompetitionConfig {
         message: '대회 설정이 다른 요청에서 변경됐어요. 다시 확인해 주세요.',
       });
     }
-    const selected = await this.prisma.v1CompetitionConfigVersion.findUnique({
+    const selected = await db.v1CompetitionConfigVersion.findUnique({
       where: { id: dto.competitionConfigVersionId },
     });
     if (!selected) {
@@ -256,7 +268,7 @@ export class TournamentCompetitionConfig {
 
     const effectivePreviewHash = selected.contentHash;
 
-    const updated = await this.prisma.$transaction(async (tx) => {
+    const applyChange = async (tx: Prisma.TransactionClient) => {
       // Match creators use the same tournament advisory key and then lock
       // canonical rows before reading their game state. Keep this lock order
       // stable (tournament -> Game id -> TeamMatch id) so a config change
@@ -311,7 +323,8 @@ export class TournamentCompetitionConfig {
         impact,
         teamMatchesRepointed,
       };
-    });
+    };
+    const updated = transaction ? await applyChange(transaction) : await this.prisma.$transaction(applyChange);
     if (!updated.changed) return updated;
     return {
       changed: true,

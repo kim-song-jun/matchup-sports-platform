@@ -57,6 +57,18 @@ async function fillForm() {
 }
 
 describe('MD-QA145 리그 생성의 실제 HTTP 참가팀 정원 계약', () => {
+  it('PR1992: 선택한 두 팀보다 작은 정원은 제출을 막고 정원을 늘리면 실제 생성 요청을 보낸다', async () => {
+    await fillForm();
+    const capacity = screen.getByLabelText(/^참가팀 정원/);
+    fireEvent.change(capacity, { target: { value: '1' } });
+    expect(screen.getByRole('button', { name: '리그 만들기' })).toBeDisabled();
+    expect(capacity).toHaveAttribute('aria-invalid', 'true');
+    expect(submitted).toBeUndefined();
+    fireEvent.change(capacity, { target: { value: '2' } });
+    fireEvent.click(screen.getByRole('button', { name: '리그 만들기' }));
+    await waitFor(() => expect(submitted).toMatchObject({ maxTeams: 2, teamIds: ['team-0', 'team-1'] }));
+  });
+
   it.each([2, 60, 2147483647])('참가팀 정원 %i팀을 선수 정원과 별개로 POST한다', async (maxTeams) => {
     // Given: 참가팀을 선택한 실제 생성 폼과 팀당 선수 제한이 있어요.
     await fillForm();

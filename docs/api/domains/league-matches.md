@@ -3,6 +3,15 @@
 League creation is exposed under `/api/v1/admin/league-matches` and public
 league reads under `/api/v1/league-matches`.
 
+Creation validates a non-null `maxTeams` against the number of distinct selected `teamIds`
+before opening its write transaction. A smaller capacity returns
+`422 LEAGUE_CAPACITY_BELOW_TEAM_COUNT`; no league or registration is created. The creation form
+uses the same lower bound and preserves the unlimited (`null`) option.
+
+The explicit-start lifecycle also protects result draft creation and submission, including
+platform operations actors: pre-start `draft/open/closed` returns `409 LEAGUE_NOT_STARTED`.
+See the [game result gate](./games.md#explicit-start-league-result-gate-2026-10-19).
+
 
 ## League display states (2026-10-19)
 

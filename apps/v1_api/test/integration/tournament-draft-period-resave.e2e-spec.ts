@@ -5,6 +5,7 @@ import { ManagedTermsRuntimeService } from '../../src/terms/managed-terms-runtim
 import { seedCompetitionConfigVersions } from '../../src/tournaments/competition-config/competition-config-backfill';
 import { FUTSAL_V1_CONFIG } from '../../src/tournaments/competition-config/competition-config.presets';
 import { createV1IntegrationApp } from './integration-app';
+import { holdRowLock } from '../team-schedules/helpers/lock-barrier';
 
 const ownerId = '14420000-0000-4000-8000-000000000001';
 
@@ -30,6 +31,43 @@ describe('Tournament draft custom periods survive HTTP re-save', () => {
   });
 
   afterAll(async () => cleanupApp?.());
+
+  it('PR1992: 조 생성과 형식·라인업 변경이 경합해 거부되면 대회 설정도 그대로다', async () => {
+    const created = await request(app.getHttpServer()).post('/api/v1/admin/tournaments')
+      .set('x-v1-user-id', ownerId).send({ sportId, title: '형식·라인업 원자성', format: 'knockout', teamCount: 8, lineupMaxPlayers: 5 }).expect(201);
+    const id: string = created.body.data.id;
+    const before = await prisma.v1Tournament.findUniqueOrThrow({ where: { id } });
+    let holderPid = 0;
+    const holder = await holdRowLock(prisma, async tx => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`league-fixture-generation:${id}`}, 0))`;
+      const rows = await tx.$queryRaw<Array<{ pid: number }>>`SELECT pg_backend_pid() AS pid`;
+      holderPid = rows[0].pid;
+    }, async tx => {
+      await tx.v1TournamentGroup.create({ data: { tournamentId: id, name: '동시에 생성된 조' } });
+    });
+    const pending = request(app.getHttpServer()).patch(`/api/v1/admin/tournaments/${id}`)
+      .set('x-v1-user-id', ownerId).send({ expectedVersion: before.updatedAt.toISOString(), format: 'league', lineupMaxPlayers: 6 }).then(response => response);
+    try {
+      const deadline = Date.now() + 5000;
+      let blocked = false;
+      while (Date.now() < deadline) {
+        const rows = await prisma.$queryRaw<Array<{ waiting: number }>>`
+          SELECT count(*)::int AS waiting FROM pg_stat_activity
+          WHERE datname = current_database() AND ${holderPid}::int = ANY(pg_blocking_pids(pid))`;
+        if ((rows[0]?.waiting ?? 0) > 0) { blocked = true; break; }
+        await new Promise(resolve => setTimeout(resolve, 20));
+      }
+      expect(blocked).toBe(true);
+    } finally {
+      await holder.release();
+    }
+    const rejected = await pending;
+    expect(rejected.status).toBe(409);
+    expect(rejected.body.code).toBe('TOURNAMENT_FORMAT_LOCKED');
+    const after = await prisma.v1Tournament.findUniqueOrThrow({ where: { id } });
+    expect(after).toMatchObject({ format: before.format, competitionConfigVersionId: before.competitionConfigVersionId, updatedAt: before.updatedAt });
+    expect(await prisma.v1AdminActionLog.count({ where: { targetId: id, action: 'tournament.competition_config.change' } })).toBe(0);
+  });
 
   it('retries the full wizard payload including sportId and preserves saved custom periods with CAS', async () => {
     const payload = {

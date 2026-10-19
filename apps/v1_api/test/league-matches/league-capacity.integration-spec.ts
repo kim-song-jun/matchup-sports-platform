@@ -14,6 +14,19 @@ describe('MD-QA #145 — 참가팀 정원의 실제 HTTP/PostgreSQL 계약', () 
   });
   afterAll(async () => cleanup?.());
 
+  it('PR1992: 생성 정원은 선택한 서로 다른 팀 수보다 작으면 입력 오류로 거부한다', async () => {
+    const teams = [await h.makeTeam('초기 정원 A'), await h.makeTeam('초기 정원 B')];
+    const title = `생성 정원 하한 ${teams[0].id}`;
+    const response = await h.http().post('/api/v1/admin/league-matches').set('x-v1-user-id', h.adminUserId).send({
+      title, sportId: h.sportId, regionId: h.regionId,
+      startsOn: '2098-01-01T00:00:00.000Z', endsOn: '2098-12-31T00:00:00.000Z',
+      teamIds: teams.map(team => team.id), minPlayers: 1, maxPlayers: 20, maxTeams: 1,
+    });
+    expect(response.status).toBe(422);
+    expect(response.body.code).toBe('LEAGUE_CAPACITY_BELOW_TEAM_COUNT');
+    expect(await h.prisma.v1Tournament.count({ where: { title } })).toBe(0);
+  });
+
   it('생성·설정·관리/공개 readback은 같은 팀 정원을 쓰고 기존 선수 정원은 그대로다', async () => {
     // Given: separate three-team and twenty-player caps, with two seeded participants.
     const { leagueId } = await h.makeLeague(3);

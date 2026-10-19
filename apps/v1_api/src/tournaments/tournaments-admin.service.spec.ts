@@ -111,6 +111,7 @@ describe('TournamentsAdminService', () => {
     v1TournamentMatchDetails: { count: jest.Mock };
     v1TournamentGroup: { count: jest.Mock };
     $executeRaw: jest.Mock;
+    $queryRaw: jest.Mock;
     v1TournamentStanding: { count: jest.Mock };
     // 대회 종료 시 후기 요청 알림 수신자(참가 확정 팀의 owner/manager) 조회용.
     v1TournamentRegistration: { findMany: jest.Mock };
@@ -139,6 +140,7 @@ describe('TournamentsAdminService', () => {
       v1TournamentMatchDetails: { count: jest.fn().mockResolvedValue(0) },
       v1TournamentGroup: { count: jest.fn().mockResolvedValue(0) },
       $executeRaw: jest.fn().mockResolvedValue(1),
+      $queryRaw: jest.fn().mockResolvedValue([{ id: 'tournament-1' }]),
       v1TournamentRegistration: { findMany: jest.fn().mockResolvedValue([]) },
       v1TournamentStanding: { count: jest.fn() },
       $transaction: jest.fn(),
@@ -1752,10 +1754,9 @@ describe('TournamentsAdminService', () => {
     });
     prisma.v1Tournament.updateMany.mockResolvedValue({ count: 1 });
 
-    // change()가 실제로 커밋하면 그 트랜잭션이 Prisma @updatedAt으로 이 대회의 updatedAt을
-    // existing.updatedAt(TOURNAMENT_ROW_UPDATED_AT)과는 다른 새 값으로 이미 앞당긴다.
+    // 같은 트랜잭션의 설정 핀 쓰기도 Prisma @updatedAt을 갱신한다.
     const freshVersionAfterConfigChange = '2026-09-17T03:00:00.000Z';
-    const changeSpy = jest.spyOn(TournamentCompetitionConfig.prototype, 'change').mockResolvedValue({
+    const changeSpy = jest.spyOn(TournamentCompetitionConfig.prototype, 'changeInTransaction').mockResolvedValue({
       changed: true,
       currentCompetitionConfigVersionId: 'new-config-version-6',
       expectedVersion: freshVersionAfterConfigChange,
@@ -1768,6 +1769,7 @@ describe('TournamentsAdminService', () => {
     try {
       await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, lineupMaxPlayers: 6 });
       expect(changeSpy).toHaveBeenCalledWith(
+        prisma,
         ownerAuthUser,
         'tournament-1',
         expect.objectContaining({
@@ -1775,10 +1777,7 @@ describe('TournamentsAdminService', () => {
           expectedVersion: existing.updatedAt.toISOString(),
         }),
       );
-      // Copilot 리뷰 지적, 실제 결함으로 확인됨: 이 뒤에 이어지는 일반 필드 업데이트
-      // 트랜잭션이 여전히 existing.updatedAt(옛 값)을 CAS 기준으로 썼다면, change()가
-      // 방금 앞당긴 실제 행과 절대 일치하지 않아 같은 요청 안에서 스스로 409를 냈을 것이다
-      // — 반드시 change()가 돌려준 새 expectedVersion을 기준으로 원자적 갱신해야 한다.
+      // 후속 일반 필드 쓰기도 설정 핀이 발행한 새 버전으로 CAS해야 한다.
       expect(prisma.v1Tournament.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: 'tournament-1', updatedAt: new Date(freshVersionAfterConfigChange) },
@@ -1801,7 +1800,7 @@ describe('TournamentsAdminService', () => {
       contentHash: 'hash-6-new',
     });
 
-    const changeSpy = jest.spyOn(TournamentCompetitionConfig.prototype, 'change').mockResolvedValue({
+    const changeSpy = jest.spyOn(TournamentCompetitionConfig.prototype, 'changeInTransaction').mockResolvedValue({
       changed: false,
       currentCompetitionConfigVersionId: 'old-config-version',
       requestedCompetitionConfigVersionId: 'new-config-version-6',
@@ -1931,7 +1930,7 @@ describe('TournamentsAdminService', () => {
     });
     prisma.v1Tournament.updateMany.mockResolvedValue({ count: 1 });
     const createVersion = jest.spyOn(CompetitionConfigRegistry.prototype, 'createVersion');
-    const change = jest.spyOn(TournamentCompetitionConfig.prototype, 'change');
+    const change = jest.spyOn(TournamentCompetitionConfig.prototype, 'changeInTransaction');
     try {
       await expect(service.update(ownerAuthUser, 'tournament-1', {
         expectedVersion: TOURNAMENT_ROW_UPDATED_AT, title: '새 제목', lineupMaxPlayers: 6, substitutionMode: 'rolling',
@@ -1960,7 +1959,7 @@ describe('TournamentsAdminService', () => {
       expect(dto.config.lineup).not.toHaveProperty('formations');
       return { id: 'new-v1-pin', version: 2, contentHash: 'new-v1-hash' } as never;
     });
-    const change = jest.spyOn(TournamentCompetitionConfig.prototype, 'change').mockResolvedValue({
+    const change = jest.spyOn(TournamentCompetitionConfig.prototype, 'changeInTransaction').mockResolvedValue({
       confirmationRequired: false, expectedVersion: TOURNAMENT_ROW_UPDATED_AT,
     } as never);
     try {
@@ -2014,7 +2013,7 @@ describe('TournamentsAdminService', () => {
         version: 4,
         contentHash: 'hash-new',
       } as never);
-    const changeSpy = jest.spyOn(TournamentCompetitionConfig.prototype, 'change').mockResolvedValue({
+    const changeSpy = jest.spyOn(TournamentCompetitionConfig.prototype, 'changeInTransaction').mockResolvedValue({
       changed: true,
       currentCompetitionConfigVersionId: 'new-config-version',
       expectedVersion: new Date().toISOString(),

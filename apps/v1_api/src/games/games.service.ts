@@ -3702,6 +3702,7 @@ export class GamesService {
       },
       async (tx, game, context) => {
         await this.assertTeamMatchMatched(tx, game.teamMatchId);
+        this.assertExplicitLeagueStarted(await this.resolveTeamMatchCompetitionContext(tx, game.teamMatchId));
         if (isFriendlyTeamMatch) await this.assertFriendlyTeamMatchLineupsReady(tx, gameId, dto.actualParticipants.map((participant) => participant.participantId));
         // 친선 팀매치는 양 팀이 서로 다른 화면에서 명단을 관리하지만 결과 초안은
         // 호스트만 만든다. 클라이언트가 자기 팀 선수만 보내더라도 상대팀의 출전·승패
@@ -3837,6 +3838,7 @@ export class GamesService {
           });
         }
         await this.assertTeamMatchMatched(tx, game.teamMatchId);
+        this.assertExplicitLeagueStarted(await this.resolveTeamMatchCompetitionContext(tx, game.teamMatchId));
         if (isFriendlyTeamMatch) await this.assertFriendlyTeamMatchLineupsReady(tx, gameId);
         this.assertLifecycle(
           game.sourceType,
@@ -5103,12 +5105,7 @@ export class GamesService {
       if (game.teamMatchId === null) return;
       const competition = await this.resolveTeamMatchCompetitionContext(tx, game.teamMatchId);
       if (competition === null) return;
-      if (competition.isLeague && competition.requiresExplicitStart && ['draft', 'open', 'closed'].includes(competition.lifecycleStatus ?? '')) {
-        throw new ConflictException({
-          code: 'LEAGUE_NOT_STARTED',
-          message: '리그가 아직 시작되지 않았어요. 리그 관리에서 리그 시작하기를 먼저 눌러 주세요.',
-        });
-      }
+      this.assertExplicitLeagueStarted(competition);
       if (competition.status === V1TeamMatchStatus.cancelled) {
         throw new ConflictException({ code: 'TOURNAMENT_MATCH_CANCELLED', message: '취소된 대진이라 경기를 시작할 수 없어요.' });
       }
@@ -5141,6 +5138,15 @@ export class GamesService {
       throw new ConflictException({
         code: 'TOURNAMENT_MATCH_TEAMS_REQUIRED',
         message: '양 팀이 확정된 뒤 경기를 시작할 수 있어요.',
+      });
+    }
+  }
+
+  private assertExplicitLeagueStarted(competition: TeamMatchCompetitionContext | null): void {
+    if (competition?.isLeague && competition.requiresExplicitStart && ['draft', 'open', 'closed'].includes(competition.lifecycleStatus ?? '')) {
+      throw new ConflictException({
+        code: 'LEAGUE_NOT_STARTED',
+        message: '리그가 아직 시작되지 않았어요. 리그 관리에서 리그 시작하기를 먼저 눌러 주세요.',
       });
     }
   }

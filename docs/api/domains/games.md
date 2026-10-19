@@ -2,6 +2,16 @@
 
 # Game aggregate contract
 
+## Explicit-start league result gate (2026-10-19)
+
+For a regular league with `requiresExplicitStart=true`, stored lifecycle `draft`, `open`, or `closed`
+rejects both `POST /api/v1/games/:gameId/result-revisions` and
+`POST /api/v1/games/:gameId/result-revisions/:revisionId/submit` with `409 LEAGUE_NOT_STARTED`,
+including platform operations actors. The same lifecycle gate protects game start. Denied requests
+do not create/submit revisions or advance the Game version/state. Existing authorization,
+idempotency and expected-version checks remain in force. Legacy leagues with the flag false retain
+their existing automatic-start result flow.
+
 Participant roster navigation: authenticated team roster reads also include `registrationId` for active `TEAM_MANAGER`/`TEAM_MEMBER` viewers when their base is a confirmed participant registration. It identifies the existing participant-roster read route; `jerseyRegistrationId`/`jerseyEditable` retain their separate manager-only write semantics. Operators and teams using the team-member fallback receive null. The registration and player APIs still enforce team membership and redact other players' personal information for ordinary members.
 
 ## Public fixture detail compatibility

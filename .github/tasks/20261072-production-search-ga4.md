@@ -1,5 +1,11 @@
 # Task 20261072: 운영 검색 노출 및 홈 GA4 계측 정정
 
+## Active same-tab team-record cache refresh fix — 2026-10-19
+
+The later main PR #1985 review identified a separate same-tab boundary: an existing successful QueryClient entry remains fresh for the app-wide 60 seconds, overrides placeholder data and can prevent a request on return or filter-key selection. Only `usePublicTeamRecords` now has `staleTime: 0`, so the normal query lifecycle revalidates mounts and cached filter-key changes. Global cache policy and the server `no-store` fix remain unchanged.
+
+Three regressions with the actual production QueryClient reproduced zero API calls for a populated same-key cache with a seed, return without a seed, and a cached filter key selected without remounting. They require a real request and current redacted API response replacing the old data. Existing data remains visible while that request runs; this change does not claim instantaneous client-side redaction or add a custom hydration/cache layer. Exact CI, current PR review and deployed Alpha remain release gates.
+
 ## Active records visibility cache review fix — 2026-10-19
 
 The additional Codex Security review of main PR #1985 found that the new server-rendered records seed used the shared helper's five-minute Next Data Cache. The current API correctly excludes hidden games and redacts status-only scores/events, but cached first HTML could retain an earlier response. Both existing records-route requests (metadata and page seed) now explicitly use the helper's `no-store` option; other routes and client cache policies are unchanged.

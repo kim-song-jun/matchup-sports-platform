@@ -209,6 +209,20 @@ describe('공통 명단 관리의 실제 탭·저장 흐름', () => {
     expect(screen.queryByText(/등록 이름/)).not.toBeInTheDocument();
     expect(screen.getByLabelText('선출 여부')).toBeDisabled();
   });
+  it('대회 참가 선수가 최대 인원에 도달하면 사라진 추가 버튼 대신 이유를 안내한다', async () => {
+    kind = 'regular_tournament';
+    server.use(http.get('*/api/v1/tournaments/:id', () => ok({
+      id: tournamentId, title: '3명 정원 대회', kind, status: 'in_progress',
+      minPlayers: 3, maxPlayers: 3, registrationDeadlineAt: null, rosterDeadlineAt: null,
+      scheduledAt: '2099-01-01T00:00:00Z', scheduledEndAt: '2099-12-31T00:00:00Z',
+    })));
+
+    open('registration');
+
+    expect(await screen.findByText('참가 선수 3명')).toBeInTheDocument();
+    expect(screen.getByText('최대 인원이에요')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '선수 추가' })).not.toBeInTheDocument();
+  });
   it('홈·경기에서 들어온 일반 팀원도 참가 명단을 읽고 편집 제어는 받지 않는다', async () => {
     role = 'member'; mock.setViewerRole('TEAM_MEMBER');
     open(); await screen.findByRole('tab', { name: '참가 선수' });

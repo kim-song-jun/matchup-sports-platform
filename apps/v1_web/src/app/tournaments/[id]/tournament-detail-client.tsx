@@ -1530,7 +1530,7 @@ function CompletedResultHero({ tournament }: { tournament: V1TournamentDetail })
           textDecoration: 'none',
           boxShadow: '0 2px 14px rgba(0,0,0,0.2)',
         }}
-        aria-label={championName ? `${championName} 우승. 최종 결과와 시상 내역 보기` : '대회 최종 결과 보기'}
+        aria-label={championName ? `${championName} 우승. 경기 결과 보기` : '경기 결과 보기'}
       >
         <span
           aria-hidden="true"
@@ -1563,7 +1563,7 @@ function CompletedResultHero({ tournament }: { tournament: V1TournamentDetail })
             {title}
           </div>
           <div style={{ fontSize: 'var(--font-size-caption)', color: 'rgba(255,255,255,0.65)', lineHeight: 1.5 }}>
-            최종 순위와 시상 결과를 확인해보세요.
+            경기 결과 보기
           </div>
         </div>
         <ChevronRight size={18} strokeWidth={2.2} style={{ color: 'rgba(255,255,255,0.7)', flexShrink: 0 }} aria-hidden="true" />

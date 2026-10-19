@@ -890,10 +890,14 @@ describe('TournamentDetailView — completed vs non-completed section rendering'
     render(createElement(TournamentDetailView, { tournament, myRegistration: null }));
 
     expect(screen.getByText('대회가 끝났어요')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '대회 최종 결과 보기' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: '경기 결과 보기' })).toHaveAttribute(
       'href',
       '/tournaments/t1/results',
     );
+    expect(screen.queryByRole('link', { name: /경기별 결과·기록/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /최종 결과·시상/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /대진표·조별 순위/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /대회 후기/ })).toBeInTheDocument();
   });
 
   it('renders the champion name in the CompletedResultHero title when the final result is resolvable', () => {
@@ -909,6 +913,10 @@ describe('TournamentDetailView — completed vs non-completed section rendering'
     render(createElement(TournamentDetailView, { tournament, myRegistration: null }));
 
     expect(screen.getByText('레드 FC 우승!')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '레드 FC 우승. 경기 결과 보기' })).toHaveAttribute(
+      'href',
+      '/tournaments/t1/results',
+    );
   });
 
   it('renders the pre-participation checklist exactly once via the accordion and drops the old duplicated copy', () => {

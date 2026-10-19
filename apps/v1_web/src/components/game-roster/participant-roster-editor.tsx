@@ -126,6 +126,7 @@ export function ParticipantRosterEditor({ tournamentId, registrationId }: { tour
     <div className={styles.heading}>
       <div><SectionTitle compact title={`참가 선수 ${players.length}명`} /><p className="tm-text-caption">{rosterLimitText(tournament.data.minPlayers, tournament.data.maxPlayers, (min, max) => `최소 ${min}명 · 최대 ${max}명`)}</p></div>
       {editable && players.length < (tournament.data.maxPlayers ?? Infinity) ? <Button variant="outline" size="sm" disabled={busy || adding} onClick={() => { setAdding(true); setAddError(null); }}>선수 추가</Button> : null}
+      {editable && tournament.data.maxPlayers !== null && players.length >= tournament.data.maxPlayers ? <span className="tm-badge tm-badge-grey">최대 인원이에요</span> : null}
     </div>
     {error ? <AlertBanner tone="error" message={error} /> : null}
     {notice ? <AlertBanner tone="info" message={notice} /> : null}

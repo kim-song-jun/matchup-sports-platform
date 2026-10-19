@@ -330,7 +330,7 @@ function PrizeSection({
 /**
  * 회고 STATS-1 — 수상 페이지의 개인 득점·도움 랭킹. 리그 수상 페이지가 순위
  * 데이터를 함께 보여주는 패턴의 대회판이며, 어워드(수상자)가 "왜 그 사람인지"를
- * 옆에서 뒷받침한다. 기록이 없으면 EmptyState(emptyBehavior=empty-state).
+ * 옆에서 뒷받침한다. 기록이 없으면 안내 문구를 보여준다.
  */
 function PlayerRecordsSection({ tournamentId, isRegularLeague }: { tournamentId: string; isRegularLeague: boolean }) {
   // 프로필에서 뒤로가면 이 시상 화면(받은 출처 포함)으로 돌아온다.
@@ -359,7 +359,6 @@ function PlayerRecordsSection({ tournamentId, isRegularLeague }: { tournamentId:
       isError={records.isError}
       errorMessage={extractErrorMessage(records.error, '기록을 불러오지 못했어요.')}
       onRetry={() => void records.refetch()}
-      emptyBehavior="empty-state"
     />
   );
 }
@@ -988,43 +987,34 @@ function ReviewsSection({ tournament }: { tournament: V1TournamentDetail }) {
 /* ── 리텐션 CTA ── */
 function RetentionSection({ tournamentId }: { tournamentId: string }) {
   return (
-    <section style={{ marginBottom: 40 }}>
-      <div className="tm-retention-card">
-        <div>
-          <p className="tm-retention-card-title">다음 대회도 함께해요 🎉</p>
-          <p className="tm-retention-card-sub">
-            팀밋 대회에서 새로운 팀을 만나고<br />
-            더 나은 기록에 도전해보세요.
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <Link
-            href="/tournaments"
-            className="tm-btn tm-btn-sm tm-btn-primary"
-            style={{ flex: '1 1 auto', justifyContent: 'center', minWidth: 120 }}
-          >
-            다른 대회 보기
-          </Link>
-          <button
-            type="button"
-            className="tm-btn tm-btn-sm tm-btn-secondary"
-            style={{ flex: '1 1 auto', minWidth: 100 }}
-            onClick={() => {
-              if (navigator.share) {
-                trackEvent('tournament_share', { channel: 'native_share' });
-                void navigator.share({
-                  title: '팀밋 대회 결과',
-                  url: window.location.href,
-                });
-              } else {
-                trackEvent('tournament_share', { channel: 'clipboard' });
-                void navigator.clipboard.writeText(window.location.href);
-              }
-            }}
-          >
-            결과 공유
-          </button>
-        </div>
+    <section style={{ marginBottom: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <Link
+          href="/tournaments"
+          className="tm-btn tm-btn-sm tm-btn-primary"
+          style={{ flex: '1 1 0', justifyContent: 'center', minWidth: 0 }}
+        >
+          다른 대회 보기
+        </Link>
+        <button
+          type="button"
+          className="tm-btn tm-btn-sm tm-btn-secondary"
+          style={{ flex: '1 1 0', justifyContent: 'center', minWidth: 0 }}
+          onClick={() => {
+            if (navigator.share) {
+              trackEvent('tournament_share', { channel: 'native_share' });
+              void navigator.share({
+                title: '팀밋 대회 결과',
+                url: window.location.href,
+              });
+            } else {
+              trackEvent('tournament_share', { channel: 'clipboard' });
+              void navigator.clipboard.writeText(window.location.href);
+            }
+          }}
+        >
+          결과 공유
+        </button>
       </div>
     </section>
   );

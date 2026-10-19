@@ -643,7 +643,7 @@ function ScheduleFilterControls({ filters, activeFilter, onSelectFilter, action 
   return (
     <div aria-label="일정 필터" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--spacing-3)' }}>
       <div role="tablist" aria-label="경기 일정 보기" style={{ display: 'flex', gap: 'var(--spacing-2)', minWidth: 0, overflowX: 'auto' }}>
-        {filters.map((option) => (
+        {filters.filter((option) => option.key !== 'mine').map((option) => (
           <button key={option.key} type="button" role="tab" aria-selected={activeFilter === option.key}
             className={`tm-chip${activeFilter === option.key ? ' tm-chip-active' : ''}`}
             style={{ flexShrink: 0 }}
@@ -652,7 +652,19 @@ function ScheduleFilterControls({ filters, activeFilter, onSelectFilter, action 
           </button>
         ))}
       </div>
-      {action}
+      {action ?? (filters.some((option) => option.key === 'mine') ? (
+        <button
+          type="button"
+          role="switch"
+          aria-checked={activeFilter === 'mine'}
+          onClick={() => onSelectFilter(activeFilter === 'mine' ? 'all' : 'mine')}
+          className="tm-text-label"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--spacing-2)', minHeight: 'var(--size-control-lg)', padding: 0, border: 0, background: 'transparent', color: 'var(--text-caption)', cursor: 'pointer', flexShrink: 0 }}
+        >
+          내 팀만
+          <span aria-hidden="true" className={`tm-toggle${activeFilter === 'mine' ? ' tm-toggle-on' : ''}`} />
+        </button>
+      ) : null)}
     </div>
   );
 }

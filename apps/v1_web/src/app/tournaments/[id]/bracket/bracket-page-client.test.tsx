@@ -2,7 +2,7 @@ import { renderToString } from 'react-dom/server';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BracketPageContent } from './bracket-page-client';
 import { publicGameRecordsKeys } from '@/components/public-game-records/use-public-game-records';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
@@ -756,6 +756,7 @@ describe('BracketPageContent — 생성된 결선 fixture는 조별리그 중에
     renderBracketStandingsTab(tournament);
 
     expect(screen.queryByText(/대진표는 조별리그가 끝난 후/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: '결선' }));
     expect(screen.getAllByText('미정')).toHaveLength(3);
   });
 
@@ -781,7 +782,14 @@ describe('BracketPageContent — 생성된 결선 fixture는 조별리그 중에
     renderBracketStandingsTab(tournament);
 
     expect(screen.queryByText(/대진표는 조별리그가 끝난 후/)).not.toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: '조별리그' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByRole('heading', { name: '조별 순위' })).not.toBeInTheDocument();
+    expect(screen.queryByText('결승 홈팀')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: '결선' }));
     expect(screen.getByText('결승 홈팀')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: '결선' })).toHaveAttribute('aria-selected', 'true');
+    fireEvent.click(screen.getByRole('tab', { name: '조별리그' }));
+    expect(screen.queryByText('결승 홈팀')).not.toBeInTheDocument();
   });
 
   it('knockout 포맷은 조별리그 자체가 없으므로 처음부터 대진표를 보여준다', () => {
@@ -819,7 +827,7 @@ describe('BracketPageContent — 결선 라운드 수에 따른 칼럼 배분 �
   const groupsDone = [makeGroup({ id: 'group-a', phase: 'group', name: 'A조', advanceCount: 2 })];
   const groupFixture = makeFixture({ id: 'fx-group', groupId: 'group-a', round: 'group', status: 'completed' });
 
-  it('결선이 결승뿐이면 순위표 쪽을 넓히는 클래스를 붙인다', () => {
+  it('단계별 보기는 순위표와 결선을 한 칼럼씩 표시한다', () => {
     const { container } = renderBracketStandingsTab(
       makeTournament({
         id: 'tour-slim',
@@ -830,7 +838,10 @@ describe('BracketPageContent — 결선 라운드 수에 따른 칼럼 배분 �
       }),
     );
 
-    expect(container.querySelector('.tm-bracket-page-grid-slim-bracket')).toBeInTheDocument();
+    expect(container.querySelector('.tm-bracket-page-grid-slim-bracket')).not.toBeInTheDocument();
+    expect(container.querySelectorAll('.tm-tourn-sub-col')).toHaveLength(1);
+    fireEvent.click(screen.getByRole('tab', { name: '결선' }));
+    expect(container.querySelectorAll('.tm-tourn-sub-col')).toHaveLength(1);
   });
 
   // 4강+결승은 대진표 최소 폭이 2×216+120 = 552px라 좁힌 칼럼(460px)에 안 들어간다.

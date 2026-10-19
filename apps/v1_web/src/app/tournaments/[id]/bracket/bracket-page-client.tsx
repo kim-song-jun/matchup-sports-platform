@@ -449,6 +449,7 @@ export function BracketScheduleTab({
         /* 순위표는 옆 탭("순위 · 대진표")이 이미 그린다 — 여기서 또 그리면 탭만 바꿔도
            같은 표가 두 번 나온다(오너 지적: "중복되는 정보도 많고"). */
         showStandings={false}
+        showScheduleHeading={false}
       />
       {/* 개인 득점·도움 랭킹. `/schedule` 이 여기로 접히면서 함께 옮겼다 — 같은 섹션이
           `/awards` 에도 있지만 그 입구는 "대회 종료 후 공개"라, 이게 없으면 **진행 중에는
@@ -517,6 +518,7 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
   const stages = buildTournamentStages(tournament);
   const searchParams = useSearchParams();
   const tabFromUrl = searchParams.get('tab');
+  const [standingsPhase, setStandingsPhase] = useState<'group_stage' | 'knockout'>('group_stage');
   const [activeTab, setActiveTab] = useState<'standings' | 'schedule'>(() =>
     tabFromUrl === 'standings' ? 'standings' : 'schedule',
   );
@@ -551,19 +553,6 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
   // 시간을 공개한다. TournamentBracket은 nullable 팀 슬롯을 `미정`으로 표시하므로,
   // 조별 순위 확정 전 팀을 지어내지 않으면서도 일정과 대진표가 같은 정보를 보여준다.
   const showBracket = hasKnockoutFixtures;
-
-  /**
-   * §데스크탑 폭 배분 — 결선 라운드 수가 대진표에 필요한 가로 폭의 유일한 근거다.
-   * 기본 배분(순위표 0.72fr : 대진표 1.28fr)은 라운드가 여러 개일 때를 전제로 대진표에
-   * 넓은 쪽을 준 것인데, 결승 하나만 남은 대회에서는 그 폭을 연결선만 가로지르고
-   * (1440 실측: 650px 칼럼에 카드 180px + 우승 카드) 순위표는 366px로 눌렸다.
-   *
-   * 임계값이 1인 이유는 대진표 자체의 최소 폭 산술이다(tournament-bracket.tsx의
-   * COL_W 180 + CONN_W 36 + CHAMP_W 120): 라운드 R개의 최소 폭 = R×216 + 120.
-   * R=1이면 336px라 좁힌 칼럼(460px)에 들어가지만, R=2(4강+결승)는 552px라 넘쳐
-   * 가로 스크롤이 생긴다 — 그 경우는 기본 배분(대진표 650px)이 맞다.
-   */
-  const knockoutRoundCount = new Set(knockoutFixtures.map((f) => f.round)).size;
 
   // 리그 포맷: 모든 그룹의 순위 행을 합산. 집계 전 조는 toGroupStandingsRows가
   // 편성 팀(groupTeams)을 0값 기준선 행으로 대신 내주므로, 경기 0건이어도 참가 팀이
@@ -624,7 +613,8 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
   // 리그엔 토너먼트 대진이 없다. isLeague 를 안 빼면 거울 행(group_knockout)이 여기서
   // 참이 되어 **빈 대진표 칼럼**이 생긴다 — 이 화면이 리그에서 가장 크게 틀어지는 자리다.
   const hasBracketColumn = !isLeague && (format === 'knockout' || format === 'group_knockout');
-  const isTwoColumn = hasStandingsColumn && hasBracketColumn;
+  const showGroupStandings = hasStandingsColumn && (!hasBracketColumn || standingsPhase === 'group_stage');
+  const showKnockoutBracket = hasBracketColumn && (!hasStandingsColumn || standingsPhase === 'knockout');
 
   return (
     // §빈 상태 재균형(fix/v1-publish) — 조별리그 미종료 등으로 대진표 우 컬럼이
@@ -727,21 +717,22 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
       <div hidden={activeTab !== 'standings'} style={{ display: activeTab === 'standings' ? 'flex' : 'none', flexDirection: 'column', flex: 1 }}>
           {/* 2열 그리드: 좌=순위표 / 우=대진표 (데스크탑). 아래 흐름 네비게이터(§FlowNav)는 탭과
               무관한 페이지 레벨 이동이라 패널 밖(항상)에 둔다. */}
-          <div
-            className={[
-              'tm-tourn-sub-grid',
-              'tm-bracket-page-grid',
-              // 폭 배분 규칙은 **두 칼럼이 다 있을 때만** 의미가 있다. 한쪽이 없으면
-              // 붙이지 않아 `.tm-tourn-sub-grid` 기본값(1열)으로 떨어진다.
-              isTwoColumn ? (format === 'group_knockout' ? 'tm-tourn-sub-grid-6040' : 'tm-tourn-sub-grid-2col') : '',
-              isTwoColumn && format === 'group_knockout' && !showBracket ? 'tm-bracket-page-grid-empty' : '',
-              isTwoColumn && showBracket && knockoutRoundCount <= 1 ? 'tm-bracket-page-grid-slim-bracket' : '',
-            ]
-              .filter(Boolean)
-              .join(' ')}
-          >
-            {/* 좌: 순위표 — 그릴 게 없으면 빈 칼럼을 남기지 않고 아예 렌더하지 않는다. */}
-            {hasStandingsColumn ? (
+          {!isLeague && (hasStandingsColumn || hasBracketColumn) ? (
+            <div role="tablist" aria-label="순위·대진 단계" style={{ display: 'flex', gap: 'var(--spacing-2)', padding: '16px 20px 0' }}>
+              {([
+                ...(hasStandingsColumn ? [{ key: 'group_stage' as const, label: '조별리그' }] : []),
+                ...(hasBracketColumn ? [{ key: 'knockout' as const, label: '결선' }] : []),
+              ]).map((phase) => (
+                <button key={phase.key} type="button" role="tab"
+                  aria-selected={phase.key === 'group_stage' ? showGroupStandings : showKnockoutBracket}
+                  className={`tm-chip${(phase.key === 'group_stage' ? showGroupStandings : showKnockoutBracket) ? ' tm-chip-active' : ''}`}
+                  onClick={() => setStandingsPhase(phase.key)}>{phase.label}</button>
+              ))}
+            </div>
+          ) : null}
+          <div className="tm-tourn-sub-grid tm-bracket-page-grid">
+            {/* 선택한 단계만 한 칼럼으로 표시한다. */}
+            {showGroupStandings ? (
             <div className="tm-tourn-sub-col" style={{ padding: '20px 20px 0' }}>
               {isLeague && (
                 <section>
@@ -766,9 +757,6 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
 
               {!isLeague && format === 'group_knockout' && hasGroupStandings && (
                 <section>
-                  <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>
-                    조별 순위
-                  </h3>
                   {orderedGroups.map((g) => (
                     <GroupStandingsSection key={g.id} group={g} isMyGroup={isMyGroup(g)} fixtures={fixtures} fromHref={bracketSelfHref ?? undefined} />
                   ))}
@@ -786,7 +774,7 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
             ) : null}
 
             {/* 우: 대진표 */}
-            {hasBracketColumn && (
+            {showKnockoutBracket && (
               <div className="tm-tourn-sub-col" style={{ padding: '20px 20px 0' }}>
                 <section>
                   <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>

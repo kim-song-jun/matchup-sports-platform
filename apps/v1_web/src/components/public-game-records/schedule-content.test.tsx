@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ScheduleContent } from './schedule-content';
 import type { PublicTournamentScheduleResponse } from './types';
@@ -22,6 +22,23 @@ function makeData(overrides: Partial<PublicTournamentScheduleResponse> = {}): Pu
 }
 
 describe('ScheduleContent — 순위표 팀 링크', () => {
+  it('대회 내 팀만 스위치로 필터하고 끄면 전체 경기를 복원한다', () => {
+    render(<ScheduleContent tournamentId="tour-1"
+      data={makeData({ items: [fixtureEntry(), fixtureEntry({ fixtureId: 'other-fixture' })] })}
+      myFixtures={{ teams: [{ fixtures: [{ fixtureId: 'fixture-1' }] }] } as unknown as Parameters<typeof ScheduleContent>[0]['myFixtures']}
+    />);
+    const toggle = screen.getByRole('switch', { name: '내 팀만' });
+    const otherGame = () => document.querySelector('a[href*="/matches/other-fixture"]');
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    expect(otherGame()).not.toBeNull();
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+    expect(otherGame()).toBeNull();
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    expect(otherGame()).not.toBeNull();
+  });
+
   it('진행 중 경기를 여러 건 최상단에 표시하고 일반 일정에는 중복하지 않는다', () => {
     const data = makeData({
       items: [

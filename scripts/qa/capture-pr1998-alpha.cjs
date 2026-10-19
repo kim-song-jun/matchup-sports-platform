@@ -42,6 +42,11 @@ const output = path.resolve('tmp/qa-pr1998', phase);
           const expected = mine.find(f => label === '전체' || (label === '조별리그' ? groupIds.has(f.fixtureId) : !groupIds.has(f.fixtureId)));
           if (!expected) throw Error(`No real own fixture available for ${label}`);
           await page.locator(`a[href*="/matches/${expected.fixtureId}"]`).first().waitFor();
+          const expectedIds = mine.filter(f => label === '전체' || (label === '조별리그' ? groupIds.has(f.fixtureId) : !groupIds.has(f.fixtureId))).map(f => f.fixtureId);
+          await page.waitForFunction(({ competitionId, expected }) => {
+            const ids = new Set([...document.querySelectorAll(`a[href*="/tournaments/${competitionId}/matches/"]`)].map(a => new URL(a.href).pathname.split('/').at(-1)));
+            return expected.every(fixtureId => ids.has(fixtureId));
+          }, { competitionId: id, expected: expectedIds });
         }
         const enabled = await toggle.getAttribute('aria-checked') === 'true';
         const ids = await ownVisible();

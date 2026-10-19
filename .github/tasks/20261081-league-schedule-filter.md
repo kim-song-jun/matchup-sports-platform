@@ -3,6 +3,8 @@
 Status: Review (local validation passed; alpha QA pending)
 
 ## 대회 스위치 통일 후속 (2026-10-19)
+- 후속 요구: 내 팀 스위치와 전체/조별리그/결선은 독립 상태로 동작. 단계 변경은 내 팀 scope를 보존하고, 스위치를 꺼도 고른 단계 유지. URL은 teamScope와 schedulePhase를 별도로 보존하고 기존 schedulePhase=mine 링크도 호환. 진행 중/시간 미정에도 같은 필터 적용. 소속 조의 미정의 --red600을 기존 --red 토큰으로 교정, `*)` 제거 및 문구 교정. 별도 dev 기반 브랜치에서 구현·CI·alpha 검증 예정. 사용자 승인으로 이번 배포 흐름의 Copilot 리뷰 게이트는 생략.
+- 로컬 후속 검증: 격리 worktree에 frozen-lockfile 의존성 설치(원본 공유 node_modules 유지). 관련 3개 suite 116/116 PASS, 타입 검사 PASS. 패턴 검사는 Windows 기본 셸의 grep/find 미지원으로 실행 차단돼 Linux CI에 위임. diff whitespace/debt 검사 통과. 실제 alpha 계정의 대상 대회 참가 및 조별·결선 경기 존재를 API로 확인하여 배포 후 실제 브라우저 필터 검증 가능.
 - 추가 요청: 대회 bracket 탭 아래 경기 일정/조별 순위 중복 제목 제거, 순위·대진표에도 조별리그/결선 버튼 추가. 각 보기를 단일 칼럼으로 전환하며 단일 단계 포맷은 해당 보기만 제공한다. 기존 결선 회귀 테스트를 클릭 흐름으로 갱신.
 - 요청: 대회 bracket 경기 일정의 내 팀 버튼을 리그와 동일한 내 팀만 스위치로 변경.
 - 범위: public-game-records/schedule-content.tsx 및 기존 테스트, patch changeset.
@@ -106,3 +108,11 @@ Forbidden: 기존 shared tree WIP, `.env*`, 운영 데이터, schema, unrelated 
 - Runtime error follow-up: observed upstream alpha 503 from fetchPublicV1 and then browser hydration mismatch in the standings heading. Upstream recovered to 200. Local server restarted with WATCHPACK_POLLING=true for Windows edits. Regular-league standings now defer browser-only query-cache data until hydration, keeping initial headings, rows and loading state consistent. Added real rendered-HTML comparison for cold server vs populated browser cache: RED before fix, GREEN after; bracket suite 43/43 PASS. No deployment.
 - Additional cause confirmed: sw-push.js caches /_next/static assets for 7 days; localhost development chunk URLs stay stable, so the browser kept executing a prior bundle after server rebuilds. Used a temporary localhost-only page to unregister this origin's SW and clear only teameet-static-* caches, preserving localStorage/cookies. Reopened bracket: GET 200 and no new browser hydration error observed in server logs. Removed the temporary refresh page after use; old build cache retained under tmp/bracket-next-cache-before-hydration. Final bracket suite 43/43 PASS.
 - PR preparation: user explicitly requested PR creation only. v1_web lint (tsc --noEmit + pattern checker) PASS; focused suites total 111 tests PASS; diff whitespace/debt checks PASS. Added patch changeset. Commit scope excludes generated next-env.d.ts and local cache/runtime files. Base is dev; no merge or deployment authorized.
+
+
+## 배포 및 최종 실측 (2026-10-19)
+- PR #1996/#1998 dev 머지 완료. 후속 merge SHA 4daf51a3bc503f89d3004b49d0f96f23482a797f, CI 39261076773 및 Deploy Alpha 39261076753 success. 공개 release SHA 일치, DB health true.
+- 관련 로컬 테스트 116/116, Linux 전체 Web/API/Gates PASS. 사용자 명시 승인으로 이번 Copilot 서비스 장애 리뷰 게이트 예외 적용.
+- 실제 참가팀 owner, 390/768/1440: 내 팀만 유지 상태에서 전체 5/조별 3/결선 2 확인. 새로고침 시 두 상태 복원, 스위치 해제 시 결선 유지. 소속 조 빨강 rgb(240,68,82), 별표 제거, overflow 없음.
+- 새 pageerror 없음. before/after 동일한 기존 이미지 최적화 400, 로그인 전 auth/me 401 기록. QA 소유 브라우저 종료 완료.
+- 사용자가 로그인 QA 화면의 공개 GitHub 게시를 명시 승인. screenshots와 재현 도구는 이 QA 증거 브랜치에 보존하고 PR #1998에 SHA 고정 갤러리 게시.

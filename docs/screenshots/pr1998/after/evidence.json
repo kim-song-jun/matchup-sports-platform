@@ -1,0 +1,222 @@
+{
+  "phase": "after",
+  "persona": "participating team owner",
+  "browserPid": 27716,
+  "parentPid": 20672,
+  "issues": [
+    {
+      "kind": "http",
+      "status": 401,
+      "path": "/api/v1/auth/me"
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 401 ()"
+    },
+    {
+      "kind": "http",
+      "status": 400,
+      "path": "/_next/image"
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "kind": "http",
+      "status": 400,
+      "path": "/_next/image"
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "kind": "http",
+      "status": 400,
+      "path": "/_next/image"
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "kind": "http",
+      "status": 400,
+      "path": "/_next/image"
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "kind": "http",
+      "status": 400,
+      "path": "/_next/image"
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "kind": "http",
+      "status": 400,
+      "path": "/_next/image"
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "kind": "http",
+      "status": 400,
+      "path": "/_next/image"
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "kind": "http",
+      "status": 400,
+      "path": "/_next/image"
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "kind": "http",
+      "status": 400,
+      "path": "/_next/image"
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "kind": "http",
+      "status": 400,
+      "path": "/_next/image"
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "kind": "http",
+      "status": 400,
+      "path": "/_next/image"
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "kind": "http",
+      "status": 400,
+      "path": "/_next/image"
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "kind": "http",
+      "status": 400,
+      "path": "/_next/image"
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "kind": "http",
+      "status": 400,
+      "path": "/_next/image"
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 400 ()"
+    },
+    {
+      "kind": "http",
+      "status": 400,
+      "path": "/_next/image"
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 400 ()"
+    }
+  ],
+  "viewports": [
+    {
+      "width": 390,
+      "results": [
+        {
+          "phase": "전체",
+          "mineEnabled": true,
+          "count": 5
+        },
+        {
+          "phase": "조별리그",
+          "mineEnabled": true,
+          "count": 3
+        },
+        {
+          "phase": "결선",
+          "mineEnabled": true,
+          "count": 2
+        }
+      ],
+      "annotationColor": "rgb(240, 68, 82)",
+      "verdict": "PASS"
+    },
+    {
+      "width": 768,
+      "results": [
+        {
+          "phase": "전체",
+          "mineEnabled": true,
+          "count": 5
+        },
+        {
+          "phase": "조별리그",
+          "mineEnabled": true,
+          "count": 3
+        },
+        {
+          "phase": "결선",
+          "mineEnabled": true,
+          "count": 2
+        }
+      ],
+      "annotationColor": "rgb(240, 68, 82)",
+      "verdict": "PASS"
+    },
+    {
+      "width": 1440,
+      "results": [
+        {
+          "phase": "전체",
+          "mineEnabled": true,
+          "count": 5
+        },
+        {
+          "phase": "조별리그",
+          "mineEnabled": true,
+          "count": 3
+        },
+        {
+          "phase": "결선",
+          "mineEnabled": true,
+          "count": 2
+        }
+      ],
+      "annotationColor": "rgb(240, 68, 82)",
+      "verdict": "PASS"
+    }
+  ],
+  "commit": "4daf51a3bc503f89d3004b49d0f96f23482a797f",
+  "cleanup": "Owned browser closed"
+}

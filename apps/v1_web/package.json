@@ -1,6 +1,6 @@
 {
   "name": "v1_web",
-  "version": "1.10.0",
+  "version": "1.9.11",
   "private": true,
   "engines": {
     "node": ">=22"

@@ -1,5 +1,14 @@
 # Task 20261072: 운영 검색 노출 및 홈 GA4 계측 정정
 
+## Root integration cursor — fresh-20261019-1518
+
+- Existing-page team continuation is the selected scope: real browser cursor href, exact next-page SSR/cache identity, q/deadline UI parameters retained, separate matching metadata, no local-slice totals, no stale placeholder href. Earlier source32-test GREEN is historical; independent review counterexamples were repaired and latest narrow4files/33tests plus frontend type/pattern checks passed.
+- Independent gpt-6-sol confirmed the topology defect (first20/105 detail links, no continuation); this does not prove ranking causation. Its final source re-review is still a merge gate. No new service route, API/DB change, hidden keywords, tournament pagination change or image-default change.
+- Alpha BEFORE has actually completed in guest185 at390×844/768×1024/1440×1000:151total, initial20, more-click20→40/API200, soccer12/reset40, images loaded and end-of-list clear. Actual public HEAD at2026-10-19T11:51:41.593Z reports033df78ac7e8c762612bfa0f62d7a2bbf93da55d /1.10.2-alpha.20261019.g033df78ac7e8; HEADtime is separate from screenshots.
+- Fresh baseline original11attempts+2necessary data-recovery rechecks stays13attempts/11logical surfaces, with actual06:xx and11:xx times. AI full-body ownership remains unverified in that baseline; Naver S11 has a third-party TEAMEET Cafe mention but no observed owned22cad URL. Prior historical reports cannot fill current gaps.
+- Root will commit only the explicit12owned paths before any remote synchronization. Existing checkout033 and existing remote source/release refs are reused; no new local branch/worktree or primary WIP modification. Candidate PR/current reviews/exactSHA CI, matching Alpha AFTER, scoped main served proof and separately captured postrelease guest evidence remain pending.
+- Evidence cache: fresh-20261019-1518-{source-cause,independent-cause,implementation,baseline-manifest,baseline-root-check}.json and separate alpha-* captures. No source release or ranking improvement is claimed at this checkpoint.
+
 ## Active same-tab team-record cache refresh fix — 2026-10-19
 
 The later main PR #1985 review identified a separate same-tab boundary: an existing successful QueryClient entry remains fresh for the app-wide 60 seconds, overrides placeholder data and can prevent a request on return or filter-key selection. Only `usePublicTeamRecords` now has `staleTime: 0`, so the normal query lifecycle revalidates mounts and cached filter-key changes. Global cache policy and the server `no-store` fix remain unchanged.
@@ -478,3 +487,24 @@ robots Disallow와 noindex 충돌 및 홈 계측 누락은 정정·운영 배포
 - Passed gate (root-provided): Final Alpha63 CI39181762333/deploy39181762197 and actual guest159 first HTML/API/cache-filter second GET/local08/CTA/noindex/cleanup passed; Sol technical gate passed with explicit evidence limits.
 - Passed gate (root-provided): Fresh expected-head MERGE PR1985 and merged-main exact CI/Deploy39184125210 plus CodeQL39184125001 succeeded; actual production Web/API healthy matching main34/release1.9.12.
 - The four reviewed Changesets are consumed; all 29 unrelated pending Changesets are retained byte-for-byte.
+
+### 2026-10-19 team-list continuation follow-up (separate source change; not a ranking claim)
+
+- Read-only public/runtime investigation found the existing `/teams` “더 보기” control had no `href`; the public cursor API returns disjoint next-page records that were absent from first-page HTML. This proves a crawlable internal-link gap, not a search-ranking or AI citation cause. Tournament pagination was not added because there is no existing tournament continuation control.
+- Bounded implementation scope: preserve the current append-on-click behavior while exposing the actual opaque cursor and normalized current filters as the same-route `href`; direct cursor requests render only that cursor page's team records and detail anchors. Filter/search/sort changes discard the cursor. Keep canonical metadata on `/teams`, omit ItemList JSON-LD for cursor slices, and do not add bot-only text, routes, keywords, or load all records at once.
+- Cursor responses omit aggregate counts/facets, so the existing public team endpoint is also queried with matching filters, `limit=1`, `includeFacets=true`, and no cursor. Only aggregate metadata is merged; cursor rows remain the displayed page. A metadata failure reports an error without treating the visible slice length as the total.
+- Implementation ownership and receipt: `.claude/worktrees/mdqa-127-kakao-talk-login`; source and validation details are in `/Users/sungjun/.cache/teameet-seo-release/evidence/fresh-20261019-1518-implementation.json`. Four focused frontend test files passed 32/32 serially. No commit, PR, deploy, Alpha interaction, DB write, or ranking claim has occurred. Independent code review and the separately owned Alpha-before check remain release gates.
+
+### 2026-10-19 independent review repair checkpoint
+
+- Sol identified three source counterexamples after the initial 32-test GREEN: the continuation helper emitted API field names instead of browser `q`/`sort` semantics (notably losing `deadline`), a terminal cursor with unavailable facets could derive misleading whole-service sport counts from its local slice, and a placeholder-disabled anchor still exposed a stale URL to modified/middle-click navigation.
+- Repair now builds continuation hrefs in the normalized browser-query dialect and leaves API translation to the existing server/API request builder; matching filtered cursor SSR and hook hydration contracts cover `q` plus `sort=deadline`. Cursor pages without valid aggregate facets suppress all sport-chip totals; metadata failure stays explicit and later metadata recovery restores sourced counts. A stale unmatched placeholder renders the existing disabled control styling as a disabled button with no href; an exact matching route seed remains navigable.
+- Updated focused verification: four files, 33 tests passed serially at 2026-10-19 20:55:03 KST. The initial rerun had one test-harness failure because the new recovery test's `rerender` omitted its QueryClientProvider; the test now rerenders the same real provider. Final `pnpm --filter v1_web lint` passed at 2026-10-19 20:55 KST (TypeScript plus v1 pattern check).
+- **Review status: BLOCKED pending Sol re-review** of the three repairs. Do not commit, create a PR, or deploy before that review and the separate Alpha-before gate. The original 32/32 GREEN remains historical evidence only; updated receipt is `/Users/sungjun/.cache/teameet-seo-release/evidence/fresh-20261019-1518-implementation.json`.
+
+- [x] Preserve browser `q` and `sort=deadline` in the continuation href; server/API calls still translate those to `query` and `joinPolicy`.
+- [x] Suppress cursor-slice-derived team and sport counts when matching aggregate metadata is absent; verify explicit failure and sourced-count recovery.
+- [x] Keep unmatched placeholder continuation controls disabled without an `href`; exact route-matching SSR seeds may keep their valid continuation.
+- [x] Updated focused tests 33/33 and final `pnpm --filter v1_web lint` (TypeScript plus v1 pattern check).
+- [ ] Independent Sol source review re-run — **BLOCKED until the reviewer confirms all three counterexamples are fixed**.
+- [ ] Separately owned Alpha-before browser check — pending; this source worker did not open another browser space.

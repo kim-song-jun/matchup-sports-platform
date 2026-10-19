@@ -953,10 +953,17 @@ export function useV1Teams(filters?: ListFilters, options?: QueryOptions & { see
   });
 }
 
-export function useV1TeamPages(filters?: ListFilters, options?: QueryOptions & { seed?: CursorPage<V1Team> }) {
-  return useInfiniteQuery({
-    queryKey: [...v1Keys.teams(filters), 'infinite'] as const,
-    initialPageParam: undefined as string | undefined,
+export function useV1TeamPages(
+  filters?: ListFilters,
+  options?: QueryOptions & {
+    seed?: CursorPage<V1Team>;
+    initialCursor?: string;
+    metadataSeed?: CursorPage<V1Team>;
+  },
+) {
+  const pagesQuery = useInfiniteQuery({
+    queryKey: [...v1Keys.teams(filters), options?.initialCursor ?? null, 'infinite'] as const,
+    initialPageParam: options?.initialCursor as string | undefined,
     queryFn: ({ pageParam }) =>
       v1Get<CursorPage<V1Team>>('/teams', {
         ...(filters ?? {}),
@@ -972,9 +979,27 @@ export function useV1TeamPages(filters?: ListFilters, options?: QueryOptions & {
     // 구워졌다) 그 빈 상태가 최대 1분간 그대로 보인다. placeholderData는 항상 실제 fetch를
     // 트리거하면서 그 결과가 올 때까지만 seed를 보여준다(useV1TeamDetail·useV1Match와 동일 패턴).
     placeholderData: options?.seed
-      ? { pages: [options.seed], pageParams: [undefined] }
+      ? { pages: [options.seed], pageParams: [options.initialCursor] }
       : undefined,
   });
+  const metadataQuery = useQuery({
+    queryKey: [...v1Keys.teams(filters), 'list-metadata'] as const,
+    queryFn: () => v1Get<CursorPage<V1Team>>('/teams', {
+      ...(filters ?? {}),
+      limit: 1,
+      includeFacets: true,
+    }),
+    enabled: Boolean(options?.initialCursor) && options?.enabled !== false,
+    initialData: options?.initialCursor ? options.metadataSeed : undefined,
+    staleTime: 0,
+  });
+
+  return {
+    ...pagesQuery,
+    listMetadata: options?.initialCursor ? metadataQuery.data : undefined,
+    isListMetadataPending: Boolean(options?.initialCursor) && metadataQuery.isPending,
+    isListMetadataError: Boolean(options?.initialCursor) && metadataQuery.isError,
+  };
 }
 
 /**

@@ -91,8 +91,40 @@ export function teamListSeedPath(params: Record<string, string | string[] | unde
   for (const [key, value] of Object.entries(filters)) {
     if (value !== undefined) query.set(key, value);
   }
+  const cursor = firstSearchParam(params.cursor);
+  if (cursor) query.set('cursor', cursor);
   query.set('limit', String(TEAM_LIST_PAGE_SIZE));
+  if (!cursor) query.set('includeFacets', 'true');
+  return `/teams?${query.toString()}`;
+}
+
+/** Server/client aggregate request for a direct cursor page; it deliberately omits the cursor. */
+export function teamListMetadataPath(params: Record<string, string | string[] | undefined> = {}): string {
+  const query = new URLSearchParams(teamListSeedPath(params).split('?')[1] ?? '');
+  query.delete('cursor');
+  query.set('limit', '1');
   query.set('includeFacets', 'true');
+  return `/teams?${query.toString()}`;
+}
+
+/** Browser route for the existing continuation. Keep the UI query dialect; the page translates it for the API. */
+export function teamListContinuationPath(params: Record<string, string | string[] | undefined>): string | undefined {
+  const cursor = firstSearchParam(params.cursor);
+  if (!cursor) return undefined;
+
+  const filters = teamListQueryFilters(params);
+  const query = new URLSearchParams();
+  if (filters.sportId) query.set('sportId', filters.sportId);
+  if (filters.regionId) query.set('regionId', filters.regionId);
+  if (filters.genderRule) query.set('genderRule', filters.genderRule);
+  if (filters.levelCodes) query.set('levelCodes', filters.levelCodes);
+
+  const search = firstSearchParam(params.q)?.trim();
+  if (search) query.set('q', search);
+  const sort = firstSearchParam(params.sort);
+  if (sort === 'recommended' || sort === 'latest' || sort === 'deadline') query.set('sort', sort);
+
+  query.set('cursor', cursor);
   return `/teams?${query.toString()}`;
 }
 

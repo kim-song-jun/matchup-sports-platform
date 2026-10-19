@@ -54,9 +54,10 @@ export type TeamListViewModel = {
     regionOptions: Array<{ label: string; value: string; href: string; active?: boolean }>;
   };
   chips: Array<{ label: string; count?: number; active?: boolean; href?: string }>;
-  summary: { scope: string; total: number; loaded?: number; recruiting: number; nearby?: number };
+  summary: { scope: string; total?: number; totalState?: 'loading' | 'error'; totalRefreshError?: boolean; loaded?: number; recruiting: number; nearby?: number };
   listLoading?: boolean;
   hasNextPage?: boolean;
+  loadMoreHref?: string;
   isFetchingNextPage?: boolean;
   loadMoreError?: boolean;
   loadMoreLocked?: boolean;

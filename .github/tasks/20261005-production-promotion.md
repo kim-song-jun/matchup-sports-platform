@@ -2,6 +2,16 @@
 
 Status: Review
 
+## Current production promotion — 2026-10-19, PR #1992
+
+This snapshot supersedes earlier user-operated-main restrictions for this release. The user explicitly requested creating and merging the current dev-to-main PR and completing production deployment. PR #1979 is merged into dev as `59d2d7137b180e9992492a101f3fdbb5997bbe4e`; promotion PR #1992 targets main from dev.
+
+- Exit proof: current dev and promotion CI success, actual Alpha SHA/version/DB, normal main merge and production environment approval, successful production workflow, served main SHA/release 1.10.1/DB=true, and public browser smoke. Preserve all shared WIP and production data; no reset/seed, policy bypass or unrelated source changes.
+- Promotion review: Copilot reviewed a subset of 509 files and raised one documentation spacing nit; this follow-up corrects that sentence. Its size warning remains a review coverage limitation, not a complete 509-file clean review.
+- Exact-head CodeQL language analyses passed. Alerts 56/54/55 were statically assessed as not actionable: UUIDv5 derives stable participant identity from database IDs with a public namespace (not a secret/password/signature); two partial-escape matches consume fixed test literals solely in Testing Library assertions. No applicable SECURITY.md was resolved. Preserve these runtime/test contracts; no alert dismissal or security-policy change is performed.
+- Separate GitHub AI security run 39203660694 failed before analysis because configured `claude-opus-5` is unavailable. Do not count this as successful AI analysis. Existing #1990 authenticated admin/three-viewport QA limitations remain open.
+- Verification before this documentation follow-up: dev Gates/Web and all three CodeQL language jobs passed; API/migration replay and the promotion CI/Alpha were still running. A new dev head requires fresh matching CI/Alpha before main merge.
+
 ## PR #1979 merge readiness — 2026-10-19
 
 This snapshot supersedes the preparation coordinates below. The user explicitly requested fixing and merging existing PR #1979, with all updates confined to its existing remote branch `chore/release-version-20261018` and base `dev`.

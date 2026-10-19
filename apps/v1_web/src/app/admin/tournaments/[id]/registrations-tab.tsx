@@ -8,6 +8,7 @@ import type { V1AdminTournamentRegistration } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { registrationCancelOutcomeLabel } from '@/lib/v1-status-labels';
 import { V1ApiError } from '@/lib/api-client';
+import { formatRosterBirthDate } from '@/lib/roster-birth-date';
 import { v1Keys } from '@/lib/query-keys';
 import { AdminCardList, AdminEmpty } from '@/components/admin';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
@@ -213,7 +214,7 @@ export function RosterModal({
                   ) : null}
                 </div>
                 <p className="text-xs text-[var(--text-muted)]">
-                  {p.birthDateSnapshot ?? '생년월일 미등록'} ·{' '}
+                  {p.birthDateSnapshot ? formatRosterBirthDate(p.birthDateSnapshot) : '생년월일 미등록'} ·{' '}
                   {p.genderSnapshot ? GENDER_LABEL[p.genderSnapshot] : '성별 미등록'}
                 </p>
                 <p className="mt-0.5 text-xs text-[var(--text-muted)]">

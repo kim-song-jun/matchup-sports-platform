@@ -53,10 +53,16 @@ import { PLAYER_ELIGIBILITY_LABEL, teamRoleLabel } from '@/lib/v1-status-labels'
 import { AvatarFallback } from '@/components/v1-ui/avatar-fallback';
 import { rosterLimitText } from '@/lib/roster-limit';
 import { compareRosterPlayers, rosterDisplayName } from '@/lib/roster-presentation';
+import {
+  formatRosterBirthDate,
+  normalizeBirthDateForInput,
+  normalizeProfileText,
+} from '@/lib/roster-birth-date';
 
 // 이 파일에서 가져다 쓰던 소비처(테스트 포함)가 그대로 돌아가게 이름만 다시 내보낸다.
 export { getRosterDeadlineState, isTournamentRosterMutable, tournamentRosterClosedMessage, type RosterDeadlineState };
 export { parseJerseyInput };
+export { formatRosterBirthDate, normalizeBirthDateForInput, normalizeProfileText } from '@/lib/roster-birth-date';
 
 /* ── Helpers ── */
 
@@ -71,33 +77,6 @@ function eligibilityBadgeClass(status: V1PlayerEligibilityStatus): string {
     case 'needs_review': return 'tm-badge-orange';
     default: return 'tm-badge-grey';
   }
-}
-
-export function normalizeProfileText(v: unknown): string {
-  if (v == null) return '';
-  if (v instanceof Date) return Number.isNaN(v.getTime()) ? '' : v.toISOString().slice(0, 10);
-  return String(v).trim();
-}
-
-export function normalizeBirthDateForInput(v: unknown): string {
-  const raw = normalizeProfileText(v);
-  if (!raw) return '';
-  if (/^\d{8}$/.test(raw)) return `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`;
-  const ymd = raw.match(/^(\d{4})[-./년\s]*(\d{1,2})[-./월\s]*(\d{1,2})/);
-  if (ymd) {
-    const [, year, month, day] = ymd;
-    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-  }
-  const d = new Date(raw);
-  if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10);
-  return raw;
-}
-
-export function formatRosterBirthDate(dateStr: string | null): string {
-  const normalized = normalizeBirthDateForInput(dateStr);
-  if (!normalized || !/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return '미입력';
-  const [year, month, day] = normalized.split('-');
-  return `${year}.${month}.${day}`;
 }
 
 export type RegistrationDeadlineState = 'upcoming' | 'closed' | 'unscheduled';

@@ -98,7 +98,7 @@ export default function AdminLeagueMatchNewPage() {
   const periodNames = periodLabels(periodMinutes.length);
   const periodsInvalid = periodMinutes.some((value) => !/^\d+$/.test(value.trim()) || Number(value) < 1 || Number(value) > 240);
   const rosterLimitInvalid = rosterLimitError(rosterLimit);
-  const teamCapacityInvalid = leagueTeamCapacityError(maxTeams);
+  const teamCapacityInvalid = leagueTeamCapacityError(maxTeams, selectedTeams.length);
   const plannedFixtureCountInvalid =
     plannedFixtureCount.trim() !== '' && !(/^\d+$/.test(plannedFixtureCount.trim()) && Number(plannedFixtureCount) >= 1 && Number(plannedFixtureCount) <= 500);
 
@@ -275,7 +275,7 @@ export default function AdminLeagueMatchNewPage() {
           disabled={submitting}
         />
 
-        <LeagueTeamCapacityField value={maxTeams} onChange={setMaxTeams} disabled={submitting || !!periodSaveFailure} />
+        <LeagueTeamCapacityField value={maxTeams} onChange={setMaxTeams} minimumTeams={selectedTeams.length} disabled={submitting || !!periodSaveFailure} />
 
         {periodMinutes.length > 0 && (
           <fieldset className="space-y-2">

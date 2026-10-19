@@ -194,6 +194,12 @@ export class LeagueMatchAdminService {
         message: '리그는 서로 다른 팀 2개 이상이 필요해요.',
       });
     }
+    if (dto.maxTeams != null && dto.maxTeams < uniqueTeamIds.length) {
+      throw new UnprocessableEntityException({
+        code: 'LEAGUE_CAPACITY_BELOW_TEAM_COUNT',
+        message: `참가팀 정원은 선택한 팀 수(${uniqueTeamIds.length}팀) 이상이어야 해요.`,
+      });
+    }
     const teams = await this.prisma.v1Team.findMany({
       where: { id: { in: uniqueTeamIds }, status: 'active', deletedAt: null },
       select: { id: true, sportId: true },

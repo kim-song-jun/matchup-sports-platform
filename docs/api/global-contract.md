@@ -1,10 +1,10 @@
 리그 표시는 모집완료·진행 중·보류·종료 4개로 통일한다. 호환 `draft`는 저장 상태 `draft/open/closed` 전체를 묶으며 모집 가능 여부·공개 여부는 별도다. 내 담당 대회는 `tournamentKind`로 종류를 구분한다. [리그 표시 계약](./domains/league-matches.md#league-display-states-2026-10-19).
 
-신규 리그는 모집완료(`closed`)로 생성하고 운영자가 명시적으로 시작한다. 관리자 목록·상세는 `lifecycleStatus`를 제공하며, 시작 전 경기 시작은 `409 LEAGUE_NOT_STARTED`다. [리그 계약](./domains/league-matches.md#new-league-lifecycle-2026-10-18)을 따른다.
+신규 리그는 모집완료(`closed`)로 생성하고 운영자가 명시적으로 시작한다. 관리자 목록·상세는 `lifecycleStatus`를 제공하며, 시작 전 경기 시작·결과 초안 생성·제출은 `409 LEAGUE_NOT_STARTED`다. 생성 정원이 선택한 서로 다른 팀 수보다 작으면 `422 LEAGUE_CAPACITY_BELOW_TEAM_COUNT`로 쓰기 전에 거부한다. [리그 계약](./domains/league-matches.md#new-league-lifecycle-2026-10-18)을 따른다.
 
 # Global v1 API contract
 
-대회 형식 수정은 mutation admin + `expectedVersion` CAS를 요구한다. 조/대진 생성 이후 또는 진행·완료 상태의 실제 형식 변경은 `409 TOURNAMENT_FORMAT_LOCKED`이며, 관리자 상세의 `formatChangeBlockedReason`으로 제한 사유를 미리 표시한다. 동일 형식 재전송과 다른 필드 수정은 허용한다. [Tournaments 계약](./domains/tournaments.md)을 따른다.
+대회 형식 수정은 mutation admin + `expectedVersion` CAS를 요구한다. 조/대진 생성 이후 또는 진행·완료 상태의 실제 형식 변경은 `409 TOURNAMENT_FORMAT_LOCKED`이며, 관리자 상세의 `formatChangeBlockedReason`으로 제한 사유를 미리 표시한다. 형식과 라인업 설정을 함께 바꾸는 PATCH는 설정 핀·대진 리포인트·일반 필드·감사를 같은 트랜잭션에서 저장하므로 거부된 요청은 부분 저장되지 않는다. 동일 형식 재전송과 다른 필드 수정은 허용한다. [Tournaments 계약](./domains/tournaments.md)을 따른다.
 
 Personal-match detail exposes the stored `isOnline` boolean (default `false`). `PATCH /api/v1/admin/matches/:matchId/online` accepts a strict boolean and requires mutation-admin authority; it atomically updates classification and its before/after audit, returning `{matchId,isOnline,changed}`. Repeating the same classification returns `changed:false`. This metadata mutation does not acquire the versioned game-command contract below and does not alter public-list access, canonical URLs or indexability. See [matches](./domains/matches.md) and [admin/ops](./domains/admin-and-ops.md).
 

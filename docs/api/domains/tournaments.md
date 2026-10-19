@@ -1,5 +1,11 @@
 # V1 Tournaments API
 
+Tournament PATCH composes format, lineup configuration pin, untouched-fixture repointing and
+ordinary metadata/audit writes in one transaction. Format/lineup edits acquire the same structural
+advisory lock as group/fixture writers before changing either setting. If a concurrent group writer
+wins and the format is rejected with `409 TOURNAMENT_FORMAT_LOCKED`, the prior config pin and
+tournament version remain unchanged; no config-change audit is committed.
+
 League compatibility (2026-10-19): public `status=draft` with `kind=league` or `kind=all` selects league storage statuses `draft | open | closed`, all displayed as **모집완료**. This matches `GET /league-matches?state=draft` and existing list redirects. Regular tournament drafts remain hidden.
 
 ## 12강 부전승 홈·어웨이 (2026-10-16)

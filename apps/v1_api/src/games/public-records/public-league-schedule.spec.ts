@@ -122,6 +122,14 @@ function buildService(options: {
 }
 
 describe('getSchedule — 정규 리그 갈래', () => {
+  it.each(['SCHEDULED', 'LIVE', 'ENDED'])('취소된 리그 경기는 게임이 %s여도 예정·진행·종료로 되돌리지 않는다', async (state) => {
+    const rows = makeTeamMatches();
+    rows[0].status = 'cancelled';
+    rows[0].game.state = state;
+    const result = await buildService({ teamMatches: rows }).getSchedule(LEAGUE_ID, {});
+    expect(result.items.find((item) => item.fixtureId === 'tm-1')?.status).toBe('cancelled');
+  });
+
   it('public status와 삭제 경계를 surface query에 함께 전달한다', async () => {
     await buildService().getSchedule(LEAGUE_ID, {});
     expect(firstTournamentWhere).toEqual(expect.objectContaining({

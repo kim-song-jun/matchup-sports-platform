@@ -149,7 +149,7 @@ describe('TournamentRosterPageClient — 명단 제출 마감 배너/액션 차�
       screen.queryByText('명단 제출 기간이 종료됐어요. 수정이 필요하면 운영진에게 문의해 주세요.'),
     ).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '선수 추가' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '홍길동 수정' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '길동이 수정' })).toBeInTheDocument();
   });
 
   it('shows the blocked banner and hides edit/remove actions once the deadline has passed with no override', () => {
@@ -162,7 +162,7 @@ describe('TournamentRosterPageClient — 명단 제출 마감 배너/액션 차�
       screen.getByText('명단 제출 기간이 종료됐어요. 수정이 필요하면 운영진에게 문의해 주세요.'),
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '선수 추가' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '홍길동 수정' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '길동이 수정' })).not.toBeInTheDocument();
   });
 
   it('keeps editing open and shows the override notice when an admin has granted a deadline exception', () => {
@@ -177,7 +177,7 @@ describe('TournamentRosterPageClient — 명단 제출 마감 배너/액션 차�
     expect(
       screen.getByText('운영진이 명단 제출 마감 예외를 허용했어요. 계속 명단을 수정할 수 있어요.'),
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '홍길동 수정' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '길동이 수정' })).toBeInTheDocument();
   });
 
   // 감사 finding #52: 잠긴 신청에 마감 예외를 부여하면 "계속 수정할 수 있어요"와 "명단이
@@ -199,7 +199,7 @@ describe('TournamentRosterPageClient — 명단 제출 마감 배너/액션 차�
     expect(
       screen.queryByText('선수 명단이 마감됐어요. 변경이 필요하면 운영진에게 문의해 주세요.'),
     ).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '홍길동 수정' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '길동이 수정' })).not.toBeInTheDocument();
   });
 
   // 감사 finding #1: 대회가 종료·취소되면 잠금·마감 예외와 무관하게 명단을 못 고친다.
@@ -216,7 +216,7 @@ describe('TournamentRosterPageClient — 명단 제출 마감 배너/액션 차�
     expect(
       screen.queryByText('운영진이 명단 제출 마감 예외를 허용했어요. 계속 명단을 수정할 수 있어요.'),
     ).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '홍길동 수정' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '길동이 수정' })).not.toBeInTheDocument();
   });
 });
 
@@ -652,7 +652,7 @@ describe('TournamentRosterPageClient — 명단 수정 권한(M-T)', () => {
 
     expect(screen.queryByText('팀장에게 요청')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '선수 추가' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '홍길동 수정' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '길동이 수정' })).toBeInTheDocument();
   });
 
   it('팀 조회가 아직 로딩 중이면 권한 배지를 보여주지 않는다(판정 전 fail-open 방지)', () => {
@@ -726,19 +726,31 @@ describe('TournamentRosterPageClient — 명단 개인정보 표시', () => {
 
     expect(screen.getByText('홍길동')).toBeInTheDocument();
     expect(screen.getByText('1995.03.15')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '홍길동 수정' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '길동이 수정' })).toBeInTheDocument();
   });
 
-  it.each(['owner', 'manager'] as const)('%s 화면은 실명 아래에 경기 명단에 나가는 이름(닉네임)을 함께 보인다', (role) => {
+  it('서버의 경기 표시 이름과 번호순을 쓰고 등록 실명은 보조로 보인다', () => {
+    renderAs('owner', { players: [
+      mockPlayer({ id: 'p-none', userId: 'u-none', displayName: '하늘', jerseyNumber: null }),
+      mockPlayer({ id: 'p-ten', userId: 'u-ten', displayName: '바다', jerseyNumber: 10 }),
+      mockPlayer({ id: 'p-zero', userId: 'u-zero', displayName: '가람', jerseyNumber: 0 }),
+    ] });
+    expect(screen.getAllByRole('button', { name: / 수정$/ }).map((button) => button.getAttribute('aria-label')))
+      .toEqual(['가람 수정', '바다 수정', '하늘 수정']);
+    expect(screen.getAllByText(/등록 이름/)).toHaveLength(3);
+    expect(screen.queryByText('길동이')).not.toBeInTheDocument();
+  });
+
+  it.each(['owner', 'manager'] as const)('%s 화면은 경기 표시 이름 아래에 등록 실명을 함께 보인다', (role) => {
     renderAs(role, { players: [mockPlayer()] });
 
     expect(screen.getByText('홍길동')).toBeInTheDocument();
-    const hint = screen.getByText(/경기 명단 이름/);
-    expect(hint).toHaveTextContent('경기 명단 이름 길동이');
-    expect(within(hint).getByText('길동이').tagName).toBe('STRONG');
+    const hint = screen.getByText(/등록 이름/);
+    expect(hint).toHaveTextContent('등록 이름 홍길동');
+    expect(within(hint).getByText('홍길동').tagName).toBe('STRONG');
   });
 
-  it('실명과 닉네임이 같거나 닉네임이 없으면 병기하지 않는다', () => {
+  it('같은 이름은 중복하지 않고, 프로필 이름이 없을 때도 허용된 등록 이름은 보조로 보인다', () => {
     renderAs('owner', {
       players: [
         mockPlayer({ id: 'p-same', userId: 'u-same', realName: '홍길동', nickname: '홍길동' }),
@@ -748,10 +760,11 @@ describe('TournamentRosterPageClient — 명단 개인정보 표시', () => {
 
     expect(screen.getByText('홍길동')).toBeInTheDocument();
     expect(screen.getByText('김철수')).toBeInTheDocument();
-    expect(screen.queryByText(/경기 명단 이름/)).toBeNull();
+    expect(screen.getByText('팀원')).toBeInTheDocument();
+    expect(screen.getByText(/등록 이름/)).toHaveTextContent('김철수');
   });
 
-  it('일반 팀원은 남의 행뿐 아니라 실명이 보이는 본인 행에도 병기를 받지 않는다', () => {
+  it('일반 팀원은 본인 행에만 등록 이름을 보조로 보고 표시 이름은 다른 화면과 같다', () => {
     renderAs('member', {
       players: [
         memberViewPlayer({ id: 'player-other', userId: 'user-other' }),
@@ -760,8 +773,8 @@ describe('TournamentRosterPageClient — 명단 개인정보 표시', () => {
     });
 
     expect(screen.getByText('김본인')).toBeInTheDocument();
-    expect(screen.queryByText(/경기 명단 이름/)).toBeNull();
-    expect(screen.queryByText('본인이')).toBeNull();
+    expect(screen.getByText(/등록 이름/)).toHaveTextContent('김본인');
+    expect(screen.getByText('본인이')).toBeInTheDocument();
   });
 
   it('일반 팀원은 닉네임·등번호·자격 상태만 보고 생년월일 줄은 그려지지 않는다', () => {
@@ -783,7 +796,7 @@ describe('TournamentRosterPageClient — 명단 개인정보 표시', () => {
       players: [memberViewPlayer({ nickname: null })],
     });
 
-    expect(screen.getByText('(탈퇴한 선수)')).toBeInTheDocument();
+    expect(screen.getByText('팀원')).toBeInTheDocument();
   });
 
   // 서버 계약: member 는 본인 행만 값이 있다. 남의 행에는 생년월일 줄이 없고 본인 행에는 있다.
@@ -873,14 +886,14 @@ describe('TournamentRosterPageClient — 정규 리그 표시', () => {
     } as unknown as ReturnType<typeof useV1Tournament>);
   }
 
-  it('진행 중 리그: 리그 기간과 "진행 중" 이 보이고 종료·일정 미정 문구는 없다', () => {
+  it('진행 중 리그: 리그 기간과 "시즌 진행 중" 이 보이고 종료·일정 미정 문구는 없다', () => {
     mockCompetition('regular_league', 'in_progress');
 
     const { container } = render(<TournamentRosterPageClient tournamentId="league-1" registrationId="reg-1" />);
 
     expect(screen.getByText('리그 기간')).toBeInTheDocument();
     expect(screen.getByText('2026년 9월 30일 (수) ~ 2026년 11월 30일 (월)')).toBeInTheDocument();
-    expect(screen.getByText('진행 중')).toBeInTheDocument();
+    expect(screen.getByText('시즌 진행 중')).toBeInTheDocument();
     expect(container.textContent).not.toContain('일정 미정');
     expect(container.textContent).not.toContain('종료');
     expect(container.textContent).not.toContain('대회 신청 마감');

@@ -334,12 +334,12 @@ function RegistrationPass({
   const statusCfg = registrationStatusConfig(status, null);
   const dateStr = formatTournamentDateRangeMedium(scheduledAt, scheduledEndAt);
   const rosterLink = rosterBlocked
-    ? { text: '명단 확인', ariaLabel: '선수 명단 확인하기' }
+    ? { text: '참가 선수 보기', ariaLabel: '참가 선수 보기' }
     : !canManageRoster
-      ? { text: '명단 보기', ariaLabel: '선수 명단 보기' }
+      ? { text: '참가 선수 보기', ariaLabel: '참가 선수 보기' }
       : belowMinimum
         ? { text: '선수 등록', ariaLabel: '선수 명단 등록하기' }
-        : { text: '선수 수정', ariaLabel: '선수 명단 수정하기' };
+        : { text: '참가 선수 관리', ariaLabel: '참가 선수 관리' };
   /* Roster next-step applies to active registrations; waitlisted shows a status note instead. */
   const showRosterFooter = status === 'confirmed' || status === 'paid';
 
@@ -421,7 +421,7 @@ function RegistrationPass({
             감사 finding #51: 잠기면 이 링크가 통째로 사라져, 팀장이 대회 당일 자기 팀 확정
             명단을 앱에서 확인할 방법이 없었다(명단 페이지 자체는 잠금 상태에서도 읽기 전용으로
             잘 그린다 — tournament-roster-client.tsx 참조). 못 고칠 땐(잠금·마감·종료) 글자를
-            '명단 확인'으로 바꿔 읽기 전용으로라도 계속 연결한다.
+            '참가 선수 보기'로 바꿔 읽기 전용으로라도 계속 연결한다(팀 화면·대회 참가 카드와 같은 이름).
           */}
           <Link
             href={rosterHref}
@@ -812,10 +812,10 @@ function RegistrationDetailView({
         <Link
           href={rosterHref}
           className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
-          aria-label="선수 명단 수정하기"
+          aria-label="참가 선수 관리"
           style={{ marginBottom: 8 }}
         >
-          선수 수정
+          참가 선수 관리
         </Link>
       ) : canManageRegistration && isRosterLocked ? (
         // 감사 finding #51: 명단이 잠기면 이 레일에서 명단으로 가는 링크가 통째로 사라져,
@@ -823,10 +823,10 @@ function RegistrationDetailView({
         <Link
           href={rosterHref}
           className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block"
-          aria-label="선수 명단 확인하기"
+          aria-label="참가 선수 보기"
           style={{ marginBottom: 8 }}
         >
-          명단 확인
+          참가 선수 보기
         </Link>
       ) : null}
 
@@ -948,20 +948,20 @@ function RegistrationDetailView({
                       <Link
                         href={rosterHref}
                         className="tm-btn tm-btn-md tm-btn-neutral"
-                        aria-label="선수 명단 수정하기"
+                        aria-label="참가 선수 관리"
                         style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
                       >
-                        선수 수정
+                        참가 선수 관리
                       </Link>
                     ) : canManageRegistration && isRosterLocked ? (
                       // 감사 finding #51 — 위 데스크톱 레일과 같은 이유로 읽기 전용 링크를 남긴다.
                       <Link
                         href={rosterHref}
                         className="tm-btn tm-btn-md tm-btn-neutral"
-                        aria-label="선수 명단 확인하기"
+                        aria-label="참가 선수 보기"
                         style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
                       >
-                        명단 확인
+                        참가 선수 보기
                       </Link>
                     ) : null}
                   </div>
@@ -1479,9 +1479,8 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
           teams={visibleTeams}
           hasAnyTeam={teams.length > 0}
           registrations={registrations}
-          // 정규 리그는 백엔드가 팀 수 정원을 적용하지 않는다. teamCount는
-          // 통합 거울의 기본값일 수 있으므로 신청 허브에서 capacity를 만들지 않는다.
-          capacity={tournament.kind === 'regular_league' ? null : resolveTournamentCapacity(tournament)}
+          // 무제한 리그는 정원 요약을 생략하고, 유한 리그는 실제 maxTeams와 점유 수를 쓴다.
+          capacity={tournament.kind === 'regular_league' && tournament.maxTeams == null ? null : resolveTournamentCapacity(tournament)}
           blockReason={resolveTournamentRegistrationBlock(tournament)}
           isLeague={tournament.kind === 'regular_league'}
         />

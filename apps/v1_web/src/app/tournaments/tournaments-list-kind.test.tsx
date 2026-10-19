@@ -70,7 +70,7 @@ describe('#1543 대회 목록 — 상태와 모순되지 않는 영역 이름', 
 
   describe.each([false, true])('결과 카드 있음: %s', (hasItems) => {
     it.each([
-      [null, '전체'], ['draft', '준비 중'], ['in_progress', '진행 중'], ['completed', '종료'],
+      [null, '전체'], ['draft', '모집완료'], ['in_progress', '진행 중'], ['completed', '종료'],
     ] as const)('%s 상태에서 영역·필터·결과 의미를 유지한다', (status, label) => {
       const params = new URLSearchParams({ sportId: SWIMMING_ID, genderCategory: 'male' });
       if (status) params.set('status', status);
@@ -136,7 +136,7 @@ describe('#1516 대회 목록 — 조건에 맞는 정상 빈 결과', () => {
   describe.each([false, true])('종목 선택: %s', (withSport) => {
     it.each([
       ['in_progress', '진행 중'],
-      ['draft', '준비 중'],
+      ['draft', '모집완료'],
       ['completed', '종료'],
       [null, '전체'],
     ] as const)('%s 상태의 요청·요약·빈 안내가 모순되지 않는다', (status, label) => {

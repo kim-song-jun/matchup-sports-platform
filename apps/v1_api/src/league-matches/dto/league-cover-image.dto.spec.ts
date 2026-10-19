@@ -11,6 +11,14 @@ describe('UpdateLeagueCoverImageDto (전역 ValidationPipe 경로)', () => {
     await expect(parse({ coverImageUrl })).resolves.toMatchObject({ coverImageUrl });
   });
 
+  it.each([null, '/uploads/list.webp'])('목록 이미지만 PATCH할 수 있다: %p', async (listImageUrl) => {
+    await expect(parse({ listImageUrl })).resolves.toMatchObject({ listImageUrl });
+  });
+
+  it.each(['', 'https://example.com/a.png', '/uploads/../a.webp', 123])('잘못된 목록 이미지는 거부한다: %p', async (listImageUrl) => {
+    await expect(parse({ listImageUrl })).rejects.toMatchObject({ status: 400 });
+  });
+
   it.each([
     ['키 누락', {}],
     ['빈 문자열', { coverImageUrl: '' }],

@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react';
 import { TournamentTitle } from '@/components/tournaments/tournament-title';
 import { Trophy } from 'lucide-react';
-import { pendingCapacityLabel, resolveTournamentRegistrationBlock } from '@/lib/tournament-registration-availability';
-import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
+import { pendingCapacityLabel, resolveTournamentCapacity, resolveTournamentRegistrationBlock, type TournamentCapacityInput } from '@/lib/tournament-registration-availability';
+import { getLeagueStatusConfig, getTournamentStatusConfig } from '@/lib/v1-tournament-status';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { formatTournamentDateRangeShort, formatEntryFee } from '@/lib/date-utils';
 import { resolveTournamentImage } from '@/lib/tournament-promo';
@@ -28,9 +28,7 @@ function getPendingPaymentCount(item: Pick<V1TournamentListItem, 'pendingPayment
 }
 
 /**
- * 정원 관련 계산은 **`teamCount` 가 있는 것을 전제로 한다.** 리그에는 정원 개념이 없어
- * 서버가 그 필드를 생략하므로, optional 을 여기서 풀지 않고 **호출부가 대회임을 확인한
- * 뒤 넘기게** 한다 — 여기서 `?? 0` 으로 메우면 리그가 "정원 0" 으로 조용히 흘러든다.
+ * 진행바에는 유한한 참가팀 정원만 전달한다. 무제한 리그의 null을 0으로 바꾸지 않는다.
  */
 type WithCapacity = Pick<V1TournamentListItem, 'confirmedCount' | 'pendingPaymentCount' | 'entryFee'> & {
   teamCount: number;
@@ -92,24 +90,23 @@ export function TournamentCard({
   const now = Date.now();
   const sportAccent = getSportAccent(item.sport.code);
   const pendingPaymentCount = getPendingPaymentCount(item);
-  /**
-   * **정원은 대회에만 있다.** `teamCount` 가 있으면 대회, 없으면 리그다 — 서버가 리그에서
-   * 그 필드를 생략한다(정원 개념이 없다). `isLeagueCompetition` 대신 **필드 유무로** 좁히는
-   * 이유는 그래야 타입이 아래 계산을 실제로 막아 주기 때문이다: `kind` 로 분기하면 TS 는
-   * `teamCount` 가 여전히 `undefined` 일 수 있다고 본다.
-   */
-  const capacity = item.teamCount === undefined ? null : { ...item, teamCount: item.teamCount };
   /* 배지·메타는 **`kind` 로만** 고른다. `isLeagueCompetition` 은 `format==='league'` 인
      **리그 방식 대회**(alpha 실측 7건)도 true 로 주는데, 그건 진짜 대회라 성별부도 정원도
      있다 — 거기에 "리그" 배지를 붙이면 대회를 리그라고 말하는 것이 된다.
      `format` 은 "어떻게 치르나", `kind` 는 "무엇인가"이고 여기 질문은 뒤쪽이다. */
   const isLeague = item.kind === 'regular_league';
-  const reservedTeamCount = capacity === null ? 0 : getReservedTeamCount(capacity);
+  // 리그는 별도 maxTeams, 정규 대회는 기존 teamCount로 정원과 신청 상태를 함께 판정한다.
+  const capacityInput: TournamentCapacityInput | null = isLeague
+    ? { ...item, kind: 'regular_league' }
+    : item.teamCount === undefined ? null : { ...item, teamCount: item.teamCount };
+  const capacity = capacityInput === null ? null : resolveTournamentCapacity(capacityInput);
+  const teamCapacity = capacity?.teamCount ?? null;
+  const finiteCapacity = teamCapacity === null ? null : { ...item, teamCount: teamCapacity };
+  const reservedTeamCount = capacity?.reservedCount ?? item.confirmedCount + pendingPaymentCount;
   // 저장된 open 상태는 마감 후에도 남을 수 있어 상세와 같은 신청 게이트를 쓴다.
-  // 정원이 생략된 리그에는 대회 정원 판정을 적용하지 않는다.
-  const registrationBlocked = capacity !== null && resolveTournamentRegistrationBlock(capacity, new Date(now)) !== null;
+  const registrationBlocked = capacityInput !== null && resolveTournamentRegistrationBlock(capacityInput, new Date(now)) !== null;
   const deadline = item.registrationDeadlineAt ? new Date(item.registrationDeadlineAt).getTime() : null;
-  const hasUpcomingDeadline = capacity !== null && !registrationBlocked
+  const hasUpcomingDeadline = capacityInput !== null && !registrationBlocked
     && deadline !== null && Number.isFinite(deadline) && deadline >= now;
 
   useEffect(() => {
@@ -119,13 +116,12 @@ export function TournamentCard({
     return () => window.clearInterval(timer);
   }, [hasUpcomingDeadline]);
 
-  const isNearlyFull = capacity !== null && capacity.teamCount > 0 && reservedTeamCount / capacity.teamCount >= 0.8;
-  const status = item.status === 'closed'
+  const isNearlyFull = teamCapacity !== null && teamCapacity > 0 && reservedTeamCount / teamCapacity >= 0.8;
+  const status = isLeague ? getLeagueStatusConfig(item.status) : item.status === 'closed'
     ? { ...getTournamentStatusConfig('closed'), label: '모집 마감' }
     : item.status === 'open' && !registrationBlocked && isNearlyFull
       ? { badgeClass: 'tm-badge-orange', label: '거의 마감' }
-      : getTournamentStatusConfig(item.status, registrationBlocked);
-  const displayedTeamCount = capacity ? reservedTeamCount : item.confirmedCount + pendingPaymentCount;
+      : getTournamentStatusConfig(item.status, registrationBlocked, item.kind === 'regular_league');
   // 커버가 없는 대회도 홍보용으로 등록한 실사진이 있으면 아이콘 대신 그 사진을 썸네일로
   // 재사용한다 (셋 다 없으면 종목색 그라디언트+아이콘 폴백).
   const thumbnailImageUrl = resolveTournamentImage(item, 'cover');
@@ -215,9 +211,9 @@ export function TournamentCard({
           </div>
         ) : null}
 
-        {capacity ? (
+        {finiteCapacity ? (
           <div style={{ marginTop: 12 }}>
-            <CapacityMiniBar item={capacity} />
+            <CapacityMiniBar item={finiteCapacity} />
           </div>
         ) : null}
 
@@ -235,11 +231,11 @@ export function TournamentCard({
           )}
           <div className={styles.capacity}>
             <span className={`tm-text-label tab-num ${styles.summary}`}>
-              {capacity
+              {finiteCapacity
                 ? pendingPaymentCount > 0
-                  ? `${item.confirmedCount} + ${pendingPaymentCount} / ${capacity.teamCount} 팀 예약`
-                  : `${item.confirmedCount}/${capacity.teamCount}팀 확정`
-                : `${displayedTeamCount}팀 참가`}
+                  ? `${item.confirmedCount} + ${pendingPaymentCount} / ${finiteCapacity.teamCount} 팀 예약`
+                  : `${item.confirmedCount}/${finiteCapacity.teamCount}팀 확정`
+                : `${reservedTeamCount}팀 참가`}
             </span>
             {pendingPaymentCount > 0 ? (
               <span className={`tm-text-caption ${styles.muted} ${styles.pending}`}>

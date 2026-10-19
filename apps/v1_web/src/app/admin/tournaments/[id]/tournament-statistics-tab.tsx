@@ -4,6 +4,7 @@ import { useV1AdminBracket } from '@/hooks/use-v1-api';
 import type { V1AdminBracketFixture } from '@/types/api';
 import { AdminEmpty, AdminTableSkeleton } from '@/components/admin';
 import { extractErrorMessage } from '@/lib/error-message';
+import { rosterPersonLabel } from '@/lib/roster-presentation';
 
 export type TournamentScorerStat = {
   key: string;
@@ -126,7 +127,8 @@ export function buildTournamentStatistics(
       } else {
         scorers.set(key, {
           key,
-          playerName: goal.playerName,
+          // 운영진에게는 득점자 실명이 함께 온다(`playerRealName`) — 다른 운영 화면과 같은 `실명 (닉네임)`.
+          playerName: rosterPersonLabel({ displayName: goal.playerName, realName: goal.playerRealName }),
           teamName,
           goals: 1,
         });

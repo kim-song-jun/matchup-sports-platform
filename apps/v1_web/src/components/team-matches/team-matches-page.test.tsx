@@ -8,6 +8,7 @@ import { TeamMatchCreatePageView, TeamMatchDetailPageView, TeamMatchListPageView
 import { getTeamMatchCreateViewModel, getTeamMatchDetailViewModel, getTeamMatchListViewModel } from './team-matches.view-model';
 import { TEAM_MATCH_WITHDRAW_CONFIRM } from './team-match-cancel-confirm';
 import type { TeamMatchDetailViewModel, TeamMatchModel } from './team-matches.types';
+import type { V1TeamMatchPeriod } from '@/types/api';
 
 // routerPush를 vi.hoisted로 모듈 스코프에 고정 — useRouter()가 매 렌더 새 vi.fn()을
 // 반환하면 클릭 핸들러가 실제로 호출한 push를 테스트에서 단언할 방법이 없다.
@@ -32,6 +33,40 @@ function renderPage(ui: ReactElement) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
 }
+
+describe('MD-QA #141 saved rules on the actual detail view', () => {
+  it.each([
+    {
+      name: 'single period',
+      periods: [{ code: 'SINGLE_PERIOD', label: '단판', durationMinutes: 37, extraTime: false }],
+      summary: '단판 · 37분',
+    },
+    {
+      name: 'unequal halves',
+      periods: [
+        { code: 'FIRST_HALF', label: '전반', durationMinutes: 17, extraTime: false },
+        { code: 'SECOND_HALF', label: '후반', durationMinutes: 19, extraTime: false },
+      ],
+      summary: '전후반 · 전반 17분 · 후반 19분',
+    },
+    {
+      name: 'historical null pin',
+      periods: null,
+      summary: '저장된 경기 규칙 정보가 없어요.',
+    },
+  ] satisfies readonly { name: string; periods: readonly V1TeamMatchPeriod[] | null; summary: string }[])(
+    'shows $name from saved configuration without inventing scheduled minutes', ({ periods, summary }) => {
+      // Given: the detail model carries actual saved periods, independently of the schedule.
+      const model = getTeamMatchDetailViewModel();
+      const matchWithSavedRules = { ...model.match, periods };
+      model.match = matchWithSavedRules;
+      // When: the actual detail page renders its condition rows.
+      renderPage(<TeamMatchDetailPageView model={model} />);
+      // Then: single, asymmetric and missing historical configurations each have an honest readback.
+      expect(screen.getByText('경기 규칙').closest('.tm-info-row')).toHaveTextContent(summary);
+    },
+  );
+});
 
 describe('team match images', () => {
   it('uses the square image on the list and the wide image on detail', () => {
@@ -671,7 +706,7 @@ describe('TeamMatchCreatePageView — 단계 h1(질문형)과 캡션(단계 이�
     expect(screen.queryByRole('heading', { level: 1, name: '경기조건' })).not.toBeInTheDocument();
   });
 
-  it('5단계(장소와 시간): 캡션은 "장소와 시간", h1 은 질문형 "언제, 어디서 하나요?"', () => {
+  it('6단계(장소와 시간): 캡션은 "장소와 시간", h1 은 질문형 "언제, 어디서 하나요?"', () => {
     renderPage(<TeamMatchCreatePageView model={getTeamMatchCreateViewModel('place-time')} />);
 
     expect(screen.getByRole('heading', { level: 1, name: '언제, 어디서 하나요?' })).toBeInTheDocument();
@@ -711,7 +746,7 @@ describe('팀매치 만들기 진행 표시줄 — 클릭 이동', () => {
     expect(screen.getByRole('button', { name: '3단계 매치 정보로 이동' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '4단계 경기조건으로 이동' })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: '5단계 장소와 시간으로 이동' }));
+    fireEvent.click(screen.getByRole('button', { name: '6단계 장소와 시간으로 이동' }));
     expect(onGoToStep).toHaveBeenCalledWith('place-time');
   });
 

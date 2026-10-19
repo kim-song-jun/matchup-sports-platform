@@ -5,6 +5,9 @@ export interface V1AdminLeagueListItem {
   title: string;
   isPublic: boolean;
   state: 'draft' | 'active' | 'completed' | 'on_hold';
+  /** 저장된 리그 단계. draft/open/closed는 모두 운영자 시작 전 모집완료로 표시한다. */
+  lifecycleStatus?: import('./api').V1TournamentStatus | 'on_hold';
+  registrationOpen?: boolean;
   teamCount: number;
   fixtureCount: number;
   startsOn: string;
@@ -175,6 +178,8 @@ export interface V1LeagueFixture {
 export interface V1AdminLeagueDetail {
   leagueId: string;
   title: string;
+  /** 기존 state에서 합쳐진 draft/open/closed를 구분한다. */
+  lifecycleStatus?: import('./api').V1TournamentStatus | 'on_hold';
   state: 'draft' | 'active' | 'completed' | 'on_hold';
   /** 공개 리그 목록·상세에 노출되는지 여부. 관리자 상세는 항상 값을 내려준다. */
   isPublic: boolean;
@@ -203,6 +208,12 @@ export interface V1AdminLeagueDetail {
   /** 팀 명단 인원. maxPlayers 가 null 이면 제한 없음. */
   minPlayers?: number;
   maxPlayers?: number | null;
+  /** 참가팀 정원. null이면 무제한이며 선수 정원·대진 템플릿과 독립이다. */
+  maxTeams: number | null;
+  /** 모든 유입 경로의 확정 팀 수(seed·승계 포함). */
+  confirmedCount: number;
+  /** 모든 유입 경로의 awaiting_payment·payment_checking·paid 팀 수. */
+  pendingPaymentCount: number;
   /** 리그를 만들 때 정한 총 경기 수(계획). 대진 생성 폼의 기본값. */
   plannedFixtureCount?: number | null;
   /**
@@ -219,6 +230,7 @@ export interface V1AdminLeagueDetail {
   /** 대표 이미지의 종목 그래픽 폴백(`CompetitionThumbnail`)에 쓴다. */
   sportCode: string;
   coverImageUrl: string | null;
+  listImageUrl?: string | null;
   /** 리그 기본 장소(새 경기가 상속한다). 경기 상세의 "이 경기만 장소가 달라요" 판정 기준이다. */
   defaultPlace?: V1PlaceView | null;
   entryFee: number;
@@ -342,13 +354,15 @@ export interface V1UpdateLeagueEntryFeeResult {
 }
 
 export interface V1UpdateLeagueCoverImagePayload {
-  /** `null` = 대표 이미지 제거. */
-  coverImageUrl: string | null;
+  /** 생략은 유지, `null`은 해당 이미지만 제거. 최소 하나의 키를 전달한다. */
+  coverImageUrl?: string | null;
+  listImageUrl?: string | null;
 }
 
 export interface V1UpdateLeagueCoverImageResult {
   leagueId: string;
   coverImageUrl: string | null;
+  listImageUrl?: string | null;
   alreadyProcessed: boolean;
 }
 
@@ -372,6 +386,8 @@ export interface V1CreateLeaguePayload {
   minPlayers?: number;
   /** null = 팀 명단 인원 제한 없음. */
   maxPlayers?: number | null;
+  /** null·생략 = 참가팀 정원 무제한. */
+  maxTeams?: number | null;
   plannedFixtureCount?: number;
 }
 
@@ -661,7 +677,7 @@ export interface V1LeagueStandingsResponse {
    * 그룹 B(시즌 결산·시상 화면 감사) — 종료된 리그의 우승팀. `state !== 'completed'`
    * 인 리그(draft/active)는 "우승"이라는 개념 자체가 성립하지 않아 항상 빈 배열이다.
    * 서버가 항상 키를 내려주므로 optional 이 아니다 -- 화면은 `champions.length === 0`
-   * 을 "아직 우승팀 없음"으로 그대로 읽으면 된다(진행 중인지 준비 중인지는 이 응답만으로
+   * 을 "아직 우승팀 없음"으로 그대로 읽으면 된다(진행 중인지 모집완료인지는 이 응답만으로
    * 구분할 필요가 없다 -- 우승 배지를 안 그리면 그만이다).
    * 새 계산이 아니라 이미 계산해 둔 tieBreakGroups(H-5)에서 1위 팀이 속한 그룹을 그대로
    * 찾아 쓴다 -- 별도의 "공동 우승 판정" 로직을 새로 만들지 않는다.

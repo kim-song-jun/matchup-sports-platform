@@ -10,6 +10,7 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { legacyAwardIconKey, TOURNAMENT_AWARD_ICON_OPTIONS, TournamentAwardIcon } from '@/components/tournaments/tournament-award-icon';
 import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-picker';
 import { randomUuid } from '@/lib/uuid';
+import { rosterPersonLabel } from '@/lib/roster-presentation';
 
 
 // ── Tab: Individual Awards ────────────────────────────────────────────────
@@ -257,9 +258,11 @@ function AwardRow({
   // 그 에러를 따로 보여주지 않고 빈 목록으로 처리해서 "명단에 선수가 없다" 처럼 보였다.
   const { data: roster, isFetching: rosterFetching } =
     useV1AdminTournamentPlayers(selectedRegistrationId);
-  const playerItems: EntityPickerItem[] = (roster?.players ?? []).map((p) => ({
+  const players = roster?.players ?? [];
+  // 다른 운영 화면과 같은 `실명 (닉네임)` 으로 고른다. 닉네임이 없으면 실명만.
+  const playerItems: EntityPickerItem[] = players.map((p) => ({
     id: p.userId,
-    label: p.realName,
+    label: p.nickname ? rosterPersonLabel({ realName: p.realName, displayName: p.nickname }) : p.realName,
   }));
   const recipientValue: EntityPickerItem | null = row.recipientName
     ? (playerItems.find((it) => it.id === row.recipientUserId) ?? { id: row.recipientUserId, label: row.recipientName })
@@ -303,7 +306,8 @@ function AwardRow({
             id={`award-recipient-${idx}`}
             value={recipientValue}
             onChange={(item) => {
-              update(idx, 'recipientName', item?.label ?? '');
+              // 저장하는 수상자 이름은 예전처럼 등록 실명이다 — 고를 때 보이는 라벨(`실명 (닉네임)`)을 저장하지 않는다.
+              update(idx, 'recipientName', item ? (players.find((p) => p.userId === item.id)?.realName ?? item.label) : '');
               update(idx, 'recipientUserId', item?.id ?? '');
             }}
             items={playerItems}

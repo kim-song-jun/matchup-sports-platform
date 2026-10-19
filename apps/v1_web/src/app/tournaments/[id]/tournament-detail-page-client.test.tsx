@@ -214,7 +214,7 @@ describe('TournamentDetailPageClient GA events', () => {
     render(<TournamentDetailPageClient tournamentId="tournament-1" />);
 
     await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
-    const rail = screen.getByRole('complementary', { name: '리그 참가 신청' });
+    const rail = screen.getByRole('complementary', { name: '리그 진행 상태' });
     expect(within(rail).getByRole('link', { name: '참가 신청하기' })).toHaveAttribute(
       'href', '/tournaments/tournament-1/my',
     );
@@ -418,7 +418,7 @@ describe('TournamentDetailPageClient — 우리 팀 참가 카드(Task 180 R-1 A
     const title = await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
     const heading = await screen.findByRole('heading', { level: 2, name: '우리 팀 참가' });
     expect(title.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.getByRole('link', { name: '마포 FC 참가 명단 수정하기' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: '마포 FC 참가 선수 관리' })).toHaveAttribute(
       'href',
       `/tournaments/tournament-1/registrations/reg-1/roster?from=${encodeURIComponent('/tournaments/tournament-1')}`,
     );

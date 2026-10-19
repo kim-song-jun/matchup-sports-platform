@@ -1,12 +1,40 @@
 import { IsPlaceLatitude, IsPlaceLongitude, IsPlaceProvider, IsPlaceProviderId } from '../../places/place-snapshot';
 import { GENDER_RULES } from '../../common/gender-rule';
-import { ArrayMaxSize, IsArray, IsDateString, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength, IsIn } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
+  IsDateString,
+  IsIn,
+  IsInt,
+  IsNotEmpty,
+  IsObject,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  MaxLength,
+  Min,
+  ValidateIf,
+  ValidateNested,
+} from 'class-validator';
 import {
   MATCH_FORMAT_MAX_LENGTH,
   MATCH_STYLE_ITEM_MAX_LENGTH,
   MATCH_STYLE_MAX_ITEMS,
   UNIFORM_COLOR_MAX_LENGTH,
 } from '../team-match-conditions.constants';
+import { MAX_TEAM_MATCH_PERIOD_MINUTES } from '../team-match-periods.constants';
+
+export class TeamMatchPeriodSettingDto {
+  // Preserve JSON number types instead of implicitly converting strings or booleans.
+  @Transform(({ obj, key }: { obj: Record<string, unknown>; key: string }): unknown => obj[key])
+  @IsInt()
+  @Min(1)
+  @Max(MAX_TEAM_MATCH_PERIOD_MINUTES)
+  durationMinutes!: number;
+}
 
 export class MutateTeamMatchDto {
   @IsUUID()
@@ -22,7 +50,11 @@ export class MutateTeamMatchDto {
   @IsNotEmpty()
   regionId!: string;
 
+  // 웹 폼은 title.trim() 으로 막지만 서버가 받아 주면 API 직접 호출로 제목 없는
+  // 팀매치가 만들어진다(MD-QA #163). 경계에서 trim 한 뒤 빈 값을 거절한다.
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
+  @IsNotEmpty({ message: '매치 제목을 입력해 주세요.' })
   @MaxLength(100)
   title!: string;
 
@@ -80,6 +112,15 @@ export class MutateTeamMatchDto {
   @IsString()
   @MaxLength(2000)
   rulesText?: string | null;
+
+  @ValidateIf((_object, value: unknown) => value !== undefined)
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(2)
+  @IsObject({ each: true })
+  @ValidateNested({ each: true })
+  @Type(() => TeamMatchPeriodSettingDto)
+  periods?: TeamMatchPeriodSettingDto[];
 
   @IsOptional()
   @IsString()

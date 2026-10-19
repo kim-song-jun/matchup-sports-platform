@@ -1,6 +1,7 @@
 import type { Prisma } from '@prisma/client';
 import { fillLeagueTeamRoster, notifyLeagueRosterFillOutcomes } from '../../league-matches/league-roster-autofill';
 import { loadGameRoster, loadJerseyRegistration } from './game-roster-loader';
+import { leagueTeamRosterBase, readLeagueTeamRosters } from '../../league-matches/league-fixture-creation';
 
 // 조회가 자동 채움(쓰기·알림)을 부르는지 본다. 동기화 쓰기 경로의 호출은 game-roster-sync.spec 이 본다.
 jest.mock('../../league-matches/league-roster-autofill', () => ({
@@ -47,7 +48,14 @@ function fakeTx(world: FakeWorld) {
     },
     v1TournamentRegistration: {
       findFirst: jest.fn(async () => world.registration ?? null),
-      findMany: jest.fn(async () => world.leagueRegistrations ?? []),
+      findMany: jest.fn(async (args: Prisma.V1TournamentRegistrationFindManyArgs) =>
+        (world.leagueRegistrations ?? []).map((registration) => ({
+          id: registration.id,
+          teamId: registration.teamId,
+          players: registration.players,
+          ...(args.select?._count ? { _count: registration._count } : {}),
+        })),
+      ),
     },
     v1Team: {
       findMany: jest.fn(async () =>
@@ -210,6 +218,57 @@ describe('loadGameRoster — 대회 경기', () => {
 });
 
 describe('loadGameRoster — 리그 폴백 팀(참가 명단 없음)', () => {
+  it('MD-QA #146: 등록 선수를 전원 제거한 명단은 팀원 폴백으로 복구하지 않는다', async () => {
+    // Given: 현재 활성 선수는 없지만 제거된 등록 선수 행 두 개는 남아 있다.
+    const tx = fakeTx({
+      teamMatch: { id: 'lm-1', tournamentId: 'league-1', leagueId: 'league-1', startAt: KICKOFF },
+      sideTeamId: 'team-A',
+      leagueTeam: {
+        memberships: [
+          { id: 'ms-1', userId: 'u1', user: PROFILE('하나') },
+          { id: 'ms-2', userId: 'u2', user: PROFILE('둘') },
+        ],
+      },
+      leagueRegistrations: [{ id: 'lreg-removed', teamId: 'team-A', players: [], _count: { players: 2 } }],
+    });
+
+    // When: 경기 명단의 실제 읽기 경로가 현재 참가자를 계산한다.
+    const loaded = await loadGameRoster(tx, { gameId: 'game-1', sideId: 'side-1' });
+
+    // Then: 명시적으로 비운 등록 명단이 유지되고 제거한 팀원은 다시 출전하지 않는다.
+    expect(loaded).toMatchObject({
+      baseSource: 'REGISTRATION',
+      base: [],
+      computation: { participants: [], suspended: [], unavailable: [], excluded: [] },
+    });
+  });
+
+  it.each([
+    { historicalPlayers: 2, expectedUserIds: [] },
+    { historicalPlayers: 0, expectedUserIds: ['u1', 'u2'] },
+  ])('MD-QA #146: 리그 생성·동기화 기준은 총 등록 행 $historicalPlayers개를 구분한다', async ({ historicalPlayers, expectedUserIds }) => {
+    // Given: 활성 등록 선수 수는 같아도 과거 등록 행 존재 여부는 다르다.
+    const tx = fakeTx({
+      teamMatch: { id: 'lm-1', tournamentId: 'league-1', leagueId: 'league-1', startAt: KICKOFF },
+      sideTeamId: 'team-A',
+      leagueTeam: {
+        memberships: [
+          { id: 'ms-1', userId: 'u1', user: PROFILE('하나') },
+          { id: 'ms-2', userId: 'u2', user: PROFILE('둘') },
+        ],
+      },
+      leagueRegistrations: [{ id: 'lreg-1', teamId: 'team-A', players: [], _count: { players: historicalPlayers } }],
+    });
+
+    // When: 실제 DB 로더 결과를 생성·동기화의 공용 기준 명단 함수에 넘긴다.
+    const teams = await readLeagueTeamRosters(tx, 'league-1', ['team-A']);
+    const base = [...teams.values()].flatMap(leagueTeamRosterBase);
+
+    // Then: 행이 한 번도 없던 등록만 팀원 기본값을 쓰고 기존 삭제 이력을 보존한다.
+    expect(base.map((entry) => entry.userId)).toEqual(expectedUserIds);
+    expect(base.every((entry) => entry.accountLinked === false)).toBe(true);
+  });
+
   it('팀 활성 멤버가 기준이고, 멤버십 userId 로 조정이 걸리며 출전자는 계정 연결 없음이다', async () => {
     const tx = fakeTx({
       teamMatch: { id: 'lm-1', tournamentId: 'league-1', leagueId: 'league-1', startAt: KICKOFF },
@@ -294,6 +353,11 @@ describe('loadJerseyRegistration — 등번호 원본 신청은 참가 명단 �
     return { tx: { v1TournamentRegistration: { findFirst } } as unknown as Prisma.TransactionClient, findFirst };
   };
   const managerInput = { baseSource: 'REGISTRATION', isTeamManager: true } as const;
+
+  it('활성 팀원의 참가 명단 탭을 위해 조회용 신청 id를 확인할 수 있다', async () => {
+    const { tx } = registrationTx(registrationRow());
+    await expect(loadJerseyRegistration(tx, scope, { baseSource: 'REGISTRATION', isTeamManager: false, isTeamMember: true })).resolves.toMatchObject({ id: 'reg-1' });
+  });
 
   it('팀장·매니저가 참가 명단 기준 경기를 보면 그 팀의 confirmed 신청 id 를 준다', async () => {
     const { tx, findFirst } = registrationTx(registrationRow());

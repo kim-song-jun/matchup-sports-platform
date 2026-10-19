@@ -93,7 +93,7 @@ describe('CompetitionEntrySection — 팀장', () => {
     expect(within(entry).getByRole('heading', { name: '우리 팀 참가' })).toBeInTheDocument();
     expect(within(entry).getByText('참가 확정')).toBeInTheDocument();
     expect(within(entry).getByText('선수 10명')).toBeInTheDocument();
-    expect(within(entry).getByRole('link', { name: '마포 FC 참가 명단 수정하기' })).toHaveAttribute(
+    expect(within(entry).getByRole('link', { name: '마포 FC 참가 선수 관리' })).toHaveAttribute(
       'href',
       `/tournaments/comp-1/registrations/reg-1/roster${FROM}`,
     );
@@ -109,13 +109,13 @@ describe('CompetitionEntrySection — 팀장', () => {
   it('초안 리그는 고칠 수 있고, 같은 초안이라도 일반 대회는 아직 못 고친다(명단 화면과 같은 판정)', async () => {
     competition = { ...competition, status: 'draft', kind: 'regular_league' };
     const { unmount } = renderSection();
-    expect(await screen.findByRole('link', { name: '마포 FC 참가 명단 수정하기' })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: '마포 FC 참가 선수 관리' })).toBeInTheDocument();
     unmount();
 
     competition = { ...competition, status: 'draft', kind: 'regular_tournament' };
     renderSection();
     const entry = await card('마포 FC');
-    expect(within(entry).getByRole('link', { name: '마포 FC 참가 명단 보기' })).toBeInTheDocument();
+    expect(within(entry).getByRole('link', { name: '마포 FC 참가 선수 보기' })).toBeInTheDocument();
     expect(within(entry).getByText('수정 불가')).toBeInTheDocument();
     expect(within(entry).getByText(/대회가 아직 공개되지 않아/)).toBeInTheDocument();
   });
@@ -130,7 +130,7 @@ describe('CompetitionEntrySection — 팀장', () => {
     renderSection();
     const entry = await card('마포 FC');
     expect(within(entry).getByText('제출 마감')).toBeInTheDocument();
-    expect(within(entry).getByRole('link', { name: '마포 FC 참가 명단 보기' })).toBeInTheDocument();
+    expect(within(entry).getByRole('link', { name: '마포 FC 참가 선수 보기' })).toBeInTheDocument();
     expect(within(entry).getByText(/명단 제출 마감\(9월 26일 \(토\) 오후 11:59\)이 지났어요\./)).toBeInTheDocument();
     expect(within(entry).getByText(/경기 명단에서 뺄 수 있어요/)).toBeInTheDocument();
     const next = await within(entry).findByRole('link', { name: /^다음 경기 명단 열기/ });
@@ -143,7 +143,7 @@ describe('CompetitionEntrySection — 팀장', () => {
     registrations = [registration({ rosterDeadlineOverrideAt: '2026-09-27T00:00:00.000Z' })];
     renderSection();
     const entry = await card('마포 FC');
-    expect(within(entry).getByRole('link', { name: '마포 FC 참가 명단 수정하기' })).toBeInTheDocument();
+    expect(within(entry).getByRole('link', { name: '마포 FC 참가 선수 관리' })).toBeInTheDocument();
     expect(within(entry).getByText(/운영진이 수정을 열어 뒀어요/)).toBeInTheDocument();
     expect(within(entry).queryByText('제출 마감')).not.toBeInTheDocument();
   });
@@ -159,7 +159,7 @@ describe('CompetitionEntrySection — 팀장', () => {
     renderSection();
     const entry = await card('마포 FC');
     expect(within(entry).getByText('수정 불가')).toBeInTheDocument();
-    expect(within(entry).getByRole('link', { name: '마포 FC 참가 명단 보기' })).toBeInTheDocument();
+    expect(within(entry).getByRole('link', { name: '마포 FC 참가 선수 보기' })).toBeInTheDocument();
     expect(within(entry).getByRole('link', { name: '신청 내역' })).toBeInTheDocument();
     await settle();
     expect(requests.some((path) => path.endsWith('/upcoming-games'))).toBe(false);
@@ -171,7 +171,7 @@ describe('CompetitionEntrySection — 팀원·여러 팀', () => {
     myTeams = [{ teamId: 'team-a', role: 'member', name: '마포 FC' }];
     renderSection();
     const entry = await card('마포 FC');
-    expect(within(entry).getByRole('link', { name: '마포 FC 참가 명단 보기' })).toHaveAttribute(
+    expect(within(entry).getByRole('link', { name: '마포 FC 참가 선수 보기' })).toHaveAttribute(
       'href',
       `/tournaments/comp-1/registrations/reg-1/roster${FROM}`,
     );
@@ -188,7 +188,7 @@ describe('CompetitionEntrySection — 팀원·여러 팀', () => {
 
     myTeams = [{ teamId: 'team-a', role: 'owner', name: '마포 FC' }];
     const owner = renderSection();
-    expect(await screen.findByRole('link', { name: '마포 FC 참가 명단 수정하기' })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: '마포 FC 참가 선수 관리' })).toBeInTheDocument();
     expect(screen.queryByText('팀장에게 요청')).not.toBeInTheDocument();
     owner.unmount();
 
@@ -212,8 +212,8 @@ describe('CompetitionEntrySection — 팀원·여러 팀', () => {
     renderSection();
     const a = await card('마포 FC');
     const b = await card('합정 유나이티드');
-    expect(within(a).getByRole('link', { name: '마포 FC 참가 명단 수정하기' })).toBeInTheDocument();
-    expect(within(b).getByRole('link', { name: '합정 유나이티드 참가 명단 보기' })).toHaveAttribute(
+    expect(within(a).getByRole('link', { name: '마포 FC 참가 선수 관리' })).toBeInTheDocument();
+    expect(within(b).getByRole('link', { name: '합정 유나이티드 참가 선수 보기' })).toHaveAttribute(
       'href',
       `/tournaments/comp-1/registrations/reg-2/roster${FROM}`,
     );

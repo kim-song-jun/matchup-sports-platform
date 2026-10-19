@@ -130,7 +130,7 @@ describe('buildNextAction — 하단 바의 다음 할 일', () => {
   it('리그 대진은 명단 조정보다 결과 입구가 먼저이고, 취소되면 아무것도 없다', () => {
     const league = { ...base, opponentAssigned: true, lineupAction: { kind: 'match-roster' as const, href: '/roster' }, resultAction: { label: '경기 결과 보기', href: '/r' } };
     expect(buildNextAction(league)?.label).toBe('경기 결과 보기');
-    expect(buildNextAction({ ...league, resultAction: null })).toEqual({ label: '명단 조정', href: '/roster', tone: 'neutral' });
+    expect(buildNextAction({ ...league, resultAction: null })).toEqual({ label: '출전 명단 조정', href: '/roster', tone: 'neutral' });
     expect(buildNextAction({ ...league, cancelled: true })).toBeUndefined();
   });
 });

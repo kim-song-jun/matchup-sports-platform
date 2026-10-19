@@ -284,7 +284,7 @@ describe('LeagueMatchStandingsClient', () => {
     );
 
     // R7: 리그 상태 배지
-    await waitFor(() => expect(screen.getByText('진행 중')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('시즌 진행 중')).toBeInTheDocument());
 
     // R1: 경기 일정 행 — 팀 이름은 standings 매핑으로 채워지고, 행 전체가 team-matches 링크다.
     const scheduled = container.querySelector('a[href="/league-matches/league-1/fixtures/tm-10"]');
@@ -1684,12 +1684,24 @@ describe('리그 참가 신청 입구', () => {
 
   function mockLeague(extra: Record<string, unknown>) {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1LeagueMatchStandingsMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', tier: null, tierLabel: null, tieBreakOrder: ['points'],
+        standings: [], pendingFixtures: [], champions: [], cancelledFixtureCount: 0,
+        promotionDecided: false, promotionForecast: null, tieBreakGroups: [],
+      },
+      isPending: false,
+    });
+    useV1LeagueMatchPlayerRecordsMock.mockReturnValue({
+      data: { leagueId: 'league-1', goals: [], assists: [], hiddenByEligibility: false },
+      isPending: false,
+    });
     useV1LeagueMatchMock.mockReturnValue({
       data: {
         leagueId: 'league-1', title: '가을 리그', state: 'active', registrationOpen: false, registrationDeadlineAt: null, sportCode: 'futsal', coverImageUrl: null, entryFee: 0, entryFeeConfigured: false,
         startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z',
         teamIds: [], fixtures: [], seriesId: null, tier: null, tierLabel: null, seasonNo: null,
-        seriesSiblings: [],
+        seriesSiblings: [], maxTeams: null, confirmedCount: 0, pendingPaymentCount: 0,
         ...extra,
       },
       isPending: false,
@@ -1706,6 +1718,86 @@ describe('리그 참가 신청 입구', () => {
     await waitFor(() => expect(screen.getByText('모집 중')).toBeInTheDocument());
     // A안: 리그 전용 신청 화면을 새로 만들지 않고 대회와 같은 폼으로 보낸다.
     expect(container.querySelector('a[href="/tournaments/league-1/apply"]')).toBeInTheDocument();
+  });
+
+  it.each([
+    { confirmedCount: 2, pendingPaymentCount: 0 },
+    { confirmedCount: 1, pendingPaymentCount: 1 },
+    { confirmedCount: 0, pendingPaymentCount: 2 },
+  ])('참가팀 정원이 차면 실제 점유 수($confirmedCount 확정 + $pendingPaymentCount 입금 대기)로 마감 이유를 안내한다', async ({ confirmedCount, pendingPaymentCount }) => {
+    mockLeague({
+      registrationOpen: false,
+      registrationDeadlineAt: '2099-10-12T14:59:00.000Z',
+      maxTeams: 2,
+      confirmedCount,
+      pendingPaymentCount,
+    });
+
+    render(<LeagueMatchStandingsClient leagueId="league-1" />);
+
+    expect(await screen.findByText(/참가팀 정원이 모두 차서 신청이 마감됐어요/)).toBeInTheDocument();
+    expect(screen.queryByText(/10월 12일.*에 마감됐어요/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '참가 신청' })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    { label: '무제한', maxTeams: null, confirmedCount: 20, pendingPaymentCount: 10 },
+    { label: '정원 미달', maxTeams: 3, confirmedCount: 1, pendingPaymentCount: 1 },
+  ])('$label 리그는 정원 마감 문구 없이 서버의 열린 신청 입구를 유지한다', async ({ maxTeams, confirmedCount, pendingPaymentCount }) => {
+    mockLeague({
+      registrationOpen: true,
+      registrationDeadlineAt: '2099-10-12T14:59:00.000Z',
+      maxTeams,
+      confirmedCount,
+      pendingPaymentCount,
+    });
+
+    render(<LeagueMatchStandingsClient leagueId="league-1" />);
+
+    expect(await screen.findByRole('link', { name: '참가 신청' })).toHaveAttribute('href', '/tournaments/league-1/apply');
+    expect(screen.queryByText(/참가팀 정원이 모두 차서/)).not.toBeInTheDocument();
+    expect(screen.getByText('모집 중')).toBeInTheDocument();
+  });
+
+  it('정원이 남아도 신청 기한이 지났으면 정원 마감 대신 실제 마감 시각을 안내한다', async () => {
+    mockLeague({
+      registrationOpen: false,
+      registrationDeadlineAt: '2020-01-01T00:00:00.000Z',
+      maxTeams: 3,
+      confirmedCount: 1,
+      pendingPaymentCount: 1,
+    });
+
+    render(<LeagueMatchStandingsClient leagueId="league-1" />);
+
+    expect(await screen.findByText(/1월 1일.*에 마감됐어요/)).toBeInTheDocument();
+    expect(screen.queryByText(/참가팀 정원이 모두 차서/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '참가 신청' })).not.toBeInTheDocument();
+  });
+
+  it.each([false, true])('정원 마감 후 다음 회차 CTA는 다음 회차의 registrationOpen(%s)을 유지한다', async (registrationOpen) => {
+    mockLeague({
+      registrationOpen: false,
+      registrationDeadlineAt: '2099-10-12T14:59:00.000Z',
+      maxTeams: 2,
+      confirmedCount: 1,
+      pendingPaymentCount: 1,
+      nextRound: {
+        leagueId: 'league-2', title: '겨울 리그', seasonNo: 2,
+        startsOn: '2099-12-01T00:00:00.000Z', endsOn: '2100-01-31T14:59:59.000Z',
+        registrationOpen, registrationDeadlineAt: '2099-11-20T14:59:00.000Z',
+      },
+    });
+
+    render(<LeagueMatchStandingsClient leagueId="league-1" />);
+
+    expect(await screen.findByText(/참가팀 정원이 모두 차서 신청이 마감됐어요/)).toBeInTheDocument();
+    if (registrationOpen) {
+      expect(screen.getByRole('link', { name: '다음 회차로 신청하기' })).toHaveAttribute('href', '/tournaments/league-2/apply');
+    } else {
+      expect(screen.queryByRole('link', { name: '다음 회차로 신청하기' })).not.toBeInTheDocument();
+      expect(screen.getByRole('link', { name: '다른 리그 둘러보기' })).toHaveAttribute('href', '/tournaments?kind=league');
+    }
   });
 
   it('비로그인에게는 내 신청을 조회하지 않는다 — 공개 화면에서 401 을 쏘지 않는다', async () => {

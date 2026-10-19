@@ -95,6 +95,7 @@ beforeEach(() => {
   vi.mocked(useV1LeagueMatch, { partial: true }).mockReturnValue({
     data: {
       leagueId: 'league-one', title: '검증 리그', state: 'completed', teamIds: ['team-home', 'team-away'],
+      maxTeams: null, confirmedCount: 2, pendingPaymentCount: 0,
       startsOn: '2026-08-01T00:00:00.000Z', endsOn: '2026-08-02T00:00:00.000Z', registrationDeadlineAt: null, registrationOpen: false, sportCode: 'futsal', coverImageUrl: null, entryFee: 0, entryFeeConfigured: false, seriesSiblings: [],
       fixtures: [{ teamMatchId: 'fixture-one', title: '검증 경기', homeTeamId: 'team-home', awayTeamId: 'team-away', startAt: '2026-08-01T10:00:00.000Z', placeName: '합성 검증장', status: 'completed', homeScore: 1, awayScore: 0 }],
     }, isError: false,
@@ -221,7 +222,7 @@ describe('실제 리그 caller → shared 선수 링크', () => {
     setLocation(fixturePath);
     render(fixture);
     expect(playerUrl(players[2][0]).searchParams.get('from')).toBe(fixturePath);
-    expect(screen.getByRole('link', { name: '전체 순위표·일정 보기' })).toHaveAttribute('href', '/tournaments/league-one');
+    expect(screen.getByRole('link', { name: '전체 순위표·일정 보기' })).toHaveAttribute('href', '/tournaments/league-one/bracket?tab=standings');
   });
 
   it.each(['https://outside.example/record', '//outside.example/record', '/\\outside.example/record', '/..//outside.example/record', 'javascript:alert(1)', '/login?from=%2Fhome'])('외부/비정상 부모 %s는 선수 복귀 체인에 남기지 않는다', (parent) => {
@@ -232,7 +233,7 @@ describe('실제 리그 caller → shared 선수 링크', () => {
     expect(target.searchParams.get('view')).toBe('record');
     expect(target.searchParams.has('from')).toBe(false);
     expect(target.hash).toBe(anchor);
-    expect(screen.getByRole('link', { name: '전체 순위표·일정 보기' })).toHaveAttribute('href', '/tournaments/league-one');
+    expect(screen.getByRole('link', { name: '전체 순위표·일정 보기' })).toHaveAttribute('href', '/tournaments/league-one/bracket?tab=standings');
   });
 
   it('서버가 profileHref:null을 주면 실제 caller에도 선수 링크가 생기지 않는다', () => {

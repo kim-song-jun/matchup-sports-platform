@@ -40,7 +40,8 @@ import {
   createTeamMatchScheduleInTx,
   syncTeamMatchScheduleInTx,
 } from '../team-schedules/team-schedules.service';
-import { resolveTeamMatchCompetitionConfig } from './resolve-team-match-competition-config';
+import { readTeamMatchCompetitionConfig, readTeamMatchRuleDefaults, readTeamMatchTwoPeriodDefaults, resolveTeamMatchCompetitionConfig, resolveTeamMatchPeriodConfig } from './resolve-team-match-competition-config';
+import { readTeamMatchRulesGame, repinTeamMatchRules, teamMatchRulesEditable } from './team-match-rule-repin';
 import { hydrateApprovedTeamMatchAwaySnapshot } from './team-match-game-snapshot';
 import { assertCreatorProfileComplete } from '../profile/creator-profile.guard';
 import { computePublicTeamRatingBatch, computeRevealedTeamTrustBatch } from '../reviews/team-trust-aggregation';
@@ -275,6 +276,7 @@ export class TeamMatchesService {
         },
         // 취소·보관된 모집은 status 필터를 직접 지정해도 공개 검색에 노출하지 않는다.
         { status: { notIn: ['cancelled', 'archived'] } },
+        ...staleFriendlyTeamMatchWhere(now),
       ],
       ...(status === 'expired'
         ? { startAt: { lt: now } }
@@ -313,7 +315,7 @@ export class TeamMatchesService {
 
   async detail(user: V1AuthUser | null, teamMatchId: string) {
     const now = new Date();
-    const teamMatch = await this.getPublicTeamMatch(teamMatchId, user, { includeTrust: true });
+    const teamMatch = await this.getPublicTeamMatch(teamMatchId, user, { includeTrust: true, includeCancelledLeague: true });
     const participantTeamIds = [teamMatch.hostTeamId, teamMatch.approvedApplicantTeamId]
       .filter((teamId): teamId is string => teamId !== null);
     const [winsByTeam, ratingsByTeam] = await Promise.all([
@@ -321,6 +323,9 @@ export class TeamMatchesService {
       computePublicTeamRatingBatch(this.prisma, participantTeamIds),
     ]);
     const viewer = await this.getViewer(teamMatch, user);
+    const competitionConfig = teamMatch.competitionConfigVersionId
+      ? await readTeamMatchCompetitionConfig(this.prisma, teamMatch.competitionConfigVersionId)
+      : null;
     const apiStatus = this.getApiStatus(teamMatch, now);
     const approvedApplication = teamMatch.applications.find(
       (item) => item.status === 'approved' && item.applicantTeamId === teamMatch.approvedApplicantTeamId,
@@ -366,6 +371,7 @@ export class TeamMatchesService {
       minLevel: teamMatch.minSportLevel ? { code: teamMatch.minSportLevel.code, name: teamMatch.minSportLevel.name } : null,
       maxLevel: teamMatch.maxSportLevel ? { code: teamMatch.maxSportLevel.code, name: teamMatch.maxSportLevel.name } : null,
       rulesText: this.formatMatchConditionsRulesText(teamMatch),
+      periods: competitionConfig?.config.periods ?? null,
       genderRule: normalizeGenderRule(teamMatch.genderRule),
       matchFormat: teamMatch.matchFormat,
       matchStyle: teamMatch.matchStyle,
@@ -469,6 +475,18 @@ export class TeamMatchesService {
       if (items.length >= 5) break;
     }
     return { items };
+  }
+
+  async ruleOptions(user: V1AuthUser, teamId: string) {
+    this.assertActiveAccount(user);
+    const membership = await this.assertCanManageTeam(user.id, teamId);
+    const defaults = await readTeamMatchRuleDefaults(this.prisma, membership.team.sportId);
+    if (!defaults.current) throw new ConflictException({ code: defaults.blockedReason, message: '이 종목에 단판·전후반으로 변경할 수 있는 활성 경기 설정이 필요해요.' });
+    const current = defaults.current;
+    return {
+      hostTeamId: teamId, sportId: membership.team.sportId, competitionConfigVersionId: current.id,
+      periods: current.config.periods, twoPeriodDefaults: await readTeamMatchTwoPeriodDefaults(this.prisma, current),
+    };
   }
 
   async applicationEligibility(
@@ -749,6 +767,13 @@ export class TeamMatchesService {
         dto.sportId,
         user.id,
       );
+      if (dto.periods !== undefined) {
+        const custom = await resolveTeamMatchPeriodConfig(tx, {
+          sportId: dto.sportId, currentConfigVersionId: source.competitionConfigVersionId,
+          periods: dto.periods, actorUserId: user.id,
+        });
+        source.competitionConfigVersionId = custom.id;
+      }
       const levelRange = await resolveSportLevelRange(tx, dto.sportId, dto.minLevelCode, dto.maxLevelCode);
       const conditionFields = this.normalizeMatchConditionFields(dto);
       const created = await tx.v1TeamMatch.create({
@@ -816,10 +841,22 @@ export class TeamMatchesService {
     const teamMatch = await this.getManageableTeamMatch(user, teamMatchId);
     const apiStatus = this.getApiStatus(teamMatch);
     const editable = ['recruiting', 'closed'].includes(teamMatch.status) && !teamMatch.approvedApplicantTeamId;
+    const competitionConfig = teamMatch.competitionConfigVersionId
+      ? await readTeamMatchCompetitionConfig(this.prisma, teamMatch.competitionConfigVersionId)
+      : null;
+    const game = await readTeamMatchRulesGame(this.prisma, teamMatch.id);
+    const defaults = await readTeamMatchRuleDefaults(this.prisma, teamMatch.sportId);
+    const rulesLockedReason = !competitionConfig || competitionConfig.status !== 'ACTIVE'
+      ? 'COMPETITION_CONFIG_REQUIRED'
+      : !teamMatchRulesEditable(teamMatch, game) ? 'TEAM_MATCH_RULES_LOCKED' : defaults.blockedReason;
+    const rulesEditable = rulesLockedReason === null;
     return {
       teamMatchId: teamMatch.id,
       editable,
       lockedReason: editable ? null : 'terminal_or_matched_status',
+      rulesEditable,
+      rulesLockedReason,
+      competitionConfigVersionId: teamMatch.competitionConfigVersionId,
       form: {
         hostTeamId: teamMatch.hostTeamId,
         sportId: teamMatch.sportId,
@@ -845,6 +882,7 @@ export class TeamMatchesService {
         matchFormat: teamMatch.matchFormat,
         matchStyle: teamMatch.matchStyle,
         uniformColor: teamMatch.uniformColor,
+        periods: competitionConfig?.config.periods.map(({ durationMinutes }) => ({ durationMinutes })) ?? null,
       },
       status: apiStatus,
       version: teamMatch.updatedAt.toISOString(),
@@ -888,6 +926,18 @@ export class TeamMatchesService {
       await tx.$queryRaw`SELECT id FROM v1_team_matches WHERE id = ${teamMatch.id} FOR UPDATE`;
       const current = await tx.v1TeamMatch.findFirst({ where: { id: teamMatch.id, deletedAt: null } });
       if (!current || current.updatedAt.toISOString() !== dto.version || current.approvedApplicantTeamId || !['recruiting', 'closed'].includes(current.status)) throw stateConflict('Team match state changed', 'VERSION_CONFLICT');
+      let competitionConfigVersionId: string | undefined;
+      let gameId: string | null;
+      if (dto.periods !== undefined) {
+        assertTeamMatchHasHostAndStart(current);
+        const membership = await this.assertCanManageTeam(user.id, current.hostTeamId, tx);
+        if (current.hostTeamId !== dto.hostTeamId || current.sportId !== dto.sportId || membership.team.sportId !== current.sportId) {
+          throw stateConflict('Team match host or sport changed', 'VERSION_CONFLICT');
+        }
+        const repinned = await repinTeamMatchRules(tx, { match: current, periods: dto.periods, actorUserId: user.id });
+        competitionConfigVersionId = repinned.competitionConfigVersionId;
+        gameId = repinned.gameId;
+      } else gameId = (await tx.v1Game.findUnique({ where: { teamMatchId: current.id }, select: { id: true } }))?.id ?? null;
       const teamMatchUpdated = await tx.v1TeamMatch.update({
         where: { id: teamMatch.id },
         data: {
@@ -910,6 +960,7 @@ export class TeamMatchesService {
           maxSportLevelId: levelRange.maxSportLevelId,
           genderRule: dto.genderRule ?? null,
           costNote: dto.costNote ?? null,
+          competitionConfigVersionId,
         },
       });
       if (requiresReconfirmation) await tx.v1TeamMatchApplication.updateMany({
@@ -921,18 +972,19 @@ export class TeamMatchesService {
         actorType: 'user', actorUserId: user.id, reason: requiresReconfirmation ? 'schedule_or_place_changed_reapply_required' : 'host_updated',
       } });
       await syncTeamMatchScheduleInTx(tx, teamMatch.id, dto.title, dates.startsAt, dates.endsAt);
-      return teamMatchUpdated;
+      return { teamMatchUpdated, gameId };
     });
 
     if (requiresReconfirmation) this.emitTeamMatchNotificationToApplicantManagers(
       teamMatch.id, 'team_match_updated', `"${teamMatch.title}" 일정 또는 장소가 변경됐어요. 변경 내용을 확인하고 다시 신청해 주세요.`,
     );
     return {
-      teamMatchId: updated.id,
-      status: updated.status,
-      updatedAt: updated.updatedAt,
-      version: updated.updatedAt.toISOString(),
-      detailRoute: `/team-matches/${updated.id}`,
+      teamMatchId: updated.teamMatchUpdated.id,
+      gameId: updated.gameId,
+      status: updated.teamMatchUpdated.status,
+      updatedAt: updated.teamMatchUpdated.updatedAt,
+      version: updated.teamMatchUpdated.updatedAt.toISOString(),
+      detailRoute: `/team-matches/${updated.teamMatchUpdated.id}`,
     };
   }
 
@@ -1882,15 +1934,22 @@ export class TeamMatchesService {
   private async getPublicTeamMatch(
     teamMatchId: string,
     user: V1AuthUser | null,
-    options: { includeTrust?: boolean } = {},
+    options: { includeTrust?: boolean; includeCancelledLeague?: boolean } = {},
   ) {
     const teamMatch = await this.prisma.v1TeamMatch.findFirst({
       where: {
         id: teamMatchId,
         deletedAt: null,
-        status: { notIn: ['cancelled', 'archived'] },
+        status: { notIn: ['archived'] },
         OR: [{ tournamentId: null }, { leagueId: { not: null } }],
         AND: [{
+          // 공개 일정에 남기는 취소 리그 경기는 상세에서도 읽는다. 모집 신청 등 다른
+          // 읽기 경로와 일반 친선 모집은 기존 취소 차단을 유지한다.
+          OR: [
+            { status: { not: 'cancelled' } },
+            ...(options.includeCancelledLeague ? [{ leagueId: { not: null } }] : []),
+          ],
+        }, {
           OR: [{ leagueId: null }, { league: { is: { isPublic: true } } }],
         }, {
           OR: [
@@ -1901,7 +1960,10 @@ export class TeamMatchesService {
       },
       include: this.teamMatchInclude(user),
     });
-    if (!teamMatch || ['cancelled', 'archived'].includes(teamMatch.status)) throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: 'Team match was not found' });
+    if (!teamMatch || teamMatch.status === 'archived' ||
+      (teamMatch.status === 'cancelled' && (!options.includeCancelledLeague || !teamMatch.leagueId))) {
+      throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: 'Team match was not found' });
+    }
     assertTeamMatchPublicInvariant(teamMatch);
 
     // 양 팀 신뢰점수는 detail() 응답에만 노출된다. applicationEligibility()/createApplication()은
@@ -2098,8 +2160,8 @@ export class TeamMatchesService {
     });
   }
 
-  private async assertCanManageTeam(userId: string, teamId: string) {
-    const membership = await this.prisma.v1TeamMembership.findFirst({
+  private async assertCanManageTeam(userId: string, teamId: string, client: Prisma.TransactionClient = this.prisma) {
+    const membership = await client.v1TeamMembership.findFirst({
       where: { teamId, userId, status: 'active', role: { in: ['owner', 'manager'] }, team: { status: 'active', deletedAt: null } },
       select: { id: true, team: { select: { sportId: true, name: true } } },
     });
@@ -2345,6 +2407,28 @@ type TeamMatchOperationalFields = {
   hostTeamId: string | null;
   startAt: Date | null;
 };
+
+/**
+ * 일반 팀매치(리그 대진은 제외)의 공개 목록에서 끝난 일정을 정리한다. 진행 중·일시중지·종료(결과 대기)
+ * 경기와 완료 7일 노출은 그대로 둔다.
+ * - 경기 기록이 취소된 매치 — 게임만 취소하는 경로(`POST /games/:id/cancel`)는 팀매치를 matched 로 남긴다.
+ * - 상대 확정 뒤 끝날 시각(없으면 시작 시각)이 지나도록 아무도 시작하지 않은 매치(게임 SCHEDULED).
+ *   기록을 하나라도 남기면 게임이 LIVE 로 바뀌므로 SCHEDULED 는 실제로 아무 일도 없었던 경기다.
+ */
+function staleFriendlyTeamMatchWhere(now: Date): Prisma.V1TeamMatchWhereInput[] {
+  return [
+    { OR: [{ leagueId: { not: null } }, { NOT: { game: { is: { state: 'CANCELLED' } } } }] },
+    {
+      OR: [
+        { leagueId: { not: null } },
+        { status: { not: 'matched' } },
+        { game: { is: { state: { in: ['LIVE', 'PAUSED', 'ENDED'] } } } },
+        { endAt: { gte: now } },
+        { endAt: null, OR: [{ startAt: null }, { startAt: { gte: now } }] },
+      ],
+    },
+  ];
+}
 
 function deadlineAwareStatusWhere(
   status: 'recruiting' | 'closed',

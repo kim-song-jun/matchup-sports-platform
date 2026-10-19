@@ -50,17 +50,28 @@ function setup(league: Partial<Row> = {}, opts: { startedGames?: number } = {}) 
 const admin = { id: 'admin-1' } as V1AuthUser;
 
 describe('LeagueMatchAdminService.changeState', () => {
-  it('준비 중 리그를 진행 중으로 시작한다', async () => {
-    const { service, row } = setup({ status: 'open' });
+  it('모집 마감 리그를 운영자가 진행 중으로 시작한다', async () => {
+    const { service, row } = setup({ status: 'closed' });
     await expect(service.changeState(admin, 'league-1', { state: 'active' }))
       .resolves.toEqual({ leagueId: 'league-1', state: 'active', alreadyProcessed: false });
     expect(row.status).toBe('in_progress');
   });
 
-  it('시작한 경기가 없으면 진행 중을 준비 중으로 돌리고, 있으면 막는다', async () => {
-    const ok = setup({ status: 'in_progress' });
+  it('시작한 경기가 없으면 모집 마감으로 돌린 뒤 다시 시작할 수 있고, 시작한 경기가 있으면 막는다', async () => {
+    const deadline = new Date('2026-10-01T00:00:00Z');
+    const ok = setup({ status: 'in_progress', registrationDeadlineAt: deadline, requiresExplicitStart: true });
     await expect(ok.service.changeState(admin, 'league-1', { state: 'draft' })).resolves.toMatchObject({ state: 'draft' });
-    expect(ok.row.status).toBe('draft');
+    expect(ok.row.status).toBe('closed');
+    expect(ok.row).toMatchObject({ isPublic: true, registrationDeadlineAt: deadline, requiresExplicitStart: true });
+    expect(ok.logAdminAction).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      action: 'league_match.revert_to_draft', fromStatus: 'active', toStatus: 'draft',
+    }), expect.anything());
+    await expect(ok.service.changeState(admin, 'league-1', { state: 'draft' }))
+      .resolves.toMatchObject({ state: 'draft', alreadyProcessed: true });
+    expect(ok.row.status).toBe('closed');
+    await expect(ok.service.changeState(admin, 'league-1', { state: 'active' }))
+      .resolves.toMatchObject({ state: 'active', alreadyProcessed: false });
+    expect(ok.row.status).toBe('in_progress');
 
     const blocked = setup({ status: 'in_progress' }, { startedGames: 1 });
     await expect(blocked.service.changeState(admin, 'league-1', { state: 'draft' }))

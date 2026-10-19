@@ -1,6 +1,12 @@
 import 'reflect-metadata';
 import { BadRequestException, ValidationPipe } from '@nestjs/common';
-import { AssignSlotDto } from './tournament-slot.dto';
+import { AssignSlotDto, SetByeSideDto } from './tournament-slot.dto';
+
+describe('부전승 위치 DTO', () => {
+  it.each([{ side: 'LEFT', expectedSide: 'HOME' }, { side: 'AWAY' }, { side: 'HOME', expectedSide: 'AWAY', fixtureId: 'other' }])('잘못된 값과 임의 필드를 거절한다', async (body) => {
+    await expect(pipe.transform(body, { type: 'body', metatype: SetByeSideDto })).rejects.toBeInstanceOf(BadRequestException);
+  });
+});
 
 const pipe = new ValidationPipe({
   whitelist: true, forbidNonWhitelisted: true, transform: true, transformOptions: { enableImplicitConversion: true },

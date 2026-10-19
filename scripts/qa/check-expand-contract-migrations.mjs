@@ -44,6 +44,47 @@ class UnparsableSqlError extends Error {}
 // weakens the gate for exactly one (file, statement) pair and nothing else.
 const REVIEWED_NON_ADDITIVE = [
   {
+    file: 'apps/v1_api/prisma/migrations/20261016070000_league_list_image/migration.sql',
+    statement: 'UPDATE "v1_tournaments" SET "list_image_url" = "cover_image_url" WHERE "kind" = \'regular_league\' AND "cover_image_url" IS NOT NULL',
+    reason: 'PR #1955 (2026-10-16): initialize only the nullable list_image_url column added immediately before this UPDATE in the same migration. Existing regular-league images must initially serve both list and detail. The source cover_image_url, uploaded files, tournament rows and every pre-existing column are unchanged; leagues without an image remain NULL. Older application instances ignore list_image_url and continue reading/writing cover_image_url, so this one-time copy does not prevent an application rollback. Subsequent PATCH requests deliberately edit only the supplied image field. This exact file/statement was verified by the real migration image-preservation integration test in API CI 38907223065; do not allow arbitrary UPDATE statements or edits to the migration.',
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20261016090000_bye_side_layout/migration.sql",
+    statement: "CREATE TEMP TABLE bye_layout_mapping ON COMMIT DROP AS SELECT s.id, s.group_id, (ARRAY[0,3,4,7])[s.position] AS old_order, (s.position - 1) * 2 + CASE WHEN m.away_slot_id = s.id THEN 1 ELSE 0 END AS new_order FROM v1_tournament_slots s JOIN v1_tournament_groups g ON g.id = s.group_id AND g.phase = 'round12' JOIN v1_team_matches m ON (m.home_slot_id = s.id OR m.away_slot_id = s.id) AND m.deleted_at IS NULL WHERE s.kind = 'BYE' AND s.position BETWEEN 1 AND 4",
+    reason: "PR #1957: snapshots only round12 BYE slot identities and persisted nondeleted fixture sides in a connection-local TEMP table. ON COMMIT DROP removes the mapping; no persistent table, competition, opponent, result or advancement edge is changed.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20261016090000_bye_side_layout/migration.sql",
+    statement: "UPDATE v1_tournament_slots s SET bye_sort_order = b.new_order FROM bye_layout_mapping b WHERE s.id = b.id",
+    reason: "PR #1957: backfills only newly added nullable bye_sort_order from that exact source-slot mapping. Existing slot IDs, positions, registrations and fixture edges are unchanged; older readers ignore the additive column.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20261016090000_bye_side_layout/migration.sql",
+    statement: "UPDATE v1_tournament_bye_slots r SET sort_order = -100 - b.new_order FROM bye_layout_mapping b WHERE r.group_id = b.group_id AND r.sort_order = b.old_order",
+    reason: "PR #1957: stages only mapped empty BYE display coordinates at negative positions to avoid group/order unique collisions. No row is deleted and no identity, team, opponent, result or advancement edge changes. The transaction commits only after both final-coordinate updates succeed.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20261016090000_bye_side_layout/migration.sql",
+    statement: "UPDATE v1_tournament_group_teams r SET sort_order = -100 - b.new_order FROM bye_layout_mapping b WHERE r.group_id = b.group_id AND r.is_bye AND r.sort_order = b.old_order",
+    reason: "PR #1957: stages only mapped is_bye group-team display coordinates. Registration IDs, ordinary group members and fixture/result/advancement data are preserved; any failed final placement rolls back all staging.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20261016090000_bye_side_layout/migration.sql",
+    statement: "UPDATE v1_tournament_bye_slots r SET sort_order = b.new_order FROM bye_layout_mapping b WHERE r.group_id = b.group_id AND r.sort_order = -100 - b.new_order",
+    reason: "PR #1957: finalizes only exact staged empty BYE display coordinates from persisted HOME/AWAY fixture links, preserving IDs and opponents. This user-requested layout correction needs the matching API: earlier APIs read arbitrary sort_order but fixed-index BYE assignment writers must not be restored after backfill; use a forward fix.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20261016090000_bye_side_layout/migration.sql",
+    statement: "UPDATE v1_tournament_group_teams r SET sort_order = b.new_order FROM bye_layout_mapping b WHERE r.group_id = b.group_id AND r.is_bye AND r.sort_order = -100 - b.new_order",
+    reason: "PR #1957: finalizes only mapped is_bye group-team display coordinates in the same transaction as empty positions and slot backfill. Registrations, slot/fixture IDs, opponents, results and advancement edges are unchanged. Earlier fixed-index BYE assignment writers must not be restored after conversion; deploy the matching API or a forward fix.",
+  },
+
+  {
+    file: "apps/v1_api/prisma/migrations/20261015180000_v1_league_optional_team_capacity/migration.sql",
+    statement: 'ALTER TABLE "v1_tournaments" ADD CONSTRAINT "v1_tournaments_max_teams_positive" CHECK ("max_teams" IS NULL OR "max_teams" > 0)',
+    reason: 'MD-QA #145 adds nullable v1_tournaments.max_teams INTEGER immediately before this CHECK in the same migration, without DEFAULT, NOT NULL, or backfill. Pre-existing rows therefore have NULL, which this exact positive-or-NULL predicate accepts; old application writes omit the new column and remain compatible, including application rollback. The CHECK reads no pre-existing column, preserves NULL as unlimited and all positive capacities, and rejects zero or negative values even through direct SQL writes that bypass DTO validation. Keep the constraint and SQL unchanged.',
+  },
+  {
     file: "apps/v1_api/prisma/migrations/20261014000100_v1_competition_field_places/migration.sql",
     statement: "WITH places AS ( SELECT tm.tournament_id, btrim(tm.place_name) AS name, lower(btrim(tm.place_name)) AS name_key, jsonb_build_object(\u0027name\u0027, btrim(tm.place_name), \u0027address\u0027, nullif(btrim(tm.place_address), \u0027\u0027), \u0027latitude\u0027, tm.place_latitude, \u0027longitude\u0027, tm.place_longitude, \u0027provider\u0027, nullif(btrim(tm.place_provider), \u0027\u0027), \u0027providerPlaceId\u0027, nullif(btrim(tm.place_provider_id), \u0027\u0027)) AS snapshot, ((nullif(btrim(tm.place_provider), \u0027\u0027) IS NULL AND nullif(btrim(tm.place_provider_id), \u0027\u0027) IS NULL AND tm.place_latitude IS NULL AND tm.place_longitude IS NULL) OR (btrim(tm.place_provider) = \u0027kakao\u0027 AND nullif(btrim(tm.place_provider_id), \u0027\u0027) IS NOT NULL AND tm.place_latitude BETWEEN -90 AND 90 AND tm.place_longitude BETWEEN -180 AND 180)) AS valid_place FROM v1_team_matches tm JOIN v1_tournaments t ON t.id = tm.tournament_id WHERE tm.deleted_at IS NULL AND t.deleted_at IS NULL AND (t.kind IN (\u0027regular_tournament\u0027, \u0027regular_league\u0027) OR t.kind IS NULL) AND tm.place_name IS NOT NULL AND btrim(tm.place_name) \u003c\u003e \u0027\u0027 AND lower(btrim(tm.place_name)) NOT IN (\u0027장소 미정\u0027, \u0027미정\u0027, \u0027tbd\u0027) ), grouped AS ( SELECT tournament_id, name_key, min(name) AS name, CASE WHEN count(DISTINCT (snapshot - \u0027name\u0027)) = 1 AND bool_and(valid_place) THEN (array_agg(snapshot ORDER BY name))[1] ELSE NULL END AS snapshot FROM places GROUP BY tournament_id, name_key ) INSERT INTO v1_tournament_fields (id, tournament_id, scope_key, name, place_snapshot, sort_order, active, version, created_at, updated_at) SELECT gen_random_uuid()::text, g.tournament_id, \u0027place-\u0027 || md5(g.name_key), g.name, g.snapshot, 0, true, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM grouped g WHERE NOT EXISTS ( SELECT 1 FROM v1_tournament_fields f WHERE f.tournament_id = g.tournament_id AND lower(btrim(f.name)) = g.name_key ) ON CONFLICT (tournament_id, scope_key) DO NOTHING",
     reason: "User explicitly approved full competition place/field integration (Task 20261082, 2026-10-14). This exact INSERT adds one field per scoped trimmed name with NOT EXISTS and ON CONFLICT DO NOTHING. Blank/unknown/deleted places are excluded; ambiguous coordinates are not shared. No match/staff/result/old field is changed. Previous APIs accept these ordinary field rows and ignore the new nullable JSON column.",
@@ -2390,6 +2431,31 @@ function selfTest() {
   }
   if (runReviewed([{ file: 'other.sql', statement: 'CREATE UNIQUE INDEX "X_a_b_key" ON "X"("a", "b")' }]).length !== 1) {
     fail('the allowlist must be scoped to its exact file, not match the same statement elsewhere');
+  }
+
+  // Exercise the actual league-image migration and its production review entry.
+  // A different predicate, destination column or file must not inherit approval.
+  {
+    const file = 'apps/v1_api/prisma/migrations/20261016070000_league_list_image/migration.sql';
+    const sql = readFileSync(new URL(`../../${file}`, import.meta.url), 'utf8');
+    const statements = parseStatements(sql, file).map((statement) => ({ file, statement }));
+    const check = (input) => {
+      const messages = [];
+      runAdditivityCheck(input, baseFunctionNames, (message) => messages.push(message));
+      return messages;
+    };
+    if (check(statements).length !== 0) fail('the real league-image migration must pass its exact review');
+    const backfill = statements.find(({ statement }) => /^UPDATE\s/.test(statement));
+    if (!backfill) fail('league-image migration backfill is missing');
+    const negatives = [
+      { ...backfill, file: 'other.sql' },
+      { ...backfill, statement: backfill.statement.replace("'regular_league'", "'regular_tournament'") },
+      { ...backfill, statement: backfill.statement.replace('"list_image_url"', '"cover_image_url"') },
+    ];
+    if (negatives.some((statement) => check([statement]).length !== 1)) {
+      fail('league-image approval must reject other files, scopes and destination columns');
+    }
+    console.log('[expand-contract-sql-v1] league-image migration review controls passed');
   }
 
   // **allowlist 의 객체가 닫혔는지 본다.** 이 파일은 한 배열에 항목을 모으는데, 양쪽

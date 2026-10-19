@@ -354,6 +354,8 @@ describe('ArrivalCheckinPanel — 운영진 전용 본인 확인 정보(실명·
     render(<ArrivalCheckinPanel sides={SIDES} lineups={[staffLineup()]} onToggleArrival={vi.fn()} />);
 
     expect(screen.getByText('7 김철수 (E2E선수01)')).toBeInTheDocument();
+    // 이름이 길어져도 자르지 않고 줄을 바꾼다.
+    expect(screen.getByText('7 김철수 (E2E선수01)')).not.toHaveClass('truncate');
     expect(screen.getByText('010-3010-1000 · 미확인')).toBeInTheDocument();
     // 계정이 없는 참가자는 값을 지어내지 않고 닉네임만, 도착 상태만 보여준다.
     expect(screen.getByText('게스트')).toBeInTheDocument();

@@ -13,7 +13,7 @@ import { createV1IntegrationApp } from '../integration/integration-app';
  * id ties, and rows the public surface must hide, so a wrong ORDER BY, keyset comparison or filter
  * changes the visible sequence. In progress comes first, then recruiting, recruitment closed and finished.
  * A stored `open` row the card shows as "모집 마감" (deadline passed or capacity held) must sort with the
- * closed group; leagues keep their stored status.
+ * closed group; unlimited leagues keep their stored status.
  */
 describe('대회 공개 목록 DB 정렬·페이지 계약', () => {
   let app: INestApplication;
@@ -77,7 +77,7 @@ describe('대회 공개 목록 DB 정렬·페이지 계약', () => {
     { name: 'o-future-deadline', status: 'open', start: day(19), deadline: FUTURE_DEADLINE },
     { name: 'o-room', status: 'open', start: day(21), capacity: 2, held: 'confirmed' },
     { name: 'o-cancelled-reg', status: 'open', start: day(22), capacity: 1, held: 'cancelled' },
-    // Leagues have no capacity and keep their stored status even past the deadline.
+    // Unlimited leagues ignore historical teamCount and keep their stored status even past the deadline.
     { name: 'lg-expired', status: 'open', kind: 'regular_league', start: day(23), deadline: PAST_DEADLINE },
     { name: 'lg-full', status: 'open', kind: 'regular_league', start: day(24), capacity: 1, held: 'confirmed' },
     // Filter coverage.
@@ -242,10 +242,66 @@ describe('대회 공개 목록 DB 정렬·페이지 계약', () => {
   it('filters keep their meaning: status, gender, sport', async () => {
     expect(ids(await list({ status: 'completed', limit: 50 }))).toEqual(['c-new', 'c-noend', 'c-old', 'c-nodate']);
     expect(ids(await list({ status: 'draft', limit: 50 }))).toEqual([]);
-    expect(ids(await list({ kind: 'league', status: 'draft', limit: 50 }))).toEqual(['lg-draft']);
+    expect(ids(await list({ kind: 'league', status: 'draft', limit: 50 }))).toEqual(['lg-draft', 'lg-open', 'lg-expired', 'lg-full']);
     expect(ids(await list({ genderCategory: 'female', limit: 50 }))).toEqual(['f-female']);
     const other = await read.list({ sportId: otherSportId, limit: 50 } as never);
     expect(ids(other)).toEqual(['f-other-sport']);
+  });
+
+  it('the pre-start filter includes a closed league and reports the matching total', async () => {
+    await db.v1Tournament.update({ where: { id: id('lg-open') }, data: { status: 'closed' } });
+    try {
+      const result = await list({ kind: 'league', status: 'draft', limit: 50, page: 1 });
+      expect(ids(result)).toEqual(['lg-draft', 'lg-expired', 'lg-full', 'lg-open']);
+      expect(result.pageInfo).toMatchObject({ total: 4 });
+    } finally {
+      await db.v1Tournament.update({ where: { id: id('lg-open') }, data: { status: 'open' } });
+    }
+  });
+
+  it.each([
+    ['confirmed', 'seeded'], ['awaiting_payment', 'applied'],
+    ['payment_checking', 'promoted'], ['paid', 'applied'],
+  ] as const)('MD-QA #145: actual DB order closes a finite league held by %s/%s while null remains unlimited', async (held, entrySource) => {
+    const sport = await db.v1Sport.create({ data: { code: `list-cap-${prefix}-${held}`, name: '정원 정렬' } });
+    const originalTeam = await db.v1Team.findUniqueOrThrow({ where: { id: teamId }, select: { ownerUserId: true, regionId: true } });
+    const team = await db.v1Team.create({ data: { ...originalTeam, sportId: sport.id, name: `정원 ${held}` } });
+    type CapacitySeed = {
+      name: string; kind: 'regular_league' | 'regular_tournament' | null; maxTeams: number | null; teamCount: number;
+      status?: 'draft' | 'open';
+      held: typeof held | 'waitlisted' | 'cancel_requested' | 'cancelled';
+    };
+    const capacitySeeds: CapacitySeed[] = [
+      // Earliest start must still sort AFTER all recruiting rows once its real team cap is full.
+      { name: 'league-full', kind: 'regular_league', maxTeams: 1, teamCount: 8, held },
+      { name: 'league-unlimited', kind: 'regular_league', maxTeams: null, teamCount: 1, held },
+      { name: 'league-room', kind: 'regular_league', maxTeams: 2, teamCount: 1, held },
+      { name: 'league-waitlisted', kind: 'regular_league', maxTeams: 1, teamCount: 8, held: 'waitlisted' },
+      { name: 'league-cancel-requested', kind: 'regular_league', maxTeams: 1, teamCount: 8, held: 'cancel_requested' },
+      { name: 'league-cancelled', kind: 'regular_league', maxTeams: 1, teamCount: 8, held: 'cancelled' },
+      { name: 'tournament-full', kind: 'regular_tournament', maxTeams: null, teamCount: 1, held },
+      { name: 'legacy-null-full', kind: null, maxTeams: 20, teamCount: 1, held },
+      { name: 'tournament-room', kind: 'regular_tournament', maxTeams: 1, teamCount: 2, held },
+      { name: 'league-draft-full', kind: 'regular_league', maxTeams: 1, teamCount: 8, status: 'draft', held },
+      { name: 'league-draft-room', kind: 'regular_league', maxTeams: 2, teamCount: 1, status: 'draft', held },
+      { name: 'league-draft-unlimited', kind: 'regular_league', maxTeams: null, teamCount: 1, status: 'draft', held },
+    ];
+    for (const [index, seed] of capacitySeeds.entries()) {
+      const tournament = await db.v1Tournament.create({ data: {
+        title: seed.name, sportId: sport.id, kind: seed.kind, status: seed.status ?? 'open', isPublic: true,
+        maxTeams: seed.maxTeams, teamCount: seed.teamCount, maxPlayers: 20, scheduledAt: day(index + 1),
+      } });
+      await db.v1TournamentRegistration.create({ data: {
+        tournamentId: tournament.id, teamId: team.id, appliedByUserId: originalTeam.ownerUserId,
+        status: seed.held, entrySource,
+      } });
+    }
+    const actual = await read.list({ sportId: sport.id, kind: 'all', limit: 50 });
+    expect(actual.items.map(item => item.title)).toEqual([
+      'league-unlimited', 'league-room', 'league-waitlisted', 'league-cancel-requested', 'league-cancelled',
+      'tournament-room', 'league-draft-room', 'league-draft-unlimited',
+      'league-full', 'tournament-full', 'legacy-null-full', 'league-draft-full',
+    ]);
   });
 
   /** Reference check: the SQL filter selects the same row set as the Prisma `where` the surface constants express. */
@@ -265,7 +321,7 @@ describe('대회 공개 목록 DB 정렬·페이지 계약', () => {
           if (status === undefined) {
             statusWhere = PUBLIC_COMPETITION_STATUS_WHERE;
           } else if (status === 'draft') {
-            statusWhere = { kind: 'regular_league', status: 'draft' };
+            statusWhere = { kind: 'regular_league', status: { in: ['draft', 'open', 'closed'] } };
           } else {
             statusWhere = { status };
           }

@@ -239,3 +239,31 @@ it.each([['quarter', '8강', '4강'], ['semi', '4강', '결승']] as const)('%s 
   expect(screen.getByRole('region', { name: label + ' 부전승' })).toHaveTextContent('부전승 · ' + nextLabel + ' 직행');
 
 });
+
+it('저장된 시각과 경기장을 결선 그림에 함께 표시한다', () => {
+  render(<TournamentBracket fixtures={[makeFixture({ id: 'saved-metadata', fixtureNumber: 31, scheduledAt: '2026-10-19T11:33:00.000Z', venue: 'A구장' })]} groups={[]} />);
+  const card = screen.getByRole('group', { name: '레드FC 대 블루FC' });
+  expect(within(card).getByText('10/19 (월) 20:33')).toBeInTheDocument();
+  expect(within(card).getByText('A구장')).toBeInTheDocument();
+});
+
+it('미배정 부전승은 지정 문구를 표시하고 팀 확정 뒤에도 보조로 유지한다', () => {
+  render(<TournamentBracket fixtures={[]} groups={[{ id: 'r12', name: '12강', phase: 'round12', sortOrder: 0, advanceCount: null, standings: [], qualification: null,
+    groupTeams: [{ id: 'bye-empty', registrationId: null, teamId: null, teamName: null, teamLogoUrl: null, sortOrder: 0, isBye: true, displayLabel: '조 1위 중 5위' }, { id: 'bye-team', registrationId: 'reg', teamId: 'team', teamName: '확정 팀', teamLogoUrl: null, sortOrder: 2, isBye: true, displayLabel: '조 1위 중 6위' }] }]} />);
+  expect(screen.getByText('조 1위 중 5위')).toBeInTheDocument();
+  expect(screen.getByText('확정 팀')).toBeInTheDocument();
+  expect(screen.getByText('조 1위 중 6위')).toBeInTheDocument();
+});
+
+
+it.each(['HOME', 'AWAY'] as const)('빈 부전승 타일에서 연결된 8강 %s 팀 줄까지 SVG 선을 렌더한다', (side) => {
+  const { container } = render(<TournamentBracket fixtures={[makeFixture({ id: 'quarter', round: 'quarter', fixtureNumber: 5, homeTeamName: 'TBD', awayTeamName: 'TBD' })]}
+    groups={[{ id: 'r12', name: '12강', phase: 'round12', sortOrder: 0, advanceCount: null, standings: [], qualification: null,
+      groupTeams: [{ id: 'bye', registrationId: null, teamId: null, teamName: null, teamLogoUrl: null, sortOrder: 0, isBye: true,
+        byeTarget: { fixtureId: 'quarter', side } }] }]} />);
+  const label = `부전승 → 5번 경기 ${side === 'HOME' ? '홈' : '어웨이'}`;
+  const path = Array.from(container.querySelectorAll('svg path')).find(path => path.querySelector('title')?.textContent === label);
+  expect(path).toBeDefined();
+  expect(path?.getAttribute('d')).toMatch(/^M /);
+  expect(screen.getByRole('region', { name: '12강 부전승' })).toHaveTextContent('미정');
+});

@@ -7,6 +7,7 @@ import { GameCommandDto } from './dto/game-command.dto';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import {
   canonicalGameCommandPayloadHash,
+  canAdminViewParticipantIdentity,
   canViewParticipantIdentity,
   applyForfeitScore,
   extractEndForfeitSideId,
@@ -657,6 +658,7 @@ describe('GamesService.confirmSideArrival', () => {
   } = {}) {
     const tx = {
       $queryRaw: jest.fn().mockResolvedValue([]),
+      v1Game: { findUnique: jest.fn().mockResolvedValue({ teamMatch: null }) },
       v1GameSide: {
         findFirst: jest.fn().mockResolvedValue(
           options.side === undefined ? { id: 'side-home', teamId: 'team-home' } : options.side,
@@ -821,7 +823,7 @@ describe('GamesService.confirmSideArrival', () => {
 // W4-V14 — 대진 취소는 게임을 건드리지 않는다. 열어 둔 콘솔이 취소된 대진의 경기를 시작하면 결과 없이
 // 진행 중으로 남으므로 시작에서 막는다.
 describe('GamesService start — 취소된 대진의 경기', () => {
-  function makeTx(teamMatchStatus: string) {
+  function makeTx(teamMatchStatus: string, lifecycleStatus = 'in_progress', requiresExplicitStart = true) {
     return {
       v1TeamMatch: {
         findUnique: jest.fn().mockResolvedValue({
@@ -829,8 +831,8 @@ describe('GamesService start — 취소된 대진의 경기', () => {
           tournamentId: 'league-1',
           leagueId: 'league-1',
           status: teamMatchStatus,
-          tournament: { kind: 'regular_league' },
-          league: { kind: 'regular_league' },
+          tournament: { kind: 'regular_league', status: lifecycleStatus, requiresExplicitStart },
+          league: { kind: 'regular_league', status: lifecycleStatus, requiresExplicitStart },
           tournamentDetails: null,
         }),
         findUniqueOrThrow: jest.fn().mockResolvedValue({ hostTeamId: 'team-h', approvedApplicantTeamId: 'team-a' }),
@@ -857,17 +859,28 @@ describe('GamesService start — 취소된 대진의 경기', () => {
     });
   });
 
+  it('모집 마감 상태에서는 대진 양 팀이 있어도 리그 시작 전 경기를 시작할 수 없다', async () => {
+    await expect(assertStartable(makeTx('matched', 'closed'))).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'LEAGUE_NOT_STARTED' }),
+    });
+  });
+
+  it.each(['draft', 'open', 'closed'])('기존 %s 리그는 새 시작 조건으로 차단하지 않는다', async (status) => {
+    await expect(assertStartable(makeTx('matched', status, false))).resolves.toBeUndefined();
+  });
+
   it('양 팀이 확정된 매칭 대진은 그대로 시작할 수 있다', async () => {
     await expect(assertStartable(makeTx('matched'))).resolves.toBeUndefined();
   });
 });
 
-describe('GamesService.listOperationsLineups — 운영진 전용 본인 확인 정보(실명·전화번호)', () => {
+// 운영 콘솔·결과 확인·정정은 `listLineups`, 팀매치 콘솔은 `listOperationsLineups` 를 읽는다 — 둘이 같은 규칙이어야 한다.
+describe.each(['listLineups', 'listOperationsLineups'] as const)('GamesService.%s — 운영진 전용 본인 확인 정보(실명·전화번호)', (method) => {
   const USER = { id: 'user-1' } as V1AuthUser;
 
   function build(role: string) {
-    const prisma = {
-      v1Game: { findUnique: jest.fn().mockResolvedValue({ state: V1GameState.LIVE }) },
+    const transactionClient = {
+      v1Game: { findUnique: jest.fn().mockResolvedValue({ state: V1GameState.LIVE, teamMatch: null }) },
       v1GameSide: { findFirst: jest.fn().mockResolvedValue({ id: 'side-home' }) },
       v1GameLineup: {
         findMany: jest.fn().mockResolvedValue([{ id: 'lineup-1', sideId: 'side-home', revision: 1, state: 'SUBMITTED' }]),
@@ -885,6 +898,10 @@ describe('GamesService.listOperationsLineups — 운영진 전용 본인 확인 
         ]),
       },
     };
+    const prisma = {
+      ...transactionClient,
+      $transaction: jest.fn(async (callback: (tx: typeof transactionClient) => Promise<unknown>) => callback(transactionClient)),
+    };
     const service = new GamesService(prisma as never, {} as never, {} as never);
     jest.spyOn(service as never, 'resolveActor' as never).mockResolvedValue({ role, teamId: 'team-home' } as never);
     return { service, prisma };
@@ -893,7 +910,7 @@ describe('GamesService.listOperationsLineups — 운영진 전용 본인 확인 
   it.each(['platform_ops', 'tournament_director', 'field_operator'])('%s 에게는 참가자마다 실명·전화번호(identity)를 싣는다', async (role) => {
     const { service } = build(role);
 
-    const [lineup] = await service.listOperationsLineups(USER, 'game-1');
+    const [lineup] = await service[method](USER, 'game-1');
 
     const byId = Object.fromEntries(lineup.participants.map((p) => [p.id, p]));
     expect(byId['p-1']).toMatchObject({ displayNameSnapshot: 'E2E선수01', identity: { realName: '김철수', phone: '01030101000' } });
@@ -907,7 +924,7 @@ describe('GamesService.listOperationsLineups — 운영진 전용 본인 확인 
     async (role) => {
       const { service, prisma } = build(role);
 
-      const [lineup] = await service.listOperationsLineups(USER, 'game-1');
+      const [lineup] = await service[method](USER, 'game-1');
 
       for (const p of lineup.participants) expect(p).not.toHaveProperty('identity');
       expect(prisma.v1User.findMany).not.toHaveBeenCalled();
@@ -917,13 +934,18 @@ describe('GamesService.listOperationsLineups — 운영진 전용 본인 확인 
   it('계정 조회는 탈퇴하지 않은 참가자 계정만, 한 번에 가져온다', async () => {
     const { service, prisma } = build('platform_ops');
 
-    await service.listOperationsLineups(USER, 'game-1');
+    await service[method](USER, 'game-1');
 
     expect(prisma.v1User.findMany).toHaveBeenCalledTimes(1);
     expect(prisma.v1User.findMany).toHaveBeenCalledWith({
       where: { id: { in: ['user-a', 'user-gone'] }, deletedAt: null },
       select: { id: true, phone: true, profile: { select: { realName: true } } },
     });
+  });
+
+  it('canAdminViewParticipantIdentity 는 owner·ops 만 통과시킨다 — support 는 조회 전용과 같다', () => {
+    expect(['owner', 'ops'].every(canAdminViewParticipantIdentity)).toBe(true);
+    expect(['support', 'x'].some(canAdminViewParticipantIdentity)).toBe(false);
   });
 
   it('canViewParticipantIdentity 는 대회 운영 역할만 통과시킨다', () => {

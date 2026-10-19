@@ -5,6 +5,7 @@ import { toKstDateString } from '@/lib/kst-calendar';
 import { randomUuid } from '@/lib/uuid';
 import type { V1TournamentField, V1PlaceView } from '@/types/api';
 import type { SharedRecord } from '@/hooks/use-team-match-record';
+import type { GameLineup } from '@/types/game-operations';
 import {
   getSignupProfileIssue,
   SIGNUP_PROFILE_ERROR_MESSAGES,
@@ -80,6 +81,10 @@ import { v1GameRosterMswHandlers } from './game-roster-handlers';
 import { v1TeamDissolutionMswHandlers } from './team-dissolution-handlers';
 import { v1TeamInviteLinkMswHandlers } from './team-invite-link-handlers';
 import { v1LeagueVisibilityMswHandlers } from './league-visibility-handlers';
+import { v1LeagueCapacityMswHandlers } from './league-capacity-handlers';
+import { createV1TeamMatchRulesMswHandlers } from './team-match-rules-handlers';
+
+export const v1TeamMatchRulesMsw = createV1TeamMatchRulesMswHandlers(v1TeamMatchesFixture);
 
 const api = '*/api/v1';
 
@@ -624,32 +629,72 @@ let v1GameFixture = {
 
 let v1GameResultRevisions: V1GameResultRevision[] = [];
 
-let v1TeamMatchLineupFixture: V1TeamMatchLineup = {
-  teamMatchId: 'team-match-1',
-  gameId: 'game-1',
-  sideId: 'side-home-1',
-  role: 'team_owner',
-  lineupId: 'lineup-1',
-  revision: 1,
-  state: 'DRAFT',
-  editable: true,
-  lockReason: null,
-  lateAdditionAllowed: false,
-  ownTeamName: '홈 FC',
-  opponent: { teamName: '원정 FC', submitted: false, published: false, participantCount: null },
-  version: 1,
-  formation: '2-2',
-  publicLineupAt: null,
-  starters: [
-    { id: 'participant-1', userId: 'user-1', displayName: '김도윤', jerseyNumber: 7, position: 'FW', goalkeeper: false, positionX: 30, positionY: 60 },
-    { id: 'participant-2', userId: 'user-2', displayName: '박서준', jerseyNumber: 1, position: 'GK', goalkeeper: true, positionX: 50, positionY: 6 },
-  ],
-  bench: [{ id: 'participant-3', displayName: '이하늘', jerseyNumber: 11 }],
-  eligibleMembers: [
-    { userId: 'user-1', displayName: '김도윤', jerseyNumber: 7, attending: true, rsvpStatus: null, alsoOpponentMember: false },
-    { userId: 'user-2', displayName: '박서준', jerseyNumber: 1, attending: true, rsvpStatus: null, alsoOpponentMember: true },
-  ],
-};
+function defaultLineupFixture(): V1TeamMatchLineup & { lineupId: string } {
+  return {
+    teamMatchId: 'team-match-1',
+    gameId: 'game-1',
+    sideId: 'side-home-1',
+    role: 'team_owner',
+    lineupId: 'lineup-1',
+    revision: 1,
+    state: 'DRAFT',
+    effectiveRosterSource: 'DEFAULT_PREVIEW',
+    hasSavedDraft: false,
+    editable: true,
+    lockReason: null,
+    lateAdditionAllowed: false,
+    ownTeamName: '홈 FC',
+    opponent: { teamName: '원정 FC', submitted: false, published: false, participantCount: null },
+    version: 1,
+    formation: null,
+    publicLineupAt: null,
+    starters: [
+      { id: '14600000-0000-4000-8000-000000001001', userId: 'user-1', displayName: '김도윤', jerseyNumber: 7, position: null, goalkeeper: false, positionX: null, positionY: null },
+      { id: '14600000-0000-4000-8000-000000001002', userId: 'user-2', displayName: '박서준', jerseyNumber: 1, position: null, goalkeeper: false, positionX: null, positionY: null },
+    ],
+    bench: [],
+    eligibleMembers: [
+      { userId: 'user-1', displayName: '김도윤', jerseyNumber: 7, attending: true, rsvpStatus: null, alsoOpponentMember: false },
+      { userId: 'user-2', displayName: '박서준', jerseyNumber: 1, attending: true, rsvpStatus: null, alsoOpponentMember: true },
+    ],
+  };
+}
+
+let v1TeamMatchLineupFixture = defaultLineupFixture();
+let v1FriendlyDefaultParticipants = v1TeamMatchLineupFixture.starters;
+
+function friendlyGameLineup(lineup: typeof v1TeamMatchLineupFixture, supersedesId: string | null, now = new Date().toISOString()): GameLineup {
+  return {
+    id: lineup.lineupId, gameId: lineup.gameId, sideId: lineup.sideId,
+    revision: lineup.revision, state: lineup.state, version: 0, supersedesId,
+    formation: lineup.formation, submittedAt: lineup.state === 'DRAFT' ? null : now,
+    createdAt: now, updatedAt: now, invalidatedAt: null,
+    participants: lineup.starters.map((participant) => ({
+      id: participant.id, gameId: lineup.gameId, sideId: lineup.sideId, lineupId: lineup.lineupId,
+      userId: participant.userId, displayNameSnapshot: participant.displayName,
+      jerseyNumber: participant.jerseyNumber, position: participant.goalkeeper ? 'GK' : participant.position,
+      positionX: participant.positionX ?? null, positionY: participant.positionY ?? null,
+      started: true, arrivedAt: null, createdAt: now, updatedAt: now,
+    })),
+  };
+}
+
+const v1FriendlyGameLineups = [friendlyGameLineup(v1TeamMatchLineupFixture, null)];
+
+function friendlyLineupVersionFailure(rawVersion: unknown) {
+  const expectedVersion = rawVersion == null || typeof rawVersion === 'object' ? rawVersion : Number(rawVersion);
+  if (typeof expectedVersion !== 'number' || !Number.isInteger(expectedVersion) || expectedVersion < 0) {
+    return HttpResponse.json({ status: 'error', statusCode: 400, code: 'VALIDATION_ERROR', message: '입력값을 다시 확인해 주세요.' }, { status: 400 });
+  }
+  if (expectedVersion !== v1TeamMatchLineupFixture.revision) {
+    return HttpResponse.json({
+      status: 'error', statusCode: 409, code: 'VERSION_CONFLICT',
+      message: '참석명단이 그새 변경됐어요. 새로고침 후 다시 시도해 주세요.',
+      details: { expectedVersion, currentVersion: v1TeamMatchLineupFixture.revision },
+    }, { status: 409 });
+  }
+  return null;
+}
 
 // ── Tournament operations mock state (Task 18/19 backend, Task 19 frontend) ─
 let v1TournamentOperationsBoardItems: V1TournamentOperationsBoardItem[] = [
@@ -706,7 +751,9 @@ export const v1MswHandlers = [
   ...v1GameRosterMswHandlers,
   ...v1TeamDissolutionMswHandlers,
   ...v1TeamInviteLinkMswHandlers,
+  ...v1LeagueCapacityMswHandlers,
   ...v1LeagueVisibilityMswHandlers,
+  ...v1TeamMatchRulesMsw.handlers,
   http.get(`${api}/auth/me`, () => ok(v1UserFixture)),
   http.post(`${api}/auth/phone/issue`, ({ request }) => issueAuthPhone(request)),
   http.post(`${api}/auth/phone/verify`, ({ request }) => verifyAuthPhone(request)),
@@ -893,7 +940,7 @@ export const v1MswHandlers = [
   http.get(`${api}/me/teams`, () => ok(v1TeamsFixture)),
   http.get(`${api}/me/team-matches`, ({ request }) => {
     const scope = new URL(request.url).searchParams.get('scope');
-    const items = v1TeamMatchesFixture.map((item) => {
+    const items = v1TeamMatchRulesMsw.listItems().map((item) => {
       const teamMatchId = item.id;
       const createdByMe = scope === 'created';
 
@@ -902,10 +949,10 @@ export const v1MswHandlers = [
         title: item.title,
         sportName: item.sport?.name ?? item.sportName ?? '종목 미정',
         startsAt: item.startsAt,
-        deadlineAt: null,
-        status: 'recruiting',
-        displayState: 'recruiting',
-        isLive: false,
+        deadlineAt: item.deadlineAt ?? null,
+        status: item.status,
+        displayState: item.displayState ?? item.status,
+        isLive: item.isLive ?? false,
         relation: createdByMe ? 'created_by_me' : 'approved',
         teamId: item.hostTeamId ?? null,
         teamName: item.hostTeam?.name ?? item.hostTeamName ?? null,
@@ -919,12 +966,13 @@ export const v1MswHandlers = [
     return ok(page(items));
   }),
   http.get(`${api}/team-matches`, ({ request }) => {
+    const storedTeamMatches = v1TeamMatchRulesMsw.listItems();
     const sportId = new URL(request.url).searchParams.get('sportId');
     const levelCodes = new URL(request.url).searchParams.get('levelCodes')?.split(',').filter(Boolean) ?? [];
     const sport = v1SportsFixture.find((item) => item.id === sportId);
     const teamMatchesBySport = sport
-      ? v1TeamMatchesFixture.filter((item) => item.sport?.sportId === sport.id || item.sportName === sport.name)
-      : v1TeamMatchesFixture;
+      ? storedTeamMatches.filter((item) => item.sport?.sportId === sport.id || item.sportName === sport.name)
+      : storedTeamMatches;
     const flags = readToggles(request);
     const byLevel = levelCodes.length
       ? teamMatchesBySport.filter((item) => rangeMatches(levelCodes, item.minLevel?.code, item.maxLevel?.code))
@@ -932,11 +980,10 @@ export const v1MswHandlers = [
     const teamMatches = applyToggles(byLevel, flags, false);
     // 종목 건수만 종목 필터를 빼고 센다(토글은 유지). 토글 칩은 종목·레벨 필터를 유지하고 자기 토글만 뺀다.
     const ignoringSportByLevel = levelCodes.length
-      ? v1TeamMatchesFixture.filter((item) => rangeMatches(levelCodes, item.minLevel?.code, item.maxLevel?.code))
-      : v1TeamMatchesFixture;
+      ? storedTeamMatches.filter((item) => rangeMatches(levelCodes, item.minLevel?.code, item.maxLevel?.code))
+      : storedTeamMatches;
     return ok(pageWithCounts(request, teamMatches, applyToggles(ignoringSportByLevel, flags, false), toggleFacets(byLevel, flags, false)));
   }),
-  http.get(`${api}/team-matches/:teamMatchId`, ({ params }) => ok(v1TeamMatchesFixture.find((item) => item.id === params.teamMatchId) ?? v1TeamMatchesFixture[0])),
   http.get(`${api}/chat/rooms`, () => ok(v1ChatRoomsFixture)),
   http.get(`${api}/chat/rooms/:roomId`, ({ params }) => {
     const room = v1ChatRoomsFixture.items.find((item) => item.roomId === params.roomId) ?? v1ChatRoomsFixture.items[0];
@@ -1593,7 +1640,20 @@ export const v1MswHandlers = [
   }, { status: 403 })),
 
   // ── Task 17: games / result revisions / team-match lineup ─────────────────
-  http.get(`${api}/games/:gameId`, () => ok(v1GameFixture)),
+  http.get(`${api}/games/:gameId`, () => ok({
+    ...v1GameFixture,
+    lineups: v1FriendlyGameLineups.map(({ id, gameId, sideId, revision, state, version, submittedAt, supersedesId, invalidatedAt }) =>
+      ({ id, gameId, sideId, revision, state, version, submittedAt, supersedesId, invalidatedAt })),
+  })),
+  http.get(`${api}/games/:gameId/lineups`, ({ params }) => {
+    if (params.gameId !== v1GameFixture.id) return HttpResponse.json({ code: 'GAME_NOT_FOUND', message: '경기를 찾을 수 없어요.' }, { status: 404 });
+    // The scheduled team-owner actor sees only its own side. A saved draft is
+    // still a default preview for record consumers until the human submits it.
+    return ok(v1FriendlyGameLineups.map((lineup) => {
+      if (lineup.id !== v1TeamMatchLineupFixture.lineupId || v1TeamMatchLineupFixture.state !== 'DRAFT') return lineup;
+      return { ...lineup, participants: friendlyGameLineup({ ...v1TeamMatchLineupFixture, starters: v1FriendlyDefaultParticipants }, lineup.supersedesId, lineup.createdAt).participants };
+    }));
+  }),
   http.get(`${api}/games/:gameId/result-revisions`, () => ok(v1GameResultRevisions)),
   http.post(`${api}/games/:gameId/result-revisions`, async ({ request }) => {
     const body = await request.json() as V1CreateGameResultRevisionPayload;
@@ -1711,14 +1771,20 @@ export const v1MswHandlers = [
   http.post(`${api}/team-matches/:teamMatchId/lineup/late-additions`, () => HttpResponse.json({
     code: 'LINEUP_NOT_LOCKED', message: '아직 경기 기록 전이라 참석명단에서 바로 넣을 수 있어요.',
   }, { status: 409 })),
-  http.put(`${api}/team-matches/:teamMatchId/lineup`, async ({ request }) => {
-    const body = await request.json() as V1TeamMatchLineupSavePayload;
+  http.put<{ teamMatchId: string }, V1TeamMatchLineupSavePayload>(`${api}/team-matches/:teamMatchId/lineup`, async ({ request }) => {
+    const body = await request.json();
+    const versionFailure = friendlyLineupVersionFailure(body.expectedVersion);
+    if (versionFailure) return versionFailure;
+    const previousLineupId = v1TeamMatchLineupFixture.lineupId;
     v1TeamMatchLineupFixture = {
       ...v1TeamMatchLineupFixture,
+      lineupId: randomUuid(),
       revision: v1TeamMatchLineupFixture.revision + 1,
-      version: v1TeamMatchLineupFixture.version + 1,
+      version: v1TeamMatchLineupFixture.revision + 1,
       // 서버와 같다(Task 180 R-2): 이미 낸 명단의 저장은 곧바로 새 제출본, 초안의 저장은 초안.
       state: v1TeamMatchLineupFixture.state === 'DRAFT' ? 'DRAFT' : 'SUBMITTED',
+      effectiveRosterSource: v1TeamMatchLineupFixture.state === 'DRAFT' ? 'DEFAULT_PREVIEW' : 'MANUAL',
+      hasSavedDraft: v1TeamMatchLineupFixture.state === 'DRAFT',
       formation: body.formation ?? null,
       // 서버(`rosterOf`)와 **같은 규칙**: `participants` 가 **비어 있지 않을 때만** 그것이
       // 명단이고, 그 밖에는 옛 `starters`+`bench` 를 합친다. `??` 로 쓰면 빈 배열에서
@@ -1729,16 +1795,16 @@ export const v1MswHandlers = [
       starters: (body.participants?.length
         ? body.participants
         : [...(body.starters ?? []), ...(body.bench ?? [])]
-      ).map((participant, index) => ({
+      ).map((participant) => ({
         // **`id` 는 `V1GameParticipant.id` 이고 `userId` 와 별개다.** 예전 mock 은 여기에
         // `userId` 를 그대로 넣어, `participantId` 를 `userId` 로 잘못 다루는 코드가
         // 있어도 테스트가 통과했다(결과 입력 폼의 골·카드 귀속이 그 값을 쓴다).
-        // 두 값이 절대 같지 않도록 접두어를 붙여 갈라 둔다.
-        id: `participant-${index + 1}`,
+        // 실제 참가자처럼 독립된 UUID를 발급해 사용자 ID와 갈라 둔다.
+        id: randomUuid(),
         // 서버와 같다: 저장 요청이 실어 보낸 사람 연결을 응답이 그대로 되돌려준다.
         // 게스트는 계정이 없으므로 null.
         userId: participant.userId ?? null,
-        displayName: participant.displayName ?? '이름 미확인',
+        displayName: participant.displayName?.trim() || v1TeamMatchLineupFixture.eligibleMembers?.find((member) => member.userId === participant.userId)?.displayName || '이름 미확인',
         jerseyNumber: participant.jerseyNumber ?? null,
         position: participant.position ?? null,
         goalkeeper: participant.goalkeeper ?? false,
@@ -1747,30 +1813,58 @@ export const v1MswHandlers = [
       })),
       bench: [],
     };
+    v1FriendlyGameLineups.unshift(friendlyGameLineup(v1TeamMatchLineupFixture, previousLineupId));
+    if (v1TeamMatchLineupFixture.state === 'DRAFT') {
+      // Preview IDs are stable per basis lineup; saving creates a new basis.
+      v1FriendlyDefaultParticipants = v1FriendlyDefaultParticipants.map((participant) => ({ ...participant, id: randomUuid() }));
+    }
     return ok({
       teamMatchId: v1TeamMatchLineupFixture.teamMatchId,
       gameId: v1TeamMatchLineupFixture.gameId,
       sideId: v1TeamMatchLineupFixture.sideId,
-      lineupId: v1TeamMatchLineupFixture.lineupId ?? 'lineup-1',
+      lineupId: v1TeamMatchLineupFixture.lineupId,
       revision: v1TeamMatchLineupFixture.revision,
       state: v1TeamMatchLineupFixture.state,
       version: v1TeamMatchLineupFixture.version,
       replayed: false,
     });
   }),
-  http.post(`${api}/team-matches/:teamMatchId/lineup/submit`, () => {
+  http.post<{ teamMatchId: string }, { expectedVersion: number }>(`${api}/team-matches/:teamMatchId/lineup/submit`, async ({ request }) => {
+    const body = await request.json();
+    const versionFailure = friendlyLineupVersionFailure(body.expectedVersion);
+    if (versionFailure) return versionFailure;
     // 서버와 같다(Task 180 R-2): 이미 낸 명단을 다시 내면 아무것도 바꾸지 않고 지금 상태로 성공한다.
     if (v1TeamMatchLineupFixture.state === 'DRAFT') {
-      v1TeamMatchLineupFixture.state = 'SUBMITTED';
-      v1TeamMatchLineupFixture.version += 1;
-      v1TeamMatchLineupFixture.publicLineupAt = new Date().toISOString();
+      const previousLineupId = v1TeamMatchLineupFixture.lineupId;
+      const pristineDefault = v1TeamMatchLineupFixture.effectiveRosterSource === 'DEFAULT_PREVIEW' && !v1TeamMatchLineupFixture.hasSavedDraft;
+      const revision = v1TeamMatchLineupFixture.revision + (pristineDefault ? 1 : 0);
+      v1TeamMatchLineupFixture = {
+        ...v1TeamMatchLineupFixture,
+        lineupId: pristineDefault ? randomUuid() : previousLineupId,
+        revision, version: revision, state: 'SUBMITTED',
+        starters: pristineDefault ? v1FriendlyDefaultParticipants : v1TeamMatchLineupFixture.starters,
+        publicLineupAt: v1TeamMatchLineupFixture.publicLineupAt ?? new Date().toISOString(),
+      };
+      if (pristineDefault) {
+        v1FriendlyGameLineups.unshift(friendlyGameLineup(v1TeamMatchLineupFixture, previousLineupId));
+      } else {
+        const saved = v1FriendlyGameLineups.find((lineup) => lineup.id === previousLineupId);
+        if (saved) {
+          saved.state = 'SUBMITTED';
+          saved.version += 1;
+          saved.submittedAt = new Date().toISOString();
+          saved.updatedAt = saved.submittedAt;
+        }
+      }
     }
+    v1TeamMatchLineupFixture.effectiveRosterSource = 'MANUAL';
+    v1TeamMatchLineupFixture.hasSavedDraft = false;
     const publicLineupAt = v1TeamMatchLineupFixture.publicLineupAt;
     return ok({
       teamMatchId: v1TeamMatchLineupFixture.teamMatchId,
       gameId: v1TeamMatchLineupFixture.gameId,
       sideId: v1TeamMatchLineupFixture.sideId,
-      lineupId: v1TeamMatchLineupFixture.lineupId ?? 'lineup-1',
+      lineupId: v1TeamMatchLineupFixture.lineupId,
       revision: v1TeamMatchLineupFixture.revision,
       state: v1TeamMatchLineupFixture.state,
       version: v1TeamMatchLineupFixture.version,

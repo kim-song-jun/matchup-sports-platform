@@ -18,6 +18,22 @@ PR #1985 review found two additional same-scope defects before either source or 
 
 Landing team matches also discarded actual host/opponent IDs before their avatar renderers. Existing projection and renderers now retain those IDs, while demos and unknown opponents have no identity. Actual projection/render tests reproduced four failures before the fix and pass afterward. The six-file local verification covers 47 cases: 46 passed on the first run; one existing Next return-flow case exceeded its five-second budget and passed unchanged in an isolated retry (580 ms, temporary CLI budget 15 seconds). No test timeout setting was committed, and final standard CI is still required. These source corrections do not establish search ranking, AI citation or live deployment; matching Alpha and current main-PR gates remain pending.
 
+## Verified guest-led release — 2026-10-19
+
+This is a verified deployment checkpoint for the existing-page information fixes. Overall SEO/AEO work remains in progress; successful deployment is not a claim of broad-query ranking or AI citation.
+
+- Scope: existing landing and team-list data/rendering only. No new route, hidden keywords, backend/schema/member/operations-data/key/store change, or unrelated dev feature was promoted. Source PRs #1980 and #1982 merged; final source `8e3eafb711f36ab8bfefbfb8b754c7d5b824de2d`, dev `8a866bab4e4d36f7a02942600843152791888134`.
+- Meaningful narrow RED/GREEN evidence covers 60 distinct related tests (22 team, 38 landing data and actual page rendering). Corrected tree frontend type/pattern checks passed. A reviewer-induced nullable-type cleanup failed CI, was corrected, and was never merged or deployed; the superseded review verdict is preserved.
+- Exact dev CI [39142763105](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/39142763105) and Alpha [39142763106](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/39142763106) succeeded. Final Alpha `8a` API/Web/DB/noindex and six top screenshots at 390/768/1440 passed independent Sol review with explicit limits; earlier `9d7` full bottom/flow/promo evidence is supplemental, not falsely labeled rerun on `8a`.
+- Scoped main PR [#1981](https://github.com/kim-song-jun/matchup-sports-platform/pull/1981) merged `782e5aa5a8274d34e56c80fd11f47f20314a7fed`. Exact [main CI/build/deploy 39145033802](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/39145033802) succeeded at 2026-10-18 16:52:48Z; [CodeQL 39145033326](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/39145033326) succeeded. Ordinary production approval used the user's explicit existing authorization, without bypass or settings change.
+- Actual public API/Web serve the same main commit, release `1.9.11`, HTTP 200 and DB healthy. The team-list first HTML and settled UI match current public facets: 105 total, 94 futsal, 11 soccer, 20 loaded. Before settled chips contained names only; the incorrect partial totals were in first HTML, not those settled chips.
+- The expired production mixed-cup promo (exact identifier retained only in local evidence) now visibly shows `모집 마감` while its raw detail lifecycle status remains `open`; deadline-aware display is derived at request time. Original before DOM/API observations are preserved. The before landing PNG is dark/transitional and excluded from a clean visual comparison. Settled team-list before/after screenshots are valid.
+- This bookkeeping update copies only the four reviewed API/Web release package/changelog blobs from deployed main, consumes only the exact two owned Changeset blobs, and preserves all other pending Changesets. It does not change the eight reviewed source/test blobs or deploy a second product change to main.
+- Guest evidence uses the existing named Profile 3 in Ego Lite/Chromium, visibly signed out, not native Chrome incognito or a zero-history claim. Primary search observations and later rechecks are maintained separately in the local `search-query-catalog.html/.json`, `guest-search-improvement-20261019.html`, `STATUS.md` and `MONITOR.md` under `/Users/sungjun/.cache/teameet-seo-release/`. Do not pool old Default or earlier guest samples into a fresh nine-surface measurement. Naver target-tile absence is not proof that an error snippet was replaced; no unsupported repeat collection request was made.
+- The GitHub-managed AI security scan still fails before analysis because configured model `claude-opus-5` is unavailable. Successful CodeQL and completed Copilot reviews are separate evidence; no successful AI security analysis is claimed.
+
+Independent evidence: local `evidence/improve-guest-20261018-independent.json`, `evidence/improve-guest-20261018-production-runtime-root.json`, `evidence/improve-guest-20261018-main-after-summary.json`, and immutable public Alpha gallery links on PR #1981. Root release and search cursors remain separate; later observations do not retroactively prove a ranking cause for these information defects.
+
 Status: In Progress — factual team and competition discovery metadata, unknown-team crawl verification, Alpha and scoped main release (2026-10-17)
 **Owner**: Codex main; explicit Luna implementation and Sol independent review
 **Created**: 2026-10-12
@@ -449,3 +465,16 @@ robots Disallow와 noindex 충돌 및 홈 계측 누락은 정정·운영 배포
 - `sitemap-live-fetch-success.png`: Google 실제 URL 테스트의 페이지 가져오기 성공.
 - `google-sitemap-success.png`: 후속 사이트맵 보고서 성공 및 271 URL 발견. 웹 패턴 검사도 통과했다.
 - `ga4-dimensions.png`, `ga4-landing-cta.png`, `ga4-existing-kakao-referral-rules.png`: 맞춤 정의·실제 운영 보고서·기존 추천 제외 규칙.
+
+### 2026-10-19 main release bookkeeping checkpoint
+
+- Approved main PR (root-provided): https://github.com/kim-song-jun/matchup-sports-platform/pull/1985
+- Successful main release SHA: `34c396ffb42e539f1087df35ba9224f4b4793585`
+- Main release proof (root-provided): Actual CI/Deploy39184125210 SUCCESS and CodeQL39184125001 SUCCESS; public Web and API health at2026-10-19T04:37:38Z both HTTP200 exact main34c396ffb42e539f1087df35ba9224f4b4793585/release1.9.12/DBtrue. Receipt evidence/team-default-20261019-main-release-proof.json.
+- Reviewed source commit on dev: `f2d840e38ddd93a50ac0bacaf79d96cc1ad9da32`
+- Dev bookkeeping base: `9c1186e063cc950df348296ce1496d594faa4196`; prepared commit remains pending its normal fast-forward push and CI.
+- Passed gate (root-provided): Source f2 hook/SSR10 tests and frontend checks passed; independent Sol source/main-port review passed.
+- Passed gate (root-provided): Current b84 exact CI39180889354/CodeQL39180885852 and Codex code6257149586/security6257148161 completed with no findings; four review threads resolved.
+- Passed gate (root-provided): Final Alpha63 CI39181762333/deploy39181762197 and actual guest159 first HTML/API/cache-filter second GET/local08/CTA/noindex/cleanup passed; Sol technical gate passed with explicit evidence limits.
+- Passed gate (root-provided): Fresh expected-head MERGE PR1985 and merged-main exact CI/Deploy39184125210 plus CodeQL39184125001 succeeded; actual production Web/API healthy matching main34/release1.9.12.
+- The four reviewed Changesets are consumed; all 29 unrelated pending Changesets are retained byte-for-byte.

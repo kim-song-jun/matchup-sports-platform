@@ -1,7 +1,7 @@
 'use client';
 
-import { useRef, useState, type FormEvent } from 'react';
-import { CircleHelp, Tag, X } from 'lucide-react';
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
+import { CircleHelp, X } from 'lucide-react';
 import { TextField } from '@/components/v1-ui/primitives';
 import { useV1CreateInquiry } from '@/hooks/use-v1-api';
 import { V1ApiError } from '@/lib/api-client';
@@ -14,6 +14,7 @@ import {
 } from './tournament-inquiry-topics';
 import { useTournamentInquiryDialog } from './use-tournament-inquiry-dialog';
 import { TournamentInquiryContext } from './tournament-inquiry-context';
+import { TournamentInquiryTopicPicker } from './tournament-inquiry-topic-picker';
 import { extractErrorMessage } from '@/lib/error-message';
 
 type InquiryFormErrors = Partial<Record<'title' | 'body' | 'form', string>>;
@@ -55,17 +56,23 @@ export function TournamentInquiryModal({
   const createInquiry = useV1CreateInquiry();
   const isSessionBlocked = isSessionChecking || hasSessionError || authUser === null;
   const isMatchInquiry = relatedType === 'team_match';
-  const [topic, setTopic] = useState<string>(isMatchInquiry ? MATCH_RESULT_TOPIC.value : 'participation');
+  const [topic, setTopic] = useState<TournamentInquiryTopic>('participation');
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [errors, setErrors] = useState<InquiryFormErrors>({});
   const dialogRef = useTournamentInquiryDialog(onClose);
+  const id = useId();
   const submitBusyRef = useRef(false);
   const selectedTopic = isMatchInquiry
     ? MATCH_RESULT_TOPIC
     : findTournamentInquiryTopic(topic) ?? TOURNAMENT_INQUIRY_TOPICS[0];
-  const topicOptions = isMatchInquiry ? [MATCH_RESULT_TOPIC] : TOURNAMENT_INQUIRY_TOPICS;
   const maximumTitleLength = 80 - selectedTopic.titlePrefix.length - 1;
+
+  useEffect(() => {
+    const initialControl = dialogRef.current?.querySelector<HTMLButtonElement>('button[role="combobox"]:not(:disabled)')
+      ?? dialogRef.current?.querySelector<HTMLInputElement>('input');
+    initialControl?.focus();
+  }, [dialogRef, isMatchInquiry]);
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -114,8 +121,8 @@ export function TournamentInquiryModal({
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="tournament-inquiry-title"
-        aria-describedby="tournament-inquiry-description"
+        aria-labelledby={`${id}-title`}
+        aria-describedby={`${id}-description`}
         className={styles.dialog}
         onClick={(event) => event.stopPropagation()}
       >
@@ -126,8 +133,8 @@ export function TournamentInquiryModal({
                 <CircleHelp size={22} strokeWidth={2.1} />
               </span>
               <div>
-                <h2 id="tournament-inquiry-title" className={styles.title}>{targetLabel} 문의하기</h2>
-                <p id="tournament-inquiry-description" className={styles.description}>
+                <h2 id={`${id}-title`} className={styles.title}>{targetLabel} 문의하기</h2>
+                <p id={`${id}-description`} className={styles.description}>
                   문의 대상과 답변 계정을 확인한 뒤 내용을 남겨 주세요.
                 </p>
               </div>
@@ -146,34 +153,18 @@ export function TournamentInquiryModal({
               onRetrySession={onRetrySession}
             />
 
-            <div className={styles.fieldGroup}>
-              <label htmlFor="tournament-inquiry-topic" className="tm-text-label">
-                문의 유형
-              </label>
-              <div className={styles.selectWrap}>
-                <Tag size={18} aria-hidden="true" />
-                <select
-                  id="tournament-inquiry-topic"
-                  className={`tm-input ${styles.select}`}
-                  value={topic}
-                  onChange={(event) => {
-                    if (isMatchInquiry) {
-                      setTopic(MATCH_RESULT_TOPIC.value);
-                      return;
-                    }
-                    const nextTopic = findTournamentInquiryTopic(event.target.value);
-                    if (nextTopic) setTopic(nextTopic.value);
-                  }}
-                >
-                  {topicOptions.map((option) => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
-              </div>
-              <p className={styles.fieldHint}>{selectedTopic.description}</p>
-            </div>
+            <TournamentInquiryTopicPicker
+              value={topic}
+              selectedTopic={selectedTopic}
+              isFixed={isMatchInquiry}
+              isPending={createInquiry.isPending}
+              onChange={(nextTopic) => {
+                if (!submitBusyRef.current) setTopic(nextTopic);
+              }}
+            />
 
             <TextField
+              fieldId={`${id}-inquiry-title`}
               label="제목"
               value={title}
               maxLength={maximumTitleLength}
@@ -182,6 +173,7 @@ export function TournamentInquiryModal({
               placeholder="궁금하신 점을 짧게 요약해 주세요"
             />
             <TextField
+              fieldId={`${id}-inquiry-body`}
               label="내용"
               value={body}
               maxLength={2000}

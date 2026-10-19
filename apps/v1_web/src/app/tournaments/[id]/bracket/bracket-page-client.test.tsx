@@ -1,3 +1,7 @@
+import { renderToString } from 'react-dom/server';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { BracketPageContent } from './bracket-page-client';
+import { publicGameRecordsKeys } from '@/components/public-game-records/use-public-game-records';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -989,7 +993,8 @@ describe('BracketPageContent — 정규 리그 거울 행(format=group_knockout,
   it('리그 순위를 그리고, 조별 순위는 그리지 않는다', () => {
     renderBracketStandingsTab(mirrorLeague());
 
-    expect(screen.getByRole('heading', { name: '리그 순위' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '리그 순위' })).not.toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: '리그 순위' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.queryByRole('heading', { name: '조별 순위' })).not.toBeInTheDocument();
   });
 
@@ -1215,6 +1220,31 @@ describe('BracketPageContent — 정규 리그 거울 행(format=group_knockout,
     expect(screen.queryByRole('table', { name: '리그 순위표' })).not.toBeInTheDocument();
   });
 
+  it('같은 화면에서 순위 query로 진입했다가 원래 URL로 돌아오면 일정 탭도 복원한다', () => {
+    const tournament = mirrorLeague();
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+    queryClient.setQueryData(publicGameRecordsKeys.schedule(tournament.id, {}), {
+      pages: [leagueSchedule()], pageParams: [null],
+    });
+    const view = () => (
+      <QueryClientProvider client={queryClient}>
+        <BracketPageContent tournament={tournament} />
+      </QueryClientProvider>
+    );
+    const page = render(view());
+    expect(screen.getByRole('tab', { name: '경기 일정' })).toHaveAttribute('aria-selected', 'true');
+
+    setMockSearchParams(new URLSearchParams({ tab: 'standings' }));
+    page.rerender(view());
+    expect(screen.getByRole('tab', { name: '리그 순위' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('table', { name: '리그 순위표' })).toBeVisible();
+
+    setMockSearchParams(new URLSearchParams());
+    page.rerender(view());
+    expect(screen.getByRole('tab', { name: '경기 일정' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByRole('table', { name: '리그 순위표' })).not.toBeInTheDocument();
+  });
+
   it.each(['schedule', 'unknown', 'https://external.invalid'])('허용되지 않은 순위 탭 값 %s는 경기 일정으로 직접 진입한다', (tab) => {
     setMockSearchParams(new URLSearchParams({ tab }));
     renderBracketPage(mirrorLeague(), leagueSchedule());
@@ -1264,10 +1294,28 @@ describe('BracketPageContent — 정규 리그 거울 행(format=group_knockout,
     expect(await screen.findByRole('heading', { name: '2부' })).toBeInTheDocument();
   });
 
-  it('대조군: 티어가 없으면 "리그 순위" 그대로', async () => {
+  it('서버에 순위 캐시가 없고 브라우저에 티어 순위 캐시가 있어도 첫 HTML은 일치한다', () => {
+    setMockSearchParams(new URLSearchParams({ tab: 'standings' }));
+    const tournament = mirrorLeague();
+    const fresh = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const cached = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+    const tiered = { ...leagueSchedule(), standings: [{ ...leagueSchedule().standings[0], groupName: '2부' }] };
+    cached.setQueryData(publicGameRecordsKeys.schedule(tournament.id, {}), { pages: [tiered], pageParams: [null] });
+    const initialHtml = (client: QueryClient) => renderToString(
+      <QueryClientProvider client={client}><BracketPageContent tournament={tournament} /></QueryClientProvider>,
+    );
+    try {
+      expect(initialHtml(cached)).toBe(initialHtml(fresh));
+    } finally {
+      fresh.clear();
+      cached.clear();
+    }
+  });
+  it('티어가 없으면 탭과 중복되는 리그 순위 제목 없이 표를 표시한다', async () => {
     renderBracketStandingsTab(mirrorLeague(), leagueSchedule() as never);
 
-    expect(await screen.findByRole('heading', { name: '리그 순위' })).toBeInTheDocument();
+    expect(await screen.findByRole('table', { name: '리그 순위표' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '리그 순위' })).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: '2부' })).not.toBeInTheDocument();
   });
 

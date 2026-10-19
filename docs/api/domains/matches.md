@@ -74,7 +74,7 @@
 |---|---|---|---|
 | `sportId` | uuid | Yes | - |
 | `regionId` | uuid | Yes | - |
-| `title` | string | Yes | - |
+| `title` | string(≤80) | Yes | 앞뒤 공백을 지우고 저장해요. 비었거나 공백뿐이면 `400 VALIDATION_ERROR`(`field=title`). 수정(PATCH)도 같은 규칙 |
 | `description` | string | No | - |
 | `imageUrl` | string | No | - |
 | `startsAt` | ISO datetime | Yes | - |

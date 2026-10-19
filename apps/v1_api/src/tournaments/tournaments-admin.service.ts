@@ -214,16 +214,20 @@ export class TournamentsAdminService {
     // 있던) 다른 테스트의 얕은 목이 undefined를 줘도 loadLineupInfo가 "종목 정보 없음"으로
     // 안전하게 degrade하지, 여기서 크래시하지 않는다.
     const lineup = await this.loadLineupInfo(row.sport?.code, row.competitionConfigVersionId);
-    return this.serialize(
-      row,
-      row._count.registrations,
-      {
-        registrations: row._count.registrations,
-        fixtures: fixtureCount,
-        announcements: row._count.announcements,
-      },
-      lineup,
-    );
+    const formatChangeBlockedReason = await this.getFormatChangeBlockedReason(this.prisma, tournamentId, row.status);
+    return {
+      formatChangeBlockedReason,
+      ...this.serialize(
+        row,
+        row._count.registrations,
+        {
+          registrations: row._count.registrations,
+          fixtures: fixtureCount,
+          announcements: row._count.announcements,
+        },
+        lineup,
+      ),
+    };
   }
 
   /**
@@ -421,6 +425,9 @@ export class TournamentsAdminService {
         message: '대회 정보가 다른 곳에서 이미 수정됐어요. 새로고침 후 다시 시도해 주세요.',
       });
     }
+
+    const formatChanged = dto.format !== undefined && dto.format !== existing.format;
+    if (formatChanged) await this.assertFormatChangeAllowed(this.prisma, tournamentId, existing.status);
 
     // "출전 인원"과 "교체 방식/횟수"는 같은 V1CompetitionConfigVersion.lineup에 함께
     // pin되는 설정이라 변경 정책도 동일해야 한다(오너 지시 #4) — 아래 게이트를 두
@@ -687,6 +694,11 @@ export class TournamentsAdminService {
     }
 
     await this.prisma.$transaction(async (tx) => {
+      if (formatChanged) {
+        // 조/경기/템플릿 생성과 같은 잠금으로 구조 확인과 형식 저장을 직렬화한다.
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`league-fixture-generation:${tournamentId}`}, 0))`;
+        await this.assertFormatChangeAllowed(tx, tournamentId, existing.status);
+      }
       // 사전 검사와 CAS 사이에 대진이 생길 수 있어 트랜잭션 안에서 한 번 더 확인한다.
       if (sportChanged) await this.assertSportChangeAllowed(tx, tournamentId, existing.status);
       // lineup만 저장하면 일반 필드 data가 비어 Prisma updateMany가 SQL 없이 count=0을
@@ -717,6 +729,7 @@ export class TournamentsAdminService {
           targetId: tournamentId,
           beforeJson: {
             title: existing.title,
+            ...(formatChanged && { format: existing.format }),
             ...(sportChanged && {
               sportId: existing.sportId,
               competitionConfigVersionId: existing.competitionConfigVersionId,
@@ -724,6 +737,7 @@ export class TournamentsAdminService {
           },
           afterJson: {
             title: data.title ?? existing.title,
+            ...(formatChanged && { format: dto.format }),
             ...(sportChanged && {
               sportId: dto.sportId,
               competitionConfigVersionId: sportChangeConfigVersionId,
@@ -1134,7 +1148,34 @@ export class TournamentsAdminService {
     };
   }
 
-  /** 대진이 만들어졌거나 대회가 시작된 뒤에는 종목을 바꿀 수 없다(이미 그 종목 규칙으로 만든 경기가 있다). */
+  /** 화면 안내와 직접 API 변경 검증이 같은 잠금 정책을 사용한다. */
+  private async getFormatChangeBlockedReason(
+    client: Pick<Prisma.TransactionClient, 'v1TournamentMatchDetails' | 'v1TournamentGroup'>,
+    tournamentId: string,
+    status: string,
+  ): Promise<string | null> {
+    if (status === 'in_progress' || status === 'completed') {
+      return '대회가 시작된 뒤에는 대회 형식을 변경할 수 없어요.';
+    }
+    const fixtures = await client.v1TournamentMatchDetails.count({
+      where: { tournamentId, teamMatch: { deletedAt: null } },
+    });
+    const groups = await client.v1TournamentGroup.count({ where: { tournamentId } });
+    return fixtures > 0 || groups > 0
+      ? '조나 대진이 만들어져 있어 대회 형식을 변경할 수 없어요. 대진표에서 경기와 조를 모두 삭제한 뒤 변경해 주세요.'
+      : null;
+  }
+
+  private async assertFormatChangeAllowed(
+    client: Pick<Prisma.TransactionClient, 'v1TournamentMatchDetails' | 'v1TournamentGroup'>,
+    tournamentId: string,
+    status: string,
+  ) {
+    const message = await this.getFormatChangeBlockedReason(client, tournamentId, status);
+    if (message) throw new ConflictException({ code: 'TOURNAMENT_FORMAT_LOCKED', message });
+  }
+
+  /** 대진이 만들어졌거나 대회가 시작된 뒤에는 종목을 바꿀 수 없다. */
   private async assertSportChangeAllowed(
     client: Pick<Prisma.TransactionClient, 'v1TournamentMatchDetails'>,
     tournamentId: string,

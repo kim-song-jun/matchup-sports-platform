@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsDateString, IsInt, IsNotEmpty, IsString, Max, MaxLength, Min, ValidateIf } from 'class-validator';
+import { IsDateString, IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min, ValidateIf } from 'class-validator';
 
 /** Full editable settings snapshot. UI-only state is never part of this contract. */
 export class UpdateLeagueSettingsDto {
@@ -37,4 +37,12 @@ export class UpdateLeagueSettingsDto {
   @Min(1)
   @Max(500)
   plannedFixtureCount?: number | null;
+
+  /** 생략은 기존 정원 유지, null은 무제한으로 변경한다. */
+  @Transform(({ obj }) => obj.maxTeams, { toClassOnly: true })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(2147483647)
+  maxTeams?: number | null;
 }

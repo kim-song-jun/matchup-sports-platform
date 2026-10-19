@@ -4,7 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
-import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
+import { Card, EmptyState, ErrorState, SectionTitle } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { PlaceCard } from '@/components/v1-ui/place-card';
 import { PlacePicker } from '@/components/v1-ui/place-picker';
@@ -39,6 +39,8 @@ import { HostApplicationsCard, HostApplicationsErrorCard, HostWaitingCard, Match
 import { TeamMatchApplyTeamSheet, TeamMatchManageMenuSheet } from './team-match-detail-sheets';
 import { TeamMatchImagesField, TeamMatchImagesPreview, teamMatchImage, teamMatchBackgroundImage } from './team-match-images';
 import { TeamMatchLevelRangeField } from './team-match-level-range-field';
+import { TeamMatchRulesFields } from './team-match-rules-fields';
+import { teamMatchRuleSummary, teamMatchSavedRuleSummary } from './team-match-rules-draft';
 
 const TEAM_MATCH_COST_EXPLANATION = '신청하는 팀의 비용이에요';
 
@@ -270,7 +272,7 @@ export function TeamMatchDetailPageSkeleton() {
 
 const LINEUP_ACTION_COPY = {
   attendance: { title: '참석명단', description: '경기에 참석할 선수 명단을 작성하고 제출하세요.', cta: '참석명단 관리' },
-  'match-roster': { title: '경기 명단', description: '참가 명단 선수가 출전해요. 이번 경기에 빠지는 선수만 빼 주세요.', cta: '명단 조정' },
+  'match-roster': { title: '이번 경기 출전 명단', description: '체크된 선수가 출전해요. 빠질 선수만 체크를 풀어 주세요.', cta: '출전 명단 조정' },
 } as const;
 
 /** 히어로의 팀 칸 — href 가 있으면 칸 전체가 팀 화면으로 가는 링크(44px 이상)다. */
@@ -742,6 +744,7 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
                 <InfoRow label="종목" value={match.sport} />
                 <InfoRow label="실력등급" value={match.grade ? `${match.grade}등급` : '미정'} />
                 <InfoRow label="경기방식" value={match.format} />
+                <InfoRow label="경기 규칙" value={teamMatchSavedRuleSummary(match.periods)} />
                 <InfoRow label="경기 스타일" value={match.style} />
                 <InfoRow label="유니폼 색상" value={match.uniform} />
                 <InfoRow label="성별 조건" value={match.gender} />
@@ -872,10 +875,11 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
 }
 
 export function TeamMatchCreatePageView({ model }: { model: TeamMatchCreateViewModel }) {
-  const edit = model.step === 'edit';
+  const edit = model.step === 'edit' || model.step === 'edit-rules';
+  const rulesStep = model.step === 'rules' || model.step === 'edit-rules';
   const step = edit ? 3 : stepToNumber(model.step);
-  const primaryLabel = model.form?.submitLabel ?? (edit ? '변경사항 저장' : model.step === 'confirm' ? '팀매치 만들기' : '다음');
-  const primaryAction = model.step === 'confirm' || edit ? model.form?.onSubmit : model.form?.onNext;
+  const primaryLabel = model.form?.submitLabel ?? (model.step === 'edit-rules' ? '설정 적용' : edit ? '변경사항 저장' : model.step === 'confirm' ? '팀매치 만들기' : '다음');
+  const primaryAction = model.step === 'confirm' || model.step === 'edit' ? model.form?.onSubmit : model.form?.onNext;
   const secondaryAction = model.form?.onBack;
   const missingFields = model.form?.missingFields ?? [];
   const hasEligibleTeams = model.teams.some((team) => !team.disabled);
@@ -885,7 +889,7 @@ export function TeamMatchCreatePageView({ model }: { model: TeamMatchCreateViewM
     || Boolean(model.teamLoadError)
     || !hasSelectedEligibleTeam
   );
-  const primaryDisabled = Boolean(model.form?.submitting || model.form?.lockedReason || teamStepBlocked);
+  const primaryDisabled = Boolean(model.form?.submitting || model.form?.lockedReason || model.form?.primaryBlocked || teamStepBlocked);
   const primaryDisabledReason = teamStepBlocked
     ? model.isLoadingTeams
       ? '팀 목록을 불러오는 중이에요.'
@@ -904,23 +908,27 @@ export function TeamMatchCreatePageView({ model }: { model: TeamMatchCreateViewM
         {model.form?.lockedReason ? <StateCard tone="orange" title="수정이 제한된 팀매치예요" body={model.form.lockedReason} /> : null}
         {model.step === 'team' ? <TeamStep model={model} /> : null}
         {model.step === 'sport' ? <SportStep model={model} /> : null}
-        {model.step === 'info' || edit ? (
+        {model.step === 'info' || model.step === 'edit' ? (
           // The server rejects every field of a locked team match, so every control is locked with it.
           <fieldset className="tm-create-fieldset" disabled={Boolean(model.form?.lockedReason)}>
             <InfoStep model={model} edit={edit} />
           </fieldset>
         ) : null}
         {model.step === 'condition' ? <ConditionStep model={model} /> : null}
+        {rulesStep && model.rules ? <TeamMatchRulesFields rules={model.rules} /> : null}
         {model.step === 'place-time' ? <PlaceTimeStep model={model} /> : null}
-        {model.step === 'confirm' ? <ConfirmStep model={model} /> : null}
+        {model.step === 'confirm' ? (<>
+          <ConfirmStep model={model} />
+          {model.rules?.error ? <ErrorState compact title="경기 규칙을 다시 확인해 주세요" message={model.rules.error} onRetry={model.rules.onRetry} retryPending={model.rules.retryPending} /> : null}
+        </>) : null}
       </div>
       <div className="tm-fixed-cta tm-create-fixed-cta">
         {primaryDisabledReason ? <div role="status" className="tm-text-caption" style={{ marginBottom: 8, textAlign: 'center' }}>{primaryDisabledReason}</div> : null}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
-          {secondaryAction ? <button className="tm-btn tm-btn-lg tm-btn-neutral" type="button" onClick={secondaryAction}>{edit ? '변경 취소' : model.step === 'team' ? '취소' : '이전'}</button> : <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={prevHref(model.step)}>{edit ? '변경 취소' : model.step === 'team' ? '취소' : '이전'}</Link>}
+          {secondaryAction ? <button className="tm-btn tm-btn-lg tm-btn-neutral" type="button" onClick={secondaryAction}>{model.step === 'edit-rules' ? '수정 화면으로' : edit ? '변경 취소' : model.step === 'team' ? '취소' : '이전'}</button> : <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={prevHref(model.step)}>{edit ? '변경 취소' : model.step === 'team' ? '취소' : '이전'}</Link>}
           {primaryAction ? <button className="tm-btn tm-btn-lg tm-btn-primary" type="button" disabled={primaryDisabled} onClick={() => { if (!primaryDisabled) primaryAction(); }}>{model.form?.imageUploading ? '이미지 업로드 중' : model.form?.submitting ? '저장 중' : primaryLabel}</button> : <Link className="tm-btn tm-btn-lg tm-btn-primary" href={nextHref(model.step)}>{primaryLabel}</Link>}
         </div>
-        {edit && model.form?.onCancel ? <button className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" type="button" style={{ marginTop: 8 }} disabled={model.form.submitting} onClick={model.form.onCancel}>팀매치 취소</button> : null}
+        {model.step === 'edit' && model.form?.onCancel ? <button className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" type="button" style={{ marginTop: 8 }} disabled={model.form.submitting} onClick={model.form.onCancel}>팀매치 취소</button> : null}
       </div>
     </>
   );
@@ -1294,6 +1302,11 @@ function InfoStep({ model, edit }: { model: TeamMatchCreateViewModel; edit: bool
       <TeamMatchImagesField images={d} sport={model.selectedSport} onChange={(field, value) => model.form?.onFieldChange(field, value)} onUpload={model.form?.uploadImage} disabled={model.form?.submitting} />
       {edit ? (
         <>
+          <div style={{ marginTop: 'var(--spacing-6)' }}>
+            <SectionTitle title="경기 규칙" />
+            <p className="tm-text-caption">{teamMatchRuleSummary(d.rules)}</p>
+            <button className="tm-btn tm-btn-md tm-btn-neutral" type="button" onClick={model.onOpenRules}>경기 규칙 설정</button>
+          </div>
           <h2 className="tm-text-subhead" style={{ marginTop: 28 }}>경기조건</h2>
           <ConditionFields model={model} />
           <h2 className="tm-text-subhead" style={{ marginTop: 28 }}>장소와 시간</h2>
@@ -1458,7 +1471,7 @@ function ConfirmStep({ model }: { model: TeamMatchCreateViewModel }) {
   // 종료 시간은 선택 입력이라 비어 있을 수 있다 — 상세 화면(:349 InfoRow label="장소")과
   // 동일하게 분기해야 확인 화면에 하이픈만 매달려 남는 것을 막는다.
   const timeRangeText = d.endTime ? `${d.date} ${d.startTime} ~ ${d.endDate && d.endDate !== d.date ? `${d.endDate} ` : ''}${d.endTime}` : `${d.date} ${d.startTime}`;
-  return <div><h1 className="tm-text-heading">입력한 내용을 확인해 주세요</h1><Card pad={0} style={{ marginTop: 16, overflow: 'hidden' }}><TeamMatchImagesPreview images={d} sport={model.selectedSport} /><div style={{ padding: 16 }}><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><span className="tm-badge tm-badge-blue">{model.selectedSport}</span><span className="tm-badge tm-badge-grey">{d.grade}</span><span className="tm-badge tm-badge-grey">{d.format}</span><span className="tm-badge tm-badge-grey">{matchGenderRuleLabel(d.gender)}</span>{isFreeInvite ? <span className="tm-badge tm-badge-blue">무료초청</span> : null}</div><div className="tm-text-subhead" style={{ marginTop: 12 }}>{d.title}</div><div className="tm-text-caption" style={{ marginTop: 8, whiteSpace: 'pre-wrap' }}>{d.description}</div></div></Card><Card pad={16} style={{ marginTop: 12 }}><InfoRow label="지역" value={regionName} sub="검색과 추천에 사용돼요" /><InfoRow label="경기조건" value={`${d.grade} · ${d.format}${styleText ? ` · ${styleText}` : ''}`} sub={`${d.uniform} · ${matchGenderRuleLabel(d.gender)}`} /><InfoRow label="비용" value={`총 ${formatAmountNumber(d.cost)}원 · 상대팀 ${formatAmountNumber(d.opponentCost)}원`} sub={TEAM_MATCH_COST_EXPLANATION} /><InfoRow label="일시" value={timeRangeText} /><InfoRow label="신청 마감" value={deadlineText} /><InfoRow label="장소" value={d.place?.name ?? ''} sub={d.place?.address ?? undefined} /></Card></div>;
+  return <div><h1 className="tm-text-heading">입력한 내용을 확인해 주세요</h1><Card pad={0} style={{ marginTop: 16, overflow: 'hidden' }}><TeamMatchImagesPreview images={d} sport={model.selectedSport} /><div style={{ padding: 16 }}><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><span className="tm-badge tm-badge-blue">{model.selectedSport}</span><span className="tm-badge tm-badge-grey">{d.grade}</span><span className="tm-badge tm-badge-grey">{d.format}</span><span className="tm-badge tm-badge-grey">{matchGenderRuleLabel(d.gender)}</span>{isFreeInvite ? <span className="tm-badge tm-badge-blue">무료초청</span> : null}</div><div className="tm-text-subhead" style={{ marginTop: 12 }}>{d.title}</div><div className="tm-text-caption" style={{ marginTop: 8, whiteSpace: 'pre-wrap' }}>{d.description}</div></div></Card><Card pad={16} style={{ marginTop: 12 }}><InfoRow label="지역" value={regionName} sub="검색과 추천에 사용돼요" /><InfoRow label="경기조건" value={`${d.grade} · ${d.format}${styleText ? ` · ${styleText}` : ''}`} sub={`${d.uniform} · ${matchGenderRuleLabel(d.gender)}`} /><InfoRow label="비용" value={`총 ${formatAmountNumber(d.cost)}원 · 상대팀 ${formatAmountNumber(d.opponentCost)}원`} sub={TEAM_MATCH_COST_EXPLANATION} /><InfoRow label="경기 규칙" value={teamMatchRuleSummary(d.rules)} /><InfoRow label="일시" value={timeRangeText} /><InfoRow label="신청 마감" value={deadlineText} /><InfoRow label="장소" value={d.place?.name ?? ''} sub={d.place?.address ?? undefined} /></Card></div>;
 
 }
 
@@ -1496,6 +1509,7 @@ const CREATE_PROGRESS_STEPS: Array<{ key: TeamMatchCreateViewModel['step']; labe
   { key: 'sport', label: '종목 선택' },
   { key: 'info', label: '매치 정보' },
   { key: 'condition', label: '경기조건' },
+  { key: 'rules', label: '경기 규칙' },
   { key: 'place-time', label: '장소와 시간' },
   { key: 'confirm', label: '작성 내용 확인' },
 ];
@@ -1544,7 +1558,7 @@ function CreateProgress({
         onClick={() => onGoToStep(item.key)}
         aria-current={itemStep === step ? 'step' : undefined}
         aria-label={`${itemStep}단계 ${withDestinationParticle(item.label)} 이동`}
-        style={{ display: 'block', width: '100%', background: 'none', border: 0, padding: 0, margin: 0, cursor: 'pointer' }}
+        style={{ display: 'block', width: '100%', background: 'none', border: 0, padding: 0, margin: 0, cursor: 'pointer', minHeight: 'var(--size-control-md)' }}
       >
         <span data-active={active} data-complete={complete} aria-hidden="true" style={{ display: 'block', width: '100%' }} />
       </button>
@@ -1556,7 +1570,7 @@ function CreateProgress({
       {/* edit 모드: 배지 + 안내 텍스트를 space-between으로 양쪽 정렬.
           일반 단계: 배지 + 단계명을 flex-start gap으로 나란히 정렬 — 레이아웃 패턴 §3 */}
       <div style={{ display: 'flex', justifyContent: edit ? 'space-between' : 'flex-start', alignItems: 'center', gap: 12 }}>
-        <span className={`tm-badge ${edit ? 'tm-badge-orange' : 'tm-badge-blue'}`}>{edit ? '수정' : `${step}/6단계`}</span>
+        <span className={`tm-badge ${edit ? 'tm-badge-orange' : 'tm-badge-blue'}`}>{edit ? '수정' : `${step}/${CREATE_PROGRESS_STEPS.length}단계`}</span>
         <span className="tm-text-caption">{edit ? '변경한 항목만 저장돼요' : stepLabel}</span>
       </div>
       {/* 단계 진행 바 — onGoToStep이 있으면(create 위저드) 각 단계를 클릭해 바로 이동할 수 있고,
@@ -1566,7 +1580,7 @@ function CreateProgress({
           스텝 — CSS가 green으로 표시(#1). */}
       {!edit ? (
         onGoToStep ? (
-          <nav aria-label="팀매치 만들기 단계 이동" className="tm-create-bars tm-create-bars-6">
+          <nav aria-label="팀매치 만들기 단계 이동" className="tm-create-bars" style={{ gridTemplateColumns: `repeat(${CREATE_PROGRESS_STEPS.length}, minmax(0, 1fr))` }}>
             {bars}
           </nav>
         ) : (
@@ -1575,8 +1589,8 @@ function CreateProgress({
             role="progressbar"
             aria-valuenow={step}
             aria-valuemin={1}
-            aria-valuemax={6}
-            aria-label={`팀매치 만들기 진행 상태: ${step}단계 중 6단계 (${stepLabel})`}
+            aria-valuemax={CREATE_PROGRESS_STEPS.length}
+            aria-label={`팀매치 만들기 진행 상태: ${step}단계 중 ${CREATE_PROGRESS_STEPS.length}단계 (${stepLabel})`}
           >
             {bars}
           </div>
@@ -1591,15 +1605,17 @@ function stepToNumber(step: TeamMatchCreateViewModel['step']) {
   if (step === 'sport') return 2;
   if (step === 'info') return 3;
   if (step === 'condition') return 4;
-  if (step === 'place-time') return 5;
-  return 6;
+  if (step === 'rules') return 5;
+  if (step === 'place-time') return 6;
+  return 7;
 }
 
 function nextHref(step: TeamMatchCreateViewModel['step']) {
   if (step === 'team') return '/team-matches/new/sport';
   if (step === 'sport') return '/team-matches/new/info';
   if (step === 'info') return '/team-matches/new/condition';
-  if (step === 'condition') return '/team-matches/new/place-time';
+  if (step === 'condition') return '/team-matches/new/rules';
+  if (step === 'rules') return '/team-matches/new/place-time';
   if (step === 'place-time') return '/team-matches/new/confirm';
   // confirm 이후(웨이브4 이전엔 /team-matches/new/complete): 이 Link fallback 은 model.form?.onNext
   // 가 없는 정적 렌더에서만 쓰이는데, confirm 스텝은 항상 onSubmit 이 있어(TeamMatchCreatePageView
@@ -1615,7 +1631,8 @@ function prevHref(step: TeamMatchCreateViewModel['step']) {
   if (step === 'sport') return '/team-matches/new/team';
   if (step === 'info') return '/team-matches/new/sport';
   if (step === 'condition') return '/team-matches/new/info';
-  if (step === 'place-time') return '/team-matches/new/condition';
+  if (step === 'rules') return '/team-matches/new/condition';
+  if (step === 'place-time') return '/team-matches/new/rules';
   if (step === 'confirm') return '/team-matches/new/place-time';
   return '/team-matches';
 }

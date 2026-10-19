@@ -8,7 +8,7 @@ import type { LeagueFixtureListItem } from '../league-matches/league-fixture-lis
 import type { TournamentDetailRow } from './tournaments-read.query';
 import { resolveTournamentFixtureOfficialResult } from './tournament-fixture-official-result';
 import type { PublicRosterPlayer } from './public-roster';
-import { slotLabelFromRow } from './slots/tournament-slot-label';
+import { publicFixtureSideLabel } from './slots/tournament-slot-label';
 import type { GroupStandingSummary } from './slots/group-rank-preview';
 import { toPlaceView, type PlaceView } from '../places/place-snapshot';
 
@@ -204,11 +204,11 @@ function presentCanonicalFixture(
     awayRegistrationId: details.awayRegistrationId,
     scheduledAt: match.startAt,
     fieldId: match.fieldId,
-    venue: match.placeName,
+    venue: match.field?.name ?? match.placeName,
     place: toPlaceView(match),
     // The label replaces 'TBD' only when a side has no team, so it is null whenever a team exists.
-    homeSlotLabel: details.homeRegistration === null && match.homeSlot ? slotLabelFromRow(match.homeSlot) : null,
-    awaySlotLabel: details.awayRegistration === null && match.awaySlot ? slotLabelFromRow(match.awaySlot) : null,
+    homeSlotLabel: details.homeRegistration === null ? publicFixtureSideLabel(match.homeSlot, details.homeDisplayLabel) : null,
+    awaySlotLabel: details.awayRegistration === null ? publicFixtureSideLabel(match.awaySlot, details.awayDisplayLabel) : null,
     status: fixtureStatusFromTeamMatch(match.status),
     homeRegistration: details.homeRegistration,
     awayRegistration: details.awayRegistration,
@@ -360,10 +360,12 @@ export function presentTournamentDetail(
     parkingInfo: row.parkingInfo,
     latitude: row.latitude,
     longitude: row.longitude,
-    coverImageUrl: row.coverImageUrl,
+    coverImageUrl: row.coverImageUrl ?? (row.kind === 'regular_league' ? row.listImageUrl : null) ?? null,
+    ...(row.kind === 'regular_league' ? { listImageUrl: row.listImageUrl } : {}),
     teamCount: row.teamCount,
     minPlayers: row.minPlayers,
     maxPlayers: row.maxPlayers,
+    ...(row.kind === V1CompetitionKind.regular_league ? { maxTeams: row.maxTeams } : {}),
     genderCategory: row.genderCategory,
     genderMinMale: row.genderMinMale,
     genderMaxMale: row.genderMaxMale,
@@ -449,17 +451,25 @@ export function presentTournamentDetail(
       sortOrder: group.sortOrder,
       advanceCount: group.advanceCount,
       qualification: groupStandingSummaries.get(group.id)?.qualification ?? null,
-      groupTeams: [...group.groupTeams, ...(group.byeSlots ?? []).map((slot) => ({ ...slot, registrationId: null, registration: null, isBye: true }))].map((groupTeam) => ({
-        id: groupTeam.id,
-        registrationId: groupTeam.registrationId,
-        teamId: hideIdentity ? null : (groupTeam.registration?.team.id ?? null),
-        teamName: hideIdentity ? null : (groupTeam.registration?.team.name ?? null),
-        // 순위 행이 아직 없을 때 이 편성 목록만으로 순위표를 그리므로(#374), 순위 행과
-        // 같은 아바타가 나오도록 로고도 함께 내려 준다.
-        teamLogoUrl: hideIdentity ? null : (groupTeam.registration?.team.profile?.logoUrl ?? null),
-        sortOrder: groupTeam.sortOrder,
-        isBye: groupTeam.isBye,
-      })),
+      groupTeams: [...group.groupTeams, ...(group.byeSlots ?? []).map((slot) => ({ ...slot, registrationId: null, registration: null, isBye: true }))].map((groupTeam) => {
+        const slot = groupTeam.isBye ? group.slots?.find(candidate => candidate.kind === 'BYE' && candidate.byeSortOrder === groupTeam.sortOrder) : undefined;
+        // The stored slot link survives an empty/reassigned team and custom labels.
+        // Never infer an unassigned BYE target from fixture numbers or visual order.
+        const target = slot ? row.tournamentMatchDetails.find(detail => detail.teamMatch.homeSlotId === slot.id || detail.teamMatch.awaySlotId === slot.id) : undefined;
+        return {
+          id: groupTeam.id,
+          registrationId: groupTeam.registrationId,
+          teamId: hideIdentity ? null : (groupTeam.registration?.team.id ?? null),
+          teamName: hideIdentity ? null : (groupTeam.registration?.team.name ?? null),
+          // 순위 행이 아직 없을 때 이 편성 목록만으로 순위표를 그리므로(#374), 순위 행과
+          // 같은 아바타가 나오도록 로고도 함께 내려 준다.
+          teamLogoUrl: hideIdentity ? null : (groupTeam.registration?.team.profile?.logoUrl ?? null),
+          sortOrder: groupTeam.sortOrder,
+          isBye: groupTeam.isBye,
+          displayLabel: slot?.displayLabel ?? null,
+          byeTarget: target && slot ? { fixtureId: target.teamMatchId, side: target.teamMatch.homeSlotId === slot.id ? 'HOME' as const : 'AWAY' as const } : null,
+        };
+      }),
       standings: group.standings.map((standing) => ({
         registrationId: standing.registrationId,
         teamId: hideIdentity ? null : standing.registration.team.id,
@@ -487,6 +497,7 @@ export function presentTournamentDetail(
       bracketSources: fixture.bracketSources,
       scheduledAt: fixture.scheduledAt?.toISOString() ?? null,
       venue: fixture.venue,
+      fieldId: fixture.fieldId,
       place: fixture.place,
       status: fixture.status,
       /**

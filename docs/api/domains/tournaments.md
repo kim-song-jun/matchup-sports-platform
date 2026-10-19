@@ -1,6 +1,28 @@
 # V1 Tournaments API
 
+League compatibility (2026-10-19): public `status=draft` with `kind=league` or `kind=all` selects league storage statuses `draft | open | closed`, all displayed as **모집완료**. This matches `GET /league-matches?state=draft` and existing list redirects. Regular tournament drafts remain hidden.
+
+## 12강 부전승 홈·어웨이 (2026-10-16)
+
+- `PUT /api/v1/admin/tournament-slots/:slotId/bye-side`: `{ side: 'HOME' | 'AWAY', expectedSide: 'HOME' | 'AWAY' }`.
+  V1AuthGuard + mutation admin(owner/ops), support/비관리자 403. `side`는 원하는 최종 자리이며 같은 요청을 재전송해도 다시 뒤집지 않는다.
+- 12강 BYE 슬롯과 WINNER 연결 하나를 가진 8강 경기만 허용한다. 다른 경기로 이동하거나 상대를 바꾸지 않는다.
+  슬롯 FK, 실제 경기/게임의 홈·어웨이 팀, 승자 edge의 targetSide, 부전승 sortOrder를 대회 잠금+게임 행 잠금 안의 단일 트랜잭션으로 교환한다.
+  이후 4강 진출 edge 및 원천 12강 경기 ID는 유지한다. 12강 결과가 이미 있어도 8강과 이후 경기가 시작 전이면 이동할 수 있다.
+  홈·어웨이를 교환해도 양 팀의 같은 경기 일정은 활성 상태와 기존 시각을 유지한다. 팀 교체 시에는 경기에서 빠진 팀의 일정만 취소한다.
+- 응답 data: `{ affectedTeamMatchIds: string[], side, sortOrder }`. `sortOrder`는 0부터 시작하는 표시 위치다.
+  어드민 slot의 `position`은 고유 순번, 신규 `byeSortOrder: number | null`은 표시 위치다. 다른 슬롯 종류는 null.
+- 409: `BYE_SIDE_INVALID`(구조/소속 불일치), `BYE_SIDE_STALE`(현재 방향 불일치), `SLOT_LOCKED`(대상 또는 후속 경기 시작·기록·미무효 결과),
+  `BYE_POSITION_OCCUPIED`(위치 충돌), `COMMAND_CONCURRENCY_CONFLICT`(게임 잠금 경합). 잘못된 DTO/추가 필드는 400, 없는 슬롯은 404.
+  실패하면 전체 롤백한다. 감사 action은 `tournament.bracket.bye.side`이며 이전/이후 방향·위치·대상/원천 경기 ID를 남긴다.
+- 새 12강 템플릿은 부전승 표시 위치 1·3·5·7(저장 0·2·4·6), 8강 HOME 배정으로 시작한다. 기존 템플릿은 migration에서 연결된 HOME/AWAY에 맞춰 표시 위치만 보정한다.
+  표시 좌표 보정 후에는 대응 API를 함께 배포해야 한다. 이전 고정 인덱스 부전승 배정 API로 롤백하면 쓰기 좌표가 어긋나므로 장애 시 forward fix한다.
+  공개 그림은 저장된 첫 라운드 순서를 유지한다. 연결된 부전승의 임의 숫자 이동/삭제는 계속 거절하고 어드민 그림·목록의 홈·어웨이 선택기를 사용한다.
+- 검증: API `slots/bye-side.spec.ts`, `test/tournaments/tournament-slots.integration-spec.ts`, 웹 `bye-side-control.test.tsx`와 `tournament-bracket-graph.test.ts`.
+
 ## Read Endpoints
+
+Regular-league list cards expose the effective list image as `coverImageUrl` (`listImageUrl ?? coverImageUrl` in storage). Detail exposes the effective detail image as `coverImageUrl` and the stored `listImageUrl`; a missing detail image uses the list image. Regular-tournament images are unchanged. See [league image mutations](./league-matches.md#cover-image-목록상세-이미지).
 
 Publication of both regular tournaments and regular leagues is independently
 controlled by `V1Tournament.isPublic` (default `true`). Unpublished competitions are
@@ -233,11 +255,22 @@ After creation, the response's `competitionConfigVersionId`, lineup size, and su
 
 On update, `null` clears nullable bank details when the resulting `entryFee` is zero (paid tournaments still require complete bank details), card-suspension limits, rules and refund text, prize fields, mixed-gender quotas, or the minimum-match setting; omitting a field preserves its current value. Sending `venue: null` clears the complete saved venue snapshot, including its address and map pin. On create, omitted or `null` values for these optional fields are stored as empty (`null`) values where applicable.
 
+정규 리그(`kind=regular_league`)는 별도 [리그 생성·정원 계약](./league-matches.md#participant-team-capacity-참가팀-정원)을
+따른다. 참가팀 정원은 nullable `maxTeams`이며 `maxPlayers`는 팀당 선수 명단 정원이다.
+일반 대회(`kind=regular_tournament` 및 기존 `kind=null` 행)와 리그 방식 일반 대회
+(`format=league`)는 계속 `teamCount`로 참가팀 정원을 판단한다. `format`으로 두 종류를 구분하지 않는다.
+
 경기 시간(피리어드): `GET /api/v1/admin/competition-configs/lineup-size-options?sportId=` 응답의 `defaultPeriods`(`[{ label, durationMinutes }]`, 연장 제외)가 종목 기본값이다 — 축구 전반 45·후반 45, 풋살 20·20, 미지원 종목 `[]`. 생성 마법사는 이 값을 채워 두고 전·후반 또는 단판(피리어드 1개)으로 고칠 수 있게 하며, 고친 경우에만 대회 생성/수정 직후 `PATCH /api/v1/admin/tournaments/:tournamentId/periods`(피리어드 설정)로 저장한다. 생성 API 자체는 종목 기본 피리어드로 만든다.
+
+피리어드 설정 저장은 새 설정 버전을 대회(리그)에 연결하면서 **끝나지 않았고 시작 전인 경기**(게임 `SCHEDULED`, 이벤트·결과·시작된 피리어드 없음 — 라인업 제출은 무관)도 같은 버전으로 옮기고 경기 피리어드 행 수를 맞춘다. 옮기는 대상은 피리어드 말고는 현재 설정과 같은 버전을 따르던 경기뿐이다(라인업·결과 규칙이 다른 버전으로 남은 경기는 그대로). 같은 피리어드를 다시 저장하면 버전은 바뀌지 않고(`changed: false`) 예전 버전에 남은 시작 전 경기만 따라온다. 응답 `fixturesRepointed`가 옮긴 경기 수다. 시작했거나 끝난 경기는 만든 때의 피리어드 그대로다. 경기 종료 예정 시각(`endAt`)은 바꾸지 않는다.
+
+피리어드 이름: 요청은 시간만 보내고 이름·코드는 서버가 정한다. 전·후반을 하나로 줄이면 `SINGLE_PERIOD`(단일), 단판을 다시 둘로 나누면 `FIRST_HALF`·`SECOND_HALF`(전반·후반)로 저장한다(MD-QA #159). 단판을 세 개 이상으로 나누면 이전 `SINGLE_PERIOD`(단일)를 이어 받지 않고 모든 행을 `PERIOD_N`(N피리어드)으로 새로 정한다. 그 밖에는 같은 순서의 기존 이름을 유지하고, 새로 붙는 피리어드만 `PERIOD_N`(N피리어드)이다.
 
 초안 재저장: `PATCH /api/v1/admin/tournaments/:tournamentId`에 출전 인원·교체 정책을 다시 보내거나 변경해도 현재 고정된 설정의 피리어드·이벤트·결과·순위·공개 정책은 유지한다. 별도 이름으로 등록한 설정도 현재 종목/이름 계열에서 동일 버전을 재사용하고, 실제 라인업 변경은 같은 계열의 다른 섹션을 보존한 불변 새 버전으로 처리한다. 기존 v1 설정에서 `lineup.positions/formations` 키가 없으면 버전 쓰기도 부재를 유지한다(읽기 응답은 `[]`로 정규화). 명시적으로 잘못된 포지션/대형 목록의 검증은 그대로 적용한다. 생성 마법사는 피리어드 PATCH 성공 전에는 공개 확인·접수 시작을 허용하지 않는다. 실패 시 초안 ID와 입력을 유지하며 같은 초안에서 재시도한다.
 
 출전 인원·교체 설정만 보내는 PATCH도 제목 등 다른 필드가 필요하지 않다. 동일 설정 재저장에도 원자적 CAS와 감사 로그를 적용하고 새 `updatedAt`을 반환한다. 후속 요청은 이 버전을 사용해야 하며 이전 버전은 `409 TOURNAMENT_VERSION_CONFLICT`로 거절한다.
+
+대회 형식 변경: 관리자 상세 응답의 `formatChangeBlockedReason`은 변경 가능하면 `null`, 제한 중이면 한국어 사유다. `PATCH /api/v1/admin/tournaments/:tournamentId`의 `format`은 `league` / `knockout` / `group_knockout`을 받으며, 참가 신청만 있으면 변경 가능하다. 조 또는 삭제되지 않은 경기가 있거나 상태가 `in_progress` / `completed`이면 실제 형식 변경은 `409 TOURNAMENT_FORMAT_LOCKED`로 거절한다. 같은 형식 재전송과 다른 정보 수정은 허용한다. 조/대진 생성과 같은 잠금 안에서 구조를 재검사하고 CAS로 저장하며 감사 로그의 before/after에 형식을 남긴다. 형식 변경은 대진을 자동 삭제·변환하지 않는다.
 
 종목 변경: `PATCH /api/v1/admin/tournaments/:tournamentId`에 현재와 다른 `sportId`를 보내면 같은 CAS 트랜잭션에서 `competitionConfigVersionId`를 새 종목의 기본 규정 버전(생성과 같은 경로, 규정을 쓰지 않는 종목은 `null`)으로 다시 연결하고, 감사 로그(`tournament.update`)의 before/after에 `sportId`·`competitionConfigVersionId`를 남긴다. 직전에 고친 경기 시간·출전 인원은 새 종목 기본값으로 돌아간다. 대진이 하나라도 있거나 상태가 `in_progress`/`completed`이면 `409 TOURNAMENT_SPORT_LOCKED`(변경 없음). 같은 종목 재전송은 pin을 건드리지 않는다. 출전 인원·교체 필드와 함께 보내면 `400 TOURNAMENT_LINEUP_SIZE_SPORT_CHANGE_CONFLICT`이므로 종목을 먼저 저장한 뒤 설정한다.
 
@@ -346,9 +379,23 @@ The list (`GET /api/v1/tournaments`) and detail (`GET /api/v1/tournaments/:tourn
 | `GET` | `/api/v1/tournaments/:tournamentId/registrations/my-registration?scope=teams` | user, active team member | path ids | registrations for teams the caller belongs to |
 | `GET` | `/api/v1/tournaments/:tournamentId/registrations/my-registrations` | user, active team member | path ids | registrations for teams the caller belongs to |
 | `GET` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId` | user, active team member | path ids | registration detail |
-| `POST` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/submit` | user, team manager+ | `SubmitRegistrationDto` | registration in `awaiting_payment` |
+| `POST` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/submit` | user, team manager+ | `SubmitRegistrationDto` | paid entry: `awaiting_payment`; free entry: `payment_checking` with paid zero-amount payment |
 | `POST` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/cancel-request` | user, team manager+ | `CancelRegistrationRequestDto` | `draft` becomes `cancelled`; active statuses become `cancel_requested` |
 | `POST` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/cancel-request/withdraw` | user, team manager+ | empty body | `cancel_requested` returns to its saved previous status |
+
+일반 대회와 정규 리그는 이 신청 경로를 공유한다. 운영자 신청 관리도 같은 등록을 다룬다:
+
+| Method | Path | Auth | Request | Response |
+|---|---|---|---|---|
+| `GET` | `/api/v1/admin/tournaments/:tournamentId/registrations` | active admin | `status?`, `cursor?`, `limit?` | `items`, `pageInfo: { hasNext, nextCursor }` |
+| `PATCH` | `/api/v1/admin/registrations/:registrationId/confirm` | owner/ops admin | `{ decision: 'confirm' \| 'waitlist', note? }` | registration; already at the target status adds `alreadyProcessed: true` |
+| `PATCH` | `/api/v1/admin/registrations/:registrationId/reject-cancel` | owner/ops admin | empty body | restored registration |
+
+신청 목록은 `createdAt` 내림차순 cursor 페이지네이션이고 `limit`은 1~50(기본 20)이다.
+`waitlisted`도 기존 상태 필터로 조회하며 `note`는 선택 문자열(최대 500자)이다.
+정원 때문에 자동 대기 등록을 만들거나 신청 실패를 성공으로 돌려주지 않는다. 확정·대기 처리의
+허용 진입 상태는 `payment_checking`·`paid`·`waitlisted`다. 대기에서 확정할 때도 서버가 현재
+정원을 확인하며 `409 TOURNAMENT_CAPACITY_FULL`이면 대기 등록을 보존한다.
 
 `cancel-request` stores the status that existed before `cancel_requested`. It is rejected with `409 TOURNAMENT_ENDED` (registration unchanged) when the tournament or league is `completed` or `cancelled` — terminal states have nothing left to cancel; this applies to `draft` registrations too. Other non-cancellable registration statuses keep returning `409 REGISTRATION_NOT_CANCELLABLE`. `cancel-request/withdraw` is allowed only while the registration status is `cancel_requested`; it clears `cancelRequestedAt`, `cancelReason`, and the stored previous status after restoring the registration.
 
@@ -360,11 +407,11 @@ Registration responses carry `cancelReason` (the team's reason from `cancel-requ
 |---|---|---|
 | `409 TOURNAMENT_STATE_CHANGED` | the tournament is no longer reachable on the tournament surface at that moment (deleted, or its kind moved off the surface) | refresh and retry — **not** a dead link |
 | `409 TOURNAMENT_ALREADY_CANCELLED` | the tournament was cancelled meanwhile | refresh; the withdrawal can never succeed now |
-| `409 TOURNAMENT_CAPACITY_FULL` | the status being restored holds a capacity slot and the other capacity-holding registrations already fill `teamCount` | refresh; retrying only helps if someone else frees a slot |
+| `409 TOURNAMENT_CAPACITY_FULL` | the restored status holds a slot and other reservations already fill the ordinary tournament's `teamCount` or a regular league's non-null `maxTeams` | refresh; retrying only helps if a slot is freed or the operator raises/removes the league cap |
 
 The first two mean *the tournament changed while the request was in flight* — not *the tournament does not exist*, which is a `404 TOURNAMENT_NOT_FOUND` from the entry check. The third is different in kind: the tournament is fine, but **someone else took the slot this registration gave up**, so a withdrawal must not push the tournament over its limit. Retrying without a freed slot returns the same `409`.
 
-`POST /registrations` is resumable for the same tournament/team while the existing registration is still `draft`. This covers users leaving the apply flow before final submit; the endpoint returns the existing draft instead of `ALREADY_REGISTERED`.
+`POST /registrations` is resumable for the same tournament/team while the existing registration is still `draft`. This covers users leaving the apply flow before final submit; the endpoint returns the existing draft instead of `ALREADY_REGISTERED`. A saved draft does not reserve a slot, so it can still be read after capacity fills, provided the registration-window, team-permission and sport checks pass. Final submit rechecks capacity under the tournament row lock and returns `409 TOURNAMENT_CAPACITY_FULL` while full; resuming the draft does not promise admission.
 
 Registration create and submit both require the team's current `sportId` to match the tournament `sportId`. A mismatch is rejected with `409 TEAM_SPORT_MISMATCH`; clients must only offer same-sport teams as new registration candidates. Submit repeats the check so a saved draft cannot bypass a later team or tournament sport change.
 
@@ -378,7 +425,31 @@ Submission repeats the paid-tournament account invariant under the tournament ro
 
 `SubmitRegistrationDto.termsDocumentIds` is the accepted current managed-document UUID list. The service rejects stale IDs and missing required current documents before the registration transaction. In the same transaction as the legacy agreement booleans and payment row, it appends verified `web` consent events with registration/team/applicant provenance; unchecked optional documents become `not_accepted`. The four legacy boolean columns remain populated from the canonical tournament policy codes for compatibility.
 
-Public tournament list/detail responses include both `confirmedCount` and `pendingPaymentCount`. `pendingPaymentCount` counts registrations in payment-stage statuses (`awaiting_payment`, `payment_checking`, `paid`) so clients can show predicted capacity as confirmed + payment-pending teams. `POST /registrations` and `POST /registrations/:registrationId/submit` reject with `409 TOURNAMENT_CAPACITY_FULL` when confirmed + payment-stage registrations already reaches `teamCount`; draft registrations do not reserve capacity.
+Public tournament list/detail responses include both `confirmedCount` and `pendingPaymentCount`.
+`pendingPaymentCount` counts registrations in payment-stage statuses (`awaiting_payment`,
+`payment_checking`, `paid`); these and `confirmed` reserve capacity across all entry sources,
+including operator-seeded and promoted teams. `draft`, `submitted`, `waitlisted`,
+`cancel_requested` and `cancelled` do not reserve capacity.
+
+정원은 일반 대회의 `teamCount`, 정규 리그의 `maxTeams`로 판정한다. 리그의 `maxTeams`가
+`null`이거나 미설정이면 무제한이고, 선수 명단 `maxPlayers`·대진 템플릿 `teamCount`·현재
+등록 수로 대신 채우지 않는다. `/tournaments` 목록은 정규 리그 항목에 `maxTeams`를 싣고
+`teamCount`를 생략한다. 단건 상세는 리그에도 기존 `teamCount`·`minPlayers`·`maxPlayers`를
+유지하며 `maxTeams`를 추가하므로, 클라이언트는 `kind`를 보고 참가팀 정원을 선택해야 한다.
+카드 목록에는 `maxPlayers`가 없다.
+
+`POST /registrations`의 신규 초안 생성·취소 신청 재활성화와
+`POST /registrations/:registrationId/submit`은 현재 점유가 유한 정원에 도달했으면
+`409 TOURNAMENT_CAPACITY_FULL`로 거절한다. 초안 생성은 자리를 예약하지 않으며,
+같은 팀의 기존 초안 조회·재개는 정원이 찬 뒤에도 허용한다. 제출은 대회 행을 잠근 뒤 정원·점유와
+신청 마감·상태를 다시 확인하고 결제/등록을 같은 트랜잭션에 저장한다. 확정·대기 승격,
+팀의 취소 요청 철회, 운영자의 취소 요청 거부(잔류), 리그 직접 팀 추가도 같은 행 잠금 아래
+점유를 다시 센다. 자기 등록이 이미 점유한 자리는 확정 시 중복 계산하지 않는다.
+
+정규 리그 설정 저장에서 점유보다 작은 `maxTeams`를 보내면
+`409 LEAGUE_CAPACITY_BELOW_OCCUPANCY`다. 공개 응답의 `confirmedCount + pendingPaymentCount`는
+화면 안내에 사용하고, 최종 판단은 저장 트랜잭션의 현재 점유다. MSW 정원 fixture는 웹의
+유한 정원·무제한·오류 표시에 쓰며 실제 PostgreSQL 경합이나 alpha 검증을 대신하지 않는다.
 
 ## Roster Endpoints
 
@@ -387,8 +458,9 @@ Public tournament list/detail responses include both `confirmedCount` and `pendi
 | `GET` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/players` | user, active team member (owner/manager, and a member's own row, also get personal info) | path ids | roster players (each with `personalInfoVisible`) and `belowMinimum` — see Roster Read Contract |
 | `POST` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/players` | user, team manager+ | `AddPlayerDto` | created or restored player |
 | `PATCH` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/players/:playerId` | user, team manager+ | `UpdatePlayerEligibilityDto` | updated player |
+| `PATCH` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/players/:playerId/roster-settings` | user, team manager+ | `UpdatePlayerRosterSettingsDto`: optional `jerseyNumber` (integer 0–99 or null), optional boolean `goalkeeper`; at least one field required | updated player and `goalkeeper`; does not change eligibility |
 | `DELETE` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/players/:playerId` | user, team manager+ | path ids | removed player |
-| `GET` | `/api/v1/admin/registrations/:registrationId/players` | active admin | path id | admin roster detail including gender snapshot, current phone, `isTeamCaptain`, captain-first ordering, and minimum check |
+| `GET` | `/api/v1/admin/registrations/:registrationId/players` | active admin | path id | admin roster detail including stored `realName`, current nullable `nickname`, gender snapshot, current phone, `isTeamCaptain`, captain-first ordering, and minimum check |
 | `GET` | `/api/v1/admin/registrations/:registrationId/players/export` | active admin | path id | `{ filename, csv }` team roster export — columns `realName,birthDate,gender,eligibility,nickname,jerseyNumber,phone` (`phone` hyphenated `010-1234-5678` so Excel keeps the leading 0; blank when unset or the account is deleted); audit `player.export` (targetType `tournament_registration`, row count only) |
 | `GET` | `/api/v1/admin/tournaments/:tournamentId/players/export` | active admin | path id (tournament or league) | `{ filename, csv }` full roster for Excel, split into **team blocks**: 3 summary lines (title · KST download time · team/player counts), then per registration (except `draft`/`cancelled`, registration order) a blank line + `[n] 팀명 · 신청 상태 · N명|명단 미등록` title row + Korean header `순번,등번호,이름,생년월일,성별,선출 여부,닉네임,비고,전화번호` + player rows (jersey asc, nulls last; Korean labels for status/gender/eligibility; `팀장` in 비고; 전화번호 formatted like the team export, blank when unset/deleted). Filename `<title>_전체명단_<YYYYMMDD>.csv`; audit `player.export` (targetType `tournament`, row count only); `404 TOURNAMENT_NOT_FOUND` |
 | `PATCH` | `/api/v1/admin/players/:playerId/eligibility` | owner/ops admin | `UpdatePlayerEligibilityDto` | updated eligibility and audit log |
@@ -419,17 +491,21 @@ The stored roster snapshot uses the server-side member profile values for `realN
 | team `member` | the caller's own row | stored snapshot values | `null` | `true` |
 | team `member` | any other row | `null` (keys stay in the response) | `null` | `false` |
 
-The own-row exception matches `GET /teams/:teamId/members`, which also shows a member their own details. `eligibilityNote` is the admin review memo, so a member never gets it, even on their own row. Every caller gets `nickname` (the profile nickname, `null` when the profile is gone — never replaced with the real name), `jerseyNumber`, `userId`, `eligibilityStatus`, `addedAt` and `removedAt` on every row. Clients must use the row's `personalInfoVisible`, not a `null` birth date, to tell "hidden" from "not entered". The caller's role is read with an active membership of an active, non-deleted registration team; a non-member, a former (`left`/`removed`) manager, or a manager of a suspended/deleted team gets `403 PERMISSION_DENIED` and no roster is read.
+The own-row exception matches `GET /teams/:teamId/members`, which also shows a member their own details. `eligibilityNote` is the admin review memo, so a member never gets it, even on their own row. Every caller gets `nickname` (the profile nickname, `null` when the profile is gone — never replaced with the real name), `jerseyNumber`, `userId`, `eligibilityStatus`, `addedAt` and `removedAt` on every row. `displayName` uses the same public name as the game roster: profile nickname → profile displayName → `팀원`; it never falls back to the registration realName. The UI orders players by jersey number (null last), displayName (ko), then userId. Clients must use the row's `personalInfoVisible`, not a `null` birth date, to tell "hidden" from "not entered". The caller's role is read with an active membership of an active, non-deleted registration team; a non-member, a former (`left`/`removed`) manager, or a manager of a suspended/deleted team gets `403 PERMISSION_DENIED` and no roster is read.
 
 Endpoints that return a team's real names or birth dates and who can call them: `POST`/`PATCH`/`DELETE` under the same prefix are team manager+ only; every `/admin/...` player endpoint (list, export, tournament export, eligible-players, eligibility, add, remove) requires an active admin; `GET /teams/:teamId/members` already returns `realName`, `phone`, `birthDate`, `gender` as `null` to a plain member (except their own row). The public tournament detail roster carries `jerseyNumber` and `nickname` only.
 
 Admin roster reads use the dedicated `/admin/registrations/:registrationId/players` endpoint. They must not reuse the team-member endpoint because active admins are not necessarily members of the registered team. Owner, ops, and support admins may read the roster; eligibility mutation remains owner/ops-only.
 
-The admin-only roster response also joins the player's current `user.phone` as nullable `phone` for operational contact. This is not a roster-time snapshot and is not exposed by the team-member roster endpoint.
+The admin-only roster response keeps the submitted `realName` snapshot and joins the player's current `user.profile.nickname` as nullable `nickname`, so admins can distinguish the registered real name from the player's current display name. When the profile is gone or either the user or profile has a recorded `deletedAt`, `nickname` is `null`; anonymized deletion identifiers are not displayed as current nicknames. It is never replaced with `realName` or `displayName`. Nickname changes are reflected on the next roster read without changing the stored real name. The public tournament detail roster remains `jerseyNumber` + `nickname` only, with no real-name fallback.
+
+The admin-only response also joins the player's current `user.phone` as nullable `phone` for operational contact. This is not a roster-time snapshot and is not exposed by the team-member roster endpoint.
 
 The admin response derives `isTeamCaptain` from the registration team's canonical `ownerUserId`. When that owner is present in the submitted roster, the response places them first; other players retain their existing `addedAt` order. The admin modal renders a `팀장` badge next to that player.
 
 `PATCH /players/:playerId` is available only before `rosterLockedAt`. It lets team managers correct the player's `eligibilityStatus` only. The already stored roster snapshots (`realName`, `birthDateSnapshot`, `genderSnapshot`) are not refreshed by eligibility edits, and the current member profile/phone is not revalidated on this path.
+
+`PATCH /players/:playerId/roster-settings` is shared by league and tournament participant management, including before fixtures exist. It checks the registration's team manager permission, then rechecks competition status, cancellation, roster lock, deadline/override and active player ownership under the registration lock. Omitted fields are preserved; `jerseyNumber: null` clears the number. Duplicate numbers reject the whole player update. GK changes produce an operation audit and enqueue the existing competition-team roster resync for unstarted games; completed match snapshots remain unchanged. Empty input returns `400 ROSTER_SETTINGS_EMPTY`. Roster reads expose the common `goalkeeper` flag (legacy null is shown as false).
 
 All team roster mutations lock the registration row and re-read `rosterLockedAt`, registration status, tournament roster deadline, and `rosterDeadlineOverrideAt` inside the same transaction as the player write. A concurrent admin lock or deadline-override revocation wins before a later player mutation can commit.
 
@@ -506,7 +582,7 @@ All team roster mutations lock the registration row and re-read `rosterLockedAt`
 - 새 표 `v1_tournament_slots`(`V1TournamentSlot`)는 팀이 들어갈 칸의 정본이다. 대회·정규 리그가 같은 표를 쓴다(`kind`: `ENTRY`·`BYE`·`GROUP_RANK`). `V1TeamMatch.homeSlotId`·`awaySlotId` 가 경기와 자리를 잇는다. 이 PR 은 스키마와 응답만 더하고 자리를 만드는 엔드포인트는 후속 PR 이다.
 - `GET /admin/tournaments/:tournamentId/bracket` 최상위에 `slots[]` 가 추가된다: `{ id, kind, groupId, sourceGroupId, position, label, registrationId, teamName }`. `label` 은 저장하지 않고 읽을 때 계산한다 — 조별 그룹의 `ENTRY` "A조 1번", 결선 그룹·정규 리그의 `ENTRY` "1번 자리", `BYE` "부전승 1", `GROUP_RANK` "A조 1위". 빈 자리는 `registrationId`·`teamName` 이 null.
 - 같은 응답의 `fixtures[]` 에 `homeSlotId`·`awaySlotId`(자리 없는 기존 경기는 null)와 `game` 이 추가된다: `{ id, state, version, hasLiveRecords, hasOfficialResult, latestRevision: { id, state, score, entryMethod } | null }`. `hasLiveRecords` 는 게임 이벤트가 1건 이상이다(빠른 결과를 못 쓰는 조건과 같다). `hasOfficialResult` 는 공식 결과 포인터(`currentOfficialRevision`)가 `OFFICIAL` 이다(진행 중인 정정 초안이 있어도 true — 시작된 경기 팀 교체 거절 조건과 같다). `latestRevision` 은 상태와 무관한 가장 최근 리비전(DRAFT·SUBMITTED·CHANGE_REQUESTED·OFFICIAL·VOID)이고 `score` 는 `{ home, away, penalties? }`, 읽을 수 없는 값이면 null. `entryMethod` 는 `reason` 이 `[quick-result]` 로 시작하면 `quick`, 앞 리비전을 대체한 것이면 `correction`, 그 밖은 `console` 이다. 정정·무효에 필요한 리비전 상세(참가자·eventsHash·goalEvents)는 싣지 않는다 — 결과 리비전 API 로 읽는다.
-- 공개 상세 `fixtures[]` 에 `homeSlotLabel`·`awaySlotLabel` 이 추가된다. **그 사이드에 팀이 없고 자리가 연결돼 있을 때만** 값이 있고 그 밖에는 null 이다(팀이 있으면 팀 이름이 나온다). `homeTeamName`·`awayTeamName` 의 `'TBD'` 규칙은 바뀌지 않는다. 공개 일정 `GET /tournaments/:id/schedule` 의 `items[]`·`unscheduled[]` 항목에도 같은 두 필드가 같은 규칙으로 추가된다(리그 경기는 항상 null). 경기 단건 상세(`/matches/:fixtureId`)에는 라벨이 없다.
+- 공개 상세 `fixtures[]` 에 `homeSlotLabel`·`awaySlotLabel` 이 추가된다. **그 사이드에 팀이 없을 때** 사용자 지정 문구를 우선 내리고, 비어 있으면 자동 자리 문구를 내린다. BYE는 연결 슬롯의 `displayLabel`이 단일 정본이며 이전 side 복사값으로 되돌아가지 않는다. 팀이 있으면 null 이고 실제 팀 이름을 우선한다. `homeTeamName`·`awayTeamName` 의 `'TBD'` 규칙은 바뀌지 않는다. 공개 일정 `GET /tournaments/:id/schedule` 의 `items[]`·`unscheduled[]` 항목에도 같은 두 필드가 같은 규칙으로 추가된다(리그 경기는 항상 null). 경기 단건 상세(`/matches/:fixtureId`)에는 라벨이 없다.
 - `PATCH /admin/fixtures/:fixtureId` 는 자리에 연결된 사이드의 팀을 현재 값과 다르게 바꾸거나 비우려 하면 `409 SLOT_LINKED` 를 돌려준다. 같은 값을 보내거나 보내지 않은 쪽, 자리에 연결되지 않은 쪽은 그대로 바꿀 수 있다.
 - `PATCH /admin/fixtures/:fixtureId` 는 **시작된 경기의 팀도 바꾼다**(2026-10-09, `docs/design/competition-canonical-flow.md` §4). 게임이 `SCHEDULED` 가 아니어도(진행 중·일시정지·종료됐지만 공식 결과 없음·결과가 `VOID` 로 돌려진 경기) 공식 결과가 없으면(제출됐지만 미확정인 `DRAFT`·`SUBMITTED`·`CHANGE_REQUESTED` 결과 포함) 교체되고, 이때 body 의 `teamChangeReason`(1~200자, 공백 제외)이 필수다(없으면 `400 TEAM_CHANGE_REASON_REQUIRED`). 시작 전 경기는 `teamChangeReason` 을 무시한다. 한 트랜잭션에서 ① 바뀐 사이드의 옛 팀 이벤트(그 사이드의 득점·자책골·카드·반칙·교체와 취소 이벤트, 그 사이드 선수가 참조된 이벤트 — 옛 팀 선수의 자책골은 상대 득점이었어도 함께)를 삭제하고 상대 팀 이벤트·피리어드/시계 이벤트는 남기며 점수는 남은 이벤트로 다시 센다, ②′ 미확정 결과 리비전은 사유와 함께 `VOID` 로 폐기하고(`CHANGE_REQUESTED` 는 불변이라 `VOID` 후속만 추가) `currentOfficialRevisionId` 를 결과 없는 `VOID` 리비전으로 옮긴다(공식 무효와 같은 상태 — 이후 `VOID_REENTRY` 정정으로 새 팀 기준 결과를 다시 입력, 폐기된 리비전은 공개 결과·순위·기록에 집계되지 않음), ② 옛 라인업을 무효화하고 새 팀 참가 명단으로 다시 계산하는 후속 이벤트(`COMPETITION_ROSTER_RESYNC` 의 `startedGameSide`, 바뀐 사이드만)를 남기고, ③ 게임 `version` 을 올려 열려 있던 콘솔의 `expectedVersion` 이 낡게 한다(`VERSION_CONFLICT`). 감사 `tournament.bracket.fixture.started_team_change`(`reason`=사유, `beforeJson.{gameState,score}`, `afterJson.{sides[].removedEventCount,removedEventCount,score,discardedRevisions[]{id,state}}`). 응답은 기존 경기 필드에 `startedTeamChange: { removedEventCount, score } | null` 을 더한다(시작 전 교체·팀 미변경이면 null). 거절: 공식 결과 `409 FIXTURE_RESULT_MUST_BE_VOIDED`(결과를 먼저 무효로 돌린 뒤 교체, 자동 무효화 없음), 취소된 경기 `409 FIXTURE_CANCELLED`, 진출 연결 자리 `409 BRACKET_SOURCE_SLOT_LINKED`/`SLOT_LINKED`. 같은 가드를 쓰는 다른 호출자(리그 대진 재조정·자리 배정)는 시작된 경기에서 여전히 `409 FIXTURE_HAS_RESULT` 다. 정규 리그(`kind=regular_league`)의 사이드 배정 가드는 범위 밖이다.
 - `DELETE /admin/fixtures/:fixtureId` 는 경기를 숨기면서 `homeSlotId`·`awaySlotId` 도 같이 비운다. `DELETE /admin/groups/:groupId` 는 조에 속한 자리(`slots`)나 그 조를 원천으로 삼는 순위 자리(`rankSlots`)가 남아 있으면 `409 GROUP_HAS_SLOTS` 로 막는다(검사 순서: `GROUP_HAS_TEAMS` → `GROUP_HAS_FIXTURES` → `GROUP_HAS_SLOTS`).
@@ -555,11 +631,28 @@ All team roster mutations lock the registration row and re-read `rosterLockedAt`
 
 ## Public list default order (2026-10-10)
 
-`GET /tournaments` orders by status group (in progress, recruiting, recruitment closed, finished), then date, then `id` ascending as the tie-breaker. "Recruitment closed" is the status the card shows: stored `closed`, plus a stored-`open` tournament whose `registrationDeadlineAt` has passed or whose capacity (confirmed + awaiting_payment/payment_checking/paid registrations vs `teamCount`) is full; regular leagues have no capacity and keep their stored status. The server is the only place this order is defined; clients render `items[]` as received. The order, the cursor comparison and the `page` offset are all computed in the database (one `ORDER BY` over the status group, the group's date key and `id`), so request cost depends on the page size, not on how many tournaments exist. A `cursor` is an opaque token (`pageInfo.nextCursor`) that carries the sort key its row had on the page that issued it, so a row that turns into 모집 마감 mid-scroll does not make the next page skip rows; a token the list did not issue returns an empty page. When `page` is present (including `page=1`) it wins and any `cursor` sent with it is ignored; `total` is counted only for `page` requests. `page` is capped at 10,000 (`MAX_PAGE_NUMBER`); a larger value is a 400 instead of an overflowing offset.
+`GET /tournaments` orders by status group (in progress, recruiting, recruitment closed, finished), then date, then `id` ascending as the tie-breaker. "Recruitment closed" includes stored `closed`, plus a stored-`open` competition or stored-`draft` regular league whose capacity is full; ordinary tournaments also move into this display group when their `registrationDeadlineAt` has passed. Capacity is confirmed + awaiting_payment/payment_checking/paid registrations across all entry sources, compared with `teamCount` for an ordinary tournament or non-null `maxTeams` for a regular league. A league's null `maxTeams` cannot make it full. This display ordering does not change the stored lifecycle status or replace the league's separate deadline gate. The server is the only place this order is defined; clients render `items[]` as received. The order, the cursor comparison and the `page` offset are all computed in the database (one `ORDER BY` over the status group, the group's date key and `id`), so request cost depends on the page size, not on how many tournaments exist. A `cursor` is an opaque token (`pageInfo.nextCursor`) that carries the sort key its row had on the page that issued it, so a row that turns into 모집 마감 mid-scroll does not make the next page skip rows; a token the list did not issue returns an empty page. When `page` is present (including `page=1`) it wins and any `cursor` sent with it is ignored; `total` is counted only for `page` requests. `page` is capped at 10,000 (`MAX_PAGE_NUMBER`); a larger value is a 400 instead of an overflowing offset.
 
 1. `in_progress` - `scheduledAt` ascending (2026-10-13: moved to the front; it used to come third)
-2. `open` (a regular league's `draft` "upcoming" is grouped here) - `scheduledAt` ascending
-3. `closed` - `scheduledAt` ascending
+2. Recruiting (`open`, plus regular-league `draft` with room or null `maxTeams`) - `scheduledAt` ascending
+3. Recruitment closed (stored `closed`, blocked `open`, and capacity-full regular-league `draft`) - `scheduledAt` ascending
 4. `completed` - most recently finished first (`scheduledEndAt` descending, falling back to `scheduledAt`)
 
-Rows without a date sort last inside their group. `page` is an offset into the same order, so page-number paging never skips or repeats a row. Passing `status` narrows to one group; the group's ordering above still applies. The visible set is unchanged (`draft`/`cancelled` tournaments stay hidden).
+Rows without a date sort last inside their group. `page` is an offset into the same order, so page-number paging uses the same sorted rows. Passing `status` filters the stored lifecycle status; an `open` result or regular-league `draft` result can still span recruiting and recruitment-closed display groups. Regular tournament `draft`/`cancelled` rows stay hidden, while regular-league `draft` rows remain public with their capacity-derived display group.
+
+## Bracket presentation overrides (2026-10-17)
+
+`PATCH /admin/fixtures/:fixtureId` accepts `homeDisplayLabel` / `awayDisplayLabel`: optional nullable strings, trimmed, maximum 120 characters. Omission preserves the override; null or whitespace restores automatic text. Only presentation changes: registration IDs, fixture ID, advancement edges and results remain unchanged. Text-only requests use the existing mutation-admin gate and competition/fixture locks, and append a display-label audit action without invoking roster/result synchronization. Support/non-admin writes remain forbidden.
+
+Admin bracket fixtures expose both nullable overrides. Slots expose `automaticLabel`, nullable `displayLabel`, and effective `label`. A BYE override is stored only on its slot; the linked quarter-final side reads/writes that same value. Assigned team names take display priority; BYE text remains secondary. Automatic source labels use the current source fixture number, while a custom override remains unchanged. Responses sort by phase/group order, fixture number, leg, stable ID; labels never affect ordering.
+
+List/canvas/mobile share the same TeamMatch `startAt` (response `scheduledAt`), place snapshot and `fieldId`. Existing values require no migration or reentry. `scheduledAt: null` clears time; omission preserves it. Registered-field assignment sends `fieldId` without a simultaneous place replacement. Unassignment sends `fieldId: null` and `venue: ''` to clear the previous snapshot. BYE slots have no independent fixture number/time/field; edit those on the actual quarter-final. Slot team assignment still uses the existing slot endpoint and started/result lock. Saving labels and assigning a BYE team are separate explicit actions.
+
+Schema migration `20261017010000_bracket_display_labels` adds nullable varchar(120) presentation columns without changing existing data. Regression and pending alpha evidence: [scenario](../../scenarios/bracket-display-edit.md).
+
+### 2026-10-18 공개 대진 표시 후속
+
+공개 상세와 공개 일정은 관리자와 동일한 side override/BYE 슬롯 값을 읽는다. `groups[].groupTeams[].displayLabel`은 BYE의 저장 문구(그 외 null)로 팀 확정 후에도 보조 표시한다. 공개 `fixtures[].fieldId`는 canonical TeamMatch의 등록 경기장 ID다. 그림의 시각·경기장 표시는 같은 경기 ID의 `scheduledAt`·`venue`이며, venue는 등록된 field 이름을 우선하고 미등록 장소 snapshot을 다음으로 사용한다. null은 시간 미정/경기장 미정이다. 번호·문구 수정으로 실제 팀 배정·승자/패자 edge는 바뀌지 않는다.
+
+
+공개 상세 `groups[].groupTeams[].byeTarget`은 BYE 슬롯이 연결된 `{ fixtureId, side: 'HOME' | 'AWAY' }` 또는 null이다. 팀 미배정·문구 변경과 무관하게 canonical TeamMatch의 homeSlotId/awaySlotId로 조회하며, 비부전승·미연결은 null이다. 대진 비공개 시 groups/fixtures 숨김 정책은 그대로다. 공개 그림은 이 명시적 연결을 우선하며 슬롯 없는 기존 대진은 기존 registration 배정 연결을 유지한다. 번호·정렬로 진출 관계를 추정하지 않는다.

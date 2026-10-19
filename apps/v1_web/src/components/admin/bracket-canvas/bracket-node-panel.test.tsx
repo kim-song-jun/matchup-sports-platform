@@ -22,7 +22,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1TournamentFields: () => ({ data: { items: [{ id: 'field-a', name: '등록 A구장', active: true }] }, isPending: false, isError: false }),
   useV1PlaceSearch: () => ({ data: undefined, isFetching: false, isError: false, error: null }),
   useV1PublicKakaoMapsKey: () => ({ data: { kakaoMapsJsKey: null }, isLoading: false }),
-  useV1UpdateFixture: () => ({ mutate: mocks.updateFixture, isPending: false }),
+  useV1UpdateFixture: () => ({ mutate: mocks.updateFixture, mutateAsync: mocks.updateFixture, isPending: false }),
   useV1DeleteFixture: () => ({ mutate: mocks.deleteFixture, isPending: false }),
 }));
 // 정정·무효·확정은 Task 11 이 따로 검증한다 — 여기서는 어떤 게임으로 불리는지만 본다.
@@ -88,7 +88,7 @@ describe('BracketNodePanel — 자리 배정', () => {
     renderPanel();
     fireEvent.change(screen.getByRole('combobox', { name: '등록된 경기장(필드)' }), { target: { value: 'field-a' } });
     expect(screen.queryByLabelText('장소')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '일정 저장' }));
+    fireEvent.click(screen.getByRole('button', { name: '경기 정보 저장' }));
     const payload = mocks.updateFixture.mock.calls[0][0];
     expect(payload).toMatchObject({ fixtureId: 'f1', fieldId: 'field-a' });
     expect(payload).not.toHaveProperty('venue');
@@ -370,7 +370,7 @@ describe('BracketNodePanel — 자리 배정', () => {
   it('읽기 전용이면 선택창·저장·삭제·점수 입력이 모두 없다', () => {
     renderPanel(fixtureOf({ awayRegistrationId: 'r3', awayTeamName: '대구FC' }), { canWrite: false });
     expect(screen.queryByLabelText('홈 팀 선택')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '일정 저장' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '경기 정보 저장' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '경기 삭제' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '점수 확정' })).not.toBeInTheDocument();
   });
@@ -416,17 +416,16 @@ describe('BracketNodePanel — 일정·삭제', () => {
   it('KST 로 입력한 시각을 UTC ISO 로 바꿔 저장하고, 장소를 안 건드렸으면 장소 필드는 보내지 않는다', () => {
     renderPanel(fixtureOf({ venue: '탄천 보조구장' }));
     fireEvent.change(screen.getByLabelText('경기 시각'), { target: { value: '2026-10-10T14:00' } });
-    fireEvent.click(screen.getByRole('button', { name: '일정 저장' }));
+    fireEvent.click(screen.getByRole('button', { name: '경기 정보 저장' }));
     expect(mocks.updateFixture).toHaveBeenCalledWith(
       { fixtureId: 'f1', scheduledAt: '2026-10-10T05:00:00.000Z' },
-      expect.any(Object),
     );
   });
 
   it('장소 이름을 바꾸면 venue 를 함께 보낸다', () => {
     renderPanel(fixtureOf({ venue: '탄천 보조구장' }));
     fireEvent.change(screen.getByLabelText('장소'), { target: { value: '상암 보조구장' } });
-    fireEvent.click(screen.getByRole('button', { name: '일정 저장' }));
+    fireEvent.click(screen.getByRole('button', { name: '경기 정보 저장' }));
     expect(mocks.updateFixture.mock.calls.at(-1)?.[0]).toMatchObject({ fixtureId: 'f1', venue: '상암 보조구장' });
   });
 

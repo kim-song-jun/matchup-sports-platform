@@ -231,7 +231,7 @@
 | `PATCH` | `/api/v1/admin/tournaments/:tournamentId/sponsors/:sponsorId` | Required + Admin | 대회 협찬/이벤트 수정 |
 | `POST` | `/api/v1/admin/tournaments/:tournamentId/sponsors/:sponsorId/deactivate` | Required + Admin | 대회 협찬/이벤트 비공개 전환 |
 | `POST` | `/api/v1/admin/tournaments/:tournamentId/publish-bracket` | Required + Owner/Ops | 공개 상세에 대진표 일괄 공개 |
-| `GET` | `/api/v1/admin/tournaments/:tournamentId/bracket` | Required + Active Admin | 조/경기/순위 운영 데이터 조회 |
+| `GET` | `/api/v1/admin/tournaments/:tournamentId/bracket` | Required + Active Admin | 조/경기/순위 운영 데이터 조회. owner·ops 어드민에게는 공식 결과 득점(`result.goals[]`)에 득점자 계정 실명 `playerRealName` 이 더해진다(값이 있을 때만, 2026-10-18). support 어드민에게는 키 자체가 없다 |
 | `POST` | `/api/v1/admin/fixtures/:fixtureId/result` | Required + Owner/Ops | 경기 결과와 득점자/영상 기록 |
 
 ### 쿼리/DTO 계약

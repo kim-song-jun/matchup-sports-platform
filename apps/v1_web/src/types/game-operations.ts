@@ -102,7 +102,8 @@ export interface GameLineupParticipant {
    * 둘이 분리돼 있어야 한다(1차 대회 회고). */
   arrivedAt: string | null;
   /**
-   * 현장 본인 확인(검인)용 실명·전화번호 — **대회 운영진에게만** 내려온다(`GET .../operations-lineup`).
+   * 현장 본인 확인(검인)용 실명·전화번호 — **대회 운영진에게만** 내려온다(`GET .../lineups`·`.../operations-lineup`·대진 라인업).
+   * 운영 콘솔·결과 화면은 선수 이름을 `participantIdentityName` 으로 그린다(`실명 (닉네임)`).
    * 키가 없으면 이 화면을 보는 사람은 볼 권한이 없는 것이다(팀 매니저 등). null 은 볼 수 있는데 줄 값이 없는
    * 참가자(계정 없는 참가자·탈퇴 회원)다.
    */

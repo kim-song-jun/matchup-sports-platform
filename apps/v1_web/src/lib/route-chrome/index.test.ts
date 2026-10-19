@@ -134,6 +134,16 @@ describe('ROUTE_CHROME_TABLE — 골든 샘플(전 세그먼트 통합, U39)', (
     expect(campaign?.params).toEqual({ slug: 'summer-cup' });
   });
 
+  it('명단 관리(경기·참가 명단 두 진입) — 모바일 상단 바 뒤로가기에 더해 데스크톱 머리글에도 뒤로가기가 있다', () => {
+    // 데스크톱 폭(≥1024px)은 상단 바가 숨겨져, desktopHead 가 없으면 뒤로가기가 화면 어디에도 없었다.
+    const game = resolveRouteChrome('/teams/t-1/games/g-1/roster');
+    expect(game?.chrome).toMatchObject({ title: '명단 관리', desktopHead: true });
+    expect(typeof game?.chrome.backHref === 'function' ? game.chrome.backHref(game.params) : game?.chrome.backHref).toBe('/teams/t-1');
+    const registration = resolveRouteChrome('/tournaments/c-1/registrations/r-1/roster');
+    expect(registration?.chrome).toMatchObject({ title: '명단 관리', desktopHead: true });
+    expect(typeof registration?.chrome.backHref === 'function' ? registration.chrome.backHref(registration.params) : registration?.chrome.backHref).toBe('/tournaments/c-1/my');
+  });
+
   it('/events(팀밋이 여는 대회) — 뒤로가기가 있고 ?from= 이 없을 때의 고정 목적지는 대회 탭이다', () => {
     // 이 화면은 대회 탭의 배너로 들어오는 하위 화면인데 backHref 가 없어 모바일 헤더에 뒤로가기가 아예 없었다.
     expect(resolveRouteChrome('/events')?.chrome.backHref).toBe('/tournaments');
@@ -200,4 +210,22 @@ describe('결과 라우트 기본 제목 — 리그 대진에 없는 행동을 �
       expect(title).toBe('경기 결과');
     });
   }
+});
+
+
+describe('MD-QA #141 separate team-match rules route chrome', () => {
+  it('creation rules retains the matches shell and returns to the actual previous condition step', () => {
+    const resolved = resolveRouteChrome('/team-matches/new/rules');
+    expect(resolved?.chrome).toMatchObject({ title: '경기 규칙 설정', activeTab: 'matches', bottomNav: false, desktopHead: true, backHref: '/team-matches/new/condition' });
+    expect(resolved?.params).toEqual({});
+  });
+  it('edit rules retains its current entity in the shell back link', () => {
+    const resolved = resolveRouteChrome('/team-matches/mdqa141-current/edit/rules');
+    expect(resolved?.chrome).toMatchObject({ title: '경기 규칙 설정', activeTab: 'matches', bottomNav: false, desktopHead: true });
+    const back = resolved?.chrome.backHref;
+    expect(typeof back).toBe('function');
+    expect(typeof back === 'function' ? back(resolved!.params) : back).toBe('/team-matches/mdqa141-current/edit');
+    expect(resolveRouteChrome('/team-matches/new/condition')?.params).toEqual({});
+    expect(resolveRouteChrome('/team-matches/mdqa141-current/edit')?.chrome.title).toBe('팀매치 수정');
+  });
 });

@@ -13,6 +13,7 @@ const LEAGUE_ID = 'synthetic-league-47';
 const NOW = '2026-10-08T00:00:00.000Z';
 const league: V1AdminLeagueDetail = {
   leagueId: LEAGUE_ID, title: '합성 종료 리그', state: 'completed', isPublic: true, teamIds: [],
+  maxTeams: null, confirmedCount: 0, pendingPaymentCount: 0,
   startsOn: NOW, registrationDeadlineAt: null, registrationOpen: false, sportCode: 'futsal',
   coverImageUrl: null, entryFee: 0, entryFeeConfiguredAt: null, bankName: null, bankAccount: null,
   bankHolder: null, activeRegistrationCount: 0, confirmedRegistrationCount: 0, fixtures: [],
@@ -90,12 +91,10 @@ async function renderPage() {
   render(<QueryClientProvider client={client}>{page}</QueryClientProvider>);
 }
 
-describe('QA #47 실제 리그 관리자 route → hooks → 후기 관리', () => {
-  it('대회 전용 상세 조회 없이 현재 리그 후기와 관리자 상세 복귀를 연결해요', async () => {
+describe('QA #47 실제 리그 관리자 route → hooks → 리뷰 관리', () => {
+  it('대회 전용 상세 조회 없이 현재 리그 후기를 연결해요', async () => {
     await renderPage();
     expect(await screen.findByText(visibleReview.comment ?? '')).toBeVisible();
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('합성 종료 리그 후기 관리');
-    expect(screen.getByRole('link', { name: '리그 상세로' })).toHaveAttribute('href', `/admin/league-matches/${LEAGUE_ID}`);
     expect(reviewReads).toEqual([LEAGUE_ID]);
   });
 
@@ -108,7 +107,7 @@ describe('QA #47 실제 리그 관리자 route → hooks → 후기 관리', () 
     }));
     await renderPage();
     try {
-      expect(screen.getByRole('status')).toHaveTextContent('후기 관리 정보를 불러오는 중이에요');
+      expect(screen.getByRole('status')).toHaveTextContent('리뷰 관리 정보를 불러오는 중이에요');
       expect(reviewReads).toEqual([]);
       expect(screen.queryByRole('button', { name: '숨기기' })).not.toBeInTheDocument();
     } finally { release(); }
@@ -122,7 +121,6 @@ describe('QA #47 실제 리그 관리자 route → hooks → 후기 관리', () 
     await renderPage();
     expect(await screen.findByRole('alert')).toHaveTextContent(message);
     expect(reviewReads).toEqual([]);
-    expect(screen.getByRole('link', { name: '리그 상세로' })).toBeVisible();
     server.use(http.get('*/api/v1/admin/league-matches/:leagueId', () => success(league)));
     fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
     expect(await screen.findByText(visibleReview.comment ?? '')).toBeVisible();

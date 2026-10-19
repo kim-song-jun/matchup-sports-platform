@@ -245,3 +245,20 @@ describe('buildTournamentStatistics', () => {
     });
   });
 });
+
+describe('buildTournamentStatistics — 득점자 운영진 실명', () => {
+  it.each([
+    ['운영진(실명 있음)', '김실명', '김실명 (김민수)'],
+    ['권한 없음(playerRealName 키 없음)', undefined, '김민수'],
+  ])('%s — 다른 운영 화면과 같은 이름 규칙으로 보이고, 같은 선수는 그대로 한 줄로 합산한다', (_, playerRealName, name) => {
+    const scored = (id: string): V1TournamentFixtureGoal => ({
+      ...goal(id, 'home', `p-${id}`, '김민수', 'user-1'),
+      ...(playerRealName === undefined ? {} : { playerRealName }),
+    });
+    const result = buildTournamentStatistics([
+      fixture({ id: 'fx-1', homeId: 'a', homeName: '한강 FC', awayId: 'b', awayName: '성수 FC', homeScore: 2, awayScore: 0, goals: [scored('g-1'), scored('g-2')] }),
+    ]);
+
+    expect(result.scorers).toEqual([expect.objectContaining({ playerName: name, goals: 2 })]);
+  });
+});

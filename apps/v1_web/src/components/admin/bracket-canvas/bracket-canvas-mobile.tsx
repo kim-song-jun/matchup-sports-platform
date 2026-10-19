@@ -18,6 +18,7 @@ import {
 } from '@/lib/bracket-canvas-mobile-model';
 import { bracketNodeStateChip } from '@/lib/competition-status';
 import { formatKstDateShort, formatKstTime } from '@/lib/date-utils';
+import { closeOverlayThenNavigate } from '@/lib/overlay-history';
 import type { V1AdminBracketFixture, V1AdminBracketGroup, V1AdminBracketSlot } from '@/types/api';
 import { MobileNodeSheetBody, type MobileSheetView } from './bracket-canvas-mobile-sheet';
 import type { RegistrationsLoadState } from './bracket-team-tray';
@@ -35,6 +36,7 @@ export interface BracketCanvasMobileProps {
   canWrite: boolean;
   registrationsState: RegistrationsLoadState;
   showToast: (message: string, variant?: AdminToastVariant) => void;
+  onEditFixture?: (fixtureId: string) => void;
 }
 
 // 390 폭에서 탭 한 칸이 44px 터치 타깃과 3~4글자 라벨을 담을 수 있는 한계. 넘으면 셀렉트로 바꾼다.
@@ -46,7 +48,7 @@ const selectClass =
 function findNode(rounds: MobileRound[], fixtureId: string): MobileNode | null {
   for (const round of rounds) {
     for (const section of round.sections) {
-      const hit = section.nodes.find((node) => node.fixtureId === fixtureId);
+      const hit = section.nodes.find((node) => (node.key ?? node.fixtureId) === fixtureId);
       if (hit) return hit;
     }
   }
@@ -54,10 +56,8 @@ function findNode(rounds: MobileRound[], fixtureId: string): MobileNode | null {
 }
 
 function whenText(node: MobileNode): string | null {
-  const parts: string[] = [];
-  if (node.scheduledAt) parts.push(`${formatKstDateShort(node.scheduledAt)} ${formatKstTime(node.scheduledAt)}`);
-  if (node.venue) parts.push(node.venue);
-  return parts.length > 0 ? parts.join(' · ') : null;
+  if (node.byeSlotId) return null;
+  return `${node.scheduledAt ? `${formatKstDateShort(node.scheduledAt)} ${formatKstTime(node.scheduledAt)}` : '시간 미정'} · ${node.venue || '경기장 미정'}`;
 }
 
 function SideName({ side }: { side: MobileSide }) {
@@ -66,6 +66,7 @@ function SideName({ side }: { side: MobileSide }) {
       className={`min-w-0 break-keep text-[length:var(--font-size-body-sm)] font-semibold ${hasTeam(side) ? 'text-[var(--text-strong)]' : 'text-[var(--text-muted)]'}`}
     >
       {sideDisplayName(side)}
+      {side.byeLabel ? <span className="block text-[length:var(--font-size-caption)] font-normal text-[var(--text-muted)]">{side.byeLabel}</span> : null}
     </span>
   );
 }
@@ -75,20 +76,20 @@ function MobileNodeCard({ node, expanded, onOpen }: { node: MobileNode; expanded
   return (
     <button
       type="button"
-      onClick={() => onOpen(node.fixtureId)}
+      onClick={() => onOpen(node.key ?? node.fixtureId)}
       aria-haspopup="dialog"
       aria-expanded={expanded}
       className="flex min-h-[44px] w-full flex-col gap-2 rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-3 text-left transition-colors hover:bg-[var(--grey50)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--blue500)]"
     >
       <span className="flex items-center justify-between gap-2">
         <span className="text-[length:var(--font-size-caption)] font-semibold text-[var(--text-muted)]">{node.title}</span>
-        <StatusChip chip={bracketNodeStateChip(node.state)} />
+        {!node.byeSlotId ? <StatusChip chip={bracketNodeStateChip(node.state)} /> : null}
       </span>
-      <span className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+      {node.byeSlotId ? <SideName side={node.home} /> : <span className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
         <SideName side={node.home} />
         <span className="text-[length:var(--font-size-caption)] text-[var(--text-caption)]" aria-hidden="true">vs</span>
         <span className="text-right"><SideName side={node.away} /></span>
-      </span>
+      </span>}
       {node.scoreText ? (
         <span className="text-center text-[length:var(--font-size-body-sm)] font-bold text-[var(--text-strong)]">{node.scoreText}</span>
       ) : null}
@@ -107,7 +108,7 @@ function MobileNodeCard({ node, expanded, onOpen }: { node: MobileNode; expanded
   );
 }
 
-export function BracketCanvasMobile({ competitionId, scope, rounds, focusFixtureId = null, slots, groups, fixtures, candidates, canWrite, registrationsState, showToast }: BracketCanvasMobileProps) {
+export function BracketCanvasMobile({ competitionId, scope, rounds, focusFixtureId = null, slots, groups, fixtures, candidates, canWrite, registrationsState, showToast, onEditFixture }: BracketCanvasMobileProps) {
   const roundSelectId = useId();
   const [pickedRoundKey, setPickedRoundKey] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -146,7 +147,7 @@ export function BracketCanvasMobile({ competitionId, scope, rounds, focusFixture
   return (
     <section aria-label="대진 보기" className="flex flex-col gap-3">
       {canWrite ? (
-        <AlertBanner tone="info" message="대진 구조는 큰 화면에서 편집해요. 여기서는 팀 넣기와 결과 입력을 할 수 있어요." />
+        <AlertBanner tone="info" message={onEditFixture ? '경기를 눌러 경기 정보와 결과를 관리해요.' : '대진 구조는 큰 화면에서 편집해요. 여기서는 팀 넣기와 결과 입력을 할 수 있어요.'} />
       ) : null}
 
       {rounds.length <= ROUND_TABS_MAX ? (
@@ -186,8 +187,8 @@ export function BracketCanvasMobile({ competitionId, scope, rounds, focusFixture
               ) : null}
               <ul role="list" className="flex flex-col gap-2">
                 {section.nodes.map((node) => (
-                  <li key={node.fixtureId}>
-                    <MobileNodeCard node={node} expanded={selectedId === node.fixtureId} onOpen={openNode} />
+                  <li key={node.key ?? node.fixtureId}>
+                    <MobileNodeCard node={node} expanded={selectedId === (node.key ?? node.fixtureId)} onOpen={openNode} />
                   </li>
                 ))}
               </ul>
@@ -198,6 +199,16 @@ export function BracketCanvasMobile({ competitionId, scope, rounds, focusFixture
 
       {selected ? (
         <BottomSheet open onClose={closeSheet} title={selected.title}>
+          {canWrite && onEditFixture && view.kind === 'detail' ? (
+            <button
+              type="button"
+              className="tm-btn tm-btn-md tm-btn-outline mb-3 w-full"
+              style={{ minHeight: 'var(--size-touch-min)' }}
+              onClick={() => void closeOverlayThenNavigate(closeSheet, () => onEditFixture(selected.fixtureId))}
+            >
+              경기 수정
+            </button>
+          ) : null}
           <MobileNodeSheetBody
             node={selected}
             competitionId={competitionId}

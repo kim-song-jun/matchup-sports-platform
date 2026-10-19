@@ -76,3 +76,15 @@ describe('12강·16강·8강 입력 계약', () => {
     expect(errors.some((error) => error.property === 'isBye')).toBe(true);
   });
 });
+
+describe('UpdateFixtureDto 표시 문구', () => {
+  it.each(['준결승 A 승자', '', '  ', null])('문구 및 자동 복원 %s를 허용한다', async value => {
+    const dto = plainToInstance(UpdateFixtureDto, { homeDisplayLabel: value, scheduledAt: null });
+    expect(await validate(dto, { whitelist: true, forbidNonWhitelisted: true })).toHaveLength(0);
+    expect(dto.homeDisplayLabel).toBe(typeof value === 'string' ? value.trim() || null : null);
+  });
+  it.each([123, true, {}, '가'.repeat(121)])('잘못된 문구를 거절한다', async value => {
+    const errors = await validate(plainToInstance(UpdateFixtureDto, { awayDisplayLabel: value }));
+    expect(errors.some(error => error.property === 'awayDisplayLabel')).toBe(true);
+  });
+});

@@ -5,6 +5,7 @@ import type { GameLineup, GameLineupParticipant, GameSide } from '@/types/game-o
 import { StatusChip } from '@/components/v1-ui/status-chip';
 import { ARRIVAL_PENDING_CHIP, SENT_OFF_CHIP, arrivalCheckInUsed } from '@/lib/competition-status';
 import { jerseyText } from './player-label';
+import { participantIdentityName } from './participant-identity';
 
 /**
  * Task 21 — tappable player grid for the live operations console.
@@ -96,15 +97,15 @@ export function latestLineupForDisplay(lineups: readonly GameLineup[], sideId: s
  *
  * 대소문자·앞뒤 공백을 무시한다. 등번호는 **접두 일치**다 — "1"로 1·10·11이 함께
  * 뜨는 게 맞다(운영자가 두 자리 번호를 한 자만 기억하는 경우가 실제로 있다).
- * 반대로 이름은 부분 일치라 성만 쳐도 찾힌다.
+ * 반대로 이름은 부분 일치라 성만 쳐도 찾힌다. 운영진에게는 실명도 함께 걸린다(화면에 보이는 `실명 (닉네임)` 그대로).
  */
 export function matchesPlayerQuery(
-  participant: Pick<GameLineupParticipant, 'displayNameSnapshot' | 'jerseyNumber'>,
+  participant: Pick<GameLineupParticipant, 'displayNameSnapshot' | 'jerseyNumber' | 'identity'>,
   rawQuery: string,
 ): boolean {
   const query = rawQuery.trim().toLowerCase();
   if (query.length === 0) return true;
-  if (participant.displayNameSnapshot.toLowerCase().includes(query)) return true;
+  if (participantIdentityName(participant).toLowerCase().includes(query)) return true;
   if (participant.jerseyNumber === null) return false;
   return String(participant.jerseyNumber).startsWith(query);
 }
@@ -234,13 +235,14 @@ export function LineupGrid({
                   {participants.map((participant) => {
                     const arrivalPending = checkInUsed && participant.arrivedAt === null;
                     const sentOff = sentOffParticipantIds?.has(participant.id) ?? false;
+                    const name = participantIdentityName(participant);
                     return (
                       <li key={participant.id}>
                         <button
                           type="button"
                           disabled={disabled}
                           onClick={() => onSelectPlayer({ sideId: side.id, participant })}
-                          aria-label={`${participant.displayNameSnapshot} 선수 이벤트 기록${sentOff ? `, ${SENT_OFF_CHIP.label}` : ''}${arrivalPending ? `, ${ARRIVAL_PENDING_CHIP.label}` : ''}`}
+                          aria-label={`${name} 선수 이벤트 기록${sentOff ? `, ${SENT_OFF_CHIP.label}` : ''}${arrivalPending ? `, ${ARRIVAL_PENDING_CHIP.label}` : ''}`}
                           className={[
                             'flex min-h-[44px] w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors',
                             'hover:bg-[var(--blue50)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500',
@@ -255,9 +257,9 @@ export function LineupGrid({
                           </span>
                           <span className="min-w-0 flex-1">
                             <span
-                              className={`block truncate text-sm font-medium ${arrivalPending || sentOff ? 'text-[var(--text-muted)]' : 'text-[var(--text-strong)]'}`}
+                              className={`block break-words text-sm font-medium ${arrivalPending || sentOff ? 'text-[var(--text-muted)]' : 'text-[var(--text-strong)]'}`}
                             >
-                              {participant.displayNameSnapshot}
+                              {name}
                             </span>
                             {participant.position ? (
                               <span className="block text-xs text-[var(--text-muted)]">

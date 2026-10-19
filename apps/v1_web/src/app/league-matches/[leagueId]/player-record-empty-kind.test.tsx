@@ -28,6 +28,7 @@ beforeEach(() => {
   window.localStorage.clear();
   vi.mocked(useV1LeagueMatch, { partial: true }).mockReturnValue({
     data: { leagueId: 'league-contract', title: '합성 계약 리그', state: 'completed', teamIds: [], fixtures: [],
+      maxTeams: null, confirmedCount: 0, pendingPaymentCount: 0,
       startsOn: '2026-08-01T00:00:00.000Z', endsOn: '2026-08-02T00:00:00.000Z',
       registrationDeadlineAt: null, registrationOpen: false, sportCode: 'futsal', coverImageUrl: null, entryFee: 0, entryFeeConfigured: false, seriesSiblings: [] }, isError: false,
   });

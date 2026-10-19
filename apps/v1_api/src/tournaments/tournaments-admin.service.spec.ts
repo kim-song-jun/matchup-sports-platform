@@ -109,6 +109,8 @@ describe('TournamentsAdminService', () => {
     v1StatusChangeLog: { create: jest.Mock; count: jest.Mock };
     v1CompetitionConfigVersion: { findFirst: jest.Mock; findUnique: jest.Mock };
     v1TournamentMatchDetails: { count: jest.Mock };
+    v1TournamentGroup: { count: jest.Mock };
+    $executeRaw: jest.Mock;
     v1TournamentStanding: { count: jest.Mock };
     // 대회 종료 시 후기 요청 알림 수신자(참가 확정 팀의 owner/manager) 조회용.
     v1TournamentRegistration: { findMany: jest.Mock };
@@ -135,6 +137,8 @@ describe('TournamentsAdminService', () => {
       // 아니라 이 경로를 안 타므로 unconfigured mock(undefined 반환)으로 둬도 무해하다.
       v1CompetitionConfigVersion: { findFirst: jest.fn(), findUnique: jest.fn() },
       v1TournamentMatchDetails: { count: jest.fn().mockResolvedValue(0) },
+      v1TournamentGroup: { count: jest.fn().mockResolvedValue(0) },
+      $executeRaw: jest.fn().mockResolvedValue(1),
       v1TournamentRegistration: { findMany: jest.fn().mockResolvedValue([]) },
       v1TournamentStanding: { count: jest.fn() },
       $transaction: jest.fn(),
@@ -940,6 +944,62 @@ describe('TournamentsAdminService', () => {
   });
 
   // ─── update ──────────────────────────────────────────────────────────────────
+
+  describe('update: tournament format', () => {
+    function arrange(overrides: Record<string, unknown> = {}) {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+      prisma.v1Tournament.findFirst.mockResolvedValue({ ...tournamentRow(overrides), _count: { registrations: 5, announcements: 0 } });
+      prisma.v1Tournament.updateMany.mockResolvedValue({ count: 1 });
+    }
+
+    it.each(['league', 'knockout', 'group_knockout'] as const)('saves %s before brackets exist, even with registrations', async (format) => {
+      arrange({ format: format === 'league' ? 'knockout' : 'league' });
+      prisma.v1Tournament.updateMany.mockImplementation(async ({ data }) => {
+        prisma.v1Tournament.findFirst.mockResolvedValue({ ...tournamentRow({ ...data }), _count: { registrations: 5, announcements: 0 } });
+        return { count: 1 };
+      });
+      const result = await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, format });
+      expect(result.format).toBe(format);
+      expect(result.formatChangeBlockedReason).toBeNull();
+      expect(prisma.v1Tournament.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { format } }));
+      expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({
+        beforeJson: expect.objectContaining({ format: format === 'league' ? 'knockout' : 'league' }),
+        afterJson: expect.objectContaining({ format }),
+      }) }));
+    });
+
+    it.each(['fixtures', 'groups', 'in_progress', 'completed'])('blocks format changes with %s', async (condition) => {
+      arrange({ format: 'group_knockout', status: ['in_progress', 'completed'].includes(condition) ? condition : 'open' });
+      if (condition === 'fixtures') prisma.v1TournamentMatchDetails.count.mockResolvedValue(1);
+      if (condition === 'groups') prisma.v1TournamentGroup.count.mockResolvedValue(1);
+      await expect(service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, format: 'knockout' }))
+        .rejects.toMatchObject({ response: { code: 'TOURNAMENT_FORMAT_LOCKED' } });
+      expect(prisma.v1Tournament.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('rechecks structure under the bracket mutation lock before writing', async () => {
+      arrange({ format: 'group_knockout' });
+      prisma.v1TournamentGroup.count.mockResolvedValueOnce(0).mockResolvedValueOnce(1);
+      await expect(service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, format: 'knockout' }))
+        .rejects.toMatchObject({ response: { code: 'TOURNAMENT_FORMAT_LOCKED' } });
+      expect(prisma.$executeRaw).toHaveBeenCalled();
+      expect(prisma.v1Tournament.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('allows other edits and resending the same format after brackets exist', async () => {
+      arrange({ format: 'knockout', status: 'in_progress' });
+      prisma.v1TournamentGroup.count.mockResolvedValue(2);
+      await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, format: 'knockout', title: '새 이름' });
+      expect(prisma.v1Tournament.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { format: 'knockout', title: '새 이름' } }));
+    });
+
+    it('admin detail includes the reason for a group-only bracket lock', async () => {
+      arrange();
+      prisma.v1TournamentGroup.count.mockResolvedValue(1);
+      const result = await service.get(ownerAuthUser, 'tournament-1');
+      expect(result.formatChangeBlockedReason).toContain('경기와 조를 모두 삭제');
+    });
+  });
 
   describe('update: sport change re-pins the competition config', () => {
     const sports: Record<string, { id: string; code: string }> = {

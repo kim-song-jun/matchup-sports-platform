@@ -65,14 +65,14 @@ describe('withPublicRecordGameState — 경기 상세가 기록 응답으로 단
 
 describe('리그 상태 × 경기 상태 — 한 화면에 함께면 대상을 붙여 가른다', () => {
   it('같은 "진행 중"이라도 리그와 경기가 서로 다른 칩 문구가 된다', () => {
-    expect(leagueStateChip('active', { withSubject: true }).label).toBe('리그 · 진행 중');
+    expect(leagueStateChip('active', { withSubject: true }).label).toBe('리그 · 시즌 진행 중');
     expect(matchPhaseChip('live', { withSubject: true }).label).toBe('경기 · 진행 중');
     expect(matchPhaseChip('scheduled', { withSubject: true }).label).toBe('경기 · 예정');
   });
 
   it.each([
-    ['draft', '준비 중'],
-    ['active', '진행 중'],
+    ['draft', '모집완료'],
+    ['active', '시즌 진행 중'],
     ['completed', '종료'],
   ] as const)('리그 %s 는 대상 없이 "%s"', (state, label) => {
     expect(leagueStateChip(state).label).toBe(label);

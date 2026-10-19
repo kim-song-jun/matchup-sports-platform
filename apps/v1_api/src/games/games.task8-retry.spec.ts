@@ -149,11 +149,11 @@ async function createTask8RetryService(lineupReady = true) {
       return [];
     },
     v1Game: {
-      async findUnique({ select }: { select: Record<string, unknown> }) {
-        if (select.lastSequence === true && Object.keys(select).length === 1) {
+      async findUnique({ select, include }: { select?: Record<string, unknown>; include?: Record<string, unknown> }) {
+        if (select?.lastSequence === true && Object.keys(select).length === 1) {
           return { lastSequence: state.game.lastSequence };
         }
-        if (select.teamMatch !== undefined) {
+        if (select?.teamMatch !== undefined) {
           return {
             sourceType: state.game.sourceType,
             teamMatch: {
@@ -169,6 +169,19 @@ async function createTask8RetryService(lineupReady = true) {
             },
           };
         }
+        if (include !== undefined) return {
+          ...state.game, teamMatch: { leagueId: null, tournamentId: null },
+          sides: [{ id: 'task8-side', teamId: 'task8-team' }, { id: 'task8-away-side', teamId: 'task8-away-team' }],
+          lineups: (lineupReady ? ['task8-side', 'task8-away-side'] : ['task8-side']).map((sideId) => ({
+            id: `${sideId}-lineup`, sideId, revision: 1, state: 'SUBMITTED', submittedAt: new Date(), invalidatedAt: null,
+          })),
+          participants: (lineupReady ? ['task8-side', 'task8-away-side'] : ['task8-side']).map((sideId) => ({
+            id: `${sideId}-participant`, gameId: state.game.id, lineupId: `${sideId}-lineup`, sideId, userId: null,
+            displayNameSnapshot: sideId, jerseyNumber: null, position: null, positionX: null, positionY: null,
+            started: true, arrivedAt: null, createdAt: new Date(), updatedAt: new Date(),
+          })),
+          sharedRecord: null, resultRevisions: [],
+        };
         return { ...state.game };
       },
       async update({ data }: { data: { lastSequence: number; version: { increment: number } } }) {
@@ -299,6 +312,9 @@ async function createTask8RetryService(lineupReady = true) {
       },
     },
     v1OperationAudit: {
+      async findMany() {
+        return [];
+      },
       async create() {
         return { id: 'task8-audit' };
       },

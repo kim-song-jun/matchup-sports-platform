@@ -3,6 +3,35 @@
 League creation is exposed under `/api/v1/admin/league-matches` and public
 league reads under `/api/v1/league-matches`.
 
+
+## League display states (2026-10-19)
+
+The user-facing lifecycle has exactly four states: **모집완료 · 진행 중 · 보류 · 종료**.
+Compatible API values remain `draft | active | on_hold | completed`.
+Stored `draft`, `open`, and `closed` all map to `draft` and display **모집완료**;
+`in_progress` displays 진행 중, `on_hold` 보류, and `completed`/`cancelled` 종료.
+There is no separate 준비 중 or 모집 중 lifecycle state. Shared labels cover common/public
+detail, fixtures, my leagues, admin lists/header/modal, season tiers, roster and staff entry.
+Registration availability/deadline and publication remain separate facts; changing a label does
+not close registration, change `isPublic`, start a game, or rewrite historical rows.
+The public list's compatible `status=draft` filter selects all three pre-start storage values,
+matching `GET /league-matches?state=draft`; ordinary tournament drafts remain hidden.
+
+## New league lifecycle (2026-10-18)
+
+New independent leagues and new series seasons are stored as `closed` (모집완료), with
+no registration deadline. No existing rows are backfilled. Admin list/detail include
+`lifecycleStatus` and authoritative `registrationOpen` alongside the compatible `state` (`closed` still maps to `draft`).
+The admin header shows 모집완료 and 리그 시작하기. Confirming the existing state
+endpoint with `{ "state": "active" }` starts the league with the existing mutation-admin
+permission and `league_match.start` audit. Normal error handling and query invalidation apply.
+For new explicit-start leagues, fixture generation/regeneration, slot assignment and result
+activity never promote the pre-start `draft`/`open`/`closed` stage. Starting a game of a new explicit-start league in `draft`, `open`, or `closed` returns `409 LEAGUE_NOT_STARTED` inside
+the command transaction, before any game-state write. Once explicitly started, games use
+normal start rules. Existing `draft`/`open`/`closed` automatic promotion is retained when `requiresExplicitStart=false`; only new rows explicitly set it to `true`. Explicit
+registration reopening still uses the existing deadline contract independently of lifecycle.
+An additive migration adds `requiresExplicitStart` (database default `false`). Existing rows and writes from old application versions keep `false`, preserving all existing lifecycle behavior, including stored `closed`. Only the new league creation boundary opts in with `true`; create/edit DTOs do not accept this internal flag. Deploy the migration before the new application; rollback keeps the column and requires no data rewrite.
+
 ## Public visibility
 
 `V1Tournament.isPublic` (`v1_tournaments.is_public`) controls publication separately
@@ -42,7 +71,7 @@ them has an official result). The automatic transition additionally waits for th
 stays `active` even if every existing fixture is official (so a league built one fixture at a time is not
 closed after each game). Manual completion ignores `plannedFixtureCount`.
 
-A `draft` league (stored `draft`/`open`/`closed`) moves to `active` on its own when one of its games is
+An existing `draft` league (stored `draft`/`open`/`closed`, with `requiresExplicitStart=false`) moves to `active` on its own when one of its games is
 started (after the start command commits; status-change reason `game_started`) or when a result becomes
 official (quick result, forfeit or console end + confirm; reason `result_confirmed`). `on_hold` and
 `completed` leagues are never touched. Automatic completion only runs on result confirmation and fixture
@@ -65,10 +94,13 @@ endpoints below instead of adding new ones:
 - `active` from `completed` → revert completion. `active` from `draft` (stored `draft`/`open`/`closed`)
   starts the league (stored `in_progress`, audit `league_match.start`). Before this, only fixture
   generation moved a league to active.
-- `draft` from `active` moves back to stored `draft` (audit `league_match.revert_to_draft`) only while no
+- `draft` from `active` returns to stored `closed` (모집완료; compatible response state remains `draft`, audit `league_match.revert_to_draft`) only while no
   game has started (`LIVE`/`PAUSED`/`ENDED`); otherwise `409 LEAGUE_HAS_STARTED_GAMES`. `draft` from
   `completed` returns `409 LEAGUE_NOT_ACTIVE` (revert to active first).
 - Asking for the current state returns `alreadyProcessed: true`.
+
+The admin modal labels the `active` → `draft` target 시작 취소 → 모집완료. Fixtures, teams, publication and registration deadline remain unchanged;
+registration availability still follows the deadline independently. The league can be explicitly started again with `active`.
 
 Returns `{ leagueId, state, alreadyProcessed }`. The individual `hold`/`resume`/`complete`/`revert-completion`
 endpoints stay for compatibility.
@@ -204,10 +236,10 @@ are rejected with 400 instead of being coerced to a free league. `reason` is opt
 Response `data`: `{ leagueId, entryFee, entryFeeConfiguredAt, bankName, bankAccount, bankHolder, alreadyProcessed }`.
 Example payload (fake values): `{ "entryFee": 150000, "bankName": "국민은행", "bankAccount": "123-456-789012", "bankHolder": "팀밋", "reason": "참가비 조정" }`.
 
-## Cover image (대표 이미지)
+## Cover image (목록/상세 이미지)
 
 `PATCH /api/v1/admin/league-matches/:leagueId/cover-image` takes
-`{ "coverImageUrl": string | null }`. The key is required; `null` removes the image.
+`{ "coverImageUrl"?: string | null, "listImageUrl"?: string | null }`. At least one key is required. `coverImageUrl` is the detail image; `listImageUrl` is the list image. Omitted keys are preserved; `null` removes only the specified image. Both may be updated atomically.
 Only paths created by the upload endpoint are accepted (`/uploads/…`, max 1000 chars);
 external URLs, `javascript:`, `..` segments and empty strings return 400. The check is
 the shared `common/safe-image-url.ts` validator (campaign and sponsor behaviour is
@@ -215,9 +247,11 @@ unchanged). Allowed in every status including `on_hold`, `completed` and `cancel
 Last write wins. The old file is never deleted because the next season may have
 inherited the same URL. A value equal to the stored one returns
 `alreadyProcessed: true` without audit. Response `data`:
-`{ leagueId, coverImageUrl, alreadyProcessed }`; errors `404 LEAGUE_NOT_FOUND`,
+`{ leagueId, coverImageUrl, listImageUrl, alreadyProcessed }`; errors `404 LEAGUE_NOT_FOUND`,
 `409 LEAGUE_MIRROR_MISSING`. Audit action `league_match.cover_image_updated`
-(before/after `coverImageUrl`).
+(before/after both image fields).
+
+Existing regular-league cover images are copied into `list_image_url` by migration; the original detail value is unchanged. Admin league detail returns both stored values. Public detail resolves `coverImageUrl` from the detail image, falling back to the list image; list cards prefer the list image and fall back to the detail image, matching team-match behavior. The tournament list card response keeps its existing `coverImageUrl` display contract, sourced from `listImageUrl` for regular leagues. Public tournament detail retains the detail cover and additionally exposes `listImageUrl` for leagues. Next-season creation inherits both independently.
 
 ## Default venue (기본 장소)
 
@@ -247,16 +281,19 @@ lock); it is intentionally not opened for leagues.
   reason-required decision is the save transaction's own count). Bank fields are
   admin-only.
 - Admin detail also returns `heldFromState` (the state resume returns to; only while on hold, otherwise
-  `null`), `minPlayers`, `maxPlayers` (team roster cap, `null` = unlimited) and `plannedFixtureCount`
+  `null`), `minPlayers`, `maxPlayers` (team roster cap, `null` = unlimited), `maxTeams`
+  (participant team cap, `null` = unlimited), `confirmedCount`, `pendingPaymentCount` and `plannedFixtureCount`
   (total games chosen at creation, `null` = not set).
 - Public detail (`GET /api/v1/league-matches/:leagueId`) adds `sportCode`,
-  `coverImageUrl`, `entryFee` and `entryFeeConfigured` (`entryFeeConfiguredAt != null`).
-  The raw timestamp, the bank fields and registration counts are never in any public
+  `coverImageUrl`, `entryFee`, `entryFeeConfigured` (`entryFeeConfiguredAt != null`),
+  `maxTeams`, `confirmedCount` and `pendingPaymentCount`. The last two count all entry sources;
+  they are separate from the admin-only application counts above.
+  The raw timestamp, the bank fields and application counts are never in any public
   league response or in `/tournaments` responses. Clients must not render the fee
   when `entryFeeConfigured` is `false` — an unset fee is not "free".
 - Season carry-over: `commitPromotions` (promotion/relegation commit) copies
   `coverImageUrl`, `entryFee`, the three bank fields and the team roster size (`minPlayers`,
-  `maxPlayers` — `null` stays unlimited) from the previous season's
+  `maxPlayers` — `null` stays unlimited), plus `maxTeams` (`null` stays unlimited), from the previous season's
   league of the **same tier** into the new season. `entryFeeConfiguredAt` is left
   `null`, so the new season shows as "inherited — please confirm". Values are copied,
   not linked: later edits to either season do not affect the other. First-season
@@ -276,14 +313,20 @@ mutation-admin authorization remains unchanged; support administrators cannot cr
 region identifier. Master data may use stable slugs such as
 `region-busan-jung`; it is not required to be a UUID.
 
-Optional roster and plan fields:
+Optional roster, participant capacity and plan fields:
 
 - `minPlayers` / `maxPlayers` (1–50): team roster size. `maxPlayers: null` means **unlimited** — every
   eligible team member goes onto the roster (auto-fill and roster add skip the `ROSTER_FULL` check).
   Omitting them means unlimited (`minPlayers: 1, maxPlayers: null`) — the league default for every creation
   path, including league-series seeding; season carry-over copies the previous season's values instead.
   The 6/10 column default applies to tournaments only. `minPlayers > maxPlayers` returns
-  `422 LEAGUE_ROSTER_RANGE_INVALID`. Responses that carry `maxPlayers` (tournament list/detail for a league) may now return `null`.
+  `422 LEAGUE_ROSTER_RANGE_INVALID`. Responses that carry `maxPlayers` (admin league detail and tournament detail for a league) may return `null`.
+- `maxTeams` (`null` or a JSON integer from 1 through 2,147,483,647): participant team cap,
+  independent of `maxPlayers`. Omission or explicit `null` creates an unlimited league.
+  Numeric strings, booleans, fractions, zero, negatives and larger integers return
+  `400 VALIDATION_ERROR`; the server does not coerce them. The initially selected distinct
+  `teamIds` become confirmed registrations and must fit the cap; otherwise creation returns
+  `409 TOURNAMENT_CAPACITY_FULL` and the transaction is rolled back.
 - `plannedFixtureCount` (1–500): total games planned for the league. It is only the default for the
   fixture generation form (see `fixtureCount` below); it never limits manual fixtures.
 
@@ -292,6 +335,57 @@ An unknown, inactive, or non-district identifier returns `422
 LEAGUE_REGION_INVALID`. This domain check remains separate from DTO shape
 validation so persisted master identifiers are accepted without allowing
 arbitrary regions.
+
+## Participant team capacity (참가팀 정원)
+
+정규 리그(`kind=regular_league`)의 참가팀 정원은 `maxTeams`다. `maxPlayers`는 기존 팀당
+선수 명단 정원이며 두 값은 서로 바꾸지 않는다. 대진 템플릿의 `teamCount`는 자리·경기를
+만들 팀 수이고, 리그 목록의 `teamCount`는 현재 확정 팀 수다. 어느 값도 참가팀 상한으로
+사용하지 않는다. 일반 대회와 리그 방식 일반 대회(`format=league`)의 기존 `teamCount`
+정원 계약은 그대로다.
+
+`V1Tournament.maxTeams`(`v1_tournaments.max_teams`)는 nullable 정수이고 기본 정원을
+만들지 않는다. 추가 마이그레이션은 기존 리그를 모두 `null`(무제한)로 유지하며 과거
+선수 수, 템플릿 팀 수나 등록 팀 수로 백필하지 않는다.
+
+| 응답 경로 | 참가팀 정원·집계 |
+|---|---|
+| `GET /api/v1/admin/league-matches/:leagueId/settings` 및 성공한 `PATCH` | `maxTeams: number \| null` |
+| `GET /api/v1/admin/league-matches/:leagueId` | `maxTeams`, `confirmedCount`, `pendingPaymentCount` |
+| `GET /api/v1/league-matches/:leagueId` | 같은 세 필드. 비인증 공개 조회이며 기존 공개 여부 가드를 적용한다 |
+| `GET /api/v1/tournaments?kind=league` | 리그 항목은 `maxTeams`, `confirmedCount`, `pendingPaymentCount`를 반환하고 `teamCount`는 생략한다 |
+| `GET /api/v1/tournaments/:tournamentId`의 정규 리그 | 같은 세 필드와 기존 `minPlayers`·`maxPlayers`를 반환한다. 호환용 `teamCount`가 있어도 리그 정원으로 해석하지 않는다 |
+| `GET /api/v1/league-matches` | `teamCount`는 확정 팀 수다. 이 목록은 `maxTeams`를 반환하지 않으므로 정원은 상세에서 읽는다 |
+
+전용 `GET /api/v1/league-matches` 목록의 `items`·`pageInfo: { hasNext, nextCursor }` 계약은
+유지한다. 상태 필터가 없으면 `active → draft → completed → on_hold` 순서이고 각 상태 안에서는
+`createdAt DESC, id DESC`다. `nextCursor`는 `<state>:<id>` 복합값이므로 그대로 다음 요청에
+보낸다. `/tournaments` 목록의 불투명 정렬 cursor와 서로 바꾸지 않는다.
+
+점유 수는 `confirmedCount + pendingPaymentCount`다. `confirmed`와 `awaiting_payment`·
+`payment_checking`·`paid`가 자리를 점유하며 `applied`·`seeded`·`promoted` 등 유입 출처를
+가리지 않는다. `draft`·`submitted`·`waitlisted`·`cancel_requested`·`cancelled`는 점유하지
+않는다. 신청 전용 `activeRegistrationCount`·`confirmedRegistrationCount`를 정원 검사에
+대신 쓰지 않는다. 공개 리그 상세의 `registrationOpen`과 `nextRound.registrationOpen`은
+수명주기·신청 마감에 더해 모든 출처의 확정·결제 대기 점유를 `maxTeams`와 비교한다.
+유한 정원이 가득 차면 `false`이며 `maxTeams: null`은 정원 때문에 닫히지 않는다.
+관리자 상세와 모집 열기 응답의 `registrationOpen`은 기존 모집 창 판정으로 유지하므로,
+공개 상세의 정원 포함 판정과 구분한다.
+
+신청 생성·제출, 운영자 직접 팀 추가, 참가 확정·대기 승격, 취소 요청 철회·잔류 처리에
+공통 정원을 적용한다. 한도를 채운 리그에서 자리를 새로 차지하려 하면
+`409 TOURNAMENT_CAPACITY_FULL`이다. 이미 점유 중인 자기 등록을 결제 대기에서 확정으로
+옮길 때는 자기 자리를 중복 계산하지 않는다. `waitlisted`는 자동 확정 약속이 아니며
+운영자가 확정할 때 빈자리를 다시 확인한다. 정원이 필요하면 기본 정보 수정에서 먼저
+늘리거나 `null`로 해제한다. 제출·확정·직접 추가·복원과 정원 저장은 같은 대회 행을
+잠근 뒤 현재 값과 점유를 다시 확인한다.
+
+웹 계약 fixture는 `apps/v1_web/src/test/msw/league-capacity-fixtures.ts`와
+`league-capacity-handlers.ts`에서 유한 정원·무제한·유입 출처별 점유·저장 오류를 재현한다.
+MSW는 메모리 상태를 사용하므로 PostgreSQL 행 잠금, 동시 접수, 실제 공개 목록 응답을
+검증하는 근거가 아니다. 실제 DB 경합 시나리오는
+`apps/v1_api/test/league-matches/league-capacity.integration-spec.ts`에 있으며 실행 결과와
+alpha 검증 여부는 별도 증거로 확인한다.
 
 ## Create a league series
 
@@ -467,15 +561,20 @@ The result-entry reminder skips such fixtures as well.
 `V1AuthGuard`, UUID route validation, `kind=regular_league` and `deletedAt=null`.
 
 GET and successful PATCH return `{ leagueId, title, rulesText, regionId, startsOn, endsOn,
-registrationDeadlineAt, plannedFixtureCount, updatedAt, status, sportName }` inside the standard success envelope.
+registrationDeadlineAt, plannedFixtureCount, maxTeams, updatedAt, status, sportName }` inside the standard success envelope.
 Missing description is normalized to `rulesText: ""`; incomplete legacy dates/region remain null.
 PATCH requires the full editable snapshot: `{ expectedUpdatedAt, title, rulesText, regionId,
-startsOn, endsOn, registrationDeadlineAt, plannedFixtureCount }`. Title is trimmed, nonempty, max 100; rulesText max
+startsOn, endsOn, registrationDeadlineAt, plannedFixtureCount?, maxTeams? }`. Title is trimmed, nonempty, max 100; rulesText max
 10,000; region must be an active level-2 district when changed; dates are ISO date-times.
 `plannedFixtureCount` is optional for compatibility with already-open admin screens; when present it is an
 integer from 1 through 500 or `null` (no planned total), and omission preserves the stored value. Changing it updates
 future fixture-generation defaults and the automatic-completion threshold; existing fixtures are never
 added, removed, cancelled or regenerated by this settings request.
+`maxTeams`도 생략하면 저장값을 유지하고 명시적 `null`이면 무제한으로 바꾼다. 유한 값은 생성과
+같은 JSON 정수 범위(1~2,147,483,647)를 따른다. 현재 모든 출처의 확정·결제 대기 점유 수보다
+작은 값은 `409 LEAGUE_CAPACITY_BELOW_OCCUPANCY`로 거절한다. 점유 수와 같은 값은 허용한다.
+거절 시 설정·`updatedAt`·감사 기록은 변경되지 않으며 기존 참가를 대기·취소로 옮기지 않는다.
+성공한 저장의 `league_match.update_settings` 감사 before/after에는 `maxTeams`가 포함된다.
 Empty rulesText is stored as null. Unknown UI fields and missing/invalid fields return
 `400 VALIDATION_ERROR`. No idempotency header is required by this route; optimistic concurrency
 uses exact `updatedAt` (`expectedUpdatedAt`) rather than `expectedVersion`.
@@ -489,7 +588,7 @@ Changed inactive/non-district regions return `422 LEAGUE_REGION_INVALID`.
 A changed, non-null deadline must be future (`422 LEAGUE_REGISTRATION_DEADLINE_PAST`);
 null closes new applications. Unchanged historical deadlines are preserved. Lifecycle,
 publication, existing applications, fees, sports, teams and fixtures stay unchanged.
-Regular leagues continue to have **no application capacity limit**; `teamCount` is not editable here.
+`maxPlayers`와 `teamCount`는 이 기본 정보 수정 계약에 포함되지 않는다.
 
 The admin detail links to `/admin/league-matches/:leagueId/edit` for writers on unfinished leagues.
 The form hydrates that exact league, preserves failed drafts, and confirms explicit discard/reload.

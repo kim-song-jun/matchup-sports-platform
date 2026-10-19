@@ -74,6 +74,14 @@ export class CreateLeagueMatchDto {
   @Max(50)
   maxPlayers?: number | null;
 
+  /** 참가팀 정원. null·생략은 무제한이며 팀당 선수 정원(maxPlayers)과 독립이다. */
+  @Transform(({ obj }) => obj.maxTeams, { toClassOnly: true })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(2147483647)
+  maxTeams?: number | null;
+
   /** 리그 총 경기 수(계획). 대진 생성 폼의 기본값이다. */
   @IsOptional()
   @IsInt()
@@ -244,11 +252,9 @@ export class DeleteLeagueFixtureDto {
 /**
  * 참가 신청을 여는 운영자 액션의 body (D7).
  *
- * 리그 축에는 `open` 상태가 없다(리그 상태는 draft·active·completed 셋뿐 — `league-state.ts`). 신청은
- * **거울(`V1Tournament`)의 `status='open'`** 으로 열리고, `V1League.state` 는 `draft` 로
- * 남는다 — `LEAGUE_STATE_BY_STATUS` 가 이미 `open → draft` 로 되돌리므로 목록·상세의
- * 리그 축 표시는 그대로 "준비 중"이다. 두 축이 어긋나는 게 아니라, **신청 접수는 시작이
- * 아니라는 것**이 두 축 모두에서 같은 뜻으로 표현된 것이다.
+ * 리그 상태는 draft·active·on_hold·completed 4개다. 신청 열기는 저장 status를 바꾸지 않고
+ * 명시적 마감 시각을 설정한다. 시작 전 리그는 모집완료로 표시하며, 실제 신청 가능 여부는
+ * registrationOpen과 마감·정원으로 별도 안내한다. 신청 열기는 리그 시작이 아니다.
  */
 export class OpenLeagueRegistrationDto {
   /** 신청 마감 시각(ISO 8601). 과거면 거부한다 — 열자마자 닫힌 리그를 만들지 않는다. */

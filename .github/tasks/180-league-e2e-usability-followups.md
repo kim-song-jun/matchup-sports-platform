@@ -216,3 +216,33 @@ As a 팀장, I want 초대 링크·여러 명 초대와 한 번에 승인 so tha
 | 2026-10-01 | 구현(W4-V11) | 같은 사건 알림 두 장 — 어느 쪽을 남기나 | 같은 스캔이면 킥오프 안내를 남기고 일일 안내에서 뺀다(#1419). 당일 아침 일일 안내 + 뒤 시각 킥오프 안내 두 장은 남김 — 빼려면 리드타임과 맞바꾸는 제품 결정이라 미정 |
 | 2026-10-01 | 제보(명단 수정) | 참가 확정 뒤 명단 입구·명단 마감 기본값·친선 제출 뒤 저장을 어떻게 고치나 | 사용자: 명단 마감 기본 비움 + 넣으면 신청 마감 이후만, R-1 A+B+C(팀원 [명단 보기]), R-2 A + 서버도 막기 |
 | 2026-10-01 | 구현(R-1 B) | 팀 상세에 대회까지 담으려면 팀 단위 신청 목록이 필요한데 기존 API 에 없다(대회 목록은 teamId 필터가 없고, 리그 목록은 확정 신청만·신청 id 없음) | 사용자: (1) 새 엔드포인트 `GET /teams/:teamId/competition-entries` 로 대회·리그를 온전히(팀 활성 멤버만) |
+
+## Follow-up: 참가팀 상세 우측 안내 및 참가 카드 (2026-10-16)
+Status: Local Verified — PR 제출
+
+### Context / Goal / Original Conditions
+- 참가팀 구성원에게 데스크톱 `참가 전 꼭 확인해 주세요` 안내가 사라지는 오류 수정.
+- 사용자 지정 배치: 웹 우측 신청/모집 마감 영역에 `우리 팀 참가`; 모바일 제목 아래 유지.
+- 기존 컴포넌트/문구 재사용. 별도 디자인 제안 대신 사용자가 지정한 배치로 구현.
+- 사용자 명시 요청에 따라 로컬 web 실행(일반 alpha-only 검증 정책의 이번 요청 예외).
+
+### User / Test Scenarios / Acceptance Criteria
+- [x] 확정 참가·무제한 리그·공지/환불 정책 없음이어도 우측 안내가 표시됨.
+- [x] 데스크톱 참가 카드 단일 렌더, 모바일 제목 아래 유지; 미참가/취소/종료 대조군 보존.
+- [x] 커스텀 환불 정책이 있으면 상충하는 기본 환불 안내는 기존처럼 제외.
+- [x] 관련 테스트와 로컬 화면 확인. Alpha 배포는 별도 상태로 보고.
+
+### Ownership / Security / Risks / Progress Snapshot
+- frontend 상세와 관련 테스트 담당, 단일 에이전트. 이전 fixture 순위 CTA 변경 보존.
+- 기존 role 기반 명단 보기/관리 권한 변경 없음. 인증/DB/운영 데이터 변경 없음.
+- 로컬 API는 기존 설정 계약 INTERNAL_API_ORIGIN으로 Alpha 연결. 로그인 필요 시 실제 세션 없음을 명시.
+- 원인: railCTA가 null이고 공지/커스텀 환불 없음이면 asideExtra까지 조건부 제거됨.
+검증: 상세32 + CTA38 = 70/70 PASS. 공개/fixture 팀원 390·768·1440 로컬 검증과 Alpha before 수집. 실제 로그인 검증과 Alpha 배포는 미실행. 증거 및 유지 서버 정보: docs/scenarios/tournament-participant-sidebar.md.
+
+## 2026-10-16: 진행 중 리그 보기 버튼 끝선 정렬
+- 사용자 후속 제보: 긴 상단 버튼과 오른쪽 참가 영역의 끝선 불일치.
+- before: 1024/1440/1920px에서 오른쪽 끝선 -20px; 상단 래퍼의 우측 padding이 원인.
+- 수정: 기존 sticky/모바일 gutter를 CSS 클래스로 유지하고, 데스크톱 우측 padding0 및 그리드와 동일한 최대 폭 적용.
+- after: 1024/1280/1440/1920px 모두 좌·우 끝선 차이0px. 768/390px도 가로 넘침0, pageerror0. 검증 6/6.
+- 증거: docs/screenshots/tournament-sidebar-local/fixture-member/alignment-{before,after}/. 회원 상태는 기존 browser fixture이며 settings/notifications의 미인증401 제한은 동일.
+- 현재 로컬 서버에 반영, 기존 사용자 미리보기 유지. Alpha 배포 미실행.

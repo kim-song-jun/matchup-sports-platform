@@ -14,6 +14,7 @@ import {
   type V1TeamRosterMatrixPlayer,
 } from '@/hooks/use-v1-game-roster';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
+import { rosterPersonLabel } from '@/lib/roster-presentation';
 import { gameRosterErrorMessage } from '@/lib/game-roster-errors';
 import { gameRosterActorRoleLabel, gameRosterReasonLabel, gameRosterStatusLabel } from '@/lib/v1-status-labels';
 import {
@@ -130,7 +131,7 @@ export function AdminRegistrationGameRosters({
         <span className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-strong)]">경기별 명단</span>
         <span className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
           다가오는 경기 {data.games.length}개 · 선수 {data.players.length}명
-          <span className="block">GK는 이 대회의 시작 전 경기와 이후 경기에 유지돼요. 여러 명을 지정할 수 있어요.</span>
+          <span className="block">GK는 시작 전 경기와 이후 경기에 계속 유지돼요. 여러 명을 지정할 수 있어요.</span>
         </span>
         {adjustedCount > 0 ? <span className="tm-badge tm-badge-sm tm-badge-orange">조정 {adjustedCount}</span> : null}
       </div>
@@ -163,7 +164,7 @@ export function AdminRegistrationGameRosters({
               {data.players.map((player) => (
                 <tr key={player.userId}>
                   <th scope="row" className="px-3 py-2 text-left font-semibold text-[var(--text-strong)]">
-                    {player.displayName}
+                    {rosterPersonLabel(player)}
                   </th>
                   <td className="px-3 py-1 align-middle">
                     {(() => {
@@ -172,7 +173,7 @@ export function AdminRegistrationGameRosters({
                       const selected = goalkeepers[player.userId] ?? (index >= 0 ? player.cells[index]?.goalkeeper : firstCell?.goalkeeper) ?? false;
                       return index < 0 ? <span aria-label={selected ? '골키퍼' : '필드 선수'}>{selected ? 'GK' : '—'}</span> : (
                         <Button size="sm" variant={selected ? 'primary' : 'outline'} disabled={batch.isPending}
-                          aria-pressed={selected} aria-label={player.displayName + (selected ? ', 골키퍼 지정 해제' : ' 골키퍼로 지정')}
+                          aria-pressed={selected} aria-label={rosterPersonLabel(player) + (selected ? ', 골키퍼 지정 해제' : ' 골키퍼로 지정')}
                           onClick={() => { setNotice(null); setGoalkeepers((current) => ({ ...current, [player.userId]: !selected })); }}
                           className="min-w-[44px]">GK</Button>
                       );
@@ -231,7 +232,7 @@ export function AdminRegistrationGameRosters({
                   .filter((player) => player.accountLinked)
                   .map((player) => (
                     <option key={player.userId} value={player.userId}>
-                      {player.displayName}
+                      {rosterPersonLabel(player)}
                     </option>
                   ))}
               </select>
@@ -252,7 +253,7 @@ export function AdminRegistrationGameRosters({
           open={sheetOpen}
           teamId={data.teamId}
           userId={sheetPlayer.userId}
-          displayName={sheetPlayer.displayName}
+          displayName={rosterPersonLabel(sheetPlayer)}
           onClose={() => setSheetOpen(false)}
         />
       ) : null}
@@ -290,7 +291,7 @@ function RosterCell({
     <button
       type="button"
       aria-pressed={playing}
-      aria-label={`${player.displayName} ${gameColumnLabel(game)} ${label}, ${playing ? '누르면 빠져요' : '누르면 출전으로 돌아가요'}`}
+      aria-label={`${rosterPersonLabel(player)} ${gameColumnLabel(game)} ${label}, ${playing ? '누르면 빠져요' : '누르면 출전으로 돌아가요'}`}
       onClick={onToggle}
       className="inline-flex min-h-[44px] items-center rounded-lg border-2 border-transparent px-2 text-left transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
       // 저장 전 칸은 점선 테두리("저장 전" 글자와 함께) — outline 은 포커스 링 자리라 쓰지 않는다.

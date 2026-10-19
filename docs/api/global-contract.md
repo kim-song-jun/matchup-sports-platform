@@ -1,6 +1,16 @@
+리그 표시는 모집완료·진행 중·보류·종료 4개로 통일한다. 호환 `draft`는 저장 상태 `draft/open/closed` 전체를 묶으며 모집 가능 여부·공개 여부는 별도다. 내 담당 대회는 `tournamentKind`로 종류를 구분한다. [리그 표시 계약](./domains/league-matches.md#league-display-states-2026-10-19).
+
+신규 리그는 모집완료(`closed`)로 생성하고 운영자가 명시적으로 시작한다. 관리자 목록·상세는 `lifecycleStatus`를 제공하며, 시작 전 경기 시작은 `409 LEAGUE_NOT_STARTED`다. [리그 계약](./domains/league-matches.md#new-league-lifecycle-2026-10-18)을 따른다.
+
 # Global v1 API contract
 
+대회 형식 수정은 mutation admin + `expectedVersion` CAS를 요구한다. 조/대진 생성 이후 또는 진행·완료 상태의 실제 형식 변경은 `409 TOURNAMENT_FORMAT_LOCKED`이며, 관리자 상세의 `formatChangeBlockedReason`으로 제한 사유를 미리 표시한다. 동일 형식 재전송과 다른 필드 수정은 허용한다. [Tournaments 계약](./domains/tournaments.md)을 따른다.
+
 Personal-match detail exposes the stored `isOnline` boolean (default `false`). `PATCH /api/v1/admin/matches/:matchId/online` accepts a strict boolean and requires mutation-admin authority; it atomically updates classification and its before/after audit, returning `{matchId,isOnline,changed}`. Repeating the same classification returns `changed:false`. This metadata mutation does not acquire the versioned game-command contract below and does not alter public-list access, canonical URLs or indexability. See [matches](./domains/matches.md) and [admin/ops](./domains/admin-and-ops.md).
+
+부전승 위치 교환(`PUT /admin/tournament-slots/:slotId/bye-side`)은 mutation admin만 가능하며 팀·슬롯·승자 연결·표시 위치를 원자적으로 저장한다. 대상 및 후속 경기의 시작/기록/결과를 보호하고 부분 성공을 반환하지 않는다. [Tournaments 계약](./domains/tournaments.md)을 따른다.
+
+Ordinary team matches accept optional `periods` on existing create/update routes. `GET /api/v1/teams/:teamId/team-match-rule-options` requires an active host owner/manager; actual current `periods` and nullable authoritative `twoPeriodDefaults` are distinct. Omitted create retains the global default; omitted edit retains the stored pin. Explicit rule edits retain the existing `version`, authorization and date gates and additionally protect gameplay/lineup history. See [the domain contract](./domains/team-matches.md#ordinary-team-match-period-rules-md-qa-141); these routes do not acquire the game-command idempotency contract below.
 
 Public `GET /tournaments/:id/standings/overall` rows include `teamLogoUrl: string | null` for both tournaments and regular leagues. Hidden participant identity returns `null` for the logo, matching the team name gate. See the [tournaments contract](./domains/tournaments.md#overall-standings--two-competition-kinds-two-row-shapes).
 
@@ -176,3 +186,11 @@ Team matches do not expose `on_hold`: unmatched recruitment with an elapsed dead
 `GET/PATCH /api/v1/admin/league-matches/:leagueId/settings` uses a full editable snapshot and `expectedUpdatedAt` concurrency, without a mandatory Idempotency-Key. PATCH permits owner/ops only; stale snapshots return `409 LEAGUE_SETTINGS_STALE`, DTO failures `400 VALIDATION_ERROR`, semantic dates/region/deadline failures `422`. Detailed fields and transactional audit are in [league-matches](domains/league-matches.md#basic-information-editing-리그-기본-정보-수정).
 
 - Public league notification detail links use `/tournaments/:id?kind=league` (the kind query preserves the league icon/category) (2026-10-14). Historical `/league-matches/:id` and `/leagues/:id` links redirect to the same detail; fixture and API routes retain their existing paths.
+
+## Independent league image PATCH fields
+
+The [league image endpoint](./domains/league-matches.md#cover-image-목록상세-이미지) requires at least one of `coverImageUrl` (detail) and `listImageUrl`. Omitted fields are preserved; explicit null clears only that stored field. Public display uses the other image if only one remains. This does not change the global validation or upload URL policy.
+
+2026-10-17: Tournament fixture presentation overrides and shared list/canvas schedule semantics are documented in [tournaments](./domains/tournaments.md#bracket-presentation-overrides-2026-10-17).
+
+- 2026-10-18: 공개 대진/일정의 사용자 지정 사이드 문구·BYE 공유 문구 및 canonical 경기장 표시를 동기화했다. 상세 계약은 [tournaments](./domains/tournaments.md) 참고.

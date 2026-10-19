@@ -704,12 +704,14 @@ export class LeagueSeriesAdminService {
           select: {
             tier: true,
             coverImageUrl: true,
+            listImageUrl: true,
             entryFee: true,
             bankName: true,
             bankAccount: true,
             bankHolder: true,
             minPlayers: true,
             maxPlayers: true,
+            maxTeams: true,
           },
         });
         const inheritedByTier = new Map(previousSeasonRows.map(({ tier, ...values }) => [tier, values]));

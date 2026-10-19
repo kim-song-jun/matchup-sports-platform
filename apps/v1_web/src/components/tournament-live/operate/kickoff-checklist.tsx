@@ -54,6 +54,8 @@ export function KickoffChecklist({ gameId, sides, lineups, onRosterError, ...pan
     return <LeagueParticipationPanel gameId={gameId} sides={sides} disabled={panelProps.disabled} onError={onRosterError} />;
   }
   const remaining = total - arrived;
+  // 조회 전용 스태프·운영 권한이 없는 운영자는 '경기 시작'을 누를 수 없다 — 그 사람에게는 도착 현황만 말한다.
+  const canStart = !panelProps.disabled;
 
   return (
     <div className="flex flex-col gap-3">
@@ -73,8 +75,8 @@ export function KickoffChecklist({ gameId, sides, lineups, onRosterError, ...pan
           ].join(' ')}
         >
           {remaining === 0
-            ? '준비가 끝났어요. ‘경기 시작’을 눌러 주세요.'
-            : `아직 도착을 확인하지 못한 선수가 ${remaining}명 있어요. 그래도 ‘경기 시작’은 누를 수 있어요.`}
+            ? canStart ? '준비가 끝났어요. ‘경기 시작’을 눌러 주세요.' : '모든 선수의 도착을 확인했어요.'
+            : `아직 도착을 확인하지 못한 선수가 ${remaining}명 있어요.${canStart ? ' 그래도 ‘경기 시작’은 누를 수 있어요.' : ''}`}
         </p>
       ) : null}
     </div>

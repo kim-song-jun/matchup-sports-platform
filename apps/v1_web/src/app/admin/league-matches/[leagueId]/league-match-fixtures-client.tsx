@@ -2,8 +2,8 @@
 
 import Link from 'next/link';
 import { useEffect, useId, useMemo, useState } from 'react';
-import { AlertTriangle, ChevronDown, ChevronLeft, Ellipsis, X } from 'lucide-react';
-import { AdminPageHeader, AdminDataTable, AdminLeagueStatePill, AdminMatchPhasePill, AdminReasonModal, AdminStatusPill, AdminTableSkeleton, AdminToasts, useAdminToast } from '@/components/admin';
+import { AlertTriangle, ChevronDown, Ellipsis, X } from 'lucide-react';
+import { AdminDataTable, AdminMatchPhasePill, AdminReasonModal, AdminStatusPill, AdminTableSkeleton, AdminToasts, useAdminToast } from '@/components/admin';
 import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-picker';
 import { GateConfirmModal } from '@/components/admin/operation-flag-gate-confirm-modal';
 import { ActionSheet, type ActionSheetAction } from '@/components/v1-ui/action-sheet';
@@ -29,8 +29,6 @@ import { describeLeagueRegistrationWindow } from '@/lib/league-registration-copy
 import { leagueFixtureMatchupLabel } from '@/lib/league-fixture-meta';
 import { LeagueManualFixtureModal } from './league-manual-fixture-modal';
 import { LeagueFixtureScheduleModal, type LeagueFixtureSchedulePatch } from './league-fixture-schedule-modal';
-import { TournamentPeriodSettingsEditor } from '@/components/admin/tournament-period-settings-editor';
-import { LeagueDisciplineSettings } from './league-discipline-settings';
 import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
 import { useTournamentPeriodSettings } from '@/hooks/use-tournament-period-settings';
 import { LeagueNextActionCard } from './league-next-action-card';
@@ -45,11 +43,6 @@ import { LeagueFixtureDatePicker } from './league-fixture-date-picker';
 import { LeagueWeeksPlanField } from './league-weeks-plan-field';
 import { resolveFixturePlan, type WeeksPlan } from '@/lib/league-round-robin-plan';
 import { formatKstDateShort, formatKstTime } from '@/lib/date-utils';
-import { LeagueVisibilityControl } from './league-visibility-control';
-import { LeagueStateModal } from './league-state-modal';
-import { LeagueCloseRegistrationControl } from './league-close-registration-control';
-import { LeagueCoverImageControl } from './league-cover-image-control';
-import { LeagueVenueControl } from './league-venue-control';
 import {
   DEFAULT_LEAGUE_PLACE_CHOICE,
   isLeaguePlaceChoiceIncomplete,
@@ -58,7 +51,7 @@ import {
   type LeaguePlaceChoice,
 } from './league-fixture-place-field';
 import { PLACE_NAME_MAX_LENGTH } from '@/lib/place';
-import { BracketCanvasMobile } from '@/components/admin/bracket-canvas/bracket-canvas-mobile';
+import { LeagueMobileScheduleBoard } from './league-mobile-schedule-board';
 import { BracketCanvasResponsive } from '@/components/admin/bracket-canvas/bracket-canvas-responsive';
 import type { RegistrationsLoadState } from '@/components/admin/bracket-canvas/bracket-team-tray';
 import { LeagueScheduleBoard } from '@/components/admin/bracket-canvas/league-schedule-board';
@@ -127,16 +120,12 @@ export type LeagueFixturesView = 'board' | 'list';
 
 export default function LeagueMatchFixturesClient({
   leagueId,
-  returnHref = '/admin/league-matches',
   initialView = 'board',
 }: {
   leagueId: string;
-  returnHref?: string;
   initialView?: LeagueFixturesView;
 }) {
   const { data: series, isPending, isError, error, refetch } = useV1AdminLeagueMatch(leagueId);
-  // 상태 변경 모달 — 상태 버튼이 상황마다 흩어져 있던 것(보류 카드·되돌리기·종료)을 하나로 모았다.
-  const [stateModalOpen, setStateModalOpen] = useState(false);
   const generateFixtures = useV1GenerateLeagueFixtures(leagueId);
   const updateFixture = useV1UpdateLeagueFixture(leagueId);
   const cancelFixture = useV1CancelLeagueFixture(leagueId);
@@ -748,64 +737,6 @@ export default function LeagueMatchFixturesClient({
 
   return (
     <div className="tm-content-enter">
-      {/* 대회 관리 상세의 "대회 목록으로"와 같은 자리·같은 모양 — 리그 상세에만 없었다. */}
-      <div className="mb-4">
-        <Link
-          href={returnHref}
-          className="inline-flex items-center gap-1 min-h-[44px] text-[length:var(--font-size-label)] text-[var(--text-muted)] hover:text-[var(--text-strong)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
-        >
-          <ChevronLeft size={14} aria-hidden="true" />
-          리그 목록으로
-        </Link>
-      </div>
-      <AdminPageHeader
-        eyebrow="플랫폼 · 리그"
-        title={series.title}
-        description={`${series.teamIds.length}팀 참가 · 대진 ${series.fixtures.length}경기`}
-        action={
-          <div className="flex flex-wrap items-center gap-2">
-            <AdminLeagueStatePill state={series.state} />
-            {canWrite && series.state !== 'completed' && (
-              <Link href={`/admin/league-matches/${encodeURIComponent(leagueId)}/edit`}
-                className="tm-btn tm-btn-md tm-btn-neutral min-h-[44px]">리그 수정</Link>
-            )}
-            {/* 경기 영상 관리 — 대회 운영 콘솔의 영상 화면과 같은 역할의 리그 판.
-                대진이 없으면 그 화면이 빈 상태 안내를 대신한다. */}
-            <Link
-              href={`/admin/league-matches/${leagueId}/videos`}
-              className="inline-flex min-h-[44px] items-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--text-strong)]"
-            >
-              경기 영상 관리
-            </Link>
-            <Link
-              href={`/admin/league-matches/${encodeURIComponent(leagueId)}/reviews`}
-              className="inline-flex min-h-[var(--size-touch-min)] items-center rounded-xl border border-[var(--border-strong)] px-4 text-[length:var(--font-size-label)] font-semibold text-[var(--text-strong)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-            >
-              후기 관리
-            </Link>
-            {canWrite && (
-              <button
-                type="button"
-                onClick={() => setStateModalOpen(true)}
-                className="inline-flex min-h-[var(--size-touch-min)] items-center rounded-xl border border-[var(--border-strong)] px-4 text-[length:var(--font-size-label)] font-semibold text-[var(--text-strong)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-              >
-                상태 변경
-              </button>
-            )}
-          </div>
-        }
-      />
-
-      {stateModalOpen && (
-        <LeagueStateModal leagueId={leagueId} series={series} onClose={() => setStateModalOpen(false)} showToast={showToast} />
-      )}
-      {/* 보류 중에는 공개 설정을 따로 바꾸지 않는다 — 보류 해제가 공개 여부까지 되돌린다(서버도 409). */}
-      {series.state === 'on_hold' ? null : <LeagueVisibilityControl leagueId={leagueId} isPublic={series.isPublic} />}
-      <LeagueCloseRegistrationControl leagueId={leagueId} state={series.state} registrationOpen={series.registrationOpen} registrationDeadlineAt={series.registrationDeadlineAt} activeRegistrationCount={series.activeRegistrationCount} confirmedCount={series.confirmedRegistrationCount} showToast={showToast} />
-      <TournamentPeriodSettingsEditor tournamentId={leagueId} canWrite={canWrite} showToast={showToast} />
-      <LeagueDisciplineSettings league={series} canWrite={canWrite} showToast={showToast} />
-      <LeagueCoverImageControl leagueId={leagueId} sportCode={series.sportCode} coverImageUrl={series.coverImageUrl} />
-      <LeagueVenueControl leagueId={leagueId} defaultPlace={series.defaultPlace ?? null} recentVenues={series.recentVenues} />
       <div className="mb-4 md:max-w-xs">
         <SegmentedTabs
           ariaLabel="대진 보기 방식"
@@ -840,14 +771,27 @@ export default function LeagueMatchFixturesClient({
             />
           }
           narrow={
-            <BracketCanvasMobile
-              competitionId={leagueId}
-              scope="league"
+            <LeagueMobileScheduleBoard
+              leagueId={leagueId}
+              replaceExisting={series.fixtures.length > 0}
+              templateBlockedReason={leagueEnded
+                ? '끝난 리그에서는 템플릿으로 경기를 만들 수 없어요.'
+                : series.fixtures.some((fixture) => fixture.status !== 'cancelled' && (
+                    // 템플릿 교체는 미확정 리비전도 보호하므로 팀 변경 gate와 별도로 확인해요.
+                    fixtureHasStartedOrResult(fixture) || fixture.game?.latestRevision != null
+                  ))
+                  ? '시작했거나 결과가 있는 경기가 있어 템플릿으로 다시 만들 수 없어요.'
+                  : null}
+              onOpenTemplate={() => setTemplateOpen(true)}
+              onEditFixture={(teamMatchId) =>
+                setScheduleFixture(series.fixtures.find((fixture) => fixture.teamMatchId === teamMatchId) ?? null)
+              }
               rounds={mobileRounds}
               focusFixtureId={mobileFocusFixtureId}
               slots={series.slots ?? []}
               candidates={mobileCandidates}
               canWrite={canWrite}
+              canEditFixture={canWrite && !leagueEnded}
               registrationsState={registrationsState}
               showToast={showToast}
             />
@@ -1474,13 +1418,13 @@ export default function LeagueMatchFixturesClient({
           defaultPlace={series.defaultPlace ?? null}
           recentVenues={series.recentVenues ?? []}
           defaultGameMinutes={periodDefaultMinutes}
-          replaceExisting={series.fixtures.some((fixture) => fixture.status !== 'cancelled')}
+          replaceExisting={series.fixtures.length > 0}
           isSubmitting={applyTemplate.isPending}
           onSubmit={async (payload) => {
             const result = await applyTemplate.mutateAsync(payload);
             showToast(`빈 경기 ${result.fixtures}개를 만들었어요. 자리에 팀을 넣어 보세요.`, 'success');
             const refreshed = await refetch();
-            const firstFixture = refreshed.data?.fixtures[0];
+            const firstFixture = refreshed.data?.fixtures.find((fixture) => fixture.status !== 'cancelled');
             if (firstFixture) {
               setFocusFixtureId(firstFixture.teamMatchId);
               setMobileFocusFixtureId(firstFixture.teamMatchId);

@@ -18,7 +18,7 @@ import { OperationAuditWriterService } from '../../common/audit/operation-audit-
 import { PrismaService } from '../../prisma/prisma.service';
 import { participantDisplayName } from '../../tournaments/participant-display-name';
 import { selectLineupParticipantsWithDraftFallback } from '../core/latest-lineup-participants';
-import { GamesService } from '../games.service';
+import { GamesService, canViewParticipantIdentity } from '../games.service';
 import type { CreateGameRosterAdjustmentDto } from './dto/game-roster-adjustment.dto';
 import type { GameRosterActorRole } from './game-roster-computation';
 import { loadGameRoster, loadJerseyRegistration } from './game-roster-loader';
@@ -56,6 +56,8 @@ export interface GameRosterHistoryEvent {
   readonly adjustmentId: string;
   readonly userId: string;
   readonly displayName: string;
+  /** 빠진 선수의 계정 실명 — 대회 운영진에게만, 값이 있을 때만 실린다(그 밖에는 키 자체가 없다). */
+  readonly realName?: string;
   readonly reason: string | null;
   /** 사이드 팀이 바뀌어 자동으로 되돌린 기록은 userId null · role SYSTEM. */
   readonly actor: { userId: string | null; displayName: string; role: string | null };
@@ -96,6 +98,20 @@ export async function loadDisplayNames(tx: Tx, userIds: readonly string[]): Prom
     select: { id: true, profile: { select: { nickname: true, displayName: true } } },
   });
   return new Map(users.map((row) => [row.id, participantDisplayName({ user: { profile: row.profile } })]));
+}
+
+/** 계정 id → 실명(프로필). 실명이 비었거나 탈퇴한 계정은 맵에서 빠진다 — 운영진 응답에만 쓴다. */
+export async function loadRealNames(tx: Tx, userIds: readonly string[]): Promise<Map<string, string>> {
+  const ids = [...new Set(userIds)];
+  if (ids.length === 0) return new Map();
+  const users = await tx.v1User.findMany({
+    where: { id: { in: ids }, deletedAt: null },
+    select: { id: true, profile: { select: { realName: true } } },
+  });
+  return new Map(users.flatMap((row) => {
+    const realName = row.profile?.realName?.trim();
+    return realName ? [[row.id, realName] as [string, string]] : [];
+  }));
 }
 
 /** Task 179 — 대회·리그 경기 한 사이드의 명단 조회와 경기별 빼기·되돌리기. */
@@ -143,7 +159,7 @@ export class GameRosterService {
 
   listAdjustments(user: V1AuthUser, target: SideTarget) {
     return this.prisma.$transaction(async (tx) => {
-      const { teamId } = await this.authorizeSide(tx, user.id, target, 'read');
+      const { teamId, identityVisible } = await this.authorizeSide(tx, user.id, target, 'read');
       const rows = await tx.v1GameRosterAdjustment.findMany({
         where: { gameId: target.gameId, sideId: target.sideId, teamId },
         orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
@@ -153,9 +169,18 @@ export class GameRosterService {
         rows.flatMap((row) => [row.userId, row.actorUserId, ...(row.revokedByUserId === null ? [] : [row.revokedByUserId])]),
       );
       const name = (userId: string) => names.get(userId) ?? '알 수 없음';
+      // 경기 명단 화면(`readView`)과 같은 규칙 — 팀 매니저·멤버·지원 계정에게는 실명 키도, 계정 조회도 없다.
+      const realNames = identityVisible ? await loadRealNames(tx, rows.map((row) => row.userId)) : null;
       const events: GameRosterHistoryEvent[] = [];
       for (const row of rows) {
-        const common = { adjustmentId: row.id, userId: row.userId, displayName: name(row.userId), reason: row.reason };
+        const realName = realNames?.get(row.userId);
+        const common = {
+          adjustmentId: row.id,
+          userId: row.userId,
+          displayName: name(row.userId),
+          ...(realName === undefined ? {} : { realName }),
+          reason: row.reason,
+        };
         events.push({
           ...common,
           type: 'EXCLUDE',
@@ -343,7 +368,13 @@ export class GameRosterService {
     if (access === null || (mode === 'write' && access.writeRole === null)) {
       throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: '이 경기 명단을 바꿀 권한이 없어요.' });
     }
-    return { ...access, teamId: side.teamId, goalkeeperEditable: access.writeRole !== null && operator?.role !== 'field_operator' };
+    return {
+      ...access,
+      teamId: side.teamId,
+      goalkeeperEditable: access.writeRole !== null && operator?.role !== 'field_operator',
+      // 선수 실명은 대회를 운영하는 쪽만 본다. 이 경로는 팀 매니저·멤버·지원 계정에도 열려 있어, 역할을 가르지 않으면 샌다.
+      identityVisible: operator !== null && canViewParticipantIdentity(operator.role),
+    };
   }
 
   /**
@@ -400,17 +431,27 @@ export class GameRosterService {
     const jerseyRegistration = await loadJerseyRegistration(tx, context, {
       baseSource: loaded.baseSource,
       isTeamManager: access.viewerRole === 'TEAM_MANAGER',
+      isTeamMember: access.viewerRole === 'TEAM_MEMBER',
     });
+    // 운영진이 아니면 계정 조회도 하지 않는다 — 응답에 `realName` 키 자체가 없다.
+    const realNameByUserId = access.identityVisible
+      ? await loadRealNames(tx, [
+          ...loaded.base.flatMap((entry) => (entry.accountLinked ? [entry.userId] : [])),
+          ...rows.flatMap((row) => (row.userId === null ? [] : [row.userId])),
+        ])
+      : undefined;
     return buildGameRosterView({
       context,
       access,
       baseSource: loaded.baseSource,
-      jerseyRegistration,
+      jerseyRegistration: access.viewerRole === 'TEAM_MANAGER' ? jerseyRegistration : null,
+      rosterRegistrationId: jerseyRegistration?.id ?? null,
       base: loaded.base,
       computation,
       fixtureSnapshotUserIds,
       legacyLineupPending,
       displayNameByUserId,
+      realNameByUserId,
       // 시작된 경기는 공식 결과와 같은 셀렉터로 고른 기록 명단을 보여 준다(동기화는 시작 뒤 멈춘다).
       playedLineup:
         context.gameState === V1GameState.SCHEDULED ? null : selectLineupParticipantsWithDraftFallback(rows, lineups).map((row) => ({ ...row, goalkeeper: row.position === (context.goalkeeperPositionCode ?? "GK") })),

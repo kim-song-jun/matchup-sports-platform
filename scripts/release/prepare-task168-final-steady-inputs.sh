@@ -31,8 +31,12 @@ schema_sha="$(sha256sum "$schema" | awk '{print $1}')"
 m11_sha="$(sha256sum "$m11" | awk '{print $1}')"
 # 2026-10-13: V1Tournament.maxPlayers nullable + additive planned_fixture_count (20261013100000_league_roster_limit_planned_fixtures); M11 remains unchanged.
 # 2026-10-14: additive V1TournamentField.placeSnapshot with migration/backfill (Task 20261082).
-# 2026-10-17: additive V1Match.isOnline; M11 remains unchanged.
-[[ "$schema_sha" == f24a600c8720322b3222aa7563a92e7122620ed8b7ff9cdc7ef2e54b989ca04d \
+# 2026-10-15 MD-QA #145: additive nullable V1Tournament.maxTeams (20261015180000_v1_league_optional_team_capacity); M11 remains unchanged.
+# 2026-10-16: nullable V1Tournament.listImageUrl (20261016070000_league_list_image); M11 remains unchanged.
+# Combined with PR #1957: nullable V1TournamentSlot.byeSortOrder.
+# 2026-10-17: additive V1Match.isOnline (20261017100000_v1_match_online_classification); M11 remains unchanged.
+# 2026-10-18: additive V1Tournament.requiresExplicitStart (20261018123000_v1_league_explicit_start); M11 remains unchanged.
+[[ "$schema_sha" == 23d87a502b12225fce2a6c5926cc272c14212da9da957cf4f5c26fb26b076644 \
   && "$m11_sha" == 08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323 ]] \
   || { echo 'Task168 final-policy schema/M11 digest mismatch' >&2; exit 1; }
 

@@ -588,8 +588,16 @@ export const gameSchemaSourceManifest = {
   // 2026-10-14 Task 20261082: additive V1GameRosterRole + back-relations, backed by
   // 20261014180000_v1_game_roster_goalkeepers. Existing game columns and bound historical migration unchanged.
   // Re-pin the combined committed LF schema, retaining both additive migrations.
-  // 2026-10-17: additive V1Match.isOnline; historical game migration unchanged.
-  schema: 'f24a600c8720322b3222aa7563a92e7122620ed8b7ff9cdc7ef2e54b989ca04d',
+  // 2026-10-15 MD-QA #145: additive nullable V1Tournament.maxTeams backed by
+  // 20261015180000_v1_league_optional_team_capacity. Re-pin LF schema bytes only;
+  // game models and the bound historical migration are unchanged. DB replay awaits CI.
+  // 2026-10-16: nullable V1Tournament.listImageUrl, backed by
+  // 20261016070000_league_list_image. Historical game migration stays unchanged.
+  // Combined with PR #1957 nullable V1TournamentSlot.byeSortOrder.
+  // 2026-10-17: additive V1Match.isOnline backed by
+  // 20261017100000_v1_match_online_classification. Game operations migration is unchanged.
+  // 2026-10-18: additive V1Tournament.requiresExplicitStart; historical game migration unchanged.
+  schema: '23d87a502b12225fce2a6c5926cc272c14212da9da957cf4f5c26fb26b076644',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

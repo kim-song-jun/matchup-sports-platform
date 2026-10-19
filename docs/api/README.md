@@ -1,8 +1,18 @@
+리그 표시는 모집완료·진행 중·보류·종료 4개로 통일한다. 호환 `draft`는 저장 상태 `draft/open/closed` 전체를 묶으며 모집 가능 여부·공개 여부는 별도다. 내 담당 대회는 `tournamentKind`로 종류를 구분한다. [리그 표시 계약](./domains/league-matches.md#league-display-states-2026-10-19).
+
+신규 리그는 모집완료(`closed`)로 생성하고 운영자가 명시적으로 시작한다. 관리자 목록·상세는 `lifecycleStatus`를 제공하며, 시작 전 경기 시작은 `409 LEAGUE_NOT_STARTED`다. [리그 계약](./domains/league-matches.md#new-league-lifecycle-2026-10-18)을 따른다.
+
+리그 목록/상세 이미지 독립 저장 및 기존 이미지 보존: [이미지 계약](./domains/league-matches.md#cover-image-목록상세-이미지).
+
 경기별 골키퍼 지정 (2026-10-14): 명단 조회에 `goalkeeper`를 추가하고 팀 일괄 명단 API에 복수 지정 `SET_GOALKEEPER`를 지원한다. [Games 계약](./domains/games.md#경기-명단-gk-지정-task-20261082)을 확인한다.
 
 # Teameet v1 API contracts
 
 Personal-match online place classification: public detail includes `isOnline`; the authenticated, audited `PATCH /admin/matches/:matchId/online` sets that factual value without changing publication or search visibility. See [matches](./domains/matches.md) and [admin/ops](./domains/admin-and-ops.md).
+
+12강 부전승 홈·어웨이 교환은 [Tournaments 계약](./domains/tournaments.md)의 `PUT /admin/tournament-slots/:slotId/bye-side`를 따른다. 저장 배치와 승자 연결을 함께 변경한다.
+
+Ordinary team-match period rules (MD-QA #141): host-authorized defaults, separate single/two-period selection, immutable pins and pre-play edit gates are documented in [team matches](./domains/team-matches.md#ordinary-team-match-period-rules-md-qa-141).
 
 Public competition overall standings include nullable `teamLogoUrl` under the existing team-identity visibility gate; see [tournaments](./domains/tournaments.md#overall-standings--two-competition-kinds-two-row-shapes).
 
@@ -28,7 +38,7 @@ Competition venue/field selection (2026-10-14): leagues and tournaments share a 
 - [Matches](./domains/matches.md)
 - [Teams](./domains/teams.md)
 - [Team matches](./domains/team-matches.md)
-- [Tournaments](./domains/tournaments.md) — 대진 생성·번호 수정·진출 연결 및 결과 계약, 5조·20팀→12강 추천·일괄 배정
+- [Tournaments](./domains/tournaments.md) — 대회 형식 수정·잠금 사유, 대진 생성·번호 수정·진출 연결 및 결과 계약, 5조·20팀→12강 추천·일괄 배정
 - [League matches](./domains/league-matches.md)
 - [Regular league public visibility](./domains/league-matches.md#public-visibility) — publication control, admin access and public read gates.
 - [Games](./domains/games.md)
@@ -91,3 +101,7 @@ Current Kakao signup and existing-account linking use the [provider contact conf
 - Public league notification detail links use `/tournaments/:id?kind=league` (the kind query preserves the league icon/category) (2026-10-14). Historical `/league-matches/:id` and `/leagues/:id` links redirect to the same detail; fixture and API routes retain their existing paths.
 
 - Task 20261083: 대회 참가 명단 GK 유지, 어드민 출전 표 GK 관리와 batch affectedGames 캐시 범위는 [games](domains/games.md)와 [teams](domains/teams.md) 참조.
+
+2026-10-17: Tournament fixture presentation overrides and shared list/canvas schedule semantics are documented in [tournaments](./domains/tournaments.md#bracket-presentation-overrides-2026-10-17).
+
+- 2026-10-18: 공개 대진/일정의 사용자 지정 사이드 문구·BYE 공유 문구 및 canonical 경기장 표시를 동기화했다. 상세 계약은 [tournaments](./domains/tournaments.md) 참고.

@@ -967,6 +967,17 @@ describe('TeamMatchesService', () => {
         ],
       },
       { status: { notIn: ['cancelled', 'archived'] } },
+      // 일반 팀매치만: 경기 기록이 취소된 매치와 끝날 시각이 지나도록 시작하지 않은 상대 확정 매치는 뺀다.
+      { OR: [{ leagueId: { not: null } }, { NOT: { game: { is: { state: 'CANCELLED' } } } }] },
+      {
+        OR: [
+          { leagueId: { not: null } },
+          { status: { not: 'matched' } },
+          { game: { is: { state: { in: ['LIVE', 'PAUSED', 'ENDED'] } } } },
+          { endAt: { gte: expect.any(Date) } },
+          { endAt: null, OR: [{ startAt: null }, { startAt: { gte: expect.any(Date) } }] },
+        ],
+      },
     ]);
   });
 
@@ -1566,6 +1577,20 @@ describe('TeamMatchesService', () => {
 
     expect(result.status).toBe(expectedStatus);
     expect(result.displayState).toBe(expectedDisplayState);
+  });
+
+  it('detail: 공개 일정에 남는 리그 취소 경기의 상세는 취소 상태로 제공한다', async () => {
+    prisma.v1TeamMatch.findFirst.mockResolvedValue({
+      ...publicTeamMatchDetailRow({ status: 'cancelled', leagueId: 'league-1' }),
+      league: { id: 'league-1', title: '공개 리그' },
+    });
+    prisma.v1Team.findMany.mockResolvedValue([]);
+
+    const result = await service.detail(null, 'tm-1');
+
+    expect(result).toMatchObject({ status: 'cancelled', league: { leagueId: 'league-1' } });
+    expect(result.lifecycle.canEdit).toBe(false);
+    expect(result.lifecycle.canDelete).toBe(false);
   });
 
   it.each(['cancelled', 'archived'])('detail: %s is absent for guests and the original host', async (status) => {

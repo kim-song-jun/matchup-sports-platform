@@ -1907,6 +1907,8 @@ model V1TournamentMatchDetails {
   parentTeamMatchId    String?  @map("parent_team_match_id")
   homeRegistrationId   String?  @map("home_registration_id")
   awayRegistrationId   String?  @map("away_registration_id")
+  homeDisplayLabel     String?  @map("home_display_label") @db.VarChar(120)
+  awayDisplayLabel     String?  @map("away_display_label") @db.VarChar(120)
   createdAt            DateTime @default(now()) @map("created_at")
   updatedAt            DateTime @updatedAt @map("updated_at")
 
@@ -2605,6 +2607,8 @@ model V1Tournament {
   title                      String
   isPublic                   Boolean                     @default(true) @map("is_public")
   status                     V1TournamentStatus          @default(draft)
+  /// 신규 정규 리그만 명시적 시작을 요구한다. 기존 행·구버전 생성 행은 false로 기존 수명주기를 유지한다.
+  requiresExplicitStart      Boolean                     @default(false) @map("requires_explicit_start")
   /// 리그 보류(on_hold) 직전 상태·공개 여부 — 보류 해제가 되돌린다. 보류 중이 아니면 null.
   heldFromStatus             V1TournamentStatus?         @map("held_from_status")
   heldFromPublic             Boolean?                    @map("held_from_public")
@@ -2628,10 +2632,13 @@ model V1Tournament {
   venueProvider              String?                     @map("venue_provider")
   venueProviderId            String?                     @map("venue_provider_id")
   coverImageUrl              String?                     @map("cover_image_url")
+  listImageUrl               String?                     @map("list_image_url")
   teamCount                  Int                         @default(8) @map("team_count")
   minPlayers                 Int                         @default(6) @map("min_players")
   /// 팀 등록 명단 정원. null = 제한 없음(리그 기본값 — 팀 전원이 명단·라인업에 오른다). 대회는 항상 값을 채운다.
   maxPlayers                 Int?                        @default(10) @map("max_players")
+  /// 정규 리그 참가팀 정원. null = 무제한. 선수 명단 정원(maxPlayers)·대회 정원(teamCount)과 별개다.
+  maxTeams                   Int?                        @map("max_teams")
   /// 리그를 만들 때 정한 총 경기 수(계획). 대진 생성 폼의 기본값으로만 쓰고, 실제 대진 수를 강제하지 않는다.
   plannedFixtureCount        Int?                        @map("planned_fixture_count")
   genderCategory             V1TournamentGenderCategory? @map("gender_category")
@@ -4068,6 +4075,8 @@ model V1TournamentSlot {
   kind           V1TournamentSlotKind @default(ENTRY)
   groupId        String?              @map("group_id")
   position       Int
+  byeSortOrder   Int?                 @map("bye_sort_order")
+  displayLabel   String?              @map("display_label") @db.VarChar(120)
   sourceGroupId  String?              @map("source_group_id")
   registrationId String?              @map("registration_id")
   createdAt      DateTime             @default(now()) @map("created_at")

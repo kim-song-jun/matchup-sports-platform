@@ -22,6 +22,30 @@ function makeData(overrides: Partial<PublicTournamentScheduleResponse> = {}): Pu
 }
 
 describe('ScheduleContent — 순위표 팀 링크', () => {
+  it('내 팀만을 켠 상태에서 전체·조별리그·결선을 독립 선택하고 단계 유지 상태로 끈다', () => {
+    const entries = [
+      fixtureEntry({ fixtureId: 'mine-group', round: 'group', groupName: 'A조' }),
+      fixtureEntry({ fixtureId: 'other-group', round: 'group', groupName: 'A조' }),
+      fixtureEntry({ fixtureId: 'mine-final', round: 'final' }),
+      fixtureEntry({ fixtureId: 'other-final', round: 'final' }),
+    ];
+    render(<ScheduleContent tournamentId="tour-1" prioritizeLiveGames data={makeData({ items: entries })}
+      myFixtures={{ teams: [{ fixtures: [{ fixtureId: 'mine-group' }, { fixtureId: 'mine-final' }] }] } as unknown as Parameters<typeof ScheduleContent>[0]['myFixtures']} />);
+    const ids = () => screen.getAllByRole('link').map(link => link.getAttribute('href')?.split('/').at(-1)).sort();
+    const toggle = screen.getByRole('switch', { name: '내 팀만' });
+    fireEvent.click(toggle);
+    expect(ids()).toEqual(['mine-final', 'mine-group']);
+    for (const [label, expected] of [['조별리그', ['mine-group']], ['결선', ['mine-final']], ['전체', ['mine-final', 'mine-group']]] as const) {
+      fireEvent.click(screen.getByRole('tab', { name: label }));
+      expect(toggle).toHaveAttribute('aria-checked', 'true');
+      expect(ids()).toEqual(expected);
+    }
+    fireEvent.click(screen.getByRole('tab', { name: '결선' }));
+    fireEvent.click(toggle);
+    expect(screen.getByRole('tab', { name: '결선' })).toHaveAttribute('aria-selected', 'true');
+    expect(ids()).toEqual(['mine-final', 'other-final']);
+  });
+
   it('대회 내 팀만 스위치로 필터하고 끄면 전체 경기를 복원한다', () => {
     render(<ScheduleContent tournamentId="tour-1"
       data={makeData({ items: [fixtureEntry(), fixtureEntry({ fixtureId: 'other-fixture' })] })}

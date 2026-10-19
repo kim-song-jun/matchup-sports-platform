@@ -1397,8 +1397,11 @@ describe('BracketPageContent — 소속 팀 조 우선 표시', () => {
       groupTeams: [{ id: `gt-${index}`, registrationId: `r-${index}`, teamId: index > 0 ? 'my-team' : 'other', teamName: name, teamLogoUrl: null, sortOrder: 0 }],
     }));
     renderBracketStandingsTab(makeTournament({ id: 'mine', status: 'in_progress', format: 'group_knockout', groups }));
-    if (loggedIn) expect(await screen.findAllByText('*) 우리팀이 속한 조에요')).toHaveLength(2);
-    else expect(screen.queryByText('*) 우리팀이 속한 조에요')).not.toBeInTheDocument();
+    if (loggedIn) {
+      const labels = await screen.findAllByText('우리 팀이 속한 조예요');
+      expect(labels).toHaveLength(2);
+      for (const label of labels) expect(label).toHaveStyle({ color: 'var(--red)' });
+    } else expect(screen.queryByText('우리 팀이 속한 조예요')).not.toBeInTheDocument();
     const sections = screen.getAllByRole('region', { name: /^[ABC]조 순위$/ });
     expect(sections.map((section) => section.getAttribute('aria-label'))).toEqual(loggedIn ? ['B조 순위', 'C조 순위', 'A조 순위'] : ['A조 순위', 'B조 순위', 'C조 순위']);
     window.localStorage.removeItem('teameet.v1.session');

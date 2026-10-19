@@ -2,6 +2,19 @@
 
 Status: Review
 
+## Current preparation refresh — 2026-10-19
+
+This snapshot supersedes the 2026-10-18 approval and release-baseline notes below.
+
+- User requested refreshing main/dev, confirmed preparation PR #1979, then explicitly instructed proceeding with latest-dev conflict resolution and main-to-dev integration.
+- Baselines: dev `1f708958c67bb59442215f1aae3137304fd314ed`; main `782e5aa5a8274d34e56c80fd11f47f20314a7fed`; original PR head `b6f4ec03248fadb9bd5fbd22ea434066a3bf45a1`.
+- Owned isolated worktree `_worktrees/pr1979-refresh`, branch `fix/pr1979-refresh`; update existing remote `chore/release-version-20261018` by normal fast-forward push. Shared worktrees, main mutation and production approval are excluded.
+- Phase 1 complete: merge preparation ancestry into latest dev, restore release inputs from dev 1.9.10 to avoid double versioning, then absorb main ancestry. Twelve main conflicts reviewed: team metadata/tests retain actual local emblems, tournament detail retains current league capacity/navigation, schema bindings retain current schema plus historical hashes, API docs retain current contracts, SEO task retains deployed main evidence already recorded on dev.
+- Exact index comparison proves application, deployment, release scripts, API docs and SEO task are byte-identical to latest dev after integration. No new runtime or DB change is introduced by this refresh.
+- Phase 2 in progress: official Changesets regeneration from all latest pending changes; preserve both production changelogs and fixed API/Web versions.
+- Phase 3 pending: release policy, committed-tree diff, current-head CI/review, preparation PR update. New dev CI/Alpha must pass after any eventual merge.
+- Final dev-to-main PR creation/merge and production environment approval remain user-operated under CLAUDE.md. No production promotion is performed by this preparation.
+
 ## Current preparation — 2026-10-18
 
 The user requests a main-promotion PR. This snapshot supersedes historical release coordinates below.

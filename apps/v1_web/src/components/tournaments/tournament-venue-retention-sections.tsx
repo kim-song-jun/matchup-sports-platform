@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import type { ReactNode } from 'react';
-import { Trophy, LayoutGrid, Star, ChevronRight, ClipboardList, Video, Gift, Search } from 'lucide-react';
+import { Trophy, LayoutGrid, Star, ChevronRight, Video, Gift, Search } from 'lucide-react';
 import { PlaceCard } from '@/components/v1-ui/place-card';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { withFromPath } from '@/lib/session-storage';
@@ -362,21 +362,18 @@ function getFixtureTeamLabel(teamName: string | null | undefined) {
 type CompletedActionItem = {
   key: string;
   label: string;
-  caption: string;
   href: string;
   icon: ReactNode;
 };
 
 /**
  * completed 전용 Toss식 컴팩트 액션 리스트 — 최종 결과·시상 / 대진표·조별 순위 /
- * 경기별 결과·기록 / 대회 후기 4개 행을 하나의 Card에 hairline 구분선으로 묶는다.
+ * 대회 후기 3개 행을 하나의 Card에 hairline 구분선으로 묶는다.
  * 각 row 전체가 링크(44px+ 터치 타겟). 하이라이트 영상 "준비 중"·협찬 "공지 대기" 같은
  * 빈 placeholder는 제거하고, "다음 대회" 링크도 Toss 절제 원칙에 따라 생략했다.
  *
- * **행마다 라벨과 도착지가 일치해야 한다.** 한때 "최종 결과·시상"이 `/results`(경기별
- * 결과)로, "대회 후기"가 `/awards`(시상·리뷰)로 가면서 두 행이 서로의 화면을 가리키고
- * 있었다 — 라벨을 읽고 누른 사람이 매번 한 화면 건너뛴 곳에 떨어졌다. 이 리스트에 행을
- * 더하거나 고칠 때는 라벨이 약속하는 화면과 `href`가 같은 곳인지 먼저 확인한다.
+ * 완료 결과 히어로가 `/results` 로 연결되므로 경기별 결과 진입은 중복하지 않는다.
+ * 행마다 라벨이 약속하는 화면과 href가 같은지 확인한다.
  */
 function TournamentCompletedActionList({ tournamentId }: { tournamentId: string }) {
   // 시상·후기 화면의 상단 뒤로가기가 이 개요로 돌아오도록 지금 주소를 출처로 싣는다.
@@ -385,30 +382,20 @@ function TournamentCompletedActionList({ tournamentId }: { tournamentId: string 
     {
       key: 'results',
       label: '최종 결과·시상',
-      caption: '최종 순위와 시상 내역을 확인해요',
       // 이 라벨이 약속하는 화면(시상대·상금·개인 어워드)은 `/awards`다 — `/results`는
       // 경기별 결과·기록 페이지라, 시상을 보러 누른 사람이 경기 목록에 떨어졌다.
       href: withFromPath(`/tournaments/${tournamentId}/awards`, currentHref),
       icon: <Trophy size={18} strokeWidth={2} aria-hidden="true" />,
     },
     {
-      key: 'results_by_match',
-      label: '경기별 결과·기록',
-      caption: '경기 하나하나의 결과를 확인해요',
-      href: `/tournaments/${tournamentId}/results`,
-      icon: <ClipboardList size={18} strokeWidth={2} aria-hidden="true" />,
-    },
-    {
       key: 'bracket',
       label: '대진표·조별 순위',
-      caption: '전체 경기 기록과 순위를 확인해요',
       href: `/tournaments/${tournamentId}/bracket`,
       icon: <LayoutGrid size={18} strokeWidth={2} aria-hidden="true" />,
     },
     {
       key: 'reviews',
       label: '대회 후기',
-      caption: '참가팀이 남긴 후기를 보고 나도 남겨요',
       // 예전엔 '/my/reviews'로 보내 대회 컨텍스트가 통째로 사라졌고, 그 다음엔
       // '/awards'(시상·리뷰)로 보냈다 — "대회 후기"를 눌렀는데 시상대·상금이 먼저 나오고
       // 후기는 스크롤 아래에 있어서, 라벨이 약속한 것과 도착지가 어긋났다(오너 지적).
@@ -457,9 +444,6 @@ function TournamentCompletedActionList({ tournamentId }: { tournamentId: string 
             <div style={{ flex: 1, minWidth: 0 }}>
               <div className="tm-text-label" style={{ color: 'var(--text-strong)' }}>
                 {item.label}
-              </div>
-              <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 1 }}>
-                {item.caption}
               </div>
             </div>
             <ChevronRight size={16} strokeWidth={2.2} aria-hidden="true" style={{ color: 'var(--text-caption)', flexShrink: 0 }} />

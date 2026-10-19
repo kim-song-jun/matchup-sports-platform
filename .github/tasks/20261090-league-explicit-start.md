@@ -74,7 +74,7 @@ UI는 사용자가 승인한 기존 대회 방식이며 기존 헤더 Button·�
 - Original Conditions / User Scenario: 관리자가 상태 변경에서 모집 마감을 선택하면 아직 시작한 경기가 없는 리그가 closed로 복귀하고 다시 시작할 수 있어야 한다.
 - Test Scenarios: active → closed → active, 시작한 경기 차단, 멱등성, 모달 선택·성공·API 실패 표시. 기존 보류·종료 권한과 오류를 보존한다.
 - Parallel Work Breakdown: 단일 에이전트가 순차 구현·검증·PR 생성한다.
-- Acceptance Criteria: [x] 상태·화면 회귀 통과; [x] 양쪽 타입·surface/pattern 검사; [ ] dev PR 생성; [ ] CI·Copilot 결과 확인.
+- Acceptance Criteria: [x] 상태·화면 회귀 통과; [x] 양쪽 타입·surface/pattern 검사; [x] dev PR 생성; [ ] CI·Copilot 결과 확인.
 - Tech Debt Resolved: 호환용 draft API 값과 실제 closed 수명주기를 구분한다.
 - Security Notes: 기존 mutation-admin 확인·시작 경기 차단·조건부 UPDATE·감사 로그를 유지한다. 신규 권한·스키마 변경 없음.
 - Risks & Dependencies: API의 draft 요청/응답과 감사 action은 호환성을 유지하고 저장 status만 closed로 바꾼다. 신청 마감 시각·공개 여부·대진은 보존한다. UI는 기존 상태 모달의 목표 라벨과 설명만 맞춘다.
@@ -84,6 +84,7 @@ UI는 사용자가 승인한 기존 대회 방식이며 기존 헤더 Button·�
 - DB integration은 Docker daemon 미기동으로 로컬 미실행. 기존 실제 HTTP integration에 closed 저장·detail 투영·멱등·재시작 단언을 추가했고 CI에서 확인한다. 개발 서버·브라우저·운영 DB는 실행/변경하지 않았다. 임시 보조 소스는 삭제했다.
 - Web 첫 타입 검사는 누락된 persist/validator 패키지와 기존 leave-team 테스트의 mutate 인수 누락 2건으로 실패했다. /tmp에 manifest 버전의 누락 의존성을 설치하고 작업트리 전용 링크로 보완했다(공유 설치 변경 없음). 후자는 `apps/v1_web/src/hooks/use-v1-api.leave-team.test.tsx`의 두 호출만 `mutate(undefined)`로 명시해 타입 오류를 바로잡고 해당 2개 테스트도 검증한다. 이 파일을 Owned에 포함한다.
 - 최종 Web 검증: 타입·pattern PASS, 모달 9/9 + leave-team 2/2 PASS(최소 worker 1, 정상 exit 0). 임시 npm 설치의 Query peer 버전 중복은 관련 패키지 5.102.8 고정으로 해소했다. API 타입·surface PASS와 합쳐 양쪽 정적 검증 완료. Alpha는 미실행이며 DB integration은 CI에 남는다.
+- [PR #1988](https://github.com/kim-song-jun/matchup-sports-platform/pull/1988), base=dev, MERGEABLE 확인. API 최종 unit 4/4 정상 exit 0으로 고유 테스트 총 15/15 PASS. CI 실행 중이며 Copilot 리뷰 요청 완료. 미머지·미배포이고 Alpha 갤러리 0/3은 후속이다. 작업트리에는 추적 소스 미커밋 변경이나 미추적 runtime 의존성이 없다.
 - 실제 전체 기존 migration 체인 재생 성공. 신규 migration 뒤 기존 7개 상태 전체 컬럼 snapshot 동일, 새 필드 전부 false. fixture 정리 완료.
 - Prisma migrate diff: No difference detected.
 - 모드 분리 후 API 4개 unit suite 186개 + 시리즈 2개 suite 6개, 고유 unit 총 192개 통과.

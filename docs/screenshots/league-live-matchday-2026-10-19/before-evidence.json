@@ -1,0 +1,71 @@
+{
+  "stage": "before",
+  "persona": "public visitor",
+  "dateKst": "2026-10-19",
+  "nodePid": 31980,
+  "widths": [
+    {
+      "width": 390,
+      "seasonLabel": 0,
+      "liveLabel": 2,
+      "scheduleLinks": 0,
+      "horizontalOverflow": false,
+      "verdict": "baseline",
+      "listSeasonLabels": 0,
+      "listHorizontalOverflow": false
+    },
+    {
+      "width": 768,
+      "seasonLabel": 0,
+      "liveLabel": 2,
+      "scheduleLinks": 0,
+      "horizontalOverflow": false,
+      "verdict": "baseline",
+      "listSeasonLabels": 0,
+      "listHorizontalOverflow": false
+    },
+    {
+      "width": 1440,
+      "seasonLabel": 0,
+      "liveLabel": 2,
+      "scheduleLinks": 0,
+      "horizontalOverflow": false,
+      "verdict": "baseline",
+      "listSeasonLabels": 0,
+      "listHorizontalOverflow": false
+    }
+  ],
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 401 ()",
+    "Failed to load resource: the server responded with a status of 401 ()",
+    "Failed to load resource: the server responded with a status of 401 ()"
+  ],
+  "pageErrors": [],
+  "httpErrors": [
+    {
+      "path": "/api/v1/auth/me",
+      "status": 401
+    },
+    {
+      "path": "/api/v1/auth/me",
+      "status": 401
+    },
+    {
+      "path": "/api/v1/auth/me",
+      "status": 401
+    }
+  ],
+  "ownedBrowserProcesses": [
+    {
+      "ProcessId": 24476,
+      "ParentProcessId": 31980,
+      "Name": "chrome.exe"
+    },
+    {
+      "ProcessId": 56140,
+      "ParentProcessId": 31980,
+      "Name": "powershell.exe"
+    }
+  ],
+  "browserClosed": true
+}

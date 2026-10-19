@@ -5,7 +5,7 @@ export interface V1AdminLeagueListItem {
   title: string;
   isPublic: boolean;
   state: 'draft' | 'active' | 'completed' | 'on_hold';
-  /** 저장된 리그 단계. closed는 운영자 시작 전 모집 마감이다. */
+  /** 저장된 리그 단계. draft/open/closed는 모두 운영자 시작 전 모집완료로 표시한다. */
   lifecycleStatus?: import('./api').V1TournamentStatus | 'on_hold';
   registrationOpen?: boolean;
   teamCount: number;
@@ -677,7 +677,7 @@ export interface V1LeagueStandingsResponse {
    * 그룹 B(시즌 결산·시상 화면 감사) — 종료된 리그의 우승팀. `state !== 'completed'`
    * 인 리그(draft/active)는 "우승"이라는 개념 자체가 성립하지 않아 항상 빈 배열이다.
    * 서버가 항상 키를 내려주므로 optional 이 아니다 -- 화면은 `champions.length === 0`
-   * 을 "아직 우승팀 없음"으로 그대로 읽으면 된다(진행 중인지 준비 중인지는 이 응답만으로
+   * 을 "아직 우승팀 없음"으로 그대로 읽으면 된다(진행 중인지 모집완료인지는 이 응답만으로
    * 구분할 필요가 없다 -- 우승 배지를 안 그리면 그만이다).
    * 새 계산이 아니라 이미 계산해 둔 tieBreakGroups(H-5)에서 1위 팀이 속한 그룹을 그대로
    * 찾아 쓴다 -- 별도의 "공동 우승 판정" 로직을 새로 만들지 않는다.

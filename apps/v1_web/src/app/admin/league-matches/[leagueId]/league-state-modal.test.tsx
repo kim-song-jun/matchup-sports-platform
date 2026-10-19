@@ -38,7 +38,7 @@ describe('leagueStateOptions — 서버 changeState 와 같은 전이 규칙', (
   it('보류 중에는 보류 전 상태로만, 종료된 리그는 진행 중으로만 돌아간다', () => {
     const held = leagueStateOptions({ state: 'on_hold', heldFromState: 'active', fixtures: [] });
     expect(reasonOf(held, 'active')).toBeNull();
-    expect(reasonOf(held, 'draft')).toContain('보류 전 상태(진행 중)');
+    expect(reasonOf(held, 'draft')).toContain('보류 전 상태(시즌 진행 중)');
 
     const completed = leagueStateOptions({ state: 'completed', heldFromState: null, fixtures: [] });
     expect(reasonOf(completed, 'active')).toBeNull();
@@ -92,6 +92,6 @@ describe('LeagueStateModal', () => {
   it('보류 중에는 "보류 해제 → 이전 상태" 하나만 고를 수 있다', () => {
     render(<LeagueStateModal leagueId="league-1" series={{ state: 'on_hold', heldFromState: 'draft', fixtures: [] }} onClose={vi.fn()} showToast={vi.fn()} />);
     expect(screen.getByRole('radio', { name: /보류 해제 → 모집완료/ })).toBeChecked();
-    expect(screen.getByRole('radio', { name: /^진행 중/ })).toBeDisabled();
+    expect(screen.getByRole('radio', { name: /^시즌 진행 중/ })).toBeDisabled();
   });
 });

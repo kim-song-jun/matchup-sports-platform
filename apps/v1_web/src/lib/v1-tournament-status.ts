@@ -22,7 +22,7 @@ export function getLeagueStatusConfig(status: string): TournamentStatusConfig {
  * (기존에 목록·상세 페이지에 동일 로직이 중복 정의돼 있던 것을 통합)
  */
 export function getTournamentStatusConfig(
-  status: V1TournamentStatus,
+  status: V1TournamentStatus | 'on_hold',
   registrationBlocked = false,
   isRegularLeague = false,
 ): TournamentStatusConfig {

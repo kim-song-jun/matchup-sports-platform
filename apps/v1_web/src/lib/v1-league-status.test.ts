@@ -12,8 +12,9 @@ describe('리그 표시 상태는 네 가지로 통일한다', () => {
   });
 
   it('호환 API와 공통 대회 API가 같은 리그 상태를 표시한다', () => {
-    for (const status of ['draft', 'open', 'closed']) {
+    for (const status of ['draft', 'open', 'closed'] as const) {
       expect(getLeagueStatusConfig(status).label).toBe(leagueStateChip('draft').label);
+      expect(getTournamentStatusConfig(status, true, true).label).toBe('모집완료');
     }
     expect(leagueStateChip('on_hold').label).toBe('보류');
     expect(leagueStateChip('draft', { withSubject: true }).label).toBe('리그 · 모집완료');

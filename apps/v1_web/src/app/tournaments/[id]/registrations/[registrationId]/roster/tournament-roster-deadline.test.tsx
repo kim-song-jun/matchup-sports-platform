@@ -195,7 +195,7 @@ describe('TournamentRosterDeadlineCard', () => {
 
       expect(screen.getByText('리그 기간')).toBeInTheDocument();
       expect(screen.getByText('2026년 9월 30일 (수) ~ 2026년 11월 30일 (월)')).toBeInTheDocument();
-      expect(screen.getByText('진행 중')).toBeInTheDocument();
+      expect(screen.getByText('시즌 진행 중')).toBeInTheDocument();
       expect(screen.queryByText('대회 신청 마감')).not.toBeInTheDocument();
       expect(screen.queryByText('일정 미정')).not.toBeInTheDocument();
       expect(screen.getByText('수정 가능')).toBeInTheDocument();

@@ -5262,7 +5262,7 @@ export type V1MyTournamentStaffFixture = {
 export type V1MyTournamentStaffGroup = {
   tournamentId: string;
   tournamentTitle: string;
-  tournamentStatus: V1TournamentStatus;
+  tournamentStatus: V1TournamentStatus | 'on_hold';
   tournamentKind?: string | null;
   assignments: V1MyTournamentStaffAssignment[];
   fixtures: V1MyTournamentStaffFixture[];

@@ -1,6 +1,6 @@
 # Task 20261090: 신규 리그 모집 마감·명시적 시작과 기존 데이터 호환성
 
-Status: In Progress (code verified; draft PR and Alpha QA pending)
+Status: In Progress (draft PR #1990; CI and Alpha QA pending)
 **Created**: 2026-10-18
 **Canonical branch**: `audit/league-state-consistency` (base `origin/dev` d51227083; prior implementation: PR #1977 and #1988)
 **Canonical worktree**: `_worktrees/league-state-audit`
@@ -72,7 +72,7 @@ UI는 사용자가 승인한 기존 대회 방식이며 기존 헤더 Button·�
 - 사용자 요청: 리그 상태 전체를 정리하고 준비 중이 언제·어떻게 접근되는지 확인한다.
 - Scope: backend + frontend + docs. Phase 1(진행 중): 상태 저장·생성·전이·투영·필터·권한·화면 소비처 전수 목록화. Phase 2(대기): 의미·표시 불일치와 기존 호환성 영향 정리. Phase 3(대기): 사용자에게 상태표·전환도·노출 경로와 정리안을 제시한다. 새 상태 체계/화면 정보구조 변경은 A/B/C 선택 전에 구현하지 않는다.
 - Owned: v1 리그 상태 관련 소스·테스트와 본 task. Forbidden: 기존 운영 데이터 백필/상태 변경, 무관한 공유 WIP, main. 병렬 에이전트 없음.
-- Acceptance Criteria: [x] 상태 writer/reader 전체 경계 확인; [x] 준비 중 신규/기존/보류 복원/화면 진입 경로 명시; [x] 신청 마감·공개·경기 상태 분리; [x] 관리자/사용자 표시 차이와 종료 조건 대조; [ ] 코드 근거와 잔여 검증 범위 보고.
+- Acceptance Criteria: [x] 상태 writer/reader 전체 경계 확인; [x] 준비 중 신규/기존/보류 복원/화면 진입 경로 명시; [x] 신청 마감·공개·경기 상태 분리; [x] 관리자/사용자 표시 차이와 종료 조건 대조; [x] 코드 근거와 잔여 검증 범위 보고.
 - Security: 코드·정본 중심 감사. 이전 Alpha QA 접근은 자동 승인 검토가 대상 리그 미지정을 사유로 차단했으므로 임의의 관리자 리그 열람·변경을 재시도하지 않는다. 계정·비밀번호·토큰은 파일에 기록하지 않는다.
 - 기존 PR #1988은 dev에 b7563a59c로 머지됐고 Alpha run 39183981501 SUCCESS, 서빙 SHA 일치·HTTP 200·DB true를 확인했다. 이전 항목의 PR/배포 대기는 이 기록으로 supersede한다. 관리자 스크린샷 0/3과 Copilot 모델 세션 오류는 미해결 검증 제한으로 남는다.
 
@@ -222,7 +222,7 @@ UI는 사용자가 승인한 기존 대회 방식이며 기존 헤더 Button·�
 - Phase 2 [x]: 공통 라벨·관리자 pill/보류 복원/모달/toast·시즌 티어·공통 목록/상세·선수 명단·담당 대회 연결. 리그 API draft 호환 값과 raw draft/open/closed 매핑은 유지한다. 현장 운영 선택·내 리그·전용 상세/경기·형제 티어·llms는 기존 공통 라벨을 통해 일치한다.
 - Phase 2 [x]: 공개 목록 status=draft를 raw draft/open/closed 전체로 보완해 옛 목록 redirect와 전용 API 그룹을 일치시킨다. 일반 대회 draft 노출 차단은 유지한다. 담당 대회 API에 tournamentKind만 추가한다.
 - Phase 3 [x]: 좁은 회귀·양쪽 타입/surface·diff·문서 동기화 검증. DB integration은 Docker daemon 미기동으로 CI 검증 대상으로 남는다.
-- Phase 4 [ ]: 검토 가능한 커밋/PR와 잔여 Alpha QA 보고. Alpha 관리자 화면 0/3이며 특정 비공개 리그 대상이 미지정된 기존 자동 승인 제한을 우회하지 않는다.
+- Phase 4 [x]: 검토 가능한 커밋/초안 PR #1990 생성과 잔여 Alpha QA 보고. Alpha 관리자 화면 0/3이며 특정 비공개 리그 대상이 미지정된 기존 자동 승인 제한을 우회하지 않는다.
 - 저장소 schema·migration·실제 DB 변경 없음. 이전 5상태 구현 중 추가한 모집 집계/응답/필터는 제거했다. 일괄 파일 복원 시도는 auto-review가 미커밋 작업 덮어쓰기 위험으로 거절했으며, 이후 파일 전체 복원 없이 이번 작업의 명시적 변경 부분만 수정했다.
 - 통합 cursor: PR #1989로 추가된 origin/dev d51227083을 기능 브랜치에 merge했다. LIVE 당일 노출·시즌 진행 중 문구를 보존하며 신규 표시 상태를 추가하지 않는다. 충돌 4곳을 수동 통합했고 API 범위는 dev 변경에 영향이 없었다.
 - 검증 중간 결과: API 3 suites/36 tests PASS, API 타입·surface PASS. 최초 API unit은 /tmp 전용 tsconfig의 Jest 타입 탐색 링크 누락으로 0 tests 실패했으며 링크 보완 뒤 정상 exit 0으로 통과했다. 공유 의존성·Prisma client는 변경하지 않았다.
@@ -230,3 +230,5 @@ UI는 사용자가 승인한 기존 대회 방식이며 기존 헤더 Button·�
 - 최종 검증: Web 10개 파일 고유 225개 + API 3개 suite 고유 36개, 총 261개 PASS. 최신 dev 통합 뒤 영향을 받는 6개 Web 파일 148개는 정상 exit 0으로 재검증했다. 최종 select.kind 단언을 추가한 API 담당 리그 선택 테스트 2개도 정상 exit 0이다(고유 합계에 중복 가산하지 않음).
 - API 타입·surface, Web 타입·patterns PASS. Web 전체 타입 검사 후 마지막 검토에서 담당 리그 on_hold 타입 누락을 발견해 같은 변경에 보완하고 증분 타입 검사를 추가로 통과했다. git diff --check 및 PR touched path debt/conflict marker 검사 PASS. 스키마 변경·운영 DB 쓰기·개발 서버/브라우저 실행 없음.
 - docs 전용 계약 트리 스크립트는 마이그레이션 plan 입력을 요구해 일반 문서 lint로 실행할 수 없었다. PASS로 계산하지 않으며 도메인/README/global-contract/디자인 결정과 링크를 직접 대조했다. DB integration·새 Alpha UI 캡처·외부 리뷰/CI는 아직 성공 증거가 없다.
+
+- [PR #1990](https://github.com/kim-song-jun/matchup-sports-platform/pull/1990), base=dev·draft 확인. 검증한 코드 cursor는 f31477c5d이며 후속 변경은 이 작업 문서의 진행 상태뿐이다. 코드·회귀는 261개와 양쪽 정적 검사로 검증했고, CI/외부 리뷰·Alpha 화면은 미완료이므로 PR-ready·배포 완료로 보고하지 않는다. 운영 DB·main·무관한 공유 WIP 변경 없음.

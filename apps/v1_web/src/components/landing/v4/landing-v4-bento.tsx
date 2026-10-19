@@ -85,7 +85,7 @@ export function LandingV4Bento() {
                 <li key={row.team} data-move={'move' in row ? row.move : undefined}>
                   <span className="tm-landing-v4-st-rank">{i + 1}</span>
                   <span className="tm-landing-v4-st-row">
-                    <TeamAvatar seed={row.team} name={row.team} size="sm" />
+                    <TeamAvatar name={row.team} size="sm" />
                     {row.team}
                     {'move' in row && row.move === 'up' ? <span className="tm-landing-v4-st-up">▲1<span className="sr-only"> 순위 상승</span></span> : null}
                     <span className="tm-landing-v4-st-pts">{row.pts}점</span>

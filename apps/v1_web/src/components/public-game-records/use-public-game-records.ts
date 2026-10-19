@@ -175,9 +175,17 @@ export function usePublicLeagueFixtureRecord(leagueId: string, teamMatchId: stri
  * 다시 필터링하지 않는다. `type`을 쿼리키에 포함해 탭을 바꾸면 캐시가 갈리고
  * (클라이언트 필터가 아니라) 서버로 새로 요청한다.
  */
-export function usePublicTeamRecords(teamId: string, season?: string, type?: TeamRecordCategory) {
+export function usePublicTeamRecords(
+  teamId: string,
+  season?: string,
+  type?: TeamRecordCategory,
+  options: { seed?: PublicTeamRecordsResponse } = {},
+) {
   return useInfiniteQuery({
     queryKey: publicGameRecordsKeys.teamRecords(teamId, season, type ?? null),
+    // Visibility can change while a route is away; bypass the app's 60s freshness window on mounts
+    // and filter-key changes. Existing data stays visible during revalidation until the response returns.
+    staleTime: 0,
     queryFn: ({ pageParam }: { pageParam: string | null }) =>
       v1Get<PublicTeamRecordsResponse>(`/teams/${teamId}/records`, {
         ...(season ? { season } : {}),
@@ -185,6 +193,10 @@ export function usePublicTeamRecords(teamId: string, season?: string, type?: Tea
         ...(pageParam ? { cursor: pageParam } : {}),
       }),
     initialPageParam: null as string | null,
+    // Server HTML can show this response immediately when the query has no cached data.
+    ...(options.seed
+      ? { placeholderData: { pages: [options.seed], pageParams: [null] } }
+      : {}),
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     enabled: Boolean(teamId),
     retry: false,

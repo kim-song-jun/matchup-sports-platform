@@ -81,6 +81,24 @@ describe('summarizeLandingData', () => {
     expect(data.teamMatches.map((c) => c.id)).toEqual(['sooner', 'later']);
   });
 
+  it('실제 양 팀 ID를 랜딩 팀매치 모델에 보존한다', () => {
+    const data = summarizeLandingData(
+      cursorPage([teamMatch({
+        id: 'team-match-with-identities',
+        hostTeam: { teamId: 'real-host-team', name: '홈팀', logoUrl: null },
+        approvedOpponentTeam: { teamId: 'real-opponent-team', name: '상대팀', logoUrl: null },
+      })]),
+      null,
+      null,
+      NOW,
+    );
+
+    expect(data.teamMatches[0]).toMatchObject({
+      hostTeamId: 'real-host-team',
+      opponentTeamId: 'real-opponent-team',
+    });
+  });
+
   it('다음 페이지가 있어도 이번 페이지에 모집 중이 0개면 "0개 이상"이 아니라 "0개"다', () => {
     const none = summarizeLandingData(null, tournamentPage([tournament({ status: 'completed' })], true), null, NOW);
     expect(formatLandingCount(none.counts.tournamentsOpen)).toBe('0개');

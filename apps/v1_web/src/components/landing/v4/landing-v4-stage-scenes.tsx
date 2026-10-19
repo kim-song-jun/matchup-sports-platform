@@ -11,11 +11,13 @@ import { CardScreenBody } from '../landing-competition-screens';
 export const EXAMPLE_TEAM_MATCHES: readonly LandingLiveTeamMatch[] = [
   {
     kind: 'team_match', id: 'example-1', hostName: 'FC 한강', opponentName: '성수 러너스',
+    hostTeamId: null, opponentTeamId: null,
     hostLogoUrl: null, opponentLogoUrl: null, region: '성동구', place: '성수 풋살장',
     dateTimeText: '토요일 19:00', formatText: '5:5', levelLabel: '입문', isLeague: false, href: '/team-matches',
   },
   {
     kind: 'team_match', id: 'example-2', hostName: '망원 FC', opponentName: '합정 SC',
+    hostTeamId: null, opponentTeamId: null,
     hostLogoUrl: null, opponentLogoUrl: null, region: '마포구', place: null,
     dateTimeText: '일요일 10:00', formatText: null, levelLabel: null, isLeague: true, href: '/team-matches',
   },
@@ -32,8 +34,8 @@ function matchTag(match: LandingLiveTeamMatch): { tone: 'blue' | 'green'; label:
 function Logos({ match }: { match: LandingLiveTeamMatch }) {
   return (
     <span className="tm-landing-v4-sm-logos">
-      <TeamAvatar seed={match.hostName} name={match.hostName} logoUrl={match.hostLogoUrl} size="sm" />
-      <TeamAvatar seed={match.opponentName} name={match.opponentName} logoUrl={match.opponentLogoUrl} size="sm" />
+      <TeamAvatar teamId={match.hostTeamId} name={match.hostName} logoUrl={match.hostLogoUrl} size="sm" />
+      <TeamAvatar teamId={match.opponentTeamId} name={match.opponentName} logoUrl={match.opponentLogoUrl} size="sm" />
     </span>
   );
 }
@@ -172,9 +174,9 @@ export function SceneLive() {
       <div className="lpm-body">
         <div className="lpm-card lpm-live">
           <div className="lpm-live-teams">
-            <span className="tm-landing-v4-live-team"><TeamAvatar seed="FC 한강" name="FC 한강" size="md" />FC 한강</span>
+            <span className="tm-landing-v4-live-team"><TeamAvatar name="FC 한강" size="md" />FC 한강</span>
             <span className="lpm-live-score"><span><Roll digits={[0, 1, 2]} side="home" /> : <Roll digits={[0, 1]} side="away" /></span></span>
-            <span className="tm-landing-v4-live-team"><TeamAvatar seed="성수 러너스" name="성수 러너스" size="md" />성수 러너스</span>
+            <span className="tm-landing-v4-live-team"><TeamAvatar name="성수 러너스" size="md" />성수 러너스</span>
           </div>
           <div className="lpm-live-meta">
             <span className="lpm-badge" data-tone="live">LIVE</span>

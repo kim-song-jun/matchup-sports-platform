@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import { publicAssetPath } from '@/lib/assets';
+import { resolveTeamLogoUrl } from '@/lib/team-logo-presets';
 import { AvatarFallback } from './avatar-fallback';
 
 export type TeamAvatarSize = 'sm' | 'md' | 'lg' | 'xl';
@@ -15,18 +16,18 @@ const SIZE_MAP: Record<TeamAvatarSize, { px: number; radius: number }> = {
 };
 
 export interface TeamAvatarProps {
-  /** 기존 호출 계약 유지용. 기본 아이콘은 팀 이름/ID와 무관하다. */
-  seed: string;
+  /** Stable team identity; missing identities keep the neutral icon. */
+  teamId?: string | null;
   name: string;
   logoUrl?: string | null;
   size?: TeamAvatarSize;
   className?: string;
 }
 
-/** 팀 로고의 로딩/실패/미등록 상태는 공용 팀 아이콘으로 표시한다. */
-function TeamAvatarContent({ logoUrl, size = 'md', className }: TeamAvatarProps) {
+/** 이미지가 로드되기 전과 로드에 실패한 경우에는 중립 팀 아이콘을 표시한다. */
+function TeamAvatarContent({ teamId, logoUrl, size = 'md', className }: TeamAvatarProps) {
   const { px, radius } = SIZE_MAP[size];
-  const url = logoUrl?.trim() || null;
+  const url = resolveTeamLogoUrl({ teamId, logoUrl });
   // URL 단위로 도착/실패를 기억해야 로고 교체·삭제 때 이전 이미지 상태가 남지 않는다.
   const [loadedUrl, setLoadedUrl] = useState<string | null>(null);
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
@@ -58,5 +59,6 @@ function TeamAvatarContent({ logoUrl, size = 'md', className }: TeamAvatarProps)
 }
 
 export function TeamAvatar(props: TeamAvatarProps) {
-  return <TeamAvatarContent key={props.logoUrl?.trim() || 'empty'} {...props} />;
+  const url = resolveTeamLogoUrl({ teamId: props.teamId, logoUrl: props.logoUrl });
+  return <TeamAvatarContent key={url || 'empty'} {...props} />;
 }

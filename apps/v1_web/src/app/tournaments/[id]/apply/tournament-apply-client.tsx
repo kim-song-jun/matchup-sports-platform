@@ -416,7 +416,7 @@ function TeamSelectStep({
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <TeamAvatar seed={team.teamId} name={team.name} logoUrl={team.logoUrl} size="md" />
+                      <TeamAvatar teamId={team.teamId} name={team.name} logoUrl={team.logoUrl} size="md" />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                           <span

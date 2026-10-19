@@ -183,6 +183,9 @@ export function usePublicTeamRecords(
 ) {
   return useInfiniteQuery({
     queryKey: publicGameRecordsKeys.teamRecords(teamId, season, type ?? null),
+    // Visibility can change while a route is away; bypass the app's 60s freshness window on mounts
+    // and filter-key changes. Existing data stays visible during revalidation until the response returns.
+    staleTime: 0,
     queryFn: ({ pageParam }: { pageParam: string | null }) =>
       v1Get<PublicTeamRecordsResponse>(`/teams/${teamId}/records`, {
         ...(season ? { season } : {}),
@@ -190,8 +193,7 @@ export function usePublicTeamRecords(
         ...(pageParam ? { cursor: pageParam } : {}),
       }),
     initialPageParam: null as string | null,
-    // Server HTML can show this response immediately, but it remains a placeholder so the
-    // client refreshes it under the normal query-client freshness policy.
+    // Server HTML can show this response immediately when the query has no cached data.
     ...(options.seed
       ? { placeholderData: { pages: [options.seed], pageParams: [null] } }
       : {}),

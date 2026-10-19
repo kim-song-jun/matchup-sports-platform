@@ -10,15 +10,9 @@ import type { PublicTournamentPlayerRecordRow } from './types';
 /**
  * 회고 STATS-1 — 대회 개인 득점·도움 랭킹 섹션(프레젠테이셔널).
  *
- * 데이터를 props로 받는다: `ScheduleContent`처럼 페이지 클라이언트가 훅을 돌리고
+ * 데이터를 props로 받는다: 페이지 클라이언트가 훅을 돌리고
  * 내려주는 이 디렉터리의 관례를 따르고, QueryClientProvider 없이도 단위 테스트가
  * 가능하게 유지한다(훅은 `usePublicTournamentPlayerRecords`).
- *
- * `emptyBehavior` — 두 표면의 빈 상태 정책이 다르다:
- * - 일정 화면('hide'): 폴링이 도는 밀도 높은 화면이라 기록이 없으면 섹션 자체를
- *   그리지 않는다(빈 골격이 일정을 밀어내지 않게).
- * - 수상 페이지('empty-state'): 기록을 보러 오는 목적지라 리그 순위 화면과 같은
- *   EmptyState 문구를 보여준다.
  */
 export function TournamentPlayerRecordsSections({
   goals,
@@ -28,8 +22,6 @@ export function TournamentPlayerRecordsSections({
   isError,
   errorMessage,
   onRetry,
-  emptyBehavior,
-  containerStyle,
 }: {
   goals: readonly PublicTournamentPlayerRecordRow[] | undefined;
   assists: readonly PublicTournamentPlayerRecordRow[] | undefined;
@@ -39,13 +31,6 @@ export function TournamentPlayerRecordsSections({
   isError: boolean;
   errorMessage: string;
   onRetry: () => void;
-  emptyBehavior: 'hide' | 'empty-state';
-  /**
-   * 실제로 그릴 내용이 있을 때만 적용되는 래퍼 스타일. 일정 화면(hide 정책)이
-   * 바깥에서 패딩 div로 감싸면 null 반환 시에도 빈 여백이 남는다(리뷰 지적) —
-   * 래퍼를 컴포넌트 안으로 들여 내용과 운명을 같이하게 한다.
-   */
-  containerStyle?: React.CSSProperties;
 }) {
   const goalRows = goals ?? [];
   const assistRows = assists ?? [];
@@ -55,30 +40,25 @@ export function TournamentPlayerRecordsSections({
     [assistRows],
   );
 
-  const wrap = (content: React.ReactNode) =>
-    containerStyle === undefined ? <>{content}</> : <div style={containerStyle}>{content}</div>;
-
   if (isError) {
-    return wrap(<ErrorState message={errorMessage} onRetry={onRetry} />);
+    return <ErrorState message={errorMessage} onRetry={onRetry} />;
   }
   if (isLoading) {
-    return emptyBehavior === 'hide' ? null : wrap(
-      <div className="tm-skeleton" style={{ height: 80, borderRadius: 'var(--radius-control)' }} />,
-    );
+    return <div className="tm-skeleton" style={{ height: 80, borderRadius: 'var(--radius-control)' }} />;
   }
   if (goalRows.length === 0 && assistRows.length === 0) {
-    return emptyBehavior === 'hide' ? null : wrap(
+    return (
       <section>
         <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>개인 기록</h3>
         <EmptyState
           title={playerRecordEmptyTitle(hiddenByEligibility)}
           sub={playerRecordsCombinedEmptySub(hiddenByEligibility)}
         />
-      </section>,
+      </section>
     );
   }
 
-  return wrap(
+  return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, marginBottom: 20 }}>
       {goalRows.length > 0 ? (
         <RecordList title="득점 순위" rows={goalRows} ranks={goalRanks} unit="골" value={(row) => row.goals} />
@@ -86,7 +66,7 @@ export function TournamentPlayerRecordsSections({
       {assistRows.length > 0 ? (
         <RecordList title="도움 순위" rows={assistRows} ranks={assistRanks} unit="도움" value={(row) => row.assists} />
       ) : null}
-    </div>,
+    </div>
   );
 }
 

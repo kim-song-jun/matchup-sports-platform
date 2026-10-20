@@ -35,7 +35,7 @@ const otherRegistration: V1AdminTournamentRegistration = {
 function player(overrides: Partial<V1AdminTournamentPlayer> = {}): V1AdminTournamentPlayer {
   return {
     id: 'player-member', userId: 'member', realName: '홍길동', nickname: '번개 선수',
-    jerseyNumber: 0, birthDateSnapshot: '1995-03-15', genderSnapshot: 'male',
+    jerseyNumber: 0, goalkeeper: false, birthDateSnapshot: '1995-03-15', genderSnapshot: 'male',
     eligibilityStatus: 'needs_review', eligibilityNote: null,
     addedAt: '2026-10-13T00:00:00Z', removedAt: null, phone: null, isTeamCaptain: false,
     ...overrides,

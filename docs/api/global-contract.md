@@ -198,3 +198,6 @@ The [league image endpoint](./domains/league-matches.md#cover-image-목록상세
 선수 추가 성별·골레이 (2026-10-20): 대회·리그 `POST …/players`가 선택적 boolean `goalkeeper`를 함께 저장·반환한다(생략 false). 성별은 서버 프로필 snapshot이며 클라이언트 입력을 받지 않는다. 상세 계약은 [tournaments](domains/tournaments.md)를 따른다.
 
 대회 시작 되돌리기 (2026-10-20): 실제 경기 시작·기록·결과 전에는 사유와 함께 `in_progress → closed`를 허용한다. 관리자 상세의 `canRevertStart`를 사용하고 저장 시 잠금 안에서 재검사한다. 시작한 경기가 있으면 `409 TOURNAMENT_ALREADY_STARTED`. 상세는 [tournaments](domains/tournaments.md)를 따른다.
+
+Admin roster settings writes use the owner/ops-only gate and append actor/before/after audit records.
+Support admins may only read. See [admin roster settings](./domains/tournaments.md#admin-roster-player-settings-2026-10-20).

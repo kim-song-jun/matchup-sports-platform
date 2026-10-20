@@ -668,3 +668,19 @@ Schema migration `20261017010000_bracket_display_labels` adds nullable varchar(1
 
 
 공개 상세 `groups[].groupTeams[].byeTarget`은 BYE 슬롯이 연결된 `{ fixtureId, side: 'HOME' | 'AWAY' }` 또는 null이다. 팀 미배정·문구 변경과 무관하게 canonical TeamMatch의 homeSlotId/awaySlotId로 조회하며, 비부전승·미연결은 null이다. 대진 비공개 시 groups/fixtures 숨김 정책은 그대로다. 공개 그림은 이 명시적 연결을 우선하며 슬롯 없는 기존 대진은 기존 registration 배정 연결을 유지한다. 번호·정렬로 진출 관계를 추정하지 않는다.
+
+
+### Admin roster player settings (2026-10-20)
+
+`PATCH /api/v1/admin/registrations/:registrationId/players/:playerId/settings` accepts required
+`jerseyNumber: number | null` and optional `goalkeeper: boolean`. Omitted GK preserves the stored value, including legacy null. Number is an integer 0–99; null clears it.
+Owner/ops admins only (`getMutationAdmin`); support receives 403. Registration and active player must match
+(404 otherwise). Existing admin roster mutability gates apply: lock/deadline can be bypassed, cancelled/terminal
+competition states cannot. Active jersey duplicates within a registration return
+409 `ROSTER_DUPLICATE_JERSEY_NUMBER`. The registration row lock serializes concurrent roster changes.
+Number, goalkeeper, `player.settings` audit before/after, and roster resync outbox commit atomically.
+Response is the serialized player; admin GET includes `jerseyNumber`, `goalkeeper`, and the existing nickname.
+Eligibility is unchanged. Both tournaments and leagues use the same endpoint.
+Uses the existing nullable goalkeeper column and scheduled-game roster synchronization; no new migration.
+Existing competition-level GK precedence, legacy per-game roles and sport-specific goalkeeper codes are preserved. Live/final snapshots
+are not rewritten. UI uses per-player edit/save/cancel; errors preserve the draft, and a blank number clears it. The UI sends GK only when changed, so a number-only edit does not erase legacy per-game roles.

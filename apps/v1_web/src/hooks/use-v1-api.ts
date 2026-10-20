@@ -5032,11 +5032,17 @@ export function useV1ExportTournamentRosterCsv(tournamentId: string) {
   });
 }
 
-/**
- * @param registrationId 자격을 바꾼 선수가 속한 신청. 명단 캐시 키가 registrationId 기준이라
- *   이걸 모르면 방금 바꾼 자격이 화면에 반영되지 않는다 — 서버는 바뀌고 토스트도 뜨는데
- *   행의 배지는 옛 값 그대로였다.
- */
+/** 어드민 명단의 번호·GK 설정을 함께 저장한다. */
+export function useV1AdminUpdatePlayerSettings(registrationId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ playerId, ...body }: { playerId: string; jerseyNumber: number | null; goalkeeper?: boolean }) =>
+      v1Patch(`/admin/registrations/${registrationId}/players/${playerId}/settings`, body),
+    onSuccess: () => invalidateRosterViews(queryClient, null, registrationId),
+  });
+}
+
+/** registrationId로 명단 캐시를 갱신해 자격 변경을 즉시 보여준다. */
 export function useV1UpdatePlayerEligibility(registrationId?: string) {
   const queryClient = useQueryClient();
   return useMutation({

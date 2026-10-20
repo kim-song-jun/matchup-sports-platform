@@ -41,7 +41,7 @@ Status: Review
 범위는 대회 경기 운영콘솔. 리그 기존 동작은 유지. 대회 공통 참가 선수 추가·번호·GK 설정은 변경하지 않는다.
 
 ## Progress Snapshot
-origin/dev 9b761fc3a 기반 fix/console-game-roster-edit 격리 작업트리. 미커밋·미배포. 검증은 WSL의 기존 의존성을 재사용했다. 오래된 Prisma 클라이언트로 서버 테스트가 막혀 `prisma generate`로 타입만 재생성했다(DB 변경 없음).
+origin/dev 9b761fc3a 기반 fix/console-game-roster-edit 격리 작업트리. PR 생성 완료, alpha 배포 진행 중. 검증은 WSL의 기존 의존성을 재사용했다. 오래된 Prisma 클라이언트로 서버 테스트가 막혀 `prisma generate`로 타입만 재생성했다(DB 변경 없음).
 
 ## Validation Evidence
 - CLI: `vitest run` 단일 worker — operate-console 102개, kickoff-checklist 8개 통과. 기존 React act/key 경고는 해당 스위트에서 관찰됨.
@@ -51,4 +51,9 @@ origin/dev 9b761fc3a 기반 fix/console-game-roster-edit 격리 작업트리. �
 - `git diff --check` 통과. touched path debt grep: docs/api/domains/games.md의 기존 Todo 11 설명만 발견, 신규 marker 없음. 신규 import는 이 작업의 신규 소스에만 의존.
 - Alpha manual QA: 미실행. 변경 미배포이고 이 세션에 브라우저 도구가 없어 390/768/1440 before/after 및 console/network 판정은 대기. CLI 테스트를 시각 검증으로 대체하지 않는다.
 - Cleanup: 테스트 프로세스 종료 확인 후 이 작업에서 만든 node_modules 링크만 해제. 로컬 Web/API 서버·DB를 띄우지 않음.
-- No commit/push/deployment. 기존 공유 dev WIP 보존. PR-ready 판정 없음.
+- PR created; alpha deployment in progress. 기존 공유 dev WIP 보존. PR-ready 판정 없음.
+
+## PR / Deployment Cursor — 2026-10-21
+- PR: https://github.com/kim-song-jun/matchup-sports-platform/pull/2011 (base dev).
+- 최신 dev 통합 완료. GitHub CI와 Copilot 최신 head 리뷰를 통과한 후 dev에 머지하고 alpha 배포 receipt·health를 검증한다.
+- 사용자가 세 PR 생성 후 alpha 배포까지 승인함. main 승격은 범위 밖.

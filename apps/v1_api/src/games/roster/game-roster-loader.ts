@@ -1,4 +1,4 @@
-import type { Prisma, V1GameState } from '@prisma/client';
+import { type Prisma, V1GameResultRevisionState, V1GameState } from '@prisma/client';
 import { parseLineupCatalog } from '../../tournaments/competition-config/competition-config.parse';
 import { compareRosterOrder } from '../../common/roster-order';
 import { leagueTeamRosterBase, readLeagueTeamRosters } from '../../league-matches/league-fixture-creation';
@@ -7,9 +7,22 @@ import { loadTeamCompetitionGameOrder } from '../../tournaments/discipline/team-
 import { participantDisplayName } from '../../tournaments/participant-display-name';
 import { rosterBlockReason } from '../../tournaments/roster-cleanup';
 import { readJerseyNumbers } from '../../tournaments/tournament-player-jersey';
+import { selectLineupParticipantsWithDraftFallback, type LineupRevision } from '../core/latest-lineup-participants';
 import { computeGameRoster, type GameRosterBaseEntry, type GameRosterComputation } from './game-roster-computation';
+import type { PlayedLineupRow } from './game-roster-view';
 
 type Tx = Prisma.TransactionClient;
+
+/** 라인업 리비전의 참가자 행 — 기록 명단 선택(`selectLineupParticipantsWithDraftFallback`)의 입력. */
+interface SideLineupRow {
+  readonly id: string;
+  readonly sideId: string;
+  readonly lineupId: string;
+  readonly userId: string | null;
+  readonly displayNameSnapshot: string;
+  readonly jerseyNumber: number | null;
+  readonly position: string | null;
+}
 
 export type GameRosterBaseSource = 'REGISTRATION' | 'TEAM_MEMBERS';
 
@@ -255,4 +268,55 @@ export async function loadGameRosterForContext(
       suspensionVerdicts,
     }),
   };
+}
+
+/**
+ * 시작된 경기의 기록 명단. 종료된 경기는 현재 공식 리비전의 출전자(공식 정정 반영), 그 밖에는 제출본(없으면 최신 리비전).
+ * 시작 전이면 null — 참가 명단에서 계산한 출전자를 쓴다. 그 사이드의 비무효 라인업·참가자 행을 이미 읽었으면 넘긴다.
+ */
+export async function loadPlayedLineup(
+  tx: Tx,
+  context: Pick<GameRosterSideContext, 'gameId' | 'sideId' | 'gameState' | 'goalkeeperPositionCode'>,
+  side?: { readonly lineups: readonly LineupRevision[]; readonly rows: readonly SideLineupRow[] },
+): Promise<PlayedLineupRow[] | null> {
+  if (context.gameState === V1GameState.SCHEDULED) return null;
+  // 공식 정정은 제출 라인업을 바꾸지 않는다. 종료된 경기는 현재 공식 리비전의 출전자만 투영한다.
+  const officialGame = context.gameState === V1GameState.ENDED
+    ? await tx.v1Game.findUnique({
+        where: { id: context.gameId },
+        select: {
+          currentOfficialRevision: {
+            select: {
+              state: true,
+              resultParticipants: {
+                where: { sideId: context.sideId },
+                select: { participantId: true, goalkeeper: true },
+              },
+            },
+          },
+        },
+      })
+    : null;
+  const officialParticipants = officialGame?.currentOfficialRevision?.state === V1GameResultRevisionState.OFFICIAL
+    ? officialGame.currentOfficialRevision.resultParticipants
+    : null;
+  if (officialParticipants !== null) {
+    // 공식 출전자가 0명이어도 확정된 값이므로 제출 명단으로 채우지 않는다.
+    if (officialParticipants.length === 0) return [];
+    const snapshots = await tx.v1GameParticipant.findMany({
+      where: { gameId: context.gameId, sideId: context.sideId, id: { in: officialParticipants.map((row) => row.participantId) } },
+      select: { id: true, userId: true, displayNameSnapshot: true, jerseyNumber: true },
+    });
+    const goalkeepers = new Map(officialParticipants.map((row) => [row.participantId, row.goalkeeper]));
+    return snapshots.map((row) => ({ ...row, goalkeeper: goalkeepers.get(row.id) ?? false }));
+  }
+  const lineups = side?.lineups ?? await tx.v1GameLineup.findMany({
+    where: { gameId: context.gameId, sideId: context.sideId, invalidatedAt: null },
+    orderBy: { revision: 'asc' },
+  });
+  const rows = side?.rows ?? await tx.v1GameParticipant.findMany({
+    where: { lineupId: { in: lineups.map((lineup) => lineup.id) } },
+    select: { id: true, sideId: true, lineupId: true, userId: true, displayNameSnapshot: true, jerseyNumber: true, position: true },
+  });
+  return selectLineupParticipantsWithDraftFallback(rows, lineups).map((row) => ({ ...row, goalkeeper: row.position === (context.goalkeeperPositionCode ?? 'GK') }));
 }

@@ -667,6 +667,15 @@ describe('TeamsService', () => {
       expect(next).not.toHaveProperty('facets');
     });
 
+    // MD-QA #176 — 생성 시각이 같은 팀이 많으면(시드) 그 사이 순서가 요청마다 달라져 "더 보기"에 같은 팀이 또 나왔다.
+    it.each([undefined, 'latest', 'member_count'] as const)('정렬(%s)의 마지막 기준은 id 다 — 커서로 이어 읽어도 겹치거나 빠지지 않게', async (sort) => {
+      await service.list(null, { sort, cursor: 'team-1' });
+
+      const args = prisma.v1Team.findMany.mock.calls.at(-1)[0];
+      expect(args.orderBy.at(-1)).toEqual({ id: 'desc' });
+      expect(args.cursor).toEqual({ id: 'team-1' });
+    });
+
     it('includes the owner in each list item', async () => {
       prisma.v1Team.findMany.mockResolvedValueOnce([
         {

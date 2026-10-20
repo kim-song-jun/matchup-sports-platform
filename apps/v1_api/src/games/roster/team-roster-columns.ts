@@ -1,7 +1,8 @@
-import type { Prisma } from '@prisma/client';
+import { type Prisma, V1GameState } from '@prisma/client';
 import { loadTeamCompetitionGameOrder } from '../../tournaments/discipline/team-game-order';
-import { loadCompetitionRosterBase, loadGameRoster, type LoadedGameRoster } from './game-roster-loader';
+import { loadCompetitionRosterBase, loadGameRoster, loadPlayedLineup, type LoadedGameRoster } from './game-roster-loader';
 import type { TeamRosterMatrixGame } from './game-roster-matrix';
+import type { PlayedLineupRow } from './game-roster-view';
 import { isUnmigratedTeamAuthoredLineup, upcomingCompetitionGameWhere } from './game-roster-sync';
 
 type Tx = Prisma.TransactionClient;
@@ -10,6 +11,8 @@ export interface TeamRosterColumn {
   readonly game: TeamRosterMatrixGame;
   /** 기준 명단이 없는 팀(확정 신청 없는 대회)은 null. */
   readonly loaded: LoadedGameRoster | null;
+  /** 시작된 경기의 기록 명단. 시작 전이거나 기준 명단이 없으면 null. */
+  readonly playedLineup: readonly PlayedLineupRow[] | null;
 }
 
 /** 대회·리그 대진에서 그 팀의 상대 팀 이름. 상대가 아직 정해지지 않았으면 null. */
@@ -26,14 +29,28 @@ export function competitionOpponentName(
 
 /**
  * 한 팀의 시작 전 대회·리그 경기와 경기마다 계산된 명단. 시각순(시각 없는 대회 대진은 뒤).
+ * `includeStarted` 면 그 대회·리그에서 시작된(진행 중·종료) 경기도 싣는다 — 취소된 경기는 빠진다.
  * 기준 명단·팀 경기 순서는 대회·리그마다 한 번만 읽는다.
  */
 export async function loadTeamRosterColumns(
   tx: Tx,
-  input: { teamId: string; competitionId: string | null; now: Date },
+  input: { teamId: string; competitionId: string | null; now: Date; includeStarted?: boolean },
 ): Promise<TeamRosterColumn[]> {
+  const upcoming = upcomingCompetitionGameWhere(input.competitionId, input.teamId, input.now);
+  const started: Prisma.V1GameWhereInput | null =
+    input.includeStarted && input.competitionId !== null
+      ? {
+          state: { in: [V1GameState.LIVE, V1GameState.PAUSED, V1GameState.ENDED] },
+          teamMatch: {
+            deletedAt: null,
+            status: { not: 'cancelled' },
+            OR: [{ leagueId: input.competitionId }, { tournamentId: input.competitionId, leagueId: null }],
+          },
+          sides: { some: { teamId: input.teamId } },
+        }
+      : null;
   const games = await tx.v1Game.findMany({
-    where: upcomingCompetitionGameWhere(input.competitionId, input.teamId, input.now),
+    where: started === null ? upcoming : { OR: [upcoming, started] },
     select: {
       id: true,
       state: true,
@@ -95,11 +112,12 @@ export async function loadTeamRosterColumns(
       preloaded.base === null
         ? null
         : await loadGameRoster(tx, { gameId: column.gameId, sideId: column.sideId }, preloaded);
-    columns.push({ game: column, loaded });
+    columns.push({ game: column, loaded, playedLineup: loaded === null ? null : await loadPlayedLineup(tx, loaded.context) });
   }
   const legacyCompetitions = new Set<string>();
   for (const { column, isLeague } of rows) {
-    if (!isLeague) continue;
+    // 일괄 GK 변경이 검사하는 것도 시작 전 경기뿐이다 — 진행한 경기의 옛 저장본이 남은 경기 GK 를 막지 않는다.
+    if (!isLeague || column.gameState !== V1GameState.SCHEDULED) continue;
     const latest = await tx.v1GameLineup.findFirst({ where: { gameId: column.gameId, sideId: column.sideId, invalidatedAt: null }, orderBy: { revision: 'desc' } });
     if (latest !== null && await isUnmigratedTeamAuthoredLineup(tx, column.gameId, column.sideId, latest)) legacyCompetitions.add(column.competitionId);
   }

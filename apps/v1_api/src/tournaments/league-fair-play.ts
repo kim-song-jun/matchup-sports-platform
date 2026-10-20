@@ -23,18 +23,25 @@ export function fairPlayPointsOf(cards: FairPlayCards): number {
 }
 
 /**
- * `V1GameResultParticipant.cards`(Json)를 `FairPlayCards`로 변환한다.
+ * 한 경기·한 선수의 `{ yellow, red }`를 경고·경고 누적 퇴장·직접 퇴장으로 나눈다. 출전정지(`card-suspension.ts`)와
+ * 페어플레이가 같이 쓴다.
  *
- * **데이터 모델 제약(추측 아님 — games.service.ts의 CARD 이벤트 집계 확인 결과)**:
- * 저장된 실제 구조는 `{ yellow: number, red: number }` 뿐이다 — "경고 누적 퇴장
- * (2번째 옐로)"과 "직접 퇴장"을 구분하는 필드가 데이터 모델 자체에 없다
- * (games.service.ts의 `V1GameEventType.CARD` 집계는 `payload.card`가 `'RED'`인지
- * 아닌지만 보고 `cards.red`/`cards.yellow`를 늘린다. 심판이 두 번째 옐로를 별도
- * RED 이벤트로 이어 기록하지 않는 한 "경고 누적 퇴장"은 애초에 red로 기록되지도
- * 않는다). 그래서 `red`는 전부 `directRed`(4점)로 계산하고 `secondYellowRed`는
- * 항상 0이다 — 실제로 경고 누적 퇴장이었던 건이 섞여 있으면 팀당 최대 1점씩
- * 과대산정될 수 있지만, 조용히 0점 처리하는 것보다는 이 근사가 tie-break 취지에
- * 더 가깝다(카드가 있는데 페어플레이 벌점이 0인 것이 원래 버그였다).
+ * 저장 모양은 `{ yellow, red }` 뿐이라 "이 레드가 두 번째 옐로 때문"이라는 표시가 없다. 운영 콘솔은 두 번째 옐로를
+ * 기록하면 레드도 따로 한 장 더 기록한다(MD-QA #81). 옐로 2장을 받은 선수는 그 경기에서 직접 레드를 또 받을 수
+ * 없으므로, 레드 한 장마다 옐로 2장을 "레드로 바뀐 경고"로 본다(MD-QA #174). 옐로 1장 뒤 직접 레드는 둘 다 남는다.
+ */
+export function classifyGameCards(cards: { yellow: number; red: number }): FairPlayCards {
+  const secondYellowRed = Math.max(0, Math.min(cards.red, Math.floor(cards.yellow / 2)));
+  return {
+    yellow: cards.yellow - secondYellowRed * 2,
+    secondYellowRed,
+    directRed: cards.red - secondYellowRed,
+  };
+}
+
+/**
+ * `V1GameResultParticipant.cards`(Json)를 `FairPlayCards`로 변환한다. 모양이 다르면 0으로 본다.
+ * 퇴장 구분은 `classifyGameCards` 규칙을 따른다.
  */
 export function parseFairPlayCards(value: unknown): FairPlayCards {
   if (
@@ -45,7 +52,7 @@ export function parseFairPlayCards(value: unknown): FairPlayCards {
     typeof (value as { red?: unknown }).red === 'number'
   ) {
     const record = value as { yellow: number; red: number };
-    return { yellow: record.yellow, secondYellowRed: 0, directRed: record.red };
+    return classifyGameCards(record);
   }
   return { yellow: 0, secondYellowRed: 0, directRed: 0 };
 }

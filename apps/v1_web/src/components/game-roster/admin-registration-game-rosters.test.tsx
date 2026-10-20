@@ -201,6 +201,24 @@ async function settleAdminMe() {
   await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
+describe('어드민 경기별 명단 — 진행한 경기', () => {
+  it('끝난 경기 열은 "종료"로 표시하고 칸을 바꿀 수 없다 — 시작 전 경기 칸은 그대로 바꾼다', async () => {
+    mock.setGameState(G1.gameId, 'ENDED');
+    renderPanel();
+    expect(await cell('김민재', G2.opponentName, '출전')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: new RegExp(`vs ${G1.opponentName} · 종료$`) })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: new RegExp(`^김민재 .* vs ${G1.opponentName} · 종료 `) })).not.toBeInTheDocument();
+    expect(screen.getByText(/경기 2개 · 선수/)).toBeInTheDocument();
+  });
+
+  it('모든 경기가 시작됐으면 "보기 권한만" 안내를 띄우지 않는다', async () => {
+    for (const game of GAME_ROSTER_MSW.games) mock.setGameState(game.gameId, 'ENDED');
+    renderPanel();
+    expect(await screen.findByText(/시작된 경기는/)).toBeInTheDocument();
+    expect(screen.queryByText(/보기 권한만 있어 명단을 바꿀 수 없어요/)).not.toBeInTheDocument();
+  });
+});
+
 describe('어드민 경기별 명단 — 역할별 노출', () => {
   it.each(['owner', 'ops'] as const)('플랫폼 어드민(%s)은 칸을 바꾸고 선수를 골라 결장 기간 시트를 연다', async (role) => {
     adminRole = role;

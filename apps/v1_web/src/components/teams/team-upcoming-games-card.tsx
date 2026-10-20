@@ -17,7 +17,7 @@ import { TeamGameKindBadge } from './team-game-kind-badge';
  * 이 목록이 따로 있는 이유: `팀 일정`(V1TeamSchedule)은 팀이 직접 만드는 캘린더라 대회
  * 경기가 들어오지 않는다. 알려진 한계: 서버가 **앞으로의 경기만** 모은다.
  */
-/** 경기 명단 화면의 "우리 팀 다른 경기" 링크가 여기로 온다(`/teams/:id#…`). */
+/** 팀 상세의 다가오는 경기 섹션 앵커. */
 export const TEAM_UPCOMING_GAMES_ANCHOR = 'team-upcoming-games';
 
 export function TeamUpcomingGamesCard({ teamId, canManageRosters }: { teamId: string; canManageRosters: boolean }) {

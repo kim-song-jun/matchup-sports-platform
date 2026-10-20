@@ -39,8 +39,8 @@ function data(): PublicTournamentScheduleResponse {
 const query = (value = data(), hasNextPage = false) => ({ data: { pages: [value] },
   isPending: false, isError: false, isFetching: false, hasNextPage, isFetchingNextPage: hasNextPage,
   fetchNextPage: vi.fn(), refetch: vi.fn() });
-const mine = () => fireEvent.click(within(screen.getByRole('tablist', { name: '경기 일정 팀 필터' })).getByRole('tab', { name: '내 팀' }));
-const all = () => fireEvent.click(within(screen.getByRole('tablist', { name: '경기 일정 팀 필터' })).getByRole('tab', { name: '전체' }));
+const mine = () => fireEvent.click(screen.getByRole('switch', { name: '내 팀만' }));
+const all = () => fireEvent.click(screen.getByRole('switch', { name: '내 팀만' }));
 const gameIds = () => screen.queryAllByRole('link').flatMap((link) => {
   const href = link.getAttribute('href') ?? '';
   return href.includes('/fixtures/') ? [new URL(href, 'https://teameet.invalid').pathname.split('/').at(-1)] : [];
@@ -64,13 +64,16 @@ afterEach(() => { cleanup(); vi.clearAllMocks(); window.localStorage.clear(); })
 describe('정규 리그 bracket 일정의 전체/내 팀 계약', () => {
   it('전체가 기본이며 일반 멤버·복수 팀·홈/원정·종료·live·시간 미정 경기를 모두 필터한다', () => {
     const result = mount();
+    expect(screen.queryByRole('heading', { name: '경기 일정' })).not.toBeInTheDocument();
+    const phaseFilters = screen.getByRole('tablist', { name: '경기 일정 보기' });
+    expect(phaseFilters.parentElement).toContainElement(screen.getByRole('switch', { name: '내 팀만' }));
     expect(gameIds()).toHaveLength(7);
     mine();
     expect(gameIds().sort()).toEqual(['away-game', 'home-game', 'live-mine', 'unset-mine']);
     expect(screen.getByText('총 4경기')).toBeInTheDocument();
     expect(within(screen.getByRole('region', { name: '진행 중인 경기' })).getAllByRole('link')).toHaveLength(1);
     expect(result.container.querySelectorAll('.tm-schedule-card-mine')).toHaveLength(4);
-    expect(screen.getAllByRole('tab', { name: '내 팀' })).toHaveLength(1);
+    expect(screen.getAllByRole('switch', { name: '내 팀만' })).toHaveLength(1);
     expect(mocks.fixtures).toHaveBeenCalledWith('league-1', { enabled: false });
     all();
     expect(gameIds()).toHaveLength(7);
@@ -90,11 +93,13 @@ describe('정규 리그 bracket 일정의 전체/내 팀 계약', () => {
 
   it('미참가 안내와 전체 일정 복귀 버튼을 제공한다', () => {
     mocks.teams.mockReturnValue({ data: { items: [] }, isPending: false, isError: false });
-    mount(); mine();
+    window.history.replaceState({}, '', base.replace('#schedule', '&teamScope=mine#schedule'));
+    mount();
     expect(screen.getByText('이 리그에 참가하는 내 팀이 없어요')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '전체 일정 보기' }));
     expect(gameIds()).toHaveLength(7);
     expect(new URL(window.location.href).searchParams.has('teamScope')).toBe(false);
+    expect(screen.queryByRole('switch', { name: '내 팀만' })).not.toBeInTheDocument();
   });
 
   it('참가 후 대진 미배정은 미참가와 구별한다', () => {
@@ -176,7 +181,7 @@ describe('정규 리그 bracket 일정의 전체/내 팀 계약', () => {
     expect(returnUrl.hash).toBe(selectedUrl.hash);
     result.unmount(); mount();
     expect(gameIds()).toHaveLength(4);
-    expect(within(screen.getByRole('tablist', { name: '경기 일정 팀 필터' })).getByRole('tab', { name: '내 팀' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('switch', { name: '내 팀만' })).toHaveAttribute('aria-checked', 'true');
   });
 
   it('history 복귀 이벤트는 최신 URL의 전체/내 팀 선택을 반영한다', () => {
@@ -187,7 +192,7 @@ describe('정규 리그 bracket 일정의 전체/내 팀 계약', () => {
 
   it('대회 일정에는 새 소속 팀 필터를 추가하지 않는다', () => {
     render(<BracketScheduleTab tournamentId="league-1" fromHref={base} />);
-    expect(screen.queryByRole('tablist', { name: '경기 일정 팀 필터' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('switch', { name: '내 팀만' })).not.toBeInTheDocument();
     expect(mocks.teams).not.toHaveBeenCalled();
   });
 

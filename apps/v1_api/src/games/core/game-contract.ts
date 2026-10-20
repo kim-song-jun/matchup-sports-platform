@@ -92,7 +92,7 @@ const actorRoles = new Set([
   'field_operator',
   'support_readonly',
 ]);
-const systemActors = new Set(['GAME_END_DERIVER', 'GAME_BACKFILL', 'PROJECTION_REPAIR']);
+const systemActors = new Set(['GAME_END_DERIVER', 'GAME_BACKFILL', 'PROJECTION_REPAIR', 'GAME_CLOCK_EXPIRY']);
 
 export const TOURNAMENT_GAME_TRANSITIONS: Readonly<
   Record<V1GameState, readonly V1GameState[]>

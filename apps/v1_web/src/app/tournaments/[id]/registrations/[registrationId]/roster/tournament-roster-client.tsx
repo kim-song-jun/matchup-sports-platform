@@ -25,7 +25,7 @@ import { v1Keys } from '@/lib/query-keys';
 import { extractErrorMessage } from '@/lib/error-message';
 import { randomUuid } from '@/lib/uuid';
 import { formatTournamentDateRangeLong, formatTournamentDateTimeLong } from '@/lib/date-utils';
-import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
+import { getLeagueStatusConfig, getTournamentStatusConfig } from '@/lib/v1-tournament-status';
 import { withFromPath } from '@/lib/session-storage';
 import type {
   V1TournamentRosterPlayer,
@@ -163,7 +163,7 @@ export function TournamentRosterDeadlineCard({
     : tournamentStatus && (isTerminalStatus || (deadlineState === 'upcoming' && tournamentStatus !== 'open'))
       ? tournamentStatus
       : null;
-  const statusBadge = statusOverride ? getTournamentStatusConfig(statusOverride) : null;
+  const statusBadge = statusOverride ? (season ? getLeagueStatusConfig(statusOverride) : getTournamentStatusConfig(statusOverride)) : null;
   const deadlineBadge = statusBadge
     ? { label: statusBadge.label, className: statusBadge.badgeClass }
     : deadlineState === 'upcoming'

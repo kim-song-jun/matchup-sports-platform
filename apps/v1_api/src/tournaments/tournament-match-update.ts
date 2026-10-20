@@ -276,7 +276,9 @@ export async function updateTournamentMatchInTx(
       }
     }
     if (teamsChanged && sideChange.oldTeamId !== sideChange.nextTeamId) {
-      if (sideChange.oldTeamId !== null) {
+      // Schedules belong to a team/match pair, not a side. A team moving to
+      // the opposite side must keep its schedule, including during a swap.
+      if (sideChange.oldTeamId !== null && ![nextHomeTeamId, nextAwayTeamId].includes(sideChange.oldTeamId)) {
         await tx.v1TeamSchedule.updateMany({
           where: { teamMatchId: input.teamMatchId, teamId: sideChange.oldTeamId, state: 'SCHEDULED' },
           data: { state: 'CANCELLED', cancelReason: 'BRACKET_TEAM_CHANGED', version: { increment: 1 } },

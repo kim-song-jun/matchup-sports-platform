@@ -194,6 +194,12 @@ export class LeagueMatchAdminService {
         message: '리그는 서로 다른 팀 2개 이상이 필요해요.',
       });
     }
+    if (dto.maxTeams != null && dto.maxTeams < uniqueTeamIds.length) {
+      throw new UnprocessableEntityException({
+        code: 'LEAGUE_CAPACITY_BELOW_TEAM_COUNT',
+        message: `참가팀 정원은 선택한 팀 수(${uniqueTeamIds.length}팀) 이상이어야 해요.`,
+      });
+    }
     const teams = await this.prisma.v1Team.findMany({
       where: { id: { in: uniqueTeamIds }, status: 'active', deletedAt: null },
       select: { id: true, sportId: true },
@@ -305,6 +311,7 @@ export class LeagueMatchAdminService {
         title: true,
         isPublic: true,
         status: true,
+        registrationDeadlineAt: true,
         scheduledAt: true,
         scheduledEndAt: true,
         // 목록에 싣지는 않지만 `isCompleteLeagueMirror` 가 본다 — 지역이 빈 거울은 깨진 것이다.
@@ -345,6 +352,8 @@ export class LeagueMatchAdminService {
         title: row.title,
         isPublic: row.isPublic,
         state: LEAGUE_STATE_BY_STATUS[row.status],
+        lifecycleStatus: row.status,
+        registrationOpen: isLeagueRegistrationOpen(row.status, row.registrationDeadlineAt),
         teamCount: row._count.registrations,
         fixtureCount: fixtureCountByLeagueId.get(row.id) ?? 0,
         startsOn: row.scheduledAt,
@@ -444,6 +453,7 @@ export class LeagueMatchAdminService {
       title: league.title,
       isPublic: league.isPublic,
       state: league.state,
+      lifecycleStatus: league.lifecycleStatus,
       // **대진 일정 폼이 요일을 날짜로 전개하는 기준일이다.** BE-2 이후 서버는 요일을 모르고
       // `schedule.dates` 를 받으므로, 화면이 "리그 시작일 이후 매주 그 요일" 을 직접 펼쳐야
       // 한다 — 그 기준일이 응답에 없어서 화면은 계산할 수가 없었다(요일을 고르면 옛 형태를
@@ -470,6 +480,7 @@ export class LeagueMatchAdminService {
       redCardSuspensionMatches: league.redCardSuspensionMatches,
       sportCode: league.sportCode,
       coverImageUrl: league.coverImageUrl,
+      listImageUrl: league.listImageUrl,
       defaultPlace: tournamentVenueSnapshot(league),
       entryFee: league.entryFee,
       entryFeeConfiguredAt: league.entryFeeConfiguredAt,
@@ -667,7 +678,7 @@ export class LeagueMatchAdminService {
         //   · `upsert` 는 `where` 에 unique 필드만 받아 `kind` 를 못 건다 — 같은 id 의 **진짜
         //     대회**가 있으면 덮어쓴다. 그 위험을 지우려면 이 형태여야 한다.
         await tx.v1Tournament.updateMany({
-          where: { id: league.id, kind: 'regular_league' },
+          where: { id: league.id, kind: 'regular_league', requiresExplicitStart: false, status: { in: ['draft', 'open', 'closed'] } },
           data: { status: STATUS_BY_LEAGUE_STATE.active },
         });
       }
@@ -1223,14 +1234,14 @@ export class LeagueMatchAdminService {
         timing,
       });
       if (ids.length > 0) {
-        // draft 리그는 첫 대진이 생기면 active 가 된다. completed·cancelled 는 위 가드(LEAGUE_ENDED)가
+        // 기존 모드의 draft/open/closed 리그만 첫 대진에서 active가 된다. 신규 리그는 명시적 시작을 기다린다. completed·cancelled 는 위 가드(LEAGUE_ENDED)가
         // 먼저 거부하므로 여기까지 오지 않는다.
         // BE-5 drop: 통합 축이 정본이라 이 update 하나가 상태 전이 전부다(예전엔 레거시
         // 테이블을 먼저 고치고 거울을 따라 고쳤다). `updateMany` + `kind` 가드인 이유:
         //   · `upsert` 는 `where` 에 unique 필드만 받아 `kind` 를 못 건다 — 같은 id 의 **진짜
         //     대회**가 있으면 덮어쓴다. 그 위험을 지우려면 이 형태여야 한다.
         await tx.v1Tournament.updateMany({
-          where: { id: league.id, kind: 'regular_league' },
+          where: { id: league.id, kind: 'regular_league', requiresExplicitStart: false, status: { in: ['draft', 'open', 'closed'] } },
           data: { status: STATUS_BY_LEAGUE_STATE.active },
         });
       }
@@ -1951,7 +1962,7 @@ export class LeagueMatchAdminService {
 
   /**
    * 리그 상태 변경 — 화면의 '상태 변경' 버튼 하나가 고른 목표 상태를 보낸다. 전이마다 이미 있는 규칙을 그대로 쓴다:
-   * 보류(사유 필수)·보류 해제(보류 전 상태로만)·종료(취소 제외 전 경기 확정)·종료 되돌리기. 준비 중 ↔ 진행 중만 새로 연다.
+   * 보류(사유 필수)·보류 해제(보류 전 상태로만)·종료(취소 제외 전 경기 확정)·종료 되돌리기. 시작 취소는 모집 마감으로 돌아간다.
    */
   async changeState(user: V1AuthUser, leagueId: string, dto: ChangeLeagueStateDto) {
     // 위임하는 각 전이도 다시 확인하지만, 멱등 응답·409 로 먼저 끝나는 경로가 권한 확인 없이 상태를 알려 주지 않게 여기서 막는다.
@@ -1994,7 +2005,7 @@ export class LeagueMatchAdminService {
         if (current === 'completed') {
           throw new ConflictException({
             code: 'LEAGUE_NOT_ACTIVE',
-            message: '종료된 리그는 먼저 진행 중으로 되돌린 뒤 준비 중으로 바꿀 수 있어요.',
+            message: '종료된 리그는 먼저 진행 중으로 되돌린 뒤 모집완료로 바꿀 수 있어요.',
           });
         }
         return this.moveBetweenDraftAndActive(user, leagueId, 'draft', reason);
@@ -2002,8 +2013,8 @@ export class LeagueMatchAdminService {
   }
 
   /**
-   * 준비 중 ↔ 진행 중. 지금까지는 대진을 만들 때만 진행 중이 됐다. 준비 중으로 돌리는 것은 아직 시작한 경기가
-   * 없을 때만 연다 — 이미 치른 경기가 있으면 '보류'가 맞다(치른 경기가 있는 리그를 '준비 중'으로 보이면 공개 화면이 거짓말을 한다).
+   * 시작 전 ↔ 진행 중. 호환 API의 draft 요청은 모집 마감(closed)으로 복귀한다.
+   * 아직 시작한 경기가 없을 때만 되돌린다 — 이미 치른 경기가 있으면 보류를 사용한다.
    */
   private async moveBetweenDraftAndActive(user: V1AuthUser, leagueId: string, target: 'draft' | 'active', reason: string | undefined) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
@@ -2015,7 +2026,7 @@ export class LeagueMatchAdminService {
         if (startedGames > 0) {
           throw new ConflictException({
             code: 'LEAGUE_HAS_STARTED_GAMES',
-            message: '이미 시작한 경기가 있어 준비 중으로 돌릴 수 없어요. 리그를 멈추려면 보류를 써 주세요.',
+            message: '이미 시작한 경기가 있어 시작을 취소할 수 없어요. 리그를 멈추려면 보류를 써 주세요.',
           });
         }
       }
@@ -2023,7 +2034,8 @@ export class LeagueMatchAdminService {
         target === 'active' ? { in: ['draft', 'open', 'closed'] } : 'in_progress';
       const moved = await tx.v1Tournament.updateMany({
         where: { id: leagueId, kind: 'regular_league', deletedAt: null, status: fromStatuses },
-        data: { status: STATUS_BY_LEAGUE_STATE[target] },
+        // 시작을 되돌리면 신규 리그와 같은 모집 마감 단계로 복귀한다. draft는 호환용 API 상태다.
+        data: { status: target === 'draft' ? 'closed' : STATUS_BY_LEAGUE_STATE[target] },
       });
       if (moved.count !== 1) {
         throw new ConflictException({ code: 'LEAGUE_STATE_CHANGED', message: '리그 상태가 방금 바뀌었어요. 새로고침한 뒤 다시 시도해 주세요.' });
@@ -2295,6 +2307,7 @@ export class LeagueMatchAdminService {
         redCardSuspensionMatches: true,
         // 대표 이미지·참가비 카드용(어드민 응답 전용 — 계좌는 공개 서비스에서 절대 select 하지 않는다).
         coverImageUrl: true,
+        listImageUrl: true,
         ...TOURNAMENT_VENUE_SELECT,
         entryFee: true,
         entryFeeConfiguredAt: true,
@@ -2341,6 +2354,7 @@ export class LeagueMatchAdminService {
       sportCode: sport.code,
       entryFeeConfiguredAt: entryFeeConfiguredAt?.toISOString() ?? null,
       state: LEAGUE_STATE_BY_STATUS[status],
+      lifecycleStatus: status,
       startsOn: scheduledAt,
       teams: registrations,
       // `state`(draft/active/completed)로는 신청 여부를 알 수 없다 — 거울의 원시 `status`

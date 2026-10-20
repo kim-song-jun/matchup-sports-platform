@@ -120,20 +120,35 @@ export function TeamListPageView({ model, fromHref }: { readonly model: TeamList
         ) : model.teams.length ? (
           <>
             <div className="tm-team-card-stack">{model.teams.map((team) => <TeamCard key={team.id} team={team} fromHref={fromHref} />)}</div>
-            {model.hasNextPage ? (
+            {model.hasNextPage && model.loadMoreLocked ? (
+              <button type="button" disabled className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block tm-load-more">
+                {model.isFetchingNextPage ? '불러오는 중…' : model.loadMoreError ? '다시 불러오기' : '더 보기'}
+              </button>
+            ) : model.hasNextPage && model.loadMoreHref ? (
               <>
                 {model.loadMoreError ? (
                   <p role="alert" className="tm-text-caption tm-load-more-error">다음 목록을 불러오지 못했어요. 다시 시도해 주세요.</p>
                 ) : null}
-                <button
-                  type="button"
+                <Link
+                  href={model.loadMoreHref}
+                  prefetch={false}
                   className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block tm-load-more"
-                  onClick={model.onLoadMore}
-                  disabled={model.isFetchingNextPage || model.loadMoreLocked}
+                  aria-disabled={model.isFetchingNextPage || model.loadMoreBusy || model.loadMoreLocked || !model.loadMoreHref || undefined}
+                  onClick={(event) => {
+                    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                    if (model.isFetchingNextPage || model.loadMoreBusy || model.loadMoreLocked || !model.loadMoreHref) {
+                      event.preventDefault();
+                      return;
+                    }
+                    event.preventDefault();
+                    model.onLoadMore?.();
+                  }}
                 >
                   {model.isFetchingNextPage ? '불러오는 중…' : model.loadMoreError ? '다시 불러오기' : '더 보기'}
-                </button>
+                </Link>
               </>
+            ) : model.hasNextPage ? (
+              <p role="alert" className="tm-text-caption tm-load-more-error">다음 목록으로 이동할 수 없어요. 잠시 후 다시 시도해 주세요.</p>
             ) : null}
           </>
         ) : (
@@ -153,6 +168,9 @@ export function TeamListPageView({ model, fromHref }: { readonly model: TeamList
 }
 
 function TeamSummaryText({ summary }: { summary: TeamListViewModel['summary'] }) {
+  if (typeof summary.total !== 'number') {
+    return <span role="status">{summary.totalState === 'error' ? '팀 수 정보를 불러오지 못했어요' : '팀 수 확인 중…'}</span>;
+  }
   const partiallyLoaded = typeof summary.loaded === 'number' && summary.loaded < summary.total;
   return (
     <>
@@ -164,6 +182,7 @@ function TeamSummaryText({ summary }: { summary: TeamListViewModel['summary'] })
         <> · 가입 가능 <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{summary.recruiting}</span></>
       )}
       {typeof summary.nearby === 'number' ? <> · 내 주변 {summary.nearby}</> : null}
+      {summary.totalRefreshError ? <> · 팀 수를 새로 확인하지 못했어요</> : null}
     </>
   );
 }
@@ -670,7 +689,7 @@ export function TeamDetailPageView({ model, refreshError }: { model: TeamDetailV
             >
               <ShareIcon size={20} />
             </button>
-            <TeamAvatar seed={team.id} name={team.name} logoUrl={team.logoUrl} size="xl" />
+            <TeamAvatar teamId={team.id} name={team.name} logoUrl={team.logoUrl} size="xl" />
             <div className="tm-team-detail-hero-identity">
               <h2 className="tm-text-heading" style={{ color: 'var(--static-white)' }}>{team.name}</h2>
               <div className="tm-text-caption" style={{ color: 'var(--overlay-white-72)', marginTop: 4 }}>{team.sport} · {team.region}</div>
@@ -817,7 +836,7 @@ export function TeamDetailPageView({ model, refreshError }: { model: TeamDetailV
           >
             <ShareIcon size={20} />
           </button>
-          <TeamAvatar seed={team.id} name={team.name} logoUrl={team.logoUrl} size="xl" />
+          <TeamAvatar teamId={team.id} name={team.name} logoUrl={team.logoUrl} size="xl" />
           <div className="tm-team-detail-hero-identity">
             <div className="tm-text-heading" style={{ color: 'var(--static-white)' }} aria-hidden="true">{team.name}</div>
             <div className="tm-text-caption" style={{ color: 'var(--overlay-white-72)', marginTop: 4 }}>{team.sport} · {team.region}</div>
@@ -1000,10 +1019,12 @@ function teamHeroStyle(team: Pick<TeamModel, 'coverImageUrl'>): CSSProperties {
 
 export function TeamFormPageView({
   model,
+  teamId,
   /** #16: my 컨텍스트에서 진입한 경우 취소·저장 후 돌아갈 경로. 기본값 '/teams' */
   cancelHref = '/teams',
 }: {
   model: TeamFormViewModel;
+  teamId?: string;
   cancelHref?: string;
 }) {
   const edit = model.mode === 'edit';
@@ -1194,9 +1215,9 @@ export function TeamFormPageView({
           {form?.error ? <div ref={errorRef} tabIndex={-1} role={displayedMissingRequired ? undefined : 'alert'}><Card pad={16} style={{ marginTop: 16, background: 'var(--red50)' }}><div className="tm-text-label">저장할 수 없어요</div><div className="tm-text-caption" style={{ marginTop: 4 }}>{form.error}</div></Card></div> : null}
           <CreateField label="팀 이름" value={team.name} placeholder="예: 성수 풋살 크루" error={form?.nameError ?? (displayedMissingRequired === 'name' ? formError ?? undefined : undefined)} onChange={(value) => form?.onFieldChange('name', value)} />
           {edit || logoPickerOpen ? (
-            <TeamLogoField logoUrl={team.logoUrl} teamName={team.name} uploadImage={form?.uploadImage} onChange={(url) => form?.onFieldChange('logoUrl', url)} />
+            <TeamLogoField teamId={teamId} logoUrl={team.logoUrl} teamName={team.name} uploadImage={form?.uploadImage} onChange={(url) => form?.onFieldChange('logoUrl', url)} />
           ) : (
-            <TeamLogoSummaryRow logoUrl={team.logoUrl} teamName={team.name} onChange={() => setLogoPickerOpen(true)} />
+            <TeamLogoSummaryRow teamId={teamId} logoUrl={team.logoUrl} teamName={team.name} onChange={() => setLogoPickerOpen(true)} />
           )}
           {edit ? coverField : null}
           <div className="tm-create-field">
@@ -1284,7 +1305,7 @@ export function TeamFormPageView({
         </div>
         {/* Desktop-only sticky rail: live team-card preview + CTA (mobile uses the fixed CTA below). */}
         <aside className="tm-team-form-rail tm-show-desktop" aria-label="팀 미리보기">
-          <TeamFormPreview team={team} sportName={previewSport} regionName={previewRegion} editing={edit} />
+          <TeamFormPreview team={team} teamId={teamId} sportName={previewSport} regionName={previewRegion} editing={edit} />
           <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" type="button" disabled={form?.submitting} onClick={submitForm}>{form?.submitting ? '저장 중' : edit ? '저장' : '팀 만들기'}</button>
           <Link className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" href={cancelHref}>{edit ? '취소' : '이전'}</Link>
         </aside>
@@ -1490,12 +1511,12 @@ function labelFromOptions(options: ReadonlyArray<{ value: string; label: string 
 }
 
 /** 만들기 첫 화면의 로고 한 줄 — 무작위 기본 로고로 시작하고, 바꿀 때만 고르는 칸을 연다(B-1). */
-function TeamLogoSummaryRow({ logoUrl, teamName, onChange }: { logoUrl: string | null; teamName: string; onChange: () => void }) {
+function TeamLogoSummaryRow({ teamId, logoUrl, teamName, onChange }: { teamId?: string; logoUrl: string | null; teamName: string; onChange: () => void }) {
   return (
     <div className="tm-create-field">
       <div className="tm-text-label">팀 로고</div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
-        <TeamAvatar seed={teamName} name={teamName} logoUrl={logoUrl} size="lg" />
+        <TeamAvatar teamId={teamId} name={teamName} logoUrl={logoUrl} size="lg" />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="tm-text-body" style={{ color: 'var(--text-strong)' }}>기본 로고로 시작해요</div>
           <div className="tm-text-caption" style={{ marginTop: 2 }}>나중에 내 이미지로 바꿀 수 있어요.</div>
@@ -1511,11 +1532,13 @@ function TeamLogoSummaryRow({ logoUrl, teamName, onChange }: { logoUrl: string |
  * TeamAvatar remains the final fallback when the selected URL cannot be loaded.
  */
 function TeamLogoField({
+  teamId,
   logoUrl,
   teamName,
   uploadImage,
   onChange,
 }: {
+  teamId?: string;
   logoUrl: string | null;
   teamName: string;
   uploadImage?: (file: File) => Promise<string>;
@@ -1545,7 +1568,7 @@ function TeamLogoField({
       <div className="tm-text-label">팀 로고</div>
       <div className="tm-team-logo-picker">
         <div className="tm-team-logo-current">
-          <TeamAvatar seed={teamName} name={teamName} logoUrl={logoUrl} size="xl" />
+          <TeamAvatar teamId={teamId} name={teamName} logoUrl={logoUrl} size="xl" />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
             <button
               type="button"
@@ -1573,7 +1596,7 @@ function TeamLogoField({
                 disabled={uploading}
                 onClick={() => onChange(presetUrl)}
               >
-                <TeamAvatar seed={presetUrl} name={'기본 팀 로고 ' + (index + 1)} logoUrl={presetUrl} size="md" />
+                <TeamAvatar name={'기본 팀 로고 ' + (index + 1)} logoUrl={presetUrl} size="md" />
                 {selected ? <span className="tm-team-logo-check" aria-hidden="true"><Check size={12} strokeWidth={3} /></span> : null}
               </button>
             );
@@ -1686,11 +1709,13 @@ function TeamCoverImageField({
 
 function TeamFormPreview({
   team,
+  teamId,
   sportName,
   regionName,
   editing,
 }: {
   team: TeamFormViewModel['team'];
+  teamId?: string;
   sportName: string;
   regionName: string;
   editing: boolean;
@@ -1711,8 +1736,7 @@ function TeamFormPreview({
       </div>
       <div className="tm-team-card" style={{ cursor: 'default' }}>
         <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-          {/* 팀 id가 아직 없는 create/edit draft이므로 팀명을 seed로 사용 — 위 TeamLogoField 미리보기와 동일 색으로 보인다. */}
-          <TeamAvatar seed={team.name} name={team.name} logoUrl={team.logoUrl} size="lg" />
+          <TeamAvatar teamId={teamId} name={team.name} logoUrl={team.logoUrl} size="lg" />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="tm-text-body-lg line-clamp-2" style={{ color: hasName ? 'var(--text-strong)' : 'var(--text-caption)' }}>
               {hasName ? trimmedName : '팀 이름'}
@@ -2134,7 +2158,7 @@ function TeamCard({ team, fromHref }: { readonly team: TeamModel; readonly fromH
   return (
     <Link className="tm-team-card tm-team-card-compact tm-pressable" href={withFromPath(`/teams/${team.id}`, fromHref)}>
       <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-        <TeamAvatar seed={team.id} name={team.name} logoUrl={team.logoUrl} size="lg" />
+        <TeamAvatar teamId={team.id} name={team.name} logoUrl={team.logoUrl} size="lg" />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="tm-text-body-lg line-clamp-1">{team.name}</div>
           <div className="tm-text-caption" style={{ marginTop: 2 }}>{team.sport} · {team.region} · <span style={{ fontVariantNumeric: 'tabular-nums' }}>{memberCapacity}</span></div>

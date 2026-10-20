@@ -1,6 +1,5 @@
 import { ConflictException, UnprocessableEntityException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
-import { ROUND12_BYE_SORT_ORDERS } from '../templates/bracket-template-plan';
 
 /**
  * 12강 그룹의 BYE 자리 <-> 부전승 저장 형태. 팀이 없으면 `V1TournamentByeSlot`(빈 자리), 팀이 정해지면
@@ -9,11 +8,11 @@ import { ROUND12_BYE_SORT_ORDERS } from '../templates/bracket-template-plan';
  */
 export async function syncByeSlotInTx(
   tx: Prisma.TransactionClient,
-  slot: { groupId: string | null; position: number },
+  slot: { groupId: string | null; position: number; byeSortOrder: number | null },
   registrationId: string | null,
 ): Promise<void> {
-  const sortOrder = ROUND12_BYE_SORT_ORDERS[slot.position - 1];
-  if (slot.groupId === null || sortOrder === undefined) {
+  const sortOrder = slot.byeSortOrder;
+  if (slot.groupId === null || sortOrder === null) {
     throw new UnprocessableEntityException({ code: 'SLOT_BYE_POSITION_INVALID', message: '부전승 자리의 위치가 올바르지 않아요.' });
   }
   const groupId = slot.groupId;
@@ -46,10 +45,9 @@ export async function findLinkedByeSlotInTx(
   group: { id: string; phase: string },
   sortOrder: number,
 ): Promise<{ id: string } | null> {
-  const index = (ROUND12_BYE_SORT_ORDERS as readonly number[]).indexOf(sortOrder);
-  if (group.phase !== 'round12' || index < 0) return null;
-  return tx.v1TournamentSlot.findFirst({ where: { groupId: group.id, kind: 'BYE', position: index + 1 }, select: { id: true } });
+  if (group.phase !== 'round12') return null;
+  return tx.v1TournamentSlot.findFirst({ where: { groupId: group.id, kind: 'BYE', byeSortOrder: sortOrder }, select: { id: true } });
 }
 
 export const slotLinkedBye = () =>
-  new ConflictException({ code: 'SLOT_LINKED', message: '대진 자리에 연결된 부전승은 위치를 옮기거나 지울 수 없어요. 자리에서 팀을 바꿔 주세요.' });
+  new ConflictException({ code: 'SLOT_LINKED', message: '연결된 부전승은 그림의 8강 경기에서 홈·어웨이를 선택해 주세요. 팀 변경은 자리에서 할 수 있어요.' });

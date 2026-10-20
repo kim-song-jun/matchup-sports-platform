@@ -5,6 +5,20 @@ const fixture = (id: string, sources: V1TournamentFixture['bracketSources'] = []
 const source = (fixtureId: string, side: 'HOME' | 'AWAY') => ({ fixtureId, side, outcome: 'WINNER' as const });
 
 describe('경기별 진출 그래프', () => {
+  it('연결 완료 여부와 무관하게 저장한 부전승 위아래 순서를 유지한다', () => {
+    for (const away of [false, true]) {
+      const groups = [{ phase: 'round12', groupTeams: [{ id: 'bye', registrationId: 'team', isBye: true, sortOrder: away ? 1 : 0 }] }] as V1TournamentGroup[];
+      const rounds = [
+        { key: 'round12', label: '12강', fixtures: [fixture('r1')] },
+        { key: 'quarter', label: '8강', fixtures: [{ ...fixture('q1', [source('r1', away ? 'HOME' : 'AWAY')]),
+          homeRegistrationId: away ? null : 'team', awayRegistrationId: away ? 'team' : null }] },
+      ];
+      const graph = buildBracketGraph(rounds, groups);
+      const order = graph.nodes.filter((node) => node.round === 'round12').sort((a, b) => a.y - b.y).map((node) => node.id);
+      expect(order).toEqual(away ? ['r1', 'bye-slot:bye'] : ['bye-slot:bye', 'r1']);
+      expect(graph.edges.find((edge) => edge.outcome === 'BYE')?.side).toBe(away ? 'AWAY' : 'HOME');
+    }
+  });
   it('8강 네 경기를 각각의 4강과 결승에 연결하며 교차 없이 부모를 가운데 배치한다', () => {
     const graph = buildBracketGraph([
       { key: 'quarter', label: '8강', fixtures: [fixture('q1'), fixture('q2'), fixture('q3'), fixture('q4')] },
@@ -97,9 +111,9 @@ it('미정 12강 4경기·부전승 4자리와 8강4·4강2·결승1·3위전1�
   expect(new Set(graph.nodes.map((node) => node.id)).size).toBe(16);
   expect(graph.edges).toEqual([]);
   expect(graph.nodes.filter((node) => node.round === 'round12').sort((a,b) => a.y-b.y).map((node) => node.id)).toEqual(['bye-slot:slot-0', 'round120', 'round121', 'bye-slot:slot-1', 'bye-slot:slot-2', 'round122', 'round123', 'bye-slot:slot-3']);
-  expect(graph.height).toBe(896);
-  expect(graph.nodes.filter((node) => node.round === 'quarter').map((node) => node.y)).toEqual([112, 336, 560, 784]);
-  expect(graph.nodes.find((node) => node.round === 'final')?.y).toBe(448);
+  expect(graph.height).toBe(1152);
+  expect(graph.nodes.filter((node) => node.round === 'quarter').map((node) => node.y)).toEqual([144, 432, 720, 1008]);
+  expect(graph.nodes.find((node) => node.round === 'final')?.y).toBe(576);
   groups[0].groupTeams[0].registrationId = 'assigned-team';
   expect(buildBracketGraph(rounds, groups).nodes.find((node) => node.id === 'bye-slot:slot-0')?.bye?.registrationId).toBe('assigned-team');
 });
@@ -120,18 +134,44 @@ it('부전승팀만 8강에 배정해도 미연결 경기들이 아래로 밀리
     fixtures: round.fixtures.map((item, index) => ({ ...item, homeRegistrationId: `b${index}`, awayRegistrationId: `playing-${index}` })),
   });
   const after = buildBracketGraph(assigned, groups);
-  expect(before.height).toBe(896);
+  expect(before.height).toBe(1152);
   expect(after.height).toBe(before.height);
   expect(after.edges).toHaveLength(4);
   expect(after.edges.every((edge) => edge.outcome === 'BYE')).toBe(true);
   expect(after.nodes.map((node) => [node.id, node.y])).toEqual(before.nodes.map((node) => [node.id, node.y]));
-  expect(after.nodes.filter((node) => node.round === 'quarter').map((node) => node.y)).toEqual([112, 336, 560, 784]);
+  expect(after.nodes.filter((node) => node.round === 'quarter').map((node) => node.y)).toEqual([144, 432, 720, 1008]);
   for (const round of rounds) {
     const column = after.nodes.filter((node) => node.round === round.key).sort((a, b) => a.y - b.y);
     for (let index = 1; index < column.length; index++) {
-      const previousHalf = column[index - 1].bye ? 40 : 72;
-      const currentHalf = column[index].bye ? 40 : 72;
+      const previousHalf = column[index - 1].bye ? 56 : 88;
+      const currentHalf = column[index].bye ? 56 : 88;
       expect(column[index].y - column[index - 1].y).toBeGreaterThanOrEqual(previousHalf + currentHalf);
     }
   }
+});
+
+
+describe('저장된 부전승 슬롯 연결', () => {
+  it.each(['HOME', 'AWAY'] as const)('팀 없는 부전승도 8강 %s까지 연결하며 팀·문구 변경 후 유지한다', (side) => {
+    const rounds = [
+      { key: 'round12', label: '12강', fixtures: [fixture('r1')] },
+      { key: 'quarter', label: '8강', fixtures: [fixture('q1', [source('r1', side === 'HOME' ? 'AWAY' : 'HOME')])] },
+    ];
+    const groups = [{ phase: 'round12', groupTeams: [{ id: 'bye', isBye: true, registrationId: null, sortOrder: 0,
+      byeTarget: { fixtureId: 'q1', side } }] }] as V1TournamentGroup[];
+    const expected = { source: 'bye-slot:bye', target: 'q1', side, outcome: 'BYE' };
+    expect(buildBracketGraph(rounds, groups).edges).toContainEqual(expected);
+    groups[0].groupTeams[0].registrationId = 'assigned';
+    groups[0].groupTeams[0].displayLabel = '조 1위 중 1위';
+    expect(buildBracketGraph(rounds, groups).edges).toContainEqual(expected);
+  });
+
+  it('명시적 연결이 있으면 같은 팀의 다른 8강 자리에 추정 연결을 추가하지 않는다', () => {
+    const graph = buildBracketGraph([
+      { key: 'round12', label: '12강', fixtures: [] },
+      { key: 'quarter', label: '8강', fixtures: [fixture('q1'), { ...fixture('q2'), homeRegistrationId: 'team' }] },
+    ], [{ phase: 'round12', groupTeams: [{ id: 'bye', isBye: true, registrationId: 'team', sortOrder: 0,
+      byeTarget: { fixtureId: 'q1', side: 'AWAY' } }] }] as V1TournamentGroup[]);
+    expect(graph.edges).toEqual([{ source: 'bye-slot:bye', target: 'q1', side: 'AWAY', outcome: 'BYE' }]);
+  });
 });

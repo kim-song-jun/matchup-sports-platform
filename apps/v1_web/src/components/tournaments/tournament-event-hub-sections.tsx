@@ -243,7 +243,7 @@ function ParticipantTeamRow({
             textDecoration: 'none',
           }}
         >
-          <TeamAvatar seed={team.teamId} name={team.teamName} logoUrl={team.teamLogoUrl} size="sm" />
+          <TeamAvatar teamId={team.teamId} name={team.teamName} logoUrl={team.teamLogoUrl} size="sm" />
           <div style={{ minWidth: 0 }}>
             <div
               className="tm-text-label"

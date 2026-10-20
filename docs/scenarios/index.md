@@ -1,3 +1,11 @@
+신규 리그 모집 마감 생성·명시적 시작(2026-10-18): [시나리오](./league-explicit-start.md). PR 호환성 보강: API192·DB68 assertion PASS, 신규 migration 단독 회귀 exit 0. Web38·양쪽 타입·표면/패턴 PASS. 전체 DB runner 종료 대기는 별도 기록, CI 확인과 미배포 alpha 0/3이 후속.
+
+## 2026-10-17 — 대진 표시 문구·경기 정보 편집
+
+[시나리오](./bracket-display-edit.md) · [Task 20261057](../../.github/tasks/20261057-admin-bracket-canvas.md). 목록/그림/모바일 공통 저장과 12강 부전승 편집. 변경 후 alpha 실측 0/3(PR 미배포), DB integration 미실행(Docker 미가동). 자동 회귀 결과는 task 최신 기록 참고.
+
+리그 목록/상세 이미지 분리(2026-10-16): [후속 QA](./league-detail-media.md). API85/Web10·타입/패턴 PASS, DB integration은 Docker 미실행, alpha 3폭은 미배포로 0/3.
+
 ## 2026-10-14 — 리그 상세 대표 이미지·통합 순위 팀 마크
 
 [시나리오](./league-detail-media.md) · [Task 20261081](../../.github/tasks/20261081-league-detail-media.md). Web49/API40·양쪽 타입/패턴 PASS. 실제 alpha before 3폭 확인, after 배포 검증 대기. 제공 리그의 저장 대표 이미지는 null이며 참가 명단은 등록 선수 6/6/5명이다.
@@ -537,3 +545,5 @@ Implementation and isolated API/browser evidence tracked in Task 156; production
 
 - [경기장 등록·선택 시나리오](competition-place-field-registry.md): Task 20261082, 같은 dev 기반 작업 브랜치. 후속 “싹 다 해줘” 승인으로 기존 미배정 경기 연결, 새 경기·장소 수정 자동 필드 등록·배정, 공개 이름 단일 표시까지 확장. 역사적 장소/좌표와 기존 배정 보존. 로컬 unit PASS. DB migration/round-trip과 alpha 실화면 390/768/1440 QA 대기; 운영 DB·main 변경 없음.
 - [리그 상세 진입 통일](./league-detail-routes.md): 14/14 코드 정리, dev/alpha 검증 진행 — Task 20261080 후속.
+
+- 2026-10-16: [참가팀 상세 우측 안내와 참가 카드](./tournament-participant-sidebar.md) — 로컬 검증 완료, Alpha 배포/실제 로그인 검증 대기.

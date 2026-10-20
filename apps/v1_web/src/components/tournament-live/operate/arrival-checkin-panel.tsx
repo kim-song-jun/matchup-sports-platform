@@ -195,7 +195,7 @@ function ArrivalRow({
           ✓
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-medium">
+          <span className="block break-words text-sm font-medium">
             {jersey ? `${jersey} ` : ''}
             {name}
           </span>

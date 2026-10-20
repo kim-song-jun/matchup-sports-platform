@@ -10,7 +10,7 @@ import { groupBlockGroups, groupRankAnchorY, layoutGroupBlocks, type GroupBlockL
 export const CANVAS_NODE_WIDTH = 232;
 export const CANVAS_HEADER_HEIGHT = 44;
 export const CANVAS_ROW_HEIGHT = 44;
-export const CANVAS_FOOTER_HEIGHT = 24;
+export const CANVAS_FOOTER_HEIGHT = 48;
 export const CANVAS_NODE_HEIGHT = CANVAS_HEADER_HEIGHT + CANVAS_ROW_HEIGHT * 2 + CANVAS_FOOTER_HEIGHT;
 export const CANVAS_COLUMN_GAP = 72;
 export const CANVAS_ROW_GAP = 24;
@@ -45,6 +45,7 @@ export type CanvasLayout = {
   height: number;
   columns: CanvasColumnLayout[];
   nodes: CanvasNodeLayout[];
+  byeNodes: (CanvasNodeLayout & { slotId: string })[];
   edges: CanvasEdgeLayout[];
   /** 조별+결선 대진의 조 편성 블록. 순위 자리가 없는 대진은 빈 배열. */
   groupBlocks: GroupBlockLayout[];
@@ -75,7 +76,7 @@ function compareFixtures(a: V1AdminBracketFixture, b: V1AdminBracketFixture): nu
 
 function bracketColumns(groups: readonly V1AdminBracketGroup[], fixtures: readonly V1AdminBracketFixture[]): ColumnSeed[] {
   const seeds: ColumnSeed[] = [...groups]
-    .sort((a, b) => (PHASE_ORDER[a.phase] ?? 99) - (PHASE_ORDER[b.phase] ?? 99) || a.sortOrder - b.sortOrder)
+    .sort((a, b) => (PHASE_ORDER[a.phase] ?? 99) - (PHASE_ORDER[b.phase] ?? 99) || a.sortOrder - b.sortOrder || a.id.localeCompare(b.id))
     .map((group) => ({
       key: group.id,
       groupId: group.id,
@@ -101,6 +102,7 @@ export function buildCanvasLayout(input: CanvasLayoutInput): CanvasLayout {
   const seeds = withGroupBlocksColumn(baseSeeds, input);
   const slotsById = new Map(input.slots.map((slot) => [slot.id, slot]));
   const placed = new Map<string, CanvasNodeLayout>();
+  const byeNodes: (CanvasNodeLayout & { slotId: string })[] = [];
   const columns: CanvasColumnLayout[] = [];
   const groupBlocks: GroupBlockLayout[] = [];
 
@@ -123,16 +125,31 @@ export function buildCanvasLayout(input: CanvasLayoutInput): CanvasLayout {
       return;
     }
     let cursor = FIRST_NODE_Y;
+    const placeBye = (slot: V1AdminBracketSlot, target: V1AdminBracketFixture) => {
+      byeNodes.push({ slotId: slot.id, fixtureId: target.id, columnKey: seed.key, x, y: cursor, width: CANVAS_NODE_WIDTH, height: 112 });
+      cursor += 112 + CANVAS_ROW_GAP;
+    };
     for (const fixture of seed.fixtures) {
+      const target = input.groups.find(group => group.id === seed.groupId)?.phase === 'round12' ? input.fixtures.find(f => f.bracketSources?.some(source => source.fixtureId === fixture.id) && [f.homeSlotId, f.awaySlotId].some(id => id && slotsById.get(id)?.kind === 'BYE')) : undefined;
+      const bye = target ? input.slots.find(slot => slot.kind === 'BYE' && [target.homeSlotId, target.awaySlotId].includes(slot.id)) : undefined;
+      if (bye && target && target.homeSlotId === bye.id) placeBye(bye, target);
       // 이미 놓인 원천 칸들의 연결 높이 평균에 맞추되, 위 칸과 겹치면 아래로 민다.
       const anchors = (fixture.bracketSources ?? [])
         .map((source) => placed.get(source.fixtureId))
         .filter((node): node is CanvasNodeLayout => node !== undefined)
         .map((node) => node.y + NODE_ANCHOR_Y);
+      anchors.push(...byeNodes.filter(node => node.fixtureId === fixture.id).map(node => node.y + node.height / 2));
       const desired = anchors.length > 0 ? Math.round(anchors.reduce((sum, value) => sum + value, 0) / anchors.length) - NODE_ANCHOR_Y : cursor;
       const y = Math.max(desired, cursor);
       placed.set(fixture.id, { fixtureId: fixture.id, columnKey: seed.key, x, y, width: CANVAS_NODE_WIDTH, height: CANVAS_NODE_HEIGHT });
       cursor = y + CANVAS_NODE_HEIGHT + CANVAS_ROW_GAP;
+      if (bye && target && target.awaySlotId === bye.id) placeBye(bye, target);
+    }
+    if (input.groups.find(group => group.id === seed.groupId)?.phase === 'round12') {
+      for (const slot of input.slots.filter(slot => slot.kind === 'BYE' && slot.groupId === seed.groupId && !byeNodes.some(node => node.slotId === slot.id)).sort((a, b) => (a.byeSortOrder ?? a.position) - (b.byeSortOrder ?? b.position) || a.id.localeCompare(b.id))) {
+        const target = input.fixtures.find(f => f.homeSlotId === slot.id || f.awaySlotId === slot.id);
+        if (target) placeBye(slot, target);
+      }
     }
     columns.push({ key: seed.key, groupId: seed.groupId, label: seed.label, x, width: CANVAS_NODE_WIDTH, fixtureIds: seed.fixtures.map((fixture) => fixture.id) });
   });
@@ -159,13 +176,14 @@ export function buildCanvasLayout(input: CanvasLayoutInput): CanvasLayout {
         const slotId = side === 'HOME' ? fixture.homeSlotId : fixture.awaySlotId;
         const slot = slotId === null ? undefined : slotsById.get(slotId);
         if (slot?.kind === 'BYE') {
+          const bye = byeNodes.find(node => node.slotId === slot.id);
           edges.push({
             id: `bye:${fixture.id}:${side}`,
             kind: 'BYE',
             fromFixtureId: null,
             toFixtureId: fixture.id,
             side,
-            path: `M${target.x - CANVAS_COLUMN_GAP / 2} ${sideAnchorY(target, side)} H${target.x}`,
+            path: bye ? elbowPath(bye.x + bye.width, bye.y + bye.height / 2, target.x, sideAnchorY(target, side)) : `M${target.x - CANVAS_COLUMN_GAP / 2} ${sideAnchorY(target, side)} H${target.x}`,
           });
         }
         const block = slot?.kind === 'GROUP_RANK' && slot.sourceGroupId !== null ? blockByGroup.get(slot.sourceGroupId) : undefined;
@@ -185,9 +203,9 @@ export function buildCanvasLayout(input: CanvasLayoutInput): CanvasLayout {
 
   const nodes = [...placed.values()];
   const width = seeds.length === 0 ? CANVAS_PADDING * 2 : CANVAS_PADDING * 2 + seeds.length * CANVAS_NODE_WIDTH + (seeds.length - 1) * CANVAS_COLUMN_GAP;
-  const nodesBottom = nodes.reduce((max, node) => Math.max(max, node.y + node.height), FIRST_NODE_Y);
+  const nodesBottom = [...nodes, ...byeNodes].reduce((max, node) => Math.max(max, node.y + node.height), FIRST_NODE_Y);
   const bottom = groupBlocks.reduce((max, block) => Math.max(max, block.y + block.height), nodesBottom);
-  return { width, height: bottom + CANVAS_PADDING, columns, nodes, edges, groupBlocks };
+  return { width, height: bottom + CANVAS_PADDING, columns, nodes, byeNodes, edges, groupBlocks };
 }
 
 /** 확정 전 결과(제출됨·정정 초안)도 `submitted` — 무효는 다시 입력할 수 있는 `scheduled` 로 돌아간다. */
@@ -279,9 +297,22 @@ export function buildSideLabelContext(
 export function fixtureSideLabel(fixture: V1AdminBracketFixture, side: SideKey, ctx: SideLabelContext): string {
   const registrationId = side === 'HOME' ? fixture.homeRegistrationId : fixture.awayRegistrationId;
   if (registrationId !== null) return side === 'HOME' ? fixture.homeTeamName : fixture.awayTeamName;
+  return fixtureSideDisplayLabel(fixture, side, ctx);
+}
+
+/** Presentation text independent of the current team; automatic labels remain live after source renumbering. */
+export function fixtureSideDisplayLabel(fixture: V1AdminBracketFixture, side: SideKey, ctx: SideLabelContext): string {
+  const override = side === 'HOME' ? fixture.homeDisplayLabel : fixture.awayDisplayLabel;
+  if (override?.trim()) return override.trim();
   const slotId = side === 'HOME' ? fixture.homeSlotId : fixture.awaySlotId;
   const slot = slotId === null ? undefined : ctx.slotsById.get(slotId);
-  if (slot !== undefined) return slot.label;
+  return slot?.label ?? automaticFixtureSideLabel(fixture, side, ctx);
+}
+
+export function automaticFixtureSideLabel(fixture: V1AdminBracketFixture, side: SideKey, ctx: SideLabelContext): string {
+  const slotId = side === 'HOME' ? fixture.homeSlotId : fixture.awaySlotId;
+  const slot = slotId === null ? undefined : ctx.slotsById.get(slotId);
+  if (slot !== undefined) return slot.automaticLabel ?? slot.label;
   const source = fixture.bracketSources?.find((candidate) => candidate.side === side);
   const sourceFixture = source === undefined ? undefined : ctx.fixturesById.get(source.fixtureId);
   if (source !== undefined && sourceFixture !== undefined) {

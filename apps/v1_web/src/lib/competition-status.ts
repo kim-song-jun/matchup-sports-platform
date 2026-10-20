@@ -39,7 +39,7 @@ export interface StatusChipModel {
 }
 
 const LEAGUE_STATE_CHIP: Record<LeagueStateKey, Omit<StatusChipModel, 'label'>> = {
-  draft: { tone: 'grey', icon: 'draft' },
+  draft: { tone: 'grey', icon: 'check' },
   active: { tone: 'blue', icon: 'live' },
   completed: { tone: 'green', icon: 'check' },
   on_hold: { tone: 'orange', icon: 'pause' },

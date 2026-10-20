@@ -242,10 +242,21 @@ describe('대회 공개 목록 DB 정렬·페이지 계약', () => {
   it('filters keep their meaning: status, gender, sport', async () => {
     expect(ids(await list({ status: 'completed', limit: 50 }))).toEqual(['c-new', 'c-noend', 'c-old', 'c-nodate']);
     expect(ids(await list({ status: 'draft', limit: 50 }))).toEqual([]);
-    expect(ids(await list({ kind: 'league', status: 'draft', limit: 50 }))).toEqual(['lg-draft']);
+    expect(ids(await list({ kind: 'league', status: 'draft', limit: 50 }))).toEqual(['lg-draft', 'lg-open', 'lg-expired', 'lg-full']);
     expect(ids(await list({ genderCategory: 'female', limit: 50 }))).toEqual(['f-female']);
     const other = await read.list({ sportId: otherSportId, limit: 50 } as never);
     expect(ids(other)).toEqual(['f-other-sport']);
+  });
+
+  it('the pre-start filter includes a closed league and reports the matching total', async () => {
+    await db.v1Tournament.update({ where: { id: id('lg-open') }, data: { status: 'closed' } });
+    try {
+      const result = await list({ kind: 'league', status: 'draft', limit: 50, page: 1 });
+      expect(ids(result)).toEqual(['lg-draft', 'lg-expired', 'lg-full', 'lg-open']);
+      expect(result.pageInfo).toMatchObject({ total: 4 });
+    } finally {
+      await db.v1Tournament.update({ where: { id: id('lg-open') }, data: { status: 'open' } });
+    }
   });
 
   it.each([
@@ -310,7 +321,7 @@ describe('대회 공개 목록 DB 정렬·페이지 계약', () => {
           if (status === undefined) {
             statusWhere = PUBLIC_COMPETITION_STATUS_WHERE;
           } else if (status === 'draft') {
-            statusWhere = { kind: 'regular_league', status: 'draft' };
+            statusWhere = { kind: 'regular_league', status: { in: ['draft', 'open', 'closed'] } };
           } else {
             statusWhere = { status };
           }

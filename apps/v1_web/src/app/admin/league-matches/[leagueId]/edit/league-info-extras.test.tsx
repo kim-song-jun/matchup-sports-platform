@@ -14,11 +14,13 @@ vi.mock('@/hooks/use-v1-api', () => ({
 }));
 
 describe('LeagueInfoExtras', () => {
-  it('대표 이미지와 기본 장소를 리그 정보 폼 아래에 둔다', () => {
-    league.value = { data: { leagueId: 'league-1', sportCode: 'futsal', coverImageUrl: null, defaultPlace: null, recentVenues: [] } };
+  it('리그 이미지와 기본 장소를 리그 정보 폼 아래에 둔다', () => {
+    league.value = { data: { leagueId: 'league-1', sportCode: 'futsal', coverImageUrl: '/uploads/detail.webp', listImageUrl: '/uploads/list.webp', defaultPlace: null, recentVenues: [] } };
     render(<LeagueInfoExtras leagueId="league-1" />);
 
-    expect(screen.getByRole('region', { name: '대표 이미지' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '리그 이미지' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: '목록 이미지 미리보기' }).style.backgroundImage).toContain('/uploads/list.webp');
+    expect(screen.getByRole('img', { name: '상세 이미지 미리보기' }).style.backgroundImage).toContain('/uploads/detail.webp');
     expect(screen.getByRole('region', { name: '기본 장소' })).toBeInTheDocument();
   });
 

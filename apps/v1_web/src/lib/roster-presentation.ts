@@ -1,3 +1,5 @@
+import { participantIdentityName } from '@/components/tournament-live/operate/participant-identity';
+
 /** 경기 화면과 참가 명단에서 같은 표시 이름과 순서를 사용한다. 실명은 관리용 보조 정보다. */
 export function rosterDisplayName(player: { displayName?: string; nickname: string | null }): string {
   return player.displayName ?? player.nickname ?? '팀원';
@@ -5,12 +7,10 @@ export function rosterDisplayName(player: { displayName?: string; nickname: stri
 
 /**
  * 운영진에게는 실명이 같이 내려온다(`realName`) — 현장에서 사람을 확인하는 쪽이라 `실명 (닉네임)` 으로 그린다.
- * 팀 화면에는 실명이 없어 표시 이름 그대로다. 실명과 닉네임이 같으면 한 번만 쓴다.
+ * 팀 화면에는 실명이 없어 표시 이름 그대로다. 규칙은 운영 콘솔과 같은 `participantIdentityName` 하나다.
  */
-export function rosterPersonLabel(person: { displayName: string; realName?: string }): string {
-  return person.realName === undefined || person.realName === person.displayName
-    ? person.displayName
-    : `${person.realName} (${person.displayName})`;
+export function rosterPersonLabel(person: { displayName: string; realName?: string | null }): string {
+  return participantIdentityName({ displayNameSnapshot: person.displayName, identity: { realName: person.realName ?? null } });
 }
 
 export function compareRosterPlayers(

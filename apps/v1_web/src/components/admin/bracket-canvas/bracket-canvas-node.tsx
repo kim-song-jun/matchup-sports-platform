@@ -1,5 +1,6 @@
 'use client';
 
+import { formatKstDateShort, formatKstTime } from '@/lib/date-utils';
 import { Zap } from 'lucide-react';
 import type { DragEvent } from 'react';
 import { StatusChip } from '@/components/v1-ui/status-chip';
@@ -65,7 +66,8 @@ export function BracketCanvasNode({
   const voided = revision?.state === 'VOID';
   const score = voided ? null : (revision?.score ?? null);
   const quick = !voided && revision?.entryMethod === 'quick';
-  const penalty = score?.penalties ? `승부차기 ${score.penalties.home}:${score.penalties.away}` : null;
+  const penalty = score?.penalties ? `PK ${score.penalties.home}:${score.penalties.away}` : null;
+  const when = `${fixture.scheduledAt ? `${formatKstDateShort(fixture.scheduledAt)} ${formatKstTime(fixture.scheduledAt)}` : '시간 미정'}`;
   const footer = [voided ? '무효 처리됨' : quick ? '어드민 빠른 입력' : null, penalty].filter((part): part is string => part !== null);
 
   const resolvedSlots = new Map([slots.HOME, slots.AWAY].filter((slot): slot is V1AdminBracketSlot => slot !== null).map((slot) => [slot.id, slot]));
@@ -82,8 +84,8 @@ export function BracketCanvasNode({
       <div
         key={side}
         data-side={side}
-        className="border-t border-[var(--border)]"
-        style={{ height: CANVAS_ROW_HEIGHT }}
+        className="tm-on-tint border-t border-[var(--border)]"
+        style={{ height: CANVAS_ROW_HEIGHT, background: filled && slot?.kind === 'BYE' ? 'var(--blue50)' : undefined }}
         onDragOver={assignable ? (event: DragEvent) => event.preventDefault() : undefined}
         onDrop={
           assignable
@@ -152,11 +154,11 @@ export function BracketCanvasNode({
       {renderSide('HOME')}
       {renderSide('AWAY')}
       <div
-        className="tm-text-caption flex items-center gap-1 border-t border-[var(--border)] px-3"
+        className="tm-text-caption flex items-center justify-between gap-2 whitespace-nowrap border-t border-[var(--border)] bg-[var(--grey50)] px-2"
         style={{ height: CANVAS_FOOTER_HEIGHT, color: 'var(--text-muted)' }}
       >
-        {quick ? <Zap size={12} aria-hidden="true" /> : null}
-        <span className="truncate">{footer.join(' · ')}</span>
+        <span className="shrink-0">{when}</span>
+        {footer.length ? <span className="flex min-w-0 items-center gap-1" title={footer.join(' · ')}>{quick ? <Zap size={12} aria-label="어드민 빠른 입력" className="shrink-0" /> : null}<span className="shrink-0">{voided ? '무효 처리됨' : penalty}</span></span> : null}
       </div>
     </div>
   );

@@ -5,7 +5,11 @@ export type BracketGraphRound = { key: string; label: string; fixtures: V1Tourna
 export type BracketGraphNode = { id: string; round: string; y: number; fixture?: V1TournamentFixture; bye?: V1TournamentGroupTeam };
 export type BracketGraphEdge = { source: string; target: string; side: 'HOME' | 'AWAY'; outcome: 'WINNER' | 'LOSER' | 'BYE' };
 
-/** Edges come from stored advancement sources or an explicitly assigned bye team. */
+// Reserve room for the shared time/venue footer and BYE label.
+const MATCH_HEIGHT = 176;
+const BYE_HEIGHT = 112;
+
+/** Prefer saved advancement/slot links; retain assigned-team links for older brackets. */
 export function buildBracketGraph(rounds: BracketGraphRound[], groups: V1TournamentGroup[]) {
   const nodes: BracketGraphNode[] = rounds.flatMap((round) => round.fixtures.map((fixture) => ({ id: fixture.id, round: round.key, fixture, y: 0 })));
   const byId = new Map(nodes.map((node) => [node.id, node]));
@@ -31,7 +35,10 @@ export function buildBracketGraph(rounds: BracketGraphRound[], groups: V1Tournam
       for (const target of nodes.filter((candidate) => candidate.round === meta.next && candidate.fixture)) {
         for (const side of ['HOME', 'AWAY'] as const) {
           const registration = side === 'HOME' ? target.fixture!.homeRegistrationId : target.fixture!.awayRegistrationId;
-          if (bye.registrationId && registration === bye.registrationId && !edges.some((edge) => edge.target === target.id && edge.side === side)) edges.push({ source: node.id, target: target.id, side, outcome: 'BYE' });
+          const connected = bye.byeTarget
+            ? bye.byeTarget.fixtureId === target.id && bye.byeTarget.side === side
+            : Boolean(bye.registrationId && registration === bye.registrationId);
+          if (connected && !edges.some((edge) => edge.target === target.id && edge.side === side)) edges.push({ source: node.id, target: target.id, side, outcome: 'BYE' });
         }
       }
     }
@@ -63,22 +70,28 @@ export function buildBracketGraph(rounds: BracketGraphRound[], groups: V1Tournam
     && new Set(edges.filter((edge) => edge.target === node.id).map((edge) => edge.side)).size < 2);
   if (edges.length === 0 || hasUnlinkedSides) {
     const columns = rounds.map((round) => nodes.filter((node) => node.round === round.key).sort((a, b) => rank.get(a.id)! - rank.get(b.id)!));
-    const columnHeights = columns.map((column) => column.reduce((sum, node) => sum + (node.bye ? 80 : 144), 0));
-    const height = Math.max(144, ...columnHeights);
+    const columnHeights = columns.map((column) => column.reduce((sum, node) => sum + (node.bye ? BYE_HEIGHT : MATCH_HEIGHT), 0));
+    const height = Math.max(MATCH_HEIGHT, ...columnHeights);
     columns.forEach((column, index) => {
       const gap = column.length ? (height - columnHeights[index]) / column.length : 0;
       let cursor = 0;
       for (const node of column) {
-        const slotHeight = (node.bye ? 80 : 144) + gap;
+        const slotHeight = (node.bye ? BYE_HEIGHT : MATCH_HEIGHT) + gap;
         node.y = cursor + slotHeight / 2;
         cursor += slotHeight;
       }
     });
     return { nodes, edges, height };
   }
-  // Traverse each destination backwards in HOME/AWAY order. Every pair shares
-  // its own junction; there is no common spine connecting unrelated matches.
+  // Stored entry order is canonical. Connections determine the centres of
+  // later rounds, never silently reorder the first-round matches/byes.
   let cursor = 0;
+  for (const node of [...nodes].filter((candidate) => !edges.some((edge) => edge.target === candidate.id))
+    .sort((a, b) => rank.get(a.id)! - rank.get(b.id)!)) {
+    const height = node.bye ? BYE_HEIGHT : MATCH_HEIGHT;
+    node.y = cursor + height / 2;
+    cursor += height;
+  }
   const visited = new Set<string>();
   const position = (node: BracketGraphNode): number => {
     if (visited.has(node.id)) return node.y;
@@ -87,20 +100,12 @@ export function buildBracketGraph(rounds: BracketGraphRound[], groups: V1Tournam
     if (parents.length) {
       const ys = parents.map(position);
       node.y = (Math.min(...ys) + Math.max(...ys)) / 2;
-    } else {
-      const height = node.bye ? 80 : 144;
-      node.y = cursor + height / 2;
-      cursor += height;
     }
     return node.y;
   };
-  const rootRank = (node: BracketGraphNode): number => {
-    const parents = edges.filter((edge) => edge.target === node.id).map((edge) => byId.get(edge.source)!);
-    return parents.length ? Math.min(...parents.map(rootRank)) : rank.get(node.id)!;
-  };
   const roots = nodes.filter((node) => !edges.some((edge) => edge.source === node.id));
-  roots.sort((a, b) => rootRank(a) - rootRank(b)).forEach(position);
-  return { nodes, edges, height: Math.max(cursor, 144) };
+  roots.forEach(position);
+  return { nodes, edges, height: Math.max(cursor, MATCH_HEIGHT) };
 }
 
 export function bracketConnectionPath(start: { x: number; y: number }, end: { x: number; y: number }, side: 'HOME' | 'AWAY') {

@@ -114,6 +114,14 @@ describe('공통 명단 관리의 실제 탭·저장 흐름', () => {
     expect(screen.queryByText('경기 목록을 불러오지 못했어요')).not.toBeInTheDocument();
     expect(screen.getByLabelText('출전을 관리할 경기')).toHaveValue(games[0].gameId);
   });
+  it('팀원이 아닌 운영진은 참가 선수 탭 대신 경기 출전에서 바로 GK를 정한다', async () => {
+    role = 'none'; mock.setViewerRole('STAFF');
+    open();
+    fireEvent.click(await screen.findByRole('button', { name: '김민재 골키퍼로 지정' }));
+    expect(screen.queryByText('번호·GK는 참가 선수 탭의 공통 설정이에요.', { exact: false })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /변경사항 저장/ }));
+    await waitFor(() => expect(mock.readRoster().participants.find(p => p.userId === 'player-1')).toMatchObject({ goalkeeper: true }));
+  });
   it('저장 실패 시 이동하지 않고 초안과 오류를 남긴다', async () => {
     server.use(http.post('*/api/v1/teams/:id/game-rosters/batch', () => HttpResponse.json({ message: '저장 실패' }, { status: 503 })));
     open(); await screen.findByRole('checkbox', { name: '김민재 이번 경기 출전' });
@@ -200,6 +208,20 @@ describe('공통 명단 관리의 실제 탭·저장 흐름', () => {
     fireEvent.click(await screen.findByRole('button', { name: '김민재 선수 정보' }));
     expect(screen.queryByText(/등록 이름/)).not.toBeInTheDocument();
     expect(screen.getByLabelText('선출 여부')).toBeDisabled();
+  });
+  it('대회 참가 선수가 최대 인원에 도달하면 사라진 추가 버튼 대신 이유를 안내한다', async () => {
+    kind = 'regular_tournament';
+    server.use(http.get('*/api/v1/tournaments/:id', () => ok({
+      id: tournamentId, title: '3명 정원 대회', kind, status: 'in_progress',
+      minPlayers: 3, maxPlayers: 3, registrationDeadlineAt: null, rosterDeadlineAt: null,
+      scheduledAt: '2099-01-01T00:00:00Z', scheduledEndAt: '2099-12-31T00:00:00Z',
+    })));
+
+    open('registration');
+
+    expect(await screen.findByText('참가 선수 3명')).toBeInTheDocument();
+    expect(screen.getByText('최대 인원이에요')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '선수 추가' })).not.toBeInTheDocument();
   });
   it('홈·경기에서 들어온 일반 팀원도 참가 명단을 읽고 편집 제어는 받지 않는다', async () => {
     role = 'member'; mock.setViewerRole('TEAM_MEMBER');

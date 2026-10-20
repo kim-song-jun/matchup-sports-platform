@@ -245,6 +245,28 @@ describe('ResultEditModal — 출전자 빼기·추가(어드민이 누가 뛰�
 });
 
 describe('ResultEditModal participant naming', () => {
+  // 결과 고치고 확인·결과 정정 창이 모두 이 라벨을 쓴다. 실명은 대회 운영진에게만 내려오고(`identity`),
+  // 권한이 없으면 키 자체가 없어 닉네임만 그린다.
+  it.each([
+    ['운영진(실명 있음)', { realName: '김실명', phone: null }, '홈 · #1 김실명 (김골키)'],
+    ['권한 없음(identity 키 없음)', undefined, '홈 · #1 김골키'],
+  ])('%s — 참가자 행·MVP 옵션이 같은 이름 규칙을 따른다', (_, identity, label) => {
+    const [home, away] = [
+      lineup(HOME_SIDE_ID, [{ id: HOME_PARTICIPANT_ID, name: '김골키', jersey: 1 }]),
+      lineup(AWAY_SIDE_ID, [{ id: AWAY_PARTICIPANT_ID, name: '강아라', jersey: 7 }]),
+    ];
+    const lineups: GameLineup[] = [
+      { ...home, participants: home.participants.map((p) => (identity === undefined ? p : { ...p, identity })) },
+      away,
+    ];
+
+    render(<ResultEditModal {...propsWithoutGoalRecords()} lineups={lineups} />);
+
+    expect(screen.getByRole('group', { name: label })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: label })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: `${label} 출전 기록에서 빼기` })).toBeInTheDocument();
+  });
+
   it('renders each participant row with their real lineup name and jersey number, not a truncated id', () => {
     const lineups: GameLineup[] = [
       lineup(HOME_SIDE_ID, [{ id: HOME_PARTICIPANT_ID, name: '김골키', jersey: 1 }]),

@@ -337,3 +337,34 @@ describe('TournamentInfoSection — 장소 스냅샷', () => {
     expect(Object.keys(body)).not.toContain('venueLatitude');
   });
 });
+
+
+describe('대회 형식 수정', () => {
+  beforeEach(() => { hooks.mutate.mockReset(); hooks.showToast.mockReset(); });
+
+  it.each(['league', 'knockout'] as const)('현재 형식을 채우고 %s 변경을 저장 요청에 포함한다', (format) => {
+    renderSection(true, { formatChangeBlockedReason: null });
+    fireEvent.click(screen.getByRole('button', { name: '대회 정보 수정' }));
+    expect(screen.getByLabelText('대회 형식')).toHaveValue('group_knockout');
+    fireEvent.change(screen.getByLabelText('대회 형식'), { target: { value: format } });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    expect(hooks.mutate).toHaveBeenCalledWith({ format, expectedVersion: tournament.updatedAt }, expect.any(Object));
+  });
+
+  it('조/대진이 있으면 선택을 잠그고 서버의 해제 안내를 보여준다', () => {
+    const reason = '조나 대진이 만들어져 있어요. 경기와 조를 모두 삭제한 뒤 변경해 주세요.';
+    renderSection(true, { formatChangeBlockedReason: reason });
+    fireEvent.click(screen.getByRole('button', { name: '대회 정보 수정' }));
+    expect(screen.getByLabelText('대회 형식')).toBeDisabled();
+    expect(screen.getByText(reason)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/대회명/), { target: { value: '변경된 이름' } });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    expect(hooks.mutate).toHaveBeenCalledWith({ title: '변경된 이름', expectedVersion: tournament.updatedAt }, expect.any(Object));
+  });
+
+  it.each(['in_progress', 'completed'] as const)('%s 대회는 형식 선택을 잠근다', (status) => {
+    renderSection(true, { status });
+    fireEvent.click(screen.getByRole('button', { name: '대회 정보 수정' }));
+    expect(screen.getByLabelText('대회 형식')).toBeDisabled();
+  });
+});

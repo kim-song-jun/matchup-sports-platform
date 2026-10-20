@@ -528,7 +528,8 @@ export class LeagueMatchPublicService {
       startsOn: league.startsOn,
       endsOn: league.endsOn,
       sportCode: league.sport.code,
-      coverImageUrl: league.coverImageUrl,
+      coverImageUrl: league.coverImageUrl ?? league.listImageUrl ?? null,
+      listImageUrl: league.listImageUrl,
       // 경기 상세가 "이 경기만 장소가 달라요" 를 판정하는 기준이다.
       defaultPlace: league.defaultPlace,
       // 미설정(entryFeeConfigured=false)이면 화면이 금액을 그리지 않는다 — 0원 '무료 확정'과 구분된다.
@@ -824,6 +825,7 @@ export class LeagueMatchPublicService {
         seasonNo: true,
         // 공개 allow-list — 입금 계좌(bank*)는 절대 select 하지 않는다. 설정 시각 원값도 응답에 싣지 않는다.
         coverImageUrl: true,
+        listImageUrl: true,
         entryFee: true,
         entryFeeConfiguredAt: true,
         ...TOURNAMENT_VENUE_SELECT,

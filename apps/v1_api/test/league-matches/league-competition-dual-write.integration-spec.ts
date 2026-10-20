@@ -115,7 +115,8 @@ describe('리그 dual-write (real DB)', () => {
       sportId: ids.sportId,
       // 새 FK(`v1_tournaments_region_fk`)가 실제로 걸린다 — 여기서만 확인된다.
       regionId: ids.regionId,
-      status: 'draft',
+      status: 'closed',
+      requiresExplicitStart: true,
     });
     expect(mirror?.scheduledAt?.toISOString()).toBe(dto.startsOn);
     expect(mirror?.scheduledEndAt?.toISOString()).toBe(dto.endsOn);

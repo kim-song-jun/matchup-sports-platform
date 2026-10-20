@@ -1,4 +1,5 @@
 import { absoluteSiteUrl, DEFAULT_SOCIAL_IMAGE, getSiteOrigin } from '@/lib/seo';
+import { resolveTeamLogoUrl } from '@/lib/team-logo-presets';
 import { canStartTournamentRegistration } from '@/lib/tournament-registration-availability';
 import type {
   V1Match,
@@ -254,6 +255,8 @@ export function teamReference(teamId: string | null | undefined, name: string | 
  * 사용자가 연 매치를 Teameet 이 주최했다고 쓰면 틀린 사실이다.
  */
 export function buildMatchEventLd(match: V1Match, id: string): JsonLdNode | null {
+  // 온라인 앱 경험은 실제 경기 이벤트가 아니므로 SportsEvent 구조화 데이터 대상이 아니에요.
+  if (match.isOnline === true) return null;
   const node = buildMatchEventBase(match, `/matches/${id}`);
   if (!node) return null;
   if (match.platformManaged) node.organizer = { '@id': organizationId() };
@@ -360,8 +363,9 @@ export function buildSportsTeamLd(team: V1TeamDetail): JsonLdNode {
   const description = team.profile?.introduction?.replace(/\s+/g, ' ').trim();
   // 공백만 있는 소개는 필드를 아예 넣지 않는다 — 빈 description 은 없는 것만 못하다.
   if (description) node.description = description;
-  if (team.profile?.logoUrl) node.logo = absoluteImageUrl(team.profile.logoUrl);
-  const image = team.profile?.coverImageUrl || team.profile?.logoUrl;
+  const logoUrl = resolveTeamLogoUrl({ teamId: id, logoUrl: team.profile?.logoUrl });
+  if (logoUrl) node.logo = absoluteImageUrl(logoUrl);
+  const image = team.profile?.coverImageUrl || logoUrl;
   if (image) node.image = absoluteImageUrl(image);
   // 멤버 수는 화면에 "N명"으로 노출되지만 SportsTeam에 이를 담는 표준 필드가 없다.
   // `member`는 Person/Organization을 기대하고 `numberOfEmployees`는 팀이 아니라 회사용이다 —

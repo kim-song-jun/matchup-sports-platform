@@ -75,7 +75,7 @@ function SideCard({ card }: { card: LandingLiveTournament }) {
           </span>
           <span className="tm-landing-v4-slots-cap">
             <span>{`${slots.total}팀 중 ${slots.confirmed}팀 확정`}</span>
-            <span>{`남은 자리 ${slots.total - slots.confirmed}`}</span>
+            <span>{`남은 자리 ${slots.remaining}`}</span>
           </span>
         </>
       ) : null}

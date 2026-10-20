@@ -48,7 +48,7 @@ const selectClass =
 function findNode(rounds: MobileRound[], fixtureId: string): MobileNode | null {
   for (const round of rounds) {
     for (const section of round.sections) {
-      const hit = section.nodes.find((node) => node.fixtureId === fixtureId);
+      const hit = section.nodes.find((node) => (node.key ?? node.fixtureId) === fixtureId);
       if (hit) return hit;
     }
   }
@@ -56,10 +56,8 @@ function findNode(rounds: MobileRound[], fixtureId: string): MobileNode | null {
 }
 
 function whenText(node: MobileNode): string | null {
-  const parts: string[] = [];
-  if (node.scheduledAt) parts.push(`${formatKstDateShort(node.scheduledAt)} ${formatKstTime(node.scheduledAt)}`);
-  if (node.venue) parts.push(node.venue);
-  return parts.length > 0 ? parts.join(' · ') : null;
+  if (node.byeSlotId) return null;
+  return `${node.scheduledAt ? `${formatKstDateShort(node.scheduledAt)} ${formatKstTime(node.scheduledAt)}` : '시간 미정'}`;
 }
 
 function SideName({ side }: { side: MobileSide }) {
@@ -68,6 +66,7 @@ function SideName({ side }: { side: MobileSide }) {
       className={`min-w-0 break-keep text-[length:var(--font-size-body-sm)] font-semibold ${hasTeam(side) ? 'text-[var(--text-strong)]' : 'text-[var(--text-muted)]'}`}
     >
       {sideDisplayName(side)}
+      {!hasTeam(side) && side.byeLabel ? <span className="block text-[length:var(--font-size-caption)] font-normal text-[var(--text-muted)]">{side.byeLabel}</span> : null}
     </span>
   );
 }
@@ -77,25 +76,26 @@ function MobileNodeCard({ node, expanded, onOpen }: { node: MobileNode; expanded
   return (
     <button
       type="button"
-      onClick={() => onOpen(node.fixtureId)}
+      onClick={() => onOpen(node.key ?? node.fixtureId)}
+      style={{ background: node.byeSlotId && hasTeam(node.home) ? 'var(--blue50)' : undefined }}
       aria-haspopup="dialog"
       aria-expanded={expanded}
-      className="flex min-h-[44px] w-full flex-col gap-2 rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-3 text-left transition-colors hover:bg-[var(--grey50)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--blue500)]"
+      className="tm-on-tint flex min-h-[44px] w-full flex-col gap-2 rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-3 text-left transition-colors hover:bg-[var(--grey50)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--blue500)]"
     >
       <span className="flex items-center justify-between gap-2">
         <span className="text-[length:var(--font-size-caption)] font-semibold text-[var(--text-muted)]">{node.title}</span>
-        <StatusChip chip={bracketNodeStateChip(node.state)} />
+        {!node.byeSlotId ? <StatusChip chip={bracketNodeStateChip(node.state)} /> : null}
       </span>
-      <span className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+      {node.byeSlotId ? <SideName side={node.home} /> : <span className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
         <SideName side={node.home} />
         <span className="text-[length:var(--font-size-caption)] text-[var(--text-caption)]" aria-hidden="true">vs</span>
         <span className="text-right"><SideName side={node.away} /></span>
-      </span>
+      </span>}
       {node.scoreText ? (
         <span className="text-center text-[length:var(--font-size-body-sm)] font-bold text-[var(--text-strong)]">{node.scoreText}</span>
       ) : null}
       {when || node.quickEntered ? (
-        <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
+        <span className="flex flex-nowrap items-center gap-2 whitespace-nowrap rounded bg-[var(--grey50)] px-2 py-1 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
           {when ? <span>{when}</span> : null}
           {node.quickEntered ? (
             <span className="inline-flex items-center gap-1 font-semibold">
@@ -188,8 +188,8 @@ export function BracketCanvasMobile({ competitionId, scope, rounds, focusFixture
               ) : null}
               <ul role="list" className="flex flex-col gap-2">
                 {section.nodes.map((node) => (
-                  <li key={node.fixtureId}>
-                    <MobileNodeCard node={node} expanded={selectedId === node.fixtureId} onOpen={openNode} />
+                  <li key={node.key ?? node.fixtureId}>
+                    <MobileNodeCard node={node} expanded={selectedId === (node.key ?? node.fixtureId)} onOpen={openNode} />
                   </li>
                 ))}
               </ul>

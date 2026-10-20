@@ -204,6 +204,36 @@ function fakeTx(startAt: Date | null = null, gameOptions: FakeGame = {}) {
 beforeEach(() => jest.clearAllMocks());
 
 describe('updateTournamentMatchInTx — 자기 경기만 잠그고 명단은 후속 이벤트로', () => {
+  it.each([
+    ['reg-b', 'reg-a', ['SCHEDULED', 'SCHEDULED', 'CANCELLED']],
+    ['reg-b', 'reg-c', ['CANCELLED', 'SCHEDULED', 'SCHEDULED']],
+    ['reg-c', 'reg-a', ['SCHEDULED', 'CANCELLED', 'SCHEDULED']],
+  ])('팀 교환/교체 %s · %s 후 남아 있는 팀의 일정을 유지한다', async (homeRegistrationId, awayRegistrationId, expected) => {
+    const startAt = new Date('2026-10-20T10:00:00Z');
+    const { tx, mocks } = fakeTx(startAt);
+    const schedules = ['team-a', 'team-b', 'team-c'].map((teamId, index) => ({
+      id: teamId, teamId, teamMatchId: 'tm-x', state: index < 2 ? 'SCHEDULED' : 'CANCELLED',
+      cancelReason: index < 2 ? null : 'BRACKET_TEAM_CHANGED', startAt,
+    }));
+    Object.assign(mocks.v1TeamSchedule, {
+      findUnique: jest.fn(async ({ where }: { where: { teamId_teamMatchId: { teamId: string; teamMatchId: string } } }) =>
+        schedules.find((row) => row.teamId === where.teamId_teamMatchId.teamId && row.teamMatchId === where.teamId_teamMatchId.teamMatchId) ?? null),
+      update: jest.fn(async ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) =>
+        Object.assign(schedules.find((row) => row.id === where.id)!, data)),
+      updateMany: jest.fn(async ({ where, data }: { where: { teamId: string; teamMatchId: string; state: string }; data: Record<string, unknown> }) => {
+        const rows = schedules.filter((row) => row.teamId === where.teamId && row.teamMatchId === where.teamMatchId && row.state === where.state);
+        rows.forEach((row) => Object.assign(row, data));
+        return { count: rows.length };
+      }),
+    });
+    await updateTournamentMatchInTx(tx, { teamMatchId: 'tm-x', homeRegistrationId, awayRegistrationId });
+    expect(schedules.map((row) => row.state)).toEqual(expected);
+    expect(schedules.filter((row) => row.state === 'SCHEDULED')).toEqual(expect.arrayContaining([
+      expect.objectContaining({ teamId: REGISTRATIONS[homeRegistrationId].teamId, cancelReason: null, startAt }),
+      expect.objectContaining({ teamId: REGISTRATIONS[awayRegistrationId].teamId, cancelReason: null, startAt }),
+    ]));
+  });
+
   it('직접 장소 수정도 같은 쓰기에서 필드를 등록·배정한다', async () => {
     const { tx, mocks } = fakeTx();
     const place = { name: '직접 등록 구장', address: null, latitude: null, longitude: null, provider: null, providerPlaceId: null };

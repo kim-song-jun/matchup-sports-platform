@@ -34,30 +34,14 @@ export function leagueStateToListStatus(state: string | null | undefined): strin
     : null;
 }
 
-/**
- * 사용자가 확정한 칩 넷. `null` 은 '전체'(파라미터 없음)다.
- *
- * ⚠️ **"준비 중"(draft)은 정규 리그에만 있는 상태다.** 대회의 `draft` 는 운영자 준비 중이라
- * 공개되지 않으므로, 대회 목록에서 이 칩을 고르면 **항상 0건**이다. 데이터가 새는 건
- * 아니지만(서버가 종류와 묶어서 건다) **고를 수 있는 것처럼 보이는 것**이 문제다 —
- * 사용자는 빈 목록을 "고장" 으로 읽는다.
- *
- * 그래서 **대회만 보는 탭에서는 이 칩을 그리지 않는다**(`statusFiltersFor`). 사용자 확정값
- * "칩 넷" 은 리그 맥락의 구성이었고, 대회 탭에서 draft 를 고르게 하라는 뜻이 아니었다.
- */
+/** 보류 리그는 공개되지 않는다. draft는 시작 전 리그 전체를 찾는 호환 필터다. */
 export const COMPETITION_STATUS_FILTERS: ReadonlyArray<{ value: string | null; label: string }> = [
   { value: null, label: '전체' },
   { value: 'in_progress', label: '진행 중' },
-  { value: 'draft', label: '준비 중' },
+  { value: 'draft', label: '모집완료' },
   { value: 'completed', label: '종료' },
 ];
 
-/**
- * 이 탭에서 **고를 수 있는** 상태 칩.
- *
- * `tournament` 탭은 리그를 담지 않으므로 `draft` 를 빼고, `all`·`league` 는 리그가 들어 있어
- * 그대로 둔다. 고를 수 없는 것을 안 보여주는 쪽이 빈 결과 화면을 설명하는 것보다 정직하다.
- */
 export function statusFiltersFor(kind: string | null | undefined) {
   return kind === 'tournament'
     ? COMPETITION_STATUS_FILTERS.filter((option) => option.value !== 'draft')
@@ -165,7 +149,7 @@ export function buildCompetitionFilterModel(input: {
   }));
 
   /* ⚠️ **칩과 같은 목록에서 찾는다.** 전역 목록에서 찾으면 대회 탭에서 칩을 안 그렸는데
-     요약 줄엔 '준비 중' 이 남는다 — 그러면 **해제할 칩이 없는 막다른 상태**가 된다
+     요약 줄엔 숨긴 상태가 남는다 — 그러면 **해제할 칩이 없는 막다른 상태**가 된다
      (URL 로 직접 들어오는 경로가 그 뒷문이다). 입구와 표시가 같은 기준이어야 한다. */
   const statusLabel = statusFiltersFor(params.get('kind')).find(
     (option) => option.value === (activeStatus ?? null),

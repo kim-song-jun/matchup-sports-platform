@@ -3,6 +3,44 @@
 League creation is exposed under `/api/v1/admin/league-matches` and public
 league reads under `/api/v1/league-matches`.
 
+Creation validates a non-null `maxTeams` against the number of distinct selected `teamIds`
+before opening its write transaction. A smaller capacity returns
+`422 LEAGUE_CAPACITY_BELOW_TEAM_COUNT`; no league or registration is created. The creation form
+uses the same lower bound and preserves the unlimited (`null`) option.
+
+The explicit-start lifecycle also protects result draft creation and submission, including
+platform operations actors: pre-start `draft/open/closed` returns `409 LEAGUE_NOT_STARTED`.
+See the [game result gate](./games.md#explicit-start-league-result-gate-2026-10-19).
+
+
+## League display states (2026-10-19)
+
+The user-facing lifecycle has exactly four states: **모집완료 · 진행 중 · 보류 · 종료**.
+Compatible API values remain `draft | active | on_hold | completed`.
+Stored `draft`, `open`, and `closed` all map to `draft` and display **모집완료**;
+`in_progress` displays 진행 중, `on_hold` 보류, and `completed`/`cancelled` 종료.
+There is no separate 준비 중 or 모집 중 lifecycle state. Shared labels cover common/public
+detail, fixtures, my leagues, admin lists/header/modal, season tiers, roster and staff entry.
+Registration availability/deadline and publication remain separate facts; changing a label does
+not close registration, change `isPublic`, start a game, or rewrite historical rows.
+The public list's compatible `status=draft` filter selects all three pre-start storage values,
+matching `GET /league-matches?state=draft`; ordinary tournament drafts remain hidden.
+
+## New league lifecycle (2026-10-18)
+
+New independent leagues and new series seasons are stored as `closed` (모집완료), with
+no registration deadline. No existing rows are backfilled. Admin list/detail include
+`lifecycleStatus` and authoritative `registrationOpen` alongside the compatible `state` (`closed` still maps to `draft`).
+The admin header shows 모집완료 and 리그 시작하기. Confirming the existing state
+endpoint with `{ "state": "active" }` starts the league with the existing mutation-admin
+permission and `league_match.start` audit. Normal error handling and query invalidation apply.
+For new explicit-start leagues, fixture generation/regeneration, slot assignment and result
+activity never promote the pre-start `draft`/`open`/`closed` stage. Starting a game of a new explicit-start league in `draft`, `open`, or `closed` returns `409 LEAGUE_NOT_STARTED` inside
+the command transaction, before any game-state write. Once explicitly started, games use
+normal start rules. Existing `draft`/`open`/`closed` automatic promotion is retained when `requiresExplicitStart=false`; only new rows explicitly set it to `true`. Explicit
+registration reopening still uses the existing deadline contract independently of lifecycle.
+An additive migration adds `requiresExplicitStart` (database default `false`). Existing rows and writes from old application versions keep `false`, preserving all existing lifecycle behavior, including stored `closed`. Only the new league creation boundary opts in with `true`; create/edit DTOs do not accept this internal flag. Deploy the migration before the new application; rollback keeps the column and requires no data rewrite.
+
 ## Public visibility
 
 `V1Tournament.isPublic` (`v1_tournaments.is_public`) controls publication separately
@@ -42,7 +80,7 @@ them has an official result). The automatic transition additionally waits for th
 stays `active` even if every existing fixture is official (so a league built one fixture at a time is not
 closed after each game). Manual completion ignores `plannedFixtureCount`.
 
-A `draft` league (stored `draft`/`open`/`closed`) moves to `active` on its own when one of its games is
+An existing `draft` league (stored `draft`/`open`/`closed`, with `requiresExplicitStart=false`) moves to `active` on its own when one of its games is
 started (after the start command commits; status-change reason `game_started`) or when a result becomes
 official (quick result, forfeit or console end + confirm; reason `result_confirmed`). `on_hold` and
 `completed` leagues are never touched. Automatic completion only runs on result confirmation and fixture
@@ -65,10 +103,13 @@ endpoints below instead of adding new ones:
 - `active` from `completed` → revert completion. `active` from `draft` (stored `draft`/`open`/`closed`)
   starts the league (stored `in_progress`, audit `league_match.start`). Before this, only fixture
   generation moved a league to active.
-- `draft` from `active` moves back to stored `draft` (audit `league_match.revert_to_draft`) only while no
+- `draft` from `active` returns to stored `closed` (모집완료; compatible response state remains `draft`, audit `league_match.revert_to_draft`) only while no
   game has started (`LIVE`/`PAUSED`/`ENDED`); otherwise `409 LEAGUE_HAS_STARTED_GAMES`. `draft` from
   `completed` returns `409 LEAGUE_NOT_ACTIVE` (revert to active first).
 - Asking for the current state returns `alreadyProcessed: true`.
+
+The admin modal labels the `active` → `draft` target 시작 취소 → 모집완료. Fixtures, teams, publication and registration deadline remain unchanged;
+registration availability still follows the deadline independently. The league can be explicitly started again with `active`.
 
 Returns `{ leagueId, state, alreadyProcessed }`. The individual `hold`/`resume`/`complete`/`revert-completion`
 endpoints stay for compatibility.
@@ -204,10 +245,10 @@ are rejected with 400 instead of being coerced to a free league. `reason` is opt
 Response `data`: `{ leagueId, entryFee, entryFeeConfiguredAt, bankName, bankAccount, bankHolder, alreadyProcessed }`.
 Example payload (fake values): `{ "entryFee": 150000, "bankName": "국민은행", "bankAccount": "123-456-789012", "bankHolder": "팀밋", "reason": "참가비 조정" }`.
 
-## Cover image (대표 이미지)
+## Cover image (목록/상세 이미지)
 
 `PATCH /api/v1/admin/league-matches/:leagueId/cover-image` takes
-`{ "coverImageUrl": string | null }`. The key is required; `null` removes the image.
+`{ "coverImageUrl"?: string | null, "listImageUrl"?: string | null }`. At least one key is required. `coverImageUrl` is the detail image; `listImageUrl` is the list image. Omitted keys are preserved; `null` removes only the specified image. Both may be updated atomically.
 Only paths created by the upload endpoint are accepted (`/uploads/…`, max 1000 chars);
 external URLs, `javascript:`, `..` segments and empty strings return 400. The check is
 the shared `common/safe-image-url.ts` validator (campaign and sponsor behaviour is
@@ -215,9 +256,11 @@ unchanged). Allowed in every status including `on_hold`, `completed` and `cancel
 Last write wins. The old file is never deleted because the next season may have
 inherited the same URL. A value equal to the stored one returns
 `alreadyProcessed: true` without audit. Response `data`:
-`{ leagueId, coverImageUrl, alreadyProcessed }`; errors `404 LEAGUE_NOT_FOUND`,
+`{ leagueId, coverImageUrl, listImageUrl, alreadyProcessed }`; errors `404 LEAGUE_NOT_FOUND`,
 `409 LEAGUE_MIRROR_MISSING`. Audit action `league_match.cover_image_updated`
-(before/after `coverImageUrl`).
+(before/after both image fields).
+
+Existing regular-league cover images are copied into `list_image_url` by migration; the original detail value is unchanged. Admin league detail returns both stored values. Public detail resolves `coverImageUrl` from the detail image, falling back to the list image; list cards prefer the list image and fall back to the detail image, matching team-match behavior. The tournament list card response keeps its existing `coverImageUrl` display contract, sourced from `listImageUrl` for regular leagues. Public tournament detail retains the detail cover and additionally exposes `listImageUrl` for leagues. Next-season creation inherits both independently.
 
 ## Default venue (기본 장소)
 

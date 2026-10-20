@@ -12,7 +12,7 @@ export function LeagueInfoExtras({ leagueId }: { leagueId: string }) {
 
   return (
     <div className="mt-6 max-w-2xl">
-      <LeagueCoverImageControl leagueId={leagueId} sportCode={series.sportCode} coverImageUrl={series.coverImageUrl} />
+      <LeagueCoverImageControl leagueId={leagueId} sportCode={series.sportCode} coverImageUrl={series.coverImageUrl} listImageUrl={series.listImageUrl} />
       <LeagueVenueControl leagueId={leagueId} defaultPlace={series.defaultPlace ?? null} recentVenues={series.recentVenues} />
     </div>
   );

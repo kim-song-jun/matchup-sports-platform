@@ -56,6 +56,11 @@ describe('리그 경기 수정 vs 리그 완료 경합 (updateFixture 원자성)
       })
       .expect(201);
     const leagueId: string = created.body.data.leagueId;
+    await request(app.getHttpServer())
+      .post(`/api/v1/admin/league-matches/${leagueId}/state`)
+      .set('x-v1-user-id', ownerUserId)
+      .send({ state: 'active' })
+      .expect(200);
     const fixtures = await request(app.getHttpServer())
       .post(`/api/v1/admin/league-matches/${leagueId}/fixtures`)
       .set('x-v1-user-id', ownerUserId)

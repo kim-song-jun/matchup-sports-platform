@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { TournamentTitle } from '@/components/tournaments/tournament-title';
 import { Trophy } from 'lucide-react';
 import { pendingCapacityLabel, resolveTournamentCapacity, resolveTournamentRegistrationBlock, type TournamentCapacityInput } from '@/lib/tournament-registration-availability';
-import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
+import { getLeagueStatusConfig, getTournamentStatusConfig } from '@/lib/v1-tournament-status';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { formatTournamentDateRangeShort, formatEntryFee } from '@/lib/date-utils';
 import { resolveTournamentImage } from '@/lib/tournament-promo';
@@ -117,11 +117,11 @@ export function TournamentCard({
   }, [hasUpcomingDeadline]);
 
   const isNearlyFull = teamCapacity !== null && teamCapacity > 0 && reservedTeamCount / teamCapacity >= 0.8;
-  const status = item.status === 'closed'
+  const status = isLeague ? getLeagueStatusConfig(item.status) : item.status === 'closed'
     ? { ...getTournamentStatusConfig('closed'), label: '모집 마감' }
     : item.status === 'open' && !registrationBlocked && isNearlyFull
       ? { badgeClass: 'tm-badge-orange', label: '거의 마감' }
-      : getTournamentStatusConfig(item.status, registrationBlocked);
+      : getTournamentStatusConfig(item.status, registrationBlocked, item.kind === 'regular_league');
   // 커버가 없는 대회도 홍보용으로 등록한 실사진이 있으면 아이콘 대신 그 사진을 썸네일로
   // 재사용한다 (셋 다 없으면 종목색 그라디언트+아이콘 폴백).
   const thumbnailImageUrl = resolveTournamentImage(item, 'cover');

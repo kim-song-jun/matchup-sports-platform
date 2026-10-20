@@ -56,6 +56,8 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
     createdAt?: Date;
     updatedAt?: Date;
     fieldId?: string | null;
+    homeDisplayLabel?: string | null;
+    awayDisplayLabel?: string | null;
     status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
     homeRegistrationId: string | null;
     awayRegistrationId: string | null;
@@ -88,6 +90,8 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
       parentTeamMatchId: fixture.parentFixtureId ?? null,
       homeRegistrationId: fixture.homeRegistrationId ?? null,
       awayRegistrationId: fixture.awayRegistrationId ?? null,
+      homeDisplayLabel: fixture.homeDisplayLabel ?? null,
+      awayDisplayLabel: fixture.awayDisplayLabel ?? null,
       homeRegistration: fixture.homeRegistration,
       awayRegistration: fixture.awayRegistration,
       createdAt: fixture.createdAt ?? new Date('2026-06-01T00:00:00Z'),
@@ -196,6 +200,22 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
     };
   }
 
+  it.each(['HOME', 'AWAY'] as const)('빈 부전승의 저장된 슬롯 연결을 공개 %s 대상으로 직렬화한다', (side) => {
+    const row = baseRow({ detailSeeds: [fixtureRow(null, 'scheduled')] });
+    const detail = row.tournamentMatchDetails[0];
+    Object.assign(detail.teamMatch, { homeSlotId: side === 'HOME' ? 'bye-slot' : null, awaySlotId: side === 'AWAY' ? 'bye-slot' : null });
+    Object.assign(detail, { round: 'quarter', homeRegistrationId: null, awayRegistrationId: null, homeRegistration: null, awayRegistration: null });
+    row.groups = [{ id: 'r12', name: '12강', phase: 'round12', sortOrder: 0, advanceCount: null,
+      groupTeams: [], standings: [], byeSlots: [{ id: 'empty-bye', sortOrder: 3 }],
+      slots: [{ id: 'bye-slot', kind: 'BYE', byeSortOrder: 3, displayLabel: '상위 시드' }],
+    }] as unknown as TournamentDetailRow['groups'];
+    const result = presentTournamentDetail(row, true);
+    expect(result.groups[0].groupTeams[0]).toMatchObject({ registrationId: null, displayLabel: '상위 시드',
+      byeTarget: { fixtureId: detail.teamMatchId, side } });
+    const hidden = presentTournamentDetail({ ...row, bracketPublishedAt: null, bracketPublishScheduledAt: null }, false);
+    expect(hidden.groups).toEqual([]);
+  });
+
   describe('자리 라벨 (homeSlotLabel / awaySlotLabel)', () => {
     const game = { state: 'SCHEDULED', sides: [], participants: [], events: [], currentOfficialRevision: null };
     const groupRank = { kind: 'GROUP_RANK', position: 1, group: { name: '4강', phase: 'semi' }, sourceGroup: { name: 'A조' } };
@@ -220,6 +240,12 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
       expect(present({ awayRegistrationId: null, awayRegistration: null, homeSlot: entry, awaySlot: groupRank })).toMatchObject({
         homeSlotLabel: null, awaySlotLabel: 'A조 1위', homeTeamName: '서울 FC', awayTeamName: 'TBD',
       });
+    });
+
+    it('관리자 문구를 공개 빈 사이드에 반영하고 BYE 슬롯 정본과 확정 팀을 우선한다', () => {
+      expect(present({ ...empty, homeSlot: groupRank, homeDisplayLabel: '조 1위 중 5위', awayDisplayLabel: '준결승 A 승자' })).toMatchObject({ homeSlotLabel: '조 1위 중 5위', awaySlotLabel: '준결승 A 승자' });
+      expect(present({ ...empty, homeSlot: { ...entry, kind: 'BYE', displayLabel: '부전승 직접 문구' }, homeDisplayLabel: '오래된 복사' })).toMatchObject({ homeSlotLabel: '부전승 직접 문구' });
+      expect(present({ homeDisplayLabel: '숨길 문구', homeSlot: entry })).toMatchObject({ homeSlotLabel: null, homeTeamName: '서울 FC' });
     });
 
     it('자리에 연결되지 않은 기존 빈 경기는 라벨이 null 이고 TBD 그대로다', () => {

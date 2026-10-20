@@ -7,6 +7,7 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import type { GameEventRecord, GameLineupParticipant } from '@/types/game-operations';
 import { jerseyText } from './player-label';
+import { participantIdentityName } from './participant-identity';
 
 export interface AssistPickerSheetProps {
   readonly open: boolean;
@@ -167,7 +168,7 @@ export function AssistPickerSheet({ open, event, scorerName, teamName, whenLabel
               <span className="inline-block min-w-[1.25rem] text-right tabular-nums text-[var(--text-muted)]">
                 {jerseyText(teammate.jerseyNumber)}
               </span>
-              {teammate.displayNameSnapshot}
+              {participantIdentityName(teammate)}
             </Button>
           ))}
         </div>

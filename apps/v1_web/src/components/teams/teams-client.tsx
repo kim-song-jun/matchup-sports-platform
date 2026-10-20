@@ -46,8 +46,8 @@ import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import { teamSharePath } from '@/lib/team-share-route';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import { sentInvitationStatusLabel, teamGenderRuleLabel, teamRecruitmentLabel, teamRoleLabel } from '@/lib/v1-status-labels';
-import type { V1Team, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
-import { TEAM_LIST_PAGE_SIZE, type CursorListSeed } from '@/lib/public-list-seed';
+import type { CursorPage, V1Team, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
+import { firstSearchParam, TEAM_LIST_PAGE_SIZE, teamListContinuationPath, teamListQueryFilters, teamListSeedPath, type CursorListSeed } from '@/lib/public-list-seed';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { TOAST_DURATION_MS, useToast } from '@/components/v1-ui/toast';
 import { JerseyNumberDialog } from './jersey-number-dialog';
@@ -59,7 +59,7 @@ import { INVITE_MESSAGE_MAX_LENGTH, TeamDetailPageSkeleton, TeamDetailPageView, 
 import type { TeamDetailViewModel, TeamListViewModel, TeamMemberAction, TeamMemberRowModel, TeamMembersViewModel, TeamModel } from './teams.types';
 import { getTeamDetailViewModel, getTeamListViewModel, getTeamMembersViewModel, getTeamStateViewModel } from './teams.view-model';
 import {
-  buildTeamHref,
+  buildTeamHref as buildBaseTeamHref,
   buildTeamSportChips,
   deriveTeamScope,
   formatTeamRegion,
@@ -67,7 +67,11 @@ import {
   toTeam,
 } from './teams.card-model';
 
-export function TeamListPageClient({ seed }: { readonly seed?: CursorListSeed<V1Team> } = {}) {
+type TeamListSeed = CursorListSeed<V1Team> & {
+  readonly metadata?: CursorPage<V1Team>;
+};
+
+export function TeamListPageClient({ seed }: { readonly seed?: TeamListSeed } = {}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const selectedSportId = searchParams.get('sportId') ?? undefined;
@@ -75,6 +79,9 @@ export function TeamListPageClient({ seed }: { readonly seed?: CursorListSeed<V1
   const selectedGenderRule = toGenderRuleFilter(searchParams.get('genderRule'));
   const selectedLevels = toLevelCodes(searchParams.get('levelCodes') ?? searchParams.get('levels'));
   const selectedRegionId = searchParams.get('regionId') ?? undefined;
+  const initialCursor = firstSearchParam(searchParams.get('cursor') ?? undefined) ?? undefined;
+  const filterSearchParams = new URLSearchParams(searchParams.toString());
+  filterSearchParams.delete('cursor');
   const filterOpen = searchParams.get('filter') === '1';
   const activeFilterCount = countTeamFilters(selectedSort, selectedGenderRule, selectedLevels, selectedRegionId);
   const initialQuery = searchParams.get('q') ?? '';
@@ -88,22 +95,43 @@ export function TeamListPageClient({ seed }: { readonly seed?: CursorListSeed<V1
   const sports = useV1MasterSports({ seed: seed?.sports });
   const regions = useV1MasterRegions();
   const teamFilters = useMemo(() => {
-    const filters: { sportId?: string; query?: string; joinPolicy?: 'approval_required'; sort?: 'recommended' | 'latest'; genderRule?: string; levelCodes?: string; regionId?: string } = {};
-    if (selectedSportId) filters.sportId = selectedSportId;
-    if (selectedGenderRule) filters.genderRule = selectedGenderRule;
-    if (selectedLevels.length) filters.levelCodes = selectedLevels.join(',');
-    if (selectedRegionId) filters.regionId = selectedRegionId;
-    if (submittedQuery.trim()) filters.query = submittedQuery.trim();
-    if (selectedSort === 'deadline') filters.joinPolicy = 'approval_required';
-    if (selectedSort === 'latest') filters.sort = 'latest';
-    if (selectedSort === 'recommended') filters.sort = 'recommended';
+    const filters = teamListQueryFilters({
+      sportId: selectedSportId,
+      sort: selectedSort,
+      genderRule: selectedGenderRule,
+      levelCodes: selectedLevels.join(','),
+      regionId: selectedRegionId,
+      q: submittedQuery,
+    });
     return Object.keys(filters).length ? filters : undefined;
   }, [selectedGenderRule, selectedLevels, selectedRegionId, selectedSort, selectedSportId, submittedQuery]);
   const listFilters = useMemo(() => ({ ...(teamFilters ?? {}), limit: TEAM_LIST_PAGE_SIZE }), [teamFilters]);
-  // /teams가 서버(SEO 프리렌더)에서 이미 받아 둔 무필터 목록을 첫 표시값으로 쓴다 — 필터가
-  // 걸려 있으면 그 목록이 이 화면과 다른 결과를 뜻하므로 seed를 넘기지 않는다(기존 로딩
-  // 스켈레톤 그대로 유지).
-  const query = useV1TeamPages(listFilters, { seed: !teamFilters ? seed?.page : undefined });
+  // Seed query identity prevents a prior route's first-page response from appearing after filters change.
+  const seedQuery = teamListSeedPath({
+    sportId: selectedSportId,
+    sort: selectedSort,
+    genderRule: selectedGenderRule,
+    levelCodes: selectedLevels.join(','),
+    regionId: selectedRegionId,
+    q: submittedQuery,
+    cursor: initialCursor,
+  });
+  const urlSeedQuery = teamListSeedPath({
+    sportId: selectedSportId,
+    sort: selectedSort,
+    genderRule: selectedGenderRule,
+    levelCodes: selectedLevels.join(','),
+    regionId: selectedRegionId,
+    q: initialQuery,
+    cursor: initialCursor,
+  });
+  const cursorForCurrentFilters = seedQuery === urlSeedQuery ? initialCursor : undefined;
+  const seedMatchesCurrentQuery = seed?.query === seedQuery && seedQuery === urlSeedQuery;
+  const query = useV1TeamPages(listFilters, {
+    seed: seedMatchesCurrentQuery ? seed.page : undefined,
+    initialCursor: cursorForCurrentFilters,
+    metadataSeed: seedMatchesCurrentQuery ? seed.metadata : undefined,
+  });
   const recentSearches = useV1RecentSearches();
   const recordSearch = useV1RecordSearch();
   const selectedSportName = selectedSportId ? sports.data?.find((sport) => sport.id === selectedSportId)?.name : undefined;
@@ -132,7 +160,30 @@ export function TeamListPageClient({ seed }: { readonly seed?: CursorListSeed<V1
   const loadMoreError = query.isFetchNextPageError;
   if (query.isError && !hasPages) return <TeamStatePageView model={getTeamStateViewModel('error')} />;
   const firstPage = query.data?.pages[0];
-  const total = firstPage?.pageInfo?.totalCount ?? visibleItems.length;
+  const lastPage = query.data?.pages.at(-1);
+  const hasNextPage = Boolean(query.hasNextPage || lastPage?.pageInfo?.hasNext);
+  const metadataPage = query.listMetadata ?? (cursorForCurrentFilters ? undefined : firstPage);
+  const total = metadataPage?.pageInfo?.totalCount ?? (cursorForCurrentFilters ? undefined : visibleItems.length);
+  const continuationCursor = lastPage?.pageInfo?.nextCursor ?? undefined;
+  // A matching route seed is still a placeholder until its refetch completes, but its cursor belongs
+  // to this URL. Previous-query placeholder rows must not expose a stale navigable cursor.
+  const loadMoreLocked = query.isPlaceholderData && !seedMatchesCurrentQuery;
+  const loadMoreHref = hasNextPage && continuationCursor && !loadMoreLocked
+    ? teamListContinuationPath({
+      sportId: selectedSportId,
+      sort: selectedSort,
+      genderRule: selectedGenderRule,
+      levelCodes: selectedLevels.join(','),
+      regionId: selectedRegionId,
+      q: submittedQuery,
+      cursor: continuationCursor,
+    })
+    : undefined;
+  const allTeamPagesLoaded = Boolean(
+    query.data?.pages.length
+      && query.hasNextPage === false
+      && query.data.pages[query.data.pages.length - 1]?.pageInfo?.hasNext === false,
+  );
   // isLoading 은 서버·하이드레이션 첫 렌더(persist 복원 중)에 false 라 데이터 없음(isPending)으로 판정한다.
   const isListLoading = query.isPending;
   const searchModel: NonNullable<TeamListViewModel['search']> = {
@@ -158,19 +209,36 @@ export function TeamListPageClient({ seed }: { readonly seed?: CursorListSeed<V1
     search: searchModel,
     filterHref: buildTeamHref(searchParams, { filter: '1' }),
     filterSheet: buildTeamFilterSheet(searchParams, selectedSort, selectedGenderRule, selectedLevels, selectedRegionId, regions.data ?? [], filterOpen),
-    chips: buildTeamSportChips(visibleItems, base, searchParams, selectedSportId, sports.data, !selectedSportId && !query.hasNextPage),
+    chips: buildTeamSportChips(
+      visibleItems,
+      base,
+      filterSearchParams,
+      selectedSportId,
+      sports.data,
+      cursorForCurrentFilters ? Boolean(metadataPage?.facets) : !selectedSportId && allTeamPagesLoaded,
+      metadataPage?.facets,
+    ),
     teams: visibleTeams,
     listLoading: isListLoading,
-    hasNextPage: query.hasNextPage,
+    hasNextPage,
+    loadMoreHref,
     isFetchingNextPage: query.isFetchingNextPage,
-    // seed(placeholder)가 떠 있는 동안에는 첫 페이지 검증이 끝나기 전이라 낡은 커서를 따라가지 않게 잠근다.
-    loadMoreLocked: query.isPlaceholderData,
+    loadMoreLocked,
+    loadMoreBusy: query.isFetching || query.isPlaceholderData,
     loadMoreError,
-    onLoadMore: () => void query.fetchNextPage(),
+    onLoadMore: () => {
+      // Infinite queries share one fetch: append must not cancel seed validation or a background refresh.
+      if (query.isFetching || query.isPlaceholderData) return;
+      void query.fetchNextPage();
+    },
     summary: {
       ...base.summary,
       scope: deriveTeamScope(selectedSportName),
       total,
+      totalState: cursorForCurrentFilters && !metadataPage
+        ? query.isListMetadataError ? 'error' : 'loading'
+        : undefined,
+      totalRefreshError: cursorForCurrentFilters ? query.isListMetadataError : false,
       loaded: visibleTeams.length,
       recruiting: visibleTeams.filter((item) => item.status === 'open').length,
       nearby: undefined,
@@ -202,6 +270,12 @@ export function TeamListPageClient({ seed }: { readonly seed?: CursorListSeed<V1
   function updateTeamUrl(nextQuery: string) {
     router.replace(buildTeamHref(searchParams, { q: nextQuery || null, filter: null }), { scroll: false });
   }
+}
+
+function buildTeamHref(params: URLSearchParams, overrides: Record<string, string | null>) {
+  const next = new URLSearchParams(params);
+  if (Object.keys(overrides).some((key) => key !== 'filter')) next.delete('cursor');
+  return buildBaseTeamHref(next, overrides);
 }
 
 /**

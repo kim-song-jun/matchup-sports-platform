@@ -50,24 +50,24 @@ describe('BracketCanvasNode — 표시', () => {
     expect(screen.getByRole('group', { name: '8강 1번 경기, 예정' })).toBeInTheDocument();
     expect(screen.getByText('예정')).toBeInTheDocument();
     expect(screen.getByText('1번 자리')).toBeInTheDocument();
-    expect(screen.queryByText('어드민 빠른 입력')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('어드민 빠른 입력')).not.toBeInTheDocument();
   });
 
   it('빠른 입력으로 확정된 칸만 "어드민 빠른 입력"과 점수를 보여 준다(대조: 콘솔 입력은 표시 없음)', () => {
     renderNode(officialQuick('quick'));
     expect(screen.getByText('확정')).toBeInTheDocument();
-    expect(screen.getByText('어드민 빠른 입력')).toBeInTheDocument();
+    expect(screen.getByLabelText('어드민 빠른 입력')).toBeInTheDocument();
   });
 
   it('라이브 콘솔로 확정된 칸에는 빠른 입력 표시가 없다', () => {
     renderNode(officialQuick('console'));
     expect(screen.getByText('확정')).toBeInTheDocument();
-    expect(screen.queryByText('어드민 빠른 입력')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('어드민 빠른 입력')).not.toBeInTheDocument();
   });
 
   it('승부차기 점수를 꼬리에 보여 준다', () => {
     renderNode(officialQuick('quick', { home: 4, away: 3 }));
-    expect(screen.getByText(/승부차기 4:3/)).toBeInTheDocument();
+    expect(screen.getByText(/PK 4:3/)).toBeInTheDocument();
   });
 
   it('무효 처리된 칸은 점수를 숨기고 "무효 처리됨"을 보여 준다', () => {
@@ -78,7 +78,7 @@ describe('BracketCanvasNode — 표시', () => {
       }),
     );
     expect(screen.getByText('무효 처리됨')).toBeInTheDocument();
-    expect(screen.queryByText('어드민 빠른 입력')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('어드민 빠른 입력')).not.toBeInTheDocument();
     expect(screen.queryByText('3')).not.toBeInTheDocument();
   });
 
@@ -234,4 +234,16 @@ describe('BracketCanvasNode — 흐름 배치(position 없음)', () => {
     expect(onSelect).toHaveBeenCalledWith('f1');
     cleanup();
   });
+});
+
+
+it('그림 카드에서는 경기장과 배정된 부전승의 시드 문구를 숨긴다', () => {
+  renderNode(makeFixture({ ...base, venue: 'A경기장', homeRegistrationId: 'r1', homeTeamName: '확정팀' }), {
+    sideLabels: { HOME: '확정팀', AWAY: '2번 자리' },
+    slots: { HOME: makeSlot({ id: 's-home', kind: 'BYE', label: '3번 시드', registrationId: 'r1' }), AWAY: null },
+  });
+  expect(screen.getByText('확정팀')).toBeInTheDocument();
+  expect(screen.queryByText('3번 시드')).not.toBeInTheDocument();
+  expect(screen.queryByText(/A경기장|경기장 미정/)).not.toBeInTheDocument();
+  expect(document.querySelector('[data-side=HOME]')).toHaveStyle({ background: 'var(--blue50)' });
 });

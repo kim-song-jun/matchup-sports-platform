@@ -1,6 +1,34 @@
 # V1 Tournaments API
 
+Tournament PATCH composes format, lineup configuration pin, untouched-fixture repointing and
+ordinary metadata/audit writes in one transaction. Format/lineup edits acquire the same structural
+advisory lock as group/fixture writers before changing either setting. If a concurrent group writer
+wins and the format is rejected with `409 TOURNAMENT_FORMAT_LOCKED`, the prior config pin and
+tournament version remain unchanged; no config-change audit is committed.
+
+League compatibility (2026-10-19): public `status=draft` with `kind=league` or `kind=all` selects league storage statuses `draft | open | closed`, all displayed as **모집완료**. This matches `GET /league-matches?state=draft` and existing list redirects. Regular tournament drafts remain hidden.
+
+## 12강 부전승 홈·어웨이 (2026-10-16)
+
+- `PUT /api/v1/admin/tournament-slots/:slotId/bye-side`: `{ side: 'HOME' | 'AWAY', expectedSide: 'HOME' | 'AWAY' }`.
+  V1AuthGuard + mutation admin(owner/ops), support/비관리자 403. `side`는 원하는 최종 자리이며 같은 요청을 재전송해도 다시 뒤집지 않는다.
+- 12강 BYE 슬롯과 WINNER 연결 하나를 가진 8강 경기만 허용한다. 다른 경기로 이동하거나 상대를 바꾸지 않는다.
+  슬롯 FK, 실제 경기/게임의 홈·어웨이 팀, 승자 edge의 targetSide, 부전승 sortOrder를 대회 잠금+게임 행 잠금 안의 단일 트랜잭션으로 교환한다.
+  이후 4강 진출 edge 및 원천 12강 경기 ID는 유지한다. 12강 결과가 이미 있어도 8강과 이후 경기가 시작 전이면 이동할 수 있다.
+  홈·어웨이를 교환해도 양 팀의 같은 경기 일정은 활성 상태와 기존 시각을 유지한다. 팀 교체 시에는 경기에서 빠진 팀의 일정만 취소한다.
+- 응답 data: `{ affectedTeamMatchIds: string[], side, sortOrder }`. `sortOrder`는 0부터 시작하는 표시 위치다.
+  어드민 slot의 `position`은 고유 순번, 신규 `byeSortOrder: number | null`은 표시 위치다. 다른 슬롯 종류는 null.
+- 409: `BYE_SIDE_INVALID`(구조/소속 불일치), `BYE_SIDE_STALE`(현재 방향 불일치), `SLOT_LOCKED`(대상 또는 후속 경기 시작·기록·미무효 결과),
+  `BYE_POSITION_OCCUPIED`(위치 충돌), `COMMAND_CONCURRENCY_CONFLICT`(게임 잠금 경합). 잘못된 DTO/추가 필드는 400, 없는 슬롯은 404.
+  실패하면 전체 롤백한다. 감사 action은 `tournament.bracket.bye.side`이며 이전/이후 방향·위치·대상/원천 경기 ID를 남긴다.
+- 새 12강 템플릿은 부전승 표시 위치 1·3·5·7(저장 0·2·4·6), 8강 HOME 배정으로 시작한다. 기존 템플릿은 migration에서 연결된 HOME/AWAY에 맞춰 표시 위치만 보정한다.
+  표시 좌표 보정 후에는 대응 API를 함께 배포해야 한다. 이전 고정 인덱스 부전승 배정 API로 롤백하면 쓰기 좌표가 어긋나므로 장애 시 forward fix한다.
+  공개 그림은 저장된 첫 라운드 순서를 유지한다. 연결된 부전승의 임의 숫자 이동/삭제는 계속 거절하고 어드민 그림·목록의 홈·어웨이 선택기를 사용한다.
+- 검증: API `slots/bye-side.spec.ts`, `test/tournaments/tournament-slots.integration-spec.ts`, 웹 `bye-side-control.test.tsx`와 `tournament-bracket-graph.test.ts`.
+
 ## Read Endpoints
+
+Regular-league list cards expose the effective list image as `coverImageUrl` (`listImageUrl ?? coverImageUrl` in storage). Detail exposes the effective detail image as `coverImageUrl` and the stored `listImageUrl`; a missing detail image uses the list image. Regular-tournament images are unchanged. See [league image mutations](./league-matches.md#cover-image-목록상세-이미지).
 
 Publication of both regular tournaments and regular leagues is independently
 controlled by `V1Tournament.isPublic` (default `true`). Unpublished competitions are
@@ -227,6 +255,12 @@ Campaign admin routes inherit `V1AuthGuard`. Production accepts only the signed 
 
 Admin-created tournaments require `teamCount` per tournament. The API does not treat an omitted team count as unlimited; missing `teamCount` is rejected with `400 TOURNAMENT_TEAM_COUNT_REQUIRED`. Public capacity, registration blocking, and progress bars must use the saved tournament `teamCount`, not a hard-coded default.
 
+The create response returns `minMatchesPerTeam` from the saved tournament row, including `null` when no minimum is configured. Send `null` to clear a previously configured minimum; omitting the field leaves it unchanged on update.
+
+After creation, the response's `competitionConfigVersionId`, lineup size, and substitution policy describe the configuration version actually pinned to the new tournament. The lineup and substitution values are read from that saved version; they are `null` when no version is pinned. This lets the create flow continue from the server's persisted state.
+
+On update, `null` clears nullable bank details when the resulting `entryFee` is zero (paid tournaments still require complete bank details), card-suspension limits, rules and refund text, prize fields, mixed-gender quotas, or the minimum-match setting; omitting a field preserves its current value. Sending `venue: null` clears the complete saved venue snapshot, including its address and map pin. On create, omitted or `null` values for these optional fields are stored as empty (`null`) values where applicable.
+
 정규 리그(`kind=regular_league`)는 별도 [리그 생성·정원 계약](./league-matches.md#participant-team-capacity-참가팀-정원)을
 따른다. 참가팀 정원은 nullable `maxTeams`이며 `maxPlayers`는 팀당 선수 명단 정원이다.
 일반 대회(`kind=regular_tournament` 및 기존 `kind=null` 행)와 리그 방식 일반 대회
@@ -241,6 +275,8 @@ Admin-created tournaments require `teamCount` per tournament. The API does not t
 초안 재저장: `PATCH /api/v1/admin/tournaments/:tournamentId`에 출전 인원·교체 정책을 다시 보내거나 변경해도 현재 고정된 설정의 피리어드·이벤트·결과·순위·공개 정책은 유지한다. 별도 이름으로 등록한 설정도 현재 종목/이름 계열에서 동일 버전을 재사용하고, 실제 라인업 변경은 같은 계열의 다른 섹션을 보존한 불변 새 버전으로 처리한다. 기존 v1 설정에서 `lineup.positions/formations` 키가 없으면 버전 쓰기도 부재를 유지한다(읽기 응답은 `[]`로 정규화). 명시적으로 잘못된 포지션/대형 목록의 검증은 그대로 적용한다. 생성 마법사는 피리어드 PATCH 성공 전에는 공개 확인·접수 시작을 허용하지 않는다. 실패 시 초안 ID와 입력을 유지하며 같은 초안에서 재시도한다.
 
 출전 인원·교체 설정만 보내는 PATCH도 제목 등 다른 필드가 필요하지 않다. 동일 설정 재저장에도 원자적 CAS와 감사 로그를 적용하고 새 `updatedAt`을 반환한다. 후속 요청은 이 버전을 사용해야 하며 이전 버전은 `409 TOURNAMENT_VERSION_CONFLICT`로 거절한다.
+
+대회 형식 변경: 관리자 상세 응답의 `formatChangeBlockedReason`은 변경 가능하면 `null`, 제한 중이면 한국어 사유다. `PATCH /api/v1/admin/tournaments/:tournamentId`의 `format`은 `league` / `knockout` / `group_knockout`을 받으며, 참가 신청만 있으면 변경 가능하다. 조 또는 삭제되지 않은 경기가 있거나 상태가 `in_progress` / `completed`이면 실제 형식 변경은 `409 TOURNAMENT_FORMAT_LOCKED`로 거절한다. 같은 형식 재전송과 다른 정보 수정은 허용한다. 조/대진 생성과 같은 잠금 안에서 구조를 재검사하고 CAS로 저장하며 감사 로그의 before/after에 형식을 남긴다. 형식 변경은 대진을 자동 삭제·변환하지 않는다.
 
 종목 변경: `PATCH /api/v1/admin/tournaments/:tournamentId`에 현재와 다른 `sportId`를 보내면 같은 CAS 트랜잭션에서 `competitionConfigVersionId`를 새 종목의 기본 규정 버전(생성과 같은 경로, 규정을 쓰지 않는 종목은 `null`)으로 다시 연결하고, 감사 로그(`tournament.update`)의 before/after에 `sportId`·`competitionConfigVersionId`를 남긴다. 직전에 고친 경기 시간·출전 인원은 새 종목 기본값으로 돌아간다. 대진이 하나라도 있거나 상태가 `in_progress`/`completed`이면 `409 TOURNAMENT_SPORT_LOCKED`(변경 없음). 같은 종목 재전송은 pin을 건드리지 않는다. 출전 인원·교체 필드와 함께 보내면 `400 TOURNAMENT_LINEUP_SIZE_SPORT_CHANGE_CONFLICT`이므로 종목을 먼저 저장한 뒤 설정한다.
 
@@ -552,7 +588,7 @@ All team roster mutations lock the registration row and re-read `rosterLockedAt`
 - 새 표 `v1_tournament_slots`(`V1TournamentSlot`)는 팀이 들어갈 칸의 정본이다. 대회·정규 리그가 같은 표를 쓴다(`kind`: `ENTRY`·`BYE`·`GROUP_RANK`). `V1TeamMatch.homeSlotId`·`awaySlotId` 가 경기와 자리를 잇는다. 이 PR 은 스키마와 응답만 더하고 자리를 만드는 엔드포인트는 후속 PR 이다.
 - `GET /admin/tournaments/:tournamentId/bracket` 최상위에 `slots[]` 가 추가된다: `{ id, kind, groupId, sourceGroupId, position, label, registrationId, teamName }`. `label` 은 저장하지 않고 읽을 때 계산한다 — 조별 그룹의 `ENTRY` "A조 1번", 결선 그룹·정규 리그의 `ENTRY` "1번 자리", `BYE` "부전승 1", `GROUP_RANK` "A조 1위". 빈 자리는 `registrationId`·`teamName` 이 null.
 - 같은 응답의 `fixtures[]` 에 `homeSlotId`·`awaySlotId`(자리 없는 기존 경기는 null)와 `game` 이 추가된다: `{ id, state, version, hasLiveRecords, hasOfficialResult, latestRevision: { id, state, score, entryMethod } | null }`. `hasLiveRecords` 는 게임 이벤트가 1건 이상이다(빠른 결과를 못 쓰는 조건과 같다). `hasOfficialResult` 는 공식 결과 포인터(`currentOfficialRevision`)가 `OFFICIAL` 이다(진행 중인 정정 초안이 있어도 true — 시작된 경기 팀 교체 거절 조건과 같다). `latestRevision` 은 상태와 무관한 가장 최근 리비전(DRAFT·SUBMITTED·CHANGE_REQUESTED·OFFICIAL·VOID)이고 `score` 는 `{ home, away, penalties? }`, 읽을 수 없는 값이면 null. `entryMethod` 는 `reason` 이 `[quick-result]` 로 시작하면 `quick`, 앞 리비전을 대체한 것이면 `correction`, 그 밖은 `console` 이다. 정정·무효에 필요한 리비전 상세(참가자·eventsHash·goalEvents)는 싣지 않는다 — 결과 리비전 API 로 읽는다.
-- 공개 상세 `fixtures[]` 에 `homeSlotLabel`·`awaySlotLabel` 이 추가된다. **그 사이드에 팀이 없고 자리가 연결돼 있을 때만** 값이 있고 그 밖에는 null 이다(팀이 있으면 팀 이름이 나온다). `homeTeamName`·`awayTeamName` 의 `'TBD'` 규칙은 바뀌지 않는다. 공개 일정 `GET /tournaments/:id/schedule` 의 `items[]`·`unscheduled[]` 항목에도 같은 두 필드가 같은 규칙으로 추가된다(리그 경기는 항상 null). 경기 단건 상세(`/matches/:fixtureId`)에는 라벨이 없다.
+- 공개 상세 `fixtures[]` 에 `homeSlotLabel`·`awaySlotLabel` 이 추가된다. **그 사이드에 팀이 없을 때** 사용자 지정 문구를 우선 내리고, 비어 있으면 자동 자리 문구를 내린다. BYE는 연결 슬롯의 `displayLabel`이 단일 정본이며 이전 side 복사값으로 되돌아가지 않는다. 팀이 있으면 null 이고 실제 팀 이름을 우선한다. `homeTeamName`·`awayTeamName` 의 `'TBD'` 규칙은 바뀌지 않는다. 공개 일정 `GET /tournaments/:id/schedule` 의 `items[]`·`unscheduled[]` 항목에도 같은 두 필드가 같은 규칙으로 추가된다(리그 경기는 항상 null). 경기 단건 상세(`/matches/:fixtureId`)에는 라벨이 없다.
 - `PATCH /admin/fixtures/:fixtureId` 는 자리에 연결된 사이드의 팀을 현재 값과 다르게 바꾸거나 비우려 하면 `409 SLOT_LINKED` 를 돌려준다. 같은 값을 보내거나 보내지 않은 쪽, 자리에 연결되지 않은 쪽은 그대로 바꿀 수 있다.
 - `PATCH /admin/fixtures/:fixtureId` 는 **시작된 경기의 팀도 바꾼다**(2026-10-09, `docs/design/competition-canonical-flow.md` §4). 게임이 `SCHEDULED` 가 아니어도(진행 중·일시정지·종료됐지만 공식 결과 없음·결과가 `VOID` 로 돌려진 경기) 공식 결과가 없으면(제출됐지만 미확정인 `DRAFT`·`SUBMITTED`·`CHANGE_REQUESTED` 결과 포함) 교체되고, 이때 body 의 `teamChangeReason`(1~200자, 공백 제외)이 필수다(없으면 `400 TEAM_CHANGE_REASON_REQUIRED`). 시작 전 경기는 `teamChangeReason` 을 무시한다. 한 트랜잭션에서 ① 바뀐 사이드의 옛 팀 이벤트(그 사이드의 득점·자책골·카드·반칙·교체와 취소 이벤트, 그 사이드 선수가 참조된 이벤트 — 옛 팀 선수의 자책골은 상대 득점이었어도 함께)를 삭제하고 상대 팀 이벤트·피리어드/시계 이벤트는 남기며 점수는 남은 이벤트로 다시 센다, ②′ 미확정 결과 리비전은 사유와 함께 `VOID` 로 폐기하고(`CHANGE_REQUESTED` 는 불변이라 `VOID` 후속만 추가) `currentOfficialRevisionId` 를 결과 없는 `VOID` 리비전으로 옮긴다(공식 무효와 같은 상태 — 이후 `VOID_REENTRY` 정정으로 새 팀 기준 결과를 다시 입력, 폐기된 리비전은 공개 결과·순위·기록에 집계되지 않음), ② 옛 라인업을 무효화하고 새 팀 참가 명단으로 다시 계산하는 후속 이벤트(`COMPETITION_ROSTER_RESYNC` 의 `startedGameSide`, 바뀐 사이드만)를 남기고, ③ 게임 `version` 을 올려 열려 있던 콘솔의 `expectedVersion` 이 낡게 한다(`VERSION_CONFLICT`). 감사 `tournament.bracket.fixture.started_team_change`(`reason`=사유, `beforeJson.{gameState,score}`, `afterJson.{sides[].removedEventCount,removedEventCount,score,discardedRevisions[]{id,state}}`). 응답은 기존 경기 필드에 `startedTeamChange: { removedEventCount, score } | null` 을 더한다(시작 전 교체·팀 미변경이면 null). 거절: 공식 결과 `409 FIXTURE_RESULT_MUST_BE_VOIDED`(결과를 먼저 무효로 돌린 뒤 교체, 자동 무효화 없음), 취소된 경기 `409 FIXTURE_CANCELLED`, 진출 연결 자리 `409 BRACKET_SOURCE_SLOT_LINKED`/`SLOT_LINKED`. 같은 가드를 쓰는 다른 호출자(리그 대진 재조정·자리 배정)는 시작된 경기에서 여전히 `409 FIXTURE_HAS_RESULT` 다. 정규 리그(`kind=regular_league`)의 사이드 배정 가드는 범위 밖이다.
 - `DELETE /admin/fixtures/:fixtureId` 는 경기를 숨기면서 `homeSlotId`·`awaySlotId` 도 같이 비운다. `DELETE /admin/groups/:groupId` 는 조에 속한 자리(`slots`)나 그 조를 원천으로 삼는 순위 자리(`rankSlots`)가 남아 있으면 `409 GROUP_HAS_SLOTS` 로 막는다(검사 순서: `GROUP_HAS_TEAMS` → `GROUP_HAS_FIXTURES` → `GROUP_HAS_SLOTS`).
@@ -609,3 +645,20 @@ All team roster mutations lock the registration row and re-read `rosterLockedAt`
 4. `completed` - most recently finished first (`scheduledEndAt` descending, falling back to `scheduledAt`)
 
 Rows without a date sort last inside their group. `page` is an offset into the same order, so page-number paging uses the same sorted rows. Passing `status` filters the stored lifecycle status; an `open` result or regular-league `draft` result can still span recruiting and recruitment-closed display groups. Regular tournament `draft`/`cancelled` rows stay hidden, while regular-league `draft` rows remain public with their capacity-derived display group.
+
+## Bracket presentation overrides (2026-10-17)
+
+`PATCH /admin/fixtures/:fixtureId` accepts `homeDisplayLabel` / `awayDisplayLabel`: optional nullable strings, trimmed, maximum 120 characters. Omission preserves the override; null or whitespace restores automatic text. Only presentation changes: registration IDs, fixture ID, advancement edges and results remain unchanged. Text-only requests use the existing mutation-admin gate and competition/fixture locks, and append a display-label audit action without invoking roster/result synchronization. Support/non-admin writes remain forbidden.
+
+Admin bracket fixtures expose both nullable overrides. Slots expose `automaticLabel`, nullable `displayLabel`, and effective `label`. A BYE override is stored only on its slot; the linked quarter-final side reads/writes that same value. Assigned team names take display priority; BYE text remains secondary. Automatic source labels use the current source fixture number, while a custom override remains unchanged. Responses sort by phase/group order, fixture number, leg, stable ID; labels never affect ordering.
+
+List/canvas/mobile share the same TeamMatch `startAt` (response `scheduledAt`), place snapshot and `fieldId`. Existing values require no migration or reentry. `scheduledAt: null` clears time; omission preserves it. Registered-field assignment sends `fieldId` without a simultaneous place replacement. Unassignment sends `fieldId: null` and `venue: ''` to clear the previous snapshot. BYE slots have no independent fixture number/time/field; edit those on the actual quarter-final. Slot team assignment still uses the existing slot endpoint and started/result lock. Saving labels and assigning a BYE team are separate explicit actions.
+
+Schema migration `20261017010000_bracket_display_labels` adds nullable varchar(120) presentation columns without changing existing data. Regression and pending alpha evidence: [scenario](../../scenarios/bracket-display-edit.md).
+
+### 2026-10-18 공개 대진 표시 후속
+
+공개 상세와 공개 일정은 관리자와 동일한 side override/BYE 슬롯 값을 읽는다. `groups[].groupTeams[].displayLabel`은 BYE의 저장 문구(그 외 null)로 팀 확정 후에도 보조 표시한다. 공개 `fixtures[].fieldId`는 canonical TeamMatch의 등록 경기장 ID다. 그림의 시각·경기장 표시는 같은 경기 ID의 `scheduledAt`·`venue`이며, venue는 등록된 field 이름을 우선하고 미등록 장소 snapshot을 다음으로 사용한다. null은 시간 미정/경기장 미정이다. 번호·문구 수정으로 실제 팀 배정·승자/패자 edge는 바뀌지 않는다.
+
+
+공개 상세 `groups[].groupTeams[].byeTarget`은 BYE 슬롯이 연결된 `{ fixtureId, side: 'HOME' | 'AWAY' }` 또는 null이다. 팀 미배정·문구 변경과 무관하게 canonical TeamMatch의 homeSlotId/awaySlotId로 조회하며, 비부전승·미연결은 null이다. 대진 비공개 시 groups/fixtures 숨김 정책은 그대로다. 공개 그림은 이 명시적 연결을 우선하며 슬롯 없는 기존 대진은 기존 registration 배정 연결을 유지한다. 번호·정렬로 진출 관계를 추정하지 않는다.

@@ -22,7 +22,7 @@ import {
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminContextService } from '../common/admin-context.service';
-import { TournamentBracketService } from './tournament-bracket.service';
+import { TournamentBracketService, withScorerRealNames } from './tournament-bracket.service';
 import { GamesService } from '../games/games.service';
 import { FOOTBALL_V1_CONFIG } from './competition-config/competition-config';
 import { kindAwareFindFirst } from '../../test/helpers/kind-aware-find-first';
@@ -413,6 +413,26 @@ describe('TournamentBracketService', () => {
     service = module.get(TournamentBracketService);
   });
 
+  it('display labels on an official fixture never rewrite teams, results or edges', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    const row = canonicalDetailsRow();
+    row.teamMatch.game.state = 'ENDED';
+    row.teamMatch.game.currentOfficialRevision = { state: 'OFFICIAL' } as never;
+    const detail = { ...row, homeDisplayLabel: null, awayDisplayLabel: null, teamMatch: { ...row.teamMatch, homeSlot: null, awaySlot: null } };
+    prisma.v1TournamentMatchDetails.findUnique.mockResolvedValue(detail);
+    prisma.v1TournamentMatchDetails.findUniqueOrThrow.mockResolvedValue(detail);
+    const result = await service.updateFixture(ownerUser, 'fixture-1', { homeDisplayLabel: '준결승 A 승자' });
+    expect(result).toMatchObject({ id: 'fixture-1', homeDisplayLabel: '준결승 A 승자', startedTeamChange: null });
+    expect(prisma.v1TournamentMatchDetails.update).toHaveBeenCalledWith({ where: { teamMatchId: 'fixture-1' }, data: { homeDisplayLabel: '준결승 A 승자' } });
+    expect(prisma.v1TeamMatch.update).not.toHaveBeenCalled();
+    expect(prisma.v1Game.update).not.toHaveBeenCalled();
+    expect(prisma.v1GameSide.update).not.toHaveBeenCalled();
+  });
+  it.each([supportUser, nonAdminUser])('display-label mutation obeys the existing write gate for $id', async user => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(user.id === supportUser.id ? supportAdmin : null);
+    await expect(service.updateFixture(user, 'fixture-1', { homeDisplayLabel: '수정' })).rejects.toThrow(ForbiddenException);
+    expect(prisma.v1TournamentMatchDetails.update).not.toHaveBeenCalled();
+  });
   afterEach(() => jest.clearAllMocks());
 
   // ─── admin role gates ──────────────────────────────────────────────────────
@@ -821,7 +841,7 @@ describe('TournamentBracketService', () => {
         prisma.v1TournamentGroupTeam.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({ ...placed, registrationId: 'reg-B' }); // 중복 검사 → 위임 뒤 재조회
         const result = await service.createBye(ownerUser, 'tournament-1', { groupId: 'group-1', byeId: 'gt-1', sortOrder: 0, registrationId: 'reg-B' });
         expect(mockAssignSlotInTx).toHaveBeenCalledWith(expect.anything(), expect.anything(), 'slot-bye-1', 'reg-B');
-        expect(prisma.v1TournamentSlot.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { groupId: 'group-1', kind: 'BYE', position: 1 } }));
+        expect(prisma.v1TournamentSlot.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { groupId: 'group-1', kind: 'BYE', byeSortOrder: 0 } }));
         expect(prisma.v1TournamentGroupTeam.update).not.toHaveBeenCalled();
         expect(result).toMatchObject({ id: 'gt-1', registrationId: 'reg-B', isBye: true, sortOrder: 0 });
       });
@@ -832,6 +852,21 @@ describe('TournamentBracketService', () => {
         expect(mockAssignSlotInTx).toHaveBeenCalledWith(expect.anything(), expect.anything(), 'slot-bye-1', null);
         expect(prisma.v1TournamentGroupTeam.delete).not.toHaveBeenCalled();
         expect(result).toMatchObject({ id: 'gt-1', registrationId: null, isBye: true, sortOrder: 0 });
+      });
+      it.each([1, 2, 3, 5, 6])('홈·어웨이 교환 후 표시 위치 %i에서도 연결된 자리로 팀 변경을 위임한다', async (sortOrder) => {
+        const moved = { ...placed, sortOrder };
+        prisma.v1TournamentGroupTeam.findMany.mockResolvedValue([moved]);
+        prisma.v1TournamentSlot.findFirst.mockImplementation(async ({ where }) =>
+          where.byeSortOrder === sortOrder ? linkedSlot : null);
+        prisma.v1TournamentGroupTeam.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({ ...moved, registrationId: 'reg-B' });
+
+        const result = await service.createBye(ownerUser, 'tournament-1', {
+          groupId: 'group-1', byeId: 'gt-1', sortOrder, registrationId: 'reg-B',
+        });
+
+        expect(mockAssignSlotInTx).toHaveBeenCalledWith(expect.anything(), expect.anything(), linkedSlot.id, 'reg-B');
+        expect(prisma.v1TournamentGroupTeam.update).not.toHaveBeenCalled();
+        expect(result).toMatchObject({ registrationId: 'reg-B', sortOrder });
       });
       it('연결된 부전승을 다른 위치로 옮기면 409 SLOT_LINKED 이고 아무것도 바꾸지 않는다', async () => {
         await expect(service.createBye(ownerUser, 'tournament-1', { groupId: 'group-1', byeId: 'gt-1', sortOrder: 3, registrationId: 'reg-A' }))
@@ -2854,7 +2889,7 @@ describe('TournamentBracketService', () => {
         }));
         prisma.v1TournamentSlot.findFirst.mockResolvedValue({ id: 'slot-bye-2' });
         await expect(service.removeGroupTeam(ownerUser, 'gt-1')).rejects.toMatchObject({ response: { code: 'SLOT_LINKED' } });
-        expect(prisma.v1TournamentSlot.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { groupId: 'group-1', kind: 'BYE', position: 2 } }));
+        expect(prisma.v1TournamentSlot.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { groupId: 'group-1', kind: 'BYE', byeSortOrder: 3 } }));
         expect(prisma.v1TournamentGroupTeam.delete).not.toHaveBeenCalled();
       });
 
@@ -3270,7 +3305,7 @@ describe('TournamentBracketService', () => {
 
   describe('getBracket — 자리·게임 블록', () => {
     const slotRow = (overrides: Record<string, unknown>) => ({
-      id: 'slot-x', tournamentId: 'tournament-1', kind: 'ENTRY', groupId: null, position: 1, sourceGroupId: null, registrationId: null,
+      id: 'slot-x', tournamentId: 'tournament-1', kind: 'ENTRY', groupId: null, position: 1, byeSortOrder: null, sourceGroupId: null, registrationId: null,
       createdAt: new Date('2026-06-14T00:00:00Z'), updatedAt: new Date('2026-06-14T00:00:00Z'),
       group: null, sourceGroup: null, registration: null, ...overrides,
     });
@@ -3292,8 +3327,8 @@ describe('TournamentBracketService', () => {
       const result = await service.getBracket(ownerUser, 'tournament-1');
 
       expect(result.slots).toEqual([
-        { id: 'slot-1', kind: 'ENTRY', groupId: 'group-1', sourceGroupId: null, position: 1, label: 'A조 1번', registrationId: 'reg-1', teamName: '서울 FC' },
-        { id: 'slot-2', kind: 'GROUP_RANK', groupId: 'group-f', sourceGroupId: 'group-1', position: 1, label: 'A조 1위', registrationId: null, teamName: null },
+        { id: 'slot-1', kind: 'ENTRY', groupId: 'group-1', sourceGroupId: null, position: 1, byeSortOrder: null, label: 'A조 1번', automaticLabel: 'A조 1번', displayLabel: null, registrationId: 'reg-1', teamName: '서울 FC' },
+        { id: 'slot-2', kind: 'GROUP_RANK', groupId: 'group-f', sourceGroupId: 'group-1', position: 1, byeSortOrder: null, label: 'A조 1위', automaticLabel: 'A조 1위', displayLabel: null, registrationId: null, teamName: null },
       ]);
       expect(prisma.v1TournamentSlot.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { tournamentId: 'tournament-1' } }));
     });
@@ -3342,4 +3377,20 @@ describe('TournamentBracketService', () => {
 
   // ─── …InTx 추출 함수 끝 (새 describe 는 이 줄 위에 추가한다) ───
 
+});
+
+describe('withScorerRealNames — 어드민 득점 순위의 운영진 실명', () => {
+  const goals = [
+    { id: 'g1', playerUserId: 'u1', playerName: '골잡이' },
+    { id: 'g2', playerUserId: 'u2', playerName: '실명없음' },
+    { id: 'g3', playerUserId: null, playerName: '게스트' },
+  ];
+
+  it('실명이 있는 득점자에게만 playerRealName 을 붙이고, 나머지는 키를 만들지 않는다', () => {
+    const [linked, noRealName, guest] = withScorerRealNames(goals, new Map([['u1', '김실명']]));
+
+    expect(linked).toEqual({ id: 'g1', playerUserId: 'u1', playerName: '골잡이', playerRealName: '김실명' });
+    expect(noRealName).not.toHaveProperty('playerRealName');
+    expect(guest).not.toHaveProperty('playerRealName');
+  });
 });

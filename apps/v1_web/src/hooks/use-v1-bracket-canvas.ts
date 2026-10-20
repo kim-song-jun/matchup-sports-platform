@@ -25,6 +25,16 @@ import type {
 
 export type BracketCompetitionScope = 'tournament' | 'league';
 
+export function useV1SetByeSide(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ slotId, ...body }: { slotId: string; side: 'HOME' | 'AWAY'; expectedSide: 'HOME' | 'AWAY' }) =>
+      v1Put<{ side: 'HOME' | 'AWAY'; sortOrder: number; affectedTeamMatchIds: string[] }>(
+        `/admin/tournament-slots/${encodeURIComponent(slotId)}/bye-side`, body),
+    onSuccess: () => invalidateCompetitionViews(queryClient, tournamentId, 'tournament'),
+  });
+}
+
 /** 대진이 바뀌면 어드민 화면과 공개 화면 캐시를 같이 털어야 한다. */
 function invalidateCompetitionViews(queryClient: QueryClient, competitionId: string, scope: BracketCompetitionScope) {
   const keys =

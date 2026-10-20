@@ -123,6 +123,13 @@ describe('teamDescriptionFallback', () => {
   it('공백만 있는 값은 없는 것으로 본다', () => {
     expect(teamDescriptionFallback('강남 FC', '  ', ' \n ')).toBe('강남 FC 팀을 만나보세요.');
   });
+
+  it('team name already ending with 팀 does not gain a duplicate suffix', () => {
+    expect(teamDescriptionFallback('새 풋살 팀', '풋살', '서울 성동구')).toBe(
+      '풋살 · 서울 성동구에서 활동하는 새 풋살 팀을 만나보세요.',
+    );
+    expect(teamDescriptionFallback('새 풋살 팀', null, null)).toBe('새 풋살 팀을 만나보세요.');
+  });
 });
 
 describe('metadataDescription', () => {

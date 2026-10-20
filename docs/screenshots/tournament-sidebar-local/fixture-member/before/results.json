@@ -1,0 +1,65 @@
+[
+  {
+    "width": 1440,
+    "persona": "fixture member; public Alpha content, intercepted membership only",
+    "url": "https://alpha.teameet.co.kr/tournaments/1701404b-317b-4018-a90d-2d160b6af45d?from=%2Ftournaments%3Fkind%3Dleague",
+    "errors": [],
+    "failures": [
+      {
+        "url": "https://alpha.teameet.co.kr/api/v1/me/settings",
+        "status": 401
+      },
+      {
+        "url": "https://alpha.teameet.co.kr/api/v1/notifications?status=unread&limit=1",
+        "status": 401
+      }
+    ],
+    "overflow": false,
+    "headings": [
+      "(QA) 1013 템플릿 UI"
+    ],
+    "noticeCount": 1
+  },
+  {
+    "width": 768,
+    "persona": "fixture member; public Alpha content, intercepted membership only",
+    "url": "https://alpha.teameet.co.kr/tournaments/1701404b-317b-4018-a90d-2d160b6af45d?from=%2Ftournaments%3Fkind%3Dleague",
+    "errors": [],
+    "failures": [
+      {
+        "url": "https://alpha.teameet.co.kr/api/v1/me/settings",
+        "status": 401
+      },
+      {
+        "url": "https://alpha.teameet.co.kr/api/v1/notifications?status=unread&limit=1",
+        "status": 401
+      }
+    ],
+    "overflow": false,
+    "headings": [
+      "(QA) 1013 템플릿 UI"
+    ],
+    "noticeCount": 1
+  },
+  {
+    "width": 390,
+    "persona": "fixture member; public Alpha content, intercepted membership only",
+    "url": "https://alpha.teameet.co.kr/tournaments/1701404b-317b-4018-a90d-2d160b6af45d?from=%2Ftournaments%3Fkind%3Dleague",
+    "errors": [],
+    "failures": [
+      {
+        "url": "https://alpha.teameet.co.kr/api/v1/me/settings",
+        "status": 401
+      },
+      {
+        "url": "https://alpha.teameet.co.kr/api/v1/notifications?status=unread&limit=1",
+        "status": 401
+      }
+    ],
+    "overflow": false,
+    "headings": [
+      "(QA) 1013 템플릿 UI"
+    ],
+    "noticeCount": 1
+  }
+]

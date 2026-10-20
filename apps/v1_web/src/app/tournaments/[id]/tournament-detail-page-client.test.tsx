@@ -37,6 +37,22 @@ vi.mock('@/lib/analytics', () => ({
   trackEvent: vi.fn(),
 }));
 
+vi.mock('@/lib/api-client', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/api-client')>()),
+  v1Get: vi.fn((path: string) => Promise.resolve(
+    path.endsWith('/standings/overall')
+      ? {
+          standings: [],
+          progress: { total: 0, played: 0, remaining: 0, percent: 0 },
+          magicNumber: null,
+          recalculatedAt: null,
+          champions: [],
+          tieBreakGroups: [],
+        }
+      : { items: [] },
+  )),
+}));
+
 vi.mock('next/navigation', () => ({
   usePathname: () => '/tournaments/tournament-1',
   useRouter: () => ({
@@ -198,7 +214,7 @@ describe('TournamentDetailPageClient GA events', () => {
     render(<TournamentDetailPageClient tournamentId="tournament-1" />);
 
     await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
-    const rail = screen.getByRole('complementary', { name: '리그 참가 신청' });
+    const rail = screen.getByRole('complementary', { name: '리그 진행 상태' });
     expect(within(rail).getByRole('link', { name: '참가 신청하기' })).toHaveAttribute(
       'href', '/tournaments/tournament-1/my',
     );

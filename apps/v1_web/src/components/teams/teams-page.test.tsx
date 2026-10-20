@@ -6,6 +6,7 @@ import { act, fireEvent, render as rtlRender, screen, waitFor, within } from '@t
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TEAM_LOGO_PRESETS } from '@/lib/team-logo-presets';
+import { resolveNextImageSrc } from '@/test/next-image';
 import { TeamMembersPageClient } from './teams-client';
 import { TeamDetailPageView, TeamFormPageView, TeamListPageView, TeamMembersPageView, TeamStatePageView } from './teams-page';
 import { getTeamDetailViewModel, getTeamListViewModel, getTeamMembersViewModel } from './teams.view-model';
@@ -505,6 +506,29 @@ describe('TeamMembersPageView — 보낸 초대 목록', () => {
 });
 
 describe('TeamFormPageView', () => {
+  it('keeps an existing team with no saved logo visually consistent across picker and card preview', () => {
+    const model: TeamFormViewModel = {
+      mode: 'edit',
+      team: {
+        name: '성수 풋살 크루', logoUrl: null, coverImageUrl: null, sport: '풋살', region: '서울 성동구',
+        description: '', sports: ['풋살'], city: '서울', county: '성동구', level: '', genderRule: '성별 무관',
+        activityDays: [], activityFrequency: '', activityTimeSlots: [], activityTypes: [], activityMemo: '', capacity: 12,
+      },
+      form: {
+        sportId: 'sport-1', regionId: 'region-1', regions: [{ id: 'region-1', name: '서울 성동구' }],
+        sports: [{ id: 'sport-1', name: '풋살' }], joinPolicy: 'approval_required', onFieldChange: vi.fn(),
+        onSportChange: vi.fn(), onRegionChange: vi.fn(), onJoinPolicyChange: vi.fn(), onSubmit: vi.fn(),
+      },
+    };
+
+    const { container } = rtlRender(<TeamFormPageView model={model} teamId="stable-team-for-preview" />);
+    const pickerImage = container.querySelector('.tm-team-logo-current img');
+    const previewImage = container.querySelector('.tm-team-card img');
+
+    expect(TEAM_LOGO_PRESETS).toContain(resolveNextImageSrc(pickerImage));
+    expect(resolveNextImageSrc(previewImage)).toBe(resolveNextImageSrc(pickerImage));
+  });
+
   it('renders and updates the team join policy control', () => {
     const onJoinPolicyChange = vi.fn();
     const onFieldChange = vi.fn();

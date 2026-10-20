@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { buildPublicMetadata, fetchPublicV1 } from '@/lib/seo';
+import { buildNoIndexMetadata, buildPublicMetadata, fetchPublicV1 } from '@/lib/seo';
+import { TEAM_LOGO_PRESETS } from '@/lib/team-logo-presets';
 import TeamDetailPage, { generateMetadata } from './page';
 
 vi.mock('next/navigation', () => ({
@@ -8,13 +9,15 @@ vi.mock('next/navigation', () => ({
   }),
 }));
 
-vi.mock('@/lib/seo', () => ({
-  fetchPublicV1: vi.fn(),
-  buildNoIndexMetadata: vi.fn(),
-  buildPublicMetadata: vi.fn(),
-  metadataDescription: vi.fn(),
-  teamDescriptionFallback: vi.fn(),
-}));
+vi.mock('@/lib/seo', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/seo')>();
+  return {
+    ...actual,
+    fetchPublicV1: vi.fn(),
+    buildNoIndexMetadata: vi.fn(actual.buildNoIndexMetadata),
+    buildPublicMetadata: vi.fn(actual.buildPublicMetadata),
+  };
+});
 
 vi.mock('@/lib/structured-data', () => ({
   buildSportsTeamLd: vi.fn(() => ({})),
@@ -72,6 +75,67 @@ describe('TeamDetailPage (server)', () => {
     expect(vi.mocked(buildPublicMetadata)).toHaveBeenLastCalledWith(
       expect.objectContaining({ image: '/uploads/cover.png', squareImage: false }),
     );
+  });
+
+  it('저장 로고가 없는 공개 팀도 실제 로컬 엠블럼을 대표 이미지와 SportsTeam 로고로 공유한다', async () => {
+    const params = Promise.resolve({ id: 'team-no-logo' });
+    fetchPublicV1Mock.mockResolvedValue({
+      id: 'team-no-logo', teamId: 'team-no-logo', name: '성수 러너스', profile: { logoUrl: null, coverImageUrl: null },
+    } as never);
+
+    const metadata = await generateMetadata({ params });
+    const publicMetadata = vi.mocked(buildPublicMetadata).mock.calls.at(-1)?.[0];
+    const generatedLocalLogo = publicMetadata?.image;
+
+    expect(TEAM_LOGO_PRESETS).toContain(generatedLocalLogo);
+    expect(publicMetadata?.squareImage).toBe(true);
+    expect(metadata.openGraph?.images).toContainEqual(expect.objectContaining({ url: generatedLocalLogo }));
+  });
+
+  it('공개 팀의 실제 종목·지역·활동·수준을 검색 메타에 전달하고 기존 canonical/image 흐름을 보존한다', async () => {
+    const params = Promise.resolve({ id: 'team-1' });
+    fetchPublicV1Mock.mockResolvedValue({
+      teamId: 'team-1',
+      name: '성수 러너스',
+      sport: { sportId: 'running', name: '러닝' },
+      region: { regionId: 'seongdong', name: '성동구', parentName: '서울' },
+      status: 'active',
+      visibility: 'public',
+      profile: {
+        introduction: '주말마다 성수에서 초보자와 함께 달려요',
+        activitySummary: '주말 · 오전',
+        levelLabel: '초급-중급',
+        joinPolicy: 'approval_required',
+        logoUrl: '/uploads/team.png',
+        coverImageUrl: null,
+      },
+    } as never);
+
+    const metadata = await generateMetadata({ params });
+
+    expect(metadata.title).toBe('성수 러너스 · 러닝 · 서울 성동구 팀');
+    expect(metadata.description).toContain('주말마다 성수에서 초보자와 함께 달려요');
+    expect(metadata.description).toContain('서울 성동구');
+    expect(metadata.description).toContain('러닝');
+    expect(metadata.description).toContain('가입은 운영진 승인 방식이에요.');
+    expect(metadata.alternates?.canonical).toBe('/teams/team-1');
+    expect(metadata.robots).toMatchObject({ index: true, follow: true });
+    expect(metadata.openGraph?.images).toContainEqual(expect.objectContaining({ url: '/uploads/team.png' }));
+    expect(vi.mocked(buildPublicMetadata)).toHaveBeenCalledWith(expect.objectContaining({ image: '/uploads/team.png', squareImage: true }));
+  });
+
+  it('없는 팀과 해체 팀의 기존 noindex 경계를 유지한다', async () => {
+    const params = Promise.resolve({ id: 'team-1' });
+    fetchPublicV1Mock.mockResolvedValue(null as never);
+    const missingMetadata = await generateMetadata({ params });
+    expect(missingMetadata.robots).toMatchObject({ index: false, follow: false });
+    expect(vi.mocked(buildNoIndexMetadata)).toHaveBeenLastCalledWith('팀을 찾을 수 없어요');
+
+    fetchPublicV1Mock.mockResolvedValue({ name: '해체 팀', dissolution: { dissolvedAt: null } } as never);
+    const dissolvedMetadata = await generateMetadata({ params });
+    expect(dissolvedMetadata.robots).toMatchObject({ index: false, follow: false });
+    expect(vi.mocked(buildNoIndexMetadata)).toHaveBeenLastCalledWith('해체 팀 (해체된 팀)');
+    expect(vi.mocked(buildPublicMetadata)).not.toHaveBeenCalled();
   });
 
   it('없는 팀은 notFound 로 끝난다', async () => {

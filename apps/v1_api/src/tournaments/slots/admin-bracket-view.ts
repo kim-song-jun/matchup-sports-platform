@@ -17,7 +17,10 @@ export type AdminBracketSlot = {
   groupId: string | null;
   sourceGroupId: string | null;
   position: number;
+  byeSortOrder: number | null;
   label: string;
+  automaticLabel: string;
+  displayLabel: string | null;
   registrationId: string | null;
   teamName: string | null;
 };
@@ -29,7 +32,10 @@ export function serializeAdminBracketSlot(row: AdminBracketSlotRow): AdminBracke
     groupId: row.groupId,
     sourceGroupId: row.sourceGroupId,
     position: row.position,
-    label: slotLabelFromRow(row),
+    byeSortOrder: row.byeSortOrder ?? null,
+    label: row.displayLabel ?? slotLabelFromRow(row),
+    automaticLabel: slotLabelFromRow(row),
+    displayLabel: row.displayLabel ?? null,
     registrationId: row.registrationId,
     teamName: row.registration?.team.name ?? null,
   };

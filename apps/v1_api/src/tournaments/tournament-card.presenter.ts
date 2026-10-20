@@ -25,7 +25,8 @@ export function presentTournamentCard(row: TournamentListRow) {
     scheduledAt: row.scheduledAt?.toISOString() ?? null,
     scheduledEndAt: row.scheduledEndAt?.toISOString() ?? null,
     venue: row.venue,
-    coverImageUrl: row.coverImageUrl,
+    // The card contract supplies the image for list consumers, including home discovery.
+    coverImageUrl: row.kind === 'regular_league' ? row.listImageUrl ?? row.coverImageUrl : row.coverImageUrl,
     // 리그의 과거 teamCount 기본값 8은 상한이 아니다. 선택적 참가팀 정원만 별도로 노출한다.
     ...(row.kind === 'regular_league' ? { maxTeams: row.maxTeams } : { teamCount: row.teamCount }),
 

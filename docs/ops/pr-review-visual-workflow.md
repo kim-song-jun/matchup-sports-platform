@@ -50,7 +50,7 @@ gh pr edit <N> --add-reviewer "@copilot"
 
 - 현재 GitHub CLI의 Copilot 예약 핸들은 `@copilot`이다. 기존 bot slug만 전달한 명령은 exit 0이어도 이 세션에서 요청 이벤트를 만들지 않았으므로, 성공 종료만으로 접수·clean을 판정하지 않는다. 실제 요청 이벤트/리뷰 workflow와 최신 head의 제출 리뷰를 확인한다. [CLI 공식 문서](https://cli.github.com/manual/gh_pr_edit).
 
-- 공식 REST 요청도 지원한다. 2026-10-16 실제로 다음 요청이 접수되고 해당 head의 리뷰 workflow가 실행됐다. 이전의 “REST는 항상422” 관찰은 현재 절차가 아니다.
+- 공식 REST 요청도 지원한다. 2026-10-16 실제로 다음 요청이 접수되고 해당 head의 리뷰 workflow가 실행됐다. 이전의 “REST는 항상 422” 관찰은 현재 절차가 아니다.
   ```bash
   gh api repos/<owner>/<repo>/pulls/<N>/requested_reviewers --method POST \
     -f 'reviewers[]=copilot-pull-request-reviewer[bot]'

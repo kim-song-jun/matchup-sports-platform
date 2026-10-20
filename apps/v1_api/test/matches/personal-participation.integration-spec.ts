@@ -95,6 +95,7 @@ describe('개인 매치 참여 이력 HTTP/DB 계약', () => {
     const id = await createMatch({ capacity: 1, hostParticipates: false });
     await end(id, false);
     const detail = (await get(host, `/matches/${id}`).expect(200)).body.data;
+    expect(detail.isOnline).toBe(false);
     expect(detail).toMatchObject({ status: 'on_hold', displayState: 'on_hold', participantCount: 0, lifecycle: { canEdit: true, canDelete: true, canConfirmProceed: false } });
     await post(host, `/matches/${id}/complete`, { participants: [] }).expect(409);
     await post(outsider, `/matches/${id}/confirm-proceed`).expect(403);

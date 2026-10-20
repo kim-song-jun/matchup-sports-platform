@@ -179,7 +179,7 @@ type FakeAssignmentRow = {
   expiresAt: Date | null;
   revokedAt: Date | null;
   createdAt: Date;
-  tournament: { title: string; status: V1TournamentStatus };
+  tournament: { title: string; status: V1TournamentStatus; kind?: 'regular_league' | 'regular_tournament' | null };
   fixtureScopes: { teamMatchId: string }[];
 };
 
@@ -310,6 +310,17 @@ function assignmentRow(overrides: Partial<FakeAssignmentRow> = {}): FakeAssignme
 }
 
 describe('TournamentOperationsStaffService.myAssignments', () => {
+  it('리그 담당 목록에 실제 competition kind를 전달해 대회 상태와 구분한다', async () => {
+    const { service, findMany } = buildMyAssignmentsHarness([
+      assignmentRow({ tournament: { title: '테스트 리그', status: 'closed', kind: 'regular_league' } }),
+    ]);
+    const result = await service.myAssignments(targetUserId);
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({
+      select: expect.objectContaining({ tournament: { select: { title: true, status: true, kind: true } } }),
+    }));
+    expect(result.items[0]).toMatchObject({ tournamentStatus: 'closed', tournamentKind: 'regular_league' });
+  });
+
   it('리그 경기장 배정은 Details가 없어도 담당 경기에 표시하고 다른 리그·삭제 경기·잘못된 종류는 제외한다', async () => {
     const field = 'league-field';
     const base: FakeTeamMatchRow = {

@@ -149,9 +149,12 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
   const selectionPlayers = [...data.participants, ...data.excluded].sort(compareRosterPlayers);
   const excludedIds = new Set(data.excluded.map((row) => row.userId));
 
+  // 통합 명단에서 GK는 참가 선수 탭이 맡지만, 그 탭은 팀 전용이다. 팀원이 아닌 운영진은 여기서 바로 GK를 정한다.
+  const goalkeeperInPlayersTab = managerNavigation !== null && (data.viewerRole === 'TEAM_MANAGER' || data.viewerRole === 'TEAM_MEMBER');
+
   function goalkeeperControl(row: { userId: string; displayName: string; goalkeeper: boolean }) {
     const checked = goalkeepers[row.userId] ?? row.goalkeeper;
-    if (managerNavigation) return <span className="tm-text-caption" style={{ minWidth: 44, textAlign: 'center' }}>{checked ? 'GK' : ''}</span>;
+    if (goalkeeperInPlayersTab) return <span className="tm-text-caption" style={{ minWidth: 44, textAlign: 'center' }}>{checked ? 'GK' : ''}</span>;
     return canEdit && data?.goalkeeperEditable !== false ? (
       <Button
         variant={checked ? 'primary' : 'outline'}
@@ -273,7 +276,7 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
             <>
               {GAME_ROSTER_PLAYING_HINT}
               <br />{GAME_ROSTER_SCOPE}
-              <br />{managerNavigation ? '번호·GK는 참가 선수 탭의 공통 설정이에요.' : data.goalkeeperEditable === false ? 'GK는 팀장·매니저와 대회 운영진이 관리해요.' : `GK는 ${competitionNoun} 공통 설정이에요. 여러 명을 지정할 수 있고, 시작 전 경기에도 반영돼요.`}
+              <br />{goalkeeperInPlayersTab ? '번호·GK는 참가 선수 탭의 공통 설정이에요.' : data.goalkeeperEditable === false ? 'GK는 팀장·매니저와 대회 운영진이 관리해요.' : `GK는 ${competitionNoun} 공통 설정이에요. 여러 명을 지정할 수 있고, 시작 전 경기에도 반영돼요.`}
               {!managerNavigation && data.jerseyRegistrationId !== null ? (
                 <>
                   <br />
@@ -357,7 +360,7 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
             ))}
           </ul>
         )}
-        {managerNavigation ? <Button variant="ghost" size="sm" onClick={managerNavigation.showPlayers}>선수 추가·번호·GK 관리</Button> : <RegistrationRosterEntry view={data} variant="block" />}
+        {managerNavigation ? <Button variant="ghost" size="sm" onClick={managerNavigation.showPlayers}>{data.viewerRole === 'TEAM_MANAGER' ? '선수 추가·번호·GK 관리' : '참가 선수 보기'}</Button> : <RegistrationRosterEntry view={data} variant="block" />}
       </RosterSection>
 
       {!canEdit && !managerNavigation && data.excluded.length > 0 ? (

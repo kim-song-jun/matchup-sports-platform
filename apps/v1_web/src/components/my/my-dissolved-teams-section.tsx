@@ -90,7 +90,7 @@ export function MyDissolvedTeamsSection() {
             <li key={team.teamId}>
               <Card pad={16}>
                 <Link className="tm-list-row tm-pressable" href={withFromPath(team.detailRoute, '/my/teams')} style={{ gap: 12 }}>
-                  <TeamAvatar seed={team.teamId} name={team.name} logoUrl={team.logoUrl} size="md" />
+                  <TeamAvatar teamId={team.teamId} name={team.name} logoUrl={team.logoUrl} size="md" />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div className="tm-text-body" style={{ color: 'var(--text-strong)', overflowWrap: 'anywhere' }}>{team.name}</div>
                     <div className="tm-text-caption" style={{ marginTop: 2 }}>

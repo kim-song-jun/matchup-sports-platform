@@ -151,3 +151,14 @@ describe('AssistPickerSheet — 어시스트 없음·맥락·잘림 (2026-08-18 
     }
   });
 });
+
+describe('AssistPickerSheet — 운영진 실명', () => {
+  it.each([
+    ['운영진(실명 있음)', { ...TEAMMATE, identity: { realName: '김실명', phone: null } }, '9 김실명 (조현우)'],
+    ['권한 없음(identity 키 없음)', TEAMMATE, '9 조현우'],
+  ])('%s', (_, teammate, name) => {
+    render(<AssistPickerSheet open event={EVENT} scorerName="정우진" teammates={[teammate]} onAttach={vi.fn()} onClose={vi.fn()} />);
+
+    expect(screen.getByRole('button', { name })).toBeInTheDocument();
+  });
+});

@@ -32,7 +32,7 @@ import {
 } from '@/lib/competition-status';
 import { StatusChip } from '@/components/v1-ui/status-chip';
 import type { V1TeamMatch, V1TeamMatchViewerState } from '@/types/api';
-import type { V1LeagueFixture, V1LeagueStandingRow } from '@/types/league-match';
+import type { V1LeagueFixture, V1LeagueStandingsResponse, V1PublicLeagueDetail, V1LeagueStandingRow } from '@/types/league-match';
 
 /**
  * 리그 경기 상세 — 리그 일정에서 경기를 누르면 오는 화면.
@@ -63,6 +63,14 @@ function recordLine(row: V1LeagueStandingRow | undefined): string | null {
   return `${row.position}위 · ${row.wins}승 ${row.draws}무 ${row.losses}패`;
 }
 
+function teamMatchNameForFixture(match: V1TeamMatch | undefined, teamId: string | null): string | null {
+  if (!match || teamId === null) return null;
+  const hostId = match.hostTeam?.teamId ?? match.hostTeamId;
+  if (hostId === teamId) return match.hostTeam?.name ?? match.hostTeamName ?? null;
+  if (match.approvedOpponentTeam?.teamId === teamId) return match.approvedOpponentTeam.name;
+  return null;
+}
+
 function TeamSide({ teamId, name, logoUrl, record, align, from }: {
   teamId: string | null;
   from?: string;
@@ -73,7 +81,7 @@ function TeamSide({ teamId, name, logoUrl, record, align, from }: {
 }) {
   const body = (
     <span className={`flex flex-col gap-2 ${align === 'right' ? 'items-end text-right' : 'items-start text-left'}`}>
-      <TeamAvatar seed={teamId ?? name} name={name} logoUrl={logoUrl} size="md" />
+      <TeamAvatar teamId={teamId} name={name} logoUrl={logoUrl} size="md" />
       <span className="tm-text-body-lg text-[var(--text-strong)]">{name}</span>
       {record ? <span className="text-xs text-[var(--text-muted)]">{record}</span> : null}
     </span>
@@ -98,7 +106,19 @@ function getViewerState(match: V1TeamMatch | undefined): V1TeamMatchViewerState 
   return match?.viewer?.state ?? match?.viewerState ?? 'none';
 }
 
-export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { leagueId: string; fixtureId: string }) {
+export default function LeagueFixtureDetailClient({
+  leagueId,
+  fixtureId,
+  seedLeague,
+  seedStandings,
+  seedTeamMatch,
+}: {
+  leagueId: string;
+  fixtureId: string;
+  seedLeague?: V1PublicLeagueDetail | null;
+  seedStandings?: V1LeagueStandingsResponse | null;
+  seedTeamMatch?: V1TeamMatch | null;
+}) {
   // 활동 기록·팀 전적처럼 리그 화면이 아닌 곳에서 들어왔으면 그 화면으로 돌아간다.
   const sourcePath = sanitizeRedirectPath(useSearchParams().get('from'));
   const fromPath = sourcePath ? normalizeLeagueDetailHref(sourcePath) : null;
@@ -109,11 +129,12 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
   const parentHref = fromPath?.split(/[?#]/, 1)[0] === leagueHref
     ? fromPath
     : withFromPath(leagueHref, fromPath);
+  const standingsHref = withFromPath(`/tournaments/${leagueId}/bracket?tab=standings`, fromPath);
   const router = useRouter();
-  const seriesQuery = useV1LeagueMatch(leagueId);
-  const standingsQuery = useV1LeagueMatchStandings(leagueId);
+  const seriesQuery = useV1LeagueMatch(leagueId, { seed: seedLeague });
+  const standingsQuery = useV1LeagueMatchStandings(leagueId, { seed: seedStandings });
   // 참가팀 여부(채팅·경기 명단 통로)만을 위해 쓴다 — 실패해도 관전 화면은 그대로 뜬다.
-  const teamMatchQuery = useV1TeamMatch(fixtureId);
+  const teamMatchQuery = useV1TeamMatch(fixtureId, { seed: seedTeamMatch });
   // 대회 경기 상세와 동일한 게임 프로젝션(스코어·득점/카드 타임라인·라인업·승부차기·
   // 몰수 사유·MVP·정정 이력·라이브 폴링). 404(게임 미공개/숨김)면 아래 자체 요약
   // 카드로 폴백하므로 이 실패는 화면 오류가 아니다.
@@ -193,7 +214,7 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
           message="이 리그에서 해당 경기를 찾을 수 없어요. 대진이 재생성되었을 수 있어요."
           onRetry={() => void seriesQuery.refetch()}
         />
-        <Link href={parentHref} className="tm-btn tm-btn-lg tm-btn-neutral mt-4 w-full">
+        <Link href={standingsHref} className="tm-btn tm-btn-lg tm-btn-neutral mt-4 w-full">
           리그 순위표·일정으로 이동
         </Link>
       </div>
@@ -208,8 +229,12 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
   const round = roundLabel(series.fixtures, fixture);
   const homeRow = fixture.homeTeamId !== null ? rowByTeam.get(fixture.homeTeamId) : undefined;
   const awayRow = fixture.awayTeamId !== null ? rowByTeam.get(fixture.awayTeamId) : undefined;
-  const homeName = fixture.homeTeamId === null ? '홈팀 미정' : homeRow?.teamName ?? '홈팀 정보 없음';
-  const awayName = fixture.awayTeamId === null ? '상대팀 미정' : awayRow?.teamName ?? '상대팀 정보 없음';
+  const homeName = fixture.homeTeamId === null
+    ? '홈팀 미정'
+    : homeRow?.teamName ?? teamMatchNameForFixture(teamMatchQuery.data, fixture.homeTeamId) ?? '홈팀 정보 없음';
+  const awayName = fixture.awayTeamId === null
+    ? '상대팀 미정'
+    : awayRow?.teamName ?? teamMatchNameForFixture(teamMatchQuery.data, fixture.awayTeamId) ?? '상대팀 정보 없음';
 
   const viewerState = getViewerState(teamMatchQuery.data);
   // 리그 대진의 신청서는 운영자가 일괄 생성한다 — away 팀 팀장은 '신청서를 낸 사람'이
@@ -308,7 +333,7 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
                         className="tm-pressable tm-list-row-interactive flex min-h-[44px] items-center justify-between gap-2 rounded-lg px-2 text-sm"
                       >
                         <span className="inline-flex items-center gap-2">
-                          <TeamAvatar seed={side.teamId} name={side.name} logoUrl={side.row?.teamLogoUrl ?? null} size="sm" />
+                          <TeamAvatar teamId={side.teamId} name={side.name} logoUrl={side.row?.teamLogoUrl ?? null} size="sm" />
                           <span className="text-[var(--text-strong)]">{side.name}</span>
                         </span>
                         <span className="text-[var(--text-muted)]">{recordLine(side.row)}</span>
@@ -320,8 +345,6 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
             </Card>
           )}
         </>
-      ) : recordQuery.isPending ? (
-        <div className="tm-skeleton" style={{ height: 180, borderRadius: 'var(--radius-container)' }} />
       ) : recordQuery.isError &&
         !(recordQuery.error instanceof V1ApiError && recordQuery.error.statusCode === 404) ? (
         /* 404(게임 미공개·숨김)만 정상 폴백이다 — 네트워크/5xx 를 요약 카드로 숨기면
@@ -331,8 +354,8 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
           onRetry={() => void recordQuery.refetch()}
         />
       ) : (
-        /* 기록 API 404(게임 미공개·숨김 정책) 폴백 — 리그 대진 요약 카드.
-           양팀 실명·스코어/상태·일시·장소는 리그 공개 상세만으로도 보여줄 수 있다. */
+        /* 기록이 아직 로딩 중이거나 404(게임 미공개·숨김 정책)일 때 공개 리그 대진 요약을 먼저 보여준다.
+           양팀 실명·스코어/상태·일시·장소는 리그 공개 상세만으로도 알 수 있다. */
 <>
         <Card pad={20}>
           <div className="flex items-start justify-between gap-3">
@@ -425,7 +448,7 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
         </Card>
       )}
 
-      <Link href={parentHref} className="tm-btn tm-btn-lg tm-btn-primary w-full">
+      <Link href={standingsHref} className="tm-btn tm-btn-lg tm-btn-primary w-full">
         전체 순위표·일정 보기
       </Link>
     </div>

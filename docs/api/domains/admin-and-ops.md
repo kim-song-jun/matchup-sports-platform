@@ -33,6 +33,7 @@
 | `GET` | `/api/v1/admin/matches` | `AdminMatchListQueryDto` | active admin | 매치 목록 |
 | `GET` | `/api/v1/admin/matches/:matchId` | - | active admin | 매치 상세 |
 | `POST` | `/api/v1/admin/matches/:matchId/status` | `ChangeMatchStatusDto` | owner/ops | 매치 상태 변경 |
+| `PATCH` | `/api/v1/admin/matches/:matchId/online` | `SetMatchOnlineDto` | owner/ops | 개인 매치 장소의 온라인 여부 분류 |
 | `GET` | `/api/v1/admin/teams` | `AdminTeamListQueryDto` | active admin | 팀 목록 |
 | `GET` | `/api/v1/admin/teams/:teamId` | - | active admin | 팀 상세·활성 팀원 연락처/역할 목록 |
 | `POST` | `/api/v1/admin/teams/:teamId/status` | `ChangeTeamStatusDto` | owner/ops | 팀 상태 변경 |
@@ -181,6 +182,13 @@ type AdminListSummary = {
 이 remediation 이후 런타임도 운영자 행과 연결 사용자 계정이 모두 active인 경우에만 접근을 허용한다.
 
 ## 상태 변경 DTO
+
+### 개인 매치 온라인 장소 분류
+
+- `PATCH /admin/matches/:matchId/online` body는 `{ isOnline: boolean }`이다. JSON boolean만 허용하며 문자열 변환을 하지 않는다.
+- 응답은 `{ matchId, isOnline, changed }`다. 같은 값을 다시 지정하면 `changed: false`로 반환하고 업데이트·감사 로그를 추가하지 않는다.
+- 관리자 권한을 확인한 뒤 매치 행을 잠그고 갱신한다. 실제 변경은 `match.online.update` 관리자 감사 로그에 `beforeJson`/`afterJson`의 `isOnline` 값으로 남긴다.
+- 이 값은 개인 매치 상세의 장소 표시를 분류하는 메타데이터다. 공개 여부, 검색 색인 여부, 팀 매치·대회 동작을 바꾸지 않는다.
 
 - 매치 `ChangeMatchStatusDto`: `status=recruiting|closed|cancelled|completed|archived`, `reason` 필수(max 500).
 - 개인 매치를 `completed`로 바꾸면 일반 호스트 완료 API와 같은 트랜잭션 계약으로 현재 `active`

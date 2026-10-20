@@ -67,6 +67,7 @@ Public team-match list/detail include the assigned field's name. For league/tour
 - 상대 확정 + 시작 시각 경과는 조회 시 서버 시각으로 판단한다. API 목록/상세 `isLive`는 표시용 파생값이며
   DB status `matched`의 신청/권한 의미는 바꾸지 않는다. 종료 예정 시각만으로 결과를 확정하지 않는다.
 - 기본/추천 목록은 진행 중인 matched 경기까지 유지한다. 명시적 recruiting 필터는 기존 모집 조건을 유지한다.
+- 단, 일반 팀매치(리그 대진 제외)는 공개 목록(`GET /team-matches`의 모든 정렬·필터와 건수)에서 두 가지를 뺀다. ① 경기 기록(`V1Game`)이 `CANCELLED`인 매치. 게임만 취소하는 `POST /games/:gameId/cancel`은 팀매치 상태를 바꾸지 않는다. ② `matched`인데 끝날 시각(`endAt`, 없으면 `startAt`)이 지나도록 게임이 `SCHEDULED`(또는 게임 없음)인 매치. 기록을 하나라도 남기면 게임이 `LIVE`가 되므로, 진행 중·일시중지·종료(결과 대기) 경기와 완료 7일 노출은 그대로다. 상세 주소는 계속 열린다.
 - UI는 진행 중 2초, 경기 전 15초 polling 및 창 focus 시 재조회. 자동 저장 성공을 시뮬레이션하지 않는다.
 - 참가자는 상세 진입 시 `/team-matches/:id/record`로 이동. `?view=detail`로 장소/라인업 상세 복귀.
   기존 `/result`, `/result/approval`도 신규 친선 경기에서는 공동 기록을 연다.
@@ -170,6 +171,7 @@ Required body:
 - `sportId` (활성 종목)
 - `regionId` (활성 시·군·구)
 - `title`, `startsAt`, `manualPlaceName`
+  - `title` 은 앞뒤 공백을 지우고 저장해요. 비었거나 공백뿐이면 `400 VALIDATION_ERROR`(`field=title`). 수정도 같은 규칙이에요.
 
 Optional body: `description`, `imageUrl`, `listImageUrl`, `endsAt`, `deadlineAt`, `addressText`, `placeLatitude`, `placeLongitude`, `placeProvider`, `placeProviderId`, `costNote`, `rulesText`, `minLevelCode`, `maxLevelCode`, `genderRule`, `matchFormat`, `matchStyle`, `uniformColor`.
 
@@ -271,6 +273,12 @@ Rules:
   - `platformManaged`, league membership, and match sport/level remain match-level fields and must not be presented as attributes of either team.
 - `GET /team-matches/:teamMatchId/applications` returns the same team-card fields (`sportName`, `levelLabel`, `ratingScore`, `ratingCount`, `wins`) for each applicant. Legacy `score`/`matchCount` remain response-compatible but are not the detail card's team-rating/win source.
 
+## GET /team-matches/:teamMatchId — 취소 리그 경기 공개
+
+공개 일정에 남는 취소 리그 경기(`leagueId`가 있는 `cancelled` 경기)는 상세도 `200`으로 제공하며 `status=cancelled`를 유지한다. 일반 친선 모집 취소와 보관 경기, 비공개 리그, 삭제 경기, 미배정 대진은 기존 `404` 차단을 유지한다. 이 예외는 상세 조회에만 적용하며 신청 자격·신청 및 참석명단·경기 기록의 취소 차단을 완화하지 않는다. 리그 상세의 `lifecycle.canEdit`·`canDelete`는 `false`다.
+
+공개 일정과 공개 경기 기록의 상태는 대진 취소를 게임의 `SCHEDULED`·`LIVE`·`ENDED`보다 우선해 `cancelled`로 반환한다. 취소 이외 상태의 게임 우선 매핑은 유지한다.
+
 ## POST /team-matches
 
 Body: `CreateTeamMatchDto`
@@ -282,6 +290,7 @@ Required:
 - `regionId`
   - Required non-empty string; accepts stable catalog slugs such as `region-seoul-jongno`.
 - `title`
+  - Required, ≤100자. 앞뒤 공백을 지우고 저장하며, 비었거나 공백뿐이면 `400 VALIDATION_ERROR`(`field=title`). `PATCH` 도 같은 규칙.
 - `startsAt`
 - `manualPlaceName`
 

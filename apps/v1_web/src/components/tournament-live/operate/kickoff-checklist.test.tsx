@@ -52,9 +52,9 @@ function rosterData(counts: { excluded: number; unavailable: number; suspended: 
   return { data: { counts: { base: 10, participating: 8, ...counts } }, isPending: false, isError: false };
 }
 
-function renderChecklist(props: { lineups: GameLineup[] }) {
+function renderChecklist(props: { lineups: GameLineup[]; disabled?: boolean }) {
   return render(
-    <KickoffChecklist gameId="g-1" sides={SIDES} lineups={props.lineups} onToggleArrival={vi.fn()} onConfirmSide={vi.fn()} onRosterError={vi.fn()} />,
+    <KickoffChecklist gameId="g-1" sides={SIDES} lineups={props.lineups} disabled={props.disabled} onToggleArrival={vi.fn()} onConfirmSide={vi.fn()} onRosterError={vi.fn()} />,
   );
 }
 
@@ -159,6 +159,17 @@ describe('KickoffChecklist — 킥오프 준비', () => {
     expect(status).not.toHaveTextContent('준비가 끝났어요');
   });
 
+  it.each([
+    ['전원 도착', ARRIVED, '모든 선수의 도착을 확인했어요.'],
+    ['미확인 남음', NOT_YET, '아직 도착을 확인하지 못한 선수가 1명 있어요.'],
+  ])('경기를 시작할 수 없는 사람(조회 전용 스태프 등)에게는 경기 시작 안내 없이 도착 현황만 말한다 — %s', (_, away, text) => {
+    renderChecklist({ lineups: lineups(ARRIVED, away), disabled: true });
+
+    const status = screen.getByRole('status');
+    expect(status).toHaveTextContent(text);
+    expect(status).not.toHaveTextContent('경기 시작');
+  });
+
   it('명단이 없으면 준비 완료 문구를 지어내지 않는다', () => {
     renderChecklist({ lineups: [] });
 
@@ -183,6 +194,19 @@ describe('KickoffChecklist — 킥오프 준비', () => {
       },
       isPending: false,
       isError: false,
+    });
+
+    it.each([
+      ['운영진(실명 있음)', { realName: '김실명' }, '김실명 (김선수)'],
+      ['운영진 — 실명과 닉네임이 같아도 둘 다', { realName: '김선수' }, '김선수 (김선수)'],
+      ['권한 없음(realName 키 없음)', {}, '김선수'],
+    ])('선수 이름은 운영 콘솔과 같은 규칙이고 자르지 않는다: %s', (_, extra, name) => {
+      mocks.useV1TeamGameRoster.mockReturnValue(leagueRoster([{ userId: 'u1', displayName: '김선수', status: 'PARTICIPATING', ...extra }]));
+      renderChecklist({ lineups: lineups(NOT_YET, NOT_YET) });
+
+      expect(screen.getAllByRole('switch', { name: `${name} — 출전, 누르면 이번 경기에서 빼요` }).length).toBeGreaterThan(0);
+      const label = screen.getAllByText(name)[0];
+      expect(label).not.toHaveClass('truncate');
     });
 
     it('도착 확인 대신 팀원 전원이 출전으로 체크돼 있고, 누르면 이번 경기에서 뺀다', async () => {

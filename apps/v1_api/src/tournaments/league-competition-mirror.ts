@@ -78,6 +78,7 @@ export interface LeagueMirrorSource {
    */
   inherited?: {
     coverImageUrl: string | null;
+    listImageUrl?: string | null;
     entryFee: number;
     bankName: string | null;
     bankAccount: string | null;
@@ -124,6 +125,7 @@ export function leagueMirrorCreateData(
       ? {}
       : {
           coverImageUrl: league.inherited.coverImageUrl,
+          listImageUrl: league.inherited.listImageUrl ?? null,
           entryFee: league.inherited.entryFee,
           bankName: league.inherited.bankName,
           bankAccount: league.inherited.bankAccount,

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Film, MapPin } from 'lucide-react';
 import { Card, EmptyState } from '@/components/v1-ui/primitives';
@@ -634,6 +634,28 @@ function ScheduleGroupBlock({
   );
 }
 
+function ScheduleFilterControls({ filters, activeFilter, onSelectFilter, action }: {
+  filters: ScheduleFilter[];
+  activeFilter: string;
+  onSelectFilter: (key: string) => void;
+  action?: ReactNode;
+}) {
+  return (
+    <div aria-label="일정 필터" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--spacing-3)' }}>
+      <div role="tablist" aria-label="경기 일정 보기" style={{ display: 'flex', gap: 'var(--spacing-2)', minWidth: 0, overflowX: 'auto' }}>
+        {filters.filter((option) => option.key !== 'mine').map((option) => (
+          <button key={option.key} type="button" role="tab" aria-selected={activeFilter === option.key}
+            className={`tm-chip${activeFilter === option.key ? ' tm-chip-active' : ''}`}
+            style={{ flexShrink: 0 }}
+            onClick={() => onSelectFilter(option.key)}>
+            {option.label}
+          </button>
+        ))}
+      </div>
+      {action}
+    </div>
+  );
+}
 /**
  * 단계(조별리그/결선) → 조·라운드 두 겹으로 묶어 보여준다. 예전에는 서버 순서대로 한
  * 목록에 쏟아부었고, 데스크톱 2열에서 A조·B조·결승·4강이 좌우로 뒤섞였다(오너 지적).
@@ -690,22 +712,8 @@ function ScheduleSections({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {filters.length > 1 ? (
-        <div role="tablist" aria-label="경기 일정 보기" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {filters.map((option) => (
-            <button
-              key={option.key}
-              type="button"
-              role="tab"
-              aria-selected={activeFilter === option.key}
-              className={`tm-chip${activeFilter === option.key ? ' tm-chip-active' : ''}`}
-              onClick={() => onSelectFilter(option.key)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
+        <ScheduleFilterControls filters={filters} activeFilter={activeFilter} onSelectFilter={onSelectFilter} />
       ) : null}
-
       {visiblePhases.length === 0 ? (
         <EmptyState title="해당하는 경기가 없어요" sub="다른 보기를 선택해 주세요." />
       ) : (
@@ -740,7 +748,12 @@ function scheduleFilterFromHref(href: string | null | undefined): string {
   const queryStart = pathAndQuery.indexOf('?');
   const query = queryStart < 0 ? '' : pathAndQuery.slice(queryStart + 1);
   const phase = new URLSearchParams(query).get('schedulePhase');
-  return phase === 'group_stage' || phase === 'knockout' || phase === 'mine' ? phase : 'all';
+  return phase === 'group_stage' || phase === 'knockout' ? phase : 'all';
+}
+
+function mineOnlyFromHref(href: string | null | undefined): boolean {
+  const params = new URL(href ?? '/', 'https://teameet.invalid').searchParams;
+  return params.get('teamScope') === 'mine' || params.get('schedulePhase') === 'mine';
 }
 
 /**
@@ -761,6 +774,8 @@ export function ScheduleContent({
   myFixtures,
   myTeamIds,
   showScheduleHeading = true,
+  filterAction,
+  filterSummary,
   isRegularLeague = false,
   fromHref,
 }: {
@@ -790,6 +805,9 @@ export function ScheduleContent({
   myTeamIds?: ReadonlySet<string>;
   /** An enclosing filter header already owns this heading. */
   showScheduleHeading?: boolean;
+  /** Membership controls share the phase-filter row, before live and scheduled games. */
+  filterAction?: ReactNode;
+  filterSummary?: ReactNode;
   /** 이 일정 화면 자신의 URL(`useCurrentHref()`) — 경기 상세의 셸 뒤로가기가 여기로 돌아오게 한다. */
   fromHref?: string | null;
 }) {
@@ -803,9 +821,10 @@ export function ScheduleContent({
   // 최상단(이른 return보다 앞)에서 훅을 선언해 두 섹션 모두 같은 값을 본다. early
   // return(!data.bracketPublished) 뒤에 두면 훅 순서가 렌더마다 달라질 수 있어 여기에 둔다.
   const [draft, setDraft] = useState(() => ({
-    tournamentId, filter: scheduleFilterFromHref(fromHref), href: fromHref,
+    tournamentId, filter: scheduleFilterFromHref(fromHref), mineOnly: mineOnlyFromHref(fromHref), href: fromHref,
   }));
   const filter = draft.tournamentId === tournamentId ? draft.filter : 'all';
+  const mineOnly = draft.tournamentId === tournamentId ? draft.mineOnly : mineOnlyFromHref(fromHref);
   const scheduleFromHref = draft.tournamentId === tournamentId ? draft.href : fromHref;
 
   useEffect(() => {
@@ -815,8 +834,9 @@ export function ScheduleContent({
       if (source.origin !== window.location.origin || source.pathname !== window.location.pathname) return;
       const href = `${window.location.pathname}${window.location.search}${window.location.hash}`;
       const nextFilter = scheduleFilterFromHref(href);
-      setDraft((previous) => previous.tournamentId === tournamentId && previous.filter === nextFilter && previous.href === href
-        ? previous : { tournamentId, filter: nextFilter, href });
+      const nextMineOnly = mineOnlyFromHref(href);
+      setDraft((previous) => previous.tournamentId === tournamentId && previous.filter === nextFilter && previous.mineOnly === nextMineOnly && previous.href === href
+        ? previous : { tournamentId, filter: nextFilter, mineOnly: nextMineOnly, href });
     };
     // 늦은 router snapshot은 마지막 선택을 덮지 않는다. 실제 pop/hash 이벤트는 최신 URL을 읽는다.
     if (source.searchParams.toString() === new URLSearchParams(window.location.search).toString()) sync();
@@ -828,7 +848,7 @@ export function ScheduleContent({
     };
   }, [fromHref, tournamentId]);
 
-  function setFilter(nextFilter: string) {
+  function setFilter(nextFilter: string, nextMineOnly = mineOnly) {
     let href = fromHref;
     if (fromHref) {
       const source = new URL(fromHref, window.location.origin);
@@ -836,12 +856,14 @@ export function ScheduleContent({
       if (source.origin === url.origin && source.pathname === url.pathname) {
         if (nextFilter === 'all') url.searchParams.delete('schedulePhase');
         else url.searchParams.set('schedulePhase', nextFilter);
+        if (nextMineOnly) url.searchParams.set('teamScope', 'mine');
+        else url.searchParams.delete('teamScope');
         href = `${url.pathname}${url.search}${url.hash}`;
         window.history.replaceState(null, '', href);
       }
     }
     // URL snapshot보다 먼저 실제 경기 링크에도 마지막 선택의 출처를 반영한다.
-    setDraft({ tournamentId, filter: nextFilter, href });
+    setDraft({ tournamentId, filter: nextFilter, mineOnly: nextMineOnly, href });
   }
 
   if (!data.bracketPublished) {
@@ -899,25 +921,41 @@ export function ScheduleContent({
     sourceData.items.some((entry) => myFixtureIds.has(entry.fixtureId)) ||
     sourceData.unscheduled.some((entry) => myFixtureIds.has(entry.fixtureId));
   // A membership-aware wrapper owns the team filter; keep only the existing phase controls here.
-  const filters = buildScheduleFilters(phases, myTeamIds === undefined && hasMyFixtures);
+  const filters = buildScheduleFilters(phases, false);
   // 고른 칩이 사라진 경우(내 경기가 없어졌다거나) 전체로 되돌린다 — 빈 화면에 갇히지 않게.
   const activeFilter = filters.some((option) => option.key === filter) ? filter : 'all';
+  const showMineSwitch = myTeamIds === undefined && (hasMyFixtures || mineOnly);
+  const teamSwitch = showMineSwitch ? (
+    <button type="button" role="switch" aria-checked={mineOnly}
+      onClick={() => setFilter(activeFilter, !mineOnly)} className="tm-text-label"
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--spacing-2)', minHeight: 'var(--size-control-lg)', padding: 0, border: 0, background: 'transparent', color: 'var(--text-caption)', cursor: 'pointer', flexShrink: 0 }}>
+      내 팀만
+      <span aria-hidden="true" className={`tm-toggle${mineOnly ? ' tm-toggle-on' : ''}`} />
+    </button>
+  ) : null;
+  const matchesTeamScope = (entry: PublicScheduleEntry) => !mineOnly || myFixtureIds.has(entry.fixtureId);
+  const matchesPhase = (entry: PublicScheduleEntry) => activeFilter === 'all' || phaseKeyOf(entry) === activeFilter;
+  const filteredLive = live.filter((entry) => matchesTeamScope(entry) && matchesPhase(entry));
 
   // "시간 미정 경기" 섹션도 위 칩과 같은 기준으로 거른다 — 예전엔 필터 state에 접근할
   // 경로 자체가 없어 어떤 칩을 눌러도 이 섹션은 항상 전체를 그렸다.
   const filteredUnscheduled = data.unscheduled.filter((entry) => {
-    if (activeFilter === 'all') return true;
-    if (activeFilter === 'mine') return myFixtureIds.has(entry.fixtureId);
-    return phaseKeyOf(entry) === activeFilter;
+    return matchesTeamScope(entry) && matchesPhase(entry);
   });
 
   return (
     <div style={{ padding: '16px 20px 40px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {live.length > 0 ? (
+      {filterAction !== undefined || filters.length > 1 || showMineSwitch ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-2)' }}>
+          <ScheduleFilterControls filters={filters} activeFilter={activeFilter} onSelectFilter={setFilter} action={filterAction ?? teamSwitch} />
+          {filterSummary}
+        </div>
+      ) : null}
+      {filteredLive.length > 0 ? (
         <section aria-label="진행 중인 경기">
           <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>진행 중인 경기</h3>
           <div className="tm-schedule-list">
-            {live.map(entry => (
+            {filteredLive.map(entry => (
               <ScheduleRow key={entry.fixtureId} tournamentId={tournamentId} entry={entry}
                 isMine={myFixtureIds.has(entry.fixtureId)} isRegularLeague={isRegularLeague} fromHref={scheduleFromHref} />
             ))}
@@ -953,7 +991,7 @@ export function ScheduleContent({
         </section>
       ) : null}
 
-      {data.items.length > 0 || live.length === 0 || hasNextPage ? <section>
+      {data.items.length > 0 || filteredLive.length === 0 || hasNextPage ? <section>
         {showScheduleHeading ? <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>
           경기 일정
         </h3> : null}
@@ -962,9 +1000,9 @@ export function ScheduleContent({
             나란히 놓여 모순으로 읽혔다 — "아직 확정된 일정이 없어요" 바로 밑에 경기 2건
             (alpha 실측). 정말 아무 경기도 없을 때만 빈 상태를 그린다. */}
         {data.items.length === 0 ? (
-          data.unscheduled.length === 0 && live.length === 0 ? (
+          data.unscheduled.length === 0 && filteredLive.length === 0 ? (
             <EmptyState title="아직 확정된 일정이 없어요" sub="경기 시간이 정해지면 여기에 표시돼요." />
-          ) : live.length > 0 && data.unscheduled.length === 0 ? null : (
+          ) : filteredLive.length > 0 && data.unscheduled.length === 0 ? null : (
             <div
               role="status"
               style={{
@@ -988,9 +1026,9 @@ export function ScheduleContent({
         ) : (
           <ScheduleSections
             tournamentId={tournamentId}
-            entries={data.items}
+            entries={data.items.filter(matchesTeamScope)}
             myFixtureIds={myFixtureIds}
-            filters={filters}
+            filters={[]}
             activeFilter={activeFilter}
             onSelectFilter={setFilter}
             phaseLabels={phaseLabels}

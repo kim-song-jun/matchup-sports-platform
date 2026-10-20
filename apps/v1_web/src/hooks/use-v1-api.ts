@@ -255,6 +255,7 @@ import type {
   V1CreateGroupPayload,
   V1CreateGroupTeamPayload,
   V1CreateFixturePayload,
+  V1CreateFixtureResponse,
   V1UpdateFixturePayload,
   V1UpdateFixtureResult,
   V1CreateAnnouncementPayload,
@@ -5110,7 +5111,7 @@ export function useV1CreateFixture(tournamentId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: V1CreateFixturePayload) =>
-      v1Post<V1AdminBracketFixture>(`/admin/tournaments/${tournamentId}/fixtures`, body),
+      v1Post<V1CreateFixtureResponse>(`/admin/tournaments/${tournamentId}/fixtures`, body),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: v1Keys.adminTournamentBracket(tournamentId),

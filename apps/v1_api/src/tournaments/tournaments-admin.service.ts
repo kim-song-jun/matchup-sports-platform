@@ -27,18 +27,18 @@ import {
 import { normalizeCompetitionSportCode, tryNormalizeCompetitionSportCode, validateCompetitionConfig } from './competition-config/competition-config';
 import { parseLineupLimits } from './competition-config/competition-config.parse';
 import { LineupSizeConfigResolver } from './competition-config/lineup-size-config-resolver';
-import { lockTournamentForConfigChange, TournamentCompetitionConfig } from './competition-config/tournament-competition-config';
+import { lockCompetitionFixtureRows, lockTournamentForConfigChange, TournamentCompetitionConfig } from './competition-config/tournament-competition-config';
 
 /**
  * 대회 status 전이 규칙. 운영 실수 회복을 위해 closed↔open 재오픈, completed→in_progress
- * (완료 되돌리기), cancelled→draft(초안 복구)를 허용한다. in_progress→open/closed 는 이미
- * 생긴 경기·결과가 새 신청과 섞이므로 계속 막는다.
+ * (완료 되돌리기), cancelled→draft(초안 복구)를 허용한다. in_progress→closed 는
+ * 실제 시작·기록·결과가 없는 경우에만 허용하며 in_progress→open 은 계속 막는다.
  */
 const TOURNAMENT_TRANSITIONS: Record<TournamentStatus, TournamentStatus[]> = {
   draft: ['open', 'cancelled'],
   open: ['closed', 'cancelled'],
   closed: ['open', 'in_progress', 'cancelled'],
-  in_progress: ['completed', 'cancelled'],
+  in_progress: ['closed', 'completed', 'cancelled'],
   completed: ['in_progress'],
   cancelled: ['draft'],
 };
@@ -47,6 +47,7 @@ const TOURNAMENT_TRANSITIONS: Record<TournamentStatus, TournamentStatus[]> = {
 const REASON_REQUIRED_TRANSITIONS: ReadonlyArray<readonly [TournamentStatus, TournamentStatus]> = [
   ['completed', 'in_progress'],
   ['cancelled', 'draft'],
+  ['in_progress', 'closed'],
 ];
 
 /** 신청 팀 수에서 빼는 상태 — 미제출 초안과 취소(운영자 거부 포함)된 신청은 참가 후보가 아니다. */
@@ -217,6 +218,7 @@ export class TournamentsAdminService {
     const formatChangeBlockedReason = await this.getFormatChangeBlockedReason(this.prisma, tournamentId, row.status);
     return {
       formatChangeBlockedReason,
+      canRevertStart: row.status === 'in_progress' && !(await this.hasStartedTournamentFixture(this.prisma, tournamentId)),
       ...this.serialize(
         row,
         row._count.registrations,
@@ -757,76 +759,94 @@ export class TournamentsAdminService {
     });
   }
 
+  /** 대진/자동 명단만 있는 경기는 허용한다. 실제 운영 흔적·결과가 있으면 이력을 보존한다. */
+  private async hasStartedTournamentFixture(
+    db: Pick<Prisma.TransactionClient, 'v1TournamentMatchDetails'>,
+    tournamentId: string,
+  ): Promise<boolean> {
+    const started = await db.v1TournamentMatchDetails.findFirst({
+      where: {
+        tournamentId,
+        teamMatch: {
+          tournamentId,
+          OR: [
+            { status: 'completed' },
+            { game: { is: { OR: [
+              { state: { in: ['LIVE', 'PAUSED', 'ENDED'] } },
+              { events: { some: {} } },
+              { resultRevisions: { some: {} } },
+              { periods: { some: { OR: [
+                { state: { not: 'SCHEDULED' } }, { startedAt: { not: null } },
+                { endedAt: { not: null } }, { pausedAt: { not: null } },
+              ] } } },
+            ] } } },
+          ],
+        },
+      },
+      select: { teamMatchId: true },
+    });
+    return started !== null;
+  }
+
   async changeStatus(user: V1AuthUser, tournamentId: string, dto: ChangeTournamentStatusDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
-    const existing = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
-      where: { id: tournamentId, deletedAt: null },
-    });
-    if (!existing) {
-      throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
-    }
-
-    const from = existing.status as TournamentStatus;
-    const to = dto.status;
-    if (from === to) {
-      // 동일 상태 재요청은 멱등 처리(no-op).
-      return { tournamentId, previousStatus: from, status: to, alreadyInStatus: true };
-    }
-    if (!TOURNAMENT_TRANSITIONS[from].includes(to)) {
-      throw new ConflictException({
-        code: 'TOURNAMENT_STATUS_TRANSITION_INVALID',
-        message: `${from} 상태에서 ${to}(으)로 변경할 수 없어요.`,
+    const result = await this.prisma.$transaction(async (tx) => {
+      // 관리자 상태 변경은 같은 대회 행에서 직렬화된다. 판정은 잠금 이후 DB 상태로 한다.
+      await lockTournamentForConfigChange(tx, tournamentId);
+      const existing = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, {
+        where: { id: tournamentId, deletedAt: null },
       });
-    }
-    const reason = dto.reason?.trim() ? dto.reason.trim() : undefined;
-    if (!reason && REASON_REQUIRED_TRANSITIONS.some(([f, t]) => f === from && t === to)) {
-      throw new BadRequestException({
-        code: 'TOURNAMENT_STATUS_REASON_REQUIRED',
-        message: '되돌리는 사유를 입력해 주세요.',
-      });
-    }
-    if (to === 'open') {
-      this.assertPaidTournamentPaymentInstructions(existing);
-    }
-    // Review-request notifications are sent on the first completion only; a revert + re-complete must not re-notify.
-    const alreadyCompletedBefore =
-      to === 'completed' &&
-      (await this.prisma.v1StatusChangeLog.count({
+      if (!existing) {
+        throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
+      }
+      const from = existing.status as TournamentStatus;
+      const to = dto.status;
+      if (from === to) {
+        return { tournamentId, previousStatus: from, status: to, alreadyInStatus: true, requestReviews: false };
+      }
+      if (!TOURNAMENT_TRANSITIONS[from].includes(to)) {
+        throw new ConflictException({
+          code: 'TOURNAMENT_STATUS_TRANSITION_INVALID',
+          message: `${from} 상태에서 ${to}(으)로 변경할 수 없어요.`,
+        });
+      }
+      const reason = dto.reason?.trim() || undefined;
+      if (!reason && REASON_REQUIRED_TRANSITIONS.some(([f, t]) => f === from && t === to)) {
+        throw new BadRequestException({ code: 'TOURNAMENT_STATUS_REASON_REQUIRED', message: '되돌리는 사유를 입력해 주세요.' });
+      }
+      if (from === 'in_progress' && to === 'closed') {
+        // 경기 시작 커맨드도 Game 행을 잠근다. 먼저 시작된 요청을 기다린 뒤 이력을 다시 확인한다.
+        await lockCompetitionFixtureRows(tx, existing.kind, tournamentId);
+        if (await this.hasStartedTournamentFixture(tx, tournamentId)) {
+          throw new ConflictException({
+            code: 'TOURNAMENT_ALREADY_STARTED',
+            message: '이미 시작했거나 기록·결과가 있는 경기가 있어 접수 마감으로 되돌릴 수 없어요.',
+          });
+        }
+      }
+      if (to === 'open') this.assertPaidTournamentPaymentInstructions(existing);
+      const alreadyCompletedBefore = to === 'completed' && (await tx.v1StatusChangeLog.count({
         where: { targetType: 'tournament', targetId: tournamentId, toStatus: 'completed' },
       })) > 0;
-
-    await this.prisma.$transaction(async (tx) => {
       await tx.v1Tournament.update({ where: { id: tournamentId }, data: { status: to } });
-      await this.adminContext.logAdminAction(
-        admin,
-        {
-          action: 'tournament.status',
-          targetType: 'tournament',
-          targetId: tournamentId,
-          reason: reason ?? null,
-          fromStatus: from,
-          toStatus: to,
-        },
-        tx,
-      );
+      await this.adminContext.logAdminAction(admin, {
+        action: 'tournament.status', targetType: 'tournament', targetId: tournamentId,
+        reason: reason ?? null, fromStatus: from, toStatus: to,
+      }, tx);
+      return { tournamentId, previousStatus: from, status: to, alreadyInStatus: false,
+        requestReviews: to === 'completed' && !alreadyCompletedBefore };
     });
-
-    if (to === 'completed' && !alreadyCompletedBefore) {
-      // 후기 요청 알림은 상태 전이의 **부수 효과**다. 전이는 위 트랜잭션에서 이미 커밋됐으므로
-      // 여기서 던지면 DB 는 completed 인데 API 만 실패로 응답한다 — 운영자는 "완료 처리가
-      // 실패했다"고 읽고 재시도하게 되고, 두 번째 호출은 alreadyInStatus 로 돌아와 더 헷갈린다.
-      // 수신자 조회(DB 일시 오류)와 발송(알림 인프라) 어느 쪽이 넘어져도 전이 결과는 지킨다.
+    if (result.requestReviews) {
+      // 알림 실패가 이미 커밋된 상태 전이를 실패 응답으로 바꾸면 안 된다.
       try {
         await this.requestTournamentReviews(tournamentId);
       } catch (error) {
-        this.logger.error(
-          `대회 ${tournamentId} 완료 후기 요청 알림에 실패했지만 completed 전이는 유지한다`,
-          error instanceof Error ? error.stack : String(error),
-        );
+        this.logger.error(`대회 ${tournamentId} 완료 후기 요청 알림에 실패했지만 completed 전이는 유지한다`,
+          error instanceof Error ? error.stack : String(error));
       }
     }
-
-    return { tournamentId, previousStatus: from, status: to, alreadyInStatus: false };
+    const { requestReviews: _requestReviews, ...response } = result;
+    return response;
   }
 
   /**

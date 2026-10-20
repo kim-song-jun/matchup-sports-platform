@@ -120,20 +120,35 @@ export function TeamListPageView({ model, fromHref }: { readonly model: TeamList
         ) : model.teams.length ? (
           <>
             <div className="tm-team-card-stack">{model.teams.map((team) => <TeamCard key={team.id} team={team} fromHref={fromHref} />)}</div>
-            {model.hasNextPage ? (
+            {model.hasNextPage && model.loadMoreLocked ? (
+              <button type="button" disabled className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block tm-load-more">
+                {model.isFetchingNextPage ? '불러오는 중…' : model.loadMoreError ? '다시 불러오기' : '더 보기'}
+              </button>
+            ) : model.hasNextPage && model.loadMoreHref ? (
               <>
                 {model.loadMoreError ? (
                   <p role="alert" className="tm-text-caption tm-load-more-error">다음 목록을 불러오지 못했어요. 다시 시도해 주세요.</p>
                 ) : null}
-                <button
-                  type="button"
+                <Link
+                  href={model.loadMoreHref}
+                  prefetch={false}
                   className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block tm-load-more"
-                  onClick={model.onLoadMore}
-                  disabled={model.isFetchingNextPage || model.loadMoreLocked}
+                  aria-disabled={model.isFetchingNextPage || model.loadMoreBusy || model.loadMoreLocked || !model.loadMoreHref || undefined}
+                  onClick={(event) => {
+                    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                    if (model.isFetchingNextPage || model.loadMoreBusy || model.loadMoreLocked || !model.loadMoreHref) {
+                      event.preventDefault();
+                      return;
+                    }
+                    event.preventDefault();
+                    model.onLoadMore?.();
+                  }}
                 >
                   {model.isFetchingNextPage ? '불러오는 중…' : model.loadMoreError ? '다시 불러오기' : '더 보기'}
-                </button>
+                </Link>
               </>
+            ) : model.hasNextPage ? (
+              <p role="alert" className="tm-text-caption tm-load-more-error">다음 목록으로 이동할 수 없어요. 잠시 후 다시 시도해 주세요.</p>
             ) : null}
           </>
         ) : (
@@ -153,6 +168,9 @@ export function TeamListPageView({ model, fromHref }: { readonly model: TeamList
 }
 
 function TeamSummaryText({ summary }: { summary: TeamListViewModel['summary'] }) {
+  if (typeof summary.total !== 'number') {
+    return <span role="status">{summary.totalState === 'error' ? '팀 수 정보를 불러오지 못했어요' : '팀 수 확인 중…'}</span>;
+  }
   const partiallyLoaded = typeof summary.loaded === 'number' && summary.loaded < summary.total;
   return (
     <>
@@ -164,6 +182,7 @@ function TeamSummaryText({ summary }: { summary: TeamListViewModel['summary'] })
         <> · 가입 가능 <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{summary.recruiting}</span></>
       )}
       {typeof summary.nearby === 'number' ? <> · 내 주변 {summary.nearby}</> : null}
+      {summary.totalRefreshError ? <> · 팀 수를 새로 확인하지 못했어요</> : null}
     </>
   );
 }

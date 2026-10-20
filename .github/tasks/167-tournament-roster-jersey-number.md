@@ -272,9 +272,10 @@ PR 통합 시 기존 nullable 필드, 종목별 GK 코드, 경기별 지정, 진
 - PR 검증은 새로 가져온 origin/dev의 정확한 변경 트리에서 frozen-lockfile 설치 후 다시 수행한다.
 - UI 3폭 갤러리는 저장소 정책상 dev 머지→alpha 배포 확인 뒤 같은 PR에 사후 게시한다. 로컬 Next 서버를 실행하지 않는다.
 
-- 최신 dev PR 검증: backend 145 tests + frontend 142 tests = 총 287 tests PASS.
+- 최신 dev PR 검증: backend 145 tests + frontend 143 tests = 총 288 tests PASS.
 - API/Web `tsc --noEmit` PASS, API surface gate PASS, Web pattern gate PASS.
 - 타입 검사가 찾은 명단 테스트 fixture 2곳에 실제 API의 goalkeeper=false 필드를 동기화했다.
 - 새 UI 글자 크기는 tm-text-caption/tm-text-label 토큰을 사용하고, 감소한 tint baseline을 5→4로 낮췄다.
 - frozen-lockfile 설치·Prisma 생성은 격리 폴더에서만 수행. 실제 DB 접근·seed·migration 적용·로컬 Next/브라우저 실행 없음.
 - 공유 작업 트리를 수정하지 않고 origin/dev 기반 별도 PR 브랜치로 제출한다.
+- 편집 중 백그라운드 재조회가 발생해도 GK 변경 여부는 편집 시작 시점과 비교한다. 재현 테스트 RED→GREEN으로 번호만 수정할 때 GK를 덮는 경합을 차단했다.

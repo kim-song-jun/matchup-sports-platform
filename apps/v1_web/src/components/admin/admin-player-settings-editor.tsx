@@ -15,11 +15,13 @@ export function AdminPlayerSettingsEditor({ registrationId, player, canWrite, sh
   const [editing, setEditing] = useState(false);
   const [number, setNumber] = useState('');
   const [goalkeeper, setGoalkeeper] = useState(false);
+  const [originalGoalkeeper, setOriginalGoalkeeper] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const begin = () => {
     setNumber(player.jerseyNumber == null ? '' : String(player.jerseyNumber));
     setGoalkeeper(player.goalkeeper ?? false);
+    setOriginalGoalkeeper(player.goalkeeper ?? false);
     setError(null);
     setEditing(true);
   };
@@ -31,7 +33,7 @@ export function AdminPlayerSettingsEditor({ registrationId, player, canWrite, sh
     }
     update.mutate({
       playerId: player.id, jerseyNumber: value === '' ? null : Number(value),
-      ...(goalkeeper !== (player.goalkeeper ?? false) ? { goalkeeper } : {}),
+      ...(goalkeeper !== originalGoalkeeper ? { goalkeeper } : {}),
     }, {
       onSuccess: () => {
         setEditing(false);

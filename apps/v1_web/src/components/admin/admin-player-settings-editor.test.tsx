@@ -1,10 +1,11 @@
 import { useV1AdminTournamentPlayers } from '@/hooks/use-v1-api';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { server } from '@/test/msw/server';
+import { v1Keys } from '@/lib/query-keys';
 import type { V1AdminTournamentPlayer } from '@/types/api';
 import { AdminPlayerSettingsEditor } from './admin-player-settings-editor';
 
@@ -30,7 +31,7 @@ function Harness({ canWrite = true }: { canWrite?: boolean }) {
 
 function mount(canWrite = true) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
-  return render(<QueryClientProvider client={client}><Harness canWrite={canWrite} /></QueryClientProvider>);
+  return { ...render(<QueryClientProvider client={client}><Harness canWrite={canWrite} /></QueryClientProvider>), client };
 }
 
 beforeEach(() => {
@@ -76,6 +77,21 @@ describe('admin player settings with real hooks and HTTP contract', () => {
     await user.click(screen.getByRole('button', { name: '홍길동 선수 설정 수정' }));
     expect(screen.getByRole('textbox', { name: '홍길동 등번호' })).toHaveValue('0');
     expect(screen.getByRole('checkbox', { name: '홍길동 GK' })).toBeChecked();
+  });
+
+  it('preserves an untouched GK when the roster refreshes during a number edit', async () => {
+    const user = userEvent.setup();
+    const { client } = mount();
+    await user.click(await screen.findByRole('button', { name: '홍길동 선수 설정 수정' }));
+    const number = screen.getByRole('textbox', { name: '홍길동 등번호' });
+    await user.clear(number);
+    await user.type(number, '8');
+    player = { ...player, goalkeeper: true };
+    await act(async () => { await client.invalidateQueries({ queryKey: v1Keys.adminTournamentRoster('reg-1') }); });
+    await user.click(screen.getByRole('button', { name: '홍길동 선수 설정 저장' }));
+    await screen.findByRole('button', { name: '홍길동 선수 설정 수정' });
+    expect(writes).toEqual([{ jerseyNumber: 8 }]);
+    expect(player.goalkeeper).toBe(true);
   });
 
   it('clears both fields, while cancel discards the draft without a request', async () => {

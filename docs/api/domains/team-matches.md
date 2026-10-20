@@ -483,7 +483,7 @@ MSW 기본 명단 픽스처는 `DRAFT`·`DEFAULT_PREVIEW`·`hasSavedDraft=false`
 - **상대 없이 끝난 일반 팀매치 자동 취소(2026-10-21)**: 워커가 5분마다 `TEAM_MATCH_NO_OPPONENT_SCAN`(outbox 자기 예약 스캔, `team-match-no-opponent-cancel.service.ts`)으로 리그·대회 대진이 아닌 `recruiting`/`closed`·상대 미확정 매치를 찾아 `cancelled`로 바꾼다.
   - 신청 마감 시각이 지났고 대기(`requested`) 신청이 없으면 그때, 대기 신청이 있으면 팀장이 승인할 수 있게 기다렸다가 경기 시작 시각에 취소한다. 마감 시각이 없으면 시작 시각에 취소한다.
   - 행은 지우지 않는다. 대기 신청은 `expired`, 연결된 SCHEDULED Game·팀 일정은 취소, 상태 이력은 `actorType=system`·`reason=no_opponent_auto_cancelled`.
-  - 1팀(일반 매치의 주최팀, 플랫폼 매치의 먼저 승인된 팀)이면 그 팀과 대기 신청 팀 owner·manager에게 `team_match_cancelled` 알림(딥링크 `/team-matches`, businessKey `team-match-no-opponent:{teamMatchId}:{userId}`, 야간에는 알림함만). 0팀이면 알림이 없다.
+  - 알림(`team_match_cancelled`, 딥링크 `/team-matches`, businessKey `team-match-no-opponent:{teamMatchId}:{userId}`, 야간에는 알림함만): 1팀(일반 매치의 주최팀, 플랫폼 매치의 먼저 승인된 팀)이면 그 팀 owner·manager에게 "상대 팀이 정해지지 않아 … 취소됐어요", 대기 신청 팀 owner·manager에게는 1팀·0팀과 상관없이 "… 취소되어 대기 중이던 신청이 종료됐어요"를 따로 보낸다. 0팀이고 대기 신청도 없으면 알림이 없다.
   - 경기 시작이 지났고 끝난 지 24시간이 지난 매치(배포 전에 쌓인 것)는 알림 없이 취소만 한다. 경기 전인 매치는 마감이 오래전이어도 알린다.
   - 자동 취소되면 일정 변경(`PATCH`)으로 다시 모집하는 길도 닫힌다 — 다시 모집하려면 새로 만든다.
 

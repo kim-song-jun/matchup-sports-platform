@@ -130,13 +130,24 @@ describe('TeamMatchNoOpponentCancelService.scanHandler', () => {
     ]);
   });
 
-  it('0팀(승인된 팀이 없는 플랫폼 주관 매치)은 취소만 하고 알리지 않는다', async () => {
+  it('0팀이고 대기 신청도 없으면(승인된 팀이 없는 플랫폼 주관 매치) 취소만 하고 알리지 않는다', async () => {
     const { tx, run } = build({ hostTeamId: null }, []);
 
     await run();
 
     expect(tx.v1TeamMatch.update).toHaveBeenCalled();
     expect(tx.v1Notification.createMany).not.toHaveBeenCalled();
+  });
+
+  it('0팀이어도 대기 신청 팀에는 신청 종료를 알린다 — 확정 팀 알림은 없다', async () => {
+    const { tx, run } = build({ hostTeamId: null, startAt: at(-HOUR) }, [{ applicantTeamId: 'team-applicant' }]);
+
+    await run();
+
+    const rows = (tx.v1Notification.createMany.mock.calls[0] as unknown as [{ data: Array<{ recipientUserId: string; body: string }> }])[0].data;
+    expect(rows).toEqual([
+      expect.objectContaining({ recipientUserId: 'team-applicant-manager', body: '"토요일 친선" 팀매치가 취소되어 대기 중이던 신청이 종료됐어요.' }),
+    ]);
   });
 
   it('오래전에 끝난 매치는 알리지 않는다', async () => {

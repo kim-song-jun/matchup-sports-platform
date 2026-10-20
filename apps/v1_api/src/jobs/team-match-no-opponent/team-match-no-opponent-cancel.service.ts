@@ -59,9 +59,9 @@ export function noOpponentCancelVerdict(match: MatchState, pendingApplications: 
 /**
  * 상대 없이 끝난 팀매치를 취소한다. 행은 지우지 않고 상태만 `cancelled` 로 바꿔 공개 목록에서 빠지게 한다.
  *
- * - 1팀(일반 팀매치의 만든 팀, 플랫폼 주관 매치의 먼저 승인된 팀): 그 팀 팀장·매니저에게 취소를, 대기 중이던
- *   신청 팀 팀장·매니저에게 신청 종료를 알린다.
- * - 0팀(아무 팀도 승인되지 않은 플랫폼 주관 매치): 알릴 팀이 없어 취소만 한다.
+ * - 1팀(일반 팀매치의 만든 팀, 플랫폼 주관 매치의 먼저 승인된 팀): 그 팀 팀장·매니저에게 취소를 알린다.
+ * - 대기 중이던 신청 팀 팀장·매니저에게는 1팀·0팀과 상관없이 신청 종료를 따로 알린다.
+ * - 0팀(아무 팀도 승인되지 않은 플랫폼 주관 매치)이고 대기 신청도 없으면 알릴 팀이 없어 취소만 한다.
  *
  * 마감 시각은 매치마다 달라 예약보다 주기 스캔이 맞다 — 라인업 리마인더처럼 스캔이 끝날 때 다음 스캔을 outbox 행으로
  * 예약한다(`scheduleNextNoOpponentScan`). 일정·마감을 바꾸는 경로가 예약을 다시 걸 필요가 없다.
@@ -139,10 +139,12 @@ export class TeamMatchNoOpponentCancelService {
       },
     });
 
-    // 0팀(승인된 팀이 없는 플랫폼 주관 매치)은 알릴 팀이 없다. 오래전에 끝난 매치도 알리지 않는다.
-    if (!verdict.notify || match.hostTeamId === null) return;
+    // 오래전에 끝난 매치는 알리지 않는다. 0팀(승인된 팀이 없는 플랫폼 주관 매치)은 확정 팀 알림이 없고 대기 신청 팀만 받는다.
+    if (!verdict.notify) return;
     const rows = [
-      ...(await this.managerRows(tx, [match.hostTeamId], teamMatchId, `상대 팀이 정해지지 않아 "${match.title}" 팀매치가 취소됐어요.`)),
+      ...(match.hostTeamId === null
+        ? []
+        : await this.managerRows(tx, [match.hostTeamId], teamMatchId, `상대 팀이 정해지지 않아 "${match.title}" 팀매치가 취소됐어요.`)),
       ...(await this.managerRows(
         tx,
         pending.map((application) => application.applicantTeamId),

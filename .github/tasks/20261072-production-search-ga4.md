@@ -508,3 +508,11 @@ robots Disallow와 noindex 충돌 및 홈 계측 누락은 정정·운영 배포
 - [x] Updated focused tests 33/33 and final `pnpm --filter v1_web lint` (TypeScript plus v1 pattern check).
 - [ ] Independent Sol source review re-run — **BLOCKED until the reviewer confirms all three counterexamples are fixed**.
 - [ ] Separately owned Alpha-before browser check — pending; this source worker did not open another browser space.
+
+### 2026-10-20 PR #1997 merge preparation
+
+- Scope: frontend logic and this task receipt; no layout redesign. Isolated checkout: `/tmp/teameet-pr-1997`; shared checkout contains unrelated WIP and is preserved.
+- Verified the open Codex finding: a matching SSR placeholder exposes a valid continuation URL but ordinary clicks must not invoke `fetchNextPage` until validation/background fetching finishes. Separate `loadMoreBusy` from the stale-seed `loadMoreLocked` condition so crawlers and modified clicks retain the correct href while ordinary append clicks are blocked. Guard the append callback as well. Removed the unused seed cursor field from its declared/server payload.
+- RED: two new DOM/click regression cases failed on the original product code (missing `aria-disabled` during placeholder validation and cached background refresh). GREEN: four focused files, 35/35 tests passed serially on Node 22.22.2. Initial shared dependencies were obsolete (missing query persistence package); isolated frozen-lockfile frontend installation repaired the test environment without modifying shared dependencies.
+- Review: original PR diff inspected, including cursor SSR, URL dialect, metadata request and cache identity. Git diff whitespace and touched-path debt checks passed. Latest-head CI and Copilot re-review remain pending after this repair; Alpha AFTER (390/768/1440), console/network and deployed SHA must follow the dev merge. No Alpha PASS or merge is claimed at this checkpoint.
+- Merge queue requested by user, processed 0/7: #1997 -> #1995 -> #1949 -> #1946 -> #1945 -> #1944 -> #1943. All bases were dev and original Gates/API/Web checks passed. #1995 had no Copilot review, so the required review was requested. Each merge must recheck base/head/checks/threads and use the reviewed head SHA.

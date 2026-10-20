@@ -68,7 +68,6 @@ import {
 } from './teams.card-model';
 
 type TeamListSeed = CursorListSeed<V1Team> & {
-  readonly cursor?: string;
   readonly metadata?: CursorPage<V1Team>;
 };
 
@@ -225,8 +224,13 @@ export function TeamListPageClient({ seed }: { readonly seed?: TeamListSeed } = 
     loadMoreHref,
     isFetchingNextPage: query.isFetchingNextPage,
     loadMoreLocked,
+    loadMoreBusy: query.isFetching || query.isPlaceholderData,
     loadMoreError,
-    onLoadMore: () => void query.fetchNextPage(),
+    onLoadMore: () => {
+      // Infinite queries share one fetch: append must not cancel seed validation or a background refresh.
+      if (query.isFetching || query.isPlaceholderData) return;
+      void query.fetchNextPage();
+    },
     summary: {
       ...base.summary,
       scope: deriveTeamScope(selectedSportName),

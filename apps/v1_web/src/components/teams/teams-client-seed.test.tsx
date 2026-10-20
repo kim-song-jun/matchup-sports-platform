@@ -121,6 +121,25 @@ describe('TeamListPageClient — 서버 seed 연결', () => {
     expect(fetchNextPage).toHaveBeenCalledOnce();
   });
 
+  it.each([
+    { isPlaceholderData: true, isFetching: true },
+    { isPlaceholderData: false, isFetching: true },
+  ])('일치하는 seed 재조회 중에는 href를 유지하고 append 클릭을 막는다: %j', (state) => {
+    const page = { items: [seedTeam(0)], nextCursor: 'next-team', pageInfo: { nextCursor: 'next-team', hasNext: true, totalCount: 52 } };
+    const fetchNextPage = vi.fn();
+    hookMocks.useV1TeamPages.mockReturnValue({
+      data: { pages: [page] }, isPending: false, isError: false, hasNextPage: true,
+      isFetchingNextPage: false, ...state, fetchNextPage,
+    });
+    render(<TeamListPageClient seed={{ page, sports: [seedSport], query: TEAM_LIST_SEED_PATH }} />);
+
+    const link = screen.getByRole('link', { name: '더 보기' });
+    expect(link).toHaveAttribute('href', '/teams?cursor=next-team');
+    expect(link).toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(link);
+    expect(fetchNextPage).not.toHaveBeenCalled();
+  });
+
   it('직접 진입한 필터 cursor seed의 레코드와 시작 커서를 그대로 화면과 query에 사용한다', () => {
     searchParamsMock.value = new URLSearchParams('sportId=sport-futsal&regionId=region-seoul&sort=deadline&q=%20%20%EB%A7%88%ED%8F%AC%20FC%20%20&cursor=opaque-page-2');
     hookMocks.useV1MasterSports.mockReturnValue({ data: [seedSport, seedSoccer] });

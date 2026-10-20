@@ -61,6 +61,7 @@ export type TeamListViewModel = {
   isFetchingNextPage?: boolean;
   loadMoreError?: boolean;
   loadMoreLocked?: boolean;
+  loadMoreBusy?: boolean;
   onLoadMore?: () => void;
   teams: TeamModel[];
 };

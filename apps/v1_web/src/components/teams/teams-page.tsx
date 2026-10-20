@@ -133,10 +133,10 @@ export function TeamListPageView({ model, fromHref }: { readonly model: TeamList
                   href={model.loadMoreHref}
                   prefetch={false}
                   className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block tm-load-more"
-                  aria-disabled={model.isFetchingNextPage || model.loadMoreLocked || !model.loadMoreHref || undefined}
+                  aria-disabled={model.isFetchingNextPage || model.loadMoreBusy || model.loadMoreLocked || !model.loadMoreHref || undefined}
                   onClick={(event) => {
                     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-                    if (model.isFetchingNextPage || model.loadMoreLocked || !model.loadMoreHref) {
+                    if (model.isFetchingNextPage || model.loadMoreBusy || model.loadMoreLocked || !model.loadMoreHref) {
                       event.preventDefault();
                       return;
                     }

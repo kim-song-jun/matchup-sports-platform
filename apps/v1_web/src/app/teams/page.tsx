@@ -45,7 +45,7 @@ export default async function TeamsPage({ searchParams }: { searchParams: Search
           )}
         />
       ) : null}
-      <TeamListPageClient seed={page ? { page, sports, query, cursor, metadata: metadata ?? undefined } : undefined} />
+      <TeamListPageClient seed={page ? { page, sports, query, metadata: metadata ?? undefined } : undefined} />
     </>
   );
 }

@@ -8,6 +8,8 @@
 
 # Teameet v1 API contracts
 
+대회 진행 중에도 미시작 경기 삭제를 허용한다. 결과·후속 대진 보호는 [대회 삭제 계약](./domains/tournaments.md#시작-전-대진-삭제-2026-10-05)을 따른다.
+
 Personal-match online place classification: public detail includes `isOnline`; the authenticated, audited `PATCH /admin/matches/:matchId/online` sets that factual value without changing publication or search visibility. See [matches](./domains/matches.md) and [admin/ops](./domains/admin-and-ops.md).
 
 12강 부전승 홈·어웨이 교환은 [Tournaments 계약](./domains/tournaments.md)의 `PUT /admin/tournament-slots/:slotId/bye-side`를 따른다. 저장 배치와 승자 연결을 함께 변경한다.

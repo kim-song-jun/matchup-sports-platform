@@ -279,8 +279,11 @@ export interface UseV1GameOperationsConsoleResult {
    * `gameDetail.refetch()`가 최신 state를 받아와도 화면엔 반영되지 않았다.
    * 호출부는 커맨드 REST 응답(`{ state, version }`)을 받은 즉시 이걸 불러
    * gameSnapshot을 그 자리에서 갱신해야 한다.
+   * 현재 경기에서 수락한 버전을 동기적으로 확정한 경우에만 true를 반환한다.
+   * 상세 조회를 캐시에 반영하는 호출부도 이 반환값을 먼저 확인해야 같은 배치의
+   * 더 최신 응답을 오래된 조회 결과로 덮어쓰지 않는다.
    */
-  applyCommandResult(result: { state: GameState; version: number }): void;
+  applyCommandResult(result: { state: GameState; version: number }): boolean;
 }
 
 /**
@@ -1243,12 +1246,13 @@ export function useV1GameOperationsConsole(
   // revert-period) 성공 응답을
   // 그 자리에서 gameSnapshot에 반영한다. 자세한 이유는
   // `UseV1GameOperationsConsoleResult.applyCommandResult` 문서 참고.
-  const applyCommandResult = useCallback((result: { state: GameState; version: number }) => {
-    if (activeGameIdRef.current !== gameId || result.version < acceptedVersionRef.current) return;
+  const applyCommandResult = useCallback((result: { state: GameState; version: number }): boolean => {
+    if (!isMountedRef.current || activeGameIdRef.current !== gameId || result.version < acceptedVersionRef.current) return false;
     acceptedVersionRef.current = result.version;
     setGameSnapshot((current) =>
       current ? { ...current, state: result.state, version: result.version } : current,
     );
+    return true;
   }, [gameId]);
 
   return {

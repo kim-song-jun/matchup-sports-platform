@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   WifiOff,
   Wifi,
@@ -18,6 +19,7 @@ import {
 } from 'lucide-react';
 import { ActionSheet, type ActionSheetAction } from '@/components/v1-ui/action-sheet';
 import { Button } from '@/components/v1-ui/button';
+import { ErrorState } from '@/components/v1-ui/primitives';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useV1AuthMe, useV1GameResultRevisions } from '@/hooks/use-v1-api';
 import {
@@ -37,7 +39,8 @@ import {
 } from '@/lib/game-operations-clock';
 import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
 import { randomUuid } from '@/lib/uuid';
-import { isV1NetworkError, V1ApiError } from '@/lib/api-client';
+import { isV1NetworkError, v1Api, V1ApiError } from '@/lib/api-client';
+import { v1Keys } from '@/lib/query-keys';
 import { ActionTargetPicker, type EventCaptureCommitInput } from './action-target-picker';
 import { isSecondYellowWithoutRed } from './second-yellow';
 import { latestLineupForDisplay, latestOperableLineup } from './lineup-grid';
@@ -83,6 +86,7 @@ import type {
   GameCardColor,
   GameCommandName,
   GameCommandRequest,
+  GameDetail,
   GameEventRecord,
   GameEventType,
   GameLineup,
@@ -221,6 +225,7 @@ const ACTION_BUTTONS: ReadonlyArray<{
 ];
 
 export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps) {
+  const queryClient = useQueryClient();
   const tournamentOpsRole = useTournamentOpsRole();
   const takeoverEnabled = tournamentOpsRole !== 'SUPPORT_READONLY';
   const authMe = useV1AuthMe();
@@ -282,6 +287,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
 
   const gameState = ops.gameSnapshot?.state ?? gameDetail.data?.state ?? null;
   const gameVersion = ops.gameSnapshot?.version ?? gameDetail.data?.version ?? 0;
+  const gameDetailBehind = (gameDetail.data?.version ?? 0) < gameVersion;
   // 확인 모달이 떠 있는 동안 버전이 낡는 문제(409 VERSION_CONFLICT) —
   // 커맨드는 이제 예외 없이 확인을 거치고(사용자 결정), 승부차기 입력은 킥을
   // 다 찍을 때까지 수 분이 걸릴 수도 있다. 그사이 다른 이벤트가 커밋되면
@@ -332,9 +338,10 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   // 옮긴다. currentPeriod와 배타적이다(한 번에 최대 하나만 참일 수 있다: 어떤
   // 피리어드도 LIVE가 아니면서 정확히 하나가 HALFTIME이거나, 그 반대다).
   const halftimePeriod = useMemo(() => {
+    if (gameDetailBehind) return null;
     const periods = gameDetail.data?.periods ?? [];
     return periods.find((period) => period.state === 'HALFTIME') ?? null;
-  }, [gameDetail.data?.periods]);
+  }, [gameDetailBehind, gameDetail.data?.periods]);
 
   const hasNextPeriod = useMemo(() => {
     if (currentPeriod === null) return false;
@@ -357,11 +364,11 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   // 모든 피리어드는 ENDED이므로 그 상태까지 이 값이 참이 되면 종료된 경기에
   // "경기 종료" 버튼이 다시 살아난다.
   const regulationEnded = useMemo(() => {
-    if (gameState !== 'LIVE') return false;
+    if (gameState !== 'LIVE' || gameDetailBehind) return false;
     const periods = gameDetail.data?.periods ?? [];
     if (periods.length === 0) return false;
     return periods.every((period) => period.state === 'ENDED');
-  }, [gameState, gameDetail.data?.periods]);
+  }, [gameState, gameDetailBehind, gameDetail.data?.periods]);
 
   // alpha "452′" 사고 대응 — 현재 피리어드의 설정된 길이(분). `periodDurations`는
   // `GameDetail.periods`와 배열 인덱스로 정렬된다(`GamePeriodDuration` 타입
@@ -374,6 +381,86 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     const entry = durations?.[currentPeriod.number - 1] ?? null;
     return entry?.durationMinutes ?? null;
   }, [currentPeriod, gameDetail.data?.periodDurations]);
+
+  const [expiredPeriodId, setExpiredPeriodId] = useState<string | null>(null);
+  const [periodExpiryError, setPeriodExpiryError] = useState<string | null>(null);
+  const [periodExpiryPending, setPeriodExpiryPending] = useState(false);
+  const [periodExpiryRetry, setPeriodExpiryRetry] = useState(0);
+  const currentPeriodId = currentPeriod?.id ?? null;
+  const periodExpired = !gameDetailBehind && gameState === 'LIVE' && currentPeriodId !== null && currentPeriodId === expiredPeriodId;
+  const periodRefreshNeeded = periodExpired || gameDetailBehind;
+  const handlePeriodExpiryChange = useCallback((expired: boolean) => {
+    setExpiredPeriodId(expired ? currentPeriodId : null);
+  }, [currentPeriodId]);
+  const applyCommandResult = ops.applyCommandResult;
+  const detailGameId = gameDetail.data?.id;
+  const detailState = gameDetail.data?.state;
+  const detailVersion = gameDetail.data?.version;
+  const snapshotVersion = ops.gameSnapshot?.version;
+  useLayoutEffect(() => {
+    if (gameId === null || detailGameId !== gameId || detailState === undefined || detailVersion === undefined || detailVersion <= (snapshotVersion ?? 0)) return;
+    // 일반 상세가 worker의 더 최신 전환을 먼저 알릴 수 있어요. 같은 경기의
+    // 상태·버전을 함께 수락하고, 같은 배치의 최신 소켓 버전은 훅이 보호해요.
+    applyCommandResult({ state: detailState, version: detailVersion });
+  }, [gameId, detailGameId, detailState, detailVersion, snapshotVersion, applyCommandResult]);
+  const periodReadGenerationRef = useRef(0);
+  const periodStartedAt = currentPeriod?.startedAt;
+  const periodPausedAt = currentPeriod?.pausedAt;
+  const periodPausedTotalMs = currentPeriod?.pausedTotalMs;
+  useLayoutEffect(() => {
+    periodReadGenerationRef.current += 1;
+    return () => { periodReadGenerationRef.current += 1; };
+  }, [gameId, myUserId, currentPeriodId, periodStartedAt, periodPausedAt, periodPausedTotalMs, gameState]);
+
+  useEffect(() => {
+    setPeriodExpiryError(null);
+    setPeriodExpiryPending(false);
+    if (!periodRefreshNeeded || gameId === null) return;
+    let active = true;
+    let inFlight = false;
+    let controller: AbortController | null = null;
+    const generation = periodReadGenerationRef.current;
+    const ownsRead = () => active && generation === periodReadGenerationRef.current;
+    // 기간 본문은 소켓 스냅숏에 없으므로 만료 또는 버전 지연 동안 상세를 읽는다.
+    // refetch는 반환 전에 캐시를 쓰므로, 직접 조회한 뒤 동기 수락을 거쳐 공개한다.
+    // 다른 metadata 조회가 소켓보다 오래된 기간을 덮어도 최신 상세를 다시 확인한다.
+    const refresh = async () => {
+      if (inFlight) return;
+      inFlight = true;
+      const abort = new AbortController();
+      controller = abort;
+      const timeout = setTimeout(() => abort.abort(), COMMAND_RESPONSE_TIMEOUT_MS);
+      setPeriodExpiryPending(true);
+      try {
+        const result = await v1Api<GameDetail>(`/games/${gameId}`, { method: 'GET', signal: abort.signal });
+        if (!ownsRead() || abort.signal.aborted || result.id !== gameId) return;
+        const key = v1Keys.game(gameId);
+        const cached = queryClient.getQueryData<GameDetail>(key);
+        if (result.version < (cached?.version ?? 0) || !applyCommandResult(result)) return;
+        queryClient.setQueryData<GameDetail>(key, (current) =>
+          result.version < (current?.version ?? 0) ? undefined : result,
+        );
+        setPeriodExpiryError(null);
+      } catch (error) {
+        if (ownsRead()) {
+          setPeriodExpiryError(abort.signal.aborted
+            ? '서버 상태 확인이 늦어지고 있어요. 다시 확인해 주세요.'
+            : extractErrorMessage(error, '기간 종료 상태를 불러오지 못했어요. 다시 확인해 주세요.'));
+        }
+      } finally {
+        clearTimeout(timeout);
+        inFlight = false;
+        if (ownsRead()) setPeriodExpiryPending(false);
+      }
+    };
+    void refresh();
+    const interval = setInterval(() => void refresh(), 5_000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+      controller?.abort();
+    };
+  }, [periodRefreshNeeded, currentPeriodId, periodStartedAt, periodPausedAt, periodPausedTotalMs, gameState, gameId, myUserId, queryClient, applyCommandResult, periodExpiryRetry]);
 
   const availableCommands: readonly GameCommandName[] = useMemo(() => {
     // 이슈 #375 — 하프타임은 gameState==='LIVE'인 채로 지속되는 실제 상태라
@@ -1518,6 +1605,8 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
                 pausedTotalMs={currentPeriod.pausedTotalMs}
                 pausedAtMs={currentPeriod.pausedAt === null ? null : new Date(currentPeriod.pausedAt).getTime()}
                 periodCount={periodCount}
+                periodDurationMinutes={gameState === 'LIVE' ? currentPeriodDurationMinutes : null}
+                onExpiryChange={handlePeriodExpiryChange}
               />
             ) : halftimePeriod !== null ? (
               // 이슈 #375 — 어떤 피리어드도 LIVE가 아니므로 경과 시간 자체가
@@ -1551,6 +1640,15 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
       {/* Banners — never silently swallowed; each condition is its own
           visible, dismissable-by-recovery state. */}
       <div className="flex flex-col gap-2 px-4 empty:hidden" aria-live="polite">
+        {periodExpired ? (
+          <Banner tone="warning">
+            설정된 시간이 끝났어요. 서버의 기간 종료 처리를 확인하고 있어요. 처리가 늦어지면 ‘{endPeriodCommandLabel(currentPeriod?.number ?? 1, periodCount)}’를 눌러 주세요.
+          </Banner>
+        ) : null}
+        {gameDetailBehind && <Banner tone="info">최신 경기 진행 상태를 확인하고 있어요.</Banner>}
+        {periodRefreshNeeded && periodExpiryError ? (
+          <ErrorState compact title="경기 진행 상태를 확인하지 못했어요" message={periodExpiryError} retryLabel="종료 상태 다시 확인" retryPending={periodExpiryPending} onRetry={() => setPeriodExpiryRetry((retry) => retry + 1)} />
+        ) : null}
         {!takeoverEnabled && (
           <Banner tone="info">지원 담당자는 이 경기의 기록을 조회할 수 있지만 수정할 수 없어요.</Banner>
         )}
@@ -1621,6 +1719,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         {currentPeriod === null &&
           halftimePeriod === null &&
           !regulationEnded &&
+          !gameDetailBehind &&
           !startBlockedByTeams &&
           gameState !== 'ENDED' &&
           gameState !== 'CANCELLED' && (

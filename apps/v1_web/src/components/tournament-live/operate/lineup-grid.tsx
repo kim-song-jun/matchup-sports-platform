@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { GameLineup, GameLineupParticipant, GameSide } from '@/types/game-operations';
+import type { V1LineupConfigPosition } from '@/types/api';
 import { StatusChip } from '@/components/v1-ui/status-chip';
 import { ARRIVAL_PENDING_CHIP, SENT_OFF_CHIP, arrivalCheckInUsed } from '@/lib/competition-status';
 import { jerseyText } from './player-label';
@@ -39,6 +40,15 @@ export interface LineupGridProps {
   /** Participants with an active red card — shown with a "퇴장" chip but still selectable,
    * since the server accepts later events and the operator may need to correct the record. */
   readonly sentOffParticipantIds?: ReadonlySet<string>;
+  /** 서버의 pinned competition config에서 온 포지션 사전. 저장 코드는 그대로 두고 화면에는 약칭을 쓴다. */
+  readonly lineupPositions?: readonly V1LineupConfigPosition[];
+}
+
+export function lineupPositionLabel(
+  positionCode: string,
+  positions: readonly V1LineupConfigPosition[] | undefined,
+): string {
+  return positions?.find((position) => position.code === positionCode)?.short || positionCode;
 }
 
 /** The latest lineup for a side is the highest `revision` row among
@@ -118,6 +128,7 @@ export function LineupGrid({
   filterParticipantIds,
   restrictSideId,
   sentOffParticipantIds,
+  lineupPositions,
 }: LineupGridProps) {
   const visibleSides = restrictSideId === undefined ? sides : sides.filter((side) => side.id === restrictSideId);
   // 모바일(390px)에서는 두 사이드가 세로로 쌓여, 원정팀을 보려면 홈팀 전체를
@@ -263,7 +274,7 @@ export function LineupGrid({
                             </span>
                             {participant.position ? (
                               <span className="block text-xs text-[var(--text-muted)]">
-                                {participant.position}
+                                {lineupPositionLabel(participant.position, lineupPositions)}
                               </span>
                             ) : null}
                           </span>

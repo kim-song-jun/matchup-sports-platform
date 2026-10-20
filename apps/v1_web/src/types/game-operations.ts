@@ -9,6 +9,8 @@
  * large, self-contained surface.
  */
 
+import type { V1LineupConfig } from './api';
+
 export type GameSourceType = 'TEAM_MATCH' | 'TOURNAMENT_FIXTURE';
 export type GameState = 'SCHEDULED' | 'LIVE' | 'PAUSED' | 'ENDED' | 'CANCELLED';
 export type GameSideKey = 'HOME' | 'AWAY';
@@ -181,6 +183,9 @@ export interface GameDetail {
   periods: GamePeriod[];
   periodDurations: readonly GamePeriodDuration[] | null;
   lineups: GameLineup[];
+  /** 서버가 pinned competition config에서 해석한 종목별 포지션 사전.
+   * 운영 콘솔은 저장 코드(`GOLEIRO` 등)를 직접 노출하지 않고 이 사전의 `short`를 표시한다. */
+  lineupConfig?: V1LineupConfig;
   actorRole: GameActorRole;
   substitutionPolicy: GameSubstitutionPolicy;
   /**

@@ -31,8 +31,10 @@ function isExpectedAbsence(error: unknown): boolean {
 export function MatchTeamRosterCard({
   team,
   footer,
+  showRegistrationRosterEntry = true,
 }: {
   team: MyMatchRosterTeam;
+  showRegistrationRosterEntry?: boolean;
   /** 카드 맨 아래 한 줄 — 화면이 명단과 내 행을 보고 정한다(리그 경기 상세의 "내 기록 연결"). */
   footer?: (context: { view: V1GameRosterView; viewerRow: V1GameRosterView['base'][number] | undefined }) => ReactNode;
 }) {
@@ -50,7 +52,7 @@ export function MatchTeamRosterCard({
       </Card>
     );
   }
-  return <ResolvedRosterCard teamId={team.teamId} gameId={team.gameId} viewerUserId={team.viewerUserId} footer={footer} />;
+  return <ResolvedRosterCard teamId={team.teamId} gameId={team.gameId} viewerUserId={team.viewerUserId} footer={footer} showRegistrationRosterEntry={showRegistrationRosterEntry} />;
 }
 
 function ResolvedRosterCard({
@@ -58,10 +60,12 @@ function ResolvedRosterCard({
   gameId,
   viewerUserId,
   footer,
+  showRegistrationRosterEntry = true,
 }: {
   teamId: string;
   gameId: string;
   viewerUserId: string;
+  showRegistrationRosterEntry?: boolean;
   footer?: Parameters<typeof MatchTeamRosterCard>[0]['footer'];
 }) {
   const roster = useV1TeamGameRoster(teamId, gameId);
@@ -127,7 +131,7 @@ function ResolvedRosterCard({
         </p>
       ) : null}
       <RosterFooter view={data} href={withFromPath(gameRosterScreenPath(teamId, gameId), currentHref)} />
-      <RegistrationRosterEntry view={data} variant="inline" />
+      {showRegistrationRosterEntry ? <RegistrationRosterEntry view={data} variant="inline" /> : null}
       {footer?.({ view: data, viewerRow: data.base.find((row) => row.userId === viewerUserId) })}
     </Card>
   );

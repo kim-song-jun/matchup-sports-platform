@@ -484,7 +484,7 @@ MSW 기본 명단 픽스처는 `DRAFT`·`DEFAULT_PREVIEW`·`hasSavedDraft=false`
   - 신청 마감 시각이 지났고 대기(`requested`) 신청이 없으면 그때, 대기 신청이 있으면 팀장이 승인할 수 있게 기다렸다가 경기 시작 시각에 취소한다. 마감 시각이 없으면 시작 시각에 취소한다.
   - 행은 지우지 않는다. 대기 신청은 `expired`, 연결된 SCHEDULED Game·팀 일정은 취소, 상태 이력은 `actorType=system`·`reason=no_opponent_auto_cancelled`.
   - 1팀(일반 매치의 주최팀, 플랫폼 매치의 먼저 승인된 팀)이면 그 팀과 대기 신청 팀 owner·manager에게 `team_match_cancelled` 알림(딥링크 `/team-matches`, businessKey `team-match-no-opponent:{teamMatchId}:{userId}`, 야간에는 알림함만). 0팀이면 알림이 없다.
-  - 끝난 지 24시간이 지난 매치(배포 전에 쌓인 것)는 알림 없이 취소만 한다.
+  - 경기 시작이 지났고 끝난 지 24시간이 지난 매치(배포 전에 쌓인 것)는 알림 없이 취소만 한다. 경기 전인 매치는 마감이 오래전이어도 알린다.
   - 자동 취소되면 일정 변경(`PATCH`)으로 다시 모집하는 길도 닫힌다 — 다시 모집하려면 새로 만든다.
 
 - 일정·장소 변경 시 기존 requested 신청은 expired로 전환하고 `team_match_updated` 알림으로 재신청을 안내한다. 과거 신청 이력은 보존한다.

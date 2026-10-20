@@ -13,7 +13,10 @@ export const TEAM_MATCH_NO_OPPONENT_SCAN_TYPE = 'TEAM_MATCH_NO_OPPONENT_SCAN';
 const SCAN_INTERVAL_MS = 5 * 60 * 1000;
 /** 한 스캔에서 취소하는 최대 건수. 남은 건은 다음 스캔이 이어서 한다(워커 트랜잭션 시간 한도 안에 끝내려고). */
 const SCAN_BATCH_SIZE = 30;
-/** 이보다 오래전에 끝난 매치는 알림 없이 취소만 한다 — 배포 직후 쌓여 있던 옛 매치 알림이 한꺼번에 나가지 않게. */
+/**
+ * 경기 시작이 지났고 이보다 오래전에 끝난 매치는 알림 없이 취소만 한다 — 배포 직후 쌓여 있던 옛 매치 알림이 한꺼번에
+ * 나가지 않게. 경기 전인 매치는 마감이 오래전이어도 알린다(팀은 아직 그날을 기다린다).
+ */
 export const NO_OPPONENT_NOTIFY_WINDOW_MS = 24 * 60 * 60 * 1000;
 const CANCEL_REASON = 'no_opponent_auto_cancelled';
 
@@ -48,7 +51,9 @@ export function noOpponentCancelVerdict(match: MatchState, pendingApplications: 
   ].filter((at): at is Date => at !== null);
   if (ends.length === 0) return { cancel: false };
   const endedAt = new Date(Math.min(...ends.map((at) => at.getTime())));
-  return { cancel: true, endedAt, notify: now.getTime() - endedAt.getTime() <= NO_OPPONENT_NOTIFY_WINDOW_MS };
+  // 창을 마감 시각으로만 재면 배포·워커 장기 중단 뒤 "마감은 오래전·경기는 며칠 뒤"인 매치가 조용히 사라진다.
+  const upcoming = match.startAt !== null && match.startAt > now;
+  return { cancel: true, endedAt, notify: upcoming || now.getTime() - endedAt.getTime() <= NO_OPPONENT_NOTIFY_WINDOW_MS };
 }
 
 /**

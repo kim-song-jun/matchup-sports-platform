@@ -56,6 +56,14 @@ describe('noOpponentCancelVerdict — 상대 없이 끝난 팀매치 판정', ()
     });
   });
 
+  it('마감이 24시간보다 오래전이어도 경기 전이면 알린다 (배포 직후 쌓인 매치 중 아직 열리지 않은 경기)', () => {
+    expect(noOpponentCancelVerdict(match({ deadlineAt: at(-25 * HOUR), startAt: at(3 * HOUR) }), 0, NOW)).toEqual({
+      cancel: true,
+      endedAt: at(-25 * HOUR),
+      notify: true,
+    });
+  });
+
   it.each([
     ['상대가 정해진 매치', { approvedApplicantTeamId: 'team-b', status: 'matched' }],
     ['리그 대진', { leagueId: 'league-1' }],

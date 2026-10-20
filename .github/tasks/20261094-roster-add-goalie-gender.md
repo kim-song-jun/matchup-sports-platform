@@ -61,3 +61,9 @@ Status: In Progress
 - 기존 schema column·migration을 재사용해 DB 변경 없음. 실 DB 통합 테스트는 미실행(Docker 미설치).
 - alpha before/after 및 390/768/1440 console/network는 미실행: 변경은 PR 단계여서 미배포. PR에 머지 후 확인 필요를 명시하며 머지를 실행하지 않는다.
 - touched source debt marker 없음, git diff --check 통과. node_modules는 임시 의존성 symlink로 커밋에서 제외.
+
+## 2026-10-20 안내 문구 후속
+- 사용자 확정: 선수 명단·등번호·골레이 설정은 대회(리그)의 모든 경기에 공통으로 적용돼요. / 첫 경기가 시작되면 변경할 수 없어요. / 경기 시작 후 수정이 필요하면 운영진에게 문의해 주세요.
+- 사용자 명시로 문구만 변경하며 실제 첫 경기 시작 후 잠금 정책은 도입하지 않는다. 현재 실제 동작과 문구의 차이는 사용자가 인지·선택한 상태다.
+- 공통 AddPlayerForm을 사용하는 ParticipantRosterEditor의 POST에서 goalkeeper 전달 누락 발견. 원래 요청한 저장 기능의 누락으로 별도 보완하며 기존 gate는 보존한다.
+- 대회·리그 문구 및 통합 명단 실제 POST true/false 회귀 검증 추가. alpha 시각 검증은 배포 후 대기.

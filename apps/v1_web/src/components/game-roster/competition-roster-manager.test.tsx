@@ -80,6 +80,33 @@ describe('공통 명단 관리의 실제 탭·저장 흐름', () => {
     expect(screen.getByLabelText('출전을 관리할 경기')).toHaveValue(games[0].gameId);
     expect(screen.queryByRole('button', { name: /골키퍼로 지정/ })).not.toBeInTheDocument();
   });
+  it.each(['regular_tournament', 'regular_league'] as const)('%s 참가 선수 안내는 확정 문구를 표시한다', async value => {
+    kind = value;
+    open('registration');
+    const noun = value === 'regular_league' ? '리그' : '대회';
+    expect(await screen.findByText((_, element) => element?.tagName === 'P' &&
+      element.textContent === `선수 명단·등번호·골레이 설정은 ${noun}의 모든 경기에 공통으로 적용돼요.첫 경기가 시작되면 변경할 수 없어요.경기 시작 후 수정이 필요하면 운영진에게 문의해 주세요.`)).toBeInTheDocument();
+  });
+  it.each([false, true])('통합 명단 선수 추가는 골레이 %s를 POST에 전달한다', async goalkeeper => {
+    let body: Record<string, unknown> | undefined;
+    server.use(
+      http.get('*/api/v1/teams/:id/members', () => ok({ items: [{ userId: 'new-player', displayName: '새선수',
+        realName: '새선수', gender: 'female', birthDate: '1995-03-15', phone: '01012345678', role: 'member' }],
+        pageInfo: { hasNext: false, nextCursor: null } })),
+      http.post('*/api/v1/tournaments/:id/registrations/:reg/players', async ({ request }) => {
+        body = await request.json() as Record<string, unknown>;
+        return ok({ id: 'new-player-row', ...body });
+      }),
+    );
+    open('registration');
+    fireEvent.click(await screen.findByRole('button', { name: '선수 추가' }));
+    await screen.findByRole('option', { name: /새선수/ });
+    fireEvent.change(screen.getByLabelText(/팀원 선택/), { target: { value: 'new-player' } });
+    expect(screen.getByLabelText('성별')).toHaveValue('여성');
+    if (goalkeeper) fireEvent.click(screen.getByRole('checkbox', { name: '골레이로 등록해요' }));
+    fireEvent.click(screen.getByRole('button', { name: '선수 등록' }));
+    await waitFor(() => expect(body).toMatchObject({ userId: 'new-player', goalkeeper }));
+  });
   it('번호 0·GK 공통 설정을 저장하면 다른 경기에도 보이며 제외 상태와는 독립적이다', async () => {
     open('registration');
     fireEvent.click(await screen.findByRole('button', { name: '김민재 등번호 7번 바꾸기' }));

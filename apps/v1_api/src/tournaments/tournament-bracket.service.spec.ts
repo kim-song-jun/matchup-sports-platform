@@ -2444,11 +2444,12 @@ describe('TournamentBracketService', () => {
     expect(prisma.v1TournamentMatchDetails.update).toHaveBeenCalledWith({ where: { teamMatchId: 'fixture-1' }, data: { groupId: null, parentTeamMatchId: null, round: 'group_a:deleted:fixture-1' } });
     expect(prisma.v1AdminActionLog.create).toHaveBeenCalled();
   });
-  it('deleteFixture: started tournament cannot delete even an unstarted match', async () => {
+  it('deleteFixture: in-progress tournament can delete an unstarted match', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
     prisma.v1TournamentMatchDetails.findUnique.mockResolvedValue(canonicalDetailsRow({ tournament: tournamentRow() }));
-    await expect(service.deleteFixture(ownerUser, 'fixture-1')).rejects.toMatchObject({ response: { code: 'FIXTURE_ALREADY_STARTED' } });
-    expect(prisma.v1Game.update).not.toHaveBeenCalled();
+    await expect(service.deleteFixture(ownerUser, 'fixture-1')).resolves.toEqual({ deleted: true });
+    expect(prisma.v1TeamMatch.update).toHaveBeenCalledWith({ where: { id: 'fixture-1' }, data: { status: 'archived', deletedAt: expect.any(Date), homeSlotId: null, awaySlotId: null } });
+    expect(prisma.v1Game.update).toHaveBeenCalledWith({ where: { id: 'game-1' }, data: { state: 'CANCELLED', version: { increment: 1 } } });
   });
   it('deleteFixture: started game cannot be deleted in a pre-start tournament', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
@@ -2456,6 +2457,24 @@ describe('TournamentBracketService', () => {
     row.teamMatch.game.state = 'LIVE';
     prisma.v1TournamentMatchDetails.findUnique.mockResolvedValue(row);
     await expect(service.deleteFixture(ownerUser, 'fixture-1')).rejects.toMatchObject({ response: { code: 'FIXTURE_ALREADY_STARTED' } });
+    expect(prisma.v1TeamMatch.update).not.toHaveBeenCalled();
+  });
+
+  it.each(['completed', 'cancelled', 'on_hold'])('deleteFixture: %s tournament still blocks an unstarted match', async (status) => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    prisma.v1TournamentMatchDetails.findUnique.mockResolvedValue(canonicalDetailsRow({ tournament: tournamentRow({ status }) }));
+    await expect(service.deleteFixture(ownerUser, 'fixture-1')).rejects.toMatchObject({ response: { code: 'FIXTURE_ALREADY_STARTED' } });
+    expect(prisma.v1Game.update).not.toHaveBeenCalled();
+    expect(prisma.v1TeamMatch.update).not.toHaveBeenCalled();
+  });
+
+  it.each(['LIVE', 'PAUSED', 'ENDED', 'CANCELLED'])('deleteFixture: in-progress tournament still protects a %s game', async (state) => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    const row = canonicalDetailsRow({ tournament: tournamentRow() });
+    row.teamMatch.game.state = state;
+    prisma.v1TournamentMatchDetails.findUnique.mockResolvedValue(row);
+    await expect(service.deleteFixture(ownerUser, 'fixture-1')).rejects.toMatchObject({ response: { code: 'FIXTURE_ALREADY_STARTED' } });
+    expect(prisma.v1Game.update).not.toHaveBeenCalled();
     expect(prisma.v1TeamMatch.update).not.toHaveBeenCalled();
   });
 

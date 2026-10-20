@@ -389,7 +389,7 @@ Global rules inherited from `~/.codex/AGENTS.md`:
   `scripts/release/`·루트 매니페스트 변경이고, `.md`·테스트·fixtures·`docs/`·`e2e/`·`.github/tasks/`·`scripts/qa/`·`scripts/docs/`는
   제외다(`scripts/release/check-changeset-policy.mjs`). 빠지면 dev-push CI가 실패하고 alpha 배포가 막힌다.
 - **Copilot 리뷰는 `generated no new comments`가 나올 때까지 반복한다.** 요청은
-  `gh pr edit <N> --add-reviewer copilot-pull-request-reviewer` 또는 공식 REST `requested_reviewers`에
+  `gh pr edit <N> --add-reviewer "@copilot"` 또는 공식 REST `requested_reviewers`에
   `reviewers: ["copilot-pull-request-reviewer[bot]"]`를 전달한다(2026-10-16 실제 접수·실행 확인). 도착은 비동기 ~3–8분.
   각 finding은 **적대적으로 검증해 real만 수정**한다 — Copilot도 틀린다. 스레드는 GraphQL
   `addPullRequestReviewThreadReply` + `resolveReviewThread`로 답변·resolve한다. **늦은 라운드에 나온 게 더 치명적일 수 있다.**

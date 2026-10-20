@@ -45,8 +45,10 @@ git push origin <current-branch>  # 항상 현재 브랜치 (브랜치 생성/�
 ### 2.1 리뷰 요청
 
 ```bash
-gh pr edit <N> --add-reviewer copilot-pull-request-reviewer
+gh pr edit <N> --add-reviewer "@copilot"
 ```
+
+- 현재 GitHub CLI의 Copilot 예약 핸들은 `@copilot`이다. 기존 bot slug만 전달한 명령은 exit 0이어도 이 세션에서 요청 이벤트를 만들지 않았으므로, 성공 종료만으로 접수·clean을 판정하지 않는다. 실제 요청 이벤트/리뷰 workflow와 최신 head의 제출 리뷰를 확인한다. [CLI 공식 문서](https://cli.github.com/manual/gh_pr_edit).
 
 - 공식 REST 요청도 지원한다. 2026-10-16 실제로 다음 요청이 접수되고 해당 head의 리뷰 workflow가 실행됐다. 이전의 “REST는 항상422” 관찰은 현재 절차가 아니다.
   ```bash
@@ -360,7 +362,7 @@ gh run view <run-id> --log-failed | grep -iE 'fail|error|FAIL'   # 실패 라인
 | v1 DB | `teameet_v1_pg` :5432 · `teameet_v1_user`/`teameet_v1_password`/`teameet_v1_dev` |
 | main api (dev) | `:8111` · DB `teameet_dev` :5433 (별개) |
 | dev 인증 헤더 | `x-v1-user-id` · `x-v1-user-email` (← localStorage `teameet.v1.userId`/`userEmail`) |
-| Copilot 요청 | `gh pr edit <N> --add-reviewer copilot-pull-request-reviewer` |
+| Copilot 요청 | `gh pr edit <N> --add-reviewer "@copilot"` |
 | Copilot clean | **5게이트**(작성자·제출시각>head·`Comments generated: 0`·suppressed 없음·미해결 0) — §2.2-a. `0 new` 하나로 판정하지 말 것 |
 | Copilot 한도 | 변경 파일 **300개** 초과 시 리뷰 불가 |
 | 캡처 3폭 | mobile **390** / tablet **768** / desktop **1440** |

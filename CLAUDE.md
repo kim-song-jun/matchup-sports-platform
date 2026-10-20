@@ -402,7 +402,7 @@ pnpm test:e2e:v1                       # Playwright — e2e/v1.config.ts (v1 스
 
 1. **커밋은 내 파일만 pathspec** + 직후 `git show --stat HEAD` 검증. 완료 보고 전 게이트 = `tsc 0` +
    영향받는 테스트 + (시각 변경이면) 아래 4번의 alpha 화면 검증.
-2. **Copilot 리뷰 루프**: 요청은 `gh pr edit <N> --add-reviewer copilot-pull-request-reviewer`
+2. **Copilot 리뷰 루프**: 요청은 `gh pr edit <N> --add-reviewer "@copilot"`
    또는 공식 REST `POST /repos/{owner}/{repo}/pulls/{number}/requested_reviewers`에
    `reviewers: ["copilot-pull-request-reviewer[bot]"]`를 전달한다(2026-10-16 실제 접수·실행 확인).
    도착은 비동기 ~3–8분 → 폴링(리뷰 수 증가). 각 finding은

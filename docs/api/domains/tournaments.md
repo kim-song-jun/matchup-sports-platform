@@ -475,6 +475,9 @@ including operator-seeded and promoted teams. `draft`, `submitted`, `waitlisted`
 
 `POST /players` only accepts an active member of the registration team.
 
+`AddPlayerDto.goalkeeper` is an optional boolean (not null); omitted means `false`. Create and restore persist the selected value in the existing `V1TournamentPlayer.goalkeeper` column in the same transaction. The response includes `goalkeeper` (boolean). The existing roster-resync outbox applies it to unstarted tournament/league games; started games keep their snapshots. In the add-player UI it is labelled **골레이로 등록해요**. The read-only gender field comes from the selected member profile and is never submitted as client-authored gender. Existing profile/gender eligibility and roster permission/lock/deadline gates are unchanged.
+
+
 The service reads the selected member's profile and phone from the team membership user record. A member can be added only when all required source fields exist:
 
 - `profile.displayName` as real name

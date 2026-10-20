@@ -30,6 +30,11 @@ export class AddPlayerDto {
   @Max(99, { message: '등번호는 0에서 99 사이로 입력해 주세요.' })
   jerseyNumber?: number;
 
+  /** 골레이 여부. 생략 시 일반 선수로 등록한다. */
+  @ValidateIf((_, value) => value !== undefined)
+  @IsBoolean()
+  goalkeeper?: boolean;
+
   /** 미지정 시 needs_review 로 저장. */
   @IsOptional()
   @IsIn(PLAYER_ELIGIBILITY_STATUSES)

@@ -49,7 +49,7 @@ import {
   tournamentRosterClosedMessage,
   type RosterDeadlineState,
 } from '@/lib/roster-editability';
-import { PLAYER_ELIGIBILITY_LABEL, teamRoleLabel } from '@/lib/v1-status-labels';
+import { PLAYER_ELIGIBILITY_LABEL, rosterGenderLabel, teamRoleLabel } from '@/lib/v1-status-labels';
 import { AvatarFallback } from '@/components/v1-ui/avatar-fallback';
 import { rosterLimitText } from '@/lib/roster-limit';
 import { compareRosterPlayers, rosterDisplayName } from '@/lib/roster-presentation';
@@ -253,6 +253,7 @@ type AddPlayerFormState = {
   phone: string;
   /** 등번호. 문자열로 들고 있다가 보낼 때만 숫자로 바꾼다 — 빈 값과 `0` 을 구분해야 한다. */
   jerseyNumber: string;
+  goalkeeper: boolean;
   eligibilityStatus: V1PlayerEligibilityStatus;
 };
 
@@ -262,6 +263,7 @@ const EMPTY_FORM: AddPlayerFormState = {
   birthDate: '',
   phone: '',
   jerseyNumber: '',
+  goalkeeper: false,
   eligibilityStatus: 'non_pro',
 };
 
@@ -664,6 +666,16 @@ export function AddPlayerForm({
           />
         </FormField>
 
+        <FormField id={`${formId}-gender`} label="성별" hint="팀원 프로필의 성별이 자동으로 표시돼요.">
+          <input
+            id={`${formId}-gender`}
+            className="tm-input"
+            value={selectedMember ? rosterGenderLabel(selectedMember.gender) : ''}
+            placeholder="팀원을 선택해 주세요"
+            readOnly
+          />
+        </FormField>
+
         <FormField
           id={birthDateFieldId}
           label="생년월일"
@@ -728,6 +740,17 @@ export function AddPlayerForm({
             style={{ fontFamily: 'var(--font-pretendard)' }}
           />
         </FormField>
+
+        <label htmlFor={`${formId}-goalkeeper`} className="tm-text-caption" style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 44, color: 'var(--text-strong)' }}>
+          <input
+            id={`${formId}-goalkeeper`}
+            type="checkbox"
+            checked={form.goalkeeper}
+            onChange={(event) => patch({ goalkeeper: event.target.checked })}
+            disabled={isSubmitting}
+          />
+          골레이로 등록해요
+        </label>
 
         <FormField id={eligibilityFieldId} label="선출 여부" labelId={`${eligibilityFieldId}-label`}>
           <div role="radiogroup" aria-labelledby={`${eligibilityFieldId}-label`} style={{ display: 'flex', gap: 12 }}>
@@ -1370,6 +1393,7 @@ export function TournamentRosterPageClient({
     birthDate: string;
     /** 문자열로 받는다 — 빈 값과 `0` 을 구분해야 한다. */
     jerseyNumber: string;
+    goalkeeper: boolean;
     eligibilityStatus: V1PlayerEligibilityStatus;
   }) {
     // 로딩 중 재클릭 시 중복 제출 방지 — isPending 은 disabled 속성과 동일하게 리렌더
@@ -1410,6 +1434,7 @@ export function TournamentRosterPageClient({
         realName: formData.realName,
         birthDate: formData.birthDate || undefined,
         jerseyNumber: jersey.value,
+        goalkeeper: formData.goalkeeper,
         eligibilityStatus: formData.eligibilityStatus,
       });
       setDraftForms((prev) => prev.filter((form) => form.id !== formId));

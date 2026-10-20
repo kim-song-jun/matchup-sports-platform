@@ -441,12 +441,14 @@ export class TournamentPlayersService {
           realName: memberRealName,
           birthDateSnapshot: memberBirthDate,
           genderSnapshot: memberGender,
+          goalkeeper: dto.goalkeeper ?? false,
           eligibilityStatus: dto.eligibilityStatus ?? 'needs_review',
         },
         update: {
           realName: memberRealName,
           birthDateSnapshot: memberBirthDate,
           genderSnapshot: memberGender,
+          goalkeeper: dto.goalkeeper ?? false,
           eligibilityStatus: adminRuled
             ? existingRow!.eligibilityStatus
             : (dto.eligibilityStatus ?? 'needs_review'),
@@ -1182,6 +1184,7 @@ export class TournamentPlayersService {
     return {
       id: row.id,
       jerseyNumber,
+      goalkeeper: row.goalkeeper ?? false,
       userId: row.userId,
       realName: row.realName,
       birthDateSnapshot: row.birthDateSnapshot ?? null,

@@ -4274,6 +4274,7 @@ export type V1TournamentRosterResponse = {
 };
 
 export type V1AdminTournamentPlayer = V1TournamentPlayer & {
+  goalkeeper: boolean;
   /** 현재 프로필 닉네임. 프로필이 없으면 null이며 등록 당시 실명과 별도 필드다. */
   nickname: string | null;
   phone: string | null;

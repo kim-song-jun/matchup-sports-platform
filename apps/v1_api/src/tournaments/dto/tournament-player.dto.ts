@@ -82,3 +82,10 @@ export class UpdatePlayerRosterSettingsDto {
   @IsBoolean()
   goalkeeper?: boolean;
 }
+
+/** 번호는 명시적으로 저장하고, GK는 바꾼 경우에만 보내 기존 경기 역할을 보존한다. */
+export class UpdateAdminPlayerSettingsDto extends UpdatePlayerJerseyDto {
+  @ValidateIf((_, value) => value !== undefined)
+  @IsBoolean()
+  goalkeeper?: boolean;
+}

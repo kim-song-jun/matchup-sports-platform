@@ -227,3 +227,54 @@
   > 여기를 고칠 때는 ① 그 상태를 말하는 자리를 **전부 세고** ② 자리마다 단언을 붙인다.
   > **변이에서 red 가 0 이면 "안전" 이 아니라 "그 자리를 안 보고 있다" 는 신호다** — 두 번 다
   > 그렇게 발견했다.
+
+
+## 2026-10-20 후속: 어드민 번호·GK 설정 (사용자 A안 확정)
+
+Status: Review — dev 대상 PR 준비, alpha QA 대기
+
+### Context / Goal
+명단 검토에서 선수 제거·재추가 없이 등번호와 GK를 수정한다. 대회·리그는 같은 모달을 사용한다.
+사용자 추가 요청인 우리 팀 일정 강조와 조별 순위 펼침 내역 스타일도 같은 PR에 포함한다.
+
+### Original Conditions / User Scenarios
+- [x] A/B/C 제안 → 사용자 A(선수별 수정·저장) 선택.
+- [x] 선수별 수정 → 등번호·GK 입력 → 저장/취소 UI.
+- [x] 취소하면 API를 호출하지 않는다. 실패하면 입력을 유지하고 실제 오류를 표시한다.
+- [x] 우리 팀 경기는 일반 경기와 같은 배경, 우리 팀 배지 + 파란 1px 테두리.
+- [x] 조별 순위의 경기 내역 배경은 blue50(라이트 #e8f3ff), 첫 경기 위 8px 여백.
+
+### Parallel Work Breakdown / Owned Scope
+단일 에이전트 순차 진행: 관리자 저장 API → 어드민 편집 UI/hooks → 테스트/docs → PR.
+공유 작업 트리의 다른 WIP는 포함하지 않는다. 최신 origin/dev에서 분리한 /tmp 작업 폴더로 PR을 준비한다.
+
+### Acceptance Criteria / Test Scenarios
+- [x] 번호 0~99, 빈 값=null, 같은 신청 내 활성 선수끼리 중복 409.
+- [x] owner/ops만 저장, support는 조회만. 다른 신청/삭제 선수 수정 404.
+- [x] 번호·GK·감사 로그·동기화 outbox는 하나의 트랜잭션.
+- [x] 기존 시작 전 경기 동기화와 경기별 GK 지정 우선순위 유지.
+- [x] 최신 dev 통합본의 frontend/API 회귀 테스트·타입 검사·diff check.
+- [ ] 머지·alpha 배포 후 390/768/1440 명단 저장·재조회 및 스타일/console/network QA.
+
+### Tech Debt Resolved
+기존 dev의 참가 명단 goalkeeper/경기 동기화 계약을 재사용해 중복 모델·마이그레이션·GK 코드 분기를 만들지 않는다.
+
+### Security Notes
+기존 getMutationAdmin, 등록 행 잠금, 상태 게이트를 재사용한다. 감사 로그는 번호·GK와 신청 id만 남긴다.
+
+### Risks & Dependencies / Ambiguity Log
+최초 작업 트리는 10월 1일 코드였으나 최신 origin/dev에는 이미 nullable goalkeeper와 종목별/경기별 GK 동기화가 있다.
+PR 통합 시 기존 nullable 필드, 종목별 GK 코드, 경기별 지정, 진행/종료 경기 스냅샷을 유지했다. 새 DB migration은 없다.
+관련 모델은 기존 V1TournamentPlayer, V1GameRosterRole, V1GameParticipant이다. 글로벌 사용자 프로필은 변경하지 않는다.
+
+### Progress Snapshot
+- 이전 트리 검증(참고 이력): 일정 43 tests, 명단 backend 212 + frontend 14 tests PASS. 이전 의존성의 리그 타입 오류는 그 트리의 결과다.
+- PR 검증은 새로 가져온 origin/dev의 정확한 변경 트리에서 frozen-lockfile 설치 후 다시 수행한다.
+- UI 3폭 갤러리는 저장소 정책상 dev 머지→alpha 배포 확인 뒤 같은 PR에 사후 게시한다. 로컬 Next 서버를 실행하지 않는다.
+
+- 최신 dev PR 검증: backend 145 tests + frontend 142 tests = 총 287 tests PASS.
+- API/Web `tsc --noEmit` PASS, API surface gate PASS, Web pattern gate PASS.
+- 타입 검사가 찾은 명단 테스트 fixture 2곳에 실제 API의 goalkeeper=false 필드를 동기화했다.
+- 새 UI 글자 크기는 tm-text-caption/tm-text-label 토큰을 사용하고, 감소한 tint baseline을 5→4로 낮췄다.
+- frozen-lockfile 설치·Prisma 생성은 격리 폴더에서만 수행. 실제 DB 접근·seed·migration 적용·로컬 Next/브라우저 실행 없음.
+- 공유 작업 트리를 수정하지 않고 origin/dev 기반 별도 PR 브랜치로 제출한다.

@@ -689,6 +689,38 @@ export class TournamentPlayersService {
 
   // ─── 어드민: 명단 조회/CSV 다운로드 ───────────────────────────────────────────
 
+  async updatePlayerSettingsForAdmin(
+    user: V1AuthUser,
+    registrationId: string,
+    playerId: string,
+    dto: { jerseyNumber: number | null; goalkeeper?: boolean },
+  ) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const scope = await this.prisma.v1TournamentRegistration.findUnique({
+      where: { id: registrationId }, select: { tournamentId: true },
+    });
+    if (!scope) throw new NotFoundException({ code: 'REGISTRATION_NOT_FOUND', message: '신청 내역을 찾을 수 없어요.' });
+    return this.prisma.$transaction(async (tx) => {
+      const { registration } = await this.lockAndLoadMutableRegistration(
+        tx, scope.tournamentId, registrationId, { allowLockedAndExpired: true },
+      );
+      const player = await tx.v1TournamentPlayer.findFirst({ where: { id: playerId, registrationId, removedAt: null } });
+      if (!player) throw new NotFoundException({ code: 'PLAYER_NOT_FOUND', message: '선수를 찾을 수 없어요.' });
+      const beforeJerseys = await readJerseyNumbers(tx, registrationId);
+      if (dto.jerseyNumber !== null) await assertJerseyAvailable(tx, registrationId, dto.jerseyNumber, playerId);
+      const updated = await tx.v1TournamentPlayer.update({
+        where: { id: playerId }, data: { jerseyNumber: dto.jerseyNumber, ...(dto.goalkeeper !== undefined ? { goalkeeper: dto.goalkeeper } : {}) },
+      });
+      await this.adminContext.logAdminAction(admin, {
+        action: 'player.settings', targetType: 'tournament_player', targetId: playerId,
+        beforeJson: { registrationId, jerseyNumber: beforeJerseys.get(playerId) ?? null, goalkeeper: player.goalkeeper },
+        afterJson: { registrationId, jerseyNumber: dto.jerseyNumber, goalkeeper: updated.goalkeeper },
+      }, tx);
+      await enqueueRosterResync(tx, competitionTeamTargets(scope.tournamentId, [registration.teamId]));
+      return this.serializePlayer(updated, dto.jerseyNumber);
+    });
+  }
+
   async listPlayersForAdmin(user: V1AuthUser, registrationId: string) {
     await this.adminContext.getActiveAdmin(user.id);
 

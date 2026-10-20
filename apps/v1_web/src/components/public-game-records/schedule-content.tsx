@@ -352,7 +352,7 @@ function ScheduleRow({
       href={fixtureDetailHref({ isRegularLeague, competitionId: tournamentId, fixtureId: entry.fixtureId, fromHref })}
       // 구분선을 인라인이 아니라 클래스로 그린다 — 인라인 style 은 미디어쿼리가 이길 수
       // 없어서, 데스크톱에서 목록을 2열로 펼 때 격자선을 다시 그릴 방법이 없어진다.
-      // 내 팀 경기는 바깥 컨테이너가 테두리를 그린다(액센트 바와 한 겹으로 맞추기 위해).
+      // 내 팀 경기의 파란 테두리는 바깥 컨테이너가 그린다.
       className={`tm-pressable${isMine ? '' : ' tm-schedule-card'}`}
       style={{
         display: 'block',
@@ -368,9 +368,7 @@ function ScheduleRow({
               fontSize: 12,
               fontWeight: 800,
               color: 'var(--blue700)',
-              // 행 배경이 중립(grey50)으로 바뀌면서 파란색이 남은 자리는 이 배지와
-              // 왼쪽 액센트 바 둘뿐이다 — 배지가 파랗게 떠야 "우리 팀"이 눈에 걸린다.
-              // 예전처럼 카드 표면색(흰색)으로 두면 중립 배경 위에서 배지 윤곽이 사라진다.
+              // 공통 카드 배경 위에서 배지로 우리 팀 경기를 구분한다.
               background: 'var(--blue50)',
               borderRadius: 'var(--radius-chip)',
               padding: '2px 8px',
@@ -475,24 +473,11 @@ function ScheduleRow({
 
   if (!isMine) return row;
 
-  // 내 팀 경기는 배지 + 옅은 배경으로 목록에서 즉시 떠오르게 한다.
+  // 일반 경기와 같은 배경을 쓰고 배지와 파란 테두리로 구분한다.
   return (
     <div
       className="tm-schedule-card tm-schedule-card-mine"
-      style={{
-        // 예전에는 행 전체를 `--blue50`(#e8f3ff)로 칠했다 — 내 팀 경기가 연달아 있으면
-        // 목록의 절반이 통째로 파랗게 덮여, 강조가 아니라 배경 자체가 바뀐 것처럼 보였다
-        // (오너 지적: "하이라이트 색상도 그렇고"). 파랑은 "우리 팀" 배지에만 남기고
-        // 면(面)은 중립 톤으로 되돌린다 — 이 저장소의 절제 원칙대로
-        // 강조는 넓은 색면 대신 배지와 텍스트 계층으로 준다.
-        //
-        // `--grey50`이 아니라 `--grey100`인 이유: 스코어 칸이 `--grey50` pill이라,
-        // 행 배경까지 `--grey50`으로 두면 **두 색이 정확히 같아져 스코어 pill이 배경에
-        // 통째로 녹는다**(alpha 실측: rowBg === pillBg === rgb(249,250,251)). 한 단계
-        // 진한 톤을 써서 pill이 그 위로 떠오르게 한다 — 라이트/다크 양쪽 모두에서
-        // 두 토큰이 서로 다른 값이라 대비가 유지된다.
-        background: 'var(--grey100)',
-      }}
+      style={{ background: 'var(--bg)', borderColor: 'var(--blue500)' }}
     >
       {row}
     </div>

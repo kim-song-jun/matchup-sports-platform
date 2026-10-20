@@ -44,6 +44,7 @@ let eligibleState: Record<string, unknown>;
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminTournamentPlayers: () => queryState,
+  useV1AdminUpdatePlayerSettings: () => ({ mutate: vi.fn(), isPending: false }),
   useV1UpdatePlayerEligibility: () => ({ mutate: updateEligibility, isPending: false }),
   useV1AdminAddPlayer: () => ({ mutate: addPlayer, isPending: false }),
   useV1AdminRosterEligibleMembers: () => eligibleState,

@@ -315,3 +315,9 @@ GK 저장/해제는 해당 참가 등록(대회·팀)의 선수 값에 보관한
 ## League start prerequisite (2026-10-18)
 
 Game `start` in a regular league with `requiresExplicitStart=true` and stored as `draft`, `open`, or `closed` returns `409 LEAGUE_NOT_STARTED` before game state changes. An authorized admin starts the league through the existing league state endpoint first; friendly matches and regular tournaments retain their current rules. See [league lifecycle](./league-matches.md#new-league-lifecycle-2026-10-18).
+
+## 운영콘솔 경기 출전 명단 (2026-10-20)
+
+대회 운영콘솔은 팀이 설정한 경기별 출전 명단을 `GET /teams/:teamId/games/:gameId/roster`로 읽는다. 기본은 조회이며 수정하기 후 저장할 때 기존 `POST /games/:gameId/sides/:sideId/roster-adjustments`(선수 제외), `DELETE .../roster-adjustments/:userId`(복귀)를 사용한다. 기존 운영자 인가와 경기 시작 전 제한을 유지하며 대회 공통 참가 명단·다른 경기는 바꾸지 않는다. 저장은 단건 API를 직렬 호출하므로 부분 실패 시 저장된 수와 오류를 표시하고 실제 명단을 재조회한다. 도착 검인은 출전 여부가 아니며 대회 콘솔에서 전원 도착을 요구하지 않는다.
+
+대회·리그 경기 이벤트 append/retry의 선수·도움·교체 대상과 기존 득점의 도움 추가는 현재 유효한 명단 리비전에 속해야 한다. 이전 리비전·제외 선수 ID는 `422 PARTICIPANT_NOT_IN_CURRENT_ROSTER`다. 기존 이벤트와 참가자 FK는 보존한다. 일반 친선 경기 계약은 유지한다.

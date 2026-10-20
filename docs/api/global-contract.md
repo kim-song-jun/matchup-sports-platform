@@ -203,3 +203,5 @@ The [league image endpoint](./domains/league-matches.md#cover-image-목록상세
 
 Admin roster settings writes use the owner/ops-only gate and append actor/before/after audit records.
 Support admins may only read. See [admin roster settings](./domains/tournaments.md#admin-roster-player-settings-2026-10-20).
+
+대회 운영콘솔의 경기별 명단 편집은 기존 roster-adjustments API를 재사용한다. 대회·리그 이벤트 및 도움 추가에서 이전 명단 참가자는 422 PARTICIPANT_NOT_IN_CURRENT_ROSTER로 거부한다. [경기 계약](./domains/games.md#운영콘솔-경기-출전-명단-2026-10-20)을 따른다.

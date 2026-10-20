@@ -1,35 +1,25 @@
 'use client';
 
-import Link from 'next/link';
 import { useV1TeamGameRoster } from '@/hooks/use-v1-game-roster';
-import { useCurrentHref } from '@/components/v1-ui/use-current-href';
-import { gameRosterScreenPath } from '@/lib/game-roster-routes';
 import { OPERATIONS_BOARD_POLL_INTERVAL_MS } from '@/lib/operations-board-polling';
-import { withFromPath } from '@/lib/session-storage';
 import type { GameSide } from '@/types/game-operations';
-import { ArrivalCheckinPanel, arrivalProgress, type ArrivalCheckinPanelProps } from './arrival-checkin-panel';
+import { TournamentParticipationPanel } from './tournament-participation-panel';
 import { LeagueParticipationPanel } from './league-participation-panel';
 
-export interface KickoffChecklistProps extends Omit<ArrivalCheckinPanelProps, 'title' | 'sideAccessory'> {
+export interface KickoffChecklistProps {
   readonly gameId: string;
-  /** 리그 출전 선수 변경이 실패했을 때 알림. */
+  readonly sides: readonly GameSide[];
+  readonly disabled?: boolean;
   readonly onRosterError: (message: string) => void;
 }
 
-/**
- * 경기 시작 전 콘솔의 "킥오프 준비". 예전에는 도착 확인은 콘솔에, 그 팀의 빠짐·정지 요약은 운영 보드에
- * 따로 있어서 운영자가 두 화면을 오가며 킥오프를 준비했다. 한 자리에 모았다: 팀마다 명단 요약(빠짐·정지)과
- * 도착 확인(전원 도착 버튼 포함)을 보고, 끝나면 "경기 시작"으로 이어진다.
- *
- * 도착 확인은 경기 시작의 조건이 아니다(서버도 막지 않는다) — 미확인이 남아도 시작할 수 있다는 것을
- * 안내 문구가 말한다. 그래서 여기에는 별도의 시작 버튼을 두지 않고, 조작 줄의 "경기 시작"이 그 자리다.
- */
-export function KickoffChecklist({ gameId, sides, lineups, onRosterError, ...panelProps }: KickoffChecklistProps) {
-  // 리그인지는 명단 응답이 말한다 — 요약 줄과 같은 캐시라 요청이 늘지 않는다.
+/** 대회는 팀이 설정한 경기 출전 명단을 조회하고 명시적인 편집으로 변경한다. */
+export function KickoffChecklist({ gameId, sides, onRosterError, disabled }: KickoffChecklistProps) {
+  // 대회 종류는 팀 명단 응답에서 확인한다 — 하위 패널과 같은 쿼리 캐시를 사용한다.
   const probeTeamId = sides.find((side) => side.teamId !== null)?.teamId ?? null;
   const probe = useV1TeamGameRoster(probeTeamId, gameId, { refetchInterval: OPERATIONS_BOARD_POLL_INTERVAL_MS });
-  const { total, arrived } = arrivalProgress(sides, lineups);
-  // 리그인지 알기 전에는 어느 쪽도 그리지 않는다 — 대회 화면(도착 확인)을 먼저 그리면 리그 운영자가 잠깐,
+
+  // 리그인지 알기 전에는 어느 쪽도 그리지 않는다 — 대회용 명단 편집을 먼저 그리면 리그 운영자가 잠깐,
   // 조회가 실패하면 계속 엉뚱한 화면을 본다. 한 번 읽은 뒤의 재조회 실패는 마지막 값을 그대로 쓴다.
   if (probeTeamId !== null && probe.data === undefined) {
     return (
@@ -49,75 +39,9 @@ export function KickoffChecklist({ gameId, sides, lineups, onRosterError, ...pan
       </section>
     );
   }
-  // 리그는 팀 전원이 처음부터 출전이고 안 온 사람만 뺀다(체크 = 출전). 대회는 팀이 낸 명단에 도착 확인을 한다.
+  // 리그는 팀 전원이 처음부터 출전이고 안 온 사람만 뺀다(체크 = 출전). 대회는 팀이 설정한 경기 명단을 조회·편집한다.
   if (probe.data?.competitionKind === 'LEAGUE') {
-    return <LeagueParticipationPanel gameId={gameId} sides={sides} disabled={panelProps.disabled} onError={onRosterError} />;
+    return <LeagueParticipationPanel gameId={gameId} sides={sides} disabled={disabled} onError={onRosterError} />;
   }
-  const remaining = total - arrived;
-  // 조회 전용 스태프·운영 권한이 없는 운영자는 '경기 시작'을 누를 수 없다 — 그 사람에게는 도착 현황만 말한다.
-  const canStart = !panelProps.disabled;
-
-  return (
-    <div className="flex flex-col gap-3">
-      <ArrivalCheckinPanel
-        title="킥오프 준비"
-        sides={sides}
-        lineups={lineups}
-        sideAccessory={(side) => <RosterSummaryLine side={side} gameId={gameId} />}
-        {...panelProps}
-      />
-      {total > 0 ? (
-        <p
-          role="status"
-          className={[
-            'mx-4 rounded-lg px-3 py-2 text-[length:var(--font-size-label)] font-medium',
-            remaining === 0 ? 'bg-[var(--blue50)] text-[var(--blue700)]' : 'bg-[var(--surface-soft)] text-[var(--text-muted)]',
-          ].join(' ')}
-        >
-          {remaining === 0
-            ? canStart ? '준비가 끝났어요. ‘경기 시작’을 눌러 주세요.' : '모든 선수의 도착을 확인했어요.'
-            : `아직 도착을 확인하지 못한 선수가 ${remaining}명 있어요.${canStart ? ' 그래도 ‘경기 시작’은 누를 수 있어요.' : ''}`}
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-/** 한 팀의 빠짐(이번 경기 빠짐 + 결장)·정지 요약. 요약을 못 읽으면 못 읽었다고 말한다 — 0 으로 그리지 않는다. */
-function RosterSummaryLine({ side, gameId }: { side: GameSide; gameId: string }) {
-  const teamId = side.teamId;
-  const from = useCurrentHref();
-  // 킥오프 직전은 팀장이 다른 기기에서 결장을 반영하는 시점이라 운영 보드와 같은 주기로 다시 읽는다.
-  const roster = useV1TeamGameRoster(teamId, gameId, { refetchInterval: OPERATIONS_BOARD_POLL_INTERVAL_MS });
-  if (teamId === null) return null;
-  if (roster.isPending) {
-    return <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">명단 요약을 불러오는 중이에요…</p>;
-  }
-  if (roster.isError || roster.data === undefined) {
-    return (
-      <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">명단 요약을 불러오지 못했어요.</p>
-    );
-  }
-  const missing = roster.data.counts.excluded + roster.data.counts.unavailable;
-  const suspended = roster.data.counts.suspended;
-  const hasAlert = missing > 0 || suspended > 0;
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      <span
-        className={[
-          'inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[length:var(--font-size-caption)] font-medium',
-          hasAlert ? 'bg-[var(--tint-orange)] text-[var(--orange700)]' : 'bg-[var(--surface-soft)] text-[var(--text-muted)]',
-        ].join(' ')}
-      >
-        빠짐 {missing} · 정지 {suspended}
-      </span>
-      <Link
-        href={withFromPath(gameRosterScreenPath(teamId, gameId), from)}
-        aria-label={`${side.displayNameSnapshot} 경기 명단 보기`}
-        className="inline-flex min-h-11 items-center rounded-lg px-2 text-[length:var(--font-size-caption)] font-medium text-[var(--blue700)] transition-colors hover:bg-[var(--surface-soft)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-      >
-        명단 보기
-      </Link>
-    </div>
-  );
+  return <TournamentParticipationPanel gameId={gameId} sides={sides} disabled={disabled} onError={onRosterError} />;
 }

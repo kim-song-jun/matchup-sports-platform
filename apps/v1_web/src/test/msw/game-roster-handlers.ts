@@ -282,6 +282,26 @@ export function createV1GameRosterMswHandlers() {
 
   const sidePath = `${api}/games/:gameId/sides/:sideId`;
   const handlers = [
+    http.post(`${sidePath}/roster-adjustments`, async ({ request, params }) => {
+      await record(request, new URL(request.url).pathname);
+      const game = findGame(String(params.gameId), String(params.sideId));
+      if (!game || state.detached.has(game.gameId)) return fail(404, 'GAME_ROSTER_NOT_AVAILABLE', '이 팀이 뛰는 경기가 아니에요.');
+      if (!canWrite()) return forbidden('명단을 바꿀 권한이 없어요.');
+      if (state.gameStates.get(game.gameId) !== 'SCHEDULED') return deadlinePassed([game.gameId]);
+      const { userId, reason } = state.requests.at(-1)!.body as { userId: string; reason?: string };
+      if (!inRoster(userId)) return fail(422, 'ROSTER_ADJUSTMENT_NOT_IN_ROSTER', '기준 명단에 없는 선수예요.');
+      const alreadyApplied = exclude(game.gameId, userId, reason ?? null);
+      return ok({ alreadyApplied, roster: view(game) });
+    }),
+    http.delete(`${sidePath}/roster-adjustments/:userId`, async ({ request, params }) => {
+      await record(request, new URL(request.url).pathname);
+      const game = findGame(String(params.gameId), String(params.sideId));
+      if (!game || state.detached.has(game.gameId)) return fail(404, 'GAME_ROSTER_NOT_AVAILABLE', '이 팀이 뛰는 경기가 아니에요.');
+      if (!canWrite()) return forbidden('명단을 바꿀 권한이 없어요.');
+      if (state.gameStates.get(game.gameId) !== 'SCHEDULED') return deadlinePassed([game.gameId]);
+      const alreadyApplied = revoke(game.gameId, String(params.userId));
+      return ok({ alreadyApplied, roster: view(game) });
+    }),
     // 사이드는 팀으로 찾는다 — 그 팀이 사이드가 아닌 경기(다른 팀·대진이 바뀐 경기)는 명단 없음과 같은 404.
     http.get(`${api}/teams/:teamId/games/:gameId/roster`, async ({ request, params }) => {
       await record(request, new URL(request.url).pathname);

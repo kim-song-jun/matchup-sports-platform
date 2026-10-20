@@ -318,6 +318,13 @@ The deterministic fixture command is derived from tournament, round, fixture num
 an occupied coordinate with the same payload returns its current canonical fixture, while a changed payload at that coordinate returns
 `409 COMMAND_IDEMPOTENCY_PAYLOAD_REUSE`.
 
+생성 응답은 `SerializedCanonicalFixture` 형태의 요약(`id`, 대회·조·라운드·번호,
+등록 ID, 시각·장소·field, 상태·생성/수정 시각)이다. `game`, `result`, `videos`,
+팀 이름, `homeSlotId`/`awaySlotId`, 진출 연결은 상세 대진 조회 응답에만 있다.
+웹 생성 훅은 `V1CreateFixtureResponse`로 구분한다. 생성 후 수정창을 열려면
+`GET /admin/tournaments/:tournamentId/bracket`에서 같은 경기 ID의 상세 정보를 다시 조회한다.
+생성 성공 뒤 이 조회가 실패한 경우는 생성 실패가 아니며, 자동으로 생성 요청을 재전송하지 않는다.
+
 ### 경기 추가 요청 고유 키 (`clientCommandId`)
 
 번호를 서버가 정하는 요청은 응답이 끊겨 다시 보내면 새 번호로 빈 경기가 하나 더 생긴다(좌표 멱등이 번호에 묶여 있다).

@@ -4846,6 +4846,16 @@ export type V1UpdateFixtureResult = V1AdminBracketFixture & {
   startedTeamChange: { removedEventCount: number; score: { home: number; away: number } } | null;
 };
 
+/** 생성 API의 요약 응답. game·result·팀 이름·slot 정보는 대진 목록을 다시 조회해야 한다. */
+export type V1CreateFixtureResponse = Pick<V1AdminBracketFixture,
+  'id' | 'tournamentId' | 'groupId' | 'round' | 'fixtureNumber' | 'legNumber' |
+  'parentFixtureId' | 'homeRegistrationId' | 'awayRegistrationId' | 'scheduledAt' |
+  'venue' | 'fieldId' | 'createdAt' | 'updatedAt'
+> & {
+  place: V1PlaceView | null;
+  status: 'scheduled' | 'completed' | 'cancelled';
+};
+
 export type V1CreateFixturePayload = {
   groupId?: string;
   round: string;

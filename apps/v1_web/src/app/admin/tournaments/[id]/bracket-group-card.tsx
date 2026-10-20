@@ -165,7 +165,7 @@ interface BracketGroupCardProps {
   autoFocus: boolean;
   showToast: (msg: string, v?: 'success' | 'error') => void;
   managedEntrySlots?: boolean;
-  onFixtureCreated?: (fixture: V1AdminBracketFixture) => void;
+  onFixtureCreated?: (fixtureId: string) => void;
 }
 
 export function BracketGroupCard({
@@ -313,7 +313,7 @@ export function BracketGroupCard({
           setFixtureNumber('1');
           setFixtureHomeRegId('');
           setFixtureAwayRegId('');
-          onFixtureCreated?.(fixture);
+          onFixtureCreated?.(fixture.id);
           showToast('경기 일정을 추가했어요.', 'success');
         },
         onError: (err) => showToast(extractErrorMessage(err, '경기 일정 추가에 실패했어요.'), 'error'),

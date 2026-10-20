@@ -10,7 +10,7 @@ import type {
   V1AddBracketFixtureInput,
   V1ApplyBracketTemplatePayload,
   V1ApplyBracketTemplateResult,
-  V1AdminBracketFixture,
+  V1CreateFixtureResponse,
   V1AssignSlotResult,
   V1QuickResultResult,
   V1QuickResultScore,
@@ -132,7 +132,7 @@ export function useV1AddBracketFixture(tournamentId: string) {
       const content = `${input.groupId}|${input.round}`;
       const clientCommandId = getFixtureRequestKey(tournamentId, content);
       try {
-        const created = await v1Post<V1AdminBracketFixture>(`/admin/tournaments/${tournamentId}/fixtures`, { ...input, clientCommandId });
+        const created = await v1Post<V1CreateFixtureResponse>(`/admin/tournaments/${tournamentId}/fixtures`, { ...input, clientCommandId });
         clearFixtureRequestKey(tournamentId, content, clientCommandId);
         return created;
       } catch (error) {

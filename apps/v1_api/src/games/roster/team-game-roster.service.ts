@@ -19,7 +19,7 @@ export interface GameRosterBatchResult {
   readonly alreadyApplied: boolean;
 }
 
-/** Task 179 팀 B·어드민 — 한 팀의 선수 × 시작 전 대회·리그 경기 표와 일괄 변경. */
+/** Task 179 팀 B·어드민 — 한 팀의 선수 × 대회·리그 경기 표(팀은 시작 전 경기, 어드민은 진행한 경기까지)와 일괄 변경. */
 @Injectable()
 export class TeamGameRosterService {
   constructor(
@@ -59,10 +59,14 @@ export class TeamGameRosterService {
       if (registration === null) {
         throw new NotFoundException({ code: 'REGISTRATION_NOT_FOUND', message: '참가 신청을 찾을 수 없어요.' });
       }
-      const columns = await loadTeamRosterColumns(tx, { teamId: registration.teamId, competitionId, now: new Date() });
+      // 운영진은 진행한 경기의 실제 출전 명단도 본다 — 시작된 경기 칸은 읽기 전용이다(정정은 결과 정정에서).
+      const columns = await loadTeamRosterColumns(tx, { teamId: registration.teamId, competitionId, now: new Date(), includeStarted: true });
       // 선수 실명은 대회를 운영하는 쪽만 본다(경기 명단 화면과 같은 규칙) — 지원 계정·조회 전용 스태프는 계정도 조회하지 않는다.
       const realNameByUserId = viewer.identityVisible
-        ? await loadRealNames(tx, columns.flatMap(({ loaded }) => (loaded?.base ?? []).filter((entry) => entry.accountLinked).map((entry) => entry.userId)))
+        ? await loadRealNames(tx, columns.flatMap(({ loaded, playedLineup }) => [
+            ...(loaded?.base ?? []).filter((entry) => entry.accountLinked).map((entry) => entry.userId),
+            ...(playedLineup ?? []).flatMap((row) => (row.userId === null ? [] : [row.userId])),
+          ]))
         : undefined;
       return {
         registrationId,

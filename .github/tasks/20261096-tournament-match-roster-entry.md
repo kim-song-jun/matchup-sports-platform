@@ -42,4 +42,9 @@ Windows에서 사용 가능한 의존성 설치와 alpha 배포 후 브라우저
 명시된 대회 경기 상세만 대상으로 해석. 리그 경기 상세와 우리팀 출전 관리의 참가 선수 관리 진입은 유지한다.
 
 ## Progress Snapshot
-격리 브랜치 fix/tournament-match-roster-entry-20261020, origin/dev 9b761fc3a 기반. diff --check 통과. 커밋·push·배포 없음.
+격리 브랜치 fix/tournament-match-roster-entry-20261020, origin/dev 9b761fc3a 기반. diff --check 통과. 개발 커밋과 PR 생성 완료. Alpha 배포 진행 중.
+## PR / Deployment Cursor — 2026-10-21
+- PR: https://github.com/kim-song-jun/matchup-sports-platform/pull/2010 (base dev).
+- 최신 dev 통합 완료. GitHub CI와 Copilot 최신 head 리뷰를 통과한 후 dev에 머지하고 alpha 배포 receipt·health를 검증한다.
+- 사용자가 세 PR 생성 후 alpha 배포까지 승인함. main 승격은 범위 밖.
+- 이전 Windows 실행 blocker는 WSL 검증으로 해소. 경기 명단 카드 테스트 17개 통과. Web 타입·규칙 검사 진행 중.

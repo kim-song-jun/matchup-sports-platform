@@ -1,3 +1,4 @@
+import { assertCurrentEventParticipants } from './roster/assert-current-event-participants';
 import {
   ConflictException,
   ForbiddenException,
@@ -2509,6 +2510,12 @@ export class GamesService {
               message: 'Assist participant must belong to the scoring side',
             });
           }
+        }
+        if (dto.assistParticipantId !== null && (
+          game.sourceType === V1GameSourceType.TOURNAMENT_FIXTURE ||
+          (game.sourceType === V1GameSourceType.TEAM_MATCH && await this.resolveTeamMatchCompetitionContext(tx, game.teamMatchId) !== null)
+        )) {
+          await assertCurrentEventParticipants(tx, game.id, [dto.assistParticipantId]);
         }
         // Issue #376 follow-up -- refuse outright rather than silently
         // letting the event and an already CONFIRMED official revision
@@ -5854,6 +5861,14 @@ export class GamesService {
       game.sourceType === V1GameSourceType.TEAM_MATCH
         ? await this.resolveTeamMatchCompetitionContext(tx, game.teamMatchId)
         : null;
+    if (game.sourceType === V1GameSourceType.TOURNAMENT_FIXTURE || teamMatchCompetition !== null) {
+      await assertCurrentEventParticipants(tx, game.id, [
+        dto.participantId,
+        dto.assistParticipantId,
+        dto.type === V1GameEventType.SUBSTITUTION && typeof dto.payload.outParticipantId === 'string'
+          ? dto.payload.outParticipantId : undefined,
+      ]);
+    }
     if (
       dto.type === V1GameEventType.GOAL &&
       dto.participantId === undefined &&

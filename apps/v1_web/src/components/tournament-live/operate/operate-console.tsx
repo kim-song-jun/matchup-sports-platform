@@ -25,8 +25,6 @@ import { useV1AuthMe, useV1GameResultRevisions } from '@/hooks/use-v1-api';
 import {
   useV1FixtureLineup,
   useV1Game,
-  useV1SetParticipantArrival,
-  useV1ConfirmSideArrival,
   postV1GameCommand,
 } from '@/hooks/use-v1-game-operations';
 import { readGameResultScore } from '@/lib/game-result-score';
@@ -50,7 +48,6 @@ import { QueueStatusPanel, hasUnsettledQueueItems } from './queue-status-panel';
 import { RecordedEventList } from './recorded-event-list';
 import { AssistPickerSheet } from './assist-picker-sheet';
 import { AbnormalEndDialog, type AbnormalEndReason } from './abnormal-end-dialog';
-import { arrivalProgress } from './arrival-checkin-panel';
 import { KickoffChecklist } from './kickoff-checklist';
 import { MatchProgressStrip } from './match-progress-strip';
 import { periodProgressSteps, resultProgressSteps } from '@/lib/match-progress-steps';
@@ -232,14 +229,6 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   const myUserId = authMe.data?.user.id;
 
   const fixtureLineup = useV1FixtureLineup(tournamentId, fixtureId);
-  const setArrival = useV1SetParticipantArrival(fixtureLineup.data?.gameId ?? null, {
-    tournamentId,
-    fixtureId,
-  });
-  const confirmSideArrival = useV1ConfirmSideArrival(fixtureLineup.data?.gameId ?? null, {
-    tournamentId,
-    fixtureId,
-  });
   const gameId = fixtureLineup.data?.gameId ?? null;
 
   const gameDetail = useV1Game(gameId);
@@ -1133,30 +1122,6 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     [commandBlocked, confirm, currentPeriod, halftimePeriod, hasNextPeriod, periodCount, gameDetail.data?.sides, scoreBySideId, knockoutTied, substitutionTracked, handleRunCommand],
   );
 
-  // "전원 도착"은 도착 시각을 여러 명에게 한꺼번에 남기고, 일괄로 되돌리는 경로가 없다(시각은 분쟁 시 근거다).
-  // 그래서 몇 명이 표시되는지 보여 주는 확인 한 단계를 거친다. 안 온 선수는 표시한 뒤 개별로 풀 수 있다.
-  const handleConfirmSideArrival = useCallback(
-    async (sideId: string) => {
-      const section = arrivalProgress(gameDetail.data?.sides ?? [], fixtureLineup.data?.lineups ?? []).sections.find(
-        (candidate) => candidate.side.id === sideId,
-      );
-      if (section === undefined) return;
-      const pendingCount = section.participants.filter((participant) => participant.arrivedAt === null).length;
-      if (pendingCount === 0) return;
-      const teamName = section.side.displayNameSnapshot;
-      const ok = await confirm({
-        title: `${teamName} ${pendingCount}명을 도착으로 표시할까요?`,
-        message: '표시한 시각이 도착 기록으로 남아요. 안 온 선수가 있으면 표시한 뒤 그 선수만 눌러 풀어 주세요.',
-        confirmLabel: '전원 도착',
-      });
-      if (!ok) return;
-      confirmSideArrival.mutate(sideId, {
-        onError: (err) => showToast(extractErrorMessage(err, '전원 도착을 저장하지 못했어요.')),
-      });
-    },
-    [confirm, confirmSideArrival, fixtureLineup.data?.lineups, gameDetail.data?.sides, showToast],
-  );
-
   // 과제 2 — 승부차기 시작. 아직 서버에 아무것도 보내지 않는다(패널을 여는
   // 로컬 상태 전환뿐) — 그래도 사용자 결정("예외 없이 전부")에 따라 확인을
   // 거친다.
@@ -1869,27 +1834,15 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           });
         }}
       />
-      {/* 명단 검인은 **킥오프 전에만** 띄운다. 경기가 시작되면 이 자리는 이벤트 기록이
+      {/* 경기 출전 명단 편집은 **킥오프 전에만** 띄운다. 경기가 시작되면 이 자리는 이벤트 기록이
           차지해야 하고, 그때까지도 안 온 사람은 애초에 라인업에서 빠졌어야 한다.
           takeover 를 쥔 운영자만 조작할 수 있게 하는 것도 다른 액션과 동일하다. */}
       {gameState === 'SCHEDULED' && (
         <KickoffChecklist
           gameId={gameId}
           sides={sides}
-          lineups={lineups}
           onRosterError={(message) => showToast(message)}
           disabled={!canOperate || commandBlocked}
-          pendingParticipantId={setArrival.isPending ? setArrival.variables?.participantId ?? null : null}
-          pendingSideId={confirmSideArrival.isPending ? confirmSideArrival.variables ?? null : null}
-          onConfirmSide={(sideId) => void handleConfirmSideArrival(sideId)}
-          onToggleArrival={({ participantId, arrived }) => {
-            setArrival.mutate(
-              { participantId, arrived },
-              {
-                onError: (err) => showToast(extractErrorMessage(err, '검인을 저장하지 못했어요.')),
-              },
-            );
-          }}
         />
       )}
 

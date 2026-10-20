@@ -1949,6 +1949,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           substitutionPolicy={gameDetail.data?.substitutionPolicy ?? null}
           substitutionUsedBySideId={substitutionUsedBySideId}
           sentOffParticipantIds={sentOffParticipantIds}
+          lineupPositions={gameDetail.data?.lineupConfig?.positions}
           onCommit={handleCommit}
           onCancel={() => setPendingAction(null)}
         />

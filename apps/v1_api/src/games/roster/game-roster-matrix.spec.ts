@@ -134,6 +134,39 @@ describe('buildTeamRosterMatrix — 선수 × 경기 표', () => {
     });
     expect(live.games[0].editable).toBe(false);
   });
+
+  it('시작된 경기는 기록 명단이 출전자다 — 시작 뒤 결장·명단 추가는 칸을 바꾸지 않고, 명단을 떠난 출전자도 행으로 남는다', () => {
+    const ended = game('g1', { gameState: 'ENDED' as V1GameState });
+    const matrix = buildTeamRosterMatrix({
+      canWrite: true,
+      columns: [
+        {
+          game: ended,
+          // u1 은 시작 뒤 결장 기간이 걸렸고, u3 는 시작 뒤 참가 명단에 들어왔다. u9 는 뛰고 나서 명단을 떠났다.
+          loaded: loaded([entry('u1'), entry('u2'), entry('u3')], { unavailabilities: [{ ...period, userId: 'u1' }] }),
+          playedLineup: [
+            { id: 'gp-1', userId: 'u1', displayNameSnapshot: '선수-u1', jerseyNumber: 7, goalkeeper: true },
+            { id: 'gp-2', userId: 'u2', displayNameSnapshot: '선수-u2', jerseyNumber: null },
+            { id: 'gp-9', userId: 'u9', displayNameSnapshot: '떠난 선수', jerseyNumber: null },
+          ],
+        },
+        { game: game('g2'), loaded: loaded([entry('u1'), entry('u2'), entry('u3')]) },
+      ],
+    });
+
+    const statuses = Object.fromEntries(matrix.players.map((player) => [player.userId, player.cells.map((cell) => cell.status)]));
+    expect(statuses).toEqual({
+      u1: ['PARTICIPATING', 'PARTICIPATING'],
+      u2: ['PARTICIPATING', 'PARTICIPATING'],
+      u3: ['NOT_IN_ROSTER', 'PARTICIPATING'],
+      u9: ['PARTICIPATING', 'NOT_IN_ROSTER'],
+    });
+    expect(matrix.players.find((player) => player.userId === 'u1')?.cells[0].goalkeeper).toBe(true);
+    expect(matrix.games.map((column) => [column.editable, column.summary])).toEqual([
+      [false, { participating: 3, excluded: 0, unavailable: 0, suspended: 0 }],
+      [true, { participating: 3, excluded: 0, unavailable: 0, suspended: 0 }],
+    ]);
+  });
 });
 
 describe('decideTeamRosterAccess — 팀 단위 명단 권한', () => {

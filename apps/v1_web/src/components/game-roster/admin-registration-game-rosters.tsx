@@ -31,8 +31,9 @@ import {
 type Notice = { tone: 'info' | 'error'; message: string };
 
 /**
- * 어드민 참가 신청의 팀 행 펼침(Task 179 어드민) — 선수 × 그 대회·리그의 시작 전 경기.
- * 칸을 누르면 그 경기에서 빼거나 되돌리고, 모아서 팀 일괄 API 한 번으로 저장한다(기록엔 운영자로 남는다).
+ * 어드민 참가 신청의 팀 행 펼침(Task 179 어드민) — 선수 × 그 대회·리그의 진행한 경기와 시작 전 경기.
+ * 진행한 경기 칸은 기록 명단 그대로 읽기만 한다. 시작 전 경기 칸을 누르면 빼거나 되돌리고,
+ * 모아서 팀 일괄 API 한 번으로 저장한다(기록엔 운영자로 남는다).
  * 결장 기간 등록은 플랫폼 어드민만(지원 계정·대회 스태프 불가 — 서버 권한 표와 같다).
  */
 export function AdminRegistrationGameRosters({
@@ -94,10 +95,10 @@ export function AdminRegistrationGameRosters({
   }
 
   const anyEditable = data.games.some((game) => game.editable);
-  // 표에는 시작 전 경기만 온다 — 경기가 있는데 바꿀 칸이 없으면 보기 권한만 있는 계정이다(지원 계정 등).
+  // 시작 전 경기가 있는데 바꿀 칸이 없으면 보기 권한만 있는 계정이다(지원 계정 등). 진행한 경기 칸은 누구도 못 바꾼다.
   const usageHint = anyEditable
     ? '칸을 누르면 그 경기에서 빼거나 되돌려요 · '
-    : data.games.length > 0
+    : data.games.some((game) => game.gameState === 'SCHEDULED')
       ? '보기 권한만 있어 명단을 바꿀 수 없어요 · '
       : '';
   // 결장 기간은 팀의 모든 대회·리그 경기에 걸린다 — 서버가 플랫폼 어드민(지원 계정 제외)만 허용한다.
@@ -130,7 +131,7 @@ export function AdminRegistrationGameRosters({
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-strong)]">경기별 명단</span>
         <span className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
-          다가오는 경기 {data.games.length}개 · 선수 {data.players.length}명
+          경기 {data.games.length}개 · 선수 {data.players.length}명
           <span className="block">GK는 시작 전 경기와 이후 경기에 계속 유지돼요. 여러 명을 지정할 수 있어요.</span>
         </span>
         {adjustedCount > 0 ? <span className="tm-badge tm-badge-sm tm-badge-orange">조정 {adjustedCount}</span> : null}
@@ -138,7 +139,7 @@ export function AdminRegistrationGameRosters({
       {notice !== null ? <AlertBanner tone={notice.tone} message={notice.message} /> : null}
       {data.games.length === 0 || data.players.length === 0 ? (
         <p className="text-[length:var(--font-size-label)] text-[var(--text-muted)]">
-          {data.games.length === 0 ? '시작 전인 경기가 없어요.' : '참가 명단이 확정된 경기가 없어요.'}
+          {data.games.length === 0 ? '경기가 없어요.' : '참가 명단이 확정된 경기가 없어요.'}
         </p>
       ) : (
         // 데스크톱 폭 기준 표 — 좁은 화면에서는 표만 가로로 스크롤한다.
@@ -316,7 +317,9 @@ function cellLabel(cell: V1TeamRosterCell, status: string, changed: boolean): st
 function gameColumnLabel(game: V1TeamRosterMatrixGame): string {
   const when = formatTournamentDateTimeShort(game.scheduledAt) ?? '일정 미정';
   const against = game.opponentName === null ? '상대 미정' : `vs ${game.opponentName}`;
-  return `${when} ${against}`;
+  // 진행한 경기 칸은 기록 명단이라 바꿀 수 없다 — 열 제목에서 먼저 알린다.
+  const state = game.gameState === 'ENDED' ? ' · 종료' : game.gameState === 'LIVE' || game.gameState === 'PAUSED' ? ' · 진행 중' : '';
+  return `${when} ${against}${state}`;
 }
 
 /** 표에는 기간 날짜가 없어 이 경기들에 걸린 결장만 요약한다(기간은 등록 시트에서 본다). */

@@ -2630,10 +2630,13 @@ export function formatRegionDisplayName(region?: { name: string; parent?: { name
   return region.parent?.name ? `${region.parent.name} ${region.name}` : `${region.name} 전체`;
 }
 
+/**
+ * 커서(`id`)로 이어 읽으므로 순서가 매번 같아야 한다. 생성 시각이 같은 팀(시드·일괄 생성)이 있으면 그 사이 순서가
+ * 요청마다 달라져 "더 보기"에서 같은 팀이 두 번 나오거나 빠졌다(MD-QA #176) — 마지막에 `id` 로 순서를 정한다.
+ */
 function getTeamOrderBy(sort: TeamsQueryDto['sort']): Prisma.V1TeamOrderByWithRelationInput[] {
-  if (sort === 'latest') return [{ createdAt: 'desc' }];
-  if (sort === 'member_count') return [{ memberCount: 'desc' }, { createdAt: 'desc' }];
-  return [{ createdAt: 'desc' }];
+  if (sort === 'member_count') return [{ memberCount: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }];
+  return [{ createdAt: 'desc' }, { id: 'desc' }];
 }
 
 function getTeamGenderRuleWhere(genderRule: NonNullable<TeamsQueryDto['genderRule']>): Prisma.V1TeamWhereInput {

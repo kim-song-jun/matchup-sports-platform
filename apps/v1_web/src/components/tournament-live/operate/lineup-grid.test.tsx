@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { latestLineupForDisplay, latestOperableLineup, LineupGrid, matchesPlayerQuery } from './lineup-grid';
+import { latestLineupForDisplay, latestOperableLineup, LineupGrid, lineupPositionLabel, matchesPlayerQuery } from './lineup-grid';
 import type { GameLineup, GameLineupParticipant, GameSide } from '@/types/game-operations';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -185,6 +185,33 @@ describe('LineupGrid — 선수 검색', () => {
     render(<LineupGrid sides={SIDES} lineups={[lineup(SQUAD)]} onSelectPlayer={vi.fn()} disabled />);
 
     expect(screen.getByLabelText('등번호 또는 이름으로 선수 찾기')).toBeDisabled();
+  });
+});
+
+describe('LineupGrid — 포지션 표시 (MD-QA #167)', () => {
+  const positions = [
+    { code: 'GOLEIRO', label: '골레이로', short: 'GK', goalkeeper: true },
+    { code: 'FIXO', label: '픽소', short: 'FX' },
+  ];
+
+  it('저장 코드를 서버 포지션 사전의 약칭으로 표시한다', () => {
+    const goalkeeper = { ...SQUAD[0], position: 'GOLEIRO' };
+    render(
+      <LineupGrid
+        sides={SIDES}
+        lineups={[lineup([goalkeeper])]}
+        onSelectPlayer={vi.fn()}
+        lineupPositions={positions}
+      />,
+    );
+
+    const button = screen.getByRole('button', { name: '홍길동 선수 이벤트 기록' });
+    expect(button).toHaveTextContent('GK');
+    expect(button).not.toHaveTextContent('GOLEIRO');
+  });
+
+  it('사전에 없는 과거 코드는 숨기지 않고 원문을 보여준다', () => {
+    expect(lineupPositionLabel('LEGACY_POSITION', positions)).toBe('LEGACY_POSITION');
   });
 });
 

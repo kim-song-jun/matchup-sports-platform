@@ -17,6 +17,7 @@ import type {
   GameSide,
   GameSubstitutionPolicy,
 } from '@/types/game-operations';
+import type { V1LineupConfigPosition } from '@/types/api';
 
 export interface EventCaptureCommitInput {
   readonly type: GameEventType;
@@ -67,6 +68,7 @@ export interface ActionTargetPickerProps {
   readonly substitutionUsedBySideId?: Readonly<Record<string, number>>;
   /** 레드카드가 기록된 선수 id — 선수 목록에서 "퇴장" 칩으로 가른다. */
   readonly sentOffParticipantIds?: ReadonlySet<string>;
+  readonly lineupPositions?: readonly V1LineupConfigPosition[];
   readonly onCommit: (input: EventCaptureCommitInput) => void;
   readonly onCancel: () => void;
 }
@@ -101,6 +103,7 @@ export function ActionTargetPicker({
   substitutionPolicy,
   substitutionUsedBySideId,
   sentOffParticipantIds,
+  lineupPositions,
   onCommit,
   onCancel,
 }: ActionTargetPickerProps) {
@@ -258,6 +261,7 @@ export function ActionTargetPicker({
                 lineups={lineups}
                 onSelectPlayer={setSubstitutionOut}
                 sentOffParticipantIds={sentOffParticipantIds}
+                lineupPositions={lineupPositions}
                 filterParticipantIds={onPitchParticipantIds}
               />
             ) : (
@@ -272,6 +276,7 @@ export function ActionTargetPicker({
                   lineups={lineups}
                   onSelectPlayer={commitSubstitution}
                   sentOffParticipantIds={sentOffParticipantIds}
+                  lineupPositions={lineupPositions}
                   restrictSideId={substitutionOut.sideId}
                   filterParticipantIds={
                     onPitchParticipantIds &&
@@ -294,6 +299,7 @@ export function ActionTargetPicker({
               lineups={lineups}
               onSelectPlayer={commitPlayer}
               sentOffParticipantIds={sentOffParticipantIds}
+              lineupPositions={lineupPositions}
             />
           )}
 

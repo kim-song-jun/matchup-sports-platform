@@ -1,12 +1,19 @@
 import { fairPlayPointsOf, parseFairPlayCards } from './league-fair-play';
 
 describe('parseFairPlayCards', () => {
-  it('{yellow, red} Json을 FairPlayCards로 변환한다 (red는 directRed로)', () => {
-    expect(parseFairPlayCards({ yellow: 2, red: 1 })).toEqual({
-      yellow: 2,
-      secondYellowRed: 0,
-      directRed: 1,
-    });
+  it('옐로 없는 레드는 직접 퇴장이다', () => {
+    expect(parseFairPlayCards({ yellow: 0, red: 1 })).toEqual({ yellow: 0, secondYellowRed: 0, directRed: 1 });
+  });
+
+  // MD-QA #174: 콘솔은 두 번째 옐로 뒤에 레드를 한 장 더 기록해 옐로 2 · 레드 1로 저장된다.
+  it('옐로 2장 + 레드는 경고 누적 퇴장 하나다 (옐로 1+1+퇴장 4 = 6점이 아니라 3점)', () => {
+    const cards = parseFairPlayCards({ yellow: 2, red: 1 });
+    expect(cards).toEqual({ yellow: 0, secondYellowRed: 1, directRed: 0 });
+    expect(fairPlayPointsOf(cards)).toBe(3);
+  });
+
+  it('옐로 1장 뒤 직접 레드는 둘 다 남는다', () => {
+    expect(parseFairPlayCards({ yellow: 1, red: 1 })).toEqual({ yellow: 1, secondYellowRed: 0, directRed: 1 });
   });
 
   it('형태가 맞지 않으면 전부 0으로 안전하게 처리한다', () => {

@@ -108,17 +108,43 @@ describe('evaluateSuspension — 경고 누적', () => {
 });
 
 describe('evaluateSuspension — 두 규정을 함께 켠 경우', () => {
-  it('같은 경기에서 경고 누적과 퇴장이 겹치면 정지가 합산된다', () => {
-    // 1경기: 옐로 2장(누적 한도 도달 → 1경기) + 레드 1장(→ 1경기) = 2경기 정지
+  // MD-QA #174: 콘솔은 두 번째 옐로 뒤에 레드를 한 장 더 기록한다 → 저장 모양이 옐로 2 · 레드 1.
+  it('옐로 → 옐로 → 레드(두 번째 옐로 퇴장)는 퇴장 1회로만 정지된다', () => {
     const played = [game(1, 2, 1)];
-    expect(evaluateSuspension({ rules: BOTH, played, upcomingGameOrder: 2 }).remainingMatches).toBe(2);
-    expect(evaluateSuspension({ rules: BOTH, played, upcomingGameOrder: 4 }).suspended).toBe(false);
+    expect(evaluateSuspension({ rules: BOTH, played, upcomingGameOrder: 2 }).remainingMatches).toBe(1);
+    expect(evaluateSuspension({ rules: BOTH, played, upcomingGameOrder: 3 }).suspended).toBe(false);
+  });
+
+  it('옐로 1장마다 1경기 규정이어도 두 번째 옐로 퇴장은 1경기다 (alpha 승제대회에서 3경기로 나왔다)', () => {
+    const rules = { yellowAccumulationLimit: 1, redCardSuspensionMatches: 1 };
+    expect(evaluateSuspension({ rules, played: [game(1, 2, 1)], upcomingGameOrder: 2 }).remainingMatches).toBe(1);
+  });
+
+  it('레드로 바뀐 옐로는 뒤 경기 누적에도 남지 않는다', () => {
+    const rules = { yellowAccumulationLimit: 3, redCardSuspensionMatches: 1 };
+    // 1경기 두 번째 옐로 퇴장 → 2경기 정지, 3경기 옐로 1장 → 누적 1장이라 4경기는 뛴다.
+    const verdict = evaluateSuspension({ rules, played: [game(1, 2, 1), game(3, 1, 0)], upcomingGameOrder: 4 });
+    expect(verdict.suspended).toBe(false);
+    expect(verdict.yellowTotal).toBe(1);
+  });
+
+  it('옐로 1장 뒤 직접 레드는 두 원인을 모두 센다', () => {
+    const rules = { yellowAccumulationLimit: 1, redCardSuspensionMatches: 1 };
+    expect(evaluateSuspension({ rules, played: [game(1, 1, 1)], upcomingGameOrder: 2 }).remainingMatches).toBe(2);
   });
 
   it('사유에 두 원인을 모두 적는다', () => {
-    const verdict = evaluateSuspension({ rules: BOTH, played: [game(1, 2, 1)], upcomingGameOrder: 2 });
+    const verdict = evaluateSuspension({ rules: BOTH, played: [game(1, 2, 0), game(2, 0, 1)], upcomingGameOrder: 3 });
     expect(verdict.reason).toContain('퇴장 1회');
     expect(verdict.reason).toContain('경고 2장 누적');
+  });
+});
+
+describe('evaluateSuspension — 레드 정지 규정이 없는 경우', () => {
+  it('두 번째 옐로 퇴장의 옐로는 경고 누적으로 센다 (레드가 따로 벌하지 않는다)', () => {
+    const verdict = evaluateSuspension({ rules: YELLOW_ONLY, played: [game(1, 2, 1)], upcomingGameOrder: 2 });
+    expect(verdict.remainingMatches).toBe(1);
+    expect(verdict.reason).toBe('경고 2장 누적으로 1경기 출전정지예요.');
   });
 });
 
@@ -134,8 +160,13 @@ describe('evaluateSuspension — 사유 문구의 조사', () => {
   });
 
   it('두 원인이 함께면 마지막 원인("누적")의 받침을 따른다', () => {
-    const verdict = evaluateSuspension({ rules: BOTH, played: [game(1, 2, 1)], upcomingGameOrder: 2 });
+    const verdict = evaluateSuspension({ rules: BOTH, played: [game(1, 1, 0), game(2, 1, 1)], upcomingGameOrder: 3 });
     expect(verdict.reason).toBe('퇴장 1회 · 경고 2장 누적으로 2경기 출전정지예요.');
+  });
+
+  it('두 번째 옐로 퇴장은 퇴장 사유만 적는다', () => {
+    const verdict = evaluateSuspension({ rules: BOTH, played: [game(1, 2, 1)], upcomingGameOrder: 2 });
+    expect(verdict.reason).toBe('퇴장 1회로 1경기 출전정지예요.');
   });
 });
 

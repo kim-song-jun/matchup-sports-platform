@@ -473,13 +473,19 @@ MSW 기본 명단 픽스처는 `DRAFT`·`DEFAULT_PREVIEW`·`hasSavedDraft=false`
 취소·보관·삭제된 매치의 참석명단/상대 명단 및 일반 사용자 경기 기록 조회도 404로 처리한다. 취소·보관된 원본 경기 기록은 활성 관리자(현재 계정도 active)에게만 기존 조회를 허용하고, 데이터를 삭제하지 않는다. 취소된 기록이 수정 가능 상태가 되지는 않는다.
 
 - 일반 미매칭 `recruiting/closed`는 신청 마감 시각(`deadlineAt`) 또는 경기 시작 시각(`startAt`)이 지나면 `closed`로 표시한다. 팀매치 API는 `on_hold`를 반환하지 않는다. 리그·대회·상대팀 확정 모집의 기존 `displayState` 마감 규칙은 유지한다. `requested` 신청은 확정 상대팀이 아니다. terminal/matched 상태는 이 계산으로 덮어쓰지 않는다.
-- 마감된 매치는 일정 변경 후 다시 모집하거나 취소할 수 있다. 상대팀 없는 팀매치를 그대로 진행하는 액션은 제공하지 않는다.
+- 마감된 매치는 아래 자동 취소 전까지 일정 변경 후 다시 모집하거나 취소할 수 있다. 상대팀 없는 팀매치를 그대로 진행하는 액션은 제공하지 않는다.
 - `GET /team-matches/:id`의 `lifecycle`은 `canEdit/canDelete/canCloseRecruitment/canReopenRecruitment/onHoldReason=null`을 제공한다. 기존 owner/manager 권한 검증을 유지한다. 경기 시작 시각이 지난 raw `recruiting` 글은 수동 마감할 수 없고 대기 신청 종료·알림을 보내지 않는다. 신청 마감 시각과 같거나 지난 raw `closed` 글은 일반 주최팀 재개 API에서 마감 시각을 수정한 뒤 다시 재개해야 한다.
 - `PATCH /team-matches/:id`는 recruiting/closed + 상대팀 미확정에서 허용. 미래 일정 및 stale version 검증 후 recruiting으로 저장하고 연동 팀 일정을 동기화한다. 이미 matched인 매치는 계속 수정 제한.
 - `POST /team-matches/:id/cancel`은 마감에서도 허용. 신청 이력, 감사 로그, 확정 상대팀 알림 및 연결 팀 일정 취소를 유지한다. 취소 후 사용자 목록·내 팀매치에서 제외하고 상세/관리/신청 자격은 404로 처리한다. 취소된 팀매치와 연결된 팀 일정·내 일정도 숨긴다. 어드민 목록·상세와 감사 이력은 유지한다.
 - `DELETE /team-matches/:id`: 인증 + 주최팀 기존 관리 권한. 사용자에게 보이는 recruiting/closed이고 확정 상대팀과 **모든 신청 이력**이 없을 때만 archived/deletedAt soft delete 및 감사 로그. 연결 팀 일정은 취소한다. 신청 이력이 있으면 409 STATE_CONFLICT로 취소를 안내한다. 취소된 매치는 이미 사용자 조회에서 제외된다.
 - 신청/승인/수정/취소/삭제는 team-match row lock 아래 상태를 재검사한다. 수정 stale version은 409 VERSION_CONFLICT.
 - 별도 DB enum/backfill 없이 조회 시 `closed`를 계산한다. 공개 목록과 내 팀매치 목록의 `closed` query는 저장된 closed와 마감/시작 시각이 지난 일반 미매칭 recruiting을 함께 반환한다. `recruiting` query는 마감 전 모집만 반환한다. 취소·보관된 행은 모든 사용자 status query에서 제외된다. 기존 expired query 호환 계약은 유지.
+- **상대 없이 끝난 일반 팀매치 자동 취소(2026-10-21)**: 워커가 5분마다 `TEAM_MATCH_NO_OPPONENT_SCAN`(outbox 자기 예약 스캔, `team-match-no-opponent-cancel.service.ts`)으로 리그·대회 대진이 아닌 `recruiting`/`closed`·상대 미확정 매치를 찾아 `cancelled`로 바꾼다.
+  - 신청 마감 시각이 지났고 대기(`requested`) 신청이 없으면 그때, 대기 신청이 있으면 팀장이 승인할 수 있게 기다렸다가 경기 시작 시각에 취소한다. 마감 시각이 없으면 시작 시각에 취소한다.
+  - 행은 지우지 않는다. 대기 신청은 `expired`, 연결된 SCHEDULED Game·팀 일정은 취소, 상태 이력은 `actorType=system`·`reason=no_opponent_auto_cancelled`.
+  - 1팀(일반 매치의 주최팀, 플랫폼 매치의 먼저 승인된 팀)이면 그 팀과 대기 신청 팀 owner·manager에게 `team_match_cancelled` 알림(딥링크 `/team-matches`, businessKey `team-match-no-opponent:{teamMatchId}:{userId}`, 야간에는 알림함만). 0팀이면 알림이 없다.
+  - 끝난 지 24시간이 지난 매치(배포 전에 쌓인 것)는 알림 없이 취소만 한다.
+  - 자동 취소되면 일정 변경(`PATCH`)으로 다시 모집하는 길도 닫힌다 — 다시 모집하려면 새로 만든다.
 
 - 일정·장소 변경 시 기존 requested 신청은 expired로 전환하고 `team_match_updated` 알림으로 재신청을 안내한다. 과거 신청 이력은 보존한다.
 - 취소·삭제 시 연결된 SCHEDULED Game도 CANCELLED로 전환하여 팀 일정/경기 상태가 어긋나지 않게 한다.

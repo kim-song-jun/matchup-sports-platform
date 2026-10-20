@@ -569,10 +569,10 @@ All team roster mutations lock the registration row and re-read `rosterLockedAt`
 
 ### 시작 전 대진 삭제 (2026-10-05)
 
-- `DELETE /admin/fixtures/:fixtureId`: V1AuthGuard + mutation admin. tournament draft/open/closed, TeamMatch matched, Game SCHEDULED, 결과 리비전 없음일 때 `{ deleted: true }`.
+- `DELETE /admin/fixtures/:fixtureId`: V1AuthGuard + mutation admin. tournament draft/open/closed/in_progress, TeamMatch matched, Game SCHEDULED, 결과 리비전 없음일 때 `{ deleted: true }`. 대회가 시작되어도 경기 자체가 미시작이면 삭제 가능하다.
 - Game은 CANCELLED, 공개 정책 STATUS_ONLY, TeamMatch는 archived/deletedAt으로 숨긴다. Game·감사·스태프 이력을 물리 삭제하지 않는다. 일정/용병 모집은 취소한다.
 - 원래 라운드/번호는 관리자 감사에 남기고 Details는 group/parent를 해제하고 round를 <originalRound>:deleted:<fixtureId>로 보관해 같은 대진 번호 재등록 및 빈 조 삭제를 허용한다.
-- 대회/경기 시작 `409 FIXTURE_ALREADY_STARTED`, 결과 `409 FIXTURE_HAS_RESULT`(경기 수정 PATCH 는 아래 `FIXTURE_RESULT_MUST_BE_VOIDED` 로 바뀜), 연결된 다음 경기 팀 배정/시작 `409 FIXTURE_DOWNSTREAM_ASSIGNED`, 하위 경기 `409 FIXTURE_HAS_CHILDREN`. 미정 다음 경기 연결은 원자적으로 해제한다.
+- 대회 종료·취소/허용 외 상태 또는 경기 미시작 조건 불충족 `409 FIXTURE_ALREADY_STARTED`, 결과 `409 FIXTURE_HAS_RESULT`(경기 수정 PATCH 는 아래 `FIXTURE_RESULT_MUST_BE_VOIDED` 로 바뀜), 연결된 다음 경기 팀 배정/시작 `409 FIXTURE_DOWNSTREAM_ASSIGNED`, 하위 경기 `409 FIXTURE_HAS_CHILDREN`. 미정 다음 경기 연결은 원자적으로 해제한다.
 - TBD 부전승은 Game/TeamMatch를 만들지 않으며 `DELETE /admin/group-teams/:id`로 자리 삭제. 미정 자리는 별도 V1TournamentByeSlot에 저장하고 응답에서 registrationId=null, isBye=true로 표시한다. 기존 GroupTeam의 필수 등록 계약은 유지한다. 팀 배정/미정 전환은 같은 id를 유지하며 두 저장소 사이에서 원자적으로 이동한다. 공개 신원/대진 게이트 유지.
 
 ### 대진 번호 수정 (2026-10-05)

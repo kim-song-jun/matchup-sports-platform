@@ -381,8 +381,8 @@ export async function softDeleteTournamentFixtureInTx(tx: Tx, admin: V1ActiveAdm
   const game = canonical.teamMatch.game;
   if (!game || game.sourceType !== V1GameSourceType.TEAM_MATCH) throw new ConflictException({ code: 'TOURNAMENT_MATCH_GAME_MISSING', message: '대회 경기의 정본 TeamMatch 게임을 찾을 수 없어요.' });
   if (game.currentOfficialRevisionId !== null) throw new ConflictException({ code: 'FIXTURE_HAS_RESULT', message: '결과가 기록된 경기는 삭제할 수 없어요.' });
-  if (!['draft', 'open', 'closed'].includes(canonical.tournament.status) || game.state !== 'SCHEDULED' || canonical.teamMatch.status !== 'matched') {
-    throw new ConflictException({ code: 'FIXTURE_ALREADY_STARTED', message: '대회 시작 전의 아직 시작하지 않은 경기만 삭제할 수 있어요.' });
+  if (!['draft', 'open', 'closed', 'in_progress'].includes(canonical.tournament.status) || game.state !== 'SCHEDULED' || canonical.teamMatch.status !== 'matched') {
+    throw new ConflictException({ code: 'FIXTURE_ALREADY_STARTED', message: '종료·취소되지 않은 대회의 아직 시작하지 않은 경기만 삭제할 수 있어요.' });
   }
   await tx.$queryRaw`SELECT g.id FROM v1_games g JOIN v1_tournament_match_advancement_edges e ON g.team_match_id = e.target_team_match_id WHERE e.source_team_match_id = ${fixtureId} ORDER BY g.id FOR UPDATE OF g`;
   const linked = await tx.v1TournamentMatchAdvancementEdge.findMany({ where: { sourceTeamMatchId: fixtureId }, include: { target: { include: { teamMatch: { include: { game: true } } } } } });

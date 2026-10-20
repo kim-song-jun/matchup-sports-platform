@@ -6,7 +6,8 @@ import type { GameRosterBatchDto, GameRosterBatchOp } from './dto/team-game-rost
 import { buildTeamRosterMatrix } from './game-roster-matrix';
 import { isUnmigratedTeamAuthoredLineup, syncLockedCompetitionTeam, syncPreparedGameSideRoster, upcomingCompetitionGameWhere } from './game-roster-sync';
 import { loadGameRosterContext } from './game-roster-loader';
-import { GameRosterService } from './game-roster.service';
+import { GameRosterService, loadRealNames } from './game-roster.service';
+import { canAdminViewParticipantIdentity, canViewParticipantIdentity } from '../games.service';
 import { resolveTeamRosterAccess } from './team-roster-access';
 import { loadTeamRosterColumns } from './team-roster-columns';
 
@@ -59,12 +60,16 @@ export class TeamGameRosterService {
         throw new NotFoundException({ code: 'REGISTRATION_NOT_FOUND', message: '참가 신청을 찾을 수 없어요.' });
       }
       const columns = await loadTeamRosterColumns(tx, { teamId: registration.teamId, competitionId, now: new Date() });
+      // 선수 실명은 대회를 운영하는 쪽만 본다(경기 명단 화면과 같은 규칙) — 지원 계정·조회 전용 스태프는 계정도 조회하지 않는다.
+      const realNameByUserId = viewer.identityVisible
+        ? await loadRealNames(tx, columns.flatMap(({ loaded }) => (loaded?.base ?? []).filter((entry) => entry.accountLinked).map((entry) => entry.userId)))
+        : undefined;
       return {
         registrationId,
         teamId: registration.teamId,
         competitionId,
         viewerRole: viewer.viewerRole,
-        ...buildTeamRosterMatrix({ columns, canWrite: viewer.canWrite }),
+        ...buildTeamRosterMatrix({ columns, canWrite: viewer.canWrite, realNameByUserId }),
       };
     });
   }
@@ -171,16 +176,16 @@ export class TeamGameRosterService {
   private async resolveCompetitionViewer(
     userId: string,
     competitionId: string,
-  ): Promise<{ viewerRole: 'ADMIN' | 'STAFF'; canWrite: boolean }> {
+  ): Promise<{ viewerRole: 'ADMIN' | 'STAFF'; canWrite: boolean; identityVisible: boolean }> {
     const admin = await this.prisma.v1AdminUser.findUnique({
       where: { userId },
       select: { adminRole: true, status: true, revokedAt: true, user: { select: { accountStatus: true } } },
     });
     if (admin !== null && admin.status === 'active' && admin.revokedAt === null && admin.user.accountStatus === 'active') {
-      return { viewerRole: 'ADMIN', canWrite: admin.adminRole !== 'support' };
+      return { viewerRole: 'ADMIN', canWrite: admin.adminRole !== 'support', identityVisible: canAdminViewParticipantIdentity(admin.adminRole) };
     }
     // 스태프가 아니면 STAFF_SCOPE_DENIED(403) 로 끝난다. 쓰기 가능 여부는 경기 단위 인가와 같은 액션으로 본다.
-    await this.staffAccess.assertAccess({ userId, action: 'read', resource: { tournamentId: competitionId } });
+    const staff = await this.staffAccess.assertAccess({ userId, action: 'read', resource: { tournamentId: competitionId } });
     const canWrite = await this.staffAccess
       .assertAccess({ userId, action: 'lineup_mutate', resource: { tournamentId: competitionId } })
       .then(
@@ -190,6 +195,6 @@ export class TeamGameRosterService {
           throw error;
         },
       );
-    return { viewerRole: 'STAFF', canWrite };
+    return { viewerRole: 'STAFF', canWrite, identityVisible: canViewParticipantIdentity(staff.role) };
   }
 }

@@ -9,8 +9,8 @@ import { buildLeagueListRedirect } from '@/lib/league-list-redirect';
  * **순서를 지켰다:** 담을 곳을 먼저 만들고 나서 넘긴다 — 반대로 하면 넘어간 화면에
  * 예정 리그가 없거나 상태 칩이 없는 창이 생긴다.
  *
- * Detail roots now redirect to /tournaments/:id (2026-10-14).
- * Fixture and awards subroutes retain their domain-specific screens.
+ * 목록 카드는 /tournaments/:id로 연결한다. 기존 /league-matches/:id 상세와
+ * 경기·시상 하위 경로는 전용 화면으로 직접 접근할 수 있다.
  *
  * ## 고른 상태를 함께 넘긴다
  * *"진행 중을 보던 사람은 넘어가서도 진행 중"* 이어야 한다. 축마다 상태 이름이 달라

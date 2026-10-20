@@ -7844,16 +7844,18 @@ button:has(> .tm-toggle):focus-visible {
 .tm-bk2-badge-live { background: var(--red50); color: var(--red700); font-weight: 800; }
 .tm-bk2-badge-time { font-size: 12px; color: var(--text-muted); }
 
-/* 뱃지 줄 — 시각 배지가 LIVE/PK 배지와 함께 표시될 수 있다 (D-12).
-   .tm-bk2-badge 자체는 손대지 않는다 — AggregateMatchCard/.tm-bk2-third가
-   이 클래스를 단독 block 배지로 그대로 쓰고 있어서다. */
+/* Fixed-width match cards keep schedule and result metadata on one gray row. */
 .tm-bk2-badge-row {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  background: var(--grey50);
+  padding: 3px 4px 4px;
 }
+.tm-bk2-badge-row .tm-bk2-badge { padding: 0; flex-shrink: 0; }
 
 /* 챔피언 슬롯 */
 .tm-bk2-champ {
@@ -8745,30 +8747,6 @@ button:has(> .tm-toggle):focus-visible {
   text-align: center;
   color: var(--text-caption);
   font-size: 13px;
-}
-
-/* 리텐션 CTA 카드 — 페이지 배경(--bg) 위 --grey50 한 단계. main과 동일. */
-.tm-retention-card {
-  background: var(--grey50);
-  border-radius: var(--radius-container);
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  align-items: flex-start;
-}
-.tm-retention-card-title {
-  font-size: 16px;
-  /* 850 → 700 (위 .v1-item-title 과 같은 이유) */
-  font-weight: 700;
-  color: var(--text-strong);
-  margin: 0;
-}
-.tm-retention-card-sub {
-  font-size: 13px;
-  color: var(--text);
-  margin: 0;
-  line-height: 1.5;
 }
 
 /* ── 토너먼트 서브 페이지 데스크탑 레이아웃 ── */

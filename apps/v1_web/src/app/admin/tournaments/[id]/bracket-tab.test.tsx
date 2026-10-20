@@ -155,6 +155,7 @@ function noopMutation() {
 }
 
 vi.mock('@/hooks/use-v1-api', () => ({
+  useV1TournamentFields: () => ({ data: { items: [{ id: 'field-a', name: 'A구장', active: true }] }, isPending: false, isError: false }),
   useV1PlaceSearch: () => ({ data: undefined, isFetching: false, isError: false, error: null }),
   useV1PublicKakaoMapsKey: () => ({ data: { kakaoMapsJsKey: null }, isLoading: false }),
   useV1AdminBracket: () => ({
@@ -563,7 +564,7 @@ describe('BracketTab — 경기 수정: 팀 해제(TBD) 전송', () => {
 });
 
 describe('BracketTab — 경기 수정: 한 팀 한 조', () => {
-  const groupWith = (id: string, name: string, phase: 'group' | 'semi', sortOrder: number, teams: string[]) => ({
+  const groupWith = (id: string, name: string, phase: V1AdminTournamentBracket['groups'][number]['phase'], sortOrder: number, teams: string[]) => ({
     ...bracket.groups[0], id, name, phase, sortOrder,
     groupTeams: teams.map((registrationId, index) => ({ id: `gt-${registrationId}`, groupId: id, registrationId, teamName: registrationId, sortOrder: index })),
   }) as unknown as typeof bracket.groups[number];
@@ -620,6 +621,17 @@ describe('BracketTab — 경기 수정: 한 팀 한 조', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: '선택 해제' }));
     fireEvent.change(within(dialog).getByPlaceholderText('홈 팀 검색'), { target: { value: '송파' } });
     expect(screen.queryAllByRole('option').some((option) => option.textContent?.includes('송파FC'))).toBe(false);
+  });
+
+  it('8강의 부전승 자리에는 조별 ENTRY 팀을 고를 수 있다', async () => {
+    bracketGroups = [groupWith('group-a', 'A조', 'group', 0, ['r1', 'r3']), groupWith('r12', '12강', 'round12', 0, []), groupWith('quarter', '8강', 'quarter', 0, [])];
+    bracketSlots = [makeSlot({ id: 'bye-home', kind: 'BYE', groupId: 'r12' }), makeSlot({ id: 'stage-r3', kind: 'ENTRY', groupId: 'group-a', registrationId: 'r3' })];
+    bracketFixtures = [fixtureRow({ id: 'fx-1', groupId: 'quarter', round: '8강', fixtureNumber: 1, homeRegistrationId: null, homeSlotId: 'bye-home', awayRegistrationId: null })];
+    renderTab(vi.fn(), registrations());
+    fireEvent.click(screen.getAllByRole('button', { name: '8강 1번 경기 수정' })[0]);
+    const dialog = await screen.findByRole('dialog', { name: '경기 수정' });
+    fireEvent.change(within(dialog).getByPlaceholderText('홈 팀 검색'), { target: { value: '송파' } });
+    expect(screen.getByRole('option', { name: '송파FC' })).toBeInTheDocument();
   });
 
   it('반대편에 선택한 팀은 후보에서 빠져 홈·어웨이에 같은 팀을 고를 수 없다', async () => {
@@ -930,5 +942,21 @@ describe('BracketTab — 팀 배정 전 대진 자동 생성 안내', () => {
     expect(screen.queryByText(HINT)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '대진 자동 생성' }));
     expect(screen.getByRole('dialog', { name: '조별리그 대진 자동 생성' })).toBeInTheDocument();
+  });
+});
+
+describe('BracketTab — 공통 경기 정보', () => {
+  beforeEach(() => { bracketGroups = bracket.groups; bracketSlots = []; bracketFixtures = [fixtureRow({ scheduledAt: '2026-10-25T05:00:00.000Z', fieldId: 'field-a', venue: 'A구장', homeDisplayLabel: '준결승 A 승자' })]; updateFixtureMutate.mockReset(); });
+  it('기존 시각·경기장·문구를 채우고 시각과 문구를 명시적으로 비운다', async () => {
+    renderTab();
+    fireEvent.click(screen.getAllByRole('button', { name: 'A조 · 조별리그 1라운드 1번 경기 수정' })[0]);
+    const dialog = await screen.findByRole('dialog', { name: '경기 수정' });
+    expect(within(dialog).getByLabelText('경기 일시')).toHaveValue('2026-10-25T14:00');
+    expect(within(dialog).getByLabelText('등록된 경기장(필드)')).toHaveValue('field-a');
+    expect(within(dialog).getByLabelText('홈 표시 문구')).toHaveValue('준결승 A 승자');
+    fireEvent.click(within(dialog).getByRole('button', { name: '시각 비우기' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '홈 자동 문구 복원' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+    expect(updateFixtureMutate.mock.calls[0][0]).toEqual({ fixtureId: 'fx-1', scheduledAt: null, homeDisplayLabel: null });
   });
 });

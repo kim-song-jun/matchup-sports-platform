@@ -100,7 +100,7 @@ function ApplicantRow({ team, onApprove, onReject }: {
 }) {
   const identity = (
     <>
-      <TeamAvatar seed={team.teamId ?? team.applicationId ?? team.name} name={team.name} logoUrl={team.logoUrl} size="md" />
+      <TeamAvatar teamId={team.teamId} name={team.name} logoUrl={team.logoUrl} size="md" />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="tm-text-label" style={{ color: 'var(--text-strong)' }}>{team.name}</div>
         {team.meta ? <div className="tm-text-micro" style={{ marginTop: 2, color: 'var(--text-caption)' }}>{team.meta}</div> : null}
@@ -202,7 +202,7 @@ export function PendingApplicationCard({ hostTeamName, team }: {
       <div style={{ ...INNER_BOX, padding: '4px 12px' }}>
         {team ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 56 }}>
-            <TeamAvatar seed={team.teamId} name={team.name} logoUrl={team.logoUrl} size="md" />
+            <TeamAvatar teamId={team.teamId} name={team.name} logoUrl={team.logoUrl} size="md" />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div className="tm-text-label" style={{ color: 'var(--text-strong)' }}>{team.name}</div>
               <div className="tm-text-micro" style={{ marginTop: 2, color: 'var(--text-caption)' }}>우리 팀으로 신청했어요</div>

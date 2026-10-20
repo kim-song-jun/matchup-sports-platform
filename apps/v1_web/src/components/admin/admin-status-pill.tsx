@@ -261,19 +261,22 @@ export function AdminStatusPill({ status, label }: AdminStatusPillProps) {
 }
 
 /**
- * 리그 상태 알약. 말은 G13 상태 모델(`leagueStateLabel` — 준비 중·진행 중·종료)을 쓰고, 모양은 같은
+ * 리그 상태 알약. 모집완료·진행 중·보류·종료 공통 라벨을 쓰고, 모양은 같은
  * 사실의 대회 상태 알약을 빌린다 — 대회·리그가 한 표에 섞이는 현장 운영 목록에서 "진행 중" 리그가
  * 계정 상태 말("활성")로 읽혔다(G6-V1).
  */
 const LEAGUE_STATE_PILL_KEY: Record<LeagueStateKey, string> = {
-  draft: 'draft',
+  draft: 'closed',
   active: 'in_progress',
   completed: 'completed',
   on_hold: 'league_on_hold',
 };
 
 export function AdminLeagueStatePill({ state }: { state: LeagueStateKey }) {
-  return <AdminStatusPill status={LEAGUE_STATE_PILL_KEY[state]} label={leagueStateLabel(state)} />;
+  return <AdminStatusPill
+    status={LEAGUE_STATE_PILL_KEY[state]}
+    label={leagueStateLabel(state)}
+  />;
 }
 
 const MATCH_PHASE_PILL_KEY: Record<PreResultMatchPhase, string> = {

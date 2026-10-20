@@ -198,7 +198,7 @@ export function TournamentStandingsTable({
                 const teamCell = (
                   <>
                     <TeamAvatar
-                      seed={row.teamId ?? row.key}
+                      teamId={row.teamName === null ? null : row.teamId}
                       name={isHidden ? '참가팀 비공개' : row.teamName}
                       logoUrl={isHidden ? null : (row.teamLogoUrl ?? null)}
                       size="sm"

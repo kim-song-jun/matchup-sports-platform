@@ -58,6 +58,7 @@ export const TOURNAMENT_DETAIL_INCLUDE = {
     orderBy: [{ phase: 'asc' }, { sortOrder: 'asc' }],
     include: {
       byeSlots: true,
+      slots: { where: { kind: 'BYE' }, select: { id: true, kind: true, byeSortOrder: true, displayLabel: true } },
       groupTeams: {
         orderBy: { sortOrder: 'asc' },
         include: {
@@ -105,9 +106,12 @@ export const TOURNAMENT_DETAIL_INCLUDE = {
         select: {
           startAt: true,
           fieldId: true,
+          field: { select: { name: true } },
           ...PLACE_SELECT,
           status: true,
           competitionConfigVersionId: true,
+          homeSlotId: true,
+          awaySlotId: true,
           homeSlot: { select: SLOT_LABEL_SELECT },
           awaySlot: { select: SLOT_LABEL_SELECT },
           game: {

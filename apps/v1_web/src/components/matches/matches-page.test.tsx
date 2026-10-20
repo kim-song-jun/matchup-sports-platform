@@ -52,7 +52,7 @@ describe('MatchDetailPageView — 종료와 모집 마감 안내 분리 (#1587)'
       statusLabel: data.viewer?.participantStatus === 'no_show' ? '불참 기록' : undefined,
       applyLabel: applyLabel(viewer, status, false),
       match: {
-        ...toMatchCard(data, fallback.match), description: '', place: null, rules: [],
+        ...toMatchCard(data, fallback.match), description: '', isOnline: false, place: null, rules: [],
         participants: [], applicationsHref: `/matches/${data.id}/applications`,
       },
     };
@@ -1145,9 +1145,9 @@ describe('MatchDetailPageView — desktop 제목 중복 정리 (#1588 A)', () =>
 });
 
 describe('MatchDetailPageView — 일정·장소의 장소 카드', () => {
-  function withPlace(place: NonNullable<ReturnType<typeof getMatchDetailViewModel>['match']['place']> | null) {
+  function withPlace(place: NonNullable<ReturnType<typeof getMatchDetailViewModel>['match']['place']> | null, isOnline = false) {
     const base = getMatchDetailViewModel('default');
-    return { ...base, match: { ...base.match, place } };
+    return { ...base, match: { ...base.match, place, isOnline } };
   }
   const mobileBody = (container: HTMLElement) =>
     within(container.querySelector<HTMLElement>('.tm-match-detail-body.tm-hide-desktop')!);
@@ -1166,6 +1166,22 @@ describe('MatchDetailPageView — 일정·장소의 장소 카드', () => {
     expect(sheet.getByRole('link', { name: /^네이버 지도/ })).toBeInTheDocument();
     expect(body.getByRole('button', { name: /주소 복사/ })).toBeInTheDocument();
     expect(body.queryByText(/정확한 위치가 등록되지 않았어요/)).not.toBeInTheDocument();
+  });
+
+  it('온라인 매치는 실제 장소명과 주소를 보여 주고 지도 동작을 제공하지 않는다', () => {
+    const { container } = render(
+      <MatchDetailPageView model={withPlace({
+        name: '실제 온라인 장소명', address: '서울 마포구 실제 주소', latitude: 37.5558, longitude: 126.8985, provider: 'kakao', providerPlaceId: 'k-1',
+      }, true)} />,
+    );
+    const body = mobileBody(container);
+
+    expect(body.getByText('실제 온라인 장소명')).toBeInTheDocument();
+    expect(body.getByText('서울 마포구 실제 주소')).toBeInTheDocument();
+    expect(body.queryByRole('button', { name: '길찾기' })).not.toBeInTheDocument();
+    expect(body.queryByRole('button', { name: '지도 앱에서 찾기' })).not.toBeInTheDocument();
+    expect(body.queryByRole('button', { name: /주소 복사/ })).not.toBeInTheDocument();
+    expect(body.queryByRole('link', { name: /지도/ })).not.toBeInTheDocument();
   });
 
   it('좌표가 없으면 위치 미등록 안내와 이름 검색 링크만 보여 준다', () => {

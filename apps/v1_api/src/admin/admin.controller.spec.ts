@@ -17,6 +17,7 @@ describe('AdminController', () => {
     overview: jest.fn(),
     changeUserStatus: jest.fn(),
     changeMatchStatus: jest.fn(),
+    setMatchOnline: jest.fn(),
     changeTeamStatus: jest.fn(),
     changeTeamMatchStatus: jest.fn(),
     actionLogs: jest.fn(),
@@ -87,6 +88,15 @@ describe('AdminController', () => {
       matchId: 'match-1',
       status: 'closed',
     });
+  });
+
+  it('sets a match online classification through the admin service', async () => {
+    const dto = { isOnline: true };
+    adminService.setMatchOnline.mockResolvedValue({ matchId: 'match-1', isOnline: true, changed: true });
+    await expect(controller.setMatchOnline(user, 'match-1', dto)).resolves.toEqual({
+      matchId: 'match-1', isOnline: true, changed: true,
+    });
+    expect(adminService.setMatchOnline).toHaveBeenCalledWith(user, 'match-1', dto);
   });
 
   it('changes team status', async () => {

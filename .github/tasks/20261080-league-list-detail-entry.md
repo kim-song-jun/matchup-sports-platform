@@ -123,3 +123,32 @@ Base origin/dev=dde8964ca. Worktree _worktrees/league-detail-routes. Phase 1 inv
 배포 전 게이트: Web/API tsc 0, 양 앱 pattern/surface 검사 PASS, API 81/81, 영향받은 Web 소비자·복귀·SEO·redirect 테스트 PASS. before 3폭에서 실제 홈 리그/목록 클릭 완료. /leagues 과거 알림404 재현. 코드 신규 debt marker0, diff check PASS.
 
 추가 적대 검토: 알림 아이콘이 구 경로에 의존함을 발견. 새 알림 링크의 kind=league와 기존 알림 정규화에 같은 구분을 보존하고 알림 카드/시트는 해당 정보를 사용한다. API 알림78/78, Web 추가32/32 PASS. 셸 기본 복귀/선수 기록 빈 상태의 이전 주소 단언도 동기화했다.
+
+## Follow-up: 경기 상세에서 진행 중 리그 순위로 이동 (2026-10-16)
+Status: In Progress
+
+### Context / Goal / Original Conditions
+- 사용자 제보: 홈에서 진입한 경기 상세의 `전체 순위표·일정 보기`가 소개 상세로 이동함.
+- 해당 CTA와 경기 없음 안내의 순위 링크를 `/tournaments/:id/bracket?tab=standings`로 연결한다.
+- 제목 링크는 소개 상세를 유지하며 안전한 기존 from 체인을 보존한다.
+
+### User / Test Scenarios
+- 홈, 소개 상세, 사용자 기록에서 진입 → 전체 순위표 CTA → 진행 화면의 리그 순위 탭.
+- from 없음/외부 URL과 없는 fixture의 안내 링크, 선수 프로필 복귀 회귀 확인.
+- 목적지 bracket의 tab=standings 선택/표 표시 기존 렌더 테스트 함께 실행.
+- API/schema/mock 응답 변경 없음.
+
+### Ownership / Acceptance Criteria / Security
+- 단일 에이전트, frontend 경기 상세와 관련 테스트만 수정. 기존 WIP 보존.
+- sanitizeRedirectPath 및 withFromPath 재사용; 외부 URL 허용 범위를 넓히지 않는다.
+- [x] 순위 CTA를 진행 화면의 순위 탭으로 변경.
+- [x] 관련 단위 테스트 통과.
+- [ ] Alpha 배포 후 실제 클릭 검증.
+
+### Progress Snapshot / Risks / Ambiguity Log
+- origin/dev e89556ad7 기반 `_worktrees/fix-fixture-standings-link`, branch `fix/fixture-standings-link`.
+- 사용자 표현의 ‘진행 중의 리그 순위’는 기존 bracket 화면의 ‘리그 순위’ 탭으로 확인함.
+- 브라우저 확인 2회 실패: CUA kernel의 Windows sandbox setup refresh 오류. Alpha 실제 클릭/console/network/viewport 증거 미확보.
+- 커밋/push/배포 미실행. UI 스타일/레이아웃 변경 없음.
+검증 결과: 경기 상세 37/37 + 프로필 복귀 30/30 = 67/67 PASS. 목적지 bracket suite는 로컬 의존성 `validator/lib/isISO8601`을 찾지 못해 수집 실패(제품 assertion 실패 아님). 전체 검증 성공으로 간주하지 않음. 로그: WSL `/tmp/fixture-standings-test.log`. diff --check PASS, touched source/test 신규 debt marker 0. 단위 테스트 프로세스 종료 확인. Alpha 배포/실제 클릭 검증은 남아 있음.
+PR 준비 검증(2026-10-16): 최신 origin/dev eded915e0 반영. 누락된 로컬 validator 타입/패키지 연결 보완 후 목적지 bracket 42/42 PASS; 순위 이동 관련 총 109/109 PASS. tsc 및 v1 패턴 검사 PASS. sidebar/정렬 변경과 같은 PR로 제출하며 Alpha 실제 클릭 검증은 머지 후 대상.

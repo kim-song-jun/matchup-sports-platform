@@ -7,24 +7,26 @@ const fieldClass =
 
 export type RosterLimitValue = { unlimited: boolean; minPlayers: string; maxPlayers: string };
 
-export function leagueTeamCapacityError(value: string): string | null {
+export function leagueTeamCapacityError(value: string, minimumTeams = 1): string | null {
   if (value.trim() === '') return null;
-  return /^\d+$/.test(value.trim()) && Number(value) >= 1 && Number(value) <= 2147483647
-    ? null
-    : '참가팀 정원은 1~2,147,483,647팀 사이의 정수로 입력해 주세요.';
+  if (!/^\d+$/.test(value.trim()) || Number(value) < 1 || Number(value) > 2147483647) {
+    return '참가팀 정원은 1~2,147,483,647팀 사이의 정수로 입력해 주세요.';
+  }
+  return Number(value) < minimumTeams ? `참가팀 정원은 선택한 팀 수(${minimumTeams}팀) 이상이어야 해요.` : null;
 }
 
-export function LeagueTeamCapacityField({ value, onChange, disabled }: {
+export function LeagueTeamCapacityField({ value, onChange, disabled, minimumTeams = 1 }: {
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
+  minimumTeams?: number;
 }) {
   const id = useId();
-  const error = leagueTeamCapacityError(value);
+  const error = leagueTeamCapacityError(value, minimumTeams);
   return (
     <div>
       <label htmlFor={id} className="mb-1 block tm-text-body-sm font-medium text-[var(--text-strong)]">참가팀 정원 (선택)</label>
-      <input id={id} type="number" inputMode="numeric" min={1} max={2147483647} step={1}
+      <input id={id} type="number" inputMode="numeric" min={Math.max(1, minimumTeams)} max={2147483647} step={1}
         value={value} disabled={disabled} aria-invalid={error !== null} aria-describedby={`${id}-hint`}
         onChange={event => onChange(event.target.value)} className={fieldClass} />
       <p id={`${id}-hint`} className="mt-1 tm-text-caption text-[var(--text-muted)]">

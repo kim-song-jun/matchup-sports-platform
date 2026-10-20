@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AwardsTab } from './awards-tab';
@@ -211,5 +211,34 @@ describe('AwardsTab 추천 근거 chip (STATS-3)', () => {
   it('읽기 전용 권한에서는 chip이 렌더되지 않는다', () => {
     render(<AwardsTab tournamentId="tournament-1" canWrite={false} showToast={vi.fn()} />);
     expect(screen.queryByText(/추천 근거/)).not.toBeInTheDocument();
+  });
+});
+
+describe('AwardsTab 수상자 선택 — 운영진 실명', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    awardsHolder.current = [award];
+  });
+  afterEach(() => {
+    awardsHolder.current = null;
+  });
+
+  it('명단 선수는 다른 운영 화면과 같은 "실명 (닉네임)" 으로 보이고, 저장하는 수상자 이름은 등록 실명 그대로다', async () => {
+    const user = userEvent.setup();
+    render(<AwardsTab tournamentId="tournament-1" canWrite showToast={vi.fn()} />);
+
+    // 이미 고른 수상자도 같은 라벨로 보이고, 반 폭 칸에서 자르지 않는다.
+    const chip = screen.getByText('김선수 (골잡이)');
+    expect(chip).not.toHaveClass('truncate');
+
+    await user.click(within(chip.parentElement!.parentElement!).getByRole('button', { name: '선택 해제' }));
+    await user.type(screen.getByRole('combobox', { name: /수상자 이름/ }), '골잡');
+    await user.click(await screen.findByRole('option', { name: '김선수 (골잡이)' }));
+    await user.click(screen.getByRole('button', { name: /어워드 저장/ }));
+
+    expect(setAwardsMutate).toHaveBeenCalledWith(
+      [expect.objectContaining({ recipientName: '김선수', recipientUserId: 'user-player-1' })],
+      expect.anything(),
+    );
   });
 });

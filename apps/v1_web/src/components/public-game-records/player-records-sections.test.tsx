@@ -18,7 +18,7 @@ const base = {
   onRetry: vi.fn(),
 } as const;
 
-describe('TournamentPlayerRecordsSections', () => {
+describe('TournamentPlayerRecordsSections — awards consumer', () => {
   it('공동 득점왕 두 명을 둘 다 1위로 매기고, 이름을 공개 프로필로 링크한다', () => {
     render(
       <TournamentPlayerRecordsSections
@@ -29,7 +29,6 @@ describe('TournamentPlayerRecordsSections', () => {
           row({ userId: 'c', nickname: '다', profileHref: '/users/c', goals: 3 }),
         ]}
         assists={[]}
-        emptyBehavior="hide"
       />,
     );
     const items = screen.getAllByRole('listitem').map((li) => li.textContent);
@@ -45,7 +44,6 @@ describe('TournamentPlayerRecordsSections', () => {
         {...base}
         goals={[]}
         assists={[row({ userId: 'a', nickname: '가', assists: 2 })]}
-        emptyBehavior="hide"
       />,
     );
     expect(screen.getByRole('heading', { name: '도움 순위' })).toBeInTheDocument();
@@ -53,45 +51,8 @@ describe('TournamentPlayerRecordsSections', () => {
     expect(screen.getByText('2도움')).toBeInTheDocument();
   });
 
-  it('기록이 없으면 hide 모드는 아무것도 그리지 않는다', () => {
-    const { container } = render(
-      <TournamentPlayerRecordsSections {...base} goals={[]} assists={[]} emptyBehavior="hide" />,
-    );
-    expect(container).toBeEmptyDOMElement();
-  });
-
-  it('hide 모드에서 기록이 없으면 containerStyle 래퍼(여백)도 그리지 않는다', () => {
-    // 리뷰에서 잡힌 버그의 고정: 페이지가 바깥 div로 감싸면 null 반환 시에도
-    // 40px 하단 패딩이 남았다 — 래퍼는 내용이 있을 때만 렌더돼야 한다.
-    const { container } = render(
-      <TournamentPlayerRecordsSections
-        {...base}
-        goals={[]}
-        assists={[]}
-        emptyBehavior="hide"
-        containerStyle={{ padding: '0 20px 40px' }}
-      />,
-    );
-    expect(container).toBeEmptyDOMElement();
-  });
-
-  it('내용이 있으면 containerStyle 래퍼가 내용과 함께 렌더된다', () => {
-    const { container } = render(
-      <TournamentPlayerRecordsSections
-        {...base}
-        goals={[row({ userId: 'a', nickname: '가', goals: 2 })]}
-        assists={[]}
-        emptyBehavior="hide"
-        containerStyle={{ padding: '0 20px 40px' }}
-      />,
-    );
-    expect((container.firstChild as HTMLElement).style.padding).toBe('0px 20px 40px');
-  });
-
-  it('기록이 없으면 empty-state 모드는 EmptyState 문구를 보여준다', () => {
-    render(
-      <TournamentPlayerRecordsSections {...base} goals={[]} assists={[]} emptyBehavior="empty-state" />,
-    );
+  it('기록이 없으면 아직 기록이 없다는 EmptyState 문구를 보여준다', () => {
+    render(<TournamentPlayerRecordsSections {...base} goals={[]} assists={[]} />);
     expect(screen.getByText('아직 기록이 없어요')).toBeInTheDocument();
     expect(screen.queryByText('아직 공개할 수 있는 기록이 없어요')).not.toBeInTheDocument();
   });
@@ -103,12 +64,18 @@ describe('TournamentPlayerRecordsSections', () => {
         hiddenByEligibility
         goals={[]}
         assists={[]}
-        emptyBehavior="empty-state"
       />,
     );
     expect(screen.getByText('아직 공개할 수 있는 기록이 없어요')).toBeInTheDocument();
     expect(screen.getByText(/동의하면 득점·도움 순위가 공개돼요/)).toBeInTheDocument();
     expect(screen.queryByText('아직 기록이 없어요')).not.toBeInTheDocument();
+  });
+
+  it('조회 중이면 loading skeleton을 보여준다', () => {
+    const { container } = render(
+      <TournamentPlayerRecordsSections {...base} isLoading goals={undefined} assists={undefined} />,
+    );
+    expect(container.querySelector('.tm-skeleton')).toBeInTheDocument();
   });
 
   it('에러면 재시도 가능한 ErrorState를 보여준다', () => {
@@ -118,7 +85,6 @@ describe('TournamentPlayerRecordsSections', () => {
         isError
         goals={undefined}
         assists={undefined}
-        emptyBehavior="hide"
       />,
     );
     expect(screen.getByText('기록을 불러오지 못했어요.')).toBeInTheDocument();

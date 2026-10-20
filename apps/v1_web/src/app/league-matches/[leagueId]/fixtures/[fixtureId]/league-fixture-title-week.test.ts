@@ -69,8 +69,10 @@ describe('리그 경기 탭 제목의 주차', () => {
     expect(await titleOf('fx-4')).toContain('개막전');
   });
 
-  it('리그 조회가 실패하면 저장된 제목으로 둔다', async () => {
+  it('리그 정보를 조회하지 못하면 저장된 제목만으로 색인하지 않는다', async () => {
     leagueResponse = () => new Response('boom', { status: 500 });
-    expect(await titleOf('fx-3')).toContain('서울 나이트 풋살 리그 2주차');
+    const meta = await generateMetadata({ params: Promise.resolve({ leagueId: 'lg-1', fixtureId: 'fx-3' }) });
+    expect(String(meta.title)).toContain('리그 경기 정보를 확인할 수 없어요');
+    expect(meta.robots).toMatchObject({ index: false, follow: false, nocache: true });
   });
 });

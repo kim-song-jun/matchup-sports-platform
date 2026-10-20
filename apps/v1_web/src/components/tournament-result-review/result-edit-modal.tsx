@@ -13,6 +13,7 @@ import type { GameLineup } from '@/types/game-operations';
 import { formatGameResultScoreWithPenalties, readGameResultScore } from '@/lib/game-result-score';
 import { describeGoalTimelineMismatch, isScoreOnlyResult } from './goal-timeline-consistency';
 import { isSinglePeriod, periodLabel } from '@/components/tournament-live/operate/period-label';
+import { participantIdentityName } from '@/components/tournament-live/operate/participant-identity';
 import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
 import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
 import { lockBodyScroll } from '@/lib/body-scroll-lock';
@@ -105,7 +106,7 @@ function buildParticipantNameMap(lineups: readonly GameLineup[]): Map<string, st
   for (const lineup of lineups) {
     for (const participant of lineup.participants) {
       const jersey = participant.jerseyNumber !== null ? `#${participant.jerseyNumber} ` : '';
-      map.set(participant.id, `${jersey}${participant.displayNameSnapshot}`);
+      map.set(participant.id, `${jersey}${participantIdentityName(participant)}`);
     }
   }
   return map;

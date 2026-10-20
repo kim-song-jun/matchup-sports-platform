@@ -62,6 +62,11 @@ export function TournamentInfoSection() {
   const [editOpen, setEditOpen] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editSportId, setEditSportId] = useState('');
+  const [editFormat, setEditFormat] = useState<V1Tournament['format']>('group_knockout');
+  const formatChangeBlockedReason = tournament?.formatChangeBlockedReason
+    ?? (tournament?.status === 'in_progress' || tournament?.status === 'completed'
+      ? '대회가 시작된 뒤에는 대회 형식을 변경할 수 없어요.'
+      : null);
   const [editScheduledAt, setEditScheduledAt] = useState('');
   const [editScheduledEndAt, setEditScheduledEndAt] = useState('');
   const [editDeadlineAt, setEditDeadlineAt] = useState('');
@@ -134,6 +139,7 @@ export function TournamentInfoSection() {
     if (!tournament) return;
     setEditTitle(tournament.title);
     setEditSportId(tournament.sportId);
+    setEditFormat(tournament.format);
     setEditScheduledAt(isoToKstDatetimeLocal(tournament.scheduledAt));
     setEditScheduledEndAt(isoToKstDatetimeLocal(tournament.scheduledEndAt));
     setEditDeadlineAt(isoToKstDatetimeLocal(tournament.registrationDeadlineAt));
@@ -285,6 +291,7 @@ export function TournamentInfoSection() {
     // 1 이상이 돼 깨진다.
     const payload: Omit<V1UpdateTournamentPayload, 'expectedVersion'> = {};
     if (normalizedTitle !== tournament.title) payload.title = normalizedTitle;
+    if (editFormat !== tournament.format) payload.format = editFormat;
     if (editSportId && editSportId !== tournament.sportId) payload.sportId = editSportId;
     if (editScheduledAt !== isoToKstDatetimeLocal(tournament.scheduledAt)) {
       payload.scheduledAt = kstDatetimeLocalToIso(editScheduledAt);
@@ -697,6 +704,25 @@ export function TournamentInfoSection() {
               ))}
             </select>
             <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">종목을 바꾸면 목록·상세의 종목 뱃지와 필터에 바로 반영돼요.</p>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <label htmlFor="edit-format" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">대회 형식</label>
+            <select
+              id="edit-format"
+              value={editFormat}
+              onChange={(event) => setEditFormat(event.target.value as V1Tournament['format'])}
+              disabled={Boolean(formatChangeBlockedReason) || updateTournament.isPending}
+              aria-describedby="edit-format-help"
+              className={inputCls}
+            >
+              {Object.entries(TOURNAMENT_FORMAT_LABEL).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+            <p id="edit-format-help" className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
+              {formatChangeBlockedReason ?? '조나 대진을 만들기 전까지 변경할 수 있어요.'}
+            </p>
           </div>
 
           <div className="flex flex-col gap-2">

@@ -89,6 +89,8 @@ export type V1GameRosterHistoryEvent = {
   adjustmentId: string;
   userId: string;
   displayName: string;
+  /** 빠진 선수의 계정 실명 — 대회 운영진에게만 온다. 다른 역할 응답에는 키 자체가 없다. */
+  realName?: string;
   reason: string | null;
   actor: V1GameRosterActor;
   at: string;
@@ -129,6 +131,8 @@ export type V1TeamRosterMatrixGame = {
 export type V1TeamRosterMatrixPlayer = {
   userId: string;
   displayName: string;
+  /** 계정 실명 — 어드민 출전 표를 대회 운영진이 볼 때만 온다. 다른 역할 응답에는 키 자체가 없다. */
+  realName?: string;
   accountLinked: boolean;
   /** `games` 와 같은 순서·길이. */
   cells: V1TeamRosterCell[];

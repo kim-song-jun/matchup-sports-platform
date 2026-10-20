@@ -1,6 +1,6 @@
 import { JsonLd } from '@/components/seo/json-ld';
 import { TeamListPageClient } from '@/components/teams/teams-client';
-import { hasListFilter, TEAM_LIST_FILTER_PARAMS, TEAM_LIST_SEED_PATH } from '@/lib/public-list-seed';
+import { hasListFilter, TEAM_LIST_FILTER_PARAMS, teamListSeedPath } from '@/lib/public-list-seed';
 import { buildPublicMetadata } from '@/lib/seo';
 import { fetchSeoMasterSports, fetchSeoSeed } from '@/lib/seo-list';
 import { buildItemListLd } from '@/lib/structured-data';
@@ -9,7 +9,7 @@ import type { CursorPage, V1Team } from '@/types/api';
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 export const metadata = buildPublicMetadata({
-  title: '활동 지역과 종목으로 스포츠 팀 찾기',
+  title: '지역별 풋살·축구 등 스포츠 팀 찾기',
   description: '동네에서 함께할 풋살·축구 팀을 찾아보세요. 활동 지역과 모집 상태를 살펴보고 러닝·수영 등 다양한 스포츠 팀의 가입 조건도 확인할 수 있어요.',
   path: '/teams',
 });
@@ -21,14 +21,16 @@ export const metadata = buildPublicMetadata({
 export const revalidate = 0;
 
 export default async function TeamsPage({ searchParams }: { searchParams: SearchParams }) {
-  const filtered = hasListFilter(await searchParams, TEAM_LIST_FILTER_PARAMS);
-  // 필터가 걸리면 클라이언트가 목록 seed 를 버리므로 받지도 않는다(LD 도 없음).
+  const params = await searchParams;
+  const query = teamListSeedPath(params);
+  const filtered = hasListFilter(params, TEAM_LIST_FILTER_PARAMS);
   const [page, sports] = await Promise.all([
-    filtered ? Promise.resolve(null) : fetchSeoSeed<CursorPage<V1Team>>(TEAM_LIST_SEED_PATH, 'teams'),
+    fetchSeoSeed<CursorPage<V1Team>>(query, 'teams'),
     fetchSeoMasterSports(),
   ]);
 
-  const ldItems = page ? page.items : [];
+  // Filtered routes keep their matching SSR cards, but preserve the existing base-list-only ItemList contract.
+  const ldItems = page && !filtered && query === teamListSeedPath() ? page.items : [];
 
   return (
     <>
@@ -41,7 +43,7 @@ export default async function TeamsPage({ searchParams }: { searchParams: Search
           )}
         />
       ) : null}
-      <TeamListPageClient seed={page ? { page, sports } : undefined} />
+      <TeamListPageClient seed={page ? { page, sports, query } : undefined} />
     </>
   );
 }

@@ -1,16 +1,16 @@
 /**
- * /teams는 서버(SEO 프리렌더)가 이미 받아 둔 무필터 목록을 seed로 클라이언트에 넘긴다.
+ * /teams는 서버(SEO 프리렌더)가 현재 URL 필터와 일치하는 첫 페이지를 seed로 클라이언트에 넘긴다.
  *
  * useV1TeamDetail의 seed(placeholderData) 패턴을 그대로 재사용해 이 화면도 서버가 이미
- * 가진 값을 첫 화면부터 보여주게 한다. 단, URL에 필터(종목/성별/레벨/검색어/정렬)가
- * 걸려 있으면 seed(무필터 스냅샷)를 넘기지 않는다 — 필터링 안 된 결과를 필터링된
- * 화면인 것처럼 잠깐 보여주는 쪽이 빈 스켈레톤보다 나쁘다.
+ * 가진 값을 첫 화면부터 보여주게 한다. URL 필터가 있으면 동일하게 정규화된 API 쿼리의
+ * seed만 사용하고, 쿼리가 바뀐 동안에는 이전 결과를 필터된 화면처럼 보여주지 않는다.
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render as rtlRender, screen } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { V1Sport, V1Team } from '@/types/api';
+import { TEAM_LIST_SEED_PATH, teamListSeedPath } from '@/lib/public-list-seed';
 
 const searchParamsMock = vi.hoisted(() => ({ value: new URLSearchParams('') }));
 
@@ -53,6 +53,7 @@ function seedTeam(index: number): V1Team {
 }
 
 const seedSport = { id: 'sport-futsal', name: '풋살', code: 'futsal' } as unknown as V1Sport;
+const seedSoccer = { id: 'sport-soccer', name: '축구', code: 'soccer' } as unknown as V1Sport;
 
 describe('TeamListPageClient — 서버 seed 연결', () => {
   beforeEach(() => {
@@ -71,7 +72,7 @@ describe('TeamListPageClient — 서버 seed 연결', () => {
 
   it('필터 없이 들어오면 seed를 useV1TeamPages/useV1MasterSports에 초기 페이지로 넘긴다', () => {
     const page = { items: [seedTeam(0), seedTeam(1)], nextCursor: 'seed-1', pageInfo: { nextCursor: 'seed-1', hasNext: true, totalCount: 52 } };
-    const seed = { page, sports: [seedSport] };
+    const seed = { page, sports: [seedSport], query: TEAM_LIST_SEED_PATH };
 
     render(<TeamListPageClient seed={seed} />);
 
@@ -81,16 +82,79 @@ describe('TeamListPageClient — 서버 seed 연결', () => {
     expect(sportsOptions.seed).toEqual(seed.sports);
   });
 
-  it('URL에 종목 필터가 걸려 있으면 무필터 목록 seed는 넘기지 않는다(종목 목록 seed는 그대로 넘긴다)', () => {
+  it('SSR 첫 페이지 20팀과 hasNextPage 미정 상태에서도 전체 105·풋살 94·축구 11의 facet 건수를 보인다', () => {
+    const page = {
+      items: [
+        ...Array.from({ length: 18 }, (_, index) => ({ ...seedTeam(index), sport: { sportId: 'sport-futsal', name: '풋살' } } as V1Team)),
+        ...Array.from({ length: 2 }, (_, index) => ({ ...seedTeam(index + 18), sport: { sportId: 'sport-soccer', name: '축구' }, sportName: '축구' } as V1Team)),
+      ],
+      nextCursor: 'seed-1',
+      pageInfo: { nextCursor: 'seed-1', hasNext: true, totalCount: 105 },
+      facets: { sports: [{ sportId: 'sport-futsal', count: 94 }, { sportId: 'sport-soccer', count: 11 }] },
+    };
+    const seed = { page, sports: [seedSport, seedSoccer], query: TEAM_LIST_SEED_PATH };
+    hookMocks.useV1TeamPages.mockReturnValue({
+      data: { pages: [page] },
+      isPending: false,
+      isError: false,
+      hasNextPage: undefined,
+      isFetchingNextPage: false,
+      isPlaceholderData: false,
+      fetchNextPage: vi.fn(),
+    });
+    hookMocks.useV1MasterSports.mockReturnValue({ data: seed.sports });
+
+    render(<TeamListPageClient seed={seed} />);
+
+    const links = Array.from(screen.getByRole('group', { name: '종목 필터' }).querySelectorAll('a'));
+    expect(links.map((link) => link.textContent?.replace(/\s+/g, '').trim())).toEqual(['전체105', '풋살94', '축구11']);
+  });
+
+  it('facet가 없고 SSR의 다음 페이지 여부가 미정이면 부분 목록 건수를 숨긴다', () => {
+    const page = {
+      items: [seedTeam(0), seedTeam(1)],
+      nextCursor: 'seed-1',
+      pageInfo: { nextCursor: 'seed-1', hasNext: true, totalCount: 52 },
+    };
+    const seed = { page, sports: [seedSport], query: TEAM_LIST_SEED_PATH };
+    hookMocks.useV1TeamPages.mockReturnValue({
+      data: { pages: [page] },
+      isPending: false,
+      isError: false,
+      hasNextPage: undefined,
+      isFetchingNextPage: false,
+      isPlaceholderData: false,
+      fetchNextPage: vi.fn(),
+    });
+    hookMocks.useV1MasterSports.mockReturnValue({ data: seed.sports });
+
+    render(<TeamListPageClient seed={seed} />);
+
+    const links = Array.from(screen.getByRole('group', { name: '종목 필터' }).querySelectorAll('a'));
+    expect(links.map((link) => link.textContent?.replace(/\s+/g, '').trim())).toEqual(['전체', '풋살']);
+  });
+
+  it('유효한 종목 필터와 같은 query seed를 첫 렌더에 쓴다', () => {
     searchParamsMock.value = new URLSearchParams('sportId=sport-futsal');
-    const seed = { page: { items: [seedTeam(0)], nextCursor: null, pageInfo: { nextCursor: null, hasNext: false, totalCount: 1 } }, sports: [seedSport] };
+    const page = { items: [seedTeam(0)], nextCursor: null, pageInfo: { nextCursor: null, hasNext: false, totalCount: 1 } };
+    const seed = { page, sports: [seedSport], query: teamListSeedPath({ sportId: 'sport-futsal' }) };
+
+    render(<TeamListPageClient seed={seed} />);
+
+    const [, teamsOptions] = hookMocks.useV1TeamPages.mock.calls[0] as [unknown, { seed?: unknown }];
+    expect(teamsOptions.seed).toEqual(page);
+    const [sportsOptions] = hookMocks.useV1MasterSports.mock.calls[0] as [{ seed?: unknown }];
+    expect(sportsOptions.seed).toEqual(seed.sports);
+  });
+
+  it('현재 URL과 seed query가 다르면 팀 목록 seed를 사용하지 않는다', () => {
+    searchParamsMock.value = new URLSearchParams('sportId=sport-basketball');
+    const seed = { page: { items: [seedTeam(0)], nextCursor: null, pageInfo: { nextCursor: null, hasNext: false, totalCount: 1 } }, sports: [seedSport], query: teamListSeedPath({ sportId: 'sport-futsal' }) };
 
     render(<TeamListPageClient seed={seed} />);
 
     const [, teamsOptions] = hookMocks.useV1TeamPages.mock.calls[0] as [unknown, { seed?: unknown }];
     expect(teamsOptions.seed).toBeUndefined();
-    const [sportsOptions] = hookMocks.useV1MasterSports.mock.calls[0] as [{ seed?: unknown }];
-    expect(sportsOptions.seed).toEqual(seed.sports);
   });
 
   it('seed prop이 없으면(예: seed 없이 렌더) 두 훅 다 seed: undefined로 부른다', () => {

@@ -890,10 +890,14 @@ describe('TournamentDetailView — completed vs non-completed section rendering'
     render(createElement(TournamentDetailView, { tournament, myRegistration: null }));
 
     expect(screen.getByText('대회가 끝났어요')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '대회 최종 결과 보기' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: '경기 결과 보기' })).toHaveAttribute(
       'href',
       '/tournaments/t1/results',
     );
+    expect(screen.queryByRole('link', { name: /경기별 결과·기록/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /최종 결과·시상/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /대진표·조별 순위/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /대회 후기/ })).toBeInTheDocument();
   });
 
   it('renders the champion name in the CompletedResultHero title when the final result is resolvable', () => {
@@ -909,6 +913,10 @@ describe('TournamentDetailView — completed vs non-completed section rendering'
     render(createElement(TournamentDetailView, { tournament, myRegistration: null }));
 
     expect(screen.getByText('레드 FC 우승!')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '레드 FC 우승. 경기 결과 보기' })).toHaveAttribute(
+      'href',
+      '/tournaments/t1/results',
+    );
   });
 
   it('renders the pre-participation checklist exactly once via the accordion and drops the old duplicated copy', () => {
@@ -1218,7 +1226,7 @@ describe('TournamentDetailView — 정규 리그 거울 행', () => {
       }),
     );
     await screen.findByText('통합 순위');
-    const rail = screen.getByRole('complementary', { name: '리그 참가 신청' });
+    const rail = screen.getByRole('complementary', { name: '리그 진행 상태' });
     expect(within(rail).getByRole('link', { name: '참가 신청하기' })).toHaveAttribute(
       'href', '/tournaments/league-1/my',
     );
@@ -1421,21 +1429,28 @@ function makeRegistration(overrides: Partial<V1TournamentRegistration> = {}): V1
 
 describe('진행 중인 정규 리그의 공개 상단 진입', () => {
   it.each([null, 'confirmed', 'draft', 'cancelled'] as const)(
-    '참가 상태 %s에서도 웹·모바일 상단에서 경기 일정·라이브 화면으로 이동한다',
+    '참가 상태 %s에서도 모바일 상단·웹 우측 레일에서 경기 일정으로 이동한다',
     (registrationStatus) => {
       const tournament = makeTournament({
         id: 'league-live', status: 'in_progress', format: 'group_knockout', kind: 'regular_league',
+        leagueFixtures: [{ teamMatchId: 'today', title: '1R', homeTeamId: 'a', awayTeamId: 'b',
+          startAt: new Date().toISOString(), placeName: '구장', status: 'matched' }],
       });
       render(createElement(TournamentDetailView, {
         tournament,
         myRegistration: registrationStatus === null ? null : makeRegistration({ status: registrationStatus }),
       }));
-      const link = screen.getByRole('link', { name: '진행 중인 리그 보기' });
-      expect(link).toHaveAttribute('href', '/tournaments/league-live/bracket');
-      expect(link.closest('.tm-hide-desktop, .tm-show-desktop')).toBeNull();
+      const links = screen.getAllByRole('link', { name: '진행 중인 리그 보기' });
+      expect(links).toHaveLength(2);
+      const mobileLink = links.find((link) => link.closest('.tm-hide-desktop'))!;
+      const rail = screen.getByRole('complementary', { name: '리그 진행 상태' });
+      const desktopLink = within(rail).getByRole('link', { name: '진행 중인 리그 보기' });
+      expect(mobileLink).toBeDefined();
+      expect(desktopLink).toHaveAttribute('href', '/tournaments/league-live/bracket');
+      expect(mobileLink).toHaveAttribute('href', '/tournaments/league-live/bracket');
       const title = screen.getByRole('heading', { level: 1, name: tournament.title });
-      expect(link.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-      expect(within(link).getByText('LIVE')).toBeInTheDocument();
+      expect(mobileLink.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(within(desktopLink).getByText('LIVE')).toBeInTheDocument();
     },
   );
 

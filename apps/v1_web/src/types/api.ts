@@ -456,6 +456,8 @@ export type V1VenueSnapshotPayload = {
 };
 
 export type V1Match = {
+  /** 공개 목록에는 없고 상세 응답에만 포함돼요. 값이 없으면 기존 오프라인 매치예요. */
+  isOnline?: boolean;
   canComplete?: boolean;
   canWithdraw?: boolean;
   completedAt?: string | null;
@@ -3686,6 +3688,8 @@ export type V1TournamentListItem = {
 
 /** Serialized by TournamentsAdminService.serialize — admin view (includes bank / player range) */
 export type V1Tournament = {
+  /** 관리자 상세 응답: null이면 형식 변경 가능. */
+  formatChangeBlockedReason?: string | null;
   id: string;
   sportId: string;
   title: string;
@@ -3800,6 +3804,10 @@ export type V1Tournament = {
  * 'TBD' 같은 별도 문자열로 구분된다.
  */
 export type V1TournamentGroupTeam = {
+  /** Stored BYE slot destination, independent of team assignment and display text. */
+  byeTarget?: { fixtureId: string; side: 'HOME' | 'AWAY' } | null;
+  /** Saved BYE label shared with its linked quarter-final. */
+  displayLabel?: string | null;
   /** 명시적으로 지정된 12강 부전승. 미배정 상대와 구분한다. */
   isBye?: boolean;
   id: string;
@@ -3856,6 +3864,8 @@ export type V1TournamentFixtureGoal = {
    * 폴백 결과일 때는 null. 어드민 대진 응답(V1AdminBracketResult)에서만 채워진다.
    */
   playerUserId: string | null;
+  /** 득점자 계정 실명 — 어드민 대진 응답을 대회 운영진이 볼 때만 온다. 그 밖에는 키 자체가 없다. */
+  playerRealName?: string;
   minute: number | null;
   ownGoal?: boolean;
 };
@@ -3888,6 +3898,7 @@ export type V1TournamentFixtureVideo = {
 export type V1BracketSource = { fixtureId: string; outcome: 'WINNER' | 'LOSER'; side: 'HOME' | 'AWAY' };
 
 export type V1TournamentFixture = {
+  fieldId?: string | null;
   bracketSources?: V1BracketSource[];
   id: string;
   groupId: string | null;
@@ -3921,7 +3932,7 @@ export type V1TournamentFixture = {
   awayTeamId: string | null;
   awayTeamName: string | null;
   awayTeamLogoUrl: string | null;
-  /** Slot label ("A조 1위") for a side with no team yet; null once a team exists or when there is no slot. */
+  /** Custom placeholder or automatic slot label for a side with no team; null once assigned. */
   homeSlotLabel: string | null;
   awaySlotLabel: string | null;
   result: V1TournamentFixtureResult | null;
@@ -4020,6 +4031,8 @@ export type V1TournamentDetail = {
   venueProvider?: 'kakao' | null;
   venueProviderId?: string | null;
   coverImageUrl: string | null;
+  /** 정규 리그 목록용 이미지. coverImageUrl은 상세용이다. */
+  listImageUrl?: string | null;
   teamCount: number;
   minPlayers: number;
   /** null = 팀당 선수 인원 제한 없음(리그). 참가팀 정원(maxTeams)과 별개다. */
@@ -4314,6 +4327,8 @@ export type V1AdminBracketGroupTeam = {
 };
 
 export type V1AdminBracketFixture = {
+  homeDisplayLabel?: string | null;
+  awayDisplayLabel?: string | null;
   fieldId?: string | null;
   bracketSources?: V1BracketSource[];
   id: string;
@@ -4379,11 +4394,15 @@ export type V1AdminBracketSlotKind = 'ENTRY' | 'BYE' | 'GROUP_RANK';
 
 /** 팀이 들어갈 칸. 라벨("A조 1번", "부전승 1")은 서버가 계산해서 준다. */
 export type V1AdminBracketSlot = {
+  automaticLabel?: string;
+  displayLabel?: string | null;
   id: string;
   kind: V1AdminBracketSlotKind;
   groupId: string | null;
   sourceGroupId: string | null;
   position: number;
+  /** 부전승의 0-based 표시 위치. 슬롯 식별 번호 position과 구분한다. */
+  byeSortOrder?: number | null;
   label: string;
   registrationId: string | null;
   teamName: string | null;
@@ -4636,7 +4655,7 @@ export type V1CreateTournamentPayload = {
   rosterDeadlineAt?: string | null;
   scheduledAt?: string;
   scheduledEndAt?: string | null;
-  venue?: string;
+  venue?: string | null;
   venueAddress?: string | null;
   venueLatitude?: number | null;
   venueLongitude?: number | null;
@@ -4655,16 +4674,16 @@ export type V1CreateTournamentPayload = {
    * 400으로 거절된다. */
   maxSubstitutions?: number;
   genderCategory?: V1TournamentGenderCategory;
-  genderMinMale?: number;
-  genderMaxMale?: number;
-  genderMinFemale?: number;
-  genderMaxFemale?: number;
-  /** 리그(format==='league') 대회에서 각 팀이 보장받아야 할 최소 경기 수. 생략하면 검증하지 않는다. */
-  minMatchesPerTeam?: number;
+  genderMinMale?: number | null;
+  genderMaxMale?: number | null;
+  genderMinFemale?: number | null;
+  genderMaxFemale?: number | null;
+  /** 리그 대회에서 각 팀이 보장받아야 할 최소 경기 수. null은 저장된 제한을 지운다. */
+  minMatchesPerTeam?: number | null;
   entryFee?: number;
-  prizePool?: number;
-  prizeSummary?: string;
-  prizeBreakdown?: string;
+  prizePool?: number | null;
+  prizeSummary?: string | null;
+  prizeBreakdown?: string | null;
   promoHomeEnabled?: boolean;
   promoHomeTitle?: string;
   promoHomeSubtitle?: string;
@@ -4685,15 +4704,15 @@ export type V1CreateTournamentPayload = {
   promoListLocationText?: string;
   promoListPrizeText?: string;
   promoListPriority?: number;
-  bankName?: string;
-  bankAccount?: string;
-  bankHolder?: string;
+  bankName?: string | null;
+  bankAccount?: string | null;
+  bankHolder?: string | null;
   /** 경고 누적 출전정지 기준(장). 생략·null = 미적용. */
   yellowAccumulationLimit?: number | null;
   /** 퇴장 1장당 출전정지 경기 수. 생략·null = 미적용. */
   redCardSuspensionMatches?: number | null;
-  rulesText?: string;
-  refundPolicyText?: string;
+  rulesText?: string | null;
+  refundPolicyText?: string | null;
 };
 
 export type V1UpdateTournamentPayload = Omit<
@@ -4800,9 +4819,11 @@ export type V1CreateGroupTeamPayload = {
 };
 
 export type V1UpdateFixturePayload = {
+  homeDisplayLabel?: string | null;
+  awayDisplayLabel?: string | null;
   fieldId?: string | null;
   fixtureNumber?: number;
-  scheduledAt?: string;
+  scheduledAt?: string | null;
   venue?: string;
   venueAddress?: string | null;
   venueLatitude?: number | null;
@@ -5241,7 +5262,8 @@ export type V1MyTournamentStaffFixture = {
 export type V1MyTournamentStaffGroup = {
   tournamentId: string;
   tournamentTitle: string;
-  tournamentStatus: V1TournamentStatus;
+  tournamentStatus: V1TournamentStatus | 'on_hold';
+  tournamentKind?: string | null;
   assignments: V1MyTournamentStaffAssignment[];
   fixtures: V1MyTournamentStaffFixture[];
 };

@@ -1,8 +1,21 @@
-import { act, cleanup, render, screen, within, fireEvent, waitFor } from '@testing-library/react';
+import { act, cleanup, render as renderElement, screen, within, fireEvent, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { COMMAND_RESPONSE_TIMEOUT_MS, OperateConsole } from './operate-console';
 import type { GameEventRecord } from '@/types/game-operations';
 import { V1_NETWORK_ERROR_CODE, V1ApiError } from '@/lib/api-client';
+
+const queryClients: QueryClient[] = [];
+function render(ui: ReactNode) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
+  queryClients.push(client);
+  return renderElement(ui, { wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> });
+}
+afterEach(() => {
+  cleanup();
+  queryClients.splice(0).forEach((client) => client.clear());
+});
 
 /**
  * "기록한 이벤트" 자리에 **로컬 전송 큐**를 그리고 있었다. 큐는 이번 세션에서 내가 올린 것만
@@ -191,7 +204,7 @@ function consoleState(overrides: Record<string, unknown> = {}) {
     requestTakeover: vi.fn(),
     reverseEvent: vi.fn(),
     assignAssist: vi.fn(),
-    applyCommandResult: vi.fn(),
+    applyCommandResult: vi.fn(() => true),
     ...overrides,
   };
 }

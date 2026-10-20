@@ -4,6 +4,7 @@ import type { ReactElement } from 'react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { TournamentsListPageClient as TournamentsPage } from './tournaments-list-client';
+import { tournamentListSeedPath } from '@/lib/public-list-seed';
 
 // 목록은 상세 복귀 복원에 QueryClient 를 쓴다(useCursorPagination) — API 훅을 mock 해도 provider 는 필요하다.
 function render(ui: ReactElement) {
@@ -21,6 +22,7 @@ function render(ui: ReactElement) {
 const tournamentsMock = vi.fn();
 let search = '';
 const SWIMMING_ID = '10fe8a75-9824-4a09-824a-385b37266fff';
+const BASKETBALL_ID = '4c3388da-1194-462f-8171-1915f82d6052';
 
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(search),
@@ -30,7 +32,9 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1Tournaments: (...args: unknown[]) => tournamentsMock(...args),
   useV1AllTournaments: () => ({ data: [], isPending: false, isError: false, refetch: vi.fn() }),
-  useV1MasterSports: () => ({ data: [{ id: SWIMMING_ID, name: '수영' }] }),
+  useV1MasterSports: (options?: { seed?: Array<{ id: string; name: string }> }) => ({
+    data: options?.seed ?? [{ id: SWIMMING_ID, name: '수영' }, { id: BASKETBALL_ID, name: '농구' }],
+  }),
 }));
 
 beforeEach(() => {
@@ -46,9 +50,27 @@ beforeEach(() => {
 });
 
 describe('#1543 대회 목록 — 상태와 모순되지 않는 영역 이름', () => {
+  it('current effective filter differs from the seed query, so the stale page is not passed to the query hook', () => {
+    search = `sportId=${BASKETBALL_ID}`;
+    const sports = [
+      { id: SWIMMING_ID, name: '수영', levels: [] },
+      { id: BASKETBALL_ID, name: '농구', levels: [] },
+    ];
+    const seed = {
+      kind: 'all' as const,
+      query: tournamentListSeedPath('all', { sportId: SWIMMING_ID }, sports)!,
+      sports,
+      page: { items: [], pageInfo: { hasNext: false, nextCursor: null } },
+    };
+
+    render(<TournamentsPage seed={seed} />);
+
+    expect(tournamentsMock.mock.calls.at(-1)?.[1]).toEqual({ seed: undefined });
+  });
+
   describe.each([false, true])('결과 카드 있음: %s', (hasItems) => {
     it.each([
-      [null, '전체'], ['draft', '준비 중'], ['in_progress', '진행 중'], ['completed', '종료'],
+      [null, '전체'], ['draft', '모집완료'], ['in_progress', '진행 중'], ['completed', '종료'],
     ] as const)('%s 상태에서 영역·필터·결과 의미를 유지한다', (status, label) => {
       const params = new URLSearchParams({ sportId: SWIMMING_ID, genderCategory: 'male' });
       if (status) params.set('status', status);
@@ -114,7 +136,7 @@ describe('#1516 대회 목록 — 조건에 맞는 정상 빈 결과', () => {
   describe.each([false, true])('종목 선택: %s', (withSport) => {
     it.each([
       ['in_progress', '진행 중'],
-      ['draft', '준비 중'],
+      ['draft', '모집완료'],
       ['completed', '종료'],
       [null, '전체'],
     ] as const)('%s 상태의 요청·요약·빈 안내가 모순되지 않는다', (status, label) => {

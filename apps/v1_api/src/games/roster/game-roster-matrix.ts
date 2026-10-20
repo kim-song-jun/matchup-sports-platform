@@ -49,6 +49,8 @@ export interface TeamRosterMatrix {
   readonly players: {
     readonly userId: string;
     readonly displayName: string;
+    /** 대회 운영진에게만, 계정 실명이 있을 때만 실린다 — 그 밖에는 키 자체가 없다(경기 명단 화면과 같은 규칙). */
+    readonly realName?: string;
     readonly accountLinked: boolean;
     /** `games` 와 같은 순서·길이. */
     readonly cells: TeamRosterCell[];
@@ -64,6 +66,8 @@ const EMPTY_CELL = { reason: null, actorRole: null, adjustmentId: null, unavaila
 export function buildTeamRosterMatrix(input: {
   readonly columns: readonly { game: TeamRosterMatrixGame; loaded: LoadedGameRoster | null }[];
   readonly canWrite: boolean;
+  /** 계정 id → 실명. 대회 운영진에게만 채워 넘긴다. */
+  readonly realNameByUserId?: ReadonlyMap<string, string>;
 }): TeamRosterMatrix {
   const players = new Map<string, { displayName: string; accountLinked: boolean }>();
   const cellsByGame = input.columns.map(({ game, loaded }) => {
@@ -127,6 +131,7 @@ export function buildTeamRosterMatrix(input: {
       .map(([userId, player]) => ({
       userId,
       ...player,
+      ...(input.realNameByUserId?.has(userId) ? { realName: input.realNameByUserId.get(userId)! } : {}),
       cells: input.columns.map(
         ({ game }, index) =>
           cellsByGame[index].get(userId) ?? { gameId: game.gameId, status: 'NOT_IN_ROSTER' as const, ...EMPTY_CELL },

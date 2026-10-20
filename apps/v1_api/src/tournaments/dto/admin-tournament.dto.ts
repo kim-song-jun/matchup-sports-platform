@@ -92,7 +92,7 @@ export class CreateTournamentDto {
   @IsInt({ message: '최소 경기 수는 정수여야 해요.' })
   @Min(1, { message: '최소 경기 수는 1경기 이상이어야 해요.' })
   @Max(50, { message: '최소 경기 수는 50경기를 넘을 수 없어요.' })
-  minMatchesPerTeam?: number;
+  minMatchesPerTeam?: number | null;
 
   @IsOptional()
   @IsDateString()
@@ -114,7 +114,7 @@ export class CreateTournamentDto {
   @IsOptional()
   @IsString()
   @MaxLength(200, { message: '장소명은 200자를 넘을 수 없어요.' })
-  venue?: string;
+  venue?: string | null;
 
   @IsOptional()
   @IsString()
@@ -169,28 +169,28 @@ export class CreateTournamentDto {
   @IsInt({ message: '남성 최소 인원은 정수여야 해요.' })
   @Min(0, { message: '남성 최소 인원은 0명 이상이어야 해요.' })
   @Max(50, { message: '남성 최소 인원은 50명을 넘을 수 없어요.' })
-  genderMinMale?: number;
+  genderMinMale?: number | null;
 
   @IsOptional()
   @Type(() => Number)
   @IsInt({ message: '남성 최대 인원은 정수여야 해요.' })
   @Min(0, { message: '남성 최대 인원은 0명 이상이어야 해요.' })
   @Max(50, { message: '남성 최대 인원은 50명을 넘을 수 없어요.' })
-  genderMaxMale?: number;
+  genderMaxMale?: number | null;
 
   @IsOptional()
   @Type(() => Number)
   @IsInt({ message: '여성 최소 인원은 정수여야 해요.' })
   @Min(0, { message: '여성 최소 인원은 0명 이상이어야 해요.' })
   @Max(50, { message: '여성 최소 인원은 50명을 넘을 수 없어요.' })
-  genderMinFemale?: number;
+  genderMinFemale?: number | null;
 
   @IsOptional()
   @Type(() => Number)
   @IsInt({ message: '여성 최대 인원은 정수여야 해요.' })
   @Min(0, { message: '여성 최대 인원은 0명 이상이어야 해요.' })
   @Max(50, { message: '여성 최대 인원은 50명을 넘을 수 없어요.' })
-  genderMaxFemale?: number;
+  genderMaxFemale?: number | null;
 
   /**
    * "출전 인원"(경기장에 서는 라인업 상한, GK 포함) — `V1CompetitionConfigVersion.lineup.maxPlayers`로
@@ -242,17 +242,17 @@ export class CreateTournamentDto {
   @IsOptional()
   @IsString()
   @MaxLength(60)
-  bankName?: string;
+  bankName?: string | null;
 
   @IsOptional()
   @IsString()
   @MaxLength(60)
-  bankAccount?: string;
+  bankAccount?: string | null;
 
   @IsOptional()
   @IsString()
   @MaxLength(60)
-  bankHolder?: string;
+  bankHolder?: string | null;
 
   /**
    * 경고 누적 출전정지 — 옐로 몇 장이 쌓이면 다음 1경기 출전이 막히는가.
@@ -278,28 +278,28 @@ export class CreateTournamentDto {
   @MaxLength(TOURNAMENT_RULES_TEXT_MAX_LENGTH, {
     message: '대회 규정은 10,000자를 넘을 수 없어요.',
   })
-  rulesText?: string;
+  rulesText?: string | null;
 
   @IsOptional()
   @IsString()
   @MaxLength(2000)
-  refundPolicyText?: string;
+  refundPolicyText?: string | null;
 
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(0)
-  prizePool?: number;
+  prizePool?: number | null;
 
   @IsOptional()
   @IsString()
   @MaxLength(500)
-  prizeSummary?: string;
+  prizeSummary?: string | null;
 
   @IsOptional()
   @IsString()
   @MaxLength(500)
-  prizeBreakdown?: string;
+  prizeBreakdown?: string | null;
 
   @IsOptional()
   @IsBoolean()
@@ -430,7 +430,7 @@ export class UpdateTournamentDto {
   @IsInt({ message: '최소 경기 수는 정수여야 해요.' })
   @Min(1, { message: '최소 경기 수는 1경기 이상이어야 해요.' })
   @Max(50, { message: '최소 경기 수는 50경기를 넘을 수 없어요.' })
-  minMatchesPerTeam?: number;
+  minMatchesPerTeam?: number | null;
 
   @IsOptional()
   @IsDateString()
@@ -624,17 +624,17 @@ export class UpdateTournamentDto {
   @Type(() => Number)
   @IsInt()
   @Min(0)
-  prizePool?: number;
+  prizePool?: number | null;
 
   @IsOptional()
   @IsString()
   @MaxLength(500)
-  prizeSummary?: string;
+  prizeSummary?: string | null;
 
   @IsOptional()
   @IsString()
   @MaxLength(500)
-  prizeBreakdown?: string;
+  prizeBreakdown?: string | null;
 
   @IsOptional()
   @IsBoolean()

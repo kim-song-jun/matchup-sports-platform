@@ -11,7 +11,7 @@ import {
   isSlotAssignable,
 } from './bracket-canvas-layout';
 
-// 칸 폭 232, 높이 156, 열 간격 72, 바깥 여백 24, 열 이름 32 → 첫 칸 y 56, 칸 사이 24.
+// 칸 폭 232, 높이 180, 열 간격 72, 바깥 여백 24, 열 이름 32 → 첫 칸 y 56, 칸 사이 24.
 const semi = makeGroup({ id: 'g-semi', name: '4강', phase: 'semi', sortOrder: 0 });
 const final = makeGroup({ id: 'g-final', name: '결승', phase: 'final', sortOrder: 1 });
 const third = makeGroup({ id: 'g-third', name: '3·4위전', phase: 'third_place', sortOrder: 2 });
@@ -53,24 +53,24 @@ describe('buildCanvasLayout — 4팀 + 3·4위전', () => {
   });
 
   it('첫 열은 번호 순으로 쌓고, 다음 열은 원천 두 칸의 가운데에 놓는다', () => {
-    expect([node('f1').y, node('f2').y]).toEqual([56, 236]);
+    expect([node('f1').y, node('f2').y]).toEqual([56, 260]);
     // 원천 연결 높이 144·324 의 평균 234 에서 칸 연결 높이 88 을 뺀다.
-    expect(node('f3').y).toBe(146);
-    expect(node('f4').y).toBe(146);
+    expect(node('f3').y).toBe(158);
+    expect(node('f4').y).toBe(158);
     expect(node('f3').x).toBe(328);
   });
 
   it('승자·패자 연결선을 칸 오른쪽 가운데에서 대상 사이드 줄까지 꺾어 그린다', () => {
     const edge = (id: string) => layout.edges.find((e) => e.id === id)!;
     expect(layout.edges).toHaveLength(4);
-    expect(edge('f1->f3:HOME')).toMatchObject({ kind: 'WINNER', fromFixtureId: 'f1', toFixtureId: 'f3', side: 'HOME', path: 'M256 144 H292 V212 H328' });
-    expect(edge('f2->f3:AWAY').path).toBe('M256 324 H292 V256 H328');
-    expect(edge('f1->f4:HOME')).toMatchObject({ kind: 'LOSER', path: 'M256 144 H596 V212 H632' });
+    expect(edge('f1->f3:HOME')).toMatchObject({ kind: 'WINNER', fromFixtureId: 'f1', toFixtureId: 'f3', side: 'HOME', path: 'M256 144 H292 V224 H328' });
+    expect(edge('f2->f3:AWAY').path).toBe('M256 348 H292 V268 H328');
+    expect(edge('f1->f4:HOME')).toMatchObject({ kind: 'LOSER', path: 'M256 144 H596 V224 H632' });
   });
 
   it('전체 크기는 마지막 열과 가장 아래 칸에 여백을 더한 값이다', () => {
     expect(layout.width).toBe(888);
-    expect(layout.height).toBe(416);
+    expect(layout.height).toBe(464);
   });
 });
 
@@ -102,17 +102,18 @@ describe('buildCanvasLayout — 12강 부전승 대진', () => {
   const layout = buildCanvasLayout({ groups, fixtures: [...r12, ...qf, ...rest], slots });
   const y = (id: string) => layout.nodes.find((n) => n.fixtureId === id)!.y;
 
-  it('8강은 12강 승자 칸과 같은 높이, 4강·결승은 원천 가운데에 놓는다', () => {
-    expect([y('f1'), y('f2'), y('f3'), y('f4')]).toEqual([56, 236, 416, 596]);
-    expect([y('f5'), y('f6'), y('f7'), y('f8')]).toEqual([56, 236, 416, 596]);
-    expect([y('f9'), y('f10')]).toEqual([146, 506]);
-    expect([y('f11'), y('f12')]).toEqual([326, 326]);
+  it('12강 부전승 타일과 실제 경기 사이에 연결된 8강을 놓는다', () => {
+    expect([y('f1'), y('f2'), y('f3'), y('f4')]).toEqual([192, 532, 872, 1212]);
+    expect(layout.byeNodes.map(n => n.y)).toEqual([56, 396, 736, 1076]);
+    expect([y('f5'), y('f6'), y('f7'), y('f8')]).toEqual([108, 448, 788, 1128]);
+    expect([y('f9'), y('f10')]).toEqual([278, 958]);
+    expect([y('f11'), y('f12')]).toEqual([618, 618]);
   });
 
-  it('부전승 자리는 8강 홈 줄 앞에 짧은 BYE 연결선을 둔다', () => {
+  it('부전승 자리는 실제 부전승 타일에서 8강 홈 줄로 BYE 연결선을 둔다', () => {
     const bye = layout.edges.filter((e) => e.kind === 'BYE');
     expect(bye).toHaveLength(4);
-    expect(bye[0]).toMatchObject({ id: 'bye:f5:HOME', fromFixtureId: null, toFixtureId: 'f5', side: 'HOME', path: 'M292 122 H328' });
+    expect(bye[0]).toMatchObject({ id: 'bye:f5:HOME', fromFixtureId: null, toFixtureId: 'f5', side: 'HOME', path: 'M256 112 H292 V174 H328' });
   });
 
   it('연결선 종류별 개수: 승자 10, 패자 2, 부전승 4', () => {
@@ -120,10 +121,10 @@ describe('buildCanvasLayout — 12강 부전승 대진', () => {
     expect([count('WINNER'), count('LOSER'), count('BYE')]).toEqual([10, 2, 4]);
   });
 
-  it('같은 열의 칸은 어떤 경우에도 겹치지 않는다(칸 높이 156 + 간격 24)', () => {
+  it('같은 열의 칸은 어떤 경우에도 겹치지 않는다(칸 높이 180 + 간격 24)', () => {
     for (const column of layout.columns) {
       const ys = column.fixtureIds.map(y).sort((a, b) => a - b);
-      ys.slice(1).forEach((value, index) => expect(value - ys[index]).toBeGreaterThanOrEqual(180));
+      ys.slice(1).forEach((value, index) => expect(value - ys[index]).toBeGreaterThanOrEqual(204));
     }
   });
 });
@@ -379,8 +380,8 @@ describe('buildCanvasLayout — 조별+결선 조 편성 블록과 순위 연결
     expect(ranks.map((e) => [e.id, e.fromFixtureId, e.toFixtureId, e.side, e.path])).toEqual([
       ['rank:sf1:HOME', null, 'sf1', 'HOME', 'M864 132 H900 V122 H936'],
       ['rank:sf1:AWAY', null, 'sf1', 'AWAY', 'M864 460 H900 V166 H936'],
-      ['rank:sf2:HOME', null, 'sf2', 'HOME', 'M864 384 H900 V302 H936'],
-      ['rank:sf2:AWAY', null, 'sf2', 'AWAY', 'M864 208 H900 V346 H936'],
+      ['rank:sf2:HOME', null, 'sf2', 'HOME', 'M864 384 H900 V326 H936'],
+      ['rank:sf2:AWAY', null, 'sf2', 'AWAY', 'M864 208 H900 V370 H936'],
     ]);
   });
 
@@ -444,7 +445,7 @@ describe.each(RANK_COMBOS)('순위 연결선 — %s', (_name, groupCount, advanc
     const blockX = 24 + groupCount * 304;
     const koX = 24 + (groupCount + 1) * 304;
     pairs.forEach(([home, away], index) => {
-      const nodeY = 56 + index * 180;
+      const nodeY = 56 + index * 204;
       for (const [side, label] of [['HOME', home], ['AWAY', away]] as const) {
         const block = layout.groupBlocks.find((b) => b.groupId === `g${label[0]}`)!;
         const fromY = block.y + (228 * Number(label.slice(1))) / (advance + 1);

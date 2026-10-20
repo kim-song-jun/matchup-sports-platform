@@ -47,7 +47,7 @@ import { teamSharePath } from '@/lib/team-share-route';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import { sentInvitationStatusLabel, teamGenderRuleLabel, teamRecruitmentLabel, teamRoleLabel } from '@/lib/v1-status-labels';
 import type { V1Team, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
-import { TEAM_LIST_PAGE_SIZE, type CursorListSeed } from '@/lib/public-list-seed';
+import { TEAM_LIST_PAGE_SIZE, teamListQueryFilters, teamListSeedPath, type CursorListSeed } from '@/lib/public-list-seed';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { TOAST_DURATION_MS, useToast } from '@/components/v1-ui/toast';
 import { JerseyNumberDialog } from './jersey-number-dialog';
@@ -88,22 +88,36 @@ export function TeamListPageClient({ seed }: { readonly seed?: CursorListSeed<V1
   const sports = useV1MasterSports({ seed: seed?.sports });
   const regions = useV1MasterRegions();
   const teamFilters = useMemo(() => {
-    const filters: { sportId?: string; query?: string; joinPolicy?: 'approval_required'; sort?: 'recommended' | 'latest'; genderRule?: string; levelCodes?: string; regionId?: string } = {};
-    if (selectedSportId) filters.sportId = selectedSportId;
-    if (selectedGenderRule) filters.genderRule = selectedGenderRule;
-    if (selectedLevels.length) filters.levelCodes = selectedLevels.join(',');
-    if (selectedRegionId) filters.regionId = selectedRegionId;
-    if (submittedQuery.trim()) filters.query = submittedQuery.trim();
-    if (selectedSort === 'deadline') filters.joinPolicy = 'approval_required';
-    if (selectedSort === 'latest') filters.sort = 'latest';
-    if (selectedSort === 'recommended') filters.sort = 'recommended';
+    const filters = teamListQueryFilters({
+      sportId: selectedSportId,
+      sort: selectedSort,
+      genderRule: selectedGenderRule,
+      levelCodes: selectedLevels.join(','),
+      regionId: selectedRegionId,
+      q: submittedQuery,
+    });
     return Object.keys(filters).length ? filters : undefined;
   }, [selectedGenderRule, selectedLevels, selectedRegionId, selectedSort, selectedSportId, submittedQuery]);
   const listFilters = useMemo(() => ({ ...(teamFilters ?? {}), limit: TEAM_LIST_PAGE_SIZE }), [teamFilters]);
-  // /teams가 서버(SEO 프리렌더)에서 이미 받아 둔 무필터 목록을 첫 표시값으로 쓴다 — 필터가
-  // 걸려 있으면 그 목록이 이 화면과 다른 결과를 뜻하므로 seed를 넘기지 않는다(기존 로딩
-  // 스켈레톤 그대로 유지).
-  const query = useV1TeamPages(listFilters, { seed: !teamFilters ? seed?.page : undefined });
+  // Seed query identity prevents a prior route's first-page response from appearing after filters change.
+  const seedQuery = teamListSeedPath({
+    sportId: selectedSportId,
+    sort: selectedSort,
+    genderRule: selectedGenderRule,
+    levelCodes: selectedLevels.join(','),
+    regionId: selectedRegionId,
+    q: submittedQuery,
+  });
+  const urlSeedQuery = teamListSeedPath({
+    sportId: selectedSportId,
+    sort: selectedSort,
+    genderRule: selectedGenderRule,
+    levelCodes: selectedLevels.join(','),
+    regionId: selectedRegionId,
+    q: initialQuery,
+  });
+  const seedMatchesCurrentQuery = seed?.query === seedQuery && seedQuery === urlSeedQuery;
+  const query = useV1TeamPages(listFilters, { seed: seedMatchesCurrentQuery ? seed.page : undefined });
   const recentSearches = useV1RecentSearches();
   const recordSearch = useV1RecordSearch();
   const selectedSportName = selectedSportId ? sports.data?.find((sport) => sport.id === selectedSportId)?.name : undefined;
@@ -133,6 +147,11 @@ export function TeamListPageClient({ seed }: { readonly seed?: CursorListSeed<V1
   if (query.isError && !hasPages) return <TeamStatePageView model={getTeamStateViewModel('error')} />;
   const firstPage = query.data?.pages[0];
   const total = firstPage?.pageInfo?.totalCount ?? visibleItems.length;
+  const allTeamPagesLoaded = Boolean(
+    query.data?.pages.length
+      && query.hasNextPage === false
+      && query.data.pages[query.data.pages.length - 1]?.pageInfo?.hasNext === false,
+  );
   // isLoading 은 서버·하이드레이션 첫 렌더(persist 복원 중)에 false 라 데이터 없음(isPending)으로 판정한다.
   const isListLoading = query.isPending;
   const searchModel: NonNullable<TeamListViewModel['search']> = {
@@ -158,7 +177,15 @@ export function TeamListPageClient({ seed }: { readonly seed?: CursorListSeed<V1
     search: searchModel,
     filterHref: buildTeamHref(searchParams, { filter: '1' }),
     filterSheet: buildTeamFilterSheet(searchParams, selectedSort, selectedGenderRule, selectedLevels, selectedRegionId, regions.data ?? [], filterOpen),
-    chips: buildTeamSportChips(visibleItems, base, searchParams, selectedSportId, sports.data, !selectedSportId && !query.hasNextPage),
+    chips: buildTeamSportChips(
+      visibleItems,
+      base,
+      searchParams,
+      selectedSportId,
+      sports.data,
+      !selectedSportId && allTeamPagesLoaded,
+      firstPage?.facets,
+    ),
     teams: visibleTeams,
     listLoading: isListLoading,
     hasNextPage: query.hasNextPage,

@@ -97,7 +97,7 @@ export function LeagueStandingsTable({ data }: { data: LeagueStandingsTableData 
                   </td>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', minHeight: 44, gap: 'var(--spacing-2)' }}>
-                      <TeamAvatar seed={row.teamId ?? row.registrationId ?? ''} name={row.teamName} logoUrl={row.teamLogoUrl} size="sm" />
+                      <TeamAvatar teamId={row.teamId} name={row.teamName} logoUrl={row.teamLogoUrl} size="sm" />
                       <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-strong)' }}>
                         {row.teamName}
                       </span>

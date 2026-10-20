@@ -39,7 +39,7 @@ describe('useV1LeaveTeam', () => {
       { wrapper: createWrapper(queryClient) },
     );
     const leave = renderHook(() => useV1LeaveTeam('team-1'), { wrapper: createWrapper(queryClient) });
-    leave.result.current.mutate();
+    leave.result.current.mutate(undefined);
 
     await waitFor(() => {
       expect(detail.result.current.data).toBeUndefined();
@@ -62,7 +62,7 @@ describe('useV1LeaveTeam', () => {
     v1PostMock.mockRejectedValue(new Error('leave failed'));
 
     const { result } = renderHook(() => useV1LeaveTeam('team-1'), { wrapper: createWrapper(queryClient) });
-    result.current.mutate();
+    result.current.mutate(undefined);
 
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(queryClient.getQueryData(v1Keys.teamMatch('match-1'))).toEqual(matches[0]);

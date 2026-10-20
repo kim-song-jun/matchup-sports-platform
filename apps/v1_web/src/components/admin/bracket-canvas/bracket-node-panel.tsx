@@ -1,22 +1,17 @@
 'use client';
 
-import { PlacePicker } from '@/components/v1-ui/place-picker';
-import { CompetitionFieldPicker } from '@/components/admin/competition-field-picker';
-import { PLACE_NAME_MAX_LENGTH } from '@/lib/place';
-import type { PlaceValue } from '@/lib/place';
-import { fixtureVenuePatch, fixtureVenueValue } from './fixture-venue-patch';
 import Link from 'next/link';
 import { X } from 'lucide-react';
-import { useState, type FormEvent } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/v1-ui/button';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useV1DeleteFixture, useV1UpdateFixture } from '@/hooks/use-v1-api';
 import { useV1AssignTournamentSlot, useV1QuickResult, useV1SetBracketSources } from '@/hooks/use-v1-bracket-canvas';
 import { bracketSourceCandidates, bracketSourceSideOptions, isFixtureLinkable } from '@/lib/bracket-fixture-tools';
 import { TEAM_IN_OTHER_GROUP_HIDDEN_NOTE, applyGroupRule, registrationIdsBlockedForGroup, registrationIdsInOppositeFinalStage } from '@/lib/bracket-group-enrollment';
+import { placedRegistrationIdsForSlot } from '@/lib/bracket-slot-candidates';
 import { describeBracketCanvasError } from '@/lib/bracket-canvas-errors';
 import { classifyFixtureSide, fixtureTeamChangeAccess, isFixtureLocked, isSlotAssignable, type SideKey } from '@/lib/bracket-canvas-layout';
-import { isoToKstDatetimeLocal, kstDatetimeLocalToIso } from '@/lib/kst-calendar';
 import type {
   V1AdminBracketFixture,
   V1AdminBracketGroup,
@@ -26,6 +21,8 @@ import type {
 import { fixtureTitle } from './bracket-canvas';
 import { BracketQuickResultForm } from './bracket-quick-result-form';
 import { BracketResultActions } from './bracket-result-actions';
+import { FixtureMetadataEditor } from './fixture-metadata-editor';
+import { ByeSideControl } from './bye-side-control';
 import { useStartedTeamChangeReason } from './use-started-team-change-reason';
 
 export type BracketNodePanelProps = {
@@ -70,9 +67,6 @@ export function BracketNodePanel({
   const deleteFixture = useV1DeleteFixture(tournamentId);
   const { confirm, ConfirmModal } = useConfirm();
   const { requestReason, dialog: teamChangeDialog } = useStartedTeamChangeReason();
-  const [scheduledAt, setScheduledAt] = useState(() => isoToKstDatetimeLocal(fixture.scheduledAt));
-  const [venue, setVenue] = useState<PlaceValue | null>(fixtureVenueValue(fixture));
-  const [fieldId, setFieldId] = useState(fixture.fieldId ?? '');
   const [quickError, setQuickError] = useState<string | null>(null);
   const [homeSourceId, setHomeSourceId] = useState(() => fixture.bracketSources?.find((source) => source.side === 'HOME')?.fixtureId ?? '');
   const [awaySourceId, setAwaySourceId] = useState(() => fixture.bracketSources?.find((source) => source.side === 'AWAY')?.fixtureId ?? '');
@@ -84,7 +78,6 @@ export function BracketNodePanel({
   const isKnockout = group !== undefined && group.phase !== 'group';
   const slotsById = new Map(slots.map((slot) => [slot.id, slot]));
   const confirmed = registrations.filter((registration) => registration.status === 'confirmed');
-  const placedIds = new Set(slots.filter((slot) => slot.kind !== 'GROUP_RANK' && slot.registrationId !== null).map((slot) => slot.registrationId));
   const game = fixture.game;
   const sourceCandidates = bracketSourceCandidates({ target: fixture, groups, fixtures });
   const sourceOptions = (side: SideKey) => {
@@ -156,13 +149,15 @@ export function BracketNodePanel({
     );
   };
 
-  const slotCandidates = (slot: V1AdminBracketSlot) =>
-    applyGroupRule(
+  const slotCandidates = (slot: V1AdminBracketSlot) => {
+    const placedIds = placedRegistrationIdsForSlot(slots, slot, groups);
+    return applyGroupRule(
       confirmed.filter((registration) => registration.id === slot.registrationId || !placedIds.has(registration.id)),
       (registration) => registration.id,
       registrationIdsBlockedForGroup(groups, slot.groupId),
       slot.registrationId,
     );
+  };
 
   // 선택창을 실제로 그리는 쪽과 같은 후보 계산에서 다른 조 팀 때문에 후보가 줄었는지 읽는다.
   const hidesOtherGroupTeams = (['HOME', 'AWAY'] as const).some((side) => {
@@ -249,24 +244,6 @@ export function BracketNodePanel({
         <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>{`${SIDE_NAME[side]} · ${sideLabels[side]}`}</p>
         {body}
       </div>
-    );
-  };
-
-  const handleSaveSchedule = (event: FormEvent) => {
-    event.preventDefault();
-    const iso = scheduledAt === '' ? null : kstDatetimeLocalToIso(scheduledAt);
-    if (scheduledAt !== '' && iso === null) {
-      showToast('경기 시각을 다시 확인해 주세요.', 'error');
-      return;
-    }
-    updateFixture.mutate(
-      { fixtureId: fixture.id, ...(iso === null ? {} : { scheduledAt: iso }),
-        ...(fieldId ? fieldId === fixture.fieldId ? {} : { fieldId }
-          : { ...(fixture.fieldId ? { fieldId: null } : {}), ...fixtureVenuePatch(venue, fixture) }) },
-      {
-        onSuccess: () => showToast('일정을 저장했어요.', 'success'),
-        onError: (error) => showToast(describeBracketCanvasError(error, '일정을 저장하지 못했어요.'), 'error'),
-      },
     );
   };
 
@@ -382,6 +359,7 @@ export function BracketNodePanel({
         <h3 className={sectionTitle} style={{ color: 'var(--text-strong)' }}>팀 자리</h3>
         {renderSide('HOME')}
         {renderSide('AWAY')}
+        <ByeSideControl tournamentId={tournamentId} fixture={fixture} slots={slots} canWrite={canWrite} showToast={showToast} onSaved={onClose} />
         {hidesOtherGroupTeams ? (
           <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>{TEAM_IN_OTHER_GROUP_HIDDEN_NOTE}</p>
         ) : null}
@@ -422,30 +400,9 @@ export function BracketNodePanel({
         {renderResult()}
       </section>
 
-      <section aria-label="일정과 장소" className="flex flex-col gap-3">
-        <h3 className={sectionTitle} style={{ color: 'var(--text-strong)' }}>일정과 장소</h3>
-        {canWrite ? (
-          <form onSubmit={handleSaveSchedule} className="flex flex-col gap-3">
-            <div className="flex flex-col gap-1">
-              <label htmlFor={`${fixture.id}-scheduled`} className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>경기 시각</label>
-              <input id={`${fixture.id}-scheduled`} type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} className="tm-input" style={{ minHeight: 44 }} />
-            </div>
-            <CompetitionFieldPicker tournamentId={tournamentId} value={fieldId} onChange={setFieldId} disabled={updateFixture.isPending} />
-            {!fieldId ? <PlacePicker
-              maxLength={PLACE_NAME_MAX_LENGTH.tournament}
-              id={`${fixture.id}-venue`}
-              label="장소"
-              value={venue}
-              onChange={setVenue}
-              disabled={updateFixture.isPending}
-            /> : null}
-            <Button type="submit" variant="outline" size="md" loading={updateFixture.isPending}>일정 저장</Button>
-          </form>
-        ) : (
-          <p className="tm-text-label" style={{ color: 'var(--text-body)' }}>
-            {`${fixture.scheduledAt === null ? '시간 미정' : isoToKstDatetimeLocal(fixture.scheduledAt).replace('T', ' ')} · ${fixture.venue ?? '장소 미정'}`}
-          </p>
-        )}
+      <section aria-label="경기 정보" className="flex flex-col gap-3">
+        <h3 className={sectionTitle} style={{ color: 'var(--text-strong)' }}>경기 정보</h3>
+        <FixtureMetadataEditor tournamentId={tournamentId} fixture={fixture} groups={groups} fixtures={fixtures} slots={slots} canWrite={canWrite} />
       </section>
 
       {canWrite ? (

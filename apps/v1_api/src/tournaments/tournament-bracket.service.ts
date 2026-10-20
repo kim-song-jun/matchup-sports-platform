@@ -42,9 +42,11 @@ import { CompetitionConfigRegistry } from './competition-config/competition-conf
 import { LineupSizeConfigResolver } from './competition-config/lineup-size-config-resolver';
 import { canonicalCompetitionConfigForSport } from './competition-config/lineup-size';
 import { TournamentCompetitionConfig } from './competition-config/tournament-competition-config';
-import { canonicalGameCommandPayloadHash, GamesService } from '../games/games.service';
+import { canAdminViewParticipantIdentity, canonicalGameCommandPayloadHash, GamesService } from '../games/games.service';
+import { loadRealNames } from '../games/roster/game-roster.service';
 import {
   resolveTournamentFixtureOfficialResult,
+  type TournamentFixtureOfficialGoal,
   type TournamentFixtureGameForResult,
 } from './tournament-fixture-official-result';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
@@ -60,6 +62,7 @@ import { assignSlotInTx } from './slots/tournament-slot.service';
 import { adminBracketSlotInclude, serializeAdminBracketSlot } from './slots/admin-bracket-view';
 import { tournamentTeamMatchBracketInclude, serializeTournamentTeamMatchBracket } from './tournament-team-match-bracket.query';
 import { competitionMatchLabel } from './tournament-round-label';
+import { updateFixtureDisplayLabelsInTx } from './fixture-display-label';
 import { acceptsBracketSource } from './tournament-bracket-phases';
 import { PLACE_SELECT } from '../places/place-select';
 import { rejectPartialPlaceUpdate, resolvePlaceSnapshot, toPlaceView, type PlaceView } from '../places/place-snapshot';
@@ -78,13 +81,25 @@ type AdminBracketResult = {
   recordedAt: string;
   createdAt: string;
   updatedAt: string;
-  goals: unknown[];
+  /** `playerRealName` 은 대회 운영진에게만, 득점자 계정 실명이 있을 때만 실린다(`getBracket`). */
+  goals: (TournamentFixtureOfficialGoal & { playerRealName?: string })[];
 } | null;
 
 type AdminBracketFixture = ReturnType<typeof serializeTournamentTeamMatchBracket> & {
   result: AdminBracketResult;
   videos: Array<{ id: string; title: string | null; url: string; sortOrder: number }>;
 };
+
+/** 득점자 계정 실명을 붙인다. 실명이 없는(계정 없음·미입력) 득점은 키를 만들지 않는다. */
+export function withScorerRealNames<G extends { playerUserId: string | null }>(
+  goals: readonly G[],
+  realNameByUserId: ReadonlyMap<string, string>,
+): (G & { playerRealName?: string })[] {
+  return goals.map((goal) => {
+    const playerRealName = goal.playerUserId === null ? undefined : realNameByUserId.get(goal.playerUserId);
+    return playerRealName === undefined ? goal : { ...goal, playerRealName };
+  });
+}
 
 const FIXTURE_CLIENT_CREATE_ACTION = 'tournament_fixture_client_create';
 // 전역 멱등 계약(docs/api/global-contract.md)의 보관 기간과 같다.
@@ -1024,6 +1039,14 @@ export class TournamentBracketService {
       if (canonical.teamMatch.game === null || canonical.teamMatch.game.sourceType !== V1GameSourceType.TEAM_MATCH) {
         throw new ConflictException({ code: 'TOURNAMENT_MATCH_GAME_MISSING', message: '대회 경기의 정본 게임을 찾을 수 없어요.' });
       }
+      const changesLabels = dto.homeDisplayLabel !== undefined || dto.awayDisplayLabel !== undefined;
+      const labelsOnly = changesLabels && [dto.fixtureNumber, dto.scheduledAt, dto.fieldId, dto.venue, dto.homeRegistrationId, dto.awayRegistrationId].every(value => value === undefined);
+      if (labelsOnly) return this.prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`league-fixture-generation:${canonical.tournamentId}`}, 0))`;
+        const labels = await updateFixtureDisplayLabelsInTx(tx, this.adminContext, admin, fixtureId, dto);
+        const fresh = await tx.v1TournamentMatchDetails.findUniqueOrThrow({ where: { teamMatchId: fixtureId }, include: { teamMatch: true } });
+        return { ...this.serializeCanonicalFixture({ ...fresh.teamMatch, ...fresh, id: fixtureId }, toPlaceView(fresh.teamMatch)), ...labels, startedTeamChange: null };
+      });
       assertSidesNotSlotLinked(
         {
           homeSlotId: canonical.teamMatch.homeSlotId,
@@ -1077,7 +1100,7 @@ export class TournamentBracketService {
         // Same lock as assignment/creation: a concurrent bye designation cannot
         // race between the participant check and the canonical match update.
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`league-fixture-generation:${canonical.tournamentId}`}, 0))`;
-        return updateTournamentFixtureInTx(tx, admin, {
+        const row = await updateTournamentFixtureInTx(tx, admin, {
           fixtureId,
           tournamentId: canonical.tournamentId,
           groupId: canonical.groupId,
@@ -1090,6 +1113,8 @@ export class TournamentBracketService {
           allowStartedTeamChange: true,
           teamChangeReason: dto.teamChangeReason,
         });
+        if (changesLabels) await updateFixtureDisplayLabelsInTx(tx, this.adminContext, admin, fixtureId, dto);
+        return row;
       });
       const startedTeamChange = updated.startedTeamChange === null
         ? null
@@ -1266,7 +1291,7 @@ export class TournamentBracketService {
   // ─── bracket view ─────────────────────────────────────────────────────────
 
   async getBracket(user: V1AuthUser, tournamentId: string) {
-    await this.adminContext.getActiveAdmin(user.id);
+    const admin = await this.adminContext.getActiveAdmin(user.id);
     const tournament = await this.loadTournament(tournamentId);
 
     const [groups, standings, canonicalMatches, canonicalTeamMatchCandidates, slots] = await Promise.all([
@@ -1362,16 +1387,31 @@ export class TournamentBracketService {
       });
     }
 
+    // 득점자 실명은 대회 운영진(플랫폼 운영자)에게만 싣는다 — support 어드민은 닉네임만(경기 명단·라인업과 같은 규칙).
+    if (canAdminViewParticipantIdentity(admin.adminRole)) {
+      const realNames = await loadRealNames(
+        this.prisma,
+        [...fixtureRows.values()].flatMap((row) => (row.result?.goals ?? []).flatMap((goal) => (goal.playerUserId === null ? [] : [goal.playerUserId]))),
+      );
+      for (const [id, row] of fixtureRows) {
+        if (row.result !== null) fixtureRows.set(id, { ...row, result: { ...row.result, goals: withScorerRealNames(row.result.goals, realNames) } });
+      }
+    }
+
+    const phaseOrder: Record<string, number> = { group: 0, round16: 1, round12: 2, quarter: 3, semi: 4, final: 5, third_place: 6 };
+    const orderedGroups = [...groups].sort((a, b) => (phaseOrder[a.phase] ?? 99) - (phaseOrder[b.phase] ?? 99) || a.sortOrder - b.sortOrder || a.id.localeCompare(b.id));
+    const groupOrder = new Map(orderedGroups.map((group, index) => [group.id, index]));
     return {
-      groups: groups.map((g) => ({
+      groups: orderedGroups.map((g) => ({
         ...this.serializeGroup(g),
         groupTeams: [...g.groupTeams.map((gt) => ({
           ...this.serializeGroupTeam(gt),
           teamName: gt.registration.team.name,
-        })), ...(g.byeSlots ?? []).map((slot) => ({ ...this.serializeGroupTeam({ ...slot, registrationId: null, isBye: true }), teamName: null }))],
+        })), ...(g.byeSlots ?? []).map((slot) => ({ ...this.serializeGroupTeam({ ...slot, registrationId: null, isBye: true }), teamName: null }))]
+          .sort((a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id)),
       })),
       fixtures: [...fixtureRows.values()].sort((a, b) =>
-        a.round.localeCompare(b.round) || a.fixtureNumber - b.fixtureNumber || a.legNumber - b.legNumber),
+        (groupOrder.get(a.groupId ?? '') ?? 999999) - (groupOrder.get(b.groupId ?? '') ?? 999999) || a.fixtureNumber - b.fixtureNumber || a.legNumber - b.legNumber || a.id.localeCompare(b.id)),
       standings: standings.map((s) => ({
         ...this.serializeStanding(s),
         teamName: s.registration.team.name,

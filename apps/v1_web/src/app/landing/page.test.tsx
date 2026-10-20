@@ -51,7 +51,7 @@ const FIXTURE: LandingV4Data = {
     {
       kind: 'tournament', id: 't2', title: '겨울 축구 리그', status: 'open', statusLabel: '모집 중',
       dateText: '11월 1일 (일)', location: null, teamsText: null, prizeText: null,
-      imageUrl: '/uploads/t2.webp', formatLabel: '조별리그 + 토너먼트', slots: { confirmed: 1, total: 4 }, href: '/tournaments/t2',
+      imageUrl: '/uploads/t2.webp', formatLabel: '조별리그 + 토너먼트', slots: { confirmed: 1, total: 4, remaining: 2 }, href: '/tournaments/t2',
     },
   ],
   teamMatches: [
@@ -201,6 +201,8 @@ describe('LandingPage', () => {
     expect(big.textContent).toContain('토너먼트');
     const side = now.querySelector('.tm-landing-v4-tcard-sm') as HTMLElement;
     expect(side.textContent).toContain('4팀 중 1팀 확정');
+    expect(side.textContent).toContain('남은 자리 2');
+    expect(side.textContent).not.toContain('남은 자리 3');
     expect(side.textContent).not.toContain('LIVE');
     const visibleCards = [...now.querySelectorAll('.tm-landing-v4-mq-group:not([data-clone]) > li:not([aria-hidden]) a')];
     expect(visibleCards.map((a) => a.getAttribute('href'))).toEqual(['/team-matches/tm1', '/team-matches/tm2']);

@@ -7,6 +7,7 @@ import {
   penaltyShootoutFinishConfirmCopy,
   penaltyShootoutOverrideFinishConfirmCopy,
   penaltyShootoutStartConfirmCopy,
+  playerLabel,
 } from './confirm-copy';
 
 const sides: GameSide[] = [
@@ -165,5 +166,19 @@ describe('점수·팀 이름 뒤 조사는 받침을 따른다', () => {
     expect(penaltyShootoutOverrideFinishConfirmCopy(home, firstKick, 3, 3, 4, 3, firstKick).message).toContain(
       `선축은 ${expected}.`,
     );
+  });
+});
+
+describe('playerLabel — 확인 문구·도움 창 제목의 운영진 실명', () => {
+  it.each([
+    ['운영진(실명 있음)', { realName: '김실명', phone: null }, '김실명 (정우진)'],
+    ['권한 없음(identity 키 없음)', undefined, '정우진'],
+  ])('%s', (_, identity, name) => {
+    const row = identity === undefined ? { id: 'p-1', displayNameSnapshot: '정우진' } : { id: 'p-1', displayNameSnapshot: '정우진', identity };
+    const lineups = [{ participants: [row] }] as unknown as GameLineup[];
+
+    expect(playerLabel('p-1', lineups)).toBe(name);
+    expect(commitActionConfirmCopy(input({ type: 'GOAL', participantId: 'p-1' }), sides, lineups, null).message)
+      .toBe(`홈팀 · ${name} · 전반 1:00에 기록해요.`);
   });
 });

@@ -225,6 +225,8 @@ export function createV1GameRosterMswHandlers() {
     const players = GAME_ROSTER_MSW.players.map((p) => ({
       userId: p.userId,
       displayName: p.displayName,
+      // 서버와 같다 — 어드민 출전 표는 운영진(ADMIN·STAFF)에게만 실명을 싣는다.
+      ...(['ADMIN', 'STAFF'].includes(state.viewerRole) && state.realNames.has(p.userId) ? { realName: state.realNames.get(p.userId) } : {}),
       accountLinked: true,
       cells: views.map(({ roster }): V1TeamRosterCell => {
         const empty = { reason: null, actorRole: null, adjustmentId: null, unavailabilityId: null, remainingMatches: null, goalkeeper: state.goalkeepers.get(p.userId) ?? false };

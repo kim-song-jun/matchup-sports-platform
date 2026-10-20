@@ -111,7 +111,7 @@ const NO_FIXTURES: V1TournamentFixture[] = [];
 const hrefPath = (el: HTMLElement) => (el.getAttribute('href') ?? '').split('?')[0];
 
 describe('TournamentPostEventHubSection — completed action list vs default hub (regression guard)', () => {
-  it('renders the 3-row completed action list with correct hrefs for a completed tournament', () => {
+  it('renders only the awards, bracket, and reviews actions when the completed hero owns /results', () => {
     render(
       createElement(TournamentPostEventHubSection, {
         tournamentId: 'tour-42',
@@ -131,10 +131,7 @@ describe('TournamentPostEventHubSection — completed action list vs default hub
       'href',
       '/tournaments/tour-42/bracket',
     );
-    expect(screen.getByRole('link', { name: /경기별 결과·기록/ })).toHaveAttribute(
-      'href',
-      '/tournaments/tour-42/results',
-    );
+    expect(screen.queryByRole('link', { name: /경기별 결과·기록/ })).not.toBeInTheDocument();
     // 후기 행은 대회 컨텍스트를 유지해야 한다 — 예전엔 '/my/reviews'로 보내 "어느 대회의
     // 후기를 쓰려던 건지"가 사라졌고, 사용자가 목록에서 대회를 다시 찾아야 했다.
     expect(hrefPath(screen.getByRole('link', { name: /대회 후기/ }))).toBe('/tournaments/tour-42/reviews');

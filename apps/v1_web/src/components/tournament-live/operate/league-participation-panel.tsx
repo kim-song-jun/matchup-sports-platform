@@ -150,7 +150,7 @@ function LeagueSideParticipation({
                     ✓
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[length:var(--font-size-body-sm)] font-medium">
+                    <span className="block break-words text-[length:var(--font-size-body-sm)] font-medium">
                       {jersey ? `${jersey} ` : ''}
                       {name}
                     </span>

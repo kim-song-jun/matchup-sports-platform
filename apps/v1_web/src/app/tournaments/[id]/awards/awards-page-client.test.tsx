@@ -26,6 +26,19 @@ const emptyOverallStandings: V1LeagueOverallStandingsResponse = {
 };
 v1GetMock.mockResolvedValue(emptyOverallStandings);
 
+function overallStandingsWithChampion(teamId: string, teamName: string): V1LeagueOverallStandingsResponse {
+  return {
+    standings: [
+      { teamId, teamName, position: 1, points: 3, wins: 1, draws: 0, losses: 0, goalsFor: 3, goalsAgainst: 0 },
+    ],
+    progress: { total: 1, played: 1, remaining: 0, percent: 100 },
+    magicNumber: null,
+    recalculatedAt: null,
+    champions: [{ teamId, teamName, teamLogoUrl: null }],
+    tieBreakGroups: [],
+  };
+}
+
 const awardsApiMocks = vi.hoisted(() => ({
   useV1Tournament: vi.fn(),
   useV1LeagueMatchPlayerRecords: vi.fn((_leagueId: string) => ({
@@ -225,6 +238,22 @@ describe('AwardsPageClient GA events', () => {
     expect(trackEvent).toHaveBeenCalledWith('tournament_share', { channel: 'clipboard' });
     expect(writeTextMock).toHaveBeenCalled();
   });
+
+  it('keeps the two actions, review section, and flow link without the retention promotion card', () => {
+    const { container } = render(<AwardsPageClient tournamentId="tournament-1" />);
+
+    expect(container.querySelector('.tm-retention-card')).toBeNull();
+    expect(screen.queryByText('다음 대회도 함께해요 🎉')).not.toBeInTheDocument();
+    expect(screen.queryByText(/팀밋 대회에서 새로운 팀을 만나고/)).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '다른 대회 보기' })).toHaveAttribute('href', '/tournaments');
+    expect(screen.getByRole('button', { name: '결과 공유' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '참가팀 후기' })).toBeInTheDocument();
+    expect(screen.getByText('아직 등록된 후기가 없어요')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '최종결과로 이동' })).toHaveAttribute(
+      'href',
+      '/tournaments/tournament-1/results',
+    );
+  });
 });
 
 describe('AwardsPageClient — regular league player records endpoint', () => {
@@ -259,13 +288,15 @@ describe('AwardsPageClient — regular league player records endpoint', () => {
     });
   });
 
-  it('uses the league player-records query and does not enable the tournament query', () => {
+  it('uses the league player-records query and does not enable the tournament query', async () => {
+    v1GetMock.mockResolvedValueOnce(overallStandingsWithChampion('league-team', '리그 챔피언'));
     render(<AwardsPageClient tournamentId="tournament-1" />);
 
     expect(awardsApiMocks.useV1LeagueMatchPlayerRecords).toHaveBeenCalledWith('tournament-1');
     expect(awardsApiMocks.usePublicTournamentPlayerRecords).toHaveBeenCalledWith('tournament-1', { enabled: false });
     expect(screen.getByText('리그 득점자')).toBeInTheDocument();
     expect(screen.getByText('리그 도움자')).toBeInTheDocument();
+    expect(await screen.findByText('리그 챔피언', { selector: '.tm-awards-podium-name' })).toBeInTheDocument();
   });
 });
 
@@ -303,7 +334,10 @@ describe('AwardsPageClient — 개인 기록 프로필 링크의 뒤로가기 �
   it.each([
     ['일반 대회', undefined, ['cup-scorer', 'cup-assister']],
     ['정규 리그', 'regular_league', ['league-scorer', 'league-assister']],
-  ] as const)('%s 득점·도움 랭킹 링크가 시상 화면을 출처로 싣는다', (_label, kind, userIds) => {
+  ] as const)('%s 득점·도움 랭킹 링크가 시상 화면을 출처로 싣는다', async (_label, kind, userIds) => {
+    if (kind === 'regular_league') {
+      v1GetMock.mockResolvedValueOnce(overallStandingsWithChampion('league-champion', '리그 우승팀'));
+    }
     awardsApiMocks.useV1Tournament.mockReturnValue({
       data: makeCompletedTournament(kind ? { kind } : {}),
       isLoading: false,
@@ -312,6 +346,10 @@ describe('AwardsPageClient — 개인 기록 프로필 링크의 뒤로가기 �
       refetch: vi.fn(),
     });
     render(<AwardsPageClient tournamentId="tournament-1" />);
+
+    if (kind === 'regular_league') {
+      await screen.findByText('리그 우승팀', { selector: '.tm-awards-podium-name' });
+    }
 
     const hrefs = screen
       .getAllByRole('link', { name: /공개 프로필 보기/ })

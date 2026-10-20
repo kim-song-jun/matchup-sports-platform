@@ -48,7 +48,7 @@ git push origin <current-branch>  # 항상 현재 브랜치 (브랜치 생성/�
 gh pr edit <N> --add-reviewer copilot-pull-request-reviewer
 ```
 
-- 공식 REST 요청도 지원한다. 2026-10-16 실제로 다음 요청이 접수되고 해당 head의 리뷰 workflow가 실행됐다. 이전의 “REST는 항상422” 관찰은 현재 절차가 아니다.
+- 공식 REST 요청도 지원한다. 2026-10-16 실제로 다음 요청이 접수되고 해당 head의 리뷰 workflow가 실행됐다. 이전의 “REST는 항상 422” 관찰은 현재 절차가 아니다.
   ```bash
   gh api repos/<owner>/<repo>/pulls/<N>/requested_reviewers --method POST \
     -f 'reviewers[]=copilot-pull-request-reviewer[bot]'

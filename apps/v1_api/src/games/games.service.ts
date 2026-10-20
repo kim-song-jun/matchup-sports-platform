@@ -47,6 +47,8 @@ import { promoteLeagueOnGameActivityInTx } from '../league-matches/league-slot-s
 import { assertPenaltyShootoutPersistable } from './core/penalty-shootout-outcome';
 import { isTeamMatchRosterDependentEventType } from './core/team-match-lineup-window';
 import { isCommandConcurrencyConflict } from './command-concurrency-error';
+import { endLiveGamePeriod } from './period-transition';
+import { gameOperationAuditScope } from './game-operation-audit-scope';
 import {
   assertBracketResolvable,
   assertPenaltiesNotAllowed,
@@ -192,6 +194,8 @@ type TeamMatchCompetitionContext = {
   competitionId: string;
   teamMatchId: string;
   isLeague: boolean;
+  lifecycleStatus: string | null;
+  requiresExplicitStart: boolean;
   status: V1TeamMatchStatus;
   homeRegistration: { id: string; teamId: string } | null;
   awayRegistration: { id: string; teamId: string } | null;
@@ -369,6 +373,14 @@ function requiresTeamScope(actor: { readonly role: string; readonly teamId?: str
  */
 export function canViewParticipantIdentity(role: string): boolean {
   return role === 'platform_ops' || role === 'tournament_director' || role === 'field_operator';
+}
+
+/**
+ * 플랫폼 어드민 등급으로 같은 판정을 한다 — owner·ops 는 경기 인가의 `platform_ops`, support 는 `support_readonly` 와 같다
+ * (`resolveCompetitionOperator`). 어드민 전용 응답(출전 표·대진)이 등급을 다시 해석하지 않게 여기 한 곳에 둔다.
+ */
+export function canAdminViewParticipantIdentity(adminRole: string): boolean {
+  return canViewParticipantIdentity(adminRole === 'owner' || adminRole === 'ops' ? 'platform_ops' : 'support_readonly');
 }
 
 /** 운영 콘솔 명단 검인 줄에 붙는, 운영진 전용 본인 확인 정보. 계정이 없는 참가자·탈퇴 회원은 null 이다. */
@@ -809,6 +821,7 @@ async function appendIdentityEvent(
         systemActor:
           | 'IDENTITY_LINK_EXPIRY'
           | 'GAME_END_DERIVER'
+          | 'GAME_CLOCK_EXPIRY'
           | 'GAME_BACKFILL'
           | 'PROJECTION_REPAIR'
           // 라인업 리비전 복사(정정 요청)가 원본의 연결을 새 참가자 행으로 옮길 때.
@@ -879,6 +892,7 @@ export async function createRosterAssertedIdentityLink(
         actorType: 'SYSTEM';
         systemActor:
           | 'GAME_END_DERIVER'
+          | 'GAME_CLOCK_EXPIRY'
           | 'GAME_BACKFILL'
           | 'PROJECTION_REPAIR'
           | 'LINEUP_REVISION_COPY'
@@ -1693,46 +1707,7 @@ export class GamesService {
     game: LockedGame,
     context: GameCommandContext,
   ): Promise<GameMutationResult> {
-    if (game.state !== V1GameState.LIVE) {
-      throw new ConflictException({
-        code: 'PERIOD_NOT_STARTED',
-        message: '경기가 진행 중이어야 피리어드를 종료할 수 있어요',
-      });
-    }
-    const current = await tx.v1GamePeriod.findFirst({
-      where: { gameId: game.id, state: V1GamePeriodState.LIVE },
-    });
-    if (current === null) {
-      throw new ConflictException({
-        code: 'PERIOD_NOT_STARTED',
-        message: '진행 중인 피리어드가 없어요',
-      });
-    }
-    const next = await tx.v1GamePeriod.findFirst({
-      where: { gameId: game.id, number: current.number + 1 },
-    });
-    const now = new Date();
-    await tx.v1GamePeriod.update({
-      where: { id: current.id },
-      data: { state: V1GamePeriodState.ENDED, endedAt: now },
-    });
-    if (next !== null) {
-      await tx.v1GamePeriod.update({
-        where: { id: next.id },
-        data: { state: V1GamePeriodState.HALFTIME },
-      });
-    }
-    const updated = await tx.v1Game.update({
-      where: { id: game.id },
-      data: { version: { increment: 1 } },
-    });
-    return {
-      gameId: updated.id,
-      state: updated.state,
-      version: updated.version,
-      durableCommandId: context.durableCommandId,
-      replayed: false,
-    };
+    return endLiveGamePeriod(tx, game, context.durableCommandId);
   }
 
   /**
@@ -2610,8 +2585,7 @@ export class GamesService {
       });
       const previewSideIds = this.authorizedPreviewSideIds(actor, ownSideId, lineups.map((lineup) => lineup.sideId));
       const participants = await this.loadEffectiveLineupParticipants(tx, gameId, lineups, previewSideIds);
-      const participantsByLineupId = groupParticipantsByLineupId(participants);
-      return lineups.map((lineup) => ({ ...lineup, participants: participantsByLineupId.get(lineup.id) ?? [] }));
+      return this.withParticipantIdentities(tx, actor.role, lineups, participants);
     }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
   }
 
@@ -2655,16 +2629,35 @@ export class GamesService {
         tx, gameId, lineups, effectivePreviewSideIds,
         teamScopedReader ? { ownSideId, lineupPublished, canRecordPublishedOpponentDefaults } : null,
       );
-      const participantsByLineupId = groupParticipantsByLineupId(participants);
-      const flatParticipants = lineups.flatMap((lineup) => participantsByLineupId.get(lineup.id) ?? []);
-      const identityByUserId = canViewParticipantIdentity(actor.role) ? await this.loadParticipantIdentities(tx, flatParticipants) : null;
-      return lineups.map((lineup) => ({
-        ...lineup,
-        participants: (participantsByLineupId.get(lineup.id) ?? []).map((participant) => identityByUserId === null
-          ? participant
-          : { ...participant, identity: participant.userId === null ? null : (identityByUserId.get(participant.userId) ?? null) }),
-      }));
+      return this.withParticipantIdentities(tx, actor.role, lineups, participants);
     }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
+  }
+
+  /**
+   * 라인업에 참가자를 붙이고, 대회 운영진(`canViewParticipantIdentity`)에게만 참가자마다 `identity`(실명·전화번호)를 싣는다.
+   * 운영 콘솔(`listLineups` 경유 대진 라인업)·결과 확인·정정(`listLineups`)·팀매치 콘솔(`listOperationsLineups`)이
+   * 같은 규칙을 쓴다 — 권한이 없으면 키 자체가 없고 계정도 조회하지 않는다.
+   */
+  private async withParticipantIdentities<L extends { id: string }>(
+    tx: Transaction,
+    role: string,
+    lineups: readonly L[],
+    participants: readonly V1GameParticipant[],
+  ) {
+    const participantsByLineupId = groupParticipantsByLineupId(participants);
+    if (!canViewParticipantIdentity(role)) {
+      return lineups.map((lineup) => ({ ...lineup, participants: participantsByLineupId.get(lineup.id) ?? [] }));
+    }
+    const identityByUserId = await this.loadParticipantIdentities(
+      tx, lineups.flatMap((lineup) => participantsByLineupId.get(lineup.id) ?? []),
+    );
+    return lineups.map((lineup) => ({
+      ...lineup,
+      participants: (participantsByLineupId.get(lineup.id) ?? []).map((participant) => ({
+        ...participant,
+        identity: participant.userId === null ? null : (identityByUserId.get(participant.userId) ?? null),
+      })),
+    }));
   }
 
   private authorizedPreviewSideIds(
@@ -3674,6 +3667,7 @@ export class GamesService {
       },
       async (tx, game, context) => {
         await this.assertTeamMatchMatched(tx, game.teamMatchId);
+        this.assertExplicitLeagueStarted(await this.resolveTeamMatchCompetitionContext(tx, game.teamMatchId));
         if (isFriendlyTeamMatch) await this.assertFriendlyTeamMatchLineupsReady(tx, gameId, dto.actualParticipants.map((participant) => participant.participantId));
         // 친선 팀매치는 양 팀이 서로 다른 화면에서 명단을 관리하지만 결과 초안은
         // 호스트만 만든다. 클라이언트가 자기 팀 선수만 보내더라도 상대팀의 출전·승패
@@ -3809,6 +3803,7 @@ export class GamesService {
           });
         }
         await this.assertTeamMatchMatched(tx, game.teamMatchId);
+        this.assertExplicitLeagueStarted(await this.resolveTeamMatchCompetitionContext(tx, game.teamMatchId));
         if (isFriendlyTeamMatch) await this.assertFriendlyTeamMatchLineupsReady(tx, gameId);
         this.assertLifecycle(
           game.sourceType,
@@ -5075,6 +5070,7 @@ export class GamesService {
       if (game.teamMatchId === null) return;
       const competition = await this.resolveTeamMatchCompetitionContext(tx, game.teamMatchId);
       if (competition === null) return;
+      this.assertExplicitLeagueStarted(competition);
       if (competition.status === V1TeamMatchStatus.cancelled) {
         throw new ConflictException({ code: 'TOURNAMENT_MATCH_CANCELLED', message: '취소된 대진이라 경기를 시작할 수 없어요.' });
       }
@@ -5107,6 +5103,15 @@ export class GamesService {
       throw new ConflictException({
         code: 'TOURNAMENT_MATCH_TEAMS_REQUIRED',
         message: '양 팀이 확정된 뒤 경기를 시작할 수 있어요.',
+      });
+    }
+  }
+
+  private assertExplicitLeagueStarted(competition: TeamMatchCompetitionContext | null): void {
+    if (competition?.isLeague && competition.requiresExplicitStart && ['draft', 'open', 'closed'].includes(competition.lifecycleStatus ?? '')) {
+      throw new ConflictException({
+        code: 'LEAGUE_NOT_STARTED',
+        message: '리그가 아직 시작되지 않았어요. 리그 관리에서 리그 시작하기를 먼저 눌러 주세요.',
       });
     }
   }
@@ -5157,8 +5162,8 @@ export class GamesService {
         tournamentId: true,
         leagueId: true,
         status: true,
-        tournament: { select: { kind: true } },
-        league: { select: { kind: true } },
+        tournament: { select: { kind: true, status: true, requiresExplicitStart: true } },
+        league: { select: { kind: true, status: true, requiresExplicitStart: true } },
         tournamentDetails: {
           select: {
             teamMatchId: true,
@@ -5186,6 +5191,8 @@ export class GamesService {
       competitionId,
       teamMatchId: teamMatch.id,
       isLeague: teamMatch.tournament?.kind === 'regular_league' || teamMatch.league?.kind === 'regular_league',
+      lifecycleStatus: teamMatch.tournament?.status ?? teamMatch.league?.status ?? null,
+      requiresExplicitStart: teamMatch.tournament?.requiresExplicitStart ?? teamMatch.league?.requiresExplicitStart ?? false,
       status: teamMatch.status,
       homeRegistration: teamMatch.tournamentDetails?.homeRegistration ?? null,
       awayRegistration: teamMatch.tournamentDetails?.awayRegistration ?? null,
@@ -7303,82 +7310,9 @@ export class GamesService {
     before: unknown,
     after: unknown,
   ) {
-    const game = await tx.v1Game.findUnique({
-      where: { id: resourceId },
-      select: {
-        sourceType: true,
-        teamMatch: {
-          select: {
-            id: true,
-            deletedAt: true,
-            tournamentId: true,
-            leagueId: true,
-            fieldId: true,
-            tournament: { select: { kind: true } },
-            league: { select: { kind: true } },
-            tournamentDetails: { select: { teamMatchId: true, tournamentId: true } },
-          },
-        },
-      },
-    });
-    if (game === null) {
-      throw this.notFound();
-    }
-    let tournamentId: string | null = null;
-    let teamMatchId: string | null = null;
-    let fieldId: string | null = null;
-
-    if (game.sourceType === V1GameSourceType.TEAM_MATCH) {
-      const match = game.teamMatch;
-      if (match === null) {
-        throw new ConflictException({
-          code: 'GAME_AUDIT_SCOPE_INVALID',
-          message: 'Team match game is missing its TeamMatch scope.',
-        });
-      }
-      if (match.deletedAt !== null) {
-        throw this.notFound('TOURNAMENT_FIXTURE_GAME_NOT_FOUND');
-      }
-      if (
-        (match.tournamentId === null && match.leagueId !== null) ||
-        (match.tournamentId !== null && match.leagueId !== null && match.tournamentId !== match.leagueId)
-      ) {
-        throw new ConflictException({
-          code: 'GAME_AUDIT_SCOPE_INVALID',
-          message: 'TeamMatch competition ownership is inconsistent.',
-        });
-      }
-      const competitionId = match.tournamentId ?? match.leagueId;
-      const details = match.tournamentDetails;
-      const isRegularLeague =
-        match.tournament?.kind === 'regular_league' || match.league?.kind === 'regular_league';
-      if (
-        (isRegularLeague && (competitionId === null || details !== null)) ||
-        (!isRegularLeague && competitionId !== null &&
-          (match.leagueId !== null ||
-            details === null ||
-            details.tournamentId !== competitionId ||
-            details.teamMatchId !== match.id)) ||
-        (competitionId === null && details !== null)
-      ) {
-        throw new ConflictException({
-          code: 'GAME_AUDIT_SCOPE_INVALID',
-          message: 'TeamMatch tournament details do not match its ownership scope.',
-        });
-      }
-      // OperationAudit's TeamMatch/field relations use the TeamMatch
-      // `(tournamentId, id)` composite key. Canonical regular leagues carry
-      // the same id in both competition columns, so the resolved competition
-      // id is valid for the audit relation. Friendly matches keep both null.
-      tournamentId = competitionId;
-      teamMatchId = competitionId === null ? null : match.id;
-      fieldId = competitionId === null ? null : match.fieldId;
-    } else {
-      throw new ConflictException({
-        code: 'GAME_AUDIT_SCOPE_INVALID',
-        message: `Unsupported game source ${game.sourceType}.`,
-      });
-    }
+    const { tournamentId, teamMatchId, fieldId } = await gameOperationAuditScope(
+      tx, resourceId, (code) => this.notFound(code),
+    );
 
     await this.operationAuditWriter.create(tx, {
       actor: gameOperationAuditActor(actor),

@@ -33,6 +33,7 @@ import { josa } from '@/lib/korean';
 import type { GameCommandName, GameLineup, GameSide } from '@/types/game-operations';
 import type { EventCaptureCommitInput } from './action-target-picker';
 import { periodPrefix } from './period-label';
+import { participantIdentityName } from './participant-identity';
 
 export interface ConfirmCopy {
   readonly title: string;
@@ -55,7 +56,7 @@ export function playerLabel(
   if (participantId === null || participantId === undefined) return '선수';
   for (const lineup of lineups) {
     const participant = lineup.participants.find((row) => row.id === participantId);
-    if (participant) return participant.displayNameSnapshot;
+    if (participant) return participantIdentityName(participant);
   }
   return '선수';
 }

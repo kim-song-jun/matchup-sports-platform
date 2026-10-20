@@ -128,6 +128,7 @@ describe('MatchCard — 진행 중·종료 경기도 시각을 유지한다 (D-1
     render(<TournamentBracket fixtures={[fixture]} groups={[]} />);
     const card = screen.getByRole('group', { name: '레드FC 대 블루FC' });
     expect(within(card).getByText('PK 5:4')).toBeInTheDocument();
+    expect(within(card).getByText('PK 5:4').parentElement).toBe(within(card).getByText('8/7 (금) 20:00').parentElement);
     expect(within(card).getByText('8/7 (금) 20:00')).toBeInTheDocument();
   });
 
@@ -186,6 +187,24 @@ it('3·4위전의 미정 두 자리에 저장된 4강 패자 출처를 표시한
   expect(within(card).getByText('4강 2경기 패자')).toBeVisible();
 });
 describe('공개 대진표 — 자리 라벨', () => {
+  it('보류 중인 슬롯은 알려진 팀 ID가 있어도 엠블럼 없이 중립 표시한다', () => {
+    render(<TournamentBracket groups={[]} fixtures={[
+      makeFixture({
+        id: 'pending-known-team',
+        round: 'semi',
+        fixtureNumber: 1,
+        homeTeamId: 'known-team-for-pending-slot',
+        homeTeamName: 'TBD',
+        homeSlotLabel: 'A조 1위',
+      }),
+    ]} />);
+
+    const card = screen.getByRole('group', { name: 'A조 1위 대 블루FC' });
+    const pendingRow = card.querySelector('.tm-bk2-row');
+    expect(pendingRow).toHaveTextContent('A조 1위');
+    expect(pendingRow?.querySelector('img')).toBeNull();
+  });
+
   it('TBD 사이드에 자리 라벨이 있으면 라벨을 보여 주고 대기 모양으로 그린다', () => {
     render(<TournamentBracket groups={[]} fixtures={[
       makeFixture({ id: 'rank-one', round: 'semi', fixtureNumber: 1, homeTeamName: 'TBD', homeSlotLabel: 'A조 1위', awayTeamName: 'TBD', awaySlotLabel: 'B조 2위' }),
@@ -220,4 +239,34 @@ it.each([['quarter', '8강', '4강'], ['semi', '4강', '결승']] as const)('%s 
     groupTeams: [{ id: 'bye', registrationId: 'direct', teamId: 'direct-team', teamName: '직행팀', teamLogoUrl: null, sortOrder: 0, isBye: true }] }]} />);
   expect(screen.getByRole('region', { name: label + ' 부전승' })).toHaveTextContent('부전승 · ' + nextLabel + ' 직행');
 
+});
+
+it('결선 그림에 시각만 표시하고 경기장은 숨긴다', () => {
+  render(<TournamentBracket fixtures={[makeFixture({ id: 'saved-metadata', fixtureNumber: 31, scheduledAt: '2026-10-19T11:33:00.000Z', venue: 'A구장' })]} groups={[]} />);
+  const card = screen.getByRole('group', { name: '레드FC 대 블루FC' });
+  expect(within(card).getByText('10/19 (월) 20:33')).toBeInTheDocument();
+  expect(within(card).queryByText('A구장')).not.toBeInTheDocument();
+});
+
+it('미배정 부전승은 지정 문구를 표시하고 팀 확정 뒤에는 숨기고 승자 배경을 표시한다', () => {
+  render(<TournamentBracket fixtures={[]} groups={[{ id: 'r12', name: '12강', phase: 'round12', sortOrder: 0, advanceCount: null, standings: [], qualification: null,
+    groupTeams: [{ id: 'bye-empty', registrationId: null, teamId: null, teamName: null, teamLogoUrl: null, sortOrder: 0, isBye: true, displayLabel: '조 1위 중 5위' }, { id: 'bye-team', registrationId: 'reg', teamId: 'team', teamName: '확정 팀', teamLogoUrl: null, sortOrder: 2, isBye: true, displayLabel: '조 1위 중 6위' }] }]} />);
+  expect(screen.getByText('조 1위 중 5위')).toBeInTheDocument();
+  expect(screen.getByText('확정 팀')).toBeInTheDocument();
+  expect(screen.queryByText('조 1위 중 6위')).not.toBeInTheDocument();
+  expect(screen.getByText('확정 팀').closest('[role=region]')).toHaveStyle({ background: 'var(--blue50)' });
+  expect(screen.getByText('조 1위 중 5위').closest('[role=region]')).not.toHaveStyle({ background: 'var(--blue50)' });
+});
+
+
+it.each(['HOME', 'AWAY'] as const)('빈 부전승 타일에서 연결된 8강 %s 팀 줄까지 SVG 선을 렌더한다', (side) => {
+  const { container } = render(<TournamentBracket fixtures={[makeFixture({ id: 'quarter', round: 'quarter', fixtureNumber: 5, homeTeamName: 'TBD', awayTeamName: 'TBD' })]}
+    groups={[{ id: 'r12', name: '12강', phase: 'round12', sortOrder: 0, advanceCount: null, standings: [], qualification: null,
+      groupTeams: [{ id: 'bye', registrationId: null, teamId: null, teamName: null, teamLogoUrl: null, sortOrder: 0, isBye: true,
+        byeTarget: { fixtureId: 'quarter', side } }] }]} />);
+  const label = `부전승 → 5번 경기 ${side === 'HOME' ? '홈' : '어웨이'}`;
+  const path = Array.from(container.querySelectorAll('svg path')).find(path => path.querySelector('title')?.textContent === label);
+  expect(path).toBeDefined();
+  expect(path?.getAttribute('d')).toMatch(/^M /);
+  expect(screen.getByRole('region', { name: '12강 부전승' })).toHaveTextContent('미정');
 });

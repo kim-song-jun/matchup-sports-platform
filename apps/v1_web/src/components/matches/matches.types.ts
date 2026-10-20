@@ -111,6 +111,8 @@ export type MatchDetailViewModel = {
   backHref?: string;
   match: MatchCardModel & {
     description: string;
+    /** 상세 API가 명시한 온라인 장소 여부. 목록/이전 캐시에서는 false로 정규화해요. */
+    isOnline: boolean;
     /** 서버가 내려준 장소 스냅샷(좌표 없으면 이름·주소만). */
     place: V1PlaceView | null;
     rules: string[];

@@ -10,7 +10,7 @@ import { LeagueStateValue } from './league-state';
  * fixtures never shows as in progress. Once no live slot-using fixture has an empty side, promote to
  * the same status `generateFixtures` uses.
  *
- * Only `draft`/`open`/`closed` are promoted; `on_hold`/`completed` are untouched. The status condition
+ * Only legacy-mode `draft`/`open`/`closed` leagues are promoted; new leagues await an operator start; `on_hold`/`completed` are untouched. The status condition
  * on `updateMany` lets only the first committer of concurrent requests win.
  */
 const PROMOTABLE_STATUSES: V1TournamentStatus[] = [
@@ -29,7 +29,7 @@ export async function promoteLeagueWhenSlotsFilledInTx(tx: Prisma.TransactionCli
   if (slotted === 0) return false;
 
   const result = await tx.v1Tournament.updateMany({
-    where: { id: leagueId, kind: 'regular_league', status: { in: PROMOTABLE_STATUSES } },
+    where: { id: leagueId, kind: 'regular_league', requiresExplicitStart: false, status: { in: PROMOTABLE_STATUSES } },
     data: { status: STATUS_BY_LEAGUE_STATE[LeagueStateValue.active] },
   });
   if (result.count === 0) return false;
@@ -61,12 +61,12 @@ export async function promoteLeagueOnGameActivityInTx(
 ): Promise<boolean> {
   const league = await findTournamentOnSurface(tx, ['regular_league'], {
     where: { id: leagueId, deletedAt: null },
-    select: { status: true },
+    select: { status: true, requiresExplicitStart: true },
   });
-  if (league === null || !PROMOTABLE_STATUSES.includes(league.status)) return false;
+  if (league === null || league.requiresExplicitStart || !PROMOTABLE_STATUSES.includes(league.status)) return false;
   await lockLeagueRowForCompletionInTx(tx, leagueId);
   const result = await tx.v1Tournament.updateMany({
-    where: { id: leagueId, kind: 'regular_league', status: { in: PROMOTABLE_STATUSES } },
+    where: { id: leagueId, kind: 'regular_league', requiresExplicitStart: false, status: { in: PROMOTABLE_STATUSES } },
     data: { status: STATUS_BY_LEAGUE_STATE[LeagueStateValue.active] },
   });
   if (result.count === 0) return false;

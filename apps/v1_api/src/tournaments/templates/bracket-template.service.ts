@@ -23,7 +23,7 @@ import { TOURNAMENT_VENUE_SELECT, type TournamentVenueRow } from '../../places/t
 
 type Tx = Prisma.TransactionClient;
 type PinnedTournament = {
-  id: string; sportId: string; regionId: string | null; title: string; competitionConfigVersionId: string;
+  id: string; format: string; sportId: string; regionId: string | null; title: string; competitionConfigVersionId: string;
 } & TournamentVenueRow;
 
 function lookup(map: ReadonlyMap<string, string>, key: string, what: string): string {
@@ -74,6 +74,12 @@ export class BracketTemplateService {
   ) {
     await lockCompetitionForBracketMutationInTx(tx, tournament);
     const pinned = await this.loadPinnedTournament(tx, tournament.id);
+    if (pinned.format !== input.kind) {
+      throw new UnprocessableEntityException({
+        code: 'BRACKET_TEMPLATE_FORMAT_MISMATCH',
+        message: '대회 진행 방식과 맞지 않는 템플릿이에요.',
+      });
+    }
 
     const existing = await this.loadExisting(tx, tournament.id);
     let replaced = false;
@@ -107,7 +113,7 @@ export class BracketTemplateService {
   private async loadPinnedTournament(tx: Tx, tournamentId: string): Promise<PinnedTournament> {
     const pinned = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, {
       where: { id: tournamentId, deletedAt: null },
-      select: { id: true, sportId: true, regionId: true, ...TOURNAMENT_VENUE_SELECT, title: true, competitionConfigVersionId: true },
+      select: { id: true, format: true, sportId: true, regionId: true, ...TOURNAMENT_VENUE_SELECT, title: true, competitionConfigVersionId: true },
     });
     if (pinned === null) {
       throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
@@ -189,6 +195,7 @@ export class BracketTemplateService {
           kind: slot.kind,
           groupId: slot.groupKey === null ? null : lookup(groupIds, slot.groupKey, 'group'),
           position: slot.position,
+          byeSortOrder: slot.kind === 'BYE' ? (slot.position - 1) * 2 : null,
           sourceGroupId: slot.sourceGroupKey === null ? null : lookup(groupIds, slot.sourceGroupKey, 'group'),
         };
       }),

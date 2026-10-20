@@ -62,6 +62,7 @@
 - Each list item includes `host.userId`, `host.displayName`, `host.profileImageUrl`, and `host.trustState`.
   `host.displayName` resolves the creator profile nickname first, then the profile display name, then the semantic `호스트` fallback.
 - Level response fields: `levelLabel`, `minLevel`, `maxLevel`
+- `GET /matches/:id` includes required `isOnline: boolean`. It is an explicit place classification; existing and newly created physical matches default to `false`. It does not change whether a match is public or indexable.
 - 참가비: `costNote?: string | null` (목록·상세·수정 폼 응답 공통, 최대 200자). 호스트가 입력하지
   않았으면 `null`이며, 프론트는 `null`이면 참가비 행 자체를 숨긴다(0원으로 단정하지 않는다).
 
@@ -73,7 +74,7 @@
 |---|---|---|---|
 | `sportId` | uuid | Yes | - |
 | `regionId` | uuid | Yes | - |
-| `title` | string | Yes | - |
+| `title` | string(≤80) | Yes | 앞뒤 공백을 지우고 저장해요. 비었거나 공백뿐이면 `400 VALIDATION_ERROR`(`field=title`). 수정(PATCH)도 같은 규칙 |
 | `description` | string | No | - |
 | `imageUrl` | string | No | - |
 | `startsAt` | ISO datetime | Yes | - |

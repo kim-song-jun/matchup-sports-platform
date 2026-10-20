@@ -42,6 +42,7 @@ function tournamentRow(overrides: Record<string, unknown> = {}) {
     teamCount: 8,
     minPlayers: 6,
     maxPlayers: 10,
+    minMatchesPerTeam: null,
     genderCategory: null,
     genderMinMale: null,
     genderMaxMale: null,
@@ -108,6 +109,9 @@ describe('TournamentsAdminService', () => {
     v1StatusChangeLog: { create: jest.Mock; count: jest.Mock };
     v1CompetitionConfigVersion: { findFirst: jest.Mock; findUnique: jest.Mock };
     v1TournamentMatchDetails: { count: jest.Mock };
+    v1TournamentGroup: { count: jest.Mock };
+    $executeRaw: jest.Mock;
+    $queryRaw: jest.Mock;
     v1TournamentStanding: { count: jest.Mock };
     // 대회 종료 시 후기 요청 알림 수신자(참가 확정 팀의 owner/manager) 조회용.
     v1TournamentRegistration: { findMany: jest.Mock };
@@ -134,6 +138,9 @@ describe('TournamentsAdminService', () => {
       // 아니라 이 경로를 안 타므로 unconfigured mock(undefined 반환)으로 둬도 무해하다.
       v1CompetitionConfigVersion: { findFirst: jest.fn(), findUnique: jest.fn() },
       v1TournamentMatchDetails: { count: jest.fn().mockResolvedValue(0) },
+      v1TournamentGroup: { count: jest.fn().mockResolvedValue(0) },
+      $executeRaw: jest.fn().mockResolvedValue(1),
+      $queryRaw: jest.fn().mockResolvedValue([{ id: 'tournament-1' }]),
       v1TournamentRegistration: { findMany: jest.fn().mockResolvedValue([]) },
       v1TournamentStanding: { count: jest.fn() },
       $transaction: jest.fn(),
@@ -940,6 +947,62 @@ describe('TournamentsAdminService', () => {
 
   // ─── update ──────────────────────────────────────────────────────────────────
 
+  describe('update: tournament format', () => {
+    function arrange(overrides: Record<string, unknown> = {}) {
+      prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+      prisma.v1Tournament.findFirst.mockResolvedValue({ ...tournamentRow(overrides), _count: { registrations: 5, announcements: 0 } });
+      prisma.v1Tournament.updateMany.mockResolvedValue({ count: 1 });
+    }
+
+    it.each(['league', 'knockout', 'group_knockout'] as const)('saves %s before brackets exist, even with registrations', async (format) => {
+      arrange({ format: format === 'league' ? 'knockout' : 'league' });
+      prisma.v1Tournament.updateMany.mockImplementation(async ({ data }) => {
+        prisma.v1Tournament.findFirst.mockResolvedValue({ ...tournamentRow({ ...data }), _count: { registrations: 5, announcements: 0 } });
+        return { count: 1 };
+      });
+      const result = await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, format });
+      expect(result.format).toBe(format);
+      expect(result.formatChangeBlockedReason).toBeNull();
+      expect(prisma.v1Tournament.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { format } }));
+      expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({
+        beforeJson: expect.objectContaining({ format: format === 'league' ? 'knockout' : 'league' }),
+        afterJson: expect.objectContaining({ format }),
+      }) }));
+    });
+
+    it.each(['fixtures', 'groups', 'in_progress', 'completed'])('blocks format changes with %s', async (condition) => {
+      arrange({ format: 'group_knockout', status: ['in_progress', 'completed'].includes(condition) ? condition : 'open' });
+      if (condition === 'fixtures') prisma.v1TournamentMatchDetails.count.mockResolvedValue(1);
+      if (condition === 'groups') prisma.v1TournamentGroup.count.mockResolvedValue(1);
+      await expect(service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, format: 'knockout' }))
+        .rejects.toMatchObject({ response: { code: 'TOURNAMENT_FORMAT_LOCKED' } });
+      expect(prisma.v1Tournament.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('rechecks structure under the bracket mutation lock before writing', async () => {
+      arrange({ format: 'group_knockout' });
+      prisma.v1TournamentGroup.count.mockResolvedValueOnce(0).mockResolvedValueOnce(1);
+      await expect(service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, format: 'knockout' }))
+        .rejects.toMatchObject({ response: { code: 'TOURNAMENT_FORMAT_LOCKED' } });
+      expect(prisma.$executeRaw).toHaveBeenCalled();
+      expect(prisma.v1Tournament.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('allows other edits and resending the same format after brackets exist', async () => {
+      arrange({ format: 'knockout', status: 'in_progress' });
+      prisma.v1TournamentGroup.count.mockResolvedValue(2);
+      await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, format: 'knockout', title: '새 이름' });
+      expect(prisma.v1Tournament.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { format: 'knockout', title: '새 이름' } }));
+    });
+
+    it('admin detail includes the reason for a group-only bracket lock', async () => {
+      arrange();
+      prisma.v1TournamentGroup.count.mockResolvedValue(1);
+      const result = await service.get(ownerAuthUser, 'tournament-1');
+      expect(result.formatChangeBlockedReason).toContain('경기와 조를 모두 삭제');
+    });
+  });
+
   describe('update: sport change re-pins the competition config', () => {
     const sports: Record<string, { id: string; code: string }> = {
       'sport-1': { id: 'sport-1', code: 'futsal' },
@@ -1557,6 +1620,81 @@ describe('TournamentsAdminService', () => {
     );
   });
 
+  it('create: returns the saved futsal lineup and substitution policy from its pinned config version', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Sport.findUnique.mockResolvedValue({ id: 'sport-1', code: 'futsal' });
+    prisma.v1CompetitionConfigVersion.findFirst.mockResolvedValue({
+      id: 'futsal-lineup-6-limited-4',
+      version: 2,
+      contentHash: 'hash-futsal-lineup-6-limited-4',
+    });
+    prisma.v1Tournament.create.mockResolvedValue(tournamentRow({
+      competitionConfigVersionId: 'futsal-lineup-6-limited-4',
+    }));
+    prisma.v1CompetitionConfigVersion.findUnique.mockResolvedValue({
+      lineup: {
+        minPlayers: 3,
+        maxPlayers: 6,
+        substitutions: 'limited',
+        maxSubstitutions: 4,
+      },
+    });
+
+    const result = await service.create(ownerAuthUser, {
+      sportId: 'sport-1',
+      title: '풋살 대회',
+      teamCount: 8,
+      lineupMaxPlayers: 6,
+      substitutionMode: 'limited',
+      maxSubstitutions: 4,
+    });
+
+    expect(result).toMatchObject({
+      competitionConfigVersionId: 'futsal-lineup-6-limited-4',
+      lineupMaxPlayers: 6,
+      lineupMinPlayers: 3,
+      substitutionMode: 'limited',
+      maxSubstitutions: 4,
+    });
+  });
+
+  it.each([null, 4])('create: returns the persisted minMatchesPerTeam value (%s)', async (minMatchesPerTeam) => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Sport.findUnique.mockResolvedValue({ id: 'sport-1' });
+    prisma.v1Tournament.create.mockResolvedValue(tournamentRow({ minMatchesPerTeam }));
+
+    const result = await service.create(ownerAuthUser, {
+      sportId: 'sport-1',
+      title: '리그 방식 대회',
+      format: 'league',
+      teamCount: 8,
+      minMatchesPerTeam,
+    });
+
+    expect(result.minMatchesPerTeam).toBe(minMatchesPerTeam);
+  });
+
+  it('create: fails config reads before writing a tournament or audit row', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Sport.findUnique.mockResolvedValue({ id: 'sport-1', code: 'futsal' });
+    prisma.v1CompetitionConfigVersion.findFirst.mockResolvedValue({
+      id: 'futsal-lineup-6',
+      version: 1,
+      contentHash: 'hash-futsal-lineup-6',
+    });
+    prisma.v1CompetitionConfigVersion.findUnique.mockRejectedValue(new Error('config read failed'));
+
+    await expect(service.create(ownerAuthUser, {
+      sportId: 'sport-1',
+      title: '풋살 대회',
+      teamCount: 8,
+      lineupMaxPlayers: 6,
+    })).rejects.toThrow('config read failed');
+
+    expect(prisma.v1Tournament.create).not.toHaveBeenCalled();
+    expect(prisma.v1AdminActionLog.create).not.toHaveBeenCalled();
+  });
+
   it('update: lineupMaxPlayers on an in_progress tournament → 409 TOURNAMENT_LINEUP_SIZE_LOCKED, no reads/writes', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'in_progress' }));
@@ -1616,10 +1754,9 @@ describe('TournamentsAdminService', () => {
     });
     prisma.v1Tournament.updateMany.mockResolvedValue({ count: 1 });
 
-    // change()가 실제로 커밋하면 그 트랜잭션이 Prisma @updatedAt으로 이 대회의 updatedAt을
-    // existing.updatedAt(TOURNAMENT_ROW_UPDATED_AT)과는 다른 새 값으로 이미 앞당긴다.
+    // 같은 트랜잭션의 설정 핀 쓰기도 Prisma @updatedAt을 갱신한다.
     const freshVersionAfterConfigChange = '2026-09-17T03:00:00.000Z';
-    const changeSpy = jest.spyOn(TournamentCompetitionConfig.prototype, 'change').mockResolvedValue({
+    const changeSpy = jest.spyOn(TournamentCompetitionConfig.prototype, 'changeInTransaction').mockResolvedValue({
       changed: true,
       currentCompetitionConfigVersionId: 'new-config-version-6',
       expectedVersion: freshVersionAfterConfigChange,
@@ -1632,6 +1769,7 @@ describe('TournamentsAdminService', () => {
     try {
       await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, lineupMaxPlayers: 6 });
       expect(changeSpy).toHaveBeenCalledWith(
+        prisma,
         ownerAuthUser,
         'tournament-1',
         expect.objectContaining({
@@ -1639,10 +1777,7 @@ describe('TournamentsAdminService', () => {
           expectedVersion: existing.updatedAt.toISOString(),
         }),
       );
-      // Copilot 리뷰 지적, 실제 결함으로 확인됨: 이 뒤에 이어지는 일반 필드 업데이트
-      // 트랜잭션이 여전히 existing.updatedAt(옛 값)을 CAS 기준으로 썼다면, change()가
-      // 방금 앞당긴 실제 행과 절대 일치하지 않아 같은 요청 안에서 스스로 409를 냈을 것이다
-      // — 반드시 change()가 돌려준 새 expectedVersion을 기준으로 원자적 갱신해야 한다.
+      // 후속 일반 필드 쓰기도 설정 핀이 발행한 새 버전으로 CAS해야 한다.
       expect(prisma.v1Tournament.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: 'tournament-1', updatedAt: new Date(freshVersionAfterConfigChange) },
@@ -1665,7 +1800,7 @@ describe('TournamentsAdminService', () => {
       contentHash: 'hash-6-new',
     });
 
-    const changeSpy = jest.spyOn(TournamentCompetitionConfig.prototype, 'change').mockResolvedValue({
+    const changeSpy = jest.spyOn(TournamentCompetitionConfig.prototype, 'changeInTransaction').mockResolvedValue({
       changed: false,
       currentCompetitionConfigVersionId: 'old-config-version',
       requestedCompetitionConfigVersionId: 'new-config-version-6',
@@ -1795,7 +1930,7 @@ describe('TournamentsAdminService', () => {
     });
     prisma.v1Tournament.updateMany.mockResolvedValue({ count: 1 });
     const createVersion = jest.spyOn(CompetitionConfigRegistry.prototype, 'createVersion');
-    const change = jest.spyOn(TournamentCompetitionConfig.prototype, 'change');
+    const change = jest.spyOn(TournamentCompetitionConfig.prototype, 'changeInTransaction');
     try {
       await expect(service.update(ownerAuthUser, 'tournament-1', {
         expectedVersion: TOURNAMENT_ROW_UPDATED_AT, title: '새 제목', lineupMaxPlayers: 6, substitutionMode: 'rolling',
@@ -1824,7 +1959,7 @@ describe('TournamentsAdminService', () => {
       expect(dto.config.lineup).not.toHaveProperty('formations');
       return { id: 'new-v1-pin', version: 2, contentHash: 'new-v1-hash' } as never;
     });
-    const change = jest.spyOn(TournamentCompetitionConfig.prototype, 'change').mockResolvedValue({
+    const change = jest.spyOn(TournamentCompetitionConfig.prototype, 'changeInTransaction').mockResolvedValue({
       confirmationRequired: false, expectedVersion: TOURNAMENT_ROW_UPDATED_AT,
     } as never);
     try {
@@ -1878,7 +2013,7 @@ describe('TournamentsAdminService', () => {
         version: 4,
         contentHash: 'hash-new',
       } as never);
-    const changeSpy = jest.spyOn(TournamentCompetitionConfig.prototype, 'change').mockResolvedValue({
+    const changeSpy = jest.spyOn(TournamentCompetitionConfig.prototype, 'changeInTransaction').mockResolvedValue({
       changed: true,
       currentCompetitionConfigVersionId: 'new-config-version',
       expectedVersion: new Date().toISOString(),

@@ -27,7 +27,7 @@ import {
 import { normalizeCompetitionSportCode, tryNormalizeCompetitionSportCode, validateCompetitionConfig } from './competition-config/competition-config';
 import { parseLineupLimits } from './competition-config/competition-config.parse';
 import { LineupSizeConfigResolver } from './competition-config/lineup-size-config-resolver';
-import { TournamentCompetitionConfig } from './competition-config/tournament-competition-config';
+import { lockTournamentForConfigChange, TournamentCompetitionConfig } from './competition-config/tournament-competition-config';
 
 /**
  * 대회 status 전이 규칙. 운영 실수 회복을 위해 closed↔open 재오픈, completed→in_progress
@@ -214,21 +214,25 @@ export class TournamentsAdminService {
     // 있던) 다른 테스트의 얕은 목이 undefined를 줘도 loadLineupInfo가 "종목 정보 없음"으로
     // 안전하게 degrade하지, 여기서 크래시하지 않는다.
     const lineup = await this.loadLineupInfo(row.sport?.code, row.competitionConfigVersionId);
-    return this.serialize(
-      row,
-      row._count.registrations,
-      {
-        registrations: row._count.registrations,
-        fixtures: fixtureCount,
-        announcements: row._count.announcements,
-      },
-      lineup,
-    );
+    const formatChangeBlockedReason = await this.getFormatChangeBlockedReason(this.prisma, tournamentId, row.status);
+    return {
+      formatChangeBlockedReason,
+      ...this.serialize(
+        row,
+        row._count.registrations,
+        {
+          registrations: row._count.registrations,
+          fixtures: fixtureCount,
+          announcements: row._count.announcements,
+        },
+        lineup,
+      ),
+    };
   }
 
   /**
-   * `get()` 전용 — 대회 상세/수정 화면이 "출전 인원"·"교체 방식/횟수" 선택지와 현재
-   * pin된 값을 함께 보여주는 데 쓴다. `sportCode`가 경기 설정 카탈로그에 없는 종목이면
+   * 대회 상세(`get()`)와 생성(`create()`) 응답에서 "출전 인원"·"교체 방식/횟수"
+   * 선택지와 현재 pin된 값을 함께 보여주는 데 쓴다. `sportCode`가 경기 설정 카탈로그에 없는 종목이면
    * `sizeOptions`는 빈 배열이고(선택지를 지어내지 않는다), `competitionConfigVersionId`가
    * 아직 null이면 `pinned`도 null이다(아직 어떤 값도 pin되지 않음 — 미지원 종목이거나
    * 레거시 대회).
@@ -328,6 +332,9 @@ export class TournamentsAdminService {
       substitutionMode: dto.substitutionMode,
       maxSubstitutions: dto.maxSubstitutions,
     });
+    // Read the immutable config before the write transaction. A read failure must not return an
+    // error after the tournament and audit row have already committed.
+    const lineup = await this.loadLineupInfo(sport.code, competitionConfigVersionId);
 
     const created = await this.prisma.$transaction(async (tx) => {
       const tournament = await tx.v1Tournament.create({
@@ -398,7 +405,7 @@ export class TournamentsAdminService {
       return tournament;
     });
 
-    return this.serialize(created, 0);
+    return this.serialize(created, 0, undefined, lineup);
   }
 
   async update(user: V1AuthUser, tournamentId: string, dto: UpdateTournamentDto) {
@@ -418,6 +425,9 @@ export class TournamentsAdminService {
         message: '대회 정보가 다른 곳에서 이미 수정됐어요. 새로고침 후 다시 시도해 주세요.',
       });
     }
+
+    const formatChanged = dto.format !== undefined && dto.format !== existing.format;
+    if (formatChanged) await this.assertFormatChangeAllowed(this.prisma, tournamentId, existing.status);
 
     // "출전 인원"과 "교체 방식/횟수"는 같은 V1CompetitionConfigVersion.lineup에 함께
     // pin되는 설정이라 변경 정책도 동일해야 한다(오너 지시 #4) — 아래 게이트를 두
@@ -610,82 +620,54 @@ export class TournamentsAdminService {
     if (dto.promoListPrizeText !== undefined) data.promoListPrizeText = nullableText(dto.promoListPrizeText);
     if (dto.promoListPriority !== undefined) data.promoListPriority = dto.promoListPriority;
 
-    // 아래 최종 업데이트의 CAS 기준값. 기본은 이 메서드가 시작할 때 읽은 existing.updatedAt
-    // 이지만, 바로 아래 lineupConfigChangeRequested 분기가 실제로 TournamentCompetitionConfig
-    // .change()를 커밋하면 그 자체가 Prisma @updatedAt으로 이 행의 updatedAt을 이미 한 번
-    // 앞당긴다 — 그 새 값을 반영하지 않으면 같은 요청 안에서 스스로 CAS 충돌을 내게 된다
-    // (Copilot 리뷰 지적, 실제 결함: 출전 인원과 다른 필드를 한 요청에 같이 보내면 매번
-    // TOURNAMENT_VERSION_CONFLICT가 났을 것).
-    let casBaseline = existing.updatedAt;
-
-    // 출전 인원/교체 정책 변경은 다른 필드들과 별도 트랜잭션으로 처리한다 —
-    // TournamentCompetitionConfig.change()가 자기 CAS(expectedVersion)와 미완료 픽스처
-    // 리포인트, 감사 로그를 이미 원자적으로 다 갖고 있어 여기서 재구현하지 않는다. CAS는
-    // 이 메서드가 시작할 때 읽은 existing.updatedAt을 그대로 쓴다 — 아래 필드 업데이트
-    // 트랜잭션이 아직 실행되기 전이라 여전히 유효하다.
-    if (lineupConfigChangeRequested) {
-      const sport = await this.prisma.v1Sport.findUnique({ where: { id: existing.sportId } });
-      if (!sport) {
-        throw new NotFoundException({ code: 'SPORT_NOT_FOUND', message: '종목을 찾을 수 없어요.' });
-      }
-      // 기존 버전 전체를 원본으로 사용한다. 라인업 필드만 보내더라도 피리어드·결과 정책 등
-      // 관리자가 저장한 다른 섹션을 종목 기본값으로 되돌리면 안 된다.
-      const pinnedVersion = existing.competitionConfigVersionId
-        ? await this.prisma.v1CompetitionConfigVersion.findUnique({
-            where: { id: existing.competitionConfigVersionId },
-            select: { name: true, periods: true, events: true, lineup: true, result: true, tieBreak: true, visibility: true },
-          })
-        : null;
-      const pinnedLineup = pinnedVersion ? parseLineupLimits(pinnedVersion.lineup) : null;
-      const pinnedConfig = pinnedVersion ? validateCompetitionConfig({
-        periods: pinnedVersion.periods,
-        events: pinnedVersion.events,
-        lineup: pinnedVersion.lineup,
-        result: pinnedVersion.result,
-        tieBreak: pinnedVersion.tieBreak,
-        visibility: pinnedVersion.visibility,
-      }, { preserveMissingCatalogKeys: true }) : undefined;
-      const resolved = await this.lineupSizeConfigResolver.resolveVersionForLineupConfig(
-        user,
-        normalizeCompetitionSportCode(sport.code),
-        {
-          baseConfig: pinnedConfig,
-          baseConfigName: pinnedVersion?.name,
-          maxPlayers: dto.lineupMaxPlayers ?? pinnedLineup?.maxPlayers,
-          substitutionMode: dto.substitutionMode ?? pinnedLineup?.substitutions,
-          maxSubstitutions:
-            dto.maxSubstitutions !== undefined ? dto.maxSubstitutions : pinnedLineup?.maxSubstitutions,
-        },
-      );
-      if (resolved.id !== existing.competitionConfigVersionId) {
-        const changeResult = await this.tournamentCompetitionConfig.change(user, tournamentId, {
-          competitionConfigVersionId: resolved.id,
-          expectedVersion: existing.updatedAt.toISOString(),
-        });
-        // change()는 완료된 픽스처/순위가 있어 소급 영향이 있을 때만 confirmationRequired를
-        // 반환하며, 그 경우 아무것도 쓰지 않고 그대로 리턴한다(non-mutating). 이 출전 인원
-        // 편집 폼에는 confirmRecalculation을 넘길 방법이 없으므로(위 상태 가드가 대부분
-        // 걸러내지만, status가 아직 in_progress/completed로 안 바뀐 채로 결과가 먼저 기록된
-        // 드문 경우를 대비한 방어) 그대로 진행하는 대신 명확한 에러로 막는다.
-        if (changeResult.confirmationRequired) {
-          throw new ConflictException({
-            code: 'TOURNAMENT_LINEUP_SIZE_LOCKED',
-            // 사유도 사실에 맞춘다 — 이 게이트는 완료된 픽스처뿐 아니라 **기록된 순위**나
-            // **이미 시작된 경기**만 있어도 걸린다(TournamentCompetitionConfig.change 의
-            // requiresRecalculation). "기록된 경기 결과가 있어"로만 안내하면, 결과가 하나도
-            // 없는데 거부당한 운영자는 무엇을 지워야 풀리는지 알 수 없다.
-            message: `이미 진행된 경기나 기록된 결과가 있어 ${lockedFieldLabel}을 변경할 수 없어요. ${LINEUP_LOCK_ESCAPE_HINT}`,
-          });
-        }
-        // confirmationRequired가 아니면 change()가 실제로 커밋된 것이다 — 그 트랜잭션이
-        // 남긴 새 updatedAt을 이후 CAS 기준으로 삼는다.
-        casBaseline = new Date(changeResult.expectedVersion);
-      }
-    }
-
     await this.prisma.$transaction(async (tx) => {
-      // 사전 검사와 CAS 사이에 대진이 생길 수 있어 트랜잭션 안에서 한 번 더 확인한다.
+      // 설정 핀과 일반 필드를 같은 트랜잭션에 둔다. 구조 검사나 CAS가 거부되면
+      // 설정 리포인트와 감사 기록까지 함께 롤백되어야 한다.
+      if (formatChanged || lineupConfigChangeRequested) await lockTournamentForConfigChange(tx, tournamentId);
+      if (formatChanged) await this.assertFormatChangeAllowed(tx, tournamentId, existing.status);
       if (sportChanged) await this.assertSportChangeAllowed(tx, tournamentId, existing.status);
+      let casBaseline = existing.updatedAt;
+      if (lineupConfigChangeRequested) {
+        const sport = await tx.v1Sport.findUnique({ where: { id: existing.sportId } });
+        if (!sport) throw new NotFoundException({ code: 'SPORT_NOT_FOUND', message: '종목을 찾을 수 없어요.' });
+        // 기존 설정의 다른 섹션과 이름을 보존하고 라인업 필드만 바꾼다.
+        const pinnedVersion = existing.competitionConfigVersionId
+          ? await tx.v1CompetitionConfigVersion.findUnique({
+              where: { id: existing.competitionConfigVersionId },
+              select: { name: true, periods: true, events: true, lineup: true, result: true, tieBreak: true, visibility: true },
+            })
+          : null;
+        const pinnedLineup = pinnedVersion ? parseLineupLimits(pinnedVersion.lineup) : null;
+        const pinnedConfig = pinnedVersion ? validateCompetitionConfig({
+          periods: pinnedVersion.periods, events: pinnedVersion.events, lineup: pinnedVersion.lineup,
+          result: pinnedVersion.result, tieBreak: pinnedVersion.tieBreak, visibility: pinnedVersion.visibility,
+        }, { preserveMissingCatalogKeys: true }) : undefined;
+        const resolved = await this.lineupSizeConfigResolver.resolveVersionForLineupConfig(
+          user,
+          normalizeCompetitionSportCode(sport.code),
+          {
+            baseConfig: pinnedConfig,
+            baseConfigName: pinnedVersion?.name,
+            maxPlayers: dto.lineupMaxPlayers ?? pinnedLineup?.maxPlayers,
+            substitutionMode: dto.substitutionMode ?? pinnedLineup?.substitutions,
+            maxSubstitutions: dto.maxSubstitutions !== undefined ? dto.maxSubstitutions : pinnedLineup?.maxSubstitutions,
+          },
+        );
+        if (resolved.id !== existing.competitionConfigVersionId) {
+          const changeResult = await this.tournamentCompetitionConfig.changeInTransaction(tx, user, tournamentId, {
+            competitionConfigVersionId: resolved.id,
+            expectedVersion: existing.updatedAt.toISOString(),
+          });
+          if (changeResult.confirmationRequired) {
+            throw new ConflictException({
+              code: 'TOURNAMENT_LINEUP_SIZE_LOCKED',
+              message: `이미 진행된 경기나 기록된 결과가 있어 ${lockedFieldLabel}을 변경할 수 없어요. ${LINEUP_LOCK_ESCAPE_HINT}`,
+            });
+          }
+          // 같은 트랜잭션의 핀 변경이 갱신한 버전을 후속 CAS에 사용한다.
+          casBaseline = new Date(changeResult.expectedVersion);
+        }
+      }
       // lineup만 저장하면 일반 필드 data가 비어 Prisma updateMany가 SQL 없이 count=0을
       // 반환한다. 이 경우에도 실제 CAS 쓰기를 수행하고 기존 버전보다 새 버전을 발행한다.
       if (Object.keys(data).length === 0) {
@@ -714,6 +696,7 @@ export class TournamentsAdminService {
           targetId: tournamentId,
           beforeJson: {
             title: existing.title,
+            ...(formatChanged && { format: existing.format }),
             ...(sportChanged && {
               sportId: existing.sportId,
               competitionConfigVersionId: existing.competitionConfigVersionId,
@@ -721,6 +704,7 @@ export class TournamentsAdminService {
           },
           afterJson: {
             title: data.title ?? existing.title,
+            ...(formatChanged && { format: dto.format }),
             ...(sportChanged && {
               sportId: dto.sportId,
               competitionConfigVersionId: sportChangeConfigVersionId,
@@ -1131,7 +1115,34 @@ export class TournamentsAdminService {
     };
   }
 
-  /** 대진이 만들어졌거나 대회가 시작된 뒤에는 종목을 바꿀 수 없다(이미 그 종목 규칙으로 만든 경기가 있다). */
+  /** 화면 안내와 직접 API 변경 검증이 같은 잠금 정책을 사용한다. */
+  private async getFormatChangeBlockedReason(
+    client: Pick<Prisma.TransactionClient, 'v1TournamentMatchDetails' | 'v1TournamentGroup'>,
+    tournamentId: string,
+    status: string,
+  ): Promise<string | null> {
+    if (status === 'in_progress' || status === 'completed') {
+      return '대회가 시작된 뒤에는 대회 형식을 변경할 수 없어요.';
+    }
+    const fixtures = await client.v1TournamentMatchDetails.count({
+      where: { tournamentId, teamMatch: { deletedAt: null } },
+    });
+    const groups = await client.v1TournamentGroup.count({ where: { tournamentId } });
+    return fixtures > 0 || groups > 0
+      ? '조나 대진이 만들어져 있어 대회 형식을 변경할 수 없어요. 대진표에서 경기와 조를 모두 삭제한 뒤 변경해 주세요.'
+      : null;
+  }
+
+  private async assertFormatChangeAllowed(
+    client: Pick<Prisma.TransactionClient, 'v1TournamentMatchDetails' | 'v1TournamentGroup'>,
+    tournamentId: string,
+    status: string,
+  ) {
+    const message = await this.getFormatChangeBlockedReason(client, tournamentId, status);
+    if (message) throw new ConflictException({ code: 'TOURNAMENT_FORMAT_LOCKED', message });
+  }
+
+  /** 대진이 만들어졌거나 대회가 시작된 뒤에는 종목을 바꿀 수 없다. */
   private async assertSportChangeAllowed(
     client: Pick<Prisma.TransactionClient, 'v1TournamentMatchDetails'>,
     tournamentId: string,
@@ -1368,10 +1379,11 @@ export class TournamentsAdminService {
       teamCount: row.teamCount,
       minPlayers: row.minPlayers,
       maxPlayers: row.maxPlayers,
+      minMatchesPerTeam: row.minMatchesPerTeam,
       // "출전 인원"(라인업 상한) — 위 minPlayers/maxPlayers("등록" 로스터 크기)와는 다른
       // 값이다. competitionConfigVersionId는 목록/생성 응답에도 항상 있는 스칼라라 비용
-      // 없이 노출하지만, lineupMaxPlayers/lineupMinPlayers/lineupSizeOptions는 조인이
-      // 필요해 get()(대회 상세·수정 화면)에서만 채운다 — 그 외에는 null/[]로 둔다.
+      // 없이 노출한다. lineupMaxPlayers/lineupMinPlayers와 교체 설정은 pinned config 조인이
+      // 필요해 상세 및 생성 응답에서만 채우고, 그 외 응답은 null/[]로 둔다.
       competitionConfigVersionId: row.competitionConfigVersionId,
       // 공개 여부 — false 면 일반 사용자 화면에서 숨겨져 있다(관리 화면의 공개 설정이 읽는다).
       isPublic: row.isPublic,

@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { INestApplication } from '@nestjs/common';
 import request = require('supertest');
 import { PrismaService } from '../../src/prisma/prisma.service';
@@ -79,6 +81,26 @@ describe('리그 대표 이미지 HTTP/DB 계약', () => {
   const IMG_1 = `/uploads/cover-${suiteId}-1.webp`;
   const IMG_2 = `/uploads/cover-${suiteId}-2.webp`;
 
+  it('실제 migration은 기존 리그 이미지를 두 필드에 보존하고 대회와 빈 이미지는 유지한다', async () => {
+    const migration = readFileSync(join(__dirname, '../../prisma/migrations/20261016070000_league_list_image/migration.sql'), 'utf8');
+    await prisma.$transaction(async (tx) => {
+      // Session-local table shadows the real one only inside this transaction.
+      await tx.$executeRawUnsafe('CREATE TEMP TABLE v1_tournaments (id TEXT, kind TEXT, cover_image_url TEXT) ON COMMIT DROP');
+      await tx.$executeRaw`INSERT INTO v1_tournaments (id, kind, cover_image_url) VALUES
+        ('existing', 'regular_league', ${IMG_1}), ('empty', 'regular_league', NULL), ('cup', 'regular_tournament', ${IMG_2})`;
+      for (const statement of migration.split(';').filter((part) => part.trim())) {
+        await tx.$executeRawUnsafe(statement);
+      }
+      const rows = await tx.$queryRaw<Array<{ id: string; cover_image_url: string | null; list_image_url: string | null }>>`
+        SELECT id, cover_image_url, list_image_url FROM v1_tournaments ORDER BY id`;
+      expect(rows).toEqual([
+        { id: 'cup', cover_image_url: IMG_2, list_image_url: null },
+        { id: 'empty', cover_image_url: null, list_image_url: null },
+        { id: 'existing', cover_image_url: IMG_1, list_image_url: IMG_1 },
+      ]);
+    });
+  });
+
   it('권한: support 는 403, 대회 id 는 404, 잘못된 id 는 400', async () => {
     await patchCover(leagueA, { coverImageUrl: IMG_1 }, supportUserId).expect(403);
     expect((await patchCover(tournamentId, { coverImageUrl: IMG_1 }).expect(404)).body.code).toBe('LEAGUE_NOT_FOUND');
@@ -99,11 +121,11 @@ describe('리그 대표 이미지 HTTP/DB 계약', () => {
   });
 
   it('설정하면 어드민·공개 상세·통합 목록에 그 리그만 바뀌고 다른 리그는 null 이다', async () => {
-    const res = await patchCover(leagueA, { coverImageUrl: IMG_1 }).expect(200);
-    expect(res.body.data).toEqual({ leagueId: leagueA, coverImageUrl: IMG_1, alreadyProcessed: false });
+    const res = await patchCover(leagueA, { coverImageUrl: IMG_1, listImageUrl: IMG_2 }).expect(200);
+    expect(res.body.data).toEqual({ leagueId: leagueA, coverImageUrl: IMG_1, listImageUrl: IMG_2, alreadyProcessed: false });
     expect(await adminCover(leagueA)).toBe(IMG_1);
     expect(await publicCover(leagueA)).toBe(IMG_1);
-    expect(await listCover(leagueA)).toBe(IMG_1);
+    expect(await listCover(leagueA)).toBe(IMG_2);
     expect(await adminCover(leagueB)).toBeNull();
     expect(await publicCover(leagueB)).toBeNull();
     expect(await listCover(leagueB)).toBeNull();
@@ -119,12 +141,19 @@ describe('리그 대표 이미지 HTTP/DB 계약', () => {
   it('교체는 before·after 를 감사에 남기고, null 은 제거한다', async () => {
     await patchCover(leagueA, { coverImageUrl: IMG_2 }).expect(200);
     const audit = await prisma.v1AdminActionLog.findFirstOrThrow({
-      where: { targetId: leagueA, action: 'league_match.cover_image_updated', afterJson: { equals: { coverImageUrl: IMG_2 } } },
+      where: { targetId: leagueA, action: 'league_match.cover_image_updated', afterJson: { equals: { coverImageUrl: IMG_2, listImageUrl: IMG_2 } } },
     });
-    expect(audit.beforeJson).toEqual({ coverImageUrl: IMG_1 });
+    expect(audit.beforeJson).toEqual({ coverImageUrl: IMG_1, listImageUrl: IMG_2 });
 
     await patchCover(leagueA, { coverImageUrl: null }).expect(200);
     expect(await adminCover(leagueA)).toBeNull();
+    expect(await publicCover(leagueA)).toBe(IMG_2);
+  });
+
+  it('상세 제거 후 목록은 보존되고 목록만 제거할 수 있다', async () => {
+    expect(await listCover(leagueA)).toBe(IMG_2);
+    await patchCover(leagueA, { listImageUrl: null }).expect(200);
+    expect(await listCover(leagueA)).toBeNull();
     expect(await publicCover(leagueA)).toBeNull();
   });
 

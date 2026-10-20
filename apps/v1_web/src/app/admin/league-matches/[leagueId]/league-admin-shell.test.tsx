@@ -121,6 +121,36 @@ describe('LeagueAdminShell', () => {
   });
 
   describe('상태 변경', () => {
+    it('모집 마감에서 리그 시작하기를 확인하면 실제 상태 변경을 요청하고 실패를 표시한다', async () => {
+      query.value = loaded({ state: 'draft', lifecycleStatus: 'closed' });
+      renderShell();
+      expect(screen.getByText('모집완료')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: '리그 시작하기' }));
+      const dialog = screen.getByRole('dialog', { name: '리그 시작하기' });
+      expect(within(dialog).getByRole('radio', { name: /진행 중/ })).toBeChecked();
+      fireEvent.click(within(dialog).getByRole('button', { name: '리그 시작하기' }));
+      expect(changeMutate).toHaveBeenCalledWith({ state: 'active', reason: undefined }, expect.anything());
+      const callbacks = changeMutate.mock.calls[0][1];
+      const { act } = await import('@testing-library/react');
+      act(() => callbacks.onError(new Error('시작 권한이 없어요.')));
+      expect(within(dialog).getByRole('alert')).toHaveTextContent('시작 권한이 없어요.');
+    });
+
+    it('운영자가 신청을 다시 열어도 시작 전 상태와 모집 표시는 구분한다', () => {
+      query.value = loaded({ state: 'draft', lifecycleStatus: 'closed', registrationOpen: true });
+      renderShell();
+      expect(screen.getByText('모집완료')).toBeInTheDocument();
+      expect(screen.queryByText('모집 중', { exact: true })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '리그 시작하기' })).toBeInTheDocument();
+    });
+
+    it('조회 전용 관리자는 모집 마감 리그를 시작할 수 없다', () => {
+      adminCanWrite.value = false;
+      query.value = loaded({ state: 'draft', lifecycleStatus: 'closed' });
+      renderShell();
+      expect(screen.queryByRole('button', { name: '리그 시작하기' })).not.toBeInTheDocument();
+    });
+
     it('조회 전용 관리자에게는 버튼이 없다', () => {
       adminCanWrite.value = false;
       renderShell();

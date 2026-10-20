@@ -320,3 +320,31 @@ describe('LineupGrid — 퇴장 선수 (MD-QA #97)', () => {
     expect(screen.queryByText('퇴장')).toBeNull();
   });
 });
+
+describe('LineupGrid — 운영진 실명', () => {
+  const withRealName = { ...participant('p-1', '홍길동', 1), identity: { realName: '김실명', phone: null } };
+
+  it.each([
+    ['운영진(실명 있음)', withRealName, '김실명 (홍길동)'],
+    ['권한 없음(identity 키 없음)', participant('p-1', '홍길동', 1), '홍길동'],
+  ])('%s — 선수 버튼 글자와 접근성 이름이 같은 규칙을 따른다', (_, row, name) => {
+    render(<LineupGrid sides={SIDES} lineups={[lineup([row])]} onSelectPlayer={vi.fn()} />);
+
+    const button = screen.getByRole('button', { name: `${name} 선수 이벤트 기록` });
+    expect(button).toHaveTextContent(name);
+  });
+
+  it('운영진은 실명으로도 찾는다 — 권한이 없으면 실명이 걸리지 않는다', () => {
+    expect(matchesPlayerQuery(withRealName, '김실')).toBe(true);
+    expect(matchesPlayerQuery(withRealName, '홍길')).toBe(true);
+    expect(matchesPlayerQuery(participant('p-1', '홍길동', 1), '김실')).toBe(false);
+  });
+
+  it('이름이 길어도 자르지 않고 줄을 바꾼다 (truncate 금지)', () => {
+    render(<LineupGrid sides={SIDES} lineups={[lineup([withRealName])]} onSelectPlayer={vi.fn()} />);
+
+    const label = screen.getByText('김실명 (홍길동)');
+    expect(label).not.toHaveClass('truncate');
+    expect(label).toHaveClass('break-words');
+  });
+});

@@ -119,8 +119,9 @@ describe('seedSeason — 통합 축 거울 dual-write', () => {
       regionId: 'region-1',
       tier: 1,
       seasonNo: 1,
-      // 시즌 시작 전이므로 draft 다.
-      status: 'draft',
+      // 신규 시즌은 모집 마감에서 운영자 시작을 기다린다.
+      status: 'closed',
+      requiresExplicitStart: true,
     });
   });
 

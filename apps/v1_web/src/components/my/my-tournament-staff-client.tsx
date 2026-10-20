@@ -6,7 +6,7 @@ import { ChevronRightIcon } from '@/components/v1-ui/icons';
 import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { useV1MyTournamentStaffAssignments } from '@/hooks/use-v1-api';
 import { myStaffEntryHref } from '@/hooks/use-v1-my-staff-assignments';
-import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
+import { getLeagueStatusConfig, getTournamentStatusConfig } from '@/lib/v1-tournament-status';
 import type { V1MyTournamentStaffAssignment, V1MyTournamentStaffGroup } from '@/types/api';
 
 /**
@@ -54,7 +54,9 @@ export function MyTournamentStaffPageClient() {
 }
 
 function StaffTournamentRow({ group }: { group: V1MyTournamentStaffGroup }) {
-  const status = getTournamentStatusConfig(group.tournamentStatus);
+  const status = group.tournamentKind === 'regular_league'
+    ? getLeagueStatusConfig(group.tournamentStatus)
+    : getTournamentStatusConfig(group.tournamentStatus);
   return (
     <Link
       className="tm-list-row tm-pressable"

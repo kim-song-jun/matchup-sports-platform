@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import LeagueFixturePage from './page';
+import LeagueFixturePage, { generateMetadata } from './page';
 import type { V1TeamMatch } from '@/types/api';
 
 const { loadPublic } = vi.hoisted(() => ({ loadPublic: vi.fn() }));
@@ -49,5 +49,41 @@ describe('리그 경기 상세 JSON-LD', () => {
     expect(breadcrumb.itemListElement).toEqual(expect.arrayContaining([
       expect.objectContaining({ name: '송파 풋살 리그', item: 'https://teameet.co.kr/tournaments/lg1' }),
     ]));
+  });
+
+  it('경기 조회 upstream 실패는 indexable 빈 리그 경기 메타데이터를 내지 않는다', async () => {
+    loadPublic.mockResolvedValueOnce({ ok: false });
+
+    const metadata = await generateMetadata({
+      params: Promise.resolve({ leagueId: 'lg1', fixtureId: 'f9' }),
+    });
+
+    expect(metadata.robots).toMatchObject({ index: false, follow: false });
+  });
+
+  it('필수 리그 조회 실패도 indexable 경기 메타데이터를 내지 않는다', async () => {
+    loadPublic
+      .mockResolvedValueOnce({
+        ok: true,
+        data: {
+          teamMatchId: 'f9', title: '1주차', sportName: '풋살', startsAt: '2026-09-20T01:00:00.000Z',
+          placeName: '송파 풋살파크', status: 'matched', league: { leagueId: 'lg1', title: '송파 풋살 리그' },
+        } as unknown as V1TeamMatch,
+      })
+      .mockResolvedValueOnce({ ok: false });
+
+    const metadata = await generateMetadata({
+      params: Promise.resolve({ leagueId: 'lg1', fixtureId: 'f9' }),
+    });
+
+    expect(metadata.robots).toMatchObject({ index: false, follow: false });
+  });
+
+  it('요청 leagueId가 잘못돼도 metadata canonical은 경기의 실제 소속 리그를 쓴다', async () => {
+    const metadata = await generateMetadata({
+      params: Promise.resolve({ leagueId: 'wrong-league', fixtureId: 'f9' }),
+    });
+
+    expect(metadata.alternates?.canonical).toBe('/league-matches/lg1/fixtures/f9');
   });
 });

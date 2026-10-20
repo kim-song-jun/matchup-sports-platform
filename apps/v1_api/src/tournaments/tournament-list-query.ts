@@ -51,7 +51,7 @@ function buildFilterSql(query: TournamentListQueryDto): Prisma.Sql {
     );
   } else if (query.status === 'draft') {
     // A tournament's own draft is operator preparation and stays hidden; only leagues expose it.
-    conditions.push(Prisma.sql`t.kind::text = 'regular_league' AND t.status::text = 'draft'`);
+    conditions.push(Prisma.sql`t.kind::text = 'regular_league' AND t.status::text IN ('draft', 'open', 'closed')`);
   } else {
     conditions.push(Prisma.sql`t.status::text = ${query.status}`);
   }

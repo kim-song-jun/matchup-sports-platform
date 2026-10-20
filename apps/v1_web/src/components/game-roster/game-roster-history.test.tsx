@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { V1GameRosterHistoryEvent } from '@/hooks/use-v1-game-roster';
-import { gameRosterHistoryCaption } from './game-roster-history';
+import { gameRosterHistoryCaption, gameRosterHistoryTitle } from './game-roster-history';
 
 /** 서버 계약: 되돌리기에도 역할이 오고, 사이드 팀이 바뀌어 자동으로 닫힌 기록은 actor.userId 가 null·role SYSTEM. */
 const revoke = (actor: V1GameRosterHistoryEvent['actor']): V1GameRosterHistoryEvent => ({
@@ -26,5 +26,25 @@ describe('gameRosterHistoryCaption', () => {
 
   it('역할을 모르는 옛 기록은 이름만', () => {
     expect(gameRosterHistoryCaption(revoke({ userId: 'u-1', displayName: '김팀장', role: null }))).toMatch(/· 김팀장$/);
+  });
+});
+
+describe('gameRosterHistoryTitle — 빠진 선수의 운영진 실명', () => {
+  const exclude = (extra: Partial<V1GameRosterHistoryEvent>): V1GameRosterHistoryEvent => ({
+    ...revoke({ userId: 'mgr-1', displayName: '김팀장', role: 'TEAM_MANAGER' }),
+    type: 'EXCLUDE',
+    reason: null,
+    ...extra,
+  });
+
+  it.each([
+    ['운영진(실명 있음)', { realName: '김실명' }, '김실명 (김민재) 빠짐'],
+    ['권한 없음(realName 키 없음)', {}, '김민재 빠짐'],
+  ])('%s', (_, extra, title) => {
+    expect(gameRosterHistoryTitle(exclude(extra))).toBe(title);
+  });
+
+  it('되돌린 기록도 같은 이름 규칙이다', () => {
+    expect(gameRosterHistoryTitle({ ...revoke({ userId: 'admin-1', displayName: '박운영', role: 'ADMIN' }), realName: '김실명' })).toBe('김실명 (김민재) 출전으로 되돌림');
   });
 });

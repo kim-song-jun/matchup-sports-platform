@@ -23,6 +23,9 @@ import { TEAM_IN_OTHER_GROUP_HIDDEN_NOTE, applyGroupRule, registrationIdsBlocked
 import type { V1AdminBracketFixture, V1AdminBracketGroup, V1AdminBracketSlot } from '@/types/api';
 import { BracketQuickResultForm } from './bracket-quick-result-form';
 import { BracketResultActions } from './bracket-result-actions';
+import { ByeSlotEditor } from './bye-slot-editor';
+import { FixtureMetadataEditor } from './fixture-metadata-editor';
+import { ByeSideControl } from './bye-side-control';
 import type { RegistrationsLoadState } from './bracket-team-tray';
 import { useLeagueResultToast } from './use-league-result-toast';
 
@@ -280,7 +283,7 @@ function SlotTeamPicker({
 }: PickerCommon & { slot: V1AdminBracketSlot; slots: V1AdminBracketSlot[]; groups: readonly V1AdminBracketGroup[]; candidates: MobilePickCandidate[]; scope: 'tournament' | 'league' }) {
   const assign = useV1AssignTournamentSlot(common.competitionId, scope);
   const { shown, hidesOtherGroupTeams } = applyGroupRule(
-    pickableCandidates(candidates, slots, slot),
+    pickableCandidates(candidates, slots, slot, groups),
     (candidate) => candidate.registrationId,
     registrationIdsBlockedForGroup(groups, slot.groupId),
     slot.registrationId,
@@ -376,6 +379,11 @@ export function MobileNodeSheetBody(props: MobileNodeSheetBodyProps) {
     return side.source === 'direct' && scope === 'tournament' ? 'direct' : null;
   };
 
+  if (node.byeSlotId && scope === 'tournament') {
+    const slot = props.slots.find(slot => slot.id === node.byeSlotId);
+    const fixture = props.fixtures?.find(f => f.id === node.fixtureId);
+    if (slot && fixture) return <ByeSlotEditor tournamentId={props.competitionId} slot={slot} fixture={fixture} groups={groups} slots={props.slots} candidates={props.candidates} canWrite={canWrite} registrationsLoaded={props.registrationsState.status === 'success'} />;
+  }
   if (view.kind === 'pick') {
     const side = view.side === 'HOME' ? node.home : node.away;
     const kind = pickKind(side);
@@ -410,7 +418,11 @@ export function MobileNodeSheetBody(props: MobileNodeSheetBodyProps) {
         <SideRow label="어웨이" side={node.away} canPick={pickKind(node.away) !== null} onPick={() => onViewChange({ kind: 'pick', side: 'AWAY' })} />
       </ul>
       {hasRankSlot ? <Note>조 순위가 정해지면 큰 화면에서 순위대로 채워요.</Note> : null}
-      {canWrite && node.state !== 'cancelled' ? <MobileFieldSetting key={node.fixtureId} {...props} /> : null}
+      {scope === 'tournament' && props.fixtures?.find((fixture) => fixture.id === node.fixtureId) ? (
+        <ByeSideControl tournamentId={props.competitionId} fixture={props.fixtures.find((fixture) => fixture.id === node.fixtureId)!}
+          slots={props.slots} canWrite={canWrite} showToast={props.showToast} onSaved={props.onDone} />
+      ) : null}
+      {scope === 'tournament' && props.fixtures?.find(f => f.id === node.fixtureId) ? <FixtureMetadataEditor key={node.fixtureId} tournamentId={props.competitionId} fixture={props.fixtures.find(f => f.id === node.fixtureId)!} groups={groups} fixtures={props.fixtures} slots={props.slots} canWrite={canWrite} /> : canWrite && node.state !== 'cancelled' ? <MobileFieldSetting key={node.fixtureId} {...props} /> : null}
       <ResultSection {...props} />
     </div>
   );

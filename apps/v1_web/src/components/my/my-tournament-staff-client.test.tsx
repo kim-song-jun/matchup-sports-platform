@@ -27,6 +27,16 @@ function render(ui: ReactElement) {
 }
 
 describe('MyTournamentStaffPageClient', () => {
+  it.each(['draft', 'open', 'closed'])('%s 리그 담당 항목은 모집완료로 표시한다', (status) => {
+    apiMocks.useV1MyTournamentStaffAssignments.mockReturnValue({
+      data: { items: [{ tournamentId: 'league-1', tournamentTitle: '담당 리그', tournamentKind: 'regular_league', tournamentStatus: status, assignments: [], fixtures: [] }] },
+      isLoading: false, isError: false,
+    });
+    render(<MyTournamentStaffPageClient />);
+    expect(screen.getByText('모집완료')).toBeInTheDocument();
+    expect(screen.queryByText('준비 중')).not.toBeInTheDocument();
+  });
+
   it('배정이 없으면 빈 상태를 보여준다', () => {
     apiMocks.useV1MyTournamentStaffAssignments.mockReturnValue({
       data: { items: [] },

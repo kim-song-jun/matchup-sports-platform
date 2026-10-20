@@ -105,7 +105,7 @@ describe('리그 승강 확정 (Task 153)', () => {
     });
   }
 
-  /** 시리즈 생성 + 시즌1 시딩. 리그는 아직 draft(대진 0건)다. */
+  /** 시리즈 생성 + 시즌1 시딩. 리그는 아직 모집 마감(대진 0건)이다. */
   async function seedSeries(title: string, tierTeams: string[][]) {
     const createRes = await asAdmin(http().post('/api/v1/admin/league-series')).send({
       title: `${title} ${suiteId}`,
@@ -132,6 +132,8 @@ describe('리그 승강 확정 (Task 153)', () => {
 
   /** 리그의 대진을 만들고 전부 공식 확정해 completed 로 만든다. */
   async function finishLeague(leagueId: string) {
+    await asAdmin(http().post(`/api/v1/admin/league-matches/${leagueId}/state`))
+      .send({ state: 'active' }).expect(200);
     const fixturesRes = await asAdmin(http().post(`/api/v1/admin/league-matches/${leagueId}/fixtures`)).send({
       weeksCount: 1,
     });

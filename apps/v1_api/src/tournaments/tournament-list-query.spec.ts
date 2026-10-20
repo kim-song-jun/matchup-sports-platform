@@ -31,6 +31,16 @@ describe('listTournamentIds cursor validation', () => {
 });
 
 describe('MD-QA #145 public list capacity SQL binding', () => {
+  it('compatible draft filter covers all pre-start league statuses without exposing tournament drafts', async () => {
+    const statements: Prisma.Sql[] = [];
+    const queryRaw = jest.fn(async (strings: TemplateStringsArray, ...values: unknown[]) => {
+      statements.push(Prisma.sql(strings, ...values));
+      return [];
+    });
+    await listTournamentIds({ $queryRaw: queryRaw } as never, { kind: 'league', status: 'draft' }, { limit: 5 });
+    expect(statements[0].text).toContain("t.kind::text = 'regular_league' AND t.status::text IN ('draft', 'open', 'closed')");
+  });
+
   it('MD-QA #145 review follow-up draft rank: actual SQL applies capacity before ranking a league draft as recruiting', async () => {
     const statements: Prisma.Sql[] = [];
     const queryRaw = jest.fn(async (strings: TemplateStringsArray, ...values: unknown[]) => {

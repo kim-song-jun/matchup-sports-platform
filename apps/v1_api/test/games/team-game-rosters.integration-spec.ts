@@ -635,6 +635,27 @@ describe('팀 경기 명단 표·일괄·결장 기간 API (Task 179)', () => {
       const other = await getAs(path(f.tournament.id, `missing-${suiteId}`), f.adminId);
       expect([other.status, other.body.code]).toEqual([404, 'REGISTRATION_NOT_FOUND']);
     });
+
+    it('진행한 경기도 기록 명단으로 읽기 전용 칸에 남고, 취소된 경기는 빠진다(팀 표는 시작 전 경기만)', async () => {
+      const f = await seedTournament();
+      const [a1, a2] = f.teamA.members;
+      const regA = f.registrations.get(f.teamA.id)!;
+      const path = `/api/v1/admin/tournaments/${f.tournament.id}/registrations/${regA}/game-rosters`;
+      await prisma.v1Game.update({ where: { id: f.games.g1.gameId }, data: { state: 'LIVE' } });
+
+      const data = (await getAs(path, f.adminId)).body.data as MatrixBody;
+      expect(data.games.map((game) => [game.gameId, game.editable])).toEqual([
+        [f.games.g1.gameId, false],
+        [f.games.g2.gameId, true],
+      ]);
+      expect(statusesOf(data)).toEqual({ [a1]: ['PARTICIPATING', 'PARTICIPATING'], [a2]: ['PARTICIPATING', 'PARTICIPATING'] });
+      const team = (await getAs(matrixPath(f.teamA.id), f.teamA.ownerId)).body.data as MatrixBody;
+      expect(team.games.map((game) => game.gameId)).toEqual([f.games.g2.gameId]);
+
+      await prisma.v1Game.update({ where: { id: f.games.g2.gameId }, data: { state: 'CANCELLED' } });
+      const afterCancel = (await getAs(path, f.adminId)).body.data as MatrixBody;
+      expect(afterCancel.games.map((game) => game.gameId)).toEqual([f.games.g1.gameId]);
+    });
   });
 
   describe('다가오는 경기 — 명단 요약', () => {

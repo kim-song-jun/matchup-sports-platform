@@ -8,7 +8,6 @@ import {
 } from '@nestjs/common';
 import {
   Prisma,
-  V1GameResultRevisionState,
   V1GameRosterAdjustmentAction,
   V1GameSourceType,
   V1GameState,
@@ -18,11 +17,10 @@ import type { V1AuthUser } from '../../auth/v1-auth-user';
 import { OperationAuditWriterService } from '../../common/audit/operation-audit-writer.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { participantDisplayName } from '../../tournaments/participant-display-name';
-import { selectLineupParticipantsWithDraftFallback } from '../core/latest-lineup-participants';
 import { GamesService, canViewParticipantIdentity } from '../games.service';
 import type { CreateGameRosterAdjustmentDto } from './dto/game-roster-adjustment.dto';
 import type { GameRosterActorRole } from './game-roster-computation';
-import { loadGameRoster, loadJerseyRegistration } from './game-roster-loader';
+import { loadGameRoster, loadJerseyRegistration, loadPlayedLineup } from './game-roster-loader';
 import { isUnmigratedTeamAuthoredLineup, lockRosterWriteScope, syncPreparedGameSideRoster } from './game-roster-sync';
 import { buildGameRosterView, decideGameRosterAccess, type GameRosterAccess, type GameRosterView } from './game-roster-view';
 import { competitionOpponentName } from './team-roster-columns';
@@ -425,39 +423,7 @@ export class GameRosterService {
         ? await isUnmigratedTeamAuthoredLineup(tx, target.gameId, target.sideId, latest)
         : false;
 
-    // 공식 정정은 제출 라인업을 바꾸지 않는다. 종료된 경기는 현재 공식 리비전의 출전자만 투영한다.
-    const officialGame = context.gameState === V1GameState.ENDED
-      ? await tx.v1Game.findUnique({
-          where: { id: target.gameId },
-          select: {
-            currentOfficialRevision: {
-              select: {
-                state: true,
-                resultParticipants: {
-                  where: { sideId: target.sideId },
-                  select: { participantId: true, goalkeeper: true },
-                },
-              },
-            },
-          },
-        })
-      : null;
-    const officialParticipants = officialGame?.currentOfficialRevision?.state === V1GameResultRevisionState.OFFICIAL
-      ? officialGame.currentOfficialRevision.resultParticipants
-      : null;
-    const officialSnapshots = officialParticipants === null || officialParticipants.length === 0
-      ? []
-      : await tx.v1GameParticipant.findMany({
-          where: { gameId: target.gameId, sideId: target.sideId, id: { in: officialParticipants.map((row) => row.participantId) } },
-          select: { id: true, userId: true, displayNameSnapshot: true, jerseyNumber: true },
-        });
-    const officialGoalkeepers = new Map(officialParticipants?.map((row) => [row.participantId, row.goalkeeper]));
-    // 공식 출전자가 0명이어도 확정된 값이므로 제출 명단으로 채우지 않는다.
-    const playedLineup = officialParticipants !== null
-      ? officialSnapshots.map((row) => ({ ...row, goalkeeper: officialGoalkeepers.get(row.id) ?? false }))
-      : context.gameState === V1GameState.SCHEDULED
-        ? null
-        : selectLineupParticipantsWithDraftFallback(rows, lineups).map((row) => ({ ...row, goalkeeper: row.position === (context.goalkeeperPositionCode ?? 'GK') }));
+    const playedLineup = await loadPlayedLineup(tx, context, { lineups, rows });
 
     const displayNameByUserId = await loadDisplayNames(tx, [
       ...computation.excluded.map((row) => row.actorUserId),
@@ -473,7 +439,7 @@ export class GameRosterService {
       ? await loadRealNames(tx, [
           ...loaded.base.flatMap((entry) => (entry.accountLinked ? [entry.userId] : [])),
           ...rows.flatMap((row) => (row.userId === null ? [] : [row.userId])),
-          ...officialSnapshots.flatMap((row) => (row.userId === null ? [] : [row.userId])),
+          ...(playedLineup ?? []).flatMap((row) => (row.userId === null ? [] : [row.userId])),
         ])
       : undefined;
     return buildGameRosterView({

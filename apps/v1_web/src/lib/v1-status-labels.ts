@@ -474,3 +474,9 @@ export const PLAYER_ELIGIBILITY_LABEL: Record<V1PlayerEligibilityStatus, string>
   pro: '선출',
   needs_review: '확인 중',
 };
+
+/** 참가 명단에 표시하는 선수 프로필 성별. */
+export function rosterGenderLabel(value: 'male' | 'female' | null | undefined): string {
+  if (!value) return '미입력';
+  return { male: '남성', female: '여성' }[value];
+}

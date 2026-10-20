@@ -4773,6 +4773,8 @@ export type V1CancelRegistrationRequestPayload = {
 };
 
 export type V1AddPlayerPayload = {
+  /** 골레이 여부. 생략 시 false. */
+  goalkeeper?: boolean;
   userId: string;
   realName: string;
   birthDate?: string;

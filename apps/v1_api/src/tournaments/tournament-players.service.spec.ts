@@ -725,6 +725,28 @@ describe('TournamentPlayersService', () => {
     ]);
   });
 
+  it.each([true, false, undefined])('addPlayer: 골레이 %s를 저장·복원하고 프로필 성별을 응답한다', async (goalkeeper) => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst
+      .mockResolvedValueOnce({ id: 'mem-1', role: 'manager' })
+      .mockResolvedValueOnce(teamPlayerMembershipRow());
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
+    prisma.v1TournamentPlayer.count.mockResolvedValue(2);
+    prisma.v1TournamentPlayer.findFirst.mockResolvedValue(null);
+    prisma.v1TournamentPlayer.upsert.mockImplementation(async ({ create, update }) => {
+      expect(create.goalkeeper).toBe(goalkeeper ?? false);
+      expect(update.goalkeeper).toBe(goalkeeper ?? false);
+      return playerRow(create);
+    });
+    const result = await service.addPlayer(manager, 'tournament-1', 'reg-1', {
+      userId: 'player-user-id', realName: '홍길동', goalkeeper,
+    });
+    expect(result).toMatchObject({ goalkeeper: goalkeeper ?? false, genderSnapshot: 'male' });
+    expect(rosterResyncEvents(prisma.$executeRaw)).toEqual([
+      { scope: 'competitionTeam', competitionId: 'tournament-1', teamId: registrationRow().teamId },
+    ]);
+  });
+
   it('addPlayer: team member missing required profile → 400 PLAYER_REQUIRED_PROFILE_MISSING', async () => {
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
     prisma.v1TeamMembership.findFirst

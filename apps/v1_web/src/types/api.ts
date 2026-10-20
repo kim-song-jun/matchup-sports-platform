@@ -3688,6 +3688,8 @@ export type V1TournamentListItem = {
 
 /** Serialized by TournamentsAdminService.serialize — admin view (includes bank / player range) */
 export type V1Tournament = {
+  /** 관리자 상세 응답. 실제 시작·기록·결과가 없어 대회 시작을 되돌릴 수 있는가. */
+  canRevertStart?: boolean;
   /** 관리자 상세 응답: null이면 형식 변경 가능. */
   formatChangeBlockedReason?: string | null;
   id: string;

@@ -34,13 +34,21 @@ export function allowedNextStatuses(current: V1TournamentStatus): V1TournamentSt
 }
 
 /** Mirrors the server's reverse transitions (TOURNAMENT_TRANSITIONS in tournaments-admin.service.ts); these need a reason. */
-export function revertTargetStatus(current: V1TournamentStatus): V1TournamentStatus | null {
+export function revertTargetStatus(current: V1TournamentStatus, canRevertStart = false): V1TournamentStatus | null {
+  if (current === 'in_progress' && canRevertStart) return 'closed';
   if (current === 'completed') return 'in_progress';
   if (current === 'cancelled') return 'draft';
   return null;
 }
 
 export const REVERT_COPY: Partial<Record<V1TournamentStatus, { button: string; confirmLabel: string; title: string; description: string; toast: string }>> = {
+  in_progress: {
+    button: '접수 마감으로 되돌리기',
+    confirmLabel: '되돌리기',
+    title: '대회를 접수 마감으로 되돌릴까요?',
+    description: '시작한 경기가 없을 때만 되돌릴 수 있어요. 기존 참가 신청·명단·대진은 유지하고 접수 마감 상태로 바꿔요. 새 참가 신청을 받으려면 이후 접수를 다시 열어 주세요.',
+    toast: '대회를 접수 마감으로 되돌렸어요.',
+  },
   completed: {
     button: '진행 중으로 되돌리기',
     confirmLabel: '되돌리기',

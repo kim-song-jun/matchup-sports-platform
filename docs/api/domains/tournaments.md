@@ -231,6 +231,9 @@ Campaign admin routes inherit `V1AuthGuard`. Production accepts only the signed 
 
 ## Admin tournament status transitions (2026-10-09)
 
+`GET /admin/tournaments/:id` includes `canRevertStart` (boolean). It is true only for an `in_progress` tournament without a started/recorded/result-bearing fixture. Automatic submitted lineups alone do not count as kickoff. The UI exposes the existing reason-based reverse action only when true; a stale client cannot bypass the server recheck. `in_progress -> closed` takes the tournament advisory/row lock, then Game and TeamMatch locks in the existing order and rechecks fixture state/period timestamps/events/result revisions before updating status and audit in one transaction. Any started/recorded fixture returns `409 TOURNAMENT_ALREADY_STARTED`; blank reason returns `400 TOURNAMENT_STATUS_REASON_REQUIRED`. Scheduled fixtures and untouched cancelled fixtures are preserved, as are registrations and rosters. This does not reopen registration (`closed -> open` remains a separate action), and the tournament endpoint continues to reject league IDs.
+
+
 `POST /admin/tournaments/:id/status` `{ status, reason? }` follows this table (`TOURNAMENT_TRANSITIONS` in `tournaments-admin.service.ts`):
 
 | from | to |
@@ -238,12 +241,12 @@ Campaign admin routes inherit `V1AuthGuard`. Production accepts only the signed 
 | draft | open, cancelled |
 | open | closed, cancelled |
 | closed | open, in_progress, cancelled |
-| in_progress | completed, cancelled |
+| in_progress | closed (only before any fixture has started or acquired records/results), completed, cancelled |
 | completed | **in_progress** (revert completion) |
 | cancelled | **draft** (restore) |
 
-- The two reverse transitions require a non-blank `reason` (`400 TOURNAMENT_STATUS_REASON_REQUIRED`); it is stored on the `tournament.status` admin action log and the status change log.
-- Everything else, including `in_progress -> open|closed`, still returns `409 TOURNAMENT_STATUS_TRANSITION_INVALID`.
+- All three reverse transitions (`in_progress -> closed`, `completed -> in_progress`, `cancelled -> draft`) require a non-blank `reason` (`400 TOURNAMENT_STATUS_REASON_REQUIRED`); it is stored on the `tournament.status` admin action log and the status change log.
+- Everything else, including `in_progress -> open`, still returns `409 TOURNAMENT_STATUS_TRANSITION_INVALID`.
 - Reverting completion changes only `status`. Awards, standings and reviews are derived from `status === 'completed'`, so they are hidden again until the tournament is completed again. Review-request notifications are sent on the first completion only (a prior `completed` status log suppresses re-sending).
 - A restored draft is not publicly listed or readable (draft/cancelled return 404 to consumers) until it is opened again, which re-runs the paid-tournament payment-instruction check.
 

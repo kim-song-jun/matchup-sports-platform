@@ -40,7 +40,7 @@ Alpha 인증 브라우저 도구가 제공되지 않아 실화면 before/after �
 사용자 오류 문구가 전역 오류 경계와 일치. 코드의 생성 응답에 game이 없고 fixtureTeamChangeAccess가 game.hasOfficialResult를 읽는 경로를 회귀 테스트로 확인한다.
 
 ## Progress Snapshot
-origin/dev ae54635a9 기반 fix/manual-bracket-create-crash. 미커밋·미배포.
+origin/dev ae54635a9 기반 fix/manual-bracket-create-crash. PR 생성 완료, alpha 배포 진행 중.
 
 ## Validation Evidence
 - RED: 실제 생성 요약 응답을 사용한 직접 입력→수정창 테스트에서 `TypeError: Cannot read properties of undefined (reading 'hasOfficialResult')`, `fixtureTeamChangeAccess` 위치로 실패함을 확인했다.
@@ -49,5 +49,10 @@ origin/dev ae54635a9 기반 fix/manual-bracket-create-crash. 미커밋·미배�
 - `git diff --check` 통과. touched path TODO/FIXME/HACK/XXX 신규 marker 없음. 신규 소스 import/route 의존성 없음.
 - Alpha 실화면 검증은 대기: 변경 미배포, 인증 브라우저 도구 없음. 요청 URL의 일반 웹 도구 접근도 실패했다. screenshots/console/network 결과를 추정하거나 테스트 통과를 실화면 PASS로 표시하지 않는다.
 - 로컬 Web/API·DB 서버를 띄우지 않았다. 검증 종료 후 이 작업에서 만든 의존성 링크 두 개만 해제한다.
-- 기존 dev WIP 및 이전 작업트리 보존. 커밋·push·배포 없음. PR-ready 판정 없음.
+- 기존 dev WIP 및 이전 작업트리 보존. 개발 커밋과 PR 생성 완료. Alpha 배포 진행 중. PR-ready 판정 없음.
 - Web pnpm lint: tsc --noEmit 및 v1-pattern-check 모두 통과.
+
+## PR / Deployment Cursor — 2026-10-21
+- PR: https://github.com/kim-song-jun/matchup-sports-platform/pull/2012 (base dev).
+- 최신 dev 통합 완료. GitHub CI와 Copilot 최신 head 리뷰를 통과한 후 dev에 머지하고 alpha 배포 receipt·health를 검증한다.
+- 사용자가 세 PR 생성 후 alpha 배포까지 승인함. main 승격은 범위 밖.

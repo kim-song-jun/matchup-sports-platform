@@ -124,8 +124,8 @@ describe('fairPlayByRegistrationFromGroups (F5: 페어플레이 실제 연결)',
 
     const totals = fairPlayByRegistrationFromGroups([group]);
 
-    // 1 + (2*1 + 1*4) = 1 + 6 = 7
-    expect(totals.get('reg-home')).toBe(7);
+    // 1 + 경고 누적 퇴장 3 = 4 — 옐로 2장 + 레드는 옐로 1+1·퇴장 4로 따로 세지 않는다(MD-QA #174)
+    expect(totals.get('reg-home')).toBe(4);
   });
 
   it('여러 조를 넘겨도 조별 합계가 registrationId 기준으로 올바르게 합쳐진다', () => {

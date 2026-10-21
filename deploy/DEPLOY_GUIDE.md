@@ -2,7 +2,7 @@
 
 이 문서는 `apps/v1_api`와 `apps/v1_web`으로 구성된 v1 운영 스택만 다룬다.
 
-`dev` 전용 alpha는 production SSH 배포와 분리된다. alpha는 GitHub runner에서 만든 ECR digest 이미지와 S3 release manifest를 사용하며, 운영 계약과 rollback 절차는 [`docs/ops/v1-alpha-environment.md`](../docs/ops/v1-alpha-environment.md)를 따른다. 이 가이드의 local image build·production 절차를 alpha에 적용하지 않는다.
+`dev` 전용 alpha는 production 배포와 분리된다. alpha는 GitHub runner에서 만든 ECR digest 이미지와 S3 release manifest를 사용하며, 운영 계약과 rollback 절차는 [`docs/ops/v1-alpha-environment.md`](../docs/ops/v1-alpha-environment.md)를 따른다. 이 가이드의 local image build·production 절차를 alpha에 적용하지 않는다.
 
 ## 1. 공개 경로 계약
 
@@ -53,14 +53,12 @@ test "$(curl -sS -o /dev/null -w '%{http_code}' http://localhost:3013/v1/home)" 
 
 `.github/workflows/deploy.yml`은 main push 또는 수동 dispatch에서 테스트가 통과한 뒤 배포한다.
 
-필수 GitHub Actions secret:
+> 프로덕션 배포는 SSH를 쓰지 않는다. SSH 배포 경로와 `EC2_HOST` · `EC2_SSH_KEY` ·
+> `EC2_KNOWN_HOSTS` secret은 폐기됐고 저장소에서 삭제됐으니 다시 등록하지 않는다. 러너는 OIDC로
+> 단기 자격증명을 얻어 S3에 릴리스를 올리고 SSM으로 EC2에 명령한다(필요한 repository
+> **variable**은 아래 표).
 
-> **2026-08-02 변경**: 프로덕션 배포는 더 이상 SSH를 쓰지 않는다. 러너는 OIDC로 단기
-> 자격증명을 얻어 S3에 릴리스를 올리고 SSM으로 EC2에 명령한다. `EC2_HOST` ·
-> `EC2_SSH_KEY` · `EC2_KNOWN_HOSTS`는 **프로덕션 배포에 더 이상 필요하지 않다**
-> (운영자 수동 접속용으로 남겨 둘 수는 있다). 대신 아래 repository **variable**이 필요하다:
-> `PROD_BUILD_AWS_ROLE_ARN` · `PROD_AWS_ROLE_ARN` · `PROD_AWS_REGION` · `PROD_DEPLOY_BUCKET` ·
-> `PROD_EC2_INSTANCE_ID` · `PROD_EXPECTED_ACCOUNT_ID`.
+필수 GitHub Actions secret:
 
 | 이름 | 책임 |
 |---|---|
@@ -80,15 +78,7 @@ test "$(curl -sS -o /dev/null -w '%{http_code}' http://localhost:3013/v1/home)" 
 | `V1_PUSH_ENVIRONMENT` | Android 기기 격리 값. Alpha=`alpha`, production=`production` |
 | `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY` | Android FCM 서버 자격증명. 세 값 전체가 없으면 disabled, 일부만 있으면 fail-fast. `docs/ops/android-fcm-setup.md` 참조 |
 
-`EC2_KNOWN_HOSTS`는 배포 시점의 `ssh-keyscan` 결과를 즉석에서 신뢰하지 않는다. 먼저 AWS Systems Manager 또는 EC2 콘솔처럼 AWS 제어면을 통해 대상 인스턴스에서 host key fingerprint를 확인하고, 별도 로컬 `ssh-keyscan -t ed25519 <EC2_HOST>` 결과의 fingerprint가 같은지 대조한 뒤 그 known_hosts 줄을 GitHub secret으로 등록한다. 값이 없거나 `EC2_HOST`와 일치하지 않으면 배포는 연결 전에 fail-closed 된다.
-
-```bash
-ssh-keyscan -t ed25519 <EC2_HOST> > ec2-known-hosts
-ssh-keygen -lf ec2-known-hosts
-gh secret set EC2_KNOWN_HOSTS < ec2-known-hosts
-```
-
-GitHub Actions의 OAuth·관리자·GA 값은 SSH 명령줄 인자가 아니라 원격 `bash` 표준입력으로만 전달한다. 따라서 프로세스 목록에 값이 남지 않으며, EC2에는 별도 임시 secret 파일을 만들지 않는다.
+GitHub Actions의 OAuth·관리자·GA 값은 SSM 명령 문자열(CloudTrail·명령 이력에 남는다)에 싣지 않고 Parameter Store(SecureString)를 거쳐서만 전달한다. EC2는 자기 IAM role로 복호화해 `.env`를 재구성한다.
 
 필수 GitHub Actions repository variable(OIDC + ECR digest 고정 경로용):
 
@@ -98,6 +88,7 @@ GitHub Actions의 OAuth·관리자·GA 값은 SSH 명령줄 인자가 아니라 
 | `PROD_AWS_ROLE_ARN` | 승인 후 `deploy`·`rollback` job 이 OIDC 로 assume 하는 IAM role(`teameet-prod-github-deploy`). SSM 명령·Parameter Store·KMS 권한이 있어 승인된 job(`environment:production` subject)에서만 assume 한다. trust 정리는 아래 "역할 분리 적용 순서" 를 따른다 |
 | `PROD_AWS_REGION` | ECR/EC2 리전(`ap-northeast-2`) |
 | `PROD_EXPECTED_ACCOUNT_ID` | AWS 계정 ID 고정값 — 잘못된 계정으로의 배포를 fail-closed |
+| `PROD_DEPLOY_BUCKET` | 릴리스 tarball·manifest 를 올리는 버전드 S3 버킷 |
 | `PROD_EC2_INSTANCE_ID` | prod EC2 instance-id — 승인 후 `verify-prod-aws-target.sh` 가 실행 중/태그 일치를 재확인 |
 
 prod EC2 instance profile(`teameet-certbot-route53`)에는 `TeameetProdImmutableImagePull` 인라인 정책이 붙어 있어야 한다(`ecr:GetAuthorizationToken` + 두 prod 리포지토리에 대한 `ecr:BatchGetImage`/`ecr:GetDownloadUrlForLayer`) — 없으면 `deploy-prod.sh`/`rollback-prod.sh`의 `docker login`/`docker pull` 단계에서 배포가 100% 실패한다.

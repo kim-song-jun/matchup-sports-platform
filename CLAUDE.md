@@ -71,9 +71,12 @@
   **repository ruleset "Copilot review for default branch"(id 15258451, enforcement=active)가 default 브랜치에
   `deletion`·`non_fast_forward`·`copilot_code_review` 세 가지를 강제한다.** 즉 main으로의 force-push와
   브랜치 삭제는 실제로 막힌다 — 2026-07-31 #231 사고 때 되돌리기 force-push가 `non_fast_forward`로
-  거부돼 `git revert`로 우회해야 했던 것이 이 ruleset 때문이다. 일반 fast-forward push 자체는 막지
-  않으므로 PR 없는 직접 push는 여전히 가능하고 그대로 프로덕션 배포로 이어진다.
+  거부돼 `git revert`로 우회해야 했던 것이 이 ruleset 때문이다. 2026-10-21부터는 ruleset
+  "Require PR for main"(PR 필수, 승인 0명, 예외 없음)도 걸려 main 직접 push가 거부된다 — 승격·핫픽스 모두 PR로.
   **확인 명령**: `gh api repos/<owner>/<repo>/rulesets` (classic protection API만 보면 실상을 놓친다).
+- **배포 environment는 브랜치로 묶여 있다**(2026-10-21): `production`은 `main`에서만(승인자 2명 유지),
+  `alpha`(`rollback-alpha.yml`이 쓰고 alpha OIDC 역할이 `environment:alpha` subject를 신뢰)는 `dev`에서만
+  쓸 수 있다. 다른 브랜치의 job이 이 environment를 선언하면 GitHub가 실행을 거부한다.
 - **`dev`에는 ruleset "Require PR for dev"가 걸려 있다**(PR 필수, 승인 0명, 관리자 포함 예외 없음 —
   2026-10-21 GitHub 토큰 탈취 대응으로 추가). 막는 것은 PR 없이 dev에 **몰래 직접 push**하는 길뿐이다 —
   같은 토큰으로 PR을 열고 스스로 머지하면 alpha 배포까지 간다(PR 기록만 남는다). 승인 1명 규칙은 자체 머지

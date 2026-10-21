@@ -17,7 +17,7 @@ export const LOGIN_SECURITY_POLICY = {
   codeTtlMs: 5 * 60_000,
   maxCodeAttempts: 5,
   resendCooldownMs: 30_000,
-  /** Real mails per email per 24h. */
+  /** Codes issued or resent per email per 24h, decoys included. */
   sendCapPerDay: 5,
   sendCapWindowMs: 24 * 60 * 60_000,
   /** A challenge token stops working (resend included) this long after it was issued. */

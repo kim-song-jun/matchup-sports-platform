@@ -237,7 +237,7 @@ describe('LoginStepUpService.resend', () => {
     expect(await rejection(service.resend(challengeToken))).toMatchObject({ status: 410, code: 'STEP_UP_EXPIRED' });
   });
 
-  it('caps real mails at 5 per email per 24 hours across logins and resends, then releases the cap', async () => {
+  it('caps codes at 5 per email per 24 hours across logins and resends, then releases the cap', async () => {
     const { service, dispatcher } = setup();
     const { challengeToken } = await service.start({ email: EMAIL, emailKey: 'key-a', userId: USER_ID });
     for (let resend = 1; resend <= 4; resend += 1) {

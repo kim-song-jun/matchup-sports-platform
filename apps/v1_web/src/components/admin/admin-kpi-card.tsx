@@ -52,8 +52,9 @@ function KpiCardInner({
   icon,
 }: Omit<AdminKpiCardProps, 'href' | 'ariaLabel'>) {
   return (
-    // h-full: 같은 그리드 줄의 카드는 보조 줄 수가 달라도 높이를 맞춘다.
-    <div className={`${TONE_WRAPPER[tone]} rounded-2xl border p-4 md:p-5 min-h-[80px] h-full flex flex-col justify-between`}>
+    // h-full: 같은 그리드 줄의 카드는 보조 줄 수가 달라도 높이를 맞춘다. 늘어난 높이는 값과 보조 줄 사이(mt-auto)에만
+    // 생겨야 값이 줄의 모든 카드에서 같은 높이에 선다.
+    <div className={`${TONE_WRAPPER[tone]} rounded-2xl border p-4 md:p-5 min-h-[80px] h-full flex flex-col`}>
       <div className="flex items-start justify-between gap-2">
         <p className="text-[length:var(--font-size-caption)] md:text-[length:var(--font-size-label)] text-[var(--text-muted)] leading-tight">{label}</p>
         {icon && (
@@ -65,10 +66,14 @@ function KpiCardInner({
       <p className={`text-2xl md:text-3xl font-bold tabular-nums mt-2 ${TONE_VALUE[tone]}`}>
         {value}
       </p>
-      {sub && <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)] mt-0.5">{sub}</p>}
-      {details?.map((line) => (
-        <p key={line} className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">{line}</p>
-      ))}
+      {sub || details?.length ? (
+        <div className="mt-auto pt-0.5">
+          {sub && <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">{sub}</p>}
+          {details?.map((line) => (
+            <p key={line} className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">{line}</p>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

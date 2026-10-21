@@ -319,7 +319,8 @@ Global rules inherited from `~/.codex/AGENTS.md`:
   fast-forward 직접 push는 가능해 그대로 프로덕션 배포로 이어진다. 확인은 `gh api repos/<owner>/<repo>/rulesets`.
 - **`dev`에는 ruleset "Require PR for dev"가 걸려 있다**(PR 필수, 승인 0명, 관리자 포함 예외 없음, 2026-10-21
   토큰 탈취 대응) — dev로의
-  직접 push는 누구든(워크플로·관리자 포함) 거부된다. 버전 커밋과 릴리스 준비(`--prepare-only` 포함)도 PR로
+  직접 push는 누구든(워크플로·관리자 포함) 거부된다. 막는 것은 PR 없는 몰래 push뿐이고, 같은 토큰으로 PR을
+  열어 스스로 머지하는 것은 막지 못한다(승인 1명 규칙은 자체 머지 흐름 때문에 채택하지 않음). 버전 커밋과 릴리스 준비(`--prepare-only` 포함)도 PR로
   전달한다. 확인은 같은 명령(`gh api repos/<owner>/<repo>/rulesets`).
 - **머지·push 전에 항상 `baseRefName`을 확인한다**(2026-08-09 base=main 오머지 사고). 직전에
   `gh pr view <N> --json baseRefName`으로 `dev`임을 확인하고 아니면 `gh pr edit <N> --base dev`로 재타깃한다.

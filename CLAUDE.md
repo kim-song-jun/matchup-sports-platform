@@ -69,7 +69,9 @@
   않으므로 PR 없는 직접 push는 여전히 가능하고 그대로 프로덕션 배포로 이어진다.
   **확인 명령**: `gh api repos/<owner>/<repo>/rulesets` (classic protection API만 보면 실상을 놓친다).
 - **`dev`에는 ruleset "Require PR for dev"가 걸려 있다**(PR 필수, 승인 0명, 관리자 포함 예외 없음 —
-  2026-10-21 GitHub 토큰 탈취 대응으로 추가. 털린 토큰으로 dev에 몰래 push해 alpha에 자동 배포되는 길을 막는다).
+  2026-10-21 GitHub 토큰 탈취 대응으로 추가). 막는 것은 PR 없이 dev에 **몰래 직접 push**하는 길뿐이다 —
+  같은 토큰으로 PR을 열고 스스로 머지하면 alpha 배포까지 간다(PR 기록만 남는다). 승인 1명 규칙은 자체 머지
+  흐름을 막아 채택하지 않았다.
   dev로의 직접 push는 누구든 — 워크플로·관리자 포함 — 거부된다. 그래서 `promote-main.yml`의 버전 커밋과
   릴리스 준비(`--prepare-only` 포함)도 PR로 전달한다. 같은 명령(`gh api repos/<owner>/<repo>/rulesets`)으로 확인한다.
 - **머지·push 전에 항상 `baseRefName`(대상 브랜치)을 확인한다.** 2026-08-09에 dev용 PR을

@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/v1-ui/button';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
+import { FinalistAssignmentButton } from './finalist-assignment-button';
 import { BracketTemplateDialog } from './bracket-template-dialog';
 import { useV1AssignTournamentSlot, useV1RandomFillSlots } from '@/hooks/use-v1-bracket-canvas';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -23,6 +24,7 @@ export function BracketListTemplateTools({ tournamentId, format, hasExistingBrac
   return <section className="flex flex-col gap-4">
     <div className="flex flex-wrap items-center gap-2">
       <Button variant="outline" size="md" onClick={() => setOpen(true)} disabled={pending}>전체 대진 만들기</Button>
+      {format === 'group_knockout' ? <FinalistAssignmentButton tournamentId={tournamentId} groups={groups} showToast={showToast} /> : null}
       {entryGroups.length > 0 ? <Button variant="neutral" size="md" disabled={pending} onClick={async () => {
         if (!await confirm({ title: '조별 빈 자리 무작위 배정', message: '이미 배정한 팀은 유지하고 조별리그의 빈 자리에 확정 참가팀을 무작위로 넣어요. 결선 팀은 넣지 않아요.', confirmLabel: '무작위 배정' })) return;
         randomFill.mutate(undefined, {

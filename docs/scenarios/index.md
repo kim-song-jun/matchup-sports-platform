@@ -1,3 +1,7 @@
+## 2026-10-21 — 수동 대진의 공통 결선 진출팀 배정
+
+[시나리오](./finalist-assignment.md) · [Task 20261099](../../.github/tasks/20261099-finalist-assignment.md). 조별 공식 순위 확인/배정안 조정/자동·수동 배정, 14·15팀 불균등 조 지원 및 기존12강 유지. API36·Web113·실제 임시 DB7 및 양쪽 타입/표면·패턴 PASS. Alpha after 0/3(미배포·인증 브라우저 없음). 지정 대회 데이터 변경 없음.
+
 신규 리그 모집 마감 생성·명시적 시작(2026-10-18): [시나리오](./league-explicit-start.md). PR 호환성 보강: API192·DB68 assertion PASS, 신규 migration 단독 회귀 exit 0. Web38·양쪽 타입·표면/패턴 PASS. 전체 DB runner 종료 대기는 별도 기록, CI 확인과 미배포 alpha 0/3이 후속.
 
 ## 2026-10-17 — 대진 표시 문구·경기 정보 편집

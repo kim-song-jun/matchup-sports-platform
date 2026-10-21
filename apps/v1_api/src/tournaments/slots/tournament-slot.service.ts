@@ -16,6 +16,8 @@ import { setByeSideInTx } from './bye-side';
 import { lockCompetitionForBracketMutationInTx, lockCompetitionForSlotReleaseInTx } from './competition-bracket-lock';
 import { fillSlotsFromStandings, previewGroupRankStandings, type FillOverride } from './group-rank-fill';
 import { pickRandomAssignments } from './random-assignment';
+import { previewFinalistAssignment, applyFinalistAssignment } from './finalist-assignment';
+import type { FinalistAssignmentDto } from './dto/finalist-assignment.dto';
 import { applyCrossGroupRound12, previewCrossGroupRound12 } from './cross-group-round12';
 import type { CrossGroupRound12Dto } from './dto/cross-group-round12.dto';
 import { assertSlotFixturesNotStarted, isSlotFixtureStarted, loadSlotUsingFixtures, sidesUsingSlot } from './slot-fixtures';
@@ -338,6 +340,14 @@ export class TournamentSlotService {
       );
       return { assignments };
     }, SLOT_TRANSACTION_OPTIONS);
+  }
+
+  finalistPreview(user: V1AuthUser, tournamentId: string) {
+    return previewFinalistAssignment({ prisma: this.prisma, adminContext: this.adminContext, games: this.games }, user, tournamentId);
+  }
+
+  finalistApply(user: V1AuthUser, tournamentId: string, input: FinalistAssignmentDto) {
+    return applyFinalistAssignment({ prisma: this.prisma, adminContext: this.adminContext, games: this.games }, user, tournamentId, input);
   }
 
   /** 조 간 성적 비교 12강 미리보기/배정. */

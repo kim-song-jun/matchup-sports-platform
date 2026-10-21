@@ -18,7 +18,12 @@ import { sanitizeRedirectPath } from '@/lib/session-storage';
 import { AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
 import { getEmailLoginViewModel } from './auth.view-model';
 import { completeEmailLogin } from './email-login-completion';
-import { STEP_UP_SEND_LIMIT, STEP_UP_SEND_LIMIT_MESSAGE } from './login-step-up-errors';
+import {
+  STEP_UP_SEND_LIMIT,
+  STEP_UP_SEND_LIMIT_MESSAGE,
+  STEP_UP_UNAVAILABLE,
+  STEP_UP_UNAVAILABLE_MESSAGE,
+} from './login-step-up-errors';
 import { PasswordResetLink } from './password-reset-link';
 
 const RATE_LIMITED_MESSAGE = '로그인 시도가 많아요. 잠시 후 다시 시도해 주세요.';
@@ -38,6 +43,7 @@ function mapEmailLoginError(err: unknown): LoginError {
     if (err.code === 'PERMISSION_DENIED') return { message: '로그인이 제한된 계정이에요. 고객센터에서 상태를 확인해 주세요.' };
     // 인증번호 발송 상한 — 기다려서 풀리는 게 아니라 비밀번호 재설정이 출구다.
     if (err.code === STEP_UP_SEND_LIMIT) return { message: STEP_UP_SEND_LIMIT_MESSAGE, recovery: true };
+    if (err.code === STEP_UP_UNAVAILABLE) return { message: STEP_UP_UNAVAILABLE_MESSAGE };
     // IP 레이트리밋. 서버 장애 문구와 섞이면 "잠시 후" 재시도가 왜 필요한지 알 수 없다.
     if (err.statusCode === 429) return { message: RATE_LIMITED_MESSAGE };
   }

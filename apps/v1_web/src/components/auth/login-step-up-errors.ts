@@ -8,13 +8,16 @@ export const STEP_UP_TOO_MANY_ATTEMPTS = 'STEP_UP_TOO_MANY_ATTEMPTS';
 export const STEP_UP_RESEND_COOLDOWN = 'STEP_UP_RESEND_COOLDOWN';
 /** 이메일 하나당 24시간 발송 상한. 로그인(챌린지 발급)과 다시 받기 둘 다에서 온다. */
 export const STEP_UP_SEND_LIMIT = 'STEP_UP_SEND_LIMIT';
-export const EMAIL_SEND_FAILED = 'EMAIL_SEND_FAILED';
+/** 서버에 메일 발송 수단이 없을 때 — 모든 추가 인증 요청이 같은 503 을 받는다. */
+export const STEP_UP_UNAVAILABLE = 'STEP_UP_UNAVAILABLE';
 
 /** 서버가 막은 "다시 받기" 대기 시간(30초). 응답에 남은 시간(details.retryAfterSeconds)이 없을 때만 쓴다. */
 export const STEP_UP_RESEND_COOLDOWN_MS = 30 * 1000;
 
 export const STEP_UP_SEND_LIMIT_MESSAGE =
   '이 메일로 보낼 수 있는 인증번호를 오늘 다 보냈어요. 비밀번호를 재설정하면 바로 다시 로그인할 수 있어요.';
+
+export const STEP_UP_UNAVAILABLE_MESSAGE = '지금은 인증 메일을 보낼 수 없어 로그인할 수 없어요. 잠시 후 다시 시도해 주세요.';
 
 export type StepUpFailure =
   /** 화면에 머물고 입력칸 아래에 알린다. */
@@ -75,9 +78,8 @@ export function describeResendFailure(err: unknown): StepUpFailure {
   if (code === STEP_UP_SEND_LIMIT) {
     return { kind: 'inline', tone: 'error', recovery: true, message: STEP_UP_SEND_LIMIT_MESSAGE };
   }
-  if (code === EMAIL_SEND_FAILED) {
-    // 서버는 메일이 못 나간 챌린지의 다시 받기를 대기 없이 받는다.
-    return { kind: 'inline', tone: 'error', resendInMs: 0, message: '인증번호 메일을 보내지 못했어요. 잠시 후 다시 받아 주세요.' };
+  if (code === STEP_UP_UNAVAILABLE) {
+    return { kind: 'inline', tone: 'error', message: STEP_UP_UNAVAILABLE_MESSAGE };
   }
   if (isRateLimited(err)) {
     return { kind: 'inline', tone: 'error', message: '요청이 많아요. 잠시 후 다시 시도해 주세요.' };

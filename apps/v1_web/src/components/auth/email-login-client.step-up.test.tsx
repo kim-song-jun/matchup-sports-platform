@@ -120,4 +120,13 @@ describe('EmailLoginClient step-up branch', () => {
     expect(screen.getByRole('link', { name: '비밀번호 재설정하기' })).toHaveAttribute('href', '/auth/find-account?mode=reset-password');
     expect(readLoginStepUp()).toBeNull();
   });
+
+  it('says sign-in is unavailable when the server cannot send verification mail', async () => {
+    renderLogin();
+
+    submitLogin(STEP_UP_MSW.unavailableEmail, 'password123');
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('지금은 인증 메일을 보낼 수 없어 로그인할 수 없어요');
+    expect(screen.queryByRole('link', { name: '비밀번호 재설정하기' })).toBeNull();
+  });
 });

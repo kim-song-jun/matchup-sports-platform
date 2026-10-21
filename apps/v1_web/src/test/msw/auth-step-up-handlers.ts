@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import type { V1EmailLoginResult, V1LoginStepUpChallenge } from '@/types/api';
+import type { V1AuthSessionResponse, V1EmailLoginResult, V1LoginStepUpChallenge } from '@/types/api';
 import { v1UserFixture } from './fixtures';
 
 /**
@@ -7,10 +7,10 @@ import { v1UserFixture } from './fixtures';
  * `/auth/login/step-up/verify|resend`. 시나리오는 토큰으로 고른다(상태를 들고 있지 않아 테스트 간 오염이 없다).
  *
  *  - STEP_UP_MSW.email 로 로그인하면 비밀번호와 무관하게 같은 모양의 stepUp 응답이 온다.
- *    STEP_UP_MSW.sendLimitEmail 은 429 STEP_UP_SEND_LIMIT.
+ *    STEP_UP_MSW.sendLimitEmail 은 429 STEP_UP_SEND_LIMIT, unavailableEmail 은 503 STEP_UP_UNAVAILABLE.
  *  - verify: 올바른 코드 → 세션, 그 외 → 400 CODE_INVALID. expired 토큰 → 410, locked 토큰 → 429.
  *  - resend: 200. cooldown 토큰 → 429 RESEND_COOLDOWN(retryAfterSeconds 12), expired 토큰 → 410,
- *    sendLimit 토큰 → 429 SEND_LIMIT, sendFailed 토큰 → 503 EMAIL_SEND_FAILED.
+ *    sendLimit 토큰 → 429 SEND_LIMIT, unavailable 토큰 → 503 STEP_UP_UNAVAILABLE.
  */
 const api = '*/api/v1';
 const NOW = '2026-10-21T00:00:00.000Z';
@@ -20,6 +20,7 @@ const RESEND_COOLDOWN_MS = 30 * 1000;
 export const STEP_UP_MSW = {
   email: 'stepup@example.com',
   sendLimitEmail: 'capped@example.com',
+  unavailableEmail: 'nomail@example.com',
   cooldownSeconds: 12,
   maskedEmail: 'st***@example.com',
   code: '123456',
@@ -29,7 +30,7 @@ export const STEP_UP_MSW = {
     locked: 'step-up-token-locked',
     cooldown: 'step-up-token-cooldown',
     sendLimit: 'step-up-token-send-limit',
-    sendFailed: 'step-up-token-send-failed',
+    unavailable: 'step-up-token-unavailable',
   },
 } as const;
 
@@ -53,7 +54,11 @@ export function stepUpChallengeFixture(overrides: Partial<V1LoginStepUpChallenge
 }
 
 export function sessionLoginResponse() {
-  return ok({ session: { userId: v1UserFixture.id, userEmail: v1UserFixture.email }, ...v1UserFixture });
+  return ok<V1AuthSessionResponse>({
+    user: { id: v1UserFixture.id, email: v1UserFixture.email, onboardingStatus: v1UserFixture.onboardingStatus },
+    profile: { displayName: v1UserFixture.displayName },
+    session: { userId: v1UserFixture.id, userEmail: v1UserFixture.email },
+  });
 }
 
 async function readJson(request: Request): Promise<Record<string, unknown>> {
@@ -70,6 +75,9 @@ export const v1AuthStepUpMswHandlers = [
     }
     if (normalized === STEP_UP_MSW.sendLimitEmail) {
       return fail(429, 'STEP_UP_SEND_LIMIT', '인증번호를 더 보낼 수 없어요.', { retryAfterSeconds: 86400 });
+    }
+    if (normalized === STEP_UP_MSW.unavailableEmail) {
+      return fail(503, 'STEP_UP_UNAVAILABLE', '인증 메일을 보낼 수 없어요.');
     }
     return sessionLoginResponse();
   }),
@@ -95,8 +103,8 @@ export const v1AuthStepUpMswHandlers = [
     if (challengeToken === STEP_UP_MSW.tokens.sendLimit) {
       return fail(429, 'STEP_UP_SEND_LIMIT', '인증번호를 더 보낼 수 없어요.', { retryAfterSeconds: 86400 });
     }
-    if (challengeToken === STEP_UP_MSW.tokens.sendFailed) {
-      return fail(503, 'EMAIL_SEND_FAILED', '메일을 보내지 못했어요.');
+    if (challengeToken === STEP_UP_MSW.tokens.unavailable) {
+      return fail(503, 'STEP_UP_UNAVAILABLE', '인증 메일을 보낼 수 없어요.');
     }
     const { expiresAt, resendAvailableAt } = stepUpChallengeFixture();
     return ok({ expiresAt, resendAvailableAt });

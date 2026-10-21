@@ -77,7 +77,8 @@ export function LoginStepUpVerifyClient() {
   const errorId = `${ids}-error`;
   const timerId = `${ids}-timer`;
   const inputRef = useRef<HTMLInputElement>(null);
-  // isPending 은 다음 렌더에야 반영된다 — 같은 틱의 연타가 인증 시도를 두 번 쓰지 않게 ref 로 막는다.
+  // isPending 은 다음 렌더에야 반영된다 — 같은 틱의 연타나 확인·다시 받기의 겹침이 요청을 두 번 보내지 않게
+  // 두 요청이 한 ref 를 함께 쓴다(한 번에 하나만 진행).
   const busyRef = useRef(false);
   // undefined = 아직 스토리지를 읽기 전(서버 렌더 포함), null = 저장된 챌린지 없음.
   const [challenge, setChallenge] = useState<StoredLoginStepUp | null | undefined>(undefined);
@@ -164,7 +165,8 @@ export function LoginStepUpVerifyClient() {
   };
 
   const requestResend = () => {
-    if (resend.isPending || resendWaitMs > 0) return;
+    if (busyRef.current || resendWaitMs > 0) return;
+    busyRef.current = true;
     setNotice(null);
     resend.mutate(
       { challengeToken: challenge.challengeToken },
@@ -183,9 +185,14 @@ export function LoginStepUpVerifyClient() {
           setResendCount((count) => count + 1);
         },
         onError: (error) => fail(describeResendFailure(error)),
+        onSettled: () => {
+          busyRef.current = false;
+        },
       },
     );
   };
+
+  const requestPending = verify.isPending || resend.isPending;
 
   return (
     <AuthFrame topTitle="본인 확인" backHref={emailLoginHref} className="tm-auth-email-frame" stage={AUTH_WELCOME_STAGE}>
@@ -238,7 +245,7 @@ export function LoginStepUpVerifyClient() {
         <Button
           className="tm-auth-email-submit"
           block
-          disabled={code.length !== CODE_LENGTH || codeLocked}
+          disabled={code.length !== CODE_LENGTH || codeLocked || resend.isPending}
           loading={verify.isPending}
           size="lg"
           type="submit"
@@ -250,12 +257,24 @@ export function LoginStepUpVerifyClient() {
           <button
             className="tm-btn tm-btn-sm tm-btn-ghost"
             type="button"
-            disabled={resend.isPending || resendWaitMs > 0}
+            disabled={requestPending || resendWaitMs > 0}
             onClick={requestResend}
           >
             {resendWaitMs > 0 ? `인증번호 다시 받기 (${Math.ceil(resendWaitMs / 1000)}초)` : '인증번호 다시 받기'}
           </button>
-          <Link className="tm-btn tm-btn-sm tm-btn-ghost" href={emailLoginHref} onClick={clearLoginStepUp}>
+          <Link
+            className="tm-btn tm-btn-sm tm-btn-ghost"
+            href={emailLoginHref}
+            aria-disabled={requestPending || undefined}
+            onClick={(event) => {
+              // 확인 요청이 날아가는 중에 떠나면 응답이 세션 쿠키를 심은 채 아무도 모르게 끝난다.
+              if (busyRef.current) {
+                event.preventDefault();
+                return;
+              }
+              clearLoginStepUp();
+            }}
+          >
             다른 계정으로 로그인
           </Link>
         </div>

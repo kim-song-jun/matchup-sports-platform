@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { http, HttpResponse } from 'msw';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LOGIN_STEP_UP_STORAGE_KEY, readLoginStepUp, saveLoginStepUp } from '@/lib/login-step-up';
 import { V1_SESSION_HINT_KEY } from '@/lib/session-storage';
@@ -226,14 +227,68 @@ describe('LoginStepUpVerifyClient', () => {
       );
     });
 
-    it('lets the user retry right away when the mail could not be sent', async () => {
-      storeChallenge({ challengeToken: STEP_UP_MSW.tokens.sendFailed, resendAvailableAt: PAST });
+    it('says sign-in is unavailable when the server cannot send mail at all', async () => {
+      storeChallenge({ challengeToken: STEP_UP_MSW.tokens.unavailable, resendAvailableAt: PAST });
       renderVerify();
 
       fireEvent.click(await screen.findByRole('button', { name: '인증번호 다시 받기' }));
 
-      expect(await screen.findByRole('alert')).toHaveTextContent('인증번호 메일을 보내지 못했어요');
-      expect(screen.getByRole('button', { name: '인증번호 다시 받기' })).toBeEnabled();
+      expect(await screen.findByRole('alert')).toHaveTextContent('지금은 인증 메일을 보낼 수 없어');
+    });
+
+    it('sends one request for a double click on resend', async () => {
+      let calls = 0;
+      server.use(http.post('*/api/v1/auth/login/step-up/resend', () => {
+        calls += 1;
+        const { expiresAt, resendAvailableAt } = stepUpChallengeFixture();
+        return HttpResponse.json({ status: 'success', data: { expiresAt, resendAvailableAt }, timestamp: PAST });
+      }));
+      storeChallenge({ resendAvailableAt: PAST });
+      renderVerify();
+      const resend = await screen.findByRole('button', { name: '인증번호 다시 받기' });
+
+      fireEvent.click(resend);
+      fireEvent.click(resend);
+
+      expect(await screen.findByRole('status')).toHaveTextContent('인증번호를 다시 보냈어요');
+      expect(calls).toBe(1);
+    });
+
+    it('keeps resend and account switching off while the code is being checked', async () => {
+      let release!: () => void;
+      const held = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      let resendCalls = 0;
+      server.use(
+        http.post('*/api/v1/auth/login/step-up/verify', async () => {
+          await held;
+          return HttpResponse.json(
+            { status: 'error', statusCode: 400, code: 'STEP_UP_CODE_INVALID', message: 'x', details: null, timestamp: PAST },
+            { status: 400 },
+          );
+        }),
+        http.post('*/api/v1/auth/login/step-up/resend', () => {
+          resendCalls += 1;
+          return HttpResponse.json({ status: 'success', data: stepUpChallengeFixture(), timestamp: PAST });
+        }),
+      );
+      storeChallenge({ resendAvailableAt: PAST });
+      renderVerify();
+      await screen.findByLabelText('인증번호 6자리');
+
+      typeCode('111111');
+      fireEvent.click(screen.getByRole('button', { name: '확인하고 로그인' }));
+      const resend = await screen.findByRole('button', { name: '인증번호 다시 받기' });
+      await waitFor(() => expect(resend).toBeDisabled());
+      fireEvent.click(resend);
+      fireEvent.click(screen.getByRole('link', { name: '다른 계정으로 로그인' }));
+
+      expect(resendCalls).toBe(0);
+      expect(readLoginStepUp()).not.toBeNull();
+
+      release();
+      expect(await screen.findByRole('alert')).toHaveTextContent('인증번호가 맞지 않아요');
     });
 
     it('ends the attempt when the challenge can no longer be resent', async () => {

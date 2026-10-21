@@ -37,7 +37,7 @@ m11_sha="$(sha256sum "$m11" | awk '{print $1}')"
 # 2026-10-17: additive V1Match.isOnline (20261017100000_v1_match_online_classification); M11 remains unchanged.
 # 2026-10-18: additive V1Tournament.requiresExplicitStart (20261018123000_v1_league_explicit_start); M11 remains unchanged.
 # 2026-10-21: additive login step-up tables (20261021120000_login_step_up); M11 remains unchanged.
-[[ "$schema_sha" == c3ba891030e13da9396f9db53bc8cac0b30981f9ed735ace8db1c67000995086 \
+[[ "$schema_sha" == df6fc250677a43c796ee145190b7053a2a7ed791f503f7e1940ddb7d3d214e16 \
   && "$m11_sha" == 08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323 ]] \
   || { echo 'Task168 final-policy schema/M11 digest mismatch' >&2; exit 1; }
 

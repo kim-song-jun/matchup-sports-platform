@@ -795,11 +795,11 @@ model V1LoginStepUpChallenge {
   userId       String?   @map("user_id")
   codeHash     String    @map("code_hash")
   attemptCount Int       @default(0) @map("attempt_count")
-  /// 실제 메일을 내보낸 횟수(가짜 챌린지는 항상 0). 이메일당 24시간 상한의 원천.
+  /// 발급·재발송한 인증번호 수(가짜 챌린지 포함 — 상한이 계정 존재를 드러내지 않게). 이메일당 24시간 상한의 원천.
   sentCount    Int       @default(0) @map("sent_count")
   expiresAt    DateTime  @map("expires_at")
   lastSentAt   DateTime  @map("last_sent_at")
-  /// 마지막 메일 발송이 실패했으면 그 시각. 재발송이 쿨다운 없이 즉시 재시도하고 실패를 사용자에게 알린다.
+  /// 마지막 메일 발송이 실패했으면 그 시각(진단 기록). 응답·쿨다운은 성공과 같게 둔다 — 다르면 계정 존재가 드러난다.
   sendFailedAt DateTime? @map("send_failed_at")
   usedAt       DateTime? @map("used_at")
   createdAt    DateTime  @default(now()) @map("created_at")

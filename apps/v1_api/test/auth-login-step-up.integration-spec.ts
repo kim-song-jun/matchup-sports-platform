@@ -160,7 +160,7 @@ describe('V1 email login step-up', () => {
       .post('/api/v1/auth/login/step-up/resend')
       .send({ challengeToken })
       .expect(200);
-    expect(Object.keys(resend.body.data).sort()).toEqual(['expiresAt', 'resendAvailableAt']);
+    expect(Object.keys(resend.body.data).sort()).toEqual(['devCode', 'expiresAt', 'resendAvailableAt']);
   });
 
   it('refuses a second resend inside the cooldown with STEP_UP_RESEND_COOLDOWN', async () => {

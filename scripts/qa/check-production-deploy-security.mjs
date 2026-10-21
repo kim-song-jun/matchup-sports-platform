@@ -105,7 +105,7 @@ export function findJobsMissingRunnerPrereqs(workflow) {
 //   - 승인 전 job: PROD_AWS_ROLE_ARN 금지. AWS 자격증명을 받는 job 은 빌드 역할만 쓰고,
 //     서버·비밀값 접근 AWS 서비스(ssm·kms·ec2) 호출과 AWS SDK(boto3·aws-sdk) 직접 사용 금지 —
 //     job 이 부르는 스크립트와 그 스크립트가 source/import 하는 파일 안까지 따라간다.
-//   - 승인 job(environment 있음): 제한 없음.
+//   - 승인 job(`environment: production`): 제한 없음.
 // (저장소 수준 GitHub secret 은 이 검사의 대상이 아니다 — 승인 전 job 도 읽을 수 있다.)
 const PRIVILEGED_AWS_SERVICES = '(?:ssm|kms|ec2)';
 // `aws --region x ssm ...` 처럼 서비스 앞에 전역 옵션이 와도 잡는다. 옵션 값 자리가 서비스
@@ -136,8 +136,11 @@ function stripShellComments(body) {
     .replace(/["']/g, '');
 }
 
+// 승인 게이트는 required reviewers 가 걸린 `production` environment 뿐이다 — 다른 이름·식(`${{ }}`)·빈 값은
+// 승인 없이 돌 수 있으므로 승인 job 으로 치지 않는다.
 function isApprovedJob(body) {
-  return /^ {4}environment:/m.test(body);
+  return /^ {4}environment:[ \t]*['"]?production['"]?[ \t]*$/m.test(body)
+    || /^ {4}environment:[ \t]*\n(?: {6}[^\n]*\n)*? {6}name:[ \t]*['"]?production['"]?[ \t]*$/m.test(body);
 }
 
 function readFileOrNull(path) {

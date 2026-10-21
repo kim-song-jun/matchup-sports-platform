@@ -276,11 +276,12 @@ const SCRIPTS = {
 };
 const readScript = (path) => SCRIPTS[path] ?? null;
 
+// environment: false(없음) · true(production) · 문자열(그 줄을 그대로 넣는다 — 여러 줄 형태 포함)
 const job = (name, { environment = false, role = 'PROD_BUILD_AWS_ROLE_ARN', steps }) => `
 jobs:
   ${name}:
     runs-on: ubuntu-latest
-${environment ? '    environment: production\n' : ''}    steps:
+${environment === true ? '    environment: production\n' : environment ? `${environment}\n` : ''}    steps:
       - uses: actions/checkout@abc
       - uses: aws-actions/configure-aws-credentials@def
         with:
@@ -298,6 +299,26 @@ test('승인된 job 은 배포 역할을 쓸 수 있다', () => {
   const wf = job('deploy', { environment: true, role: 'PROD_AWS_ROLE_ARN', steps: ['aws ssm send-command --instance-ids "$ID"'] });
   assert.deepEqual(findProdRoleWithoutApproval(wf), []);
   assert.deepEqual(findPrivilegedAwsWithoutApproval(wf, readScript), []);
+});
+
+test('production 이 아닌 environment 는 승인으로 치지 않는다', () => {
+  const notApproved = [
+    '    environment: staging',
+    '    environment: ${{ inputs.target }}',
+    '    environment:',
+    '    environment:\n      name: preview',
+  ];
+  for (const environment of notApproved) {
+    const wf = job('build-images', { environment, role: 'PROD_AWS_ROLE_ARN', steps: ['aws ssm send-command --instance-ids "$ID"'] });
+    assert.equal(findProdRoleWithoutApproval(wf).length, 1, `${JSON.stringify(environment)} 를 승인으로 쳤습니다`);
+    assert.ok(findPrivilegedAwsWithoutApproval(wf, readScript).length >= 1, `${JSON.stringify(environment)} 의 ssm 호출을 놓쳤습니다`);
+  }
+  const approved = ["    environment: 'production'", '    environment:\n      name: production\n      url: https://example.test'];
+  for (const environment of approved) {
+    const wf = job('deploy', { environment, role: 'PROD_AWS_ROLE_ARN', steps: ['aws ssm send-command --instance-ids "$ID"'] });
+    assert.deepEqual(findProdRoleWithoutApproval(wf), [], `${JSON.stringify(environment)} 는 승인 job 입니다`);
+    assert.deepEqual(findPrivilegedAwsWithoutApproval(wf, readScript), []);
+  }
 });
 
 test('승인 전 job 의 서버·비밀값 접근 AWS 호출을 형태와 무관하게 탐지한다', () => {

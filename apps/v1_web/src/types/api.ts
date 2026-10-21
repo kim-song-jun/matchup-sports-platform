@@ -1727,6 +1727,8 @@ export type V1GameResultRevision = {
   createdByUserId: string | null;
   /** 만든 사람의 닉네임. 시스템이 만든 리비전은 `null`. */
   createdByName: string | null;
+  /** 공식 확정한 사람의 닉네임(확정 명령 감사 기록 기준). 확정 전이거나 확정 기록이 없으면 `null`. */
+  officializedByName: string | null;
   createdBySystemActor: string | null;
   supersedesId: string | null;
   submittedAt: string | null;

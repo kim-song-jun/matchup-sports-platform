@@ -256,7 +256,7 @@ export function RosterModal({
         <div className="mt-4 rounded-xl border border-[var(--border)] p-3 dark:border-gray-700">
           <p className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-strong)] dark:text-white">선수 추가</p>
           <p className="mt-0.5 text-xs text-[var(--text-muted)]">
-            팀의 활성 멤버만 추가할 수 있어요. 명단 잠금과 제출 마감은 운영자 권한으로 넘어갑니다.
+            팀의 활성 멤버만 추가할 수 있어요. 명단이 잠기거나 제출 마감이 지나도 운영자는 추가할 수 있어요.
           </p>
           <div className="mt-3 flex flex-col gap-2 sm:flex-row">
             <div className="flex-1">

@@ -444,7 +444,8 @@ describe('참가팀 상세 우측 정보와 반응형 참가 카드', () => {
   const entry = <section aria-label="우리 팀 참가"><a href="/tournaments/t-sidebar/registrations/reg-1/roster">참가 명단 보기</a></section>;
   const league = (overrides: Partial<V1TournamentDetail> = {}) => makeTournament({
     id: 't-sidebar', status: 'closed', format: 'league', kind: 'regular_league',
-    maxTeams: null, announcements: [], refundPolicyText: null, ...overrides,
+    // 유료 리그 — 무료 대회는 입금·환불 항목이 빠진다(MD-QA #170, tournament-detail-page-client.test 가 본다).
+    maxTeams: null, announcements: [], refundPolicyText: null, entryFee: 20000, ...overrides,
   });
 
   it.each(['open', 'closed', 'in_progress'] as const)('%s 참가 리그에 공지·환불 정책·정원이 없어도 우측 안내와 참가 명단 링크가 남는다', (status) => {

@@ -1682,6 +1682,7 @@ export const v1MswHandlers = [
       createdByActorType: 'USER',
       createdByUserId: 'user-1',
       createdByName: '스태프 닉네임',
+      officializedByName: null,
       createdBySystemActor: null,
       supersedesId: null,
       submittedAt: null,

@@ -157,6 +157,7 @@ function buildRevision(
     createdByActorType: 'SYSTEM',
     createdByUserId: null,
     createdByName: null,
+    officializedByName: null,
     createdBySystemActor: 'GAME_END_DERIVER',
     supersedesId: null,
     submittedAt: '2026-08-01T10:00:00.000Z',

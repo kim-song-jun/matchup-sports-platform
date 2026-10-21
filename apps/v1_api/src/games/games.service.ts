@@ -154,6 +154,11 @@ import type {
  * 시작조차 못 했다**(2026-09-05 alpha 실측: 콘솔은 다 그려지는데 "경기 시작" 이
  * `STAFF_SCOPE_DENIED`). 그래서 인라인 템플릿을 지우고 이 함수로 모은다.
  */
+/** 운영 담당자 이름 — 선수 기록용 실명 정책은 쓰지 않고 닉네임, 탈퇴 회원은 표시 이름만. */
+function operatorDisplayName(profile: { nickname: string; displayName: string | null; deletedAt: Date | null } | undefined): string | null {
+  return profile === undefined ? null : profile.deletedAt !== null ? (profile.displayName ?? profile.nickname) : profile.nickname;
+}
+
 function platformOpsAuthorizationSubject(userId: string, adminUpdatedAt: Date): string {
   return `platform_ops:${userId}@${adminUpdatedAt.getTime()}`;
 }
@@ -3569,19 +3574,33 @@ export class GamesService {
       include: { resultParticipants: true },
       orderBy: { revision: 'desc' },
     });
+    // 확정한 사람은 리비전을 만든 사람과 다를 수 있다(필드 담당자가 제출하고 어드민이 확정). 리비전에는 확정자 칸이 없어
+    // 확정 명령이 남긴 운영 감사(after.revisionId · revisionState OFFICIAL)에서 찾는다 — 없으면(팀 승인·자동 확정 등) 비운다(MD-QA #169).
+    const officializedByRevisionId = new Map<string, string>();
+    const officialAudits = await this.prisma.v1OperationAudit.findMany({
+      where: { resourceType: 'GAME', resourceId: gameId, actorUserId: { not: null } },
+      select: { actorUserId: true, after: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    for (const audit of officialAudits) {
+      const after = audit.after as { revisionId?: unknown; revisionState?: unknown } | null;
+      if (audit.actorUserId !== null && typeof after?.revisionId === 'string' && after.revisionState === V1GameResultRevisionState.OFFICIAL) {
+        officializedByRevisionId.set(after.revisionId, audit.actorUserId);
+      }
+    }
     // The creator (a team-match draft may be submitted by another manager) is an operator, not a player:
     // the roster name policy below does not apply, so show the nickname (a withdrawn account keeps only its display label).
-    const creatorProfiles = await loadParticipantNameProfiles(
-      this.prisma,
-      revisions.map((revision) => revision.createdByUserId),
-    );
-    const withCreatorName = <T extends { createdByUserId: string | null }>(revision: T) => {
-      const profile = revision.createdByUserId === null ? undefined : creatorProfiles.get(revision.createdByUserId);
-      return {
-        ...revision,
-        createdByName: profile === undefined ? null : profile.deletedAt !== null ? (profile.displayName ?? profile.nickname) : profile.nickname,
-      };
-    };
+    const creatorProfiles = await loadParticipantNameProfiles(this.prisma, [
+      ...revisions.map((revision) => revision.createdByUserId),
+      ...officializedByRevisionId.values(),
+    ]);
+    const operatorName = (userId: string | null | undefined) =>
+      operatorDisplayName(userId == null ? undefined : creatorProfiles.get(userId));
+    const withCreatorName = <T extends { id: string; createdByUserId: string | null }>(revision: T) => ({
+      ...revision,
+      createdByName: operatorName(revision.createdByUserId),
+      officializedByName: operatorName(officializedByRevisionId.get(revision.id)),
+    });
     const participantIds = Array.from(
       new Set(revisions.flatMap((revision) => revision.resultParticipants.map((row) => row.participantId))),
     );
@@ -7131,7 +7150,7 @@ export class GamesService {
   async requestTakeover(
     user: V1AuthUser,
     gameId: string,
-    input: { clientInstanceId: string; lastSequence: number },
+    input: { clientInstanceId: string; lastSequence: number; force?: boolean },
     reservation?: GameTakeoverRequestReservation,
   ): Promise<{
     gameId: string;
@@ -7153,11 +7172,22 @@ export class GamesService {
       if (game === null) {
         throw this.notFound();
       }
+      // 다른 사람이 운영 중이면 조용히 뺏지 않는다 — 콘솔을 여는 것만으로 상대 권한이 넘어가 새로고침마다 핑퐁이 났다(MD-QA #165).
+      // 확인을 거친 요청(force)만 가져간다. 같은 사람의 다른 탭·새로고침은 지금처럼 바로 넘긴다.
+      const holder = this.takeover.activeGrant(gameId);
+      if (input.force !== true && holder !== null && holder.authorizationSubject !== actor.authorizationSubject) {
+        throw new ForbiddenException({
+          code: 'TAKEOVER_HELD',
+          message: 'Another operator is operating this game',
+          details: { holderName: await this.takeoverHolderName(gameId, user.id) },
+        });
+      }
       const grant = this.takeover.grant({
         gameId,
         authorizationSubject: actor.authorizationSubject,
         clientInstanceId: input.clientInstanceId,
         lastSequence: input.lastSequence,
+        userId: user.id,
       }, pending);
       if (grant === null) {
         throw new ForbiddenException({
@@ -7175,6 +7205,13 @@ export class GamesService {
     } finally {
       this.takeover.finishRequest(pending);
     }
+  }
+
+  /** 지금 이 경기를 운영 중인 사람의 닉네임. 보유자가 없거나 묻는 사람 자신이면 `null`(화면은 "다른 화면에서"로 말한다). */
+  async takeoverHolderName(gameId: string, viewerUserId: string): Promise<string | null> {
+    const holderUserId = this.takeover.activeGrant(gameId)?.userId;
+    if (holderUserId === undefined || holderUserId === viewerUserId) return null;
+    return operatorDisplayName((await loadParticipantNameProfiles(this.prisma, [holderUserId])).get(holderUserId));
   }
 
   /**

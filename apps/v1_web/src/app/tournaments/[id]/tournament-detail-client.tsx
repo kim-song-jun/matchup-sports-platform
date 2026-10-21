@@ -1098,7 +1098,7 @@ export function TournamentDetailView({
 
         <AccordionSection id="precheck-content" title="참가 전 유의사항">
           <div style={{ display: 'grid', gap: 0 }}>
-            {preParticipationCheckItems(Boolean(tournament.refundPolicyText)).map((item, idx, arr) => (
+            {preParticipationCheckItems({ hasCustomRefundPolicy: Boolean(tournament.refundPolicyText), isFreeEntry: tournament.entryFee === 0 }).map((item, idx, arr) => (
               <div
                 key={item.label}
                 style={{
@@ -1163,19 +1163,7 @@ export function TournamentDetailView({
         <section aria-label="참가 전 꼭 확인해 주세요" className="tm-show-desktop">
           <div className="tm-text-body-lg" style={{ marginBottom: 8 }}>참가 전 꼭 확인해 주세요</div>
           <Card pad={0} className="tm-on-tint" style={{ background: 'var(--grey50)', overflow: 'hidden' }}>
-            {([
-              { label: '신청 확정', text: '운영진 확인 + 참가비 입금 완료 후 확정돼요.' },
-              { label: '환불 불가', text: '단순 변심·일정 착오·팀 사정으로 인한 취소는 원칙적으로 불가해요.' },
-              { label: '주최 취소', text: '주최 측 사정 취소 시 참가비 100% 환불돼요.' },
-              { label: '노쇼 실격', text: '노쇼 시 실격 처리되며 참가비는 환불되지 않아요.' },
-              { label: '허위 정보', text: '경력·소속 이력 허위 제출 시 팀 탈락돼요.' },
-              { label: '본인 확인', text: '당일 신분증 또는 확인 자료 제출을 요청할 수 있어요.' },
-              { label: '부상 책임', text: '경기 전 본인 건강 상태를 확인하고 참가해 주세요.' },
-              { label: '현장 촬영', text: '대회 현장에서 사진·영상이 촬영될 수 있어요.' },
-            ] as { label: string; text: string }[])
-              // 벤치마크 감사(P0 ①): 이 데스크톱 aside 목록도 모바일 카드와 같은 라벨을 쓰는
-              // 별도 사본이라 같은 모순이 생긴다 — 같은 기준(REFUND_RELATED_LABELS)으로 거른다.
-              .filter((item) => !(tournament.refundPolicyText && REFUND_RELATED_LABELS.has(item.label)))
+            {preParticipationCheckItems({ hasCustomRefundPolicy: Boolean(tournament.refundPolicyText), isFreeEntry: tournament.entryFee === 0 })
               .map((item, idx, arr) => (
               <div
                 key={item.label}
@@ -1497,7 +1485,7 @@ export function TournamentDetailView({
             제거, 이 카드, 새 하단 CTA) 쌓이는 상황이었다. */}
         {!isCompleted && <BracketSection tournament={tournament} />}
         {!isCompleted && (
-          <TournamentPreParticipationNotice hasCustomRefundPolicy={Boolean(tournament.refundPolicyText)} />
+          <TournamentPreParticipationNotice hasCustomRefundPolicy={Boolean(tournament.refundPolicyText)} isFreeEntry={tournament.entryFee === 0} />
         )}
       </div>
     </article>
@@ -1658,13 +1646,22 @@ const REFUND_RELATED_LABELS = new Set(['환불 불가', '주최 취소', '대회
  * 표시). 운영자 정책이 있으면 그 세 항목을 빼 모순을 없애고, 없으면 기존 고정문구가
  * fallback으로 남는다(사용자 결정, 2026-09-15).
  */
-function preParticipationCheckItems(hasCustomRefundPolicy: boolean) {
-  return hasCustomRefundPolicy
-    ? PRE_PARTICIPATION_CHECK_ITEMS.filter((item) => !REFUND_RELATED_LABELS.has(item.label))
-    : PRE_PARTICIPATION_CHECK_ITEMS;
+/**
+ * 무료 대회(참가비 0원)는 낼 돈이 없어 입금·환불 항목이 맞지 않는다(MD-QA #170) — 환불 항목을 빼고, 확정·노쇼 문구에서
+ * 참가비를 뺀다. 데스크톱 aside·모바일 카드·종료 대회 아코디언이 모두 이 함수 하나를 쓴다.
+ */
+function preParticipationCheckItems({ hasCustomRefundPolicy, isFreeEntry }: { hasCustomRefundPolicy: boolean; isFreeEntry: boolean }) {
+  return PRE_PARTICIPATION_CHECK_ITEMS
+    .filter((item) => !((hasCustomRefundPolicy || isFreeEntry) && REFUND_RELATED_LABELS.has(item.label)))
+    .map((item) => (isFreeEntry ? { ...item, text: FREE_ENTRY_CHECK_TEXT[item.label] ?? item.text } : item));
 }
 
-function TournamentPreParticipationNotice({ hasCustomRefundPolicy }: { hasCustomRefundPolicy: boolean }) {
+const FREE_ENTRY_CHECK_TEXT: Record<string, string> = {
+  '신청 확정': '운영진 확인 후 참가가 확정돼요.',
+  '노쇼 실격': '노쇼 시 실격 처리돼요.',
+};
+
+function TournamentPreParticipationNotice({ hasCustomRefundPolicy, isFreeEntry }: { hasCustomRefundPolicy: boolean; isFreeEntry: boolean }) {
   return (
     <div className="tm-tournament-bleed tm-hide-desktop">
       <div className="tm-match-detail-body">
@@ -1673,7 +1670,7 @@ function TournamentPreParticipationNotice({ hasCustomRefundPolicy }: { hasCustom
             참가 전 꼭 확인해 주세요
           </div>
           <Card pad={0} className="tm-on-tint" style={{ background: 'var(--grey50)', overflow: 'hidden' }}>
-            {preParticipationCheckItems(hasCustomRefundPolicy).map((item, idx, arr) => (
+            {preParticipationCheckItems({ hasCustomRefundPolicy, isFreeEntry }).map((item, idx, arr) => (
               <div
                 key={item.label}
                 style={{

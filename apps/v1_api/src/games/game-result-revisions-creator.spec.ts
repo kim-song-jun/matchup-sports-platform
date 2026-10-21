@@ -20,7 +20,7 @@ describe('GamesService.listResultRevisions — 리비전을 만든 사람 이름
     };
   }
 
-  function makeService(revisions: unknown[], profiles: unknown[]) {
+  function makeService(revisions: unknown[], profiles: unknown[], audits: unknown[] = []) {
     const prisma = {
       v1Game: {
         findUnique: jest.fn().mockResolvedValue({
@@ -52,6 +52,7 @@ describe('GamesService.listResultRevisions — 리비전을 만든 사람 이름
       v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
       v1GameResultRevision: { findMany: jest.fn().mockResolvedValue(revisions) },
       v1UserProfile: { findMany: jest.fn().mockResolvedValue(profiles) },
+      v1OperationAudit: { findMany: jest.fn().mockResolvedValue(audits) },
     };
     return new GamesService(
       prisma as unknown as PrismaService,
@@ -90,6 +91,28 @@ describe('GamesService.listResultRevisions — 리비전을 만든 사람 이름
       { id: 'r3', createdByName: 'staff-1-닉네임' },
       { id: 'r2', createdByName: null },
       { id: 'r1', createdByName: '탈퇴 회원' },
+    ]);
+  });
+
+  // MD-QA #169: 필드 담당자가 제출하고 어드민이 확정해도 "공식 확정" 줄에 제출자만 보였다.
+  it('확정 명령 감사 기록에서 확정한 사람을 찾아 싣는다 — 확정 기록이 없는 리비전은 비운다', async () => {
+    const service = makeService(
+      [
+        revision({ id: 'r2', revision: 2, createdByUserId: 'staff-1' }),
+        revision({ id: 'r1', revision: 1, createdByUserId: 'staff-1' }),
+      ],
+      [profile('staff-1'), profile('admin-1')],
+      [
+        { actorUserId: 'staff-1', after: { revisionId: 'r2', revisionState: 'SUBMITTED' } },
+        { actorUserId: 'admin-1', after: { revisionId: 'r2', revisionState: 'OFFICIAL' } },
+      ],
+    );
+
+    const result = await service.listResultRevisions(ops, 'game-1');
+
+    expect(result.map((row) => ({ id: row.id, createdByName: row.createdByName, officializedByName: row.officializedByName }))).toEqual([
+      { id: 'r2', createdByName: 'staff-1-닉네임', officializedByName: 'admin-1-닉네임' },
+      { id: 'r1', createdByName: 'staff-1-닉네임', officializedByName: null },
     ]);
   });
 });

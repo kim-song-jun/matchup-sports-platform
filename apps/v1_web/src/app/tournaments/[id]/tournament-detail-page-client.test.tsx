@@ -306,7 +306,8 @@ describe('TournamentDetailPageClient — 참가 전 유의사항과 환불 정�
 
   it('운영자가 환불 정책을 안 썼으면 기존 고정 문구가 그대로 fallback으로 남는다', async () => {
     tournamentApiMocks.useV1Tournament.mockReturnValue({
-      data: makeTournament({ refundPolicyText: null }),
+      // 환불 문구는 돈을 받는 대회 얘기다 — 무료 대회는 아래 MD-QA #170 테스트가 본다.
+      data: makeTournament({ refundPolicyText: null, entryFee: 20000 }),
       isLoading: false,
       isError: false,
       error: null,
@@ -321,6 +322,25 @@ describe('TournamentDetailPageClient — 참가 전 유의사항과 환불 정�
     expect(screen.getAllByText('환불 불가').length).toBeGreaterThan(0);
     expect(screen.getAllByText('주최 취소').length).toBeGreaterThan(0);
     expect(screen.getAllByText('대회 연기').length).toBeGreaterThan(0);
+  });
+
+  // MD-QA #170: 무료 대회에도 "참가비 입금 완료 후 확정"·"환불 불가" 안내가 그대로 보였다.
+  it('무료 대회는 입금·환불 문구 없이 확인·노쇼 안내만 남긴다', async () => {
+    tournamentApiMocks.useV1Tournament.mockReturnValue({
+      data: makeTournament({ refundPolicyText: null, entryFee: 0 }),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(<TournamentDetailPageClient tournamentId="tournament-1" />);
+
+    await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
+    expect(screen.queryByText('환불 불가')).not.toBeInTheDocument();
+    expect(screen.queryByText(/참가비 입금/)).not.toBeInTheDocument();
+    expect(screen.getAllByText('운영진 확인 후 참가가 확정돼요.').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('노쇼 시 실격 처리돼요.').length).toBeGreaterThan(0);
   });
 });
 

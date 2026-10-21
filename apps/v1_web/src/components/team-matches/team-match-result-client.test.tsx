@@ -129,6 +129,7 @@ function revision(overrides: Partial<V1GameResultRevision> = {}): V1GameResultRe
     createdByActorType: 'USER',
     createdByUserId: 'user-host',
     createdByName: null,
+    officializedByName: null,
     createdBySystemActor: null,
     supersedesId: null,
     submittedAt: null,

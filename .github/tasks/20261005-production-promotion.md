@@ -9,7 +9,7 @@ This section supersedes earlier release coordinates and authorizations. The curr
 - Owned: isolated worktree `_worktrees/main-promotion-prep-20261021`, branch `chore/main-promotion-prep-20261021`; both v1 app manifests/changelogs, the 23 consumed Changesets, and this existing task. Forbidden: shared WIP, runtime/UI changes, migration edits, production data writes, main mutation, workflow/policy bypass.
 - [x] Phase 1: fetch and compare remote branches, CI and deployed releases.
 - [x] Phase 2: integrate main history into the dev candidate and generate release metadata with official Changesets CLI 2.30.0.
-- [ ] Phase 3: verify committed preparation/promotion policies and publish a dev-targeted preparation PR; record exact-head CI/review results.
+- [x] Phase 3: committed preparation/promotion policies passed; published [preparation PR #2014](https://github.com/kim-song-jun/matchup-sports-platform/pull/2014) with base dev and recorded CI/review state.
 - [ ] Release gate after preparation PR merge: latest dev CI/Alpha pass and live SHA/version/DB match; independent release review; user creates/merges main PR and approves production.
 
 ### Baseline evidence
@@ -43,6 +43,14 @@ This section supersedes earlier release coordinates and authorizations. The curr
 5. Before main merge require promotion CI/review gates and no unresolved findings. After user merge, inspect `CI / Deploy` for that main SHA, approve only its production environment deployment, default stage none. Verify production landing release/commit and API DB=true; manually smoke tournament list/detail/bracket, roster and console permissions before declaring production complete.
 6. Rollback uses the existing `rollback-prod.yml` workflow and recorded prior successful immutable release. User operates production approval; no force push, DB reset/seed or automatic Stage A/B replay. Check migration compatibility and the workflow's rollback guards first.
 
+### Published preparation and blocking review
+
+- PR #2014: `chore/main-promotion-prep-20261021` -> `dev`, MERGEABLE, 28 release/documentation paths. Main history integration is merge commit `e5fa7c6f8`; release consumption is ordinary commit `4cdba2f24`, so production promotion can retrieve its deletion receipts. Preserve both commits with a normal merge commit; do not squash away main ancestry.
+- Actual committed-tree promotion policy passed against main API/Web 1.10.2; runtime/Prisma/deploy/workflow tree remains identical to baseline dev, no untracked dependency, isolated worktree clean after commit. Existing historical `COLORXXX500` changelog text is unchanged; no new debt marker.
+- [Preparation CI 39541097435](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/39541097435) on `4cdba2f24` was running when this evidence update was prepared. This documentation commit requires a new matching-head CI result. Pending CI is not treated as passed.
+- Copilot was requested on #2014. [Review service run 39541101453](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/39541101453) failed before analysis: `Request session.create failed ... Model "claude-opus-5" is not available`. No review was produced. This is an external review-service blocker, not a code finding or clean review. Do not merge preparation or main without restored clean review or an explicit applicable user decision; the #2013 exception does not apply. No bypass/model/account/policy change was made.
+- Current production deployment log, job `118378873245` of run `39343729418`, explicitly reports `Task168 M11 guard: prod ledger already shows M11 applied`. Together with identical main/dev migration trees, this supports ordinary stage none rather than repeating the historic cutover.
+- Shared working tree and all other worktrees are preserved. No local app/browser/DB service was started, no dev/main push or main PR creation/merge or production approval was performed. Release preparation remains review-blocked; production promotion is not declared ready.
 ### Risks, security and ambiguity
 
 - Local Docker daemon is unavailable. This release-metadata-only preparation does not start a DB or repeat full app suites; baseline CI owns migration replay and actual DB integration. Host preflight: CPU 22% on 28 logical processors, approximately 13 GiB free RAM, Node 3 / Chrome 31 / Edge 7 processes. No owned long-running services are started.

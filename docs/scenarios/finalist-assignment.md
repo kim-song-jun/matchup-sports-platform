@@ -26,8 +26,8 @@ Status: 로컬 자동 검증 완료, alpha 배포/실측 대기
 
 ## 검증 기록 (2026-10-21)
 - API unit 관련 28 + DTO8 = 36 tests PASS.
-- Web 변경 및 인접 회귀 5 suites / 113 tests PASS. 실제 UI 입력→자동배정→수동교환→확인→API payload 및 실패 처리 포함.
+- Web 변경 및 인접 회귀 6 suites / 121 tests PASS. 실제 UI 입력→자동배정→수동교환→확인→API payload 및 실패 처리 포함.
 - 임시 PostgreSQL 18.4-beta, migration 전체 재생 PASS; 신규 불균등 수동 대진2 + 기존12강3 + 공통12강 부전승 보존2 = 7/7 PASS. DB 쓰기 중간 오류 주입으로 전체 롤백 확인.
 - DB 테스트는 각 suite별 clone을 사용하고 종료 시 삭제. 소유한 localhost:56439 PostgreSQL 종료 및 `/tmp/teameet-finalist-pg-data` 정리 완료. 운영/alpha DB와 지정 대회 데이터 변경 없음.
 - API/Web 타입 및 surface/pattern 검증 기록은 task 최신 snapshot 참고.
-- 실제 alpha before/after: **0/3** (390/768/1440). 미배포이며 인증된 브라우저 도구/로그인 세션이 없어 미실행. UI 테스트/jsdom은 alpha 시각 검증으로 계산하지 않음. console/network/스크린샷 판정도 대기.
+- 실제 alpha before: **3/3** (390/768/1440), 지정15팀 대진·운영자 실제 로그인, overflow/console/network 오류0. after: **0/3**, 최신 PR 미배포. UI 테스트/jsdom은 alpha 시각 검증으로 계산하지 않음. console/network/스크린샷 판정도 대기.

@@ -50,3 +50,6 @@ origin/dev 88119dbd9, branch feat/group-finalist-assignment, worktree /tmp/teame
 - 사용자가 PR 생성 및 dev 배포를 명시 승인. 최신 fetch 후 origin/dev와 base 차이 0.
 - 변경26파일을 exact pathspec으로 커밋/feature branch push → base=dev PR → 최신 head Copilot/CI 게이트 → dev 머지 → alpha 배포 SHA 확인 순서로 진행.
 - 원본 작업트리 WIP는 보존. alpha 실제 로그인 세션 확보 요청 중이며 직접 대회 배정은 저장하지 않고 화면·응답을 확인할 예정.
+
+- PR #2013 생성, 최초 head 3c369ed79. Copilot run39528327466은 코드 검토 전 모델 `claude-opus-5` unavailable로 실패(최신 리뷰 없음). 실패를 clean으로 취급하지 않음.
+- 실제 alpha 로그인·지정15팀 수동대진의 before1440/768/390 캡처 완료(overflow0, console/network 오류0). 모바일 그림은 별도 컴포넌트라 공통 버튼 진입을 보강했으며, 수동/슬롯 없는 대진에서 preview API까지 여는 모바일 회귀8 PASS. Web 검증 누적121.

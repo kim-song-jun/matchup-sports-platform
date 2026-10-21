@@ -20,7 +20,7 @@ export interface LoginStepUpChallengeView {
   maskedEmail: string;
   expiresAt: string;
   resendAvailableAt: string;
-  /** Only where the dev-echo convention applies (no real mail transport), and only for a deliverable challenge. */
+  /** Echo environments only (no real mail transport). A decoy carries one too — its code never verifies — so its presence says nothing. */
   devCode?: string;
 }
 
@@ -77,7 +77,7 @@ export class LoginStepUpService implements OnApplicationShutdown {
       maskedEmail: maskEmail(input.email),
       expiresAt: expiresAt.toISOString(),
       resendAvailableAt: resendAvailableAt(now).toISOString(),
-      ...(input.userId && this.dispatcher.devEchoActive ? { devCode: code } : {}),
+      ...(this.dispatcher.devEchoActive ? { devCode: code } : {}),
     };
   }
 
@@ -117,7 +117,7 @@ export class LoginStepUpService implements OnApplicationShutdown {
     return {
       expiresAt: expiresAt.toISOString(),
       resendAvailableAt: resendAvailableAt(now).toISOString(),
-      ...(challenge.userId && this.dispatcher.devEchoActive ? { devCode: code } : {}),
+      ...(this.dispatcher.devEchoActive ? { devCode: code } : {}),
     };
   }
 

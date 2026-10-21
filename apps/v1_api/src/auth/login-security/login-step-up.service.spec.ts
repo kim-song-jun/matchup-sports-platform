@@ -83,13 +83,28 @@ describe('LoginStepUpService.start', () => {
     expect(decoy.state.challenges[0]).toMatchObject({ userId: null, sentCount: 0 });
   });
 
-  it('echoes the code only for a deliverable challenge in an echo environment', async () => {
+  it('in an echo environment carries a six-digit devCode on a decoy as well, and the decoy code never verifies', async () => {
     const { service, dispatcher } = setup({ devEcho: true });
     const real = await service.start({ email: EMAIL, emailKey: 'key-a', userId: USER_ID });
     const decoy = await service.start({ email: 'ghost@example.com', emailKey: 'key-ghost', userId: null });
     await service.onApplicationShutdown();
 
     expect(real.devCode).toBe(lastMailedCode(dispatcher));
+    expect(decoy.devCode).toMatch(/^\d{6}$/);
+    expect(Object.keys(decoy)).toEqual(Object.keys(real));
+    expect(await rejection(service.verify(decoy.challengeToken, decoy.devCode as string))).toMatchObject({
+      status: 400,
+      code: 'STEP_UP_CODE_INVALID',
+    });
+  });
+
+  it('sends no devCode to anyone when echo is off', async () => {
+    const { service } = setup({ devEcho: false });
+    const real = await service.start({ email: EMAIL, emailKey: 'key-a', userId: USER_ID });
+    const decoy = await service.start({ email: 'ghost@example.com', emailKey: 'key-ghost', userId: null });
+    await service.onApplicationShutdown();
+
+    expect(real).not.toHaveProperty('devCode');
     expect(decoy).not.toHaveProperty('devCode');
   });
 });
@@ -178,6 +193,20 @@ describe('LoginStepUpService.resend', () => {
       expect(await rejection(service.verify(challengeToken, firstCode))).toMatchObject({ code: 'STEP_UP_CODE_INVALID' });
     }
     await expect(service.verify(challengeToken, secondCode)).resolves.toMatchObject({ userId: USER_ID });
+  });
+
+  it('in an echo environment a decoy resend carries a devCode like a real one', async () => {
+    const { service } = setup({ devEcho: true });
+    const real = await service.start({ email: EMAIL, emailKey: 'key-a', userId: USER_ID });
+    const decoy = await service.start({ email: 'ghost@example.com', emailKey: 'key-ghost', userId: null });
+    advance(31_000);
+
+    const realResend = await service.resend(real.challengeToken);
+    const decoyResend = await service.resend(decoy.challengeToken);
+    await service.onApplicationShutdown();
+
+    expect(Object.keys(decoyResend)).toEqual(Object.keys(realResend));
+    expect(decoyResend.devCode).toMatch(/^\d{6}$/);
   });
 
   it('answers a decoy with the same 200 body shape and mails nothing', async () => {

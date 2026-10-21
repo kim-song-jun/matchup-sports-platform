@@ -1,0 +1,68 @@
+{
+  "pr": 2013,
+  "date": "2026-10-21",
+  "environment": "alpha",
+  "commit": "ab1c1c5180fcadc767c0d2df331bc7a3bb74d995",
+  "release": "1.11.0-alpha.20261021.gab1c1c5180fc",
+  "ci": {
+    "pr": 39528962276,
+    "dev": 39530776886,
+    "deploy": 39530776927,
+    "result": "success"
+  },
+  "persona": "active administrator (real login)",
+  "route": "/admin/tournaments/ad200600-0000-4000-8000-000000000002/bracket",
+  "preview": {
+    "status": 200,
+    "groupSizes": [
+      4,
+      4,
+      4,
+      3
+    ],
+    "allGroupsComplete": true,
+    "targets": 8,
+    "blockedReason": null
+  },
+  "viewports": [
+    {
+      "width": 390,
+      "height": 1000,
+      "autoEnabled": true,
+      "slots": 8,
+      "unique": 8,
+      "swapVerified": true,
+      "saveEnabled": true,
+      "horizontalOverflow": 0,
+      "visualVerdict": "PASS"
+    },
+    {
+      "width": 768,
+      "height": 1000,
+      "autoEnabled": true,
+      "slots": 8,
+      "unique": 8,
+      "swapVerified": true,
+      "saveEnabled": true,
+      "horizontalOverflow": 0,
+      "visualVerdict": "PASS"
+    },
+    {
+      "width": 1440,
+      "height": 1000,
+      "autoEnabled": true,
+      "slots": 8,
+      "unique": 8,
+      "swapVerified": true,
+      "saveEnabled": true,
+      "horizontalOverflow": 0,
+      "visualVerdict": "PASS"
+    }
+  ],
+  "consoleErrors": [],
+  "failedResponses": [],
+  "assignmentSaved": false,
+  "cleanup": "Owned headed browser and Node process stopped; PID checks show no remaining owned processes. Isolated integration DB already removed.",
+  "limitations": "Alpha verification exercised preview and local draft only. Persistence/rollback, stale input, permissions and existing round12 behavior were verified in isolated automated tests.",
+  "reviewException": "User approved Copilot clean-review exception for PR2013 only, conditional on CI success; both latest PR and merged dev CI succeeded."
+}

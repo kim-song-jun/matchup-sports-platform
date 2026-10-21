@@ -1,5 +1,5 @@
 # Task 20261099: 조별 결과 기반 공통 결선 진출팀 배정
-Status: Review
+Status: Complete
 Created: 2026-10-21
 
 ## Context
@@ -24,13 +24,13 @@ Created: 2026-10-21
 - [x] 승인된 기능 시나리오와 보안 계약 검증
 - [x] 타입/API 문서/changeset 동기화
 - [x] alpha QA blocker 기록
-- [ ] dev 반영 후 alpha 실제 화면 390/768/1440 검증
+- [x] dev 반영 후 alpha 실제 화면 390/768/1440 검증
 ## Tech Debt Resolved
 수동 대진에서 조별 결과 기반 배정이 불가능했던 템플릿 종속성 제거.
 ## Security Notes
 V1AuthGuard 및 활성 관리자 읽기/쓰기 권한. 서버에서 대상·확정 등록·공식 결과·중복·잠금 검증. 한 트랜잭션 저장.
 ## Risks & Dependencies
-alpha 로그인/브라우저 도구 없음. 공식 결과 정정 시 저장된 결선은 자동 덮어쓰지 않음; 새 preview에서 차이 확인.
+공식 결과 정정 시 저장된 결선은 자동 덮어쓰지 않음; 새 preview에서 차이 확인.
 ## Ambiguity Log
 사용자가 기존 12강 유지 및 공통 순위 확인/수정/자동·수동 배정 기획을 승인함. 기존 UI 프리미티브와 12강 모달 패턴 확장. 공식 순위 변경 대신 배정 초안 수정.
 ## Progress Snapshot
@@ -53,3 +53,12 @@ origin/dev 88119dbd9, branch feat/group-finalist-assignment, worktree /tmp/teame
 
 - PR #2013 생성, 최초 head 3c369ed79. Copilot run39528327466은 코드 검토 전 모델 `claude-opus-5` unavailable로 실패(최신 리뷰 없음). 실패를 clean으로 취급하지 않음.
 - 실제 alpha 로그인·지정15팀 수동대진의 before1440/768/390 캡처 완료(overflow0, console/network 오류0). 모바일 그림은 별도 컴포넌트라 공통 버튼 진입을 보강했으며, 수동/슬롯 없는 대진에서 preview API까지 여는 모바일 회귀8 PASS. Web 검증 누적121.
+
+## 최종 배포 및 alpha QA (2026-10-21)
+- PR [#2013](https://github.com/kim-song-jun/matchup-sports-platform/pull/2013) dev merge 완료. Merge SHA `ab1c1c5180fcadc767c0d2df331bc7a3bb74d995`.
+- Copilot은 GitHub 모델 unavailable로 실행 전 실패. 사용자가 **이번 PR만, CI 전체 통과 조건**으로 예외 승인했고 PR 코멘트에 기록. 최신 PR CI39528962276 및 머지 dev CI39530776886 모두 success.
+- Alpha 배포39530776927 success. 웹 `/` 및 `/api/v1/health` 200, 둘 다 위 SHA와 `1.11.0-alpha.20261021.gab1c1c5180fc` 확인. 로컬 dev도 `--ff-only` 동기화 완료.
+- 실제 관리자 로그인, 지정15팀(4/4/4/3) 수동대진 preview200/공식결과 완료/대상8/차단사유 없음. 390·768·1440 **3/3 PASS**: 공통 버튼 진입, 조별 순위 확인, 교차 자동배정8팀, 중복0, 수동교환, 최종확인/저장버튼 활성화. 페이지/모달 가로넘침0, console/network 오류0. 실제 저장은 하지 않음.
+- 캡처9장(진입/순위/배정초안 각3폭)과 `docs/screenshots/finalist-assignment/alpha-evidence.json`은 별도 `qa/pr2013-alpha-evidence` 브랜치에 보존하고 원 PR 갤러리에서 SHA 고정 링크로 제공. 이 증거 추가는 런타임 코드 변경 없음.
+- 저장/rollback·권한·stale·기존12강은 격리 DB/단위/UI 테스트 증거 사용. alpha에서는 결과 정정이나 실제 배정 저장을 실행하지 않음.
+- 소유 headed 브라우저/Node 종료 및 PID 부재 확인. 원본 공유 작업트리 WIP 보존. 위 pending 스냅샷은 배포 전 이력이며 이 최종 기록이 최신 상태.

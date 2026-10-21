@@ -1,7 +1,7 @@
 # 조별 결과 기반 결선 진출팀 배정
 
 Task: [20261099](../../.github/tasks/20261099-finalist-assignment.md)
-Status: 로컬 자동 검증 완료, alpha 배포/실측 대기
+Status: dev 머지·alpha 배포 및 실제 화면 3/3 검증 완료
 
 ## 대상과 준비
 - 관리자(owner/ops), 대회 방식 `group_knockout`.
@@ -30,4 +30,6 @@ Status: 로컬 자동 검증 완료, alpha 배포/실측 대기
 - 임시 PostgreSQL 18.4-beta, migration 전체 재생 PASS; 신규 불균등 수동 대진2 + 기존12강3 + 공통12강 부전승 보존2 = 7/7 PASS. DB 쓰기 중간 오류 주입으로 전체 롤백 확인.
 - DB 테스트는 각 suite별 clone을 사용하고 종료 시 삭제. 소유한 localhost:56439 PostgreSQL 종료 및 `/tmp/teameet-finalist-pg-data` 정리 완료. 운영/alpha DB와 지정 대회 데이터 변경 없음.
 - API/Web 타입 및 surface/pattern 검증 기록은 task 최신 snapshot 참고.
-- 실제 alpha before: **3/3** (390/768/1440), 지정15팀 대진·운영자 실제 로그인, overflow/console/network 오류0. after: **0/3**, 최신 PR 미배포. UI 테스트/jsdom은 alpha 시각 검증으로 계산하지 않음. console/network/스크린샷 판정도 대기.
+- 실제 alpha before: **3/3** (390/768/1440), 지정15팀 대진·운영자 실제 로그인, overflow/console/network 오류0. after: **3/3 PASS**, 배포 SHA `ab1c1c5180fcadc767c0d2df331bc7a3bb74d995`. 세 폭에서 교차 자동배정8팀·중복0·수동교환·최종확인/저장 활성화, 가로넘침0/console/network 오류0. 캡처 직접 시각 검토 PASS. 실제 저장은 수행하지 않음.
+- Alpha 배포39530776927 success, 웹/API200 및 같은 SHA 확인. [기계 판독 증거](../screenshots/finalist-assignment/alpha-evidence.json). 캡처/최종 기록은 `qa/pr2013-alpha-evidence`에 보존하며 원 PR2013 갤러리에서 확인.
+- 격리 DB와 owned headed 브라우저/Node 종료·정리 완료.

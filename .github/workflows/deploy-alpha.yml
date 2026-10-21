@@ -112,7 +112,7 @@ jobs:
           ref: ${{ steps.release.outputs.sha }}
           fetch-depth: 0
 
-      # 판정 규칙(push run 또는 Promote 가 건 dispatch run)은 select-matching-ci-run.sh 에 있어서
+      # 판정 규칙(그 커밋의 push run 만 인정)은 select-matching-ci-run.sh 에 있어서
       # 체크아웃이 이 스텝보다 앞서야 한다.
       - name: Wait for matching CI success
         timeout-minutes: 35

@@ -93,7 +93,7 @@ jobs:
           #    "이전 상태가 없다" 는 뜻이므로 비교 기준은 main 뿐이다. 여기서 main 을 쓰는 건
           #    옳다 — 아래 보강에서 main 을 안 쓰는 이유(PR 의 base 는 dev 일 수 있다)와
           #    상황이 다르다.
-          # ⚠️ workflow_dispatch(Promote to main 이 버전 커밋을 push 한 뒤 거는 CI)에는
+          # ⚠️ workflow_dispatch(사람이 dev 에서 수동으로 건 CI)에는
           #    `event.before` 가 없다. 그 커밋 하나가 push 였다면 잡혔을 범위, 즉 첫 부모를 base 로
           #    쓴다. 비워 두면 아래 보강이 dev 를 받아 base==head 가 되어 게이트가 죽는다.
           if [[ "${EVENT_NAME:-}" == "workflow_dispatch" ]]; then
@@ -228,12 +228,11 @@ jobs:
         run: bash scripts/qa/test-alpha-release-state.sh
 
       # release-main.yml(Actions PR 생성 불가로 항상 실패)을 대체한 promote-main.yml 의 로직
-      # 본체 — alpha 검증·버전 bump·승격 게이트·PR 링크 생성이 실제로 순서대로 도는지 확인한다.
+      # 본체 — alpha 검증·버전 PR 생성·승격 게이트·PR 링크 생성이 실제로 순서대로 도는지 확인한다.
       - name: Promote-to-main contract tests
         run: bash scripts/qa/test-promote-main.sh
 
-      # Promote 워크플로가 GITHUB_TOKEN 으로 push 한 버전 커밋엔 push CI 가 생기지 않는다.
-      # deploy-alpha.yml 이 어떤 CI run 을 기다림 없이 믿고 어떤 것을 거절하는지 고정한다.
+      # deploy-alpha.yml 이 어떤 CI run 을 릴리스 SHA 의 CI 로 인정하는지(그 커밋의 push run 만) 고정한다.
       - name: Alpha matching-CI selector tests
         run: bash scripts/qa/test-select-matching-ci-run.sh
 

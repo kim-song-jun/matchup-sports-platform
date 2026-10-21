@@ -97,6 +97,18 @@ describe('5조·20팀→12강 실제 저장 계약', () => {
     const stillAssigned = await prisma.v1TournamentMatchDetails.findUniqueOrThrow({ where: { teamMatchId: saved.targets[0].fixtureId } });
     expect(saved.targets[0].side === 'HOME' ? stillAssigned.homeRegistrationId : stillAssigned.awayRegistrationId).toBe(swapped.assignments[0]);
   });
+  it.each([false, true])('공통 수동 배정도 슬롯 없는 대진=%s의 부전승과 8강 직행을 유지한다', async (direct) => {
+    const { tournamentId } = await settledTournament(`general-round12-${direct}`, direct);
+    const preview = await slots.finalistPreview(user, tournamentId);
+    expect(preview.blockedReason).toBeNull(); expect(preview.targets).toHaveLength(12);
+    expect(preview.targets.filter((target) => target.byePosition !== null)).toHaveLength(4);
+    const teamIds = preview.groups.flatMap((group) => group.teams.map((team) => team.registrationId)).slice(0, 12);
+    await slots.finalistApply(user, tournamentId, { version: preview.version, reason: '공통 배정 부전승 보존',
+      assignments: preview.targets.map((target, i) => ({ fixtureId: target.fixtureId, side: target.side, registrationId: teamIds[i] })) });
+    expect((await slots.finalistPreview(user, tournamentId)).targets.map((target) => target.currentRegistrationId)).toEqual(teamIds);
+    expect(await prisma.v1TournamentGroupTeam.count({ where: { group: { tournamentId }, isBye: true } })).toBe(4);
+    expect(await prisma.v1TournamentSlot.count({ where: { tournamentId, kind: 'BYE', registrationId: { not: null } } })).toBe(4);
+  });
   it('support 쓰기를 막고 미확정 조별 결과가 있으면 배정하지 않는다', async () => {
     const { tournamentId } = await seedBracketTournament(prisma, { label: 'unsettled', format: 'group_knockout', teamCount: 20 });
     await templates.apply(user, tournamentId, { kind: 'group_knockout', groupCount: 5, teamsPerGroup: 4, advancePerGroup: 2,

@@ -9,6 +9,7 @@ import { buildLeagueStandings } from '@/lib/bracket-league-standings-model';
 import { buildBracketMobileRounds, buildLeagueTournamentMobileRounds, candidatesFromRegistrations } from '@/lib/bracket-canvas-mobile-model';
 import { extractErrorMessage } from '@/lib/error-message';
 import type { V1AdminTournamentRegistration, V1TournamentFormat } from '@/types/api';
+import { FinalistAssignmentButton } from './finalist-assignment-button';
 import { BracketCanvasMobile } from './bracket-canvas-mobile';
 import { BracketLeagueStandings } from './bracket-league-standings';
 import type { RegistrationsLoadState } from './bracket-team-tray';
@@ -56,6 +57,7 @@ export function BracketCanvasMobileScreen({ tournamentId, registrations, registr
 
   return (
     <>
+      {canWrite && format === 'group_knockout' ? <div className="mb-3 flex justify-end"><FinalistAssignmentButton tournamentId={tournamentId} groups={bracket.groups} showToast={showToast} /></div> : null}
       {format === 'league' && standingsGroups.length > 0 ? (
         <details className="mb-3" style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-container)', background: 'var(--card-surface)' }}>
           <summary className="tm-text-label flex min-h-[44px] cursor-pointer items-center px-4 font-semibold">조별 순위</summary>

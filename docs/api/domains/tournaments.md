@@ -691,3 +691,20 @@ Eligibility is unchanged. Both tournaments and leagues use the same endpoint.
 Uses the existing nullable goalkeeper column and scheduled-game roster synchronization; no new migration.
 Existing competition-level GK precedence, legacy per-game roles and sport-specific goalkeeper codes are preserved. Live/final snapshots
 are not rewritten. UI uses per-player edit/save/cancel; errors preserve the draft, and a blank number clears it. The UI sends GK only when changed, so a number-only edit does not erase legacy per-game roles.
+
+## 공통 결선 진출팀 배정 (2026-10-21)
+
+템플릿 없이 직접 만든 결선 및 불균등 조(14팀 4/4/3/3, 15팀 4/4/4/3 포함)를 지원한다. 기존 12강 전용 `round12-preview` / `round12-assignments`의 조 간 비교·선발·부전승 규칙은 변경하지 않는다. 관리자 목록/그림의 **결선 진출팀 배정**에서 일반 배정 또는 기존 12강 전용 배정을 연다.
+
+- `GET /admin/tournaments/:tournamentId/bracket/finalist-preview`: `V1AuthGuard` + active admin(support 포함). 대회만 허용(정규 리그 404), format은 `group_knockout`이어야 한다. 응답 `{ version, sourceVersion, standingsChanged, groups, targets, blockedReason }`. `standingsChanged`는 마지막 공통 배정 감사 기록의 조별 성적 fingerprint와 현재 값을 비교한다. 바뀌면 재확인 안내를 표시하고 현재 결선 배정은 유지한다.
+  - `groups[]`: `{ id, name, advanceCount, complete, teams, ranks }`. `teams[]`는 `{ registrationId, teamName, position, points, goalsFor, goalsAgainst }`, `ranks[]`는 `{ rank, state, registrationId? , tiedRegistrationIds? }`. 공식 순위를 읽기만 하며, 동률은 기존 조 순위 판정과 동일하다. 확정 등록이 아닌 팀은 후보가 아니다.
+  - `targets[]`: `{ fixtureId, side: HOME|AWAY, label, groupId, slotId, currentRegistrationId }`. 첫 결선의 직접 배정 자리 및 후속 경기의 직행 자리만 반환하고, 기존 승자/패자 연결이 있는 자리는 제외한다. 후속 결선·3위전의 진출 연결이 빠졌으면 저장을 막는다. 조별 ENTRY를 공유하거나 자리와 경기의 등록이 어긋나면 `409 FINALIST_NOT_READY`.
+  - 모든 조의 공식 결과/순위 반영이 끝나기 전에는 순위 정보와 차단 사유를 보여준다. 결선 시작·결과·기록 존재, 종료/취소/보관 대회도 차단한다.
+- `POST /admin/tournaments/:tournamentId/bracket/finalist-assignments`: mutation admin만 허용. `{ version: SHA256(64), reason: string(1..500, 공백만 불가), assignments: [{ fixtureId: uuid, side: HOME|AWAY, registrationId: uuid }] }`(1..128자리).
+  - 전체 대상 자리 각각에 조별 참가 확정팀 한 팀씩 지정한다. 모든 자리 채움, 자리/팀 중복, 다른 대회·미확정·조별 외 팀, 승자 연결 자리 침범을 서버에서 검증한다. 운영자 배정안은 공식 순위와 다르게 선택할 수 있으며 원본 순위는 변경하지 않는다.
+  - 공식 결과와 같은 대회→게임→팀매치 잠금 아래 미리보기를 다시 계산하고 버전을 비교한다. `409 FINALIST_PREVIEW_STALE`이면 다시 불러와 확인한다. 미완료/시작/구조 오류는 `409 FINALIST_NOT_READY`, 후보/중복 오류는 `422 FINALIST_ASSIGNMENT_INVALID`, DTO 형식/추가 필드는 공통 400 계약.
+  - 자리가 없는 수동 대진에는 결선 GROUP_RANK 자리를 만들고 기존 결선 ENTRY는 sourceGroupId 없는 GROUP_RANK로 전환한다. BYE는 기존 동기화 경로를 유지한다. 공유 자리는 거부한다. 기존 조별 ENTRY, 경기 시간·장소, 승자/패자 연결은 보존한다. 팀 교환은 기존 batch assign 경로로 슬롯·경기·게임 사이드·일정·명단 재동기화를 처리한다.
+  - 응답 `{ assignments: [{ slotId, registrationId }] }`. 전체 저장과 감사 `tournament.bracket.assign_finalists`(사유, 이전 배정, 이후 배정, preview version)는 한 트랜잭션이며 부분 성공은 없다. 동일 미리보기 버전은 저장 후 재사용할 수 없다.
+- 화면의 자동 추천은 조별 진출 수 및 운영자가 조정한 조 내 순서를 사용한다. 교차 배정은 다른 조를 우선하며, 시드순은 조별 배정 순위→조 표시 순서 후 상하위 페어링이다. 조 간 승점 비교는 일반 자동 배정에 적용하지 않는다(조별 경기 수가 다른 경우 포함). 모든 초안은 수동 변경 가능하며 같은 조 재대결을 경고한다. 동률/운영자 조정은 명시 확인 후 저장한다.
+- 저장된 배정은 공식 결과 정정으로 자동 덮어쓰지 않는다. 다시 열거나 **순위 다시 불러오기**로 최신 공식 순위와 현재 배정의 차이를 확인해 저장한다. 배정 초안은 서버에 저장되지 않으며 새 preview를 불러오면 운영자 확인 후 초기화한다. `standings-preview`의 기존 sourceGroupId 기반 채우기는 별도 호환 경로로 유지한다.
+- DB schema/migration 변경 없음. 관련 모델은 `V1TournamentGroup`, `V1TournamentStanding`, `V1TournamentSlot`, `V1TournamentMatchDetails`, `V1TeamMatch`, `V1Game`, 진출 edge 및 관리자 감사 로그다. destructive seed/backfill은 없다.

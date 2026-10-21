@@ -4,6 +4,8 @@ import { AccountRecoveryService } from './account-recovery.service';
 import { AuthController } from './auth.controller';
 import { AppleTokenModule } from './apple-token.module';
 import { AuthService } from './auth.service';
+import { LoginSecurityService } from './login-security/login-security.service';
+import { LoginStepUpService } from './login-security/login-step-up.service';
 import { OptionalV1AuthGuard } from './optional-v1-auth.guard';
 import { PhoneVerificationPublicController } from './phone-verification-public.controller';
 import { V1AuthGuard } from './v1-auth.guard';
@@ -17,6 +19,8 @@ import { VerificationModule } from '../verification/verification.module';
   providers: [
     AuthService,
     AccountRecoveryService,
+    LoginSecurityService,
+    LoginStepUpService,
     V1AuthGuard,
     OptionalV1AuthGuard,
     V1SessionCookieInterceptor,

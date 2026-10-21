@@ -42,6 +42,11 @@ export class VerificationDispatcherService {
     return this.devEcho && !this.sms.enabled && !this.email.enabled;
   }
 
+  /** 사용자가 이메일 코드를 실제로 받을 수 있는지 — 메일 발송이 설정됐거나, 응답에 코드를 싣는 dev-echo 환경. */
+  get emailDeliverable(): boolean {
+    return this.email.enabled || this.devEchoActive;
+  }
+
   /**
    * emailPurpose 는 email 채널의 메일 문구만 고른다(제목·머리말). 기본값은 기존 호출자가
    * 쓰던 이메일 인증 문구라, 넘기지 않던 곳의 동작은 그대로다.

@@ -3,8 +3,11 @@ import {
   Controller,
   Get,
   HttpCode,
+  HttpStatus,
+  Ip,
   Post,
   Query,
+  Res,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
@@ -16,6 +19,7 @@ import { AppleIdentityService } from './apple-identity.service';
 import { CheckEmailQueryDto, CheckNicknameQueryDto } from './dto/check-availability.dto';
 import { KakaoLoginDto, KakaoTokenLoginDto } from './dto/kakao-login.dto';
 import { LoginDto } from './dto/login.dto';
+import { LoginStepUpResendDto, LoginStepUpVerifyDto } from './dto/login-step-up.dto';
 import { RegisterDto } from './dto/register.dto';
 import { SocialLinkDto } from './dto/social-link.dto';
 import { SocialProfileDto, SocialTermsDto } from './dto/social-profile.dto';
@@ -38,10 +42,31 @@ export class AuthController {
     return this.authService.me(user.id);
   }
 
+  /** A step-up challenge is a 200 (no session, nothing created); a completed login keeps its existing status. */
   @Post('login')
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
-  login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
+  async login(
+    @Body() dto: LoginDto,
+    @Ip() ip: string,
+    @Res({ passthrough: true }) response: { status(code: number): unknown },
+  ) {
+    const result = await this.authService.login(dto, { ip });
+    if ('stepUp' in result) response.status(HttpStatus.OK);
+    return result;
+  }
+
+  @Post('login/step-up/verify')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  verifyLoginStepUp(@Body() dto: LoginStepUpVerifyDto, @Ip() ip: string) {
+    return this.authService.verifyLoginStepUp(dto, { ip });
+  }
+
+  @Post('login/step-up/resend')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  resendLoginStepUp(@Body() dto: LoginStepUpResendDto) {
+    return this.authService.resendLoginStepUp(dto.challengeToken);
   }
 
   /**

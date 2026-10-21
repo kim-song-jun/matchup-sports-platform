@@ -41,12 +41,19 @@ describe('AdminMonitoringController', () => {
       pushUnacked: 2,
       smsUnacked: 3,
       auditToday: 4,
+      loginAnomalies: { last24hCount: 0, latest: null },
     });
 
     const result = await controller.summary(user);
 
     expect(adminContext.getActiveAdmin).toHaveBeenCalledWith('user-1');
-    expect(result).toEqual({ errorsLast24h: 1, pushUnacked: 2, smsUnacked: 3, auditToday: 4 });
+    expect(result).toEqual({
+      errorsLast24h: 1,
+      pushUnacked: 2,
+      smsUnacked: 3,
+      auditToday: 4,
+      loginAnomalies: { last24hCount: 0, latest: null },
+    });
   });
 
   it('summary rejects before any aggregation when the caller is not an active admin', async () => {

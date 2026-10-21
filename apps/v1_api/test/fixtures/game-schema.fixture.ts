@@ -597,7 +597,9 @@ export const gameSchemaSourceManifest = {
   // 2026-10-17: additive V1Match.isOnline backed by
   // 20261017100000_v1_match_online_classification. Game operations migration is unchanged.
   // 2026-10-18: additive V1Tournament.requiresExplicitStart; historical game migration unchanged.
-  schema: '23d87a502b12225fce2a6c5926cc272c14212da9da957cf4f5c26fb26b076644',
+  // 2026-10-21: additive V1LoginAttempt, V1LoginStepUpChallenge, V1SecurityAnomaly (+ V1User back-relation),
+  // backed by 20261021120000_login_step_up. No game model changes; historical game migration unchanged.
+  schema: 'df6fc250677a43c796ee145190b7053a2a7ed791f503f7e1940ddb7d3d214e16',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

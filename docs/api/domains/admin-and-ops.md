@@ -23,6 +23,7 @@
 |---|---|---|---|---|
 | `GET` | `/api/v1/admin/me` | - | active admin | 내 운영자 역할·capability |
 | `GET` | `/api/v1/admin/hub/inbox` | - | active admin | 처리할 대회 신청·결과 검토·문의·진행 중 대회 집계 |
+| `GET` | `/api/v1/admin/monitoring/summary` | - | active admin | 모니터링 허브 신호 스트립 `{ errorsLast24h, pushUnacked, smsUnacked, auditToday, loginAnomalies }`. `loginAnomalies = { last24hCount, latest }` — 최근 24시간에 시작된 로그인 실패 급증(password spray) 감지 수와, 시점과 무관한 가장 최근 1건 `{ startedAt, lastDetectedAt, failedCount, accountCount, ipCount, active }`(없으면 `null`). `active` 는 마지막 감지 후 30분 안 = 지금 모든 이메일 로그인이 추가 인증을 요구하는 중. 상세는 [Auth](./auth.md#email-login-step-up) |
 | `GET` | `/api/v1/admin/overview` | `AdminOverviewQueryDto` | active admin | 운영 현황 요약 |
 | `GET` | `/api/v1/admin/action-logs` | `AdminLogsQueryDto` | active admin | 관리자 액션 로그 |
 | `GET` | `/api/v1/admin/status-change-logs` | `AdminLogsQueryDto` | active admin | 상태 변경 로그 |

@@ -11,24 +11,36 @@
  * 구분이 어려워 사용자에게 "링크를 눌러도 된다"는 습관을 들이지 않는 편이 안전하다.
  */
 
-export type OtpEmailPurpose = 'verify' | 'password_reset';
+export type OtpEmailPurpose = 'verify' | 'password_reset' | 'login_step_up';
 
 interface Copy {
   subject: string;
   heading: string;
   lead: string;
+  /** Closing note under the code. A login code that was not requested by its owner needs a stronger instruction than "ignore". */
+  notice: string;
 }
+
+const IGNORE_NOTICE = '본인이 요청하지 않았다면 이 메일은 무시해도 됩니다. 누군가 주소를 잘못 입력했을 수 있어요.';
 
 const COPY: Record<OtpEmailPurpose, Copy> = {
   verify: {
     subject: '[Teameet] 이메일 인증번호',
     heading: '이메일 인증',
     lead: '아래 인증번호를 입력하면 이메일 확인이 완료돼요.',
+    notice: IGNORE_NOTICE,
   },
   password_reset: {
     subject: '[Teameet] 비밀번호 재설정 인증번호',
     heading: '비밀번호 재설정',
     lead: '아래 인증번호를 입력하면 새 비밀번호를 정할 수 있어요.',
+    notice: IGNORE_NOTICE,
+  },
+  login_step_up: {
+    subject: '[Teameet] 로그인 인증번호',
+    heading: '본인 확인',
+    lead: '아래 인증번호를 입력하면 로그인이 완료돼요.',
+    notice: '본인이 아니라면 바로 비밀번호를 바꿔 주세요.',
   },
 };
 
@@ -63,7 +75,7 @@ export function buildOtpEmailText(code: string, purpose: OtpEmailPurpose = 'veri
     `인증번호: ${code}`,
     '',
     '5분 안에 입력해 주세요.',
-    '본인이 요청하지 않았다면 이 메일은 무시해도 됩니다.',
+    copy.notice,
     '',
     'Teameet · 같이 뛸 사람을 한 번에',
   ].join('\n');
@@ -131,8 +143,7 @@ export function buildOtpEmailHtml(code: string, purpose: OtpEmailPurpose = 'veri
               5분 안에 입력해 주세요.
             </p>
             <p style="margin:14px 0 0 0;padding-top:16px;border-top:1px solid #f2f4f6;font-size:13px;line-height:20px;color:#8b95a1;">
-              본인이 요청하지 않았다면 이 메일은 무시해도 됩니다.
-              누군가 주소를 잘못 입력했을 수 있어요.
+              ${escapeHtml(copy.notice)}
             </p>
           </td>
         </tr>

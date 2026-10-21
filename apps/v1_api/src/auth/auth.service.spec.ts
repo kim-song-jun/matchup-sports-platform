@@ -22,6 +22,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AppleIdentityService } from './apple-identity.service';
 import { AppleTokenService } from './apple-token.service';
 import { AuthService } from './auth.service';
+import { LoginSecurityService } from './login-security/login-security.service';
+import { LoginStepUpService } from './login-security/login-step-up.service';
 import type { RegisterDto } from './dto/register.dto';
 import { hashPassword } from './password-hash';
 import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
@@ -150,6 +152,13 @@ describe('AuthService', () => {
     }),
   };
   const phoneVerification = { enabled: false };
+  const loginSecurity = {
+    isStepUpRequired: jest.fn().mockResolvedValue(false),
+    record: jest.fn().mockResolvedValue(undefined),
+    scheduleSprayDetection: jest.fn(),
+  };
+  const loginStepUp = { start: jest.fn(), verify: jest.fn(), resend: jest.fn() };
+  const CLIENT = { ip: '203.0.113.9' };
 
   beforeEach(async () => {
     prisma = buildPrismaMock();
@@ -179,6 +188,8 @@ describe('AuthService', () => {
         { provide: PhoneVerificationService, useValue: phoneVerification },
         { provide: AppleIdentityService, useValue: appleIdentity },
         { provide: AppleTokenService, useValue: { storeFromAuthorizationCode: jest.fn() } },
+        { provide: LoginSecurityService, useValue: loginSecurity },
+        { provide: LoginStepUpService, useValue: loginStepUp },
       ],
     }).compile();
 
@@ -489,11 +500,18 @@ describe('AuthService', () => {
     prisma.v1AuthIdentity.findUnique.mockResolvedValue(null);
 
     await expect(
-      service.login({ email: 'ghost@teameet.v1', password: 'any' }),
+      service.login({ email: 'ghost@teameet.v1', password: 'any' }, CLIENT),
     ).rejects.toMatchObject({
       status: 401,
       response: { code: 'UNAUTHENTICATED' },
     });
+
+    // Unknown emails count as failures too, keyed by hash — never by the raw address.
+    expect(loginSecurity.record).toHaveBeenCalledWith(
+      'failed',
+      expect.objectContaining({ emailKey: expect.not.stringContaining('ghost') }),
+    );
+    expect(loginSecurity.scheduleSprayDetection).toHaveBeenCalledTimes(1);
   });
 
   it('login: 올바른 이메일 + 틀린 비밀번호 → 401 UNAUTHENTICATED (타이밍 공격 방지 — verifyPassword 호출되어야 함)', async () => {
@@ -513,7 +531,7 @@ describe('AuthService', () => {
     });
 
     await expect(
-      service.login({ email: 'user@teameet.v1', password: 'WrongPass999!' }),
+      service.login({ email: 'user@teameet.v1', password: 'WrongPass999!' }, CLIENT),
     ).rejects.toMatchObject({
       status: 401,
       response: { code: 'UNAUTHENTICATED' },
@@ -521,6 +539,29 @@ describe('AuthService', () => {
 
     // no DB mutation must occur on wrong password
     expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(loginSecurity.record).toHaveBeenCalledWith('failed', expect.any(Object));
+    expect(loginSecurity.record).not.toHaveBeenCalledWith('success', expect.any(Object));
+    expect(loginStepUp.start).not.toHaveBeenCalled();
+  });
+
+  it('login: 맞는 비밀번호는 성공으로 기록하고 공격 감지를 예약하지 않는다', async () => {
+    const hash = await hashPassword('ValidPass1!');
+    prisma.v1AuthIdentity.findUnique.mockResolvedValue({
+      id: 'identity-1',
+      passwordHash: hash,
+      status: 'active',
+      user: { id: 'user-1', email: 'user@teameet.v1', accountStatus: 'active', onboardingStatus: 'completed', createdAt: NOW, updatedAt: NOW },
+    });
+    jest.spyOn(service, 'me').mockResolvedValue({
+      user: { id: 'user-1', email: 'user@teameet.v1' },
+      onboarding: { status: 'completed', missing: [] },
+    } as unknown as Awaited<ReturnType<AuthService['me']>>);
+
+    const result = await service.login({ email: 'user@teameet.v1', password: 'ValidPass1!' }, CLIENT);
+
+    expect(result).toMatchObject({ session: { userId: 'user-1', userEmail: 'user@teameet.v1' } });
+    expect(loginSecurity.record).toHaveBeenCalledWith('success', expect.any(Object));
+    expect(loginSecurity.scheduleSprayDetection).not.toHaveBeenCalled();
   });
 
   it('login: identity.status=suspended 계정 → 403 PERMISSION_DENIED', async () => {
@@ -540,7 +581,7 @@ describe('AuthService', () => {
     });
 
     await expect(
-      service.login({ email: 'user@teameet.v1', password: 'ValidPass1!' }),
+      service.login({ email: 'user@teameet.v1', password: 'ValidPass1!' }, CLIENT),
     ).rejects.toMatchObject({
       status: 403,
       response: { code: 'PERMISSION_DENIED' },
@@ -564,7 +605,7 @@ describe('AuthService', () => {
     });
 
     await expect(
-      service.login({ email: 'user@teameet.v1', password: 'ValidPass1!' }),
+      service.login({ email: 'user@teameet.v1', password: 'ValidPass1!' }, CLIENT),
     ).rejects.toMatchObject({
       status: 403,
       response: { code: 'ACCOUNT_WITHDRAWAL_PENDING' },
@@ -576,7 +617,7 @@ describe('AuthService', () => {
     prisma.v1AuthIdentity.findUnique.mockResolvedValue(null);
 
     await expect(
-      service.login({ email: 'UPPER@Example.COM', password: 'any' }),
+      service.login({ email: 'UPPER@Example.COM', password: 'any' }, CLIENT),
     ).rejects.toThrow(UnauthorizedException);
 
     expect(prisma.v1AuthIdentity.findUnique).toHaveBeenCalledWith(

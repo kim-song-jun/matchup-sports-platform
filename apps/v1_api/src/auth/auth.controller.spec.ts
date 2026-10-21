@@ -78,10 +78,12 @@ describe('AuthController', () => {
     const controller = moduleRef.get(AuthController);
     const dto = { email: 'user@example.com', password: 'password123' };
 
-    await expect(controller.login(dto)).resolves.toEqual({
+    const response = { status: jest.fn() };
+    await expect(controller.login(dto, '203.0.113.9', response)).resolves.toEqual({
       session: { userId: 'user-1', userEmail: 'user@example.com' },
     });
-    expect(authService.login).toHaveBeenCalledWith(dto);
+    expect(authService.login).toHaveBeenCalledWith(dto, { ip: '203.0.113.9' });
+    expect(response.status).not.toHaveBeenCalled();
   });
 
   it('mints a signed session for an already-guard-authenticated caller (dev-session)', async () => {
@@ -351,6 +353,116 @@ describe('AuthController', () => {
         .expect(200, { available: true });
       expect(authService.checkEmail).toHaveBeenCalledWith('A@Example.com');
       expect(authService.checkNickname).toHaveBeenCalledWith('가나', undefined);
+      await app.close();
+    });
+  });
+
+  describe('login step-up HTTP contract', () => {
+    const SESSION_SECRET = 'login-step-up-controller-session-secret-0123456789';
+    const savedSecret = process.env.V1_SESSION_SECRET;
+    const SESSION = { session: { userId: 'user-1', userEmail: 'user@example.com' } };
+    const STEP_UP = {
+      stepUp: {
+        challengeToken: 'c'.repeat(43),
+        maskedEmail: 'us***@example.com',
+        expiresAt: '2026-10-21T12:05:00.000Z',
+        resendAvailableAt: '2026-10-21T12:00:30.000Z',
+      },
+    };
+
+    beforeAll(() => {
+      process.env.V1_SESSION_SECRET = SESSION_SECRET;
+    });
+    afterAll(() => {
+      if (savedSecret === undefined) delete process.env.V1_SESSION_SECRET;
+      else process.env.V1_SESSION_SECRET = savedSecret;
+    });
+
+    const buildApp = async () => {
+      const authService = {
+        login: jest.fn(),
+        verifyLoginStepUp: jest.fn().mockResolvedValue(SESSION),
+        resendLoginStepUp: jest.fn().mockResolvedValue({
+          expiresAt: '2026-10-21T12:05:31.000Z',
+          resendAvailableAt: '2026-10-21T12:01:01.000Z',
+        }),
+      };
+      const moduleRef = await Test.createTestingModule({
+        controllers: [AuthController],
+        providers: [
+          { provide: AuthService, useValue: authService },
+          { provide: PrismaService, useValue: {} },
+          { provide: AppleIdentityService, useValue: appleIdentityDouble() },
+        ],
+      }).compile();
+      const app = moduleRef.createNestApplication();
+      app.useGlobalPipes(createGlobalValidationPipe());
+      await app.init();
+      return { app, authService };
+    };
+
+    const login = { email: 'user@example.com', password: 'password123' };
+
+    it('keeps a completed login at 201 with the session cookie', async () => {
+      const { app, authService } = await buildApp();
+      authService.login.mockResolvedValue(SESSION);
+
+      const res = await request(app.getHttpServer()).post('/auth/login').send(login).expect(201);
+
+      expect(String(res.headers['set-cookie'])).toContain('teameet_v1_session=');
+      expect(res.body).toEqual(SESSION);
+      expect(authService.login).toHaveBeenCalledWith(login, { ip: expect.any(String) });
+      await app.close();
+    });
+
+    it('answers a step-up challenge with 200 and no session cookie', async () => {
+      const { app, authService } = await buildApp();
+      authService.login.mockResolvedValue(STEP_UP);
+
+      const res = await request(app.getHttpServer()).post('/auth/login').send(login).expect(200);
+
+      expect(res.headers['set-cookie']).toBeUndefined();
+      expect(res.body).toEqual(STEP_UP);
+      await app.close();
+    });
+
+    it('verify returns the login session with the cookie, as 200', async () => {
+      const { app, authService } = await buildApp();
+      const body = { challengeToken: 'c'.repeat(43), code: '123456' };
+
+      const res = await request(app.getHttpServer()).post('/auth/login/step-up/verify').send(body).expect(200);
+
+      expect(String(res.headers['set-cookie'])).toContain('teameet_v1_session=');
+      expect(authService.verifyLoginStepUp).toHaveBeenCalledWith(body, { ip: expect.any(String) });
+      await app.close();
+    });
+
+    it.each([
+      { name: 'a 5-digit code', body: { challengeToken: 'c'.repeat(43), code: '12345' } },
+      { name: 'a non-numeric code', body: { challengeToken: 'c'.repeat(43), code: '12345a' } },
+      { name: 'a missing token', body: { code: '123456' } },
+      { name: 'an unknown field', body: { challengeToken: 'c'.repeat(43), code: '123456', userId: 'someone-else' } },
+    ])('verify rejects $name with 400 before reaching the service', async ({ body }) => {
+      const { app, authService } = await buildApp();
+
+      const res = await request(app.getHttpServer()).post('/auth/login/step-up/verify').send(body).expect(400);
+
+      expect(res.body.code).toBe('VALIDATION_ERROR');
+      expect(authService.verifyLoginStepUp).not.toHaveBeenCalled();
+      await app.close();
+    });
+
+    it('resend forwards only the token and returns the service result as 200', async () => {
+      const { app, authService } = await buildApp();
+
+      const res = await request(app.getHttpServer())
+        .post('/auth/login/step-up/resend')
+        .send({ challengeToken: 'c'.repeat(43) })
+        .expect(200);
+
+      expect(res.body).toEqual({ expiresAt: '2026-10-21T12:05:31.000Z', resendAvailableAt: '2026-10-21T12:01:01.000Z' });
+      expect(authService.resendLoginStepUp).toHaveBeenCalledWith('c'.repeat(43));
+      await request(app.getHttpServer()).post('/auth/login/step-up/resend').send({}).expect(400);
       await app.close();
     });
   });

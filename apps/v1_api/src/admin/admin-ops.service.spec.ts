@@ -23,6 +23,7 @@ describe('AdminOpsService', () => {
     v1SmsEventLog: { findMany: jest.fn(), updateMany: jest.fn(), count: jest.fn() },
     v1ErrorLog: { count: jest.fn() },
     v1AdminActionLog: { count: jest.fn() },
+    v1SecurityAnomaly: { count: jest.fn().mockResolvedValue(0), findFirst: jest.fn().mockResolvedValue(null) },
     v1User: { findUnique: jest.fn(), findMany: jest.fn() },
     v1PushSubscription: { findMany: jest.fn() },
     v1NotificationPreference: { findUnique: jest.fn() },
@@ -127,7 +128,13 @@ describe('AdminOpsService', () => {
 
     const result = await service.monitoringSummary();
 
-    expect(result).toEqual({ errorsLast24h: 4, pushUnacked: 2, smsUnacked: 5, auditToday: 11 });
+    expect(result).toEqual({
+      errorsLast24h: 4,
+      pushUnacked: 2,
+      smsUnacked: 5,
+      auditToday: 11,
+      loginAnomalies: { last24hCount: 0, latest: null },
+    });
 
     // 에러는 lastSeenAt 24시간 창 — occurredAt/createdAt 이 아니라 "마지막 활동" 기준이다.
     const errorWhere = prisma.v1ErrorLog.count.mock.calls[0][0].where;
@@ -146,6 +153,49 @@ describe('AdminOpsService', () => {
     expect((auditCutoff.getTime() + KST_OFFSET_MS) % 86_400_000).toBe(0);
     expect(auditCutoff.getTime()).toBeLessThanOrEqual(Date.now());
     expect(Date.now() - auditCutoff.getTime()).toBeLessThan(86_400_000);
+  });
+
+  describe('monitoringSummary loginAnomalies', () => {
+    const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60_000);
+
+    it('reports the 24h count and the latest anomaly as active while the last detection is under 30 minutes old', async () => {
+      prisma.v1SecurityAnomaly.count.mockResolvedValue(2);
+      prisma.v1SecurityAnomaly.findFirst.mockResolvedValue({
+        startedAt: minutesAgo(50),
+        lastDetectedAt: minutesAgo(12),
+        failedCount: 128,
+        accountCount: 91,
+        ipCount: 37,
+      });
+
+      const { loginAnomalies } = await service.monitoringSummary();
+
+      expect(loginAnomalies).toMatchObject({
+        last24hCount: 2,
+        latest: { failedCount: 128, accountCount: 91, ipCount: 37, active: true },
+      });
+      const countWhere = prisma.v1SecurityAnomaly.count.mock.calls[0][0].where;
+      expect(countWhere.kind).toBe('login_spray');
+      expect(Date.now() - (countWhere.startedAt.gte as Date).getTime()).toBeGreaterThanOrEqual(24 * 60 * 60_000 - 1_000);
+      expect(prisma.v1SecurityAnomaly.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({ orderBy: { lastDetectedAt: 'desc' } }),
+      );
+    });
+
+    it('still shows an old latest anomaly but marks it inactive', async () => {
+      prisma.v1SecurityAnomaly.count.mockResolvedValue(0);
+      prisma.v1SecurityAnomaly.findFirst.mockResolvedValue({
+        startedAt: minutesAgo(3 * 24 * 60),
+        lastDetectedAt: minutesAgo(3 * 24 * 60 - 20),
+        failedCount: 40,
+        accountCount: 12,
+        ipCount: 5,
+      });
+
+      const { loginAnomalies } = await service.monitoringSummary();
+
+      expect(loginAnomalies).toMatchObject({ last24hCount: 0, latest: { failedCount: 40, active: false } });
+    });
   });
 
   it('ackSmsFailures updates only the still-unacknowledged ids and logs one audit entry each, in one transaction', async () => {

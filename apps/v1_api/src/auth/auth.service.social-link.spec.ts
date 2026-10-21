@@ -8,6 +8,8 @@ import { PhoneVerificationService } from '../verification/phone-verification.ser
 import { AppleIdentityService } from './apple-identity.service';
 import { AppleTokenService } from './apple-token.service';
 import { AuthService } from './auth.service';
+import { LoginSecurityService } from './login-security/login-security.service';
+import { LoginStepUpService } from './login-security/login-step-up.service';
 
 const PHONE = '01012345678';
 const CALLER_ID = 'pending-user';
@@ -89,6 +91,8 @@ describe('AuthService.linkSocialToPhoneOwner', () => {
         { provide: PhoneVerificationService, useValue: {} },
         { provide: AppleIdentityService, useValue: {} },
         { provide: AppleTokenService, useValue: {} },
+        { provide: LoginSecurityService, useValue: {} },
+        { provide: LoginStepUpService, useValue: {} },
       ],
     }).compile();
     service = module.get(AuthService);

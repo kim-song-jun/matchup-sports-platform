@@ -7,6 +7,11 @@ import {
   INQUIRY_SLACK_NOTIFICATION_TYPE,
   InquirySlackNotifier,
 } from '../inquiries/inquiry-slack-notifier';
+import {
+  LoginAnomalySlackNotifier,
+  securityEnvironmentLabel,
+} from '../auth/login-security/login-anomaly-slack-notifier';
+import { SECURITY_LOGIN_ANOMALY_TYPE } from '../auth/login-security/login-security.policy';
 import { LineupTodoService } from '../team-lineups/lineup-todo.service';
 import { LINEUP_INCLUDED_NOTIFICATION_TYPE } from '../team-matches/team-match-lineup.service';
 import {
@@ -18,6 +23,11 @@ import {
   LineupReminderService,
   scheduleNextScan,
 } from './lineup-reminders/lineup-reminder.service';
+import {
+  LOGIN_SECURITY_RETENTION_SCAN_TYPE,
+  LoginSecurityRetentionService,
+  scheduleNextLoginSecurityRetentionScan,
+} from './login-security-retention/login-security-retention.service';
 import { ScheduleReminderService } from './schedule-reminders/schedule-reminder.service';
 import {
   scheduleNextNoOpponentScan,
@@ -36,9 +46,16 @@ async function bootstrap(): Promise<void> {
       frontendUrl: process.env.FRONTEND_URL,
     });
     worker.registerHandler(INQUIRY_SLACK_NOTIFICATION_TYPE, inquirySlack.handler);
+    // Security alerts reuse the inquiry webhook (no separate env); registration follows the same condition.
+    const loginAnomalySlack = new LoginAnomalySlackNotifier({
+      webhookUrl: process.env.SLACK_INQUIRY_WEBHOOK_URL,
+      frontendUrl: process.env.FRONTEND_URL,
+      environment: securityEnvironmentLabel(process.env.V1_PUSH_ENVIRONMENT),
+    });
+    worker.registerHandler(SECURITY_LOGIN_ANOMALY_TYPE, loginAnomalySlack.handler);
   } else {
     new Logger('InquirySlackNotifier').warn(
-      'SLACK_INQUIRY_WEBHOOK_URL is not configured; inquiry Slack outbox events remain pending',
+      'SLACK_INQUIRY_WEBHOOK_URL is not configured; inquiry and login-anomaly Slack outbox events have no handler and retry until POISONED',
     );
   }
   worker.registerDurableAuditHandler('GAME_OPERATION_FLAG_CHANGED');
@@ -96,6 +113,11 @@ async function bootstrap(): Promise<void> {
   const noOpponentCancel = new TeamMatchNoOpponentCancelService(prisma, webPush);
   worker.registerHandler(TEAM_MATCH_NO_OPPONENT_SCAN_TYPE, noOpponentCancel.scanHandler);
   await prisma.$transaction((tx) => scheduleNextNoOpponentScan(tx, new Date()));
+
+  // 로그인 시도 기록·만료 챌린지 보관 정리(30일/7일). 같은 자기 예약 스캔이다.
+  const loginSecurityRetention = new LoginSecurityRetentionService(prisma);
+  worker.registerHandler(LOGIN_SECURITY_RETENTION_SCAN_TYPE, loginSecurityRetention.scanHandler);
+  await prisma.$transaction((tx) => scheduleNextLoginSecurityRetentionScan(tx, new Date()));
 
   app.setGlobalPrefix('api/v1');
   app.useGlobalPipes(new ValidationPipe({

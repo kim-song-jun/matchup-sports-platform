@@ -1,5 +1,22 @@
 # 2026-10-05 dev → main production promotion
 
+## Current preparation — 2026-10-22 (finalist schedule labels)
+
+This snapshot supersedes previous execution permissions and coordinates below. The current user request authorizes dev deployment and main promotion preparation, not main PR creation/merge or production approval.
+
+- Owned: `_worktrees/release-main-prep-20261022`, branch `chore/release-main-prep-20261022`; both app versions/changelogs, 8 consumed Changesets and this task. Preserve shared WIP; no schema/runtime/workflow change, main mutation or production write.
+- [x] #2026 latest head `7b3cf443b` API/Web/Gates CI39619957559 success, including real PostgreSQL regression. Merged dev `b106202e66758e2d460e7de8fbfe6c21d72a6401`; main-tree dev synchronized with document WIP restored.
+- [x] Official Changesets CLI2.30.0 consumed 8 changesets for fixed API/Web1.11.3, including #2008/#2016/#2018/#2026 and other current dev changes. Base main `71411e304` is1.11.2; migration tree comparison is required before final handoff.
+- [ ] Release diff and main-promotion policy checks; dev-target release PR and exact-head CI.
+- [ ] Release PR merge, latest dev push CI and matching alpha workflow success; actual public Web/API SHA/version/DB and finalist labels.
+- [ ] Main promotion gate and user-operated compare link. Main remains untouched.
+
+### Ambiguity / runtime evidence
+
+At 2026-10-21 15:13UTC, merged feature SHA had no push CI/check suites/alpha run registered, despite active push-triggered workflows. Remote dev and merged PR were confirmed. Manual workflow_dispatch CI cannot satisfy the push-only alpha gate, so no bypass is attempted. Version preparation proceeds independently; no claim of alpha validation or prepare-only script success is made. Current alpha remains `b6a7a1a21` /1.11.3-alpha; final deployment verification is pending. Original feature Alpha browser after remains0/3.
+
+The separate GitHub AI security task failed at Processing Request before code CI; it is not counted as a clean AI review. Main PR/production approval remain user-operated.
+
 ## Main execution refresh — 2026-10-21 after finalist stability regression
 
 This snapshot supersedes prior user-operated-main restrictions for this execution. The user explicitly requested proceeding without review and then executing main promotion. Create/merge the main PR and approve the matching production deployment only after the actual CI gates pass. No policy bypass, forced merge, production data write/reset/seed, or unrelated WIP changes are authorized.

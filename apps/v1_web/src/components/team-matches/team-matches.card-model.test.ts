@@ -2,7 +2,7 @@
  * `matches.card-model.test.ts` 와 같은 계약 — 누르면 실제로 필터가 걸리는 링크만 만든다.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { buildSportChips, getStatus, sortTeamMatchesByAvailability, statusToCardStatus, summarizeTeamMatches, toTeamMatch } from './team-matches.card-model';
+import { buildSportChips, getStatus, statusToCardStatus, summarizeTeamMatches, toTeamMatch } from './team-matches.card-model';
 import { getTeamMatchListViewModel } from './team-matches.view-model';
 import type { V1Sport, V1TeamMatch, V1TeamMatchApiStatus, V1TeamMatchViewerState } from '@/types/api';
 
@@ -66,22 +66,30 @@ describe('getStatus — 마감 판정', () => {
   });
 });
 
-describe('sortTeamMatchesByAvailability', () => {
-  it('신청 가능한 팀 매치를 먼저 두고 각 상태 그룹의 서버 순서는 유지한다', () => {
-    const items = [
-      { id: 'matched-new', status: 'matched' },
-      { id: 'open-new', status: 'recruiting' },
-      { id: 'deadline-closed', status: 'recruiting', deadlineAt: new Date(Date.now() - 60_000).toISOString() },
-      { id: 'open-old', status: 'recruiting' },
-    ] as unknown as V1TeamMatch[];
+describe('buildSportChips — 서버 건수', () => {
+  // 순서는 서버가 정한다(2026-10-21 상태 묶음). 화면은 다시 정렬하지 않고, 칩 숫자는 서버가 센 전체 건수를 쓴다.
+  const sports = [{ id: 'sport-futsal', name: '풋살' }, { id: 'sport-soccer', name: '축구' }];
+  const loaded = [{ id: 'a', sport: { sportId: 'sport-futsal', name: '풋살' } }] as unknown as V1TeamMatch[];
 
-    expect(sortTeamMatchesByAvailability(items).map((item) => item.id)).toEqual([
-      'open-new',
-      'open-old',
-      'matched-new',
-      'deadline-closed',
-    ]);
-    expect(items.map((item) => item.id)).toEqual(['matched-new', 'open-new', 'deadline-closed', 'open-old']);
+  it('facets 가 있으면 불러온 목록이 아니라 서버가 센 종목별·전체 건수를 쓴다', () => {
+    const chips = buildSportChips({
+      base: getTeamMatchListViewModel(),
+      params: new URLSearchParams(),
+      sports,
+      matches: loaded,
+      facets: { sports: [{ sportId: 'sport-futsal', count: 94 }, { sportId: 'sport-soccer', count: 11 }] },
+    });
+
+    expect(chips[0].count).toBe(105);
+    expect(chips.find((chip) => chip.label === '풋살')?.count).toBe(94);
+    expect(chips.find((chip) => chip.label === '축구')?.count).toBe(11);
+  });
+
+  it('facets 가 아직 없으면 불러온 목록으로 센다', () => {
+    const chips = buildSportChips({ base: getTeamMatchListViewModel(), params: new URLSearchParams(), sports, matches: loaded });
+
+    expect(chips[0].count).toBe(1);
+    expect(chips.find((chip) => chip.label === '풋살')?.count).toBe(1);
   });
 });
 
@@ -168,8 +176,7 @@ describe('toTeamMatch — 마감 여부는 관계와 독립이다', () => {
     expect(model.closed).toBe(true);
   });
 
-  it('정렬은 viewerState 를 안 쓰므로 이 변경에 영향받지 않는다', () => {
-    // sortTeamMatchesByAvailability 는 statusToCardStatus(getStatus(item)) 를 인자 하나로 부른다.
+  it('관계 없이 부르면 상태만으로 판정한다', () => {
     expect(statusToCardStatus('closed')).toBe('closed');
     expect(statusToCardStatus('recruiting')).toBe('open');
   });

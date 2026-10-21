@@ -3,7 +3,7 @@
  * 서버 프리렌더가 마스터 종목 없이도 이 함수를 호출하므로 두 경로를 모두 고정한다.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { formatDeadline, formatDeadlineDetail, toMatchCard, buildSportSummary, sortMatchesByAvailability } from './matches.card-model';
+import { formatDeadline, formatDeadlineDetail, toMatchCard, buildSportSummary } from './matches.card-model';
 import { getMatchListViewModel } from './matches.view-model';
 import type { V1Match, V1Sport } from '@/types/api';
 
@@ -44,30 +44,31 @@ describe('buildSportSummary', () => {
   });
 });
 
-describe('sortMatchesByAvailability', () => {
-  it('모집중 → 진행중 → 종료 확인 필요 → 최근 종료 순으로 두고 각 그룹의 서버 순서는 유지한다', () => {
-    const items = [
-      { id: 'closed-new', status: 'closed' },
-      { id: 'completed', status: 'completed', displayState: 'completed' },
-      { id: 'open-new', status: 'recruiting' },
-      { id: 'pending-completion', status: 'expired', displayState: 'completion_pending' },
-      { id: 'full', status: 'recruiting', displayState: 'full' },
-      { id: 'in-progress', status: 'expired', displayState: 'in_progress' },
-      { id: 'open-old', status: 'recruiting' },
-    ] as unknown as V1Match[];
+describe('buildSportSummary — 서버 건수', () => {
+  // 순서는 서버가 정한다(2026-10-21 상태 묶음). 화면은 다시 정렬하지 않고, 칩 숫자는 서버가 센 전체 건수를 쓴다.
+  it('facets 가 있으면 불러온 목록이 아니라 서버가 센 종목별·전체 건수를 쓴다', () => {
+    const base = getMatchListViewModel();
+    const futsal = { id: 'sport-futsal', code: 'futsal', name: '풋살', order: 1 } as unknown as V1Sport;
+    const soccer = { id: 'sport-soccer', code: 'soccer', name: '축구', order: 2 } as unknown as V1Sport;
+    const loaded = [{ id: 'a', sport: { sportId: 'sport-futsal', name: '풋살' } }] as unknown as V1Match[];
+    const facets = { sports: [{ sportId: 'sport-futsal', count: 94 }, { sportId: 'sport-soccer', count: 11 }] };
 
-    expect(sortMatchesByAvailability(items).map((item) => item.id)).toEqual([
-      'open-new',
-      'open-old',
-      'closed-new',
-      'full',
-      'in-progress',
-      'pending-completion',
-      'completed',
-    ]);
-    expect(items.map((item) => item.id)).toEqual(['closed-new', 'completed', 'open-new', 'pending-completion', 'full', 'in-progress', 'open-old']);
+    const chips = buildSportSummary(new URLSearchParams(), loaded, base, undefined, [futsal, soccer], facets);
+
+    expect(chips[0]).toMatchObject({ count: 105, active: true });
+    expect(chips.find((chip) => chip.label === '풋살')?.count).toBe(94);
+    expect(chips.find((chip) => chip.label === '축구')?.count).toBe(11);
   });
 
+  it('facets 가 아직 없으면 불러온 목록으로 센다', () => {
+    const base = getMatchListViewModel();
+    const loaded = [{ id: 'a', sport: { sportId: 'sport-futsal', name: '풋살' } }] as unknown as V1Match[];
+
+    expect(buildSportSummary(new URLSearchParams(), loaded, base)[0].count).toBe(1);
+  });
+});
+
+describe('toMatchCard — 종료 확인', () => {
   it('종료 확인이 필요한 호스트 카드에는 다음 행동을 안내한다', () => {
     const card = toMatchCard({
       id: 'pending-completion',

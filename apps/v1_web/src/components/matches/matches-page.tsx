@@ -13,6 +13,7 @@ import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { cssUrl } from '@/lib/assets';
 import { SportIllustration } from '@/components/v1-ui/sport-illustration';
 import { MatchTypeSegment } from '@/components/v1-ui/match-type-segment';
+import { ListSummaryCounts } from '@/components/v1-ui/list-summary-counts';
 import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
 import { CreateField, FieldErrorText, GenderRuleSelector, MissingFieldsBanner } from '@/components/v1-ui/create-form-fields';
 import type {
@@ -117,8 +118,7 @@ export function MatchListPageView({ model }: { model: MatchListViewModel }) {
               줄을 더하지 않고 요약 행 안에서 제목 역할을 한다(2026-09-07 사용자 확정). */}
           <h2 className="tm-list-scope-heading">{model.summary.label}</h2>
           {/* summary.urgent = status==='open'(모집중) 매치 수 — '마감'은 의미 반대였음(WS11 Rank6) */}
-          {/* #21 + [P1 tabular-nums]: '모집 중 N' 숫자 weight700 + tabular-nums */}
-          <div className="tm-text-caption tab-num">{model.summary.count}개 · 오늘 {model.summary.today} · 모집 중 <strong style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{model.summary.urgent}</strong></div>
+          <ListSummaryCounts summary={model.summary} />
         </div>
         {/* team-matches-page.tsx #5와 동일 — 로딩 중(isLoading)엔 PageSkeleton, 완료 후
             비어 있으면 EmptyState. 이 분기 없이는 필터를 바꿔 새 쿼리가 도는 동안에도
@@ -1383,3 +1383,4 @@ function nextCreateHref(step: MatchCreateViewModel['step']) {
   // 만약 도달하면 안전하게 목록으로 복귀.
   return '/matches';
 }
+

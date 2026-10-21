@@ -109,4 +109,15 @@ describe('EmailLoginClient step-up branch', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('로그인 시도가 많아요. 잠시 후 다시 시도해 주세요.');
     expect(screen.queryByText(/지금은 로그인할 수 없어요/)).toBeNull();
   });
+
+  it('sends the user to a password reset when this email has used up today\'s codes', async () => {
+    renderLogin();
+
+    submitLogin(STEP_UP_MSW.sendLimitEmail, 'password123');
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('오늘 다 보냈어요');
+    expect(screen.queryByText(/로그인 시도가 많아요/)).toBeNull();
+    expect(screen.getByRole('link', { name: '비밀번호 재설정하기' })).toHaveAttribute('href', '/auth/find-account?mode=reset-password');
+    expect(readLoginStepUp()).toBeNull();
+  });
 });

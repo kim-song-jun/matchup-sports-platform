@@ -6,15 +6,31 @@ export const STEP_UP_CODE_INVALID = 'STEP_UP_CODE_INVALID';
 export const STEP_UP_EXPIRED = 'STEP_UP_EXPIRED';
 export const STEP_UP_TOO_MANY_ATTEMPTS = 'STEP_UP_TOO_MANY_ATTEMPTS';
 export const STEP_UP_RESEND_COOLDOWN = 'STEP_UP_RESEND_COOLDOWN';
+/** 이메일 하나당 24시간 발송 상한. 로그인(챌린지 발급)과 다시 받기 둘 다에서 온다. */
+export const STEP_UP_SEND_LIMIT = 'STEP_UP_SEND_LIMIT';
+export const EMAIL_SEND_FAILED = 'EMAIL_SEND_FAILED';
 
-/** 서버가 막은 "다시 받기" 대기 시간(30초). RESEND_COOLDOWN 응답에는 남은 시간이 없어 같은 값으로 맞춘다. */
+/** 서버가 막은 "다시 받기" 대기 시간(30초). 응답에 남은 시간(details.retryAfterSeconds)이 없을 때만 쓴다. */
 export const STEP_UP_RESEND_COOLDOWN_MS = 30 * 1000;
+
+export const STEP_UP_SEND_LIMIT_MESSAGE =
+  '이 메일로 보낼 수 있는 인증번호를 오늘 다 보냈어요. 비밀번호를 재설정하면 바로 다시 로그인할 수 있어요.';
 
 export type StepUpFailure =
   /** 화면에 머물고 입력칸 아래에 알린다. */
-  | { kind: 'inline'; message: string; tone: 'error' | 'info'; restartCooldown?: boolean }
+  | {
+    kind: 'inline';
+    message: string;
+    tone: 'error' | 'info';
+    /** 비밀번호 재설정으로 가는 길을 함께 보여 준다. */
+    recovery?: boolean;
+    /** 이 시간(ms) 뒤에 다시 받을 수 있다. 0 이면 바로. */
+    resendInMs?: number;
+    /** 현재 인증번호로는 더 시도할 수 없다 — 새 인증번호를 받아야 풀린다. */
+    codeExhausted?: boolean;
+  }
   /** 이 챌린지로는 더 할 수 있는 게 없다 — 처음부터 다시 로그인해야 한다. */
-  | { kind: 'dead'; reason: 'expired' | 'locked' };
+  | { kind: 'dead' };
 
 const RESTRICTED_MESSAGE = '로그인이 제한된 계정이에요. 고객센터에서 상태를 확인해 주세요.';
 
@@ -22,10 +38,23 @@ function isRateLimited(err: unknown) {
   return err instanceof V1ApiError && err.statusCode === 429;
 }
 
+function retryAfterMs(err: unknown): number {
+  const details = err instanceof V1ApiError ? err.details : null;
+  const seconds = typeof details === 'object' && details !== null ? (details as { retryAfterSeconds?: unknown }).retryAfterSeconds : null;
+  return typeof seconds === 'number' && Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : STEP_UP_RESEND_COOLDOWN_MS;
+}
+
 export function describeVerifyFailure(err: unknown): StepUpFailure {
   const code = extractErrorCode(err);
-  if (code === STEP_UP_EXPIRED) return { kind: 'dead', reason: 'expired' };
-  if (code === STEP_UP_TOO_MANY_ATTEMPTS) return { kind: 'dead', reason: 'locked' };
+  if (code === STEP_UP_EXPIRED) return { kind: 'dead' };
+  if (code === STEP_UP_TOO_MANY_ATTEMPTS) {
+    return {
+      kind: 'inline',
+      tone: 'error',
+      codeExhausted: true,
+      message: '인증번호를 너무 많이 틀렸어요. 인증번호를 다시 받아 주세요.',
+    };
+  }
   if (code === STEP_UP_CODE_INVALID) {
     return { kind: 'inline', tone: 'error', message: '인증번호가 맞지 않아요. 메일에 적힌 6자리 숫자를 다시 확인해 주세요.' };
   }
@@ -38,14 +67,20 @@ export function describeVerifyFailure(err: unknown): StepUpFailure {
 
 export function describeResendFailure(err: unknown): StepUpFailure {
   const code = extractErrorCode(err);
-  if (code === STEP_UP_EXPIRED) return { kind: 'dead', reason: 'expired' };
-  if (code === STEP_UP_TOO_MANY_ATTEMPTS) return { kind: 'dead', reason: 'locked' };
+  if (code === STEP_UP_EXPIRED) return { kind: 'dead' };
   if (code === STEP_UP_RESEND_COOLDOWN) {
     // 실패가 아니라 "조금 뒤에 다시" 안내다. 빨간 오류로 띄우면 인증이 틀어진 줄 안다.
-    return { kind: 'inline', tone: 'info', restartCooldown: true, message: '잠시 후에 다시 받을 수 있어요.' };
+    return { kind: 'inline', tone: 'info', resendInMs: retryAfterMs(err), message: '잠시 후에 다시 받을 수 있어요.' };
+  }
+  if (code === STEP_UP_SEND_LIMIT) {
+    return { kind: 'inline', tone: 'error', recovery: true, message: STEP_UP_SEND_LIMIT_MESSAGE };
+  }
+  if (code === EMAIL_SEND_FAILED) {
+    // 서버는 메일이 못 나간 챌린지의 다시 받기를 대기 없이 받는다.
+    return { kind: 'inline', tone: 'error', resendInMs: 0, message: '인증번호 메일을 보내지 못했어요. 잠시 후 다시 받아 주세요.' };
   }
   if (isRateLimited(err)) {
-    return { kind: 'inline', tone: 'error', message: '인증번호를 너무 많이 요청했어요. 시간을 두고 다시 시도해 주세요.' };
+    return { kind: 'inline', tone: 'error', message: '요청이 많아요. 잠시 후 다시 시도해 주세요.' };
   }
   return { kind: 'inline', tone: 'error', message: '지금은 인증번호를 보낼 수 없어요. 잠시 후 다시 시도해 주세요.' };
 }

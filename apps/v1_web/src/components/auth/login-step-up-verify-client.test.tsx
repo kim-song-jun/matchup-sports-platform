@@ -164,17 +164,23 @@ describe('LoginStepUpVerifyClient', () => {
       expect(readLoginStepUp()).toBeNull();
     });
 
-    it('locks the screen after too many wrong codes', async () => {
-      storeChallenge({ challengeToken: STEP_UP_MSW.tokens.locked });
+    it('locks the used-up code until a new one is requested, then unlocks the field', async () => {
+      storeChallenge({ challengeToken: STEP_UP_MSW.tokens.locked, resendAvailableAt: PAST });
       renderVerify();
       await screen.findByLabelText('인증번호 6자리');
 
       typeCode('111111');
       fireEvent.click(screen.getByRole('button', { name: '확인하고 로그인' }));
 
-      expect(await screen.findByRole('heading', { level: 1, name: '인증번호를 너무 많이 틀렸어요' })).toBeInTheDocument();
-      expect(screen.queryByLabelText('인증번호 6자리')).toBeNull();
-      expect(readLoginStepUp()).toBeNull();
+      expect(await screen.findByRole('alert')).toHaveTextContent('인증번호를 다시 받아 주세요');
+      expect(screen.getByLabelText('인증번호 6자리')).toBeDisabled();
+      expect(screen.getByRole('button', { name: '확인하고 로그인' })).toBeDisabled();
+      expect(readLoginStepUp()).not.toBeNull();
+
+      fireEvent.click(screen.getByRole('button', { name: '인증번호 다시 받기' }));
+
+      expect(await screen.findByRole('status')).toHaveTextContent('인증번호를 다시 보냈어요');
+      expect(screen.getByLabelText('인증번호 6자리')).toBeEnabled();
     });
   });
 
@@ -201,7 +207,33 @@ describe('LoginStepUpVerifyClient', () => {
 
       expect(await screen.findByRole('status')).toHaveTextContent('잠시 후에 다시 받을 수 있어요');
       expect(screen.queryByRole('alert')).toBeNull();
-      expect(screen.getByRole('button', { name: /^인증번호 다시 받기 \(\d+초\)$/ })).toBeDisabled();
+      const wait = screen.getByRole('button', { name: /^인증번호 다시 받기 \((\d+)초\)$/ });
+      expect(wait).toBeDisabled();
+      // 서버가 알려 준 남은 시간(12초)을 따른다 — 기본 30초로 덮지 않는다.
+      expect(Number(/\((\d+)초\)/.exec(wait.textContent ?? '')?.[1])).toBeLessThanOrEqual(STEP_UP_MSW.cooldownSeconds);
+    });
+
+    it('points to a password reset when this email has used up today\'s codes', async () => {
+      storeChallenge({ challengeToken: STEP_UP_MSW.tokens.sendLimit, resendAvailableAt: PAST });
+      renderVerify();
+
+      fireEvent.click(await screen.findByRole('button', { name: '인증번호 다시 받기' }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('오늘 다 보냈어요');
+      expect(screen.getByRole('link', { name: '비밀번호 재설정하기' })).toHaveAttribute(
+        'href',
+        '/auth/find-account?mode=reset-password&redirect=%2Fmy',
+      );
+    });
+
+    it('lets the user retry right away when the mail could not be sent', async () => {
+      storeChallenge({ challengeToken: STEP_UP_MSW.tokens.sendFailed, resendAvailableAt: PAST });
+      renderVerify();
+
+      fireEvent.click(await screen.findByRole('button', { name: '인증번호 다시 받기' }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('인증번호 메일을 보내지 못했어요');
+      expect(screen.getByRole('button', { name: '인증번호 다시 받기' })).toBeEnabled();
     });
 
     it('ends the attempt when the challenge can no longer be resent', async () => {

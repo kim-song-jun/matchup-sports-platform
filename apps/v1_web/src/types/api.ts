@@ -3412,10 +3412,16 @@ export type V1AdminLoginAnomalySummary = {
   latest: {
     /** 감지가 시작된 시각(ISO). */
     startedAt: string;
-    /** 감지 당시 집계한 실패 수. */
-    failureCount: number;
-    /** 감지 당시 서로 다른 계정(이메일) 수. */
+    /** 마지막으로 다시 감지된 시각(ISO). */
+    lastDetectedAt: string;
+    /** 마지막 감지 때 집계한 실패 수. */
+    failedCount: number;
+    /** 마지막 감지 때 서로 다른 계정(이메일) 수. */
     accountCount: number;
+    /** 마지막 감지 때 서로 다른 IP 수. */
+    ipCount: number;
+    /** 아직 감지 중(마지막 감지 후 30분 이내)이라 모든 이메일 로그인에 추가 인증을 요구하는지. */
+    active: boolean;
   } | null;
 };
 

@@ -20,18 +20,14 @@ import {
 } from '@/lib/login-step-up';
 import { AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
 import { completeEmailLogin } from './email-login-completion';
-import {
-  describeResendFailure,
-  describeVerifyFailure,
-  STEP_UP_RESEND_COOLDOWN_MS,
-  type StepUpFailure,
-} from './login-step-up-errors';
+import { describeResendFailure, describeVerifyFailure, type StepUpFailure } from './login-step-up-errors';
+import { PasswordResetLink } from './password-reset-link';
 
 const CODE_LENGTH = 6;
 const TICK_MS = 1000;
 
-type Notice = { message: string; tone: 'error' | 'info' };
-type DeadReason = 'missing' | 'expired' | 'locked';
+type Notice = { message: string; tone: 'error' | 'info'; recovery?: boolean };
+type DeadReason = 'missing' | 'expired';
 
 const DEAD_COPY: Record<DeadReason, { title: string; body: string }> = {
   missing: {
@@ -41,10 +37,6 @@ const DEAD_COPY: Record<DeadReason, { title: string; body: string }> = {
   expired: {
     title: '인증 시간이 지났어요',
     body: '이메일 로그인에서 다시 로그인하면 새 인증번호를 받을 수 있어요.',
-  },
-  locked: {
-    title: '인증번호를 너무 많이 틀렸어요',
-    body: '안전을 위해 이 인증은 더 쓸 수 없어요. 이메일 로그인에서 처음부터 다시 시도해 주세요.',
   },
 };
 
@@ -94,6 +86,8 @@ export function LoginStepUpVerifyClient() {
   const [notice, setNotice] = useState<Notice | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [resendCount, setResendCount] = useState(0);
+  // 시도 5회를 다 쓴 인증번호 — 서버는 새로 받기 전까지 이 코드를 받지 않는다.
+  const [codeExhausted, setCodeExhausted] = useState(false);
 
   useEffect(() => {
     const stored = readLoginStepUp();
@@ -126,26 +120,28 @@ export function LoginStepUpVerifyClient() {
   const remainingMs = msUntil(challenge.expiresAt, now);
   const resendWaitMs = msUntil(challenge.resendAvailableAt, now);
   const codeExpired = remainingMs <= 0;
+  const codeLocked = codeExpired || codeExhausted;
   const inlineError = notice?.tone === 'error' ? notice : null;
 
   const fail = (failure: StepUpFailure) => {
     if (failure.kind === 'dead') {
       clearLoginStepUp();
-      setDead(failure.reason);
+      setDead('expired');
       return;
     }
-    setNotice({ message: failure.message, tone: failure.tone });
-    if (failure.restartCooldown) {
-      setChallenge((current) => current && {
-        ...current,
-        resendAvailableAt: new Date(Date.now() + STEP_UP_RESEND_COOLDOWN_MS).toISOString(),
-      });
+    setNotice({ message: failure.message, tone: failure.tone, recovery: failure.recovery });
+    if (failure.codeExhausted) setCodeExhausted(true);
+    if (failure.resendInMs !== undefined) {
+      // 남은 시간은 화면의 now(1초마다 갱신)로 계산하므로 같은 시각으로 맞춰야 1초씩 어긋나지 않는다.
+      const at = Date.now();
+      setNow(at);
+      setChallenge((current) => current && { ...current, resendAvailableAt: new Date(at + failure.resendInMs!).toISOString() });
     }
   };
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (busyRef.current || code.length !== CODE_LENGTH || codeExpired) return;
+    if (busyRef.current || code.length !== CODE_LENGTH || codeLocked) return;
     busyRef.current = true;
     setNotice(null);
     verify.mutate(
@@ -182,6 +178,7 @@ export function LoginStepUpVerifyClient() {
             devCode: result.devCode,
           });
           setCode(result.devCode ?? '');
+          setCodeExhausted(false);
           setNotice({ message: '인증번호를 다시 보냈어요. 메일함을 확인해 주세요.', tone: 'info' });
           setResendCount((count) => count + 1);
         },
@@ -213,7 +210,7 @@ export function LoginStepUpVerifyClient() {
               pattern="[0-9]*"
               placeholder="123456"
               value={code}
-              disabled={codeExpired}
+              disabled={codeLocked}
               readOnly={verify.isPending}
               onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, CODE_LENGTH))}
               aria-invalid={inlineError ? true : undefined}
@@ -233,6 +230,7 @@ export function LoginStepUpVerifyClient() {
               <span className="tm-text-caption">{inlineError.message}</span>
             </div>
           ) : null}
+          {inlineError?.recovery ? <PasswordResetLink redirect={redirect} /> : null}
           {notice?.tone === 'info' ? (
             <p className="tm-text-caption" role="status" style={{ color: 'var(--blue700)' }}>{notice.message}</p>
           ) : null}
@@ -240,7 +238,7 @@ export function LoginStepUpVerifyClient() {
         <Button
           className="tm-auth-email-submit"
           block
-          disabled={code.length !== CODE_LENGTH || codeExpired}
+          disabled={code.length !== CODE_LENGTH || codeLocked}
           loading={verify.isPending}
           size="lg"
           type="submit"

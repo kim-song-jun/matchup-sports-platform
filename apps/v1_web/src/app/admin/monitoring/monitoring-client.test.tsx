@@ -37,7 +37,14 @@ const SUMMARY: V1AdminMonitoringSummary = {
   loginAnomalies: {
     last24hCount: 2,
     // 2026-10-21 05:03 UTC = 14:03 KST
-    latest: { startedAt: '2026-10-21T05:03:00.000Z', failureCount: 63, accountCount: 14 },
+    latest: {
+      startedAt: '2026-10-21T05:03:00.000Z',
+      lastDetectedAt: '2026-10-21T05:09:00.000Z',
+      failedCount: 63,
+      accountCount: 14,
+      ipCount: 9,
+      active: false,
+    },
   },
 };
 
@@ -100,8 +107,9 @@ describe('MonitoringClient', () => {
       render(<MonitoringClient />);
 
       const tile = screen.getByRole('group', { name: '로그인 이상(최근 24시간): 2건' });
-      expect(tile).toHaveTextContent('마지막 감지 10.21 14:03');
-      expect(tile).toHaveTextContent('실패 63건 · 계정 14개');
+      expect(tile).toHaveTextContent('마지막 감지 10.21 14:09');
+      expect(tile).toHaveTextContent('실패 63건 · 계정 14개 · IP 9개');
+      expect(tile).not.toHaveTextContent('감지 중');
     });
 
     it('is display-only: it opens no tab and the strip keeps its own tab shortcuts', async () => {
@@ -131,7 +139,14 @@ describe('MonitoringClient', () => {
           ...SUMMARY,
           loginAnomalies: {
             last24hCount: 0,
-            latest: { startedAt: '2026-10-19T05:03:00.000Z', failureCount: 41, accountCount: 12 },
+            latest: {
+              startedAt: '2026-10-19T05:03:00.000Z',
+              lastDetectedAt: '2026-10-19T05:03:00.000Z',
+              failedCount: 41,
+              accountCount: 12,
+              ipCount: 5,
+              active: false,
+            },
           },
         },
         isPending: false, isError: false, refetch: vi.fn(),
@@ -140,7 +155,18 @@ describe('MonitoringClient', () => {
 
       const tile = screen.getByRole('group', { name: '로그인 이상(최근 24시간): 0건' });
       expect(tile).toHaveTextContent('마지막 감지 10.19 14:03');
-      expect(tile).toHaveTextContent('실패 41건 · 계정 12개');
+      expect(tile).toHaveTextContent('실패 41건 · 계정 12개 · IP 5개');
+    });
+
+    it('says the attack is still being detected and step-up is on while it is active', () => {
+      summaryMock.mockReturnValue({
+        data: { ...SUMMARY, loginAnomalies: { last24hCount: 1, latest: { ...SUMMARY.loginAnomalies.latest!, active: true } } },
+        isPending: false, isError: false, refetch: vi.fn(),
+      });
+      render(<MonitoringClient />);
+
+      const tile = screen.getByRole('group', { name: '로그인 이상(최근 24시간): 1건, 지금 감지 중' });
+      expect(tile).toHaveTextContent('감지 중 · 추가 인증 요구 · 마지막 10.21 14:09');
     });
 
     it('shows a placeholder instead of a count while the summary is loading', () => {

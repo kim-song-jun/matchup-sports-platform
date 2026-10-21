@@ -54,16 +54,19 @@ function describeLoginAnomalies(anomalies: V1AdminLoginAnomalySummary | undefine
     ? []
     : latest
       ? [
-          `마지막 감지 ${formatAdminKstDateTimeShort(latest.startedAt)}`,
-          `실패 ${latest.failureCount}건 · 계정 ${latest.accountCount}개`,
+          latest.active
+            ? `감지 중 · 추가 인증 요구 · 마지막 ${formatAdminKstDateTimeShort(latest.lastDetectedAt)}`
+            : `마지막 감지 ${formatAdminKstDateTimeShort(latest.lastDetectedAt)}`,
+          `실패 ${latest.failedCount}건 · 계정 ${latest.accountCount}개 · IP ${latest.ipCount}개`,
         ]
       : ['감지된 적이 없어요'];
   const count = anomalies?.last24hCount ?? null;
+  const active = latest?.active === true;
   return {
     count,
     details,
-    alert: (count ?? 0) > 0,
-    ariaLabel: `로그인 이상(최근 24시간): ${count === null ? '집계 중' : `${count}건`}`,
+    alert: active || (count ?? 0) > 0,
+    ariaLabel: `로그인 이상(최근 24시간): ${count === null ? '집계 중' : `${count}건`}${active ? ', 지금 감지 중' : ''}`,
   };
 }
 

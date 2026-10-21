@@ -1,3 +1,5 @@
+템플릿 경기 전체 삭제 후에도 조별 자리 비우기가 편성을 정리하며, 조 삭제는 미사용 빈 자리/고아 편성만 원자적으로 정리한다. 실제 배정·경기·참조는 계속 보호한다. [대회 계약](./domains/tournaments.md) 참고.
+
 결선 배정 미리보기의 version/sourceVersion은 동일한 조별 원천의 DB 반환 순서에 영향받지 않는다. 실제 성적·순위·대진 변경과 시작 경기 보호는 유지하며 [대회 계약](./domains/tournaments.md)을 따른다.
 
 리그 표시는 모집완료·진행 중·보류·종료 4개로 통일한다. 호환 `draft`는 저장 상태 `draft/open/closed` 전체를 묶으며 모집 가능 여부·공개 여부는 별도다. 내 담당 대회는 `tournamentKind`로 종류를 구분한다. [리그 표시 계약](./domains/league-matches.md#league-display-states-2026-10-19).

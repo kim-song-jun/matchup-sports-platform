@@ -405,8 +405,8 @@ export async function softDeleteTournamentFixtureInTx(tx: Tx, admin: V1ActiveAdm
 }
 
 /**
- * 조 삭제. 편성 팀·경기·자리가 남아 있으면 실수 방지를 위해 409 로 막는다. 자리는 FK(Restrict)가 500 을 내기 전에 여기서
- * 막는다 — 템플릿 교체(PR-1b)는 자리를 먼저 지운 뒤 이 함수를 부른다. 호출자가 advisory lock 을 잡는다.
+ * 조 삭제. 실제 팀 배정·경기·참조된 자리는 보호하고, 비어 있는 미사용 템플릿 자리와 고아 편성만 정리한다.
+ * 호출자가 대회 advisory lock 을 잡는다.
  */
 export async function deleteTournamentGroupInTx(tx: Tx, admin: V1ActiveAdmin, groupId: string): Promise<void> {
   const group = await tx.v1TournamentGroup.findUnique({
@@ -414,21 +414,44 @@ export async function deleteTournamentGroupInTx(tx: Tx, admin: V1ActiveAdmin, gr
     include: { _count: { select: { groupTeams: true, byeSlots: true, tournamentMatchDetails: true, slots: true, rankSlots: true } } },
   });
   if (!group) throw new NotFoundException({ code: 'GROUP_NOT_FOUND', message: '조를 찾을 수 없어요.' });
-  if (group._count.groupTeams > 0 || group._count.byeSlots > 0) {
+  const hasSlots = group._count.slots > 0 || group._count.rankSlots > 0;
+  const slots = hasSlots ? await tx.v1TournamentSlot.findMany({
+    where: { tournamentId: group.tournamentId, OR: [{ groupId }, { sourceGroupId: groupId }] },
+    select: { id: true, groupId: true, kind: true, registrationId: true },
+  }) : [];
+  const emptySlots = slots.length > 0 && slots.every((slot) => slot.registrationId === null);
+  // 취소/보관 경기라도 참조가 남아 있으면 기록을 임의로 바꾸지 않는다.
+  const unusedSlots = emptySlots && group._count.tournamentMatchDetails === 0 && group._count.byeSlots === 0
+    && await tx.v1TeamMatch.findFirst({ where: { OR: [
+      { homeSlotId: { in: slots.map((slot) => slot.id) } }, { awaySlotId: { in: slots.map((slot) => slot.id) } },
+    ] }, select: { id: true } }) === null;
+  const orphanEnrollment = unusedSlots && group.phase === 'group'
+    && slots.some((slot) => slot.groupId === groupId && slot.kind === 'ENTRY');
+  if ((group._count.groupTeams > 0 && !orphanEnrollment) || group._count.byeSlots > 0
+    || slots.some((slot) => slot.groupId === groupId && slot.kind === 'ENTRY' && slot.registrationId !== null)) {
     throw new ConflictException({ code: 'GROUP_HAS_TEAMS', message: '조에 배정된 팀이 있어요. 팀 배정을 먼저 해제해 주세요.' });
   }
   if (group._count.tournamentMatchDetails > 0) {
     throw new ConflictException({ code: 'GROUP_HAS_FIXTURES', message: '조에 연결된 경기가 있어요. 경기를 먼저 삭제해 주세요.' });
   }
-  if (group._count.slots > 0 || group._count.rankSlots > 0) {
+  if (hasSlots && !unusedSlots) {
     throw new ConflictException({ code: 'GROUP_HAS_SLOTS', message: '조에 대진 자리가 남아 있어요. 대진 템플릿을 교체하거나 자리를 먼저 지워 주세요.' });
   }
+  if (unusedSlots) {
+    if (orphanEnrollment && group._count.groupTeams > 0) {
+      await tx.v1TournamentGroupTeam.deleteMany({ where: { groupId, isBye: false } });
+      await tx.v1TournamentStanding.deleteMany({ where: { groupId } });
+    }
+    await tx.v1TournamentSlot.deleteMany({ where: { id: { in: slots.map((slot) => slot.id) } } });
+  }
   await tx.v1TournamentGroup.delete({ where: { id: groupId } });
+  if (orphanEnrollment && group._count.groupTeams > 0) await recalculateStandingsInTx(tx, group.tournamentId);
   await writeAdminActionLog(tx, admin, {
     action: 'tournament.bracket.group.delete',
     targetType: 'tournament_group',
     targetId: groupId,
     beforeJson: { name: group.name, phase: group.phase },
+    ...(unusedSlots ? { afterJson: { removedUnusedSlotIds: slots.map((slot) => slot.id), removedOrphanGroupTeamCount: orphanEnrollment ? group._count.groupTeams : 0 } } : {}),
   });
 }
 
@@ -529,6 +552,8 @@ export async function releaseUnusedGroupTeamsInTx(
       },
     });
     if (stillPlaying > 0) continue;
+    // 경기 없는 조의 자리 맞바꾸기에서도 최종 ENTRY에 남은 팀은 편성을 유지한다.
+    if (await tx.v1TournamentSlot.findFirst({ where: { groupId, kind: 'ENTRY', registrationId }, select: { id: true } })) continue;
     const groupTeam = await tx.v1TournamentGroupTeam.findFirst({ where: { groupId, registrationId, isBye: false }, select: { id: true } });
     if (groupTeam === null) continue;
     const hadStandings = (await tx.v1TournamentStanding.count({ where: { groupId } })) > 0;

@@ -33,6 +33,25 @@ describe('magicNumberOf', () => {
     expect(result).toEqual({ registrationId: 'a', value: 5, clinched: false });
   });
 
+  // MD-QA #166: 3/3 경기가 끝났는데 1·2위 승점이 같아 "1위 확정까지 승점 1"이 남았다.
+  it('남은 경기가 없으면 승점이 같아도 1위가 확정된다', () => {
+    const result = magicNumberOf(
+      [
+        { registrationId: 'a', points: 4 },
+        { registrationId: 'b', points: 4 },
+        { registrationId: 'c', points: 0 },
+      ],
+      new Map([['a', 0], ['b', 0], ['c', 0]]),
+      3,
+    );
+    expect(result).toEqual({ registrationId: 'a', value: 0, clinched: true });
+  });
+
+  it('1위에게만 경기가 남아 있으면 동점은 아직 확정이 아니다', () => {
+    const result = magicNumberOf([{ registrationId: 'a', points: 4 }, { registrationId: 'b', points: 4 }], new Map([['a', 1], ['b', 0]]), 3);
+    expect(result).toEqual({ registrationId: 'a', value: 1, clinched: false });
+  });
+
   it('팀이 2팀 미만이면 null을 반환한다', () => {
     expect(magicNumberOf([{ registrationId: 'a', points: 3 }], new Map(), winPoints)).toBeNull();
     expect(magicNumberOf([], new Map(), winPoints)).toBeNull();

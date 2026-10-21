@@ -3,13 +3,17 @@
  * LoginStepUpService over an in-memory database and real scrypt. Only the mail transport, the account
  * snapshot and the unrelated collaborators are stand-ins.
  */
+import { Logger } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import * as crypto from 'crypto';
 import { createLoginSecurityFakePrisma } from '../../test/helpers/login-security-fake-prisma';
 import { PrismaService } from '../prisma/prisma.service';
 import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
 import { VerificationDispatcherService } from '../verification/verification-dispatcher.service';
+import { EmailVerificationService } from '../verification/email-verification.service';
+import { issueEmailProofToken } from '../verification/email-proof-token';
 import { PhoneVerificationService } from '../verification/phone-verification.service';
+import { AccountRecoveryService } from './account-recovery.service';
 import { AppleIdentityService } from './apple-identity.service';
 import { AppleTokenService } from './apple-token.service';
 import { AuthService } from './auth.service';
@@ -31,9 +35,9 @@ const CLIENT = { ip: '203.0.113.9' };
 const stepUpOf = (result: unknown) => (result as { stepUp: Record<string, unknown> }).stepUp;
 const scryptCalls = () => (crypto.scrypt as unknown as jest.Mock).mock.calls.length;
 
-async function build(options: { accountStatus?: string } = {}) {
+async function build(options: { accountStatus?: string; devEcho?: boolean } = {}) {
   const { prisma, state } = createLoginSecurityFakePrisma();
-  state.identities.push({
+  const identity = {
     id: 'identity-1',
     userId: 'user-1',
     provider: 'email',
@@ -48,15 +52,19 @@ async function build(options: { accountStatus?: string } = {}) {
       createdAt: T0,
       updatedAt: T0,
     },
-  });
-  const dispatcher = { send: jest.fn().mockResolvedValue(undefined), devEchoActive: false };
+  };
+  state.identities.push(identity);
+  state.users.push({ id: 'user-1', email: EMAIL, accountStatus: 'active', authIdentities: [identity] });
+  const dispatcher = { send: jest.fn().mockResolvedValue(undefined), devEchoActive: options.devEcho ?? false };
   const moduleRef = await Test.createTestingModule({
     providers: [
       AuthService,
+      AccountRecoveryService,
       LoginSecurityService,
       LoginStepUpService,
       { provide: PrismaService, useValue: prisma },
       { provide: VerificationDispatcherService, useValue: dispatcher },
+      { provide: EmailVerificationService, useValue: {} },
       { provide: ManagedTermsRuntimeService, useValue: {} },
       { provide: PhoneVerificationService, useValue: {} },
       { provide: AppleIdentityService, useValue: {} },
@@ -72,7 +80,8 @@ async function build(options: { accountStatus?: string } = {}) {
     await moduleRef.get(LoginStepUpService).onApplicationShutdown();
     await moduleRef.get(LoginSecurityService).onApplicationShutdown();
   };
-  return { service, state, dispatcher, flush, moduleRef };
+  const recovery = moduleRef.get(AccountRecoveryService);
+  return { service, recovery, state, dispatcher, flush, moduleRef };
 }
 
 const seedFailures = (state: { attempts: Array<Record<string, unknown>> }, email: string, count: number) => {
@@ -221,5 +230,99 @@ describe('AuthService.login during a spray attack', () => {
     jest.setSystemTime(new Date(T0.getTime() + 31 * 60_000));
     const after = await service.login({ email: EMAIL, password: PASSWORD }, CLIENT);
     expect(after).toMatchObject({ session: { userId: 'user-1' } });
+  });
+});
+
+describe('AuthService.login in an echo environment', () => {
+  it('gives right password, wrong password and unknown email the same key set, each with a six-digit devCode', async () => {
+    const { service, state, flush } = await build({ devEcho: true });
+    seedFailures(state, EMAIL, 3);
+    seedFailures(state, 'ghost@example.com', 3);
+
+    const results = [];
+    for (const input of [
+      { email: EMAIL, password: PASSWORD },
+      { email: EMAIL, password: 'wrong-password-1' },
+      { email: 'ghost@example.com', password: 'wrong-password-1' },
+    ]) {
+      results.push(stepUpOf(await service.login(input, CLIENT)));
+    }
+    await flush();
+
+    for (const stepUp of results) {
+      expect(Object.keys(stepUp)).toEqual(['challengeToken', 'maskedEmail', 'expiresAt', 'resendAvailableAt', 'devCode']);
+      expect(stepUp.devCode).toMatch(/^\d{6}$/);
+    }
+  });
+});
+
+describe('password reset releases the login restrictions', () => {
+  const NEW_PASSWORD = 'Brand-new-horse-2!';
+
+  /** Three misses, then five right-password logins that each mail a code: the daily cap is spent. */
+  async function exhaustSendCap(harness: Awaited<ReturnType<typeof build>>) {
+    seedFailures(harness.state, EMAIL, 3);
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await harness.service.login({ email: EMAIL, password: PASSWORD }, CLIENT);
+    }
+    await harness.flush();
+    await expect(harness.service.login({ email: EMAIL, password: PASSWORD }, CLIENT)).rejects.toMatchObject({
+      status: 429,
+      response: { code: 'STEP_UP_SEND_LIMIT' },
+    });
+  }
+
+  const reset = (harness: Awaited<ReturnType<typeof build>>) =>
+    harness.recovery.resetPasswordByEmail({
+      email: EMAIL,
+      proofToken: issueEmailProofToken(EMAIL),
+      newPassword: NEW_PASSWORD,
+    });
+
+  beforeEach(() => {
+    process.env.V1_SESSION_SECRET = 'x'.repeat(48);
+  });
+
+  it('lets the owner log in with the new password at once after the cap was burned', async () => {
+    const harness = await build();
+    await exhaustSendCap(harness);
+
+    await expect(reset(harness)).resolves.toEqual({ ok: true });
+    const result = await harness.service.login({ email: EMAIL, password: NEW_PASSWORD }, CLIENT);
+
+    expect(result).toMatchObject({ session: { userId: 'user-1', userEmail: EMAIL } });
+    expect(result).not.toHaveProperty('stepUp');
+    expect(harness.state.challenges).toHaveLength(0);
+  });
+
+  it('leaves another email restricted, and an active spray attack stays in force', async () => {
+    const harness = await build();
+    seedFailures(harness.state, 'other@example.com', 3);
+    harness.state.anomalies.push({
+      id: 'an-1',
+      kind: 'login_spray',
+      startedAt: new Date(Date.now() - 5 * 60_000),
+      lastDetectedAt: new Date(Date.now() - 60_000),
+    });
+
+    await reset(harness);
+
+    expect(await harness.moduleRef.get(LoginSecurityService).isStepUpRequired(loginEmailKey('other@example.com'))).toBe(true);
+    const during = await harness.service.login({ email: EMAIL, password: NEW_PASSWORD }, CLIENT);
+    await harness.flush();
+    expect(during).toHaveProperty('stepUp');
+  });
+
+  it('still changes the password when clearing the restrictions fails', async () => {
+    const harness = await build();
+    await exhaustSendCap(harness);
+    jest.spyOn(harness.moduleRef.get(LoginSecurityService), 'forgetEmail').mockRejectedValue(new Error('db down'));
+    const logError = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+
+    await expect(reset(harness)).resolves.toEqual({ ok: true });
+
+    expect(logError).toHaveBeenCalledWith(expect.stringContaining('db down'));
+    expect(harness.state.identities[0].passwordHash).not.toBe(await hashPassword(PASSWORD));
+    logError.mockRestore();
   });
 });

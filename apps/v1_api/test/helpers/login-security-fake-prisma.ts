@@ -108,11 +108,13 @@ export interface LoginSecurityFakeState {
   anomalies: Row[];
   outbox: Row[];
   identities: Row[];
+  /** `{ id, email, accountStatus, authIdentities }` — `authIdentities` entries should be the same objects as in `identities`. */
+  users: Row[];
 }
 
 /** `identities` rows are `{ id, userId, provider, providerUserKey, passwordHash, status, user }`. */
 export function createLoginSecurityFakePrisma() {
-  const state: LoginSecurityFakeState = { attempts: [], challenges: [], anomalies: [], outbox: [], identities: [] };
+  const state: LoginSecurityFakeState = { attempts: [], challenges: [], anomalies: [], outbox: [], identities: [], users: [] };
 
   const challengeDelegate = delegate(state.challenges, () => ({
     attemptCount: 0,
@@ -167,9 +169,17 @@ export function createLoginSecurityFakePrisma() {
         return found ?? null;
       }),
       findFirst: jest.fn(async ({ where }: { where: Where }) => state.identities.find((row) => matches(row, where)) ?? null),
-      update: jest.fn(async () => ({})),
+      update: jest.fn(async ({ where, data }: { where: Where; data: Row }) => {
+        const found = state.identities.find((row) => matches(row, where));
+        if (!found) throw notFound();
+        applyData(found, data);
+        return found;
+      }),
     },
-    v1User: { update: jest.fn(async () => ({})) },
+    v1User: {
+      update: jest.fn(async () => ({})),
+      findFirst: jest.fn(async ({ where }: { where: Where }) => state.users.find((row) => matches(row, where)) ?? null),
+    },
     /** The spray aggregate: mirrors `WHERE result = 'failed' AND created_at > $since`. */
     $queryRaw: jest.fn(async (sql: { values: unknown[] }) => {
       const since = (sql.values[0] as Date).getTime();

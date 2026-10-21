@@ -175,6 +175,41 @@ describe('V1 email login step-up', () => {
     expect(res.body.details.retryAfterSeconds).toBeGreaterThan(0);
   });
 
+  it('gives a decoy the same key set as a real challenge in an echo environment, devCode included', async () => {
+    await missThreeTimes(EMAIL);
+    await missThreeTimes(GHOST_EMAIL);
+
+    const real = (await login(EMAIL, PASSWORD).expect(200)).body.data.stepUp;
+    const wrong = (await login(EMAIL, WRONG).expect(200)).body.data.stepUp;
+    const ghost = (await login(GHOST_EMAIL, WRONG).expect(200)).body.data.stepUp;
+
+    for (const stepUp of [real, wrong, ghost]) {
+      expect(Object.keys(stepUp).sort()).toEqual(['challengeToken', 'devCode', 'expiresAt', 'maskedEmail', 'resendAvailableAt']);
+      expect(stepUp.devCode).toMatch(/^\d{6}$/);
+    }
+  });
+
+  it('lets the owner back in with a new password right after the daily send cap was burned', async () => {
+    await missThreeTimes(EMAIL);
+    for (let attempt = 0; attempt < 5; attempt += 1) await login(EMAIL, PASSWORD).expect(200);
+    const capped = await login(EMAIL, PASSWORD).expect(429);
+    expect(capped.body.code).toBe('STEP_UP_SEND_LIMIT');
+
+    const requested = await request(app.getHttpServer()).post('/api/v1/auth/recovery/email/request').send({ email: EMAIL }).expect(200);
+    const confirmed = await request(app.getHttpServer())
+      .post('/api/v1/auth/recovery/email/confirm')
+      .send({ email: EMAIL, code: requested.body.data.devCode })
+      .expect(200);
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/recovery/email/reset-password')
+      .send({ email: EMAIL, proofToken: confirmed.body.data.proofToken, newPassword: 'login-step-up-new-password' })
+      .expect(200);
+
+    const res = await login(EMAIL, 'login-step-up-new-password').expect(201);
+    expect(res.body.data.session.userId).toBe(USER_ID);
+    expect(await prisma.v1LoginStepUpChallenge.count({ where: { emailKey: loginEmailKey(EMAIL) } })).toBe(0);
+  });
+
   it('opens exactly one anomaly and one alert when detections race, then keeps refreshing the same anomaly', async () => {
     const now = new Date();
     await prisma.v1LoginAttempt.createMany({

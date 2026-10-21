@@ -97,6 +97,13 @@ code already expired. Failures: `429 STEP_UP_RESEND_COOLDOWN` (`details.retryAft
 
 Rate limits per IP: `login` 10/min, `verify` 10/min, `resend` 5/min.
 
+In echo environments (`V1_VERIFICATION_DEV_ECHO`), a decoy challenge and decoy resend carry a random six-digit `devCode` too, so the
+field's presence never reveals whether the password was right; the decoy code never verifies.
+
+A successful password reset by email (`POST /auth/recovery/email/reset-password`) clears that email's login failure records, send count
+and open step-up challenges, so the owner can sign in with the new password without step-up (unless a spray attack is active). A
+failure while clearing is logged and does not undo the reset.
+
 **Records.** `v1_login_attempts` keeps `emailKey` / `ipKey` (HMAC-SHA256 under a key derived from `V1_SESSION_SECRET`,
 never the raw values), the result (`success | failed | step_up_issued`) and the time, for 30 days.
 `v1_login_step_up_challenges` keeps token and code as hashes, attempt and send counters, and is purged 7 days after expiry.

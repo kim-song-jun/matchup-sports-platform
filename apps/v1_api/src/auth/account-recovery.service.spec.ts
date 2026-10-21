@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailVerificationService } from '../verification/email-verification.service';
 import { issueEmailProofToken } from '../verification/email-proof-token';
@@ -35,8 +35,10 @@ function prismaByEmail(users: Record<string, unknown>, update = jest.fn().mockRe
   } as unknown as PrismaService;
 }
 
+const loginSecurity = { forgetEmail: jest.fn().mockResolvedValue(undefined) };
+
 function service(prisma: PrismaService, emailVerification = emailVerificationMock()) {
-  return new AccountRecoveryService(prisma, emailVerification);
+  return new AccountRecoveryService(prisma, emailVerification, loginSecurity as never);
 }
 
 const emailUser = {
@@ -225,6 +227,7 @@ describe('AccountRecoveryService — 인증번호 메일 요청', () => {
 describe('AccountRecoveryService — 비밀번호 재설정(이메일)', () => {
   beforeEach(() => {
     process.env.V1_SESSION_SECRET = 'x'.repeat(48);
+    loginSecurity.forgetEmail.mockReset().mockResolvedValue(undefined);
   });
 
   /**
@@ -241,6 +244,7 @@ describe('AccountRecoveryService — 비밀번호 재설정(이메일)', () => {
       ).rejects.toMatchObject({ response: { code: 'EMAIL_NOT_VERIFIED' } });
     }
     expect(update).not.toHaveBeenCalled();
+    expect(loginSecurity.forgetEmail).not.toHaveBeenCalled();
   });
 
   it('다른 주소로 발급된 증명은 통하지 않는다', async () => {
@@ -273,6 +277,34 @@ describe('AccountRecoveryService — 비밀번호 재설정(이메일)', () => {
     expect(await verifyPassword('brand-new-password', saved)).toBe(true);
   });
 
+  it('재설정에 성공하면 그 이메일의 로그인 제한(실패 기록·발송 횟수·챌린지)을 푼다', async () => {
+    const svc = service(prismaByEmail({ [EMAIL]: emailUser }));
+
+    await svc.resetPasswordByEmail({
+      email: ` ${EMAIL.toUpperCase()} `,
+      proofToken: issueEmailProofToken(EMAIL),
+      newPassword: 'brand-new-password',
+    });
+
+    expect(loginSecurity.forgetEmail).toHaveBeenCalledTimes(1);
+    expect(loginSecurity.forgetEmail).toHaveBeenCalledWith(EMAIL);
+  });
+
+  it('제한을 푸는 데 실패해도 이미 바뀐 비밀번호는 성공으로 돌려주고 실패는 로그에 남긴다', async () => {
+    const logError = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+    loginSecurity.forgetEmail.mockRejectedValue(new Error('db down'));
+    const update = jest.fn().mockResolvedValue({});
+    const svc = service(prismaByEmail({ [EMAIL]: emailUser }, update));
+
+    await expect(
+      svc.resetPasswordByEmail({ email: EMAIL, proofToken: issueEmailProofToken(EMAIL), newPassword: 'brand-new-password' }),
+    ).resolves.toEqual({ ok: true });
+
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(logError).toHaveBeenCalledWith(expect.stringContaining('db down'));
+    logError.mockRestore();
+  });
+
   it('카카오 전용 계정은 비밀번호를 만들지 않고 안내로 되돌린다', async () => {
     const update = jest.fn();
     const svc = service(prismaByEmail({ 'kakao@example.com': kakaoOnlyUser }, update));
@@ -285,6 +317,7 @@ describe('AccountRecoveryService — 비밀번호 재설정(이메일)', () => {
       }),
     ).rejects.toMatchObject({ response: { code: 'PASSWORD_LOGIN_UNAVAILABLE' } });
     expect(update).not.toHaveBeenCalled();
+    expect(loginSecurity.forgetEmail).not.toHaveBeenCalled();
   });
 
   it('그 사이 계정이 사라졌으면 ACCOUNT_NOT_FOUND', async () => {

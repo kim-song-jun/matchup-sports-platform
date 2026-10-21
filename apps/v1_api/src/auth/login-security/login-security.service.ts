@@ -5,6 +5,7 @@ import {
   LOGIN_SECURITY_POLICY,
   LOGIN_SPRAY_ANOMALY_KIND,
   SECURITY_LOGIN_ANOMALY_TYPE,
+  loginEmailKey,
   type LoginAttemptKeys,
 } from './login-security.policy';
 
@@ -44,6 +45,20 @@ export class LoginSecurityService implements OnApplicationShutdown {
     await this.prisma.v1LoginAttempt.create({
       data: { emailKey: keys.emailKey, ipKey: keys.ipKey, result, createdAt: now },
     });
+  }
+
+  /**
+   * Drops everything that restricts this email's login: failure streak, step-up send count and open
+   * challenges. Called when the owner proves the mailbox and sets a new password, so someone who knows the
+   * old password cannot keep the owner out by burning the daily send cap. An active spray attack is not
+   * per-email state and stays in force.
+   */
+  async forgetEmail(normalizedEmail: string): Promise<void> {
+    const emailKey = loginEmailKey(normalizedEmail);
+    await this.prisma.$transaction([
+      this.prisma.v1LoginAttempt.deleteMany({ where: { emailKey } }),
+      this.prisma.v1LoginStepUpChallenge.deleteMany({ where: { emailKey } }),
+    ]);
   }
 
   /** Both conditions are always queried so the check costs the same whichever one decides. */

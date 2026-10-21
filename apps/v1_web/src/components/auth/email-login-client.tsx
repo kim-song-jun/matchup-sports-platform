@@ -12,11 +12,15 @@ import { EyeIcon, EyeOffIcon } from '@/components/v1-ui/icons';
 import { useV1EmailLogin } from '@/hooks/use-v1-api';
 import { V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
+import { isLoginStepUpResponse, LOGIN_STEP_UP_VERIFY_PATH, saveLoginStepUp } from '@/lib/login-step-up';
 import { isNativeAppleSignInAvailable } from '@/lib/native-apple';
-import { clearV1IdentityCache } from '@/lib/query-keys';
-import { resolveAuthContinuationPath, sanitizeRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
+import { sanitizeRedirectPath } from '@/lib/session-storage';
 import { AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
 import { getEmailLoginViewModel } from './auth.view-model';
+import { completeEmailLogin } from './email-login-completion';
+
+const RATE_LIMITED_MESSAGE = '로그인 시도가 많아요. 잠시 후 다시 시도해 주세요.';
+const STEP_UP_STORAGE_FAILED_MESSAGE = '본인 확인 화면으로 이동하지 못했어요. 브라우저의 저장 공간 설정을 확인한 뒤 다시 시도해 주세요.';
 
 function mapEmailLoginError(err: unknown): string {
   if (err instanceof V1ApiError) {
@@ -28,6 +32,8 @@ function mapEmailLoginError(err: unknown): string {
       return `이메일 또는 비밀번호가 맞지 않아요. ${signupMethods}로 가입하셨다면 로그인 첫 화면의 ${buttons} 버튼으로 로그인해 주세요.`;
     }
     if (err.code === 'PERMISSION_DENIED') return '로그인이 제한된 계정이에요. 고객센터에서 상태를 확인해 주세요.';
+    // IP 레이트리밋. 서버 장애 문구와 섞이면 "잠시 후" 재시도가 왜 필요한지 알 수 없다.
+    if (err.statusCode === 429) return RATE_LIMITED_MESSAGE;
   }
   return '지금은 로그인할 수 없어요. 잠시 후 다시 시도해 주세요.';
 }
@@ -57,12 +63,18 @@ export function EmailLoginClient({ redirectPath }: { redirectPath?: string | nul
       { email, password },
       {
         onSuccess: (result) => {
-          saveStoredV1Session(result.session);
-          clearV1IdentityCache(queryClient);
-          trackEvent('login', { method: 'email' });
-          router.replace(resolveAuthContinuationPath(
-            result.next?.route, new URLSearchParams(window.location.search).get('redirect'),
-          ));
+          const requestedRedirect = new URLSearchParams(window.location.search).get('redirect');
+          if (isLoginStepUpResponse(result)) {
+            // 비밀번호가 맞았는지는 이 응답으로 알 수 없다. 어느 쪽이든 같은 본인 확인 화면으로 보낸다.
+            if (!saveLoginStepUp(result.stepUp, requestedRedirect)) {
+              setError(STEP_UP_STORAGE_FAILED_MESSAGE);
+              return;
+            }
+            trackEvent('login_step_up_required', { method: 'email' });
+            router.push(LOGIN_STEP_UP_VERIFY_PATH);
+            return;
+          }
+          completeEmailLogin({ result, queryClient, replace: (path) => router.replace(path), requestedRedirect });
         },
         onError: (nextError) => {
           trackEvent('login_failed', { method: 'email', reason: nextError instanceof V1ApiError ? nextError.code : 'unknown' });

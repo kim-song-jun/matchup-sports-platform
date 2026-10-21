@@ -144,6 +144,30 @@ export type V1AuthSessionResponse = V1AuthMe & {
   };
 };
 
+/**
+ * 이메일 로그인에 추가 인증(step-up)이 필요할 때 오는 챌린지. 비밀번호가 맞든 틀리든 계정이 없든
+ * 같은 모양이라 응답만 보고 정답 여부를 알 수 없다 — 클라이언트도 이 값으로 정답을 추정하지 않는다.
+ */
+export type V1LoginStepUpChallenge = {
+  /** 무작위 불투명 값. 주소(URL)에 싣지 않고 sessionStorage 로만 화면 사이를 넘긴다. */
+  challengeToken: string;
+  /** 서버가 정규화·마스킹한 이메일(예: `mi***@email.com`). */
+  maskedEmail: string;
+  /** 인증번호 만료 시각(ISO). 다시 받으면 새 값이 온다. */
+  expiresAt: string;
+  /** 이 시각 전에는 다시 받을 수 없다(ISO). */
+  resendAvailableAt: string;
+  /** 인증번호 에코가 켜진 환경(alpha)에서만 온다. */
+  devCode?: string;
+};
+
+export type V1LoginStepUpResponse = { stepUp: V1LoginStepUpChallenge };
+
+/** `POST /auth/login` 결과 — 세션이거나 추가 인증 챌린지다. */
+export type V1EmailLoginResult = V1AuthSessionResponse | V1LoginStepUpResponse;
+
+export type V1LoginStepUpResendResult = Pick<V1LoginStepUpChallenge, 'expiresAt' | 'resendAvailableAt' | 'devCode'>;
+
 export type V1Sport = {
   id: string;
   code?: string;
@@ -3377,6 +3401,22 @@ export type V1AdminMonitoringSummary = {
   smsUnacked: number;
   /** 오늘(KST 자정 이후) 기록된 관리자 액션 수. */
   auditToday: number;
+  /** 로그인 실패 급증(password spray 의심) 감지 요약. */
+  loginAnomalies: V1AdminLoginAnomalySummary;
+};
+
+export type V1AdminLoginAnomalySummary = {
+  /** 최근 24시간에 감지된 건수. */
+  last24hCount: number;
+  /** 가장 최근 감지 1건. 감지된 적이 없으면 null. */
+  latest: {
+    /** 감지가 시작된 시각(ISO). */
+    startedAt: string;
+    /** 감지 당시 집계한 실패 수. */
+    failureCount: number;
+    /** 감지 당시 서로 다른 계정(이메일) 수. */
+    accountCount: number;
+  } | null;
 };
 
 // ---------------------------------------------------------------------------

@@ -49,7 +49,7 @@ git diff --stat
 ```
 
 이 모드는 alpha SHA·버전을 먼저 확인하며 stage/commit/push/dispatch를 하지 않는다.
-**`--prepare-only`를 빼면 기존 모드는 dev push와 alpha dispatch까지 실행한다.**
+**`--prepare-only`를 빼면 버전 커밋을 `release/version-<버전>` 브랜치로 push하고 dev 대상 PR까지 연다(dev 직접 push는 ruleset이 거부한다).**
 준비한 diff는 dev 대상 PR로 전달하고, 그 결과의 새 dev SHA에서 API·Web·Gates·CodeQL과 alpha를
 다시 확인한다. 추가 Changeset이 들어왔다면 다시 소비해야 한다. 2026-10-01 준비 결과와
 남은 운영 조건은 [GO/NO-GO 보고서](prod-readiness-2026-10-01.md)를 참고한다.

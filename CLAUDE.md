@@ -47,9 +47,10 @@
   **어떤 방식으로도 직접 실행하지 않는다.** 승격이 필요해 보이면 사용자에게 알리고 멈춘다.
   사용자가 GitHub에서 직접 PR을 머지하는 것이 유일한 승격 경로이며, **자동으로 승격(머지)하는
   워크플로는 존재하지 않는다**(워크플로의 `refs/heads/main` 참조는 전부 감지용 `if:` 조건이다).
-  `promote-main.yml`("Promote to main", 수동 실행)은 alpha 검증 + 필요하면 dev에 버전 커밋
-  push까지만 하고, dev→main PR은 사람이 누를 링크만 job summary에 남긴다(저장소 설정이
-  Actions의 PR 생성을 허용하지 않는다) — 그 PR을 실제로 열고 머지하는 것은 여전히 사용자만 한다.
+  `promote-main.yml`("Promote to main", 수동 실행)은 alpha 검증 후 미소비 changeset이 있으면 버전
+  커밋을 `release/version-<버전>` 브랜치로 push해 **dev 대상 PR**을 열고 멈춘다. 그 PR을 머지하고
+  alpha가 새 dev SHA를 서빙하면 다시 실행해 승격 게이트를 검증하고, dev→main PR은 사람이 누를 링크만
+  job summary에 남긴다 — 그 PR을 실제로 열고 머지하는 것은 여전히 사용자만 한다.
 - **dev 머지 = 즉시 alpha 실배포.** 승인 게이트가 없으므로 dev 머지 전 검증(테스트·tsc·lint)을
   실배포 게이트로 취급한다.
 - **배포 동작에 영향을 주는 main 대상 PR의 릴리스 검사는 출발 브랜치와 무관하게 동일하다.** 사용자 승인으로 범위를 제한한 hotfix PR도 Changesets 소비, 고정 API/Web 버전 증가, 두 변경 이력을 모두 검증한다. 순수 문서·테스트 변경에는 버전 증가를 요구하지 않는다. 이 CI 계약은 승격 권한이나 승인 정책을 대신하지 않는다.
@@ -67,6 +68,12 @@
   거부돼 `git revert`로 우회해야 했던 것이 이 ruleset 때문이다. 일반 fast-forward push 자체는 막지
   않으므로 PR 없는 직접 push는 여전히 가능하고 그대로 프로덕션 배포로 이어진다.
   **확인 명령**: `gh api repos/<owner>/<repo>/rulesets` (classic protection API만 보면 실상을 놓친다).
+- **`dev`에는 ruleset "Require PR for dev"가 걸려 있다**(PR 필수, 승인 0명, 관리자 포함 예외 없음 —
+  2026-10-21 GitHub 토큰 탈취 대응으로 추가). 막는 것은 PR 없이 dev에 **몰래 직접 push**하는 길뿐이다 —
+  같은 토큰으로 PR을 열고 스스로 머지하면 alpha 배포까지 간다(PR 기록만 남는다). 승인 1명 규칙은 자체 머지
+  흐름을 막아 채택하지 않았다.
+  dev로의 직접 push는 누구든 — 워크플로·관리자 포함 — 거부된다. 그래서 `promote-main.yml`의 버전 커밋과
+  릴리스 준비(`--prepare-only` 포함)도 PR로 전달한다. 같은 명령(`gh api repos/<owner>/<repo>/rulesets`)으로 확인한다.
 - **머지·push 전에 항상 `baseRefName`(대상 브랜치)을 확인한다.** 2026-08-09에 dev용 PR을
   `mergeable`/CI만 보고 머지했다가 **base가 main이라 프로덕션 브랜치에 머지된 사고**가 있었다
   (`gh pr merge`는 PR에 설정된 base로 머지하지, 내가 의도한 곳으로 머지하지 않는다). 머지 직전

@@ -305,6 +305,11 @@ Global rules inherited from `~/.codex/AGENTS.md`:
     `environment: production` 승인 게이트 있음.
 - **승격 뒤 추가 절차가 필요한 배포(Task168 Stage A/B DB 전환 등)는
   `docs/ops/prod-task168-transition-runbook.md` 참고** — 실패 메시지가 이 문서를 직접 가리킨다.
+- **승인 전 `build-images` 는 prod 서버(SSM)·Parameter Store·KMS·EC2 에 닿지 않는다.** 그 job 은 빌드 전용
+  역할(`vars.PROD_BUILD_AWS_ROLE_ARN`: ECR·릴리스 소스 S3만)을 쓰고, 서버 명령·서버 상태 읽기·운영 비밀값 쓰기와
+  배포 역할(`vars.PROD_AWS_ROLE_ARN`)은 승인된 `deploy` job 에만 둔다. `pnpm qa:production-deploy-security` 가
+  강제한다(`deploy/DEPLOY_GUIDE.md` §4). **한계:** 저장소 수준 GitHub secret(배포용 `SECRET_*` 원본 다수)은
+  `build-images` 도 읽을 수 있다 — 환경 secret 으로 옮기는 것은 별도 후속이다.
 - **모든 작업은 `dev`에서만.** 작업 브랜치·PR의 base는 항상 `dev`. 기능의 "완료" = dev 머지.
 - **`dev` → `main` 승격은 사용자만 한다.** 에이전트는 `git push`/`gh pr merge`/
   `gh pr create --base main` 어느 방식으로도 **직접 실행하지 않는다** — 필요해 보이면 사용자에게

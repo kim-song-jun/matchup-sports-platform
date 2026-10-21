@@ -133,8 +133,8 @@ Actions → `deploy.yml` → "Run workflow" → 아래 입력으로 수동 실�
   꺼진 채라 돌려 봐야 12회 재시도 끝에 실패하고 같은 `deploy-production` 큐의 Stage B 만
   그만큼 기다리게 된다. Stage A 성공 판정은 `Run deploy-prod.sh` 스텝 성공 + 아래 5번의 로그 줄이다.
 - Stage A 는 nginx 공개 헤더(`X-Teameet-Release/Commit`) 파일을 **쓰지 않는다** — 승격되지 않는
-  SHA 가 A~B 사이 nginx 재시작으로 공개 헤더에 실리면 Stage B 빌드의
-  `resolve-prod-rollback-base.sh` 가 "퍼블릭 SHA 불일치"로 거부하기 때문이다.
+  SHA 가 A~B 사이 nginx 재시작으로 공개 헤더에 실리면 Stage B `deploy` job(승인 직후, 아무것도
+  바꾸기 전)의 `resolve-prod-rollback-base.sh` 가 "퍼블릭 SHA 불일치"로 거부하기 때문이다.
 - **A~B 사이 재부팅·docker 재시작 주의**: `v1_api`·`v1_game_operations_worker` 는
   `restart: always` 라 호스트 재부팅이나 docker 데몬 재시작이 옛 API·워커를 다시 띄운다.
   Stage B 는 진입할 때마다 두 서비스를 다시 멈추고 멈췄는지 확인한 뒤에만 DB 에 손대므로
@@ -285,6 +285,8 @@ Actions 변수/시크릿 이름이나 `.env` 키 이름으로만 가리킨다 �
 | 단계 | 에러 메시지(요지) | 남는 상태 | 재실행 안전? | 할 일 |
 |---|---|---|---|---|
 | dispatch 입력 검증 (build-images, DB 미접촉) | `task168_rehearsal_evidence is required for stageA` / `must not contain control characters` / `Unknown task168_stage` | 아무 것도 안 바뀜 | 예 | 입력값 고쳐서 재dispatch. |
+| 승인 직후 deploy job — 롤백 기준 계산(서버 변경 전) | `[prod-rollback-base] migration base 와 퍼블릭 릴리스 SHA 가 다릅니다` / `[prod-rollback-base] canonical 상태가 비어 있거나 형식이 잘못됐습니다` / `[expand-contract-sql-v1] …`(expand-contract 위반) | 서버 변경 없음. 이미지(`sha-<SHA>`)와 소스 tarball 은 ECR·S3 에 이미 푸시됨 | 예 | 원인을 해소한 뒤 같은 Stage 재dispatch — IMMUTABLE 태그라 이미지는 다시 빌드하지 않고 재사용한다. 퍼블릭 SHA 불일치면 공개 헤더와 `state.json` 의 active SHA 를 맞추고, expand-contract 위반이면 파괴적 마이그레이션을 분리한 새 커밋으로 다시 승격한다. |
+| 승인 직후 deploy job — 런타임 env 동기화 뒤, activation 전 | `[prod-internal-origin] 호스트 .env 의 V1_INTERNAL_API_ORIGIN 이 웹 이미지에 구워진 값과 다릅니다` / `[prod-internal-origin] 호스트에 런타임 .env 가 없습니다` | 활성 릴리스·컨테이너·DB 변경 없음(런타임 `.env` 동기화만 끝남). 이미지는 푸시됨 | 예 | 호스트 `.env` 의 `V1_INTERNAL_API_ORIGIN` 을 지우거나(값이 없으면 통과), 다른 값이 의도라면 워크플로 `PROD_INTERNAL_API_ORIGIN` 을 고쳐 새 이미지를 빌드한 뒤 재dispatch. `.env` 부재면 `Sync runtime env` 스텝 로그부터 확인. |
 | deploy-prod.sh 시작 직후 | `Task168 ${stage} requires an existing active release (had_active=false)` | 아무 것도 안 바뀜(첫 배포 이전 상태에서만 발생, 지금 prod 는 `state.json` 이 있어 실무에서는 안 나올 가능성이 높다) | 해당 없음 | 이 에러가 나오면 `state.json` 자체가 없다는 뜻 — Stage A/B 이전에 먼저 일반 배포로 `state.json` 을 만들어야 한다. 이 문서 범위 밖의 별도 판단이 필요하니 진행 전 사용자에게 보고. |
 | Stage A 시작, 원장/seal 상태 판정 | `Stage A refuses: prod ledger/seal state is not a recognized Stage A state` | API·워커 정지 안 됨(quiesce 이전에 거부) | 아니오 | 자동 복구 대상이 아니다. DB 원장을 부록 B 쿼리로 직접 읽어 어떤 상태인지(다른 브랜치의 마이그레이션이 섞였는지 등) 사람이 판단한다. |
 | Stage A/B quiesce(정지 확인) | `compose stop failed` / `writers did not quiesce` | API·워커가 일부만 내려갔을 수 있음. DB 는 이 시도에서 아직 안 건드림 | 예 | 컨테이너 상태를 확인하고 같은 Stage 재dispatch(매 진입마다 다시 정지·확인한다). |

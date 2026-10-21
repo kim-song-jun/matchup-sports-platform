@@ -647,6 +647,7 @@ model V1User {
   tournamentStaffAssignments     V1TournamentStaffAssignment[] @relation("V1TournamentStaffUser")
   grantedTournamentStaff         V1TournamentStaffAssignment[] @relation("V1TournamentStaffGrantor")
   verificationTokens             V1VerificationToken[]
+  loginStepUpChallenges          V1LoginStepUpChallenge[]
   inquiries                      V1Inquiry[]
   uploadAssets                   V1UploadAsset[]
   acknowledgedResultEscalations  V1ResultEscalation[]          @relation("V1EscalationAcknowledgedBy")
@@ -758,6 +759,78 @@ model V1EmailVerificationChallenge {
   updatedAt    DateTime  @updatedAt @map("updated_at")
 
   @@map("v1_email_verification_challenges")
+}
+
+enum V1LoginAttemptResult {
+  /// 세션이 발급된 로그인(추가 인증을 마친 경우 포함). 계정 실패 집계를 끊는다.
+  success
+  /// 비밀번호 불일치·계정 없음. 추가 인증 상태에서도 틀리면 이 값이다.
+  failed
+  /// 비밀번호는 맞았지만 추가 인증 챌린지를 내보냈다. 실패로도 성공으로도 세지 않는다.
+  step_up_issued
+}
+
+/// 이메일 로그인 시도 기록 — 계정별 실패 집계(추가 인증 판정)와 전체 실패율(공격 감지)의 원천.
+/// 이메일·IP 는 원문이 아니라 서버 비밀값 HMAC 으로만 둔다(유출돼도 계정 목록이 되지 않는다).
+/// 보관 30일(워커 정리).
+model V1LoginAttempt {
+  id        String               @id @default(uuid())
+  emailKey  String               @map("email_key")
+  ipKey     String?              @map("ip_key")
+  result    V1LoginAttemptResult
+  createdAt DateTime             @default(now()) @map("created_at")
+
+  @@index([emailKey, createdAt])
+  @@index([createdAt, result])
+  @@map("v1_login_attempts")
+}
+
+/// 로그인 추가 인증(step-up) 챌린지. 비밀번호 맞음/틀림/계정 없음을 응답으로 가를 수 없게
+/// 가짜 챌린지(userId null — 메일을 보내지 않는다)도 같은 모양으로 만든다.
+/// 토큰·코드는 해시만 저장한다. 만료 7일 뒤 워커가 정리한다.
+model V1LoginStepUpChallenge {
+  id           String    @id @default(uuid())
+  tokenHash    String    @unique @map("token_hash")
+  emailKey     String    @map("email_key")
+  userId       String?   @map("user_id")
+  codeHash     String    @map("code_hash")
+  attemptCount Int       @default(0) @map("attempt_count")
+  /// 실제 메일을 내보낸 횟수(가짜 챌린지는 항상 0). 이메일당 24시간 상한의 원천.
+  sentCount    Int       @default(0) @map("sent_count")
+  expiresAt    DateTime  @map("expires_at")
+  lastSentAt   DateTime  @map("last_sent_at")
+  /// 마지막 메일 발송이 실패했으면 그 시각. 재발송이 쿨다운 없이 즉시 재시도하고 실패를 사용자에게 알린다.
+  sendFailedAt DateTime? @map("send_failed_at")
+  usedAt       DateTime? @map("used_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  user V1User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([emailKey, lastSentAt])
+  @@index([expiresAt])
+  @@index([userId])
+  @@map("v1_login_step_up_challenges")
+}
+
+enum V1SecurityAnomalyKind {
+  /// 짧은 시간에 서로 다른 계정에 걸친 로그인 실패 급증(password spray).
+  login_spray
+}
+
+/// 보안 이상 기록. 마지막 감지 후 30분 안이면 "진행 중"이라, 감지가 반복돼도 새 행(과 Slack 알림)을 만들지 않고
+/// 마지막 감지 시각·집계만 갱신한다.
+model V1SecurityAnomaly {
+  id             String                @id @default(uuid())
+  kind           V1SecurityAnomalyKind
+  startedAt      DateTime              @default(now()) @map("started_at")
+  lastDetectedAt DateTime              @default(now()) @map("last_detected_at")
+  failedCount    Int                   @map("failed_count")
+  accountCount   Int                   @map("account_count")
+  ipCount        Int                   @map("ip_count")
+
+  @@index([kind, lastDetectedAt])
+  @@index([startedAt])
+  @@map("v1_security_anomalies")
 }
 
 model V1UserProfile {

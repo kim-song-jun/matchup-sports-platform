@@ -1,4 +1,5 @@
 import type { V1InquiryCategory } from '@prisma/client';
+import { escapeSlackText, postSlackWebhook, requireSlackWebhookUrl } from '../common/slack/slack-webhook';
 import type { GameOperationClaim, GameOperationHandler } from '../jobs/v1-game-operations-worker.service';
 
 export const INQUIRY_SLACK_NOTIFICATION_TYPE = 'INQUIRY_SLACK_NOTIFICATION';
@@ -32,8 +33,6 @@ const CATEGORY_LABELS: Record<V1InquiryCategory, string> = {
   partnership: '제휴',
 };
 
-const SLACK_WEBHOOK_PATTERN = /^https:\/\/hooks\.slack\.com\/services\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+$/;
-
 /**
  * Delivers one durable inquiry-created outbox event to Slack.
  *
@@ -61,27 +60,15 @@ export class InquirySlackNotifier {
   };
 
   async send(payload: InquirySlackNotificationPayload): Promise<void> {
-    const webhookUrl = this.requireWebhookUrl();
+    const webhookUrl = requireSlackWebhookUrl(this.webhookUrl, 'SLACK_INQUIRY_WEBHOOK_URL');
     const adminUrl = this.adminInquiryUrl(payload.inquiryId);
-    const response = await this.fetchFn(webhookUrl, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json; charset=utf-8' },
-      body: JSON.stringify(buildSlackMessage(payload, adminUrl)),
-      signal: AbortSignal.timeout(this.timeoutMs),
+    await postSlackWebhook({
+      webhookUrl,
+      body: buildSlackMessage(payload, adminUrl),
+      label: 'inquiry',
+      fetchFn: this.fetchFn,
+      timeoutMs: this.timeoutMs,
     });
-    const responseBody = await response.text();
-    if (!response.ok || responseBody.trim() !== 'ok') {
-      throw new Error(
-        `Slack inquiry webhook failed (${response.status}): ${responseBody.trim().slice(0, 300) || 'empty response'}`,
-      );
-    }
-  }
-
-  private requireWebhookUrl(): string {
-    if (!this.webhookUrl || !SLACK_WEBHOOK_PATTERN.test(this.webhookUrl)) {
-      throw new Error('SLACK_INQUIRY_WEBHOOK_URL must be a valid Slack Incoming Webhook URL');
-    }
-    return this.webhookUrl;
   }
 
   private adminInquiryUrl(inquiryId: string): string {
@@ -180,8 +167,4 @@ function buildSlackMessage(payload: InquirySlackNotificationPayload, adminUrl: s
       },
     ],
   };
-}
-
-function escapeSlackText(value: string): string {
-  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }

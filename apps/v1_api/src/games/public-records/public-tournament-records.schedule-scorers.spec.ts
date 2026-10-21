@@ -58,6 +58,7 @@ type FakeFixture = {
 };
 
 type FakeCanonicalScheduleRow = {
+  advancementTargets?: { targetSide: 'HOME' | 'AWAY'; sourceOutcome: 'WINNER' | 'LOSER'; source: { round: string; fixtureNumber: number } }[];
   homeDisplayLabel?: string | null;
   awayDisplayLabel?: string | null;
   teamMatchId: string;
@@ -74,7 +75,7 @@ type FakeCanonicalScheduleRow = {
   teamMatch: {
     homeSlot?: Record<string, unknown> | null;
     awaySlot?: Record<string, unknown> | null;
-    startAt: Date;
+    startAt: Date | null;
     placeName: null;
     status: string;
     fieldId: string | null;
@@ -1102,5 +1103,35 @@ describe('PublicTournamentRecordsService.getSchedule -- 자리 라벨 (homeSlotL
       { homeSlot: null, awaySlot: null },
     );
     expect(result.items[0]).toMatchObject({ homeSlotLabel: null, awaySlotLabel: null });
+  });
+
+  const sources = [
+    { targetSide: 'HOME' as const, sourceOutcome: 'WINNER' as const, source: { round: 'semi', fixtureNumber: 1 } },
+    { targetSide: 'AWAY' as const, sourceOutcome: 'LOSER' as const, source: { round: '4강', fixtureNumber: 2 } },
+  ];
+  const unassigned = { homeRegistrationId: null, homeRegistration: null, awayRegistrationId: null, awayRegistration: null };
+
+  it('팀과 슬롯이 없는 결선도 현재 목록에 없는 원천 경기의 승자·패자를 표시한다', async () => {
+    const result = await scheduleWith({ ...unassigned, round: 'final', advancementTargets: sources }, { homeSlot: null, awaySlot: null });
+    expect(result.items[0]).toMatchObject({ home: null, away: null, homeSlotLabel: '4강 1경기 승자', awaySlotLabel: '4강 2경기 패자' });
+  });
+
+  it('시간 미정 결선에도 같은 연결 문구를 반환한다', async () => {
+    const base = makeFixture({});
+    const result = await scheduleWith({ ...unassigned, advancementTargets: sources,
+      teamMatch: { startAt: null, placeName: null, status: 'scheduled', fieldId: null, field: null, videos: [], game: base.game },
+    }, {});
+    expect(result.items).toHaveLength(0);
+    expect(result.unscheduled[0]).toMatchObject({ homeSlotLabel: '4강 1경기 승자', awaySlotLabel: '4강 2경기 패자' });
+  });
+
+  it('진출 연결이 있어도 직접 문구와 슬롯 문구를 우선한다', async () => {
+    const result = await scheduleWith({ ...unassigned, advancementTargets: sources, homeDisplayLabel: '직접 지정한 결선 자리' }, { homeSlot: null, awaySlot: groupRank });
+    expect(result.items[0]).toMatchObject({ homeSlotLabel: '직접 지정한 결선 자리', awaySlotLabel: 'A조 1위' });
+  });
+
+  it('배정된 실제 팀은 연결 문구로 대체하지 않는다', async () => {
+    const result = await scheduleWith({ advancementTargets: sources }, {});
+    expect(result.items[0]).toMatchObject({ home: { teamName: '홈팀' }, homeSlotLabel: null, awaySlotLabel: null });
   });
 });

@@ -12,6 +12,8 @@
 
 # Teameet v1 API contracts
 
+공개 대회 일정의 결선 기본 문구는 저장된 진출 연결로 보완한다(직접 문구·슬롯·실제 팀 우선). [대회 라벨 계약](./domains/tournaments.md)을 따른다.
+
 대회 진행 중에도 미시작 경기 삭제를 허용한다. 결과·후속 대진 보호는 [대회 삭제 계약](./domains/tournaments.md#시작-전-대진-삭제-2026-10-05)을 따른다.
 
 Personal-match online place classification: public detail includes `isOnline`; the authenticated, audited `PATCH /admin/matches/:matchId/online` sets that factual value without changing publication or search visibility. See [matches](./domains/matches.md) and [admin/ops](./domains/admin-and-ops.md).

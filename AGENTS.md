@@ -315,8 +315,10 @@ Global rules inherited from `~/.codex/AGENTS.md`:
 - **배포 동작에 영향을 주는 main 대상 PR의 릴리스 검사는 출발 브랜치와 무관하게 동일하다.** 사용자 승인으로 범위를 제한한 hotfix PR도 Changesets 소비, 고정 API/Web 버전 증가, 두 변경 이력을 모두 검증한다. 순수 문서·테스트 변경에는 버전 증가를 요구하지 않는다. 이 CI 계약은 승격 권한이나 승인 정책을 대신하지 않는다.
 - **`main`에는 classic branch protection은 없지만 ruleset이 걸려 있다**(2026-08-09 실측 정정).
   ruleset "Copilot review for default branch"(active)가 `deletion`·`non_fast_forward`·`copilot_code_review`를
-  강제한다 — main으로의 force-push·삭제는 막힌다(#231 롤백이 `git revert`로만 가능했던 이유). 일반
-  fast-forward 직접 push는 가능해 그대로 프로덕션 배포로 이어진다. 확인은 `gh api repos/<owner>/<repo>/rulesets`.
+  강제한다 — main으로의 force-push·삭제는 막힌다(#231 롤백이 `git revert`로만 가능했던 이유). 2026-10-21부터
+  ruleset "Require PR for main"(PR 필수, 승인 0명, 예외 없음)으로 main 직접 push도 거부된다. 확인은 `gh api repos/<owner>/<repo>/rulesets`.
+- **배포 environment는 브랜치로 묶여 있다**(2026-10-21): `production`은 `main`에서만(승인자 2명 유지), `alpha`
+  (`rollback-alpha.yml`이 쓰고 alpha OIDC 역할이 `environment:alpha`를 신뢰)는 `dev`에서만 쓸 수 있다.
 - **`dev`에는 ruleset "Require PR for dev"가 걸려 있다**(PR 필수, 승인 0명, 관리자 포함 예외 없음, 2026-10-21
   토큰 탈취 대응) — dev로의
   직접 push는 누구든(워크플로·관리자 포함) 거부된다. 막는 것은 PR 없는 몰래 push뿐이고, 같은 토큰으로 PR을

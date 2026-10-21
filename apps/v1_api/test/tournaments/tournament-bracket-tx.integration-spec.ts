@@ -55,26 +55,45 @@ describe('대진 …InTx 함수 (PostgreSQL)', () => {
         data: { tournamentId: ids.tournamentId, kind: data.kind ?? 'ENTRY', groupId: data.groupId, position: data.position, sourceGroupId: data.sourceGroupId ?? null },
       });
 
-    it('자리가 남은 조는 409 GROUP_HAS_SLOTS 로 막히고(500 이 아니다), 자리를 지우면 지워진다', async () => {
+    it('팀 미정이고 어느 경기에서도 쓰지 않는 자리는 조 삭제와 함께 정리한다', async () => {
       const group = await bracket.createGroup(user, ids.tournamentId, { name: 'slot-group', phase: 'group' });
       const slot = await makeSlot({ groupId: group.id, position: 1 });
+      await expect(bracket.deleteGroup(user, group.id)).resolves.toEqual({ deleted: true });
+      expect(await prisma.v1TournamentGroup.count({ where: { id: group.id } })).toBe(0);
+      expect(await prisma.v1TournamentSlot.findUnique({ where: { id: slot.id } })).toBeNull();
+    });
 
-      await expect(bracket.deleteGroup(user, group.id)).rejects.toMatchObject({ response: { code: 'GROUP_HAS_SLOTS' } });
+    it('실제 ENTRY 팀 배정은 편성 행이 없어도 보호하며, 미정으로 비운 뒤 삭제한다', async () => {
+      const group = await bracket.createGroup(user, ids.tournamentId, { name: 'occupied-slot-group', phase: 'group' });
+      const slot = await makeSlot({ groupId: group.id, position: 1 });
+      await prisma.v1TournamentSlot.update({ where: { id: slot.id }, data: { registrationId: reg0 } });
+      await expect(bracket.deleteGroup(user, group.id)).rejects.toMatchObject({ response: { code: 'GROUP_HAS_TEAMS' } });
       expect(await prisma.v1TournamentGroup.count({ where: { id: group.id } })).toBe(1);
-
-      await prisma.v1TournamentSlot.delete({ where: { id: slot.id } });
+      await prisma.v1TournamentSlot.update({ where: { id: slot.id }, data: { registrationId: null } });
       await expect(bracket.deleteGroup(user, group.id)).resolves.toEqual({ deleted: true });
     });
 
-    it('다른 조의 순위 자리가 원천으로 삼는 조도 막힌다', async () => {
+    it('다른 조의 실제 결선 경기가 참조하는 순위 자리는 보호하고 경기 삭제 후 정리한다', async () => {
       const source = await bracket.createGroup(user, ids.tournamentId, { name: 'rank-source', phase: 'group' });
       const finals = await bracket.createGroup(user, ids.tournamentId, { name: 'rank-finals', phase: 'semi' });
       const rank = await makeSlot({ kind: 'GROUP_RANK', groupId: finals.id, position: 1, sourceGroupId: source.id });
-
+      const row = await findTournamentOnSurface(prisma, TOURNAMENT_KINDS, {
+        where: { id: ids.tournamentId },
+        select: { id: true, sportId: true, regionId: true, title: true, competitionConfigVersionId: true, ...TOURNAMENT_VENUE_SELECT },
+      });
+      if (!row?.competitionConfigVersionId) throw new Error('fixture tournament has no competition config');
+      const fixture = await prisma.$transaction(async tx => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`league-fixture-generation:${ids.tournamentId}`}, 0))`;
+        return createEmptyTournamentFixtureInTx(tx, { games }, admin, {
+          tournament: { ...row, competitionConfigVersionId: row.competitionConfigVersionId! }, groupId: finals.id,
+          round: '4강', fixtureNumber: 98001, legNumber: 1, homeSlotId: rank.id, awaySlotId: null,
+        });
+      });
       await expect(bracket.deleteGroup(user, source.id)).rejects.toMatchObject({ response: { code: 'GROUP_HAS_SLOTS' } });
-
-      await prisma.v1TournamentSlot.delete({ where: { id: rank.id } });
+      expect(await prisma.v1TournamentSlot.findUnique({ where: { id: rank.id } })).not.toBeNull();
+      await bracket.deleteFixture(user, fixture.id);
       await expect(bracket.deleteGroup(user, source.id)).resolves.toEqual({ deleted: true });
+      expect(await prisma.v1TournamentSlot.findUnique({ where: { id: rank.id } })).toBeNull();
       await expect(bracket.deleteGroup(user, finals.id)).resolves.toEqual({ deleted: true });
     });
 

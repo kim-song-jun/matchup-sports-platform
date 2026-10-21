@@ -130,4 +130,32 @@ describe('공통 결선 배정', () => {
     expect(tx.v1TournamentSlot.create).not.toHaveBeenCalled();
     expect(assignSlotsBatchInTx).not.toHaveBeenCalled();
   });
+  it('동일한 조별 원천의 조회 순서만 바뀌면 버전과 저장 가능 상태를 유지한다', async () => {
+    const { deps, tx, sources, read } = setup();
+    const before = await read();
+    for (const source of sources.values()) {
+      source.registrationIds.reverse();
+      source.standings.reverse();
+      source.fixtures.reverse();
+    }
+    jest.mocked(loadGroupRankSources).mockResolvedValue(new Map([...sources].reverse()));
+    const after = await read();
+    expect(after.version).toBe(before.version);
+    expect(after.sourceVersion).toBe(before.sourceVersion);
+    expect(after.groups).toEqual(before.groups);
+    expect(after.blockedReason).toBeNull();
+    await expect(applyFinalistAssignment(deps, user, 't', inputFor(before))).resolves.toHaveProperty('assignments');
+    expect(tx.v1TournamentSlot.create).toHaveBeenCalledTimes(8);
+  });
+  it('정렬을 정규화해도 실제 공식 결과가 바뀌면 원래 미리보기로 저장할 수 없다', async () => {
+    const { deps, tx, sources, read } = setup();
+    const before = await read();
+    sources.get('g0')!.fixtures[0].official = { homeScore: 2, awayScore: 0 };
+    const after = await read();
+    expect(after.version).not.toBe(before.version);
+    expect(after.sourceVersion).not.toBe(before.sourceVersion);
+    await expect(applyFinalistAssignment(deps, user, 't', inputFor(before))).rejects.toThrow('바뀌었어요');
+    expect(tx.v1TournamentSlot.create).not.toHaveBeenCalled();
+    expect(assignSlotsBatchInTx).not.toHaveBeenCalled();
+  });
 });

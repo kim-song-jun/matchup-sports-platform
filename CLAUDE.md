@@ -498,12 +498,16 @@ start → end-period(하프타임) → start-period(후반) → end-period → e
 대회·리그 경기 명단은 참가 명단에서 계산된 제출본이라 라인업 단계가 없다(Task 179 — 라인업 저장·제출
 API 는 409 `ROSTER_MANAGED_BY_ADJUSTMENTS`, 빠질 선수는 `/games/:gameId/sides/:sideId/roster-adjustments`).
 
-실측으로 확인된 계약 2개(하나라도 어기면 409/422):
+실측으로 확인된 계약 3개(1·2는 어기면 409/422, 3은 거절 응답):
 1. **takeover 토큰은 REST로 못 받는다.** `TOURNAMENT_FIXTURE` 게임의 모든 커맨드에 필수인데
    발급 경로는 Socket.IO `/game-operations` 의 `game.takeover.request` 하나뿐이다
    (`socket.io-client` + `extraHeaders: { cookie }` + `auth: { clientInstanceId,
    authorizationSubjectVersion: 0 }`).
 2. **`Idempotency-Key` 헤더 = body의 `clientCommandId`.** 다르면 422 `COMMAND_IDEMPOTENCY_KEY_MISMATCH`.
+3. **다른 계정이 콘솔을 쥐고 있으면 조용히 뺏지 않는다(MD-QA #165).** 같은 경기 콘솔을 다른 계정이 열어 두었으면
+   (예: 사용자가 브라우저로 콘솔을 보는 중) `game.takeover.request` 는 `{status:'denied', code:'TAKEOVER_HELD', holderName}`
+   이다. 스크립트는 payload 에 `force: true` 를 실어 가져오고, 그 콘솔은 보기 모드로 바뀐다. 같은 계정의 재요청은
+   `force` 없이 넘어간다.
 
 ### 4. 판정은 공개 API를 ground truth로
 

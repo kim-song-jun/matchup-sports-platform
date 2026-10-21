@@ -432,7 +432,8 @@ Global rules inherited from `~/.codex/AGENTS.md`:
   3. **라이브 경기는 운영 API로 만든다.** alpha엔 `live` 경기가 보통 없다. 순서: start → end-period → start-period
      → end-period → end. 대회·리그 경기 명단은 참가 명단에서 계산된 제출본이라 라인업 단계가 없다(Task 179 — 라인업
      저장·제출 API 는 409 `ROSTER_MANAGED_BY_ADJUSTMENTS`, 빠질 선수는 `/games/:gameId/sides/:sideId/roster-adjustments`).
-     계약 2개: takeover 토큰은 Socket.IO `game.takeover.request` 로만 발급 / `Idempotency-Key` 헤더 = body `clientCommandId`.
+     계약 3개: takeover 토큰은 Socket.IO `game.takeover.request` 로만 발급 / `Idempotency-Key` 헤더 = body `clientCommandId` /
+     다른 계정이 콘솔을 쥐고 있으면 `TAKEOVER_HELD` 로 거절되니 스크립트는 `force: true` 를 싣는다(MD-QA #165).
   4. **판정은 비인증 공개 API**(`GET /tournaments/:id/matches/:fixtureId`)를 ground truth로. 육안 스크린샷 대조로
      "차이 없음"을 결론내지 말고 computed 값을 직접 읽는다.
   5. 라이브 페이지는 10초 폴링이라 Playwright `networkidle`이 끝나지 않는다 → `domcontentloaded` + 명시적 대기.

@@ -1,3 +1,5 @@
+결선 배정 미리보기의 version/sourceVersion은 동일한 조별 원천의 DB 반환 순서에 영향받지 않는다. 실제 성적·순위·대진 변경과 시작 경기 보호는 유지하며 [대회 계약](./domains/tournaments.md)을 따른다.
+
 리그 표시는 모집완료·진행 중·보류·종료 4개로 통일한다. 호환 `draft`는 저장 상태 `draft/open/closed` 전체를 묶으며 모집 가능 여부·공개 여부는 별도다. 내 담당 대회는 `tournamentKind`로 종류를 구분한다. [리그 표시 계약](./domains/league-matches.md#league-display-states-2026-10-19).
 
 신규 리그는 모집완료(`closed`)로 생성하고 운영자가 명시적으로 시작한다. 관리자 목록·상세는 `lifecycleStatus`를 제공하며, 시작 전 경기 시작·결과 초안 생성·제출은 `409 LEAGUE_NOT_STARTED`다. 생성 정원이 선택한 서로 다른 팀 수보다 작으면 `422 LEAGUE_CAPACITY_BELOW_TEAM_COUNT`로 쓰기 전에 거부한다. [리그 계약](./domains/league-matches.md#new-league-lifecycle-2026-10-18)을 따른다.

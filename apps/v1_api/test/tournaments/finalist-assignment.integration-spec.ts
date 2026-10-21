@@ -88,6 +88,8 @@ describe('수동 결선 진출팀 실제 저장 계약', () => {
     const game = await prisma.v1Game.findUniqueOrThrow({ where: { teamMatchId: fixtureIds[0] } });
     await prisma.v1Game.update({ where: { id: game.id }, data: { state: 'LIVE' } });
     const started = await slots.finalistPreview(user, tournamentId);
+    expect(started.blockedReason).not.toBeNull();
+    expect((await slots.finalistPreview(user, tournamentId)).version).toBe(started.version);
     await expect(slots.finalistApply(user, tournamentId, { ...swapped, version: started.version })).rejects.toMatchObject({ response: { code: 'FINALIST_NOT_READY' } });
   });
 });

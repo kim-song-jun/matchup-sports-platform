@@ -7,7 +7,7 @@ import type { GamesService } from '../../games/games.service';
 import type { PrismaService } from '../../prisma/prisma.service';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from '../tournament-surface-lookup';
 import { loadCanonicalStandingsSource } from '../tournament-standings-source';
-import { resolveGroupRank } from './group-rank-preview';
+import { resolveGroupRank, type GroupRankSource } from './group-rank-preview';
 import { loadGroupRankSources } from './load-group-rank-preview';
 import { assignSlotsBatchInTx } from './tournament-slot.service';
 import type { FinalistAssignmentDto } from './dto/finalist-assignment.dto';
@@ -17,6 +17,12 @@ type Target = { fixtureId: string; side: 'HOME' | 'AWAY'; label: string; groupId
 const options = { timeout: 45_000, maxWait: 5_000 } as const;
 const notReady = (message: string) => new ConflictException({ code: 'FINALIST_NOT_READY', message });
 
+// Only unordered source rows are normalized; ordered rules in the fixture snapshot stay intact.
+const rankFixtureKey = (fixture: GroupRankSource['fixtures'][number]) => JSON.stringify([
+  fixture.homeRegistrationId, fixture.awayRegistrationId,
+  fixture.official?.homeScore ?? null, fixture.official?.awayScore ?? null, fixture.officialAt,
+]);
+
 export async function loadFinalistPreview(tx: Prisma.TransactionClient, tournamentId: string) {
   const tournament = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, {
     where: { id: tournamentId, deletedAt: null }, select: { id: true, format: true, status: true },
@@ -25,7 +31,13 @@ export async function loadFinalistPreview(tx: Prisma.TransactionClient, tourname
   if (tournament.format !== 'group_knockout') throw notReady('조별리그 후 결선 방식에서만 배정할 수 있어요.');
   const groups = await tx.v1TournamentGroup.findMany({ where: { tournamentId }, orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] });
   const sourceGroups = groups.filter((group) => group.phase === 'group');
-  const sources = await loadGroupRankSources(tx, tournamentId, sourceGroups.map((group) => group.id));
+  const loadedSources = await loadGroupRankSources(tx, tournamentId, sourceGroups.map((group) => group.id));
+  const sources = new Map([...loadedSources].sort(([left], [right]) => left.localeCompare(right)).map(([groupId, source]) => [groupId, {
+    ...source,
+    registrationIds: [...source.registrationIds].sort(),
+    standings: [...source.standings].sort((left, right) => left.registrationId.localeCompare(right.registrationId)),
+    fixtures: [...source.fixtures].sort((left, right) => rankFixtureKey(left).localeCompare(rankFixtureKey(right))),
+  }] as const));
   const standings = await tx.v1TournamentStanding.findMany({ where: { groupId: { in: sourceGroups.map((group) => group.id) } }, orderBy: [{ groupId: 'asc' }, { registrationId: 'asc' }] });
   const registrations = await tx.v1TournamentRegistration.findMany({ where: { tournamentId, status: 'confirmed' }, select: { id: true }, orderBy: { id: 'asc' } });
   const confirmed = new Set(registrations.map((row) => row.id));

@@ -53,3 +53,14 @@ origin/dev 88119dbd9, branch feat/group-finalist-assignment, worktree /tmp/teame
 
 - PR #2013 생성, 최초 head 3c369ed79. Copilot run39528327466은 코드 검토 전 모델 `claude-opus-5` unavailable로 실패(최신 리뷰 없음). 실패를 clean으로 취급하지 않음.
 - 실제 alpha 로그인·지정15팀 수동대진의 before1440/768/390 캡처 완료(overflow0, console/network 오류0). 모바일 그림은 별도 컴포넌트라 공통 버튼 진입을 보강했으며, 수동/슬롯 없는 대진에서 preview API까지 여는 모바일 회귀8 PASS. Web 검증 누적121.
+
+## Main 승격 차단 회귀 수정 — 2026-10-21
+
+- 사용자 요청: 리뷰 생략 후 main 승격 진행. PR #2015 API CI 39545183659에서 174 suite 중 1 suite, 1289 test 중 1 test 실패. 실제 수동 결선 시작 차단은 FINALIST_NOT_READY여야 하지만 직전 preview의 버전이 FINALIST_PREVIEW_STALE로 달라졌다. dev main은 아직 승격하지 않았다.
+- 원인: loadGroupRankSources의 세 원천 배열은 조회 순서가 보장되지 않는데 finalist fingerprint가 배열 순서를 그대로 해시한다. 실제 순위/성적/배정 변경 없이도 조회 순서만 바뀌면 버전이 달라질 수 있다.
+- Owned: finalist-assignment.ts/spec.ts, 해당 실제 DB 통합 회귀, canonical API 문서, patch Changeset 및 이 task. Forbidden: shared WIP, schema/migration, UI, 기존12강, 배포/CI 정책 변경. 단독 순차 수정한다.
+- [x] RED: 같은 원천을 역순으로 반환하면 기존 fingerprint와 실제 저장 경로가 달라지는 회귀를 증명.
+- [x] GREEN: 의미 없는 원천 조회 순서만 정규화하고 실제 공식 성적/대진/시작 상태 변경은 계속 stale/차단. 전체 배열을 재귀 정렬해 의미 있는 정책 순서를 지우지 않는다.
+- [ ] 좁은 회귀·API 타입 검증 및 실제 DB CI 후 dev 반영; release metadata 재준비와 matching Alpha 확인 후 main PR을 재검증한다.
+- API/Prisma 모델·DB schema 변경 없음, migration 불필요. 권한·잠금·원자 저장·감사·기존12강을 유지한다. 테스트 기대값을 완화하거나 실패 CI를 성공으로 취급하지 않는다.
+검증 기록: 로컬 stale Prisma client 때문에 일반 Jest 타입 단계에서 시작하지 못한 1회는 RED 증거로 세지 않았다. 공유 client를 덮어쓰지 않고 임시 transpile-only 설정으로 기존 코드의 새 회귀 1실패/18통과를 확인한 뒤 수정 후 19/19 PASS. 실제 PG 통합·Prisma 생성·타입 검사는 최종 head CI에서 확인하며 로컬 Docker 부재를 숨기지 않는다. 새 debt marker 없음.

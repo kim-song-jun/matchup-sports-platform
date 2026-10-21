@@ -671,7 +671,9 @@ Schema migration `20261017010000_bracket_display_labels` adds nullable varchar(1
 
 ### 2026-10-18 공개 대진 표시 후속
 
-공개 상세와 공개 일정은 관리자와 동일한 side override/BYE 슬롯 값을 읽는다. `groups[].groupTeams[].displayLabel`은 BYE의 저장 문구(그 외 null)로 팀 확정 후에도 보조 표시한다. 공개 `fixtures[].fieldId`는 canonical TeamMatch의 등록 경기장 ID다. 그림의 시각·경기장 표시는 같은 경기 ID의 `scheduledAt`·`venue`이며, venue는 등록된 field 이름을 우선하고 미등록 장소 snapshot을 다음으로 사용한다. null은 시간 미정/경기장 미정이다. 번호·문구 수정으로 실제 팀 배정·승자/패자 edge는 바뀌지 않는다.
+공개 상세와 공개 일정은 관리자와 동일한 side override/BYE 슬롯 값을 읽는다. 공개 일정 `GET /tournaments/:id/schedule`의 `items[]`·`unscheduled[]`는 팀·직접 입력 문구·슬롯 문구가 없는 사이드에도 저장된 진출 연결의 원천 라운드·현재 경기 번호·WINNER/LOSER를 읽어 `4강 1경기 승자`·`4강 2경기 패자`를 기존 `homeSlotLabel`·`awaySlotLabel`에 제공한다. 원천 경기가 현재 필터·페이지 밖이거나 시간 미정이어도 동일하다. 삭제된 원천은 제외하고, 연결 자체가 없으면 추정하지 않는다. 실제 팀 배정과 팀명 비공개 정책은 유지한다.
+
+`groups[].groupTeams[].displayLabel`은 BYE의 저장 문구(그 외 null)로 팀 확정 후에도 보조 표시한다. 공개 `fixtures[].fieldId`는 canonical TeamMatch의 등록 경기장 ID다. 그림의 시각·경기장 표시는 같은 경기 ID의 `scheduledAt`·`venue`이며, venue는 등록된 field 이름을 우선하고 미등록 장소 snapshot을 다음으로 사용한다. null은 시간 미정/경기장 미정이다. 번호·문구 수정으로 실제 팀 배정·승자/패자 edge는 바뀌지 않는다.
 
 
 공개 상세 `groups[].groupTeams[].byeTarget`은 BYE 슬롯이 연결된 `{ fixtureId, side: 'HOME' | 'AWAY' }` 또는 null이다. 팀 미배정·문구 변경과 무관하게 canonical TeamMatch의 homeSlotId/awaySlotId로 조회하며, 비부전승·미연결은 null이다. 대진 비공개 시 groups/fixtures 숨김 정책은 그대로다. 공개 그림은 이 명시적 연결을 우선하며 슬롯 없는 기존 대진은 기존 registration 배정 연결을 유지한다. 번호·정렬로 진출 관계를 추정하지 않는다.

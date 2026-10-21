@@ -6,6 +6,8 @@
 
 # Global v1 API contract
 
+공개 대회 일정의 미배정 홈·어웨이는 직접/슬롯 문구가 없으면 저장된 진출 연결의 원천 라운드·경기 번호·승자/패자를 기존 라벨 필드에 제공한다. 삭제된 원천은 제외하고 실제 팀명·가림 정책은 유지한다. [대회 계약](./domains/tournaments.md)을 따른다.
+
 대회 형식 수정은 mutation admin + `expectedVersion` CAS를 요구한다. 조/대진 생성 이후 또는 진행·완료 상태의 실제 형식 변경은 `409 TOURNAMENT_FORMAT_LOCKED`이며, 관리자 상세의 `formatChangeBlockedReason`으로 제한 사유를 미리 표시한다. 형식과 라인업 설정을 함께 바꾸는 PATCH는 설정 핀·대진 리포인트·일반 필드·감사를 같은 트랜잭션에서 저장하므로 거부된 요청은 부분 저장되지 않는다. 동일 형식 재전송과 다른 필드 수정은 허용한다. [Tournaments 계약](./domains/tournaments.md)을 따른다.
 
 Personal-match detail exposes the stored `isOnline` boolean (default `false`). `PATCH /api/v1/admin/matches/:matchId/online` accepts a strict boolean and requires mutation-admin authority; it atomically updates classification and its before/after audit, returning `{matchId,isOnline,changed}`. Repeating the same classification returns `changed:false`. This metadata mutation does not acquire the versioned game-command contract below and does not alter public-list access, canonical URLs or indexability. See [matches](./domains/matches.md) and [admin/ops](./domains/admin-and-ops.md).

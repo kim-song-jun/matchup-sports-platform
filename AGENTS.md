@@ -317,7 +317,8 @@ Global rules inherited from `~/.codex/AGENTS.md`:
   ruleset "Copilot review for default branch"(active)가 `deletion`·`non_fast_forward`·`copilot_code_review`를
   강제한다 — main으로의 force-push·삭제는 막힌다(#231 롤백이 `git revert`로만 가능했던 이유). 일반
   fast-forward 직접 push는 가능해 그대로 프로덕션 배포로 이어진다. 확인은 `gh api repos/<owner>/<repo>/rulesets`.
-- **`dev`에는 ruleset "Require PR for dev"가 걸려 있다**(PR 필수, 승인 0명, 관리자 포함 예외 없음) — dev로의
+- **`dev`에는 ruleset "Require PR for dev"가 걸려 있다**(PR 필수, 승인 0명, 관리자 포함 예외 없음, 2026-10-21
+  토큰 탈취 대응) — dev로의
   직접 push는 누구든(워크플로·관리자 포함) 거부된다. 버전 커밋과 릴리스 준비(`--prepare-only` 포함)도 PR로
   전달한다. 확인은 같은 명령(`gh api repos/<owner>/<repo>/rulesets`).
 - **머지·push 전에 항상 `baseRefName`을 확인한다**(2026-08-09 base=main 오머지 사고). 직전에

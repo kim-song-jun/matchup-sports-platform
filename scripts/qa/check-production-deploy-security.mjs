@@ -96,28 +96,44 @@ export function findJobsMissingRunnerPrereqs(workflow) {
 }
 
 // 승인(environment) 전에 도는 job 은 main 에 push 할 수 있는 누구든 스텝과 그 스텝이 부르는
-// 스크립트를 바꿔 실행시킬 수 있다. 그 job 이 prod 서버·운영 비밀값에 닿으면 승인 게이트가
-// 의미를 잃는다 — build-images 가 SSM send-command(롤백 기준 읽기, 호스트 .env 읽기)와
-// 승인 없이 assume 되는 배포 역할(ssm:SendCommand·ssm:PutParameter·KMS 권한 보유)을 쓰던 것이
-// 정확히 그 길이었다. IAM(역할 trust 와 권한)이 경계 자체이고, 이 검사는 같은 실수가 워크플로나
-// 스크립트에 되돌아오는 것을 CI 에서 먼저 잡는 보조 장치다.
+// 스크립트를 바꿔 실행시킬 수 있다. 그 job 이 prod 서버(SSM)·Parameter Store·KMS·EC2 에 닿으면
+// 승인 게이트가 의미를 잃는다 — build-images 가 SSM send-command(롤백 기준 읽기, 호스트 .env
+// 읽기)와 승인 없이 assume 되는 배포 역할(ssm:SendCommand·ssm:PutParameter·KMS 권한 보유)을
+// 쓰던 것이 정확히 그 길이었다. IAM(역할 trust 와 권한)이 경계 자체이고, 이 검사는 같은 실수가
+// 워크플로나 스크립트에 되돌아오는 것을 CI 에서 먼저 잡는 보조 장치다. 정적 검사라 pnpm/npm
+// 스크립트·Dockerfile·변수에 담아 부르는 aws 는 따라가지 않는다.
 //   - 승인 전 job: PROD_AWS_ROLE_ARN 금지. AWS 자격증명을 받는 job 은 빌드 역할만 쓰고,
-//     서버·비밀값 접근 AWS 서비스(ssm·kms·ec2) 호출 금지 — 호출하는 스크립트 안까지 따라간다.
+//     서버·비밀값 접근 AWS 서비스(ssm·kms·ec2) 호출과 AWS SDK(boto3·aws-sdk) 직접 사용 금지 —
+//     job 이 부르는 스크립트와 그 스크립트가 source/import 하는 파일 안까지 따라간다.
 //   - 승인 job(environment 있음): 제한 없음.
+// (저장소 수준 GitHub secret 은 이 검사의 대상이 아니다 — 승인 전 job 도 읽을 수 있다.)
 const PRIVILEGED_AWS_SERVICES = '(?:ssm|kms|ec2)';
 // `aws --region x ssm ...` 처럼 서비스 앞에 전역 옵션이 와도 잡는다. 옵션 값 자리가 서비스
-// 이름을 삼키지 않도록 (?!...) 로 막는다.
+// 이름을 삼키지 않도록 (?!...) 로 막는다. `python -m awscli`·`amazon/aws-cli` 이미지도 같은 형태다.
 const PRIVILEGED_AWS_CALL = new RegExp(
-  String.raw`\baws(?:\s+--?[A-Za-z][A-Za-z-]*(?:[ =](?!${PRIVILEGED_AWS_SERVICES}\b)[^\s|;&<>]+)?)*\s+(${PRIVILEGED_AWS_SERVICES})\b`,
+  String.raw`\baws(?:-?cli)?(?:\s+--?[A-Za-z][A-Za-z-]*(?:[ =](?!${PRIVILEGED_AWS_SERVICES}\b)[^\s|;&<>]+)?)*\s+(${PRIVILEGED_AWS_SERVICES})\b`,
 );
+const AWS_SDK_USAGE = /\b(?:boto3|botocore)\b|@aws-sdk\/|\baws-sdk\b/;
 const BUILD_ROLE_PATTERN = /role-to-assume:\s*\$\{\{\s*vars\.PROD_BUILD_AWS_ROLE_ARN\s*\}\}/;
+// 실행할 수 있는 스크립트 경로 토큰. `bash -x ./a.sh`, `bash "a.sh"`, `./a.sh`(직접 실행), `env X=1 bash a.sh`
+// 처럼 호출 형태가 달라도 경로 자체는 같은 모양이라, 호출어를 보지 않고 경로 토큰을 모은다.
+const SCRIPT_PATH_TOKEN = /[A-Za-z0-9_./-]+\.(?:sh|bash|mjs|cjs|js|py)(?![A-Za-z0-9_])/g;
+// `import './x'`·`from './x'`·`require('./x')` 의 확장자 없는 상대 경로.
+const RELATIVE_IMPORT = /(?:\bfrom|\bimport|\brequire\()\s*(\.{1,2}\/[A-Za-z0-9_./-]+)/g;
+const IMPORT_SUFFIXES = ['', '.mjs', '.js', '.cjs', '/index.js'];
 
+// 탐지용 정규화: 전체 주석 줄 제거 → 줄 끝 `\` 이어붙이기 → 트레일링 주석 제거 → 따옴표 제거.
+// 주석을 먼저 지워야 `# ... \` 로 끝나는 주석 줄이 다음 코드 줄을 삼키지 않는다.
 function stripShellComments(body) {
   return body
     .split('\n')
     .filter((line) => !/^\s*#/.test(line))
+    .join('\n')
+    .replace(/\\\r?\n[ \t]*/g, ' ')
+    .split('\n')
     .map((line) => line.replace(/\s#.*$/, ''))
-    .join('\n');
+    .join('\n')
+    .replace(/["']/g, '');
 }
 
 function isApprovedJob(body) {
@@ -132,27 +148,49 @@ function readFileOrNull(path) {
   }
 }
 
-// 스크립트가 직접 또는 source/bash/node 로 부르는 스크립트 안에서 서버·비밀값 접근 AWS 호출을
-// 찾는다. 반환값은 "<스크립트 경로>: aws <서비스>" 목록.
+// 정규화된 코드가 가리키는 스크립트 중 읽을 수 있는 것의 경로. 경로는 저장소 루트 기준으로 먼저,
+// 없으면 부르는 파일의 디렉터리 기준으로 푼다(`source "$(dirname ...)/helper.sh"` 형태).
+function referencedScripts(code, dir, readScript) {
+  const found = new Set();
+  const tryResolve = (token, suffixes) => {
+    const clean = token.replace(/^\/+/, '').replace(/^(?:\.\/)+/, '');
+    const bases = dir ? [clean, `${dir}/${clean}`] : [clean];
+    for (const base of bases) {
+      for (const suffix of suffixes) {
+        if (readScript(`${base}${suffix}`) !== null) {
+          found.add(`${base}${suffix}`);
+          return;
+        }
+      }
+    }
+  };
+  for (const m of code.matchAll(SCRIPT_PATH_TOKEN)) tryResolve(m[0], ['']);
+  for (const m of code.matchAll(RELATIVE_IMPORT)) tryResolve(m[1], IMPORT_SUFFIXES);
+  return [...found];
+}
+
+function privilegedHitsInCode(code) {
+  const hits = [];
+  const call = code.match(PRIVILEGED_AWS_CALL);
+  if (call) hits.push(`aws ${call[1]}`);
+  const sdk = code.match(AWS_SDK_USAGE);
+  if (sdk) hits.push(`AWS SDK(${sdk[0]}) 직접 사용`);
+  return hits;
+}
+
+// 스크립트가 직접 또는 source/import/호출로 부르는 파일 안에서 서버·비밀값 접근을 찾는다.
+// 반환값은 "<경로>: <발견>" 목록.
 export function findPrivilegedAwsInScript(path, readScript = readFileOrNull, seen = new Set()) {
   if (seen.has(path)) return [];
   seen.add(path);
   const body = readScript(path);
   if (body === null) return [];
   const code = stripShellComments(body);
-  const hits = [];
-  const call = code.match(PRIVILEGED_AWS_CALL);
-  if (call) hits.push(`${path}: aws ${call[1]}`);
-
-  const dir = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '.';
-  const targets = new Set();
-  for (const m of code.matchAll(/\b(?:bash|sh|node)\s+(scripts\/[A-Za-z0-9_./-]+)/g)) targets.add(m[1]);
-  // source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/image-scan-common.sh" 처럼 경로를
-  // 계산해 쓰는 형태 — 파일 이름만 뽑아 같은 디렉터리 기준으로 해석한다.
-  for (const m of code.matchAll(/(?:^|[\s;&(])(?:source|\.)\s+[^\n]*?((?:[A-Za-z0-9_.-]+\/)*[A-Za-z0-9_.-]+\.sh)\b/gm)) {
-    targets.add(m[1].startsWith('scripts/') ? m[1] : `${dir}/${m[1]}`);
+  const dir = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
+  const hits = privilegedHitsInCode(code).map((hit) => `${path}: ${hit}`);
+  for (const target of referencedScripts(code, dir, readScript)) {
+    hits.push(...findPrivilegedAwsInScript(target, readScript, seen));
   }
-  for (const target of targets) hits.push(...findPrivilegedAwsInScript(target, readScript, seen));
   return hits;
 }
 
@@ -184,22 +222,18 @@ export function findPrivilegedAwsWithoutApproval(workflow, readScript = readFile
       );
     }
 
-    const inline = code.match(PRIVILEGED_AWS_CALL);
-    if (inline) {
+    for (const hit of privilegedHitsInCode(code)) {
       problems.push(
-        `job '${name}': 승인(environment) 없이 도는 job 이 prod 서버·운영 비밀값에 닿는 AWS 호출(aws ${inline[1]})을 합니다 — ` +
+        `job '${name}': 승인(environment) 없이 도는 job 이 prod 서버·Parameter Store·KMS·EC2 에 닿는 호출(${hit})을 합니다 — ` +
           '승인된 deploy job 으로 옮기세요',
       );
     }
 
-    const scripts = new Set(
-      [...code.matchAll(/\b(?:bash|sh|node)\s+(scripts\/[A-Za-z0-9_./-]+)/g)].map((m) => m[1]),
-    );
     const seen = new Set();
-    for (const script of scripts) {
+    for (const script of referencedScripts(code, '', readScript)) {
       for (const hit of findPrivilegedAwsInScript(script, readScript, seen)) {
         problems.push(
-          `job '${name}': 승인(environment) 없이 도는 job 이 부르는 스크립트가 prod 서버·운영 비밀값에 닿는 AWS 호출을 합니다 (${hit}) — ` +
+          `job '${name}': 승인(environment) 없이 도는 job 이 부르는 스크립트가 prod 서버·Parameter Store·KMS·EC2 에 닿습니다 (${hit}) — ` +
             '승인된 deploy job 으로 옮기세요',
         );
       }

@@ -95,7 +95,7 @@ GitHub Actions의 OAuth·관리자·GA 값은 SSH 명령줄 인자가 아니라 
 | 이름 | 책임 |
 |---|---|
 | `PROD_BUILD_AWS_ROLE_ARN` | 승인 전 `build-images` job 만 OIDC 로 assume 하는 빌드 전용 IAM role(`teameet-prod-github-build`). trust 는 `repo:kim-song-jun/matchup-sports-platform:ref:refs/heads/main` 뿐이고 ECR push·스캔 조회와 릴리스 소스 S3 업로드 권한만 갖는다 |
-| `PROD_AWS_ROLE_ARN` | 승인 후 `deploy`·`rollback` job 이 OIDC 로 assume 하는 IAM role(`teameet-prod-github-deploy`). SSM 명령·Parameter Store·KMS 권한이 있어 승인된 job(`environment:production` subject)에서만 assume 한다 |
+| `PROD_AWS_ROLE_ARN` | 승인 후 `deploy`·`rollback` job 이 OIDC 로 assume 하는 IAM role(`teameet-prod-github-deploy`). SSM 명령·Parameter Store·KMS 권한이 있어 승인된 job(`environment:production` subject)에서만 assume 한다. trust 정리는 아래 "역할 분리 적용 순서" 를 따른다 |
 | `PROD_AWS_REGION` | ECR/EC2 리전(`ap-northeast-2`) |
 | `PROD_EXPECTED_ACCOUNT_ID` | AWS 계정 ID 고정값 — 잘못된 계정으로의 배포를 fail-closed |
 | `PROD_EC2_INSTANCE_ID` | prod EC2 instance-id — 승인 후 `verify-prod-aws-target.sh` 가 실행 중/태그 일치를 재확인 |
@@ -111,7 +111,7 @@ prod EC2 instance profile(`teameet-certbot-route53`)에는 `TeameetProdImmutable
 3. ECR 이미지 스캔에서 CRITICAL 취약점이 없는지 확인한다.
 4. 저장소 tarball 을 S3 `releases/<sha>.tar.gz` 에 올린다(EC2 는 승인 후 SSM 명령으로 이 객체를 내려받아 스테이징 경로에 푼다).
 
-이 job은 **서버(SSM)·운영 비밀값(Parameter Store·KMS)·DB·실행 중인 컨테이너·활성 릴리스 심볼릭 링크(`~/teameet`)를 전혀 건드리지 않는다.** 승인이 거부돼도 서비스는 이전 릴리스로 계속 돌아간다. 승인 전 job 은 main 에 push 할 수 있는 누구든 스텝과 스크립트를 바꿔 실행시킬 수 있으므로, 서버·비밀값에 닿는 동작은 이 job 에 두지 않는다(`pnpm qa:production-deploy-security` 가 강제).
+이 job은 **prod 서버(SSM)·Parameter Store·KMS·EC2·DB·실행 중인 컨테이너·활성 릴리스 심볼릭 링크(`~/teameet`)를 전혀 건드리지 않는다.** 승인이 거부돼도 서비스는 이전 릴리스로 계속 돌아간다. 승인 전 job 은 main 에 push 할 수 있는 누구든 스텝과 스크립트를 바꿔 실행시킬 수 있으므로, 서버에 닿는 동작은 이 job 에 두지 않는다(`pnpm qa:production-deploy-security` 가 강제). **한계:** 저장소 수준 GitHub secret(배포용 `SECRET_*` 원본 다수)은 이 job 도 읽을 수 있다 — 환경 secret 으로 옮기는 것은 별도 후속이다.
 
 **`deploy` job — `production` environment 승인 후, 배포 역할(`PROD_AWS_ROLE_ARN`)**
 
@@ -121,7 +121,17 @@ prod EC2 instance profile(`teameet-certbot-route53`)에는 `TeameetProdImmutable
 8. `deploy/deploy-prod.sh` 를 EC2 에서 실행한다 — 이 한 스크립트가 activation(release-sha 디렉터리로 `~/teameet` 심볼릭 링크 원자 스왑) → `docker login`/`pull`(ECR digest) → `prisma migrate deploy`(정확히 1회) → 수상자 연결 CLI(멱등) → API/Web/game-operations worker 컨테이너 교체 → 헬스 계약 확인 → active/previous 상태(`~/.teameet-prod-releases/state.json`) 원자 승격까지 전부 수행한다. 실패하면 ERR trap 이 이전 활성 릴리스로 자동 복구를 시도한다.
 9. workflow는 internal API와 game-operations worker, root-origin API, root Web과 legacy browser `/v1/home`이 현재 경로로 308 redirect되는지를 러너에서 한 번 더 health check한다(EC2 로컬은 성공했지만 worker 또는 네트워크 경로가 준비되지 않은 경우를 잡기 위함).
 
-두 역할의 권한이 갈리는 이유: 승인 게이트는 `deploy` job 에만 있으므로, 승인 전 job 이 assume 하는 역할이 SSM `SendCommand` 나 `/teameet/prod/env/*` 쓰기 권한을 가지면 main 에 스크립트만 바꿔 push 해도 승인 없이 prod 서버 명령·운영 비밀값 쓰기가 가능해진다. 그래서 빌드 역할에는 그 권한이 없고, 배포 역할은 승인된 job 에서만 assume 하며 IAM trust 도 `environment:production` subject 만 남긴다.
+두 역할의 권한이 갈리는 이유: 승인 게이트는 `deploy` job 에만 있으므로, 승인 전 job 이 assume 하는 역할이 SSM `SendCommand` 나 `/teameet/prod/env/*` 쓰기 권한을 가지면 main 에 스크립트만 바꿔 push 해도 승인 없이 prod 서버 명령·운영 비밀값 쓰기가 가능해진다. 그래서 빌드 역할에는 그 권한이 없고, 배포 역할은 승인된 job 에서만 assume 한다.
+
+**역할 분리 적용 순서** (전환이 끝나면 이 표를 지운다):
+
+| 순서 | 할 일 | 상태 |
+|---|---|---|
+| ① | 빌드 역할 `teameet-prod-github-build` 와 repo 변수 `PROD_BUILD_AWS_ROLE_ARN` 준비 | 완료 |
+| ② | 이 변경(`build-images` 가 빌드 역할 사용)을 main 에 승격 | 미완료 — 승격은 사용자만 한다 |
+| ③ | ② 의 첫 prod 배포가 성공한 **뒤에만** 기존 배포 역할(`teameet-prod-github-deploy`) trust 에서 `ref:refs/heads/main` 을 빼고 `environment:production` subject 만 남긴다 | 미완료 |
+
+③ 을 ② 보다 먼저 하면, 아직 기존 역할로 `build-images` 를 돌리는 현재 main 의 prod 배포가 assume 단계에서 깨진다.
 
 `build-images`와 `deploy`는 같은 concurrency group(`deploy-production`)을 공유한다. 승인 대기 중인 릴리스가 있으면 다음 릴리스의 빌드도 뒤에 큐잉되므로, 두 릴리스가 같은 호스트를 동시에 건드리지 않는다.
 

@@ -694,11 +694,12 @@ jobs:
   # 이 한다 — 승인이 거부돼도 서비스는 그대로 돌아간다.
   #
   # 승인 전 job 이라 main 에 push 할 수 있는 사람은 누구든 이 job 의 스텝과 이 job 이 부르는
-  # 스크립트를 바꿔 실행시킬 수 있다. 그래서 여기서는 prod 서버·운영 비밀값에 닿는 일을 하지
-  # 않는다 — SSM 명령, Parameter Store, KMS, EC2 조회, 서버 상태를 읽는 롤백 기준 계산은 전부
-  # 승인된 deploy job 에 있다. 이 job 의 역할(PROD_BUILD_AWS_ROLE_ARN)은 ECR push·스캔 조회와
-  # 릴리스 소스 업로드 권한만 갖고, trust 도 main ref 로만 열려 있다.
-  # scripts/qa/check-production-deploy-security.mjs 가 이 경계를 CI 에서 강제한다.
+  # 스크립트를 바꿔 실행시킬 수 있다. 그래서 여기서는 prod 서버에 닿는 일을 하지 않는다 —
+  # SSM 명령, Parameter Store, KMS, EC2 조회, 서버 상태를 읽는 롤백 기준 계산은 전부 승인된
+  # deploy job 에 있다. 이 job 의 역할(PROD_BUILD_AWS_ROLE_ARN)은 ECR push·스캔 조회와 릴리스
+  # 소스 업로드 권한만 갖고, trust 도 main ref 로만 열려 있다. scripts/qa/check-production-
+  # deploy-security.mjs 가 이 경계를 CI 에서 강제한다. 단 저장소 수준 GitHub secret 은 이 job
+  # 도 읽을 수 있다(환경 secret 으로 옮기는 것은 별도 후속).
   build-images:
     name: Build images
     needs: [gates, api, web]

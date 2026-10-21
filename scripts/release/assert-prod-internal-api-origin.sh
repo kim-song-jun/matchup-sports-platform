@@ -24,11 +24,19 @@ done
   exit 1
 }
 
-# sync-prod-runtime-env.sh 가 방금 갱신한 파일이다. 키가 없으면 awk 는 아무것도 출력하지 않는다.
+# sync-prod-runtime-env.sh 가 방금 갱신한 파일이다. 같은 키가 여러 번 있으면 dotenv 규칙대로
+# 마지막 값이 이긴다. 키가 없으면 아무것도 출력하지 않고, 파일이 없으면 __ENV_FILE_MISSING__ 만 출력한다.
 remote_script=$(cat <<'REMOTE'
-awk '/^V1_INTERNAL_API_ORIGIN=/ { sub(/^V1_INTERNAL_API_ORIGIN=/, ""); print; exit }' /home/ec2-user/.teameet-prod-runtime/.env
+env_file=/home/ec2-user/.teameet-prod-runtime/.env
+if [ ! -f "${env_file}" ]; then
+  echo __ENV_FILE_MISSING__
+  exit 0
+fi
+awk '/^V1_INTERNAL_API_ORIGIN=/ { v = $0; sub(/^V1_INTERNAL_API_ORIGIN=/, "", v); found = 1 } END { if (found) print v }' "${env_file}"
 REMOTE
 )
+# 위 원격 스크립트가 출력하는 값과 같아야 한다.
+readonly MISSING_MARKER=__ENV_FILE_MISSING__
 parameters="$(jq -nc --arg script "${remote_script}" '{commands:[$script]}')"
 command_id="$(aws ssm send-command --instance-ids "${INSTANCE_ID}" \
   --document-name AWS-RunShellScript --comment "Teameet prod read internal api origin" \
@@ -61,6 +69,10 @@ if [[ "${resolved}" != true ]]; then
 fi
 
 host_value="$(tr -d '\r\n' <<< "${host_value}")"
+if [[ "${host_value}" == "${MISSING_MARKER}" ]]; then
+  echo "[prod-internal-origin] 호스트에 런타임 .env 가 없습니다 — Sync runtime env 스텝이 먼저 성공했는지 확인하세요" >&2
+  exit 1
+fi
 if [[ -n "${host_value}" && "${host_value}" != "${EXPECTED_INTERNAL_API_ORIGIN}" ]]; then
   echo "[prod-internal-origin] 호스트 .env 의 V1_INTERNAL_API_ORIGIN 이 웹 이미지에 구워진 값과 다릅니다" >&2
   echo "[prod-internal-origin]   이미지(PROD_INTERNAL_API_ORIGIN): ${EXPECTED_INTERNAL_API_ORIGIN}" >&2

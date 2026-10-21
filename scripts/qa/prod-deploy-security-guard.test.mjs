@@ -350,6 +350,98 @@ test('스크립트 내부 탐색은 순환 source 에서도 끝나고 없는 파
   assert.deepEqual(findPrivilegedAwsInScript('scripts/missing.sh', () => null), []);
 });
 
+// 리뷰에서 통과된 우회 형태들 — 줄 끝 `\` 이어붙이기, 따옴표, 스크립트 호출 형태(선택 플래그·`./`·
+// 직접 실행·env 접두), source/import 로 이어진 파일, SDK 직접 사용. 이 표가 깨지면 승인 전 job 이
+// 서버에 닿는 길이 다시 열린다.
+const EVASION_SCRIPTS = {
+  'scripts/release/continued.sh': 'set -e\naws \\\n  ssm send-command --instance-ids "$ID"\n',
+  'scripts/release/quoted.sh': 'aws "ssm" send-command --instance-ids "$ID"\n',
+  'scripts/release/after-comment.sh': '# 메모 \\\naws ssm send-command --instance-ids "$ID"\n',
+  'scripts/release/sdk.py': 'import boto3\nboto3.client("ssm").send_command()\n',
+  'scripts/release/sdk.mjs': "import { SSMClient } from '@aws-sdk/client-ssm';\n",
+  'scripts/release/uses-sdk.mjs': "import './sdk.mjs';\n",
+  'scripts/release/uses-sdk-bare.mjs': "import { run } from './sdk';\n",
+  'scripts/release/required-sdk.cjs': "const ssm = require('./sdk.mjs');\n",
+  'scripts/release/ecr-continued.sh': 'aws ecr \\\n  describe-images --repository-name r\n',
+  'scripts/release/comment-backslash.sh': '# aws \\\nssm 호출은 deploy job 에서만 한다\necho ok\n',
+  'scripts/release/comment-sdk.sh': '# boto3 로 읽던 것을 SSM 호출로 바꿨다가 deploy job 으로 옮겼다\necho ok\n',
+};
+const evasionRead = (path) => EVASION_SCRIPTS[path] ?? SCRIPTS[path] ?? null;
+
+const jobRun = (run) => `
+jobs:
+  build-images:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@abc
+      - uses: aws-actions/configure-aws-credentials@def
+        with:
+          role-to-assume: \${{ vars.PROD_BUILD_AWS_ROLE_ARN }}
+      - name: step
+        run: |
+${run.split('\n').map((line) => `          ${line}`).join('\n')}
+`;
+
+test('승인 전 job 의 우회 형태(이어붙이기·따옴표·호출 형태·SDK)를 탐지한다', () => {
+  const forms = [
+    ['인라인 줄 끝 \\ 이어붙이기', 'aws \\\n  ssm send-command --instance-ids "$ID"'],
+    ['인라인 따옴표 서비스', "aws 'ec2' describe-instances"],
+    ['인라인 따옴표 aws', '"aws" kms decrypt --key-id k'],
+    ['python -m awscli', 'python3 -m awscli ssm get-command-invocation'],
+    ['aws-cli 컨테이너', 'docker run amazon/aws-cli ssm send-command'],
+    ['bash -x', 'bash -x scripts/release/read-state.sh'],
+    ['bash 여러 플래그와 값 가진 -o', 'bash -eu -o pipefail scripts/release/read-state.sh'],
+    ['따옴표 경로', 'bash "scripts/release/read-state.sh"'],
+    ['./ 접두', 'bash ./scripts/release/read-state.sh'],
+    ['직접 실행 ./', './scripts/release/read-state.sh'],
+    ['직접 실행(접두 없음)', 'scripts/release/read-state.sh --flag'],
+    ['env 접두', 'env X=1 bash scripts/release/read-state.sh'],
+    ['sh', 'sh scripts/release/read-state.sh'],
+    ['source 경로', 'source scripts/release/read-state.sh'],
+    ['dot source ./', '. ./scripts/release/read-state.sh'],
+    ['스크립트 안의 줄 끝 \\ 이어붙이기', 'bash scripts/release/continued.sh'],
+    ['스크립트 안의 따옴표 서비스', 'bash scripts/release/quoted.sh'],
+    ['백슬래시로 끝나는 주석 다음 줄의 호출', 'bash scripts/release/after-comment.sh'],
+    ['인라인 python SDK', `python3 -c "import boto3; boto3.client('ssm')"`],
+    ['인라인 node SDK', `node -e "require('@aws-sdk/client-ssm')"`],
+    ['python 스크립트 SDK', 'python3 scripts/release/sdk.py'],
+    ['node 스크립트 SDK', 'node scripts/release/sdk.mjs'],
+    ['SDK 를 import 하는 스크립트', 'node scripts/release/uses-sdk.mjs'],
+    ['확장자 없는 상대 import', 'node scripts/release/uses-sdk-bare.mjs'],
+    ['require 한 파일의 SDK', 'node scripts/release/required-sdk.cjs'],
+  ];
+  const missed = forms
+    .filter(([, run]) => findPrivilegedAwsWithoutApproval(jobRun(run), evasionRead).length === 0)
+    .map(([label]) => label);
+  assert.deepEqual(
+    missed,
+    [],
+    '탐지하지 못한 형태가 있습니다 — 통과하면 승인 전에 prod 서버를 건드릴 수 있습니다.',
+  );
+});
+
+test('우회 방지를 넓혀도 정상 빌드 단계와 주석은 오탐하지 않는다', () => {
+  const clean = [
+    'aws ecr \\\n  describe-images --repository-name r',
+    'aws s3api put-object --bucket b --key k',
+    'bash scripts/release/ecr-continued.sh',
+    'bash -x ./scripts/release/ecr-continued.sh',
+    'bash scripts/release/comment-backslash.sh',
+    'bash scripts/release/comment-sdk.sh',
+    '# aws ssm send-command 와 boto3 는 deploy job 에서만 쓴다\necho ok',
+    'echo "aws is fine"  # aws ssm 은 여기 없다',
+  ];
+  for (const run of clean) {
+    assert.deepEqual(findPrivilegedAwsWithoutApproval(jobRun(run), evasionRead), [], `오탐했습니다: ${run}`);
+  }
+});
+
+test('승인된 job 은 우회 형태 호출도 그대로 쓸 수 있다', () => {
+  const approved = jobRun('bash -x ./scripts/release/continued.sh\npython3 scripts/release/sdk.py')
+    .replace('    runs-on: ubuntu-latest\n', '    runs-on: ubuntu-latest\n    environment: production\n');
+  assert.deepEqual(findPrivilegedAwsWithoutApproval(approved, evasionRead), []);
+});
+
 test('실제 deploy.yml 의 build-images 는 이 경계를 지킨다', () => {
   const real = normalizeWorkflowSource(readFileSync('.github/workflows/deploy.yml', 'utf8'));
   assert.deepEqual(findProdRoleWithoutApproval(real), []);

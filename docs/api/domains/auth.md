@@ -3,8 +3,8 @@
 ## Source Of Truth Priority
 
 1. `apps/v1_api/src/auth/auth.controller.ts`, `account-recovery.controller.ts`, `phone-verification-public.controller.ts`
-2. `apps/v1_api/src/auth/dto/` (`login.dto.ts`, `register.dto.ts`, `kakao-login.dto.ts`, `apple-login.dto.ts`, `social-profile.dto.ts`)
-3. `apps/v1_api/src/auth/auth.service.ts`, `account-recovery.service.ts`
+2. `apps/v1_api/src/auth/dto/` (`login.dto.ts`, `login-step-up.dto.ts`, `register.dto.ts`, `kakao-login.dto.ts`, `apple-login.dto.ts`, `social-profile.dto.ts`)
+3. `apps/v1_api/src/auth/auth.service.ts`, `account-recovery.service.ts`, `login-security/` (attempt counting, spray detection, step-up challenges)
 4. `apps/v1_api/src/auth/*.spec.ts`
 5. `apps/v1_web/src/lib/api-client.ts`, `apps/v1_web/src/hooks/use-v1-api.ts`
 
@@ -13,7 +13,9 @@
 | Method | Path | Auth | Request | Response |
 |---|---|---|---|---|
 | `GET` | `/api/v1/auth/me` | user | headers only | current user, profile, onboarding summary, `termsCompliance` |
-| `POST` | `/api/v1/auth/login` | none | `LoginDto { email, password }` | session cookie + user snapshot |
+| `POST` | `/api/v1/auth/login` | none | `LoginDto { email, password }` | session cookie + user snapshot, **or** `200 { stepUp }` with no session (see [Email login step-up](#email-login-step-up)) |
+| `POST` | `/api/v1/auth/login/step-up/verify` | none | `{ challengeToken, code }` (`code` = 6 digits) | same response and cookie as a completed `login` |
+| `POST` | `/api/v1/auth/login/step-up/resend` | none | `{ challengeToken }` | `{ expiresAt, resendAvailableAt, devCode? }` |
 | `POST` | `/api/v1/auth/dev-session` | user (header identity, non-production) | empty body | issues signed `teameet_v1_session` cookie for an already-header-authenticated caller |
 | `POST` | `/api/v1/auth/register` | none | `RegisterDto` + current required document IDs | session cookie + onboarding/terms route |
 | `POST` | `/api/v1/auth/kakao` | none | `{ code, redirectUri? }` | social session + onboarding route |
@@ -57,6 +59,53 @@ the session is re-derived from the cookie on each request by `V1AuthGuard`.
 return `401 UNAUTHENTICATED` ("Email or password is incorrect") — the two failure modes are not
 distinguished. A non-active identity or account status returns `403 PERMISSION_DENIED`, except a
 `withdrawal_pending` account status, which returns `403 ACCOUNT_WITHDRAWAL_PENDING`.
+
+## Email login step-up
+
+Email login adds one email-code step when the password check alone is not trustworthy enough.
+Social login (Kakao, Apple) is never counted and never asked for it.
+
+**When it applies** (decided before the password is looked at):
+
+- the email (lower-cased, trimmed) has failed **3 or more** times in the last 15 minutes, counted since its last completed login; or
+- a password-spray attack is *active*: in the last 10 minutes there were at least 30 failed logins across at least 10 distinct emails,
+  and the last such detection is under 30 minutes old. While active, **every** email login steps up.
+
+**What the client sees.** While step-up applies, a right password, a wrong password and an unknown email all
+answer `200` with the same body and no session cookie:
+
+```json
+{ "stepUp": { "challengeToken": "<opaque>", "maskedEmail": "ru***@example.com",
+              "expiresAt": "<ISO, +5 min>", "resendAvailableAt": "<ISO, +30 s>", "devCode": "123456" } }
+```
+
+`maskedEmail` masks the address the caller typed. `devCode` appears only where `V1_VERIFICATION_DEV_ECHO` applies
+(no real mail transport) and only for a challenge that is actually deliverable. A code is mailed **only** when the password
+was right; the other two get a decoy challenge that is issued, resent and verified the same way (same scrypt work, same
+errors) but can never log in. Nothing in the status, body or timing separates the three cases. The mail is sent off the
+request path for the same reason. A mail failure is logged, recorded on the challenge, and reported by the **next resend** as
+`503 EMAIL_SEND_FAILED` (which also skips the cooldown).
+
+`POST /auth/login/step-up/verify` ends exactly like a completed login (session response + cookie).
+Failures: `400 STEP_UP_CODE_INVALID`, `410 STEP_UP_EXPIRED` (unknown or used token, code older than 5 minutes, token older than 30 minutes),
+`429 STEP_UP_TOO_MANY_ATTEMPTS` (the 5th wrong code, and anything after it until a resend). Suspended and withdrawal-pending accounts get
+their usual `403` here, after the code proved ownership.
+
+`POST /auth/login/step-up/resend` issues a new code (attempts reset) while the token is under 30 minutes old, even if the previous
+code already expired. Failures: `429 STEP_UP_RESEND_COOLDOWN` (`details.retryAfterSeconds`, 30 s between sends) and
+`429 STEP_UP_SEND_LIMIT` (5 real mails per email per 24 h; also returned by `login` itself once the cap is hit).
+
+Rate limits per IP: `login` 10/min, `verify` 10/min, `resend` 5/min.
+
+**Records.** `v1_login_attempts` keeps `emailKey` / `ipKey` (HMAC-SHA256 under a key derived from `V1_SESSION_SECRET`,
+never the raw values), the result (`success | failed | step_up_issued`) and the time, for 30 days.
+`v1_login_step_up_challenges` keeps token and code as hashes, attempt and send counters, and is purged 7 days after expiry.
+`v1_security_anomalies` records each spray detection: while the last detection is under 30 minutes old a new detection only refreshes
+`lastDetectedAt` and the counts, so one attack produces one anomaly and one Slack alert (outbox `SECURITY_LOGIN_ANOMALY`, delivered by
+the worker to the inquiry webhook with a `[보안] 로그인 실패 급증 (alpha|prod)` first line). The admin monitoring hub shows the signal through
+`GET /api/v1/admin/monitoring/summary` → `loginAnomalies`.
+
+All thresholds live in `LOGIN_SECURITY_POLICY` (`apps/v1_api/src/auth/login-security/login-security.policy.ts`).
 
 `POST /api/v1/auth/dev-session` requires the caller to already be authenticated (`V1AuthGuard`),
 which in a non-production environment accepts header-based dev identity
@@ -147,6 +196,7 @@ Primary tables:
 - `v1_email_verification_challenges` — pre-session email OTP, keyed by email. Separate from
   `v1_verification_tokens` precisely because a row must exist for addresses that belong to no
   account; a `user_id` requirement would make "no such account" observable.
+- `v1_login_attempts`, `v1_login_step_up_challenges`, `v1_security_anomalies` — email login step-up (see above)
 - `v1_status_change_logs`
 
 Managed terms phase-1 tables:

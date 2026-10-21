@@ -157,3 +157,28 @@ describe('LoginSecurityService.record', () => {
     ]);
   });
 });
+
+describe('LoginSecurityService.scheduleSprayDetection', () => {
+  it('runs one spray scan at a time and folds a burst of failures into a single extra pass', async () => {
+    const { service } = setup();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const detect = jest.spyOn(service, 'detectSpray').mockImplementation(async () => {
+      await gate;
+      return { detected: false, opened: false };
+    });
+
+    for (let failure = 0; failure < 20; failure += 1) service.scheduleSprayDetection();
+    expect(detect).toHaveBeenCalledTimes(1);
+
+    release();
+    await service.onApplicationShutdown();
+    expect(detect).toHaveBeenCalledTimes(2);
+
+    service.scheduleSprayDetection();
+    await service.onApplicationShutdown();
+    expect(detect).toHaveBeenCalledTimes(3);
+  });
+});

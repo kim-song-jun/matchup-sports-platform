@@ -80,11 +80,12 @@ answer `200` with the same body and no session cookie:
 ```
 
 `maskedEmail` masks the address the caller typed. `devCode` appears only where `V1_VERIFICATION_DEV_ECHO` applies
-(no real mail transport) and only for a challenge that is actually deliverable. A code is mailed **only** when the password
+(no real mail transport), on real and decoy challenges alike. A code is mailed **only** when the password
 was right; the other two get a decoy challenge that is issued, resent and verified the same way (same scrypt work, same
 errors) but can never log in. Nothing in the status, body or timing separates the three cases. The mail is sent off the
-request path for the same reason. A mail failure is logged, recorded on the challenge, and reported by the **next resend** as
-`503 EMAIL_SEND_FAILED` (which also skips the cooldown).
+request path for the same reason, and a mail failure never changes any response: it is logged and stamped on the challenge
+(`sendFailedAt`) for operators, and resend keeps its normal cooldown. When no mail transport is configured (and no echo), every
+step-up `login`/`resend` answers the same `503 STEP_UP_UNAVAILABLE`.
 
 `POST /auth/login/step-up/verify` ends exactly like a completed login (session response + cookie).
 Failures: `400 STEP_UP_CODE_INVALID`, `410 STEP_UP_EXPIRED` (unknown or used token, code older than 5 minutes, token older than 30 minutes),
@@ -93,7 +94,8 @@ their usual `403` here, after the code proved ownership.
 
 `POST /auth/login/step-up/resend` issues a new code (attempts reset) while the token is under 30 minutes old, even if the previous
 code already expired. Failures: `429 STEP_UP_RESEND_COOLDOWN` (`details.retryAfterSeconds`, 30 s between sends) and
-`429 STEP_UP_SEND_LIMIT` (5 real mails per email per 24 h; also returned by `login` itself once the cap is hit).
+`429 STEP_UP_SEND_LIMIT` (5 issued or resent codes per email per 24 h, decoys included so the cap reveals nothing about the
+password; also returned by `login` itself once the cap is hit). The cap check and the send are serialized per email.
 
 Rate limits per IP: `login` 10/min, `verify` 10/min, `resend` 5/min.
 

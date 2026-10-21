@@ -55,7 +55,11 @@ async function build(options: { accountStatus?: string; devEcho?: boolean } = {}
   };
   state.identities.push(identity);
   state.users.push({ id: 'user-1', email: EMAIL, accountStatus: 'active', authIdentities: [identity] });
-  const dispatcher = { send: jest.fn().mockResolvedValue(undefined), devEchoActive: options.devEcho ?? false };
+  const dispatcher = {
+    send: jest.fn().mockResolvedValue(undefined),
+    devEchoActive: options.devEcho ?? false,
+    emailDeliverable: true,
+  };
   const moduleRef = await Test.createTestingModule({
     providers: [
       AuthService,

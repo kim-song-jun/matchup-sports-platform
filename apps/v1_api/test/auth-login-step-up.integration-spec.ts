@@ -137,7 +137,8 @@ describe('V1 email login step-up', () => {
 
     const challenged = await login(GHOST_EMAIL, PASSWORD).expect(200);
     const { challengeToken, ...rest } = challenged.body.data.stepUp;
-    expect(Object.keys(rest).sort()).toEqual(['expiresAt', 'maskedEmail', 'resendAvailableAt']);
+    // The key set (devCode included in this echo environment) is pinned against a real challenge in its own test below.
+    expect(Object.keys(rest).sort()).toEqual(expect.arrayContaining(['expiresAt', 'maskedEmail', 'resendAvailableAt']));
     expect(rest.maskedEmail).toBe(`${GHOST_EMAIL.slice(0, 2)}***@integration.test`);
     expect(await prisma.v1LoginStepUpChallenge.count({ where: { userId: null } })).toBe(1);
 
@@ -187,6 +188,17 @@ describe('V1 email login step-up', () => {
       expect(Object.keys(stepUp).sort()).toEqual(['challengeToken', 'devCode', 'expiresAt', 'maskedEmail', 'resendAvailableAt']);
       expect(stepUp.devCode).toMatch(/^\d{6}$/);
     }
+  });
+
+  it('holds the daily cap under parallel requests, and wrong passwords reach it exactly like right ones', async () => {
+    await missThreeTimes(EMAIL);
+    const parallel = await Promise.all(
+      Array.from({ length: 7 }, (_, index) => login(EMAIL, index % 2 === 0 ? PASSWORD : WRONG)),
+    );
+    const statuses = parallel.map((res) => res.status).sort();
+    expect(statuses.filter((status) => status === 200)).toHaveLength(5);
+    expect(parallel.filter((res) => res.status === 429).every((res) => res.body.code === 'STEP_UP_SEND_LIMIT')).toBe(true);
+    expect(statuses.filter((status) => status === 429)).toHaveLength(2);
   });
 
   it('lets the owner back in with a new password right after the daily send cap was burned', async () => {

@@ -34,6 +34,8 @@ export interface LoginAnomalyOutboxPayload {
 export class LoginSecurityService implements OnApplicationShutdown {
   private readonly logger = new Logger(LoginSecurityService.name);
   private readonly inFlightDetections = new Set<Promise<unknown>>();
+  private detectionRunning = false;
+  private detectionRequested = false;
 
   constructor(private readonly prisma: PrismaService) {}
 
@@ -94,13 +96,29 @@ export class LoginSecurityService implements OnApplicationShutdown {
   /**
    * Fire-and-forget: detection must not add time to the login response, and a failure here must not
    * turn a wrong password into a 500. Errors are logged, never swallowed silently.
+   *
+   * At most one scan runs at a time. Failures that arrive meanwhile only ask for one more pass, so a burst
+   * of failed logins (the very attack being detected) cannot pile up scans and lock waiters on the database.
    */
   scheduleSprayDetection(): void {
-    const detection = this.detectSpray().catch((error: unknown) => {
-      this.logger.error(`spray detection failed: ${error instanceof Error ? error.message : String(error)}`);
+    this.detectionRequested = true;
+    if (this.detectionRunning) return;
+    this.detectionRunning = true;
+    const run = (async () => {
+      while (this.detectionRequested) {
+        this.detectionRequested = false;
+        try {
+          await this.detectSpray();
+        } catch (error) {
+          this.logger.error(`spray detection failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      }
+    })();
+    this.inFlightDetections.add(run);
+    void run.finally(() => {
+      this.detectionRunning = false;
+      this.inFlightDetections.delete(run);
     });
-    this.inFlightDetections.add(detection);
-    void detection.finally(() => this.inFlightDetections.delete(detection));
   }
 
   async detectSpray(now = new Date()): Promise<SprayDetectionOutcome> {

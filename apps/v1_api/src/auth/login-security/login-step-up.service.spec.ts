@@ -7,10 +7,14 @@ const T0 = new Date('2026-10-21T12:00:00.000Z');
 const EMAIL = 'runner@example.com';
 const USER_ID = 'user-1';
 
-function setup(options: { devEcho?: boolean } = {}) {
+function setup(options: { devEcho?: boolean; deliverable?: boolean } = {}) {
   const { prisma, state } = createLoginSecurityFakePrisma();
   state.identities.push({ id: 'identity-1', userId: USER_ID, provider: 'email', providerUserKey: EMAIL });
-  const dispatcher = { send: jest.fn().mockResolvedValue(undefined), devEchoActive: options.devEcho ?? false };
+  const dispatcher = {
+    send: jest.fn().mockResolvedValue(undefined),
+    devEchoActive: options.devEcho ?? false,
+    emailDeliverable: options.deliverable ?? true,
+  };
   const service = new LoginStepUpService(prisma as never, dispatcher as never);
   return { prisma, state, dispatcher, service };
 }
@@ -80,7 +84,7 @@ describe('LoginStepUpService.start', () => {
     expect(decoyView.resendAvailableAt).toBe(realView.resendAvailableAt);
     expect(decoyView.maskedEmail).toBe('gh***@example.com');
     expect(decoy.dispatcher.send).not.toHaveBeenCalled();
-    expect(decoy.state.challenges[0]).toMatchObject({ userId: null, sentCount: 0 });
+    expect(decoy.state.challenges[0]).toMatchObject({ userId: null, sentCount: 1 });
   });
 
   it('in an echo environment carries a six-digit devCode on a decoy as well, and the decoy code never verifies', async () => {
@@ -255,29 +259,46 @@ describe('LoginStepUpService.resend', () => {
     await expect(service.start({ email: EMAIL, emailKey: 'key-a', userId: USER_ID })).resolves.toHaveProperty('challengeToken');
   });
 
-  it('does not let decoy challenges eat the cap of a real user with the same email', async () => {
-    const { service } = setup();
-    for (let index = 0; index < 8; index += 1) {
-      await service.start({ email: EMAIL, emailKey: 'key-a', userId: null });
+  it('counts decoys toward the same cap, so reaching it says nothing about whether the password was right', async () => {
+    const wrongPassword = setup();
+    const rightPassword = setup();
+    for (let index = 0; index < 5; index += 1) {
+      await wrongPassword.service.start({ email: EMAIL, emailKey: 'key-a', userId: null });
+      await rightPassword.service.start({ email: EMAIL, emailKey: 'key-a', userId: USER_ID });
     }
-    await expect(service.start({ email: EMAIL, emailKey: 'key-a', userId: USER_ID })).resolves.toHaveProperty('challengeToken');
-    await service.onApplicationShutdown();
+    await rightPassword.service.onApplicationShutdown();
+
+    const decoySixth = await rejection(wrongPassword.service.start({ email: EMAIL, emailKey: 'key-a', userId: null }));
+    const realSixth = await rejection(rightPassword.service.start({ email: EMAIL, emailKey: 'key-a', userId: USER_ID }));
+    expect(decoySixth).toMatchObject({ status: 429, code: 'STEP_UP_SEND_LIMIT' });
+    expect(realSixth).toMatchObject({ status: decoySixth.status, code: decoySixth.code, details: decoySixth.details });
   });
 
-  it('reports a failed delivery on the next resend instead of hiding it, and lets the user retry immediately', async () => {
+  it('answers a failed delivery exactly like a sent one: logged and stamped, and resend still waits the cooldown', async () => {
     const logError = jest.spyOn(Logger.prototype, 'error').mockImplementation();
     const { service, dispatcher, state } = setup();
-    dispatcher.send.mockRejectedValueOnce(new ServiceUnavailableException({ code: 'EMAIL_SEND_FAILED' }));
-    const { challengeToken } = await service.start({ email: EMAIL, emailKey: 'key-a', userId: USER_ID });
+    dispatcher.send.mockRejectedValue(new ServiceUnavailableException({ code: 'EMAIL_SEND_FAILED' }));
+    const view = await service.start({ email: EMAIL, emailKey: 'key-a', userId: USER_ID });
     await service.onApplicationShutdown();
+    expect(Object.keys(view).sort()).toEqual(['challengeToken', 'expiresAt', 'maskedEmail', 'resendAvailableAt']);
     expect(state.challenges[0].sendFailedAt).toEqual(T0);
     expect(logError).toHaveBeenCalledWith(expect.stringContaining('login step-up mail failed'));
 
-    dispatcher.send.mockRejectedValueOnce(new ServiceUnavailableException({ code: 'EMAIL_SEND_FAILED' }));
-    expect(await rejection(service.resend(challengeToken))).toMatchObject({ status: 503, code: 'EMAIL_SEND_FAILED' });
+    expect(await rejection(service.resend(view.challengeToken))).toMatchObject({ status: 429, code: 'STEP_UP_RESEND_COOLDOWN' });
+    advance(31_000);
+    await expect(service.resend(view.challengeToken)).resolves.toHaveProperty('expiresAt');
+    await service.onApplicationShutdown();
+  });
 
-    await expect(service.resend(challengeToken)).resolves.toHaveProperty('expiresAt');
-    expect(state.challenges[0].sendFailedAt).toBeNull();
-    expect(dispatcher.send).toHaveBeenCalledTimes(3);
+  it('refuses every caller with the same 503 when no mail transport (and no echo) is available, storing nothing', async () => {
+    const logError = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+    const { service, dispatcher, state } = setup({ deliverable: false });
+    const real = await rejection(service.start({ email: EMAIL, emailKey: 'key-a', userId: USER_ID }));
+    const decoy = await rejection(service.start({ email: 'ghost@example.com', emailKey: 'key-ghost', userId: null }));
+    expect(real).toMatchObject({ status: 503, code: 'STEP_UP_UNAVAILABLE' });
+    expect(decoy).toMatchObject({ status: real.status, code: real.code });
+    expect(state.challenges).toHaveLength(0);
+    expect(dispatcher.send).not.toHaveBeenCalled();
+    expect(logError).toHaveBeenCalledWith(expect.stringContaining('email delivery is not configured'));
   });
 });

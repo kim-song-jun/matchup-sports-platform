@@ -7,6 +7,7 @@ import {
   Injectable,
   Logger,
   OnApplicationShutdown,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { Prisma, type V1LoginStepUpChallenge } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -52,23 +53,26 @@ export class LoginStepUpService implements OnApplicationShutdown {
   }
 
   async start(input: { email: string; emailKey: string; userId: string | null }): Promise<LoginStepUpChallengeView> {
+    this.assertMailDeliverable();
     const now = new Date();
-    await this.assertSendCapacity(input.emailKey, now);
-
     const token = randomBytes(32).toString('base64url');
     const code = newCode();
     const codeHash = await hashPassword(code);
     const expiresAt = new Date(now.getTime() + LOGIN_SECURITY_POLICY.codeTtlMs);
-    const challenge = await this.prisma.v1LoginStepUpChallenge.create({
-      data: {
-        tokenHash: hashToken(token),
-        emailKey: input.emailKey,
-        userId: input.userId,
-        codeHash,
-        sentCount: input.userId ? 1 : 0,
-        expiresAt,
-        lastSentAt: now,
-      },
+    const challenge = await this.prisma.$transaction(async (tx) => {
+      await lockEmailSends(tx, input.emailKey);
+      await assertSendCapacity(tx, input.emailKey, now);
+      return tx.v1LoginStepUpChallenge.create({
+        data: {
+          tokenHash: hashToken(token),
+          emailKey: input.emailKey,
+          userId: input.userId,
+          codeHash,
+          sentCount: 1,
+          expiresAt,
+          lastSentAt: now,
+        },
+      });
     });
     if (input.userId) this.sendInBackground(challenge.id, input.userId, code);
 
@@ -82,38 +86,25 @@ export class LoginStepUpService implements OnApplicationShutdown {
   }
 
   async resend(token: string): Promise<LoginStepUpResend> {
+    this.assertMailDeliverable();
     const now = new Date();
     const challenge = await this.findUsable(token, now);
-
-    // After a failed delivery the user must be able to retry at once; otherwise the cooldown would lock them out.
-    if (!challenge.sendFailedAt) this.assertCooldownElapsed(challenge.lastSentAt, now);
-    await this.assertSendCapacity(challenge.emailKey, now);
+    this.assertCooldownElapsed(challenge.lastSentAt, now);
 
     const code = newCode();
     const codeHash = await hashPassword(code);
     const expiresAt = new Date(now.getTime() + LOGIN_SECURITY_POLICY.codeTtlMs);
-    // Matching lastSentAt makes two concurrent resends race for one winner; the loser sees the cooldown.
-    const claimed = await this.prisma.v1LoginStepUpChallenge.updateMany({
-      where: { id: challenge.id, usedAt: null, lastSentAt: challenge.lastSentAt },
-      data: {
-        codeHash,
-        expiresAt,
-        attemptCount: 0,
-        lastSentAt: now,
-        sendFailedAt: null,
-        ...(challenge.userId ? { sentCount: { increment: 1 } } : {}),
-      },
+    const claimed = await this.prisma.$transaction(async (tx) => {
+      await lockEmailSends(tx, challenge.emailKey);
+      await assertSendCapacity(tx, challenge.emailKey, now);
+      // Matching lastSentAt makes two concurrent resends race for one winner; the loser sees the cooldown.
+      return tx.v1LoginStepUpChallenge.updateMany({
+        where: { id: challenge.id, usedAt: null, lastSentAt: challenge.lastSentAt },
+        data: { codeHash, expiresAt, attemptCount: 0, lastSentAt: now, sendFailedAt: null, sentCount: { increment: 1 } },
+      });
     });
     if (claimed.count === 0) throw resendCooldown(LOGIN_SECURITY_POLICY.resendCooldownMs);
-
-    if (challenge.userId) {
-      if (challenge.sendFailedAt) {
-        // The previous mail never left; report this failure instead of hiding it behind a 200.
-        await this.send(challenge.id, challenge.userId, code);
-      } else {
-        this.sendInBackground(challenge.id, challenge.userId, code);
-      }
-    }
+    if (challenge.userId) this.sendInBackground(challenge.id, challenge.userId, code);
     return {
       expiresAt: expiresAt.toISOString(),
       resendAvailableAt: resendAvailableAt(now).toISOString(),
@@ -171,28 +162,19 @@ export class LoginStepUpService implements OnApplicationShutdown {
     if (remainingMs > 0) throw resendCooldown(remainingMs);
   }
 
-  /** The cap is per email and counts mails actually sent, so decoys (0 mails) never eat a real user's quota. */
-  private async assertSendCapacity(emailKey: string, now: Date): Promise<void> {
-    const since = new Date(now.getTime() - LOGIN_SECURITY_POLICY.sendCapWindowMs);
-    const sent = await this.prisma.v1LoginStepUpChallenge.aggregate({
-      _sum: { sentCount: true },
-      where: { emailKey, lastSentAt: { gt: since } },
+  /** Without a mail transport (and no echo) nobody could ever finish step-up; every caller gets the same 503. */
+  private assertMailDeliverable(): void {
+    if (this.dispatcher.emailDeliverable) return;
+    this.logger.error('login step-up requested but email delivery is not configured (SES_REGION/EMAIL_FROM)');
+    throw new ServiceUnavailableException({
+      code: 'STEP_UP_UNAVAILABLE',
+      message: '지금은 인증 메일을 보낼 수 없어 로그인할 수 없어요. 잠시 후 다시 시도해 주세요.',
     });
-    if ((sent._sum.sentCount ?? 0) >= LOGIN_SECURITY_POLICY.sendCapPerDay) {
-      throw new HttpException(
-        {
-          code: 'STEP_UP_SEND_LIMIT',
-          message: '인증번호를 너무 많이 요청했어요. 내일 다시 시도해 주세요.',
-          details: { retryAfterSeconds: LOGIN_SECURITY_POLICY.sendCapWindowMs / 1000 },
-        },
-        HttpStatus.TOO_MANY_REQUESTS,
-      );
-    }
   }
 
   /**
-   * Mail delivery stays off the request path so a real challenge answers as fast as a decoy. A failure is
-   * logged and persisted by `send`, and surfaces to the user on the next resend.
+   * Mail delivery stays off the request path, and a delivery failure never changes the response, so a real
+   * challenge and a decoy answer alike even during a mail outage. Failures are logged and stamped on the row.
    */
   private sendInBackground(challengeId: string, userId: string, code: string): void {
     const delivery = this.send(challengeId, userId, code).then(
@@ -241,6 +223,33 @@ function newCode(): string {
 /** The token is 256 random bits, so an unsalted digest is enough; the DB never holds the usable value. */
 function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
+}
+
+/** Serializes the cap check and the send that follows it for one email, so parallel requests cannot overshoot the cap. */
+async function lockEmailSends(tx: Prisma.TransactionClient, emailKey: string): Promise<void> {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${'login-step-up-send'}), hashtext(${emailKey}))`;
+}
+
+/**
+ * The cap is per email and counts every issued or resent code, decoys included. Counting only real mails would
+ * let a caller learn whether a password was right by repeating it until the cap answered.
+ */
+async function assertSendCapacity(tx: Prisma.TransactionClient, emailKey: string, now: Date): Promise<void> {
+  const since = new Date(now.getTime() - LOGIN_SECURITY_POLICY.sendCapWindowMs);
+  const sent = await tx.v1LoginStepUpChallenge.aggregate({
+    _sum: { sentCount: true },
+    where: { emailKey, lastSentAt: { gt: since } },
+  });
+  if ((sent._sum.sentCount ?? 0) >= LOGIN_SECURITY_POLICY.sendCapPerDay) {
+    throw new HttpException(
+      {
+        code: 'STEP_UP_SEND_LIMIT',
+        message: '인증번호를 너무 많이 요청했어요. 내일 다시 시도해 주세요.',
+        details: { retryAfterSeconds: LOGIN_SECURITY_POLICY.sendCapWindowMs / 1000 },
+      },
+      HttpStatus.TOO_MANY_REQUESTS,
+    );
+  }
 }
 
 function resendAvailableAt(now: Date): Date {

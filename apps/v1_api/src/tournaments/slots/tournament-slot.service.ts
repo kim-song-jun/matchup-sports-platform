@@ -8,7 +8,7 @@ import { lockGameRows } from '../../games/roster/game-row-lock';
 import { assignLeagueFixtureSideInTx } from '../../league-matches/league-fixture-side-assignment';
 import { promoteLeagueWhenSlotsFilledInTx } from '../../league-matches/league-slot-status';
 import { PrismaService } from '../../prisma/prisma.service';
-import { assertNotInOtherGroupInTx, assignTournamentFixtureSideInTx, releaseUnusedGroupTeamsInTx, type GroupEnrollment } from '../tournament-bracket-tx';
+import { assertNotInOtherGroupInTx, assignTournamentFixtureSideInTx, ensureGroupPhaseTeamsInTx, releaseUnusedGroupTeamsInTx, type GroupEnrollment } from '../tournament-bracket-tx';
 import { adminBracketSlotInclude, serializeAdminBracketSlot } from './admin-bracket-view';
 import { ALL_COMPETITION_KINDS, findTournamentOnSurface } from '../tournament-surface-lookup';
 import { syncByeSlotInTx } from './bye-slot-sync';
@@ -125,6 +125,15 @@ async function assignSlotCore(
     throw error;
   }
   if (slot.kind === 'BYE') await syncByeSlotInTx(tx, slot, registrationId);
+  // ENTRY의 조 편성은 경기가 모두 삭제된 뒤에도 자리 자체를 기준으로 정리한다.
+  if (slot.kind === 'ENTRY' && slot.groupId !== null) {
+    const group = await tx.v1TournamentGroup.findUnique({ where: { id: slot.groupId }, select: { phase: true } });
+    if (group?.phase === 'group') {
+      if (slot.registrationId !== null) ledger.releases.push({ groupId: slot.groupId, registrationId: slot.registrationId });
+      ledger.enrollments.push(...await ensureGroupPhaseTeamsInTx(tx, ctx.admin, slot.tournamentId, slot.groupId, group.phase,
+        [registrationId], { deferOtherGroupCheck: true }));
+    }
+  }
   for (const fixture of fixtures) {
     if (fixture.groupPhase === 'group' && fixture.groupId !== null && slot.registrationId !== null) {
       ledger.releases.push({ groupId: fixture.groupId, registrationId: slot.registrationId });

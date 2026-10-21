@@ -209,3 +209,5 @@ Support admins may only read. See [admin roster settings](./domains/tournaments.
 대회 운영콘솔의 경기별 명단 편집은 기존 roster-adjustments API를 재사용한다. 대회·리그 이벤트 및 도움 추가에서 이전 명단 참가자는 422 PARTICIPANT_NOT_IN_CURRENT_ROSTER로 거부한다. [경기 계약](./domains/games.md#운영콘솔-경기-출전-명단-2026-10-20)을 따른다.
 
 공통 결선 배정은 `GET .../bracket/finalist-preview` → `POST .../bracket/finalist-assignments`로 수행한다([대회 계약](./domains/tournaments.md#공통-결선-진출팀-배정-2026-10-21)). 활성 관리자 읽기/쓰기 분리, SHA256 preview 버전 재검증, 사유·변경 전후 감사, 단일 트랜잭션/부분 성공 없음 원칙을 따른다. 공식 순위는 변경하지 않으며 운영자 결선 배정안만 저장한다.
+
+빈 템플릿 조 정리(2026-10-21): 기존 관리자 mutation 권한·대회 레인 잠금·단일 트랜잭션을 유지한다. 실제 배정/경기/슬롯 참조는409로 보호하고, 비어 있는 미사용 자리와 그에 종속된 고아 편성만 삭제 시 정리한다. 세부 조건은 [대회 계약](./domains/tournaments.md)을 따른다.

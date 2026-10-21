@@ -137,6 +137,12 @@ export function LeagueStandingsTable({ data }: { data: LeagueStandingsTableData 
         </table>
       </div>
 
+      {/* "FP 10" 약어만 있어 무슨 숫자인지, 왜 순위가 갈렸는지 알 수 없었다(MD-QA #171). FP 가 있는 대회에서만 적는다. */}
+      {sorted.some((row) => (row.fairPlayPoints ?? 0) > 0) ? (
+        <div className="tm-text-caption" style={{ padding: '8px 16px 0', color: 'var(--text-caption)' }}>
+          FP는 페어플레이 벌점이에요(경고 1·퇴장 3~4점). 낮을수록 위이고, 승점이 같을 때 순위를 가르는 기준 중 하나예요.
+        </div>
+      ) : null}
       {updatedLabel ? (
         <div
           className="tm-text-caption"

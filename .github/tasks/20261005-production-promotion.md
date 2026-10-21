@@ -1,5 +1,22 @@
 # 2026-10-05 dev → main production promotion
 
+## Main execution refresh — 2026-10-21 after finalist stability regression
+
+This snapshot supersedes prior user-operated-main restrictions for this execution. The user explicitly requested proceeding without review and then executing main promotion. Create/merge the main PR and approve the matching production deployment only after the actual CI gates pass. No policy bypass, forced merge, production data write/reset/seed, or unrelated WIP changes are authorized.
+
+- Promotion PR #2015 (dev -> main) was created from validated dev 821b0d74f. CodeQL/Gates/Web passed, but API CI 39545183659 failed one real PG integration assertion: unchanged latest finalist preview was rejected as FINALIST_PREVIEW_STALE instead of the existing started-game guard FINALIST_NOT_READY. Main/production remain unchanged.
+- Fix PR #2017 / commit 8a87689e4 canonicalizes only unordered group-source map/registration/standing/official-fixture inputs. It preserves meaningful rule ordering, actual result/bracket/start changes, authorization, locks, atomic save/audit and existing round12 behavior. Unit regression observed RED 1failed/18passed -> GREEN 19/19. Local stale Prisma client type failure is recorded separately; final client/type/actual PG validation belongs to the fix PR CI. API surface guard PASS.
+- This release metadata branch is based on that exact fix commit. Official Changesets CLI 2.30.0 consumes its patch Changeset, generates matching source API/Web 1.11.1 and changelog entries. Existing resolver semantics plan production artifact **1.11.2** with no pending Changeset. Earlier expected artifact 1.11.1 is superseded.
+- Ownership: this existing task, both app manifests/changelogs and consumed finalist-preview-stable-source Changeset. Runtime/Prisma/deploy/workflow bytes stay identical to fix commit 8a87689e4; no schema migration. Main already contains the same migration tree and M11 applied ledger; use default stage none.
+- [ ] Fix #2017 exact-head CI pass, dev merge and local dev ff-only synchronization.
+- [ ] Release metadata dev PR exact-head CI pass, dev merge and local dev ff-only synchronization.
+- [ ] Latest dev CI/Alpha success and actual deployed commit/release/DB match.
+- [ ] #2015 updated head main-promotion policy, CI/CodeQL pass and no unresolved real findings; user-approved review omission is not CI omission.
+- [ ] Normal main merge, matching main CI/images/scans success, production environment approval and actual production SHA/release1.11.2/DB + public browser smoke verification.
+- Rollback predecessor remains production1.10.3 / 33cd8a8b7; use guarded rollback-prod.yml expected-active-SHA contract if deployment fails. No force push or repeated Stage A/B.
+- Alpha public headed smoke before the fix: landing/tournaments/teams at390/768/1440,9/9 HTTP200, page error/failed response/overflow0; screenshots and JSON under local tmp/release-public-smoke-20261021/alpha. Browser Node55288/Chrome33292 closed and absent. This is public smoke, not full authenticated write/permission QA.
+
+
 ## Preparation refresh — 2026-10-21
 
 This section supersedes earlier release coordinates and authorizations. The current request is to prepare the already-published dev changes for user-operated main promotion. Main PR creation/merge and production approval are not executed by this task.

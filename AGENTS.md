@@ -309,12 +309,17 @@ Global rules inherited from `~/.codex/AGENTS.md`:
 - **`dev` → `main` 승격은 사용자만 한다.** 에이전트는 `git push`/`gh pr merge`/
   `gh pr create --base main` 어느 방식으로도 **직접 실행하지 않는다** — 필요해 보이면 사용자에게
   알리고 멈춘다. 자동으로 승격하는 워크플로는 없다(워크플로의 `refs/heads/main` 참조는 전부 감지용 `if:` 조건이다).
+  `promote-main.yml`은 버전 커밋을 dev 대상 PR(`release/version-*`)로 올리고, 그 PR 머지 뒤 다시 실행하면
+  승격 게이트 검증과 dev→main PR 링크만 남긴다 — 그 PR을 열고 머지하는 것은 사용자다.
 - **`main`에 dev에 없는 커밋이 생겼다면** `origin/main → dev` 방향으로만 흡수한다.
 - **배포 동작에 영향을 주는 main 대상 PR의 릴리스 검사는 출발 브랜치와 무관하게 동일하다.** 사용자 승인으로 범위를 제한한 hotfix PR도 Changesets 소비, 고정 API/Web 버전 증가, 두 변경 이력을 모두 검증한다. 순수 문서·테스트 변경에는 버전 증가를 요구하지 않는다. 이 CI 계약은 승격 권한이나 승인 정책을 대신하지 않는다.
 - **`main`에는 classic branch protection은 없지만 ruleset이 걸려 있다**(2026-08-09 실측 정정).
   ruleset "Copilot review for default branch"(active)가 `deletion`·`non_fast_forward`·`copilot_code_review`를
   강제한다 — main으로의 force-push·삭제는 막힌다(#231 롤백이 `git revert`로만 가능했던 이유). 일반
   fast-forward 직접 push는 가능해 그대로 프로덕션 배포로 이어진다. 확인은 `gh api repos/<owner>/<repo>/rulesets`.
+- **`dev`에는 ruleset "Require PR for dev"가 걸려 있다**(PR 필수, 승인 0명, 관리자 포함 예외 없음) — dev로의
+  직접 push는 누구든(워크플로·관리자 포함) 거부된다. 버전 커밋과 릴리스 준비(`--prepare-only` 포함)도 PR로
+  전달한다. 확인은 같은 명령(`gh api repos/<owner>/<repo>/rulesets`).
 - **머지·push 전에 항상 `baseRefName`을 확인한다**(2026-08-09 base=main 오머지 사고). 직전에
   `gh pr view <N> --json baseRefName`으로 `dev`임을 확인하고 아니면 `gh pr edit <N> --base dev`로 재타깃한다.
 - **dev push = alpha 자동 실배포** → dev 머지 전 검증(테스트·tsc·lint)을 실배포 게이트로 취급한다.

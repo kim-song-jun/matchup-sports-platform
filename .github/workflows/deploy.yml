@@ -31,6 +31,12 @@ on:
 permissions:
   contents: read
 
+env:
+  # 프로덕션 웹 이미지는 서버측 API origin 을 빌드 인자로 굽는다(next.config rewrites).
+  # build-images 가 이 값을 굽고, deploy 의 assert-prod-internal-api-origin.sh 가 호스트
+  # .env 의 V1_INTERNAL_API_ORIGIN 이 이 값과 다르지 않은지 대조한다 — 단일 출처.
+  PROD_INTERNAL_API_ORIGIN: http://v1_api:8121
+
 # PR 간 상호 취소 방지: 그룹을 PR/ref 단위로 분리
 # - pull_request: 같은 PR의 이전 attempt만 취소 (ci-pr-N)
 # - dev push: 새 push가 이전 push CI를 취소 (서버 배포 job은 main 전용)
@@ -407,6 +413,14 @@ jobs:
       - name: Prod release manifest generator tests (Task168 none/stageA/stageB)
         run: bash scripts/qa/test-create-prod-release-manifest.sh
 
+      # 승인 전 build-images 의 빌드 역할에는 ec2 권한이 없다 — 레지스트리 확인이 ec2 를 부르지
+      # 않는지, 승인 뒤 전체 확인은 인스턴스를 빼먹지 않는지 고정한다.
+      - name: Prod AWS target verification scope tests
+        run: bash scripts/qa/test-verify-prod-aws-target.sh
+
+      - name: Prod internal API origin assertion tests
+        run: bash scripts/qa/test-assert-prod-internal-api-origin.sh
+
       # Fix round 1, Important 1: a workflow_dispatch string input can carry
       # a raw newline, which would forge an extra key=value line in
       # GITHUB_OUTPUT (last line for a key wins). This locks the
@@ -675,9 +689,17 @@ jobs:
   # 승인 직후 남는 일은 activation + 마이그레이션·컨테이너 교체뿐이다.
   # (요구사항 1·2 — 러너가 빌드해 ECR digest 로 push, EC2 는 pull 만 한다. :latest 제거.)
   # 이 job 은 DB 와 실행 중인 컨테이너를 전혀 건드리지 않는다 — ECR 에 새 이미지를 올리고
-  # EC2 의 고정 스테이징 경로(~/.teameet-prod-staging/<sha>)에 소스를 채워 두기만 한다
-  # (D3). activation(symlink 스왑)은 승인 후 deploy job 이 한다 — 승인이 거부돼도 서비스는
-  # 그대로 돌아간다.
+  # 릴리스 소스를 S3 에 올려 두기만 한다(EC2 는 승인 후 deploy job 이 시키는 SSM 명령으로
+  # 그 객체를 받아 스테이징 경로에 푼다, D3). activation(symlink 스왑)도 승인 후 deploy job
+  # 이 한다 — 승인이 거부돼도 서비스는 그대로 돌아간다.
+  #
+  # 승인 전 job 이라 main 에 push 할 수 있는 사람은 누구든 이 job 의 스텝과 이 job 이 부르는
+  # 스크립트를 바꿔 실행시킬 수 있다. 그래서 여기서는 prod 서버에 닿는 일을 하지 않는다 —
+  # SSM 명령, Parameter Store, KMS, EC2 조회, 서버 상태를 읽는 롤백 기준 계산은 전부 승인된
+  # deploy job 에 있다. 이 job 의 역할(PROD_BUILD_AWS_ROLE_ARN)은 ECR push·스캔 조회와 릴리스
+  # 소스 업로드 권한만 갖고, trust 도 main ref 로만 열려 있다. scripts/qa/check-production-
+  # deploy-security.mjs 가 이 경계를 CI 에서 강제한다. 단 저장소 수준 GitHub secret 은 이 job
+  # 도 읽을 수 있다(환경 secret 으로 옮기는 것은 별도 후속).
   build-images:
     name: Build images
     needs: [gates, api, web]
@@ -694,25 +716,21 @@ jobs:
       contents: read
       id-token: write
 
+    # deploy job 이 매니페스트를 만들고 deploy-prod-via-ssm.sh 에 넘기는 데 필요한 값만
+    # 내보낸다. 매니페스트·롤백 기준은 서버 상태에 의존하므로 deploy job 에서 만든다.
     outputs:
       registry: ${{ steps.login-ecr.outputs.registry }}
-      # manifestSha256 은 실제로 S3 에 올라간 바이트를 해싱한 값이어야 한다 —
-      # 업로드 스텝에서 계산해 내보낸다(생성 스텝이 아니라).
-      manifestSha256: ${{ steps.manifest_upload.outputs.manifestSha256 }}
-      manifestVersionId: ${{ steps.manifest_upload.outputs.manifestVersionId }}
+      imageTag: ${{ steps.images.outputs.imageTag }}
       sourceSha256: ${{ steps.source.outputs.sourceSha256 }}
       sourceVersionId: ${{ steps.source.outputs.sourceVersionId }}
       releaseVersion: ${{ steps.version.outputs.stable }}
       task168Stage: ${{ steps.task168.outputs.stage }}
+      task168Evidence: ${{ steps.task168.outputs.evidence }}
+      # stageA 가 아니면 빈 값 — 매니페스트의 cutoverTool 항목이 stageA 에만 생긴다.
+      cutoverToolDigest: ${{ steps.cutover-tool.outputs.digest }}
 
     steps:
-      # fetch-depth: 0 필수 — "Resolve rollback compatibility base" 스텝이 호출하는
-      # check-expand-contract-migrations.sh 는 migration_base_sha(수 커밋 전일 수 있음)와
-      # 현재 SHA 사이 git history 를 직접 walk 한다. 얕은 checkout 이면 "unknown revision"
-      # 으로 실패한다(alpha 의 deploy-alpha.yml 이 이미 동일한 이유로 fetch-depth: 0 사용).
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-        with:
-          fetch-depth: 0
 
       # Resolves the Task168 stage for every step below. Values are read
       # through env (never interpolated into the run body) so a
@@ -730,30 +748,26 @@ jobs:
           EVIDENCE_INPUT: ${{ inputs.task168_rehearsal_evidence }}
         run: bash scripts/release/resolve-task168-stage.sh
 
+      # 승인 전 job 전용 빌드 역할 — 기존 배포 역할(PROD_AWS_ROLE_ARN)은 SSM·Parameter Store·
+      # KMS 권한을 가져서 승인된 deploy job 만 쓴다.
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6
         with:
-          role-to-assume: ${{ vars.PROD_AWS_ROLE_ARN }}
+          role-to-assume: ${{ vars.PROD_BUILD_AWS_ROLE_ARN }}
           aws-region: ${{ vars.PROD_AWS_REGION }}
 
-      - name: Verify production AWS target
+      # 계정·ECR 리포지토리만 확인한다. 인스턴스 확인(ec2:DescribeInstances)은 서버 쪽 확인이라
+      # 승인된 deploy job 이 verify-prod-aws-target.sh 로 한다.
+      - name: Verify production registry target
         id: target
         env:
           PROD_AWS_REGION: ${{ vars.PROD_AWS_REGION }}
           PROD_EXPECTED_ACCOUNT_ID: ${{ vars.PROD_EXPECTED_ACCOUNT_ID }}
-          PROD_EC2_INSTANCE_ID: ${{ vars.PROD_EC2_INSTANCE_ID }}
-        run: bash scripts/release/verify-prod-aws-target.sh
+        run: bash scripts/release/verify-prod-registry-target.sh
 
       - name: Sign in to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@d539f0932e70871a027e9d5a9d8fc38589180a64 # v2
-
-      - name: Resolve rollback compatibility base
-        id: rollback-base
-        env:
-          RELEASE_SHA: ${{ github.sha }}
-          INSTANCE_ID: ${{ vars.PROD_EC2_INSTANCE_ID }}
-        run: bash scripts/release/resolve-prod-rollback-base.sh
 
       - name: Validate Kakao web configuration before immutable image resolution
         env:
@@ -856,37 +870,6 @@ jobs:
             --image-ids "imageTag=${TOOL_TAG}" --query 'imageDetails[0].imageDigest' --output text)"
           echo "digest=${digest}" >> "${GITHUB_OUTPUT}"
 
-      # 웹 이미지 빌드 인자 하나(INTERNAL_API_ORIGIN)만 EC2 .env 에서 읽는다. 승인 전
-      # 단계라 .env 를 쓰지는 않는다 — 값만 조회한다.
-      - name: Resolve internal API origin
-        id: origin
-        env:
-          INSTANCE_ID: ${{ vars.PROD_EC2_INSTANCE_ID }}
-        run: |
-          set -Eeuo pipefail
-          # SSH 대신 SSM 으로 읽는다. 값이 없거나 조회가 실패하면 기본값으로 떨어진다 —
-          # 이 값은 웹 이미지 빌드 인자일 뿐이라 조회 실패로 배포를 막지 않는다.
-          origin=""
-          cmd_id="$(aws ssm send-command --instance-ids "${INSTANCE_ID}" \
-            --document-name AWS-RunShellScript --comment "Teameet prod resolve internal api origin" \
-            --parameters 'commands=["awk -F= '"'"'/^V1_INTERNAL_API_ORIGIN=/{sub(/^V1_INTERNAL_API_ORIGIN=/,\"\"); print; exit}'"'"' /home/ec2-user/teameet/deploy/.env 2>/dev/null || true"]' \
-            --query 'Command.CommandId' --output text 2>/dev/null || true)"
-          if [[ -n "${cmd_id}" ]]; then
-            for _ in $(seq 1 20); do
-              status="$(aws ssm get-command-invocation --command-id "${cmd_id}" \
-                --instance-id "${INSTANCE_ID}" --query Status --output text 2>/dev/null || true)"
-              [[ "${status}" == "InProgress" || "${status}" == "Pending" || -z "${status}" ]] || break
-              sleep 3
-            done
-            if [[ "${status:-}" == "Success" ]]; then
-              origin="$(aws ssm get-command-invocation --command-id "${cmd_id}" \
-                --instance-id "${INSTANCE_ID}" --query StandardOutputContent --output text 2>/dev/null | tr -d '\r\n' || true)"
-            else
-              echo "[prod-build] internal API origin 조회 실패(${status:-unknown}) — 기본값을 씁니다" >&2
-            fi
-          fi
-          echo "internalApiOrigin=${origin:-http://v1_api:8121}" >> "${GITHUB_OUTPUT}"
-
       - name: Build and push immutable Web image
         if: steps.images.outputs.web_exists != 'true'
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
@@ -897,7 +880,7 @@ jobs:
           tags: ${{ steps.login-ecr.outputs.registry }}/teameet-prod-v1-web:${{ steps.images.outputs.imageTag }}
           build-args: |
             NEXT_PUBLIC_API_URL=/api/v1
-            INTERNAL_API_ORIGIN=${{ steps.origin.outputs.internalApiOrigin }}
+            INTERNAL_API_ORIGIN=${{ env.PROD_INTERNAL_API_ORIGIN }}
             NEXT_PUBLIC_KAKAO_CLIENT_ID=${{ secrets.KAKAO_CLIENT_ID }}
             NEXT_PUBLIC_KAKAO_LOGIN_JS_KEY=${{ secrets.KAKAO_LOGIN_JS_KEY }}
             NEXT_PUBLIC_KAKAO_REDIRECT_URI=${{ secrets.KAKAO_REDIRECT_URI }}
@@ -919,9 +902,9 @@ jobs:
           TASK168_CUTOVER_IMAGE_TAG: ${{ steps.task168.outputs.stage == 'stageA' && steps.images.outputs.toolTag || '' }}
         run: bash scripts/release/check-prod-image-scans.sh
 
-      # D2: S3 중계 없이 러너가 저장소를 EC2 의 고정 스테이징 경로로 직접 rsync 한다.
-      # 이 스텝은 아직 어떤 release-sha 도 활성화하지 않는다 — activation(symlink 스왑)은
-      # 승인 이후 deploy job 의 deploy-prod.sh 책임이다(D3).
+      # 이 스텝은 소스 tarball 을 S3 에 올릴 뿐 어떤 release-sha 도 활성화하지 않는다 —
+      # 스테이징 경로로 푸는 일과 activation(symlink 스왑)은 승인 이후 deploy job 의
+      # deploy-prod-via-ssm.sh·deploy-prod.sh 책임이다(D3).
       - name: Upload release source to S3
         id: source
         env:
@@ -960,19 +943,84 @@ jobs:
           echo "sourceSha256=${source_sha256}" >> "${GITHUB_OUTPUT}"
           echo "sourceVersionId=${source_version_id}" >> "${GITHUB_OUTPUT}"
 
+  # ── Deploy job: 승인 후 서버·운영 비밀값에 닿는 모든 일 ─────────────────────────
+  # 롤백 기준 계산(서버 상태 읽기)·릴리스 매니페스트·런타임 env 동기화·activation·마이그레이션·
+  # 컨테이너 교체. 기존 배포 역할(PROD_AWS_ROLE_ARN)은 environment:production 승인을 통과한
+  # 이 job(과 rollback-prod.yml)에서만 assume 한다.
+  deploy:
+    name: Deploy
+    needs: build-images
+    if: |
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    # 수동 승인 게이트: production environment의 required reviewer가
+    # GitHub UI에서 승인해야 배포가 시작된다 (main push 자동 배포 제거)
+    environment: production
+    # 프로덕션 배포 직렬화: 진행 중 배포는 취소하지 않고 뒤에 큐잉
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    # 이 job 의 스텝은 aws CLI(ssm·s3·ecr·ec2)를 호출한다.
+    # 워크플로 기본값은 contents: read 뿐이라 여기서 OIDC 토큰을 따로 요청해야 한다.
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      # SSH → SSM 전환에서 "Setup SSH" 스텝을 걷어낼 때 checkout 과 AWS 자격증명 스텝이
+      # 함께 빠졌다. 그 결과 첫 승인 배포가 "sync-prod-runtime-env.sh: No such file or
+      # directory"(exit 127) 로 죽었다 — 이 job 은 러너에 리포도, 자격증명도 없이 시작한다.
+      # fetch-depth: 0 필수 — "Resolve rollback compatibility base" 스텝이 호출하는
+      # check-expand-contract-migrations.sh 는 migration_base_sha(수 커밋 전일 수 있음)와
+      # 현재 SHA 사이 git history 를 직접 walk 한다. 얕은 checkout 이면 "unknown revision"
+      # 으로 실패한다(alpha 의 deploy-alpha.yml 이 이미 동일한 이유로 fetch-depth: 0 사용).
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6
+        with:
+          role-to-assume: ${{ vars.PROD_AWS_ROLE_ARN }}
+          aws-region: ${{ vars.PROD_AWS_REGION }}
+
+      # 대상 계정·인스턴스·ECR 리포지토리가 고정한 값과 같은지 확인한다. build-images 는
+      # 계정·리포지토리만 보고(verify-prod-registry-target.sh), 인스턴스 확인은 서버 쪽 확인이라
+      # 여기서 한다.
+      - name: Verify production AWS target
+        id: target
+        env:
+          PROD_AWS_REGION: ${{ vars.PROD_AWS_REGION }}
+          PROD_EXPECTED_ACCOUNT_ID: ${{ vars.PROD_EXPECTED_ACCOUNT_ID }}
+          PROD_EC2_INSTANCE_ID: ${{ vars.PROD_EC2_INSTANCE_ID }}
+        run: bash scripts/release/verify-prod-aws-target.sh
+
+      # 롤백 기준은 서버의 릴리스 상태(SSM 으로 읽음)에서 나오므로 승인 뒤에 계산한다. 승인
+      # 대기 중에 다른 릴리스가 끝났어도 승인 직전이 아니라 지금의 상태를 읽는다. 런타임
+      # env 동기화·activation 보다 앞에 둬서, expand-contract 위반이면 아무것도 바뀌기 전에 멈춘다.
+      - name: Resolve rollback compatibility base
+        id: rollback-base
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+          INSTANCE_ID: ${{ vars.PROD_EC2_INSTANCE_ID }}
+        run: bash scripts/release/resolve-prod-rollback-base.sh
+
+      # 매니페스트는 롤백 기준(위 스텝)을 담으므로 build-images 가 아니라 여기서 만든다.
+      # 이미지 digest 는 build-images 가 스캔 게이트를 통과시킨 불변 태그에서 읽는다.
       - name: Create release manifest
         id: manifest
         env:
           RELEASE_SHA: ${{ github.sha }}
-          RELEASE_VERSION: ${{ steps.version.outputs.stable }}
-          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          SOURCE_SHA256: ${{ steps.source.outputs.sourceSha256 }}
-          IMAGE_TAG: ${{ steps.images.outputs.imageTag }}
+          RELEASE_VERSION: ${{ needs.build-images.outputs.releaseVersion }}
+          REGISTRY: ${{ needs.build-images.outputs.registry }}
+          SOURCE_SHA256: ${{ needs.build-images.outputs.sourceSha256 }}
+          IMAGE_TAG: ${{ needs.build-images.outputs.imageTag }}
           PREVIOUS_SHA: ${{ steps.rollback-base.outputs.previousSha }}
           MIGRATION_BASE_SHA: ${{ steps.rollback-base.outputs.migrationBaseSha }}
-          TASK168_STAGE: ${{ steps.task168.outputs.stage }}
-          TASK168_CUTOVER_DIGEST: ${{ steps.cutover-tool.outputs.digest }}
-          TASK168_REHEARSAL_EVIDENCE: ${{ steps.task168.outputs.evidence }}
+          TASK168_STAGE: ${{ needs.build-images.outputs.task168Stage }}
+          TASK168_CUTOVER_DIGEST: ${{ needs.build-images.outputs.cutoverToolDigest }}
+          TASK168_REHEARSAL_EVIDENCE: ${{ needs.build-images.outputs.task168Evidence }}
         run: bash scripts/release/create-prod-release-manifest.sh
 
       - name: Upload release manifest to S3
@@ -986,7 +1034,7 @@ jobs:
           set -Eeuo pipefail
           # 매니페스트도 소스와 같은 버킷에 버전 고정으로 올린다. EC2 는 배포 시점에
           # version-id 로 정확히 이 객체를 받고 sha256 으로 대조한다 — 중간에 바꿔치기해도
-          # 검증에서 걸린다.
+          # 검증에서 걸린다. manifestSha256 은 실제로 S3 에 올라간 바이트를 해싱한 값이어야 한다.
           manifest_sha256="$(sha256sum "${MANIFEST_PATH}" | awk '{print $1}')"
           if [[ ! "${manifest_sha256}" =~ ^[0-9a-f]{64}$ ]]; then
             echo "Failed to compute manifestSha256 from ${MANIFEST_PATH}" >&2
@@ -1002,41 +1050,6 @@ jobs:
           fi
           echo "manifestSha256=${manifest_sha256}" >> "${GITHUB_OUTPUT}"
           echo "manifestVersionId=${manifest_version_id}" >> "${GITHUB_OUTPUT}"
-
-  # ── Deploy job: 승인 후 activation + 마이그레이션 + 컨테이너 교체만 수행 ───────
-  deploy:
-    name: Deploy
-    needs: build-images
-    if: |
-      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
-    runs-on: ubuntu-latest
-    # 수동 승인 게이트: production environment의 required reviewer가
-    # GitHub UI에서 승인해야 배포가 시작된다 (main push 자동 배포 제거)
-    environment: production
-    # 프로덕션 배포 직렬화: 진행 중 배포는 취소하지 않고 뒤에 큐잉
-    concurrency:
-      group: deploy-production
-      cancel-in-progress: false
-    # 이 job 의 세 스텝은 전부 aws CLI(ssm put-parameter / send-command)를 호출한다.
-    # 워크플로 기본값은 contents: read 뿐이라 여기서 OIDC 토큰을 따로 요청해야 한다.
-    permissions:
-      contents: read
-      id-token: write
-
-    steps:
-      # SSH → SSM 전환에서 "Setup SSH" 스텝을 걷어낼 때 checkout 과 AWS 자격증명 스텝이
-      # 함께 빠졌다. 그 결과 첫 승인 배포가 "sync-prod-runtime-env.sh: No such file or
-      # directory"(exit 127) 로 죽었다 — 이 job 은 러너에 리포도, 자격증명도 없이 시작한다.
-      # build-images 와 달리 git history 를 walk 하는 스크립트가 없으므로 얕은 checkout 으로
-      # 충분하다(여기서 도는 스크립트는 S3 에 올라간 소스를 SSM 으로 내려받게 시킬 뿐이다).
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6
-        with:
-          role-to-assume: ${{ vars.PROD_AWS_ROLE_ARN }}
-          aws-region: ${{ vars.PROD_AWS_REGION }}
 
       # 런타임 시크릿은 Parameter Store(SecureString) 를 거쳐 전달한다.
       # SSM send-command 의 파라미터는 CloudTrail 과 명령 이력에 남으므로 시크릿을 명령
@@ -1097,17 +1110,27 @@ jobs:
           SECRET_ANDROID_APP_LINKS_SHA256_CERT_FINGERPRINTS: ${{ vars.ANDROID_APP_LINKS_SHA256_CERT_FINGERPRINTS }}
         run: bash scripts/release/sync-prod-runtime-env.sh
 
+      # 웹 이미지는 서버측 API origin 을 빌드 인자로 굽는다(build-images, 승인 전). 예전에는
+      # 그 값을 승인 전에 호스트 .env 에서 SSM 으로 읽어 왔는데, 서버를 읽는 일이라 승인된
+      # job 으로 옮겼다. 이미지는 이미 만들어졌으므로 읽어서 쓰는 대신 대조만 한다 — 호스트가
+      # 다른 값을 가리키면 이미지에 구워진 값과 런타임 값이 갈라지니 activation 전에 멈춘다.
+      - name: Assert host internal API origin matches the web image
+        env:
+          INSTANCE_ID: ${{ vars.PROD_EC2_INSTANCE_ID }}
+          EXPECTED_INTERNAL_API_ORIGIN: ${{ env.PROD_INTERNAL_API_ORIGIN }}
+        run: bash scripts/release/assert-prod-internal-api-origin.sh
+
       - name: Run deploy-prod.sh
         timeout-minutes: 20
         env:
           PROD_SHA: ${{ github.sha }}
-          PROD_MANIFEST_SHA256: ${{ needs.build-images.outputs.manifestSha256 }}
+          PROD_MANIFEST_SHA256: ${{ steps.manifest_upload.outputs.manifestSha256 }}
           PROD_RELEASE_VERSION: ${{ needs.build-images.outputs.releaseVersion }}
           PROD_ECR_REGISTRY: ${{ needs.build-images.outputs.registry }}
           PROD_AWS_REGION: ${{ vars.PROD_AWS_REGION }}
           PROD_SOURCE_SHA256: ${{ needs.build-images.outputs.sourceSha256 }}
           PROD_SOURCE_VERSION_ID: ${{ needs.build-images.outputs.sourceVersionId }}
-          PROD_MANIFEST_VERSION_ID: ${{ needs.build-images.outputs.manifestVersionId }}
+          PROD_MANIFEST_VERSION_ID: ${{ steps.manifest_upload.outputs.manifestVersionId }}
           PROD_DEPLOY_BUCKET: ${{ vars.PROD_DEPLOY_BUCKET }}
           PROD_EXPECTED_ACCOUNT_ID: ${{ vars.PROD_EXPECTED_ACCOUNT_ID }}
           PROD_EC2_INSTANCE_ID: ${{ vars.PROD_EC2_INSTANCE_ID }}

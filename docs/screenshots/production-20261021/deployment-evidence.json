@@ -1,0 +1,71 @@
+{
+  "date": "2026-10-21",
+  "pr": 2015,
+  "workflowRun": 39551355745,
+  "workflowResult": "success",
+  "codeqlRun": 39551352655,
+  "codeqlResult": "success",
+  "approval": {
+    "method": "normal production environment reviewer approval",
+    "authorizedBy": "explicit user instruction in this session",
+    "deploymentId": 7219045761
+  },
+  "identity": [
+    {
+      "path": "/",
+      "status": 200,
+      "commit": "d09eaeb3d9343609b7f06f673155a60a1899343e",
+      "release": "1.11.2"
+    },
+    {
+      "path": "/api/v1/health",
+      "status": 200,
+      "commit": "d09eaeb3d9343609b7f06f673155a60a1899343e",
+      "release": "1.11.2",
+      "health": {
+        "status": "success",
+        "data": {
+          "service": "v1_api",
+          "checks": {
+            "db": true
+          }
+        },
+        "timestamp": "2026-10-21T06:14:11.035Z"
+      }
+    }
+  ],
+  "db": {
+    "checksDb": true,
+    "migrationCount": 214,
+    "pendingMigrations": 0,
+    "m11AlreadyApplied": true,
+    "schemaChangesInPromotion": false
+  },
+  "worker": "production Health check passed (asserts game-operations worker healthy)",
+  "browser": {
+    "persona": "anonymous production visitor",
+    "routesProcessed": 7,
+    "routesTotal": 7,
+    "detailAndBracketWidths": [
+      390,
+      768,
+      1440
+    ],
+    "horizontalOverflow": 0,
+    "newObservedErrors": 0,
+    "knownBaselineResponses": [
+      "401 /api/v1/me/record-consent on home",
+      "401 /api/v1/auth/me on tournament detail"
+    ],
+    "notes": [
+      "Tournament bracket correctly shows unpublished state; no bracket publication or assignment performed.",
+      "Initial client-navigation capture reached loading state; subsequent direct navigation/render checks confirmed actual detail content in all three widths.",
+      "Landing check covers initial visible content and HTTP/render health; no comprehensive scroll-animation QA claimed."
+    ]
+  },
+  "limitations": [
+    "Authenticated administrator and tournament-ops mutations were not exercised in production.",
+    "Read-only smoke verification; no full data integrity audit or load test."
+  ],
+  "cleanup": "Owned headed Chromium/Node sessions closed; PID checks show no remaining owned processes. No application/DB mutations performed by manual QA."
+}

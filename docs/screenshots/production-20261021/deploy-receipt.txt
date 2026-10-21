@@ -1,0 +1,5 @@
+Deploy	Run deploy-prod.sh	2026-10-21T06:10:48.0009765Z [prod-deploy] Task168 M11 guard: prod ledger already shows M11 applied (checksum 08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323)
+Deploy	Run deploy-prod.sh	2026-10-21T06:10:48.0013195Z 214 migrations found in prisma/migrations
+Deploy	Run deploy-prod.sh	2026-10-21T06:10:48.0013889Z No pending migrations to apply.
+Deploy	Run deploy-prod.sh	2026-10-21T06:10:48.0024377Z [prod-deploy] 1.11.2 (d09eaeb3d9343609b7f06f673155a60a1899343e) is healthy
+Deploy	Health check	2026-10-21T06:10:55.3941983Z Deploy OK — 퍼블릭 응답이 1.11.2 (d09eaeb3d9343609b7f06f673155a60a1899343e) 입니다

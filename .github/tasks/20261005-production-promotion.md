@@ -329,3 +329,15 @@ Owned: this task/status record, GitHub canonical promotion workflow dispatch and
 Release execution note (2026-10-21): after #2017 passes and merges to dev, integrate that dev merge into the prepared metadata branch and publish only the reviewed manifest/changelog/Changeset/task diff by ordinary fast-forward push to dev. This is version preparation as supported by the existing promote-main.sh push_dev contract; no forced push or CI/review policy change. Runtime identity with the exact tested fix commit and preparation/promotion policies must pass first, and the resulting dev CI/Alpha/main-PR gates must pass before main promotion.
 
 Final metadata publication receipt: based on #2017 dev merge cf896b77b, only manifest/changelog/consumed patch Changeset/task files differ; runtime/Prisma/deploy/workflow bytes match tested8a87689e4. Publication is an ordinary fast-forward dev push after preparation and main-promotion policies pass. Final matching dev CI/Alpha/main PR validation remains required before main merge.
+
+## Production 1.11.2 배포 완료 — 2026-10-21
+
+- 사용자가 main 승격 완료 후 production 승인·배포 모니터링·버전/커밋/DB/주요 화면 확인을 명시 요청. 에이전트 main push/merge 없이 기존 승격 [PR2015](https://github.com/kim-song-jun/matchup-sports-platform/pull/2015)의 실행만 처리.
+- Main/serving SHA `d09eaeb3d9343609b7f06f673155a60a1899343e`, public release **1.11.2**. 기존 prod1.10.3/33cd8a8b7에서 전환. 소스 manifest1.11.1과 artifact1.11.2 차이는 기존 zero-Changeset patch version resolver의 결과이며 실제 public header로 검증.
+- CI/Deploy [39551355745](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/39551355745): API/Web/Gates/Build images/Deploy 전부 success. CodeQL39551352655 success.
+- production environment의 정상 required-reviewer 승인으로 진행. deployment7219045761. 보호 규칙 우회/변경 없음.
+- 웹 `/` 및 `/api/v1/health`200, version/commit 일치, DB check=true. 운영 deploy 로그: M11 already applied, migration214개, pending0. 서버 내부 DB/API/worker healthy 및 public serving-SHA 검사가 성공. Task168 Stage A/B 재실행 없음. 승격 diff에 Prisma schema/migration 변경 없음.
+- 공개 브라우저 smoke **7/7**: landing/home/tournaments/league-matches/team-matches/tournament detail/bracket. 실제 목록→상세→대진표 링크 이동 확인. 상세/대진표390·768·1440 **3/3 PASS**, 가로넘침0. 대진표는 해당 대회의 정상 미공개 안내 표시.
+- 기존 비로그인401(record-consent/auth/me)은 배포 전후 동일하게 관찰. 신규 오류는 확인되지 않음. production 관리자 로그인/운영 명령/실제 배정 저장은 검증 범위에 포함하지 않음. DB 전체 데이터 무결성 검사를 수행했다고 주장하지 않음.
+- 소유 headed Chromium/Node 모두 종료 및 PID 부재 확인. 수동 QA에서 데이터 변경 없음. 원본 공유 WIP 보존.
+- 최종 증거: `docs/screenshots/production-20261021/deployment-evidence.json`, 실제 운영 로그 발췌, before/after 캡처. 이 기록과 캡처는 증거 전용 `qa/pr2015-production-evidence` 브랜치에 보존하고 PR2015에 SHA 고정 링크로 첨부. 런타임 코드 추가 변경 없음.

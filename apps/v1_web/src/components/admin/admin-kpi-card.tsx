@@ -5,6 +5,8 @@ interface AdminKpiCardProps {
   label: string;
   value: string | number;
   sub?: string;
+  /** sub 아래에 한 줄씩 덧붙는 보조 수치. 값이 길면 카드 안에서 줄바꿈된다. */
+  details?: string[];
   tone?: 'neutral' | 'positive' | 'warning' | 'danger';
   icon?: ReactNode;
   href?: string;
@@ -45,11 +47,13 @@ function KpiCardInner({
   label,
   value,
   sub,
+  details,
   tone = 'neutral',
   icon,
 }: Omit<AdminKpiCardProps, 'href' | 'ariaLabel'>) {
   return (
-    <div className={`${TONE_WRAPPER[tone]} rounded-2xl border p-4 md:p-5 min-h-[80px] flex flex-col justify-between`}>
+    // h-full: 같은 그리드 줄의 카드는 보조 줄 수가 달라도 높이를 맞춘다.
+    <div className={`${TONE_WRAPPER[tone]} rounded-2xl border p-4 md:p-5 min-h-[80px] h-full flex flex-col justify-between`}>
       <div className="flex items-start justify-between gap-2">
         <p className="text-[length:var(--font-size-caption)] md:text-[length:var(--font-size-label)] text-[var(--text-muted)] leading-tight">{label}</p>
         {icon && (
@@ -62,6 +66,9 @@ function KpiCardInner({
         {value}
       </p>
       {sub && <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)] mt-0.5">{sub}</p>}
+      {details?.map((line) => (
+        <p key={line} className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">{line}</p>
+      ))}
     </div>
   );
 }
@@ -70,6 +77,7 @@ export function AdminKpiCard({
   label,
   value,
   sub,
+  details,
   tone = 'neutral',
   icon,
   href,
@@ -84,9 +92,9 @@ export function AdminKpiCard({
         type="button"
         onClick={onClick}
         aria-label={derivedAriaLabel}
-        className="block w-full min-h-[44px] rounded-2xl text-left active:opacity-70 transition-opacity focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+        className="block w-full h-full min-h-[44px] rounded-2xl text-left active:opacity-70 transition-opacity focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
       >
-        <KpiCardInner label={label} value={value} sub={sub} tone={tone} icon={icon} />
+        <KpiCardInner label={label} value={value} sub={sub} details={details} tone={tone} icon={icon} />
       </button>
     );
   }
@@ -96,16 +104,17 @@ export function AdminKpiCard({
       <Link
         href={href}
         aria-label={derivedAriaLabel}
-        className="block min-h-[44px] rounded-2xl active:opacity-70 transition-opacity focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+        className="block h-full min-h-[44px] rounded-2xl active:opacity-70 transition-opacity focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
       >
-        <KpiCardInner label={label} value={value} sub={sub} tone={tone} icon={icon} />
+        <KpiCardInner label={label} value={value} sub={sub} details={details} tone={tone} icon={icon} />
       </Link>
     );
   }
 
   return (
-    <div aria-label={derivedAriaLabel}>
-      <KpiCardInner label={label} value={value} sub={sub} tone={tone} icon={icon} />
+    // role=group: 이름(aria-label)을 가질 수 있는 역할이 없으면 스크린리더가 무시한다.
+    <div role="group" aria-label={derivedAriaLabel} className="h-full">
+      <KpiCardInner label={label} value={value} sub={sub} details={details} tone={tone} icon={icon} />
     </div>
   );
 }

@@ -77,6 +77,7 @@ import {
   toAdminInquiryDetail,
   toAdminInquiryRow,
 } from './fixtures';
+import { v1AuthStepUpMswHandlers } from './auth-step-up-handlers';
 import { v1GameRosterMswHandlers } from './game-roster-handlers';
 import { v1TeamDissolutionMswHandlers } from './team-dissolution-handlers';
 import { v1TeamInviteLinkMswHandlers } from './team-invite-link-handlers';
@@ -764,7 +765,7 @@ export const v1MswHandlers = [
   http.post(`${api}/auth/recovery/email/request`, ({ request }) => requestRecoveryEmail(request)),
   http.post(`${api}/auth/recovery/email/confirm`, ({ request }) => confirmRecoveryEmail(request)),
   http.post(`${api}/auth/recovery/email/reset-password`, ({ request }) => resetPasswordByRecoveryEmail(request)),
-  http.post(`${api}/auth/login`, () => ok({ session: { userId: v1UserFixture.id, userEmail: v1UserFixture.email }, ...v1UserFixture })),
+  ...v1AuthStepUpMswHandlers,
   http.post(`${api}/auth/register`, async ({ request }) => {
     const body = await request.json();
     const issue = getRegisterIssue(body);

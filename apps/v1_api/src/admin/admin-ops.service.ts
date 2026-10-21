@@ -6,6 +6,7 @@ import { AdminContextService, V1ActiveAdmin } from '../common/admin-context.serv
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { WebPushService, type PushDeliverySummary } from '../notifications/web-push.service';
 import { AdminPushSendDto } from './dto/admin-push-send.dto';
+import { LOGIN_SECURITY_POLICY, LOGIN_SPRAY_ANOMALY_KIND } from '../auth/login-security/login-security.policy';
 
 export interface PushFailureSummary {
   id: string;
@@ -47,6 +48,24 @@ export interface AdminMonitoringSummary {
   pushUnacked: number;
   smsUnacked: number;
   auditToday: number;
+  loginAnomalies: AdminLoginAnomaliesSignal;
+}
+
+/**
+ * "로그인 이상" 신호 — 로그인 실패 급증(password spray)으로 열린 이상 기록. `last24hCount` 는 최근 24시간에 시작된
+ * 이상 기록 수, `latest` 는 시점과 무관하게 가장 최근에 감지된 1건(없으면 null)이다. `active` 는 마지막 감지 후
+ * 30분 안이라 지금 모든 이메일 로그인이 추가 인증을 요구하는 중이라는 뜻이다.
+ */
+export interface AdminLoginAnomaliesSignal {
+  last24hCount: number;
+  latest: {
+    startedAt: Date;
+    lastDetectedAt: Date;
+    failedCount: number;
+    accountCount: number;
+    ipCount: number;
+    active: boolean;
+  } | null;
 }
 
 /**
@@ -213,7 +232,7 @@ export class AdminOpsService {
       Math.floor((now + KST_OFFSET_MS) / 86_400_000) * 86_400_000 - KST_OFFSET_MS,
     );
 
-    const [errorsLast24h, pushUnacked, smsUnacked, auditToday] = await Promise.all([
+    const [errorsLast24h, pushUnacked, smsUnacked, auditToday, loginAnomalies] = await Promise.all([
       // 에러 로그는 (fingerprint, windowBucket) 으로 접힌 행이므로 이 수는
       // "최근 24시간에 활동한 에러 그룹 수"다 — 발생 총량(occurrenceCount 합)이 아니다.
       this.prisma.v1ErrorLog.count({
@@ -222,9 +241,30 @@ export class AdminOpsService {
       this.prisma.v1WebPushFailureLog.count({ where: { acknowledgedAt: null } }),
       this.prisma.v1SmsEventLog.count({ where: { acknowledgedAt: null } }),
       this.prisma.v1AdminActionLog.count({ where: { createdAt: { gte: kstMidnight } } }),
+      this.loginAnomaliesSignal(now),
     ]);
 
-    return { errorsLast24h, pushUnacked, smsUnacked, auditToday };
+    return { errorsLast24h, pushUnacked, smsUnacked, auditToday, loginAnomalies };
+  }
+
+  private async loginAnomaliesSignal(now: number): Promise<AdminLoginAnomaliesSignal> {
+    const [last24hCount, latest] = await Promise.all([
+      this.prisma.v1SecurityAnomaly.count({
+        where: { kind: LOGIN_SPRAY_ANOMALY_KIND, startedAt: { gte: new Date(now - 24 * 60 * 60_000) } },
+      }),
+      this.prisma.v1SecurityAnomaly.findFirst({
+        where: { kind: LOGIN_SPRAY_ANOMALY_KIND },
+        orderBy: { lastDetectedAt: 'desc' },
+        select: { startedAt: true, lastDetectedAt: true, failedCount: true, accountCount: true, ipCount: true },
+      }),
+    ]);
+    return {
+      last24hCount,
+      latest: latest && {
+        ...latest,
+        active: latest.lastDetectedAt.getTime() > now - LOGIN_SECURITY_POLICY.sprayActiveMs,
+      },
+    };
   }
 
   /** acknowledgeFailures(웹 푸시)와 동일 계약 — 실제로 미확인인 id만 갱신하고 건별 감사 로그를 남긴다. */

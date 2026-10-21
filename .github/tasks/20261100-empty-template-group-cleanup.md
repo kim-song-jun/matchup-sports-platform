@@ -38,3 +38,9 @@ Base origin/dev d09eaeb3d, /tmp/teameet-empty-group-fix. 원인 확인 완료, �
 - 임시 PostgreSQL localhost56440, migration 전체 재생 및 suite clone 격리. 테스트용 오류 trigger는 finally 제거, 클러스터/데이터 삭제 확인.
 - 변경 모델: V1TournamentGroup/GroupTeam/Slot/Standing/OverallStanding, 보호 조회 V1TeamMatch. 스키마/migration 변경 없음. 참가 등록/선수 명단/기존 경기 결과 변경 없음.
 - 최종 수정은 기존 API 동작만 보강하며 UI/layout 변경 없음. 실제 alpha 수정 버전 검증 및 dev/production 반영은 아직 하지 않음. 원본 공유 작업트리 WIP 보존.
+
+## Hotfix authorization / CI follow-up
+- 사용자가 이번 건을 hotfix로 main/production까지 반영하고 리뷰 없이 진행하라고 명시 승인. PR2019의 최신 Copilot clean 조건 예외 및 해당 hotfix main 승격/정상 production 승인 범위로 기록. CI 실패나 실제 보안 finding 무시는 포함하지 않음.
+- PR2019 head30ec85d, CI39559144963: Gates/Web PASS, API integration175 suites 중174 PASS; 1294개 중1289 PASS/3 skip/2 FAIL. 실패2개는 기존 tournament-bracket-tx의 미사용 빈 슬롯도 항상 삭제 금지 기대값. 새 미사용 슬롯 정리 계약과 충돌하므로 실제 경기 참조 차단/ENTRY 실제 팀 배정 차단을 보존하는 시나리오로 갱신.
+- Changesets CLI2.30.0으로 별도 릴리스 브랜치에 양 앱 source1.11.2/예상 artifact1.11.3 준비. 버전 준비/승격 정책 PASS. API runtime 바이트는 수정 PR과 동일하게 유지.
+- CI 지적된 기존 대진 Tx + 신규 빈 조 정리 DB2 suites17/17 PASS. 빈 미사용 자리 삭제와 실제 ENTRY 배정/결선 경기 참조 차단을 구분해 확인. 수정된 것은 기존 통합 테스트와 이 기록이며 runtime 구현은30ec85d와 동일. 임시 DB 정리 완료.

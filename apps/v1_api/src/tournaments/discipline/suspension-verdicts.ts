@@ -39,8 +39,8 @@ function emptyVerdicts(): Map<string, SuspensionVerdict> {
 
 /**
  * `V1GameResultParticipant.cards`(Json)에서 카드 수를 읽는다. 저장 모양은
- * `{ yellow: number, red: number }` 뿐이다(`parseFairPlayCards` 주석 참고 — 경고 누적
- * 퇴장과 직접 퇴장을 구분하는 필드가 데이터 모델에 없다). 모양이 다르면 0으로 본다 —
+ * `{ yellow: number, red: number }` 뿐이다(경고 누적 퇴장 구분은 `classifyGameCards` 규칙으로
+ * `evaluateSuspension` 안에서 한다). 모양이 다르면 0으로 본다 —
  * 판정을 못 하는 것이 잘못 막는 것보다 낫다.
  */
 function readResultCards(value: unknown): { yellow: number; red: number } {

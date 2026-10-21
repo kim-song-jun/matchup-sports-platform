@@ -120,12 +120,17 @@ export function ParticipantRosterEditor({ tournamentId, registrationId }: { tour
       canManageRoster={manager} permissionResolved={permissionResolved}
       season={noun === '리그' ? { startAt: tournament.data.scheduledAt, endAt: tournament.data.scheduledEndAt, status: tournament.data.status } : null} />
     {team.isError ? <ErrorState title="수정 권한을 확인하지 못했어요" message={extractErrorMessage(team.error, '팀 조회에 실패했어요.')} onRetry={() => void team.refetch()} /> : null}
-    <p className="tm-text-caption">{noun} 공통 설정이에요. 선수·번호·GK 변경은 시작 전 경기에 반영돼요.</p>
+    <p className="tm-text-caption">
+      선수 명단·등번호·골레이 설정은 {noun}의 모든 경기에 공통으로 적용돼요.<br />
+      첫 경기가 시작되면 변경할 수 없어요.<br />
+      경기 시작 후 수정이 필요하면 운영진에게 문의해 주세요.
+    </p>
     {roster.data.belowMinimum ? <AlertBanner tone="warning" message={`최소 ${tournament.data.minPlayers}명 이상 등록해야 해요. 현재 ${Math.max(0, tournament.data.minPlayers - players.length)}명이 부족해요.`} /> : null}
     {tournament.data.rosterDeadlineAt ? <p className="tm-text-caption">명단 제출 마감 · {formatTournamentDateTimeLong(tournament.data.rosterDeadlineAt)}{deadline.overridden ? ' · 운영진이 수정 예외를 허용했어요.' : ''}</p> : null}
     <div className={styles.heading}>
       <div><SectionTitle compact title={`참가 선수 ${players.length}명`} /><p className="tm-text-caption">{rosterLimitText(tournament.data.minPlayers, tournament.data.maxPlayers, (min, max) => `최소 ${min}명 · 최대 ${max}명`)}</p></div>
       {editable && players.length < (tournament.data.maxPlayers ?? Infinity) ? <Button variant="outline" size="sm" disabled={busy || adding} onClick={() => { setAdding(true); setAddError(null); }}>선수 추가</Button> : null}
+      {editable && tournament.data.maxPlayers !== null && players.length >= tournament.data.maxPlayers ? <span className="tm-badge tm-badge-grey">최대 인원이에요</span> : null}
     </div>
     {error ? <AlertBanner tone="error" message={error} /> : null}
     {notice ? <AlertBanner tone="info" message={notice} /> : null}
@@ -139,7 +144,7 @@ export function ParticipantRosterEditor({ tournamentId, registrationId }: { tour
           if (!jersey.ok) { setAddError('등번호는 0에서 99 사이 숫자로 입력해 주세요.'); return; }
           if (add.isPending) return;
           try { await add.mutateAsync({ userId: form.userId, realName: form.realName, birthDate: form.birthDate,
-            eligibilityStatus: form.eligibilityStatus, ...(jersey.value === undefined ? {} : { jerseyNumber: jersey.value }) });
+            goalkeeper: form.goalkeeper, eligibilityStatus: form.eligibilityStatus, ...(jersey.value === undefined ? {} : { jerseyNumber: jersey.value }) });
             setAdding(false); setNotice('선수를 추가했어요. 시작 전 경기에도 반영돼요.');
           } catch (caught) { setAddError(extractErrorMessage(caught, '선수를 추가하지 못했어요.')); }
         }} />

@@ -235,6 +235,31 @@ export function BracketTab({
   const editFixtureTeamsLocked = editFixtureAccess === 'official' || editFixtureAccess === 'cancelled';
   const slotSideLocked = (side: 'HOME' | 'AWAY') => editFixtureAccess === 'started' && editFixture !== null && (side === 'HOME' ? editFixture.homeSlotId : editFixture.awaySlotId) !== null;
 
+  function openFixtureEditor(fixture: V1AdminBracketFixture) {
+    setEditFixture(fixture);
+    setEditFxNumber(String(fixture.fixtureNumber));
+    setEditFxScheduledAt(isoToKstDatetimeLocal(fixture.scheduledAt));
+    setEditFxVenue(fixtureVenueValue(fixture));
+    setEditFxLabels(fixtureLabelDraft(fixture));
+    setEditFxFieldId(fixture.fieldId ?? '');
+    setEditFxError(null);
+    setEditFxHomeRegId(fixture.homeRegistrationId ?? '');
+    setEditFxAwayRegId(fixture.awayRegistrationId ?? '');
+  }
+
+  async function handleFixtureCreated(fixtureId: string) {
+    try {
+      // 생성 응답은 요약이다. 실제 game·slot·팀 정보를 가진 조회 응답으로만 수정창을 연다.
+      const refreshed = await refetch();
+      if (refreshed.isError) throw refreshed.error;
+      const fixture = refreshed.data?.fixtures.find((row) => row.id === fixtureId);
+      if (!fixture) throw new Error('생성한 경기를 최신 대진에서 찾지 못했어요.');
+      openFixtureEditor(fixture);
+    } catch (error) {
+      showToast(`경기는 생성됐지만 수정 정보를 불러오지 못했어요. ${extractErrorMessage(error, '목록을 다시 불러온 뒤 수정해 주세요.')}`, 'error');
+    }
+  }
+
   const handleUpdateFixture = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editFixture) return;
@@ -803,14 +828,7 @@ export function BracketTab({
                 onRemoveGroupTeam={(groupTeamId, teamName) => void handleRemoveGroupTeam(groupTeamId, teamName)}
                 autoFocus={focusGroupId === group.id}
                 showToast={showToast}
-                onFixtureCreated={(fixture) => {
-                  setEditFixture(fixture);
-                  setEditFxNumber(String(fixture.fixtureNumber));
-                  setEditFxScheduledAt(isoToKstDatetimeLocal(fixture.scheduledAt));
-                  setEditFxVenue(fixtureVenueValue(fixture)); setEditFxLabels(fixtureLabelDraft(fixture)); setEditFxFieldId(fixture.fieldId ?? ''); setEditFxError(null);
-                  setEditFxHomeRegId(fixture.homeRegistrationId ?? '');
-                  setEditFxAwayRegId(fixture.awayRegistrationId ?? '');
-                }}
+                onFixtureCreated={(fixtureId) => void handleFixtureCreated(fixtureId)}
               />
             </div>
           ))}
@@ -906,14 +924,7 @@ export function BracketTab({
                 <span className="inline-flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => {
-                      setEditFixture(f);
-                      setEditFxNumber(String(f.fixtureNumber));
-                      setEditFxScheduledAt(isoToKstDatetimeLocal(f.scheduledAt));
-                      setEditFxVenue(fixtureVenueValue(f)); setEditFxLabels(fixtureLabelDraft(f)); setEditFxFieldId(f.fieldId ?? ''); setEditFxError(null);
-                      setEditFxHomeRegId(f.homeRegistrationId ?? '');
-                      setEditFxAwayRegId(f.awayRegistrationId ?? '');
-                    }}
+                      onClick={() => openFixtureEditor(f)}
                     aria-label={`${bracketFixtureLabel(f, groups)} 수정`}
                     className="tm-on-tint inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium whitespace-nowrap text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                   >

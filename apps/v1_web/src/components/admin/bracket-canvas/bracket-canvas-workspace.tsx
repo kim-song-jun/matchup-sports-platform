@@ -32,6 +32,7 @@ import { BracketLeagueGrid } from './bracket-league-grid';
 import { BracketLeagueStandings } from './bracket-league-standings';
 import { ByeSlotEditor } from './bye-slot-editor';
 import { BracketNodePanel } from './bracket-node-panel';
+import { FinalistAssignmentButton } from './finalist-assignment-button';
 import { BracketStandingsFillButton } from './bracket-standings-fill-button';
 import { BracketTeamTray, type RegistrationsLoadState } from './bracket-team-tray';
 import { BracketFixtureToolsDialog } from './bracket-fixture-tools-dialog';
@@ -289,6 +290,7 @@ export function BracketCanvasWorkspace({
                 빈 자리 무작위 채우기
               </Button>
             ) : null}
+            {!isEmpty && canWrite && format === 'group_knockout' ? <FinalistAssignmentButton tournamentId={tournamentId} groups={bracket.groups} showToast={showToast} /> : null}
             {!isEmpty && canWrite ? (
               <BracketStandingsFillButton
                 tournamentId={tournamentId}

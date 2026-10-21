@@ -128,6 +128,7 @@ describe('MatchCard — 진행 중·종료 경기도 시각을 유지한다 (D-1
     render(<TournamentBracket fixtures={[fixture]} groups={[]} />);
     const card = screen.getByRole('group', { name: '레드FC 대 블루FC' });
     expect(within(card).getByText('PK 5:4')).toBeInTheDocument();
+    expect(within(card).getByText('PK 5:4').parentElement).toBe(within(card).getByText('8/7 (금) 20:00').parentElement);
     expect(within(card).getByText('8/7 (금) 20:00')).toBeInTheDocument();
   });
 
@@ -240,19 +241,21 @@ it.each([['quarter', '8강', '4강'], ['semi', '4강', '결승']] as const)('%s 
 
 });
 
-it('저장된 시각과 경기장을 결선 그림에 함께 표시한다', () => {
+it('결선 그림에 시각만 표시하고 경기장은 숨긴다', () => {
   render(<TournamentBracket fixtures={[makeFixture({ id: 'saved-metadata', fixtureNumber: 31, scheduledAt: '2026-10-19T11:33:00.000Z', venue: 'A구장' })]} groups={[]} />);
   const card = screen.getByRole('group', { name: '레드FC 대 블루FC' });
   expect(within(card).getByText('10/19 (월) 20:33')).toBeInTheDocument();
-  expect(within(card).getByText('A구장')).toBeInTheDocument();
+  expect(within(card).queryByText('A구장')).not.toBeInTheDocument();
 });
 
-it('미배정 부전승은 지정 문구를 표시하고 팀 확정 뒤에도 보조로 유지한다', () => {
+it('미배정 부전승은 지정 문구를 표시하고 팀 확정 뒤에는 숨기고 승자 배경을 표시한다', () => {
   render(<TournamentBracket fixtures={[]} groups={[{ id: 'r12', name: '12강', phase: 'round12', sortOrder: 0, advanceCount: null, standings: [], qualification: null,
     groupTeams: [{ id: 'bye-empty', registrationId: null, teamId: null, teamName: null, teamLogoUrl: null, sortOrder: 0, isBye: true, displayLabel: '조 1위 중 5위' }, { id: 'bye-team', registrationId: 'reg', teamId: 'team', teamName: '확정 팀', teamLogoUrl: null, sortOrder: 2, isBye: true, displayLabel: '조 1위 중 6위' }] }]} />);
   expect(screen.getByText('조 1위 중 5위')).toBeInTheDocument();
   expect(screen.getByText('확정 팀')).toBeInTheDocument();
-  expect(screen.getByText('조 1위 중 6위')).toBeInTheDocument();
+  expect(screen.queryByText('조 1위 중 6위')).not.toBeInTheDocument();
+  expect(screen.getByText('확정 팀').closest('[role=region]')).toHaveStyle({ background: 'var(--blue50)' });
+  expect(screen.getByText('조 1위 중 5위').closest('[role=region]')).not.toHaveStyle({ background: 'var(--blue50)' });
 });
 
 

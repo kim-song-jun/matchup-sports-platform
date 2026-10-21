@@ -1,6 +1,15 @@
 # Task 20261081: 리그 경기 일정 전체/내 팀 필터
 
 Status: Review (local validation passed; alpha QA pending)
+
+## 대회 스위치 통일 후속 (2026-10-19)
+- 후속 요구: 내 팀 스위치와 전체/조별리그/결선은 독립 상태로 동작. 단계 변경은 내 팀 scope를 보존하고, 스위치를 꺼도 고른 단계 유지. URL은 teamScope와 schedulePhase를 별도로 보존하고 기존 schedulePhase=mine 링크도 호환. 진행 중/시간 미정에도 같은 필터 적용. 소속 조의 미정의 --red600을 기존 --red 토큰으로 교정, `*)` 제거 및 문구 교정. 별도 dev 기반 브랜치에서 구현·CI·alpha 검증 예정. 사용자 승인으로 이번 배포 흐름의 Copilot 리뷰 게이트는 생략.
+- 로컬 후속 검증: 격리 worktree에 frozen-lockfile 의존성 설치(원본 공유 node_modules 유지). 관련 3개 suite 116/116 PASS, 타입 검사 PASS. 패턴 검사는 Windows 기본 셸의 grep/find 미지원으로 실행 차단돼 Linux CI에 위임. diff whitespace/debt 검사 통과. 실제 alpha 계정의 대상 대회 참가 및 조별·결선 경기 존재를 API로 확인하여 배포 후 실제 브라우저 필터 검증 가능.
+- 추가 요청: 대회 bracket 탭 아래 경기 일정/조별 순위 중복 제목 제거, 순위·대진표에도 조별리그/결선 버튼 추가. 각 보기를 단일 칼럼으로 전환하며 단일 단계 포맷은 해당 보기만 제공한다. 기존 결선 회귀 테스트를 클릭 흐름으로 갱신.
+- 요청: 대회 bracket 경기 일정의 내 팀 버튼을 리그와 동일한 내 팀만 스위치로 변경.
+- 범위: public-game-records/schedule-content.tsx 및 기존 테스트, patch changeset.
+- 구현: 단계 탭에서 mine 항목을 분리하고 리그와 동일한 toggle 스타일과 switch/aria-checked 계약 적용. 기존 필터 및 전체 복원 동작 유지.
+- 검증: 내 팀 필터 켜기/끄기 및 전체 경기 복원 회귀 테스트 추가. focused Vitest 실행은 설치 의존성 문제로 시작 전 차단됨(`ERR_MODULE_NOT_FOUND: @vitest/utils`; pnpm shim 또한 Windows에서 sh를 찾지 못함). 범위 내 diff whitespace 검사 통과, 새 debt marker 없음. alpha 배포 및 viewport별 시각 검증은 미실행.
 Owner: Codex (단일 실행)
 Created: 2026-10-14
 

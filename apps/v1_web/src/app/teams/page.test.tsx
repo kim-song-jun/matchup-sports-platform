@@ -92,4 +92,67 @@ describe('teams list metadata', () => {
     expect(stripScriptTags(html)).toContain('전체 팀');
     expect(parseJsonLd(html)).toBeNull();
   });
+
+  it('direct cursor SSR renders only that page as detail anchors and gets counts from the matching first-page metadata request', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL) => {
+      const url = new URL(String(input));
+      requests.push(url.toString());
+      if (url.pathname.endsWith('/master/sports')) {
+        return envelope([
+          { id: 'sport-futsal', name: '풋살', code: 'futsal' },
+          { id: 'sport-soccer', name: '축구', code: 'soccer' },
+        ]);
+      }
+      if (url.searchParams.get('cursor') === 'cursor-page-2') {
+        return envelope({
+          items: [team('cursor-team', '두 번째 페이지 팀')],
+          nextCursor: 'cursor-page-3',
+          pageInfo: { hasNext: true, nextCursor: 'cursor-page-3' },
+        });
+      }
+      if (url.searchParams.get('includeFacets') === 'true') {
+        return envelope({
+          items: [team('metadata-only-team', '메타데이터 전용 팀')],
+          nextCursor: null,
+          pageInfo: { hasNext: true, totalCount: 105 },
+          facets: { sports: [{ sportId: 'sport-futsal', count: 94 }, { sportId: 'sport-soccer', count: 11 }] },
+        });
+      }
+      return envelope({ items: [], nextCursor: null, pageInfo: { hasNext: false, totalCount: 0 } });
+    }));
+
+    const html = await serverHtml('sportId=sport-futsal&regionId=region-seoul&sort=deadline&q=%20%20%EB%A7%88%ED%8F%AC%20FC%20%20&cursor=cursor-page-2');
+    const body = stripScriptTags(html);
+
+    const teamRequests = requests.map((request) => new URL(request)).filter((url) => url.pathname.endsWith('/teams'));
+    const cursorRequest = teamRequests.find((url) => url.searchParams.get('cursor') === 'cursor-page-2');
+    expect(cursorRequest?.searchParams.get('sportId')).toBe('sport-futsal');
+    expect(cursorRequest?.searchParams.get('regionId')).toBe('region-seoul');
+    expect(cursorRequest?.searchParams.get('query')).toBe('마포 FC');
+    expect(cursorRequest?.searchParams.get('joinPolicy')).toBe('approval_required');
+    const metadataRequest = teamRequests.find((url) => url.searchParams.get('includeFacets') === 'true');
+    expect(metadataRequest?.searchParams.get('sportId')).toBe('sport-futsal');
+    expect(metadataRequest?.searchParams.get('regionId')).toBe('region-seoul');
+    expect(metadataRequest?.searchParams.get('query')).toBe('마포 FC');
+    expect(metadataRequest?.searchParams.get('joinPolicy')).toBe('approval_required');
+    expect(metadataRequest?.searchParams.get('cursor')).toBeNull();
+    expect(metadataRequest?.searchParams.get('limit')).toBe('1');
+    expect(body).toContain('두 번째 페이지 팀');
+    expect(body).not.toContain('메타데이터 전용 팀');
+    expect(body).toContain('105');
+    expect(body).toContain('94');
+    expect(body).toContain('11');
+    expect(body).toContain('href="/teams/cursor-team?from=');
+    const continuationHref = body.match(/href="([^"]*cursor=cursor-page-3[^"]*)"/)?.[1]?.replaceAll('&amp;', '&');
+    expect(continuationHref).toBeDefined();
+    const continuationUrl = new URL(continuationHref!, 'https://teameet.test');
+    expect(continuationUrl.searchParams.get('cursor')).toBe('cursor-page-3');
+    expect(continuationUrl.searchParams.get('sportId')).toBe('sport-futsal');
+    expect(continuationUrl.searchParams.get('regionId')).toBe('region-seoul');
+    expect(continuationUrl.searchParams.get('sort')).toBe('deadline');
+    expect(continuationUrl.searchParams.get('q')).toBe('마포 FC');
+    expect(continuationUrl.searchParams.get('query')).toBeNull();
+    expect(continuationUrl.searchParams.get('joinPolicy')).toBeNull();
+    expect(parseJsonLd(html)).toBeNull();
+  });
 });

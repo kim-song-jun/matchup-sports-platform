@@ -3688,6 +3688,8 @@ export type V1TournamentListItem = {
 
 /** Serialized by TournamentsAdminService.serialize — admin view (includes bank / player range) */
 export type V1Tournament = {
+  /** 관리자 상세 응답. 실제 시작·기록·결과가 없어 대회 시작을 되돌릴 수 있는가. */
+  canRevertStart?: boolean;
   /** 관리자 상세 응답: null이면 형식 변경 가능. */
   formatChangeBlockedReason?: string | null;
   id: string;
@@ -4272,6 +4274,7 @@ export type V1TournamentRosterResponse = {
 };
 
 export type V1AdminTournamentPlayer = V1TournamentPlayer & {
+  goalkeeper: boolean;
   /** 현재 프로필 닉네임. 프로필이 없으면 null이며 등록 당시 실명과 별도 필드다. */
   nickname: string | null;
   phone: string | null;
@@ -4773,6 +4776,8 @@ export type V1CancelRegistrationRequestPayload = {
 };
 
 export type V1AddPlayerPayload = {
+  /** 골레이 여부. 생략 시 false. */
+  goalkeeper?: boolean;
   userId: string;
   realName: string;
   birthDate?: string;
@@ -4839,6 +4844,16 @@ export type V1UpdateFixturePayload = {
 /** 시작된 경기의 팀을 바꾸면 서버가 옛 팀 기록을 지우고 그 결과를 알려 준다. */
 export type V1UpdateFixtureResult = V1AdminBracketFixture & {
   startedTeamChange: { removedEventCount: number; score: { home: number; away: number } } | null;
+};
+
+/** 생성 API의 요약 응답. game·result·팀 이름·slot 정보는 대진 목록을 다시 조회해야 한다. */
+export type V1CreateFixtureResponse = Pick<V1AdminBracketFixture,
+  'id' | 'tournamentId' | 'groupId' | 'round' | 'fixtureNumber' | 'legNumber' |
+  'parentFixtureId' | 'homeRegistrationId' | 'awayRegistrationId' | 'scheduledAt' |
+  'venue' | 'fieldId' | 'createdAt' | 'updatedAt'
+> & {
+  place: V1PlaceView | null;
+  status: 'scheduled' | 'completed' | 'cancelled';
 };
 
 export type V1CreateFixturePayload = {

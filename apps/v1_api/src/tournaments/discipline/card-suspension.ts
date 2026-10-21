@@ -14,6 +14,7 @@
  */
 
 import { withEuroRo } from '../../common/korean-josa';
+import { classifyGameCards } from '../league-fair-play';
 
 /** 한 경기에서 그 선수가 받은 카드. `V1GameResultParticipant.cards` 의 실제 저장 모양이다. */
 export interface GameCards {
@@ -49,7 +50,7 @@ export interface SuspensionRules {
 export interface SuspensionVerdict {
   /** 지금(=`upcomingGameOrder` 경기) 출전이 막히는가. */
   readonly suspended: boolean;
-  /** 누적 옐로 총합(정지 소진분 차감 전 원본). */
+  /** 경고 누적에 세는 옐로 총합(정지 소진분 차감 전). 레드 정지 규정이 있으면 레드로 바뀐 옐로는 뺀다. */
   readonly yellowTotal: number;
   /** 누적 레드 총합. */
   readonly redTotal: number;
@@ -87,6 +88,8 @@ function isPositive(value: number | null): value is number {
  *   여러 장이면 정지가 누적된다(연달아 소화).
  * - **경고 누적**: 옐로 총합이 한도의 배수에 도달할 때마다 그 시점의 *다음* 경기
  *   1경기 정지. 예: 한도 2 → 2장째에 1경기, 4장째에 또 1경기.
+ * - **두 번째 옐로 퇴장**: 레드 정지 규정이 있으면 레드로 바뀐 옐로 2장은 누적에 넣지 않는다
+ *   (`classifyGameCards`). 옐로 → 옐로 → 레드는 퇴장 1회로만 정지된다.
  * - 이미 치른 경기는 정지를 **소진**한다. 그래서 정지된 경기를 지나면 자동으로 풀린다.
  *
  * **소진은 출전 기록이 아니라 일정 순서로 센다.** 결장한 경기는 로스터에 없어
@@ -108,24 +111,30 @@ export function evaluateSuspension(input: {
 
   // 아직 치르지 않은(=이 경기 이후의) 기록은 판정에 쓰지 않는다. 결과 정정으로
   // 미래 경기의 카드가 먼저 들어오는 경우가 실제로 있다.
+  // 두 번째 옐로로 받은 레드는 레드 몫으로만 센다 — 레드로 바뀐 옐로 2장을 경고 누적에 또 넣으면 같은 반칙으로
+  // 두 번 정지된다(MD-QA #174). 레드 정지 규정이 꺼져 있으면 그 레드가 벌하지 않으므로 옐로를 그대로 센다.
+  const redPunishes = isPositive(rules.redCardSuspensionMatches);
   const priorGames = played
     .filter((game) => game.gameOrder < upcomingGameOrder)
     .slice()
-    .sort((a, b) => a.gameOrder - b.gameOrder);
+    .sort((a, b) => a.gameOrder - b.gameOrder)
+    .map((game) => {
+      const yellow = normalize(game.cards.yellow);
+      const red = normalize(game.cards.red);
+      return { gameOrder: game.gameOrder, yellow: redPunishes ? classifyGameCards({ yellow, red }).yellow : yellow, red };
+    });
 
-  const yellowTotal = priorGames.reduce((sum, game) => sum + normalize(game.cards.yellow), 0);
-  const redTotal = priorGames.reduce((sum, game) => sum + normalize(game.cards.red), 0);
+  const yellowTotal = priorGames.reduce((sum, game) => sum + game.yellow, 0);
+  const redTotal = priorGames.reduce((sum, game) => sum + game.red, 0);
 
   // 정지가 "몇 번째 경기부터" 걸리는지를 경기 순서로 누적한다.
   // suspendedUntil = 이 순서 미만의 경기는 못 뛴다(= 이 순서부터 출전 가능).
   let servedFrom = 0;
   let runningYellow = 0;
 
-  for (const game of priorGames) {
-    const yellow = normalize(game.cards.yellow);
-    const red = normalize(game.cards.red);
+  for (const { gameOrder, yellow, red } of priorGames) {
     // 정지는 이 경기 "다음"부터 시작한다. 이미 더 뒤로 밀려 있으면 그 지점부터 이어 붙인다.
-    const startFrom = Math.max(servedFrom, game.gameOrder + 1);
+    const startFrom = Math.max(servedFrom, gameOrder + 1);
     let added = 0;
 
     if (isPositive(rules.redCardSuspensionMatches) && red > 0) {

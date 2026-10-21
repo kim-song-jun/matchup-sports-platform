@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import * as publicListSeed from './public-list-seed';
 import {
   TEAM_LIST_PAGE_SIZE,
   TEAM_LIST_SEED_PATH,
@@ -19,6 +20,46 @@ describe('TEAM_LIST_SEED_PATH', () => {
 });
 
 describe('filtered public-list seed requests', () => {
+  it('builds a crawlable UI URL from normalized filters while preserving the UI query dialect', () => {
+    const path = publicListSeed.teamListContinuationPath({
+      sportId: 'sport-futsal',
+      regionId: 'region-seoul',
+      genderRule: '남',
+      levels: '입문, novice,unknown',
+      sort: 'deadline',
+      q: '  마포 FC  ',
+      cursor: 'cursor/opaque +value',
+    });
+    expect(path).toBeDefined();
+    const params = new URL(path!, 'https://teameet.test').searchParams;
+
+    expect(params.get('sportId')).toBe('sport-futsal');
+    expect(params.get('regionId')).toBe('region-seoul');
+    expect(params.get('genderRule')).toBe('남');
+    expect(params.get('levelCodes')).toBe('beginner,novice');
+    expect(params.get('sort')).toBe('deadline');
+    expect(params.get('joinPolicy')).toBeNull();
+    expect(params.get('q')).toBe('마포 FC');
+    expect(params.get('query')).toBeNull();
+    expect(params.get('cursor')).toBe('cursor/opaque +value');
+    expect(params.get('limit')).toBeNull();
+    expect(params.get('includeFacets')).toBeNull();
+  });
+
+  it('uses cursor rows for direct SSR while keeping aggregate metadata on the matching first-page request', () => {
+    const cursorPath = teamListSeedPath({ sportId: 'sport-futsal', cursor: 'cursor-2' });
+    const cursorParams = new URL(cursorPath, 'https://teameet.test').searchParams;
+    expect(cursorParams.get('sportId')).toBe('sport-futsal');
+    expect(cursorParams.get('cursor')).toBe('cursor-2');
+    expect(cursorParams.get('includeFacets')).toBeNull();
+
+    const metadata = new URL(publicListSeed.teamListMetadataPath({ sportId: 'sport-futsal', cursor: 'cursor-2' }), 'https://teameet.test').searchParams;
+    expect(metadata.get('sportId')).toBe('sport-futsal');
+    expect(metadata.get('cursor')).toBeNull();
+    expect(metadata.get('limit')).toBe('1');
+    expect(metadata.get('includeFacets')).toBe('true');
+  });
+
   it('normalizes team filters exactly like the list client, including query trim and level aliases', () => {
     const path = teamListSeedPath({
       sportId: ['sport-futsal', 'ignored'],

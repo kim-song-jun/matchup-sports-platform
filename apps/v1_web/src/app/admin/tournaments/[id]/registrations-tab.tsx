@@ -2,12 +2,14 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { AdminPlayerSettingsEditor } from '@/components/admin/admin-player-settings-editor';
 import { ClipboardList, Download, Lock, Unlock, Check, X, Users, User, Clock, AlertCircle, Undo2, Timer, TimerOff, ListChecks } from 'lucide-react';
 import { useV1AdminTournamentRegistrations, useV1ConfirmPayment, useV1ConfirmRegistration, useV1CancelRegistrationAdmin, useV1RejectCancelRequest, useV1RosterLock, useV1RosterUnlock, useV1RosterDeadlineOverrideGrant, useV1RosterDeadlineOverrideRevoke, useV1ExportRosterCsv, useV1ExportTournamentRosterCsv, useV1AdminTournamentPlayers, useV1UpdatePlayerEligibility, useV1AdminAddPlayer, useV1AdminRemovePlayer, useV1AdminRosterEligibleMembers } from '@/hooks/use-v1-api';
 import type { V1AdminTournamentRegistration } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { registrationCancelOutcomeLabel } from '@/lib/v1-status-labels';
 import { V1ApiError } from '@/lib/api-client';
+import { formatRosterBirthDate } from '@/lib/roster-birth-date';
 import { v1Keys } from '@/lib/query-keys';
 import { AdminCardList, AdminEmpty } from '@/components/admin';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
@@ -187,10 +189,10 @@ export function RosterModal({
         <ul className="flex flex-col gap-2 max-h-[60vh] overflow-y-auto" role="list">
           {players.map((p) => (
             <li
-              key={p.id}
-              className="flex items-center gap-3 py-2 border-b border-[var(--border)] last:border-0"
+              key={`${registration?.id}-${p.id}-${open}`}
+              className="flex flex-wrap items-center gap-3 py-2 border-b border-[var(--border)] last:border-0"
             >
-              <div className="flex-1 min-w-0">
+              <div className="flex-1 min-w-[140px]">
                 <div className="flex min-w-0 items-center gap-2">
                   {/* 정본 §3 "명단 공개 = 등번호·이름". 번호 없는 선수는 자리를 비우지 않고
                       "—" 로 둔다 — 열이 들쭉날쭉하면 번호가 있는지 없는지가 안 읽힌다.
@@ -213,7 +215,7 @@ export function RosterModal({
                   ) : null}
                 </div>
                 <p className="text-xs text-[var(--text-muted)]">
-                  {p.birthDateSnapshot ?? '생년월일 미등록'} ·{' '}
+                  {p.birthDateSnapshot ? formatRosterBirthDate(p.birthDateSnapshot) : '생년월일 미등록'} ·{' '}
                   {p.genderSnapshot ? GENDER_LABEL[p.genderSnapshot] : '성별 미등록'}
                 </p>
                 <p className="mt-0.5 text-xs text-[var(--text-muted)]">
@@ -240,6 +242,12 @@ export function RosterModal({
               >
                 제외
               </button>
+              <AdminPlayerSettingsEditor
+                registrationId={registration?.id ?? ''}
+                player={p}
+                canWrite={canWrite}
+                showToast={showToast}
+              />
             </li>
           ))}
         </ul>

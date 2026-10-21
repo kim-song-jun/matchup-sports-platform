@@ -26,7 +26,7 @@
   "src/components/my/preferred-position-picker.tsx": 1,
   "src/components/public-game-records/live-badge.tsx": 1,
   "src/components/public-game-records/match-detail-content.tsx": 3,
-  "src/components/public-game-records/schedule-content.tsx": 5,
+  "src/components/public-game-records/schedule-content.tsx": 4,
   "src/components/public-game-records/team-records-content.tsx": 1,
   "src/components/public-game-records/user-records-content.tsx": 3,
   "src/components/reviews/reviews-page.tsx": 1,

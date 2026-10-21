@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { makeBracket, makeFixture, makeGroup, makeRegistration, makeSlot, makeStanding } from '@/test/bracket-canvas-fixtures';
 import type { RegistrationsLoadState } from './bracket-team-tray';
@@ -8,6 +9,9 @@ const { bracketState, refetch } = vi.hoisted(() => ({
   bracketState: { value: {} as Record<string, unknown> },
   refetch: vi.fn(),
 }));
+
+const { previewGet } = vi.hoisted(() => ({ previewGet: vi.fn() }));
+vi.mock('@/lib/api-client', async (original) => ({ ...await original<typeof import('@/lib/api-client')>(), v1Get: previewGet }));
 
 vi.mock('@/hooks/use-v1-api', () => ({ useV1AdminBracket: () => bracketState.value }));
 vi.mock('./bracket-canvas-mobile', () => ({
@@ -49,6 +53,17 @@ beforeEach(() => {
 });
 
 describe('BracketCanvasMobileScreen', () => {
+  it('모바일 수동 대진에서도 결선 배정을 열고 실제 미리보기 API를 조회한다', async () => {
+    bracketState.value = { data: makeBracket({ ...bracket, groups: [makeGroup({ id: 'g-a', phase: 'group', name: 'A조' }), ...bracket.groups], slots: [] }), isPending: false, isError: false, error: null, refetch };
+    previewGet.mockResolvedValue({ version: 'v', groups: [], targets: [], blockedReason: '모든 조별 경기의 공식 결과를 확정해 주세요.' });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={client}><BracketCanvasMobileScreen tournamentId="t-1" registrations={registrations} registrationsState={registrationsState} canWrite format="group_knockout" showToast={vi.fn()} /></QueryClientProvider>);
+    fireEvent.click(screen.getByRole('button', { name: '결선 진출팀 배정' }));
+    await screen.findByText('모든 조별 경기의 공식 결과를 확정해 주세요.');
+    expect(previewGet).toHaveBeenCalledWith('/admin/tournaments/t-1/bracket/finalist-preview');
+    expect(screen.getByRole('button', { name: '조별 교차 자동 배정' })).toBeDisabled();
+  });
+
   it('응답에서 만든 라운드·자리와 확정된 참가팀만 후보로 모바일 목록에 넘긴다', () => {
     renderScreen();
     const mobile = screen.getByTestId('mobile-canvas');

@@ -66,8 +66,8 @@ export function BracketCanvasNode({
   const voided = revision?.state === 'VOID';
   const score = voided ? null : (revision?.score ?? null);
   const quick = !voided && revision?.entryMethod === 'quick';
-  const penalty = score?.penalties ? `승부차기 ${score.penalties.home}:${score.penalties.away}` : null;
-  const when = `${fixture.scheduledAt ? `${formatKstDateShort(fixture.scheduledAt)} ${formatKstTime(fixture.scheduledAt)}` : '시간 미정'} · ${fixture.venue || '경기장 미정'}`;
+  const penalty = score?.penalties ? `PK ${score.penalties.home}:${score.penalties.away}` : null;
+  const when = `${fixture.scheduledAt ? `${formatKstDateShort(fixture.scheduledAt)} ${formatKstTime(fixture.scheduledAt)}` : '시간 미정'}`;
   const footer = [voided ? '무효 처리됨' : quick ? '어드민 빠른 입력' : null, penalty].filter((part): part is string => part !== null);
 
   const resolvedSlots = new Map([slots.HOME, slots.AWAY].filter((slot): slot is V1AdminBracketSlot => slot !== null).map((slot) => [slot.id, slot]));
@@ -84,8 +84,8 @@ export function BracketCanvasNode({
       <div
         key={side}
         data-side={side}
-        className="border-t border-[var(--border)]"
-        style={{ height: CANVAS_ROW_HEIGHT }}
+        className="tm-on-tint border-t border-[var(--border)]"
+        style={{ height: CANVAS_ROW_HEIGHT, background: filled && slot?.kind === 'BYE' ? 'var(--blue50)' : undefined }}
         onDragOver={assignable ? (event: DragEvent) => event.preventDefault() : undefined}
         onDrop={
           assignable
@@ -108,7 +108,6 @@ export function BracketCanvasNode({
             style={{ color: filled || placing ? 'var(--text-strong)' : 'var(--text-muted)' }}
           >
             {sideLabels[side]}
-            {filled && slot?.kind === 'BYE' ? <span className="tm-text-caption block truncate font-normal text-[var(--text-muted)]">{slot.label}</span> : null}
           </span>
           {placing ? (
             <span className="tm-text-caption-strong shrink-0" style={{ color: 'var(--blue700)' }}>
@@ -155,11 +154,11 @@ export function BracketCanvasNode({
       {renderSide('HOME')}
       {renderSide('AWAY')}
       <div
-        className="tm-text-caption flex flex-col justify-center items-start gap-0 border-t border-[var(--border)] px-3"
+        className="tm-text-caption flex items-center justify-between gap-2 whitespace-nowrap border-t border-[var(--border)] bg-[var(--grey50)] px-2"
         style={{ height: CANVAS_FOOTER_HEIGHT, color: 'var(--text-muted)' }}
       >
-        <span className="w-full truncate">{when}</span>
-        {footer.length ? <span className="flex min-w-0 w-full items-center gap-1">{quick ? <Zap size={12} aria-hidden="true" /> : null}<span className="truncate">{footer.join(' · ')}</span></span> : null}
+        <span className="shrink-0">{when}</span>
+        {footer.length ? <span className="flex min-w-0 items-center gap-1" title={footer.join(' · ')}>{quick ? <Zap size={12} aria-label="어드민 빠른 입력" className="shrink-0" /> : null}<span className="shrink-0">{voided ? '무효 처리됨' : penalty}</span></span> : null}
       </div>
     </div>
   );

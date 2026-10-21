@@ -2,11 +2,13 @@ import { renderToString } from 'react-dom/server';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BracketPageContent } from './bracket-page-client';
 import { publicGameRecordsKeys } from '@/components/public-game-records/use-public-game-records';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
+import { setupServer } from 'msw/node';
 import { server } from '@/test/msw/server';
+import { saveStoredV1Session, V1_USER_ID_KEY, V1_USER_EMAIL_KEY } from '@/lib/session-storage';
 import { renderBracketPage, renderBracketStandingsTab } from './bracket-test-utils';
 import { AppBackLink } from '@/components/v1-ui/app-back-link';
 import { __resetNavigationHistoryForTests } from '@/lib/navigation-history';
@@ -37,6 +39,9 @@ vi.mock('next/navigation', async (importOriginal) => ({
 }));
 
 afterEach(() => {
+  window.localStorage.removeItem('teameet.v1.session');
+  window.localStorage.removeItem(V1_USER_ID_KEY);
+  window.localStorage.removeItem(V1_USER_EMAIL_KEY);
   setMockSearchParams(new URLSearchParams());
   setMockPathname('/tournaments/tour-1/bracket');
   replace.mockClear();
@@ -528,8 +533,8 @@ describe('BracketPageContent — 순위표 팀 링크', () => {
  * completed/cancelled일 때만 뜬다. 예전엔 group.advanceCount만 있으면 1경기만
  * 끝나도 확정처럼 보였다(오너 지적의 핵심 리그레션).
  */
-describe('BracketPageContent — 진출 배지는 조별리그 완료 후에만', () => {
-  it('조별리그가 아직 안 끝났으면 "상위 N팀 진출" 배지를 렌더하지 않고 정직한 안내를 보여준다', () => {
+describe('BracketPageContent — 조별 진출 안내 문구 제거', () => {
+  it('조별리그가 아직 안 끝났으면 "상위 N팀 진출" 배지와 대기 안내를 모두 숨긴다', () => {
     const tournament = makeTournament({
       id: 'tour-3',
       status: 'in_progress',
@@ -568,10 +573,10 @@ describe('BracketPageContent — 진출 배지는 조별리그 완료 후에만'
     renderBracketStandingsTab(tournament);
 
     expect(screen.queryByText(/상위 2팀 진출/)).not.toBeInTheDocument();
-    expect(screen.getByText('조별리그가 끝나면 진출 팀이 정해져요')).toBeInTheDocument();
+    expect(screen.queryByText('조별리그가 끝나면 진출 팀이 정해져요')).not.toBeInTheDocument();
   });
 
-  it('조별리그의 모든 픽스처가 completed/cancelled면 "상위 N팀 진출" 배지를 렌더한다', () => {
+  it('조별리그의 모든 픽스처가 completed/cancelled여도 진출 안내 문구를 숨긴다', () => {
     const tournament = makeTournament({
       id: 'tour-4',
       status: 'in_progress',
@@ -609,7 +614,7 @@ describe('BracketPageContent — 진출 배지는 조별리그 완료 후에만'
 
     renderBracketStandingsTab(tournament);
 
-    expect(screen.getByText(/상위 2팀 진출/)).toBeInTheDocument();
+    expect(screen.queryByText(/상위 2팀 진출/)).not.toBeInTheDocument();
     expect(screen.queryByText('조별리그가 끝나면 진출 팀이 정해져요')).not.toBeInTheDocument();
   });
 
@@ -724,7 +729,7 @@ describe('BracketPageContent — 진출 배지는 조별리그 완료 후에만'
 
     expect(highlightedTeams(screen.getByRole('table', { name: 'A조 순위표' }))).toEqual([]);
     expect(screen.queryByText('동률 — 운영자가 진출 팀을 정해요')).not.toBeInTheDocument();
-    expect(screen.getByText('조별리그가 끝나면 진출 팀이 정해져요')).toBeInTheDocument();
+    expect(screen.queryByText('조별리그가 끝나면 진출 팀이 정해져요')).not.toBeInTheDocument();
   });
 });
 
@@ -751,6 +756,7 @@ describe('BracketPageContent — 생성된 결선 fixture는 조별리그 중에
     renderBracketStandingsTab(tournament);
 
     expect(screen.queryByText(/대진표는 조별리그가 끝난 후/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: '결선' }));
     expect(screen.getAllByText('미정')).toHaveLength(3);
   });
 
@@ -776,7 +782,14 @@ describe('BracketPageContent — 생성된 결선 fixture는 조별리그 중에
     renderBracketStandingsTab(tournament);
 
     expect(screen.queryByText(/대진표는 조별리그가 끝난 후/)).not.toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: '조별리그' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByRole('heading', { name: '조별 순위' })).not.toBeInTheDocument();
+    expect(screen.queryByText('결승 홈팀')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: '결선' }));
     expect(screen.getByText('결승 홈팀')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: '결선' })).toHaveAttribute('aria-selected', 'true');
+    fireEvent.click(screen.getByRole('tab', { name: '조별리그' }));
+    expect(screen.queryByText('결승 홈팀')).not.toBeInTheDocument();
   });
 
   it('knockout 포맷은 조별리그 자체가 없으므로 처음부터 대진표를 보여준다', () => {
@@ -814,7 +827,7 @@ describe('BracketPageContent — 결선 라운드 수에 따른 칼럼 배분 �
   const groupsDone = [makeGroup({ id: 'group-a', phase: 'group', name: 'A조', advanceCount: 2 })];
   const groupFixture = makeFixture({ id: 'fx-group', groupId: 'group-a', round: 'group', status: 'completed' });
 
-  it('결선이 결승뿐이면 순위표 쪽을 넓히는 클래스를 붙인다', () => {
+  it('단계별 보기는 순위표와 결선을 한 칼럼씩 표시한다', () => {
     const { container } = renderBracketStandingsTab(
       makeTournament({
         id: 'tour-slim',
@@ -825,7 +838,10 @@ describe('BracketPageContent — 결선 라운드 수에 따른 칼럼 배분 �
       }),
     );
 
-    expect(container.querySelector('.tm-bracket-page-grid-slim-bracket')).toBeInTheDocument();
+    expect(container.querySelector('.tm-bracket-page-grid-slim-bracket')).not.toBeInTheDocument();
+    expect(container.querySelectorAll('.tm-tourn-sub-col')).toHaveLength(1);
+    fireEvent.click(screen.getByRole('tab', { name: '결선' }));
+    expect(container.querySelectorAll('.tm-tourn-sub-col')).toHaveLength(1);
   });
 
   // 4강+결승은 대진표 최소 폭이 2×216+120 = 552px라 좁힌 칼럼(460px)에 안 들어간다.
@@ -1359,5 +1375,35 @@ describe('BracketPageContent — 대회 상세로 돌아가는 링크는 받은 
 
     expect(screen.getByRole('link', { name: '대회 정보 보기' })).toHaveAttribute('href', '/tournaments/tour-1');
     expect(screen.getByRole('link', { name: '대회 정보로 이동' })).toHaveAttribute('href', '/tournaments/tour-1');
+  });
+});
+
+
+describe('BracketPageContent — 소속 팀 조 우선 표시', () => {
+  const server = setupServer(
+    http.get('*/api/v1/me/teams', () => HttpResponse.json({ status: 'success', data: { items: [{ teamId: 'my-team' }] } })),
+  );
+  afterEach(() => {
+    server.close();
+    vi.unstubAllEnvs();
+  });
+
+  it.each([true, false])('소속 팀이 있는 조만 상단에 모으고 표시한다 (로그인=%s)', async (loggedIn) => {
+    vi.stubEnv('NEXT_PUBLIC_API_URL', 'http://localhost/api/v1');
+    server.listen({ onUnhandledRequest: 'bypass' });
+    if (loggedIn) saveStoredV1Session({ userId: 'bracket-member' });
+    const groups = ['A조', 'B조', 'C조'].map((name, index) => makeGroup({
+      id: `group-${index}`, name, phase: 'group', sortOrder: index,
+      groupTeams: [{ id: `gt-${index}`, registrationId: `r-${index}`, teamId: index > 0 ? 'my-team' : 'other', teamName: name, teamLogoUrl: null, sortOrder: 0 }],
+    }));
+    renderBracketStandingsTab(makeTournament({ id: 'mine', status: 'in_progress', format: 'group_knockout', groups }));
+    if (loggedIn) {
+      const labels = await screen.findAllByText('우리 팀이 속한 조예요');
+      expect(labels).toHaveLength(2);
+      for (const label of labels) expect(label).toHaveStyle({ color: 'var(--red)' });
+    } else expect(screen.queryByText('우리 팀이 속한 조예요')).not.toBeInTheDocument();
+    const sections = screen.getAllByRole('region', { name: /^[ABC]조 순위$/ });
+    expect(sections.map((section) => section.getAttribute('aria-label'))).toEqual(loggedIn ? ['B조 순위', 'C조 순위', 'A조 순위'] : ['A조 순위', 'B조 순위', 'C조 순위']);
+    window.localStorage.removeItem('teameet.v1.session');
   });
 });

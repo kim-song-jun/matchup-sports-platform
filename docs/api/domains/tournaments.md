@@ -231,6 +231,9 @@ Campaign admin routes inherit `V1AuthGuard`. Production accepts only the signed 
 
 ## Admin tournament status transitions (2026-10-09)
 
+`GET /admin/tournaments/:id` includes `canRevertStart` (boolean). It is true only for an `in_progress` tournament without a started/recorded/result-bearing fixture. Automatic submitted lineups alone do not count as kickoff. The UI exposes the existing reason-based reverse action only when true; a stale client cannot bypass the server recheck. `in_progress -> closed` takes the tournament advisory/row lock, then Game and TeamMatch locks in the existing order and rechecks fixture state/period timestamps/events/result revisions before updating status and audit in one transaction. Any started/recorded fixture returns `409 TOURNAMENT_ALREADY_STARTED`; blank reason returns `400 TOURNAMENT_STATUS_REASON_REQUIRED`. Scheduled fixtures and untouched cancelled fixtures are preserved, as are registrations and rosters. This does not reopen registration (`closed -> open` remains a separate action), and the tournament endpoint continues to reject league IDs.
+
+
 `POST /admin/tournaments/:id/status` `{ status, reason? }` follows this table (`TOURNAMENT_TRANSITIONS` in `tournaments-admin.service.ts`):
 
 | from | to |
@@ -238,12 +241,12 @@ Campaign admin routes inherit `V1AuthGuard`. Production accepts only the signed 
 | draft | open, cancelled |
 | open | closed, cancelled |
 | closed | open, in_progress, cancelled |
-| in_progress | completed, cancelled |
+| in_progress | closed (only before any fixture has started or acquired records/results), completed, cancelled |
 | completed | **in_progress** (revert completion) |
 | cancelled | **draft** (restore) |
 
-- The two reverse transitions require a non-blank `reason` (`400 TOURNAMENT_STATUS_REASON_REQUIRED`); it is stored on the `tournament.status` admin action log and the status change log.
-- Everything else, including `in_progress -> open|closed`, still returns `409 TOURNAMENT_STATUS_TRANSITION_INVALID`.
+- All three reverse transitions (`in_progress -> closed`, `completed -> in_progress`, `cancelled -> draft`) require a non-blank `reason` (`400 TOURNAMENT_STATUS_REASON_REQUIRED`); it is stored on the `tournament.status` admin action log and the status change log.
+- Everything else, including `in_progress -> open`, still returns `409 TOURNAMENT_STATUS_TRANSITION_INVALID`.
 - Reverting completion changes only `status`. Awards, standings and reviews are derived from `status === 'completed'`, so they are hidden again until the tournament is completed again. Review-request notifications are sent on the first completion only (a prior `completed` status log suppresses re-sending).
 - A restored draft is not publicly listed or readable (draft/cancelled return 404 to consumers) until it is opened again, which re-runs the paid-tournament payment-instruction check.
 
@@ -314,6 +317,13 @@ inactive pin fails with `409 COMPETITION_CONFIG_REQUIRED` and rolls back both fi
 The deterministic fixture command is derived from tournament, round, fixture number, and leg;
 an occupied coordinate with the same payload returns its current canonical fixture, while a changed payload at that coordinate returns
 `409 COMMAND_IDEMPOTENCY_PAYLOAD_REUSE`.
+
+생성 응답은 `SerializedCanonicalFixture` 형태의 요약(`id`, 대회·조·라운드·번호,
+등록 ID, 시각·장소·field, 상태·생성/수정 시각)이다. `game`, `result`, `videos`,
+팀 이름, `homeSlotId`/`awaySlotId`, 진출 연결은 상세 대진 조회 응답에만 있다.
+웹 생성 훅은 `V1CreateFixtureResponse`로 구분한다. 생성 후 수정창을 열려면
+`GET /admin/tournaments/:tournamentId/bracket`에서 같은 경기 ID의 상세 정보를 다시 조회한다.
+생성 성공 뒤 이 조회가 실패한 경우는 생성 실패가 아니며, 자동으로 생성 요청을 재전송하지 않는다.
 
 ### 경기 추가 요청 고유 키 (`clientCommandId`)
 
@@ -475,6 +485,9 @@ including operator-seeded and promoted teams. `draft`, `submitted`, `waitlisted`
 
 `POST /players` only accepts an active member of the registration team.
 
+`AddPlayerDto.goalkeeper` is an optional boolean (not null); omitted means `false`. Create and restore persist the selected value in the existing `V1TournamentPlayer.goalkeeper` column in the same transaction. The response includes `goalkeeper` (boolean). The existing roster-resync outbox applies it to unstarted tournament/league games; started games keep their snapshots. In the add-player UI it is labelled **골레이로 등록해요**. The read-only gender field comes from the selected member profile and is never submitted as client-authored gender. Existing profile/gender eligibility and roster permission/lock/deadline gates are unchanged.
+
+
 The service reads the selected member's profile and phone from the team membership user record. A member can be added only when all required source fields exist:
 
 - `profile.displayName` as real name
@@ -556,10 +569,10 @@ All team roster mutations lock the registration row and re-read `rosterLockedAt`
 
 ### 시작 전 대진 삭제 (2026-10-05)
 
-- `DELETE /admin/fixtures/:fixtureId`: V1AuthGuard + mutation admin. tournament draft/open/closed, TeamMatch matched, Game SCHEDULED, 결과 리비전 없음일 때 `{ deleted: true }`.
+- `DELETE /admin/fixtures/:fixtureId`: V1AuthGuard + mutation admin. tournament draft/open/closed/in_progress, TeamMatch matched, Game SCHEDULED, 결과 리비전 없음일 때 `{ deleted: true }`. 대회가 시작되어도 경기 자체가 미시작이면 삭제 가능하다.
 - Game은 CANCELLED, 공개 정책 STATUS_ONLY, TeamMatch는 archived/deletedAt으로 숨긴다. Game·감사·스태프 이력을 물리 삭제하지 않는다. 일정/용병 모집은 취소한다.
 - 원래 라운드/번호는 관리자 감사에 남기고 Details는 group/parent를 해제하고 round를 <originalRound>:deleted:<fixtureId>로 보관해 같은 대진 번호 재등록 및 빈 조 삭제를 허용한다.
-- 대회/경기 시작 `409 FIXTURE_ALREADY_STARTED`, 결과 `409 FIXTURE_HAS_RESULT`(경기 수정 PATCH 는 아래 `FIXTURE_RESULT_MUST_BE_VOIDED` 로 바뀜), 연결된 다음 경기 팀 배정/시작 `409 FIXTURE_DOWNSTREAM_ASSIGNED`, 하위 경기 `409 FIXTURE_HAS_CHILDREN`. 미정 다음 경기 연결은 원자적으로 해제한다.
+- 대회 종료·취소/허용 외 상태 또는 경기 미시작 조건 불충족 `409 FIXTURE_ALREADY_STARTED`, 결과 `409 FIXTURE_HAS_RESULT`(경기 수정 PATCH 는 아래 `FIXTURE_RESULT_MUST_BE_VOIDED` 로 바뀜), 연결된 다음 경기 팀 배정/시작 `409 FIXTURE_DOWNSTREAM_ASSIGNED`, 하위 경기 `409 FIXTURE_HAS_CHILDREN`. 미정 다음 경기 연결은 원자적으로 해제한다.
 - TBD 부전승은 Game/TeamMatch를 만들지 않으며 `DELETE /admin/group-teams/:id`로 자리 삭제. 미정 자리는 별도 V1TournamentByeSlot에 저장하고 응답에서 registrationId=null, isBye=true로 표시한다. 기존 GroupTeam의 필수 등록 계약은 유지한다. 팀 배정/미정 전환은 같은 id를 유지하며 두 저장소 사이에서 원자적으로 이동한다. 공개 신원/대진 게이트 유지.
 
 ### 대진 번호 수정 (2026-10-05)
@@ -662,3 +675,36 @@ Schema migration `20261017010000_bracket_display_labels` adds nullable varchar(1
 
 
 공개 상세 `groups[].groupTeams[].byeTarget`은 BYE 슬롯이 연결된 `{ fixtureId, side: 'HOME' | 'AWAY' }` 또는 null이다. 팀 미배정·문구 변경과 무관하게 canonical TeamMatch의 homeSlotId/awaySlotId로 조회하며, 비부전승·미연결은 null이다. 대진 비공개 시 groups/fixtures 숨김 정책은 그대로다. 공개 그림은 이 명시적 연결을 우선하며 슬롯 없는 기존 대진은 기존 registration 배정 연결을 유지한다. 번호·정렬로 진출 관계를 추정하지 않는다.
+
+
+### Admin roster player settings (2026-10-20)
+
+`PATCH /api/v1/admin/registrations/:registrationId/players/:playerId/settings` accepts required
+`jerseyNumber: number | null` and optional `goalkeeper: boolean`. Omitted GK preserves the stored value, including legacy null. Number is an integer 0–99; null clears it.
+Owner/ops admins only (`getMutationAdmin`); support receives 403. Registration and active player must match
+(404 otherwise). Existing admin roster mutability gates apply: lock/deadline can be bypassed, cancelled/terminal
+competition states cannot. Active jersey duplicates within a registration return
+409 `ROSTER_DUPLICATE_JERSEY_NUMBER`. The registration row lock serializes concurrent roster changes.
+Number, goalkeeper, `player.settings` audit before/after, and roster resync outbox commit atomically.
+Response is the serialized player; admin GET includes `jerseyNumber`, `goalkeeper`, and the existing nickname.
+Eligibility is unchanged. Both tournaments and leagues use the same endpoint.
+Uses the existing nullable goalkeeper column and scheduled-game roster synchronization; no new migration.
+Existing competition-level GK precedence, legacy per-game roles and sport-specific goalkeeper codes are preserved. Live/final snapshots
+are not rewritten. UI uses per-player edit/save/cancel; errors preserve the draft, and a blank number clears it. The UI sends GK only when changed, so a number-only edit does not erase legacy per-game roles.
+
+## 공통 결선 진출팀 배정 (2026-10-21)
+
+템플릿 없이 직접 만든 결선 및 불균등 조(14팀 4/4/3/3, 15팀 4/4/4/3 포함)를 지원한다. 기존 12강 전용 `round12-preview` / `round12-assignments`의 조 간 비교·선발·부전승 규칙은 변경하지 않는다. 관리자 목록/그림의 **결선 진출팀 배정**에서 일반 배정 또는 기존 12강 전용 배정을 연다.
+
+- `GET /admin/tournaments/:tournamentId/bracket/finalist-preview`: `V1AuthGuard` + active admin(support 포함). 대회만 허용(정규 리그 404), format은 `group_knockout`이어야 한다. 응답 `{ version, sourceVersion, standingsChanged, groups, targets, blockedReason }`. `standingsChanged`는 마지막 공통 배정 감사 기록의 조별 성적 fingerprint와 현재 값을 비교한다. 바뀌면 재확인 안내를 표시하고 현재 결선 배정은 유지한다.
+  - `groups[]`: `{ id, name, advanceCount, complete, teams, ranks }`. `teams[]`는 `{ registrationId, teamName, position, points, goalsFor, goalsAgainst }`, `ranks[]`는 `{ rank, state, registrationId? , tiedRegistrationIds? }`. 공식 순위를 읽기만 하며, 동률은 기존 조 순위 판정과 동일하다. 확정 등록이 아닌 팀은 후보가 아니다.
+  - `targets[]`: `{ fixtureId, side: HOME|AWAY, label, groupId, slotId, currentRegistrationId }`. 첫 결선의 직접 배정 자리 및 후속 경기의 직행 자리만 반환하고, 기존 승자/패자 연결이 있는 자리는 제외한다. 후속 결선·3위전의 진출 연결이 빠졌으면 저장을 막는다. 조별 ENTRY를 공유하거나 자리와 경기의 등록이 어긋나면 `409 FINALIST_NOT_READY`.
+  - 모든 조의 공식 결과/순위 반영이 끝나기 전에는 순위 정보와 차단 사유를 보여준다. 결선 시작·결과·기록 존재, 종료/취소/보관 대회도 차단한다.
+- `POST /admin/tournaments/:tournamentId/bracket/finalist-assignments`: mutation admin만 허용. `{ version: SHA256(64), reason: string(1..500, 공백만 불가), assignments: [{ fixtureId: uuid, side: HOME|AWAY, registrationId: uuid }] }`(1..128자리).
+  - 전체 대상 자리 각각에 조별 참가 확정팀 한 팀씩 지정한다. 모든 자리 채움, 자리/팀 중복, 다른 대회·미확정·조별 외 팀, 승자 연결 자리 침범을 서버에서 검증한다. 운영자 배정안은 공식 순위와 다르게 선택할 수 있으며 원본 순위는 변경하지 않는다.
+  - 공식 결과와 같은 대회→게임→팀매치 잠금 아래 미리보기를 다시 계산하고 버전을 비교한다. `409 FINALIST_PREVIEW_STALE`이면 다시 불러와 확인한다. 미리보기 `version`/`sourceVersion`은 조별 원천의 DB 반환 순서에 영향받지 않으며 같은 내용은 같은 fingerprint를 유지한다. 실제 공식 결과·순위·대진·시작 상태 변경은 계속 검출한다. 미완료/시작/구조 오류는 `409 FINALIST_NOT_READY`, 후보/중복 오류는 `422 FINALIST_ASSIGNMENT_INVALID`, DTO 형식/추가 필드는 공통 400 계약.
+  - 자리가 없는 수동 대진에는 결선 GROUP_RANK 자리를 만들고 기존 결선 ENTRY는 sourceGroupId 없는 GROUP_RANK로 전환한다. BYE는 기존 동기화 경로를 유지한다. 공유 자리는 거부한다. 기존 조별 ENTRY, 경기 시간·장소, 승자/패자 연결은 보존한다. 팀 교환은 기존 batch assign 경로로 슬롯·경기·게임 사이드·일정·명단 재동기화를 처리한다.
+  - 응답 `{ assignments: [{ slotId, registrationId }] }`. 전체 저장과 감사 `tournament.bracket.assign_finalists`(사유, 이전 배정, 이후 배정, preview version)는 한 트랜잭션이며 부분 성공은 없다. 동일 미리보기 버전은 저장 후 재사용할 수 없다.
+- 화면의 자동 추천은 조별 진출 수 및 운영자가 조정한 조 내 순서를 사용한다. 교차 배정은 다른 조를 우선하며, 시드순은 조별 배정 순위→조 표시 순서 후 상하위 페어링이다. 조 간 승점 비교는 일반 자동 배정에 적용하지 않는다(조별 경기 수가 다른 경우 포함). 모든 초안은 수동 변경 가능하며 같은 조 재대결을 경고한다. 동률/운영자 조정은 명시 확인 후 저장한다.
+- 저장된 배정은 공식 결과 정정으로 자동 덮어쓰지 않는다. 다시 열거나 **순위 다시 불러오기**로 최신 공식 순위와 현재 배정의 차이를 확인해 저장한다. 배정 초안은 서버에 저장되지 않으며 새 preview를 불러오면 운영자 확인 후 초기화한다. `standings-preview`의 기존 sourceGroupId 기반 채우기는 별도 호환 경로로 유지한다.
+- DB schema/migration 변경 없음. 관련 모델은 `V1TournamentGroup`, `V1TournamentStanding`, `V1TournamentSlot`, `V1TournamentMatchDetails`, `V1TeamMatch`, `V1Game`, 진출 edge 및 관리자 감사 로그다. destructive seed/backfill은 없다.

@@ -17,11 +17,10 @@ import type { V1AuthUser } from '../../auth/v1-auth-user';
 import { OperationAuditWriterService } from '../../common/audit/operation-audit-writer.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { participantDisplayName } from '../../tournaments/participant-display-name';
-import { selectLineupParticipantsWithDraftFallback } from '../core/latest-lineup-participants';
 import { GamesService, canViewParticipantIdentity } from '../games.service';
 import type { CreateGameRosterAdjustmentDto } from './dto/game-roster-adjustment.dto';
 import type { GameRosterActorRole } from './game-roster-computation';
-import { loadGameRoster, loadJerseyRegistration } from './game-roster-loader';
+import { loadGameRoster, loadJerseyRegistration, loadPlayedLineup } from './game-roster-loader';
 import { isUnmigratedTeamAuthoredLineup, lockRosterWriteScope, syncPreparedGameSideRoster } from './game-roster-sync';
 import { buildGameRosterView, decideGameRosterAccess, type GameRosterAccess, type GameRosterView } from './game-roster-view';
 import { competitionOpponentName } from './team-roster-columns';
@@ -424,6 +423,8 @@ export class GameRosterService {
         ? await isUnmigratedTeamAuthoredLineup(tx, target.gameId, target.sideId, latest)
         : false;
 
+    const playedLineup = await loadPlayedLineup(tx, context, { lineups, rows });
+
     const displayNameByUserId = await loadDisplayNames(tx, [
       ...computation.excluded.map((row) => row.actorUserId),
       ...computation.unavailable.map((row) => row.actorUserId),
@@ -438,6 +439,7 @@ export class GameRosterService {
       ? await loadRealNames(tx, [
           ...loaded.base.flatMap((entry) => (entry.accountLinked ? [entry.userId] : [])),
           ...rows.flatMap((row) => (row.userId === null ? [] : [row.userId])),
+          ...(playedLineup ?? []).flatMap((row) => (row.userId === null ? [] : [row.userId])),
         ])
       : undefined;
     return buildGameRosterView({
@@ -452,9 +454,7 @@ export class GameRosterService {
       legacyLineupPending,
       displayNameByUserId,
       realNameByUserId,
-      // 시작된 경기는 공식 결과와 같은 셀렉터로 고른 기록 명단을 보여 준다(동기화는 시작 뒤 멈춘다).
-      playedLineup:
-        context.gameState === V1GameState.SCHEDULED ? null : selectLineupParticipantsWithDraftFallback(rows, lineups).map((row) => ({ ...row, goalkeeper: row.position === (context.goalkeeperPositionCode ?? "GK") })),
+      playedLineup,
     });
   }
 }

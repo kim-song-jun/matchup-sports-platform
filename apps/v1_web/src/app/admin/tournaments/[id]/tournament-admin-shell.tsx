@@ -97,7 +97,7 @@ const STATUS_CHANGE_CONFIRM: Partial<Record<V1TournamentStatus, ConfirmOptions>>
   },
   in_progress: {
     title: '대회를 시작할까요?',
-    message: '시작하면 접수 단계로 되돌릴 수 없어요. 대진표와 경기 일정을 먼저 확인해 주세요.',
+    message: '대진표와 경기 일정을 먼저 확인해 주세요. 실제 시작한 경기가 없으면 접수 마감으로 되돌릴 수 있어요.',
     confirmLabel: '대회 시작하기',
   },
   completed: {
@@ -161,7 +161,7 @@ export function TournamentAdminShell({ id, children }: { id: string; children: R
   };
 
   const onConfirmRevert = (reason: string) => {
-    const target = tournament ? revertTargetStatus(tournament.status) : null;
+    const target = tournament ? revertTargetStatus(tournament.status, tournament.canRevertStart === true) : null;
     if (!tournament || !target) return;
     changeStatus.mutate(
       { status: target, reason: reason.trim() },
@@ -204,7 +204,7 @@ export function TournamentAdminShell({ id, children }: { id: string; children: R
   }
 
   const nextStatuses = allowedNextStatuses(tournament.status);
-  const revertCopy = revertTargetStatus(tournament.status) ? REVERT_COPY[tournament.status] : undefined;
+  const revertCopy = revertTargetStatus(tournament.status, tournament.canRevertStart === true) ? REVERT_COPY[tournament.status] : undefined;
   const scheduleLabel = formatDateRange(tournament.scheduledAt, tournament.scheduledEndAt);
   const counts = tournament.operationCounts;
   const navGroups: AdminSectionNavGroup[] = SECTION_GROUPS.map((group) => ({

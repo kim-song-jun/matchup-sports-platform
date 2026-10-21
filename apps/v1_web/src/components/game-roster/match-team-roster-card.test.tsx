@@ -57,16 +57,16 @@ afterEach(() => {
 });
 
 /** 경기 상세가 하는 그대로 — 두 팀 id·게임 id 로 우리 팀을 골라 카드에 넘긴다. */
-function Harness({ gameId }: { gameId: string | null }) {
+function Harness({ gameId, showRegistrationRosterEntry }: { gameId: string | null; showRegistrationRosterEntry?: boolean }) {
   const team = useMyMatchRosterTeam({ teamIds: [teamId, 'team-2'], gameId });
-  return <MatchTeamRosterCard team={team} />;
+  return <MatchTeamRosterCard team={team} showRegistrationRosterEntry={showRegistrationRosterEntry} />;
 }
 
-function renderCard(gameId: string | null = G1.gameId) {
+function renderCard(gameId: string | null = G1.gameId, showRegistrationRosterEntry?: boolean) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <Harness gameId={gameId} />
+      <Harness gameId={gameId} showRegistrationRosterEntry={showRegistrationRosterEntry} />
     </QueryClientProvider>,
   );
 }
@@ -75,6 +75,12 @@ const rosterRequests = () => mock.requests.filter((r) => r.path.endsWith('/roste
 const settle = () => new Promise((resolve) => setTimeout(resolve, 50));
 
 describe('MatchTeamRosterCard', () => {
+  it('대회 경기 상세는 참가 선수 관리 안내 없이 이번 경기 출전 관리를 유지한다', async () => {
+    renderCard(G1.gameId, false);
+    expect(await screen.findByRole('link', { name: '이번 경기 출전 관리' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '참가 선수 관리' })).not.toBeInTheDocument();
+    expect(screen.queryByText('선수·번호·GK는 대회 공통 설정이에요')).not.toBeInTheDocument();
+  });
   it('팀장에게 출전 요약과 "명단 조정"을 보여 준다 — 팀·경기 명단 한 번의 조회로', async () => {
     renderCard();
     expect(await screen.findByRole('heading', { name: '이번 경기 출전 명단' })).toBeInTheDocument();

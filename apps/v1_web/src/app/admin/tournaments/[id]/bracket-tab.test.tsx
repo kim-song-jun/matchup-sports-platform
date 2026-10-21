@@ -14,7 +14,7 @@
  */
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { V1AdminBracketFixture, V1AdminBracketFixtureGame, V1AdminTournamentBracket, V1AdminTournamentRegistration } from '@/types/api';
+import type { V1CreateFixtureResponse, V1AdminBracketFixture, V1AdminBracketFixtureGame, V1AdminTournamentBracket, V1AdminTournamentRegistration } from '@/types/api';
 import { makeGame, makeSlot } from '@/test/bracket-canvas-fixtures';
 import { V1ApiError } from '@/lib/api-client';
 import { BracketTab, describeLeagueReplace } from './bracket-tab';
@@ -29,6 +29,8 @@ vi.mock('@/lib/api-client', async (importOriginal) => {
 
 /** 테스트마다 바꿔 끼우는 대진 목록 — 아래 useV1AdminBracket 목이 이 값을 읽는다. */
 let bracketFixtures: V1AdminBracketFixture[] = [];
+let createdFixtureReadError: Error | null = null;
+let createdFixtureMissing = false;
 let bracketSlots: NonNullable<V1AdminTournamentBracket['slots']> = [];
 
 function fixtureRow(overrides: Partial<V1AdminBracketFixture>): V1AdminBracketFixture {
@@ -163,7 +165,9 @@ vi.mock('@/hooks/use-v1-api', () => ({
     isPending: false,
     isError: false,
     error: null,
-    refetch: vi.fn(() => Promise.resolve({ data: { ...bracket, groups: bracketGroups, fixtures: bracketFixtures } })),
+    refetch: vi.fn(() => Promise.resolve(createdFixtureReadError
+      ? { isError: true, error: createdFixtureReadError }
+      : { data: { ...bracket, groups: bracketGroups, fixtures: createdFixtureMissing ? [] : bracketFixtures } })),
   }),
   useV1PublishTournamentBracket: noopMutation,
   useV1UnpublishTournamentBracket: noopMutation,
@@ -958,5 +962,61 @@ describe('BracketTab — 공통 경기 정보', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: '홈 자동 문구 복원' }));
     fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
     expect(updateFixtureMutate.mock.calls[0][0]).toEqual({ fixtureId: 'fx-1', scheduledAt: null, homeDisplayLabel: null });
+  });
+});
+
+describe('BracketTab — 직접입력생성회귀', () => {
+  // serializeCanonicalFixture의 실제 요약 응답. game/result/slot/name/표시 문구는 없다.
+  function createResponse(created: V1AdminBracketFixture): V1CreateFixtureResponse {
+    return {
+      id: created.id, tournamentId: created.tournamentId, groupId: created.groupId,
+      round: created.round, fixtureNumber: created.fixtureNumber, legNumber: 1,
+      parentFixtureId: null, homeRegistrationId: created.homeRegistrationId, awayRegistrationId: created.awayRegistrationId,
+      scheduledAt: null, venue: null, place: null, fieldId: null, status: 'scheduled',
+      createdAt: created.createdAt, updatedAt: created.updatedAt,
+    };
+  }
+  beforeEach(() => {
+    bracketGroups = bracket.groups;
+    bracketFixtures = [];
+    bracketSlots = [];
+    createFixtureMutate.mockReset();
+    createdFixtureReadError = null;
+    createdFixtureMissing = false;
+  });
+
+  it('상세 game이 없는 생성 응답을 받은 뒤 최신 목록 정보로 수정창을 연다', async () => {
+    const created = fixtureRow({ id: 'new-fixture', round: '조별 1라운드', fieldId: 'field-a', homeDisplayLabel: '재조회한 홈 문구', homeRegistrationId: null, awayRegistrationId: null, game: makeGame({ state: 'SCHEDULED' }) });
+    const response = createResponse(created);
+    createFixtureMutate.mockImplementation((_body, options) => {
+      bracketFixtures = [created];
+      options.onSuccess(response);
+    });
+    renderTab();
+    fireEvent.click(within(document.getElementById('bracket-group-group-a-body')!).getByRole('button', { name: /직접 입력/ }));
+    fireEvent.change(screen.getByLabelText('라운드'), { target: { value: '조별 1라운드' } });
+    fireEvent.click(screen.getByRole('button', { name: '경기 일정 추가' }));
+    const dialog = await screen.findByRole('dialog', { name: '경기 수정' });
+    expect(within(dialog).getByLabelText('대진 번호')).toHaveValue(1);
+    expect(within(dialog).getByLabelText('등록된 경기장(필드)')).toHaveValue('field-a');
+    expect(within(dialog).getByLabelText('홈 표시 문구')).toHaveValue('재조회한 홈 문구');
+    expect(screen.queryByText('화면을 다시 불러올 수 없어요')).toBeNull();
+  });
+
+  it.each(['error', 'missing'] as const)('생성 후 상세 조회 %s는 화면을 깨뜨리거나 생성 요청을 반복하지 않는다', async (mode) => {
+    if (mode === 'error') createdFixtureReadError = new Error('상세 조회 실패');
+    else createdFixtureMissing = true;
+    createFixtureMutate.mockImplementation((_body, options) => {
+      options.onSuccess(createResponse(fixtureRow({ id: 'created-without-detail' })));
+    });
+    const toast = renderTab();
+    fireEvent.click(within(document.getElementById('bracket-group-group-a-body')!).getByRole('button', { name: /직접 입력/ }));
+    fireEvent.change(screen.getByLabelText('라운드'), { target: { value: '조별 1라운드' } });
+    fireEvent.click(screen.getByRole('button', { name: '경기 일정 추가' }));
+    await waitFor(() => expect(toast).toHaveBeenCalledWith(expect.stringContaining('경기는 생성됐지만 수정 정보를 불러오지 못했어요.'), 'error'));
+    expect(createFixtureMutate).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('dialog', { name: '경기 수정' })).toBeNull();
+    createdFixtureReadError = null;
+    createdFixtureMissing = false;
   });
 });

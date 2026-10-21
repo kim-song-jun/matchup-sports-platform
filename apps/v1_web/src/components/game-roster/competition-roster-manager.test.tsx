@@ -80,6 +80,33 @@ describe('공통 명단 관리의 실제 탭·저장 흐름', () => {
     expect(screen.getByLabelText('출전을 관리할 경기')).toHaveValue(games[0].gameId);
     expect(screen.queryByRole('button', { name: /골키퍼로 지정/ })).not.toBeInTheDocument();
   });
+  it.each(['regular_tournament', 'regular_league'] as const)('%s 참가 선수 안내는 확정 문구를 표시한다', async value => {
+    kind = value;
+    open('registration');
+    const noun = value === 'regular_league' ? '리그' : '대회';
+    expect(await screen.findByText((_, element) => element?.tagName === 'P' &&
+      element.textContent === `선수 명단·등번호·골레이 설정은 ${noun}의 모든 경기에 공통으로 적용돼요.첫 경기가 시작되면 변경할 수 없어요.경기 시작 후 수정이 필요하면 운영진에게 문의해 주세요.`)).toBeInTheDocument();
+  });
+  it.each([false, true])('통합 명단 선수 추가는 골레이 %s를 POST에 전달한다', async goalkeeper => {
+    let body: Record<string, unknown> | undefined;
+    server.use(
+      http.get('*/api/v1/teams/:id/members', () => ok({ items: [{ userId: 'new-player', displayName: '새선수',
+        realName: '새선수', gender: 'female', birthDate: '1995-03-15', phone: '01012345678', role: 'member' }],
+        pageInfo: { hasNext: false, nextCursor: null } })),
+      http.post('*/api/v1/tournaments/:id/registrations/:reg/players', async ({ request }) => {
+        body = await request.json() as Record<string, unknown>;
+        return ok({ id: 'new-player-row', ...body });
+      }),
+    );
+    open('registration');
+    fireEvent.click(await screen.findByRole('button', { name: '선수 추가' }));
+    await screen.findByRole('option', { name: /새선수/ });
+    fireEvent.change(screen.getByLabelText(/팀원 선택/), { target: { value: 'new-player' } });
+    expect(screen.getByLabelText('성별')).toHaveValue('여성');
+    if (goalkeeper) fireEvent.click(screen.getByRole('checkbox', { name: '골레이로 등록해요' }));
+    fireEvent.click(screen.getByRole('button', { name: '선수 등록' }));
+    await waitFor(() => expect(body).toMatchObject({ userId: 'new-player', goalkeeper }));
+  });
   it('번호 0·GK 공통 설정을 저장하면 다른 경기에도 보이며 제외 상태와는 독립적이다', async () => {
     open('registration');
     fireEvent.click(await screen.findByRole('button', { name: '김민재 등번호 7번 바꾸기' }));
@@ -208,6 +235,20 @@ describe('공통 명단 관리의 실제 탭·저장 흐름', () => {
     fireEvent.click(await screen.findByRole('button', { name: '김민재 선수 정보' }));
     expect(screen.queryByText(/등록 이름/)).not.toBeInTheDocument();
     expect(screen.getByLabelText('선출 여부')).toBeDisabled();
+  });
+  it('대회 참가 선수가 최대 인원에 도달하면 사라진 추가 버튼 대신 이유를 안내한다', async () => {
+    kind = 'regular_tournament';
+    server.use(http.get('*/api/v1/tournaments/:id', () => ok({
+      id: tournamentId, title: '3명 정원 대회', kind, status: 'in_progress',
+      minPlayers: 3, maxPlayers: 3, registrationDeadlineAt: null, rosterDeadlineAt: null,
+      scheduledAt: '2099-01-01T00:00:00Z', scheduledEndAt: '2099-12-31T00:00:00Z',
+    })));
+
+    open('registration');
+
+    expect(await screen.findByText('참가 선수 3명')).toBeInTheDocument();
+    expect(screen.getByText('최대 인원이에요')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '선수 추가' })).not.toBeInTheDocument();
   });
   it('홈·경기에서 들어온 일반 팀원도 참가 명단을 읽고 편집 제어는 받지 않는다', async () => {
     role = 'member'; mock.setViewerRole('TEAM_MEMBER');

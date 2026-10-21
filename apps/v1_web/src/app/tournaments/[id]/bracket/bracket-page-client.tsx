@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
-import { useV1MyTournamentFixtures, useV1Tournament } from '@/hooks/use-v1-api';
+import { useV1MyTeams, useV1MyTournamentFixtures, useV1Tournament } from '@/hooks/use-v1-api';
+import { normalizeMyTeamsResponse } from '@/lib/team-role';
 import { extractErrorMessage } from '@/lib/error-message';
 import { formatTournamentDateShort, formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { TournamentFlowNav } from '@/components/tournaments/tournament-flow-nav';
@@ -138,7 +139,7 @@ function TeamFixturesDetail({ teamId, fixtures }: { teamId: string | null; fixtu
   }
 
   return (
-    <ul style={{ display: 'flex', flexDirection: 'column', gap: 8, listStyle: 'none', margin: 0, padding: 0 }}>
+    <ul style={{ display: 'flex', flexDirection: 'column', gap: 8, listStyle: 'none', margin: 0, padding: '8px 0 0' }}>
       {mine.map((f) => {
         const isHome = f.homeTeamId === teamId;
         const opponent = (isHome ? f.awayTeamName : f.homeTeamName) ?? '비공개';
@@ -155,7 +156,7 @@ function TeamFixturesDetail({ teamId, fixtures }: { teamId: string | null; fixtu
               gap: 8,
               padding: '8px 12px',
               borderRadius: 10,
-              background: 'var(--surface-soft)',
+              background: 'var(--blue50)',
               fontSize: 12,
             }}
           >
@@ -177,20 +178,14 @@ function TeamFixturesDetail({ teamId, fixtures }: { teamId: string | null; fixtu
   );
 }
 
-/**
- * §B-7 핵심 — 진출 배지는 그 조의 조별리그가 실제로 끝난(모든 픽스처가 completed
- * 또는 cancelled) 뒤에만 보여준다. 예전엔 group.advanceCount만 있으면 1경기만 끝나도
- * "상위 N팀 진출" 배지·순위표 강조가 확정처럼 떴다 — 오너 지적: "바로 진출 그게
- * 아니라 실제 조별리그가 다 끝나야 나오게끔". 미완료면 배지 대신 정직한 안내
- * ("조별리그가 끝나면 진출 팀이 정해져요")를 보여주고, 순위표에 넘기는 advancingKeys 도
- * 같은 `stageComplete` 로 gate 해 하이라이트·진출 배지가 함께 꺼지게 한다.
- */
 function GroupStandingsSection({
   group,
+  isMyGroup,
   fixtures,
   fromHref,
 }: {
   group: V1TournamentGroup;
+  isMyGroup: boolean;
   fixtures: V1TournamentFixture[];
   fromHref?: string;
 }) {
@@ -199,7 +194,6 @@ function GroupStandingsSection({
   // 임의 순서라 `position <= advanceCount` 로 칠하면 실제 결선 팀과 갈린다. 없으면 칠하지 않는다.
   const advancingKeys =
     stageComplete && group.qualification ? new Set(group.qualification.advancingRegistrationIds) : null;
-  const advance = stageComplete ? group.advanceCount : null;
   /* #381 — 펼침 상세는 "이 조에서 치른 경기"만 보여준다. 예전엔 대회 전체 픽스처를
      팀 id 로만 걸러서, 조별 순위 영역인데도 그 팀의 결선(4강·결승·3·4위전) 경기와
      스코어가 조별 경기와 같은 목록에 섞여 나왔다. 결선 픽스처는 오른쪽 "토너먼트
@@ -219,15 +213,11 @@ function GroupStandingsSection({
         }}
       >
         {group.name}
-        {advance !== null ? (
-          <span className="tm-text-caption" style={{ marginLeft: 8 }}>
-            상위 {advance}팀 진출
+        {isMyGroup && (
+          <span className="tm-text-caption" style={{ marginLeft: 8, color: 'var(--red)', fontWeight: 600, textTransform: 'none', letterSpacing: 'normal' }}>
+            우리 팀이 속한 조예요
           </span>
-        ) : group.advanceCount !== null ? (
-          <span className="tm-text-caption" style={{ marginLeft: 8, textTransform: 'none', letterSpacing: 'normal' }}>
-            조별리그가 끝나면 진출 팀이 정해져요
-          </span>
-        ) : null}
+        )}
       </div>
       {stageComplete && group.qualification?.undecided ? (
         <div className="tm-text-caption" style={{ marginBottom: 8 }}>
@@ -434,8 +424,6 @@ export function BracketScheduleTab({
       hasNextPage={hasNextPage} isFetchingNextPage={isFetchingNextPage} onLoadMore={() => void fetchNextPage()} />;
   }
 
-  // 순위표는 옆 탭("순위 · 대진표")이 이미 그린다 — 여기서 또 그리면 탭만 바꿔도
-  // 같은 표가 두 번 나온다(오너 지적: "중복되는 정보도 많고").
   return (
     <ScheduleContent
       tournamentId={tournamentId}
@@ -447,7 +435,10 @@ export function BracketScheduleTab({
       onLoadMore={() => void fetchNextPage()}
       myFixtures={myFixtures.data}
       fromHref={fromHref}
+      /* 순위표는 옆 탭("순위 · 대진표")이 이미 그린다 — 여기서 또 그리면 탭만 바꿔도
+         같은 표가 두 번 나온다(오너 지적: "중복되는 정보도 많고"). */
       showStandings={false}
+      showScheduleHeading={false}
     />
   );
 }
@@ -485,6 +476,7 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
   // 리그일 때는 형제 탭과 **같은 쿼리 키**라 React Query 가 합친다 — 왕복이 안 는다.
   // 브라우저에만 남아 있는 순위 캐시는 첫 HTML과 다를 수 있어 마운트 후에 반영한다.
   const [hydrated, setHydrated] = useState(false);
+  const myTeams = useV1MyTeams(undefined, { enabled: hydrated && hasStoredV1Session() });
   useEffect(() => setHydrated(true), []);
   const leagueSchedule = usePublicTournamentSchedule(tournament.id, {}, { enabled: isRegularLeague });
   const leagueScheduleStandings = isRegularLeague && hydrated
@@ -496,6 +488,7 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
   const stages = buildTournamentStages(tournament);
   const searchParams = useSearchParams();
   const tabFromUrl = searchParams.get('tab');
+  const [standingsPhase, setStandingsPhase] = useState<'group_stage' | 'knockout'>('group_stage');
   const [activeTab, setActiveTab] = useState<'standings' | 'schedule'>(() =>
     tabFromUrl === 'standings' ? 'standings' : 'schedule',
   );
@@ -521,24 +514,15 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
 
   const { groupPhaseGroups, knockoutFixtures, hasGroupStandings, hasKnockoutFixtures } =
     partitionTournamentSections(format, fixtures, groups);
+  const myTeamIds = new Set(hydrated && hasStoredV1Session() ? normalizeMyTeamsResponse(myTeams.data).map((team) => team.teamId) : []);
+  const isMyGroup = (group: V1TournamentGroup) => group.groupTeams.some((team) => team.teamId !== null && myTeamIds.has(team.teamId));
+  // Stable sort preserves the configured order within both sets of groups.
+  const orderedGroups = [...groupPhaseGroups].sort((a, b) => Number(isMyGroup(b)) - Number(isMyGroup(a)));
 
   // 결선 fixture를 미리 만들었다면 참가 팀이 아직 정해지지 않았어도 대진 구조와
   // 시간을 공개한다. TournamentBracket은 nullable 팀 슬롯을 `미정`으로 표시하므로,
   // 조별 순위 확정 전 팀을 지어내지 않으면서도 일정과 대진표가 같은 정보를 보여준다.
   const showBracket = hasKnockoutFixtures;
-
-  /**
-   * §데스크탑 폭 배분 — 결선 라운드 수가 대진표에 필요한 가로 폭의 유일한 근거다.
-   * 기본 배분(순위표 0.72fr : 대진표 1.28fr)은 라운드가 여러 개일 때를 전제로 대진표에
-   * 넓은 쪽을 준 것인데, 결승 하나만 남은 대회에서는 그 폭을 연결선만 가로지르고
-   * (1440 실측: 650px 칼럼에 카드 180px + 우승 카드) 순위표는 366px로 눌렸다.
-   *
-   * 임계값이 1인 이유는 대진표 자체의 최소 폭 산술이다(tournament-bracket.tsx의
-   * COL_W 180 + CONN_W 36 + CHAMP_W 120): 라운드 R개의 최소 폭 = R×216 + 120.
-   * R=1이면 336px라 좁힌 칼럼(460px)에 들어가지만, R=2(4강+결승)는 552px라 넘쳐
-   * 가로 스크롤이 생긴다 — 그 경우는 기본 배분(대진표 650px)이 맞다.
-   */
-  const knockoutRoundCount = new Set(knockoutFixtures.map((f) => f.round)).size;
 
   // 리그 포맷: 모든 그룹의 순위 행을 합산. 집계 전 조는 toGroupStandingsRows가
   // 편성 팀(groupTeams)을 0값 기준선 행으로 대신 내주므로, 경기 0건이어도 참가 팀이
@@ -599,7 +583,8 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
   // 리그엔 토너먼트 대진이 없다. isLeague 를 안 빼면 거울 행(group_knockout)이 여기서
   // 참이 되어 **빈 대진표 칼럼**이 생긴다 — 이 화면이 리그에서 가장 크게 틀어지는 자리다.
   const hasBracketColumn = !isLeague && (format === 'knockout' || format === 'group_knockout');
-  const isTwoColumn = hasStandingsColumn && hasBracketColumn;
+  const showGroupStandings = hasStandingsColumn && (!hasBracketColumn || standingsPhase === 'group_stage');
+  const showKnockoutBracket = hasBracketColumn && (!hasStandingsColumn || standingsPhase === 'knockout');
 
   return (
     // §빈 상태 재균형(fix/v1-publish) — 조별리그 미종료 등으로 대진표 우 컬럼이
@@ -702,21 +687,22 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
       <div hidden={activeTab !== 'standings'} style={{ display: activeTab === 'standings' ? 'flex' : 'none', flexDirection: 'column', flex: 1 }}>
           {/* 2열 그리드: 좌=순위표 / 우=대진표 (데스크탑). 아래 흐름 네비게이터(§FlowNav)는 탭과
               무관한 페이지 레벨 이동이라 패널 밖(항상)에 둔다. */}
-          <div
-            className={[
-              'tm-tourn-sub-grid',
-              'tm-bracket-page-grid',
-              // 폭 배분 규칙은 **두 칼럼이 다 있을 때만** 의미가 있다. 한쪽이 없으면
-              // 붙이지 않아 `.tm-tourn-sub-grid` 기본값(1열)으로 떨어진다.
-              isTwoColumn ? (format === 'group_knockout' ? 'tm-tourn-sub-grid-6040' : 'tm-tourn-sub-grid-2col') : '',
-              isTwoColumn && format === 'group_knockout' && !showBracket ? 'tm-bracket-page-grid-empty' : '',
-              isTwoColumn && showBracket && knockoutRoundCount <= 1 ? 'tm-bracket-page-grid-slim-bracket' : '',
-            ]
-              .filter(Boolean)
-              .join(' ')}
-          >
-            {/* 좌: 순위표 — 그릴 게 없으면 빈 칼럼을 남기지 않고 아예 렌더하지 않는다. */}
-            {hasStandingsColumn ? (
+          {!isLeague && (hasStandingsColumn || hasBracketColumn) ? (
+            <div role="tablist" aria-label="순위·대진 단계" style={{ display: 'flex', gap: 'var(--spacing-2)', padding: '16px 20px 0' }}>
+              {([
+                ...(hasStandingsColumn ? [{ key: 'group_stage' as const, label: '조별리그' }] : []),
+                ...(hasBracketColumn ? [{ key: 'knockout' as const, label: '결선' }] : []),
+              ]).map((phase) => (
+                <button key={phase.key} type="button" role="tab"
+                  aria-selected={phase.key === 'group_stage' ? showGroupStandings : showKnockoutBracket}
+                  className={`tm-chip${(phase.key === 'group_stage' ? showGroupStandings : showKnockoutBracket) ? ' tm-chip-active' : ''}`}
+                  onClick={() => setStandingsPhase(phase.key)}>{phase.label}</button>
+              ))}
+            </div>
+          ) : null}
+          <div className="tm-tourn-sub-grid tm-bracket-page-grid">
+            {/* 선택한 단계만 한 칼럼으로 표시한다. */}
+            {showGroupStandings ? (
             <div className="tm-tourn-sub-col" style={{ padding: '20px 20px 0' }}>
               {isLeague && (
                 <section>
@@ -741,11 +727,8 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
 
               {!isLeague && format === 'group_knockout' && hasGroupStandings && (
                 <section>
-                  <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>
-                    조별 순위
-                  </h3>
-                  {groupPhaseGroups.map((g) => (
-                    <GroupStandingsSection key={g.id} group={g} fixtures={fixtures} fromHref={bracketSelfHref ?? undefined} />
+                  {orderedGroups.map((g) => (
+                    <GroupStandingsSection key={g.id} group={g} isMyGroup={isMyGroup(g)} fixtures={fixtures} fromHref={bracketSelfHref ?? undefined} />
                   ))}
                 </section>
               )}
@@ -761,7 +744,7 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
             ) : null}
 
             {/* 우: 대진표 */}
-            {hasBracketColumn && (
+            {showKnockoutBracket && (
               <div className="tm-tourn-sub-col" style={{ padding: '20px 20px 0' }}>
                 <section>
                   <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>

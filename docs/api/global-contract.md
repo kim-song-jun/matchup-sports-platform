@@ -1,3 +1,5 @@
+결선 배정 미리보기의 version/sourceVersion은 동일한 조별 원천의 DB 반환 순서에 영향받지 않는다. 실제 성적·순위·대진 변경과 시작 경기 보호는 유지하며 [대회 계약](./domains/tournaments.md)을 따른다.
+
 리그 표시는 모집완료·진행 중·보류·종료 4개로 통일한다. 호환 `draft`는 저장 상태 `draft/open/closed` 전체를 묶으며 모집 가능 여부·공개 여부는 별도다. 내 담당 대회는 `tournamentKind`로 종류를 구분한다. [리그 표시 계약](./domains/league-matches.md#league-display-states-2026-10-19).
 
 신규 리그는 모집완료(`closed`)로 생성하고 운영자가 명시적으로 시작한다. 관리자 목록·상세는 `lifecycleStatus`를 제공하며, 시작 전 경기 시작·결과 초안 생성·제출은 `409 LEAGUE_NOT_STARTED`다. 생성 정원이 선택한 서로 다른 팀 수보다 작으면 `422 LEAGUE_CAPACITY_BELOW_TEAM_COUNT`로 쓰기 전에 거부한다. [리그 계약](./domains/league-matches.md#new-league-lifecycle-2026-10-18)을 따른다.
@@ -15,6 +17,8 @@ Ordinary team matches accept optional `periods` on existing create/update routes
 Public `GET /tournaments/:id/standings/overall` rows include `teamLogoUrl: string | null` for both tournaments and regular leagues. Hidden participant identity returns `null` for the logo, matching the team name gate. See the [tournaments contract](./domains/tournaments.md#overall-standings--two-competition-kinds-two-row-shapes).
 
 조별 성적 기반 12강 배정은 [tournaments](./domains/tournaments.md)의 `round12-preview` / `round12-assignments` 계약을 따른다. 읽기는 support 포함, 쓰기는 mutation admin만 허용한다. 미리보기의 버전은 저장 시 다시 검증하며 성적·대진 변경은 409로 차단한다. 12자리 및 부전승·8강 직행 반영은 단일 트랜잭션이며 부분 성공 응답은 없다.
+
+대회 경기 삭제는 대회 `in_progress`에서도 허용하되 경기 `SCHEDULED`/`matched`, 결과 없음, 후속 대진·하위 경기 보호를 적용한다. 종료·취소 대회는 계속 거부한다. [대회 계약](./domains/tournaments.md#시작-전-대진-삭제-2026-10-05)을 따른다.
 
 This contract is frozen against the approved Task 127 plan. Domain documents provide navigation and domain-specific policy; this registry is the exact cross-domain REST, field, actor, idempotency, error, transition, and compensation contract.
 
@@ -194,3 +198,14 @@ The [league image endpoint](./domains/league-matches.md#cover-image-목록상세
 2026-10-17: Tournament fixture presentation overrides and shared list/canvas schedule semantics are documented in [tournaments](./domains/tournaments.md#bracket-presentation-overrides-2026-10-17).
 
 - 2026-10-18: 공개 대진/일정의 사용자 지정 사이드 문구·BYE 공유 문구 및 canonical 경기장 표시를 동기화했다. 상세 계약은 [tournaments](./domains/tournaments.md) 참고.
+
+선수 추가 성별·골레이 (2026-10-20): 대회·리그 `POST …/players`가 선택적 boolean `goalkeeper`를 함께 저장·반환한다(생략 false). 성별은 서버 프로필 snapshot이며 클라이언트 입력을 받지 않는다. 상세 계약은 [tournaments](domains/tournaments.md)를 따른다.
+
+대회 시작 되돌리기 (2026-10-20): 실제 경기 시작·기록·결과 전에는 사유와 함께 `in_progress → closed`를 허용한다. 관리자 상세의 `canRevertStart`를 사용하고 저장 시 잠금 안에서 재검사한다. 시작한 경기가 있으면 `409 TOURNAMENT_ALREADY_STARTED`. 상세는 [tournaments](domains/tournaments.md)를 따른다.
+
+Admin roster settings writes use the owner/ops-only gate and append actor/before/after audit records.
+Support admins may only read. See [admin roster settings](./domains/tournaments.md#admin-roster-player-settings-2026-10-20).
+
+대회 운영콘솔의 경기별 명단 편집은 기존 roster-adjustments API를 재사용한다. 대회·리그 이벤트 및 도움 추가에서 이전 명단 참가자는 422 PARTICIPANT_NOT_IN_CURRENT_ROSTER로 거부한다. [경기 계약](./domains/games.md#운영콘솔-경기-출전-명단-2026-10-20)을 따른다.
+
+공통 결선 배정은 `GET .../bracket/finalist-preview` → `POST .../bracket/finalist-assignments`로 수행한다([대회 계약](./domains/tournaments.md#공통-결선-진출팀-배정-2026-10-21)). 활성 관리자 읽기/쓰기 분리, SHA256 preview 버전 재검증, 사유·변경 전후 감사, 단일 트랜잭션/부분 성공 없음 원칙을 따른다. 공식 순위는 변경하지 않으며 운영자 결선 배정안만 저장한다.

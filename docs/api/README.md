@@ -1,3 +1,5 @@
+결선 배정 미리보기의 version/sourceVersion은 동일한 조별 원천의 DB 반환 순서에 영향받지 않는다. 실제 성적·순위·대진 변경과 시작 경기 보호는 유지하며 [대회 계약](./domains/tournaments.md)을 따른다.
+
 리그 표시는 모집완료·진행 중·보류·종료 4개로 통일한다. 호환 `draft`는 저장 상태 `draft/open/closed` 전체를 묶으며 모집 가능 여부·공개 여부는 별도다. 내 담당 대회는 `tournamentKind`로 종류를 구분한다. [리그 표시 계약](./domains/league-matches.md#league-display-states-2026-10-19).
 
 신규 리그는 모집완료(`closed`)로 생성하고 운영자가 명시적으로 시작한다. 관리자 목록·상세는 `lifecycleStatus`를 제공하며, 시작 전 경기 시작·결과 초안 생성·제출은 `409 LEAGUE_NOT_STARTED`다. 생성 정원은 처음 선택한 서로 다른 팀 수 이상이어야 한다. [리그 계약](./domains/league-matches.md#new-league-lifecycle-2026-10-18)을 따른다.
@@ -7,6 +9,8 @@
 경기별 골키퍼 지정 (2026-10-14): 명단 조회에 `goalkeeper`를 추가하고 팀 일괄 명단 API에 복수 지정 `SET_GOALKEEPER`를 지원한다. [Games 계약](./domains/games.md#경기-명단-gk-지정-task-20261082)을 확인한다.
 
 # Teameet v1 API contracts
+
+대회 진행 중에도 미시작 경기 삭제를 허용한다. 결과·후속 대진 보호는 [대회 삭제 계약](./domains/tournaments.md#시작-전-대진-삭제-2026-10-05)을 따른다.
 
 Personal-match online place classification: public detail includes `isOnline`; the authenticated, audited `PATCH /admin/matches/:matchId/online` sets that factual value without changing publication or search visibility. See [matches](./domains/matches.md) and [admin/ops](./domains/admin-and-ops.md).
 
@@ -38,7 +42,7 @@ Competition venue/field selection (2026-10-14): leagues and tournaments share a 
 - [Matches](./domains/matches.md)
 - [Teams](./domains/teams.md)
 - [Team matches](./domains/team-matches.md)
-- [Tournaments](./domains/tournaments.md) — 대회 형식 수정·잠금 사유, 대진 생성·번호 수정·진출 연결 및 결과 계약, 5조·20팀→12강 추천·일괄 배정
+- [Tournaments](./domains/tournaments.md) — 어드민 선수별 등번호·GK 저장, 대회 형식 수정·잠금 사유, 대진 생성·번호 수정·진출 연결 및 결과 계약, 5조·20팀→12강 추천·일괄 배정
 - [League matches](./domains/league-matches.md)
 - [Regular league public visibility](./domains/league-matches.md#public-visibility) — publication control, admin access and public read gates.
 - [Games](./domains/games.md)
@@ -105,3 +109,11 @@ Current Kakao signup and existing-account linking use the [provider contact conf
 2026-10-17: Tournament fixture presentation overrides and shared list/canvas schedule semantics are documented in [tournaments](./domains/tournaments.md#bracket-presentation-overrides-2026-10-17).
 
 - 2026-10-18: 공개 대진/일정의 사용자 지정 사이드 문구·BYE 공유 문구 및 canonical 경기장 표시를 동기화했다. 상세 계약은 [tournaments](./domains/tournaments.md) 참고.
+
+선수 추가 성별·골레이 (2026-10-20): 대회·리그 `POST …/players`가 선택적 boolean `goalkeeper`를 함께 저장·반환한다(생략 false). 성별은 서버 프로필 snapshot이며 클라이언트 입력을 받지 않는다. 상세 계약은 [tournaments](domains/tournaments.md)를 따른다.
+
+대회 시작 되돌리기 (2026-10-20): 실제 경기 시작·기록·결과 전에는 사유와 함께 `in_progress → closed`를 허용한다. 관리자 상세의 `canRevertStart`를 사용하고 저장 시 잠금 안에서 재검사한다. 시작한 경기가 있으면 `409 TOURNAMENT_ALREADY_STARTED`. 상세는 [tournaments](domains/tournaments.md)를 따른다.
+
+대회 운영콘솔의 경기별 명단 편집은 기존 roster-adjustments API를 재사용한다. 대회·리그 이벤트 및 도움 추가에서 이전 명단 참가자는 422 PARTICIPANT_NOT_IN_CURRENT_ROSTER로 거부한다. [경기 계약](./domains/games.md#운영콘솔-경기-출전-명단-2026-10-20)을 따른다.
+
+- 조별 결과 기반 공통 결선 배정: [tournaments — 공통 결선 진출팀 배정](./domains/tournaments.md#공통-결선-진출팀-배정-2026-10-21). 수동 대진·불균등 조 지원, 기존 12강 규칙 보존.

@@ -58,6 +58,7 @@ describe('Task 20 game-operations takeover realtime protocol', () => {
     retryEvent: jest.fn(),
     requestTakeover: jest.fn(),
     renewTakeover: jest.fn(),
+    takeoverHolderName: jest.fn().mockResolvedValue('다른운영자'),
   };
   const prisma = { v1Game: { findUnique: jest.fn() }, v1User: { findFirst: jest.fn() } };
   const staffAccess = { assertAccess: jest.fn() };
@@ -109,6 +110,7 @@ describe('Task 20 game-operations takeover realtime protocol', () => {
     expect(gamesService.requestTakeover).toHaveBeenCalledWith(USER, GAME_ID, {
       clientInstanceId: 'client-1',
       lastSequence: 2,
+      force: false,
     }, expect.objectContaining({ gameId: GAME_ID }));
     expect(client.emit).toHaveBeenCalledWith('game.takeover.granted', grant);
     expect(result).toEqual({ status: 'granted', ...grant });
@@ -244,8 +246,32 @@ describe('Task 20 game-operations takeover realtime protocol', () => {
       clientInstanceId: 'client-1',
     });
 
-    expect(result).toEqual({ status: 'denied', code: 'TAKEOVER_SUPERSEDED' });
+    // 뺏긴 쪽은 누가 가져갔는지 같이 받는다(MD-QA #165).
+    expect(result).toEqual({ status: 'denied', code: 'TAKEOVER_SUPERSEDED', holderName: '다른운영자' });
     expect(gameTakeover.isSuperseded).toHaveBeenCalledWith(GAME_ID, 'outbid-token-value');
+  });
+
+  // MD-QA #165: 콘솔을 여는 것만으로 다른 운영자의 권한을 뺏었다. 확인 창을 거친 요청만 force 를 싣는다.
+  it('passes force through and maps TAKEOVER_HELD to a denial that names the current holder', async () => {
+    const client = socket();
+    gamesService.requestTakeover.mockRejectedValueOnce(
+      new ForbiddenException({ code: 'TAKEOVER_HELD', message: 'held', details: { holderName: '김운영' } }),
+    );
+
+    const held = await task20Gateway(gateway).requestGameTakeover(client, {
+      gameId: GAME_ID, authorizationSubjectVersion: 1, clientInstanceId: 'client-1', lastSequence: 2,
+    });
+    expect(held).toEqual({ status: 'denied', code: 'TAKEOVER_HELD', holderName: '김운영' });
+
+    gamesService.requestTakeover.mockResolvedValueOnce({
+      gameId: GAME_ID, takeoverToken: 'b'.repeat(64), version: 3, lastSequence: 2, expiresAt: '2030-01-01T00:00:00.000Z',
+    });
+    await task20Gateway(gateway).requestGameTakeover(client, {
+      gameId: GAME_ID, authorizationSubjectVersion: 1, clientInstanceId: 'client-1', lastSequence: 2, force: true,
+    });
+    expect(gamesService.requestTakeover).toHaveBeenLastCalledWith(USER, GAME_ID, {
+      clientInstanceId: 'client-1', lastSequence: 2, force: true,
+    }, expect.objectContaining({ gameId: GAME_ID }));
   });
 
   it('maps a scope-denied rejection from GamesService.renewTakeover to STAFF_SCOPE_DENIED, distinct from an expired token', async () => {

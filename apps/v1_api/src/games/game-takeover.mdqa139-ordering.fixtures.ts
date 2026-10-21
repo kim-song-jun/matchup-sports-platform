@@ -96,6 +96,13 @@ export async function createOrderingService() {
       },
     },
     v1TeamMatch: { async findUnique() { return teamMatch; } },
+    v1UserProfile: {
+      async findMany({ where }: { where: { userId: { in: string[] } } }) {
+        return where.userId.in.map((userId) => ({
+          userId, realName: null, displayName: null, nickname: `${userId}-닉네임`, tournamentRealNameVisible: false, deletedAt: null,
+        }));
+      },
+    },
     v1AdminUser: {
       async findUnique({ where }: { where: { userId: string } }) {
         const gate = nextActorGate;

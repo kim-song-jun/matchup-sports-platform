@@ -112,3 +112,46 @@ describe('useV1GameOperationsConsole — renew가 TAKEOVER_TOKEN_EXPIRED로 실�
     unmount();
   });
 });
+
+// MD-QA #165: 콘솔을 여는 것만으로 다른 운영자의 권한을 뺏었다. 자동 요청은 force 없이 보내고,
+// 다른 사람이 쥐고 있으면 보기 모드(denied TAKEOVER_HELD)로 남았다가 확인한 요청만 force 로 가져온다.
+describe('useV1GameOperationsConsole — 다른 운영자가 쥐고 있으면 확인 전까지 가져오지 않는다', () => {
+  it('TAKEOVER_HELD 는 자동 재요청하지 않고, force 요청만 가져온다', async () => {
+    const takeoverPayloads: Record<string, unknown>[] = [];
+    mockSocket.emit.mockImplementation(
+      (event: string, payload: Record<string, unknown>, cb?: (result: unknown) => void) => {
+        if (event === 'game.subscribe' && cb) {
+          cb({ status: 'subscribed', snapshot: { gameId: 'game-1', version: 5, state: 'LIVE', lastSequence: 0, events: [] } });
+        } else if (event === 'game.takeover.request' && cb) {
+          takeoverPayloads.push(payload);
+          cb(payload.force === true
+            ? { status: 'granted', takeoverToken: 'tok-forced', expiresAt: new Date(Date.now() + 60_000).toISOString() }
+            : { status: 'denied', code: 'TAKEOVER_HELD', holderName: '김운영' });
+        }
+      },
+    );
+
+    const { useV1GameOperationsConsole } = await import('./use-v1-game-operations-console');
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { result, unmount } = renderHook(
+      () => useV1GameOperationsConsole({ tournamentId: null, gameId: 'game-1', myUserId: 'user-1', initialLastSequence: 0 }),
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(TAKEOVER_RENEW_INTERVAL_MS);
+    });
+    expect(result.current.takeover).toEqual({ status: 'denied', code: 'TAKEOVER_HELD', holderName: '김운영' });
+    expect(takeoverPayloads).toHaveLength(1);
+    expect(takeoverPayloads[0]).not.toHaveProperty('force');
+
+    await act(async () => {
+      result.current.requestTakeover({ force: true });
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(takeoverPayloads[1]).toMatchObject({ force: true });
+    expect(result.current.takeover.status).toBe('held');
+
+    unmount();
+  });
+});

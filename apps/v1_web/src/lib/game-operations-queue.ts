@@ -321,7 +321,8 @@ export type TakeoverState =
     }
   | { readonly status: 'expired' }
   | { readonly status: 'revoked'; readonly assignmentVersion: number }
-  | { readonly status: 'denied'; readonly code: string };
+  /** `holderName` — TAKEOVER_HELD·TAKEOVER_SUPERSEDED 때 지금 운영 중인 사람(모르거나 본인의 다른 화면이면 null). */
+  | { readonly status: 'denied'; readonly code: string; readonly holderName?: string | null };
 
 export const INITIAL_TAKEOVER_STATE: TakeoverState = { status: 'none' };
 
@@ -333,7 +334,7 @@ export type TakeoverAction =
       readonly expiresAtMs: number;
       readonly assignmentVersion: number;
     }
-  | { readonly type: 'DENIED'; readonly code: string }
+  | { readonly type: 'DENIED'; readonly code: string; readonly holderName?: string | null }
   | { readonly type: 'CHECK_EXPIRY'; readonly nowMs: number }
   | { readonly type: 'REVOKED'; readonly assignmentVersion: number }
   | { readonly type: 'RESET' };
@@ -350,7 +351,9 @@ export function takeoverReducer(state: TakeoverState, action: TakeoverAction): T
         assignmentVersion: action.assignmentVersion,
       };
     case 'DENIED':
-      return { status: 'denied', code: action.code };
+      return action.holderName === undefined
+        ? { status: 'denied', code: action.code }
+        : { status: 'denied', code: action.code, holderName: action.holderName };
     case 'CHECK_EXPIRY':
       // A held grant past its own expiresAtMs transitions to `expired`
       // exactly once (idempotent — re-checking an already-expired/other

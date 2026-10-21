@@ -86,7 +86,7 @@ export function createFixture(server: SetupServerApi) {
           id: 'result-expiry', gameId: game.id, revision: 1, state: 'SUBMITTED', score: { home: 0, away: 0 }, goalEvents: [],
           eventsHash: createHash('sha256').update('[]').digest('hex'), missingScorer: false, mvpParticipantId: null, reason: null,
           outcomeReason: 'NORMAL', outcomeNote: null, createdByActorType: 'USER', createdByUserId: 'operator-expiry',
-          createdByName: null, createdBySystemActor: null, supersedesId: null, submittedAt: now, officialAt: null,
+          createdByName: null, officializedByName: null, createdBySystemActor: null, supersedesId: null, submittedAt: now, officialAt: null,
           createdAt: now, updatedAt: now, resultParticipants: [],
         };
         resultRevisions.push(revision);

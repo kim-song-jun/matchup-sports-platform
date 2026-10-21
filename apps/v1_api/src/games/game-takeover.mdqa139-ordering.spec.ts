@@ -245,3 +245,36 @@ describe('MD-QA #139 takeover arrival order through actual GamesService', () => 
     } finally { actor.release(); await fixture.close(); }
   });
 });
+
+describe('MD-QA #165 다른 운영자가 쥔 경기는 확인 없이 넘기지 않는다', () => {
+  const otherUser = { ...ORDERING_USER, id: 'mdqa165-other-operator' };
+
+  it('다른 사람이 운영 중이면 보유자 이름과 함께 거절하고, force 요청만 가져간다', async () => {
+    const fixture = await createOrderingService();
+    try {
+      const held = await fixture.service.requestTakeover(ORDERING_USER, ORDERING_GAME_ID, { clientInstanceId: 'a-tab', lastSequence: 7 });
+
+      await expect(fixture.service.requestTakeover(otherUser, ORDERING_GAME_ID, { clientInstanceId: 'b-tab', lastSequence: 7 }))
+        .rejects.toMatchObject({ response: { code: 'TAKEOVER_HELD', details: { holderName: `${ORDERING_USER.id}-닉네임` } } });
+      // 거절은 상대 권한을 건드리지 않는다.
+      await expect(fixture.service.renewTakeover(ORDERING_USER, ORDERING_GAME_ID, { takeoverToken: held.takeoverToken, clientInstanceId: 'a-tab' }))
+        .resolves.toMatchObject({ takeoverToken: held.takeoverToken });
+
+      const forced = await fixture.service.requestTakeover(otherUser, ORDERING_GAME_ID, { clientInstanceId: 'b-tab', lastSequence: 7, force: true });
+      await expect(fixture.service.renewTakeover(otherUser, ORDERING_GAME_ID, { takeoverToken: forced.takeoverToken, clientInstanceId: 'b-tab' }))
+        .resolves.toMatchObject({ takeoverToken: forced.takeoverToken });
+      // 뺏긴 쪽이 보는 보유자 이름. 본인에게는 이름 대신 null("다른 화면에서")이다.
+      await expect(fixture.service.takeoverHolderName(ORDERING_GAME_ID, ORDERING_USER.id)).resolves.toBe(`${otherUser.id}-닉네임`);
+      await expect(fixture.service.takeoverHolderName(ORDERING_GAME_ID, otherUser.id)).resolves.toBeNull();
+    } finally { await fixture.close(); }
+  });
+
+  it('같은 사람의 새 탭·새로고침은 확인 없이 바로 넘긴다', async () => {
+    const fixture = await createOrderingService();
+    try {
+      await fixture.service.requestTakeover(ORDERING_USER, ORDERING_GAME_ID, { clientInstanceId: 'old-tab', lastSequence: 7 });
+      await expect(fixture.service.requestTakeover(ORDERING_USER, ORDERING_GAME_ID, { clientInstanceId: 'reloaded-tab', lastSequence: 7 }))
+        .resolves.toMatchObject({ gameId: ORDERING_GAME_ID });
+    } finally { await fixture.close(); }
+  });
+});

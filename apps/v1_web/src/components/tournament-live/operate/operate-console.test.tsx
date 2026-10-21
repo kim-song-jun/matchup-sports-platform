@@ -255,6 +255,46 @@ describe('OperateConsole — 기록된 이벤트 / 전송 상태 분리', () => 
     render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
     expect(screen.getByText('이 경기를 운영할 권한이 없어요.')).toBeInTheDocument();
     expect(screen.queryByText('Tournament staff scope is denied')).not.toBeInTheDocument();
+    // 권한 문제는 다시 불러와도 같은 답이다 — 누를 버튼을 두지 않는다(MD-QA #171).
+    expect(screen.queryByRole('button', { name: '다시 시도' })).not.toBeInTheDocument();
+  });
+
+  it('권한이 아닌 불러오기 실패에는 다시 시도를 둔다', () => {
+    const refetch = vi.fn();
+    mocks.useV1FixtureLineup.mockReturnValue({
+      data: undefined, isLoading: false, isError: true,
+      error: new V1ApiError({ status: 'error', message: '경기 정보를 불러오지 못했어요.', statusCode: 500, code: 'INTERNAL_ERROR', timestamp: '2026-10-14T01:00:00Z' }),
+      refetch,
+    });
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+    expect(refetch).toHaveBeenCalled();
+  });
+
+  // MD-QA #165: 다른 운영자가 쥔 경기는 보기 모드로 열고, 코드 없이 누가 운영 중인지와 가져오는 방법을 보여 준다.
+  it('다른 운영자가 운영 중이면 이름과 가져오기 버튼을 보여 주고, 확인해야만 force 로 가져온다', async () => {
+    const state = consoleState({ takeover: { status: 'denied', code: 'TAKEOVER_HELD', holderName: '김운영' } });
+    mocks.useV1GameOperationsConsole.mockReturnValue(state);
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    expect(screen.getByText('김운영님이 이 경기를 운영하고 있어요. 지금은 보기만 할 수 있어요.')).toBeInTheDocument();
+    expect(screen.queryByText(/TAKEOVER_HELD/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '운영 권한 가져오기' }));
+    expect(state.requestTakeover).not.toHaveBeenCalled();
+    fireEvent.click(await screen.findByRole('button', { name: '가져오기' }));
+    await waitFor(() => expect(state.requestTakeover).toHaveBeenCalledWith({ force: true }));
+  });
+
+  it('권한을 뺏긴 쪽도 코드 대신 누가 가져갔는지 보여 준다', () => {
+    mocks.useV1GameOperationsConsole.mockReturnValue(
+      consoleState({ takeover: { status: 'denied', code: 'TAKEOVER_SUPERSEDED', holderName: '박운영' } }),
+    );
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    expect(screen.getByText('박운영님이 운영 권한을 가져갔어요. 지금은 보기만 할 수 있어요.')).toBeInTheDocument();
+    expect(screen.queryByText(/TAKEOVER_SUPERSEDED/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '운영 권한 가져오기' })).toBeInTheDocument();
   });
 
   // Task 180 G6(F76) — 콘솔에서는 방금 한 일이 맨 위여야 어시스트를 잘못된 골에 다는 사고가 없다.

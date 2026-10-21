@@ -27,7 +27,7 @@ Created: 2026-10-21
 ## Acceptance Criteria
 - [x] 일정 API가 실제 저장된 연결로 홈·어웨이 문구를 반환한다.
 - [x] 관련 좁은 회귀와 API 타입 검증 증거를 기록한다.
-- [ ] base=dev PR 생성. 머지/배포는 이번 요청 범위에 포함하지 않는다.
+- [x] base=dev [PR #2026](https://github.com/kim-song-jun/matchup-sports-platform/pull/2026) 생성. 머지/배포는 이번 요청 범위에 포함하지 않는다.
 
 ## Tech Debt Resolved
 대진표에서만 해석하던 진출 연결이 공개 일정에서는 유실되던 문제를 수정한다.
@@ -48,3 +48,4 @@ API만 수정한다. alpha 변경 후 수동 화면 확인은 배포 이후에 �
 - GREEN: 일정 service37 + 리그 일정/순위22 = 59 PASS. 최초 네이티브 Node 실행은 WSL 의존성 해석 실패, 최초 리그 테스트 경로 오타는 ENOENT로 실패했으며 통과 증거에 포함하지 않았다. 올바른 WSL 경로에서 검증했다.
 - 실제 PostgreSQL 회귀 추가: 템플릿 생성 → 결선 필터/limit → 최신 원천 번호/승자/패자 → 원천 soft delete 제외. 로컬 Docker 엔진 미가동으로 실행하지 못했으며 CI에서 확인해야 한다.
 - API `tsc --noEmit` 및 surface 검사 PASS. 새 debt marker 없음, `git diff --check` PASS. Alpha after 화면 확인 0/3(미배포); 원격 데이터 변경0.
+- 구현 커밋 `97fd02a89`, PR #2026 head/base 확인 완료. CI 및 실제 DB 회귀는 PR에서 후속 확인한다.

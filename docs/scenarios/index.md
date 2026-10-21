@@ -1,3 +1,5 @@
+[빈 템플릿 조 정리](./empty-template-group-cleanup.md) · Task20261100/PR2019. 로컬 DB·단위·타입 검증 완료, hotfix CI/alpha/main/production 진행 중. 운영 대회는 조회만 수행.
+
 ## 2026-10-21 — 수동 대진의 공통 결선 진출팀 배정
 
 [시나리오](./finalist-assignment.md) · [Task 20261099](../../.github/tasks/20261099-finalist-assignment.md). 조별 공식 순위 확인/배정안 조정/자동·수동 배정, 14·15팀 불균등 조 지원 및 기존12강 유지. API36·Web121·실제 임시 DB7 및 양쪽 타입/표면·패턴 PASS. Alpha before3/3(실제 로그인), after0/3(미배포). 지정 대회 데이터 변경 없음.

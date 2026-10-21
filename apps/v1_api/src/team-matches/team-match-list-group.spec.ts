@@ -31,7 +31,9 @@ describe('teamMatchListGroup — 공개 목록 묶음', () => {
     ['친선이 종료 시각을 지남(카드의 종료 확인 중)', row({ status: 'matched', startAt: at(-3 * HOUR), endAt: at(-HOUR), game: { state: 'SCHEDULED' } }), 'ended'],
     ['경기 기록 종료(결과 대기)', row({ status: 'matched', startAt: at(-3 * HOUR), game: { state: 'ENDED' } }), 'ended'],
     ['완료', row({ status: 'completed', startAt: at(-48 * HOUR) }), 'ended'],
-    ['시작이 지났는데 기록이 없는 리그 경기', row({ status: 'matched', leagueId: 'league-1', startAt: at(-HOUR), endAt: at(HOUR), game: { state: 'SCHEDULED' } }), 'ended'],
+    ['시작이 지났는데 기록을 아직 시작하지 않은 리그 경기(종료 시각 전)', row({ status: 'matched', leagueId: 'league-1', startAt: at(-HOUR), endAt: at(HOUR), game: { state: 'SCHEDULED' } }), 'scheduled'],
+    ['종료 시각이 지나도록 기록이 없는 리그 경기', row({ status: 'matched', leagueId: 'league-1', startAt: at(-3 * HOUR), endAt: at(-HOUR), game: { state: 'SCHEDULED' } }), 'ended'],
+    ['종료 시각이 없고 시작이 지났는데 기록이 없는 리그 경기', row({ status: 'matched', leagueId: 'league-1', startAt: at(-HOUR), endAt: null, game: { state: 'SCHEDULED' } }), 'ended'],
     ['시작 시각이 없는 리그 대진', row({ status: 'matched', leagueId: 'league-1', startAt: null }), 'unscheduled'],
   ] as const)('%s → %s', (_, value, expected) => {
     expect(teamMatchListGroup(value, AT)).toBe(expected);

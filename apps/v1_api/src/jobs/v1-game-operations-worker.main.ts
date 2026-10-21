@@ -19,6 +19,11 @@ import {
   scheduleNextScan,
 } from './lineup-reminders/lineup-reminder.service';
 import { ScheduleReminderService } from './schedule-reminders/schedule-reminder.service';
+import {
+  scheduleNextNoOpponentScan,
+  TEAM_MATCH_NO_OPPONENT_SCAN_TYPE,
+  TeamMatchNoOpponentCancelService,
+} from './team-match-no-opponent/team-match-no-opponent-cancel.service';
 import { V1GameOperationsWorkerModule } from './v1-game-operations-worker.module';
 import { V1GameOperationsWorkerService } from './v1-game-operations-worker.service';
 
@@ -86,6 +91,11 @@ async function bootstrap(): Promise<void> {
   // 체인의 첫 고리. 이미 예약돼 있으면 슬롯 키가 같아 무시되므로, 워커를 몇 번 재시작해도
   // 스캔이 늘어나지 않는다. 반대로 어떤 이유로 체인이 끊겼더라도 다음 배포 때 되살아난다.
   await prisma.$transaction((tx) => scheduleNextScan(tx, new Date()));
+
+  // 상대 없이 끝난 일반 팀매치 자동 취소(2026-10-21). 라인업 리마인더와 같은 자기 예약 스캔이고, 첫 고리는 여기서 심는다.
+  const noOpponentCancel = new TeamMatchNoOpponentCancelService(prisma, webPush);
+  worker.registerHandler(TEAM_MATCH_NO_OPPONENT_SCAN_TYPE, noOpponentCancel.scanHandler);
+  await prisma.$transaction((tx) => scheduleNextNoOpponentScan(tx, new Date()));
 
   app.setGlobalPrefix('api/v1');
   app.useGlobalPipes(new ValidationPipe({

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
+import { resolve as resolvePath } from 'node:path';
 
 export function normalizeWorkflowSource(source) {
   return source.replace(/\r\n/g, '\n');
@@ -94,12 +95,140 @@ export function findJobsMissingRunnerPrereqs(workflow) {
   return problems;
 }
 
+// 승인(environment) 전에 도는 job 은 main 에 push 할 수 있는 누구든 스텝과 그 스텝이 부르는
+// 스크립트를 바꿔 실행시킬 수 있다. 그 job 이 prod 서버·운영 비밀값에 닿으면 승인 게이트가
+// 의미를 잃는다 — build-images 가 SSM send-command(롤백 기준 읽기, 호스트 .env 읽기)와
+// 승인 없이 assume 되는 배포 역할(ssm:SendCommand·ssm:PutParameter·KMS 권한 보유)을 쓰던 것이
+// 정확히 그 길이었다. IAM(역할 trust 와 권한)이 경계 자체이고, 이 검사는 같은 실수가 워크플로나
+// 스크립트에 되돌아오는 것을 CI 에서 먼저 잡는 보조 장치다.
+//   - 승인 전 job: PROD_AWS_ROLE_ARN 금지. AWS 자격증명을 받는 job 은 빌드 역할만 쓰고,
+//     서버·비밀값 접근 AWS 서비스(ssm·kms·ec2) 호출 금지 — 호출하는 스크립트 안까지 따라간다.
+//   - 승인 job(environment 있음): 제한 없음.
+const PRIVILEGED_AWS_SERVICES = '(?:ssm|kms|ec2)';
+// `aws --region x ssm ...` 처럼 서비스 앞에 전역 옵션이 와도 잡는다. 옵션 값 자리가 서비스
+// 이름을 삼키지 않도록 (?!...) 로 막는다.
+const PRIVILEGED_AWS_CALL = new RegExp(
+  String.raw`\baws(?:\s+--?[A-Za-z][A-Za-z-]*(?:[ =](?!${PRIVILEGED_AWS_SERVICES}\b)[^\s|;&<>]+)?)*\s+(${PRIVILEGED_AWS_SERVICES})\b`,
+);
+const BUILD_ROLE_PATTERN = /role-to-assume:\s*\$\{\{\s*vars\.PROD_BUILD_AWS_ROLE_ARN\s*\}\}/;
+
+function stripShellComments(body) {
+  return body
+    .split('\n')
+    .filter((line) => !/^\s*#/.test(line))
+    .map((line) => line.replace(/\s#.*$/, ''))
+    .join('\n');
+}
+
+function isApprovedJob(body) {
+  return /^ {4}environment:/m.test(body);
+}
+
+function readFileOrNull(path) {
+  try {
+    return readFileSync(path, 'utf8');
+  } catch {
+    return null;
+  }
+}
+
+// 스크립트가 직접 또는 source/bash/node 로 부르는 스크립트 안에서 서버·비밀값 접근 AWS 호출을
+// 찾는다. 반환값은 "<스크립트 경로>: aws <서비스>" 목록.
+export function findPrivilegedAwsInScript(path, readScript = readFileOrNull, seen = new Set()) {
+  if (seen.has(path)) return [];
+  seen.add(path);
+  const body = readScript(path);
+  if (body === null) return [];
+  const code = stripShellComments(body);
+  const hits = [];
+  const call = code.match(PRIVILEGED_AWS_CALL);
+  if (call) hits.push(`${path}: aws ${call[1]}`);
+
+  const dir = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '.';
+  const targets = new Set();
+  for (const m of code.matchAll(/\b(?:bash|sh|node)\s+(scripts\/[A-Za-z0-9_./-]+)/g)) targets.add(m[1]);
+  // source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/image-scan-common.sh" 처럼 경로를
+  // 계산해 쓰는 형태 — 파일 이름만 뽑아 같은 디렉터리 기준으로 해석한다.
+  for (const m of code.matchAll(/(?:^|[\s;&(])(?:source|\.)\s+[^\n]*?((?:[A-Za-z0-9_.-]+\/)*[A-Za-z0-9_.-]+\.sh)\b/gm)) {
+    targets.add(m[1].startsWith('scripts/') ? m[1] : `${dir}/${m[1]}`);
+  }
+  for (const target of targets) hits.push(...findPrivilegedAwsInScript(target, readScript, seen));
+  return hits;
+}
+
+export function findProdRoleWithoutApproval(workflow) {
+  const problems = [];
+  for (const { name, body } of splitJobs(workflow)) {
+    if (isApprovedJob(body)) continue;
+    if (/\bvars\.PROD_AWS_ROLE_ARN\b/.test(stripShellComments(body))) {
+      problems.push(
+        `job '${name}': 승인(environment) 없이 prod 배포 역할(PROD_AWS_ROLE_ARN)을 assume 합니다 — ` +
+          '그 역할은 ssm:SendCommand·ssm:PutParameter·KMS 권한을 갖습니다. 승인 전 job 은 PROD_BUILD_AWS_ROLE_ARN 만 씁니다',
+      );
+    }
+  }
+  return problems;
+}
+
+export function findPrivilegedAwsWithoutApproval(workflow, readScript = readFileOrNull) {
+  const problems = [];
+  for (const { name, body } of splitJobs(workflow)) {
+    if (isApprovedJob(body)) continue;
+    const code = stripShellComments(body);
+    // 자격증명을 받지 않는 job(gates 등)은 aws 를 불러도 인증이 없어 서버에 닿지 못한다.
+    if (!/uses:\s*aws-actions\/configure-aws-credentials@/.test(code)) continue;
+
+    if (!BUILD_ROLE_PATTERN.test(code)) {
+      problems.push(
+        `job '${name}': 승인(environment) 없이 도는 job 이 빌드 역할(vars.PROD_BUILD_AWS_ROLE_ARN)이 아닌 역할을 assume 합니다`,
+      );
+    }
+
+    const inline = code.match(PRIVILEGED_AWS_CALL);
+    if (inline) {
+      problems.push(
+        `job '${name}': 승인(environment) 없이 도는 job 이 prod 서버·운영 비밀값에 닿는 AWS 호출(aws ${inline[1]})을 합니다 — ` +
+          '승인된 deploy job 으로 옮기세요',
+      );
+    }
+
+    const scripts = new Set(
+      [...code.matchAll(/\b(?:bash|sh|node)\s+(scripts\/[A-Za-z0-9_./-]+)/g)].map((m) => m[1]),
+    );
+    const seen = new Set();
+    for (const script of scripts) {
+      for (const hit of findPrivilegedAwsInScript(script, readScript, seen)) {
+        problems.push(
+          `job '${name}': 승인(environment) 없이 도는 job 이 부르는 스크립트가 prod 서버·운영 비밀값에 닿는 AWS 호출을 합니다 (${hit}) — ` +
+            '승인된 deploy job 으로 옮기세요',
+        );
+      }
+    }
+  }
+  return problems;
+}
+
 const workflowPath = process.argv[2] ?? '.github/workflows/deploy.yml';
 const workflow = normalizeWorkflowSource(readFileSync(workflowPath, 'utf8'));
 const errors = [];
 
 for (const problem of findJobsMissingRunnerPrereqs(workflow)) {
   errors.push(`${workflowPath}: ${problem}`);
+}
+
+for (const problem of [
+  ...findProdRoleWithoutApproval(workflow),
+  ...findPrivilegedAwsWithoutApproval(workflow),
+]) {
+  errors.push(`${workflowPath}: ${problem}`);
+}
+
+// 같은 역할을 다른 워크플로(rollback-prod.yml 등)에서 승인 없이 assume 하는 길도 막는다.
+for (const file of readdirSync('.github/workflows').filter((f) => /\.ya?ml$/.test(f))) {
+  const path = `.github/workflows/${file}`;
+  if (resolvePath(path) === resolvePath(workflowPath)) continue;
+  const other = normalizeWorkflowSource(readFileSync(path, 'utf8'));
+  for (const problem of findProdRoleWithoutApproval(other)) errors.push(`${path}: ${problem}`);
 }
 
 // deploy.yml 이 SSH 를 안 쓰게 됐어도, **그 워크플로가 호출하는 스크립트**가 여전히
@@ -375,10 +504,10 @@ const requiredPatterns = [
     message: 'production immutable image tags must be prefixed with sha-<commit sha>',
   },
   {
-    // build-images job 만 OIDC 로 AWS(ECR push, 대상 검증)를 건드린다 — deploy job 은
-    // SSH 만 쓰고 AWS API 를 직접 호출하지 않으므로 id-token: write 가 필요 없다.
-    pattern: /id-token: write/,
-    message: 'build-images job must request an OIDC token to assume the AWS deploy role',
+    // 승인 전 build-images job 은 ECR push·스캔 조회·소스 업로드 권한만 가진 빌드 역할을 쓴다.
+    // 서버·운영 비밀값 권한이 있는 배포 역할(PROD_AWS_ROLE_ARN)은 승인된 deploy job 전용이다.
+    pattern: /role-to-assume: \$\{\{ vars\.PROD_BUILD_AWS_ROLE_ARN \}\}/,
+    message: 'build-images must assume the build-only role (PROD_BUILD_AWS_ROLE_ARN), never the deploy role',
   },
 ];
 

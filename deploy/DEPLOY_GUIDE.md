@@ -59,7 +59,7 @@ test "$(curl -sS -o /dev/null -w '%{http_code}' http://localhost:3013/v1/home)" 
 > 자격증명을 얻어 S3에 릴리스를 올리고 SSM으로 EC2에 명령한다. `EC2_HOST` ·
 > `EC2_SSH_KEY` · `EC2_KNOWN_HOSTS`는 **프로덕션 배포에 더 이상 필요하지 않다**
 > (운영자 수동 접속용으로 남겨 둘 수는 있다). 대신 아래 repository **variable**이 필요하다:
-> `PROD_AWS_ROLE_ARN` · `PROD_AWS_REGION` · `PROD_DEPLOY_BUCKET` ·
+> `PROD_BUILD_AWS_ROLE_ARN` · `PROD_AWS_ROLE_ARN` · `PROD_AWS_REGION` · `PROD_DEPLOY_BUCKET` ·
 > `PROD_EC2_INSTANCE_ID` · `PROD_EXPECTED_ACCOUNT_ID`.
 
 | 이름 | 책임 |
@@ -94,29 +94,34 @@ GitHub Actions의 OAuth·관리자·GA 값은 SSH 명령줄 인자가 아니라 
 
 | 이름 | 책임 |
 |---|---|
-| `PROD_AWS_ROLE_ARN` | `build-images`/`rollback` job 이 OIDC 로 assume 하는 IAM role(`teameet-prod-github-deploy`) |
+| `PROD_BUILD_AWS_ROLE_ARN` | 승인 전 `build-images` job 만 OIDC 로 assume 하는 빌드 전용 IAM role(`teameet-prod-github-build`). trust 는 `repo:kim-song-jun/matchup-sports-platform:ref:refs/heads/main` 뿐이고 ECR push·스캔 조회와 릴리스 소스 S3 업로드 권한만 갖는다 |
+| `PROD_AWS_ROLE_ARN` | 승인 후 `deploy`·`rollback` job 이 OIDC 로 assume 하는 IAM role(`teameet-prod-github-deploy`). SSM 명령·Parameter Store·KMS 권한이 있어 승인된 job(`environment:production` subject)에서만 assume 한다 |
 | `PROD_AWS_REGION` | ECR/EC2 리전(`ap-northeast-2`) |
 | `PROD_EXPECTED_ACCOUNT_ID` | AWS 계정 ID 고정값 — 잘못된 계정으로의 배포를 fail-closed |
-| `PROD_EC2_INSTANCE_ID` | prod EC2 instance-id — `verify-prod-aws-target.sh` 가 실행 중/태그 일치를 재확인 |
+| `PROD_EC2_INSTANCE_ID` | prod EC2 instance-id — 승인 후 `verify-prod-aws-target.sh` 가 실행 중/태그 일치를 재확인 |
 
 prod EC2 instance profile(`teameet-certbot-route53`)에는 `TeameetProdImmutableImagePull` 인라인 정책이 붙어 있어야 한다(`ecr:GetAuthorizationToken` + 두 prod 리포지토리에 대한 `ecr:BatchGetImage`/`ecr:GetDownloadUrlForLayer`) — 없으면 `deploy-prod.sh`/`rollback-prod.sh`의 `docker login`/`docker pull` 단계에서 배포가 100% 실패한다.
 
-배포는 **승인 게이트를 기준으로 두 job으로 나뉜다**. 빌드·ECR push·소스 스테이징은 게이트 앞에서 끝내고, 승인 뒤에는 activation(symlink 스왑) + 마이그레이션 + 컨테이너 교체만 남긴다 — 승인 대기가 배포 시간의 대부분이었기 때문이다(실측 29분). 이미지는 러너에서 빌드해 ECR 에 **digest 로 고정 push** 하고, EC2 는 그 digest 를 **pull 만** 한다 — `:latest` 태그는 더 이상 쓰지 않는다.
+배포는 **승인 게이트를 기준으로 두 job으로 나뉜다**. 빌드·ECR push·스캔·소스 업로드는 게이트 앞에서 끝내고, 승인 뒤에는 서버 상태를 읽는 일(롤백 기준·매니페스트)과 activation(symlink 스왑) + 마이그레이션 + 컨테이너 교체가 남는다 — 승인 대기가 배포 시간의 대부분이었기 때문이다(실측 29분). 이미지는 러너에서 빌드해 ECR 에 **digest 로 고정 push** 하고, EC2 는 그 digest 를 **pull 만** 한다 — `:latest` 태그는 더 이상 쓰지 않는다.
 
-**`build-images` job — 승인 전, 서비스에 영향 없음**
+**`build-images` job — 승인 전, 서비스에 영향 없음, 빌드 역할(`PROD_BUILD_AWS_ROLE_ARN`)**
 
-1. OIDC 로 `PROD_AWS_ROLE_ARN`을 assume 하고 ECR 에 로그인한다.
-2. v1 API/Web 이미지를 빌드해 ECR 에 **`sha-<커밋SHA>` 태그로 push**한다(IMMUTABLE 리포지토리라 같은 태그 재push 는 불가능 — 이미 존재하면 빌드 자체를 skip해 재실행을 멱등하게 만든다).
+1. OIDC 로 빌드 역할을 assume 하고 계정·ECR 리포지토리를 확인(`verify-prod-registry-target.sh`)한 뒤 ECR 에 로그인한다.
+2. v1 API/Web 이미지를 빌드해 ECR 에 **`sha-<커밋SHA>` 태그로 push**한다(IMMUTABLE 리포지토리라 같은 태그 재push 는 불가능 — 이미 존재하면 빌드 자체를 skip해 재실행을 멱등하게 만든다). 웹 이미지에는 서버측 API origin(`http://v1_api:8121`, 워크플로 `PROD_INTERNAL_API_ORIGIN`)을 빌드 인자로 굽는다.
 3. ECR 이미지 스캔에서 CRITICAL 취약점이 없는지 확인한다.
-4. 저장소를 EC2 의 고정 스테이징 경로(`~/.teameet-prod-staging/<sha>`)로 rsync 하고, digest·소스 체크섬을 담은 release manifest 를 만들어 같이 올린다.
+4. 저장소 tarball 을 S3 `releases/<sha>.tar.gz` 에 올린다(EC2 는 승인 후 SSM 명령으로 이 객체를 내려받아 스테이징 경로에 푼다).
 
-이 job은 **DB·실행 중인 컨테이너·활성 릴리스 심볼릭 링크(`~/teameet`)를 전혀 건드리지 않는다.** 승인이 거부돼도 서비스는 이전 릴리스로 계속 돌아간다.
+이 job은 **서버(SSM)·운영 비밀값(Parameter Store·KMS)·DB·실행 중인 컨테이너·활성 릴리스 심볼릭 링크(`~/teameet`)를 전혀 건드리지 않는다.** 승인이 거부돼도 서비스는 이전 릴리스로 계속 돌아간다. 승인 전 job 은 main 에 push 할 수 있는 누구든 스텝과 스크립트를 바꿔 실행시킬 수 있으므로, 서버·비밀값에 닿는 동작은 이 job 에 두지 않는다(`pnpm qa:production-deploy-security` 가 강제).
 
-**`deploy` job — `production` environment 승인 후**
+**`deploy` job — `production` environment 승인 후, 배포 역할(`PROD_AWS_ROLE_ARN`)**
 
-5. GitHub secret·variable 을 고정 런타임 경로(`~/.teameet-prod-runtime/.env`)로 동기화한다. **런타임 설정 변경이 승인 뒤에만 일어나도록 이 단계는 여기 있다** — 승인 전에 바꾸면 그 사이 재기동이 "새 설정 + 옛 이미지" 조합을 띄울 수 있다.
-6. `deploy/deploy-prod.sh` 를 EC2 에서 실행한다 — 이 한 스크립트가 activation(release-sha 디렉터리로 `~/teameet` 심볼릭 링크 원자 스왑) → `docker login`/`pull`(ECR digest) → `prisma migrate deploy`(정확히 1회) → 수상자 연결 CLI(멱등) → API/Web/game-operations worker 컨테이너 교체 → 헬스 계약 확인 → active/previous 상태(`~/.teameet-prod-releases/state.json`) 원자 승격까지 전부 수행한다. 실패하면 ERR trap 이 이전 활성 릴리스로 자동 복구를 시도한다.
-7. workflow는 internal API와 game-operations worker, root-origin API, root Web과 legacy browser `/v1/home`이 현재 경로로 308 redirect되는지를 러너에서 한 번 더 health check한다(EC2 로컬은 성공했지만 worker 또는 네트워크 경로가 준비되지 않은 경우를 잡기 위함).
+5. 대상 확인(`verify-prod-aws-target.sh`: 계정·인스턴스·ECR)과 롤백 기준 계산(`resolve-prod-rollback-base.sh`: 서버의 릴리스 상태를 SSM 으로 읽고 expand-contract 호환을 검사)을 한다. 둘 다 아무것도 바꾸기 전에 돈다.
+6. 롤백 기준을 담은 release manifest(이미지 digest·소스 체크섬)를 만들어 S3 `manifests/<sha>.json` 에 올린다.
+7. GitHub secret·variable 을 고정 런타임 경로(`~/.teameet-prod-runtime/.env`)로 동기화한다. **런타임 설정 변경이 승인 뒤에만 일어나도록 이 단계는 여기 있다** — 승인 전에 바꾸면 그 사이 재기동이 "새 설정 + 옛 이미지" 조합을 띄울 수 있다. 이어서 호스트 `.env` 의 `V1_INTERNAL_API_ORIGIN` 이 웹 이미지에 구워진 값과 다르지 않은지 대조한다(`assert-prod-internal-api-origin.sh`, 값이 비어 있으면 통과).
+8. `deploy/deploy-prod.sh` 를 EC2 에서 실행한다 — 이 한 스크립트가 activation(release-sha 디렉터리로 `~/teameet` 심볼릭 링크 원자 스왑) → `docker login`/`pull`(ECR digest) → `prisma migrate deploy`(정확히 1회) → 수상자 연결 CLI(멱등) → API/Web/game-operations worker 컨테이너 교체 → 헬스 계약 확인 → active/previous 상태(`~/.teameet-prod-releases/state.json`) 원자 승격까지 전부 수행한다. 실패하면 ERR trap 이 이전 활성 릴리스로 자동 복구를 시도한다.
+9. workflow는 internal API와 game-operations worker, root-origin API, root Web과 legacy browser `/v1/home`이 현재 경로로 308 redirect되는지를 러너에서 한 번 더 health check한다(EC2 로컬은 성공했지만 worker 또는 네트워크 경로가 준비되지 않은 경우를 잡기 위함).
+
+두 역할의 권한이 갈리는 이유: 승인 게이트는 `deploy` job 에만 있으므로, 승인 전 job 이 assume 하는 역할이 SSM `SendCommand` 나 `/teameet/prod/env/*` 쓰기 권한을 가지면 main 에 스크립트만 바꿔 push 해도 승인 없이 prod 서버 명령·운영 비밀값 쓰기가 가능해진다. 그래서 빌드 역할에는 그 권한이 없고, 배포 역할은 승인된 job 에서만 assume 하며 IAM trust 도 `environment:production` subject 만 남긴다.
 
 `build-images`와 `deploy`는 같은 concurrency group(`deploy-production`)을 공유한다. 승인 대기 중인 릴리스가 있으면 다음 릴리스의 빌드도 뒤에 큐잉되므로, 두 릴리스가 같은 호스트를 동시에 건드리지 않는다.
 

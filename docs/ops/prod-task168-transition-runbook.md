@@ -133,8 +133,8 @@ Actions → `deploy.yml` → "Run workflow" → 아래 입력으로 수동 실�
   꺼진 채라 돌려 봐야 12회 재시도 끝에 실패하고 같은 `deploy-production` 큐의 Stage B 만
   그만큼 기다리게 된다. Stage A 성공 판정은 `Run deploy-prod.sh` 스텝 성공 + 아래 5번의 로그 줄이다.
 - Stage A 는 nginx 공개 헤더(`X-Teameet-Release/Commit`) 파일을 **쓰지 않는다** — 승격되지 않는
-  SHA 가 A~B 사이 nginx 재시작으로 공개 헤더에 실리면 Stage B 빌드의
-  `resolve-prod-rollback-base.sh` 가 "퍼블릭 SHA 불일치"로 거부하기 때문이다.
+  SHA 가 A~B 사이 nginx 재시작으로 공개 헤더에 실리면 Stage B `deploy` job(승인 직후, 아무것도
+  바꾸기 전)의 `resolve-prod-rollback-base.sh` 가 "퍼블릭 SHA 불일치"로 거부하기 때문이다.
 - **A~B 사이 재부팅·docker 재시작 주의**: `v1_api`·`v1_game_operations_worker` 는
   `restart: always` 라 호스트 재부팅이나 docker 데몬 재시작이 옛 API·워커를 다시 띄운다.
   Stage B 는 진입할 때마다 두 서비스를 다시 멈추고 멈췄는지 확인한 뒤에만 DB 에 손대므로

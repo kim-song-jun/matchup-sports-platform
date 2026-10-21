@@ -4,6 +4,8 @@ import { V1AuthProvider } from '@prisma/client';
 import { AppleIdentityService } from './apple-identity.service';
 import { AppleTokenService } from './apple-token.service';
 import { AuthService } from './auth.service';
+import { LoginSecurityService } from './login-security/login-security.service';
+import { LoginStepUpService } from './login-security/login-step-up.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
 import { PhoneVerificationService } from '../verification/phone-verification.service';
@@ -62,6 +64,8 @@ describe('AuthService.appleSignIn', () => {
         { provide: PhoneVerificationService, useValue: { enabled: false } },
         { provide: AppleIdentityService, useValue: appleIdentity },
         { provide: AppleTokenService, useValue: appleTokens },
+        { provide: LoginSecurityService, useValue: {} },
+        { provide: LoginStepUpService, useValue: {} },
       ],
     }).compile();
 

@@ -97,6 +97,15 @@ describe('maskSensitive', () => {
     });
   });
 
+  // 로그인 추가 인증 verify 가 4xx/429 면 본문이 V1ErrorLog 에 무기한 저장된다 — 토큰과 코드가 평문으로 남으면 안 된다.
+  it('masks the login step-up challenge token and code', () => {
+    expect(maskSensitive({ challengeToken: 'opaque-token-value', code: '123456', note: 'kept' })).toEqual({
+      challengeToken: '[REDACTED]',
+      code: '[REDACTED]',
+      note: 'kept',
+    });
+  });
+
   // entry-fee 요청이 4xx/5xx 면 본문이 V1ErrorLog 에 무기한 저장된다 — 계좌번호·예금주가 평문으로 남으면 안 된다.
   it('masks league entry-fee bank account and holder (any key spelling), keeps bank name and amount', () => {
     const result = maskSensitive({

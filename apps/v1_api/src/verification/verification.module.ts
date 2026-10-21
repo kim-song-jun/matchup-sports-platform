@@ -31,6 +31,6 @@ import { VerificationService } from './verification.service';
     EmailVerificationService,
     V1AuthGuard,
   ],
-  exports: [PhoneVerificationService, EmailVerificationService],
+  exports: [PhoneVerificationService, EmailVerificationService, VerificationDispatcherService],
 })
 export class VerificationModule {}

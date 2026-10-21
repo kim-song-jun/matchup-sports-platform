@@ -133,6 +133,7 @@ validate_alpha_final_release_manifest() {
        .database.task168.schemaSha256 == "d54fe0c8c3415eabd9a363277afc8c5b20ff14a8bbae1c04fc943c1ba50df8b3" or
        .database.task168.schemaSha256 == "1f217e10790894fd23fb206aa4b8693c9fb8c35ceadd2e99e60a4a5731b33970" or
        .database.task168.schemaSha256 == "8776cccbf35b17cca2bd962cd44fe09fa98542c0395304b109e2a00f04684d0b" or
+       .database.task168.schemaSha256 == "c3ba891030e13da9396f9db53bc8cac0b30981f9ed735ace8db1c67000995086" or
        .database.task168.schemaSha256 == "23d87a502b12225fce2a6c5926cc272c14212da9da957cf4f5c26fb26b076644" or
        .database.task168.schemaSha256 == "887da0ea94d64d5c0ee6b51927f82a9022bfff97878b2e5094ad0d88ea05eaf3" or
        .database.task168.schemaSha256 == "96cf396f434e0fba80e9c2fa84e79ee347471ae56387ca6493b6d11f09c93a42" or

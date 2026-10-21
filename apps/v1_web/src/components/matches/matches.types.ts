@@ -66,6 +66,8 @@ export type MatchListViewModel = {
     count: number;
     today: number;
     urgent: number;
+    /** '모집 중 N'을 누르면 지금 신청할 수 있는 매치만 본다. 없으면 숫자만 그린다. */
+    recruitingFilter?: { active: boolean; href: string };
   };
   matches: MatchCardModel[];
   /** 결과가 1~2건뿐인 "희소" 상태에서 목록 아래를 채우는 인접 매치 (디자인 검수 W-3, B안).

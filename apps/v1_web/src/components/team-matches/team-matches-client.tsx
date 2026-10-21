@@ -70,7 +70,6 @@ import {
   getStatus,
   getViewerState,
   statusToCardStatus,
-  sortTeamMatchesByAvailability,
   summarizeTeamMatches,
   toTeamMatch,
 } from './team-matches.card-model';
@@ -85,6 +84,8 @@ export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSe
   const selectedGenderRule = toGenderRuleFilter(searchParams.get('genderRule'));
   const selectedLevels = toLevelCodes(searchParams.get('levelCodes') ?? searchParams.get('levels'));
   const selectedKind = toTeamMatchKind(searchParams.get('kind'));
+  // 요약 줄의 '모집 중 N'을 누르면 지금 신청할 수 있는 매치만 본다(서버 recruitingOnly).
+  const recruitingOnly = searchParams.get('recruitingOnly') === '1';
   const filterOpen = searchParams.get('filter') === '1';
   const activeFilterCount = countTeamMatchFilters(selectedSort, selectedGenderRule, selectedLevels, selectedKind);
   const initialQuery = searchParams.get('q') ?? '';
@@ -118,8 +119,9 @@ export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSe
   }, [searchParams, submittedQuery]);
   const sportsQuery = useV1MasterSports({ seed: seed?.sports });
   const teamMatchFilters = useMemo(() => {
-    const filters: { sportId?: string; query?: string; sort?: 'recommended' | 'deadline' | 'latest'; view?: 'card' | 'compact'; genderRule?: string; levelCodes?: string; kind?: 'friendly' | 'competition' } = {};
+    const filters: { sportId?: string; query?: string; sort?: 'recommended' | 'deadline' | 'latest'; view?: 'card' | 'compact'; genderRule?: string; levelCodes?: string; kind?: 'friendly' | 'competition'; recruitingOnly?: boolean } = {};
     if (selectedSportId) filters.sportId = selectedSportId;
+    if (recruitingOnly) filters.recruitingOnly = true;
     if (selectedGenderRule) filters.genderRule = selectedGenderRule;
     if (selectedLevels.length) filters.levelCodes = selectedLevels.join(',');
     if (selectedKind) filters.kind = selectedKind;
@@ -127,7 +129,7 @@ export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSe
     if (selectedSort) filters.sort = selectedSort;
     if (selectedView !== 'card') filters.view = selectedView;
     return Object.keys(filters).length ? filters : undefined;
-  }, [selectedGenderRule, selectedLevels, selectedKind, selectedSportId, selectedSort, selectedView, submittedQuery]);
+  }, [recruitingOnly, selectedGenderRule, selectedLevels, selectedKind, selectedSportId, selectedSort, selectedView, submittedQuery]);
   // 서버는 20건씩 커서 페이지네이션인데(team-matches.service.ts) 예전엔 이 화면이 단발
   // useQuery로 첫 페이지만 받아 21번째부터는 볼 방법이 없었다(감사 결함 — matches-client.tsx의
   // 같은 수정과 동일 패턴, tournaments/tournaments-list-client.tsx 의 "더 보기" 누적 방식을 따른다).
@@ -154,22 +156,22 @@ export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSe
     seed: allQueryFilters ? undefined : seed?.page,
     refetchOnWindowFocus: 'always',
   });
-  const countFilters = useMemo(() => {
-    const filters: { query?: string; genderRule?: string; levelCodes?: string; kind?: 'friendly' | 'competition' } = {};
-    if (selectedGenderRule) filters.genderRule = selectedGenderRule;
-    if (selectedLevels.length) filters.levelCodes = selectedLevels.join(',');
-    if (selectedKind) filters.kind = selectedKind;
-    if (submittedQuery.trim()) filters.query = submittedQuery.trim();
-    return Object.keys(filters).length ? filters : undefined;
-  }, [selectedGenderRule, selectedLevels, selectedKind, submittedQuery]);
+  // 상단 숫자(전체·오늘·모집 중)와 종목 칩은 서버가 센 전체 건수다 — 불러온 20개만 세면 "전체 20"처럼 작게 보였다.
+  // 정렬·보기 방식은 건수와 무관해 빼고, 한 건만 받는다(목록은 아래 조회가 맡는다). 목록 폴링(15초)에는 붙지 않는다.
+  const facetFilters = useMemo(() => {
+    const countable = { ...teamMatchFilters };
+    delete countable.sort;
+    delete countable.view;
+    return { ...countable, includeFacets: true, limit: 1 };
+  }, [teamMatchFilters]);
   const filteredQuery = useV1TeamMatches(
     filteredQueryFilters,
     { enabled: Boolean(teamMatchFilters), refetchOnWindowFocus: 'always' },
   );
-  const countQuery = useV1TeamMatches(
-    countFilters,
-    { enabled: Boolean(countFilters), refetchOnWindowFocus: 'always' },
-  );
+  // 무필터 첫 화면은 서버 seed(includeFacets)가 같은 숫자를 이미 갖고 있다.
+  const facetPage = useV1TeamMatches(facetFilters, { seed: teamMatchFilters ? undefined : seed?.page, refetchInterval: false, refetchOnWindowFocus: 'always' }).data;
+  const facets = facetPage?.facets;
+  const totalCount = facetPage?.pageInfo?.totalCount;
   const recentSearches = useV1RecentSearches();
   const recordSearch = useV1RecordSearch();
   const query = teamMatchFilters ? filteredQuery : allQuery;
@@ -283,23 +285,25 @@ export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSe
 
   const base = getTeamMatchListViewModel();
   const pageItems = query.data?.items;
-  // 가용성 정렬은 페이지 안에서만 한다 — 누적 전체를 다시 정렬하면 새 페이지의 신청 가능 카드가
-  // 앞 페이지 마감 카드 위로 끼어들어 보던 카드가 밀린다.
+  // 순서는 서버가 정한다 — 진행 중 → 신청 가능 → 경기 예정 → 신청 마감 → 끝난 경기 묶음을 페이지에 걸쳐 이어 준다
+  // (team-matches.service.ts list). 예전처럼 페이지 안에서 다시 정렬하면 다음 페이지의 신청 가능 카드가 앞 페이지 마감
+  // 카드 뒤에 나온다.
   const items: V1TeamMatch[] | undefined = cursorPageUnavailable
     ? [...accumulated]
     : pageItems === undefined
       ? undefined
       : cursor
-        ? [...accumulated, ...sortTeamMatchesByAvailability(pageItems.filter((item) => !accumulated.some((prev) => (prev.teamMatchId ?? prev.id) === (item.teamMatchId ?? item.id))))]
-        : sortTeamMatchesByAvailability(pageItems);
+        ? [...accumulated, ...pageItems.filter((item) => !accumulated.some((prev) => (prev.teamMatchId ?? prev.id) === (item.teamMatchId ?? item.id)))]
+        : pageItems;
   const visibleItems = filterTeamMatchesByLevels(items, selectedLevels);
-  const countPageItems = (countFilters ? countQuery.data?.items ?? allQuery.data?.items : allQuery.data?.items) ?? [];
-  const countPageIds = new Set(countPageItems.map((item) => item.teamMatchId ?? item.id));
-  const loadedMoreItems = selectedSportId ? [] : (items ?? []).filter((item) => !countPageIds.has(item.teamMatchId ?? item.id));
-  const countItems = filterTeamMatchesByLevels(
-    [...countPageItems, ...loadedMoreItems],
-    selectedLevels,
-  );
+  // 서버 건수가 아직 없으면(첫 렌더·조회 실패) 불러온 목록으로 센다.
+  const loadedSummary = summarizeTeamMatches(visibleItems);
+  const summary: TeamMatchListViewModel['summary'] = {
+    count: totalCount ?? loadedSummary.count,
+    today: facets?.today ?? loadedSummary.today,
+    urgent: facets?.recruiting ?? loadedSummary.urgent,
+    recruitingFilter: { active: recruitingOnly, href: buildTeamMatchHref(navigationParams, { recruitingOnly: recruitingOnly ? null : '1', filter: null }) },
+  };
   const hasNext = cursorPageUnavailable || (query.data?.pageInfo?.hasNext ?? false);
   // 다음 페이지 요청만 "불러오는 중"이다 — 15초 배경 폴링(isFetching)은 버튼과 무관하다.
   const loadMorePending = Boolean(cursor) && (query.isPlaceholderData || (cursorPageUnavailable && query.isFetching));
@@ -349,11 +353,12 @@ export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSe
           base,
           params: navigationParams,
           sports: sportsQuery.data,
-          matches: countItems,
+          matches: visibleItems,
           selectedSportId,
+          facets,
         }),
         matches: visibleItems.map((item, index) => toTeamMatch(item, base.matches[index] ?? base.matches[0])),
-        summary: summarizeTeamMatches(visibleItems),
+        summary,
         hasNext,
         onLoadMore: handleLoadMore,
         loadMorePending,
@@ -371,10 +376,12 @@ export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSe
           base,
           params: navigationParams,
           sports: sportsQuery.data,
-          matches: countItems,
+          matches: visibleItems,
           selectedSportId,
+          facets,
         }),
         matches: [],
+        summary,
         // #5: 로딩 중임을 명시 — 빈/로딩 구분. isPending 인 이유는 matches-client.tsx 같은 자리.
         isLoading: query.isPending,
       };

@@ -9,7 +9,7 @@ import { formatCardDate as formatDate, formatCardTime as formatTime } from '@/li
 import { genderRuleLabel, matchGenderRuleLabel } from '@/lib/v1-status-labels';
 import { toKstDateString } from '@/lib/kst-calendar';
 import type { TeamMatchListViewModel, TeamMatchModel } from './team-matches.types';
-import type { V1Sport, V1TeamMatch, V1TeamMatchApiStatus, V1TeamMatchViewerState } from '@/types/api';
+import type { ListFacets, V1Sport, V1TeamMatch, V1TeamMatchApiStatus, V1TeamMatchViewerState } from '@/types/api';
 
 // 경기조건은 구조화 필드(matchFormat/matchStyle/uniformColor, levelLabel)가 진실이다. `fallback`은
 // 화면 스켈레톤용 하드코딩 목업(team-matches.view-model.ts)일 뿐 이 매치의 실제 조건이 아니므로
@@ -110,12 +110,15 @@ export function buildSportChips({
   sports,
   matches,
   selectedSportId,
+  facets,
 }: {
   base: TeamMatchListViewModel;
   params: URLSearchParams;
   sports?: Array<{ id: string; name: string }>;
   matches: V1TeamMatch[];
   selectedSportId?: string;
+  /** 서버가 센 종목별 건수(종목 필터만 뺀 나머지 필터). 있으면 불러온 목록 대신 이것을 쓴다. */
+  facets?: Pick<ListFacets, 'sports'>;
 }): TeamMatchListViewModel['sports'] {
   // 마스터 종목 목록이 없으면(서버 프리렌더 등) fallback 칩의 id 는 **라벨 문자열**이다.
   // 그대로 sportId 쿼리에 넣으면 `?sportId=풋살` 같은 URL 이 HTML 에 나가는데, 실제 API 필터는
@@ -125,19 +128,22 @@ export function buildSportChips({
     ? sports!.slice(0, 4)
     : base.sports.slice(1, 5).map((sport) => ({ id: sport.label, name: sport.label }));
 
+  const facetCounts = facets && hasMasterSportIds ? new Map(facets.sports.map(({ sportId, count }) => [sportId, count] as const)) : null;
   return [
     {
       label: base.sports[0]?.label ?? '전체',
-      count: matches.length,
+      count: facetCounts ? [...facetCounts.values()].reduce((sum, count) => sum + count, 0) : matches.length,
       active: !selectedSportId,
       href: buildTeamMatchHref(params, { sportId: null, filter: null }),
     },
     ...fixedSports.map((sport) => ({
       label: sport.name,
-      count: matches.filter((match) => {
-        const matchSport = match.sport;
-        return matchSport?.sportId === sport.id || matchSport?.name === sport.name || match.sportName === sport.name;
-      }).length,
+      count: facetCounts
+        ? facetCounts.get(sport.id) ?? 0
+        : matches.filter((match) => {
+          const matchSport = match.sport;
+          return matchSport?.sportId === sport.id || matchSport?.name === sport.name || match.sportName === sport.name;
+        }).length,
       active: hasMasterSportIds && selectedSportId === sport.id,
       // ID 를 모르면 링크를 아예 붙이지 않는다 — 붙이면 '종목 필터'처럼 보이는데 눌러도
       // 아무 필터가 걸리지 않는다(teams 목록과 같은 규약).
@@ -180,14 +186,6 @@ export function getStatus(match: Pick<V1TeamMatch, 'status' | 'displayState' | '
     if (deadline && !Number.isNaN(deadline.getTime()) && deadline.getTime() < Date.now()) return 'closed';
   }
   return base;
-}
-
-/** 개인 매치와 같은 공개 목록 계약: 신청 가능 우선, 마감 하단, 그룹 내부 서버 순서 유지. */
-export function sortTeamMatchesByAvailability(items: V1TeamMatch[]): V1TeamMatch[] {
-  return items
-    .map((item, index) => ({ item, index, rank: statusToCardStatus(getStatus(item)) === 'open' ? 0 : 1 }))
-    .sort((left, right) => left.rank - right.rank || left.index - right.index)
-    .map(({ item }) => item);
 }
 
 export function getViewerState(match: V1TeamMatch): V1TeamMatchViewerState {

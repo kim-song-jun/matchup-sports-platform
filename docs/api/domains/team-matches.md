@@ -235,7 +235,7 @@ Query:
 | `regionId` | uuid | No | — |
 | `status` | recruiting/closed/matched/cancelled/completed/expired | No | 기본 recruiting |
 | `teamId` | uuid | No | host 또는 applicant team 기준 |
-| `sort` | recommended/latest/starts_at/deadline | No | 생략 시 경기일 순 |
+| `sort` | recommended/latest/starts_at/deadline | No | 신청 가능 묶음 안의 순서(개인매치 목록과 같음). 생략 시 경기 가까운 순 |
 | `view` | card/compact | No | — |
 | `cursor` | string | No | cursor pagination |
 | `limit` | int(1~50) | No | default 20 |
@@ -255,8 +255,8 @@ Query:
 Rules:
 
 - `status`를 생략한 일반 탐색은 경기 시작 전인 `recruiting`, `closed`, `matched`를 포함한다.
-- 기본 목록(그리고 `recommended`/`deadline`/`starts_at`)은 경기일 순이다: 시작 전 경기를 `startAt ASC` 로 먼저, 이미 시작한 경기를 `startAt DESC` 로 그 뒤에, 일정 미정(`startAt` null)을 `createdAt DESC` 로 맨 뒤에 잇는다(동률은 `createdAt DESC, id DESC`). `latest` 만 `createdAt DESC, id DESC` 등록 최신순이다.
-- `pageInfo.nextCursor` 는 `"<구간>:<id>@<기준 시각 epoch ms>"`(`upcoming:`/`past:`/`unscheduled:`, 최신순은 시각 없는 `latest:<id>`) 형태다 — 기준 시각 규칙(구간 분할에만 사용, 공개 범위는 요청 시각 판정, 미래 값은 요청 시각으로 내림, 깨진 값은 첫 페이지부터, 시각 없는 구형 커서는 요청 시각 기준)은 개인매치 목록과 같다. 커서 행이 그사이 목록 조건을 벗어나도 다음 경기를 건너뛰지 않는 것도 같다.
+- 목록은 **상태 묶음 순서**로 채운다(2026-10-21, 개인매치 목록과 같은 `list-status-groups.ts`): 진행 중(경기 기록 진행·일시중지, 또는 친선이 시작~종료 시각 사이) → 신청 가능(모집 중·상대 없음·신청 마감 전) → 경기 예정(상대 확정·시작 전) → 신청 마감(상대 없이 모집이 닫힘·시작 전) → 끝난 경기(완료·경기 기록 종료·종료 시각이 지난 확정 경기) → 일정 미정(`startAt` null). 묶음은 행마다 카드와 같은 규칙(`team-match-list-group.ts`)으로 정한다. 묶음 안 순서와 `sort` 규칙은 개인매치 목록과 같다.
+- `pageInfo.nextCursor` 는 `"<묶음>:<id>@<기준 시각 epoch ms>"`(`live:`/`open:`/`scheduled:`/`closed:`/`ended:`/`unscheduled:`) 형태다 — 기준 시각 규칙(묶음 판정에만 사용, 공개 범위는 요청 시각 판정, 미래 값은 요청 시각으로 내림, 깨진 값·예전 형식 `upcoming:`/`past:`/`latest:` 커서는 첫 페이지부터)은 개인매치 목록과 같다. 커서 행이 그사이 목록 조건을 벗어나도 다음 경기를 건너뛰지 않는 것도 같다.
 - 일반 목록은 신청 마감 시각에 도달한 일반 미매칭 모집도 `closed` 상태로 경기 시작 전까지 노출한다. 신청 마감이 없더라도 시작 시각이 지난 미매칭 모집은 `closed`다. 기본 탐색에서는 기존 시작 후 제외 규칙을 따른다. 취소·보관된 팀매치는 명시적인 status 필터에서도 노출하지 않으며 건수/facets에도 포함하지 않는다.
 - `status=closed`는 저장된 `closed`와 마감 시각이 지난 일반 미매칭 `recruiting`을 포함하며, `status=recruiting`은 마감이 남았거나 마감 시각이 없는 모집만 포함한다. 검색 결과도 같은 필터를 적용한다.
 - `sort=recommended`는 경기 시작 전인 raw `recruiting` 중 신청 마감이 없거나 아직 지나지 않은 항목만 포함한다. 신청 가능 목록과 `facets.recruiting`도 마감 시각과 같아지는 순간부터 제외한다.

@@ -352,7 +352,7 @@ identity/side itself:
   missing-scorer integrity warning. Public event rows render a null goal
   participant as `익명` and a null own-goal participant as `OG`.
 - `GET /tournaments/:id/schedule` `items[]`/`unscheduled[]` gained
-  `scorers: { side, participantName, jerseyNumber, period, clockMs }[]` -- a
+  `scorers: { side, participantName, jerseyNumber, period, clockMs, ownGoal?: true }[]` -- a
   goal-only summary for the schedule card, same identity/consent rule as
   above. `period` is the stored game period (`1` first half, `2` second half,
   `null` only for malformed/historical data) and lets consumers group halves
@@ -568,3 +568,9 @@ the response still omits `consentGranted` for non-owners.
 ## 2026-10-13 정규 리그 자동 명단 공개
 
 리그 경기 공개 기록은 사이드별 최신 제출·잠금 명단을 우선 사용한다. 제출본이 없는 사이드는 유효한 최신 자동 초안을 표시하므로 홈만 출전을 조정해도 원정 명단이 사라지지 않는다. 무효화된 명단은 제외하며 제출본 위의 미제출 초안은 기존 제출본을 덮어쓰지 않는다. 이름 동의·명단 공개 시각·가시성 정책과 대회 명단 규칙은 유지한다.
+
+### Own-goal display side (2026-10-22)
+
+자책골은 점수가 올라간 팀 영역에 표시한다. 공개 일정·경기 상세의 `side`, 팀 전적의 `own/opponent`, 공식 결과 득점의 `team`은 득점 귀속 `sideId`를 따른다. 선수 이름·프로필과 `OWN_GOAL`/`ownGoal`·OG 표시는 실제 행위 선수를 유지하며 개인 득점에는 합산하지 않는다. 라이브 이벤트와 공식 revision JSON에 동일하게 적용한다.
+
+선수가 미지정이거나 현재 참가자 목록에 없어도 득점 팀 영역을 유지한다. 이 변경은 표시 projection만 수정하며 저장된 이벤트·점수·개인 기록 집계를 변경하지 않는다. 이전의 선수 소속팀 기준 표시 계약을 대체한다.

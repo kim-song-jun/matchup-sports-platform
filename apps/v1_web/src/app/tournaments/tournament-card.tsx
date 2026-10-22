@@ -13,6 +13,7 @@ import {
   CompetitionCardHeader,
   CompetitionCardShell,
 } from '@/components/v1-ui/competition-card';
+import type { CompetitionDiscoveryItem } from '@/lib/competition-discovery';
 import type { V1TournamentListItem } from '@/types/api';
 import styles from './tournament-card.module.css';
 
@@ -42,7 +43,7 @@ function getGenderCategoryLabel(category: V1TournamentListItem['genderCategory']
   if (category === 'male') return '남성부';
   if (category === 'female') return '여성부';
   if (category === 'mixed') return '혼성';
-  return '성별 구분 없음';
+  return '성별 부문 미지정';
 }
 
 /**
@@ -76,7 +77,7 @@ export function TournamentCard({
   interactive = true,
   fromPath,
 }: {
-  item: V1TournamentListItem;
+  item: CompetitionDiscoveryItem;
   /** 목록 필터를 상세의 공통 뒤로가기에 전달한다. 다른 카드 소비처는 기존 URL을 유지한다. */
   fromPath?: string;
   /**
@@ -117,11 +118,11 @@ export function TournamentCard({
   }, [hasUpcomingDeadline]);
 
   const isNearlyFull = teamCapacity !== null && teamCapacity > 0 && reservedTeamCount / teamCapacity >= 0.8;
-  const status = isLeague ? getLeagueStatusConfig(item.status) : item.status === 'closed'
-    ? { ...getTournamentStatusConfig('closed'), label: '모집 마감' }
-    : item.status === 'open' && !registrationBlocked && isNearlyFull
-      ? { badgeClass: 'tm-badge-orange', label: '거의 마감' }
-      : getTournamentStatusConfig(item.status, registrationBlocked, item.kind === 'regular_league');
+  const registrationOpen = item.registrationOpen !== false && capacityInput !== null && !registrationBlocked;
+  const status = ['draft', 'open', 'closed'].includes(item.status)
+    ? { badgeClass: 'tm-badge-grey', label: isLeague || item.status === 'draft' ? '준비 중' : '시작 전' }
+    : isLeague ? getLeagueStatusConfig(item.status) : getTournamentStatusConfig(item.status);
+  const registrationLabel = registrationOpen ? '신청 접수 중' : isLeague ? '접수 안 함' : '모집 종료';
   // 커버가 없는 대회도 홍보용으로 등록한 실사진이 있으면 아이콘 대신 그 사진을 썸네일로
   // 재사용한다 (셋 다 없으면 종목색 그라디언트+아이콘 폴백).
   const thumbnailImageUrl = resolveTournamentImage(item, 'cover');
@@ -132,7 +133,7 @@ export function TournamentCard({
         interactive={interactive}
         // 통합 목록은 리그도 소개·신청 정보가 있는 기존 상세로 연결하고 목록 필터를 보존한다.
         href={withFromPath(`/tournaments/${item.id}`, fromPath)}
-        ariaLabel={`${item.title} — ${sportAccent.label} — ${status.label}`}
+        ariaLabel={`${item.title} — ${sportAccent.label} — ${status.label} · ${registrationLabel}`}
       >
         <CompetitionCardHeader
           sportCode={item.sport.code}
@@ -141,6 +142,8 @@ export function TournamentCard({
           statusBadge={{ label: status.label, badgeClass: status.badgeClass }}
           meta={
             <>
+              {!['completed', 'cancelled', 'on_hold'].includes(item.status) && <span className={`tm-badge ${registrationOpen ? 'tm-badge-blue' : 'tm-badge-grey'}`}>{registrationLabel}</span>}
+              {registrationOpen && isNearlyFull && <span className="tm-text-caption">잔여 자리 적음</span>}
               {isLeague ? (
                 /* 한 목록에 두 종류가 섞이므로 "이건 리그다" 를 카드에서 알려야 한다.
                    상태 배지(진행중 등)는 대회와 글자가 같아서 구분이 안 된다.

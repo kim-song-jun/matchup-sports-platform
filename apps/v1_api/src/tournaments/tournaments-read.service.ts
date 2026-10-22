@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { Prisma, V1CompetitionKind, V1GameSourceType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { buildPageInfo } from '../common/pagination/page-args';
@@ -120,6 +120,11 @@ export class TournamentsReadService {
    */
   async list(query: TournamentListQueryDto) {
     const limit = query.limit ?? 20;
+    if ((query.dateFrom && query.dateTo && query.dateFrom > query.dateTo)
+      || (query.feeMin !== undefined && query.feeMax !== undefined && query.feeMin > query.feeMax)) {
+      throw new BadRequestException({ code: 'INVALID_FILTER_RANGE', message: '필터의 시작값은 종료값 이하여야 해요.' });
+    }
+    const now = new Date();
 
     // Only page-number requests need the grand total; infinite scroll just needs "is there a next".
     const page = query.page !== undefined && query.page > 0 ? query.page : undefined;
@@ -131,7 +136,7 @@ export class TournamentsReadService {
       limit,
       ...(page !== undefined ? { offset: (page - 1) * limit } : { cursor: query.cursor }),
     });
-    const total = wantsPageNumbers ? await countTournamentList(this.prisma, query) : null;
+    const total = wantsPageNumbers || query.withTotal ? await countTournamentList(this.prisma, query) : null;
     const hasNext = window.length > limit;
     const pageWindow = hasNext ? window.slice(0, limit) : window;
     const pageIds = pageWindow.map((row) => row.id);
@@ -149,13 +154,13 @@ export class TournamentsReadService {
     const nextCursor = hasNext ? (pageWindow.at(-1)?.cursor ?? null) : null;
 
     return {
-      items: pageItems.map(presentTournamentCard),
+      items: pageItems.map((row) => presentTournamentCard(row, now)),
       // 페이지 번호를 묻지 않은 요청에는 **예전과 똑같은 두 필드만** 돌려준다. total 을
       // 세지 않았으므로 `total: 0`/`totalPages: 0` 을 실어 보내면 "전체 0건"이라는 거짓말이
       // 되고, 커서 클라이언트가 그 값을 읽기 시작하면 조용히 틀린 화면이 나온다.
       pageInfo: wantsPageNumbers
         ? buildPageInfo({ page, limit, total, hasNext, nextCursor })
-        : { nextCursor, hasNext },
+        : { nextCursor, hasNext, ...(query.withTotal ? { total } : {}) },
     };
   }
 

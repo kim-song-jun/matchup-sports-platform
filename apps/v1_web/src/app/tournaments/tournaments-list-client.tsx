@@ -11,25 +11,20 @@ import {
   parseCompetitionKind,
   type CompetitionKind,
 } from '@/components/v1-ui/competition-kind-segment';
-import {
-  CompetitionFilterSheet,
-  CompetitionFilterSummary,
-} from '@/components/v1-ui/competition-filter-sheet';
-import {
-  buildCompetitionFilterModel,
-  resolveSportIdParam,
-  statusFiltersFor,
-} from '@/components/v1-ui/competition-filter-model';
+import { CompetitionDiscoveryControls } from '@/components/v1-ui/competition-discovery-controls';
+import { resolveSportIdParam } from '@/components/v1-ui/competition-filter-model';
+import { readCompetitionDiscovery, competitionDiscoveryHref, competitionDiscoverySeedPath, type CompetitionDiscoveryFilters } from '@/lib/competition-discovery';
+import { useCompetitionDiscovery } from '@/hooks/use-competition-discovery';
 import { EmptyState, ErrorState, SectionTitle } from '@/components/v1-ui/primitives';
 import { TournamentPromoCarousel } from '@/components/tournaments/tournament-promo-carousel';
-import { useV1AllTournaments, useV1Tournaments, useV1MasterSports } from '@/hooks/use-v1-api';
+import { useV1AllTournaments, useV1MasterSports } from '@/hooks/use-v1-api';
 import { useMediaQuery, DESKTOP_LIST_MEDIA_QUERY } from '@/hooks/use-media-query';
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
 import { useCursorPagination, useCursorPaginationSnapshot } from '@/hooks/use-cursor-pagination';
 import { PaginationBar } from '@/components/v1-ui/pagination-bar';
 import { extractErrorMessage } from '@/lib/error-message';
 import { withFromPath } from '@/lib/session-storage';
-import { TOURNAMENT_LIST_PAGE_SIZE, tournamentListSeedPath, type TournamentListSeed } from '@/lib/public-list-seed';
+import { TOURNAMENT_LIST_PAGE_SIZE, type TournamentListSeed } from '@/lib/public-list-seed';
 import { v1Keys } from '@/lib/query-keys';
 import { TournamentCard } from './tournament-card';
 import type { V1TournamentListItem } from '@/types/api';
@@ -95,7 +90,7 @@ function tournamentPagePath(params: URLSearchParams, page: number): string {
   return `/tournaments${query ? `?${query}` : ''}`;
 }
 
-type TournamentListFilters = NonNullable<Parameters<typeof useV1Tournaments>[0]>;
+type TournamentListFilters = CompetitionDiscoveryFilters & { limit: number; withTotal: 'true' };
 
 /**
  * 대회 목록의 페이지 이동은 화면 폭에 따라 **다른 방식**을 쓴다.
@@ -114,6 +109,12 @@ type TournamentListFilters = NonNullable<Parameters<typeof useV1Tournaments>[0]>
  * 정적 프리렌더로 되돌리면 빌드가 missing-suspense 로 실패한다.
  */
 export function TournamentsListPageClient({ seed }: { readonly seed?: TournamentListSeed }) {
+  const params = useSearchParams();
+  const filters = readCompetitionDiscovery(new URLSearchParams(params.toString()), parseCompetitionKind(params.get('kind'), 'all'));
+  return <TournamentsListContent key={competitionDiscoveryHref(filters)} seed={seed} />;
+}
+
+function TournamentsListContent({ seed }: { readonly seed?: TournamentListSeed }) {
   const isDesktop = useMediaQuery(DESKTOP_LIST_MEDIA_QUERY);
 
   /* 유형 필터(전체/정규 대회/정규 리그)는 **URL 이 소유한다** — 링크로 공유되고 뒤로가기가
@@ -138,35 +139,9 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
   const [pageDraft, setPageDraft] = useState<{ readonly query: string; readonly page: number } | null>(null);
   const page = pageDraft?.query === listQuery ? pageDraft.page : urlPage;
   useEffect(() => { setPageDraft(null); }, [listQuery]);
-  const activeKind: CompetitionKind = parseCompetitionKind(searchParams.get('kind'), 'all');
-  /* 빈 문자열은 **없는 것과 같다.** `?status=` 를 그대로 넘기면 서버가 400 을 내 목록이
-     통째로 에러가 된다(실측). 아래 `??` 폴백만으로는 안 걸린다 — `''` 는 null 이 아니다. */
-  const rawStatus = searchParams.get('status');
-  const activeStatus = rawStatus === '' ? null : rawStatus;
-  const rawSportId = searchParams.get('sportId');
-  const activeSportId = rawSportId === '' ? null : rawSportId;
-  const rawGenderCategory = searchParams.get('genderCategory');
-  const activeGenderCategory = rawGenderCategory === '' ? null : rawGenderCategory;
-  const knownGenderCategory =
-    activeGenderCategory === 'mixed' || activeGenderCategory === 'male' || activeGenderCategory === 'female'
-      ? activeGenderCategory
-      : undefined;
-
-  /* URL 은 사용자가 직접 편집할 수 있다 — 모르는 값을 서버로 넘기면 400 이 나고, 그때는
-     원인이 주소인지 화면인지 구분이 안 된다. **아는 값만 통과시킨다.**
-     ⚠️ `activeStatus` 가 null 이면(파라미터 없음) `some()` 이 '전체' 항목에 맞아 true 가
-     된다 — 그대로 두면 쿼리 키에 `status: null` 이 실려 **"파라미터 없음" 과 다른 캐시**가
-     생긴다. 그래서 null 을 먼저 걸러 `undefined` 로 떨어뜨린다. */
-  /* ⚠️ **이 탭에서 고를 수 있는 값만** 통과시킨다. 전역 목록으로 검사하면 대회 탭에서
-     칩을 안 그렸는데 `?status=draft` 로 직접 들어온 주소는 그대로 서버까지 간다 —
-     칩(입구)만 막고 URL(뒷문)을 안 막은 셈이다. 데이터는 안 새지만(서버가 종류와 묶는다)
-     화면이 **요약엔 '준비 중', 목록은 비어 있고, 해제할 칩은 없는** 막다른 상태가 된다. */
-  const knownStatus =
-    activeStatus !== null &&
-    statusFiltersFor(activeKind).some((option) => option.value === activeStatus)
-      ? (activeStatus as NonNullable<Parameters<typeof useV1Tournaments>[0]>['status'])
-      : undefined;
-  // 시트 열림도 URL 이다 — 뒤로가기로 닫히고, 필터가 담긴 주소를 그대로 공유할 수 있다.
+  const filters = readCompetitionDiscovery(new URLSearchParams(listQuery), parseCompetitionKind(searchParams.get('kind'), 'all'));
+  const activeKind: CompetitionKind = filters.kind;
+  const rawSportId = filters.sportId ?? null;
   const filterSheetOpen = searchParams.get('filter') === '1';
 
   /* D3: 데이터드리븐 종목 필터 — DB seed 기준 유효한 종목만 노출 (하드코딩 제거) */
@@ -179,18 +154,14 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
      목록이 통째로 400 이 된다(실측). 목록이 아직 안 왔으면 **판단을 보류**한다:
      로딩 중에 걸러 버리면 공유받은 정상 링크마다 필터가 깜빡인다(`resolveSportIdParam`). */
   const querySportId = resolveSportIdParam({
-    raw: rawSportId,
+    raw: rawSportId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawSportId) ? rawSportId : null,
     sports: filterSports,
     sportsLoaded: sportsData !== undefined,
   });
 
   // 모바일은 커서 페이지를 누적한다 — 필터 되감기·상세 복귀 복원은 useCursorPagination(매치·팀매치와 같은 훅).
   const mobileFilters: TournamentListFilters = {
-    limit: TOURNAMENT_LIST_PAGE_SIZE,
-    sportId: querySportId,
-    status: knownStatus,
-    kind: activeKind,
-    genderCategory: knownGenderCategory,
+    ...filters, sort: filters.sort ?? 'latest', limit: TOURNAMENT_LIST_PAGE_SIZE, sportId: querySportId, withTotal: 'true',
   };
   const { cursor, accumulated: allItems, setPagination, snapshotKey } = useCursorPagination<V1TournamentListItem>(
     v1Keys.tournaments(),
@@ -198,11 +169,7 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
     (savedCursor) => v1Keys.tournaments((savedCursor ? { ...mobileFilters, cursor: savedCursor } : mobileFilters) as Record<string, unknown>),
   );
 
-  const seedQuery = tournamentListSeedPath(activeKind, {
-    status: knownStatus,
-    sportId: querySportId,
-    genderCategory: knownGenderCategory,
-  }, sportsData ?? seed?.sports ?? []);
+  const seedQuery = competitionDiscoverySeedPath({ ...filters, sportId: querySportId }, sportsData ?? seed?.sports ?? []);
   // Accept a server seed only while the effective query and pagination still match its request.
   const seedMatches = seed !== undefined
     && seed.query === seedQuery
@@ -210,12 +177,12 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
     && cursor === undefined;
   // 로딩 판정은 isPending(데이터 없음)이다 — isLoading 은 서버·하이드레이션 첫 렌더(persist 복원 중,
   // fetchStatus 'idle')에 false 라 아직 안 받은 목록을 "대회가 없어요"로 그린다.
-  const { data, isPending, isError, error, isFetching, isPlaceholderData, isSuccess, dataUpdatedAt, refetch } = useV1Tournaments(
+  const { data, isPending, isError, error, isFetching, isPlaceholderData, isSuccess, dataUpdatedAt, refetch } = useCompetitionDiscovery(
     {
       ...mobileFilters,
       ...(isDesktop ? { page } : { cursor }),
     },
-    { seed: seedMatches ? seed.page : undefined },
+    seedMatches ? seed.page : undefined,
   );
   const promoTournaments = useV1AllTournaments({
     status: 'open',
@@ -290,22 +257,6 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
     }
   };
 
-  /* 필터 링크·요약 문구는 순수 함수가 만든다(`competition-filter-model`) — 화면 없이
-     검증되고, 2단계 리다이렉트가 같은 매핑을 재사용한다. */
-  const filterParams = new URLSearchParams(listQuery);
-  // 조건이 바뀌면 새 결과의 첫 페이지를 조회한다. 시트 여닫기는 조회 조건이 아니므로
-  // 아래에서 페이지를 다시 붙인다 — 시트만 열었는데 2페이지가 사라지면 안 된다.
-  filterParams.delete('page');
-  const filterLinks = buildCompetitionFilterModel({
-    basePath: '/tournaments',
-    params: filterParams,
-    sports: filterSports,
-  });
-  filterParams.set('filter', '1');
-  const openHref = tournamentPagePath(filterParams, page);
-  filterParams.delete('filter');
-  const filterModel = { ...filterLinks, openHref, closeHref: tournamentPagePath(filterParams, page) };
-
   return (
     <div className="tm-tournament-list">
       <h1 className="sr-only">{tournamentListTitle(activeKind)}</h1>
@@ -326,12 +277,11 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
         <SectionTitle title="대회 목록" />
         <div id="tournament-list-heading" className="sr-only">대회 목록</div>
 
-        <CompetitionKindSegment active={activeKind} />
-
-        {/* 종목 칩 **줄을 대신한다** — 새 줄을 얹는 게 아니라 교체다. 사용자가 "세로 높이를
-            지금보다 늘리지 않는 것이 이 안의 핵심" 이라고 못박았고, 줄 수가 같아야 그게
-            구조적으로 성립한다. 칩 줄은 종목이 늘면 래핑돼 두 줄이 되지만 이 줄은 하나다. */}
-        <CompetitionFilterSummary model={filterModel} />
+        <CompetitionKindSegment active={activeKind} filters={{ ...filters, sportId: querySportId }} />
+        {searchParams.get('notice') === 'type-filters-cleared' && <p role="status" className="tm-text-caption">유형을 바꿔 대회 전용 필터를 해제했어요. 공통 조건은 유지해요.</p>}
+        <CompetitionDiscoveryControls filters={{ ...filters, sportId: querySportId }} sports={filterSports}
+          sheetOpen={filterSheetOpen} desktop={isDesktop} page={page}
+          total={isError ? undefined : data?.pageInfo?.total} pending={isPending} />
 
         {isPending || needsPageNormalization || emptyPreviousPage ? (
           <TournamentSkeletonList />
@@ -345,10 +295,10 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
         ) : displayItems.length === 0 ? (
           <EmptyState
             illustration={{ name: 'journey-done' }}
-            title="조건에 맞는 대회가 없어요"
-            sub="필터 조건을 바꾸거나 팀밋 대회를 확인해 보세요."
-            cta="팀밋 대회 보기"
-            ctaHref={withFromPath('/events', listPath)}
+            title={`선택한 조건에 맞는 ${activeKind === 'league' ? '리그가' : activeKind === 'tournament' ? '대회가' : '대회·리그가'} 없어요`}
+            sub={filters.phase === 'completed' && filters.registration === 'open' ? '종료된 항목은 신청을 받지 않아요. 진행 상태나 모집 상태를 바꿔 주세요.' : '필터를 바꾸거나 초기화해서 다시 찾아보세요.'}
+            cta="필터 초기화"
+            ctaHref={competitionDiscoveryHref({ kind: activeKind, sort: filters.sort === 'deadline' ? undefined : filters.sort })}
           />
         ) : (
           <>
@@ -405,7 +355,7 @@ export function TournamentsListPageClient({ seed }: { readonly seed?: Tournament
           </>
         )}
 
-        {filterSheetOpen ? <CompetitionFilterSheet model={filterModel} /> : null}
+
       </section>
 
       <section

@@ -21,7 +21,7 @@ import TournamentsPage, { generateMetadata } from './page';
 
 function item(id: string, title: string): V1TournamentListItem {
   return {
-    id, sportId: 'sport-futsal', sport: { code: 'futsal', name: '풋살' }, title, status: 'open',
+    id, sportId: '8c0ae163-e4d0-4037-8cf2-4e18216fe0f8', sport: { code: 'futsal', name: '풋살' }, title, status: 'open',
     format: 'knockout', kind: 'tournament', registrationDeadlineAt: null, scheduledAt: null,
     scheduledEndAt: null, venue: null, coverImageUrl: null, teamCount: 8, genderCategory: 'mixed',
     entryFee: 0, prizePool: null, prizeSummary: null, prizeBreakdown: null,
@@ -41,7 +41,7 @@ function stubApi(respond: (url: string) => Response) {
     requested.push(url);
     if (url.includes('/master/sports')) {
       const response = respond(url);
-      return response.ok ? envelope([{ id: 'sport-futsal', name: '풋살', code: 'futsal' }]) : response;
+      return response.ok ? envelope([{ id: '8c0ae163-e4d0-4037-8cf2-4e18216fe0f8', name: '풋살', code: 'futsal' }]) : response;
     }
     return respond(url);
   }));
@@ -121,6 +121,14 @@ describe('/tournaments 서버 렌더', () => {
     expect(ld?.url).toBe(`https://teameet.co.kr${metadata.alternates?.canonical}`);
   });
 
+  it('필터가 열린 주소에서도 실제 목록과 결과 보기 폼을 함께 렌더한다', async () => {
+    stubApi(() => envelope({ items: [item('t-filter-open', '필터 시트 연결 대회')], pageInfo: { nextCursor: null, hasNext: false } }));
+    const html = await serverHtml('kind=tournament&filter=1');
+    expect(markup(html)).toContain('필터 시트 연결 대회');
+    expect(markup(html)).toContain('대회·리그 필터');
+    expect(markup(html)).toContain('결과 보기');
+  });
+
   it('API 가 실패하면 빈 상태 대신 로딩 스켈레톤으로 넘기고 ItemList 를 내지 않는다', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     stubApi(() => new Response('upstream down', { status: 503 }));
@@ -134,13 +142,13 @@ describe('/tournaments 서버 렌더', () => {
 
   it('유효한 현재 필터와 같은 첫 페이지 seed를 서버 HTML에 렌더하고 filtered ItemList는 생략한다', async () => {
     stubApi((url) => {
-      if (url.includes('/master/sports')) return envelope([{ id: 'sport-futsal', name: '풋살', code: 'futsal' }]);
+      if (url.includes('/master/sports')) return envelope([{ id: '8c0ae163-e4d0-4037-8cf2-4e18216fe0f8', name: '풋살', code: 'futsal' }]);
       return envelope({ items: [item('t-filtered', '풋살 필터 대회')], pageInfo: { nextCursor: null, hasNext: false } });
     });
 
-    const html = await serverHtml('kind=tournament&status=in_progress&sportId=sport-futsal&genderCategory=mixed');
+    const html = await serverHtml('kind=tournament&status=in_progress&sportId=8c0ae163-e4d0-4037-8cf2-4e18216fe0f8&genderCategory=mixed');
 
-    expect(requestedPath('/tournaments?limit=20&kind=tournament&status=in_progress&sportId=sport-futsal&genderCategory=mixed')).toBe(true);
+    expect(requestedPath('/tournaments?kind=tournament&limit=20&phase=ongoing&sportId=8c0ae163-e4d0-4037-8cf2-4e18216fe0f8&genderCategory=mixed&sort=latest&withTotal=true')).toBe(true);
     expect(markup(html)).toContain('풋살 필터 대회');
     expect(itemListNames(html)).toEqual([]);
     expect(html).not.toContain('application/ld+json');
@@ -149,13 +157,13 @@ describe('/tournaments 서버 렌더', () => {
 
   it('무시되는 비어 있지 않은 필터도 base 목록을 seed 하되 ItemList는 생략한다', async () => {
     stubApi((url) => {
-      if (url.includes('/master/sports')) return envelope([{ id: 'sport-futsal', name: '풋살', code: 'futsal' }]);
+      if (url.includes('/master/sports')) return envelope([{ id: '8c0ae163-e4d0-4037-8cf2-4e18216fe0f8', name: '풋살', code: 'futsal' }]);
       return envelope({ items: [item('t-normalized', '정규화된 전체 목록 대회')], pageInfo: { nextCursor: null, hasNext: false } });
     });
 
     const html = await serverHtml('kind=unknown&status=open&genderCategory=unknown&sportId=unknown-sport');
 
-    expect(requestedPath('/tournaments?limit=20&kind=all')).toBe(true);
+    expect(requestedPath('/tournaments?kind=all&limit=20&registration=open&sort=latest&withTotal=true')).toBe(true);
     expect(requested.some((url) => url.includes('status=open') || url.includes('genderCategory=unknown') || url.includes('sportId=unknown-sport'))).toBe(false);
     expect(markup(html)).toContain('정규화된 전체 목록 대회');
     expect(itemListNames(html)).toEqual([]);
@@ -169,7 +177,7 @@ describe('/tournaments 서버 렌더', () => {
       return envelope({ items: [item('t-unfiltered', '필터와 무관한 전체 대회')], pageInfo: { nextCursor: null, hasNext: false } });
     });
 
-    const html = await serverHtml('sportId=sport-futsal');
+    const html = await serverHtml('sportId=8c0ae163-e4d0-4037-8cf2-4e18216fe0f8');
 
     expect(requested.some((url) => url.includes('/tournaments?'))).toBe(false);
     expect(markup(html)).not.toContain('필터와 무관한 전체 대회');
@@ -181,7 +189,7 @@ describe('/tournaments 서버 렌더', () => {
 
     await serverHtml('kind=tournament&status=draft');
 
-    expect(requestedPath('/tournaments?limit=20&kind=tournament')).toBe(true);
+    expect(requestedPath('/tournaments?kind=tournament&limit=20&phase=upcoming&sort=latest&withTotal=true')).toBe(true);
     expect(requested.some((url) => url.includes('status=draft'))).toBe(false);
   });
 

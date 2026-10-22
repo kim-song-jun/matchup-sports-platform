@@ -56,14 +56,48 @@ function buildFilterSql(query: TournamentListQueryDto): Prisma.Sql {
     conditions.push(Prisma.sql`t.status::text = ${query.status}`);
   }
   if (query.sportId) conditions.push(Prisma.sql`t.sport_id = ${query.sportId}`);
-  if (query.genderCategory) conditions.push(Prisma.sql`t.gender_category::text = ${query.genderCategory}`);
+  if (query.phase) {
+    conditions.push(query.phase === 'upcoming' ? Prisma.sql`t.status::text IN ('draft', 'open', 'closed')`
+      : Prisma.sql`t.status::text = ${query.phase === 'ongoing' ? 'in_progress' : 'completed'}`);
+  }
+  const registration = query.sort === 'deadline' ? 'open' : query.registration;
+  if (registration) {
+    const accepting = Prisma.sql`(
+      (t.kind::text = 'regular_league' AND t.status::text NOT IN ('completed', 'cancelled', 'on_hold')
+        AND t.registration_deadline_at >= (now() AT TIME ZONE 'UTC'))
+      OR ((t.kind IS NULL OR t.kind::text = 'regular_tournament') AND t.status::text = 'open'
+        AND (t.registration_deadline_at IS NULL OR t.registration_deadline_at >= (now() AT TIME ZONE 'UTC')))
+    ) AND (
+      (t.kind::text = 'regular_league' AND t.max_teams IS NULL)
+      OR (SELECT COUNT(*) FROM v1_tournament_registrations r WHERE r.tournament_id = t.id
+          AND r.status::text IN (${Prisma.join([...CAPACITY_HOLD_STATUSES])}))
+        < CASE WHEN t.kind::text = 'regular_league' THEN t.max_teams ELSE t.team_count END
+    )`;
+    conditions.push(registration === 'open' ? Prisma.sql`COALESCE((${accepting}), FALSE)` : Prisma.sql`NOT COALESCE((${accepting}), FALSE)`);
+  }
+  if (query.genderCategory) conditions.push(query.genderCategory === 'unspecified'
+    ? Prisma.sql`t.gender_category IS NULL` : Prisma.sql`t.gender_category::text = ${query.genderCategory}`);
+  if (query.format) conditions.push(Prisma.sql`t.format::text = ${query.format}`);
+  if (query.feeMin !== undefined) conditions.push(Prisma.sql`t.entry_fee >= ${query.feeMin}`);
+  if (query.feeMax !== undefined) conditions.push(Prisma.sql`t.entry_fee <= ${query.feeMax}`);
+  if (query.genderCategory || query.format || query.feeMin !== undefined || query.feeMax !== undefined) {
+    conditions.push(Prisma.sql`(t.kind::text = 'regular_tournament' OR t.kind IS NULL)`);
+  }
+  if (query.dateFrom || query.dateTo) conditions.push(Prisma.sql`t.scheduled_at IS NOT NULL`);
+  if (query.dateFrom) conditions.push(Prisma.sql`COALESCE(t.scheduled_end_at, t.scheduled_at) >= ${new Date(`${query.dateFrom}T00:00:00+09:00`)}`);
+  if (query.dateTo) conditions.push(Prisma.sql`t.scheduled_at <= ${new Date(`${query.dateTo}T23:59:59.999+09:00`)}`);
   return Prisma.join(conditions, ' AND ');
 }
 
+// 명시적 정렬은 한 그룹에서 동작한다. 기존 keyset의 3그룹은 내림차순,
+// 0그룹은 오름차순이라 같은 microsecond 보존 cursor 비교를 재사용할 수 있다.
 const FILTERED_SQL = (query: TournamentListQueryDto) => Prisma.sql`filtered AS (
   SELECT t.id,
-    ${GROUP_RANK_SQL} AS grp,
-    CASE WHEN t.status::text = 'completed' THEN COALESCE(t.scheduled_end_at, t.scheduled_at) ELSE t.scheduled_at END AS sort_at
+    ${query.sort === 'latest' ? Prisma.sql`3` : query.sort ? Prisma.sql`0` : GROUP_RANK_SQL} AS grp,
+    ${query.sort === 'latest' ? Prisma.sql`t.created_at`
+      : query.sort === 'deadline' ? Prisma.sql`t.registration_deadline_at`
+      : query.sort === 'scheduled' ? Prisma.sql`t.scheduled_at`
+      : Prisma.sql`CASE WHEN t.status::text = 'completed' THEN COALESCE(t.scheduled_end_at, t.scheduled_at) ELSE t.scheduled_at END`} AS sort_at
   FROM v1_tournaments t
   WHERE ${buildFilterSql(query)}
 )`;
@@ -105,6 +139,7 @@ interface CursorKey {
   /** `timestamp` rendered as text, so microseconds survive the round trip. */
   sortAt: string | null;
   id: string;
+  sort?: 'latest' | 'deadline' | 'scheduled';
 }
 
 const SORT_AT_TEXT = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})(\.\d{1,6})?$/;
@@ -131,7 +166,7 @@ function isRealTimestampText(text: string): boolean {
  * and the next page would skip or repeat rows.
  */
 function encodeCursor(key: CursorKey): string {
-  return Buffer.from(JSON.stringify([key.grp, key.sortAt, key.id])).toString('base64url');
+  return Buffer.from(JSON.stringify(key.sort ? [key.grp, key.sortAt, key.id, key.sort] : [key.grp, key.sortAt, key.id])).toString('base64url');
 }
 
 function decodeCursor(token: string): CursorKey | null {
@@ -141,12 +176,13 @@ function decodeCursor(token: string): CursorKey | null {
   } catch {
     return null;
   }
-  if (!Array.isArray(parsed) || parsed.length !== 3) return null;
-  const [grp, sortAt, id] = parsed;
+  if (!Array.isArray(parsed) || (parsed.length !== 3 && parsed.length !== 4)) return null;
+  const [grp, sortAt, id, sort] = parsed;
   if (!Number.isInteger(grp) || grp < 0 || grp > 4) return null;
   if (sortAt !== null && !(typeof sortAt === 'string' && isRealTimestampText(sortAt))) return null;
   if (typeof id !== 'string' || id.length === 0 || id.length > 64) return null;
-  return { grp, sortAt, id };
+  if (sort !== undefined && !['latest', 'deadline', 'scheduled'].includes(sort)) return null;
+  return { grp, sortAt, id, sort };
 }
 
 /** One page window plus one lookahead row, in default list order. */
@@ -160,7 +196,7 @@ export async function listTournamentIds(
   let rows: Row[];
   if (window.cursor !== undefined && window.cursor !== '') {
     const key = decodeCursor(window.cursor);
-    if (!key) return [];
+    if (!key || key.sort !== query.sort) return [];
     rows = await prisma.$queryRaw<Row[]>`
         WITH ${FILTERED_SQL(query)},
           c AS (SELECT ${key.grp}::int AS grp, ${key.sortAt}::timestamp AS sort_at, ${key.id}::text AS id)
@@ -174,7 +210,7 @@ export async function listTournamentIds(
   }
   return rows.map((row) => ({
     id: row.id,
-    cursor: encodeCursor({ grp: row.grp, sortAt: row.sort_at, id: row.id }),
+    cursor: encodeCursor({ grp: row.grp, sortAt: row.sort_at, id: row.id, sort: query.sort }),
   }));
 }
 

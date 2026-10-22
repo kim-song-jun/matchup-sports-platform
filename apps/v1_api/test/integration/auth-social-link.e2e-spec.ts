@@ -6,7 +6,7 @@ import { ManagedTermsRuntimeService } from '../../src/terms/managed-terms-runtim
 import { createV1IntegrationApp } from './integration-app';
 
 const HOLDER_ID = 'integration-social-link-holder';
-const HOLDER_PHONE = '01055550126';
+const HOLDER_PHONE = '01000000126';
 const KEY_PREFIX = 'integration-social-link-key';
 const PENDING_PREFIX = 'integration-social-link-pending';
 class SocialLinkFixtureError extends Error {}
@@ -261,8 +261,9 @@ describe('V1 social link to phone owner integration', () => {
   });
 
   it('preserves the operator-account gate and still requires account proof after revocation', async () => {
-    await prisma.v1AdminUser.create({ data: { userId: HOLDER_ID, adminRole: 'ops', status: 'active' } });
+    // The dev echo withholds codes from operator accounts, so the phone is proven before the grant.
     const proof = await proveHolderPhone();
+    await prisma.v1AdminUser.create({ data: { userId: HOLDER_ID, adminRole: 'ops', status: 'active' } });
     const callerId = await seedPending();
     const before = await accountState();
 

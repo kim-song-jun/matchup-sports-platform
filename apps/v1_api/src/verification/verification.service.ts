@@ -150,11 +150,20 @@ export class VerificationService {
     // 인증 실패 기록은 email 채널에서도 남긴다("인증 실패" 트래킹이 목적) — 다만 저장
     // 컬럼은 번호 끝 4자리(phoneMasked)라, 전화번호 형태가 아닌 이메일 대상은 항상
     // '****' 로 마스킹된다(로컬파트 숫자 유출 방지). 어느 채널인지는 detail 로 구분한다.
-    if (token.attemptCount >= MAX_ATTEMPTS) {
+    // 시도는 대조보다 먼저, 상한 조건을 단 한 번의 갱신으로 예약한다 — 읽고 나서 올리면 동시 추측이 상한을 넘긴다.
+    let attemptCount: number;
+    try {
+      ({ attemptCount } = await this.prisma.v1VerificationToken.update({
+        where: { id: token.id, attemptCount: { lt: MAX_ATTEMPTS } },
+        data: { attemptCount: { increment: 1 } },
+        select: { attemptCount: true },
+      }));
+    } catch (error) {
+      if (!(error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025')) throw error;
       await this.smsEventLog.record({
         eventType: SMS_EVENT_TYPE.TOO_MANY_ATTEMPTS,
         phone: token.target,
-        detail: `channel=${channel} 인증 시도 ${token.attemptCount}회 초과`,
+        detail: `channel=${channel} 인증 시도 ${MAX_ATTEMPTS}회 초과`,
       });
       throw new BadRequestException({
         code: 'VERIFICATION_TOO_MANY_ATTEMPTS',
@@ -162,17 +171,12 @@ export class VerificationService {
       });
     }
 
-    await this.prisma.v1VerificationToken.update({
-      where: { id: token.id },
-      data: { attemptCount: { increment: 1 } },
-    });
-
     const matches = await verifyPassword(code, token.codeHash);
     if (!matches) {
       await this.smsEventLog.record({
         eventType: SMS_EVENT_TYPE.CODE_MISMATCH,
         phone: token.target,
-        detail: `channel=${channel} 인증 시도 ${token.attemptCount + 1}/${MAX_ATTEMPTS}`,
+        detail: `channel=${channel} 인증 시도 ${attemptCount}/${MAX_ATTEMPTS}`,
       });
       throw new BadRequestException({
         code: 'VERIFICATION_CODE_MISMATCH',
@@ -281,7 +285,7 @@ export class VerificationService {
       target: maskTarget(channel, target),
       // 프론트가 서버 TTL 기준으로 카운트다운하도록 만료 시각을 내려준다(클라이언트 하드코딩 드리프트 방지).
       expiresAt: expiresAt.toISOString(),
-      ...(this.dispatcher.devEchoActive ? { devCode: code } : {}),
+      ...((await this.dispatcher.mayEchoCode({ channel, address: target, userId })) ? { devCode: code } : {}),
     };
   }
 

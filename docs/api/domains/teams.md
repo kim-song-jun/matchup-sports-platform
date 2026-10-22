@@ -51,7 +51,9 @@
 ## Member Response Contract
 
 `GET /teams/:teamId/members`는 팀의 멤버-목록 공개 정책에 따라 보이는 모든 디렉터리 행을 반환한다.
-디렉터리 열람 권한과 개별 PII 열람 권한은 별개 결정이다.
+디렉터리 열람 권한과 개별 PII 열람 권한은 별개 결정이다. 공개 정책은 `status=active`(기본값)에만
+적용된다 — `status=left|removed`(떠난·내보낸 멤버)는 active owner/manager만 볼 수 있고, 그 외에는
+403 `TEAM_MEMBER_HISTORY_FORBIDDEN`이다.
 
 각 멤버 항목은 `displayName`(닉네임/멤버 라벨로 폴백), 그리고 다음 비공개 필드를 포함한다
 (값은 nullable): `realName`, `phone`, `birthDate`, `gender`(`male | female`로 정규화).

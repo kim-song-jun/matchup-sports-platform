@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { randomInt } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { hashPassword, verifyPassword } from '../auth/password-hash';
@@ -56,45 +57,22 @@ export class PhoneVerificationService {
       throw err;
     }
 
-    return { expiresAt: expiresAt.toISOString(), ...(this.dispatcher.devEchoActive ? { devCode: code } : {}) };
+    const echo = await this.dispatcher.mayEchoCode({ channel: 'phone', address: phone });
+    return { expiresAt: expiresAt.toISOString(), ...(echo ? { devCode: code } : {}) };
   }
 
   async verifyCode(phone: string, code: string): Promise<boolean> {
     const challenge = await this.prisma.v1PhoneVerificationChallenge.findUnique({ where: { phone } });
-    if (!challenge || challenge.expiresAt.getTime() < Date.now()) {
-      throw new BadRequestException({
-        code: 'VERIFICATION_NO_PENDING',
-        message: '유효한 인증 요청이 없어요. 인증번호를 다시 받아 주세요.',
-      });
-    }
-    // verifiedAt 여부와 무관하게 항상 제출된 코드를 codeHash 와 대조한다.
-    // 이미 검증된 challenge 라도 잘못된 코드로는 절대 성공시키지 않는다(인증 우회 방지) —
-    // verifiedAt 만으로 단락하면 공격자가 번호만 알아도 임의 코드로 proofToken 을 탈취할 수 있다.
-    // 올바른 코드 재제출은 그대로 멱등 성공한다.
+    if (!challenge || challenge.expiresAt.getTime() < Date.now()) throw noPendingChallenge();
+    const attemptCount = await this.reserveAttempt(phone, challenge.codeHash);
+    // verifiedAt 여부와 무관하게 항상 제출된 코드를 codeHash 와 대조한다 — verifiedAt 만으로 단락하면
+    // 번호만 아는 쪽이 임의 코드로 proofToken 을 가져갈 수 있다.
     const matches = await verifyPassword(code, challenge.codeHash);
     if (!matches) {
-      // 시도 횟수 상한은 '불일치' 경로에서만 적용한다 — 올바른 코드 재제출은 상한과 무관하게
-      // 멱등 성공해야 하므로, cap 을 코드 대조보다 앞에 두면 verified 이후 오입력이 쌓였을 때
-      // 정상 재제출까지 막히는 문제가 생긴다.
-      if (challenge.attemptCount >= MAX_ATTEMPTS) {
-        await this.smsEventLog.record({
-          eventType: SMS_EVENT_TYPE.TOO_MANY_ATTEMPTS,
-          phone,
-          detail: `pre-account 인증 시도 ${challenge.attemptCount}회 초과`,
-        });
-        throw new BadRequestException({
-          code: 'VERIFICATION_TOO_MANY_ATTEMPTS',
-          message: '시도 횟수를 초과했어요. 인증번호를 다시 받아 주세요.',
-        });
-      }
-      await this.prisma.v1PhoneVerificationChallenge.update({
-        where: { phone },
-        data: { attemptCount: { increment: 1 } },
-      });
       await this.smsEventLog.record({
         eventType: SMS_EVENT_TYPE.CODE_MISMATCH,
         phone,
-        detail: `pre-account 인증 시도 ${challenge.attemptCount + 1}/${MAX_ATTEMPTS}`,
+        detail: `pre-account 인증 시도 ${attemptCount}/${MAX_ATTEMPTS}`,
       });
       throw new BadRequestException({
         code: 'VERIFICATION_CODE_MISMATCH',
@@ -102,13 +80,43 @@ export class PhoneVerificationService {
       });
     }
 
-    if (!challenge.verifiedAt) {
-      await this.prisma.v1PhoneVerificationChallenge.update({
-        where: { phone },
-        data: { verifiedAt: new Date() },
+    // 정답은 시도로 세지 않는다(예약을 돌려준다) — 올바른 코드 재제출은 상한과 무관하게 멱등 성공한다.
+    // codeHash 를 조건에 둬서, 대조하는 사이 새 번호가 발급됐으면 옛 번호로 새 챌린지를 검증하지 않는다.
+    const settled = await this.prisma.v1PhoneVerificationChallenge.updateMany({
+      where: { phone, codeHash: challenge.codeHash },
+      data: { attemptCount: { decrement: 1 }, verifiedAt: challenge.verifiedAt ?? new Date() },
+    });
+    if (settled.count === 0) throw noPendingChallenge();
+    return true;
+  }
+
+  /**
+   * 대조보다 먼저 시도 한 번을 원자적으로 예약한다. 대조 뒤에 세면 상한을 넘긴 뒤에 낸 정답이 통과하고,
+   * 동시에 보낸 추측들이 모두 낡은 횟수를 읽어 상한을 넘긴다. 읽은 챌린지(codeHash)에 묶어, 그사이 새로
+   * 발급된 번호의 시도를 옛 번호 제출이 깎지 않게 한다.
+   */
+  private async reserveAttempt(phone: string, codeHash: string): Promise<number> {
+    try {
+      const reserved = await this.prisma.v1PhoneVerificationChallenge.update({
+        where: { phone, codeHash, attemptCount: { lt: MAX_ATTEMPTS } },
+        data: { attemptCount: { increment: 1 } },
+        select: { attemptCount: true },
+      });
+      return reserved.attemptCount;
+    } catch (error) {
+      if (!(error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025')) throw error;
+      const current = await this.prisma.v1PhoneVerificationChallenge.findUnique({ where: { phone }, select: { codeHash: true } });
+      if (current?.codeHash !== codeHash) throw noPendingChallenge();
+      await this.smsEventLog.record({
+        eventType: SMS_EVENT_TYPE.TOO_MANY_ATTEMPTS,
+        phone,
+        detail: `pre-account 인증 시도 ${MAX_ATTEMPTS}회 초과`,
+      });
+      throw new BadRequestException({
+        code: 'VERIFICATION_TOO_MANY_ATTEMPTS',
+        message: '시도 횟수를 초과했어요. 인증번호를 다시 받아 주세요.',
       });
     }
-    return true;
   }
 
   issueProof(phone: string, purpose: PhoneProofPurpose = 'signup'): string {
@@ -137,4 +145,11 @@ export class PhoneVerificationService {
       });
     }
   }
+}
+
+function noPendingChallenge(): BadRequestException {
+  return new BadRequestException({
+    code: 'VERIFICATION_NO_PENDING',
+    message: '유효한 인증 요청이 없어요. 인증번호를 다시 받아 주세요.',
+  });
 }

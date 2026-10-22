@@ -75,13 +75,16 @@ export class LoginStepUpService implements OnApplicationShutdown {
       });
     });
     if (input.userId) this.sendInBackground(challenge.id, input.userId, code);
+    // Judged on the typed address for real and decoy challenges alike, so devCode never tells whether the password was right.
+    // Resend never echoes: a challenge keeps only the email hash, and a per-account answer there would.
+    const echo = await this.dispatcher.mayEchoCode({ channel: 'email', address: input.email });
 
     return {
       challengeToken: token,
       maskedEmail: maskEmail(input.email),
       expiresAt: expiresAt.toISOString(),
       resendAvailableAt: resendAvailableAt(now).toISOString(),
-      ...(this.dispatcher.devEchoActive ? { devCode: code } : {}),
+      ...(echo ? { devCode: code } : {}),
     };
   }
 
@@ -108,7 +111,6 @@ export class LoginStepUpService implements OnApplicationShutdown {
     return {
       expiresAt: expiresAt.toISOString(),
       resendAvailableAt: resendAvailableAt(now).toISOString(),
-      ...(this.dispatcher.devEchoActive ? { devCode: code } : {}),
     };
   }
 

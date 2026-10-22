@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { hashPassword } from '../auth/password-hash';
 import type { SmsEventLogService } from './sms-event-log.service';
 import type { SmsSender } from './sms/sms-sender';
@@ -10,19 +11,30 @@ const smsStub: SmsSender = { enabled: false, send: jest.fn().mockResolvedValue(u
 const smsEventLog = { record: jest.fn().mockResolvedValue(undefined) };
 const eventLogStub = () => smsEventLog as unknown as SmsEventLogService;
 const emailStub = { enabled: false, send: jest.fn().mockResolvedValue(undefined) };
-const dispatcher = new VerificationDispatcherService(smsStub, emailStub, eventLogStub());
+const dispatcher = new VerificationDispatcherService(smsStub, emailStub, eventLogStub(), {} as never);
 
 function buildPrismaMock() {
   const prisma: Record<string, unknown> = {};
-  prisma.v1VerificationToken = {
-    findFirst: jest.fn(),
-    update: jest.fn().mockResolvedValue({}),
+  const findFirst = jest.fn();
+  const tokens = {
+    findFirst,
+    // Same contract as the database: the attemptCount condition is checked and applied in one step, on the
+    // row findFirst hands out.
+    update: jest.fn(async ({ where }: { where: { attemptCount?: { lt: number } } }) => {
+      const row: { attemptCount: number } = await findFirst.getMockImplementation()?.();
+      if (where.attemptCount && row.attemptCount >= where.attemptCount.lt) {
+        throw new Prisma.PrismaClientKnownRequestError('No record was found for an update.', { code: 'P2025', clientVersion: 'test' });
+      }
+      row.attemptCount += 1;
+      return { attemptCount: row.attemptCount };
+    }),
     updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     create: jest.fn().mockResolvedValue({ id: 'tok' }),
     deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
     // 24시간 발송 상한(assertSendQuota)이 세는 값. 기본은 "아직 여유 있음".
     count: jest.fn().mockResolvedValue(0),
   };
+  prisma.v1VerificationToken = tokens;
   prisma.v1User = {
     findUnique: jest.fn(),
     findFirst: jest.fn().mockResolvedValue(null),
@@ -76,6 +88,20 @@ describe('VerificationService.confirm', () => {
     await expect(service.confirm(authUser, 'email', '123456')).rejects.toMatchObject({
       response: { code: 'VERIFICATION_TOO_MANY_ATTEMPTS' },
     });
+  });
+
+  it('compares only five of many concurrent guesses', async () => {
+    const prisma = buildPrismaMock();
+    const codeHash = await hashPassword('123456');
+    (prisma as never as { v1VerificationToken: { findFirst: jest.Mock } }).v1VerificationToken.findFirst.mockResolvedValue({
+      id: 't1', channel: 'email', target: 'a@b.com', codeHash, attemptCount: 0,
+    });
+    const service = new VerificationService(prisma, dispatcher, eventLogStub());
+
+    const results = await Promise.allSettled(Array.from({ length: 9 }, () => service.confirm(authUser, 'email', '000000')));
+    const codes = results.map((result) => (result as PromiseRejectedResult).reason.getResponse().code);
+    expect(codes.filter((code) => code === 'VERIFICATION_CODE_MISMATCH')).toHaveLength(5);
+    expect(codes.filter((code) => code === 'VERIFICATION_TOO_MANY_ATTEMPTS')).toHaveLength(4);
   });
 
   it('verifies email on the correct code and reports verified state', async () => {
@@ -286,6 +312,7 @@ describe('VerificationService.requestPhone (MT)', () => {
     handle.v1User.findUnique.mockResolvedValue({ id: 'u1', email: 'a@b.com', phone: null, emailVerifiedAt: null, phoneVerifiedAt: null });
     handle.v1User.findFirst.mockResolvedValue(null);
     const sendSpy = jest.spyOn(dispatcher, 'send').mockResolvedValue(undefined);
+    const echoSpy = jest.spyOn(dispatcher, 'mayEchoCode');
     const service = new VerificationService(prisma, dispatcher, eventLogStub());
 
     const result = await service.requestPhone(authUser, '01012345678');
@@ -295,7 +322,9 @@ describe('VerificationService.requestPhone (MT)', () => {
       expect.objectContaining({ data: expect.objectContaining({ channel: 'phone', target: '01012345678' }) }),
     );
     expect(sendSpy).toHaveBeenCalledWith('phone', '01012345678', expect.stringMatching(/^\d{6}$/));
+    expect(echoSpy).toHaveBeenCalledWith({ channel: 'phone', address: '01012345678', userId: 'u1' });
     sendSpy.mockRestore();
+    echoSpy.mockRestore();
   });
 
   it('deletes the just-created token when SMS dispatch fails (즉시 재요청 가능)', async () => {

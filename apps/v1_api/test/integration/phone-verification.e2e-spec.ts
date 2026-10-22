@@ -2,6 +2,7 @@ import type { INestApplication } from '@nestjs/common';
 import request = require('supertest');
 import { createV1IntegrationApp } from './integration-app';
 import { verifyPhoneProofToken } from '../../src/verification/phone-proof-token';
+import { PhoneVerificationService } from '../../src/verification/phone-verification.service';
 
 /**
  * MT SMS OTP 휴대폰 본인인증 — 실 DB + 실 HTTP end-to-end.
@@ -55,7 +56,7 @@ describe('V1 phone verification (MT SMS OTP) integration', () => {
   it('issues a challenge with an expiresAt and a 6-digit dev code (no dest/QR)', async () => {
     const response = await request(app.getHttpServer())
       .post('/api/v1/auth/phone/issue')
-      .send({ phone: '01011112222' })
+      .send({ phone: '01000002222' })
       .expect(200);
 
     expect(response.body.data.devCode).toMatch(/^\d{6}$/);
@@ -65,7 +66,7 @@ describe('V1 phone verification (MT SMS OTP) integration', () => {
   });
 
   it('verifies the entered code and returns a proof token bound to that phone', async () => {
-    const phone = '01033334444';
+    const phone = '01000004444';
     const issued = await request(app.getHttpServer())
       .post('/api/v1/auth/phone/issue')
       .send({ phone })
@@ -85,7 +86,7 @@ describe('V1 phone verification (MT SMS OTP) integration', () => {
   });
 
   it('rejects a wrong code with 400 (no proof token)', async () => {
-    const phone = '01044445555';
+    const phone = '01000005555';
     const issued = await request(app.getHttpServer())
       .post('/api/v1/auth/phone/issue')
       .send({ phone })
@@ -101,7 +102,7 @@ describe('V1 phone verification (MT SMS OTP) integration', () => {
   it('rejects verify with 400 when no challenge exists for the phone', async () => {
     await request(app.getHttpServer())
       .post('/api/v1/auth/phone/verify')
-      .send({ phone: '01055556666', code: '123456' })
+      .send({ phone: '01000006666', code: '123456' })
       .expect(400);
   });
 
@@ -115,7 +116,34 @@ describe('V1 phone verification (MT SMS OTP) integration', () => {
   it('rejects a malformed code (not 6 digits) with a validation error', async () => {
     await request(app.getHttpServer())
       .post('/api/v1/auth/phone/verify')
-      .send({ phone: '01011112222', code: '123' })
+      .send({ phone: '01000002222', code: '123' })
       .expect(400);
+  });
+
+  // 서비스를 직접 부른다 — 검증 라우트의 분당 요청 상한이 동시 시도를 대조 전에 끊어 버리면 시도 상한을 재지 못한다.
+  it('withholds the dev code from a number that could reach a real person', async () => {
+    const issued = await app.get(PhoneVerificationService).issueChallenge('01012345678');
+    expect(issued.devCode).toBeUndefined();
+  });
+
+  it('refuses the right code after five wrong ones, and compares only five of many concurrent guesses', async () => {
+    const service = app.get(PhoneVerificationService);
+    const capped = '01000000101';
+    const { devCode } = await service.issueChallenge(capped);
+    const wrong = devCode === '000000' ? '111111' : '000000';
+    for (let i = 0; i < 5; i += 1) {
+      await expect(service.verifyCode(capped, wrong)).rejects.toMatchObject({ response: { code: 'VERIFICATION_CODE_MISMATCH' } });
+    }
+    await expect(service.verifyCode(capped, devCode!)).rejects.toMatchObject({
+      response: { code: 'VERIFICATION_TOO_MANY_ATTEMPTS' },
+    });
+
+    const raced = '01000000102';
+    const second = await service.issueChallenge(raced);
+    const miss = second.devCode === '000000' ? '111111' : '000000';
+    const results = await Promise.allSettled(Array.from({ length: 12 }, () => service.verifyCode(raced, miss)));
+    const codes = results.map((result) => (result as PromiseRejectedResult).reason.getResponse().code);
+    expect(codes.filter((code) => code === 'VERIFICATION_CODE_MISMATCH')).toHaveLength(5);
+    expect(codes.filter((code) => code === 'VERIFICATION_TOO_MANY_ATTEMPTS')).toHaveLength(7);
   });
 });

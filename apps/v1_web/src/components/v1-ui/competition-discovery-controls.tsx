@@ -2,6 +2,7 @@
 
 import { useId, useState } from 'react';
 import Link from 'next/link';
+import { ChevronDown } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { BottomSheet } from './bottom-sheet';
 import { FilterIcon } from './icons';
@@ -134,25 +135,36 @@ export function CompetitionDiscoveryControls({ filters, sports, sheetOpen, deskt
     router.replace(competitionDiscoveryHref({ ...filters, sort: value, ...(value === 'deadline' ? { registration: 'open' } : {}) }), { scroll: false });
     setSortOpen(false);
   };
+  const filterLink = <Link className={`tm-btn tm-btn-sm tm-btn-neutral ${desktop ? '' : styles.mobileFilter}`}
+    aria-label={`필터 열기 — 현재 ${summary || '전체'}`} href={competitionDiscoveryHref(filters, { filter: true, page })} scroll={false}>
+    <FilterIcon size={18} aria-hidden="true" />필터{count > 0 && <> <span className={styles.filterCount}>{count}</span></>}
+  </Link>;
   return <>
-    <div className={styles.toolbar}>
-      <Link className={`tm-chip ${filters.registration === 'open' ? 'tm-chip-active' : ''}`} aria-current={filters.registration === 'open' ? 'true' : undefined}
-        href={competitionDiscoveryHref({ ...filters, registration: filters.registration === 'open' ? undefined : 'open',
-          sort: filters.registration === 'open' && sort === 'deadline' ? 'latest' : filters.sort })} scroll={false}>신청 접수 중만</Link>
-      <Link className="tm-btn tm-btn-sm tm-btn-neutral" aria-label={`필터 열기 — 현재 ${summary || '전체'}`} href={competitionDiscoveryHref(filters, { filter: true, page })} scroll={false}><FilterIcon size={18} aria-hidden="true" />필터{count > 0 ? ` ${count}` : ''}</Link>
-    </div>
-    {summary && <div className={styles.summary}><span>{summary}</span><Link href={competitionDiscoveryHref(reset)} scroll={false}>초기화</Link></div>}
-    <div className={styles.resultbar}>
-      <span className="tm-text-caption" aria-live="polite">{pending ? '불러오는 중…' : total === undefined ? '' : `총 ${total.toLocaleString()}개`}</span>
+    {desktop && <>
+      <div className={styles.toolbar}>
+        <Link className={`tm-chip ${filters.registration === 'open' ? 'tm-chip-active' : ''}`} aria-current={filters.registration === 'open' ? 'true' : undefined}
+          href={competitionDiscoveryHref({ ...filters, registration: filters.registration === 'open' ? undefined : 'open',
+            sort: filters.registration === 'open' && sort === 'deadline' ? 'latest' : filters.sort })} scroll={false}>신청 접수 중만</Link>
+        {filterLink}
+      </div>
+      {summary && <div className={styles.summary}><span>{summary}</span><Link href={competitionDiscoveryHref(reset)} scroll={false}>초기화</Link></div>}
+    </>}
+    <div className={desktop ? styles.resultbar : styles.mobileResultbar}
+      role={desktop ? undefined : 'group'} aria-label={desktop ? undefined : '대회 목록 필터 및 정렬'}>
+      <span className={`tm-text-caption ${desktop ? '' : styles.mobileCount}`} aria-live="polite">{pending ? '불러오는 중…' : total === undefined ? '' : `총 ${total.toLocaleString()}개`}</span>
       {desktop ? <label className={styles.sort}>정렬<select aria-label="대회·리그 정렬" value={sort} onChange={(event) => navigateSort(event.target.value as CompetitionSort)}>
         {COMPETITION_SORTS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-      </select></label> : <button type="button" className="tm-btn tm-btn-sm tm-btn-ghost" aria-haspopup="dialog" onClick={() => setSortOpen(true)}>{COMPETITION_SORTS.find((option) => option.value === sort)?.label} ▾</button>}
+      </select></label> : <div className={styles.mobileActions}>
+        {filterLink}
+        <button type="button" className={`tm-btn tm-btn-sm tm-btn-ghost ${styles.mobileSort}`} aria-haspopup="dialog" onClick={() => setSortOpen(true)}>
+          {COMPETITION_SORTS.find((option) => option.value === sort)?.label}<ChevronDown size={14} aria-hidden="true" />
+        </button>
+      </div>}
     </div>
-    {sort === 'deadline' && <p className="tm-text-caption">신청 접수 중인 항목을 마감 가까운 순으로 봐요. 마감 미정은 뒤에 표시해요.</p>}
+    {desktop && sort === 'deadline' && <p className="tm-text-caption">신청 접수 중인 항목을 마감 가까운 순으로 봐요. 마감 미정은 뒤에 표시해요.</p>}
     {sheetOpen && <DiscoveryFilterSheet key={competitionDiscoveryHref(filters)} filters={filters} sports={sports} page={page} />}
     {sortOpen && !desktop && <BottomSheet open title="정렬" onClose={() => setSortOpen(false)}>
-      <div className="tm-filter-sheet-handle" />
-      <div className={styles.sortOptions}>{COMPETITION_SORTS.map((option) => <button key={option.value} type="button" className={`tm-btn tm-btn-lg ${sort === option.value ? 'tm-btn-primary' : 'tm-btn-neutral'}`} aria-pressed={sort === option.value} onClick={() => navigateSort(option.value)}>{option.label}</button>)}</div>
+      <div className={styles.sortOptions}><p className="tm-text-caption">마감 가까운 순은 신청 접수 중인 항목만 보여줘요.</p>{COMPETITION_SORTS.map((option) => <button key={option.value} type="button" className={`tm-btn tm-btn-lg ${sort === option.value ? 'tm-btn-primary' : 'tm-btn-neutral'}`} aria-pressed={sort === option.value} onClick={() => navigateSort(option.value)}>{option.label}</button>)}</div>
     </BottomSheet>}
   </>;
 }

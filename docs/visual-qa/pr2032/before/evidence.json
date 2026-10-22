@@ -1,0 +1,48 @@
+{
+  "nodePid": 43405,
+  "browserPid": 43424,
+  "browserPpid": 43405,
+  "route": "/tournaments/aa100000-0000-4000-8000-000000000004",
+  "persona": "비로그인 공개 방문자",
+  "results": [
+    {
+      "width": 390,
+      "overflow": false,
+      "errors": [
+        "Minified React error #418; visit https://react.dev/errors/418?args[]=text&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+      ],
+      "failedResponses": [
+        {
+          "url": "/api/v1/auth/me",
+          "status": 401
+        }
+      ]
+    },
+    {
+      "width": 768,
+      "overflow": false,
+      "errors": [
+        "Minified React error #418; visit https://react.dev/errors/418?args[]=text&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+      ],
+      "failedResponses": [
+        {
+          "url": "/api/v1/auth/me",
+          "status": 401
+        }
+      ]
+    },
+    {
+      "width": 1440,
+      "overflow": false,
+      "errors": [
+        "Minified React error #418; visit https://react.dev/errors/418?args[]=text&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+      ],
+      "failedResponses": [
+        {
+          "url": "/api/v1/auth/me",
+          "status": 401
+        }
+      ]
+    }
+  ]
+}

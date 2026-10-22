@@ -6,12 +6,13 @@ Created: 2026-10-22
 ## Context
 사용자는 대회도 리그와 같은 목록·상세 2장 구성으로 변경하고 상세의 종목 기본 이미지까지 숨길 수 있기를 요청했다.
 ## Goal
-등록/초안 재개/관리자 수정의 이미지 저장 계약과 공개 목록/상세 표시를 일치시키고 dev 대상 PR을 생성한다.
+등록/초안 재개/관리자 수정의 이미지 저장 계약과 공개 목록/상세 표시를 일치시키고 dev 대상 PR을 생성한다. 추가 사용자 요청에 따라 #2032 dev 머지·alpha 배포 및 결과 기록까지 수행한다.
 ## Original Conditions
 - [x] 대회 목록·상세 이미지 2장
 - [x] 상세에서 업로드가 없으면 종목 기본 이미지 표시
 - [x] 상세 이미지 표시 스위치를 끄면 기본 이미지와 영역/여백까지 제거
 - [x] 구현 완료 후 dev 대상 PR 생성 (#2032)
+- [x] 추가 요청: #2032 dev 머지·alpha 배포 및 공개 응답 확인
 - [x] 별도 #2031(main→dev 이력 동기화) dev 머지 및 alpha 배포 확인 완료
 ## User Scenarios
 운영자는 목록/상세 사진을 각각 올리거나 하나를 공유한다. 상세 표시를 껐다 켜도 사진은 보존된다. 관람자는 숨김 대회에서 제목·정보를 바로 본다.
@@ -27,7 +28,8 @@ Created: 2026-10-22
 - [x] DTO→저장→응답→공개 UI 계약 일치
 - [x] 관련 테스트/타입 검증 및 diff/debt 검사
 - [x] dev PR 생성, CI 상태 기록 (#2032, 61840a809; CI/Copilot 진행)
-- [ ] alpha 390/768/1440 실제 QA(배포 후 가능)
+- [x] 공개 상세 사진/기본 그래픽 390/768/1440 실제 QA (2 routes × 3 widths = 6/6)
+- [ ] alpha 관리자 업로드/숨김 저장/재표시 UI (인증 세션 미확보)
 ## Tech Debt Resolved
 기존 커버 단일 업로더와 실제 상세 이미지 미표시 불일치 정리. 기존 홍보 이미지 데이터는 삭제하지 않으며 이전 홍보 커스터마이징 호환 유지.
 ## Security Notes
@@ -37,10 +39,11 @@ v1_tournaments/V1Tournament에 show_detail_image 기본 true 추가 migration �
 ## Ambiguity Log
 A안은 상세 노출 스위치로 확정. 두 장은 리그와 동일한 listImageUrl/coverImageUrl이며 업로드 없는 상세는 종목 그래픽으로 표시한다.
 ## Progress Snapshot
-Base cd901fa68 (#2031 merge), worktree /tmp/teameet-tournament-images, branch feat/tournament-two-images.
-Phase 1 contracts: completed. Phase 2 UI: completed. Phase 3 validation/docs completed, PR #2032 생성. #2031 alpha run39705838057 서버 반영·공개 배포 identity 검증 SUCCESS.
+#2032 dev 머지/alpha 배포 SHA c184cff233af2f77a4c2f6842e1d9905fbe10278. source branch feat/tournament-two-images의 코드 작업은 dev에 반영됐다. PR CI39709551247 및 dev CI39715119478 모두 PASS, alpha39715119491 SUCCESS.
+Phase 1 contracts / Phase 2 UI / Phase 3 validation·PR·deploy: completed. 공개 대표 사진+종목 기본 그래픽2 routes ×390/768/1440 =6/6 실측 완료. 관리자 저장 UI는 세션 미확보로 pending이며 Status Review를 유지한다.
+증거 branch docs/pr2032-alpha-evidence, worktree /tmp/teameet-pr2032-evidence-worktree. before3장+after6장 및 README/evidence.json을 원래 PR에 SHA 고정 갤러리로 게시한다. 원본 shared WIP 보존, 실제 로컬 dev --ff-only 동기화 완료.
 
-## Validation (2026-10-22)
+## Validation (2026-10-22, 아래 배포 전 원본 기록)
 - API unit 185 PASS (admin service, DTO, public detail presenter), schema snapshot 5 PASS.
 - Web 4 suites/153 PASS (create→payload/draft hydration, admin CAS+readonly, public open/completed hide/default, two-image resolution).
 - API/Web full TypeScript 검사 exit0. API surface 및 Web pattern PASS.
@@ -68,3 +71,23 @@ Phase 1 contracts: completed. Phase 2 UI: completed. Phase 3 validation/docs com
 - after merge: alpha 배포 SHA/health/공개 상세3폭 확인 및 PR 갤러리. 관리자 인증 세션 미확보로 실제 관리자 저장 UI는 별도 제한을 명시한다.
 
 - CI 실패를 RED 증거로 유지하고 read-service suite 재검증 52/52 PASS(단일 worker). git diff --check PASS, 신규 debt marker 없음. 기존 구현/DB/API 계약은 유지하고 읽기 응답 테스트와 fixture만 동기화했다.
+
+## #2032 배포 결과 및 공개 QA
+- #2032 dev 머지 c184cff233af2f77a4c2f6842e1d9905fbe10278. PR CI39709551247 및 dev CI39715119478 모두 SUCCESS. Windows 실제 dev 작업트리를 --ff-only 동기화 완료.
+- alpha run39715119491의 동일 SHA 공개 identity와 health/DB 정상 확인 후 공개 상세 390/768/1440(3/3)을 headed 브라우저로 캡처했다.
+- 증거: docs/visual-qa/pr2032/README.md, before/after 각3폭 PNG와 evidence.json. 기능 코드 변경 없이 evidence 전용 branch docs/pr2032-alpha-evidence에 보관하고 원래 PR에 SHA 고정 갤러리로 게시한다.
+- 공개 대표 이미지3/3 및 두 사진이 모두 null인 대회의 종목 기본 그래픽3/3, 총6/6 실측. 가로 넘침0/pageerror0. before의 hydration #418은 이번 after에서 미관찰. 비로그인 auth/me401, 보조 요청 중단 및 최초 fallback 진입 중단은 증거에 따로 기록했다.
+- 사용자 외부 리뷰 오류 예외 승인 적용. 최신 Copilot run39709553504의 unavailable 모델 오류는 clean 리뷰가 아니다.
+- 관리자 세션 미확보: alpha에서 2장 업로드/숨김 저장/재표시 실제 UI는 pending. DB통합 및 웹 회귀 PASS를 수동 QA로 바꿔 표기하지 않는다.
+- 배포 요청 완료. 공개2경로6/6 실측 완료. 관리자 저장 UI는 인증 세션 미확보로 Review 상태 보존. 리포트의 오류·재캡처 이력을 생략하지 않는다.
+
+## #2032 배포 결과 및 공개 QA
+- #2032 dev 머지 c184cff233af2f77a4c2f6842e1d9905fbe10278. PR CI39709551247 및 dev CI39715119478 모두 SUCCESS. Windows 실제 dev 작업트리를 --ff-only 동기화 완료.
+- alpha run39715119491의 동일 SHA 공개 identity와 health/DB 정상 확인 후 공개 상세 390/768/1440(3/3)을 headed 브라우저로 캡처했다.
+- 증거: docs/visual-qa/pr2032/README.md, before/after 각3폭 PNG와 evidence.json. 기능 코드 변경 없이 evidence 전용 branch docs/pr2032-alpha-evidence에 보관하고 원래 PR에 SHA 고정 갤러리로 게시한다.
+- 공개 대표 이미지3/3 및 두 사진이 모두 null인 대회의 종목 기본 그래픽3/3, 총6/6 실측. 가로 넘침0/pageerror0. before의 hydration #418은 이번 after에서 미관찰. 비로그인 auth/me401, 보조 요청 중단 및 최초 fallback 진입 중단은 증거에 따로 기록했다.
+- 사용자 외부 리뷰 오류 예외 승인 적용. 최신 Copilot run39709553504의 unavailable 모델 오류는 clean 리뷰가 아니다.
+- 관리자 세션 미확보: alpha에서 2장 업로드/숨김 저장/재표시 실제 UI는 pending. DB통합 및 웹 회귀 PASS를 수동 QA로 바꿔 표기하지 않는다.
+- 배포 요청 완료. 공개2경로6/6 실측 완료. 관리자 저장 UI는 인증 세션 미확보로 Review 상태 보존. 리포트의 오류·재캡처 이력을 생략하지 않는다.
+
+- 추가 공개 fallback 경로는 배포 후 선정하여 해당 경로의 before는 없다. 대표 이미지 경로의 before3장 + after3장, fallback after3장 및 각 evidence.json을 보존한다.

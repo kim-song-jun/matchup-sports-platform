@@ -1,0 +1,75 @@
+{
+  "nodePid": 49838,
+  "browserPid": 49882,
+  "browserPpid": 49838,
+  "releaseSha": "c184cff233af2f77a4c2f6842e1d9905fbe10278",
+  "persona": "비로그인 공개 방문자",
+  "route": "/tournaments/7f9517de-394a-433f-9525-f8639b830523",
+  "publicImageContract": {
+    "coverImageUrl": null,
+    "listImageUrl": null,
+    "showDetailImage": true
+  },
+  "results": [
+    {
+      "width": 390,
+      "overflow": false,
+      "mediaVisible": true,
+      "defaultGraphic": 1,
+      "errors": [],
+      "failedResponses": [
+        {
+          "url": "/api/v1/auth/me",
+          "status": 401
+        }
+      ],
+      "consoleMessages": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 ()"
+        }
+      ],
+      "failedRequests": []
+    },
+    {
+      "width": 768,
+      "overflow": false,
+      "mediaVisible": true,
+      "defaultGraphic": 1,
+      "errors": [],
+      "failedResponses": [
+        {
+          "url": "/api/v1/auth/me",
+          "status": 401
+        }
+      ],
+      "consoleMessages": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 ()"
+        }
+      ],
+      "failedRequests": []
+    },
+    {
+      "width": 1440,
+      "overflow": false,
+      "mediaVisible": true,
+      "defaultGraphic": 1,
+      "errors": [],
+      "failedResponses": [
+        {
+          "url": "/api/v1/auth/me",
+          "status": 401
+        }
+      ],
+      "consoleMessages": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 ()"
+        }
+      ],
+      "failedRequests": []
+    }
+  ]
+}

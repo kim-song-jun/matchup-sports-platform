@@ -103,9 +103,8 @@ function extractStepShell(path) {
 /**
  * Gates 의 세 스텝이 workflow_dispatch(dev) 에서도 도는지 `if:` 를 직접 본다.
  *
- * 이 조건이 빠져도 base 해석 셸은 멀쩡해서 위 픽스처들이 모두 통과한다. 그러면 Promote 가
- * 거는 dispatch CI 가 게이트를 건너뛰고도 green 으로 끝나고, 매처는 그 run 을 받아들여
- * 검사 안 된 버전 커밋이 alpha 로 나간다.
+ * 이 조건이 빠져도 base 해석 셸은 멀쩡해서 위 픽스처들이 모두 통과한다. 그러면 dev 에서
+ * 수동 dispatch 한 CI 가 게이트를 건너뛰고도 green 으로 끝난다.
  */
 const DISPATCH_GATED_STEPS = [
   'Verify release changeset',
@@ -140,7 +139,7 @@ function checkDispatchConditions(path) {
     const condition = extractStepCondition(path, stepName);
     if (!DISPATCH_DEV_CLAUSE.test(condition)) {
       fail(
-        `"${stepName}" 스텝의 if: 에 workflow_dispatch(dev) 절이 없다 — Promote 가 거는 CI 가 이 게이트를 건너뛴다.\n`
+        `"${stepName}" 스텝의 if: 에 workflow_dispatch(dev) 절이 없다 — dev 에서 수동 dispatch 한 CI 가 이 게이트를 건너뛴다.\n`
         + `  받은 조건: ${condition || '(if: 없음)'}`,
       );
     }
@@ -305,10 +304,10 @@ function makeZeroBaseFixture() {
 }
 
 /**
- * 픽스처 4 — **workflow_dispatch**(Promote 가 버전 커밋을 push 한 뒤 거는 CI).
+ * 픽스처 4 — **workflow_dispatch**(사람이 dev 에서 수동으로 건 CI).
  *
  * 이 이벤트엔 `event.before` 가 없어 BASE_SHA 가 빈 값이다. 스텝이 첫 부모를 base 로 잡아야
- * 버전 커밋이 push 였다면 검사받았을 범위(= 그 커밋 하나)가 그대로 검사된다. 못 잡으면 보강이
+ * 그 커밋이 push 였다면 검사받았을 범위(= 그 커밋 하나)가 그대로 검사된다. 못 잡으면 보강이
  * dev 를 받아 base==head 가 되어 스텝이 변경 목록 없이 죽는다.
  * 부모 앞에 남의 커밋을 하나 더 둬서, base 가 첫 부모보다 더 오래된 곳으로 잡히면 드러나게 한다.
  */

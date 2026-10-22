@@ -12,6 +12,7 @@ import { PLACE_NAME_MAX_LENGTH } from '@/lib/place';
 import type { V1PlaceView } from '@/types/api';
 import { ChevronLeftIcon, ChevronRightIcon, FilterIcon, MoreIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { MatchTypeSegment } from '@/components/v1-ui/match-type-segment';
+import { ListSummaryCounts } from '@/components/v1-ui/list-summary-counts';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { CreateField, FieldErrorText, GenderRuleSelector, MissingFieldsBanner, MultiPresetChipSelector, PresetChipSelector } from '@/components/v1-ui/create-form-fields';
 import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
@@ -84,15 +85,11 @@ export function TeamMatchListPageView({ model }: { model: TeamMatchListViewModel
       {/* 결과가 0건일 때만 tm-list-empty — matches-page.tsx 와 같은 이유. */}
       <div className={`tm-match-list${!model.isLoading && model.matches.length === 0 ? ' tm-list-empty' : ''}`}>
         <div className="tm-sport-chip-row">{model.sports.map((sport) => sport.href ? <Link key={sport.label} className={`tm-chip ${sport.active ? 'tm-chip-active' : ''}`} href={sport.href} aria-current={sport.active ? 'page' : undefined}>{sport.label} <span className="tab-num">{sport.count}</span></Link> : <button key={sport.label} className={`tm-chip ${sport.active ? 'tm-chip-active' : ''}`} type="button" aria-pressed={sport.active}>{sport.label} <span className="tab-num">{sport.count}</span></button>)}</div>
-        <p className="tm-text-caption">전체·종목별 건수는 불러온 목록 기준이에요</p>
         {/* P1: 통계 숫자 tabular-nums + weight 차등 (2:1 원칙) */}
         <div className="tm-match-summary-row">
           {/* matches-page.tsx 와 같은 이유 — 이 화면도 모바일 헤딩이 0개였다. */}
           <h2 className="tm-list-scope-heading">{buildTeamMatchSummaryLabel()}</h2>
-          <div className="tm-text-caption tab-num">
-            <div>현재 목록 기준</div>
-            <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{model.summary.count}</span>개 · 오늘 {model.summary.today} · 모집 중 <strong style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{model.summary.urgent}</strong>
-          </div>
+          <ListSummaryCounts summary={model.summary} />
         </div>
         {/* #5: 로딩 중엔 PageSkeleton, 완료 후 비어 있으면 EmptyState — 빈/로딩 구분 */}
         {model.isLoading

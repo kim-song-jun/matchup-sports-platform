@@ -129,7 +129,7 @@ seed는 lifecycle 기준 상태를 매 배포에서 다시 만들기 때문에 Q
 
 ## `dev` 자동 배포
 
-`.github/workflows/deploy-alpha.yml`은 `dev` push와 함께 시작하지만, 같은 commit의 `CI / Deploy` 실행이 성공할 때까지 기다린 뒤에만 AWS 권한을 취득한다. 인정하는 실행은 그 commit의 push run, 그리고 `Promote to main`이 버전 커밋을 push한 뒤 직접 건 `workflow_dispatch` run(`github-actions[bot]`)뿐이다 — `GITHUB_TOKEN` push는 push run을 만들지 못한다. 판정은 `scripts/release/select-matching-ci-run.sh`. GitHub 장기 AWS access key나 EC2 private key는 사용하지 않는다.
+`.github/workflows/deploy-alpha.yml`은 `dev` push와 함께 시작하지만, 같은 commit의 `CI / Deploy` 실행이 성공할 때까지 기다린 뒤에만 AWS 권한을 취득한다. 인정하는 실행은 그 commit의 push run뿐이다 — `workflow_dispatch` run은 누가 걸었든 인정하지 않는다. `Promote to main`의 버전 커밋도 PR 머지로 dev에 들어오므로 일반 push run이 생긴다. 판정은 `scripts/release/select-matching-ci-run.sh`. GitHub 장기 AWS access key나 EC2 private key는 사용하지 않는다.
 
 ```text
 dev push/merge

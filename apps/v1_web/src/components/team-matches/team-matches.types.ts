@@ -97,7 +97,13 @@ export type TeamMatchListViewModel = {
     kindOptions: Array<{ label: string; value: '' | 'friendly' | 'competition'; href: string; active?: boolean }>;
   };
   sports: Array<{ label: string; count: number; active?: boolean; href?: string }>;
-  summary: { count: number; today: number; urgent: number };
+  summary: {
+    count: number;
+    today: number;
+    urgent: number;
+    /** '모집 중 N'을 누르면 지금 신청할 수 있는 매치만 본다. 없으면 숫자만 그린다. */
+    recruitingFilter?: { active: boolean; href: string };
+  };
   matches: TeamMatchModel[];
   /** #5: 로딩 중 여부 — true일 때 EmptyState 대신 PageSkeleton 렌더 */
   isLoading?: boolean;

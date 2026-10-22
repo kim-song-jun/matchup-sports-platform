@@ -24,7 +24,11 @@ import { isSignupAgeEligible, isValidBirthDateDigits, normalizeSignupDisplayName
 import { SocialLinkDto } from './dto/social-link.dto';
 import { SocialProfileDto, SocialTermsDto } from './dto/social-profile.dto';
 import { recordSignupConsent } from './signup-record-consent';
-import { hashPassword, verifyPassword } from './password-hash';
+import { hashPassword, verifyPasswordConstantCost } from './password-hash';
+import { loginAttemptKeys, loginIpKey, type LoginAttemptKeys } from './login-security/login-security.policy';
+import { LoginSecurityService } from './login-security/login-security.service';
+import { LoginStepUpService } from './login-security/login-step-up.service';
+import type { LoginStepUpVerifyDto } from './dto/login-step-up.dto';
 import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
 import { PhoneVerificationService } from '../verification/phone-verification.service';
 import { verifyPhoneProofToken } from '../verification/phone-proof-token';
@@ -81,6 +85,29 @@ type KakaoProfile = {
   signupPrefill: KakaoSignupPrefill | null;
 };
 
+export interface LoginRequestContext {
+  /** Client IP as Express resolves it (`trust proxy` is set in main.ts). */
+  ip?: string | null;
+}
+
+const EMAIL_LOGIN_IDENTITY_SELECT = {
+  id: true,
+  passwordHash: true,
+  status: true,
+  user: {
+    select: {
+      id: true,
+      email: true,
+      accountStatus: true,
+      onboardingStatus: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  },
+} satisfies Prisma.V1AuthIdentitySelect;
+
+type EmailLoginIdentity = Prisma.V1AuthIdentityGetPayload<{ select: typeof EMAIL_LOGIN_IDENTITY_SELECT }>;
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
@@ -91,6 +118,8 @@ export class AuthService {
     private readonly managedTerms: ManagedTermsRuntimeService,
     private readonly phoneVerification: PhoneVerificationService,
     private readonly appleTokens: AppleTokenService,
+    private readonly loginSecurity: LoginSecurityService,
+    private readonly loginStepUp: LoginStepUpService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -275,8 +304,15 @@ export class AuthService {
     return { available: !existing };
   }
 
-  async login(dto: LoginDto) {
+  /**
+   * Once step-up applies (the email keeps failing, or a spray attack is active) every outcome — right
+   * password, wrong password, unknown email — answers with the same `stepUp` challenge shape, and only a
+   * right password mails a code. Nothing in the response, status or timing tells the three apart.
+   */
+  async login(dto: LoginDto, context: LoginRequestContext) {
     const email = normalizeEmail(dto.email);
+    const keys = loginAttemptKeys(email, context.ip);
+    const stepUpRequired = await this.loginSecurity.isStepUpRequired(keys.emailKey);
     const identity = await this.prisma.v1AuthIdentity.findUnique({
       where: {
         provider_providerUserKey: {
@@ -284,31 +320,59 @@ export class AuthService {
           providerUserKey: email,
         },
       },
-      select: {
-        id: true,
-        passwordHash: true,
-        status: true,
-        user: {
-          select: {
-            id: true,
-            email: true,
-            accountStatus: true,
-            onboardingStatus: true,
-            createdAt: true,
-            updatedAt: true,
-          },
-        },
-      },
+      select: EMAIL_LOGIN_IDENTITY_SELECT,
     });
 
-    const passwordMatches = await verifyPassword(dto.password, identity?.passwordHash);
-    if (!identity || !passwordMatches) {
+    const passwordMatches = await verifyPasswordConstantCost(dto.password, identity?.passwordHash);
+    const verifiedIdentity = identity && passwordMatches ? identity : null;
+
+    if (stepUpRequired) {
+      await this.recordLoginAttempt(verifiedIdentity ? 'step_up_issued' : 'failed', keys);
+      const stepUp = await this.loginStepUp.start({
+        email,
+        emailKey: keys.emailKey,
+        userId: verifiedIdentity?.user.id ?? null,
+      });
+      return { stepUp };
+    }
+
+    if (!verifiedIdentity) {
+      await this.recordLoginAttempt('failed', keys);
       throw new UnauthorizedException({
         code: 'UNAUTHENTICATED',
         message: 'Email or password is incorrect',
       });
     }
 
+    return this.completeEmailLogin(verifiedIdentity, keys);
+  }
+
+  async verifyLoginStepUp(dto: LoginStepUpVerifyDto, context: LoginRequestContext) {
+    const { userId, emailKey } = await this.loginStepUp.verify(dto.challengeToken, dto.code);
+    const identity = await this.prisma.v1AuthIdentity.findFirst({
+      where: { userId, provider: V1AuthProvider.email },
+      select: EMAIL_LOGIN_IDENTITY_SELECT,
+    });
+    if (!identity) {
+      throw new UnauthorizedException({
+        code: 'UNAUTHENTICATED',
+        message: 'Email or password is incorrect',
+      });
+    }
+    return this.completeEmailLogin(identity, { emailKey, ipKey: loginIpKey(context.ip) });
+  }
+
+  resendLoginStepUp(challengeToken: string) {
+    return this.loginStepUp.resend(challengeToken);
+  }
+
+  private async recordLoginAttempt(result: 'failed' | 'step_up_issued', keys: LoginAttemptKeys) {
+    await this.loginSecurity.record(result, keys);
+    if (result === 'failed') this.loginSecurity.scheduleSprayDetection();
+  }
+
+  /** Shared by the password path and the step-up verify path, so both end in the same session response. */
+  private async completeEmailLogin(identity: EmailLoginIdentity, keys: LoginAttemptKeys) {
     if (identity.status !== 'active' || identity.user.accountStatus !== 'active') {
       this.assertNotWithdrawalPending(identity.user.accountStatus);
       throw new ForbiddenException({
@@ -327,6 +391,7 @@ export class AuthService {
         data: { lastLoginAt: new Date() },
       }),
     ]);
+    await this.loginSecurity.record('success', keys);
 
     return this.sessionResponse(identity.user.id, identity.user.email);
   }

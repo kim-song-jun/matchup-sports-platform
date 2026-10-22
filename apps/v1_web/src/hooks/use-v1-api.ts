@@ -92,6 +92,8 @@ import type {
   V1AdminUserRow,
   V1AuthMe,
   V1AuthSessionResponse,
+  V1EmailLoginResult,
+  V1LoginStepUpResendResult,
   V1CurrentSignupTerms,
   V1CurrentTerms,
   V1ChatMessage,
@@ -325,11 +327,33 @@ export function useV1Logout() {
 export function useV1EmailLogin() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: { email: string; password: string }) => v1Post<V1AuthSessionResponse>('/auth/login', body),
+    mutationFn: (body: { email: string; password: string }) => v1Post<V1EmailLoginResult>('/auth/login', body),
     // Mutation callbacks run before the component callback that stores the
     // local session hint. Refetching here can send /auth/me without headers
     // and cache a 401 that immediately ejects the newly-created session.
+    // A step-up challenge has no session: caching it as the auth snapshot would make
+    // the app read `{ stepUp }` as a signed-in user.
+    onSuccess: (result) => {
+      if ('stepUp' in result) return;
+      queryClient.setQueryData<V1AuthMe>(v1Keys.authMe(), result);
+    },
+  });
+}
+
+export function useV1LoginStepUpVerify() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { challengeToken: string; code: string }) =>
+      v1Post<V1AuthSessionResponse>('/auth/login/step-up/verify', body),
+    // Same snapshot rule as useV1EmailLogin: the verified response is the authoritative session.
     onSuccess: (result) => queryClient.setQueryData<V1AuthMe>(v1Keys.authMe(), result),
+  });
+}
+
+export function useV1LoginStepUpResend() {
+  return useMutation({
+    mutationFn: (body: { challengeToken: string }) =>
+      v1Post<V1LoginStepUpResendResult>('/auth/login/step-up/resend', body),
   });
 }
 

@@ -6,7 +6,8 @@ import { AdminInlineError, AdminKpiCard } from '@/components/admin';
 import { PushFailureTable } from '@/components/admin/push-failure-table';
 import { SmsFailureTable } from '@/components/admin/sms-failure-table';
 import { useV1AdminMonitoringSummary } from '@/hooks/use-v1-api';
-import type { V1AdminMonitoringSummary } from '@/types/api';
+import { formatAdminKstDateTimeShort } from '@/lib/date-utils';
+import type { V1AdminLoginAnomalySummary, V1AdminMonitoringSummary } from '@/types/api';
 import { AuditLogView } from './audit-log-view';
 import { ErrorLogsClient } from './error-logs-client';
 
@@ -43,6 +44,32 @@ const SIGNAL_CARDS: SignalCard[] = [
   { tab: 'audit', label: '운영 활동', caption: '오늘', value: (s) => s.auditToday, alerting: false },
 ];
 
+/**
+ * "로그인 이상" 신호 — 로그인 실패 급증(password spray 의심)을 감지한 기록. 건수는 최근 24시간,
+ * 보조 줄은 가장 최근 1건이다. 목록 탭이 없어(Slack 알림이 상세를 담는다) 누르는 타일이 아니다.
+ */
+function describeLoginAnomalies(anomalies: V1AdminLoginAnomalySummary | undefined) {
+  const latest = anomalies?.latest ?? null;
+  const details = !anomalies
+    ? []
+    : latest
+      ? [
+          latest.active
+            ? `감지 중 · 추가 인증 요구 · 마지막 ${formatAdminKstDateTimeShort(latest.lastDetectedAt)}`
+            : `마지막 감지 ${formatAdminKstDateTimeShort(latest.lastDetectedAt)}`,
+          `실패 ${latest.failedCount}건 · 계정 ${latest.accountCount}개 · IP ${latest.ipCount}개`,
+        ]
+      : ['감지된 적이 없어요'];
+  const count = anomalies?.last24hCount ?? null;
+  const active = latest?.active === true;
+  return {
+    count,
+    details,
+    alert: active || (count ?? 0) > 0,
+    ariaLabel: `로그인 이상(최근 24시간): ${count === null ? '집계 중' : `${count}건`}${active ? ', 지금 감지 중' : ''}`,
+  };
+}
+
 function pickTab(value: string | null): TabKey {
   return TABS.some((tab) => tab.key === value) ? (value as TabKey) : 'errors';
 }
@@ -69,6 +96,7 @@ export function MonitoringClient() {
   }, [searchParams]);
 
   const { data: summary, isPending, isError, refetch } = useV1AdminMonitoringSummary();
+  const loginAnomalies = describeLoginAnomalies(summary?.loginAnomalies);
 
   // 상태 → URL 은 탭 전환 시점에만 쓴다(replace — 탭을 오갈 때마다 히스토리가 쌓이면
   // 뒤로가기가 허브 안에서 맴돈다). effect 동기화가 필요할 만큼 상태가 얽혀 있지 않다.
@@ -79,9 +107,9 @@ export function MonitoringClient() {
 
   return (
     <>
-      {/* ── 신호 스트립: 미확인 신호 4카드, 클릭 = 해당 탭. 개요 페이지 KPI 와
+      {/* ── 신호 스트립: 미확인 신호 4카드(클릭 = 해당 탭) + 로그인 이상 1카드(표시 전용). 개요 페이지 KPI 와
           같은 AdminKpiCard 시각 언어를 쓰고, 활성 탭 표시는 아래 세그먼트가 담당한다. ── */}
-      <div className="tm-content-enter mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="tm-content-enter mb-5 grid grid-cols-2 gap-3 lg:grid-cols-5">
         {SIGNAL_CARDS.map((card) => {
           const count = summary ? card.value(summary) : null;
           const alert = card.alerting && (count ?? 0) > 0;
@@ -99,6 +127,16 @@ export function MonitoringClient() {
             />
           );
         })}
+        <div className="col-span-2 lg:col-span-1">
+          <AdminKpiCard
+            label="로그인 이상"
+            value={loginAnomalies.count ?? '—'}
+            sub="최근 24시간"
+            details={loginAnomalies.details}
+            tone={loginAnomalies.alert ? 'danger' : 'neutral'}
+            ariaLabel={loginAnomalies.ariaLabel}
+          />
+        </div>
       </div>
       {isError && (
         <div className="mb-5 -mt-2">

@@ -14,6 +14,8 @@ export const SENSITIVE_KEYS: readonly string[] = [
   'accessToken',
   'refreshToken',
   'idToken',
+  // 로그인 추가 인증 챌린지 토큰 — 코드(code)와 함께 있어야 로그인이 완료되므로 에러 로그에 남기지 않는다.
+  'challengeToken',
   'code',
   'authorization',
   'cookie',

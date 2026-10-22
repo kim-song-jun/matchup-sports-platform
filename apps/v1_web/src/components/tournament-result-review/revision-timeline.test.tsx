@@ -23,6 +23,7 @@ function revision(overrides: Partial<GameResultRevision> & { id: string }): Game
     createdByActorType: 'SYSTEM',
     createdByUserId: null,
     createdByName: null,
+    officializedByName: null,
     createdBySystemActor: 'GAME_END_DERIVER',
     supersedesId: null,
     submittedAt: '2026-08-09T19:30:00.000Z',
@@ -172,4 +173,20 @@ describe('RevisionTimeline — 처리한 사람', () => {
     expect(screen.getByText('담당자 처리 · 리비전 #2')).toBeInTheDocument();
     expect(screen.getByText('자동 처리(GAME_END_DERIVER) · 리비전 #1')).toBeInTheDocument();
   });
+
+  // MD-QA #169: 필드 담당자가 제출하고 어드민이 확정했는데 "공식 확정" 줄에 제출자만 보였다.
+  it('확정한 사람이 제출한 사람과 다르면 둘 다 보여준다', () => {
+    render(
+      <RevisionTimeline
+        revisions={[
+          revision({ id: 'r2', revision: 2, createdByActorType: 'USER', createdByUserId: 'u-1', createdByName: '김스태프', officializedByName: '박어드민', createdBySystemActor: null }),
+          revision({ id: 'r1', revision: 1, createdByActorType: 'USER', createdByUserId: 'u-1', createdByName: '김스태프', officializedByName: '김스태프', createdBySystemActor: null }),
+        ]}
+      />,
+    );
+
+    expect(screen.getByText('제출 김스태프 · 확정 박어드민 · 리비전 #2')).toBeInTheDocument();
+    expect(screen.getByText('김스태프 처리 · 리비전 #1')).toBeInTheDocument();
+  });
 });
+

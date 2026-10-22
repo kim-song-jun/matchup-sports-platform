@@ -305,16 +305,30 @@ Global rules inherited from `~/.codex/AGENTS.md`:
     `environment: production` 승인 게이트 있음.
 - **승격 뒤 추가 절차가 필요한 배포(Task168 Stage A/B DB 전환 등)는
   `docs/ops/prod-task168-transition-runbook.md` 참고** — 실패 메시지가 이 문서를 직접 가리킨다.
+- **승인 전 `build-images` 는 prod 서버(SSM)·Parameter Store·KMS·EC2 에 닿지 않는다.** 그 job 은 빌드 전용
+  역할(`vars.PROD_BUILD_AWS_ROLE_ARN`: ECR·릴리스 소스 S3만)을 쓰고, 서버 명령·서버 상태 읽기·운영 비밀값 쓰기와
+  배포 역할(`vars.PROD_AWS_ROLE_ARN`)은 승인된 `deploy` job 에만 둔다. `pnpm qa:production-deploy-security` 가
+  강제한다(`deploy/DEPLOY_GUIDE.md` §4). **한계:** 저장소 수준 GitHub secret(배포용 `SECRET_*` 원본 다수)은
+  `build-images` 도 읽을 수 있다 — 환경 secret 으로 옮기는 것은 별도 후속이다.
 - **모든 작업은 `dev`에서만.** 작업 브랜치·PR의 base는 항상 `dev`. 기능의 "완료" = dev 머지.
 - **`dev` → `main` 승격은 사용자만 한다.** 에이전트는 `git push`/`gh pr merge`/
   `gh pr create --base main` 어느 방식으로도 **직접 실행하지 않는다** — 필요해 보이면 사용자에게
   알리고 멈춘다. 자동으로 승격하는 워크플로는 없다(워크플로의 `refs/heads/main` 참조는 전부 감지용 `if:` 조건이다).
+  `promote-main.yml`은 버전 커밋을 dev 대상 PR(`release/version-*`)로 올리고, 그 PR 머지 뒤 다시 실행하면
+  승격 게이트 검증과 dev→main PR 링크만 남긴다 — 그 PR을 열고 머지하는 것은 사용자다.
 - **`main`에 dev에 없는 커밋이 생겼다면** `origin/main → dev` 방향으로만 흡수한다.
 - **배포 동작에 영향을 주는 main 대상 PR의 릴리스 검사는 출발 브랜치와 무관하게 동일하다.** 사용자 승인으로 범위를 제한한 hotfix PR도 Changesets 소비, 고정 API/Web 버전 증가, 두 변경 이력을 모두 검증한다. 순수 문서·테스트 변경에는 버전 증가를 요구하지 않는다. 이 CI 계약은 승격 권한이나 승인 정책을 대신하지 않는다.
 - **`main`에는 classic branch protection은 없지만 ruleset이 걸려 있다**(2026-08-09 실측 정정).
   ruleset "Copilot review for default branch"(active)가 `deletion`·`non_fast_forward`·`copilot_code_review`를
-  강제한다 — main으로의 force-push·삭제는 막힌다(#231 롤백이 `git revert`로만 가능했던 이유). 일반
-  fast-forward 직접 push는 가능해 그대로 프로덕션 배포로 이어진다. 확인은 `gh api repos/<owner>/<repo>/rulesets`.
+  강제한다 — main으로의 force-push·삭제는 막힌다(#231 롤백이 `git revert`로만 가능했던 이유). 2026-10-21부터
+  ruleset "Require PR for main"(PR 필수, 승인 0명, 예외 없음)으로 main 직접 push도 거부된다. 확인은 `gh api repos/<owner>/<repo>/rulesets`.
+- **배포 environment는 브랜치로 묶여 있다**(2026-10-21): `production`은 `main`에서만(승인자 2명 유지), `alpha`
+  (`rollback-alpha.yml`이 쓰고 alpha OIDC 역할이 `environment:alpha`를 신뢰)는 `dev`에서만 쓸 수 있다.
+- **`dev`에는 ruleset "Require PR for dev"가 걸려 있다**(PR 필수, 승인 0명, 관리자 포함 예외 없음, 2026-10-21
+  토큰 탈취 대응) — dev로의
+  직접 push는 누구든(워크플로·관리자 포함) 거부된다. 막는 것은 PR 없는 몰래 push뿐이고, 같은 토큰으로 PR을
+  열어 스스로 머지하는 것은 막지 못한다(승인 1명 규칙은 자체 머지 흐름 때문에 채택하지 않음). 버전 커밋과 릴리스 준비(`--prepare-only` 포함)도 PR로
+  전달한다. 확인은 같은 명령(`gh api repos/<owner>/<repo>/rulesets`).
 - **머지·push 전에 항상 `baseRefName`을 확인한다**(2026-08-09 base=main 오머지 사고). 직전에
   `gh pr view <N> --json baseRefName`으로 `dev`임을 확인하고 아니면 `gh pr edit <N> --base dev`로 재타깃한다.
 - **dev push = alpha 자동 실배포** → dev 머지 전 검증(테스트·tsc·lint)을 실배포 게이트로 취급한다.
@@ -432,7 +446,8 @@ Global rules inherited from `~/.codex/AGENTS.md`:
   3. **라이브 경기는 운영 API로 만든다.** alpha엔 `live` 경기가 보통 없다. 순서: start → end-period → start-period
      → end-period → end. 대회·리그 경기 명단은 참가 명단에서 계산된 제출본이라 라인업 단계가 없다(Task 179 — 라인업
      저장·제출 API 는 409 `ROSTER_MANAGED_BY_ADJUSTMENTS`, 빠질 선수는 `/games/:gameId/sides/:sideId/roster-adjustments`).
-     계약 2개: takeover 토큰은 Socket.IO `game.takeover.request` 로만 발급 / `Idempotency-Key` 헤더 = body `clientCommandId`.
+     계약 3개: takeover 토큰은 Socket.IO `game.takeover.request` 로만 발급 / `Idempotency-Key` 헤더 = body `clientCommandId` /
+     다른 계정이 콘솔을 쥐고 있으면 `TAKEOVER_HELD` 로 거절되니 스크립트는 `force: true` 를 싣는다(MD-QA #165).
   4. **판정은 비인증 공개 API**(`GET /tournaments/:id/matches/:fixtureId`)를 ground truth로. 육안 스크린샷 대조로
      "차이 없음"을 결론내지 말고 computed 값을 직접 읽는다.
   5. 라이브 페이지는 10초 폴링이라 Playwright `networkidle`이 끝나지 않는다 → `domcontentloaded` + 명시적 대기.

@@ -714,6 +714,18 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
 
   const { confirm, ConfirmModal: confirmModal } = useConfirm();
 
+  // MD-QA #165: 다른 사람이 운영 중이면 콘솔은 보기 모드로 열린다. 가져오기는 확인을 거친 이 경로뿐이다.
+  const takeoverHandoff = ops.takeover.status === 'denied' && TAKEOVER_HANDOFF_CODES.has(ops.takeover.code) ? ops.takeover : null;
+  const takeOverFromHolder = useCallback(async () => {
+    const holder = takeoverHandoff?.holderName;
+    const ok = await confirm({
+      title: '운영 권한을 가져올까요?',
+      message: `${holder ? `${holder}님의` : '다른'} 화면은 보기 전용으로 바뀌어요. 같은 경기를 두 곳에서 기록하지 않도록 먼저 확인해 주세요.`,
+      confirmLabel: '가져오기',
+    });
+    if (ok) ops.requestTakeover({ force: true });
+  }, [confirm, ops, takeoverHandoff?.holderName]);
+
   // alpha "452′" 사고 대응 — 예전엔 이 계산이 곧장 `confirm()`을 띄우는
   // `confirmIfClockSuspicious`였다(시계가 수상할 때만 확인). 과제 1(사용자
   // 결정: "예외 없이 전부"에 확인 모달)로 이제 모든 커밋이 항상 확인을
@@ -1264,16 +1276,20 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   }
 
   if (fixtureLineup.isError) {
+    // 담당 범위 밖(다른 구장 경기)은 다시 불러와도 같은 답이라 '다시 시도'를 두지 않는다(MD-QA #171).
+    const scopeDenied = extractErrorCode(fixtureLineup.error) === 'STAFF_SCOPE_DENIED';
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center gap-2 px-4 text-center">
         <p className="text-sm font-medium text-[var(--text-body)]">
-          {extractErrorCode(fixtureLineup.error) === 'STAFF_SCOPE_DENIED'
+          {scopeDenied
             ? gameOperationsErrorMessage('STAFF_SCOPE_DENIED')
             : extractErrorMessage(fixtureLineup.error, '경기 정보를 불러오지 못했어요.')}
         </p>
-        <Button size="md" variant="outline" onClick={() => fixtureLineup.refetch()}>
-          다시 시도
-        </Button>
+        {scopeDenied ? null : (
+          <Button size="md" variant="outline" onClick={() => fixtureLineup.refetch()}>
+            다시 시도
+          </Button>
+        )}
       </div>
     );
   }
@@ -1704,14 +1720,22 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         {ops.takeover.status === 'expired' && (
           <Banner tone="warning">운영 권한을 다시 가져오는 중이에요…</Banner>
         )}
-        {ops.takeover.status === 'denied' && (
+        {takeoverHandoff ? (
+          /* 다른 운영자에게 넘어간 건 오류가 아니다 — 코드 없이 누가 쥐고 있는지와 되찾는 방법을 보여 준다(MD-QA #165). */
+          <div role="status" className="flex flex-col items-stretch gap-2 rounded-lg bg-[var(--blue50)] px-3 py-2 text-[length:var(--font-size-body-sm)] font-medium text-[var(--blue700)] sm:flex-row sm:items-center sm:gap-3">
+            <span className="min-w-0 flex-1 break-keep">{takeoverHandoffMessage(takeoverHandoff)}</span>
+            <Button type="button" size="sm" variant="outline" className="min-h-[44px] shrink-0 self-start text-[length:var(--font-size-body-sm)] sm:self-auto" onClick={() => void takeOverFromHolder()}>
+              운영 권한 가져오기
+            </Button>
+          </div>
+        ) : ops.takeover.status === 'denied' ? (
           /* 거부 사유와 무관하게 "권한이 없어요" 로 고정돼 있었다 — 서버가 실제로는
              granted 를 준 경우까지 권한 문제로 보여, 운영자를 엉뚱한 대응으로 보냈다.
              코드별 문구를 쓰고 코드 자체는 운영 문의용으로 괄호에 남긴다. */
           <Banner tone="danger">
             {gameOperationsErrorMessage(ops.takeover.code)} ({ops.takeover.code})
           </Banner>
-        )}
+        ) : null}
         {ops.sync.status === 'gap' && (
           <Banner tone="info">누락된 기록을 다시 불러오는 중이에요…</Banner>
         )}
@@ -1973,6 +1997,16 @@ export function teammatesForSide(
   // 움직인다**는 원래 계약은 그대로다.
   const lineup = latestLineupForDisplay(lineups, sideId);
   return (lineup?.participants ?? []).filter((participant) => participant.id !== excludeParticipantId);
+}
+
+/** 다른 운영자(또는 내 다른 화면)가 쥐고 있어 보기 모드인 거부 코드. 자동 재요청하지 않는다. */
+const TAKEOVER_HANDOFF_CODES: ReadonlySet<string> = new Set(['TAKEOVER_HELD', 'TAKEOVER_SUPERSEDED']);
+
+function takeoverHandoffMessage({ code, holderName }: { code: string; holderName?: string | null }): string {
+  if (!holderName) return gameOperationsErrorMessage(code);
+  return code === 'TAKEOVER_HELD'
+    ? `${holderName}님이 이 경기를 운영하고 있어요. 지금은 보기만 할 수 있어요.`
+    : `${holderName}님이 운영 권한을 가져갔어요. 지금은 보기만 할 수 있어요.`;
 }
 
 function Banner({ tone, children }: { tone: 'info' | 'warning' | 'danger'; children: ReactNode }) {

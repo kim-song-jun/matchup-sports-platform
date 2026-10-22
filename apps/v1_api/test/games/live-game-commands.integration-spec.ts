@@ -63,7 +63,14 @@ async function captureFailure(operation: () => Promise<unknown>): Promise<unknow
 
 async function grantTakeover(gameId: string, userId: string, clientInstanceId = 'task20-client') {
   return (
-    await service.requestTakeover(authUser(userId), gameId, { clientInstanceId, lastSequence: 0 })
+    await service.requestTakeover(authUser(userId), gameId, {
+      clientInstanceId,
+      lastSequence: 0,
+      // These integration scenarios intentionally hand the same game to a
+      // different operator. Mirror the confirmation-backed UI request instead
+      // of relying on the retired silent takeover behavior.
+      force: true,
+    })
   ).takeoverToken;
 }
 
@@ -381,6 +388,7 @@ describe('Task 20 live tournament commands, event validation, atomic result subm
     const grant = await service.requestTakeover(authUser(ids.platformOps), liveGameId, {
       clientInstanceId: 'ops-client',
       lastSequence: 0,
+      force: true,
     });
     const game = await prisma.v1Game.findUniqueOrThrow({ where: { id: liveGameId } });
     const appended = await service.appendEvent(authUser(ids.platformOps), liveGameId, 'task20-ops-token', {

@@ -63,6 +63,9 @@ async function grantTournamentTakeover(gameId: string, userId: string): Promise<
   const grant = await service.requestTakeover(authUser(userId), gameId, {
     clientInstanceId: `task7-${userId}-client`,
     lastSequence: 0,
+    // The matrix deliberately rotates multiple authorized personas through one
+    // game. Each rotation represents an explicit, confirmed takeover.
+    force: true,
   });
   return grant.takeoverToken;
 }

@@ -38,7 +38,7 @@
 | `levelCodes` | comma string | No | `beginner,novice,intermediate,advanced` 중 다중 선택 |
 | `genderRule` | string | No | `성별 무관`, `남`, `여` |
 | `status` | recruiting/closed/completed/cancelled/expired | No | 기본 recruiting |
-| `sort` | recommended/latest/starts_at/deadline | No | 생략 시 경기일 순 |
+| `sort` | recommended/latest/starts_at/deadline | No | 신청 가능 묶음 안의 순서(아래). 생략 시 경기 가까운 순 |
 | `cursor` | string | No | cursor pagination |
 | `limit` | 1~50 | No | 기본 20 |
 | `today` | boolean(`true`/`false`) | No | `true` 이면 오늘(KST) 시작하는 경기만 |
@@ -54,8 +54,9 @@
 - `facets.today` / `facets.recruiting`: 나머지 필터는 그대로 두고 해당 토글을 켠 건수. 토글이 꺼져 있어도 "켜면 몇 건"을 알려 준다.
 - 쿼리는 요청한 첫 페이지에 `groupBy` 1회와 `count` 2회에, 정원 찬 글 id 를 구하는 raw SQL 1회(총 4회)를 더한다. `recruitingOnly` 요청은 목록 조회가 이미 그 id 를 구했으므로 raw SQL 이 없어 3회다. `status`·`startAt`·`sportId` 인덱스를 탄다.
 
-- 기본 목록(그리고 `recommended`/`deadline`/`starts_at`)은 경기일 순이다: 시작 전 경기(`startAt >= now`)를 `startAt ASC` 로 먼저, 이미 시작한 경기를 `startAt DESC` 로 그 뒤에 잇는다(동률은 `createdAt DESC, id DESC`). `latest` 만 `createdAt DESC, id DESC` 등록 최신순이다.
-- 경기일 순은 구간별로 따로 읽어 잇기 때문에 `pageInfo.nextCursor` 가 `"<구간>:<id>@<기준 시각 epoch ms>"`(`upcoming:`/`past:`) 형태다. 기준 시각은 첫 페이지를 읽은 시각이며, 이후 페이지는 요청 시각이 아니라 이 값으로 시작 전/후 구간을 가른다 — 넘기는 도중 1페이지 마지막 경기가 시작해도 다음 경기가 건너뛰어지지 않는다. 기준 시각은 구간 분할에만 쓰고 공개 범위(모집 중 여부·최근 7일 등)는 항상 요청 시각으로 판정한다. 요청 시각보다 미래인 기준 시각은 요청 시각으로 내려 읽고, 시각이 깨진 커서는 첫 페이지부터 다시 읽는다. 최신순(`latest:<id>`)은 구간이 없어 시각을 싣지 않는다. 커서 행이 그사이 목록 조건(모집 중 여부 등)을 벗어나도 다음 경기는 건너뛰지 않고 이어서 돌려준다. 클라이언트는 받은 값을 그대로 돌려주면 된다 — 시각 없는 `"<구간>:<id>"` 커서는 요청 시각을 기준으로 이어 읽고, 접두사 없는 예전 커서는 첫 페이지부터 다시 읽는다.
+- 목록은 **상태 묶음 순서**로 채운다(2026-10-21, `common/pagination/list-status-groups.ts`): 진행 중(`in_progress`) → 신청 가능(모집 중·정원 남음·신청 마감 전) → 경기 예정(진행 확정 `scheduled`·정원 마감 `full`) → 신청 마감(인원 부족 보류 `on_hold`·직접 마감, 시작 전) → 끝난 경기(`completion_pending`·`completed`·시작이 지나도록 열리지 못한 매치). 한 묶음을 끝까지 보낸 뒤 다음 묶음으로 넘어가며, 묶음은 행마다 카드와 같은 상태 규칙(`match-list-group.ts`)으로 정한다.
+- 묶음 안 순서: 신청 가능은 `sort` 를 따른다 — 생략·`recommended`·`starts_at` 은 `startAt ASC`, `deadline` 은 `deadlineAt ASC NULLS LAST, startAt ASC`, `latest` 는 등록 최신순. 진행 중·경기 예정·신청 마감은 `startAt ASC`, 끝난 경기는 `startAt DESC`. 모두 `createdAt DESC, id DESC` 로 끝난다. `sort` 는 공개 범위를 바꾸지 않는다(`recommended` 의 기존 범위 제한은 그대로).
+- `pageInfo.nextCursor` 는 `"<묶음>:<id>@<기준 시각 epoch ms>"`(`live:`/`open:`/`scheduled:`/`closed:`/`ended:`) 형태다. 기준 시각은 첫 페이지를 읽은 시각이며, 이후 페이지도 이 시각으로 묶음을 정한다 — 넘기는 도중 1페이지 마지막 매치가 시작하거나 마감돼도 카드가 묶음 사이를 옮기거나 건너뛰지 않는다. 기준 시각은 묶음 판정에만 쓰고 공개 범위(모집 중 여부·최근 7일 등)는 항상 요청 시각으로 판정한다. 요청 시각보다 미래인 기준 시각은 요청 시각으로 내려 읽고, 시각이 깨진 커서와 예전 형식 커서(`upcoming:`/`past:`/`latest:`)는 첫 페이지부터 다시 읽는다. 커서 행이 그사이 목록 조건을 벗어나도 다음 매치는 건너뛰지 않고 이어서 돌려준다. 클라이언트는 받은 순서를 다시 정렬하지 않는다.
 - `status`를 생략한 일반 목록은 시작 전 raw `recruiting`/`closed`와 최근 7일 안에 시작·완료된 매치를 포함한다. raw 상태는 mutation guard를 위해 그대로 두고, 화면 상태는 `displayState`로 구분한다: 시작 전 `recruiting|closed|full`, 진행 조건 충족 시 `startAt <= now < endAt`은 `in_progress`, `endAt <= now`(종료 시각이 없으면 시작 시각부터)는 `completion_pending`, 완료 확정 뒤에는 `completed`다.
 - `completion_pending` 매치는 호스트가 확정 명단에서 참가자별 `completed|no_show`를 지정하고 완료할 수 있다. 완료·미완료 모두 공개 목록에는 최대 7일만 유지되며, `/me/matches` 이력은 이 공개 보존 기간의 영향을 받지 않는다.
 - `sort=recommended` 목록과 `GET /home/recommendations`는 경기 시작 전인 raw `recruiting` 중 신청 마감이 없거나 아직 지나지 않은 항목만 포함한다.

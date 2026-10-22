@@ -84,7 +84,7 @@ requirePatterns(workflowPath, [
   [/SECRET_KAKAO_CLIENT_SECRET: \$\{\{ secrets\.ALPHA_KAKAO_CLIENT_SECRET \}\}/, 'API secret must be isolated from production'],
   [/SECRET_KAKAO_APP_ID: \$\{\{ secrets\.ALPHA_KAKAO_APP_ID \}\}/, 'native token audience must use the alpha app ID'],
   [/runs\?branch=dev&head_sha=\$\{RELEASE_SHA\}/, 'must query CI runs for the exact release SHA'],
-  [/select-matching-ci-run\.sh "\$\{RELEASE_SHA\}"/, 'must judge CI via select-matching-ci-run.sh (accepts the Promote bot dispatch of version commits)'],
+  [/select-matching-ci-run\.sh "\$\{RELEASE_SHA\}"/, 'must judge CI via select-matching-ci-run.sh (push runs of the exact release SHA only)'],
 ]);
 
 requirePatterns(firebaseRuntimeSyncPath, [

@@ -25,6 +25,8 @@ export interface GameTakeoverGrant {
   readonly clientInstanceId: string;
   readonly lastSequence: number;
   readonly expiresAt: number;
+  /** 보유자 이름을 보여 주는 데만 쓴다(MD-QA #165). 같은 사람인지는 `authorizationSubject` 로 가른다. */
+  readonly userId?: string;
 }
 
 const REQUEST_ORDINAL = Symbol('game-takeover-request-ordinal');
@@ -40,6 +42,7 @@ type GrantInput = {
   authorizationSubject: string;
   clientInstanceId: string;
   lastSequence: number;
+  userId?: string;
 };
 
 type PendingRequestOrder = {
@@ -90,6 +93,7 @@ export class GameTakeoverService {
         clientInstanceId: input.clientInstanceId,
         lastSequence: input.lastSequence,
         expiresAt: Date.now() + GAME_TAKEOVER_TOKEN_TTL_MS,
+        ...(input.userId === undefined ? {} : { userId: input.userId }),
       };
       // Check, grant and successful watermark advance are one synchronous operation.
       this.grants.set(input.gameId, record);
@@ -139,6 +143,12 @@ export class GameTakeoverService {
       current.authorizationSubject === input.authorizationSubject &&
       current.expiresAt > Date.now()
     );
+  }
+
+  /** 지금 살아 있는 보유 기록. 만료됐거나 아무도 없으면 `null`. */
+  activeGrant(gameId: string): GameTakeoverGrant | null {
+    const current = this.grants.get(gameId);
+    return current !== undefined && current.expiresAt > Date.now() ? current : null;
   }
 
   /** Evicts any active grant for a game -- used when a holder's permission is revoked. */

@@ -53,21 +53,22 @@ expect_empty 'no runs' wait
 expect 'push run success' pass \
   "$(run_json 1 push completed success "${SHA}" human "${T1}")"
 
-# 회귀 대상: 버전 커밋은 push run 이 없고 Promote 의 dispatch run 만 있다.
-expect 'bot workflow_dispatch success' pass \
+# workflow_dispatch run 은 HEAD^ 기준 게이트라 push 범위보다 좁게 검사할 수 있다 — 누가 걸었든(bot·사람),
+# 다시 실행했든 성공·실패 어느 쪽이든 판정에 쓰지 않는다(push run 이 없으면 계속 기다린다).
+expect 'bot workflow_dispatch success is not accepted' wait \
   "$(run_json 2 workflow_dispatch completed success "${SHA}" "${BOT}" "${T1}")"
-
+expect 'bot workflow_dispatch failure is not accepted' wait \
+  "$(run_json 19 workflow_dispatch completed failure "${SHA}" "${BOT}" "${T1}")"
 expect 'human workflow_dispatch is not accepted' wait \
   "$(run_json 3 workflow_dispatch completed success "${SHA}" kim-song-jun "${T1}")"
-
-# 회귀 대상: bot 이 건 dispatch run 을 사람이 `gh run rerun` 하면 actor 는 bot 그대로,
-# triggering_actor 만 사람이다(실측: deploy.yml run 37114520414). 재실행도 인정해야 한다.
-rerun_run="$(run_json 4 workflow_dispatch completed success "${SHA}" "${BOT}" "${T1}" dev kim-song-jun)"
-expect 'human re-run of bot dispatch is accepted' pass "${rerun_run}"
+expect 'human re-run of bot dispatch is not accepted' wait \
+  "$(run_json 20 workflow_dispatch completed success "${SHA}" "${BOT}" "${T1}" dev kim-song-jun)"
 expect 'human dispatch re-run by human is not accepted' wait \
   "$(run_json 5 workflow_dispatch completed success "${SHA}" kim-song-jun "${T1}" dev kim-song-jun)"
-expect 'failed human re-run of bot dispatch fails' 'fail failure' \
-  "$(run_json 19 workflow_dispatch completed failure "${SHA}" "${BOT}" "${T1}" dev kim-song-jun)"
+
+# `gh run rerun` 은 event 를 push 로 둔 채 triggering_actor 만 사람으로 바꾼다 — 재실행 push run 은 인정한다.
+expect 'human re-run of a push run is accepted' pass \
+  "$(run_json 4 push completed success "${SHA}" human "${T1}" dev kim-song-jun)"
 
 expect 'other SHA is ignored' wait \
   "$(run_json 6 push completed success "${OTHER_SHA}" human "${T1}")"
@@ -81,30 +82,29 @@ expect 'other branch is ignored' wait \
 
 expect 'pending push run' wait \
   "$(run_json 9 push in_progress null "${SHA}" human "${T1}")"
-expect 'queued bot dispatch run' wait \
-  "$(run_json 10 workflow_dispatch queued null "${SHA}" "${BOT}" "${T1}")"
 
 expect 'completed failure fails' 'fail failure' \
   "$(run_json 11 push completed failure "${SHA}" human "${T1}")"
 expect 'completed cancelled fails' 'fail cancelled' \
-  "$(run_json 12 workflow_dispatch completed cancelled "${SHA}" "${BOT}" "${T1}")"
+  "$(run_json 12 push completed cancelled "${SHA}" human "${T1}")"
 
-# push run 이 있으면 push 가 판정한다 — 더 최근의 bot dispatch(좁은 HEAD^ 범위)가 덮지 못한다.
+# 인정되지 않는 dispatch run 은 더 최근이어도 push run 의 판정을 덮지 못한다.
 expect 'push decides over newer bot dispatch (dispatch pending)' pass \
   "$(run_json 13 workflow_dispatch in_progress null "${SHA}" "${BOT}" "${T2}")" \
   "$(run_json 14 push completed success "${SHA}" human "${T1}")"
 expect 'push failure is not hidden by newer bot dispatch success' 'fail failure' \
   "$(run_json 15 push completed failure "${SHA}" human "${T1}")" \
   "$(run_json 16 workflow_dispatch completed success "${SHA}" "${BOT}" "${T2}")"
-
-# 같은 종류끼리는 가장 최근 run 이 판정한다(입력 순서는 상관없다).
-expect 'newest bot dispatch wins over older failed one' pass \
-  "$(run_json 21 workflow_dispatch completed success "${SHA}" "${BOT}" "${T2}")" \
-  "$(run_json 22 workflow_dispatch completed failure "${SHA}" "${BOT}" "${T1}")"
-
-# 인정되지 않는 run 은 더 최근이어도 판정에 끼어들지 못한다.
 expect 'newer human dispatch does not override push success' pass \
   "$(run_json 17 push completed success "${SHA}" human "${T1}")" \
   "$(run_json 18 workflow_dispatch completed failure "${SHA}" kim-song-jun "${T2}")"
+
+# push run 끼리는 가장 최근 run 이 판정한다(입력 순서는 상관없다).
+expect 'newest push run wins over older failed one' pass \
+  "$(run_json 21 push completed success "${SHA}" human "${T2}")" \
+  "$(run_json 22 push completed failure "${SHA}" human "${T1}")"
+expect 'newest push run failure wins over older success' 'fail failure' \
+  "$(run_json 23 push completed failure "${SHA}" human "${T2}")" \
+  "$(run_json 24 push completed success "${SHA}" human "${T1}")"
 
 echo "[test-select-matching-ci-run] all scenarios passed"

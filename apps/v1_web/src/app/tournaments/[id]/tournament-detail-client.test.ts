@@ -864,7 +864,8 @@ describe('TournamentDetailView — completed vs non-completed section rendering'
     render(createElement(TournamentDetailView, { tournament, myRegistration: null }));
 
     expect(screen.getByText('입금 절차는 없어요.', { exact: false })).toBeInTheDocument();
-    expect(screen.getByText('운영진 확인 후 참가가 확정돼요.', { exact: false })).toBeInTheDocument();
+    // 신청 안내와 참가 전 확인 목록(MD-QA #170) 양쪽에 같은 말이 나온다.
+    expect(screen.getAllByText('운영진 확인 후 참가가 확정돼요.', { exact: false }).length).toBeGreaterThan(0);
     expect(screen.queryByText('입금 확인 후 대회 참가가 확정돼요.', { exact: false })).not.toBeInTheDocument();
     expect(screen.queryByText('2시간 내 입금 확인')).not.toBeInTheDocument();
   });

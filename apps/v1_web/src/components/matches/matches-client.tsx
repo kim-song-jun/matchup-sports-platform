@@ -39,7 +39,6 @@ import {
   getStatus,
   getViewerState,
   statusToCardStatus,
-  sortMatchesByAvailability,
   toMatchCard,
 } from './matches.card-model';
 import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
@@ -62,6 +61,8 @@ export function MatchListPageClient({ seed }: { readonly seed?: CursorListSeed<V
   const selectedGenderRule = toGenderRuleFilter(searchParams.get('genderRule'));
   const selectedLevels = toLevelCodes(searchParams.get('levelCodes') ?? searchParams.get('levels'));
   const selectedRegionId = searchParams.get('regionId') ?? undefined;
+  // 요약 줄의 '모집 중 N'을 누르면 지금 신청할 수 있는 매치만 본다(서버 recruitingOnly).
+  const recruitingOnly = searchParams.get('recruitingOnly') === '1';
   const filterOpen = searchParams.get('filter') === '1';
   const initialQuery = searchParams.get('q') ?? '';
   const [searchValue, setSearchValue] = useState(initialQuery);
@@ -73,8 +74,9 @@ export function MatchListPageClient({ seed }: { readonly seed?: CursorListSeed<V
   }, [initialQuery]);
   const activeFilterCount = countMatchFilters(selectedSort, selectedGenderRule, selectedLevels, selectedRegionId);
   const matchFilters = useMemo(() => {
-    const filters: { sportId?: string; query?: string; sort?: 'recommended' | 'latest' | 'deadline'; view?: 'card' | 'compact'; genderRule?: string; levelCodes?: string; regionId?: string } = {};
+    const filters: { sportId?: string; query?: string; sort?: 'recommended' | 'latest' | 'deadline'; view?: 'card' | 'compact'; genderRule?: string; levelCodes?: string; regionId?: string; recruitingOnly?: boolean } = {};
     if (selectedSportId) filters.sportId = selectedSportId;
+    if (recruitingOnly) filters.recruitingOnly = true;
     if (selectedGenderRule) filters.genderRule = selectedGenderRule;
     if (selectedLevels.length) filters.levelCodes = selectedLevels.join(',');
     if (selectedRegionId) filters.regionId = selectedRegionId;
@@ -82,7 +84,7 @@ export function MatchListPageClient({ seed }: { readonly seed?: CursorListSeed<V
     if (selectedSort) filters.sort = selectedSort;
     if (selectedView !== 'card') filters.view = selectedView;
     return Object.keys(filters).length ? filters : undefined;
-  }, [selectedGenderRule, selectedLevels, selectedRegionId, selectedSportId, selectedSort, selectedView, submittedQuery]);
+  }, [recruitingOnly, selectedGenderRule, selectedLevels, selectedRegionId, selectedSportId, selectedSort, selectedView, submittedQuery]);
   // 서버는 20건씩 커서 페이지네이션으로 자르는데(matches.service.ts list()) 예전엔 이 화면이
   // 단발 useQuery로 첫 페이지만 받아 21번째 매치부터는 볼 방법이 아예 없었다(감사 결함).
   // 대회 목록(tournaments/tournaments-list-client.tsx)과 같은 "더 보기" 누적 방식 — 다만 그 화면 수준의
@@ -102,16 +104,19 @@ export function MatchListPageClient({ seed }: { readonly seed?: CursorListSeed<V
   );
   // seed 는 무필터 첫 페이지라 allMatches 의 cursor 없는 키에만 맞는다(필터가 걸려도 이 키는 무필터다).
   const allMatches = useV1Matches(allMatchesFilters, { seed: allMatchesFilters ? undefined : seed?.page });
-  const countFilters = useMemo(() => {
-    const filters: { query?: string; genderRule?: string; levelCodes?: string; regionId?: string } = {};
-    if (selectedGenderRule) filters.genderRule = selectedGenderRule;
-    if (selectedLevels.length) filters.levelCodes = selectedLevels.join(',');
-    if (selectedRegionId) filters.regionId = selectedRegionId;
-    if (submittedQuery.trim()) filters.query = submittedQuery.trim();
-    return Object.keys(filters).length ? filters : undefined;
-  }, [selectedGenderRule, selectedLevels, selectedRegionId, submittedQuery]);
+  // 상단 숫자(전체·오늘·모집 중)와 종목 칩은 서버가 센 전체 건수다 — 불러온 20개만 세면 "전체 20"처럼 작게 보였다.
+  // 정렬·보기 방식은 건수와 무관해 빼고, 한 건만 받는다(목록은 위 조회가 맡는다).
+  const facetFilters = useMemo(() => {
+    const countable = { ...matchFilters };
+    delete countable.sort;
+    delete countable.view;
+    return { ...countable, includeFacets: true, limit: 1 };
+  }, [matchFilters]);
   const filteredMatches = useV1Matches(filteredMatchesFilters, { enabled: Boolean(matchFilters) });
-  const countMatches = useV1Matches(countFilters, { enabled: Boolean(countFilters) });
+  // 무필터 첫 화면은 서버 seed(includeFacets)가 같은 숫자를 이미 갖고 있다.
+  const facetPage = useV1Matches(facetFilters, { seed: matchFilters ? undefined : seed?.page }).data;
+  const facets = facetPage?.facets;
+  const totalCount = facetPage?.pageInfo?.totalCount;
   const recentSearches = useV1RecentSearches();
   const recordSearch = useV1RecordSearch();
   const sports = useV1MasterSports({ seed: seed?.sports });
@@ -131,33 +136,29 @@ export function MatchListPageClient({ seed }: { readonly seed?: CursorListSeed<V
   // 누적: cursor가 있으면(2페이지 이상) 직전까지 쌓아둔 목록 뒤에 새 페이지를 이어 붙인다 —
   // id 기준 중복 제거는 in-flight 재요청(포커스 재검증 등)이 겹쳐 와도 카드가 두 번 그려지지
   // 않게 하기 위함.
-  // 가용성 정렬은 페이지 안에서만 한다 — 누적 전체를 다시 정렬하면 새 페이지의 신청 가능 카드가
-  // 앞 페이지 마감 카드 위로 끼어들어 보던 카드가 밀린다.
+  // 순서는 서버가 정한다 — 진행 중 → 신청 가능 → 경기 예정 → 신청 마감 → 끝난 경기 묶음을 페이지에 걸쳐 이어 준다
+  // (matches.service.ts list). 예전처럼 페이지 안에서 다시 정렬하면 다음 페이지의 신청 가능 카드가 앞 페이지 마감 카드
+  // 뒤에 나온다.
   const items: V1Match[] | undefined = cursorPageUnavailable
     ? [...accumulated]
     : pageItems === undefined
       ? undefined
       : cursor
-        ? [...accumulated, ...sortMatchesByAvailability(pageItems.filter((item) => !accumulated.some((prev) => (prev.matchId ?? prev.id) === (item.matchId ?? item.id))))]
-        : sortMatchesByAvailability(pageItems);
+        ? [...accumulated, ...pageItems.filter((item) => !accumulated.some((prev) => (prev.matchId ?? prev.id) === (item.matchId ?? item.id)))]
+        : pageItems;
   const visibleItems = filterMatchesByLevels(items, selectedLevels);
-  const countItems = filterMatchesByLevels((countFilters ? countMatches.data?.items ?? allMatches.data?.items : allMatches.data?.items) ?? items, selectedLevels);
   const hasNext = cursorPageUnavailable || (query.data?.pageInfo?.hasNext ?? false);
   // 희소 결과(1~2건) 아래를 채우는 인접 매치 — 디자인 검수 W-3, B안.
   // 새 요청을 만들지 않는다: allMatches 는 필터가 걸려 있든 아니든 이미 돌고 있고
-  // (countItems 가 같은 데이터를 쓴다) 그 무필터 목록에서 지금 보여준 것만 빼면 된다.
+  // 그 무필터 목록에서 지금 보여준 것만 빼면 된다.
   // 필터가 없을 때는 allMatches 가 곧 결과라 차집합이 비고, 레일은 그리지 않는다 —
   // "다른 매치가 정말 없다" 는 뜻이므로 그게 맞는 동작이다.
   const shownIds = new Set((visibleItems ?? []).map((item) => item.matchId ?? item.id));
   const nearbyItems =
     visibleItems && visibleItems.length > 0 && visibleItems.length <= SPARSE_RESULT_MAX
-      ? sortMatchesByAvailability(
-          (allMatches.data?.items ?? []).filter(
-            (item) =>
-              !shownIds.has(item.matchId ?? item.id) &&
-              statusToCardStatus(getStatus(item)) === 'open',
-          ),
-        ).slice(0, NEARBY_RAIL_MAX)
+      ? (allMatches.data?.items ?? [])
+          .filter((item) => !shownIds.has(item.matchId ?? item.id) && statusToCardStatus(getStatus(item)) === 'open')
+          .slice(0, NEARBY_RAIL_MAX)
       : [];
   // 다음 페이지 요청만 "불러오는 중"이다 — 배경 재검증(isFetching)은 버튼과 무관하다.
   const loadMorePending = Boolean(cursor) && (query.isPlaceholderData || (cursorPageUnavailable && query.isFetching));
@@ -198,12 +199,13 @@ export function MatchListPageClient({ seed }: { readonly seed?: CursorListSeed<V
         filterSheet: buildMatchFilterSheet(searchParams, selectedSort, selectedView, selectedGenderRule, selectedLevels, selectedRegionId, regions.data ?? [], filterOpen),
         matches: visibleItems.map((item, index) => toMatchCard(item, base.matches[index] ?? base.matches[0])),
         nearbyMatches: nearbyItems.map((item, index) => toMatchCard(item, base.matches[index] ?? base.matches[0])),
-        sports: buildSportSummary(searchParams, countItems, base, selectedSportId, sports.data),
+        sports: buildSportSummary(searchParams, visibleItems, base, selectedSportId, sports.data, facets),
         summary: {
           ...base.summary,
-          count: visibleItems.length,
-          today: countToday(visibleItems),
-          urgent: visibleItems.filter((item) => statusToCardStatus(getStatus(item)) === 'open').length,
+          count: totalCount ?? visibleItems.length,
+          today: facets?.today ?? countToday(visibleItems),
+          urgent: facets?.recruiting ?? visibleItems.filter((item) => statusToCardStatus(getStatus(item)) === 'open').length,
+          recruitingFilter: { active: recruitingOnly, href: buildMatchHref(searchParams, { recruitingOnly: recruitingOnly ? null : '1', filter: null }) },
         },
         hasNext,
         onLoadMore: handleLoadMore,
@@ -219,12 +221,13 @@ export function MatchListPageClient({ seed }: { readonly seed?: CursorListSeed<V
         filterHref: buildMatchHref(searchParams, { filter: '1' }),
         filterSheet: buildMatchFilterSheet(searchParams, selectedSort, selectedView, selectedGenderRule, selectedLevels, selectedRegionId, regions.data ?? [], filterOpen),
         matches: [],
-        sports: buildSportSummary(searchParams, countItems, base, selectedSportId, sports.data),
+        sports: buildSportSummary(searchParams, [], base, selectedSportId, sports.data, facets),
         summary: {
           ...base.summary,
-          count: 0,
-          today: 0,
-          urgent: 0,
+          count: totalCount ?? 0,
+          today: facets?.today ?? 0,
+          urgent: facets?.recruiting ?? 0,
+          recruitingFilter: { active: recruitingOnly, href: buildMatchHref(searchParams, { recruitingOnly: recruitingOnly ? null : '1', filter: null }) },
         },
         // team-matches-client.tsx #5와 동일 — 로딩 중임을 명시해 EmptyState 대신 스켈레톤을
         // 그리게 한다(로딩 중을 "조건에 맞는 매치 0개"로 오인시키지 않는다). isLoading 이 아니라 isPending —

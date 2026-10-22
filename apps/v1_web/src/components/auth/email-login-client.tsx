@@ -12,24 +12,42 @@ import { EyeIcon, EyeOffIcon } from '@/components/v1-ui/icons';
 import { useV1EmailLogin } from '@/hooks/use-v1-api';
 import { V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
+import { isLoginStepUpResponse, LOGIN_STEP_UP_VERIFY_PATH, saveLoginStepUp } from '@/lib/login-step-up';
 import { isNativeAppleSignInAvailable } from '@/lib/native-apple';
-import { clearV1IdentityCache } from '@/lib/query-keys';
-import { resolveAuthContinuationPath, sanitizeRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
+import { sanitizeRedirectPath } from '@/lib/session-storage';
 import { AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
 import { getEmailLoginViewModel } from './auth.view-model';
+import { completeEmailLogin } from './email-login-completion';
+import {
+  STEP_UP_SEND_LIMIT,
+  STEP_UP_SEND_LIMIT_MESSAGE,
+  STEP_UP_UNAVAILABLE,
+  STEP_UP_UNAVAILABLE_MESSAGE,
+} from './login-step-up-errors';
+import { PasswordResetLink } from './password-reset-link';
 
-function mapEmailLoginError(err: unknown): string {
+const RATE_LIMITED_MESSAGE = '로그인 시도가 많아요. 잠시 후 다시 시도해 주세요.';
+const STEP_UP_STORAGE_FAILED_MESSAGE = '본인 확인 화면으로 이동하지 못했어요. 브라우저의 저장 공간 설정을 확인한 뒤 다시 시도해 주세요.';
+
+type LoginError = { message: string; recovery?: boolean };
+
+function mapEmailLoginError(err: unknown): LoginError {
   if (err instanceof V1ApiError) {
     // 계정 존재·가입 경로를 드러내지 않도록 항상 같은 안내를 쓴다. Apple 버튼은 iOS 앱에만 있다.
     if (err.code === 'UNAUTHENTICATED') {
       const withApple = isNativeAppleSignInAvailable();
       const signupMethods = withApple ? '카카오나 Apple' : '카카오';
       const buttons = withApple ? "'카카오' 또는 'Apple로 계속하기'" : "'카카오'";
-      return `이메일 또는 비밀번호가 맞지 않아요. ${signupMethods}로 가입하셨다면 로그인 첫 화면의 ${buttons} 버튼으로 로그인해 주세요.`;
+      return { message: `이메일 또는 비밀번호가 맞지 않아요. ${signupMethods}로 가입하셨다면 로그인 첫 화면의 ${buttons} 버튼으로 로그인해 주세요.` };
     }
-    if (err.code === 'PERMISSION_DENIED') return '로그인이 제한된 계정이에요. 고객센터에서 상태를 확인해 주세요.';
+    if (err.code === 'PERMISSION_DENIED') return { message: '로그인이 제한된 계정이에요. 고객센터에서 상태를 확인해 주세요.' };
+    // 인증번호 발송 상한 — 기다려서 풀리는 게 아니라 비밀번호 재설정이 출구다.
+    if (err.code === STEP_UP_SEND_LIMIT) return { message: STEP_UP_SEND_LIMIT_MESSAGE, recovery: true };
+    if (err.code === STEP_UP_UNAVAILABLE) return { message: STEP_UP_UNAVAILABLE_MESSAGE };
+    // IP 레이트리밋. 서버 장애 문구와 섞이면 "잠시 후" 재시도가 왜 필요한지 알 수 없다.
+    if (err.statusCode === 429) return { message: RATE_LIMITED_MESSAGE };
   }
-  return '지금은 로그인할 수 없어요. 잠시 후 다시 시도해 주세요.';
+  return { message: '지금은 로그인할 수 없어요. 잠시 후 다시 시도해 주세요.' };
 }
 
 export function EmailLoginClient({ redirectPath }: { redirectPath?: string | null }) {
@@ -42,7 +60,7 @@ export function EmailLoginClient({ redirectPath }: { redirectPath?: string | nul
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<LoginError | null>(null);
   // isPending 은 리렌더 이후에나 반영되므로, 같은 이벤트 루프 틱에서 두 번 눌리는
   // 극단적인 케이스(연타/마우스 더블클릭 버그 등)까지 막으려면 ref 기반 동기 락이 필요하다.
   const submitBusyRef = useRef(false);
@@ -57,12 +75,18 @@ export function EmailLoginClient({ redirectPath }: { redirectPath?: string | nul
       { email, password },
       {
         onSuccess: (result) => {
-          saveStoredV1Session(result.session);
-          clearV1IdentityCache(queryClient);
-          trackEvent('login', { method: 'email' });
-          router.replace(resolveAuthContinuationPath(
-            result.next?.route, new URLSearchParams(window.location.search).get('redirect'),
-          ));
+          const requestedRedirect = new URLSearchParams(window.location.search).get('redirect');
+          if (isLoginStepUpResponse(result)) {
+            // 비밀번호가 맞았는지는 이 응답으로 알 수 없다. 어느 쪽이든 같은 본인 확인 화면으로 보낸다.
+            if (!saveLoginStepUp(result.stepUp, requestedRedirect)) {
+              setError({ message: STEP_UP_STORAGE_FAILED_MESSAGE });
+              return;
+            }
+            trackEvent('login_step_up_required', { method: 'email' });
+            router.push(LOGIN_STEP_UP_VERIFY_PATH);
+            return;
+          }
+          completeEmailLogin({ result, queryClient, replace: (path) => router.replace(path), requestedRedirect });
         },
         onError: (nextError) => {
           trackEvent('login_failed', { method: 'email', reason: nextError instanceof V1ApiError ? nextError.code : 'unknown' });
@@ -125,9 +149,10 @@ export function EmailLoginClient({ redirectPath }: { redirectPath?: string | nul
           {error ? (
             <div className="tm-auth-inline-error" id="email-login-error" role="alert">
               <AlertCircle aria-hidden="true" size={17} strokeWidth={2.2} />
-              <span className="tm-text-caption">{error}</span>
+              <span className="tm-text-caption">{error.message}</span>
             </div>
           ) : null}
+          {error?.recovery ? <PasswordResetLink redirect={recoveryRedirect} /> : null}
         </div>
         <Button className="tm-auth-email-submit" block loading={login.isPending} size="lg" type="submit" variant="primary">
           {model.primary.label}

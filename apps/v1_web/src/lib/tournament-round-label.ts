@@ -22,6 +22,8 @@ export function isKnockoutPhase(phase: string): boolean {
 }
 
 const LEAGUE_ROUND = /^league_r(\d+)$/;
+/** 리그 방식 대회 템플릿이 만드는 하나뿐인 조 이름(bracket-template-plan.ts). */
+const LEAGUE_FORMAT_GROUP = '리그';
 
 export function tournamentRoundLabel(round: string): string {
   const trimmed = round.trim();
@@ -52,6 +54,9 @@ export function competitionMatchLabel({ groupName, round, legNumber, withinGroup
   const leg = legNumber != null && legNumber > 1 && !LEAGUE_ROUND.test(round.trim()) ? ` ${legNumber}차` : '';
   const roundPart = `${tournamentRoundLabel(round)}${leg}`;
   const group = groupName?.trim() ?? '';
+  // 리그 방식 대회는 조가 하나('리그')라 조별리그가 아니다 — "리그 · 조별리그 1라운드" 대신 "리그 1라운드"(MD-QA #171).
+  const leagueRound = LEAGUE_ROUND.exec(round.trim());
+  if (leagueRound !== null && group === LEAGUE_FORMAT_GROUP) return withinGroup ? `${Number(leagueRound[1])}라운드` : `리그 ${Number(leagueRound[1])}라운드`;
   if (withinGroup || group === '' || isKnockoutRound(round) || group === tournamentRoundLabel(round)) return roundPart;
   return `${group} · ${roundPart}`;
 }

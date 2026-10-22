@@ -1,9 +1,10 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { V1AuthProvider } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailVerificationService } from '../verification/email-verification.service';
 import { verifyEmailProofToken } from '../verification/email-proof-token';
 import { verifyPhoneProofToken } from '../verification/phone-proof-token';
+import { LoginSecurityService } from './login-security/login-security.service';
 import { normalizeEmail } from './normalize-email';
 import { hashPassword } from './password-hash';
 import {
@@ -35,9 +36,12 @@ export interface FoundAccount {
 
 @Injectable()
 export class AccountRecoveryService {
+  private readonly logger = new Logger(AccountRecoveryService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly emailVerification: EmailVerificationService,
+    private readonly loginSecurity: LoginSecurityService,
   ) {}
 
   async findAccountByPhone(dto: FindAccountDto): Promise<FoundAccount> {
@@ -110,7 +114,7 @@ export class AccountRecoveryService {
       });
     }
 
-    return this.applyNewPassword(user, dto.newPassword);
+    return this.applyNewPassword(user, email, dto.newPassword);
   }
 
   /**
@@ -119,6 +123,7 @@ export class AccountRecoveryService {
    */
   private async applyNewPassword(
     user: { authIdentities: { id: string; provider: string }[] },
+    email: string,
     newPassword: string,
   ): Promise<{ ok: true }> {
     const emailIdentity = user.authIdentities.find(
@@ -137,8 +142,23 @@ export class AccountRecoveryService {
       where: { id: emailIdentity.id },
       data: { passwordHash: await hashPassword(newPassword) },
     });
+    await this.releaseLoginRestrictions(email);
 
     return { ok: true };
+  }
+
+  /**
+   * 사서함 주인이 새 비밀번호를 정했으니 이 이메일의 로그인 제한(실패 기록·추가 인증 발송 횟수·열린 챌린지)을 푼다.
+   * 이미 바뀐 비밀번호를 되돌릴 수는 없으므로 정리가 실패해도 재설정은 성공으로 두고 로그만 남긴다.
+   */
+  private async releaseLoginRestrictions(email: string): Promise<void> {
+    try {
+      await this.loginSecurity.forgetEmail(email);
+    } catch (error) {
+      this.logger.error(
+        `login restrictions were not cleared after a password reset: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   /**

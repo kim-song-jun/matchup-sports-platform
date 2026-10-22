@@ -27,6 +27,15 @@ describe('LeagueStandingsTable', () => {
       expect(image?.closest('td')).toHaveTextContent(path.includes('tournament') ? '성수 블루웨이브' : '강남 FC');
     }
   });
+  // MD-QA #171: "FP 10" 약어만 보여 무슨 숫자인지, 왜 순위가 갈렸는지 알 수 없었다.
+  it('FP 가 있으면 페어플레이 벌점이라는 설명을 함께 보여준다', () => {
+    render(<LeagueStandingsTable data={baseData} />);
+    expect(screen.getByText(/FP는 페어플레이 벌점이에요/)).toBeInTheDocument();
+  });
+  it('FP 가 없는 표(정규 리그 등)에는 설명을 붙이지 않는다', () => {
+    render(<LeagueStandingsTable data={{ ...baseData, standings: baseData.standings.map(({ fairPlayPoints: _fp, ...row }) => row) }} />);
+    expect(screen.queryByText(/FP는 페어플레이 벌점이에요/)).not.toBeInTheDocument();
+  });
   it('순위·팀명·승점을 표시한다', () => {
     render(<LeagueStandingsTable data={baseData} />);
     expect(screen.getByText('성수 블루웨이브')).toBeInTheDocument();

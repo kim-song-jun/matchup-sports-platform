@@ -1,5 +1,4 @@
 import { MatchListPageClient } from '@/components/matches/matches-client';
-import { sortMatchesByAvailability } from '@/components/matches/matches.card-model';
 import { JsonLd } from '@/components/seo/json-ld';
 import { hasListFilter, MATCH_LIST_FILTER_PARAMS, MATCH_LIST_SEED_PATH } from '@/lib/public-list-seed';
 import { buildPublicMetadata } from '@/lib/seo';
@@ -29,7 +28,7 @@ export default async function MatchesPage({ searchParams }: { searchParams: Sear
   ]);
 
   // 카드와 같은 순서(클라이언트가 가용성순으로 다시 정렬한다)·같은 이름. 필터가 걸리면 화면이 seed 와 달라 내지 않는다.
-  const ldItems = page && !filtered ? sortMatchesByAvailability([...page.items]) : [];
+  const ldItems = page && !filtered ? page.items : [];
 
   return (
     <>

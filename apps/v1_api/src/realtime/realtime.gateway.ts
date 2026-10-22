@@ -115,9 +115,10 @@ type GameRealtimeOperations = {
   requestTakeover(
     user: V1AuthUser,
     gameId: string,
-    input: { clientInstanceId: string; lastSequence: number },
+    input: { clientInstanceId: string; lastSequence: number; force?: boolean },
     reservation?: GameTakeoverRequestReservation,
   ): Promise<GameTakeoverGrantResult>;
+  takeoverHolderName(gameId: string, viewerUserId: string): Promise<string | null>;
   renewTakeover(
     user: V1AuthUser,
     gameId: string,
@@ -206,6 +207,8 @@ type GameTakeoverRequestPayload = {
   readonly authorizationSubjectVersion: number;
   readonly clientInstanceId: string;
   readonly lastSequence: number;
+  /** 다른 사람이 운영 중이어도 가져온다 — 콘솔이 확인 창을 거친 뒤에만 보낸다(MD-QA #165). */
+  readonly force: boolean;
 };
 
 type GameTakeoverRenewPayload = {
@@ -224,8 +227,12 @@ type GameTakeoverResult =
         | 'TAKEOVER_TOKEN_EXPIRED'
         // A late request or superseded renewal must not auto-reacquire.
         | 'TAKEOVER_SUPERSEDED'
+        // 다른 사람이 운영 중이라 확인 없이는 넘기지 않았다 — 콘솔은 보기 모드로 연다.
+        | 'TAKEOVER_HELD'
         | 'ACTIVITY_PROFILE_REQUIRED'
         | 'VALIDATION_ERROR';
+      /** TAKEOVER_HELD·TAKEOVER_SUPERSEDED 일 때 지금 운영 중인 사람. 모르거나 본인(다른 탭)이면 null. */
+      readonly holderName?: string | null;
     };
 
 /**
@@ -843,6 +850,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       const grant = await this.gamesService.requestTakeover(authUser, input.gameId, {
         clientInstanceId: input.clientInstanceId,
         lastSequence: input.lastSequence,
+        force: input.force,
       }, reservation);
       client.emit('game.takeover.granted', grant);
       return { status: 'granted', ...grant };
@@ -851,6 +859,10 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
         const response = error.getResponse();
         if (isRecord(response) && response.code === 'TAKEOVER_SUPERSEDED') {
           return { status: 'denied', code: 'TAKEOVER_SUPERSEDED' };
+        }
+        if (isRecord(response) && response.code === 'TAKEOVER_HELD') {
+          const holderName = isRecord(response.details) && typeof response.details.holderName === 'string' ? response.details.holderName : null;
+          return { status: 'denied', code: 'TAKEOVER_HELD', holderName };
         }
         return { status: 'denied', code: 'STAFF_SCOPE_DENIED', reason: staffDenialReasonOf(error) };
       }
@@ -901,10 +913,11 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
         // registry directly (this gateway is where the client-facing code is
         // decided) so the client can tell the two apart without either
         // `GamesService` or the wire contract changing for the common case.
-        const code = this.gameTakeover.isSuperseded(input.gameId, input.takeoverToken)
-          ? 'TAKEOVER_SUPERSEDED'
-          : 'TAKEOVER_TOKEN_EXPIRED';
-        return { status: 'denied', code };
+        if (this.gameTakeover.isSuperseded(input.gameId, input.takeoverToken)) {
+          // 뺏긴 쪽이 누가 가져갔는지 알아야 되찾을지 정할 수 있다(MD-QA #165).
+          return { status: 'denied', code: 'TAKEOVER_SUPERSEDED', holderName: await this.gamesService.takeoverHolderName(input.gameId, authUser.id) };
+        }
+        return { status: 'denied', code: 'TAKEOVER_TOKEN_EXPIRED' };
       }
       throw error;
     }
@@ -2066,13 +2079,10 @@ function parseGameEventRetry(payload: unknown): GameEventRetryPayload | null {
 }
 
 function parseGameTakeoverRequest(payload: unknown): GameTakeoverRequestPayload | null {
+  const keys = ['gameId', 'authorizationSubjectVersion', 'clientInstanceId', 'lastSequence'];
   if (
-    !isPlainObjectWithKeys(payload, [
-      'gameId',
-      'authorizationSubjectVersion',
-      'clientInstanceId',
-      'lastSequence',
-    ]) ||
+    !(isPlainObjectWithKeys(payload, keys) || isPlainObjectWithKeys(payload, [...keys, 'force'])) ||
+    (Object.hasOwn(payload, 'force') && typeof payload.force !== 'boolean') ||
     !isNonemptyString(payload.gameId) ||
     !isSafeNonnegative(payload.authorizationSubjectVersion) ||
     !isNonemptyString(payload.clientInstanceId) ||
@@ -2085,6 +2095,7 @@ function parseGameTakeoverRequest(payload: unknown): GameTakeoverRequestPayload 
     authorizationSubjectVersion: payload.authorizationSubjectVersion,
     clientInstanceId: payload.clientInstanceId,
     lastSequence: payload.lastSequence,
+    force: payload.force === true,
   };
 }
 

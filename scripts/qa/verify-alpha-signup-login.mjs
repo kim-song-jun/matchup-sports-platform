@@ -22,11 +22,16 @@
 // 이 스크립트는 alpha 에 **사용자 행을 만든다.** 지우지 않는다 — 가입 흐름을 다시 밟을 때
 // 필요하고, 남은 계정이 어떤 것인지 이름으로 알 수 있게 접두어를 붙인다.
 //
-// 사용법:
-//   node scripts/qa/verify-alpha-signup-login.mjs
-//   BASE_URL=https://alpha.teameet.co.kr node scripts/qa/verify-alpha-signup-login.mjs
+// 사용법 (QA_SIGNUP_PASSWORD 는 이 스크립트가 만드는 일회용 계정의 비밀번호다 — 저장소에 적지 않는다):
+//   QA_SIGNUP_PASSWORD='<비밀번호>' node scripts/qa/verify-alpha-signup-login.mjs
+//   BASE_URL=https://alpha.teameet.co.kr QA_SIGNUP_PASSWORD='<비밀번호>' node scripts/qa/verify-alpha-signup-login.mjs
 
 const BASE = process.env.BASE_URL ?? 'https://alpha.teameet.co.kr';
+const SIGNUP_PASSWORD = process.env.QA_SIGNUP_PASSWORD;
+if (!SIGNUP_PASSWORD?.trim()) {
+  console.error('QA_SIGNUP_PASSWORD 환경변수가 필요해요. 가입시킬 일회용 계정의 비밀번호를 넘겨 주세요.');
+  process.exit(1);
+}
 const API = `${BASE}/api/v1`;
 // 사람이 만든 계정과 섞이지 않게. 나중에 정리할 때 이 접두어로 고른다.
 const PREFIX = 'qa-e2e';
@@ -35,7 +40,7 @@ const stamp = `${Date.now().toString(36)}${Math.floor(Math.random() * 46656).toS
 const account = {
   nickname: `${PREFIX}${stamp}`,
   email: `${PREFIX}.${stamp}@example.com`,
-  password: 'QaE2e!2026alpha',
+  password: SIGNUP_PASSWORD,
   // 010-0000-xxxx 는 어느 통신사에도 배정되지 않는다. 발송 경로가 꺼져 있으므로 어차피 아무
   // 곳으로도 나가지 않지만, 실수로 실발송이 켜져 있어도 남의 폰이 울리지 않는 번호를 쓴다.
   phone: `0100000${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`,

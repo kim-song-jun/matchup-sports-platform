@@ -58,7 +58,7 @@ import type {
  */
 type GameTakeoverAck =
   | ({ status: 'granted' } & GameTakeoverGrant)
-  | { status: 'denied'; code?: string };
+  | { status: 'denied'; code?: string; holderName?: string | null };
 
 const CLOCK_PING_INTERVAL_MS = 15_000;
 /**
@@ -250,7 +250,8 @@ export interface UseV1GameOperationsConsoleResult {
   /** Resolves to the queued item's `clientEventId`, or `null` when nothing was queued (no takeover / snapshot). */
   submitEvent(input: SubmitEventInput): Promise<string | null>;
   retryFailedEvent(clientEventId: string): void;
-  requestTakeover(): void;
+  /** `force` — 다른 사람이 운영 중이어도 가져온다. 확인 창을 거친 뒤에만 쓴다(MD-QA #165). */
+  requestTakeover(options?: { readonly force?: boolean }): void;
   /** T3 추가 — 큐를 거치지 않는 온라인 전용 되돌리기(D-10과 같은 이유로 절대
    * 오프라인 큐에 들어가지 않는다). 골/카드/교체 등 일반 이벤트를 되돌릴 때 쓰인다
    * — 어시스트 부착·해제는 더 이상 이 경로를 타지 않는다(아래 assignAssist 참고,
@@ -777,7 +778,7 @@ export function useV1GameOperationsConsole(
   }, [gameId]);
 
   // ── Takeover: request once, renew on a timer, expire on a timer ────────────
-  const requestTakeover = useCallback(() => {
+  const requestTakeover = useCallback((options?: { readonly force?: boolean }) => {
     if (!isMountedRef.current || !takeoverEnabledRef.current || activeGameIdRef.current !== gameId) return;
     if (!gameId || (myAssignment.data === undefined && myAssignment.isLoading)) return;
     const socket = getV1GameOperationsSocket();
@@ -794,6 +795,8 @@ export function useV1GameOperationsConsole(
         authorizationSubjectVersion: myAssignment.data ?? 0,
         clientInstanceId: clientInstanceIdRef.current,
         lastSequence: sync.lastSequence,
+        // 자동 요청은 force 를 싣지 않는다 — 다른 사람이 운영 중이면 서버가 TAKEOVER_HELD 로 거절하고 콘솔은 보기 모드로 남는다.
+        ...(options?.force === true ? { force: true } : {}),
       },
       (result: GameTakeoverAck) => {
         if (!isMountedRef.current || activeGameIdRef.current !== gameId || takeoverRequestGenerationRef.current !== requestGeneration) return;
@@ -806,7 +809,7 @@ export function useV1GameOperationsConsole(
         // 서버가 명시한 거부만 그 코드로 남기고, 나머지는 원인 미상으로 구분한다.
         if (result.status !== 'granted') {
           if (result.code === ACTIVITY_PROFILE_REQUIRED_CODE) notifyActivityProfileRequired();
-          dispatchTakeover({ type: 'DENIED', code: result.code ?? 'TAKEOVER_UNAVAILABLE' });
+          dispatchTakeover({ type: 'DENIED', code: result.code ?? 'TAKEOVER_UNAVAILABLE', holderName: result.holderName });
           return;
         }
         if (!result.takeoverToken || !result.expiresAt) {
@@ -861,7 +864,7 @@ export function useV1GameOperationsConsole(
             return;
           }
           if (result.status !== 'granted') {
-            dispatchTakeover({ type: 'DENIED', code: result.code ?? 'TAKEOVER_TOKEN_EXPIRED' });
+            dispatchTakeover({ type: 'DENIED', code: result.code ?? 'TAKEOVER_TOKEN_EXPIRED', holderName: result.holderName });
             return;
           }
           if (!result.takeoverToken || !result.expiresAt) {
@@ -1284,7 +1287,10 @@ export function gameOperationsErrorMessage(code: string): string {
     // 실제로 아무것도 다시 시도하지 않는데 그렇게 말하면 운영자가 기다리기만
     // 하다 골을 놓친다.
     case 'TAKEOVER_SUPERSEDED':
-      return '다른 화면에서 이 경기 운영 권한을 가져갔어요. 새로고침 후 다시 시도해주세요.';
+      return '다른 화면에서 이 경기 운영 권한을 가져갔어요. 지금은 보기만 할 수 있어요.';
+    // MD-QA #165: 다른 사람이 운영 중이라 콘솔을 보기 모드로 열었다. 가져오려면 확인을 거친다.
+    case 'TAKEOVER_HELD':
+      return '다른 운영자가 이 경기를 운영하고 있어요. 지금은 보기만 할 수 있어요.';
     case 'STAFF_SCOPE_DENIED':
       return '이 경기를 운영할 권한이 없어요.';
     case ACTIVITY_PROFILE_REQUIRED_CODE:

@@ -114,6 +114,7 @@ function buildPrismaMock() {
     v1AuthIdentity: {
       findUnique: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       create: jest.fn().mockResolvedValue({ id: 'created-identity' }),
     },
     v1TermsDocument: {
@@ -562,6 +563,32 @@ describe('AuthService', () => {
     expect(result).toMatchObject({ session: { userId: 'user-1', userEmail: 'user@teameet.v1' } });
     expect(loginSecurity.record).toHaveBeenCalledWith('success', expect.any(Object));
     expect(loginSecurity.scheduleSprayDetection).not.toHaveBeenCalled();
+  });
+
+  it('login: 비밀번호를 확인한 사이 재설정으로 해시가 바뀌면 세션 없이 401, 통과하면 확인 때 읽은 세션 번호를 넘긴다', async () => {
+    const hash = await hashPassword('ValidPass1!');
+    prisma.v1AuthIdentity.findUnique.mockResolvedValue({
+      id: 'identity-1',
+      passwordHash: hash,
+      status: 'active',
+      user: { id: 'user-1', email: 'user@teameet.v1', accountStatus: 'active', onboardingStatus: 'completed', createdAt: NOW, updatedAt: NOW, sessionEpoch: 4 },
+    });
+    jest.spyOn(service, 'me').mockResolvedValue({
+      user: { id: 'user-1', email: 'user@teameet.v1' },
+      onboarding: { status: 'completed', missing: [] },
+    } as unknown as Awaited<ReturnType<AuthService['me']>>);
+
+    prisma.v1AuthIdentity.updateMany.mockResolvedValueOnce({ count: 0 });
+    await expect(service.login({ email: 'user@teameet.v1', password: 'ValidPass1!' }, CLIENT)).rejects.toMatchObject({
+      response: { code: 'UNAUTHENTICATED' },
+    });
+    expect(prisma.v1AuthIdentity.updateMany).toHaveBeenCalledWith({
+      where: { id: 'identity-1', passwordHash: hash },
+      data: { lastLoginAt: expect.any(Date) },
+    });
+
+    const result = await service.login({ email: 'user@teameet.v1', password: 'ValidPass1!' }, CLIENT);
+    expect(result).toMatchObject({ session: { userId: 'user-1', sessionEpoch: 4 } });
   });
 
   it('login: identity.status=suspended 계정 → 403 PERMISSION_DENIED', async () => {

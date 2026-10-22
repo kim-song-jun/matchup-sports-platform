@@ -130,7 +130,7 @@ describe('V1 account recovery requires independent email proof', () => {
   it('revokes every session cookie issued before an email password reset, and the new password signs in again', async () => {
     const sessionCookieOf = (response: request.Response) =>
       ([] as string[]).concat(response.headers['set-cookie'] ?? []).find((cookie) => cookie.startsWith('teameet_v1_session='))?.split(';')[0];
-    const signedIn = await request(app.getHttpServer()).post('/api/v1/auth/login').send({ email: EMAIL, password: ORIGINAL_PASSWORD }).expect(200);
+    const signedIn = await request(app.getHttpServer()).post('/api/v1/auth/login').send({ email: EMAIL, password: ORIGINAL_PASSWORD }).expect(201);
     const oldCookie = sessionCookieOf(signedIn);
     if (!oldCookie) throw new RecoveryFixtureError('Login did not set a session cookie');
     expect((await request(app.getHttpServer()).get('/api/v1/auth/me').set('Cookie', oldCookie)).status).not.toBe(401);
@@ -143,7 +143,7 @@ describe('V1 account recovery requires independent email proof', () => {
 
     const revoked = await request(app.getHttpServer()).get('/api/v1/auth/me').set('Cookie', oldCookie);
     expect({ status: revoked.status, code: revoked.body.code }).toEqual({ status: 401, code: 'UNAUTHENTICATED' });
-    const signedInAgain = await request(app.getHttpServer()).post('/api/v1/auth/login').send({ email: EMAIL, password: REPLACEMENT_PASSWORD }).expect(200);
+    const signedInAgain = await request(app.getHttpServer()).post('/api/v1/auth/login').send({ email: EMAIL, password: REPLACEMENT_PASSWORD }).expect(201);
     const newCookie = sessionCookieOf(signedInAgain);
     if (!newCookie) throw new RecoveryFixtureError('Login after reset did not set a session cookie');
     expect((await request(app.getHttpServer()).get('/api/v1/auth/me').set('Cookie', newCookie)).status).not.toBe(401);

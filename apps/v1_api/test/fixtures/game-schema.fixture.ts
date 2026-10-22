@@ -600,6 +600,7 @@ export const gameSchemaSourceManifest = {
   // 2026-10-21: additive V1LoginAttempt, V1LoginStepUpChallenge, V1SecurityAnomaly (+ V1User back-relation),
   // backed by 20261021120000_login_step_up. No game model changes; historical game migration unchanged.
   // 2026-10-22: additive show_detail_image boolean default true; historical game migration unchanged.
+  // 2026-10-22: additive V1User.session_epoch integer default 0 (20261022120000_user_session_epoch); historical game migration unchanged.
   schema: 'c8c382bd8c3659e3d754703b12d4c55c5522b91af928cddfb3ae8649a8f2bc3e',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;

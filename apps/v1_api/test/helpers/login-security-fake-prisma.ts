@@ -175,6 +175,11 @@ export function createLoginSecurityFakePrisma() {
         applyData(found, data);
         return found;
       }),
+      updateMany: jest.fn(async ({ where, data }: { where: Where; data: Row }) => {
+        const found = state.identities.filter((row) => matches(row, where));
+        found.forEach((row) => applyData(row, data));
+        return { count: found.length };
+      }),
     },
     v1User: {
       update: jest.fn(async () => ({})),

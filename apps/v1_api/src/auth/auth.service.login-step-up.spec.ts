@@ -9,6 +9,7 @@ import * as crypto from 'crypto';
 import { createLoginSecurityFakePrisma } from '../../test/helpers/login-security-fake-prisma';
 import { PrismaService } from '../prisma/prisma.service';
 import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { VerificationDispatcherService } from '../verification/verification-dispatcher.service';
 import { EmailVerificationService } from '../verification/email-verification.service';
 import { issueEmailProofToken } from '../verification/email-proof-token';
@@ -73,6 +74,7 @@ async function build(options: { accountStatus?: string; devEcho?: boolean } = {}
       { provide: PhoneVerificationService, useValue: {} },
       { provide: AppleIdentityService, useValue: {} },
       { provide: AppleTokenService, useValue: {} },
+      { provide: RealtimeGateway, useValue: { forceDisconnectUser: jest.fn() } },
     ],
   }).compile();
   const service = moduleRef.get(AuthService);

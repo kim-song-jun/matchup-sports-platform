@@ -39,9 +39,10 @@ function prismaByEmail(users: Record<string, unknown>, update = jest.fn().mockRe
 }
 
 const loginSecurity = { forgetEmail: jest.fn().mockResolvedValue(undefined) };
+const realtimeGateway = { forceDisconnectUser: jest.fn() };
 
 function service(prisma: PrismaService, emailVerification = emailVerificationMock()) {
-  return new AccountRecoveryService(prisma, emailVerification, loginSecurity as never);
+  return new AccountRecoveryService(prisma, emailVerification, loginSecurity as never, realtimeGateway);
 }
 
 const emailUser = {
@@ -290,6 +291,8 @@ describe('AccountRecoveryService — 비밀번호 재설정(이메일)', () => {
     expect(handle.v1User.update).toHaveBeenCalledWith({ where: { id: 'u1' }, data: { sessionEpoch: { increment: 1 } } });
     expect(handle.$transaction).toHaveBeenCalledTimes(1);
     expect(handle.$transaction.mock.calls[0][0]).toHaveLength(2);
+    // Sockets only check the session at handshake, so the open ones are cut too.
+    expect(realtimeGateway.forceDisconnectUser).toHaveBeenCalledWith('u1');
   });
 
   it('재설정에 성공하면 그 이메일의 로그인 제한(실패 기록·발송 횟수·챌린지)을 푼다', async () => {

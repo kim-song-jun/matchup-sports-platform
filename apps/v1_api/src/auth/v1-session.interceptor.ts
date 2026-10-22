@@ -24,16 +24,17 @@ export class V1SessionCookieInterceptor implements NestInterceptor {
 
     return next.handle().pipe(
       mergeMap(async (body: unknown) => {
-        const userId = readSessionUserId(body);
-        if (userId) {
-          // The cookie carries the epoch it was issued under; a later bump revokes it (v1IdentityUserWhere).
-          const { sessionEpoch } = await this.prisma.v1User.findUniqueOrThrow({
-            where: { id: userId },
-            select: { sessionEpoch: true },
-          });
-          writeV1SessionCookie(response, { userId, sessionEpoch });
-        }
-        return body;
+        const session = readSessionBody(body);
+        if (!session) return body;
+        // The cookie carries the epoch it was issued under; a later bump revokes it (v1IdentityUserWhere). A password
+        // login hands over the epoch it read with the credentials, so a reset landing meanwhile cannot lend it the new one.
+        const { sessionEpoch: carried, ...visibleSession } = session;
+        const sessionEpoch = carried ?? (await this.prisma.v1User.findUniqueOrThrow({
+          where: { id: session.userId },
+          select: { sessionEpoch: true },
+        })).sessionEpoch;
+        writeV1SessionCookie(response, { userId: session.userId, sessionEpoch });
+        return carried === undefined ? body : { ...(body as object), session: visibleSession };
       }),
     );
   }
@@ -54,7 +55,7 @@ export class V1SessionLogoutInterceptor implements NestInterceptor {
   }
 }
 
-function readSessionUserId(value: unknown): string | null {
+function readSessionBody(value: unknown): { userId: string; sessionEpoch?: number } | null {
   if (
     typeof value !== 'object' ||
     value === null ||
@@ -66,6 +67,10 @@ function readSessionUserId(value: unknown): string | null {
   ) {
     return null;
   }
-
-  return value.session.userId;
+  const epoch = 'sessionEpoch' in value.session ? value.session.sessionEpoch : undefined;
+  return {
+    ...(value.session as Record<string, unknown>),
+    userId: value.session.userId,
+    sessionEpoch: typeof epoch === 'number' ? epoch : undefined,
+  };
 }

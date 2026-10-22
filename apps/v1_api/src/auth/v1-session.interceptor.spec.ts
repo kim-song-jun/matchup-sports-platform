@@ -34,6 +34,15 @@ describe('V1SessionCookieInterceptor', () => {
     expect(readV1Session(`${V1_SESSION_COOKIE_NAME}=${token}`, { secret: SECRET })).toEqual({ userId: 'user-1', sessionEpoch: 4 });
   });
 
+  it('signs with the epoch a password login read with the credentials, without a second read, and keeps it out of the body', async () => {
+    const { prisma, response, result } = run({ session: { userId: 'user-1', userEmail: null, sessionEpoch: 2 }, next: undefined }, 9);
+
+    await expect(result).resolves.toEqual({ session: { userId: 'user-1', userEmail: null }, next: undefined });
+    expect(prisma.v1User.findUniqueOrThrow).not.toHaveBeenCalled();
+    const token = response.cookie.mock.calls[0][1] as string;
+    expect(readV1Session(`${V1_SESSION_COOKIE_NAME}=${token}`, { secret: SECRET })).toEqual({ userId: 'user-1', sessionEpoch: 2 });
+  });
+
   it('writes nothing for a response without a session', async () => {
     const { prisma, response, result } = run({ ok: true });
 

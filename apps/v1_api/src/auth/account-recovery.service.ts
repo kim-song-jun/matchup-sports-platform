@@ -1,6 +1,7 @@
-import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { V1AuthProvider } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { EmailVerificationService } from '../verification/email-verification.service';
 import { verifyEmailProofToken } from '../verification/email-proof-token';
 import { verifyPhoneProofToken } from '../verification/phone-proof-token';
@@ -42,6 +43,8 @@ export class AccountRecoveryService {
     private readonly prisma: PrismaService,
     private readonly emailVerification: EmailVerificationService,
     private readonly loginSecurity: LoginSecurityService,
+    @Inject(RealtimeGateway)
+    private readonly realtimeGateway: Pick<RealtimeGateway, 'forceDisconnectUser'>,
   ) {}
 
   async findAccountByPhone(dto: FindAccountDto): Promise<FoundAccount> {
@@ -144,6 +147,8 @@ export class AccountRecoveryService {
       this.prisma.v1AuthIdentity.update({ where: { id: emailIdentity.id }, data: { passwordHash } }),
       this.prisma.v1User.update({ where: { id: user.id }, data: { sessionEpoch: { increment: 1 } } }),
     ]);
+    // 이미 열린 소켓은 핸드셰이크 때만 세션을 보므로 직접 끊는다(탈퇴·정지와 같은 처리).
+    this.realtimeGateway.forceDisconnectUser(user.id);
     await this.releaseLoginRestrictions(email);
 
     return { ok: true };

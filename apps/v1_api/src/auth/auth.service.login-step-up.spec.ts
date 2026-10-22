@@ -58,6 +58,7 @@ async function build(options: { accountStatus?: string; devEcho?: boolean } = {}
   const dispatcher = {
     send: jest.fn().mockResolvedValue(undefined),
     devEchoActive: options.devEcho ?? false,
+    mayEchoCode: jest.fn(async () => options.devEcho ?? false),
     emailDeliverable: true,
   };
   const moduleRef = await Test.createTestingModule({

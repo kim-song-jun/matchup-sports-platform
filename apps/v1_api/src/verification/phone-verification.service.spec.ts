@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { createHmac } from 'crypto';
 import { verifyPhoneProofToken } from './phone-proof-token';
 import { PhoneVerificationService } from './phone-verification.service';
@@ -25,11 +26,21 @@ function prismaMock() {
         return row;
       }),
       findUnique: jest.fn(async ({ where }: { where: { phone: string } }) => store.get(where.phone) ?? null),
-      update: jest.fn(async ({ where, data }: { where: { phone: string }; data: Record<string, unknown> }) => {
-        const row = store.get(where.phone)!;
-        if ((data.attemptCount as { increment?: number })?.increment) row.attemptCount += 1;
-        if ('verifiedAt' in data) row.verifiedAt = data.verifiedAt as Date | null;
-        return row;
+      // Same contract as the database: the attemptCount condition is checked and applied in one step.
+      update: jest.fn(async ({ where, data }: { where: { phone: string; codeHash?: string; attemptCount?: { lt: number } }; data: { attemptCount: { increment: number } } }) => {
+        const row = store.get(where.phone);
+        if (!row || (where.codeHash !== undefined && row.codeHash !== where.codeHash) || (where.attemptCount && row.attemptCount >= where.attemptCount.lt)) {
+          throw new Prisma.PrismaClientKnownRequestError('No record was found for an update.', { code: 'P2025', clientVersion: 'test' });
+        }
+        row.attemptCount += data.attemptCount.increment;
+        return { attemptCount: row.attemptCount };
+      }),
+      updateMany: jest.fn(async ({ where, data }: { where: { phone: string; codeHash: string }; data: { attemptCount: { decrement: number }; verifiedAt: Date } }) => {
+        const row = store.get(where.phone);
+        if (!row || row.codeHash !== where.codeHash) return { count: 0 };
+        row.attemptCount -= data.attemptCount.decrement;
+        row.verifiedAt = data.verifiedAt;
+        return { count: 1 };
       }),
       deleteMany: jest.fn(async ({ where }: { where: { phone: string } }) => {
         const existed = store.has(where.phone);
@@ -43,7 +54,12 @@ function prismaMock() {
 
 function dispatcherMock(devEcho = true) {
   // 테스트에선 SMS provider 가 비활성이라 devEchoActive === devEcho.
-  return { devEcho, devEchoActive: devEcho, send: jest.fn().mockResolvedValue(undefined) } as unknown as VerificationDispatcherService;
+  return {
+    devEcho,
+    devEchoActive: devEcho,
+    mayEchoCode: jest.fn().mockResolvedValue(devEcho),
+    send: jest.fn().mockResolvedValue(undefined),
+  } as unknown as VerificationDispatcherService;
 }
 
 const PHONE = '01012345678';
@@ -64,7 +80,13 @@ describe('PhoneVerificationService (MT SMS OTP)', () => {
     expect(row.codeHash).not.toBe(res.devCode); // 평문 저장 금지
   });
 
-  it('does not expose devCode when dispatcher.devEcho is false', async () => {
+  it('asks the dispatcher whether this phone may see the code', async () => {
+    const dispatcher = dispatcherMock(true);
+    await new PhoneVerificationService(prismaMock(), dispatcher, eventLogStub()).issueChallenge(PHONE);
+    expect(dispatcher.mayEchoCode).toHaveBeenCalledWith({ channel: 'phone', address: PHONE });
+  });
+
+  it('does not expose devCode when the dispatcher withholds it', async () => {
     const svc = new PhoneVerificationService(prismaMock(), dispatcherMock(false), eventLogStub());
     const res = await svc.issueChallenge(PHONE);
     expect(res.devCode).toBeUndefined();
@@ -113,12 +135,55 @@ describe('PhoneVerificationService (MT SMS OTP)', () => {
     await expect(svc.verifyCode(PHONE, wrong)).rejects.toMatchObject({ response: { code: 'VERIFICATION_TOO_MANY_ATTEMPTS' } });
   });
 
-  it('verifyCode still accepts the correct code even at the attempt cap (cap은 불일치에만 적용, 멱등)', async () => {
+  it('verifyCode rejects even the correct code after five wrong attempts — otherwise the cap does not cap guessing', async () => {
     const prisma = prismaMock();
     const svc = new PhoneVerificationService(prisma, dispatcherMock(true), eventLogStub());
     const { devCode } = await svc.issueChallenge(PHONE);
-    (prisma as never as { __store: Map<string, ChallengeRow> }).__store.get(PHONE)!.attemptCount = 5;
+    const wrong = devCode === '000000' ? '111111' : '000000';
+    for (let i = 0; i < 5; i += 1) {
+      await expect(svc.verifyCode(PHONE, wrong)).rejects.toMatchObject({ response: { code: 'VERIFICATION_CODE_MISMATCH' } });
+    }
+    await expect(svc.verifyCode(PHONE, devCode!)).rejects.toMatchObject({ response: { code: 'VERIFICATION_TOO_MANY_ATTEMPTS' } });
+    expect((prisma as never as { __store: Map<string, ChallengeRow> }).__store.get(PHONE)!.verifiedAt).toBeNull();
+  });
+
+  it('verifyCode lets only five of many concurrent guesses be compared', async () => {
+    const prisma = prismaMock();
+    const svc = new PhoneVerificationService(prisma, dispatcherMock(true), eventLogStub());
+    const { devCode } = await svc.issueChallenge(PHONE);
+    const wrong = devCode === '000000' ? '111111' : '000000';
+
+    const results = await Promise.allSettled(Array.from({ length: 12 }, () => svc.verifyCode(PHONE, wrong)));
+    const codes = results.map((result) => (result as PromiseRejectedResult).reason.getResponse().code);
+    expect(codes.filter((code) => code === 'VERIFICATION_CODE_MISMATCH')).toHaveLength(5);
+    expect(codes.filter((code) => code === 'VERIFICATION_TOO_MANY_ATTEMPTS')).toHaveLength(7);
+  });
+
+  it('verifyCode does not spend an attempt on the correct code, so re-submitting it near the cap still succeeds', async () => {
+    const prisma = prismaMock();
+    const svc = new PhoneVerificationService(prisma, dispatcherMock(true), eventLogStub());
+    const { devCode } = await svc.issueChallenge(PHONE);
+    const wrong = devCode === '000000' ? '111111' : '000000';
+    for (let i = 0; i < 4; i += 1) await svc.verifyCode(PHONE, wrong).catch(() => undefined);
+
     expect(await svc.verifyCode(PHONE, devCode!)).toBe(true);
+    expect(await svc.verifyCode(PHONE, devCode!)).toBe(true);
+    expect((prisma as never as { __store: Map<string, ChallengeRow> }).__store.get(PHONE)!.attemptCount).toBe(4);
+  });
+
+  it('verifyCode answers NO_PENDING for a code read before a re-issue, without spending the new code\'s attempts', async () => {
+    const prisma = prismaMock();
+    const svc = new PhoneVerificationService(prisma, dispatcherMock(true), eventLogStub());
+    const { devCode } = await svc.issueChallenge(PHONE);
+    const store = (prisma as never as { __store: Map<string, ChallengeRow> }).__store;
+    const issued = { ...store.get(PHONE)! };
+    (prisma as never as { v1PhoneVerificationChallenge: { findUnique: jest.Mock } }).v1PhoneVerificationChallenge.findUnique
+      .mockResolvedValueOnce(issued);
+    store.get(PHONE)!.codeHash = 'replaced-by-a-newer-issue';
+
+    await expect(svc.verifyCode(PHONE, devCode!)).rejects.toMatchObject({ response: { code: 'VERIFICATION_NO_PENDING' } });
+    expect(store.get(PHONE)!.verifiedAt).toBeNull();
+    expect(store.get(PHONE)!.attemptCount).toBe(0);
   });
 
   it('verifyCode stays idempotent for the correct code but rejects a wrong code even after verification', async () => {

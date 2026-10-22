@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { randomInt } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { hashPassword, verifyPassword } from '../auth/password-hash';
@@ -67,55 +68,55 @@ export class EmailVerificationService {
       throw err;
     }
 
-    return {
-      expiresAt: expiresAt.toISOString(),
-      ...(this.dispatcher.devEchoActive ? { devCode: code } : {}),
-    };
+    const echo = await this.dispatcher.mayEchoCode({ channel: 'email', address: email });
+    return { expiresAt: expiresAt.toISOString(), ...(echo ? { devCode: code } : {}) };
   }
 
   async verifyCode(rawEmail: string, code: string): Promise<boolean> {
     const email = normalizeEmail(rawEmail);
     const challenge = await this.prisma.v1EmailVerificationChallenge.findUnique({ where: { email } });
-    if (!challenge || challenge.expiresAt.getTime() < Date.now()) {
-      throw new BadRequestException({
-        code: 'VERIFICATION_NO_PENDING',
-        message: '유효한 인증 요청이 없어요. 인증번호를 다시 받아 주세요.',
-      });
-    }
+    if (!challenge || challenge.expiresAt.getTime() < Date.now()) throw noPendingChallenge();
+    const attemptCount = await this.reserveAttempt(email, challenge.codeHash);
     // verifiedAt 여부와 무관하게 항상 제출된 코드를 codeHash 와 대조한다 — verifiedAt 만으로
     // 단락하면 주소만 아는 쪽이 임의 코드로 증명 토큰을 가져갈 수 있다.
-    // 올바른 코드 재제출은 그대로 멱등 성공한다.
     const matches = await verifyPassword(code, challenge.codeHash);
     if (!matches) {
-      // 시도 상한은 '불일치' 경로에서만 적용한다 — 올바른 코드 재제출까지 막지 않기 위해서다.
-      if (challenge.attemptCount >= MAX_ATTEMPTS) {
-        await this.recordFailure(SMS_EVENT_TYPE.TOO_MANY_ATTEMPTS, `인증 시도 ${challenge.attemptCount}회 초과`);
-        throw new BadRequestException({
-          code: 'VERIFICATION_TOO_MANY_ATTEMPTS',
-          message: '시도 횟수를 초과했어요. 인증번호를 다시 받아 주세요.',
-        });
-      }
-      await this.prisma.v1EmailVerificationChallenge.update({
-        where: { email },
-        data: { attemptCount: { increment: 1 } },
-      });
-      await this.recordFailure(
-        SMS_EVENT_TYPE.CODE_MISMATCH,
-        `인증 시도 ${challenge.attemptCount + 1}/${MAX_ATTEMPTS}`,
-      );
+      await this.recordFailure(SMS_EVENT_TYPE.CODE_MISMATCH, `인증 시도 ${attemptCount}/${MAX_ATTEMPTS}`);
       throw new BadRequestException({
         code: 'VERIFICATION_CODE_MISMATCH',
         message: '인증번호가 올바르지 않아요.',
       });
     }
 
-    if (!challenge.verifiedAt) {
-      await this.prisma.v1EmailVerificationChallenge.update({
-        where: { email },
-        data: { verifiedAt: new Date() },
+    // 정답은 시도로 세지 않는다(예약을 돌려준다) — 올바른 코드 재제출은 상한과 무관하게 멱등 성공한다.
+    // codeHash 를 조건에 둬서, 대조하는 사이 새 번호가 발급됐으면 옛 번호로 새 챌린지를 검증하지 않는다.
+    const settled = await this.prisma.v1EmailVerificationChallenge.updateMany({
+      where: { email, codeHash: challenge.codeHash },
+      data: { attemptCount: { decrement: 1 }, verifiedAt: challenge.verifiedAt ?? new Date() },
+    });
+    if (settled.count === 0) throw noPendingChallenge();
+    return true;
+  }
+
+  /** 대조보다 먼저 시도 한 번을 원자적으로 예약한다(phone-verification.service 의 같은 이름 메서드와 같은 이유). */
+  private async reserveAttempt(email: string, codeHash: string): Promise<number> {
+    try {
+      const reserved = await this.prisma.v1EmailVerificationChallenge.update({
+        where: { email, codeHash, attemptCount: { lt: MAX_ATTEMPTS } },
+        data: { attemptCount: { increment: 1 } },
+        select: { attemptCount: true },
+      });
+      return reserved.attemptCount;
+    } catch (error) {
+      if (!(error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025')) throw error;
+      const current = await this.prisma.v1EmailVerificationChallenge.findUnique({ where: { email }, select: { codeHash: true } });
+      if (current?.codeHash !== codeHash) throw noPendingChallenge();
+      await this.recordFailure(SMS_EVENT_TYPE.TOO_MANY_ATTEMPTS, `인증 시도 ${MAX_ATTEMPTS}회 초과`);
+      throw new BadRequestException({
+        code: 'VERIFICATION_TOO_MANY_ATTEMPTS',
+        message: '시도 횟수를 초과했어요. 인증번호를 다시 받아 주세요.',
       });
     }
-    return true;
   }
 
   /** 이 흐름이 발급할 수 있는 증명은 비밀번호 재설정용 하나뿐이다(용도를 요청자가 고르지 못한다). */
@@ -167,4 +168,11 @@ export class EmailVerificationService {
       detail: `channel=email-recovery ${detail}`,
     });
   }
+}
+
+function noPendingChallenge(): BadRequestException {
+  return new BadRequestException({
+    code: 'VERIFICATION_NO_PENDING',
+    message: '유효한 인증 요청이 없어요. 인증번호를 다시 받아 주세요.',
+  });
 }

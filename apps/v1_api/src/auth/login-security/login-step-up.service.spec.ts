@@ -13,6 +13,8 @@ function setup(options: { devEcho?: boolean; deliverable?: boolean } = {}) {
   const dispatcher = {
     send: jest.fn().mockResolvedValue(undefined),
     devEchoActive: options.devEcho ?? false,
+    // The address rules are the dispatcher's own (verification-dispatcher.service.spec); here every address qualifies.
+    mayEchoCode: jest.fn(async () => options.devEcho ?? false),
     emailDeliverable: options.deliverable ?? true,
   };
   const service = new LoginStepUpService(prisma as never, dispatcher as never);
@@ -199,18 +201,33 @@ describe('LoginStepUpService.resend', () => {
     await expect(service.verify(challengeToken, secondCode)).resolves.toMatchObject({ userId: USER_ID });
   });
 
-  it('in an echo environment a decoy resend carries a devCode like a real one', async () => {
+  it('in an echo environment carries no devCode on any resend, so a resend cannot tell a real challenge from a decoy', async () => {
     const { service } = setup({ devEcho: true });
     const real = await service.start({ email: EMAIL, emailKey: 'key-a', userId: USER_ID });
-    const decoy = await service.start({ email: 'ghost@example.com', emailKey: 'key-ghost', userId: null });
+    const decoy = await service.start({ email: EMAIL, emailKey: 'key-a', userId: null });
     advance(31_000);
 
     const realResend = await service.resend(real.challengeToken);
     const decoyResend = await service.resend(decoy.challengeToken);
     await service.onApplicationShutdown();
 
+    expect(Object.keys(realResend)).toEqual(['expiresAt', 'resendAvailableAt']);
     expect(Object.keys(decoyResend)).toEqual(Object.keys(realResend));
-    expect(decoyResend.devCode).toMatch(/^\d{6}$/);
+  });
+
+  it('judges devCode on the typed address only, the same question for the right and the wrong password', async () => {
+    const { service, dispatcher } = setup({ devEcho: true });
+    dispatcher.mayEchoCode.mockResolvedValue(false);
+    const real = await service.start({ email: EMAIL, emailKey: 'key-a', userId: USER_ID });
+    const wrongPassword = await service.start({ email: EMAIL, emailKey: 'key-a', userId: null });
+    await service.onApplicationShutdown();
+
+    expect(dispatcher.mayEchoCode.mock.calls).toEqual([
+      [{ channel: 'email', address: EMAIL }],
+      [{ channel: 'email', address: EMAIL }],
+    ]);
+    expect(real.devCode).toBeUndefined();
+    expect(wrongPassword.devCode).toBeUndefined();
   });
 
   it('answers a decoy with the same 200 body shape and mails nothing', async () => {

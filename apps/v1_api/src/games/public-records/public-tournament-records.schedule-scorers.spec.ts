@@ -413,22 +413,33 @@ describe('PublicTournamentRecordsService.getSchedule -- 일정 카드 득점자 
     ]);
   });
 
-  it('자책골은 행위 선수 소속팀 영역에 표시하고 ownGoal=true로 구분한다', async () => {
-    const prisma = buildFakePrisma({
-      fixtures: [makeFixture({})],
-      consentLinks: [],
-      consentSnapshots: [],
-      goalEvents: [
-        { id: 'og1', gameId: 'game-1', type: 'OWN_GOAL', sideId: 'side-home', participantId: INELIGIBLE.id, period: 1, clockMs: 124_000, reversesEventId: null },
-      ],
+  describe.each(['live', 'official'] as const)('%s 자책골 표시', (source) => {
+    it.each([
+      ['side-home', 'home', INELIGIBLE],
+      ['side-away', 'away', ELIGIBLE],
+    ] as const)('%s에 점수가 올라가면 그 팀 영역에 선수와 OG를 표시한다', async (sideId, side, player) => {
+      const fixture = makeFixture({});
+      if (source === 'official') {
+        fixture.status = 'completed';
+        fixture.game!.state = 'ENDED';
+        fixture.game!.currentOfficialRevision = {
+          state: 'OFFICIAL', supersedesId: null, officialAt: new Date('2026-08-10T06:00:00Z'),
+          score: { home: side === 'home' ? 1 : 0, away: side === 'away' ? 1 : 0 },
+          outcomeReason: 'NORMAL', outcomeNote: null,
+          goalEvents: [{ id: 'og1', sideId, participantId: player.id, period: 1, minute: 3, ownGoal: true }],
+        };
+      }
+      const prisma = buildFakePrisma({
+        fixtures: [fixture], consentLinks: [], consentSnapshots: [],
+        goalEvents: source === 'live' ? [
+          { id: 'og1', gameId: 'game-1', type: 'OWN_GOAL', sideId, participantId: player.id, period: 1, clockMs: 180_000, reversesEventId: null },
+        ] : [],
+      });
+      const result = await new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE).getSchedule(TOURNAMENT_ID, {});
+      expect(result.items[0].scorers).toEqual([
+        { side, ownGoal: true, participantName: player.displayNameSnapshot, jerseyNumber: player.jerseyNumber, period: 1, clockMs: 180_000 },
+      ]);
     });
-    const service = new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE);
-
-    const result = await service.getSchedule(TOURNAMENT_ID, {});
-
-    expect(result.items[0].scorers).toEqual([
-      { side: 'away', ownGoal: true, participantName: '이영희', jerseyNumber: 10, period: 1, clockMs: 124_000 },
-    ]);
   });
 
   it('롤백 스위치(V1_TOURNAMENT_PARTICIPANT_NAMES_CONSENT_GATE=true)를 켜면 동의 게이팅으로 되돌아간다', async () => {

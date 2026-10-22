@@ -9,7 +9,7 @@ import { useV1AdminTournament, useV1LineupSizeOptions, useV1MasterSports, useV1U
 import type { V1Tournament, V1UpdateTournamentPayload, V1TournamentGenderCategory } from '@/types/api';
 import { extractErrorMessage, extractErrorCode } from '@/lib/error-message';
 import { v1Keys } from '@/lib/query-keys';
-import { CoverImageUploader } from '@/components/admin/tournaments/cover-image-uploader';
+import { TournamentImagesField } from '@/components/admin/tournaments/tournament-images-field';
 import { resolveTournamentImage } from '@/lib/tournament-promo';
 import { PrizeBreakdownEditor, createPrizeRowId, serializeTournamentPrizeRows, type TournamentPrizeRow } from '@/components/admin/tournaments/prize-breakdown-editor';
 import { PromoCardFields, type TournamentPromoCardValue } from '@/components/admin/tournaments/promo-card-fields';
@@ -583,7 +583,7 @@ export function TournamentInfoSection() {
 
       <TournamentPeriodSettingsEditor tournamentId={id} canWrite={canWrite} showToast={showToast} />
 
-      <CoverImageCard tournament={tournament} canWrite={canWrite} showToast={showToast} />
+      <CoverImageCard tournament={tournament} sportCode={masterSports?.find((sport) => sport.id === tournament.sportId)?.code} canWrite={canWrite} showToast={showToast} />
 
       <PrizeCard tournament={tournament} canWrite={canWrite} showToast={showToast} />
 
@@ -1212,6 +1212,7 @@ export function TournamentInfoSection() {
             defaultImageUrl={resolveTournamentImage(
               {
                 coverImageUrl: tournament?.coverImageUrl,
+                listImageUrl: tournament?.listImageUrl,
                 promoHomeImageUrl: null,
                 promoListImageUrl: promoListImageUrl,
               },
@@ -1255,6 +1256,7 @@ export function TournamentInfoSection() {
             defaultImageUrl={resolveTournamentImage(
               {
                 coverImageUrl: tournament?.coverImageUrl,
+                listImageUrl: tournament?.listImageUrl,
                 promoHomeImageUrl: promoHomeImageUrl,
                 promoListImageUrl: null,
               },
@@ -1318,13 +1320,15 @@ function GenderQuotaInput({
   );
 }
 
-/** 커버 이미지 — 목록 카드 썸네일. 읽기 전용 관리자에게는 업로더를 잠근다. */
+/** 목록·상세 이미지와 노출 설정. 기존 관리자 권한 및 CAS를 그대로 따른다. */
 function CoverImageCard({
   tournament,
+  sportCode,
   canWrite,
   showToast,
 }: {
   tournament: V1Tournament;
+  sportCode?: string;
   canWrite: boolean;
   showToast: (msg: string, v?: 'success' | 'error') => void;
 }) {
@@ -1341,42 +1345,28 @@ function CoverImageCard({
     showToast(extractErrorMessage(err, fallback), 'error');
   };
 
-  const handleUpload = async (file: File) => {
-    try {
-      const { urls } = await uploadImages.mutateAsync(file);
-      if (!urls[0]) {
-        showToast('업로드된 이미지 URL을 받지 못했어요.', 'error');
-        return;
-      }
-      updateTournament.mutate({ coverImageUrl: urls[0], expectedVersion: tournament.updatedAt }, {
-        onSuccess: () => showToast('커버 이미지를 저장했어요.', 'success'),
-        onError: (err) => handleConflict(err, '커버 이미지 저장에 실패했어요.'),
-      });
-    } catch (err) {
-      showToast(extractErrorMessage(err, '이미지 업로드에 실패했어요.'), 'error');
-    }
-  };
-
-  const handleRemove = () => {
-    updateTournament.mutate({ coverImageUrl: null, expectedVersion: tournament.updatedAt }, {
-      onSuccess: () => showToast('커버 이미지를 제거했어요.', 'success'),
-      onError: (err) => handleConflict(err, '커버 이미지 제거에 실패했어요.'),
+  const persist = (patch: Pick<V1UpdateTournamentPayload, 'coverImageUrl' | 'listImageUrl' | 'showDetailImage'>) => {
+    updateTournament.mutate({ ...patch, expectedVersion: tournament.updatedAt }, {
+      onSuccess: () => showToast('대회 이미지 설정을 저장했어요.', 'success'),
+      onError: (err) => handleConflict(err, '이미지 설정을 저장하지 못했어요.'),
     });
   };
 
   return (
-    <section
-      aria-label="커버 이미지"
-      className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] px-5 py-4 mb-6"
-    >
-      {/* 제목은 CoverImageUploader가 자체 label로 그린다 — 여기서 또 그리면 같은 글자가 두 번 뜬다. */}
-      <CoverImageUploader
-        value={tournament.coverImageUrl}
-        onSelectFile={(file) => void handleUpload(file)}
-        onClear={handleRemove}
-        uploading={uploadImages.isPending}
-        disabled={!canWrite || updateTournament.isPending}
-        eager
+    <section aria-label="대회 이미지" className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] px-5 py-4 mb-6">
+      <TournamentImagesField
+        coverImageUrl={tournament.coverImageUrl}
+        listImageUrl={tournament.listImageUrl ?? null}
+        showDetailImage={tournament.showDetailImage ?? true}
+        sportCode={sportCode}
+        onImageChange={(field, value) => persist({ [field]: value })}
+        onVisibilityChange={(visible) => persist({ showDetailImage: visible })}
+        onUpload={async (file) => {
+          const { urls } = await uploadImages.mutateAsync(file);
+          if (!urls[0]) throw new Error('업로드된 이미지 URL을 받지 못했어요.');
+          return urls[0];
+        }}
+        disabled={!canWrite || uploadImages.isPending || updateTournament.isPending}
       />
     </section>
   );

@@ -60,13 +60,12 @@ export function readLoginStepUp(): StoredLoginStepUp | null {
   return null;
 }
 
-/** 다시 받기 응답으로 만료·재발송 시각을 갱신한다. 저장된 챌린지가 없으면 아무것도 쓰지 않는다. */
-export function updateLoginStepUpTimes(times: Pick<V1LoginStepUpChallenge, 'expiresAt' | 'resendAvailableAt' | 'devCode'>) {
+/** 다시 받기 응답으로 만료·재발송 시각을 갱신하고, 이제 맞지 않는 이전 인증번호(devCode)는 지운다. 저장된 챌린지가 없으면 아무것도 쓰지 않는다. */
+export function updateLoginStepUpTimes(times: Pick<V1LoginStepUpChallenge, 'expiresAt' | 'resendAvailableAt'>) {
   const current = readLoginStepUp();
   if (!current) return;
-  const next: StoredLoginStepUp = { ...current, expiresAt: times.expiresAt, resendAvailableAt: times.resendAvailableAt };
-  if (times.devCode === undefined) delete next.devCode;
-  else next.devCode = times.devCode;
+  const { devCode: _stale, ...rest } = current;
+  const next: StoredLoginStepUp = { ...rest, expiresAt: times.expiresAt, resendAvailableAt: times.resendAvailableAt };
   try {
     window.sessionStorage.setItem(LOGIN_STEP_UP_STORAGE_KEY, JSON.stringify(next));
   } catch {

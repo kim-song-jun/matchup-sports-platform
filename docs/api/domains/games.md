@@ -108,6 +108,11 @@ non-null `sideLabel` snapshot for each row. Clients must render that context as 
 must not infer a participant's side from list ordering; a missing side context is an integrity
 error rather than a display fallback.
 
+기록 연결 후보 목록과 연결 신청(`identity-link` request)은 명단 공개(`isLineupPublished` — 공개 경기 화면과 같은
+킥오프 60분 전 기준) 전에는 신청자가 활성 멤버인 팀의 side만 다룬다(두 팀 모두의 멤버면 둘 다). 공개 뒤에는
+상대 side도 열어 상대 팀에 용병으로 뛴 팀원이 자기 이름을 찾을 수 있다. 공개 전 상대 side 참가자에게 신청하면
+403 `PERMISSION_DENIED`, 후보·`rosterCount`·`rosterSubmitted`도 그 범위로 센다. platform_ops 는 좁히지 않는다.
+
 ### Penalty-shootout conclusion rule
 
 Tournament shootouts use a three-kick opening series. With `earlyStop: true` (the default),

@@ -61,9 +61,15 @@ GET도 row가 없으면 기본값으로 실제 row를 생성한다. PATCH는 위
 
 ### POST `/notifications/push-subscribe`
 
+`endpoint` 는 표준 브라우저 푸시 서비스(`fcm.googleapis.com`·`updates.push.services.mozilla.com`·`notify.windows.com`·
+`web.push.apple.com` 와 그 하위 도메인)의 https URL 이어야 하고, 포트·사용자 정보를 붙일 수 없다(400). 서버는 WHATWG 표준형으로
+저장하고(원문 형태로 저장된 옛 행은 재구독 때 같은 소유 규칙으로 표준형 행에 합친다), 보내기 직전에 같은 검사를 다시 해
+통과하지 못한 구독(검사 도입 전에 저장된 행)은 보내지 않고 지운다(`src/notifications/push-endpoint.ts`).
+`push-unsubscribe` 는 자기 행을 저장된 문자열로 지우기만 하므로 이 검사를 걸지 않는다(빈 값·2048자 초과만 400).
+
 ```json
 {
-  "endpoint": "https://push-service.example/subscription",
+  "endpoint": "https://fcm.googleapis.com/fcm/send/subscription-id",
   "keys": {
     "p256dh": "base64url",
     "auth": "base64url"
@@ -75,7 +81,7 @@ GET도 row가 없으면 기본값으로 실제 row를 생성한다. PATCH는 위
 
 ```json
 {
-  "endpoint": "https://push-service.example/subscription"
+  "endpoint": "https://fcm.googleapis.com/fcm/send/subscription-id"
 }
 ```
 

@@ -80,7 +80,7 @@
 V1_VERIFICATION_DEV_ECHO=true
 ```
 
-`SMS_PROVIDER=gabia`로 설정했지만 `GABIA_SMS_ID`/`GABIA_API_KEY`/`GABIA_SENDER_NUMBER` 중 하나라도 비어 있어 `GabiaSmsSender.enabled === false`인 상태에서 `V1_VERIFICATION_DEV_ECHO=true`이면, `VerificationDispatcherService`는 실제 발송을 시도하지 않고 발급한 인증코드를 **API 응답의 `devCode` 필드로 그대로 반환**한다. 3개 값이 모두 채워져 `enabled === true`가 되면 dev-echo 여부와 무관하게 항상 실제 가비아 발송이 우선한다. 프로덕션에서는 `V1_VERIFICATION_DEV_ECHO`를 설정하지 않는다.
+`SMS_PROVIDER=gabia`로 설정했지만 `GABIA_SMS_ID`/`GABIA_API_KEY`/`GABIA_SENDER_NUMBER` 중 하나라도 비어 있어 `GabiaSmsSender.enabled === false`인 상태에서 `V1_VERIFICATION_DEV_ECHO=true`이면, `VerificationDispatcherService`는 실제 발송을 시도하지 않고 발급한 인증코드를 **API 응답의 `devCode` 필드로 반환**한다(테스트 대상에만 — `docs/ops/solapi-setup.md` 와 같은 규칙). 3개 값이 모두 채워져 `enabled === true`가 되면 dev-echo 여부와 무관하게 항상 실제 가비아 발송이 우선한다. 프로덕션에서는 `V1_VERIFICATION_DEV_ECHO`를 설정하지 않는다.
 
 ---
 

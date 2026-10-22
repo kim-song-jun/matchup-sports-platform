@@ -352,6 +352,8 @@ export class TournamentsAdminService {
           scheduledEndAt: dto.scheduledEndAt ? new Date(dto.scheduledEndAt) : null,
           ...this.venueColumns(venueSnapshot),
           coverImageUrl: dto.coverImageUrl ?? null,
+          listImageUrl: nullableText(dto.listImageUrl) ?? null,
+          showDetailImage: dto.showDetailImage ?? true,
           teamCount: dto.teamCount,
           minPlayers: dto.minPlayers ?? 6,
           maxPlayers: dto.maxPlayers ?? 10,
@@ -574,6 +576,8 @@ export class TournamentsAdminService {
     if (venueSnapshot !== undefined) Object.assign(data, this.venueColumns(venueSnapshot));
     if (dto.parkingInfo !== undefined) data.parkingInfo = nullableText(dto.parkingInfo);
     if (dto.coverImageUrl !== undefined) data.coverImageUrl = dto.coverImageUrl;
+    if (dto.listImageUrl !== undefined) data.listImageUrl = nullableText(dto.listImageUrl);
+    if (dto.showDetailImage !== undefined && dto.showDetailImage !== null) data.showDetailImage = dto.showDetailImage;
     if (dto.teamCount !== undefined) data.teamCount = dto.teamCount;
     if (dto.minPlayers !== undefined) data.minPlayers = dto.minPlayers;
     if (dto.maxPlayers !== undefined) data.maxPlayers = dto.maxPlayers;
@@ -1396,6 +1400,8 @@ export class TournamentsAdminService {
       latitude: row.latitude,
       longitude: row.longitude,
       coverImageUrl: row.coverImageUrl,
+      listImageUrl: row.listImageUrl,
+      showDetailImage: row.showDetailImage,
       teamCount: row.teamCount,
       minPlayers: row.minPlayers,
       maxPlayers: row.maxPlayers,

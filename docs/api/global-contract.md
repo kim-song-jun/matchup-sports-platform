@@ -1,3 +1,5 @@
+자책골은 점수가 올라간 팀 영역에 표시한다. 공개 일정·경기 상세의 `side`, 팀 전적의 `own/opponent`, 공식 결과 득점의 `team`은 득점 귀속 `sideId`를 따른다. 선수 이름·프로필과 `OWN_GOAL`/`ownGoal`·OG 표시는 실제 행위 선수를 유지하며 개인 득점에는 합산하지 않는다. 라이브 이벤트와 공식 revision JSON에 동일하게 적용한다. [공개 기록 계약](./domains/public-records.md#own-goal-display-side-2026-10-22).
+
 결선 배정 미리보기의 version/sourceVersion은 동일한 조별 원천의 DB 반환 순서에 영향받지 않는다. 실제 성적·순위·대진 변경과 시작 경기 보호는 유지하며 [대회 계약](./domains/tournaments.md)을 따른다.
 
 리그 표시는 모집완료·진행 중·보류·종료 4개로 통일한다. 호환 `draft`는 저장 상태 `draft/open/closed` 전체를 묶으며 모집 가능 여부·공개 여부는 별도다. 내 담당 대회는 `tournamentKind`로 종류를 구분한다. [리그 표시 계약](./domains/league-matches.md#league-display-states-2026-10-19).
@@ -213,3 +215,15 @@ Support admins may only read. See [admin roster settings](./domains/tournaments.
 공통 결선 배정은 `GET .../bracket/finalist-preview` → `POST .../bracket/finalist-assignments`로 수행한다([대회 계약](./domains/tournaments.md#공통-결선-진출팀-배정-2026-10-21)). 활성 관리자 읽기/쓰기 분리, SHA256 preview 버전 재검증, 사유·변경 전후 감사, 단일 트랜잭션/부분 성공 없음 원칙을 따른다. 공식 순위는 변경하지 않으며 운영자 결선 배정안만 저장한다.
 
 빈 템플릿 조 정리(2026-10-21): 기존 관리자 mutation 권한·대회 레인 잠금·단일 트랜잭션을 유지한다. 실제 배정/경기/슬롯 참조는409로 보호하고, 비어 있는 미사용 자리와 그에 종속된 고아 편성만 삭제 시 정리한다. 세부 조건은 [대회 계약](./domains/tournaments.md)을 따른다.
+
+대회 이미지 설정은 기존 관리자 create/PATCH 권한·CAS·감사 계약으로 저장한다. `showDetailImage: false`는 사진 삭제 없이 상세 미디어만 숨긴다. [대회 이미지 계약](./domains/tournaments.md#목록상세-이미지와-상세-숨김-2026-10-22)을 따른다.
+
+
+### Competition discovery pagination extension (Task 20261103)
+
+The public `/tournaments` collection additionally accepts phase/registration/date/format/fee
+filters and latest/deadline/scheduled sorting. This domain retains `pageInfo` pagination rather
+than the frozen game contracts above: numbered pages include total/totalPages; cursor callers
+opt into total with `withTotal=true`. Filters run before pagination and do not widen public
+visibility. Admission-window and capacity semantics, 400 range errors, and backward-compatible
+status inputs are defined in [Tournaments](./domains/tournaments.md#competition-discovery-filters-task-20261103).

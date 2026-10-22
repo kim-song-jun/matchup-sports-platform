@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { resolveTournamentImage } from '@/lib/tournament-promo';
 import { useSearchParams } from 'next/navigation';
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
@@ -793,10 +794,12 @@ export function TournamentDetailView({
      layout and the completed layout, which relocates it above the result hero (TARGET §1). ── */
   const headerIdentitySection = (
     <>
-    {tournament.kind === 'regular_league' && tournament.coverImageUrl?.trim() ? (
+    {(tournament.kind === 'regular_league'
+      ? Boolean(tournament.coverImageUrl?.trim())
+      : tournament.showDetailImage !== false) ? (
       <div className="mb-4 aspect-video overflow-hidden rounded-[var(--radius-container)] bg-[var(--grey50)]">
         <TournamentCampaignMedia
-          src={tournament.coverImageUrl}
+          src={tournament.kind === 'regular_league' ? tournament.coverImageUrl : resolveTournamentImage(tournament, 'detail')}
           sportCode={tournament.sport?.code ?? ''}
           alt={`${tournament.title} 대표 이미지`}
           className="h-full w-full object-contain"

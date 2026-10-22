@@ -110,14 +110,20 @@ function renderSection(canWrite: boolean, overrides: Partial<V1Tournament> = {})
 }
 
 describe('TournamentInfoSection', () => {
+  it('상세 이미지 숨김은 CAS 버전과 함께 저장하고 사진을 지우지 않는다', () => {
+    renderSection(true, { listImageUrl: '/uploads/list.webp', coverImageUrl: '/uploads/detail.webp', showDetailImage: true });
+    fireEvent.click(screen.getByRole('switch', { name: '상세 이미지 표시' }));
+    expect(hooks.mutate).toHaveBeenCalledWith({ showDetailImage: false, expectedVersion: tournament.updatedAt }, expect.any(Object));
+  });
+
   it('같은 값을 두 번 그리지 않는다', () => {
     renderSection(true);
 
     for (const label of ['신청 마감', '명단 마감', '참가비', '팀 수', '출전 인원', '교체 방식', '입금 계좌']) {
       expect(screen.getAllByText(label)).toHaveLength(1);
     }
-    // 카드 제목과 업로더 자체 label이 겹쳐 '커버 이미지'가 두 번 뜬 적이 있다.
-    expect(screen.getAllByText('커버 이미지')).toHaveLength(1);
+    expect(screen.getAllByText('목록 이미지 (선택)')).toHaveLength(1);
+    expect(screen.getAllByText('상세 이미지 (선택)')).toHaveLength(1);
   });
 
   it('편집 진입점은 관심사마다 하나씩이다', () => {
@@ -158,6 +164,8 @@ describe('TournamentInfoSection', () => {
     // 상금 저장 버튼과 입력이 함께 잠긴다 — 예전에는 둘 다 그대로 노출됐다.
     expect(screen.queryByRole('button', { name: '상금 정보 저장' })).not.toBeInTheDocument();
     expect(screen.getByLabelText('상품 및 상금')).toBeDisabled();
+    expect(screen.getByRole('switch', { name: '상세 이미지 표시' })).toBeDisabled();
+    expect(screen.getByLabelText('목록 이미지')).toBeDisabled();
   });
 });
 

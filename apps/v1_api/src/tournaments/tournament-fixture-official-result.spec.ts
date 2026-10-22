@@ -8,7 +8,7 @@ import {
   type TournamentFixtureGameForResult,
 } from './tournament-fixture-official-result';
 
-function officialGame(overrides: Record<string, unknown> = {}): TournamentFixtureGameForResult {
+function officialGame(overrides: Record<string, unknown> = {}): NonNullable<TournamentFixtureGameForResult> {
   return {
     sides: [
       { id: 'side-home', sideKey: 'HOME' },
@@ -27,7 +27,7 @@ function officialGame(overrides: Record<string, unknown> = {}): TournamentFixtur
       updatedAt: new Date('2026-08-01T00:00:00.000Z'),
     },
     ...overrides,
-  } as TournamentFixtureGameForResult;
+  } as NonNullable<TournamentFixtureGameForResult>;
 }
 
 describe('canonical official result resolver', () => {
@@ -109,5 +109,29 @@ describe('canonical official guards', () => {
     expect(resolveTournamentFixtureOfficialTimestamp({ currentOfficialRevision: { state: 'OFFICIAL', officialAt } })).toEqual(officialAt);
     expect(resolveTournamentFixtureOfficialTimestamp(null)).toBeNull();
     expect(resolveTournamentFixtureOfficialTimestamp({ currentOfficialRevision: { state: 'VOID', officialAt: null } })).toBeNull();
+  });
+});
+
+describe.each(['events', 'revision'] as const)('own-goal credited side (%s)', (source) => {
+  it.each(['home', 'away'] as const)('keeps %s credit and the opposing player identity', (credited) => {
+    const sideId = credited === 'home' ? 'side-home' : 'side-away';
+    const playerSideId = credited === 'home' ? 'side-away' : 'side-home';
+    const game = officialGame({
+      participants: [{ id: 'player-1', sideId: playerSideId, userId: 'user-1', displayNameSnapshot: '자책골 선수' }],
+      events: [{ id: 'og-1', type: 'OWN_GOAL', sideId, participantId: 'player-1', clockMs: 180000, reversesEventId: null, payload: null }],
+    });
+    if (source === 'revision') game.currentOfficialRevision!.goalEvents = [
+      { id: 'og-1', sideId, participantId: 'player-1', minute: 3, period: 1, ownGoal: true },
+    ];
+    const result = resolveTournamentFixtureOfficialResult(game);
+    expect(result?.score).toEqual({ homeScore: 2, awayScore: 1, hasPenalty: false, homePenaltyScore: null, awayPenaltyScore: null });
+    expect(result?.goals).toEqual([
+      { id: 'og-1', team: credited, playerId: 'player-1', playerUserId: 'user-1', playerName: '자책골 선수', minute: 3, ownGoal: true },
+    ]);
+  });
+  it.each([null, 'missing-player'])('preserves credited side when participant is %s', (participantId) => {
+    const game = officialGame({ events: [{ id: 'og-1', type: 'OWN_GOAL', sideId: 'side-away', participantId, clockMs: 60000, reversesEventId: null, payload: null }] });
+    if (source === 'revision') game.currentOfficialRevision!.goalEvents = [{ id: 'og-1', sideId: 'side-away', participantId, minute: 1, period: 1, ownGoal: true }];
+    expect(resolveTournamentFixtureOfficialResult(game)?.goals[0]).toMatchObject({ team: 'away', ownGoal: true, playerId: participantId });
   });
 });

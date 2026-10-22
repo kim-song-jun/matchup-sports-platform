@@ -3016,13 +3016,48 @@ export class GamesService {
     return this.listClaimableParticipantsForGame(user, teamMatch.game);
   }
 
+  /**
+   * 신원 연결을 고를·신청할 수 있는 사이드. 명단 공개(isLineupPublished — 공개 경기 화면과 같은 기준) 전에는
+   * 신청자가 활성 멤버인 팀의 사이드만이다(두 팀 모두의 멤버면 둘 다). 공개 뒤에는 상대 쪽도 연다 — 상대 팀에
+   * 용병으로 빌려 간 팀원이 그쪽 명단에서 자기 이름을 찾아야 한다. 팀 범위가 없는 운영자(platform_ops)는 좁히지 않는다.
+   */
+  private async identityClaimSideScope(
+    tx: Transaction | PrismaService,
+    actor: { readonly role: string; readonly teamId?: string | null },
+    gameId: string,
+    userId: string,
+  ): Promise<{ sideId?: { in: string[] } }> {
+    if (!hasTeamScope(actor)) return {};
+    const game = await tx.v1Game.findUnique({
+      where: { id: gameId },
+      select: { visibilityPolicy: { select: { lineupAt: true } }, teamMatch: { select: { startAt: true } } },
+    });
+    const published = isLineupPublished(
+      { lineupAt: game?.visibilityPolicy?.lineupAt ?? null, scheduledAt: game?.teamMatch?.startAt ?? null },
+      new Date(),
+    );
+    if (published) return {};
+    const sides = await tx.v1GameSide.findMany({
+      where: { gameId, teamId: { not: null } },
+      select: { id: true, teamId: true },
+    });
+    const memberships = await tx.v1TeamMembership.findMany({
+      where: { userId, status: 'active', teamId: { in: sides.map((side) => side.teamId as string) } },
+      select: { teamId: true },
+    });
+    const ownTeamIds = new Set(memberships.map((membership) => membership.teamId));
+    return { sideId: { in: sides.filter((side) => ownTeamIds.has(side.teamId as string)).map((side) => side.id) } };
+  }
+
   private async listClaimableParticipantsForGame(
     user: V1AuthUser,
     game: { id: string; version: number },
   ) {
     const gameId = game.id;
     // 신청 자격과 동일한 스코프. 비참가자는 여기서 403 으로 끊긴다.
-    await this.resolveActor(this.prisma, gameId, user.id, 'participant_identity');
+    const actor = await this.resolveActor(this.prisma, gameId, user.id, 'participant_identity');
+    // 이 목록은 자기 이름을 골라 연결을 신청하는 데만 쓴다 — 공개 전인 상대 팀 명단은 내리지 않는다.
+    const sideScope = await this.identityClaimSideScope(this.prisma, actor, gameId, user.id);
 
     // 감사 결함 수정(2026-08-27): 예전엔 gameId 로만 걸러 사이드마다 쌓인 모든 라인업
     // 리비전의 참가자 행을 통째로 돌려줬다 -- listLineups/listOperationsLineups(위
@@ -3035,14 +3070,14 @@ export class GamesService {
     // participantId 로만 쓰이므로 개인 기록이 영원히 매칭되지 않는다(public-user-records
     // .service.ts). 최신 리비전으로만 좁혀 애초에 고를 수 없게 한다.
     const lineups = await this.prisma.v1GameLineup.findMany({
-      where: { gameId },
+      where: { gameId, ...sideScope },
       // 공식 결과 스냅샷(deriveTournamentRevision)이 DRAFT 리비전을 빼는 이상, 신원
       // 연결 후보도 같은 기준이어야 한다 — 아니면 위 주석이 경고한 그대로, 공식 결과에
       // 실리지 않을 participantId 를 연결해 개인 기록이 영원히 매칭되지 않는다.
       select: { id: true, sideId: true, revision: true, state: true, invalidatedAt: true },
     });
     const participantCandidates = await this.prisma.v1GameParticipant.findMany({
-      where: { gameId },
+      where: { gameId, ...sideScope },
       select: {
         id: true,
         sideId: true,
@@ -4076,6 +4111,10 @@ export class GamesService {
         });
         if (side?.teamId === null || side?.teamId === undefined) {
           throw this.notFound('GAME_PARTICIPANT_NOT_FOUND');
+        }
+        const sideScope = await this.identityClaimSideScope(tx, actor, gameId, user.id);
+        if (sideScope.sideId !== undefined && !sideScope.sideId.in.includes(participant.sideId)) {
+          throw this.forbidden();
         }
         const [lineups, candidateRows] = await Promise.all([
           tx.v1GameLineup.findMany({

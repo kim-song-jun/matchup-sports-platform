@@ -497,6 +497,13 @@ export class TeamsService {
 
     const limit = Math.min(Math.max(query.limit ?? 50, 1), 100);
     const status = query.status ?? 'active';
+    // 공개 설정은 지금 팀원 목록에만 해당한다. 떠난·내보낸 사람의 기록은 팀 관리자만 본다.
+    if (status !== 'active' && viewer.role !== 'owner' && viewer.role !== 'manager') {
+      throw new ForbiddenException({
+        code: 'TEAM_MEMBER_HISTORY_FORBIDDEN',
+        message: '지난 팀원 목록은 팀장과 매니저만 볼 수 있어요.',
+      });
+    }
     const [memberships, ownerCount] = await Promise.all([
       this.prisma.v1TeamMembership.findMany({
         where: {

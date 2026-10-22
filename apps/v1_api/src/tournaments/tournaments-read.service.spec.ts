@@ -38,6 +38,8 @@ function tournamentCard(overrides: Record<string, unknown> = {}) {
     scheduledEndAt: null,
     venue: '서울 풋살장',
     coverImageUrl: '/uploads/tournaments/spring-cup.webp',
+    listImageUrl: null,
+    showDetailImage: true,
     teamCount: 8,
     entryFee: 60000,
     bankName: '국민은행',
@@ -133,6 +135,8 @@ function fullTournamentRow(overrides: Record<string, unknown> = {}) {
     venue: '서울 풋살장',
     parkingInfo: '지하 주차장 2시간 무료',
     coverImageUrl: '/uploads/tournaments/spring-cup.webp',
+    listImageUrl: null,
+    showDetailImage: true,
     teamCount: 8,
     minPlayers: 6,
     maxPlayers: 10,
@@ -326,10 +330,13 @@ describe('TournamentsReadService', () => {
     expect(result.pageInfo).toEqual({ nextCursor: null, hasNext: false });
   });
 
-  it.each(['/uploads/list.webp', null])('list: 리그 목록 이미지를 우선하고 한 장만 있으면 상세 이미지를 쓴다 (%s)', async (listImageUrl) => {
+  it.each([
+    ['regular_league', '/uploads/list.webp'], ['regular_league', null],
+    ['regular_tournament', '/uploads/list.webp'], ['regular_tournament', null],
+  ])('list: %s 목록 이미지를 우선하고 한 장만 있으면 상세 이미지를 쓴다 (%s)', async (kind, listImageUrl) => {
     mockListQueries(['league-1']);
     prisma.v1Tournament.findMany.mockResolvedValueOnce([
-      tournamentCard({ id: 'league-1', kind: 'regular_league', coverImageUrl: '/uploads/detail.webp', listImageUrl }),
+      tournamentCard({ id: 'league-1', kind, coverImageUrl: '/uploads/detail.webp', listImageUrl }),
     ]);
     const result = await service.list({});
     expect(result.items[0].coverImageUrl).toBe(listImageUrl ?? '/uploads/detail.webp');
@@ -571,6 +578,8 @@ describe('TournamentsReadService', () => {
       sportId: 'sport-1',
       sport: { code: 'futsal', name: '풋살' },
       coverImageUrl: '/uploads/tournaments/spring-cup.webp',
+      listImageUrl: null,
+      showDetailImage: true,
       parkingInfo: '지하 주차장 2시간 무료',
       confirmedCount: 4,
       pendingPaymentCount: 1,
@@ -1309,6 +1318,8 @@ describe('TournamentsReadService', () => {
     ['regular_league', null, '/uploads/list.webp', '/uploads/list.webp'],
     ['regular_league', null, null, null],
     ['regular_tournament', null, '/uploads/list.webp', null],
+    ['regular_tournament', '/uploads/detail.webp', '/uploads/list.webp', '/uploads/detail.webp'],
+    ['regular_tournament', null, null, null],
   ])('get: %s detail image resolves independently (%s, %s)', async (kind, coverImageUrl, listImageUrl, expected) => {
     prisma.v1Tournament.findFirst.mockResolvedValue(fullTournamentRow({ kind, coverImageUrl, listImageUrl }));
     jest.spyOn(service as unknown as { leagueCompetitionFixtures: () => Promise<unknown[]> }, 'leagueCompetitionFixtures').mockResolvedValue([]);
@@ -1316,9 +1327,18 @@ describe('TournamentsReadService', () => {
     const result = await service.get('tournament-1');
 
     expect(result.coverImageUrl).toBe(expected);
-    if (kind === 'regular_league') expect(result.listImageUrl).toBe(listImageUrl);
-    else expect(result).not.toHaveProperty('listImageUrl');
+    expect(result.listImageUrl).toBe(listImageUrl);
+    expect(result.showDetailImage).toBe(true);
   });
+  it.each([true, false])('get: 대회 상세 표시 %s를 두 사진과 함께 그대로 반환한다', async (showDetailImage) => {
+    prisma.v1Tournament.findFirst.mockResolvedValue(fullTournamentRow({
+      kind: 'regular_tournament', coverImageUrl: '/uploads/detail.webp', listImageUrl: '/uploads/list.webp', showDetailImage,
+    }));
+    expect(await service.get('tournament-1')).toMatchObject({
+      coverImageUrl: '/uploads/detail.webp', listImageUrl: '/uploads/list.webp', showDetailImage,
+    });
+  });
+
   it('get: DateTime fields are serialized as ISO strings', async () => {
     const scheduledDate = new Date('2026-07-01T09:00:00.000Z');
     const scheduledEndDate = new Date('2026-07-02T09:00:00.000Z');

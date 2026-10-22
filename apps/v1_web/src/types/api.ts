@@ -166,7 +166,8 @@ export type V1LoginStepUpResponse = { stepUp: V1LoginStepUpChallenge };
 /** `POST /auth/login` 결과 — 세션이거나 추가 인증 챌린지다. */
 export type V1EmailLoginResult = V1AuthSessionResponse | V1LoginStepUpResponse;
 
-export type V1LoginStepUpResendResult = Pick<V1LoginStepUpChallenge, 'expiresAt' | 'resendAvailableAt' | 'devCode'>;
+/** 재발송은 에코 환경에서도 인증번호를 싣지 않는다 — 챌린지별 답이 되면 비밀번호가 맞았는지 드러난다. */
+export type V1LoginStepUpResendResult = Pick<V1LoginStepUpChallenge, 'expiresAt' | 'resendAvailableAt'>;
 
 export type V1Sport = {
   id: string;
@@ -3684,6 +3685,7 @@ export type V1TournamentListItem = {
   scheduledEndAt: string | null;
   venue: string | null;
   coverImageUrl: string | null;
+  listImageUrl?: string | null;
   /**
    * **정규 대회의 참가팀 정원.** 리그는 별도 maxTeams를 쓰므로 서버가 생략한다.
    *
@@ -3770,6 +3772,8 @@ export type V1Tournament = {
   venueProvider?: 'kakao' | null;
   venueProviderId?: string | null;
   coverImageUrl: string | null;
+  listImageUrl?: string | null;
+  showDetailImage?: boolean;
   teamCount: number;
   minPlayers: number;
   /** null = 팀당 선수 인원 제한 없음(리그). 참가팀 정원(maxTeams)과 별개다. */
@@ -4081,8 +4085,9 @@ export type V1TournamentDetail = {
   venueProvider?: 'kakao' | null;
   venueProviderId?: string | null;
   coverImageUrl: string | null;
-  /** 정규 리그 목록용 이미지. coverImageUrl은 상세용이다. */
+  /** 목록용 이미지. coverImageUrl은 상세용이다. */
   listImageUrl?: string | null;
+  showDetailImage?: boolean;
   teamCount: number;
   minPlayers: number;
   /** null = 팀당 선수 인원 제한 없음(리그). 참가팀 정원(maxTeams)과 별개다. */
@@ -4713,6 +4718,8 @@ export type V1CreateTournamentPayload = {
   venueProvider?: 'kakao' | null;
   venueProviderId?: string | null;
   coverImageUrl?: string | null;
+  listImageUrl?: string | null;
+  showDetailImage?: boolean;
   teamCount?: number;
   minPlayers?: number;
   maxPlayers?: number;

@@ -18,7 +18,7 @@ import { extractErrorMessage, extractErrorCode } from '@/lib/error-message';
 import { formatWithComma, onlyDigits } from '@/lib/number-format';
 import type { V1Tournament, V1TournamentFormat, V1TournamentGenderCategory } from '@/types/api';
 import { AdminPageHeader, AdminToasts, useAdminToast } from '@/components/admin';
-import { CoverImageUploader } from '@/components/admin/tournaments/cover-image-uploader';
+import { TournamentImagesField } from '@/components/admin/tournaments/tournament-images-field';
 import {
   PrizeBreakdownEditor,
   type TournamentPrizeRow,
@@ -243,9 +243,9 @@ export default function AdminTournamentsNewPage() {
       const uploaded = await uploadImages.mutateAsync([file]);
       const url = uploaded.urls[0];
       if (!url) throw new Error('이미지 업로드 결과가 비어 있어요.');
-      setField('coverImageUrl', url);
+      return url;
     } catch (error) {
-      showToast(extractErrorMessage(error, '커버 이미지 업로드에 실패했어요.'), 'error');
+      throw new Error(extractErrorMessage(error, '이미지 업로드에 실패했어요.'));
     }
   };
 
@@ -1349,19 +1349,21 @@ function PresentationStep({
   errors: Record<string, string>;
   dispatch: React.Dispatch<TournamentCreateAction>;
   setField: SetField;
-  onCoverUpload: (file: File) => Promise<void>;
+  onCoverUpload: (file: File) => Promise<string>;
   onPromoUpload: (slot: 'promoHome' | 'promoList', file: File) => Promise<void>;
   fallback: { title: string; venue: string | null; sportName: string | null };
 }) {
   return (
     <div className="grid gap-6">
-      <CoverImageUploader
-        value={state.coverImageUrl}
-        onSelectFile={(file) => void onCoverUpload(file)}
-        onClear={() => setField('coverImageUrl', null)}
-        uploading={uploadPending && promoUploadingSlot === null}
-        disabled={pending}
-        eager
+      <TournamentImagesField
+        coverImageUrl={state.coverImageUrl}
+        listImageUrl={state.listImageUrl}
+        showDetailImage={state.showDetailImage}
+        sportCode={fallback.sportName ?? undefined}
+        onImageChange={(field, value) => setField(field, value)}
+        onVisibilityChange={(visible) => setField('showDetailImage', visible)}
+        onUpload={onCoverUpload}
+        disabled={pending || uploadPending}
       />
 
       <section className="grid gap-4">
@@ -1485,6 +1487,7 @@ function PresentationStep({
           defaultImageUrl={resolveTournamentImage(
             {
               coverImageUrl: state.coverImageUrl,
+              listImageUrl: state.listImageUrl,
               promoHomeImageUrl: null,
               promoListImageUrl: state.promoList.imageUrl,
             },
@@ -1508,6 +1511,7 @@ function PresentationStep({
           defaultImageUrl={resolveTournamentImage(
             {
               coverImageUrl: state.coverImageUrl,
+              listImageUrl: state.listImageUrl,
               promoHomeImageUrl: state.promoHome.imageUrl,
               promoListImageUrl: null,
             },

@@ -177,9 +177,9 @@ export function LoginStepUpVerifyClient() {
             ...current,
             expiresAt: result.expiresAt,
             resendAvailableAt: result.resendAvailableAt,
-            devCode: result.devCode,
+            devCode: undefined,
           });
-          setCode(result.devCode ?? '');
+          setCode('');
           setCodeExhausted(false);
           setNotice({ message: '인증번호를 다시 보냈어요. 메일함을 확인해 주세요.', tone: 'info' });
           setResendCount((count) => count + 1);

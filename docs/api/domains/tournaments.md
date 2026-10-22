@@ -180,6 +180,51 @@ For a league, `progress` counts only fixtures that can still be played: cancelle
 are excluded from `played`, `remaining`, **and `total`**. Counting a fixture that will never be played
 as "remaining" would keep progress permanently below 100%.
 
+
+## Competition discovery filters (Task 20261103)
+
+`GET /api/v1/tournaments` retains the public surface: regular tournaments expose only
+`open/closed/in_progress/completed`; regular leagues also expose `draft`. Cancelled, on_hold, deleted, and isPublic=false rows remain hidden. `kind=all|tournament|league` defaults to `tournament` at the API;
+the web explicitly requests `all` for its default tab.
+
+| Query | Values / behavior |
+|---|---|
+| `phase` | `upcoming` = draft/open/closed intersected with public gate; `ongoing` = in_progress; `completed` = completed |
+| `registration` | `open` = accepting new registrations; `closed` = remaining public competitions |
+| `sportId` | UUID, existing sport filter |
+| `genderCategory` | mixed/male/female/unspecified; unspecified matches null |
+| `format` | league/knockout/group_knockout; format is not competition kind |
+| `feeMin`, `feeMax` | integer KRW, inclusive 0–2147483647; max=0 selects free |
+| `dateFrom`, `dateTo` | real calendar date YYYY-MM-DD, inclusive Asia/Seoul day boundaries; period overlap; undated rows excluded |
+| `sort` | latest (createdAt desc), deadline (deadline asc), scheduled (start asc); nulls last, id byte-order asc ties; absent sort retains the existing lifecycle-group ordering |
+| `withTotal` | literal string true adds actual total to cursor pageInfo; numbered pages already include total |
+
+`deadline` also enforces registration=open. Tournament admission requires status=open,
+no expired deadline (null is permitted), and confirmed + awaiting_payment + payment_checking +
+paid registrations below teamCount. Leagues require a non-null unexpired deadline and a
+nonterminal lifecycle; optional maxTeams is checked against the same reserved registrations (null means unlimited), and in_progress leagues can still accept entries.
+The deadline equality instant is open. `registrationOpen` on every list item uses the same
+window/capacity semantics, independent of the viewer's individual team eligibility.
+
+All conditions and sort apply before pagination in the existing SQL keyset query. Default cursors remain compatible; explicit-sort cursors carry their sort mode and cannot be reused across modes.
+Legacy `status` is retained and intersects new filters. Contradictory filters return an empty
+list. Reversed date or fee ranges return 400 `INVALID_FILTER_RANGE`; malformed/unknown inputs
+are rejected by the existing DTO validation pipe. Gender/format/fee conditions narrow to
+regular tournaments (including legacy null kind); the web only offers them in the tournament tab.
+
+For dates, scheduledAt must exist. The interval end is scheduledEndAt or scheduledAt when
+end is absent. Date filters do not change lifecycle status. `upcoming` is an operational stage,
+not a deduction from the first fixture's actual kickoff.
+
+Frontend: applied filters live in URL, sheet choices remain local until submit, compatible
+filters survive kind changes. New hook/type modules are `use-competition-discovery.ts` and
+`lib/competition-discovery.ts`; the existing shared API files contain unrelated WIP and are
+preserved. Test MSW factory: `src/test/msw/competition-discovery-handlers.ts` (test fixtures only;
+not a runtime fallback). Real PostgreSQL query behavior is covered by
+`test/tournaments/competition-discovery.integration-spec.ts`; execution requires the isolated
+integration database. Unit/UI/MSW checks do not replace that verification or alpha browser QA.
+
+
 ## Individual awards
 
 `GET /api/v1/admin/tournaments/:tournamentId/awards` returns the saved award list, and `PUT` to the same path replaces it atomically. Each admin item contains `awardType`, `awardLabel`, nullable `iconKey`, `recipientName`, nullable `recipientUserId`, nullable `teamName`, nullable `note`, and optional `sortOrder` on writes. New writes require a UUID `recipientUserId`; the nullable admin read shape only accommodates historical rows that could not be linked without ambiguity. `iconKey` accepts `trophy`, `crown`, `goal`, `shield`, `glove`, `handshake`, `sparkles`, `medal`, or `star`; unknown values are rejected by DTO validation. Public `GET /api/v1/tournaments/:id` keeps the display snapshot but deliberately omits `recipientUserId`, so a public award cannot bypass the user's record-consent gate to reveal account linkage. Existing rows with `iconKey=null` retain the legacy `awardType`-based icon mapping in the Web client.
@@ -712,3 +757,11 @@ are not rewritten. UI uses per-player edit/save/cancel; errors preserve the draf
 - DB schema/migration 변경 없음. 관련 모델은 `V1TournamentGroup`, `V1TournamentStanding`, `V1TournamentSlot`, `V1TournamentMatchDetails`, `V1TeamMatch`, `V1Game`, 진출 edge 및 관리자 감사 로그다. destructive seed/backfill은 없다.
 
 경기0인 조별 ENTRY 배정 변경도 자리의 groupId를 기준으로 조 편성을 생성/해제한다. 최종 ENTRY 또는 비삭제·비취소 경기에 남은 팀은 해제하지 않으며 배치 교환은 모든 자리 변경 후 정리한다. 참가 신청/확정 상태와 팀 선수 명단은 변경하지 않는다. (2026-10-21, Task20261100)
+
+## 목록·상세 이미지와 상세 숨김 (2026-10-22)
+
+`POST /admin/tournaments`와 `PATCH /admin/tournaments/:id`는 `coverImageUrl`(상세용), `listImageUrl`(목록용) 및 `showDetailImage`(boolean, 기본 true)를 받는다. 두 URL은 각각 최대 1000자이며 null로 해당 사진만 제거할 수 있다. 생략한 PATCH 필드는 보존된다. `showDetailImage: false`는 사진을 삭제하지 않는다. 기존 mutation-admin 권한, PATCH `expectedVersion` CAS 및 감사 계약을 그대로 사용하며 충돌은 `409 TOURNAMENT_VERSION_CONFLICT`다. 업로드는 기존 이미지 업로드 API를 이용하며 업로드 성공만으로 대회 설정 저장 성공을 표시하지 않는다.
+
+관리자 응답은 원본 두 URL과 `showDetailImage`를 반환한다. 공개 상세도 이를 반환한다(리그 거울의 기존 cover fallback 유지). 공개 목록의 `coverImageUrl`은 기존 소비자 호환을 위해 `listImageUrl ?? coverImageUrl`이며 `listImageUrl`도 포함한다. 프론트 기본 목록은 목록 사진을 우선한다. 상세는 상세 사진→목록 사진→종목 기본 그래픽 순으로 표시하며 `showDetailImage: false`면 업로드·기본 이미지와 전체 영역을 렌더하지 않는다. 제목·본문·목록·홍보 노출은 유지된다. 새 설정은 정규 대회용이며 정규 리그의 기존 표시 정책은 유지한다.
+
+DB는 기존 `V1Tournament.listImageUrl`을 재사용하고 `v1_tournaments.show_detail_image BOOLEAN NOT NULL DEFAULT true`를 migration으로 추가한다. 기존 행은 true다. 홈/목록 홍보 카드의 기존 전용 이미지와 문구는 호환 유지하며, 기본 사진을 사용할 때 목록→상세 사진을 따른다. 상세는 홍보 전용 이미지를 fallback으로 사용하지 않는다.

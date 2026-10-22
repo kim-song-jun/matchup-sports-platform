@@ -628,3 +628,25 @@ describe('TournamentDetailPageClient — 신청 마감은 시각까지 보여요
     expect(within(rail).getByText('신청 마감 2099년 8월 10일 (월) 오후 11:59')).toBeInTheDocument();
   });
 });
+
+describe('대회 상세 이미지 표시', () => {
+  beforeEach(() => {
+    tournamentApiMocks.useV1MyRegistrations.mockReturnValue({ data: [] });
+    tournamentApiMocks.useV1Reviews.mockReturnValue({ data: { items: [], summary: { totalCount: 0, averageRating: null } }, isPending: false });
+  });
+  it.each(['open', 'completed'] as const)('%s 상세는 사진을 표시하고 숨기면 영역까지 제거한다', (status) => {
+    const data = makeTournament({ status, coverImageUrl: '/uploads/detail.webp', listImageUrl: '/uploads/list.webp', showDetailImage: true });
+    tournamentApiMocks.useV1Tournament.mockReturnValue({ data, isPending: false, isError: false });
+    const view = render(<TournamentDetailPageClient tournamentId="tournament-1" />);
+    expect(queryImageBySrc(view.container, '/uploads/detail.webp')).toBeInTheDocument();
+    data.showDetailImage = false;
+    view.rerender(<QueryClientProvider client={new QueryClient()}><TournamentDetailPageClient tournamentId="tournament-1" /></QueryClientProvider>);
+    expect(queryImageBySrc(view.container, '/uploads/detail.webp')).not.toBeInTheDocument();
+    expect(view.container.querySelector('.aspect-video')).not.toBeInTheDocument();
+  });
+  it('업로드가 없으면 기본 종목 그래픽을 표시한다', () => {
+    tournamentApiMocks.useV1Tournament.mockReturnValue({ data: makeTournament({ showDetailImage: true }), isPending: false, isError: false });
+    const view = render(<TournamentDetailPageClient tournamentId="tournament-1" />);
+    expect(view.container.querySelector('.tm-campaign-media-fallback')).toBeInTheDocument();
+  });
+});

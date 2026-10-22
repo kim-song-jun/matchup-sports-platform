@@ -213,6 +213,8 @@ function fakeDraftResponseForPayload(
     venue: payload.venue ?? null,
     venueAddress: payload.venueAddress ?? null,
     coverImageUrl: payload.coverImageUrl ?? null,
+    listImageUrl: payload.listImageUrl ?? null,
+    showDetailImage: payload.showDetailImage ?? true,
     teamCount: payload.teamCount ?? 8,
     minPlayers: payload.minPlayers ?? 6,
     maxPlayers: payload.maxPlayers ?? 10,
@@ -812,6 +814,15 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
     });
   });
 
+  it('초안을 다시 열면 두 사진과 false를 복원하고 다시 저장해도 유지한다', () => {
+    const hydrated = tournamentCreateReducer(INITIAL_TOURNAMENT_CREATE_STATE, {
+      type: 'hydrate-from-draft',
+      tournament: fakeDraftTournament({ coverImageUrl: '/uploads/detail.webp', listImageUrl: '/uploads/list.webp', showDetailImage: false }),
+    });
+    expect(hydrated).toMatchObject({ coverImageUrl: '/uploads/detail.webp', listImageUrl: '/uploads/list.webp', showDetailImage: false });
+    expect(buildTournamentCreatePayload(hydrated)).toMatchObject({ coverImageUrl: '/uploads/detail.webp', listImageUrl: '/uploads/list.webp', showDetailImage: false });
+  });
+
   it('T6b serializes "제한" substitution mode with its count, but omits the count entirely for "무제한"', () => {
     const limited = buildTournamentCreatePayload({
       ...INITIAL_TOURNAMENT_CREATE_STATE,
@@ -1003,6 +1014,19 @@ describe('AdminTournamentsNewPage — 4단계(공개 확인)', () => {
     });
     uploadMutateAsync.mockResolvedValue({ urls: ['/uploads/cover-test.webp'] });
     useV1UploadImagesMock.mockReturnValue({ mutateAsync: uploadMutateAsync, isPending: false });
+  });
+
+  it('목록·상세 사진과 표시 설정을 생성 payload로 전달한다', async () => {
+    renderPage();
+    goToPresentationStep();
+    const listFile = new File(['list'], 'list.webp', { type: 'image/webp' });
+    fireEvent.change(screen.getByLabelText('목록 이미지'), { target: { files: [listFile] } });
+    await waitFor(() => expect(screen.getByLabelText('목록 이미지')).toBeEnabled());
+    fireEvent.click(screen.getByRole('switch', { name: '상세 이미지 표시' }));
+    fireEvent.click(screen.getByRole('button', { name: '대회 만들기' }));
+    expect(createMutate).toHaveBeenCalledWith(expect.objectContaining({
+      listImageUrl: '/uploads/cover-test.webp', coverImageUrl: null, showDetailImage: false,
+    }), expect.any(Object));
   });
 
   it('상금·홍보 단계에서 CTA는 "다음"이 아니라 실제로 일어날 일(대회 만들기)을 말한다', () => {

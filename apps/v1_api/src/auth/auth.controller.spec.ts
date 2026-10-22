@@ -391,7 +391,8 @@ describe('AuthController', () => {
         controllers: [AuthController],
         providers: [
           { provide: AuthService, useValue: authService },
-          { provide: PrismaService, useValue: {} },
+          // The session cookie interceptor signs the cookie with the user's epoch.
+          { provide: PrismaService, useValue: { v1User: { findUniqueOrThrow: jest.fn().mockResolvedValue({ sessionEpoch: 0 }) } } },
           { provide: AppleIdentityService, useValue: appleIdentityDouble() },
         ],
       }).compile();

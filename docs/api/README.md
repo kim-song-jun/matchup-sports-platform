@@ -1,3 +1,5 @@
+자책골은 점수가 올라간 팀 영역에 표시한다. 공개 일정·경기 상세의 `side`, 팀 전적의 `own/opponent`, 공식 결과 득점의 `team`은 득점 귀속 `sideId`를 따른다. 선수 이름·프로필과 `OWN_GOAL`/`ownGoal`·OG 표시는 실제 행위 선수를 유지하며 개인 득점에는 합산하지 않는다. 라이브 이벤트와 공식 revision JSON에 동일하게 적용한다. [공개 기록 계약](./domains/public-records.md#own-goal-display-side-2026-10-22).
+
 템플릿 경기 전체 삭제 후에도 조별 자리 비우기가 편성을 정리하며, 조 삭제는 미사용 빈 자리/고아 편성만 원자적으로 정리한다. 실제 배정·경기·참조는 계속 보호한다. [대회 계약](./domains/tournaments.md) 참고.
 
 결선 배정 미리보기의 version/sourceVersion은 동일한 조별 원천의 DB 반환 순서에 영향받지 않는다. 실제 성적·순위·대진 변경과 시작 경기 보호는 유지하며 [대회 계약](./domains/tournaments.md)을 따른다.
@@ -46,7 +48,7 @@ Competition venue/field selection (2026-10-14): leagues and tournaments share a 
 - [Matches](./domains/matches.md)
 - [Teams](./domains/teams.md)
 - [Team matches](./domains/team-matches.md)
-- [Tournaments](./domains/tournaments.md) — 어드민 선수별 등번호·GK 저장, 대회 형식 수정·잠금 사유, 대진 생성·번호 수정·진출 연결 및 결과 계약, 5조·20팀→12강 추천·일괄 배정
+- [Tournaments](./domains/tournaments.md) — competition discovery filters/sort and registration capacity — 어드민 선수별 등번호·GK 저장, 대회 형식 수정·잠금 사유, 대진 생성·번호 수정·진출 연결 및 결과 계약, 5조·20팀→12강 추천·일괄 배정
 - [League matches](./domains/league-matches.md)
 - [Regular league public visibility](./domains/league-matches.md#public-visibility) — publication control, admin access and public read gates.
 - [Games](./domains/games.md)
@@ -121,3 +123,5 @@ Current Kakao signup and existing-account linking use the [provider contact conf
 대회 운영콘솔의 경기별 명단 편집은 기존 roster-adjustments API를 재사용한다. 대회·리그 이벤트 및 도움 추가에서 이전 명단 참가자는 422 PARTICIPANT_NOT_IN_CURRENT_ROSTER로 거부한다. [경기 계약](./domains/games.md#운영콘솔-경기-출전-명단-2026-10-20)을 따른다.
 
 - 조별 결과 기반 공통 결선 배정: [tournaments — 공통 결선 진출팀 배정](./domains/tournaments.md#공통-결선-진출팀-배정-2026-10-21). 수동 대진·불균등 조 지원, 기존 12강 규칙 보존.
+
+대회 목록·상세 이미지 2장과 상세 기본 이미지까지 숨기는 `showDetailImage` 설정은 [대회 이미지 계약](./domains/tournaments.md#목록상세-이미지와-상세-숨김-2026-10-22)을 따른다.

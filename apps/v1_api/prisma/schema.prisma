@@ -600,6 +600,8 @@ model V1User {
   deletedAt        DateTime?          @map("deleted_at")
   emailVerifiedAt  DateTime?          @map("email_verified_at")
   phoneVerifiedAt  DateTime?          @map("phone_verified_at")
+  /// 세션 쿠키는 서버에 저장하지 않는 서명표라, 이 값을 올리면 그 전에 발급된 쿠키가 모두 무효가 된다(비밀번호 재설정·탈퇴 신청).
+  sessionEpoch     Int                @default(0) @map("session_epoch")
   themePreference  V1ThemePreference  @default(light) @map("theme_preference")
 
   chatBlocksMade                 V1ChatUserBlock[] @relation("ChatBlockActor")
@@ -2706,6 +2708,7 @@ model V1Tournament {
   venueProviderId            String?                     @map("venue_provider_id")
   coverImageUrl              String?                     @map("cover_image_url")
   listImageUrl               String?                     @map("list_image_url")
+  showDetailImage            Boolean                     @default(true) @map("show_detail_image")
   teamCount                  Int                         @default(8) @map("team_count")
   minPlayers                 Int                         @default(6) @map("min_players")
   /// 팀 등록 명단 정원. null = 제한 없음(리그 기본값 — 팀 전원이 명단·라인업에 오른다). 대회는 항상 값을 채운다.

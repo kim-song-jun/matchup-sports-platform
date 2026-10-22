@@ -102,6 +102,7 @@ const EMAIL_LOGIN_IDENTITY_SELECT = {
       onboardingStatus: true,
       createdAt: true,
       updatedAt: true,
+      sessionEpoch: true,
     },
   },
 } satisfies Prisma.V1AuthIdentitySelect;
@@ -381,19 +382,22 @@ export class AuthService {
       });
     }
 
-    await this.prisma.$transaction([
-      this.prisma.v1AuthIdentity.update({
-        where: { id: identity.id },
-        data: { lastLoginAt: new Date() },
-      }),
-      this.prisma.v1User.update({
-        where: { id: identity.user.id },
-        data: { lastLoginAt: new Date() },
-      }),
-    ]);
+    // A password reset that lands between the password check and here changes the hash and bumps the epoch;
+    // the hash condition refuses this login, and the epoch read with the identity keeps its cookie pre-reset.
+    const now = new Date();
+    await this.prisma.$transaction(async (tx) => {
+      const touched = await tx.v1AuthIdentity.updateMany({
+        where: { id: identity.id, passwordHash: identity.passwordHash },
+        data: { lastLoginAt: now },
+      });
+      if (touched.count === 0) {
+        throw new UnauthorizedException({ code: 'UNAUTHENTICATED', message: 'Email or password is incorrect' });
+      }
+      await tx.v1User.update({ where: { id: identity.user.id }, data: { lastLoginAt: now } });
+    });
     await this.loginSecurity.record('success', keys);
 
-    return this.sessionResponse(identity.user.id, identity.user.email);
+    return this.sessionResponse(identity.user.id, identity.user.email, { sessionEpoch: identity.user.sessionEpoch });
   }
 
   async kakaoLogin(dto: KakaoLoginDto) {
@@ -1580,7 +1584,11 @@ export class AuthService {
     }
   }
 
-  private async sessionResponse(userId: string, userEmail: string | null, options?: { social?: boolean }) {
+  private async sessionResponse(
+    userId: string,
+    userEmail: string | null,
+    options?: { social?: boolean; sessionEpoch?: number },
+  ) {
     const snapshot = await this.me(userId);
     const onboardingRoute = getAuthNextRoute(snapshot.onboarding, options);
     const nextRoute = onboardingRoute
@@ -1592,6 +1600,8 @@ export class AuthService {
       session: {
         userId,
         userEmail,
+        // Read with the credentials it vouches for; V1SessionCookieInterceptor signs it and drops it from the body.
+        ...(options?.sessionEpoch === undefined ? {} : { sessionEpoch: options.sessionEpoch }),
       },
       next: nextRoute ? { route: nextRoute } : undefined,
       ...snapshot,

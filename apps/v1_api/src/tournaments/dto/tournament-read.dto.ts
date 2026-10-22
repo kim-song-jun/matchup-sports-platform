@@ -3,6 +3,8 @@ import {
   IsBoolean,
   IsIn,
   IsInt,
+  IsDateString,
+  Matches,
   IsOptional,
   IsString,
   IsUUID,
@@ -53,6 +55,50 @@ export type CompetitionListStatus = (typeof COMPETITION_LIST_STATUSES)[number];
 
 export class TournamentListQueryDto {
   @IsOptional()
+  @IsIn(['true'])
+  withTotal?: 'true';
+
+  @IsOptional()
+  @IsIn(['upcoming', 'ongoing', 'completed'])
+  phase?: 'upcoming' | 'ongoing' | 'completed';
+
+  @IsOptional()
+  @IsIn(['open', 'closed'])
+  registration?: 'open' | 'closed';
+
+  @IsOptional()
+  @IsIn(['latest', 'deadline', 'scheduled'])
+  sort?: 'latest' | 'deadline' | 'scheduled';
+
+  @IsOptional()
+  @IsIn(['league', 'knockout', 'group_knockout'])
+  format?: 'league' | 'knockout' | 'group_knockout';
+
+  @IsOptional()
+  @IsDateString({ strict: true })
+  @Matches(/^(?!0000)\d{4}-\d{2}-\d{2}$/)
+  dateFrom?: string;
+
+  @IsOptional()
+  @IsDateString({ strict: true })
+  @Matches(/^(?!0000)\d{4}-\d{2}-\d{2}$/)
+  dateTo?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(2147483647)
+  feeMin?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(2147483647)
+  feeMax?: number;
+
+  @IsOptional()
   @IsIn(COMPETITION_LIST_STATUSES)
   status?: CompetitionListStatus;
 
@@ -73,8 +119,8 @@ export class TournamentListQueryDto {
   kind?: CompetitionListKind;
 
   @IsOptional()
-  @IsIn(['mixed', 'male', 'female'])
-  genderCategory?: 'mixed' | 'male' | 'female';
+  @IsIn(['mixed', 'male', 'female', 'unspecified'])
+  genderCategory?: 'mixed' | 'male' | 'female' | 'unspecified';
 
   @IsOptional()
   @IsString()

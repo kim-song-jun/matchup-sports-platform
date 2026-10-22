@@ -348,7 +348,7 @@ describe('WithdrawalPageClient session termination', () => {
   });
 
   it('removes the browser subscription when the inactive-account guard rejects push-row cleanup', async () => {
-    const subscription = { endpoint: 'https://push.example/device', unsubscribe: vi.fn().mockResolvedValue(true) };
+    const subscription = { endpoint: 'https://fcm.googleapis.com/fcm/send/device', unsubscribe: vi.fn().mockResolvedValue(true) };
     vi.stubGlobal('navigator', {
       serviceWorker: { getRegistration: vi.fn().mockResolvedValue({ pushManager: { getSubscription: vi.fn().mockResolvedValue(subscription) } }) },
     });
@@ -456,7 +456,7 @@ describe('WithdrawalPageClient session termination', () => {
   });
 
   it('still clears the withdrawn session and navigates when browser subscription removal rejects', async () => {
-    const subscription = { endpoint: 'https://push.example/device', unsubscribe: vi.fn().mockRejectedValue(new Error('browser refused unsubscribe')) };
+    const subscription = { endpoint: 'https://fcm.googleapis.com/fcm/send/device', unsubscribe: vi.fn().mockRejectedValue(new Error('browser refused unsubscribe')) };
     vi.stubGlobal('navigator', {
       serviceWorker: { getRegistration: vi.fn().mockResolvedValue({ pushManager: { getSubscription: vi.fn().mockResolvedValue(subscription) } }) },
     });
@@ -475,7 +475,7 @@ describe('WithdrawalPageClient session termination', () => {
 
   it('keeps valid identity, cached data, and navigation after the API rejects the request', async () => {
     withdrawStatus = 403;
-    const subscription = { endpoint: 'https://push.example/device', unsubscribe: vi.fn().mockResolvedValue(true) };
+    const subscription = { endpoint: 'https://fcm.googleapis.com/fcm/send/device', unsubscribe: vi.fn().mockResolvedValue(true) };
     vi.stubGlobal('navigator', {
       serviceWorker: { getRegistration: vi.fn().mockResolvedValue({ pushManager: { getSubscription: vi.fn().mockResolvedValue(subscription) } }) },
     });

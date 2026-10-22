@@ -17,7 +17,7 @@ import { plainToInstance } from 'class-transformer';
 import type { V1CompetitionKind } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { V1AuthUser } from '../auth/v1-auth-user';
-import { currentRuntimeConfiguration, resolveV1RequestIdentity } from '../auth/v1-session';
+import { currentRuntimeConfiguration, resolveV1RequestIdentity, v1IdentityUserWhere } from '../auth/v1-session';
 import { requireProductionFrontendOrigin } from '../common/security/v1-mutation-origin';
 import { getPendingSocialSignupRoute, isActivityProfileRequired } from '../auth/social-signup-access';
 import { isPhoneVerificationExemptActor } from '../verification/phone-verification-access';
@@ -418,7 +418,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     }
 
     const user = await this.prisma.v1User.findFirst({
-      where: identity.kind === 'user_id' ? { id: identity.userId } : { email: identity.email },
+      where: v1IdentityUserWhere(identity),
       select: { id: true, email: true, accountStatus: true, onboardingStatus: true },
     });
     if (

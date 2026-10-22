@@ -352,8 +352,8 @@ function PlayerRecordsSection({ tournamentId, isRegularLeague }: { tournamentId:
     : withProfileHref(tournamentRecords.data?.assists);
   return (
     <TournamentPlayerRecordsSections
-      goals={goals}
-      assists={assists}
+      goals={goals?.slice(0, 10)}
+      assists={assists?.slice(0, 10)}
       hiddenByEligibility={records.data?.hiddenByEligibility ?? false}
       isLoading={records.isLoading}
       isError={records.isError}

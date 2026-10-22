@@ -149,14 +149,14 @@ describe('Task 8 game-operations realtime protocol', () => {
       headers: {},
       header: (name: string) => (name === 'x-v1-user-id' ? 'forged-user' : undefined),
     };
-    const signed = createV1SessionToken({ userId: USER.id, secret: SESSION_SECRET, issuedAtMs: 0 });
+    const signed = createV1SessionToken({ userId: USER.id, sessionEpoch: 0, secret: SESSION_SECRET, issuedAtMs: 0 });
     const productionSession = {
       headers: { cookie: `${V1_SESSION_COOKIE_NAME}=${signed}` },
       header: forged.header,
     };
 
     expect(resolveV1RequestIdentity(forged, { nodeEnv: 'production', sessionSecret: SESSION_SECRET, nowMs: 1_000 })).toBeNull();
-    expect(resolveV1RequestIdentity(productionSession, { nodeEnv: 'production', sessionSecret: SESSION_SECRET, nowMs: 1_000 })).toEqual({ kind: 'user_id', userId: USER.id });
+    expect(resolveV1RequestIdentity(productionSession, { nodeEnv: 'production', sessionSecret: SESSION_SECRET, nowMs: 1_000 })).toEqual({ kind: 'user_id', userId: USER.id, sessionEpoch: 0 });
     expect(resolveV1RequestIdentity(forged, { nodeEnv: 'test', sessionSecret: null })).toEqual({ kind: 'user_id', userId: 'forged-user' });
   });
 

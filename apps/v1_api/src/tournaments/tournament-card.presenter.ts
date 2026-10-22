@@ -1,7 +1,13 @@
+import { capacityLimitOf } from './registration-capacity';
 import type { TournamentListRow } from './tournaments-read.query';
 
-export function presentTournamentCard(row: TournamentListRow) {
+export function presentTournamentCard(row: TournamentListRow, now = new Date()) {
+  const capacityLimit = capacityLimitOf(row);
   return {
+    registrationOpen: (row.kind === 'regular_league'
+      ? !['completed', 'cancelled', 'on_hold'].includes(row.status) && row.registrationDeadlineAt !== null && row.registrationDeadlineAt >= now
+      : row.status === 'open' && (!row.registrationDeadlineAt || row.registrationDeadlineAt >= now))
+      && (capacityLimit === null || row._count.registrations + row.registrations.length < capacityLimit),
     id: row.id,
     sportId: row.sportId,
     sport: { code: row.sport.code, name: row.sport.name },
@@ -26,7 +32,8 @@ export function presentTournamentCard(row: TournamentListRow) {
     scheduledEndAt: row.scheduledEndAt?.toISOString() ?? null,
     venue: row.venue,
     // The card contract supplies the image for list consumers, including home discovery.
-    coverImageUrl: row.kind === 'regular_league' ? row.listImageUrl ?? row.coverImageUrl : row.coverImageUrl,
+    coverImageUrl: row.listImageUrl ?? row.coverImageUrl,
+    listImageUrl: row.listImageUrl,
     // 리그의 과거 teamCount 기본값 8은 상한이 아니다. 선택적 참가팀 정원만 별도로 노출한다.
     ...(row.kind === 'regular_league' ? { maxTeams: row.maxTeams } : { teamCount: row.teamCount }),
 

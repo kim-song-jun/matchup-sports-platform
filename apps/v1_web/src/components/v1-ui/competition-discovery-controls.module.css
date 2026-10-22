@@ -1,0 +1,53 @@
+.toolbar, .resultbar, .summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-3);
+  margin-top: var(--spacing-3);
+}
+.summary {
+  font-size: var(--font-size-caption);
+  color: var(--blue500);
+  align-items: flex-start;
+}
+.summary span { min-width: 0; overflow-wrap: anywhere; }
+.summary a { flex-shrink: 0; min-height: 44px; display: flex; align-items: center; }
+.group { margin: 0; padding: 0; border: 0; min-width: 0; }
+.group legend { margin-bottom: 12px; }
+.sections { display: grid; gap: 24px; padding: 16px 20px; }
+.range { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+.range label { display: grid; gap: 8px; min-width: 0; font-size: var(--font-size-caption); }
+.range input, .sort select {
+  width: 100%; min-width: 0; min-height: 44px; border: 1px solid var(--border);
+  border-radius: var(--radius-control); padding: 8px; background: var(--surface); color: var(--text-strong);
+  font: inherit;
+}
+.range input:focus-visible, .sort select:focus-visible { outline: 2px solid var(--blue500); outline-offset: 2px; }
+.sort { display: flex; gap: 8px; align-items: center; font-size: var(--font-size-caption); }
+.sort select { width: auto; }
+.actions {
+  display: grid; grid-template-columns: 1fr 1fr;
+  position: sticky; bottom: calc(-1 * var(--tm-filter-sheet-pad-bottom));
+  background: var(--surface); padding: var(--spacing-4) 0; z-index: 1;
+}
+.sortOptions { display: grid; gap: 12px; padding: 20px; }
+
+.mobileResultbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--spacing-2);
+  min-height: 44px;
+}
+.mobileCount { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mobileActions { display: flex; align-items: center; gap: var(--spacing-1); }
+.mobileActions .mobileFilter, .mobileActions .mobileSort {
+  min-height: 44px;
+  padding-inline: var(--spacing-2);
+  gap: var(--spacing-1);
+  white-space: nowrap;
+}
+.mobileActions .mobileFilter { background: transparent; }
+.mobileActions .mobileSort { padding-right: 0; }
+.mobileActions .filterCount { color: var(--blue500); font-weight: 600; }
+.mobileActions svg { flex-shrink: 0; }

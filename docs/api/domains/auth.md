@@ -15,8 +15,8 @@
 | `GET` | `/api/v1/auth/me` | user | headers only | current user, profile, onboarding summary, `termsCompliance` |
 | `POST` | `/api/v1/auth/login` | none | `LoginDto { email, password }` | session cookie + user snapshot, **or** `200 { stepUp }` with no session (see [Email login step-up](#email-login-step-up)) |
 | `POST` | `/api/v1/auth/login/step-up/verify` | none | `{ challengeToken, code }` (`code` = 6 digits) | same response and cookie as a completed `login` |
-| `POST` | `/api/v1/auth/login/step-up/resend` | none | `{ challengeToken }` | `{ expiresAt, resendAvailableAt, devCode? }` |
-| `POST` | `/api/v1/auth/dev-session` | user (header identity, non-production) | empty body | issues signed `teameet_v1_session` cookie for an already-header-authenticated caller |
+| `POST` | `/api/v1/auth/login/step-up/resend` | none | `{ challengeToken }` | `{ expiresAt, resendAvailableAt }` |
+| `POST` | `/api/v1/auth/dev-session` | user (header identity) — **404 in production mode** (alpha included) | empty body | issues signed `teameet_v1_session` cookie for an already-header-authenticated caller |
 | `POST` | `/api/v1/auth/register` | none | `RegisterDto` + current required document IDs | session cookie + onboarding/terms route |
 | `POST` | `/api/v1/auth/kakao` | none | `{ code, redirectUri? }` | social session + onboarding route |
 | `POST` | `/api/v1/auth/kakao/token` | none | `{ accessToken }` (10-4096 chars) | same as `/auth/kakao` — both resolve the user through one shared path |
@@ -54,6 +54,12 @@ Auth does not issue JWT access/refresh tokens. `AuthController` is wrapped in
 (`v1.<payload>.<HMAC>`, no server-side session table). There is no `/auth/refresh` endpoint —
 the session is re-derived from the cookie on each request by `V1AuthGuard`.
 
+The payload carries `V1User.sessionEpoch` as it was at issue time (`ep`; cookies from before the field read as 0).
+`V1AuthGuard`, `OptionalV1AuthGuard` and the realtime handshake only resolve the user when the cookie's epoch equals the
+current one (`v1IdentityUserWhere`), so bumping it revokes every cookie issued before on every device: a password reset
+by email and a withdrawal request do. A revoked cookie answers `401 UNAUTHENTICATED`, is anonymous on optional routes,
+and fails the socket handshake. Logout still only clears this device's cookie.
+
 `POST /api/v1/auth/login` verifies `LoginDto { email (min 3), password (min 8) }` against
 `V1AuthIdentity` (`provider = email`) with a hashed password compare. Wrong email or password both
 return `401 UNAUTHENTICATED` ("Email or password is incorrect") — the two failure modes are not
@@ -80,7 +86,8 @@ answer `200` with the same body and no session cookie:
 ```
 
 `maskedEmail` masks the address the caller typed. `devCode` appears only where `V1_VERIFICATION_DEV_ECHO` applies
-(no real mail transport), on real and decoy challenges alike. A code is mailed **only** when the password
+(no real mail transport) and only when the typed address is a test address (see "Dev echo" below) that no admin or
+tournament staff account owns — judged on the typed address, so real and decoy challenges alike. A code is mailed **only** when the password
 was right; the other two get a decoy challenge that is issued, resent and verified the same way (same scrypt work, same
 errors) but can never log in. Nothing in the status, body or timing separates the three cases. The mail is sent off the
 request path for the same reason, and a mail failure never changes any response: it is logged and stamped on the challenge
@@ -99,8 +106,9 @@ password; also returned by `login` itself once the cap is hit). The cap check an
 
 Rate limits per IP: `login` 10/min, `verify` 10/min, `resend` 5/min.
 
-In echo environments (`V1_VERIFICATION_DEV_ECHO`), a decoy challenge and decoy resend carry a random six-digit `devCode` too, so the
-field's presence never reveals whether the password was right; the decoy code never verifies.
+In echo environments (`V1_VERIFICATION_DEV_ECHO`), a decoy challenge for such an address carries a random six-digit `devCode` too
+(it never verifies), and resend carries no `devCode` for anyone — a challenge keeps only the email hash, so a per-challenge answer
+there would reveal whether the password was right.
 
 A successful password reset by email (`POST /auth/recovery/email/reset-password`) clears that email's login failure records, send count
 and open step-up challenges, so the owner can sign in with the new password without step-up (unless a spray attack is active). A
@@ -120,9 +128,9 @@ All thresholds live in `LOGIN_SECURITY_POLICY` (`apps/v1_api/src/auth/login-secu
 which in a non-production environment accepts header-based dev identity
 (`x-v1-user-id`/`x-v1-user-email`). It upgrades that header identity into the same signed session
 cookie `login()` issues — most seeded personas have no password, so `login()` itself is not usable
-to obtain a session for them. In production, `V1AuthGuard` rejects header identity outright, so
-this route grants nothing beyond what any other guarded route already grants a caller with a valid
-session cookie.
+to obtain a session for them. In production mode (alpha included) the route answers `404` before any
+other guard (`NonProductionGuard`): with a valid cookie it would mint a fresh seven-day cookie, so a stolen
+cookie could be kept alive indefinitely.
 
 `GET /api/v1/auth/check-email` and `GET /api/v1/auth/check-nickname` are availability probes (check-nickname: optional auth, see below) (`{ available: boolean }`) used by signup forms; both are rate-limited
 (30/min). A missing or empty `email`/`nickname` query is rejected by the query DTO before the
@@ -172,7 +180,8 @@ account. It always answers `{ sent: true, expiresAt }` and always writes a chall
 registered address is actually mailed. Nobody can guess a code that was never sent, so an
 unregistered address and a wrong code fail identically (`VERIFICATION_CODE_MISMATCH`). `devCode`
 appears only where no real delivery channel is configured (dev-echo) *and* mail was actually sent,
-because otherwise its presence alone would answer the question. Expired challenges are swept on
+because otherwise its presence alone would answer the question — and, like every dev echo, only for a
+test address that no admin or tournament staff account owns. Expired challenges are swept on
 each issue so the table stays short — it grows with addresses tried, not with accounts.
 
 The phone path does not need this: `find-account` answers `ACCOUNT_NOT_FOUND` openly, but only
@@ -315,3 +324,13 @@ These APIs are frozen in `docs/reference/sm-new-api-v1-contract-checklist.md` bu
 - `POST /api/v1/auth/signup` — superseded by the implemented `POST /api/v1/auth/register`.
 
 Frontend auth/session work must not assume old app auth storage is shared with v1.
+
+### Dev echo
+
+`devCode` exists so local runs, CI and alpha can finish code flows without SMS or mail. Wherever it appears
+(`phone/issue`, `recovery/email/request`, `me/verification/*` requests, step-up `login`) it is returned only when
+no real sender is configured, `V1_VERIFICATION_DEV_ECHO=true`, the target cannot reach a real person — a reserved
+domain (`.test`, `example.com`/`.net`/`.org`) or the unassigned `010-0000-xxxx` block — and the target does not belong
+to an active admin or a live tournament staff assignment (the code also proves ownership for password resets and
+social linking). Anything else gets the same response without `devCode`. The rule lives in
+`VerificationDispatcherService.mayEchoCode`.

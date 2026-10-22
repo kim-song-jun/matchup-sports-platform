@@ -14,10 +14,15 @@ type V1SessionPayload = {
   readonly sub: string;
   readonly iat: number;
   readonly exp: number;
+  /** V1User.sessionEpoch at issue time. Tokens issued before the field existed carry none and count as 0. */
+  readonly ep?: number;
 };
 
+export type V1Session = { readonly userId: string; readonly sessionEpoch: number };
+
 export type V1RequestIdentity =
-  | { readonly kind: 'user_id'; readonly userId: string }
+  // sessionEpoch is set for cookie sessions only; dev header identities have none to compare.
+  | { readonly kind: 'user_id'; readonly userId: string; readonly sessionEpoch?: number }
   | { readonly kind: 'email'; readonly email: string };
 
 type V1SessionRuntimeConfiguration = {
@@ -85,6 +90,7 @@ export function assertV1SessionRuntimeConfiguration(
 
 export function createV1SessionToken(input: {
   readonly userId: string;
+  readonly sessionEpoch: number;
   readonly secret: string;
   readonly issuedAtMs?: number;
 }): string {
@@ -99,6 +105,7 @@ export function createV1SessionToken(input: {
     sub: input.userId,
     iat: issuedAt,
     exp: issuedAt + SESSION_TTL_SECONDS,
+    ep: input.sessionEpoch,
   };
   const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64url');
   const signedValue = `${SESSION_TOKEN_VERSION}.${encodedPayload}`;
@@ -106,10 +113,10 @@ export function createV1SessionToken(input: {
   return `${signedValue}.${signature}`;
 }
 
-export function readV1SessionUserId(
+export function readV1Session(
   cookieHeader: string | undefined,
   configuration: { readonly secret: string; readonly nowMs?: number },
-): string | null {
+): V1Session | null {
   const token = readCookie(cookieHeader, V1_SESSION_COOKIE_NAME);
   if (!token) return null;
 
@@ -135,21 +142,21 @@ export function readV1SessionUserId(
   const now = Math.floor((configuration.nowMs ?? Date.now()) / 1_000);
   if (payload.iat > now + 60 || payload.exp <= now) return null;
   if (payload.exp - payload.iat !== SESSION_TTL_SECONDS) return null;
-  return payload.sub;
+  return { userId: payload.sub, sessionEpoch: payload.ep ?? 0 };
 }
 
 export function resolveV1RequestIdentity(
   request: V1SessionRequest,
   configuration: V1SessionRuntimeConfiguration,
 ): V1RequestIdentity | null {
-  const sessionUserId = isStrongSessionSecret(configuration.sessionSecret)
-    ? readV1SessionUserId(request.headers.cookie, {
+  const session = isStrongSessionSecret(configuration.sessionSecret)
+    ? readV1Session(request.headers.cookie, {
         secret: configuration.sessionSecret,
         nowMs: configuration.nowMs,
       })
     : null;
 
-  if (sessionUserId) return { kind: 'user_id', userId: sessionUserId };
+  if (session) return { kind: 'user_id', userId: session.userId, sessionEpoch: session.sessionEpoch };
   if (configuration.nodeEnv === 'production') return null;
 
   const userId = readHeader(request, 'x-v1-user-id');
@@ -159,9 +166,20 @@ export function resolveV1RequestIdentity(
   return email ? { kind: 'email', email } : null;
 }
 
+/**
+ * The V1User row an identity may act as. A cookie session also has to match the user's current sessionEpoch:
+ * bumping it (password reset, withdrawal request) revokes every cookie issued before, since nothing else is stored.
+ */
+export function v1IdentityUserWhere(identity: V1RequestIdentity): { id: string; sessionEpoch?: number } | { email: string } {
+  if (identity.kind === 'email') return { email: identity.email };
+  return identity.sessionEpoch === undefined
+    ? { id: identity.userId }
+    : { id: identity.userId, sessionEpoch: identity.sessionEpoch };
+}
+
 export function writeV1SessionCookie(
   response: Pick<V1SessionCookieResponse, 'cookie'>,
-  userId: string,
+  session: V1Session,
   configuration: V1SessionRuntimeConfiguration = currentRuntimeConfiguration(),
 ): boolean {
   if (!isStrongSessionSecret(configuration.sessionSecret)) {
@@ -170,7 +188,8 @@ export function writeV1SessionCookie(
   }
 
   const token = createV1SessionToken({
-    userId,
+    userId: session.userId,
+    sessionEpoch: session.sessionEpoch,
     secret: configuration.sessionSecret,
     issuedAtMs: configuration.nowMs,
   });
@@ -255,7 +274,8 @@ function isV1SessionPayload(value: unknown): value is V1SessionPayload {
     Number.isInteger(value.iat) &&
     'exp' in value &&
     typeof value.exp === 'number' &&
-    Number.isInteger(value.exp)
+    Number.isInteger(value.exp) &&
+    (!('ep' in value) || (typeof value.ep === 'number' && Number.isInteger(value.ep) && value.ep >= 0))
   );
 }
 

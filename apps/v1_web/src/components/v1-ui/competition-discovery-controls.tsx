@@ -139,7 +139,7 @@ export function CompetitionDiscoveryControls({ filters, sports, sheetOpen, deskt
       <Link className={`tm-chip ${filters.registration === 'open' ? 'tm-chip-active' : ''}`} aria-current={filters.registration === 'open' ? 'true' : undefined}
         href={competitionDiscoveryHref({ ...filters, registration: filters.registration === 'open' ? undefined : 'open',
           sort: filters.registration === 'open' && sort === 'deadline' ? 'latest' : filters.sort })} scroll={false}>신청 접수 중만</Link>
-      <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={competitionDiscoveryHref(filters, { filter: true, page })} scroll={false}><FilterIcon size={18} aria-hidden="true" />필터{count > 0 ? ` ${count}` : ''}</Link>
+      <Link className="tm-btn tm-btn-sm tm-btn-neutral" aria-label={`필터 열기 — 현재 ${summary || '전체'}`} href={competitionDiscoveryHref(filters, { filter: true, page })} scroll={false}><FilterIcon size={18} aria-hidden="true" />필터{count > 0 ? ` ${count}` : ''}</Link>
     </div>
     {summary && <div className={styles.summary}><span>{summary}</span><Link href={competitionDiscoveryHref(reset)} scroll={false}>초기화</Link></div>}
     <div className={styles.resultbar}>

@@ -5,6 +5,8 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { TournamentsListPageClient as TournamentsPage } from './tournaments-list-client';
 import { tournamentListSeedPath } from '@/lib/public-list-seed';
+import { readCompetitionDiscovery, competitionDiscoveryHref } from '@/lib/competition-discovery';
+const phaseFor = (status: string | null) => status === 'draft' ? 'upcoming' : status === 'in_progress' ? 'ongoing' : status === 'completed' ? 'completed' : undefined;
 
 // 목록은 상세 복귀 복원에 QueryClient 를 쓴다(useCursorPagination) — API 훅을 mock 해도 provider 는 필요하다.
 function render(ui: ReactElement) {
@@ -29,8 +31,11 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: vi.fn() }),
 }));
 
+vi.mock('@/hooks/use-competition-discovery', () => ({
+  useCompetitionDiscovery: (...args: unknown[]) => tournamentsMock(...args),
+}));
+
 vi.mock('@/hooks/use-v1-api', () => ({
-  useV1Tournaments: (...args: unknown[]) => tournamentsMock(...args),
   useV1AllTournaments: () => ({ data: [], isPending: false, isError: false, refetch: vi.fn() }),
   useV1MasterSports: (options?: { seed?: Array<{ id: string; name: string }> }) => ({
     data: options?.seed ?? [{ id: SWIMMING_ID, name: '수영' }, { id: BASKETBALL_ID, name: '농구' }],
@@ -65,12 +70,12 @@ describe('#1543 대회 목록 — 상태와 모순되지 않는 영역 이름', 
 
     render(<TournamentsPage seed={seed} />);
 
-    expect(tournamentsMock.mock.calls.at(-1)?.[1]).toEqual({ seed: undefined });
+    expect(tournamentsMock.mock.calls.at(-1)?.[1]).toBeUndefined();
   });
 
   describe.each([false, true])('결과 카드 있음: %s', (hasItems) => {
     it.each([
-      [null, '전체'], ['draft', '모집완료'], ['in_progress', '진행 중'], ['completed', '종료'],
+      [null, '전체'], ['draft', '시작 전'], ['in_progress', '진행 중'], ['completed', '종료'],
     ] as const)('%s 상태에서 영역·필터·결과 의미를 유지한다', (status, label) => {
       const params = new URLSearchParams({ sportId: SWIMMING_ID, genderCategory: 'male' });
       if (status) params.set('status', status);
@@ -97,11 +102,11 @@ describe('#1543 대회 목록 — 상태와 모순되지 않는 영역 이름', 
       expect(region).toContainElement(accessibleHeading);
       expect(accessibleHeading).toHaveTextContent(/^대회 목록$/);
       expect(tournamentsMock.mock.calls.at(-1)?.[0]).toMatchObject({
-        kind: 'all', status: status ?? undefined, sportId: SWIMMING_ID, genderCategory: 'male',
+        kind: 'tournament', phase: phaseFor(status), sportId: SWIMMING_ID, genderCategory: 'male',
       });
       const summary = `${status ? `${label} · ` : ''}수영 · 남성부`;
       expect(within(region).getByRole('link', { name: `필터 열기 — 현재 ${summary}` }))
-        .toHaveAttribute('href', `/tournaments?${new URLSearchParams({ ...Object.fromEntries(params), filter: '1' })}`);
+        .toHaveAttribute('href', competitionDiscoveryHref(readCompetitionDiscovery(params, 'all'), { filter: true }));
       if (hasItems) {
         const list = within(region).getByRole('list', { name: '대회 목록' });
         const detailHref = within(list).getByRole('link', { name: /수영 대조 대회/ }).getAttribute('href');
@@ -113,12 +118,12 @@ describe('#1543 대회 목록 — 상태와 모순되지 않는 영역 이름', 
         expect([...detailUrl.searchParams.entries()]).toEqual([
           ['from', `/tournaments?${params.toString()}`],
         ]);
-        expect(within(region).queryByText('조건에 맞는 대회가 없어요')).not.toBeInTheDocument();
+        expect(within(region).queryByText('선택한 조건에 맞는 대회가 없어요')).not.toBeInTheDocument();
       } else {
-        expect(within(region).getByText('조건에 맞는 대회가 없어요')).toBeInTheDocument();
-        // 팀밋 대회 화면의 뒤로가기가 지금 보던 목록(필터 포함)으로 돌아오도록 출처를 싣는다.
-        expect(within(region).getByRole('link', { name: '팀밋 대회 보기' }))
-          .toHaveAttribute('href', `/events?${new URLSearchParams({ from: `/tournaments?${params.toString()}` })}`);
+        expect(within(region).getByText('선택한 조건에 맞는 대회가 없어요')).toBeInTheDocument();
+        // 빈 결과의 초기화는 현재 대회 유형을 유지한다.
+        expect(within(region).getByRole('link', { name: '필터 초기화' }))
+          .toHaveAttribute('href', '/tournaments?kind=tournament');
       }
     });
   });
@@ -128,7 +133,7 @@ describe('#1543 대회 목록 — 상태와 모순되지 않는 영역 이름', 
     render(<TournamentsPage />);
     const region = screen.getByRole('region', { name: '대회 목록' });
     expect(within(region).getByRole('link', { name: '정규 리그' })).toHaveAttribute('aria-current', 'page');
-    expect(tournamentsMock.mock.calls.at(-1)?.[0]).toMatchObject({ kind: 'league', status: 'completed' });
+    expect(tournamentsMock.mock.calls.at(-1)?.[0]).toMatchObject({ kind: 'league', phase: 'completed' });
   });
 });
 
@@ -136,7 +141,7 @@ describe('#1516 대회 목록 — 조건에 맞는 정상 빈 결과', () => {
   describe.each([false, true])('종목 선택: %s', (withSport) => {
     it.each([
       ['in_progress', '진행 중'],
-      ['draft', '모집완료'],
+      ['draft', '시작 전'],
       ['completed', '종료'],
       [null, '전체'],
     ] as const)('%s 상태의 요청·요약·빈 안내가 모순되지 않는다', (status, label) => {
@@ -150,22 +155,21 @@ describe('#1516 대회 목록 — 조건에 맞는 정상 빈 결과', () => {
       render(<TournamentsPage />);
 
       expect(tournamentsMock.mock.calls.at(-1)?.[0]).toMatchObject({
-        status: status ?? undefined,
+        phase: phaseFor(status),
         sportId: withSport ? SWIMMING_ID : undefined,
-        genderCategory: withSport ? 'male' : undefined,
+        ...(withSport ? { genderCategory: 'male' } : {}),
       });
       const summary = withSport
         ? `${status ? `${label} · ` : ''}수영 · 남성부`
-        : label;
+        : status === 'draft' ? '시작 전·준비 중' : label;
       expect(screen.getByRole('link', { name: `필터 열기 — 현재 ${summary}` })).toHaveAttribute(
-        'href', `/tournaments?${new URLSearchParams({ ...Object.fromEntries(params), filter: '1' })}`,
+        'href', competitionDiscoveryHref(readCompetitionDiscovery(params, 'all'), { filter: true }),
       );
-      expect(screen.getByText('조건에 맞는 대회가 없어요')).toBeInTheDocument();
-      expect(screen.getByText('필터 조건을 바꾸거나 팀밋 대회를 확인해 보세요.')).toBeInTheDocument();
+      expect(screen.getByText(withSport ? '선택한 조건에 맞는 대회가 없어요' : '선택한 조건에 맞는 대회·리그가 없어요')).toBeInTheDocument();
+      expect(screen.getByText('필터를 바꾸거나 초기화해서 다시 찾아보세요.')).toBeInTheDocument();
       expect(screen.queryByText(/모집 중인 대회가 없어요|대회 알림/)).not.toBeInTheDocument();
-      const listPath = params.toString() ? `/tournaments?${params.toString()}` : '/tournaments';
-      expect(screen.getByRole('link', { name: '팀밋 대회 보기' })).toHaveAttribute(
-        'href', `/events?${new URLSearchParams({ from: listPath })}`,
+      expect(screen.getByRole('link', { name: '필터 초기화' })).toHaveAttribute(
+        'href', withSport ? '/tournaments?kind=tournament' : '/tournaments',
       );
     });
   });
@@ -179,7 +183,7 @@ describe('#1516 대회 목록 — 조건에 맞는 정상 빈 결과', () => {
     render(<TournamentsPage />);
     expect(screen.getByRole('region', { name: '대회 목록' })).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent('대회 목록 연결에 실패했어요.');
-    expect(screen.queryByText('조건에 맞는 대회가 없어요')).not.toBeInTheDocument();
+    expect(screen.queryByText('선택한 조건에 맞는 대회가 없어요')).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: '목록 다시 불러오기' }));
     expect(refetch).toHaveBeenCalledOnce();
   });
@@ -191,7 +195,7 @@ describe('#1516 대회 목록 — 조건에 맞는 정상 빈 결과', () => {
     render(<TournamentsPage />);
     expect(screen.getByRole('region', { name: '대회 목록' })).toBeInTheDocument();
     expect(screen.getByLabelText('대회 목록 불러오는 중')).toHaveAttribute('aria-busy', 'true');
-    expect(screen.queryByText('조건에 맞는 대회가 없어요')).not.toBeInTheDocument();
+    expect(screen.queryByText('선택한 조건에 맞는 대회가 없어요')).not.toBeInTheDocument();
   });
 });
 
@@ -253,7 +257,7 @@ describe('대회 목록 — 유형(kind) 축', () => {
     expect(section).not.toBeNull();
 
     const segment = within(section as HTMLElement).getByRole('navigation', { name: '대회 유형' });
-    const filterSummary = section!.querySelector('.tm-competition-filter-summary');
+    const filterSummary = within(section as HTMLElement).getByRole('link', { name: /^필터 열기/ });
     expect(filterSummary).not.toBeNull();
 
     // DOCUMENT_POSITION_FOLLOWING(4) = segment 뒤에 요약 줄이 온다
@@ -271,7 +275,7 @@ describe('대회 목록 — 유형(kind) 축', () => {
     const { container } = render(<TournamentsPage />);
     const section = container.querySelector('#tournament-list') as HTMLElement;
 
-    expect(section.querySelector('.tm-competition-filter-summary')).not.toBeNull();
+    expect(within(section).getByRole('link', { name: /^필터 열기/ })).toBeInTheDocument();
     expect(section.querySelector('.tm-sport-chip-row')).toBeNull();
   });
 });

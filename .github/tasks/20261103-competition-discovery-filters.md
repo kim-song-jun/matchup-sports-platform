@@ -69,3 +69,11 @@ WSL Docker·통합 DB URL 없음. 공유 의존성을 연결하되 Prisma client
 - 최초 공유 작업폴더의 검증 로그는 최신 dev 결과로 합산하지 않는다.
 - 개발 의존성은 기존 설치를 연결했고 누락된 persister는 /tmp에 설치했다. Prisma client는 이 worktree의 node_modules/.prisma에 격리 생성했다. 스키마·migration·manifest·lockfile·공유 생성물은 변경하지 않았다.
 - 앱 서버·브라우저·DB 프로세스 시작0. 검증 runner 모두 종료 확인. 앱/브라우저/DB cleanup 대상 프로세스 없음.
+
+## PR 검토 및 dev 배포 보완 (2026-10-22)
+- 사용자 요청: #2033·#2034 검토 후 dev/alpha 배포.
+- #2034 기존 CI: Gates/API PASS, Web 6 suites 58 failures. 새 discovery 훅 경계·진행/모집 문구·draft 적용 계약과 기존 테스트/MSW의 drift 확인.
+- 훅 mock, 필터 파라미터, 정원 카드, 빈 결과 및 모바일/데스크톱 상세 복귀 회귀 검증을 새 계약에 동기화. 필터 링크의 현재 조건 accessible name 복원.
+- 단일 worker 검증: paging18/load-more2/capacity24 PASS, kind27/controls7 PASS, return18/fetching2 PASS. Web 전체 tsc --noEmit --incremental false PASS.
+- 원격 PR CI 및 머지 이후 matching dev push CI/alpha 배포·공개 health/SHA 확인은 계속 진행.
+- Windows 검토 환경에 Docker daemon 없음. 기존 API CI SUCCESS를 확인했으며 DB reset/seed 수동 실행 없음.

@@ -129,7 +129,7 @@ const server = setupServer(
   http.get('*/api/v1/tournaments', ({ request }) => {
     const params = new URL(request.url).searchParams;
     const kind = params.get('kind');
-    const status = params.get('status');
+    const status = params.get('status') ?? (params.get('phase') === 'ongoing' ? 'in_progress' : params.get('phase') === 'completed' ? 'completed' : null);
     const filtered = items.filter((item) => (
       (!status || item.status === status)
       && (kind === 'tournament' ? item.kind === 'regular_tournament' : kind === 'league' ? item.kind === 'regular_league' : true)
@@ -253,7 +253,8 @@ describe('MD-QA #42 — 대회 목록 페이지 복귀', () => {
         const params = new URL(request.url).searchParams;
         const page = Number(params.get('page') ?? 1);
         const limit = Number(params.get('limit') ?? 20);
-        const filtered = leagues.filter((item) => !params.get('status') || item.status === params.get('status'));
+        const status = params.get('status') ?? (params.get('phase') === 'ongoing' ? 'in_progress' : params.get('phase') === 'completed' ? 'completed' : null);
+        const filtered = leagues.filter((item) => !status || item.status === status);
         return ok({
           items: filtered.slice((page - 1) * limit, page * limit),
           pageInfo: { page, total: filtered.length, totalPages: Math.ceil(filtered.length / limit), hasNext: page * limit < filtered.length, nextCursor: null },
@@ -331,9 +332,9 @@ describe('MD-QA #42 — 대회 목록 페이지 복귀', () => {
     await waitFor(() => expect(navigation.path).toBe(lastPage === 1 ? leagueList : `${leagueList}&page=${lastPage}`));
     if (count > 0) {
       await waitFor(() => expect(within(screen.getByRole('list', { name: '대회 목록' })).getAllByRole('listitem')).toHaveLength(count === 22 ? 2 : 1));
-      expect(screen.queryByText('조건에 맞는 대회가 없어요')).not.toBeInTheDocument();
+      expect(screen.queryByText('선택한 조건에 맞는 리그가 없어요')).not.toBeInTheDocument();
     } else {
-      await screen.findByText('조건에 맞는 대회가 없어요');
+      await screen.findByText('선택한 조건에 맞는 리그가 없어요');
     }
     expect(requestedPages).toEqual([9, lastPage]);
   });
@@ -403,7 +404,7 @@ describe('MD-QA #42 — 대회 목록 페이지 복귀', () => {
 
       // Then: 실제 조회 완료 전에는 빈 결과 대신 기존 로딩 표면을 유지한다.
       expect(navigation.path).toBe(leagueList);
-      expect(screen.queryByText('조건에 맞는 대회가 없어요')).not.toBeInTheDocument();
+      expect(screen.queryByText('선택한 조건에 맞는 리그가 없어요')).not.toBeInTheDocument();
       expect(screen.getByLabelText('대회 목록 불러오는 중')).toBeInTheDocument();
       release();
       await screen.findByRole('link', { name: /정규 리그 1/ });
@@ -460,11 +461,13 @@ describe('MD-QA #42 — 대회 목록 페이지 복귀', () => {
     await user.click(screen.getByRole('link', { name: '필터 열기 — 현재 전체' }));
 
     // When: 상태 필터를 바꾼다.
-    await user.click(screen.getByRole('link', { name: '진행 중' }));
+    await user.click(screen.getByRole('button', { name: '진행 중' }));
+    expect(new URL(navigation.path, 'https://teameet.example').searchParams.get('page')).toBe('2');
+    await user.click(screen.getByRole('button', { name: '결과 보기' }));
 
     // Then: URL의 페이지도 지우고 바뀐 필터의 1–20 결과를 조회한다.
     const params = new URL(navigation.path, 'https://teameet.example').searchParams;
-    expect(params.get('status')).toBe('in_progress');
+    expect(params.get('phase')).toBe('ongoing');
     expect(params.has('page')).toBe(false);
     await screen.findByText(/전체 22건 중 1–20/);
   });
@@ -516,7 +519,7 @@ describe('MD-QA #55 — 모바일 대회 목록 더 보기 복귀', () => {
     await expectMobileCards(20);
     await user.click(screen.getByRole('button', { name: '더 보기' }));
     await expectMobileCards(40);
-    await user.click(screen.getByRole('link', { name: '모바일 대회 1 — 풋살 — 진행 중' }));
+    await user.click(screen.getByRole('link', { name: '모바일 대회 1 — 풋살 — 진행 중 · 모집 종료' }));
     await screen.findByRole('heading', { level: 1, name: '모바일 대회 1' });
 
     // When: 상세 상단 액션 또는 브라우저 history로 목록에 돌아간다.

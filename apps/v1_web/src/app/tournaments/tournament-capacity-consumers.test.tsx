@@ -69,7 +69,7 @@ describe.each(scenarios)('공개 정원 소비자 — $name', ({ overrides, limi
   it('목록 카드는 실제 참가팀 정원과 별개로 리그 수명주기를 표시해요', () => {
     const item: V1TournamentListItem = capacityTournament(overrides);
     render(<TournamentCard item={item} />);
-    const label = item.kind === 'regular_league' ? '모집완료' : full ? '모집 마감' : '모집 중';
+    const label = `${item.kind === 'regular_league' ? '준비 중' : '시작 전'} · ${full ? (item.kind === 'regular_league' ? '접수 안 함' : '모집 종료') : '신청 접수 중'}`;
     expect(screen.getByRole('link')).toHaveAccessibleName(`${item.title} — 풋살 — ${label}`);
     if (limit === null) {
       expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();

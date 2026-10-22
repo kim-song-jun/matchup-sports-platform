@@ -17,7 +17,7 @@ describe('필터 선택·적용과 목록 정렬', () => {
   });
   it('필터 시트를 열고 닫을 때 현재 페이지를 유지한다', () => {
     const view = render(<CompetitionDiscoveryControls {...props} page={3} />);
-    expect(screen.getByRole('link', { name: '필터' })).toHaveAttribute('href', '/tournaments?kind=tournament&page=3&filter=1');
+    expect(screen.getByRole('link', { name: '필터 열기 — 현재 전체' })).toHaveAttribute('href', '/tournaments?kind=tournament&page=3&filter=1');
     view.rerender(<CompetitionDiscoveryControls {...props} page={3} sheetOpen />);
     const dialog = within(screen.getByRole('dialog', { name: '대회·리그 필터' }));
     expect(dialog.getByRole('link', { name: '닫기' })).toHaveAttribute('href', '/tournaments?kind=tournament&page=3');

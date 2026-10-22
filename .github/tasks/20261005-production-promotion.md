@@ -1,5 +1,21 @@
 # 2026-10-05 dev → main production promotion
 
+## Active release execution — PR2030 / 2026-10-22
+
+This snapshot is the current cursor; older handoffs below are historical. User requested deployment after the user-only main rule and hotfix-only previous exception were explained, explicitly authorizing direct main PR creation/merge and normal production approval for this release.
+
+- Scope: dev ad524500587895f726d73f1911da9f91570de281, source API/Web1.11.4, expected production artifact1.11.5 under existing zero-Changeset patch resolver. Main baseline71411e304/artifact1.11.3. Diff55 commits/172 files, behind0.
+- Existing dev CI39642284759, alpha39642284531 and Promote#25/39646577430 success. Actual alpha1.11.5-alpha.20261022.gad5245005878/SHAad52450/DB=true. Version PR2029 CI and Copilot Approval recommended/No open issues verified; they do not substitute for this main PR's latest-head checks.
+- Created main PR2030 from exact dev head; base main/head ad52450 verified. CI39699767204 and CodeQL39699765487 started. Copilot explicitly requested.
+- GitHub Advanced Security39699776077 failed before analysis: Model claude-opus-5 not available. This is not a clean review or an actual finding. User explicitly approved “이번 PR만 리뷰 예외·검증 후 배포” for PR2030; record this limited exception without treating the failed run as clean. Other CI/security gates remain mandatory.
+- Additive migration20261021120000_login_step_up adds3 tables/2 enums/indexes/FK. Existing production M11 applied ledger verified in prior successful deployment; no repeat Stage A/B. Normal migrate deploy only. No manual production data write/reset/seed.
+- Alpha headed login201 and representative5 routes200 with pageerror/failed response0. Existing KPI before/after3 viewport evidence linked in PR2028 comment6321803961. New release is a promotion of existing dev code, not additional runtime/UI edits.
+- Ownership: existing release task and QA evidence only, separate qa/release-2030-execution worktree. Preserve original shared WIP. Main promotion only through reviewed PR; no direct main/dev push under current PR rulesets.
+- Phase1 candidate verification/PR preparation complete; Phase2 PR CI/CodeQL complete with user-approved PR2030-only review exception; Phase3 main merge complete and main CI/build pending; Phase4 production gate/deploy/identity/DB/worker/migrations/browser QA and evidence pending.
+- PR2030 CI39699767204 success (API/Web/Gates), CodeQL39699765487 and aggregate success, unresolved threads0/0. Exact base main/head ad52450 rechecked before merge. Merge ed8a7b5f5ca0300d9cce1302a687948add7a550f at2026-10-22 00:41:30UTC.
+- Main CI39701200396/CodeQL39701198771 started. main/dev source-tree diff0; only main merge commit differs. Current dev ruleset requires PR for history absorption; no direct dev/main push performed. Alpha headed Node36256→Chrome36275 closed/PIDs absent.
+
+
 ## Current preparation — 2026-10-22 (finalist schedule labels)
 
 This snapshot supersedes previous execution permissions and coordinates below. The current user request authorizes dev deployment and main promotion preparation, not main PR creation/merge or production approval.

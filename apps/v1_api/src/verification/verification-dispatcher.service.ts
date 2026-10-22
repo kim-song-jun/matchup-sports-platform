@@ -1,5 +1,7 @@
 import { Inject, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { V1VerificationChannel } from '@prisma/client';
+import { normalizeEmail } from '../auth/normalize-email';
+import { PrismaService } from '../prisma/prisma.service';
 import { EMAIL_SENDER, EmailSender } from './email/email-sender';
 import {
   buildOtpEmailHtml,
@@ -28,6 +30,7 @@ export class VerificationDispatcherService {
     @Inject(SMS_SENDER) private readonly sms: SmsSender,
     @Inject(EMAIL_SENDER) private readonly email: EmailSender,
     private readonly smsEventLog: SmsEventLogService,
+    private readonly prisma: PrismaService,
   ) {}
 
   /**
@@ -40,6 +43,20 @@ export class VerificationDispatcherService {
    */
   get devEchoActive(): boolean {
     return this.devEcho && !this.sms.enabled && !this.email.enabled;
+  }
+
+  /**
+   * 이 응답에 코드를 실어도 되는지. dev-echo 환경이라도 실제 사람에게 닿을 수 없는 주소(예약 테스트 도메인,
+   * 배정되지 않는 010-0000 대역)에만 싣는다 — alpha 는 공개 환경이라, 아무 주소에나 실으면 남의 번호·가입
+   * 이메일로 인증을 끝낼 수 있다. 코드는 비밀번호 재설정·소셜 연결 증명도 되므로 어드민·대회 스태프 계정에는 싣지 않는다.
+   */
+  async mayEchoCode(target: {
+    channel: V1VerificationChannel;
+    address: string;
+    userId?: string | null;
+  }): Promise<boolean> {
+    if (!this.devEchoActive || !isTestAddress(target.channel, target.address)) return false;
+    return !(await this.isPrivilegedAccount(target));
   }
 
   /** 사용자가 이메일 코드를 실제로 받을 수 있는지 — 메일 발송이 설정됐거나, 응답에 코드를 싣는 dev-echo 환경. */
@@ -118,4 +135,38 @@ export class VerificationDispatcherService {
       `[verification:email] dispatched code to ${masked}${this.devEchoActive ? ` (dev code=${code})` : ''}`,
     );
   }
+
+  private async isPrivilegedAccount(target: {
+    channel: V1VerificationChannel;
+    address: string;
+    userId?: string | null;
+  }): Promise<boolean> {
+    const userId =
+      target.userId ??
+      (
+        await this.prisma.v1User.findFirst({
+          where:
+            target.channel === 'email'
+              ? { email: normalizeEmail(target.address) }
+              : { phone: target.address },
+          select: { id: true },
+        })
+      )?.id;
+    if (!userId) return false;
+    const [admins, staffAssignments] = await Promise.all([
+      this.prisma.v1AdminUser.count({ where: { userId } }),
+      this.prisma.v1TournamentStaffAssignment.count({ where: { userId, revokedAt: null } }),
+    ]);
+    return admins > 0 || staffAssignments > 0;
+  }
+}
+
+// RFC 2606·6761 예약 도메인과, 어느 통신사에도 배정되지 않는 010-0000-xxxx(QA 가입 스크립트가 쓰는 대역).
+const TEST_EMAIL_DOMAINS = ['test', 'example.com', 'example.net', 'example.org'];
+const TEST_PHONE_PATTERN = /^0100000\d{4}$/;
+
+export function isTestAddress(channel: V1VerificationChannel, address: string): boolean {
+  if (channel === 'phone') return TEST_PHONE_PATTERN.test(address);
+  const domain = normalizeEmail(address).split('@').pop() ?? '';
+  return TEST_EMAIL_DOMAINS.some((reserved) => domain === reserved || domain.endsWith(`.${reserved}`));
 }

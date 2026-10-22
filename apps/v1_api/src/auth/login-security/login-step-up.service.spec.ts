@@ -10,9 +10,12 @@ const USER_ID = 'user-1';
 function setup(options: { devEcho?: boolean; deliverable?: boolean } = {}) {
   const { prisma, state } = createLoginSecurityFakePrisma();
   state.identities.push({ id: 'identity-1', userId: USER_ID, provider: 'email', providerUserKey: EMAIL });
+  state.users.push({ id: USER_ID, email: EMAIL });
   const dispatcher = {
     send: jest.fn().mockResolvedValue(undefined),
     devEchoActive: options.devEcho ?? false,
+    // The address rules are the dispatcher's own (verification-dispatcher.service.spec); here every address qualifies.
+    mayEchoCode: jest.fn(async () => options.devEcho ?? false),
     emailDeliverable: options.deliverable ?? true,
   };
   const service = new LoginStepUpService(prisma as never, dispatcher as never);
@@ -199,8 +202,8 @@ describe('LoginStepUpService.resend', () => {
     await expect(service.verify(challengeToken, secondCode)).resolves.toMatchObject({ userId: USER_ID });
   });
 
-  it('in an echo environment a decoy resend carries a devCode like a real one', async () => {
-    const { service } = setup({ devEcho: true });
+  it('in an echo environment judges a resend by the account address; a decoy keeps only an email hash and gets no devCode', async () => {
+    const { service, dispatcher } = setup({ devEcho: true });
     const real = await service.start({ email: EMAIL, emailKey: 'key-a', userId: USER_ID });
     const decoy = await service.start({ email: 'ghost@example.com', emailKey: 'key-ghost', userId: null });
     advance(31_000);
@@ -209,8 +212,19 @@ describe('LoginStepUpService.resend', () => {
     const decoyResend = await service.resend(decoy.challengeToken);
     await service.onApplicationShutdown();
 
-    expect(Object.keys(decoyResend)).toEqual(Object.keys(realResend));
-    expect(decoyResend.devCode).toMatch(/^\d{6}$/);
+    expect(dispatcher.mayEchoCode).toHaveBeenCalledWith({ channel: 'email', address: EMAIL, userId: USER_ID });
+    expect(realResend.devCode).toMatch(/^\d{6}$/);
+    expect(decoyResend.devCode).toBeUndefined();
+  });
+
+  it('asks the dispatcher with the typed address and the account, and carries no devCode when it says no', async () => {
+    const { service, dispatcher } = setup({ devEcho: true });
+    dispatcher.mayEchoCode.mockResolvedValue(false);
+    const started = await service.start({ email: EMAIL, emailKey: 'key-a', userId: USER_ID });
+    await service.onApplicationShutdown();
+
+    expect(dispatcher.mayEchoCode).toHaveBeenCalledWith({ channel: 'email', address: EMAIL, userId: USER_ID });
+    expect(started.devCode).toBeUndefined();
   });
 
   it('answers a decoy with the same 200 body shape and mails nothing', async () => {

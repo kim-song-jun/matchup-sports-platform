@@ -179,6 +179,7 @@ export function createLoginSecurityFakePrisma() {
     v1User: {
       update: jest.fn(async () => ({})),
       findFirst: jest.fn(async ({ where }: { where: Where }) => state.users.find((row) => matches(row, where)) ?? null),
+      findUnique: jest.fn(async ({ where }: { where: Where }) => state.users.find((row) => matches(row, where)) ?? null),
     },
     /** The spray aggregate: mirrors `WHERE result = 'failed' AND created_at > $since`. */
     $queryRaw: jest.fn(async (sql: { values: unknown[] }) => {

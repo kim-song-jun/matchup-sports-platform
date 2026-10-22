@@ -7,7 +7,6 @@ import {
   isPeriodUnknown,
   parseTournamentFixtureRevisionGoals,
   parseTournamentFixtureOfficialScore,
-  resolveGoalDisplaySideId,
 } from '../../tournaments/tournament-fixture-official-result';
 import { resolveIsForfeit } from '../../league-matches/league-forfeit-result';
 import { TeamRecordsQueryDto } from './dto/public-records-query.dto';
@@ -477,9 +476,6 @@ export class PublicTeamRecordsService {
       const participantById = new Map(
         row.resultRevision.game.participants.map((participant) => [participant.id, participant] as const),
       );
-      const participantSideIdById = new Map(
-        row.resultRevision.game.participants.map((participant) => [participant.id, participant.sideId] as const),
-      );
 
       const revisionGoals = revisionGoalsByGameId.get(row.gameId) ?? null;
       const rows = (eventsByGame.get(row.gameId) ?? [])
@@ -488,13 +484,8 @@ export class PublicTeamRecordsService {
           const consent = event.participantId === null ? undefined : consentMap.get(event.participantId);
           const eligible = resolveParticipantNameEligible(false, consent);
           const participant = event.participantId === null ? undefined : participantById.get(event.participantId);
-          const displaySideId = resolveGoalDisplaySideId(
-            event.sideId ?? '',
-            event.participantId,
-            event.type === 'OWN_GOAL',
-            participantSideIdById,
-          );
-          const eventSideKey = sideKeyBySideId.get(displaySideId) ?? null;
+
+          const eventSideKey = sideKeyBySideId.get(event.sideId ?? '') ?? null;
           return {
             id: event.id,
             type:
@@ -525,13 +516,8 @@ export class PublicTeamRecordsService {
             const eligible = resolveParticipantNameEligible(false, consent);
             const participant =
               event.participantId === null ? undefined : participantById.get(event.participantId);
-            const displaySideId = resolveGoalDisplaySideId(
-              event.sideId,
-              event.participantId,
-              event.ownGoal,
-              participantSideIdById,
-            );
-            const eventSideKey = sideKeyBySideId.get(displaySideId) ?? null;
+
+            const eventSideKey = sideKeyBySideId.get(event.sideId ?? '') ?? null;
             return {
               id: event.id,
               type: event.ownGoal ? ('OWN_GOAL' as const) : ('GOAL' as const),

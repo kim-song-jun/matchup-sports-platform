@@ -26,6 +26,7 @@ import { SocialProfileDto, SocialTermsDto } from './dto/social-profile.dto';
 import type { V1AuthUser } from './v1-auth-user';
 import { OptionalV1AuthGuard } from './optional-v1-auth.guard';
 import { V1AuthGuard } from './v1-auth.guard';
+import { NonProductionGuard } from './non-production.guard';
 import { V1SessionCookieInterceptor } from './v1-session.interceptor';
 
 @Controller('auth')
@@ -81,7 +82,8 @@ export class AuthController {
    * itself isn't usable to obtain one.
    */
   @Post('dev-session')
-  @UseGuards(V1AuthGuard)
+  // A valid cookie in, a fresh seven-day cookie out: in production that would keep a stolen cookie alive forever.
+  @UseGuards(NonProductionGuard, V1AuthGuard)
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
   devSession(@CurrentUser() user: V1AuthUser) {
     return this.authService.devSession(user.id, user.email);

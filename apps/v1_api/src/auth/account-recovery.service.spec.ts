@@ -20,8 +20,9 @@ function emailVerificationMock(overrides: Record<string, unknown> = {}) {
 
 function prismaMock(user: unknown, update = jest.fn().mockResolvedValue({})) {
   return {
-    v1User: { findFirst: jest.fn().mockResolvedValue(user) },
+    v1User: { findFirst: jest.fn().mockResolvedValue(user), update: jest.fn().mockResolvedValue({}) },
     v1AuthIdentity: { update },
+    $transaction: jest.fn((operations: Promise<unknown>[]) => Promise.all(operations)),
   } as unknown as PrismaService;
 }
 
@@ -30,8 +31,10 @@ function prismaByEmail(users: Record<string, unknown>, update = jest.fn().mockRe
   return {
     v1User: {
       findFirst: jest.fn(async ({ where }: { where: { email?: string } }) => users[where.email ?? ''] ?? null),
+      update: jest.fn().mockResolvedValue({}),
     },
     v1AuthIdentity: { update },
+    $transaction: jest.fn((operations: Promise<unknown>[]) => Promise.all(operations)),
   } as unknown as PrismaService;
 }
 
@@ -275,6 +278,18 @@ describe('AccountRecoveryService — 비밀번호 재설정(이메일)', () => {
     const saved = update.mock.calls[0][0].data.passwordHash;
     expect(saved).not.toBe('brand-new-password');
     expect(await verifyPassword('brand-new-password', saved)).toBe(true);
+  });
+
+  it('재설정은 같은 트랜잭션에서 세션 번호를 올려, 그 전에 발급된 쿠키를 모든 기기에서 끊는다', async () => {
+    const update = jest.fn().mockResolvedValue({});
+    const prisma = prismaByEmail({ [EMAIL]: emailUser }, update);
+
+    await service(prisma).resetPasswordByEmail({ email: EMAIL, proofToken: issueEmailProofToken(EMAIL), newPassword: 'brand-new-password' });
+
+    const handle = prisma as unknown as { v1User: { update: jest.Mock }; $transaction: jest.Mock };
+    expect(handle.v1User.update).toHaveBeenCalledWith({ where: { id: 'u1' }, data: { sessionEpoch: { increment: 1 } } });
+    expect(handle.$transaction).toHaveBeenCalledTimes(1);
+    expect(handle.$transaction.mock.calls[0][0]).toHaveLength(2);
   });
 
   it('재설정에 성공하면 그 이메일의 로그인 제한(실패 기록·발송 횟수·챌린지)을 푼다', async () => {

@@ -122,7 +122,7 @@ export class AccountRecoveryService {
    * 소셜 전용 계정에 새 이메일 로그인 경로가 열리지 않도록 한다.
    */
   private async applyNewPassword(
-    user: { authIdentities: { id: string; provider: string }[] },
+    user: { id: string; authIdentities: { id: string; provider: string }[] },
     email: string,
     newPassword: string,
   ): Promise<{ ok: true }> {
@@ -138,10 +138,12 @@ export class AccountRecoveryService {
       });
     }
 
-    await this.prisma.v1AuthIdentity.update({
-      where: { id: emailIdentity.id },
-      data: { passwordHash: await hashPassword(newPassword) },
-    });
+    const passwordHash = await hashPassword(newPassword);
+    // 세션 번호를 함께 올려, 재설정 전에 발급된(훔쳤을 수도 있는) 쿠키를 모든 기기에서 끊는다.
+    await this.prisma.$transaction([
+      this.prisma.v1AuthIdentity.update({ where: { id: emailIdentity.id }, data: { passwordHash } }),
+      this.prisma.v1User.update({ where: { id: user.id }, data: { sessionEpoch: { increment: 1 } } }),
+    ]);
     await this.releaseLoginRestrictions(email);
 
     return { ok: true };

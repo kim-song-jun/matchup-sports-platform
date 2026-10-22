@@ -16,7 +16,7 @@
 | `POST` | `/api/v1/auth/login` | none | `LoginDto { email, password }` | session cookie + user snapshot, **or** `200 { stepUp }` with no session (see [Email login step-up](#email-login-step-up)) |
 | `POST` | `/api/v1/auth/login/step-up/verify` | none | `{ challengeToken, code }` (`code` = 6 digits) | same response and cookie as a completed `login` |
 | `POST` | `/api/v1/auth/login/step-up/resend` | none | `{ challengeToken }` | `{ expiresAt, resendAvailableAt, devCode? }` |
-| `POST` | `/api/v1/auth/dev-session` | user (header identity, non-production) | empty body | issues signed `teameet_v1_session` cookie for an already-header-authenticated caller |
+| `POST` | `/api/v1/auth/dev-session` | user (header identity) — **404 in production mode** (alpha included) | empty body | issues signed `teameet_v1_session` cookie for an already-header-authenticated caller |
 | `POST` | `/api/v1/auth/register` | none | `RegisterDto` + current required document IDs | session cookie + onboarding/terms route |
 | `POST` | `/api/v1/auth/kakao` | none | `{ code, redirectUri? }` | social session + onboarding route |
 | `POST` | `/api/v1/auth/kakao/token` | none | `{ accessToken }` (10-4096 chars) | same as `/auth/kakao` — both resolve the user through one shared path |
@@ -53,6 +53,12 @@ Auth does not issue JWT access/refresh tokens. `AuthController` is wrapped in
 `apple/nonce`) ends by minting the same stateless, signed `teameet_v1_session` httpOnly cookie
 (`v1.<payload>.<HMAC>`, no server-side session table). There is no `/auth/refresh` endpoint —
 the session is re-derived from the cookie on each request by `V1AuthGuard`.
+
+The payload carries `V1User.sessionEpoch` as it was at issue time (`ep`; cookies from before the field read as 0).
+`V1AuthGuard`, `OptionalV1AuthGuard` and the realtime handshake only resolve the user when the cookie's epoch equals the
+current one (`v1IdentityUserWhere`), so bumping it revokes every cookie issued before on every device: a password reset
+by email and a withdrawal request do. A revoked cookie answers `401 UNAUTHENTICATED`, is anonymous on optional routes,
+and fails the socket handshake. Logout still only clears this device's cookie.
 
 `POST /api/v1/auth/login` verifies `LoginDto { email (min 3), password (min 8) }` against
 `V1AuthIdentity` (`provider = email`) with a hashed password compare. Wrong email or password both
@@ -120,9 +126,9 @@ All thresholds live in `LOGIN_SECURITY_POLICY` (`apps/v1_api/src/auth/login-secu
 which in a non-production environment accepts header-based dev identity
 (`x-v1-user-id`/`x-v1-user-email`). It upgrades that header identity into the same signed session
 cookie `login()` issues — most seeded personas have no password, so `login()` itself is not usable
-to obtain a session for them. In production, `V1AuthGuard` rejects header identity outright, so
-this route grants nothing beyond what any other guarded route already grants a caller with a valid
-session cookie.
+to obtain a session for them. In production mode (alpha included) the route answers `404` before any
+other guard (`NonProductionGuard`): with a valid cookie it would mint a fresh seven-day cookie, so a stolen
+cookie could be kept alive indefinitely.
 
 `GET /api/v1/auth/check-email` and `GET /api/v1/auth/check-nickname` are availability probes (check-nickname: optional auth, see below) (`{ available: boolean }`) used by signup forms; both are rate-limited
 (30/min). A missing or empty `email`/`nickname` query is rejected by the query DTO before the

@@ -4,8 +4,9 @@ import type {
   ExecutionContext,
   NestInterceptor,
 } from '@nestjs/common';
-import { tap } from 'rxjs';
+import { mergeMap, tap } from 'rxjs';
 import type { Observable } from 'rxjs';
+import { PrismaService } from '../prisma/prisma.service';
 import {
   clearV1SessionCookie,
   writeV1SessionCookie,
@@ -14,15 +15,25 @@ import type { V1SessionCookieResponse } from './v1-session';
 
 @Injectable()
 export class V1SessionCookieInterceptor implements NestInterceptor {
+  constructor(private readonly prisma: PrismaService) {}
+
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const response = context
       .switchToHttp()
       .getResponse<V1SessionCookieResponse>();
 
     return next.handle().pipe(
-      tap((body: unknown) => {
+      mergeMap(async (body: unknown) => {
         const userId = readSessionUserId(body);
-        if (userId) writeV1SessionCookie(response, userId);
+        if (userId) {
+          // The cookie carries the epoch it was issued under; a later bump revokes it (v1IdentityUserWhere).
+          const { sessionEpoch } = await this.prisma.v1User.findUniqueOrThrow({
+            where: { id: userId },
+            select: { sessionEpoch: true },
+          });
+          writeV1SessionCookie(response, { userId, sessionEpoch });
+        }
+        return body;
       }),
     );
   }

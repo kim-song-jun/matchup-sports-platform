@@ -38,7 +38,7 @@ v1_tournaments/V1Tournament에 show_detail_image 기본 true 추가 migration �
 A안은 상세 노출 스위치로 확정. 두 장은 리그와 동일한 listImageUrl/coverImageUrl이며 업로드 없는 상세는 종목 그래픽으로 표시한다.
 ## Progress Snapshot
 Base cd901fa68 (#2031 merge), worktree /tmp/teameet-tournament-images, branch feat/tournament-two-images.
-Phase 1 contracts: in_progress. Phase 2 UI: pending. Phase 3 validation/docs completed, PR #2032 생성. #2031 alpha run39705838057 서버 반영·공개 배포 identity 검증 SUCCESS.
+Phase 1 contracts: completed. Phase 2 UI: completed. Phase 3 validation/docs completed, PR #2032 생성. #2031 alpha run39705838057 서버 반영·공개 배포 identity 검증 SUCCESS.
 
 ## Validation (2026-10-22)
 - API unit 185 PASS (admin service, DTO, public detail presenter), schema snapshot 5 PASS.
@@ -60,3 +60,11 @@ Phase 1 contracts: in_progress. Phase 2 UI: pending. Phase 3 validation/docs com
 
 - #2031 alpha 실측(2026-10-22T01:50:42Z): landing HTTP200, x-teameet-commit=cd901fa688e7226cdcaaa74ea1cd543d5d9cb864, x-teameet-release=1.11.5-alpha.20261022.gcd901fa688e7. /api/v1/health success, checks.db=true. 신규 이미지 PR #2032는 아직 dev 머지/배포하지 않았으므로 이미지 after QA는 계속 pending.
 - PR #2032 최초 code head 61840a809의 Gates PASS, API/Web CI 진행 중. Copilot 요청은 완료했지만 제출된 리뷰가 없어 clean으로 판정하지 않음. 후속 커밋은 이 task의 PR/배포/기준 화면 증거 동기화만 포함한다.
+
+## #2032 배포 요청 — 2026-10-22
+- 사용자 dev/alpha 배포 승인 및 Copilot 외부 오류 예외 명시 승인. 최신 head95d0dd865의 Copilot run39708108350은 모델 claude-opus-5 unavailable로 검토 전 실패; clean으로 표시하지 않는다. 예외 PR comment6330899608.
+- CI39708104473: Gates/Web PASS, API unit 6852 PASS/1 FAIL(451 suites 중1). read-service 기존 테스트가 regular_tournament에는 listImageUrl이 없어야 한다는 이전 계약을 유지하고 있었다. 구현의 새 응답은 요청한2장 계약대로 필드를 제공한다.
+- read-service fixture의 listImageUrl/showDetailImage 기본값을 sync하고, 대회/리그 목록 fallback·대회 상세의 두 원본 URL·표시 true/false를 모두 검증하도록 수정한다. assertion을 제거하거나 오류를 성공 처리하지 않는다.
+- after merge: alpha 배포 SHA/health/공개 상세3폭 확인 및 PR 갤러리. 관리자 인증 세션 미확보로 실제 관리자 저장 UI는 별도 제한을 명시한다.
+
+- CI 실패를 RED 증거로 유지하고 read-service suite 재검증 52/52 PASS(단일 worker). git diff --check PASS, 신규 debt marker 없음. 기존 구현/DB/API 계약은 유지하고 읽기 응답 테스트와 fixture만 동기화했다.

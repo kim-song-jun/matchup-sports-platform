@@ -11,8 +11,8 @@ Created: 2026-10-22
 - [x] 대회 목록·상세 이미지 2장
 - [x] 상세에서 업로드가 없으면 종목 기본 이미지 표시
 - [x] 상세 이미지 표시 스위치를 끄면 기본 이미지와 영역/여백까지 제거
-- [ ] 구현 완료 후 dev 대상 PR 생성
-- [x] 별도 #2031(main→dev 이력 동기화) dev 머지, alpha 배포 확인 진행
+- [x] 구현 완료 후 dev 대상 PR 생성 (#2032)
+- [x] 별도 #2031(main→dev 이력 동기화) dev 머지 및 alpha 배포 확인 완료
 ## User Scenarios
 운영자는 목록/상세 사진을 각각 올리거나 하나를 공유한다. 상세 표시를 껐다 켜도 사진은 보존된다. 관람자는 숨김 대회에서 제목·정보를 바로 본다.
 ## Test Scenarios
@@ -26,7 +26,7 @@ Created: 2026-10-22
 - [x] UI A/B/C 제시 후 사용자 A안 승인(2026-10-22)
 - [x] DTO→저장→응답→공개 UI 계약 일치
 - [x] 관련 테스트/타입 검증 및 diff/debt 검사
-- [ ] dev PR 생성, CI 상태 기록
+- [x] dev PR 생성, CI 상태 기록 (#2032, 61840a809; CI/Copilot 진행)
 - [ ] alpha 390/768/1440 실제 QA(배포 후 가능)
 ## Tech Debt Resolved
 기존 커버 단일 업로더와 실제 상세 이미지 미표시 불일치 정리. 기존 홍보 이미지 데이터는 삭제하지 않으며 이전 홍보 커스터마이징 호환 유지.
@@ -38,7 +38,7 @@ v1_tournaments/V1Tournament에 show_detail_image 기본 true 추가 migration �
 A안은 상세 노출 스위치로 확정. 두 장은 리그와 동일한 listImageUrl/coverImageUrl이며 업로드 없는 상세는 종목 그래픽으로 표시한다.
 ## Progress Snapshot
 Base cd901fa68 (#2031 merge), worktree /tmp/teameet-tournament-images, branch feat/tournament-two-images.
-Phase 1 contracts: in_progress. Phase 2 UI: pending. Phase 3 validation/docs/PR: pending. #2031 alpha run39705838057 진행 중.
+Phase 1 contracts: in_progress. Phase 2 UI: pending. Phase 3 validation/docs completed, PR #2032 생성. #2031 alpha run39705838057 서버 반영·공개 배포 identity 검증 SUCCESS.
 
 ## Validation (2026-10-22)
 - API unit 185 PASS (admin service, DTO, public detail presenter), schema snapshot 5 PASS.
@@ -49,4 +49,14 @@ Phase 1 contracts: in_progress. Phase 2 UI: pending. Phase 3 validation/docs/PR:
 - 격리 작업트리 전용 Prisma client 생성. 공유 client와 원본 shared WIP는 수정하지 않음.
 - 신규 debt marker 없음, git diff --check PASS. 신규 import는 동일 PR의 tournament-images-field.tsx이며 외부 dependency 변경 없음.
 - Phase 1 contracts completed; Phase 2 UI completed; Phase 3 validation/docs completed, PR/CI in_progress.
-- Alpha UI QA pending 0/3 (390/768/1440): 신규 이미지 작업 미배포로 after/console/network 미검증. PR 요청 범위는 PR 생성이며 신규 PR dev 머지는 승인받지 않았음. 머지 후 alpha 갤러리 게시 필요. baseline 자체 캡처 없음.
+- Alpha UI QA pending 0/3 (390/768/1440): 신규 이미지 작업 미배포로 after/console/network 미검증. PR 요청 범위는 PR 생성이며 신규 PR dev 머지는 승인받지 않았음. 머지 후 alpha 갤러리 게시 필요. baseline은 아래 후속 증거 참고.
+
+## PR / baseline handoff
+- PR: https://github.com/kim-song-jun/matchup-sports-platform/pull/2032 (base dev, 최초 head 61840a809). 31파일 scoped commit, committed-tree diff/check PASS, 추적 WIP 없음. 원본 shared tree 보존.
+- Copilot review 요청 완료. 최신 head 리뷰/CI 성공 여부는 최종 보고 시 확인하며 clean으로 선판정하지 않는다.
+- before alpha: 비로그인 공개 방문자, `/tournaments/aa100000-0000-4000-8000-000000000004`, 390/768/1440 캡처 `/tmp/teameet-tournament-images-before/{390,768,1440}.png` 및 evidence.json. 세 폭 모두 overflow false. 각 폭에서 선재 React hydration error #418 1건과 비로그인 auth/me 401을 관찰. 신규 UI와 무관한 배포 전 기준이며 after PASS로 취급하지 않는다.
+- headed Playwright 소유 node PID43405/browser PID43424(PPID43405), 종료 후 두 PID 부재 확인. 임시 캡처 스크립트 제거. local Next 서버/alpha 데이터 쓰기 없음.
+- #2031 merge cd901fa688e7226cdcaaa74ea1cd543d5d9cb864, matching CI run39705838073 SUCCESS. Windows 실제 dev worktree synced-dev-20261012를 --ff-only로 동기화 완료. alpha run39705838057 서버 반영·공개 배포 identity 검증 SUCCESS.
+
+- #2031 alpha 실측(2026-10-22T01:50:42Z): landing HTTP200, x-teameet-commit=cd901fa688e7226cdcaaa74ea1cd543d5d9cb864, x-teameet-release=1.11.5-alpha.20261022.gcd901fa688e7. /api/v1/health success, checks.db=true. 신규 이미지 PR #2032는 아직 dev 머지/배포하지 않았으므로 이미지 after QA는 계속 pending.
+- PR #2032 최초 code head 61840a809의 Gates PASS, API/Web CI 진행 중. Copilot 요청은 완료했지만 제출된 리뷰가 없어 clean으로 판정하지 않음. 후속 커밋은 이 task의 PR/배포/기준 화면 증거 동기화만 포함한다.

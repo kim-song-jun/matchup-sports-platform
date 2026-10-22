@@ -60,11 +60,27 @@ describe('PushSubscribeDto', () => {
     const errors = await validate(dto);
     expect(errors.some((error) => error.property === 'keys')).toBe(true);
   });
+
+  it.each(['https://fcm.googleapis.com:8443/fcm/send/abc', 'https://user:pass@fcm.googleapis.com/fcm/send/abc'])(
+    'rejects an allowed host with a port or user information: %s',
+    async (endpoint) => {
+      const dto = plainToInstance(PushSubscribeDto, { endpoint, keys: { p256dh: 'p', auth: 'a' } });
+      const errors = await validate(dto);
+      expect(errors.some((error) => error.property === 'endpoint')).toBe(true);
+    },
+  );
 });
 
 describe('PushUnsubscribeDto', () => {
-  it('rejects a non-allowlisted endpoint', async () => {
-    const dto = plainToInstance(PushUnsubscribeDto, { endpoint: 'https://attacker.example/collect' });
+  // Unsubscribing only deletes the caller's own row by its stored string, so rows saved before the subscribe check stay removable.
+  it('accepts a stored endpoint the subscribe check would now refuse', async () => {
+    const dto = plainToInstance(PushUnsubscribeDto, { endpoint: 'https://fcm.googleapis.com:8443/fcm/send/abc' });
+
+    await expect(validate(dto)).resolves.toHaveLength(0);
+  });
+
+  it.each(['', 'x'.repeat(2049)])('rejects an empty or oversized endpoint', async (endpoint) => {
+    const dto = plainToInstance(PushUnsubscribeDto, { endpoint });
 
     const errors = await validate(dto);
     expect(errors.some((error) => error.property === 'endpoint')).toBe(true);

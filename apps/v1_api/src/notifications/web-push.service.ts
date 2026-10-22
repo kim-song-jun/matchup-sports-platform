@@ -91,6 +91,17 @@ export class WebPushService implements OnModuleInit {
         message: '푸시 서비스 주소가 올바르지 않아요.',
       });
     }
+    if (endpoint !== dto.endpoint) {
+      // 표준형 전에 원문 그대로 저장된 행은 같은 브라우저 구독이다 — 표준형 행과 같은 소유 규칙으로 정리해 두 행이 되지 않게 한다.
+      const legacy = await this.prisma.v1PushSubscription.findUnique({ where: { endpoint: dto.endpoint } });
+      if (legacy && legacy.userId !== userId) {
+        throw new ConflictException({
+          code: 'PUSH_ENDPOINT_ALREADY_REGISTERED',
+          message: '이미 다른 계정에 등록된 구독이에요.',
+        });
+      }
+      if (legacy) await this.prisma.v1PushSubscription.deleteMany({ where: { id: legacy.id } });
+    }
     try {
       await this.prisma.v1PushSubscription.create({
         data: { userId, endpoint, p256dh: dto.keys.p256dh, auth: dto.keys.auth },

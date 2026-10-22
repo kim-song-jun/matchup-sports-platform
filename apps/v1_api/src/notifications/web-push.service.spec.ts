@@ -376,6 +376,7 @@ describe('WebPushService', () => {
 
   it('subscribe stores the normalized endpoint and refuses one outside the push services', async () => {
     const service = await build({});
+    prisma.v1PushSubscription.findUnique.mockResolvedValue(null);
     prisma.v1PushSubscription.create.mockResolvedValue({ id: 'sub-1' });
 
     await service.subscribe('user-1', { endpoint: 'https://FCM.googleapis.com:443/fcm/send/abc', keys: { p256dh: 'p', auth: 'a' } });
@@ -387,6 +388,29 @@ describe('WebPushService', () => {
       service.subscribe('user-1', { endpoint: 'https://user@fcm.googleapis.com/x', keys: { p256dh: 'p', auth: 'a' } }),
     ).rejects.toMatchObject({ response: expect.objectContaining({ code: 'PUSH_ENDPOINT_NOT_ALLOWED' }) });
     expect(prisma.v1PushSubscription.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('subscribe folds a row stored under the raw form into the normalized one, and keeps refusing another account\'s row', async () => {
+    const service = await build({});
+    const dto = { endpoint: 'https://FCM.googleapis.com/fcm/send/abc', keys: { p256dh: 'p', auth: 'a' } };
+    prisma.v1PushSubscription.findUnique.mockResolvedValueOnce({ id: 'legacy-1', userId: 'user-1' });
+    prisma.v1PushSubscription.create.mockResolvedValue({ id: 'sub-1' });
+
+    await service.subscribe('user-1', dto);
+
+    expect(prisma.v1PushSubscription.findUnique).toHaveBeenCalledWith({ where: { endpoint: dto.endpoint } });
+    expect(prisma.v1PushSubscription.deleteMany).toHaveBeenCalledWith({ where: { id: 'legacy-1' } });
+    expect(prisma.v1PushSubscription.create).toHaveBeenCalledWith({
+      data: { userId: 'user-1', endpoint: 'https://fcm.googleapis.com/fcm/send/abc', p256dh: 'p', auth: 'a' },
+    });
+
+    jest.clearAllMocks();
+    prisma.v1PushSubscription.findUnique.mockResolvedValueOnce({ id: 'legacy-2', userId: 'other-user' });
+    await expect(service.subscribe('user-1', dto)).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'PUSH_ENDPOINT_ALREADY_REGISTERED' }),
+    });
+    expect(prisma.v1PushSubscription.create).not.toHaveBeenCalled();
+    expect(prisma.v1PushSubscription.deleteMany).not.toHaveBeenCalled();
   });
 
   it('unsubscribe removes the subscription stored either as typed or in normalized form', async () => {

@@ -1,8 +1,10 @@
 import { Type } from 'class-transformer';
 import {
   IsDefined,
+  IsNotEmpty,
   IsObject,
   IsString,
+  MaxLength,
   ValidateNested,
   ValidationArguments,
   ValidationOptions,
@@ -54,6 +56,10 @@ export class PushSubscribeDto {
 }
 
 export class PushUnsubscribeDto {
-  @IsPushEndpointUrl()
+  // 해지는 이 사용자의 행을 문자열로 지울 뿐 어디에도 보내지 않는다. 등록 검사를 걸면 검사가 생기기 전에
+  // 저장된 행을 해지할 수 없게 된다.
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(2048)
   endpoint!: string;
 }

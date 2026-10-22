@@ -1,0 +1,16 @@
+{
+  "identity": {
+    "X-Teameet-Release": "1.11.5-alpha.20261022.g0b0ac9a39333",
+    "X-Teameet-Commit": "0b0ac9a39333cc90d4556d437ab923575f34eaa4"
+  },
+  "health": {
+    "status": "success",
+    "data": {
+      "service": "v1_api",
+      "checks": {
+        "db": true
+      }
+    },
+    "timestamp": "2026-10-22T09:26:15.963Z"
+  }
+}

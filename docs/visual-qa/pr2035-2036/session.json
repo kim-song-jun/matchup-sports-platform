@@ -1,0 +1,285 @@
+{
+  "lifecycle": {
+    "nodePid": 59437,
+    "browserPid": 59456,
+    "browserPpid": 59437
+  },
+  "results": [
+    {
+      "width": 320,
+      "rect": {
+        "x": 20,
+        "y": 483.5,
+        "width": 280,
+        "height": 44
+      },
+      "overflow": false,
+      "filterSortFlow": "PASS",
+      "issues": {
+        "pageErrors": [],
+        "consoleErrors": [],
+        "httpErrors": [],
+        "failedRequests": [
+          {
+            "url": "https://www.google-analytics.com/g/collect",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "https://www.google-analytics.com/g/collect",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "https://www.google-analytics.com/g/collect",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "https://alpha.teameet.co.kr/tournaments",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "https://alpha.teameet.co.kr/tournaments",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "https://alpha.teameet.co.kr/tournaments/c041c8b2-b624-493c-8eba-b9d0995588d9",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "https://alpha.teameet.co.kr/tournaments/bd55b6a5-ecab-4406-8d25-cc1c2ff07139",
+            "error": "net::ERR_ABORTED"
+          }
+        ]
+      }
+    },
+    {
+      "width": 390,
+      "rect": {
+        "x": 20,
+        "y": 483.5,
+        "width": 350,
+        "height": 44
+      },
+      "overflow": false,
+      "filterSortFlow": "PASS",
+      "issues": {
+        "pageErrors": [],
+        "consoleErrors": [
+          "Failed to load resource: the server responded with a status of 401 ()"
+        ],
+        "httpErrors": [
+          {
+            "status": 401,
+            "url": "https://alpha.teameet.co.kr/api/v1/auth/me"
+          }
+        ],
+        "failedRequests": [
+          {
+            "url": "https://www.google-analytics.com/g/collect",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "https://www.google-analytics.com/g/collect",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "https://alpha.teameet.co.kr/tournaments",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "https://www.google-analytics.com/g/collect",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "https://alpha.teameet.co.kr/tournaments",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "https://alpha.teameet.co.kr/tournaments",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "https://www.google-analytics.com/g/collect",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "https://www.google-analytics.com/g/collect",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "https://www.google-analytics.com/g/collect",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "https://alpha.teameet.co.kr/api/v1/health",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "https://www.google-analytics.com/g/collect",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "https://www.google-analytics.com/g/collect",
+            "error": "net::ERR_ABORTED"
+          }
+        ]
+      },
+      "matchText": "경기 기록\nA조 · 조별리그 2라운드\n(테스트) 알파 6인 2팀\n3 : 1\n(테스트) 알파 6인 5팀\n2026년 10월 22일 (목) 오전 12:10 · 종료 · 상암문화광장\n장소\n상암문화광장\n서울 마포구 성암로 255\n주소 복사\n길찾기\n라인업\n(테스트) 알파 6인 2팀\n1\n알파02팀1번\n2\n알파02팀2번\n3\n알파02팀3번\n4\n알파02팀4번\n5\n알파02팀5번\n6\n알파02팀6번\n(테스트) 알파 6인 5팀\n1\n알파05팀1번\n2\n알파05팀2번\n4\n알파05팀4번\n5\n알파05팀5번\n6\n알파05팀6번\n득점·카드\n전반\n🟨\n옐로카드\n1′\n2\n알파05팀2번\n1\n알파02팀1번\n⚽\n골\n1′\n1\n알파02팀1번\n⚽\n골\n2′\n4\n알파05팀4번\n⚽\n자책골\nOG\n2′\n후반\n⚽\n골\n1′\n5\n알파05팀5번\n결과 변경 이력\n확정 · 1차\n2026년 10월 22일 (목) 오전 12:41\n다음 경기\n(테스트) 알파 6인 2팀 vs (테스트) 알파 6인 4팀\n이 경기에 뛰었는데 내 기록이 없나요?\n명단에서 본인을 찾아 연결하면 내 활동 기록으로 가져올 수 있어요.\n명단에서 나 찾기\n로그인 후 문의하기\n\n경기 문의는 회원가입 후 로그인한 사용자만 접수할 수 있어요.\n\n인스타그램\n@teameet_official\n이메일\nteameetsports@naver.com\n홈\n매치\n대회\n팀\n마이"
+    },
+    {
+      "width": 768,
+      "rect": {
+        "x": 104,
+        "y": 483.5,
+        "width": 560,
+        "height": 44
+      },
+      "overflow": false,
+      "filterSortFlow": "PASS",
+      "issues": {
+        "pageErrors": [],
+        "consoleErrors": [
+          "Failed to load resource: the server responded with a status of 401 ()"
+        ],
+        "httpErrors": [
+          {
+            "status": 401,
+            "url": "https://alpha.teameet.co.kr/api/v1/auth/me"
+          }
+        ],
+        "failedRequests": [
+          {
+            "url": "https://www.google-analytics.com/g/collect",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "https://www.google-analytics.com/g/collect",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "https://www.google-analytics.com/g/collect",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "https://alpha.teameet.co.kr/tournaments",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "https://alpha.teameet.co.kr/events",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "https://www.google-analytics.com/g/collect",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "https://www.google-analytics.com/g/collect",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "https://alpha.teameet.co.kr/api/v1/health",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "https://www.google-analytics.com/g/collect",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "https://www.google-analytics.com/g/collect",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "https://www.google-analytics.com/g/collect",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "https://www.google-analytics.com/g/collect",
+            "error": "net::ERR_ABORTED"
+          }
+        ]
+      },
+      "matchText": "경기 기록\nA조 · 조별리그 2라운드\n(테스트) 알파 6인 2팀\n3 : 1\n(테스트) 알파 6인 5팀\n2026년 10월 22일 (목) 오전 12:10 · 종료 · 상암문화광장\n장소\n상암문화광장\n서울 마포구 성암로 255\n주소 복사\n100m\n길찾기\n라인업\n(테스트) 알파 6인 2팀\n1\n알파02팀1번\n2\n알파02팀2번\n3\n알파02팀3번\n4\n알파02팀4번\n5\n알파02팀5번\n6\n알파02팀6번\n(테스트) 알파 6인 5팀\n1\n알파05팀1번\n2\n알파05팀2번\n4\n알파05팀4번\n5\n알파05팀5번\n6\n알파05팀6번\n득점·카드\n전반\n🟨\n옐로카드\n1′\n2\n알파05팀2번\n1\n알파02팀1번\n⚽\n골\n1′\n1\n알파02팀1번\n⚽\n골\n2′\n4\n알파05팀4번\n⚽\n자책골\nOG\n2′\n후반\n⚽\n골\n1′\n5\n알파05팀5번\n결과 변경 이력\n확정 · 1차\n2026년 10월 22일 (목) 오전 12:41\n다음 경기\n(테스트) 알파 6인 2팀 vs (테스트) 알파 6인 4팀\n이 경기에 뛰었는데 내 기록이 없나요?\n명단에서 본인을 찾아 연결하면 내 활동 기록으로 가져올 수 있어요.\n명단에서 나 찾기\n로그인 후 문의하기\n\n경기 문의는 회원가입 후 로그인한 사용자만 접수할 수 있어요.\n\n인스타그램\n@teameet_official\n이메일\nteameetsports@naver.com\n홈\n매치\n대회\n팀\n마이"
+    },
+    {
+      "width": 1440,
+      "rect": {
+        "x": 1133,
+        "y": 630.5,
+        "width": 107,
+        "height": 44
+      },
+      "overflow": false,
+      "filterSortFlow": "PASS",
+      "issues": {
+        "pageErrors": [],
+        "consoleErrors": [
+          "Failed to load resource: the server responded with a status of 401 ()"
+        ],
+        "httpErrors": [
+          {
+            "status": 401,
+            "url": "https://alpha.teameet.co.kr/api/v1/auth/me"
+          }
+        ],
+        "failedRequests": [
+          {
+            "url": "https://www.google-analytics.com/g/collect",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "https://alpha.teameet.co.kr/tournaments",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "https://alpha.teameet.co.kr/tournaments",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "https://alpha.teameet.co.kr/tournaments/1da67562-f74e-469d-9fe5-17f7863eeeec",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "https://www.google-analytics.com/g/collect",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "https://www.google-analytics.com/g/collect",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "https://alpha.teameet.co.kr/tournaments/cdd6e6e6-5a9e-491a-ab64-c1fb8e85c2c4",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "https://alpha.teameet.co.kr/tournaments/41714566-75a4-44c1-b6e1-aab718176757",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "https://www.google-analytics.com/g/collect",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "https://alpha.teameet.co.kr/api/v1/health",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "https://alpha.teameet.co.kr/tournaments/57f483c8-b8ad-4465-b310-e02782a9ca15",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "https://www.google-analytics.com/g/collect",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "https://www.google-analytics.com/g/collect",
+            "error": "net::ERR_ABORTED"
+          },
+          {
+            "url": "https://alpha.teameet.co.kr/teams/e7c2549a-09a2-412f-b50b-84a6515a3d95",
+            "error": "net::ERR_ABORTED"
+          }
+        ]
+      },
+      "matchText": "teameet\n홈\n매치\n대회\n팀\n마이\n경기 기록\nA조 · 조별리그 2라운드\n(테스트) 알파 6인 2팀\n3 : 1\n(테스트) 알파 6인 5팀\n2026년 10월 22일 (목) 오전 12:10 · 종료 · 상암문화광장\n장소\n상암문화광장\n서울 마포구 성암로 255\n주소 복사\n100m\n길찾기\n라인업\n(테스트) 알파 6인 2팀\n1\n알파02팀1번\n2\n알파02팀2번\n3\n알파02팀3번\n4\n알파02팀4번\n5\n알파02팀5번\n6\n알파02팀6번\n(테스트) 알파 6인 5팀\n1\n알파05팀1번\n2\n알파05팀2번\n4\n알파05팀4번\n5\n알파05팀5번\n6\n알파05팀6번\n득점·카드\n전반\n🟨\n옐로카드\n1′\n2\n알파05팀2번\n1\n알파02팀1번\n⚽\n골\n1′\n1\n알파02팀1번\n⚽\n골\n2′\n4\n알파05팀4번\n⚽\n자책골\nOG\n2′\n후반\n⚽\n골\n1′\n5\n알파05팀5번\n결과 변경 이력\n확정 · 1차\n2026년 10월 22일 (목) 오전 12:41\n다음 경기\n(테스트) 알파 6인 2팀 vs (테스트) 알파 6인 4팀\n이 경기에 뛰었는데 내 기록이 없나요?\n명단에서 본인을 찾아 연결하면 내 활동 기록으로 가져올 수 있어요.\n명단에서 나 찾기\n로그인 후 문의하기\n\n경기 문의는 회원가입 후 로그인한 사용자만 접수할 수 있어요.\n\n인스타그램\n@teameet_official\n이메일\nteameetsports@naver.com\nteameet\n같이 뛸 사람을 한 번에\n공지사항\n서비스 이용약관\n개인정보처리방침\n위치기반서비스 이용약관\n대회 운영정책\n고객센터\n\n© 2026 Teameet"
+    }
+  ]
+}

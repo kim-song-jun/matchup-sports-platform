@@ -1,0 +1,52 @@
+[
+  {
+    "tournamentId": "8e16d6fc-5c5a-44d9-93bd-ea14a4007082",
+    "fixtureId": "c19135fd-3465-5277-abab-2cc240389d01",
+    "score": {
+      "home": 2,
+      "away": 0,
+      "penalties": null
+    },
+    "before": {
+      "side": "away",
+      "participantName": "김도현",
+      "jerseyNumber": 4,
+      "period": 1,
+      "clockMs": 180000,
+      "ownGoal": true
+    },
+    "after": {
+      "side": "home",
+      "participantName": "김도현",
+      "jerseyNumber": 4,
+      "period": 1,
+      "clockMs": 180000,
+      "ownGoal": true
+    }
+  },
+  {
+    "tournamentId": "bd55b6a5-ecab-4406-8d25-cc1c2ff07139",
+    "fixtureId": "5c824264-af8c-5b49-8623-3461357fd781",
+    "score": {
+      "home": 3,
+      "away": 1,
+      "penalties": null
+    },
+    "before": {
+      "side": "away",
+      "participantName": "알파05팀4번",
+      "jerseyNumber": 4,
+      "period": 1,
+      "clockMs": 120000,
+      "ownGoal": true
+    },
+    "after": {
+      "side": "home",
+      "participantName": "알파05팀4번",
+      "jerseyNumber": 4,
+      "period": 1,
+      "clockMs": 120000,
+      "ownGoal": true
+    }
+  }
+]

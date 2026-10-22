@@ -1,6 +1,6 @@
 # Task 20261105: 대회 모바일 필터·정렬 B안
 
-Status: Review
+Status: Deployed (alpha)
 Created: 2026-10-22
 Owner: Codex (단일 세션)
 
@@ -43,3 +43,14 @@ alpha 미배포·브라우저 연결 없음. 수동 화면 확인은 별도이�
 - common BottomSheet origin/dev 대비 diff0, touched-path debt marker0 및 git diff --check PASS.
 - alpha 미배포로 실제 320/390/768 화면·콘솔·네트워크는 미검증. 프리뷰 이미지는 선택용 예시이며 실제 앱 검증으로 계산하지 않는다.
 - 기존 PR #2036의 범위를 B안 모바일 정리와 중복 손잡이 제거로 갱신한다. 머지·배포는 수행하지 않는다.
+
+
+## Alpha deployment — 2026-10-22
+- 사용자 배포 승인 및 Copilot 외부 모델 오류 예외 승인 후 #2035·#2036 dev 머지. Copilot clean으로 기록하지 않는다.
+- 최종 배포 SHA: `0b0ac9a39333cc90d4556d437ab923575f34eaa4`. 각 머지 직후 Windows 로컬 dev `--ff-only` 동기화 완료.
+- dev CI Gates/API/Web PASS: [39751993655](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/39751993655).
+- alpha 배포 SUCCESS: [39751993510](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/39751993510). 실제 응답 commit 일치, API success / db true.
+- 공개 비로그인 persona로 headed Chromium: 대회 목록 320/390/768/1440 한 줄 배치·44px·가로 overflow 없음, 모바일/태블릿 정렬→마감순 접수조건→필터→초기화→적용→Escape, PC 정렬 PASS.
+- 기존 확정 경기(승제21, fixture 5c824264-af8c-5b49-8623-3461357fd781)의 자책골이 홈 득점 영역으로 이동한 것을 390/768/1440에서 before/after 확인. 3:1 점수 및 선수명·OG 유지. 공개 API 두 자책골 사례의 방향 변경 및 점수·이름 보존 PASS.
+- pageerror 0. 비로그인 auth/me 401 및 탐색·prefetch·analytics 요청 ERR_ABORTED를 원본 증거에 별도 기록. 로그인·운영자 수정/저장 흐름은 범위 밖으로 미실행.
+- 증거: `docs/visual-qa/pr2035-2036/README.md` (별도 evidence branch). 실행한 브라우저 트리 종료 확인. 앱·DB 데이터 변경 없음.

@@ -63,7 +63,9 @@ describe('필터 선택·적용과 목록 정렬', () => {
   it('모바일 정렬은 선택 시트를 열고 선택한 정렬을 적용한다', () => {
     render(<CompetitionDiscoveryControls {...props} desktop={false} />);
     fireEvent.click(screen.getByRole('button', { name: /최신 등록순/ }));
-    const dialog = within(screen.getByRole('dialog', { name: '정렬' }));
+    const sheet = screen.getByRole('dialog', { name: '정렬' });
+    expect(sheet.querySelectorAll('.tm-filter-sheet-handle')).toHaveLength(1);
+    const dialog = within(sheet);
     fireEvent.click(dialog.getByRole('button', { name: '개최 가까운 순' }));
     expect(navigation.replace).toHaveBeenCalledWith('/tournaments?kind=tournament&sort=scheduled', { scroll: false });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();

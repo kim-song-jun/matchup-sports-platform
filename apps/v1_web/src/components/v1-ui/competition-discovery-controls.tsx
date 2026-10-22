@@ -151,7 +151,6 @@ export function CompetitionDiscoveryControls({ filters, sports, sheetOpen, deskt
     {sort === 'deadline' && <p className="tm-text-caption">신청 접수 중인 항목을 마감 가까운 순으로 봐요. 마감 미정은 뒤에 표시해요.</p>}
     {sheetOpen && <DiscoveryFilterSheet key={competitionDiscoveryHref(filters)} filters={filters} sports={sports} page={page} />}
     {sortOpen && !desktop && <BottomSheet open title="정렬" onClose={() => setSortOpen(false)}>
-      <div className="tm-filter-sheet-handle" />
       <div className={styles.sortOptions}>{COMPETITION_SORTS.map((option) => <button key={option.value} type="button" className={`tm-btn tm-btn-lg ${sort === option.value ? 'tm-btn-primary' : 'tm-btn-neutral'}`} aria-pressed={sort === option.value} onClick={() => navigateSort(option.value)}>{option.label}</button>)}</div>
     </BottomSheet>}
   </>;

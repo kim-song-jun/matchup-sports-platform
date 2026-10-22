@@ -16,7 +16,7 @@ import {
   isPendingSocialSignupRequestAllowed,
 } from './social-signup-access';
 import type { V1AuthUser } from './v1-auth-user';
-import { currentRuntimeConfiguration, resolveV1RequestIdentity, type V1RequestIdentity } from './v1-session';
+import { currentRuntimeConfiguration, resolveV1RequestIdentity, v1IdentityUserWhere } from './v1-session';
 import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
 import { isTermsReconsentRequestAllowed } from '../terms/terms-reconsent-access';
 import {
@@ -68,7 +68,7 @@ export class V1AuthGuard implements CanActivate {
     }
 
     const user = await this.prisma.v1User.findFirst({
-      where: identityWhere(identity),
+      where: v1IdentityUserWhere(identity),
       select: {
         id: true,
         email: true,
@@ -156,19 +156,4 @@ export class V1AuthGuard implements CanActivate {
     request.v1User = user;
     return true;
   }
-}
-
-function identityWhere(identity: V1RequestIdentity) {
-  switch (identity.kind) {
-    case 'user_id':
-      return { id: identity.userId };
-    case 'email':
-      return { email: identity.email };
-    default:
-      return assertNever(identity);
-  }
-}
-
-function assertNever(value: never): never {
-  return value;
 }

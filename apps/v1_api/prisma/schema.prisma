@@ -600,6 +600,8 @@ model V1User {
   deletedAt        DateTime?          @map("deleted_at")
   emailVerifiedAt  DateTime?          @map("email_verified_at")
   phoneVerifiedAt  DateTime?          @map("phone_verified_at")
+  /// 세션 쿠키는 서버에 저장하지 않는 서명표라, 이 값을 올리면 그 전에 발급된 쿠키가 모두 무효가 된다(비밀번호 재설정·탈퇴 신청).
+  sessionEpoch     Int                @default(0) @map("session_epoch")
   themePreference  V1ThemePreference  @default(light) @map("theme_preference")
 
   chatBlocksMade                 V1ChatUserBlock[] @relation("ChatBlockActor")

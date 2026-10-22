@@ -69,6 +69,7 @@ function socket(
 function sessionCookie(userId = USER.id, issuedAtMs?: number): string {
   const token = createV1SessionToken({
     userId,
+    sessionEpoch: 0,
     secret: SESSION_SECRET,
     ...(issuedAtMs === undefined ? {} : { issuedAtMs }),
   });
@@ -209,7 +210,7 @@ describe('Task 8 realtime authenticated pre-connect handshake', () => {
       expect.objectContaining({ status: 'subscribed', room: `game:${GAME_ID}` }),
     );
     expect(prisma.v1User.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: USER.id } }),
+      expect.objectContaining({ where: { id: USER.id, sessionEpoch: 0 } }),
     );
   });
 

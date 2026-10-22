@@ -1,9 +1,11 @@
+import { createHmac } from 'node:crypto';
 import {
   V1_SESSION_COOKIE_NAME,
   V1SessionConfigurationError,
   assertV1SessionRuntimeConfiguration,
   createV1SessionToken,
-  readV1SessionUserId,
+  readV1Session,
+  v1IdentityUserWhere,
   resolveV1RequestIdentity,
   clearV1SessionCookie,
   writeV1SessionCookie,
@@ -13,28 +15,46 @@ const NOW_MS = Date.UTC(2026, 6, 15, 4, 0, 0);
 const SESSION_SECRET = 'teameet-test-session-secret-32-bytes-minimum';
 
 describe('v1 signed session', () => {
-  it('reads the signed user id from the session cookie', () => {
+  it('reads the signed user id and session epoch from the session cookie', () => {
     // Given
     const token = createV1SessionToken({
       userId: 'user-1',
+      sessionEpoch: 3,
       secret: SESSION_SECRET,
       issuedAtMs: NOW_MS,
     });
 
     // When
-    const userId = readV1SessionUserId(`${V1_SESSION_COOKIE_NAME}=${token}`, {
+    const session = readV1Session(`${V1_SESSION_COOKIE_NAME}=${token}`, {
       secret: SESSION_SECRET,
       nowMs: NOW_MS + 1_000,
     });
 
     // Then
-    expect(userId).toBe('user-1');
+    expect(session).toEqual({ userId: 'user-1', sessionEpoch: 3 });
+  });
+
+  it('reads a cookie signed before the epoch existed as epoch 0, so deploying revokes nobody', () => {
+    const issuedAt = Math.floor(NOW_MS / 1_000);
+    const legacyPayload = Buffer.from(JSON.stringify({ sub: 'user-1', iat: issuedAt, exp: issuedAt + 7 * 24 * 60 * 60 })).toString('base64url');
+    const signed = `v1.${legacyPayload}`;
+    const signature = createHmac('sha256', SESSION_SECRET).update(signed).digest('base64url');
+
+    expect(readV1Session(`${V1_SESSION_COOKIE_NAME}=${signed}.${signature}`, { secret: SESSION_SECRET, nowMs: NOW_MS + 1_000 }))
+      .toEqual({ userId: 'user-1', sessionEpoch: 0 });
+  });
+
+  it('matches a cookie session to the user only at the epoch it was issued under', () => {
+    expect(v1IdentityUserWhere({ kind: 'user_id', userId: 'user-1', sessionEpoch: 2 })).toEqual({ id: 'user-1', sessionEpoch: 2 });
+    expect(v1IdentityUserWhere({ kind: 'user_id', userId: 'user-1' })).toEqual({ id: 'user-1' });
+    expect(v1IdentityUserWhere({ kind: 'email', email: 'host@teameet.v1' })).toEqual({ email: 'host@teameet.v1' });
   });
 
   it('rejects a session token whose signature was changed', () => {
     // Given
     const token = createV1SessionToken({
       userId: 'user-1',
+      sessionEpoch: 3,
       secret: SESSION_SECRET,
       issuedAtMs: NOW_MS,
     });
@@ -42,13 +62,13 @@ describe('v1 signed session', () => {
     const tamperedToken = `${token.slice(0, -1)}${replacement}`;
 
     // When
-    const userId = readV1SessionUserId(`${V1_SESSION_COOKIE_NAME}=${tamperedToken}`, {
+    const session = readV1Session(`${V1_SESSION_COOKIE_NAME}=${tamperedToken}`, {
       secret: SESSION_SECRET,
       nowMs: NOW_MS + 1_000,
     });
 
     // Then
-    expect(userId).toBeNull();
+    expect(session).toBeNull();
   });
 
   it('ignores caller supplied identity headers in production', () => {
@@ -73,6 +93,7 @@ describe('v1 signed session', () => {
     // Given
     const token = createV1SessionToken({
       userId: 'user-1',
+      sessionEpoch: 3,
       secret: SESSION_SECRET,
       issuedAtMs: NOW_MS,
     });
@@ -86,7 +107,7 @@ describe('v1 signed session', () => {
     });
 
     // Then
-    expect(identity).toEqual({ kind: 'user_id', userId: 'user-1' });
+    expect(identity).toEqual({ kind: 'user_id', userId: 'user-1', sessionEpoch: 3 });
   });
 
   it('keeps identity headers available for local development', () => {
@@ -120,7 +141,7 @@ describe('v1 signed session', () => {
     const response = { cookie: jest.fn() };
 
     // When
-    writeV1SessionCookie(response, 'user-1', {
+    writeV1SessionCookie(response, { userId: 'user-1', sessionEpoch: 0 }, {
       nodeEnv: 'production',
       sessionSecret: SESSION_SECRET,
       nowMs: NOW_MS,
@@ -147,7 +168,7 @@ describe('v1 signed session', () => {
     const response = { cookie: jest.fn() };
 
     // When
-    writeV1SessionCookie(response, 'user-1', {
+    writeV1SessionCookie(response, { userId: 'user-1', sessionEpoch: 0 }, {
       nodeEnv: 'production',
       sessionSecret: SESSION_SECRET,
       nowMs: NOW_MS,

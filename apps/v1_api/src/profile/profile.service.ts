@@ -1017,9 +1017,10 @@ export class ProfileService {
         });
       }
 
+      // 세션 번호도 올려 이 기기 밖에 남은 쿠키까지 끊는다(이 기기 쿠키는 V1SessionLogoutInterceptor 가 지운다).
       const next = await tx.v1User.update({
         where: { id: user.id },
-        data: { accountStatus: 'withdrawal_pending' },
+        data: { accountStatus: 'withdrawal_pending', sessionEpoch: { increment: 1 } },
       });
 
       // assertWithdrawable() 이 owner·manager 를 이미 막았으므로 여기 남는 것은 일반

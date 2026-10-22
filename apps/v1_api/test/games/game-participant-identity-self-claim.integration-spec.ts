@@ -214,6 +214,24 @@ describe('Task 154 대회 경기 신원 연결 자가신청 (참가팀 멤버)',
     expect(await prisma.v1ParticipantIdentityLinkEvent.count({ where: { participantId } })).toBe(before);
   });
 
+  it('명단 공개(킥오프 60분 전) 전에는 상대 등록팀 멤버가 이쪽 참가자에게 연결을 신청할 수 없다', async () => {
+    const before = await prisma.v1ParticipantIdentityLinkEvent.count({ where: { participantId } });
+
+    const error = await captureFailure(() =>
+      service.requestIdentityLink(
+        authUser(ids.attestor),
+        gameId,
+        participantId,
+        'mu3-opponent-request-before-lineup',
+        { expectedVersion: 1, clientCommandId: 'mu3-opponent-request-before-lineup' },
+      ),
+    );
+
+    expect(error).toBeInstanceOf(HttpException);
+    expect((error as HttpException).getStatus()).toBe(403);
+    expect(await prisma.v1ParticipantIdentityLinkEvent.count({ where: { participantId } })).toBe(before);
+  });
+
   it('신청자가 자기 신청을 스스로 확인할 수는 없다 (신청자 ≠ 확인자)', async () => {
     // 여기가 이 변경의 안전장치다. 신청 자격을 열어도 혼자서 연결을 완성할 수 없어야
     // 아무나 남의 기록을 자기 것으로 만들지 못한다.

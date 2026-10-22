@@ -1158,7 +1158,7 @@ describe('TeamsService', () => {
         sport: { id: 'sport-1', name: 'Soccer' },
         region: null,
         profile: null,
-        memberships: [],
+        memberships: [membershipRow({ role: 'owner', userId: owner.id })],
         joinApplications: [],
         trustScore: null,
         ownerUser: { id: owner.id, profile: null },
@@ -1175,7 +1175,7 @@ describe('TeamsService', () => {
       ]);
       prisma.v1TeamMembership.count.mockResolvedValueOnce(2);
 
-      const result = await service.members(null, 'team-1', {
+      const result = await service.members(owner, 'team-1', {
         cursor: 'previous-membership',
         limit: 1,
         role: 'manager',
@@ -1233,47 +1233,55 @@ describe('TeamsService', () => {
       });
     });
 
-    it.each(['left', 'removed'] as const)(
-      'members hides private profile fields from the former member own $status row',
-      async (status) => {
+    describe('former members (status=left|removed)', () => {
+      function publicTeamViewedBy(viewerMembership: ReturnType<typeof membershipRow> | null) {
         prisma.v1Team.findFirst.mockResolvedValueOnce({
           ...teamRow({ membersVisible: true }),
           sport: { id: 'sport-1', name: 'Soccer' },
           region: null,
           profile: null,
-          memberships: [membershipRow({ role: 'member', status, userId: member.id })],
+          memberships: viewerMembership ? [viewerMembership] : [],
           joinApplications: [],
           trustScore: null,
           ownerUser: { id: owner.id, profile: null },
         });
+      }
+
+      it.each([
+        { label: 'a signed-out visitor', viewer: null, membership: null, status: 'left' as const },
+        { label: 'an ordinary member', viewer: member, membership: membershipRow({ role: 'member', userId: member.id }), status: 'removed' as const },
+        {
+          label: 'the former member themself',
+          viewer: member,
+          membership: membershipRow({ role: 'member', status: 'left', userId: member.id }),
+          status: 'left' as const,
+        },
+      ])('are refused to $label even when the roster is public', async ({ viewer, membership, status }) => {
+        publicTeamViewedBy(membership);
+
+        await expect(service.members(viewer, 'team-1', { status })).rejects.toMatchObject({
+          response: expect.objectContaining({ code: 'TEAM_MEMBER_HISTORY_FORBIDDEN' }),
+        });
+        expect(prisma.v1TeamMembership.findMany).not.toHaveBeenCalled();
+      });
+
+      it.each([
+        { viewer: owner, role: 'owner' as const },
+        { viewer: manager, role: 'manager' as const },
+      ])('stay visible to an active $role', async ({ viewer, role }) => {
+        publicTeamViewedBy(membershipRow({ role, userId: viewer.id }));
         prisma.v1TeamMembership.findMany.mockResolvedValueOnce([
-          {
-            ...membershipRow({ id: `former-member-${status}`, role: 'member', status, userId: member.id }),
-            user: {
-              phone: '010-3333-4444',
-              profile: {
-                nickname: 'former',
-                displayName: 'Former Real Name',
-                profileImageUrl: null,
-                birthDate: new Date('1991-02-03'),
-                gender: 'female',
-              },
-            },
-          },
+          { ...membershipRow({ id: 'gone', role: 'member', status: 'removed', userId: 'gone-user' }), user: { phone: null, profile: null } },
         ]);
 
-        const result = await service.members(member, 'team-1', { status });
+        const result = await service.members(viewer, 'team-1', { status: 'removed' });
 
-        expect(result.viewerRole).toBe('none');
-        expect(result.items[0]).toMatchObject({
-          userId: member.id,
-          realName: null,
-          phone: null,
-          birthDate: null,
-          gender: null,
-        });
-      },
-    );
+        expect(result.items.map((item) => item.userId)).toEqual(['gone-user']);
+        expect(prisma.v1TeamMembership.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({ where: expect.objectContaining({ teamId: 'team-1', status: 'removed' }) }),
+        );
+      });
+    });
 
     it('detail allows non-members to preview members when public visibility is enabled', async () => {
       prisma.v1Team.findFirst.mockResolvedValueOnce({

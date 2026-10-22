@@ -1,3 +1,10 @@
+## 2026-10-22 — 대회·리그 필터·정렬
+
+[시나리오](./competition-discovery-filters-2026-10-22.md) · [Task 20261103](../../.github/tasks/20261103-competition-discovery-filters.md).
+진행·모집 상태 분리, 종목·기간 및 대회 부문/방식/참가비, 신청 접수 퀵 필터와 우측 정렬을 구현했다.
+최신 dev 기반 단위·SSR·MSW 및 양쪽 타입/표면·패턴 검사 PASS. 실제 DB0/5·alpha0/8·after viewport0/3.
+사용자 요청으로 dev 대상 PR을 생성한다. 머지·배포 및 alpha 실측은 후속이다.
+
 [빈 템플릿 조 정리](./empty-template-group-cleanup.md) · Task20261100/PR2019. 로컬 DB·단위·타입 검증 완료, hotfix CI/alpha/main/production 진행 중. 운영 대회는 조회만 수행.
 
 ## 2026-10-21 — 결선 경기일정 기본 문구

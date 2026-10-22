@@ -75,3 +75,28 @@ describe('MD-QA #145 public list capacity SQL binding', () => {
     expect(statement.text).not.toMatch(/max_players/);
   });
 });
+
+describe('Task 20261103 explicit sort cursor', () => {
+  it('carries the selected sort and refuses a cursor from another sort mode', async () => {
+    const queryRaw = jest.fn().mockResolvedValue([{ id: 'a', grp: 3, sort_at: '2026-11-01 09:00:00.123456' }]);
+    const rows = await listTournamentIds({ $queryRaw: queryRaw } as never, { sort: 'latest' }, { limit: 1 });
+    expect(JSON.parse(Buffer.from(rows[0].cursor, 'base64url').toString('utf8'))).toEqual([3, '2026-11-01 09:00:00.123456', 'a', 'latest']);
+    queryRaw.mockClear();
+    expect(await listTournamentIds({ $queryRaw: queryRaw } as never, { sort: 'scheduled' }, { limit: 1, cursor: rows[0].cursor })).toEqual([]);
+    expect(queryRaw).not.toHaveBeenCalled();
+    await listTournamentIds({ $queryRaw: queryRaw } as never, { sort: 'latest' }, { limit: 1, cursor: rows[0].cursor });
+    expect(queryRaw).toHaveBeenCalledTimes(1);
+  });
+
+  it('closed registration keeps null-deadline leagues by negating a non-null boolean', async () => {
+    const statements: Prisma.Sql[] = [];
+    const queryRaw = jest.fn(async (strings: TemplateStringsArray, ...values: unknown[]) => {
+      statements.push(Prisma.sql(strings, ...values)); return [];
+    });
+    await listTournamentIds({ $queryRaw: queryRaw } as never, { kind: 'league', registration: 'closed', phase: 'upcoming' }, { limit: 5 });
+    expect(statements[0].text).toContain('NOT COALESCE(');
+    expect(statements[0].text).toContain("t.status::text IN ('draft', 'open', 'closed')");
+    expect(statements[0].text).toContain('t.max_teams IS NULL');
+    expect(statements[0].text).toContain('t.is_public = true');
+  });
+});

@@ -215,3 +215,13 @@ Support admins may only read. See [admin roster settings](./domains/tournaments.
 빈 템플릿 조 정리(2026-10-21): 기존 관리자 mutation 권한·대회 레인 잠금·단일 트랜잭션을 유지한다. 실제 배정/경기/슬롯 참조는409로 보호하고, 비어 있는 미사용 자리와 그에 종속된 고아 편성만 삭제 시 정리한다. 세부 조건은 [대회 계약](./domains/tournaments.md)을 따른다.
 
 대회 이미지 설정은 기존 관리자 create/PATCH 권한·CAS·감사 계약으로 저장한다. `showDetailImage: false`는 사진 삭제 없이 상세 미디어만 숨긴다. [대회 이미지 계약](./domains/tournaments.md#목록상세-이미지와-상세-숨김-2026-10-22)을 따른다.
+
+
+### Competition discovery pagination extension (Task 20261103)
+
+The public `/tournaments` collection additionally accepts phase/registration/date/format/fee
+filters and latest/deadline/scheduled sorting. This domain retains `pageInfo` pagination rather
+than the frozen game contracts above: numbered pages include total/totalPages; cursor callers
+opt into total with `withTotal=true`. Filters run before pagination and do not widen public
+visibility. Admission-window and capacity semantics, 400 range errors, and backward-compatible
+status inputs are defined in [Tournaments](./domains/tournaments.md#competition-discovery-filters-task-20261103).

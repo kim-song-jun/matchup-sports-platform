@@ -22,8 +22,11 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: navigation.replace }),
 }));
 
+vi.mock('@/hooks/use-competition-discovery', () => ({
+  useCompetitionDiscovery: (...args: unknown[]) => tournamentsMock(...args),
+ }));
+
 vi.mock('@/hooks/use-v1-api', () => ({
-  useV1Tournaments: (...args: unknown[]) => tournamentsMock(...args),
   useV1AllTournaments: () => ({ data: [], isPending: false, isError: false, refetch: vi.fn() }),
   useV1MasterSports: () => ({ data: [] }),
 }));

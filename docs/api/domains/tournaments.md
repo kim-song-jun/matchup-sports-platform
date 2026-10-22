@@ -180,6 +180,51 @@ For a league, `progress` counts only fixtures that can still be played: cancelle
 are excluded from `played`, `remaining`, **and `total`**. Counting a fixture that will never be played
 as "remaining" would keep progress permanently below 100%.
 
+
+## Competition discovery filters (Task 20261103)
+
+`GET /api/v1/tournaments` retains the public surface: regular tournaments expose only
+`open/closed/in_progress/completed`; regular leagues also expose `draft`. Cancelled, on_hold, deleted, and isPublic=false rows remain hidden. `kind=all|tournament|league` defaults to `tournament` at the API;
+the web explicitly requests `all` for its default tab.
+
+| Query | Values / behavior |
+|---|---|
+| `phase` | `upcoming` = draft/open/closed intersected with public gate; `ongoing` = in_progress; `completed` = completed |
+| `registration` | `open` = accepting new registrations; `closed` = remaining public competitions |
+| `sportId` | UUID, existing sport filter |
+| `genderCategory` | mixed/male/female/unspecified; unspecified matches null |
+| `format` | league/knockout/group_knockout; format is not competition kind |
+| `feeMin`, `feeMax` | integer KRW, inclusive 0–2147483647; max=0 selects free |
+| `dateFrom`, `dateTo` | real calendar date YYYY-MM-DD, inclusive Asia/Seoul day boundaries; period overlap; undated rows excluded |
+| `sort` | latest (createdAt desc), deadline (deadline asc), scheduled (start asc); nulls last, id byte-order asc ties; absent sort retains the existing lifecycle-group ordering |
+| `withTotal` | literal string true adds actual total to cursor pageInfo; numbered pages already include total |
+
+`deadline` also enforces registration=open. Tournament admission requires status=open,
+no expired deadline (null is permitted), and confirmed + awaiting_payment + payment_checking +
+paid registrations below teamCount. Leagues require a non-null unexpired deadline and a
+nonterminal lifecycle; optional maxTeams is checked against the same reserved registrations (null means unlimited), and in_progress leagues can still accept entries.
+The deadline equality instant is open. `registrationOpen` on every list item uses the same
+window/capacity semantics, independent of the viewer's individual team eligibility.
+
+All conditions and sort apply before pagination in the existing SQL keyset query. Default cursors remain compatible; explicit-sort cursors carry their sort mode and cannot be reused across modes.
+Legacy `status` is retained and intersects new filters. Contradictory filters return an empty
+list. Reversed date or fee ranges return 400 `INVALID_FILTER_RANGE`; malformed/unknown inputs
+are rejected by the existing DTO validation pipe. Gender/format/fee conditions narrow to
+regular tournaments (including legacy null kind); the web only offers them in the tournament tab.
+
+For dates, scheduledAt must exist. The interval end is scheduledEndAt or scheduledAt when
+end is absent. Date filters do not change lifecycle status. `upcoming` is an operational stage,
+not a deduction from the first fixture's actual kickoff.
+
+Frontend: applied filters live in URL, sheet choices remain local until submit, compatible
+filters survive kind changes. New hook/type modules are `use-competition-discovery.ts` and
+`lib/competition-discovery.ts`; the existing shared API files contain unrelated WIP and are
+preserved. Test MSW factory: `src/test/msw/competition-discovery-handlers.ts` (test fixtures only;
+not a runtime fallback). Real PostgreSQL query behavior is covered by
+`test/tournaments/competition-discovery.integration-spec.ts`; execution requires the isolated
+integration database. Unit/UI/MSW checks do not replace that verification or alpha browser QA.
+
+
 ## Individual awards
 
 `GET /api/v1/admin/tournaments/:tournamentId/awards` returns the saved award list, and `PUT` to the same path replaces it atomically. Each admin item contains `awardType`, `awardLabel`, nullable `iconKey`, `recipientName`, nullable `recipientUserId`, nullable `teamName`, nullable `note`, and optional `sortOrder` on writes. New writes require a UUID `recipientUserId`; the nullable admin read shape only accommodates historical rows that could not be linked without ambiguity. `iconKey` accepts `trophy`, `crown`, `goal`, `shield`, `glove`, `handshake`, `sparkles`, `medal`, or `star`; unknown values are rejected by DTO validation. Public `GET /api/v1/tournaments/:id` keeps the display snapshot but deliberately omits `recipientUserId`, so a public award cannot bypass the user's record-consent gate to reveal account linkage. Existing rows with `iconKey=null` retain the legacy `awardType`-based icon mapping in the Web client.

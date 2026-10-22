@@ -21,8 +21,8 @@ import { reportClientError } from '@/lib/client-error-reporter';
 import { trackEvent } from '@/lib/analytics';
 
 const subscription = {
-  endpoint: 'https://push.example/abc',
-  toJSON: () => ({ endpoint: 'https://push.example/abc', keys: { p256dh: 'p', auth: 'a' } }),
+  endpoint: 'https://fcm.googleapis.com/fcm/send/abc',
+  toJSON: () => ({ endpoint: 'https://fcm.googleapis.com/fcm/send/abc', keys: { p256dh: 'p', auth: 'a' } }),
   unsubscribe: vi.fn().mockResolvedValue(true),
 };
 const pushManager = { getSubscription: vi.fn(), subscribe: vi.fn() };
@@ -211,7 +211,7 @@ describe('useV1PushRegistration', () => {
     expect(Notification.requestPermission).toHaveBeenCalled();
     expect(navigator.serviceWorker.register).toHaveBeenCalledWith('/sw-push.js');
     expect(v1Post).toHaveBeenCalledWith('/notifications/push-subscribe', {
-      endpoint: 'https://push.example/abc',
+      endpoint: 'https://fcm.googleapis.com/fcm/send/abc',
       keys: { p256dh: 'p', auth: 'a' },
     });
   });
@@ -290,7 +290,7 @@ describe('useV1PushRegistration', () => {
     expect(installingRegistration.pushManager.subscribe).not.toHaveBeenCalled();
     expect(pushManager.subscribe).toHaveBeenCalled();
     expect(v1Post).toHaveBeenCalledWith('/notifications/push-subscribe', {
-      endpoint: 'https://push.example/abc',
+      endpoint: 'https://fcm.googleapis.com/fcm/send/abc',
       keys: { p256dh: 'p', auth: 'a' },
     });
     expect(reportClientError).not.toHaveBeenCalledWith(
@@ -324,7 +324,7 @@ describe('useV1PushRegistration', () => {
       await result.current.unsubscribe();
     });
 
-    expect(v1Delete).toHaveBeenCalledWith('/notifications/push-unsubscribe', { endpoint: 'https://push.example/abc' });
+    expect(v1Delete).toHaveBeenCalledWith('/notifications/push-unsubscribe', { endpoint: 'https://fcm.googleapis.com/fcm/send/abc' });
     expect(subscription.unsubscribe).toHaveBeenCalled();
   });
 

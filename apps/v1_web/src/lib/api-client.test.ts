@@ -174,7 +174,7 @@ describe('v1Api error reporting', () => {
       }),
     );
 
-    await expect(v1Delete('/notifications/push-unsubscribe', { endpoint: 'https://push.example/abc' })).resolves.toBeUndefined();
+    await expect(v1Delete('/notifications/push-unsubscribe', { endpoint: 'https://fcm.googleapis.com/fcm/send/abc' })).resolves.toBeUndefined();
   });
 
   // v1Delete 의 2번째 인자는 fetch 의 init 이 아니라 body 다. 이 구분을 놓쳐서

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { ConflictException, Injectable, OnModuleInit, Optional } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, OnModuleInit, Optional } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import * as webpush from 'web-push';
@@ -8,6 +8,7 @@ import { V1PushEnvironment, V1PushPlatform } from '@prisma/client';
 import { ApnsPushService } from './apns-push.service';
 import { FcmPushService } from './fcm-push.service';
 import { NativeDeliverySummary, NativePushPayload, PushTarget } from './native-push.types';
+import { normalizePushEndpoint } from './push-endpoint';
 import { PushDeviceService } from './push-device.service';
 import { resolvePushEnvironment } from './push-environment';
 
@@ -83,9 +84,27 @@ export class WebPushService implements OnModuleInit {
   }
 
   async subscribe(userId: string, dto: { endpoint: string; keys: { p256dh: string; auth: string } }): Promise<void> {
+    const endpoint = normalizePushEndpoint(dto.endpoint);
+    if (endpoint === null) {
+      throw new BadRequestException({
+        code: 'PUSH_ENDPOINT_NOT_ALLOWED',
+        message: '푸시 서비스 주소가 올바르지 않아요.',
+      });
+    }
+    if (endpoint !== dto.endpoint) {
+      // 표준형 전에 원문 그대로 저장된 행은 같은 브라우저 구독이다 — 표준형 행과 같은 소유 규칙으로 정리해 두 행이 되지 않게 한다.
+      const legacy = await this.prisma.v1PushSubscription.findUnique({ where: { endpoint: dto.endpoint } });
+      if (legacy && legacy.userId !== userId) {
+        throw new ConflictException({
+          code: 'PUSH_ENDPOINT_ALREADY_REGISTERED',
+          message: '이미 다른 계정에 등록된 구독이에요.',
+        });
+      }
+      if (legacy) await this.prisma.v1PushSubscription.deleteMany({ where: { id: legacy.id } });
+    }
     try {
       await this.prisma.v1PushSubscription.create({
-        data: { userId, endpoint: dto.endpoint, p256dh: dto.keys.p256dh, auth: dto.keys.auth },
+        data: { userId, endpoint, p256dh: dto.keys.p256dh, auth: dto.keys.auth },
       });
       return;
     } catch (error) {
@@ -94,7 +113,7 @@ export class WebPushService implements OnModuleInit {
 
     // endpoint unique 충돌 — DB가 보장하는 원자적 신호를 기준으로 소유권을 재확인한다
     // (create 이전의 findUnique는 그 자체로 TOCTOU race를 남기므로 쓰지 않는다).
-    const existing = await this.prisma.v1PushSubscription.findUnique({ where: { endpoint: dto.endpoint } });
+    const existing = await this.prisma.v1PushSubscription.findUnique({ where: { endpoint } });
     if (!existing || existing.userId !== userId) {
       throw new ConflictException({
         code: 'PUSH_ENDPOINT_ALREADY_REGISTERED',
@@ -103,13 +122,15 @@ export class WebPushService implements OnModuleInit {
     }
 
     await this.prisma.v1PushSubscription.update({
-      where: { endpoint: dto.endpoint },
+      where: { endpoint },
       data: { p256dh: dto.keys.p256dh, auth: dto.keys.auth },
     });
   }
 
+  /** 표준형 이전에 원문 그대로 저장된 구독도 지운다. */
   async unsubscribe(userId: string, endpoint: string): Promise<void> {
-    await this.prisma.v1PushSubscription.deleteMany({ where: { userId, endpoint } });
+    const forms = [...new Set([endpoint, normalizePushEndpoint(endpoint) ?? endpoint])];
+    await this.prisma.v1PushSubscription.deleteMany({ where: { userId, endpoint: { in: forms } } });
   }
 
   /**
@@ -256,11 +277,18 @@ export class WebPushService implements OnModuleInit {
     let failed = 0;
 
     await Promise.all(
-      subscriptions.map((subscription) =>
-        webpush
+      subscriptions.map((subscription) => {
+        // 등록 검사가 생기기 전에 저장된 행도 있다 — 보내기 직전에 다시 보고, 걸리면 그 구독을 지운다.
+        const endpoint = normalizePushEndpoint(subscription.endpoint);
+        if (endpoint === null) {
+          failed += 1;
+          this.logger.warn({ userId, subscriptionId: subscription.id }, '허용되지 않은 웹 푸시 endpoint — 구독 삭제');
+          return this.removeSubscription(userId, subscription.id);
+        }
+        return webpush
           .sendNotification(
             {
-              endpoint: subscription.endpoint,
+              endpoint,
               keys: { p256dh: subscription.p256dh, auth: subscription.auth },
             },
             JSON.stringify(payload),
@@ -271,18 +299,7 @@ export class WebPushService implements OnModuleInit {
           .catch(async (error: { statusCode?: number; message?: string }) => {
             failed += 1;
             if (error.statusCode === 410 || error.statusCode === 404) {
-              try {
-                await this.prisma.v1PushSubscription.delete({ where: { id: subscription.id } });
-              } catch (deleteError) {
-                const alreadyRemoved =
-                  deleteError instanceof Prisma.PrismaClientKnownRequestError && deleteError.code === 'P2025';
-                if (!alreadyRemoved) {
-                  this.logger.warn(
-                    { userId, subscriptionId: subscription.id, err: deleteError },
-                    '만료된 웹 푸시 구독 삭제 실패',
-                  );
-                }
-              }
+              await this.removeSubscription(userId, subscription.id);
               return;
             }
 
@@ -311,10 +328,22 @@ export class WebPushService implements OnModuleInit {
                 '웹 푸시 실패 기록(V1WebPushFailureLog) 저장 실패',
               );
             }
-          }),
-      ),
+          });
+      }),
     );
 
     return { subscriptions: subscriptions.length, delivered, failed, disabled: false };
+  }
+
+  private async removeSubscription(userId: string, subscriptionId: string): Promise<void> {
+    try {
+      await this.prisma.v1PushSubscription.delete({ where: { id: subscriptionId } });
+    } catch (deleteError) {
+      const alreadyRemoved =
+        deleteError instanceof Prisma.PrismaClientKnownRequestError && deleteError.code === 'P2025';
+      if (!alreadyRemoved) {
+        this.logger.warn({ userId, subscriptionId, err: deleteError }, '웹 푸시 구독 삭제 실패');
+      }
+    }
   }
 }

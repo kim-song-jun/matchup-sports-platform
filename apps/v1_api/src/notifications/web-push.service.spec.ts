@@ -186,7 +186,7 @@ describe('WebPushService', () => {
       VAPID_SUBJECT: 'mailto:ops@teameet.co.kr',
     });
     prisma.v1PushSubscription.findMany.mockResolvedValue([
-      { id: 'sub-1', endpoint: 'https://push.example/abc', p256dh: 'p', auth: 'a' },
+      { id: 'sub-1', endpoint: 'https://fcm.googleapis.com/fcm/send/abc', p256dh: 'p', auth: 'a' },
     ]);
     (webpush.sendNotification as jest.Mock).mockRejectedValue({ statusCode: 410 });
 
@@ -202,7 +202,7 @@ describe('WebPushService', () => {
       VAPID_SUBJECT: 'mailto:ops@teameet.co.kr',
     });
     prisma.v1PushSubscription.findMany.mockResolvedValue([
-      { id: 'sub-1', endpoint: 'https://push.example/abc', p256dh: 'p', auth: 'a' },
+      { id: 'sub-1', endpoint: 'https://fcm.googleapis.com/fcm/send/abc', p256dh: 'p', auth: 'a' },
     ]);
     (webpush.sendNotification as jest.Mock).mockRejectedValue({ statusCode: 410 });
     prisma.v1PushSubscription.delete.mockRejectedValue(recordNotFoundError());
@@ -221,7 +221,7 @@ describe('WebPushService', () => {
       VAPID_SUBJECT: 'mailto:ops@teameet.co.kr',
     });
     prisma.v1PushSubscription.findMany.mockResolvedValue([
-      { id: 'sub-1', endpoint: 'https://push.example/abc', p256dh: 'p', auth: 'a' },
+      { id: 'sub-1', endpoint: 'https://fcm.googleapis.com/fcm/send/abc', p256dh: 'p', auth: 'a' },
     ]);
     (webpush.sendNotification as jest.Mock).mockRejectedValue({ statusCode: 410 });
     const connectionError = new Error('connection timeout');
@@ -232,7 +232,7 @@ describe('WebPushService', () => {
     expect(prisma.v1PushSubscription.delete).toHaveBeenCalledWith({ where: { id: 'sub-1' } });
     expect(logger.warn).toHaveBeenCalledWith(
       expect.objectContaining({ userId: 'user-1', subscriptionId: 'sub-1', err: connectionError }),
-      '만료된 웹 푸시 구독 삭제 실패',
+      '웹 푸시 구독 삭제 실패',
     );
   });
 
@@ -243,7 +243,7 @@ describe('WebPushService', () => {
       VAPID_SUBJECT: 'mailto:ops@teameet.co.kr',
     });
     prisma.v1PushSubscription.findMany.mockResolvedValue([
-      { id: 'sub-1', endpoint: 'https://push.example/abc', p256dh: 'p', auth: 'a' },
+      { id: 'sub-1', endpoint: 'https://fcm.googleapis.com/fcm/send/abc', p256dh: 'p', auth: 'a' },
     ]);
     (webpush.sendNotification as jest.Mock).mockRejectedValue({ statusCode: 500 });
 
@@ -260,7 +260,7 @@ describe('WebPushService', () => {
           userId: 'user-1',
           subscriptionId: 'sub-1',
           statusCode: 500,
-          endpointSuffix: 'le/abc',
+          endpointSuffix: 'nd/abc',
         }),
       }),
     );
@@ -274,7 +274,7 @@ describe('WebPushService', () => {
       VAPID_SUBJECT: 'mailto:ops@teameet.co.kr',
     });
     prisma.v1PushSubscription.findMany.mockResolvedValue([
-      { id: 'sub-1', endpoint: 'https://push.example/abc', p256dh: 'p', auth: 'a' },
+      { id: 'sub-1', endpoint: 'https://fcm.googleapis.com/fcm/send/abc', p256dh: 'p', auth: 'a' },
     ]);
     (webpush.sendNotification as jest.Mock).mockRejectedValue({ statusCode: 500, message: 'gateway timeout' });
 
@@ -293,7 +293,7 @@ describe('WebPushService', () => {
       VAPID_SUBJECT: 'mailto:ops@teameet.co.kr',
     });
     prisma.v1PushSubscription.findMany.mockResolvedValue([
-      { id: 'sub-1', endpoint: 'https://push.example/abc', p256dh: 'p', auth: 'a' },
+      { id: 'sub-1', endpoint: 'https://fcm.googleapis.com/fcm/send/abc', p256dh: 'p', auth: 'a' },
     ]);
     (webpush.sendNotification as jest.Mock).mockRejectedValue({ statusCode: 500 });
     const dbError = new Error('db unavailable');
@@ -349,6 +349,58 @@ describe('WebPushService', () => {
       response: expect.objectContaining({ code: 'PUSH_ENDPOINT_ALREADY_REGISTERED' }),
     });
     expect(prisma.v1PushSubscription.update).not.toHaveBeenCalled();
+  });
+
+  it('sendToUser never sends to a stored endpoint the subscribe check would refuse, and removes that subscription', async () => {
+    const service = await build({
+      VAPID_PUBLIC_KEY: 'pub-key',
+      VAPID_PRIVATE_KEY: 'priv-key',
+      VAPID_SUBJECT: 'mailto:ops@teameet.co.kr',
+    });
+    prisma.v1PushSubscription.findMany.mockResolvedValue([
+      { id: 'sub-legacy', endpoint: 'https://fcm.googleapis.com:8443/internal', p256dh: 'p1', auth: 'a1' },
+      { id: 'sub-ok', endpoint: 'https://FCM.googleapis.com/fcm/send/ok', p256dh: 'p2', auth: 'a2' },
+    ]);
+    (webpush.sendNotification as jest.Mock).mockResolvedValue({});
+
+    const summary = await service.sendToUser('user-1', { title: 'hi' });
+
+    expect(webpush.sendNotification).toHaveBeenCalledTimes(1);
+    expect(webpush.sendNotification).toHaveBeenCalledWith(
+      { endpoint: 'https://fcm.googleapis.com/fcm/send/ok', keys: { p256dh: 'p2', auth: 'a2' } },
+      JSON.stringify({ title: 'hi' }),
+    );
+    expect(prisma.v1PushSubscription.delete).toHaveBeenCalledWith({ where: { id: 'sub-legacy' } });
+    expect(summary).toMatchObject({ subscriptions: 2, delivered: 1, failed: 1 });
+  });
+
+  it('subscribe stores the normalized endpoint and refuses one outside the push services', async () => {
+    const service = await build({});
+    prisma.v1PushSubscription.create.mockResolvedValue({ id: 'sub-1' });
+
+    await service.subscribe('user-1', { endpoint: 'https://FCM.googleapis.com:443/fcm/send/abc', keys: { p256dh: 'p', auth: 'a' } });
+    expect(prisma.v1PushSubscription.create).toHaveBeenCalledWith({
+      data: { userId: 'user-1', endpoint: 'https://fcm.googleapis.com/fcm/send/abc', p256dh: 'p', auth: 'a' },
+    });
+
+    await expect(
+      service.subscribe('user-1', { endpoint: 'https://user@fcm.googleapis.com/x', keys: { p256dh: 'p', auth: 'a' } }),
+    ).rejects.toMatchObject({ response: expect.objectContaining({ code: 'PUSH_ENDPOINT_NOT_ALLOWED' }) });
+    expect(prisma.v1PushSubscription.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('unsubscribe removes the subscription stored either as typed or in normalized form', async () => {
+    const service = await build({});
+    prisma.v1PushSubscription.deleteMany.mockResolvedValue({ count: 1 });
+
+    await service.unsubscribe('user-1', 'https://FCM.googleapis.com/fcm/send/abc');
+
+    expect(prisma.v1PushSubscription.deleteMany).toHaveBeenCalledWith({
+      where: {
+        userId: 'user-1',
+        endpoint: { in: ['https://FCM.googleapis.com/fcm/send/abc', 'https://fcm.googleapis.com/fcm/send/abc'] },
+      },
+    });
   });
 
   it('subscribe rejects a non-conflict create error unchanged', async () => {

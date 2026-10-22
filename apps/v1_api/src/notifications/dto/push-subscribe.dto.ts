@@ -8,19 +8,7 @@ import {
   ValidationOptions,
   registerDecorator,
 } from 'class-validator';
-
-const ALLOWED_PUSH_ENDPOINT_HOST_SUFFIXES = [
-  'fcm.googleapis.com',
-  'updates.push.services.mozilla.com',
-  'notify.windows.com',
-  'web.push.apple.com',
-];
-
-function isAllowedPushEndpointHost(hostname: string): boolean {
-  return ALLOWED_PUSH_ENDPOINT_HOST_SUFFIXES.some(
-    (suffix) => hostname === suffix || hostname.endsWith(`.${suffix}`),
-  );
-}
+import { normalizePushEndpoint } from '../push-endpoint';
 
 /**
  * 표준 브라우저 푸시 서비스(FCM/Mozilla/Windows/Apple) 호스트만 허용한다.
@@ -36,14 +24,7 @@ function IsPushEndpointUrl(validationOptions?: ValidationOptions) {
       options: validationOptions,
       validator: {
         validate(value: unknown) {
-          if (typeof value !== 'string') return false;
-          let parsed: URL;
-          try {
-            parsed = new URL(value);
-          } catch {
-            return false;
-          }
-          return parsed.protocol === 'https:' && isAllowedPushEndpointHost(parsed.hostname);
+          return typeof value === 'string' && normalizePushEndpoint(value) !== null;
         },
         defaultMessage(args: ValidationArguments) {
           return `${args.property}는 FCM/Mozilla/Windows/Apple 푸시 서비스의 https URL이어야 해요.`;

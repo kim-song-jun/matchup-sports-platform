@@ -128,6 +128,8 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
       latitude: null,
       longitude: null,
       coverImageUrl: null,
+      listImageUrl: null,
+      showDetailImage: true,
       teamCount: 8,
       minPlayers: 6,
       maxPlayers: 10,
@@ -214,6 +216,11 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
       byeTarget: { fixtureId: detail.teamMatchId, side } });
     const hidden = presentTournamentDetail({ ...row, bracketPublishedAt: null, bracketPublishScheduledAt: null }, false);
     expect(hidden.groups).toEqual([]);
+  });
+
+  it('공개 상세는 사진 두 장과 숨김 설정을 지우거나 목록 사진으로 덮어쓰지 않는다', () => {
+    const row = baseRow({ coverImageUrl: '/uploads/detail.webp', listImageUrl: '/uploads/list.webp', showDetailImage: false });
+    expect(presentTournamentDetail(row, false)).toMatchObject({ coverImageUrl: '/uploads/detail.webp', listImageUrl: '/uploads/list.webp', showDetailImage: false });
   });
 
   describe('자리 라벨 (homeSlotLabel / awaySlotLabel)', () => {

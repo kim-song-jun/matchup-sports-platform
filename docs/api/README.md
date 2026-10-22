@@ -121,3 +121,5 @@ Current Kakao signup and existing-account linking use the [provider contact conf
 대회 운영콘솔의 경기별 명단 편집은 기존 roster-adjustments API를 재사용한다. 대회·리그 이벤트 및 도움 추가에서 이전 명단 참가자는 422 PARTICIPANT_NOT_IN_CURRENT_ROSTER로 거부한다. [경기 계약](./domains/games.md#운영콘솔-경기-출전-명단-2026-10-20)을 따른다.
 
 - 조별 결과 기반 공통 결선 배정: [tournaments — 공통 결선 진출팀 배정](./domains/tournaments.md#공통-결선-진출팀-배정-2026-10-21). 수동 대진·불균등 조 지원, 기존 12강 규칙 보존.
+
+대회 목록·상세 이미지 2장과 상세 기본 이미지까지 숨기는 `showDetailImage` 설정은 [대회 이미지 계약](./domains/tournaments.md#목록상세-이미지와-상세-숨김-2026-10-22)을 따른다.

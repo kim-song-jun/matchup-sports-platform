@@ -139,6 +139,17 @@ export class CreateTournamentDto {
   @MaxLength(1000)
   coverImageUrl?: string | null;
 
+  /** 목록용 이미지. 비우면 상세용 이미지와 함께 사용한다. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  listImageUrl?: string | null;
+
+  /** false면 업로드 이미지와 종목 기본 이미지 모두 상세에서 숨긴다. */
+  @IsOptional()
+  @IsBoolean()
+  showDetailImage?: boolean;
+
   @IsDefined({ message: '참가 팀 수를 입력해 주세요.' })
   @Type(() => Number)
   @IsInt({ message: '참가 팀 수는 정수여야 해요.' })
@@ -481,6 +492,17 @@ export class UpdateTournamentDto {
   @IsString()
   @MaxLength(1000)
   coverImageUrl?: string | null;
+
+  /** 목록용 이미지. 비우면 상세용 이미지와 함께 사용한다. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  listImageUrl?: string | null;
+
+  /** false면 업로드 이미지와 종목 기본 이미지 모두 상세에서 숨긴다. */
+  @IsOptional()
+  @IsBoolean()
+  showDetailImage?: boolean;
 
   @IsOptional()
   @Type(() => Number)

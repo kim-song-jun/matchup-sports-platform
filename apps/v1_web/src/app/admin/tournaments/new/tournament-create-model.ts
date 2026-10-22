@@ -94,6 +94,8 @@ export type TournamentCreateState = {
   rulesText: string;
   refundPolicyText: string;
   coverImageUrl: string | null;
+  listImageUrl: string | null;
+  showDetailImage: boolean;
   promoHome: TournamentPromoCardValue;
   promoList: TournamentPromoCardValue;
   /**
@@ -162,6 +164,8 @@ export const INITIAL_TOURNAMENT_CREATE_STATE: TournamentCreateState = {
   rulesText: '',
   refundPolicyText: '',
   coverImageUrl: null,
+  listImageUrl: null,
+  showDetailImage: true,
   promoHome: { ...EMPTY_PROMO },
   promoList: { ...EMPTY_PROMO },
   promoFactsDirty: {
@@ -451,6 +455,8 @@ export function mapTournamentToWizardFields(tournament: V1Tournament): Tournamen
     rulesText: tournament.rulesText ?? '',
     refundPolicyText: tournament.refundPolicyText ?? '',
     coverImageUrl: tournament.coverImageUrl,
+    listImageUrl: tournament.listImageUrl ?? null,
+    showDetailImage: tournament.showDetailImage ?? true,
     promoHome: {
       enabled: tournament.promoHomeEnabled,
       title: tournament.promoHomeTitle ?? '',
@@ -540,6 +546,7 @@ export function buildTournamentPreviewItem(
     scheduledEndAt: kstDatetimeLocalToIso(state.scheduledEndAt),
     venue: state.venue?.name ?? null,
     coverImageUrl: state.coverImageUrl,
+    listImageUrl: state.listImageUrl,
     teamCount: Number(state.teamCount) || 0,
     genderCategory: state.genderCategory,
     entryFee: Number(state.entryFee) || 0,
@@ -756,6 +763,8 @@ export function buildTournamentCreatePayload(
     rosterDeadlineAt: kstDatetimeLocalToIso(state.rosterDeadlineAt),
     ...(state.venue ? toVenuePayload(state.venue) : { venue: null }),
     coverImageUrl: state.coverImageUrl,
+    listImageUrl: state.listImageUrl,
+    showDetailImage: state.showDetailImage,
     teamCount: Number(state.teamCount),
     minPlayers: Number(state.minPlayers),
     maxPlayers: Number(state.maxPlayers),

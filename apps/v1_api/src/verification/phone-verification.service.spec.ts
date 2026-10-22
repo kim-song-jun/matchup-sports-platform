@@ -27,9 +27,9 @@ function prismaMock() {
       }),
       findUnique: jest.fn(async ({ where }: { where: { phone: string } }) => store.get(where.phone) ?? null),
       // Same contract as the database: the attemptCount condition is checked and applied in one step.
-      update: jest.fn(async ({ where, data }: { where: { phone: string; attemptCount?: { lt: number } }; data: { attemptCount: { increment: number } } }) => {
+      update: jest.fn(async ({ where, data }: { where: { phone: string; codeHash?: string; attemptCount?: { lt: number } }; data: { attemptCount: { increment: number } } }) => {
         const row = store.get(where.phone);
-        if (!row || (where.attemptCount && row.attemptCount >= where.attemptCount.lt)) {
+        if (!row || (where.codeHash !== undefined && row.codeHash !== where.codeHash) || (where.attemptCount && row.attemptCount >= where.attemptCount.lt)) {
           throw new Prisma.PrismaClientKnownRequestError('No record was found for an update.', { code: 'P2025', clientVersion: 'test' });
         }
         row.attemptCount += data.attemptCount.increment;
@@ -171,7 +171,7 @@ describe('PhoneVerificationService (MT SMS OTP)', () => {
     expect((prisma as never as { __store: Map<string, ChallengeRow> }).__store.get(PHONE)!.attemptCount).toBe(4);
   });
 
-  it('verifyCode refuses a code checked against a challenge that was re-issued meanwhile', async () => {
+  it('verifyCode answers NO_PENDING for a code read before a re-issue, without spending the new code\'s attempts', async () => {
     const prisma = prismaMock();
     const svc = new PhoneVerificationService(prisma, dispatcherMock(true), eventLogStub());
     const { devCode } = await svc.issueChallenge(PHONE);
@@ -183,6 +183,7 @@ describe('PhoneVerificationService (MT SMS OTP)', () => {
 
     await expect(svc.verifyCode(PHONE, devCode!)).rejects.toMatchObject({ response: { code: 'VERIFICATION_NO_PENDING' } });
     expect(store.get(PHONE)!.verifiedAt).toBeNull();
+    expect(store.get(PHONE)!.attemptCount).toBe(0);
   });
 
   it('verifyCode stays idempotent for the correct code but rejects a wrong code even after verification', async () => {

@@ -15,20 +15,31 @@ function smsMock(enabled: boolean, send = jest.fn().mockResolvedValue(undefined)
 const smsEventLog = { record: jest.fn().mockResolvedValue(undefined) };
 const eventLogStub = () => smsEventLog as unknown as SmsEventLogService;
 
-/** Users found by address, and how many admin rows / live staff assignments each one has. */
-function prismaStub(users: Record<string, { id: string; admins?: number; staff?: number }> = {}) {
-  const byId = new Map(Object.values(users).map((user) => [user.id, user]));
+type AdminRow = { userId: string; status: 'active' | 'revoked'; revokedAt: Date | null };
+type StaffRow = { userId: string; revokedAt: Date | null; expiresAt: Date | null };
+
+/** Users found by address, plus admin and staff rows the counts filter the way the database would. */
+function prismaStub(
+  users: Record<string, string> = {},
+  rows: { admins?: AdminRow[]; staff?: StaffRow[] } = {},
+) {
   return {
     v1User: {
       findFirst: jest.fn(async ({ where }: { where: { email?: string; phone?: string } }) => {
-        const found = users[where.email ?? where.phone ?? ''];
-        return found ? { id: found.id } : null;
+        const id = users[where.email ?? where.phone ?? ''];
+        return id ? { id } : null;
       }),
     },
-    v1AdminUser: { count: jest.fn(async ({ where }: { where: { userId: string } }) => byId.get(where.userId)?.admins ?? 0) },
+    v1AdminUser: {
+      count: jest.fn(async ({ where }: { where: { userId: string; status: string; revokedAt: null } }) =>
+        (rows.admins ?? []).filter((row) => row.userId === where.userId && row.status === where.status && row.revokedAt === where.revokedAt).length),
+    },
     v1TournamentStaffAssignment: {
-      count: jest.fn(async ({ where }: { where: { userId: string; revokedAt: null } }) =>
-        where.revokedAt === null ? byId.get(where.userId)?.staff ?? 0 : 0),
+      count: jest.fn(async ({ where }: { where: { userId: string; revokedAt: null; OR: [{ expiresAt: null }, { expiresAt: { gt: Date } }] } }) =>
+        (rows.staff ?? []).filter((row) =>
+          row.userId === where.userId &&
+          row.revokedAt === where.revokedAt &&
+          (row.expiresAt === null || row.expiresAt.getTime() > where.OR[1].expiresAt.gt.getTime())).length),
     },
   } as never;
 }
@@ -119,9 +130,9 @@ describe('VerificationDispatcherService', () => {
   });
 
   describe('mayEchoCode', () => {
-    function echoDispatcher(users?: Parameters<typeof prismaStub>[0]) {
+    function echoDispatcher(...stub: Parameters<typeof prismaStub>) {
       process.env.V1_VERIFICATION_DEV_ECHO = 'true';
-      return new VerificationDispatcherService(smsMock(false), emailMock(false), eventLogStub(), prismaStub(users));
+      return new VerificationDispatcherService(smsMock(false), emailMock(false), eventLogStub(), prismaStub(...stub));
     }
 
     it('echoes only to addresses that cannot reach a real person', async () => {
@@ -140,16 +151,37 @@ describe('VerificationDispatcherService', () => {
     });
 
     it('withholds the code from admin and tournament staff accounts, by user id or by the address they own', async () => {
-      const d = echoDispatcher({
-        'admin@teameet.test': { id: 'admin', admins: 1 },
-        '01000000001': { id: 'staff', staff: 1 },
-        'player@teameet.test': { id: 'player' },
-      });
+      const d = echoDispatcher(
+        { 'admin@teameet.test': 'admin', '01000000001': 'staff', 'player@teameet.test': 'player' },
+        {
+          admins: [{ userId: 'admin', status: 'active', revokedAt: null }],
+          staff: [{ userId: 'staff', revokedAt: null, expiresAt: null }],
+        },
+      );
       expect(await d.mayEchoCode({ channel: 'email', address: 'Admin@teameet.test' })).toBe(false);
       expect(await d.mayEchoCode({ channel: 'phone', address: '01000000001' })).toBe(false);
       expect(await d.mayEchoCode({ channel: 'email', address: 'new@teameet.test', userId: 'staff' })).toBe(false);
       expect(await d.mayEchoCode({ channel: 'email', address: 'player@teameet.test' })).toBe(true);
       expect(await d.mayEchoCode({ channel: 'email', address: 'player@teameet.test', userId: 'player' })).toBe(true);
+    });
+
+    it('treats revoked admins and revoked or expired staff assignments as ordinary accounts', async () => {
+      const d = echoDispatcher(
+        {},
+        {
+          admins: [{ userId: 'former-admin', status: 'revoked', revokedAt: new Date('2026-01-01') }],
+          staff: [
+            { userId: 'revoked-staff', revokedAt: new Date('2026-01-01'), expiresAt: null },
+            { userId: 'expired-staff', revokedAt: null, expiresAt: new Date(Date.now() - 60_000) },
+            { userId: 'current-staff', revokedAt: null, expiresAt: new Date(Date.now() + 60_000) },
+          ],
+        },
+      );
+      const echoes = (userId: string) => d.mayEchoCode({ channel: 'email', address: 'qa@teameet.test', userId });
+      expect(await echoes('former-admin')).toBe(true);
+      expect(await echoes('revoked-staff')).toBe(true);
+      expect(await echoes('expired-staff')).toBe(true);
+      expect(await echoes('current-staff')).toBe(false);
     });
   });
 

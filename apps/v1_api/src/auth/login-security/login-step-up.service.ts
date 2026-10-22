@@ -75,7 +75,9 @@ export class LoginStepUpService implements OnApplicationShutdown {
       });
     });
     if (input.userId) this.sendInBackground(challenge.id, input.userId, code);
-    const echo = await this.dispatcher.mayEchoCode({ channel: 'email', address: input.email, userId: input.userId });
+    // Judged on the typed address for real and decoy challenges alike, so devCode never tells whether the password was right.
+    // Resend never echoes: a challenge keeps only the email hash, and a per-account answer there would.
+    const echo = await this.dispatcher.mayEchoCode({ channel: 'email', address: input.email });
 
     return {
       challengeToken: token,
@@ -109,7 +111,6 @@ export class LoginStepUpService implements OnApplicationShutdown {
     return {
       expiresAt: expiresAt.toISOString(),
       resendAvailableAt: resendAvailableAt(now).toISOString(),
-      ...((await this.mayEchoResend(challenge.userId)) ? { devCode: code } : {}),
     };
   }
 
@@ -143,13 +144,6 @@ export class LoginStepUpService implements OnApplicationShutdown {
 
     if (attemptCount >= LOGIN_SECURITY_POLICY.maxCodeAttempts) throw tooManyAttempts();
     throw new BadRequestException({ code: 'STEP_UP_CODE_INVALID', message: '인증번호가 올바르지 않아요.' });
-  }
-
-  /** The challenge keeps only a hash of the email, so a decoy has no address to judge and never echoes on resend. */
-  private async mayEchoResend(userId: string | null): Promise<boolean> {
-    if (!userId || !this.dispatcher.devEchoActive) return false;
-    const user = await this.prisma.v1User.findUnique({ where: { id: userId }, select: { email: true } });
-    return user?.email ? this.dispatcher.mayEchoCode({ channel: 'email', address: user.email, userId }) : false;
   }
 
   private async findUsable(

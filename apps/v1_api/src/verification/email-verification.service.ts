@@ -75,13 +75,8 @@ export class EmailVerificationService {
   async verifyCode(rawEmail: string, code: string): Promise<boolean> {
     const email = normalizeEmail(rawEmail);
     const challenge = await this.prisma.v1EmailVerificationChallenge.findUnique({ where: { email } });
-    if (!challenge || challenge.expiresAt.getTime() < Date.now()) {
-      throw new BadRequestException({
-        code: 'VERIFICATION_NO_PENDING',
-        message: '유효한 인증 요청이 없어요. 인증번호를 다시 받아 주세요.',
-      });
-    }
-    const attemptCount = await this.reserveAttempt(email);
+    if (!challenge || challenge.expiresAt.getTime() < Date.now()) throw noPendingChallenge();
+    const attemptCount = await this.reserveAttempt(email, challenge.codeHash);
     // verifiedAt 여부와 무관하게 항상 제출된 코드를 codeHash 와 대조한다 — verifiedAt 만으로
     // 단락하면 주소만 아는 쪽이 임의 코드로 증명 토큰을 가져갈 수 있다.
     const matches = await verifyPassword(code, challenge.codeHash);
@@ -99,26 +94,23 @@ export class EmailVerificationService {
       where: { email, codeHash: challenge.codeHash },
       data: { attemptCount: { decrement: 1 }, verifiedAt: challenge.verifiedAt ?? new Date() },
     });
-    if (settled.count === 0) {
-      throw new BadRequestException({
-        code: 'VERIFICATION_NO_PENDING',
-        message: '유효한 인증 요청이 없어요. 인증번호를 다시 받아 주세요.',
-      });
-    }
+    if (settled.count === 0) throw noPendingChallenge();
     return true;
   }
 
   /** 대조보다 먼저 시도 한 번을 원자적으로 예약한다(phone-verification.service 의 같은 이름 메서드와 같은 이유). */
-  private async reserveAttempt(email: string): Promise<number> {
+  private async reserveAttempt(email: string, codeHash: string): Promise<number> {
     try {
       const reserved = await this.prisma.v1EmailVerificationChallenge.update({
-        where: { email, attemptCount: { lt: MAX_ATTEMPTS } },
+        where: { email, codeHash, attemptCount: { lt: MAX_ATTEMPTS } },
         data: { attemptCount: { increment: 1 } },
         select: { attemptCount: true },
       });
       return reserved.attemptCount;
     } catch (error) {
       if (!(error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025')) throw error;
+      const current = await this.prisma.v1EmailVerificationChallenge.findUnique({ where: { email }, select: { codeHash: true } });
+      if (current?.codeHash !== codeHash) throw noPendingChallenge();
       await this.recordFailure(SMS_EVENT_TYPE.TOO_MANY_ATTEMPTS, `인증 시도 ${MAX_ATTEMPTS}회 초과`);
       throw new BadRequestException({
         code: 'VERIFICATION_TOO_MANY_ATTEMPTS',
@@ -176,4 +168,11 @@ export class EmailVerificationService {
       detail: `channel=email-recovery ${detail}`,
     });
   }
+}
+
+function noPendingChallenge(): BadRequestException {
+  return new BadRequestException({
+    code: 'VERIFICATION_NO_PENDING',
+    message: '유효한 인증 요청이 없어요. 인증번호를 다시 받아 주세요.',
+  });
 }

@@ -89,11 +89,11 @@ EC2 호스트의 `deploy/.env`에 직접 써넣을 필요는 없다 — `dev` pu
 V1_VERIFICATION_DEV_ECHO=true
 ```
 
-`SOLAPI_API_KEY`/`SOLAPI_API_SECRET`/`SOLAPI_SENDER_NUMBER` 중 하나라도 비어 있어 `SolapiSmsSender.enabled === false`인 상태에서 `V1_VERIFICATION_DEV_ECHO=true`이면, `VerificationDispatcherService`는 실제 발송을 시도하지 않고 발급한 인증코드를 **API 응답의 `devCode` 필드로 그대로 반환**한다. 프론트(`PhoneVerificationCard`)는 이 값이 있으면 입력 필드를 프리필해 개발자가 실제 문자 수신 없이 confirm까지 끝까지 검증할 수 있다.
+`SOLAPI_API_KEY`/`SOLAPI_API_SECRET`/`SOLAPI_SENDER_NUMBER` 중 하나라도 비어 있어 `SolapiSmsSender.enabled === false`인 상태에서 `V1_VERIFICATION_DEV_ECHO=true`이면, `VerificationDispatcherService`는 실제 발송을 시도하지 않고 발급한 인증코드를 **API 응답의 `devCode` 필드로 반환**한다 — 단 실제 사람에게 닿지 않는 테스트 대상(배정되지 않는 `010-0000-xxxx`, `.test`·`example.*` 주소)에만, 어드민·대회 스태프 계정은 빼고(`docs/api/domains/auth.md` "Dev echo"). 프론트(`PhoneVerificationCard`)는 이 값이 있으면 입력 필드를 프리필해 개발자가 실제 문자 수신 없이 confirm까지 끝까지 검증할 수 있다.
 
 3개 값이 모두 채워져 `enabled === true`가 되면 dev-echo 여부와 무관하게 항상 실제 솔라피 발송이 우선한다 — 즉 운영 환경에서는 `V1_VERIFICATION_DEV_ECHO`를 켜 두더라도 실제 SMS가 나간다(코드 노출용이 아니라 발송 성공 이후의 로그 보조용으로만 동작). 프로덕션에서는 `V1_VERIFICATION_DEV_ECHO`를 설정하지 않는다.
 
-로컬/CI에서 3개 시크릿을 모두 비워 두고 `V1_VERIFICATION_DEV_ECHO=true`만 설정하면, 옥토모 시절과 동일하게 벤더 자격 증명 없이 휴대폰 인증 플로우 전체(발급 → 코드 확인 → phoneVerifiedAt/proofToken)를 테스트할 수 있다.
+로컬/CI에서 3개 시크릿을 모두 비워 두고 `V1_VERIFICATION_DEV_ECHO=true`만 설정하면, 옥토모 시절과 동일하게 벤더 자격 증명 없이 휴대폰 인증 플로우 전체(발급 → 코드 확인 → phoneVerifiedAt/proofToken)를 `010-0000-xxxx` 번호로 테스트할 수 있다.
 
 ---
 

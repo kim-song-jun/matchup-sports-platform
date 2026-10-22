@@ -153,9 +153,12 @@ export class VerificationDispatcherService {
         })
       )?.id;
     if (!userId) return false;
+    const now = new Date();
     const [admins, staffAssignments] = await Promise.all([
-      this.prisma.v1AdminUser.count({ where: { userId } }),
-      this.prisma.v1TournamentStaffAssignment.count({ where: { userId, revokedAt: null } }),
+      this.prisma.v1AdminUser.count({ where: { userId, status: 'active', revokedAt: null } }),
+      this.prisma.v1TournamentStaffAssignment.count({
+        where: { userId, revokedAt: null, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
+      }),
     ]);
     return admins > 0 || staffAssignments > 0;
   }

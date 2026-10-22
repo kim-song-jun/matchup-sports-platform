@@ -166,7 +166,8 @@ export type V1LoginStepUpResponse = { stepUp: V1LoginStepUpChallenge };
 /** `POST /auth/login` 결과 — 세션이거나 추가 인증 챌린지다. */
 export type V1EmailLoginResult = V1AuthSessionResponse | V1LoginStepUpResponse;
 
-export type V1LoginStepUpResendResult = Pick<V1LoginStepUpChallenge, 'expiresAt' | 'resendAvailableAt' | 'devCode'>;
+/** 재발송은 에코 환경에서도 인증번호를 싣지 않는다 — 챌린지별 답이 되면 비밀번호가 맞았는지 드러난다. */
+export type V1LoginStepUpResendResult = Pick<V1LoginStepUpChallenge, 'expiresAt' | 'resendAvailableAt'>;
 
 export type V1Sport = {
   id: string;

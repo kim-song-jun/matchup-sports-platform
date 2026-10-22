@@ -54,11 +54,15 @@ function prismaMock() {
           where,
           data,
         }: {
-          where: { email: string; attemptCount?: { lt: number } };
+          where: { email: string; codeHash?: string; attemptCount?: { lt: number } };
           data: { attemptCount: { increment: number } };
         }) => {
           const row = store.get(where.email);
-          if (!row || (where.attemptCount && row.attemptCount >= where.attemptCount.lt)) {
+          if (
+            !row ||
+            (where.codeHash !== undefined && row.codeHash !== where.codeHash) ||
+            (where.attemptCount && row.attemptCount >= where.attemptCount.lt)
+          ) {
             throw new Prisma.PrismaClientKnownRequestError('No record was found for an update.', {
               code: 'P2025',
               clientVersion: 'test',
@@ -238,6 +242,22 @@ describe('EmailVerificationService (공개 이메일 OTP)', () => {
     const codes = results.map((result) => (result as PromiseRejectedResult).reason.getResponse().code);
     expect(codes.filter((code) => code === 'VERIFICATION_CODE_MISMATCH')).toHaveLength(5);
     expect(codes.filter((code) => code === 'VERIFICATION_TOO_MANY_ATTEMPTS')).toHaveLength(7);
+  });
+
+  it('읽은 뒤 새 번호가 발급됐으면 NO_PENDING 이고 새 번호의 시도 횟수는 깎지 않는다', async () => {
+    const prisma = prismaMock();
+    const svc = new EmailVerificationService(prisma, dispatcherMock(true), eventLogStub());
+    const { devCode } = await svc.issueChallenge(EMAIL, { deliver: true });
+    const issued = { ...storeOf(prisma).get(EMAIL)! };
+    (prisma as never as { v1EmailVerificationChallenge: { findUnique: jest.Mock } }).v1EmailVerificationChallenge.findUnique
+      .mockResolvedValueOnce(issued);
+    storeOf(prisma).get(EMAIL)!.codeHash = 'replaced-by-a-newer-issue';
+
+    await expect(svc.verifyCode(EMAIL, devCode!)).rejects.toMatchObject({
+      response: { code: 'VERIFICATION_NO_PENDING' },
+    });
+    expect(storeOf(prisma).get(EMAIL)!.attemptCount).toBe(0);
+    expect(storeOf(prisma).get(EMAIL)!.verifiedAt).toBeNull();
   });
 
   it('올바른 코드는 시도로 세지 않아 상한 직전에도 재제출이 멱등하게 통과한다', async () => {

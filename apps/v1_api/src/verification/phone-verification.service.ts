@@ -63,13 +63,8 @@ export class PhoneVerificationService {
 
   async verifyCode(phone: string, code: string): Promise<boolean> {
     const challenge = await this.prisma.v1PhoneVerificationChallenge.findUnique({ where: { phone } });
-    if (!challenge || challenge.expiresAt.getTime() < Date.now()) {
-      throw new BadRequestException({
-        code: 'VERIFICATION_NO_PENDING',
-        message: '유효한 인증 요청이 없어요. 인증번호를 다시 받아 주세요.',
-      });
-    }
-    const attemptCount = await this.reserveAttempt(phone);
+    if (!challenge || challenge.expiresAt.getTime() < Date.now()) throw noPendingChallenge();
+    const attemptCount = await this.reserveAttempt(phone, challenge.codeHash);
     // verifiedAt 여부와 무관하게 항상 제출된 코드를 codeHash 와 대조한다 — verifiedAt 만으로 단락하면
     // 번호만 아는 쪽이 임의 코드로 proofToken 을 가져갈 수 있다.
     const matches = await verifyPassword(code, challenge.codeHash);
@@ -91,29 +86,27 @@ export class PhoneVerificationService {
       where: { phone, codeHash: challenge.codeHash },
       data: { attemptCount: { decrement: 1 }, verifiedAt: challenge.verifiedAt ?? new Date() },
     });
-    if (settled.count === 0) {
-      throw new BadRequestException({
-        code: 'VERIFICATION_NO_PENDING',
-        message: '유효한 인증 요청이 없어요. 인증번호를 다시 받아 주세요.',
-      });
-    }
+    if (settled.count === 0) throw noPendingChallenge();
     return true;
   }
 
   /**
    * 대조보다 먼저 시도 한 번을 원자적으로 예약한다. 대조 뒤에 세면 상한을 넘긴 뒤에 낸 정답이 통과하고,
-   * 동시에 보낸 추측들이 모두 낡은 횟수를 읽어 상한을 넘긴다.
+   * 동시에 보낸 추측들이 모두 낡은 횟수를 읽어 상한을 넘긴다. 읽은 챌린지(codeHash)에 묶어, 그사이 새로
+   * 발급된 번호의 시도를 옛 번호 제출이 깎지 않게 한다.
    */
-  private async reserveAttempt(phone: string): Promise<number> {
+  private async reserveAttempt(phone: string, codeHash: string): Promise<number> {
     try {
       const reserved = await this.prisma.v1PhoneVerificationChallenge.update({
-        where: { phone, attemptCount: { lt: MAX_ATTEMPTS } },
+        where: { phone, codeHash, attemptCount: { lt: MAX_ATTEMPTS } },
         data: { attemptCount: { increment: 1 } },
         select: { attemptCount: true },
       });
       return reserved.attemptCount;
     } catch (error) {
       if (!(error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025')) throw error;
+      const current = await this.prisma.v1PhoneVerificationChallenge.findUnique({ where: { phone }, select: { codeHash: true } });
+      if (current?.codeHash !== codeHash) throw noPendingChallenge();
       await this.smsEventLog.record({
         eventType: SMS_EVENT_TYPE.TOO_MANY_ATTEMPTS,
         phone,
@@ -152,4 +145,11 @@ export class PhoneVerificationService {
       });
     }
   }
+}
+
+function noPendingChallenge(): BadRequestException {
+  return new BadRequestException({
+    code: 'VERIFICATION_NO_PENDING',
+    message: '유효한 인증 요청이 없어요. 인증번호를 다시 받아 주세요.',
+  });
 }

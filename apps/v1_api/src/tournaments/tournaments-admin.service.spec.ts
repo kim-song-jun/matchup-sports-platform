@@ -35,6 +35,9 @@ function tournamentRow(overrides: Record<string, unknown> = {}) {
     scheduledAt: null,
     scheduledEndAt: null,
     venue: null,
+    coverImageUrl: null,
+    listImageUrl: null,
+    showDetailImage: true,
     venueAddress: null,
     venueProvider: null,
     venueProviderId: null,
@@ -283,6 +286,28 @@ describe('TournamentsAdminService', () => {
     expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ action: 'tournament.create', targetType: 'tournament' }) }),
     );
+  });
+
+  it('create: two images and hidden detail persist and round-trip', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Sport.findUnique.mockResolvedValue({ id: 'sport-1' });
+    prisma.v1Tournament.create.mockImplementation(async ({ data }) => tournamentRow(data));
+    const result = await service.create(ownerAuthUser, {
+      sportId: 'sport-1', title: '이미지 대회', teamCount: 8,
+      coverImageUrl: '/uploads/detail.webp', listImageUrl: '/uploads/list.webp', showDetailImage: false,
+    });
+    expect(result).toMatchObject({ coverImageUrl: '/uploads/detail.webp', listImageUrl: '/uploads/list.webp', showDetailImage: false });
+  });
+
+  it('update: visibility changes preserve both photos and unrelated edits preserve visibility', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    let stored = tournamentRow({ coverImageUrl: '/uploads/detail.webp', listImageUrl: '/uploads/list.webp' });
+    prisma.v1Tournament.findFirst.mockImplementation(async () => ({ ...stored, _count: { registrations: 0 } }));
+    prisma.v1Tournament.updateMany.mockImplementation(async ({ data }) => { stored = { ...stored, ...data }; return { count: 1 }; });
+    const hidden = await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, showDetailImage: false });
+    expect(hidden).toMatchObject({ showDetailImage: false, coverImageUrl: '/uploads/detail.webp', listImageUrl: '/uploads/list.webp' });
+    const edited = await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: stored.updatedAt.toISOString(), title: '새 제목' });
+    expect(edited.showDetailImage).toBe(false);
   });
 
   // ─── venue snapshot (장소 검색에서 고른 값만 저장) ─────────────────────────────

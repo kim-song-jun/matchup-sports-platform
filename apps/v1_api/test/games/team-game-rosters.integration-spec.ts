@@ -7,6 +7,7 @@ import type { GameCommandContext, GameSourceCreationInput } from '../../src/game
 import { createTournamentMatchInTx } from '../../src/tournaments/tournament-match-creation';
 import { syncCompetitionTeamRosters } from '../../src/games/roster/game-roster-sync';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { LineupTodoService, loadRosterSummaries } from '../../src/team-lineups/lineup-todo.service';
 import { ManagedTermsRuntimeService } from '../../src/terms/managed-terms-runtime.service';
 import { drainOutboxWorker } from '../helpers/drain-outbox-worker';
 import { createV1IntegrationApp } from '../integration/integration-app';
@@ -683,6 +684,7 @@ describe('팀 경기 명단 표·일괄·결장 기간 API (Task 179)', () => {
 
       // The endpoint's rows are consumed as one roster selector list. More than
       // 500 older delayed fixtures must not crowd out a later scheduled fixture.
+      const sharedPastKickoff = new Date(pastKickoff.getTime() - 1_000);
       const backlogMatches = Array.from({ length: 500 }, (_, index) => ({
         id: randomUUID(),
         sportId,
@@ -691,7 +693,7 @@ describe('팀 경기 명단 표·일괄·결장 기간 API (Task 179)', () => {
         tournamentId: f.tournament.id,
         hostTeamId: f.teamA.id,
         approvedApplicantTeamId: f.teamB.id,
-        startAt: new Date(pastKickoff.getTime() - (500 - index) * 1_000),
+        startAt: sharedPastKickoff,
         status: 'matched' as const,
         competitionConfigVersionId: configId,
       }));
@@ -724,7 +726,10 @@ describe('팀 경기 명단 표·일괄·결장 기간 API (Task 179)', () => {
       });
       const withBacklog = await getAs(memberPath, f.teamA.members[0]);
       expect(withBacklog.status).toBe(200);
-      expect((withBacklog.body.data.items as Array<{ gameId: string }>).map((item) => item.gameId)).toContain(f.games.g2.gameId);
+      const returnedGameIds = (withBacklog.body.data.items as Array<{ gameId: string }>).map((item) => item.gameId);
+      expect(returnedGameIds).toHaveLength(502);
+      expect(new Set(returnedGameIds).size).toBe(returnedGameIds.length);
+      expect(returnedGameIds).toEqual(expect.arrayContaining([...backlogGameIds, f.games.g1.gameId, f.games.g2.gameId]));
 
       await prisma.v1TeamMatch.update({ where: { id: f.games.g2.teamMatchId }, data: { startAt: pastKickoff } });
       await prisma.v1Game.update({ where: { id: f.games.g2.gameId }, data: { state: 'ENDED' } });
@@ -775,6 +780,16 @@ describe('팀 경기 명단 표·일괄·결장 기간 API (Task 179)', () => {
       expect(res.status).toBe(200);
       type Item = { gameId: string; competitionKind: string; sideId: string | null; teamMatchId: string | null; rosterSummary: unknown };
       const byGame = new Map((res.body.data.items as Item[]).map((item) => [item.gameId, item]));
+      const lineupGames = await app.get(LineupTodoService).listUpcomingForTeam(f.teamA.id, new Date());
+      const legacySummaryByGame = await loadRosterSummaries(prisma, f.teamA.id, lineupGames);
+      for (const item of byGame.values()) {
+        const expected = legacySummaryByGame.get(item.gameId)!;
+        expect(item).toMatchObject({
+          teamMatchId: expected.teamMatchId,
+          sideId: expected.sideId,
+          rosterSummary: expected.summary,
+        });
+      }
       expect(byGame.get(f.games.g1.gameId)).toMatchObject({
         competitionKind: 'TOURNAMENT',
         sideId: f.games.g1.sideByTeam.get(f.teamA.id),

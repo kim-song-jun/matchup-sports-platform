@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
 import { LineupTodoService, loadRosterSummaries } from './lineup-todo.service';
+import { loadTeamUpcomingRosterSummaries } from './team-upcoming-roster-summaries';
 import { assertTeamLineupMember } from './team-lineup-access';
 import { loadViewerParticipation } from './viewer-game-participation';
 
@@ -53,7 +54,7 @@ export class TeamUpcomingGamesService {
       includeElapsedScheduledTournamentGames: true,
     });
     // 조회라 DB 를 바꾸지 않는다 — 리그 명단 자동 채움은 동기화 쓰기 경로에서만 돈다.
-    const rosters = await loadRosterSummaries(this.prisma, teamId, games);
+    const rosters = await loadTeamUpcomingRosterSummaries(this.prisma, teamId, games);
     const participating = await loadViewerParticipation(this.prisma, { userId: user.id, games, rosters });
     return {
       items: games.map((game) => ({

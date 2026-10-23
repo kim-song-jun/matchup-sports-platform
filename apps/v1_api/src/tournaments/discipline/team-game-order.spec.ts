@@ -1,5 +1,5 @@
 import type { Prisma } from '@prisma/client';
-import { readSuspensionVerdicts } from './suspension-verdicts';
+import { readSuspensionVerdicts, readSuspensionVerdictsForUpcomingKeys } from './suspension-verdicts';
 import { loadTeamCompetitionGameOrder, narrowToTeamGames, type CompetitionMatchOrderRow } from './team-game-order';
 
 // 네 팀 · 다섯 경기(대회 전체 순서). 같은 날 다른 팀 경기가 사이에 낀다.
@@ -88,6 +88,24 @@ describe('출전정지는 그 팀의 다음 경기에서 소진된다 (S1)', () 
   it('A팀의 다음 경기(m3)에서 pa 가 정지된다', async () => {
     const verdicts = await verdictsFor('A', 'm3');
     expect(verdicts.get('pa')?.suspended).toBe(true);
+  });
+
+  it('한 번 읽은 징계 이력으로 여러 경기의 판정을 각각 계산한다', async () => {
+    const tx = fakeTx(RED_ONE);
+    const orderedGames = await loadTeamCompetitionGameOrder(tx, { competitionId: 'cup', isLeague: false, teamId: 'A' });
+    const verdicts = await readSuspensionVerdictsForUpcomingKeys(tx, {
+      competitionId: 'cup',
+      orderedGames,
+      upcomingKeys: ['m1', 'm3', 'm5'],
+    });
+
+    expect(verdicts.get('m1')?.get('pa')?.suspended).toBe(false);
+    expect(verdicts.get('m3')?.get('pa')?.suspended).toBe(true);
+    expect(verdicts.get('m5')?.get('pa')?.suspended).toBe(false);
+    expect(tx.v1Tournament.findFirst).toHaveBeenCalledTimes(1);
+    expect(tx.v1Game.findMany).toHaveBeenCalledTimes(1);
+    expect(tx.v1GameResultParticipant.findMany).toHaveBeenCalledTimes(1);
+    expect(tx.v1GameParticipant.findMany).toHaveBeenCalledTimes(1);
   });
 
   it('정지를 한 경기 치른 뒤(A팀의 m5)에는 pa 가 복귀한다', async () => {

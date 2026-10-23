@@ -125,3 +125,5 @@ Current Kakao signup and existing-account linking use the [provider contact conf
 - 조별 결과 기반 공통 결선 배정: [tournaments — 공통 결선 진출팀 배정](./domains/tournaments.md#공통-결선-진출팀-배정-2026-10-21). 수동 대진·불균등 조 지원, 기존 12강 규칙 보존.
 
 대회 목록·상세 이미지 2장과 상세 기본 이미지까지 숨기는 `showDetailImage` 설정은 [대회 이미지 계약](./domains/tournaments.md#목록상세-이미지와-상세-숨김-2026-10-22)을 따른다.
+
+대회 이미지 설정의 JSON boolean 검증과 관리자 종목 기본 이미지 선택도 같은 계약에서 관리한다. `showDetailImage`의 문자열/숫자 강제 변환은 허용하지 않는다.

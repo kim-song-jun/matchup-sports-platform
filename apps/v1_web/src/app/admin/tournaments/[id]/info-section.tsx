@@ -583,7 +583,7 @@ export function TournamentInfoSection() {
 
       <TournamentPeriodSettingsEditor tournamentId={id} canWrite={canWrite} showToast={showToast} />
 
-      <CoverImageCard tournament={tournament} sportCode={masterSports?.find((sport) => sport.id === tournament.sportId)?.code} canWrite={canWrite} showToast={showToast} />
+      <CoverImageCard tournament={tournament} sportCode={masterSports?.find((sport) => sport.id === tournament.sportId)?.name} canWrite={canWrite} showToast={showToast} />
 
       <PrizeCard tournament={tournament} canWrite={canWrite} showToast={showToast} />
 

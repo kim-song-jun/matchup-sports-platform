@@ -68,3 +68,17 @@ Phase 1 contracts: completed. Phase 2 UI: completed. Phase 3 validation/docs com
 - after merge: alpha 배포 SHA/health/공개 상세3폭 확인 및 PR 갤러리. 관리자 인증 세션 미확보로 실제 관리자 저장 UI는 별도 제한을 명시한다.
 
 - CI 실패를 RED 증거로 유지하고 read-service suite 재검증 52/52 PASS(단일 worker). git diff --check PASS, 신규 debt marker 없음. 기존 구현/DB/API 계약은 유지하고 읽기 응답 테스트와 fixture만 동기화했다.
+
+## Progress Snapshot — 2026-10-23 후속 회귀 수정
+
+- 원 PR #2032는 2026-10-22T03:07:25Z dev MERGED, head `705871b6b194d2d884e434c0ee08a32d81875442`, merge `c184cff233af2f77a4c2f6842e1d9905fbe10278`. 위의 미머지 기록은 당시 이력이며 현재 상태를 뜻하지 않는다.
+- 최신 `origin/dev` `b3cbb4b63cfaa385d7daea1ea16a0258a311901b`에서 후속 작업을 분리했다. Worktree `C:/Users/kinso/.codex/worktrees/tournament-image-contract-followup/matchup-sports-platform`, branch `fix/tournament-image-contract-followup`. 기존 `pr2032-review-fixes` 작업트리의 로컬 회귀 테스트와 수정은 그대로 보존했다. 머지된 원 브랜치에는 push하지 않는다.
+- 실제 결함 2건: 전역 HTTP pipe의 implicit Boolean conversion이 문자열 `"false"` 등을 true로 수용함 / 관리자 이미지 미리보기가 표시 이름 대신 영문 종목 코드를 전달해 공용 그래픽을 선택함. 권한 우회나 이미지 URL 비공개 보장 문제로 분류하지 않는다.
+- Owned: 대회 DTO와 직접 회귀 spec, 관리자 info-section과 spec, 이 canonical task, API 계약 3문서, 후속 patch Changeset. Forbidden: 공유 계약/정책, main, 다른 작업트리 WIP, DB/seed, tracker 완료 처리. Root가 구현·검증·Git을 소유하며 별도 구현자 외 리뷰어가 immutable head를 검수한다.
+- Acceptance: 생성/PATCH에서 JSON true/false와 생략/null을 보존하고 비boolean 값은 해당 필드의 400 검증 오류로 거절한다. 이미지 없는 풋살 대회의 목록·상세 미리보기는 풋살 그래픽을 선택한다. 기존 권한·CAS·업로드 오류와 화면 구조는 유지한다.
+- RED: 최신 dev의 실제 HTTP pipe spec 32건 중 12 FAIL/20 PASS. 문자열/숫자/객체가 거절되지 않아 실패했다. 관리자 실제 caller spec은 1 FAIL/20 SKIP, 두 미리보기 모두 풋살 대신 landing-hero 선택으로 실패했다.
+- GREEN: raw JSON Transform 2곳과 표시 이름 전달 1곳 수정 후 API 34/34 PASS(생략/null 및 URL 경계 포함), Web info-section 전체 21/21 PASS(단일 worker). 로컬 Next/DB 서버를 띄우지 않았다.
+- 검증 로그: QA root의 git 제외 `tmp/qa/mdqa-assigned-monitor/2026-10-23-heartbeat-0442/{api-red,web-red,api-green,web-green}.log`. 앞선 중단된 API 실행은 결과 불명이며 RED/PASS에 합산하지 않았다.
+- API/Web TypeScript 검사는 각각 1회 통과했다. 두 lint script의 뒤 단계는 Windows `find.exe` 충돌로 실패한 사실을 남겼다. 게이트 코드는 바꾸지 않고 API는 Git GNU find PATH, Web은 Git Bash ComSpec/PATH로 실제 surface/pattern 검사를 각각 재실행해 통과했다. API 708파일 surface 스캔 및 Web 전체 패턴 검사 통과. 신규 debt marker 없음, diff/check 통과, 신규 외부 import 없음.
+- 이 Snapshot 시점에는 PR/독립 리뷰가 진행 중이다. 최신 immutable head 리뷰·후속 PR/CI/머지 및 tracker 상태는 QA root 정본 `tmp/qa/mdqa-assigned-monitor/state.json`의 `resume20261023`과 후속 PR에 기록한다. 전체 열린 dev PR 3/3을 끝까지 조회했으며 동일 후속 수정 PR은 없었다.
+- Alpha 현재 서빙 SHA는 `b3cbb4b63cfaa385d7daea1ea16a0258a311901b`, landing HTTP200, 배포 run39768675591 SUCCESS. 이 후속 수정은 미배포다. IAB의 리포트 `/projects/1/`와 Alpha `/my` 모두 로그인 화면으로 이동했다. 신규 리포트 전체 census·상세·선점·댓글 및 관리자 이미지 실제 저장·3폭(390/768/1440) 스크린샷·console/network는 미검증이다. 코드 테스트/원 PR의 공개 QA를 관리자 실측 PASS로 대체하지 않는다.

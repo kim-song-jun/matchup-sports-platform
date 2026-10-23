@@ -2179,7 +2179,7 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
     ).toBeEnabled();
   });
 
-  it('[MD-QA #180] 조회 전용 운영자에게 결선 동점 경고가 전역 표시되지 않고 종료 명령도 전송하지 않는다', () => {
+  it('[MD-QA #180] takeover가 거절된 대회 디렉터는 결선 동점 경고가 전역 표시되지 않고 조작이 잠긴다', () => {
     setup({ periods: [FIRST_PERIOD, { ...FINAL_PERIOD, state: 'HALFTIME', startedAt: null, endedAt: null }] });
     mocks.useV1GameOperationsConsole.mockReturnValue(
       consoleState({ takeover: { status: 'denied', code: 'TAKEOVER_HELD', holderName: '김운영' } }),
@@ -2188,6 +2188,17 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
 
     expect(screen.getByText('김운영님이 이 경기를 운영하고 있어요. 지금은 보기만 할 수 있어요.')).toBeInTheDocument();
     expect(screen.queryByText(/결선 경기는 무승부로 끝낼 수 없어요/)).toBeNull();
+    expect(screen.getByRole('button', { name: '더보기' })).toBeDisabled();
+    expect(mocks.postV1GameCommand).not.toHaveBeenCalled();
+  });
+
+  it('[MD-QA #180] SUPPORT_READONLY 권한의 결선 동점 경기는 경고 없이 더보기와 종료 명령이 잠긴다', () => {
+    setup({ periods: [FIRST_PERIOD, { ...FINAL_PERIOD, state: 'HALFTIME', startedAt: null, endedAt: null }] });
+    mocks.useTournamentOpsRole.mockReturnValue('SUPPORT_READONLY');
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    expect(screen.queryByText(/결선 경기는 무승부로 끝낼 수 없어요/)).toBeNull();
+    expect(screen.queryByRole('button', { name: '경기 종료' })).toBeNull();
     expect(screen.getByRole('button', { name: '더보기' })).toBeDisabled();
     expect(mocks.postV1GameCommand).not.toHaveBeenCalled();
   });

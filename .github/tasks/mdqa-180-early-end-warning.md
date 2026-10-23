@@ -14,7 +14,7 @@ Status: Review
 - [x] 진행 화면에서 결선 동점 조기 종료 경고를 전역 배너로 표시하지 않아요.
 - [x] 더보기 메뉴를 열면 조기 종료가 비활성화되고 차단 사유가 표시돼요.
 - [x] 비활성 액션으로 `end` 명령이 나가지 않아요.
-- [x] 비동점, 정규 시간 종료, 조회 전용 권한에서 기존 동작을 유지해요.
+- [x] 비동점과 정규 시간 종료 동작을 유지하고, takeover 거절 보기 전용과 `SUPPORT_READONLY` 역할을 구분해요.
 - [x] 다른 경고와 더보기 시트의 접근성 동작을 유지해요.
 
 ## User Scenarios
@@ -27,7 +27,7 @@ Status: Review
 ### Edge cases
 - [x] 비동점은 차단 이유가 없어요.
 - [x] 정규 시간 종료 후 기존 승부차기/경기 종료 흐름이 유지돼요.
-- [x] 조회 전용 권한은 더보기 조작을 비활성화해요.
+- [x] takeover가 거절된 대회 디렉터와 `SUPPORT_READONLY` 모두 더보기 조작을 비활성화해요.
 ### Error paths
 - [x] 비활성 액션을 클릭해도 종료 명령이 전송되지 않아요.
 ### Mock data updates needed
@@ -62,6 +62,8 @@ Status: Review
 - Worktree: `/Users/sungjun/.codex/worktrees/mdqa-180/matchup-sports-platform`
 - Branch/base: `codex/mdqa-180-20261023` / `b3cbb4b63cfaa385d7daea1ea16a0258a311901b`
 - RED: focused Vitest filtered by `MD-QA #180` — 1 failed / 3 passed / 103 skipped, actual exit 1. The failure captured the duplicate global `role=status` warning before ⋯ was opened.
-- Fix/GREEN: removed only the global warning render. The same command passed 4/4 selected tests (103 skipped), actual exit 0.
-- Cleanup: temporary root and app `node_modules` symlinks were removed. No Vitest process remained; broad nodeish process count returned to the preflight value of 43.
+- Fix/GREEN: removed only the global warning render. The initial same-command run passed 4/4 selected tests (103 skipped), actual exit 0.
+- Independent review correction: the earlier viewer test covered a `TOURNAMENT_DIRECTOR` with denied takeover, not the `SUPPORT_READONLY` role. The test now names that path accurately and a separate `SUPPORT_READONLY` tie case verifies hidden global warning, disabled overflow action, and no command. Follow-up narrow run passed all 5 selected tests (103 skipped), actual exit 0.
+- Follow-up test command: `pnpm --filter v1_web exec vitest run src/components/tournament-live/operate/operate-console.test.tsx --testNamePattern='MD-QA #180' --maxWorkers=1 --minWorkers=1` — 5 passed / 103 skipped, actual exit 0.
+- Cleanup: temporary root and app `node_modules` symlinks were removed. No Vitest process remained; broad nodeish process count returned to the preflight value of 44.
 - Remaining: alpha screenshots and console/network checks at 390/768/1440 after merge; no local server used.

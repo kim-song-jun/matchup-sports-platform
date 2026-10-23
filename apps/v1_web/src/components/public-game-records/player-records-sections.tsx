@@ -25,7 +25,7 @@ export function TournamentPlayerRecordsSections({
 }: {
   goals: readonly PublicTournamentPlayerRecordRow[] | undefined;
   assists: readonly PublicTournamentPlayerRecordRow[] | undefined;
-  /** 기록은 있지만 공개 자격이 없어 가려졌는가 — 빈 상태 문구를 가른다. */
+  /** 공개 자격으로 숨겨진 기록이 있는가 — 빈 상태와 부분 공개 안내에 사용한다. */
   hiddenByEligibility: boolean;
   isLoading: boolean;
   isError: boolean;
@@ -60,6 +60,11 @@ export function TournamentPlayerRecordsSections({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, marginBottom: 20 }}>
+      {hiddenByEligibility ? (
+        <p style={{ margin: 0, fontSize: 'var(--font-size-body-sm)', color: 'var(--text-muted)' }}>
+          {playerRecordsCombinedEmptySub(hiddenByEligibility)}
+        </p>
+      ) : null}
       {goalRows.length > 0 ? (
         <RecordList title="득점 순위" rows={goalRows} ranks={goalRanks} unit="골" value={(row) => row.goals} />
       ) : null}
@@ -106,8 +111,8 @@ function RecordList({
                 color: 'inherit',
                 textDecoration: 'underline',
                 textUnderlineOffset: 2,
-              textAlign: 'left',
-            }}
+                textAlign: 'left',
+              }}
             >
               <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
                 <span>{ranks[index]}. </span>

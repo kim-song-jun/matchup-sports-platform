@@ -5,6 +5,10 @@ import { canonicalGameCommandPayloadHash, GamesService } from '../../src/games/g
 import type { GameCommandContext, GameSourceCreationInput } from '../../src/games/games.types';
 import { PublicUserRecordsService } from '../../src/games/public-records/public-user-records.service';
 import { syncGameSideRoster } from '../../src/games/roster/game-roster-sync';
+import { seedCompetitionConfigVersions } from '../../src/tournaments/competition-config/competition-config-backfill';
+import { recordSignupConsent } from '../../src/auth/signup-record-consent';
+import { ProfileService } from '../../src/profile/profile.service';
+import type { RealtimeGateway } from '../../src/realtime/realtime.gateway';
 import { PrismaService } from '../../src/prisma/prisma.service';
 
 /**
@@ -25,7 +29,7 @@ import { PrismaService } from '../../src/prisma/prisma.service';
  * 직접 구성한다: 이 스펙의 목적은 "결과가 official로 확정된 이후" 구간이므로
  * 그 확정에 이르는 커맨드 시퀀스 자체는 게임 라이프사이클 스펙들이 이미
  * 별도로 커버한다) -> `PublicUserRecordsService.getRecords` 3단 관찰
- * (동의 전 0건 -> 사용자 단위 GRANTED 즉시 소급 노출 -> 개별 REVOKED로 재차
+ * (설정 없음 0건 -> 가입 기본 공개로 소급 노출 -> 사용자 비공개/공개 -> 개별 REVOKED로 재차
  * 숨김).
  */
 
@@ -73,6 +77,8 @@ describe('End-to-end: lineup roster link -> official result -> user-consent-gate
       throw new Error('DATABASE_URL is required for this integration verification');
     }
     await prisma.$connect();
+    // The isolated database need not have been seeded outside this test.
+    await seedCompetitionConfigVersions(prisma);
     const config = await prisma.v1CompetitionConfigVersion.findFirstOrThrow({
       where: { name: 'futsal-v1', status: 'ACTIVE' },
       orderBy: { version: 'desc' },
@@ -212,7 +218,7 @@ describe('End-to-end: lineup roster link -> official result -> user-consent-gate
     await prisma.$disconnect();
   });
 
-  it('is 0 records before any user-level consent, appears retroactively once GRANTED, and hides again on an individual REVOKED override', async () => {
+  it('publishes linked past records with the signup default, honors user privacy changes and individual hiding', async () => {
     // -- 0건: 연결은 있지만 사용자 단위 동의가 아직 없다.
     const beforeConsent = await userRecords.getRecords(ids.targetUser, {});
     expect(beforeConsent.summary.appearances).toBe(0);
@@ -220,9 +226,7 @@ describe('End-to-end: lineup roster link -> official result -> user-consent-gate
 
     // -- 사용자 단위 GRANTED: 시간 비교 없이 이 "과거" 경기가 즉시 보인다
     // (소급 허용이 사용자 결정이었다 -- public-consent.ts 문서 참고).
-    await prisma.v1UserRecordConsent.create({
-      data: { userId: ids.targetUser, state: 'GRANTED', policyHash: 'records-e2e-policy-hash' },
-    });
+    await prisma.$transaction(tx => recordSignupConsent(tx, ids.targetUser, undefined));
     const afterGrant = await userRecords.getRecords(ids.targetUser, {});
     // 파울 누적치는 공개 요약에 싣지 않는다(개인 프로필 낙인 방지) — 그래서 fouls 는 단언하지 않는다.
     expect(afterGrant.summary).toEqual(expect.objectContaining({ appearances: 1, goals: 2, assists: 0 }));
@@ -230,6 +234,15 @@ describe('End-to-end: lineup roster link -> official result -> user-consent-gate
     expect(afterGrant.items[0]).toEqual(
       expect.objectContaining({ gameId, goals: 2, officialAt: officialAt.toISOString() }),
     );
+
+    // A system default must remain reversible through the actual settings service.
+    const profile = new ProfileService(prisma, { forceDisconnectUser: jest.fn() } as unknown as RealtimeGateway);
+    await profile.updateMyRecordConsent(authUser(ids.targetUser), { granted: false, policyHash: 'explicit-private' });
+    expect((await userRecords.getRecords(ids.targetUser, {})).items).toHaveLength(0);
+    await prisma.$transaction(tx => recordSignupConsent(tx, ids.targetUser, undefined));
+    expect((await profile.myRecordConsent(authUser(ids.targetUser))).granted).toBe(false);
+    await profile.updateMyRecordConsent(authUser(ids.targetUser), { granted: true, policyHash: 'explicit-public' });
+    expect((await userRecords.getRecords(ids.targetUser, {})).items).toHaveLength(1);
 
     // -- 이 participant만 개별 숨김(REVOKED 스냅샷). 실제 서비스 호출
     // (games.revokeParticipantConsent)로 만든다 -- 사용자 단위 동의는 그대로

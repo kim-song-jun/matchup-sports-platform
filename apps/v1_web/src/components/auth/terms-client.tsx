@@ -232,21 +232,29 @@ export function TermsClient() {
       onBack={isSocialMode ? () => void exitFlow.exit() : undefined}
       backLabel={isSocialMode ? '가입 그만두기' : undefined}
       fixedAction={
-        <Button
-          block
-          disabled={!currentTerms.data?.ready || !requiredAccepted}
-          loading={currentTerms.isPending || socialTerms.isPending || acceptTerms.isPending}
-          onClick={continueToSignup}
-          size="lg"
-          type="button"
-          variant="primary"
-        >
-          {requiredAccepted
-            ? isRenewalMode
-              ? '동의하고 계속하기'
-              : model.primary.label
-            : '필수 약관에 동의해 주세요'}
-        </Button>
+        <>
+          {!isRenewalMode && (mode === 'signup' || isSocialMode) ? (
+            <p className="tm-text-caption" style={{ color: 'var(--text-caption)', margin: '0 0 var(--spacing-3)' }}>
+              <span style={{ display: 'block' }}>경기 기록은 닉네임으로 기본 공개돼요.</span>
+              <span style={{ display: 'block' }}>공개 여부는 가입 후 설정에서 변경할 수 있어요.</span>
+            </p>
+          ) : null}
+          <Button
+            block
+            disabled={!currentTerms.data?.ready || !requiredAccepted}
+            loading={currentTerms.isPending || socialTerms.isPending || acceptTerms.isPending}
+            onClick={continueToSignup}
+            size="lg"
+            type="button"
+            variant="primary"
+          >
+            {requiredAccepted
+              ? isRenewalMode
+                ? '동의하고 계속하기'
+                : model.primary.label
+              : '필수 약관에 동의해 주세요'}
+          </Button>
+        </>
       }
     >
       <div className="tm-auth-body" style={{ paddingBottom: 112 }}>

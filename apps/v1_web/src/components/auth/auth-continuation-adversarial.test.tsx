@@ -5,7 +5,6 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getSavedRedirectPath, saveRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
-import { RECORD_CONSENT_POLICY_HASH } from '@/lib/record-consent';
 import { RequireAuth } from './require-auth';
 import { PendingSocialSignupGate } from './pending-social-signup-gate';
 import { SocialSignupClient } from './social-signup-client';
@@ -152,7 +151,7 @@ describe('적대적 인증 continuation의 실제 consumer 계약', () => {
     const endpoint = mode === 'defer' ? '/auth/social-profile/defer' : '/auth/social-profile';
     server.use(http.post(`*/api/v1${endpoint}`, async ({ request }) => {
       if (mode === 'activity') expect(await request.json()).toEqual({ nickname: '카카오러너', displayName: '김러너', phone: '01012345678',
-        birthDate: '20000229', gender: 'female', recordConsent: { granted: true, policyHash: RECORD_CONSENT_POLICY_HASH } });
+        birthDate: '20000229', gender: 'female' });
       profileRequests += 1;
       state.auth = { ...state.auth, user: { ...state.auth.user, onboardingStatus: mode === 'defer' ? 'social_profile_deferred' : 'deferred' },
         termsCompliance: compliance(false) };

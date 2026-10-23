@@ -1,7 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { expect } from 'vitest';
-import { RECORD_CONSENT_POLICY_HASH } from '@/lib/record-consent';
 import type { V1AuthMe, V1AuthSessionResponse, V1CurrentSignupTerms, V1OnboardingDetail, V1OnboardingPreferencePayload } from '@/types/api';
 
 export const SPORT = '22222222-2222-4222-8222-222222222222';
@@ -123,7 +122,7 @@ export function createRedirectFixture() {
     http.get('*/api/v1/auth/check-nickname', () => success({ available: true })),
     http.post('*/api/v1/auth/social-profile', async ({ request }) => {
       expect(await request.json()).toEqual({ nickname: '카카오러너', displayName: '김러너', phone: '01087654321',
-        birthDate: '20000229', gender: 'female', recordConsent: { granted: true, policyHash: RECORD_CONSENT_POLICY_HASH } });
+        birthDate: '20000229', gender: 'female' });
       state.profileRequests += 1;
       state.auth = makeAuth('signup_done', PENDING, true);
       state.auth.user.phone = '01087654321';

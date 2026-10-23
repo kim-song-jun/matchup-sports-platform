@@ -60,6 +60,11 @@ export function TournamentPlayerRecordsSections({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, marginBottom: 20 }}>
+      {hiddenByEligibility ? (
+        <p style={{ margin: 0, fontSize: 'var(--font-size-body-sm)', color: 'var(--text-muted)' }}>
+          기록 공개에 동의한 선수만 보여요.
+        </p>
+      ) : null}
       {goalRows.length > 0 ? (
         <RecordList title="득점 순위" rows={goalRows} ranks={goalRanks} unit="골" value={(row) => row.goals} />
       ) : null}
@@ -106,8 +111,8 @@ function RecordList({
                 color: 'inherit',
                 textDecoration: 'underline',
                 textUnderlineOffset: 2,
-              textAlign: 'left',
-            }}
+                textAlign: 'left',
+              }}
             >
               <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
                 <span>{ranks[index]}. </span>

@@ -56,7 +56,7 @@ Status: Review
 - alpha UI 검증은 merge 뒤 수행해야 해요.
 
 ## Ambiguity Log
-없음. 기존 Task 180은 G6–G13 통합 이력이라 MD-QA #180의 작업 문서로 재사용하지 않아요.
+기존 Task 180은 G6–G13 통합 이력이라 MD-QA #180의 작업 문서로 재사용하지 않아요. 이번 변경은 사용자가 요청한 MD-QA 자동 수정 범위에서 이미 더보기 메뉴에 있는 차단 사유의 중복 전역 렌더만 제거해요. 새 화면·새 동작·정보 구조를 설계하는 선택은 만들지 않아요. 별도 제품 디자인 선택이 생기면 구현 전에 A·B·C 제시와 사용자 선택을 적용해요.
 
 ## Progress Snapshot
 - Worktree: `/Users/sungjun/.codex/worktrees/mdqa-180/matchup-sports-platform`
@@ -67,3 +67,5 @@ Status: Review
 - Follow-up test command: `pnpm --filter v1_web exec vitest run src/components/tournament-live/operate/operate-console.test.tsx --testNamePattern='MD-QA #180' --maxWorkers=1 --minWorkers=1` — 5 passed / 103 skipped, actual exit 0.
 - Cleanup: temporary root and app `node_modules` symlinks were removed. No Vitest process remained; broad nodeish process count returned to the preflight value of 44.
 - Remaining: alpha screenshots and console/network checks at 390/768/1440 after merge; no local server used.
+- Prior committed head `821405396706b088a7b87de853eb2ef82d504345`: independent gpt-6-sol review PASS (Critical 0 / Warning 0); CI `39907213962` Gates/API/Web registered and SUCCESS; actual Codex code review completed with no findings. These results apply to that head, not to the later documentation rename.
+- Documentation follow-up: renamed this task to a numeric filename per `.github/tasks/README.md`. New-head CI and review remain pending; source/test bytes are unchanged by this documentation-only follow-up.

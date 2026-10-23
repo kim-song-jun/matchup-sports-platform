@@ -1,6 +1,6 @@
 # 경기 기록 기본 공개 — 2026-10-23
 
-Status: 구현 및 로컬 계약 검증 완료, alpha 미검증
+Status: 기능 dev/alpha 배포 및 변경 계약 검증 완료, main 승격 준비 중
 
 [Task 20261106](../../.github/tasks/20261106-default-public-player-records.md)
 
@@ -14,15 +14,15 @@ Status: 구현 및 로컬 계약 검증 완료, alpha 미검증
 - 공개 기록 서비스의 기본 공개→설정에서 OFF→재초기화해도 OFF 유지→ON→개별 숨김 실제 DB 검증 PASS. 최종 DB통합 2/2. 초기 canonical config fixture 누락은 테스트 내부 초기화로 수정.
 - 데이터는 임시 DB만 사용했고, 소유 PostgreSQL은 종료·정리. 실제 사용자 계정 변경 없음.
 
-## Alpha 수동 검증 대기 — 0/6
-1. 비로그인 이메일 신규 가입 약관: 하단 버튼 위 안내 확인, 별도 체크박스 없음.
-2. 신규 카카오·Apple: 공통 소셜 약관 안내와 가입 완료/프로필 미루기 후 설정 공개 ON 확인.
-3. 기존 미설정 회원: migration 후 공개 ON, 연결된 확정 경기와 해당 순위 표시.
-4. 기존 명시적 비공개 회원: migration 후 OFF, 다시 로그인하거나 프로필을 완성해도 유지.
-5. 설정 공개 OFF→ON 및 개별 경기 숨김: 본인/타인 조회 차이와 기존 숨김 계약 유지.
-6. 재동의/공개 약관: 신규 가입 안내 없음. 390/768/1440px에서 CTA·스크롤 겹침, console/network 오류 확인.
+## Alpha 실행 결과
+- [x] 실제 이메일 약관→가입 UI→공식 테스트 OTP→서버 기본 공개 저장. 임시 계정 정리201.
+- [x] 제공받은 선수 QA 계정의 실제 로그인·설정 OFF/ON·새로고침·원래 공개 상태 복구.
+- [x] 익명 공개 조회의 출전40/수상1 → 0/0 → 40/1, 첫 페이지20 → 0 → 20.
+- [x] 기존 미설정629명 전환·잔여0, 기존 비공개6명 전체의 상태/정책/시간 보존.
+- [x] 390/768/1440px before/after·가로 넘침0·console/network 오류0. 모바일 고정 CTA/desktop 흐름 CTA 접근 확인.
+- [x] 가입/소셜 공통 약관 및 재동의 제외 계약은 unit 28건 PASS. 외부 OAuth 공급자의 신규 인증 자체는 이번 수정에 포함되지 않아 재실행하지 않았다.
 
-변경분이 alpha에 배포되지 않았고 사용 가능한 브라우저 도구가 없어 실제 화면 evidence는 수집하지 않았다. 변경 전/후 viewport verdict는 0/3이며 스크린샷을 대체하는 로컬 Next 서버는 실행하지 않았다.
+[실제 alpha 증거](../screenshots/default-public-player-records/README.md). 브라우저 PID/launcher PID는 증거에 기록했고 소유 브라우저를 모두 종료했다. 자격증명·세션·OTP·계정 식별자는 기록하지 않았다. dev CI39924007213와 alpha39924007216 성공, 서빙 SHA `df42407a1` 확인. main/production은 별도 승격 절차를 진행한다.
 
 ## Production 읽기 전용 사전 집계
 

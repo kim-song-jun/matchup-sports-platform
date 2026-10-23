@@ -1,0 +1,17 @@
+{
+  "origin": "alpha",
+  "readOnly": true,
+  "before": {
+    "targets": 629,
+    "privateCount": 6,
+    "defaultRows": 0
+  },
+  "after": {
+    "targets": 0,
+    "privateCount": 6,
+    "defaultRows": 629,
+    "migrationApplied": true,
+    "migrationFailures": 0
+  },
+  "existingPrivateHistoryUnchanged": true
+}

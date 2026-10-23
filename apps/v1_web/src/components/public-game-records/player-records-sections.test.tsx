@@ -51,7 +51,7 @@ describe('TournamentPlayerRecordsSections — awards consumer', () => {
     expect(screen.getByText('2도움')).toBeInTheDocument();
   });
 
-  it('일부 기록이 공개된 상태에서 다른 기록이 자격 때문에 숨겨졌음을 안내한다', () => {
+  it('일부 기록이 공개돼도 신원 연동과 공개 동의 기준을 함께 안내한다', () => {
     render(
       <TournamentPlayerRecordsSections
         {...base}
@@ -60,7 +60,9 @@ describe('TournamentPlayerRecordsSections — awards consumer', () => {
         assists={[]}
       />,
     );
-    expect(screen.getByText('기록 공개에 동의한 선수만 보여요.')).toBeInTheDocument();
+    expect(
+      screen.getByText('기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 득점·도움 순위가 공개돼요.'),
+    ).toBeInTheDocument();
     expect(screen.getAllByRole('listitem')[0]).toHaveTextContent('1. 가1골');
   });
 
@@ -72,7 +74,9 @@ describe('TournamentPlayerRecordsSections — awards consumer', () => {
         assists={[]}
       />,
     );
-    expect(screen.queryByText('기록 공개에 동의한 선수만 보여요.')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 득점·도움 순위가 공개돼요.'),
+    ).not.toBeInTheDocument();
     expect(screen.getAllByRole('listitem')[0]).toHaveTextContent('1. 가1골');
   });
 
@@ -85,7 +89,9 @@ describe('TournamentPlayerRecordsSections — awards consumer', () => {
         assists={[row({ userId: 'a', nickname: '가', assists: 2 })]}
       />,
     );
-    expect(screen.getByText('기록 공개에 동의한 선수만 보여요.')).toBeInTheDocument();
+    expect(
+      screen.getByText('기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 득점·도움 순위가 공개돼요.'),
+    ).toBeInTheDocument();
     expect(screen.getByText('2도움')).toBeInTheDocument();
   });
 

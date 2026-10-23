@@ -62,7 +62,7 @@ export function TournamentPlayerRecordsSections({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, marginBottom: 20 }}>
       {hiddenByEligibility ? (
         <p style={{ margin: 0, fontSize: 'var(--font-size-body-sm)', color: 'var(--text-muted)' }}>
-          기록 공개에 동의한 선수만 보여요.
+          {playerRecordsCombinedEmptySub(hiddenByEligibility)}
         </p>
       ) : null}
       {goalRows.length > 0 ? (

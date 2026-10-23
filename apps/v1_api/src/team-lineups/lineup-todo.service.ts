@@ -67,6 +67,12 @@ export type LineupTodo = {
 /** 대회·리그 경기의 "명단 확인" 대상 — 전날 알림이 쓴다. */
 export type CompetitionRosterCheck = TeamUpcomingGame & { rosterSummary: GameRosterSummary };
 
+interface TeamMatchCollectionOptions {
+  startedWithinMs?: number;
+  /** Keep delayed, not-yet-started tournament games in the team roster selector. */
+  includeElapsedScheduledTournamentGames?: boolean;
+}
+
 /** 대회·리그 경기 명단 웹 화면. 알림 딥링크와 웹 라우트가 같은 값을 써야 한다. */
 export function rosterScreenPath(teamId: string, gameId: string): string {
   return `/teams/${teamId}/games/${gameId}/roster`;
@@ -117,12 +123,16 @@ export class LineupTodoService {
    * 그대로 쓰면 **팀이 라인업을 제출하는 순간 그 경기의 전술보드에 다시 못 들어간다** —
    * 전술은 제출 후에도 계속 고치는 것이라 그 동작은 틀렸다.
    *
-   * 알려진 한계: `collect` 계열은 `now` 기준으로 앞으로의 경기만 모은다. 그래서 **끝난
-   * 경기의 전술보드는 이 목록으로 열 수 없다.** 지금은 의도된 범위다(지난 경기 배치를
-   * 다시 여는 화면이 아직 없다) — 이름에 `upcoming` 을 넣어 그 한계를 드러내 둔다.
+   * 팀 roster 선택기는 옵션으로 킥오프 시각이 지난 대회 경기 중 `SCHEDULED`인 경기를 더 받는다.
+   * 이 지연 경기 예외는 진행 중 대회에만 적용하며, `LIVE`·`PAUSED`·종료된 경기는 추가하지 않는다.
+   * 다른 소비자는 기존 시간 범위를 쓴다.
    */
-  async listUpcomingForTeam(teamId: string, now: Date): Promise<TeamUpcomingGame[]> {
-    return this.collectWithLineupState([teamId], now);
+  async listUpcomingForTeam(
+    teamId: string,
+    now: Date,
+    options: Pick<TeamMatchCollectionOptions, 'includeElapsedScheduledTournamentGames'> = {},
+  ): Promise<TeamUpcomingGame[]> {
+    return this.collectWithLineupState([teamId], now, options);
   }
 
   /**
@@ -133,10 +143,10 @@ export class LineupTodoService {
   async listUpcomingForTeams(
     teamIds: readonly string[],
     now: Date,
-    options: { startedWithinMs?: number } = {},
+    options: Pick<TeamMatchCollectionOptions, 'startedWithinMs'> = {},
   ): Promise<TeamUpcomingGame[]> {
     if (teamIds.length === 0) return [];
-    return this.collectWithLineupState([...teamIds], now, options.startedWithinMs ?? 0);
+    return this.collectWithLineupState([...teamIds], now, options);
   }
 
   /**
@@ -171,9 +181,9 @@ export class LineupTodoService {
   private async collectWithLineupState(
     teamIds: string[] | null,
     now: Date,
-    startedWithinMs = 0,
+    options: TeamMatchCollectionOptions = {},
   ): Promise<TeamUpcomingGame[]> {
-    const candidates = await this.loadTeamMatches(teamIds, now, startedWithinMs);
+    const candidates = await this.loadTeamMatches(teamIds, now, options);
     if (candidates.length === 0) return [];
 
     const states = await this.loadLineupStates(candidates.map((candidate) => ({
@@ -201,17 +211,38 @@ export class LineupTodoService {
     return items;
   }
 
-  private async loadTeamMatches(teamIds: string[] | null, now: Date, startedWithinMs: number) {
+  private async loadTeamMatches(teamIds: string[] | null, now: Date, options: TeamMatchCollectionOptions) {
+    const scheduleFilter: Prisma.V1TeamMatchWhereInput = options.includeElapsedScheduledTournamentGames
+      ? {
+          AND: [
+            NOT_IN_HELD_LEAGUE_WHERE,
+            {
+              OR: [
+                { startAt: { gte: now } },
+                {
+                  startAt: { lt: now },
+                  deletedAt: null,
+                  leagueId: null,
+                  tournamentId: { not: null },
+                  tournament: { status: { notIn: ['completed', 'cancelled'] } },
+                  game: { is: { state: 'SCHEDULED' } },
+                },
+              ],
+            },
+          ],
+        }
+      : {
+          startAt: { gte: new Date(now.getTime() - (options.startedWithinMs ?? 0)) },
+          AND: [NOT_IN_HELD_LEAGUE_WHERE],
+        };
     const matches = await this.prisma.v1TeamMatch.findMany({
       where: {
         // 상대가 정해진 매치만 — 아직 모집 중이면 라인업을 짤 대상이 없다.
         status: 'matched',
-        startAt: { gte: new Date(now.getTime() - startedWithinMs) },
+        ...scheduleFilter,
         hostTeamId: { not: null },
         approvedApplicantTeamId: { not: null },
         game: { isNot: null },
-        // 보류 리그의 경기는 라인업 할 일·리마인더·다음 경기에서 뺀다 — 보류가 풀리면 다시 나온다(league-hold.ts).
-        AND: [NOT_IN_HELD_LEAGUE_WHERE],
         ...(teamIds !== null
           ? { OR: [{ hostTeamId: { in: teamIds } }, { approvedApplicantTeamId: { in: teamIds } }] }
           : {}),

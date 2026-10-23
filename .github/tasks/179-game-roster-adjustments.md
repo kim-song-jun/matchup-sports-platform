@@ -286,3 +286,12 @@ EXCLUDE 로 옮기는 스크립트를 만든다(actor = 원래 저장한 팀장,
 - Alpha 배포·실제 로그인·390/768/1440 화면 및 console/network 검증은 미수행. 이 변경은 로컬 작업트리에만 있으며 배포 완료로 간주하지 않는다.
 - 같은 사용자 요청으로 `우리 팀 다른 경기` 링크도 제거하고 `변경 기록`은 유지한다. 시작한 경기에서는 빈 액션 컨테이너도 렌더하지 않는다.
 - 대회 참가 명단과 팀 경기 명단 진입점은 모두 `CompetitionRosterManager` → `GameRosterClient`를 사용하며, 공통 컴포넌트 변경은 TOURNAMENT/LEAGUE 양쪽에 적용된다. 링크용 import·역할 필터와 팀 일정 앵커의 오래된 설명을 정리했다. 팀원 테스트의 기존 링크 기대값도 제거 계약으로 변경했다.
+
+## 2026-10-23 회귀: 지연된 SCHEDULED 대회 경기의 팀원 선택 목록
+
+- 증상: 대회 참가 신청 화면의 `경기 출전`에서 owner/manager는 시작 시각이 지난 `SCHEDULED` 경기를 보지만, member는 `/teams/:teamId/upcoming-games` 응답에서 그 경기를 못 본다.
+- 원인: 관리자 표는 `V1Game.state = SCHEDULED`와 종료되지 않은 대회 상태를 기준으로 시작 전 경기를 모으지만, 팀원 경기 목록은 공유 `LineupTodoService`의 `startAt >= now` 조건으로 먼저 잘라 지연 경기를 놓쳤다.
+- 수정: `/teams/:teamId/upcoming-games` 소비자만 `includeElapsedScheduledTournamentGames`를 요청한다. 킥오프 시각이 지난 `SCHEDULED` 대회 경기만 추가하고, 취소 경기·취소/종료 대회·다른 팀 경기는 조회에서 제외한다. 일정 미정 경기, 개인 라인업 할 일·홈 다음 경기·알림은 기존 시간 기준을 유지한다. 이 변경은 읽기 경로만 다루며 member 쓰기 권한은 그대로다.
+- 회귀 검증: `lineup-todo.service.spec.ts`의 새 조건 조회 테스트는 수정 전 API signature가 2개 인자만 받아 TS2554로 실패했고, 수정 후 같은 단일 케이스가 통과했다(1 passed, 12 skipped). DB 회귀는 `team-game-rosters.integration-spec.ts`에 추가했으며, 실제 DB를 사용하는 격리 CI에서 실행 대기다. 로컬 integration은 실행하지 않았다.
+- 문서 계약: `docs/api/domains/games.md`에 경기 명단 팀원 목록의 시간/상태 범위와 다른 소비자 시간 기준을 명시했다.
+- 미실행: backend 전체 unit, integration, lint/typecheck, alpha 로그인·390 role 비교. root가 직렬 typecheck를 진행하고 member/manager alpha 실측을 후속 처리한다.

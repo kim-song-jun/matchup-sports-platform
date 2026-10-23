@@ -4,13 +4,13 @@ import { useId } from 'react';
 import { TeamMatchImagesField } from '@/components/team-matches/team-match-images';
 
 export function TournamentImagesField({
-  coverImageUrl, listImageUrl, showDetailImage, sportCode, disabled = false,
+  coverImageUrl, listImageUrl, showDetailImage, sportName, disabled = false,
   onImageChange, onVisibilityChange, onUpload, onUploadingChange,
 }: {
   coverImageUrl: string | null;
   listImageUrl: string | null;
   showDetailImage: boolean;
-  sportCode?: string;
+  sportName?: string;
   disabled?: boolean;
   onImageChange: (field: 'coverImageUrl' | 'listImageUrl', value: string | null) => void;
   onVisibilityChange: (visible: boolean) => void;
@@ -21,7 +21,7 @@ export function TournamentImagesField({
   return <div>
     <TeamMatchImagesField
       images={{ imageUrl: coverImageUrl, listImageUrl }}
-      sport={sportCode}
+      sport={sportName}
       disabled={disabled}
       onUpload={onUpload}
       onUploadingChange={onUploadingChange}

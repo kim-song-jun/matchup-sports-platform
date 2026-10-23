@@ -1359,7 +1359,7 @@ function PresentationStep({
         coverImageUrl={state.coverImageUrl}
         listImageUrl={state.listImageUrl}
         showDetailImage={state.showDetailImage}
-        sportCode={fallback.sportName ?? undefined}
+        sportName={fallback.sportName ?? undefined}
         onImageChange={(field, value) => setField(field, value)}
         onVisibilityChange={(visible) => setField('showDetailImage', visible)}
         onUpload={onCoverUpload}

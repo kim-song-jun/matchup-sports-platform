@@ -82,3 +82,11 @@ Phase 1 contracts: completed. Phase 2 UI: completed. Phase 3 validation/docs com
 - API/Web TypeScript 검사는 각각 1회 통과했다. 두 lint script의 뒤 단계는 Windows `find.exe` 충돌로 실패한 사실을 남겼다. 게이트 코드는 바꾸지 않고 API는 Git GNU find PATH, Web은 Git Bash ComSpec/PATH로 실제 surface/pattern 검사를 각각 재실행해 통과했다. API 708파일 surface 스캔 및 Web 전체 패턴 검사 통과. 신규 debt marker 없음, diff/check 통과, 신규 외부 import 없음.
 - 이 Snapshot 시점에는 PR/독립 리뷰가 진행 중이다. 최신 immutable head 리뷰·후속 PR/CI/머지 및 tracker 상태는 QA root 정본 `tmp/qa/mdqa-assigned-monitor/state.json`의 `resume20261023`과 후속 PR에 기록한다. 전체 열린 dev PR 3/3을 끝까지 조회했으며 동일 후속 수정 PR은 없었다.
 - Alpha 현재 서빙 SHA는 `b3cbb4b63cfaa385d7daea1ea16a0258a311901b`, landing HTTP200, 배포 run39768675591 SUCCESS. 이 후속 수정은 미배포다. IAB의 리포트 `/projects/1/`와 Alpha `/my` 모두 로그인 화면으로 이동했다. 신규 리포트 전체 census·상세·선점·댓글 및 관리자 이미지 실제 저장·3폭(390/768/1440) 스크린샷·console/network는 미검증이다. 코드 테스트/원 PR의 공개 QA를 관리자 실측 PASS로 대체하지 않는다.
+
+## Progress Snapshot — PR #2045 명명 리뷰 후속
+
+- 후속 PR: https://github.com/kim-song-jun/matchup-sports-platform/pull/2045 (base dev, 최초 head `cc13322e543ffbf6a4f2a1cb86d5310a4750f59f`). 최초 head의 독립 API 5/5·Web/task/Changeset 4/4 리뷰는 FindingsNone, Codex 코드·보안 리뷰도 지적 없이 완료했다. 이후 Copilot이 실제 표시 이름을 받는 `sportCode` prop에 optional/non-blocking 명명 지적을 남겼다: discussion `4356294050`.
+- 실제 호출부를 대조했다. `CoverImageCard`와 `TournamentImagesField`는 한글 종목 표시 이름으로 그래픽을 고르며, 등록 화면도 이미 `fallback.sportName`을 전달한다. 두 호출부와 공유 이미지 필드의 내부 prop을 `sportName`으로 통일한다. 실제 종목 코드·API 계약·화면 구조·이미지 선택 동작은 변경하지 않는다.
+- 단일 frontend 작업자가 공유 이미지 필드, 관리자 수정 info-section, 등록 new/page의 3파일만 소유한다. Root는 이 task·직렬 검증·Git/PR을 소유한다. 최초 커밋 대비 전체 PR 범위에 공유 이미지 필드와 등록 화면 2경로가 추가되어 총 11경로다. API 파일·공유 hooks/types/MSW·타인 WIP는 수정하지 않는다.
+- 이 명명 지적은 별도 런타임 실패가 아니므로 이름 문자열만 검사하는 가짜 RED 테스트를 만들지 않는다. 최초 실제 HTTP/미리보기 RED→GREEN 근거를 보존하고, 등록·수정 실제 caller의 기존 회귀 테스트와 Web 타입/패턴 검사로 prop 변경 연결을 검증한다. 새 head의 검증·독립 재리뷰·CI·스레드 답변 및 resolve 결과는 같은 PR과 QA root SSOT에 이어 기록한다. 최초 head의 리뷰/CI를 새 head 성공으로 간주하지 않는다.
+- 명명 수정 후 등록 화면 89건·수정 화면 21건, 총 2 suites/110 tests PASS(최소 worker 직렬). Web TypeScript exit0 및 Git Bash 환경의 기존 Web 패턴 검사 PASS. touched debt marker 없음, diff/check PASS. API와 해당 34건 spec의 blob은 최초 검증 head와 같아 불필요한 API 재실행은 하지 않았다. 로그는 QA root의 git 제외 `tmp/qa/mdqa-assigned-monitor/2026-10-23-heartbeat-0514/`에 보존한다. 이 snapshot 시점 새 커밋의 독립 재리뷰/원격 CI는 대기다.

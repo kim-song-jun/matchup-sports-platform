@@ -2,6 +2,7 @@
 
 Status: Review — revised-copy test passed; new-head CI and alpha visual acceptance pending
 **Owner**: Frontend UI
+**Task number allocation**: After merging dev, `20261106` belongs to the default-public-records task. The concurrent loop-owned PR #2048 reserves `20261107` for MD-QA #180, so this task uses the next unreserved number `20261108`.
 **Created**: 2026-10-23 KST
 
 ## Context

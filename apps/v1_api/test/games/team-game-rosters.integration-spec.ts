@@ -659,6 +659,42 @@ describe('팀 경기 명단 표·일괄·결장 기간 API (Task 179)', () => {
   });
 
   describe('다가오는 경기 — 명단 요약', () => {
+    it('킥오프가 지나도 SCHEDULED 대회 경기는 팀원 선택 목록과 팀장 표에 남고, 취소·종료 뒤에는 빠진다', async () => {
+      const f = await seedTournament();
+      const pastKickoff = new Date(Date.now() - 60_000);
+      await prisma.v1TeamMatch.update({
+        where: { id: f.games.g1.teamMatchId },
+        data: { startAt: pastKickoff },
+      });
+
+      const memberPath = `/api/v1/teams/${f.teamA.id}/upcoming-games`;
+      const managerPath = matrixPath(f.teamA.id);
+      const member = await getAs(memberPath, f.teamA.members[0]);
+      const manager = await getAs(managerPath, f.teamA.ownerId);
+      expect(member.status).toBe(200);
+      expect((member.body.data.items as Array<{ gameId: string }>).map((item) => item.gameId)).toContain(f.games.g1.gameId);
+      expect((manager.body.data as MatrixBody).games.map((game) => game.gameId)).toContain(f.games.g1.gameId);
+
+      await prisma.v1TeamMatch.update({ where: { id: f.games.g2.teamMatchId }, data: { startAt: pastKickoff } });
+      await prisma.v1Game.update({ where: { id: f.games.g2.gameId }, data: { state: 'ENDED' } });
+      const endedGame = await getAs(memberPath, f.teamA.members[0]);
+      expect((endedGame.body.data.items as Array<{ gameId: string }>).map((item) => item.gameId)).not.toContain(f.games.g2.gameId);
+
+      await prisma.v1Game.update({ where: { id: f.games.g1.gameId }, data: { state: 'CANCELLED' } });
+      const cancelled = await getAs(memberPath, f.teamA.members[0]);
+      expect((cancelled.body.data.items as Array<{ gameId: string }>).map((item) => item.gameId)).not.toContain(f.games.g1.gameId);
+      expect((await getAs(managerPath, f.teamA.ownerId)).body.data.games.map((game: { gameId: string }) => game.gameId)).not.toContain(f.games.g1.gameId);
+
+      await prisma.v1Game.update({ where: { id: f.games.g1.gameId }, data: { state: 'SCHEDULED' } });
+      await prisma.v1Tournament.update({ where: { id: f.tournament.id }, data: { status: 'completed' } });
+      const endedCompetition = await getAs(memberPath, f.teamA.members[0]);
+      expect((endedCompetition.body.data.items as Array<{ gameId: string }>).map((item) => item.gameId)).not.toContain(f.games.g1.gameId);
+      expect((await getAs(managerPath, f.teamA.ownerId)).body.data.games.map((game: { gameId: string }) => game.gameId)).not.toContain(f.games.g1.gameId);
+
+      const otherTeam = await getAs(`/api/v1/teams/${f.teamC.id}/upcoming-games`, f.teamC.members[0]);
+      expect((otherTeam.body.data.items as Array<{ gameId: string }>).map((item) => item.gameId)).not.toContain(f.games.g1.gameId);
+    });
+
     it('대회 경기에는 rosterSummary 와 사이드를, 친선에는 null 을 싣는다', async () => {
       const f = await seedTournament();
       const [a1] = f.teamA.members;

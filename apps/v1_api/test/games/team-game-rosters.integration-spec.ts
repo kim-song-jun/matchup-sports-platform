@@ -746,6 +746,13 @@ describe('팀 경기 명단 표·일괄·결장 기간 API (Task 179)', () => {
       const cancelledTournament = await getAs(memberPath, f.teamA.members[0]);
       expect((cancelledTournament.body.data.items as Array<{ gameId: string }>).map((item) => item.gameId)).not.toContain(f.games.g1.gameId);
       await prisma.v1Tournament.update({ where: { id: f.tournament.id }, data: { status: 'in_progress' } });
+      const activeTournament = await getAs(memberPath, f.teamA.members[0]);
+      const activeManagerMatrix = await getAs(managerPath, f.teamA.ownerId);
+      expect(activeTournament.status).toBe(200);
+      expect((activeTournament.body.data.items as Array<{ gameId: string }>).map((item) => item.gameId)).toContain(f.games.g1.gameId);
+      expect(activeManagerMatrix.status).toBe(200);
+      expect((activeManagerMatrix.body.data as MatrixBody).games.map((game) => game.gameId)).toContain(f.games.g1.gameId);
+
       await prisma.v1Tournament.update({ where: { id: f.tournament.id }, data: { status: 'completed' } });
       const endedCompetition = await getAs(memberPath, f.teamA.members[0]);
       expect((endedCompetition.body.data.items as Array<{ gameId: string }>).map((item) => item.gameId)).not.toContain(f.games.g1.gameId);

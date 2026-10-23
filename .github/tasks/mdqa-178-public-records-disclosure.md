@@ -15,7 +15,7 @@ Show the existing public-consent disclosure whenever records are hidden by eligi
 - [x] Show an explicit disclosure for non-empty results when `hiddenByEligibility` is true.
 - [x] Do not show the disclosure for non-empty results when `hiddenByEligibility` is false.
 - [x] Preserve the existing empty, loading, and error states.
-- [ ] Record focused regression evidence and hand off for independent review and alpha visual verification.
+- [x] Record focused regression evidence and hand off for independent review and alpha visual verification.
 
 ## User Scenarios
 ### Public awards with partial eligibility
@@ -51,7 +51,7 @@ Expected result: The page explains that only players who consented to public rec
 - [x] Original conditions are satisfied in source and focused tests.
 - [x] No score, rank, order, privacy gate, API contract, or server policy changed.
 - [x] Existing design tokens and Korean 해요체 copy are used.
-- [ ] Focused test result is recorded after the implementation.
+- [x] Focused test result is recorded after the implementation.
 - [ ] Independent review and alpha before/after at required viewports are recorded.
 
 ## Tech Debt Resolved

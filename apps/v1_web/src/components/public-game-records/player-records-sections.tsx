@@ -25,7 +25,7 @@ export function TournamentPlayerRecordsSections({
 }: {
   goals: readonly PublicTournamentPlayerRecordRow[] | undefined;
   assists: readonly PublicTournamentPlayerRecordRow[] | undefined;
-  /** 기록은 있지만 공개 자격이 없어 가려졌는가 — 빈 상태 문구를 가른다. */
+  /** 공개 자격으로 숨겨진 기록이 있는가 — 빈 상태와 부분 공개 안내에 사용한다. */
   hiddenByEligibility: boolean;
   isLoading: boolean;
   isError: boolean;

@@ -1,0 +1,52 @@
+{
+  "phase": "after",
+  "origin": "https://alpha.teameet.co.kr",
+  "persona": "existing QA player",
+  "errors": [],
+  "network": [],
+  "checks": [
+    "Actual UI login and authenticated session hydration PASS",
+    "UI toggle to false persisted and anonymous projection verified PASS",
+    "UI toggle to true persisted and anonymous projection verified PASS",
+    "Original setting restored and reload verified PASS"
+  ],
+  "process": {
+    "browserPid": 19896,
+    "launcherPid": 50768,
+    "headless": false
+  },
+  "initial": {
+    "granted": true,
+    "effectiveAt": "2026-10-23T08:50:06.315Z",
+    "hasResponded": true,
+    "pendingRecordCount": 0
+  },
+  "publicReads": [
+    {
+      "granted": true,
+      "records": 20,
+      "appearances": 40,
+      "awards": 1
+    },
+    {
+      "granted": false,
+      "records": 0,
+      "appearances": 0,
+      "awards": 0
+    },
+    {
+      "granted": true,
+      "records": 20,
+      "appearances": 40,
+      "awards": 1
+    }
+  ],
+  "final": {
+    "granted": true,
+    "effectiveAt": "2026-10-23T08:53:15.414Z",
+    "hasResponded": true,
+    "pendingRecordCount": 0
+  },
+  "url": "https://alpha.teameet.co.kr/my/settings/record-consent",
+  "overflow": false
+}

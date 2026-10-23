@@ -36,7 +36,7 @@ Status: Review
 - [x] backend/web typecheck 각 1회 PASS.
 - [x] 실제 공개 기록 서비스 통합: 기본 공개→비공개→재공개→개별 숨김 PASS. 최종 DB 통합 2/2.
 - [x] migration exact-statement 허용 및 범위 확대/덮어쓰기 거부 self-test, API surface/Web pattern PASS.
-- [ ] alpha 수동 QA: 신규 가입·기존 비공개 회원·390/768/1440px before/after 및 console/network.
+- [x] alpha 수동 QA: 실제 신규 이메일 가입·선수 로그인·공개 ON/OFF 익명 조회·기존 비공개 보존·390/768/1440px before/after 및 console/network. 외부 OAuth 공급자 인증 자체는 재실행하지 않음.
 
 Mock/fixture: 가입/설정 API 응답 shape는 유지한다. 변경된 payload는 inline signup fixture와 서비스 테스트에 반영했다. 기존 MSW 가입 응답에는 공개 상태가 없으며 해당 응답 구조는 변경하지 않는다.
 
@@ -46,18 +46,19 @@ Mock/fixture: 가입/설정 API 응답 shape는 유지한다. 변경된 payload�
 - [x] DB: 데이터 migration 추가. 스키마 구조 변경 없음.
 - [x] Frontend: 가입 토글 제거, 기존 고정 CTA 높이 관측 레이아웃에 안내 추가.
 - [x] Docs: auth/users/public-records, API README/global-contract, scenario 및 changeset 동기화.
-- [ ] Alpha 배포 후 실제 사용자 흐름 검증.
+- [x] Alpha 배포 후 변경된 사용자 흐름 검증.
 
 Owned files: auth signup helper/service/DTO/tests, profile·public-consent 주석, 신규 migration/통합 테스트, auth signup/terms UI/tests, 공개 설정 hook 주석, API·scenario·task 문서, 기능 changeset 및 migration 검사기의 해당 SQL 한정 허용/negative controls.
-Forbidden files: 타 작업트리의 기존 변경, v0, 환경 파일, 원격 main/실제 서비스 DB 직접 변경.
+Forbidden files: 타 작업트리의 기존 변경, v0, 환경 파일, main 직접 push·실제 서비스 DB 수동 변경. 사용자 후속 요청에 따른 정상 main 승격 PR과 배포 pipeline migration은 별도 실행 범위다.
 
 ## Acceptance Criteria
 - [x] Original conditions 충족하는 코드/데이터 migration 작성.
 - [x] 명시적 거부 및 기본 초기화 후 OFF를 덮어쓰지 않음.
 - [x] 기본값 출처 `v1-public-record-default-2`를 명시적 동의와 구분.
 - [x] 테스트·typecheck 및 migration 재생.
-- [ ] Alpha 실제 화면·브라우저 검증.
-- [ ] Dev 반영/배포. 현재 코드 구현 검증과 서비스 반영을 구분한다.
+- [x] Alpha 실제 화면·브라우저 검증. [증거](../../docs/screenshots/default-public-player-records/README.md).
+- [x] 기능 PR #2049 dev 반영/alpha 배포.
+- [ ] 버전 PR dev 반영·alpha 재검증 및 main 승격·production 확인.
 
 ## Tech Debt Resolved
 가입 경로별 기본값 누락과 소셜 미루기 경로의 공개 설정 누락을 해소했다. 사용하지 않는 가입 공개 토글 컴포넌트를 제거했다. `hasResponded`는 기존 필드명을 유지하되 실제 의미인 설정 행 존재 여부(정책 기본값 포함)를 문서화했다.
@@ -68,7 +69,7 @@ Forbidden files: 타 작업트리의 기존 변경, v0, 환경 파일, 원격 ma
 ## Risks & Dependencies
 - 실제 기존 회원 전환은 배포 시 migration 실행 이후 적용된다. 이 세션에서는 서비스 DB에 적용하지 않았다.
 - 기본 공개는 계정에 연결된 과거 기록에도 기존 규칙대로 적용된다.
-- 브라우저 도구가 제공되지 않고 변경분은 alpha에 미배포이므로 변경 후 실제 시각 QA는 미완료다. 로컬 Next 서버는 띄우지 않았다.
+- 초기에는 브라우저 도구가 없었으나 Windows Chrome/Playwright-core headed로 실제 alpha QA를 완료했다. 로컬 Next 서버는 띄우지 않았다.
 - Web 기존 가입 테스트에서 React act 경고가 출력됐으나 106건 모두 통과했다.
 
 ## Ambiguity Log
@@ -122,3 +123,15 @@ Forbidden files: 타 작업트리의 기존 변경, v0, 환경 파일, 원격 ma
 Copilot 요청 run 39915170384는 `Model "claude-opus-5" is not available`로 세션 생성에 실패해 최신 코드 리뷰를 수행하지 못했다. 이를 clean 리뷰로 간주하지 않는다. 수정 후 재요청 및 CI 확인을 진행한다. dev merge/alpha 검증·version release·main 승격·production은 각각 실제 결과를 확인한 뒤 갱신한다.
 
 로컬 관련 회귀: 인증 continuation/약관 복구/계정 연결 redirect 28/28 PASS. 최초 CI 실패가 잡은 payload 검증을 유지하며 기대 계약만 갱신했다.
+
+## Alpha Deployment / Release Preparation — 2026-10-23
+
+- 사용자에게 Copilot 모델 장애와 clean 대체 금지 규칙을 알리고 예외 여부를 물은 뒤, 사용자가 배포·승격을 다시 명시 지시했다. 이를 이번 배포의 외부 리뷰 장애 예외로 반영한다고 사용자에게 알렸다. Copilot clean으로 표시하지 않는다. 이후 제공된 선수 QA 계정은 환경으로만 사용하고 저장소에 저장하지 않았다.
+- PR #2049 head `fa1676239`, CI39921784226 API/Web/Gates PASS → dev merge `df42407a1`.
+- Dev CI39924007213 PASS, alpha39924007216 SUCCESS, 실제 응답 header SHA 일치. 로컬 dev도 즉시 FF 동기화.
+- Alpha DB: 미설정629명 → 기본 공개, 잔여0, 기존 비공개6명의 상태·정책·시간 지문 일치. 실패 migration0.
+- 실제 신규 가입 기본 공개, 실제 선수 설정 ON/OFF와 익명 공개 기록(출전40/수상1 → 0/0 → 40/1), 원상 복구, 신규 테스트 계정 탈퇴 정리 PASS. 3폭 screenshots 및 console/network 오류0. [증거](../../docs/screenshots/default-public-player-records/README.md).
+- Production 사전 READ ONLY 실측 2026-10-23 17:24 KST: 전환 대상734명 유지, 기존 비공개는 현재11명(초기 집계10명과 시점 차이), M11 적용 완료·실패 migration0. 이번 배포는 일반 steady 경로이며 Task168 Stage A/B 재실행은 필요 없다.
+- 최신 dev 기반 release worktree에서 main에만 있던 이전 승격 이력 `dd7e6e171`을 흡수했다(파일 내용 변화0).
+- 정식 `promote-main.sh --prepare-only`로 alpha SHA·버전을 확인하고 Changeset1개 소비, API/Web package1.11.5→1.11.6 및 CHANGELOG2개 갱신. 승격 게이트 PASS. 이 단계는 자동 stage/commit/push/dispatch 없이 diff만 준비했다.
+- 남음: 릴리스 PR의 CI/dev 반영/alpha 재검증 → 사용자 명시 요청에 따른 main 승격 PR → 정상 production 승인/배포와 전환 결과 확인.

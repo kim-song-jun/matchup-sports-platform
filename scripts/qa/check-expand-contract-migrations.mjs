@@ -44,6 +44,11 @@ class UnparsableSqlError extends Error {}
 // weakens the gate for exactly one (file, statement) pair and nothing else.
 const REVIEWED_NON_ADDITIVE = [
   {
+    file: "apps/v1_api/prisma/migrations/20261023120000_default_public_user_records/migration.sql",
+    statement: "INSERT INTO \"v1_user_record_consents\" (\n  \"user_id\", \"state\", \"effective_at\", \"policy_hash\", \"created_at\", \"updated_at\"\n)\nSELECT\n  u.\"id\", 'GRANTED'::\"V1ConsentState\", CURRENT_TIMESTAMP,\n  'v1-public-record-default-2', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP\nFROM \"v1_users\" u\nWHERE u.\"account_status\" = 'active'\n  AND u.\"deleted_at\" IS NULL\n  AND u.\"onboarding_status\" IN (\n    'signup_done', 'sport_done', 'level_done', 'region_done',\n    'completed', 'deferred', 'social_profile_deferred'\n  )\n  AND NOT EXISTS (\n    SELECT 1 FROM \"v1_user_record_consents\" c WHERE c.\"user_id\" = u.\"id\"\n  )\nON CONFLICT (\"user_id\") DO NOTHING",
+    reason: 'Task 20261106, explicit user decision 2026-10-23: initialize only missing public-record preferences for active, non-deleted, signup-complete members. NOT EXISTS plus ON CONFLICT DO NOTHING preserve all explicit private/public history and concurrent choices. Pending/inactive/deleted accounts and participant-level privacy overrides remain excluded. The product-default policy marker is distinct from explicit consent. Existing application versions understand the GRANTED enum and policy row; no schema or existing row is changed. Verified with real PostgreSQL preservation/idempotency tests. Approval applies only to this exact statement and file.',
+  },
+  {
     file: 'apps/v1_api/prisma/migrations/20261016070000_league_list_image/migration.sql',
     statement: 'UPDATE "v1_tournaments" SET "list_image_url" = "cover_image_url" WHERE "kind" = \'regular_league\' AND "cover_image_url" IS NOT NULL',
     reason: 'PR #1955 (2026-10-16): initialize only the nullable list_image_url column added immediately before this UPDATE in the same migration. Existing regular-league images must initially serve both list and detail. The source cover_image_url, uploaded files, tournament rows and every pre-existing column are unchanged; leagues without an image remain NULL. Older application instances ignore list_image_url and continue reading/writing cover_image_url, so this one-time copy does not prevent an application rollback. Subsequent PATCH requests deliberately edit only the supplied image field. This exact file/statement was verified by the real migration image-preservation integration test in API CI 38907223065; do not allow arbitrary UPDATE statements or edits to the migration.',
@@ -2431,6 +2436,29 @@ function selfTest() {
   }
   if (runReviewed([{ file: 'other.sql', statement: 'CREATE UNIQUE INDEX "X_a_b_key" ON "X"("a", "b")' }]).length !== 1) {
     fail('the allowlist must be scoped to its exact file, not match the same statement elsewhere');
+  }
+
+  // User-approved default visibility backfill is scoped to one immutable statement.
+  {
+    const file = 'apps/v1_api/prisma/migrations/20261023120000_default_public_user_records/migration.sql';
+    const sql = readFileSync(new URL(`../../${file}`, import.meta.url), 'utf8');
+    const statements = parseStatements(sql, file).map(statement => ({ file, statement }));
+    const check = (input) => {
+      const failures = [];
+      runAdditivityCheck(input, baseFunctionNames, message => failures.push(message));
+      return failures;
+    };
+    if (statements.length !== 1 || check(statements).length !== 0) fail('record default migration must pass its exact review');
+    const row = statements[0];
+    for (const changed of [
+      { ...row, file: 'other.sql' },
+      { ...row, statement: row.statement.replace('NOT EXISTS', 'EXISTS') },
+      { ...row, statement: row.statement.replace("= 'active'", "<> 'active'") },
+      { ...row, statement: row.statement.replace('DO NOTHING', "DO UPDATE SET state = 'GRANTED'") },
+    ]) {
+      if (check([changed]).length === 0) fail('record default approval must reject changed scope or overwrite semantics');
+    }
+    console.log('[expand-contract-sql-v1] default public records review controls passed');
   }
 
   // Exercise the actual league-image migration and its production review entry.

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
 import { LineupTodoService, loadRosterSummaries } from './lineup-todo.service';
+import { loadTeamUpcomingRosterSummaries } from './team-upcoming-roster-summaries';
 import { assertTeamLineupMember } from './team-lineup-access';
 import { loadViewerParticipation } from './viewer-game-participation';
 
@@ -49,9 +50,11 @@ export class TeamUpcomingGamesService {
   async listForTeam(user: V1AuthUser, teamId: string, now: Date = new Date()) {
     // 전술보드 읽기와 같은 선 — 활성 팀원이면 본다. 팀이 없으면 404, 팀원이 아니면 403.
     await assertTeamLineupMember(this.prisma, teamId, user.id);
-    const games = await this.lineupTodos.listUpcomingForTeam(teamId, now);
+    const games = await this.lineupTodos.listUpcomingForTeam(teamId, now, {
+      includeElapsedScheduledTournamentGames: true,
+    });
     // 조회라 DB 를 바꾸지 않는다 — 리그 명단 자동 채움은 동기화 쓰기 경로에서만 돈다.
-    const rosters = await loadRosterSummaries(this.prisma, teamId, games);
+    const rosters = await loadTeamUpcomingRosterSummaries(this.prisma, teamId, games);
     const participating = await loadViewerParticipation(this.prisma, { userId: user.id, games, rosters });
     return {
       items: games.map((game) => ({

@@ -111,6 +111,36 @@ async function buildService(prisma: ReturnType<typeof buildPrismaMock>) {
 }
 
 describe('LineupTodoService — 리그 대진의 맥락', () => {
+  it('팀 경기 출전 관리 목록은 킥오프가 지나도 아직 시작하지 않은 대회 경기를 유지한다', async () => {
+    const prisma = buildPrismaMock();
+    const { service, moduleRef } = await buildService(prisma);
+
+    try {
+      await service.listUpcomingForTeam(teamId, new Date('2026-09-10T00:00:00.000Z'), {
+        includeElapsedScheduledTournamentGames: true,
+      });
+
+      const query = prisma.v1TeamMatch.findMany.mock.calls[0][0];
+      expect(query.where).toMatchObject({
+        AND: expect.arrayContaining([
+          expect.objectContaining({
+            OR: expect.arrayContaining([
+              expect.objectContaining({ startAt: { gte: expect.any(Date) } }),
+              expect.objectContaining({
+                game: { is: { state: 'SCHEDULED' } },
+                deletedAt: null,
+                leagueId: null,
+                tournamentId: { not: null },
+              }),
+            ]),
+          }),
+        ]),
+      });
+    } finally {
+      await moduleRef.close();
+    }
+  });
+
   it('리그 대진에는 리그 id·제목과 startAt에서 파생한 "N주차" 라벨이 실린다', async () => {
     const prisma = buildPrismaMock();
     const { service, moduleRef } = await buildService(prisma);

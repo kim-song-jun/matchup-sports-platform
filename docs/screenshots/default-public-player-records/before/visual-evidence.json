@@ -1,0 +1,63 @@
+{
+  "phase": "before",
+  "origin": "https://alpha.teameet.co.kr",
+  "pages": [
+    {
+      "width": 390,
+      "url": "https://alpha.teameet.co.kr/terms?mode=signup",
+      "status": 200,
+      "release": "1.11.6-alpha.20261022.gb3cbb4b63cfa",
+      "commit": "b3cbb4b63cfaa385d7daea1ea16a0258a311901b",
+      "overflow": false,
+      "notice": false,
+      "cta": {
+        "top": 809,
+        "bottom": 900,
+        "height": 91
+      },
+      "viewport": {
+        "width": 390,
+        "height": 900
+      }
+    },
+    {
+      "width": 768,
+      "url": "https://alpha.teameet.co.kr/terms?mode=signup",
+      "status": 200,
+      "release": "1.11.6-alpha.20261022.gb3cbb4b63cfa",
+      "commit": "b3cbb4b63cfaa385d7daea1ea16a0258a311901b",
+      "overflow": false,
+      "notice": false,
+      "cta": {
+        "top": 809,
+        "bottom": 900,
+        "height": 91
+      },
+      "viewport": {
+        "width": 768,
+        "height": 900
+      }
+    },
+    {
+      "width": 1440,
+      "url": "https://alpha.teameet.co.kr/terms?mode=signup",
+      "status": 200,
+      "release": "1.11.6-alpha.20261022.gb3cbb4b63cfa",
+      "commit": "b3cbb4b63cfaa385d7daea1ea16a0258a311901b",
+      "overflow": false,
+      "notice": false,
+      "cta": {
+        "top": 802,
+        "bottom": 893,
+        "height": 91
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      }
+    }
+  ],
+  "errors": [],
+  "network": [],
+  "browserProcess": "{\"browserPid\":65812,\"launcherPid\":62836,\"headless\":false}"
+}

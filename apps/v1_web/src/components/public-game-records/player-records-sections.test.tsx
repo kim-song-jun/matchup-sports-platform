@@ -51,6 +51,50 @@ describe('TournamentPlayerRecordsSections — awards consumer', () => {
     expect(screen.getByText('2도움')).toBeInTheDocument();
   });
 
+  it('일부 기록이 공개돼도 신원 연동과 공개 동의 기준을 함께 안내한다', () => {
+    render(
+      <TournamentPlayerRecordsSections
+        {...base}
+        hiddenByEligibility
+        goals={[row({ userId: 'a', nickname: '가', goals: 1 })]}
+        assists={[]}
+      />,
+    );
+    expect(
+      screen.getByText('기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 득점·도움 순위가 공개돼요.'),
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole('listitem')[0]).toHaveTextContent('1. 가1골');
+  });
+
+  it('공개 자격으로 숨겨진 기록이 없으면 부분 공개 안내를 표시하지 않는다', () => {
+    render(
+      <TournamentPlayerRecordsSections
+        {...base}
+        goals={[row({ userId: 'a', nickname: '가', goals: 1 })]}
+        assists={[]}
+      />,
+    );
+    expect(
+      screen.queryByText('기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 득점·도움 순위가 공개돼요.'),
+    ).not.toBeInTheDocument();
+    expect(screen.getAllByRole('listitem')[0]).toHaveTextContent('1. 가1골');
+  });
+
+  it('공개된 도움 순위가 있어도 숨겨진 선수 안내를 표시한다', () => {
+    render(
+      <TournamentPlayerRecordsSections
+        {...base}
+        hiddenByEligibility
+        goals={[]}
+        assists={[row({ userId: 'a', nickname: '가', assists: 2 })]}
+      />,
+    );
+    expect(
+      screen.getByText('기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 득점·도움 순위가 공개돼요.'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('2도움')).toBeInTheDocument();
+  });
+
   it('기록이 없으면 아직 기록이 없다는 EmptyState 문구를 보여준다', () => {
     render(<TournamentPlayerRecordsSections {...base} goals={[]} assists={[]} />);
     expect(screen.getByText('아직 기록이 없어요')).toBeInTheDocument();

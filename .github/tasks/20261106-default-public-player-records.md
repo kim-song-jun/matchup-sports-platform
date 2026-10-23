@@ -114,3 +114,11 @@ Forbidden files: 타 작업트리의 기존 변경, v0, 환경 파일, 원격 ma
 적용 시점: dev PR 생성/원격 기능 브랜치 push만으로 배포되지 않는다. dev 머지 시 alpha 배포의 DB에 먼저 적용되고, 사용자가 dev→main 승격 및 production 배포 승인을 완료한 뒤 prod `migrate deploy`가 앱 교체 전에 수행될 때 실제 회원에 적용된다. 재로그인은 필요하지 않으며 다음 조회부터 서버 상태를 따른다. 이미 열린 화면은 해당 데이터의 새 조회/캐시 갱신 시 반영된다. 개별 이메일·푸시 발송은 추가하지 않았다.
 
 실패 시점: migration 실행 전이면 기존 회원 변화가 없지만, migration 성공 후 앱 배포가 실패해 이전 앱으로 돌아가더라도 새 공개 설정 행은 DB에 남는다. 이 데이터 변경은 앱 코드 복구만으로 자동 취소되지 않는다. migration 재실행은 DO NOTHING이며 이후 사용자가 OFF로 바꾼 행도 보존한다. 기존 비공개10명과 개별 기록 숨김·경기 공개 조건·실명 별도 설정은 계속 유지한다.
+
+## Deployment Continuation — 2026-10-23
+
+사용자 요청: dev 배포 및 main 승격 준비·승격. PR #2049의 최초 CI는 Gates/API PASS, Web 4건 실패였다. 실패 원인은 가입 공개 토글 제거 후 인증 continuation·약관 복구 테스트와 공유 MSW fixture가 옛 recordConsent payload를 기대한 것이었다. 해당 세 파일을 새 서버 기본값 계약에 맞췄다. 런타임 변경은 없다.
+
+Copilot 요청 run 39915170384는 `Model "claude-opus-5" is not available`로 세션 생성에 실패해 최신 코드 리뷰를 수행하지 못했다. 이를 clean 리뷰로 간주하지 않는다. 수정 후 재요청 및 CI 확인을 진행한다. dev merge/alpha 검증·version release·main 승격·production은 각각 실제 결과를 확인한 뒤 갱신한다.
+
+로컬 관련 회귀: 인증 continuation/약관 복구/계정 연결 redirect 28/28 PASS. 최초 CI 실패가 잡은 payload 검증을 유지하며 기대 계약만 갱신했다.

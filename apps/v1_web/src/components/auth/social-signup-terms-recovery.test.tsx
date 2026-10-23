@@ -8,7 +8,6 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import type { V1AuthMe } from '@/types/api';
 import { v1Keys } from '@/lib/query-keys';
 import { getSavedRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
-import { RECORD_CONSENT_POLICY_HASH } from '@/lib/record-consent';
 import { PendingSocialSignupGate } from './pending-social-signup-gate';
 import { SocialSignupClient } from './social-signup-client';
 import { TermsClient } from './terms-client';
@@ -168,7 +167,7 @@ describe('필수 약관이 변경된 소셜 가입의 실제 인증 캐시 복�
       }),
       http.post('*/api/v1/auth/social-profile', async ({ request }) => {
         expect(await request.json()).toEqual({ nickname: '카카오러너', displayName: '김러너', phone: '01012345678',
-          birthDate: '19950115', gender: 'female', recordConsent: { granted: true, policyHash: RECORD_CONSENT_POLICY_HASH } });
+          birthDate: '19950115', gender: 'female' });
         profileRequests += 1;
         state.auth = { ...requiredAuth, user: { ...requiredAuth.user, onboardingStatus: 'signup_done' } };
         return success(authSession(state.auth, '/onboarding/sport'));

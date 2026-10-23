@@ -1692,11 +1692,6 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
               : '정규 시간이 끝났어요. 기록을 확인한 뒤 ‘경기 종료’를 눌러주세요.'}
           </Banner>
         )}
-        {/* 요구사항 4 — 결선 무승부인데 승부차기가 없어 "경기 종료"를 막았을
-            때 그 사유. 버튼을 숨기지 않고 비활성 + 사유 배너로 설명한다. */}
-        {endBlockedReason !== null && availableCommands.includes('end') && (
-          <Banner tone="warning">{endBlockedReason}</Banner>
-        )}
         {currentPeriod === null &&
           halftimePeriod === null &&
           !regulationEnded &&

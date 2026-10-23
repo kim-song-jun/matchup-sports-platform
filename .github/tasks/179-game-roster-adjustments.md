@@ -295,3 +295,5 @@ EXCLUDE 로 옮기는 스크립트를 만든다(actor = 원래 저장한 팀장,
 - 회귀 검증: `lineup-todo.service.spec.ts`의 새 조건 조회 테스트는 수정 전 API signature가 2개 인자만 받아 TS2554로 실패했고, 수정 후 같은 단일 케이스가 통과했다(1 passed, 12 skipped). DB 회귀는 `team-game-rosters.integration-spec.ts`에 추가했으며, 실제 DB를 사용하는 격리 CI에서 실행 대기다. 로컬 integration은 실행하지 않았다.
 - 문서 계약: `docs/api/domains/games.md`에 경기 명단 팀원 목록의 시간/상태 범위와 다른 소비자 시간 기준을 명시했다.
 - 미실행: backend 전체 unit, integration, lint/typecheck, alpha 로그인·390 role 비교. root가 직렬 typecheck를 진행하고 member/manager alpha 실측을 후속 처리한다.
+- 2026-10-23 독립 리뷰 보완: `/teams/:teamId/upcoming-games` 는 전체 roster selector 목록 계약을 유지하므로, 지연된 `SCHEDULED` 대회 경기 수가 500개를 넘을 때도 이후 시각순 경기까지 반환해야 한다. 조회당 500행 제한은 유지하되 이 소비자만 안정 정렬(`startAt`, `id`) 커서로 후보를 모두 읽는다. 할 일·홈·알림 소비자의 기존 단일 조회/시간 기준은 바꾸지 않는다.
+- 보완 회귀: 실제 integration DB에 기존 지연 경기보다 더 오래된 지연 `SCHEDULED` 대회 경기 500개를 추가하고, 활성 member의 HTTP 목록에서 뒤의 미래 경기가 계속 나오는지 확인한다. 다른 팀 대조군은 대회가 활성인 상태에서 검사하고, 취소 대회도 별도 제외 조건으로 검사한다. 로컬 integration DB는 실행하지 않고 CI에서 확인한다.

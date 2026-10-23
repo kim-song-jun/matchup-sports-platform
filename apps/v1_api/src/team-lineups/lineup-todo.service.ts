@@ -235,7 +235,7 @@ export class LineupTodoService {
           startAt: { gte: new Date(now.getTime() - (options.startedWithinMs ?? 0)) },
           AND: [NOT_IN_HELD_LEAGUE_WHERE],
         };
-    const matches = await this.prisma.v1TeamMatch.findMany({
+    const matchQuery = {
       where: {
         // 상대가 정해진 매치만 — 아직 모집 중이면 라인업을 짤 대상이 없다.
         status: 'matched',
@@ -265,9 +265,31 @@ export class LineupTodoService {
         league: { select: { title: true } },
         game: { select: { id: true } },
       },
-      orderBy: { startAt: 'asc' },
+      // The stable tie-breaker lets the roster-only path continue after a cursor
+      // without dropping matches that share a kickoff time. Other consumers keep
+      // their prior ordering contract.
+      orderBy: options.includeElapsedScheduledTournamentGames
+        ? [{ startAt: 'asc' }, { id: 'asc' }]
+        : { startAt: 'asc' },
       take: 500,
-    });
+    } satisfies Prisma.V1TeamMatchFindManyArgs;
+    const matches = await this.prisma.v1TeamMatch.findMany(matchQuery);
+    if (options.includeElapsedScheduledTournamentGames && matches.length === matchQuery.take) {
+      // Delayed SCHEDULED tournament games sort before future fixtures. Keep each
+      // database read bounded, but exhaust the roster selector's candidate set so
+      // a backlog cannot hide later fixtures behind the historical 500-row cap.
+      let cursorId = matches[matches.length - 1]?.id;
+      while (cursorId !== undefined) {
+        const page = await this.prisma.v1TeamMatch.findMany({
+          ...matchQuery,
+          cursor: { id: cursorId },
+          skip: 1,
+        });
+        matches.push(...page);
+        if (page.length < matchQuery.take) break;
+        cursorId = page[page.length - 1]!.id;
+      }
+    }
 
     // Prisma keeps these columns nullable because tournament TBD slots share the
     // TeamMatch table. A slot without a scheduled time has no lineup action yet;

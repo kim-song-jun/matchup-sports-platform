@@ -675,6 +675,57 @@ describe('팀 경기 명단 표·일괄·결장 기간 API (Task 179)', () => {
       expect((member.body.data.items as Array<{ gameId: string }>).map((item) => item.gameId)).toContain(f.games.g1.gameId);
       expect((manager.body.data as MatrixBody).games.map((game) => game.gameId)).toContain(f.games.g1.gameId);
 
+      // Keep this check while the tournament is eligible. Checking after it is
+      // completed would pass even if team scoping were broken.
+      const otherTeam = await getAs(`/api/v1/teams/${f.teamC.id}/upcoming-games`, f.teamC.members[0]);
+      expect(otherTeam.status).toBe(200);
+      expect((otherTeam.body.data.items as Array<{ gameId: string }>).map((item) => item.gameId)).not.toContain(f.games.g1.gameId);
+
+      // The endpoint's rows are consumed as one roster selector list. More than
+      // 500 older delayed fixtures must not crowd out a later scheduled fixture.
+      const backlogMatches = Array.from({ length: 500 }, (_, index) => ({
+        id: randomUUID(),
+        sportId,
+        regionId,
+        title: `지연 경기 ${index + 1} ${suiteId}`,
+        tournamentId: f.tournament.id,
+        hostTeamId: f.teamA.id,
+        approvedApplicantTeamId: f.teamB.id,
+        startAt: new Date(pastKickoff.getTime() - (500 - index) * 1_000),
+        status: 'matched' as const,
+        competitionConfigVersionId: configId,
+      }));
+      await prisma.v1TeamMatch.createMany({ data: backlogMatches });
+      await prisma.v1TournamentMatchDetails.createMany({
+        data: backlogMatches.map((match, index) => ({
+          teamMatchId: match.id,
+          tournamentId: f.tournament.id,
+          round: 'group',
+          fixtureNumber: index + 3,
+          homeRegistrationId: f.registrations.get(f.teamA.id)!,
+          awayRegistrationId: f.registrations.get(f.teamB.id)!,
+        })),
+      });
+      const backlogGameIds = backlogMatches.map(() => randomUUID());
+      await prisma.v1Game.createMany({
+        data: backlogMatches.map((match, index) => ({
+          id: backlogGameIds[index],
+          sourceType: 'TEAM_MATCH',
+          teamMatchId: match.id,
+          state: 'SCHEDULED',
+          competitionConfigVersionId: configId,
+        })),
+      });
+      await prisma.v1GameSide.createMany({
+        data: backlogGameIds.flatMap((gameId) => [
+          { gameId, sideKey: V1GameSideKey.HOME, teamId: f.teamA.id, displayNameSnapshot: '홈' },
+          { gameId, sideKey: V1GameSideKey.AWAY, teamId: f.teamB.id, displayNameSnapshot: '원정' },
+        ]),
+      });
+      const withBacklog = await getAs(memberPath, f.teamA.members[0]);
+      expect(withBacklog.status).toBe(200);
+      expect((withBacklog.body.data.items as Array<{ gameId: string }>).map((item) => item.gameId)).toContain(f.games.g2.gameId);
+
       await prisma.v1TeamMatch.update({ where: { id: f.games.g2.teamMatchId }, data: { startAt: pastKickoff } });
       await prisma.v1Game.update({ where: { id: f.games.g2.gameId }, data: { state: 'ENDED' } });
       const endedGame = await getAs(memberPath, f.teamA.members[0]);
@@ -686,13 +737,15 @@ describe('팀 경기 명단 표·일괄·결장 기간 API (Task 179)', () => {
       expect((await getAs(managerPath, f.teamA.ownerId)).body.data.games.map((game: { gameId: string }) => game.gameId)).not.toContain(f.games.g1.gameId);
 
       await prisma.v1Game.update({ where: { id: f.games.g1.gameId }, data: { state: 'SCHEDULED' } });
+      await prisma.v1Tournament.update({ where: { id: f.tournament.id }, data: { status: 'cancelled' } });
+      const cancelledTournament = await getAs(memberPath, f.teamA.members[0]);
+      expect((cancelledTournament.body.data.items as Array<{ gameId: string }>).map((item) => item.gameId)).not.toContain(f.games.g1.gameId);
+      await prisma.v1Tournament.update({ where: { id: f.tournament.id }, data: { status: 'in_progress' } });
       await prisma.v1Tournament.update({ where: { id: f.tournament.id }, data: { status: 'completed' } });
       const endedCompetition = await getAs(memberPath, f.teamA.members[0]);
       expect((endedCompetition.body.data.items as Array<{ gameId: string }>).map((item) => item.gameId)).not.toContain(f.games.g1.gameId);
       expect((await getAs(managerPath, f.teamA.ownerId)).body.data.games.map((game: { gameId: string }) => game.gameId)).not.toContain(f.games.g1.gameId);
 
-      const otherTeam = await getAs(`/api/v1/teams/${f.teamC.id}/upcoming-games`, f.teamC.members[0]);
-      expect((otherTeam.body.data.items as Array<{ gameId: string }>).map((item) => item.gameId)).not.toContain(f.games.g1.gameId);
     });
 
     it('대회 경기에는 rosterSummary 와 사이드를, 친선에는 null 을 싣는다', async () => {

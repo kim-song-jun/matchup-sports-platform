@@ -15,6 +15,10 @@ import type { PrismaService } from '../../prisma/prisma.service';
  * 동의**로 단순화한다 -- 동의하면 과거 경기까지 전부 공개 후보가 된다(사용자
  * 명시 결정: "모두 그냥 다 보이게").
  *
+ * 2026-10-23: 가입 완료와 활성 기존 회원의 미설정 상태는 GRANTED 기본값으로 초기화한다.
+ * 이는 명시적 사용자 동의와 다른 정책 출처로 저장한다. 행이 없다는 이유만으로 공개하지 않으며,
+ * 사용자 REVOKED와 개별 참가 기록 REVOKED는 계속 우선한다.
+ *
  * ## 새 규칙
  * eligible =
  *   1) 이 participant 에 현재 신원 연결(`V1ParticipantIdentityLinkCurrent`)이

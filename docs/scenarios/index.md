@@ -1,3 +1,8 @@
+## 2026-10-23 — 경기 기록 기본 공개
+
+[시나리오](./default-public-player-records.md) · [Task 20261106](../../.github/tasks/20261106-default-public-player-records.md).
+신규 가입 기본 공개·약관 CTA 위 안내 및 기존 미설정 활성 회원만 전환하는 migration 구현. API114/Web106·migration 재생218·DB통합2·양쪽 타입/surface/pattern·migration gate PASS. 명시적 비공개·개별 숨김 유지. PR2049 dev/alpha 배포 완료. alpha 미설정629명 전환·기존 비공개6명 원형 보존, 실제 가입·선수 설정/익명 조회·before/after3폭 PASS. 외부 OAuth 신규 인증 자체는 재실행하지 않음. 버전1.11.6/main 승격 준비 중.
+
 ## 2026-10-22 — 대회·리그 필터·정렬
 
 [시나리오](./competition-discovery-filters-2026-10-22.md) · [Task 20261103](../../.github/tasks/20261103-competition-discovery-filters.md).

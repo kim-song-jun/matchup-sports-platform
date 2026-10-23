@@ -805,8 +805,8 @@ export class ProfileService {
   }
 
   /**
-   * 사용자 단위 공개 기록 동의 조회. 아직 한 번도 응답한 적 없으면(row 없음)
-   * 미동의 기본값을 반환한다 — participant 단위 스냅샷과 달리 opt-in 이 기본이다.
+   * 사용자 단위 기록 공개 설정 조회. 가입 완료와 마이그레이션에서 기본 공개를
+   * 초기화한다. 예외적으로 행이 없으면 계속 비공개로 판정하며 조회 중에 생성하지 않는다.
    */
   async myRecordConsent(user: V1AuthUser) {
     const consent = await this.prisma.v1UserRecordConsent.findUnique({ where: { userId: user.id } });
@@ -816,7 +816,7 @@ export class ProfileService {
   /**
    * 동의 응답에 유도 UI 용 신호 두 개를 얹는다.
    *
-   * - `hasResponded`: GRANTED/REVOKED 와 무관하게 **한 번이라도 답한 적 있는지**.
+   * - `hasResponded`: GRANTED/REVOKED 와 무관하게 설정 행이 있는지(기본 정책 초기화 포함).
    *   `granted:false` 는 "거부"와 "아직 안 물어봄"을 구분하지 못하는데, 유도 배너는
    *   그 둘을 반드시 다르게 취급해야 한다(명시적 거부는 다시 조르지 않는다).
    * - `pendingRecordCount`: 지금 켜면 즉시 공개될 경기 수. 이미 GRANTED 면 유도할

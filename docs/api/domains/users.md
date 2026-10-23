@@ -25,6 +25,14 @@
 | `POST` | `/api/v1/auth/logout` | Controller guard 없음 | - | 세션 로그아웃 응답 |
 | `POST` | `/api/v1/me/withdrawal-request` | Required | `WithdrawalRequestDto` | 탈퇴 대기 요청 |
 
+## 경기 기록 공개 설정
+
+`GET /me/record-consent`와 `PUT /me/record-consent`는 사용자 단위 경기 기록 공개 상태를 조회·변경한다. 저장 payload는 `{ granted: boolean, policyHash: string }`이며 active 계정만 변경할 수 있다. `granted:false`는 `REVOKED`로 저장된다.
+
+신규 가입 완료(이메일·카카오·Apple 및 소셜 프로필 입력 미루기)는 미설정 상태를 기본 공개로 초기화한다. 기존 회원도 마이그레이션에서 활성·가입 완료·미설정인 경우에만 초기화한다. 기본값 출처는 `policyHash = v1-public-record-default-2`로 명시적 선택과 구분한다. 직접 비공개를 선택한 기존 행은 바꾸지 않는다.
+
+응답의 `hasResponded`는 기존 필드명이며 **설정 행 존재 여부**다(정책 기본값 초기화 포함). 명시적 동의 증거로 사용하지 않는다. `pendingRecordCount`는 비공개일 때 현재 공개 가능한 연결 경기 수이며, 공개 상태에서는 0이다. 기록 공개는 실명 공개와 별개이고 개별 경기 숨김·신원 연결·경기/공식 결과 가시성 규칙을 우회하지 않는다.
+
 ## 프로필 조회·수정
 
 ### `GET /me/profile`

@@ -64,7 +64,7 @@ The UI renders only existing public rows and the aggregate eligibility flag. It 
 
 ## Risks & Dependencies
 - Focused component tests verify the rendering contract; actual deployed appearance at 390, 768, and 1440 pixels remains an alpha QA dependency.
-- Earlier exact-head CI run `39906532982` passed Gates/API/Web and independent Sol review on head `f5b8ed36e4d0c3d5e5780d410d4f7ae18b926a20`. These review-driven edits create a new uncommitted head; its CI and review are pending.
+- Earlier exact-head CI run `39906532982` passed Gates/API/Web and independent Sol review on head `f5b8ed36e4d0c3d5e5780d410d4f7ae18b926a20`. The revised disclosure and documentation were subsequently committed as `4f449dfddb4ba749c5c9ae0345dd33c4ba4b3f32`; new-head CI remains a separate gate.
 - The task-start base before the initial implementation was `b3cbb4b63cfaa385d7daea1ea16a0258a311901b`.
 
 ## Ambiguity Log
@@ -77,6 +77,6 @@ The UI renders only existing public rows and the aggregate eligibility flag. It 
 - Owned source/test remain `apps/v1_web/src/components/public-game-records/player-records-sections.tsx` and `.test.tsx`.
 - No API, hook, shared type, or MSW contract was changed.
 - Initial implementation RED: focused test had 2 failing regression cases / 7 passing, actual exit 1. Initial implementation GREEN: 9/9 passed, actual exit 0. Both were run on worktree base `b3cbb4b63cfaa385d7daea1ea16a0258a311901b`.
-- Review of head `f5b8ed36e4d0c3d5e5780d410d4f7ae18b926a20`: CI run `39906532982` Gates/API/Web passed; independent Sol review returned findings addressed by the current uncommitted copy and task-doc edits. Do not treat that CI as validation of the new diff.
+- Review of head `f5b8ed36e4d0c3d5e5780d410d4f7ae18b926a20`: CI run `39906532982` Gates/API/Web passed. The later Codex copy and task-document findings were addressed in commit `4f449dfddb4ba749c5c9ae0345dd33c4ba4b3f32`; independent Sol review checked that follow-up diff. Do not treat the earlier CI as validation of the later commit.
 - Revised-copy focused test: `pnpm --filter v1_web exec vitest run src/components/public-game-records/player-records-sections.test.tsx --maxWorkers=1 --minWorkers=1` — 9/9 passed, actual exit 0; process PID 28330, PPID 65113, exited before cleanup check. Preflight: 12 cores, load `33.33 44.51 41.03`, swap `3589.69/5120 MB`, 63 node/browser-like processes, 10 Docker containers (other projects untouched). No test server was started.
-- Full lint/typecheck, new-head CI, independent review of this follow-up diff, and alpha visual QA remain pending.
+- Fresh `origin/dev` commit `df00fdeddb5a823578145c74175973c069de7eb1` was merged without conflicts. Sol confirmed the reviewed source/test bytes remain unchanged and the shared eligibility copy still matches the updated consent contract. The new-head CI and alpha visual QA remain pending; the local source review is PASS. A later documentation-only correction removes stale present-tense uncommitted wording.

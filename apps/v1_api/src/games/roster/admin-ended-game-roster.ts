@@ -27,6 +27,8 @@ export async function syncAdminEndedGameRoster(
     return row.userId === userId || (entry?.accountLinked === false && row.userId === null && row.displayNameSnapshot === entry.displayNameSnapshot);
   };
   let participants = snapshots.filter((row) => played?.some((person) => person.id === row.id));
+  const attendanceKey = (rows: typeof snapshots) => rows.map((row) => row.userId === null ? `guest:${row.displayNameSnapshot}` : `user:${row.userId}`).sort().join('\n');
+  const beforeAttendance = attendanceKey(participants);
   for (const change of changes) {
     participants = participants.filter((row) => !matches(row, change.userId));
     if (change.op === 'REVOKE') {
@@ -35,6 +37,8 @@ export async function syncAdminEndedGameRoster(
       participants.push(snapshot);
     }
   }
+  // Replayed requests may reach here even when a prior adjustment row already exists.
+  if (attendanceKey(participants) === beforeAttendance) return;
   const latest = await tx.v1GameResultRevision.findFirst({ where: { gameId: target.gameId }, orderBy: { revision: 'desc' } });
   const base = game.currentOfficialRevisionId === null
     ? latest?.state === V1GameResultRevisionState.SUBMITTED ? latest : null

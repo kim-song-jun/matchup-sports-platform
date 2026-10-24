@@ -340,7 +340,7 @@ Status: In Progress
 
 ### Progress Snapshot
 - Base: b92096f81 (origin/dev). 권한/matrix/출전 정정 및 MSW 수정 완료.
-- API unit: matrix·registration 서비스·권한 gate·공식 결과 보존 총 44개 통과. 최초 42개 green 뒤 확정 전/결과 없음 보강 2개를 추가했고 최종 helper/access 19개도 green.
+- API unit: matrix·registration 서비스·권한 gate·공식 결과 보존 총 45개 통과. 최초 42개 green 뒤 확정 전/결과 없음 및 외부 정정 후 재제외 보강 3개를 추가했고 최종 helper/access 20개도 green. 반복 요청은 새 결과 이력을 만들지 않고, 외부 공식 정정으로 복귀한 선수는 이전 EXCLUDE가 활성이어도 실제 출전을 다시 조정한다.
 - Web 어드민 표 21개 통과(종료 경기 빠짐·되돌리기 HTTP batch payload와 저장 후 상태 포함).
 - API/Web typecheck 통과. API는 공유 node_modules의 오래된 Prisma 생성물을 수정하지 않고 최신 schema로 `/tmp/teameet-admin-prisma-client`에 엔진 없는 client를 생성해 임시 paths/moduleNameMapper로 검증했다. 이 QA 설정/생성물은 PR에 포함하지 않는다.
 - 새 DB integration 4건(공식/제출/결과 없음의 왕복, 개인 기록 충돌 시 전체 rollback)은 CI에서 실행. 로컬 DB/alpha 실제 클릭·스크린샷 검증은 미실행.

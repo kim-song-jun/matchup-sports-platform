@@ -62,6 +62,9 @@ describe('어드민 종료 경기 출전 정정', () => {
     expect(data.game.currentOfficialRevisionId).toBe('r2');
     expect(data.resultRows.filter((row) => row.resultRevisionId === 'r2').map((row) => row.participantId)).toEqual(['p-b', 'p-away']);
     expect(data.revisions[0]).toEqual(original);
+    await data.save('EXCLUDE');
+    expect(data.revisions).toHaveLength(2);
+    expect(data.events).toHaveLength(1);
     expect(data.revisions[1]).toMatchObject({ supersedesId: 'r1', createdByUserId: 'admin', score: original.score, state: 'OFFICIAL' });
     await data.save('REVOKE');
     expect(data.game.currentOfficialRevisionId).toBe('r3');
@@ -71,6 +74,15 @@ describe('어드민 종료 경기 출전 정정', () => {
       expect.objectContaining({ type: 'GAME_RESULT_OFFICIAL', revisionId: 'r2', payload: { revisionId: 'r2' } }),
       expect.objectContaining({ type: 'GAME_RESULT_OFFICIAL', revisionId: 'r3' }),
     ]);
+  });
+
+  it('이전 빠짐 조정이 남아 있어도 외부 공식 정정으로 복귀한 선수를 다시 뺄 수 있다', async () => {
+    const data = fixture();
+    await data.save('EXCLUDE');
+    data.game.currentOfficialRevisionId = 'r1';
+    await data.save('EXCLUDE');
+    expect(data.game.currentOfficialRevisionId).toBe('r3');
+    expect(data.resultRows.filter((row) => row.resultRevisionId === 'r3').map((row) => row.participantId)).toEqual(['p-b', 'p-away']);
   });
 
   it.each(['SUBMITTED', null] as const)('%s 결과도 빠짐·되돌리기와 제출 명단의 후속 이력을 유지한다', async (state) => {

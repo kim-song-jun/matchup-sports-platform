@@ -172,7 +172,9 @@ export class TeamGameRosterService {
             : change.op === 'EXCLUDE'
             ? await this.gameRoster.applyExclude(tx, actor, target, { userId: change.userId, reason: change.reason })
             : await this.gameRoster.applyRevoke(tx, actor, target, change.userId);
-        if (!alreadyApplied) touched.add(change.gameId);
+        // An official correction can restore a player while an older EXCLUDE remains active.
+        // Reconcile ended attendance even when the adjustment write itself is idempotent.
+        if (!alreadyApplied || endedAllowedIds.includes(change.gameId)) touched.add(change.gameId);
         results.push({ gameId: target.gameId, sideId: target.sideId, userId: change.userId, op: change.op, alreadyApplied });
       }
       const changedCompetitions = new Set([...touched].flatMap((gameId) => roleScopes.has(gameId) ? [roleScopes.get(gameId)!] : []));

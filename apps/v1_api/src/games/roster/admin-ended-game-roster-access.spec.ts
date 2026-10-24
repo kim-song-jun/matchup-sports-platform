@@ -4,6 +4,7 @@ import type { TournamentStaffAccessService } from '../../tournaments/staff/tourn
 import { GameRosterService } from './game-roster.service';
 import { TeamGameRosterService } from './team-game-roster.service';
 import * as sync from './game-roster-sync';
+import * as ended from './admin-ended-game-roster';
 
 describe('종료 경기 batch — 서버 권한과 잠금 후 상태 검증', () => {
   afterEach(() => jest.restoreAllMocks());
@@ -20,11 +21,12 @@ describe('종료 경기 batch — 서버 권한과 잠금 후 상태 검증', ()
     ['ops', 'active', null, 'active', 'CANCELLED', false],
   ])('admin=%s status=%s revoked=%s account=%s game=%s -> %s', async (adminRole, status, revokedAt, accountStatus, state, allowed) => {
     jest.spyOn(sync, 'lockRosterWriteScope').mockResolvedValue();
+    jest.spyOn(ended, 'syncAdminEndedGameRoster').mockResolvedValue();
     const tx = {
       v1Team: { findFirst: async () => ({ id: 'team' }) },
       v1GameSide: { findMany: async () => [{ id: 'side', gameId: 'game' }] },
       v1AdminUser: { findUnique: async () => adminRole === null ? null : ({ adminRole, status, revokedAt, user: { accountStatus } }) },
-      v1Game: { findMany: async () => [{ id: 'game', state }] },
+      v1Game: { findMany: async () => [{ id: 'game', state }], findUniqueOrThrow: async () => ({ state }) },
     };
     const prisma = { $transaction: async (fn: (tx: unknown) => unknown) => fn(tx) } as unknown as PrismaService;
     const roster = new GameRosterService(prisma, {} as GamesService);

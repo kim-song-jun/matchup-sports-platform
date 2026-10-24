@@ -328,6 +328,7 @@ function createHarness(options: HarnessOptions = {}): Harness {
           : []),
       ],
     },
+    v1GamePeriod: { findMany: async () => [{ number: 1 }, { number: 2 }] },
     v1CompetitionConfigVersion: {
       findUnique: async () => ({ result: {} }),
     },
@@ -485,6 +486,28 @@ describe('canonical source boundary', () => {
 });
 
 describe('공식 득점 타임라인 정합성', () => {
+  it('정정 카드의 합계와 시간을 같은 참가자 스냅샷에 저장한다', async () => {
+    const harness = createHarness();
+    const cards = { yellow: 1, red: 1, events: [
+      { id: 'yellow-1', card: 'YELLOW', minute: 0, period: 1 },
+      { id: 'red-1', card: 'RED' },
+    ] };
+    await harness.correct({ actualParticipants: [{ ...validParticipants[0], cards }, validParticipants[1]] });
+    expect(harness.createdParticipants[0]).toMatchObject({ participantId: ids.homePlayer, cards });
+  });
+  it('없는 피리어드와 선수 간 중복 카드 id는 저장 전에 거부한다', async () => {
+    const harness = createHarness();
+    const cards = { yellow: 1, red: 0, events: [{ id: 'same', card: 'YELLOW', period: 99 }] };
+    const error = await captureFailure(() => harness.correct({ actualParticipants: [
+      { ...validParticipants[0], cards }, validParticipants[1],
+    ] }));
+    expectHttp(error, 422, 'RESULT_CARD_TIMELINE_INVALID');
+    const duplicate = await captureFailure(() => harness.correct({ actualParticipants: [
+      { ...validParticipants[0], cards }, { ...validParticipants[1], cards },
+    ] }));
+    expectHttp(duplicate, 422, 'RESULT_CARD_TIMELINE_INVALID');
+    expect(harness.createdRevisions).toHaveLength(0);
+  });
   it('정정한 득점자와 개인 득점 합계가 일치하면 새 참가자 기록에 반영한다', async () => {
     const harness = createHarness();
     await harness.correct({

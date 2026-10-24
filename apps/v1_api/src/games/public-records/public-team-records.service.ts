@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { resolveResultCardEvents } from '../core/result-card-events';
 import { Prisma } from '@prisma/client';
 import type { V1VisibilityMode } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -47,6 +48,7 @@ interface TeamRecordFactRow {
   readonly resultRevision: {
     readonly score: Prisma.JsonValue;
     readonly goalEvents: Prisma.JsonValue | null;
+    readonly resultParticipants: readonly { participantId: string; sideId: string; cards: unknown }[];
     readonly outcomeReason: string;
     readonly reason: string | null;
     readonly game: {
@@ -349,6 +351,7 @@ export class PublicTeamRecordsService {
           select: {
             score: true,
             goalEvents: true,
+            resultParticipants: { select: { participantId: true, sideId: true, cards: true } },
             // 몰수 여부(`resolveIsForfeit`)만 읽는다 — 사유 원문은 공개하지 않는다.
             outcomeReason: true,
             reason: true,
@@ -454,6 +457,7 @@ export class PublicTeamRecordsService {
       ...Array.from(revisionGoalsByGameId.values()).flatMap((goals) =>
         (goals ?? []).map((goal) => goal.participantId),
       ),
+      ...currentRows.flatMap((row) => (row.resultRevision.resultParticipants ?? []).map((participant) => participant.participantId)),
     ].filter((id): id is string => id !== null);
     // **항상 조회한다.** 이름 게이팅(되돌린 상태에서만 동작)에는 쓰이지 않지만, 프로필
     // 링크(`resolveParticipantProfileHref`)는 정책 공개 기본값에서도 동의를 확인해야 하기
@@ -479,6 +483,7 @@ export class PublicTeamRecordsService {
 
       const revisionGoals = revisionGoalsByGameId.get(row.gameId) ?? null;
       const rows = (eventsByGame.get(row.gameId) ?? [])
+        .filter((event) => event.type !== 'CARD')
         .filter((event) => revisionGoals === null || event.type === 'CARD')
         .map((event) => {
           const consent = event.participantId === null ? undefined : consentMap.get(event.participantId);
@@ -508,6 +513,22 @@ export class PublicTeamRecordsService {
           };
         })
         .sort(byUnknownLast);
+      rows.push(...resolveResultCardEvents(row.resultRevision.resultParticipants ?? [], eventsByGame.get(row.gameId) ?? []).map((event) => {
+        const consent = consentMap.get(event.participantId);
+        const eligible = resolveParticipantNameEligible(false, consent);
+        const participant = participantById.get(event.participantId);
+        const eventSideKey = sideKeyBySideId.get(event.sideId);
+        return {
+          id: event.id, type: 'CARD' as const,
+          side: eventSideKey === ownSideKey ? 'own' as const : 'opponent' as const,
+          participantName: eligible ? resolveParticipantDisplayName(participant, nameProfileByUserId) : null,
+          jerseyNumber: eligible ? participant?.jerseyNumber ?? null : null,
+          profileHref: eligible ? resolveParticipantProfileHref(participant?.userId ?? null, consent) : null,
+          cardColor: event.card, period: event.period ?? null,
+          clockMs: event.clockMs ?? (event.minute === undefined ? null : event.minute * 60000),
+        };
+      }));
+      rows.sort(byUnknownLast);
       if (revisionGoals !== null) {
         rows.push(
           ...revisionGoals.map((event) => {

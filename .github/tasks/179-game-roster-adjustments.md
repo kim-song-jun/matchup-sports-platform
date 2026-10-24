@@ -316,8 +316,8 @@ Status: In Progress
 ### User Scenarios / Test Scenarios
 - [x] owner·ops 어드민이 종료 경기 칸을 빠짐으로 저장하고 되돌린다.
 - [x] 팀장·대회 스태프·support는 기존 마감 유지, 진행 중·일시정지·취소 및 종료 GK 변경은 불가.
-- [ ] 공식 결과 출전자가 새 리비전에 반영되고 기존 이력·점수·상대팀은 보존된다.
-- [ ] 개인 기록이 있는 선수는 결과 정정 안내와 409, batch 전체 rollback.
+- [x] 공식 결과 출전자가 새 리비전에 반영되고 기존 이력·점수·상대팀은 보존된다.
+- [x] 개인 기록이 있는 선수는 결과 정정 안내와 409, batch 전체 rollback.
 - [ ] alpha 실제 로그인·화면·network 검증: PR 머지/배포 전이므로 미실행.
 
 ### Parallel Work Breakdown / Owned / Forbidden
@@ -353,3 +353,4 @@ Status: In Progress
 - HTTP DTO의 선택 필드가 undefined로 존재해 감사 스냅샷 검증이 거절한 런타임 결함도 수정: 감사 데이터는 userId/op만 명시적으로 직렬화한다. unit fixture에 DB DRAFT guard와 실제 DTO의 undefined 필드를 추가해 같은 결함이 unit에서도 실패하도록 강화했다.
 - Copilot 스캔은 외부 모델 세션 생성 실패로 clean 판정을 얻지 못한 상태이며 재요청/정책 변경 없이 기록한다. 제품 CI가 green이 된 후 사용자 배포 요청에 따라 표준 dev 머지·alpha 자동 배포 경로로 진행한다.
 - 보강 helper unit 10개 통과 및 API typecheck 통과. DB trigger를 우회하지 않고 상태 전환 순서를 바로잡은 수정만 PR에 반영해 실제 CI integration을 재검증한다.
+- 수정 head `7ecdea532`의 CI `40091201436`: Gates/API/Web 모두 성공. 실제 DB의 새 4개 시나리오도 통과했다. 대기 중 dev에 #2054 카드 타임라인 변경이 머지되어 문서 2곳의 append 충돌을 양쪽 보존으로 해결하고 최신 dev를 통합한다. 코드 충돌은 없다.

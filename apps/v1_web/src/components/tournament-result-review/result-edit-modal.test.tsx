@@ -133,6 +133,38 @@ function baseProps() {
   };
 }
 
+describe('card timeline correction', () => {
+  it('shows aggregate cards without time, edits color/player/time and submits consistent totals', () => {
+    const props = baseProps();
+    props.base.participants[0].cards = { yellow: 1, red: 1 };
+    render(<ResultEditModal {...props} lineups={[]} />);
+    expect(screen.getAllByText('시간 미입력')).toHaveLength(2);
+    expect(screen.getByLabelText('1번째 카드 시간(분)')).toHaveValue(null);
+    fireEvent.change(screen.getByLabelText('1번째 카드 시간(분)'), { target: { value: '12' } });
+    fireEvent.change(screen.getByLabelText('1번째 카드 피리어드'), { target: { value: '2' } });
+    fireEvent.change(screen.getByLabelText('1번째 카드 종류'), { target: { value: 'RED' } });
+    fireEvent.change(screen.getByLabelText('1번째 카드 선수'), { target: { value: AWAY_PARTICIPANT_ID } });
+    fireEvent.click(screen.getByRole('button', { name: '2번째 카드 삭제' }));
+    fireEvent.change(screen.getByLabelText('사유'), { target: { value: '카드 정정' } });
+    fireEvent.click(screen.getByRole('button', { name: '정정 제출' }));
+    const submitted = props.onConfirm.mock.calls[0][0].actualParticipants;
+    expect(submitted[0].cards).toEqual({ yellow: 0, red: 0, events: [] });
+    expect(submitted[1].cards).toMatchObject({ yellow: 0, red: 1,
+      events: [{ card: 'RED', minute: 12, period: 2 }] });
+  });
+  it('adds a card and keeps a real zero minute distinct from missing time', () => {
+    const props = baseProps();
+    render(<ResultEditModal {...props} lineups={[]} />);
+    fireEvent.click(screen.getByRole('button', { name: '카드 추가' }));
+    fireEvent.change(screen.getByLabelText('1번째 카드 시간(분)'), { target: { value: '0' } });
+    fireEvent.change(screen.getByLabelText('사유'), { target: { value: '누락 카드 추가' } });
+    fireEvent.click(screen.getByRole('button', { name: '정정 제출' }));
+    expect(props.onConfirm.mock.calls[0][0].actualParticipants[0].cards).toMatchObject({
+      yellow: 1, red: 0, events: [{ minute: 0, card: 'YELLOW' }],
+    });
+  });
+});
+
 /** 득점 기록 행이 없는 화면 -- 득점 선택칸의 선수 옵션이 선수 이름 개수 검증에 섞이지 않게 한다. */
 function propsWithoutGoalRecords() {
   const props = baseProps();

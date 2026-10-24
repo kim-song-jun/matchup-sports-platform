@@ -476,6 +476,35 @@ describe('void -- retiring the current official result', () => {
 });
 
 describe('correction -- create against the current official revision, always capturing reason + diff', () => {
+  it('기존 현장 카드의 시간을 불러와 정정 요청의 합계와 타임라인에 함께 전달한다', async () => {
+    hookMocks.game.data = buildGame('platform_ops', { version: 2, currentOfficialRevisionId: 'rev-1' });
+    const revision = buildRevision({ id: 'rev-1', revision: 1, state: 'OFFICIAL' });
+    const participant = revision.resultParticipants[0];
+    participant.cards = { yellow: 1, red: 0 };
+    hookMocks.revisions.data = [revision];
+    hookMocks.events.data = { events: [{ id: 'existing-yellow', type: 'CARD',
+      participantId: participant.participantId, sideId: participant.sideId, payload: { card: 'YELLOW' },
+      period: 2, clockMs: 480000, reversesEventId: null }] };
+    renderWithClient(<GameResultCorrectionPanel gameId="game-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '정정 시작' }));
+    expect(screen.getByLabelText('1번째 카드 시간(분)')).toHaveValue(8);
+    fireEvent.change(screen.getByLabelText('1번째 카드 시간(분)'), { target: { value: '12' } });
+    fireEvent.change(screen.getByLabelText('정정 사유'), { target: { value: '카드 시간 정정' } });
+    fireEvent.click(screen.getByRole('button', { name: '정정 제출' }));
+    expect(hookMocks.createCorrection.mutate.mock.calls[0][0].changes.actualParticipants[0].cards).toEqual({
+      yellow: 1, red: 0, events: [{ id: 'existing-yellow', card: 'YELLOW', minute: 12, period: 2 }],
+    });
+  });
+  it('현장 기록 로딩 중에는 편집기를 먼저 열어 카드 시간을 지우지 않는다', () => {
+    hookMocks.game.data = buildGame('platform_ops', { currentOfficialRevisionId: 'rev-1' });
+    hookMocks.revisions.data = [buildRevision({ id: 'rev-1', revision: 1, state: 'OFFICIAL' })];
+    hookMocks.events.isPending = true;
+    renderWithClient(<GameResultCorrectionPanel gameId="game-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '정정 시작' }));
+    expect(screen.getByRole('status')).toHaveTextContent('기존 경기 기록을 불러오고 있어요.');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(hookMocks.createCorrection.mutate).not.toHaveBeenCalled();
+  });
   it('captures a reason and a score diff before creating a correction draft', async () => {
     hookMocks.game.data = buildGame('tournament_director', { version: 2, currentOfficialRevisionId: 'rev-1' });
     hookMocks.revisions.data = [buildRevision({ id: 'rev-1', revision: 1, state: 'OFFICIAL', score: { home: 1, away: 1 } })];
@@ -515,7 +544,7 @@ describe('correction -- create against the current official revision, always cap
               goals: 1,
               assists: 1,
               fouls: 0,
-              cards: { yellow: 0, red: 0 },
+              cards: { yellow: 0, red: 0, events: [] },
               goalkeeper: false,
             },
           ],

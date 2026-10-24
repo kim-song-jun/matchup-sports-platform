@@ -130,6 +130,8 @@ Current Kakao signup and existing-account linking use the [provider contact conf
 
 대회 이미지 설정의 JSON boolean 검증과 관리자 종목 기본 이미지 선택도 같은 계약에서 관리한다. `showDetailImage`의 문자열/숫자 강제 변환은 허용하지 않는다.
 
+- 2026-10-24: [경기 계약](domains/games.md#어드민-종료-경기의-출전-정정-2026-10-24)에 owner·ops 어드민의 종료 경기 EXCLUDE/REVOKE 예외 및 결과 이력 보존 계약을 반영했다.
+
 ## 결과 정정 카드 계약 보완
 
 카드의 기존 합계와 선택적 시간별 기록(`cards.events`), 정정·재제출 검증 및 공개 프로젝션은

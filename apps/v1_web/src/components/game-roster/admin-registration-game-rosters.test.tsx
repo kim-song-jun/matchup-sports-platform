@@ -72,7 +72,7 @@ function batchBodies() {
 }
 
 const cell = (player: string, opponent: string, state: string) =>
-  screen.findByRole('button', { name: new RegExp(`^${player} .* vs ${opponent} ${state}, `) });
+  screen.findByRole('button', { name: new RegExp(`^${player} .* vs ${opponent}(?: · 종료)? ${state}, `) });
 
 describe('어드민 경기별 명단 — 운영진 실명', () => {
   it.each([
@@ -202,19 +202,34 @@ async function settleAdminMe() {
 }
 
 describe('어드민 경기별 명단 — 진행한 경기', () => {
-  it('끝난 경기 열은 "종료"로 표시하고 칸을 바꿀 수 없다 — 시작 전 경기 칸은 그대로 바꾼다', async () => {
+  it.each(['owner', 'ops'] as const)('%s 어드민은 종료 경기에서 빠짐을 저장하고 다시 출전으로 되돌린다', async (role) => {
+    adminRole = role;
+    mock.setGameState(G1.gameId, 'ENDED');
+    renderPanel();
+    fireEvent.click(await cell('김민재', G1.opponentName, '출전'));
+    fireEvent.click(screen.getByRole('button', { name: '변경 1건 저장' }));
+    expect(await cell('김민재', G1.opponentName, '빠짐 · 운영자')).toBeInTheDocument();
+    fireEvent.click(await cell('김민재', G1.opponentName, '빠짐 · 운영자'));
+    fireEvent.click(screen.getByRole('button', { name: '변경 1건 저장' }));
+    expect(await cell('김민재', G1.opponentName, '출전')).toBeInTheDocument();
+    expect(batchBodies()).toEqual([
+      { changes: [{ gameId: G1.gameId, userId: 'player-1', op: 'EXCLUDE' }] },
+      { changes: [{ gameId: G1.gameId, userId: 'player-1', op: 'REVOKE' }] },
+    ]);
+  });
+
+  it.each(['STAFF', 'TEAM_MANAGER'] as const)('%s는 종료 경기를 바꿀 수 없다', async (role) => {
+    mock.setViewerRole(role);
     mock.setGameState(G1.gameId, 'ENDED');
     renderPanel();
     expect(await cell('김민재', G2.opponentName, '출전')).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: new RegExp(`vs ${G1.opponentName} · 종료$`) })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: new RegExp(`^김민재 .* vs ${G1.opponentName} · 종료 `) })).not.toBeInTheDocument();
-    expect(screen.getByText(/경기 2개 · 선수/)).toBeInTheDocument();
   });
 
   it('모든 경기가 시작됐으면 "보기 권한만" 안내를 띄우지 않는다', async () => {
     for (const game of GAME_ROSTER_MSW.games) mock.setGameState(game.gameId, 'ENDED');
     renderPanel();
-    expect(await screen.findByText(/시작된 경기는/)).toBeInTheDocument();
+    expect(await screen.findByText(/개인 기록이 있는 선수는/)).toBeInTheDocument();
     expect(screen.queryByText(/보기 권한만 있어 명단을 바꿀 수 없어요/)).not.toBeInTheDocument();
   });
 });

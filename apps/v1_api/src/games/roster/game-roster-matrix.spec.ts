@@ -236,3 +236,16 @@ describe('buildTeamRosterMatrix — 운영진 실명', () => {
     }
   });
 });
+
+
+describe('종료 경기 편집 capability', () => {
+  it.each([true, false])('서버가 허용한 어드민만 종료 출전을 조정한다: %s', (canEditEnded) => {
+    const result = buildTeamRosterMatrix({ columns: [{ game: game('ended', { gameState: 'ENDED' }), loaded: loaded([entry('u1')]) }], canWrite: true, canEditEnded });
+    expect(result.games[0].editable).toBe(canEditEnded);
+    expect(result.games[0].goalkeeperEditable).toBe(false);
+  });
+  it.each(['LIVE', 'PAUSED', 'CANCELLED'] as const)('어드민이어도 %s 출전 조정은 막는다', (gameState) => {
+    const result = buildTeamRosterMatrix({ columns: [{ game: game('g', { gameState }), loaded: loaded([entry('u1')]) }], canWrite: true, canEditEnded: true });
+    expect(result.games[0].editable).toBe(false);
+  });
+});

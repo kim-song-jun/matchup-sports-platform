@@ -812,4 +812,68 @@ describe('팀 경기 명단 표·일괄·결장 기간 API (Task 179)', () => {
       expect(g1ForB?.rosterSummary).toEqual({ participating: 1, excluded: 0, unavailable: 0, suspended: 0 });
     });
   });
+
+  describe('어드민 종료 경기 출전 정정', () => {
+    async function endedFixture(resultState: 'OFFICIAL' | 'SUBMITTED' | null, goals = 0) {
+      const f = await seedTournament();
+      const target = sideOf(f, 'g1', f.teamA.id);
+      const lineups = await prisma.v1GameLineup.findMany({ where: { gameId: target.gameId, invalidatedAt: null }, orderBy: { revision: 'desc' } });
+      const latestSides = [...new Map(lineups.map((row) => row.sideId).map((sideId) => [sideId, lineups.find((row) => row.sideId === sideId)!])).values()];
+      const participants = await prisma.v1GameParticipant.findMany({ where: { lineupId: { in: latestSides.map((row) => row.id) } } });
+      let revisionId: string | null = null;
+      if (resultState !== null) {
+        const revision = await prisma.v1GameResultRevision.create({ data: {
+          gameId: target.gameId, revision: 1, state: 'DRAFT', score: { home: goals, away: 0 }, eventsHash: 'ended-roster-test',
+          createdByActorType: 'USER', createdByUserId: f.adminId,
+        } });
+        revisionId = revision.id;
+        await prisma.v1GameResultParticipant.createMany({ data: participants.map((row) => ({ resultRevisionId: revision.id, participantId: row.id, sideId: row.sideId, started: true, goals: row.userId === f.teamA.members[0] ? goals : 0, cards: { yellow: 0, red: 0 } })) });
+        await prisma.v1GameResultRevision.update({ where: { id: revision.id }, data: { state: resultState, submittedAt: new Date(), officialAt: resultState === 'OFFICIAL' ? new Date() : null } });
+      }
+      await prisma.v1Game.update({ where: { id: target.gameId }, data: { state: 'ENDED', currentOfficialRevisionId: resultState === 'OFFICIAL' ? revisionId : null } });
+      return { f, target, participants, revisionId };
+    }
+
+    it.each(['OFFICIAL', 'SUBMITTED', null] as const)('%s 결과의 종료 경기를 어드민이 빼고 되돌리며 이력을 보존한다', async (state) => {
+      const { f, target, participants, revisionId } = await endedFixture(state);
+      const userId = f.teamA.members[0];
+      const path = matrixPath(f.teamA.id) + '/batch';
+      const change = { gameId: target.gameId, userId, op: 'EXCLUDE' };
+      for (const actor of [f.teamA.ownerId, f.teamA.managerId, f.directorId]) {
+        const denied = await postAs(path, actor, { changes: [change] });
+        expect([denied.status, denied.body.code]).toEqual([409, 'LINEUP_DEADLINE_PASSED']);
+      }
+      const saved = await postAs(path, f.adminId, { changes: [change] });
+      expect([saved.status, saved.body.data?.results[0]?.alreadyApplied]).toEqual([200, false]);
+      const view = await getAs(f.sidePath('g1', f.teamA.id) + '/roster', f.teamA.ownerId);
+      expect(view.body.data.participants.map((row: { userId: string }) => row.userId)).not.toContain(userId);
+      expect(view.body.data.excluded.map((row: { userId: string }) => row.userId)).toContain(userId);
+      expect(await prisma.v1GameRosterAdjustment.findFirst({ where: { ...target, userId, revokedAt: null } })).toMatchObject({ actorRole: 'ADMIN', actorUserId: f.adminId });
+      expect((await postAs(path, f.adminId, { changes: [change] })).body.data.results[0].alreadyApplied).toBe(true);
+      expect((await postAs(path, f.adminId, { changes: [{ ...change, op: 'REVOKE' }] })).status).toBe(200);
+      const restored = await getAs(f.sidePath('g1', f.teamA.id) + '/roster', f.teamA.ownerId);
+      expect(restored.body.data.participants.map((row: { userId: string }) => row.userId)).toContain(userId);
+      expect(await prisma.v1GameParticipant.count({ where: { id: { in: participants.map((row) => row.id) } } })).toBe(participants.length);
+      if (revisionId !== null) {
+        expect(await prisma.v1GameResultParticipant.count({ where: { resultRevisionId: revisionId } })).toBe(participants.length);
+        const latest = await prisma.v1GameResultRevision.findFirstOrThrow({ where: { gameId: target.gameId }, orderBy: { revision: 'desc' } });
+        expect(latest).toMatchObject({ state, score: { home: 0, away: 0 }, createdByUserId: f.adminId });
+        expect(await prisma.v1GameResultParticipant.count({ where: { resultRevisionId: latest.id } })).toBe(participants.length);
+        expect(await prisma.v1OutboxEvent.count({ where: { revisionId: latest.id, type: state === 'OFFICIAL' ? 'GAME_RESULT_OFFICIAL' : 'GAME_RESULT_SUBMITTED' } })).toBe(1);
+      }
+    });
+
+    it('개인 기록이 있는 선수는 결과 정정으로 안내하고 다른 경기 변경까지 rollback한다', async () => {
+      const { f, target, revisionId } = await endedFixture('OFFICIAL', 1);
+      const userId = f.teamA.members[0];
+      const saved = await postAs(matrixPath(f.teamA.id) + '/batch', f.adminId, { changes: [
+        { gameId: f.games.g2.gameId, userId, op: 'EXCLUDE' },
+        { gameId: target.gameId, userId, op: 'EXCLUDE' },
+      ] });
+      expect([saved.status, saved.body.code]).toEqual([409, 'ROSTER_RESULT_CORRECTION_REQUIRED']);
+      expect(await prisma.v1GameRosterAdjustment.count({ where: { gameId: { in: [target.gameId, f.games.g2.gameId] } } })).toBe(0);
+      expect((await prisma.v1Game.findUniqueOrThrow({ where: { id: target.gameId } })).currentOfficialRevisionId).toBe(revisionId);
+    });
+  });
+
 });

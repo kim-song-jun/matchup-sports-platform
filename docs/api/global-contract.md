@@ -231,6 +231,9 @@ than the frozen game contracts above: numbered pages include total/totalPages; c
 opt into total with `withTotal=true`. Filters run before pagination and do not widen public
 visibility. Admission-window and capacity semantics, 400 range errors, and backward-compatible
 status inputs are defined in [Tournaments](./domains/tournaments.md#competition-discovery-filters-task-20261103).
+
+- 종료 경기 명단의 관리자 정정도 기존 transaction/error envelope를 따른다. owner·ops만 batch EXCLUDE/REVOKE 예외를 가지며 개인 기록과 충돌하면 409 `ROSTER_RESULT_CORRECTION_REQUIRED`로 전체 요청을 rollback한다([경기 계약](domains/games.md)).
+
 ## 카드 기록 중첩 검증
 
 경기 결과 참가자의 `cards.events`는 명시적 빈 배열과 생략의 의미가 다르다. 빈 배열은 카드 삭제,

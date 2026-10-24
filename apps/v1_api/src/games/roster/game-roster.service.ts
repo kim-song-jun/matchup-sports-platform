@@ -378,9 +378,9 @@ export class GameRosterService {
 
   /**
    * 경기 시작 명령과 같은 행을 잠가, 조정이 시작 직후 경기에 끼어들지 않게 한다. 트랜잭션의 첫 잠금이다
-   * (`lockRosterWriteScope` — 대회 행·빈 리그 명단 채우기가 경기보다 앞선다). 하나라도 시작됐으면 전부 거부한다.
+   * (`lockRosterWriteScope` — 대회 행·빈 리그 명단 채우기가 경기보다 앞선다). 시작된 경기는 거부하며, 호출자가 검증한 어드민의 종료 출전 조정만 예외다.
    */
-  async lockScheduledGames(tx: Tx, sides: readonly SideTarget[]): Promise<void> {
+  async lockScheduledGames(tx: Tx, sides: readonly SideTarget[], adminEndedGameIds: readonly string[] = []): Promise<void> {
     const ids = [...new Set(sides.map((side) => side.gameId))];
     await lockRosterWriteScope(
       tx,
@@ -388,7 +388,7 @@ export class GameRosterService {
       sides.map((side) => side.sideId),
     );
     const games = await tx.v1Game.findMany({ where: { id: { in: ids } }, select: { id: true, state: true } });
-    const started = games.filter((game) => game.state !== V1GameState.SCHEDULED).map((game) => game.id);
+    const started = games.filter((game) => game.state !== V1GameState.SCHEDULED && !(game.state === V1GameState.ENDED && adminEndedGameIds.includes(game.id))).map((game) => game.id);
     if (started.length > 0) {
       throw new ConflictException({
         code: 'LINEUP_DEADLINE_PASSED',

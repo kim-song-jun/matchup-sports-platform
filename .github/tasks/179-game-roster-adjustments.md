@@ -303,3 +303,54 @@ EXCLUDE 로 옮기는 스크립트를 만든다(actor = 원래 저장한 팀장,
 - Copilot 리뷰 보완: 취소 대회 제외를 검사한 뒤 대회 상태를 `in_progress`로 복원했을 때 member upcoming-games와 manager matrix 양쪽이 elapsed `SCHEDULED` g1을 다시 포함하는 HTTP positive control을 추가한다. 그 다음에만 대회를 `completed`로 바꾸고 두 목록에서 빠지는 negative control을 검증한다.
 - 후속 검증 대기: root가 직렬 테스트 슬롯을 배정하기 전에는 tests/build/typecheck/lint/integration을 실행하지 않는다. 예상 narrow targets: `lineup-todo.service.spec.ts`, `team-game-order.spec.ts`, `team-game-rosters.integration-spec.ts`, `team-upcoming-games.service.spec.ts`. 실제 CI RED는 확인됐지만 후속 product GREEN은 아직 확인되지 않았다.
 - 직렬 unit 슬롯 검증 (2026-10-23): 첫 명령 `pnpm --filter v1_api exec jest --selectProjects unit --runInBand src/team-upcoming-games.service.spec.ts src/tournaments/discipline/team-game-order.spec.ts` 는 2개 suite를 골랐고 fake cutoff 불일치로 service spec 2개가 실패(나머지 23 통과)했다. fake cutoff 추출을 `AND/OR` 경로도 읽게 보정했다. 같은 malformed target로 실행한 후속 결과 1 suite / 14 passed는 discipline spec만 실행한 것으로 확인되어 service spec GREEN 증거로 취급하지 않는다. root 요청 뒤 정확한 명령 `pnpm --filter v1_api exec jest --selectProjects unit --runInBand src/team-lineups/team-upcoming-games.service.spec.ts` 실행: runner가 이 spec을 명시해 1 suite / 11 tests passed, exit 0. 앞선 suspension spec은 14/14로 통과했다. 실제 HTTP + DB batch/parity integration은 로컬 실행하지 않았고 정확한 제품-green CI가 필요하다.
+
+
+## 2026-10-24 후속: 어드민 종료 경기 빠짐 처리
+
+Status: In Progress
+
+### Context / Goal / Original Conditions
+- 사용자: “어드민 경기별 명단에서 지난 경기도 빠짐 처리”, “수정하고 PR”. 범위: v1 API·Web·관련 계약 문서, dev 대상 PR.
+- 기존 표는 종료 경기까지 읽지만 editable=false이고 batch가 모든 시작 경기를 409로 거절했다.
+
+### User Scenarios / Test Scenarios
+- [x] owner·ops 어드민이 종료 경기 칸을 빠짐으로 저장하고 되돌린다.
+- [x] 팀장·대회 스태프·support는 기존 마감 유지, 진행 중·일시정지·취소 및 종료 GK 변경은 불가.
+- [x] 공식 결과 출전자가 새 리비전에 반영되고 기존 이력·점수·상대팀은 보존된다.
+- [x] 개인 기록이 있는 선수는 결과 정정 안내와 409, batch 전체 rollback.
+- [ ] alpha 실제 로그인·화면·network 검증: PR 머지/배포 전이므로 미실행.
+
+### Parallel Work Breakdown / Owned / Forbidden
+- 서브에이전트 없이 직렬 작업. Owned: games/roster의 matrix·batch·새 종료 정정 helper·테스트, 어드민 명단 표의 기존 제어 로직·문구·테스트·MSW, API/정본/task 문서와 changeset.
+- Forbidden: schema/migration, 일반 사용자 권한 확대, 운영 데이터 수정, main 승격, 타 세션 WIP.
+- 기존 표 구조를 유지하는 권한·로직 수정으로 신규 디자인은 만들지 않는다.
+
+### Acceptance Criteria / Security Notes
+- owner·ops active/status/revokedAt/accountStatus를 서버가 판정하고 잠금 뒤 ENDED만 예외.
+- 기존 결과·라인업은 덮어쓰지 않고 후속 리비전·주체·outbox를 남긴다.
+- 저장 실패를 성공으로 표시하지 않으며 개인 기록은 조용히 삭제하지 않는다.
+
+### Tech Debt Resolved
+- 화면의 editable 계약과 서버 batch의 종료 경기 처리 계약을 일치시킨다.
+
+### Risks & Dependencies / Ambiguity Log
+- 개인 기록이 있는 선수는 기존 결과 정정으로 함께 고친다. 단순 출전 토글이 기록을 자동 삭제하지 않는다.
+- alpha QA는 배포와 실제 로그인 계정이 필요하다. DB integration은 CI에서 실행한다.
+- 원본 shared tree는 광범위한 WIP와 CRLF 변동이 있어 최신 origin/dev 기반 `/tmp/teameet-admin-past-roster` 격리 worktree에서 구현한다.
+
+### Progress Snapshot
+- Base: b92096f81 (origin/dev). 권한/matrix/출전 정정 및 MSW 수정 완료.
+- API unit: matrix·registration 서비스·권한 gate·공식 결과 보존 총 45개 통과. 최초 42개 green 뒤 확정 전/결과 없음 및 외부 정정 후 재제외 보강 3개를 추가했고 최종 helper/access 20개도 green. 반복 요청은 새 결과 이력을 만들지 않고, 외부 공식 정정으로 복귀한 선수는 이전 EXCLUDE가 활성이어도 실제 출전을 다시 조정한다.
+- Web 어드민 표 21개 통과(종료 경기 빠짐·되돌리기 HTTP batch payload와 저장 후 상태 포함).
+- API/Web typecheck 통과. API는 공유 node_modules의 오래된 Prisma 생성물을 수정하지 않고 최신 schema로 `/tmp/teameet-admin-prisma-client`에 엔진 없는 client를 생성해 임시 paths/moduleNameMapper로 검증했다. 이 QA 설정/생성물은 PR에 포함하지 않는다.
+- 새 DB integration 4건(공식/제출/결과 없음의 왕복, 개인 기록 충돌 시 전체 rollback)은 CI에서 실행. 로컬 DB/alpha 실제 클릭·스크린샷 검증은 미실행.
+- Changeset 정책·git diff --check 통과, touched path debt marker 추가 없음. 실제 schema/DTO 변경 및 migration 없음.
+
+
+### 2026-10-24 alpha 배포 준비 / 실제 DB RED 수정
+- 사용자가 alpha 배포를 요청했다. dev PR #2053의 Gates·Web은 통과했지만 CI `40090070568`의 실제 DB integration에서 새 테스트 4건이 실패했다(179 suites 통과).
+- 실제 원인: DB는 DRAFT 결과에만 참가자 INSERT를 허용하므로 helper와 fixture 모두 DRAFT 생성 → 참가자 쓰기 → SUBMITTED/OFFICIAL 전환 순서가 필요하다. 개인 기록 충돌 fixture도 확정 뒤 결과 행을 수정하지 않고 DRAFT 때 기록을 넣는다.
+- HTTP DTO의 선택 필드가 undefined로 존재해 감사 스냅샷 검증이 거절한 런타임 결함도 수정: 감사 데이터는 userId/op만 명시적으로 직렬화한다. unit fixture에 DB DRAFT guard와 실제 DTO의 undefined 필드를 추가해 같은 결함이 unit에서도 실패하도록 강화했다.
+- Copilot 스캔은 외부 모델 세션 생성 실패로 clean 판정을 얻지 못한 상태이며 재요청/정책 변경 없이 기록한다. 제품 CI가 green이 된 후 사용자 배포 요청에 따라 표준 dev 머지·alpha 자동 배포 경로로 진행한다.
+- 보강 helper unit 10개 통과 및 API typecheck 통과. DB trigger를 우회하지 않고 상태 전환 순서를 바로잡은 수정만 PR에 반영해 실제 CI integration을 재검증한다.
+- 수정 head `7ecdea532`의 CI `40091201436`: Gates/API/Web 모두 성공. 실제 DB의 새 4개 시나리오도 통과했다. 대기 중 dev에 #2054 카드 타임라인 변경이 머지되어 문서 2곳의 append 충돌을 양쪽 보존으로 해결하고 최신 dev를 통합한다. 코드 충돌은 없다.

@@ -1,5 +1,24 @@
 # 2026-10-05 dev → main production promotion
 
+## Current preparation — 2026-10-24 (1.11.8)
+
+This snapshot supersedes historical execution permissions below. The user requested main promotion preparation only. Actual dev→main PR creation/merge and production approval remain user-operated.
+
+- Owned: `/tmp/teameet-main-prep-1.11.8`, local `chore/main-prep-1.11.8-20261024`, remote `release/version-1.11.8` / dev-target PR #2055. Release metadata, consumed Changesets and this task only. Preserve shared WIP; no runtime/schema/workflow/policy edits or production writes.
+- [x] Phase 1 — dev `a31de2c32df2c37018fe3c542712ec9828093458`: exact-head API/Web/Gates CI40093721309 and Alpha40093721285 success. Public alpha Web SHA matches, release1.11.8-alpha.20261024.ga31de2c32df2, API health DB=true.
+- [x] Phase 2 — official Promote workflow40097434301 consumed 2 Changesets and opened #2055, both app source versions/changelogs1.11.8. Scope includes admin ended-game attendance correction and result-card timeline editing. Main1.11.7 has one merge-only commit absent from dev; it has the identical tree to b92096f81. Absorbed origin/main into the dev preparation branch without content changes.
+- [ ] Phase 3 — release/promotion policy and committed diff verification; latest #2055 CI; normal dev merge; matching dev CI/Alpha and public release/SHA/DB check.
+- [ ] Phase 4 — rerun official promotion gate after matching alpha and provide the user-operated main compare link. No main mutation.
+
+### Acceptance / security / ambiguity
+- API/Web versions and both changelogs stay in lockstep; consumed Changesets0. Runtime, Prisma migration, deploy and workflow bytes match current dev. New dev→main delta has no schema or deployment changes.
+- Existing resolver intentionally computes source1.11.8 + no pending Changeset as artifact1.11.9 (alpha1.11.9-alpha.*). Preserve this contract; do not present the source version as the deployed artifact version.
+- Copilot AI scan failed to create its configured model session. No clean-review claim, repeated request or review-policy bypass. Product CI is still required for the release head.
+- Shared root dev fast-forward is currently blocked by existing uncommitted WIP; preserve it. Isolated worktree and remote dev are the release cursor.
+
+### Progress snapshot
+- Official version commit34012a032; main-history merge is metadata-only. Next: publish task/history integration to existing release PR, validate exact-head CI, then complete dev/alpha promotion preparation.
+
 ## Current preparation — 2026-10-22 (finalist schedule labels)
 
 This snapshot supersedes previous execution permissions and coordinates below. The current user request authorizes dev deployment and main promotion preparation, not main PR creation/merge or production approval.

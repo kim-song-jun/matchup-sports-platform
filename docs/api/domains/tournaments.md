@@ -762,6 +762,8 @@ are not rewritten. UI uses per-player edit/save/cancel; errors preserve the draf
 
 `POST /admin/tournaments`와 `PATCH /admin/tournaments/:id`는 `coverImageUrl`(상세용), `listImageUrl`(목록용) 및 `showDetailImage`(boolean, 기본 true)를 받는다. 두 URL은 각각 최대 1000자이며 null로 해당 사진만 제거할 수 있다. 생략한 PATCH 필드는 보존된다. `showDetailImage: false`는 사진을 삭제하지 않는다. 기존 mutation-admin 권한, PATCH `expectedVersion` CAS 및 감사 계약을 그대로 사용하며 충돌은 `409 TOURNAMENT_VERSION_CONFLICT`다. 업로드는 기존 이미지 업로드 API를 이용하며 업로드 성공만으로 대회 설정 저장 성공을 표시하지 않는다.
 
+`showDetailImage`는 JSON boolean만 받으며 문자열 `"false"`·`"true"`, 숫자, 객체, 배열은 `400 VALIDATION_ERROR`의 `details.field=showDetailImage`로 거절한다. 전역 implicit conversion으로 이 값들을 boolean으로 강제 변환하지 않는다. 생략과 null은 기존 optional 계약대로 생성 시 기본 true, PATCH 시 변경 없음으로 처리한다. 관리자 이미지 미리보기는 마스터 종목의 표시 이름으로 기존 종목 기본 그래픽을 선택한다.
+
 관리자 응답은 원본 두 URL과 `showDetailImage`를 반환한다. 공개 상세도 이를 반환한다(리그 거울의 기존 cover fallback 유지). 공개 목록의 `coverImageUrl`은 기존 소비자 호환을 위해 `listImageUrl ?? coverImageUrl`이며 `listImageUrl`도 포함한다. 프론트 기본 목록은 목록 사진을 우선한다. 상세는 상세 사진→목록 사진→종목 기본 그래픽 순으로 표시하며 `showDetailImage: false`면 업로드·기본 이미지와 전체 영역을 렌더하지 않는다. 제목·본문·목록·홍보 노출은 유지된다. 새 설정은 정규 대회용이며 정규 리그의 기존 표시 정책은 유지한다.
 
 DB는 기존 `V1Tournament.listImageUrl`을 재사용하고 `v1_tournaments.show_detail_image BOOLEAN NOT NULL DEFAULT true`를 migration으로 추가한다. 기존 행은 true다. 홈/목록 홍보 카드의 기존 전용 이미지와 문구는 호환 유지하며, 기본 사진을 사용할 때 목록→상세 사진을 따른다. 상세는 홍보 전용 이미지를 fallback으로 사용하지 않는다.

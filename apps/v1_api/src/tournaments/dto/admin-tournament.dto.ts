@@ -147,6 +147,7 @@ export class CreateTournamentDto {
 
   /** false면 업로드 이미지와 종목 기본 이미지 모두 상세에서 숨긴다. */
   @IsOptional()
+  @Transform(({ obj }) => obj.showDetailImage, { toClassOnly: true })
   @IsBoolean()
   showDetailImage?: boolean;
 
@@ -501,6 +502,7 @@ export class UpdateTournamentDto {
 
   /** false면 업로드 이미지와 종목 기본 이미지 모두 상세에서 숨긴다. */
   @IsOptional()
+  @Transform(({ obj }) => obj.showDetailImage, { toClassOnly: true })
   @IsBoolean()
   showDetailImage?: boolean;
 

@@ -229,3 +229,7 @@ than the frozen game contracts above: numbered pages include total/totalPages; c
 opt into total with `withTotal=true`. Filters run before pagination and do not widen public
 visibility. Admission-window and capacity semantics, 400 range errors, and backward-compatible
 status inputs are defined in [Tournaments](./domains/tournaments.md#competition-discovery-filters-task-20261103).
+## 카드 기록 중첩 검증
+
+경기 결과 참가자의 `cards.events`는 명시적 빈 배열과 생략의 의미가 다르다. 빈 배열은 카드 삭제,
+생략은 기존 합계 전용 입력이다. 상세 형식·합계 일치·피리어드 검증은 [games](./domains/games.md#결과-정정-카드-타임라인-2026-10-24)를 따른다.

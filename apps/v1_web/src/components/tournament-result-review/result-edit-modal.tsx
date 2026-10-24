@@ -9,7 +9,8 @@ import type {
   GameResultScoreInput,
   TournamentGameSide,
 } from '@/hooks/use-tournament-result-review';
-import type { GameLineup } from '@/types/game-operations';
+import type { GameLineup, GameEventRecord } from '@/types/game-operations';
+import { cardsForParticipant, deriveEditableCardEvents, type EditableCardEvent } from '@/lib/result-card-events';
 import { formatGameResultScoreWithPenalties, readGameResultScore } from '@/lib/game-result-score';
 import { describeGoalTimelineMismatch, isScoreOnlyResult } from './goal-timeline-consistency';
 import { isSinglePeriod, periodLabel } from '@/components/tournament-live/operate/period-label';
@@ -17,6 +18,7 @@ import { participantIdentityName } from '@/components/tournament-live/operate/pa
 import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
 import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
 import { lockBodyScroll } from '@/lib/body-scroll-lock';
+import { CardTimelineEditor } from './card-timeline-editor';
 
 /**
  * `score` 는 서버가 돌려주는 스냅샷(`GameResultScore`, 두 형태의 union -- `base.score`가
@@ -64,6 +66,7 @@ export type ResultEditModalProps = {
    * 실명 표시에 쓴다. 아직 로딩 중이거나 없으면 빈 배열을 넘기면 된다(폴백은
    * `participantLabel`이 알아서 처리한다). */
   lineups: readonly GameLineup[];
+  events?: readonly GameEventRecord[];
   /**
    * 이 경기가 결선(knockout) 픽스처인지 -- `GET /games/:gameId` 응답의
    * `isKnockoutFixture`(`TournamentGameDetail`)를 그대로 내려준다.
@@ -318,6 +321,7 @@ export function ResultEditModal({
   periods,
   periodCount,
   lineups,
+  events = [],
   isKnockoutFixture = false,
   submitting = false,
   errorMessage,
@@ -368,6 +372,7 @@ export function ResultEditModal({
     const isHome = (sideId: string) => sides.find((side) => side.id === sideId)?.sideKey === 'HOME';
     return base.participants.map(toEditable).sort((a, b) => Number(isHome(b.sideId)) - Number(isHome(a.sideId)));
   });
+  const [cardEvents, setCardEvents] = useState(() => deriveEditableCardEvents(base.participants, events));
   const [mvpParticipantId, setMvpParticipantId] = useState<string>(base.mvpParticipantId ?? '');
   const [reason, setReason] = useState('');
 
@@ -567,9 +572,30 @@ export function ResultEditModal({
     !submitting;
 
   function updateParticipant(index: number, patch: Partial<EditableParticipant>) {
+    if (patch.cards) {
+      const participant = participants[index];
+      // Aggregate edits remain compatible, but new rows have no invented occurrence time.
+      const own = cardEvents.filter((event) => event.participantId === participant.participantId);
+      const next = (['YELLOW', 'RED'] as const).flatMap((card) => {
+        const count = patch.cards![card === 'YELLOW' ? 'yellow' : 'red'];
+        const existing = own.filter((event) => event.card === card);
+        return Array.from({ length: count }, (_, i) => existing[i] ?? {
+          id: crypto.randomUUID(), card, participantId: participant.participantId, sideId: participant.sideId,
+        });
+      });
+      replaceCardEvents([...cardEvents.filter((event) => event.participantId !== participant.participantId), ...next]);
+      return;
+    }
     setParticipants((current) =>
       current.map((participant, i) => (i === index ? { ...participant, ...patch } : participant)),
     );
+  }
+
+  function replaceCardEvents(next: EditableCardEvent[]) {
+    setCardEvents(next);
+    setParticipants((current) => current.map((participant) => ({
+      ...participant, cards: cardsForParticipant(next, participant.participantId),
+    })));
   }
 
   /** 기록(득점·도움·카드)이 있거나 득점·MVP 로 걸린 사람은 빼지 않는다 — 빼면 그 기록이 함께 사라진다. */
@@ -913,6 +939,20 @@ export function ResultEditModal({
             </div>
           </section>
 
+          <CardTimelineEditor
+            events={cardEvents}
+            participants={participants.map((participant) => ({
+              participantId: participant.participantId, sideId: participant.sideId,
+              label: participantLabel(sides, participantNameMap, participant.participantId, participant.sideId),
+            }))}
+            periods={periods}
+            periodCount={periodCount}
+            onChange={replaceCardEvents}
+          />
+          {JSON.stringify(cardEvents) !== JSON.stringify(deriveEditableCardEvents(base.participants, events)) ? (
+            <p className="tm-text-caption mb-3" style={{ color: 'var(--blue700)' }}>카드 기록 변경: {cardEvents.length}건으로 저장해요.</p>
+          ) : null}
+
           <p className="tm-text-label" style={{ fontWeight: 600, color: 'var(--text-strong)', marginBottom: 4 }}>
             참가자별 기록
           </p>
@@ -1124,7 +1164,9 @@ export function ResultEditModal({
                 // 서버가 받아 주는 상태(`penaltiesAllowed`)에서는 반드시 실어 보낸다.
                 score: draftScore,
                 ...(scoreOnly ? {} : { goalEvents }),
-                actualParticipants: participants,
+                actualParticipants: participants.map((participant) => ({
+                  ...participant, cards: cardsForParticipant(cardEvents, participant.participantId),
+                })),
                 ...(mvpParticipantId ? { mvpParticipantId } : {}),
                 reason: trimmedReason,
               });

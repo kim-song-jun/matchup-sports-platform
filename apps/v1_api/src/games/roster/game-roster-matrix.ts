@@ -68,6 +68,7 @@ export function buildTeamRosterMatrix(input: {
   /** `playedLineup` 은 시작된 경기의 기록 명단(`loadPlayedLineup`) — 없거나 null 이면 계산한 출전자를 쓴다. */
   readonly columns: readonly { game: TeamRosterMatrixGame; loaded: LoadedGameRoster | null; playedLineup?: readonly PlayedLineupRow[] | null }[];
   readonly canWrite: boolean;
+  readonly canEditEnded?: boolean;
   /** 계정 id → 실명. 대회 운영진에게만 채워 넘긴다. */
   readonly realNameByUserId?: ReadonlyMap<string, string>;
 }): TeamRosterMatrix {
@@ -129,7 +130,7 @@ export function buildTeamRosterMatrix(input: {
   return {
     games: input.columns.map(({ game, loaded }, index) => ({
       ...game,
-      editable: input.canWrite && loaded !== null && game.gameState === 'SCHEDULED',
+      editable: input.canWrite && loaded !== null && (game.gameState === 'SCHEDULED' || (input.canEditEnded === true && game.gameState === 'ENDED')),
       goalkeeperEditable: game.goalkeeperEditable !== false && input.canWrite && loaded !== null && game.gameState === 'SCHEDULED',
       summary: byGame[index].summary,
     })),

@@ -2,6 +2,31 @@
 
 # Game aggregate contract
 
+## 결과 정정 카드 타임라인 (2026-10-24)
+
+`GameResultParticipantDto.cards`는 기존 `{yellow,red}`에 선택적 `events` 배열을 추가한다.
+각 항목은 `{id,card:'YELLOW'|'RED',minute?,period?}`이며 minute은 0 이상 정수,
+period는 1 이상 정수다. 생략은 시간/피리어드 미입력을 뜻하며 0분과 다르다.
+중첩 필드는 whitelist 검증하고, events가 있으면 종류별 개수는 yellow/red와 일치해야 한다.
+정정과 재제출은 경기 내 중복 id 및 존재하지 않는 피리어드를 422
+`RESULT_CARD_TIMELINE_INVALID`로 거부한다. HTTP 구조 오류는 400 `VALIDATION_ERROR`다.
+
+`POST /games/:gameId/corrections`의 `changes.actualParticipants`와
+`POST /games/:gameId/result-revisions/:revisionId/supersede-and-submit`의 `actualParticipants`에
+같은 형식을 사용한다. 기존 권한·expectedVersion·Idempotency-Key 계약은 유지한다.
+배열은 참가자별 `V1GameResultParticipant.cards` JSON에 합계와 함께 저장되어 별도 migration이 없다.
+기존 합계 전용 요청도 허용한다. 프론트 정정/재제출은 events를 항상 포함해 삭제도 명시한다.
+
+공식화 후 공개 경기 상세·일정 카드·팀 전적의 CARD는 현재 공식 참가자 스냅샷을 읽는다.
+명시적 `events:[]`는 삭제이며 현장 이벤트로 되살리지 않는다. 과거 합계만 있는 기록은
+취소되지 않은 같은 선수·같은 진영·같은 종류 현장 기록을 합계 범위에서 복원하고,
+부족한 장수는 시각/피리어드 null로 표시한다. 개인 기록의 yellow/red 합계도 같은 행을 읽는다.
+카드의 이름·프로필은 기존 공개 동의/스태프 게이트를 그대로 따른다. 테스트·MSW에서 시간 정보가
+필요한 fixture는 events까지 넣고 합계와 맞춰야 한다. 합계 전용 fixture는 기존 호환 사례다.
+
+검증 근거: `result-cards.dto.spec.ts`, `result-card-events.spec.ts`,
+`public-tournament-records.event-order.spec.ts`, `public-team-records.service.spec.ts`, `result-edit-modal.test.tsx`.
+
 ## Explicit-start league result gate (2026-10-19)
 
 For a regular league with `requiresExplicitStart=true`, stored lifecycle `draft`, `open`, or `closed`
@@ -74,12 +99,12 @@ raw roster identity fields.
 | `POST` | `/api/v1/games/:gameId/sides/:sideId/roster-adjustments` | 그 사이드 팀 owner·manager · 플랫폼 운영자 · 라인업 쓰기 가능한 대회 스태프(`support_readonly` 제외) | `CreateGameRosterAdjustmentDto { userId, reason?: INJURY\|PERSONAL\|LATE_OR_EARLY\|OTHER }` → 200 `{ alreadyApplied, adjustment, roster }`. `actorRole` 은 TEAM_MANAGER/ADMIN/STAFF. 기준 명단 밖이면 `422 ROSTER_ADJUSTMENT_NOT_IN_ROSTER`, 경기가 `SCHEDULED` 가 아니면 `409 LINEUP_DEADLINE_PASSED`(게임 행을 잠가 시작 명령과 직렬화), 인가 뒤 잠그는 사이에 사이드 팀이 바뀌었으면 `409 COMMAND_CONCURRENCY_CONFLICT`. 조정 행은 그때의 사이드 팀(`teamId`)에 묶이고, 사이드 팀이 바뀌는 쓰기(진출 재투영·배정 해제·대진 수정)는 새 팀이 아닌 활성 조정을 시스템 되돌리기(`revokedByRole=SYSTEM`)로 닫는다 — 같은 팀이 다시 배정돼도 옛 빼기가 되살아나지 않는다. 이미 빠져 있으면 첫 기록을 그대로 돌려준다(`alreadyApplied: true`). 같은 트랜잭션에서 경기 명단을 다시 맞춘다(새 SUBMITTED 리비전, 행 삭제 없음, 검인 시각 이월). 잠금은 대회·리그 행 → 명단 행 없는 리그 확정 신청 채우기 → 경기 순이다. 경기 잠금이 결과 확정·대진 수정 등과 겹치면 NOWAIT로 전체 명단 쓰기를 롤백하고 `409 COMMAND_CONCURRENCY_CONFLICT`를 반환한다(다시 조회 후 재시도). 후속 명단 워커의 같은 충돌은 기존 outbox 재시도로 처리한다. |
 | `DELETE` | `/api/v1/games/:gameId/sides/:sideId/roster-adjustments/:userId` | POST 와 같음 | 지금 사이드 팀의 활성 EXCLUDE 를 `revokedAt`·`revokedByUserId`·`revokedByRole`(되돌린 사람 역할)로 되돌린다(행은 남는다) → 200 `{ alreadyApplied, roster }`. 활성 조정이 없으면 `alreadyApplied: true`. 마감 규칙은 POST 와 같다. |
 | `GET` | `/api/v1/teams/:teamId/game-rosters` | 그 팀 owner·manager · 플랫폼 어드민(support 는 읽기만). 팀원·대회 스태프는 `403 PERMISSION_DENIED` (Task 179 팀 B) | 선수 × 시작 전 대회·리그 경기 표. 시작 전 = `SCHEDULED` — 대회 경기는 킥오프 시각이 지나도 시작 명령 전이면 포함하고(지연 경기, 끝난·취소된 대회 제외), 리그 경기는 킥오프 시각 전까지만(결과 입력이 `SCHEDULED` 에서 바로 끝낼 수 있어 시각이 지난 경기는 이미 치렀을 수 있다). 저장된 경기 명단의 재계산(후속 이벤트 `COMPETITION_ROSTER_RESYNC`)도 같은 경기들을 대상으로 한다. `games[]` = `{ gameId, sideId, teamMatchId, competitionId, competitionKind, competitionTitle, opponentName, scheduledAt, gameState, editable, summary }`(시각순, `summary` = `{ participating, excluded, unavailable, suspended }`, 확정 명단 없는 경기는 null), `players[]` = `{ userId, displayName, accountLinked, cells[] }`(이름순 — 대회·리그마다 등번호가 달라서) — `cells` 는 `games` 와 같은 순서로 `{ gameId, status: PARTICIPATING\|EXCLUDED\|UNAVAILABLE\|SUSPENDED\|NOT_IN_ROSTER, reason, actorRole, adjustmentId, unavailabilityId, remainingMatches }`. |
-| `POST` | `/api/v1/teams/:teamId/game-rosters/batch` | 경기마다 그 팀 사이드 기준으로 경기 명단 POST 와 같은 권한 | `GameRosterBatchDto { changes: [{ gameId, userId, op: EXCLUDE\|REVOKE, reason? }] }`(1~200건, 같은 경기·선수 중복·REVOKE 에 사유는 400) → 200 `{ teamId, results[]: { gameId, sideId, userId, op, alreadyApplied } }`. 한 트랜잭션 — 게임 행을 id 순으로 잠그고 하나라도 `SCHEDULED` 가 아니면 `409 LINEUP_DEADLINE_PASSED`(`details.gameIds`), 그 팀이 안 뛰는 경기는 `404 GAME_SIDE_NOT_FOUND`, 기준 밖 선수는 `422`. 어느 경우든 아무것도 쓰지 않는다. 바뀐 사이드마다 명단을 한 번 다시 맞춘다. |
+| `POST` | `/api/v1/teams/:teamId/game-rosters/batch` | 경기마다 그 팀 사이드 기준으로 경기 명단 POST 와 같은 권한 | `GameRosterBatchDto { changes: [{ gameId, userId, op: EXCLUDE\|REVOKE, reason? }] }`(1~200건, 같은 경기·선수 중복·REVOKE 에 사유는 400) → 200 `{ teamId, results[]: { gameId, sideId, userId, op, alreadyApplied } }`. 한 트랜잭션 — 게임 행을 id 순으로 잠그고 하나라도 `SCHEDULED` 가 아니면(활성 owner·ops 플랫폼 어드민의 `ENDED` 출전 EXCLUDE/REVOKE는 예외) `409 LINEUP_DEADLINE_PASSED`(`details.gameIds`), 그 팀이 안 뛰는 경기는 `404 GAME_SIDE_NOT_FOUND`, 기준 밖 선수는 `422`. 어느 경우든 아무것도 쓰지 않는다. 바뀐 사이드마다 명단을 한 번 다시 맞춘다. |
 | `GET` | `/api/v1/teams/:teamId/members/:userId/unavailability` | 그 팀 활성 멤버 · 플랫폼 어드민 (Task 179 팀 C) | 그 팀원의 결장 기간(취소 포함) `items[]` = `{ id, teamId, userId, startsAt, endsAt, reason, actor: { userId, displayName, role }, createdAt, revokedAt }`, 시작 시각 내림차순. |
 | `GET` | `/api/v1/teams/:teamId/unavailability?activeAt=<ISO 8601>` | 팀원별 결장 조회와 같다 — 그 팀 활성 멤버 · 플랫폼 어드민(support 포함). 대회 스태프·떠난 팀원은 `403 PERMISSION_DENIED` (Task 179) | `activeAt`(선택, 없으면 지금)을 덮는(`startsAt <= activeAt < endsAt`) 취소 안 된 결장 기간 중 **지금 활성 팀원**의 것만 `{ items[]: { id, userId, reason, startsAt, endsAt, actorRole } }`, 시작 시각 오름차순(한 사람이 겹치는 기간을 가지면 경기 명단 계산처럼 먼저 시작한 것이 앞). 친선 참석명단의 "결장 중" 표시용 — 친선에는 자동 제외가 없다. `activeAt` 이 ISO 8601 이 아니거나 없는 날짜면 `400`. |
 | `POST` | `/api/v1/teams/:teamId/members/:userId/unavailability` | 그 팀 owner·manager · 플랫폼 어드민(support 제외). **본인 것은 등록·취소 불가**(D6), 대회 스태프 불가 | `CreateMemberUnavailabilityDto { startsAt, endsAt, reason?: INJURY\|PERSONAL\|OTHER }` → 201 `{ unavailability }`. `startsAt < endsAt` 아니면 `400 UNAVAILABILITY_INVALID_PERIOD`, 활동 중 팀원이 아니면 `404 TEAM_MEMBER_NOT_FOUND`. 시작 시각이 `[startsAt, endsAt)` 안인 시작 전 대회·리그 경기에서 빠진다(친선 제외). 조회(경기 명단 GET·팀 표)는 요청 때 계산해 곧바로 반영되고, 저장된 경기 명단(제출본)은 후속 이벤트 `COMPETITION_ROSTER_RESYNC` 를 워커가 처리하며 맞춘다. |
 | `DELETE` | `/api/v1/teams/:teamId/members/:userId/unavailability/:unavailabilityId` | POST 와 같음 | `revokedAt` 으로 취소(행은 남는다) → 200 `{ alreadyApplied, unavailability }`. 없는 id 는 `404 UNAVAILABILITY_NOT_FOUND`. |
-| `GET` | `/api/v1/admin/tournaments/:tournamentId/registrations/:registrationId/game-rosters` | 플랫폼 어드민(support 포함, support 는 `editable=false`) · 그 대회 스태프(`support_readonly` 포함, 라인업 쓰기 판정이 없으면 `editable=false`) | 참가 신청 팀의 선수 × 경기 표(대회·리그 공통, 모양은 팀 표와 같고 그 대회·리그 경기만). **진행한 경기 포함(2026-10-20)**: 팀 표의 시작 전 경기에 더해 그 대회·리그에서 시작된 경기(`LIVE`·`PAUSED`·`ENDED`)도 시각순으로 싣는다 — 취소된 경기(`CANCELLED`)·취소된 대진은 빠진다. 시작된 경기 칸은 경기 명단 화면과 같은 규칙으로 기록 명단을 출전자로 보여 준다(종료 경기는 현재 공식 리비전 출전자, 그 밖에는 제출본 — 없으면 최신 리비전). 기록에 있는 사람은 시작 뒤 생긴 결장·정지로 빠짐이 되지 않고, 시작 뒤 참가 명단에 들어온 사람은 `NOT_IN_ROSTER`, 명단을 떠난 출전자도 행으로 남는다. 시작된 경기는 `editable=false`(정정은 결과 정정에서). `{ registrationId, teamId, competitionId, viewerRole: ADMIN\|STAFF, games, players }`. 권한을 먼저 보고, 그 대회 신청이 아니면 `404 REGISTRATION_NOT_FOUND`. 쓰기는 경기 명단 API 를 운영자 권한으로 쓴다. **운영진 실명(2026-10-18)**: owner·ops 어드민과 디렉터·현장 운영자 스태프에게는 계정 선수 행에 `realName` 이 더해진다(값이 있을 때만). support 어드민·`support_readonly` 스태프에게는 키 자체가 없고 계정도 조회하지 않는다. |
+| `GET` | `/api/v1/admin/tournaments/:tournamentId/registrations/:registrationId/game-rosters` | 플랫폼 어드민(support 포함, support 는 `editable=false`) · 그 대회 스태프(`support_readonly` 포함, 라인업 쓰기 판정이 없으면 `editable=false`) | 참가 신청 팀의 선수 × 경기 표(대회·리그 공통, 모양은 팀 표와 같고 그 대회·리그 경기만). **진행한 경기 포함(2026-10-20)**: 팀 표의 시작 전 경기에 더해 그 대회·리그에서 시작된 경기(`LIVE`·`PAUSED`·`ENDED`)도 시각순으로 싣는다 — 취소된 경기(`CANCELLED`)·취소된 대진은 빠진다. 시작된 경기 칸은 경기 명단 화면과 같은 규칙으로 기록 명단을 출전자로 보여 준다(종료 경기는 현재 공식 리비전 출전자, 그 밖에는 제출본 — 없으면 최신 리비전). 기록에 있는 사람은 시작 뒤 생긴 결장·정지로 빠짐이 되지 않고, 시작 뒤 참가 명단에 들어온 사람은 `NOT_IN_ROSTER`, 명단을 떠난 출전자도 행으로 남는다. 진행 중·일시정지는 `editable=false`. 종료(`ENDED`)는 활성 owner·ops 플랫폼 어드민에게만 `editable=true`(support·스태프는 false), GK 변경은 계속 false. 저장은 팀 batch API로 한다. `{ registrationId, teamId, competitionId, viewerRole: ADMIN\|STAFF, games, players }`. 권한을 먼저 보고, 그 대회 신청이 아니면 `404 REGISTRATION_NOT_FOUND`. 쓰기는 경기 명단 API 를 운영자 권한으로 쓴다. **운영진 실명(2026-10-18)**: owner·ops 어드민과 디렉터·현장 운영자 스태프에게는 계정 선수 행에 `realName` 이 더해진다(값이 있을 때만). support 어드민·`support_readonly` 스태프에게는 키 자체가 없고 계정도 조회하지 않는다. |
 | `GET` | `/api/v1/teams/:teamId/upcoming-games` | 그 팀 활성 멤버 | 팀 경기 목록(라인업 할 일과 같은 수집 경로, 완료 라인업도 포함). 항목 `{ gameId, source, competitionKind: TOURNAMENT\|LEAGUE\|FRIENDLY, teamMatchId, sideId, title, opponentName, scheduledAt, tournamentId, tournamentTitle, lineupState, rosterSummary }`. **Task 179**: `rosterSummary` = 대회·리그 경기의 계산된 명단 `{ participating, excluded, unavailable, suspended }`, 팀 경기 명단 표와 같은 계산을 쓰며 친선·확정 명단 없는 팀은 null. 경기 명단 진입 목록은 킥오프가 지났더라도 게임 상태가 `SCHEDULED`이고 대회가 진행 중인 대회 경기를 포함한다(대회 표의 시작 전 판정과 동일). 이 지연 경기 추가 경로에는 취소 게임·취소/종료된 대회가 들어오지 않는다. 개인 라인업 할 일·홈 다음 경기·알림은 이 예외를 공유하지 않고 각자의 시간 기준을 유지한다. 대회 경기 `title` 은 `<대회명> · <경기 이름>` 이고 경기 이름은 화면과 같은 `competitionMatchLabel` 규칙이다 — 조별 경기는 조 이름 + 라운드(`A조 · 조별리그 2라운드`), 조 없는 결선은 라운드만(`4강`, 2차전은 `4강 2차`). 라운드 코드(`league_r2`·`semi` 등)는 그대로 싣지 않는다. **Task 180 G7**: `viewerParticipating` = 요청자가 그 경기에 출전하는지(서버 판정 — 대회·리그는 계산된 경기 명단의 출전자, 친선은 그 사이드의 가장 최근 제출본 참석명단). 빠진 경기는 `false` 일 뿐 별도 값이 없고, 홈 `teamActivity.nextGame.viewerParticipating` 과 같은 판정(`viewer-game-participation.ts`)이다. |
 | `GET` | `/api/v1/teams/:teamId/games/:gameId/tactics-board` | 그 팀 활성 멤버(`assertTeamLineupMember`). 경기 사이드는 `gameId`+`teamId` 로 함께 찾는다 — 그 팀이 안 뛰는 경기는 `404 TACTICS_BOARD_SIDE_NOT_FOUND` | 팀 내부 전술보드 한 판 `{ gameSideId, sideKey, teamNameSnapshot, formation, version, updatedAt, updatedByUserId, starterCount, benchCount, lineupLimits, sportCode, playersPerSide, lineupConfig, entries[] }`. 저장 전이면 `version: 0` 빈 판. **Task 180 H7**: `sportCode`(`football`\|`futsal`, 설정을 못 찾으면 null)로 화면이 코트 모양을, `playersPerSide`(GK 포함 한 팀 인원 — 친선은 경기방식이 `"N:N"` 으로 읽힐 때 그 N, 아니면 설정의 `lineup.maxPlayers`)와 `lineupConfig`(`{ positions, formations, minPlayers, maxPlayers }`, 라인업 GET 과 같은 `parseLineupConfigForResponse`)로 고를 수 있는 대형을 정한다. 보드는 명단·kickoff·결과 어느 쪽과도 연결되지 않는다(정본 §3). |
 | `PUT` | `/api/v1/teams/:teamId/games/:gameId/tactics-board` | 그 팀 owner·manager(`assertTeamLineupManager`) | `SaveTeamTacticsBoardDto { formation, expectedVersion?, entries[] }` 전체 교체, compare-and-swap. 어긋나면 `409 TACTICS_BOARD_VERSION_CONFLICT`, 좌표 한쪽만 주면 `422 TACTICS_BOARD_INVALID_COORDINATE`. 응답은 GET 과 같은 모양. |
@@ -326,3 +351,11 @@ Game `start` in a regular league with `requiresExplicitStart=true` and stored as
 대회 운영콘솔은 팀이 설정한 경기별 출전 명단을 `GET /teams/:teamId/games/:gameId/roster`로 읽는다. 기본은 조회이며 수정하기 후 저장할 때 기존 `POST /games/:gameId/sides/:sideId/roster-adjustments`(선수 제외), `DELETE .../roster-adjustments/:userId`(복귀)를 사용한다. 기존 운영자 인가와 경기 시작 전 제한을 유지하며 대회 공통 참가 명단·다른 경기는 바꾸지 않는다. 저장은 단건 API를 직렬 호출하므로 부분 실패 시 저장된 수와 오류를 표시하고 실제 명단을 재조회한다. 도착 검인은 출전 여부가 아니며 대회 콘솔에서 전원 도착을 요구하지 않는다.
 
 대회·리그 경기 이벤트 append/retry의 선수·도움·교체 대상과 기존 득점의 도움 추가는 현재 유효한 명단 리비전에 속해야 한다. 이전 리비전·제외 선수 ID는 `422 PARTICIPANT_NOT_IN_CURRENT_ROSTER`다. 기존 이벤트와 참가자 FK는 보존한다. 일반 친선 경기 계약은 유지한다.
+
+
+### 어드민 종료 경기의 출전 정정 (2026-10-24)
+
+- `POST /teams/:teamId/game-rosters/batch`의 `EXCLUDE`/`REVOKE`만 활성 owner·ops 어드민에게 `ENDED` 예외를 허용한다. 사용자 입력 flag로 권한을 열지 않으며 경기 행 잠금 후 상태를 다시 확인한다. 일반 팀 권한·스태프·support, LIVE/PAUSED/CANCELLED, 종료 경기의 SET_GOALKEEPER는 기존 마감대로 거절한다.
+- 공식 결과는 기존 리비전을 수정하지 않고 점수·상대팀·기존 개인 기록을 보존한 새 공식 리비전으로 출전자만 변경한다. `GAME_RESULT_OFFICIAL` 후속 이벤트로 공식 조회 캐시·개인 전적을 갱신한다. 확정 전은 제출 결과와 기록 명단의 후속 리비전을 만들고 `GAME_RESULT_SUBMITTED`를 발행한다. 결과 없는 종료 경기는 기록 명단의 후속 제출본을 만든다.
+- 뺄 선수에게 득점·도움·반칙·카드·MVP·득점 타임라인이 있거나 되돌릴 과거 참가자 행이 없으면 `409 ROSTER_RESULT_CORRECTION_REQUIRED`: 결과 정정에서 함께 수정하도록 실제 이유를 안내한다. 전체 batch는 rollback한다. 이미 적용한 변경 재요청은 기존 멱등 처리를 유지한다.
+- 경기별 조정 기록에 ADMIN 주체가 남고, 기존 라인업·결과 이력을 삭제하지 않는다. API 응답 필드 추가나 DB migration은 없다.

@@ -32,7 +32,7 @@ type Notice = { tone: 'info' | 'error'; message: string };
 
 /**
  * 어드민 참가 신청의 팀 행 펼침(Task 179 어드민) — 선수 × 그 대회·리그의 진행한 경기와 시작 전 경기.
- * 진행한 경기 칸은 기록 명단 그대로 읽기만 한다. 시작 전 경기 칸을 누르면 빼거나 되돌리고,
+ * 종료 경기 칸은 플랫폼 어드민만 빼거나 되돌릴 수 있다. 편집 가능한 칸의 변경을
  * 모아서 팀 일괄 API 한 번으로 저장한다(기록엔 운영자로 남는다).
  * 결장 기간 등록은 플랫폼 어드민만(지원 계정·대회 스태프 불가 — 서버 권한 표와 같다).
  */
@@ -95,7 +95,7 @@ export function AdminRegistrationGameRosters({
   }
 
   const anyEditable = data.games.some((game) => game.editable);
-  // 시작 전 경기가 있는데 바꿀 칸이 없으면 보기 권한만 있는 계정이다(지원 계정 등). 진행한 경기 칸은 누구도 못 바꾼다.
+  // 시작 전 경기가 있는데 바꿀 칸이 없으면 보기 권한만 있는 계정이다(지원 계정 등). 종료 경기는 플랫폼 어드민만 바꾼다.
   const usageHint = anyEditable
     ? '칸을 누르면 그 경기에서 빼거나 되돌려요 · '
     : data.games.some((game) => game.gameState === 'SCHEDULED')
@@ -210,7 +210,7 @@ export function AdminRegistrationGameRosters({
       )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="m-0 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
-          {usageHint}시작된 경기는{' '}
+          {usageHint}개인 기록이 있는 선수는{' '}
           <Link href={correctionHref} className="font-semibold text-[var(--blue700)] underline underline-offset-2">
             결과 정정
           </Link>

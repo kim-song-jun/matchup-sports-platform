@@ -1696,6 +1696,17 @@ export class TournamentResultReviewService {
         });
       }
     }
+    const cardEvents = content.actualParticipants.flatMap((participant) => participant.cards.events ?? []);
+    if (new Set(cardEvents.map((event) => event.id)).size !== cardEvents.length) {
+      throw new UnprocessableEntityException({ code: 'RESULT_CARD_TIMELINE_INVALID', message: '카드 기록이 중복돼요.' });
+    }
+    if (cardEvents.some((event) => event.period !== undefined)) {
+      const periods = await tx.v1GamePeriod.findMany({ where: { gameId }, select: { number: true } });
+      const allowed = new Set(periods.map((period) => period.number));
+      if (cardEvents.some((event) => event.period !== undefined && !allowed.has(event.period))) {
+        throw new UnprocessableEntityException({ code: 'RESULT_CARD_TIMELINE_INVALID', message: '이 경기의 피리어드를 선택해 주세요.' });
+      }
+    }
     // Participants of a lineup invalidated by a side team change belong to the replaced team; their rows stay for
     // history (earlier revisions and identity links reference them) but cannot join a new revision.
     const replacedLineups = await tx.v1GameLineup.findMany({

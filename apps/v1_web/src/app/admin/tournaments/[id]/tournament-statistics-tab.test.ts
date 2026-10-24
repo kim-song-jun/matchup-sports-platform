@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { V1AdminBracketFixture, V1AdminBracketResult, V1TournamentFixtureGoal } from '@/types/api';
-import { buildTournamentStatistics } from './tournament-statistics-tab';
+import { buildTournamentStatistics, buildTournamentStageScorers } from './tournament-statistics-tab';
 
 function fixture({
   id,
@@ -260,5 +260,38 @@ describe('buildTournamentStatistics — 득점자 운영진 실명', () => {
     ]);
 
     expect(result.scorers).toEqual([expect.objectContaining({ playerName: name, goals: 2 })]);
+  });
+});
+
+
+describe('buildTournamentStageScorers', () => {
+  const match = () => fixture({ id: 'final', homeId: 'a', homeName: '한강 FC', awayId: 'b', awayName: '성수 FC', homeScore: 2, awayScore: 1,
+    goals: [goal('g1', 'home', 'p1', '득점 선수'), goal('g2', 'home', 'p1', '득점 선수'), { ...goal('g3', 'away', 'p2', '자책 선수'), ownGoal: true }],
+  });
+
+  it('조의 phase를 우선하며 결승과 3·4위전, 전체 기록을 구분한다', () => {
+    const final = { ...match(), groupId: 'final-group', round: '자유 표시 이름' };
+    const third = { ...match(), id: 'third', groupId: 'third-group', round: '결승' };
+    const semi = { ...match(), id: 'semi', groupId: 'semi-group', round: '결승' };
+    const groups = [{ id: 'final-group', phase: 'final' }, { id: 'third-group', phase: 'third_place' }, { id: 'semi-group', phase: 'semi' }];
+    expect(buildTournamentStageScorers([final, third, semi], groups, 'final')).toEqual([expect.objectContaining({ playerName: '득점 선수', goals: 2 })]);
+    expect(buildTournamentStageScorers([final, third, semi], groups, 'third_place')).toEqual([expect.objectContaining({ goals: 2 })]);
+    expect(buildTournamentStatistics([final, third, semi]).scorers[0].goals).toBe(6);
+  });
+
+  it.each([['final', '결승'], ['final', 'final'], ['third_place', '3·4위전'], ['third_place', 'third_place']] as const)('조 없는 수동 경기 %s / %s도 집계한다', (stage, round) => {
+    expect(buildTournamentStageScorers([{ ...match(), round }], [], stage)[0]).toMatchObject({ playerName: '득점 선수', goals: 2 });
+  });
+
+  it('예정·몰수·중단 경기와 자책골은 제외하고 10명이 넘어도 모든 득점자를 보여준다', () => {
+    const final = { ...match(), round: 'final' };
+    const goals = Array.from({ length: 12 }, (_, i) => goal(`g${i}`, 'home', `p${i}`, `선수 ${i}`, `u${i}`));
+    const normal = { ...final, result: { ...final.result!, goals, homeScore: 12 } };
+    const forfeit = { ...final, result: { ...final.result!, outcomeReason: 'FORFEIT' as const } };
+    const abandoned = { ...final, result: { ...final.result!, outcomeReason: 'ABANDONED' as const } };
+    const rows = buildTournamentStageScorers([normal, forfeit, abandoned, { ...final, result: null }], [], 'final');
+    expect(rows).toHaveLength(12);
+    expect(rows.every((row) => row.goals === 1)).toBe(true);
+    expect(buildTournamentStageScorers([final], [], 'final')).toHaveLength(1);
   });
 });

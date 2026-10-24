@@ -1712,7 +1712,14 @@ export type V1GameResultScore =
       };
     };
 
-export type V1GameResultCards = { yellow: number; red: number };
+export type V1GameResultCardEvent = {
+  id: string;
+  card: 'YELLOW' | 'RED';
+  minute?: number;
+  period?: number;
+};
+
+export type V1GameResultCards = { yellow: number; red: number; events?: V1GameResultCardEvent[] };
 
 export type V1GameResultParticipantRow = {
   id: string;

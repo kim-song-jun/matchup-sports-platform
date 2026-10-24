@@ -1,5 +1,17 @@
 # 2026-10-05 dev → main production promotion
 
+## Current preparation refresh — 2026-10-24 (1.11.9)
+
+This supersedes the 1.11.8 preparation coordinates below; actual main creation/merge and production approval remain user-operated.
+
+- During the post-merge verification of #2055, #2056 introduced admin tournament stage statistics into dev b01eee64727627c350f2ddd243364ddcb72891d3. The newer dev push cancelled CI40099155930; alpha40099155948 stopped before server changes because its matching CI was cancelled. This is supersession, not a product failure.
+- Owned: `/tmp/teameet-main-prep-1.11.9`, branch `release/version-1.11.9`, both app manifests/changelogs, the new consumed Changeset and this task. No runtime/schema/workflow changes, no shared WIP or main/production writes.
+- [x] Fresh dev baseline; official Changesets CLI2.30.0 consumed the one new Web patch. Fixed group now has source API/Web1.11.9 and both version headings. API has no new runtime delta; Web changelog records #2056.
+- [ ] Validate release/promotion policies and publish a new dev preparation PR; exact-head CI then normal dev merge.
+- [ ] Latest dev CI/alpha release identity and API DB health, followed by official promotion gate and user-operated main compare link.
+- Metadata is prepared independently while alpha follows the latest dev; do not claim alpha/prepare-only success for this source yet. Existing resolver plans artifact1.11.10 once these Changesets are consumed.
+- Earlier #2055 and its exact-head product CI succeeded; no earlier alpha or earlier-head review is presented as current verification. AI scan still has the external model-session error and shared root ff-only sync remains blocked by unrelated WIP.
+
 ## Current preparation — 2026-10-24 (1.11.8)
 
 This snapshot supersedes historical execution permissions below. The user requested main promotion preparation only. Actual dev→main PR creation/merge and production approval remain user-operated.

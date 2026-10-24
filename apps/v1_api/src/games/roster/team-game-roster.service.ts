@@ -3,6 +3,7 @@ import type { V1AuthUser } from '../../auth/v1-auth-user';
 import { PrismaService } from '../../prisma/prisma.service';
 import { TournamentStaffAccessService } from '../../tournaments/staff/tournament-staff-access.service';
 import type { GameRosterBatchDto, GameRosterBatchOp } from './dto/team-game-roster.dto';
+import { syncAdminEndedGameRoster } from './admin-ended-game-roster';
 import { buildTeamRosterMatrix } from './game-roster-matrix';
 import { isUnmigratedTeamAuthoredLineup, syncLockedCompetitionTeam, syncPreparedGameSideRoster, upcomingCompetitionGameWhere } from './game-roster-sync';
 import { loadGameRosterContext } from './game-roster-loader';
@@ -59,7 +60,7 @@ export class TeamGameRosterService {
       if (registration === null) {
         throw new NotFoundException({ code: 'REGISTRATION_NOT_FOUND', message: '참가 신청을 찾을 수 없어요.' });
       }
-      // 운영진은 진행한 경기의 실제 출전 명단도 본다 — 시작된 경기 칸은 읽기 전용이다(정정은 결과 정정에서).
+      // 운영진은 진행한 경기의 실제 출전 명단도 본다 — 종료 경기의 출전 조정은 플랫폼 어드민만 허용한다.
       const columns = await loadTeamRosterColumns(tx, { teamId: registration.teamId, competitionId, now: new Date(), includeStarted: true });
       // 선수 실명은 대회를 운영하는 쪽만 본다(경기 명단 화면과 같은 규칙) — 지원 계정·조회 전용 스태프는 계정도 조회하지 않는다.
       const realNameByUserId = viewer.identityVisible
@@ -73,14 +74,14 @@ export class TeamGameRosterService {
         teamId: registration.teamId,
         competitionId,
         viewerRole: viewer.viewerRole,
-        ...buildTeamRosterMatrix({ columns, canWrite: viewer.canWrite, realNameByUserId }),
+        ...buildTeamRosterMatrix({ columns, canWrite: viewer.canWrite, canEditEnded: viewer.viewerRole === 'ADMIN' && viewer.canWrite, realNameByUserId }),
       };
     });
   }
 
   /**
    * 여러 경기·선수의 빼기·되돌리기를 한 트랜잭션으로. 권한은 경기마다 그 사이드 기준으로 다시 보고,
-   * 시작된 경기가 하나라도 섞이면 아무것도 쓰지 않는다(409).
+   * 진행 중 경기는 거절하고 종료 경기는 플랫폼 어드민의 출전 조정만 허용한다.
    */
   applyBatch(user: V1AuthUser, teamId: string, dto: GameRosterBatchDto) {
     const keys = dto.changes.map((change) => `${change.gameId}:${change.userId}:${change.op === "SET_GOALKEEPER" ? "ROLE" : "ATTENDANCE"}`);
@@ -121,6 +122,14 @@ export class TeamGameRosterService {
         const target = { gameId, sideId: sideIdByGame.get(gameId)! };
         accessByGame.set(gameId, await this.gameRoster.authorizeSide(tx, user.id, target, 'write'));
       }
+      // Only a verified platform admin may correct ended attendance. Do not trust a UI flag or team role.
+      const admin = await tx.v1AdminUser.findUnique({
+        where: { userId: user.id },
+        select: { adminRole: true, status: true, revokedAt: true, user: { select: { accountStatus: true } } },
+      });
+      const canEditEnded = admin !== null && admin.status === 'active' && admin.revokedAt === null &&
+        admin.user.accountStatus === 'active' && (admin.adminRole === 'owner' || admin.adminRole === 'ops');
+      const endedAllowedIds = canEditEnded ? gameIds.filter((id) => !dto.changes.some((change) => change.gameId === id && change.op === 'SET_GOALKEEPER')) : [];
       const roleScopes = new Map<string, string>();
       const roleKeys = new Set<string>();
       for (const change of dto.changes.filter((row) => row.op === 'SET_GOALKEEPER')) {
@@ -142,7 +151,7 @@ export class TeamGameRosterService {
       });
       for (const game of affected) if (game.sides[0]) sideIdByGame.set(game.id, game.sides[0].id);
       const lockedIds = [...new Set([...gameIds, ...affected.map((game) => game.id)])];
-      await this.gameRoster.lockScheduledGames(tx, lockedIds.map((gameId) => ({ gameId, sideId: sideIdByGame.get(gameId)! })));
+      await this.gameRoster.lockScheduledGames(tx, lockedIds.map((gameId) => ({ gameId, sideId: sideIdByGame.get(gameId)! })), endedAllowedIds);
       // Propagation must not silently skip an old team-authored league lineup.
       for (const game of affected) {
         const context = await loadGameRosterContext(tx, { gameId: game.id, sideId: sideIdByGame.get(game.id)! });
@@ -156,7 +165,7 @@ export class TeamGameRosterService {
       const touched = new Set<string>();
       for (const change of dto.changes) {
         const target = { gameId: change.gameId, sideId: sideIdByGame.get(change.gameId)!, teamId };
-        const actor = { userId: user.id, role: accessByGame.get(change.gameId)!.writeRole! };
+        const actor = { userId: user.id, role: endedAllowedIds.includes(change.gameId) ? 'ADMIN' as const : accessByGame.get(change.gameId)!.writeRole! };
         const { alreadyApplied } =
           change.op === "SET_GOALKEEPER"
             ? await this.gameRoster.applyGoalkeeper(tx, actor, target, change.userId, change.goalkeeper!)
@@ -171,7 +180,13 @@ export class TeamGameRosterService {
         await syncLockedCompetitionTeam(tx, { competitionId, teamId }, new Set(lockedIds));
       }
       for (const gameId of touched) {
-        if (!roleScopes.has(gameId)) await syncPreparedGameSideRoster(tx, { gameId, sideId: sideIdByGame.get(gameId)! });
+        if (!roleScopes.has(gameId)) {
+          const target = { gameId, sideId: sideIdByGame.get(gameId)! };
+          const game = await tx.v1Game.findUniqueOrThrow({ where: { id: gameId }, select: { state: true } });
+          if (game.state === 'ENDED' && endedAllowedIds.includes(gameId)) {
+            await syncAdminEndedGameRoster(tx, target, user.id, dto.changes.filter((change): change is typeof change & { op: 'EXCLUDE' | 'REVOKE' } => change.gameId === gameId && change.op !== 'SET_GOALKEEPER'));
+          } else await syncPreparedGameSideRoster(tx, target);
+        }
       }
       return { teamId, results, affectedGames: lockedIds.map((gameId) => ({ gameId, sideId: sideIdByGame.get(gameId)! })) };
     });

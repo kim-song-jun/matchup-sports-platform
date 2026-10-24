@@ -1,6 +1,6 @@
 # 결과 정정 카드 타임라인
 
-Status: In Progress
+Status: Review
 
 ## Context
 결과 정정은 카드 합계만 저장하고 공개 타임라인은 현장 CARD 이벤트만 읽어 서로 달랐다.
@@ -45,7 +45,8 @@ V1GameResultParticipant.cards JSON에 events를 추가한다. 테이블/Prisma �
 - 브랜치: fix/result-correction-card-timeline (base dev).
 - 구현: cards JSON events 계약, 중첩 DTO·합계 검증, 경기 피리어드·중복 id 검증, 정정/재제출 타임라인 편집과 합계 동기화.
 - 공개 경기·일정·팀 전적은 같은 공식 카드 스냅샷을 읽는다. 기존 개인 기록 합계 경로는 유지한다.
-- 검증: 프론트 편집기/복원 53 tests, 백엔드 DTO·정정 서비스·공개 상세/일정·팀/개인 기록 회귀 PASS. 타입 검사 진행 중.
+- 검증: 프론트 편집기/복원 53 tests, 정정/재제출 화면 31 tests, 검토 패널/오류 카피 33 tests PASS. 백엔드 카드 DTO 10, 카드 복원 3, 정정 서비스 59, 기존 결과 DTO 27, 공개 경기/일정 10, 팀/개인 기록 28 tests PASS.
+- API `tsc --noEmit` + surface 검사 PASS. Web의 기존 unrelated 리그 목록 WIP 오류는 보존하고, commit `76ce11717`의 별도 clean worktree에서 `tsc --noEmit` + pattern 검사 PASS. PR diff 25 files 및 `git diff --check` 확인.
 - 초기 환경: Windows에서는 Linux pnpm symlink를 실행할 수 없어 기존 WSL Node로 실행. 현재 스키마와 달랐던 Prisma Client는 generate만 수행(DB 변경 없음).
 - alpha manual QA: 아직 dev 미머지·미배포. 390/768/1440 before/after 스크린샷과 console/network 판정은 미실시이며 완료로 주장하지 않는다. 로컬 Next 서버는 띄우지 않았다.
 - 기존 unrelated dirty files는 커밋 제외. 테스트를 위해 서버/브라우저/DB 프로세스를 만들지 않았다.

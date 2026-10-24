@@ -1,0 +1,29 @@
+{
+  "phase": "before",
+  "origin": "https://alpha.teameet.co.kr",
+  "persona": "existing QA player",
+  "errors": [],
+  "network": [],
+  "checks": [
+    "Actual UI login and authenticated session hydration PASS"
+  ],
+  "process": {
+    "browserPid": 36020,
+    "launcherPid": 20052,
+    "headless": false
+  },
+  "initial": {
+    "granted": true,
+    "effectiveAt": "2026-08-20T13:42:18.559Z",
+    "hasResponded": true,
+    "pendingRecordCount": 0
+  },
+  "final": {
+    "granted": true,
+    "effectiveAt": "2026-08-20T13:42:18.559Z",
+    "hasResponded": true,
+    "pendingRecordCount": 0
+  },
+  "url": "https://alpha.teameet.co.kr/my/settings/record-consent",
+  "overflow": false
+}

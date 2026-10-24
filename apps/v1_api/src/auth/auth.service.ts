@@ -1302,6 +1302,8 @@ export class AuthService {
         update: { currentStep: 'confirm' },
         create: { userId, currentStep: 'confirm' },
       });
+      // Deferral completes signup too; it must use the same visibility default.
+      await recordSignupConsent(transaction, userId, undefined);
     });
 
     return this.sessionResponse(user.id, user.email, { social: true });

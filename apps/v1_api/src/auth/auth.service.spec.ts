@@ -867,10 +867,13 @@ describe('AuthService', () => {
       });
     });
 
-    it('register: recordConsent 가 없으면(구 클라이언트) 동의 row 를 만들지 않는다', async () => {
+    it('register: recordConsent 생략 시 공개 기본값을 저장한다', async () => {
       arrangeRegister();
       await service.register(registerInput());
-      expect(prisma.v1UserRecordConsent.upsert).not.toHaveBeenCalled();
+      expect(prisma.v1UserRecordConsent.upsert).toHaveBeenCalledWith({
+        where: { userId: 'new-user' }, update: {},
+        create: { userId: 'new-user', state: 'GRANTED', policyHash: 'v1-public-record-default-2' },
+      });
     });
 
     it.each([
@@ -889,10 +892,13 @@ describe('AuthService', () => {
       });
     });
 
-    it('completeSocialProfile: recordConsent 가 없으면 동의 row 를 만들지 않는다', async () => {
+    it('completeSocialProfile: recordConsent 생략 시 공개 기본값을 저장한다', async () => {
       arrangeSocialProfile();
       await service.completeSocialProfile('user-1', socialInput);
-      expect(prisma.v1UserRecordConsent.upsert).not.toHaveBeenCalled();
+      expect(prisma.v1UserRecordConsent.upsert).toHaveBeenCalledWith({
+        where: { userId: 'user-1' }, update: {},
+        create: { userId: 'user-1', state: 'GRANTED', policyHash: 'v1-public-record-default-2' },
+      });
     });
 
     it('completeSocialProfile: 미룬 계정이 프로필 사진을 생략하면 기존 사진을 지우지 않는다', async () => {
@@ -1174,6 +1180,10 @@ describe('AuthService', () => {
       });
       expect(result.next).toBeUndefined();
       expect(result.onboarding.status).toBe('social_profile_deferred');
+      expect(prisma.v1UserRecordConsent.upsert).toHaveBeenCalledWith({
+        where: { userId: 'user-1' }, update: {},
+        create: { userId: 'user-1', state: 'GRANTED', policyHash: 'v1-public-record-default-2' },
+      });
     });
 
     it('deferSocialProfile: 닉네임이 겹치면 숫자 접미를 붙인다', async () => {

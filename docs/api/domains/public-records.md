@@ -1,5 +1,9 @@
 # Public records and consent contract
 
+## Default public player records — 2026-10-23
+
+Signup completion initializes a missing `V1UserRecordConsent` to `GRANTED` using the product-default marker `v1-public-record-default-2`. A data migration applies the same default only to active, non-deleted, signup-complete accounts without a preference. Explicit `REVOKED` rows remain private. The existing shared eligibility function still requires an identity link and `GRANTED`, and respects participant-level `REVOKED` overrides. Game visibility and official-result requirements are unchanged. Defaults may expose already-linked historical records; real-name display remains a separate opt-in. See [signup](./auth.md#signup-flow) and [settings](./users.md#경기-기록-공개-설정).
+
 ## Shared tournament fixture detail route
 
 `GET /api/v1/tournaments/:tournamentId/matches/:fixtureId` supports both

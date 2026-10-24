@@ -265,6 +265,9 @@ export function GameResultCorrectionPanel({
 
   const renderCorrectionEditor = () => {
     if (!correctionFormOpen || !draftBase || !editPrefill) return null;
+    // The editor seeds once: opening before the log arrives would erase existing card times on save.
+    if (eventsQuery.isPending) return <p role="status" className="tm-text-caption">기존 경기 기록을 불러오고 있어요.</p>;
+    if (eventsQuery.isError) return <ErrorState title="경기 기록을 불러오지 못했어요" message={describeResultReviewError(eventsQuery.error)} onRetry={() => void eventsQuery.refetch()} />;
     const baseGoalEvents = deriveEditableGoalEvents(editPrefill.goalEvents, eventsQuery.data?.events ?? []);
     return (
       <ResultEditModal
@@ -281,6 +284,7 @@ export function GameResultCorrectionPanel({
         }}
         sides={game.sides}
         lineups={lineupsQuery.data ?? []}
+        events={eventsQuery.data?.events ?? []}
         periods={game.periods}
         periodCount={regularPeriodCountOf(game.periods.length, game.periodDurations)}
         isKnockoutFixture={game.isKnockoutFixture}

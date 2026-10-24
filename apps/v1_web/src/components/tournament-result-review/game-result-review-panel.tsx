@@ -198,7 +198,7 @@ export function GameResultReviewPanel({
   const outcomeNotice =
     outcomeReason !== null ? { reason: outcomeReason, note: outcomeSource?.outcomeNote?.trim() ?? '' } : null;
   const periodCount = regularPeriodCountOf(game.periods.length, game.periodDurations);
-  const resubmitModal = resubmitTarget ? (
+  const resubmitModal = resubmitTarget && !eventsQuery.isPending && !eventsQuery.isError ? (
     <ResultEditModal
       open
       title="결과를 다시 제출할까요?"
@@ -216,6 +216,7 @@ export function GameResultReviewPanel({
       }}
       sides={game.sides}
       lineups={lineupsQuery.data ?? []}
+      events={eventsQuery.data?.events ?? []}
       periods={game.periods}
       periodCount={periodCount}
       // 재제출도 정정과 **같은** 서버 승부차기 가드(`applyPenalties`)를 통과한다 --

@@ -2129,13 +2129,14 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
     );
   }
 
-  it('대회 knockout 경기가 정규시간 종료 후 동점이면 "승부차기 시작" 버튼이 보이고, "경기 종료" 버튼은 숨는다', () => {
+  it('[MD-QA #180] 대회 knockout 경기가 정규시간 종료 후 동점이면 "승부차기 시작" 버튼이 보이고, "경기 종료" 버튼은 숨는다', () => {
     setup();
     render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
 
     expect(screen.getByRole('button', { name: /승부차기 시작/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '경기 종료' })).toBeNull();
     expect(screen.getByText(/정규 시간이 무승부로 끝났어요/)).toBeInTheDocument();
+    expect(screen.queryByText(/결선 경기는 무승부로 끝낼 수 없어요/)).toBeNull();
   });
 
   // 요구사항 4 — 아직 정규 시간이 끝나지 않은 예외 종료 경로(하프타임 중
@@ -2143,21 +2144,63 @@ describe('OperateConsole — 승부차기 (과제 2)', () => {
   // 나가 리비전이 저장되고 브래킷 프로젝션만 조용히 POISONED가 됐다.
   // 이제 버튼 자체가 막히고 사유를 알려준다(백엔드도 409
   // TOURNAMENT_PENALTY_REQUIRED로 이중 방어).
-  it('결선 무승부인데 승부차기 결과가 없으면 "경기 종료"를 막고 사유를 알려준다', () => {
+  it('[MD-QA #180] 결선 무승부 조기 종료는 화면을 경고로 채우지 않고, 더보기 메뉴에서 막은 이유를 알려준다', () => {
     // 하프타임(후반이 아직 시작조차 안 됨) — game.state는 LIVE라 "경기 종료"
     // 탈출구가 남아 있는 상태다.
     setup({ periods: [FIRST_PERIOD, { ...FINAL_PERIOD, state: 'HALFTIME', startedAt: null, endedAt: null }] });
 
     render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
 
-    // 조기 종료는 ⋯ 시트 안에서만 만난다 — 비활성이고, 왜 못 누르는지 배너와 시트가 함께 말한다.
+    // 경고는 경기 진행 화면을 점유하지 않고, 종료 액션을 열었을 때만 맥락 안에서 안내한다.
+    expect(screen.queryByText(/결선 경기는 무승부로 끝낼 수 없어요/)).toBeNull();
     expect(screen.queryByRole('button', { name: '경기 종료' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '더보기' }));
-    const endButton = within(screen.getByRole('dialog')).getByRole('button', { name: /^경기 종료/ });
+    const moreDialog = screen.getByRole('dialog', { name: '경기 더보기' });
+    const endButton = within(moreDialog).getByRole('button', { name: /^경기 종료/ });
     expect(endButton).toBeDisabled();
-    expect(screen.getAllByText(/승부차기 결과를 입력해주세요/).length).toBeGreaterThanOrEqual(1);
+    expect(within(moreDialog).getByText(/결선 경기는 무승부로 끝낼 수 없어요/)).toBeInTheDocument();
+    fireEvent.click(endButton);
+    expect(mocks.postV1GameCommand).not.toHaveBeenCalled();
     // 아직 정규 시간이 끝나지 않았으므로 승부차기 입력도 아직 열리지 않는다.
     expect(screen.queryByRole('button', { name: /승부차기 시작/ })).toBeNull();
+  });
+
+  it('[MD-QA #180] 비동점 결선 경기의 더보기 종료 액션은 경고 없이 사용할 수 있다', () => {
+    setup({
+      liveEvents: [tiedGoal(1, 'side-home', 'e1')],
+      periods: [FIRST_PERIOD, { ...FINAL_PERIOD, state: 'HALFTIME', startedAt: null, endedAt: null }],
+    });
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    expect(screen.queryByText(/결선 경기는 무승부로 끝낼 수 없어요/)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '더보기' }));
+    expect(
+      within(screen.getByRole('dialog', { name: '경기 더보기' })).getByRole('button', { name: /^경기 종료/ }),
+    ).toBeEnabled();
+  });
+
+  it('[MD-QA #180] takeover가 거절된 대회 디렉터는 결선 동점 경고가 전역 표시되지 않고 조작이 잠긴다', () => {
+    setup({ periods: [FIRST_PERIOD, { ...FINAL_PERIOD, state: 'HALFTIME', startedAt: null, endedAt: null }] });
+    mocks.useV1GameOperationsConsole.mockReturnValue(
+      consoleState({ takeover: { status: 'denied', code: 'TAKEOVER_HELD', holderName: '김운영' } }),
+    );
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    expect(screen.getByText('김운영님이 이 경기를 운영하고 있어요. 지금은 보기만 할 수 있어요.')).toBeInTheDocument();
+    expect(screen.queryByText(/결선 경기는 무승부로 끝낼 수 없어요/)).toBeNull();
+    expect(screen.getByRole('button', { name: '더보기' })).toBeDisabled();
+    expect(mocks.postV1GameCommand).not.toHaveBeenCalled();
+  });
+
+  it('[MD-QA #180] SUPPORT_READONLY 권한의 결선 동점 경기는 경고 없이 더보기와 종료 명령이 잠긴다', () => {
+    setup({ periods: [FIRST_PERIOD, { ...FINAL_PERIOD, state: 'HALFTIME', startedAt: null, endedAt: null }] });
+    mocks.useTournamentOpsRole.mockReturnValue('SUPPORT_READONLY');
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    expect(screen.queryByText(/결선 경기는 무승부로 끝낼 수 없어요/)).toBeNull();
+    expect(screen.queryByRole('button', { name: '경기 종료' })).toBeNull();
+    expect(screen.getByRole('button', { name: '더보기' })).toBeDisabled();
+    expect(mocks.postV1GameCommand).not.toHaveBeenCalled();
   });
 
   describe('종료 확인 문구가 경기 종류를 따른다', () => {

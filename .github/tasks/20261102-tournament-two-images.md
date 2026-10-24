@@ -90,3 +90,12 @@ Phase 1 contracts: completed. Phase 2 UI: completed. Phase 3 validation/docs com
 - 단일 frontend 작업자가 공유 이미지 필드, 관리자 수정 info-section, 등록 new/page의 3파일만 소유한다. Root는 이 task·직렬 검증·Git/PR을 소유한다. 최초 커밋 대비 전체 PR 범위에 공유 이미지 필드와 등록 화면 2경로가 추가되어 총 11경로다. API 파일·공유 hooks/types/MSW·타인 WIP는 수정하지 않는다.
 - 이 명명 지적은 별도 런타임 실패가 아니므로 이름 문자열만 검사하는 가짜 RED 테스트를 만들지 않는다. 최초 실제 HTTP/미리보기 RED→GREEN 근거를 보존하고, 등록·수정 실제 caller의 기존 회귀 테스트와 Web 타입/패턴 검사로 prop 변경 연결을 검증한다. 새 head의 검증·독립 재리뷰·CI·스레드 답변 및 resolve 결과는 같은 PR과 QA root SSOT에 이어 기록한다. 최초 head의 리뷰/CI를 새 head 성공으로 간주하지 않는다.
 - 명명 수정 후 등록 화면 89건·수정 화면 21건, 총 2 suites/110 tests PASS(최소 worker 직렬). Web TypeScript exit0 및 Git Bash 환경의 기존 Web 패턴 검사 PASS. touched debt marker 없음, diff/check PASS. API와 해당 34건 spec의 blob은 최초 검증 head와 같아 불필요한 API 재실행은 하지 않았다. 로그는 QA root의 git 제외 `tmp/qa/mdqa-assigned-monitor/2026-10-23-heartbeat-0514/`에 보존한다. 이 snapshot 시점 새 커밋의 독립 재리뷰/원격 CI는 대기다.
+
+## Progress Snapshot — 2026-10-24 dev 통합
+
+- 외부 PR #2054가 dev에 머지되어 `origin/dev`가 `6de116392c13b9903321c0c5994cc88691c251cb`로 전진했고, 열린 후속 PR #2045의 GitHub mergeability가 DIRTY로 바뀌었다. 기존 전용 작업트리·브랜치에서 해당 dev를 통합한다. 새 작업·PR을 만들거나 원 PR #2032의 머지된 브랜치에 push하지 않는다.
+- 실제 충돌은 `docs/api/README.md` 한 곳이다. 대회 이미지 boolean/종목 기본 이미지 안내와 결과 정정 카드 타임라인 안내를 모두 보존했다. `docs/api/global-contract.md`의 자동 통합도 확인했다. 이 통합에서 후속 수정의 API/화면/회귀 spec 소스는 이전 head `8d72c0bf70349d5e393ecf9cc80b76e5cb1d1c0b`와 동일하다. dev에서 들어온 변경은 해당 부모의 이력을 그대로 유지한다.
+- Root 최소 worker 직렬 회귀: 기존 HTTP DTO 34/34, 등록·수정 실제 caller 2 suites/110 tests PASS. 최초 API 실행의 CLI 옵션 오류와 Jest의 Windows `.codex` 경로 glob 탐색 실패는 테스트 미실행이며 RED/PASS에 합산하지 않는다. 같은 matcher에서 경로 구분자 하나만 바꾸면 false→true가 됨을 독립 조사로 확인했고, 원래 `rootDir/src/**/*.spec.ts`를 forward absolute glob으로 실행 인자에 전달해 같은 unit 프로젝트·ts-jest·assertion을 실행했다. 설정·의존성·테스트는 변경하지 않았다.
+- API/Web TypeScript 각각 1회 exit0. 전체 suite/build·로컬 Next·DB 서버는 실행하지 않았다. 전용 Task127 plan bundle이 필요한 API 문서 checker는 이번 목차 충돌의 범용 검증기로 사용하지 않는다. 인자 없는 실행 실패를 PASS로 처리하지 않고 양쪽 도메인 링크·본문과 실제 committed diff를 검수한다.
+- 증거는 QA root의 git 제외 `tmp/qa/mdqa-assigned-monitor/2026-10-24-heartbeat-1200/`에 보존한다. 새 immutable head에 대한 독립 API/Web 리뷰, 원격 CI 및 Copilot 확인은 대기다. 이전 head의 OK를 이 통합의 OK로 재사용하지 않는다.
+- dev 배포 run40091718692 SUCCESS와 공개 landing HTTP200/SHA `6de116392c13b9903321c0c5994cc88691c251cb`, API health success·DB true를 2026-10-24T12:15Z에 확인했다. 이는 외부 dev 배포의 공개 identity/health 근거이며, 아직 미머지인 #2045의 alpha 검증이 아니다. Tracker 프로젝트와 Alpha `/my`는 실제 IAB 로그인 화면으로 이동했다. 최신 리포트 census·상세·선점·진행 댓글 및 관리자 저장 흐름·3폭(390/768/1440) 스크린샷·console/network는 계속 미검증이다.

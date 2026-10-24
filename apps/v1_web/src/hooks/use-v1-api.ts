@@ -2918,7 +2918,7 @@ export type V1RecordConsent = {
   granted: boolean;
   effectiveAt: string | null;
   /**
-   * GRANTED/REVOKED 와 무관하게 "한 번이라도 응답했는지". `granted:false` 만으로는
+   * GRANTED/REVOKED 와 무관하게 설정 행이 있는지(정책 기본값 초기화 포함). `granted:false` 만으로는
    * "거부"와 "아직 안 물어봄"이 구분되지 않는데, 유도 배너는 둘을 다르게 다뤄야 한다
    * (명시적 거부는 다시 조르지 않는다). 옛 서버 응답에는 없으므로 optional.
    */

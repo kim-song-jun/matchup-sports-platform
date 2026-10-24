@@ -213,7 +213,7 @@ export function createV1GameRosterMswHandlers() {
       opponentName: game.opponentName,
       scheduledAt: game.startAt,
       gameState: roster.gameState,
-      editable: roster.editable,
+      editable: roster.editable || (roster.gameState === 'ENDED' && state.viewerRole === 'ADMIN' && canWrite()),
       goalkeeperEditable: roster.goalkeeperEditable,
       summary: {
         participating: roster.counts.participating,
@@ -344,7 +344,7 @@ export function createV1GameRosterMswHandlers() {
       if (!canWrite()) return forbidden('팀장·매니저만 경기 명단을 바꿀 수 있어요.');
       const detached = [...new Set(changes.map((c) => c.gameId))].filter((id) => state.detached.has(id));
       if (detached.length > 0) return fail(404, 'GAME_SIDE_NOT_FOUND', '이 팀이 뛰는 경기가 아니에요.', { gameIds: detached });
-      const started = [...new Set(changes.map((c) => c.gameId))].filter((id) => state.gameStates.get(id) !== 'SCHEDULED');
+      const started = [...new Set(changes.map((c) => c.gameId))].filter((id) => state.gameStates.get(id) !== 'SCHEDULED' && !(state.gameStates.get(id) === 'ENDED' && state.viewerRole === 'ADMIN' && !changes.some((c) => c.gameId === id && c.op === 'SET_GOALKEEPER')));
       if (started.length > 0) return deadlinePassed(started);
       if (changes.some((c) => !inRoster(c.userId))) return fail(422, 'ROSTER_ADJUSTMENT_NOT_IN_ROSTER', '기준 명단에 없는 선수예요.');
       const results = changes.map((c) => {

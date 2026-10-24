@@ -127,6 +127,9 @@ Current Kakao signup and existing-account linking use the [provider contact conf
 - 조별 결과 기반 공통 결선 배정: [tournaments — 공통 결선 진출팀 배정](./domains/tournaments.md#공통-결선-진출팀-배정-2026-10-21). 수동 대진·불균등 조 지원, 기존 12강 규칙 보존.
 
 대회 목록·상세 이미지 2장과 상세 기본 이미지까지 숨기는 `showDetailImage` 설정은 [대회 이미지 계약](./domains/tournaments.md#목록상세-이미지와-상세-숨김-2026-10-22)을 따른다.
+
+- 2026-10-24: [경기 계약](domains/games.md#어드민-종료-경기의-출전-정정-2026-10-24)에 owner·ops 어드민의 종료 경기 EXCLUDE/REVOKE 예외 및 결과 이력 보존 계약을 반영했다.
+
 ## 결과 정정 카드 계약 보완
 
 카드의 기존 합계와 선택적 시간별 기록(`cards.events`), 정정·재제출 검증 및 공개 프로젝션은

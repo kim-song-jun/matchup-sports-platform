@@ -345,3 +345,11 @@ Status: In Progress
 - API/Web typecheck 통과. API는 공유 node_modules의 오래된 Prisma 생성물을 수정하지 않고 최신 schema로 `/tmp/teameet-admin-prisma-client`에 엔진 없는 client를 생성해 임시 paths/moduleNameMapper로 검증했다. 이 QA 설정/생성물은 PR에 포함하지 않는다.
 - 새 DB integration 4건(공식/제출/결과 없음의 왕복, 개인 기록 충돌 시 전체 rollback)은 CI에서 실행. 로컬 DB/alpha 실제 클릭·스크린샷 검증은 미실행.
 - Changeset 정책·git diff --check 통과, touched path debt marker 추가 없음. 실제 schema/DTO 변경 및 migration 없음.
+
+
+### 2026-10-24 alpha 배포 준비 / 실제 DB RED 수정
+- 사용자가 alpha 배포를 요청했다. dev PR #2053의 Gates·Web은 통과했지만 CI `40090070568`의 실제 DB integration에서 새 테스트 4건이 실패했다(179 suites 통과).
+- 실제 원인: DB는 DRAFT 결과에만 참가자 INSERT를 허용하므로 helper와 fixture 모두 DRAFT 생성 → 참가자 쓰기 → SUBMITTED/OFFICIAL 전환 순서가 필요하다. 개인 기록 충돌 fixture도 확정 뒤 결과 행을 수정하지 않고 DRAFT 때 기록을 넣는다.
+- HTTP DTO의 선택 필드가 undefined로 존재해 감사 스냅샷 검증이 거절한 런타임 결함도 수정: 감사 데이터는 userId/op만 명시적으로 직렬화한다. unit fixture에 DB DRAFT guard와 실제 DTO의 undefined 필드를 추가해 같은 결함이 unit에서도 실패하도록 강화했다.
+- Copilot 스캔은 외부 모델 세션 생성 실패로 clean 판정을 얻지 못한 상태이며 재요청/정책 변경 없이 기록한다. 제품 CI가 green이 된 후 사용자 배포 요청에 따라 표준 dev 머지·alpha 자동 배포 경로로 진행한다.
+- 보강 helper unit 10개 통과 및 API typecheck 통과. DB trigger를 우회하지 않고 상태 전환 순서를 바로잡은 수정만 PR에 반영해 실제 CI integration을 재검증한다.

@@ -69,14 +69,13 @@ export async function syncAdminEndedGameRoster(
     }
     const revision = await tx.v1GameResultRevision.create({ data: {
       gameId: target.gameId, revision: (latest?.revision ?? activeResult.revision) + 1,
-      state: activeResult.state, supersedesId: activeResult.id,
+      state: 'DRAFT', supersedesId: activeResult.id,
       score: activeResult.score as Prisma.InputJsonValue,
       goalEvents: activeResult.goalEvents === null ? Prisma.DbNull : activeResult.goalEvents as Prisma.InputJsonValue,
       eventsHash: activeResult.eventsHash, missingScorer: activeResult.missingScorer,
       mvpParticipantId: activeResult.mvpParticipantId, outcomeReason: activeResult.outcomeReason, outcomeNote: activeResult.outcomeNote,
       reason: '어드민 경기별 명단 출전 정정', createdByActorType: 'USER', createdByUserId: actorUserId,
-      submittedAt: activeResult.submittedAt ?? new Date(),
-      officialAt: activeResult.state === 'OFFICIAL' ? new Date() : null,
+      submittedAt: null, officialAt: null,
     } });
     const kept = rows.filter((row) => row.sideId !== target.sideId || retainedIds.has(row.participantId));
     await tx.v1GameResultParticipant.createMany({ data: [
@@ -86,6 +85,11 @@ export async function syncAdminEndedGameRoster(
         goals: 0, assists: 0, fouls: 0, cards: { yellow: 0, red: 0 }, goalkeeper: person.position === (loaded.context.goalkeeperPositionCode ?? 'GK'),
       })),
     ] });
+    // The DB permits participant writes only while their revision is DRAFT.
+    await tx.v1GameResultRevision.update({ where: { id: revision.id }, data: {
+      state: activeResult.state, submittedAt: activeResult.submittedAt ?? new Date(),
+      officialAt: activeResult.state === 'OFFICIAL' ? new Date() : null,
+    } });
     if (activeResult.state === 'OFFICIAL') {
       await tx.v1Game.update({ where: { id: target.gameId }, data: { currentOfficialRevisionId: revision.id } });
     }
@@ -112,7 +116,7 @@ export async function syncAdminEndedGameRoster(
     actor: { type: 'PLATFORM_OPS', id: actorUserId }, action: 'ADMIN_ENDED_GAME_ROSTER_CORRECTED',
     requestId: randomUUID(), occurredAt: new Date(), targetType: 'GAME_SIDE', targetId: target.sideId,
     before: { officialRevisionId: game.currentOfficialRevisionId },
-    after: { gameId: target.gameId, changes: changes.map((change) => ({ ...change })) },
+    after: { gameId: target.gameId, changes: changes.map(({ userId, op }) => ({ userId, op })) },
     reason: '어드민 경기별 명단 출전 정정',
   });
 }

@@ -10,7 +10,7 @@ function fixture(state: 'OFFICIAL' | 'SUBMITTED' | null = 'OFFICIAL') {
   const game: { id: string; state: string; currentOfficialRevisionId: string | null; version: number } = { id: 'game', state: 'ENDED', currentOfficialRevisionId: state === 'OFFICIAL' ? 'r1' : null, version: 2 };
   const lineups = [{ id: 'l1', revision: 1, formation: null }];
   const snapshots = ['a', 'b', 'away'].map((userId) => ({ id: `p-${userId}`, userId, gameId: 'game', sideId: userId === 'away' ? 'away' : 'home', displayNameSnapshot: userId, position: null, jerseyNumber: null, lineupId: 'l1' }));
-  const revisions = [{ id: 'r1', gameId: 'game', revision: 1, state: state ?? 'OFFICIAL', score: { home: 0, away: 0 }, eventsHash: 'hash', missingScorer: false, mvpParticipantId: null, outcomeReason: 'NORMAL', outcomeNote: null, submittedAt: new Date(), goalEvents: null }];
+  const revisions = [{ id: 'r1', gameId: 'game', revision: 1, state: (state ?? 'OFFICIAL') as string, score: { home: 0, away: 0 }, eventsHash: 'hash', missingScorer: false, mvpParticipantId: null, outcomeReason: 'NORMAL', outcomeNote: null, submittedAt: new Date(), goalEvents: null }];
   const resultRows = snapshots.map((row) => ({ id: `r1-${row.id}`, resultRevisionId: 'r1', participantId: row.id, sideId: row.sideId, started: true, goals: 0, assists: 0, fouls: 0, goalkeeper: false, cards: { yellow: 0, red: 0 } }));
   if (state === null) revisions.length = 0;
   const events: unknown[] = [];
@@ -41,16 +41,24 @@ function fixture(state: 'OFFICIAL' | 'SUBMITTED' | null = 'OFFICIAL') {
     v1GameResultRevision: {
       findFirst: async () => revisions.at(-1),
       findUnique: async ({ where }: { where: { id: string } }) => revisions.find((row) => row.id === where.id),
+      update: async ({ where, data }: { where: { id: string }; data: Partial<typeof revisions[number]> }) => {
+        const row = revisions.find((entry) => entry.id === where.id)!;
+        if (row.state !== 'DRAFT') throw new Error('terminal result revisions are immutable');
+        Object.assign(row, data); return row;
+      },
       create: async ({ data }: { data: typeof revisions[number] }) => { const row = { ...data, id: `r${revisions.length + 1}` }; revisions.push(row); return row; },
     },
     v1GameResultParticipant: {
       findMany: async ({ where }: { where: { resultRevisionId: string } }) => resultRows.filter((row) => row.resultRevisionId === where.resultRevisionId),
-      createMany: async ({ data }: { data: typeof resultRows }) => { resultRows.push(...data); },
+      createMany: async ({ data }: { data: typeof resultRows }) => {
+        if (data.some((row) => revisions.find((revision) => revision.id === row.resultRevisionId)?.state !== 'DRAFT')) throw new Error('result participants require a draft revision');
+        resultRows.push(...data);
+      },
     },
     v1OperationAudit: { create: async () => ({ id: 'audit' }) },
     v1OutboxEvent: { create: async ({ data }: { data: unknown }) => { events.push(data); } },
   };
-  const save = (op: 'EXCLUDE' | 'REVOKE') => syncAdminEndedGameRoster(tx as unknown as Prisma.TransactionClient, { gameId: 'game', sideId: 'home' }, 'admin', [{ userId: 'a', op }]);
+  const save = (op: 'EXCLUDE' | 'REVOKE') => syncAdminEndedGameRoster(tx as unknown as Prisma.TransactionClient, { gameId: 'game', sideId: 'home' }, 'admin', [Object.assign({ userId: 'a', op }, { reason: undefined, goalkeeper: undefined })]);
   return { game, revisions, resultRows, events, save };
 }
 

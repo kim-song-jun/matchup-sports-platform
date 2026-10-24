@@ -814,7 +814,7 @@ describe('팀 경기 명단 표·일괄·결장 기간 API (Task 179)', () => {
   });
 
   describe('어드민 종료 경기 출전 정정', () => {
-    async function endedFixture(resultState: 'OFFICIAL' | 'SUBMITTED' | null) {
+    async function endedFixture(resultState: 'OFFICIAL' | 'SUBMITTED' | null, goals = 0) {
       const f = await seedTournament();
       const target = sideOf(f, 'g1', f.teamA.id);
       const lineups = await prisma.v1GameLineup.findMany({ where: { gameId: target.gameId, invalidatedAt: null }, orderBy: { revision: 'desc' } });
@@ -823,11 +823,12 @@ describe('팀 경기 명단 표·일괄·결장 기간 API (Task 179)', () => {
       let revisionId: string | null = null;
       if (resultState !== null) {
         const revision = await prisma.v1GameResultRevision.create({ data: {
-          gameId: target.gameId, revision: 1, state: resultState, score: { home: 0, away: 0 }, eventsHash: 'ended-roster-test',
-          createdByActorType: 'USER', createdByUserId: f.adminId, submittedAt: new Date(), officialAt: resultState === 'OFFICIAL' ? new Date() : null,
+          gameId: target.gameId, revision: 1, state: 'DRAFT', score: { home: goals, away: 0 }, eventsHash: 'ended-roster-test',
+          createdByActorType: 'USER', createdByUserId: f.adminId,
         } });
         revisionId = revision.id;
-        await prisma.v1GameResultParticipant.createMany({ data: participants.map((row) => ({ resultRevisionId: revision.id, participantId: row.id, sideId: row.sideId, started: true, cards: { yellow: 0, red: 0 } })) });
+        await prisma.v1GameResultParticipant.createMany({ data: participants.map((row) => ({ resultRevisionId: revision.id, participantId: row.id, sideId: row.sideId, started: true, goals: row.userId === f.teamA.members[0] ? goals : 0, cards: { yellow: 0, red: 0 } })) });
+        await prisma.v1GameResultRevision.update({ where: { id: revision.id }, data: { state: resultState, submittedAt: new Date(), officialAt: resultState === 'OFFICIAL' ? new Date() : null } });
       }
       await prisma.v1Game.update({ where: { id: target.gameId }, data: { state: 'ENDED', currentOfficialRevisionId: resultState === 'OFFICIAL' ? revisionId : null } });
       return { f, target, participants, revisionId };
@@ -863,10 +864,8 @@ describe('팀 경기 명단 표·일괄·결장 기간 API (Task 179)', () => {
     });
 
     it('개인 기록이 있는 선수는 결과 정정으로 안내하고 다른 경기 변경까지 rollback한다', async () => {
-      const { f, target, revisionId, participants } = await endedFixture('OFFICIAL');
+      const { f, target, revisionId } = await endedFixture('OFFICIAL', 1);
       const userId = f.teamA.members[0];
-      const player = participants.find((row) => row.userId === userId)!;
-      await prisma.v1GameResultParticipant.update({ where: { resultRevisionId_participantId: { resultRevisionId: revisionId!, participantId: player.id } }, data: { goals: 1 } });
       const saved = await postAs(matrixPath(f.teamA.id) + '/batch', f.adminId, { changes: [
         { gameId: f.games.g2.gameId, userId, op: 'EXCLUDE' },
         { gameId: target.gameId, userId, op: 'EXCLUDE' },

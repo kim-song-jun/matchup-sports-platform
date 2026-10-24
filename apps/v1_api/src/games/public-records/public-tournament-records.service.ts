@@ -1,4 +1,5 @@
 import { ConflictException, ForbiddenException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { resolveResultCardEvents } from '../core/result-card-events';
 import type { Prisma, V1GameEventType, V1GameLineupState, V1GameResultRevisionState, V1GameState, V1TeamMatchStatus, V1VisibilityMode } from '@prisma/client';
 import type { GameScore } from '../games.types';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -149,6 +150,7 @@ const GAME_MATCH_SELECT = {
       officialAt: true,
       score: true,
       goalEvents: true,
+      resultParticipants: { select: { participantId: true, sideId: true, cards: true } },
       mvpParticipantId: true,
       outcomeReason: true,
       outcomeNote: true,
@@ -1276,6 +1278,8 @@ export class PublicTournamentRecordsService {
             consentMap,
             nameProfileByUserId,
             isStaffBypass,
+            fixture.game?.currentOfficialRevision?.state === 'OFFICIAL'
+              ? fixture.game.currentOfficialRevision.resultParticipants : undefined,
           );
     const mvp = buildMvp(fixture, mode, currentRevisionState, consentMap, nameProfileByUserId, isStaffBypass);
 
@@ -1518,9 +1522,10 @@ export class PublicTournamentRecordsService {
     consentMap: Map<string, ParticipantConsentEligibility>,
     nameProfileByUserId: ReadonlyMap<string, ParticipantNameProfileRow>,
     isStaffBypass: boolean,
+    officialParticipants?: readonly { participantId: string; sideId: string; cards: unknown }[],
   ) {
     if (gameId === null) return [];
-    const events = await this.prisma.v1GameEvent.findMany({
+    const liveEvents = await this.prisma.v1GameEvent.findMany({
       where: { gameId },
       // 타임라인은 입력(append) 순서가 아니라 경기 시각순이어야 한다 -- sequence 는
       // 서버가 이벤트를 "받은" 순서일 뿐 경기 중 실제 발생 순서와 다를 수 있다
@@ -1539,6 +1544,18 @@ export class PublicTournamentRecordsService {
         reversesEventId: true,
       },
     });
+    // Explicit correction snapshots replace live cards, including deletions.
+    const events = officialParticipants === undefined ? liveEvents : [
+      ...liveEvents.filter((event) => event.type !== 'CARD'),
+      ...resolveResultCardEvents(officialParticipants, liveEvents).map((event) => ({
+        id: event.id, type: 'CARD' as const, sideId: event.sideId, participantId: event.participantId,
+        assistParticipantId: null, period: event.period ?? 1, clockMs: event.clockMs ?? (event.minute ?? 0) * 60000,
+        officialPeriod: event.period ?? null,
+        officialClockMs: event.clockMs ?? (event.minute === undefined ? null : event.minute * 60000),
+        reversesEventId: null,
+        payload: { card: event.card },
+      })),
+    ];
     const reversedIds = new Set(
       events.map((event) => event.reversesEventId).filter((id): id is string => id !== null),
     );
@@ -1560,7 +1577,7 @@ export class PublicTournamentRecordsService {
       .filter(
         (event) =>
           scoringTypes.has(event.type) &&
-          !reversedIds.has(event.id) &&
+          (!reversedIds.has(event.id) || (officialParticipants !== undefined && event.type === 'CARD')) &&
           (revisionGoals === null || event.type === 'CARD'),
       )
       .map((event) => {
@@ -1599,12 +1616,12 @@ export class PublicTournamentRecordsService {
           // 어쩔 수 없이 넣은 값이고 레거시 원본엔 전/후반 자체가 없었다 -- 그대로
           // 내보내면 이 타임라인이 `periodLabel(1)`="전반" 헤딩을 붙여 없던 사실을
           // 만든다. null이면 프론트가 이미 "기타" 구간으로 렌더한다.
-          period: isPeriodUnknown(event.payload) ? null : event.period,
+          period: 'officialPeriod' in event ? event.officialPeriod : isPeriodUnknown(event.payload) ? null : event.period,
           // 백필로 복원된 "분 미상" 골은 `clockMs: 0`으로 저장돼 있으므로 그대로
           // 내보내면 "0:00 득점"이 된다 -- 표식이 있으면 시각을 아예 내리지 않는다
           // (`PublicMatchEvent.clockMs`는 이미 `number | null`이고, 프론트
           // `formatClock`/`isClockAbnormal`도 null을 "표시 없음"으로 다룬다).
-          clockMs: isMinuteUnknown(event.payload) ? null : event.clockMs,
+          clockMs: 'officialClockMs' in event ? event.officialClockMs : isMinuteUnknown(event.payload) ? null : event.clockMs,
         };
       })
       .sort(byUnknownLast);
@@ -1694,7 +1711,17 @@ export class PublicTournamentRecordsService {
         fixture.game.currentOfficialRevision?.state === 'OFFICIAL'
           ? parseTournamentFixtureRevisionGoals(fixture.game.currentOfficialRevision.goalEvents)
           : null;
-      const rows: ScheduleEventRow[] = (eventsByGame.get(fixture.game.id) ?? [])
+      const liveRows = eventsByGame.get(fixture.game.id) ?? [];
+      const official = fixture.game.currentOfficialRevision;
+      const cardRows: ScheduleEventRow[] = official?.state === 'OFFICIAL'
+        ? resolveResultCardEvents(official.resultParticipants ?? [], liveRows).map((event) => ({
+          type: 'CARD', cardColor: event.card,
+          side: sideKeyById.get(event.sideId) === 'HOME' ? 'home' : 'away',
+          participantId: event.participantId, playerNameSnapshot: null,
+          period: event.period ?? null, clockMs: event.clockMs ?? (event.minute === undefined ? null : event.minute * 60000),
+        })) : [];
+      const rows: ScheduleEventRow[] = liveRows
+        .filter((event) => official?.state !== 'OFFICIAL' || event.type !== 'CARD')
         .filter((event) => revisionGoals === null || event.type === 'CARD')
         .map((event) => ({
         type:
@@ -1715,6 +1742,7 @@ export class PublicTournamentRecordsService {
         // buildEvents와 동일한 규칙 -- 분 미상 골은 시각을 내리지 않는다.
         clockMs: isMinuteUnknown(event.payload) ? null : event.clockMs,
         }));
+      rows.push(...cardRows);
       if (revisionGoals !== null) {
         rows.push(
           ...revisionGoals.map((event) => ({
@@ -1953,6 +1981,8 @@ export class PublicTournamentRecordsService {
             consentMap,
             nameProfileByUserId,
             false,
+            teamMatch.game?.currentOfficialRevision?.state === 'OFFICIAL'
+              ? teamMatch.game.currentOfficialRevision.resultParticipants : undefined,
           );
     const mvp = buildMvp({ game: teamMatch.game }, mode, currentRevisionState, consentMap, nameProfileByUserId, false);
 

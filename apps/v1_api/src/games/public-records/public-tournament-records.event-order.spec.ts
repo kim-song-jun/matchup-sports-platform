@@ -80,7 +80,12 @@ const MULTI_PERIOD_EVENTS: FakeEvent[] = [
   { id: 'p1-goal', gameId: GAME_ID, type: 'GOAL', sideId: 'side-home', participantId: HOME_SCORER.id, period: 1, clockMs: 2_400_000, sequence: 2, reversesEventId: null },
 ];
 
-function buildFakePrisma(events: readonly FakeEvent[]): PrismaService {
+function buildFakePrisma(events: readonly FakeEvent[], cards?: unknown): PrismaService {
+  const official = cards === undefined ? null : {
+    state: 'OFFICIAL', score: { home: 0, away: 0 }, goalEvents: [],
+    officialAt: new Date('2026-08-10T05:00:00Z'), mvpParticipantId: null,
+    resultParticipants: [{ participantId: HOME_SCORER.id, sideId: 'side-home', cards }],
+  };
   const database = {
     v1Tournament: {
       async findFirst() {
@@ -121,7 +126,7 @@ function buildFakePrisma(events: readonly FakeEvent[]): PrismaService {
             videos: [],
             game: {
               id: GAME_ID,
-              state: 'LIVE',
+              state: official ? 'ENDED' : 'LIVE',
               visibilityPolicy: { mode: 'LIVE', lineupAt: null },
               sides: [
                 { id: 'side-home', sideKey: 'HOME' },
@@ -129,7 +134,7 @@ function buildFakePrisma(events: readonly FakeEvent[]): PrismaService {
               ],
               lineups: [{ id: 'lineup-home-1', sideId: 'side-home', revision: 1, state: 'LOCKED', invalidatedAt: null }],
               participants: [HOME_SCORER],
-              currentOfficialRevision: null,
+              currentOfficialRevision: official,
               periods: [],
             },
           },
@@ -158,9 +163,9 @@ function buildFakePrisma(events: readonly FakeEvent[]): PrismaService {
               videos: [],
               game: {
                 id: GAME_ID,
-                state: 'LIVE',
+                state: official ? 'ENDED' : 'LIVE',
                 visibilityPolicy: { mode: 'LIVE', lineupAt: null },
-                currentOfficialRevision: null,
+                currentOfficialRevision: official,
                 sides: [
                   { id: 'side-home', sideKey: 'HOME' },
                   { id: 'side-away', sideKey: 'AWAY' },
@@ -364,5 +369,31 @@ describe('PublicTournamentRecordsService -- 백필이 복원한 골은 없는 �
     const result = await service.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined);
 
     expect(result.events.map((event) => [event.period, event.clockMs])).toEqual([[2, 71 * 60_000]]);
+  });
+});
+
+
+describe('official card corrections on public routes', () => {
+  it('shows corrected red cards once in both match detail and schedule, replacing live yellow cards', async () => {
+    const service = new PublicTournamentRecordsService(buildFakePrisma(ALPHA_SHAPED_EVENTS, {
+      yellow: 0, red: 1, events: [{ id: 'corrected-red', card: 'RED', minute: 3, period: 2 }],
+    }), NO_ASSIGNMENTS_ACCESS);
+    const match = await service.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined);
+    expect(match.events).toHaveLength(1);
+    expect(match.events[0]).toMatchObject({ type: 'CARD', cardColor: 'RED', clockMs: 180000, period: 2 });
+    const schedule = await service.getSchedule(TOURNAMENT_ID, {});
+    expect(schedule.items[0].cards).toHaveLength(1);
+    expect(schedule.items[0].cards[0]).toMatchObject({ cardColor: 'RED', clockMs: 180000, period: 2 });
+  });
+  it('shows aggregate-only cards with unknown time and respects explicit deletions', async () => {
+    const service = new PublicTournamentRecordsService(buildFakePrisma([], { yellow: 1, red: 1 }), NO_ASSIGNMENTS_ACCESS);
+    const match = await service.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined);
+    expect(match.events.map((event) => [event.cardColor, event.clockMs, event.period]))
+      .toEqual([['YELLOW', null, null], ['RED', null, null]]);
+    const deleted = new PublicTournamentRecordsService(buildFakePrisma(ALPHA_SHAPED_EVENTS, {
+      yellow: 0, red: 0, events: [],
+    }), NO_ASSIGNMENTS_ACCESS);
+    expect((await deleted.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined)).events).toEqual([]);
+    expect((await deleted.getSchedule(TOURNAMENT_ID, {})).items[0].cards).toEqual([]);
   });
 });

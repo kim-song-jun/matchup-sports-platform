@@ -2,6 +2,31 @@
 
 # Game aggregate contract
 
+## 결과 정정 카드 타임라인 (2026-10-24)
+
+`GameResultParticipantDto.cards`는 기존 `{yellow,red}`에 선택적 `events` 배열을 추가한다.
+각 항목은 `{id,card:'YELLOW'|'RED',minute?,period?}`이며 minute은 0 이상 정수,
+period는 1 이상 정수다. 생략은 시간/피리어드 미입력을 뜻하며 0분과 다르다.
+중첩 필드는 whitelist 검증하고, events가 있으면 종류별 개수는 yellow/red와 일치해야 한다.
+정정과 재제출은 경기 내 중복 id 및 존재하지 않는 피리어드를 422
+`RESULT_CARD_TIMELINE_INVALID`로 거부한다. HTTP 구조 오류는 400 `VALIDATION_ERROR`다.
+
+`POST /games/:gameId/corrections`의 `changes.actualParticipants`와
+`POST /games/:gameId/result-revisions/:revisionId/supersede-and-submit`의 `actualParticipants`에
+같은 형식을 사용한다. 기존 권한·expectedVersion·Idempotency-Key 계약은 유지한다.
+배열은 참가자별 `V1GameResultParticipant.cards` JSON에 합계와 함께 저장되어 별도 migration이 없다.
+기존 합계 전용 요청도 허용한다. 프론트 정정/재제출은 events를 항상 포함해 삭제도 명시한다.
+
+공식화 후 공개 경기 상세·일정 카드·팀 전적의 CARD는 현재 공식 참가자 스냅샷을 읽는다.
+명시적 `events:[]`는 삭제이며 현장 이벤트로 되살리지 않는다. 과거 합계만 있는 기록은
+취소되지 않은 같은 선수·같은 진영·같은 종류 현장 기록을 합계 범위에서 복원하고,
+부족한 장수는 시각/피리어드 null로 표시한다. 개인 기록의 yellow/red 합계도 같은 행을 읽는다.
+카드의 이름·프로필은 기존 공개 동의/스태프 게이트를 그대로 따른다. 테스트·MSW에서 시간 정보가
+필요한 fixture는 events까지 넣고 합계와 맞춰야 한다. 합계 전용 fixture는 기존 호환 사례다.
+
+검증 근거: `result-cards.dto.spec.ts`, `result-card-events.spec.ts`,
+`public-tournament-records.event-order.spec.ts`, `public-team-records.service.spec.ts`, `result-edit-modal.test.tsx`.
+
 ## Explicit-start league result gate (2026-10-19)
 
 For a regular league with `requiresExplicitStart=true`, stored lifecycle `draft`, `open`, or `closed`

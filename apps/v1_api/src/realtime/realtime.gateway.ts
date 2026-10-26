@@ -72,6 +72,7 @@ type SubscriberRefreshFlight = {
   readonly generation: number;
   dirty: boolean;
   minimumVersion: number;
+  pendingAck?: PendingGameSnapshotAck;
   passes: number;
   promise: Promise<void>;
   scheduled?: ScheduledRefresh;
@@ -115,6 +116,7 @@ type PendingGameSnapshotAck = {
   readonly generation: number;
   snapshot?: GameSnapshot;
   scheduled?: ScheduledRefresh;
+  failedRefreshMinimumVersion?: number;
 };
 
 type RetryGameEventInput = {
@@ -703,6 +705,24 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
         return { status: 'denied', code: 'STAFF_SCOPE_DENIED', reason: 'ASSIGNMENT_REQUIRED' };
       }
       const { initialBackfill, finalPrincipal } = snapshotWork.value;
+      const failedRefreshMinimumVersion = snapshotAck.failedRefreshMinimumVersion;
+      const availableAckVersion = Math.max(
+        initialBackfill.version,
+        snapshotAck.snapshot?.version ?? -1,
+      );
+      if (failedRefreshMinimumVersion !== undefined && availableAckVersion < failedRefreshMinimumVersion) {
+        this.logger.error(
+          {
+            socketId: client.id,
+            gameId: input.gameId,
+            requiredVersion: failedRefreshMinimumVersion,
+            actualVersion: availableAckVersion,
+          },
+          'Pending game subscription cannot satisfy a failed committed refresh',
+        );
+        this.disconnectGameSubscriberForRecovery(client, input.gameId, failedRefreshMinimumVersion);
+        throw new Error('Pending game subscription snapshot is behind a failed committed refresh');
+      }
       if (scope !== null) {
         if (finalPrincipal === null) {
           throw new ForbiddenException({ code: 'STAFF_SCOPE_DENIED', reason: 'ASSIGNMENT_REQUIRED' });
@@ -1238,6 +1258,25 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     if (!this.pendingGameSnapshotAcks.delete(key)) return false;
     current.scheduled?.cancel();
     return true;
+  }
+
+  private preserveFailedRefreshFloor(
+    client: V1Socket,
+    gameId: string,
+    generation: number,
+    minimumVersion: number,
+    expectedPendingAck: PendingGameSnapshotAck | undefined,
+  ): void {
+    const key = this.roomTransitionKey(client.id, gameId);
+    const pendingAck = this.pendingGameSnapshotAcks.get(key);
+    if (expectedPendingAck === undefined || pendingAck !== expectedPendingAck || pendingAck.generation !== generation ||
+      !this.isSocketLive(client) || !client.rooms.has(gameRoom(gameId)) ||
+      !this.isRoomGenerationCurrent(client.id, gameId, generation) ||
+      this.staffRoomOwners.get(key) !== generation || this.socketClients.get(client.id) !== client) return;
+    pendingAck.failedRefreshMinimumVersion = Math.max(
+      pendingAck.failedRefreshMinimumVersion ?? 0,
+      minimumVersion,
+    );
   }
 
   private clearSocketGameRefreshFlights(socketId: string, gameId?: string): void {
@@ -2108,10 +2147,12 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     const generation = this.staffLeaseGenerations.get(client.id)?.get(gameId);
     if (generation === undefined) return Promise.resolve();
     const key = `${this.roomTransitionKey(client.id, gameId)}:${generation}`;
+    const pendingAck = this.pendingGameSnapshotAcks.get(this.roomTransitionKey(client.id, gameId));
     const existing = this.subscriberRefreshFlights.get(key);
     if (existing !== undefined) {
       existing.dirty = true;
       existing.minimumVersion = Math.max(existing.minimumVersion, minimumVersion);
+      if (pendingAck?.generation === generation) existing.pendingAck = pendingAck;
       return existing.promise;
     }
 
@@ -2121,6 +2162,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       generation,
       dirty: false,
       minimumVersion,
+      ...(pendingAck?.generation === generation ? { pendingAck } : {}),
       passes: 0,
       promise: Promise.resolve(),
     };
@@ -2139,6 +2181,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
           flight.gameId,
           flight.generation,
           flight.minimumVersion,
+          flight.pendingAck,
         );
       } while (flight.dirty && flight.passes < 2 &&
         this.isRoomGenerationCurrent(client.id, gameId, generation) && this.isSocketLive(client));
@@ -2154,6 +2197,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       }
     });
     flight.promise = flight.scheduled.promise.catch((error: unknown) => {
+      this.preserveFailedRefreshFloor(client, gameId, generation, flight.minimumVersion, flight.pendingAck);
       if (!this.pendingGameSnapshotAcks.has(this.roomTransitionKey(client.id, gameId)) &&
         this.isSocketLive(client) && client.rooms.has(gameRoom(gameId)) &&
         this.isRoomGenerationCurrent(client.id, gameId, generation)) {
@@ -2215,6 +2259,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     gameId: string,
     generation: number,
     minimumVersion: number,
+    pendingAck: PendingGameSnapshotAck | undefined,
   ): Promise<void> {
     const room = gameRoom(gameId);
     const roomKey = this.roomTransitionKey(client.id, gameId);
@@ -2255,6 +2300,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
           this.staffLeases.get(client.id)?.has(gameId)) return;
         if (backfill.version < minimumVersion) {
           this.logger.error({ socketId: client.id, gameId, minimumVersion, actualVersion: backfill.version }, 'Game snapshot did not meet committed refresh version');
+          this.preserveFailedRefreshFloor(client, gameId, generation, minimumVersion, pendingAck);
           return;
         }
         if (!this.isBackfillAtCurrentRefreshFloor(client, gameId, generation, backfill.version)) return;
@@ -2265,6 +2311,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
           await this.leaveUnscopedGameRoomIfCurrent(client, gameId, generation);
           return;
         }
+        this.preserveFailedRefreshFloor(client, gameId, generation, minimumVersion, pendingAck);
         this.logger.error({ socketId: client.id, gameId, err: error }, 'Failed to refresh unscoped game snapshot');
       }
       return;
@@ -2342,6 +2389,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
         this.staffRoomOwners.get(roomKey) !== lease.generation) return;
       if (backfill.version < minimumVersion) {
         this.logger.error({ socketId: client.id, gameId, minimumVersion, actualVersion: backfill.version }, 'Game snapshot did not meet committed refresh version');
+        this.preserveFailedRefreshFloor(client, gameId, lease.generation, minimumVersion, pendingAck);
         return;
       }
       if (!this.isBackfillAtCurrentRefreshFloor(client, gameId, lease.generation, backfill.version)) return;
@@ -2354,6 +2402,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
         });
         return;
       }
+      this.preserveFailedRefreshFloor(client, gameId, lease.generation, minimumVersion, pendingAck);
       this.logger.error({ socketId: client.id, gameId, err: error }, 'Failed to refresh authorized game snapshot');
     }
   }

@@ -535,16 +535,23 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
       initialVersion = before.body.data.version;
       const startRefreshes = trackRefreshPromises();
       let goalSequence: number;
+      type GoalSnapshot = {
+        gameId: string;
+        version: number;
+        state: string;
+        lastSequence: number;
+        events: Array<{ type: string; sequence: number; sideId?: string | null; participantId?: string | null }>;
+      };
+      const deliveredSnapshots: GoalSnapshot[] = [];
       const committedDeliveryOrder: string[] = [];
-      const recordSnapshotDelivery = (snapshot: { version: number }) => committedDeliveryOrder.push(`snapshot:${snapshot.version}`);
+      const recordSnapshotDelivery = (snapshot: GoalSnapshot) => {
+        deliveredSnapshots.push(snapshot);
+        committedDeliveryOrder.push(`snapshot:${snapshot.version}`);
+      };
       const recordEventDelivery = (event: { version: number }) => committedDeliveryOrder.push(`event:${event.version}`);
       observer.on('game.snapshot', recordSnapshotDelivery);
       observer.on('game.event.committed', recordEventDelivery);
-      const goalCommitted = eventOnce<{ gameId: string; version: number; sequence: number }>(observer, 'game.event.committed');
-      const secondConsoleGoalCommitted = eventOnce<{ gameId: string; version: number; sequence: number }>(
-        operatorSecondConsole,
-        'game.event.committed',
-      );
+      const goalEventWaits: Array<{ cancel: () => void }> = [];
       try {
         const command = await request(app.getHttpServer())
           .post(`/api/v1/games/${gameId}/commands/start`)
@@ -560,6 +567,16 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
           .expect(201);
         commandVersion = command.body.data.version;
         expect(startRefreshes.promises).toHaveLength(1);
+        // Complete the real START refresh while the initial subscribe read is still held,
+        // so the later GOAL cannot legitimately raise the pending ACK's minimum version.
+        await startRefreshes.promises[0];
+        const goalCommitted = eventOnce<{ gameId: string; version: number; sequence: number }>(observer, 'game.event.committed');
+        goalEventWaits.push(goalCommitted);
+        const secondConsoleGoalCommitted = eventOnce<{ gameId: string; version: number; sequence: number }>(
+          operatorSecondConsole,
+          'game.event.committed',
+        );
+        goalEventWaits.push(secondConsoleGoalCommitted);
 
         const goal = await request(app.getHttpServer())
           .post(`/api/v1/games/${gameId}/events`)
@@ -584,27 +601,50 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
           gameId,
           version: goalVersion,
           sequence: goalSequence,
+          type: 'GOAL',
+          sideId: homeSideId,
+          participantId: homeParticipantId,
         } });
         initialReadGate.release();
         const observerAck = await observerSubscribe;
         expect(observerAck).toMatchObject({ status: 'subscribed', snapshot: {
           gameId,
-          version: goalVersion,
+          version: commandVersion,
           state: 'LIVE',
-          lastSequence: goalSequence,
-          events: [expect.objectContaining({ type: 'GOAL', sequence: goalSequence, participantId: homeParticipantId })],
+          lastSequence: 0,
+          events: [],
         } });
         await expect(goalCommitted.promise).resolves.toMatchObject({ event: {
           gameId,
           version: goalVersion,
           sequence: goalSequence,
+          type: 'GOAL',
+          sideId: homeSideId,
+          participantId: homeParticipantId,
         } });
+        const committedGoalSnapshot = deliveredSnapshots.find((snapshot) => snapshot.version === goalVersion);
+        expect(committedGoalSnapshot).toMatchObject({
+          gameId,
+          version: goalVersion,
+          state: 'LIVE',
+          lastSequence: goalSequence,
+          events: [expect.objectContaining({
+            type: 'GOAL',
+            sequence: goalSequence,
+            sideId: homeSideId,
+            participantId: homeParticipantId,
+          })],
+        });
         const snapshotOrder = committedDeliveryOrder.findIndex((entry) => entry.startsWith('snapshot:'));
         const eventOrder = committedDeliveryOrder.findIndex((entry) => entry.startsWith('event:'));
         expect(snapshotOrder).toBeGreaterThanOrEqual(0);
         expect(eventOrder).toBeGreaterThan(snapshotOrder);
-        await startRefreshes.promises[0];
+        const goalSnapshotOrder = committedDeliveryOrder.indexOf(`snapshot:${goalVersion}`);
+        const goalEventOrder = committedDeliveryOrder.indexOf(`event:${goalVersion}`);
+        expect(goalSnapshotOrder).toBeGreaterThanOrEqual(0);
+        expect(goalEventOrder).toBeGreaterThan(goalSnapshotOrder);
       } finally {
+        goalEventWaits.forEach(({ cancel }) => cancel());
         startRefreshes.restore();
         observer.off('game.snapshot', recordSnapshotDelivery);
         observer.off('game.event.committed', recordEventDelivery);

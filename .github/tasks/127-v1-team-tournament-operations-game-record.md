@@ -1921,3 +1921,5 @@ Validation:
 - 추가 scope: `apps/v1_api/src/realtime/game-subscriber-refresh.scheduler.ts`, `apps/v1_api/src/realtime/game-subscriber-refresh.scheduler.spec.ts`.
 - 구독은 요청한 `afterSequence`로 기록을 한 번만 읽고 최종 권한·scope 검사까지 같은 제한된 작업 안에서 처리해요. 이전 요청의 취소는 자신이 소유한 대기 작업에만 적용하고, 이미 보낸 최신 snapshot보다 낮은 ACK는 반환하지 않아요. 최종 권한 검사는 유지했으며 기존 lease·room 테스트도 실제 호출 순서에 맞췄어요.
 - 커밋 `bfc97076e`의 실제 CI DB 통합은 181개 suite 모두 통과했지만 뒤의 단위 단계는 7건 실패했어요. 위 구독 수정 후 커밋 스키마와 같은 격리 Prisma client 및 원본의 강한 Jest/TypeScript 진단 설정으로 관련 단위 2개 suite·59개 테스트가 통과했어요. 새 수정 커밋의 전체 CI·Alpha 검증은 아직 남아 있어요. 공유 Prisma 생성물·패키지·lock·schema는 바꾸지 않았어요.
+- Pending refresh 실패 뒤에도 최소 확정 버전을 소유 ACK에 보존해 오래된 성공 ACK를 막는 회복 경로를 추가했어요. 게이트웨이 단위 52개가 통과했고, 같은 production 소스에서 앞서 통과한 handshake 9개도 유지돼요. 첫 실행의 테스트 문법 오류는 실행 전 실패로 기록하고 수정 후 해당 게이트웨이 파일만 재실행했어요.
+- `fe5d710a7` CI는 초기 ACK가 뒤의 GOAL까지 포함한다는 이전 단언에서 실패했어요. START 갱신 완료를 초기 read 보류 중 확인한 뒤 GOAL을 제출해 ACK v1과 후속 GOAL snapshot/event v2를 분리하고, 실제 GOAL 내용과 동일 버전의 snapshot-before-event를 대조하도록 보정했어요. 수신 타이머는 GOAL 제출 직전에 시작하고 `finally`에서 정리해요. 이후 실행기 OOM/exit 134로 전수 집계가 없었으므로 새 CI의 재발 여부를 확인해야 하며, 전체 통합 GREEN이나 OOM 해결은 아직 주장하지 않아요.

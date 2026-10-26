@@ -637,6 +637,56 @@ describe('RealtimeGateway', () => {
       expect(gamesService.listEvents).toHaveBeenNthCalledWith(2, activeUser, GAME_SCOPE.gameId, 0);
     });
 
+    it.each([
+      [4, false],
+      [9, true],
+    ] as const)(
+      'preserves a failed refresh floor until subscribe settles (initial version %i; satisfies floor: %s)',
+      async (initialVersion, satisfiesFloor) => {
+        const socket = await connectAuthenticatedSocket();
+        resolveScopedGame();
+        const initialRead = deferred<{ version: number; state: string; events: unknown[]; lastSequence: number }>();
+        const initialReadEntered = deferred<void>();
+        gamesService.listEvents.mockImplementation(() => {
+          initialReadEntered.resolve();
+          return initialRead.promise;
+        });
+
+        const subscribing = task8Gateway().subscribeToGame(socket, {
+          gameId: GAME_SCOPE.gameId,
+          afterSequence: 0,
+        });
+        await initialReadEntered.promise;
+
+        prisma.v1Game.findUnique.mockRejectedValueOnce(new Error('refresh game lookup failed'));
+        const refresh = Reflect.apply(Reflect.get(gateway, 'requestSocketGameRefresh'), gateway, [
+          socket,
+          GAME_SCOPE.gameId,
+          9,
+        ]) as Promise<void>;
+        const refreshOutcome = refresh.then(() => null, (error: unknown) => error);
+        await expect(refreshOutcome).resolves.toBeInstanceOf(Error);
+
+        const pendingAcks = Reflect.get(gateway, 'pendingGameSnapshotAcks') as Map<
+          string,
+          { failedRefreshMinimumVersion?: number }
+        >;
+        expect(pendingAcks.get(`${socket.id}:${GAME_SCOPE.gameId}`)?.failedRefreshMinimumVersion).toBe(9);
+        expect((Reflect.get(gateway, 'subscriberRefreshFlights') as Map<string, unknown>).size).toBe(0);
+
+        initialRead.resolve({ version: initialVersion, state: 'LIVE', events: [], lastSequence: 0 });
+        if (satisfiesFloor) {
+          await expect(subscribing).resolves.toMatchObject({ status: 'subscribed', snapshot: { version: 9 } });
+          expect(socket.client.conn.close).not.toHaveBeenCalled();
+        } else {
+          await expect(subscribing).rejects.toThrow('behind a failed committed refresh');
+          expect(socket.client.conn.close).toHaveBeenCalled();
+          expect(socket.emit).toHaveBeenCalledWith('game.error', { code: 'INTERNAL_ERROR' });
+          expect(socket.emit).not.toHaveBeenCalledWith('game.snapshot', expect.anything());
+        }
+      },
+    );
+
     it('keeps a resubscribed queue alive when the previous generation refresh rejects', async () => {
       const socket = await connectAuthenticatedSocket();
       resolveScopedGame();

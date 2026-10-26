@@ -148,7 +148,10 @@ describe('game period pause tracking — pausedTotalMs/pausedAt survive multiple
         { sideKey: V1GameSideKey.HOME, teamId: ids.hostTeam, displayNameSnapshot: 'Pause Host' },
         { sideKey: V1GameSideKey.AWAY, teamId: ids.opponentTeam, displayNameSnapshot: 'Pause Opponent' },
       ],
-      participants: [],
+      participants: [
+        { sourceParticipantId: 'pause-home-player', sideKey: V1GameSideKey.HOME, displayNameSnapshot: 'Pause Home Player' },
+        { sourceParticipantId: 'pause-away-player', sideKey: V1GameSideKey.AWAY, displayNameSnapshot: 'Pause Away Player' },
+      ],
     };
     const actor: GameActorScope = {
       actorType: 'USER',

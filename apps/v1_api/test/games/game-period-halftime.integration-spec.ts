@@ -166,6 +166,7 @@ describe('이슈 #375 — end-period/start-period/revert-period drive an observa
       ],
       participants: [
         { sourceParticipantId: 'issue-375-home-player-1', sideKey: V1GameSideKey.HOME, displayNameSnapshot: 'Issue 375 Scorer' },
+        { sourceParticipantId: 'issue-375-away-player-1', sideKey: V1GameSideKey.AWAY, displayNameSnapshot: 'Issue 375 Opponent Player' },
       ],
     };
     const actor: GameActorScope = {
@@ -400,7 +401,10 @@ describe('이슈 #375 — 경기 종료가 하프타임 도중에도 다음 피�
         { sideKey: V1GameSideKey.HOME, teamId: ids.hostTeam, displayNameSnapshot: 'Issue 375 Host' },
         { sideKey: V1GameSideKey.AWAY, teamId: ids.opponentTeam, displayNameSnapshot: 'Issue 375 Opponent' },
       ],
-      participants: [],
+      participants: [
+        { sourceParticipantId: 'issue-375-end-home-player', sideKey: V1GameSideKey.HOME, displayNameSnapshot: 'Issue 375 End Home Player' },
+        { sourceParticipantId: 'issue-375-end-away-player', sideKey: V1GameSideKey.AWAY, displayNameSnapshot: 'Issue 375 End Away Player' },
+      ],
     };
     const actor: GameActorScope = {
       actorType: 'USER',
@@ -491,7 +495,10 @@ describe('정규 시간 종료 — 마지막 피리어드도 end-period로 닫�
         { sideKey: V1GameSideKey.HOME, teamId: ids.hostTeam, displayNameSnapshot: 'Issue 375 Host' },
         { sideKey: V1GameSideKey.AWAY, teamId: ids.opponentTeam, displayNameSnapshot: 'Issue 375 Opponent' },
       ],
-      participants: [],
+      participants: [
+        { sourceParticipantId: 'final-period-home-player', sideKey: V1GameSideKey.HOME, displayNameSnapshot: 'Final Period Home Player' },
+        { sourceParticipantId: 'final-period-away-player', sideKey: V1GameSideKey.AWAY, displayNameSnapshot: 'Final Period Away Player' },
+      ],
     };
     const actor: GameActorScope = {
       actorType: 'USER',

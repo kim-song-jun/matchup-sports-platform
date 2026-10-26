@@ -137,6 +137,10 @@ error rather than a display fallback.
 킥오프 60분 전 기준) 전에는 신청자가 활성 멤버인 팀의 side만 다룬다(두 팀 모두의 멤버면 둘 다). 공개 뒤에는
 상대 side도 열어 상대 팀에 용병으로 뛴 팀원이 자기 이름을 찾을 수 있다. 공개 전 상대 side 참가자에게 신청하면
 403 `PERMISSION_DENIED`, 후보·`rosterCount`·`rosterSubmitted`도 그 범위로 센다. platform_ops 는 좁히지 않는다.
+후보 목록과 직접 연결 신청은 모두 `invalidatedAt: null`인 라인업만 공유 선택기에 전달한다. 팀 교체로 무효화된
+`SUBMITTED` 리비전은 이력으로 보존되지만 현재 후보로 노출되지 않고, 직접 그 참가자를 신청해도
+`409 GAME_PARTICIPANT_NOT_CURRENT_LINEUP`으로 거절되며 연결 이벤트는 남지 않는다. 제출/잠금본이 없는 side에서는
+선택기가 현재 유효한 `DRAFT`를 기존 폴백 규칙대로 선택할 수 있다. 게임·side 범위와 기존 인가 규칙은 그대로다.
 
 ### Penalty-shootout conclusion rule
 
@@ -345,6 +349,10 @@ GK 저장/해제는 해당 참가 등록(대회·팀)의 선수 값에 보관한
 ## League start prerequisite (2026-10-18)
 
 Game `start` in a regular league with `requiresExplicitStart=true` and stored as `draft`, `open`, or `closed` returns `409 LEAGUE_NOT_STARTED` before game state changes. An authorized admin starts the league through the existing league state endpoint first; friendly matches and regular tournaments retain their current rules. See [league lifecycle](./league-matches.md#new-league-lifecycle-2026-10-18).
+
+## Tournament and league start roster prerequisite (MD-QA #175)
+
+Starting a scheduled tournament or regular-league game requires confirmed, distinct teams on both sides and at least one participant in each side's effective current matchday lineup. Missing, duplicate, or mismatched team assignment returns `409 TOURNAMENT_MATCH_TEAMS_REQUIRED`; when team assignment is valid but an effective lineup is empty, the API returns `409 GAME_START_LINEUP_EMPTY` before the game state changes. The latter response names the side and asks the operator to check its matchday lineup. If a side has a non-invalidated `SUBMITTED` or `LOCKED` lineup, its latest operable revision is effective; otherwise the latest non-invalidated revision is effective. Submission is not required: a generated draft with at least one participant on each side remains startable. Official result snapshots use that same effective lineup set and exclude invalidated revisions retained for history, so replacing a side cannot reintroduce its previous submitted players. Team assignment, actor authorization, league lifecycle, and the existing game-row lock/serializable command boundary remain in force. This guard does not define a no-show or forfeit outcome.
 
 ## 운영콘솔 경기 출전 명단 (2026-10-20)
 

@@ -100,6 +100,11 @@ describe('Task 20 live tournament commands, event validation, atomic result subm
           sideKey: V1GameSideKey.HOME,
           displayNameSnapshot: 'Task 20 Host Scorer',
         },
+        {
+          sourceParticipantId: `${fixtureId}-away-player-1`,
+          sideKey: V1GameSideKey.AWAY,
+          displayNameSnapshot: 'Task 20 Opponent Player',
+        },
       ],
     };
     const actor: GameActorScope = {
@@ -790,7 +795,10 @@ describe('TEAM_MATCH sourced games allow lifecycle commands other than end, host
         { sideKey: V1GameSideKey.HOME, teamId: tmIds.hostTeam, displayNameSnapshot: 'T3 TM Command Host' },
         { sideKey: V1GameSideKey.AWAY, teamId: tmIds.opponentTeam, displayNameSnapshot: 'T3 TM Command Opponent' },
       ],
-      participants: [],
+      participants: [
+        { sourceParticipantId: 't3-team-match-home-player', sideKey: V1GameSideKey.HOME, displayNameSnapshot: 'T3 Host Player' },
+        { sourceParticipantId: 't3-team-match-away-player', sideKey: V1GameSideKey.AWAY, displayNameSnapshot: 'T3 Opponent Player' },
+      ],
     };
     const created = await prisma.$transaction((tx) =>
       service.createFromSourceInTransaction(

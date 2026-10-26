@@ -116,6 +116,7 @@ async function buildTournamentGame(fixtureId: string): Promise<string> {
     ],
     participants: [
       { sourceParticipantId: `host-player-${fixtureId}`, sideKey: V1GameSideKey.HOME, displayNameSnapshot: 'Host One' },
+      { sourceParticipantId: `away-player-${fixtureId}`, sideKey: V1GameSideKey.AWAY, displayNameSnapshot: 'Opponent One' },
     ],
   };
   const created = await prisma.$transaction((tx) =>

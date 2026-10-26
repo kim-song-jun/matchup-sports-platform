@@ -121,7 +121,10 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
         { sideKey: V1GameSideKey.HOME, teamId: ids.homeTeam, displayNameSnapshot: '#29 홈' },
         { sideKey: V1GameSideKey.AWAY, teamId: ids.awayTeam, displayNameSnapshot: '#29 원정' },
       ],
-      participants: [],
+      participants: [
+        { sourceParticipantId: `${teamMatchId}-home-player`, sideKey: V1GameSideKey.HOME, displayNameSnapshot: '#29 홈 선수' },
+        { sourceParticipantId: `${teamMatchId}-away-player`, sideKey: V1GameSideKey.AWAY, displayNameSnapshot: '#29 원정 선수' },
+      ],
     };
     const created = await prisma.$transaction((tx) =>
       service.createFromSourceInTransaction(
@@ -142,7 +145,10 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
         { sideKey: V1GameSideKey.HOME, teamId: ids.homeTeam, displayNameSnapshot: '대조군 홈' },
         { sideKey: V1GameSideKey.AWAY, teamId: ids.awayTeam, displayNameSnapshot: '대조군 원정' },
       ],
-      participants: [],
+      participants: [
+        { sourceParticipantId: 'console-fixture-home-player', sideKey: V1GameSideKey.HOME, displayNameSnapshot: '대조군 홈 선수' },
+        { sourceParticipantId: 'console-fixture-away-player', sideKey: V1GameSideKey.AWAY, displayNameSnapshot: '대조군 원정 선수' },
+      ],
     };
     const created = await prisma.$transaction((tx) =>
       service.createFromSourceInTransaction(

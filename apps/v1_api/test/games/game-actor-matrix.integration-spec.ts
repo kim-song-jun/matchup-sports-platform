@@ -390,7 +390,10 @@ describe('Task 7 six-persona Game actor matrix characterization PIN', () => {
           displayNameSnapshot: 'Task 7 Opponent',
         },
       ],
-      participants: [],
+      participants: [
+        { sourceParticipantId: 'task7-host-player', sideKey: V1GameSideKey.HOME, displayNameSnapshot: 'Task 7 Host Player' },
+        { sourceParticipantId: 'task7-away-player', sideKey: V1GameSideKey.AWAY, displayNameSnapshot: 'Task 7 Opponent Player' },
+      ],
     };
     const tournamentCreated = await prisma.$transaction((tx) =>
       service.createFromSourceInTransaction(

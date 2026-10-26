@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { COMMAND_RESPONSE_TIMEOUT_MS, OperateConsole } from './operate-console';
-import type { GameEventRecord } from '@/types/game-operations';
+import type { FixtureLineupResponse, GameEventRecord, GameLineupState } from '@/types/game-operations';
 import { V1_NETWORK_ERROR_CODE, V1ApiError } from '@/lib/api-client';
 
 const queryClients: QueryClient[] = [];
@@ -1595,17 +1595,77 @@ const HOME_AWAY_SIDES = [
 // UX 감사 item 2 — 라인업 없이 경기 시작 가능 → 복구 불가능한 막다른 길.
 describe('OperateConsole — 라인업 게이트 (UX 감사 item 2)', () => {
   function setup(
-    lineups: Array<{ sideId: string; state: string; revision: number; invalidatedAt: string | null }>,
+    lineups: Array<{ sideId: string; state: GameLineupState; revision: number; invalidatedAt: string | null }>,
     sourceType: 'TEAM_MATCH' | 'TOURNAMENT_FIXTURE' = 'TEAM_MATCH',
+    participantCounts: { home: number; away: number } = { home: 1, away: 1 },
   ) {
+    const makeLineup = (
+      sideId: string,
+      revision: number,
+      state: GameLineupState,
+      count: number,
+      invalidatedAt: string | null = null,
+    ) => {
+      const id = `${sideId}-lineup-${revision}`;
+      return {
+        id,
+        gameId: 'game-1',
+        sideId,
+        revision,
+        state,
+        version: 0,
+        submittedAt: null,
+        supersedesId: null,
+        formation: null,
+        createdAt: '',
+        updatedAt: '',
+        invalidatedAt,
+        participants: Array.from({ length: count }, (_, index) => ({
+          id: `${id}-player-${index + 1}`,
+          gameId: 'game-1',
+          sideId,
+          lineupId: id,
+          userId: null,
+          displayNameSnapshot: `${sideId} 선수 ${index + 1}`,
+          jerseyNumber: index + 1,
+          position: null,
+          positionX: null,
+          positionY: null,
+          started: true,
+          arrivedAt: null,
+          createdAt: '',
+          updatedAt: '',
+        })),
+      };
+    };
+    const effectiveLineups = [
+      makeLineup('side-home', 1, 'DRAFT', participantCounts.home),
+      makeLineup('side-away', 1, 'DRAFT', participantCounts.away),
+      ...lineups.map((lineup) => makeLineup(
+        lineup.sideId,
+        lineup.revision,
+        lineup.state,
+        lineup.invalidatedAt === null
+          ? lineup.sideId === 'side-home' ? participantCounts.home : participantCounts.away
+          : 0,
+        lineup.invalidatedAt,
+      )),
+    ];
     mocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'user-1' } } });
-    mocks.useV1FixtureLineup.mockReturnValue({
-      data: { gameId: 'game-1', lineups: lineups.map((l) => ({ ...l, participants: [] })) },
+    const fixtureLineupResponse: {
+      data: FixtureLineupResponse;
+      isLoading: false;
+      isError: false;
+      error: null;
+      refetch: ReturnType<typeof vi.fn>;
+    } = {
+      data: { gameId: 'game-1', lineups: effectiveLineups },
       isLoading: false,
       isError: false,
       error: null,
       refetch: vi.fn(),
-    });
+    };
+    mocks.useV1FixtureLineup.mockReturnValue(fixtureLineupResponse);
     mocks.useV1Game.mockReturnValue({
       data: {
         id: 'game-1', state: 'SCHEDULED', version: 1, lastSequence: 0, sourceType,
@@ -1621,6 +1681,7 @@ describe('OperateConsole — 라인업 게이트 (UX 감사 item 2)', () => {
       refetch: vi.fn(),
     });
     mocks.useV1GameOperationsConsole.mockReturnValue(consoleState({ gameSnapshot: { version: 1, state: 'SCHEDULED' } }));
+    return fixtureLineupResponse;
   }
 
   /**
@@ -1631,7 +1692,7 @@ describe('OperateConsole — 라인업 게이트 (UX 감사 item 2)', () => {
    * "왜 명단이 비어 있지"를 운영자가 현장에서 알 수 없다.
    */
   it('한쪽 팀만 라인업을 제출했어도 "경기 시작"은 활성이고, 미제출 경고는 그대로 뜬다', () => {
-    setup([{ sideId: 'side-home', state: 'SUBMITTED', revision: 1, invalidatedAt: null }]);
+    setup([{ sideId: 'side-home', state: 'SUBMITTED', revision: 2, invalidatedAt: null }]);
     render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
 
     expect(screen.getByRole('button', { name: '경기 시작' })).toBeEnabled();
@@ -1646,7 +1707,7 @@ describe('OperateConsole — 라인업 게이트 (UX 감사 item 2)', () => {
    * 있는데도 이 경고가 떴다(alpha 실측). 운영자가 할 수 있는 일이 없는 경고다.
    */
   it('대회 경기에서는 미제출 경고를 띄우지 않는다', () => {
-    setup([{ sideId: 'side-home', state: 'SUBMITTED', revision: 1, invalidatedAt: null }], 'TOURNAMENT_FIXTURE');
+    setup([{ sideId: 'side-home', state: 'SUBMITTED', revision: 2, invalidatedAt: null }], 'TOURNAMENT_FIXTURE');
     render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
 
     expect(screen.getByRole('button', { name: '경기 시작' })).toBeEnabled();
@@ -1655,13 +1716,64 @@ describe('OperateConsole — 라인업 게이트 (UX 감사 item 2)', () => {
 
   it('양 팀 모두 라인업을 제출하면 "경기 시작"이 활성화되고 배너가 없다', () => {
     setup([
-      { sideId: 'side-home', state: 'SUBMITTED', revision: 1, invalidatedAt: null },
-      { sideId: 'side-away', state: 'LOCKED', revision: 1, invalidatedAt: null },
+      { sideId: 'side-home', state: 'SUBMITTED', revision: 2, invalidatedAt: null },
+      { sideId: 'side-away', state: 'LOCKED', revision: 2, invalidatedAt: null },
     ]);
     render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
 
     expect(screen.getByRole('button', { name: '경기 시작' })).not.toBeDisabled();
     expect(screen.queryByText(/출전 명단을 제출해야/)).toBeNull();
+  });
+
+  it('무효화된 제출 명단은 유효한 현재 초안의 출전자를 덮어쓰지 않는다', () => {
+    setup([{
+      sideId: 'side-home',
+      state: 'SUBMITTED',
+      revision: 2,
+      invalidatedAt: '2026-10-26T00:00:00.000Z',
+    }]);
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    expect(screen.getByRole('button', { name: '경기 시작' })).toBeEnabled();
+    expect(screen.queryByText(/출전 선수가 없어요/)).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['홈', { home: 0, away: 1 }, '강남 풋살 클럽'],
+    ['원정', { home: 1, away: 0 }, '성수 풋살 클럽'],
+    ['양쪽', { home: 0, away: 0 }, '강남 풋살 클럽, 성수 풋살 클럽'],
+  ] as const)('유효 경기 출전자가 %s 팀에 없으면 시작을 막고 팀 이름을 안내한다', (_side, counts, teamNames) => {
+    setup([], 'TEAM_MATCH', counts);
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    expect(screen.getByRole('button', { name: '경기 시작' })).toBeDisabled();
+    expect(screen.getByText(`${teamNames} 팀 출전 선수가 없어요. 경기 명단을 확인해 주세요.`)).toBeInTheDocument();
+  });
+
+  it('명단 불러오기에서 완료 상태로 바뀌어도 시작 전환이 계속 렌더된다', () => {
+    const loadedLineup = setup([], 'TEAM_MATCH', { home: 0, away: 1 });
+    type FixtureLineupQueryState =
+      | {
+          data: undefined;
+          isLoading: true;
+          isError: false;
+          error: null;
+          refetch: ReturnType<typeof vi.fn>;
+        }
+      | typeof loadedLineup;
+    let fixtureLineupState: FixtureLineupQueryState = {
+      ...loadedLineup,
+      data: undefined,
+      isLoading: true,
+    };
+    mocks.useV1FixtureLineup.mockImplementation(() => fixtureLineupState);
+    const { rerender } = render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    expect(screen.getByText('불러오는 중이에요…')).toBeInTheDocument();
+    fixtureLineupState = loadedLineup;
+    expect(() => rerender(<OperateConsole tournamentId="t-1" fixtureId="f-1" />)).not.toThrow();
+    expect(screen.getByRole('button', { name: '경기 시작' })).toBeDisabled();
+    expect(screen.getByText('강남 풋살 클럽 팀 출전 선수가 없어요. 경기 명단을 확인해 주세요.')).toBeInTheDocument();
   });
 });
 

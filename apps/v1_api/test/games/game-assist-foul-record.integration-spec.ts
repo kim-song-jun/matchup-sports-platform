@@ -70,6 +70,7 @@ describe('deriveTournamentRevision — assist/foul aggregation (T1-4)', () => {
         { sourceParticipantId: 'record-scorer', sideKey: V1GameSideKey.HOME, displayNameSnapshot: 'Scorer' },
         { sourceParticipantId: 'record-assister', sideKey: V1GameSideKey.HOME, displayNameSnapshot: 'Assister' },
         { sourceParticipantId: 'record-fouler', sideKey: V1GameSideKey.HOME, displayNameSnapshot: 'Fouler' },
+        { sourceParticipantId: 'record-away-player', sideKey: V1GameSideKey.AWAY, displayNameSnapshot: 'Away Player' },
       ],
     };
     const actor: GameActorScope = { actorType: 'USER', actorUserId: ids.operator, role: 'field_operator', tournamentId: ids.tournament, fixtureId: ids.fixture };

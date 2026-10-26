@@ -94,6 +94,7 @@ async function buildTournamentGame(fixtureId: string): Promise<string> {
     ],
     participants: [
       { sourceParticipantId: `host-player-${fixtureId}`, sideKey: V1GameSideKey.HOME, displayNameSnapshot: 'Host One' },
+      { sourceParticipantId: `away-player-${fixtureId}`, sideKey: V1GameSideKey.AWAY, displayNameSnapshot: 'Opponent One' },
     ],
   };
   const created = await prisma.$transaction((tx) =>
@@ -390,6 +391,7 @@ describe('Task 22 T-B: QA scenario gap coverage (Q-02/04/07/08/11/13)', () => {
       ],
       participants: [
         { sourceParticipantId: `host-player-${fixtureId}`, sideKey: V1GameSideKey.HOME, displayNameSnapshot: 'Host One' },
+        { sourceParticipantId: `away-player-${fixtureId}`, sideKey: V1GameSideKey.AWAY, displayNameSnapshot: 'Opponent One' },
       ],
     };
     const created = await prisma.$transaction((tx) =>

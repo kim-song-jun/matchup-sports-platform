@@ -37,8 +37,13 @@ describe('GamesService.listLeagueClaimableParticipants', () => {
     /** Kickoff (and so the derived lineup publication) is already past unless stated otherwise. */
     lineupPublished?: boolean;
   }) {
-    const bySide = <T extends { sideId?: string }>(rows: T[], where: { sideId?: { in: string[] } }) =>
-      rows.filter((row) => where.sideId === undefined || where.sideId.in.includes(row.sideId as string));
+    const bySide = <T extends { sideId?: string; invalidatedAt?: Date | null }>(
+      rows: T[],
+      where: { sideId?: { in: string[] }; invalidatedAt?: null },
+    ) => rows.filter((row) =>
+      (where.sideId === undefined || where.sideId.in.includes(row.sideId as string))
+      && (where.invalidatedAt !== null || row.invalidatedAt === null || row.invalidatedAt === undefined),
+    );
     const prisma = {
       v1TeamMatch: {
         findFirst: jest.fn().mockResolvedValue(overrides.teamMatch ?? null),
@@ -73,7 +78,7 @@ describe('GamesService.listLeagueClaimableParticipants', () => {
         findMany: jest.fn().mockResolvedValue(overrides.memberships ?? []),
       },
       v1GameLineup: {
-        findMany: jest.fn(async ({ where }) => bySide((overrides.lineups ?? []) as { sideId?: string }[], where)),
+        findMany: jest.fn(async ({ where }) => bySide((overrides.lineups ?? []) as { sideId?: string; invalidatedAt?: Date | null }[], where)),
       },
       v1GameParticipant: {
         findMany: jest.fn(async ({ where }) => bySide((overrides.participants ?? []) as { sideId?: string }[], where)),
@@ -198,6 +203,35 @@ describe('GamesService.listLeagueClaimableParticipants', () => {
         { participantId: 'p-current', sideId: 's-1', sideKey: 'HOME', sideLabel: '블루팀', displayName: '김민준', jerseyNumber: 7 },
       ],
     });
+  });
+
+  it('팀 교체로 무효화된 제출본 대신 현재 유효한 초안의 후보만 보여준다', async () => {
+    const invalidatedAt = new Date('2026-10-26T00:00:00.000Z');
+    const { service, prisma } = makeService({
+      teamMatch: { game: { id: 'game-1', version: 11 } },
+      memberships: [{ teamId: 'team-host', role: 'member' }],
+      lineups: [
+        { id: 'lineup-old', sideId: 's-1', revision: 1, state: 'SUBMITTED', invalidatedAt },
+        { id: 'lineup-current', sideId: 's-1', revision: 2, state: 'DRAFT', invalidatedAt: null },
+      ],
+      participants: [
+        { id: 'p-old-team', sideId: 's-1', lineupId: 'lineup-old', displayNameSnapshot: '이전 팀 선수', jerseyNumber: 7 },
+        { id: 'p-current-team', sideId: 's-1', lineupId: 'lineup-current', displayNameSnapshot: '현재 팀 선수', jerseyNumber: 7 },
+      ],
+    });
+
+    await expect(service.listLeagueClaimableParticipants(user, 'league-1', 'tm-1')).resolves.toEqual({
+      gameId: 'game-1',
+      version: 11,
+      rosterCount: 1,
+      rosterSubmitted: false,
+      participants: [
+        { participantId: 'p-current-team', sideId: 's-1', sideKey: 'HOME', sideLabel: '블루팀', displayName: '현재 팀 선수', jerseyNumber: 7 },
+      ],
+    });
+    expect(prisma.v1GameLineup.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ invalidatedAt: null }),
+    }));
   });
 
 

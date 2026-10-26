@@ -145,3 +145,11 @@ Expected result: Read access remains unchanged and no new socket or write author
 - 새 CODE P2 지적은 유효했어요. 경기A의 snapshot·events를 받은 뒤 경기B의 인증이 pending/error/unavailable일 때 이전 정보를 지우지 못하는3개 실제 소비자 RED를 확인했어요. 경기전환 초기화 효과를 인증 준비 조건과 분리했고 기존9대조군을 포함한12/12가 통과했어요. 준비 전 연결·구독·takeover를 허용하지 않아요.
 - 현재 보완분의 별도 Sol 소스 검토와 root 최종 타입·패턴 검사, 새 커밋 게시 후 CI·DB통합·CODE/Copilot 리뷰는 아직 진행 전이에요. 이전 head의 local READY·Web 성공을 새 head 증거로 대신하지 않아요.
 - Alpha135와 승인된 실제 스태프의 연결·구독은 계속 미검증이에요. 다른 이슈의 PARTIAL 선택과 업무 데이터 쓰기 금지를 유지해요.
+
+
+## Progress Snapshot — 2026-10-27 / tick 0729
+
+- current head0c258의 CODE는 NoMajor였지만 Copilot 본문에서 GET이 불필요한 행 잠금을 잡는다는 optional 지적을 확인했어요. 별도 Sol이 실제 경로를 대조해 유효함을 확인했어요. 단순히 tx를 제거하면 열린 트랜잭션이 다른 풀 연결을 기다릴 수 있어 기각했고, 같은 tx를 유지하는 읽기 전용 잠금 생략 옵션을 적용했어요. 기존 쓰기 호출의 잠금 기본값은 유지해요.
+- 읽기 전용 옵션을 mutation action에 잘못 쓸 때 명시적으로 거절하는 가드를 보완했어요. 이 가드만 임시 제거한 실제 RED는6개 중1개 실패였고 복원 후6/6, 바뀐 GET 호출의 기존 계약4/4가 직렬 통과했어요. 이 증거를 원래 GET 잠금 경합의 로컬 RED→GREEN으로 부르지 않아요. 실제 DB의 기본 잠금·동시 회수 대조 케이스와 새 읽기 경합 케이스는 CI로 확인해야 해요.
+- 0c258의 API CI는 통합179묶음 PASS/0FAIL 뒤 V8 OOM134로 중단됐고 actor-matrix는 실제 PASS였어요. 이후 unit CI 단계는 실행되지 않았어요. 직전2f38의 같은 통합 게이트는181묶음 통과했고 둘 사이 운영 API·통합 spec·runner 변경이 없어 제품 단언 실패나 특정 코드 원인으로 단정하지 않아요. 이번 보완 head의 계획된 CI1회를 확인하고, OOM 반복 시 직렬 프로세스 경계를 별도로 진단해요. 테스트 생략·단순 heap 증설은 하지 않았어요.
+- 보완4파일과 이 task 기록의 최종 독립 Sol 리뷰·API 타입/패턴 검사는 root가 이어서 맡아요. 새 head의 CI·CODE/Copilot·DB 경합·Alpha 실제 사용자 경로는 계속 미완이에요.

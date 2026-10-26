@@ -1318,7 +1318,7 @@ export class GamesService {
           fixtureId: teamMatch.id,
           ...(teamMatch.fieldId === null ? {} : { fieldId: teamMatch.fieldId }),
         },
-      }, tx);
+      }, tx, { lockMode: 'read_only' });
       if (principal.role === 'platform_ops') {
         return { kind: 'platform_ops', subjectVersion: 0 };
       }

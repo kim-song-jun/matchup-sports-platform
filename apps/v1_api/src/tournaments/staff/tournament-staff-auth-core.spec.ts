@@ -179,6 +179,14 @@ function currentUserFactory(): CustomRouteArgumentMetadata['factory'] {
 }
 
 describe('Tournament staff auth core', () => {
+  it('rejects read-only lock mode for mutation authorization', async () => {
+    const { service } = accessService();
+
+    await expect(
+      service.assertAccess(staffInput(), undefined, { lockMode: 'read_only' }),
+    ).rejects.toThrow('STAFF_ACCESS_READ_ONLY_LOCK_MODE_REQUIRES_READ_ACTION');
+  });
+
   it('PINs the existing authenticated-user request/decorator convention', () => {
     const user = {
       id: '77000000-0000-4000-8000-000000000001',

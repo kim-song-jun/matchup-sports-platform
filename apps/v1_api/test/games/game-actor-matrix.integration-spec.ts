@@ -741,6 +741,60 @@ describe('Task 7 six-persona Game actor matrix characterization PIN', () => {
     }));
   });
 
+  it('does not block a concurrent revoke while read-only staff authorization stays in its transaction', async () => {
+    let signalAuthorizationComplete!: () => void;
+    let releaseTransaction!: () => void;
+    const authorizationComplete = new Promise<void>((resolve) => {
+      signalAuthorizationComplete = resolve;
+    });
+    const transactionMayFinish = new Promise<void>((resolve) => {
+      releaseTransaction = resolve;
+    });
+
+    const readTransaction = prisma.$transaction(async (tx) => {
+      const principal = await staffAccess.assertAccess(
+        {
+          userId: ids.multiAssignmentOperator,
+          action: 'read',
+          resource: { tournamentId: ids.tournament, fixtureId: ids.fixture, fieldId: ids.field },
+          expectedAssignmentVersion: 17,
+        },
+        tx,
+        { lockMode: 'read_only' },
+      ).finally(signalAuthorizationComplete);
+      expect(principal.assignmentVersion).toBe(17);
+      await transactionMayFinish;
+    });
+
+    await authorizationComplete;
+    try {
+      await prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SET LOCAL lock_timeout = '2s'`;
+        await tx.v1TournamentStaffAssignment.update({
+          where: { id: '77000000-0000-4000-8000-000000000071' },
+          data: { revokedAt: new Date(), version: { increment: 1 } },
+        });
+      });
+    } finally {
+      releaseTransaction();
+      await readTransaction;
+    }
+
+    await expect(
+      staffAccess.assertAccess({
+        userId: ids.multiAssignmentOperator,
+        action: 'read',
+        resource: { tournamentId: ids.tournament, fixtureId: ids.fixture, fieldId: ids.field },
+        expectedAssignmentVersion: 17,
+      }),
+    ).rejects.toMatchObject({
+      response: {
+        code: 'STAFF_SCOPE_DENIED',
+        details: { reason: 'STALE_ASSIGNMENT_VERSION' },
+      },
+    });
+  });
+
   it('revalidates the current assignment before replaying a privileged command', async () => {
     const current = await prisma.v1Game.findUniqueOrThrow({ where: { id: tournamentGameId } });
     const eventId = 'task7-revoke-between-commands';

@@ -1,4 +1,5 @@
 import { normalizeGenderRule } from '../common/gender-rule';
+import { authProviderWhere, signupFilterWhere, signupStage, USER_AUTH_PROVIDERS, USER_SIGNUP_FILTERS, USER_SIGNUP_WHERE } from './admin-user-filters';
 import { OPERATOR_ACTIONABLE_APPLICATION_WHERE } from './admin-team-match-pending';
 import { completePersonalMatch } from '../matches/complete-personal-match';
 import { cascadeCancelTeamMatchSchedulesInTx } from '../team-schedules/team-schedules.service';
@@ -827,12 +828,16 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         }
       : {};
 
-    const [rows, statusGroups] = await Promise.all([this.prisma.v1User.findMany({
-      where: {
-        ...(query.status ? { accountStatus: query.status } : {}),
-        ...searchWhere,
-      },
-      orderBy: { createdAt: 'desc' },
+    const accountWhere: Prisma.V1UserWhereInput = query.status ? { accountStatus: query.status } : {};
+    const signupWhere = signupFilterWhere(query.signup);
+    const providerWhere = authProviderWhere(query.providers);
+    const where: Prisma.V1UserWhereInput = { AND: [searchWhere, accountWhere, signupWhere, providerWhere] };
+    // Each facet excludes only its own selection so operators can add another OR option.
+    const signupBase: Prisma.V1UserWhereInput = { AND: [searchWhere, accountWhere, providerWhere] };
+    const providerBase: Prisma.V1UserWhereInput = { AND: [searchWhere, accountWhere, signupWhere] };
+    const [rows, statusGroups, total, signupTotal, providerTotal, signupCounts, providerCounts] = await Promise.all([this.prisma.v1User.findMany({
+      where,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,
       ...paginationArgs(query, limit),
       select: {
@@ -843,7 +848,8 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         lastLoginAt: true,
         createdAt: true,
         deletedAt: true,
-        profile: { select: { nickname: true, displayName: true, realName: true, gender: true } },
+        profile: { select: { nickname: true, displayName: true, realName: true, gender: true, deletedAt: true } },
+        termsConsents: { take: 1, select: { id: true } },
         authIdentities: {
           where: { status: 'active' },
           select: { provider: true },
@@ -862,9 +868,18 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       },
     }), this.prisma.v1User.groupBy({
       by: ['accountStatus'],
-      where: searchWhere,
+      where: { AND: [searchWhere, signupWhere, providerWhere] },
       _count: { _all: true },
-    })]);
+    }), this.prisma.v1User.count({ where }),
+    this.prisma.v1User.count({ where: signupBase }),
+    this.prisma.v1User.count({ where: providerBase }),
+    Promise.all(USER_SIGNUP_FILTERS.map((key) => this.prisma.v1User.count({
+      where: { AND: [signupBase, USER_SIGNUP_WHERE[key]] },
+    }))),
+    Promise.all(USER_AUTH_PROVIDERS.map((key) => this.prisma.v1User.count({
+      where: { AND: [providerBase, authProviderWhere([key])] },
+    }))),
+    ]);
 
     const pageItems = rows.slice(0, limit);
     const hasNext = rows.length > limit;
@@ -881,9 +896,10 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         nickname: row.profile?.nickname ?? null,
         displayName: row.profile?.realName ?? row.profile?.displayName ?? null,
         email: row.email ?? null,
-        authProviders: row.authIdentities.map((identity) => identity.provider),
+        authProviders: [...new Set(row.authIdentities.map((identity) => identity.provider))],
         accountStatus: row.accountStatus,
         onboardingStatus: row.onboardingStatus,
+        signupStage: signupStage(row),
         lastLoginAt: row.lastLoginAt,
         createdAt: row.createdAt,
         hostedMatchCount: row._count.hostedMatches,
@@ -899,11 +915,17 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       pageInfo: buildPageInfo({
         page: query.page,
         limit,
-        total: query.status ? summary.byStatus[query.status] ?? 0 : summary.total,
+        total,
         hasNext,
         nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null,
       }),
-      summary,
+      summary: {
+        ...summary,
+        signupTotal,
+        providerTotal,
+        bySignup: Object.fromEntries(USER_SIGNUP_FILTERS.map((key, index) => [key, signupCounts[index]])),
+        byProvider: Object.fromEntries(USER_AUTH_PROVIDERS.map((key, index) => [key, providerCounts[index]])),
+      },
     };
   }
 

@@ -61,6 +61,11 @@ export type AdminListSummary = {
   byReportReason?: Record<string, number>;
   /** 문의 목록 전용 — 사유 필터만 뺀 같은 조건의 총 건수('전체 사유'). 사유 미지정(null) 신고 포함. */
   reportReasonTotal?: number;
+  /** 회원 목록: 자기 그룹 선택만 제외하고 검색·다른 필터를 적용한 집계. */
+  bySignup?: Record<string, number>;
+  byProvider?: Record<string, number>;
+  signupTotal?: number;
+  providerTotal?: number;
 };
 
 export type AdminCursorPage<T> = CursorPage<T> & {
@@ -3068,6 +3073,7 @@ export type V1AdminUserRow = {
   gender: 'male' | 'female' | null;
   accountStatus: 'active' | 'suspended' | 'blocked' | 'withdrawal_pending' | 'deleted';
   onboardingStatus: string;
+  signupStage?: 'required_complete' | 'onboarding_complete' | 'terms_required' | 'profile_required' | 'profile_deferred';
   lastLoginAt: string | null;
   createdAt: string;
   hostedMatchCount: number;
@@ -3335,6 +3341,9 @@ export type V1AdminTeamRenameResult = {
 };
 
 export type AdminListFilters = {
+  /** 회원 목록 전용. 쉼표로 구분한 복수 선택 (그룹 안 OR, 그룹 사이 AND). */
+  signup?: string;
+  providers?: string;
   status?: string;
   q?: string;
   sportId?: string;

@@ -19,6 +19,18 @@
 
 ## Endpoint Matrix
 
+### 회원 가입 상태·로그인 수단 필터
+
+`GET /api/v1/admin/users`는 기존 `q`, 단일 `status`, `page`, `cursor`, `limit`와 함께 다음 복수 필터를 받는다.
+
+- `signup`: `required_complete`, `onboarding_complete`, `incomplete`, `terms_required`, `profile_required`, `profile_deferred`의 쉼표 구분 문자열 또는 배열.
+- `providers`: `email`, `kakao`, `apple`의 쉼표 구분 문자열 또는 배열. active 인증 identity 기준이며 이메일 주소 존재 여부는 사용하지 않는다.
+- 그룹 안은 OR, 그룹 사이는 AND. 가입 완료와 온보딩 완료를 함께 선택하거나 여러 로그인 수단이 연결돼도 회원은 중복되지 않는다.
+- `items[].signupStage`는 가입 시 약관·기본 프로필 기준의 분류다. 입력 보류의 자동 생성 프로필은 완료로 세지 않는다. `onboarding_complete`는 `required_complete`의 부분집합이다. 약관 개정 후 재동의 여부와는 별개다.
+- `summary.bySignup`, `summary.signupTotal`, `summary.byProvider`, `summary.providerTotal`은 자기 그룹 선택만 제외하고 검색어·나머지 필터를 적용한 집계다. 기존 `byStatus`와 `total`도 계정 상태 선택만 제외한다. 겹치는 상태·연결 수단의 수치는 합산하지 않는다.
+- `pageInfo.total`은 모든 조건을 적용한 중복 없는 회원 수다. 전체 DB에서 필터·집계 후 페이지를 나눈다. 생성일 동률에서는 ID 내림차순으로 순서를 고정한다.
+- 잘못된 필터 값은 DTO 검증 오류이며 관리자 권한은 기존과 동일하다.
+
 | Method | Path | DTO / Query | 권한 | 용도 |
 |---|---|---|---|---|
 | `GET` | `/api/v1/admin/me` | - | active admin | 내 운영자 역할·capability |

@@ -2,4 +2,4 @@
 'v1_api': patch
 ---
 
-Add an API-owned Socket.IO test dependency and an integration regression for lifecycle commands that should refresh authorized game subscribers. The regression setup does not claim the missing REST-to-realtime refresh is fixed.
+경기 상태 변경이 승인된 다른 콘솔에도 전달되는지 확인하는 실제 통합 회귀 테스트와 API 전용 테스트 의존성을 추가해요. 갱신 누락의 수정과 실제 통과 여부는 후속 검증으로 확인해요.

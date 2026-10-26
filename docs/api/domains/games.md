@@ -137,6 +137,10 @@ error rather than a display fallback.
 킥오프 60분 전 기준) 전에는 신청자가 활성 멤버인 팀의 side만 다룬다(두 팀 모두의 멤버면 둘 다). 공개 뒤에는
 상대 side도 열어 상대 팀에 용병으로 뛴 팀원이 자기 이름을 찾을 수 있다. 공개 전 상대 side 참가자에게 신청하면
 403 `PERMISSION_DENIED`, 후보·`rosterCount`·`rosterSubmitted`도 그 범위로 센다. platform_ops 는 좁히지 않는다.
+후보 목록과 직접 연결 신청은 모두 `invalidatedAt: null`인 라인업만 공유 선택기에 전달한다. 팀 교체로 무효화된
+`SUBMITTED` 리비전은 이력으로 보존되지만 현재 후보로 노출되지 않고, 직접 그 참가자를 신청해도
+`409 GAME_PARTICIPANT_NOT_CURRENT_LINEUP`으로 거절되며 연결 이벤트는 남지 않는다. 제출/잠금본이 없는 side에서는
+선택기가 현재 유효한 `DRAFT`를 기존 폴백 규칙대로 선택할 수 있다. 게임·side 범위와 기존 인가 규칙은 그대로다.
 
 ### Penalty-shootout conclusion rule
 

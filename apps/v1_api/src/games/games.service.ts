@@ -3056,10 +3056,8 @@ export class GamesService {
     // participantId 로만 쓰이므로 개인 기록이 영원히 매칭되지 않는다(public-user-records
     // .service.ts). 최신 리비전으로만 좁혀 애초에 고를 수 없게 한다.
     const lineups = await this.prisma.v1GameLineup.findMany({
-      where: { gameId, ...sideScope },
-      // 공식 결과 스냅샷(deriveTournamentRevision)이 DRAFT 리비전을 빼는 이상, 신원
-      // 연결 후보도 같은 기준이어야 한다 — 아니면 위 주석이 경고한 그대로, 공식 결과에
-      // 실리지 않을 participantId 를 연결해 개인 기록이 영원히 매칭되지 않는다.
+      where: { gameId, invalidatedAt: null, ...sideScope },
+      // 공식 결과와 같은 유효 리비전 집합을 써야 무효화된 제출본의 재등장을 막으면서 유효 초안 폴백도 보존한다.
       select: { id: true, sideId: true, revision: true, state: true, invalidatedAt: true },
     });
     const participantCandidates = await this.prisma.v1GameParticipant.findMany({
@@ -4104,7 +4102,7 @@ export class GamesService {
         }
         const [lineups, candidateRows] = await Promise.all([
           tx.v1GameLineup.findMany({
-            where: { gameId, sideId: participant.sideId },
+            where: { gameId, sideId: participant.sideId, invalidatedAt: null },
             select: { id: true, sideId: true, revision: true, state: true, invalidatedAt: true },
           }),
           tx.v1GameParticipant.findMany({

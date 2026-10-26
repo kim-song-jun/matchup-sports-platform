@@ -30,6 +30,7 @@ import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
  */
 export interface GameRoomBroadcaster {
   emitToGame(gameId: string, event: string, payload: unknown): void;
+  refreshGameSubscribers(gameId: string): Promise<void>;
 }
 
 @Injectable()
@@ -58,6 +59,16 @@ export class GameBroadcastRegistry implements GameRoomBroadcaster {
       this.delegate.emitToGame(gameId, event, payload);
     } catch (error: unknown) {
       this.logger.warn({ gameId, event, err: error }, 'Game room broadcast failed');
+    }
+  }
+
+  /** Refresh durable state for each currently authorized subscriber after a REST command. */
+  async refreshGameSubscribers(gameId: string): Promise<void> {
+    if (this.delegate === null) return;
+    try {
+      await this.delegate.refreshGameSubscribers(gameId);
+    } catch (error: unknown) {
+      this.logger.warn({ gameId, err: error }, 'Game subscriber refresh failed');
     }
   }
 }

@@ -1899,9 +1899,16 @@ Validation:
 
 ## 후속 작업 — REST 경기 상태 실시간 갱신 (MD-QA #134, 2026-10-26)
 
-- [ ] 실제 REST `start` 명령 뒤 별도 `SUPPORT_READONLY` Socket.IO 구독자에게 승인된 전체 `game.snapshot`이 전달되는 통합 회귀를 추가한다. 양 팀에 유효한 참가자와 제출 lineup을 두고, observer는 팀 소유권이 없는 순수 조회 스태프로 둔다.
-- [ ] 관찰자 REST 상세의 state/version/period `startedAt`이 같은 커밋을 반영하는지 검증한다.
-- [ ] CI에서 현재 코드의 RED를 확인한 뒤에만 controller/registry/gateway 수정 범위를 재평가한다. 본 진행 기록은 코드 수정 완료를 주장하지 않는다.
-- 범위: `apps/v1_api/test/games/game-command-realtime.integration-spec.ts`; API의 직접 테스트 의존성 `socket.io-client@4.8.3`; `.changeset/mdqa-134-realtime.md`.
-- 검증 책임: CI가 실제 isolated DB fixture와 앱의 HTTP/Socket.IO 경로로 실행한다. 로컬 통합 DB 실행은 하지 않는다.
+- [x] 실제 REST `start` 명령 뒤 별도 `SUPPORT_READONLY` Socket.IO 구독자와 동일 operator의 두 번째 콘솔에 승인된 전체 `game.snapshot`을 전달하는 HTTP/Socket.IO 통합 회귀를 추가한다. 양 팀의 positive participant/lineup fixture를 사용하고 observer는 팀 소유권이 없다.
+- [x] 별도의 unscoped friendly TeamMatch에서 두 팀 소유자가 새 REST `start` snapshot을 받는지, 다른 scoped room의 조회자가 target friendly game 권한 없이 subscribe/snapshot을 받지 않는지 실제 Socket.IO 소비자로 대조한다.
+- [x] observer 상세의 state/version/period `startedAt`, 후속 `pause` snapshot의 state/version/non-empty event history, 상세 `pausedAt`, 접근 없는 socket의 구독 거부를 검증하도록 확장한다.
+- [x] 실제 assignment revoke 또는 expiry가 `listEvents`의 실제 DB 결과 반환 중 일어나면 snapshot 전달과 재가입이 차단되는 통합 반례를 추가한다. 테스트 spy는 실제 `GamesService.listEvents`를 호출하고 그 결과를 barrier 뒤 반환한다.
+- [x] 첫 REST lifecycle refresh의 실제 event-read 결과를 보류하고 후속 더 높은 version의 REST command refresh를 완료한 뒤 첫 결과를 해제해도 observer snapshot version/state가 되돌아오지 않는 통합 반례와 현재 DB version 재확인을 추가한다.
+- [x] 실제 `listEvents`와 current-game DB 조회가 모두 끝난 오래된 결과를 보류해 더 높은 snapshot 뒤 반환해도 socket/game/generation watermark가 낮은 snapshot을 보내지 않는지 대조하고, 구 generation이 unsubscribe/re-subscribe 뒤 새 room으로 전달되지 않는 반례를 추가한다.
+- [x] 실제 HTTP idempotent command replay와 실제 실패 command가 refresh/snapshot을 만들지 않는지, pause/resume의 period `pausedAt`/`pausedTotalMs` 및 `end-period` 뒤 다음 period detail을 대조하는 통합 사례를 추가한다.
+- [x] Gateway refresh는 실제 namespace game room 멤버를 대상으로 scoped/unscoped 기존 권한 경로를 적용하고, event-read 뒤 room ownership/generation/source/version을 재검증하도록 구현한다.
+- [x] CI API run `40311513836`, job `121533581445`에서 정확한 PR test head `7a33af8c95acff77250246a23e42e986e0ae3102`의 의도된 RED를 확인했다. REST start는 201이었고 observer의 `game.snapshot` wait만 timeout됐다.
+- [ ] CI에서 현재 수정 head의 exact API typecheck, real integration GREEN, revoke/expiry/version-order/generation/replay/failure/period assertions를 실행해 확인한다. 로컬 shared Prisma client mismatch로 새 테스트 실행은 하지 않았다.
+- 범위: `apps/v1_api/src/games/games.controller.ts`, `apps/v1_api/src/games/game-broadcast.registry.ts`, `apps/v1_api/src/games/games.controller.broadcast.spec.ts`, `apps/v1_api/src/realtime/realtime.gateway.ts`, `apps/v1_api/test/games/game-command-realtime.integration-spec.ts`, `docs/api/domains/game-realtime.md`, `.changeset/mdqa-134-realtime.md`.
+- 검증 책임: CI가 실제 isolated DB fixture와 앱의 HTTP/Socket.IO 경로로 실행한다. 로컬 통합 DB 실행은 하지 않는다. 로컬 단위 실행은 0 tests에서 Prisma generated-client/schema type mismatch로 중단됐으며, generated files를 수정하지 않았다.
 - 초기 테스트 초안은 각 팀 참가자가 없어 시작 전용 `GAME_START_LINEUP_EMPTY`에서 막힐 수 있어 positive fixture와 분리 소유 계정으로 보정했다. 이는 테스트 준비 결함 수정이며, REST-to-realtime 회귀의 RED 관측이 아니다.

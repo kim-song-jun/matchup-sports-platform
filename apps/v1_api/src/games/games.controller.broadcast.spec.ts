@@ -130,4 +130,82 @@ describe('GamesController — REST 변경의 룸 브로드캐스트', () => {
       event: persistedEvent,
     });
   });
+
+  describe('REST lifecycle command snapshot refresh', () => {
+    function commandSetup(
+      result: unknown,
+      refreshGameSubscribers: (gameId: string) => Promise<void>,
+    ) {
+      const warn = jest.fn();
+      const registry = new GameBroadcastRegistry({ warn } as unknown as PinoLogger);
+      registry.register({ emitToGame: jest.fn(), refreshGameSubscribers });
+      const executeCommand = jest.fn().mockResolvedValue(result);
+      const controller = new GamesController({ executeCommand } as unknown as GamesService, registry);
+      return { controller, executeCommand, warn };
+    }
+
+    it('keeps the committed HTTP result independent of an in-flight snapshot refresh', async () => {
+      const response = { gameId: 'game-1', state: 'LIVE', version: 3, replayed: false };
+      let beginRefresh!: () => void;
+      let continueRefresh!: () => void;
+      let markRefreshFinished!: () => void;
+      let refreshFinished = false;
+      const refreshStarted = new Promise<void>((resolve) => { beginRefresh = resolve; });
+      const finished = new Promise<void>((resolve) => { markRefreshFinished = resolve; });
+      const { controller, executeCommand } = commandSetup(response, async (gameId) => {
+        expect(gameId).toBe('game-1');
+        beginRefresh();
+        await new Promise<void>((resolve) => { continueRefresh = resolve; });
+        refreshFinished = true;
+        markRefreshFinished();
+      });
+
+      const command = controller.command(user, 'game-1', 'start' as never, 'idem-start', {} as never);
+      await refreshStarted;
+      await expect(command).resolves.toBe(response);
+      expect(executeCommand).toHaveBeenCalledTimes(1);
+      expect(refreshFinished).toBe(false);
+      continueRefresh();
+      await finished;
+      expect(refreshFinished).toBe(true);
+    });
+
+    it('does not refresh for an idempotent replay or a failed command', async () => {
+      const refreshGameSubscribers = jest.fn().mockResolvedValue(undefined);
+      const replay = { gameId: 'game-1', state: 'LIVE', version: 3, replayed: true };
+      const replaySetup = commandSetup(replay, refreshGameSubscribers);
+      await expect(replaySetup.controller.command(user, 'game-1', 'start' as never, 'idem-start', {} as never))
+        .resolves.toBe(replay);
+      expect(refreshGameSubscribers).not.toHaveBeenCalled();
+
+      const error = new Error('command rejected');
+      const failed = commandSetup(undefined, refreshGameSubscribers);
+      failed.executeCommand.mockRejectedValueOnce(error);
+      await expect(failed.controller.command(user, 'game-1', 'start' as never, 'idem-start', {} as never))
+        .rejects.toBe(error);
+      expect(refreshGameSubscribers).not.toHaveBeenCalled();
+    });
+
+    it('logs a failed async refresh without changing the committed response', async () => {
+      const response = { gameId: 'game-1', state: 'LIVE', version: 3, replayed: false };
+      let refreshSettled!: () => void;
+      const settled = new Promise<void>((resolve) => { refreshSettled = resolve; });
+      const { controller, warn } = commandSetup(response, async () => {
+        try {
+          throw new Error('socket refresh unavailable');
+        } finally {
+          refreshSettled();
+        }
+      });
+
+      await expect(controller.command(user, 'game-1', 'start' as never, 'idem-start', {} as never))
+        .resolves.toBe(response);
+      await settled;
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(warn).toHaveBeenCalledWith(
+        expect.objectContaining({ gameId: 'game-1', err: expect.any(Error) }),
+        'Game subscriber refresh failed',
+      );
+    });
+  });
 });

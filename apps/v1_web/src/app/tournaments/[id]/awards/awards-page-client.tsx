@@ -28,8 +28,8 @@ import { trackEvent } from '@/lib/analytics';
 import { isUnauthenticatedError, retryTransientFailure, V1ApiError, v1Get } from '@/lib/api-client';
 import { TournamentFlowNav } from '@/components/tournaments/tournament-flow-nav';
 import { formatEntryFee } from '@/lib/date-utils';
-import { parsePrizeRows, isPrizeAmountValue, formatPrizeRowValue } from '@/lib/prize-breakdown';
-import { PrizeRankIcon } from '@/components/tournaments/prize-rank-icon';
+import { parsePrizeRows } from '@/lib/prize-breakdown';
+import { GroupedPrizes } from '@/components/tournaments/grouped-prizes';
 import { PendingReviewsCard } from '@/components/tournaments/pending-review-card';
 import { publicAssetPath } from '@/lib/assets';
 import { TournamentAwardIcon } from '@/components/tournaments/tournament-award-icon';
@@ -283,38 +283,16 @@ function PrizeSection({
             <span style={{ display: 'inline-flex', marginRight: 12 }} aria-hidden="true">
               <Trophy size={20} className="tm-medal-gold" strokeWidth={2} />
             </span>
-            <span style={{ flex: 1, fontSize: 14, fontWeight: 700, color: 'var(--text-strong)' }}>총 상금</span>
+            <span style={{ flex: 1, fontSize: 14, fontWeight: 700, color: 'var(--text-strong)' }}>상금·상품 총규모</span>
             <span style={{ fontSize: 18, fontWeight: 900, color: 'var(--blue700)', letterSpacing: '-0.01em' }}>{formatEntryFee(tournament.prizePool)}</span>
           </div>
         )}
 
-        {/* 순위별 상금 배분 — 금액 행은 강조 스타일, 물품(goods) 행은 일반 텍스트로 우측에 표시 */}
-        {rows.length > 0 && rows.map((row, idx) => {
-          // 상금 항목은 숫자 순위와 우승·준우승 표기를 모두 사용한다.
-          const pos = row.label === '우승' ? 1 : row.label === '준우승' ? 2 : Number(row.label.match(/^(\d+)위$/)?.[1]);
-          const teamName = teamByPos[pos];
-          const isAmount = isPrizeAmountValue(row.amount);
-          return (
-            <div key={idx} style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', borderTop: idx > 0 || tournament.prizePool ? '1px solid var(--grey100)' : 'none' }}>
-              <span style={{ display: 'inline-flex', marginRight: 12, flexShrink: 0 }} aria-hidden="true">
-                <PrizeRankIcon label={row.label} />
-              </span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-strong)' }}>{row.label}</div>
-                {teamName && (
-                  <div style={{ fontSize: 12, color: 'var(--text-caption)', marginTop: 1 }}>{teamName}</div>
-                )}
-              </div>
-              {row.amount && (
-                isAmount ? (
-                  <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-strong)', letterSpacing: '-0.01em', flexShrink: 0 }}>{formatPrizeRowValue(row.amount)}</span>
-                ) : (
-                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-caption)', flexShrink: 0, marginLeft: 12, textAlign: 'right', maxWidth: '55%' }}>{row.amount}</span>
-                )
-              )}
-            </div>
-          );
-        })}
+        {rows.length > 0 && (
+          <div style={{ padding: '16px 20px' }}>
+            <GroupedPrizes rows={rows} teamByPosition={teamByPos} />
+          </div>
+        )}
 
         {/* prizeSummary */}
         {tournament.prizeSummary?.trim() && (

@@ -8,7 +8,33 @@ import {
   formatPrizeRowValue,
   prizeRowAmountValue,
   prizeRowsTotal,
+  groupPrizeRows,
 } from './prize-breakdown';
+
+describe('groupPrizeRows', () => {
+  it('비연속 항목과 우승·숫자 순위를 같은 묶음으로 모으되 저장 데이터와 상품 수량을 보존한다', () => {
+    const rows = parsePrizeRows('우승 1000000 / MVP 트레이닝복 / 1위 트로피 / 우승 트로피 / MVP 삭스 / 준우승 300000 / 3위 상품권 / 추첨 경품 / 개인어워드 상품권 / 특별 상품');
+    const before = structuredClone(rows);
+    expect(groupPrizeRows(rows)).toEqual([
+      { label: '우승', position: 1, category: '팀 시상', amounts: ['1000000', '트로피', '트로피'] },
+      { label: 'MVP', position: null, category: '개인 시상', amounts: ['트레이닝복', '삭스'] },
+      { label: '준우승', position: 2, category: '팀 시상', amounts: ['300000'] },
+      { label: '3위', position: 3, category: '팀 시상', amounts: ['상품권'] },
+      { label: '추첨', position: null, category: '추첨·이벤트', amounts: ['경품'] },
+      { label: '개인어워드', position: null, category: '개인 시상', amounts: ['상품권'] },
+      { label: '특별', position: null, category: '기타 시상', amounts: ['상품'] },
+    ]);
+    expect(rows).toEqual(before);
+  });
+
+  it('빈 라벨을 생략하고 내용 없는 시상·공동 순위·자유 항목은 보존한다', () => {
+    expect(groupPrizeRows([{ label: ' ', amount: '상품' }, { label: '공동 3위', amount: ' 트로피 ' }, { label: '특별', amount: '' }])).toEqual([
+      { label: '공동 3위', position: 3, category: '팀 시상', amounts: ['트로피'] },
+      { label: '특별', position: null, category: '기타 시상', amounts: [] },
+    ]);
+    expect(groupPrizeRows([])).toEqual([]);
+  });
+});
 
 describe('splitPrizeSegments (공용 스플리터 — 공개 칩·시상/어드민 행 공유)', () => {
   it('splits on "/" and newline', () => {

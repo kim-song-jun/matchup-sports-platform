@@ -123,6 +123,23 @@ function contrast(a: string, b: string) {
 }
 
 describe('actual tournament prize caption contrast', () => {
+  it.each(['open', 'completed'] as const)('%s 상세에서 반복 시상을 묶고 종료 후에만 결과 링크를 표시한다', (status) => {
+    renderPage(<TournamentDetailView tournament={makeTournament({
+      id: 'synthetic-grouped-prize', status, format: 'knockout',
+      prizeSummary: '총 800만원 상당의 상금 및 상품',
+      prizeBreakdown: '우승 1000000 / 우승 트로피 / MVP 트레이닝복 / MVP 삭스 / 추첨 경품',
+    })} myRegistration={null} />);
+    const region = screen.getByRole('region', { name: '상품 및 상금 안내' });
+    expect(within(region).getAllByText('우승', { exact: true })).toHaveLength(1);
+    expect(within(region).getByText('우승').parentElement).toHaveTextContent('트로피');
+    expect(within(region).getByText('우승').parentElement).toHaveTextContent('1,000,000원');
+    expect(within(region).getAllByText('MVP', { exact: true })).toHaveLength(1);
+    expect(within(region).getByText('MVP').parentElement).toHaveTextContent('트레이닝복');
+    expect(within(region).getByText('MVP').parentElement).toHaveTextContent('삭스');
+    const link = within(region).queryByRole('link', { name: '시상 결과 보기 →' });
+    if (status === 'completed') expect(link).toHaveAttribute('href', '/tournaments/synthetic-grouped-prize/awards');
+    else expect(link).not.toBeInTheDocument();
+  });
   it.each(['open', 'completed'] as const)('%s uses a sufficient light caption token while preserving the surrounding card', (status) => {
     const tournament = makeTournament({ id: 'synthetic-prize', status, format: 'knockout', prizeSummary: '합성 상금 안내', prizeBreakdown: '우승 300,000원 / 준우승 200,000원' });
     renderPage(<TournamentDetailView tournament={tournament} myRegistration={null} />);
@@ -145,9 +162,9 @@ describe('actual tournament prize caption contrast', () => {
     expect(body.style.fontWeight).toBe('800');
     const rank = within(region).getByText('우승');
     expect(rank.style.color).toBe('var(--text-strong)');
-    expect(rank.parentElement!.style.color).toBe('var(--text-body)');
-    expect(rank.parentElement!.style.background).toBe('var(--tint-orange)');
-    expect(rank.parentElement).not.toHaveClass('tm-on-tint');
+    expect(rank.tagName).toBe('DT');
+    expect(rank.parentElement).toHaveTextContent('300,000원');
+    expect(within(region).getByRole('region', { name: '팀 시상' })).toContainElement(rank);
     // Same old/new dark foreground; no actual dark contrast or alpha-after claim.
     expect(resolveToken(caption.style.color, true)).toBe(resolveToken('var(--text-muted)', true));
   });

@@ -513,13 +513,18 @@ describe('AwardsPageClient — 정규 리그 거울 행(kind=regular_league)의 
     render(<AwardsPageClient tournamentId="tournament-1" />);
     await screen.findByText('우승팀', { selector: '.tm-awards-podium-name' });
 
-    for (const [label, teamName] of [['우승', '우승팀'], ['준우승', '준우승팀'], ['1위', '우승팀'], ['2위', '준우승팀'], ['3위', '펌킨FS']]) {
+    for (const [label, teamName] of [['우승', '우승팀'], ['준우승', '준우승팀'], ['3위', '펌킨FS']]) {
       for (const item of screen.getAllByText(label, { exact: true })) {
         expect(item.parentElement).toHaveTextContent(teamName);
       }
     }
+    expect(screen.getAllByText('우승', { exact: true })).toHaveLength(1);
+    expect(screen.getByText('우승', { exact: true }).parentElement).toHaveTextContent('칼치오 상품권 30만원');
+    expect(screen.getByText('우승', { exact: true }).parentElement).toHaveTextContent('상품');
+    expect(screen.queryByText('1위', { exact: true })).not.toBeInTheDocument();
+    expect(screen.queryByText('2위', { exact: true })).not.toBeInTheDocument();
     for (const label of ['추첨', '개인어워드', 'MVP']) {
-      expect(screen.getByText(label, { exact: true }).parentElement?.textContent).toBe(label);
+      expect(screen.getByText(label, { exact: true }).parentElement).not.toHaveTextContent(/우승팀|준우승팀|펌킨FS/);
     }
   });
 });
@@ -549,7 +554,7 @@ describe('AwardsPageClient — 완료 전 상금 정보 노출 (hasPrizeData 판
 
     render(<AwardsPageClient tournamentId="tournament-1" />);
 
-    expect(screen.getByText('총 상금')).toBeInTheDocument();
+    expect(screen.getByText('상금·상품 총규모')).toBeInTheDocument();
   });
 
   it('진행 중이고 prizePool·prizeSummary·prizeBreakdown 전부 없으면 상금 섹션을 그리지 않는다', () => {
@@ -568,7 +573,7 @@ describe('AwardsPageClient — 완료 전 상금 정보 노출 (hasPrizeData 판
 
     render(<AwardsPageClient tournamentId="tournament-1" />);
 
-    expect(screen.queryByText('총 상금')).not.toBeInTheDocument();
+    expect(screen.queryByText('상금·상품 총규모')).not.toBeInTheDocument();
   });
 });
 

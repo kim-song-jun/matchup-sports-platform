@@ -1423,24 +1423,10 @@ export class GamesService {
           end: V1GameState.ENDED,
         }[command];
         this.assertLifecycle(game.sourceType, 'TOURNAMENT_COMMAND', game.state, target);
-        // [P1-c] "양 팀이 라인업을 제출해야 시작할 수 있다"는 게이트를 걷어냈다.
-        //
-        // 그 게이트는 "시작했는데 기록할 참가자가 없다"를 막으려던 것이었다. 그런데 이제
-        // 참가자는 **대회 등록 명단에서 게임 생성 시점에 이미 만들어진다**
-        // (tournament-bracket.service.ts — registration.players → participants). 즉 제출
-        // 여부와 무관하게 참가자는 항상 있고, 게이트가 막던 상황 자체가 사라졌다.
-        //
-        // 반대로 게이트는 실제 운영을 막고 있었다 — 명단을 미리 못 낸 팀 하나 때문에
-        // 경기를 시작할 수 없었다. 현장에서 그건 흔한 일이다.
-        //
-        // **함께 고쳐야 하는 것**: 이 게이트는 공식 결과 스냅샷의 전제이기도 했다
-        // (latest-lineup-participants.ts 의 엄격 셀렉터 주석 참고 — "대회는 이 게이트를
-        // 반드시 거치므로 종료 시점에 제출본이 항상 있다"). 게이트만 지우면 제출 없이 끝난
-        // 경기에서 그 셀렉터가 **빈 배열**을 돌려주고, 공식 결과에 선수가 한 명도 안 실린다.
-        // 그래서 deriveTournamentRevision 을 리그와 같은 사이드별 폴백 셀렉터로 바꿨다
-        // (selectLineupParticipantsWithDraftFallback) — 리그가 같은 이유로 이미 그 셀렉터를
-        // 쓰고 있고, 제출본이 있는 사이드에서는 그 위에 얹힌 DRAFT 가 직전 제출을 밀어내지
-        // 못한다는 원래 보호는 그대로 유지된다.
+        // 제출 자체는 시작 조건이 아니다. 위 start guard는 같은 대회 명단 셀렉터로
+        // 각 사이드에 유효 출전자가 있는지만 확인한다. 제출되지 않은 초안도 선수가 있으면
+        // 시작할 수 있고, 빈 최신 명단은 서버에서 거절한다. 종료 결과 역시 같은 폴백
+        // 셀렉터를 사용하므로 시작 허용 여부와 공식 출전자 목록이 일치한다.
         // 이슈 #375 — HALFTIME이 실제로 영속되는 상태가 되면서 "game.state
         // === LIVE인데 LIVE인 피리어드는 없다"(하프타임 도중)가 처음으로
         // 정상 상태가 됐다. `pause`는 LIVE 피리어드가 있어야만 뜻이 통하는
@@ -5155,7 +5141,7 @@ export class GamesService {
     } else {
       throw this.notFound('TOURNAMENT_FIXTURE_GAME_NOT_FOUND');
     }
-    const sides = await tx.v1GameSide.findMany({ where: { gameId: game.id }, select: { sideKey: true, teamId: true } });
+    const sides = await tx.v1GameSide.findMany({ where: { gameId: game.id }, select: { id: true, sideKey: true, teamId: true, displayNameSnapshot: true } });
     const homeSide = sides.find((side) => side.sideKey === 'HOME')?.teamId ?? null;
     const awaySide = sides.find((side) => side.sideKey === 'AWAY')?.teamId ?? null;
     if (
@@ -5168,6 +5154,25 @@ export class GamesService {
       throw new ConflictException({
         code: 'TOURNAMENT_MATCH_TEAMS_REQUIRED',
         message: '양 팀이 확정된 뒤 경기를 시작할 수 있어요.',
+      });
+    }
+
+    const lineups = await tx.v1GameLineup.findMany({
+      where: { gameId: game.id, invalidatedAt: null },
+      select: { id: true, sideId: true, revision: true, state: true, invalidatedAt: true },
+    });
+    const participantCandidates = await tx.v1GameParticipant.findMany({
+      where: { gameId: game.id },
+      select: { id: true, sideId: true, lineupId: true },
+    });
+    const currentParticipants = selectLineupParticipantsWithDraftFallback(participantCandidates, lineups);
+    const sidesWithoutParticipants = sides.filter((side) =>
+      !currentParticipants.some((participant) => participant.sideId === side.id),
+    );
+    if (sidesWithoutParticipants.length > 0) {
+      throw new ConflictException({
+        code: 'GAME_START_LINEUP_EMPTY',
+        message: `${sidesWithoutParticipants.map((side) => side.displayNameSnapshot).join(', ')} 팀 출전 선수가 없어요. 경기 명단을 확인해 주세요.`,
       });
     }
   }
@@ -6215,9 +6220,10 @@ export class GamesService {
       tx.v1GameEvent.findMany({ where: { gameId: game.id }, orderBy: { sequence: 'asc' } }),
       tx.v1GameParticipant.findMany({ where: { gameId: game.id } }),
       tx.v1GameLineup.findMany({
-        where: { gameId: game.id },
+        where: { gameId: game.id, invalidatedAt: null },
         // `state` 를 함께 읽어 셀렉터가 사이드별로 제출본을 우선하도록 한다 — 정정
-        // 요청으로 새로 열린 초안이 직전 제출을 무효화하지 않는다(그 유틸의 계약).
+        // 요청으로 새로 열린 초안이 직전 제출을 밀어내지 않는다. 무효화된 이전 팀의
+        // 제출본은 경기 결과에 다시 선택되지 않도록 시작 게이트와 같은 집합만 읽는다.
         select: { id: true, sideId: true, revision: true, state: true, invalidatedAt: true },
       }),
       tx.v1GameSide.findMany({ where: { gameId: game.id } }),

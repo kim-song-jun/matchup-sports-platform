@@ -1267,6 +1267,19 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   }, [gameId, myUserId, pendingCommandRetry]);
 
 
+  const sides = gameDetail.data?.sides ?? [];
+  const homeTeamId = sides.find((side) => side.sideKey === 'HOME')?.teamId;
+  const awayTeamId = sides.find((side) => side.sideKey === 'AWAY')?.teamId;
+  const startBlockedByTeams = !homeTeamId || !awayTeamId || homeTeamId === awayTeamId;
+  const lineups = fixtureLineup.data?.lineups ?? [];
+  const sidesWithoutCurrentPlayers = gameDetail.data?.sourceType === 'TEAM_MATCH'
+    ? sides.filter((side) => {
+        const lineup = latestLineupForDisplay(lineups, side.id);
+        return lineup === null || lineup.participants.length === 0;
+      })
+    : [];
+  const startBlockedByLineup = sidesWithoutCurrentPlayers.length > 0;
+
   if (fixtureLineup.isLoading || (gameId && gameDetail.isLoading)) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center text-sm text-[var(--text-muted)]">
@@ -1301,12 +1314,6 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
       </div>
     );
   }
-
-  const sides = gameDetail.data?.sides ?? [];
-  const homeTeamId = sides.find((side) => side.sideKey === 'HOME')?.teamId;
-  const awayTeamId = sides.find((side) => side.sideKey === 'AWAY')?.teamId;
-  const startBlockedByTeams = !homeTeamId || !awayTeamId || homeTeamId === awayTeamId;
-  const lineups = fixtureLineup.data?.lineups ?? [];
 
   // 진행 조작 줄. "다음 걸음"은 진행 방향 명령 하나(시작·후반 시작·재개·전반/후반 종료)이고
   // 일시 중지·되돌리기는 그 곁의 보조다. 정규 시간 종료 뒤에는 "경기 종료"(동점 결선이면
@@ -1377,9 +1384,8 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           'whitespace-nowrap max-sm:!min-h-12',
           primary ? 'flex-1 enabled:!bg-[var(--blue700)] enabled:!text-white enabled:hover:brightness-95 sm:flex-none' : '',
         ].join(' ')}
-        // 라인업 미제출은 시작을 막지 않는다(경고 배너만) — 참가자는 대회 명단에서 경기 생성
-        // 시점에 이미 만들어져 있어 제출 여부와 무관하게 항상 있다.
-        disabled={commandUnavailable || (command === 'start' && startBlockedByTeams)}
+        // 제출 여부는 허용하되, 현재 유효 명단에 참가자가 없는 대회 경기는 시작하지 않는다.
+        disabled={commandUnavailable || (command === 'start' && (startBlockedByTeams || startBlockedByLineup))}
         loading={commandPending}
         // 확인 없이 실행하는 명령은 `revert-period` 하나뿐이다 — 그 자체가 되돌리기다.
         onClick={() => void (command === 'revert-period' ? handleRunCommand('revert-period') : confirmAndRunCommand(command))}
@@ -1660,8 +1666,14 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         {gameState === 'SCHEDULED' && startBlockedByTeams && (
           <Banner tone="warning">대진표에서 서로 다른 두 팀을 배정한 뒤 경기를 시작해 주세요.</Banner>
         )}
+        {gameState === 'SCHEDULED' && !startBlockedByTeams && startBlockedByLineup && (
+          <Banner tone="warning">
+            {sidesWithoutCurrentPlayers.map((side) => side.displayNameSnapshot).join(', ')} 팀 출전 선수가 없어요. 경기 명단을 확인해 주세요.
+          </Banner>
+        )}
         {gameDetail.data?.sourceType === 'TEAM_MATCH' &&
           !startBlockedByTeams &&
+          !startBlockedByLineup &&
           gameState === 'SCHEDULED' &&
           sidesMissingLineup.length > 0 && (
           <Banner tone="warning">
@@ -1697,6 +1709,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           !regulationEnded &&
           !gameDetailBehind &&
           !startBlockedByTeams &&
+          !startBlockedByLineup &&
           gameState !== 'ENDED' &&
           gameState !== 'CANCELLED' && (
             // [P1-c] 예전에는 라인업 미제출일 때 이 안내를 숨겼다(시작이 막혀 있었으므로).

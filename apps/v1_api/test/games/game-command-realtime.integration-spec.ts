@@ -356,39 +356,6 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
     };
   }
 
-  function holdActualCurrentGameRead(userId: string, requestedGameId: string) {
-    const gamesService = app.get(GamesService);
-    const gateway = app.get(RealtimeGateway) as unknown as {
-      loadGameForStaffLease(targetGameId: string): Promise<unknown>;
-    };
-    const originalListEvents = gamesService.listEvents.bind(gamesService);
-    const originalCurrentGameRead = gateway.loadGameForStaffLease.bind(app.get(RealtimeGateway));
-    let holdNextGameRead = false;
-    let armed = true;
-    let release!: () => void;
-    let markReached!: () => void;
-    const gate = new Promise<void>((resolve) => { release = resolve; });
-    const reached = new Promise<void>((resolve) => { markReached = resolve; });
-    const listSpy = jest.spyOn(gamesService, 'listEvents').mockImplementation(async (user, targetGameId, afterSequence) => {
-      const actual = await originalListEvents(user, targetGameId, afterSequence);
-      if (armed && user.id === userId && targetGameId === requestedGameId && afterSequence === 0) {
-        armed = false;
-        holdNextGameRead = true;
-      }
-      return actual;
-    });
-    const gameSpy = jest.spyOn(gateway, 'loadGameForStaffLease').mockImplementation(async (targetGameId) => {
-      const actual = await originalCurrentGameRead(targetGameId);
-      if (holdNextGameRead && targetGameId === requestedGameId) {
-        holdNextGameRead = false;
-        markReached();
-        await gate;
-      }
-      return actual;
-    });
-    return { reached, release, restore: () => { listSpy.mockRestore(); gameSpy.mockRestore(); } };
-  }
-
   function trackRefreshPromises() {
     const registry = app.get(GameBroadcastRegistry);
     const original = registry.refreshGameSubscribers.bind(registry);
@@ -1181,7 +1148,7 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
     }
   });
 
-  it('drops an older DB-read snapshot and prevents its old generation entering a re-subscribed room', async () => {
+  it('drops an older event-read snapshot and prevents its old generation entering a re-subscribed room', async () => {
     const assignment = await grantScopedReader(raceReaderId);
     const reader = connect(raceReaderId, 'version-race-reader', assignment.version);
     reader.connect();
@@ -1192,8 +1159,8 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
     const snapshots: Array<{ gameId: string; version: number; state: string }> = [];
     const snapshotListener = (snapshot: { gameId: string; version: number; state: string }) => snapshots.push(snapshot);
     reader.on('game.snapshot', snapshotListener);
-    const readGate = holdActualCurrentGameRead(raceReaderId, gameId);
-    let rejoinGate: ReturnType<typeof holdActualCurrentGameRead> | undefined;
+    const readGate = holdActualEventRead(raceReaderId, gameId);
+    let rejoinGate: ReturnType<typeof holdActualEventRead> | undefined;
     const refreshes = trackRefreshPromises();
     try {
       const firstCommand = await request(app.getHttpServer())
@@ -1241,7 +1208,7 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
       readGate.restore();
 
       const snapshotsBeforeThirdCommand = snapshots.length;
-      rejoinGate = holdActualCurrentGameRead(raceReaderId, gameId);
+      rejoinGate = holdActualEventRead(raceReaderId, gameId);
       const thirdCommand = await request(app.getHttpServer())
         .post(`/api/v1/games/${gameId}/commands/resume`)
         .set('x-v1-user-id', operatorId)

@@ -1907,6 +1907,9 @@ Validation:
 - [x] 실제 `listEvents`와 current-game DB 조회가 모두 끝난 오래된 결과를 보류해 더 높은 snapshot 뒤 반환해도 socket/game/generation watermark가 낮은 snapshot을 보내지 않는지 대조하고, 구 generation이 unsubscribe/re-subscribe 뒤 새 room으로 전달되지 않는 반례를 추가한다.
 - [x] 실제 HTTP idempotent command replay와 실제 실패 command가 refresh/snapshot을 만들지 않는지, pause/resume의 period `pausedAt`/`pausedTotalMs` 및 `end-period` 뒤 다음 period detail을 대조하는 통합 사례를 추가한다.
 - [x] Gateway refresh는 실제 namespace game room 멤버를 대상으로 scoped/unscoped 기존 권한 경로를 적용하고, event-read 뒤 room ownership/generation/source/version을 재검증하도록 구현한다.
+- [x] 각 recipient에 미완료된 subscribe/lifecycle snapshot이 있으면 같은 socket/game/generation의 committed event를 그 refresh 뒤 FIFO로 보낸다. 수렴된 event-only 경로는 추가 full-history 조회를 하지 않으며 socket command ACK는 즉시 유지한다.
+- [x] Per-game 128건 및 socket 전체 512건의 event backlog 상한, overflow 또는 snapshot floor 실패 시 Engine.IO transport 종료, 자동 재연결 뒤 full snapshot 복구, subscribe ACK/세대교체/revoke/expiry/disconnect/shutdown 정리를 명시한다. 중간 event는 조용히 생략하지 않는다.
+- [x] 실제 REST event가 snapshot보다 먼저 전달되지 않는지 실제 HTTP/Socket.IO 회귀를 추가하고, 같은 recipient refresh 교착을 만드는 race 기대 순서를 refresh 해제 후 coalesced snapshot으로 수정한다.
 - [x] CI API run `40311513836`, job `121533581445`에서 정확한 PR test head `7a33af8c95acff77250246a23e42e986e0ae3102`의 의도된 RED를 확인했다. REST start는 201이었고 observer의 `game.snapshot` wait만 timeout됐다.
 - [ ] CI에서 현재 수정 head의 exact API typecheck, real integration GREEN, revoke/expiry/version-order/generation/replay/failure/period assertions를 실행해 확인한다. 로컬 shared Prisma client mismatch로 새 테스트 실행은 하지 않았다.
 - 범위: `apps/v1_api/src/games/games.controller.ts`, `apps/v1_api/src/games/game-broadcast.registry.ts`, `apps/v1_api/src/games/games.controller.broadcast.spec.ts`, `apps/v1_api/src/realtime/realtime.gateway.ts`, `apps/v1_api/test/games/game-command-realtime.integration-spec.ts`, `docs/api/domains/game-realtime.md`, `.changeset/mdqa-134-realtime.md`.

@@ -7,6 +7,7 @@ import { canonicalGameCommandPayloadHash, GamesService } from '../../src/games/g
 import { GameBroadcastRegistry } from '../../src/games/game-broadcast.registry';
 import type { GameCommandContext, GameSourceCreationInput } from '../../src/games/games.types';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { RealtimeGateway } from '../../src/realtime/realtime.gateway';
 import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 import { TournamentStaffService } from '../../src/tournaments/staff/tournament-staff.service';
 import { ManagedTermsRuntimeService } from '../../src/terms/managed-terms-runtime.service';
@@ -65,6 +66,8 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
   let expiringReaderId: string;
   let raceReaderId: string;
   let awayTeamOwnerId: string;
+  let friendlyMemberId: string;
+  let friendlyMemberMembershipId: string;
   let gameId: string;
   let hostTeamId: string;
   let awayTeamId: string;
@@ -99,6 +102,7 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
     raceReaderId = await makeUser('버전 경합 조회자', 8);
     adminId = await makeUser('관리자', 3);
     awayTeamOwnerId = await makeUser('원정팀장', 4);
+    friendlyMemberId = await makeUser('친선팀원', 9);
     await prisma.v1AdminUser.create({ data: { userId: adminId, adminRole: 'ops', status: 'active' } });
     tournamentId = (await prisma.v1Tournament.create({
       data: { sportId, regionId, title: `REST lifecycle realtime ${SESSION}`, competitionConfigVersionId: configId, status: 'in_progress' },
@@ -111,6 +115,9 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
     });
     hostTeamId = await makeTeam('home', operatorId);
     awayTeamId = await makeTeam('away', awayTeamOwnerId);
+    friendlyMemberMembershipId = (await prisma.v1TeamMembership.create({
+      data: { teamId: hostTeamId, userId: friendlyMemberId, role: 'member', status: 'active' },
+    })).id;
     const registrations = await Promise.all([hostTeamId, awayTeamId].map((teamId, index) =>
       prisma.v1TournamentRegistration.create({ data: { tournamentId, teamId, appliedByUserId: index === 0 ? operatorId : awayTeamOwnerId, status: 'confirmed' } }),
     ));
@@ -322,8 +329,11 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
 
   function holdActualCurrentGameRead(userId: string) {
     const gamesService = app.get(GamesService);
+    const gateway = app.get(RealtimeGateway) as unknown as {
+      loadGameForStaffLease(targetGameId: string): Promise<unknown>;
+    };
     const originalListEvents = gamesService.listEvents.bind(gamesService);
-    const originalFindUnique = prisma.v1Game.findUnique.bind(prisma.v1Game);
+    const originalCurrentGameRead = gateway.loadGameForStaffLease.bind(app.get(RealtimeGateway));
     let holdNextGameRead = false;
     let armed = true;
     let release!: () => void;
@@ -338,9 +348,9 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
       }
       return actual;
     });
-    const gameSpy = jest.spyOn(prisma.v1Game, 'findUnique').mockImplementation(async (args) => {
-      const actual = await originalFindUnique(args);
-      if (holdNextGameRead && args.where.id === gameId) {
+    const gameSpy = jest.spyOn(gateway, 'loadGameForStaffLease').mockImplementation(async (targetGameId) => {
+      const actual = await originalCurrentGameRead(targetGameId);
+      if (holdNextGameRead && targetGameId === gameId) {
         holdNextGameRead = false;
         markReached();
         await gate;
@@ -354,8 +364,8 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
     const registry = app.get(GameBroadcastRegistry);
     const original = registry.refreshGameSubscribers.bind(registry);
     const promises: Promise<void>[] = [];
-    const spy = jest.spyOn(registry, 'refreshGameSubscribers').mockImplementation((targetGameId) => {
-      const promise = original(targetGameId);
+    const spy = jest.spyOn(registry, 'refreshGameSubscribers').mockImplementation((targetGameId, minimumVersion) => {
+      const promise = original(targetGameId, minimumVersion);
       promises.push(promise);
       return promise;
     });
@@ -415,19 +425,25 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
     deniedReader.connect();
     await Promise.all([connected(observer), connected(operator), connected(operatorSecondConsole), connected(deniedReader)]);
 
-    const [observerSubscribe, operatorSubscribe, secondConsoleSubscribe] = await Promise.all([
-      subscribe(observer), subscribe(operator), subscribe(operatorSecondConsole),
-    ]);
-    expect(observerSubscribe).toMatchObject({
-      status: 'subscribed',
-      snapshot: { gameId, version: 0, state: 'SCHEDULED', lastSequence: 0, events: [] },
-    });
-    expect(operatorSubscribe).toMatchObject({
-      status: 'subscribed',
-      snapshot: { gameId, version: 0, state: 'SCHEDULED', lastSequence: 0, events: [] },
-    });
-    expect(secondConsoleSubscribe).toMatchObject({ status: 'subscribed', snapshot: { gameId, version: 0 } });
-    await expect(subscribe(deniedReader)).resolves.toMatchObject({ status: 'denied' });
+    const initialReadGate = holdActualEventRead(observerId);
+    const observerSubscribe = subscribe(observer);
+    let initialVersion: number;
+    let commandVersion: number;
+    let goalVersion: number;
+    let takeoverToken: string;
+    const startCommandId = `gcr-start-${SESSION}`;
+    const startOccurredAt = new Date().toISOString();
+    try {
+      await initialReadGate.reached;
+      const [operatorSubscribe, secondConsoleSubscribe] = await Promise.all([
+        subscribe(operator), subscribe(operatorSecondConsole),
+      ]);
+      expect(operatorSubscribe).toMatchObject({
+        status: 'subscribed',
+        snapshot: { gameId, version: 0, state: 'SCHEDULED', lastSequence: 0, events: [] },
+      });
+      expect(secondConsoleSubscribe).toMatchObject({ status: 'subscribed', snapshot: { gameId, version: 0 } });
+      await expect(subscribe(deniedReader)).resolves.toMatchObject({ status: 'denied' });
 
     const requestTakeover = (
       socket: Socket,
@@ -465,79 +481,108 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
         `gcr-${SESSION}-observer`,
       ),
     ).resolves.toMatchObject({ status: 'denied', code: 'STAFF_SCOPE_DENIED' });
-    const takeover = await requestTakeover(
-      operator,
-      operatorAssignment.assignmentVersion ?? 0,
-      `gcr-${SESSION}-operator`,
-    );
-    expect(takeover).toMatchObject({ status: 'granted', gameId, version: 0, lastSequence: 0 });
+      const takeover = await requestTakeover(
+        operator,
+        operatorAssignment.assignmentVersion ?? 0,
+        `gcr-${SESSION}-operator`,
+      );
+      expect(takeover).toMatchObject({ status: 'granted', gameId, version: 0, lastSequence: 0 });
+      if (takeover.takeoverToken === undefined) throw new Error('Operator takeover token missing');
+      takeoverToken = takeover.takeoverToken;
 
-    const before = await request(app.getHttpServer())
-      .get(`/api/v1/games/${gameId}`)
-      .set('x-v1-user-id', observerId)
-      .expect(200);
-    const snapshotWait = eventOnce<{
-      gameId: string;
-      version: number;
-      state: string;
-      lastSequence: number;
-      events: unknown[];
-    }>(observer, 'game.snapshot');
-    let commandVersion: number;
-    const startCommandId = `gcr-start-${SESSION}`;
-    const startOccurredAt = new Date().toISOString();
-    try {
-      const command = await request(app.getHttpServer())
-        .post(`/api/v1/games/${gameId}/commands/start`)
-        .set('x-v1-user-id', operatorId)
-        .set('Idempotency-Key', startCommandId)
-        .send({
-          expectedVersion: before.body.data.version,
-          clientCommandId: startCommandId,
-          takeoverToken: takeover.takeoverToken,
-          occurredAt: startOccurredAt,
-          payload: {},
-        })
-        .expect(201);
-      commandVersion = command.body.data.version;
-      const received = await snapshotWait.promise;
-      expect(received).toHaveProperty('event');
-      if (!('event' in received)) throw new Error('Observer did not receive a game.snapshot');
-      expect(received.event).toMatchObject({
-        gameId,
-        version: commandVersion,
-        state: 'LIVE',
-        lastSequence: 0,
-        events: [],
-      });
+      const before = await request(app.getHttpServer())
+        .get(`/api/v1/games/${gameId}`)
+        .set('x-v1-user-id', observerId)
+        .expect(200);
+      initialVersion = before.body.data.version;
+      const startRefreshes = trackRefreshPromises();
+      let goalSequence: number;
+      const committedDeliveryOrder: string[] = [];
+      const recordSnapshotDelivery = (snapshot: { version: number }) => committedDeliveryOrder.push(`snapshot:${snapshot.version}`);
+      const recordEventDelivery = (event: { version: number }) => committedDeliveryOrder.push(`event:${event.version}`);
+      observer.on('game.snapshot', recordSnapshotDelivery);
+      observer.on('game.event.committed', recordEventDelivery);
+      const goalCommitted = eventOnce<{ gameId: string; version: number; sequence: number }>(observer, 'game.event.committed');
+      const secondConsoleGoalCommitted = eventOnce<{ gameId: string; version: number; sequence: number }>(
+        operatorSecondConsole,
+        'game.event.committed',
+      );
+      try {
+        const command = await request(app.getHttpServer())
+          .post(`/api/v1/games/${gameId}/commands/start`)
+          .set('x-v1-user-id', operatorId)
+          .set('Idempotency-Key', startCommandId)
+          .send({
+            expectedVersion: initialVersion,
+            clientCommandId: startCommandId,
+            takeoverToken,
+            occurredAt: startOccurredAt,
+            payload: {},
+          })
+          .expect(201);
+        commandVersion = command.body.data.version;
+        expect(startRefreshes.promises).toHaveLength(1);
+
+        const goal = await request(app.getHttpServer())
+          .post(`/api/v1/games/${gameId}/events`)
+          .set('x-v1-user-id', operatorId)
+          .set('Idempotency-Key', `gcr-goal-${SESSION}`)
+          .send({
+            expectedVersion: commandVersion,
+            clientEventId: `gcr-goal-${SESSION}`,
+            takeoverToken,
+            type: 'GOAL',
+            sideId: homeSideId,
+            participantId: homeParticipantId,
+            period: 1,
+            clockMs: 1_000,
+            occurredAt: new Date().toISOString(),
+            payload: {},
+          })
+          .expect(201);
+        goalVersion = goal.body.data.version;
+        goalSequence = goal.body.data.sequence;
+        await expect(secondConsoleGoalCommitted.promise).resolves.toMatchObject({ event: {
+          gameId,
+          version: goalVersion,
+          sequence: goalSequence,
+        } });
+        initialReadGate.release();
+        const observerAck = await observerSubscribe;
+        expect(observerAck).toMatchObject({ status: 'subscribed', snapshot: {
+          gameId,
+          version: goalVersion,
+          state: 'LIVE',
+          lastSequence: goalSequence,
+          events: [expect.objectContaining({ type: 'GOAL', sequence: goalSequence, participantId: homeParticipantId })],
+        } });
+        await expect(goalCommitted.promise).resolves.toMatchObject({ event: {
+          gameId,
+          version: goalVersion,
+          sequence: goalSequence,
+        } });
+        const snapshotOrder = committedDeliveryOrder.findIndex((entry) => entry.startsWith('snapshot:'));
+        const eventOrder = committedDeliveryOrder.findIndex((entry) => entry.startsWith('event:'));
+        expect(snapshotOrder).toBeGreaterThanOrEqual(0);
+        expect(eventOrder).toBeGreaterThan(snapshotOrder);
+        await startRefreshes.promises[0];
+      } finally {
+        startRefreshes.restore();
+        observer.off('game.snapshot', recordSnapshotDelivery);
+        observer.off('game.event.committed', recordEventDelivery);
+      }
     } finally {
-      snapshotWait.cancel();
+      initialReadGate.release();
+      initialReadGate.restore();
     }
     const refreshedDetail = await request(app.getHttpServer())
       .get(`/api/v1/games/${gameId}`)
       .set('x-v1-user-id', observerId)
       .expect(200);
-    expect(refreshedDetail.body.data).toMatchObject({ state: 'LIVE', version: commandVersion! });
+    expect(refreshedDetail.body.data).toMatchObject({ state: 'LIVE', version: goalVersion! });
     expect(refreshedDetail.body.data.periods[0].startedAt).toEqual(expect.any(String));
 
-    const goal = await request(app.getHttpServer())
-      .post(`/api/v1/games/${gameId}/events`)
-      .set('x-v1-user-id', operatorId)
-      .set('Idempotency-Key', `gcr-goal-${SESSION}`)
-      .send({
-        expectedVersion: commandVersion,
-        clientEventId: `gcr-goal-${SESSION}`,
-        takeoverToken: takeover.takeoverToken,
-        type: 'GOAL',
-        sideId: homeSideId,
-        participantId: homeParticipantId,
-        period: 1,
-        clockMs: 1_000,
-        occurredAt: new Date().toISOString(),
-        payload: {},
-      })
-      .expect(201);
-    const pauseVersion = goal.body.data.version as number;
+    const pauseVersion = goalVersion!;
     const observerPauseSnapshot = eventOnce(observer, 'game.snapshot');
     const secondConsolePauseSnapshot = eventOnce(operatorSecondConsole, 'game.snapshot');
     const pause = await request(app.getHttpServer())
@@ -547,7 +592,7 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
       .send({
         expectedVersion: pauseVersion,
         clientCommandId: `gcr-pause-${SESSION}`,
-        takeoverToken: takeover.takeoverToken,
+        takeoverToken,
         occurredAt: new Date().toISOString(),
         payload: {},
       })
@@ -571,6 +616,100 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
     expect(pausedDetail.body.data).toMatchObject({ state: 'PAUSED', version: pause.body.data.version });
     expect(pausedDetail.body.data.periods[0].pausedAt).toEqual(expect.any(String));
 
+    const resumeReadGate = holdActualEventRead(operatorId);
+    const resumeRefreshes = trackRefreshPromises();
+    const resumeSnapshot = eventOnce<{ gameId: string; version: number; state: string; lastSequence: number }>(operator, 'game.snapshot');
+    const resumedGoalEvent = eventOnce<{ gameId: string; version: number; sequence: number }>(observer, 'game.event.committed');
+    const senderGameAck = eventOnce<{ clientEventId: string; version: number; sequence: number; status: string }>(operator, 'game.event.ack');
+    const senderGoalEvent = eventOnce<{ gameId: string; version: number; sequence: number }>(operator, 'game.event.committed');
+    const resumeDeliveryOrder: string[] = [];
+    const recordResumeSnapshot = (snapshot: { version: number }) => resumeDeliveryOrder.push(`snapshot:${snapshot.version}`);
+    const recordResumedGoal = (event: { version: number }) => resumeDeliveryOrder.push(`event:${event.version}`);
+    operator.on('game.snapshot', recordResumeSnapshot);
+    operator.on('game.event.committed', recordResumedGoal);
+    try {
+      const resume = await request(app.getHttpServer())
+        .post(`/api/v1/games/${gameId}/commands/resume`)
+        .set('x-v1-user-id', operatorId)
+        .set('Idempotency-Key', `gcr-resume-before-event-${SESSION}`)
+        .send({
+          expectedVersion: pause.body.data.version,
+          clientCommandId: `gcr-resume-before-event-${SESSION}`,
+          takeoverToken,
+          occurredAt: new Date().toISOString(),
+          payload: {},
+        })
+        .expect(201);
+      await resumeReadGate.reached;
+      expect(resumeRefreshes.promises).toHaveLength(1);
+      const socketEventId = `gcr-socket-goal-during-refresh-${SESSION}`;
+      const socketEvent = {
+        type: 'GOAL',
+        sideId: homeSideId,
+        participantId: homeParticipantId,
+        period: 1,
+        clockMs: 2_000,
+        occurredAt: new Date().toISOString(),
+        payload: {},
+      };
+      const socketAppendResult = await new Promise<{
+        status: string;
+        clientEventId?: string;
+        sequence?: number;
+        version?: number;
+      }>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('Timed out waiting for socket event append acknowledgement')), timeoutMs);
+        operator.emit('game.event.append', {
+          gameId,
+          expectedVersion: resume.body.data.version,
+          clientEventId: socketEventId,
+          takeoverToken,
+          payloadHash: canonicalGameCommandPayloadHash(socketEvent),
+          event: socketEvent,
+        }, (result: { status: string; clientEventId?: string; sequence?: number; version?: number }) => {
+          clearTimeout(timer);
+          resolve(result);
+        });
+      });
+      const emittedAck = await senderGameAck.promise;
+      expect(socketAppendResult).toMatchObject({ status: 'ack', clientEventId: socketEventId });
+      expect(emittedAck).toMatchObject({
+        event: {
+          clientEventId: socketEventId,
+          status: 'committed',
+          version: socketAppendResult.version,
+          sequence: socketAppendResult.sequence,
+        },
+      });
+      expect(socketAppendResult.version).toBeGreaterThan(resume.body.data.version);
+      resumeReadGate.release();
+      await resumeRefreshes.promises[0];
+      await expect(resumeSnapshot.promise).resolves.toMatchObject({ event: {
+        gameId,
+        version: socketAppendResult.version,
+        state: 'LIVE',
+        lastSequence: socketAppendResult.sequence,
+      } });
+      await expect(resumedGoalEvent.promise).resolves.toMatchObject({ event: {
+        gameId,
+        version: socketAppendResult.version,
+        sequence: socketAppendResult.sequence,
+      } });
+      await expect(senderGoalEvent.promise).resolves.toMatchObject({ event: {
+        gameId,
+        version: socketAppendResult.version,
+        sequence: socketAppendResult.sequence,
+      } });
+      expect(resumeDeliveryOrder.findIndex((entry) => entry.startsWith('snapshot:')))
+        .toBeLessThan(resumeDeliveryOrder.findIndex((entry) => entry.startsWith('event:')));
+    } finally {
+      resumeReadGate.release();
+      resumeReadGate.restore();
+      resumeRefreshes.restore();
+      operator.off('game.snapshot', recordResumeSnapshot);
+      operator.off('game.event.committed', recordResumedGoal);
+    }
+
     const replaySnapshots: unknown[] = [];
     const replaySnapshotListener = (snapshot: unknown) => replaySnapshots.push(snapshot);
     observer.on('game.snapshot', replaySnapshotListener);
@@ -581,9 +720,9 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
         .set('x-v1-user-id', operatorId)
         .set('Idempotency-Key', startCommandId)
         .send({
-          expectedVersion: before.body.data.version,
+          expectedVersion: initialVersion,
           clientCommandId: startCommandId,
-          takeoverToken: takeover.takeoverToken,
+          takeoverToken,
           occurredAt: startOccurredAt,
           payload: {},
         })
@@ -598,7 +737,7 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
         .send({
           expectedVersion: pause.body.data.version - 1,
           clientCommandId: `gcr-failed-command-${SESSION}`,
-          takeoverToken: takeover.takeoverToken,
+          takeoverToken,
           occurredAt: new Date().toISOString(),
           payload: {},
         })
@@ -621,43 +760,80 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
     });
     const hostOwner = connect(operatorId, 'friendly-host-owner', 0);
     const awayOwner = connect(awayTeamOwnerId, 'friendly-away-owner', 0);
+    const hostMember = connect(friendlyMemberId, 'friendly-host-member', 0);
     const scopedObserver = connect(observerId, 'scoped-observer-other-room', scopedObserverAssignment.assignmentVersion ?? 0);
-    await Promise.all([hostOwner, awayOwner, scopedObserver].map(async (socket) => {
+    await Promise.all([hostOwner, awayOwner, hostMember, scopedObserver].map(async (socket) => {
       socket.connect();
       await connected(socket);
     }));
 
     await expect(subscribe(hostOwner, friendlyGameId)).resolves.toMatchObject({ status: 'subscribed' });
     await expect(subscribe(awayOwner, friendlyGameId)).resolves.toMatchObject({ status: 'subscribed' });
+    await expect(subscribe(hostMember, friendlyGameId)).resolves.toMatchObject({ status: 'subscribed' });
     await expect(subscribe(scopedObserver, gameId)).resolves.toMatchObject({ status: 'subscribed' });
     await expect(subscribe(scopedObserver, friendlyGameId)).resolves.toMatchObject({ status: 'denied' });
 
     const hostSnapshot = eventOnce(hostOwner, 'game.snapshot');
     const awaySnapshot = eventOnce(awayOwner, 'game.snapshot');
+    const memberSnapshots: unknown[] = [];
+    const memberSnapshotListener = (snapshot: unknown) => memberSnapshots.push(snapshot);
+    hostMember.on('game.snapshot', memberSnapshotListener);
     const otherRoomSnapshot = eventOnce(scopedObserver, 'game.snapshot');
-    const command = await request(app.getHttpServer())
-      .post(`/api/v1/games/${friendlyGameId}/commands/start`)
-      .set('x-v1-user-id', operatorId)
-      .set('Idempotency-Key', `gcr-friendly-start-${SESSION}`)
-      .send({
-        expectedVersion: 0,
-        clientCommandId: `gcr-friendly-start-${SESSION}`,
-        takeoverToken: `gcr-friendly-no-takeover-${SESSION}`,
-        occurredAt: new Date().toISOString(),
-        payload: {},
-      })
-      .expect(201);
+    const readGate = holdActualEventRead(friendlyMemberId);
+    const refreshes = trackRefreshPromises();
+    let commandVersion: number;
+    try {
+      const command = await request(app.getHttpServer())
+        .post(`/api/v1/games/${friendlyGameId}/commands/start`)
+        .set('x-v1-user-id', operatorId)
+        .set('Idempotency-Key', `gcr-friendly-start-${SESSION}`)
+        .send({
+          expectedVersion: 0,
+          clientCommandId: `gcr-friendly-start-${SESSION}`,
+          takeoverToken: `gcr-friendly-no-takeover-${SESSION}`,
+          occurredAt: new Date().toISOString(),
+          payload: {},
+        })
+        .expect(201);
+      commandVersion = command.body.data.version;
+      await readGate.reached;
+      expect(refreshes.promises).toHaveLength(1);
+      await expect(hostSnapshot.promise).resolves.toMatchObject({ event: {
+        gameId: friendlyGameId,
+        version: commandVersion,
+        state: 'LIVE',
+      } });
+      await expect(awaySnapshot.promise).resolves.toMatchObject({ event: {
+        gameId: friendlyGameId,
+        version: commandVersion,
+        state: 'LIVE',
+      } });
+      await request(app.getHttpServer())
+        .post(`/api/v1/teams/team-memberships/${friendlyMemberMembershipId}/remove`)
+        .set('x-v1-user-id', operatorId)
+        .send({ reason: 'membership revoked during held game snapshot' })
+        .expect(201);
+      readGate.release();
+      await refreshes.promises[0];
+      await expect(subscribe(hostMember, friendlyGameId)).resolves.toMatchObject({ status: 'denied' });
+      expect(memberSnapshots).toEqual([]);
+    } finally {
+      readGate.release();
+      readGate.restore();
+      refreshes.restore();
+      hostMember.off('game.snapshot', memberSnapshotListener);
+    }
     const [hostResult, awayResult] = await Promise.all([hostSnapshot.promise, awaySnapshot.promise]);
     expect(hostResult).toMatchObject({ event: {
       gameId: friendlyGameId,
-      version: command.body.data.version,
+      version: commandVersion!,
       state: 'LIVE',
       lastSequence: 0,
       events: [],
     } });
     expect(awayResult).toMatchObject({ event: {
       gameId: friendlyGameId,
-      version: command.body.data.version,
+      version: commandVersion!,
       state: 'LIVE',
       lastSequence: 0,
       events: [],
@@ -668,6 +844,84 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
     ]);
     otherRoomSnapshot.cancel();
     expect(otherRoomResult).toEqual({ timeout: true });
+  });
+
+  it('fans out an append from an unsubscribed socket to the only subscribed recipient', async () => {
+    const server = app.getHttpServer();
+    if (!server.listening) await app.listen(0, '127.0.0.1');
+    const sender = connect(operatorId, 'unsubscribed-event-sender', 0);
+    const recipient = connect(awayTeamOwnerId, 'subscribed-event-recipient', 0);
+    sender.connect();
+    recipient.connect();
+    await Promise.all([connected(sender), connected(recipient)]);
+    await expect(subscribe(recipient, friendlyGameId)).resolves.toMatchObject({ status: 'subscribed' });
+    expect(socketGameSubscriptions.get(sender)?.has(friendlyGameId)).toBeFalsy();
+
+    const game = await prisma.v1Game.findUniqueOrThrow({
+      where: { id: friendlyGameId },
+      select: { version: true, state: true },
+    });
+    if (game.state !== 'LIVE') throw new Error(`Expected the friendly fixture to be LIVE, got ${game.state}`);
+    const homeSide = await prisma.v1GameSide.findFirstOrThrow({
+      where: { gameId: friendlyGameId, sideKey: V1GameSideKey.HOME },
+      select: { id: true },
+    });
+    const participant = await prisma.v1GameParticipant.findFirstOrThrow({
+      where: { gameId: friendlyGameId, sideId: homeSide.id },
+      select: { id: true },
+    });
+    const clientEventId = `gcr-unsubscribed-sender-goal-${SESSION}`;
+    const friendlyTakeoverPlaceholder = `gcr-friendly-no-takeover-${SESSION}`;
+    const event = {
+      type: 'GOAL',
+      sideId: homeSide.id,
+      participantId: participant.id,
+      period: 1,
+      clockMs: 1_000,
+      occurredAt: new Date().toISOString(),
+      payload: {},
+    };
+    const senderAck = eventOnce<{ clientEventId: string; version: number; sequence: number; status: string }>(
+      sender,
+      'game.event.ack',
+    );
+    const senderReceipt = eventOnce<{ gameId: string; version: number; sequence: number }>(sender, 'game.event.committed');
+    const recipientCommitted = eventOnce<{ gameId: string; version: number; sequence: number }>(
+      recipient,
+      'game.event.committed',
+    );
+    const append = await new Promise<{ status: string; version?: number; sequence?: number }>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('Timed out waiting for unsubscribed sender append ACK')), timeoutMs);
+      sender.emit('game.event.append', {
+        gameId: friendlyGameId,
+        expectedVersion: game.version,
+        clientEventId,
+        takeoverToken: friendlyTakeoverPlaceholder,
+        payloadHash: canonicalGameCommandPayloadHash(event),
+        event,
+      }, (result: { status: string; version?: number; sequence?: number }) => {
+        clearTimeout(timer);
+        resolve(result);
+      });
+    });
+
+    expect(append).toMatchObject({ status: 'ack' });
+    const [ack, senderNotice, recipientNotice] = await Promise.all([
+      senderAck.promise,
+      senderReceipt.promise,
+      recipientCommitted.promise,
+    ]);
+    expect(ack).toMatchObject({ event: { clientEventId, status: 'committed', version: append.version } });
+    expect(senderNotice).toMatchObject({ event: {
+      gameId: friendlyGameId,
+      version: append.version,
+      sequence: append.sequence,
+    } });
+    expect(recipientNotice).toMatchObject({ event: {
+      gameId: friendlyGameId,
+      version: append.version,
+      sequence: append.sequence,
+    } });
   });
 
   it('does not refresh or rejoin a scoped reader revoked while the real event read is held', async () => {
@@ -803,7 +1057,6 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
       await readGate.reached;
       expect(refreshes.promises).toHaveLength(1);
 
-      const higherSnapshot = eventOnce<{ gameId: string; version: number; state: string }>(reader, 'game.snapshot');
       const secondCommand = await request(app.getHttpServer())
         .post(`/api/v1/games/${gameId}/commands/pause`)
         .set('x-v1-user-id', operatorId)
@@ -816,17 +1069,16 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
           payload: {},
         })
         .expect(201);
-      await expect(higherSnapshot.promise).resolves.toMatchObject({ event: {
+      expect(secondCommand.body.data.version).toBeGreaterThan(firstCommand.body.data.version);
+      expect(refreshes.promises).toHaveLength(2);
+      const coalescedSnapshot = eventOnce<{ gameId: string; version: number; state: string }>(reader, 'game.snapshot');
+      readGate.release();
+      await Promise.all(refreshes.promises.slice(0, 2));
+      await expect(coalescedSnapshot.promise).resolves.toMatchObject({ event: {
         gameId,
         version: secondCommand.body.data.version,
         state: 'PAUSED',
       } });
-      expect(secondCommand.body.data.version).toBeGreaterThan(firstCommand.body.data.version);
-      expect(refreshes.promises).toHaveLength(2);
-      await refreshes.promises[1];
-
-      readGate.release();
-      await refreshes.promises[0];
       expect(snapshots).toEqual([expect.objectContaining({
         gameId,
         version: secondCommand.body.data.version,

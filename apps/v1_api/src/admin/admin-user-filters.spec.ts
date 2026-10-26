@@ -18,7 +18,7 @@ describe('admin member signup classification', () => {
     ['completed', profile, [{}], 'onboarding_complete'],
     ['completed', null, [{}], 'profile_required'],
     ['completed', { ...profile, nickname: '' }, [{}], 'profile_required'],
-    ['completed', { ...profile, deletedAt: new Date() }, [{}], 'profile_required'],
+    ['completed', { ...profile, nickname: 'deleted-member', deletedAt: new Date() }, [{}], 'onboarding_complete'],
   ])('%s classifies incomplete and completed profiles correctly', (onboardingStatus, userProfile, termsConsents, expected) => {
     expect(signupStage({ onboardingStatus, profile: userProfile, termsConsents })).toBe(expected);
   });

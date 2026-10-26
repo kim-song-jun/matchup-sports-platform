@@ -33,6 +33,7 @@ describe('admin user signup/provider filters against PostgreSQL', () => {
     await member('ready', 'signup_done', ['email']);
     await member('complete', 'completed', ['email', 'kakao']);
     await member('suspended', 'completed', ['apple'], { accountStatus: 'suspended' });
+    await member('deleted', 'completed', [], { accountStatus: 'deleted', profile: { create: { nickname: `${prefix}-deleted`, deletedAt: new Date() } } });
     await member('missing', 'completed', ['kakao'], { profile: undefined });
     await prisma.v1UserProfile.deleteMany({ where: { userId: ids.missing } });
     await prisma.v1AuthIdentity.create({ data: { userId: ids.complete, provider: 'apple', providerUserKey: `${prefix}-unlinked`, status: 'unlinked' } });
@@ -61,5 +62,12 @@ describe('admin user signup/provider filters against PostgreSQL', () => {
     const apple = await service.listUsers(actor, { q: `${prefix}-complete`, providers: ['apple'] });
     expect(apple.items).toEqual([]);
     expect(apple.pageInfo.total).toBe(0);
+  });
+
+  it('keeps completed signup history when a withdrawn profile has been anonymized and soft-deleted', async () => {
+    const result = await service.listUsers(actor, { q: prefix, status: 'deleted', signup: ['required_complete'] });
+    expect(result.pageInfo.total).toBe(1);
+    expect(result.items[0]).toMatchObject({ userId: ids.deleted, signupStage: 'onboarding_complete' });
+    expect(result.summary.bySignup.incomplete).toBe(0);
   });
 });

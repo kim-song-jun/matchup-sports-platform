@@ -848,7 +848,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         lastLoginAt: true,
         createdAt: true,
         deletedAt: true,
-        profile: { select: { nickname: true, displayName: true, realName: true, gender: true, deletedAt: true } },
+        profile: { select: { nickname: true, displayName: true, realName: true, gender: true } },
         termsConsents: { take: 1, select: { id: true } },
         authIdentities: {
           where: { status: 'active' },

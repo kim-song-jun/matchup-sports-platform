@@ -16,7 +16,8 @@ const termsRequired: Prisma.V1UserWhereInput = {
   ],
 };
 const profilePresent: Prisma.V1UserWhereInput = {
-  profile: { is: { deletedAt: null, nickname: { not: '' } } },
+  // Withdrawal anonymizes and soft-deletes the profile. Keep the completed signup history.
+  profile: { is: { nickname: { not: '' } } },
 };
 const profileDeferred: Prisma.V1UserWhereInput = { onboardingStatus: 'social_profile_deferred' };
 const profileRequired: Prisma.V1UserWhereInput = {
@@ -47,11 +48,11 @@ export function authProviderWhere(values?: readonly V1AuthProvider[]): Prisma.V1
   return values?.length ? { authIdentities: { some: { status: 'active', provider: { in: [...values] } } } } : {};
 }
 
-export function signupStage(row: { onboardingStatus: string; profile: { nickname: string; deletedAt: Date | null } | null; termsConsents: unknown[] }) {
+export function signupStage(row: { onboardingStatus: string; profile: { nickname: string } | null; termsConsents: unknown[] }) {
   if (row.onboardingStatus === 'social_terms_required'
     || (row.onboardingStatus === 'not_started' && row.termsConsents.length === 0)) return 'terms_required';
   if (row.onboardingStatus === 'social_profile_deferred') return 'profile_deferred';
   if (['terms_done', 'social_profile_required'].includes(row.onboardingStatus)
-    || !row.profile?.nickname || row.profile.deletedAt) return 'profile_required';
+    || !row.profile?.nickname) return 'profile_required';
   return row.onboardingStatus === 'completed' ? 'onboarding_complete' : 'required_complete';
 }

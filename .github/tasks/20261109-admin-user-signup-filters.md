@@ -1,6 +1,6 @@
 # Task 20261109: 회원 가입 상태·로그인 수단 집계와 복수 필터
 
-Status: In Progress
+Status: Review
 Created: 2026-10-26
 
 ## Context
@@ -54,10 +54,14 @@ facet 집계는 회원 테이블 기준으로 수행하여 연결 identity가 �
 - 기존 계정 상태는 단일 선택 유지, 새 가입/로그인 수단 그룹은 복수 선택.
 - not_started라도 기존 동의 기록이 있으면 프로필 단계로 분류. social_terms_required는 저장된 가입 게이트 우선.
 - 별도 UI 카드로 재설계하지 않고 기존 AdminFilterBar를 재사용.
+- 탈퇴 시 프로필을 익명화·soft-delete하므로 deletedAt만으로 가입 이력을 미완료로 바꾸지 않는다.
 
 ## Progress Snapshot
 - 최신 origin/dev d312dda13b52 기반 feat/admin-member-signup-filters.
 - API·웹 타입 검사 통과. API 84 tests / web 14 tests 통과. 실제 페이지→조회 훅→HTTP 직렬화→응답 렌더 검증 포함.
 - v1 웹 패턴 및 API surface 검사 통과. Windows의 find/grep 충돌은 Git usr/bin PATH로 실행해 해결.
-- DB 통합 테스트 2개 추가 및 독립 타입 검사 통과. 이 호스트에는 테스트 PostgreSQL/Docker가 없어 실행은 CI에서 확인.
+- DB 통합 테스트 3개 추가. 이 호스트에는 테스트 PostgreSQL/Docker가 없어 실행은 CI에서 확인.
 - 실제 alpha 화면 QA는 배포 및 Teameet 브라우저 연결 후 확인. 관련 없는 Chrome 업무창은 접근하지 않음.
+- PR #2060 (dev 대상). 첫 head 754f79dfd의 Gates/Web 전체 CI와 PostgreSQL migration/drift/integration 단계 통과.
+- 삭제 계정의 익명화·soft-delete가 가입 완료 이력을 미완료로 바꾸지 않도록 후속 보정 및 통합 회귀 테스트 추가. API 관련 84개 테스트 재통과.
+- 최초 AI 검사 run 40277990422는 GitHub 모델 세션 생성 오류(`Model is not available`)로 실패. PR review 결과는 아직 없음. 이를 clean 리뷰로 표시하거나 리뷰 규칙을 변경하지 않는다.

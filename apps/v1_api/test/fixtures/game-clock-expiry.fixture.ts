@@ -11,6 +11,7 @@ import {
   FOOTBALL_COMPETITION_CONFIG_ID,
   seedCompetitionConfigVersions,
 } from '../../src/tournaments/competition-config/competition-config-backfill';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 export const CLOCK_EXPIRY_PERIOD_MS = FOOTBALL_V1_CONFIG.periods[0].durationMinutes * 60_000;
 
@@ -58,7 +59,7 @@ export async function seedClockExpiryFixture(prisma: PrismaService) {
   });
   return {
     prisma,
-    service: new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService()),
+    service: new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma)),
     authUser: {
       id: user.id,
       email: user.email,

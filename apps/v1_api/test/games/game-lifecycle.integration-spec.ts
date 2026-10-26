@@ -16,6 +16,7 @@ import type {
   GameCommandContext,
   GameSourceCreationInput,
 } from '../../src/games/games.types';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 const ids = {
   hostUser: '61000000-0000-4000-8000-000000000001',
@@ -36,7 +37,7 @@ const ids = {
 } as const;
 
 const prisma = new PrismaService();
-const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 
 async function grantTournamentTakeover(gameId: string, userId: string): Promise<string> {
   const grant = await service.requestTakeover(authUser(userId), gameId, {

@@ -4,6 +4,7 @@ import type { V1AuthUser } from '../auth/v1-auth-user';
 import type { PrismaService } from '../prisma/prisma.service';
 import type { GameTakeoverService } from './game-takeover.service';
 import { GamesService } from './games.service';
+import { TournamentStaffAccessService } from '../tournaments/staff/tournament-staff-access.service';
 
 /**
  * `listLeagueClaimableParticipants` (2026-08-25, claim 의 리그 확장) 의 계약 3개를
@@ -97,6 +98,7 @@ describe('GamesService.listLeagueClaimableParticipants', () => {
       prisma as unknown as PrismaService,
       {} as OperationAuditWriterService,
       {} as GameTakeoverService,
+      new TournamentStaffAccessService(prisma as unknown as PrismaService),
     );
     return { service, prisma };
   }

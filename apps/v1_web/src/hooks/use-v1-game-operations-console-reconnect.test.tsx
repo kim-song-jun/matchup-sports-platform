@@ -142,7 +142,6 @@ function createMockSocket() {
 }
 
 vi.mock('@/lib/api-client', () => ({
-  v1Get: vi.fn(async () => ({ items: [] })),
   v1Post: vi.fn(async () => ({})),
 }));
 
@@ -170,9 +169,10 @@ async function mountConsole() {
   const rendered = renderHook(
     () =>
       useV1GameOperationsConsole({
-        tournamentId: null,
         gameId: GAME_ID,
-        myUserId: 'user-1',
+          gameDetailGameId: GAME_ID,
+          gameDetailStatus: 'success',
+          realtimeAuthorization: { kind: 'unscoped', subjectVersion: 0 },
         initialLastSequence: SERVER_LAST_SEQUENCE,
       }),
     { wrapper: createWrapper(queryClient) },

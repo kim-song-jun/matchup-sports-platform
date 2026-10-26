@@ -6,6 +6,7 @@ import { canonicalGameCommandPayloadHash, GamesService } from '../../src/games/g
 import type { GameCommandContext, GameSourceCreationInput } from '../../src/games/games.types';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { TeamMatchLineupService } from '../../src/team-matches/team-match-lineup.service';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 /**
  * 팀매치 참석명단 저장에는 리그·친선 구분 없이 **참석 응답 게이트를 걸지 않는다.**
@@ -56,7 +57,7 @@ const ids = {
 } as const;
 
 const prisma = new PrismaService();
-const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 const service = new TeamMatchLineupService(prisma, new OperationAuditWriterService());
 
 const authUser = (id: string) => ({

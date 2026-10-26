@@ -20,6 +20,13 @@ export type GameSideKey = 'HOME' | 'AWAY';
 export type GamePeriodState = 'SCHEDULED' | 'LIVE' | 'HALFTIME' | 'ENDED';
 export type GameLineupState = 'DRAFT' | 'SUBMITTED' | 'LOCKED';
 
+/** Server-authored realtime scope from the authenticated game detail response. */
+export type GameRealtimeAuthorization =
+  | { kind: 'staff'; subjectVersion: number }
+  | { kind: 'platform_ops'; subjectVersion: 0 }
+  | { kind: 'unscoped'; subjectVersion: 0 }
+  | { kind: 'unavailable' };
+
 /**
  * The October minimum event set is GOAL/CARD/FOUL; SUBSTITUTION and the
  * PERIOD_START/PERIOD_END/PAUSE/RESUME lifecycle markers are recorded by
@@ -187,6 +194,7 @@ export interface GameDetail {
    * 운영 콘솔은 저장 코드(`GOLEIRO` 등)를 직접 노출하지 않고 이 사전의 `short`를 표시한다. */
   lineupConfig?: V1LineupConfig;
   actorRole: GameActorRole;
+  realtimeAuthorization: GameRealtimeAuthorization;
   substitutionPolicy: GameSubstitutionPolicy;
   /**
    * 승부차기 입력 단계(운영 콘솔) 추가 — `GamesService.isKnockoutFixture`를

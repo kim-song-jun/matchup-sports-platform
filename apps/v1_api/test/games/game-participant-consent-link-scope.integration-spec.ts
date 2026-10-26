@@ -4,6 +4,7 @@ import { GameTakeoverService } from '../../src/games/game-takeover.service';
 import { canonicalGameCommandPayloadHash, GamesService } from '../../src/games/games.service';
 import type { GameCommandContext, GameSourceCreationInput } from '../../src/games/games.types';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 /**
  * Task 14 원래 계약(위 커밋 이력 참고)은 "직전 스냅샷이 GRANTED여야만 철회
@@ -48,7 +49,7 @@ const ids = {
 } as const;
 
 const prisma = new PrismaService();
-const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 
 const authUser = (id: string) => ({
   id,

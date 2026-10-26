@@ -9,6 +9,7 @@ import type {
 } from '../../src/games/games.types';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { FOOTBALL_V1_CONFIG } from '../../src/tournaments/competition-config/competition-config.presets';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 /**
  * Issue #392 — `deriveTournamentRevision`'s `missingScorer` field (the
@@ -58,7 +59,7 @@ const ids = {
 } as const;
 
 const prisma = new PrismaService();
-const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 
 const authUser = (id: string) => ({
   id,

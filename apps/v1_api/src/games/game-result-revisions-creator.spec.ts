@@ -3,6 +3,7 @@ import type { OperationAuditWriterService } from '../common/audit/operation-audi
 import type { PrismaService } from '../prisma/prisma.service';
 import type { GameTakeoverService } from './game-takeover.service';
 import { GamesService } from './games.service';
+import { TournamentStaffAccessService } from '../tournaments/staff/tournament-staff-access.service';
 
 describe('GamesService.listResultRevisions — 리비전을 만든 사람 이름', () => {
   const ops = { id: 'ops-user', accountStatus: 'active' } as V1AuthUser;
@@ -58,6 +59,7 @@ describe('GamesService.listResultRevisions — 리비전을 만든 사람 이름
       prisma as unknown as PrismaService,
       {} as OperationAuditWriterService,
       {} as GameTakeoverService,
+      new TournamentStaffAccessService(prisma as unknown as PrismaService),
     );
   }
 

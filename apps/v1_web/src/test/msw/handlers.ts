@@ -619,6 +619,7 @@ let v1GameFixture = {
   lastSequence: 0,
   competitionConfigVersionId: 'competition-config-v1',
   currentOfficialRevisionId: null as string | null,
+  realtimeAuthorization: { kind: 'unscoped', subjectVersion: 0 } as const,
   sides: [
     { id: 'side-home-1', gameId: 'game-1', sideKey: 'HOME' as const, teamId: 'team-1', displayNameSnapshot: '성수 볼러즈' },
     { id: 'side-away-1', gameId: 'game-1', sideKey: 'AWAY' as const, teamId: 'team-2', displayNameSnapshot: '마포 FC' },

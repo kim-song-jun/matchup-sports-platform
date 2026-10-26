@@ -7,6 +7,7 @@ import { GamesService, canonicalGameCommandPayloadHash } from '../../src/games/g
 import { FOOTBALL_V1_CONFIG, FUTSAL_V1_CONFIG } from '../../src/tournaments/competition-config/competition-config.presets';
 import type { GameActorScope, GameCommandContext, GameSourceCreationInput } from '../../src/games/games.types';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 /**
  * Live-substitution addition — proves the wiring `assertEventReferences` →
@@ -42,7 +43,7 @@ const ids = {
 } as const;
 
 const prisma = new PrismaService();
-const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 
 const authUser = (id: string) => ({
   id,

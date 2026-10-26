@@ -40,24 +40,6 @@ export function coversFixture(
 }
 
 /**
- * 실시간 소켓 핸드셰이크가 제시할 배정 버전.
- *
- * `game.subscribe`/`game.takeover.request` 의 staleness 게이트가 이 값을 검사한다. 필드
- * 담당자는 대회 전역 스태프 목록을 읽을 수 없어 그쪽에서 읽으면 항상 0 이 되고, 그러면
- * 콘솔은 열리는데 이벤트가 하나도 들어오지 않는다(STAFF_SCOPE_DENIED). 본인 배정에서 읽는다.
- * 한 대회에 배정이 여럿이면 가장 높은 버전을 쓴다 — 게이트는 "제시값이 서버보다 낮으면 거부"라
- * 최댓값이 안전하다. 배정이 없으면(플랫폼 운영자 등) 0 을 돌려주고 게이트는 적용되지 않는다.
- */
-export function myAssignmentVersion(
-  response: V1MyTournamentStaffResponse | undefined,
-  tournamentId: string,
-): number {
-  const group = findMyTournamentGroup(response, tournamentId);
-  if (group === null) return 0;
-  return group.assignments.reduce((max, assignment) => Math.max(max, assignment.version), 0);
-}
-
-/**
  * 역할별 진입 목적지.
  *
  * 셸 역할(대회 디렉터·플랫폼 운영자)은 대회 전역 리소스를 읽을 수 있으므로 운영 보드로 간다.

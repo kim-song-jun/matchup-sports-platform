@@ -73,7 +73,6 @@ function createMockSocket() {
 }
 
 vi.mock('@/lib/api-client', () => ({
-  v1Get: vi.fn(async () => ({ items: [] })),
   v1Post: vi.fn(async () => ({})),
 }));
 
@@ -102,9 +101,10 @@ describe('useV1GameOperationsConsole — 최초 구독은 전체 이력을 받�
     const { result, unmount } = renderHook(
       () =>
         useV1GameOperationsConsole({
-          tournamentId: null,
           gameId: 'game-1',
-          myUserId: 'user-1',
+          gameDetailGameId: 'game-1',
+          gameDetailStatus: 'success',
+          realtimeAuthorization: { kind: 'unscoped', subjectVersion: 0 },
           // REST로 이미 lastSequence=5까지 안다고 알려주는 상황 — 이게 바로
           // 이전 버그를 유발하던 입력이다.
           initialLastSequence: 5,

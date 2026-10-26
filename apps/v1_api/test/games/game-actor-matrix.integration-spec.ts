@@ -15,6 +15,7 @@ import type {
 } from '../../src/games/games.types';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { submitFriendlyTeamMatchLineups } from '../helpers/submit-friendly-team-match-lineups';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 const ids = {
   platformOps: '77000000-0000-4000-8000-000000000001',
@@ -31,6 +32,7 @@ const ids = {
   revokedOperator: '77000000-0000-4000-8000-00000000000b',
   expiredOperator: '77000000-0000-4000-8000-00000000000c',
   staleSession: '77000000-0000-4000-8000-00000000000d',
+  multiAssignmentOperator: '77000000-0000-4000-8000-00000000000f',
   sport: '77000000-0000-4000-8000-000000000010',
   region: '77000000-0000-4000-8000-000000000011',
   hostTeam: '77000000-0000-4000-8000-000000000020',
@@ -50,7 +52,8 @@ const ids = {
 } as const;
 
 const prisma = new PrismaService();
-const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const staffAccess = new TournamentStaffAccessService(prisma);
+const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), staffAccess);
 
 const authUser = (id: string) => ({
   id,
@@ -173,6 +176,7 @@ describe('Task 7 six-persona Game actor matrix characterization PIN', () => {
       ids.revokedOperator,
       ids.expiredOperator,
       ids.staleSession,
+      ids.multiAssignmentOperator,
     ];
     await prisma.v1User.createMany({
       data: userIds.map((id, index) => ({
@@ -372,6 +376,36 @@ describe('Task 7 six-persona Game actor matrix characterization PIN', () => {
       });
     }
 
+    const multiAssignmentRows = [
+      {
+        id: '77000000-0000-4000-8000-000000000071',
+        version: 17,
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      },
+      {
+        id: '77000000-0000-4000-8000-000000000072',
+        version: 29,
+        createdAt: new Date('2026-02-01T00:00:00.000Z'),
+      },
+    ];
+    for (const assignment of multiAssignmentRows) {
+      await prisma.$transaction(async (tx) => {
+        const created = await tx.v1TournamentStaffAssignment.create({
+          data: {
+            ...assignment,
+            tournamentId: ids.tournament,
+            userId: ids.multiAssignmentOperator,
+            role: 'FIELD_OPERATOR',
+            fieldId: ids.field,
+            grantedByUserId: ids.director,
+          },
+        });
+        await tx.v1TournamentStaffFixtureScope.create({
+          data: { assignmentId: created.id, tournamentId: ids.tournament, teamMatchId: ids.fixture },
+        });
+      });
+    }
+
     await prisma.v1GameOperationFlag.upsert({
       where: { key: 'PUBLIC_LIVE' },
       create: { key: 'PUBLIC_LIVE', value: 'on', ownerActor: 'platform_ops' },
@@ -516,6 +550,11 @@ describe('Task 7 six-persona Game actor matrix characterization PIN', () => {
     for (const row of tournamentRows) {
       const read = await service.getGame(authUser(row.userId), tournamentGameId);
       expect(read.actorRole).toBe(row.actor);
+      if (row.actor === 'platform_ops') {
+        expect(read.realtimeAuthorization).toEqual({ kind: 'platform_ops', subjectVersion: 0 });
+      } else {
+        expect(read.realtimeAuthorization).toEqual({ kind: 'staff', subjectVersion: 0 });
+      }
       allowed += 1;
 
       const current = await prisma.v1Game.findUniqueOrThrow({ where: { id: tournamentGameId } });
@@ -558,6 +597,7 @@ describe('Task 7 six-persona Game actor matrix characterization PIN', () => {
 
     const teamRead = await service.getGame(authUser(ids.teamManager), teamGameId);
     expect(teamRead.actorRole).toBe('team_manager');
+    expect(teamRead.realtimeAuthorization).toEqual({ kind: 'unscoped', subjectVersion: 0 });
     allowed += 1;
     const teamMutation = await service.createResultRevision(
       authUser(ids.teamManager),
@@ -624,6 +664,7 @@ describe('Task 7 six-persona Game actor matrix characterization PIN', () => {
       ['stale-session', ids.staleSession],
     ] as const;
     for (const [probe, userId] of deniedUsers) {
+      expectForbidden(await captureFailure(() => service.getGame(authUser(userId), tournamentGameId)));
       const current = await prisma.v1Game.findUniqueOrThrow({ where: { id: tournamentGameId } });
       const eventId = `task7-probe-${probe}`;
       await expectDeniedWithoutWrite(tournamentGameId, () =>
@@ -680,6 +721,78 @@ describe('Task 7 six-persona Game actor matrix characterization PIN', () => {
           audit.fieldId === ids.field,
       ),
     ).toBe(true);
+  });
+
+  it('returns the same deterministically selected assignment version as canonical staff authorization', async () => {
+    const response = await service.getGame(authUser(ids.multiAssignmentOperator), tournamentGameId);
+    const principal = await staffAccess.assertAccess({
+      userId: ids.multiAssignmentOperator,
+      action: 'read',
+      resource: { tournamentId: ids.tournament, fixtureId: ids.fixture, fieldId: ids.field },
+    });
+
+    expect(response.realtimeAuthorization).toEqual({
+      kind: 'staff',
+      subjectVersion: principal.assignmentVersion,
+    });
+    expect(principal).toEqual(expect.objectContaining({
+      assignmentId: '77000000-0000-4000-8000-000000000071',
+      assignmentVersion: 17,
+    }));
+  });
+
+  it('does not block a concurrent revoke while read-only staff authorization stays in its transaction', async () => {
+    let signalAuthorizationComplete!: () => void;
+    let releaseTransaction!: () => void;
+    const authorizationComplete = new Promise<void>((resolve) => {
+      signalAuthorizationComplete = resolve;
+    });
+    const transactionMayFinish = new Promise<void>((resolve) => {
+      releaseTransaction = resolve;
+    });
+
+    const readTransaction = prisma.$transaction(async (tx) => {
+      const principal = await staffAccess.assertAccess(
+        {
+          userId: ids.multiAssignmentOperator,
+          action: 'read',
+          resource: { tournamentId: ids.tournament, fixtureId: ids.fixture, fieldId: ids.field },
+          expectedAssignmentVersion: 17,
+        },
+        tx,
+        { lockMode: 'read_only' },
+      ).finally(signalAuthorizationComplete);
+      expect(principal.assignmentVersion).toBe(17);
+      await transactionMayFinish;
+    });
+
+    await authorizationComplete;
+    try {
+      await prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SET LOCAL lock_timeout = '2s'`;
+        await tx.v1TournamentStaffAssignment.update({
+          where: { id: '77000000-0000-4000-8000-000000000071' },
+          data: { revokedAt: new Date(), version: { increment: 1 } },
+        });
+      });
+    } finally {
+      releaseTransaction();
+      await readTransaction;
+    }
+
+    await expect(
+      staffAccess.assertAccess({
+        userId: ids.multiAssignmentOperator,
+        action: 'read',
+        resource: { tournamentId: ids.tournament, fixtureId: ids.fixture, fieldId: ids.field },
+        expectedAssignmentVersion: 17,
+      }),
+    ).rejects.toMatchObject({
+      response: {
+        code: 'STAFF_SCOPE_DENIED',
+        details: { reason: 'STALE_ASSIGNMENT_VERSION' },
+      },
+    });
   });
 
   it('revalidates the current assignment before replaying a privileged command', async () => {

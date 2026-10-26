@@ -14,6 +14,7 @@ import type {
   GameCommandContext,
   GameSourceCreationInput,
 } from '../../src/games/games.types';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 // Task 16: host-only draft/submit authority, the matched-opponent precondition that replaces
 // the removed `/team-matches/:teamMatchId/complete` shortcut, and the atomic TeamMatch
@@ -45,7 +46,7 @@ const ids = {
 let sportId: string;
 
 const prisma = new PrismaService();
-const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 const authUser = (id: string) => ({
   id,
   email: `${id}@example.test`,

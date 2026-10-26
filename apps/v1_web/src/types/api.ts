@@ -2,7 +2,7 @@
 // 생기고 서버 계약이 바뀔 때 조용히 갈린다. (league-match.ts 는 이 파일을 import 하지
 // 않으므로 순환이 없다.)
 import type { V1LeagueFixture } from './league-match';
-import type { GamePeriodDuration } from './game-operations';
+import type { GamePeriodDuration, GameRealtimeAuthorization } from './game-operations';
 
 export type ApiEnvelope<T> = {
   status: 'success';
@@ -1662,6 +1662,7 @@ export type V1Game = {
   periodDurations?: readonly GamePeriodDuration[] | null;
   lineups: V1GameLineupSummary[];
   actorRole: string;
+  realtimeAuthorization: GameRealtimeAuthorization;
   lineupConfig?: V1LineupConfig;
 };
 

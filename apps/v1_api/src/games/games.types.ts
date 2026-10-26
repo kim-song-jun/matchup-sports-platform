@@ -24,6 +24,13 @@ export type GameActorRole =
   | 'field_operator'
   | 'support_readonly';
 
+/** Server-selected scope for the game-operations Socket.IO handshake. */
+export type GameRealtimeAuthorization =
+  | { readonly kind: 'staff'; readonly subjectVersion: number }
+  | { readonly kind: 'platform_ops'; readonly subjectVersion: 0 }
+  | { readonly kind: 'unscoped'; readonly subjectVersion: 0 }
+  | { readonly kind: 'unavailable' };
+
 export type GameActorScope =
   | {
       actorType: 'USER';

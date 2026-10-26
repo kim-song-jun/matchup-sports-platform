@@ -203,12 +203,15 @@ describe('OperateConsole — 서버가 확정하는 기간 시간 만료', () =>
 
   it('초기 소켓 구독 뒤 worker가 끝낸 최신 상세를 받으면 수동 종료도 그 버전으로 보내요', async () => {
     const held = fixture.delayNextRead(undefined, { captureAfterRelease: true });
+    // Seed the exact detail fixture so realtime has authoritative same-game
+    // authorization while its stale refetch remains delayed below.
+    queryClient.setQueryData(v1Keys.game('game-expiry'), fixture.gameDetail);
     render(consoleTree());
     await waitFor(async () => { await held.started; await fixture.subscribed; });
     expect(await screen.findByLabelText(/경과 시간/)).toBeInTheDocument();
     expect(await screen.findByText(/설정된 시간이 끝났어요/)).toBeInTheDocument();
-    // Keep the initial GET held while both recovery and expiry reads capture v5.
-    await waitFor(() => fixture.waitForReads(3));
+    // Keep the initial revalidation held while the expiry check captures v5.
+    await waitFor(() => fixture.waitForReads(2));
     fixture.endPeriod();
     await releaseRead(held);
     expect(await screen.findByText('정규 시간이 끝났어요. 기록을 확인한 뒤 ‘경기 종료’를 눌러주세요.')).toBeInTheDocument();

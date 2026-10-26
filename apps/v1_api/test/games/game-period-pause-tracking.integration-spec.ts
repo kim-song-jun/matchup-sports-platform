@@ -8,6 +8,7 @@ import type {
   GameSourceCreationInput,
 } from '../../src/games/games.types';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 /**
  * 경과 시간 일시정지 반영 (2026-08) — before this: `pause`/`resume` only ever
@@ -32,7 +33,7 @@ const ids = {
 } as const;
 
 const prisma = new PrismaService();
-const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 
 const authUser = (id: string) => ({
   id,

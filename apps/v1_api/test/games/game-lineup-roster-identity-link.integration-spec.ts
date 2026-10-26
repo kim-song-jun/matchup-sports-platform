@@ -4,6 +4,7 @@ import { GameTakeoverService } from '../../src/games/game-takeover.service';
 import { canonicalGameCommandPayloadHash, GamesService } from '../../src/games/games.service';
 import type { GameCommandContext, GameSourceCreationInput } from '../../src/games/games.types';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 /**
  * 대진 생성 시 참가 명단의 계정(`participants[].userId`)이 같은 트랜잭션에서 신원 연결
@@ -29,7 +30,7 @@ const ids = {
 } as const;
 
 const prisma = new PrismaService();
-const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 
 function creationContext(commandId: string, payload: unknown): GameCommandContext {
   return {

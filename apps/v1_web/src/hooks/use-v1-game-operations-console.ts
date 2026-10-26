@@ -1,8 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { v1Get, v1Post } from '@/lib/api-client';
+import { useQueryClient } from '@tanstack/react-query';
+import { v1Post } from '@/lib/api-client';
 import {
   assertQueueable,
   canAppendWhileSyncing,
@@ -35,11 +35,10 @@ import { randomUuid } from '@/lib/uuid';
 import { ACTIVITY_PROFILE_REQUIRED_CODE, notifyActivityProfileRequired } from '@/lib/activity-profile-required';
 import { reportClientError } from '@/lib/client-error-reporter';
 import { v1Keys } from '@/lib/query-keys';
-import type { V1MyTournamentStaffResponse } from '@/types/api';
-import { myAssignmentVersion } from '@/hooks/use-v1-my-staff-assignments';
 import type {
   AssignGoalAssistResult,
   GameEventRecord,
+  GameRealtimeAuthorization,
   GameEventType,
   GameState,
   GameTakeoverGrant,
@@ -167,32 +166,7 @@ function persistQueue(gameId: string, state: GameOperationsQueueState): boolean 
   }
 }
 
-/** Resolves the CURRENT actor's own tournament-staff assignment version, so
- * the socket handshake can present a value the gateway's `game.subscribe`
- * staleness gate will actually recognize as fresh (see that handler's own
- * doc comment in `RealtimeGateway`). `null` (no row found) is correct and
- * expected for a `platform_ops` admin-bypass actor -- the gateway only
- * enforces this check `when principal.assignmentVersion !== null`.
- *
- * 출처가 `GET /tournament-ops/tournaments/:id/staff`(대회 전역 목록)였는데, 그 라우트는
- * **필드 담당자에게 항상 403**이다(배정에 fixture/field 스코프가 붙어 대회 전역 read가
- * 거부된다). 그래서 정작 현장에서 콘솔을 쓰는 역할만 자기 배정 버전을 못 읽고 0을 제시해,
- * 버전이 0이 아닌 배정이면 소켓 구독·takeover가 STAFF_SCOPE_DENIED로 막혔다. 본인 스코프로
- * 닫힌 `GET /me/tournament-staff`로 바꾼다 — 모든 역할이 같은 경로로 자기 버전을
- * 읽고, 어드민 우회(platform_ops)는 배정 행이 없어 종전대로 null이 된다. */
-function useMyTournamentStaffAssignmentVersion(tournamentId: string | null, myUserId: string | undefined) {
-  return useQuery({
-    queryKey: v1Keys.myTournamentOpsAssignments(),
-    queryFn: () => v1Get<V1MyTournamentStaffResponse>('/me/tournament-staff'),
-    // 팀매치(tournamentId===null)는 스태프 배정 개념이 없다 — 쿼리 자체를 스킵하고
-    // 아래 효과가 항상 0을 기록/전송하게 둔다(그래도 self-consistency 체크는 통과한다).
-    enabled: Boolean(tournamentId) && Boolean(myUserId),
-    staleTime: 15_000,
-    // 한 대회에 배정이 여러 건이면 가장 높은 버전을 쓴다 — 게이트는 "제시값이 서버보다
-    // 낮으면 거부"라 최댓값이 안전하다. 배정이 없으면 0(게이트 미적용).
-    select: (data) => (tournamentId === null ? 0 : myAssignmentVersion(data, tournamentId)),
-  });
-}
+const REALTIME_AUTHORIZATION_ERROR_MESSAGE = '이 경기의 실시간 권한을 확인하지 못했어요. 새로고침 후 다시 시도해주세요.';
 
 export type GameOperationsConnectionStatus = 'connecting' | 'connected' | 'disconnected';
 
@@ -210,12 +184,11 @@ export interface SubmitEventInput {
 export interface UseV1GameOperationsConsoleOptions {
   /** Read-only staff may subscribe and receive live updates, but never acquire a write lease. */
   readonly takeoverEnabled?: boolean;
-  // T3 추가: 팀매치는 tournamentId/스태프 배정 개념이 없다 — null이면 아래
-  // useMyTournamentStaffAssignmentVersion 쿼리가 스킵되고 버전은 항상 0으로
-  // 고정된다(팀매치는 배정 handshake가 필요 없어 언제나 self-consistent하다).
-  readonly tournamentId: string | null;
+  /** The authenticated detail must match the route game before realtime starts. */
+  readonly gameDetailGameId: string | null;
+  readonly gameDetailStatus: 'pending' | 'success' | 'error';
+  readonly realtimeAuthorization: GameRealtimeAuthorization | null;
   readonly gameId: string | null;
-  readonly myUserId: string | undefined;
   /**
    * 페이지가 REST로 미리 읽어온(`useV1Game`) `gameDetail.data.lastSequence`.
    * **이 값은 소켓 최초 구독의 `afterSequence`로 쓰이면 안 된다** — 이전엔
@@ -297,7 +270,14 @@ export interface UseV1GameOperationsConsoleResult {
 export function useV1GameOperationsConsole(
   options: UseV1GameOperationsConsoleOptions,
 ): UseV1GameOperationsConsoleResult {
-  const { tournamentId, gameId, myUserId, initialLastSequence, takeoverEnabled = true } = options;
+  const {
+    gameId,
+    initialLastSequence,
+    takeoverEnabled = true,
+    gameDetailGameId,
+    gameDetailStatus,
+    realtimeAuthorization,
+  } = options;
   const queryClient = useQueryClient();
 
   const [connectionStatus, setConnectionStatus] = useState<GameOperationsConnectionStatus>('connecting');
@@ -330,10 +310,24 @@ export function useV1GameOperationsConsole(
   const takeoverScopeGameIdRef = useRef(gameId);
   const heldTakeoverGameIdRef = useRef<string | null>(null);
   const takeoverRequestGenerationRef = useRef(0);
-
   const clockOffsetMs = useMemo(() => medianOffsetMs(clockSamples), [clockSamples]);
 
-  const myAssignment = useMyTournamentStaffAssignmentVersion(tournamentId, myUserId);
+  const realtimeAuthorizationReady =
+    Boolean(gameId) &&
+    gameDetailStatus === 'success' &&
+    gameDetailGameId === gameId &&
+    realtimeAuthorization !== null &&
+    realtimeAuthorization.kind !== 'unavailable';
+  const realtimeAuthorizationVersion =
+    realtimeAuthorizationReady && realtimeAuthorization !== null
+      ? realtimeAuthorization.subjectVersion
+      : null;
+  const realtimeAuthorizationKey =
+    realtimeAuthorizationVersion === null || realtimeAuthorization === null
+      ? null
+      : `${gameId}:${realtimeAuthorization.kind}:${realtimeAuthorizationVersion}`;
+  const previousRealtimeAuthorizationKeyRef = useRef<string | null>(null);
+
   const clientInstanceIdRef = useRef<string | null>(null);
   // 언마운트 후 SEND_ACK_TIMEOUT_MS 타이머가 뒤늦게 발화해 dispatch하는 것을
   // 막는다 — 화면을 떠난 뒤의 상태 갱신은 의미가 없다.
@@ -345,6 +339,18 @@ export function useV1GameOperationsConsole(
       takeoverRequestGenerationRef.current += 1;
     };
   }, []);
+
+  useEffect(() => {
+    if (previousRealtimeAuthorizationKeyRef.current === realtimeAuthorizationKey) return;
+    if (previousRealtimeAuthorizationKeyRef.current !== null) {
+      takeoverRequestGenerationRef.current += 1;
+      heldTakeoverGameIdRef.current = null;
+      takeoverStatusRef.current = 'none';
+      takeoverTokenRef.current = null;
+      dispatchTakeover({ type: 'RESET' });
+    }
+    previousRealtimeAuthorizationKeyRef.current = realtimeAuthorizationKey;
+  }, [realtimeAuthorizationKey]);
 
   useEffect(() => {
     if (takeoverScopeGameIdRef.current === gameId) return;
@@ -410,28 +416,37 @@ export function useV1GameOperationsConsole(
   const resyncEventsRef = useRef<(() => void) | null>(null);
 
   // ── Handshake authorization-subject version ────────────────────────────────
+  // Game state belongs to the route identity, not to whether the next game's
+  // socket authorization has loaded. Clear it on every game transition before
+  // the authorization gate below can return early.
   useEffect(() => {
-    setGameOperationsAuthorizationSubjectVersion(myAssignment.data ?? 0);
-  }, [myAssignment.data]);
-
-  // ── Socket lifecycle: connect, subscribe, listen ───────────────────────────
-  useEffect(() => {
-    if (!gameId) return undefined;
-
-    const socket = getV1GameOperationsSocket();
-    let cancelled = false;
-    const isCurrentGame = () => !cancelled && isMountedRef.current && activeGameIdRef.current === gameId;
-    // 새 경기의 구독을 시작하는 지점이다 — 이전 경기에서 올려 둔 시퀀스를 그대로
-    // 들고 가면, 이벤트가 적은 경기로 옮겼을 때 그 경기의 초기 시퀀스가
-    // "이미 아는 값"으로 보여 아래 중복 판정이 정상 브로드캐스트를 버린다.
-    // Versions belong to one game. Until its first authoritative snapshot arrives,
-    // do not show or compare against the previous game's snapshot/timeline.
     setGameSnapshot(null);
     setLiveEvents([]);
     receivedSequenceRef.current = 0;
     confirmedSequenceRef.current = 0;
     acceptedVersionRef.current = 0;
+  }, [gameId]);
 
+  useEffect(() => {
+    if (realtimeAuthorizationVersion !== null) {
+      setGameOperationsAuthorizationSubjectVersion(realtimeAuthorizationVersion);
+      setBannerMessage((current) => current === REALTIME_AUTHORIZATION_ERROR_MESSAGE ? null : current);
+      return;
+    }
+    if (!gameId) return;
+    setConnectionStatus(gameDetailStatus === 'pending' ? 'connecting' : 'disconnected');
+    if (gameDetailStatus === 'error' || (gameDetailStatus === 'success' && (gameDetailGameId !== gameId || realtimeAuthorization?.kind === 'unavailable' || realtimeAuthorization === null))) {
+      setBannerMessage(REALTIME_AUTHORIZATION_ERROR_MESSAGE);
+    }
+  }, [gameDetailGameId, gameDetailStatus, gameId, realtimeAuthorization, realtimeAuthorizationVersion]);
+
+  // ── Socket lifecycle: connect, subscribe, listen ───────────────────────────
+  useEffect(() => {
+    if (!gameId || realtimeAuthorizationVersion === null) return undefined;
+
+    const socket = getV1GameOperationsSocket();
+    let cancelled = false;
+    const isCurrentGame = () => !cancelled && isMountedRef.current && activeGameIdRef.current === gameId;
     type GameSubscriptionSnapshot = { readonly gameId: string; readonly version: number; readonly state: GameState; readonly lastSequence: number; readonly events: readonly GameEventRecord[] };
     type SubscribeAck = {
       status: string;
@@ -442,8 +457,8 @@ export function useV1GameOperationsConsole(
     let bootstrapResyncVersion = -1;
     const receivedEventVersions = new Map<number, number>();
 
-    // This effect intentionally depends only on `[gameId]` (resubscribing on
-    // every sync/queue change would thrash the connection), so every handler
+    // This effect resubscribes when the game or confirmed authorization version
+    // changes, not on every sync/queue update, so every handler
     // below reads the LATEST received sequence through `receivedSequenceRef`
     // instead of closing over the `sync` state value from whichever render
     // created this effect — a stale closure here would judge contiguity
@@ -748,11 +763,11 @@ export function useV1GameOperationsConsole(
       socket.off('game.permission.revoked', onPermissionRevoked);
       socket.off('game.error', onGameError);
     };
-  }, [gameId]);
+  }, [gameId, realtimeAuthorizationVersion]);
 
   // ── Clock sync ping/pong ────────────────────────────────────────────────────
   useEffect(() => {
-    if (!gameId) return undefined;
+    if (!gameId || !realtimeAuthorizationReady) return undefined;
     const socket = getV1GameOperationsSocket();
     const ping = () => {
       const clientSentAt = Date.now();
@@ -775,12 +790,12 @@ export function useV1GameOperationsConsole(
     ping();
     const interval = setInterval(ping, CLOCK_PING_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [gameId]);
+  }, [gameId, realtimeAuthorizationReady, realtimeAuthorizationVersion]);
 
   // ── Takeover: request once, renew on a timer, expire on a timer ────────────
   const requestTakeover = useCallback((options?: { readonly force?: boolean }) => {
     if (!isMountedRef.current || !takeoverEnabledRef.current || activeGameIdRef.current !== gameId) return;
-    if (!gameId || (myAssignment.data === undefined && myAssignment.isLoading)) return;
+    if (!gameId || realtimeAuthorizationVersion === null || !realtimeAuthorizationReady) return;
     const socket = getV1GameOperationsSocket();
     clientInstanceIdRef.current = clientInstanceIdRef.current ?? randomUuid();
     const requestGeneration = ++takeoverRequestGenerationRef.current;
@@ -792,7 +807,7 @@ export function useV1GameOperationsConsole(
       'game.takeover.request',
       {
         gameId,
-        authorizationSubjectVersion: myAssignment.data ?? 0,
+        authorizationSubjectVersion: realtimeAuthorizationVersion,
         clientInstanceId: clientInstanceIdRef.current,
         lastSequence: sync.lastSequence,
         // 자동 요청은 force 를 싣지 않는다 — 다른 사람이 운영 중이면 서버가 TAKEOVER_HELD 로 거절하고 콘솔은 보기 모드로 남는다.
@@ -822,11 +837,11 @@ export function useV1GameOperationsConsole(
           type: 'GRANTED',
           token: result.takeoverToken,
           expiresAtMs: new Date(result.expiresAt).getTime(),
-          assignmentVersion: myAssignment.data ?? 0,
+          assignmentVersion: realtimeAuthorizationVersion,
         });
       },
     );
-  }, [gameId, myAssignment.data, myAssignment.isLoading, sync.lastSequence, takeoverEnabled]);
+  }, [gameId, realtimeAuthorizationReady, realtimeAuthorizationVersion, sync.lastSequence, takeoverEnabled]);
 
   useEffect(() => {
     if (!takeoverEnabled && takeover.status !== 'none') {
@@ -835,11 +850,11 @@ export function useV1GameOperationsConsole(
   }, [takeoverEnabled, takeover.status]);
 
   useEffect(() => {
-    if (takeoverEnabled && takeover.status === 'none') requestTakeover();
-  }, [takeover.status, requestTakeover, takeoverEnabled]);
+    if (realtimeAuthorizationReady && connectionStatus === 'connected' && takeoverEnabled && takeover.status === 'none') requestTakeover();
+  }, [connectionStatus, realtimeAuthorizationReady, takeover.status, requestTakeover, takeoverEnabled]);
 
   useEffect(() => {
-    if (!takeoverEnabled || takeover.status !== 'held' || heldTakeoverGameIdRef.current !== gameId) return undefined;
+    if (!realtimeAuthorizationReady || !takeoverEnabled || takeover.status !== 'held' || heldTakeoverGameIdRef.current !== gameId) return undefined;
     const requestGeneration = takeoverRequestGenerationRef.current;
     const interval = setInterval(() => {
       if (!isMountedRef.current || activeGameIdRef.current !== gameId || heldTakeoverGameIdRef.current !== gameId || takeoverRequestGenerationRef.current !== requestGeneration) return;
@@ -882,7 +897,7 @@ export function useV1GameOperationsConsole(
     }, TAKEOVER_RENEW_INTERVAL_MS);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [takeover.status, takeover.status === 'held' ? takeover.token : null, gameId, takeoverEnabled]);
+  }, [realtimeAuthorizationReady, takeover.status, takeover.status === 'held' ? takeover.token : null, gameId, takeoverEnabled]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -928,7 +943,7 @@ export function useV1GameOperationsConsole(
   const sendQueuedItem = useCallback(
     (item: QueuedGameEvent) => {
       // A restored queue must wait for this game's first authoritative version.
-      if (!isMountedRef.current || !takeoverEnabledRef.current || !gameId || activeGameIdRef.current !== gameId || heldTakeoverGameIdRef.current !== gameId || item.gameId !== gameId || !gameSnapshot || !isTakeoverHeld(takeover) || !canAppendWhileSyncing(sync)) return;
+      if (!realtimeAuthorizationReady || !isMountedRef.current || !takeoverEnabledRef.current || !gameId || activeGameIdRef.current !== gameId || heldTakeoverGameIdRef.current !== gameId || item.gameId !== gameId || !gameSnapshot || !isTakeoverHeld(takeover) || !canAppendWhileSyncing(sync)) return;
       if (Date.now() >= takeover.expiresAtMs) return; // CHECK_EXPIRY's poll will flip status to 'expired' shortly; do not send meanwhile.
       const socket = getV1GameOperationsSocket();
       dispatchQueue({ type: 'MARK_SENDING', clientEventId: item.clientEventId });
@@ -1056,12 +1071,13 @@ export function useV1GameOperationsConsole(
         );
       }
     },
-    [gameId, takeover, sync, queryClient, gameSnapshot, clockOffsetMs, advanceGameVersion],
+    [gameId, realtimeAuthorizationReady, takeover, sync, queryClient, gameSnapshot, clockOffsetMs, advanceGameVersion],
   );
 
   useEffect(() => {
     if (
       connectionStatus !== 'connected' ||
+      !realtimeAuthorizationReady ||
       !takeoverEnabled ||
       !isTakeoverHeld(takeover) ||
       Date.now() >= takeover.expiresAtMs ||
@@ -1071,11 +1087,11 @@ export function useV1GameOperationsConsole(
     }
     const next = nextQueuedItem(queue);
     if (next) sendQueuedItem(next);
-  }, [connectionStatus, takeoverEnabled, takeover, sync, queue, sendQueuedItem]);
+  }, [connectionStatus, realtimeAuthorizationReady, takeoverEnabled, takeover, sync, queue, sendQueuedItem]);
 
   const submitEvent = useCallback(
     async (input: SubmitEventInput): Promise<string | null> => {
-      if (!takeoverEnabledRef.current || !gameSnapshot) return null;
+      if (!realtimeAuthorizationReady || !takeoverEnabledRef.current || !gameSnapshot) return null;
       // D-10 (frozen decision table): this is the ONLY thing that may ever
       // enter the durable offline queue. Asserting it here — even though
       // every current caller already only constructs an append_event —
@@ -1202,7 +1218,7 @@ export function useV1GameOperationsConsole(
       // when its GamesController broadcast was missed during reconnect.
       resyncEventsRef.current?.();
     },
-    [gameId, gameSnapshot, takeover, queryClient, advanceGameVersion],
+    [gameId, realtimeAuthorizationReady, gameSnapshot, takeover, queryClient, advanceGameVersion],
   );
 
   // 이슈 #376 — 큐를 거치지 않는 온라인 전용 REST 호출(reverseEvent와 동일한 이유,
@@ -1242,7 +1258,7 @@ export function useV1GameOperationsConsole(
       // broadcast와 함께 in-place assist 변경을 확실히 반영한다.
       resyncEventsRef.current?.();
     },
-    [gameId, gameSnapshot, takeover, queryClient, advanceGameVersion],
+    [gameId, realtimeAuthorizationReady, gameSnapshot, takeover, queryClient, advanceGameVersion],
   );
 
   // UX 감사 — REST 커맨드(start/pause/resume/end/end-period/start-period/

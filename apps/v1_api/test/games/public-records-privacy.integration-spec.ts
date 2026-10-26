@@ -296,6 +296,7 @@ describe('Task 24 public tournament schedule/match and team/player record projec
     // -- status_only, driven straight to an OFFICIAL 1-0 --
     gameStatusOnlyId = await buildGame(ids.fixtureStatusOnly, [
       { sourceParticipantId: `status-home-${ids.fixtureStatusOnly}`, sideKey: V1GameSideKey.HOME, displayNameSnapshot: 'Status Only Home Player' },
+      { sourceParticipantId: `status-away-${ids.fixtureStatusOnly}`, sideKey: V1GameSideKey.AWAY, displayNameSnapshot: 'Status Only Away Player' },
     ]);
     await prisma.v1GameVisibilityPolicy.update({ where: { gameId: gameStatusOnlyId }, data: { mode: 'STATUS_ONLY' } });
     await driveToOfficial(gameStatusOnlyId, []);
@@ -309,6 +310,7 @@ describe('Task 24 public tournament schedule/match and team/player record projec
       { sourceParticipantId: `main-consented-${ids.fixtureMain}`, sideKey: V1GameSideKey.HOME, displayNameSnapshot: 'Consented Scorer' },
       { sourceParticipantId: `main-revoked-${ids.fixtureMain}`, sideKey: V1GameSideKey.HOME, displayNameSnapshot: 'Revoked Scorer' },
       { sourceParticipantId: `main-guest-${ids.fixtureMain}`, sideKey: V1GameSideKey.HOME, displayNameSnapshot: 'Guest Scorer' },
+      { sourceParticipantId: `main-away-${ids.fixtureMain}`, sideKey: V1GameSideKey.AWAY, displayNameSnapshot: 'Main Away Player' },
     ]);
     const homeSide = await prisma.v1GameSide.findFirstOrThrow({ where: { gameId: gameMainId, sideKey: V1GameSideKey.HOME } });
     homeSideId = homeSide.id;

@@ -330,6 +330,7 @@ describe('deriveTournamentRevision — excludes reversed goals/assists from the 
         { sourceParticipantId: 'derive-assist-a', sideKey: V1GameSideKey.HOME, displayNameSnapshot: 'Assist A' },
         { sourceParticipantId: 'derive-scorer-b', sideKey: V1GameSideKey.HOME, displayNameSnapshot: 'Scorer B' },
         { sourceParticipantId: 'derive-assist-b', sideKey: V1GameSideKey.HOME, displayNameSnapshot: 'Assist B' },
+        { sourceParticipantId: 'derive-away-player', sideKey: V1GameSideKey.AWAY, displayNameSnapshot: 'Derive Away Player' },
       ],
     };
     const actor: GameActorScope = { actorType: 'USER', actorUserId: ids.operator, role: 'field_operator', tournamentId: ids.tournament, fixtureId: ids.fixtureB };
@@ -437,6 +438,7 @@ describe('assignGoalAssist supersedes a SUBMITTED revision with an assist-synced
         { sourceParticipantId: 'sync-assistant-1', sideKey: V1GameSideKey.HOME, displayNameSnapshot: 'Sync Assistant 1' },
         { sourceParticipantId: 'sync-scorer-b', sideKey: V1GameSideKey.HOME, displayNameSnapshot: 'Sync Scorer B' },
         { sourceParticipantId: 'sync-assistant-b', sideKey: V1GameSideKey.HOME, displayNameSnapshot: 'Sync Assistant B' },
+        { sourceParticipantId: 'sync-away-player', sideKey: V1GameSideKey.AWAY, displayNameSnapshot: 'Sync Away Player' },
       ],
     };
     const actor: GameActorScope = { actorType: 'USER', actorUserId: ids.operator, role: 'field_operator', tournamentId: ids.tournament, fixtureId: ids.fixtureC };
@@ -659,6 +661,7 @@ describe('officializeResultRevision refuses a SUBMITTED revision that ASSIST_SYN
       participants: [
         { sourceParticipantId: 'stale-scorer', sideKey: V1GameSideKey.HOME, displayNameSnapshot: 'Stale Scorer' },
         { sourceParticipantId: 'stale-assistant-1', sideKey: V1GameSideKey.HOME, displayNameSnapshot: 'Stale Assistant 1' },
+        { sourceParticipantId: 'stale-away-player', sideKey: V1GameSideKey.AWAY, displayNameSnapshot: 'Stale Away Player' },
       ],
     };
     const actor: GameActorScope = { actorType: 'USER', actorUserId: ids.operator, role: 'field_operator', tournamentId: ids.tournament, fixtureId: ids.fixtureE };
@@ -786,6 +789,7 @@ describe('assignGoalAssist rejects when the game already has an OFFICIAL revisio
       participants: [
         { sourceParticipantId: 'official-block-scorer', sideKey: V1GameSideKey.HOME, displayNameSnapshot: 'Official Block Scorer' },
         { sourceParticipantId: 'official-block-assistant', sideKey: V1GameSideKey.HOME, displayNameSnapshot: 'Official Block Assistant' },
+        { sourceParticipantId: 'official-block-away-player', sideKey: V1GameSideKey.AWAY, displayNameSnapshot: 'Official Block Away Player' },
       ],
     };
     const actor: GameActorScope = { actorType: 'USER', actorUserId: ids.operator, role: 'field_operator', tournamentId: ids.tournament, fixtureId: ids.fixtureD };

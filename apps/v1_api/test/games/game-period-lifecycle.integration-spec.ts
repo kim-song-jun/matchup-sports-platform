@@ -163,6 +163,7 @@ describe('T1-0 period lifecycle — start/next_period/end drive V1GamePeriod, no
       ],
       participants: [
         { sourceParticipantId: 't1-0-home-player-1', sideKey: V1GameSideKey.HOME, displayNameSnapshot: 'T1-0 Scorer' },
+        { sourceParticipantId: 't1-0-away-player-1', sideKey: V1GameSideKey.AWAY, displayNameSnapshot: 'T1-0 Opponent Player' },
       ],
     };
     const actor: GameActorScope = {

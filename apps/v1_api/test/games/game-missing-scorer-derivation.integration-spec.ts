@@ -172,6 +172,7 @@ describe('deriveTournamentRevision — missingScorer excludes reversed goals (is
       ],
       participants: [
         { sourceParticipantId: 'reversed-case-scorer', sideKey: V1GameSideKey.HOME, displayNameSnapshot: 'Valid Scorer' },
+        { sourceParticipantId: 'reversed-case-away-player', sideKey: V1GameSideKey.AWAY, displayNameSnapshot: 'Missing Scorer Away Player' },
       ],
     };
     const actor: GameActorScope = {
@@ -257,6 +258,7 @@ describe('deriveTournamentRevision — missingScorer stays true for an un-revers
       ],
       participants: [
         { sourceParticipantId: 'remains-case-scorer', sideKey: V1GameSideKey.HOME, displayNameSnapshot: 'Valid Scorer 2' },
+        { sourceParticipantId: 'remains-case-away-player', sideKey: V1GameSideKey.AWAY, displayNameSnapshot: 'Missing Scorer Away Player 2' },
       ],
     };
     const actor: GameActorScope = {

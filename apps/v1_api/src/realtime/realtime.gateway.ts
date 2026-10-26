@@ -1873,6 +1873,31 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
         promoted = true;
         if (!(await this.joinAuthorizedGameRoom(client, expiredLease.gameId, rejoinGeneration))) return;
         const backfill = await this.gamesService.listEvents(client.data.authUser!, expiredLease.gameId, 0);
+        const room = gameRoom(expiredLease.gameId);
+        const roomKey = this.roomTransitionKey(client.id, expiredLease.gameId);
+        if (this.pendingGameSnapshotAcks.get(roomKey) !== pendingSnapshotAck ||
+          !this.isSocketLive(client) || !client.rooms.has(room) ||
+          !this.isRoomGenerationCurrent(client.id, expiredLease.gameId, rejoinGeneration) ||
+          this.staffRoomOwners.get(roomKey) !== rejoinGeneration) return;
+        const failedRefreshMinimumVersion = pendingSnapshotAck.failedRefreshMinimumVersion;
+        const availableSnapshotVersion = Math.max(
+          backfill.version,
+          pendingSnapshotAck.snapshot?.version ?? -1,
+        );
+        if (failedRefreshMinimumVersion !== undefined && availableSnapshotVersion < failedRefreshMinimumVersion) {
+          this.logger.error(
+            {
+              socketId: client.id,
+              gameId: expiredLease.gameId,
+              requiredVersion: failedRefreshMinimumVersion,
+              actualVersion: availableSnapshotVersion,
+            },
+            'Expired staff lease rejoin snapshot is behind a failed committed refresh',
+          );
+          this.emitProtocolError(client, { code: 'INTERNAL_ERROR' }, { gameId: expiredLease.gameId });
+          this.disconnectGameSubscriberForRecovery(client, expiredLease.gameId, failedRefreshMinimumVersion);
+          return;
+        }
         if (!this.activateStaffLease(client.id, expiredLease.gameId, rejoinGeneration)) {
           const cancelled = this.cancelAuthorizedLeaseIfGeneration(client.id, expiredLease.gameId, rejoinGeneration);
           if (cancelled) await this.leaveAuthorizedGameRoom(client, expiredLease.gameId, rejoinGeneration);

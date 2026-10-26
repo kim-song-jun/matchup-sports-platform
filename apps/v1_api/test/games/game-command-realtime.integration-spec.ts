@@ -601,9 +601,11 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
           gameId,
           version: goalVersion,
           sequence: goalSequence,
-          type: 'GOAL',
-          sideId: homeSideId,
-          participantId: homeParticipantId,
+          event: expect.objectContaining({
+            type: 'GOAL',
+            sideId: homeSideId,
+            participantId: homeParticipantId,
+          }),
         } });
         initialReadGate.release();
         const observerAck = await observerSubscribe;
@@ -618,9 +620,11 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
           gameId,
           version: goalVersion,
           sequence: goalSequence,
-          type: 'GOAL',
-          sideId: homeSideId,
-          participantId: homeParticipantId,
+          event: expect.objectContaining({
+            type: 'GOAL',
+            sideId: homeSideId,
+            participantId: homeParticipantId,
+          }),
         } });
         const committedGoalSnapshot = deliveredSnapshots.find((snapshot) => snapshot.version === goalVersion);
         expect(committedGoalSnapshot).toMatchObject({

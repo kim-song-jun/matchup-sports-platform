@@ -22,7 +22,7 @@
 
 - `/game-operations` namespace의 `game:<gameId>` room에 속한 socket ID만 순회하고, 추적 중인 소켓의 신원·room 참여·구독 세대를 확인해요. 미전달 committed event 수는 추가·전달·삭제 때 증분 집계해요. 기존 socket/game당 128개·socket 전체 512개 한도를 유지해요. 경기별 정리는 socket/game key로 바로 찾고, 소켓 전체 정리는 해당 소켓의 queue-key 인덱스를 사용해요.
 - Lifecycle snapshot 갱신은 socket/game/generation마다 하나의 작업으로 병합해요. 대기 중에도 가장 높은 요청 version floor를 유지하며, 전체 최대 4개·경기당 최대 2개의 갱신 작업을 공정하게 실행해요. 승인된 수신자는 버리지 않고, 구독 가능한 소켓 수나 권한 정책을 바꾸지 않아요. 시작 전에 취소된 작업은 DB를 읽지 않고 끝나요. 진행 중인 작업은 실제 갱신 promise가 성공하거나 실패로 끝난 뒤에만 실행 자리를 반환해요. 서버 종료 때는 대기 작업을 취소하고 진행 중인 작업은 실제 완료 후 `finally`에서 자리를 반환해요. 개별 DB 요청의 외부 timeout은 이 한도로 보장하지 않아요.
-- Pending 구독 중 갱신이 실패해도 이미 확정된 명령의 최소 버전은 해당 ACK record와 세대에 숫자로 보존해요. 초기 결과와 같은 세대의 최신 snapshot 모두 이 버전에 못 미치면 오래된 snapshot이나 성공 ACK를 보내지 않고 기존 내부 오류·transport 재연결 경로로 복구해요. 이미 버전을 충족하는 결과는 정상 응답하고, 이전 세대의 실패로 새 구독을 변경하지 않아요.
+- Pending 구독 또는 권한 만료 뒤 자동 재가입 중 갱신이 실패해도 이미 확정된 명령의 최소 버전은 해당 ACK record와 세대에 숫자로 보존해요. 초기 결과와 같은 세대의 최신 snapshot 모두 이 버전에 못 미치면 오래된 snapshot이나 성공 ACK를 보내지 않고 기존 내부 오류·transport 재연결 경로로 복구해요. 이미 버전을 충족하는 결과는 정상 응답하고, 이전 세대의 실패로 새 구독을 변경하지 않아요.
 
 <!-- API_CONTRACT_SECTION_END:Frozen realtime contract -->
 

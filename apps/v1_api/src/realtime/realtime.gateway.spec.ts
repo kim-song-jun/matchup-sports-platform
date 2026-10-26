@@ -946,6 +946,140 @@ describe('RealtimeGateway', () => {
       }
     });
 
+    it.each([
+      [4, false],
+      [9, true],
+    ] as const)(
+      'checks the failed refresh floor before an expired-lease rejoin snapshot (version %i; satisfies floor: %s)',
+      async (rejoinVersion, satisfiesFloor) => {
+        jest.useFakeTimers();
+        try {
+          const socket = await connectAuthenticatedSocket();
+          const expiresAt = new Date(Date.now() + 1_000);
+          const renewedExpiresAt = new Date(Date.now() + 60_000);
+          prisma.v1Game.findUnique.mockResolvedValue(gameScopeRecord(GAME_SCOPE));
+          staffAccess.assertAccess
+            .mockResolvedValueOnce(staffPrincipal(GAME_SCOPE, expiresAt))
+            .mockResolvedValueOnce(staffPrincipal(GAME_SCOPE, expiresAt))
+            .mockResolvedValueOnce(staffPrincipal(GAME_SCOPE, renewedExpiresAt));
+          await task8Gateway().subscribeToGame(socket, { gameId: GAME_SCOPE.gameId, afterSequence: 0 });
+
+          const snapshotsBeforeRejoin = socket.emit.mock.calls.filter(([event]) => event === 'game.snapshot').length;
+          const leases = Reflect.get(gateway, 'staffLeases') as Map<string, Map<string, { expiresAt: Date | null }>>;
+          const lease = leases.get(socket.id)?.get(GAME_SCOPE.gameId);
+          expect(lease).toBeDefined();
+          jest.setSystemTime(expiresAt.getTime() + 1);
+
+          const rejoinBackfill = deferred<{ version: number; state: string; events: unknown[]; lastSequence: number }>();
+          const rejoinBackfillEntered = deferred<void>();
+          gamesService.listEvents.mockImplementationOnce(() => {
+            rejoinBackfillEntered.resolve();
+            return rejoinBackfill.promise;
+          });
+          const rejoining = Reflect.apply(Reflect.get(gateway, 'expireStaffLease'), gateway, [socket, lease]) as Promise<void>;
+          await rejoinBackfillEntered.promise;
+
+          prisma.v1Game.findUnique.mockRejectedValueOnce(new Error('committed refresh metadata lookup failed'));
+          const refresh = Reflect.apply(Reflect.get(gateway, 'requestSocketGameRefresh'), gateway, [
+            socket,
+            GAME_SCOPE.gameId,
+            9,
+          ]) as Promise<void>;
+          const refreshOutcome = refresh.then(() => null, (error: unknown) => error);
+          await expect(refreshOutcome).resolves.toBeInstanceOf(Error);
+
+          const pendingAcks = Reflect.get(gateway, 'pendingGameSnapshotAcks') as Map<string, {
+            generation: number;
+            failedRefreshMinimumVersion?: number;
+          }>;
+          expect(pendingAcks.get(`${socket.id}:${GAME_SCOPE.gameId}`)?.failedRefreshMinimumVersion).toBe(9);
+
+          rejoinBackfill.resolve({ version: rejoinVersion, state: 'LIVE', events: [], lastSequence: 0 });
+          await rejoining;
+
+          const snapshotCountAfterRejoin = socket.emit.mock.calls.filter(([event]) => event === 'game.snapshot').length;
+          if (satisfiesFloor) {
+            expect(snapshotCountAfterRejoin).toBe(snapshotsBeforeRejoin + 1);
+            expect(socket.client.conn.close).not.toHaveBeenCalled();
+          } else {
+            expect(snapshotCountAfterRejoin).toBe(snapshotsBeforeRejoin);
+            expect(socket.client.conn.close).toHaveBeenCalled();
+          }
+          expect(pendingAcks.has(`${socket.id}:${GAME_SCOPE.gameId}`)).toBe(false);
+        } finally {
+          jest.useRealTimers();
+        }
+      },
+    );
+
+    it('does not apply a stale refresh failure floor to a replacement pending ACK record', async () => {
+      const socket = await connectAuthenticatedSocket();
+      resolveScopedGame();
+      await task8Gateway().subscribeToGame(socket, { gameId: GAME_SCOPE.gameId, afterSequence: 0 });
+
+      const oldSubscriptionRead = deferred<{ version: number; state: string; events: unknown[]; lastSequence: number }>();
+      const oldSubscriptionEntered = deferred<void>();
+      const replacementRead = deferred<{ version: number; state: string; events: unknown[]; lastSequence: number }>();
+      const replacementReadEntered = deferred<void>();
+      gamesService.listEvents
+        .mockImplementationOnce(() => {
+          oldSubscriptionEntered.resolve();
+          return oldSubscriptionRead.promise;
+        })
+        .mockImplementationOnce(() => {
+          replacementReadEntered.resolve();
+          return replacementRead.promise;
+        });
+      const oldSubscription = task8Gateway().subscribeToGame(socket, {
+        gameId: GAME_SCOPE.gameId,
+        afterSequence: 0,
+      });
+      await oldSubscriptionEntered.promise;
+
+      const oldRefreshMetadata = deferred<ReturnType<typeof gameScopeRecord>>();
+      const oldRefreshMetadataEntered = deferred<void>();
+      prisma.v1Game.findUnique.mockImplementationOnce(() => {
+        oldRefreshMetadataEntered.resolve();
+        return oldRefreshMetadata.promise;
+      });
+      const oldRefresh = Reflect.apply(Reflect.get(gateway, 'requestSocketGameRefresh'), gateway, [
+        socket,
+        GAME_SCOPE.gameId,
+        9,
+      ]) as Promise<void>;
+      const oldRefreshOutcome = oldRefresh.then(() => null, (error: unknown) => error);
+      await oldRefreshMetadataEntered.promise;
+
+      const replacementJoinEntered = deferred<void>();
+      const originalJoin = socket.join.getMockImplementation();
+      socket.join.mockImplementation(async (room: string) => {
+        await originalJoin?.(room);
+        if (room === `game:${GAME_SCOPE.gameId}`) replacementJoinEntered.resolve();
+      });
+      const replacement = task8Gateway().subscribeToGame(socket, {
+        gameId: GAME_SCOPE.gameId,
+        afterSequence: 0,
+      });
+      await replacementJoinEntered.promise;
+      const pendingAcks = Reflect.get(gateway, 'pendingGameSnapshotAcks') as Map<string, {
+        failedRefreshMinimumVersion?: number;
+      }>;
+      const replacementAck = pendingAcks.get(`${socket.id}:${GAME_SCOPE.gameId}`);
+      expect(replacementAck).toBeDefined();
+
+      oldRefreshMetadata.reject(new Error('stale generation metadata lookup failed'));
+      await expect(oldRefreshOutcome).resolves.toBeInstanceOf(Error);
+      await replacementReadEntered.promise;
+      expect(pendingAcks.get(`${socket.id}:${GAME_SCOPE.gameId}`)).toBe(replacementAck);
+      expect(replacementAck?.failedRefreshMinimumVersion).toBeUndefined();
+
+      oldSubscriptionRead.resolve({ version: 4, state: 'LIVE', events: [], lastSequence: 0 });
+      await expect(oldSubscription).resolves.toMatchObject({ status: 'denied' });
+      replacementRead.resolve({ version: 4, state: 'LIVE', events: [], lastSequence: 0 });
+      await expect(replacement).resolves.toMatchObject({ status: 'subscribed' });
+      expect(socket.client.conn.close).not.toHaveBeenCalled();
+    });
+
     it.each(['resolve', 'reject'] as const)('does not let an older pending backfill %s leave a newer successful subscription', async (olderOutcome) => {
       const socket = await connectAuthenticatedSocket();
       const firstBackfill = deferred<{ version: number; state: string; events: unknown[]; lastSequence: number }>();

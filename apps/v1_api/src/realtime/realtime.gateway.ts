@@ -12,7 +12,7 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
-import type { Server, Socket } from 'socket.io';
+import type { Namespace, Socket } from 'socket.io';
 import { plainToInstance } from 'class-transformer';
 import type { V1CompetitionKind } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -28,6 +28,7 @@ import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.servi
 import { GamesService } from '../games/games.service';
 import type { GameEventAppendResult } from '../games/games.types';
 import { TournamentStaffAccessService } from '../tournaments/staff/tournament-staff-access.service';
+import { GameSubscriberRefreshScheduler, type ScheduledRefresh } from './game-subscriber-refresh.scheduler';
 
 type V1Socket = Socket & {
   data: {
@@ -73,6 +74,7 @@ type SubscriberRefreshFlight = {
   minimumVersion: number;
   passes: number;
   promise: Promise<void>;
+  scheduled?: ScheduledRefresh;
 };
 
 type QueuedCommittedEvent = {
@@ -331,7 +333,7 @@ const frontendOrigin = isProduction ? requireProductionFrontendOrigin(process.en
 })
 export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy {
   @WebSocketServer()
-  server!: Server;
+  server!: Namespace;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -361,8 +363,12 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
   >();
   /** At most one serial refresh per socket/game/generation; distinct sockets never block each other. */
   private readonly subscriberRefreshFlights = new Map<string, SubscriberRefreshFlight>();
+  private readonly refreshFlightKeysBySocket = new Map<string, Map<string, Set<string>>>();
   /** Per-recipient queues preserve snapshot-before-event order without room-wide head-of-line blocking. */
   private readonly committedEventDeliveryQueues = new Map<string, CommittedEventDeliveryQueue>();
+  private readonly committedEventQueueKeysBySocket = new Map<string, Set<string>>();
+  private readonly pendingCommittedEventsBySocket = new Map<string, number>();
+  private readonly refreshScheduler = new GameSubscriberRefreshScheduler(4, 2);
   /** Authorization awaits live here until they atomically promote to `staffLeases`. */
   private readonly pendingStaffLeaseAttempts = new Map<string, Map<string, StaffLeaseAttempt>>();
   private readonly staffLeaseGenerations = new Map<string, Map<string, number>>();
@@ -372,7 +378,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
   private readonly socketClients = new Map<string, V1Socket>();
   private shuttingDown = false;
 
-  afterInit(server: Server): void {
+  afterInit(server: Namespace): void {
     // Hand the games lane a way to reach this namespace's rooms without
     // GamesModule importing RealtimeModule (which would close the module graph
     // into a cycle — RealtimeModule already imports GamesModule). See
@@ -1152,12 +1158,22 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
   }
 
   private clearSocketGameRefreshFlights(socketId: string, gameId?: string): void {
-    for (const [key, flight] of this.subscriberRefreshFlights) {
-      if (flight.socket.id === socketId && (gameId === undefined || flight.gameId === gameId)) {
-        flight.dirty = false;
-        this.subscriberRefreshFlights.delete(key);
+    const byGame = this.refreshFlightKeysBySocket.get(socketId);
+    const games = gameId === undefined ? [...(byGame?.keys() ?? [])] : [gameId];
+    for (const currentGameId of games) {
+      const keys = byGame?.get(currentGameId);
+      if (keys === undefined) continue;
+      for (const key of keys) {
+        const flight = this.subscriberRefreshFlights.get(key);
+        if (flight !== undefined) {
+          flight.dirty = false;
+          flight.scheduled?.cancel();
+          if (this.subscriberRefreshFlights.get(key) === flight) this.subscriberRefreshFlights.delete(key);
+        }
       }
+      byGame?.delete(currentGameId);
     }
+    if (byGame?.size === 0) this.refreshFlightKeysBySocket.delete(socketId);
   }
 
   private enqueueCommittedEventForSubscribers(
@@ -1166,24 +1182,28 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     payload: unknown,
   ): void {
     const room = gameRoom(gameId);
-    for (const client of this.socketClients.values()) {
-      if (!this.isSocketLive(client) || !client.rooms.has(room)) continue;
+    const roomSocketIds = this.server.adapter.rooms.get(room);
+    if (roomSocketIds === undefined) return;
+    for (const socketId of roomSocketIds) {
+      const client = this.socketClients.get(socketId);
+      if (client === undefined || !this.isSocketLive(client) || !client.rooms.has(room)) continue;
       const generation = this.staffLeaseGenerations.get(client.id)?.get(gameId);
       if (generation === undefined) continue;
       const key = this.roomTransitionKey(client.id, gameId);
       let queue = this.committedEventDeliveryQueues.get(key);
       if (queue === undefined || queue.generation !== generation) {
-        this.clearCommittedEventDeliveryQueue(client.id, gameId);
+        if (queue !== undefined) this.removeCommittedEventDeliveryQueue(key, queue);
         queue = { socket: client, gameId, generation, events: [], draining: false };
         this.committedEventDeliveryQueues.set(key, queue);
+        const socketKeys = this.committedEventQueueKeysBySocket.get(client.id) ?? new Set<string>();
+        socketKeys.add(key);
+        this.committedEventQueueKeysBySocket.set(client.id, socketKeys);
       }
       if (queue.events.length >= MAX_PENDING_COMMITTED_EVENTS_PER_SOCKET_GAME) {
         this.disconnectGameSubscriberForRecovery(client, gameId, version);
         continue;
       }
-      const socketPending = [...this.committedEventDeliveryQueues.values()]
-        .filter((candidate) => candidate.socket.id === client.id)
-        .reduce((total, candidate) => total + candidate.events.length, 0);
+      const socketPending = this.pendingCommittedEventsBySocket.get(client.id) ?? 0;
       if (socketPending >= MAX_PENDING_COMMITTED_EVENTS_PER_SOCKET) {
         this.disconnectGameSubscriberForRecovery(client, gameId, version);
         continue;
@@ -1196,6 +1216,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
         activeRefresh.minimumVersion = Math.max(activeRefresh.minimumVersion, version);
       }
       queue.events.push({ version, payload, requiresSnapshot });
+      this.pendingCommittedEventsBySocket.set(client.id, socketPending + 1);
       this.startCommittedEventDelivery(client, gameId);
     }
   }
@@ -1208,11 +1229,12 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     queue.draining = true;
     void this.drainCommittedEventDeliveryQueue(queue).catch((error: unknown) => {
       this.logger.error({ socketId: client.id, gameId, err: error }, 'Committed game event delivery failed');
-      if (this.isSocketLive(client)) {
-        this.disconnectGameSubscriberForRecovery(client, gameId, queue.events[0]?.version ?? 0);
-      } else {
-        this.clearCommittedEventDeliveryQueue(client.id, gameId);
-      }
+      const roomKey = this.roomTransitionKey(client.id, gameId);
+      if (this.committedEventDeliveryQueues.get(roomKey) !== queue ||
+        !this.isRoomGenerationCurrent(client.id, gameId, queue.generation) ||
+        !this.isSocketLive(client) || !client.rooms.has(gameRoom(gameId)) ||
+        this.staffRoomOwners.get(roomKey) !== queue.generation) return;
+      this.disconnectGameSubscriberForRecovery(client, gameId, queue.events[0]?.version ?? 0);
     });
   }
 
@@ -1255,23 +1277,41 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
         if (this.pendingGameSnapshotAcks.get(key)?.generation === generation) return;
         socket.emit('game.event.committed', next.payload);
         queue.events.shift();
+        const pending = this.pendingCommittedEventsBySocket.get(socket.id) ?? 0;
+        if (pending <= 1) this.pendingCommittedEventsBySocket.delete(socket.id);
+        else this.pendingCommittedEventsBySocket.set(socket.id, pending - 1);
       }
     } finally {
       if (this.committedEventDeliveryQueues.get(key) === queue) {
         queue.draining = false;
-        if (queue.events.length === 0) this.committedEventDeliveryQueues.delete(key);
+        if (queue.events.length === 0) this.removeCommittedEventDeliveryQueue(key, queue);
       }
     }
   }
 
   private clearCommittedEventDeliveryQueue(socketId: string, gameId?: string, generation?: number): void {
-    for (const key of this.committedEventDeliveryQueues.keys()) {
+    const keys = gameId === undefined
+      ? [...(this.committedEventQueueKeysBySocket.get(socketId) ?? [])]
+      : [this.roomTransitionKey(socketId, gameId)];
+    for (const key of keys) {
       const queue = this.committedEventDeliveryQueues.get(key);
-      if (key.startsWith(`${socketId}:`) && (gameId === undefined || key === this.roomTransitionKey(socketId, gameId)) &&
-        (generation === undefined || queue?.generation === generation)) {
-        this.committedEventDeliveryQueues.delete(key);
+      if (queue !== undefined && (generation === undefined || queue.generation === generation)) {
+        this.removeCommittedEventDeliveryQueue(key, queue);
       }
     }
+  }
+
+  private removeCommittedEventDeliveryQueue(key: string, queue: CommittedEventDeliveryQueue): void {
+    if (this.committedEventDeliveryQueues.get(key) !== queue) return;
+    this.committedEventDeliveryQueues.delete(key);
+    const pending = this.pendingCommittedEventsBySocket.get(queue.socket.id) ?? 0;
+    const remaining = Math.max(0, pending - queue.events.length);
+    if (remaining === 0) this.pendingCommittedEventsBySocket.delete(queue.socket.id);
+    else this.pendingCommittedEventsBySocket.set(queue.socket.id, remaining);
+    queue.events.length = 0;
+    const keys = this.committedEventQueueKeysBySocket.get(queue.socket.id);
+    keys?.delete(key);
+    if (keys?.size === 0) this.committedEventQueueKeysBySocket.delete(queue.socket.id);
   }
 
   private emitGameSnapshotIfNewer(
@@ -1969,10 +2009,16 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
    */
   private async refreshGameSubscribers(gameId: string, minimumVersion: number): Promise<void> {
     const room = gameRoom(gameId);
-    const subscribers = [...this.socketClients.values()].filter(
-      (client) => this.isSocketLive(client) && client.rooms.has(room),
-    );
-    await Promise.all(subscribers.map((client) => this.requestSocketGameRefresh(client, gameId, minimumVersion)));
+    const roomSocketIds = this.server.adapter.rooms.get(room);
+    if (roomSocketIds === undefined) return;
+    const pending: Promise<void>[] = [];
+    for (const socketId of roomSocketIds) {
+      const client = this.socketClients.get(socketId);
+      if (client !== undefined && this.isSocketLive(client) && client.rooms.has(room)) {
+        pending.push(this.requestSocketGameRefresh(client, gameId, minimumVersion));
+      }
+    }
+    await Promise.all(pending);
   }
 
   private requestSocketGameRefresh(client: V1Socket, gameId: string, minimumVersion: number): Promise<void> {
@@ -1996,7 +2042,12 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       promise: Promise.resolve(),
     };
     this.subscriberRefreshFlights.set(key, flight);
-    flight.promise = (async () => {
+    const indexedGames = this.refreshFlightKeysBySocket.get(client.id) ?? new Map<string, Set<string>>();
+    const indexedKeys = indexedGames.get(gameId) ?? new Set<string>();
+    indexedKeys.add(key);
+    indexedGames.set(gameId, indexedKeys);
+    this.refreshFlightKeysBySocket.set(client.id, indexedGames);
+    flight.scheduled = this.refreshScheduler.schedule(gameId, async () => {
       do {
         flight.dirty = false;
         flight.passes += 1;
@@ -2018,7 +2069,8 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
         !this.isCurrentSnapshotAtLeast(client, gameId, generation, flight.minimumVersion)) {
         this.disconnectGameSubscriberForRecovery(client, gameId, flight.minimumVersion);
       }
-    })().catch((error: unknown) => {
+    });
+    flight.promise = flight.scheduled.promise.catch((error: unknown) => {
       if (!this.pendingGameSnapshotAcks.has(this.roomTransitionKey(client.id, gameId)) &&
         this.isSocketLive(client) && client.rooms.has(gameRoom(gameId)) &&
         this.isRoomGenerationCurrent(client.id, gameId, generation)) {
@@ -2026,7 +2078,14 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       }
       throw error;
     }).finally(() => {
-      if (this.subscriberRefreshFlights.get(key) === flight) this.subscriberRefreshFlights.delete(key);
+      if (this.subscriberRefreshFlights.get(key) === flight) {
+        this.subscriberRefreshFlights.delete(key);
+        const keys = this.refreshFlightKeysBySocket.get(client.id)?.get(gameId);
+        keys?.delete(key);
+        if (keys?.size === 0) this.refreshFlightKeysBySocket.get(client.id)?.delete(gameId);
+        const games = this.refreshFlightKeysBySocket.get(client.id);
+        if (games?.size === 0) this.refreshFlightKeysBySocket.delete(client.id);
+      }
     });
     return flight.promise;
   }
@@ -2249,6 +2308,9 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
 
   onModuleDestroy(): void {
     this.shuttingDown = true;
+    this.refreshScheduler.shutdown();
+    for (const socketId of this.refreshFlightKeysBySocket.keys()) this.clearSocketGameRefreshFlights(socketId);
+    for (const socketId of this.committedEventQueueKeysBySocket.keys()) this.clearCommittedEventDeliveryQueue(socketId);
     for (const leases of this.staffLeases.values()) {
       for (const lease of leases.values()) {
         if (lease.timer !== undefined) clearTimeout(lease.timer);
@@ -2261,6 +2323,9 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     this.pendingGameSnapshotAcks.clear();
     this.subscriberRefreshFlights.clear();
     this.committedEventDeliveryQueues.clear();
+    this.refreshFlightKeysBySocket.clear();
+    this.committedEventQueueKeysBySocket.clear();
+    this.pendingCommittedEventsBySocket.clear();
     this.staffRoomOwners.clear();
     this.socketClients.clear();
     this.gameSubscriptions.clear();

@@ -241,11 +241,11 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
   }
 
   async function makeUser(label: string, index: number): Promise<string> {
-    const id = `gcr-${SESSION}-${index}`;
+    const id = randomUUID();
     await prisma.v1User.create({
       data: {
         id,
-        email: `${id}@integration.test`,
+        email: `gcr-${SESSION}-${index}@integration.test`,
         accountStatus: 'active',
         onboardingStatus: 'completed',
         phone: `0103188${String(index).padStart(4, '0')}`,
@@ -352,6 +352,48 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
       reached: gates.map(({ reached }) => reached),
       release: (index: number) => gates[index]?.release(),
       releaseAll: () => gates.forEach(({ release }) => release()),
+      restore: () => spy.mockRestore(),
+    };
+  }
+
+  function holdActualEventReadsWithCapacity(userId: string, requestedGameId: string, holdCount: number) {
+    const gamesService = app.get(GamesService);
+    const original = gamesService.listEvents.bind(gamesService);
+    const gates = Array.from({ length: holdCount }, () => {
+      let release!: () => void;
+      let markReached!: () => void;
+      const gate = new Promise<void>((resolve) => { release = resolve; });
+      const reached = new Promise<void>((resolve) => { markReached = resolve; });
+      return { gate, reached, release, markReached };
+    });
+    let enteredCount = 0;
+    let activeCount = 0;
+    let maximumActiveCount = 0;
+    const spy = jest.spyOn(gamesService, 'listEvents').mockImplementation(async (user, targetGameId, afterSequence) => {
+      const matches = user.id === userId && targetGameId === requestedGameId && afterSequence === 0;
+      const matchingCallIndex = matches ? enteredCount++ : -1;
+      if (matches) {
+        activeCount += 1;
+        maximumActiveCount = Math.max(maximumActiveCount, activeCount);
+      }
+      try {
+        const actual = await original(user, targetGameId, afterSequence);
+        if (matchingCallIndex >= 0 && matchingCallIndex < gates.length) {
+          const gate = gates[matchingCallIndex];
+          gate.markReached();
+          await gate.gate;
+        }
+        return actual;
+      } finally {
+        if (matches) activeCount -= 1;
+      }
+    });
+    return {
+      reached: gates.map(({ reached }) => reached),
+      releaseAll: () => gates.forEach(({ release }) => release()),
+      get enteredCount() { return enteredCount; },
+      get activeCount() { return activeCount; },
+      get maximumActiveCount() { return maximumActiveCount; },
       restore: () => spy.mockRestore(),
     };
   }
@@ -805,7 +847,7 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
         state: 'LIVE',
       } });
       await request(app.getHttpServer())
-        .post(`/api/v1/teams/team-memberships/${friendlyMemberMembershipId}/remove`)
+        .post(`/api/v1/team-memberships/${friendlyMemberMembershipId}/remove`)
         .set('x-v1-user-id', operatorId)
         .send({ reason: 'membership revoked during held game snapshot' })
         .expect(201);
@@ -976,6 +1018,111 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
       refreshes.restore();
       socket.off('game.snapshot', snapshotListener);
       socket.disconnect();
+    }
+  });
+
+  it('bounds concurrent real history reads and refreshes every authorized observer console', async () => {
+    const server = app.getHttpServer();
+    if (!server.listening) await app.listen(0, '127.0.0.1');
+    const assignment = await app.get(TournamentStaffAccessService).assertAccess({
+      userId: observerId,
+      action: 'read',
+      resource: { tournamentId, fixtureId },
+    });
+    expect(assignment.role).toBe('support_readonly');
+    const readers = Array.from({ length: 6 }, (_, index) =>
+      connect(observerId, `fanout-reader-${index + 1}`, assignment.assignmentVersion ?? 0));
+    for (const reader of readers) {
+      reader.connect();
+      await connected(reader);
+      await expect(subscribe(reader)).resolves.toMatchObject({ status: 'subscribed' });
+    }
+
+    const { socket: operator, takeoverToken } = await openOperatorConsole('fanout-operator');
+    const current = await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId }, select: { state: true, version: true } });
+    expect(current.state).toBe('LIVE');
+    const snapshots = readers.map((reader) =>
+      eventOnce<{ gameId: string; version: number; state: string; lastSequence: number }>(reader, 'game.snapshot'));
+    const reads = holdActualEventReadsWithCapacity(observerId, gameId, 2);
+    const refreshes = trackRefreshPromises();
+    let pauseVersion: number | undefined;
+    let resumed = false;
+    const commandId = `gcr-many-recipient-pause-${SESSION}`;
+    try {
+      const pause = await request(server)
+        .post(`/api/v1/games/${gameId}/commands/pause`)
+        .set('x-v1-user-id', operatorId)
+        .set('Idempotency-Key', commandId)
+        .send({
+          expectedVersion: current.version,
+          clientCommandId: commandId,
+          takeoverToken,
+          occurredAt: new Date().toISOString(),
+          payload: {},
+        })
+        .expect(201);
+      pauseVersion = pause.body.data.version as number;
+      expect(refreshes.promises).toHaveLength(1);
+      await Promise.all(reads.reached);
+      expect(reads.enteredCount).toBe(2);
+      expect(reads.activeCount).toBe(2);
+      expect(reads.maximumActiveCount).toBeLessThanOrEqual(2);
+
+      reads.releaseAll();
+      const [deliveredSnapshots] = await Promise.all([
+        Promise.all(snapshots.map(({ promise }) => promise)),
+        Promise.all(refreshes.promises),
+      ]);
+      expect(reads.enteredCount).toBe(6);
+      expect(reads.activeCount).toBe(0);
+      expect(reads.maximumActiveCount).toBeLessThanOrEqual(2);
+      for (const delivered of deliveredSnapshots) {
+        expect(delivered).toMatchObject({ event: {
+          gameId,
+          version: pauseVersion,
+          state: 'PAUSED',
+        } });
+      }
+
+      const resumeId = `gcr-many-recipient-resume-${SESSION}`;
+      await request(server)
+        .post(`/api/v1/games/${gameId}/commands/resume`)
+        .set('x-v1-user-id', operatorId)
+        .set('Idempotency-Key', resumeId)
+        .send({
+          expectedVersion: pauseVersion,
+          clientCommandId: resumeId,
+          takeoverToken,
+          occurredAt: new Date().toISOString(),
+          payload: {},
+        })
+        .expect(201);
+      resumed = true;
+      const restored = await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId }, select: { state: true } });
+      expect(restored.state).toBe('LIVE');
+    } finally {
+      reads.releaseAll();
+      await Promise.allSettled(refreshes.promises);
+      reads.restore();
+      refreshes.restore();
+      snapshots.forEach(({ cancel }) => cancel());
+      if (pauseVersion !== undefined && !resumed) {
+        const resumeId = `gcr-many-recipient-cleanup-resume-${SESSION}`;
+        await request(server)
+          .post(`/api/v1/games/${gameId}/commands/resume`)
+          .set('x-v1-user-id', operatorId)
+          .set('Idempotency-Key', resumeId)
+          .send({
+            expectedVersion: pauseVersion,
+            clientCommandId: resumeId,
+            takeoverToken,
+            occurredAt: new Date().toISOString(),
+            payload: {},
+          })
+          .expect(201);
+      }
+      operator.disconnect();
+      readers.forEach((reader) => reader.disconnect());
     }
   });
 

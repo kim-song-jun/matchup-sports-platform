@@ -17,6 +17,11 @@
 - MD-QA #139: `game.takeover.request`는 첫 활동 프로필/권한 조회 전에 서버 내부 예약을 만들며, 마지막 game metadata 조회 후 성공한 발급 순서를 동기적으로 적용한다. 이미 더 늦게 도착한 정상 요청이 발급받았으면 과거 요청은 `{status:'denied', code:'TAKEOVER_SUPERSEDED'}`를 반환하고 token을 바꾸지 않는다. 새 요청이 권한 검사에 실패했으면 이전 정상 요청은 계속 가능하다. 클라이언트 payload로 ordinal을 받지 않으며 프로필 거부·DB 실패·정상 종료 모두 예약을 해제한다. 만료/회수가 진행 중 예약의 성공 순서 기록을 지우지 않고, 모든 예약 종료 시 해당 기록을 제거한다. `TAKEOVER_SUPERSEDED`는 새 요청과 갱신 모두의 오류이며 만료처럼 자동 재획득하지 않는다. MD-QA #165: `game.takeover.request`는 선택 key `force:boolean`을 받는다. `force`가 없거나 false인데 **다른 authorization subject**(다른 사람)의 살아 있는 grant가 있으면 `{status:'denied', code:'TAKEOVER_HELD', holderName}`으로 거절하고 그 grant를 건드리지 않는다 — 콘솔은 보기 모드로 열리고, 사용자가 확인 창을 거친 뒤에만 `force:true`로 다시 요청한다. 같은 subject(같은 사람의 새 탭·새로고침)는 지금처럼 바로 넘긴다. 갱신이 `TAKEOVER_SUPERSEDED`로 거절될 때도 `holderName`을 싣는다. `holderName`은 보유자 닉네임이며 모르거나 묻는 사람 자신이면 `null`이다. 이 순서·grant registry는 현재 단일 API 프로세스의 메모리 상태다. 다중 API 인스턴스 간 일관성은 이 변경의 검증 범위가 아니다.
 - Tournament staff revoke가 commit되면 해당 사용자의 해당 tournament 구독만 대상으로, 추적된 game마다 `game.permission.revoked`를 그 사용자의 socket에 먼저 보내고 그 socket만 해당 room에서 퇴장시킨다. 다른 사용자와 다른 tournament 구독은 유지되며, 이후 stale `authorizationSubjectVersion` subscribe는 `STAFF_SCOPE_DENIED`다. 계정 정지·차단·삭제는 별도 user-room 강제 disconnect 경계다.
 
+### 실시간 전파의 자원 한도
+
+- `/game-operations` namespace의 `game:<gameId>` room에 속한 socket ID만 순회하고, 추적 중인 소켓의 신원·room 참여·구독 세대를 확인해요. 미전달 committed event 수는 추가·전달·삭제 때 증분 집계해요. 기존 socket/game당 128개·socket 전체 512개 한도를 유지해요. 경기별 정리는 socket/game key로 바로 찾고, 소켓 전체 정리는 해당 소켓의 queue-key 인덱스를 사용해요.
+- Lifecycle snapshot 갱신은 socket/game/generation마다 하나의 작업으로 병합해요. 대기 중에도 가장 높은 요청 version floor를 유지하며, 전체 최대 4개·경기당 최대 2개의 갱신 작업을 공정하게 실행해요. 승인된 수신자는 버리지 않고, 구독 가능한 소켓 수나 권한 정책을 바꾸지 않아요. 시작 전에 취소된 작업은 DB를 읽지 않고 끝나요. 진행 중인 작업은 실제 갱신 promise가 성공하거나 실패로 끝난 뒤에만 실행 자리를 반환해요. 서버 종료 때는 대기 작업을 취소하고 진행 중인 작업은 실제 완료 후 `finally`에서 자리를 반환해요. 개별 DB 요청의 외부 timeout은 이 한도로 보장하지 않아요.
+
 <!-- API_CONTRACT_SECTION_END:Frozen realtime contract -->
 
 ## 경기 시간 만료 확인 (MD-QA #142)

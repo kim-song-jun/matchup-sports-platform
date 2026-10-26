@@ -416,6 +416,17 @@ export function useV1GameOperationsConsole(
   const resyncEventsRef = useRef<(() => void) | null>(null);
 
   // ── Handshake authorization-subject version ────────────────────────────────
+  // Game state belongs to the route identity, not to whether the next game's
+  // socket authorization has loaded. Clear it on every game transition before
+  // the authorization gate below can return early.
+  useEffect(() => {
+    setGameSnapshot(null);
+    setLiveEvents([]);
+    receivedSequenceRef.current = 0;
+    confirmedSequenceRef.current = 0;
+    acceptedVersionRef.current = 0;
+  }, [gameId]);
+
   useEffect(() => {
     if (realtimeAuthorizationVersion !== null) {
       setGameOperationsAuthorizationSubjectVersion(realtimeAuthorizationVersion);
@@ -436,17 +447,6 @@ export function useV1GameOperationsConsole(
     const socket = getV1GameOperationsSocket();
     let cancelled = false;
     const isCurrentGame = () => !cancelled && isMountedRef.current && activeGameIdRef.current === gameId;
-    // 새 경기의 구독을 시작하는 지점이다 — 이전 경기에서 올려 둔 시퀀스를 그대로
-    // 들고 가면, 이벤트가 적은 경기로 옮겼을 때 그 경기의 초기 시퀀스가
-    // "이미 아는 값"으로 보여 아래 중복 판정이 정상 브로드캐스트를 버린다.
-    // Versions belong to one game. Until its first authoritative snapshot arrives,
-    // do not show or compare against the previous game's snapshot/timeline.
-    setGameSnapshot(null);
-    setLiveEvents([]);
-    receivedSequenceRef.current = 0;
-    confirmedSequenceRef.current = 0;
-    acceptedVersionRef.current = 0;
-
     type GameSubscriptionSnapshot = { readonly gameId: string; readonly version: number; readonly state: GameState; readonly lastSequence: number; readonly events: readonly GameEventRecord[] };
     type SubscribeAck = {
       status: string;
@@ -457,8 +457,8 @@ export function useV1GameOperationsConsole(
     let bootstrapResyncVersion = -1;
     const receivedEventVersions = new Map<number, number>();
 
-    // This effect intentionally depends only on `[gameId]` (resubscribing on
-    // every sync/queue change would thrash the connection), so every handler
+    // This effect resubscribes when the game or confirmed authorization version
+    // changes, not on every sync/queue update, so every handler
     // below reads the LATEST received sequence through `receivedSequenceRef`
     // instead of closing over the `sync` state value from whichever render
     // created this effect — a stale closure here would judge contiguity

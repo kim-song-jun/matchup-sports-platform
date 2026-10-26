@@ -9,6 +9,7 @@ import {
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import { OperationAuditWriterService } from '../common/audit/operation-audit-writer.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { TournamentStaffAccessService } from '../tournaments/staff/tournament-staff-access.service';
 import { AppendGameEventDto } from './dto/game-event.dto';
 import { GameTakeoverService } from './game-takeover.service';
 import { canonicalGameCommandPayloadHash, GamesService } from './games.service';
@@ -325,6 +326,7 @@ async function createTask8RetryService(lineupReady = true) {
     providers: [
       GamesService,
       GameTakeoverService,
+      TournamentStaffAccessService,
       { provide: PrismaService, useValue: database },
       { provide: OperationAuditWriterService, useValue: new OperationAuditWriterService() },
     ],

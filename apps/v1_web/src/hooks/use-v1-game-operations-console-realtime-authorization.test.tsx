@@ -166,6 +166,7 @@ function createGatewayTransport(
       fire('disconnect', 'io server disconnect');
     },
     refreshHandshake() { beginConnect(); },
+    serverEmit(event: string, payload: unknown) { fire(event, payload); },
     bindAuth(auth: typeof authCallback) {
       authCallback = auth;
       if (delayConnect) beginConnect();
@@ -389,5 +390,48 @@ describe('MD-QA #135 — game detail authorization drives the actual socket hand
     expect(hook.transport.authAttempts.at(-1)).toMatchObject({ authorizationSubjectVersion: 2 });
     expect(hook.transport.takeoverRequests).toEqual([GAME_A, GAME_B]);
     expect(hook.result.current.takeover.status).not.toBe('held');
+  });
+
+  it.each([
+    { name: 'pending', detailStatus: 'pending' as const, detailGameId: undefined, realtimeAuthorization: undefined },
+    { name: 'failed', detailStatus: 'error' as const, detailGameId: undefined, realtimeAuthorization: undefined },
+    { name: 'unavailable', detailStatus: 'success' as const, detailGameId: GAME_B, realtimeAuthorization: { kind: 'unavailable' } as const },
+  ])('clears A snapshot and events while B authorization is $name', async ({ detailStatus, detailGameId, realtimeAuthorization }) => {
+    const oldEvent: GameEventRecord = {
+      id: 'event-a-1', gameId: GAME_A, sequence: 1, clientEventId: 'client-a-1', payloadHash: 'hash-a-1',
+      type: 'GOAL', sideId: null, participantId: null, assistParticipantId: null, period: 1, clockMs: 10_000,
+      occurredAt: '2026-10-27T00:00:00.000Z', receivedAt: '2026-10-27T00:00:00.100Z', actorUserId: 'operator-a',
+      reversesEventId: null, payload: {},
+    };
+    const rules = new Map<string, ServerRule>([
+      [GAME_A, { allowedGameId: GAME_A, subjectVersion: 7 }],
+      [GAME_B, { allowedGameId: GAME_B, subjectVersion: 8 }],
+    ]);
+    const hook = await mount({
+      gameId: GAME_A, detailStatus: 'success', detailGameId: GAME_A,
+      realtimeAuthorization: { kind: 'staff', subjectVersion: 7 }, rules,
+    });
+    await waitFor(() => expect(hook.result.current.gameSnapshot).toEqual({ state: 'LIVE', version: 1 }));
+    act(() => hook.transport.serverEmit('game.snapshot', {
+      gameId: GAME_A, version: 2, state: 'LIVE', lastSequence: 1, events: [oldEvent],
+    } satisfies Snapshot));
+    await waitFor(() => expect(hook.result.current.liveEvents).toEqual([oldEvent]));
+
+    act(() => hook.rerender({ gameId: GAME_B, detailStatus, detailGameId, realtimeAuthorization, rules }));
+
+    expect(hook.result.current.gameSnapshot).toBeNull();
+    expect(hook.result.current.liveEvents).toEqual([]);
+    expect(hook.transport.subscriptions).toEqual([{ gameId: GAME_A, status: 'subscribed' }]);
+    expect(hook.transport.takeoverRequests).toEqual([GAME_A]);
+    expect(hook.transport.authAttempts.at(-1)).toMatchObject({ authorizationSubjectVersion: 7 });
+
+    act(() => hook.rerender({
+      gameId: GAME_B, detailStatus: 'success', detailGameId: GAME_B,
+      realtimeAuthorization: { kind: 'staff', subjectVersion: 8 }, rules,
+    }));
+    await waitFor(() => expect(hook.transport.subscriptions).toContainEqual({ gameId: GAME_B, status: 'subscribed' }));
+    await waitFor(() => expect(hook.result.current.gameSnapshot).toEqual({ state: 'LIVE', version: 1 }));
+    expect(hook.result.current.liveEvents).toEqual([]);
+    expect(hook.transport.authAttempts.at(-1)).toMatchObject({ authorizationSubjectVersion: 8 });
   });
 });

@@ -137,3 +137,11 @@ Expected result: Read access remains unchanged and no new socket or write author
 ### 최종 로컬 검수
 
 독립 Sol R2는 Critical 0·Warning 0이고, 검토한 111개 파일의 해시는 검토 전후 일치했어요. API 타입·표면 검사와 보완 후 Web 타입·패턴 검사도 실제 exit 0이에요. 이 상태 기록만 root가 마지막으로 갱신했고 제품 소스는 검토 뒤 바꾸지 않았어요. 현재 head의 CI·DB 통합과 Alpha 실제 스태프 경로는 게시 뒤 확인해야 해요.
+
+
+## Progress Snapshot — 2026-10-27 / tick 0711
+
+- 게시된 head2f38의 API CI에서 6묶음·51테스트가 실패했어요. 직접 생성 호출만 확인한 이전 인벤토리가 Nest 테스트 모듈의 필수 서비스 등록을 놓쳤고, 4개 spec과 공유 fixture1개의 실제 provider를 보완했어요. 같은6묶음 RED를 확인한 뒤 직렬 GREEN55/55를 확인했어요. 운영 서비스·Gateway 권한은 바꾸지 않았어요.
+- 새 CODE P2 지적은 유효했어요. 경기A의 snapshot·events를 받은 뒤 경기B의 인증이 pending/error/unavailable일 때 이전 정보를 지우지 못하는3개 실제 소비자 RED를 확인했어요. 경기전환 초기화 효과를 인증 준비 조건과 분리했고 기존9대조군을 포함한12/12가 통과했어요. 준비 전 연결·구독·takeover를 허용하지 않아요.
+- 현재 보완분의 별도 Sol 소스 검토와 root 최종 타입·패턴 검사, 새 커밋 게시 후 CI·DB통합·CODE/Copilot 리뷰는 아직 진행 전이에요. 이전 head의 local READY·Web 성공을 새 head 증거로 대신하지 않아요.
+- Alpha135와 승인된 실제 스태프의 연결·구독은 계속 미검증이에요. 다른 이슈의 PARTIAL 선택과 업무 데이터 쓰기 금지를 유지해요.

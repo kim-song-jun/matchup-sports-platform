@@ -56,7 +56,7 @@ import {
   formatTournamentDateTimeShort,
   formatTournamentDateRangeWithTime,
   formatTournamentDateTimeLong,
-  formatKstMonthDay,
+  formatMonthDay,
   formatEntryFee,
 } from '@/lib/date-utils';
 import {
@@ -2221,7 +2221,7 @@ function AnnouncementCard({ announcement }: { announcement: V1TournamentAnnounce
             {announcement.title}
           </div>
           <span className="tm-text-caption" style={{ color: 'var(--text-caption)', flexShrink: 0 }}>
-            {formatKstMonthDay(announcement.publishedAt) ?? '날짜 미정'}
+            {formatMonthDay(announcement.publishedAt) ?? '날짜 미정'}
           </span>
         </div>
         <span className="tm-badge tm-badge-grey" style={{ marginTop: 8 }}>

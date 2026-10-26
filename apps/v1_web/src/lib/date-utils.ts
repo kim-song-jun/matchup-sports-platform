@@ -97,14 +97,6 @@ export function formatTournamentDateShort(dateStr: string | null | undefined): s
   return `${parts.month}/${parts.day} (${parts.weekday})`;
 }
 
-/** 공지 게시일 등 날짜만 필요한 표기: 'M월 D일'. null/invalid는 null, 오프셋 없는 값은 KST 벽시계로 읽어요. */
-export function formatKstMonthDay(dateStr: string | null | undefined): string | null {
-  if (!dateStr) return null;
-  const parts = getTournamentKstParts(dateStr);
-  if (!parts) return null;
-  return `${parts.month}월 ${parts.day}일`;
-}
-
 export function formatTournamentDateRangeShort(
   startStr: string | null | undefined,
   endStr: string | null | undefined,
@@ -266,13 +258,14 @@ export function formatTournamentDateRangeWithTime(
 /**
  * 목록 카드용 짧은 날짜: 'M월 D일'
  * 받은 초대 · 보낸 가입 신청처럼 "언제 있었던 일인지"만 알면 되는 슬롯에서 사용해요.
- * dateStr 이 없거나 invalid 이면 null 을 반환해, 호출부가 줄 자체를 감출 수 있게 해요.
+ * KST 달력으로 고정하며 오프셋 없는 datetime 은 KST 벽시계로 읽어요. 날짜 전용 문자열은
+ * 적힌 달력 날짜 그대로 표시해요. 값이 없거나 invalid 이면 null 을 반환해요.
  */
 export function formatMonthDay(dateStr: string | null | undefined): string | null {
   if (!dateStr) return null;
-  const d = new Date(dateStr);
-  if (Number.isNaN(d.getTime())) return null;
-  return `${d.getMonth() + 1}월 ${d.getDate()}일`;
+  const parts = getTournamentKstParts(dateStr);
+  if (!parts) return null;
+  return `${parts.month}월 ${parts.day}일`;
 }
 
 /**

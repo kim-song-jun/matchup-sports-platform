@@ -554,6 +554,89 @@ describe('RealtimeGateway', () => {
       staffAccess.assertAccess.mockResolvedValue(staffPrincipal(GAME_SCOPE));
     }
 
+    it('bounds initial history jobs, cancels a queued subscription on disconnect, and starts the next one', async () => {
+      resolveScopedGame();
+      const sockets = await Promise.all(
+        Array.from({ length: 4 }, (_, index) => connectAuthenticatedSocket(`initial-${index}`)),
+      );
+      const gates = Array.from({ length: 3 }, () => deferred<{ version: number; state: string; events: unknown[]; lastSequence: number }>());
+      const entered = Array.from({ length: 3 }, () => deferred<void>());
+      let started = 0;
+      let active = 0;
+      let maximumActive = 0;
+      gamesService.listEvents.mockImplementation(() => {
+        const index = started++;
+        active += 1;
+        maximumActive = Math.max(maximumActive, active);
+        entered[index]?.resolve();
+        return gates[index]!.promise.finally(() => { active -= 1; });
+      });
+
+      const subscriptions = sockets.map((socket) =>
+        task8Gateway().subscribeToGame(socket, { gameId: GAME_SCOPE.gameId, afterSequence: 0 }));
+      await Promise.all([entered[0]!.promise, entered[1]!.promise]);
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(started).toBe(2);
+      const pendingAcks = Reflect.get(gateway, 'pendingGameSnapshotAcks') as Map<string, { scheduled?: { cancel(): boolean } }>;
+      expect(pendingAcks.get(`${sockets[2]!.id}:${GAME_SCOPE.gameId}`)?.scheduled).toBeDefined();
+
+      handleDisconnect(gateway, sockets[2]!);
+      await expect(subscriptions[2]).resolves.toMatchObject({ status: 'denied' });
+      gates[0]!.resolve({ version: 4, state: 'LIVE', events: [], lastSequence: 0 });
+      gates[1]!.resolve({ version: 4, state: 'LIVE', events: [], lastSequence: 0 });
+      await entered[2]!.promise;
+      expect(started).toBe(3);
+      expect(maximumActive).toBe(2);
+      gates[2]!.resolve({ version: 4, state: 'LIVE', events: [], lastSequence: 0 });
+
+      const [first, second, fourth] = await Promise.all([subscriptions[0], subscriptions[1], subscriptions[3]]);
+      expect(first).toMatchObject({ status: 'subscribed' });
+      expect(second).toMatchObject({ status: 'subscribed' });
+      expect(fourth).toMatchObject({ status: 'subscribed' });
+      expect(gamesService.listEvents).toHaveBeenCalledTimes(3);
+      expect(gamesService.listEvents).toHaveBeenNthCalledWith(1, activeUser, GAME_SCOPE.gameId, 0);
+      expect(gamesService.listEvents).toHaveBeenNthCalledWith(2, activeUser, GAME_SCOPE.gameId, 0);
+      expect(gamesService.listEvents).toHaveBeenNthCalledWith(3, activeUser, GAME_SCOPE.gameId, 0);
+    });
+
+    it('returns an already emitted newer refresh snapshot in the subscribe acknowledgement', async () => {
+      const socket = await connectAuthenticatedSocket();
+      resolveScopedGame();
+      const finalAuthorization = deferred<ReturnType<typeof staffPrincipal>>();
+      const finalAuthorizationEntered = deferred<void>();
+      const refreshBackfillEntered = deferred<void>();
+      let authorizationCalls = 0;
+      staffAccess.assertAccess.mockImplementation(() => {
+        authorizationCalls += 1;
+        if (authorizationCalls === 2) {
+          finalAuthorizationEntered.resolve();
+          return finalAuthorization.promise;
+        }
+        return Promise.resolve(staffPrincipal(GAME_SCOPE));
+      });
+      gamesService.listEvents
+        .mockResolvedValueOnce({ version: 4, state: 'LIVE', events: [{ sequence: 1 }], lastSequence: 1 })
+        .mockImplementationOnce(() => {
+          refreshBackfillEntered.resolve();
+          return Promise.resolve({ version: 9, state: 'LIVE', events: [{ sequence: 1 }], lastSequence: 1 });
+        });
+
+      const subscribing = task8Gateway().subscribeToGame(socket, { gameId: GAME_SCOPE.gameId, afterSequence: 0 });
+      await finalAuthorizationEntered.promise;
+      const refresh = Reflect.apply(Reflect.get(gateway, 'requestSocketGameRefresh'), gateway, [socket, GAME_SCOPE.gameId, 9]) as Promise<void>;
+      await refreshBackfillEntered.promise;
+      await refresh;
+      const pendingAcks = Reflect.get(gateway, 'pendingGameSnapshotAcks') as Map<string, { snapshot?: { version: number } }>;
+      expect(pendingAcks.get(`${socket.id}:${GAME_SCOPE.gameId}`)?.snapshot?.version).toBe(9);
+
+      finalAuthorization.resolve(staffPrincipal(GAME_SCOPE));
+      await expect(subscribing).resolves.toMatchObject({ status: 'subscribed', snapshot: { version: 9 } });
+      expect(socket.emit).toHaveBeenCalledWith('game.snapshot', expect.objectContaining({ version: 9 }));
+      expect(gamesService.listEvents).toHaveBeenCalledTimes(2);
+      expect(gamesService.listEvents).toHaveBeenNthCalledWith(1, activeUser, GAME_SCOPE.gameId, 0);
+      expect(gamesService.listEvents).toHaveBeenNthCalledWith(2, activeUser, GAME_SCOPE.gameId, 0);
+    });
+
     it('keeps a resubscribed queue alive when the previous generation refresh rejects', async () => {
       const socket = await connectAuthenticatedSocket();
       resolveScopedGame();
@@ -696,10 +779,9 @@ describe('RealtimeGateway', () => {
       try {
         const socket = await connectAuthenticatedSocket();
         const expiresAt = new Date(Date.now() + 1_000);
-        prisma.v1Game.findUnique
-          .mockResolvedValueOnce(gameScopeRecord(GAME_SCOPE))
-          .mockResolvedValueOnce(gameScopeRecord(GAME_SCOPE));
+        prisma.v1Game.findUnique.mockResolvedValue(gameScopeRecord(GAME_SCOPE));
         staffAccess.assertAccess
+          .mockResolvedValueOnce(staffPrincipal(GAME_SCOPE, expiresAt))
           .mockResolvedValueOnce(staffPrincipal(GAME_SCOPE, expiresAt))
           .mockRejectedValueOnce(
             new ForbiddenException({ code: 'STAFF_SCOPE_DENIED', details: { reason: 'ASSIGNMENT_EXPIRED' } }),
@@ -746,6 +828,7 @@ describe('RealtimeGateway', () => {
         const authorizationEntered = deferred<void>();
         staffAccess.assertAccess
           .mockResolvedValueOnce(staffPrincipal(GAME_SCOPE, expiresAt))
+          .mockResolvedValueOnce(staffPrincipal(GAME_SCOPE, expiresAt))
           .mockImplementation(() => {
             authorizationEntered.resolve();
             return pendingAuthorization.promise;
@@ -791,9 +874,7 @@ describe('RealtimeGateway', () => {
         const expiresAt = new Date(Date.now() + 500);
         const backfill = deferred<{ version: number; state: string; events: unknown[]; lastSequence: number }>();
         const backfillEntered = deferred<void>();
-        prisma.v1Game.findUnique
-          .mockResolvedValueOnce(gameScopeRecord(GAME_SCOPE))
-          .mockResolvedValueOnce(gameScopeRecord(GAME_SCOPE));
+        prisma.v1Game.findUnique.mockResolvedValue(gameScopeRecord(GAME_SCOPE));
         staffAccess.assertAccess
           .mockResolvedValueOnce(staffPrincipal(GAME_SCOPE, expiresAt))
           .mockRejectedValueOnce(new ForbiddenException({ code: 'STAFF_SCOPE_DENIED' }));
@@ -821,10 +902,9 @@ describe('RealtimeGateway', () => {
       const secondBackfill = deferred<{ version: number; state: string; events: unknown[]; lastSequence: number }>();
       const firstBackfillEntered = deferred<void>();
       const secondBackfillEntered = deferred<void>();
-      prisma.v1Game.findUnique
-        .mockResolvedValueOnce(gameScopeRecord(GAME_SCOPE))
-        .mockResolvedValueOnce(gameScopeRecord(GAME_SCOPE));
+      prisma.v1Game.findUnique.mockResolvedValue(gameScopeRecord(GAME_SCOPE));
       staffAccess.assertAccess
+        .mockResolvedValueOnce(staffPrincipal(GAME_SCOPE))
         .mockResolvedValueOnce(staffPrincipal(GAME_SCOPE))
         .mockResolvedValueOnce(staffPrincipal(GAME_SCOPE));
       gamesService.listEvents
@@ -856,6 +936,9 @@ describe('RealtimeGateway', () => {
       }
       expect(socket.rooms.has(`game:${GAME_SCOPE.gameId}`)).toBe(true);
       expect(socket.emit).toHaveBeenCalledWith('game.snapshot', expect.objectContaining({ version: 5 }));
+      expect(gamesService.listEvents).toHaveBeenCalledTimes(2);
+      expect(gamesService.listEvents).toHaveBeenNthCalledWith(1, activeUser, GAME_SCOPE.gameId, 0);
+      expect(gamesService.listEvents).toHaveBeenNthCalledWith(2, activeUser, GAME_SCOPE.gameId, 0);
     });
 
     it('Task 8 subscribes an authenticated, authorized user to the stable game room', async () => {
@@ -886,6 +969,8 @@ describe('RealtimeGateway', () => {
           fieldId: GAME_SCOPE.fieldId,
         },
       });
+      expect(staffAccess.assertAccess).toHaveBeenCalledTimes(2);
+      expect(gamesService.listEvents).toHaveBeenCalledTimes(1);
       expect(gamesService.listEvents).toHaveBeenCalledWith(activeUser, GAME_SCOPE.gameId, 0);
       expect(socket.join.mock.calls).toEqual([
         [`user:${activeUser.id}`],
@@ -1056,20 +1141,28 @@ describe('RealtimeGateway', () => {
       expect(socket.join).not.toHaveBeenCalledWith(`game:${GAME_SCOPE.gameId}`);
     });
 
-    it('Task 8 returns the authoritative reconnect backfill in ascending sequence order', async () => {
+    it('Task 8 reads one authoritative backfill from the reconnect cursor', async () => {
       const socket = await connectAuthenticatedSocket();
       resolveScopedGame();
-      const events = [{ sequence: 2 }, { sequence: 3 }];
-      gamesService.listEvents.mockResolvedValue({ version: 4, state: 'LIVE', events, lastSequence: 3 });
+      const events = [{ sequence: 4 }, { sequence: 5 }];
+      gamesService.listEvents.mockResolvedValue({
+        version: 4,
+        state: 'LIVE',
+        events,
+        lastSequence: 5,
+        gap: { expectedSequence: 3, availableFrom: 4 },
+      });
 
       await expect(
-        task8Gateway().subscribeToGame(socket, { gameId: GAME_SCOPE.gameId, afterSequence: 1 }),
+        task8Gateway().subscribeToGame(socket, { gameId: GAME_SCOPE.gameId, afterSequence: 2 }),
       ).resolves.toMatchObject({
         status: 'subscribed',
-        afterSequence: 1,
-        snapshot: { lastSequence: 3, events },
+        afterSequence: 2,
+        snapshot: { lastSequence: 5, events },
       });
-      expect(gamesService.listEvents).toHaveBeenCalledWith(activeUser, GAME_SCOPE.gameId, 1);
+      expect(gamesService.listEvents).toHaveBeenCalledTimes(1);
+      expect(gamesService.listEvents).toHaveBeenCalledWith(activeUser, GAME_SCOPE.gameId, 2);
+      expect(socket.emit).toHaveBeenCalledWith('game.gap', { expectedSequence: 3, availableFrom: 4 });
     });
 
     it('Task 8 reauthorizes after reconnect and resumes from the last contiguous sequence', async () => {
@@ -1095,7 +1188,8 @@ describe('RealtimeGateway', () => {
         snapshot: { lastSequence: 3, events: [{ sequence: 3 }] },
       });
 
-      expect(staffAccess.assertAccess).toHaveBeenCalledTimes(2);
+      expect(staffAccess.assertAccess).toHaveBeenCalledTimes(4);
+      expect(gamesService.listEvents).toHaveBeenCalledTimes(2);
       expect(gamesService.listEvents).toHaveBeenLastCalledWith(activeUser, GAME_SCOPE.gameId, 2);
     });
 
@@ -1217,11 +1311,12 @@ describe('RealtimeGateway', () => {
 
     it('Task 8 evicts only matching game rooms through the server without disconnecting the user room', async () => {
       const socket = await connectAuthenticatedSocket();
-      prisma.v1Game.findUnique
-        .mockResolvedValueOnce(gameScopeRecord(GAME_SCOPE))
-        .mockResolvedValueOnce(gameScopeRecord(OTHER_GAME_SCOPE));
+      prisma.v1Game.findUnique.mockImplementation(({ where }: { where: { id: string } }) =>
+        Promise.resolve(where.id === GAME_SCOPE.gameId ? gameScopeRecord(GAME_SCOPE) : gameScopeRecord(OTHER_GAME_SCOPE)));
       staffAccess.assertAccess
         .mockResolvedValueOnce(staffPrincipal(GAME_SCOPE))
+        .mockResolvedValueOnce(staffPrincipal(GAME_SCOPE))
+        .mockResolvedValueOnce(staffPrincipal(OTHER_GAME_SCOPE))
         .mockResolvedValueOnce(staffPrincipal(OTHER_GAME_SCOPE));
       expect(task8Gateway().evictUserFromScopedGameRooms).toEqual(expect.any(Function));
       await task8Gateway().subscribeToGame(socket, { gameId: GAME_SCOPE.gameId, afterSequence: 0 });
@@ -1270,7 +1365,9 @@ describe('RealtimeGateway', () => {
       });
       // 재구독을 시도하면 방금 만료로 제거된 상태에서 다시 정상 판정을 받는지
       // 확인 — 내부 gameSubscriptions 맵에서도 실제로 지워졌다는 방증.
-      staffAccess.assertAccess.mockResolvedValueOnce(staffPrincipal(GAME_SCOPE));
+      staffAccess.assertAccess
+        .mockResolvedValueOnce(staffPrincipal(GAME_SCOPE))
+        .mockResolvedValueOnce(staffPrincipal(GAME_SCOPE));
       await expect(
         task8Gateway().subscribeToGame(socket, { gameId: GAME_SCOPE.gameId, afterSequence: 0 }),
       ).resolves.toMatchObject({ status: 'subscribed' });

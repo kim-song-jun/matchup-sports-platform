@@ -114,6 +114,7 @@ type StaffLeaseAttempt = {
 type PendingGameSnapshotAck = {
   readonly generation: number;
   snapshot?: GameSnapshot;
+  scheduled?: ScheduledRefresh;
 };
 
 type RetryGameEventInput = {
@@ -622,51 +623,90 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
         this.clearPendingGameSnapshotAck(client.id, input.gameId, leaseGeneration, pendingSnapshotAck);
         return { status: 'denied', code: 'STAFF_SCOPE_DENIED', reason: 'ASSIGNMENT_REQUIRED' };
       }
-      const initialBackfill = await this.gamesService.listEvents(authUser, input.gameId, input.afterSequence);
-      if (scope !== null) {
-        if (!this.activateStaffLease(client.id, input.gameId, leaseGeneration!)) {
+      const snapshotAck = pendingSnapshotAck!;
+      const snapshotWork = await this.runPendingGameSnapshotWork(
+        client,
+        input.gameId,
+        leaseGeneration!,
+        snapshotAck,
+        async () => {
+          const initialBackfill = await this.gamesService.listEvents(authUser, input.gameId, input.afterSequence);
+          if (this.pendingGameSnapshotAcks.get(this.roomTransitionKey(client.id, input.gameId)) !== snapshotAck ||
+            !this.isSocketLive(client) || !client.rooms.has(room)) {
+            return { status: 'stale' as const };
+          }
+          if (scope !== null) {
+            if (!this.activateStaffLease(client.id, input.gameId, leaseGeneration!)) {
+              return { status: 'lease-denied' as const };
+            }
+            this.recordGameSubscription(userId, scope.tournamentId, input.gameId, client.id);
+          } else if (
+            !this.isRoomGenerationCurrent(client.id, input.gameId, leaseGeneration!) ||
+            this.staffRoomOwners.get(this.roomTransitionKey(client.id, input.gameId)) !== leaseGeneration
+          ) {
+            return { status: 'room-denied' as const };
+          }
+
+          const currentGame = await this.loadGameForStaffLease(input.gameId);
+          const currentScope = currentGame === null ? null : gameRealtimeScope(currentGame);
+          if (currentGame === null || (scope === null
+            ? currentScope !== null
+            : currentScope === null || !this.sameStaffScope(scope, currentScope))) {
+            throw new ForbiddenException({ code: 'STAFF_SCOPE_DENIED', message: 'Game read scope changed during subscribe' });
+          }
+          if (!this.isPendingGameSnapshotAckCurrent(client, input.gameId, leaseGeneration!, snapshotAck)) {
+            return { status: 'stale' as const };
+          }
+          const finalPrincipal = scope === null
+            ? (await this.gamesService.assertReadAccess(authUser, input.gameId), null)
+            : await this.tournamentStaffAccess.assertAccess({
+              userId,
+              action: 'read',
+              resource: {
+                tournamentId: scope.tournamentId,
+                fixtureId: scope.fixtureId,
+                ...(scope.fieldId === null ? {} : { fieldId: scope.fieldId }),
+              },
+            });
+          return { status: 'ready' as const, initialBackfill, finalPrincipal };
+        },
+      );
+      if (!snapshotWork.completed) {
+        this.clearPendingGameSnapshotAck(client.id, input.gameId, leaseGeneration, snapshotAck);
+        return { status: 'denied', code: 'STAFF_SCOPE_DENIED', reason: 'ASSIGNMENT_REQUIRED' };
+      }
+      if (snapshotWork.value.status === 'lease-denied') {
+        if (scope !== null && this.pendingGameSnapshotAcks.get(this.roomTransitionKey(client.id, input.gameId)) === snapshotAck &&
+          this.isRoomGenerationCurrent(client.id, input.gameId, leaseGeneration!)) {
           const cancelled = this.cancelAuthorizedLeaseIfGeneration(client.id, input.gameId, leaseGeneration!);
           if (cancelled || this.staffRoomOwners.get(this.roomTransitionKey(client.id, input.gameId)) === leaseGeneration) {
             await this.leaveAuthorizedGameRoom(client, input.gameId, leaseGeneration!);
           }
-          this.clearPendingGameSnapshotAck(client.id, input.gameId, leaseGeneration, pendingSnapshotAck);
-          return { status: 'denied', code: 'STAFF_SCOPE_DENIED', reason: 'ASSIGNMENT_REQUIRED' };
         }
-        this.recordGameSubscription(userId, scope.tournamentId, input.gameId, client.id);
-      } else if (
-        leaseGeneration === undefined ||
-        !this.isRoomGenerationCurrent(client.id, input.gameId, leaseGeneration) ||
-        this.staffRoomOwners.get(this.roomTransitionKey(client.id, input.gameId)) !== leaseGeneration
-      ) {
-        if (leaseGeneration !== undefined) {
+        this.clearPendingGameSnapshotAck(client.id, input.gameId, leaseGeneration, snapshotAck);
+        return { status: 'denied', code: 'STAFF_SCOPE_DENIED', reason: 'ASSIGNMENT_REQUIRED' };
+      }
+      if (snapshotWork.value.status === 'room-denied') {
+        if (leaseGeneration !== undefined && this.pendingGameSnapshotAcks.get(this.roomTransitionKey(client.id, input.gameId)) === snapshotAck &&
+          this.isRoomGenerationCurrent(client.id, input.gameId, leaseGeneration)) {
           if (this.invalidateRoomGenerationIfCurrent(client.id, input.gameId, leaseGeneration)) {
             await this.forceLeaveGameRoom(client, input.gameId);
           } else {
             await this.leaveAuthorizedGameRoom(client, input.gameId, leaseGeneration);
           }
-          this.clearPendingGameSnapshotAck(client.id, input.gameId, leaseGeneration, pendingSnapshotAck);
+          this.clearPendingGameSnapshotAck(client.id, input.gameId, leaseGeneration, snapshotAck);
         }
         return { status: 'denied', code: 'STAFF_SCOPE_DENIED' };
       }
-
-      const currentGame = await this.loadGameForStaffLease(input.gameId);
-      const currentScope = currentGame === null ? null : gameRealtimeScope(currentGame);
-      if (currentGame === null || (scope === null
-        ? currentScope !== null
-        : currentScope === null || !this.sameStaffScope(scope, currentScope))) {
-        throw new ForbiddenException({ code: 'STAFF_SCOPE_DENIED', message: 'Game read scope changed during subscribe' });
+      if (snapshotWork.value.status === 'stale' || !snapshotWork.current) {
+        this.clearPendingGameSnapshotAck(client.id, input.gameId, leaseGeneration, snapshotAck);
+        return { status: 'denied', code: 'STAFF_SCOPE_DENIED', reason: 'ASSIGNMENT_REQUIRED' };
       }
-      const ackBackfill = await this.gamesService.listEvents(authUser, input.gameId, 0);
+      const { initialBackfill, finalPrincipal } = snapshotWork.value;
       if (scope !== null) {
-        const finalPrincipal = await this.tournamentStaffAccess.assertAccess({
-          userId,
-          action: 'read',
-          resource: {
-            tournamentId: scope.tournamentId,
-            fixtureId: scope.fixtureId,
-            ...(scope.fieldId === null ? {} : { fieldId: scope.fieldId }),
-          },
-        });
+        if (finalPrincipal === null) {
+          throw new ForbiddenException({ code: 'STAFF_SCOPE_DENIED', reason: 'ASSIGNMENT_REQUIRED' });
+        }
         if (!this.matchesAuthorizationVersion(client, finalPrincipal.assignmentVersion) ||
           (finalPrincipal.expiresAt !== null && finalPrincipal.expiresAt.getTime() <= Date.now())) {
           throw new ForbiddenException({ code: 'STAFF_SCOPE_DENIED', reason: 'ASSIGNMENT_REQUIRED' });
@@ -685,15 +725,14 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
           this.refreshAuthorizedLeaseExpiry(client, input.gameId, leaseGeneration!, finalPrincipal.expiresAt ?? null);
         }
       } else {
-        await this.gamesService.assertReadAccess(authUser, input.gameId);
         if (!this.isRoomGenerationCurrent(client.id, input.gameId, leaseGeneration!) ||
           this.staffRoomOwners.get(this.roomTransitionKey(client.id, input.gameId)) !== leaseGeneration ||
           !client.rooms.has(room) || !this.isSocketLive(client)) {
           throw new ForbiddenException({ code: 'STAFF_SCOPE_DENIED', message: 'Game subscription generation changed' });
         }
       }
-      const emitted = this.emitGameSnapshotIfNewer(client, input.gameId, leaseGeneration!, ackBackfill);
-      const gap = initialBackfill.gap ?? ackBackfill.gap;
+      const emitted = this.emitGameSnapshotIfNewer(client, input.gameId, leaseGeneration!, initialBackfill);
+      const gap = initialBackfill.gap;
       if (emitted && gap !== undefined && gap !== null) {
         client.emit('game.gap', gap);
       }
@@ -702,7 +741,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       const snapshot = pendingSnapshotAck !== undefined && pendingAck === pendingSnapshotAck &&
         pendingAck.snapshot !== undefined
         ? pendingAck.snapshot
-        : this.toGameSnapshot(input.gameId, ackBackfill);
+        : this.toGameSnapshot(input.gameId, initialBackfill);
       this.clearPendingGameSnapshotAck(client.id, input.gameId, leaseGeneration, pendingSnapshotAck);
       this.startCommittedEventDelivery(client, input.gameId);
       return {
@@ -1144,6 +1183,48 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     return pendingAck;
   }
 
+  private async runPendingGameSnapshotWork<T>(
+    client: V1Socket,
+    gameId: string,
+    generation: number,
+    pendingAck: PendingGameSnapshotAck,
+    work: () => Promise<T>,
+  ): Promise<{ readonly completed: true; readonly value: T; readonly current: boolean } | { readonly completed: false }> {
+    let value: T | undefined;
+    let hasValue = false;
+    const scheduled = this.refreshScheduler.schedule(gameId, async () => {
+      const result = await work();
+      value = result;
+      hasValue = true;
+    });
+    pendingAck.scheduled = scheduled;
+    try {
+      await scheduled.promise;
+    } finally {
+      if (pendingAck.scheduled === scheduled) pendingAck.scheduled = undefined;
+    }
+    if (!hasValue) return { completed: false };
+    return {
+      completed: true,
+      value: value as T,
+      current: this.isPendingGameSnapshotAckCurrent(client, gameId, generation, pendingAck),
+    };
+  }
+
+  private isPendingGameSnapshotAckCurrent(
+    client: V1Socket,
+    gameId: string,
+    generation: number,
+    pendingAck: PendingGameSnapshotAck,
+  ): boolean {
+    const key = this.roomTransitionKey(client.id, gameId);
+    return this.pendingGameSnapshotAcks.get(key) === pendingAck &&
+      pendingAck.generation === generation &&
+      this.isSocketLive(client) && client.rooms.has(gameRoom(gameId)) &&
+      this.isRoomGenerationCurrent(client.id, gameId, generation) &&
+      this.staffRoomOwners.get(key) === generation;
+  }
+
   private clearPendingGameSnapshotAck(
     clientId: string,
     gameId: string,
@@ -1154,7 +1235,9 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     const current = this.pendingGameSnapshotAcks.get(key);
     if (current === undefined || (generation !== undefined && current.generation !== generation) ||
       (expected !== undefined && current !== expected)) return false;
-    return this.pendingGameSnapshotAcks.delete(key);
+    if (!this.pendingGameSnapshotAcks.delete(key)) return false;
+    current.scheduled?.cancel();
+    return true;
   }
 
   private clearSocketGameRefreshFlights(socketId: string, gameId?: string): void {

@@ -8,7 +8,7 @@ import type { ReactNode } from 'react';
 import { renderToString } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PublicMatchDetail } from '@/components/public-game-records/types';
-import type { V1TournamentDetail } from '@/types/api';
+import type { V1TournamentAnnouncement, V1TournamentDetail } from '@/types/api';
 import { stripScriptTags } from '@/test/html-sanitize';
 
 vi.mock('next/navigation', () => ({
@@ -19,6 +19,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 import TournamentDetailPage from './page';
+import { TournamentDetailView } from './tournament-detail-client';
 import ResultsPage from './results/page';
 import BracketPage from './bracket/page';
 import AwardsPage from './awards/page';
@@ -95,6 +96,46 @@ async function serverHtml(node: Promise<ReactNode>): Promise<string> {
 }
 
 describe('대회 상세 첫 HTML', () => {
+  it('UTC와 KST 서버 렌더에서 공지 날짜를 같은 KST 날짜로 보여준다', async () => {
+    const announcement = {
+      id: 'announcement-date-boundary',
+      title: '날짜 경계 공지',
+      body: '테스트 공지예요.',
+      category: 'general',
+      audience: 'public',
+      publishedAt: '2026-10-26T18:14:47.468Z',
+      createdAt: '2026-10-26T18:14:47.468Z',
+    } satisfies V1TournamentAnnouncement;
+
+    tournamentDetail = {
+      ...tournamentDetail,
+      announcements: [announcement],
+    };
+
+    const originalTimezone = process.env.TZ;
+    try {
+      // This compares two server renders of the production view; Alpha browser hydration remains a separate gate.
+      process.env.TZ = 'UTC';
+      const utcServerHtml = await serverHtml(Promise.resolve(
+        <TournamentDetailView tournament={tournamentDetail} myRegistration={null} />,
+      ));
+      process.env.TZ = 'Asia/Seoul';
+      const kstServerHtml = await serverHtml(Promise.resolve(
+        <TournamentDetailView tournament={tournamentDetail} myRegistration={null} />,
+      ));
+      const announcementDate = (html: string) => {
+        const titleIndex = html.indexOf('날짜 경계 공지');
+        return html.slice(titleIndex).match(/<span class="tm-text-caption"[^>]*>(.*?)<\/span>/)?.[1];
+      };
+
+      expect(announcementDate(utcServerHtml)).toBe('10월 27일');
+      expect(announcementDate(kstServerHtml)).toBe(announcementDate(utcServerHtml));
+    } finally {
+      if (originalTimezone === undefined) delete process.env.TZ;
+      else process.env.TZ = originalTimezone;
+    }
+  });
+
   it('상세는 오류 화면 대신 대회 이름을 서버 HTML 에 그린다', async () => {
     const html = await serverHtml(TournamentDetailPage({ params: Promise.resolve({ id: 't-1' }) }));
     expect(html).not.toContain('불러오지 못했어요');

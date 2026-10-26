@@ -97,6 +97,14 @@ export function formatTournamentDateShort(dateStr: string | null | undefined): s
   return `${parts.month}/${parts.day} (${parts.weekday})`;
 }
 
+/** 공지 게시일 등 날짜만 필요한 표기: 'M월 D일'. null/invalid는 null, 오프셋 없는 값은 KST 벽시계로 읽어요. */
+export function formatKstMonthDay(dateStr: string | null | undefined): string | null {
+  if (!dateStr) return null;
+  const parts = getTournamentKstParts(dateStr);
+  if (!parts) return null;
+  return `${parts.month}월 ${parts.day}일`;
+}
+
 export function formatTournamentDateRangeShort(
   startStr: string | null | undefined,
   endStr: string | null | undefined,

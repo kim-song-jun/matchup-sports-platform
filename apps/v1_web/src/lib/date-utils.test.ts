@@ -9,6 +9,7 @@ import {
   formatAdminKstDateTimeShort,
   formatCardDate,
   formatCardTime,
+  formatKstMonthDay,
   formatKstDateShort,
   formatKstTime,
   formatTournamentDateRangeWithTime,
@@ -112,6 +113,19 @@ describe('formatKstTime / formatKstDateShort (리그 대진 timing 타임라인)
   it('invalid 문자열은 원본을 그대로 반환한다', () => {
     expect(formatKstTime('nope')).toBe('nope');
     expect(formatKstDateShort('nope')).toBe('nope');
+  });
+});
+
+describe('formatKstMonthDay', () => {
+  it('UTC 날짜 경계를 KST 월·일로 표시하고 오프셋 없는 값은 KST 벽시계로 읽는다', () => {
+    expect(formatKstMonthDay('2026-10-26T18:14:47.468Z')).toBe('10월 27일');
+    expect(formatKstMonthDay('2026-10-26T18:14:47.468')).toBe('10월 26일');
+  });
+
+  it('null, undefined, invalid 날짜는 null을 반환한다', () => {
+    expect(formatKstMonthDay(null)).toBeNull();
+    expect(formatKstMonthDay(undefined)).toBeNull();
+    expect(formatKstMonthDay('not-a-date')).toBeNull();
   });
 });
 

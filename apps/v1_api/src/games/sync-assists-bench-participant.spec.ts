@@ -3,6 +3,7 @@ import type { PrismaService } from '../prisma/prisma.service';
 import type { GameCommandContext } from './games.types';
 import type { GameTakeoverService } from './game-takeover.service';
 import { GamesService } from './games.service';
+import { TournamentStaffAccessService } from '../tournaments/staff/tournament-staff-access.service';
 
 /**
  * 감사 결함 수정(2026-08-27) — `syncAssistsIntoSubmittedRevision`(private, `assignGoalAssist`
@@ -107,6 +108,7 @@ describe('GamesService.syncAssistsIntoSubmittedRevision (private, via assignGoal
       {} as PrismaService,
       {} as OperationAuditWriterService,
       {} as GameTakeoverService,
+      new TournamentStaffAccessService({} as PrismaService),
     );
     return { service, tx, predecessor, successorDraft };
   }

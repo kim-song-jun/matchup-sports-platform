@@ -5,6 +5,7 @@ import { GamesService, canonicalGameCommandPayloadHash } from '../../src/games/g
 import type { GameActorScope, GameCommandContext, GameSourceCreationInput } from '../../src/games/games.types';
 import { PublicUserRecordsService } from '../../src/games/public-records/public-user-records.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 const ids = {
   operator: '67000000-0000-4000-8000-000000000001',
@@ -23,7 +24,7 @@ const ids = {
 } as const;
 
 const prisma = new PrismaService();
-const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 const userRecords = new PublicUserRecordsService(prisma);
 const authUser = (id: string) => ({ id, email: `${id}@task-summary.example.test`, accountStatus: 'active' as const, onboardingStatus: 'completed' as const });
 

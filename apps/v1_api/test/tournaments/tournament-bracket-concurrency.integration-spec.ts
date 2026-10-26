@@ -12,7 +12,7 @@ import { competitionConfigFixture as ids, seedCompetitionConfigFixture } from '.
 
 const prisma = new PrismaService();
 const user = { id: ids.adminUserId, email: 'bracket-concurrency@example.test', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
-const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 const bracket = (db = prisma) => new TournamentBracketService(db, new AdminContextService(db), games);
 const review = (db = prisma) => new TournamentResultReviewService(db, new TournamentStaffAccessService(db), new OperationAuditWriterService());
 const gate = () => {

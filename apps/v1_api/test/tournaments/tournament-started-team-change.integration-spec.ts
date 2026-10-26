@@ -36,7 +36,7 @@ const ids = {
 
 const prisma = new PrismaService();
 const audit = new OperationAuditWriterService();
-const games = new GamesService(prisma, audit, new GameTakeoverService());
+const games = new GamesService(prisma, audit, new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 const staffAccess = new TournamentStaffAccessService(prisma);
 const resultReview = new TournamentResultReviewService(prisma, staffAccess, audit);
 const bracket = new TournamentBracketService(prisma, new AdminContextService(prisma), games);

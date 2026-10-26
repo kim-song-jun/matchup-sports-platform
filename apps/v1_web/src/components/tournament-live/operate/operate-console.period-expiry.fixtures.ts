@@ -10,6 +10,7 @@ export function createFixture(server: SetupServerApi) {
   let game: GameDetail = {
     id: 'game-expiry', sourceType: 'TEAM_MATCH', state: 'LIVE', version: 5, lastSequence: 0,
     competitionConfigVersionId: 'config-expiry', currentOfficialRevisionId: null, actorRole: 'tournament_director',
+    realtimeAuthorization: { kind: 'staff', subjectVersion: 1 },
     sides: [
       { id: 'home', gameId: 'game-expiry', sideKey: 'HOME', teamId: 'team-home', displayNameSnapshot: '홈 팀', createdAt: '', updatedAt: '' },
       { id: 'away', gameId: 'game-expiry', sideKey: 'AWAY', teamId: 'team-away', displayNameSnapshot: '원정 팀', createdAt: '', updatedAt: '' },
@@ -102,6 +103,7 @@ export function createFixture(server: SetupServerApi) {
   );
   return {
     socket, commands, endPeriod, resultRevisions, subscribed: subscribed.promise,
+    get gameDetail() { return game; },
     get reads() { return reads; },
     waitForReads(count: number) {
       if (reads >= count) return Promise.resolve();

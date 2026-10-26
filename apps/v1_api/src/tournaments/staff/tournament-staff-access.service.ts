@@ -144,6 +144,7 @@ export class TournamentStaffAccessService {
           tournamentId: input.resource.tournamentId,
           userId: input.userId,
         },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
         select: {
           id: true,
           tournamentId: true,

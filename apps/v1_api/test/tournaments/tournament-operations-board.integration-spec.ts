@@ -1729,7 +1729,7 @@ describe('Task 18 tournament fixture lineup capture and submit', () => {
     // GamesService, and Task 18's P1-4 fix added TournamentStaffAccessService to
     // TournamentFixtureLineupService (so authorization runs before any fixture/game lookup).
     // Both are required - the current signatures are 3-arg on each.
-    gamesService = new GamesService(lineupPrisma, new OperationAuditWriterService(), new GameTakeoverService());
+    gamesService = new GamesService(lineupPrisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(lineupPrisma));
     lineupService = new TournamentFixtureLineupService(
       lineupPrisma,
       gamesService,

@@ -14,11 +14,12 @@ import { TournamentBracketService } from '../../src/tournaments/tournament-brack
 import { assignSlotInTx, assignSlotsBatchInTx, TournamentSlotService, type SlotMutationContext } from '../../src/tournaments/slots/tournament-slot.service';
 import { competitionConfigFixture as ids, seedCompetitionConfigFixture } from '../fixtures/competition-config.fixture';
 import { seedBracketTournament, type SeededBracketTournament } from '../helpers/bracket-canvas-fixture';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 const prisma = new PrismaService();
 const user = { id: ids.adminUserId, email: 'tournament-slots@example.test', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
 const adminContext = new AdminContextService(prisma);
-const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 const templates = new BracketTemplateService(prisma, adminContext, games);
 const slots = new TournamentSlotService(prisma, adminContext, games);
 const bracket = new TournamentBracketService(prisma, adminContext, games);

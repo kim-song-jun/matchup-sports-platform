@@ -5,6 +5,7 @@ import { GamesService, canonicalGameCommandPayloadHash } from '../../src/games/g
 import type { GameActorScope, GameCommandContext, GameSourceCreationInput } from '../../src/games/games.types';
 import { runGamePeriodLiveBackfill } from '../../src/games/migration/game-period-live-backfill';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 /**
  * D-21 / Task 1의 blocker B7 — Task 1이 심는 PERIOD_NOT_STARTED 가드가 배포되는
@@ -63,7 +64,7 @@ const ids = {
 } as const;
 
 const prisma = new PrismaService();
-const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 
 const authUser = (id: string) => ({
   id,

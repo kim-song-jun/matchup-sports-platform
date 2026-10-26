@@ -9,12 +9,13 @@ import { lockCompetitionForBracketMutationInTx } from '../../src/tournaments/slo
 import { BracketTemplateService } from '../../src/tournaments/templates/bracket-template.service';
 import { competitionConfigFixture as ids, seedCompetitionConfigFixture } from '../fixtures/competition-config.fixture';
 import { seedBracketTournament, seedSupportAdmin } from '../helpers/bracket-canvas-fixture';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 jest.setTimeout(120_000);
 const prisma = new PrismaService();
 const user = { id: ids.adminUserId, email: 'empty-template@example.test', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
 const context = new AdminContextService(prisma);
-const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 const bracket = new TournamentBracketService(prisma, context, games);
 const slots = new TournamentSlotService(prisma, context, games);
 const templates = new BracketTemplateService(prisma, context, games);

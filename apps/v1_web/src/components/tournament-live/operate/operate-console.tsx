@@ -234,11 +234,12 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   const gameDetail = useV1Game(gameId);
 
   const ops = useV1GameOperationsConsole({
-    tournamentId,
     gameId,
-    myUserId,
     initialLastSequence: gameDetail.data?.lastSequence ?? 0,
     takeoverEnabled,
+    gameDetailGameId: gameDetail.data?.id ?? null,
+    gameDetailStatus: gameDetail.status,
+    realtimeAuthorization: gameDetail.data?.realtimeAuthorization ?? null,
   });
   const canOperate = takeoverEnabled && isTakeoverHeld(ops.takeover);
   // 진행 명령은 실시간 연결이 있을 때만 보낸다. 끊긴 동안엔 takeover 갱신이 서버에 닿지 않고

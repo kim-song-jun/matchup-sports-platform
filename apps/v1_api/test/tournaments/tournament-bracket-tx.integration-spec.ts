@@ -10,10 +10,11 @@ import { updateTournamentMatchInTx } from '../../src/tournaments/tournament-matc
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from '../../src/tournaments/tournament-surface-lookup';
 import type { Prisma } from '@prisma/client';
 import { competitionConfigFixture as ids, seedCompetitionConfigFixture } from '../fixtures/competition-config.fixture';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 const prisma = new PrismaService();
 const user = { id: ids.adminUserId, email: 'bracket-tx@example.test', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
-const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 const adminContext = new AdminContextService(prisma);
 const bracket = new TournamentBracketService(prisma, adminContext, games);
 let admin: Awaited<ReturnType<AdminContextService['getMutationAdmin']>>;

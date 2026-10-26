@@ -21,6 +21,7 @@ import {
   toGameHttpException,
   GamesService,
 } from './games.service';
+import { TournamentStaffAccessService } from '../tournaments/staff/tournament-staff-access.service';
 
 function participant(overrides: Partial<V1GameParticipant>): V1GameParticipant {
   return {
@@ -523,6 +524,7 @@ describe('GamesService.listMyTournamentFixtures canonical source', () => {
       prisma as never,
       {} as never,
       {} as never,
+      new TournamentStaffAccessService(prisma as never),
     );
 
     await expect(
@@ -600,7 +602,7 @@ describe('GamesService.listMyTournamentFixtures canonical source', () => {
         ]),
       },
     };
-    const service = new GamesService(prisma as never, {} as never, {} as never);
+    const service = new GamesService(prisma as never, {} as never, {} as never, new TournamentStaffAccessService(prisma as never));
 
     await expect(
       service.listMyTournamentFixtures({ id: 'user-1' } as V1AuthUser, 'tournament-1'),
@@ -632,7 +634,7 @@ describe('GamesService.listMyTournamentFixtures canonical source', () => {
         ]),
       },
     };
-    const service = new GamesService(prisma as never, {} as never, {} as never);
+    const service = new GamesService(prisma as never, {} as never, {} as never, new TournamentStaffAccessService(prisma as never));
 
     await expect(
       service.listMyTournamentFixtures({ id: 'user-1' } as V1AuthUser, 'tournament-1'),
@@ -673,7 +675,7 @@ describe('GamesService.confirmSideArrival', () => {
       },
     };
     const prisma = { $transaction: jest.fn(async (callback: (client: unknown) => unknown) => callback(tx)) };
-    const service = new GamesService(prisma as never, {} as never, {} as never);
+    const service = new GamesService(prisma as never, {} as never, {} as never, new TournamentStaffAccessService(prisma as never));
     const resolveActor = jest
       .spyOn(service as never, 'resolveActor' as never)
       .mockResolvedValue((options.actor ?? { role: 'platform_ops', teamId: null }) as never);
@@ -865,7 +867,7 @@ describe('GamesService start — 취소된 대진의 경기', () => {
   }
 
   function assertStartable(tx: ReturnType<typeof makeTx>) {
-    const service = new GamesService({} as never, {} as never, {} as never) as unknown as {
+    const service = new GamesService({} as never, {} as never, {} as never, new TournamentStaffAccessService({} as never)) as unknown as {
       assertTournamentMatchStartable(tx: unknown, game: { id: string; sourceType: string; teamMatchId: string }): Promise<void>;
     };
     return service.assertTournamentMatchStartable(tx, { id: 'game-1', sourceType: 'TEAM_MATCH', teamMatchId: 'tm-1' });
@@ -965,7 +967,7 @@ describe.each(['listLineups', 'listOperationsLineups'] as const)('GamesService.%
       ...transactionClient,
       $transaction: jest.fn(async (callback: (tx: typeof transactionClient) => Promise<unknown>) => callback(transactionClient)),
     };
-    const service = new GamesService(prisma as never, {} as never, {} as never);
+    const service = new GamesService(prisma as never, {} as never, {} as never, new TournamentStaffAccessService(prisma as never));
     jest.spyOn(service as never, 'resolveActor' as never).mockResolvedValue({ role, teamId: 'team-home' } as never);
     return { service, prisma };
   }

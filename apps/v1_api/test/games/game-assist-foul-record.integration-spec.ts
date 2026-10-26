@@ -4,6 +4,7 @@ import { GameTakeoverService } from '../../src/games/game-takeover.service';
 import { GamesService, canonicalGameCommandPayloadHash } from '../../src/games/games.service';
 import type { GameActorScope, GameCommandContext, GameSourceCreationInput } from '../../src/games/games.types';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 const ids = {
   operator: '66000000-0000-4000-8000-000000000001',
@@ -19,7 +20,7 @@ const ids = {
 } as const;
 
 const prisma = new PrismaService();
-const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 const authUser = (id: string) => ({ id, email: `${id}@task-record.example.test`, accountStatus: 'active' as const, onboardingStatus: 'completed' as const });
 
 function context(actor: GameActorScope, commandId: string, payload: unknown): GameCommandContext {

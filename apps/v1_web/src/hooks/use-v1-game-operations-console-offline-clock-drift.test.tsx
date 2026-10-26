@@ -57,7 +57,6 @@ function createMockSocket() {
 const mockV1Post = vi.fn(async (..._args: unknown[]) => ({ gameId: 'game-1', state: 'LIVE', version: 6 }));
 
 vi.mock('@/lib/api-client', () => ({
-  v1Get: vi.fn(async () => ({ items: [] })),
   v1Post: (...args: unknown[]) => mockV1Post(...args),
 }));
 
@@ -85,9 +84,10 @@ describe('useV1GameOperationsConsole — 오프라인 큐 첫 전송의 CLOCK_DR
     const { result, unmount } = renderHook(
       () =>
         useV1GameOperationsConsole({
-          tournamentId: null,
           gameId: 'game-1',
-          myUserId: 'user-1',
+          gameDetailGameId: 'game-1',
+          gameDetailStatus: 'success',
+          realtimeAuthorization: { kind: 'unscoped', subjectVersion: 0 },
           initialLastSequence: 0,
         }),
       { wrapper: createWrapper(queryClient) },
@@ -134,9 +134,10 @@ describe('useV1GameOperationsConsole — 오프라인 큐 첫 전송의 CLOCK_DR
     const { result, unmount } = renderHook(
       () =>
         useV1GameOperationsConsole({
-          tournamentId: null,
           gameId: 'game-1',
-          myUserId: 'user-1',
+          gameDetailGameId: 'game-1',
+          gameDetailStatus: 'success',
+          realtimeAuthorization: { kind: 'unscoped', subjectVersion: 0 },
           initialLastSequence: 0,
         }),
       { wrapper: createWrapper(queryClient) },

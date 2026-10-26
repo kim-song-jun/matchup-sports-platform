@@ -22,7 +22,10 @@ async function mount() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   clients.push(client);
   function wrapper({ children }: { readonly children: ReactNode }) { return <QueryClientProvider client={client}>{children}</QueryClientProvider>; }
-  const hook = renderHook(({ gameId }: { readonly gameId: string }) => useV1GameOperationsConsole({ tournamentId: null, gameId, myUserId: USER_ID, initialLastSequence: 1 }), { wrapper, initialProps: { gameId: GAME_A } });
+  const hook = renderHook(({ gameId }: { readonly gameId: string }) => useV1GameOperationsConsole({ gameId,
+          gameDetailGameId: gameId,
+          gameDetailStatus: 'success',
+          realtimeAuthorization: { kind: 'unscoped', subjectVersion: 0 }, initialLastSequence: 1 }), { wrapper, initialProps: { gameId: GAME_A } });
   await waitFor(() => expect(hook.result.current.gameSnapshot).toEqual({ state: 'LIVE', version: 5 }));
   await waitFor(() => expect(transport.requests).toHaveLength(1));
   return { ...hook, transport };

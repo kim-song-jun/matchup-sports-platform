@@ -9,6 +9,7 @@ import { TournamentBracketService } from '../../src/tournaments/tournament-brack
 import { drainOutboxWorker } from '../helpers/drain-outbox-worker';
 import { FOOTBALL_V1_CONFIG } from '../../src/tournaments/competition-config/competition-config';
 import { runCompetitionConfigContractPhaseBackfill } from '../../src/tournaments/competition-config/competition-config-backfill';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 const ids = {
   user: '66000000-0000-4000-8000-000000000001',
@@ -35,7 +36,7 @@ const authUser = {
 };
 
 const prisma = new PrismaService();
-const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 const adminContext = new AdminContextService(prisma);
 const bracket = new TournamentBracketService(prisma, adminContext, games);
 

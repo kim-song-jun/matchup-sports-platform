@@ -5,6 +5,7 @@ import { canonicalGameCommandPayloadHash, GamesService } from '../../src/games/g
 import type { GameCommandContext, GameSourceCreationInput } from '../../src/games/games.types';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { invalidateLineupAndTactics } from '../../src/tournaments/tournament-match-update';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 /**
  * [P1-c] 라인업을 **한쪽도 제출하지 않은** 대회 경기를 시작할 수 있어야 한다.
@@ -43,7 +44,7 @@ const ids = {
 } as const;
 
 const prisma = new PrismaService();
-const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 
 const authUser = (id: string) => ({
   id,

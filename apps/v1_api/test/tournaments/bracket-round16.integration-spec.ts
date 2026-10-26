@@ -8,10 +8,11 @@ import { TournamentBracketService } from '../../src/tournaments/tournament-brack
 import { TOURNAMENT_DETAIL_INCLUDE } from '../../src/tournaments/tournaments-read.query';
 import { competitionConfigFixture as ids, seedCompetitionConfigFixture } from '../fixtures/competition-config.fixture';
 import { seedBracketTournament } from '../helpers/bracket-canvas-fixture';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 const prisma = new PrismaService();
 const adminContext = new AdminContextService(prisma);
-const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 const templates = new BracketTemplateService(prisma, adminContext, games);
 const bracket = new TournamentBracketService(prisma, adminContext, games);
 const user = { id: ids.adminUserId, email: 'round16-admin@example.test', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };

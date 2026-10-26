@@ -58,6 +58,7 @@ import {
   type StoredPenalties,
 } from './core/knockout-penalties';
 import { GameTakeoverService, type GameTakeoverRequestReservation } from './game-takeover.service';
+import { TournamentStaffAccessService } from '../tournaments/staff/tournament-staff-access.service';
 import {
   loadParticipantConsentEligibility,
 } from './public-records/public-consent';
@@ -117,6 +118,7 @@ import type {
   GameRevisionMutationResult,
   GameScore,
   GameSourceCreationInput,
+  GameRealtimeAuthorization,
 } from './games.types';
 import type { CancelGameDto, GameCommandDto } from './dto/game-command.dto';
 import type {
@@ -1040,9 +1042,9 @@ export class GamesService {
     private readonly prisma: PrismaService,
     private readonly operationAuditWriter: OperationAuditWriterService,
     private readonly takeover: GameTakeoverService,
+    private readonly tournamentStaffAccess: TournamentStaffAccessService,
     // 신원 연결 승인 요청 푸시(2026-08-26). optional 인 이유는 워커 서비스의 webPush 와 같다 —
-    // `new GamesService(prisma, audit, takeover)` 로 직접 만드는 스펙이 다수 있고 그쪽은
-    // 푸시가 no-op 이면 된다. 실제 앱에서는 GamesModule 이 import 한 WebPushModule 에서 주입된다.
+    // 권한 판정 서비스는 필수로 전달하고, 푸시 의존성은 푸시가 없는 테스트에서 생략할 수 있어요.
     @Optional() private readonly webPush?: WebPushService,
   ) {}
 
@@ -1202,6 +1204,14 @@ export class GamesService {
           competitionConfigVersionId: true,
           currentOfficialRevisionId: true,
           teamMatchId: true,
+          teamMatch: {
+            select: {
+              id: true,
+              tournamentId: true,
+              leagueId: true,
+              fieldId: true,
+            },
+          },
           sides: { orderBy: { sideKey: 'asc' } },
           periods: { orderBy: { number: 'asc' } },
           lineups: { orderBy: [{ sideId: 'asc' }, { revision: 'desc' }] },
@@ -1218,10 +1228,16 @@ export class GamesService {
         select: { lineup: true, periods: true, result: true },
       });
       const lineup = config === null ? {} : jsonObject(config.lineup);
-      const { teamMatchId, ...gameFields } = game;
+      const { teamMatchId, teamMatch, ...gameFields } = game;
       return {
         ...gameFields,
         actorRole: actor.role,
+        realtimeAuthorization: await this.resolveGameRealtimeAuthorization(
+          tx,
+          user.id,
+          actor,
+          { sourceType: game.sourceType, teamMatch },
+        ),
         // 승부차기 입력 단계(운영 콘솔) 추가 — `applyPenalties`가 이미 쓰는
         // 것과 완전히 같은 knockout 판정을 재사용한다(새 판정을 만들지
         // 않는다). 콘솔은 이 값으로 "승부차기 시작" 버튼을 조별리그 무승부
@@ -1253,6 +1269,70 @@ export class GamesService {
         penaltyShootoutPolicy: parseResultPolicy(config?.result ?? null),
       };
     });
+  }
+
+  private async resolveGameRealtimeAuthorization(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    actor: Extract<GameActorScope, { actorType: 'USER' }>,
+    game: {
+      readonly sourceType: V1GameSourceType;
+      readonly teamMatch: {
+        readonly id: string;
+        readonly tournamentId: string | null;
+        readonly leagueId: string | null;
+        readonly fieldId: string | null;
+      } | null;
+    },
+  ): Promise<GameRealtimeAuthorization> {
+    if (actor.role === 'platform_ops') {
+      return { kind: 'platform_ops', subjectVersion: 0 };
+    }
+
+    const teamMatch = game.teamMatch;
+    const competitionId = teamMatch?.tournamentId ?? teamMatch?.leagueId ?? null;
+    if (competitionId === null) {
+      return { kind: 'unscoped', subjectVersion: 0 };
+    }
+
+    const isStaffRole =
+      actor.role === 'tournament_director' ||
+      actor.role === 'field_operator' ||
+      actor.role === 'support_readonly';
+    if (
+      !isStaffRole ||
+      game.sourceType !== V1GameSourceType.TEAM_MATCH ||
+      teamMatch === null ||
+      actor.tournamentId !== competitionId ||
+      actor.fixtureId !== teamMatch.id
+    ) {
+      return { kind: 'unavailable' };
+    }
+
+    try {
+      const principal = await this.tournamentStaffAccess.assertAccess({
+        userId,
+        action: 'read',
+        resource: {
+          tournamentId: competitionId,
+          fixtureId: teamMatch.id,
+          ...(teamMatch.fieldId === null ? {} : { fieldId: teamMatch.fieldId }),
+        },
+      }, tx);
+      if (principal.role === 'platform_ops') {
+        return { kind: 'platform_ops', subjectVersion: 0 };
+      }
+      if (principal.assignmentVersion === null) {
+        return { kind: 'unavailable' };
+      }
+      return { kind: 'staff', subjectVersion: principal.assignmentVersion };
+    } catch (error) {
+      if (error instanceof ForbiddenException) {
+        // 경기는 이미 읽을 수 있어요. 이 응답은 현재 실시간 스태프 권한만 없다고 알려줘요.
+        return { kind: 'unavailable' };
+      }
+      throw error;
+    }
   }
 
   async getVisibility(gameId: string) {
@@ -5557,6 +5637,7 @@ export class GamesService {
           tournamentId: fixture.tournamentId,
           userId,
         },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
         select: {
           id: true,
           tournamentId: true,

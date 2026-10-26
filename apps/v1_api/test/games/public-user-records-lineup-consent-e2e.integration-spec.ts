@@ -10,6 +10,7 @@ import { recordSignupConsent } from '../../src/auth/signup-record-consent';
 import { ProfileService } from '../../src/profile/profile.service';
 import type { RealtimeGateway } from '../../src/realtime/realtime.gateway';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 /**
  * 이번 작업 전체의 출발 증상 -- "대회가 끝나도 개인 기록이 안 나온다"(GET
@@ -48,7 +49,7 @@ const ids = {
 } as const;
 
 const prisma = new PrismaService();
-const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 const userRecords = new PublicUserRecordsService(prisma);
 
 const authUser = (id: string) => ({

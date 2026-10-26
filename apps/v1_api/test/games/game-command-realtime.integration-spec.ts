@@ -64,6 +64,7 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
   let deniedReaderId: string;
   let revocableReaderId: string;
   let expiringReaderId: string;
+  let autoRejoinReaderId: string;
   let raceReaderId: string;
   let awayTeamOwnerId: string;
   let friendlyMemberId: string;
@@ -99,6 +100,7 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
     deniedReaderId = await makeUser('권한 없는 조회자', 5);
     revocableReaderId = await makeUser('회수 경합 조회자', 6);
     expiringReaderId = await makeUser('만료 경합 조회자', 7);
+    autoRejoinReaderId = await makeUser('자동 재가입 경합 조회자', 10);
     raceReaderId = await makeUser('버전 경합 조회자', 8);
     adminId = await makeUser('관리자', 3);
     awayTeamOwnerId = await makeUser('원정팀장', 4);
@@ -301,13 +303,12 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
       tournamentId,
       targetUserId: userId,
       role: V1TournamentStaffRole.SUPPORT_READONLY,
-      fixtureIds: [fixtureId],
       ...(expiresAt === undefined ? {} : { expiresAt }),
       audit: { requestId: randomUUID() },
     });
   }
 
-  function holdActualEventRead(userId: string) {
+  function holdActualEventRead(userId: string, requestedGameId: string) {
     const gamesService = app.get(GamesService);
     const original = gamesService.listEvents.bind(gamesService);
     let release!: () => void;
@@ -317,7 +318,7 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
     const reached = new Promise<void>((resolve) => { markReached = resolve; });
     const spy = jest.spyOn(gamesService, 'listEvents').mockImplementation(async (user, targetGameId, afterSequence) => {
       const actual = await original(user, targetGameId, afterSequence);
-      if (armed && user.id === userId && targetGameId === gameId && afterSequence === 0) {
+      if (armed && user.id === userId && targetGameId === requestedGameId && afterSequence === 0) {
         armed = false;
         markReached();
         await gate;
@@ -327,7 +328,35 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
     return { reached, release, restore: () => spy.mockRestore() };
   }
 
-  function holdActualCurrentGameRead(userId: string) {
+  function holdActualEventReads(userId: string, requestedGameId: string, count: number) {
+    const gamesService = app.get(GamesService);
+    const original = gamesService.listEvents.bind(gamesService);
+    const gates = Array.from({ length: count }, () => {
+      let release!: () => void;
+      let markReached!: () => void;
+      const gate = new Promise<void>((resolve) => { release = resolve; });
+      const reached = new Promise<void>((resolve) => { markReached = resolve; });
+      return { gate, reached, release, markReached };
+    });
+    let captured = 0;
+    const spy = jest.spyOn(gamesService, 'listEvents').mockImplementation(async (user, targetGameId, afterSequence) => {
+      const actual = await original(user, targetGameId, afterSequence);
+      if (user.id === userId && targetGameId === requestedGameId && afterSequence === 0 && captured < gates.length) {
+        const gate = gates[captured++];
+        gate.markReached();
+        await gate.gate;
+      }
+      return actual;
+    });
+    return {
+      reached: gates.map(({ reached }) => reached),
+      release: (index: number) => gates[index]?.release(),
+      releaseAll: () => gates.forEach(({ release }) => release()),
+      restore: () => spy.mockRestore(),
+    };
+  }
+
+  function holdActualCurrentGameRead(userId: string, requestedGameId: string) {
     const gamesService = app.get(GamesService);
     const gateway = app.get(RealtimeGateway) as unknown as {
       loadGameForStaffLease(targetGameId: string): Promise<unknown>;
@@ -342,7 +371,7 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
     const reached = new Promise<void>((resolve) => { markReached = resolve; });
     const listSpy = jest.spyOn(gamesService, 'listEvents').mockImplementation(async (user, targetGameId, afterSequence) => {
       const actual = await originalListEvents(user, targetGameId, afterSequence);
-      if (armed && user.id === userId && targetGameId === gameId && afterSequence === 0) {
+      if (armed && user.id === userId && targetGameId === requestedGameId && afterSequence === 0) {
         armed = false;
         holdNextGameRead = true;
       }
@@ -350,7 +379,7 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
     });
     const gameSpy = jest.spyOn(gateway, 'loadGameForStaffLease').mockImplementation(async (targetGameId) => {
       const actual = await originalCurrentGameRead(targetGameId);
-      if (holdNextGameRead && targetGameId === gameId) {
+      if (holdNextGameRead && targetGameId === requestedGameId) {
         holdNextGameRead = false;
         markReached();
         await gate;
@@ -425,7 +454,7 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
     deniedReader.connect();
     await Promise.all([connected(observer), connected(operator), connected(operatorSecondConsole), connected(deniedReader)]);
 
-    const initialReadGate = holdActualEventRead(observerId);
+    const initialReadGate = holdActualEventRead(observerId, gameId);
     const observerSubscribe = subscribe(observer);
     let initialVersion: number;
     let commandVersion: number;
@@ -616,7 +645,7 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
     expect(pausedDetail.body.data).toMatchObject({ state: 'PAUSED', version: pause.body.data.version });
     expect(pausedDetail.body.data.periods[0].pausedAt).toEqual(expect.any(String));
 
-    const resumeReadGate = holdActualEventRead(operatorId);
+    const resumeReadGate = holdActualEventRead(operatorId, gameId);
     const resumeRefreshes = trackRefreshPromises();
     const resumeSnapshot = eventOnce<{ gameId: string; version: number; state: string; lastSequence: number }>(operator, 'game.snapshot');
     const resumedGoalEvent = eventOnce<{ gameId: string; version: number; sequence: number }>(observer, 'game.event.committed');
@@ -779,7 +808,7 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
     const memberSnapshotListener = (snapshot: unknown) => memberSnapshots.push(snapshot);
     hostMember.on('game.snapshot', memberSnapshotListener);
     const otherRoomSnapshot = eventOnce(scopedObserver, 'game.snapshot');
-    const readGate = holdActualEventRead(friendlyMemberId);
+    const readGate = holdActualEventRead(friendlyMemberId, friendlyGameId);
     const refreshes = trackRefreshPromises();
     let commandVersion: number;
     try {
@@ -924,6 +953,131 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
     } });
   });
 
+  it('keeps a newer pending subscribe ACK through an older subscribe cleanup and REST refresh', async () => {
+    const socket = connect(operatorId, 'nested-subscribe-reader', 0);
+    socket.connect();
+    await connected(socket);
+    const reads = holdActualEventReads(operatorId, friendlyGameId, 2);
+    const snapshots: Array<{ version: number; state: string }> = [];
+    const snapshotListener = (snapshot: { version: number; state: string }) => snapshots.push(snapshot);
+    socket.on('game.snapshot', snapshotListener);
+    const refreshes = trackRefreshPromises();
+    try {
+      const firstSubscribe = subscribe(socket, friendlyGameId);
+      await reads.reached[0];
+      const secondSubscribe = subscribe(socket, friendlyGameId);
+      await reads.reached[1];
+      reads.release(0);
+      await expect(firstSubscribe).resolves.toMatchObject({ status: 'denied' });
+
+      const current = await prisma.v1Game.findUniqueOrThrow({
+        where: { id: friendlyGameId },
+        select: { state: true, version: true },
+      });
+      expect(current.state).toBe('LIVE');
+      const committedSnapshot = eventOnce<{ gameId: string; version: number; state: string }>(socket, 'game.snapshot');
+      const pause = await request(app.getHttpServer())
+        .post(`/api/v1/games/${friendlyGameId}/commands/pause`)
+        .set('x-v1-user-id', operatorId)
+        .set('Idempotency-Key', `gcr-nested-subscribe-pause-${SESSION}`)
+        .send({
+          expectedVersion: current.version,
+          clientCommandId: `gcr-nested-subscribe-pause-${SESSION}`,
+          takeoverToken: `gcr-friendly-no-takeover-${SESSION}`,
+          occurredAt: new Date().toISOString(),
+          payload: {},
+        })
+        .expect(201);
+      await expect(committedSnapshot.promise).resolves.toMatchObject({ event: {
+        gameId: friendlyGameId,
+        version: pause.body.data.version,
+        state: 'PAUSED',
+      } });
+      expect(refreshes.promises).toHaveLength(1);
+      await refreshes.promises[0];
+
+      reads.release(1);
+      await expect(secondSubscribe).resolves.toMatchObject({ status: 'subscribed', snapshot: {
+        gameId: friendlyGameId,
+        version: pause.body.data.version,
+        state: 'PAUSED',
+      } });
+      expect(snapshots.every(({ version }) => version >= pause.body.data.version)).toBe(true);
+    } finally {
+      reads.releaseAll();
+      reads.restore();
+      refreshes.restore();
+      socket.off('game.snapshot', snapshotListener);
+      socket.disconnect();
+    }
+  });
+
+  it('coalesces a real REST commit into an auto-rejoining scoped lease snapshot', async () => {
+    const initialExpiry = new Date(Date.now() + 8_000);
+    const assignment = await grantScopedReader(autoRejoinReaderId, initialExpiry);
+    const reader = connect(autoRejoinReaderId, 'auto-rejoin-pending', assignment.version);
+    reader.connect();
+    await connected(reader);
+    await expect(subscribe(reader)).resolves.toMatchObject({ status: 'subscribed' });
+    const readGate = holdActualEventRead(autoRejoinReaderId, gameId);
+    const snapshots: Array<{ gameId: string; version: number; state: string }> = [];
+    const snapshotListener = (value: { gameId: string; version: number; state: string }) => snapshots.push(value);
+    reader.on('game.snapshot', snapshotListener);
+    const snapshot = eventOnce<{ gameId: string; version: number; state: string }>(reader, 'game.snapshot', 15_000);
+    const extendedExpiry = new Date(Date.now() + 30_000);
+    await prisma.v1TournamentStaffAssignment.update({
+      where: { id: assignment.id },
+      data: { expiresAt: extendedExpiry },
+    });
+    const { socket: operator, takeoverToken } = await openOperatorConsole('auto-rejoin-operator');
+    const current = await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId }, select: { version: true } });
+    const refreshes = trackRefreshPromises();
+    const gateway = app.get(RealtimeGateway) as unknown as {
+      recordGameSubscription(userId: string, targetTournamentId: string, targetGameId: string, socketId: string): void;
+    };
+    const recordSubscription = gateway.recordGameSubscription.bind(gateway);
+    let markRejoined!: () => void;
+    const rejoined = new Promise<void>((resolve) => { markRejoined = resolve; });
+    const rejoinSpy = jest.spyOn(gateway, 'recordGameSubscription').mockImplementation((userId, targetTournamentId, targetGameId, socketId) => {
+      recordSubscription(userId, targetTournamentId, targetGameId, socketId);
+      if (userId === autoRejoinReaderId && targetGameId === gameId) markRejoined();
+    });
+    try {
+      await readGate.reached;
+      const pause = await request(app.getHttpServer())
+        .post(`/api/v1/games/${gameId}/commands/pause`)
+        .set('x-v1-user-id', operatorId)
+        .set('Idempotency-Key', `gcr-auto-rejoin-pause-${SESSION}`)
+        .send({
+          expectedVersion: current.version,
+          clientCommandId: `gcr-auto-rejoin-pause-${SESSION}`,
+          takeoverToken,
+          occurredAt: new Date().toISOString(),
+          payload: {},
+        })
+        .expect(201);
+      expect(refreshes.promises).toHaveLength(1);
+      await refreshes.promises[0];
+      await expect(snapshot.promise).resolves.toMatchObject({ event: {
+        gameId,
+        version: pause.body.data.version,
+        state: 'PAUSED',
+      } });
+      readGate.release();
+      await rejoined;
+      expect(snapshots.length).toBeGreaterThan(0);
+      expect(snapshots.every(({ version }) => version >= pause.body.data.version)).toBe(true);
+    } finally {
+      readGate.release();
+      readGate.restore();
+      refreshes.restore();
+      rejoinSpy.mockRestore();
+      snapshot.cancel();
+      reader.off('game.snapshot', snapshotListener);
+      operator.disconnect();
+    }
+  });
+
   it('does not refresh or rejoin a scoped reader revoked while the real event read is held', async () => {
     const assignment = await grantScopedReader(revocableReaderId);
     const reader = connect(revocableReaderId, 'revoked-during-refresh', assignment.version);
@@ -936,7 +1090,7 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
     const snapshotListener = (snapshot: unknown) => snapshots.push(snapshot);
     reader.on('game.snapshot', snapshotListener);
     const revokedEvent = eventOnce<{ gameId: string }>(reader, 'game.permission.revoked');
-    const readGate = holdActualEventRead(revocableReaderId);
+    const readGate = holdActualEventRead(revocableReaderId, gameId);
     const refreshes = trackRefreshPromises();
     try {
       await request(app.getHttpServer())
@@ -992,7 +1146,7 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
     const snapshotListener = (snapshot: unknown) => snapshots.push(snapshot);
     reader.on('game.snapshot', snapshotListener);
     const revokedEvent = eventOnce<{ gameId: string }>(reader, 'game.permission.revoked', 10_000);
-    const readGate = holdActualEventRead(expiringReaderId);
+    const readGate = holdActualEventRead(expiringReaderId, gameId);
     const refreshes = trackRefreshPromises();
     try {
       await request(app.getHttpServer())
@@ -1038,7 +1192,7 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
     const snapshots: Array<{ gameId: string; version: number; state: string }> = [];
     const snapshotListener = (snapshot: { gameId: string; version: number; state: string }) => snapshots.push(snapshot);
     reader.on('game.snapshot', snapshotListener);
-    const readGate = holdActualCurrentGameRead(raceReaderId);
+    const readGate = holdActualCurrentGameRead(raceReaderId, gameId);
     let rejoinGate: ReturnType<typeof holdActualCurrentGameRead> | undefined;
     const refreshes = trackRefreshPromises();
     try {
@@ -1087,7 +1241,7 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
       readGate.restore();
 
       const snapshotsBeforeThirdCommand = snapshots.length;
-      rejoinGate = holdActualCurrentGameRead(raceReaderId);
+      rejoinGate = holdActualCurrentGameRead(raceReaderId, gameId);
       const thirdCommand = await request(app.getHttpServer())
         .post(`/api/v1/games/${gameId}/commands/resume`)
         .set('x-v1-user-id', operatorId)

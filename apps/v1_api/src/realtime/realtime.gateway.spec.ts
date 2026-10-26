@@ -138,6 +138,7 @@ describe('RealtimeGateway', () => {
   const logger = { debug: jest.fn(), warn: jest.fn(), error: jest.fn() };
   const staffAccess = { assertAccess: jest.fn() };
   const managedTerms = { signupCompliance: jest.fn() };
+  const emitCommittedEvent = jest.fn();
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -164,7 +165,7 @@ describe('RealtimeGateway', () => {
         // 게이트웨이가 afterInit 에서 자신을 등록하는 룸 브로드캐스터. 이 스펙들은
         // 소켓 경로만 검증하므로 주입만 만족하면 된다(REST 경로 브로드캐스트는
         // games.controller.broadcast.spec.ts 가 따로 검증한다).
-        { provide: GameBroadcastRegistry, useValue: { register: jest.fn(), emitToGame: jest.fn() } },
+        { provide: GameBroadcastRegistry, useValue: { register: jest.fn(), emitCommittedEvent } },
         GameTakeoverService,
       ],
     }).compile();
@@ -386,6 +387,14 @@ describe('RealtimeGateway', () => {
       stubUser('social_profile_deferred', { status: 'active' });
       const socket = await connect();
       await expect(append(socket)).resolves.toMatchObject({ status: 'ack' });
+      expect(emitCommittedEvent).toHaveBeenCalledWith('game-1', 2, {
+        gameId: 'game-1',
+        sequence: 1,
+        version: 2,
+        event: {},
+      });
+      expect(socket.emit).toHaveBeenCalledWith('game.event.ack', expect.objectContaining({ version: 2 }));
+      expect(socket.emit).toHaveBeenCalledWith('game.event.committed', expect.objectContaining({ version: 2, event: {} }));
 
       stubUser('social_profile_deferred', { status: 'revoked' });
       await expect(append(socket)).resolves.toMatchObject({ code: 'ACTIVITY_PROFILE_REQUIRED' });
@@ -395,6 +404,9 @@ describe('RealtimeGateway', () => {
       stubUser('completed');
       const socket = await connect();
       await expect(append(socket)).resolves.toMatchObject({ status: 'ack' });
+      expect(emitCommittedEvent).toHaveBeenCalledWith('game-1', 2, expect.objectContaining({ event: {} }));
+      expect(socket.emit).toHaveBeenCalledWith('game.event.ack', expect.objectContaining({ version: 2 }));
+      expect(socket.emit).toHaveBeenCalledWith('game.event.committed', expect.objectContaining({ version: 2, event: {} }));
       await expect(requestTakeover(socket)).resolves.toMatchObject({ status: 'granted' });
     });
 

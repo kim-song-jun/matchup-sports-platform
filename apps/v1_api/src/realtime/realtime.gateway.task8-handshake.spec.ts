@@ -116,7 +116,7 @@ describe('Task 8 realtime authenticated pre-connect handshake', () => {
         { provide: TournamentStaffAccessService, useValue: staffAccess },
         { provide: GamesService, useValue: gamesService },
         { provide: getLoggerToken(RealtimeGateway.name), useValue: logger },
-        { provide: GameBroadcastRegistry, useValue: { register: jest.fn(), emitToGame: jest.fn() } },
+        { provide: GameBroadcastRegistry, useValue: { register: jest.fn() } },
         { provide: GameTakeoverService, useValue: { isSuperseded: jest.fn().mockReturnValue(false) } },
       ],
     }).compile();

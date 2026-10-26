@@ -40,6 +40,7 @@ type SocketAdapter = {
     clientInstanceId?: string;
     authorizationSubjectVersion?: number;
   };
+  readonly rooms: Set<string>;
   readonly join: jest.Mock<Promise<void>, [string]>;
   readonly leave: jest.Mock<Promise<void>, [string]>;
   readonly emit: jest.Mock<void, [string, unknown]>;
@@ -73,12 +74,14 @@ type Task8ProtocolGateway = {
 };
 
 function socket(overrides: Partial<SocketAdapter> = {}): SocketAdapter {
+  const rooms = new Set<string>();
   return {
     id: 'socket-task-8',
     handshake: { headers: {}, auth: {} },
     data: { userId: USER.id, authUser: USER, clientInstanceId: 'client-task-8', authorizationSubjectVersion: 0 },
-    join: jest.fn().mockResolvedValue(undefined),
-    leave: jest.fn().mockResolvedValue(undefined),
+    rooms,
+    join: jest.fn(async (room: string) => { rooms.add(room); }),
+    leave: jest.fn(async (room: string) => { rooms.delete(room); }),
     emit: jest.fn(),
     disconnect: jest.fn(),
     ...overrides,
@@ -115,6 +118,7 @@ describe('Task 8 game-operations realtime protocol', () => {
   };
   const staffAccess = { assertAccess: jest.fn() };
   const logger = { debug: jest.fn(), warn: jest.fn(), error: jest.fn() };
+  const emitCommittedEvent = jest.fn();
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -137,7 +141,7 @@ describe('Task 8 game-operations realtime protocol', () => {
         { provide: TournamentStaffAccessService, useValue: staffAccess },
         { provide: GamesService, useValue: gamesService },
         { provide: getLoggerToken(RealtimeGateway.name), useValue: logger },
-        { provide: GameBroadcastRegistry, useValue: { register: jest.fn(), emitToGame: jest.fn() } },
+        { provide: GameBroadcastRegistry, useValue: { register: jest.fn(), emitCommittedEvent } },
         { provide: GameTakeoverService, useValue: { isSuperseded: jest.fn().mockReturnValue(false) } },
       ],
     }).compile();
@@ -235,6 +239,7 @@ describe('Task 8 game-operations realtime protocol', () => {
     expect(gamesService.appendEvent).toHaveBeenCalledWith(USER, GAME_ID, 'event-1', expect.objectContaining({ takeoverToken: 'nonempty-takeover-token' }));
     expect(client.emit).toHaveBeenCalledWith('game.event.ack', expect.objectContaining({ clientEventId: 'event-1', sequence: 4, version: 5 }));
     expect(client.emit).toHaveBeenCalledWith('game.event.committed', expect.objectContaining({ gameId: GAME_ID, sequence: 4, version: 5 }));
+    expect(emitCommittedEvent).toHaveBeenCalledWith(GAME_ID, 5, expect.objectContaining({ gameId: GAME_ID, sequence: 4 }));
   });
 
   /**
@@ -354,6 +359,7 @@ describe('Task 8 game-operations realtime protocol', () => {
     expect(broadcastEvent).not.toBe(rawEvent);
     expect((broadcastEvent as { id: string }).id).toBe('persisted-event-id');
     expect((broadcastEvent as { reversesEventId: string | null }).reversesEventId).toBeNull();
+    expect(emitCommittedEvent).toHaveBeenCalledWith(GAME_ID, 5, expect.objectContaining({ event: persistedEvent }));
   });
 
   it('Task 8 RED delegates retry to GamesService.retryEvent with the original event envelope and never appendEvent', async () => {
@@ -392,6 +398,7 @@ describe('Task 8 game-operations realtime protocol', () => {
     expect(gamesService.appendEvent).not.toHaveBeenCalled();
     expect(client.emit).toHaveBeenCalledWith('game.event.ack', expect.objectContaining({ clientEventId: 'event-1', sequence: 4, version: 5 }));
     expect(client.emit).toHaveBeenCalledWith('game.event.committed', expect.objectContaining({ gameId: GAME_ID, sequence: 4, version: 5 }));
+    expect(emitCommittedEvent).toHaveBeenCalledWith(GAME_ID, 5, expect.objectContaining({ gameId: GAME_ID, sequence: 4 }));
   });
 
   // Copilot 리뷰 지적: retry payload는 `expectedVersion`이 아니라

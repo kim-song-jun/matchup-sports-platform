@@ -82,7 +82,7 @@ describe('Task 20 game-operations takeover realtime protocol', () => {
         { provide: TournamentStaffAccessService, useValue: staffAccess },
         { provide: GamesService, useValue: gamesService },
         { provide: getLoggerToken(RealtimeGateway.name), useValue: logger },
-        { provide: GameBroadcastRegistry, useValue: { register: jest.fn(), emitToGame: jest.fn() } },
+        { provide: GameBroadcastRegistry, useValue: { register: jest.fn() } },
         { provide: GameTakeoverService, useValue: gameTakeover },
       ],
     }).compile();

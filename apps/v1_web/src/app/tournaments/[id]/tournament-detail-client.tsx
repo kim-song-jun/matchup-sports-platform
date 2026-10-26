@@ -56,6 +56,7 @@ import {
   formatTournamentDateTimeShort,
   formatTournamentDateRangeWithTime,
   formatTournamentDateTimeLong,
+  formatMonthDay,
   formatEntryFee,
 } from '@/lib/date-utils';
 import {
@@ -215,13 +216,6 @@ export function getCompletedChampionName(tournament: V1TournamentDetail): string
 export function getPrizeBreakdownChips(prizeBreakdown: string | null): string[] {
   if (!prizeBreakdown) return [];
   return splitPrizeSegments(prizeBreakdown);
-}
-
-function formatPublishedAt(dateStr: string): string {
-  const d = new Date(dateStr);
-  const month = d.getMonth() + 1;
-  const day = d.getDate();
-  return `${month}월 ${day}일`;
 }
 
 function CapacityProgressBar({
@@ -2227,7 +2221,7 @@ function AnnouncementCard({ announcement }: { announcement: V1TournamentAnnounce
             {announcement.title}
           </div>
           <span className="tm-text-caption" style={{ color: 'var(--text-caption)', flexShrink: 0 }}>
-            {formatPublishedAt(announcement.publishedAt)}
+            {formatMonthDay(announcement.publishedAt) ?? '날짜 미정'}
           </span>
         </div>
         <span className="tm-badge tm-badge-grey" style={{ marginTop: 8 }}>

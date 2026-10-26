@@ -290,8 +290,9 @@ function PrizeSection({
 
         {/* 순위별 상금 배분 — 금액 행은 강조 스타일, 물품(goods) 행은 일반 텍스트로 우측에 표시 */}
         {rows.length > 0 && rows.map((row, idx) => {
-          const posNum = row.label.match(/^(\d+)위$/)?.[1];
-          const teamName = posNum ? teamByPos[Number(posNum)] : undefined;
+          // 상금 항목은 숫자 순위와 우승·준우승 표기를 모두 사용한다.
+          const pos = row.label === '우승' ? 1 : row.label === '준우승' ? 2 : Number(row.label.match(/^(\d+)위$/)?.[1]);
+          const teamName = teamByPos[pos];
           const isAmount = isPrizeAmountValue(row.amount);
           return (
             <div key={idx} style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', borderTop: idx > 0 || tournament.prizePool ? '1px solid var(--grey100)' : 'none' }}>
@@ -328,7 +329,7 @@ function PrizeSection({
   );
 }
 /**
- * 회고 STATS-1 — 수상 페이지의 개인 득점·도움 랭킹. 리그 수상 페이지가 순위
+ * 수상 페이지의 개인 득점 랭킹. 리그 수상 페이지가 순위
  * 데이터를 함께 보여주는 패턴의 대회판이며, 어워드(수상자)가 "왜 그 사람인지"를
  * 옆에서 뒷받침한다. 기록이 없으면 안내 문구를 보여준다.
  */
@@ -347,13 +348,10 @@ function PlayerRecordsSection({ tournamentId, isRegularLeague }: { tournamentId:
   const goals = isRegularLeague
     ? withProfileHref(leagueRecords.data?.goals ?? [])
     : withProfileHref(tournamentRecords.data?.goals);
-  const assists = isRegularLeague
-    ? withProfileHref(leagueRecords.data?.assists ?? [])
-    : withProfileHref(tournamentRecords.data?.assists);
   return (
     <TournamentPlayerRecordsSections
       goals={goals?.slice(0, 10)}
-      assists={assists?.slice(0, 10)}
+      assists={[]}
       hiddenByEligibility={records.data?.hiddenByEligibility ?? false}
       isLoading={records.isLoading}
       isError={records.isError}

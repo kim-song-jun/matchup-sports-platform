@@ -1896,3 +1896,12 @@ Validation:
 - [x] 대회·정규 리그 라우트와 A → B 선택 회귀 테스트 추가
 - [x] 관련 Web 테스트 128건, `tsc --noEmit`, v1 패턴 검사 통과
 - [ ] PR CI와 머지 후 Alpha 복귀 동선 확인
+
+## Follow-up — REST 경기 생명주기 실시간 갱신 (MD-QA #134, 2026-10-26)
+
+- [ ] 실제 REST `start` 명령 뒤 별도 `SUPPORT_READONLY` Socket.IO 구독자에게 승인된 전체 `game.snapshot`이 전달되는 통합 회귀를 추가한다. 양 팀에 유효한 참가자와 제출 lineup을 두고, observer는 팀 소유권이 없는 순수 조회 스태프로 둔다.
+- [ ] 관찰자 REST 상세의 state/version/period `startedAt`이 같은 커밋을 반영하는지 검증한다.
+- [ ] CI에서 현재 코드의 RED를 확인한 뒤에만 controller/registry/gateway 수정 범위를 재평가한다. 본 진행 기록은 코드 수정 완료를 주장하지 않는다.
+- 범위: `apps/v1_api/test/games/game-command-realtime.integration-spec.ts`; API의 직접 테스트 의존성 `socket.io-client@4.8.3`; `.changeset/mdqa-134-realtime.md`.
+- 검증 책임: CI가 실제 isolated DB fixture와 앱의 HTTP/Socket.IO 경로로 실행한다. 로컬 통합 DB 실행은 하지 않는다.
+- 초기 테스트 초안은 각 팀 참가자가 없어 시작 전용 `GAME_START_LINEUP_EMPTY`에서 막힐 수 있어 positive fixture와 분리 소유 계정으로 보정했다. 이는 테스트 준비 결함 수정이며, REST-to-realtime 회귀의 RED 관측이 아니다.

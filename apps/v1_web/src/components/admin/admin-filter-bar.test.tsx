@@ -1,9 +1,33 @@
+import { useState } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { AdminFilterBar } from './admin-filter-bar';
 
 describe('AdminFilterBar', () => {
+  it('복수 선택·개별 해제·전체를 누르면 선택 상태가 실제로 갱신된다', async () => {
+    const user = userEvent.setup();
+    function MultiFilter() {
+      const [selected, setSelected] = useState<string[]>([]);
+      return <AdminFilterBar hideSearch searchValue="" onSearchChange={() => {}}
+        statusOptions={[{ value: '', label: '전체', count: 7 }, { value: 'kakao', label: '카카오', count: 4 }, { value: 'apple', label: 'Apple', count: 5 }]}
+        selectedStatuses={selected} onStatusesChange={setSelected} />;
+    }
+    render(<MultiFilter />);
+    const all = screen.getByRole('button', { name: '전체 7' });
+    const kakao = screen.getByRole('button', { name: '카카오 4' });
+    const apple = screen.getByRole('button', { name: 'Apple 5' });
+    await user.click(kakao); await user.click(apple);
+    expect(kakao).toHaveAttribute('aria-pressed', 'true');
+    expect(apple).toHaveAttribute('aria-pressed', 'true');
+    expect(all).toHaveAttribute('aria-pressed', 'false');
+    await user.click(kakao);
+    expect(kakao).toHaveAttribute('aria-pressed', 'false');
+    expect(apple).toHaveAttribute('aria-pressed', 'true');
+    await user.click(all);
+    expect(all).toHaveAttribute('aria-pressed', 'true');
+    expect(apple).toHaveAttribute('aria-pressed', 'false');
+  });
   it('renders exact facet counts and keeps the count in the accessible name', async () => {
     const user = userEvent.setup();
     const onStatusChange = vi.fn();

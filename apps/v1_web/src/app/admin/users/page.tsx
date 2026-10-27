@@ -11,6 +11,7 @@ import {
 import { extractErrorMessage } from '@/lib/error-message';
 import { formatAuthProviders, formatGender, formatUserTitle } from '@/lib/format-user';
 import { formatAdminDate } from '@/lib/date-utils';
+import { ADMIN_USER_MULTI_FILTERS, ADMIN_USER_PROVIDER_OPTIONS, ADMIN_USER_SIGNUP_OPTIONS, adminUserSignupLabel } from '@/lib/admin-user-filters';
 import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
 import { useAdminUrlListQuery } from '../use-admin-url-list-query';
 import {
@@ -81,7 +82,9 @@ function AdminUsersPageContent() {
     filters,
     resetToFirstPage,
     buildPagination,
-  } = useAdminUrlListQuery(USER_STATUS_FILTER_OPTIONS, PAGE_SIZE);
+    selectedFilters,
+    setMultiFilter,
+  } = useAdminUrlListQuery(USER_STATUS_FILTER_OPTIONS, PAGE_SIZE, ADMIN_USER_MULTI_FILTERS);
 
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);
@@ -153,7 +156,40 @@ function AdminUsersPageContent() {
           statusOptions={statusOptions}
           activeStatus={activeStatus}
           onStatusChange={(v) => setActiveStatus(v)}
+          rightSlot={<button type="button" className="min-h-[44px] px-3 text-[length:var(--font-size-label)] text-[var(--text-muted)] hover:text-[var(--text-strong)]" onClick={() => {
+            setSearch(''); setActiveStatus(''); setMultiFilter('signup', []); setMultiFilter('providers', []);
+          }}>필터 초기화</button>}
         />
+
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-4">
+            <span className="shrink-0 text-[length:var(--font-size-label)] font-semibold text-[var(--text-strong)] sm:w-20 sm:pt-3">가입 상태</span>
+            <div className="min-w-0 flex-1">
+              <AdminFilterBar
+                hideSearch searchValue="" onSearchChange={() => {}}
+                statusGroupLabel="가입 상태 필터"
+                statusOptions={ADMIN_USER_SIGNUP_OPTIONS.map((option) => ({ ...option, count: option.value ? firstPage?.summary.bySignup?.[option.value] : firstPage?.summary.signupTotal }))}
+                selectedStatuses={selectedFilters.signup?.split(',').filter(Boolean) ?? []}
+                onStatusesChange={(values) => setMultiFilter('signup', values)}
+              />
+              <p className="mt-2 text-[length:var(--font-size-micro)] text-[var(--text-muted)]">필수정보 완료는 가입 시 약관·기본 프로필 기준이며, 온보딩 완료자를 포함해요. 가입 미완료에는 입력 보류도 포함해요.</p>
+            </div>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-4">
+            <span className="shrink-0 text-[length:var(--font-size-label)] font-semibold text-[var(--text-strong)] sm:w-20 sm:pt-3">로그인 수단</span>
+            <div className="min-w-0 flex-1">
+              <AdminFilterBar
+                hideSearch searchValue="" onSearchChange={() => {}}
+                statusGroupLabel="로그인 수단 필터"
+                statusOptions={ADMIN_USER_PROVIDER_OPTIONS.map((option) => ({ ...option, count: option.value ? firstPage?.summary.byProvider?.[option.value] : firstPage?.summary.providerTotal }))}
+                selectedStatuses={selectedFilters.providers?.split(',').filter(Boolean) ?? []}
+                onStatusesChange={(values) => setMultiFilter('providers', values)}
+              />
+              <p className="mt-2 text-[length:var(--font-size-micro)] text-[var(--text-muted)]">복수 선택할 수 있어요. 같은 그룹은 하나라도, 다른 그룹은 모두 일치하는 회원을 표시해요. 여러 수단을 연결한 회원은 목록에서 한 명으로 세요.</p>
+            </div>
+          </div>
+          <p className="text-[length:var(--font-size-micro)] text-[var(--text-muted)]">필터 숫자는 검색어와 다른 그룹 조건을 적용한 인원이에요. 완료 상태와 로그인 수단이 겹칠 수 있어 숫자를 더한 값은 전체와 다를 수 있어요.</p>
+        </div>
 
         {/* Card list */}
         {/* 회원 한 명에 8개 지표가 붙는데 카드 2열로는 값이 서로 붙어 읽히지 않았다.
@@ -200,6 +236,12 @@ function AdminUsersPageContent() {
               header: '상태',
               width: 'w-[104px]',
               render: (row) => <AdminStatusPill status={row.accountStatus} />,
+            },
+            {
+              key: 'signupStage',
+              header: '가입 상태',
+              width: 'w-[132px]',
+              render: (row) => <span className="text-[var(--text-muted)]">{adminUserSignupLabel(row.signupStage)}</span>,
             },
             {
               key: 'gender',

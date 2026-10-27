@@ -5,10 +5,12 @@ import { useSearchParams } from 'next/navigation';
 import type { AdminListQueryState } from '@/hooks/use-admin-list-query';
 import { pickAllowedParam } from './pick-allowed-param';
 
-type Draft = { search: string; activeStatus: string; page: number };
+type Draft = { search: string; activeStatus: string; page: number; selectedFilters: Record<string, string> };
 type StatusOptions = ReadonlyArray<{ value: string }>;
+type MultiFilters = Readonly<Record<string, readonly string[]>>;
+const NO_MULTI_FILTERS: MultiFilters = {};
 
-function readDraft(query: string, statuses: StatusOptions): Draft {
+function readDraft(query: string, statuses: StatusOptions, multiFilters: MultiFilters): Draft {
   const params = new URLSearchParams(query);
   const rawPage = params.get('page') ?? '1';
   const page = Number(rawPage);
@@ -16,6 +18,10 @@ function readDraft(query: string, statuses: StatusOptions): Draft {
     search: params.get('q') ?? '',
     activeStatus: pickAllowedParam(params.get('status'), statuses),
     page: /^\d+$/.test(rawPage) && Number.isSafeInteger(page) && page >= 1 ? page : 1,
+    selectedFilters: Object.fromEntries(Object.entries(multiFilters).map(([key, allowed]) => {
+      const values = new Set(params.get(key)?.split(',') ?? []);
+      return [key, allowed.filter((value) => values.has(value)).join(',')];
+    })),
   };
 }
 
@@ -35,14 +41,17 @@ function rememberListUrl(pathname: string, search: string): void {
  * 조건이 기본값으로 돌아간다(MD-QA #21). `useAdminListQuery`와 같은 반환 계약이라 바꿔 끼우면 된다.
  * 지금 목록 주소는 탭 세션에 기억해 두고, 상세의 '목록' 버튼이 `useAdminListReturnHref`로 그 주소로 돌아온다.
  */
-export function useAdminUrlListQuery(statuses: StatusOptions, pageSize: number): AdminListQueryState {
+export function useAdminUrlListQuery(statuses: StatusOptions, pageSize: number, multiFilters: MultiFilters = NO_MULTI_FILTERS): AdminListQueryState & {
+  selectedFilters: Record<string, string>;
+  setMultiFilter: (key: string, values: readonly string[]) => void;
+} {
   const query = useSearchParams().toString();
 
   useEffect(() => {
     // Next가 replaceState·Back을 반영할 때마다 지금 주소를 기억한다(오래된 snapshot이 아니라 실제 주소).
     rememberListUrl(window.location.pathname, window.location.search);
   }, [query]);
-  const fromUrl = useMemo(() => readDraft(query, statuses), [query, statuses]);
+  const fromUrl = useMemo(() => readDraft(query, statuses, multiFilters), [query, statuses, multiFilters]);
   const [draft, setDraft] = useState(fromUrl);
   const latestDraft = useRef(draft);
   const [debouncedSearch, setDebouncedSearch] = useState(fromUrl.search.trim());
@@ -52,7 +61,8 @@ export function useAdminUrlListQuery(statuses: StatusOptions, pageSize: number):
     if (query !== new URLSearchParams(window.location.search).toString()) return;
     const current = latestDraft.current;
     if (current.search === fromUrl.search && current.activeStatus === fromUrl.activeStatus
-      && current.page === fromUrl.page) return;
+      && current.page === fromUrl.page
+      && JSON.stringify(current.selectedFilters) === JSON.stringify(fromUrl.selectedFilters)) return;
     // Back/Forward·외부 URL 변경은 검색 debounce를 기다리지 않고 복원한다.
     latestDraft.current = fromUrl;
     setDraft(fromUrl);
@@ -76,6 +86,10 @@ export function useAdminUrlListQuery(statuses: StatusOptions, pageSize: number):
     else url.searchParams.delete('status');
     if (next.page > 1) url.searchParams.set('page', String(next.page));
     else url.searchParams.delete('page');
+    for (const [key, value] of Object.entries(next.selectedFilters)) {
+      if (value) url.searchParams.set(key, value);
+      else url.searchParams.delete(key);
+    }
     // Next의 native History 연동이 내부 state를 복사한다. 새 history 항목·scroll 이동 없음.
     // API 검색만 debounce하며 URL은 즉시 보존해 입력 직후 상세로 이동해도 유실되지 않는다.
     window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
@@ -87,12 +101,21 @@ export function useAdminUrlListQuery(statuses: StatusOptions, pageSize: number):
   const setActiveStatus = useCallback((activeStatus: string) => updateDraft({ activeStatus, page: 1 }), [updateDraft]);
   const setPage = useCallback((page: number) => updateDraft({ page }), [updateDraft]);
   const resetToFirstPage = useCallback(() => setPage(1), [setPage]);
+  const setMultiFilter = useCallback((key: string, values: readonly string[]) => {
+    const allowed = multiFilters[key];
+    if (!allowed) return;
+    updateDraft({
+      selectedFilters: { ...latestDraft.current.selectedFilters, [key]: allowed.filter((value) => values.includes(value)).join(',') },
+      page: 1,
+    });
+  }, [multiFilters, updateDraft]);
   const filters = useMemo(() => ({
     ...(debouncedSearch ? { q: debouncedSearch } : {}),
     ...(draft.activeStatus ? { status: draft.activeStatus } : {}),
+    ...Object.fromEntries(Object.entries(draft.selectedFilters).filter(([, value]) => value)),
     page: draft.page,
     limit: pageSize,
-  }), [debouncedSearch, draft.activeStatus, draft.page, pageSize]);
+  }), [debouncedSearch, draft.activeStatus, draft.selectedFilters, draft.page, pageSize]);
 
   const buildPagination: AdminListQueryState['buildPagination'] = useCallback((pageInfo, isFetching) => {
     if (!pageInfo?.totalPages) return undefined;
@@ -107,7 +130,7 @@ export function useAdminUrlListQuery(statuses: StatusOptions, pageSize: number):
   }, [draft.page, pageSize, setPage]);
 
   return {
-    ...draft, setSearch, debouncedSearch, setActiveStatus, setPage, resetToFirstPage, filters, buildPagination,
+    ...draft, setSearch, debouncedSearch, setActiveStatus, setPage, resetToFirstPage, filters, buildPagination, setMultiFilter,
   };
 }
 

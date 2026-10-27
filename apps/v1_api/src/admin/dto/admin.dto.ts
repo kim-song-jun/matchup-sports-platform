@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayMinSize,
@@ -16,6 +16,11 @@ import {
 } from 'class-validator';
 import { MAX_PAGE_NUMBER } from '../../common/pagination/page-args';
 import { POPUP_TARGET_SCREENS, PopupTargetScreen } from '../../popups/popup-screen';
+import { USER_AUTH_PROVIDERS, USER_SIGNUP_FILTERS, type UserSignupFilter } from '../admin-user-filters';
+
+function splitFilterValues({ value }: { value: unknown }) {
+  return typeof value === 'string' ? value.split(',') : value;
+}
 
 // ─── List query DTOs ──────────────────────────────────────────────────────────
 
@@ -27,6 +32,22 @@ export class AdminGlobalSearchQueryDto {
 }
 
 export class AdminUserListQueryDto {
+  @IsOptional()
+  @Transform(splitFilterValues)
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(6)
+  @IsIn(USER_SIGNUP_FILTERS, { each: true })
+  signup?: UserSignupFilter[];
+
+  @IsOptional()
+  @Transform(splitFilterValues)
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(3)
+  @IsIn(USER_AUTH_PROVIDERS, { each: true })
+  providers?: Array<typeof USER_AUTH_PROVIDERS[number]>;
+
   @IsOptional()
   @IsIn(['active', 'suspended', 'blocked', 'withdrawal_pending', 'deleted'])
   status?: 'active' | 'suspended' | 'blocked' | 'withdrawal_pending' | 'deleted';

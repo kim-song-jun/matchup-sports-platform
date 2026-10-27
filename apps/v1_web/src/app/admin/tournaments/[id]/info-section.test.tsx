@@ -9,19 +9,20 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { V1Tournament } from '@/types/api';
+import type { V1Sport, V1Tournament } from '@/types/api';
+import { resolveNextImageSrc } from '@/test/next-image';
 import { TournamentInfoSection } from './info-section';
 import { TournamentAdminProvider } from './tournament-admin-context';
 
 const { hooks } = vi.hoisted(() => ({
-  hooks: { tournament: undefined as unknown, mutate: vi.fn(), showToast: vi.fn(), isPending: false },
+  hooks: { tournament: undefined as unknown, mutate: vi.fn(), showToast: vi.fn(), isPending: false, masterSports: vi.fn<() => V1Sport[]>(() => []) },
 }));
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminTournament: () => ({ data: hooks.tournament }),
   useV1UpdateTournament: () => ({ mutate: hooks.mutate, isPending: hooks.isPending }),
   useV1UploadImages: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useV1MasterSports: () => ({ data: [] }),
+  useV1MasterSports: () => ({ data: hooks.masterSports() }),
   useV1PlaceSearch: () => ({ data: undefined, isFetching: false, isError: false, error: null }),
   useV1PublicKakaoMapsKey: () => ({ data: { kakaoMapsJsKey: null }, isLoading: false }),
   useV1LineupSizeOptions: () => ({ data: [], isPending: false, isError: false }),
@@ -166,6 +167,31 @@ describe('TournamentInfoSection', () => {
     expect(screen.getByLabelText('상품 및 상금')).toBeDisabled();
     expect(screen.getByRole('switch', { name: '상세 이미지 표시' })).toBeDisabled();
     expect(screen.getByLabelText('목록 이미지')).toBeDisabled();
+  });
+});
+
+describe('TournamentInfoSection — 종목 기본 이미지', () => {
+  beforeEach(() => {
+    hooks.masterSports.mockReturnValue([
+      { id: 'sport-1', code: 'futsal', name: '풋살', levels: [] },
+    ]);
+  });
+  afterEach(() => {
+    hooks.masterSports.mockReturnValue([]);
+  });
+
+  it('이미지가 없는 풋살 대회는 목록과 상세 미리보기에 풋살 기본 이미지를 표시한다', () => {
+    // Given: 종목 코드와 표시 이름이 다른 실제 마스터 응답, 업로드 이미지가 없는 대회.
+    const images = { listImageUrl: null, coverImageUrl: null };
+
+    // When: 실제 관리자 정보 섹션과 공유 이미지 필드를 렌더한다.
+    renderSection(true, images);
+
+    // Then: 두 미리보기 모두 공용 그래픽이 아닌 해당 종목의 이미지를 고른다.
+    const listPreview = screen.getByRole('img', { name: '목록 이미지 미리보기' });
+    const detailPreview = screen.getByRole('img', { name: '상세 이미지 미리보기' });
+    expect.soft(resolveNextImageSrc(listPreview.querySelector('img'))).toBe('/illustrations/sport-futsal-640.webp');
+    expect.soft(resolveNextImageSrc(detailPreview.querySelector('img'))).toBe('/illustrations/sport-futsal-640.webp');
   });
 });
 

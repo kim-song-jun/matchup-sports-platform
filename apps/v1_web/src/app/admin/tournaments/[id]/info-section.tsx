@@ -583,7 +583,7 @@ export function TournamentInfoSection() {
 
       <TournamentPeriodSettingsEditor tournamentId={id} canWrite={canWrite} showToast={showToast} />
 
-      <CoverImageCard tournament={tournament} sportCode={masterSports?.find((sport) => sport.id === tournament.sportId)?.code} canWrite={canWrite} showToast={showToast} />
+      <CoverImageCard tournament={tournament} sportName={masterSports?.find((sport) => sport.id === tournament.sportId)?.name} canWrite={canWrite} showToast={showToast} />
 
       <PrizeCard tournament={tournament} canWrite={canWrite} showToast={showToast} />
 
@@ -1323,12 +1323,12 @@ function GenderQuotaInput({
 /** 목록·상세 이미지와 노출 설정. 기존 관리자 권한 및 CAS를 그대로 따른다. */
 function CoverImageCard({
   tournament,
-  sportCode,
+  sportName,
   canWrite,
   showToast,
 }: {
   tournament: V1Tournament;
-  sportCode?: string;
+  sportName?: string;
   canWrite: boolean;
   showToast: (msg: string, v?: 'success' | 'error') => void;
 }) {
@@ -1358,7 +1358,7 @@ function CoverImageCard({
         coverImageUrl={tournament.coverImageUrl}
         listImageUrl={tournament.listImageUrl ?? null}
         showDetailImage={tournament.showDetailImage ?? true}
-        sportCode={sportCode}
+        sportName={sportName}
         onImageChange={(field, value) => persist({ [field]: value })}
         onVisibilityChange={(visible) => persist({ showDetailImage: visible })}
         onUpload={async (file) => {

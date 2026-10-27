@@ -128,6 +128,8 @@ Current Kakao signup and existing-account linking use the [provider contact conf
 
 대회 목록·상세 이미지 2장과 상세 기본 이미지까지 숨기는 `showDetailImage` 설정은 [대회 이미지 계약](./domains/tournaments.md#목록상세-이미지와-상세-숨김-2026-10-22)을 따른다.
 
+대회 이미지 설정의 JSON boolean 검증과 관리자 종목 기본 이미지 선택도 같은 계약에서 관리한다. `showDetailImage`의 문자열/숫자 강제 변환은 허용하지 않는다.
+
 - 2026-10-24: [경기 계약](domains/games.md#어드민-종료-경기의-출전-정정-2026-10-24)에 owner·ops 어드민의 종료 경기 EXCLUDE/REVOKE 예외 및 결과 이력 보존 계약을 반영했다.
 
 ## 결과 정정 카드 계약 보완

@@ -2,4 +2,4 @@
 "v1_web": patch
 ---
 
-Keep admin image and visibility guidance readable on narrow screens.
+관리자 이미지와 공개 설정 안내의 모바일 줄바꿈을 개선합니다.

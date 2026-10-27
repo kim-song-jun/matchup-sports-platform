@@ -2,4 +2,4 @@
 "v1_web": patch
 ---
 
-Correct tournament result review feedback and podium display.
+대회 결과 확정 안내와 시상대의 빈 순위 표시를 수정합니다.

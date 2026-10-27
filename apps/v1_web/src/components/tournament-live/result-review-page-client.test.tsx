@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { ResultReviewPageClient } from './result-review-page-client';
 
@@ -32,7 +32,9 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mocks.routerPush }),
 }));
 vi.mock('@/components/tournament-result-review/game-result-review-panel', () => ({
-  GameResultReviewPanel: ({ gameId }: { gameId: string }) => <div data-testid="panel">panel:{gameId}</div>,
+  GameResultReviewPanel: ({ gameId, onOfficialized }: { gameId: string; onOfficialized?: () => void }) => (
+    <div data-testid="panel">panel:{gameId}<button onClick={onOfficialized}>공식 결과 확정 성공</button></div>
+  ),
 }));
 
 const ITEM = (fixtureId: string, gameId: string, fixtureNumber: number) => ({
@@ -78,6 +80,43 @@ describe('ResultReviewPageClient fixtureId 딥링크 (T6-1)', () => {
     expect(screen.queryByTestId('panel')).not.toBeInTheDocument();
   });
 
+  it('같은 페이지에서 딥링크 쿼리가 바뀌면 새 경기 선택과 미존재 안내를 갱신한다', () => {
+    mocks.useSearchParams.mockReturnValue(new URLSearchParams());
+    const { rerender } = render(<ResultReviewPageClient tournamentId="t-1" />);
+
+    mocks.useSearchParams.mockReturnValue(new URLSearchParams('fixtureId=fx-missing'));
+    rerender(<ResultReviewPageClient tournamentId="t-1" />);
+    expect(screen.getByText(/전달받은 경기는 지금 검토 목록에 없어요/)).toBeInTheDocument();
+    expect(screen.queryByTestId('panel')).not.toBeInTheDocument();
+
+    mocks.useSearchParams.mockReturnValue(new URLSearchParams('fixtureId=fx-2'));
+    rerender(<ResultReviewPageClient tournamentId="t-1" />);
+    expect(screen.queryByText(/전달받은 경기는 지금 검토 목록에 없어요/)).not.toBeInTheDocument();
+    expect(screen.getByTestId('panel')).toHaveTextContent('panel:game-2');
+
+    fireEvent.click(screen.getByRole('button', { name: /1번 경기/ }));
+    rerender(<ResultReviewPageClient tournamentId="t-1" />);
+    expect(screen.getByTestId('panel')).toHaveTextContent('panel:game-1');
+    expect(screen.queryByText(/전달받은 경기는 지금 검토 목록에 없어요/)).not.toBeInTheDocument();
+
+    mocks.useSearchParams.mockReturnValue(new URLSearchParams('fixtureId=fx-missing'));
+    rerender(<ResultReviewPageClient tournamentId="t-1" />);
+    expect(screen.getByText(/전달받은 경기는 지금 검토 목록에 없어요/)).toBeInTheDocument();
+    expect(screen.queryByTestId('panel')).not.toBeInTheDocument();
+  });
+
+  it('확정 성공 후 다른 딥링크로 이동하면 이전 성공 문구를 새 경기에 남기지 않는다', () => {
+    mocks.useSearchParams.mockReturnValue(new URLSearchParams('fixtureId=fx-2'));
+    const { rerender } = render(<ResultReviewPageClient tournamentId="t-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '공식 결과 확정 성공' }));
+    expect(screen.getByText('공식 결과로 확정했어요.')).toBeInTheDocument();
+
+    mocks.useSearchParams.mockReturnValue(new URLSearchParams('fixtureId=fx-1'));
+    rerender(<ResultReviewPageClient tournamentId="t-1" />);
+    expect(screen.queryByText('공식 결과로 확정했어요.')).not.toBeInTheDocument();
+    expect(screen.getByTestId('panel')).toHaveTextContent('panel:game-1');
+  });
+
   // Fix round 1 — `useTournamentEndedFixtures`는 staleTime: 15_000이라 창 포커스 등으로
   // 백그라운드 refetch가 돈다. 딥링크 진입 시점엔 목록에 없어 "검토 목록에 없어요" 배너가
   // 뜬 뒤, refetch로 그 fixture가 목록에 들어오면 배너가 사라지고 패널만 남아야 한다
@@ -103,5 +142,21 @@ describe('ResultReviewPageClient fixtureId 딥링크 (T6-1)', () => {
 
     expect(screen.queryByText(/검토 목록에 없어요/)).not.toBeInTheDocument();
     expect(screen.getByTestId('panel')).toHaveTextContent('panel:game-3');
+  });
+
+  it('딥링크 경기 확정에 성공하고 목록에서 빠져도 성공 안내를 보여준다', () => {
+    mocks.useSearchParams.mockReturnValue(new URLSearchParams('fixtureId=fx-2'));
+    const { rerender } = render(<ResultReviewPageClient tournamentId="t-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '공식 결과 확정 성공' }));
+
+    mocks.useTournamentEndedFixtures.mockReturnValue({
+      isPending: false, isSuccess: true, isError: false, data: { items: [ITEMS[0]] }, refetch: vi.fn(),
+    });
+    rerender(<ResultReviewPageClient tournamentId="t-1" />);
+
+    expect(screen.getByText('공식 결과로 확정했어요.')).toBeInTheDocument();
+    expect(screen.queryByText(/전달받은 경기는 지금 검토 목록에 없어요/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /1번 경기/ }));
+    expect(screen.queryByText('공식 결과로 확정했어요.')).not.toBeInTheDocument();
   });
 });

@@ -314,6 +314,20 @@ describe('MatchDetailContent — 선수 이름 프로필 링크', () => {
  * 이 경기에서 팀으로 갈 수 있는 자리가 여기뿐인데 막혀 있었다.
  */
 describe('MatchDetailContent — 팀 이름 진입점', () => {
+  it('공개 점수판은 팀 이름의 단어를 유지하면서 긴 한 단어도 화면 밖으로 넘기지 않도록 표시한다', () => {
+    const homeName = '(테스트) 알파 6인 1팀';
+    const awayName = 'VeryLongUnbrokenTournamentTeamName';
+    render(<MatchDetailContent data={makeDetail({
+      home: { registrationId: 'reg-home', teamId: 'team-home', teamName: homeName },
+      away: { registrationId: 'reg-away', teamId: 'team-away', teamName: awayName },
+    })} />);
+
+    for (const name of [homeName, awayName]) {
+      const cell = screen.getByRole('link', { name }).parentElement;
+      expect(cell).toHaveStyle({ minWidth: '0', wordBreak: 'keep-all', overflowWrap: 'anywhere' });
+    }
+  });
+
   it('팀 이름을 누르면 팀 페이지로 간다', () => {
     render(<MatchDetailContent data={makeDetail()} />);
 

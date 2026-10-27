@@ -108,6 +108,8 @@ describe('StaffClient', () => {
     const user = userEvent.setup();
     render(<StaffClient tournamentId="t-1" />);
     const heading = screen.getByRole('heading', { name: '경기장(필드)' });
+    expect(heading.querySelector('.tm-section-title')).toHaveClass('tm-section-title-compact');
+    expect(heading.parentElement).toHaveClass('min-w-0', 'flex-1');
     expect(screen.getAllByText('디렉터윤')[0].compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     await user.click(screen.getByRole('button', { name: '기존 경기 장소 추가' }));
     expect(screen.getByRole('status')).toHaveTextContent('경기 장소 2개를 추가했어요. 이미 등록된 장소는 1개예요.');

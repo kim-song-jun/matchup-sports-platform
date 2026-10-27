@@ -2,12 +2,12 @@
 
 import Link from 'next/link';
 import { Trophy } from 'lucide-react';
-import { formatPrizeRowValue, parsePrizeRows } from '@/lib/prize-breakdown';
+import { parsePrizeRows } from '@/lib/prize-breakdown';
 import type {
   V1AdminTournamentCampaignPreview,
   V1PublicTournamentCampaign,
 } from '@/types/tournament-campaign';
-import { PrizeRankIcon } from './prize-rank-icon';
+import { GroupedPrizes } from './grouped-prizes';
 import { TournamentCampaignPrimaryAction } from './tournament-campaign-primary-action';
 import type { getCampaignActions } from './tournament-campaign-presentation';
 import { useTournamentCampaignRegistration } from './tournament-campaign-registration-state';
@@ -30,9 +30,7 @@ export function TournamentCampaignRewards({
 }: TournamentCampaignRewardsProps) {
   const { registrationOpen } = useTournamentCampaignRegistration();
   const prizeRows = tournament.prizeBreakdown
-    ? parsePrizeRows(tournament.prizeBreakdown).filter(
-        (row) => row.amount.trim().length > 0,
-      )
+    ? parsePrizeRows(tournament.prizeBreakdown)
     : [];
   const followUpHeading = getFollowUpHeading(tournament.status, registrationOpen);
 
@@ -46,32 +44,20 @@ export function TournamentCampaignRewards({
         <p>대회의 보상과 공식 파트너 혜택을 한 흐름에서 확인하고 신청까지 이어가세요.</p>
       </div>
 
-      {tournament.prizeSummary || tournament.prizePool !== null ? (
+      {tournament.prizeSummary || tournament.prizePool !== null || prizeRows.length > 0 ? (
         <div className={styles.prize} role="group" aria-labelledby="campaign-prize-title">
           <div className={styles.prizeSummary}>
             <div className={styles.prizeIcon} aria-hidden="true"><Trophy /></div>
             <div>
               <span className={styles.sectionKicker}>총 보상</span>
               <h3 id="campaign-prize-title" className={styles.prizeTitle}>
-                {tournament.prizeSummary ?? `${tournament.prizePool?.toLocaleString('ko-KR')}원`}
+                {tournament.prizeSummary ?? (tournament.prizePool !== null ? `${tournament.prizePool.toLocaleString('ko-KR')}원` : '시상 안내')}
               </h3>
               <p>순위와 개인 시상 결과는 대회 종료 후 결과 페이지에 투명하게 기록해요.</p>
             </div>
           </div>
           {prizeRows.length > 0 ? (
-            <dl className={styles.prizeBreakdown} aria-label="상금 및 상품 구성">
-              {prizeRows.map((row, index) => (
-                <div key={`${row.label}:${row.amount}:${index}`}>
-                  <dt>
-                    <span className={styles.prizeRankIcon} aria-hidden="true">
-                      <PrizeRankIcon label={row.label} />
-                    </span>
-                    {row.label}
-                  </dt>
-                  <dd>{formatPrizeRowValue(row.amount)}</dd>
-                </div>
-              ))}
-            </dl>
+            <GroupedPrizes rows={prizeRows} />
           ) : null}
         </div>
       ) : null}

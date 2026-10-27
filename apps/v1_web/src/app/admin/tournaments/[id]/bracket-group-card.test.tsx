@@ -7,7 +7,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { V1AdminBracketFixture, V1AdminBracketGroup, V1AdminBracketStanding } from '@/types/api';
-import { makeFixture } from '@/test/bracket-canvas-fixtures';
+import { makeFixture, makeSlot } from '@/test/bracket-canvas-fixtures';
 import { BracketGroupCard } from './bracket-group-card';
 
 function noopMutation() {
@@ -15,6 +15,53 @@ function noopMutation() {
     typeof import('@/hooks/use-v1-api').useV1CreateFixture
   >;
 }
+
+describe('BracketGroupCard — 결선 진출 슬롯', () => {
+  const semi: V1AdminBracketGroup = {
+    id: 'semi', tournamentId: 't-1', name: '4강', phase: 'semi', sortOrder: 0,
+    advanceCount: null, createdAt: '2026-10-01T00:00:00.000Z',
+    updatedAt: '2026-10-01T00:00:00.000Z', groupTeams: [],
+  };
+  const fixture = makeFixture({ id: 'semi-fx', groupId: semi.id, fixtureNumber: 1, homeSlotId: 'home', awaySlotId: 'away', homeRegistrationId: 'r1', awayRegistrationId: null });
+  const renderSlotCard = (assigned: boolean) => render(
+    <BracketGroupCard group={semi} allGroups={[semi]} allStandings={[]} fixtures={[fixture]}
+      slots={[
+        makeSlot({ id: 'home', kind: 'GROUP_RANK', groupId: semi.id, registrationId: assigned ? 'r1' : null, teamName: assigned ? '강남FC' : null }),
+        makeSlot({ id: 'away', kind: 'GROUP_RANK', groupId: semi.id, registrationId: null }),
+      ]}
+      confirmedTeamItems={[]} assignGroupTeam={noopMutation() as unknown as ReturnType<typeof import('@/hooks/use-v1-api').useV1AssignGroupTeam>}
+      createFixture={noopMutation()} isAutoGenerating={false} onAutoGenerate={vi.fn()} onEditGroup={vi.fn()}
+      onDeleteGroup={vi.fn()} onRemoveGroupTeam={vi.fn()} autoFocus={false} showToast={vi.fn()} />,
+  );
+
+  it('일부만 배정한 결선은 팀 수를 표시하되 준비 완료로 단정하지 않는다', () => {
+    renderSlotCard(true);
+    expect(screen.getByRole('button', { name: /4강.*1팀 배정됨/ })).not.toHaveTextContent('준비완료');
+    expect(screen.queryByText('아직 배정된 팀이 없어요')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '대진 자동 생성' })).not.toBeInTheDocument();
+  });
+
+  it('빈 슬롯은 fixture에 이전 참가 ID가 남아 있어도 배정된 팀으로 세지 않는다', () => {
+    renderSlotCard(false);
+    expect(screen.getByRole('button', { name: /4강.*배정 대기/ })).not.toHaveTextContent('준비완료');
+    expect(screen.getByText('아직 배정된 팀이 없어요')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '대진 자동 생성' })).not.toBeInTheDocument();
+  });
+
+  it('부전승 팀이 그룹 행과 슬롯에 함께 있어도 한 팀으로 센다', () => {
+    const group: V1AdminBracketGroup = {
+      ...semi,
+      groupTeams: [{ id: 'bye-row', groupId: semi.id, registrationId: 'r1', teamName: '강남FC', isBye: true, sortOrder: 0, createdAt: '2026-10-01T00:00:00.000Z' }],
+    };
+    render(<BracketGroupCard group={group} allGroups={[group]} allStandings={[]}
+      fixtures={[makeFixture({ id: 'fx', groupId: group.id, fixtureNumber: 1, homeRegistrationId: 'r1', awayRegistrationId: 'r2' })]}
+      slots={[makeSlot({ id: 'bye', kind: 'BYE', groupId: group.id, registrationId: 'r1', teamName: '강남FC' })]}
+      confirmedTeamItems={[]} assignGroupTeam={noopMutation() as unknown as ReturnType<typeof import('@/hooks/use-v1-api').useV1AssignGroupTeam>}
+      createFixture={noopMutation()} isAutoGenerating={false} onAutoGenerate={vi.fn()} onEditGroup={vi.fn()}
+      onDeleteGroup={vi.fn()} onRemoveGroupTeam={vi.fn()} autoFocus={false} showToast={vi.fn()} />);
+    expect(screen.getByRole('button', { name: /4강.*2팀 배정됨/ })).toHaveTextContent('준비완료');
+  });
+});
 
 describe('BracketGroupCard — 팀 일괄 배정', () => {
   const groupA: V1AdminBracketGroup = {

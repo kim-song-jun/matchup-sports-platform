@@ -1,9 +1,13 @@
 import { Goal, Handshake, Medal, Star, Trophy } from 'lucide-react';
 
+import { prizePosition } from '@/lib/prize-breakdown';
+
 /** 상금 배분 항목 라벨 → 아이콘 (공개 시상 카드·어드민 미리보기 공용) */
 export function PrizeRankIcon({ label }: { label: string }) {
   const size = 20;
-  switch (label) {
+  const position = prizePosition(label);
+  const iconLabel = position !== null ? `${position}위` : label;
+  switch (iconLabel) {
     case '1위': return <Medal size={size} className="tm-medal-gold" strokeWidth={2} />;
     case '2위': return <Medal size={size} className="tm-medal-silver" strokeWidth={2} />;
     case '3위': return <Medal size={size} className="tm-medal-bronze" strokeWidth={2} />;

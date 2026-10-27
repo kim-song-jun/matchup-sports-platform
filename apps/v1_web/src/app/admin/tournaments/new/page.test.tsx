@@ -747,7 +747,7 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
       expect(createMutate).toHaveBeenCalledWith(expect.objectContaining({
         prizePool: 600000,
         prizeSummary: '현금과 물품 시상',
-        prizeBreakdown: '우승 600,000원 / 상품 우승 트로피·상품권',
+        prizeBreakdown: '@teameet/prizes/v1:' + JSON.stringify([{ category: '팀 시상', label: '우승', amount: '600,000원' }, { category: '팀 시상', label: '상품', amount: '우승 트로피·상품권' }]),
       }), expect.anything());
       expect(updateMutate).not.toHaveBeenCalled();
       expect(screen.getByText('STEP 5 / 5')).toBeInTheDocument();
@@ -808,7 +808,7 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
       genderMinFemale: 2,
       coverImageUrl: '/uploads/cover-test.webp',
       prizePool: 600000,
-      prizeBreakdown: '1위 600,000원',
+      prizeBreakdown: '@teameet/prizes/v1:' + JSON.stringify([{ category: '팀 시상', label: '1위', amount: '600,000원' }]),
       promoHomeEnabled: true,
       promoHomeTitle: '이번 주 추천 대회',
     });

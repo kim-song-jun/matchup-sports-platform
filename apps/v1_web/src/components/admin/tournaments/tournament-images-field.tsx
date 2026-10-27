@@ -34,7 +34,7 @@ export function TournamentImagesField({
         className="h-5 w-5 accent-[var(--blue500)]" />
       상세 이미지 표시
     </label>
-    <p id={hintId} className="tm-text-caption mt-1 text-[var(--text-muted)]">
+    <p id={hintId} className="tm-text-caption mt-1 text-[var(--text-muted)]" style={{ wordBreak: 'keep-all', overflowWrap: 'anywhere' }}>
       {showDetailImage
         ? '상세 이미지가 없으면 목록 이미지를 사용하고, 둘 다 없으면 종목 기본 이미지를 보여줘요.'
         : '상세에서 기본 이미지와 이미지 영역을 모두 숨겨요. 목록·홍보 카드와 저장된 사진은 유지돼요.'}

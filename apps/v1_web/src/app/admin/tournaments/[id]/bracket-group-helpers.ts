@@ -10,6 +10,7 @@
 import type {
   V1AdminBracketFixture,
   V1AdminBracketGroup,
+  V1AdminBracketSlot,
   V1AdminBracketStanding,
   V1TournamentGroupPhase,
 } from '@/types/api';
@@ -56,9 +57,39 @@ export function templateFor(
   return { name: `${base} ${n}`, phase };
 }
 
-/** 팀이 1명 이상 배정됐고 경기 일정도 1개 이상 있으면 "준비완료"로 본다(카드 기본 접힘 판정 기준). */
-export function isGroupReady(group: V1AdminBracketGroup, fixtures: V1AdminBracketFixture[]): boolean {
-  return group.groupTeams.length > 0 && fixtures.some((f) => f.groupId === group.id);
+/** 결선 첫 라운드는 슬롯을, 다음 라운드는 이전 경기에서 전파된 fixture 팀을 사용한다. */
+export function groupAssignedTeamIds(
+  group: V1AdminBracketGroup,
+  fixtures: V1AdminBracketFixture[],
+  slots: V1AdminBracketSlot[],
+): Set<string> {
+  const assigned = new Set(group.groupTeams.flatMap((team) => team.registrationId ? [team.registrationId] : []));
+  if (group.phase === 'group') return assigned;
+  for (const slot of slots) {
+    if (slot.groupId === group.id && slot.registrationId) assigned.add(slot.registrationId);
+  }
+  for (const fixture of fixtures) {
+    if (fixture.groupId !== group.id) continue;
+    for (const [slotId, directId] of [[fixture.homeSlotId, fixture.homeRegistrationId], [fixture.awaySlotId, fixture.awayRegistrationId]]) {
+      const registrationId = slotId ? slots.find((slot) => slot.id === slotId)?.registrationId : directId;
+      if (registrationId) assigned.add(registrationId);
+    }
+  }
+  return assigned;
+}
+
+/** 부분 배정된 결선이 전체 준비완료로 표시되지 않게 각 경기의 양쪽을 확인한다. */
+export function isGroupReady(group: V1AdminBracketGroup, fixtures: V1AdminBracketFixture[], slots: V1AdminBracketSlot[] = []): boolean {
+  const groupFixtures = fixtures.filter((fixture) => fixture.groupId === group.id);
+  if (group.phase === 'group') return group.groupTeams.length > 0 && groupFixtures.length > 0;
+  if (groupFixtures.length === 0) return false;
+  const groupSlots = slots.filter((slot) => slot.groupId === group.id);
+  if (groupSlots.some((slot) => !slot.registrationId)) return false;
+  return groupFixtures.every((fixture) => {
+    const resolved = (slotId: string | null, registrationId: string | null) =>
+      slotId ? Boolean(slots.find((slot) => slot.id === slotId)?.registrationId) : Boolean(registrationId);
+    return resolved(fixture.homeSlotId, fixture.homeRegistrationId) && resolved(fixture.awaySlotId, fixture.awayRegistrationId);
+  });
 }
 
 export interface QualifyingCandidate {

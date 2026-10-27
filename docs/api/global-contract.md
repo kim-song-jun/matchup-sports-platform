@@ -240,3 +240,6 @@ status inputs are defined in [Tournaments](./domains/tournaments.md#competition-
 
 경기 결과 참가자의 `cards.events`는 명시적 빈 배열과 생략의 의미가 다르다. 빈 배열은 카드 삭제,
 생략은 기존 합계 전용 입력이다. 상세 형식·합계 일치·피리어드 검증은 [games](./domains/games.md#결과-정정-카드-타임라인-2026-10-24)를 따른다.
+
+
+대회 생성·수정의 `prizeBreakdown`은 nullable string(최대 4,000자)이다. 기존 구분자 텍스트와 `@teameet/prizes/v1:` 접두의 분류 JSON 문자열을 지원하며, 소비자는 공용 파서로 읽는다. 이 필드를 원문 그대로 사용자에게 렌더하지 않는다. [대회 시상 계획 계약](./domains/tournaments.md#categorized-prize-plans) 참고.

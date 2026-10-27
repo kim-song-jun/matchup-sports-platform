@@ -10,7 +10,7 @@ import { registrationIdsBlockedForGroup, registrationIdsInOppositeFinalStage } f
 import type { useV1AssignGroupTeam, useV1CreateFixture, useV1CreateBracketBye } from '@/hooks/use-v1-api';
 import type { V1AdminBracketFixture, V1AdminBracketGroup, V1AdminBracketStanding, V1AdminBracketSlot } from '@/types/api';
 import { ByeSideControl } from '@/components/admin/bracket-canvas/bye-side-control';
-import { computeQualifyingShortlist, isGroupReady } from './bracket-group-helpers';
+import { computeQualifyingShortlist, groupAssignedTeamIds, isGroupReady } from './bracket-group-helpers';
 import { inputCls, submitBtnCls } from './bracket-shared-styles';
 
 // ── 팀 스테이징 피커: 검색/추천으로 담아뒀다가 한 번에 일괄 배정 ────────────────
@@ -193,7 +193,7 @@ export function BracketGroupCard({
   const groupFixtures = fixtures.filter((f) => f.groupId === group.id);
   // 준비완료 여부는 마운트 시점 한 번만 계산해서 초기 접힘 기본값으로 쓴다 — 매 렌더마다
   // 다시 계산하면 "방금 4팀 배정 + 대진 생성까지 끝낸" 카드가 사용자 눈앞에서 접혀버린다.
-  const [expanded, setExpanded] = useState(() => !isGroupReady(group, groupFixtures));
+  const [expanded, setExpanded] = useState(() => !isGroupReady(group, groupFixtures, slots));
   const [isBatchAssigning, setIsBatchAssigning] = useState(false);
   const [entryType, setEntryType] = useState<'match' | 'bye'>('match');
   const [byePosition, setByePosition] = useState('1');
@@ -215,14 +215,14 @@ export function BracketGroupCard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const teamCount = group.groupTeams.filter((team) => team.registrationId).length;
+  const assignedIds = groupAssignedTeamIds(group, groupFixtures, slots);
+  const teamCount = assignedIds.size;
   const fixtureCount = groupFixtures.length;
   const autoGenerateHintId = useId();
-  const ready = teamCount > 0 && fixtureCount > 0;
+  const ready = isGroupReady(group, groupFixtures, slots);
   const teamLabel = teamCount === 0 ? '배정 대기' : `${teamCount}팀 배정됨`;
   const fixtureLabel = fixtureCount === 0 ? '대진 미생성' : `대진 ${fixtureCount}경기`;
 
-  const assignedIds = new Set(group.groupTeams.map((gt) => gt.registrationId));
   const finalStageIds = registrationIdsInOppositeFinalStage(allGroups, fixtures, group.id);
   const suggestedTeams = computeQualifyingShortlist(group, allGroups, allStandings).filter(
     (c) => !assignedIds.has(c.id) && !finalStageIds.has(c.id),
@@ -254,6 +254,10 @@ export function BracketGroupCard({
   }
 
   const isKnockout = group.phase !== 'group';
+  const managedKnockout = isKnockout && (slots.some((slot) => slot.groupId === group.id) || groupFixtures.some((fixture) => fixture.homeSlotId || fixture.awaySlotId || (fixture.bracketSources?.length ?? 0) > 0));
+  const existingKnockout = isKnockout && (managedKnockout || groupFixtures.some((fixture) =>
+    fixture.homeRegistrationId || fixture.awayRegistrationId || fixture.result || (fixture.game && fixture.game.state !== 'SCHEDULED'),
+  ));
   const needsMoreTeams = !isKnockout && teamCount < 2;
   const roundOptions: string[] = isKnockout
     ? ['16강', '12강', '8강', '4강', '결승', '3·4위전']
@@ -335,7 +339,7 @@ export function BracketGroupCard({
   // 결선 조는 순위를 계산하지 않는다 — 순위만 보면 팀을 배정한 뒤에도 계속 0이라
   // "아직 배정된 팀이 없어요" 가 남았다(alpha 실측: 2팀 배정 후에도 잔존). 이 문장이
   // 말하는 것은 배정이므로 배정을 본다.
-  const knockoutEmpty = isKnockout && standings.length === 0 && group.groupTeams.length === 0;
+  const knockoutEmpty = isKnockout && standings.length === 0 && teamCount === 0;
   const bodyId = `bracket-group-${group.id}-body`;
 
   return (
@@ -440,9 +444,9 @@ export function BracketGroupCard({
           </div>
 
           {/* ── 팀 배정 ── */}
-          {managedEntrySlots ? <p className="tm-text-caption text-[var(--text-muted)]">위의 ‘조별 팀 자리 편집’에서 팀을 선택해 주세요. 연결된 조별 경기들에 함께 반영돼요.</p> : <TeamStagingPicker
+          {managedKnockout ? <p className="tm-text-caption text-[var(--text-muted)]">결선 진출 자리는 대진표에서 확인하고 배정해 주세요.</p> : managedEntrySlots ? <p className="tm-text-caption text-[var(--text-muted)]">위의 ‘조별 팀 자리 편집’에서 팀을 선택해 주세요. 연결된 조별 경기들에 함께 반영돼요.</p> : <TeamStagingPicker
             pickerId={`bracket-group-${group.id}-team-search`}
-            suggestedTeams={suggestedTeams}
+            suggestedTeams={existingKnockout ? [] : suggestedTeams}
             searchPoolItems={searchPoolItems}
             isSubmitting={isBatchAssigning || assignGroupTeam.isPending}
             onBatchAssign={handleBatchAssign}
@@ -451,7 +455,7 @@ export function BracketGroupCard({
           {/* ── 경기 일정 ── */}
           <div className="flex flex-col gap-3 pt-1 border-t border-[var(--border)]">
             <div className="flex flex-wrap items-center gap-2 pt-4">
-              <button
+              {!existingKnockout && <button
                 type="button"
                 onClick={() => onAutoGenerate(group.id)}
                 disabled={managedEntrySlots || isAutoGenerating || createFixture.isPending}
@@ -460,7 +464,7 @@ export function BracketGroupCard({
               >
                 <RefreshCw size={14} aria-hidden="true" />
                 {isAutoGenerating ? '생성 중…' : '대진 자동 생성'}
-              </button>
+              </button>}
               <button
                 type="button"
                 onClick={() => setManualFixtureOpen((v) => !v)}

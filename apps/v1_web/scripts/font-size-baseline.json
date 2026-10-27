@@ -81,7 +81,7 @@
   "src/components/admin/push-send-form.tsx": 3,
   "src/components/admin/season-seed-panel.tsx": 14,
   "src/components/admin/tournaments/cover-image-uploader.tsx": 4,
-  "src/components/admin/tournaments/prize-breakdown-editor.tsx": 9,
+  "src/components/admin/tournaments/prize-breakdown-editor.tsx": 0,
   "src/components/admin/tournaments/promo-card-fields.tsx": 12,
   "src/components/auth/terms-client.tsx": 1,
   "src/components/auth/terms-document-body.tsx": 1,

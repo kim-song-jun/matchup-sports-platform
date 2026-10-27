@@ -1,6 +1,6 @@
 # 대회 시상 계획의 명시적 분류
 
-Status: In Progress
+Status: PR Open — alpha QA pending
 Created: 2026-10-27
 Related: `20261109-grouped-public-prizes.md`의 이름 추정 분류를 확장하는 사용자 승인 후속 작업.
 
@@ -31,8 +31,8 @@ Related: `20261109-grouped-public-prizes.md`의 이름 추정 분류를 확장�
 ## Acceptance Criteria
 - [x] 이름과 관계없이 명시적 분류 저장.
 - [x] 공통 공개 그룹·미리보기 반영, 기존 텍스트 읽기.
-- [ ] 관련 테스트·타입 검사 통과.
-- [ ] dev 대상 PR 생성.
+- [x] 관련 frontend 224건(8개 파일의 최종 통과 결과 합계), API DTO 4건, frontend 타입·패턴 검사 통과.
+- [x] dev 대상 PR #2066 생성.
 - [ ] 배포 후 alpha 화면 검증.
 
 ## Tech Debt Resolved
@@ -48,4 +48,4 @@ DB 컬럼 추가 없이 기존 string 필드에 버전 prefix+JSON으로 분류�
 신규 이름도 분류를 명시해 저장한다는 사용자 확정. 추첨·이벤트는 기타 시상에 포함한다. 기존 기타/추정 분류를 바꾸려면 원하는 구역에 새 행으로 옮긴다.
 
 ## Progress Snapshot
-구현 완료, 검증 진행. alpha는 자동 배포 전이므로 변경 화면 QA는 아직 수행하지 않았다. PR 요청 범위만 수행하며 자동 머지는 하지 않는다.
+구현·검증 완료, PR #2066(dev) 생성. 검증 중 테스트 의존성의 중복 React를 worktree 안에서만 정리한 뒤 생성 화면 89건 재통과를 확인했다. 생성·캠페인 최종 108건, 정보·공개 시상 최종 46건, 공용 파서/편집기/그룹 45건, 생성 모델 25건, API DTO 4건 통과. committed-tree frontend tsc 0, 디자인 패턴·diff 검사 통과. alpha는 배포 전이므로 변경 화면 QA는 미실시이며 PR에 후속 게이트를 명시했다. 자동 머지는 하지 않는다.

@@ -1,0 +1,86 @@
+[
+  {
+    "route": "/tournaments/f59d3e16-48bb-46ef-8162-c0242a575f69",
+    "width": 390,
+    "phase": "focus",
+    "status": 200,
+    "release": "392906709c15bf3e31d5b4099d8f203b032f39c5",
+    "sections": [
+      "대회 기본 정보",
+      "상품 및 상금 안내",
+      "팀 시상",
+      "대회 문의"
+    ],
+    "overflow": false,
+    "pageErrors": [],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 401 ()"
+    ],
+    "failures": [
+      {
+        "status": 401,
+        "path": "/api/v1/auth/me"
+      }
+    ],
+    "unexpectedFailures": [],
+    "unexpectedConsoleErrors": [],
+    "verdict": "PASS",
+    "screenshot": "detail-390.png"
+  },
+  {
+    "route": "/tournaments/f59d3e16-48bb-46ef-8162-c0242a575f69",
+    "width": 768,
+    "phase": "focus",
+    "status": 200,
+    "release": "392906709c15bf3e31d5b4099d8f203b032f39c5",
+    "sections": [
+      "대회 기본 정보",
+      "상품 및 상금 안내",
+      "팀 시상",
+      "대회 문의"
+    ],
+    "overflow": false,
+    "pageErrors": [],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 401 ()"
+    ],
+    "failures": [
+      {
+        "status": 401,
+        "path": "/api/v1/auth/me"
+      }
+    ],
+    "unexpectedFailures": [],
+    "unexpectedConsoleErrors": [],
+    "verdict": "PASS",
+    "screenshot": "detail-768.png"
+  },
+  {
+    "route": "/tournaments/f59d3e16-48bb-46ef-8162-c0242a575f69",
+    "width": 1440,
+    "phase": "focus",
+    "status": 200,
+    "release": "392906709c15bf3e31d5b4099d8f203b032f39c5",
+    "sections": [
+      "대회 기본 정보",
+      "상품 및 상금 안내",
+      "팀 시상",
+      "대회 문의"
+    ],
+    "overflow": false,
+    "pageErrors": [],
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 401 ()"
+    ],
+    "failures": [
+      {
+        "status": 401,
+        "path": "/api/v1/auth/me"
+      }
+    ],
+    "unexpectedFailures": [],
+    "unexpectedConsoleErrors": [],
+    "verdict": "PASS",
+    "screenshot": "detail-1440.png"
+  }
+]

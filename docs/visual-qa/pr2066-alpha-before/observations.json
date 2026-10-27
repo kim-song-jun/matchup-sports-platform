@@ -1,0 +1,143 @@
+[
+  {
+    "phase": "before",
+    "route": "/tournaments/f59d3e16-48bb-46ef-8162-c0242a575f69",
+    "width": 390,
+    "status": 200,
+    "release": "d1080c6843063c7b9459d1aedc355bc9458b3742",
+    "url": "https://alpha.teameet.co.kr/tournaments/f59d3e16-48bb-46ef-8162-c0242a575f69",
+    "sections": [
+      "대회 기본 정보",
+      "상품 및 상금 안내",
+      "팀 시상",
+      "대회 문의"
+    ],
+    "errors": [
+      "Failed to load resource: the server responded with a status of 401 ()"
+    ],
+    "failures": [
+      {
+        "status": 401,
+        "url": "/api/v1/auth/me"
+      }
+    ],
+    "overflow": false,
+    "screenshot": "detail-390.png"
+  },
+  {
+    "phase": "before",
+    "route": "/tournaments/f59d3e16-48bb-46ef-8162-c0242a575f69",
+    "width": 768,
+    "status": 200,
+    "release": "d1080c6843063c7b9459d1aedc355bc9458b3742",
+    "url": "https://alpha.teameet.co.kr/tournaments/f59d3e16-48bb-46ef-8162-c0242a575f69",
+    "sections": [
+      "대회 기본 정보",
+      "상품 및 상금 안내",
+      "팀 시상",
+      "대회 문의"
+    ],
+    "errors": [
+      "Failed to load resource: the server responded with a status of 401 ()"
+    ],
+    "failures": [
+      {
+        "status": 401,
+        "url": "/api/v1/auth/me"
+      }
+    ],
+    "overflow": false,
+    "screenshot": "detail-768.png"
+  },
+  {
+    "phase": "before",
+    "route": "/tournaments/f59d3e16-48bb-46ef-8162-c0242a575f69",
+    "width": 1440,
+    "status": 200,
+    "release": "d1080c6843063c7b9459d1aedc355bc9458b3742",
+    "url": "https://alpha.teameet.co.kr/tournaments/f59d3e16-48bb-46ef-8162-c0242a575f69",
+    "sections": [
+      "대회 기본 정보",
+      "상품 및 상금 안내",
+      "팀 시상",
+      "대회 문의"
+    ],
+    "errors": [
+      "Failed to load resource: the server responded with a status of 401 ()"
+    ],
+    "failures": [
+      {
+        "status": 401,
+        "url": "/api/v1/auth/me"
+      }
+    ],
+    "overflow": false,
+    "screenshot": "detail-1440.png"
+  },
+  {
+    "phase": "before",
+    "route": "/tournaments/f59d3e16-48bb-46ef-8162-c0242a575f69/awards",
+    "width": 390,
+    "status": 200,
+    "release": "d1080c6843063c7b9459d1aedc355bc9458b3742",
+    "url": "https://alpha.teameet.co.kr/tournaments/f59d3e16-48bb-46ef-8162-c0242a575f69/awards",
+    "sections": [
+      "팀 시상"
+    ],
+    "errors": [
+      "Failed to load resource: the server responded with a status of 401 ()"
+    ],
+    "failures": [
+      {
+        "status": 401,
+        "url": "/api/v1/auth/me"
+      }
+    ],
+    "overflow": false,
+    "screenshot": "awards-390.png"
+  },
+  {
+    "phase": "before",
+    "route": "/tournaments/f59d3e16-48bb-46ef-8162-c0242a575f69/awards",
+    "width": 768,
+    "status": 200,
+    "release": "d1080c6843063c7b9459d1aedc355bc9458b3742",
+    "url": "https://alpha.teameet.co.kr/tournaments/f59d3e16-48bb-46ef-8162-c0242a575f69/awards",
+    "sections": [
+      "팀 시상"
+    ],
+    "errors": [
+      "Failed to load resource: the server responded with a status of 401 ()"
+    ],
+    "failures": [
+      {
+        "status": 401,
+        "url": "/api/v1/auth/me"
+      }
+    ],
+    "overflow": false,
+    "screenshot": "awards-768.png"
+  },
+  {
+    "phase": "before",
+    "route": "/tournaments/f59d3e16-48bb-46ef-8162-c0242a575f69/awards",
+    "width": 1440,
+    "status": 200,
+    "release": "d1080c6843063c7b9459d1aedc355bc9458b3742",
+    "url": "https://alpha.teameet.co.kr/tournaments/f59d3e16-48bb-46ef-8162-c0242a575f69/awards",
+    "sections": [
+      "팀 시상"
+    ],
+    "errors": [
+      "Failed to load resource: the server responded with a status of 401 ()"
+    ],
+    "failures": [
+      {
+        "status": 401,
+        "url": "/api/v1/auth/me"
+      }
+    ],
+    "overflow": false,
+    "screenshot": "awards-1440.png"
+  }
+]

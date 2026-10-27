@@ -1,6 +1,6 @@
 # 대회 시상 계획의 명시적 분류
 
-Status: PR Open — alpha QA pending
+Status: Deployed — authenticated admin QA pending
 Created: 2026-10-27
 Related: `20261109-grouped-public-prizes.md`의 이름 추정 분류를 확장하는 사용자 승인 후속 작업.
 
@@ -33,7 +33,8 @@ Related: `20261109-grouped-public-prizes.md`의 이름 추정 분류를 확장�
 - [x] 공통 공개 그룹·미리보기 반영, 기존 텍스트 읽기.
 - [x] 관련 frontend 224건(8개 파일의 최종 통과 결과 합계), API DTO 4건, frontend 타입·패턴 검사 통과.
 - [x] dev 대상 PR #2066 생성.
-- [ ] 배포 후 alpha 화면 검증.
+- [x] alpha 배포 성공, 실제 SHA·API/DB 정상, 공개 상세·시상 390/768/1440 확인.
+- [ ] 관리자 입력·저장의 alpha 실로그인 검증 (세션 없음으로 BLOCKED).
 
 ## Tech Debt Resolved
 분류를 이름만으로 추정하던 제약, 개인명 공백 손실, 빈 시상 전체 삭제 미반영, 시상만 입력했을 때 공개 결과 누락을 처리한다.
@@ -48,4 +49,9 @@ DB 컬럼 추가 없이 기존 string 필드에 버전 prefix+JSON으로 분류�
 신규 이름도 분류를 명시해 저장한다는 사용자 확정. 추첨·이벤트는 기타 시상에 포함한다. 기존 기타/추정 분류를 바꾸려면 원하는 구역에 새 행으로 옮긴다.
 
 ## Progress Snapshot
-구현·검증 완료, PR #2066(dev) 생성. 검증 중 테스트 의존성의 중복 React를 worktree 안에서만 정리한 뒤 생성 화면 89건 재통과를 확인했다. 생성·캠페인 최종 108건, 정보·공개 시상 최종 46건, 공용 파서/편집기/그룹 45건, 생성 모델 25건, API DTO 4건 통과. committed-tree frontend tsc 0, 디자인 패턴·diff 검사 통과. alpha는 배포 전이므로 변경 화면 QA는 미실시이며 PR에 후속 게이트를 명시했다. 자동 머지는 하지 않는다.
+
+구현 테스트 frontend 224건·API DTO 4건, committed-tree 타입·패턴 검증 통과. 사용자 추가 지시로 PR #2066을 리뷰 없이 dev에 merge했고 merge commit CI와 alpha 배포도 성공했다. 실제 서비스·DB 상태 및 공개 화면 3폭 검증을 완료했다. 관리자 실로그인 검증은 세션 부재로 남아 있다. 아래 Deployment Snapshot과 별도 QA 브랜치의 증거를 최신 커서로 쓴다.
+
+## Deployment Snapshot
+
+사용자가 리뷰 대기를 면제하고 즉시 배포를 지시했다. PR #2066을 dev에 merge했고, merge commit CI 및 Deploy Alpha 모두 success다. 실제 서비스 SHA `392906709c15bf3e31d5b4099d8f203b032f39c5`, DB health 정상. 공개 화면 6/6 PASS, 관리자 3폭은 로그인 세션 부재로 BLOCKED다. [배포·화면 증거](../../docs/visual-qa/pr2066-alpha-verification.md)는 별도 QA 브랜치에서 관리한다. 공개 원본 데이터는 수정하지 않았다.

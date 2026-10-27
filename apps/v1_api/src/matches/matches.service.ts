@@ -1154,11 +1154,20 @@ export class MatchesService {
       throw stateConflict(getReasonMessage(reasonCode), reasonCode);
     }
 
-    const existing = match.applications[0] ?? null;
     const application = await this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "v1_matches" WHERE id = ${match.id} FOR UPDATE`;
-      const current = await tx.v1Match.findFirst({ where: { id: match.id, deletedAt: null } });
+      const current = await tx.v1Match.findFirst({
+        where: { id: match.id, deletedAt: null },
+        include: this.matchInclude(user),
+      });
       if (!current || current.status !== 'recruiting' || current.startAt <= new Date() || (current.deadlineAt && current.deadlineAt <= new Date())) throw stateConflict('매치 상태가 바뀌었어요. 다시 확인해 주세요.');
+      // Another request may have committed an application or participant while this request
+      // waited for the match lock. Recheck the same eligibility contract against that state.
+      const currentReason = this.getEligibilityReason(current, this.getViewer(current, user).state);
+      if (currentReason !== 'OK') {
+        throw stateConflict(getReasonMessage(currentReason), currentReason);
+      }
+      const existing = current.applications[0] ?? null;
       const nextApplication = existing
         ? await (async () => {
             const transition = await tx.v1MatchApplication.updateMany({

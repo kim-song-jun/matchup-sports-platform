@@ -9,6 +9,40 @@ export interface PrizeRow {
   amount: string;
 }
 
+export const PRIZE_CATEGORIES = ['팀 시상', '개인 시상', '추첨·이벤트', '기타 시상'] as const;
+
+export interface PrizeGroup {
+  label: string;
+  position: number | null;
+  category: typeof PRIZE_CATEGORIES[number];
+  amounts: string[];
+}
+
+/** 저장된 상품 행은 그대로 두고 공개 화면에서만 시상별로 모은다. */
+export function groupPrizeRows(rows: readonly PrizeRow[]): PrizeGroup[] {
+  const groups = new Map<string, PrizeGroup>();
+  for (const row of rows) {
+    const label = row.label.trim();
+    if (!label) continue;
+    const rank = label.match(/^(?:공동\s*)?([1-9]\d*)위$/);
+    const position = label === '우승' ? 1 : label === '준우승' ? 2 : rank ? Number(rank[1]) : null;
+    // '우승'과 '1위'도 같은 시상이지만 공동 순위는 별도 표기를 보존한다.
+    const key = position !== null && !label.startsWith('공동') ? `rank:${position}` : `label:${label}`;
+    let group = groups.get(key);
+    if (!group) {
+      const category = position !== null ? '팀 시상'
+        : /추첨|경품|이벤트|참가|전원/.test(label) ? '추첨·이벤트'
+        : /^(MVP|득점왕|도움왕|개인.*|최우수.*|우수.*|베스트.*|.*상)$/.test(label) ? '개인 시상'
+        : '기타 시상';
+      group = { label, position, category, amounts: [] };
+      groups.set(key, group);
+    }
+    // 같은 상품을 여러 번 등록했을 수 있으므로 내용 중복은 임의로 제거하지 않는다.
+    if (row.amount.trim()) group.amounts.push(row.amount.trim());
+  }
+  return [...groups.values()];
+}
+
 /** 어드민 편집기의 항목 프리셋 (공개 카드 아이콘 매핑과 동일한 라벨) */
 export const PRIZE_LABEL_PRESETS = ['1위', '2위', '3위', 'MVP', '득점왕', '도움왕'] as const;
 

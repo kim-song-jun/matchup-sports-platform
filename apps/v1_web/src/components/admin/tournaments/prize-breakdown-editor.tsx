@@ -1,6 +1,7 @@
 'use client';
 
 import { Plus, X } from 'lucide-react';
+import { GroupedPrizes } from '@/components/tournaments/grouped-prizes';
 import {
   PRIZE_LABEL_PRESETS,
   formatPrizeRowValue,
@@ -141,16 +142,9 @@ export function PrizeBreakdownEditor({
         <p className="text-xs font-semibold text-[var(--text-caption)]">공개 페이지 미리보기</p>
         <div className="mt-2 grid gap-2">
           {rows.some((row) => row.label.trim() && row.value.trim()) ? (
-            rows
+            <GroupedPrizes rows={rows
               .filter((row) => row.label.trim() && row.value.trim())
-              .map((row) => (
-                <div key={row.id} className="flex items-center justify-between gap-3 text-sm">
-                  <span className="font-semibold text-[var(--text-body)]">{row.label.trim()}</span>
-                  <span className="text-right font-bold text-[var(--text-strong)]">
-                    {formatPrizeRowValue(row.value)}
-                  </span>
-                </div>
-              ))
+              .map((row) => ({ label: row.label, amount: row.value }))} />
           ) : (
             <p className="text-sm text-[var(--text-caption)]">상금 항목을 추가하면 여기에 바로 보여요.</p>
           )}

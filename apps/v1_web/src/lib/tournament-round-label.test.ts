@@ -52,16 +52,16 @@ describe('competitionMatchLabel', () => {
 describe('KNOCKOUT_PHASES', () => {
   // V1TournamentGroupPhase 에 값이 늘면 이 Record 가 컴파일 오류로 먼저 알려 준다(결선 단계 누락 = 공개 대진표에서 경기 소실).
   const everyKnockoutPhase: Record<Exclude<V1TournamentGroupPhase, 'group'>, true> = {
-    round16: true, round12: true, quarter: true, semi: true, final: true, third_place: true,
+    round64: true, round32: true, round16: true, round12: true, quarter: true, semi: true, final: true, third_place: true,
   };
 
   it('조별을 뺀 모든 단계를 큰 단계부터 담는다', () => {
     expect([...KNOCKOUT_PHASES].sort()).toEqual(Object.keys(everyKnockoutPhase).sort());
-    expect(KNOCKOUT_PHASES.map(tournamentRoundLabel)).toEqual(['16강', '12강', '8강', '4강', '결승', '3·4위전']);
+    expect(KNOCKOUT_PHASES.map(tournamentRoundLabel)).toEqual(['64강', '32강', '16강', '12강', '8강', '4강', '결승', '3·4위전']);
   });
 
   it('isKnockoutPhase — 결선 단계만 참이다', () => {
     expect(KNOCKOUT_PHASES.every((phase) => isKnockoutPhase(phase))).toBe(true);
-    expect(['group', '', 'league_r1', 'round32'].some((phase) => isKnockoutPhase(phase))).toBe(false);
+    expect(['group', '', 'league_r1', 'round128'].some((phase) => isKnockoutPhase(phase))).toBe(false);
   });
 });

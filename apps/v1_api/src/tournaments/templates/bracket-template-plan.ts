@@ -3,17 +3,18 @@ import type { V1TournamentGroupPhase, V1TournamentSlotKind } from '@prisma/clien
 import { buildLeagueFixtureRows } from '../league-fixture-generator.service';
 import { FIXTURES_IN_PHASE, GROUP_NAME, ROUND_LABEL, type KnockoutPhase } from './knockout-phase-labels';
 import { planGroupKnockoutTemplate } from './group-knockout-plan';
+import { planFlexibleBracket, type FlexibleBracketSettings } from './flexible-bracket-plan';
 
 export type BracketTemplateInput =
-  | { kind: 'knockout'; size: 4 | 8 | 12 | 16; thirdPlace: boolean }
-  | { kind: 'group_knockout'; groupCount: number; teamsPerGroup: number; advancePerGroup: 1 | 2; legs: 1 | 2; thirdPlace: boolean; qualificationMode?: 'cross_group_round12' }
+  | ({ kind: 'knockout'; size: number; thirdPlace: boolean } & FlexibleBracketSettings)
+  | ({ kind: 'group_knockout'; groupCount: number; teamsPerGroup: number; advancePerGroup: number; legs: 1 | 2; thirdPlace: boolean; qualificationMode?: 'cross_group_round12' } & FlexibleBracketSettings)
   | { kind: 'league'; teamCount: number; legs: 1 | 2 };
 export type PlanGroup = { key: string; name: string; phase: V1TournamentGroupPhase; sortOrder: number; advanceCount: number | null };
-export type PlanSlot = { key: string; kind: V1TournamentSlotKind; groupKey: string | null; position: number; sourceGroupKey: string | null };
+export type PlanSlot = { key: string; kind: V1TournamentSlotKind; groupKey: string | null; position: number; sourceGroupKey: string | null; byeSortOrder?: number };
 export type PlanFixture = { key: string; groupKey: string; round: string; fixtureNumber: number; legNumber: number; homeSlotKey: string | null; awaySlotKey: string | null };
 export type PlanEdge = { sourceFixtureKey: string; outcome: 'WINNER' | 'LOSER'; targetFixtureKey: string; targetSide: 'HOME' | 'AWAY' };
 export type PlanByeSlot = { groupKey: string; sortOrder: number };
-export type BracketTemplatePlan = { groups: PlanGroup[]; slots: PlanSlot[]; fixtures: PlanFixture[]; edges: PlanEdge[]; byeSlots: PlanByeSlot[] };
+export type BracketTemplatePlan = { groups: PlanGroup[]; slots: PlanSlot[]; fixtures: PlanFixture[]; edges: PlanEdge[]; byeSlots: PlanByeSlot[]; warnings?: string[] };
 
 export const BRACKET_TEMPLATE_MAX_FIXTURES = 240;
 
@@ -117,9 +118,10 @@ function planLeague(input: Extract<BracketTemplateInput, { kind: 'league' }>, of
 }
 
 function build(input: BracketTemplateInput, offset: number): BracketTemplatePlan {
+  if (input.kind !== 'league' && input.schemaVersion === 2) return planFlexibleBracket(input, offset);
   switch (input.kind) {
     case 'knockout':
-      if (!([4, 8, 12, 16] as readonly number[]).includes(input.size)) unsupported('토너먼트는 4강·8강·12강·16강으로만 만들 수 있어요.');
+      if (!([4, 8, 12, 16] as readonly number[]).includes(input.size)) unsupported('새 짝수 팀 대진은 schemaVersion 2로 만들어 주세요.');
       return planKnockout(input, offset);
     case 'league':
       if (!Number.isInteger(input.teamCount) || input.teamCount < 3 || input.teamCount > 20) unsupported('리그는 3~20팀으로 만들 수 있어요.');

@@ -28,6 +28,13 @@ describe('fixture display labels', () => {
     await expect(save({ awayDisplayLabel: '   ' })).resolves.toEqual({ homeDisplayLabel: null, awayDisplayLabel: null });
     expect(tx.v1TournamentMatchDetails.update).toHaveBeenCalledWith({ where: { teamMatchId: 'fixture' }, data: { awayDisplayLabel: null } });
   });
+  it('keeps a group-rank bye label on its shared slot without changing its source', async () => {
+    const { current, tx, save } = setup(true);
+    Object.assign(current.teamMatch.homeSlot!, { kind: 'GROUP_RANK', byeSortOrder: 0, sourceGroupId: 'A' });
+    await save({ homeDisplayLabel: 'A조 1위 직행' });
+    expect(tx.v1TournamentSlot.update).toHaveBeenCalledWith({ where: { id: 'bye' }, data: { displayLabel: 'A조 1위 직행' } });
+    expect(tx.v1TournamentMatchDetails.update).not.toHaveBeenCalled();
+  });
   it('does not write or audit an unchanged label', async () => {
     const { tx, context, save } = setup();
     await save({ awayDisplayLabel: '직접 입력' });

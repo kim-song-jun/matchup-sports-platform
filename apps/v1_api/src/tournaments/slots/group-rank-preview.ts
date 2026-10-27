@@ -105,7 +105,7 @@ export type GroupQualification = { advancingRegistrationIds: string[]; undecided
 export type GroupStandingSummary = {
   /** §5 로 끝까지 안 갈린 팀만 들어간다. 값 = 그 동률 묶음 팀들의 저장 position 중 최솟값. */
   sharedRankByRegistrationId: Map<string, number>;
-  /** advanceCount 가 null 이면 null. */
+  /** 진출 규칙도 실제 결선 배정도 없으면 null. */
   qualification: GroupQualification | null;
 };
 
@@ -139,7 +139,13 @@ function qualificationOf(
   advanceCount: number | null,
   placedRegistrationIds: ReadonlySet<string>,
 ): GroupQualification | null {
-  if (advanceCount === null) return null;
+  // 수동 조는 진출 수가 없어도 결선에 실제 배정한 소속 팀을 보여준다.
+  // 순위로 추가 진출 인원을 추측하지 않는다.
+  if (advanceCount === null) {
+    const advancingRegistrationIds = [...new Set(source.registrationIds)]
+      .filter((id) => placedRegistrationIds.has(id)).sort();
+    return advancingRegistrationIds.length === 0 ? null : { advancingRegistrationIds, undecided: false };
+  }
   const effectiveCount = Math.min(advanceCount, source.registrationIds.length);
   const orderIndexById = new Map(league.standings.map((row, index) => [row.teamId, index]));
   const positionById = new Map(source.standings.map((row) => [row.registrationId, row.position]));

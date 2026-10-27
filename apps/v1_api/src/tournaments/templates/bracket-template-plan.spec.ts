@@ -231,8 +231,8 @@ describe('planBracketTemplate — 거부', () => {
 
   it.each([
     [{ kind: 'knockout', size: 5, thirdPlace: false }],
-    [{ kind: 'knockout', size: 10, thirdPlace: false }],
-    [{ kind: 'knockout', size: 20, thirdPlace: true }],
+    [{ kind: 'knockout', size: 66, thirdPlace: false }],
+    [{ kind: 'knockout', size: 3, thirdPlace: true }],
     [{ kind: 'league', teamCount: 2, legs: 1 }],
     [{ kind: 'league', teamCount: 21, legs: 1 }],
     [{ kind: 'league', teamCount: 4, legs: 3 }],

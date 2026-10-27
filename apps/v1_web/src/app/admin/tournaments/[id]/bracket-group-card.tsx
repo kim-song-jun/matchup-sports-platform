@@ -366,6 +366,7 @@ export function BracketGroupCard({
             <span className="block text-xs text-[var(--text-muted)] mt-0.5">
               {teamLabel} · {fixtureLabel}{group.groupTeams.some((team) => team.isBye) && ` · 부전승 ${group.groupTeams.filter((team) => team.isBye).length}자리`}
               {group.advanceCount != null && ` · 상위 ${group.advanceCount}팀 진출`}
+              {group.phase === 'group' && group.advanceCount == null && ' · 진출 수 미설정 (조 수정에서 설정)'}
             </span>
           </span>
         </button>

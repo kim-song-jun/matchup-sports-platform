@@ -28,6 +28,7 @@ interface RoundGroup {
 }
 
 const PHASE_ORDER: Record<string, number> = {
+  round64: -2, round32: -1,
   round16: 0,
   round12: 1,
   quarter: 2,
@@ -37,6 +38,7 @@ const PHASE_ORDER: Record<string, number> = {
 };
 
 const PHASE_LABEL: Record<string, string> = {
+  round64: '64강', round32: '32강',
   round16: '16강',
   round12: '12강',
   quarter: '8강',
@@ -66,6 +68,8 @@ function getFixturePhase(round: string): keyof typeof PHASE_ORDER | null {
 
   if (normalized.includes('third_place') || normalized.includes('3·4위전') || normalized.includes('3-4위전')) return 'third_place';
   if (normalized === 'final' || normalized === '결승') return 'final';
+  if (normalized === 'round64' || normalized === '64강') return 'round64';
+  if (normalized === 'round32' || normalized === '32강') return 'round32';
   if (normalized === 'round16' || normalized === '16강') return 'round16';
   if (normalized === 'round12' || normalized === '12강') return 'round12';
   if (normalized === 'quarter' || normalized === 'quarterfinal' || normalized === '8강') return 'quarter';

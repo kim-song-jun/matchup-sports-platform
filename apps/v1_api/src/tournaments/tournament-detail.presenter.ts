@@ -453,7 +453,7 @@ export function presentTournamentDetail(
       advanceCount: group.advanceCount,
       qualification: groupStandingSummaries.get(group.id)?.qualification ?? null,
       groupTeams: [...group.groupTeams, ...(group.byeSlots ?? []).map((slot) => ({ ...slot, registrationId: null, registration: null, isBye: true }))].map((groupTeam) => {
-        const slot = groupTeam.isBye ? group.slots?.find(candidate => candidate.kind === 'BYE' && candidate.byeSortOrder === groupTeam.sortOrder) : undefined;
+        const slot = groupTeam.isBye ? group.slots?.find(candidate => candidate.byeSortOrder != null && candidate.byeSortOrder === groupTeam.sortOrder) : undefined;
         // The stored slot link survives an empty/reassigned team and custom labels.
         // Never infer an unassigned BYE target from fixture numbers or visual order.
         const target = slot ? row.tournamentMatchDetails.find(detail => detail.teamMatch.homeSlotId === slot.id || detail.teamMatch.awaySlotId === slot.id) : undefined;

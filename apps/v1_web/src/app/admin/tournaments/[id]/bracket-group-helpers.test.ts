@@ -7,7 +7,8 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { V1AdminBracketFixture, V1AdminBracketGroup, V1AdminBracketStanding } from '@/types/api';
-import { computeQualifyingShortlist, GROUP_PHASE_TEMPLATES, isGroupReady, templateFor } from './bracket-group-helpers';
+import { makeSlot } from '@/test/bracket-canvas-fixtures';
+import { computeQualifyingShortlist, groupAssignedTeamIds, GROUP_PHASE_TEMPLATES, isGroupReady, templateFor } from './bracket-group-helpers';
 
 function group(overrides: Partial<V1AdminBracketGroup>): V1AdminBracketGroup {
   return {
@@ -130,6 +131,61 @@ describe('isGroupReady', () => {
     const g = group({ groupTeams: [{ id: 'gt-1', groupId: 'g-1', registrationId: 'r1', teamName: '팀A', sortOrder: 0, createdAt: '2026-08-01T00:00:00.000Z' }] });
     const fixtures = [fixture({ groupId: 'g-1' })];
     expect(isGroupReady(g, fixtures)).toBe(true);
+  });
+});
+
+describe('결선 배정 및 준비 상태', () => {
+  it('조 순위 슬롯의 양 팀을 집계하고 다른 결선의 슬롯과 경기는 제외한다', () => {
+    const semi = group({ id: 'semi', phase: 'semi' });
+    const slots = [
+      makeSlot({ id: 's1', groupId: 'semi', kind: 'GROUP_RANK', registrationId: 'r1' }),
+      makeSlot({ id: 's2', groupId: 'semi', kind: 'GROUP_RANK', registrationId: 'r2' }),
+      makeSlot({ id: 'other', groupId: 'final', kind: 'GROUP_RANK', registrationId: 'r3' }),
+    ];
+    const fixtures = [
+      fixture({ groupId: 'semi', homeSlotId: 's1', awaySlotId: 's2', homeRegistrationId: null, awayRegistrationId: null }),
+      fixture({ id: 'other-fixture', groupId: 'final', homeRegistrationId: 'r3', awayRegistrationId: 'r4' }),
+    ];
+
+    expect(groupAssignedTeamIds(semi, fixtures, slots)).toEqual(new Set(['r1', 'r2']));
+    expect(isGroupReady(semi, fixtures, slots)).toBe(true);
+    expect(isGroupReady(semi, [fixtures[1]], slots)).toBe(false);
+  });
+
+  it('빈 슬롯에 남은 경기의 이전 팀 값은 집계하지 않고 부분 배정은 준비 대기로 남는다', () => {
+    const semi = group({ id: 'semi', phase: 'semi' });
+    const slots = [
+      makeSlot({ id: 's1', groupId: 'semi', kind: 'GROUP_RANK', registrationId: 'r1' }),
+      makeSlot({ id: 's2', groupId: 'semi', kind: 'GROUP_RANK', registrationId: null }),
+    ];
+    const fixtures = [fixture({ groupId: 'semi', homeSlotId: 's1', awaySlotId: 's2', awayRegistrationId: 'stale' })];
+
+    expect(groupAssignedTeamIds(semi, fixtures, slots)).toEqual(new Set(['r1']));
+    expect(isGroupReady(semi, fixtures, slots)).toBe(false);
+    expect(isGroupReady(semi, fixtures, [slots[0]])).toBe(false);
+  });
+
+  it('부전승 팀이 조 팀과 슬롯에 모두 있어도 한 번만 집계한다', () => {
+    const knockout = group({
+      id: 'round12',
+      phase: 'round12',
+      groupTeams: [{ id: 'bye-team', groupId: 'round12', registrationId: 'r1', teamName: '팀A', sortOrder: 0, isBye: true, createdAt: '2026-08-01T00:00:00.000Z' }],
+    });
+    const slots = [makeSlot({ id: 'bye', groupId: 'round12', kind: 'BYE', registrationId: 'r1' })];
+    const fixtures = [fixture({ groupId: 'round12', homeRegistrationId: 'r1', awayRegistrationId: 'r2' })];
+
+    expect(groupAssignedTeamIds(knockout, fixtures, slots)).toEqual(new Set(['r1', 'r2']));
+    expect(isGroupReady(knockout, fixtures, slots)).toBe(true);
+  });
+
+  it('다음 경기의 승자 전파와 이전 단계 부전승 슬롯을 같은 경기 참가자로 읽는다', () => {
+    const quarter = group({ id: 'quarter', phase: 'quarter' });
+    const slots = [makeSlot({ id: 'bye', groupId: 'round12', kind: 'BYE', registrationId: 'r1' })];
+    const fixtures = [fixture({ groupId: 'quarter', homeSlotId: 'bye', homeRegistrationId: null, awayRegistrationId: 'r2' })];
+
+    expect(groupAssignedTeamIds(quarter, fixtures, slots)).toEqual(new Set(['r1', 'r2']));
+    expect(isGroupReady(quarter, fixtures, slots)).toBe(true);
+    expect(isGroupReady(quarter, [fixture({ ...fixtures[0], awayRegistrationId: null })], slots)).toBe(false);
   });
 });
 

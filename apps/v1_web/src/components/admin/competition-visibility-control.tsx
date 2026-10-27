@@ -48,7 +48,7 @@ export function CompetitionVisibilityControl({
           현재 상태: {hiddenReason ? '일반 화면에 노출 안 됨' : isPublic ? '공개' : '비공개'}
         </p>
         {!hiddenReason && exposureNote && (
-          <p className="tm-text-caption mt-1 text-[var(--text-muted)]">{exposureNote}</p>
+          <p className="tm-text-caption mt-1 text-[var(--text-muted)]" style={{ wordBreak: 'keep-all', overflowWrap: 'anywhere' }}>{exposureNote}</p>
         )}
         {!hiddenReason && !canWrite && (
           <p className="tm-text-caption mt-1 text-[var(--text-muted)]">

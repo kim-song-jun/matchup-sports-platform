@@ -2,4 +2,4 @@
 "v1_web": patch
 ---
 
-Improve mobile tournament operation and match layouts.
+대회 운영 모바일 화면에서 경기 일정과 팀명 및 경기장 안내의 표시를 개선합니다.

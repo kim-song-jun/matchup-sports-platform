@@ -13,7 +13,7 @@ import {
 } from '@/components/admin/tournaments/prize-breakdown-editor';
 import type { TournamentPromoCardValue } from '@/components/admin/tournaments/promo-card-fields';
 import { DAY_MS, isoToKstDatetimeLocal, kstDatetimeLocalToIso, kstMidnightMs, toKstDateString } from '@/lib/kst-calendar';
-import { parsePrizeRows } from '@/lib/prize-breakdown';
+import { parsePrizeRows, prizeCategoryOf } from '@/lib/prize-breakdown';
 import {
   applyPromoFactDefaults,
   buildTournamentPromoFactDefaults,
@@ -388,6 +388,7 @@ export function mapTournamentToWizardFields(tournament: V1Tournament): Tournamen
     ? parsePrizeRows(tournament.prizeBreakdown).map((row) => ({
         id: createPrizeRowId(),
         label: row.label,
+        category: prizeCategoryOf(row),
         value: row.amount,
       }))
     : [];

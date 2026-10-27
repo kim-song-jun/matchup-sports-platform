@@ -253,7 +253,7 @@ function AwardsPodium({
 /* ── 상금 상세 — 파서·아이콘은 어드민 미리보기와 공유 (lib/prize-breakdown, prize-rank-icon) ── */
 
 function hasPrizeData(tournament: V1TournamentDetail): boolean {
-  return Boolean(tournament.prizeSummary?.trim() || tournament.prizePool);
+  return Boolean(tournament.prizeSummary?.trim() || tournament.prizePool || tournament.prizeBreakdown?.trim());
 }
 
 function PrizeSection({

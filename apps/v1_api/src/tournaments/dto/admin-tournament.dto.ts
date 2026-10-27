@@ -310,7 +310,7 @@ export class CreateTournamentDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(500)
+  @MaxLength(4000)
   prizeBreakdown?: string | null;
 
   @IsOptional()
@@ -657,7 +657,7 @@ export class UpdateTournamentDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(500)
+  @MaxLength(4000)
   prizeBreakdown?: string | null;
 
   @IsOptional()

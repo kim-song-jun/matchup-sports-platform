@@ -20,8 +20,7 @@ describe('GroupedPrizes', () => {
     const mvp = within(screen.getByRole('region', { name: '개인 시상' })).getByText('MVP').parentElement!;
     expect(mvp).toHaveTextContent('트레이닝복');
     expect(mvp).toHaveTextContent('삭스');
-    expect(screen.getByRole('region', { name: '추첨·이벤트' })).toHaveTextContent('경품');
-    expect(screen.queryByRole('region', { name: '기타 시상' })).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '기타 시상' })).toHaveTextContent('경품');
   });
 
   it('안내·미리보기에서는 수상자를 만들지 않고 빈 목록은 빈 분류를 남기지 않는다', () => {
@@ -31,4 +30,14 @@ describe('GroupedPrizes', () => {
     rerender(<GroupedPrizes rows={[]} />);
     expect(screen.queryByRole('region')).not.toBeInTheDocument();
   });
+});
+
+
+it('입력 구역을 저장한 자유 개인 시상은 공개 개인 구역에 표시하고 같은 이름의 팀 시상과 분리한다', () => {
+  render(<GroupedPrizes rows={[
+    { category: '개인 시상', label: '오늘의 허슬 플레이어', amount: '운동복' },
+    { category: '팀 시상', label: '오늘의 허슬 플레이어', amount: '트로피' },
+  ]} />);
+  expect(within(screen.getByRole('region', { name: '개인 시상' })).getByText('운동복')).toBeInTheDocument();
+  expect(within(screen.getByRole('region', { name: '팀 시상' })).getByText('트로피')).toBeInTheDocument();
 });

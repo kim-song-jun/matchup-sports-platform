@@ -39,7 +39,8 @@ m11_sha="$(sha256sum "$m11" | awk '{print $1}')"
 # 2026-10-21: additive login step-up tables (20261021120000_login_step_up); M11 remains unchanged.
 # 2026-10-22: additive V1Tournament.showDetailImage default true; M11 remains unchanged.
 # 2026-10-22: additive V1User.sessionEpoch default 0 (20261022120000_user_session_epoch); M11 remains unchanged.
-[[ "$schema_sha" == c8c382bd8c3659e3d754703b12d4c55c5522b91af928cddfb3ae8649a8f2bc3e \
+# 2026-10-28: flexible brackets add round64/round32 and tournament draft columns; M11 remains unchanged.
+[[ "$schema_sha" == de8b01ba4d2aa2538dcc2879dd4af58dfa5356e6afc34694e5622c84b681a69f \
   && "$m11_sha" == 08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323 ]] \
   || { echo 'Task168 final-policy schema/M11 digest mismatch' >&2; exit 1; }
 

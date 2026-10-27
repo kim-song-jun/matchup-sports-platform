@@ -204,7 +204,7 @@ it.each([null, 'r1'])('부전승 타일은 배정 후 시드 문구를 숨기고
     slots: [makeSlot({ id: 'bye', kind: 'BYE', groupId: 'r12', label: '5번 시드', registrationId, teamName: registrationId ? '확정팀' : null })],
     fixtures: [makeFixture({ id: 'quarter', fixtureNumber: 1, groupId: 'q', round: '8강', homeSlotId: 'bye', homeRegistrationId: registrationId, homeTeamName: registrationId ? '확정팀' : 'TBD' })],
   });
-  const tile = screen.getByRole('button', { name: `12강 부전승 ${registrationId ? '확정팀' : '5번 시드'} 편집` });
+  const tile = screen.getByRole('button', { name: `부전승 ${registrationId ? '확정팀' : '5번 시드'} 편집` });
   if (registrationId) {
     expect(tile).not.toHaveTextContent('5번 시드');
     expect(tile).toHaveStyle({ background: 'var(--blue50)' });

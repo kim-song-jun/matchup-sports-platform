@@ -717,6 +717,19 @@ describe('getCompletedChampionName', () => {
 });
 
 describe('TournamentDetailView — completed vs non-completed section rendering', () => {
+  it.each([
+    ['a Korean tournament title', '(테스트) 현재 경기 중 챔피언십'],
+    ['an unbroken tournament title within the 120-character limit', '가'.repeat(120)],
+  ])('keeps %s readable with bounded wrapping', (_description, title) => {
+    const tournament = makeTournament({ id: 't1', title, status: 'open', format: 'league' });
+
+    render(createElement(TournamentDetailView, { tournament, myRegistration: null }));
+
+    const heading = screen.getByRole('heading', { level: 1, name: title });
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect(heading).toHaveStyle({ wordBreak: 'keep-all', overflowWrap: 'anywhere' });
+  });
+
   it('exposes exactly one page-level heading for the tournament title', () => {
     const tournament = makeTournament({
       id: 't1',

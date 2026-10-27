@@ -444,7 +444,7 @@ The list (`GET /api/v1/tournaments`) and detail (`GET /api/v1/tournaments/:tourn
 | `POST` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/cancel-request` | user, team manager+ | `CancelRegistrationRequestDto` | `draft` becomes `cancelled`; active statuses become `cancel_requested` |
 | `POST` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/cancel-request/withdraw` | user, team manager+ | empty body | `cancel_requested` returns to its saved previous status |
 
-일반 대회와 정규 리그는 이 신청 경로를 공유한다. 운영자 신청 관리도 같은 등록을 다룬다:
+일반 대회와 정규 리그는 이 신청 경로를 공유한다. 신청은 둘 다 상태가 `open`(접수 중)이고 마감 전일 때만 받는다(2026-10-27 — 리그도 마감 시각만으로 열리지 않는다). 아니면 `409 TOURNAMENT_NOT_OPEN`, 마감이 지났으면 `409 REGISTRATION_DEADLINE_PASSED`이고 판정은 `src/tournaments/registration-window.ts` 하나다. 운영자 신청 관리도 같은 등록을 다룬다:
 
 | Method | Path | Auth | Request | Response |
 |---|---|---|---|---|

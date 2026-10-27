@@ -23,6 +23,7 @@ import {
   SubmitRegistrationDto,
 } from './dto/tournament-registration.dto';
 import { CAPACITY_HOLD_STATUSES, capacityLimitOf, countCapacityReservations, isCapacityFull } from './registration-capacity';
+import { isRegistrationWindowOpen } from './registration-window';
 import { ALL_COMPETITION_KINDS, findTournamentOnSurface, findTournamentOnSurfaceOrThrow } from './tournament-surface-lookup';
 
 /** cancel-request로 어드민 처리가 필요한 상태(이미 운영에 반영됨). */
@@ -50,38 +51,15 @@ type TournamentPaymentInstructionSource = Pick<
 
 
 /**
- * 신청을 받는 중인지 — **리그와 대회가 판정 축이 다르다.**
- *
- * · **대회**: `status === 'open'` 이 곧 "모집 중" 이다(운영자가 상태로 연다). 그대로 둔다.
- * · **리그**: 판정자는 `registrationDeadlineAt` 하나다(정본 §6, 2026-09-04 사용자 확정).
- *   `status` 는 수명주기 표시 전용이 됐다 — `generateFixtures` 가 `in_progress` 로 옮기기
- *   때문에 status 를 보면 **대진이 있는 리그가 영영 신청을 못 받는다**(alpha 실측).
- *
- * 두 축을 한 조건으로 합치지 않는 이유: 대회의 `status === 'open'` 요구를 건드리면 대회
- * 신청 경로 전체가 회귀 범위에 들어온다. 리그만 갈라 대회는 한 줄도 안 바뀌게 한다.
+ * 신청을 받는 중인지 — 대회와 정규 리그가 같은 규칙이다(`registration-window.ts`, 2026-10-27).
+ * 거절 사유만 둘로 나눠 알린다: 접수 중이 아니면 `TOURNAMENT_NOT_OPEN`, 마감이 지났으면
+ * `REGISTRATION_DEADLINE_PASSED`.
  */
-function assertRegistrationOpen(tournament: {
-  kind: string | null;
-  status: string;
-  registrationDeadlineAt: Date | null;
-}): void {
-  if (tournament.kind === 'regular_league') {
-    if (tournament.status === 'completed' || tournament.status === 'cancelled') {
-      throw new ConflictException({ code: 'TOURNAMENT_NOT_OPEN', message: '지금은 참가 신청을 받지 않아요.' });
-    }
-    if (tournament.registrationDeadlineAt === null) {
-      // 마감이 없으면 아무도 연 적이 없는 리그다(정본 §6 "안 정하면 신청을 안 받는다").
-      throw new ConflictException({ code: 'TOURNAMENT_NOT_OPEN', message: '지금은 참가 신청을 받지 않아요.' });
-    }
-    if (tournament.registrationDeadlineAt.getTime() < Date.now()) {
-      throw new ConflictException({ code: 'REGISTRATION_DEADLINE_PASSED', message: '신청이 마감됐어요.' });
-    }
-    return;
-  }
+function assertRegistrationOpen(tournament: { status: string; registrationDeadlineAt: Date | null }): void {
   if (tournament.status !== 'open') {
     throw new ConflictException({ code: 'TOURNAMENT_NOT_OPEN', message: '지금은 참가 신청을 받지 않아요.' });
   }
-  if (tournament.registrationDeadlineAt && tournament.registrationDeadlineAt.getTime() < Date.now()) {
+  if (!isRegistrationWindowOpen(tournament.status, tournament.registrationDeadlineAt)) {
     throw new ConflictException({ code: 'REGISTRATION_DEADLINE_PASSED', message: '신청이 마감됐어요.' });
   }
 }

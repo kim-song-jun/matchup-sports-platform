@@ -3,14 +3,14 @@ import { IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength } 
 
 // 전역 ValidationPipe 는 enableImplicitConversion 이라 `@Type` 이 없어도 number 속성은 Number(값)으로 바뀐다
 // (`""`·`false`·`[]` → 0). 원본(obj)을 검증에 넘겨야 그런 값이 '무료 확정'으로 저장되지 않는다.
-const rawValue = ({ obj, key }: { obj: Record<string, unknown>; key: string }): unknown => obj[key];
+export const rawValue = ({ obj, key }: { obj: Record<string, unknown>; key: string }): unknown => obj[key];
 
-const trimmedString = ({ obj, key }: { obj: Record<string, unknown>; key: string }): unknown => {
+export const trimmedString = ({ obj, key }: { obj: Record<string, unknown>; key: string }): unknown => {
   const value = obj[key];
   return typeof value === 'string' ? value.trim() : value;
 };
 
-const BANK_FIELD_PATTERN = /^[^\u0000-\u001f\u007f]+$/;
+export const BANK_FIELD_PATTERN = /^[^\u0000-\u001f\u007f]+$/;
 
 export class UpdateLeagueEntryFeeDto {
   @Transform(rawValue)

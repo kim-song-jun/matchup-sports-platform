@@ -111,7 +111,8 @@ describe('리그 시즌 승계 — 같은 티어 값 복사', () => {
     const nextRoundOf = async (leagueId: string) => (await http().get(`/api/v1/league-matches/${leagueId}`).expect(200)).body.data.nextRound;
     expect(await nextRoundOf(leagueIds[1])).toMatchObject({ leagueId: next[1].id, seasonNo: 2, registrationOpen: false, registrationDeadlineAt: null });
     const deadline = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    await prisma.v1Tournament.update({ where: { id: next[0].id }, data: { registrationDeadlineAt: deadline } });
+    // 2026-10-27: 대회처럼 접수 중(open)이어야 신청을 받는다 — 마감만 놓아서는 열리지 않는다.
+    await prisma.v1Tournament.update({ where: { id: next[0].id }, data: { status: 'open', registrationDeadlineAt: deadline } });
     expect(await nextRoundOf(leagueIds[0])).toMatchObject({ leagueId: next[0].id, seasonNo: 2, registrationOpen: true, registrationDeadlineAt: deadline.toISOString() });
     // 마지막 시즌에는 다음 회차가 없다.
     expect(await nextRoundOf(next[0].id)).toBeNull();

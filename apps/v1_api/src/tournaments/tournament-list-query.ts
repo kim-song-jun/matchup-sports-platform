@@ -9,15 +9,18 @@ import { CAPACITY_HOLD_STATUSES } from './registration-capacity';
  * Default public list order, evaluated by the database:
  * in progress -> recruiting (eligible open or regular-league draft) -> recruitment closed -> finished.
  * "Recruitment closed" is the status the card shows: a stored `closed`, or a recruiting row
- * whose applicable deadline has passed or whose capacity is full (the web's
+ * whose deadline has passed or whose capacity is full (the web's
  * `resolveTournamentRegistrationBlock`; leagues use optional maxTeams independently of roster size).
  * Within the first three groups the earliest start comes first; the finished group is most recently
  * ended first (falling back to the start date). Rows without a date sort last in their group, and
  * `id` (byte order) breaks ties. This file is the single source of that order.
  */
-/** A recruiting row the card renders as "모집 마감". `registration_deadline_at` is UTC, so compare in UTC. */
+/**
+ * A recruiting row the card renders as "모집 마감". `registration_deadline_at` is UTC, so compare in UTC.
+ * Only an open row is closed by its deadline (`registration-window.ts`); a league draft is not recruiting yet.
+ */
 const RECRUITMENT_BLOCKED_SQL = Prisma.sql`(
-  (t.kind::text IS DISTINCT FROM 'regular_league' AND t.registration_deadline_at < (now() AT TIME ZONE 'UTC'))
+  (t.status::text = 'open' AND t.registration_deadline_at < (now() AT TIME ZONE 'UTC'))
   OR (SELECT COUNT(*) FROM v1_tournament_registrations r
         WHERE r.tournament_id = t.id AND r.status::text IN (${Prisma.join([...CAPACITY_HOLD_STATUSES])}))
       >= CASE WHEN t.kind::text = 'regular_league' THEN t.max_teams ELSE t.team_count END
@@ -62,11 +65,10 @@ function buildFilterSql(query: TournamentListQueryDto): Prisma.Sql {
   }
   const registration = query.sort === 'deadline' ? 'open' : query.registration;
   if (registration) {
+    // Same rule as `registration-window.ts` for both kinds: operator opened (`open`) and not past the deadline.
     const accepting = Prisma.sql`(
-      (t.kind::text = 'regular_league' AND t.status::text NOT IN ('completed', 'cancelled', 'on_hold')
-        AND t.registration_deadline_at >= (now() AT TIME ZONE 'UTC'))
-      OR ((t.kind IS NULL OR t.kind::text = 'regular_tournament') AND t.status::text = 'open'
-        AND (t.registration_deadline_at IS NULL OR t.registration_deadline_at >= (now() AT TIME ZONE 'UTC')))
+      t.status::text = 'open'
+        AND (t.registration_deadline_at IS NULL OR t.registration_deadline_at >= (now() AT TIME ZONE 'UTC'))
     ) AND (
       (t.kind::text = 'regular_league' AND t.max_teams IS NULL)
       OR (SELECT COUNT(*) FROM v1_tournament_registrations r WHERE r.tournament_id = t.id

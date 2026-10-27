@@ -13,7 +13,8 @@ const ownerAId = `close-owner-a-${suiteId}`;
 const ownerBId = `close-owner-b-${suiteId}`;
 
 /**
- * 리그 신청 즉시 마감(MD-QA #35) — 마감하면 그 리그만 신청이 막히고, 낸 신청은 남고, open-registration 으로 다시 열린다.
+ * 리그 '접수 마감하기'(MD-QA #35, 2026-10-27 상태 기준) — 마감하면 그 리그만 신청이 막히고, 낸 신청은 남고,
+ * open-registration 으로 다시 열린다.
  */
 describe('리그 신청 즉시 마감 HTTP/DB 계약', () => {
   let app: INestApplication;
@@ -97,7 +98,7 @@ describe('리그 신청 즉시 마감 HTTP/DB 계약', () => {
     await postClose(leagueA, {}, supportUserId).expect(403);
     expect((await postClose(tournamentId).expect(404)).body.code).toBe('LEAGUE_NOT_FOUND');
     await postClose('not-a-uuid').expect(400);
-    expect((await prisma.v1Tournament.findUniqueOrThrow({ where: { id: leagueA } })).registrationDeadlineAt!.getTime()).toBeGreaterThan(Date.now());
+    expect((await prisma.v1Tournament.findUniqueOrThrow({ where: { id: leagueA } })).status).toBe('open');
   });
 
   it('검증: 사유 201자는 400, 모르는 필드도 400', async () => {
@@ -105,27 +106,28 @@ describe('리그 신청 즉시 마감 HTTP/DB 계약', () => {
     await postClose(leagueA, { registrationDeadlineAt: '2030-01-01T00:00:00Z' }).expect(400);
   });
 
-  it('A 를 마감하면 A 의 신청 제출은 409 이고 B 는 여전히 신청할 수 있다 — 감사 before·after 가 남는다', async () => {
-    const before = (await prisma.v1Tournament.findUniqueOrThrow({ where: { id: leagueA } })).registrationDeadlineAt!;
+  it('A 를 마감하면 A 는 마감(closed)이 되어 신청이 409 이고 B 는 여전히 신청할 수 있다 — 감사·상태 이력이 남는다', async () => {
+    const deadline = (await prisma.v1Tournament.findUniqueOrThrow({ where: { id: leagueA } })).registrationDeadlineAt!;
     const res = await postClose(leagueA, { reason: '정원 마감' }).expect(200);
-    expect(res.body.data).toMatchObject({ leagueId: leagueA, registrationOpen: false, alreadyProcessed: false });
+    expect(res.body.data).toMatchObject({ leagueId: leagueA, lifecycleStatus: 'closed', registrationOpen: false, alreadyProcessed: false });
     await sleep(20);
 
-    await expect(submitTeamA()).rejects.toMatchObject({ response: { code: 'REGISTRATION_DEADLINE_PASSED' } });
+    await expect(submitTeamA()).rejects.toMatchObject({ response: { code: 'TOURNAMENT_NOT_OPEN' } });
     expect((await publicDetail(leagueA)).registrationOpen).toBe(false);
+    // 마감 시각은 그대로 두고 상태만 바꾼다.
+    expect(await prisma.v1Tournament.findUniqueOrThrow({ where: { id: leagueA } })).toMatchObject({ status: 'closed', registrationDeadlineAt: deadline });
     // 대조군: 같은 시각에 B 는 열려 있다(마감이 전체로 번지지 않았다).
     expect((await publicDetail(leagueB)).registrationOpen).toBe(true);
-    expect((await prisma.v1Tournament.findUniqueOrThrow({ where: { id: leagueB } })).registrationDeadlineAt!.getTime()).toBeGreaterThan(Date.now());
+    expect((await prisma.v1Tournament.findUniqueOrThrow({ where: { id: leagueB } })).status).toBe('open');
 
     const audit = await prisma.v1AdminActionLog.findFirstOrThrow({ where: { targetId: leagueA, action: 'league_match.close_registration' } });
     expect(audit.reason).toBe('정원 마감');
-    expect(audit.beforeJson).toEqual({ registrationDeadlineAt: before.toISOString() });
-    expect(new Date((audit.afterJson as { registrationDeadlineAt: string }).registrationDeadlineAt).getTime()).toBeLessThanOrEqual(Date.now());
+    await expect(prisma.v1StatusChangeLog.count({ where: { targetId: leagueA, fromStatus: 'open', toStatus: 'closed' } })).resolves.toBe(1);
   });
 
   it('두 번째 마감은 alreadyProcessed 이고 감사 행은 1건으로 남는다', async () => {
     const res = await postClose(leagueA).expect(200);
-    expect(res.body.data).toMatchObject({ registrationOpen: false, alreadyProcessed: true });
+    expect(res.body.data).toMatchObject({ lifecycleStatus: 'closed', registrationOpen: false, alreadyProcessed: true });
     expect(await prisma.v1AdminActionLog.count({ where: { targetId: leagueA, action: 'league_match.close_registration' } })).toBe(1);
   });
 
@@ -140,10 +142,10 @@ describe('리그 신청 즉시 마감 HTTP/DB 계약', () => {
     expect(kept.status).not.toBe('cancelled');
   });
 
-  it('끝난 리그는 409 LEAGUE_REGISTRATION_NOT_ALLOWED 이고 마감은 바뀌지 않는다', async () => {
+  it('접수 중이 아닌(끝난) 리그는 alreadyProcessed 이고 상태·마감은 바뀌지 않는다', async () => {
     const before = (await prisma.v1Tournament.findUniqueOrThrow({ where: { id: leagueB } })).registrationDeadlineAt;
     await prisma.v1Tournament.update({ where: { id: leagueB }, data: { status: 'completed' } });
-    expect((await postClose(leagueB).expect(409)).body.code).toBe('LEAGUE_REGISTRATION_NOT_ALLOWED');
-    expect((await prisma.v1Tournament.findUniqueOrThrow({ where: { id: leagueB } })).registrationDeadlineAt).toEqual(before);
+    expect((await postClose(leagueB).expect(200)).body.data).toMatchObject({ lifecycleStatus: 'completed', alreadyProcessed: true });
+    expect(await prisma.v1Tournament.findUniqueOrThrow({ where: { id: leagueB } })).toMatchObject({ status: 'completed', registrationDeadlineAt: before });
   });
 });

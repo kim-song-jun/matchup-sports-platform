@@ -490,6 +490,11 @@ describe('BracketTab — 경기 일정 전체보기의 경기 이름', () => {
     vi.clearAllMocks();
   });
 
+  afterEach(() => {
+    bracketGroups = bracket.groups;
+    bracketFixtures = [];
+  });
+
   it('조별 경기는 조 이름과 라운드를, 조 없는 결선은 라운드만 쓴다', () => {
     bracketFixtures = [
       fixtureRow({ id: 'fx-1', round: 'league_r1', fixtureNumber: 1 }),
@@ -501,6 +506,64 @@ describe('BracketTab — 경기 일정 전체보기의 경기 이름', () => {
     expect(screen.getAllByText('4강 2차').length).toBeGreaterThan(0);
     expect(screen.getAllByRole('button', { name: '4강 2차 2번 경기 수정' }).length).toBeGreaterThan(0);
     expect(screen.queryByText(/league_r/)).not.toBeInTheDocument();
+  });
+
+  it('모바일 경기 카드에서도 홈·어웨이와 운영 및 결과 검토 작업을 함께 제공한다', () => {
+    bracketGroups = bracket.groups;
+    bracketFixtures = [fixtureRow({ id: 'mobile-fx', fixtureNumber: 1, venue: 'A구장' })];
+    renderTab();
+
+    const section = screen.getByRole('heading', { name: '경기 일정 전체보기' }).parentElement;
+    if (!section) throw new Error('경기 일정 섹션을 찾지 못했어요.');
+    const cardList = within(section).getByRole('list');
+    expect(cardList).toHaveClass('lg:hidden');
+    const card = within(cardList).getByRole('listitem');
+    expect(within(card).getByText('강남FC')).toBeInTheDocument();
+    expect(within(card).getByText('서초유나이티드')).toBeInTheDocument();
+    expect(within(card).getByText(/A구장/)).toBeInTheDocument();
+    expect(within(card).getByRole('button', { name: 'A조 · 조별리그 1라운드 1번 경기 수정' })).toBeInTheDocument();
+    expect(within(card).getByRole('link', { name: 'A조 · 조별리그 1라운드 1번 경기 운영 콘솔 열기' }))
+      .toHaveAttribute('href', '/admin/live/t-1/fixtures/mobile-fx/operate');
+    const review = within(card).getByRole('link', { name: 'A조 · 조별리그 1라운드 1번 경기 결과 검토하러 가기' });
+    expect(review).toHaveAttribute('href', '/admin/live/t-1/result-review?fixtureId=mobile-fx');
+    expect(review.parentElement).toHaveClass('flex-wrap');
+  });
+
+  it('결과가 있는 모바일 경기 카드에는 점수와 해당 경기 결과 정정 링크를 표시한다', () => {
+    bracketGroups = bracket.groups;
+    bracketFixtures = [fixtureRow({
+      id: 'mobile-done',
+      result: {
+        id: 'result-1', fixtureId: 'mobile-done', homeScore: 2, awayScore: 1,
+        hasPenalty: false, homePenaltyScore: null, awayPenaltyScore: null,
+        note: null, outcomeReason: 'NORMAL', recordedAt: '2026-08-01T00:00:00.000Z',
+        createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z', goals: [],
+      },
+    })];
+    renderTab();
+
+    const section = screen.getByRole('heading', { name: '경기 일정 전체보기' }).parentElement;
+    if (!section) throw new Error('경기 일정 섹션을 찾지 못했어요.');
+    const card = within(within(section).getByRole('list')).getByRole('listitem');
+    expect(within(card).getByText('2 : 1')).toBeInTheDocument();
+    expect(within(card).getByRole('link', { name: 'A조 · 조별리그 1라운드 1번 경기 결과 정정하러 가기' }))
+      .toHaveAttribute('href', '/admin/live/t-1/records/corrections?fixtureId=mobile-done');
+    expect(within(card).queryByRole('button', { name: 'A조 · 조별리그 1라운드 1번 경기 삭제' }))
+      .not.toBeInTheDocument();
+  });
+
+  it('모바일 카드의 긴 공백 없는 조 이름과 경기장명도 줄바꿈할 수 있다', () => {
+    const longGroupName = '가'.repeat(60);
+    const longVenue = '나'.repeat(200);
+    bracketGroups = [{ ...bracket.groups[0], name: longGroupName }];
+    bracketFixtures = [fixtureRow({ id: 'long-fixture', venue: longVenue })];
+    renderTab();
+
+    const section = screen.getByRole('heading', { name: '경기 일정 전체보기' }).parentElement;
+    if (!section) throw new Error('경기 일정 섹션을 찾지 못했어요.');
+    const card = within(within(section).getByRole('list')).getByRole('listitem');
+    expect(within(card).getByText(new RegExp(longGroupName))).toHaveClass('break-words');
+    expect(within(card).getByText(new RegExp(longVenue))).toHaveClass('break-words');
   });
 });
 

@@ -148,8 +148,8 @@ function TournamentFieldsSection({
         <span className="text-blue-500 mt-0.5 shrink-0" aria-hidden="true">
           <MapPin size={18} />
         </span>
-        <div>
-          <div role="heading" aria-level={2}><SectionTitle id="tournament-fields-heading" title="경기장(필드)" /></div>
+        <div className="min-w-0 flex-1">
+          <div role="heading" aria-level={2}><SectionTitle id="tournament-fields-heading" title="경기장(필드)" compact /></div>
           <p className="text-[length:var(--font-size-label)] text-[var(--text-muted)] mt-0.5">
             경기 설정과 스태프 배정에서 같은 경기장을 선택해요. 기존 경기 장소도 이름별로 모을 수 있어요.
           </p>

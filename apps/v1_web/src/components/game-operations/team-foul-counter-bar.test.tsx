@@ -24,13 +24,17 @@ describe('TeamFoulCounterBar', () => {
 
   // F91 — 390px 에서 팀 이름이 길면 "파울 / 0" 으로 꺾였다. jsdom 은 레이아웃을 계산하지 않아
   // 꺾임 자체를 잴 수 없으므로, 숫자 묶음이 줄지도 꺾이지도 않게 걸어 둔 클래스를 계약으로 둔다.
-  it('숫자 묶음은 줄어들지도 꺾이지도 않고, 긴 팀 이름이 그 대신 잘린다', () => {
+  it('숫자 묶음은 꺾지 않고 공통 접두사가 있는 팀 이름 전체를 줄바꿈할 수 있다', () => {
     render(<TeamFoulCounterBar sides={SIDES} counts={{ 'side-home': 0, 'side-away': 0 }} period={1} />);
 
     const count = screen.getAllByText('파울 0')[1].parentElement as HTMLElement;
     expect(count).toHaveClass('shrink-0', 'whitespace-nowrap');
-    const name = screen.getByText(SIDES[1].displayNameSnapshot);
-    expect(name).toHaveClass('truncate', 'min-w-0');
+    for (const side of SIDES) {
+      const name = screen.getByText(side.displayNameSnapshot);
+      expect(name).toHaveClass('min-w-0', 'break-keep');
+      expect(name).not.toHaveClass('truncate');
+      expect(name).toHaveStyle({ overflowWrap: 'anywhere' });
+    }
   });
 
   it('경고 임계치에 닿은 팀만 프리킥 안내를 보여준다 (대조군: 다른 팀은 임계치 미만)', () => {

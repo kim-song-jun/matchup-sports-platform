@@ -767,3 +767,10 @@ are not rewritten. UI uses per-player edit/save/cancel; errors preserve the draf
 관리자 응답은 원본 두 URL과 `showDetailImage`를 반환한다. 공개 상세도 이를 반환한다(리그 거울의 기존 cover fallback 유지). 공개 목록의 `coverImageUrl`은 기존 소비자 호환을 위해 `listImageUrl ?? coverImageUrl`이며 `listImageUrl`도 포함한다. 프론트 기본 목록은 목록 사진을 우선한다. 상세는 상세 사진→목록 사진→종목 기본 그래픽 순으로 표시하며 `showDetailImage: false`면 업로드·기본 이미지와 전체 영역을 렌더하지 않는다. 제목·본문·목록·홍보 노출은 유지된다. 새 설정은 정규 대회용이며 정규 리그의 기존 표시 정책은 유지한다.
 
 DB는 기존 `V1Tournament.listImageUrl`을 재사용하고 `v1_tournaments.show_detail_image BOOLEAN NOT NULL DEFAULT true`를 migration으로 추가한다. 기존 행은 true다. 홈/목록 홍보 카드의 기존 전용 이미지와 문구는 호환 유지하며, 기본 사진을 사용할 때 목록→상세 사진을 따른다. 상세는 홍보 전용 이미지를 fallback으로 사용하지 않는다.
+
+
+### Categorized prize plans
+
+`prizeBreakdown` remains a nullable string stored on `V1Tournament`; no schema migration is required. Create/update DTOs accept up to 4,000 characters (previously 500) to accommodate the existing 12-row editor plus category metadata. This is the prize plan, separate from actual award recipients.
+
+Legacy delimiter-separated text remains readable. New admin saves use `@teameet/prizes/v1:` followed by a JSON array of `{ category, label, amount }`. Category is one of `팀 시상`, `개인 시상`, `기타 시상`. Readers must use `parsePrizeRows` / `splitPrizeSegments` instead of rendering the encoded field directly. Explicit category wins over label inference, including arbitrary or multiword personal award names. Unclassified legacy rows use name-based inference; former raffle/event rows belong to `기타 시상`. Team aliases `우승/1위/1등`, `준우승/2위/2등`, and numeric `N위/N등` map to the same position for grouping and winner links. Separate categories never merge, and personal awards never acquire a team winner through a rank-like name. Empty saved rows clear the field with `null` on the info editor.

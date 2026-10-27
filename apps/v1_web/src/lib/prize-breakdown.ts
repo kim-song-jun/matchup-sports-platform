@@ -1,15 +1,48 @@
 /**
  * 상금 배분(prizeBreakdown) 텍스트 ↔ 구조화 행 변환 — 공개 시상 카드와 어드민 편집기의 단일 소스.
- * 저장 포맷은 기존 텍스트("1위 600,000원 / 2위 300,000원")를 유지해 스키마·하위 호환을 지킨다.
+ * 기존 텍스트를 읽고, 명시적 분류가 있는 행은 버전이 있는 JSON 문자열로 저장한다.
  */
 
 export interface PrizeRow {
+  category?: PrizeCategory;
   label: string;
   /** 자유 텍스트 — 숫자형("600,000원")이면 합계 계산에 포함, "트로피" 같은 비금액도 허용 */
   amount: string;
 }
 
-export const PRIZE_CATEGORIES = ['팀 시상', '개인 시상', '추첨·이벤트', '기타 시상'] as const;
+export const PRIZE_CATEGORIES = ['팀 시상', '개인 시상', '기타 시상'] as const;
+export type PrizeCategory = typeof PRIZE_CATEGORIES[number];
+const STRUCTURED_PRIZES_PREFIX = '@teameet/prizes/v1:';
+
+/** 기존 순위 별칭은 같은 팀 시상으로 연결하되 입력 문구는 보존한다. */
+export function prizePosition(label: string): number | null {
+  const normalized = label.trim().replace(/\s+/g, '');
+  if (normalized === '우승') return 1;
+  if (normalized === '준우승') return 2;
+  const rank = normalized.match(/^(?:공동)?([1-9]\d*)(?:위|등)$/);
+  return rank ? Number(rank[1]) : null;
+}
+
+/** 분류가 없던 기존 데이터에만 이름 기반 추정을 적용한다. */
+export function prizeCategoryOf(row: Pick<PrizeRow, 'category' | 'label'>): PrizeCategory {
+  if (row.category) return row.category;
+  if (prizePosition(row.label) !== null) return '팀 시상';
+  if (/추첨|경품|이벤트|참가|전원/.test(row.label)) return '기타 시상';
+  return /^(MVP|득점왕|도움왕|개인.*|최우수.*|우수.*|베스트.*|.*상)$/i.test(row.label.trim())
+    ? '개인 시상' : '기타 시상';
+}
+
+function structuredPrizeRows(text: string): PrizeRow[] | null {
+  if (!text.startsWith(STRUCTURED_PRIZES_PREFIX)) return null;
+  const parsed: unknown = JSON.parse(text.slice(STRUCTURED_PRIZES_PREFIX.length));
+  if (!Array.isArray(parsed) || !parsed.every((row: unknown) => {
+    if (typeof row !== 'object' || row === null) return false;
+    return 'label' in row && typeof row.label === 'string'
+      && 'amount' in row && typeof row.amount === 'string'
+      && 'category' in row && PRIZE_CATEGORIES.some((category) => category === row.category);
+  })) throw new Error('시상 정보 형식이 올바르지 않아요.');
+  return parsed as PrizeRow[];
+}
 
 export interface PrizeGroup {
   label: string;
@@ -24,16 +57,12 @@ export function groupPrizeRows(rows: readonly PrizeRow[]): PrizeGroup[] {
   for (const row of rows) {
     const label = row.label.trim();
     if (!label) continue;
-    const rank = label.match(/^(?:공동\s*)?([1-9]\d*)위$/);
-    const position = label === '우승' ? 1 : label === '준우승' ? 2 : rank ? Number(rank[1]) : null;
-    // '우승'과 '1위'도 같은 시상이지만 공동 순위는 별도 표기를 보존한다.
-    const key = position !== null && !label.startsWith('공동') ? `rank:${position}` : `label:${label}`;
+    const category = prizeCategoryOf(row);
+    const position = category === '팀 시상' ? prizePosition(label) : null;
+    // 명시적 분류가 다르면 같은 이름이어도 합치지 않는다. 공동 순위 문구도 보존한다.
+    const key = `${category}:${position !== null && !label.startsWith('공동') ? `rank:${position}` : `label:${label}`}`;
     let group = groups.get(key);
     if (!group) {
-      const category = position !== null ? '팀 시상'
-        : /추첨|경품|이벤트|참가|전원/.test(label) ? '추첨·이벤트'
-        : /^(MVP|득점왕|도움왕|개인.*|최우수.*|우수.*|베스트.*|.*상)$/.test(label) ? '개인 시상'
-        : '기타 시상';
       group = { label, position, category, amounts: [] };
       groups.set(key, group);
     }
@@ -68,6 +97,8 @@ function isThousandsComma(text: string, index: number): boolean {
  * 예: "1위 600,000원, MVP 축구화 / 참가팀 전원 음료 제공" → 3항목.
  */
 export function splitPrizeSegments(breakdown: string): string[] {
+  const structured = structuredPrizeRows(breakdown);
+  if (structured) return structured.map((row) => `${row.label}${row.amount ? ` ${row.amount}` : ''}`);
   const segments: string[] = [];
   let current = '';
 
@@ -92,6 +123,8 @@ export function splitPrizeSegments(breakdown: string): string[] {
 
 /** 항목 텍스트 → {label, amount} 행. 예: "1위 1,000,000원 / MVP 축구화"는 두 행. */
 export function parsePrizeRows(breakdown: string): PrizeRow[] {
+  const structured = structuredPrizeRows(breakdown);
+  if (structured) return structured;
   return splitPrizeSegments(breakdown).map((s) => {
     const m = s.match(/^(\S+)\s+(.+)$/);
     return m ? { label: m[1], amount: m[2] } : { label: s, amount: '' };
@@ -124,6 +157,12 @@ function sanitizePrizeCellText(text: string): string {
 
 /** 편집기 행 → 저장 텍스트. 빈 행은 제외하고, 셀 안의 행 구분자 문자는 나열 표기로 정규화한다. */
 export function serializePrizeRows(rows: PrizeRow[]): string {
+  if (rows.some((row) => row.category !== undefined)) {
+    const filled = rows.filter((row) => row.label.trim()).map((row) => ({
+      category: prizeCategoryOf(row), label: row.label.trim(), amount: row.amount.trim(),
+    }));
+    return filled.length ? STRUCTURED_PRIZES_PREFIX + JSON.stringify(filled) : '';
+  }
   return rows
     .map((r) => ({ label: sanitizePrizeCellText(r.label), amount: sanitizePrizeCellText(r.amount) }))
     .filter((r) => r.label.length > 0)

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Pencil } from 'lucide-react';
 import { onlyDigits, formatWithComma } from '@/lib/number-format';
-import { parsePrizeRows } from '@/lib/prize-breakdown';
+import { parsePrizeRows, prizeCategoryOf } from '@/lib/prize-breakdown';
 import { useV1AdminTournament, useV1LineupSizeOptions, useV1MasterSports, useV1UpdateTournament, useV1UploadImages } from '@/hooks/use-v1-api';
 import type { V1Tournament, V1UpdateTournamentPayload, V1TournamentGenderCategory } from '@/types/api';
 import { extractErrorMessage, extractErrorCode } from '@/lib/error-message';
@@ -1394,20 +1394,18 @@ function PrizeCard({
     tournament.prizePool !== null && tournament.prizePool !== undefined ? String(tournament.prizePool) : '',
   );
   const [prizeSummary, setPrizeSummary] = useState(() => tournament.prizeSummary ?? '');
-  // 배분은 구조화 행으로 편집하고 저장 시 기존 텍스트 포맷으로 직렬화한다 (공개 파서 호환).
+  // 배분은 명시적 분류와 함께 저장한다. 공용 파서는 기존 텍스트도 읽는다.
   // 각 행 값(value)은 자유 텍스트 — 금액("600,000원")이든 물품("우승 트로피")이든 그대로 보관한다.
   const [prizeRows, setPrizeRows] = useState<TournamentPrizeRow[]>(() =>
     parsePrizeRows(tournament.prizeBreakdown ?? '').map((row) => ({
       id: createPrizeRowId(),
       label: row.label,
+      category: prizeCategoryOf(row),
       value: row.amount,
     })),
   );
 
   const handleSave = () => {
-    // expectedVersion은 diff 축적이 끝난 뒤 mutate() 호출부에서 tournament.updatedAt으로
-    // 채운다 — 여기서 처음부터 넣으면 아래 "변경 없음" 판정(Object.keys 길이)이 항상
-    // 1 이상이 돼 깨진다.
     const payload: Omit<V1UpdateTournamentPayload, 'expectedVersion'> = {};
     const pool = prizePool.trim();
     if (pool !== '') {
@@ -1421,11 +1419,7 @@ function PrizeCard({
     if (prizeSummary.trim()) payload.prizeSummary = prizeSummary.trim();
     // 금액 행은 "1,234,567원" 형태로 정규화, 물품 행은 입력한 자유 텍스트 그대로 저장한다.
     const breakdownText = serializeTournamentPrizeRows(prizeRows);
-    if (breakdownText) payload.prizeBreakdown = breakdownText;
-    if (Object.keys(payload).length === 0) {
-      showToast('변경할 상금 정보를 입력해주세요.', 'error');
-      return;
-    }
+    payload.prizeBreakdown = breakdownText || null;
     updateTournament.mutate({ ...payload, expectedVersion: tournament.updatedAt }, {
       onSuccess: () => showToast('상금 정보를 저장했어요.', 'success'),
       onError: (err) => {

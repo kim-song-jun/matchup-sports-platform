@@ -265,9 +265,18 @@ describe('TournamentInfoSection — 상금 행 모바일 전체 폭 actual calle
     expect(hooks.mutate).toHaveBeenCalledWith({
       prizePool: 650000,
       prizeSummary: '수정된 시상 안내',
-      prizeBreakdown: '1위 650,000원 / 상품 우승 트로피·상품권',
+      prizeBreakdown: '@teameet/prizes/v1:' + JSON.stringify([{ category: '팀 시상', label: '1위', amount: '650,000원' }, { category: '기타 시상', label: '상품', amount: '우승 트로피·상품권' }]),
       expectedVersion: tournament.updatedAt,
     }, expect.anything());
+  });
+
+  it('시상 항목을 모두 삭제해 저장하면 null을 보내 기존 시상을 비운다', async () => {
+    const user = userEvent.setup();
+    renderSection(true);
+    const card = within(screen.getByRole('region', { name: '상금·시상 정보' }));
+    await user.click(card.getByRole('button', { name: '상금 항목 1 삭제' }));
+    await user.click(card.getByRole('button', { name: '상금 정보 저장' }));
+    expect(hooks.mutate).toHaveBeenCalledWith(expect.objectContaining({ prizeBreakdown: null }), expect.anything());
   });
 
   it.each([
@@ -281,7 +290,7 @@ describe('TournamentInfoSection — 상금 행 모바일 전체 폭 actual calle
     const name = card.getByRole('combobox', { name: '상금 항목 1 이름' });
     const value = card.getByRole('textbox', { name: '상금 항목 1 내용' });
     const remove = card.getByRole('button', { name: '상금 항목 1 삭제' });
-    const add = card.getByRole('button', { name: '항목 추가' });
+    const add = card.getByRole('button', { name: '팀 시상 추가' });
     for (const control of [name, value, remove, add, card.getByRole('textbox', { name: '총상금' }), card.getByRole('textbox', { name: '상품 및 상금' })]) {
       expect(control).toBeDisabled();
     }

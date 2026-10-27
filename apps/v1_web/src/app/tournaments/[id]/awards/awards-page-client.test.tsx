@@ -2,6 +2,7 @@ import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { serializePrizeRows } from '@/lib/prize-breakdown';
 import { trackEvent } from '@/lib/analytics';
 import type { V1LeagueOverallStandingsResponse, V1TournamentDetail } from '@/types/api';
 import type { V1LeaguePlayerRecordRow } from '@/types/league-match';
@@ -456,7 +457,7 @@ describe('AwardsPageClient — 정규 리그 거울 행(kind=regular_league)의 
     expect(screen.getByText('마포 레인저스 · 풋살크루', { selector: '.tm-awards-podium-name' })).toBeInTheDocument();
   });
 
-  it.each(['1위', '우승'])('공동 우승이면 %s 상금란에도 두 팀 이름을 함께 보여준다', async (label) => {
+  it.each(['1위', '1등', '우승'])('공동 우승이면 %s 상금란에도 두 팀 이름을 함께 보여준다', async (label) => {
     const overall: V1LeagueOverallStandingsResponse = {
       standings: [
         { teamId: 'team-mapo', teamName: '마포 레인저스', position: 1, points: 1, wins: 0, draws: 1, losses: 0, goalsFor: 1, goalsAgainst: 1 },
@@ -555,6 +556,17 @@ describe('AwardsPageClient — 완료 전 상금 정보 노출 (hasPrizeData 판
     render(<AwardsPageClient tournamentId="tournament-1" />);
 
     expect(screen.getByText('상금·상품 총규모')).toBeInTheDocument();
+  });
+
+  it('총상금·요약·상품 없이 자유 개인 시상 이름만 저장해도 공개 개인 구역에 표시한다', () => {
+    awardsApiMocks.useV1Tournament.mockReturnValue({
+      data: makeCompletedTournament({
+        status: 'in_progress', prizePool: null, prizeSummary: null,
+        prizeBreakdown: serializePrizeRows([{ category: '개인 시상', label: '오늘의 허슬 플레이어', amount: '' }]),
+      }), isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    });
+    render(<AwardsPageClient tournamentId="tournament-1" />);
+    expect(screen.getByRole('region', { name: '개인 시상' })).toHaveTextContent('오늘의 허슬 플레이어');
   });
 
   it('진행 중이고 prizePool·prizeSummary·prizeBreakdown 전부 없으면 상금 섹션을 그리지 않는다', () => {

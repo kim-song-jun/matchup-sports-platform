@@ -215,6 +215,42 @@ function renderTab(showToast = vi.fn(), registrations: V1AdminTournamentRegistra
   return showToast;
 }
 
+describe('BracketTab — 결선 슬롯과 경기 배정 상태', () => {
+  afterEach(() => {
+    bracketGroups = bracket.groups;
+    bracketFixtures = [];
+    bracketSlots = [];
+  });
+
+  it('조별과 결선 단계를 구분하고 배정된 슬롯 및 결과 확정 경기를 준비 상태로 표시한다', () => {
+    const group = bracket.groups[0];
+    const semi = { ...group, id: 'semi', name: '4강', phase: 'semi' as const, groupTeams: [] };
+    const final = { ...group, id: 'final', name: '결승', phase: 'final' as const, groupTeams: [] };
+    bracketGroups = [group, semi, final];
+    bracketSlots = [
+      makeSlot({ id: 's1', kind: 'GROUP_RANK', groupId: 'semi', sourceGroupId: group.id, registrationId: 'r1', teamName: '강남FC' }),
+      makeSlot({ id: 's2', kind: 'GROUP_RANK', groupId: 'semi', sourceGroupId: group.id, registrationId: 'r2', teamName: '서초FC' }),
+      makeSlot({ id: 's3', kind: 'GROUP_RANK', groupId: 'semi', sourceGroupId: group.id, registrationId: 'r3', teamName: '마포FC' }),
+      makeSlot({ id: 's4', kind: 'GROUP_RANK', groupId: 'semi', sourceGroupId: group.id, registrationId: 'r4', teamName: '송파FC' }),
+    ];
+    bracketFixtures = [
+      fixtureRow({ id: 'group-fx', groupId: group.id }),
+      fixtureRow({ id: 'semi-1', groupId: semi.id, round: '4강', homeSlotId: 's1', awaySlotId: 's2', homeRegistrationId: 'r1', awayRegistrationId: 'r2', game: makeGame({ state: 'ENDED', hasOfficialResult: true }) }),
+      fixtureRow({ id: 'semi-2', groupId: semi.id, round: '4강', homeSlotId: 's3', awaySlotId: 's4', homeRegistrationId: 'r3', awayRegistrationId: 'r4', game: makeGame({ state: 'ENDED', hasOfficialResult: true }) }),
+      fixtureRow({ id: 'final-fx', groupId: final.id, round: '결승', homeRegistrationId: 'r1', awayRegistrationId: 'r3', game: makeGame({ state: 'ENDED', hasOfficialResult: true }) }),
+    ];
+    renderTab();
+
+    expect(screen.getByText(/1개 조.*2개 결선/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /4강.*4팀 배정됨.*대진 2경기/ })).toHaveTextContent('준비완료');
+    expect(screen.getByRole('button', { name: /결승.*2팀 배정됨.*대진 1경기/ })).toHaveTextContent('준비완료');
+    fireEvent.click(screen.getByRole('button', { name: /4강.*4팀 배정됨/ }));
+    expect(screen.queryByText('아직 배정된 팀이 없어요')).not.toBeInTheDocument();
+    expect(screen.queryByText(/예선 상위 진출팀이에요/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '대진 자동 생성' })).not.toBeInTheDocument();
+  });
+});
+
 describe('BracketTab — 진출 연결 출처 선택', () => {
   afterEach(() => {
     bracketGroups = bracket.groups;
@@ -898,6 +934,21 @@ describe('BracketTab — 12강·8강 토너먼트 자동 생성', () => {
     expect(bracketFixtures).toHaveLength(0);
     expect(createFixtureMutate).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: '대진 자동 생성' })).toBeEnabled();
+  });
+
+  it('수동 결선에 배정된 경기까지 있으면 자동 재생성을 표시하지 않는다', () => {
+    setKnockoutGroup('quarter');
+    bracketFixtures = [fixtureRow({
+      groupId: 'knockout',
+      round: '8강',
+      homeRegistrationId: 'r1',
+      awayRegistrationId: 'r2',
+    })];
+    renderTab();
+
+    fireEvent.click(screen.getByRole('button', { name: /8강.*8팀 배정됨.*대진 1경기/ }));
+    expect(screen.queryByRole('button', { name: '대진 자동 생성' })).not.toBeInTheDocument();
+    expect(createFixtureMutate).not.toHaveBeenCalled();
   });
 });
 

@@ -598,7 +598,9 @@ export function BracketTab({
   const fixtures: V1AdminBracketFixture[] = bracket?.fixtures ?? [];
   const sideLabelContext = buildSideLabelContext(groups, fixtures, bracket?.slots ?? []);
   const allStandings = bracket?.standings ?? [];
-  const readyGroupCount = groups.filter((g) => isGroupReady(g, fixtures)).length;
+  const readyGroupCount = groups.filter((g) => isGroupReady(g, fixtures, bracket?.slots ?? [])).length;
+  const qualifyingGroupCount = groups.filter((group) => group.phase === 'group').length;
+  const knockoutStageCount = groups.length - qualifyingGroupCount;
 
   // ── Task 109 Track 6: 대진표 일괄 공개 ─────────────────────────────
   // 예약 시각이 지나면 서버는 공개로 판정하지만 bracketPublishedAt 은 null 로 남는다.
@@ -774,7 +776,7 @@ export function BracketTab({
       {/* ── 조 롤업 헤더 + 원클릭 조 추가 ─────────────────────────────── */}
       <div className="flex items-center justify-between gap-3 flex-wrap px-1">
         <p className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">
-          총 {groups.length}개 조 · {readyGroupCount}개 준비 완료
+          총 {qualifyingGroupCount > 0 || knockoutStageCount === 0 ? `${qualifyingGroupCount}개 조` : ''}{qualifyingGroupCount > 0 && knockoutStageCount > 0 ? ' · ' : ''}{knockoutStageCount > 0 ? `${knockoutStageCount}개 결선 단계` : ''} · {readyGroupCount}개 준비 완료
         </p>
         {groups.length > 0 && (
           <button

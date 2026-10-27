@@ -20,11 +20,11 @@ export function GroupedPrizes({ rows, teamByPosition = {} }: {
                 const teamName = group.position !== null ? teamByPosition[group.position] : undefined;
                 return (
                   <div key={group.label} style={{ padding: '12px 0', borderTop: index ? '1px solid var(--border)' : undefined, overflowWrap: 'anywhere' }}>
-                    <dt style={{ color: 'var(--text-strong)', fontSize: 15, fontWeight: 700 }}>{group.label}</dt>
+                    <dt style={{ color: 'var(--text-strong)', fontSize: 'var(--font-size-body)', fontWeight: 700 }}>{group.label}</dt>
                     <dd style={{ margin: '6px 0 0', display: 'grid', gap: 4 }}>
-                      {teamName && <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--blue700)' }}>{teamName}</div>}
+                      {teamName && <div style={{ fontSize: 'var(--font-size-label)', fontWeight: 600, color: 'var(--blue700)' }}>{teamName}</div>}
                       {group.amounts.map((amount, itemIndex) => (
-                        <div key={itemIndex} style={{ fontSize: 14, fontWeight: isPrizeAmountValue(amount) ? 700 : 400, color: isPrizeAmountValue(amount) ? 'var(--text-strong)' : 'var(--text-body)' }}>
+                        <div key={itemIndex} style={{ fontSize: 'var(--font-size-body)', fontWeight: isPrizeAmountValue(amount) ? 700 : 400, color: isPrizeAmountValue(amount) ? 'var(--text-strong)' : 'var(--text-body)' }}>
                           {formatPrizeRowValue(amount)}
                         </div>
                       ))}

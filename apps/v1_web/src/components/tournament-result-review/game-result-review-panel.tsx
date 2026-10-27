@@ -51,6 +51,7 @@ export function GameResultReviewPanel({
   correctionsHref,
   inline = false,
   onSaved,
+  onOfficialized,
   variant = 'page',
   confirmedFooter,
 }: {
@@ -59,6 +60,7 @@ export function GameResultReviewPanel({
   correctionsHref?: string;
   inline?: boolean;
   onSaved?: () => void;
+  onOfficialized?: () => void;
   /**
    * `console` 은 운영 콘솔이 경기 종료 직후 그 자리에 끼우는 압축판이다 — 스코어를 맨
    * 위에 둔 확정 카드만 그리고, 세부 기록·처리 이력은 콘솔 자신의 화면이 이미 갖고 있다.
@@ -176,7 +178,7 @@ export function GameResultReviewPanel({
         mvpParticipantId: freshRevision.mvpParticipantId,
       },
       {
-        onSuccess: () => { setDirectorGateStatus('enabled'); onSaved?.(); },
+        onSuccess: () => { setDirectorGateStatus('enabled'); onOfficialized?.(); onSaved?.(); },
         onError: (error) => {
           if (isDirectorOfficializeDisabledError(error)) setDirectorGateStatus('disabled');
         },

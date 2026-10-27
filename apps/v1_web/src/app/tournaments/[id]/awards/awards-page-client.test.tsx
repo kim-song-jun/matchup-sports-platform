@@ -1,10 +1,10 @@
 import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render as rtlRender, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { serializePrizeRows } from '@/lib/prize-breakdown';
 import { trackEvent } from '@/lib/analytics';
-import type { V1LeagueOverallStandingsResponse, V1TournamentDetail } from '@/types/api';
+import type { V1LeagueOverallStandingsResponse, V1TournamentDetail, V1TournamentFixture } from '@/types/api';
 import type { V1LeaguePlayerRecordRow } from '@/types/league-match';
 import type { PublicTournamentPlayerRecordRow } from '@/components/public-game-records/types';
 import { useShellOverrideForRoute } from '@/components/v1-ui/shell-override';
@@ -174,6 +174,57 @@ function makeCompletedTournament(overrides: Partial<V1TournamentDetail> = {}): V
     ...overrides,
   };
 }
+
+describe('AwardsPageClient — 존재하는 결선 시상대', () => {
+  function finishedFixture(round: string, home: string, away: string): V1TournamentFixture {
+    return {
+      id: round, groupId: null, round, fixtureNumber: 1, legNumber: 1,
+      scheduledAt: null, venue: null, status: 'completed', liveStatus: 'ended',
+      homeRegistrationId: 'home', homeTeamId: 'home', homeTeamName: home, homeTeamLogoUrl: null,
+      awayRegistrationId: 'away', awayTeamId: 'away', awayTeamName: away, awayTeamLogoUrl: null,
+      homeSlotLabel: null, awaySlotLabel: null, videos: [],
+      result: { homeScore: 2, awayScore: 1, hasPenalty: false, homePenaltyScore: null,
+        awayPenaltyScore: null, note: null, recordedAt: '2026-10-28T00:00:00Z', goals: [] },
+    };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    v1GetMock.mockResolvedValue(emptyOverallStandings);
+  });
+
+  it('3·4위전이 없으면 우승·준우승만 표시하고 빈 3위 단상을 만들지 않는다', () => {
+    awardsApiMocks.useV1Tournament.mockReturnValue({
+      data: makeCompletedTournament({ fixtures: [finishedFixture('final', '우승팀', '준우승팀')] }),
+      isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    });
+
+    render(<AwardsPageClient tournamentId="tournament-1" />);
+
+    const podium = screen.getByLabelText('최종 시상대');
+    expect(within(podium).getByText('우승팀')).toBeInTheDocument();
+    expect(within(podium).getByText('준우승팀')).toBeInTheDocument();
+    expect(within(podium).queryByText('—')).not.toBeInTheDocument();
+    expect(podium.querySelector('.tm-awards-podium-3')).not.toBeInTheDocument();
+  });
+
+  it('3·4위전 결과가 있으면 실제 3위 팀을 표시한다', () => {
+    awardsApiMocks.useV1Tournament.mockReturnValue({
+      data: makeCompletedTournament({ fixtures: [
+        finishedFixture('final', '우승팀', '준우승팀'),
+        finishedFixture('third_place', '3위팀', '4위팀'),
+      ] }),
+      isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    });
+
+    render(<AwardsPageClient tournamentId="tournament-1" />);
+
+    const podium = screen.getByLabelText('최종 시상대');
+    expect(within(podium).getByText('3위팀')).toBeInTheDocument();
+    expect(within(podium).queryByText('4위팀')).not.toBeInTheDocument();
+  });
+
+});
 
 describe('AwardsPageClient GA events', () => {
   const originalShare = navigator.share;

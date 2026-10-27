@@ -1166,9 +1166,6 @@ export function TournamentDetailView({
 
   /* ── Desktop right-rail CTA card ── */
   // 리그도 대회와 같은 우측 레일에 진행 입구와 핵심 정보를 모은다.
-  const leagueApplicationCta = isLeagueMirror && registrationBlock === null && !hasActiveRegistration
-    ? <div className="mt-4"><ApplyCTAButtons tournament={tournament} blockReason={null} myRegistration={myRegistration} /></div>
-    : null;
   const nextLeagueInvite = isLeagueMirror && registrationBlock !== null
     ? <div className="mb-4"><LeagueNextRegistrationInvite leagueId={tournament.id} variant="sidebar" /></div>
     : null;
@@ -1320,7 +1317,6 @@ export function TournamentDetailView({
           </div>
         ) : null}
       </div>
-      {leagueApplicationCta}
     </aside>
   ) : tournament.status === 'closed' || (isLeagueMirror && tournament.status === 'in_progress') ? (
     /* 경기 없는 날의 정규 리그도 일정 진입을 유지한다.
@@ -1362,7 +1358,6 @@ export function TournamentDetailView({
           <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>{showsCapacity ? `${reservedTeamCount}/${teamCapacity}팀` : `${tournament.confirmedCount}팀`}</span>
         </div>
       </div>
-      {leagueApplicationCta}
     </aside>
   ) : tournament.status === 'completed' ? (
     <aside className="tm-tournament-rail tm-show-desktop" role="complementary" aria-label="대회 결과">

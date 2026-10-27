@@ -17,11 +17,16 @@ vi.mock('@/hooks/use-admin-can-write', () => ({ useAdminCanWrite: () => adminCan
 
 const query = vi.hoisted(() => ({ value: {} as Record<string, unknown>, refetch: vi.fn() }));
 const changeMutate = vi.hoisted(() => vi.fn());
+const openMutate = vi.hoisted(() => vi.fn());
+const closeMutate = vi.hoisted(() => vi.fn());
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminLeagueMatch: () => query.value,
   useV1ChangeLeagueState: () => ({ mutate: changeMutate, isPending: false }),
   useV1UpdateLeagueVisibility: () => ({ mutate: vi.fn(), isPending: false, isError: false, isSuccess: false, error: null }),
   useV1TournamentStaffAssignments: () => ({ data: { items: [] }, isPending: false, isError: false, error: null }),
+  useV1OpenLeagueRegistration: () => ({ mutate: openMutate, isPending: false }),
+  useV1UpdateLeagueEntryFee: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useV1CloseLeagueRegistration: () => ({ mutate: closeMutate, isPending: false }),
 }));
 
 const fixture = (id: string, status: string, resultStage: string) => ({
@@ -35,6 +40,8 @@ function loaded(overrides: Record<string, unknown> = {}) {
       leagueId: 'league-1', isPublic: true, title: '가을 풋살 리그', state: 'active',
       teamIds: ['t1', 't2'], startsOn: '2026-09-01T00:00:00.000Z',
       fixtures: [fixture('tm-1', 'completed', 'official'), fixture('tm-2', 'matched', 'not_entered')],
+      entryFee: 0, entryFeeConfiguredAt: null, registrationDeadlineAt: null,
+      activeRegistrationCount: 0, confirmedRegistrationCount: 0,
       ...overrides,
     },
     isPending: false, isError: false, error: null, refetch: query.refetch,
@@ -53,6 +60,8 @@ describe('LeagueAdminShell', () => {
     query.value = loaded();
     query.refetch.mockClear();
     changeMutate.mockClear();
+    openMutate.mockClear();
+    closeMutate.mockClear();
   });
 
   it('제목과 참가팀·대진 수를 헤더에 그리고, 섹션 본문은 그 아래에 둔다', () => {
@@ -124,7 +133,7 @@ describe('LeagueAdminShell', () => {
     it('모집 마감에서 리그 시작하기를 확인하면 실제 상태 변경을 요청하고 실패를 표시한다', async () => {
       query.value = loaded({ state: 'draft', lifecycleStatus: 'closed' });
       renderShell();
-      expect(screen.getByText('모집완료')).toBeInTheDocument();
+      expect(screen.getByText('마감')).toBeInTheDocument();
       fireEvent.click(screen.getByRole('button', { name: '리그 시작하기' }));
       const dialog = screen.getByRole('dialog', { name: '리그 시작하기' });
       expect(within(dialog).getByRole('radio', { name: /진행 중/ })).toBeChecked();
@@ -136,11 +145,11 @@ describe('LeagueAdminShell', () => {
       expect(within(dialog).getByRole('alert')).toHaveTextContent('시작 권한이 없어요.');
     });
 
-    it('운영자가 신청을 다시 열어도 시작 전 상태와 모집 표시는 구분한다', () => {
-      query.value = loaded({ state: 'draft', lifecycleStatus: 'closed', registrationOpen: true });
+    // 2026-10-27: 리그 상태 이름을 대회처럼 나눈다 — 접수 중인 리그는 '접수 중'이고 시작은 따로 누른다.
+    it('접수 중인 리그는 접수 중으로 보이고 리그 시작하기를 따로 누른다', () => {
+      query.value = loaded({ state: 'draft', lifecycleStatus: 'open', registrationOpen: true });
       renderShell();
-      expect(screen.getByText('모집완료')).toBeInTheDocument();
-      expect(screen.queryByText('모집 중', { exact: true })).not.toBeInTheDocument();
+      expect(screen.getByText('접수 중')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: '리그 시작하기' })).toBeInTheDocument();
     });
 
@@ -214,6 +223,60 @@ describe('LeagueAdminShell', () => {
       expect(screen.getByText('리그 정보를 불러오지 못했어요.')).toBeInTheDocument();
       fireEvent.click(screen.getByRole('button', { name: '다시 시도하기' }));
       expect(query.refetch).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // 2026-10-27 사용자 선택: 접수를 여닫는 버튼은 대회 어드민처럼 리그 상단에 둔다.
+  describe('접수 시작하기 · 접수 마감하기', () => {
+    const configuredFee = { entryFee: 0, entryFeeConfiguredAt: '2026-10-01T00:00:00.000Z', registrationDeadlineAt: null, activeRegistrationCount: 0, confirmedRegistrationCount: 0 };
+
+    it('초안 리그는 접수 시작하기에서 마감 없이 받기를 골라 연다', () => {
+      query.value = loaded({ state: 'draft', lifecycleStatus: 'draft', ...configuredFee });
+      renderShell();
+      expect(screen.queryByRole('button', { name: '접수 마감하기' })).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: '접수 시작하기' }));
+      const dialog = screen.getByRole('dialog', { name: '접수를 시작할까요?' });
+      // 마감도 '마감 없이'도 고르지 않으면 열지 않는다.
+      fireEvent.click(within(dialog).getByRole('button', { name: '접수 시작' }));
+      expect(within(dialog).getByRole('alert')).toHaveTextContent("신청 마감을 정하거나 '마감 없이 받기'를 골라 주세요.");
+      expect(openMutate).not.toHaveBeenCalled();
+      fireEvent.click(within(dialog).getByLabelText(/마감 없이 받기/));
+      fireEvent.click(within(dialog).getByRole('button', { name: '접수 시작' }));
+      expect(openMutate).toHaveBeenCalledWith({ registrationDeadlineAt: null }, expect.anything());
+    });
+
+    it('참가비를 정하지 않은 리그는 무료로 열린다고 먼저 알린다', () => {
+      query.value = loaded({ state: 'draft', lifecycleStatus: 'closed', ...configuredFee, entryFeeConfiguredAt: null });
+      renderShell();
+      fireEvent.click(screen.getByRole('button', { name: '접수 시작하기' }));
+      const dialog = screen.getByRole('dialog', { name: '접수를 시작할까요?' });
+      expect(within(dialog).getByText(/참가비를 정하지 않아 무료로 열려요/)).toBeInTheDocument();
+      expect(within(dialog).getByRole('button', { name: '무료로 접수 시작' })).toBeInTheDocument();
+    });
+
+    it('접수 중인 리그는 접수 마감하기로 닫는다', () => {
+      query.value = loaded({ state: 'draft', lifecycleStatus: 'open', ...configuredFee, registrationDeadlineAt: '2099-01-01T00:00:00.000Z', activeRegistrationCount: 3, confirmedRegistrationCount: 1 });
+      renderShell();
+      expect(screen.queryByRole('button', { name: '접수 시작하기' })).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: '접수 마감하기' }));
+      const dialog = screen.getByRole('dialog', { name: '접수를 마감할까요?' });
+      expect(within(dialog).getByText('3팀 (확정 1 · 대기 2)')).toBeInTheDocument();
+      fireEvent.click(within(dialog).getByRole('button', { name: '접수 마감' }));
+      expect(closeMutate).toHaveBeenCalledWith({}, expect.anything());
+    });
+
+    it.each(['in_progress', 'on_hold', 'completed'])('%s 리그에는 접수 버튼이 없다', (lifecycleStatus) => {
+      query.value = loaded({ state: lifecycleStatus === 'in_progress' ? 'active' : lifecycleStatus, lifecycleStatus, ...configuredFee });
+      renderShell();
+      expect(screen.queryByRole('button', { name: '접수 시작하기' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: '접수 마감하기' })).not.toBeInTheDocument();
+    });
+
+    it('조회 전용 관리자에게는 접수 버튼이 없다', () => {
+      adminCanWrite.value = false;
+      query.value = loaded({ state: 'draft', lifecycleStatus: 'draft', ...configuredFee });
+      renderShell();
+      expect(screen.queryByRole('button', { name: '접수 시작하기' })).not.toBeInTheDocument();
     });
   });
 });

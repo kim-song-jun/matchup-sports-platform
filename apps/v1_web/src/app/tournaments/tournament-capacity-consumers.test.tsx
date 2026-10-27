@@ -66,10 +66,11 @@ describe.each(scenarios)('공개 정원 소비자 — $name', ({ overrides, limi
     api.useV1Team.mockReturnValue({ data: undefined });
   });
 
-  it('목록 카드는 실제 참가팀 정원과 별개로 리그 수명주기를 표시해요', () => {
+  it('목록 카드는 대회와 같은 시작 전 배지에 실제 참가팀 정원을 따로 보여요', () => {
     const item: V1TournamentListItem = capacityTournament(overrides);
     render(<TournamentCard item={item} />);
-    const label = `${item.kind === 'regular_league' ? '준비 중' : '시작 전'} · ${full ? (item.kind === 'regular_league' ? '접수 안 함' : '모집 종료') : '신청 접수 중'}`;
+    // 접수 중인 리그는 대회처럼 '시작 전'이다(2026-10-27). 정원이 차면 신청 배지만 닫힌다.
+    const label = `시작 전 · ${full ? (item.kind === 'regular_league' ? '접수 안 함' : '모집 종료') : '신청 접수 중'}`;
     expect(screen.getByRole('link')).toHaveAccessibleName(`${item.title} — 풋살 — ${label}`);
     if (limit === null) {
       expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();

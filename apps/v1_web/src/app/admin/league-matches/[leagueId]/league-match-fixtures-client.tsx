@@ -808,7 +808,7 @@ export default function LeagueMatchFixturesClient({
           A안 범위는 "신청 열기 + 목록" 이다. 그 밖의 화면을 새로 만들지 않는다. */}
       <LeagueRegistrationSummary
         leagueId={leagueId}
-        state={series.state}
+        status={series.lifecycleStatus}
         registrationOpen={series?.registrationOpen ?? false}
         registrationDeadlineAt={series?.registrationDeadlineAt ?? null}
       />
@@ -1166,7 +1166,7 @@ export default function LeagueMatchFixturesClient({
               A안 범위는 "신청 열기 + 목록" 이다. 그 밖의 화면을 새로 만들지 않는다. */}
           <LeagueRegistrationSummary
             leagueId={leagueId}
-            state={series.state}
+            status={series.lifecycleStatus}
             registrationOpen={series?.registrationOpen ?? false}
             registrationDeadlineAt={series?.registrationDeadlineAt ?? null}
           />
@@ -1890,12 +1890,13 @@ function DailyPlanCard({ plan }: { plan: DailyPlan }) {
  */
 function LeagueRegistrationSummary({
   leagueId,
-  state,
+  status,
   registrationOpen,
   registrationDeadlineAt,
 }: {
   leagueId: string;
-  state: 'draft' | 'active' | 'completed' | 'on_hold';
+  /** 리그 저장 상태(`lifecycleStatus`) — 닫혀 있으면 이유를 가른다. */
+  status: string | undefined;
   registrationOpen: boolean;
   registrationDeadlineAt: string | null;
 }) {
@@ -1904,23 +1905,15 @@ function LeagueRegistrationSummary({
       <div className="mb-1 flex flex-wrap items-center gap-2">
         <p className="text-sm font-semibold text-[var(--text-strong)]">참가 신청</p>
         {registrationOpen ? (
-          <span className="tm-badge tm-badge-blue">모집 중</span>
+          <span className="tm-badge tm-badge-blue">신청 받는 중</span>
         ) : (
           <span className="tm-badge tm-badge-grey">신청 안 받는 중</span>
         )}
       </div>
-      {/* **받는지는 `registrationOpen`, 닫혔다면 그 이유는 `state` 가 가른다.**
-          문장 판정은 `describeLeagueRegistrationWindow` 한 곳에 있다 — 예전엔 이 카드와
-          신청 관리 화면이 각자 삼항식을 갖고 있어서 **닫힌 이유를 가르는 수정이 한쪽에만
-          들어갔다.** 끝난 리그는 마감이 미래로 남아 있어서, 섞어 두면 "마감됐어요" 라고
-          거짓말한다. */}
+      {/* 받는지는 `registrationOpen`, 닫혔다면 그 이유는 저장 상태가 가른다 — 문장 판정은
+          `describeLeagueRegistrationWindow` 한 곳에 있다(신청 관리 화면과 같은 말). */}
       <p className="mb-3 text-xs text-[var(--text-muted)]">
-        {describeLeagueRegistrationWindow({
-          state,
-          registrationOpen,
-          registrationDeadlineAt,
-          noDeadlineHint: '신청 마감을 정하면 팀장이 리그 화면에서 바로 신청할 수 있어요.',
-        })}
+        {describeLeagueRegistrationWindow({ status, registrationOpen, registrationDeadlineAt })}
       </p>
       <Link
         href={`/admin/league-matches/${leagueId}/registrations`}

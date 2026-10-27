@@ -197,8 +197,9 @@ describe('TournamentDetailPageClient GA events', () => {
 
   it('keeps the shared application contract in a regular-league rail without tournament capacity facts', async () => {
     tournamentApiMocks.useV1Tournament.mockReturnValue({
+      // 2026-10-27: 리그도 접수 중(open)일 때만 신청 레일이 있다.
       data: makeTournament({
-        status: 'in_progress',
+        status: 'open',
         kind: 'regular_league',
         entryFeeConfigured: false,
         registrationDeadlineAt: '2099-08-10T14:59:00.000Z',
@@ -214,7 +215,7 @@ describe('TournamentDetailPageClient GA events', () => {
     render(<TournamentDetailPageClient tournamentId="tournament-1" />);
 
     await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
-    const rail = screen.getByRole('complementary', { name: '리그 진행 상태' });
+    const rail = screen.getByRole('complementary', { name: '리그 참가 신청' });
     expect(within(rail).getByRole('link', { name: '참가 신청하기' })).toHaveAttribute(
       'href', '/tournaments/tournament-1/my',
     );

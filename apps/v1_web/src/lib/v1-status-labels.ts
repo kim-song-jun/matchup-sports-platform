@@ -307,8 +307,9 @@ export function gameRosterStatusLabel(status: string, remainingMatches?: number 
 
 export type LeagueStateKey = 'draft' | 'active' | 'completed' | 'on_hold';
 
+// `draft` 는 시작 전 단계(초안·접수 중·마감)를 한데 묶은 값이다. 단계를 구분할 수 있으면 `leagueLifecycleLabel` 을 쓴다.
 const LEAGUE_STATE_LABEL: Record<LeagueStateKey, string> = {
-  draft: '모집완료',
+  draft: '시작 전',
   active: '시즌 진행 중',
   completed: '종료',
   // 리그 취소 대신 쓰는 보류 — 공개 화면에선 숨겨져 있고 관리자가 다시 열 수 있다.
@@ -318,6 +319,24 @@ const LEAGUE_STATE_LABEL: Record<LeagueStateKey, string> = {
 /** 리그(시즌) 자체의 상태. 경기 상태와 한 화면에 함께 나오면 `LEAGUE_SUBJECT_LABEL` 을 앞에 붙인다. */
 export function leagueStateLabel(state: LeagueStateKey): string {
   return LEAGUE_STATE_LABEL[state];
+}
+
+// 리그 저장 상태의 어드민 이름 — 대회 어드민(초안·접수 중·마감)과 같은 말에 리그 말(시즌 진행 중·보류)을 더한다(2026-10-27).
+const LEAGUE_LIFECYCLE_LABEL: Record<string, string> = {
+  draft: '초안',
+  open: '접수 중',
+  closed: '마감',
+  in_progress: LEAGUE_STATE_LABEL.active,
+  completed: LEAGUE_STATE_LABEL.completed,
+  // 리그 취소는 없다(보류로 대신한다). 남아 있는 행은 종료로 묶는다.
+  cancelled: LEAGUE_STATE_LABEL.completed,
+  on_hold: LEAGUE_STATE_LABEL.on_hold,
+};
+
+/** 리그 저장 상태(`lifecycleStatus`)의 이름. 모르는 값은 영문 코드 대신 '상태 확인 중'. */
+export function leagueLifecycleLabel(status: string): string {
+  // `in` 이나 인덱싱만 쓰면 'constructor' 같은 프로토타입 키가 통과한다 — 자기 키만 본다.
+  return Object.hasOwn(LEAGUE_LIFECYCLE_LABEL, status) ? LEAGUE_LIFECYCLE_LABEL[status] : '상태 확인 중';
 }
 
 /** 경기 하나의 단계. 공개 화면의 리그 대진·운영 콘솔·결과 검토가 같은 말을 쓴다. */

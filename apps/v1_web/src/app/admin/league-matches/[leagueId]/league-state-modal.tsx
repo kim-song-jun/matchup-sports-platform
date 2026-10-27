@@ -10,7 +10,7 @@ import type { V1AdminLeagueDetail, V1LeagueStateValue } from '@/types/league-mat
 
 // "지금은 ○○" 문장 — 라벨에 조사를 붙이면 '보류이에요'·'종료이에요'가 된다.
 const STATE_NOW: Record<V1LeagueStateValue, string> = {
-  draft: '모집완료 상태예요',
+  draft: '시작 전이에요',
   active: '진행 중이에요',
   on_hold: '보류 중이에요',
   completed: '종료됐어요',
@@ -50,11 +50,10 @@ export function leagueStateOptions(series: Pick<V1AdminLeagueDetail, 'state' | '
     if (state === 'on_hold' && target === holdRestore) return '보류를 풀고 보류 전 상태와 공개 설정으로 돌아가요.';
     switch (target) {
       case 'draft':
-        if (state === 'active') return '리그 시작을 취소하고 모집완료로 돌아가요. 대진·참가 팀은 그대로 남고, 참가 신청은 신청 마감 설정을 따라요.';
-        // 시작 취소는 기존 신청 마감·정원 설정을 유지한다.
-        return '모집완료로 돌아가요. 참가 신청은 별도 신청 마감 설정을 따라요.';
+        if (state === 'active') return '리그 시작을 취소하고 마감 상태로 돌아가요. 대진·참가 팀은 그대로 남고, 신청을 다시 받으려면 신청 관리에서 접수를 시작해요.';
+        return '시작 전 상태로 돌아가요. 신청은 신청 관리에서 접수를 시작하거나 마감해요.';
       case 'active':
-        return state === 'completed' ? '종료를 풀고 다시 진행 중으로 돌려요. 남은 경기가 모두 확정되면(총 경기 수를 정했으면 그 수를 채우면) 다시 자동으로 종료돼요.' : '리그를 시작해요.';
+        return state === 'completed' ? '종료를 풀고 다시 진행 중으로 돌려요. 남은 경기가 모두 확정되면(총 경기 수를 정했으면 그 수를 채우면) 다시 자동으로 종료돼요.' : '리그를 시작해요. 접수 중이던 참가 신청은 닫혀요.';
       case 'on_hold':
         return '리그와 경기가 공개 화면에서 숨겨져요. 대진·결과·참가 팀은 그대로 남아요.';
       case 'completed':

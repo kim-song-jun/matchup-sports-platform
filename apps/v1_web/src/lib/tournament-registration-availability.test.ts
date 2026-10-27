@@ -98,17 +98,18 @@ describe('resolveTournamentRegistrationBlock', () => {
       resolveTournamentRegistrationBlock(tournament({ registrationDeadlineAt: null }), NOW),
     ).toBeNull();
   });
-  it.each(['draft', 'open', 'in_progress'])('keeps a regular league open by future deadline while status is %s', (status) => {
-    expect(resolveTournamentRegistrationBlock(tournament({ kind: 'regular_league', status, teamCount: 0, confirmedCount: 99, pendingPaymentCount: 99 }), NOW)).toBeNull();
+  // 2026-10-27: 리그도 대회처럼 접수 중(open)일 때만 받는다 — 진행 중·보류 리그는 마감이 남아도 닫는다.
+  it('accepts a regular league only while open, with or without a deadline', () => {
+    expect(resolveTournamentRegistrationBlock(tournament({ kind: 'regular_league', status: 'open', teamCount: 0, confirmedCount: 99, pendingPaymentCount: 99 }), NOW)).toBeNull();
+    expect(resolveTournamentRegistrationBlock(tournament({ kind: 'regular_league', status: 'open', registrationDeadlineAt: null }), NOW)).toBeNull();
   });
 
-  it.each(['completed', 'cancelled'])('blocks a terminal regular league even with a future deadline: %s', (status) => {
+  it.each(['draft', 'closed', 'in_progress', 'on_hold', 'completed', 'cancelled'])('blocks a regular league that is %s even with a future deadline', (status) => {
     expect(resolveTournamentRegistrationBlock(tournament({ kind: 'regular_league', status, registrationDeadlineAt: '2026-08-10T14:59:00.000Z' }), NOW)).toBe('not_open');
   });
 
-  it('blocks a regular league with no deadline or an expired deadline', () => {
-    expect(resolveTournamentRegistrationBlock(tournament({ kind: 'regular_league', status: 'draft', registrationDeadlineAt: null }), NOW)).toBe('not_open');
-    expect(resolveTournamentRegistrationBlock(tournament({ kind: 'regular_league', status: 'in_progress', registrationDeadlineAt: '2026-07-01T00:00:00.000Z' }), NOW)).toBe('deadline_passed');
+  it('blocks an open regular league once its deadline passes', () => {
+    expect(resolveTournamentRegistrationBlock(tournament({ kind: 'regular_league', status: 'open', registrationDeadlineAt: '2026-07-01T00:00:00.000Z' }), NOW)).toBe('deadline_passed');
   });
 
 });
@@ -136,9 +137,9 @@ describe('copy helpers', () => {
 });
 
 describe('regular league optional team capacity', () => {
-  it.each(['draft', 'open', 'in_progress'])('blocks a full finite league while status is %s', (status) => {
+  it('blocks a full finite open league', () => {
     // Given: the actual team cap differs from the legacy tournament mirror default.
-    const league = tournament({ kind: 'regular_league', status, maxTeams: 5, confirmedCount: 5 });
+    const league = tournament({ kind: 'regular_league', status: 'open', maxTeams: 5, confirmedCount: 5 });
     // When: the same capacity data reaches the application entry and summary.
     const capacity = resolveTournamentCapacity(league);
     // Then: neither consumer offers a sixth reserved place.

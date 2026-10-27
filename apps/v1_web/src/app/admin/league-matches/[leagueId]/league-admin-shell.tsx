@@ -17,6 +17,7 @@ import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
 import { useV1AdminLeagueMatch } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { sanitizeRedirectPath } from '@/lib/session-storage';
+import { LeagueRegistrationActions } from './league-registration-actions';
 import { LeagueStateModal } from './league-state-modal';
 import { Button } from '@/components/v1-ui/button';
 import { LeagueVisibilityControl } from './league-visibility-control';
@@ -115,7 +116,8 @@ export function LeagueAdminShell({ leagueId, children }: { leagueId: string; chi
         description={`${series.teamIds.length}팀 참가 · 대진 ${series.fixtures.length}경기`}
         action={
           <div className="flex flex-wrap items-center gap-2">
-            <AdminLeagueStatePill state={series.state} />
+            <AdminLeagueStatePill state={series.state} status={series.lifecycleStatus} />
+            {canWrite && <LeagueRegistrationActions leagueId={leagueId} league={series} showToast={showToast} />}
             {canWrite && series.state === 'draft' && (
               <Button variant="primary" onClick={() => { setStarting(true); setStateModalOpen(true); }}>
                 리그 시작하기

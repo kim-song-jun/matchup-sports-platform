@@ -1218,16 +1218,17 @@ describe('TournamentDetailView — 정규 리그 거울 행', () => {
     expect(container.querySelector('[aria-label="참가 신청"]')).toBeNull();
   });
 
-  it('미래 마감 정규 리그에는 정원·참가비 없는 공통 참가 신청 레일이 있다', async () => {
+  // 2026-10-27: 리그도 대회처럼 접수 중일 때만 신청을 받는다 — 신청 레일은 접수 중 리그에만 있다.
+  it('접수 중 정규 리그에는 정원·참가비 없는 공통 참가 신청 레일이 있다', async () => {
     vi.mocked(v1Get).mockResolvedValueOnce(standingsResponse);
     render(
       createElement(TournamentDetailView, {
-        tournament: makeMirror({ registrationDeadlineAt: '2099-08-10T14:59:00.000Z' }),
+        tournament: makeMirror({ status: 'open', registrationDeadlineAt: '2099-08-10T14:59:00.000Z' }),
         myRegistration: null,
       }),
     );
     await screen.findByText('통합 순위');
-    const rail = screen.getByRole('complementary', { name: '리그 진행 상태' });
+    const rail = screen.getByRole('complementary', { name: '리그 참가 신청' });
     expect(within(rail).getByRole('link', { name: '참가 신청하기' })).toHaveAttribute(
       'href', '/tournaments/league-1/my',
     );

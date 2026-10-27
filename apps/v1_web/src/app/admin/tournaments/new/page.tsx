@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, ArrowRight, Check, ChevronLeft, Copy, Lock } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, ChevronLeft, Copy } from 'lucide-react';
 import { useEffect, useReducer, useRef, useState, type FocusEvent, type MouseEvent } from 'react';
 import {
   useV1AdminTournament,
@@ -18,6 +18,7 @@ import { extractErrorMessage, extractErrorCode } from '@/lib/error-message';
 import { formatWithComma, onlyDigits } from '@/lib/number-format';
 import type { V1Tournament, V1TournamentFormat, V1TournamentGenderCategory } from '@/types/api';
 import { AdminPageHeader, AdminToasts, useAdminToast } from '@/components/admin';
+import { WizardStepper } from '@/components/admin/wizard-stepper';
 import { TournamentImagesField } from '@/components/admin/tournaments/tournament-images-field';
 import {
   PrizeBreakdownEditor,
@@ -420,7 +421,14 @@ export default function AdminTournamentsNewPage() {
       />
 
       <form ref={formRef} onSubmit={handleCreateOrUpdateDraft} noValidate className="pb-28">
-        <WizardStepper currentStep={state.step} hasDraft={state.draftId !== null && !state.periodMinutesDirty} onSelect={goToStep} />
+        {/* 확인 단계는 초안이 생기기 전에는 잠근다 — "대회 없이 확인 화면으로 건너뛰기"를 막는다(goToStep 방어와 이중화). */}
+        <WizardStepper
+          steps={TOURNAMENT_CREATE_STEPS}
+          currentStep={state.step}
+          onSelect={goToStep}
+          ariaLabel="대회 생성 단계"
+          isLocked={(index) => index === CONFIRM_STEP_INDEX && !(state.draftId !== null && !state.periodMinutesDirty)}
+        />
 
         <div className="mx-auto mt-5 max-w-4xl rounded-2xl border border-[var(--border)] bg-[var(--card-surface)]">
           <div className="border-b border-[var(--border)] px-5 py-5 sm:px-7">
@@ -581,88 +589,6 @@ export default function AdminTournamentsNewPage() {
       {startRegistrationConfirmModal}
       <AdminToasts toasts={toasts} />
     </>
-  );
-}
-
-/**
- * done/current/locked 3상태 + 진행률 표시 — components/admin/operation-flag-gate-stepper.tsx의
- * 패턴을 그대로 따른다. "locked"는 오직 확인 단계(CONFIRM_STEP_INDEX)에만 적용된다: 초안이
- * 아직 없으면 버튼 자체를 disabled로 막아 "대회 없이 확인 화면으로 건너뛰기"를 원천 차단한다
- * (goToStep의 방어 로직과 이중화). 나머지 단계는 기존처럼 검증만 통과하면 앞으로 건너뛸 수 있다.
- */
-function WizardStepper({
-  currentStep,
-  hasDraft,
-  onSelect,
-}: {
-  currentStep: number;
-  hasDraft: boolean;
-  onSelect: (step: number) => void;
-}) {
-  const doneCount = TOURNAMENT_CREATE_STEPS.filter((_, index) => index < currentStep).length;
-
-  return (
-    <div className="mx-auto max-w-4xl">
-      <div className="mb-2 flex items-center justify-between gap-3">
-        <p className="text-xs font-semibold text-[var(--text-body)]">
-          {TOURNAMENT_CREATE_STEPS.length}단계 중 {doneCount}단계 완료
-        </p>
-      </div>
-      <div className="mb-3 h-1.5 w-full overflow-hidden rounded-full bg-[var(--grey100)]">
-        <div
-          className="h-full rounded-full bg-blue-500 transition-[width] duration-150"
-          style={{ width: `${(doneCount / TOURNAMENT_CREATE_STEPS.length) * 100}%` }}
-        />
-      </div>
-      <nav aria-label="대회 생성 단계">
-        <ol className="grid grid-cols-5 gap-1 rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-2 sm:gap-2">
-          {TOURNAMENT_CREATE_STEPS.map((step, index) => {
-            const active = index === currentStep;
-            const done = index < currentStep;
-            const locked = index === CONFIRM_STEP_INDEX && !hasDraft && !active;
-            const statusLabel = done ? '완료' : active ? '진행 중' : locked ? '잠김' : '';
-            return (
-              <li key={step.title}>
-                <button
-                  type="button"
-                  onClick={() => onSelect(index)}
-                  disabled={locked}
-                  aria-current={active ? 'step' : undefined}
-                  aria-label={`${index + 1}단계 ${step.title}${statusLabel ? ` — ${statusLabel}` : ''}`}
-                  title={step.description}
-                  className={[
-                    'flex min-h-[64px] w-full items-center gap-2 rounded-xl px-2 text-left transition-colors sm:px-3',
-                    'disabled:cursor-not-allowed disabled:opacity-60',
-                    active ? 'bg-[var(--blue50)] text-[var(--blue700)]' : 'text-[var(--text-caption)] hover:bg-[var(--grey50)] disabled:hover:bg-transparent',
-                  ].join(' ')}
-                >
-                  <span
-                    aria-hidden="true"
-                    className={[
-                      'grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-bold',
-                      // locked는 색상으로는 upcoming(아직 안 온 단계)과 구분하지 않는다 —
-                      // 자물쇠 아이콘 자체가 신호이고, 바깥 버튼의 disabled 스타일이 이미
-                      // "지금 누를 수 없음"을 전달한다.
-                      active
-                        ? 'bg-blue-500 text-white'
-                        : done
-                          ? 'bg-[var(--blue50)] text-[var(--blue700)]'
-                          : 'tm-on-tint bg-[var(--grey150)] text-[var(--text-caption)]',
-                    ].join(' ')}
-                  >
-                    {done ? <Check size={14} /> : locked ? <Lock size={12} /> : index + 1}
-                  </span>
-                  <span className="hidden min-w-0 sm:block" aria-hidden="true">
-                    <span className="block truncate text-xs font-bold">{step.title}</span>
-                    <span className="mt-0.5 block truncate text-[length:var(--font-size-caption)]">{step.description}</span>
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ol>
-      </nav>
-    </div>
   );
 }
 

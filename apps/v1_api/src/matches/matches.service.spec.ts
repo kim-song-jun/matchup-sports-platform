@@ -702,6 +702,59 @@ describe('MatchesService', () => {
     });
   });
 
+  it('createApplication: 잠금 대기 중 같은 사용자의 신청이 접수되면 중복 생성 대신 충돌을 반환한다', async () => {
+    const available = matchRow({ participants: [], applications: [] });
+    const alreadyRequested = matchRow({ participants: [], applications: [applicationRow()] });
+    let releaseLock: () => void = () => undefined;
+    let signalWaiting: () => void = () => undefined;
+    const lockWaiting = new Promise<void>((resolve) => { signalWaiting = resolve; });
+    const locked = new Promise<void>((resolve) => { releaseLock = resolve; });
+    let competingRequestCommitted = false;
+    prisma.v1Match.findFirst.mockImplementation(async () => competingRequestCommitted ? alreadyRequested : available);
+    prisma.$queryRaw.mockImplementation(async () => { signalWaiting(); await locked; });
+    prisma.v1MatchApplication.create.mockResolvedValue(applicationRow());
+
+    const response = service.createApplication(otherUser, 'match-1', {});
+    await lockWaiting;
+    competingRequestCommitted = true;
+    releaseLock();
+
+    await expect(response).rejects.toMatchObject({ response: { code: 'ALREADY_REQUESTED' } });
+    expect(prisma.v1MatchApplication.create).not.toHaveBeenCalled();
+    expect(prisma.v1StatusChangeLog.create).not.toHaveBeenCalled();
+    expect(notifications.emitNotification).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['다른 참가자가 마지막 자리를 채운', 'another-user', 'FULL'],
+    ['신청자가 이미 참가자로 승인된', otherUser.id, 'ALREADY_PARTICIPANT'],
+  ])('createApplication: 잠금 대기 중 %s 경우 새 신청을 거부한다', async (_description, participantUserId, code) => {
+    const available = matchRow({ maxParticipants: 1, participants: [], applications: [] });
+    const occupied = matchRow({
+      maxParticipants: 1,
+      participants: [{ id: 'participant-1', userId: participantUserId, role: 'participant', status: 'active' }],
+      applications: [],
+    });
+    let releaseLock: () => void = () => undefined;
+    let signalWaiting: () => void = () => undefined;
+    const lockWaiting = new Promise<void>((resolve) => { signalWaiting = resolve; });
+    const locked = new Promise<void>((resolve) => { releaseLock = resolve; });
+    let concurrentChangeCommitted = false;
+    prisma.v1Match.findFirst.mockImplementation(async () => concurrentChangeCommitted ? occupied : available);
+    prisma.$queryRaw.mockImplementation(async () => { signalWaiting(); await locked; });
+    prisma.v1MatchApplication.create.mockResolvedValue(applicationRow());
+
+    const response = service.createApplication(otherUser, 'match-1', {});
+    await lockWaiting;
+    concurrentChangeCommitted = true;
+    releaseLock();
+
+    await expect(response).rejects.toMatchObject({ response: { code } });
+    expect(prisma.v1MatchApplication.create).not.toHaveBeenCalled();
+    expect(prisma.v1StatusChangeLog.create).not.toHaveBeenCalled();
+    expect(notifications.emitNotification).not.toHaveBeenCalled();
+  });
+
   it('edit: 참가 조건 미달로 시작 시각이 지난 매치는 보류에서 수정 가능하다', async () => {
     prisma.v1Match.findFirst.mockResolvedValue(
       matchRow({ hostUserId: host.id, status: 'recruiting', startAt: PAST }),

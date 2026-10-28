@@ -1,3 +1,4 @@
+import { parseSixTeamState } from './six-team/six-team-state';
 import { V1CompetitionKind, V1TeamMatchStatus } from '@prisma/client';
 import { effectivePublicVisibilityMode, publicFixtureStatus } from '../games/public-records/public-visibility';
 import {
@@ -319,6 +320,11 @@ export function presentTournamentDetail(
   const hideIdentity = shouldHideParticipantIdentity(row.status, staffBypass);
 
   return {
+    sixTeamMode: row.sixTeamMode,
+    sixTeamBracket: bracketPublished ? (() => {
+      const state = parseSixTeamState(row.sixTeamBracket);
+      return state ? { rounds: state.rounds, bye: state.bye, manual: state.manual, swapSemi: state.swapSemi ?? false, swapFinal: state.swapFinal ?? false, winners: state.winners, needsReview: state.needsReview } : null;
+    })() : null,
     id: row.id,
     sportId: row.sportId,
     sport: { code: row.sport.code, name: row.sport.name },

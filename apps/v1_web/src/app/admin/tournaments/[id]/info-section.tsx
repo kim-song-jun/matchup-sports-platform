@@ -1,4 +1,5 @@
 'use client';
+import { SixTeamModeField } from '@/components/admin/bracket-canvas/six-team-mode-field';
 
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -62,6 +63,7 @@ export function TournamentInfoSection() {
   const [editOpen, setEditOpen] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editSportId, setEditSportId] = useState('');
+  const [editSixTeamMode, setEditSixTeamMode] = useState(false);
   const [editFormat, setEditFormat] = useState<V1Tournament['format']>('group_knockout');
   const formatChangeBlockedReason = tournament?.formatChangeBlockedReason
     ?? (tournament?.status === 'in_progress' || tournament?.status === 'completed'
@@ -148,6 +150,7 @@ export function TournamentInfoSection() {
     setEditParkingInfo(tournament.parkingInfo ?? '');
     setEditEntryFee(String(tournament.entryFee));
     setEditTeamCount(String(tournament.teamCount));
+    setEditSixTeamMode(tournament.sixTeamMode ?? false);
     setEditMinPlayers(String(tournament.minPlayers));
     setEditMaxPlayers(String(tournament.maxPlayers));
     // 빈 문자열로 시작 — "아직 안 바꿈"을 뜻하며, 선택지 그룹은 tournament.lineupMaxPlayers를
@@ -291,6 +294,8 @@ export function TournamentInfoSection() {
     // 1 이상이 돼 깨진다.
     const payload: Omit<V1UpdateTournamentPayload, 'expectedVersion'> = {};
     if (normalizedTitle !== tournament.title) payload.title = normalizedTitle;
+    const nextSixTeamMode = editSixTeamMode && editFormat === 'knockout' && Number(editTeamCount) === 6;
+    if (nextSixTeamMode !== (tournament.sixTeamMode ?? false)) payload.sixTeamMode = nextSixTeamMode;
     if (editFormat !== tournament.format) payload.format = editFormat;
     if (editSportId && editSportId !== tournament.sportId) payload.sportId = editSportId;
     if (editScheduledAt !== isoToKstDatetimeLocal(tournament.scheduledAt)) {
@@ -825,6 +830,7 @@ export function TournamentInfoSection() {
                 className={inputCls}
               />
             </div>
+            <SixTeamModeField eligible={editFormat === 'knockout' && Number(editTeamCount) === 6} value={editSixTeamMode} onChange={setEditSixTeamMode} disabled={updateTournament.isPending || Boolean(tournament?.sixTeamBracket)} />
             <div className="flex flex-col gap-2">
               <label htmlFor="edit-min-players" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">최소 선수 (등록 명단)</label>
               <input

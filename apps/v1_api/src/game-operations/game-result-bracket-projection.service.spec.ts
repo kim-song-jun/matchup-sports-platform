@@ -38,6 +38,7 @@ function makeTx() {
     .mockResolvedValueOnce([{ id: HOME_REG, tournamentId: TOURNAMENT, status: 'confirmed', teamId: 'team-home', teamName: 'Home' }, { id: AWAY_REG, tournamentId: TOURNAMENT, status: 'confirmed', teamId: 'team-away', teamName: 'Away' }]);
   return {
     $queryRaw: queryRaw,
+    v1Tournament: { findFirst: jest.fn().mockResolvedValue({ sixTeamBracket: null }) },
     v1TournamentMatchDetails: { update: jest.fn() },
     v1TeamMatch: { update: jest.fn() },
     v1GameLineup: {

@@ -2679,6 +2679,9 @@ enum V1TournamentAnnouncementCategory {
 }
 
 model V1Tournament {
+  /// Six-team result-ranked advancement; null preserves the standard bracket.
+  sixTeamMode Boolean @default(false) @map("six_team_mode")
+  sixTeamBracket Json? @map("six_team_bracket")
   bracketDraft Json? @map("bracket_draft")
   bracketDraftRevision Int @default(0) @map("bracket_draft_revision")
   id                         String                      @id @default(uuid())

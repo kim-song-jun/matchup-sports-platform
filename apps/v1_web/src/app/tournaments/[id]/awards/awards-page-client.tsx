@@ -98,7 +98,8 @@ export function getTopThree(tournament: V1TournamentDetail): Array<{ pos: number
   const result: Array<{ pos: number; name: string }> = [];
 
   if (finalFixture?.result) {
-    const w = getWinnerSide(finalFixture.result);
+    const selectedWinner = tournament.sixTeamBracket?.winners[finalFixture.id];
+    const w = selectedWinner ? selectedWinner === finalFixture.homeRegistrationId ? 'home' : selectedWinner === finalFixture.awayRegistrationId ? 'away' : null : getWinnerSide(finalFixture.result);
     const champion = w === 'home' ? finalFixture.homeTeamName : w === 'away' ? finalFixture.awayTeamName : null;
     const runner = w === 'home' ? finalFixture.awayTeamName : w === 'away' ? finalFixture.homeTeamName : null;
     if (champion) result.push({ pos: 1, name: champion });

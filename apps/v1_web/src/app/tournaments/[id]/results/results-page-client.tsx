@@ -52,12 +52,13 @@ function computeTeamRecord(teamName: string, fixtures: V1TournamentFixture[]) {
 
 interface FinalRankRow { pos: number; name: string; record?: { w: number; gf: number; ga: number; games: number }; }
 
-function buildKnockoutFinalRanking(fixtures: V1TournamentFixture[]): FinalRankRow[] {
+function buildKnockoutFinalRanking(fixtures: V1TournamentFixture[], winners: Record<string, string> = {}): FinalRankRow[] {
   const finalFix = fixtures.find((f) => f.round === 'final' || f.round === '결승');
   const thirdFix = fixtures.find((f) => f.round === 'third_place' || f.round === '3·4위전');
   const rows: FinalRankRow[] = [];
   if (finalFix?.result) {
-    const w = getWinnerSide(finalFix.result);
+    const selectedWinner = winners[finalFix.id];
+    const w = selectedWinner ? selectedWinner === finalFix.homeRegistrationId ? 'home' : selectedWinner === finalFix.awayRegistrationId ? 'away' : null : getWinnerSide(finalFix.result);
     const champion = w === 'home' ? finalFix.homeTeamName : w === 'away' ? finalFix.awayTeamName : null;
     const runner   = w === 'home' ? finalFix.awayTeamName : w === 'away' ? finalFix.homeTeamName : null;
     if (champion) rows.push({ pos: 1, name: champion });
@@ -1084,7 +1085,7 @@ export function ResultsPageContent({ tournament }: { tournament: V1TournamentDet
     ? []
     : isLeague
       ? (needsOverallStandings ? (overallLeague?.rows ?? []) : buildSingleGroupLeagueRanking(tournament))
-      : buildKnockoutFinalRanking(tournament.fixtures);
+      : buildKnockoutFinalRanking(tournament.fixtures, tournament.sixTeamBracket?.winners);
   // 동점 처리 기준을 전부 소진하고도 1위가 안 갈리면(공동 우승) 순차 순위(1,2…) 대신
   // 그 자리를 나눠 가진 팀 전부를 "1위"로 함께 표기한다 — 실제로 갈리지 않은 걸 팀ID
   // 사전순으로 임의 확정해 트로피를 씌우던 결함(실사용자 발견, 2026-09-16)의 화면판.

@@ -1,3 +1,4 @@
+import { planSixTeamBracket } from '../six-team/six-team-plan';
 import { UnprocessableEntityException } from '@nestjs/common';
 import type { V1TournamentGroupPhase, V1TournamentSlotKind } from '@prisma/client';
 import { buildLeagueFixtureRows } from '../league-fixture-generator.service';
@@ -118,6 +119,7 @@ function planLeague(input: Extract<BracketTemplateInput, { kind: 'league' }>, of
 }
 
 function build(input: BracketTemplateInput, offset: number): BracketTemplatePlan {
+  if (input.kind !== 'league' && input.sixTeamMode) return planSixTeamBracket(input, offset);
   if (input.kind !== 'league' && input.schemaVersion === 2) return planFlexibleBracket(input, offset);
   switch (input.kind) {
     case 'knockout':

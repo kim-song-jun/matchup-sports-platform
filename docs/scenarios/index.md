@@ -1,3 +1,9 @@
+## 2026-10-28 — 6강 결승 직행 토너먼트
+
+[시나리오](./six-team-knockout.md) · [Task 20261118](../../.github/tasks/20261118-six-team-knockout.md).
+A안 코드 구현: 정원6/토너먼트 선택·확정6팀 생성·공식 성적 비교·운영자 진출 지정·전용 공개 대진표.
+API212/Web116·격리 DB 통합4·양쪽 타입/표면·패턴·schema drift0 PASS. Alpha after0/3(미배포), 커밋/PR/배포 없음.
+
 ## 2026-10-23 — 경기 기록 기본 공개
 
 [시나리오](./default-public-player-records.md) · [Task 20261106](../../.github/tasks/20261106-default-public-player-records.md).

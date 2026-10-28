@@ -421,3 +421,44 @@ describe('최종결과 — 조별/결선 분류는 편성 phase 기준', () => {
     expect(screen.getByText('성수 FC')).toBeInTheDocument();
   });
 });
+
+
+describe('결선 표시 순서와 단판 합산', () => {
+  const fixture = (id: string, round: string, num: number, goals: [number, number], extra: Partial<V1TournamentFixture> = {}) => makeFixture({ id, round, fixtureNumber: num, result: makeResult(...goals), ...extra });
+  it('결승 다음3위전, 다음4강을 표시하고 단판 점수를 합산으로 복제하지 않는다', () => {
+    const pair = (a: string, b: string) => ({ homeTeamName: `${a}팀`, awayTeamName: `${b}팀`, homeRegistrationId: a, awayRegistrationId: b });
+    const fixtures = [fixture('semi-1', '4강', 1, [2, 0], pair('A', 'B')), fixture('semi-2', '4강', 2, [0, 2], pair('C', 'D')), fixture('final', '결승', 1, [1, 4], pair('A', 'D')), fixture('third', '3·4위전', 1, [4, 0], pair('B', 'C'))];
+    const before = JSON.stringify(fixtures);
+    render(<ResultsPageContent tournament={makeTournament({ fixtures })} />);
+    const links = screen.getAllByRole('link').filter(link => /\/matches\//.test(link.getAttribute('href') ?? ''));
+    const ids = links.map(link => link.getAttribute('href')!.split('/matches/')[1].split('?')[0]);
+    expect(ids).toEqual(['final', 'third', 'semi-1', 'semi-2']);
+    expect(screen.queryByText('합산')).not.toBeInTheDocument();
+    expect(screen.queryByText('4강 1차')).not.toBeInTheDocument();
+    expect(screen.getAllByText('4강')).toHaveLength(2);
+    expect(JSON.stringify(fixtures)).toBe(before);
+  });
+  it('실제같은대진의 홈원정1·2차전은 합산을 유지한다', () => {
+    const fixtures = [fixture('first', '4강', 1, [2, 1]), fixture('second', '4강', 1, [3, 1], { legNumber: 2, homeRegistrationId: 'registration-away', awayRegistrationId: 'registration-home', homeTeamName: '원정 팀', awayTeamName: '홈 팀' })];
+    render(<ResultsPageContent tournament={makeTournament({ fixtures })} />);
+    expect(screen.getByText('합산')).toBeInTheDocument();
+    expect(screen.getByText('4강 1차')).toBeInTheDocument();
+    expect(screen.getByText('4강 2차')).toBeInTheDocument();
+  });
+  it('번호만 같고 참가팀이 다른 경기는 합산하거나 누락하지 않는다', () => {
+    const fixtures = [fixture('first', '4강', 1, [2, 1]), fixture('other', '4강', 1, [3, 1], { legNumber: 2, homeRegistrationId: 'other-home', awayRegistrationId: 'other-away' })];
+    render(<ResultsPageContent tournament={makeTournament({ fixtures })} />);
+    expect(screen.queryByText('합산')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('link').filter(link => /\/matches\//.test(link.getAttribute('href') ?? ''))).toHaveLength(2);
+  });
+});
+
+it('차전2만 있는4강 경기와 점수가 없는2차전은 가짜 합산을 만들지 않는다', () => {
+  const first = makeFixture({ id: 'standalone-second', round: '4강', fixtureNumber: 1, legNumber: 2, result: makeResult(3, 1) });
+  const missingScore = makeFixture({ id: 'unconfirmed', round: '4강', fixtureNumber: 1, legNumber: 1, result: null, status: 'scheduled' });
+  render(<ResultsPageContent tournament={makeTournament({ fixtures: [first, missingScore] })} />);
+  expect(screen.queryByText('합산')).not.toBeInTheDocument();
+  const links = screen.getAllByRole('link').filter(link => /\/matches\//.test(link.getAttribute('href') ?? ''));
+  expect(links).toHaveLength(1);
+  expect(links[0]).toHaveAttribute('href', expect.stringContaining('/matches/standalone-second'));
+});

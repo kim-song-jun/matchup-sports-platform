@@ -216,7 +216,7 @@ describe('leagueMobileNode', () => {
 
 describe('buildBracketMobileRounds', () => {
   const knockoutGroups = [
-    // 3·4위전의 sortOrder 가 결승보다 앞서도 결승 탭 안에서는 결승이 먼저여야 한다.
+    // 3·4위전의 sortOrder 가 결승 탭 안에서도 3·4위전을 먼저 표시한다.
     makeGroup({ id: 'g-3', phase: 'third_place', name: '3위 결정전', sortOrder: 3 }),
     makeGroup({ id: 'g-f', phase: 'final', name: '결승', sortOrder: 4 }),
     makeGroup({ id: 'g-q', phase: 'quarter', name: '8강', sortOrder: 1 }),
@@ -230,10 +230,10 @@ describe('buildBracketMobileRounds', () => {
     makeFixture({ id: 'f-8', groupId: 'g-3', fixtureNumber: 8 }),
   ];
 
-  it('탭은 단계 순서이고 3·4위전은 결승 탭 안의 두 번째 섹션이다', () => {
+  it('탭은 단계 순서이고 3·4위전은 결승 탭 안의 첫 번째 섹션이다', () => {
     const rounds = buildBracketMobileRounds({ groups: knockoutGroups, fixtures: knockoutFixtures, slots: [] });
     expect(rounds.map((r) => r.label)).toEqual(['8강', '4강', '결승']);
-    expect(rounds[2].sections.map((s) => s.heading)).toEqual(['결승', '3위 결정전']);
+    expect(rounds[2].sections.map((s) => s.heading)).toEqual(['3위 결정전', '결승']);
     // 대조군: 8강 안에서 경기 번호 순
     expect(rounds[0].sections[0].nodes.map((n) => n.fixtureId)).toEqual(['f-1', 'f-2']);
     expect(rounds[0].sections[0].nodes[0].title).toBe('8강 · 1번 경기');

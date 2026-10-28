@@ -5,7 +5,7 @@ import { Card, ErrorState, InfoRow } from '@/components/v1-ui/primitives';
 import { useV1TeamMatch } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import type { V1TeamMatch } from '@/types/api';
-import { TeamMatchOperateConsole } from '@/components/tournament-live/operate/operate-console';
+import { TeamMatchOperateConsole } from './team-match-operate-console';
 
 export function TeamMatchOperateEntry({ teamMatchId }: { teamMatchId: string }) {
   const query = useV1TeamMatch(teamMatchId, {

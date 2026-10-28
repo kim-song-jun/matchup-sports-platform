@@ -1,4 +1,4 @@
-import { formatPhone } from '@/components/auth/signup-profile-validation';
+import { formatPhone } from '@/shared/lib';
 import type { GameLineupParticipant, GameParticipantIdentity } from '@/types/game-operations';
 
 /**

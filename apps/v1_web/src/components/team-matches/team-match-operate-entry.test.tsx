@@ -25,7 +25,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
     return teamMatchQuery.current;
   },
 }));
-vi.mock('@/components/tournament-live/operate/operate-console', () => ({
+vi.mock('@/components/team-matches/team-match-operate-console', () => ({
   TeamMatchOperateConsole: (props: unknown) => operateConsole.render(props),
 }));
 

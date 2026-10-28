@@ -2,7 +2,9 @@ import { act, cleanup, render as renderElement, screen, within, fireEvent, waitF
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { COMMAND_RESPONSE_TIMEOUT_MS, OperateConsole, TeamMatchOperateConsole } from './operate-console';
+import { COMMAND_RESPONSE_TIMEOUT_MS } from './operate-console-core';
+import { OperateConsole } from '@/components/tournament-live/operate/operate-console';
+import { TeamMatchOperateConsole } from '@/components/team-matches/team-match-operate-console';
 import type { FixtureLineupResponse, GameDetail, GameEventRecord, GameLineup, GameLineupState } from '@/types/game-operations';
 import { V1_NETWORK_ERROR_CODE, V1ApiError } from '@/lib/api-client';
 import * as overlayHistory from '@/lib/overlay-history';
@@ -1083,16 +1085,20 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
     );
   });
 
-  it('clears a pending command when tournament fixture identity changes during its request', async () => {
+  it('an older fixture response cannot clear a newer fixture command pending state', async () => {
     gameWithPeriods('LIVE', [
       { number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null },
       { number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null },
     ]);
-    let resolveCommand!: (result: { gameId: string; state: string; version: number }) => void;
-    const commandResponse = new Promise<{ gameId: string; state: string; version: number }>((resolve) => {
-      resolveCommand = resolve;
+    let resolveOldCommand!: (result: { gameId: string; state: string; version: number }) => void;
+    let resolveNewCommand!: (result: { gameId: string; state: string; version: number }) => void;
+    const oldCommandResponse = new Promise<{ gameId: string; state: string; version: number }>((resolve) => {
+      resolveOldCommand = resolve;
     });
-    mocks.postV1GameCommand.mockReturnValue(commandResponse);
+    const newCommandResponse = new Promise<{ gameId: string; state: string; version: number }>((resolve) => {
+      resolveNewCommand = resolve;
+    });
+    mocks.postV1GameCommand.mockReturnValueOnce(oldCommandResponse).mockReturnValueOnce(newCommandResponse);
 
     const view = render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
     fireEvent.click(screen.getByRole('button', { name: '전반 종료' }));
@@ -1100,11 +1106,22 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
     await waitFor(() => expect(mocks.postV1GameCommand).toHaveBeenCalledTimes(1));
 
     view.rerender(<OperateConsole tournamentId="t-1" fixtureId="f-2" />);
+    fireEvent.click(screen.getByRole('button', { name: '전반 종료' }));
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '전반 종료' }));
+    await waitFor(() => expect(mocks.postV1GameCommand).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole('button', { name: '전반 종료' })).toHaveAttribute('aria-busy', 'true');
 
-    expect(screen.getByRole('button', { name: '전반 종료' })).toBeEnabled();
     await act(async () => {
-      resolveCommand({ gameId: 'game-1', state: 'LIVE', version: 3 });
-      await commandResponse;
+      resolveOldCommand({ gameId: 'game-1', state: 'LIVE', version: 3 });
+      await oldCommandResponse;
+    });
+
+    expect(screen.getByRole('button', { name: '전반 종료' })).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByRole('button', { name: '전반 종료' })).toBeDisabled();
+
+    await act(async () => {
+      resolveNewCommand({ gameId: 'game-1', state: 'LIVE', version: 3 });
+      await newCommandResponse;
     });
     expect(screen.getByRole('button', { name: '전반 종료' })).toBeEnabled();
   });
@@ -2046,6 +2063,68 @@ describe('OperateConsole — 라인업 게이트 (UX 감사 item 2)', () => {
     expect(() => rerender(<OperateConsole tournamentId="t-1" fixtureId="f-1" />)).not.toThrow();
     expect(screen.getByRole('button', { name: '경기 시작' })).toBeDisabled();
     expect(screen.getByText('강남 풋살 클럽 팀 출전 선수가 없어요. 경기 명단을 확인해 주세요.')).toBeInTheDocument();
+  });
+
+  it('같은 fixture에서 lease 만료 중 command 응답이 끝나도 pending을 풀어 재획득 후 시작을 허용한다', async () => {
+    setup([], 'TOURNAMENT_FIXTURE');
+    const initialGameQuery = mocks.useV1Game() as {
+      data: GameDetail;
+      isLoading: false;
+      isError: false;
+      error: null;
+      status: 'success';
+      refetch: ReturnType<typeof vi.fn>;
+    };
+    let gameState: GameDetail['state'] = 'SCHEDULED';
+    mocks.useV1Game.mockImplementation(() => ({
+      ...initialGameQuery,
+      data: {
+        ...initialGameQuery.data,
+        state: gameState,
+        periods: initialGameQuery.data.periods.map((period) => ({
+          ...period,
+          state: gameState === 'LIVE' ? 'LIVE' : 'SCHEDULED',
+          startedAt: gameState === 'LIVE' ? '2026-10-28T00:00:00.000Z' : null,
+        })),
+      },
+    }));
+    let operationsState = consoleState({ gameSnapshot: { version: 1, state: 'SCHEDULED' } });
+    mocks.useV1GameOperationsConsole.mockImplementation(() => operationsState);
+    let resolveCommand!: (value: { gameId: string; state: string; version: number }) => void;
+    const pendingCommand = new Promise<{ gameId: string; state: string; version: number }>((resolve) => {
+      resolveCommand = resolve;
+    });
+    mocks.postV1GameCommand.mockReturnValueOnce(pendingCommand);
+
+    const view = render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '경기 시작' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: '경기 시작' }));
+    await waitFor(() => expect(mocks.postV1GameCommand).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole('button', { name: '경기 시작' })).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByRole('button', { name: '경기 시작' })).toBeDisabled();
+
+    operationsState = consoleState({
+      canOperate: false,
+      takeover: { status: 'expired', token: null, expiresAtMs: null, assignmentVersion: 0 },
+      gameSnapshot: { version: 1, state: 'SCHEDULED' },
+    });
+    view.rerender(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    await act(async () => {
+      resolveCommand({ gameId: 'game-1', state: 'LIVE', version: 2 });
+      await pendingCommand;
+    });
+
+    gameState = 'LIVE';
+    operationsState = consoleState({
+      takeover: { status: 'held', token: 'tok-renewed', expiresAtMs: Date.now() + 60000, assignmentVersion: 1 },
+      gameSnapshot: { version: 2, state: 'LIVE' },
+    });
+    view.rerender(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    const pauseButton = screen.getByRole('button', { name: '일시 중지' });
+    expect(pauseButton).toBeEnabled();
+    expect(pauseButton).not.toHaveAttribute('aria-busy', 'true');
   });
 });
 

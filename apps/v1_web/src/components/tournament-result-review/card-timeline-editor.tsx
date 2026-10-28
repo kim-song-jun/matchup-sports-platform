@@ -2,7 +2,7 @@
 
 import { useId } from 'react';
 import type { EditableCardEvent } from '@/lib/result-card-events';
-import { isSinglePeriod, periodLabel } from '@/components/tournament-live/operate/period-label';
+import { isSinglePeriod, periodLabel } from '@/shared/game-operations';
 
 type Props = {
   events: readonly EditableCardEvent[];

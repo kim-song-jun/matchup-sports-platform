@@ -1,4 +1,4 @@
-import { participantIdentityName } from '@/components/tournament-live/operate/participant-identity';
+import { participantIdentityName } from '@/shared/game-operations';
 
 /** 경기 화면과 참가 명단에서 같은 표시 이름과 순서를 사용한다. 실명은 관리용 보조 정보다. */
 export function rosterDisplayName(player: { displayName?: string; nickname: string | null }): string {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { teammatesForSide } from './operate-console';
+import { teammatesForSide } from './operate-console-core';
 import type { GameLineup, GameLineupParticipant } from '@/types/game-operations';
 
 // ─────────────────────────────────────────────────────────────────────────────

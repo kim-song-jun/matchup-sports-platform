@@ -8,7 +8,10 @@ import type { V1TeamMatch } from '@/types/api';
 import { TeamMatchOperateConsole } from '@/components/tournament-live/operate/operate-console';
 
 export function TeamMatchOperateEntry({ teamMatchId }: { teamMatchId: string }) {
-  const query = useV1TeamMatch(teamMatchId);
+  const query = useV1TeamMatch(teamMatchId, {
+    refetchInterval: 15_000,
+    refetchOnWindowFocus: 'always',
+  });
   const detailHref = `/team-matches/${encodeURIComponent(teamMatchId)}`;
 
   if (query.isLoading || query.isPlaceholderData) {

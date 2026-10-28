@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { COMMAND_RESPONSE_TIMEOUT_MS, OperateConsole, TeamMatchOperateConsole } from './operate-console';
-import type { FixtureLineupResponse, GameDetail, GameEventRecord, GameLineupState } from '@/types/game-operations';
+import type { FixtureLineupResponse, GameDetail, GameEventRecord, GameLineup, GameLineupState } from '@/types/game-operations';
 import { V1_NETWORK_ERROR_CODE, V1ApiError } from '@/lib/api-client';
 
 const queryClients: QueryClient[] = [];
@@ -437,7 +437,7 @@ describe('TeamMatchOperateConsole — source binding and ordinary host actions',
     };
   }
 
-  function mountOrdinaryConsole(detail = ordinaryGameDetail()) {
+  function mountOrdinaryConsole(detail = ordinaryGameDetail(), lineups: GameLineup[] = []) {
     mocks.useV1Game.mockReturnValue({
       data: detail,
       isLoading: false,
@@ -447,7 +447,7 @@ describe('TeamMatchOperateConsole — source binding and ordinary host actions',
       refetch: vi.fn(),
     });
     mocks.useV1GameOperationsLineup.mockReturnValue({
-      data: [],
+      data: lineups,
       isLoading: false,
       isError: false,
       error: null,
@@ -457,7 +457,7 @@ describe('TeamMatchOperateConsole — source binding and ordinary host actions',
       canOperate: true,
       takeover: { status: 'none' },
       liveEvents: [],
-      gameSnapshot: { version: 2, state: 'LIVE' },
+      gameSnapshot: { version: detail.version, state: detail.state },
     }));
     return render(<TeamMatchOperateConsole gameId="game-1" teamMatchContext={teamMatchContext} resultHref="/team-matches/team-match-1/result" />);
   }
@@ -537,6 +537,84 @@ describe('TeamMatchOperateConsole — source binding and ordinary host actions',
     const [, command, body] = mocks.postV1GameCommand.mock.calls[0];
     expect(command).toBe('end-period');
     expect(body).not.toHaveProperty('takeoverToken');
+  });
+
+  it('does not dispatch a confirmed ordinary command after the console unmounts during overlay dismissal', async () => {
+    const view = mountOrdinaryConsole();
+
+    fireEvent.click(screen.getByRole('button', { name: '일시 중지' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: '일시 중지' }));
+    view.unmount();
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(mocks.postV1GameCommand).not.toHaveBeenCalled();
+  });
+
+  it('starts with the host-side lineup returned by the ordinary operations endpoint without claiming the hidden opponent is missing', () => {
+    const hostLineup: GameLineup = {
+      id: 'host-lineup',
+      gameId: 'game-1',
+      sideId: 'side-home',
+      revision: 1,
+      state: 'DRAFT',
+      version: 1,
+      submittedAt: null,
+      supersedesId: null,
+      formation: null,
+      createdAt: '',
+      updatedAt: '',
+      invalidatedAt: null,
+      participants: [{
+        id: 'host-player',
+        gameId: 'game-1',
+        sideId: 'side-home',
+        lineupId: 'host-lineup',
+        userId: null,
+        displayNameSnapshot: '호스트 선수',
+        jerseyNumber: 7,
+        position: null,
+        positionX: null,
+        positionY: null,
+        started: true,
+        arrivedAt: null,
+        createdAt: '',
+        updatedAt: '',
+      }],
+    };
+    const scheduledGame = ordinaryGameDetail({
+      state: 'SCHEDULED',
+      version: 1,
+      periods: [
+        { id: 'period-1', gameId: 'game-1', number: 1, state: 'SCHEDULED', startedAt: null, endedAt: null, pausedTotalMs: 0, pausedAt: null },
+        { id: 'period-2', gameId: 'game-1', number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null, pausedTotalMs: 0, pausedAt: null },
+      ],
+    });
+    mountOrdinaryConsole(scheduledGame, [hostLineup]);
+
+    expect(screen.getByRole('button', { name: '경기 시작' })).toBeEnabled();
+    expect(screen.queryByText(/원정팀.*출전 선수가 없어요/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/원정팀.*아직 출전 명단을 제출하지 않았어요/)).not.toBeInTheDocument();
+  });
+
+  it('routes the ordinary host to result submission when its final period ends', () => {
+    const finishedPeriods = ordinaryGameDetail({
+      periods: [
+        { id: 'period-1', gameId: 'game-1', number: 1, state: 'ENDED', startedAt: '2026-10-28T02:00:00.000Z', endedAt: '2026-10-28T02:20:00.000Z', pausedTotalMs: 0, pausedAt: null },
+        { id: 'period-2', gameId: 'game-1', number: 2, state: 'ENDED', startedAt: '2026-10-28T02:20:00.000Z', endedAt: '2026-10-28T02:40:00.000Z', pausedTotalMs: 0, pausedAt: null },
+      ],
+    });
+    mountOrdinaryConsole(finishedPeriods);
+
+    expect(screen.getByText(/정규 시간이 끝났어요/)).toBeInTheDocument();
+    expect(screen.queryByText(/‘경기 종료’를 눌러주세요/)).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '결과 제출 화면 열기' })).toHaveAttribute(
+      'href',
+      '/team-matches/team-match-1/result',
+    );
   });
 });
 

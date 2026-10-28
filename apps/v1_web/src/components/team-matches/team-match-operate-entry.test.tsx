@@ -12,11 +12,18 @@ const teamMatchQuery = vi.hoisted(() => ({
     error: undefined as unknown,
     refetch: vi.fn(),
   },
+  calls: [] as Array<{
+    teamMatchId: string;
+    options: { refetchInterval: number; refetchOnWindowFocus: 'always' };
+  }>,
 }));
 const operateConsole = vi.hoisted(() => ({ render: vi.fn() }));
 
 vi.mock('@/hooks/use-v1-api', () => ({
-  useV1TeamMatch: () => teamMatchQuery.current,
+  useV1TeamMatch: (teamMatchId: string, options: { refetchInterval: number; refetchOnWindowFocus: 'always' }) => {
+    teamMatchQuery.calls.push({ teamMatchId, options });
+    return teamMatchQuery.current;
+  },
 }));
 vi.mock('@/components/tournament-live/operate/operate-console', () => ({
   TeamMatchOperateConsole: (props: unknown) => operateConsole.render(props),
@@ -67,6 +74,7 @@ function recruitingMatch(overrides: Partial<V1TeamMatch> = {}): V1TeamMatch {
 describe('TeamMatchOperateEntry recruiting preview', () => {
   beforeEach(() => {
     operateConsole.render.mockClear();
+    teamMatchQuery.calls = [];
     teamMatchQuery.current = {
       data: recruitingMatch(),
       isLoading: false,
@@ -155,5 +163,37 @@ describe('TeamMatchOperateEntry recruiting preview', () => {
     );
     expect(screen.getByRole('alert')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '다시 시도하기' })).toBeInTheDocument();
+  });
+
+  it('polls and refetches on window focus so live match state and host access stay current', () => {
+    renderEntry();
+
+    expect(teamMatchQuery.calls.at(-1)).toEqual({
+      teamMatchId: 'team-match-1',
+      options: { refetchInterval: 15_000, refetchOnWindowFocus: 'always' },
+    });
+  });
+
+  it('reflects a refreshed completion or changed host permission instead of keeping the old live entry', () => {
+    const { rerender } = renderEntry();
+    teamMatchQuery.current = {
+      data: recruitingMatch({ status: 'completed' }),
+      isLoading: false,
+      isError: false,
+      error: undefined,
+      refetch: vi.fn(),
+    };
+
+    rerender(
+      <QueryClientProvider client={new QueryClient()}>
+        <TeamMatchOperateEntry teamMatchId="team-match-1" />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByRole('link', { name: '경기 결과 보기' })).toHaveAttribute(
+      'href',
+      '/team-matches/team-match-1/result',
+    );
+    expect(operateConsole.render).not.toHaveBeenCalled();
   });
 });

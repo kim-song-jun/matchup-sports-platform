@@ -114,3 +114,6 @@ API 담당 소유: GameCommand/GameEvent DTO와 spec, realtime gateway의 관련
 - 2026-10-28 독립 API R1: C0/W3으로 QA 게이트를 보류했어요. REST/Socket 공백 토큰 차이, 테스트간 LIVE 상태 의존, 새 retry 쓰기와 실제 assist 해제 효과 누락을 수정해요. 새 공백 DTO 실제 RED5/PASS6은 관찰했고 GREEN/독립 재검토는 대기예요.
 
 - 2026-10-28 root frontend checkpoint: Web전체타입오류0·관련8파일161/161·패턴통과를관찰했어요. takeover/게임전환snapshot/authversion/reconnect와기존콘솔122회귀를포함해직렬1worker로확인했어요. 기존동기식콘솔테스트의act경고와id없는과거payload대조군의key경고는로그에남았고경고0이라고주장하지않아요. API Sol R2 C0/W0정적PASS이며gateway/PG실행·원격head CI와frontend독립리뷰·Alpha사후QA는아직대기예요.
+
+- 2026-10-28 UI R1 재수정: 이전 화면·Game/user/source/실제권한 문맥의 확인 후 명령을 차단하고, 같은 경기에서 정상적으로 갱신된 현재 lease token을 쓰는 기존 동작은 유지해요. 공통 guard가 가렸던 기존 만료 원인 안내2건은 실제166PASS/2FAIL을 보고 수정했어요. 일반 시작에는 대회 전용 명단 필수 요건을 복사하지 않고 서버의 기존 일반 start 경로를 따라요. 마지막 period 안내는 결과 제출로 연결하고, 실제 TeamMatch를15초/포커스에 재조회해요.
+- 2026-10-28 root 최종 R1 검증: Web 타입0·관련9파일168/168·패턴PASS를실제로관찰했어요. 실제 TanStack/MSW focus 대조군과entry미재조회RED→GREEN을확인했어요. 초기C1/C2/종료안내RED원본은미보존이라소급주장하지않아요. root가잘못제시했던같은entity정상lease재획득거부기대는범위밖으로격리하고기존명세를보존했어요. act/key경고는남았고0이라고표시하지않아요. frontend독립R2·현재headCI·Alpha사후QA/갤러리는여전히대기예요.

@@ -515,17 +515,110 @@ function OperateConsoleCore({
   const gameVersionRef = useRef(gameVersion);
   const commandScopeGenerationRef = useRef(0);
   const commandAttemptRef = useRef(0);
+  const commandMountedRef = useRef(false);
+  const commandCanOperateRef = useRef(canOperate);
+  const realtimeAuthorization = gameDetail.data?.realtimeAuthorization;
+  const realtimeAuthorizationSubjectVersion = realtimeAuthorization && realtimeAuthorization.kind !== 'unavailable'
+    ? realtimeAuthorization.subjectVersion
+    : null;
+  const commandIdentityKey = JSON.stringify([
+    gameId,
+    myUserId ?? null,
+    operationMode,
+    tournamentId,
+    fixtureId,
+    tournamentOpsRole,
+    gameDetail.data?.id ?? null,
+    gameDetail.data?.sourceType ?? null,
+    gameDetail.data?.actorRole ?? null,
+    teamMatchContext?.teamMatchId ?? null,
+    teamMatchContext?.gameId ?? null,
+    teamMatchContext?.status ?? null,
+    teamMatchContext?.isStandalone ?? null,
+    teamMatchContext?.viewerCanManageHost ?? null,
+  ]);
+  const commandScopeKey = JSON.stringify([
+    gameId,
+    myUserId ?? null,
+    operationMode,
+    gameDetail.data?.id ?? null,
+    gameDetail.data?.sourceType ?? null,
+    gameDetail.data?.actorRole ?? null,
+    gameDetail.data?.realtimeAuthorization?.kind ?? null,
+    realtimeAuthorizationSubjectVersion,
+    teamMatchContext?.teamMatchId ?? null,
+    teamMatchContext?.gameId ?? null,
+    teamMatchContext?.status ?? null,
+    teamMatchContext?.isStandalone ?? null,
+    teamMatchContext?.viewerCanManageHost ?? null,
+  ]);
+  const commandScopeKeyRef = useRef(commandScopeKey);
+  const commandIdentityKeyRef = useRef(commandIdentityKey);
   useEffect(() => {
     gameVersionRef.current = gameVersion;
   }, [gameVersion]);
 
   useLayoutEffect(() => {
-    commandScopeGenerationRef.current += 1;
-    commandAttemptRef.current += 1;
-    setPendingCommandRetry(null);
-    setCommandError(null);
-    setCommandPending(false);
-  }, [gameId, myUserId]);
+    commandMountedRef.current = true;
+    return () => {
+      commandMountedRef.current = false;
+      commandScopeGenerationRef.current += 1;
+      commandAttemptRef.current += 1;
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    const scopeChanged = commandScopeKeyRef.current !== commandScopeKey;
+    commandIdentityKeyRef.current = commandIdentityKey;
+    if (scopeChanged) {
+      commandScopeKeyRef.current = commandScopeKey;
+      commandScopeGenerationRef.current += 1;
+      commandAttemptRef.current += 1;
+      setPendingCommandRetry(null);
+      setCommandError(null);
+      setCommandPending(false);
+    }
+    commandCanOperateRef.current = canOperate;
+  }, [commandIdentityKey, commandScopeKey, canOperate]);
+
+  const captureCommandScope = useCallback(() => ({
+    generation: commandScopeGenerationRef.current,
+    key: commandScopeKeyRef.current,
+    identityKey: commandIdentityKeyRef.current,
+    gameId,
+  }), [gameId]);
+  const isCommandScopeCurrent = useCallback((scope: ReturnType<typeof captureCommandScope>) =>
+    commandMountedRef.current &&
+    commandScopeGenerationRef.current === scope.generation &&
+    commandScopeKeyRef.current === scope.key &&
+    commandIdentityKeyRef.current === scope.identityKey &&
+    scope.gameId === gameId &&
+    commandCanOperateRef.current,
+  [gameId]);
+  const isCommandIdentityCurrent = useCallback((scope: ReturnType<typeof captureCommandScope>) =>
+    commandMountedRef.current &&
+    commandIdentityKeyRef.current === scope.identityKey &&
+    scope.gameId === gameId,
+  [gameId]);
+  const commandGateFailureMessage = useCallback((command: GameCommandName, label: string) => {
+    const gate = commandGateRef.current;
+    const leaseRequired = operationMode === 'tournament-leased';
+    if (operationMode === 'ordinary-host' && command === 'end') {
+      return '일반 팀매치에서는 콘솔에서 경기를 종료할 수 없어요. 결과 보내기에서 경기 기록을 제출해 주세요.';
+    }
+    if (!gate.pathOpen) {
+      if (leaseRequired && !gate.connected && gate.token === null) {
+        return `연결이 끊긴 사이 운영 권한이 만료돼 ‘${label}’ 요청을 보내지 않았어요. 다시 연결되면 권한을 새로 받아요.`;
+      }
+      return `실시간 연결이 끊겨 있어 ‘${label}’ 요청을 보내지 않았어요. 연결되면 다시 눌러 주세요.`;
+    }
+    if (leaseRequired && gate.token === null) {
+      return gate.connected
+        ? `운영 권한을 다시 확인하는 중이라 ‘${label}’ 요청을 보내지 않았어요. 권한을 받으면 다시 눌러 주세요.`
+        : `연결이 끊긴 사이 운영 권한이 만료돼 ‘${label}’ 요청을 보내지 않았어요. 다시 연결되면 권한을 새로 받아요.`;
+    }
+    return `운영 권한이 바뀌었어요. ‘${label}’ 요청을 다시 확인해 주세요.`;
+  }, [operationMode]);
 
   // T1-0: a period only counts as "current" once the server has marked it
   // LIVE (via executeCommand's start/start-period). Falling back to "the
@@ -1191,28 +1284,26 @@ function OperateConsoleCore({
       command: GameCommandName,
       payload: Record<string, unknown> = {},
       replayBody?: GameCommandRequest,
+      confirmedScope?: ReturnType<typeof captureCommandScope>,
     ): Promise<boolean> => {
+      const scope = confirmedScope ?? captureCommandScope();
       if (!gameId) return false;
-      if (pendingCommandRetry !== null && replayBody === undefined) return false;
       // 라벨은 실행 "전" currentPeriod/halftimePeriod 기준으로 미리 굳혀둔다 —
       // end-period/start-period 명령이 성공하면 refetch 후 currentPeriod·
       // halftimePeriod가 곧장 바뀌어서(하프타임 진입/탈출), 완료 후에 다시
       // 계산하면 "방금 무엇을 끝냈는지"가 아니라 "다음에 뭘 할 수 있는지"로
       // 라벨이 뒤바뀐다.
       const label = commandLabel(command, currentPeriod?.number ?? null, halftimePeriod?.number ?? null, periodCount);
+      if (!isCommandScopeCurrent(scope)) {
+        if (isCommandIdentityCurrent(scope)) setCommandError(commandGateFailureMessage(command, label));
+        return false;
+      }
+      if (pendingCommandRetry !== null && replayBody === undefined) return false;
       const gate = commandGateRef.current;
       const leaseRequired = operationMode === 'tournament-leased';
       if (!gate.pathOpen || (leaseRequired && gate.token === null) || (operationMode === 'ordinary-host' && command === 'end')) {
         // 확인까지 누른 명령이 조용히 끝나면 운영자는 나간 줄 안다(G6-V6) — 보내지 않았다고 남긴다.
-        setCommandError(
-          operationMode === 'ordinary-host' && command === 'end'
-            ? '일반 팀매치에서는 콘솔에서 경기를 종료할 수 없어요. 결과 보내기에서 경기 기록을 제출해 주세요.'
-            : !gate.pathOpen
-            ? `실시간 연결이 끊겨 있어 ‘${label}’ 요청을 보내지 않았어요. 연결되면 다시 눌러 주세요.`
-            : gate.connected
-              ? `운영 권한을 다시 확인하는 중이라 ‘${label}’ 요청을 보내지 않았어요. 권한을 받으면 다시 눌러 주세요.`
-              : `연결이 끊긴 사이 운영 권한이 만료돼 ‘${label}’ 요청을 보내지 않았어요. 다시 연결되면 권한을 새로 받아요.`,
-        );
+        setCommandError(commandGateFailureMessage(command, label));
         return false;
       }
       setCommandPending(true);
@@ -1224,13 +1315,16 @@ function OperateConsoleCore({
         occurredAt: new Date(Date.now() + ops.clockOffsetMs).toISOString(),
         payload,
       };
-      const attemptGeneration = commandScopeGenerationRef.current;
+      const attemptGeneration = scope.generation;
       const attemptId = ++commandAttemptRef.current;
       const ownsAttempt = () =>
-        commandScopeGenerationRef.current === attemptGeneration && commandAttemptRef.current === attemptId;
+        isCommandScopeCurrent(scope) &&
+        commandScopeGenerationRef.current === attemptGeneration &&
+        commandAttemptRef.current === attemptId;
       // fetch 에는 제한 시간이 없어 망이 먹통이면 요청이 끝없이 걸린다. 끊어서 "응답을 못 받음"으로
       // 드러내면 아래 재시도가 같은 clientCommandId 로 다시 보내고, 이미 처리됐다면 서버가 재생한다.
       const send = async (body: GameCommandRequest) => {
+        if (!ownsAttempt()) return null;
         const abort = new AbortController();
         const abortTimer = setTimeout(() => abort.abort(), COMMAND_RESPONSE_TIMEOUT_MS);
         try {
@@ -1240,10 +1334,11 @@ function OperateConsoleCore({
         }
       };
       try {
-        let result: Awaited<ReturnType<typeof postV1GameCommand>>;
+        let result: Awaited<ReturnType<typeof postV1GameCommand>> | null;
         try {
           try {
             result = await send(commandBody);
+            if (result === null) return false;
           } catch (error) {
             // 서버 멱등 해시는 토큰·occurredAt 까지 본문 전체라, 재시도는 처음 본문 그대로여야 저장된 결과가
             // 재생된다. 이 두 거절은 멱등 조회를 지난 뒤에만 나오므로 첫 요청이 저장되지 않았다는 뜻이고,
@@ -1268,6 +1363,7 @@ function OperateConsoleCore({
               occurredAt: new Date(Date.now() + ops.clockOffsetMs).toISOString(),
             };
             result = await send(commandBody);
+            if (result === null) return false;
           }
         } catch (error) {
           if (ownsAttempt()) {
@@ -1345,7 +1441,7 @@ function OperateConsoleCore({
         if (ownsAttempt()) setCommandPending(false);
       }
     },
-    [gameId, myUserId, ops, gameDetail, currentPeriod, halftimePeriod, hasNextPeriod, periodCount, pendingCommandRetry, showToast, operationMode],
+    [gameId, myUserId, ops, gameDetail, currentPeriod, halftimePeriod, hasNextPeriod, periodCount, pendingCommandRetry, showToast, operationMode, captureCommandScope, isCommandScopeCurrent, isCommandIdentityCurrent, commandGateFailureMessage],
   );
 
   // start/pause/resume/end-period/start-period/end 버튼이 실제로 부르는 진입점 —
@@ -1356,6 +1452,7 @@ function OperateConsoleCore({
   const confirmAndRunCommand = useCallback(
     async (command: Exclude<GameCommandName, 'revert-period'>) => {
       if (commandBlocked) return;
+      const confirmedScope = captureCommandScope();
       const label = commandLabel(command, currentPeriod?.number ?? null, halftimePeriod?.number ?? null, periodCount);
       const copy = commandConfirmCopy(command, label, {
         sides: gameDetail.data?.sides ?? [],
@@ -1368,9 +1465,9 @@ function OperateConsoleCore({
         substitutionTracked,
       });
       if (!(await confirm(copy))) return;
-      await handleRunCommand(command);
+      await handleRunCommand(command, {}, undefined, confirmedScope);
     },
-    [commandBlocked, confirm, currentPeriod, halftimePeriod, hasNextPeriod, periodCount, gameDetail.data?.sides, scoreBySideId, knockoutTied, substitutionTracked, handleRunCommand],
+    [commandBlocked, confirm, currentPeriod, halftimePeriod, hasNextPeriod, periodCount, gameDetail.data?.sides, scoreBySideId, knockoutTied, substitutionTracked, handleRunCommand, captureCommandScope, isCommandScopeCurrent],
   );
 
   // 과제 2 — 승부차기 시작. 아직 서버에 아무것도 보내지 않는다(패널을 여는
@@ -1511,7 +1608,7 @@ function OperateConsoleCore({
   const awayTeamId = sides.find((side) => side.sideKey === 'AWAY')?.teamId;
   const startBlockedByTeams = !homeTeamId || !awayTeamId || homeTeamId === awayTeamId;
   const lineups = lineupsQuery.data ?? [];
-  const sidesWithoutCurrentPlayers = gameDetail.data?.sourceType === 'TEAM_MATCH'
+  const sidesWithoutCurrentPlayers = operationMode === 'tournament-leased' && gameDetail.data?.sourceType === 'TEAM_MATCH'
     ? sides.filter((side) => {
         const lineup = latestLineupForDisplay(lineups, side.id);
         return lineup === null || lineup.participants.length === 0;
@@ -1902,11 +1999,8 @@ function OperateConsoleCore({
                 : '연결이 끊긴 사이 운영 권한이 만료돼 진행 명령을 보낼 수 없어요. 다시 연결되면 권한을 새로 받아요.'}
           </Banner>
         )}
-        {/* [P1-d] 예전에는 "버튼이 비활성인 이유 + 제출하러 가는 링크"였다. 지금은 둘 다
-            아니다 — P1-c 로 미제출이어도 시작할 수 있고(버튼 활성), P1-d 로 경기별 라인업
-            화면이 사라져 갈 곳도 없다. 남긴 이유는 **운영자가 상황을 알아야** 하기
-            때문이다: 명단이 왜 비어 보이는지, 어느 팀이 아직 안 냈는지. 차단이 아니라
-            경고다. */}
+        {/* 대회 운영에서는 미제출이어도 시작할 수 있어 각 팀의 명단 상황을 경고로 안내한다.
+            일반 팀매치는 호스트 명단만 응답될 수 있으므로 상대 명단을 누락으로 단정하지 않는다. */}
         {/* 레거시 TOURNAMENT_FIXTURE 는 제외한다 — 거기엔 라인업 제출 단계가 없어
             자동 생성된 초안이 영영 SUBMITTED 가 되지 않는다. 명단 검인에 선수가 다 차 있는데
             "아직 제출하지 않았어요" 가 뜨던 자리다(alpha 실측). */}
@@ -1918,7 +2012,8 @@ function OperateConsoleCore({
             {sidesWithoutCurrentPlayers.map((side) => side.displayNameSnapshot).join(', ')} 팀 출전 선수가 없어요. 경기 명단을 확인해 주세요.
           </Banner>
         )}
-        {gameDetail.data?.sourceType === 'TEAM_MATCH' &&
+        {operationMode === 'tournament-leased' &&
+          gameDetail.data?.sourceType === 'TEAM_MATCH' &&
           !startBlockedByTeams &&
           !startBlockedByLineup &&
           gameState === 'SCHEDULED' &&
@@ -1948,7 +2043,21 @@ function OperateConsoleCore({
           <Banner tone="info">
             {penaltyShootoutEligible
               ? '정규 시간이 무승부로 끝났어요. ‘승부차기 시작’으로 결과를 입력해주세요.'
-              : '정규 시간이 끝났어요. 기록을 확인한 뒤 ‘경기 종료’를 눌러주세요.'}
+              : operationMode === 'ordinary-host'
+                ? (
+                  <>
+                    정규 시간이 끝났어요. 기록을 확인한 뒤 결과 제출 화면에서 경기 기록을 보내 주세요.
+                    {resultHref ? (
+                      <Link
+                        href={resultHref}
+                        className="mt-2 inline-flex min-h-[44px] items-center font-semibold underline underline-offset-2"
+                      >
+                        결과 제출 화면 열기
+                      </Link>
+                    ) : null}
+                  </>
+                )
+                : '정규 시간이 끝났어요. 기록을 확인한 뒤 ‘경기 종료’를 눌러주세요.'}
           </Banner>
         )}
         {currentPeriod === null &&

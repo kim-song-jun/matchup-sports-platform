@@ -72,7 +72,7 @@ host/team owner-manager 권한과 운영 콘솔의 별도 권한을 보존한다
 ### 후속 목표와 계약
 - 일반 TeamMatch 상세에서 canonical Game 운영 경로로 이동해요. 모집 중에는 저장된 단판·전후반을 보기 전용으로 확인해요.
 - TeamMatch→Game source/id 관계, 실제 host owner/manager 권한, 직접 URL 접근과 명단의 side/state 개인정보 범위를 확인해요. 기존 Game GET/operations-lineup을 우선하며 새 API가 필요하다고 추정하지 않아요.
-- 명시적인 preview / ordinary host lease-free / tournament leased mode를 구분해요. preview는 자동 takeover·명령·이벤트·queue 전송이 모두 0이에요. 상대 확정 후 host 운영은 기존 서버가 허용한 lease 없는 명령·이벤트 경로를 써요.
+- 읽기 전용 preview 경계와 ordinary host lease-free / tournament leased 운영 모드를 구분해요. preview는 자동 takeover·명령·이벤트·queue 전송이 모두 0이에요. 상대 확정 후 host 운영은 기존 서버가 허용한 lease 없는 명령·이벤트 경로를 써요.
 - tournament/regular league staff lease·authorization version·snapshot·reconnect·queue 계약은 유지해요. 가짜 TournamentOpsRoleProvider 또는 권한 우회는 금지해요.
 - 일반 경기의 generic end는 서버가 금지하므로 노출하지 않고 현재 TeamMatch 결과 제출 경로를 연결해요. 결과 정책 정본은 ‘결과 보내기→어드민 확인’이며 이전 계획의 ‘상대 승인’ 표현은 새 정책으로 구현하지 않아요.
 
@@ -83,7 +83,7 @@ host/team owner-manager 권한과 운영 콘솔의 별도 권한을 보존한다
 
 ### 후속 검증·완료 기준
 - [x] A/B/C 비교·선택 완료, 기존 B 별도 규칙 결정 보존
-- [ ] 실제 hook RED→GREEN: preview 쓰기0, authorized ordinary lease-free command/event, unauthorized/preview negative, tournament lease 회귀
+- [ ] 실제 UI preview의 운영 hook 미마운트·쓰기0 및 hook RED→GREEN: authorized ordinary lease-free command/event, unauthorized/preview negative, tournament lease 회귀
 - [ ] 상세→route binding·권한·로딩/오류/미일치, period label/duration, ordinary end 숨김·실제 결과 경로, tournament 결과 흐름 보존
 - [ ] 영향 범위의 직렬 최소 worker 테스트·Web tsc·pattern·committed diff·node_modules 추적0
 - [ ] Sol 독립 리뷰·지적 재수정·현재 head 필수 CI/check-runs·실제 원격 리뷰 게이트
@@ -97,7 +97,7 @@ host/team owner-manager 권한과 운영 콘솔의 별도 권한을 보존한다
 - 2026-10-28 11:53 root: 중단1050 잠금을 복구했고, 제품 변경 없이 최신 dev로 FF했어요. #141 후속 owner=loop, 신규 PR은 아직 없어요. 구현·독립 리뷰·CI·Alpha QA는 대기예요.
 
 ### 2026-10-28 Wave A 고정 인터페이스
-`useV1GameOperationsConsole`의 옵션에 `operationMode?: 'preview' | 'ordinary-host' | 'tournament-leased'`, `teamMatchContext?: { teamMatchId: string; gameId: string | null; status: V1TeamMatchApiStatus; isStandalone: boolean; viewerCanManageHost: boolean }`, `gameSourceType: GameSourceType | null`, `gameActorRole: GameActorRole | null`을 추가하고 `canOperate`를 반환해요. 기존 Game detail id/status/realtimeAuthorization 옵션은 유지해요.
+`useV1GameOperationsConsole`의 옵션에 `operationMode?: 'ordinary-host' | 'tournament-leased'`, `teamMatchContext?: { teamMatchId: string; gameId: string | null; status: V1TeamMatchApiStatus; isStandalone: boolean; viewerCanManageHost: boolean }`, `gameSourceType: GameSourceType | null`, `gameActorRole: GameActorRole | null`을 추가하고 `canOperate`를 반환해요. 기존 Game detail id/status/realtimeAuthorization 옵션은 유지해요.
 
 일반 host gate는 성공한 실제 Game id·TEAM_MATCH source·team_owner/manager actorRole·unscoped/0 권한과, 실제 TeamMatch 응답의 gameId 일치·matched·nonleague·viewer.manageableHostTeam을 함께 검증해요. Game read actorRole만으로 host를 판정하지 않아요. Game 응답에는 sourceId가 없으므로 존재하지 않는 필드를 만들지 않아요. 모집 preview와 completed/cancelled/권한 변경은 쓰기 불가예요. 기존 tournament adapter는 leased 모드를 사용하고, 생략 시 기존 leased 동작을 보존해요. 실제 쓰기 권한은 각 서버 API가 다시 검증해요.
 
@@ -109,3 +109,8 @@ API 담당 소유: GameCommand/GameEvent DTO와 spec, realtime gateway의 관련
 사전 Alpha 증거: Sol 요청의 별도 검증자가 기존 모집 A/B의 단판2분/전후반1+1을 실제 승인 신원과3폭에서 대조했어요. 운영 진입은 배포 전 없고 실제 운영은 미검증이에요. TaskSpace27은 별도 finish와 부재 확인을 마쳤어요.
 
 - 2026-10-28 API checkpoint: DTO 실제 RED4/입력거부PASS5 뒤 GREEN9/9를 확인했어요. 최초 초안 선수정·자기 소유 baseline 복원과 harness0tests는 RED 근거에서 제외해요. root API 타입 검사에서 새 gateway 오류2건을 찾아 고쳤고 재검사에서 변경 경로 오류0, 기존 생성타입 관련172건은 남아 있어요. gateway assertions와 PostgreSQL HTTP/Socket 통합은 CI 확인 전이에요. 공유 Prisma 생성/타입 약화 없이 남은 검증을 명시해요.
+
+- 2026-10-28 최소화: 모집 preview는 저장 규칙을 읽는 독립 화면으로 운영 Core/hook을 마운트하지 않아요. 실제 소비자가 없던 hook 수준 preview 모드·queue분기·mock-only test는 삭제했어요. 운영 hook은 실제 ordinary-host/tournament-leased 두 모드만 남겨요. UI는 공유 Card/InfoRow/ErrorState를 재사용하고 미정의 tm-page-shell을 없앴어요.
+- 2026-10-28 독립 API R1: C0/W3으로 QA 게이트를 보류했어요. REST/Socket 공백 토큰 차이, 테스트간 LIVE 상태 의존, 새 retry 쓰기와 실제 assist 해제 효과 누락을 수정해요. 새 공백 DTO 실제 RED5/PASS6은 관찰했고 GREEN/독립 재검토는 대기예요.
+
+- 2026-10-28 root frontend checkpoint: Web전체타입오류0·관련8파일161/161·패턴통과를관찰했어요. takeover/게임전환snapshot/authversion/reconnect와기존콘솔122회귀를포함해직렬1worker로확인했어요. 기존동기식콘솔테스트의act경고와id없는과거payload대조군의key경고는로그에남았고경고0이라고주장하지않아요. API Sol R2 C0/W0정적PASS이며gateway/PG실행·원격head CI와frontend독립리뷰·Alpha사후QA는아직대기예요.

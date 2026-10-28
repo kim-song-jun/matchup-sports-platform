@@ -702,6 +702,15 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
     viewerOnApplicantSide: !canManageHostTeam && (canManageOpponentTeam || viewerState === 'approved'),
     applyTeamPicker,
     resultAction,
+    operateAction: !seeding &&
+      query.data.league === null &&
+      canManageHostTeam &&
+      (apiStatus === 'recruiting' || (apiStatus === 'matched' && Boolean(query.data.gameId)))
+      ? {
+          label: apiStatus === 'recruiting' ? '경기 규칙 미리보기' : '경기 운영하기',
+          href: `/team-matches/${encodeURIComponent(teamMatchId)}/operate`,
+        }
+      : undefined,
     reviewAction,
     ...(seeding ? { statusLabel: undefined, statusLabelKind: 'application' as const } : statusMeta({
       scheduleLabel,

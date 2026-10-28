@@ -2,8 +2,8 @@ import { act, cleanup, render as renderElement, screen, within, fireEvent, waitF
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { COMMAND_RESPONSE_TIMEOUT_MS, OperateConsole } from './operate-console';
-import type { FixtureLineupResponse, GameEventRecord, GameLineupState } from '@/types/game-operations';
+import { COMMAND_RESPONSE_TIMEOUT_MS, OperateConsole, TeamMatchOperateConsole } from './operate-console';
+import type { FixtureLineupResponse, GameDetail, GameEventRecord, GameLineupState } from '@/types/game-operations';
 import { V1_NETWORK_ERROR_CODE, V1ApiError } from '@/lib/api-client';
 
 const queryClients: QueryClient[] = [];
@@ -30,6 +30,7 @@ const mocks = vi.hoisted(() => ({
   useV1AuthMe: vi.fn(),
   useV1FixtureLineup: vi.fn(),
   useV1Game: vi.fn(),
+  useV1GameOperationsLineup: vi.fn(),
   useV1GameOperationsConsole: vi.fn(),
   postV1GameCommand: vi.fn(),
   // 종료된 경기의 확정 결과(승부차기 포함) 조회 — 기본값은 "아직 리비전 없음"이라
@@ -51,6 +52,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
 vi.mock('@/hooks/use-v1-game-operations', () => ({
   useV1FixtureLineup: () => mocks.useV1FixtureLineup(),
   useV1Game: () => mocks.useV1Game(),
+  useV1GameOperationsLineup: (...args: unknown[]) => mocks.useV1GameOperationsLineup(...args),
   postV1GameCommand: (...args: unknown[]) => mocks.postV1GameCommand(...args),
   // 명단 검인 토글 — 이 스위트는 검인 동작 자체를 검증하지 않지만(전용 스위트가 있다),
   // 콘솔이 매 렌더 호출하는 훅이라 모듈 목에 반드시 있어야 한다.
@@ -64,7 +66,7 @@ vi.mock('@/hooks/use-v1-game-roster', () => ({
   useV1TeamGameRoster: (...args: unknown[]) => mocks.useV1TeamGameRoster(...args),
 }));
 vi.mock('@/hooks/use-v1-game-operations-console', async (importOriginal) => ({
-  useV1GameOperationsConsole: () => mocks.useV1GameOperationsConsole(),
+  useV1GameOperationsConsole: (...args: unknown[]) => mocks.useV1GameOperationsConsole(...args),
   gameOperationsErrorMessage: (await importOriginal<typeof import('@/hooks/use-v1-game-operations-console')>()).gameOperationsErrorMessage,
   isRetryableGameOperationsErrorCode: () => true,
 }));
@@ -192,6 +194,7 @@ function goal(sequence: number): GameEventRecord {
 
 function consoleState(overrides: Record<string, unknown> = {}) {
   return {
+    canOperate: true,
     connectionStatus: 'connected',
     sync: { status: 'ok', lastSequence: 1 },
     takeover: { status: 'held', token: 'tok', expiresAtMs: Date.now() + 60000, assignmentVersion: 0 },
@@ -236,6 +239,13 @@ describe('OperateConsole — 기록된 이벤트 / 전송 상태 분리', () => 
       refetch: vi.fn(),
     });
     mocks.useV1GameOperationsConsole.mockReturnValue(consoleState());
+    mocks.useV1GameOperationsLineup.mockReturnValue({
+      data: [],
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
   });
 
   it('서버에 확정된 이벤트를 보여준다 — 로컬 큐가 비어 있어도', () => {
@@ -379,6 +389,154 @@ describe('OperateConsole — 기록된 이벤트 / 전송 상태 분리', () => 
     expect(screen.queryByText('전송 대기·실패')).toBeNull();
     // 확정 로그는 그대로다 — 큐를 숨긴 것이지 기록을 숨긴 게 아니다.
     expect(screen.getByRole('list', { name: '기록된 이벤트 목록' })).toBeInTheDocument();
+  });
+});
+
+describe('TeamMatchOperateConsole — source binding and ordinary host actions', () => {
+  const teamMatchContext = {
+    teamMatchId: 'team-match-1',
+    gameId: 'game-1',
+    status: 'matched' as const,
+    isStandalone: true,
+    viewerCanManageHost: true,
+  };
+
+  beforeEach(() => {
+    mocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'user-1' } } });
+    mocks.useV1GameOperationsConsole.mockClear();
+    mocks.useV1GameOperationsLineup.mockClear();
+    mocks.postV1GameCommand.mockReset();
+    mocks.postV1GameCommand.mockResolvedValue({ gameId: 'game-1', state: 'LIVE', version: 3 });
+  });
+
+  function ordinaryGameDetail(overrides: Partial<GameDetail> = {}): GameDetail {
+    return {
+      id: 'game-1',
+      sourceType: 'TEAM_MATCH',
+      state: 'LIVE',
+      version: 2,
+      lastSequence: 1,
+      competitionConfigVersionId: 'config-1',
+      currentOfficialRevisionId: null,
+      sides: [
+        { id: 'side-home', gameId: 'game-1', sideKey: 'HOME', teamId: 'team-home', displayNameSnapshot: '홈팀', createdAt: '', updatedAt: '' },
+        { id: 'side-away', gameId: 'game-1', sideKey: 'AWAY', teamId: 'team-away', displayNameSnapshot: '원정팀', createdAt: '', updatedAt: '' },
+      ],
+      periods: [
+        { id: 'period-1', gameId: 'game-1', number: 1, state: 'LIVE', startedAt: '2026-10-28T02:00:00.000Z', endedAt: null, pausedTotalMs: 0, pausedAt: null },
+        { id: 'period-2', gameId: 'game-1', number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null, pausedTotalMs: 0, pausedAt: null },
+      ],
+      periodDurations: [{ durationMinutes: 20, extraTime: false }, { durationMinutes: 20, extraTime: false }],
+      lineups: [],
+      actorRole: 'team_owner',
+      realtimeAuthorization: { kind: 'unscoped', subjectVersion: 0 },
+      substitutionPolicy: { mode: 'rolling', maxSubstitutions: null },
+      isKnockoutFixture: false,
+      penaltyShootoutPolicy: { earlyStop: true },
+      ...overrides,
+    };
+  }
+
+  function mountOrdinaryConsole(detail = ordinaryGameDetail()) {
+    mocks.useV1Game.mockReturnValue({
+      data: detail,
+      isLoading: false,
+      isError: false,
+      error: null,
+      status: 'success',
+      refetch: vi.fn(),
+    });
+    mocks.useV1GameOperationsLineup.mockReturnValue({
+      data: [],
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    mocks.useV1GameOperationsConsole.mockReturnValue(consoleState({
+      canOperate: true,
+      takeover: { status: 'none' },
+      liveEvents: [],
+      gameSnapshot: { version: 2, state: 'LIVE' },
+    }));
+    return render(<TeamMatchOperateConsole gameId="game-1" teamMatchContext={teamMatchContext} resultHref="/team-matches/team-match-1/result" />);
+  }
+
+  it('renders the ordinary host core without a tournament role provider and hides generic end', async () => {
+    mountOrdinaryConsole();
+    await screen.findByRole('group', { name: '경기 진행 조작' });
+
+    expect(screen.getByRole('group', { name: '경기 진행 조작' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '경기 종료' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '결과 보내기' })).toHaveAttribute(
+      'href',
+      '/team-matches/team-match-1/result',
+    );
+    expect(mocks.useV1GameOperationsConsole).toHaveBeenCalledWith(expect.objectContaining({
+      operationMode: 'ordinary-host',
+      gameSourceType: 'TEAM_MATCH',
+      gameActorRole: 'team_owner',
+      teamMatchContext,
+    }));
+  });
+
+  it('does not expose live controls or roster data when the returned Game does not match the TeamMatch', () => {
+    mountOrdinaryConsole(ordinaryGameDetail({ id: 'game-other' }));
+
+    expect(screen.getByRole('alert')).toHaveTextContent('팀매치와 경기 정보가 일치하지 않아요');
+    expect(screen.queryByRole('group', { name: '경기 진행 조작' })).not.toBeInTheDocument();
+    expect(screen.queryByText('홈팀')).not.toBeInTheDocument();
+    expect(mocks.useV1GameOperationsLineup).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['tournament source', { sourceType: 'TOURNAMENT_FIXTURE' as const }],
+    ['opposing manager role', { actorRole: 'opponent_manager' as const }],
+    ['leased authorization', { realtimeAuthorization: { kind: 'staff' as const, subjectVersion: 4 } }],
+  ])('does not load host controls or lineups for a Game with %s', (_name, detailOverrides) => {
+    mountOrdinaryConsole(ordinaryGameDetail(detailOverrides));
+
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: '경기 진행 조작' })).not.toBeInTheDocument();
+    expect(mocks.useV1GameOperationsLineup).not.toHaveBeenCalled();
+    expect(mocks.useV1GameOperationsConsole).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['non-matched detail', { status: 'recruiting' as const }],
+    ['league context', { isStandalone: false }],
+    ['opponent manager', { viewerCanManageHost: false }],
+  ])('keeps the console closed for a TeamMatch with %s', (_name, contextOverrides) => {
+    const context = { ...teamMatchContext, ...contextOverrides };
+    mocks.useV1Game.mockReturnValue({
+      data: ordinaryGameDetail(),
+      isLoading: false,
+      isError: false,
+      error: null,
+      status: 'success',
+      refetch: vi.fn(),
+    });
+
+    render(<TeamMatchOperateConsole gameId="game-1" teamMatchContext={context} resultHref="/team-matches/team-match-1/result" />);
+
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: '경기 진행 조작' })).not.toBeInTheDocument();
+    expect(mocks.useV1GameOperationsLineup).not.toHaveBeenCalled();
+    expect(mocks.useV1GameOperationsConsole).not.toHaveBeenCalled();
+  });
+
+  it('sends an ordinary host period command without a lease token', async () => {
+    mountOrdinaryConsole();
+    mocks.postV1GameCommand.mockResolvedValue({ gameId: 'game-1', state: 'LIVE', version: 3 });
+
+    fireEvent.click(screen.getByRole('button', { name: '전반 종료' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: '전반 종료' }));
+
+    await waitFor(() => expect(mocks.postV1GameCommand).toHaveBeenCalledTimes(1));
+    const [, command, body] = mocks.postV1GameCommand.mock.calls[0];
+    expect(command).toBe('end-period');
+    expect(body).not.toHaveProperty('takeoverToken');
   });
 });
 

@@ -40,8 +40,12 @@ import type {
   GameEventRecord,
   GameRealtimeAuthorization,
   GameEventType,
+  GameActorRole,
+  GameOperationsMode,
+  GameSourceType,
   GameState,
   GameTakeoverGrant,
+  TeamMatchGameOperationsContext,
 } from '@/types/game-operations';
 
 /**
@@ -184,6 +188,13 @@ export interface SubmitEventInput {
 export interface UseV1GameOperationsConsoleOptions {
   /** Read-only staff may subscribe and receive live updates, but never acquire a write lease. */
   readonly takeoverEnabled?: boolean;
+  /** Ordinary hosts use the server's lease-free contract; tournament staff keep an exclusive lease. */
+  readonly operationMode?: GameOperationsMode;
+  /** Values copied from the matching authenticated GET /games/:gameId response. */
+  readonly gameSourceType?: GameSourceType | null;
+  readonly gameActorRole?: GameActorRole | null;
+  /** Matching authenticated/public TeamMatch detail; required for ordinary-host authority. */
+  readonly teamMatchContext?: TeamMatchGameOperationsContext | null;
   /** The authenticated detail must match the route game before realtime starts. */
   readonly gameDetailGameId: string | null;
   readonly gameDetailStatus: 'pending' | 'success' | 'error';
@@ -212,6 +223,8 @@ export interface UseV1GameOperationsConsoleOptions {
 }
 
 export interface UseV1GameOperationsConsoleResult {
+  /** Current write capability after mode, source, server authorization, and lease checks. */
+  readonly canOperate: boolean;
   readonly connectionStatus: GameOperationsConnectionStatus;
   readonly sync: GameSyncState;
   readonly takeover: TakeoverState;
@@ -274,6 +287,10 @@ export function useV1GameOperationsConsole(
     gameId,
     initialLastSequence,
     takeoverEnabled = true,
+    operationMode = 'tournament-leased',
+    gameSourceType = null,
+    gameActorRole = null,
+    teamMatchContext = null,
     gameDetailGameId,
     gameDetailStatus,
     realtimeAuthorization,
@@ -318,6 +335,44 @@ export function useV1GameOperationsConsole(
     gameDetailGameId === gameId &&
     realtimeAuthorization !== null &&
     realtimeAuthorization.kind !== 'unavailable';
+  const ordinaryHostAuthorized =
+    operationMode === 'ordinary-host' &&
+    takeoverEnabled &&
+    Boolean(gameId) &&
+    gameDetailStatus === 'success' &&
+    gameDetailGameId === gameId &&
+    gameSourceType === 'TEAM_MATCH' &&
+    (gameActorRole === 'team_manager' || gameActorRole === 'team_owner') &&
+    realtimeAuthorization?.kind === 'unscoped' &&
+    realtimeAuthorization.subjectVersion === 0 &&
+    teamMatchContext !== null &&
+    teamMatchContext.teamMatchId.length > 0 &&
+    teamMatchContext.gameId === gameDetailGameId &&
+    teamMatchContext.status === 'matched' &&
+    teamMatchContext.isStandalone &&
+    teamMatchContext.viewerCanManageHost;
+  const leaseWriteAuthorized =
+    operationMode === 'tournament-leased' &&
+    takeoverEnabled &&
+    realtimeAuthorizationReady &&
+    takeover.status === 'held' &&
+    heldTakeoverGameIdRef.current === gameId &&
+    Date.now() < takeover.expiresAtMs;
+  const canOperate = ordinaryHostAuthorized || leaseWriteAuthorized;
+  const writeAccessRef = useRef(canOperate);
+  writeAccessRef.current = canOperate;
+  const operationModeRef = useRef(operationMode);
+  operationModeRef.current = operationMode;
+  const previousOperationModeRef = useRef(operationMode);
+  useEffect(() => {
+    if (previousOperationModeRef.current === operationMode) return;
+    previousOperationModeRef.current = operationMode;
+    takeoverRequestGenerationRef.current += 1;
+    heldTakeoverGameIdRef.current = null;
+    takeoverStatusRef.current = 'none';
+    takeoverTokenRef.current = null;
+    dispatchTakeover({ type: 'RESET' });
+  }, [operationMode]);
   const realtimeAuthorizationVersion =
     realtimeAuthorizationReady && realtimeAuthorization !== null
       ? realtimeAuthorization.subjectVersion
@@ -364,9 +419,9 @@ export function useV1GameOperationsConsole(
 
   // ── Queue: hydrate once per gameId, persist on every change ───────────────
   useEffect(() => {
-    if (!gameId) return;
+    if (!gameId || (operationMode === 'ordinary-host' && !ordinaryHostAuthorized)) return;
     dispatchQueue({ type: 'HYDRATE', items: loadPersistedQueue(gameId).items });
-  }, [gameId]);
+  }, [gameId, operationMode, ordinaryHostAuthorized]);
 
   // 저장 실패 배너는 **상태가 바뀌는 순간에만** 세우고 지운다. 이 effect의 deps는
   // `[gameId, queue]`라 큐가 바뀔 때마다 다시 도는데, 저장이 계속 실패하는 기기에서
@@ -375,7 +430,7 @@ export function useV1GameOperationsConsole(
   // 저장이 다시 성공했을 때 지우지 않으면 이미 해소된 경고가 경기 내내 남는다.
   const persistFailedRef = useRef(false);
   useEffect(() => {
-    if (!gameId) return;
+    if (!gameId || (operationMode === 'ordinary-host' && !ordinaryHostAuthorized)) return;
     if (persistQueue(gameId, queue)) {
       if (!persistFailedRef.current) return;
       persistFailedRef.current = false;
@@ -389,7 +444,7 @@ export function useV1GameOperationsConsole(
     // 전송 자체는 메모리 큐로 계속되므로 지금 기록을 막지는 않지만, 운영자가
     // 이 사실을 모른 채 새로고침하는 일은 막아야 한다.
     setBannerMessage(QUEUE_PERSIST_FAILED_MESSAGE);
-  }, [gameId, queue]);
+  }, [gameId, operationMode, ordinaryHostAuthorized, queue]);
 
   // 서버가 확정한 이벤트 시퀀스 중 이 클라이언트가 **본문까지 실제로 받은** 마지막
   // 값. 예전에는 `sync.lastSequence`를 그대로 미러링했는데, 그 값은 REST로 읽어온
@@ -794,7 +849,7 @@ export function useV1GameOperationsConsole(
 
   // ── Takeover: request once, renew on a timer, expire on a timer ────────────
   const requestTakeover = useCallback((options?: { readonly force?: boolean }) => {
-    if (!isMountedRef.current || !takeoverEnabledRef.current || activeGameIdRef.current !== gameId) return;
+    if (!isMountedRef.current || operationModeRef.current !== 'tournament-leased' || !takeoverEnabledRef.current || activeGameIdRef.current !== gameId) return;
     if (!gameId || realtimeAuthorizationVersion === null || !realtimeAuthorizationReady) return;
     const socket = getV1GameOperationsSocket();
     clientInstanceIdRef.current = clientInstanceIdRef.current ?? randomUuid();
@@ -814,7 +869,7 @@ export function useV1GameOperationsConsole(
         ...(options?.force === true ? { force: true } : {}),
       },
       (result: GameTakeoverAck) => {
-        if (!isMountedRef.current || activeGameIdRef.current !== gameId || takeoverRequestGenerationRef.current !== requestGeneration) return;
+        if (!isMountedRef.current || operationModeRef.current !== 'tournament-leased' || activeGameIdRef.current !== gameId || takeoverRequestGenerationRef.current !== requestGeneration) return;
         if (!takeoverEnabledRef.current) {
           dispatchTakeover({ type: 'REVOKED', assignmentVersion: -1 });
           return;
@@ -844,20 +899,20 @@ export function useV1GameOperationsConsole(
   }, [gameId, realtimeAuthorizationReady, realtimeAuthorizationVersion, sync.lastSequence, takeoverEnabled]);
 
   useEffect(() => {
-    if (!takeoverEnabled && takeover.status !== 'none') {
+    if ((operationMode === 'ordinary-host' || !takeoverEnabled) && takeover.status !== 'none') {
       dispatchTakeover({ type: 'REVOKED', assignmentVersion: -1 });
     }
-  }, [takeoverEnabled, takeover.status]);
+  }, [operationMode, takeoverEnabled, takeover.status]);
 
   useEffect(() => {
-    if (realtimeAuthorizationReady && connectionStatus === 'connected' && takeoverEnabled && takeover.status === 'none') requestTakeover();
-  }, [connectionStatus, realtimeAuthorizationReady, takeover.status, requestTakeover, takeoverEnabled]);
+    if (operationMode === 'tournament-leased' && realtimeAuthorizationReady && connectionStatus === 'connected' && takeoverEnabled && takeover.status === 'none') requestTakeover();
+  }, [connectionStatus, operationMode, realtimeAuthorizationReady, takeover.status, requestTakeover, takeoverEnabled]);
 
   useEffect(() => {
-    if (!realtimeAuthorizationReady || !takeoverEnabled || takeover.status !== 'held' || heldTakeoverGameIdRef.current !== gameId) return undefined;
+    if (operationMode === 'ordinary-host' || !realtimeAuthorizationReady || !takeoverEnabled || takeover.status !== 'held' || heldTakeoverGameIdRef.current !== gameId) return undefined;
     const requestGeneration = takeoverRequestGenerationRef.current;
     const interval = setInterval(() => {
-      if (!isMountedRef.current || activeGameIdRef.current !== gameId || heldTakeoverGameIdRef.current !== gameId || takeoverRequestGenerationRef.current !== requestGeneration) return;
+      if (!isMountedRef.current || operationModeRef.current !== 'tournament-leased' || activeGameIdRef.current !== gameId || heldTakeoverGameIdRef.current !== gameId || takeoverRequestGenerationRef.current !== requestGeneration) return;
       const socket = getV1GameOperationsSocket();
       if (!clientInstanceIdRef.current) return;
       socket.emit(
@@ -866,6 +921,7 @@ export function useV1GameOperationsConsole(
         (result: GameTakeoverAck) => {
           if (
             !isMountedRef.current ||
+            operationModeRef.current !== 'tournament-leased' ||
             activeGameIdRef.current !== gameId ||
             heldTakeoverGameIdRef.current !== gameId ||
             takeoverRequestGenerationRef.current !== requestGeneration ||
@@ -897,7 +953,7 @@ export function useV1GameOperationsConsole(
     }, TAKEOVER_RENEW_INTERVAL_MS);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [realtimeAuthorizationReady, takeover.status, takeover.status === 'held' ? takeover.token : null, gameId, takeoverEnabled]);
+  }, [operationMode, realtimeAuthorizationReady, takeover.status, takeover.status === 'held' ? takeover.token : null, gameId, takeoverEnabled]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -932,19 +988,20 @@ export function useV1GameOperationsConsole(
   const deniedCode = takeover.status === 'denied' ? takeover.code : null;
   useEffect(() => {
     if (
+      operationMode === 'tournament-leased' &&
       takeoverEnabled &&
       (takeover.status === 'expired' || (takeover.status === 'denied' && deniedCode === 'TAKEOVER_TOKEN_EXPIRED'))
     ) {
       requestTakeover();
     }
-  }, [takeover.status, deniedCode, requestTakeover, takeoverEnabled]);
+  }, [operationMode, takeover.status, deniedCode, requestTakeover, takeoverEnabled]);
 
   // ── Event send / durable-queue flush ────────────────────────────────────────
   const sendQueuedItem = useCallback(
     (item: QueuedGameEvent) => {
       // A restored queue must wait for this game's first authoritative version.
-      if (!realtimeAuthorizationReady || !isMountedRef.current || !takeoverEnabledRef.current || !gameId || activeGameIdRef.current !== gameId || heldTakeoverGameIdRef.current !== gameId || item.gameId !== gameId || !gameSnapshot || !isTakeoverHeld(takeover) || !canAppendWhileSyncing(sync)) return;
-      if (Date.now() >= takeover.expiresAtMs) return; // CHECK_EXPIRY's poll will flip status to 'expired' shortly; do not send meanwhile.
+      if (!realtimeAuthorizationReady || !isMountedRef.current || !writeAccessRef.current || !gameId || activeGameIdRef.current !== gameId || item.gameId !== gameId || !gameSnapshot || !canAppendWhileSyncing(sync)) return;
+      if (operationModeRef.current === 'tournament-leased' && (heldTakeoverGameIdRef.current !== gameId || !isTakeoverHeld(takeover) || Date.now() >= takeover.expiresAtMs)) return; // CHECK_EXPIRY's poll will flip status to 'expired' shortly; do not send meanwhile.
       const socket = getV1GameOperationsSocket();
       dispatchQueue({ type: 'MARK_SENDING', clientEventId: item.clientEventId });
       // `attempts > 0` means this item already failed once and is being
@@ -1050,7 +1107,7 @@ export function useV1GameOperationsConsole(
             // item was originally enqueued with.
             rebasedExpectedVersion: acceptedVersionRef.current,
             clientEventId: item.clientEventId,
-            takeoverToken: takeover.token,
+            ...(operationModeRef.current === 'tournament-leased' && takeover.status === 'held' ? { takeoverToken: takeover.token } : {}),
             payloadHash: item.payloadHash,
             event: item.event,
           },
@@ -1063,7 +1120,7 @@ export function useV1GameOperationsConsole(
             gameId,
             expectedVersion: item.expectedVersion,
             clientEventId: item.clientEventId,
-            takeoverToken: takeover.token,
+            ...(operationModeRef.current === 'tournament-leased' && takeover.status === 'held' ? { takeoverToken: takeover.token } : {}),
             payloadHash: item.payloadHash,
             event: item.event,
           },
@@ -1078,20 +1135,19 @@ export function useV1GameOperationsConsole(
     if (
       connectionStatus !== 'connected' ||
       !realtimeAuthorizationReady ||
-      !takeoverEnabled ||
-      !isTakeoverHeld(takeover) ||
-      Date.now() >= takeover.expiresAtMs ||
+      !canOperate ||
+      (operationMode === 'tournament-leased' && (!isTakeoverHeld(takeover) || Date.now() >= takeover.expiresAtMs)) ||
       !canAppendWhileSyncing(sync)
     ) {
       return;
     }
     const next = nextQueuedItem(queue);
     if (next) sendQueuedItem(next);
-  }, [connectionStatus, realtimeAuthorizationReady, takeoverEnabled, takeover, sync, queue, sendQueuedItem]);
+  }, [connectionStatus, realtimeAuthorizationReady, operationMode, canOperate, takeover, sync, queue, sendQueuedItem]);
 
   const submitEvent = useCallback(
     async (input: SubmitEventInput): Promise<string | null> => {
-      if (!realtimeAuthorizationReady || !takeoverEnabledRef.current || !gameSnapshot) return null;
+      if (!realtimeAuthorizationReady || !writeAccessRef.current || !gameSnapshot) return null;
       // D-10 (frozen decision table): this is the ONLY thing that may ever
       // enter the durable offline queue. Asserting it here — even though
       // every current caller already only constructs an append_event —
@@ -1110,7 +1166,7 @@ export function useV1GameOperationsConsole(
         occurredAt: input.occurredAt,
         payload: input.payload,
       });
-      if (!takeoverEnabledRef.current || !isMountedRef.current || activeGameIdRef.current !== gameId) return null;
+      if (!writeAccessRef.current || !isMountedRef.current || activeGameIdRef.current !== gameId) return null;
       const item: QueuedGameEvent = {
         clientEventId,
         gameId: gameId ?? '',
@@ -1141,7 +1197,7 @@ export function useV1GameOperationsConsole(
 
   const retryFailedEvent = useCallback(
     async (clientEventId: string) => {
-      if (!takeoverEnabledRef.current) return;
+      if (!writeAccessRef.current) return;
       // alpha 실사고(2026-08) 구제: `medianOffsetMs()`를 고치기 전에 이미
       // 캡처된 항목은 `event.clockMs`가 소수(.5 등)일 수 있다 — 그대로
       // 재전송하면 서버 `parseGameEvent`(`Number.isSafeInteger` 요구)에
@@ -1187,16 +1243,21 @@ export function useV1GameOperationsConsole(
   // 때만 호출 가능"을 문서화한다.
   const reverseEvent = useCallback(
     async (input: { eventId: string; reason: string }) => {
+      const requiresLease = operationModeRef.current === 'tournament-leased';
+      const leaseToken = takeover.status === 'held' ? takeover.token : null;
       if (
         !isMountedRef.current ||
-        !takeoverEnabledRef.current ||
+        !writeAccessRef.current ||
         !gameId ||
         activeGameIdRef.current !== gameId ||
-        heldTakeoverGameIdRef.current !== gameId ||
         !gameSnapshot ||
-        !isTakeoverHeld(takeover) ||
-        takeoverStatusRef.current !== 'held' ||
-        takeoverTokenRef.current !== takeover.token
+        (requiresLease && (
+          heldTakeoverGameIdRef.current !== gameId ||
+          !isTakeoverHeld(takeover) ||
+          takeoverStatusRef.current !== 'held' ||
+          leaseToken === null ||
+          takeoverTokenRef.current !== leaseToken
+        ))
       ) {
         throw new Error('경기 운영 권한이 없어 되돌릴 수 없어요.');
       }
@@ -1206,7 +1267,7 @@ export function useV1GameOperationsConsole(
         {
           expectedVersion: acceptedVersionRef.current,
           clientEventId,
-          takeoverToken: takeover.token,
+          ...(requiresLease && leaseToken !== null ? { takeoverToken: leaseToken } : {}),
           reason: input.reason,
         },
         { headers: { 'Idempotency-Key': clientEventId } },
@@ -1227,16 +1288,21 @@ export function useV1GameOperationsConsole(
   // 송신 시점에 확정된 최신 버전을 보내고, 경합은 서버 버전 검증이 판정한다.
   const assignAssist = useCallback(
     async (input: { eventId: string; assistParticipantId: string | null }) => {
+      const requiresLease = operationModeRef.current === 'tournament-leased';
+      const leaseToken = takeover.status === 'held' ? takeover.token : null;
       if (
         !isMountedRef.current ||
-        !takeoverEnabledRef.current ||
+        !writeAccessRef.current ||
         !gameId ||
         activeGameIdRef.current !== gameId ||
-        heldTakeoverGameIdRef.current !== gameId ||
         !gameSnapshot ||
-        !isTakeoverHeld(takeover) ||
-        takeoverStatusRef.current !== 'held' ||
-        takeoverTokenRef.current !== takeover.token
+        (requiresLease && (
+          heldTakeoverGameIdRef.current !== gameId ||
+          !isTakeoverHeld(takeover) ||
+          takeoverStatusRef.current !== 'held' ||
+          leaseToken === null ||
+          takeoverTokenRef.current !== leaseToken
+        ))
       ) {
         throw new Error('경기 운영 권한이 없어 어시스트를 기록할 수 없어요.');
       }
@@ -1246,7 +1312,7 @@ export function useV1GameOperationsConsole(
         {
           expectedVersion: acceptedVersionRef.current,
           clientEventId,
-          takeoverToken: takeover.token,
+          ...(requiresLease && leaseToken !== null ? { takeoverToken: leaseToken } : {}),
           assistParticipantId: input.assistParticipantId,
         },
         { headers: { 'Idempotency-Key': clientEventId } },
@@ -1275,6 +1341,7 @@ export function useV1GameOperationsConsole(
   }, [gameId]);
 
   return {
+    canOperate,
     connectionStatus,
     sync,
     takeover,

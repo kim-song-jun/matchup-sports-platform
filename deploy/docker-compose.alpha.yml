@@ -13,6 +13,8 @@ services:
       # 구분할 수 없어서(둘 다 production) 전용 플래그를 쓴다 — 프로덕션 compose 에는 없으므로
       # 그쪽에서는 라우트가 404 이고 버튼도 렌더되지 않는다.
       V1_ENABLE_MOCK_SEED: "true"
+      # Flexible bracket settings are available for validation on alpha.
+      V1_FLEXIBLE_BRACKETS_ENABLED: "true"
       # 인증번호는 alpha 에서 발송하지 않고 응답에 실어 보낸다.
       #
       # 그동안 alpha 는 발송 수단이 없어 issueChallenge 가 503 을 내고 있었고, 문자 인증은 가입

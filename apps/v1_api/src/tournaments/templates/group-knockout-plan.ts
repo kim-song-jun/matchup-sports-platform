@@ -45,7 +45,7 @@ function assertSupported(input: GroupKnockoutTemplateInput): void {
       unsupported('조 간 성적 비교 12강은 5개 조·조당 4팀·1회전·조 1·2위 진출로 만들어 주세요.');
     }
   } else {
-    groupRankPairings(groupCount, advancePerGroup);
+    groupRankPairings(groupCount, advancePerGroup as 1 | 2);
   }
   if (groupCount * advancePerGroup === 2 && thirdPlace) {
     unsupported('결선이 결승 한 경기뿐이면 3·4위전을 만들 수 없어요.');
@@ -122,7 +122,7 @@ export function planGroupKnockoutTemplate(
       slots: [...slots, ...knockout.slots], fixtures: [...fixtures, ...knockout.fixtures],
       edges: knockout.edges, byeSlots: knockout.byeSlots };
   }
-  const pairings = groupRankPairings(groupCount, advancePerGroup);
+  const pairings = groupRankPairings(groupCount, advancePerGroup as 1 | 2);
   for (const phase of phases) {
     for (let index = 1; index <= FIXTURES_IN_PHASE[phase]; index += 1) {
       lastNumber += 1;

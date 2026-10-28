@@ -484,11 +484,12 @@ export class TournamentBracketService {
       const group = await tx.v1TournamentGroup.findFirst({ where: { id: dto.groupId, tournamentId } });
       if (!group) throw new NotFoundException({ code: 'GROUP_NOT_FOUND', message: '해당 대회의 조를 찾을 수 없어요.' });
       const limits: Record<string, { teams: number; byes: number }> = {
+        round64: { teams: 64, byes: 32 }, round32: { teams: 32, byes: 16 }, round16: { teams: 16, byes: 8 },
         round12: { teams: 12, byes: 4 }, quarter: { teams: 8, byes: 4 }, semi: { teams: 4, byes: 2 },
       };
       const limit = limits[group.phase];
-      if (!limit) throw new BadRequestException({ code: 'BYE_PHASE_INVALID', message: '부전승은 12강·8강·4강에서 등록할 수 있어요.' });
-      if (dto.sortOrder >= (group.phase === 'semi' ? 4 : 8)) {
+      if (!limit) throw new BadRequestException({ code: 'BYE_PHASE_INVALID', message: '부전승은 결승 이전의 토너먼트 단계에서 등록할 수 있어요.' });
+      if (dto.sortOrder >= (group.phase === 'round12' ? 8 : limit.teams)) {
         throw new BadRequestException({ code: 'BYE_POSITION_INVALID', message: '해당 라운드의 대진표 위치 범위를 확인해 주세요.' });
       }
       const registrationId = dto.registrationId ?? null;
@@ -713,7 +714,7 @@ export class TournamentBracketService {
       if (dto.groupId && group === null) {
         throw new NotFoundException({ code: 'GROUP_NOT_FOUND', message: '해당 대회의 조를 찾을 수 없어요.' });
       }
-      if (dto.groupId && group && ['round12', 'quarter', 'semi'].includes(group.phase)) {
+      if (dto.groupId && group && ['round64', 'round32', 'round16', 'round12', 'quarter', 'semi'].includes(group.phase)) {
         const byeTeam = await tx.v1TournamentGroupTeam.findFirst({ where: {
           groupId: dto.groupId, isBye: true,
           registrationId: { in: [dto.homeRegistrationId, dto.awayRegistrationId].filter((id): id is string => typeof id === 'string') },
@@ -1398,7 +1399,7 @@ export class TournamentBracketService {
       }
     }
 
-    const phaseOrder: Record<string, number> = { group: 0, round16: 1, round12: 2, quarter: 3, semi: 4, final: 5, third_place: 6 };
+    const phaseOrder: Record<string, number> = { group: 0, round64: 0.25, round32: 0.5, round16: 1, round12: 2, quarter: 3, semi: 4, final: 5, third_place: 6 };
     const orderedGroups = [...groups].sort((a, b) => (phaseOrder[a.phase] ?? 99) - (phaseOrder[b.phase] ?? 99) || a.sortOrder - b.sortOrder || a.id.localeCompare(b.id));
     const groupOrder = new Map(orderedGroups.map((group, index) => [group.id, index]));
     return {

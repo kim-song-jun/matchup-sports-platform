@@ -2,6 +2,7 @@ import { tournamentRoundLabel } from './tournament-round-label';
 
 const PHASE_RANK: Readonly<Record<string, number>> = {
   group: 0,
+  round64: 0.25, round32: 0.5,
   round16: 1,
   round12: 2,
   quarter: 3,
@@ -12,6 +13,7 @@ const PHASE_RANK: Readonly<Record<string, number>> = {
 
 const ROUND_RANK: Readonly<Record<string, number>> = {
   '조별리그': 0,
+  '64강': 0.25, '32강': 0.5,
   '16강': 1,
   '12강': 2,
   '8강': 3,

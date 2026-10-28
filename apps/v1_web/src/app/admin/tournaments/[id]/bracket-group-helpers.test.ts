@@ -210,14 +210,14 @@ describe('computeQualifyingShortlist', () => {
     ]);
   });
 
-  it('advanceCount 미설정이면 기본 상위 2팀만 추천한다', () => {
+  it('advanceCount 미설정이면 진출 수를 추측해서 추천하지 않는다', () => {
     const groupA = group({ id: 'A', name: 'A조', phase: 'group', advanceCount: null });
     const semi = group({ id: 'semi-1', name: '4강', phase: 'semi', groupTeams: [] });
     const standings = [1, 2, 3].map((position) =>
       standing({ groupId: 'A', registrationId: `r${position}`, teamName: `${position}위팀`, position }),
     );
     const shortlist = computeQualifyingShortlist(semi, [groupA, semi], standings);
-    expect(shortlist.map((c) => c.id)).toEqual(['r1', 'r2']);
+    expect(shortlist.map((c) => c.id)).toEqual([]);
   });
 
   it('이미 이 조에 배정된 팀은 추천 목록에서 빠진다', () => {
@@ -249,9 +249,9 @@ describe('computeQualifyingShortlist', () => {
 });
 
 describe('GROUP_PHASE_TEMPLATES', () => {
-  it('큰 단계부터 조별 → 16강 → 12강 → 8강 → 준결승 → 결승 → 3위 결정전 순서로 "+16강" 을 포함한다', () => {
+  it('조별 다음 큰 결선 단계부터 표시한다', () => {
     expect(GROUP_PHASE_TEMPLATES.map((t) => [t.phase, t.label])).toEqual([
-      ['group', '조별'], ['round16', '16강'], ['round12', '12강'], ['quarter', '8강'],
+      ['group', '조별'], ['round64', '64강'], ['round32', '32강'], ['round16', '16강'], ['round12', '12강'], ['quarter', '8강'],
       ['semi', '준결승'], ['final', '결승'], ['third_place', '3위 결정전'],
     ]);
   });

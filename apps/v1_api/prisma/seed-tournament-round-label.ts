@@ -3,6 +3,8 @@
 // 두 구현이 같은지는 src/tournaments/seed-alpha-tournament-qa.spec.ts 가 단언한다.
 export const SEED_TOURNAMENT_PHASE_LABEL: Readonly<Record<string, string>> = {
   group: '조별리그',
+  round64: '64강',
+  round32: '32강',
   round16: '16강',
   round12: '12강',
   quarter: '8강',

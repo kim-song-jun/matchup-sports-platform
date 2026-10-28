@@ -88,12 +88,14 @@ describe('16강 단계 (PostgreSQL)', () => {
     expect(await prisma.v1TournamentMatchAdvancementEdge.count({ where: { tournamentId } })).toBe(2);
   });
 
-  it('16강 조에는 부전승 자리가 생기지 않는다 (12강 전용 규칙이 번지지 않았다는 대조군)', async () => {
+  it('16강 부전승은 가짜 경기 없이 자리를 만들고 범위를 검증한다', async () => {
     const { tournamentId } = await seedBracketTournament(prisma, { label: 'ko16-bye', format: 'knockout', teamCount: 0 });
     const g16 = await bracket.createGroup(user, tournamentId, { name: '16강', phase: 'round16' });
-    await expect(bracket.createBye(user, tournamentId, { groupId: g16.id, sortOrder: 0 }))
-      .rejects.toMatchObject({ response: { code: 'BYE_PHASE_INVALID' } });
-    expect(await prisma.v1TournamentByeSlot.count({ where: { groupId: g16.id } })).toBe(0);
+    await bracket.createBye(user, tournamentId, { groupId: g16.id, sortOrder: 0 });
+    expect(await prisma.v1TournamentByeSlot.count({ where: { groupId: g16.id } })).toBe(1);
+    expect(await prisma.v1TournamentMatchDetails.count({ where: { tournamentId } })).toBe(0);
+    await expect(bracket.createBye(user, tournamentId, { groupId: g16.id, sortOrder: 16 }))
+      .rejects.toMatchObject({ response: { code: 'BYE_POSITION_INVALID' } });
     expect(await prisma.v1TournamentGroupTeam.count({ where: { groupId: g16.id } })).toBe(0);
   });
 });

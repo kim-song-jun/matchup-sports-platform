@@ -260,7 +260,7 @@ export function BracketGroupCard({
   ));
   const needsMoreTeams = !isKnockout && teamCount < 2;
   const roundOptions: string[] = isKnockout
-    ? ['16강', '12강', '8강', '4강', '결승', '3·4위전']
+    ? ['64강', '32강', '16강', '12강', '8강', '4강', '결승', '3·4위전']
     : ['조별 1라운드', '조별 2라운드', '조별 3라운드', '조별 4라운드', '조별 5라운드'];
 
   const byeGroup = allGroups.find((candidate) => candidate.id === group.id && byeRound(candidate.phase)?.label === fixtureRound)
@@ -370,6 +370,7 @@ export function BracketGroupCard({
             <span className="block text-xs text-[var(--text-muted)] mt-0.5">
               {teamLabel} · {fixtureLabel}{group.groupTeams.some((team) => team.isBye) && ` · 부전승 ${group.groupTeams.filter((team) => team.isBye).length}자리`}
               {group.advanceCount != null && ` · 상위 ${group.advanceCount}팀 진출`}
+              {group.phase === 'group' && group.advanceCount == null && ' · 진출 수 미설정 (조 수정에서 설정)'}
             </span>
           </span>
         </button>

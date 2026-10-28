@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { V1ApiError } from '@/lib/api-client';
-import { BracketTemplateDialog } from './bracket-template-dialog';
+import { LegacyBracketTemplateDialog as BracketTemplateDialog } from './bracket-template-dialog';
 
 const mocks = vi.hoisted(() => ({ apply: vi.fn() }));
 vi.mock('@/hooks/use-v1-bracket-canvas', () => ({

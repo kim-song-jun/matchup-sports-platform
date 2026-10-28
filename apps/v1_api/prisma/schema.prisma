@@ -2650,6 +2650,8 @@ enum V1TournamentPlayerEligibility {
 
 enum V1TournamentGroupPhase {
   group
+  round64
+  round32
   round16
   round12
   quarter
@@ -2677,6 +2679,8 @@ enum V1TournamentAnnouncementCategory {
 }
 
 model V1Tournament {
+  bracketDraft Json? @map("bracket_draft")
+  bracketDraftRevision Int @default(0) @map("bracket_draft_revision")
   id                         String                      @id @default(uuid())
   sportId                    String                      @map("sport_id")
   title                      String

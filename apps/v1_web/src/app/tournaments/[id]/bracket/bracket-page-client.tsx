@@ -14,7 +14,7 @@ import {
   TournamentProgressStepper,
   buildTournamentStages,
 } from '@/components/tournaments/tournament-progress-stepper';
-import { TournamentBracket } from '@/components/tournaments/tournament-bracket';
+import { TournamentBracket, groupFixturesByRound } from '@/components/tournaments/tournament-bracket';
 import { LeagueProgressSummary, LeagueTeamFixturesDetail } from '@/components/tournaments/league-inline-records';
 import {
   TournamentStandingsTable,
@@ -490,6 +490,8 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
   const searchParams = useSearchParams();
   const tabFromUrl = searchParams.get('tab');
   const [standingsPhase, setStandingsPhase] = useState<'group_stage' | 'knockout'>('group_stage');
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [selectedRoundKey, setSelectedRoundKey] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'standings' | 'schedule'>(() =>
     tabFromUrl === 'standings' ? 'standings' : 'schedule',
   );
@@ -524,6 +526,10 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
   // 시간을 공개한다. TournamentBracket은 nullable 팀 슬롯을 `미정`으로 표시하므로,
   // 조별 순위 확정 전 팀을 지어내지 않으면서도 일정과 대진표가 같은 정보를 보여준다.
   const showBracket = hasKnockoutFixtures;
+  const knockoutRounds = groupFixturesByRound(knockoutFixtures, groups);
+  const activeRoundKey = knockoutRounds.some((round) => round.key === selectedRoundKey) ? selectedRoundKey : null;
+  const activeGroupId = orderedGroups.some((group) => group.id === selectedGroupId) ? selectedGroupId : null;
+  const visibleGroups = activeGroupId ? orderedGroups.filter((group) => group.id === activeGroupId) : orderedGroups;
 
   // 리그 포맷: 모든 그룹의 순위 행을 합산. 집계 전 조는 toGroupStandingsRows가
   // 편성 팀(groupTeams)을 0값 기준선 행으로 대신 내주므로, 경기 0건이어도 참가 팀이
@@ -701,6 +707,18 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
               ))}
             </div>
           ) : null}
+          {!isLeague && showGroupStandings && orderedGroups.length > 0 && (
+            <nav aria-label="조 선택" className="flex flex-wrap gap-2 px-5 pt-3">
+              <button type="button" className={`tm-chip${!activeGroupId ? ' tm-chip-active' : ''}`} aria-pressed={!activeGroupId} onClick={() => setSelectedGroupId(null)}>전체</button>
+              {orderedGroups.map((group) => <button key={group.id} type="button" className={`tm-chip${activeGroupId === group.id ? ' tm-chip-active' : ''}`} aria-pressed={activeGroupId === group.id} onClick={() => setSelectedGroupId(group.id)}>{group.name}</button>)}
+            </nav>
+          )}
+          {showKnockoutBracket && knockoutRounds.length > 0 && (
+            <nav aria-label="결선 단계 선택" className="flex flex-wrap gap-2 px-5 pt-3">
+              <button type="button" className={`tm-chip${!activeRoundKey ? ' tm-chip-active' : ''}`} aria-pressed={!activeRoundKey} onClick={() => setSelectedRoundKey(null)}>전체</button>
+              {knockoutRounds.map((round) => <button key={round.key} type="button" className={`tm-chip${activeRoundKey === round.key ? ' tm-chip-active' : ''}`} aria-pressed={activeRoundKey === round.key} onClick={() => setSelectedRoundKey(round.key)}>{round.label}</button>)}
+            </nav>
+          )}
           <div className="tm-tourn-sub-grid tm-bracket-page-grid">
             {/* 선택한 단계만 한 칼럼으로 표시한다. */}
             {showGroupStandings ? (
@@ -728,7 +746,7 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
 
               {!isLeague && format === 'group_knockout' && hasGroupStandings && (
                 <section>
-                  {orderedGroups.map((g) => (
+                  {visibleGroups.map((g) => (
                     <GroupStandingsSection key={g.id} group={g} isMyGroup={isMyGroup(g)} fixtures={fixtures} fromHref={bracketSelfHref ?? undefined} />
                   ))}
                 </section>
@@ -753,9 +771,10 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
                   </h3>
                   {showBracket ? (
                     <div className="tm-bk-wrap">
-                      {tournament.sixTeamBracket ? <SixTeamBracket tournamentId={tournament.id} state={tournament.sixTeamBracket} fixtures={knockoutFixtures} /> : <TournamentBracket
+                      {tournament.sixTeamBracket ? <SixTeamBracket tournamentId={tournament.id} state={tournament.sixTeamBracket} fixtures={knockoutFixtures} selectedRoundKey={activeRoundKey} stageLabels={Object.fromEntries(knockoutRounds.map((round) => [round.key, round.label]))} /> : <TournamentBracket
                         fixtures={knockoutFixtures}
                         groups={groups}
+                        selectedRoundKey={activeRoundKey}
                       />}
                     </div>
                   ) : (

@@ -8,10 +8,14 @@ export function SixTeamBracket({
   state,
   fixtures,
   tournamentId,
+  selectedRoundKey,
+  stageLabels = {},
 }: {
   tournamentId: string;
   state: V1SixTeamBracket;
   fixtures: V1TournamentFixture[];
+  selectedRoundKey?: string | null;
+  stageLabels?: Partial<Record<'quarter' | 'semi' | 'final', string>>;
 }) {
   const rounds = state.rounds.map((id) =>
     fixtures.find((row) => row.id === id)
@@ -48,9 +52,10 @@ export function SixTeamBracket({
       <p className="tm-text-label text-[var(--text-muted)]">
         6강 토너먼트 · 총 5경기
       </p>
-      <section aria-label="6강" className="space-y-3">
+      {(!selectedRoundKey || selectedRoundKey === 'quarter' || selectedRoundKey === '6강') && <>
+      <section aria-label={stageLabels.quarter ?? '6강'} className="space-y-3">
         <div role="heading" aria-level={4}>
-          <SectionTitle title="6강 · 3경기" />
+          <SectionTitle title={`${stageLabels.quarter ?? '6강'} · 3경기`} />
         </div>
         <div className="grid gap-3 xl:grid-cols-3">
           {rounds
@@ -167,21 +172,24 @@ export function SixTeamBracket({
           </div>
         </details>
       </section>
-      <div className="grid gap-6 xl:grid-cols-2">
+      </>}
+      <div className={`grid gap-6${!selectedRoundKey ? ' xl:grid-cols-2' : ''}`}>
         {[
           {
             index: 3,
-            label: '준결승',
+            key: 'semi',
+            label: stageLabels.semi ?? '준결승',
             home: '6강 승리팀 중 선정',
             away: '6강 승리팀 중 선정',
           },
           {
             index: 4,
-            label: '결승',
+            key: 'final',
+            label: stageLabels.final ?? '결승',
             home: '결승 직행팀',
             away: '준결승 승리팀',
           },
-        ].map((stage) => {
+        ].filter((stage) => !selectedRoundKey || selectedRoundKey === stage.key || selectedRoundKey === (stage.index === 3 ? '준결승' : '결승')).map((stage) => {
           const row = rounds[stage.index];
           return (
             <section
@@ -223,7 +231,7 @@ export function SixTeamBracket({
           );
         })}
       </div>
-      {final?.status === 'completed' && (
+      {(!selectedRoundKey || selectedRoundKey === 'final' || selectedRoundKey === '결승') && final?.status === 'completed' && (
         <p className="tm-text-body-lg font-bold">
           우승 · {championId ? teamName(championId) : '공식 결과 확인 대기'}
           {state.winners[state.rounds[4]] && ' · 운영자 지정'}

@@ -45,6 +45,20 @@ const fixtures: V1TournamentFixture[] = state.rounds.map((id, index) => ({
   videos: [],
 }));
 describe('6강 공개 대진표 A안', () => {
+  it('결선 필터의 내부 키로 선택한 경기만 표시하고 조 이름을 제목에 쓴다', () => {
+    const { rerender } = render(<SixTeamBracket tournamentId="t1" state={state} fixtures={fixtures} selectedRoundKey="semi" stageLabels={{ semi: '준결승 조' }} />);
+    expect(screen.getByRole('region', { name: '준결승 조' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '6강' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '결승' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: '경기 상세' })).toHaveLength(1);
+    rerender(<SixTeamBracket tournamentId="t1" state={state} fixtures={fixtures} selectedRoundKey="quarter" />);
+    expect(screen.getByRole('region', { name: '6강' })).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: '경기 상세' })).toHaveLength(3);
+    rerender(<SixTeamBracket tournamentId="t1" state={state} fixtures={fixtures} selectedRoundKey="final" />);
+    expect(screen.getByRole('region', { name: '결승' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '준결승' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: '경기 상세' })).toHaveLength(1);
+  });
   it('6강 3경기·직행 선정·준결승·결승을 구분하고 가상 부전승 경기를 만들지 않는다', () => {
     render(
       <SixTeamBracket tournamentId="t1" state={state} fixtures={fixtures} />

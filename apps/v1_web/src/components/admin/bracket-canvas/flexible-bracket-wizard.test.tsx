@@ -32,6 +32,41 @@ const next = () => fireEvent.click(screen.getByRole('button', { name: '다음' }
 async function preview() { next(); next(); next(); await screen.findByText(/총 5경기/); }
 
 describe('단계별 대진 설정', () => {
+  it('각 조 회전 수를 따로 선택하고 초안·미리보기·생성에 동일하게 전달한다', async () => {
+    const payloads: Record<string, unknown>[] = [];
+    server.use(http.put(`${base}/draft`, async ({ request }) => { const input = await request.json() as Record<string, unknown>; payloads.push(input); return success({ input, revision: 1 }); }),
+      http.post(`${base}/preview`, async ({ request }) => { payloads.push(await request.json() as Record<string, unknown>); return success(plan); }),
+      http.post(base, async ({ request }) => { payloads.push(await request.json() as Record<string, unknown>); return success(plan.counts); }));
+    const props = show({ format: 'group_knockout', confirmedTeamCount: 6 });
+    await screen.findByLabelText('참가 팀 수'); next();
+    expect(screen.queryByLabelText('조별 회전')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('2번째 조 회전'), { target: { value: '2' } });
+    expect(screen.getByLabelText('1번째 조 회전')).toHaveValue('1');
+    expect(screen.getByText('3경기 · 팀당 2경기 · 67% 진출')).toBeInTheDocument();
+    expect(screen.getByText('6경기 · 팀당 4경기 · 67% 진출')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '초안 저장' }));
+    await waitFor(() => expect(payloads).toHaveLength(1));
+    await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled());
+    next(); next(); await screen.findByText(/총 5경기/);
+    fireEvent.click(screen.getByRole('button', { name: '이 설정으로 대진 만들기' }));
+    await waitFor(() => expect(props.onClose).toHaveBeenCalledOnce());
+    expect(payloads).toHaveLength(3);
+    for (const input of payloads) expect(input).toMatchObject({ groups: [
+      { name: 'A조', capacity: 3, advanceCount: 2, legs: 1 }, { name: 'B조', capacity: 3, advanceCount: 2, legs: 2 },
+    ] });
+  });
+  it.each([undefined, 1] as const)('초안의 조별 회전(%s)을 우선하고 없으면 전체 회전으로 복원한다', async (firstLegs) => {
+    const saved = { schemaVersion: 2, kind: 'group_knockout', participantCount: 8, legs: 2, thirdPlace: false, drawSeed: 7, seedPolicy: 'random',
+      groups: [{ name: 'A조', capacity: 4, advanceCount: 1, legs: firstLegs }, { name: 'B조', capacity: 4, advanceCount: 1 }] };
+    server.use(http.get(`${base}/draft`, () => success({ input: saved, revision: 2 })));
+    show({ format: 'group_knockout', confirmedTeamCount: 6 });
+    fireEvent.click(await screen.findByRole('button', { name: '저장한 설정 불러오기' }));
+    await waitFor(() => expect(screen.getByLabelText('참가 팀 수')).toHaveValue(8)); next();
+    expect(screen.getByLabelText('1번째 조 회전')).toHaveValue(String(firstLegs ?? 2));
+    expect(screen.getByLabelText('2번째 조 회전')).toHaveValue('2');
+    fireEvent.change(screen.getByLabelText('1번째 조 회전'), { target: { value: '1' } });
+    expect(screen.getByLabelText('2번째 조 회전')).toHaveValue('2');
+  });
   it('출시 플래그가 꺼져 있으면 기존 템플릿을 제공한다', async () => {
     server.use(http.get(`${base}/capabilities`, () => success({ flexibleEnabled: false })));
     show({ confirmedTeamCount: 8 });

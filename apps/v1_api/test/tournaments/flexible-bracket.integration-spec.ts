@@ -32,6 +32,28 @@ describe('짝수 대진 실제 저장과 조별 진출', () => {
   beforeAll(async () => { process.env.V1_FLEXIBLE_BRACKETS_ENABLED = 'true'; await prisma.$connect(); await seedCompetitionConfigFixture(prisma, user); });
   afterAll(async () => { await prisma.$disconnect(); if (oldFlag === undefined) delete process.env.V1_FLEXIBLE_BRACKETS_ENABLED; else process.env.V1_FLEXIBLE_BRACKETS_ENABLED = oldFlag; });
 
+  it('조별 1·2회전을 초안과 실제 경기의 회전 번호·홈원정에 반영한다', async () => {
+    const { tournamentId, registrationIds } = await seedBracketTournament(prisma, { label: 'mixed-group-legs', format: 'group_knockout', teamCount: 6 });
+    const input: ApplyBracketTemplateDto = { schemaVersion: 2, kind: 'group_knockout', participantCount: 6, drawSeed: 7, registrationIds,
+      groups: [{ name: 'A조', capacity: 3, advanceCount: 1, legs: 1 }, { name: 'B조', capacity: 3, advanceCount: 1, legs: 2 }] };
+    await templates.saveDraft(user, tournamentId, { ...input, expectedRevision: 0 });
+    expect(await templates.draft(user, tournamentId)).toMatchObject({ input: { groups: input.groups }, revision: 1 });
+    const preview = await templates.preview(user, tournamentId, input);
+    expect(preview.counts.fixtures).toBe(10);
+    await templates.apply(user, tournamentId, { ...input, previewHash: preview.previewHash, requestId: 'mixed-group-legs-request' });
+    const fixtures = await prisma.v1TournamentMatchDetails.findMany({ where: { tournamentId }, include: { group: true } });
+    expect(fixtures).toHaveLength(10);
+    const first = fixtures.filter(row => row.group?.name === 'A조');
+    const second = fixtures.filter(row => row.group?.name === 'B조');
+    expect(first).toHaveLength(3);
+    expect(first.every(row => row.legNumber === 1)).toBe(true);
+    expect(second.filter(row => row.legNumber === 1)).toHaveLength(3);
+    expect(second.filter(row => row.legNumber === 2)).toHaveLength(3);
+    for (const fixture of second) expect(second).toEqual(expect.arrayContaining([
+      expect.objectContaining({ homeRegistrationId: fixture.awayRegistrationId, awayRegistrationId: fixture.homeRegistrationId }),
+    ]));
+  });
+
   it('10팀: 두 부전승이 만나는 경기까지 배정하고 중복 동시 요청은 한 번만 생성한다', async () => {
     const seeded = await seedBracketTournament(prisma, { label: 'flex10', format: 'knockout', teamCount: 10 });
     const input: ApplyBracketTemplateDto = { schemaVersion: 2, kind: 'knockout', size: 10, participantCount: 10,

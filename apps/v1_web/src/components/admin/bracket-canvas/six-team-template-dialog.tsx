@@ -1,5 +1,6 @@
 'use client';
 import { useId, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { SectionTitle } from '@/components/v1-ui/primitives';
 import { Button } from '@/components/v1-ui/button';
@@ -60,12 +61,12 @@ export function SixTeamTemplateDialog(
     onClose: props.onClose,
     pending: busy,
   });
-  if (!mounted) return null;
+  if (!mounted || typeof document === 'undefined') return null;
   return (
     <>
-      {ConfirmModal}
-      <div
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 tm-modal-scrim"
+      {createPortal(<div
+        style={{ zIndex: 'var(--z-modal)' }}
+        className="fixed inset-0 flex items-center justify-center p-4 tm-modal-scrim"
         onClick={onBackdropClick}
       >
         <div
@@ -232,7 +233,8 @@ export function SixTeamTemplateDialog(
             )}
           </div>
         </div>
-      </div>
+      </div>, document.body)}
+      {ConfirmModal}
     </>
   );
 }

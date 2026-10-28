@@ -1,0 +1,35 @@
+{
+  "observations": [
+    {
+      "width": 390,
+      "status": 200,
+      "url": "https://alpha.teameet.co.kr/tournaments/93a11ead-52ca-4262-bede-66802587c3d8/bracket?tab=standings",
+      "selectedGroup": [],
+      "choices": [],
+      "selected": [],
+      "errors": [],
+      "horizontalOverflow": false
+    },
+    {
+      "width": 768,
+      "status": 200,
+      "url": "https://alpha.teameet.co.kr/tournaments/93a11ead-52ca-4262-bede-66802587c3d8/bracket?tab=standings",
+      "selectedGroup": [],
+      "choices": [],
+      "selected": [],
+      "errors": [],
+      "horizontalOverflow": false
+    },
+    {
+      "width": 1440,
+      "status": 200,
+      "url": "https://alpha.teameet.co.kr/tournaments/93a11ead-52ca-4262-bede-66802587c3d8/bracket?tab=standings",
+      "selectedGroup": [],
+      "choices": [],
+      "selected": [],
+      "errors": [],
+      "horizontalOverflow": false
+    }
+  ],
+  "cleanup": "owned headed browser closed"
+}

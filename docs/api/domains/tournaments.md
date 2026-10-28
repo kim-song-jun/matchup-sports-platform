@@ -13,7 +13,7 @@
 | POST (suffix 없음) | 설정 + `previewHash` + `requestId` + 선택 `replaceExisting`, `acknowledgeRematches`. 실제 생성은 하나의 대회 잠금/트랜잭션 안에서 수행한다. |
 | GET `/requests/:requestId` | `{ completed, result }`. 감사 로그에 커밋된 생성 결과가 있으면 completed=true. false는 진행 중/미완료를 구분하지 않으며 동일 키로 재시도할 수 있다. |
 
-설정은 `schemaVersion: 2`, `kind: knockout | group_knockout`, `participantCount`, `drawSeed`(uint32), `seedPolicy: random | seeded`, 선택 `registrationIds`, `thirdPlace`를 받는다. 단독은 `size`와 participantCount가 동일한 4~64 짝수다. 조별은 `groups: [{ name, capacity, advanceCount }]`, `legs: 1 | 2`를 받는다. 조는 2~16개, capacity 2~8, advanceCount 1~capacity−1이며 합계는 참가 수와 같아야 한다. 결선은 2팀 이상이며 홀수도 가능하고 3·4위전은 4팀 이상에서만 허용한다. 조별+결선 실제 경기는 합계 240개 이하다.
+설정은 `schemaVersion: 2`, `kind: knockout | group_knockout`, `participantCount`, `drawSeed`(uint32), `seedPolicy: random | seeded`, 선택 `registrationIds`, `thirdPlace`를 받는다. 단독은 `size`와 participantCount가 동일한 4~64 짝수다. 조별은 `groups: [{ name, capacity, advanceCount, legs?: 1 | 2 }]`로 각 조의 회전 수를 따로 정한다. 조별 `legs`가 우선하며, 생략하면 기존 최상위 `legs`를 사용하고 둘 다 없으면 1회전이다. v1·리그 계약의 최상위 `legs` 필수 조건은 유지한다. 초안·미리보기·생성·240경기 상한 계산 모두 동일한 조별 회전 수를 사용한다. 조는 2~16개, capacity 2~8, advanceCount 1~capacity−1이며 합계는 참가 수와 같아야 한다. 결선은 2팀 이상이며 홀수도 가능하고 3·4위전은 4팀 이상에서만 허용한다. 조별+결선 실제 경기는 합계 240개 이하다.
 
 배정 배열은 단독에서는 position(시드 번호) 순서, 조별에서는 조 배열과 조 안 자리 순서다. 제공 시 모든 자리에 서로 다른 confirmed 등록을 넣어야 한다. 생략하면 빈 골격을 생성한다. 조별 결선은 높은 조별 순위를 우선하여 부전승을 주며 동일 순위는 drawSeed로 추첨한다. 같은 조 분리는 128회 이내 결정적 탐색으로 개선하고, 첫 경기 재대결 가능성은 warnings로 알려 확인 후 생성한다.
 

@@ -4521,8 +4521,8 @@ export type BracketTemplateInput =
 
 export type FlexibleBracketInput = {
   schemaVersion: 2; kind: 'knockout' | 'group_knockout'; size?: number; participantCount: number;
-  groups?: { name: string; capacity: number; advanceCount: number }[];
-  legs: 1 | 2; thirdPlace: boolean; drawSeed: number; seedPolicy: 'random' | 'seeded'; registrationIds?: string[];
+  groups?: { name: string; capacity: number; advanceCount: number; legs?: 1 | 2 }[];
+  legs?: 1 | 2; thirdPlace: boolean; drawSeed: number; seedPolicy: 'random' | 'seeded'; registrationIds?: string[];
 };
 export type FlexibleBracketPreview = {
   warnings?: string[];

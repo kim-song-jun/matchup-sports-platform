@@ -15,14 +15,14 @@ import { distributeGroupSeeds } from '@/lib/seeded-group-assignment';
 import type { FlexibleBracketInput, FlexibleBracketPreview } from '@/types/api';
 import type { BracketTemplateDialogProps } from './bracket-template-dialog';
 
-type Group = NonNullable<FlexibleBracketInput['groups']>[number];
+type Group = NonNullable<FlexibleBracketInput['groups']>[number] & { legs: 1 | 2 };
 type Draft = { input: FlexibleBracketInput | null; revision: number };
 const inputClass = 'tm-input min-h-[44px] w-full';
 const draw = () => crypto.getRandomValues(new Uint32Array(1))[0];
 function distribute(total: number, count: number): Group[] {
   return Array.from({ length: count }, (_, i) => {
     const capacity = Math.floor(total / count) + Number(i < total % count);
-    return { name: `${String.fromCharCode(65 + i)}조`, capacity, advanceCount: Math.min(2, capacity - 1) };
+    return { name: `${String.fromCharCode(65 + i)}조`, capacity, advanceCount: Math.min(2, capacity - 1), legs: 1 };
   });
 }
 
@@ -33,7 +33,6 @@ export function FlexibleBracketWizard(props: BracketTemplateDialogProps & { onLe
   const [step, setStep] = useState(0);
   const [count, setCount] = useState(props.confirmedTeamCount || 8);
   const [groups, setGroups] = useState<Group[]>(() => distribute(props.confirmedTeamCount || 8, 2));
-  const [legs, setLegs] = useState<1 | 2>(1);
   const [thirdPlace, setThirdPlace] = useState(false);
   const [seed, setSeed] = useState(0);
   const [seedPolicy, setSeedPolicy] = useState<'random' | 'seeded'>('random');
@@ -54,7 +53,7 @@ export function FlexibleBracketWizard(props: BracketTemplateDialogProps & { onLe
   const teams = (registrations.data?.items ?? []).filter((team) => team.status === 'confirmed');
   const draft = useQuery({ queryKey: ['bracket-draft', tournamentId], queryFn: () => v1Get<Draft>(`${base}/draft`), enabled: open });
   const input: FlexibleBracketInput = { schemaVersion: 2, kind: format === 'group_knockout' ? 'group_knockout' : 'knockout',
-    participantCount: count, ...(format === 'knockout' ? { size: count } : { groups }), legs, thirdPlace,
+    participantCount: count, ...(format === 'knockout' ? { size: count } : { groups }), thirdPlace,
     drawSeed: seed, seedPolicy, ...(assignNow ? { registrationIds: assignments } : {}) };
   const serialized = JSON.stringify(input);
   const preview = useMutation({ mutationFn: (payload: FlexibleBracketInput) => v1Post<FlexibleBracketPreview>(`${base}/preview`, payload) });
@@ -87,7 +86,7 @@ export function FlexibleBracketWizard(props: BracketTemplateDialogProps & { onLe
   const validGroups = format === 'knockout' || (total === count && groups.length >= 2 && groups.length <= 16
     && new Set(groups.map((group) => group.name.trim())).size === groups.length
     && groups.every((group) => group.name.trim() && Number.isInteger(group.capacity) && group.capacity >= 2 && group.capacity <= 8
-      && Number.isInteger(group.advanceCount) && group.advanceCount >= 1 && group.advanceCount < group.capacity));
+      && Number.isInteger(group.advanceCount) && group.advanceCount >= 1 && group.advanceCount < group.capacity && [1, 2].includes(group.legs)));
   const validAssignment = !assignNow || (assignments.length === count && new Set(assignments).size === count
     && assignments.every((id) => teams.some((team) => team.id === id)));
   const valid = validCount && validGroups && validAssignment && (!thirdPlace || finalists >= 4);
@@ -99,13 +98,15 @@ export function FlexibleBracketWizard(props: BracketTemplateDialogProps & { onLe
     const saved = fresh.data?.input;
     if (!saved || saved.schemaVersion !== 2 || saved.kind !== input.kind) return;
     touched.current = true;
-    setCount(saved.participantCount); setGroups(saved.groups ?? distribute(saved.participantCount, 2)); setLegs(saved.legs);
+    setCount(saved.participantCount);
+    setGroups(saved.groups?.map(group => ({ ...group, legs: group.legs ?? saved.legs ?? 1 })) ?? distribute(saved.participantCount, 2));
     setThirdPlace(saved.thirdPlace); setSeed(saved.drawSeed); setSeedPolicy(saved.seedPolicy);
     setAssignNow(Boolean(saved.registrationIds)); setAssignments(saved.registrationIds ?? []); setGroupSeeds([]); setRevision(fresh.data!.revision); setDirty(false);
   };
   async function changeGroupCount(groupCount: number) {
     if (assignments.some(Boolean) && !await confirm({ title: '조 편성 변경', message: '조 수를 바꾸면 현재 팀 배정이 초기화돼요. 다시 편성할까요?', confirmLabel: '다시 편성' })) return;
-    setGroups(distribute(count, groupCount)); setAssignments([]); setGroupSeeds([]); mark();
+    setGroups(distribute(count, groupCount).map((group, i) => ({ ...group, legs: groups[i]?.legs ?? 1 })));
+    setAssignments([]); setGroupSeeds([]); mark();
   }
   function fillTeams(seeded: boolean) {
     if (seeded && groupSeeds.slice(0, groupSeeds.findLastIndex(Boolean) + 1).some(id => !id)) {
@@ -170,15 +171,16 @@ export function FlexibleBracketWizard(props: BracketTemplateDialogProps & { onLe
               {candidates.map((n) => <option key={n} value={n}>{n}개 조</option>)}
             </select></label>
             <div className="flex flex-wrap gap-2" aria-label="조 편성 추천">{[...candidates].sort((a, b) => Math.abs(count / a - 4) - Math.abs(count / b - 4)).slice(0, 3).map((n) => <Button key={n} variant="outline" onClick={() => void changeGroupCount(n)}>{n}개 조 · {distribute(count, n).map((g) => g.capacity).join('·')}팀</Button>)}</div>
-            <div className="space-y-3">{groups.map((group, index) => <fieldset key={index} className="grid grid-cols-3 gap-2 rounded-xl border border-[var(--border)] p-3">
+            <div className="space-y-3">{groups.map((group, index) => <fieldset key={index} className="grid grid-cols-3 gap-2 rounded-xl border border-[var(--border)] p-3 sm:grid-cols-4">
               <legend className="tm-text-label px-1">{group.name || `${index + 1}번째 조`}</legend>
               {(['name', 'capacity', 'advanceCount'] as const).map((field, i) => <label key={field} className="tm-text-caption">{['조 이름', '팀 수', '진출 수'][i]}<input aria-label={`${index + 1}번째 조 ${['이름', '팀 수', '진출 수'][i]}`} className={inputClass} type={field === 'name' ? 'text' : 'number'} value={group[field]} min={field === 'capacity' ? 2 : 1} max={field === 'capacity' ? 8 : field === 'advanceCount' ? group.capacity - 1 : undefined} maxLength={80}
                 onChange={(e) => { setGroups(groups.map((g, j) => j !== index ? g : { ...g, [field]: field === 'name' ? e.target.value : Number(e.target.value) })); mark(); }} /></label>)}
-              <p className="col-span-3 tm-text-caption text-[var(--text-muted)]">{group.capacity * (group.capacity - 1) / 2 * legs}경기 · 팀당 {(group.capacity - 1) * legs}경기 · {Math.round(group.advanceCount / group.capacity * 100)}% 진출</p>
+              <label className="col-span-3 tm-text-caption sm:col-span-1">회전<select aria-label={`${index + 1}번째 조 회전`} className={inputClass} value={group.legs}
+                onChange={(e) => { setGroups(groups.map((g, j) => j !== index ? g : { ...g, legs: Number(e.target.value) as 1 | 2 })); mark(); }}><option value={1}>1회전</option><option value={2}>2회전</option></select></label>
+              <p className="col-span-3 tm-text-caption text-[var(--text-muted)] sm:col-span-4">{group.capacity * (group.capacity - 1) / 2 * group.legs}경기 · 팀당 {(group.capacity - 1) * group.legs}경기 · {Math.round(group.advanceCount / group.capacity * 100)}% 진출</p>
             </fieldset>)}</div>
             <p className="tm-text-label">참가 {count}팀 중 {total}팀 편성 · 결선 {finalists}팀</p>
             {!validGroups && <p role="alert" className="tm-text-caption text-[var(--red700)]">조별 팀 수 합계를 맞추고, 각 조 진출 수는 1팀 이상·조 팀 수보다 적게 설정해 주세요.</p>}
-            <label className="block tm-text-label">조별 회전<select className={inputClass} value={legs} onChange={(e) => { setLegs(Number(e.target.value) as 1 | 2); mark(); }}><option value={1}>1회전</option><option value={2}>2회전</option></select></label>
           </>}
           <p className="tm-text-body">결선 {finalists}팀 · 부전승 {finalists >= 2 ? 2 ** Math.ceil(Math.log2(finalists)) - finalists : 0}팀</p>
           <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={thirdPlace} disabled={finalists < 4} onChange={(e) => { setThirdPlace(e.target.checked); mark(); }} />3·4위전도 만들기</label>

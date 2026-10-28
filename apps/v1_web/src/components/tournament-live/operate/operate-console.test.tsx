@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { COMMAND_RESPONSE_TIMEOUT_MS, OperateConsole, TeamMatchOperateConsole } from './operate-console';
 import type { FixtureLineupResponse, GameDetail, GameEventRecord, GameLineup, GameLineupState } from '@/types/game-operations';
 import { V1_NETWORK_ERROR_CODE, V1ApiError } from '@/lib/api-client';
+import * as overlayHistory from '@/lib/overlay-history';
 
 const queryClients: QueryClient[] = [];
 function render(ui: ReactNode) {
@@ -539,19 +540,26 @@ describe('TeamMatchOperateConsole — source binding and ordinary host actions',
     expect(body).not.toHaveProperty('takeoverToken');
   });
 
-  it('does not dispatch a confirmed ordinary command after the console unmounts during overlay dismissal', async () => {
+  it('waits for the real confirmation dismissal and suppresses its continuation after unmount', async () => {
+    let resolveDismissal!: () => void;
+    const dismissal = new Promise<void>((resolve) => { resolveDismissal = resolve; });
+    const waitForDismissal = vi.spyOn(overlayHistory, 'waitForOverlayHistory').mockReturnValue(dismissal);
     const view = mountOrdinaryConsole();
 
     fireEvent.click(screen.getByRole('button', { name: '일시 중지' }));
     const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('일시 중지');
     fireEvent.click(within(dialog).getByRole('button', { name: '일시 중지' }));
+    await waitFor(() => expect(waitForDismissal).toHaveBeenCalledTimes(1));
     view.unmount();
 
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      resolveDismissal();
+      await dismissal;
     });
 
     expect(mocks.postV1GameCommand).not.toHaveBeenCalled();
+    waitForDismissal.mockRestore();
   });
 
   it('starts with the host-side lineup returned by the ordinary operations endpoint without claiming the hidden opponent is missing', () => {
@@ -611,10 +619,12 @@ describe('TeamMatchOperateConsole — source binding and ordinary host actions',
 
     expect(screen.getByText(/정규 시간이 끝났어요/)).toBeInTheDocument();
     expect(screen.queryByText(/‘경기 종료’를 눌러주세요/)).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '결과 제출 화면 열기' })).toHaveAttribute(
+    const resultLink = screen.getByRole('link', { name: '결과 제출 화면 열기' });
+    expect(resultLink).toHaveAttribute(
       'href',
       '/team-matches/team-match-1/result',
     );
+    expect(resultLink).toHaveStyle({ minHeight: 'var(--size-touch-min)' });
   });
 });
 
@@ -1071,6 +1081,32 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
     await waitFor(() =>
       expect(mocks.postV1GameCommand).toHaveBeenCalledWith('game-1', 'end-period', expect.anything(), COMMAND_OPTIONS),
     );
+  });
+
+  it('clears a pending command when tournament fixture identity changes during its request', async () => {
+    gameWithPeriods('LIVE', [
+      { number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null },
+      { number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null },
+    ]);
+    let resolveCommand!: (result: { gameId: string; state: string; version: number }) => void;
+    const commandResponse = new Promise<{ gameId: string; state: string; version: number }>((resolve) => {
+      resolveCommand = resolve;
+    });
+    mocks.postV1GameCommand.mockReturnValue(commandResponse);
+
+    const view = render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '전반 종료' }));
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '전반 종료' }));
+    await waitFor(() => expect(mocks.postV1GameCommand).toHaveBeenCalledTimes(1));
+
+    view.rerender(<OperateConsole tournamentId="t-1" fixtureId="f-2" />);
+
+    expect(screen.getByRole('button', { name: '전반 종료' })).toBeEnabled();
+    await act(async () => {
+      resolveCommand({ gameId: 'game-1', state: 'LIVE', version: 3 });
+      await commandResponse;
+    });
+    expect(screen.getByRole('button', { name: '전반 종료' })).toBeEnabled();
   });
 
   // 종료 흐름 개편 요구사항 1 — 전반 종료는 확인 게이트 없이 실행되면 안

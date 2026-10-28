@@ -541,6 +541,9 @@ function OperateConsoleCore({
     gameId,
     myUserId ?? null,
     operationMode,
+    tournamentId ?? null,
+    fixtureId ?? null,
+    tournamentOpsRole ?? null,
     gameDetail.data?.id ?? null,
     gameDetail.data?.sourceType ?? null,
     gameDetail.data?.actorRole ?? null,
@@ -2050,7 +2053,8 @@ function OperateConsoleCore({
                     {resultHref ? (
                       <Link
                         href={resultHref}
-                        className="mt-2 inline-flex min-h-[44px] items-center font-semibold underline underline-offset-2"
+                        className="mt-2 inline-flex items-center font-semibold underline underline-offset-2"
+                        style={{ minHeight: 'var(--size-touch-min)' }}
                       >
                         결과 제출 화면 열기
                       </Link>

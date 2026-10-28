@@ -53,9 +53,10 @@ export class AppendGameEventDto {
   @IsNotEmpty()
   clientEventId!: string;
 
+  @ValidateIf((_dto, value) => value !== undefined)
   @IsString()
   @IsNotEmpty()
-  takeoverToken!: string;
+  takeoverToken?: string;
 
   @IsEnum(V1GameEventType)
   type!: V1GameEventType;
@@ -103,9 +104,10 @@ export class ReverseGameEventDto {
   @IsNotEmpty()
   clientEventId!: string;
 
+  @ValidateIf((_dto, value) => value !== undefined)
   @IsString()
   @IsNotEmpty()
-  takeoverToken!: string;
+  takeoverToken?: string;
 
   @IsString()
   @IsNotEmpty()
@@ -139,9 +141,10 @@ export class AssignGoalAssistDto {
   @IsNotEmpty()
   clientEventId!: string;
 
+  @ValidateIf((_dto, value) => value !== undefined)
   @IsString()
   @IsNotEmpty()
-  takeoverToken!: string;
+  takeoverToken?: string;
 
   @ValidateIf((dto: AssignGoalAssistDto) => dto.assistParticipantId !== null)
   @IsUUID()

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useId, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 import { Button } from '@/components/v1-ui/button';
@@ -146,14 +147,15 @@ export function FlexibleBracketWizard(props: BracketTemplateDialogProps & { onLe
   }
   const assignmentSlots = format === 'knockout' ? Array.from({ length: validCount ? count : 0 }, (_, i) => `${i + 1}번 시드`)
     : groups.flatMap((group) => Array.from({ length: Number.isInteger(group.capacity) && group.capacity >= 2 && group.capacity <= 8 ? group.capacity : 0 }, (_, i) => `${group.name} ${i + 1}번`));
-  if (!mounted) return ConfirmModal;
-  return <>{ConfirmModal}<div className={`fixed inset-0 z-50 flex items-center justify-center p-4 tm-modal-scrim${closing ? ' is-closing' : ''}`} onClick={onBackdropClick}>
+  if (!mounted || typeof document === 'undefined') return ConfirmModal;
+  return <>{ConfirmModal}{createPortal(<div className={`fixed inset-0 z-50 flex items-center justify-center p-4 tm-modal-scrim${closing ? ' is-closing' : ''}`} onClick={onBackdropClick}>
     <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={`${prefix}-title`} className="tm-modal-panel flex max-h-[calc(100dvh-32px)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-[var(--card-surface)] text-[var(--text-strong)]">
-      <div className="flex items-center justify-between border-b border-[var(--border)] p-4">
+      <div className="flex shrink-0 items-center justify-between border-b border-[var(--border)] p-4">
         <h2 id={`${prefix}-title`} className="tm-text-body-lg font-bold">전체 대진 만들기</h2>
         <button aria-label="모달 닫기" className="flex size-11 items-center justify-center rounded-lg" disabled={busy} onClick={() => void close()}><X size={20} /></button>
       </div>
-      <fieldset disabled={busy} className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5">
+      <div key={step} className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]">
+      <fieldset disabled={busy} className="min-w-0 space-y-5 p-5">
         <p className="tm-text-label text-[var(--text-muted)]">{step + 1}/4 · {['참가 팀 수', '조 편성과 진출', '팀 배정', '전체 미리보기'][step]}</p>
         {error && <p role="alert" className="tm-text-caption text-[var(--red700)]">{error}</p>}
         {recovering && <p role="status" className="tm-text-caption">서버에 저장된 생성 결과를 확인하고 있어요.</p>}
@@ -171,7 +173,7 @@ export function FlexibleBracketWizard(props: BracketTemplateDialogProps & { onLe
               {candidates.map((n) => <option key={n} value={n}>{n}개 조</option>)}
             </select></label>
             <div className="flex flex-wrap gap-2" aria-label="조 편성 추천">{[...candidates].sort((a, b) => Math.abs(count / a - 4) - Math.abs(count / b - 4)).slice(0, 3).map((n) => <Button key={n} variant="outline" onClick={() => void changeGroupCount(n)}>{n}개 조 · {distribute(count, n).map((g) => g.capacity).join('·')}팀</Button>)}</div>
-            <div className="space-y-3">{groups.map((group, index) => <fieldset key={index} className="grid grid-cols-3 gap-2 rounded-xl border border-[var(--border)] p-3 sm:grid-cols-4">
+            <div className="space-y-3">{groups.map((group, index) => <fieldset key={index} className="grid min-w-0 grid-cols-3 gap-2 rounded-xl border border-[var(--border)] p-3 sm:grid-cols-4">
               <legend className="tm-text-label px-1">{group.name || `${index + 1}번째 조`}</legend>
               {(['name', 'capacity', 'advanceCount'] as const).map((field, i) => <label key={field} className="tm-text-caption">{['조 이름', '팀 수', '진출 수'][i]}<input aria-label={`${index + 1}번째 조 ${['이름', '팀 수', '진출 수'][i]}`} className={inputClass} type={field === 'name' ? 'text' : 'number'} value={group[field]} min={field === 'capacity' ? 2 : 1} max={field === 'capacity' ? 8 : field === 'advanceCount' ? group.capacity - 1 : undefined} maxLength={80}
                 onChange={(e) => { setGroups(groups.map((g, j) => j !== index ? g : { ...g, [field]: field === 'name' ? e.target.value : Number(e.target.value) })); mark(); }} /></label>)}
@@ -211,7 +213,8 @@ export function FlexibleBracketWizard(props: BracketTemplateDialogProps & { onLe
           </div>}
         </>}
       </fieldset>
-      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border)] p-4">
+      </div>
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-[var(--border)] p-4">
         <Button variant="neutral" disabled={busy || !valid || revision === null} onClick={() => save.mutate()}>초안 저장</Button>
         <div className="flex gap-2">{step > 0 && <Button variant="neutral" disabled={busy} onClick={() => setStep(step - 1)}>이전</Button>}
           {step < 3 ? <Button variant="primary" loading={preview.isPending} disabled={busy || !validCount || (step >= 1 && !validGroups) || (step === 2 && !valid)} onClick={() => void next()}>다음</Button>
@@ -219,7 +222,7 @@ export function FlexibleBracketWizard(props: BracketTemplateDialogProps & { onLe
         </div>
       </div>
     </div>
-  </div></>;
+  </div>, document.body)}</>;
 }
 
 function BracketPlanReview({ plan, input, teams }: { plan: FlexibleBracketPreview; input: FlexibleBracketInput; teams: { id: string; teamName?: string | null }[] }) {

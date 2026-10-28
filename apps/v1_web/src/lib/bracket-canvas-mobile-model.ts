@@ -212,7 +212,7 @@ export function buildBracketMobileRounds(input: {
 }): MobileRound[] {
   const labels = buildSideLabelContext(input.groups, input.fixtures, input.slots);
   const groupIds = new Set(input.groups.map((group) => group.id));
-  const order: Record<string, number> = { group: 0, round64: 0.25, round32: 0.5, round16: 1, round12: 2, quarter: 3, semi: 4, final: 5, third_place: 6 };
+  const order: Record<string, number> = { group: 0, round64: 0.25, round32: 0.5, round16: 1, round12: 2, quarter: 3, semi: 4, third_place: 5, final: 6 };
   const groups = [...input.groups].sort((a, b) => (order[a.phase] ?? 99) - (order[b.phase] ?? 99) || a.sortOrder - b.sortOrder || a.id.localeCompare(b.id));
   const rounds: MobileRound[] = [];
   const roundByKey = new Map<string, MobileRound>();
@@ -251,7 +251,7 @@ export function buildBracketMobileRounds(input: {
 
   for (const round of rounds) {
     if (round.key === 'group' && round.sections.length === 1) round.label = round.sections[0].heading ?? round.label;
-    round.sections.sort((a, b) => Number(thirdPlaceSectionKeys.has(a.key)) - Number(thirdPlaceSectionKeys.has(b.key)));
+    round.sections.sort((a, b) => Number(thirdPlaceSectionKeys.has(b.key)) - Number(thirdPlaceSectionKeys.has(a.key)));
   }
 
   const orphans = input.fixtures

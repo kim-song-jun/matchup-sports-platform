@@ -51,8 +51,8 @@ export type CanvasLayout = {
   groupBlocks: GroupBlockLayout[];
 };
 
-// 조별리그(group)는 결선보다 앞 열이고, 결선은 round16 > round12 > quarter > semi > final > third_place 순이다(한 대회에 16강·12강이 함께 있지는 않다). 모르는 단계는 맨 뒤.
-const PHASE_ORDER: Readonly<Record<string, number>> = { group: 0, round64: 0.25, round32: 0.5, round16: 1, round12: 2, quarter: 3, semi: 4, final: 5, third_place: 6 };
+// 조별리그(group)는 결선보다 앞 열이고, 결선은 round16 > round12 > quarter > semi > third_place > final 순이다(한 대회에 16강·12강이 함께 있지는 않다). 모르는 단계는 맨 뒤.
+const PHASE_ORDER: Readonly<Record<string, number>> = { group: 0, round64: 0.25, round32: 0.5, round16: 1, round12: 2, quarter: 3, semi: 4, third_place: 5, final: 6 };
 
 type ColumnSeed = { key: string; groupId: string | null; label: string; fixtures: V1AdminBracketFixture[] };
 

@@ -823,3 +823,14 @@ DB는 기존 `V1Tournament.listImageUrl`을 재사용하고 `v1_tournaments.show
 `prizeBreakdown` remains a nullable string stored on `V1Tournament`; no schema migration is required. Create/update DTOs accept up to 4,000 characters (previously 500) to accommodate the existing 12-row editor plus category metadata. This is the prize plan, separate from actual award recipients.
 
 Legacy delimiter-separated text remains readable. New admin saves use `@teameet/prizes/v1:` followed by a JSON array of `{ category, label, amount }`. Category is one of `팀 시상`, `개인 시상`, `기타 시상`. Readers must use `parsePrizeRows` / `splitPrizeSegments` instead of rendering the encoded field directly. Explicit category wins over label inference, including arbitrary or multiword personal award names. Unclassified legacy rows use name-based inference; former raffle/event rows belong to `기타 시상`. Team aliases `우승/1위/1등`, `준우승/2위/2등`, and numeric `N위/N등` map to the same position for grouping and winner links. Separate categories never merge, and personal awards never acquire a team winner through a rank-like name. Empty saved rows clear the field with `null` on the info editor.
+
+
+## 대회 결선 표시 순서 (2026-10-28)
+
+`GET /admin/tournaments/:id/bracket`의 groups 및 fixtures 기본 표시 순서는 조별/이전 라운드 → 4강 → 3·4위전 → 결승이다.
+기존 group.sortOrder, fixtureNumber, legNumber, 참가 등록, 점수, 경기 시각 및 승자·패자 연결은 변경하지 않는다.
+조회 배열의 표시 정렬만 바뀌며 저장·마이그레이션은 없다. 어드민 desktop/mobile도 같은 기본 순서를 사용한다.
+실제 시각으로 정렬하는 일정 API/화면은 기존 시간순을 유지한다.
+공개 종료 결과는 결승 → 3·4위전 → 4강 → 이전 라운드로 읽는다.
+단판은 단일 경기로 표시하며, 합산은 같은 단계/편성·경기번호의1·2차전이 모두 공식 점수와 같은 참가팀 식별자를 가질 때만 보여준다.
+팀명으로 같은 대진이라고 추정하거나 미확정 점수를0점으로 합산하지 않는다.

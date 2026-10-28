@@ -2009,6 +2009,24 @@ describe('TournamentBracketService', () => {
     });
   });
 
+  it('getBracket: displays third-place before final without rewriting stored groups', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
+    const groups = [
+      { ...groupRow({ id: 'final', name: '결승', phase: 'final', sortOrder: 0 }), groupTeams: [], byeSlots: [] },
+      { ...groupRow({ id: 'third', name: '3·4위전', phase: 'third_place', sortOrder: 99 }), groupTeams: [], byeSlots: [] },
+      { ...groupRow({ id: 'semi', name: '4강', phase: 'semi', sortOrder: 100 }), groupTeams: [], byeSlots: [] },
+    ];
+    const before = JSON.stringify(groups);
+    prisma.v1TournamentGroup.findMany.mockResolvedValue(groups);
+    prisma.v1TournamentStanding.findMany.mockResolvedValue([]);
+    const result = await service.getBracket(ownerUser, 'tournament-1');
+    expect(result.groups.map(group => group.name)).toEqual(['4강', '3·4위전', '결승']);
+    expect(JSON.stringify(groups)).toBe(before);
+    expect(prisma.v1TournamentGroup.create).not.toHaveBeenCalled();
+    expect(prisma.v1TournamentMatchDetails.update).not.toHaveBeenCalled();
+  });
+
   it('getBracket: returns groups/fixtures/standings structure', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
     prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());

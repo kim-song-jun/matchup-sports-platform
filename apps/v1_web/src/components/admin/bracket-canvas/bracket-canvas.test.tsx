@@ -67,7 +67,7 @@ describe('BracketCanvas', () => {
   it('열 이름을 단계 순서(4강 > 결승 > 3·4위전)로 보여 준다', () => {
     renderCanvas();
     const headings = screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent);
-    expect(headings).toEqual(['4강', '결승', '3·4위전']);
+    expect(headings).toEqual(['4강', '3·4위전', '결승']);
   });
 
   it('칸마다 제목과 자리 라벨을 그리고, 연결선은 승자 2 + 패자 2 개를 SVG 로 그린다', () => {

@@ -1,3 +1,9 @@
+## 2026-10-28 — 결과·운영 결선 표시 순서와 단판 합산
+
+[시나리오](./tournament-round-display.md) · [Task20261119](../../.github/tasks/20261119-tournament-round-display.md).
+종료결과는 결승→3위전, 운영은3위전→결승. 단판4강의 가짜 합산 제거, 실제2차전 유지.
+저장데이터·진출·일정 변경0. API221/Web203 PASS, alpha0/3(미배포).
+
 ## 2026-10-28 — 6강 결승 직행 토너먼트
 
 [시나리오](./six-team-knockout.md) · [Task 20261118](../../.github/tasks/20261118-six-team-knockout.md).

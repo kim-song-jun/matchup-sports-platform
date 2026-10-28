@@ -1408,7 +1408,7 @@ export class TournamentBracketService {
       }
     }
 
-    const phaseOrder: Record<string, number> = { group: 0, round64: 0.25, round32: 0.5, round16: 1, round12: 2, quarter: 3, semi: 4, final: 5, third_place: 6 };
+    const phaseOrder: Record<string, number> = { group: 0, round64: 0.25, round32: 0.5, round16: 1, round12: 2, quarter: 3, semi: 4, third_place: 5, final: 6 };
     const orderedGroups = [...groups].sort((a, b) => (phaseOrder[a.phase] ?? 99) - (phaseOrder[b.phase] ?? 99) || a.sortOrder - b.sortOrder || a.id.localeCompare(b.id));
     const groupOrder = new Map(orderedGroups.map((group, index) => [group.id, index]));
     return {

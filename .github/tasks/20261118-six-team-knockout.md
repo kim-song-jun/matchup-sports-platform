@@ -1,5 +1,20 @@
 # Task 20261118: 6강 전용 토너먼트 진행 방식
 
+## 2026-10-28 상세 화면 부전승 누락 후속
+
+- 대상: a90df6d5-47e9-40f9-93ef-f679ce8da858, `1028 토너먼트 6 test`.
+- 실제 API: sixTeamMode=true, 첫 3경기 모두 scheduled/result=null, bye=null. 선정 전 상태는 정상이다.
+- 원인: `/bracket`은 SixTeamBracket을 쓰지만 대회 상세 BracketSection은 일반 TournamentBracket만 사용해 성적 기반 부전승 경로를 누락했다.
+- 기존 승인된 6강 A안 전용 컴포넌트를 상세에도 재사용한다. 새 가상 경기나 결과/팀 배정을 만들지 않는다.
+- Owned: 상세 client, 기존 six-team-bracket 안내, 상세 렌더 회귀 테스트, 이 task와 changeset.
+- Forbidden: API/DB/결과 변경, 공유 WIP, main 승격.
+- [x] 상세 화면의 전용 대진표 및 사용자 지정 단계 이름 연결.
+- [x] 준결승 부전승 1팀임을 안내.
+- [x] 상세 선정 전/후 포함 2 files / 42 tests, tsc --noEmit --incremental false, v1 패턴 검사 통과.
+- [ ] PR 제출, 배포 후 alpha 390/768/1440 검증.
+- Progress: origin/dev ec33d1609에서 격리 작업트리 fix/six-team-bye-display. 앞선 일정 필터 #2083의 배포 요청은 유지하며 Copilot 예외 승인 확인 대기 중.
+- QA: alpha Before 390/768/1440에서 일반 대진표 및 직행 안내 누락 재현. 비로그인 auth/me 401은 기존 오류로 로그에 보존. 브라우저 PID 65220/parent 51764 종료 확인. After는 배포 후 실행. `git diff --check`, touched debt marker 0 확인. 원래 승인된 A안 재사용이며 새 디자인/가상 경기는 없음.
+
 Status: Review
 **Owner**: Main session (단독 진행)
 **Created**: 2026-10-28

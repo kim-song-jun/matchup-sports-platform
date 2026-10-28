@@ -31,7 +31,8 @@ import { compareTournamentGroupNames } from '@/lib/tournament-display-order';
 import { splitPrizeSegments, parsePrizeRows } from '@/lib/prize-breakdown';
 import { GroupedPrizes } from '@/components/tournaments/grouped-prizes';
 import { leagueSideLabel } from '@/lib/league-fixture-meta';
-import { TournamentBracket } from '@/components/tournaments/tournament-bracket';
+import { TournamentBracket, groupFixturesByRound } from '@/components/tournaments/tournament-bracket';
+import { SixTeamBracket } from '@/components/tournaments/six-team-bracket';
 import { LeagueFixtureCard } from '@/components/tournaments/league-fixture-card';
 import {
   CompetitionFixtureCard,
@@ -1926,18 +1927,25 @@ function BracketSection({ tournament }: { tournament: V1TournamentDetail }) {
      여기서 안 걸리고 아래 group_knockout 경로로 떨어져 **없는 대진표를 그린다**. */
   if (isLeagueCompetition(tournament)) return null;
 
+  const sixTeamState = tournament.sixTeamMode ? tournament.sixTeamBracket : null;
+  const bracketContent = sixTeamState ? (
+    <SixTeamBracket tournamentId={tournament.id} state={sixTeamState} fixtures={knockoutFixtures}
+      stageLabels={Object.fromEntries(groupFixturesByRound(knockoutFixtures, groups).map(round => [round.key, round.label]))} />
+  ) : <TournamentBracket fixtures={knockoutFixtures} groups={groups} />;
+  const connectedBracketWide = !sixTeamState && knockoutFixtures.length > 1 ? 'true' : undefined;
+
   /* knockout: 픽스처가 있을 때만 표시 (모집 중/마감 단계엔 미표시) */
   if (format === 'knockout') {
     if (!hasAnyFixtures) return null;
     return (
-      <div className="tm-tournament-detail-bracket" data-connected-bracket-wide={knockoutFixtures.length > 1 ? 'true' : undefined}>
+      <div className="tm-tournament-detail-bracket" data-connected-bracket-wide={connectedBracketWide}>
         <div className="tm-match-detail-body">
           <section aria-labelledby="bracket-heading" style={{ marginTop: 24 }}>
             <div id="bracket-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>
               대진표
             </div>
             <div style={{ marginTop: 4 }}>
-              <TournamentBracket fixtures={knockoutFixtures} groups={groups} />
+              {bracketContent}
             </div>
           </section>
         </div>
@@ -1951,14 +1959,14 @@ function BracketSection({ tournament }: { tournament: V1TournamentDetail }) {
   if (!hasKnockoutFixtures) return null;
 
   return (
-    <div className="tm-tournament-detail-bracket" data-connected-bracket-wide={knockoutFixtures.length > 1 ? 'true' : undefined}>
+    <div className="tm-tournament-detail-bracket" data-connected-bracket-wide={connectedBracketWide}>
       <div className="tm-match-detail-body">
         <section aria-labelledby="bracket-heading" style={{ marginTop: 24 }}>
           <div id="bracket-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>
             결선 대진표
           </div>
           <div style={{ marginTop: 4 }}>
-            <TournamentBracket fixtures={knockoutFixtures} groups={groups} />
+            {bracketContent}
           </div>
         </section>
       </div>

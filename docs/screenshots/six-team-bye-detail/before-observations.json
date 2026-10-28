@@ -1,0 +1,32 @@
+{
+  "observations": [
+    {
+      "width": 390,
+      "text": "대진표\n6강\n3강\n결승\n\n진출 연결이 등록된 경기만 선으로 이어져요. 연결되지 않은 경기는 별도로 표시해요.\n\n단계별 대진은 옆으로 밀어 확인할 수 있어요.\n\n6강\n\n1번 경기\n\n비공개\n비공개\n시간 미정\n\n2번 경기\n\n비공개\n비공개\n시간 미정\n\n3번 경기\n\n비공개\n비공개\n시간 미정\n3강\n\n4번 경기\n\n미정\n미정\n시간 미정\n결승\n\n5번 경기\n\n미정\n미정\n시간 미정\n우승\n미정",
+      "errors": [
+        "401 https://alpha.teameet.co.kr/api/v1/auth/me",
+        "Failed to load resource: the server responded with a status of 401 ()"
+      ],
+      "horizontalOverflow": false
+    },
+    {
+      "width": 768,
+      "text": "대진표\n6강\n3강\n결승\n\n진출 연결이 등록된 경기만 선으로 이어져요. 연결되지 않은 경기는 별도로 표시해요.\n\n단계별 대진은 옆으로 밀어 확인할 수 있어요.\n\n6강\n\n1번 경기\n\n비공개\n비공개\n시간 미정\n\n2번 경기\n\n비공개\n비공개\n시간 미정\n\n3번 경기\n\n비공개\n비공개\n시간 미정\n3강\n\n4번 경기\n\n미정\n미정\n시간 미정\n결승\n\n5번 경기\n\n미정\n미정\n시간 미정\n우승\n미정",
+      "errors": [
+        "401 https://alpha.teameet.co.kr/api/v1/auth/me",
+        "Failed to load resource: the server responded with a status of 401 ()"
+      ],
+      "horizontalOverflow": false
+    },
+    {
+      "width": 1440,
+      "text": "대진표\n6강\n3강\n결승\n\n진출 연결이 등록된 경기만 선으로 이어져요. 연결되지 않은 경기는 별도로 표시해요.\n\n6강\n\n1번 경기\n\n비공개\n비공개\n시간 미정\n\n2번 경기\n\n비공개\n비공개\n시간 미정\n\n3번 경기\n\n비공개\n비공개\n시간 미정\n3강\n\n4번 경기\n\n미정\n미정\n시간 미정\n결승\n\n5번 경기\n\n미정\n미정\n시간 미정\n우승\n미정",
+      "errors": [
+        "401 https://alpha.teameet.co.kr/api/v1/auth/me",
+        "Failed to load resource: the server responded with a status of 401 ()"
+      ],
+      "horizontalOverflow": false
+    }
+  ],
+  "cleanup": "owned headed browser closed"
+}

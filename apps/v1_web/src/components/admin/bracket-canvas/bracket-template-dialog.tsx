@@ -1,5 +1,6 @@
 'use client';
 
+import { SixTeamTemplateDialog } from './six-team-template-dialog';
 import { X } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { v1Get } from '@/lib/api-client';
@@ -71,11 +72,14 @@ function templateStagePreview(input: BracketTemplateInput): string {
 
 export function BracketTemplateDialog(props: BracketTemplateDialogProps) {
   const [legacy, setLegacy] = useState(false);
+  const [standard, setStandard] = useState(false);
+  useEffect(() => { if (!props.open) setStandard(false); }, [props.open]);
   useEffect(() => { if (!props.open) setLegacy(false); }, [props.open]);
   const capabilities = useQuery({ queryKey: ['bracket-template-capabilities', props.tournamentId],
-    queryFn: () => v1Get<{ flexibleEnabled: boolean }>(`/admin/tournaments/${encodeURIComponent(props.tournamentId)}/bracket/template/capabilities`),
+    queryFn: () => v1Get<{ flexibleEnabled: boolean; sixTeamEligible: boolean }>(`/admin/tournaments/${encodeURIComponent(props.tournamentId)}/bracket/template/capabilities`),
     enabled: props.open && props.format !== 'league', staleTime: 0, refetchOnWindowFocus: false, refetchOnReconnect: false });
   if (props.format !== 'league' && !capabilities.data) return <TemplateAvailabilityDialog open={props.open} onClose={props.onClose} error={capabilities.isError} retry={() => void capabilities.refetch()} />;
+  if (capabilities.data?.sixTeamEligible && !standard) return <SixTeamTemplateDialog {...props} onStandard={() => setStandard(true)} />;
   return !capabilities.data?.flexibleEnabled || props.format === 'league' || legacy
     ? <LegacyBracketTemplateDialog {...props} />
     : <FlexibleBracketWizard {...props} onLegacy={() => setLegacy(true)} />;

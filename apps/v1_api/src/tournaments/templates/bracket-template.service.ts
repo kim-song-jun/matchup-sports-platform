@@ -43,7 +43,7 @@ export class BracketTemplateService {
 
   private async snapshot(tx: Tx, tournamentId: string) {
     const tournament = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, {
-      where: { id: tournamentId, deletedAt: null }, select: { id: true, format: true, competitionConfigVersionId: true },
+      where: { id: tournamentId, deletedAt: null }, select: { id: true, format: true, teamCount: true, competitionConfigVersionId: true },
     });
     if (!tournament) throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
     const groups = await tx.v1TournamentGroup.findMany({ where: { tournamentId }, orderBy: { id: 'asc' } });
@@ -64,11 +64,12 @@ export class BracketTemplateService {
 
   async capabilities(user: V1AuthUser, tournamentId: string) {
     await this.draft(user, tournamentId);
-    return { flexibleEnabled: this.flexibleEnabled(tournamentId), schemaVersion: 2 };
+    const row = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, { where: { id: tournamentId, deletedAt: null }, select: { format: true, teamCount: true } });
+    return { flexibleEnabled: this.flexibleEnabled(tournamentId), schemaVersion: 2, sixTeamEligible: row?.format === 'knockout' && row.teamCount === 6 };
   }
 
   private assertFlexibleEnabled(tournamentId: string, dto: ApplyBracketTemplateDto) {
-    if (dto.schemaVersion === 2 && !this.flexibleEnabled(tournamentId)) {
+    if (dto.schemaVersion === 2 && !dto.sixTeamMode && !this.flexibleEnabled(tournamentId)) {
       throw new ConflictException({ code: 'BRACKET_V2_DISABLED', message: '새 대진 설정은 아직 활성화되지 않았어요.' });
     }
   }
@@ -81,6 +82,7 @@ export class BracketTemplateService {
     return this.prisma.$transaction(async (tx) => {
       const snapshot = await this.snapshot(tx, tournamentId);
       if (snapshot.tournament.format !== input.kind) throw new UnprocessableEntityException({ code: 'BRACKET_TEMPLATE_FORMAT_MISMATCH', message: '대회 진행 방식과 맞지 않아요.' });
+      this.assertSixTeamEligibility(input, snapshot);
       if (input.kind !== 'league' && input.registrationIds) {
         const entries = input.kind === 'knockout' ? plan.slots : plan.slots.filter((slot) => slot.kind === 'ENTRY');
         const confirmed = new Set(snapshot.registrations.filter((row) => row.status === 'confirmed').map((row) => row.id));
@@ -195,7 +197,8 @@ export class BracketTemplateService {
     });
     const plan = planBracketTemplate(input, { fixtureNumberOffset: maxNumber._max.fixtureNumber ?? 0 });
     if (plan.warnings?.length && !dto.acknowledgeRematches) throw new ConflictException({ code: 'BRACKET_REMATCH_CONFIRMATION_REQUIRED', message: '같은 조 재대결 안내를 확인해 주세요.' });
-    const slotIds = await this.materialize(tx, admin, pinned, plan);
+    if (input.kind !== 'league' && input.sixTeamMode) this.assertSixTeamEligibility(input, await this.snapshot(tx, tournament.id));
+    const { slotIds, fixtureIds } = await this.materialize(tx, admin, pinned, plan);
     if (input.kind !== 'league' && input.registrationIds) {
       const entries = input.kind === 'knockout' ? [...plan.slots].sort((a, b) => a.position - b.position)
         : plan.slots.filter((slot) => slot.kind === 'ENTRY');
@@ -207,6 +210,8 @@ export class BracketTemplateService {
       })));
     }
 
+    await tx.v1Tournament.update({ where: { id: tournament.id }, data: { sixTeamMode: input.kind !== 'league' && Boolean(input.sixTeamMode), sixTeamBracket: input.kind !== 'league' && input.sixTeamMode
+      ? { rounds: plan.fixtures.map(row => lookup(fixtureIds, row.key, 'fixture')), winners: {}, bye: null, manual: false, sourceVersion: null, needsReview: false } : Prisma.DbNull } });
     const counts = { groups: plan.groups.length, slots: plan.slots.length, fixtures: plan.fixtures.length, edges: plan.edges.length };
     await this.adminContext.logAdminAction(admin, {
       action: 'tournament.bracket.template.apply',
@@ -215,6 +220,13 @@ export class BracketTemplateService {
       afterJson: JSON.parse(JSON.stringify({ input, replaced, ...counts, requestId: dto.requestId, requestHash, acknowledgeRematches: dto.acknowledgeRematches })),
     }, tx);
     return counts;
+  }
+
+  private assertSixTeamEligibility(input: BracketTemplateInput, snapshot: Awaited<ReturnType<BracketTemplateService['snapshot']>>) {
+    if (input.kind === 'league' || !input.sixTeamMode) return;
+    if (snapshot.tournament.format !== 'knockout' || snapshot.tournament.teamCount !== 6 || snapshot.registrations.filter(row => row.status === 'confirmed').length !== 6 || input.registrationIds?.length !== 6) {
+      throw new UnprocessableEntityException({ code: 'SIX_TEAM_REGISTRATIONS_REQUIRED', message: '모집 정원이 6팀인 토너먼트에서 확정팀 6팀을 모두 배정해 주세요.' });
+    }
   }
 
   /** 잠금 안에서 다시 읽는다 — 경기 규칙 버전이 없으면 아무것도 지우거나 만들기 전에 끊는다. */
@@ -334,6 +346,6 @@ export class BracketTemplateService {
         targetSide: edge.targetSide,
       });
     }
-    return slotIds;
+    return { slotIds, fixtureIds };
   }
 }

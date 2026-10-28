@@ -411,3 +411,23 @@ describe('대회 형식 수정', () => {
     expect(screen.getByLabelText('대회 형식')).toBeDisabled();
   });
 });
+
+
+describe('6강 방식 수정 payload', () => {
+  beforeEach(() => { hooks.mutate.mockReset(); hooks.showToast.mockReset(); });
+  it('6팀 토너먼트에서 선택한 방식만 CAS 버전과 함께 저장한다', () => {
+    renderSection(true, { format: 'knockout', teamCount: 6, sixTeamMode: false });
+    fireEvent.click(screen.getByRole('button', { name: '대회 정보 수정' }));
+    fireEvent.change(screen.getByLabelText('6팀 토너먼트 진행'), { target: { value: 'six' } });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    expect(hooks.mutate).toHaveBeenCalledWith({ sixTeamMode: true, expectedVersion: tournament.updatedAt }, expect.any(Object));
+  });
+  it('이미 선택된 6강 방식은 불러오고 다른 필드 수정에 끼워 보내지 않는다', () => {
+    renderSection(true, { format: 'knockout', teamCount: 6, sixTeamMode: true });
+    fireEvent.click(screen.getByRole('button', { name: '대회 정보 수정' }));
+    expect(screen.getByLabelText('6팀 토너먼트 진행')).toHaveValue('six');
+    fireEvent.change(screen.getByLabelText(/대회명/), { target: { value: '새 대회명' } });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    expect(hooks.mutate).toHaveBeenCalledWith({ title: '새 대회명', expectedVersion: tournament.updatedAt }, expect.any(Object));
+  });
+});

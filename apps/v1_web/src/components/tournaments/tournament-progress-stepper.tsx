@@ -249,6 +249,16 @@ export function buildTournamentStages(tournament: V1TournamentDetail): Tournamen
     ];
   }
 
+  if (tournament.sixTeamMode || tournament.sixTeamBracket) {
+    const namedRounds = groupFixturesByRound(fixtures, tournament.groups ?? []);
+    const stageName = (key: string, fallback: string) => namedRounds.find((round) => round.key === key || round.key === fallback)?.label ?? fallback;
+    return makeMonotonic([
+      { key: 'six', label: stageName('quarter', '6강'), fixtures: fixtures.filter(row => row.round === '6강') },
+      { key: 'semi', label: stageName('semi', '준결승'), fixtures: fixtures.filter(row => row.round === '준결승') },
+      { key: 'final', label: stageName('final', '결승'), fixtures: fixtures.filter(row => row.round === '결승') },
+    ].map(stage => ({ key: stage.key, label: stage.label, status: rawStageStatus(stage.fixtures) })), allDone);
+  }
+
   const drafts: StageDraft[] = [];
 
   // 조별리그는 이 포맷의 **출발점**이라 픽스처가 아직 없어도 칸을 세운다 — 대진이 나오기

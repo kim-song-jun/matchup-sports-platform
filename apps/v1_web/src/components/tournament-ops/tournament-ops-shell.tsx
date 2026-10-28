@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import type { V1CompetitionKind, V1TournamentStaffRole } from '@/types/api';
 import type { TournamentOpsOrigin } from '@/lib/session-storage';
-import { resolveTournamentLiveBase } from '@/lib/tournament-live-routes';
+import { fixtureIdFromConsolePath, resolveTournamentLiveBase } from '@/lib/tournament-live-routes';
 import { competitionOpsTitle } from '@/lib/competition-kind';
 import { staffRoleLabel } from './badges';
 import { canManageTournamentResults } from './role-context';
@@ -208,6 +208,7 @@ interface TournamentOpsShellProps {
  * 보냈다 — 그 화면의 어드민 상세 API 는 대회 종류만 받아 리그면 "대회 정보를 불러오지 못했어요"가 떴다.
  */
 function returnTarget(origin: TournamentOpsOrigin, tournamentId: string, kind?: V1CompetitionKind | null) {
+  if (origin === 'staff') return { href: `/my/tournament-staff/${encodeURIComponent(tournamentId)}`, label: '담당 경기 목록으로 돌아가기' };
   if (origin === 'home') return { href: '/home', label: '서비스로 돌아가기' };
   // 종류를 알기 전에 대회 관리 링크를 그리면 리그 어드민이 그걸 눌러 열리지 않는 화면으로 간다.
   // `null`(옛 대회 행)까지 숨기면 그 대회들에서 링크가 영영 사라지므로 `undefined` 만 본다.
@@ -385,7 +386,10 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
   const navItems = buildNavItems(basePath, role);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const hamburgerRef = useRef<HTMLButtonElement>(null);
-  const back = returnTarget(origin, tournamentId, tournamentKind);
+  const isFixtureConsole = fixtureIdFromConsolePath(pathname, tournamentId) !== null;
+  const back = isFixtureConsole && origin === 'admin'
+    ? { href: `${basePath}/operations`, label: '경기 목록으로 돌아가기' }
+    : returnTarget(isFixtureConsole && origin === 'home' ? 'staff' : origin, tournamentId, tournamentKind);
 
   const openDrawer = useCallback(() => setDrawerOpen(true), []);
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);

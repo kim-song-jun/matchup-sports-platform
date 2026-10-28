@@ -4632,6 +4632,51 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   padding: 0 12px;
 }
 
+.tm-team-summary-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  gap: var(--spacing-2) var(--spacing-3);
+  min-width: 0;
+}
+
+.tm-team-summary-meta > * {
+  min-width: 0;
+}
+
+.tm-team-tablet-create {
+  display: none;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.tm-team-tablet-create:focus-visible {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
+}
+
+/* Tablet list CTA sits beside scope and count. display:none also removes inactive
+   variants from keyboard focus, so each viewport has exactly one create action. */
+@media (min-width: 768px) and (max-width: 1023.98px) {
+  .tm-team-summary-meta {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: var(--spacing-1);
+  }
+
+  .tm-team-mobile-create {
+    display: none !important;
+  }
+
+  .tm-team-tablet-create {
+    display: inline-flex;
+  }
+}
+
 .tm-section-row {
   margin-top: 16px;
   display: flex;
@@ -6151,6 +6196,13 @@ textarea.tm-chat-input-placeholder::placeholder {
     justify-content: center;
     gap: 4px;
     padding: 8px 12px;
+  }
+
+  .tm-team-summary-meta {
+    align-items: flex-start;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: var(--spacing-1);
   }
 
   .tm-match-list-footer,

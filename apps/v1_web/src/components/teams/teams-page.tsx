@@ -89,7 +89,7 @@ export function TeamListPageView({ model, fromHref }: { readonly model: TeamList
   // 설계 문서 §1.3) — FAB이 고정 JSX라도 항상 override로 옮긴다.
   useShellOverride({
     // 팀이 없는 새 사용자에게 "+" 만으로는 진입점이 약하다 — 글자를 함께 쓴다(F21).
-    floatingSlot: <Link className="tm-floating-fab tm-floating-fab-extended tm-hide-desktop" href="/teams/new"><PlusIcon size={20} strokeWidth={2.4} aria-hidden="true" />팀 만들기</Link>,
+    floatingSlot: <Link className="tm-floating-fab tm-floating-fab-extended tm-hide-desktop tm-team-mobile-create" href="/teams/new"><PlusIcon size={20} strokeWidth={2.4} aria-hidden="true" />팀 만들기</Link>,
   });
   return (
     <>
@@ -112,8 +112,14 @@ export function TeamListPageView({ model, fromHref }: { readonly model: TeamList
             되고, 세로 44px 를 돌려받는다(사용자 확정 — 보이는 제목을 주되 줄은 더하지 않는다).
             hide/show-desktop 으로 같은 값을 두 번 그리던 중복도 함께 사라진다. */}
         <div className="tm-team-summary-bar">
-          <h2 className="tm-list-scope-heading">{model.summary.scope}</h2>
-          <div className="tm-text-caption tab-num"><TeamSummaryText summary={model.summary} /></div>
+          <div className="tm-team-summary-meta">
+            <h2 className="tm-list-scope-heading">{model.summary.scope}</h2>
+            <div className="tm-text-caption tab-num"><TeamSummaryText summary={model.summary} /></div>
+          </div>
+          <Link className="tm-btn tm-btn-md tm-btn-primary tm-team-tablet-create" href="/teams/new">
+            <PlusIcon size={18} strokeWidth={2.5} aria-hidden="true" />
+            팀 만들기
+          </Link>
         </div>
         {model.listLoading ? (
           <TeamListSkeleton />

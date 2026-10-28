@@ -3,6 +3,21 @@
 Status: Review
 Owner: Codex
 
+## 경기 일정 후속 수정 (2026-10-28)
+
+- 요청: 순위·대진표에만 적용했던 하위 필터를 경기 일정에도 적용하고 dev 대상 PR 제출.
+- Owned: bracket-page-client.tsx, 공용 schedule-content.tsx/schedule-grouping.ts 및 관련 테스트, 이 문서, changeset.
+- Forbidden: API/DB, 기존 공유 작업트리의 WIP, 배포 및 main 승격.
+- [x] 조별리그 선택 시 전체/각 조 선택, 결선 선택 시 전체/각 단계 선택.
+- [x] 대진표와 같은 resolver로 결선 조 이름 및 단계 분류 적용.
+- [x] 진행 중·일정 확정·시간 미정 경기 및 내 팀만 조건에 함께 적용.
+- [x] 선택한 하위 필터를 경기 상세 복귀 URL에 보존하고 잘못된 선택은 전체 처리.
+- [x] 관련 회귀 테스트와 타입/패턴 검사.
+- [ ] dev 대상 PR 제출, CI 및 Copilot 리뷰 요청.
+- [ ] 배포 후 alpha 390/768/1440 실제 화면 검증 (이번 요청은 PR 제출까지).
+
+Progress Snapshot: origin/dev ec33d1609 기준 fix/schedule-stage-filters 격리 작업트리에서 구현. 일정 렌더 59개, 일정 탭 통합 3개, 기존 상세 복귀 14개, 그룹 정렬 10개로 총 86개 테스트 통과. 타입/패턴 검사 통과. 사용자 지정 결선 이름이 `조`로 끝나는 경우도 실제 라운드를 우선하도록 수정. 조별리그의 기존 라운드 번호는 유지한다. `git diff --check` 통과, touched path의 TODO/FIXME/HACK/XXX 없음. 로컬 web 서버 및 배포 실행 없음.
+
 ## Context
 대상 대회 93a11ead-52ca-4262-bede-66802587c3d8에서 진행 단계는 경기 round를, 대진표는 phase의 고정 이름을 사용해 이름이 달랐다.
 ## Goal

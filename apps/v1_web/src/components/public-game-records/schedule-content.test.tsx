@@ -22,6 +22,74 @@ function makeData(overrides: Partial<PublicTournamentScheduleResponse> = {}): Pu
 }
 
 describe('ScheduleContent — 순위표 팀 링크', () => {
+  it('선택한 조를 URL과 경기 상세 출처에 보존하고 재마운트 시 복원한다', () => {
+    const original = window.location.href;
+    const path = '/tournaments/tour-1/bracket';
+    window.history.replaceState(null, '', path);
+    try {
+      const data = makeData({ items: [
+        fixtureEntry({ fixtureId: 'a', groupId: 'a', groupName: 'A조' }),
+        fixtureEntry({ fixtureId: 'b', groupId: 'b', groupName: 'B조' }),
+      ] });
+      const view = render(<ScheduleContent tournamentId="tour-1" data={data} fromHref={path} />);
+      fireEvent.click(screen.getByRole('tab', { name: '조별리그' }));
+      fireEvent.click(within(screen.getByRole('navigation', { name: '일정 조 선택' })).getByRole('button', { name: 'B조' }));
+      expect(new URL(window.location.href).searchParams.get('scheduleGroup')).toBe('group:b');
+      const link = new URL(screen.getByRole('link').getAttribute('href')!, window.location.origin);
+      expect(new URL(link.searchParams.get('from')!, window.location.origin).searchParams.get('scheduleGroup')).toBe('group:b');
+      view.unmount();
+      render(<ScheduleContent tournamentId="tour-1" data={data} fromHref={`${path}${window.location.search}`} />);
+      expect(screen.getAllByRole('link')).toHaveLength(1);
+      expect(screen.getByRole('button', { name: 'B조' })).toHaveAttribute('aria-pressed', 'true');
+    } finally {
+      window.history.replaceState(null, '', original);
+    }
+  });
+
+  it('조와 모든 결선 단계를 선택해 진행 중·시간 미정 경기까지 거르고 전체로 복원한다', () => {
+    render(<ScheduleContent tournamentId="tour-1" prioritizeLiveGames data={makeData({
+      items: [
+        fixtureEntry({ fixtureId: 'a', groupId: 'a', groupName: '1경기' }),
+        fixtureEntry({ fixtureId: 'b', groupId: 'b', groupName: '2경기' }),
+        fixtureEntry({ fixtureId: 'semi', round: 'semi', groupName: '준결승', status: 'live' }),
+        fixtureEntry({ fixtureId: 'third', round: 'third_place', groupName: '순위 결정전' }),
+      ],
+      unscheduled: [fixtureEntry({ fixtureId: 'final', round: 'final', groupName: '우승조', scheduledAt: null })],
+    })} />);
+    const ids = () => screen.getAllByRole('link').map(link => link.getAttribute('href')?.split('/').at(-1)).sort();
+    fireEvent.click(screen.getByRole('tab', { name: '조별리그' }));
+    const groups = screen.getByRole('navigation', { name: '일정 조 선택' });
+    fireEvent.click(within(groups).getByRole('button', { name: '2경기' }));
+    expect(ids()).toEqual(['b']);
+    fireEvent.click(within(groups).getByRole('button', { name: '전체' }));
+    expect(ids()).toEqual(['a', 'b']);
+    fireEvent.click(screen.getByRole('tab', { name: '결선' }));
+    const rounds = screen.getByRole('navigation', { name: '일정 결선 단계 선택' });
+    for (const [name, id] of [['준결승', 'semi'], ['우승조', 'final'], ['순위 결정전', 'third']]) {
+      fireEvent.click(within(rounds).getByRole('button', { name }));
+      expect(ids()).toEqual([id]);
+    }
+    fireEvent.click(within(rounds).getByRole('button', { name: '전체' }));
+    expect(ids()).toEqual(['final', 'semi', 'third']);
+    fireEvent.click(screen.getByRole('tab', { name: '전체' }));
+    expect(ids()).toEqual(['a', 'b', 'final', 'semi', 'third']);
+  });
+
+  it('같은 이름의 조도 식별자로 구분하고 선택한 조의 경기가 사라지면 전체를 보여준다', () => {
+    const data = makeData({ items: [
+      fixtureEntry({ fixtureId: 'a', groupId: 'a', groupName: '동일 이름' }),
+      fixtureEntry({ fixtureId: 'b', groupId: 'b', groupName: '동일 이름' }),
+    ] });
+    const { rerender } = render(<ScheduleContent tournamentId="tour-1" data={data} />);
+    fireEvent.click(screen.getByRole('tab', { name: '조별리그' }));
+    const buttons = within(screen.getByRole('navigation', { name: '일정 조 선택' })).getAllByRole('button', { name: '동일 이름' });
+    fireEvent.click(buttons[1]);
+    expect(screen.getAllByRole('link')).toHaveLength(1);
+    expect(screen.getByRole('link')).toHaveAttribute('href', '/tournaments/tour-1/matches/b');
+    rerender(<ScheduleContent tournamentId="tour-1" data={{ ...data, items: [data.items[0]] }} />);
+    expect(screen.getByRole('link')).toHaveAttribute('href', '/tournaments/tour-1/matches/a');
+  });
+
   it('내 팀만을 켠 상태에서 전체·조별리그·결선을 독립 선택하고 단계 유지 상태로 끈다', () => {
     const entries = [
       fixtureEntry({ fixtureId: 'mine-group', round: 'group', groupName: 'A조' }),

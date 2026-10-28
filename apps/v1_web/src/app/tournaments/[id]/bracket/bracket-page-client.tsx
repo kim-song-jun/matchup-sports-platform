@@ -34,6 +34,7 @@ import {
   toStandingsRows as publicStandingsToRows,
 } from '@/components/public-game-records/schedule-content';
 import { competitionFormatLabel, isLeagueCompetition } from '@/lib/competition-kind';
+import { tournamentRoundLabel } from '@/lib/tournament-round-label';
 import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import { hasStoredV1Session, withFromPath } from '@/lib/session-storage';
 import type {
@@ -365,10 +366,12 @@ function BracketEmpty({
  */
 export function BracketScheduleTab({
   tournamentId,
+  tournament,
   isRegularLeague = false,
   fromHref,
 }: {
   tournamentId: string;
+  tournament?: Pick<V1TournamentDetail, 'format' | 'fixtures' | 'groups'>;
   /**
    * **정규 리그 시즌인가(`kind`)** — 이 파일의 다른 `isLeague`(`isLeagueCompetition`,
    * `format === 'league'` 인 진짜 대회도 포함)와 **뜻이 다르다.** 이름을 갈라 둔다.
@@ -418,7 +421,29 @@ export function BracketScheduleTab({
     );
   }
 
-  const combined = { ...firstPage, items: data.pages.flatMap((page) => page.items) };
+  // Use the same phase/round resolver as the bracket, including custom group names
+  // and finals stored in a shared semifinal group.
+  const roundByFixture = new Map<string, { key: string; label: string }>();
+  const groupIds = new Set<string>();
+  if (tournament && !isRegularLeague) {
+    const sections = partitionTournamentSections(tournament.format, tournament.fixtures, tournament.groups);
+    sections.groupPhaseGroups.forEach(group => groupIds.add(group.id));
+    groupFixturesByRound(sections.knockoutFixtures, tournament.groups).forEach(round => {
+      round.fixtures.forEach(fixture => roundByFixture.set(fixture.id, round));
+    });
+  }
+  const normalizeEntry = (entry: typeof firstPage.items[number]) => {
+    const round = roundByFixture.get(entry.fixtureId);
+    if (round) return { ...entry, round: round.key, groupName: round.label };
+    if (entry.groupId && groupIds.has(entry.groupId) && !tournamentRoundLabel(entry.round).startsWith('조별')) {
+      return { ...entry, round: 'group' };
+    }
+    return entry;
+  };
+  const combined = { ...firstPage,
+    items: data.pages.flatMap((page) => page.items).map(normalizeEntry),
+    unscheduled: firstPage.unscheduled.map(normalizeEntry),
+  };
 
   if (isRegularLeague) {
     return <LeagueScheduleContent tournamentId={tournamentId} data={combined} fromHref={fromHref}
@@ -684,6 +709,7 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
               리그 방식 대회도 true 라(alpha 62건 중 7건) 그 대회들의 어휘까지 바꾼다. */}
           <BracketScheduleTab
             tournamentId={tournament.id}
+            tournament={tournament}
             isRegularLeague={isRegularLeague}
             fromHref={bracketSelfHref}
           />

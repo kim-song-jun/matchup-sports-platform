@@ -741,6 +741,16 @@ function mineOnlyFromHref(href: string | null | undefined): boolean {
   return params.get('teamScope') === 'mine' || params.get('schedulePhase') === 'mine';
 }
 
+function scheduleGroupFromHref(href: string | null | undefined): string | null {
+  return new URL(href ?? '/', 'https://teameet.invalid').searchParams.get('scheduleGroup');
+}
+
+function scheduleGroupKey(entry: PublicScheduleEntry): string {
+  return phaseKeyOf(entry) === 'group_stage'
+    ? `group:${entry.groupId ?? entry.groupName ?? entry.round}`
+    : `round:${entry.round}`;
+}
+
 /**
  * `showStandings=false` 는 이 콘텐츠가 **순위표를 이미 보여주는 화면 안에** 들어갈 때
  * 쓴다. `/bracket` 은 "순위 · 대진표" 탭에서 조별 순위를 그리는데, "경기 일정" 탭이
@@ -806,7 +816,7 @@ export function ScheduleContent({
   // 최상단(이른 return보다 앞)에서 훅을 선언해 두 섹션 모두 같은 값을 본다. early
   // return(!data.bracketPublished) 뒤에 두면 훅 순서가 렌더마다 달라질 수 있어 여기에 둔다.
   const [draft, setDraft] = useState(() => ({
-    tournamentId, filter: scheduleFilterFromHref(fromHref), mineOnly: mineOnlyFromHref(fromHref), href: fromHref,
+    tournamentId, filter: scheduleFilterFromHref(fromHref), group: scheduleGroupFromHref(fromHref), mineOnly: mineOnlyFromHref(fromHref), href: fromHref,
   }));
   const filter = draft.tournamentId === tournamentId ? draft.filter : 'all';
   const mineOnly = draft.tournamentId === tournamentId ? draft.mineOnly : mineOnlyFromHref(fromHref);
@@ -820,8 +830,9 @@ export function ScheduleContent({
       const href = `${window.location.pathname}${window.location.search}${window.location.hash}`;
       const nextFilter = scheduleFilterFromHref(href);
       const nextMineOnly = mineOnlyFromHref(href);
-      setDraft((previous) => previous.tournamentId === tournamentId && previous.filter === nextFilter && previous.mineOnly === nextMineOnly && previous.href === href
-        ? previous : { tournamentId, filter: nextFilter, mineOnly: nextMineOnly, href });
+      const nextGroup = scheduleGroupFromHref(href);
+      setDraft((previous) => previous.tournamentId === tournamentId && previous.filter === nextFilter && previous.group === nextGroup && previous.mineOnly === nextMineOnly && previous.href === href
+        ? previous : { tournamentId, filter: nextFilter, group: nextGroup, mineOnly: nextMineOnly, href });
     };
     // 늦은 router snapshot은 마지막 선택을 덮지 않는다. 실제 pop/hash 이벤트는 최신 URL을 읽는다.
     if (source.searchParams.toString() === new URLSearchParams(window.location.search).toString()) sync();
@@ -833,7 +844,7 @@ export function ScheduleContent({
     };
   }, [fromHref, tournamentId]);
 
-  function setFilter(nextFilter: string, nextMineOnly = mineOnly) {
+  function setFilter(nextFilter: string, nextMineOnly = mineOnly, nextGroup: string | null = nextFilter === filter ? draft.group : null) {
     let href = fromHref;
     if (fromHref) {
       const source = new URL(fromHref, window.location.origin);
@@ -841,6 +852,8 @@ export function ScheduleContent({
       if (source.origin === url.origin && source.pathname === url.pathname) {
         if (nextFilter === 'all') url.searchParams.delete('schedulePhase');
         else url.searchParams.set('schedulePhase', nextFilter);
+        if (nextGroup) url.searchParams.set('scheduleGroup', nextGroup);
+        else url.searchParams.delete('scheduleGroup');
         if (nextMineOnly) url.searchParams.set('teamScope', 'mine');
         else url.searchParams.delete('teamScope');
         href = `${url.pathname}${url.search}${url.hash}`;
@@ -848,7 +861,7 @@ export function ScheduleContent({
       }
     }
     // URL snapshot보다 먼저 실제 경기 링크에도 마지막 선택의 출처를 반영한다.
-    setDraft({ tournamentId, filter: nextFilter, mineOnly: nextMineOnly, href });
+    setDraft({ tournamentId, filter: nextFilter, group: nextGroup, mineOnly: nextMineOnly, href });
   }
 
   if (!data.bracketPublished) {
@@ -909,6 +922,17 @@ export function ScheduleContent({
   const filters = buildScheduleFilters(phases, false);
   // 고른 칩이 사라진 경우(내 경기가 없어졌다거나) 전체로 되돌린다 — 빈 화면에 갇히지 않게.
   const activeFilter = filters.some((option) => option.key === filter) ? filter : 'all';
+  const groupOptionKeys = new Set<string>();
+  const groupOptions = isRegularLeague || activeFilter === 'all' ? [] :
+    phases.filter(phase => phase.key === activeFilter).flatMap(phase => phase.groups.flatMap(group => {
+      return group.entries.flatMap(entry => {
+        const key = scheduleGroupKey(entry);
+        if (groupOptionKeys.has(key)) return [];
+        groupOptionKeys.add(key);
+        return [{ key, label: group.label }];
+      });
+    }));
+  const selectedGroup = draft.tournamentId === tournamentId && groupOptions.some(option => option.key === draft.group) ? draft.group : null;
   const showMineSwitch = myTeamIds === undefined && (hasMyFixtures || mineOnly);
   const teamSwitch = showMineSwitch ? (
     <button type="button" role="switch" aria-checked={mineOnly}
@@ -919,7 +943,8 @@ export function ScheduleContent({
     </button>
   ) : null;
   const matchesTeamScope = (entry: PublicScheduleEntry) => !mineOnly || myFixtureIds.has(entry.fixtureId);
-  const matchesPhase = (entry: PublicScheduleEntry) => activeFilter === 'all' || phaseKeyOf(entry) === activeFilter;
+  const matchesPhase = (entry: PublicScheduleEntry) => (activeFilter === 'all' || phaseKeyOf(entry) === activeFilter)
+    && (selectedGroup === null || scheduleGroupKey(entry) === selectedGroup);
   const filteredLive = live.filter((entry) => matchesTeamScope(entry) && matchesPhase(entry));
 
   // "시간 미정 경기" 섹션도 위 칩과 같은 기준으로 거른다 — 예전엔 필터 state에 접근할
@@ -933,6 +958,15 @@ export function ScheduleContent({
       {filterAction !== undefined || filters.length > 1 || showMineSwitch ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-2)' }}>
           <ScheduleFilterControls filters={filters} activeFilter={activeFilter} onSelectFilter={setFilter} action={filterAction ?? teamSwitch} />
+          {groupOptions.length > 0 ? (
+            <nav aria-label={activeFilter === 'group_stage' ? '일정 조 선택' : '일정 결선 단계 선택'} className="flex flex-wrap gap-2">
+              {[{ key: null, label: '전체' }, ...groupOptions].map(option => (
+                <button key={option.key ?? 'all'} type="button" aria-pressed={selectedGroup === option.key}
+                  className={`tm-chip${selectedGroup === option.key ? ' tm-chip-active' : ''}`}
+                  onClick={() => setFilter(activeFilter, mineOnly, option.key)}>{option.label}</button>
+              ))}
+            </nav>
+          ) : null}
           {filterSummary}
         </div>
       ) : null}
@@ -1011,7 +1045,7 @@ export function ScheduleContent({
         ) : (
           <ScheduleSections
             tournamentId={tournamentId}
-            entries={data.items.filter(matchesTeamScope)}
+            entries={data.items.filter(entry => matchesTeamScope(entry) && matchesPhase(entry))}
             myFixtureIds={myFixtureIds}
             filters={[]}
             activeFilter={activeFilter}

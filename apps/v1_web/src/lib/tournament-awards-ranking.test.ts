@@ -124,3 +124,12 @@ describe('getTopThree', () => {
     expect(getTopThree(tournament)).toEqual([]);
   });
 });
+
+it('6강 결승의 운영자 지정 우승팀을 시상에도 반영하고 경기 점수는 보존한다', () => {
+  const score = result(3, 1);
+  const value = { format: 'knockout', kind: 'regular_tournament', groups: [], fixtures: [{ id: 'final', round: '결승', result: score,
+    homeRegistrationId: 'a', awayRegistrationId: 'b', homeTeamName: 'A팀', awayTeamName: 'B팀' }],
+    sixTeamBracket: { rounds: ['r1', 'r2', 'r3', 'semi', 'final'], bye: 'a', manual: true, winners: { final: 'b' }, needsReview: false } } as unknown as V1TournamentDetail;
+  expect(getTopThree(value)).toEqual([{ pos: 1, name: 'B팀' }, { pos: 2, name: 'A팀' }]);
+  expect(score).toMatchObject({ homeScore: 3, awayScore: 1 });
+});

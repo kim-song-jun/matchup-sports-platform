@@ -27,7 +27,7 @@
     "db:generate": "prisma generate",
     "test": "jest --selectProjects unit",
     "test:watch": "jest --selectProjects unit --watch",
-    "test:integration": "jest --selectProjects integration --runInBand"
+    "test:integration": "jest --selectProjects integration --maxWorkers=1 --workerIdleMemoryLimit=1024MB"
   },
   "dependencies": {
     "@aws-sdk/client-sesv2": "^3.1095.0",

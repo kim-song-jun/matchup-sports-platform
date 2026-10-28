@@ -358,6 +358,7 @@ export class TournamentBracketService {
   async createGroup(user: V1AuthUser, tournamentId: string, dto: CreateGroupDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     const tournament = await this.loadTournament(tournamentId);
+    this.assertStandardBracket(tournament);
     this.assertLeagueGroupShape(tournament.format, tournament.kind, dto.phase ?? 'group', dto.advanceCount);
 
     const created = await this.prisma.$transaction((tx) =>
@@ -370,6 +371,10 @@ export class TournamentBracketService {
     );
 
     return this.serializeGroup(created);
+  }
+
+  private assertStandardBracket(tournament: { sixTeamBracket?: unknown }) {
+    if (tournament.sixTeamBracket != null) throw new ConflictException({ code: 'SIX_TEAM_STRUCTURE_LOCKED', message: '6강 전용 대진은 5경기로 구성돼요. 진출팀은 6강 진출 관리에서 변경해 주세요.' });
   }
 
   // ─── group-team ───────────────────────────────────────────────────────────
@@ -604,6 +609,7 @@ export class TournamentBracketService {
   async createFixture(user: V1AuthUser, tournamentId: string, dto: CreateFixtureDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     const tournament = await this.loadTournament(tournamentId);
+    this.assertStandardBracket(tournament);
 
     const legNumber = dto.legNumber ?? 1;
     // 저장과 같은 정규화(resolvePlaceSnapshot)를 거친 값으로 해시를 만든다 — 안 맞추면 같은 번호 재시도가 해시 불일치 409 가 난다.
@@ -958,7 +964,7 @@ export class TournamentBracketService {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     const initial = await this.prisma.v1TournamentMatchDetails.findUnique({ where: { teamMatchId: fixtureId }, select: { tournamentId: true } });
     if (!initial) throw new NotFoundException({ code: 'FIXTURE_NOT_FOUND', message: '경기를 찾을 수 없어요.' });
-    await this.loadTournament(initial.tournamentId);
+    this.assertStandardBracket(await this.loadTournament(initial.tournamentId));
     return this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`league-fixture-generation:${initial.tournamentId}`}, 0))`;
       const old = await tx.v1TournamentMatchAdvancementEdge.findMany({ where: { targetTeamMatchId: fixtureId } });
@@ -1019,6 +1025,7 @@ export class TournamentBracketService {
     const canonical = await this.prisma.v1TournamentMatchDetails.findUnique({
       where: { teamMatchId: fixtureId },
       select: {
+        tournament: { select: { sixTeamBracket: true } },
         tournamentId: true,
         groupId: true,
         homeRegistrationId: true,
@@ -1034,6 +1041,7 @@ export class TournamentBracketService {
       },
     });
     if (canonical !== null) {
+      if (canonical.tournament?.sixTeamBracket != null && (dto.homeRegistrationId !== undefined || dto.awayRegistrationId !== undefined)) this.assertStandardBracket(canonical.tournament);
       if (canonical.teamMatch.deletedAt !== null) {
         throw new NotFoundException({ code: 'FIXTURE_NOT_FOUND', message: '경기를 찾을 수 없어요.' });
       }
@@ -1135,6 +1143,7 @@ export class TournamentBracketService {
       await tx.$queryRaw`SELECT id FROM v1_tournaments WHERE id = ${initial.tournamentId} FOR UPDATE`;
       const tournament = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, { where: { id: initial.tournamentId, deletedAt: null } });
       if (!tournament) throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
+      this.assertStandardBracket(tournament);
       await softDeleteTournamentFixtureInTx(tx, admin, fixtureId);
       return { deleted: true };
     });

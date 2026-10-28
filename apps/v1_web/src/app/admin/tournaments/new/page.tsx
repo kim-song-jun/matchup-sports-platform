@@ -1,4 +1,5 @@
 'use client';
+import { SixTeamModeField } from '@/components/admin/bracket-canvas/six-team-mode-field';
 
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -982,6 +983,7 @@ function ParticipationStep({
           error={errors.teamCount}
           required
         />
+        <SixTeamModeField eligible={state.format === 'knockout' && Number(state.teamCount) === 6} value={state.sixTeamMode} onChange={value => setField('sixTeamMode', value)} disabled={pending} />
         <NumberField
           id="min-players"
           label="최소 선수 수 (등록 명단)"

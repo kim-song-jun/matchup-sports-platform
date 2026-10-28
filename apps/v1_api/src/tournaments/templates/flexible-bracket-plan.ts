@@ -5,6 +5,7 @@ import { GROUP_NAME, type KnockoutPhase } from './knockout-phase-labels';
 
 export type FlexibleGroup = { name: string; capacity: number; advanceCount: number; legs?: 1 | 2 };
 export type FlexibleBracketSettings = {
+  sixTeamMode?: boolean;
   schemaVersion?: 2;
   participantCount?: number;
   groups?: FlexibleGroup[];

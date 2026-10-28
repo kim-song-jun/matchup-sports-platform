@@ -49,6 +49,7 @@ export type TournamentCreateState = {
   savedPayload: V1CreateTournamentPayload | null;
   sportId: string;
   title: string;
+  sixTeamMode: boolean;
   format: V1TournamentFormat;
   genderCategory: V1TournamentGenderCategory;
   scheduledAt: string;
@@ -125,6 +126,7 @@ export const INITIAL_TOURNAMENT_CREATE_STATE: TournamentCreateState = {
   savedPayload: null,
   sportId: '',
   title: '',
+  sixTeamMode: false,
   format: 'group_knockout',
   genderCategory: 'mixed',
   scheduledAt: '',
@@ -399,6 +401,7 @@ export function mapTournamentToWizardFields(tournament: V1Tournament): Tournamen
     draftUpdatedAt: tournament.updatedAt,
     sportId: tournament.sportId,
     title: tournament.title,
+    sixTeamMode: tournament.sixTeamMode ?? false,
     format: tournament.format,
     genderCategory: tournament.genderCategory ?? 'mixed',
     scheduledAt: isoToKstDatetimeLocal(tournament.scheduledAt),
@@ -537,6 +540,7 @@ export function buildTournamentPreviewItem(
     sport: { code: sport?.code ?? '', name: sport?.name ?? '' },
     title: state.title.trim() || '새 대회',
     status: 'open',
+    sixTeamMode: state.sixTeamMode && state.format === 'knockout' && Number(state.teamCount) === 6,
     format: state.format,
     // 이 위저드는 단발 대회만 만든다(정규 리그 시즌은 리그 어드민에서 만들어진다).
     // state.format 이 'league' 여도 그건 "리그 방식으로 치른다"는 뜻이지 리그 시즌이 아니다.
@@ -755,6 +759,7 @@ export function buildTournamentCreatePayload(
   const payload: V1CreateTournamentPayload = {
     sportId: state.sportId,
     title: state.title.trim(),
+    sixTeamMode: state.sixTeamMode && state.format === 'knockout' && Number(state.teamCount) === 6,
     format: state.format,
     genderCategory: state.genderCategory,
     scheduledAt: kstDatetimeLocalToIso(state.scheduledAt) ?? undefined,

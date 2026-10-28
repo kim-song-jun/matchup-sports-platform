@@ -14,6 +14,7 @@ export class FlexibleGroupDto {
 }
 
 export class ApplyBracketTemplateDto {
+  @IsOptional() @IsBoolean() sixTeamMode?: boolean;
   @IsOptional() @IsIn([2]) schemaVersion?: 2;
   @IsOptional() @IsInt() @Min(4) @Max(64) participantCount?: number;
   @IsOptional() @IsInt() @Min(0) @Max(4294967295) drawSeed?: number;
@@ -67,11 +68,12 @@ function required(value: number | undefined, field: string): number {
 
 /** 필수 필드를 확인한다. 조별 합계와 결선 범위 등 조합 검증은 플래너에서 수행한다. */
 export function toBracketTemplateInput(dto: ApplyBracketTemplateDto): BracketTemplateInput {
+  if (dto.sixTeamMode && dto.schemaVersion !== 2) throw new UnprocessableEntityException({ code: 'SIX_TEAM_FORMAT_INVALID', message: '6강 결승 직행 방식은 전용 미리보기에서 생성해 주세요.' });
   if (dto.schemaVersion === 2 && dto.groups && dto.groups.length < 2) {
     throw new UnprocessableEntityException({ code: 'BRACKET_TEMPLATE_UNSUPPORTED', message: '조를 2개 이상 설정해 주세요.' });
   }
   const flexible = dto.schemaVersion === 2 ? {
-    schemaVersion: 2 as const, participantCount: dto.participantCount, groups: dto.groups, drawSeed: dto.drawSeed,
+    sixTeamMode: dto.sixTeamMode, schemaVersion: 2 as const, participantCount: dto.participantCount, groups: dto.groups, drawSeed: dto.drawSeed,
     seedPolicy: dto.seedPolicy, registrationIds: dto.registrationIds,
   } : {};
   switch (dto.kind) {

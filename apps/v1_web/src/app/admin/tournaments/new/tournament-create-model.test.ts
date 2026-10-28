@@ -478,3 +478,10 @@ describe('대회 생성 — 장소 스냅샷', () => {
     expect(next.promoHome.locationText).toBe('상암 풋살파크');
   });
 });
+
+it('6강 선택은 실제 생성 payload로 저장하고 정원·형식이 바뀌면 해제한다', () => {
+  const state = { ...INITIAL_TOURNAMENT_CREATE_STATE, format: 'knockout' as const, teamCount: '6', sixTeamMode: true };
+  expect(buildTournamentCreatePayload(state).sixTeamMode).toBe(true);
+  expect(buildTournamentCreatePayload({ ...state, teamCount: '8' }).sixTeamMode).toBe(false);
+  expect(buildTournamentCreatePayload({ ...state, format: 'group_knockout' }).sixTeamMode).toBe(false);
+});

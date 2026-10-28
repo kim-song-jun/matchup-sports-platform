@@ -1,4 +1,5 @@
 'use client';
+import { SixTeamDecisionPanel } from './six-team-template-dialog';
 import { useState } from 'react';
 import { Button } from '@/components/v1-ui/button';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
@@ -22,6 +23,7 @@ export function BracketListTemplateTools({ tournamentId, format, hasExistingBrac
   const confirmed = registrations.filter((registration) => registration.status === 'confirmed');
   const pending = assign.isPending || randomFill.isPending;
   return <section className="flex flex-col gap-4">
+    <SixTeamDecisionPanel tournamentId={tournamentId} />
     <div className="flex flex-wrap items-center gap-2">
       <Button variant="outline" size="md" onClick={() => setOpen(true)} disabled={pending}>전체 대진 만들기</Button>
       {format === 'group_knockout' ? <FinalistAssignmentButton tournamentId={tournamentId} groups={groups} showToast={showToast} /> : null}

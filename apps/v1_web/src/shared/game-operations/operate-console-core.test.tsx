@@ -549,8 +549,35 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
 
     render(<CoreHarness />);
 
-    const foulGroup = screen.getByRole('group', { name: '2피리어드 팀 파울' });
+    const foulGroup = screen.getByRole('group', { name: '후반 팀 파울' });
     expect(foulGroup).toHaveTextContent('파울 1');
+    // 마지막 피리어드 뒤에는 다시 셀 피리어드가 없다.
+    expect(foulGroup).not.toHaveTextContent('0부터 다시 세요');
+  });
+
+  // MD-QA #189: 하프타임에는 방금 끝난 전반의 팀 파울을 보여 주고, 후반에 다시 센다고 알려 준다.
+  it('하프타임에는 전반 팀 파울과 후반에 0부터 다시 센다는 안내를 보여준다', () => {
+    gameWithPeriods('LIVE', [
+      { number: 1, state: 'ENDED', startedAt: '2026-08-07T00:00:00.000Z', endedAt: '2026-08-07T00:20:00.000Z' },
+      { number: 2, state: 'HALFTIME', startedAt: null, endedAt: null },
+    ]);
+    testFixtures.operations.mockReturnValue(
+      consoleState({
+        liveEvents: [{
+          id: 'foul-period-1', gameId: 'game-1', sequence: 1, clientEventId: 'foul-client-1',
+          payloadHash: 'foul-hash', type: 'FOUL', sideId: 'side-home', participantId: null,
+          assistParticipantId: null, period: 1, clockMs: 30_000,
+          occurredAt: '2026-08-07T00:10:00.000Z', receivedAt: '2026-08-07T00:10:00.000Z',
+          actorUserId: 'actor-1', reversesEventId: null, payload: {},
+        } as GameEventRecord],
+      }),
+    );
+
+    render(<CoreHarness />);
+
+    const foulGroup = screen.getByRole('group', { name: '전반 팀 파울' });
+    expect(foulGroup).toHaveTextContent('파울 1');
+    expect(foulGroup).toHaveTextContent('후반에는 0부터 다시 세요');
   });
 
   it('1피리어드가 진행 중이고 다음 피리어드가 있으면 "전반 종료" 버튼을 보여주고 액션을 허용한다', async () => {

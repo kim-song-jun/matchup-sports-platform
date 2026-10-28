@@ -1,3 +1,4 @@
+import { parseSixTeamState } from './six-team/six-team-state';
 import { V1CompetitionKind, V1TeamMatchStatus } from '@prisma/client';
 import { effectivePublicVisibilityMode, publicFixtureStatus } from '../games/public-records/public-visibility';
 import {
@@ -319,6 +320,11 @@ export function presentTournamentDetail(
   const hideIdentity = shouldHideParticipantIdentity(row.status, staffBypass);
 
   return {
+    sixTeamMode: row.sixTeamMode,
+    sixTeamBracket: bracketPublished ? (() => {
+      const state = parseSixTeamState(row.sixTeamBracket);
+      return state ? { rounds: state.rounds, bye: state.bye, manual: state.manual, swapSemi: state.swapSemi ?? false, swapFinal: state.swapFinal ?? false, winners: state.winners, needsReview: state.needsReview } : null;
+    })() : null,
     id: row.id,
     sportId: row.sportId,
     sport: { code: row.sport.code, name: row.sport.name },
@@ -453,7 +459,7 @@ export function presentTournamentDetail(
       advanceCount: group.advanceCount,
       qualification: groupStandingSummaries.get(group.id)?.qualification ?? null,
       groupTeams: [...group.groupTeams, ...(group.byeSlots ?? []).map((slot) => ({ ...slot, registrationId: null, registration: null, isBye: true }))].map((groupTeam) => {
-        const slot = groupTeam.isBye ? group.slots?.find(candidate => candidate.kind === 'BYE' && candidate.byeSortOrder === groupTeam.sortOrder) : undefined;
+        const slot = groupTeam.isBye ? group.slots?.find(candidate => candidate.byeSortOrder != null && candidate.byeSortOrder === groupTeam.sortOrder) : undefined;
         // The stored slot link survives an empty/reassigned team and custom labels.
         // Never infer an unassigned BYE target from fixture numbers or visual order.
         const target = slot ? row.tournamentMatchDetails.find(detail => detail.teamMatch.homeSlotId === slot.id || detail.teamMatch.awaySlotId === slot.id) : undefined;

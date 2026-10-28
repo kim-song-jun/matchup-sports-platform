@@ -4,9 +4,11 @@ import {
   IsInt,
   IsNotEmpty,
   IsObject,
+  Matches,
   IsOptional,
   IsString,
   Min,
+  ValidateIf,
 } from 'class-validator';
 
 export enum GameCommandName {
@@ -57,9 +59,10 @@ export class GameCommandDto {
   @IsNotEmpty()
   clientCommandId!: string;
 
+  @ValidateIf((_dto, value) => value !== undefined)
   @IsString()
-  @IsNotEmpty()
-  takeoverToken!: string;
+  @Matches(/\S/, { message: 'takeoverToken must contain a non-whitespace character' })
+  takeoverToken?: string;
 
   @IsDateString()
   occurredAt!: string;

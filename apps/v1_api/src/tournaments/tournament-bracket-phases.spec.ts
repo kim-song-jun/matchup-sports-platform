@@ -2,6 +2,8 @@ import { BRACKET_SOURCE_PHASES, acceptsBracketSource } from './tournament-bracke
 
 describe('acceptsBracketSource — 바로 이전 단계만 연결할 수 있다', () => {
   it.each<[string, string]>([
+    ['round32', 'round64'],
+    ['round16', 'round32'],
     ['quarter', 'round16'],
     ['quarter', 'round12'],
     ['semi', 'quarter'],
@@ -26,8 +28,8 @@ describe('acceptsBracketSource — 바로 이전 단계만 연결할 수 있다'
     expect(acceptsBracketSource(target, source)).toBe(false);
   });
 
-  it('16강은 첫 결선 단계라 원천을 받는 표 항목이 없다', () => {
-    expect(BRACKET_SOURCE_PHASES).not.toHaveProperty('round16');
+  it('64강과 기존 12강은 원천을 받는 표 항목이 없다', () => {
+    expect(BRACKET_SOURCE_PHASES).not.toHaveProperty('round64');
     expect(BRACKET_SOURCE_PHASES).not.toHaveProperty('round12');
   });
 

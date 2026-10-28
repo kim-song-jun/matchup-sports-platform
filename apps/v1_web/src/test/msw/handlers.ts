@@ -750,6 +750,7 @@ const v1CompetitionFixturePlaces: Array<{ fixtureId: string; tournamentId: strin
   place: { name: '서울 풋살파크', address: '서울' as string | null, latitude: null, longitude: null, provider: null, providerPlaceId: null } }];
 
 export const v1MswHandlers = [
+  http.get(`${api}/admin/tournaments/:tournamentId/bracket/template/capabilities`, () => ok({ flexibleEnabled: false, schemaVersion: 2, sixTeamEligible: false })),
   ...v1GameRosterMswHandlers,
   ...v1TeamDissolutionMswHandlers,
   ...v1TeamInviteLinkMswHandlers,

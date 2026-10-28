@@ -236,7 +236,7 @@ export function BracketCanvasWorkspace({
           AWAY: fixtureSideLabel(selectedFixture, 'AWAY', labelContext),
         };
 
-  const selectedBye = bracket.slots.find(slot => slot.id === selectedByeSlotId && slot.kind === 'BYE');
+  const selectedBye = bracket.slots.find(slot => slot.id === selectedByeSlotId && (slot.kind === 'BYE' || slot.byeSortOrder != null));
   const selectFixture = (id: string) => { setSelectedByeSlotId(null); setSelectedFixtureId(id); };
   const selectBye = (slotId: string) => { const fixture = bracket.fixtures.find(f => f.homeSlotId === slotId || f.awaySlotId === slotId); if (fixture) { setSelectedByeSlotId(slotId); setSelectedFixtureId(fixture.id); } };
   const panel = selectedBye && selectedFixture ? <ByeSlotEditor key={selectedBye.id} tournamentId={tournamentId} slot={selectedBye} fixture={selectedFixture} groups={bracket.groups} slots={bracket.slots} candidates={confirmedTeams.map(r => ({ registrationId: r.id, teamName: r.teamName ?? r.teamId }))} canWrite={canWrite} registrationsLoaded={registrationsState.status === 'success'} onClose={() => { setSelectedByeSlotId(null); setSelectedFixtureId(null); }} /> :

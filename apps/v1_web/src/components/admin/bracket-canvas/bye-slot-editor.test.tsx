@@ -23,7 +23,7 @@ describe('BYE slot editing', () => {
   it('opens an empty standalone canvas slot, independently of selecting the quarter-final', () => {
     const selectBye = vi.fn(), selectFixture = vi.fn();
     render(<BracketCanvas groups={groups} fixtures={fixtures} slots={[slot]} selectedFixtureId={null} pendingRegistrationId={null} canWrite onSelectBye={selectBye} onSelectFixture={selectFixture} onAssignSlot={vi.fn()} onAssignDirect={vi.fn()} />);
-    fireEvent.click(screen.getByRole('button', { name: '12강 부전승 12강 부전승 1 편집' }));
+    fireEvent.click(screen.getByRole('button', { name: '부전승 12강 부전승 1 편집' }));
     expect(selectBye).toHaveBeenCalledWith('bye');
     expect(selectFixture).not.toHaveBeenCalled();
   });

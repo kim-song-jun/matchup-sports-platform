@@ -38,6 +38,11 @@ describe('GameSummaryHeader 역할 라벨', () => {
     expect(document.body.textContent).not.toContain('undefined');
   });
 
+  it('대회 디렉터 역할을 스태프 배정 화면과 같은 이름으로 보여준다', () => {
+    render(<GameSummaryHeader game={gameWith('tournament_director')} currentRevision={null} />);
+    expect(screen.getByText(/내 권한 대회 디렉터/)).toBeInTheDocument();
+  });
+
   it('서버가 아직 모르는 역할을 보내도 undefined 를 찍지 않는다', () => {
     // 타입은 다 덮지만, 서버가 새 역할을 **먼저** 내보내는 순간이 있다.
     render(

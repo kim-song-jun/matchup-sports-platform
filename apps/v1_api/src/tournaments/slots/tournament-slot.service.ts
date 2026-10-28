@@ -124,7 +124,7 @@ async function assignSlotCore(
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw alreadyPlaced();
     throw error;
   }
-  if (slot.kind === 'BYE') await syncByeSlotInTx(tx, slot, registrationId);
+  if (slot.kind === 'BYE' || slot.byeSortOrder != null) await syncByeSlotInTx(tx, slot, registrationId);
   // ENTRY의 조 편성은 경기가 모두 삭제된 뒤에도 자리 자체를 기준으로 정리한다.
   if (slot.kind === 'ENTRY' && slot.groupId !== null) {
     const group = await tx.v1TournamentGroup.findUnique({ where: { id: slot.groupId }, select: { phase: true } });

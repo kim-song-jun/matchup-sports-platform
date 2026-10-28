@@ -197,6 +197,9 @@ export function getCompletedChampionName(tournament: V1TournamentDetail): string
   const finalFixture = tournament.fixtures.find((f) => f.round === 'final' || f.round === '결승');
   if (!finalFixture?.result) return null;
 
+  const selectedWinner = tournament.sixTeamBracket?.winners[finalFixture.id];
+  if (selectedWinner) return selectedWinner === finalFixture.homeRegistrationId ? finalFixture.homeTeamName : selectedWinner === finalFixture.awayRegistrationId ? finalFixture.awayTeamName : null;
+
   const { homeScore, awayScore, hasPenalty, homePenaltyScore, awayPenaltyScore } = finalFixture.result;
   let winnerSide: 'home' | 'away' | null = null;
   if (hasPenalty && homePenaltyScore !== null && awayPenaltyScore !== null) {
@@ -796,7 +799,7 @@ export function TournamentDetailView({
         <Trophy size={28} strokeWidth={1.6} />
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <h1 className="tm-text-heading" style={{ color: 'var(--text-strong)', margin: 0, lineHeight: 1.3 }}>
+        <h1 className="tm-text-heading" style={{ color: 'var(--text-strong)', margin: 0, lineHeight: 1.3, wordBreak: 'keep-all', overflowWrap: 'anywhere' }}>
           {tournament.title}
         </h1>
         <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 'var(--spacing-1)', flexWrap: 'wrap' }}>

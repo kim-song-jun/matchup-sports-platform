@@ -598,7 +598,9 @@ export function BracketTab({
   const fixtures: V1AdminBracketFixture[] = bracket?.fixtures ?? [];
   const sideLabelContext = buildSideLabelContext(groups, fixtures, bracket?.slots ?? []);
   const allStandings = bracket?.standings ?? [];
-  const readyGroupCount = groups.filter((g) => isGroupReady(g, fixtures)).length;
+  const readyGroupCount = groups.filter((g) => isGroupReady(g, fixtures, bracket?.slots ?? [])).length;
+  const qualifyingGroupCount = groups.filter((group) => group.phase === 'group').length;
+  const knockoutStageCount = groups.length - qualifyingGroupCount;
 
   // ── Task 109 Track 6: 대진표 일괄 공개 ─────────────────────────────
   // 예약 시각이 지나면 서버는 공개로 판정하지만 bracketPublishedAt 은 null 로 남는다.
@@ -774,7 +776,7 @@ export function BracketTab({
       {/* ── 조 롤업 헤더 + 원클릭 조 추가 ─────────────────────────────── */}
       <div className="flex items-center justify-between gap-3 flex-wrap px-1">
         <p className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">
-          총 {groups.length}개 조 · {readyGroupCount}개 준비 완료
+          총 {qualifyingGroupCount > 0 || knockoutStageCount === 0 ? `${qualifyingGroupCount}개 조` : ''}{qualifyingGroupCount > 0 && knockoutStageCount > 0 ? ' · ' : ''}{knockoutStageCount > 0 ? `${knockoutStageCount}개 결선 단계` : ''} · {readyGroupCount}개 준비 완료
         </p>
         {groups.length > 0 && (
           <button
@@ -839,19 +841,18 @@ export function BracketTab({
       {fixtures.length > 0 && (
         <div className="flex flex-col gap-2">
           <h3 className="text-[length:var(--font-size-body)] font-bold text-[var(--text-strong)]">경기 일정 전체보기</h3>
-          {/* #6b: scrollOnMobile so wide fixture rows scroll horizontally on narrow screens.
+          {/* 모바일에서는 경기별 카드로 모든 열과 작업을 볼 수 있다.
               tableMaxWidth="max-w-none" — 조 카드 목록과 별개인 전폭 섹션이라
               기본 900px 캡을 걸 이유가 없고, 오히려 좁은 데스크톱(~1024px)에서
               불필요한 가로 스크롤을 유발했다. */}
           <AdminDataTable<V1AdminBracketFixture>
-            scrollOnMobile
             tableMaxWidth="max-w-none"
             columns={[
               {
                 key: 'round',
                 header: '라운드',
                 render: (f) => (
-                  <span className="text-[var(--text-muted)]">
+                  <span className="text-[var(--text-muted)] break-words">
                     {competitionMatchLabel({
                       groupName: groups.find((group) => group.id === f.groupId)?.name ?? null,
                       round: f.round,
@@ -871,20 +872,20 @@ export function BracketTab({
                 key: 'homeTeamName',
                 header: '홈',
                 render: (f) => (
-                  <span className="font-medium text-[var(--text-strong)] break-keep">{fixtureSideLabel(f, 'HOME', sideLabelContext)}</span>
+                  <span className="font-medium text-[var(--text-strong)] break-keep break-words">{fixtureSideLabel(f, 'HOME', sideLabelContext)}</span>
                 ),
               },
               {
                 key: 'awayTeamName',
                 header: '어웨이',
                 render: (f) => (
-                  <span className="font-medium text-[var(--text-strong)] break-keep">{fixtureSideLabel(f, 'AWAY', sideLabelContext)}</span>
+                  <span className="font-medium text-[var(--text-strong)] break-keep break-words">{fixtureSideLabel(f, 'AWAY', sideLabelContext)}</span>
                 ),
               },
               {
                 key: 'scheduledAt',
                 header: '시각 · 경기장',
-                render: (f) => <span className="tm-text-caption text-[var(--text-muted)]">{f.scheduledAt ? `${formatKstDateShort(f.scheduledAt)} ${formatKstTime(f.scheduledAt)}` : '시간 미정'} · {f.venue || '경기장 미정'}</span>,
+                render: (f) => <span className="tm-text-caption text-[var(--text-muted)] break-words">{f.scheduledAt ? `${formatKstDateShort(f.scheduledAt)} ${formatKstTime(f.scheduledAt)}` : '시간 미정'} · {f.venue || '경기장 미정'}</span>,
               },
               {
                 key: 'result',
@@ -921,7 +922,7 @@ export function BracketTab({
               const canOperate = f.status === 'scheduled' || f.status === 'in_progress';
               const operateHref = `/admin/live/${encodeURIComponent(tournamentId)}/fixtures/${encodeURIComponent(f.id)}/operate`;
               return (
-                <span className="inline-flex items-center gap-2">
+                <span className="inline-flex max-w-full flex-wrap items-center justify-end gap-2 lg:flex-nowrap">
                   <button
                     type="button"
                       onClick={() => openFixtureEditor(f)}

@@ -28,6 +28,7 @@ interface RoundGroup {
 }
 
 const PHASE_ORDER: Record<string, number> = {
+  round64: -2, round32: -1,
   round16: 0,
   round12: 1,
   quarter: 2,
@@ -37,6 +38,7 @@ const PHASE_ORDER: Record<string, number> = {
 };
 
 const PHASE_LABEL: Record<string, string> = {
+  round64: '64강', round32: '32강',
   round16: '16강',
   round12: '12강',
   quarter: '8강',
@@ -66,6 +68,8 @@ function getFixturePhase(round: string): keyof typeof PHASE_ORDER | null {
 
   if (normalized.includes('third_place') || normalized.includes('3·4위전') || normalized.includes('3-4위전')) return 'third_place';
   if (normalized === 'final' || normalized === '결승') return 'final';
+  if (normalized === 'round64' || normalized === '64강') return 'round64';
+  if (normalized === 'round32' || normalized === '32강') return 'round32';
   if (normalized === 'round16' || normalized === '16강') return 'round16';
   if (normalized === 'round12' || normalized === '12강') return 'round12';
   if (normalized === 'quarter' || normalized === 'quarterfinal' || normalized === '8강') return 'quarter';
@@ -111,6 +115,10 @@ export function groupFixturesByRound(
   }
 
   for (const round of roundMap.values()) {
+    const names = [...new Set(groups.filter((group) => group.phase === round.key &&
+      (round.fixtures.some((fixture) => fixture.groupId === group.id) || group.groupTeams.some((team) => team.isBye)))
+      .map((group) => group.name.trim()).filter(Boolean))];
+    if (names.length) round.label = names.join(' · ');
     round.fixtures.sort((a, b) => a.fixtureNumber - b.fixtureNumber);
   }
 
@@ -417,7 +425,7 @@ function MatchTeamRow({
 }
 
 /* ── 매치 카드 ── */
-function MatchCard({ fixture }: { fixture: V1TournamentFixture }) {
+export function MatchCard({ fixture, fluid = false }: { fixture: V1TournamentFixture; fluid?: boolean }) {
   const winner = getWinner(fixture);
   const hasResult = fixture.result !== null;
   const pk = penaltyText(fixture);
@@ -439,6 +447,7 @@ function MatchCard({ fixture }: { fixture: V1TournamentFixture }) {
   return (
     <div
       className={`tm-bk2-card${isLive ? ' tm-bk2-card-live' : ''}`}
+      style={fluid ? { width: '100%' } : undefined}
       role="group"
       aria-label={`${homeLabel} 대 ${awayLabel}`}
     >
@@ -674,7 +683,7 @@ function BracketEmpty() {
 }
 
 /** SVG endpoints are measured from rendered cards/rows, including badges and logos. */
-function ConnectedBracket({ rounds, groups, champion }: { rounds: BracketGraphRound[]; groups: V1TournamentGroup[]; champion: string | null }) {
+function ConnectedBracket({ rounds, groups, champion, sourceRounds = rounds, showChampion = true }: { rounds: BracketGraphRound[]; groups: V1TournamentGroup[]; champion: string | null; sourceRounds?: BracketGraphRound[]; showChampion?: boolean }) {
   const graph = buildBracketGraph(rounds, groups);
   const canvas = useRef<HTMLDivElement>(null);
   const [paths, setPaths] = useState<Array<{ id: string; d: string; label: string; decided: boolean }>>([]);
@@ -710,7 +719,7 @@ function ConnectedBracket({ rounds, groups, champion }: { rounds: BracketGraphRo
     element.querySelectorAll('[data-bracket-node]').forEach((card) => observer.observe(card));
     return () => observer.disconnect();
   }, [rounds, groups, champion]);
-  const minWidth = rounds.length * COL_W + rounds.length * 40 + CHAMP_W;
+  const minWidth = rounds.length * COL_W + rounds.length * 40 + (showChampion ? CHAMP_W : 0);
   const finalY = graph.nodes.find((node) => node.round === 'final')?.y ?? graph.height / 2;
   return <div ref={canvas} style={{ position: 'relative', display: 'flex', width: '100%', minWidth, height: graph.height + HEAD_H }}>
     <svg aria-label="경기별 진출 연결선" role="img" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
@@ -728,7 +737,7 @@ function ConnectedBracket({ rounds, groups, champion }: { rounds: BracketGraphRo
           return <div key={node.id} data-bracket-node={node.id} style={{ position: 'absolute', width: COL_W, top: HEAD_H + node.y, transform: 'translateY(-50%)' }}>
             {fixture ? <>
               <p className="tm-text-micro" style={{ marginBottom: 4, color: 'var(--text-caption)' }}>{fixture.fixtureNumber}번 경기</p>
-              <MatchCard fixture={withBracketSourceNames(fixture, rounds)} />
+              <MatchCard fixture={withBracketSourceNames(fixture, sourceRounds)} />
             </> : node.bye ? <div className="tm-bk2-card tm-on-tint" role="region" aria-label={`${byeRound(node.round)?.label} 부전승`} style={{ padding: 12, background: byeHasPublicTeam ? 'var(--blue50)' : undefined }}>
               <div className="tm-text-caption-strong" style={{ color: 'var(--blue700)', marginBottom: 8 }}>부전승 · {byeRound(node.round)?.nextLabel} 직행</div>
               <div className="flex items-center gap-2"><TeamAvatar teamId={byeHasPublicTeam ? node.bye.teamId : null} name={byeName!.label} logoUrl={byeHasPublicTeam ? node.bye.teamLogoUrl : null} size="sm" /><span className="tm-text-caption-strong min-w-0 truncate">{byeName!.label}</span></div>
@@ -738,7 +747,7 @@ function ConnectedBracket({ rounds, groups, champion }: { rounds: BracketGraphRo
       </div>
       <div aria-hidden="true" style={{ flex: '1 0 40px' }} />
     </Fragment>)}
-    <div style={{ width: CHAMP_W, flexShrink: 0, position: 'relative' }}><div data-bracket-champion style={{ position: 'absolute', top: HEAD_H + finalY, width: CHAMP_W, transform: 'translateY(-50%)' }}><ChampionSlot champion={champion} /></div></div>
+    {showChampion && <div style={{ width: CHAMP_W, flexShrink: 0, position: 'relative' }}><div data-bracket-champion style={{ position: 'absolute', top: HEAD_H + finalY, width: CHAMP_W, transform: 'translateY(-50%)' }}><ChampionSlot champion={champion} /></div></div>}
   </div>;
 }
 
@@ -747,15 +756,17 @@ function ConnectedBracket({ rounds, groups, champion }: { rounds: BracketGraphRo
 export interface TournamentBracketProps {
   fixtures: V1TournamentFixture[];
   groups: V1TournamentGroup[];
+  selectedRoundKey?: string | null;
 }
 
-export function TournamentBracket({ fixtures, groups }: TournamentBracketProps) {
+export function TournamentBracket({ fixtures, groups, selectedRoundKey }: TournamentBracketProps) {
   const rounds = groupFixturesByRound(fixtures, groups);
 
 
-  const mainRounds = rounds.filter((r) => r.key !== 'third_place');
-  const thirdPlace = rounds.find((r) => r.key === 'third_place') ?? null;
+  const mainRounds = rounds.filter((r) => r.key !== 'third_place' && (!selectedRoundKey || r.key === selectedRoundKey));
+  const thirdPlace = (!selectedRoundKey || selectedRoundKey === 'third_place') ? rounds.find((r) => r.key === 'third_place') ?? null : null;
   const champion = getChampion(rounds);
+  const showChampion = !selectedRoundKey || selectedRoundKey === 'final';
 
   const roundHeights = mainRounds.map((r) => {
     const slotCount = isMultiLeg(r.fixtures)
@@ -867,7 +878,7 @@ export function TournamentBracket({ fixtures, groups }: TournamentBracketProps) 
               / minWidth)의 합이 그보다 크면 자연스럽게 오버플로해 상위 overflowX:auto가
               스크롤을 켠다. 남는 폭은 각 ConnectorSegment의 연장선(flex-grow)이 흡수한다. */}
           <div ref={contentRef}>
-            {usesAggregate ? (          <div  style={{ display: 'flex', width: '100%', alignItems: 'flex-start', paddingRight: 8 }}>
+            {mainRounds.length === 0 ? null : usesAggregate ? (          <div  style={{ display: 'flex', width: '100%', alignItems: 'flex-start', paddingRight: 8 }}>
 
             {mainRounds.map((round, idx) => {
               const isFirst = idx === 0;
@@ -894,15 +905,15 @@ export function TournamentBracket({ fixtures, groups }: TournamentBracketProps) 
                   {!isLast && (
                     <ConnectorSegment topCount={slotCount} totalH={rH} nextN={nextSlotCount} />
                   )}
-                  {isLast && (
+                  {isLast && showChampion && (
                     <ConnectorSegment topCount={1} totalH={treeH} nextN={1} />
                   )}
                 </Fragment>
               );
             })}
 
-            <ChampionCol champion={champion} h={treeH} />
-          </div>) : <ConnectedBracket rounds={mainRounds} groups={groups} champion={champion} />}
+            {showChampion && <ChampionCol champion={champion} h={treeH} />}
+          </div>) : <ConnectedBracket rounds={mainRounds} groups={groups} champion={champion} sourceRounds={rounds} showChampion={showChampion} />}
           </div>
         </div>
 
@@ -914,7 +925,7 @@ export function TournamentBracket({ fixtures, groups }: TournamentBracketProps) 
       {thirdPlace && (
         <div className="tm-bk2-third">
           <div className="tm-bk2-third-header">
-            <span className="tm-bk2-pill tm-bk2-pill-sm">3 · 4위전</span>
+            <span className="tm-bk2-pill tm-bk2-pill-sm">{thirdPlace.label}</span>
             {/* [R-T2] 고정폭 없는 안내문 — 캡션 토큰과 맞춰 12로 상향. */}
             <span className="tm-text-caption">4강에서 진 두 팀이 3위를 가려요</span>
           </div>

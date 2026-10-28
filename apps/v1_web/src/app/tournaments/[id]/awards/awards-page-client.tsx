@@ -98,7 +98,8 @@ export function getTopThree(tournament: V1TournamentDetail): Array<{ pos: number
   const result: Array<{ pos: number; name: string }> = [];
 
   if (finalFixture?.result) {
-    const w = getWinnerSide(finalFixture.result);
+    const selectedWinner = tournament.sixTeamBracket?.winners[finalFixture.id];
+    const w = selectedWinner ? selectedWinner === finalFixture.homeRegistrationId ? 'home' : selectedWinner === finalFixture.awayRegistrationId ? 'away' : null : getWinnerSide(finalFixture.result);
     const champion = w === 'home' ? finalFixture.homeTeamName : w === 'away' ? finalFixture.awayTeamName : null;
     const runner = w === 'home' ? finalFixture.awayTeamName : w === 'away' ? finalFixture.homeTeamName : null;
     if (champion) result.push({ pos: 1, name: champion });
@@ -191,7 +192,7 @@ function AwardsPodium({
     pos === 1
       ? (champions.length > 0 ? { pos: 1, name: champions.map((c) => c.name).join(' · ') } : null)
       : top3.find((t) => t.pos === pos) ?? null,
-  );
+  ).filter((slot) => slot !== null);
   // 3위 → 2위 → 1위 순으로 차오르는 등장 딜레이(챔피언 공개에 살짝 뜸을 둠)
   const REVEAL_DELAY_MS: Record<number, number> = { 3: 0, 2: 140, 1: 300 };
 
@@ -206,9 +207,9 @@ function AwardsPodium({
           <strong>{champions[0].name}</strong>, 우승을 축하드려요! 🎉
         </p>
       ) : null}
-      <div className="tm-awards-podium" aria-label="최종 시상대">
-        {podiumSlots.map((slot, idx) => {
-          const pos = podiumOrder[idx];
+      <div className="tm-awards-podium mx-auto w-full max-w-xl" aria-label="최종 시상대">
+        {podiumSlots.map((slot) => {
+          const pos = slot.pos;
           const posClass = `tm-awards-podium-${pos}` as const;
           return (
             <div
@@ -218,7 +219,7 @@ function AwardsPodium({
             >
             {/* 팀명 (podium 위) */}
             <span className="tm-awards-podium-name">
-              {slot?.name ?? '—'}
+              {slot.name}
             </span>
             <span className={`tm-awards-podium-pos tm-medal-${pos === 1 ? 'gold' : pos === 2 ? 'silver' : 'bronze'}`} aria-hidden="true">
               <Medal size={pos === 1 ? 26 : 22} strokeWidth={2} />
@@ -253,7 +254,7 @@ function AwardsPodium({
 /* ── 상금 상세 — 파서·아이콘은 어드민 미리보기와 공유 (lib/prize-breakdown, prize-rank-icon) ── */
 
 function hasPrizeData(tournament: V1TournamentDetail): boolean {
-  return Boolean(tournament.prizeSummary?.trim() || tournament.prizePool);
+  return Boolean(tournament.prizeSummary?.trim() || tournament.prizePool || tournament.prizeBreakdown?.trim());
 }
 
 function PrizeSection({

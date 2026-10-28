@@ -1,4 +1,53 @@
+## 6강 결승 직행 방식 (2026-10-28)
+
+- 대회 create/update DTO의 `sixTeamMode?: boolean`: true는 정원6 + format=knockout만 허용. 기존 대회 기본 false.
+  생성된 6강 대진이 있으면 정원/형식/방식 변경은 `409 SIX_TEAM_SETTINGS_LOCKED`.
+- 기존 template capabilities에 `sixTeamEligible` 추가. 정원6 토너먼트에서만 true.
+- template preview/apply 입력: `{ schemaVersion:2, kind:'knockout', size:6, participantCount:6, sixTeamMode:true, thirdPlace:false, registrationIds:[6개] }`.
+  apply는 기존 `previewHash`/`requestId` 필수. 확정 참가팀이 정확히6팀이며 중복 없는6자리 배정 필요.
+  일반 v2 rollout flag와 별개로 위 조건이 게이트다. 일반6팀 템플릿과 결과 비교형6강은 별도 선택이다.
+- 생성: 6강3/준결승1/결승1, 정확히5개 TeamMatch/Game. V1Tournament.sixTeamBracket에 경기 식별자/진출 선택/직행 출처/기준 버전 저장.
+- `GET /admin/tournaments/:id/bracket/six-team`: active admin, state/results/teams/candidates/automaticBye/version 조회.
+- `PUT /admin/tournaments/:id/bracket/six-team`: mutation admin(owner/ops), `{version,reason,manual,bye?,swapSemi?,swapFinal?,winners:{[fixtureId]:registrationId}}`.
+  사유 필수. winners는 각 경기 참가팀 내 선택, bye는6강 진출팀3팀 내 선택. 외부팀/중복/구버전 거절.
+  `manual:false`는 직행 성적 자동 선정, winners override는 그대로 유지(각 경기 선택에서 공식 결과 따르기로 해제).
+- 공식 결과3건의 승리팀 기준 다득점→득실차→최소실점. PK 점수 제외, 공식 점수에 포함된 연장 득점 포함.
+  완전 동률/비교 가능한 공식 점수 미비는 자동 대기. 운영자가 수동 진출/직행 지정 가능.
+- 수동 결과는 실제 점수/개인전적을 위조하지 않음. 사유/처리자/이전·이후값은 감사 action `tournament.six_team.decide`.
+  수동 선정 후 근거 결과 정정은 needsReview=true. 자동 재계산이 수동 선택을 덮어쓰지 않음.
+- 부분 배정 없음: 같은 tx에서 Details/TeamMatch/GameSide/명단무효화/일정 동기화.
+  후속 시작 상태는 `409 NEXT_FIXTURE_CONFLICT`; 구버전 `409 SIX_TEAM_STALE`; 경합 `409 SIX_TEAM_BUSY`; 후보 오류422.
+- 공개 detail의 `sixTeamMode`는 방식 설명용. `sixTeamBracket`는 대진 공개 이후만 `{rounds,bye,manual,swapSemi,swapFinal,winners,needsReview}`.
+  공개 응답에 사유/처리자/원시 비교점수 없음. 비교표는 기존 공개 fixtures.result만 사용, 숨긴 점수 재노출 금지.
+- Mock: MSW capabilities 기본 sixTeamEligible=false, 공개표 테스트 inline fixture 및 실제 DB 통합 fixture로 별도6강 계약 검증.
+- schema migration 20261028000000_six_team_bracket / 20261028000001_six_team_mode 필요.
+
 # V1 Tournaments API
+
+## 유연한 대진 v2 (2026-10-27)
+
+모든 경로의 prefix는 `/api/v1/admin/tournaments/:tournamentId/bracket/template`이다. V1AuthGuard와 mutation admin(owner/ops)을 요구하며 support와 비관리자는 거절한다.
+
+| Method / suffix | 계약 |
+|---|---|
+| GET `/capabilities` | `{ flexibleEnabled, schemaVersion: 2 }`. Web은 서버 활성화 상태에 따라 단계별 설정 또는 기존 템플릿을 연다. 조회 실패는 오류와 재시도를 표시한다. |
+| POST `/preview` | 정규화된 입력으로 groups/slots/fixtures/edges/byeSlots/warnings/counts와 `previewHash`, `confirmedTeamCount`를 반환한다. 저장하지 않는다. |
+| GET `/draft` | `{ input, revision }`. 초안이 없으면 input=null, revision=0. |
+| PUT `/draft` | 설정과 `expectedRevision`으로 유효한 초안을 저장한다. revision 불일치는 409 `BRACKET_DRAFT_STALE`. |
+| POST (suffix 없음) | 설정 + `previewHash` + `requestId` + 선택 `replaceExisting`, `acknowledgeRematches`. 실제 생성은 하나의 대회 잠금/트랜잭션 안에서 수행한다. |
+| GET `/requests/:requestId` | `{ completed, result }`. 감사 로그에 커밋된 생성 결과가 있으면 completed=true. false는 진행 중/미완료를 구분하지 않으며 동일 키로 재시도할 수 있다. |
+
+설정은 `schemaVersion: 2`, `kind: knockout | group_knockout`, `participantCount`, `drawSeed`(uint32), `seedPolicy: random | seeded`, 선택 `registrationIds`, `thirdPlace`를 받는다. 단독은 `size`와 participantCount가 동일한 4~64 짝수다. 조별은 `groups: [{ name, capacity, advanceCount, legs?: 1 | 2 }]`로 각 조의 회전 수를 따로 정한다. 조별 `legs`가 우선하며, 생략하면 기존 최상위 `legs`를 사용하고 둘 다 없으면 1회전이다. v1·리그 계약의 최상위 `legs` 필수 조건은 유지한다. 초안·미리보기·생성·240경기 상한 계산 모두 동일한 조별 회전 수를 사용한다. 조는 2~16개, capacity 2~8, advanceCount 1~capacity−1이며 합계는 참가 수와 같아야 한다. 결선은 2팀 이상이며 홀수도 가능하고 3·4위전은 4팀 이상에서만 허용한다. 조별+결선 실제 경기는 합계 240개 이하다.
+
+배정 배열은 단독에서는 position(시드 번호) 순서, 조별에서는 조 배열과 조 안 자리 순서다. 제공 시 모든 자리에 서로 다른 confirmed 등록을 넣어야 한다. 생략하면 빈 골격을 생성한다. 조별 결선은 높은 조별 순위를 우선하여 부전승을 주며 동일 순위는 drawSeed로 추첨한다. 같은 조 분리는 128회 이내 결정적 탐색으로 개선하고, 첫 경기 재대결 가능성은 warnings로 알려 확인 후 생성한다.
+
+부전승에는 가짜 경기를 만들지 않는다. 조별 진출 슬롯은 `GROUP_RANK + sourceGroupId + position`을 유지하며 부전승일 때 `byeSortOrder`도 저장한다. 첫 라운드 phase는 2의 거듭제곱 크기(round64/round32/round16/quarter/semi/final), 불완전 첫 라운드 이름은 `N팀 첫 라운드`다. 예: 10팀은 round16의 실제 2경기+부전승 6자리에서 8강으로 연결된다. 기존 v1 4/8/12/16팀과 특수 20팀, 정규 리그 계약은 유지한다.
+
+previewHash는 입력과 대회 규칙 pin·조·슬롯·경기 상태·등록 상태·진출 연결을 묶는다. 적용 직전 재검증하며 변경 시 409 `BRACKET_PREVIEW_STALE`, 누락 시 `BRACKET_PREVIEW_REQUIRED`다. 같은 requestId와 입력은 기존 결과를 돌려주며 입력이 다르면 `BRACKET_REQUEST_CONFLICT`다. 감사 로그와 생성이 같은 트랜잭션에 커밋되므로 부분 생성과 중복 생성이 없다. 기존 `BRACKET_NOT_EMPTY`/`BRACKET_LOCKED` 교체 보호를 유지한다.
+
+수동 조의 advanceCount=null은 자동 2팀으로 추측하지 않는다. 조별 공식 결과가 완료된 경우 실제 결선에 배정된 해당 조 팀을 qualification에 반환하여 공개 진출 강조에 사용한다. 미완료 조는 강조하지 않는다. 신규 순위 출처가 있는 결선은 실제 순위 또는 동률 후보와 일치해야 배정된다.
+
+출시 순서는 migration → API/Web → 테스트 대회 활성화 → alpha 확인 → 전체 활성화다. `V1_FLEXIBLE_BRACKETS_ENABLED=true`는 전체 활성화, `V1_FLEXIBLE_BRACKET_TOURNAMENT_IDS`는 쉼표로 구분한 허용 대회 ID다. 둘 다 미설정이면 비활성이다. 비활성 시 v2 preview/save/apply는 `BRACKET_V2_DISABLED`이며 기존 v2 조회·경기 운영은 유지한다. Web 빌드 플래그는 필요 없다. 모델 변경은 V1Tournament.bracketDraft/bracketDraftRevision, V1TournamentGroupPhase의 round64/round32 추가이며 기존 데이터 재생성은 없다.
 
 Tournament PATCH composes format, lineup configuration pin, untouched-fixture repointing and
 ordinary metadata/audit writes in one transaction. Format/lineup edits acquire the same structural
@@ -8,16 +57,16 @@ tournament version remain unchanged; no config-change audit is committed.
 
 League compatibility (2026-10-19): public `status=draft` with `kind=league` or `kind=all` selects league storage statuses `draft | open | closed`, all displayed as **모집완료**. This matches `GET /league-matches?state=draft` and existing list redirects. Regular tournament drafts remain hidden.
 
-## 12강 부전승 홈·어웨이 (2026-10-16)
+## 부전승 홈·어웨이 (2026-10-27 확장)
 
 - `PUT /api/v1/admin/tournament-slots/:slotId/bye-side`: `{ side: 'HOME' | 'AWAY', expectedSide: 'HOME' | 'AWAY' }`.
   V1AuthGuard + mutation admin(owner/ops), support/비관리자 403. `side`는 원하는 최종 자리이며 같은 요청을 재전송해도 다시 뒤집지 않는다.
-- 12강 BYE 슬롯과 WINNER 연결 하나를 가진 8강 경기만 허용한다. 다른 경기로 이동하거나 상대를 바꾸지 않는다.
+- 부전승 슬롯과 바로 이전 라운드 WINNER 연결 하나를 가진 경기에서 허용한다. GROUP_RANK 부전승도 포함한다. 다른 경기로 이동하거나 상대를 바꾸지 않는다.
   슬롯 FK, 실제 경기/게임의 홈·어웨이 팀, 승자 edge의 targetSide, 부전승 sortOrder를 대회 잠금+게임 행 잠금 안의 단일 트랜잭션으로 교환한다.
   이후 4강 진출 edge 및 원천 12강 경기 ID는 유지한다. 12강 결과가 이미 있어도 8강과 이후 경기가 시작 전이면 이동할 수 있다.
   홈·어웨이를 교환해도 양 팀의 같은 경기 일정은 활성 상태와 기존 시각을 유지한다. 팀 교체 시에는 경기에서 빠진 팀의 일정만 취소한다.
 - 응답 data: `{ affectedTeamMatchIds: string[], side, sortOrder }`. `sortOrder`는 0부터 시작하는 표시 위치다.
-  어드민 slot의 `position`은 고유 순번, 신규 `byeSortOrder: number | null`은 표시 위치다. 다른 슬롯 종류는 null.
+  어드민 slot의 `position`은 참가 순번 또는 원천 조 순위, `byeSortOrder: number | null`은 부전승 표시 위치다. v1 round12는 방향에 맞춰 위치를 바꾸고 v2는 원래 첫 라운드 가지 번호를 보존한다.
 - 409: `BYE_SIDE_INVALID`(구조/소속 불일치), `BYE_SIDE_STALE`(현재 방향 불일치), `SLOT_LOCKED`(대상 또는 후속 경기 시작·기록·미무효 결과),
   `BYE_POSITION_OCCUPIED`(위치 충돌), `COMMAND_CONCURRENCY_CONFLICT`(게임 잠금 경합). 잘못된 DTO/추가 필드는 400, 없는 슬롯은 404.
   실패하면 전체 롤백한다. 감사 action은 `tournament.bracket.bye.side`이며 이전/이후 방향·위치·대상/원천 경기 ID를 남긴다.
@@ -409,7 +458,7 @@ Tournament gender classification uses the enum `genderCategory = mixed | male | 
 
 The admin creation surface is a four-step controlled wizard: basic information, schedule/location, participation requirements, then prize/rules/promotion. It uses native `datetime-local` inputs, suggests registration deadline D-3 23:59 until the operator manually edits it, leaves the roster deadline empty by default (an empty value is sent as `null`), and preserves every field while navigating between steps. Tournament edit reuses the same date, cover, prize-breakdown, and promotion-card components. On update, clearing an optional schedule, venue, bank, rules, or refund field sends `null` and persists the cleared state instead of silently omitting the field.
 
-Admin-facing prize entry is text-first. `prizeSummary` is the public "상품 및 상금" display string and clients must render that text as entered instead of deriving `총 N원` or `최대 N원` copy from `prizePool`. `prizeBreakdown` remains the comma/dot/newline-delimited breakdown string that public detail renders as separate chips below the main prize card.
+Admin-facing prize entry is text-first. `prizeSummary` is the public "상품 및 상금" display string and clients must render that text as entered instead of deriving `총 N원` or `최대 N원` copy from `prizePool`. `prizeBreakdown` accepts legacy delimiter-separated text and versioned categorized prize rows; public readers use the shared parser and grouped prize presentation. See [Categorized prize plans](#categorized-prize-plans).
 
 Tournament promo cards are separate from prize fields and from the normal tournament edit surface. Admin update/create accepts independent home promo fields (`promoHomeEnabled`, `promoHomeTitle`, `promoHomeSubtitle`, `promoHomeImageUrl`, `promoHomeBadgeText`, `promoHomeDateText`, `promoHomeTeamsText`, `promoHomeLocationText`, `promoHomePrizeText`, `promoHomePriority`) and list promo fields (`promoListEnabled`, `promoListTitle`, `promoListSubtitle`, `promoListImageUrl`, `promoListBadgeText`, `promoListDateText`, `promoListTeamsText`, `promoListLocationText`, `promoListPrizeText`, `promoListPriority`); public list/detail responses include the same fields. `promoHomeEnabled` controls the home "오늘의 추천" tournament cards and `promoListEnabled` controls the tournament-list carousel. The home section shows only promos that accept registration right now (the registration gate — status, deadline, capacity — is open and `scheduledAt` has not passed); closed promos are dropped instead of staying as "모집 마감" cards. The same section also adds, without a promo toggle, the open regular league with the nearest registration deadline (`GET /tournaments?kind=league&status=open`, same gate) and the nearest recruiting friendly team match (`GET /team-matches?status=recruiting&kind=friendly&sort=recommended&limit=1`). Clients expose every enabled open tournament in descending priority order, with the earliest `createdAt` first for ties. When a published `campaignSlug` exists, both promo surfaces link to `/tournaments/campaigns/:slug`; otherwise they link to the normal tournament detail. Promo images are uploaded through the shared upload endpoint first, then the returned URL is saved in the corresponding promo image field.
 
@@ -605,7 +654,7 @@ All team roster mutations lock the registration row and re-read `rosterLockedAt`
 - `POST /admin/tournaments/:tournamentId/byes`: 인증 + mutation admin. 입력 `{ groupId: UUID, registrationId?: UUID | null, byeId?: UUID, sortOrder: integer(0..7) }`, 반환은 groupTeam. 감사 action `tournament.bracket.bye.save`.
 - 그룹 phase로 12강·8강·4강을 구분한다. 팀 미정은 registrationId 생략/null로 저장하며, 팀을 선택하면 해당 대회의 confirmed 등록이어야 한다. 홈·어웨이 또는 경기 생성 없이 저장한다. byeId를 보내면 해당 조의 기존 부전승 id와 위치를 유지하며 팀 배정/미정 전환/위치 수정을 저장한다. byeId 생략 시 새 자리 생성 또는 기존 일반 배정을 변환한다.
 - 템플릿이 만든 12강 BYE 자리(`V1TournamentSlot kind=BYE`, position 1~4 ↔ sortOrder 0·3·4·7)에 연결된 부전승은 같은 위치에서 팀을 바꾸거나 `registrationId: null` 로 비우는 요청을 자리 배정 트랜잭션(`assignSlotInTx`)에 위임한다 — 자리 `registrationId`·부전승 행·8강 홈 사이드가 함께 바뀌고 응답 형태는 그대로다. 위치를 옮기는 요청, 그리고 `DELETE /admin/group-teams/:id` 로 연결된 부전승 행을 지우는 요청은 `409 SLOT_LINKED`(삭제는 위치 자체를 없애 자리↔위치 대응을 깨므로 위임하지 않고 거절하며, 비우기는 수정 요청이 맡는다). 자리에 연결되지 않은 부전승은 기존 동작 그대로다.
-- 12강 정원 12팀/부전승 4팀, 8강 정원 8팀/부전승 4팀, 4강 정원 4팀/부전승 2팀. 초과 `409 BYE_CAPACITY`; group/final/third_place는 `400 BYE_PHASE_INVALID`. 16강은 부전승이 없어 `400 BYE_PHASE_INVALID`(group/final/third_place 와 같다).
+- 정원/부전승 상한: 64강 64/32, 32강 32/16, 16강 16/8, 12강 12/4, 8강 8/4, 4강 4/2. 초과 `409 BYE_CAPACITY`; group/final/third_place는 `400 BYE_PHASE_INVALID`. v2 확장으로 64·32·16강 부전승도 허용한다.
 - 다른 조의 같은 단계 부전승 중복 `409 BYE_ALREADY_IN_ROUND`; 같은 단계 경기 참가 중인 팀 `409 BYE_TEAM_HAS_MATCH`. 기존 경기 생성/수정도 해당 단계 부전승팀을 거절한다.
 - 4강 위치는 0..3이며 초과는 `400 BYE_POSITION_INVALID`. 중복 위치는 `409 BYE_POSITION_OCCUPIED`, 다른 조/없는 byeId는 `404 BYE_NOT_FOUND`. 이전 명단 순번이 위치 범위를 벗어난 기존 부전승은 읽기 렌더링에서 경기 사이 위치로 호환하고 DB 값은 변경하지 않는다.
 - 부전승 groupTeam의 `sortOrder`는 해당 열의 일반 경기와 부전승을 합친 0부터의 삽입 위치다. UI에서는 1부터 표시한다. 예시 이미지의 12강은 위치 1·4·5·8에 부전승을 놓을 수 있다. 기존 일반 팀의 sortOrder 의미는 유지한다.
@@ -767,3 +816,10 @@ are not rewritten. UI uses per-player edit/save/cancel; errors preserve the draf
 관리자 응답은 원본 두 URL과 `showDetailImage`를 반환한다. 공개 상세도 이를 반환한다(리그 거울의 기존 cover fallback 유지). 공개 목록의 `coverImageUrl`은 기존 소비자 호환을 위해 `listImageUrl ?? coverImageUrl`이며 `listImageUrl`도 포함한다. 프론트 기본 목록은 목록 사진을 우선한다. 상세는 상세 사진→목록 사진→종목 기본 그래픽 순으로 표시하며 `showDetailImage: false`면 업로드·기본 이미지와 전체 영역을 렌더하지 않는다. 제목·본문·목록·홍보 노출은 유지된다. 새 설정은 정규 대회용이며 정규 리그의 기존 표시 정책은 유지한다.
 
 DB는 기존 `V1Tournament.listImageUrl`을 재사용하고 `v1_tournaments.show_detail_image BOOLEAN NOT NULL DEFAULT true`를 migration으로 추가한다. 기존 행은 true다. 홈/목록 홍보 카드의 기존 전용 이미지와 문구는 호환 유지하며, 기본 사진을 사용할 때 목록→상세 사진을 따른다. 상세는 홍보 전용 이미지를 fallback으로 사용하지 않는다.
+
+
+### Categorized prize plans
+
+`prizeBreakdown` remains a nullable string stored on `V1Tournament`; no schema migration is required. Create/update DTOs accept up to 4,000 characters (previously 500) to accommodate the existing 12-row editor plus category metadata. This is the prize plan, separate from actual award recipients.
+
+Legacy delimiter-separated text remains readable. New admin saves use `@teameet/prizes/v1:` followed by a JSON array of `{ category, label, amount }`. Category is one of `팀 시상`, `개인 시상`, `기타 시상`. Readers must use `parsePrizeRows` / `splitPrizeSegments` instead of rendering the encoded field directly. Explicit category wins over label inference, including arbitrary or multiword personal award names. Unclassified legacy rows use name-based inference; former raffle/event rows belong to `기타 시상`. Team aliases `우승/1위/1등`, `준우승/2위/2등`, and numeric `N위/N등` map to the same position for grouping and winner links. Separate categories never merge, and personal awards never acquire a team winner through a rank-like name. Empty saved rows clear the field with `null` on the info editor.

@@ -1,10 +1,16 @@
 import { act, cleanup, render as renderElement, screen, within, fireEvent, waitFor } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { COMMAND_RESPONSE_TIMEOUT_MS, OperateConsole } from './operate-console';
-import type { FixtureLineupResponse, GameEventRecord, GameLineupState } from '@/types/game-operations';
+import type { Mock } from 'vitest';
+import { useConfirm } from '@/components/v1-ui/confirm-modal';
+import { AbnormalEndDialog, OperateConsoleCore, type GameDetailQueryState, type OperateConsoleRuntime } from '@/shared/game-operations';
+import { COMMAND_RESPONSE_TIMEOUT_MS } from './operate-console-core';
+import type { FixtureLineupResponse, GameCommandRequest, GameDetail, GameEventRecord, GameLineup, GameLineupState, GameMutationResult, GameRevisionMutationResult, GameState } from '@/types/game-operations';
+import type { V1GameResultRevision } from '@/types/api';
+import type { QueuedGameEvent } from '@/lib/game-operations-queue';
 import { V1_NETWORK_ERROR_CODE, V1ApiError } from '@/lib/api-client';
+import * as overlayHistory from '@/lib/overlay-history';
 
 const queryClients: QueryClient[] = [];
 function render(ui: ReactNode) {
@@ -26,63 +32,28 @@ afterEach(() => {
  * "전송 상태" 로 따로 세운다. 둘은 다른 것을 뜻하므로 같은 제목 아래 둘 수 없다.
  */
 
-const mocks = vi.hoisted(() => ({
-  useV1AuthMe: vi.fn(),
-  useV1FixtureLineup: vi.fn(),
-  useV1Game: vi.fn(),
-  useV1GameOperationsConsole: vi.fn(),
-  postV1GameCommand: vi.fn(),
-  // 종료된 경기의 확정 결과(승부차기 포함) 조회 — 기본값은 "아직 리비전 없음"이라
-  // 이 훅을 신경 쓰지 않는 기존 테스트들은 그대로 동작한다.
-  useV1GameResultRevisions: vi.fn((..._args: unknown[]) => ({
-    data: undefined as Array<Record<string, unknown>> | undefined,
+const testFixtures = vi.hoisted(() => ({
+  auth: vi.fn(),
+  lineups: vi.fn(),
+  game: vi.fn(),
+  operations: vi.fn<() => MockedOperations>(),
+  sendCommand: vi.fn<OperateConsoleRuntime['postGameCommand']>(),
+  // 종료된 경기의 확정 결과(승부차기 포함) 조회 기본 fixture.
+  resultRevisions: vi.fn((..._args: unknown[]) => ({
+    data: undefined as V1GameResultRevision[] | undefined,
     isPending: false,
     isError: false,
   })),
-  useTournamentOpsRole: vi.fn(),
-  confirmSideArrival: vi.fn(),
-  useV1TeamGameRoster: vi.fn(),
 }));
 
-vi.mock('@/hooks/use-v1-api', () => ({
-  useV1AuthMe: () => mocks.useV1AuthMe(),
-  useV1GameResultRevisions: (...args: unknown[]) => mocks.useV1GameResultRevisions(...args),
-}));
-vi.mock('@/hooks/use-v1-game-operations', () => ({
-  useV1FixtureLineup: () => mocks.useV1FixtureLineup(),
-  useV1Game: () => mocks.useV1Game(),
-  postV1GameCommand: (...args: unknown[]) => mocks.postV1GameCommand(...args),
-  // 명단 검인 토글 — 이 스위트는 검인 동작 자체를 검증하지 않지만(전용 스위트가 있다),
-  // 콘솔이 매 렌더 호출하는 훅이라 모듈 목에 반드시 있어야 한다.
-  useV1SetParticipantArrival: () => ({ mutate: vi.fn(), isPending: false, variables: undefined }),
-  // 팀별 "전원 도착" 일괄 검인 — 호출 인자만 본다(서버 계약은 API 스펙이 검증한다).
-  useV1ConfirmSideArrival: () => ({ mutate: mocks.confirmSideArrival, isPending: false, variables: undefined }),
-}));
-// 킥오프 준비 체크리스트의 팀별 명단 요약(빠짐·정지). 요약 자체의 표시 규칙은 kickoff-checklist.test 가 본다.
-vi.mock('@/hooks/use-v1-game-roster', () => ({
-  useV1SetGameRosterParticipation: () => ({ mutateAsync: vi.fn() }),
-  useV1TeamGameRoster: (...args: unknown[]) => mocks.useV1TeamGameRoster(...args),
-}));
-vi.mock('@/hooks/use-v1-game-operations-console', async (importOriginal) => ({
-  useV1GameOperationsConsole: () => mocks.useV1GameOperationsConsole(),
-  gameOperationsErrorMessage: (await importOriginal<typeof import('@/hooks/use-v1-game-operations-console')>()).gameOperationsErrorMessage,
-  isRetryableGameOperationsErrorCode: () => true,
-}));
-// 종료 직후 콘솔이 끼우는 결과 확정 카드 — 카드 자체(권한별 표시·확정 흐름)는 패널 스위트가 검증한다.
-// 여기서는 콘솔이 언제, 어떤 경기에 대해 그 카드를 마운트하는지만 본다.
-vi.mock('@/components/tournament-result-review/game-result-review-panel', () => ({
-  GameResultReviewPanel: (props: { gameId: string; variant?: string; tournamentId?: string }) => (
-    <div
-      data-testid="result-confirm-card"
-      data-game-id={props.gameId}
-      data-variant={props.variant}
-      data-tournament-id={props.tournamentId}
-    />
-  ),
-}));
-vi.mock('@/components/tournament-ops/role-context', () => ({
-  useTournamentOpsRole: () => mocks.useTournamentOpsRole(),
-}));
+type OperationsContract = OperateConsoleRuntime['operations'];
+type GameCommandResult = GameMutationResult | GameRevisionMutationResult;
+type MockedOperations = {
+  [Key in keyof OperationsContract]: OperationsContract[Key] extends (...args: infer Args) => infer Result
+    ? Mock<(...args: Args) => Result>
+    : OperationsContract[Key];
+};
+
 // action-target-picker.tsx가 그대로 import하는 './lineup-grid'와 같은 상대
 // 경로라 여기서 목을 걸면 (모달이 열렸을 때) 그 안에서 렌더되는 실제
 // LineupGrid도 이 목으로 대체된다.
@@ -147,23 +118,17 @@ vi.mock('./lineup-grid', async (importOriginal) => ({
   },
 }));
 
-// 이슈 #375 — `mocks.postV1GameCommand`는 `vi.hoisted`로 파일 전체가 공유하는
+// 이슈 #375 — `testFixtures.sendCommand`는 `vi.hoisted`로 파일 전체가 공유하는
 // 스파이라 `vitest.config.mts`에 clearMocks가 없는 이 프로젝트에서는 호출
 // 기록이 테스트 사이에 그대로 누적된다. "하프타임" describe가 실제로
-// postV1GameCommand를 호출하는 테스트를 추가하면서, 그 뒤에 있는 "경기 종료
+// sendCommand를 호출하는 테스트를 추가하면서, 그 뒤에 있는 "경기 종료
 // 확인" describe의 "아직 호출되지 않았다" 단언이 앞선 테스트의 호출까지
 // 주워 담아 깨졌다 — 구현 결함이 아니라 파일 전체가 공유하는 목의 호출
 // 기록이 초기화되지 않던 잠재적 취약점이다. 매 테스트 전에 호출 기록만
 // 지운다(mockClear, 각 describe가 이미 따로 설정하는 mockResolvedValue
 // 구현 자체는 건드리지 않는다).
 beforeEach(() => {
-  mocks.useV1TeamGameRoster.mockReturnValue({
-    data: { competitionKind: 'TOURNAMENT', editable: true, base: [], participants: [], counts: { base: 0, participating: 0, excluded: 0, unavailable: 0, suspended: 0 } },
-    isPending: false,
-    isError: false,
-  });
-  mocks.postV1GameCommand.mockClear();
-  mocks.useTournamentOpsRole.mockReturnValue('TOURNAMENT_DIRECTOR');
+  testFixtures.sendCommand.mockClear();
 });
 
 // 진행 명령은 응답 제한 시간을 걸 수 있게 abort 신호를 함께 넘긴다.
@@ -190,30 +155,136 @@ function goal(sequence: number): GameEventRecord {
   } as GameEventRecord;
 }
 
-function consoleState(overrides: Record<string, unknown> = {}) {
+function queuedEvent(clientEventId: string, status: QueuedGameEvent['status'], type = 'GOAL'): QueuedGameEvent {
   return {
+    clientEventId,
+    gameId: 'game-1',
+    expectedVersion: 2,
+    event: { type, period: 1, clockMs: 0, occurredAt: '2026-10-28T00:00:00.000Z', payload: {} },
+    payloadHash: 'hash',
+    status,
+    queuedAt: '2026-10-28T00:00:00.000Z',
+    attempts: 1,
+    lastError: status === 'failed' ? { code: 'INTERNAL_ERROR', message: '이벤트를 기록하지 못했어요.' } : null,
+    ackedSequence: status === 'acked' ? 1 : null,
+    ackedVersion: status === 'acked' ? 2 : null,
+  };
+}
+
+function gameMutationResult(state: GameState, version = 3, replayed = false): GameMutationResult {
+  return {
+    gameId: 'game-1',
+    state,
+    version,
+    durableCommandId: 'command-1',
+    replayed,
+  };
+}
+
+function gameRevisionMutationResult(state: GameState, version = 3): GameRevisionMutationResult {
+  return {
+    ...gameMutationResult(state, version),
+    revisionId: 'revision-1',
+    revision: 1,
+    revisionState: 'SUBMITTED',
+  };
+}
+
+function consoleState(overrides: Partial<MockedOperations> = {}): MockedOperations {
+  return {
+    canOperate: true,
     connectionStatus: 'connected',
-    sync: { status: 'ok', lastSequence: 1 },
+    sync: { status: 'synced', lastSequence: 1 },
     takeover: { status: 'held', token: 'tok', expiresAtMs: Date.now() + 60000, assignmentVersion: 0 },
     queue: { items: [] },
     clockOffsetMs: 0,
     liveEvents: [goal(1)],
     gameSnapshot: { version: 2, state: 'LIVE' },
     bannerMessage: null,
-    submitEvent: vi.fn(),
-    retryFailedEvent: vi.fn(),
-    requestTakeover: vi.fn(),
-    reverseEvent: vi.fn(),
-    assignAssist: vi.fn(),
-    applyCommandResult: vi.fn(() => true),
+    submitEvent: vi.fn<OperationsContract['submitEvent']>(),
+    retryFailedEvent: vi.fn<OperationsContract['retryFailedEvent']>(),
+    requestTakeover: vi.fn<OperationsContract['requestTakeover']>(),
+    reverseEvent: vi.fn<OperationsContract['reverseEvent']>(),
+    assignAssist: vi.fn<OperationsContract['assignAssist']>(),
+    applyCommandResult: vi.fn<OperationsContract['applyCommandResult']>(() => true),
     ...overrides,
   };
 }
 
-describe('OperateConsole — 기록된 이벤트 / 전송 상태 분리', () => {
+function CoreHarness({
+  fixtureId = 'f-1',
+  takeoverEnabled = true,
+  operatorScopeKey = 'operator-1',
+}: {
+  fixtureId?: string;
+  takeoverEnabled?: boolean;
+  operatorScopeKey?: string;
+}) {
+  const queryClient = useQueryClient();
+  const { confirm, ConfirmModal } = useConfirm();
+  const fixtureLineup = testFixtures.lineups();
+  const gameQuery = testFixtures.game();
+  const operations = testFixtures.operations();
+  const auth = testFixtures.auth();
+  const revisions = testFixtures.resultRevisions();
+  const data = gameQuery.data as GameDetail | undefined;
+  const queryStatus = gameQuery.status ?? (gameQuery.isLoading ? 'pending' : gameQuery.isError ? 'error' : 'success');
+  const gameDetail: GameDetailQueryState = {
+    data,
+    isLoading: gameQuery.isLoading ?? false,
+    isError: gameQuery.isError ?? false,
+    error: gameQuery.error ?? null,
+    status: queryStatus,
+    refetch: gameQuery.refetch ?? (async () => undefined),
+  };
+
+  return (
+    <OperateConsoleCore
+      gameId={fixtureLineup.data?.gameId ?? data?.id ?? null}
+      runtime={{
+        authUserId: auth.data?.user?.id,
+        resultRevisions: revisions.data,
+        queryClient,
+        confirm,
+        confirmModal: ConfirmModal,
+        postGameCommand: testFixtures.sendCommand,
+        gameOperationsErrorMessage: (code) => code === 'STAFF_SCOPE_DENIED' ? '이 경기를 운영할 권한이 없어요.' : code,
+        isRetryableGameOperationsErrorCode: (code) => code !== 'STAFF_SCOPE_DENIED',
+        operations,
+      }}
+      gameDetail={gameDetail}
+      lineupsQuery={{
+        data: fixtureLineup.data?.lineups,
+        isLoading: fixtureLineup.isLoading ?? false,
+        isError: fixtureLineup.isError ?? false,
+        error: fixtureLineup.error ?? null,
+        refetch: fixtureLineup.refetch ?? (async () => undefined),
+      }}
+      leaseRequired
+      takeoverEnabled={takeoverEnabled}
+      operatorScopeKey={operatorScopeKey}
+      operationContextKey={JSON.stringify(['operation', fixtureId])}
+      headerTopClass="top-[52px]"
+      requiresLineupBeforeStart={data?.sourceType === 'TEAM_MATCH'}
+      allowPenaltyShootout={data?.isKnockoutFixture === true}
+      resultReviewEnabled
+      renderResultReview={(gameId) => (
+        <div data-testid="result-confirm-card" data-game-id={gameId} />
+      )}
+      renderAbnormalEndDialog={(props) => <AbnormalEndDialog {...props} />}
+      renderKickoffChecklist={({ gameId }) => (
+        <section role="region" aria-label="킥오프 준비" data-game-id={gameId}>
+          <p>이번 경기 출전 명단</p>
+        </section>
+      )}
+    />
+  );
+}
+
+describe('OperateConsoleCore — 기록된 이벤트 / 전송 상태 분리', () => {
   beforeEach(() => {
-    mocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'user-1' } } });
-    mocks.useV1FixtureLineup.mockReturnValue({
+    testFixtures.auth.mockReturnValue({ data: { user: { id: 'user-1' } } });
+    testFixtures.lineups.mockReturnValue({
       data: { gameId: 'game-1', lineups: [{ sideId: SIDE_ID, invalidatedAt: null, participants: [
         { id: 'p-1', gameId: 'game-1', sideId: SIDE_ID, lineupId: 'l-1',
           displayNameSnapshot: '정우진', jerseyNumber: 10, position: null,
@@ -224,7 +295,7 @@ describe('OperateConsole — 기록된 이벤트 / 전송 상태 분리', () => 
       error: null,
       refetch: vi.fn(),
     });
-    mocks.useV1Game.mockReturnValue({
+    testFixtures.game.mockReturnValue({
       data: {
         id: 'game-1', state: 'LIVE', version: 2, lastSequence: 1, periods: [],
         sides: [{ id: SIDE_ID, gameId: 'game-1', sideKey: 'HOME', teamId: null,
@@ -235,11 +306,11 @@ describe('OperateConsole — 기록된 이벤트 / 전송 상태 분리', () => 
       isError: false,
       refetch: vi.fn(),
     });
-    mocks.useV1GameOperationsConsole.mockReturnValue(consoleState());
+    testFixtures.operations.mockReturnValue(consoleState());
   });
 
   it('서버에 확정된 이벤트를 보여준다 — 로컬 큐가 비어 있어도', () => {
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    render(<CoreHarness />);
 
     const list = screen.getByRole('list', { name: '기록된 이벤트 목록' });
     expect(within(list).getAllByRole('listitem')).toHaveLength(1);
@@ -247,12 +318,12 @@ describe('OperateConsole — 기록된 이벤트 / 전송 상태 분리', () => 
   });
 
   it('필드 범위 밖 경기 접근의 REST 오류를 한국어로 안내한다', () => {
-    mocks.useV1FixtureLineup.mockReturnValue({
+    testFixtures.lineups.mockReturnValue({
       data: undefined, isLoading: false, isError: true,
       error: new V1ApiError({ status: 'error', message: 'Tournament staff scope is denied', statusCode: 403, code: 'STAFF_SCOPE_DENIED', timestamp: '2026-10-14T01:00:00Z' }),
       refetch: vi.fn(),
     });
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    render(<CoreHarness />);
     expect(screen.getByText('이 경기를 운영할 권한이 없어요.')).toBeInTheDocument();
     expect(screen.queryByText('Tournament staff scope is denied')).not.toBeInTheDocument();
     // 권한 문제는 다시 불러와도 같은 답이다 — 누를 버튼을 두지 않는다(MD-QA #171).
@@ -261,12 +332,12 @@ describe('OperateConsole — 기록된 이벤트 / 전송 상태 분리', () => 
 
   it('권한이 아닌 불러오기 실패에는 다시 시도를 둔다', () => {
     const refetch = vi.fn();
-    mocks.useV1FixtureLineup.mockReturnValue({
+    testFixtures.lineups.mockReturnValue({
       data: undefined, isLoading: false, isError: true,
       error: new V1ApiError({ status: 'error', message: '경기 정보를 불러오지 못했어요.', statusCode: 500, code: 'INTERNAL_ERROR', timestamp: '2026-10-14T01:00:00Z' }),
       refetch,
     });
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    render(<CoreHarness />);
     fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
     expect(refetch).toHaveBeenCalled();
   });
@@ -274,8 +345,8 @@ describe('OperateConsole — 기록된 이벤트 / 전송 상태 분리', () => 
   // MD-QA #165: 다른 운영자가 쥔 경기는 보기 모드로 열고, 코드 없이 누가 운영 중인지와 가져오는 방법을 보여 준다.
   it('다른 운영자가 운영 중이면 이름과 가져오기 버튼을 보여 주고, 확인해야만 force 로 가져온다', async () => {
     const state = consoleState({ takeover: { status: 'denied', code: 'TAKEOVER_HELD', holderName: '김운영' } });
-    mocks.useV1GameOperationsConsole.mockReturnValue(state);
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    testFixtures.operations.mockReturnValue(state);
+    render(<CoreHarness />);
 
     expect(screen.getByText('김운영님이 이 경기를 운영하고 있어요. 지금은 보기만 할 수 있어요.')).toBeInTheDocument();
     expect(screen.queryByText(/TAKEOVER_HELD/)).not.toBeInTheDocument();
@@ -287,10 +358,10 @@ describe('OperateConsole — 기록된 이벤트 / 전송 상태 분리', () => 
   });
 
   it('권한을 뺏긴 쪽도 코드 대신 누가 가져갔는지 보여 준다', () => {
-    mocks.useV1GameOperationsConsole.mockReturnValue(
+    testFixtures.operations.mockReturnValue(
       consoleState({ takeover: { status: 'denied', code: 'TAKEOVER_SUPERSEDED', holderName: '박운영' } }),
     );
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    render(<CoreHarness />);
 
     expect(screen.getByText('박운영님이 운영 권한을 가져갔어요. 지금은 보기만 할 수 있어요.')).toBeInTheDocument();
     expect(screen.queryByText(/TAKEOVER_SUPERSEDED/)).not.toBeInTheDocument();
@@ -299,32 +370,30 @@ describe('OperateConsole — 기록된 이벤트 / 전송 상태 분리', () => 
 
   // Task 180 G6(F76) — 콘솔에서는 방금 한 일이 맨 위여야 어시스트를 잘못된 골에 다는 사고가 없다.
   it('콘솔의 기록된 이벤트는 최신순이다 (맨 위가 가장 나중에 기록된 골)', () => {
-    mocks.useV1GameOperationsConsole.mockReturnValue(
+    testFixtures.operations.mockReturnValue(
       consoleState({ liveEvents: [goal(1), { ...goal(2), clockMs: 9 * 60000 }, { ...goal(3), clockMs: 12 * 60000 }] }),
     );
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    render(<CoreHarness />);
 
     const rows = within(screen.getByRole('list', { name: '기록된 이벤트 목록' })).getAllByRole('listitem');
     expect(rows.map((row) => /후반 (\d+)/.exec(row.textContent ?? '')?.[1])).toEqual(['12', '9', '6']);
     expect(screen.getByRole('heading', { name: /기록된 이벤트/ })).toHaveTextContent('최신순');
   });
 
-  it('FIELD_OPERATOR가 takeover를 보유하면 기록 수정 액션을 노출한다', () => {
-    mocks.useTournamentOpsRole.mockReturnValue('FIELD_OPERATOR');
-    mocks.useV1GameOperationsConsole.mockReturnValue(
+  it('takeover가 허용되고 보유 중이면 기록 수정 액션을 노출한다', () => {
+    testFixtures.operations.mockReturnValue(
       consoleState({
         takeover: { status: 'held', token: 'tok', expiresAtMs: Date.now() + 60000, assignmentVersion: 0 },
         liveEvents: [{ ...goal(1), assistParticipantId: null }],
       }),
     );
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    render(<CoreHarness />);
 
     expect(within(screen.getByRole('list', { name: '기록된 이벤트 목록' })).getByRole('button', { name: /어시스트/ })).toBeInTheDocument();
   });
 
-  it('SUPPORT_READONLY에서는 기록 수정 액션을 노출하지 않는다', () => {
-    mocks.useTournamentOpsRole.mockReturnValue('SUPPORT_READONLY');
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+  it('takeover가 비활성화되면 기록 조회만 허용한다', () => {
+    render(<CoreHarness takeoverEnabled={false} operatorScopeKey="readonly-operator" />);
 
     expect(screen.getByRole('list', { name: '기록된 이벤트 목록' })).toHaveTextContent('정우진');
     expect(screen.queryByRole('button', { name: /어시스트/ })).toBeNull();
@@ -334,26 +403,21 @@ describe('OperateConsole — 기록된 이벤트 / 전송 상태 분리', () => 
   // 큐가 비어 있으면 "전송 상태" 절은 아예 나오지 않아야 한다 — 평상시 화면에 빈 패널이
   // 남아 있으면 운영자가 그걸 이벤트 목록으로 오해한다(예전 회귀의 원인).
   it('전송할 것이 없으면 전송 상태 절을 세우지 않는다', () => {
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    render(<CoreHarness />);
 
     expect(screen.queryByText('전송 대기·실패')).toBeNull();
   });
 
   it('대기·실패한 전송이 있을 때만 전송 상태를 따로 세운다', () => {
-    mocks.useV1GameOperationsConsole.mockReturnValue(
+    testFixtures.operations.mockReturnValue(
       consoleState({
         queue: {
-          items: [{
-            clientEventId: 'client-9',
-            status: 'failed',
-            lastError: '이벤트를 기록하지 못했어요.',
-            event: { type: 'GOAL', payload: {} },
-          }],
+          items: [queuedEvent('client-9', 'failed')],
         },
       }),
     );
 
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    render(<CoreHarness />);
 
     expect(screen.getByText('전송 대기·실패')).toBeInTheDocument();
     // 서버 로그는 그대로 남아 있어야 한다 — 큐가 그것을 대체하지 않는다.
@@ -363,18 +427,15 @@ describe('OperateConsole — 기록된 이벤트 / 전송 상태 분리', () => 
   // 전부 ack 된 평상시에는 이 절이 통째로 사라져야 한다. 예전에는 ack 된 항목까지 남아
   // "골·옐로카드·골 · 기록 완료"가 위 확정 로그와 1:1로 중복됐다(시각·선수·팀 없이).
   it('전부 서버에 기록된 뒤에는 전송 절을 남기지 않는다', () => {
-    mocks.useV1GameOperationsConsole.mockReturnValue(
+    testFixtures.operations.mockReturnValue(
       consoleState({
         queue: {
-          items: [
-            { clientEventId: 'c-1', status: 'acked', lastError: null, event: { type: 'GOAL', payload: {} } },
-            { clientEventId: 'c-2', status: 'acked', lastError: null, event: { type: 'FOUL', payload: {} } },
-          ],
+          items: [queuedEvent('c-1', 'acked'), queuedEvent('c-2', 'acked', 'FOUL')],
         },
       }),
     );
 
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    render(<CoreHarness />);
 
     expect(screen.queryByText('전송 대기·실패')).toBeNull();
     // 확정 로그는 그대로다 — 큐를 숨긴 것이지 기록을 숨긴 게 아니다.
@@ -384,8 +445,8 @@ describe('OperateConsole — 기록된 이벤트 / 전송 상태 분리', () => 
 
 describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
   beforeEach(() => {
-    mocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'user-1' } } });
-    mocks.useV1FixtureLineup.mockReturnValue({
+    testFixtures.auth.mockReturnValue({ data: { user: { id: 'user-1' } } });
+    testFixtures.lineups.mockReturnValue({
       data: {
         gameId: 'game-1',
         lineups: [{
@@ -423,7 +484,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
     }>,
     periodDurations?: Array<{ durationMinutes: number; extraTime: boolean } | null>,
   ) {
-    mocks.useV1Game.mockReturnValue({
+    testFixtures.game.mockReturnValue({
       data: {
         id: 'game-1', state, version: 2, lastSequence: 1,
         periods: periods.map((period) => ({
@@ -450,7 +511,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       isError: false,
       refetch: vi.fn(),
     });
-    mocks.useV1GameOperationsConsole.mockReturnValue(consoleState({ gameSnapshot: { version: 2, state } }));
+    testFixtures.operations.mockReturnValue(consoleState({ gameSnapshot: { version: 2, state } }));
   }
 
   // G6-V3 — 시작 전엔 패드가 전부 비활성이라 자리만 차지해 폰에서 킥오프 준비를 첫 화면 밖으로 밀었다.
@@ -461,7 +522,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       { number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null },
     ]);
 
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    render(<CoreHarness />);
 
     expect(screen.getByText('경기를 시작해 주세요.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^골/ })).toBeNull();
@@ -474,7 +535,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       { number: 1, state: 'ENDED', startedAt: '2026-08-07T00:00:00.000Z', endedAt: '2026-08-07T00:20:00.000Z' },
       { number: 2, state: 'ENDED', startedAt: '2026-08-07T00:20:00.000Z', endedAt: '2026-08-07T00:40:00.000Z' },
     ]);
-    mocks.useV1GameOperationsConsole.mockReturnValue(
+    testFixtures.operations.mockReturnValue(
       consoleState({
         liveEvents: [{
           id: 'foul-period-2', gameId: 'game-1', sequence: 1, clientEventId: 'foul-client-1',
@@ -486,7 +547,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       }),
     );
 
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    render(<CoreHarness />);
 
     const foulGroup = screen.getByRole('group', { name: '2피리어드 팀 파울' });
     expect(foulGroup).toHaveTextContent('파울 1');
@@ -498,7 +559,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       { number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null },
     ]);
 
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    render(<CoreHarness />);
 
     expect(screen.queryByText('경기를 시작해 주세요.')).toBeNull();
     expect(screen.getByRole('button', { name: '전반 종료' })).toBeInTheDocument();
@@ -516,17 +577,17 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'select-player' }));
     const confirmDialog = await screen.findByRole('dialog');
     expect(screen.getAllByRole('dialog')).toHaveLength(1);
-    expect(mocks.useV1GameOperationsConsole().submitEvent).not.toHaveBeenCalled();
+    expect(testFixtures.operations().submitEvent).not.toHaveBeenCalled();
 
     // 확인해야만(취소가 아니라) submitEvent가 골 이벤트로 정확히 한 번
     // 호출되고 모달이 닫힌다 — "확인하면 정확히 한 번만 기록된다" 요구사항.
     fireEvent.click(within(confirmDialog).getByRole('button', { name: '골 기록' }));
     await waitFor(() =>
-      expect(mocks.useV1GameOperationsConsole().submitEvent).toHaveBeenCalledWith(
+      expect(testFixtures.operations().submitEvent).toHaveBeenCalledWith(
         expect.objectContaining({ type: 'GOAL', participantId: 'p-1', sideId: 'side-home' }),
       ),
     );
-    expect(mocks.useV1GameOperationsConsole().submitEvent).toHaveBeenCalledTimes(1);
+    expect(testFixtures.operations().submitEvent).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   });
 
@@ -538,7 +599,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
     const card = (sequence: number, participantId: string, color: 'RED' | 'YELLOW'): GameEventRecord =>
       ({ ...goal(sequence), type: 'CARD', participantId, payload: { card: color } }) as GameEventRecord;
     const undoneRed = card(2, 'p-2', 'RED');
-    mocks.useV1GameOperationsConsole.mockReturnValue(
+    testFixtures.operations.mockReturnValue(
       consoleState({
         liveEvents: [
           card(1, 'p-1', 'RED'),
@@ -548,7 +609,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
         ],
       }),
     );
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    render(<CoreHarness />);
 
     fireEvent.click(screen.getByRole('button', { name: /^골/ }));
 
@@ -573,10 +634,10 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       ackedSequence: null,
       ackedVersion: null,
     });
-    mocks.useV1GameOperationsConsole.mockReturnValue(
+    testFixtures.operations.mockReturnValue(
       consoleState({ queue: { items: [queuedRed('c-1', 'p-1', 'queued'), queuedRed('c-2', 'p-2', 'failed')] } }),
     );
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    render(<CoreHarness />);
 
     fireEvent.click(screen.getByRole('button', { name: /^골/ }));
 
@@ -589,7 +650,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       { number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null },
     ]);
 
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    render(<CoreHarness />);
 
     fireEvent.click(screen.getByRole('button', { name: /^골/ }));
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'select-player' }));
@@ -598,7 +659,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
     fireEvent.click(within(confirmDialog).getByRole('button', { name: '취소' }));
 
     expect(screen.queryByRole('dialog')).toBeNull();
-    expect(mocks.useV1GameOperationsConsole().submitEvent).not.toHaveBeenCalled();
+    expect(testFixtures.operations().submitEvent).not.toHaveBeenCalled();
   });
 
   describe('두 번째 옐로 — 레드 기록 확인 시트 (MD-QA #81)', () => {
@@ -614,15 +675,15 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       // 방금 적재한 옐로(q-1)는 이미 서버에 확정된 상태 — 레드는 옐로가 확정된 뒤에만 적재된다.
       const state = consoleState({ liveEvents, queue: { items: [queuedYellow('acked')] } });
       state.submitEvent.mockResolvedValue('q-1');
-      mocks.useV1GameOperationsConsole.mockReturnValue(state);
-      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      testFixtures.operations.mockReturnValue(state);
+      render(<CoreHarness />);
       fireEvent.click(screen.getByRole('button', { name: /^옐로카드/ }));
       fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'select-player' }));
       fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '옐로카드 기록' }));
       return state.submitEvent;
     }
 
-    function queuedYellow(status: 'queued' | 'sending' | 'acked' | 'failed') {
+    function queuedYellow(status: QueuedGameEvent['status']): QueuedGameEvent {
       return {
         clientEventId: 'q-1', gameId: 'game-1', expectedVersion: 2, status,
         event: { type: 'CARD', sideId: SIDE_ID, participantId: 'p-1', period: 1, clockMs: 1, occurredAt: '', payload: { card: 'YELLOW' } },
@@ -649,7 +710,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
     });
 
     it('앞선 옐로가 아직 전송 중이면 확정될 때까지 기다렸다가 레드를 기록한다(같은 버전으로 둘을 적재하면 서버가 거절한다)', async () => {
-      const pendingYellowItem = {
+      const pendingYellowItem: QueuedGameEvent = {
         clientEventId: 'q-1', gameId: 'game-1', expectedVersion: 2, status: 'sending',
         event: { type: 'CARD', sideId: SIDE_ID, participantId: 'p-1', period: 1, clockMs: 1, occurredAt: '', payload: { card: 'YELLOW' } },
         payloadHash: 'h', queuedAt: '', attempts: 0, lastError: null, ackedSequence: null, ackedVersion: null,
@@ -660,16 +721,16 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       ]);
       const state = consoleState({ liveEvents: [yellow(1, 'p-1')] });
       state.submitEvent.mockResolvedValue('q-1');
-      mocks.useV1GameOperationsConsole.mockReturnValue(state);
-      const { rerender } = render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      testFixtures.operations.mockReturnValue(state);
+      const { rerender } = render(<CoreHarness />);
       fireEvent.click(screen.getByRole('button', { name: /^옐로카드/ }));
       fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'select-player' }));
       fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '옐로카드 기록' }));
       const redButton = await screen.findByRole('button', { name: '레드도 기록' });
       // 시트가 떠 있는 동안 방금 기록한 옐로가 큐에서 전송 중이다.
       const sending = consoleState({ liveEvents: [yellow(1, 'p-1')], queue: { items: [pendingYellowItem] }, submitEvent: state.submitEvent });
-      mocks.useV1GameOperationsConsole.mockReturnValue(sending);
-      rerender(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      testFixtures.operations.mockReturnValue(sending);
+      rerender(<CoreHarness />);
       fireEvent.click(redButton);
 
       await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
@@ -684,8 +745,8 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
         gameSnapshot: { version: 3, state: 'LIVE' },
         submitEvent: state.submitEvent,
       });
-      mocks.useV1GameOperationsConsole.mockReturnValue(acked);
-      rerender(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      testFixtures.operations.mockReturnValue(acked);
+      rerender(<CoreHarness />);
 
       await waitFor(() => expect(state.submitEvent).toHaveBeenCalledTimes(2));
       expect(state.submitEvent).toHaveBeenLastCalledWith(expect.objectContaining({ payload: { card: 'RED' } }));
@@ -698,23 +759,23 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       ]);
       const state = consoleState({ liveEvents: [yellow(1, 'p-1')] });
       state.submitEvent.mockResolvedValue('q-1');
-      mocks.useV1GameOperationsConsole.mockReturnValue(state);
-      const { rerender } = render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      testFixtures.operations.mockReturnValue(state);
+      const { rerender } = render(<CoreHarness />);
       fireEvent.click(screen.getByRole('button', { name: /^옐로카드/ }));
       fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'select-player' }));
       fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '옐로카드 기록' }));
       const redButton = await screen.findByRole('button', { name: '레드도 기록' });
-      mocks.useV1GameOperationsConsole.mockReturnValue(
+      testFixtures.operations.mockReturnValue(
         consoleState({ liveEvents: [yellow(1, 'p-1')], queue: { items: [queuedYellow('sending')] }, submitEvent: state.submitEvent }),
       );
-      rerender(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      rerender(<CoreHarness />);
       fireEvent.click(redButton);
       await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
 
-      mocks.useV1GameOperationsConsole.mockReturnValue(
+      testFixtures.operations.mockReturnValue(
         consoleState({ liveEvents: [yellow(1, 'p-1')], queue: { items: [queuedYellow('failed')] }, submitEvent: state.submitEvent }),
       );
-      rerender(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      rerender(<CoreHarness />);
 
       expect(await screen.findByText('옐로 기록이 실패했어요. 옐로를 다시 보낸 뒤 레드를 기록해 주세요.')).toBeInTheDocument();
       expect(state.submitEvent).toHaveBeenCalledTimes(1);
@@ -755,7 +816,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       { number: 2, state: 'LIVE', startedAt: '2026-08-07T00:25:00.000Z', endedAt: null },
     ]);
 
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    render(<CoreHarness />);
 
     expect(screen.getByRole('button', { name: '후반 종료' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '경기 종료' })).toBeNull();
@@ -767,14 +828,14 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
 
     it('진행 버튼은 "정규 시간 종료"이고 "전반 종료"는 없다', () => {
       gameWithPeriods('LIVE', live, [{ durationMinutes: 40, extraTime: false }]);
-      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      render(<CoreHarness />);
       expect(screen.getByRole('button', { name: '정규 시간 종료' })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: '전반 종료' })).toBeNull();
     });
 
     it('시계 옆에 "전반" 라벨이 없고 진행 단계는 "경기 · 종료"다', () => {
       gameWithPeriods('LIVE', live, [{ durationMinutes: 40, extraTime: false }]);
-      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      render(<CoreHarness />);
       expect(screen.queryByText('전반')).toBeNull();
       expect(screen.getByText('경기')).toBeInTheDocument();
     });
@@ -785,7 +846,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
         [...live, { number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null }],
         [{ durationMinutes: 40, extraTime: false }, { durationMinutes: 5, extraTime: true }],
       );
-      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      render(<CoreHarness />);
       expect(screen.getByRole('button', { name: '정규 시간 종료' })).toBeInTheDocument();
     });
   });
@@ -798,9 +859,9 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       { number: 1, state: 'ENDED', startedAt: '2026-08-07T00:00:00.000Z', endedAt: '2026-08-07T00:20:00.000Z' },
       { number: 2, state: 'LIVE', startedAt: '2026-08-07T00:25:00.000Z', endedAt: null },
     ]);
-    mocks.postV1GameCommand.mockResolvedValue({ gameId: 'game-1', state: 'LIVE', version: 3 });
+    testFixtures.sendCommand.mockResolvedValue(gameMutationResult('LIVE'));
 
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    render(<CoreHarness />);
     fireEvent.click(screen.getByRole('button', { name: '후반 종료' }));
 
     const dialog = await screen.findByRole('dialog');
@@ -808,7 +869,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: '후반 종료' }));
 
     await waitFor(() =>
-      expect(mocks.postV1GameCommand).toHaveBeenCalledWith('game-1', 'end-period', expect.anything(), COMMAND_OPTIONS),
+      expect(testFixtures.sendCommand).toHaveBeenCalledWith('game-1', 'end-period', expect.anything(), COMMAND_OPTIONS),
     );
     // 전반 종료에는 붙는 되돌리기 토스트가 여기서는 붙지 않는다.
     await waitFor(() => expect(screen.queryByRole('button', { name: '되돌리기' })).toBeNull());
@@ -817,24 +878,65 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
   // 이슈 #375 — "전반 종료" 버튼 라벨은 그대로지만 실제로 서버에 보내는
   // 커맨드는 구 fused `next-period`가 아니라 새로 분리된 `end-period`여야
   // 한다(라벨과 동작을 일치시키는 것이 이슈의 핵심).
-  it('"전반 종료"를 누르면 확인 모달을 거쳐 postV1GameCommand가 end-period로 호출된다', async () => {
+  it('"전반 종료"를 누르면 확인 모달을 거쳐 sendCommand가 end-period로 호출된다', async () => {
     gameWithPeriods('LIVE', [
       { number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null },
       { number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null },
     ]);
-    mocks.postV1GameCommand.mockResolvedValue({ gameId: 'game-1', state: 'LIVE', version: 3 });
+    testFixtures.sendCommand.mockResolvedValue(gameMutationResult('LIVE'));
 
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    render(<CoreHarness />);
     fireEvent.click(screen.getByRole('button', { name: '전반 종료' }));
 
     // 사용자 결정("예외 없이 전부")으로 end-period도 이제 확인을 거친다.
     const dialog = await screen.findByRole('dialog');
-    expect(mocks.postV1GameCommand).not.toHaveBeenCalled();
+    expect(testFixtures.sendCommand).not.toHaveBeenCalled();
     fireEvent.click(within(dialog).getByRole('button', { name: '전반 종료' }));
 
     await waitFor(() =>
-      expect(mocks.postV1GameCommand).toHaveBeenCalledWith('game-1', 'end-period', expect.anything(), COMMAND_OPTIONS),
+      expect(testFixtures.sendCommand).toHaveBeenCalledWith('game-1', 'end-period', expect.anything(), COMMAND_OPTIONS),
     );
+  });
+
+  it('an older fixture response cannot clear a newer fixture command pending state', async () => {
+    gameWithPeriods('LIVE', [
+      { number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null },
+      { number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null },
+    ]);
+    let resolveOldCommand!: (result: GameCommandResult) => void;
+    let resolveNewCommand!: (result: GameCommandResult) => void;
+    const oldCommandResponse = new Promise<GameCommandResult>((resolve) => {
+      resolveOldCommand = resolve;
+    });
+    const newCommandResponse = new Promise<GameCommandResult>((resolve) => {
+      resolveNewCommand = resolve;
+    });
+    testFixtures.sendCommand.mockReturnValueOnce(oldCommandResponse).mockReturnValueOnce(newCommandResponse);
+
+    const view = render(<CoreHarness />);
+    fireEvent.click(screen.getByRole('button', { name: '전반 종료' }));
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '전반 종료' }));
+    await waitFor(() => expect(testFixtures.sendCommand).toHaveBeenCalledTimes(1));
+
+    view.rerender(<CoreHarness fixtureId="f-2" />);
+    fireEvent.click(screen.getByRole('button', { name: '전반 종료' }));
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '전반 종료' }));
+    await waitFor(() => expect(testFixtures.sendCommand).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole('button', { name: '전반 종료' })).toHaveAttribute('aria-busy', 'true');
+
+    await act(async () => {
+      resolveOldCommand(gameMutationResult('LIVE'));
+      await oldCommandResponse;
+    });
+
+    expect(screen.getByRole('button', { name: '전반 종료' })).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByRole('button', { name: '전반 종료' })).toBeDisabled();
+
+    await act(async () => {
+      resolveNewCommand(gameMutationResult('LIVE'));
+      await newCommandResponse;
+    });
+    expect(screen.getByRole('button', { name: '전반 종료' })).toBeEnabled();
   });
 
   // 종료 흐름 개편 요구사항 1 — 전반 종료는 확인 게이트 없이 실행되면 안
@@ -845,17 +947,17 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       { number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null },
       { number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null },
     ]);
-    mocks.postV1GameCommand.mockResolvedValue({ gameId: 'game-1', state: 'LIVE', version: 3 });
+    testFixtures.sendCommand.mockResolvedValue(gameMutationResult('LIVE'));
 
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    render(<CoreHarness />);
     fireEvent.click(screen.getByRole('button', { name: '전반 종료' }));
 
     const dialog = await screen.findByRole('dialog');
-    expect(mocks.postV1GameCommand).not.toHaveBeenCalled();
+    expect(testFixtures.sendCommand).not.toHaveBeenCalled();
     fireEvent.click(within(dialog).getByRole('button', { name: '취소' }));
 
     expect(screen.queryByRole('dialog')).toBeNull();
-    expect(mocks.postV1GameCommand).not.toHaveBeenCalled();
+    expect(testFixtures.sendCommand).not.toHaveBeenCalled();
   });
 
   // 이슈 #375 — 하프타임(피리어드1 ENDED + 피리어드2 HALFTIME)에서는 '후반
@@ -872,7 +974,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
 
     it('"후반 시작"과 "되돌리기"를 보여주고, 일시 중지·전반 종료는 숨긴다', () => {
       gameAtHalftime();
-      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      render(<CoreHarness />);
 
       expect(screen.getByRole('button', { name: '후반 시작' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: '되돌리기' })).toBeInTheDocument();
@@ -891,25 +993,25 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
 
     it('"후반 시작"을 누르면 확인 모달을 거쳐 start-period를 보낸다', async () => {
       gameAtHalftime();
-      mocks.postV1GameCommand.mockResolvedValue({ gameId: 'game-1', state: 'LIVE', version: 3 });
-      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    testFixtures.sendCommand.mockResolvedValue(gameMutationResult('LIVE'));
+      render(<CoreHarness />);
 
       fireEvent.click(screen.getByRole('button', { name: '후반 시작' }));
 
       // 사용자 결정("예외 없이 전부")으로 start-period도 이제 확인을 거친다.
       const dialog = await screen.findByRole('dialog');
-      expect(mocks.postV1GameCommand).not.toHaveBeenCalled();
+      expect(testFixtures.sendCommand).not.toHaveBeenCalled();
       fireEvent.click(within(dialog).getByRole('button', { name: '후반 시작' }));
 
       await waitFor(() =>
-        expect(mocks.postV1GameCommand).toHaveBeenCalledWith('game-1', 'start-period', expect.anything(), COMMAND_OPTIONS),
+        expect(testFixtures.sendCommand).toHaveBeenCalledWith('game-1', 'start-period', expect.anything(), COMMAND_OPTIONS),
       );
     });
 
     it('"되돌리기"를 누르면 확인 없이 곧장 revert-period를 보낸다', async () => {
       gameAtHalftime();
-      mocks.postV1GameCommand.mockResolvedValue({ gameId: 'game-1', state: 'LIVE', version: 3 });
-      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      testFixtures.sendCommand.mockResolvedValue(gameMutationResult('LIVE'));
+      render(<CoreHarness />);
 
       fireEvent.click(screen.getByRole('button', { name: '되돌리기' }));
 
@@ -917,7 +1019,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       // 교정 행동이라 확인 다이얼로그를 거치지 않는다.
       expect(screen.queryByRole('dialog')).toBeNull();
       await waitFor(() =>
-        expect(mocks.postV1GameCommand).toHaveBeenCalledWith('game-1', 'revert-period', expect.anything(), COMMAND_OPTIONS),
+        expect(testFixtures.sendCommand).toHaveBeenCalledWith('game-1', 'revert-period', expect.anything(), COMMAND_OPTIONS),
       );
     });
   });
@@ -936,7 +1038,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
 
     it('전반 중에는 헤더에 "경기 종료"·"몰수·중단으로 종료"가 없고, ⋯ 시트 안에 둘 다 있다', () => {
       gameWithPeriods('LIVE', FIRST_HALF);
-      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      render(<CoreHarness />);
 
       expect(screen.getByRole('button', { name: '전반 종료' })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: '경기 종료' })).toBeNull();
@@ -950,8 +1052,8 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
 
     it('시트에서 "경기 종료"를 고르면 시트는 닫히고 확인 창이 하나만 뜨며, 확인해야 end 를 보낸다', async () => {
       gameWithPeriods('LIVE', FIRST_HALF);
-      mocks.postV1GameCommand.mockResolvedValue({ gameId: 'game-1', state: 'ENDED', version: 3 });
-      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      testFixtures.sendCommand.mockResolvedValue(gameRevisionMutationResult('ENDED'));
+      render(<CoreHarness />);
 
       fireEvent.click(screen.getByRole('button', { name: '더보기' }));
       fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^경기 종료/ }));
@@ -959,17 +1061,17 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       const confirmDialog = await screen.findByRole('dialog');
       expect(screen.getAllByRole('dialog')).toHaveLength(1);
       expect(confirmDialog).not.toHaveAccessibleName('경기 더보기');
-      expect(mocks.postV1GameCommand).not.toHaveBeenCalled();
+      expect(testFixtures.sendCommand).not.toHaveBeenCalled();
 
       fireEvent.click(within(confirmDialog).getByRole('button', { name: '경기 종료' }));
       await waitFor(() =>
-        expect(mocks.postV1GameCommand).toHaveBeenCalledWith('game-1', 'end', expect.anything(), COMMAND_OPTIONS),
+        expect(testFixtures.sendCommand).toHaveBeenCalledWith('game-1', 'end', expect.anything(), COMMAND_OPTIONS),
       );
     });
 
     it('시트에서 "몰수·중단으로 종료"를 고르면 사유 입력 창이 열린다', () => {
       gameWithPeriods('LIVE', FIRST_HALF);
-      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      render(<CoreHarness />);
 
       fireEvent.click(screen.getByRole('button', { name: '더보기' }));
       fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^몰수·중단으로 종료/ }));
@@ -980,12 +1082,12 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
 
     it('일시 중지 중에도 "경기 종료"는 헤더가 아니라 시트 안에 있다', () => {
       gameWithPeriods('LIVE', FIRST_HALF);
-      mocks.useV1Game.mockReturnValue({
-        ...mocks.useV1Game(),
-        data: { ...mocks.useV1Game().data, state: 'PAUSED' },
+      testFixtures.game.mockReturnValue({
+        ...testFixtures.game(),
+        data: { ...testFixtures.game().data, state: 'PAUSED' },
       });
-      mocks.useV1GameOperationsConsole.mockReturnValue(consoleState({ gameSnapshot: { version: 2, state: 'PAUSED' } }));
-      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      testFixtures.operations.mockReturnValue(consoleState({ gameSnapshot: { version: 2, state: 'PAUSED' } }));
+      render(<CoreHarness />);
 
       expect(screen.getByRole('button', { name: '재개' })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: '경기 종료' })).toBeNull();
@@ -995,7 +1097,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
 
     it('정규 시간 종료 뒤의 "경기 종료"는 헤더 주 버튼이고, 시트에는 몰수·중단만 남는다', () => {
       gameWithPeriods('LIVE', REGULATION_ENDED);
-      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      render(<CoreHarness />);
 
       expect(screen.getByRole('button', { name: '경기 종료' })).toBeEnabled();
 
@@ -1007,23 +1109,23 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
 
     it('조작할 명령이 없는 경기(종료됨)에는 조작 줄과 ⋯ 가 없다', () => {
       gameWithPeriods('LIVE', REGULATION_ENDED);
-      mocks.useV1Game.mockReturnValue({
-        ...mocks.useV1Game(),
-        data: { ...mocks.useV1Game().data, state: 'ENDED' },
+      testFixtures.game.mockReturnValue({
+        ...testFixtures.game(),
+        data: { ...testFixtures.game().data, state: 'ENDED' },
       });
-      mocks.useV1GameOperationsConsole.mockReturnValue(consoleState({ gameSnapshot: { version: 3, state: 'ENDED' } }));
-      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      testFixtures.operations.mockReturnValue(consoleState({ gameSnapshot: { version: 3, state: 'ENDED' } }));
+      render(<CoreHarness />);
 
       expect(screen.queryByRole('button', { name: '더보기' })).toBeNull();
       expect(screen.queryByRole('group', { name: '경기 진행 조작' })).toBeNull();
     });
   });
 
-  describe('대회 경기 출전 명단', () => {
+  describe('킥오프 체크리스트 렌더 계약', () => {
     it('경기 시작 전에는 팀 명단을 기본 조회 상태로 보여주고 전원 도착은 없다', () => {
       gameWithPeriods('SCHEDULED', []);
-      mocks.useV1GameOperationsConsole.mockReturnValue(consoleState({ gameSnapshot: { version: 1, state: 'SCHEDULED' } }));
-      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      testFixtures.operations.mockReturnValue(consoleState({ gameSnapshot: { version: 1, state: 'SCHEDULED' } }));
+      render(<CoreHarness />);
       expect(screen.getByRole('region', { name: '킥오프 준비' })).toHaveTextContent('이번 경기 출전 명단');
       expect(screen.queryByRole('button', { name: /전원 도착/ })).toBeNull();
       expect(screen.queryByRole('checkbox')).toBeNull();
@@ -1031,7 +1133,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
 
     it('경기가 시작된 뒤에는 출전 명단 편집 영역이 없다', () => {
       gameWithPeriods('LIVE', [{ number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null }]);
-      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      render(<CoreHarness />);
       expect(screen.queryByRole('region', { name: '킥오프 준비' })).toBeNull();
       expect(screen.queryByRole('button', { name: /명단 수정하기/ })).toBeNull();
     });
@@ -1049,7 +1151,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
         { number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null },
         { number: 2, state: 'SCHEDULED', startedAt: null, endedAt: null },
       ]);
-      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      render(<CoreHarness />);
 
       expect(within(strip() as HTMLElement).getAllByRole('listitem').filter((el) => el.textContent).map((el) => el.textContent)).toEqual([
         '전반', '하프타임', '후반', '종료',
@@ -1062,7 +1164,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
         { number: 1, state: 'ENDED', startedAt: '2026-08-07T00:00:00.000Z', endedAt: '2026-08-07T00:20:00.000Z' },
         { number: 2, state: 'HALFTIME', startedAt: null, endedAt: null },
       ]);
-      const { unmount } = render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      const { unmount } = render(<CoreHarness />);
       expect(current()).toBe('하프타임');
       unmount();
 
@@ -1070,7 +1172,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
         { number: 1, state: 'ENDED', startedAt: '2026-08-07T00:00:00.000Z', endedAt: '2026-08-07T00:20:00.000Z' },
         { number: 2, state: 'LIVE', startedAt: '2026-08-07T00:25:00.000Z', endedAt: null },
       ]);
-      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      render(<CoreHarness />);
       expect(current()).toBe('후반');
     });
 
@@ -1079,7 +1181,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
         { number: 1, state: 'ENDED', startedAt: '2026-08-07T00:00:00.000Z', endedAt: '2026-08-07T00:20:00.000Z' },
         { number: 2, state: 'ENDED', startedAt: '2026-08-07T00:25:00.000Z', endedAt: '2026-08-07T00:45:00.000Z' },
       ]);
-      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      render(<CoreHarness />);
 
       expect(current()).toBe('종료');
     });
@@ -1089,12 +1191,12 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
         { number: 1, state: 'ENDED', startedAt: '2026-08-07T00:00:00.000Z', endedAt: '2026-08-07T00:20:00.000Z' },
         { number: 2, state: 'ENDED', startedAt: '2026-08-07T00:25:00.000Z', endedAt: '2026-08-07T00:45:00.000Z' },
       ]);
-      mocks.useV1Game.mockReturnValue({
-        ...mocks.useV1Game(),
-        data: { ...mocks.useV1Game().data, state: 'ENDED' },
+      testFixtures.game.mockReturnValue({
+        ...testFixtures.game(),
+        data: { ...testFixtures.game().data, state: 'ENDED' },
       });
-      mocks.useV1GameOperationsConsole.mockReturnValue(consoleState({ gameSnapshot: { version: 3, state: 'ENDED' } }));
-      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      testFixtures.operations.mockReturnValue(consoleState({ gameSnapshot: { version: 3, state: 'ENDED' } }));
+      render(<CoreHarness />);
 
       expect(within(strip() as HTMLElement).getAllByRole('listitem').filter((el) => el.textContent).map((el) => el.textContent)).toEqual([
         '예정', '진행', '결과 확인', '확정',
@@ -1104,8 +1206,8 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
 
     it('시작 전 경기에는 스트립이 없다 — 그 자리는 킥오프 준비가 맡는다', () => {
       gameWithPeriods('SCHEDULED', []);
-      mocks.useV1GameOperationsConsole.mockReturnValue(consoleState({ gameSnapshot: { version: 1, state: 'SCHEDULED' } }));
-      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      testFixtures.operations.mockReturnValue(consoleState({ gameSnapshot: { version: 1, state: 'SCHEDULED' } }));
+      render(<CoreHarness />);
 
       expect(strip()).toBeNull();
     });
@@ -1120,27 +1222,25 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
 
     function endedGame(state: 'LIVE' | 'ENDED') {
       gameWithPeriods('LIVE', REGULATION_ENDED);
-      mocks.useV1Game.mockReturnValue({
-        ...mocks.useV1Game(),
-        data: { ...mocks.useV1Game().data, state },
+      testFixtures.game.mockReturnValue({
+        ...testFixtures.game(),
+        data: { ...testFixtures.game().data, state },
       });
-      mocks.useV1GameOperationsConsole.mockReturnValue(consoleState({ gameSnapshot: { version: 3, state } }));
+      testFixtures.operations.mockReturnValue(consoleState({ gameSnapshot: { version: 3, state } }));
     }
 
     it('경기가 ENDED 이면 이 경기의 확정 카드를 콘솔 모드로 마운트한다', () => {
       endedGame('ENDED');
-      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      render(<CoreHarness />);
 
       const card = screen.getByTestId('result-confirm-card');
       expect(card).toHaveAttribute('data-game-id', 'game-1');
-      expect(card).toHaveAttribute('data-variant', 'console');
-      expect(card).toHaveAttribute('data-tournament-id', 't-1');
     });
 
     // G6-V7 — 종료 뒤엔 기록할 수 없는 패드·팀 파울 줄이 확정 카드 아래 한 화면 가까이를 채웠다.
     it('경기가 ENDED 이면 이벤트 패드와 팀 파울 줄 없이 확정 카드와 기록 목록만 남는다', () => {
       endedGame('ENDED');
-      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      render(<CoreHarness />);
 
       expect(screen.getByTestId('result-confirm-card')).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /^골/ })).toBeNull();
@@ -1150,19 +1250,19 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
 
     it('아직 끝나지 않은 경기(정규 시간 종료 직후 포함)에는 확정 카드가 없다', () => {
       endedGame('LIVE');
-      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      render(<CoreHarness />);
 
       expect(screen.queryByTestId('result-confirm-card')).toBeNull();
     });
 
     it('명령 왕복 시간(ms)을 더 이상 보여주지 않는다', async () => {
       gameWithPeriods('LIVE', REGULATION_ENDED);
-      mocks.postV1GameCommand.mockResolvedValue({ gameId: 'game-1', state: 'ENDED', version: 3 });
-      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      testFixtures.sendCommand.mockResolvedValue(gameRevisionMutationResult('ENDED'));
+      render(<CoreHarness />);
 
       fireEvent.click(screen.getByRole('button', { name: '경기 종료' }));
       fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '경기 종료' }));
-      await waitFor(() => expect(mocks.postV1GameCommand).toHaveBeenCalled());
+      await waitFor(() => expect(testFixtures.sendCommand).toHaveBeenCalled());
       // 성공 뒤 재조회·상태 갱신까지 흘려보낸 다음에도 화면에 시간이 없어야 한다.
       await act(async () => {
         await new Promise((resolve) => setTimeout(resolve, 0));
@@ -1178,7 +1278,9 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       { number: 1, state: 'ENDED', startedAt: '2026-08-07T00:00:00.000Z', endedAt: '2026-08-07T00:20:00.000Z' },
       { number: 2, state: 'LIVE', startedAt: '2026-08-07T00:25:00.000Z', endedAt: null },
     ];
-    const HELD = { status: 'held', token: 'tok', expiresAtMs: Date.now() + 60000, assignmentVersion: 0 };
+    const HELD: Extract<OperationsContract['takeover'], { status: 'held' }> = {
+      status: 'held', token: 'tok', expiresAtMs: Date.now() + 60000, assignmentVersion: 0,
+    };
 
     function secondHalf(
       state: 'LIVE' | 'PAUSED',
@@ -1186,8 +1288,8 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       actorRole: string = 'tournament_director',
     ) {
       gameWithPeriods('LIVE', SECOND_HALF);
-      mocks.useV1Game.mockReturnValue({ ...mocks.useV1Game(), data: { ...mocks.useV1Game().data, state, actorRole } });
-      mocks.useV1GameOperationsConsole.mockReturnValue(
+      testFixtures.game.mockReturnValue({ ...testFixtures.game(), data: { ...testFixtures.game().data, state, actorRole } });
+      testFixtures.operations.mockReturnValue(
         consoleState({ gameSnapshot: { version: 2, state }, takeover: HELD, ...overrides }),
       );
     }
@@ -1195,17 +1297,17 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
     /** 일시 중지 상태에서 재개 확인 창을 연 뒤, 창이 떠 있는 동안 콘솔 상태를 바꾸고 확인을 누른다. */
     async function confirmResumeAfter(change: Record<string, unknown>, actorRole?: string) {
       secondHalf('PAUSED', {}, actorRole);
-      const view = render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      const view = render(<CoreHarness />);
       fireEvent.click(screen.getByRole('button', { name: '재개' }));
       const dialog = await screen.findByRole('dialog');
       secondHalf('PAUSED', change, actorRole);
-      view.rerender(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      view.rerender(<CoreHarness />);
       fireEvent.click(within(dialog).getByRole('button', { name: '재개' }));
     }
 
     it('후반이 뛰는 중에도 ⋯ 시트로 조기 종료와 몰수·중단 종료에 닿는다', () => {
       secondHalf('LIVE');
-      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      render(<CoreHarness />);
 
       expect(screen.getByRole('button', { name: '후반 종료' })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: '경기 종료' })).toBeNull();
@@ -1217,7 +1319,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
 
     it('연결이 끊긴 동안에는 재개와 ⋯ 을 잠그고 다시 연결하는 중이라고 알리되, 이벤트 기록은 막지 않는다', () => {
       secondHalf('PAUSED', { connectionStatus: 'disconnected' });
-      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      render(<CoreHarness />);
 
       expect(screen.getByRole('button', { name: '재개' })).toBeDisabled();
       expect(screen.getByRole('button', { name: '더보기' })).toBeDisabled();
@@ -1232,7 +1334,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       expect(
         await screen.findByText('실시간 연결이 끊겨 있어 ‘재개’ 요청을 보내지 않았어요. 연결되면 다시 눌러 주세요.'),
       ).toBeInTheDocument();
-      expect(mocks.postV1GameCommand).not.toHaveBeenCalled();
+      expect(testFixtures.sendCommand).not.toHaveBeenCalled();
     });
 
     it('확인 창이 떠 있는 사이 운영 권한이 만료되면 재개를 보내지 않고, 그 이유를 알린다', async () => {
@@ -1241,23 +1343,23 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       expect(
         await screen.findByText('운영 권한을 다시 확인하는 중이라 ‘재개’ 요청을 보내지 않았어요. 권한을 받으면 다시 눌러 주세요.'),
       ).toBeInTheDocument();
-      expect(mocks.postV1GameCommand).not.toHaveBeenCalled();
+      expect(testFixtures.sendCommand).not.toHaveBeenCalled();
     });
 
     it('확인 창이 떠 있는 사이 운영 권한이 다시 발급되면 창을 열 때의 토큰이 아니라 새 토큰으로 보낸다', async () => {
-      mocks.postV1GameCommand.mockResolvedValue({ gameId: 'game-1', state: 'LIVE', version: 3 });
+      testFixtures.sendCommand.mockResolvedValue(gameMutationResult('LIVE'));
       await confirmResumeAfter({ takeover: { ...HELD, token: 'tok-2' } });
 
-      await waitFor(() => expect(mocks.postV1GameCommand).toHaveBeenCalledTimes(1));
-      expect(mocks.postV1GameCommand.mock.calls[0][1]).toBe('resume');
-      expect(mocks.postV1GameCommand.mock.calls[0][2]).toEqual(expect.objectContaining({ takeoverToken: 'tok-2' }));
+      await waitFor(() => expect(testFixtures.sendCommand).toHaveBeenCalledTimes(1));
+      expect(testFixtures.sendCommand.mock.calls[0][1]).toBe('resume');
+      expect(testFixtures.sendCommand.mock.calls[0][2]).toEqual(expect.objectContaining({ takeoverToken: 'tok-2' }));
     });
 
     // 2026-10-01 사용자 결정 — 어드민은 언제든 고칠 수 있어야 한다. 현장 스태프의 잠금(위)은 그대로다.
     describe('플랫폼 운영자는 연결이 끊긴 동안에도', () => {
       it('재개와 ⋯ 을 쓸 수 있고, 잠그지 않는다고 알린다', () => {
         secondHalf('PAUSED', { connectionStatus: 'disconnected' }, 'platform_ops');
-        render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+        render(<CoreHarness />);
 
         expect(screen.getByRole('button', { name: '재개' })).toBeEnabled();
         expect(screen.getByRole('button', { name: '더보기' })).toBeEnabled();
@@ -1266,18 +1368,18 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       });
 
       it('확인 창이 떠 있는 사이 끊겨도 들고 있던 토큰으로 재개를 보낸다', async () => {
-        mocks.postV1GameCommand.mockResolvedValue({ gameId: 'game-1', state: 'LIVE', version: 3 });
+        testFixtures.sendCommand.mockResolvedValue(gameMutationResult('LIVE'));
         await confirmResumeAfter({ connectionStatus: 'disconnected' }, 'platform_ops');
 
-        await waitFor(() => expect(mocks.postV1GameCommand).toHaveBeenCalledTimes(1));
-        expect(mocks.postV1GameCommand.mock.calls[0][1]).toBe('resume');
-        expect(mocks.postV1GameCommand.mock.calls[0][2]).toEqual(expect.objectContaining({ takeoverToken: 'tok' }));
+        await waitFor(() => expect(testFixtures.sendCommand).toHaveBeenCalledTimes(1));
+        expect(testFixtures.sendCommand.mock.calls[0][1]).toBe('resume');
+        expect(testFixtures.sendCommand.mock.calls[0][2]).toEqual(expect.objectContaining({ takeoverToken: 'tok' }));
       });
 
       // 토큰 갱신은 소켓으로만 된다 — 끊긴 채 만료되면 서버가 거절하므로 보내지 않고 이유를 보인다.
       it('끊긴 사이 운영 권한이 만료되면 진행 버튼을 잠그고 그 이유를 알린다', () => {
         secondHalf('PAUSED', { connectionStatus: 'disconnected', takeover: { status: 'expired' } }, 'platform_ops');
-        render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+        render(<CoreHarness />);
 
         expect(screen.getByRole('button', { name: '재개' })).toBeDisabled();
         expect(screen.getByText('연결이 끊긴 사이 운영 권한이 만료돼 진행 명령을 보낼 수 없어요. 다시 연결되면 권한을 새로 받아요.')).toBeInTheDocument();
@@ -1289,7 +1391,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
         expect(
           await screen.findByText('연결이 끊긴 사이 운영 권한이 만료돼 ‘재개’ 요청을 보내지 않았어요. 다시 연결되면 권한을 새로 받아요.'),
         ).toBeInTheDocument();
-        expect(mocks.postV1GameCommand).not.toHaveBeenCalled();
+        expect(testFixtures.sendCommand).not.toHaveBeenCalled();
       });
     });
 
@@ -1298,22 +1400,22 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       vi.useFakeTimers();
       try {
         secondHalf('PAUSED');
-        mocks.postV1GameCommand
-          .mockImplementationOnce(
-            (_gameId: string, _command: string, _body: unknown, options: { signal: AbortSignal }) =>
-              new Promise((_resolve, reject) => {
-                options.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
-              }),
+        testFixtures.sendCommand
+          .mockImplementationOnce((...[, , , options]: Parameters<OperateConsoleRuntime['postGameCommand']>) =>
+            new Promise<GameCommandResult>((_resolve, reject) => {
+              if (options.signal === undefined) throw new Error('Expected command AbortSignal');
+              options.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+            }),
           )
-          .mockResolvedValueOnce({ gameId: 'game-1', state: 'LIVE', version: 3 });
-        render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+          .mockResolvedValueOnce(gameMutationResult('LIVE'));
+        render(<CoreHarness />);
 
         fireEvent.click(screen.getByRole('button', { name: '재개' }));
         fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '재개' }));
         await act(async () => {
           await vi.advanceTimersByTimeAsync(2_000);
         });
-        expect(mocks.postV1GameCommand).toHaveBeenCalledTimes(1);
+        expect(testFixtures.sendCommand).toHaveBeenCalledTimes(1);
         expect(screen.queryByRole('button', { name: '같은 요청 재시도' })).toBeNull();
 
         await act(async () => {
@@ -1325,10 +1427,10 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
           await vi.advanceTimersByTimeAsync(0);
         });
 
-        expect(mocks.postV1GameCommand).toHaveBeenCalledTimes(2);
+        expect(testFixtures.sendCommand).toHaveBeenCalledTimes(2);
         // 같은 clientCommandId(=Idempotency-Key) — 첫 요청이 사실 처리됐다면 서버가 그 결과를 재생한다.
-        expect(mocks.postV1GameCommand.mock.calls[1][2]).toEqual(mocks.postV1GameCommand.mock.calls[0][2]);
-        expect(mocks.useV1GameOperationsConsole().applyCommandResult).toHaveBeenCalledWith(
+        expect(testFixtures.sendCommand.mock.calls[1][2]).toEqual(testFixtures.sendCommand.mock.calls[0][2]);
+        expect(testFixtures.operations().applyCommandResult).toHaveBeenCalledWith(
           expect.objectContaining({ state: 'LIVE', version: 3 }),
         );
       } finally {
@@ -1337,18 +1439,19 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
     });
 
     describe('재시도 사이 운영 권한이 다시 발급되거나 시간이 흐르면', () => {
-      const hangUntilAbort = (_gameId: string, _command: string, _body: unknown, options: { signal: AbortSignal }) =>
-        new Promise((_resolve, reject) => {
+      const hangUntilAbort: OperateConsoleRuntime['postGameCommand'] = (...[, , , options]) =>
+        new Promise<GameCommandResult>((_resolve, reject) => {
+          if (options.signal === undefined) throw new Error('Expected command AbortSignal');
           options.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
         });
       const rejected = (statusCode: number, code: string, message: string) =>
         new V1ApiError({ status: 'error', timestamp: '', statusCode, code, message });
-      const bodyOf = (call: number) => mocks.postV1GameCommand.mock.calls[call][2] as Record<string, unknown>;
+      const bodyOf = (call: number): GameCommandRequest => testFixtures.sendCommand.mock.calls[call][2];
 
       /** 첫 재개가 응답 없이 제한 시간을 넘긴 뒤, 콘솔 상태를 바꾸고 `waitMs` 만큼 지나 "같은 요청 재시도"를 누른다. */
       async function retryAfterTimeout(change: Record<string, unknown>, waitMs = 0) {
         secondHalf('PAUSED');
-        const view = render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+        const view = render(<CoreHarness />);
         fireEvent.click(screen.getByRole('button', { name: '재개' }));
         fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '재개' }));
         await act(async () => {
@@ -1356,7 +1459,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
           await vi.advanceTimersByTimeAsync(COMMAND_RESPONSE_TIMEOUT_MS + 2_000 + waitMs);
         });
         secondHalf('PAUSED', change);
-        view.rerender(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+        view.rerender(<CoreHarness />);
         fireEvent.click(screen.getByRole('button', { name: '같은 요청 재시도' }));
         await act(async () => {
           await vi.advanceTimersByTimeAsync(0);
@@ -1364,44 +1467,44 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       }
 
       // 한 테스트가 남긴 Once 응답이 다음 테스트로 새지 않게, 기본 구현만 남기고 매번 비운다.
-      let defaultImplementation: ReturnType<typeof mocks.postV1GameCommand.getMockImplementation>;
+      let defaultImplementation: ReturnType<typeof testFixtures.sendCommand.getMockImplementation>;
       beforeEach(() => {
         vi.useFakeTimers();
-        defaultImplementation = mocks.postV1GameCommand.getMockImplementation();
-        mocks.postV1GameCommand.mockReset();
-        mocks.postV1GameCommand.mockImplementationOnce(hangUntilAbort);
+        defaultImplementation = testFixtures.sendCommand.getMockImplementation();
+        testFixtures.sendCommand.mockReset();
+        testFixtures.sendCommand.mockImplementationOnce(hangUntilAbort);
       });
       afterEach(() => {
         vi.useRealTimers();
-        mocks.postV1GameCommand.mockReset();
-        if (defaultImplementation) mocks.postV1GameCommand.mockImplementation(defaultImplementation);
+        testFixtures.sendCommand.mockReset();
+        if (defaultImplementation) testFixtures.sendCommand.mockImplementation(defaultImplementation);
       });
 
       // 서버는 토큰까지 해시해 멱등을 가린다 — 토큰을 바꿔 보내면 저장된 결과가 재생되지 않고 409 가 된다.
       it('첫 요청이 이미 저장됐다면 새 토큰이 있어도 처음 본문 그대로 보내 서버가 결과를 재생하게 한다', async () => {
-        mocks.postV1GameCommand.mockResolvedValueOnce({ gameId: 'game-1', state: 'LIVE', version: 3, replayed: true });
+        testFixtures.sendCommand.mockResolvedValueOnce(gameMutationResult('LIVE', 3, true));
         await retryAfterTimeout({ takeover: { ...HELD, token: 'tok-2' } });
 
-        expect(mocks.postV1GameCommand).toHaveBeenCalledTimes(2);
+        expect(testFixtures.sendCommand).toHaveBeenCalledTimes(2);
         expect(bodyOf(1)).toEqual(bodyOf(0));
         expect(bodyOf(1).takeoverToken).toBe('tok');
-        expect(mocks.useV1GameOperationsConsole().applyCommandResult).toHaveBeenCalledWith(
+        expect(testFixtures.operations().applyCommandResult).toHaveBeenCalledWith(
           expect.objectContaining({ state: 'LIVE', version: 3 }),
         );
       });
 
       it('처음 본문이 옛 토큰으로 거절되면 저장되지 않은 것이라, 같은 clientCommandId 에 새 토큰을 실어 한 번 더 보낸다', async () => {
-        mocks.postV1GameCommand
+        testFixtures.sendCommand
           .mockRejectedValueOnce(rejected(403, 'TAKEOVER_TOKEN_EXPIRED', 'A valid exclusive takeover token is required'))
-          .mockResolvedValueOnce({ gameId: 'game-1', state: 'LIVE', version: 3 });
+          .mockResolvedValueOnce(gameMutationResult('LIVE'));
         await retryAfterTimeout({ takeover: { ...HELD, token: 'tok-2' } });
 
-        expect(mocks.postV1GameCommand).toHaveBeenCalledTimes(3);
+        expect(testFixtures.sendCommand).toHaveBeenCalledTimes(3);
         expect(bodyOf(1)).toEqual(bodyOf(0));
         // clientCommandId·expectedVersion·payload 는 그대로 — 새 명령이 아니라 같은 명령이다.
         expect(bodyOf(2)).toEqual({ ...bodyOf(0), takeoverToken: 'tok-2', occurredAt: expect.any(String) });
-        expect(mocks.postV1GameCommand.mock.calls[2][1]).toBe('resume');
-        expect(mocks.useV1GameOperationsConsole().applyCommandResult).toHaveBeenCalledWith(
+        expect(testFixtures.sendCommand.mock.calls[2][1]).toBe('resume');
+        expect(testFixtures.operations().applyCommandResult).toHaveBeenCalledWith(
           expect.objectContaining({ state: 'LIVE', version: 3 }),
         );
         expect(screen.queryByRole('button', { name: '같은 요청 재시도' })).toBeNull();
@@ -1410,10 +1513,10 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
 
       // 새 토큰 본문이 저장됐을 수 있으니, 다음 재시도가 처음 본문을 보내면 서버는 재생 대신 409 를 낸다.
       it('새 토큰으로 다시 보낸 본문도 응답이 없으면, 다음 재시도는 그 새 본문을 그대로 보낸다', async () => {
-        mocks.postV1GameCommand
+        testFixtures.sendCommand
           .mockRejectedValueOnce(rejected(403, 'TAKEOVER_TOKEN_EXPIRED', 'A valid exclusive takeover token is required'))
           .mockImplementationOnce(hangUntilAbort)
-          .mockResolvedValueOnce({ gameId: 'game-1', state: 'LIVE', version: 3, replayed: true });
+          .mockResolvedValueOnce(gameMutationResult('LIVE', 3, true));
         await retryAfterTimeout({ takeover: { ...HELD, token: 'tok-2' } });
         await act(async () => {
           await vi.advanceTimersByTimeAsync(COMMAND_RESPONSE_TIMEOUT_MS);
@@ -1423,21 +1526,21 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
           await vi.advanceTimersByTimeAsync(0);
         });
 
-        expect(mocks.postV1GameCommand).toHaveBeenCalledTimes(4);
+        expect(testFixtures.sendCommand).toHaveBeenCalledTimes(4);
         expect(bodyOf(2).takeoverToken).toBe('tok-2');
         expect(bodyOf(3)).toEqual(bodyOf(2));
-        expect(mocks.useV1GameOperationsConsole().applyCommandResult).toHaveBeenCalledWith(
+        expect(testFixtures.operations().applyCommandResult).toHaveBeenCalledWith(
           expect.objectContaining({ state: 'LIVE', version: 3 }),
         );
       });
 
       it('서버 시각 허용 폭(30초)을 넘겨 처음 본문이 거절되면, 같은 clientCommandId 에 지금 시각을 실어 다시 보낸다', async () => {
-        mocks.postV1GameCommand
+        testFixtures.sendCommand
           .mockRejectedValueOnce(rejected(422, 'CLOCK_DRIFT', 'occurredAt has drifted from server time by more than 30 seconds'))
-          .mockResolvedValueOnce({ gameId: 'game-1', state: 'LIVE', version: 3 });
+          .mockResolvedValueOnce(gameMutationResult('LIVE'));
         await retryAfterTimeout({}, 40_000);
 
-        expect(mocks.postV1GameCommand).toHaveBeenCalledTimes(3);
+        expect(testFixtures.sendCommand).toHaveBeenCalledTimes(3);
         const original = bodyOf(0);
         const resent = bodyOf(2);
         expect(resent).toEqual({ ...original, occurredAt: expect.any(String) });
@@ -1445,12 +1548,12 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
       });
 
       it('토큰이 그대로인데 거절되면 권한을 잃은 것이라 다시 보내지 않고, 거절 사유를 보여 준다', async () => {
-        mocks.postV1GameCommand.mockRejectedValueOnce(
+        testFixtures.sendCommand.mockRejectedValueOnce(
           rejected(403, 'TAKEOVER_TOKEN_EXPIRED', 'A valid exclusive takeover token is required'),
         );
         await retryAfterTimeout({});
 
-        expect(mocks.postV1GameCommand).toHaveBeenCalledTimes(2);
+        expect(testFixtures.sendCommand).toHaveBeenCalledTimes(2);
         expect(screen.getByText('A valid exclusive takeover token is required')).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: '같은 요청 재시도' })).toBeNull();
       });
@@ -1463,8 +1566,8 @@ describe('OperateConsole — 선수 교체', () => {
   const SUB_SIDES = [{ id: 'side-home', gameId: 'game-1', sideKey: 'HOME', teamId: null, displayNameSnapshot: '강남 풋살 클럽', createdAt: '', updatedAt: '' }];
 
   beforeEach(() => {
-    mocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'user-1' } } });
-    mocks.useV1FixtureLineup.mockReturnValue({
+    testFixtures.auth.mockReturnValue({ data: { user: { id: 'user-1' } } });
+    testFixtures.lineups.mockReturnValue({
       data: {
         gameId: 'game-1',
         lineups: [{
@@ -1490,13 +1593,13 @@ describe('OperateConsole — 선수 교체', () => {
     substitutionPolicy: { mode: 'limited' | 'rolling'; maxSubstitutions: number | null },
     liveEvents: GameEventRecord[] = [],
   ) {
-    mocks.useV1Game.mockReturnValue({
+    testFixtures.game.mockReturnValue({
       data: { id: 'game-1', state: 'LIVE', version: 2, lastSequence: 1, periods: [LIVE_PERIOD], sides: SUB_SIDES, lineups: [], substitutionPolicy },
       isLoading: false,
       isError: false,
       refetch: vi.fn(),
     });
-    mocks.useV1GameOperationsConsole.mockReturnValue(consoleState({ gameSnapshot: { version: 2, state: 'LIVE' }, liveEvents }));
+    testFixtures.operations.mockReturnValue(consoleState({ gameSnapshot: { version: 2, state: 'LIVE' }, liveEvents }));
   }
 
   function substitutionEvent(id: string, sequence: number, inParticipantId: string, outParticipantId: string): GameEventRecord {
@@ -1522,7 +1625,7 @@ describe('OperateConsole — 선수 교체', () => {
 
   it('"교체" 액션 버튼이 있고, 2단계(나갈 선수 → 들어올 선수)를 거쳐 SUBSTITUTION 이벤트를 제출한다', async () => {
     gameWithSubstitutionPolicy({ mode: 'limited', maxSubstitutions: 5 });
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    render(<CoreHarness />);
 
     fireEvent.click(screen.getByRole('button', { name: /^교체/ }));
     expect(screen.getByRole('dialog')).toBeInTheDocument();
@@ -1537,11 +1640,11 @@ describe('OperateConsole — 선수 교체', () => {
 
     // 사용자 결정("예외 없이 전부")으로 교체도 이제 확인 모달을 거친다.
     const confirmDialog = await screen.findByRole('dialog');
-    expect(mocks.useV1GameOperationsConsole().submitEvent).not.toHaveBeenCalled();
+    expect(testFixtures.operations().submitEvent).not.toHaveBeenCalled();
     fireEvent.click(within(confirmDialog).getByRole('button', { name: '교체 기록' }));
 
     await waitFor(() =>
-      expect(mocks.useV1GameOperationsConsole().submitEvent).toHaveBeenCalledWith(
+      expect(testFixtures.operations().submitEvent).toHaveBeenCalledWith(
         expect.objectContaining({ type: 'SUBSTITUTION', participantId: 'p-2', sideId: 'side-home', payload: { outParticipantId: 'p-1' } }),
       ),
     );
@@ -1553,7 +1656,7 @@ describe('OperateConsole — 선수 교체', () => {
     // **누를 수 있는데 항상 실패하는** 액션이 된다. 종목을 화면에 하드코딩하지 않고
     // 서버가 내려주는 substitutionPolicy.mode 로만 가른다.
     gameWithSubstitutionPolicy({ mode: 'rolling', maxSubstitutions: null });
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    render(<CoreHarness />);
     expect(screen.queryByRole('button', { name: /^교체$/ })).toBeNull();
     // 롤링 전용이던 "빠른 교체 모드"도 함께 사라졌다.
     expect(screen.queryByRole('button', { name: /빠른 교체 모드/ })).toBeNull();
@@ -1562,7 +1665,7 @@ describe('OperateConsole — 선수 교체', () => {
   it('제한 교체 종목에서는 "교체" 액션 버튼이 그대로 있다 (회귀)', () => {
     // 음성 케이스가 없으면 "모든 경기에서 숨김" 으로 바뀌어도 위 테스트가 통과한다.
     gameWithSubstitutionPolicy({ mode: 'limited', maxSubstitutions: 5 });
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    render(<CoreHarness />);
     expect(screen.getByRole('button', { name: /^교체$/ })).toBeInTheDocument();
   });
 
@@ -1571,7 +1674,7 @@ describe('OperateConsole — 선수 교체', () => {
       { mode: 'limited', maxSubstitutions: 5 },
       [substitutionEvent('sub-1', 1, 'p-2', 'p-1')],
     );
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    render(<CoreHarness />);
 
     fireEvent.click(screen.getByRole('button', { name: /^교체/ }));
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'select-player' }));
@@ -1580,7 +1683,7 @@ describe('OperateConsole — 선수 교체', () => {
     const confirmDialog = await screen.findByRole('dialog');
     fireEvent.click(within(confirmDialog).getByRole('button', { name: '교체 기록' }));
     await waitFor(() =>
-      expect(mocks.useV1GameOperationsConsole().submitEvent).toHaveBeenCalledWith(
+      expect(testFixtures.operations().submitEvent).toHaveBeenCalledWith(
         expect.objectContaining({ participantId: 'p-3', payload: { outParticipantId: 'p-2' } }),
       ),
     );
@@ -1651,7 +1754,7 @@ describe('OperateConsole — 라인업 게이트 (UX 감사 item 2)', () => {
         lineup.invalidatedAt,
       )),
     ];
-    mocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'user-1' } } });
+    testFixtures.auth.mockReturnValue({ data: { user: { id: 'user-1' } } });
     const fixtureLineupResponse: {
       data: FixtureLineupResponse;
       isLoading: false;
@@ -1665,8 +1768,8 @@ describe('OperateConsole — 라인업 게이트 (UX 감사 item 2)', () => {
       error: null,
       refetch: vi.fn(),
     };
-    mocks.useV1FixtureLineup.mockReturnValue(fixtureLineupResponse);
-    mocks.useV1Game.mockReturnValue({
+    testFixtures.lineups.mockReturnValue(fixtureLineupResponse);
+    testFixtures.game.mockReturnValue({
       data: {
         id: 'game-1', state: 'SCHEDULED', version: 1, lastSequence: 0, sourceType,
         periods: [{ id: 'period-1', gameId: 'game-1', number: 1, state: 'SCHEDULED', startedAt: null, endedAt: null, pausedTotalMs: 0, pausedAt: null }],
@@ -1680,7 +1783,7 @@ describe('OperateConsole — 라인업 게이트 (UX 감사 item 2)', () => {
       isError: false,
       refetch: vi.fn(),
     });
-    mocks.useV1GameOperationsConsole.mockReturnValue(consoleState({ gameSnapshot: { version: 1, state: 'SCHEDULED' } }));
+    testFixtures.operations.mockReturnValue(consoleState({ gameSnapshot: { version: 1, state: 'SCHEDULED' } }));
     return fixtureLineupResponse;
   }
 
@@ -1693,7 +1796,7 @@ describe('OperateConsole — 라인업 게이트 (UX 감사 item 2)', () => {
    */
   it('한쪽 팀만 라인업을 제출했어도 "경기 시작"은 활성이고, 미제출 경고는 그대로 뜬다', () => {
     setup([{ sideId: 'side-home', state: 'SUBMITTED', revision: 2, invalidatedAt: null }]);
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    render(<CoreHarness />);
 
     expect(screen.getByRole('button', { name: '경기 시작' })).toBeEnabled();
     expect(screen.getByText(/성수 풋살 클럽.*아직 출전 명단을 제출하지 않았어요/)).toBeInTheDocument();
@@ -1708,7 +1811,7 @@ describe('OperateConsole — 라인업 게이트 (UX 감사 item 2)', () => {
    */
   it('대회 경기에서는 미제출 경고를 띄우지 않는다', () => {
     setup([{ sideId: 'side-home', state: 'SUBMITTED', revision: 2, invalidatedAt: null }], 'TOURNAMENT_FIXTURE');
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    render(<CoreHarness />);
 
     expect(screen.getByRole('button', { name: '경기 시작' })).toBeEnabled();
     expect(screen.queryByText(/아직 출전 명단을 제출하지 않았어요/)).not.toBeInTheDocument();
@@ -1719,7 +1822,7 @@ describe('OperateConsole — 라인업 게이트 (UX 감사 item 2)', () => {
       { sideId: 'side-home', state: 'SUBMITTED', revision: 2, invalidatedAt: null },
       { sideId: 'side-away', state: 'LOCKED', revision: 2, invalidatedAt: null },
     ]);
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    render(<CoreHarness />);
 
     expect(screen.getByRole('button', { name: '경기 시작' })).not.toBeDisabled();
     expect(screen.queryByText(/출전 명단을 제출해야/)).toBeNull();
@@ -1732,7 +1835,7 @@ describe('OperateConsole — 라인업 게이트 (UX 감사 item 2)', () => {
       revision: 2,
       invalidatedAt: '2026-10-26T00:00:00.000Z',
     }]);
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    render(<CoreHarness />);
 
     expect(screen.getByRole('button', { name: '경기 시작' })).toBeEnabled();
     expect(screen.queryByText(/출전 선수가 없어요/)).not.toBeInTheDocument();
@@ -1744,7 +1847,7 @@ describe('OperateConsole — 라인업 게이트 (UX 감사 item 2)', () => {
     ['양쪽', { home: 0, away: 0 }, '강남 풋살 클럽, 성수 풋살 클럽'],
   ] as const)('유효 경기 출전자가 %s 팀에 없으면 시작을 막고 팀 이름을 안내한다', (_side, counts, teamNames) => {
     setup([], 'TEAM_MATCH', counts);
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    render(<CoreHarness />);
 
     expect(screen.getByRole('button', { name: '경기 시작' })).toBeDisabled();
     expect(screen.getByText(`${teamNames} 팀 출전 선수가 없어요. 경기 명단을 확인해 주세요.`)).toBeInTheDocument();
@@ -1766,29 +1869,91 @@ describe('OperateConsole — 라인업 게이트 (UX 감사 item 2)', () => {
       data: undefined,
       isLoading: true,
     };
-    mocks.useV1FixtureLineup.mockImplementation(() => fixtureLineupState);
-    const { rerender } = render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    testFixtures.lineups.mockImplementation(() => fixtureLineupState);
+    const { rerender } = render(<CoreHarness />);
 
     expect(screen.getByText('불러오는 중이에요…')).toBeInTheDocument();
     fixtureLineupState = loadedLineup;
-    expect(() => rerender(<OperateConsole tournamentId="t-1" fixtureId="f-1" />)).not.toThrow();
+    expect(() => rerender(<CoreHarness />)).not.toThrow();
     expect(screen.getByRole('button', { name: '경기 시작' })).toBeDisabled();
     expect(screen.getByText('강남 풋살 클럽 팀 출전 선수가 없어요. 경기 명단을 확인해 주세요.')).toBeInTheDocument();
+  });
+
+  it('같은 fixture에서 lease 만료 중 command 응답이 끝나도 pending을 풀어 재획득 후 시작을 허용한다', async () => {
+    setup([], 'TOURNAMENT_FIXTURE');
+    const initialGameQuery = testFixtures.game() as {
+      data: GameDetail;
+      isLoading: false;
+      isError: false;
+      error: null;
+      status: 'success';
+      refetch: ReturnType<typeof vi.fn>;
+    };
+    let gameState: GameDetail['state'] = 'SCHEDULED';
+    testFixtures.game.mockImplementation(() => ({
+      ...initialGameQuery,
+      data: {
+        ...initialGameQuery.data,
+        state: gameState,
+        periods: initialGameQuery.data.periods.map((period) => ({
+          ...period,
+          state: gameState === 'LIVE' ? 'LIVE' : 'SCHEDULED',
+          startedAt: gameState === 'LIVE' ? '2026-10-28T00:00:00.000Z' : null,
+        })),
+      },
+    }));
+    let operationsState = consoleState({ gameSnapshot: { version: 1, state: 'SCHEDULED' } });
+    testFixtures.operations.mockImplementation(() => operationsState);
+    let resolveCommand!: (value: GameCommandResult) => void;
+    const pendingCommand = new Promise<GameCommandResult>((resolve) => {
+      resolveCommand = resolve;
+    });
+    testFixtures.sendCommand.mockReturnValueOnce(pendingCommand);
+
+    const view = render(<CoreHarness />);
+    fireEvent.click(screen.getByRole('button', { name: '경기 시작' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: '경기 시작' }));
+    await waitFor(() => expect(testFixtures.sendCommand).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole('button', { name: '경기 시작' })).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByRole('button', { name: '경기 시작' })).toBeDisabled();
+
+    operationsState = consoleState({
+      canOperate: false,
+      takeover: { status: 'expired' },
+      gameSnapshot: { version: 1, state: 'SCHEDULED' },
+    });
+    view.rerender(<CoreHarness />);
+    await act(async () => {
+      resolveCommand(gameMutationResult('LIVE', 2));
+      await pendingCommand;
+    });
+
+    gameState = 'LIVE';
+    operationsState = consoleState({
+      takeover: { status: 'held', token: 'tok-renewed', expiresAtMs: Date.now() + 60000, assignmentVersion: 1 },
+      gameSnapshot: { version: 2, state: 'LIVE' },
+    });
+    view.rerender(<CoreHarness />);
+
+    const pauseButton = screen.getByRole('button', { name: '일시 중지' });
+    expect(pauseButton).toBeEnabled();
+    expect(pauseButton).not.toHaveAttribute('aria-busy', 'true');
   });
 });
 
 // UX 감사 item 3 — "경기 종료"가 확인 없이 즉시 실행됐다(되돌릴 수 없는 동작).
 describe('OperateConsole — 경기 종료 확인 (UX 감사 item 3)', () => {
   beforeEach(() => {
-    mocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'user-1' } } });
-    mocks.useV1FixtureLineup.mockReturnValue({
+    testFixtures.auth.mockReturnValue({ data: { user: { id: 'user-1' } } });
+    testFixtures.lineups.mockReturnValue({
       data: { gameId: 'game-1', lineups: [] },
       isLoading: false,
       isError: false,
       error: null,
       refetch: vi.fn(),
     });
-    mocks.useV1Game.mockReturnValue({
+    testFixtures.game.mockReturnValue({
       data: {
         id: 'game-1', state: 'LIVE', version: 2, lastSequence: 1,
         // 종료 흐름 개편(사용자 결정 2) — "경기 종료"는 이제 정규 시간이
@@ -1803,31 +1968,32 @@ describe('OperateConsole — 경기 종료 확인 (UX 감사 item 3)', () => {
       isError: false,
       refetch: vi.fn(),
     });
-    mocks.useV1GameOperationsConsole.mockReturnValue(consoleState({ gameSnapshot: { version: 2, state: 'LIVE' } }));
-    mocks.postV1GameCommand.mockResolvedValue({ gameId: 'game-1', state: 'ENDED', version: 3 });
+    testFixtures.operations.mockReturnValue(consoleState({ gameSnapshot: { version: 2, state: 'LIVE' } }));
+      testFixtures.sendCommand.mockResolvedValue(gameRevisionMutationResult('ENDED'));
   });
 
   it('"경기 종료"를 눌러도 확인 전에는 실행되지 않고, 취소하면 아무 일도 일어나지 않는다', async () => {
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    render(<CoreHarness />);
 
     fireEvent.click(screen.getByRole('button', { name: '경기 종료' }));
     const dialog = await screen.findByRole('dialog');
-    expect(mocks.postV1GameCommand).not.toHaveBeenCalled();
+    expect(testFixtures.sendCommand).not.toHaveBeenCalled();
 
     fireEvent.click(within(dialog).getByRole('button', { name: '취소' }));
     expect(screen.queryByRole('dialog')).toBeNull();
-    expect(mocks.postV1GameCommand).not.toHaveBeenCalled();
+    expect(testFixtures.sendCommand).not.toHaveBeenCalled();
   });
 
   it('확인하면 그때 종료 명령이 실행된다', async () => {
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    testFixtures.sendCommand.mockResolvedValue(gameRevisionMutationResult('ENDED'));
+    render(<CoreHarness />);
 
     fireEvent.click(screen.getByRole('button', { name: '경기 종료' }));
     const dialog = await screen.findByRole('dialog');
     fireEvent.click(within(dialog).getByRole('button', { name: '경기 종료' }));
 
     await waitFor(() =>
-      expect(mocks.postV1GameCommand).toHaveBeenCalledWith('game-1', 'end', expect.anything(), COMMAND_OPTIONS),
+      expect(testFixtures.sendCommand).toHaveBeenCalledWith('game-1', 'end', expect.anything(), COMMAND_OPTIONS),
     );
 
     // UX 감사 — 명령 응답이 그 자리에서 gameSnapshot에 반영돼야 한다.
@@ -1835,11 +2001,7 @@ describe('OperateConsole — 경기 종료 확인 (UX 감사 item 3)', () => {
     // 이전 상태(예: "일시 중지")를 계속 보여준다(alpha 실측, 2026-08:
     // 새로고침해야만 반영됨).
     await waitFor(() =>
-      expect(mocks.useV1GameOperationsConsole().applyCommandResult).toHaveBeenCalledWith({
-        gameId: 'game-1',
-        state: 'ENDED',
-        version: 3,
-      }),
+      expect(testFixtures.operations().applyCommandResult).toHaveBeenCalledWith(gameRevisionMutationResult('ENDED')),
     );
   });
 
@@ -1849,18 +2011,18 @@ describe('OperateConsole — 경기 종료 확인 (UX 감사 item 3)', () => {
       { status: 'error', timestamp: '', statusCode: 0, code: V1_NETWORK_ERROR_CODE, message: 'Failed to fetch' },
       { displayableMessage: false },
     );
-    mocks.postV1GameCommand
+    testFixtures.sendCommand
       .mockRejectedValueOnce(networkError)
-      .mockResolvedValueOnce({ gameId: 'game-1', state: 'ENDED', version: 3 });
+      .mockResolvedValueOnce(gameRevisionMutationResult('ENDED'));
 
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    render(<CoreHarness />);
 
     fireEvent.click(screen.getByRole('button', { name: '경기 종료' }));
     const dialog = await screen.findByRole('dialog');
     fireEvent.click(within(dialog).getByRole('button', { name: '경기 종료' }));
 
     const retry = await screen.findByRole('button', { name: '같은 요청 재시도' });
-    const firstRequest = mocks.postV1GameCommand.mock.calls[0]?.[2];
+    const firstRequest = testFixtures.sendCommand.mock.calls[0]?.[2];
     expect(firstRequest).toEqual(expect.objectContaining({
       expectedVersion: 2,
       clientCommandId: expect.any(String),
@@ -1871,14 +2033,10 @@ describe('OperateConsole — 경기 종료 확인 (UX 감사 item 3)', () => {
 
     fireEvent.click(retry);
 
-    await waitFor(() => expect(mocks.postV1GameCommand).toHaveBeenCalledTimes(2));
-    expect(mocks.postV1GameCommand.mock.calls[1]?.[2]).toEqual(firstRequest);
+    await waitFor(() => expect(testFixtures.sendCommand).toHaveBeenCalledTimes(2));
+    expect(testFixtures.sendCommand.mock.calls[1]?.[2]).toEqual(firstRequest);
     await waitFor(() => expect(screen.queryByRole('button', { name: '같은 요청 재시도' })).toBeNull());
-    expect(mocks.useV1GameOperationsConsole().applyCommandResult).toHaveBeenCalledWith({
-      gameId: 'game-1',
-      state: 'ENDED',
-      version: 3,
-    });
+    expect(testFixtures.operations().applyCommandResult).toHaveBeenCalledWith(gameRevisionMutationResult('ENDED'));
   });
 
   it('종료 POST가 성공한 뒤 상세 재조회가 실패해도 이미 저장된 명령을 재시도하지 않는다', async () => {
@@ -1887,10 +2045,10 @@ describe('OperateConsole — 경기 종료 확인 (UX 감사 item 3)', () => {
     const refetch = vi.fn((options?: { throwOnError?: boolean }) =>
       options?.throwOnError ? Promise.reject(refreshError) : Promise.resolve({ isError: true, error: refreshError }),
     );
-    mocks.useV1Game.mockReturnValue({ ...mocks.useV1Game(), refetch });
-    mocks.postV1GameCommand.mockResolvedValue({ gameId: 'game-1', state: 'ENDED', version: 3 });
+    testFixtures.game.mockReturnValue({ ...testFixtures.game(), refetch });
+      testFixtures.sendCommand.mockResolvedValue(gameRevisionMutationResult('ENDED'));
 
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    render(<CoreHarness />);
 
     fireEvent.click(screen.getByRole('button', { name: '경기 종료' }));
     const dialog = await screen.findByRole('dialog');
@@ -1903,31 +2061,31 @@ describe('OperateConsole — 경기 종료 확인 (UX 감사 item 3)', () => {
   });
 
   it('진행 중인 종료 요청이 다른 경기로 전환된 뒤 도착해도 새 경기 상태를 오염시키지 않는다', async () => {
-    let resolvePost: ((value: { gameId: string; state: 'ENDED'; version: number }) => void) | undefined;
-    mocks.postV1GameCommand.mockReturnValueOnce(new Promise((resolve) => { resolvePost = resolve; }));
+    let resolvePost: ((value: GameCommandResult) => void) | undefined;
+    testFixtures.sendCommand.mockReturnValueOnce(new Promise((resolve) => { resolvePost = resolve; }));
 
-    const view = render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    const view = render(<CoreHarness />);
     fireEvent.click(screen.getByRole('button', { name: '경기 종료' }));
     const dialog = await screen.findByRole('dialog');
     fireEvent.click(within(dialog).getByRole('button', { name: '경기 종료' }));
-    await waitFor(() => expect(mocks.postV1GameCommand).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(testFixtures.sendCommand).toHaveBeenCalledTimes(1));
 
-    const nextFixtureLineup = mocks.useV1FixtureLineup();
-    const nextGame = mocks.useV1Game();
-    mocks.useV1FixtureLineup.mockReturnValue({
+    const nextFixtureLineup = testFixtures.lineups();
+    const nextGame = testFixtures.game();
+    testFixtures.lineups.mockReturnValue({
       ...nextFixtureLineup,
       data: { ...nextFixtureLineup.data, gameId: 'game-2' },
     });
-    mocks.useV1Game.mockReturnValue({
+    testFixtures.game.mockReturnValue({
       ...nextGame,
       data: { ...nextGame.data, id: 'game-2' },
     });
-    view.rerender(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    view.rerender(<CoreHarness />);
 
     await act(async () => {
-      resolvePost?.({ gameId: 'game-1', state: 'ENDED', version: 3 });
+      resolvePost?.(gameRevisionMutationResult('ENDED'));
     });
-    expect(mocks.useV1GameOperationsConsole().applyCommandResult).not.toHaveBeenCalled();
+    expect(testFixtures.operations().applyCommandResult).not.toHaveBeenCalled();
     expect(screen.queryByRole('button', { name: '같은 요청 재시도' })).toBeNull();
   });
 });
@@ -1938,8 +2096,8 @@ describe('OperateConsole — 경기 종료 확인 (UX 감사 item 3)', () => {
 // 해야 한다 — 취소해도 "제출 안 됨"일 뿐 서버 422가 아니다.
 describe('OperateConsole — 이상 클럭 확인 게이트 (alpha 452′ 사고)', () => {
   function setup(periodDurations: unknown) {
-    mocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'user-1' } } });
-    mocks.useV1FixtureLineup.mockReturnValue({
+    testFixtures.auth.mockReturnValue({ data: { user: { id: 'user-1' } } });
+    testFixtures.lineups.mockReturnValue({
       data: {
         gameId: 'game-1',
         lineups: [{
@@ -1957,7 +2115,7 @@ describe('OperateConsole — 이상 클럭 확인 게이트 (alpha 452′ 사고
       error: null,
       refetch: vi.fn(),
     });
-    mocks.useV1Game.mockReturnValue({
+    testFixtures.game.mockReturnValue({
       data: {
         id: 'game-1', state: 'LIVE', version: 2, lastSequence: 1,
         // 20분 피리어드가 아득한 과거(2020년)에 시작 — 실제 Date.now() 기준으로도
@@ -1972,18 +2130,18 @@ describe('OperateConsole — 이상 클럭 확인 게이트 (alpha 452′ 사고
       isError: false,
       refetch: vi.fn(),
     });
-    mocks.useV1GameOperationsConsole.mockReturnValue(consoleState({ gameSnapshot: { version: 2, state: 'LIVE' } }));
+    testFixtures.operations.mockReturnValue(consoleState({ gameSnapshot: { version: 2, state: 'LIVE' } }));
   }
 
   it('설정된 피리어드 길이를 크게 넘는 시각을 기록하려 하면 제출 전 확인을 요구하고, 취소하면 제출되지 않는다', async () => {
     setup([{ durationMinutes: 20, extraTime: false }]);
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    render(<CoreHarness />);
 
     fireEvent.click(screen.getByRole('button', { name: '골' }));
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'select-player' }));
 
     expect(await screen.findByText(/이 피리어드는 보통 20분이에요/)).toBeInTheDocument();
-    expect(mocks.useV1GameOperationsConsole().submitEvent).not.toHaveBeenCalled();
+    expect(testFixtures.operations().submitEvent).not.toHaveBeenCalled();
     // 과제 1 요구사항 4 — 시계 경고와 일반 커밋 확인이 별개 모달로 겹쳐
     // 뜨지 않는다(모달은 항상 하나뿐, 경고가 그 안에 병합된다).
     expect(screen.getAllByRole('dialog')).toHaveLength(1);
@@ -1991,12 +2149,12 @@ describe('OperateConsole — 이상 클럭 확인 게이트 (alpha 452′ 사고
     // 서버 하드 거부가 아니라 확인 게이트일 뿐이라는 계약: 취소해도 그냥
     // "제출 안 됨"이지 에러가 아니다.
     fireEvent.click(screen.getByRole('button', { name: '취소' }));
-    expect(mocks.useV1GameOperationsConsole().submitEvent).not.toHaveBeenCalled();
+    expect(testFixtures.operations().submitEvent).not.toHaveBeenCalled();
   });
 
   it('확인을 누르면 그대로(숫자 조작 없이) 기록된다', async () => {
     setup([{ durationMinutes: 20, extraTime: false }]);
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    render(<CoreHarness />);
 
     fireEvent.click(screen.getByRole('button', { name: '골' }));
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'select-player' }));
@@ -2005,7 +2163,7 @@ describe('OperateConsole — 이상 클럭 확인 게이트 (alpha 452′ 사고
     fireEvent.click(screen.getByRole('button', { name: '그대로 기록' }));
 
     await waitFor(() =>
-      expect(mocks.useV1GameOperationsConsole().submitEvent).toHaveBeenCalledWith(
+      expect(testFixtures.operations().submitEvent).toHaveBeenCalledWith(
         expect.objectContaining({ type: 'GOAL', participantId: 'p-1' }),
       ),
     );
@@ -2013,7 +2171,7 @@ describe('OperateConsole — 이상 클럭 확인 게이트 (alpha 452′ 사고
 
   it('피리어드 설정을 못 읽었으면(periodDurations: null) 시계 경고 없이 일반 확인만 거친다', async () => {
     setup(null);
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    render(<CoreHarness />);
 
     fireEvent.click(screen.getByRole('button', { name: '골' }));
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'select-player' }));
@@ -2025,7 +2183,7 @@ describe('OperateConsole — 이상 클럭 확인 게이트 (alpha 452′ 사고
     expect(within(dialog).queryByText(/이 피리어드는 보통/)).toBeNull();
     fireEvent.click(within(dialog).getByRole('button', { name: '골 기록' }));
 
-    await waitFor(() => expect(mocks.useV1GameOperationsConsole().submitEvent).toHaveBeenCalled());
+    await waitFor(() => expect(testFixtures.operations().submitEvent).toHaveBeenCalled());
   });
 });
 
@@ -2033,15 +2191,15 @@ describe('OperateConsole — 이상 클럭 확인 게이트 (alpha 452′ 사고
 // LineupGrid가 전부 비활성인데 이유가 화면에 없었다.
 describe('OperateConsole — 운영 권한 요청 중 배너 (UX 감사 item 4)', () => {
   beforeEach(() => {
-    mocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'user-1' } } });
-    mocks.useV1FixtureLineup.mockReturnValue({
+    testFixtures.auth.mockReturnValue({ data: { user: { id: 'user-1' } } });
+    testFixtures.lineups.mockReturnValue({
       data: { gameId: 'game-1', lineups: [] },
       isLoading: false,
       isError: false,
       error: null,
       refetch: vi.fn(),
     });
-    mocks.useV1Game.mockReturnValue({
+    testFixtures.game.mockReturnValue({
       data: {
         id: 'game-1', state: 'LIVE', version: 2, lastSequence: 1, periods: [],
         sides: [HOME_AWAY_SIDES[0]],
@@ -2056,16 +2214,16 @@ describe('OperateConsole — 운영 권한 요청 중 배너 (UX 감사 item 4)'
   it.each(['none', 'requesting'] as const)(
     'takeover.status가 %s이면 권한을 가져오는 중이라는 배너를 보여준다',
     (status) => {
-      mocks.useV1GameOperationsConsole.mockReturnValue(consoleState({ takeover: { status } }));
-      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+      testFixtures.operations.mockReturnValue(consoleState({ takeover: { status } }));
+      render(<CoreHarness />);
 
       expect(screen.getByText('경기 운영 권한을 가져오는 중이에요…')).toBeInTheDocument();
     },
   );
 
   it('권한을 보유하면(held) 배너가 사라진다', () => {
-    mocks.useV1GameOperationsConsole.mockReturnValue(consoleState());
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    testFixtures.operations.mockReturnValue(consoleState());
+    render(<CoreHarness />);
 
     expect(screen.queryByText('경기 운영 권한을 가져오는 중이에요…')).toBeNull();
   });
@@ -2075,15 +2233,15 @@ describe('OperateConsole — 운영 권한 요청 중 배너 (UX 감사 item 4)'
 // 제외하고 확정 이벤트에서만 파생해야 한다(`on-pitch-state.ts`와 동일한 규칙).
 describe('OperateConsole — 헤더 점수 표시 (UX 감사 item 6)', () => {
   beforeEach(() => {
-    mocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'user-1' } } });
-    mocks.useV1FixtureLineup.mockReturnValue({
+    testFixtures.auth.mockReturnValue({ data: { user: { id: 'user-1' } } });
+    testFixtures.lineups.mockReturnValue({
       data: { gameId: 'game-1', lineups: [] },
       isLoading: false,
       isError: false,
       error: null,
       refetch: vi.fn(),
     });
-    mocks.useV1Game.mockReturnValue({
+    testFixtures.game.mockReturnValue({
       data: {
         id: 'game-1', state: 'LIVE', version: 2, lastSequence: 1,
         periods: [{ id: 'period-1', gameId: 'game-1', number: 1, state: 'LIVE', startedAt: '2026-08-07T00:00:00.000Z', endedAt: null, pausedTotalMs: 0, pausedAt: null }],
@@ -2103,10 +2261,10 @@ describe('OperateConsole — 헤더 점수 표시 (UX 감사 item 6)', () => {
     const homeGoalB = { ...goal(4), id: 'e4', sideId: 'side-home' };
     const awayGoal = { ...goal(5), id: 'e5', sideId: 'side-away' };
 
-    mocks.useV1GameOperationsConsole.mockReturnValue(
+    testFixtures.operations.mockReturnValue(
       consoleState({ liveEvents: [homeGoalA, homeGoalReversed, reversal, homeGoalB, awayGoal] }),
     );
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    render(<CoreHarness />);
 
     // 강남(홈) 3골 중 1골이 되돌려져 2, 성수(원정) 1골 → "2 : 1"
     expect(screen.getByText('2 : 1')).toBeInTheDocument();
@@ -2119,7 +2277,7 @@ describe('OperateConsole — 헤더 점수 표시 (UX 감사 item 6)', () => {
    * 쏘는 `game.event.committed` 브로드캐스트에 서버가 실제로 저장한 행이
    * 아니라 클라이언트가 보낸 원본 요청 payload를 그대로 실어 보냈다는
    * 것이다 — 그 payload에는 서버가 나중에 채우는 `id`/`reversesEventId`가
-   * 없다. 이 콘솔의 `useV1GameOperationsConsole`은 그렇게 도착한 이벤트를
+   * 없다. 이 콘솔의 `operations`은 그렇게 도착한 이벤트를
    * `liveEvents`에 그대로 이어붙이므로(`onCommitted`), 방금 기록한 골의
    * `id`/`reversesEventId`가 `undefined`인 채로 들어온다. `scoreBySideId`가
    * `reversesEventId !== null`만으로 "되돌려짐" 집합을 만들면
@@ -2141,10 +2299,10 @@ describe('OperateConsole — 헤더 점수 표시 (UX 감사 item 6)', () => {
       sideId: 'side-home',
     } as unknown as GameEventRecord;
 
-    mocks.useV1GameOperationsConsole.mockReturnValue(
+    testFixtures.operations.mockReturnValue(
       consoleState({ liveEvents: [malformedSelfCommittedGoal] }),
     );
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    render(<CoreHarness />);
 
     expect(screen.getByText('1 : 0')).toBeInTheDocument();
   });
@@ -2163,10 +2321,10 @@ describe('OperateConsole — 헤더 점수 표시 (UX 감사 item 6)', () => {
       sideId: 'side-away',
     } as unknown as GameEventRecord;
 
-    mocks.useV1GameOperationsConsole.mockReturnValue(
+    testFixtures.operations.mockReturnValue(
       consoleState({ liveEvents: [firstMalformed, secondMalformed] }),
     );
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    render(<CoreHarness />);
 
     expect(screen.getByText('1 : 1')).toBeInTheDocument();
   });
@@ -2176,568 +2334,3 @@ describe('OperateConsole — 헤더 점수 표시 (UX 감사 item 6)', () => {
 // 게이팅과, 최종 결과 반영
 // (요구사항 4·5: end 커맨드의 payload.penalties로 실제 반영, 확인 모달을 거침)
 // 을 검증한다.
-describe('OperateConsole — 승부차기 (과제 2)', () => {
-  const PENALTY_SIDES = [
-    { id: 'side-home', gameId: 'game-1', sideKey: 'HOME' as const, teamId: null, displayNameSnapshot: '강남 풋살 클럽', createdAt: '', updatedAt: '' },
-    { id: 'side-away', gameId: 'game-1', sideKey: 'AWAY' as const, teamId: null, displayNameSnapshot: '성수 풋살 클럽', createdAt: '', updatedAt: '' },
-  ];
-  // 종료 흐름 개편(사용자 결정 2·3) — 승부차기 입력은 이제 "후반 종료"
-  // 이후, 즉 마지막 피리어드까지 ENDED가 된 뒤에만 열린다(경기 자체는
-  // 아직 LIVE = 결과 미확정). 예전엔 마지막 피리어드가 LIVE인 동안 열려
-  // 있었다 — 아직 뛰는 중인 경기에 승부차기 입력이 열려 있는 셈이었다.
-  const FINAL_PERIOD = {
-    id: 'period-2', gameId: 'game-1', number: 2, state: 'ENDED',
-    startedAt: '2026-08-07T00:00:00.000Z', endedAt: '2026-08-07T00:45:00.000Z', pausedTotalMs: 0, pausedAt: null,
-  };
-
-  function tiedGoal(sequence: number, sideId: string, id: string): GameEventRecord {
-    return {
-      id, gameId: 'game-1', sequence, clientEventId: `client-${sequence}`, payloadHash: 'hash',
-      type: 'GOAL', sideId, participantId: null, assistParticipantId: null, period: 2,
-      clockMs: 5 * 60000, occurredAt: '2026-08-07T00:05:00.000Z', receivedAt: '2026-08-07T00:05:00.000Z',
-      actorUserId: 'actor-1', reversesEventId: null, payload: {},
-    } as GameEventRecord;
-  }
-
-  const FIRST_PERIOD = {
-    id: 'period-1', gameId: 'game-1', number: 1, state: 'ENDED',
-    startedAt: '2026-08-07T00:00:00.000Z', endedAt: '2026-08-07T00:20:00.000Z', pausedTotalMs: 0, pausedAt: null,
-  };
-
-  function setup(
-    overrides: {
-      isKnockoutFixture?: boolean;
-      sourceType?: 'TEAM_MATCH' | 'TOURNAMENT_FIXTURE';
-      liveEvents?: GameEventRecord[];
-      periods?: ReadonlyArray<Record<string, unknown>>;
-      /** 서버가 대회 설정에서 해석해 내려주는 승부차기 종료 정책. 생략하면 서버가
-       *  이 필드를 안 보낸 상태(레거시 응답)를 그대로 재현한다. */
-      penaltyShootoutPolicy?: { earlyStop: boolean };
-      substitutionPolicy?: { mode: 'limited' | 'rolling'; maxSubstitutions: number | null };
-    } = {},
-  ) {
-    mocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'user-1' } } });
-    mocks.useV1FixtureLineup.mockReturnValue({
-      data: { gameId: 'game-1', lineups: [] },
-      isLoading: false, isError: false, error: null, refetch: vi.fn(),
-    });
-    mocks.useV1Game.mockReturnValue({
-      data: {
-        id: 'game-1',
-        sourceType: overrides.sourceType ?? 'TEAM_MATCH',
-        isKnockoutFixture: overrides.isKnockoutFixture ?? true,
-        state: 'LIVE', version: 2, lastSequence: 1,
-        periods: overrides.periods ?? [FIRST_PERIOD, FINAL_PERIOD],
-        sides: PENALTY_SIDES,
-        lineups: [],
-        penaltyShootoutPolicy: overrides.penaltyShootoutPolicy,
-        substitutionPolicy: overrides.substitutionPolicy,
-      },
-      isLoading: false, isError: false, refetch: vi.fn(),
-    });
-    const liveEvents = overrides.liveEvents ?? [tiedGoal(1, 'side-home', 'e1'), tiedGoal(2, 'side-away', 'e2')];
-    mocks.useV1GameOperationsConsole.mockReturnValue(
-      consoleState({ gameSnapshot: { version: 2, state: 'LIVE' }, liveEvents }),
-    );
-  }
-
-  it('[MD-QA #180] 대회 knockout 경기가 정규시간 종료 후 동점이면 "승부차기 시작" 버튼이 보이고, "경기 종료" 버튼은 숨는다', () => {
-    setup();
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
-
-    expect(screen.getByRole('button', { name: /승부차기 시작/ })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '경기 종료' })).toBeNull();
-    expect(screen.getByText(/정규 시간이 무승부로 끝났어요/)).toBeInTheDocument();
-    expect(screen.queryByText(/결선 경기는 무승부로 끝낼 수 없어요/)).toBeNull();
-  });
-
-  // 요구사항 4 — 아직 정규 시간이 끝나지 않은 예외 종료 경로(하프타임 중
-  // 중단 등)에서 결선 무승부인 채 "경기 종료"를 누르면, 예전에는 그대로
-  // 나가 리비전이 저장되고 브래킷 프로젝션만 조용히 POISONED가 됐다.
-  // 이제 버튼 자체가 막히고 사유를 알려준다(백엔드도 409
-  // TOURNAMENT_PENALTY_REQUIRED로 이중 방어).
-  it('[MD-QA #180] 결선 무승부 조기 종료는 화면을 경고로 채우지 않고, 더보기 메뉴에서 막은 이유를 알려준다', () => {
-    // 하프타임(후반이 아직 시작조차 안 됨) — game.state는 LIVE라 "경기 종료"
-    // 탈출구가 남아 있는 상태다.
-    setup({ periods: [FIRST_PERIOD, { ...FINAL_PERIOD, state: 'HALFTIME', startedAt: null, endedAt: null }] });
-
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
-
-    // 경고는 경기 진행 화면을 점유하지 않고, 종료 액션을 열었을 때만 맥락 안에서 안내한다.
-    expect(screen.queryByText(/결선 경기는 무승부로 끝낼 수 없어요/)).toBeNull();
-    expect(screen.queryByRole('button', { name: '경기 종료' })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: '더보기' }));
-    const moreDialog = screen.getByRole('dialog', { name: '경기 더보기' });
-    const endButton = within(moreDialog).getByRole('button', { name: /^경기 종료/ });
-    expect(endButton).toBeDisabled();
-    expect(within(moreDialog).getByText(/결선 경기는 무승부로 끝낼 수 없어요/)).toBeInTheDocument();
-    fireEvent.click(endButton);
-    expect(mocks.postV1GameCommand).not.toHaveBeenCalled();
-    // 아직 정규 시간이 끝나지 않았으므로 승부차기 입력도 아직 열리지 않는다.
-    expect(screen.queryByRole('button', { name: /승부차기 시작/ })).toBeNull();
-  });
-
-  it('[MD-QA #180] 비동점 결선 경기의 더보기 종료 액션은 경고 없이 사용할 수 있다', () => {
-    setup({
-      liveEvents: [tiedGoal(1, 'side-home', 'e1')],
-      periods: [FIRST_PERIOD, { ...FINAL_PERIOD, state: 'HALFTIME', startedAt: null, endedAt: null }],
-    });
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
-
-    expect(screen.queryByText(/결선 경기는 무승부로 끝낼 수 없어요/)).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: '더보기' }));
-    expect(
-      within(screen.getByRole('dialog', { name: '경기 더보기' })).getByRole('button', { name: /^경기 종료/ }),
-    ).toBeEnabled();
-  });
-
-  it('[MD-QA #180] takeover가 거절된 대회 디렉터는 결선 동점 경고가 전역 표시되지 않고 조작이 잠긴다', () => {
-    setup({ periods: [FIRST_PERIOD, { ...FINAL_PERIOD, state: 'HALFTIME', startedAt: null, endedAt: null }] });
-    mocks.useV1GameOperationsConsole.mockReturnValue(
-      consoleState({ takeover: { status: 'denied', code: 'TAKEOVER_HELD', holderName: '김운영' } }),
-    );
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
-
-    expect(screen.getByText('김운영님이 이 경기를 운영하고 있어요. 지금은 보기만 할 수 있어요.')).toBeInTheDocument();
-    expect(screen.queryByText(/결선 경기는 무승부로 끝낼 수 없어요/)).toBeNull();
-    expect(screen.getByRole('button', { name: '더보기' })).toBeDisabled();
-    expect(mocks.postV1GameCommand).not.toHaveBeenCalled();
-  });
-
-  it('[MD-QA #180] SUPPORT_READONLY 권한의 결선 동점 경기는 경고 없이 더보기와 종료 명령이 잠긴다', () => {
-    setup({ periods: [FIRST_PERIOD, { ...FINAL_PERIOD, state: 'HALFTIME', startedAt: null, endedAt: null }] });
-    mocks.useTournamentOpsRole.mockReturnValue('SUPPORT_READONLY');
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
-
-    expect(screen.queryByText(/결선 경기는 무승부로 끝낼 수 없어요/)).toBeNull();
-    expect(screen.queryByRole('button', { name: '경기 종료' })).toBeNull();
-    expect(screen.getByRole('button', { name: '더보기' })).toBeDisabled();
-    expect(mocks.postV1GameCommand).not.toHaveBeenCalled();
-  });
-
-  describe('종료 확인 문구가 경기 종류를 따른다', () => {
-    const LIVE_FINAL_PERIOD = { ...FINAL_PERIOD, state: 'LIVE', endedAt: null };
-
-    it('"후반 종료" 확인: 승부차기가 열리는 knockout 동점 경기는 승부차기 단계를 안내한다', async () => {
-      setup({ periods: [FIRST_PERIOD, LIVE_FINAL_PERIOD] });
-      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
-      fireEvent.click(screen.getByRole('button', { name: '후반 종료' }));
-
-      expect(await screen.findByRole('dialog')).toHaveTextContent('승부차기 입력 또는 경기 종료');
-    });
-
-    it('"후반 종료" 확인: 조별 경기는 동점이어도 승부차기를 말하지 않는다', async () => {
-      setup({ isKnockoutFixture: false, periods: [FIRST_PERIOD, LIVE_FINAL_PERIOD] });
-      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
-      fireEvent.click(screen.getByRole('button', { name: '후반 종료' }));
-
-      const dialog = await screen.findByRole('dialog');
-      expect(dialog).toHaveTextContent('다음 단계에서 경기 종료');
-      expect(dialog).not.toHaveTextContent('승부차기');
-    });
-
-    it('"경기 종료" 확인: 롤링 교체 경기는 교체를 확인하라고 하지 않고, 제한 교체 경기는 그대로 안내한다', async () => {
-      setup({ isKnockoutFixture: false, substitutionPolicy: { mode: 'rolling', maxSubstitutions: null } });
-      const { unmount } = render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
-      fireEvent.click(screen.getByRole('button', { name: '경기 종료' }));
-      const rolling = await screen.findByRole('dialog');
-      expect(rolling).toHaveTextContent('기록한 골·카드를 먼저 확인해주세요');
-      expect(rolling).not.toHaveTextContent('교체');
-      unmount();
-
-      setup({ isKnockoutFixture: false, substitutionPolicy: { mode: 'limited', maxSubstitutions: 5 } });
-      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
-      fireEvent.click(screen.getByRole('button', { name: '경기 종료' }));
-      expect(await screen.findByRole('dialog')).toHaveTextContent('기록한 골·카드·교체를 먼저 확인해주세요');
-    });
-  });
-
-  it('knockout이 아니면(조별리그) 동점이어도 "승부차기 시작"이 보이지 않고 평소처럼 "경기 종료"가 보인다', () => {
-    setup({ isKnockoutFixture: false });
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
-
-    expect(screen.queryByRole('button', { name: /승부차기 시작/ })).toBeNull();
-    expect(screen.getByRole('button', { name: '경기 종료' })).toBeInTheDocument();
-  });
-
-  it('동점이 아니면 knockout 경기여도 "승부차기 시작"이 보이지 않는다', () => {
-    setup({ liveEvents: [tiedGoal(1, 'side-home', 'e1')] });
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
-
-    expect(screen.queryByRole('button', { name: /승부차기 시작/ })).toBeNull();
-    expect(screen.getByRole('button', { name: '경기 종료' })).toBeInTheDocument();
-  });
-
-  it('현행 대회 경기(TEAM_MATCH)도 결선 무승부면 "승부차기 시작"이 보이고 일반 종료는 막힌다', () => {
-    setup({ sourceType: 'TEAM_MATCH', isKnockoutFixture: true });
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
-
-    expect(screen.getByRole('button', { name: /승부차기 시작/ })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '경기 종료' })).toBeNull();
-  });
-
-  /**
-   * **대회 설정 스위치가 실제로 배선돼 있다는 유일한 증거.**
-   *
-   * `earlyStop`은 서버 `getGame` 응답(`penaltyShootoutPolicy`)에서 와서 술어까지
-   * 흘러가야 한다. 술어 자체는 `penalty-shootout.test.ts`가 양방향으로 검증하지만,
-   * **그 값을 어디서 얻는가**는 거기서 검증되지 않는다 — 콘솔이 서버 값을 무시하고
-   * `true`로 굳혀도 술어 테스트는 전부 초록이다.
-   *
-   * 그래서 두 정책의 답이 갈리는 국면을 UI로 직접 만든다: 홈(선축)·원정 각 2킥, 2점 대
-   * 0점. 남은 1킥씩으로도 따라잡을 수 없어 A2는 종료를 허용하지만, 조기 종료를 끈 A1은
-   * 세 번째 킥까지 기다린다.
-   */
-  async function openPanelAndKickTwoRounds(policy?: { earlyStop: boolean }): Promise<HTMLElement> {
-    setup(policy === undefined ? {} : { penaltyShootoutPolicy: policy });
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
-
-    fireEvent.click(screen.getByRole('button', { name: /승부차기 시작/ }));
-    const startDialog = await screen.findByRole('dialog');
-    fireEvent.click(within(startDialog).getByRole('button', { name: '승부차기 시작' }));
-
-    const panel = await screen.findByRole('dialog', { name: '승부차기' });
-    chooseFirstKicker(panel, '강남 풋살 클럽');
-    const successButton = within(panel).getByRole('button', { name: /성공/ });
-    const missButton = within(panel).getByRole('button', { name: /실패/ });
-    // 홈 성공 / 원정 실패를 두 번 반복 → 각 2킥, 홈 2점 / 원정 0점.
-    for (let round = 0; round < 2; round += 1) {
-      fireEvent.click(successButton);
-      fireEvent.click(missButton);
-    }
-    return panel;
-  }
-
-  it('earlyStop 정책이면(기본) 각 2킥 2점 대 0점에서 승부차기를 종료할 수 있다', async () => {
-    const panel = await openPanelAndKickTwoRounds({ earlyStop: true });
-    expect(within(panel).getByRole('button', { name: '승부차기 종료' })).not.toBeDisabled();
-  });
-
-  it('서버가 earlyStop=false를 내려주면 같은 국면에서 종료가 잠긴다 — 정책이 UI까지 배선돼 있다', async () => {
-    const panel = await openPanelAndKickTwoRounds({ earlyStop: false });
-    expect(within(panel).getByRole('button', { name: '승부차기 종료' })).toBeDisabled();
-    expect(panel).toHaveTextContent('아직 남은 킥으로 뒤집힐 수 있어요.');
-    // 미결이므로 킥 입력은 계속 열려 있다.
-    expect(within(panel).getByRole('button', { name: /성공/ })).toBeEnabled();
-  });
-
-  it('서버가 정책을 안 내려주면(레거시 응답) FIFA 정규로 폴백한다', async () => {
-    const panel = await openPanelAndKickTwoRounds(undefined);
-    expect(within(panel).getByRole('button', { name: '승부차기 종료' })).not.toBeDisabled();
-  });
-
-  /**
-   * 킥 시퀀스가 "각 2킥 2:1"에서 "각 3킥 3:0"으로 바뀐 이유: 2킥씩 찬 2:1은 **결판이
-   * 아니다.** 원정에게 아직 3킥이 남아 있어 뒤집을 수 있기 때문이다(FIFA 정규).
-   * 예전 술어가 그 국면을 결판으로 읽은 것이 이 작업이 고치는 결함의 다른 얼굴이다 —
-   * `home !== away` 하나만 봤으므로 홈이 1킥 넣은 1:0조차 결판이었다.
-   *
-   * 이 테스트가 지키는 계약 자체(최종 점수를 **배열 순서가 아니라 `sideKey` 기준으로**
-   * 매핑해 `end` payload 에 싣는다)는 그대로다. 각 2킥 뒤 2:0 은 원정이 남은 1킥을
-   * 넣어도 1점이라 수학적으로 끝난 국면이다.
-   */
-  it('승부차기 시작 확인 → 킥 입력(2:0) → 종료 확인을 거치면, end 커맨드가 sideKey 기준 최종 점수로 호출된다', async () => {
-    setup();
-    mocks.postV1GameCommand.mockResolvedValue({
-      gameId: 'game-1', state: 'ENDED', version: 3, revisionId: 'rev-1', revision: 1, revisionState: 'SUBMITTED',
-    });
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
-
-    fireEvent.click(screen.getByRole('button', { name: /승부차기 시작/ }));
-    const startDialog = await screen.findByRole('dialog');
-    fireEvent.click(within(startDialog).getByRole('button', { name: '승부차기 시작' }));
-
-    const panel = await screen.findByRole('dialog', { name: '승부차기' });
-    // 이 시나리오는 홈이 선축인 경우다 — 아래 기대 payload 의 `firstKickSideKey: 'HOME'`이
-    // 그 선택의 결과다(예전에는 고를 수 없었고 항상 홈으로 굳어 있었다).
-    chooseFirstKicker(panel, '강남 풋살 클럽');
-    const successButton = within(panel).getByRole('button', { name: /성공/ });
-    const missButton = within(panel).getByRole('button', { name: /실패/ });
-
-    // 순서는 항상 번갈아 찬다(선축인 홈 먼저). 각 2킥 뒤 2:0 은 남은 1킥씩으로 따라잡을 수
-    // 없어 규칙상 결판이고, 그 순간부터 킥 입력이 잠긴다.
-    fireEvent.click(successButton); // 홈 1:0
-    fireEvent.click(missButton); // 원정 1:0
-    fireEvent.click(successButton); // 홈 2:0
-    fireEvent.click(missButton); // 원정 2:0
-    expect(successButton).toBeDisabled();
-    expect(missButton).toBeDisabled();
-
-    const finishButton = within(panel).getByRole('button', { name: '승부차기 종료' });
-    expect(finishButton).not.toBeDisabled();
-    fireEvent.click(finishButton);
-
-    const finishDialog = await screen.findByRole('dialog', { name: '승부차기를 종료할까요?' });
-    expect(finishDialog).toHaveTextContent('강남 풋살 클럽 2 : 0 성수 풋살 클럽');
-    fireEvent.click(within(finishDialog).getByRole('button', { name: '승부차기 종료' }));
-
-    await waitFor(() =>
-      expect(mocks.postV1GameCommand).toHaveBeenCalledWith(
-        'game-1',
-        'end',
-        expect.objectContaining({
-          // 킥 수가 함께 나가야 서버도 같은 술어로 결판을 판정할 수 있다. 규칙대로
-          // 끝난 종료이므로 `operatorOverride`는 **실리지 않는다** — 키 부재가 곧
-          // "우회 아님"이라, 여기에 키가 생기면 감사 기록이 우회를 구분하지 못한다.
-          payload: {
-            penalties: { home: 2, away: 0, firstKickSideKey: 'HOME', takenHome: 2, takenAway: 2 },
-          },
-        }),
-        COMMAND_OPTIONS,
-      ),
-    );
-  });
-
-  // 현장에서는 규칙보다 먼저 승부차기가 끝난다 — 한 팀이 기권하거나 선수가 없어 더 못 차면
-  // 두 팀의 킥 수가 어긋난 채로 경기가 종료된다. 자동 판정만 믿으면 그 상태에서 종료가
-  // 영원히 잠겨, 운영자는 **차지도 않은 킥을 지어내야만** 경기를 닫을 수 있었다.
-  it('킥 수가 어긋나 자동 종료가 잠긴 상태에서도 "그래도 종료"로 end 커맨드가 실제 집계 그대로 나간다', async () => {
-    setup();
-    mocks.postV1GameCommand.mockResolvedValue({
-      gameId: 'game-1', state: 'ENDED', version: 3, revisionId: 'rev-1', revision: 1, revisionState: 'SUBMITTED',
-    });
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
-
-    fireEvent.click(screen.getByRole('button', { name: /승부차기 시작/ }));
-    const startDialog = await screen.findByRole('dialog');
-    fireEvent.click(within(startDialog).getByRole('button', { name: '승부차기 시작' }));
-
-    const panel = await screen.findByRole('dialog', { name: '승부차기' });
-    chooseFirstKicker(panel, '강남 풋살 클럽');
-    const successButton = within(panel).getByRole('button', { name: /성공/ });
-    const missButton = within(panel).getByRole('button', { name: /실패/ });
-
-    // 홈 2킥 2점 / 원정 1킥 0점 — 원정이 남은 4킥을 다 넣으면 역전 가능하므로 규칙상 미결.
-    // 아래 주석은 **점수가 아니라 킥 수와 점수**를 함께 적는다 — 이 테스트의 관심사가
-    // "몇 대 몇인가"가 아니라 "누가 몇 번 찼는가"이기 때문이다.
-    fireEvent.click(successButton); // 홈 1킥 1점
-    fireEvent.click(missButton); // 원정 1킥 0점
-    fireEvent.click(successButton); // 홈 2킥 2점 — 여기서 원정이 기권했다고 하자
-
-    expect(within(panel).getByRole('button', { name: '승부차기 종료' })).toBeDisabled();
-    fireEvent.click(within(panel).getByRole('button', { name: '그래도 종료' }));
-
-    // 확인 문구가 평소 종료와 달라야 한다 — 이건 "예상대로 끝났나" 확인이 아니라
-    // "자동 판정과 다른 결론을 낸다"는 선언이고, 킥 수까지 보여줘야 오조작을 알아챈다.
-    const finishDialog = await screen.findByRole('dialog', { name: '아직 안 끝난 승부차기예요' });
-    expect(finishDialog).toHaveTextContent('강남 풋살 클럽 2킥 2점');
-    expect(finishDialog).toHaveTextContent('성수 풋살 클럽 1킥 0점');
-    fireEvent.click(within(finishDialog).getByRole('button', { name: '그래도 종료' }));
-
-    await waitFor(() =>
-      expect(mocks.postV1GameCommand).toHaveBeenCalledWith(
-        'game-1',
-        'end',
-        expect.objectContaining({
-          // 우회 종료는 킥 수(2 vs 1)와 `operatorOverride: true`를 함께 싣는다 —
-          // 서버가 이 값을 `score.penalties`에 저장해 리비전에 영구히 남기므로,
-          // 나중에 "이 결과는 왜 규칙과 다른가"에 답할 수 있는 유일한 근거가 된다.
-          payload: {
-            penalties: {
-              home: 2,
-              away: 0,
-              firstKickSideKey: 'HOME',
-              takenHome: 2,
-              takenAway: 1,
-              operatorOverride: true,
-            },
-          },
-        }),
-        COMMAND_OPTIONS,
-      ),
-    );
-  });
-
-  it('두 팀 점수가 같으면 "승부차기 종료" 버튼이 비활성이다(무승부 승부차기는 백엔드도 거부)', async () => {
-    setup();
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
-
-    fireEvent.click(screen.getByRole('button', { name: /승부차기 시작/ }));
-    const startDialog = await screen.findByRole('dialog');
-    fireEvent.click(within(startDialog).getByRole('button', { name: '승부차기 시작' }));
-
-    const panel = await screen.findByRole('dialog', { name: '승부차기' });
-    expect(within(panel).getByRole('button', { name: '승부차기 종료' })).toBeDisabled();
-  });
-
-  /**
-   * 선축(먼저 차는 팀)을 고른다. 승부차기는 동전 던지기로 선축을 정하고 시작하므로,
-   * 패널은 이걸 고르기 전까지 성공/실패 버튼을 잠근다 — 즉 킥을 기록하는 모든 시나리오는
-   * 이 단계를 거쳐야 한다(실제 운영자도 그렇게 한다).
-   */
-  function chooseFirstKicker(panel: HTMLElement, teamName: string): void {
-    fireEvent.click(within(panel).getByLabelText(teamName));
-  }
-
-  /**
-   * "다음 순서" 배지가 붙은 팀 이름. 패널은 `nextPenaltyKicker`가 고른 사이드
-   * 카드에만 이 배지를 렌더하므로, 배지가 어느 팀에 있는지가 곧 킥 상태다.
-   */
-  function nextKickerName(panel: HTMLElement): string {
-    const badge = within(panel).getByText('다음 순서');
-    return (badge.parentElement?.textContent ?? '').replace('다음 순서', '').trim();
-  }
-
-  /**
-   * 되돌리기 검증의 증거는 **패널이 그리는 킥 상태 자체**여야 한다 — 킥 기록 배지,
-   * 사이드별 점수, "다음 순서" 배지의 이동.
-   *
-   * 이전 판은 증거로 "'승부차기 종료' 버튼이 다시 활성화된다"를 썼는데, 그 활성화는
-   * 되돌리기가 동작해서가 아니라 **결판 술어가 킥 수를 보지 않아서**(홈 1:0이면
-   * 원정이 0킥이어도 결판으로 읽힘) 켜지는 것이었다. 즉 그 단언은 사용자가 보고한
-   * 결함을 "정답"으로 박제하고 주석으로까지 명문화하고 있었다. 원래 의도인 "undo가
-   * 실제로 상태를 되감는다"는 아래 증거들이 더 직접적으로 지킨다.
-   */
-  it('킥을 잘못 입력했을 때 "방금 킥 되돌리기"로 킥 상태가 되감긴다', async () => {
-    setup();
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
-
-    fireEvent.click(screen.getByRole('button', { name: /승부차기 시작/ }));
-    const startDialog = await screen.findByRole('dialog');
-    fireEvent.click(within(startDialog).getByRole('button', { name: '승부차기 시작' }));
-
-    const panel = await screen.findByRole('dialog', { name: '승부차기' });
-    chooseFirstKicker(panel, '강남 풋살 클럽');
-    const undoButton = within(panel).getByRole('button', { name: '방금 킥 되돌리기' });
-    // 킥이 하나도 없으면 되돌리기 자체가 막힌다(되돌릴 대상이 없다).
-    expect(undoButton).toBeDisabled();
-
-    const awayKicks = within(panel).getByLabelText('성수 풋살 클럽 킥 기록');
-    expect(awayKicks).toHaveTextContent('아직 기록된 킥이 없어요');
-
-    const successButton = within(panel).getByRole('button', { name: /성공/ });
-    fireEvent.click(successButton); // 홈 성공 → 다음은 원정
-    expect(nextKickerName(panel)).toBe('성수 풋살 클럽');
-    fireEvent.click(successButton); // 원정 성공 → 다음은 다시 홈
-    expect(nextKickerName(panel)).toBe('강남 풋살 클럽');
-    expect(within(awayKicks).getByLabelText('1번째 킥 성공')).toBeInTheDocument();
-    expect(undoButton).not.toBeDisabled();
-
-    fireEvent.click(undoButton); // 원정 킥 되돌림
-
-    // 되돌린 킥이 기록에서 사라지고, 차례도 원정으로 되돌아간다.
-    expect(awayKicks).toHaveTextContent('아직 기록된 킥이 없어요');
-    expect(within(awayKicks).queryByLabelText('1번째 킥 성공')).toBeNull();
-    expect(nextKickerName(panel)).toBe('성수 풋살 클럽');
-    // 되돌릴 킥이 하나(홈)만 남았다가, 그것마저 되돌리면 다시 잠긴다.
-    expect(undoButton).not.toBeDisabled();
-    fireEvent.click(undoButton);
-    expect(undoButton).toBeDisabled();
-  });
-
-  /**
-   * 사용자 보고 결함의 코어. 홈이 첫 킥을 성공하면 점수는 1:0이 되고, 옛 술어
-   * (`isPenaltyShootoutDecisive(home, away) { return home !== away; }`)는 킥 수를
-   * 보지 않으므로 이를 "결판"으로 읽어 `disabled={!decisive}`가 풀렸다 — **원정이
-   * 한 번도 차기 전에** 승부차기를 종료할 수 있었다.
-   */
-  it('홈만 1킥 성공한 상태에서는 "승부차기 종료"가 비활성이다 — 원정이 아직 한 번도 차지 않았다', async () => {
-    setup();
-    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
-
-    fireEvent.click(screen.getByRole('button', { name: /승부차기 시작/ }));
-    const startDialog = await screen.findByRole('dialog');
-    fireEvent.click(within(startDialog).getByRole('button', { name: '승부차기 시작' }));
-
-    const panel = await screen.findByRole('dialog', { name: '승부차기' });
-
-    // 선축을 먼저 골라야 성공/실패 버튼이 열린다. 이걸 빼면 클릭이 무시돼(버튼 disabled)
-    // 킥이 한 개도 기록되지 않고, 테스트는 "0킥이라 종료 불가"만 확인하는 공테스트가 된다
-    // — 옛 술어(`home !== away`)를 되살려도 0:0이라 그대로 초록이었다.
-    chooseFirstKicker(panel, '강남 풋살 클럽');
-    fireEvent.click(within(panel).getByRole('button', { name: /성공/ }));
-
-    // 홈이 실제로 1점을 넣었는지부터 확인한다 — 이 단언이 있어야 아래 disabled가
-    // "1:0인데도 잠겨 있다"를 뜻한다(옛 술어라면 여기서 버튼이 열린다).
-    expect(within(within(panel).getByLabelText('강남 풋살 클럽 킥 기록')).getByLabelText('1번째 킥 성공')).toBeInTheDocument();
-    expect(within(panel).getByLabelText('성수 풋살 클럽 킥 기록')).toHaveTextContent('아직 기록된 킥이 없어요');
-    expect(within(panel).getByRole('button', { name: '승부차기 종료' })).toBeDisabled();
-    expect(panel).toHaveTextContent('성수 풋살 클럽이(가) 아직 한 번도 차지 않았어요.');
-  });
-
-  /* 종료 후 결과 표시 — 승부차기를 입력하고 종료하면 패널이 닫히고 헤더 스코어는
-     골 이벤트에서만 파생돼 "0 : 0"만 남았다. 방금 입력한 승부차기 결과가 이 화면
-     어디에도 없어서, 운영자는 자기가 기록한 값을 확인할 수단이 없었다(알파 실측:
-     서버에는 승부차기 2:0 이 저장돼 있었다). 승부차기는 골 이벤트가 아니므로
-     `liveEvents`로는 절대 복원되지 않는다 — 확정 결과 리비전에서 읽어야 한다. */
-  describe('종료된 경기의 승부차기 결과', () => {
-    function setupEnded(revisions: Array<Record<string, unknown>>, currentOfficialRevisionId: string | null = null) {
-      mocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'user-1' } } });
-      mocks.useV1FixtureLineup.mockReturnValue({
-        data: { gameId: 'game-1', lineups: [] },
-        isLoading: false, isError: false, error: null, refetch: vi.fn(),
-      });
-      mocks.useV1Game.mockReturnValue({
-        data: {
-          id: 'game-1',
-          sourceType: 'TOURNAMENT_FIXTURE',
-          isKnockoutFixture: true,
-          state: 'ENDED', version: 3, lastSequence: 2,
-          currentOfficialRevisionId,
-          periods: [FIRST_PERIOD, FINAL_PERIOD],
-          sides: PENALTY_SIDES,
-          lineups: [],
-        },
-        isLoading: false, isError: false, refetch: vi.fn(),
-      });
-      mocks.useV1GameOperationsConsole.mockReturnValue(
-        consoleState({
-          gameSnapshot: { version: 3, state: 'ENDED' },
-          liveEvents: [tiedGoal(1, 'side-home', 'e1'), tiedGoal(2, 'side-away', 'e2')],
-        }),
-      );
-      mocks.useV1GameResultRevisions.mockReturnValue({ data: revisions, isPending: false, isError: false });
-    }
-
-    it('경기 종료 후에도 확정된 승부차기 점수를 헤더에 남긴다', () => {
-      setupEnded([{ id: 'rev-1', revision: 1, state: 'DRAFT', score: { home: 1, away: 1, penalties: { home: 2, away: 0 } } }]);
-
-      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
-
-      expect(screen.getByText('승부차기 2:0')).toBeInTheDocument();
-      // 정규시간 스코어는 그대로 남는다 — 승부차기가 정규 점수를 덮어쓰면 안 된다.
-      expect(screen.getByText('1 : 1')).toBeInTheDocument();
-    });
-
-    it('정정으로 확정본이 바뀌면 최신 리비전이 아니라 확정된 리비전의 승부차기를 보여준다', () => {
-      // 목록은 revision 내림차순(서버 정렬)이다. 최신(rev-2)은 아직 확정 전 초안이고
-      // 확정본은 rev-1 — 여기서 최신을 그대로 쓰면 확정되지 않은 값을 결과로 보여준다.
-      setupEnded(
-        [
-          { id: 'rev-2', revision: 2, state: 'DRAFT', score: { home: 1, away: 1, penalties: { home: 5, away: 4 } } },
-          { id: 'rev-1', revision: 1, state: 'OFFICIAL', score: { home: 1, away: 1, penalties: { home: 2, away: 0 } } },
-        ],
-        'rev-1',
-      );
-
-      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
-
-      expect(screen.getByText('승부차기 2:0')).toBeInTheDocument();
-      expect(screen.queryByText('승부차기 5:4')).toBeNull();
-    });
-
-    it('결과 검수에서 점수를 정정해 확정하면 헤더는 이벤트가 아니라 확정본 점수를 보여준다', () => {
-      // 이벤트 로그는 1:1 그대로지만 "고치고 확인"으로 확정본이 3:0이 됐다.
-      setupEnded(
-        [
-          { id: 'rev-2', revision: 2, state: 'OFFICIAL', score: { home: 3, away: 0 } },
-          { id: 'rev-1', revision: 1, state: 'SUPERSEDED', score: { home: 1, away: 1 } },
-        ],
-        'rev-2',
-      );
-
-      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
-
-      expect(screen.getByText('3 : 0')).toBeInTheDocument();
-      expect(screen.queryByText('1 : 1')).toBeNull();
-    });
-
-    it('승부차기 없이 끝난 경기에는 승부차기 표기를 만들지 않는다', () => {
-      setupEnded([{ id: 'rev-1', revision: 1, state: 'DRAFT', score: { home: 2, away: 1 } }]);
-
-      render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
-
-      expect(screen.queryByText(/승부차기/)).toBeNull();
-    });
-  });
-});

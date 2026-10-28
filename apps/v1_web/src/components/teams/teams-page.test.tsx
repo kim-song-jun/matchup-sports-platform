@@ -126,6 +126,47 @@ describe('TeamListPageView', () => {
     expect(screen.queryByText(/내 주변\s+\d+/)).not.toBeInTheDocument();
   });
 
+  it('keeps the team create action in the summary row for tablet layouts', () => {
+    const base = getTeamListViewModel();
+    const { container, rerender } = render(<TeamListPageView model={base} />);
+
+    const expectCreateLink = () => {
+      const tabletCreateLink = container.querySelector('.tm-team-tablet-create');
+      expect(tabletCreateLink).toHaveAttribute('href', '/teams/new');
+      expect(tabletCreateLink).toHaveAccessibleName('팀 만들기');
+      expect(tabletCreateLink?.parentElement).toHaveClass('tm-team-summary-bar');
+    };
+    expectCreateLink();
+
+    rerender(<TeamListPageView model={{ ...base, listLoading: true, teams: [] }} />);
+    expectCreateLink();
+
+    rerender(<TeamListPageView model={{ ...base, listLoading: false, teams: [] }} />);
+    expectCreateLink();
+
+    const css = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8');
+    const tabletStart = css.indexOf('@media (min-width: 768px) and (max-width: 1023.98px)');
+    const tabletEnd = css.indexOf('.tm-section-row {', tabletStart);
+    const tabletRules = css.slice(tabletStart, tabletEnd);
+    const narrowStart = css.indexOf('@media (max-width: 360px) {', css.indexOf('.tm-team-summary-bar {'));
+    const narrowEnd = css.indexOf('.tm-match-list-footer,', narrowStart);
+    const narrowRules = css.slice(narrowStart, narrowEnd);
+    const narrowMetaRule = narrowRules.match(/\.tm-team-summary-meta\s*\{([^}]+)\}/)?.[1];
+    const summaryMetaRule = css.match(/\.tm-team-summary-meta\s*\{([^}]+)\}/)?.[1];
+    expect(css.match(/\.tm-team-tablet-create\s*\{([^}]+)\}/)?.[1]).toMatch(/display:\s*none/);
+    expect(summaryMetaRule).toMatch(/display:\s*flex/);
+    expect(summaryMetaRule).toMatch(/justify-content:\s*space-between/);
+    expect(summaryMetaRule).not.toMatch(/flex-direction:/);
+    expect(tabletRules).toMatch(/\.tm-team-mobile-create\s*\{\s*display:\s*none\s*!important/);
+    expect(tabletRules).toMatch(/\.tm-team-tablet-create\s*\{\s*display:\s*inline-flex/);
+    expect(tabletRules).toMatch(/\.tm-team-summary-meta\s*\{[^}]*flex-direction:\s*column/);
+    expect(tabletRules).toMatch(/\.tm-team-summary-meta\s*\{[^}]*justify-content:\s*flex-start/);
+    expect(narrowMetaRule).toMatch(/flex-direction:\s*column/);
+    expect(narrowMetaRule).toMatch(/align-items:\s*flex-start/);
+    expect(narrowMetaRule).toMatch(/justify-content:\s*flex-start/);
+    expect(narrowMetaRule).toMatch(/gap:\s*var\(--spacing-1\)/);
+  });
+
   function listOf(team: Partial<TeamListViewModel['teams'][number]>): TeamListViewModel {
     const base = getTeamListViewModel();
     return {

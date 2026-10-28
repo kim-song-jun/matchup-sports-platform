@@ -1,10 +1,12 @@
 import { spawnSync } from 'node:child_process';
-import { readdirSync } from 'node:fs';
+import { readdirSync, readFileSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, relative, resolve } from 'node:path';
 import { PrismaClient } from '@prisma/client';
 
 const apiRoot = resolve(__dirname, '../..');
 const jestBin = resolve(apiRoot, 'node_modules/jest/bin/jest.js');
+const integrationArgs = (JSON.parse(readFileSync(join(apiRoot, 'package.json'), 'utf8')).scripts['test:integration'] as string).trim().split(/\s+/).slice(1);
 const { recoveryContract } = require('../helpers/isolated-integration-environment.cjs') as {
   recoveryContract: {
     CLONE_PREFIX: string;
@@ -65,16 +67,37 @@ function runJestResolver(...args: string[]): string {
 }
 
 describe('v1_api Jest integration discovery contract', () => {
+  it('recycles the single integration worker between suites without dropping tests', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'teameet-jest-worker-contract-'));
+    try {
+      const receipt = join(directory, 'worker-pids');
+      for (const name of ['first', 'second']) {
+        writeFileSync(join(directory, `${name}.test.js`), `const fs = require('node:fs'); test('executes ${name}', () => fs.appendFileSync(${JSON.stringify(receipt)}, process.pid + '\\n'));`);
+      }
+      const config = { projects: [{ displayName: 'integration', rootDir: directory, testMatch: ['<rootDir>/*.test.js'], testEnvironment: 'node' }] };
+      // A tiny threshold proves real worker recycling without allocating a gigabyte in the test itself.
+      const args = integrationArgs.filter(arg => !arg.startsWith('--workerIdleMemoryLimit='));
+      const result = JSON.parse(runJestResolver(...args, '--workerIdleMemoryLimit=1MB', '--config', JSON.stringify(config), '--json')) as { numPassedTests: number; numFailedTests: number };
+      expect(result.numPassedTests).toBe(2);
+      expect(result.numFailedTests).toBe(0);
+      const pids = readFileSync(receipt, 'utf8').trim().split('\n');
+      expect(pids).toHaveLength(2);
+      expect(new Set(pids).size).toBe(2);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it('resolves every canonical suite through the isolated serial integration runner', () => {
     const shown = JSON.parse(
-      runJestResolver('--selectProjects', 'integration', '--runInBand', '--showConfig', '--json'),
+      runJestResolver(...integrationArgs, '--showConfig', '--json'),
     ) as {
       configs: Array<{
         displayName: { name: string };
         testEnvironment: string;
         testPathIgnorePatterns?: string[];
       }>;
-      globalConfig: { maxWorkers: number };
+      globalConfig: { maxWorkers: number; runInBand: boolean; workerIdleMemoryLimit: number };
     };
     const integration = shown.configs.find((project) => project.displayName.name === 'integration');
 
@@ -82,9 +105,11 @@ describe('v1_api Jest integration discovery contract', () => {
       resolve(apiRoot, 'test/helpers/isolated-integration-environment.cjs'),
     );
     expect(shown.globalConfig.maxWorkers).toBe(1);
+    expect(shown.globalConfig.runInBand).toBe(false);
+    expect(shown.globalConfig.workerIdleMemoryLimit).toBe(1024 * 1000 * 1000);
 
     const listed = JSON.parse(
-      runJestResolver('--selectProjects', 'integration', '--runInBand', '--listTests', '--json'),
+      runJestResolver(...integrationArgs, '--listTests', '--json'),
     ) as string[];
     /**
      * **목록을 적지 않는다 — 디스크와 config 로 만든다.**
@@ -163,7 +188,7 @@ describe('v1_api Jest integration discovery contract', () => {
    */
   it('keeps every integration ignore pattern pointing at a file that exists', () => {
     const shown = JSON.parse(
-      runJestResolver('--selectProjects', 'integration', '--runInBand', '--showConfig', '--json'),
+      runJestResolver(...integrationArgs, '--showConfig', '--json'),
     ) as { configs: Array<{ displayName: { name: string }; testPathIgnorePatterns?: string[] }> };
     const patterns =
       shown.configs.find((project) => project.displayName.name === 'integration')

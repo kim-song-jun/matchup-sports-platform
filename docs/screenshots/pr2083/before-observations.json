@@ -1,0 +1,47 @@
+{
+  "observations": [
+    {
+      "width": 390,
+      "allIds": [
+        "065eb107-32cd-5edf-a82d-310a446cdb14",
+        "3d7e1668-f5e1-59a1-baf4-041a56033a1d",
+        "777dcae1-4a74-5da0-adf5-1f2094973bb2",
+        "7d584224-8d15-5df8-96d0-8cfeb0936418",
+        "f67b45fa-3c01-5d8e-bff7-03b617066746"
+      ],
+      "selections": [],
+      "errors": [],
+      "horizontalOverflow": false,
+      "verdict": "PASS"
+    },
+    {
+      "width": 768,
+      "allIds": [
+        "065eb107-32cd-5edf-a82d-310a446cdb14",
+        "3d7e1668-f5e1-59a1-baf4-041a56033a1d",
+        "777dcae1-4a74-5da0-adf5-1f2094973bb2",
+        "7d584224-8d15-5df8-96d0-8cfeb0936418",
+        "f67b45fa-3c01-5d8e-bff7-03b617066746"
+      ],
+      "selections": [],
+      "errors": [],
+      "horizontalOverflow": false,
+      "verdict": "PASS"
+    },
+    {
+      "width": 1440,
+      "allIds": [
+        "065eb107-32cd-5edf-a82d-310a446cdb14",
+        "3d7e1668-f5e1-59a1-baf4-041a56033a1d",
+        "777dcae1-4a74-5da0-adf5-1f2094973bb2",
+        "7d584224-8d15-5df8-96d0-8cfeb0936418",
+        "f67b45fa-3c01-5d8e-bff7-03b617066746"
+      ],
+      "selections": [],
+      "errors": [],
+      "horizontalOverflow": false,
+      "verdict": "PASS"
+    }
+  ],
+  "cleanup": "owned headed browser closed"
+}

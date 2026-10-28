@@ -35,7 +35,7 @@ function makeGroup(
   overrides: Partial<V1TournamentGroup> & Pick<V1TournamentGroup, 'id' | 'phase'>,
 ): V1TournamentGroup {
   return {
-    name: overrides.phase,
+    name: ({ round16: '16강', round12: '12강', quarter: '8강', semi: '4강', final: '결승', third_place: '3·4위전' } as Record<string, string>)[overrides.phase] ?? overrides.phase,
     sortOrder: 0,
     advanceCount: null,
     groupTeams: [],
@@ -48,6 +48,14 @@ function makeGroup(
 /* ── Tests ── */
 
 describe('groupFixturesByRound', () => {
+  it('uses the configured group name without changing the phase key', () => {
+    const group = makeGroup({ id: 'semi-group', phase: 'semi', name: '준결승' });
+    const rounds = groupFixturesByRound([
+      makeFixture({ id: 'semi', fixtureNumber: 1, round: '3팀 첫 라운드', groupId: group.id }),
+      makeFixture({ id: 'final', fixtureNumber: 2, round: '결승', groupId: group.id }),
+    ], [group]);
+    expect(rounds.map(({ key, label }) => [key, label])).toEqual([['semi', '준결승'], ['final', '결승']]);
+  });
   it('returns an empty array when no fixtures are provided', () => {
     const result = groupFixturesByRound([], []);
     expect(result).toEqual([]);
@@ -169,9 +177,9 @@ describe('groupFixturesByRound', () => {
   });
 
   it('returns correct labels for known phases', () => {
-    const groupSemi = makeGroup({ id: 'g-semi', phase: 'semi' });
-    const groupFinal = makeGroup({ id: 'g-final', phase: 'final' });
-    const groupThird = makeGroup({ id: 'g-third', phase: 'third_place' });
+    const groupSemi = makeGroup({ id: 'g-semi', phase: 'semi', name: '4강' });
+    const groupFinal = makeGroup({ id: 'g-final', phase: 'final', name: '결승' });
+    const groupThird = makeGroup({ id: 'g-third', phase: 'third_place', name: '3·4위전' });
 
     const rounds = groupFixturesByRound(
       [

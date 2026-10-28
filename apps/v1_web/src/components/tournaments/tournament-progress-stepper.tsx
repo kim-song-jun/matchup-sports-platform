@@ -102,6 +102,7 @@ function StageWithConnector({
 
 import type { V1TournamentDetail, V1TournamentFixture } from '@/types/api';
 import { isLeagueCompetition } from '@/lib/competition-kind';
+import { groupFixturesByRound } from './tournament-bracket';
 import { compareTournamentRounds } from '@/lib/tournament-display-order';
 
 /**
@@ -133,21 +134,6 @@ function classifyRound(round: string | null | undefined): RoundKind {
   if (r === 'third_place' || (r.includes('3') && r.includes('위'))) return 'third_place';
   if (r === 'group' || r.startsWith('조별') || r.startsWith('league_r')) return 'group';
   return 'knockout';
-}
-
-/** 영문 키로 들어온 라운드는 화면에 그대로 쓸 수 없다 — 한국어 라벨로 바꾼다. */
-const ROUND_LABEL: Record<string, string> = {
-  group: '조별리그',
-  semi: '4강',
-  round64: '64강', round32: '32강',
-  round16: '16강',
-  round12: '12강',
-  quarter: '8강',
-  final: '결승',
-};
-
-function roundLabel(round: string): string {
-  return ROUND_LABEL[round.trim()] ?? round.trim();
 }
 
 /**
@@ -215,27 +201,18 @@ function isFinalRound(round: string): boolean {
  * 1차 기준으로 쓰고, 나머지는 참가 팀 수가 큰 라운드부터 세운다(12강 → 8강 → 4강).
  * fixtureNumber 는 알 수 없는 운영자 입력 라운드 또는 같은 규모의 라운드에만 쓴다.
  */
-function knockoutStageDrafts(fixtures: V1TournamentFixture[]): StageDraft[] {
-  const byRound = new Map<string, V1TournamentFixture[]>();
-  for (const fixture of fixtures) {
-    if (classifyRound(fixture.round) !== 'knockout') continue;
-    const list = byRound.get(fixture.round);
-    if (list === undefined) byRound.set(fixture.round, [fixture]);
-    else list.push(fixture);
-  }
-
-  return [...byRound.entries()]
-    .map(([round, list]) => ({ key: round, label: roundLabel(round), fixtures: list }))
-    .sort((a, b) => {
-      const finalRank = Number(isFinalRound(a.key)) - Number(isFinalRound(b.key));
-      if (finalRank !== 0) return finalRank;
-      const sizeRank = compareTournamentRounds(a.key, b.key);
-      if (sizeRank !== 0) return sizeRank;
-      return (
-        Math.min(...a.fixtures.map((f) => f.fixtureNumber)) -
-        Math.min(...b.fixtures.map((f) => f.fixtureNumber))
-      );
-    });
+function knockoutStageDrafts(fixtures: V1TournamentFixture[], groups: V1TournamentDetail['groups'] = []): StageDraft[] {
+  const groupById = new Map(groups.map((group) => [group.id, group]));
+  const knockoutFixtures = fixtures.filter((fixture) => {
+    const phase = fixture.groupId ? groupById.get(fixture.groupId)?.phase : undefined;
+    return phase !== 'group' && phase !== 'league' && classifyRound(fixture.round) === 'knockout';
+  });
+  return groupFixturesByRound(knockoutFixtures, groups)
+    .filter((round) => classifyRound(round.key) === 'knockout')
+    .map((round) => ({ key: round.key, label: round.label, fixtures: round.fixtures }))
+    .sort((a, b) => Number(isFinalRound(a.key)) - Number(isFinalRound(b.key))
+      || compareTournamentRounds(a.key, b.key)
+      || Math.min(...a.fixtures.map((fixture) => fixture.fixtureNumber)) - Math.min(...b.fixtures.map((fixture) => fixture.fixtureNumber)));
 }
 
 /**
@@ -283,7 +260,7 @@ export function buildTournamentStages(tournament: V1TournamentDetail): Tournamen
       fixtures: fixtures.filter((f) => classifyRound(f.round) === 'group'),
     });
   }
-  drafts.push(...knockoutStageDrafts(fixtures));
+  drafts.push(...knockoutStageDrafts(fixtures, tournament.groups));
 
   // 결승은 이 대회의 **목적지**다. 실제 결승 픽스처는 4강이 끝나야 생기는 경우가 많은데
   // (alpha 실측: 진행 중인 조별+토너먼트 대회의 라운드가 `['조별 리그','4강']` 뿐),

@@ -9,6 +9,11 @@ import {
   type TournamentPeriodPhase,
   type TournamentPeriodSettingsResponse,
 } from '@/hooks/use-tournament-period-settings';
+import {
+  switchPeriodCount,
+  TOURNAMENT_PERIOD_PHASES,
+  tournamentPeriodPhaseLabel,
+} from '@/app/admin/tournaments/new/tournament-create-model';
 
 interface TournamentPeriodSettingsEditorProps {
   tournamentId: string;
@@ -30,29 +35,6 @@ function hasValidDurations(durations: string[]) {
   return durations.every((duration) => /^\d+$/.test(duration.trim()) && Number(duration) >= 1);
 }
 
-function switchPeriodCount(durations: readonly string[], count: 1 | 2): string[] {
-  if (count === 1) return [durations.length === 1 ? durations[0] : String(durations.reduce((sum, value) => sum + (Number(value) || 0), 0))];
-  if (durations.length === 2) return [...durations];
-  const total = Number(durations[0]) || 0;
-  return [String(Math.ceil(total / 2)), String(Math.floor(total / 2))];
-}
-
-const PERIOD_PHASES: ReadonlyArray<{ value: TournamentPeriodPhase; label: string }> = [
-  { value: 'group', label: '조별리그' },
-  { value: 'round64', label: '64강' },
-  { value: 'round32', label: '32강' },
-  { value: 'round16', label: '16강' },
-  { value: 'round12', label: '12강' },
-  { value: 'quarter', label: '8강' },
-  { value: 'semi', label: '4강' },
-  { value: 'final', label: '결승' },
-  { value: 'third_place', label: '3·4위전' },
-];
-
-function phaseLabel(phase: TournamentPeriodPhase) {
-  return PERIOD_PHASES.find((option) => option.value === phase)?.label ?? phase;
-}
-
 export function TournamentPeriodSettingsEditor(props: TournamentPeriodSettingsEditorProps) {
   return <PeriodSettingsEditor key={props.tournamentId} {...props} />;
 }
@@ -71,11 +53,13 @@ function PeriodSettingsEditor({
   const [editingBasePeriods, setEditingBasePeriods] = useState<string | null>(null);
   const [stageEditingPhase, setStageEditingPhase] = useState<TournamentPeriodPhase | null>(null);
   const [stageDraft, setStageDraft] = useState<string[]>([]);
+  // 단계 편집을 시작할 때 본 그 단계 피리어드 — 버전 충돌이 나도 이 값이 그대로면 다른 설정이 행을 바꾼 것뿐이다.
+  const [stageBasePeriods, setStageBasePeriods] = useState<string | null>(null);
   const [newPhase, setNewPhase] = useState<TournamentPeriodPhase>('group');
   const hydratedSettingsKey = useRef<string | null>(null);
   const settingsDataKey = useMemo(() => JSON.stringify(settingsQuery.data ?? null), [settingsQuery.data]);
   const availableStagePhases = useMemo(
-    () => PERIOD_PHASES.filter((option) => !settingsQuery.data?.stageOverrides.some((override) => override.phase === option.value)),
+    () => TOURNAMENT_PERIOD_PHASES.filter((option) => !settingsQuery.data?.stageOverrides.some((override) => override.phase === option.value)),
     [settingsQuery.data?.stageOverrides],
   );
 
@@ -165,6 +149,7 @@ function PeriodSettingsEditor({
   const startStageEditing = (phase: TournamentPeriodPhase) => {
     const existing = settingsQuery.data?.stageOverrides.find((override) => override.phase === phase);
     setStageDraft(existing?.periods?.map((period) => String(period.durationMinutes)) ?? draftFromSettings(settingsQuery.data));
+    setStageBasePeriods(JSON.stringify(existing?.periods ?? null));
     setStageEditingPhase(phase);
   };
 
@@ -178,24 +163,42 @@ function PeriodSettingsEditor({
       showToast('각 피리어드 시간을 1분 이상 입력해 주세요.', 'error');
       return;
     }
-    updateSettings.mutate(
-      {
-        expectedVersion: settingsQuery.data.expectedVersion,
-        phase: stageEditingPhase,
-        inheritDefault,
-        ...(inheritDefault ? {} : { periods: stageDraft.map((duration) => ({ durationMinutes: Number(duration) })) }),
-      },
-      {
-        onSuccess: (saved) => {
-          const repointed = saved.fixturesRepointed ?? 0;
-          setStageEditingPhase(null);
-          showToast(inheritDefault
-            ? `${phaseLabel(stageEditingPhase)} 경기 시간을 기본값으로 되돌렸어요.${repointed > 0 ? ` 시작 전 경기 ${repointed}개에도 적용했어요.` : ''}`
-            : `${phaseLabel(stageEditingPhase)} 경기 시간을 저장했어요.${repointed > 0 ? ` 시작 전 경기 ${repointed}개에도 적용했어요.` : ''}`, 'success');
+    const phase = stageEditingPhase;
+    const label = tournamentPeriodPhaseLabel(phase);
+    const change = {
+      phase,
+      inheritDefault,
+      ...(inheritDefault ? {} : { periods: stageDraft.map((duration) => ({ durationMinutes: Number(duration) })) }),
+    };
+    const submit = (expectedVersion: string, retryOnUnrelatedChange: boolean) =>
+      updateSettings.mutate(
+        { expectedVersion, ...change },
+        {
+          onSuccess: (saved) => {
+            const repointed = saved.fixturesRepointed ?? 0;
+            setStageEditingPhase(null);
+            showToast(inheritDefault
+              ? `${label} 경기 시간을 기본값으로 되돌렸어요.${repointed > 0 ? ` 시작 전 경기 ${repointed}개에도 적용했어요.` : ''}`
+              : `${label} 경기 시간을 저장했어요.${repointed > 0 ? ` 시작 전 경기 ${repointed}개에도 적용했어요.` : ''}`, 'success');
+          },
+          onError: async (error) => {
+            if (extractErrorCode(error) === 'TOURNAMENT_VERSION_CONFLICT') {
+              // 기본값 저장과 같다 — 버전은 대회 행의 수정 시각이라 다른 설정만 바꿔도 낡는다. 다시 읽어 다음 저장이
+              // 새 버전을 쓰게 하고, 이 단계 값이 편집을 시작할 때와 같으면 한 번 더 보낸다.
+              const fresh = await settingsQuery.refetch();
+              const freshPeriods = fresh.data?.stageOverrides.find((override) => override.phase === phase)?.periods ?? null;
+              if (retryOnUnrelatedChange && fresh.data?.expectedVersion && JSON.stringify(freshPeriods) === stageBasePeriods) {
+                submit(fresh.data.expectedVersion, false);
+                return;
+              }
+              showToast(`다른 곳에서 ${label} 경기 시간이 먼저 바뀌었어요. 입력 중인 값은 유지했어요. 목록의 최신 값을 확인한 뒤 다시 저장해 주세요.`, 'error');
+              return;
+            }
+            showToast(extractErrorMessage(error, '단계별 경기 시간 저장에 실패했어요.'), 'error');
+          },
         },
-        onError: (error) => showToast(extractErrorMessage(error, '단계별 경기 시간 저장에 실패했어요.'), 'error'),
-      },
-    );
+      );
+    submit(settingsQuery.data.expectedVersion, true);
   };
 
   if (settingsQuery.isPending) {
@@ -276,7 +279,7 @@ function PeriodSettingsEditor({
                 <select id="new-period-phase" value={newPhase} onChange={(event) => setNewPhase(event.target.value as TournamentPeriodPhase)} className="h-[44px] rounded-lg border border-[var(--border)] bg-[var(--card-surface)] px-3 text-[length:var(--font-size-body-sm)] text-[var(--text-strong)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500">
                   {availableStagePhases.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
-                <button type="button" onClick={() => startStageEditing(newPhase)} disabled={settingsQuery.data.stageOverrides.length === PERIOD_PHASES.length} className="inline-flex h-[44px] items-center gap-1.5 rounded-lg px-3 text-[length:var(--font-size-body-sm)] font-medium text-blue-600 hover:bg-[var(--surface-soft)] disabled:opacity-50"><Plus size={14} aria-hidden="true" /> 단계 추가</button>
+                <button type="button" onClick={() => startStageEditing(newPhase)} disabled={settingsQuery.data.stageOverrides.length === TOURNAMENT_PERIOD_PHASES.length} className="inline-flex h-[44px] items-center gap-1.5 rounded-lg px-3 text-[length:var(--font-size-body-sm)] font-medium text-blue-600 hover:bg-[var(--surface-soft)] disabled:opacity-50"><Plus size={14} aria-hidden="true" /> 단계 추가</button>
               </div>
             )}
           </div>
@@ -285,7 +288,7 @@ function PeriodSettingsEditor({
             {settingsQuery.data.stageOverrides.map((override) => (
               <div key={override.phase} className="flex min-h-[52px] items-center justify-between gap-3 rounded-xl bg-[var(--surface-soft)] px-3 py-2">
                 <div>
-                  <p className="text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-strong)]">{phaseLabel(override.phase)}</p>
+                  <p className="text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-strong)]">{tournamentPeriodPhaseLabel(override.phase)}</p>
                   <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">{override.periods?.map((period) => `${period.durationMinutes}분`).join(' / ') ?? '시간 입력 필요'}</p>
                 </div>
                 {canWrite && <button type="button" onClick={() => startStageEditing(override.phase)} disabled={stageEditingPhase !== null || updateSettings.isPending} className="h-[44px] rounded-lg px-3 text-[length:var(--font-size-caption)] font-medium text-[var(--text-muted)] hover:bg-[var(--grey300)] disabled:opacity-50">수정</button>}
@@ -296,7 +299,7 @@ function PeriodSettingsEditor({
 
           {stageEditingPhase !== null && (
             <div className="mt-4 rounded-xl border border-[var(--border)] p-3">
-              <p className="text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-strong)]">{phaseLabel(stageEditingPhase)} 설정</p>
+              <p className="text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-strong)]">{tournamentPeriodPhaseLabel(stageEditingPhase)} 설정</p>
               <p className="mt-1 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">이 단계의 새 경기와 아직 시작하지 않은 경기에만 적용돼요.</p>
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
                 {stageDraft.map((duration, index) => (

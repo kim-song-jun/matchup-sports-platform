@@ -37,6 +37,8 @@ vi.mock('@/hooks/use-tournament-period-settings', () => ({
       periods: [{ code: 'FIRST_HALF', label: '전반', durationMinutes: 45, extraTime: false }],
       legacyPeriodCount: null,
       requiresDurationInput: false,
+      kind: 'regular_tournament',
+      stageOverrides: [],
     },
     isPending: false,
     isError: false,

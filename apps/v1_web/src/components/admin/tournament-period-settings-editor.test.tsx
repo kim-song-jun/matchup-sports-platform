@@ -222,6 +222,53 @@ describe('TournamentPeriodSettingsEditor', () => {
     );
   });
 
+  describe('stage save version conflict', () => {
+    const finalOverride = (minutes: number) => ({
+      phase: 'final' as const,
+      competitionConfigVersionId: 'config-final',
+      periods: [
+        { code: 'FIRST_HALF', label: '전반', durationMinutes: minutes, extraTime: false },
+        { code: 'SECOND_HALF', label: '후반', durationMinutes: minutes, extraTime: false },
+      ],
+      legacyPeriodCount: null,
+    });
+
+    function saveFinalAfterConflict(freshOverrideMinutes: number) {
+      const base = { ...state.settings, expectedVersion: 'version-stage-3', kind: 'regular_tournament' as const, stageOverrides: [finalOverride(10)] };
+      state.settings = base;
+      state.mutate.mockClear();
+      state.refetch.mockResolvedValue({ data: { ...base, expectedVersion: 'version-stage-4', stageOverrides: [finalOverride(freshOverrideMinutes)] } });
+      const showToast = vi.fn();
+      render(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={showToast} />);
+
+      fireEvent.click(screen.getAllByRole('button', { name: '수정' })[1]);
+      fireEvent.change(screen.getByLabelText('전반 (분)'), { target: { value: '12' } });
+      fireEvent.click(screen.getByRole('button', { name: '저장' }));
+      const [, callbacks] = state.mutate.mock.calls[0] as [unknown, { onError: (error: unknown) => Promise<void> }];
+      return { showToast, conflict: () => act(() => callbacks.onError({ response: { data: { code: 'TOURNAMENT_VERSION_CONFLICT' } } })) };
+    }
+
+    it('retries once with the fresh version when only other settings changed', async () => {
+      const { showToast, conflict } = saveFinalAfterConflict(10);
+      await conflict();
+
+      expect(state.mutate).toHaveBeenCalledTimes(2);
+      expect(state.mutate.mock.calls[1][0]).toEqual({
+        expectedVersion: 'version-stage-4', phase: 'final', inheritDefault: false,
+        periods: [{ durationMinutes: 12 }, { durationMinutes: 10 }],
+      });
+      expect(showToast).not.toHaveBeenCalled();
+    });
+
+    it('does not overwrite when the same stage changed elsewhere', async () => {
+      const { showToast, conflict } = saveFinalAfterConflict(15);
+      await conflict();
+
+      expect(state.mutate).toHaveBeenCalledTimes(1);
+      expect(showToast).toHaveBeenCalledWith(expect.stringContaining('결승 경기 시간이 먼저 바뀌었어요'), 'error');
+    });
+  });
+
   it('keeps legacy count explicit until every duration is entered', () => {
     state.settings = {
       ...state.settings,

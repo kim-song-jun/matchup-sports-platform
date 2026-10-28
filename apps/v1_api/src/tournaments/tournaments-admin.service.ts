@@ -702,6 +702,11 @@ export class TournamentsAdminService {
           message: '대회 정보가 다른 곳에서 이미 수정됐어요. 새로고침 후 다시 시도해 주세요.',
         });
       }
+      // 단계별 경기 시간은 이전 종목의 규칙 버전을 가리키므로 종목과 함께 지운다. 종목은 대진이 없을 때만
+      // 바뀌어 옮길 경기도 없다 — 단계 설정은 새 종목 기본값 위에서 다시 정한다.
+      const stagePeriodOverridesCleared = sportChanged
+        ? (await tx.v1TournamentStagePeriodSetting.deleteMany({ where: { tournamentId } })).count
+        : 0;
       await this.adminContext.logAdminAction(
         admin,
         {
@@ -722,6 +727,7 @@ export class TournamentsAdminService {
             ...(sportChanged && {
               sportId: dto.sportId,
               competitionConfigVersionId: sportChangeConfigVersionId,
+              stagePeriodOverridesCleared,
             }),
           },
         },

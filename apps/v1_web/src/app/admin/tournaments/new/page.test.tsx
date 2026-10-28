@@ -572,6 +572,36 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
     expect(savePeriodsMutateAsync).toHaveBeenCalledTimes(2);
   });
 
+  it('경기 시간: 기본 시간 저장 뒤 단계 저장이 실패하면 재시도는 올라간 버전으로 보낸다', async () => {
+    const createdVersion = '2026-08-01T00:00:00.000Z';
+    const periodsVersion = '2026-08-01T00:02:00.000Z';
+    createMutate.mockImplementationOnce(
+      (payload: Partial<V1CreateTournamentPayload>, opts: { onSuccess: (t: V1Tournament) => void }) =>
+        opts.onSuccess(fakeDraftResponseForPayload(payload, { updatedAt: createdVersion })),
+    );
+    savePeriodsMutateAsync
+      .mockResolvedValueOnce({ expectedVersion: periodsVersion })
+      .mockRejectedValueOnce(new Error('결승 경기 시간 저장 실패'));
+    renderPage();
+    goToParticipationStep();
+    fireEvent.change(screen.getByLabelText('전반 시간(분)'), { target: { value: '15' } });
+    fireEvent.change(screen.getByLabelText('경기 시간 재정의를 추가할 단계'), { target: { value: 'final' } });
+    fireEvent.click(screen.getByRole('button', { name: '단계 추가' }));
+    fireEvent.click(screen.getByRole('button', { name: /다음/ }));
+    fireEvent.click(screen.getByRole('button', { name: '대회 만들기' }));
+
+    expect(await screen.findByText('결승 경기 시간 저장 실패')).toBeInTheDocument();
+    expect(savePeriodsMutateAsync).toHaveBeenLastCalledWith(expect.objectContaining({ expectedVersion: periodsVersion, phase: 'final' }));
+    expect(screen.getByRole('button', { name: /공개 확인/ })).toBeDisabled();
+
+    updateMutate.mockImplementationOnce(() => undefined);
+    fireEvent.click(screen.getByRole('button', { name: /이전/ }));
+    fireEvent.click(screen.getByRole('button', { name: /다음/ }));
+    fireEvent.click(screen.getByRole('button', { name: '저장하고 계속하기' }));
+
+    expect(updateMutate).toHaveBeenCalledWith(expect.objectContaining({ expectedVersion: periodsVersion }), expect.any(Object));
+  });
+
   it('경기 시간: 1~240분 정수가 아니면 다음 단계로 못 넘어간다', () => {
     renderPage();
     goToParticipationStep();

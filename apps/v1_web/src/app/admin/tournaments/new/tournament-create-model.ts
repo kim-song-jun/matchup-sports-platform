@@ -1,4 +1,5 @@
 import { placeFromVenueFields, toVenuePayload, type PlaceValue } from '@/lib/place';
+import type { TournamentPeriodPhase } from '@/hooks/use-tournament-period-settings';
 import type {
   V1CreateTournamentPayload,
   V1Tournament,
@@ -37,9 +38,18 @@ export const TOURNAMENT_CREATE_STEPS = [
 export const LAST_INPUT_STEP_INDEX = TOURNAMENT_CREATE_STEPS.length - 2;
 export const CONFIRM_STEP_INDEX = TOURNAMENT_CREATE_STEPS.length - 1;
 
-export type TournamentPeriodPhase =
-  | 'group' | 'round64' | 'round32' | 'round16' | 'round12'
-  | 'quarter' | 'semi' | 'final' | 'third_place';
+/** 단계별 경기 시간을 정할 수 있는 대회 단계. 생성 마법사와 대회 정보의 피리어드 편집기가 같이 쓴다. */
+export const TOURNAMENT_PERIOD_PHASES: ReadonlyArray<{ value: TournamentPeriodPhase; label: string }> = [
+  { value: 'group', label: '조별리그' }, { value: 'round64', label: '64강' },
+  { value: 'round32', label: '32강' }, { value: 'round16', label: '16강' },
+  { value: 'round12', label: '12강' }, { value: 'quarter', label: '8강' },
+  { value: 'semi', label: '4강' }, { value: 'final', label: '결승' },
+  { value: 'third_place', label: '3·4위전' },
+];
+
+export function tournamentPeriodPhaseLabel(phase: TournamentPeriodPhase) {
+  return TOURNAMENT_PERIOD_PHASES.find((option) => option.value === phase)?.label ?? phase;
+}
 
 export type TournamentCreateState = {
   step: number;
@@ -216,6 +226,8 @@ export type TournamentCreateAction =
   | { type: 'prefill-stage-period-minutes'; value: Partial<Record<TournamentPeriodPhase, string[]>> }
   /** 피리어드 설정 저장 성공 — 다음 PATCH 의 expectedVersion 을 새 updatedAt 으로 맞춘다. */
   | { type: 'periods-saved'; updatedAt: string }
+  /** 경기 시간 저장이 일부만 성공했을 때 — 다음 저장의 expectedVersion 만 맞추고 고친 표시는 남겨 다시 보낸다. */
+  | { type: 'draft-version-synced'; updatedAt: string }
   | { type: 'draft-saved'; tournament: V1Tournament }
   /** 초안 생성/수정 성공 직후 — draftId를 고정하고 확인 단계로 넘어간다. */
   | { type: 'draft-created'; tournament: V1Tournament }
@@ -297,6 +309,8 @@ export function tournamentCreateReducer(
       return { ...state, stagePeriodMinutes: action.value };
     case 'periods-saved':
       return { ...state, draftUpdatedAt: action.updatedAt, periodMinutesDirty: false, stagePeriodMinutesDirty: false };
+    case 'draft-version-synced':
+      return { ...state, draftUpdatedAt: action.updatedAt };
     case 'copy-bank':
       return {
         ...state,

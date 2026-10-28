@@ -113,6 +113,7 @@ describe('TournamentsAdminService', () => {
     v1CompetitionConfigVersion: { findFirst: jest.Mock; findUnique: jest.Mock };
     v1TournamentMatchDetails: { count: jest.Mock; findFirst: jest.Mock };
     v1TournamentGroup: { count: jest.Mock };
+    v1TournamentStagePeriodSetting: { deleteMany: jest.Mock };
     $executeRaw: jest.Mock;
     $queryRaw: jest.Mock;
     v1TournamentStanding: { count: jest.Mock };
@@ -142,6 +143,7 @@ describe('TournamentsAdminService', () => {
       v1CompetitionConfigVersion: { findFirst: jest.fn(), findUnique: jest.fn() },
       v1TournamentMatchDetails: { count: jest.fn().mockResolvedValue(0), findFirst: jest.fn().mockResolvedValue(null) },
       v1TournamentGroup: { count: jest.fn().mockResolvedValue(0) },
+      v1TournamentStagePeriodSetting: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
       $executeRaw: jest.fn().mockResolvedValue(1),
       $queryRaw: jest.fn().mockResolvedValue([{ id: 'tournament-1' }]),
       v1TournamentRegistration: { findMany: jest.fn().mockResolvedValue([]) },
@@ -1106,6 +1108,26 @@ describe('TournamentsAdminService', () => {
           afterJson: expect.objectContaining({ sportId: 'sport-2', competitionConfigVersionId: 'football-default-version' }),
         }),
       });
+    });
+
+    it('clears stage period overrides because they stay pinned to the previous sport config', async () => {
+      arrange({ sportId: 'sport-1', competitionConfigVersionId: 'futsal-default-version' });
+      prisma.v1TournamentStagePeriodSetting.deleteMany.mockResolvedValue({ count: 2 });
+
+      await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, sportId: 'sport-2' });
+
+      expect(prisma.v1TournamentStagePeriodSetting.deleteMany).toHaveBeenCalledWith({ where: { tournamentId: 'tournament-1' } });
+      expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ afterJson: expect.objectContaining({ stagePeriodOverridesCleared: 2 }) }),
+      });
+    });
+
+    it('keeps stage period overrides when the sport stays the same', async () => {
+      arrange({ sportId: 'sport-1', competitionConfigVersionId: 'futsal-default-version' });
+
+      await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, sportId: 'sport-1', title: '새 이름' });
+
+      expect(prisma.v1TournamentStagePeriodSetting.deleteMany).not.toHaveBeenCalled();
     });
 
     it('a CAS conflict leaves nothing to commit: the single updateMany carries both columns and no audit log is written', async () => {

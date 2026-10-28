@@ -109,6 +109,8 @@ function makeWorld(teamCount = 4) {
       findUnique: jest.fn().mockResolvedValue(null),
     },
     v1TournamentMatchDetails: { create: jest.fn(async ({ data }: never) => data) },
+    // 단계별 경기 시간 재정의 — 시드 대회에는 없으므로 기본 설정을 쓴다.
+    v1TournamentStagePeriodSetting: { findUnique: jest.fn(async () => null) },
     v1IdempotencyRecord: { findFirst: jest.fn().mockResolvedValue(null), create: jest.fn() },
     v1TeamSchedule: { count: jest.fn().mockResolvedValue(0), create: jest.fn() },
     $executeRaw: jest.fn(),

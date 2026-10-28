@@ -52,12 +52,13 @@ import {
   isShortLeadTime,
   periodLabels,
   switchPeriodCount,
+  TOURNAMENT_PERIOD_PHASES,
+  tournamentPeriodPhaseLabel,
   validateTournamentCreateStep,
   type TournamentCreateAction,
   type TournamentCreateState,
-  type TournamentPeriodPhase,
 } from './tournament-create-model';
-import { useSaveTournamentPeriodSettings, useTournamentPeriodSettings } from '@/hooks/use-tournament-period-settings';
+import { useSaveTournamentPeriodSettings, useTournamentPeriodSettings, type TournamentPeriodPhase } from '@/hooks/use-tournament-period-settings';
 import { CompetitionTemplateCard } from '@/shared/ui/competition-template-card';
 
 function scrollBehavior(): ScrollBehavior {
@@ -68,18 +69,6 @@ const inputClass =
   'h-[44px] w-full rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-strong)] placeholder:text-[var(--text-caption)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50';
 const textareaClass =
   'w-full resize-none rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 py-3 text-sm text-[var(--text-strong)] placeholder:text-[var(--text-caption)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50';
-
-const TOURNAMENT_PERIOD_PHASES: ReadonlyArray<{ value: TournamentPeriodPhase; label: string }> = [
-  { value: 'group', label: '조별리그' }, { value: 'round64', label: '64강' },
-  { value: 'round32', label: '32강' }, { value: 'round16', label: '16강' },
-  { value: 'round12', label: '12강' }, { value: 'quarter', label: '8강' },
-  { value: 'semi', label: '4강' }, { value: 'final', label: '결승' },
-  { value: 'third_place', label: '3·4위전' },
-];
-
-function tournamentPeriodPhaseLabel(phase: TournamentPeriodPhase) {
-  return TOURNAMENT_PERIOD_PHASES.find((option) => option.value === phase)?.label ?? phase;
-}
 
 export default function AdminTournamentsNewPage() {
   const router = useRouter();
@@ -322,8 +311,8 @@ export default function AdminTournamentsNewPage() {
         }
         return;
       }
+      let expectedVersion = tournament.updatedAt;
       try {
-        let expectedVersion = tournament.updatedAt;
         if (state.periodMinutesDirty) {
           const saved = await savePeriods.mutateAsync({
             tournamentId: tournament.id,
@@ -366,6 +355,9 @@ export default function AdminTournamentsNewPage() {
           dispatch({ type: 'draft-created', tournament: updatedTournament });
         }
       } catch (error) {
+        // 앞선 저장이 성공했으면 대회 버전이 이미 올라갔다. 그 버전으로 맞춰 둬야 "저장하고 계속하기" 재시도가
+        // 버전 충돌로 막히지 않는다. 이미 저장된 값은 서버가 그대로 넘기므로(changed: false) 다시 보내도 된다.
+        if (expectedVersion !== tournament.updatedAt) dispatch({ type: 'draft-version-synced', updatedAt: expectedVersion });
         showToast(extractErrorMessage(error, '대회는 초안으로 저장했지만 경기 시간을 저장하지 못했어요. 저장하고 계속하기로 다시 시도해 주세요.'), 'error');
       }
     };
@@ -1195,7 +1187,7 @@ function ParticipationStep({
                   </div>
                   <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label={`${tournamentPeriodPhaseLabel(phase)} 경기 방식`}>
                     {([{ count: 2, label: '전·후반' }, { count: 1, label: '단판' }] as const).map((option) => (
-                      <button key={option.count} type="button" disabled={pending} aria-pressed={values.length === option.count} onClick={() => dispatch({ type: 'set-stage-period-minutes', phase, value: switchPeriodCount(values.length ? values : state.periodMinutes, option.count) })} className={`min-h-[44px] rounded-xl border px-3 text-[length:var(--font-size-body-sm)] font-semibold ${values.length === option.count ? 'border-blue-500 bg-blue-500 text-white' : 'border-[var(--border)] bg-[var(--card-surface)] text-[var(--text-body)]'}`}>{option.label}</button>
+                      <button key={option.count} type="button" disabled={pending} aria-pressed={values.length === option.count} onClick={() => { if (values.length !== option.count) dispatch({ type: 'set-stage-period-minutes', phase, value: switchPeriodCount(values.length ? values : state.periodMinutes, option.count) }); }} className={`min-h-[44px] rounded-xl border px-3 text-[length:var(--font-size-body-sm)] font-semibold ${values.length === option.count ? 'border-blue-500 bg-blue-500 text-white' : 'border-[var(--border)] bg-[var(--card-surface)] text-[var(--text-body)]'}`}>{option.label}</button>
                     ))}
                   </div>
                   <div className="mt-2 grid gap-2 sm:grid-cols-2">

@@ -194,3 +194,15 @@ Owned: 위 v1 관련 파일과 이 task. Forbidden: legacy, env 파일, main 승
 - 사용자 PR 생성 요청. origin/dev aff3e49cb까지 안전 FF(변경 경로 겹침0).
 - 기존 검증 이후 기능 소스 변경 없음. API212/Web116/DB4 및 양쪽 타입·패턴·schema drift0 기록 유지.
 - 이번 커밋은 아래 구현 범위만 포함하며, PR base는 dev. alpha3폭 갤러리는 저장소 절차에 따라 머지/배포 후 추가한다.
+
+
+## PR #2076 Monitoring — 2026-10-28
+- PR: https://github.com/kim-song-jun/matchup-sports-platform/pull/2076, base dev, initial head8c18ba2de.
+- CI run40616474485 Gates FAIL: Task168 final schema binding pins were not synchronized with additive six-team fields.
+  Runtime image pin, source binder, manifest writer and historical manifest allowlist must bind the current schema; previous approved hashes and M11 stay intact.
+- Copilot run40616477767 failed before producing a review: `Model "claude-opus-5" is not available` during session.create.
+  This is an external review blocker, not a clean review. No model/account/plan changes and no immediate retry for that failed session.
+
+- 추가 Web CI 실패3건: info-section의 sixTeamMode를 변경 유무와 무관하게 전송해 기존 부분수정 계약을 깨뜨림.
+  실제로 바뀐 경우에만 payload에 포함하도록 수정. 기존 회귀22 + 신규6강2 = 24 PASS.
+- Task168 스키마 바인딩 실제 게이트9 PASS: 현행 hash 반영, 이전 manifest hash 및 변조 거절 유지. shell syntax/diff-check PASS.

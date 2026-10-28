@@ -294,7 +294,8 @@ export function TournamentInfoSection() {
     // 1 이상이 돼 깨진다.
     const payload: Omit<V1UpdateTournamentPayload, 'expectedVersion'> = {};
     if (normalizedTitle !== tournament.title) payload.title = normalizedTitle;
-    payload.sixTeamMode = editSixTeamMode && editFormat === 'knockout' && Number(editTeamCount) === 6;
+    const nextSixTeamMode = editSixTeamMode && editFormat === 'knockout' && Number(editTeamCount) === 6;
+    if (nextSixTeamMode !== (tournament.sixTeamMode ?? false)) payload.sixTeamMode = nextSixTeamMode;
     if (editFormat !== tournament.format) payload.format = editFormat;
     if (editSportId && editSportId !== tournament.sportId) payload.sportId = editSportId;
     if (editScheduledAt !== isoToKstDatetimeLocal(tournament.scheduledAt)) {

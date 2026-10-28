@@ -4653,11 +4653,6 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   text-decoration: none;
 }
 
-.tm-team-tablet-create:focus-visible {
-  outline: 2px solid var(--blue500);
-  outline-offset: 2px;
-}
-
 /* Tablet list CTA sits beside scope and count. display:none also removes inactive
    variants from keyboard focus, so each viewport has exactly one create action. */
 @media (min-width: 768px) and (max-width: 1023.98px) {

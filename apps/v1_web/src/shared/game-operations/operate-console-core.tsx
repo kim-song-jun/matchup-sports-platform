@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
-import { useQueryClient, type RefetchOptions } from '@tanstack/react-query';
+import type { QueryClient, RefetchOptions } from '@tanstack/react-query';
 import {
   WifiOff,
   Wifi,
@@ -21,12 +21,10 @@ import {
 import { ActionSheet, type ActionSheetAction } from '@/components/v1-ui/action-sheet';
 import { Button } from '@/components/v1-ui/button';
 import { ErrorState } from '@/components/v1-ui/primitives';
-import { useConfirm } from '@/components/v1-ui/confirm-modal';
-import { useV1AuthMe, useV1GameResultRevisions } from '@/hooks/use-v1-api';
-import { postV1GameCommand } from '@/hooks/use-v1-game-operations';
+import type { ConfirmOptions } from '@/components/v1-ui/confirm-modal';
 import { readGameResultScore } from '@/lib/game-result-score';
-import { gameOperationsErrorMessage, useV1GameOperationsConsole } from '@/hooks/use-v1-game-operations-console';
-import { hasPendingWork, isTakeoverHeld } from '@/lib/game-operations-queue';
+
+import { hasPendingWork, isTakeoverHeld, type GameOperationsQueueState, type GameSyncState, type TakeoverState } from '@/lib/game-operations-queue';
 import {
   freezeCapture,
   isClockSuspicious,
@@ -80,12 +78,15 @@ import type {
   GameEventType,
   GameLineup,
   GameLineupParticipant,
+  GameMutationResult,
+  GameRevisionMutationResult,
   GameSide,
   GameSideKey,
   GameState,
   TeamMatchGameOperationsContext,
 } from '@/types/game-operations';
 import type { MatchOutcomeReason } from '@/lib/match-outcome';
+import type { V1GameResultRevision } from '@/types/api';
 
 export type GameDetailQueryState = {
   readonly data: GameDetail | undefined;
@@ -95,6 +96,50 @@ export type GameDetailQueryState = {
   readonly status: 'pending' | 'error' | 'success';
   readonly refetch: (options?: RefetchOptions) => Promise<unknown>;
 };
+
+type OperateConsoleSubmitEventInput = {
+  type: GameEventType;
+  sideId?: string;
+  participantId?: string;
+  assistParticipantId?: string | null;
+  period: number;
+  clockMs: number;
+  occurredAt: string;
+  payload: Record<string, unknown>;
+};
+
+export interface OperateConsoleRuntime {
+  readonly authUserId: string | undefined;
+  readonly resultRevisions: readonly V1GameResultRevision[] | undefined;
+  readonly queryClient: Pick<QueryClient, 'getQueryData' | 'setQueryData'>;
+  readonly confirm: (options: ConfirmOptions) => Promise<boolean>;
+  readonly confirmModal: ReactNode;
+  readonly postGameCommand: (
+    gameId: string,
+    command: GameCommandName,
+    body: GameCommandRequest,
+    options: { signal?: AbortSignal },
+  ) => Promise<GameMutationResult | GameRevisionMutationResult>;
+  readonly gameOperationsErrorMessage: (code: string) => string;
+  readonly isRetryableGameOperationsErrorCode: (code: string, reason?: string | null) => boolean;
+  readonly operations: {
+    readonly canOperate: boolean;
+    readonly connectionStatus: 'connecting' | 'connected' | 'disconnected';
+    readonly sync: GameSyncState;
+    readonly takeover: TakeoverState;
+    readonly queue: GameOperationsQueueState;
+    readonly clockOffsetMs: number;
+    readonly liveEvents: readonly GameEventRecord[];
+    readonly gameSnapshot: { readonly version: number; readonly state: GameState } | null;
+    readonly bannerMessage: string | null;
+    submitEvent(input: OperateConsoleSubmitEventInput): Promise<string | null>;
+    retryFailedEvent(clientEventId: string): void;
+    requestTakeover(options?: { readonly force?: boolean }): void;
+    reverseEvent(input: { eventId: string; reason: string }): Promise<void>;
+    assignAssist(input: { eventId: string; assistParticipantId: string | null }): Promise<void>;
+    applyCommandResult(result: { state: GameState; version: number }): boolean;
+  };
+}
 
 type LineupQueryState = {
   readonly data: readonly GameLineup[] | undefined;
@@ -106,6 +151,7 @@ type LineupQueryState = {
 
 export interface OperateConsoleCoreProps {
   readonly gameId: string | null;
+  readonly runtime: OperateConsoleRuntime;
   readonly gameDetail: GameDetailQueryState;
   readonly lineupsQuery: LineupQueryState;
   /** Ordinary team-match host only: re-read the public operations roster after start changes its visibility. */
@@ -275,6 +321,7 @@ const ACTION_BUTTONS: ReadonlyArray<{
 
 export function OperateConsoleCore({
   gameId,
+  runtime,
   gameDetail,
   lineupsQuery,
   refreshLineupsAfterStart,
@@ -293,22 +340,17 @@ export function OperateConsoleCore({
   renderKickoffChecklist,
   renderPenaltyShootoutPanel,
 }: OperateConsoleCoreProps) {
-  const queryClient = useQueryClient();
-  const authMe = useV1AuthMe();
-  const myUserId = authMe.data?.user.id;
-
-  const ops = useV1GameOperationsConsole({
-    gameId,
-    initialLastSequence: gameDetail.data?.lastSequence ?? 0,
-    takeoverEnabled,
-    gameDetailGameId: gameDetail.data?.id ?? null,
-    gameDetailStatus: gameDetail.status,
-    realtimeAuthorization: gameDetail.data?.realtimeAuthorization ?? null,
-    operationMode: leaseRequired ? 'tournament-leased' : 'ordinary-host',
-    gameSourceType: gameDetail.data?.sourceType ?? null,
-    gameActorRole: gameDetail.data?.actorRole ?? null,
-    teamMatchContext: hostContext,
-  });
+  const {
+    operations: ops,
+    queryClient,
+    authUserId: myUserId,
+    resultRevisions,
+    confirm,
+    confirmModal,
+    postGameCommand,
+    gameOperationsErrorMessage,
+    isRetryableGameOperationsErrorCode,
+  } = runtime;
   const canOperate = !leaseRequired
     ? ops.canOperate
     : takeoverEnabled && ops.canOperate && isTakeoverHeld(ops.takeover);
@@ -355,7 +397,7 @@ export function OperateConsoleCore({
   // 다 찍을 때까지 수 분이 걸릴 수도 있다. 그사이 다른 이벤트가 커밋되면
   // (`use-v1-game-operations-console`의 WS ack가 gameSnapshot.version을
   // 올린다) 모달을 연 렌더의 클로저가 들고 있던 `gameVersion`은 이미 낡은
-  // 값이고, 그대로 보내면 서버가 CAS에서 409를 던진다(postV1GameCommand는
+  // 값이고, 그대로 보내면 서버가 CAS에서 409를 던진다(command transport는
   // 재시도하지 않는다). ref로 "보내는 순간의" 최신 버전을 읽는다 —
   // 아래 handleRunCommandRef가 토스트 콜백에 쓰는 것과 같은 패턴이다.
   const gameVersionRef = useRef(gameVersion);
@@ -761,11 +803,10 @@ export function OperateConsoleCore({
    * 경기가 끝난 뒤에만 조회한다(그 전에는 결과 리비전 자체가 없다). 조회 권한은
    * 이 콘솔을 여는 것과 같은 `read` 권한이라 필드 담당자도 그대로 통과한다. */
   const gameEnded = gameState === 'ENDED';
-  const resultRevisions = useV1GameResultRevisions(gameId, { enabled: gameEnded });
 
   const confirmedResultScore = useMemo(() => {
     if (!gameEnded) return null;
-    const revisions = resultRevisions.data ?? [];
+    const revisions = resultRevisions ?? [];
     if (revisions.length === 0) return null;
     // 확정본이 있으면 그걸 따른다 — 정정으로 점수가 바뀐 경기에서 "가장 최신 리비전"은
     // 아직 확정 전 초안일 수 있고, 그 초안을 결과로 보여주면 화면이 공식 결과와
@@ -781,7 +822,7 @@ export function OperateConsoleCore({
     const officialId = gameDetail.data?.currentOfficialRevisionId ?? null;
     const chosen = officialId ? revisions.find((revision) => revision.id === officialId) : revisions[0];
     return readGameResultScore(chosen?.score);
-  }, [gameEnded, resultRevisions.data, gameDetail.data?.currentOfficialRevisionId]);
+  }, [gameEnded, resultRevisions, gameDetail.data?.currentOfficialRevisionId]);
   const confirmedPenalties = confirmedResultScore?.penalties ?? null;
 
   /* 헤더 스코어. 경기 중에는 이벤트 파생값이지만, 종료 후 결과 검수에서 "고치고 확인"으로
@@ -808,9 +849,9 @@ export function OperateConsoleCore({
     if (!gameEnded) return false;
     const officialId = gameDetail.data?.currentOfficialRevisionId ?? null;
     if (officialId === null) return false;
-    const revisions = resultRevisions.data ?? [];
+    const revisions = resultRevisions ?? [];
     return revisions.some((revision) => revision.id === officialId && revision.state === 'OFFICIAL');
-  }, [gameEnded, gameDetail.data?.currentOfficialRevisionId, resultRevisions.data]);
+  }, [gameEnded, gameDetail.data?.currentOfficialRevisionId, resultRevisions]);
 
   /* 확정된 승부차기의 선축 사이드. 저장값은 `sideKey`(`'HOME'|'AWAY'`)이므로 여기서
      사이드 목록과 맞춰 실제 팀으로 되돌린다. 선축이 없던 시절에 저장된 경기(그리고 중첩
@@ -872,7 +913,6 @@ export function OperateConsoleCore({
   const penaltyEarlyStop = gameDetail.data?.penaltyShootoutPolicy?.earlyStop ?? true;
   const penaltyPolicy = useMemo(() => ({ earlyStop: penaltyEarlyStop }), [penaltyEarlyStop]);
 
-  const { confirm, ConfirmModal: confirmModal } = useConfirm();
 
   // MD-QA #165: 다른 사람이 운영 중이면 콘솔은 보기 모드로 열린다. 가져오기는 확인을 거친 이 경로뿐이다.
   const takeoverHandoff = leaseRequired && ops.takeover.status === 'denied' && TAKEOVER_HANDOFF_CODES.has(ops.takeover.code) ? ops.takeover : null;
@@ -1175,13 +1215,13 @@ export function OperateConsoleCore({
         const abort = new AbortController();
         const abortTimer = setTimeout(() => abort.abort(), COMMAND_RESPONSE_TIMEOUT_MS);
         try {
-          return await postV1GameCommand(gameId, command, body, { signal: abort.signal });
+          return await postGameCommand(gameId, command, body, { signal: abort.signal });
         } finally {
           clearTimeout(abortTimer);
         }
       };
       try {
-        let result: Awaited<ReturnType<typeof postV1GameCommand>> | null;
+        let result: Awaited<ReturnType<typeof postGameCommand>> | null;
         try {
           try {
             result = await send(commandBody);
@@ -1945,7 +1985,7 @@ export function OperateConsoleCore({
         {takeoverHandoff ? (
           /* 다른 운영자에게 넘어간 건 오류가 아니다 — 코드 없이 누가 쥐고 있는지와 되찾는 방법을 보여 준다(MD-QA #165). */
           <div role="status" className="flex flex-col items-stretch gap-2 rounded-lg bg-[var(--blue50)] px-3 py-2 text-[length:var(--font-size-body-sm)] font-medium text-[var(--blue700)] sm:flex-row sm:items-center sm:gap-3">
-            <span className="min-w-0 flex-1 break-keep">{takeoverHandoffMessage(takeoverHandoff)}</span>
+            <span className="min-w-0 flex-1 break-keep">{takeoverHandoffMessage(takeoverHandoff, gameOperationsErrorMessage)}</span>
             <Button type="button" size="sm" variant="outline" className="min-h-[44px] shrink-0 self-start text-[length:var(--font-size-body-sm)] sm:self-auto" onClick={() => void takeOverFromHolder()}>
               운영 권한 가져오기
             </Button>
@@ -2116,7 +2156,7 @@ export function OperateConsoleCore({
       {hasUnsettledQueueItems(ops.queue.items) && (
         <section className="px-4">
           <h3 className="mb-2 text-sm font-semibold text-[var(--text-strong)]">전송 대기·실패</h3>
-          <QueueStatusPanel items={ops.queue.items} onRetry={ops.retryFailedEvent} disabled={commandBlocked} />
+          <QueueStatusPanel items={ops.queue.items} onRetry={ops.retryFailedEvent} disabled={commandBlocked} isRetryableError={isRetryableGameOperationsErrorCode} />
         </section>
       )}
       </div>
@@ -2211,8 +2251,11 @@ export function teammatesForSide(
 /** 다른 운영자(또는 내 다른 화면)가 쥐고 있어 보기 모드인 거부 코드. 자동 재요청하지 않는다. */
 const TAKEOVER_HANDOFF_CODES: ReadonlySet<string> = new Set(['TAKEOVER_HELD', 'TAKEOVER_SUPERSEDED']);
 
-function takeoverHandoffMessage({ code, holderName }: { code: string; holderName?: string | null }): string {
-  if (!holderName) return gameOperationsErrorMessage(code);
+function takeoverHandoffMessage(
+  { code, holderName }: { code: string; holderName?: string | null },
+  formatError: (code: string) => string,
+): string {
+  if (!holderName) return formatError(code);
   return code === 'TAKEOVER_HELD'
     ? `${holderName}님이 이 경기를 운영하고 있어요. 지금은 보기만 할 수 있어요.`
     : `${holderName}님이 운영 권한을 가져갔어요. 지금은 보기만 할 수 있어요.`;

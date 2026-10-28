@@ -8,7 +8,7 @@ import { v1Keys } from '@/lib/query-keys';
 import type { GameDetail, GameLineup } from '@/types/game-operations';
 import { TeamMatchOperateConsole } from './team-match-operate-console';
 
-const state = vi.hoisted(() => ({ gameState: 'SCHEDULED' as 'SCHEDULED' | 'LIVE' }));
+const state = vi.hoisted(() => ({ gameState: 'SCHEDULED' as 'SCHEDULED' | 'LIVE', operationsHookCalls: 0 }));
 
 vi.mock('@/hooks/use-v1-api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/hooks/use-v1-api')>()),
@@ -17,23 +17,26 @@ vi.mock('@/hooks/use-v1-api', async (importOriginal) => ({
 
 vi.mock('@/hooks/use-v1-game-operations-console', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/hooks/use-v1-game-operations-console')>()),
-  useV1GameOperationsConsole: () => ({
-    canOperate: true,
-    connectionStatus: 'connected',
-    sync: { status: 'ok', lastSequence: 0 },
-    takeover: { status: 'held', token: null, expiresAtMs: null, assignmentVersion: 0 },
-    queue: { items: [] },
-    clockOffsetMs: 0,
-    liveEvents: [],
-    gameSnapshot: { version: state.gameState === 'LIVE' ? 2 : 1, state: state.gameState },
-    bannerMessage: null,
-    submitEvent: vi.fn(),
-    retryFailedEvent: vi.fn(),
-    requestTakeover: vi.fn(),
-    reverseEvent: vi.fn(),
-    assignAssist: vi.fn(),
-    applyCommandResult: vi.fn(() => true),
-  }),
+  useV1GameOperationsConsole: () => {
+    state.operationsHookCalls += 1;
+    return {
+      canOperate: true,
+      connectionStatus: 'connected',
+      sync: { status: 'ok', lastSequence: 0 },
+      takeover: { status: 'held', token: null, expiresAtMs: null, assignmentVersion: 0 },
+      queue: { items: [] },
+      clockOffsetMs: 0,
+      liveEvents: [],
+      gameSnapshot: { version: state.gameState === 'LIVE' ? 2 : 1, state: state.gameState },
+      bannerMessage: null,
+      submitEvent: vi.fn(),
+      retryFailedEvent: vi.fn(),
+      requestTakeover: vi.fn(),
+      reverseEvent: vi.fn(),
+      assignAssist: vi.fn(),
+      applyCommandResult: vi.fn(() => true),
+    };
+  },
 }));
 
 const success = (data: unknown) => HttpResponse.json({
@@ -125,6 +128,7 @@ const server = setupServer(
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(() => {
   state.gameState = 'SCHEDULED';
+  state.operationsHookCalls = 0;
   lineupReadCount = 0;
   const interceptedFetch = globalThis.fetch.bind(globalThis);
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
@@ -149,6 +153,42 @@ afterEach(() => {
 });
 afterAll(() => {
   server.close();
+});
+
+it('명단 로딩과 오류 화면에서는 운영 런타임을 시작하지 않고 명단 성공 뒤에만 마운트한다', async () => {
+  let releaseFirstRead!: (response: Response) => void;
+  const firstRead = new Promise<Response>((resolve) => { releaseFirstRead = resolve; });
+  let reads = 0;
+  server.use(http.get('*/api/v1/games/game-1/operations-lineup', async () => {
+    reads += 1;
+    if (reads === 1) return firstRead;
+    return success([homeLineup]);
+  }), http.post('*/api/v1/logs/client-error', () => new HttpResponse(null, { status: 204 })));
+
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity }, mutations: { retry: false } } });
+  const teamMatchContext = {
+    teamMatchId: 'team-match-1', gameId: 'game-1', status: 'matched' as const,
+    isStandalone: true, viewerCanManageHost: true,
+  };
+  render(
+    <QueryClientProvider client={client}>
+      <TeamMatchOperateConsole gameId="game-1" teamMatchContext={teamMatchContext} resultHref="/team-matches/team-match-1/result" />
+    </QueryClientProvider>,
+  );
+
+  await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('경기 명단을 불러오는 중이에요.'));
+  await waitFor(() => expect(reads).toBe(1));
+  expect(state.operationsHookCalls).toBe(0);
+
+  releaseFirstRead(HttpResponse.json({ status: 'error', statusCode: 400, code: 'LINEUP_UNAVAILABLE', message: '명단을 불러올 수 없어요.', timestamp: '2026-10-28T00:00:00.000Z' }, { status: 400 }));
+  const error = await screen.findByRole('alert');
+  expect(error).toHaveTextContent('경기 명단을 불러오지 못했어요');
+  expect(state.operationsHookCalls).toBe(0);
+
+  fireEvent.click(within(error).getByRole('button', { name: '다시 시도하기' }));
+  await waitFor(() => expect(reads).toBe(2));
+  await waitFor(() => expect(state.operationsHookCalls).toBeGreaterThan(0));
+  await act(async () => client.clear());
 });
 
 it('경기 시작 뒤 실제 operations-lineup 쿼리를 갱신해 상대 선수를 실제 이벤트 선택기에 보여준다', async () => {
@@ -219,7 +259,7 @@ it('시작 뒤 operations-lineup 재조회가 실패하면 기존 오류 화면�
   await waitFor(() => expect(reads).toBe(1));
   fireEvent.click(screen.getByRole('button', { name: '경기 시작' }));
   fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '경기 시작' }));
-  await screen.findByRole('button', { name: '일시 중지' });
+  await waitFor(() => expect(state.gameState).toBe('LIVE'));
 
   const rosterError = await screen.findByRole('alert');
   expect(state.gameState).toBe('LIVE');

@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { QueueStatusPanel } from './queue-status-panel';
 import type { QueuedGameEvent } from '@/lib/game-operations-queue';
 
+const retryPolicy = (code: string) => code === 'VERSION_CONFLICT';
+
 /**
  * Task 5 (e3dccad2) made FOUL a real `type: 'FOUL'` wire event instead of
  * disguising it as `type: 'CORRECTION', payload: { kind: 'FOUL' }`. This
@@ -36,7 +38,7 @@ function queuedEvent(overrides: Partial<QueuedGameEvent['event']> = {}): QueuedG
 
 describe('QueueStatusPanel — 이벤트 라벨', () => {
   it('실제 FOUL 이벤트를 "파울"로 표시한다 (영문 원문 노출 금지)', () => {
-    render(<QueueStatusPanel items={[queuedEvent()]} onRetry={vi.fn()} />);
+    render(<QueueStatusPanel items={[queuedEvent()]} onRetry={vi.fn()} isRetryableError={retryPolicy} />);
 
     expect(screen.getByText('파울')).toBeInTheDocument();
     expect(screen.queryByText('FOUL')).toBeNull();
@@ -55,7 +57,7 @@ describe('QueueStatusPanel — 재시도 버튼 게이팅', () => {
       status: 'failed',
       lastError: { code: 'VERSION_CONFLICT', message: '경기 상태가 변경되어 다시 시도해주세요.' },
     };
-    render(<QueueStatusPanel items={[failed]} onRetry={vi.fn()} />);
+    render(<QueueStatusPanel items={[failed]} onRetry={vi.fn()} isRetryableError={retryPolicy} />);
     expect(screen.getByRole('button', { name: '다시 시도' })).toBeInTheDocument();
   });
 
@@ -65,7 +67,7 @@ describe('QueueStatusPanel — 재시도 버튼 게이팅', () => {
       status: 'failed',
       lastError: { code: 'VERSION_CONFLICT', message: '경기 상태가 변경되어 다시 시도해주세요.' },
     };
-    render(<QueueStatusPanel items={[failed]} onRetry={vi.fn()} disabled />);
+    render(<QueueStatusPanel items={[failed]} onRetry={vi.fn()} disabled isRetryableError={retryPolicy} />);
     expect(screen.getByRole('button', { name: '다시 시도' })).toBeDisabled();
   });
 
@@ -75,7 +77,7 @@ describe('QueueStatusPanel — 재시도 버튼 게이팅', () => {
       status: 'failed',
       lastError: { code: 'STAFF_SCOPE_DENIED', message: '이 경기를 운영할 권한이 없어요.' },
     };
-    render(<QueueStatusPanel items={[failed]} onRetry={vi.fn()} />);
+    render(<QueueStatusPanel items={[failed]} onRetry={vi.fn()} isRetryableError={retryPolicy} />);
     expect(screen.queryByRole('button', { name: '다시 시도' })).toBeNull();
     // 버튼 대신 무엇을 해야 하는지 안내하는 문구는 그대로 보인다.
     expect(screen.getByText('이 경기를 운영할 권한이 없어요.')).toBeInTheDocument();

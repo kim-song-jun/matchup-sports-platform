@@ -124,3 +124,6 @@ API 담당 소유: GameCommand/GameEvent DTO와 spec, realtime gateway의 관련
 
 - 2026-10-28 14:16 후속: Codex P1 실제 경기 시작/상대명단 누락과 P2 lease 만료 뒤 pending 고착을 실제 RED→GREEN으로 수정했어요. 상대명단 재조회 실패는 기존 명단 오류 화면에서 조작을 막고 재시도해요. QueryClient/MSW 테스트2개, 운영 Core 127개, 관련30파일 중365개 및 이동 경로 보완 후 가독성24개가 통과했어요(서로 겹치는 개수는 합산하지 않아요). Web tsc 및 패턴 검사도 통과했어요.
 - FSD 공용 경계 분리에서 독립 리뷰가 발견한 nullable ID, auth 역의존, 외부 private mock을 정리했어요. 기존 일반 경기에서도 사용하던 abnormal-end는 기능을 제거하지 않고 공용 위치에 유지했어요. 기존 font/radius 예외는 동일 건수만 새 파일 경로로 이전하고 font 합계 표기 오류를 바로잡았어요. 전체 변경의 최종 독립 리뷰, 새 head CI/두 원격 리뷰 스레드 처리, dev 머지와 Alpha 사후 QA는 아직이에요. API 기존 subscribe ACK timeout 원인은 미확정이에요.
+
+- 2026-10-28 15:30 후속: 현재 원격 head의 독립 리뷰에서 공용 운영 코드가 상위 hooks에 의존하는 경계 위반을 확인했어요. 운영 의존성을 adapter에서 주입하도록 수정 중이며, 공용 테스트의 상위 adapter 의존과 일반 경기 명단 로딩·오류 중 운영 hook 마운트 시점도 바로잡고 있어요. 중간 버전의 운영 Core 127개·Web 타입·패턴 검사는 통과했지만, 최종 수정본 검증과 독립 재검토를 대신하지 않아요. Copilot의 assist 권한 문서 지적은 실제 서비스 인가를 대조해 로컬에서 수정했어요. 원격 head API CI는 진행 중이고 기존 ACK timeout 원인은 미확정이에요. 머지와 Alpha 사후 QA는 아직이에요.
+- 후속 로컬 검증: 공용 Core 92개, 대회 adapter 27개, 일반 adapter 12개, 일반 명단 통합 3개, 전송 상태 4개를 관련 변경에 따라 직렬로 확인했어요. 테스트 이관 중 발생한 실패와 타입 오류를 수정한 뒤 Core·대회 adapter 및 Web 전체 타입·패턴 검사를 다시 통과했어요. Core 테스트에는 기존 React act/key 경고가 남아 있어요. 이전 원격 dd27 head의 API CI는 성공했지만 기존 ACK timeout의 원인은 확정하지 않았고, 이 로컬 수정본의 독립 리뷰·새 head CI·Alpha 사후 QA는 아직이에요.

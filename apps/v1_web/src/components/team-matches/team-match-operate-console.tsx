@@ -1,7 +1,11 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useV1Game, useV1GameOperationsLineup } from '@/hooks/use-v1-game-operations';
+import { useV1Game, useV1GameOperationsLineup, postV1GameCommand } from '@/hooks/use-v1-game-operations';
+import { useV1AuthMe, useV1GameResultRevisions } from '@/hooks/use-v1-api';
+import { useV1GameOperationsConsole, gameOperationsErrorMessage, isRetryableGameOperationsErrorCode } from '@/hooks/use-v1-game-operations-console';
+import { useQueryClient } from '@tanstack/react-query';
+import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { ErrorState } from '@/components/v1-ui/primitives';
 import { extractErrorMessage } from '@/lib/error-message';
 import { OperateConsoleCore, type GameDetailQueryState } from '@/shared/game-operations';
@@ -112,17 +116,6 @@ function TeamMatchOperateConsoleWithGame({
   resultHref,
 }: TeamMatchOperateConsoleProps & { gameDetail: GameDetailQueryState }) {
   const lineups = useV1GameOperationsLineup(gameId);
-  const safeLineups = useMemo(
-    () => lineups.data?.map((lineup) => ({
-      ...lineup,
-      participants: lineup.participants.map((participant) => {
-        const { identity, ...safeParticipant } = participant;
-        void identity;
-        return safeParticipant;
-      }),
-    })),
-    [lineups.data],
-  );
   if (lineups.isLoading) {
     return (
       <main className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6">
@@ -144,8 +137,67 @@ function TeamMatchOperateConsoleWithGame({
   }
 
   return (
+    <TeamMatchOperateConsoleRuntime
+      gameId={gameId}
+      gameDetail={gameDetail}
+      lineups={lineups}
+      teamMatchContext={teamMatchContext}
+      resultHref={resultHref}
+    />
+  );
+}
+
+function TeamMatchOperateConsoleRuntime({
+  gameId,
+  gameDetail,
+  lineups,
+  teamMatchContext,
+  resultHref,
+}: TeamMatchOperateConsoleProps & {
+  gameDetail: GameDetailQueryState;
+  lineups: ReturnType<typeof useV1GameOperationsLineup>;
+}) {
+  const authMe = useV1AuthMe();
+  const queryClient = useQueryClient();
+  const { confirm, ConfirmModal } = useConfirm();
+  const operations = useV1GameOperationsConsole({
+    gameId,
+    initialLastSequence: gameDetail.data?.lastSequence ?? 0,
+    takeoverEnabled: true,
+    gameDetailGameId: gameDetail.data?.id ?? null,
+    gameDetailStatus: gameDetail.status,
+    realtimeAuthorization: gameDetail.data?.realtimeAuthorization ?? null,
+    operationMode: 'ordinary-host',
+    gameSourceType: gameDetail.data?.sourceType ?? null,
+    gameActorRole: gameDetail.data?.actorRole ?? null,
+    teamMatchContext,
+  });
+  const resultRevisions = useV1GameResultRevisions(gameId, { enabled: (operations.gameSnapshot?.state ?? gameDetail.data?.state) === 'ENDED' });
+  const safeLineups = useMemo(
+    () => lineups.data?.map((lineup) => ({
+      ...lineup,
+      participants: lineup.participants.map((participant) => {
+        const { identity, ...safeParticipant } = participant;
+        void identity;
+        return safeParticipant;
+      }),
+    })),
+    [lineups.data],
+  );
+  return (
     <OperateConsoleCore
       gameId={gameId}
+      runtime={{
+        authUserId: authMe.data?.user.id,
+        resultRevisions: resultRevisions.data,
+        queryClient,
+        confirm,
+        confirmModal: ConfirmModal,
+        postGameCommand: postV1GameCommand,
+        gameOperationsErrorMessage,
+        isRetryableGameOperationsErrorCode,
+        operations,
+      }}
       gameDetail={gameDetail}
       lineupsQuery={{
         data: safeLineups,

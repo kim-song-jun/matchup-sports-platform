@@ -295,6 +295,7 @@ describe('LeagueFixtureGeneratorService.generate', () => {
     v1TournamentMatchAdvancementEdge: { findMany: jest.fn() },
     v1TournamentPlayer: { findMany: jest.fn() },
     v1IdempotencyRecord: { findFirst: jest.fn() },
+    v1TournamentStagePeriodSetting: { findUnique: jest.fn().mockResolvedValue(null) },
     v1TournamentMatchDetails: {
       findMany: jest.fn(),
       findFirst: jest.fn(),

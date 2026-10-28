@@ -299,6 +299,7 @@ describe('TournamentBracketService', () => {
     v1TournamentGroup: { findFirst: jest.Mock; create: jest.Mock; findMany: jest.Mock; findUnique: jest.Mock; delete: jest.Mock };
     v1TournamentByeSlot: { findMany: jest.Mock; findUnique: jest.Mock; findUniqueOrThrow: jest.Mock; count: jest.Mock; create: jest.Mock; update: jest.Mock; delete: jest.Mock };
     v1TournamentGroupTeam: { delete: jest.Mock; findUnique: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock };
+    v1TournamentStagePeriodSetting: { findUnique: jest.Mock };
     v1TournamentMatchDetails: { findUnique: jest.Mock; findUniqueOrThrow: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock; count: jest.Mock; aggregate: jest.Mock; create: jest.Mock; update: jest.Mock };
     v1TeamMatch: { findUnique: jest.Mock; findUniqueOrThrow: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock };
     v1TournamentMatchAdvancementEdge: { findMany: jest.Mock; deleteMany: jest.Mock };
@@ -333,6 +334,7 @@ describe('TournamentBracketService', () => {
       v1TournamentGroup: { findFirst: jest.fn(), create: jest.fn(), findMany: jest.fn(), findUnique: jest.fn(), delete: jest.fn() },
       v1TournamentByeSlot: { findMany: jest.fn().mockResolvedValue([]), findUnique: jest.fn().mockResolvedValue(null), findUniqueOrThrow: jest.fn(), count: jest.fn().mockResolvedValue(0), create: jest.fn(), update: jest.fn(), delete: jest.fn() },
       v1TournamentGroupTeam: { delete: jest.fn(), findUnique: jest.fn(), findFirst: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([]), create: jest.fn().mockResolvedValue({ id: 'group-team-auto' }), update: jest.fn() },
+      v1TournamentStagePeriodSetting: { findUnique: jest.fn().mockResolvedValue(null) },
       v1TournamentMatchDetails: {
         findUnique: jest.fn().mockResolvedValue(null),
         findUniqueOrThrow: jest.fn().mockImplementation(async () => canonicalDetailsRow()),
@@ -982,6 +984,33 @@ describe('TournamentBracketService', () => {
       fixtureNumber: 1,
       status: 'scheduled',
     });
+  });
+
+  it('createFixture: 단계 재정의가 있으면 새 경기와 Game이 그 설정 버전을 고정한다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
+    prisma.v1TournamentGroup.findFirst.mockResolvedValue(groupRow({ phase: 'final' }));
+    prisma.v1TournamentStagePeriodSetting.findUnique.mockResolvedValue({ competitionConfigVersionId: 'config-final' });
+    prisma.v1TeamMatch.findUniqueOrThrow.mockResolvedValue({
+      ...canonicalDetailsRow().teamMatch,
+      hostTeamId: null,
+      approvedApplicantTeamId: null,
+    });
+
+    await service.createFixture(ownerUser, 'tournament-1', {
+      groupId: 'group-1',
+      round: '결승',
+      fixtureNumber: 1,
+    });
+
+    expect(prisma.v1TeamMatch.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ competitionConfigVersionId: 'config-final' }),
+    }));
+    expect(games.createFromSourceInTransaction).toHaveBeenCalledWith(
+      prisma,
+      expect.objectContaining({ competitionConfigVersionId: 'config-final' }),
+      expect.any(Object),
+    );
   });
 
   it('createFixture: 새 결승을 조별 경기보다 이른 시각으로 만들면 409 로 막고 만들지 않는다', async () => {

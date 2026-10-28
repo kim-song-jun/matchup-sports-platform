@@ -13,18 +13,31 @@ export interface TournamentPeriodSetting {
 
 export interface TournamentPeriodSettingsResponse {
   tournamentId: string;
+  kind: 'regular_tournament' | 'regular_league';
   competitionConfigVersionId: string | null;
   expectedVersion: string | null;
   periods: TournamentPeriodSetting[] | null;
   legacyPeriodCount: number | null;
   requiresDurationInput: boolean;
+  stageOverrides: Array<{
+    phase: TournamentPeriodPhase;
+    competitionConfigVersionId: string;
+    periods: TournamentPeriodSetting[] | null;
+    legacyPeriodCount: number | null;
+  }>;
   /** 저장(PATCH) 응답에만 있다 — 새 피리어드로 옮긴 시작 전 경기 수. */
   fixturesRepointed?: number;
 }
 
+export type TournamentPeriodPhase =
+  | 'group' | 'round64' | 'round32' | 'round16' | 'round12'
+  | 'quarter' | 'semi' | 'final' | 'third_place';
+
 export interface UpdateTournamentPeriodSettingsPayload {
   expectedVersion: string;
-  periods: Array<{ durationMinutes: number }>;
+  phase?: TournamentPeriodPhase;
+  inheritDefault?: boolean;
+  periods?: Array<{ durationMinutes: number }>;
 }
 
 const periodSettingsKey = (tournamentId: string) =>

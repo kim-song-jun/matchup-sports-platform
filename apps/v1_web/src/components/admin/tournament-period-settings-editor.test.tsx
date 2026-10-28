@@ -5,15 +5,17 @@ import type { TournamentPeriodSettingsResponse } from '@/hooks/use-tournament-pe
 
 const { state } = vi.hoisted(() => {
   const settings: TournamentPeriodSettingsResponse = {
-      tournamentId: 'tournament-1',
-      competitionConfigVersionId: 'config-1',
-      expectedVersion: 'version-1',
-      periods: [
-        { code: 'FIRST_HALF', label: '전반', durationMinutes: 45, extraTime: false },
-        { code: 'SECOND_HALF', label: '후반', durationMinutes: 45, extraTime: false },
-      ],
-      legacyPeriodCount: null,
-      requiresDurationInput: false,
+    tournamentId: 'tournament-1',
+    kind: 'regular_tournament',
+    competitionConfigVersionId: 'config-1',
+    expectedVersion: 'version-1',
+    periods: [
+      { code: 'FIRST_HALF', label: '전반', durationMinutes: 45, extraTime: false },
+      { code: 'SECOND_HALF', label: '후반', durationMinutes: 45, extraTime: false },
+    ],
+    legacyPeriodCount: null,
+    requiresDurationInput: false,
+    stageOverrides: [],
   };
   return { state: { settings, mutate: vi.fn(), refetch: vi.fn() } };
 });
@@ -159,12 +161,74 @@ describe('TournamentPeriodSettingsEditor', () => {
     expect(state.mutate).not.toHaveBeenCalled();
   });
 
+  it('adds a stage override using the current default as its initial value', () => {
+    state.settings = {
+      ...state.settings,
+      expectedVersion: 'version-stage-1',
+      kind: 'regular_tournament',
+      periods: [
+        { code: 'FIRST_HALF', label: '전반', durationMinutes: 45, extraTime: false },
+        { code: 'SECOND_HALF', label: '후반', durationMinutes: 45, extraTime: false },
+      ],
+      stageOverrides: [],
+    };
+    state.mutate.mockClear();
+    const showToast = vi.fn();
+    render(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={showToast} />);
+
+    fireEvent.change(screen.getByLabelText('추가할 대회 단계'), { target: { value: 'final' } });
+    fireEvent.click(screen.getByRole('button', { name: '단계 추가' }));
+    expect(screen.getByText('결승 설정')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('전반 (분)'), { target: { value: '10' } });
+    fireEvent.change(screen.getByLabelText('후반 (분)'), { target: { value: '10' } });
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+
+    expect(state.mutate).toHaveBeenCalledWith(
+      {
+        expectedVersion: 'version-stage-1',
+        phase: 'final',
+        inheritDefault: false,
+        periods: [{ durationMinutes: 10 }, { durationMinutes: 10 }],
+      },
+      expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
+    );
+  });
+
+  it('can remove a stage override and return that phase to the tournament default', () => {
+    state.settings = {
+      ...state.settings,
+      expectedVersion: 'version-stage-2',
+      kind: 'regular_tournament',
+      stageOverrides: [{
+        phase: 'final',
+        competitionConfigVersionId: 'config-final',
+        periods: [
+          { code: 'FIRST_HALF', label: '전반', durationMinutes: 10, extraTime: false },
+          { code: 'SECOND_HALF', label: '후반', durationMinutes: 10, extraTime: false },
+        ],
+        legacyPeriodCount: null,
+      }],
+    };
+    state.mutate.mockClear();
+    const showToast = vi.fn();
+    render(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={showToast} />);
+
+    fireEvent.click(screen.getAllByRole('button', { name: '수정' })[1]);
+    fireEvent.click(screen.getByRole('button', { name: '기본값 사용' }));
+
+    expect(state.mutate).toHaveBeenCalledWith(
+      { expectedVersion: 'version-stage-2', phase: 'final', inheritDefault: true },
+      expect.objectContaining({ onSuccess: expect.any(Function), onError: expect.any(Function) }),
+    );
+  });
+
   it('keeps legacy count explicit until every duration is entered', () => {
     state.settings = {
       ...state.settings,
       periods: null,
       legacyPeriodCount: 3,
       requiresDurationInput: true,
+      stageOverrides: [],
     };
     const showToast = vi.fn();
     render(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={showToast} />);

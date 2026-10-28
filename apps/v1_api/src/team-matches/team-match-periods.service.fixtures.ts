@@ -36,8 +36,12 @@ export async function teamMatchPeriodsFixture() {
   const configs = new Map<string, ConfigRow>([[baseConfig.id, baseConfig]]);
   const tournament = {
     id: 'tournament-periods', kind: 'regular_tournament', deletedAt: null,
-    competitionConfigVersionId: baseConfig.id, updatedAt: version,
+    competitionConfigVersionId: baseConfig.id, updatedAt: version, stagePeriodSettings: [],
   };
+  const stagePeriodSettings: Array<{
+    id: string; tournamentId: string; phase: 'group' | 'final'; periods: Prisma.JsonValue;
+    competitionConfigVersionId: string; competitionConfig: ConfigRow;
+  }> = [];
   const lineups: LineupRow[] = [];
   const periods: PeriodRow[] = [];
   let periodIdentitySequence = 0;
@@ -81,12 +85,31 @@ export async function teamMatchPeriodsFixture() {
       findMany: jest.fn().mockResolvedValue([]),
     },
     v1Tournament: {
-      findFirst: jest.fn(() => Promise.resolve({ ...tournament, competitionConfig: configs.get(tournament.competitionConfigVersionId) })),
-      updateMany: jest.fn(({ data }: { data: { competitionConfigVersionId: string } }) => {
-        tournament.competitionConfigVersionId = data.competitionConfigVersionId;
-        tournament.updatedAt = new Date(tournament.updatedAt.getTime() + 1);
+      findFirst: jest.fn(() => Promise.resolve({ ...tournament, stagePeriodSettings, competitionConfig: configs.get(tournament.competitionConfigVersionId) })),
+      updateMany: jest.fn(({ data }: { data: { competitionConfigVersionId?: string; updatedAt?: Date } }) => {
+        if (data.competitionConfigVersionId !== undefined) tournament.competitionConfigVersionId = data.competitionConfigVersionId;
+        tournament.updatedAt = data.updatedAt ?? new Date(tournament.updatedAt.getTime() + 1);
         return Promise.resolve({ count: 1 });
       }),
+    },
+    v1TournamentMatchDetails: { findMany: jest.fn().mockResolvedValue([]) },
+    v1TournamentStagePeriodSetting: {
+      findUnique: jest.fn().mockResolvedValue(null),
+      upsert: jest.fn(({ where, create, update }: { where: { tournamentId_phase: { phase: 'group' | 'final' } }; create: { tournamentId: string; phase: 'group' | 'final'; periods: Prisma.JsonValue; competitionConfigVersionId: string }; update: { periods: Prisma.JsonValue; competitionConfigVersionId: string } }) => {
+        const found = stagePeriodSettings.find((setting) => setting.phase === where.tournamentId_phase.phase);
+        if (found) {
+          found.periods = update.periods; found.competitionConfigVersionId = update.competitionConfigVersionId;
+          found.competitionConfig = configs.get(update.competitionConfigVersionId)!;
+          return Promise.resolve(found);
+        }
+        const row = { id: `stage-${stagePeriodSettings.length + 1}`, ...create, competitionConfig: configs.get(create.competitionConfigVersionId)! };
+        stagePeriodSettings.push(row); return Promise.resolve(row);
+      }),
+      delete: jest.fn(({ where }: { where: { id: string } }) => {
+        const index = stagePeriodSettings.findIndex((setting) => setting.id === where.id);
+        const [removed] = stagePeriodSettings.splice(index, 1); return Promise.resolve(removed);
+      }),
+      update: jest.fn(),
     },
     v1CompetitionConfigVersion: {
       findMany: jest.fn(({ where, take }: { where: { name?: string; sportCode?: string; status?: V1CompetitionConfigStatus; version?: { lt: number } }; take?: number }) => Promise.resolve(
@@ -165,9 +188,9 @@ export async function teamMatchPeriodsFixture() {
   const module = await Test.createTestingModule({ providers: [
     TeamMatchesService, TournamentPeriodSettingsService,
     { provide: PrismaService, useValue: prisma }, { provide: GamesService, useValue: games },
-    { provide: AdminContextService, useValue: { getMutationAdmin: jest.fn().mockResolvedValue({ id: 'admin-periods' }), logAdminAction: jest.fn().mockResolvedValue(undefined) } },
+    { provide: AdminContextService, useValue: { getMutationAdmin: jest.fn().mockResolvedValue({ id: 'admin-periods', userId: periodsActor.id, adminRole: 'owner', status: 'active' }), logAdminAction: jest.fn().mockResolvedValue(undefined) } },
     { provide: NotificationsService, useValue: { emitToManyDeferred: jest.fn() } },
   ] }).compile();
   tx = module.get<PrismaService>(PrismaService);
-  return { service: module.get(TeamMatchesService), tournamentService: module.get(TournamentPeriodSettingsService), tournament, module, prisma, match, game, configs, baseConfig, lineups, periods, participants, events, results };
+  return { service: module.get(TeamMatchesService), tournamentService: module.get(TournamentPeriodSettingsService), tournament, stagePeriodSettings, module, prisma, match, game, configs, baseConfig, lineups, periods, participants, events, results };
 }

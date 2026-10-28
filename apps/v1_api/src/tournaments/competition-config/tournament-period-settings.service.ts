@@ -1,7 +1,7 @@
-import { ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
-import { Prisma, V1CompetitionKind } from '@prisma/client';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { Prisma, V1CompetitionKind, V1TournamentGroupPhase } from '@prisma/client';
 import { V1AuthUser } from '../../auth/v1-auth-user';
-import { AdminContextService } from '../../common/admin-context.service';
+import { AdminContextService, type V1ActiveAdmin } from '../../common/admin-context.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { competitionConfigContentHash, validateCompetitionConfig } from './competition-config';
 import { isReusableCompetitionPeriodConfig, normalizeCompetitionPeriods as normalizeTournamentPeriods } from './competition-config-periods';
@@ -10,10 +10,17 @@ import { ALL_COMPETITION_KINDS, findTournamentOnSurface } from '../tournament-su
 import {
   lockCompetitionFixtureRows, lockTournamentForConfigChange, repointUntouchedFixtures, teamMatchOwnershipWhere, untouchedGameWhere,
 } from './tournament-competition-config';
+import { competitionStagePhase } from '../tournament-stage-rank';
+import { materializePeriodConfigVersion } from './materialize-period-config-version';
 
 type StoredPeriod = { code: string; label: string; durationMinutes: number; extraTime: boolean };
 type PeriodRead = { periods: StoredPeriod[] | null; legacyPeriodCount: number | null };
 type ConfigContent = { periods: Prisma.JsonValue; events: Prisma.JsonValue; lineup: Prisma.JsonValue; result: Prisma.JsonValue; tieBreak: Prisma.JsonValue; visibility: Prisma.JsonValue };
+const PERIOD_SETTINGS_INCLUDE = {
+  competitionConfig: true,
+  stagePeriodSettings: { include: { competitionConfig: true }, orderBy: { phase: 'asc' as const } },
+} satisfies Prisma.V1TournamentInclude;
+type PeriodSettingsTournament = Prisma.V1TournamentGetPayload<{ include: typeof PERIOD_SETTINGS_INCLUDE }>;
 
 export { normalizeCompetitionPeriods as normalizeTournamentPeriods } from './competition-config-periods';
 
@@ -32,7 +39,7 @@ export class TournamentPeriodSettingsService {
     await this.adminContext.getActiveAdmin(user.id);
     const row = await findTournamentOnSurface(this.prisma, ALL_COMPETITION_KINDS, {
       where: { id: tournamentId, deletedAt: null },
-      include: { competitionConfig: true },
+      include: PERIOD_SETTINGS_INCLUDE,
     });
     if (!row) throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
     this.assertSupportedKind(row.kind);
@@ -54,7 +61,7 @@ export class TournamentPeriodSettingsService {
       await lockTournamentForConfigChange(tx, tournamentId);
       const row = await findTournamentOnSurface(tx, ALL_COMPETITION_KINDS, {
         where: { id: tournamentId, deletedAt: null },
-        include: { competitionConfig: true },
+        include: PERIOD_SETTINGS_INCLUDE,
       });
       if (!row) throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
       this.assertSupportedKind(row.kind);
@@ -70,12 +77,26 @@ export class TournamentPeriodSettingsService {
 
       await lockCompetitionFixtureRows(tx, row.kind, row.id);
 
+      if (dto.phase !== undefined) {
+        return this.updateStage(tx, user.id, admin, row, { ...dto, phase: dto.phase });
+      }
+      if (dto.inheritDefault === true) {
+        throw new BadRequestException({
+          code: 'TOURNAMENT_PERIOD_DEFAULT_REQUIRED',
+          message: '대회 기본 경기 시간은 삭제할 수 없어요.',
+        });
+      }
+      if (!dto.periods) {
+        throw new BadRequestException({ code: 'TOURNAMENT_PERIODS_REQUIRED', message: '피리어드 시간을 입력해 주세요.' });
+      }
+
       const currentRead = this.readPeriods(row.competitionConfig.periods);
       const currentPeriods = currentRead.periods ?? [];
       const nextPeriods = normalizeTournamentPeriods(currentPeriods, dto.periods);
+      const defaultOwnership = await this.periodOwnership(tx, row, null);
       if (currentRead.periods && periodsEqual(currentPeriods, nextPeriods)) {
         // 같은 값을 다시 저장하면 예전 설정에 남은 시작 전 경기만 지금 설정으로 맞춘다.
-        const fixturesRepointed = await this.followPeriods(tx, row, row.competitionConfig, nextPeriods);
+        const fixturesRepointed = await this.followPeriods(tx, row, row.competitionConfig, nextPeriods, defaultOwnership);
         if (fixturesRepointed > 0) {
           await this.adminContext.logAdminAction(admin, {
             action: 'tournament.period_settings.apply_pending',
@@ -111,7 +132,7 @@ export class TournamentPeriodSettingsService {
       if (updated.count !== 1) {
         throw new ConflictException({ code: 'TOURNAMENT_VERSION_CONFLICT', message: '대회 설정이 다른 요청에서 변경됐어요. 다시 확인해 주세요.' });
       }
-      const fixturesRepointed = await this.followPeriods(tx, row, version, nextPeriods);
+      const fixturesRepointed = await this.followPeriods(tx, row, version, nextPeriods, defaultOwnership);
       const committedKinds = row.kind === V1CompetitionKind.regular_league
         ? [V1CompetitionKind.regular_league]
         : [V1CompetitionKind.regular_tournament];
@@ -128,10 +149,12 @@ export class TournamentPeriodSettingsService {
       }, tx);
       return {
         changed: true,
-        tournamentId: row.id,
-        competitionConfigVersionId: version.id,
-        expectedVersion: committed?.updatedAt.toISOString() ?? dto.expectedVersion,
-        periods: nextPeriods,
+        ...this.serialize({
+          ...row,
+          updatedAt: committed?.updatedAt ?? row.updatedAt,
+          competitionConfigVersionId: version.id,
+          competitionConfig: version,
+        }),
         fixturesRepointed,
       };
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
@@ -150,6 +173,127 @@ export class TournamentPeriodSettingsService {
     throw new ConflictException({ code: 'TOURNAMENT_PERIOD_SETTINGS_RETRYABLE', message: '대회 설정 저장을 다시 시도해 주세요.' });
   }
 
+  private async updateStage(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    admin: V1ActiveAdmin,
+    row: PeriodSettingsTournament,
+    dto: UpdateTournamentPeriodSettingsDto & { phase: V1TournamentGroupPhase },
+  ) {
+    if (row.kind === V1CompetitionKind.regular_league) {
+      throw new BadRequestException({
+        code: 'TOURNAMENT_STAGE_PERIODS_UNSUPPORTED',
+        message: '단계별 경기 시간은 정규 대회에서만 설정할 수 있어요.',
+      });
+    }
+    if (!row.competitionConfig) {
+      throw new UnprocessableEntityException({ code: 'COMPETITION_PERIODS_UNAVAILABLE', message: '대회 기본 경기 설정이 없어요.' });
+    }
+    const existing = row.stagePeriodSettings.find((setting) => setting.phase === dto.phase);
+    const ownership = await this.periodOwnership(tx, row, dto.phase);
+
+    if (dto.inheritDefault === true) {
+      if (!existing) return { changed: false, fixturesRepointed: 0, ...this.serialize(row) };
+      await tx.v1TournamentStagePeriodSetting.delete({ where: { id: existing.id } });
+      const bumped = await this.bumpTournamentVersion(tx, row);
+      const defaultPeriods = this.readPeriods(row.competitionConfig.periods).periods;
+      if (!defaultPeriods) throw new UnprocessableEntityException({ code: 'COMPETITION_PERIODS_UNAVAILABLE', message: '대회 기본 경기 시간을 읽을 수 없어요.' });
+      const fixturesRepointed = await this.followPeriods(tx, row, row.competitionConfig, defaultPeriods, ownership);
+      await this.adminContext.logAdminAction(admin, {
+        action: 'tournament.stage_period_settings.inherit', targetType: 'tournament', targetId: row.id,
+        beforeJson: { phase: dto.phase, competitionConfigVersionId: existing.competitionConfigVersionId, periods: existing.periods },
+        afterJson: { phase: dto.phase, competitionConfigVersionId: row.competitionConfigVersionId, fixturesRepointed },
+      }, tx);
+      return {
+        changed: true,
+        ...this.serialize({ ...row, updatedAt: bumped, stagePeriodSettings: row.stagePeriodSettings.filter((setting) => setting.id !== existing.id) }),
+        fixturesRepointed,
+      };
+    }
+    if (!dto.periods) throw new BadRequestException({ code: 'TOURNAMENT_PERIODS_REQUIRED', message: '단계별 경기 시간을 입력해 주세요.' });
+
+    const source = existing?.competitionConfig ?? row.competitionConfig;
+    const currentRead = this.readPeriods(existing?.periods ?? source.periods);
+    const currentPeriods = currentRead.periods ?? [];
+    const nextPeriods = normalizeTournamentPeriods(currentPeriods, dto.periods);
+    if (existing && currentRead.periods && periodsEqual(currentPeriods, nextPeriods)) {
+      const fixturesRepointed = await this.followPeriods(tx, row, existing.competitionConfig, nextPeriods, ownership);
+      return { changed: false, fixturesRepointed, ...this.serialize(row) };
+    }
+
+    // 단계 설정은 피리어드만 소유한다. 다른 규칙은 항상 현재 대회 기본 설정을 복제해 단계 설정이
+    // 라인업·결과 정책을 과거 버전에 얼려 두지 않게 한다.
+    const materialized = await materializePeriodConfigVersion(tx, {
+      source: row.competitionConfig,
+      periods: nextPeriods as unknown as Prisma.JsonValue,
+      createdByUserId: userId,
+    });
+    const saved = await tx.v1TournamentStagePeriodSetting.upsert({
+      where: { tournamentId_phase: { tournamentId: row.id, phase: dto.phase } },
+      create: {
+        tournamentId: row.id,
+        phase: dto.phase,
+        periods: nextPeriods as unknown as Prisma.InputJsonValue,
+        competitionConfigVersionId: materialized.version.id,
+      },
+      update: {
+        periods: nextPeriods as unknown as Prisma.InputJsonValue,
+        competitionConfigVersionId: materialized.version.id,
+      },
+      include: { competitionConfig: true },
+    });
+    const bumped = await this.bumpTournamentVersion(tx, row);
+    const fixturesRepointed = await this.followPeriods(tx, row, materialized.version, nextPeriods, ownership);
+    if (materialized.created) {
+      await tx.v1AdminActionLog.create({ data: {
+        adminUserId: admin.id, action: 'competition_config.version.create', targetType: 'competition_config', targetId: materialized.version.id,
+        beforeJson: { sourceVersionId: row.competitionConfig.id, sourceVersion: row.competitionConfig.version },
+        afterJson: { version: materialized.version.version, contentHash: materialized.version.contentHash, tournamentId: row.id, phase: dto.phase },
+      } });
+    }
+    await this.adminContext.logAdminAction(admin, {
+      action: 'tournament.stage_period_settings.change', targetType: 'tournament', targetId: row.id,
+      beforeJson: existing ? { phase: dto.phase, competitionConfigVersionId: existing.competitionConfigVersionId, periods: existing.periods } : undefined,
+      afterJson: { phase: dto.phase, competitionConfigVersionId: materialized.version.id, periods: nextPeriods, fixturesRepointed },
+    }, tx);
+    const stagePeriodSettings = [...row.stagePeriodSettings.filter((setting) => setting.phase !== dto.phase), saved]
+      .sort((left, right) => left.phase.localeCompare(right.phase));
+    return {
+      changed: true,
+      ...this.serialize({ ...row, updatedAt: bumped, stagePeriodSettings }),
+      fixturesRepointed,
+    };
+  }
+
+  private async bumpTournamentVersion(tx: Prisma.TransactionClient, row: PeriodSettingsTournament) {
+    // updatedAt이 CAS 토큰이라 같은 밀리초 안의 연속 저장도 반드시 새 버전을 받아야 한다.
+    const updatedAt = new Date(Math.max(Date.now(), row.updatedAt.getTime() + 1));
+    const result = await tx.v1Tournament.updateMany({ where: { id: row.id, updatedAt: row.updatedAt }, data: { updatedAt } });
+    if (result.count !== 1) {
+      throw new ConflictException({ code: 'TOURNAMENT_VERSION_CONFLICT', message: '대회 설정이 다른 요청에서 변경됐어요. 다시 확인해 주세요.' });
+    }
+    return updatedAt;
+  }
+
+  private async periodOwnership(
+    tx: Prisma.TransactionClient,
+    row: Pick<PeriodSettingsTournament, 'id' | 'kind' | 'stagePeriodSettings'>,
+    phase: V1TournamentGroupPhase | null,
+  ): Promise<Prisma.V1TeamMatchWhereInput> {
+    const base = teamMatchOwnershipWhere(row.kind, row.id);
+    if (row.kind === V1CompetitionKind.regular_league) return base;
+    const details = await tx.v1TournamentMatchDetails.findMany({
+      where: { tournamentId: row.id, teamMatch: { deletedAt: null } },
+      select: { teamMatchId: true, round: true, group: { select: { phase: true } } },
+    });
+    const overridden = new Set(row.stagePeriodSettings.map((setting) => setting.phase));
+    const teamMatchIds = details.filter((detail) => {
+      const fixturePhase = competitionStagePhase({ phase: detail.group?.phase, round: detail.round });
+      return phase === null ? fixturePhase === null || !overridden.has(fixturePhase) : fixturePhase === phase;
+    }).map((detail) => detail.teamMatchId);
+    return { ...base, id: { in: teamMatchIds } };
+  }
+
   /**
    * 시작 전 경기(라인업만 낸 경기 포함)를 새 피리어드 버전으로 옮긴다. 피리어드 말고는 지금 설정과 같은 버전을 따르던
    * 경기만 옮긴다 — 라인업·결과 규칙이 다른 버전으로 남겨 둔 경기를 피리어드 저장이 바꾸면 안 된다.
@@ -160,8 +304,8 @@ export class TournamentPeriodSettingsService {
     row: { id: string; kind: V1CompetitionKind | null },
     target: { id: string; contentHash: string; periods: Prisma.JsonValue },
     nextPeriods: StoredPeriod[],
+    ownership = teamMatchOwnershipWhere(row.kind, row.id),
   ) {
-    const ownership = teamMatchOwnershipWhere(row.kind, row.id);
     const pinned = await tx.v1TeamMatch.findMany({
       where: { ...ownership, status: { not: 'completed' }, competitionConfigVersionId: { not: target.id }, OR: [{ game: null }, { game: { is: untouchedGameWhere(true) } }] },
       select: { competitionConfigVersionId: true },
@@ -270,13 +414,19 @@ export class TournamentPeriodSettingsService {
     return row;
   }
 
-  private serialize(row: { id: string; updatedAt: Date; competitionConfigVersionId: string | null; competitionConfig: { periods: Prisma.JsonValue } | null }) {
+  private serialize(row: Pick<PeriodSettingsTournament, 'id' | 'kind' | 'updatedAt' | 'competitionConfigVersionId' | 'competitionConfig' | 'stagePeriodSettings'>) {
     return {
       tournamentId: row.id,
+      kind: row.kind ?? V1CompetitionKind.regular_tournament,
       competitionConfigVersionId: row.competitionConfigVersionId,
       expectedVersion: row.updatedAt.toISOString(),
       ...(row.competitionConfig ? this.readPeriods(row.competitionConfig.periods) : { periods: null, legacyPeriodCount: null }),
       requiresDurationInput: row.competitionConfig ? this.readPeriods(row.competitionConfig.periods).periods === null : true,
+      stageOverrides: row.stagePeriodSettings.map((setting) => ({
+        phase: setting.phase,
+        competitionConfigVersionId: setting.competitionConfigVersionId,
+        ...this.readPeriods(setting.periods),
+      })),
     };
   }
 }

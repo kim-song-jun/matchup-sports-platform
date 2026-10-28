@@ -36,7 +36,8 @@ export function TeamMatchOperateEntry({ teamMatchId }: { teamMatchId: string }) 
   }
 
   const match = query.data;
-  if (!match || match.id !== teamMatchId) {
+  const canonicalTeamMatchId = match?.teamMatchId;
+  if (!match || typeof canonicalTeamMatchId !== 'string' || canonicalTeamMatchId !== teamMatchId) {
     return (
       <main className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6">
         <ErrorState
@@ -74,7 +75,7 @@ export function TeamMatchOperateEntry({ teamMatchId }: { teamMatchId: string }) 
   }
 
   if (match.status === 'recruiting') {
-    return <TeamMatchRulePreview match={match} teamMatchId={teamMatchId} />;
+    return <TeamMatchRulePreview match={match} teamMatchId={canonicalTeamMatchId} />;
   }
 
   if (match.status === 'completed') {
@@ -83,7 +84,7 @@ export function TeamMatchOperateEntry({ teamMatchId }: { teamMatchId: string }) 
         <ErrorState
           title="경기가 종료됐어요"
           message="경기 기록은 기존 결과 화면에서 확인해 주세요."
-          back={{ href: `/team-matches/${encodeURIComponent(teamMatchId)}/result`, label: '경기 결과 보기' }}
+          back={{ href: `/team-matches/${encodeURIComponent(canonicalTeamMatchId)}/result`, label: '경기 결과 보기' }}
         />
       </main>
     );
@@ -105,13 +106,13 @@ export function TeamMatchOperateEntry({ teamMatchId }: { teamMatchId: string }) 
     <TeamMatchOperateConsole
       gameId={match.gameId}
       teamMatchContext={{
-        teamMatchId: match.id,
+        teamMatchId: canonicalTeamMatchId,
         gameId: match.gameId,
         status: match.status,
         isStandalone: match.league === null,
         viewerCanManageHost: canManageHost,
       }}
-      resultHref={`/team-matches/${encodeURIComponent(match.id)}/result`}
+      resultHref={`/team-matches/${encodeURIComponent(canonicalTeamMatchId)}/result`}
     />
   );
 }

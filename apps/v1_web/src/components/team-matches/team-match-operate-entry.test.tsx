@@ -129,6 +129,17 @@ describe('TeamMatchOperateEntry recruiting preview', () => {
     expect(screen.queryByText('단판')).not.toBeInTheDocument();
   });
 
+  it('rejects a response whose canonical teamMatchId differs from the requested route ID', () => {
+    teamMatchQuery.current.data = recruitingMatch({ teamMatchId: 'different-team-match' });
+
+    renderEntry();
+
+    expect(screen.getByRole('alert')).toHaveTextContent('팀매치를 확인할 수 없어요');
+    expect(screen.getByRole('alert')).toHaveTextContent('요청한 팀매치와 조회된 정보가 일치하지 않아요.');
+    expect(screen.queryByText('전반')).not.toBeInTheDocument();
+    expect(operateConsole.render).not.toHaveBeenCalled();
+  });
+
   it('does not show guessed rules when the saved periods are absent', () => {
     teamMatchQuery.current.data = recruitingMatch({ periods: null });
 

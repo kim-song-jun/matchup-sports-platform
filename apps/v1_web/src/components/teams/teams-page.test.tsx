@@ -161,6 +161,8 @@ describe('TeamListPageView', () => {
     expect(tabletRules).toMatch(/\.tm-team-tablet-create\s*\{\s*display:\s*inline-flex/);
     expect(tabletRules).toMatch(/\.tm-team-summary-meta\s*\{[^}]*flex-direction:\s*column/);
     expect(tabletRules).toMatch(/\.tm-team-summary-meta\s*\{[^}]*justify-content:\s*flex-start/);
+    expect(tabletRules).toMatch(/\.tm-scroll-area:has\(\.tm-team-tablet-create\)\s*\{\s*--v1-shell-fab-clear-pad:\s*var\(--v1-shell-scroll-bottom-pad\)/);
+    expect(tabletRules).toMatch(/\.tm-team-list:has\(\.tm-team-tablet-create\)\s*\{\s*padding-bottom:\s*0/);
     expect(narrowMetaRule).toMatch(/flex-direction:\s*column/);
     expect(narrowMetaRule).toMatch(/align-items:\s*flex-start/);
     expect(narrowMetaRule).toMatch(/justify-content:\s*flex-start/);

@@ -1,7 +1,6 @@
 'use client';
 
 import { Button } from '@/components/v1-ui/button';
-import { isRetryableGameOperationsErrorCode } from '@/hooks/use-v1-game-operations-console';
 import type { QueuedGameEvent, QueuedEventStatus } from '@/lib/game-operations-queue';
 
 /**
@@ -25,6 +24,7 @@ export interface QueueStatusPanelProps {
   readonly items: readonly QueuedGameEvent[];
   readonly onRetry: (clientEventId: string) => void;
   readonly disabled?: boolean;
+  readonly isRetryableError: (code: string, reason?: string | null) => boolean;
 }
 
 const STATUS_LABEL: Record<QueuedEventStatus, string> = {
@@ -54,7 +54,7 @@ function eventLabel(item: QueuedGameEvent): string {
   return item.event.type;
 }
 
-export function QueueStatusPanel({ items, onRetry, disabled = false }: QueueStatusPanelProps) {
+export function QueueStatusPanel({ items, onRetry, disabled = false, isRetryableError }: QueueStatusPanelProps) {
   const unsettled = items.filter((item) => item.status !== 'acked');
   if (unsettled.length === 0) {
     return (
@@ -95,7 +95,7 @@ export function QueueStatusPanel({ items, onRetry, disabled = false }: QueueStat
               확실한 버튼을 살려 두면 운영자가 실패 루프에 갇힌다. 그 대신 위의
               `item.lastError.message` 문구가 무엇을 해야 하는지(새로고침/관리자 문의
               등) 직접 안내한다. */}
-          {item.status === 'failed' && (item.lastError === null || isRetryableGameOperationsErrorCode(item.lastError.code, item.lastError.reason)) ? (
+          {item.status === 'failed' && (item.lastError === null || isRetryableError(item.lastError.code, item.lastError.reason)) ? (
             <Button size="sm" variant="outline" disabled={disabled} onClick={() => onRetry(item.clientEventId)}>
               다시 시도
             </Button>

@@ -9,9 +9,18 @@
  * large, self-contained surface.
  */
 
-import type { V1LineupConfig } from './api';
+import type { V1LineupConfig, V1TeamMatchApiStatus } from './api';
 
 export type GameSourceType = 'TEAM_MATCH' | 'TOURNAMENT_FIXTURE';
+export type GameOperationsMode = 'ordinary-host' | 'tournament-leased';
+/** API-authored TeamMatch context needed to bind an ordinary host console to its source. */
+export interface TeamMatchGameOperationsContext {
+  readonly teamMatchId: string;
+  readonly gameId: string | null;
+  readonly status: V1TeamMatchApiStatus;
+  readonly isStandalone: boolean;
+  readonly viewerCanManageHost: boolean;
+}
 export type GameState = 'SCHEDULED' | 'LIVE' | 'PAUSED' | 'ENDED' | 'CANCELLED';
 export type GameSideKey = 'HOME' | 'AWAY';
 /** 이슈 #375 — `HALFTIME`: 현재 피리어드는 `ENDED`로 닫혔지만 다음
@@ -273,7 +282,7 @@ export type GameCommandName = 'start' | 'pause' | 'resume' | 'end' | 'end-period
 export interface GameCommandRequest {
   expectedVersion: number;
   clientCommandId: string;
-  takeoverToken: string;
+  takeoverToken?: string;
   occurredAt: string;
   payload: Record<string, unknown>;
 }
@@ -297,7 +306,7 @@ export interface GameRevisionMutationResult extends GameMutationResult {
 export interface GameEventAppendInput {
   expectedVersion: number;
   clientEventId: string;
-  takeoverToken: string;
+  takeoverToken?: string;
   type: GameEventType;
   sideId?: string;
   participantId?: string;
@@ -333,7 +342,7 @@ export interface GameEventAppendResult extends GameMutationResult {
 export interface AssignGoalAssistRequest {
   expectedVersion: number;
   clientEventId: string;
-  takeoverToken: string;
+  takeoverToken?: string;
   assistParticipantId: string | null;
 }
 

@@ -112,6 +112,7 @@ vi.mock('./team-matches-page', () => ({
       <span data-testid="team-match-host-actions">{model.hostActions?.map((action) => action.label).join(',')}</span>
       <span data-testid="team-match-host-action-details">{JSON.stringify(model.hostActions?.map((action) => ({ label: action.label, description: action.description, confirm: action.confirm ?? null })) ?? null)}</span>
       <span data-testid="team-match-next-action">{model.nextAction?.label}</span>
+      {model.operateAction && <a href={model.operateAction.href}>{model.operateAction.label}</a>}
       <span data-testid="team-match-status-caption">{model.statusCaption}</span>
       <span data-testid="team-match-manage-menu">{JSON.stringify(model.manageMenu ?? null)}</span>
       <span data-testid="team-match-progress">{JSON.stringify(model.progress ?? null)}</span>
@@ -489,7 +490,7 @@ describe('TeamMatchDetailPageClient — result action routing gate (Task 17)', (
   ) {
     useV1TeamMatchMock.mockReturnValue({
       data: {
-        ...(league ? { league } : {}),
+        league: league ?? null,
         id: 'team-match-1',
         teamMatchId: 'team-match-1',
         title: '풋살 팀매치',
@@ -500,6 +501,7 @@ describe('TeamMatchDetailPageClient — result action routing gate (Task 17)', (
         capacityText: '2/2',
         displayState: status,
         status,
+        gameId: 'game-1',
         viewer: {
           state: viewer.state,
           manageableHostTeam: viewer.manageableHostTeam ?? false,
@@ -524,6 +526,10 @@ describe('TeamMatchDetailPageClient — result action routing gate (Task 17)', (
 
     const link = screen.getByRole('link', { name: '경기 기록 보기' });
     expect(link).toHaveAttribute('href', '/team-matches/team-match-1/result');
+    expect(screen.getByRole('link', { name: '경기 운영하기' })).toHaveAttribute(
+      'href',
+      '/team-matches/team-match-1/operate',
+    );
     expect(screen.queryByText('경기 결과 대기')).not.toBeInTheDocument();
     expect(screen.queryByText('경기 결과 확인/승인')).not.toBeInTheDocument();
   });
@@ -596,6 +602,60 @@ describe('TeamMatchDetailPageClient — result action routing gate (Task 17)', (
     expect(screen.queryByRole('link', { name: '경기 기록 보기' })).not.toBeInTheDocument();
     expect(document.querySelector('a[href="/team-matches/team-match-1/result/approval"]')).toBeNull();
     expect(screen.queryByRole('link', { name: '경기 결과 보기' })).not.toBeInTheDocument();
+  });
+});
+
+describe('TeamMatchDetailPageClient — recruiting host rule preview entry (MD-QA #141)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useV1TeamMatchEligibilityMock.mockReturnValue({ data: undefined, isSuccess: false });
+  });
+
+  it('links a host manager directly to the same TeamMatch rule preview', () => {
+    useV1TeamMatchMock.mockReturnValue({
+      data: {
+        id: 'team-match-1',
+        teamMatchId: 'team-match-1',
+        title: '풋살 팀매치',
+        sportName: '풋살',
+        status: 'recruiting',
+        gameId: 'game-1',
+        periods: [{ code: 'SINGLE', label: '단판', durationMinutes: 35, extraTime: false }],
+        league: null,
+        viewer: { state: 'host_team', manageableHostTeam: true, manageableOpponentTeam: false },
+        hostTeam: { teamId: 'team-host', name: '호스트 팀' },
+      },
+      isError: false,
+    });
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+
+    expect(screen.getByRole('link', { name: '경기 규칙 미리보기' })).toHaveAttribute(
+      'href',
+      '/team-matches/team-match-1/operate',
+    );
+  });
+
+  it('does not expose the host preview entry to a non-manager or league fixture', () => {
+    useV1TeamMatchMock.mockReturnValue({
+      data: {
+        id: 'team-match-1',
+        teamMatchId: 'team-match-1',
+        title: '풋살 팀매치',
+        sportName: '풋살',
+        status: 'recruiting',
+        gameId: 'game-1',
+        periods: [{ code: 'SINGLE', label: '단판', durationMinutes: 35, extraTime: false }],
+        league: { leagueId: 'league-1', title: '리그' },
+        viewer: { state: 'none', manageableHostTeam: false, manageableOpponentTeam: false },
+        hostTeam: { teamId: 'team-host', name: '호스트 팀' },
+      },
+      isError: false,
+    });
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+
+    expect(screen.queryByRole('link', { name: '경기 규칙 미리보기' })).not.toBeInTheDocument();
   });
 });
 

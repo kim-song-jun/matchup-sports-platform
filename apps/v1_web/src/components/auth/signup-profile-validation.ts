@@ -1,3 +1,5 @@
+export { formatPhone } from '@/shared/lib';
+
 export type SignupProfileField = 'displayName' | 'phone' | 'birthDate' | 'gender';
 
 export type SignupProfileDraft = {
@@ -37,13 +39,6 @@ export function isCompleteSignupProfile(profile: SignupProfileDraft): profile is
 
 export function normalizeSeparatedDigits(value: string): string {
   return value.replace(/[-\s]/gu, '');
-}
-
-export function formatPhone(value: string): string {
-  if (!/^\d+$/.test(value)) return value;
-  if (value.length <= 3) return value;
-  if (value.length <= 7) return `${value.slice(0, 3)}-${value.slice(3)}`;
-  return `${value.slice(0, 3)}-${value.slice(3, 7)}-${value.slice(7)}`;
 }
 
 export function formatBirthDate(value: string): string {

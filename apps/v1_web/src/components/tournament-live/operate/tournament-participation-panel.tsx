@@ -8,7 +8,7 @@ import { rosterPersonLabel } from '@/lib/roster-presentation';
 import { gameRosterStatusLabel } from '@/lib/v1-status-labels';
 import { SectionTitle } from '@/components/v1-ui/primitives';
 import type { GameSide } from '@/types/game-operations';
-import { jerseyText } from './player-label';
+import { jerseyText } from '@/shared/game-operations';
 
 const signature = (view: V1GameRosterView) => JSON.stringify(view.base.map(({ userId, status }) => [userId, status]).sort());
 

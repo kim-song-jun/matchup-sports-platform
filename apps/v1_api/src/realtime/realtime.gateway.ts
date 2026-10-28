@@ -122,7 +122,7 @@ type PendingGameSnapshotAck = {
 type RetryGameEventInput = {
   readonly rebasedExpectedVersion: number;
   readonly clientEventId: string;
-  readonly takeoverToken: string;
+  readonly takeoverToken?: string;
   readonly payloadHash: string;
   readonly event: Record<string, unknown>;
 };
@@ -230,7 +230,7 @@ type GameEventCommandPayload = {
   readonly gameId: string;
   readonly expectedVersion: number;
   readonly clientEventId: string;
-  readonly takeoverToken: string;
+  readonly takeoverToken?: string;
   readonly payloadHash: string;
   readonly event: Record<string, unknown>;
 };
@@ -2825,19 +2825,23 @@ function correlationEcho(payload: unknown): {
 }
 
 function parseGameEventCommand(payload: unknown): GameEventCommandPayload | null {
+  const requiredKeys = ['gameId', 'expectedVersion', 'clientEventId', 'payloadHash', 'event'];
   if (
-    !isPlainObjectWithKeys(payload, [
-      'gameId',
-      'expectedVersion',
-      'clientEventId',
-      'takeoverToken',
-      'payloadHash',
-      'event',
-    ]) ||
+    !isPlainObjectWithKeys(payload, requiredKeys) &&
+    !isPlainObjectWithKeys(payload, [...requiredKeys, 'takeoverToken'])
+  ) {
+    return null;
+  }
+  let takeoverToken: string | undefined;
+  if (Object.hasOwn(payload, 'takeoverToken')) {
+    const suppliedToken = payload.takeoverToken;
+    if (!isNonemptyString(suppliedToken)) return null;
+    takeoverToken = suppliedToken;
+  }
+  if (
     !isNonemptyString(payload.gameId) ||
     !isSafeNonnegative(payload.expectedVersion) ||
     !isNonemptyString(payload.clientEventId) ||
-    !isNonemptyString(payload.takeoverToken) ||
     !isNonemptyString(payload.payloadHash)
   ) {
     return null;
@@ -2849,26 +2853,30 @@ function parseGameEventCommand(payload: unknown): GameEventCommandPayload | null
         gameId: payload.gameId,
         expectedVersion: payload.expectedVersion,
         clientEventId: payload.clientEventId,
-        takeoverToken: payload.takeoverToken,
+        ...(takeoverToken === undefined ? {} : { takeoverToken }),
         payloadHash: payload.payloadHash,
         event,
       };
 }
 
 function parseGameEventRetry(payload: unknown): GameEventRetryPayload | null {
+  const requiredKeys = ['gameId', 'rebasedExpectedVersion', 'clientEventId', 'payloadHash', 'event'];
   if (
-    !isPlainObjectWithKeys(payload, [
-      'gameId',
-      'rebasedExpectedVersion',
-      'clientEventId',
-      'takeoverToken',
-      'payloadHash',
-      'event',
-    ]) ||
+    !isPlainObjectWithKeys(payload, requiredKeys) &&
+    !isPlainObjectWithKeys(payload, [...requiredKeys, 'takeoverToken'])
+  ) {
+    return null;
+  }
+  let takeoverToken: string | undefined;
+  if (Object.hasOwn(payload, 'takeoverToken')) {
+    const suppliedToken = payload.takeoverToken;
+    if (!isNonemptyString(suppliedToken)) return null;
+    takeoverToken = suppliedToken;
+  }
+  if (
     !isNonemptyString(payload.gameId) ||
     !isSafeNonnegative(payload.rebasedExpectedVersion) ||
     !isNonemptyString(payload.clientEventId) ||
-    !isNonemptyString(payload.takeoverToken) ||
     !isNonemptyString(payload.payloadHash)
   ) {
     return null;
@@ -2880,7 +2888,7 @@ function parseGameEventRetry(payload: unknown): GameEventRetryPayload | null {
         gameId: payload.gameId,
         rebasedExpectedVersion: payload.rebasedExpectedVersion,
         clientEventId: payload.clientEventId,
-        takeoverToken: payload.takeoverToken,
+        ...(takeoverToken === undefined ? {} : { takeoverToken }),
         payloadHash: payload.payloadHash,
         event,
       };
@@ -2953,7 +2961,6 @@ const GAME_EVENT_COMMAND_KEYS = [
   'gameId',
   'expectedVersion',
   'clientEventId',
-  'takeoverToken',
   'payloadHash',
   'event',
 ] as const;
@@ -2961,7 +2968,6 @@ const GAME_EVENT_RETRY_KEYS = [
   'gameId',
   'rebasedExpectedVersion',
   'clientEventId',
-  'takeoverToken',
   'payloadHash',
   'event',
 ] as const;
@@ -2980,7 +2986,8 @@ function diagnoseGameEventEnvelope(
     return { missingKeys: [], unknownKeys: [], invalidFields: ['(payload는 object가 아님)'] };
   }
   const missingKeys = requiredKeys.filter((key) => !Object.hasOwn(payload, key));
-  const unknownKeys = Object.keys(payload).filter((key) => !requiredKeys.includes(key));
+  const allowedKeys = [...requiredKeys, 'takeoverToken'];
+  const unknownKeys = Object.keys(payload).filter((key) => !allowedKeys.includes(key));
   const invalidFields: string[] = [];
   if (Object.hasOwn(payload, 'gameId') && !isNonemptyString(payload.gameId)) {
     invalidFields.push('gameId');

@@ -20,6 +20,8 @@
 
 경기별 골키퍼 지정 (2026-10-14): 명단 조회에 `goalkeeper`를 추가하고 팀 일괄 명단 API에 복수 지정 `SET_GOALKEEPER`를 지원한다. [Games 계약](./domains/games.md#경기-명단-gk-지정-task-20261082)을 확인한다.
 
+일반 팀매치 경기 운영의 명령·이벤트 요청은 `takeoverToken` 생략을 transport에서 허용한다. 생략 시에도 GamesService의 기존 host/lease 권한 판정이 최종 기준이며, tournament-scoped 운영은 기존 유효 lease를 요구한다. 제공 값은 공백 문자가 아닌 문자를 하나 이상 포함한 문자열이어야 하며 원문 그대로 전달된다. 빈 문자열·공백 전용 문자열·`null`·잘못된 타입은 계속 validation error다. [Games](./domains/games.md) · [Game realtime](./domains/game-realtime.md).
+
 # Teameet v1 API contracts
 
 대진 v2는 4~64팀 짝수, 조별 인원·진출 수와 홀수 결선, 서버 미리보기·초안·멱등 생성 계약을 제공한다. 활성화와 수동 결선 진출 표시 규칙은 [대회 v2 계약](./domains/tournaments.md#유연한-대진-v2-2026-10-27)을 따른다.

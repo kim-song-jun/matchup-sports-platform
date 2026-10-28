@@ -242,6 +242,61 @@ describe('Task 8 game-operations realtime protocol', () => {
     expect(emitCommittedEvent).toHaveBeenCalledWith(GAME_ID, 5, expect.objectContaining({ gameId: GAME_ID, sequence: 4 }));
   });
 
+  it('passes an omitted takeover token through append and retry parsing', async () => {
+    const client = socket();
+    const event = { type: 'SCORE', period: 1, clockMs: 12_000, occurredAt: '2026-08-01T10:00:00.000Z', payload: {} };
+    gamesService.appendEvent.mockResolvedValue({
+      gameId: GAME_ID, state: 'LIVE', version: 5, durableCommandId: 'event-no-lease',
+      replayed: false, clientEventId: 'event-no-lease', sequence: 4,
+    });
+    gamesService.retryEvent.mockResolvedValue({
+      gameId: GAME_ID, state: 'LIVE', version: 5, durableCommandId: 'event-no-lease',
+      replayed: true, clientEventId: 'event-no-lease', sequence: 4,
+    });
+
+    await expect(task8Gateway(gateway).appendGameEvent(client, {
+      gameId: GAME_ID,
+      expectedVersion: 4,
+      clientEventId: 'event-no-lease',
+      payloadHash: 'sha256:stable-payload',
+      event,
+    })).resolves.toMatchObject({ status: 'ack', clientEventId: 'event-no-lease' });
+    expect(gamesService.appendEvent).toHaveBeenCalledWith(
+      USER, GAME_ID, 'event-no-lease', expect.objectContaining({ takeoverToken: undefined }),
+    );
+
+    await expect(task8Gateway(gateway).retryGameEvent(client, {
+      gameId: GAME_ID,
+      rebasedExpectedVersion: 5,
+      clientEventId: 'event-no-lease',
+      payloadHash: 'sha256:stable-payload',
+      event,
+    })).resolves.toMatchObject({ status: 'ack', clientEventId: 'event-no-lease' });
+    expect(gamesService.retryEvent).toHaveBeenCalledWith(USER, GAME_ID, expect.objectContaining({
+      rebasedExpectedVersion: 5,
+      clientEventId: 'event-no-lease',
+      takeoverToken: undefined,
+      event,
+    }));
+  });
+
+  it.each([null, '', 42, false])('rejects a supplied invalid takeover token (%p) before append or retry', async (takeoverToken) => {
+    const client = socket();
+    const event = { type: 'SCORE', period: 1, clockMs: 12_000, occurredAt: '2026-08-01T10:00:00.000Z', payload: {} };
+    const append = await task8Gateway(gateway).appendGameEvent(client, {
+      gameId: GAME_ID, expectedVersion: 4, clientEventId: 'bad-token', takeoverToken,
+      payloadHash: 'sha256:stable-payload', event,
+    });
+    expect(append).toMatchObject({ status: 'error', code: 'VALIDATION_ERROR' });
+    const retry = await task8Gateway(gateway).retryGameEvent(client, {
+      gameId: GAME_ID, rebasedExpectedVersion: 4, clientEventId: 'bad-token', takeoverToken,
+      payloadHash: 'sha256:stable-payload', event,
+    });
+    expect(retry).toMatchObject({ status: 'error', code: 'VALIDATION_ERROR' });
+    expect(gamesService.appendEvent).not.toHaveBeenCalled();
+    expect(gamesService.retryEvent).not.toHaveBeenCalled();
+  });
+
   /**
    * **큐가 실제로 가장 많이 만나는 실패가 이 경로다.**
    *

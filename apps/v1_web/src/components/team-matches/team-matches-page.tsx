@@ -728,6 +728,14 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
                 </div>
               ) : null}
               {nowCard}
+              {model.operateAction ? (
+                <Link
+                  className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block mt-3"
+                  href={model.operateAction.href}
+                >
+                  {model.operateAction.label}
+                </Link>
+              ) : null}
               {/* ── 그룹 1: 일정 · 장소 ── */}
               <div className="tm-info-group">
                 <div className="tm-info-group-label">일정 · 장소</div>

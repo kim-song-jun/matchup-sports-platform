@@ -53,12 +53,12 @@ describe('16강 단계 (PostgreSQL)', () => {
     expect(await prisma.v1TournamentSlot.count({ where: { tournamentId, kind: 'BYE' } })).toBe(0);
   });
 
-  it('조는 16강이 조별 다음 첫 결선으로 정렬된다 — 어드민 대진 조회와 공개 상세 조회 둘 다 (enum 순서 = BEFORE round12)', async () => {
+  it('16강은 첫 결선으로 정렬되고, 어드민은 3·4위전 뒤 결승을 표시하며 공개 조회 원본 순서는 보존한다', async () => {
     const { tournamentId } = await seedBracketTournament(prisma, { label: 'ko16-order', format: 'knockout', teamCount: 0 });
     await templates.apply(user, tournamentId, { kind: 'knockout', size: 16, thirdPlace: true });
 
     const admin = await bracket.getBracket(user, tournamentId);
-    expect(admin.groups.map((g) => g.phase)).toEqual(['round16', 'quarter', 'semi', 'final', 'third_place']);
+    expect(admin.groups.map((g) => g.phase)).toEqual(['round16', 'quarter', 'semi', 'third_place', 'final']);
 
     const row = await prisma.v1Tournament.findUniqueOrThrow({ where: { id: tournamentId }, include: TOURNAMENT_DETAIL_INCLUDE });
     expect(row.groups.map((g) => g.phase)).toEqual(['round16', 'quarter', 'semi', 'final', 'third_place']);

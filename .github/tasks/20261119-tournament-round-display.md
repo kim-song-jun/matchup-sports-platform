@@ -70,3 +70,9 @@ Forbidden: DB/schema/migrations/결과확정·진출·stage rank 정책/다른 �
 - Alpha 화면/console/network 0/3(미배포). 로컬 Next 서버 및 브라우저 실행0. 프로덕션 읽기 전용 조회만 수행.
 - 신규 데이터, 점수·참가자·진출·시간·sortOrder 수정0. API/화면의 반환/표시 순서만 변경.
 - 미커밋 별도 worktree. 기존6강PR과 원본 공유트리 변경 없음. 사용자 PR 생성 요청에 따라 명시 경로 커밋 및 dev 대상 PR 진행. 배포 후 alpha 검증은 후속.
+
+## CI 후속 수정
+- CI40646348721: Web/Gates PASS. API 통합1347 PASS/1 FAIL(16강 조회 순서 기대값이 이전 정책을 유지).
+- 승인된 어드민3위전→결승 순서에 맞춰 해당 기대값만 갱신. 공개 원본 조회 순서 및 실제 경기 생성·진출 검증은 보존.
+- 전용 로컬 PostgreSQL에 기존 migration 전체 적용 후 bracket-round16 통합4건 PASS. 운영 DB 접근/쓰기0.
+- 최신 head CI 재실행 대상. Copilot 모델 불가 외부 오류/필수리뷰 예외 승인 대기. 미머지·미배포.

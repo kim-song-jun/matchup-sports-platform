@@ -8,13 +8,14 @@ import { useV1AdminBracket } from '@/hooks/use-v1-api';
 import { buildLeagueStandings } from '@/lib/bracket-league-standings-model';
 import { buildBracketMobileRounds, buildLeagueTournamentMobileRounds, candidatesFromRegistrations } from '@/lib/bracket-canvas-mobile-model';
 import { extractErrorMessage } from '@/lib/error-message';
-import type { V1AdminTournamentRegistration, V1TournamentFormat } from '@/types/api';
+import type { V1AdminTournamentRegistration, V1TournamentFormat, V1SixTeamBracket } from '@/types/api';
 import { FinalistAssignmentButton } from './finalist-assignment-button';
 import { BracketCanvasMobile } from './bracket-canvas-mobile';
 import { BracketLeagueStandings } from './bracket-league-standings';
 import type { RegistrationsLoadState } from './bracket-team-tray';
 
 export interface BracketCanvasMobileScreenProps {
+  sixTeamState?: V1SixTeamBracket | null;
   tournamentId: string;
   registrations: V1AdminTournamentRegistration[];
   registrationsState: RegistrationsLoadState;
@@ -24,7 +25,7 @@ export interface BracketCanvasMobileScreenProps {
 }
 
 /** 768px 미만의 대진 그림 화면. 구조 편집 도구(툴바·트레이)는 두지 않고 목록과 시트만 보여 준다. */
-export function BracketCanvasMobileScreen({ tournamentId, registrations, registrationsState, canWrite, format, showToast }: BracketCanvasMobileScreenProps) {
+export function BracketCanvasMobileScreen({ sixTeamState, tournamentId, registrations, registrationsState, canWrite, format, showToast }: BracketCanvasMobileScreenProps) {
   const { data: bracket, isPending, isError, error, refetch } = useV1AdminBracket(tournamentId);
   const rounds = useMemo(() => {
     if (bracket === undefined) return [];
@@ -67,6 +68,7 @@ export function BracketCanvasMobileScreen({ tournamentId, registrations, registr
         </details>
       ) : null}
       <BracketCanvasMobile
+        sixTeamState={sixTeamState}
         competitionId={tournamentId}
         scope="tournament"
         rounds={rounds}

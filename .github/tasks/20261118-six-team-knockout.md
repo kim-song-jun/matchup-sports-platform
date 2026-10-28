@@ -1,5 +1,25 @@
 # Task 20261118: 6강 전용 토너먼트 진행 방식
 
+## 2026-10-28 연결형 대진표 후속 — 사용자 승인
+
+- Status: In Progress. 단일 에이전트, branch `fix/six-team-connected`, base `b71a5d031`.
+- [x] A/B/C 비교 후 A 선택, 사용자 최종 수정안 승인: 한 캔버스에 6강3 → 준결승1+부전승1 → 결승1. 6강 출발선 없음, 준결승/부전승→결승만 연결.
+- [x] Phase 1: 공개/관리자 공통 배치 및 선정 전후·결승 홈원정 교환 모델.
+- [x] Phase 2: 상세/공개 대진표, 관리자 그림 desktop/mobile와 기존 편집 연결.
+- [x] Phase 3: 좁은 회귀·타입/패턴·diff/debt 검사, 시나리오 기록.
+- [ ] Alpha after390/768/1440 및 인증된 관리자 실제 편집/생성 검증(미배포).
+- Owned: six-team bracket 공통 컴포넌트/테스트, 관리자 canvas/page props, template preview 안내, 이 task/scenario/changeset.
+- Forbidden: 다른 세션 WIP, 기존 alpha/prod 데이터, 비밀/.env, main 승격, 부전승 가상 Game.
+- AC: 단계 전체 가로 배치, 6강 연결0/후속 연결2, 선정 전 자리 유지, 선정/교환 후 같은 위치, 실제5경기 유지, 관리자 편집 접근 유지.
+- 기존 sixTeamBracket 상태와 결과 확정 후 자동 배정을 사용한다. 동적 6강 출처를 고정 edge로 저장하지 않는다. 기존 대회 재생성 불필요.
+- Risks: alpha after는 코드 배포 후에만 검증 가능. 로컬 Next 서버 금지. 현재 도구에 browser connector 없음.
+- Progress: `_worktrees/six-team-connected`에 구현. Web211 PASS, frontend tsc/패턴 PASS. 실제 alpha before3/3(연결0/overflow0/pageerror0, 기존 익명401 기록), after0/3. 기존 데이터 변경0.
+- 서버 자동 진출 배정과 5경기 생성 계약 유지. 표시 관계는 저장된 sixTeamBracket에서 유도해 기존 생성 대회도 반영. 고정 6강 edge나 가상 부전승 Game을 추가하지 않음.
+- CLI/컴포넌트 검증: desktop 실제 결승 선택 callback, mobile 실제 경기 시트, 템플릿 실제 여섯 팀 선택→미리보기→기존 생성 payload 검증. 단위/타입을 실서버 저장 QA로 대체하지 않음.
+- 보안: 공개 팀명/점수 비공개 회귀 유지, 신규 endpoint/auth/schema 없음. touched marker0/diff-check PASS. 신규 컴포넌트/테스트/changeset/script를 같은 PR에 포함한다. merge/배포는 후속.
+- PR 준비: 사용자 PR 생성 요청. 최신 origin/dev=b71a5d031, 구현 이후 base 변경0. 검증 후 기능 소스 변경 없음. 명시 pathspec으로 이 후속 변경만 커밋하고 dev 대상 PR 생성, Copilot 리뷰 요청. UI 갤러리는 저장소 규칙에 따라 머지/alpha 배포 뒤 보완한다.
+- Cleanup: headed browser PID756/parent27076 종료, 테스트/타입 프로세스 정상 종료. 기존 공유 pnpm 의존성/WIP는 보존. 검증 의존성만 root tmp/six-team-qa에 분리 설치. Windows 패턴 gate는 Git Bash로 실행.
+
 ## 2026-10-28 상세 화면 부전승 누락 후속
 
 - 대상: a90df6d5-47e9-40f9-93ef-f679ce8da858, `1028 토너먼트 6 test`.

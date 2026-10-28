@@ -676,8 +676,10 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
         });
         expect(noLeaseAck).toMatchObject({ status: 'error', code: 'TAKEOVER_TOKEN_EXPIRED' });
         await expect(leaseError.promise).resolves.toMatchObject({
-          code: 'TAKEOVER_TOKEN_EXPIRED',
-          clientEventId: noLeaseEventId,
+          event: {
+            code: 'TAKEOVER_TOKEN_EXPIRED',
+            clientEventId: noLeaseEventId,
+          },
         });
         await expect(prisma.v1GameEvent.count({ where: { gameId, clientEventId: noLeaseEventId } }))
           .resolves.toBe(0);

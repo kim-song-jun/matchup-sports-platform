@@ -4,6 +4,7 @@ import {
   IsInt,
   IsNotEmpty,
   IsObject,
+  Matches,
   IsOptional,
   IsString,
   Min,
@@ -60,7 +61,7 @@ export class GameCommandDto {
 
   @ValidateIf((_dto, value) => value !== undefined)
   @IsString()
-  @IsNotEmpty()
+  @Matches(/\S/, { message: 'takeoverToken must contain a non-whitespace character' })
   takeoverToken?: string;
 
   @IsDateString()

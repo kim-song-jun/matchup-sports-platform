@@ -263,6 +263,71 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
     return team.id;
   }
 
+  async function createFreshFriendlyLiveGame(label: string): Promise<{
+    gameId: string;
+    version: number;
+    homeSideId: string;
+    scorerId: string;
+    assisterId: string;
+  }> {
+    const matchId = randomUUID();
+    await prisma.v1TeamMatch.create({
+      data: {
+        id: matchId,
+        hostTeamId,
+        createdByUserId: operatorId,
+        sportId,
+        regionId,
+        title: `${label} ${SESSION}`,
+        placeName: 'Integration pitch',
+        startAt: new Date('2030-01-03T00:00:00.000Z'),
+        approvedApplicantTeamId: awayTeamId,
+        status: 'matched',
+        competitionConfigVersionId: configId,
+      },
+    });
+    const creation: GameSourceCreationInput = {
+      sourceType: V1GameSourceType.TEAM_MATCH,
+      sourceId: matchId,
+      competitionConfigVersionId: configId,
+      sides: [
+        { sideKey: V1GameSideKey.HOME, teamId: hostTeamId, displayNameSnapshot: `${label} 홈` },
+        { sideKey: V1GameSideKey.AWAY, teamId: awayTeamId, displayNameSnapshot: `${label} 원정` },
+      ],
+      participants: [
+        { sourceParticipantId: `gcr-${SESSION}-${label}-scorer`, sideKey: V1GameSideKey.HOME, displayNameSnapshot: `${label} 득점자`, jerseyNumber: 1 },
+        { sourceParticipantId: `gcr-${SESSION}-${label}-assister`, sideKey: V1GameSideKey.HOME, displayNameSnapshot: `${label} 도움 선수`, jerseyNumber: 2 },
+        { sourceParticipantId: `gcr-${SESSION}-${label}-away`, sideKey: V1GameSideKey.AWAY, displayNameSnapshot: `${label} 원정 선수`, jerseyNumber: 1 },
+      ],
+    };
+    const context: GameCommandContext = {
+      actor: { actorType: 'USER', actorUserId: adminId, role: 'platform_ops' },
+      expectedVersion: 0,
+      durableCommandId: `gcr-${SESSION}-${label}-create`,
+      payloadHash: canonicalGameCommandPayloadHash(creation),
+    };
+    const created = await prisma.$transaction((tx: Prisma.TransactionClient) =>
+      app.get(GamesService).createFromSourceInTransaction(tx, creation, context),
+    );
+    await prisma.v1GameLineup.updateMany({ where: { gameId: created.gameId, revision: 1 }, data: { state: 'SUBMITTED' } });
+    const homeSide = await prisma.v1GameSide.findFirstOrThrow({
+      where: { gameId: created.gameId, sideKey: V1GameSideKey.HOME },
+      select: { id: true },
+    });
+    const [scorer, assister] = await Promise.all([
+      prisma.v1GameParticipant.findFirstOrThrow({ where: { gameId: created.gameId, sideId: homeSide.id, jerseyNumber: 1 }, select: { id: true } }),
+      prisma.v1GameParticipant.findFirstOrThrow({ where: { gameId: created.gameId, sideId: homeSide.id, jerseyNumber: 2 }, select: { id: true } }),
+    ]);
+    const commandId = `gcr-${SESSION}-${label}-start`;
+    const start = await request(app.getHttpServer())
+      .post(`/api/v1/games/${created.gameId}/commands/start`)
+      .set('x-v1-user-id', operatorId)
+      .set('Idempotency-Key', commandId)
+      .send({ expectedVersion: 0, clientCommandId: commandId, occurredAt: new Date().toISOString(), payload: {} })
+      .expect(201);
+    return { gameId: created.gameId, version: start.body.data.version, homeSideId: homeSide.id, scorerId: scorer.id, assisterId: assister.id };
+  }
+
   function connect(userId: string, suffix: string, assignmentVersion: number): Socket {
     const address = app.getHttpServer().address();
     if (address === null || typeof address === 'string') throw new Error('Integration HTTP server is not listening');
@@ -1080,32 +1145,55 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
     await expect(retryEventAck.promise).resolves.toMatchObject({
       event: { clientEventId, status: 'replayed', version: append.version, sequence: append.sequence },
     });
+
+    const freshRetryId = `gcr-unsubscribed-sender-fresh-retry-${SESSION}`;
+    const freshRetryAckEvent = eventOnce<{ event: { clientEventId: string; status: string; version: number; sequence: number } }>(
+      sender,
+      'game.event.ack',
+    );
+    const freshRetryAck = await new Promise<{ status: string; version?: number; sequence?: number }>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('Timed out waiting for fresh token-free event retry ACK')), timeoutMs);
+      sender.emit('game.event.retry', {
+        gameId: friendlyGameId,
+        rebasedExpectedVersion: append.version,
+        clientEventId: freshRetryId,
+        payloadHash: canonicalGameCommandPayloadHash(event),
+        event,
+      }, (result: { status: string; version?: number; sequence?: number }) => {
+        clearTimeout(timer);
+        resolve(result);
+      });
+    });
+    expect(freshRetryAck).toMatchObject({ status: 'ack', version: append.version + 1, sequence: append.sequence! + 1 });
+    await expect(freshRetryAckEvent.promise).resolves.toMatchObject({
+      event: { clientEventId: freshRetryId, status: 'committed', version: append.version + 1, sequence: append.sequence! + 1 },
+    });
+    await expect(prisma.v1GameEvent.findUnique({
+      where: { gameId_clientEventId: { gameId: friendlyGameId, clientEventId: freshRetryId } },
+      select: { id: true, clientEventId: true, sequence: true, payloadHash: true },
+    })).resolves.toMatchObject({
+      id: expect.any(String),
+      clientEventId: freshRetryId,
+      sequence: append.sequence! + 1,
+      payloadHash: canonicalGameCommandPayloadHash(event),
+    });
   });
 
   it('accepts token-free host append, assist detach, and reversal through the real HTTP routes', async () => {
     const server = app.getHttpServer();
     if (!server.listening) await app.listen(0, '127.0.0.1');
-    const game = await prisma.v1Game.findUniqueOrThrow({ where: { id: friendlyGameId }, select: { version: true, state: true } });
-    if (game.state !== 'LIVE') throw new Error(`Expected the friendly fixture to be LIVE, got ${game.state}`);
-    const friendlyHomeSide = await prisma.v1GameSide.findFirstOrThrow({
-      where: { gameId: friendlyGameId, sideKey: V1GameSideKey.HOME },
-      select: { id: true },
-    });
-    const friendlyHomeParticipant = await prisma.v1GameParticipant.findFirstOrThrow({
-      where: { gameId: friendlyGameId, sideId: friendlyHomeSide.id },
-      select: { id: true },
-    });
+    const game = await createFreshFriendlyLiveGame('token-free-http-contract');
     const eventId = `gcr-token-free-http-goal-${SESSION}`;
     const event = await request(app.getHttpServer())
-      .post(`/api/v1/games/${friendlyGameId}/events`)
+      .post(`/api/v1/games/${game.gameId}/events`)
       .set('x-v1-user-id', operatorId)
       .set('Idempotency-Key', eventId)
       .send({
         expectedVersion: game.version,
         clientEventId: eventId,
         type: 'GOAL',
-        sideId: friendlyHomeSide.id,
-        participantId: friendlyHomeParticipant.id,
+        sideId: game.homeSideId,
+        participantId: game.scorerId,
         period: 1,
         clockMs: 2_000,
         occurredAt: new Date().toISOString(),
@@ -1113,43 +1201,43 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
       })
       .expect(201);
     const persistedEvent = await prisma.v1GameEvent.findUniqueOrThrow({
-      where: { gameId_clientEventId: { gameId: friendlyGameId, clientEventId: eventId } },
+      where: { gameId_clientEventId: { gameId: game.gameId, clientEventId: eventId } },
     });
 
     const opponentEventId = `gcr-token-free-http-opponent-${SESSION}`;
     await request(app.getHttpServer())
-      .post(`/api/v1/games/${friendlyGameId}/events`)
+      .post(`/api/v1/games/${game.gameId}/events`)
       .set('x-v1-user-id', awayTeamOwnerId)
       .set('Idempotency-Key', opponentEventId)
       .send({
         expectedVersion: event.body.data.version,
         clientEventId: opponentEventId,
         type: 'GOAL',
-        sideId: friendlyHomeSide.id,
-        participantId: friendlyHomeParticipant.id,
+        sideId: game.homeSideId,
+        participantId: game.scorerId,
         period: 1,
         clockMs: 2_500,
         occurredAt: new Date().toISOString(),
         payload: {},
       })
       .expect(403);
-    await expect(prisma.v1GameEvent.count({ where: { gameId: friendlyGameId, clientEventId: opponentEventId } }))
+    await expect(prisma.v1GameEvent.count({ where: { gameId: game.gameId, clientEventId: opponentEventId } }))
       .resolves.toBe(0);
 
     const opponentAssistId = `gcr-token-free-http-opponent-assist-${SESSION}`;
     await request(app.getHttpServer())
-      .post(`/api/v1/games/${friendlyGameId}/events/${persistedEvent.id}/assist`)
+      .post(`/api/v1/games/${game.gameId}/events/${persistedEvent.id}/assist`)
       .set('x-v1-user-id', awayTeamOwnerId)
       .set('Idempotency-Key', opponentAssistId)
       .send({
         expectedVersion: event.body.data.version,
         clientEventId: opponentAssistId,
-        assistParticipantId: null,
+        assistParticipantId: game.assisterId,
       })
       .expect(403);
     const opponentReverseId = `gcr-token-free-http-opponent-reverse-${SESSION}`;
     await request(app.getHttpServer())
-      .post(`/api/v1/games/${friendlyGameId}/events/${persistedEvent.id}/reverse`)
+      .post(`/api/v1/games/${game.gameId}/events/${persistedEvent.id}/reverse`)
       .set('x-v1-user-id', awayTeamOwnerId)
       .set('Idempotency-Key', opponentReverseId)
       .send({
@@ -1158,33 +1246,51 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
         reason: 'opponent should not amend the host event',
       })
       .expect(403);
-    await expect(prisma.v1Game.findUniqueOrThrow({ where: { id: friendlyGameId }, select: { version: true } }))
+    await expect(prisma.v1GameEvent.findUniqueOrThrow({ where: { id: persistedEvent.id }, select: { assistParticipantId: true } }))
+      .resolves.toEqual({ assistParticipantId: null });
+    await expect(prisma.v1Game.findUniqueOrThrow({ where: { id: game.gameId }, select: { version: true } }))
       .resolves.toEqual({ version: event.body.data.version });
 
     const assistId = `gcr-token-free-http-assist-${SESSION}`;
     const assist = await request(app.getHttpServer())
-      .post(`/api/v1/games/${friendlyGameId}/events/${persistedEvent.id}/assist`)
+      .post(`/api/v1/games/${game.gameId}/events/${persistedEvent.id}/assist`)
       .set('x-v1-user-id', operatorId)
       .set('Idempotency-Key', assistId)
       .send({
         expectedVersion: event.body.data.version,
         clientEventId: assistId,
+        assistParticipantId: game.assisterId,
+      })
+      .expect(201);
+    await expect(prisma.v1GameEvent.findUniqueOrThrow({ where: { id: persistedEvent.id }, select: { assistParticipantId: true } }))
+      .resolves.toEqual({ assistParticipantId: game.assisterId });
+
+    const detachId = `gcr-token-free-http-assist-detach-${SESSION}`;
+    const detached = await request(app.getHttpServer())
+      .post(`/api/v1/games/${game.gameId}/events/${persistedEvent.id}/assist`)
+      .set('x-v1-user-id', operatorId)
+      .set('Idempotency-Key', detachId)
+      .send({
+        expectedVersion: assist.body.data.version,
+        clientEventId: detachId,
         assistParticipantId: null,
       })
       .expect(201);
+    await expect(prisma.v1GameEvent.findUniqueOrThrow({ where: { id: persistedEvent.id }, select: { assistParticipantId: true } }))
+      .resolves.toEqual({ assistParticipantId: null });
 
     const reverseId = `gcr-token-free-http-reverse-${SESSION}`;
     const reversed = await request(app.getHttpServer())
-      .post(`/api/v1/games/${friendlyGameId}/events/${persistedEvent.id}/reverse`)
+      .post(`/api/v1/games/${game.gameId}/events/${persistedEvent.id}/reverse`)
       .set('x-v1-user-id', operatorId)
       .set('Idempotency-Key', reverseId)
       .send({
-        expectedVersion: assist.body.data.version,
+        expectedVersion: detached.body.data.version,
         clientEventId: reverseId,
         reason: 'token-free host route contract',
       })
       .expect(201);
-    expect(reversed.body.data).toMatchObject({ gameId: friendlyGameId, sequence: expect.any(Number) });
+    expect(reversed.body.data).toMatchObject({ gameId: game.gameId, sequence: expect.any(Number) });
   });
 
   it('keeps a newer pending subscribe ACK through an older subscribe cleanup and REST refresh', async () => {

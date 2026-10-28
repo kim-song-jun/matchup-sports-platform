@@ -15,14 +15,16 @@ describe('GameCommandDto takeover token transport contract', () => {
     await expect(validate(plainToInstance(GameCommandDto, validCommand))).resolves.toHaveLength(0);
   });
 
-  it.each([null, '', 42, false])('rejects a provided invalid takeoverToken (%p)', async (takeoverToken) => {
+  it.each([null, '', '   ', '\t\n', 42, false])('rejects a provided invalid takeoverToken (%p)', async (takeoverToken) => {
     const errors = await validate(plainToInstance(GameCommandDto, { ...validCommand, takeoverToken }));
     expect(errors.map(({ property }) => property)).toContain('takeoverToken');
   });
 
   it('accepts a provided nonempty token for leased sources', async () => {
+    const dto = plainToInstance(GameCommandDto, { ...validCommand, takeoverToken: ' lease-token ' });
     await expect(
-      validate(plainToInstance(GameCommandDto, { ...validCommand, takeoverToken: 'lease-token' })),
+      validate(dto),
     ).resolves.toHaveLength(0);
+    expect(dto.takeoverToken).toBe(' lease-token ');
   });
 });

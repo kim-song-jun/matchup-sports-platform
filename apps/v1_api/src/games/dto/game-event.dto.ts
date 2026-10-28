@@ -5,6 +5,7 @@ import {
   IsInt,
   IsNotEmpty,
   IsObject,
+  Matches,
   IsOptional,
   IsString,
   IsUUID,
@@ -55,7 +56,7 @@ export class AppendGameEventDto {
 
   @ValidateIf((_dto, value) => value !== undefined)
   @IsString()
-  @IsNotEmpty()
+  @Matches(/\S/, { message: 'takeoverToken must contain a non-whitespace character' })
   takeoverToken?: string;
 
   @IsEnum(V1GameEventType)
@@ -106,7 +107,7 @@ export class ReverseGameEventDto {
 
   @ValidateIf((_dto, value) => value !== undefined)
   @IsString()
-  @IsNotEmpty()
+  @Matches(/\S/, { message: 'takeoverToken must contain a non-whitespace character' })
   takeoverToken?: string;
 
   @IsString()
@@ -143,7 +144,7 @@ export class AssignGoalAssistDto {
 
   @ValidateIf((_dto, value) => value !== undefined)
   @IsString()
-  @IsNotEmpty()
+  @Matches(/\S/, { message: 'takeoverToken must contain a non-whitespace character' })
   takeoverToken?: string;
 
   @ValidateIf((dto: AssignGoalAssistDto) => dto.assistParticipantId !== null)

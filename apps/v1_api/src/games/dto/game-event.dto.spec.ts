@@ -31,7 +31,7 @@ const validAssist = {
 };
 
 describe('game event DTO takeover token transport contract', () => {
-  type TestDto = new () => object;
+  type TestDto = new () => { takeoverToken?: string };
   const cases: Array<{ name: string; dto: TestDto; validBody: object }> = [
     { name: 'append', dto: AppendGameEventDto, validBody: validAppend },
     { name: 'reverse', dto: ReverseGameEventDto, validBody: validReverse },
@@ -41,13 +41,13 @@ describe('game event DTO takeover token transport contract', () => {
   it.each(cases)('$name allows token omission but rejects supplied invalid values', async ({ dto, validBody }) => {
     await expect(validate(plainToInstance(dto, validBody))).resolves.toHaveLength(0);
 
-    for (const takeoverToken of [null, '', 42, false]) {
+    for (const takeoverToken of [null, '', '   ', '\t\n', 42, false]) {
       const errors = await validate(plainToInstance(dto, { ...validBody, takeoverToken }));
       expect(errors.map(({ property }) => property)).toContain('takeoverToken');
     }
 
-    await expect(
-      validate(plainToInstance(dto, { ...validBody, takeoverToken: 'lease-token' })),
-    ).resolves.toHaveLength(0);
+    const validTokenDto = plainToInstance(dto, { ...validBody, takeoverToken: ' lease-token ' });
+    await expect(validate(validTokenDto)).resolves.toHaveLength(0);
+    expect(validTokenDto.takeoverToken).toBe(' lease-token ');
   });
 });

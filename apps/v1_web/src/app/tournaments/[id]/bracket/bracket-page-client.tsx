@@ -1,4 +1,5 @@
 'use client';
+import { SixTeamBracket } from '@/components/tournaments/six-team-bracket';
 
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -752,10 +753,10 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
                   </h3>
                   {showBracket ? (
                     <div className="tm-bk-wrap">
-                      <TournamentBracket
+                      {tournament.sixTeamBracket ? <SixTeamBracket tournamentId={tournament.id} state={tournament.sixTeamBracket} fixtures={knockoutFixtures} /> : <TournamentBracket
                         fixtures={knockoutFixtures}
                         groups={groups}
-                      />
+                      />}
                     </div>
                   ) : (
                     <BracketEmpty

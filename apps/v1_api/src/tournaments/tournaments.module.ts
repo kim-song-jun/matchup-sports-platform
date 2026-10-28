@@ -1,3 +1,5 @@
+import { SixTeamController } from './six-team/six-team.controller';
+import { SixTeamService } from './six-team/six-team.service';
 import { Module } from '@nestjs/common';
 import { AdminContextModule } from '../common/admin-context.module';
 import { OperationAuditModule } from '../common/audit/operation-audit.module';
@@ -80,6 +82,7 @@ import { TeamCompetitionEntriesService } from './team-competition-entries.servic
     PublicRecordsModule,
   ],
   controllers: [
+    SixTeamController,
     TournamentCampaignsPublicController,
     TournamentCampaignsAdminController,
     TournamentsAdminController,
@@ -102,6 +105,7 @@ import { TeamCompetitionEntriesService } from './team-competition-entries.servic
     TeamCompetitionEntriesController,
   ],
   providers: [
+    SixTeamService,
     MockTournamentSeedService,
     TournamentsAdminService,
     TournamentRegistrationsService,

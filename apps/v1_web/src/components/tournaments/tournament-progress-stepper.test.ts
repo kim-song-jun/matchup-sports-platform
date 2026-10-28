@@ -364,3 +364,9 @@ describe('buildTournamentStages — 정규 리그 거울 행', () => {
     expect(stages.map((s) => s.label)).toContain('조별리그');
   });
 });
+
+it('6강 전용 방식은 일반 8강·4강 명칭 대신 6강→준결승→결승을 표시한다', () => {
+  const value = tournament({ format: 'knockout', status: 'in_progress', fixtures: [fixture({ round: '6강', liveStatus: 'live' })] });
+  value.sixTeamMode = true;
+  expect(buildTournamentStages(value).map(row => row.label)).toEqual(['6강', '준결승', '결승']);
+});

@@ -421,7 +421,7 @@ function MatchTeamRow({
 }
 
 /* ── 매치 카드 ── */
-function MatchCard({ fixture }: { fixture: V1TournamentFixture }) {
+export function MatchCard({ fixture, fluid = false }: { fixture: V1TournamentFixture; fluid?: boolean }) {
   const winner = getWinner(fixture);
   const hasResult = fixture.result !== null;
   const pk = penaltyText(fixture);
@@ -443,6 +443,7 @@ function MatchCard({ fixture }: { fixture: V1TournamentFixture }) {
   return (
     <div
       className={`tm-bk2-card${isLive ? ' tm-bk2-card-live' : ''}`}
+      style={fluid ? { width: '100%' } : undefined}
       role="group"
       aria-label={`${homeLabel} 대 ${awayLabel}`}
     >

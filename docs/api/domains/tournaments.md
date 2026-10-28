@@ -1,3 +1,27 @@
+## 6강 결승 직행 방식 (2026-10-28)
+
+- 대회 create/update DTO의 `sixTeamMode?: boolean`: true는 정원6 + format=knockout만 허용. 기존 대회 기본 false.
+  생성된 6강 대진이 있으면 정원/형식/방식 변경은 `409 SIX_TEAM_SETTINGS_LOCKED`.
+- 기존 template capabilities에 `sixTeamEligible` 추가. 정원6 토너먼트에서만 true.
+- template preview/apply 입력: `{ schemaVersion:2, kind:'knockout', size:6, participantCount:6, sixTeamMode:true, thirdPlace:false, registrationIds:[6개] }`.
+  apply는 기존 `previewHash`/`requestId` 필수. 확정 참가팀이 정확히6팀이며 중복 없는6자리 배정 필요.
+  일반 v2 rollout flag와 별개로 위 조건이 게이트다. 일반6팀 템플릿과 결과 비교형6강은 별도 선택이다.
+- 생성: 6강3/준결승1/결승1, 정확히5개 TeamMatch/Game. V1Tournament.sixTeamBracket에 경기 식별자/진출 선택/직행 출처/기준 버전 저장.
+- `GET /admin/tournaments/:id/bracket/six-team`: active admin, state/results/teams/candidates/automaticBye/version 조회.
+- `PUT /admin/tournaments/:id/bracket/six-team`: mutation admin(owner/ops), `{version,reason,manual,bye?,swapSemi?,swapFinal?,winners:{[fixtureId]:registrationId}}`.
+  사유 필수. winners는 각 경기 참가팀 내 선택, bye는6강 진출팀3팀 내 선택. 외부팀/중복/구버전 거절.
+  `manual:false`는 직행 성적 자동 선정, winners override는 그대로 유지(각 경기 선택에서 공식 결과 따르기로 해제).
+- 공식 결과3건의 승리팀 기준 다득점→득실차→최소실점. PK 점수 제외, 공식 점수에 포함된 연장 득점 포함.
+  완전 동률/비교 가능한 공식 점수 미비는 자동 대기. 운영자가 수동 진출/직행 지정 가능.
+- 수동 결과는 실제 점수/개인전적을 위조하지 않음. 사유/처리자/이전·이후값은 감사 action `tournament.six_team.decide`.
+  수동 선정 후 근거 결과 정정은 needsReview=true. 자동 재계산이 수동 선택을 덮어쓰지 않음.
+- 부분 배정 없음: 같은 tx에서 Details/TeamMatch/GameSide/명단무효화/일정 동기화.
+  후속 시작 상태는 `409 NEXT_FIXTURE_CONFLICT`; 구버전 `409 SIX_TEAM_STALE`; 경합 `409 SIX_TEAM_BUSY`; 후보 오류422.
+- 공개 detail의 `sixTeamMode`는 방식 설명용. `sixTeamBracket`는 대진 공개 이후만 `{rounds,bye,manual,swapSemi,swapFinal,winners,needsReview}`.
+  공개 응답에 사유/처리자/원시 비교점수 없음. 비교표는 기존 공개 fixtures.result만 사용, 숨긴 점수 재노출 금지.
+- Mock: MSW capabilities 기본 sixTeamEligible=false, 공개표 테스트 inline fixture 및 실제 DB 통합 fixture로 별도6강 계약 검증.
+- schema migration 20261028000000_six_team_bracket / 20261028000001_six_team_mode 필요.
+
 # V1 Tournaments API
 
 ## 유연한 대진 v2 (2026-10-27)

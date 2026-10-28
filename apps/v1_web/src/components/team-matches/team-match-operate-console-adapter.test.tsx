@@ -3,10 +3,19 @@ import { act, cleanup, fireEvent, render as renderElement, screen, waitFor, with
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as overlayHistory from '@/lib/overlay-history';
-import type { GameDetail, GameLineup } from '@/types/game-operations';
+import type { GameDetail, GameLineup, GameMutationResult } from '@/types/game-operations';
 import { TeamMatchOperateConsole } from './team-match-operate-console';
 
 const queryClients: QueryClient[] = [];
+function gameMutationResult(state: GameMutationResult['state']): GameMutationResult {
+  return {
+    gameId: 'game-1',
+    state,
+    version: 3,
+    durableCommandId: 'command-1',
+    replayed: false,
+  };
+}
 function render(ui: ReactNode) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
   queryClients.push(client);
@@ -45,7 +54,7 @@ beforeEach(() => {
   mocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'user-1' } } });
   mocks.useV1GameOperationsConsole.mockReturnValue(consoleState());
   mocks.postV1GameCommand.mockClear();
-  mocks.postV1GameCommand.mockResolvedValue({ gameId: 'game-1', state: 'LIVE', version: 3 });
+  mocks.postV1GameCommand.mockResolvedValue(gameMutationResult('LIVE'));
 });
 
 function consoleState(overrides: Record<string, unknown> = {}) {
@@ -83,7 +92,7 @@ describe('TeamMatchOperateConsole — source binding and ordinary host actions',
     mocks.useV1GameOperationsConsole.mockClear();
     mocks.useV1GameOperationsLineup.mockClear();
     mocks.postV1GameCommand.mockReset();
-    mocks.postV1GameCommand.mockResolvedValue({ gameId: 'game-1', state: 'LIVE', version: 3 });
+    mocks.postV1GameCommand.mockResolvedValue(gameMutationResult('LIVE'));
   });
 
   function ordinaryGameDetail(overrides: Partial<GameDetail> = {}): GameDetail {
@@ -204,7 +213,7 @@ describe('TeamMatchOperateConsole — source binding and ordinary host actions',
 
   it('sends an ordinary host period command without a lease token', async () => {
     mountOrdinaryConsole();
-    mocks.postV1GameCommand.mockResolvedValue({ gameId: 'game-1', state: 'LIVE', version: 3 });
+    mocks.postV1GameCommand.mockResolvedValue(gameMutationResult('LIVE'));
 
     fireEvent.click(screen.getByRole('button', { name: '전반 종료' }));
     const dialog = await screen.findByRole('dialog');

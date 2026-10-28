@@ -1,0 +1,146 @@
+{
+  "observations": [
+    {
+      "width": 390,
+      "status": 200,
+      "url": "https://alpha.teameet.co.kr/tournaments/93a11ead-52ca-4262-bede-66802587c3d8/bracket?tab=standings",
+      "selectedGroup": [
+        "전체",
+        "1경기",
+        "2경기",
+        "3경기"
+      ],
+      "groupSelections": [
+        {
+          "name": "1경기",
+          "pressed": "true"
+        },
+        {
+          "name": "2경기",
+          "pressed": "true"
+        },
+        {
+          "name": "3경기",
+          "pressed": "true"
+        }
+      ],
+      "choices": [
+        "전체",
+        "준결승",
+        "결승"
+      ],
+      "selected": [
+        {
+          "name": "준결승",
+          "pressed": "true"
+        },
+        {
+          "name": "결승",
+          "pressed": "true"
+        }
+      ],
+      "restoredAll": true,
+      "roundLabels": [
+        "준결승",
+        "결승"
+      ],
+      "errors": [],
+      "horizontalOverflow": false
+    },
+    {
+      "width": 768,
+      "status": 200,
+      "url": "https://alpha.teameet.co.kr/tournaments/93a11ead-52ca-4262-bede-66802587c3d8/bracket?tab=standings",
+      "selectedGroup": [
+        "전체",
+        "1경기",
+        "2경기",
+        "3경기"
+      ],
+      "groupSelections": [
+        {
+          "name": "1경기",
+          "pressed": "true"
+        },
+        {
+          "name": "2경기",
+          "pressed": "true"
+        },
+        {
+          "name": "3경기",
+          "pressed": "true"
+        }
+      ],
+      "choices": [
+        "전체",
+        "준결승",
+        "결승"
+      ],
+      "selected": [
+        {
+          "name": "준결승",
+          "pressed": "true"
+        },
+        {
+          "name": "결승",
+          "pressed": "true"
+        }
+      ],
+      "restoredAll": true,
+      "roundLabels": [
+        "준결승",
+        "결승"
+      ],
+      "errors": [],
+      "horizontalOverflow": false
+    },
+    {
+      "width": 1440,
+      "status": 200,
+      "url": "https://alpha.teameet.co.kr/tournaments/93a11ead-52ca-4262-bede-66802587c3d8/bracket?tab=standings",
+      "selectedGroup": [
+        "전체",
+        "1경기",
+        "2경기",
+        "3경기"
+      ],
+      "groupSelections": [
+        {
+          "name": "1경기",
+          "pressed": "true"
+        },
+        {
+          "name": "2경기",
+          "pressed": "true"
+        },
+        {
+          "name": "3경기",
+          "pressed": "true"
+        }
+      ],
+      "choices": [
+        "전체",
+        "준결승",
+        "결승"
+      ],
+      "selected": [
+        {
+          "name": "준결승",
+          "pressed": "true"
+        },
+        {
+          "name": "결승",
+          "pressed": "true"
+        }
+      ],
+      "restoredAll": true,
+      "roundLabels": [
+        "준결승",
+        "결승"
+      ],
+      "errors": [],
+      "horizontalOverflow": false
+    }
+  ],
+  "cleanup": "owned headed browser closed"
+}

@@ -41,12 +41,14 @@ const path = require('node:path');
             if (index === 1) await page.screenshot({ path: path.join(out, `${phase}-selected-group-${width}.png`), fullPage: true });
           }
           await groupNav.getByRole('button', { name: '전체', exact: true }).click();
+          for (const name of selectedGroup.slice(1)) await page.getByRole('region', { name: `${name} 순위`, exact: true }).waitFor({ state: 'visible' });
         }
         const knockoutTab = page.getByRole('tab', { name: '결선', exact: true });
         if (await knockoutTab.count()) await knockoutTab.click();
         const knockoutNav = page.getByRole('navigation', { name: '결선 단계 선택', exact: true });
         const choices = await knockoutNav.count() ? await knockoutNav.getByRole('button').allTextContents() : [];
         if (phase === 'after' && choices.length < 2) throw new Error('Expected deployed knockout stage controls');
+        if (phase === 'after') await page.screenshot({ path: path.join(out, `${phase}-knockout-all-${width}.png`), fullPage: true });
         const selected = [];
         for (let i = 1; i < choices.length; i++) {
           const button = knockoutNav.getByRole('button').nth(i);
@@ -56,7 +58,16 @@ const path = require('node:path');
           selected.push({ name: choices[i], pressed });
         }
         await page.screenshot({ path: path.join(out, `${phase}-knockout-${width}.png`), fullPage: true });
-        observations.push({ width, status: response.status(), url: page.url(), selectedGroup, groupSelections, choices, selected, errors, horizontalOverflow: await page.evaluate(() => document.documentElement.scrollWidth > innerWidth) });
+        let restoredAll = null;
+        if (choices.length > 1) {
+          const allButton = knockoutNav.getByRole('button', { name: '전체', exact: true });
+          await allButton.click();
+          restoredAll = await allButton.getAttribute('aria-pressed') === 'true';
+          if (!restoredAll) throw new Error('Knockout all selection did not restore');
+        }
+        const roundLabels = await page.locator('.tm-bk2-pill').allTextContents();
+        if (phase === 'after' && choices.slice(1).some(name => !roundLabels.includes(name))) throw new Error('A knockout stage is missing after restoring all');
+        observations.push({ width, status: response.status(), url: page.url(), selectedGroup, groupSelections, choices, selected, restoredAll, roundLabels, errors, horizontalOverflow: await page.evaluate(() => document.documentElement.scrollWidth > innerWidth) });
       } catch (error) {
         observations.push({ width, failure: error.message });
       } finally {

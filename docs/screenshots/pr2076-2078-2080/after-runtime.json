@@ -1,0 +1,9 @@
+﻿{
+    "HttpStatus":  200,
+    "Commit":  "ec33d1609c652e6d0bc153a30333d89558bec069",
+    "Release":  "1.12.0-alpha.20261028.gec33d1609c65",
+    "Database":  true,
+    "SixTeamModeFieldPresent":  true,
+    "SixTeamBracketFieldPresent":  true,
+    "SixTeamMode":  false
+}

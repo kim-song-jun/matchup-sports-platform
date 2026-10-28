@@ -206,3 +206,14 @@ Owned: 위 v1 관련 파일과 이 task. Forbidden: legacy, env 파일, main 승
 - 추가 Web CI 실패3건: info-section의 sixTeamMode를 변경 유무와 무관하게 전송해 기존 부분수정 계약을 깨뜨림.
   실제로 바뀐 경우에만 payload에 포함하도록 수정. 기존 회귀22 + 신규6강2 = 24 PASS.
 - Task168 스키마 바인딩 실제 게이트9 PASS: 현행 hash 반영, 이전 manifest hash 및 변조 거절 유지. shell syntax/diff-check PASS.
+
+- head3eb94ee7d CI run40617756281: Gates/Web PASS. API integration found stale gameSchemaSourceManifest.schema pin.
+  Source snapshot unit reproduced RED (3 failed/2 passed). Rebind only current schema; historical game migration stays unchanged.
+- The same API run ended with Node heap OOM (~4GB) while serial integration suites accumulated in --runInBand.
+  Keep maxWorkers=1 and the exact suite discovery, use workerIdleMemoryLimit=1024MB so Jest recycles the single child between suites.
+  Update the discovery contract to execute actual package-script arguments, check serial worker bound, recycling threshold and all canonical suites.
+- Latest Copilot run40617758203 also failed before review generation with the same unavailable-model error. Review remains blocked.
+
+- Source snapshot GREEN: 5/5 PASS including canonical LF, repeated CRLF, schema mutation and historical migration mutation rejection.
+- Actual single-worker recycling contract PASS: both scratch tests executed and PID changed between suites; actual package-script discovery still contains every canonical integration suite.
+- Narrow runner-contract2 PASS (other DB recovery contracts intentionally not run locally; CI retains them). No integration test exclusions or worker parallelism added.

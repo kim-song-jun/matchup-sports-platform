@@ -3,7 +3,7 @@ import { buildLeagueFixtureRows } from '../league-fixture-generator.service';
 import type { BracketTemplateInput, BracketTemplatePlan, PlanFixture, PlanSlot } from './bracket-template-plan';
 import { GROUP_NAME, type KnockoutPhase } from './knockout-phase-labels';
 
-export type FlexibleGroup = { name: string; capacity: number; advanceCount: number };
+export type FlexibleGroup = { name: string; capacity: number; advanceCount: number; legs?: 1 | 2 };
 export type FlexibleBracketSettings = {
   sixTeamMode?: boolean;
   schemaVersion?: 2;
@@ -63,7 +63,7 @@ export function planFlexibleBracket(input: Input, offset: number): BracketTempla
   } else {
     if (input.qualificationMode) invalid('조 간 성적 비교 12강은 기존 전용 설정으로 만들어 주세요.');
     if (!input.groups && !integer(input.groupCount, 2, 16)) invalid('조 수는 2~16개로 설정해 주세요.');
-    const groups = input.groups ?? Array.from({ length: input.groupCount }, (_, i) => ({
+    const groups: FlexibleGroup[] = input.groups ?? Array.from({ length: input.groupCount }, (_, i) => ({
       name: `${String.fromCharCode(65 + i)}조`, capacity: input.teamsPerGroup, advanceCount: input.advancePerGroup,
     }));
     if (!integer(groups.length, 2, 16) || ![1, 2].includes(input.legs)) invalid('조는 2~16개, 회전은 1~2회로 설정해 주세요.');
@@ -77,13 +77,15 @@ export function planFlexibleBracket(input: Input, offset: number): BracketTempla
       if (!name || name.length > 80 || names.has(name)) invalid('조 이름은 1~80자로 중복 없이 입력해 주세요.');
       names.add(name);
       if (!integer(group.capacity, 2, 8) || !integer(group.advanceCount, 1, group.capacity - 1)) invalid(`${name}의 팀 수는 2~8팀, 진출 수는 팀 수보다 적게 설정해 주세요.`);
+      const legs = group.legs ?? input.legs;
+      if (![1, 2].includes(legs)) invalid(`${name}의 회전 수는 1회전 또는 2회전으로 설정해 주세요.`);
       const key = `group:${i}`;
       plan.groups.push({ key, name, phase: 'group', sortOrder: i, advanceCount: group.advanceCount });
       const slots = Array.from({ length: group.capacity }, (_, p): PlanSlot => ({
         key: `entry:${i}:${p + 1}`, kind: 'ENTRY', groupKey: key, position: p + 1, sourceGroupKey: null,
       }));
       plan.slots.push(...slots);
-      const rows = buildLeagueFixtureRows({ groupId: key, registrationIds: slots.map((slot) => slot.key), legs: input.legs,
+      const rows = buildLeagueFixtureRows({ groupId: key, registrationIds: slots.map((slot) => slot.key), legs,
         balanceHome: true, schedule: null, fixtureNumberOffset: number });
       for (const row of rows) plan.fixtures.push({ key: `group-fixture:${++number}`, groupKey: key, round: row.round,
         fixtureNumber: number, legNumber: row.legNumber, homeSlotKey: row.homeRegistrationId, awaySlotKey: row.awayRegistrationId });

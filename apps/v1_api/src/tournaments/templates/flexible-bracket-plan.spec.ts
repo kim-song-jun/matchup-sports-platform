@@ -3,6 +3,32 @@ import { planBracketTemplate, type BracketTemplateInput } from './bracket-templa
 const plan = (input: BracketTemplateInput) => planBracketTemplate(input, { fixtureNumberOffset: 0 });
 
 describe('flexible bracket', () => {
+  it('uses each group rotation independently and keeps old global rotations compatible', () => {
+    const input = { kind: 'group_knockout' as const, schemaVersion: 2 as const, groupCount: 2,
+      teamsPerGroup: 3, advancePerGroup: 1, legs: 2 as const, thirdPlace: false,
+      groups: [{ name: 'A', capacity: 3, advanceCount: 1, legs: 1 as const },
+        { name: 'B', capacity: 3, advanceCount: 1, legs: 2 as const }] };
+    const mixed = plan(input);
+    expect(mixed.fixtures.filter(row => row.groupKey === 'group:0')).toHaveLength(3);
+    const second = mixed.fixtures.filter(row => row.groupKey === 'group:1');
+    expect(second).toHaveLength(6);
+    for (const fixture of second) expect(second).toEqual(expect.arrayContaining([
+      expect.objectContaining({ homeSlotKey: fixture.awaySlotKey, awaySlotKey: fixture.homeSlotKey }),
+    ]));
+    expect(mixed.fixtures).toHaveLength(10);
+    const legacy = plan({ ...input, groups: input.groups.map(({ legs: _legs, ...group }) => group) });
+    expect(legacy.fixtures).toHaveLength(13);
+  });
+
+  it('rejects invalid per-group rotations and includes them in the 240-game limit', () => {
+    const input = { kind: 'group_knockout' as const, schemaVersion: 2 as const, groupCount: 8,
+      teamsPerGroup: 8, advancePerGroup: 2, legs: 1 as const, thirdPlace: true,
+      groups: Array.from({ length: 8 }, (_, i) => ({ name: String(i), capacity: 8, advanceCount: 2, legs: 1 as 1 | 2 })) };
+    expect(plan(input).fixtures).toHaveLength(240);
+    expect(() => plan({ ...input, groups: input.groups.map((group, i) => ({ ...group, legs: i === 0 ? 2 : 1 })) })).toThrow();
+    expect(() => plan({ ...input, groups: input.groups.map(group => ({ ...group, legs: 3 as 1 })) })).toThrow();
+  });
+
   it.each(Array.from({ length: 31 }, (_, i) => 4 + i * 2))('%i teams have a complete playable path to the final', (size) => {
     const p = plan({ kind: 'knockout', schemaVersion: 2, size, thirdPlace: true, drawSeed: 7 });
     expect(p.fixtures).toHaveLength(size);

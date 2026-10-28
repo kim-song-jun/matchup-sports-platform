@@ -10,6 +10,7 @@ export class FlexibleGroupDto {
   @IsString() @MaxLength(80) name!: string;
   @IsInt() @Min(2) @Max(8) capacity!: number;
   @IsInt() @Min(1) @Max(7) advanceCount!: number;
+  @IsOptional() @IsIn([1, 2]) legs?: 1 | 2;
 }
 
 export class ApplyBracketTemplateDto {
@@ -86,7 +87,7 @@ export function toBracketTemplateInput(dto: ApplyBracketTemplateDto): BracketTem
         groupCount: dto.schemaVersion === 2 && dto.groups ? dto.groups.length : required(dto.groupCount, 'groupCount'),
         teamsPerGroup: dto.schemaVersion === 2 && dto.groups ? dto.groups[0].capacity : required(dto.teamsPerGroup, 'teamsPerGroup'),
         advancePerGroup: dto.schemaVersion === 2 && dto.groups ? dto.groups[0].advanceCount : required(dto.advancePerGroup, 'advancePerGroup'),
-        legs: required(dto.legs, 'legs') as 1 | 2,
+        legs: (dto.schemaVersion === 2 && dto.groups ? dto.legs ?? 1 : required(dto.legs, 'legs')) as 1 | 2,
         thirdPlace: dto.thirdPlace ?? false,
         ...(dto.qualificationMode ? { qualificationMode: dto.qualificationMode } : {}),
         ...flexible,

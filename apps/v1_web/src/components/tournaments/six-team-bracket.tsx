@@ -85,6 +85,7 @@ export function SixTeamBracket({
         <div role="heading" aria-level={4}>
           <SectionTitle title={`결승 직행 · ${teamName(state.bye)}`} />
         </div>
+        <p className="tm-text-label">준결승 부전승 1팀 · 6강 승리팀 중 선정</p>
         <p className="tm-text-caption text-[var(--text-muted)]">
           {state.needsReview
             ? '결과가 정정되어 운영자가 진출팀을 다시 확인하고 있어요.'

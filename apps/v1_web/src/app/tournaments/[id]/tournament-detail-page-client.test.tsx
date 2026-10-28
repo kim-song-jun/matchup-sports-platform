@@ -149,6 +149,30 @@ describe('TournamentDetailPageClient GA events', () => {
     });
   });
 
+  it.each([null, 'winner-a'] as const)('6강 상세에서 부전승 선정 상태(%s)와 5개 실제 경기만 표시한다', async bye => {
+    const rounds: [string, string, string, string, string] = ['six-a', 'six-b', 'six-c', 'semi', 'final'];
+    const fixtures: V1TournamentDetail['fixtures'] = rounds.map((id, index) => ({
+      id, groupId: null, round: index < 3 ? '6강' : index === 3 ? '준결승' : '결승',
+      fixtureNumber: index + 1, legNumber: 1, scheduledAt: null, venue: null,
+      status: 'scheduled', liveStatus: 'scheduled',
+      homeRegistrationId: index === 0 ? 'winner-a' : null, awayRegistrationId: null,
+      homeTeamId: null, awayTeamId: null, homeTeamName: index === 0 ? '가팀' : 'TBD', awayTeamName: 'TBD',
+      homeTeamLogoUrl: null, awayTeamLogoUrl: null, homeSlotLabel: null, awaySlotLabel: null, result: null, videos: [],
+    }));
+    tournamentApiMocks.useV1Tournament.mockReturnValue({
+      data: makeTournament({ format: 'knockout', status: 'in_progress', bracketPublishedAt: '2026-10-28T00:00:00Z',
+        teamCount: 6, sixTeamMode: true, sixTeamBracket: { rounds, bye, winners: {}, manual: false, needsReview: false }, fixtures }),
+      isPending: false, isError: false, error: null, refetch: vi.fn(),
+    });
+    const { container } = render(<TournamentDetailPageClient tournamentId="tournament-1" />);
+    await screen.findByRole('heading', { name: `결승 직행 · ${bye ? '가팀' : '선정 대기'}` });
+    expect(screen.getByText('준결승 부전승 1팀 · 6강 승리팀 중 선정')).toBeInTheDocument();
+    expect(screen.getByText(/최다 득점 → 최대 득실차 → 최소 실점/)).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: '경기 상세' })).toHaveLength(5);
+    expect(container.querySelector('[data-connected-bracket-wide="true"]')).toBeNull();
+    expect(screen.getByRole('region', { name: '결승 직행 선정' })).toBeInTheDocument();
+  });
+
   it.each(['in_progress', 'completed'] as const)('리그 %s 상세에서 저장된 대표 이미지를 본문에 표시한다', async (status) => {
     tournamentApiMocks.useV1Tournament.mockReturnValue({
       data: makeTournament({ kind: 'regular_league', status, coverImageUrl: '/uploads/leagues/cover.webp' }),

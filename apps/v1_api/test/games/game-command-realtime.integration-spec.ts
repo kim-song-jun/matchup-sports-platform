@@ -1164,9 +1164,26 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
         resolve(result);
       });
     });
-    expect(freshRetryAck).toMatchObject({ status: 'ack', version: append.version + 1, sequence: append.sequence! + 1 });
+    expect(freshRetryAck.status).toBe('ack');
+    if (typeof append.version !== 'number' || typeof append.sequence !== 'number') {
+      throw new Error('Initial append ACK did not include numeric version and sequence');
+    }
+    if (typeof freshRetryAck.version !== 'number' || typeof freshRetryAck.sequence !== 'number') {
+      throw new Error('Fresh retry ACK did not include numeric version and sequence');
+    }
+    const expectedFreshRetryVersion = append.version + 1;
+    const expectedFreshRetrySequence = append.sequence + 1;
+    expect(freshRetryAck).toMatchObject({
+      version: expectedFreshRetryVersion,
+      sequence: expectedFreshRetrySequence,
+    });
     await expect(freshRetryAckEvent.promise).resolves.toMatchObject({
-      event: { clientEventId: freshRetryId, status: 'committed', version: append.version + 1, sequence: append.sequence! + 1 },
+      event: {
+        clientEventId: freshRetryId,
+        status: 'committed',
+        version: expectedFreshRetryVersion,
+        sequence: expectedFreshRetrySequence,
+      },
     });
     await expect(prisma.v1GameEvent.findUnique({
       where: { gameId_clientEventId: { gameId: friendlyGameId, clientEventId: freshRetryId } },
@@ -1174,7 +1191,7 @@ describe('REST lifecycle commands refresh authorized game subscribers', () => {
     })).resolves.toMatchObject({
       id: expect.any(String),
       clientEventId: freshRetryId,
-      sequence: append.sequence! + 1,
+      sequence: expectedFreshRetrySequence,
       payloadHash: canonicalGameCommandPayloadHash(event),
     });
   });

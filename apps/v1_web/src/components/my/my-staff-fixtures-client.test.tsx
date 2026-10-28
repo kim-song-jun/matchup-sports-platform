@@ -188,7 +188,7 @@ describe('MyStaffFixturesPageClient', () => {
     render(<MyStaffFixturesPageClient tournamentId="t-1" />);
 
     const link = screen.getByRole('link', { name: /성수 FC vs 망원 FC, 경기 운영 콘솔 열기/ });
-    expect(link).toHaveAttribute('href', '/tournament-ops/tournaments/t-1/fixtures/fx-1/operate');
+    expect(link).toHaveAttribute('href', '/tournament-ops/tournaments/t-1/fixtures/fx-1/operate?from=staff');
     expect(screen.queryByText(/남의 팀/)).toBeNull();
     expect(screen.queryByText(/\(테스트\)1010/)).toBeNull();
   });

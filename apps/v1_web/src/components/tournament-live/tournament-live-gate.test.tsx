@@ -478,6 +478,17 @@ describe('TournamentLiveGate 진입 출처 (T6-2)', () => {
     window.sessionStorage.clear();
   });
 
+  it('담당 경기 진입은 이전 admin 출처를 덮어쓰고 nav 이동 뒤에도 유지된다', () => {
+    window.sessionStorage.setItem('teameet.v1.tournamentOpsOrigin.t-1', 'admin');
+    mocks.useSearchParams.mockReturnValue(new URLSearchParams('from=staff'));
+    const { rerender } = render(<TournamentLiveGate tournamentId="t-1"><div>x</div></TournamentLiveGate>);
+    expect(screen.getByTestId('shell')).toHaveAttribute('data-origin', 'staff');
+    expect(window.sessionStorage.getItem('teameet.v1.tournamentOpsOrigin.t-1')).toBe('staff');
+    mocks.useSearchParams.mockReturnValue(new URLSearchParams());
+    rerender(<TournamentLiveGate tournamentId="t-1"><div>x</div></TournamentLiveGate>);
+    expect(screen.getByTestId('shell')).toHaveAttribute('data-origin', 'staff');
+  });
+
   it('?from=admin이면 origin="admin"으로 셸에 전달하고 sessionStorage에 기록한다', () => {
     mocks.useSearchParams.mockReturnValue(new URLSearchParams('from=admin'));
     render(

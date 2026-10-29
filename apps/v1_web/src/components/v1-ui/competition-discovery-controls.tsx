@@ -46,9 +46,14 @@ function FilterChoices({ title, value, options, onChange }: {
   </fieldset>;
 }
 
+/** 틀린 칸 바로 밑에 띄우고, 시트 아래 버튼에 가려지지 않게 보이는 자리로 스크롤한다. */
+function RangeError({ message }: { message: string }) {
+  return <p role="alert" className="tm-create-field-error" ref={(node) => { node?.scrollIntoView?.({ block: 'nearest' }); }}>{message}</p>;
+}
+
 function DiscoveryFilterSheet({ filters, sports, page }: { filters: CompetitionDiscoveryFilters; sports: Sport[]; page?: number }) {
   const [draft, setDraft] = useState(filters);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ReturnType<typeof discoveryRangeError>>(null);
   const router = useRouter();
   const id = useId();
   function set<K extends keyof CompetitionDiscoveryFilters>(key: K, value: CompetitionDiscoveryFilters[K]) {
@@ -89,6 +94,7 @@ function DiscoveryFilterSheet({ filters, sports, page }: { filters: CompetitionD
             <label htmlFor={`${id}-from`}>시작 날짜<input id={`${id}-from`} type="date" value={draft.dateFrom ?? ''} onChange={(event) => set('dateFrom', event.target.value || undefined)} /></label>
             <label htmlFor={`${id}-to`}>종료 날짜<input id={`${id}-to`} type="date" value={draft.dateTo ?? ''} onChange={(event) => set('dateTo', event.target.value || undefined)} /></label>
           </div>
+          {error?.field === 'date' && <RangeError message={error.message} />}
         </fieldset>
         {tournament && <>
           <FilterChoices title="경기 방식" value={draft.format} options={Object.entries(FORMAT_LABELS).map(([value, label]) => ({ value, label }))} onChange={(value) => set('format', value as typeof draft.format)} />
@@ -102,10 +108,10 @@ function DiscoveryFilterSheet({ filters, sports, page }: { filters: CompetitionD
               <label htmlFor={`${id}-min`}>최소 금액(원)<input id={`${id}-min`} type="number" min="0" max="2147483647" step="1" inputMode="numeric" value={draft.feeMin ?? ''} onChange={(event) => set('feeMin', event.target.value === '' ? undefined : Number(event.target.value))} /></label>
               <label htmlFor={`${id}-max`}>최대 금액(원)<input id={`${id}-max`} type="number" min="0" max="2147483647" step="1" inputMode="numeric" value={draft.feeMax ?? ''} onChange={(event) => set('feeMax', event.target.value === '' ? undefined : Number(event.target.value))} /></label>
             </div>
+            {error?.field === 'fee' && <RangeError message={error.message} />}
           </fieldset>
         </>}
         {draft.phase === 'completed' && draft.registration === 'open' && <p className="tm-text-caption">종료된 항목은 신청을 받지 않아 결과가 없어요. 진행 상태나 모집 상태를 바꿔 주세요.</p>}
-        {error && <p role="alert">{error}</p>}
       </div>
       <div className={`tm-filter-actions ${styles.actions}`}>
         <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={competitionDiscoveryHref(filters, { page })}>닫기</Link>
@@ -129,7 +135,7 @@ export function CompetitionDiscoveryControls({ filters, sports, sheetOpen, deskt
     filters.genderCategory ? GENDER_LABELS[filters.genderCategory] : null,
     filters.dateFrom || filters.dateTo ? `${filters.dateFrom ?? '전체'} ~ ${filters.dateTo ?? '전체'}` : null,
     filters.format ? FORMAT_LABELS[filters.format] : null,
-    filters.feeMin !== undefined || filters.feeMax !== undefined ? (filters.feeMax === 0 ? '무료' : `${filters.feeMin?.toLocaleString() ?? '0'} ~ ${filters.feeMax?.toLocaleString() ?? '전체'}원`) : null,
+    filters.feeMin !== undefined || filters.feeMax !== undefined ? (filters.feeMax === 0 ? '무료' : filters.feeMax === undefined ? `${(filters.feeMin ?? 0).toLocaleString()}원 이상` : `${filters.feeMin?.toLocaleString() ?? '0'} ~ ${filters.feeMax.toLocaleString()}원`) : null,
   ].filter(Boolean).join(' · ');
   const navigateSort = (value: CompetitionSort) => {
     router.replace(competitionDiscoveryHref({ ...filters, sort: value, ...(value === 'deadline' ? { registration: 'open' } : {}) }), { scroll: false });

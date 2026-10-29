@@ -58,7 +58,22 @@ describe('필터 선택·적용과 목록 정렬', () => {
     fireEvent.change(screen.getByLabelText('종료 날짜'), { target: { value: '2026-11-01' } });
     fireEvent.click(screen.getByRole('button', { name: '결과 보기' }));
     expect(navigation.replace).not.toHaveBeenCalled();
-    expect(screen.getByRole('alert')).toHaveTextContent('종료 날짜');
+    // 시트 맨 아래가 아니라 날짜 칸 바로 밑에 띄운다 — 아래에 두면 '결과 보기'가 반응하지 않는 것처럼 보였다.
+    expect(within(screen.getByRole('group', { name: '개최 기간' })).getByRole('alert')).toHaveTextContent('종료 날짜');
+  });
+  it('참가비 역전 안내는 참가비 칸 바로 밑에 띄운다', () => {
+    render(<CompetitionDiscoveryControls {...props} sheetOpen />);
+    fireEvent.change(screen.getByLabelText('최소 금액(원)'), { target: { value: '50000' } });
+    fireEvent.change(screen.getByLabelText('최대 금액(원)'), { target: { value: '10000' } });
+    fireEvent.click(screen.getByRole('button', { name: '결과 보기' }));
+    expect(navigation.replace).not.toHaveBeenCalled();
+    expect(within(screen.getByRole('group', { name: '참가비' })).getByRole('alert')).toHaveTextContent('최대 참가비');
+    expect(within(screen.getByRole('group', { name: '개최 기간' })).queryByRole('alert')).not.toBeInTheDocument();
+  });
+  it('최소 금액만 고르면 요약을 "N원 이상"으로 보여 준다', () => {
+    render(<CompetitionDiscoveryControls {...props} filters={{ kind: 'tournament', feeMin: 100000 }} />);
+    expect(screen.getByText('100,000원 이상')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '필터 열기 — 현재 100,000원 이상' })).toBeInTheDocument();
   });
   it('모바일 정렬은 선택 시트를 열고 선택한 정렬을 적용한다', () => {
     render(<CompetitionDiscoveryControls {...props} desktop={false} />);

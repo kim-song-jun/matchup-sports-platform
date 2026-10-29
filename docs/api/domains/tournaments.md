@@ -245,7 +245,7 @@ the web explicitly requests `all` for its default tab.
 | `format` | league/knockout/group_knockout; format is not competition kind |
 | `feeMin`, `feeMax` | integer KRW, inclusive 0–2147483647; max=0 selects free |
 | `dateFrom`, `dateTo` | real calendar date YYYY-MM-DD, inclusive Asia/Seoul day boundaries; period overlap; undated rows excluded |
-| `sort` | latest (createdAt desc), deadline (deadline asc), scheduled (start asc; excludes completed/cancelled rows and rows whose `scheduledEndAt ?? scheduledAt` has passed, keeps undated rows); nulls last, id byte-order asc ties; absent sort retains the existing lifecycle-group ordering |
+| `sort` | latest (createdAt desc), deadline (deadline asc), scheduled (start asc; excludes completed/cancelled rows and rows whose `scheduledEndAt ?? scheduledAt` is before today's Asia/Seoul day start, keeps `in_progress` and undated rows; an explicit `phase=completed`/`status=completed` skips this exclusion); nulls last, id byte-order asc ties; absent sort retains the existing lifecycle-group ordering |
 | `withTotal` | literal string true adds actual total to cursor pageInfo; numbered pages already include total |
 
 `deadline` also enforces registration=open. Tournament admission requires status=open,

@@ -170,7 +170,7 @@ export function CompetitionDiscoveryControls({ filters, sports, sheetOpen, deskt
     {desktop && sort === 'deadline' && <p className="tm-text-caption">신청 접수 중인 항목을 마감 가까운 순으로 봐요. 마감 미정은 뒤에 표시해요.</p>}
     {sheetOpen && <DiscoveryFilterSheet key={competitionDiscoveryHref(filters)} filters={filters} sports={sports} page={page} />}
     {sortOpen && !desktop && <BottomSheet open title="정렬" onClose={() => setSortOpen(false)}>
-      <div className={styles.sortOptions}><p className="tm-text-caption">마감 가까운 순은 신청 접수 중인 항목만 보여줘요.</p>{COMPETITION_SORTS.map((option) => <button key={option.value} type="button" className={`tm-btn tm-btn-lg ${sort === option.value ? 'tm-btn-primary' : 'tm-btn-neutral'}`} aria-pressed={sort === option.value} onClick={() => navigateSort(option.value)}>{option.label}</button>)}</div>
+      <div className={styles.sortOptions}><p className="tm-text-caption">마감 가까운 순은 신청 접수 중인 항목만 보여줘요.</p><p className="tm-text-caption">개최 가까운 순은 끝난 대회를 빼고 보여줘요. 끝난 대회는 필터의 진행 상태에서 &apos;종료&apos;를 고르면 볼 수 있어요.</p>{COMPETITION_SORTS.map((option) => <button key={option.value} type="button" className={`tm-btn tm-btn-lg ${sort === option.value ? 'tm-btn-primary' : 'tm-btn-neutral'}`} aria-pressed={sort === option.value} onClick={() => navigateSort(option.value)}>{option.label}</button>)}</div>
     </BottomSheet>}
   </>;
 }

@@ -115,6 +115,7 @@ describe('모바일 B안 — 한 줄 목록 조작', () => {
     fireEvent.click(screen.getByRole('button', { name: /최신 등록순/ }));
     const dialog = within(screen.getByRole('dialog', { name: '정렬' }));
     expect(dialog.getByText('마감 가까운 순은 신청 접수 중인 항목만 보여줘요.')).toBeInTheDocument();
+    expect(dialog.getByText(/개최 가까운 순은 끝난 대회를 빼고 보여줘요/)).toHaveTextContent("진행 상태에서 '종료'를 고르면");
     fireEvent.click(dialog.getByRole('button', { name: '마감 가까운 순' }));
     expect(navigation.replace).toHaveBeenCalledWith('/tournaments?kind=tournament&registration=open&sort=deadline', { scroll: false });
   });

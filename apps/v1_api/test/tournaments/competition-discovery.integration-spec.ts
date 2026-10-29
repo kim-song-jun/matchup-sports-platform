@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { TournamentsReadService } from '../../src/tournaments/tournaments-read.service';
+import { kstDayRange } from '../../src/common/pagination/list-facets';
 import type { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 /** 실제 DB에서 공개 범위·정원 점유·페이지네이션 전 필터를 검증한다. */
@@ -72,15 +73,20 @@ describe('대회·리그 탐색 (real DB)', () => {
     const result = await read.list({ kind: 'tournament', sportId, genderCategory: 'mixed', format: 'knockout', feeMax: 0, registration: 'open' });
     expect(result.items.map((item) => item.id)).toEqual([ids.available]);
   });
-  it('개최 정렬은 일정이 끝난 대회를 빼고 cursor가 중복·누락 없이 이어진다', async () => {
-    // 시작은 지났어도 일정이 남은 진행 중 리그는 남는다. 끝난 일정(종료일 또는 종료일 없는 시작일)과 종료 상태는 빠진다.
+  it('개최 정렬은 일정이 끝난 대회를 빼되 진행 중·오늘 열리는 대회는 남기고 cursor가 중복·누락 없이 이어진다', async () => {
+    // 진행 중 상태는 종료일이 지나도 남고, 종료 일시를 비운 하루 대회는 그날(KST) 내내 남는다. 끝난 일정과 종료 상태는 빠진다.
     await prisma.v1Tournament.update({ where: { id: ids.activeLeague }, data: { scheduledAt: new Date('2000-01-01') } });
-    await prisma.v1Tournament.update({ where: { id: ids.fullLeague }, data: { scheduledAt: new Date('2000-01-01'), scheduledEndAt: new Date('2000-01-02') } });
+    await prisma.v1Tournament.update({ where: { id: ids.fullLeague }, data: { scheduledAt: new Date('2000-01-02'), scheduledEndAt: new Date('2000-01-03') } });
+    await prisma.v1Tournament.update({ where: { id: ids.openLeague }, data: { scheduledAt: kstDayRange(new Date()).gte, scheduledEndAt: null } });
     await prisma.v1Tournament.update({ where: { id: ids.closedLeague }, data: { scheduledAt: new Date('2000-01-01'), scheduledEndAt: null } });
     const first = await read.list({ kind: 'league', sportId, sort: 'scheduled', limit: 1, withTotal: 'true' });
     expect(first.items[0].id).toBe(ids.activeLeague);
-    expect(first.pageInfo.total).toBe(4);
+    expect(first.pageInfo.total).toBe(5);
     const second = await read.list({ kind: 'league', sportId, sort: 'scheduled', limit: 10, cursor: first.pageInfo.nextCursor! });
-    expect(second.items.map((item) => item.id).sort()).toEqual([ids.draftLeague, ids.openLeague, ids.noDeadlineLeague].sort());
+    expect(second.items.map((item) => item.id)).toEqual([ids.fullLeague, ids.openLeague, ...[ids.draftLeague, ids.noDeadlineLeague].sort()]);
+  });
+  it('개최 정렬이어도 진행 상태 종료를 직접 고르면 끝난 대회를 보여 준다', async () => {
+    const result = await read.list({ kind: 'league', sportId, sort: 'scheduled', phase: 'completed' });
+    expect(result.items.map((item) => item.id)).toEqual([ids.finishedLeague]);
   });
 });

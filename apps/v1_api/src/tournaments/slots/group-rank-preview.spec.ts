@@ -264,7 +264,21 @@ describe('summarizeGroupStanding', () => {
       expect(summary?.qualification?.undecided).toBe(true);
     });
 
-    it('진출 팀 수가 정해지지 않았으면(advanceCount null) qualification 은 null — sharedRank 는 그대로', () => {
+    it('수동 조의 진출 수가 없어도 실제 결선에 배정된 소속 팀은 표시한다', () => {
+      const summary = summarizeGroupStanding(sourceOf(['A', 'B', 'C'], CLEAN), null, new Set(['C', 'OTHER-GROUP']));
+      expect(summary?.qualification).toEqual({ advancingRegistrationIds: ['C'], undecided: false });
+    });
+
+    it('수동 결선의 실제 선택은 동률에서도 보존하고 미배정 팀을 추측하지 않는다', () => {
+      const summary = summarizeGroupStanding(sourceOf(['A', 'B', 'C'], TIE_THREE), null, new Set(['B']));
+      expect(summary?.qualification).toEqual({ advancingRegistrationIds: ['B'], undecided: false });
+    });
+
+    it('수동 결선에 배정해도 원천 조별 결과가 미완료면 표시하지 않는다', () => {
+      expect(summarizeGroupStanding(sourceOf(['A', 'B', 'C'], CLEAN, { unofficialIndex: 0 }), null, new Set(['A']))).toBeNull();
+    });
+
+    it('진출 팀 수도 실제 결선 배정도 없으면 qualification 은 null — sharedRank 는 그대로', () => {
       const summary = summarizeGroupStanding(sourceOf(['A', 'B', 'C'], TIE_THREE), null, none);
       expect(summary?.qualification).toBeNull();
       expect(summary?.sharedRankByRegistrationId.size).toBe(3);

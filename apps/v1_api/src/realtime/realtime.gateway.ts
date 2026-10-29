@@ -12,7 +12,7 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
-import type { Server, Socket } from 'socket.io';
+import type { Namespace, Socket } from 'socket.io';
 import { plainToInstance } from 'class-transformer';
 import type { V1CompetitionKind } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -28,6 +28,7 @@ import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.servi
 import { GamesService } from '../games/games.service';
 import type { GameEventAppendResult } from '../games/games.types';
 import { TournamentStaffAccessService } from '../tournaments/staff/tournament-staff-access.service';
+import { GameSubscriberRefreshScheduler, type ScheduledRefresh } from './game-subscriber-refresh.scheduler';
 
 type V1Socket = Socket & {
   data: {
@@ -65,6 +66,35 @@ type GameBackfill = {
   readonly gap?: { readonly expectedSequence: number; readonly availableFrom: number } | null;
 };
 
+type SubscriberRefreshFlight = {
+  readonly socket: V1Socket;
+  readonly gameId: string;
+  readonly generation: number;
+  dirty: boolean;
+  minimumVersion: number;
+  pendingAck?: PendingGameSnapshotAck;
+  passes: number;
+  promise: Promise<void>;
+  scheduled?: ScheduledRefresh;
+};
+
+type QueuedCommittedEvent = {
+  readonly version: number;
+  readonly payload: unknown;
+  readonly requiresSnapshot: boolean;
+};
+
+type CommittedEventDeliveryQueue = {
+  readonly socket: V1Socket;
+  readonly gameId: string;
+  readonly generation: number;
+  readonly events: QueuedCommittedEvent[];
+  draining: boolean;
+};
+
+const MAX_PENDING_COMMITTED_EVENTS_PER_SOCKET_GAME = 128;
+const MAX_PENDING_COMMITTED_EVENTS_PER_SOCKET = 512;
+
 type StaffLease = {
   readonly generation: number;
   readonly userId: string;
@@ -82,10 +112,17 @@ type StaffLeaseAttempt = {
   readonly scope: GameFixtureScope;
 };
 
+type PendingGameSnapshotAck = {
+  readonly generation: number;
+  snapshot?: GameSnapshot;
+  scheduled?: ScheduledRefresh;
+  failedRefreshMinimumVersion?: number;
+};
+
 type RetryGameEventInput = {
   readonly rebasedExpectedVersion: number;
   readonly clientEventId: string;
-  readonly takeoverToken: string;
+  readonly takeoverToken?: string;
   readonly payloadHash: string;
   readonly event: Record<string, unknown>;
 };
@@ -193,7 +230,7 @@ type GameEventCommandPayload = {
   readonly gameId: string;
   readonly expectedVersion: number;
   readonly clientEventId: string;
-  readonly takeoverToken: string;
+  readonly takeoverToken?: string;
   readonly payloadHash: string;
   readonly event: Record<string, unknown>;
 };
@@ -299,7 +336,7 @@ const frontendOrigin = isProduction ? requireProductionFrontendOrigin(process.en
 })
 export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy {
   @WebSocketServer()
-  server!: Server;
+  server!: Namespace;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -317,6 +354,24 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
   >();
   /** The last authorized lease. A new authorization attempt never shortens this lease. */
   private readonly staffLeases = new Map<string, Map<string, StaffLease>>();
+  /** Scalar delivery floor only; full event history must not live for the socket lifetime. */
+  private readonly gameSnapshotWatermarks = new Map<
+    string,
+    { readonly generation: number; readonly version: number; readonly lastSequence: number }
+  >();
+  /** Full snapshots exist here only while the owning subscribe ACK is pending. */
+  private readonly pendingGameSnapshotAcks = new Map<
+    string,
+    PendingGameSnapshotAck
+  >();
+  /** At most one serial refresh per socket/game/generation; distinct sockets never block each other. */
+  private readonly subscriberRefreshFlights = new Map<string, SubscriberRefreshFlight>();
+  private readonly refreshFlightKeysBySocket = new Map<string, Map<string, Set<string>>>();
+  /** Per-recipient queues preserve snapshot-before-event order without room-wide head-of-line blocking. */
+  private readonly committedEventDeliveryQueues = new Map<string, CommittedEventDeliveryQueue>();
+  private readonly committedEventQueueKeysBySocket = new Map<string, Set<string>>();
+  private readonly pendingCommittedEventsBySocket = new Map<string, number>();
+  private readonly refreshScheduler = new GameSubscriberRefreshScheduler(4, 2);
   /** Authorization awaits live here until they atomically promote to `staffLeases`. */
   private readonly pendingStaffLeaseAttempts = new Map<string, Map<string, StaffLeaseAttempt>>();
   private readonly staffLeaseGenerations = new Map<string, Map<string, number>>();
@@ -326,16 +381,17 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
   private readonly socketClients = new Map<string, V1Socket>();
   private shuttingDown = false;
 
-  afterInit(server: Server): void {
+  afterInit(server: Namespace): void {
     // Hand the games lane a way to reach this namespace's rooms without
     // GamesModule importing RealtimeModule (which would close the module graph
     // into a cycle — RealtimeModule already imports GamesModule). See
     // games/game-broadcast.registry.ts for why the binding is runtime rather
     // than a Nest injection token.
     this.gameBroadcast.register({
-      emitToGame: (gameId, event, payload) => {
-        server.to(gameRoom(gameId)).emit(event, payload);
+      emitCommittedEvent: (gameId, minimumVersion, payload) => {
+        this.enqueueCommittedEventForSubscribers(gameId, minimumVersion, payload);
       },
+      refreshGameSubscribers: (gameId, minimumVersion) => this.refreshGameSubscribers(gameId, minimumVersion),
     });
 
     server.use((socket, next) => {
@@ -501,6 +557,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     const scope = gameRealtimeScope(game);
     let leaseGeneration: number | undefined;
     let leasePromoted = false;
+    let pendingSnapshotAck: PendingGameSnapshotAck | undefined;
     try {
       if (scope?.invalid === true) {
         return { status: 'denied', code: 'STAFF_SCOPE_DENIED' };
@@ -513,6 +570,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
         if (leaseGeneration === undefined) {
           return { status: 'denied', code: 'STAFF_SCOPE_DENIED', reason: 'SESSION_NOT_AUTHENTICATED' };
         }
+        pendingSnapshotAck = this.beginGameSnapshotAck(client.id, input.gameId, leaseGeneration);
         const principal = await this.tournamentStaffAccess.assertAccess({
           userId,
           action: 'read',
@@ -528,10 +586,12 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
         ) {
           // **재접속하면 풀린다** — 권한이 없어진 것이 아니다.
           await this.denyCurrentStaffAttempt(client, userId, input.gameId, leaseGeneration);
+          this.clearPendingGameSnapshotAck(client.id, input.gameId, leaseGeneration, pendingSnapshotAck);
           return { status: 'denied', code: 'STAFF_SCOPE_DENIED', reason: 'AUTHORIZATION_SUBJECT_STALE' };
         }
         if (principal.expiresAt !== null && principal.expiresAt.getTime() <= Date.now()) {
           await this.denyCurrentStaffAttempt(client, userId, input.gameId, leaseGeneration);
+          this.clearPendingGameSnapshotAck(client.id, input.gameId, leaseGeneration, pendingSnapshotAck);
           return { status: 'denied', code: 'STAFF_SCOPE_DENIED', reason: 'ASSIGNMENT_EXPIRED' };
         }
         if (
@@ -542,6 +602,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
             principal.expiresAt ?? null,
           )
         ) {
+          this.clearPendingGameSnapshotAck(client.id, input.gameId, leaseGeneration, pendingSnapshotAck);
           return { status: 'denied', code: 'STAFF_SCOPE_DENIED', reason: 'ASSIGNMENT_REQUIRED' };
         }
         leasePromoted = true;
@@ -552,50 +613,157 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
         if (leaseGeneration === undefined) {
           return { status: 'denied', code: 'STAFF_SCOPE_DENIED', reason: 'SESSION_NOT_AUTHENTICATED' };
         }
+        pendingSnapshotAck = this.beginGameSnapshotAck(client.id, input.gameId, leaseGeneration);
         await this.gamesService.assertReadAccess(authUser, input.gameId);
         if (!(await this.joinUnscopedGameRoom(client, input.gameId, leaseGeneration))) {
+          this.clearPendingGameSnapshotAck(client.id, input.gameId, leaseGeneration, pendingSnapshotAck);
           return { status: 'denied', code: 'STAFF_SCOPE_DENIED' };
         }
       } else if (!(await this.joinAuthorizedGameRoom(client, input.gameId, leaseGeneration!))) {
         const cancelled = this.cancelAuthorizedLeaseIfGeneration(client.id, input.gameId, leaseGeneration!);
         if (cancelled) await this.leaveAuthorizedGameRoom(client, input.gameId, leaseGeneration!);
+        this.clearPendingGameSnapshotAck(client.id, input.gameId, leaseGeneration, pendingSnapshotAck);
         return { status: 'denied', code: 'STAFF_SCOPE_DENIED', reason: 'ASSIGNMENT_REQUIRED' };
       }
-      const backfill = await this.gamesService.listEvents(authUser, input.gameId, input.afterSequence);
-      if (scope !== null) {
-        if (!this.activateStaffLease(client.id, input.gameId, leaseGeneration!)) {
+      const snapshotAck = pendingSnapshotAck!;
+      const snapshotWork = await this.runPendingGameSnapshotWork(
+        client,
+        input.gameId,
+        leaseGeneration!,
+        snapshotAck,
+        async () => {
+          const initialBackfill = await this.gamesService.listEvents(authUser, input.gameId, input.afterSequence);
+          if (this.pendingGameSnapshotAcks.get(this.roomTransitionKey(client.id, input.gameId)) !== snapshotAck ||
+            !this.isSocketLive(client) || !client.rooms.has(room)) {
+            return { status: 'stale' as const };
+          }
+          if (scope !== null) {
+            if (!this.activateStaffLease(client.id, input.gameId, leaseGeneration!)) {
+              return { status: 'lease-denied' as const };
+            }
+            this.recordGameSubscription(userId, scope.tournamentId, input.gameId, client.id);
+          } else if (
+            !this.isRoomGenerationCurrent(client.id, input.gameId, leaseGeneration!) ||
+            this.staffRoomOwners.get(this.roomTransitionKey(client.id, input.gameId)) !== leaseGeneration
+          ) {
+            return { status: 'room-denied' as const };
+          }
+
+          const currentGame = await this.loadGameForStaffLease(input.gameId);
+          const currentScope = currentGame === null ? null : gameRealtimeScope(currentGame);
+          if (currentGame === null || (scope === null
+            ? currentScope !== null
+            : currentScope === null || !this.sameStaffScope(scope, currentScope))) {
+            throw new ForbiddenException({ code: 'STAFF_SCOPE_DENIED', message: 'Game read scope changed during subscribe' });
+          }
+          if (!this.isPendingGameSnapshotAckCurrent(client, input.gameId, leaseGeneration!, snapshotAck)) {
+            return { status: 'stale' as const };
+          }
+          const finalPrincipal = scope === null
+            ? (await this.gamesService.assertReadAccess(authUser, input.gameId), null)
+            : await this.tournamentStaffAccess.assertAccess({
+              userId,
+              action: 'read',
+              resource: {
+                tournamentId: scope.tournamentId,
+                fixtureId: scope.fixtureId,
+                ...(scope.fieldId === null ? {} : { fieldId: scope.fieldId }),
+              },
+            });
+          return { status: 'ready' as const, initialBackfill, finalPrincipal };
+        },
+      );
+      if (!snapshotWork.completed) {
+        this.clearPendingGameSnapshotAck(client.id, input.gameId, leaseGeneration, snapshotAck);
+        return { status: 'denied', code: 'STAFF_SCOPE_DENIED', reason: 'ASSIGNMENT_REQUIRED' };
+      }
+      if (snapshotWork.value.status === 'lease-denied') {
+        if (scope !== null && this.pendingGameSnapshotAcks.get(this.roomTransitionKey(client.id, input.gameId)) === snapshotAck &&
+          this.isRoomGenerationCurrent(client.id, input.gameId, leaseGeneration!)) {
           const cancelled = this.cancelAuthorizedLeaseIfGeneration(client.id, input.gameId, leaseGeneration!);
           if (cancelled || this.staffRoomOwners.get(this.roomTransitionKey(client.id, input.gameId)) === leaseGeneration) {
             await this.leaveAuthorizedGameRoom(client, input.gameId, leaseGeneration!);
           }
-          return { status: 'denied', code: 'STAFF_SCOPE_DENIED', reason: 'ASSIGNMENT_REQUIRED' };
         }
-        this.recordGameSubscription(userId, scope.tournamentId, input.gameId, client.id);
-      } else if (
-        leaseGeneration === undefined ||
-        !this.isRoomGenerationCurrent(client.id, input.gameId, leaseGeneration) ||
-        this.staffRoomOwners.get(this.roomTransitionKey(client.id, input.gameId)) !== leaseGeneration
-      ) {
-        if (leaseGeneration !== undefined) {
+        this.clearPendingGameSnapshotAck(client.id, input.gameId, leaseGeneration, snapshotAck);
+        return { status: 'denied', code: 'STAFF_SCOPE_DENIED', reason: 'ASSIGNMENT_REQUIRED' };
+      }
+      if (snapshotWork.value.status === 'room-denied') {
+        if (leaseGeneration !== undefined && this.pendingGameSnapshotAcks.get(this.roomTransitionKey(client.id, input.gameId)) === snapshotAck &&
+          this.isRoomGenerationCurrent(client.id, input.gameId, leaseGeneration)) {
           if (this.invalidateRoomGenerationIfCurrent(client.id, input.gameId, leaseGeneration)) {
             await this.forceLeaveGameRoom(client, input.gameId);
           } else {
             await this.leaveAuthorizedGameRoom(client, input.gameId, leaseGeneration);
           }
+          this.clearPendingGameSnapshotAck(client.id, input.gameId, leaseGeneration, snapshotAck);
         }
         return { status: 'denied', code: 'STAFF_SCOPE_DENIED' };
       }
-      const snapshot = {
-        gameId: input.gameId,
-        version: backfill.version,
-        state: backfill.state,
-        lastSequence: backfill.lastSequence,
-        events: backfill.events,
-      };
-      client.emit('game.snapshot', snapshot);
-      if (backfill.gap !== undefined && backfill.gap !== null) {
-        client.emit('game.gap', backfill.gap);
+      if (snapshotWork.value.status === 'stale' || !snapshotWork.current) {
+        this.clearPendingGameSnapshotAck(client.id, input.gameId, leaseGeneration, snapshotAck);
+        return { status: 'denied', code: 'STAFF_SCOPE_DENIED', reason: 'ASSIGNMENT_REQUIRED' };
       }
+      const { initialBackfill, finalPrincipal } = snapshotWork.value;
+      const failedRefreshMinimumVersion = snapshotAck.failedRefreshMinimumVersion;
+      const availableAckVersion = Math.max(
+        initialBackfill.version,
+        snapshotAck.snapshot?.version ?? -1,
+      );
+      if (failedRefreshMinimumVersion !== undefined && availableAckVersion < failedRefreshMinimumVersion) {
+        this.logger.error(
+          {
+            socketId: client.id,
+            gameId: input.gameId,
+            requiredVersion: failedRefreshMinimumVersion,
+            actualVersion: availableAckVersion,
+          },
+          'Pending game subscription cannot satisfy a failed committed refresh',
+        );
+        this.disconnectGameSubscriberForRecovery(client, input.gameId, failedRefreshMinimumVersion);
+        throw new Error('Pending game subscription snapshot is behind a failed committed refresh');
+      }
+      if (scope !== null) {
+        if (finalPrincipal === null) {
+          throw new ForbiddenException({ code: 'STAFF_SCOPE_DENIED', reason: 'ASSIGNMENT_REQUIRED' });
+        }
+        if (!this.matchesAuthorizationVersion(client, finalPrincipal.assignmentVersion) ||
+          (finalPrincipal.expiresAt !== null && finalPrincipal.expiresAt.getTime() <= Date.now())) {
+          throw new ForbiddenException({ code: 'STAFF_SCOPE_DENIED', reason: 'ASSIGNMENT_REQUIRED' });
+        }
+        if (!this.isAuthorizedLeaseAdmissible(client.id, input.gameId, leaseGeneration!) ||
+          this.staffRoomOwners.get(this.roomTransitionKey(client.id, input.gameId)) !== leaseGeneration) {
+          throw new ForbiddenException({ code: 'STAFF_SCOPE_DENIED', reason: 'ASSIGNMENT_REQUIRED' });
+        }
+        const finalLease = this.staffLeases.get(client.id)?.get(input.gameId);
+        if (finalLease === undefined || finalLease.generation !== leaseGeneration ||
+          !this.isAuthorizedLeaseOwner(client.id, input.gameId, leaseGeneration!) ||
+          this.staffRoomOwners.get(this.roomTransitionKey(client.id, input.gameId)) !== leaseGeneration) {
+          throw new ForbiddenException({ code: 'STAFF_SCOPE_DENIED', reason: 'ASSIGNMENT_REQUIRED' });
+        }
+        if (finalLease.expiresAt?.getTime() !== (finalPrincipal.expiresAt?.getTime() ?? undefined)) {
+          this.refreshAuthorizedLeaseExpiry(client, input.gameId, leaseGeneration!, finalPrincipal.expiresAt ?? null);
+        }
+      } else {
+        if (!this.isRoomGenerationCurrent(client.id, input.gameId, leaseGeneration!) ||
+          this.staffRoomOwners.get(this.roomTransitionKey(client.id, input.gameId)) !== leaseGeneration ||
+          !client.rooms.has(room) || !this.isSocketLive(client)) {
+          throw new ForbiddenException({ code: 'STAFF_SCOPE_DENIED', message: 'Game subscription generation changed' });
+        }
+      }
+      const emitted = this.emitGameSnapshotIfNewer(client, input.gameId, leaseGeneration!, initialBackfill);
+      const gap = initialBackfill.gap;
+      if (emitted && gap !== undefined && gap !== null) {
+        client.emit('game.gap', gap);
+      }
+      const ackKey = this.roomTransitionKey(client.id, input.gameId);
+      const pendingAck = this.pendingGameSnapshotAcks.get(ackKey);
+      const snapshot = pendingSnapshotAck !== undefined && pendingAck === pendingSnapshotAck &&
+        pendingAck.snapshot !== undefined
+        ? pendingAck.snapshot
+        : this.toGameSnapshot(input.gameId, initialBackfill);
+      this.clearPendingGameSnapshotAck(client.id, input.gameId, leaseGeneration, pendingSnapshotAck);
+      this.startCommittedEventDelivery(client, input.gameId);
       return {
         status: 'subscribed',
         room,
@@ -604,6 +772,12 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       };
     } catch (error) {
       let cleanupFailed = false;
+      if (leaseGeneration !== undefined) {
+        this.clearPendingGameSnapshotAck(client.id, input.gameId, leaseGeneration, pendingSnapshotAck);
+      }
+      if (leaseGeneration !== undefined) {
+        this.clearCommittedEventDeliveryQueue(client.id, input.gameId, leaseGeneration);
+      }
       if (scope !== null) {
         if (leaseGeneration !== undefined) {
           const ownedAttempt = this.clearStaffLeaseAttempt(client.id, input.gameId, leaseGeneration);
@@ -1016,7 +1190,280 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     const generation = (generations.get(gameId) ?? 0) + 1;
     generations.set(gameId, generation);
     this.staffLeaseGenerations.set(client.id, generations);
+    this.clearSocketGameRefreshFlights(client.id, gameId);
+    this.clearCommittedEventDeliveryQueue(client.id, gameId);
+    this.gameSnapshotWatermarks.delete(this.roomTransitionKey(client.id, gameId));
+    this.clearPendingGameSnapshotAck(client.id, gameId);
     return generation;
+  }
+
+  private beginGameSnapshotAck(clientId: string, gameId: string, generation: number): PendingGameSnapshotAck {
+    const pendingAck: PendingGameSnapshotAck = { generation };
+    this.pendingGameSnapshotAcks.set(this.roomTransitionKey(clientId, gameId), pendingAck);
+    return pendingAck;
+  }
+
+  private async runPendingGameSnapshotWork<T>(
+    client: V1Socket,
+    gameId: string,
+    generation: number,
+    pendingAck: PendingGameSnapshotAck,
+    work: () => Promise<T>,
+  ): Promise<{ readonly completed: true; readonly value: T; readonly current: boolean } | { readonly completed: false }> {
+    let value: T | undefined;
+    let hasValue = false;
+    const scheduled = this.refreshScheduler.schedule(gameId, async () => {
+      const result = await work();
+      value = result;
+      hasValue = true;
+    });
+    pendingAck.scheduled = scheduled;
+    try {
+      await scheduled.promise;
+    } finally {
+      if (pendingAck.scheduled === scheduled) pendingAck.scheduled = undefined;
+    }
+    if (!hasValue) return { completed: false };
+    return {
+      completed: true,
+      value: value as T,
+      current: this.isPendingGameSnapshotAckCurrent(client, gameId, generation, pendingAck),
+    };
+  }
+
+  private isPendingGameSnapshotAckCurrent(
+    client: V1Socket,
+    gameId: string,
+    generation: number,
+    pendingAck: PendingGameSnapshotAck,
+  ): boolean {
+    const key = this.roomTransitionKey(client.id, gameId);
+    return this.pendingGameSnapshotAcks.get(key) === pendingAck &&
+      pendingAck.generation === generation &&
+      this.isSocketLive(client) && client.rooms.has(gameRoom(gameId)) &&
+      this.isRoomGenerationCurrent(client.id, gameId, generation) &&
+      this.staffRoomOwners.get(key) === generation;
+  }
+
+  private clearPendingGameSnapshotAck(
+    clientId: string,
+    gameId: string,
+    generation?: number,
+    expected?: PendingGameSnapshotAck,
+  ): boolean {
+    const key = this.roomTransitionKey(clientId, gameId);
+    const current = this.pendingGameSnapshotAcks.get(key);
+    if (current === undefined || (generation !== undefined && current.generation !== generation) ||
+      (expected !== undefined && current !== expected)) return false;
+    if (!this.pendingGameSnapshotAcks.delete(key)) return false;
+    current.scheduled?.cancel();
+    return true;
+  }
+
+  private preserveFailedRefreshFloor(
+    client: V1Socket,
+    gameId: string,
+    generation: number,
+    minimumVersion: number,
+    expectedPendingAck: PendingGameSnapshotAck | undefined,
+  ): void {
+    const key = this.roomTransitionKey(client.id, gameId);
+    const pendingAck = this.pendingGameSnapshotAcks.get(key);
+    if (expectedPendingAck === undefined || pendingAck !== expectedPendingAck || pendingAck.generation !== generation ||
+      !this.isSocketLive(client) || !client.rooms.has(gameRoom(gameId)) ||
+      !this.isRoomGenerationCurrent(client.id, gameId, generation) ||
+      this.staffRoomOwners.get(key) !== generation || this.socketClients.get(client.id) !== client) return;
+    pendingAck.failedRefreshMinimumVersion = Math.max(
+      pendingAck.failedRefreshMinimumVersion ?? 0,
+      minimumVersion,
+    );
+  }
+
+  private clearSocketGameRefreshFlights(socketId: string, gameId?: string): void {
+    const byGame = this.refreshFlightKeysBySocket.get(socketId);
+    const games = gameId === undefined ? [...(byGame?.keys() ?? [])] : [gameId];
+    for (const currentGameId of games) {
+      const keys = byGame?.get(currentGameId);
+      if (keys === undefined) continue;
+      for (const key of keys) {
+        const flight = this.subscriberRefreshFlights.get(key);
+        if (flight !== undefined) {
+          flight.dirty = false;
+          flight.scheduled?.cancel();
+          if (this.subscriberRefreshFlights.get(key) === flight) this.subscriberRefreshFlights.delete(key);
+        }
+      }
+      byGame?.delete(currentGameId);
+    }
+    if (byGame?.size === 0) this.refreshFlightKeysBySocket.delete(socketId);
+  }
+
+  private enqueueCommittedEventForSubscribers(
+    gameId: string,
+    version: number,
+    payload: unknown,
+  ): void {
+    const room = gameRoom(gameId);
+    const roomSocketIds = this.server.adapter.rooms.get(room);
+    if (roomSocketIds === undefined) return;
+    for (const socketId of roomSocketIds) {
+      const client = this.socketClients.get(socketId);
+      if (client === undefined || !this.isSocketLive(client) || !client.rooms.has(room)) continue;
+      const generation = this.staffLeaseGenerations.get(client.id)?.get(gameId);
+      if (generation === undefined) continue;
+      const key = this.roomTransitionKey(client.id, gameId);
+      let queue = this.committedEventDeliveryQueues.get(key);
+      if (queue === undefined || queue.generation !== generation) {
+        if (queue !== undefined) this.removeCommittedEventDeliveryQueue(key, queue);
+        queue = { socket: client, gameId, generation, events: [], draining: false };
+        this.committedEventDeliveryQueues.set(key, queue);
+        const socketKeys = this.committedEventQueueKeysBySocket.get(client.id) ?? new Set<string>();
+        socketKeys.add(key);
+        this.committedEventQueueKeysBySocket.set(client.id, socketKeys);
+      }
+      if (queue.events.length >= MAX_PENDING_COMMITTED_EVENTS_PER_SOCKET_GAME) {
+        this.disconnectGameSubscriberForRecovery(client, gameId, version);
+        continue;
+      }
+      const socketPending = this.pendingCommittedEventsBySocket.get(client.id) ?? 0;
+      if (socketPending >= MAX_PENDING_COMMITTED_EVENTS_PER_SOCKET) {
+        this.disconnectGameSubscriberForRecovery(client, gameId, version);
+        continue;
+      }
+      const refreshKey = `${key}:${generation}`;
+      const activeRefresh = this.subscriberRefreshFlights.get(refreshKey);
+      const requiresSnapshot = this.pendingGameSnapshotAcks.get(key)?.generation === generation || activeRefresh !== undefined;
+      if (activeRefresh !== undefined) {
+        activeRefresh.dirty = true;
+        activeRefresh.minimumVersion = Math.max(activeRefresh.minimumVersion, version);
+      }
+      queue.events.push({ version, payload, requiresSnapshot });
+      this.pendingCommittedEventsBySocket.set(client.id, socketPending + 1);
+      this.startCommittedEventDelivery(client, gameId);
+    }
+  }
+
+  private startCommittedEventDelivery(client: V1Socket, gameId: string): void {
+    const key = this.roomTransitionKey(client.id, gameId);
+    const queue = this.committedEventDeliveryQueues.get(key);
+    if (queue === undefined || queue.draining || queue.events.length === 0 ||
+      this.pendingGameSnapshotAcks.get(key)?.generation === queue.generation) return;
+    queue.draining = true;
+    void this.drainCommittedEventDeliveryQueue(queue).catch((error: unknown) => {
+      this.logger.error({ socketId: client.id, gameId, err: error }, 'Committed game event delivery failed');
+      const roomKey = this.roomTransitionKey(client.id, gameId);
+      if (this.committedEventDeliveryQueues.get(roomKey) !== queue ||
+        !this.isRoomGenerationCurrent(client.id, gameId, queue.generation) ||
+        !this.isSocketLive(client) || !client.rooms.has(gameRoom(gameId)) ||
+        this.staffRoomOwners.get(roomKey) !== queue.generation) return;
+      this.disconnectGameSubscriberForRecovery(client, gameId, queue.events[0]?.version ?? 0);
+    });
+  }
+
+  private async drainCommittedEventDeliveryQueue(queue: CommittedEventDeliveryQueue): Promise<void> {
+    const { socket, gameId, generation } = queue;
+    const key = this.roomTransitionKey(socket.id, gameId);
+    const room = gameRoom(gameId);
+    try {
+      while (queue.events.length > 0) {
+        if (this.committedEventDeliveryQueues.get(key) !== queue ||
+          !this.isSocketLive(socket) || !socket.rooms.has(room) ||
+          !this.isRoomGenerationCurrent(socket.id, gameId, generation)) return;
+        if (this.pendingGameSnapshotAcks.get(key)?.generation === generation) return;
+
+        const next = queue.events[0];
+        const refreshKey = `${key}:${generation}`;
+        let activeRefresh = this.subscriberRefreshFlights.get(refreshKey);
+        const requiresSnapshot = next.requiresSnapshot || activeRefresh !== undefined;
+        if (activeRefresh !== undefined) {
+          activeRefresh.dirty = true;
+          activeRefresh.minimumVersion = Math.max(activeRefresh.minimumVersion, next.version);
+          await activeRefresh.promise;
+          if (this.committedEventDeliveryQueues.get(key) !== queue ||
+            !this.isSocketLive(socket) || !socket.rooms.has(room) ||
+            !this.isRoomGenerationCurrent(socket.id, gameId, generation)) return;
+        }
+        if (requiresSnapshot && !this.isCurrentSnapshotAtLeast(socket, gameId, generation, next.version)) {
+          await this.requestSocketGameRefresh(socket, gameId, next.version);
+          if (this.committedEventDeliveryQueues.get(key) !== queue ||
+            !this.isSocketLive(socket) || !socket.rooms.has(room) ||
+            !this.isRoomGenerationCurrent(socket.id, gameId, generation)) return;
+          if (!this.isCurrentSnapshotAtLeast(socket, gameId, generation, next.version)) {
+            this.disconnectGameSubscriberForRecovery(socket, gameId, next.version);
+            return;
+          }
+        }
+        if (this.committedEventDeliveryQueues.get(key) !== queue ||
+          !this.isSocketLive(socket) || !socket.rooms.has(room) ||
+          !this.isRoomGenerationCurrent(socket.id, gameId, generation)) return;
+        if (this.pendingGameSnapshotAcks.get(key)?.generation === generation) return;
+        socket.emit('game.event.committed', next.payload);
+        queue.events.shift();
+        const pending = this.pendingCommittedEventsBySocket.get(socket.id) ?? 0;
+        if (pending <= 1) this.pendingCommittedEventsBySocket.delete(socket.id);
+        else this.pendingCommittedEventsBySocket.set(socket.id, pending - 1);
+      }
+    } finally {
+      if (this.committedEventDeliveryQueues.get(key) === queue) {
+        queue.draining = false;
+        if (queue.events.length === 0) this.removeCommittedEventDeliveryQueue(key, queue);
+      }
+    }
+  }
+
+  private clearCommittedEventDeliveryQueue(socketId: string, gameId?: string, generation?: number): void {
+    const keys = gameId === undefined
+      ? [...(this.committedEventQueueKeysBySocket.get(socketId) ?? [])]
+      : [this.roomTransitionKey(socketId, gameId)];
+    for (const key of keys) {
+      const queue = this.committedEventDeliveryQueues.get(key);
+      if (queue !== undefined && (generation === undefined || queue.generation === generation)) {
+        this.removeCommittedEventDeliveryQueue(key, queue);
+      }
+    }
+  }
+
+  private removeCommittedEventDeliveryQueue(key: string, queue: CommittedEventDeliveryQueue): void {
+    if (this.committedEventDeliveryQueues.get(key) !== queue) return;
+    this.committedEventDeliveryQueues.delete(key);
+    const pending = this.pendingCommittedEventsBySocket.get(queue.socket.id) ?? 0;
+    const remaining = Math.max(0, pending - queue.events.length);
+    if (remaining === 0) this.pendingCommittedEventsBySocket.delete(queue.socket.id);
+    else this.pendingCommittedEventsBySocket.set(queue.socket.id, remaining);
+    queue.events.length = 0;
+    const keys = this.committedEventQueueKeysBySocket.get(queue.socket.id);
+    keys?.delete(key);
+    if (keys?.size === 0) this.committedEventQueueKeysBySocket.delete(queue.socket.id);
+  }
+
+  private emitGameSnapshotIfNewer(
+    client: V1Socket,
+    gameId: string,
+    generation: number,
+    backfill: GameBackfill,
+  ): boolean {
+    const key = this.roomTransitionKey(client.id, gameId);
+    const previous = this.gameSnapshotWatermarks.get(key);
+    if (previous?.generation === generation && (
+      backfill.version < previous.version ||
+      (backfill.version === previous.version && backfill.lastSequence < previous.lastSequence)
+    )) return false;
+    const snapshot = this.toGameSnapshot(gameId, backfill);
+    this.gameSnapshotWatermarks.set(key, { generation, version: snapshot.version, lastSequence: snapshot.lastSequence });
+    const pendingAck = this.pendingGameSnapshotAcks.get(key);
+    if (pendingAck?.generation === generation) pendingAck.snapshot = snapshot;
+    client.emit('game.snapshot', snapshot);
+    return true;
+  }
+
+  private toGameSnapshot(gameId: string, backfill: GameBackfill): GameSnapshot {
+    return {
+      gameId,
+      version: backfill.version,
+      state: backfill.state,
+      lastSequence: backfill.lastSequence,
+      events: backfill.events,
+    };
   }
 
   private isSocketLive(client: V1Socket): boolean {
@@ -1033,6 +1480,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
 
   private invalidateRoomGenerationIfCurrent(clientId: string, gameId: string, generation: number): boolean {
     if (!this.isRoomGenerationCurrent(clientId, gameId, generation)) return false;
+    this.clearCommittedEventDeliveryQueue(clientId, gameId);
     this.invalidateStaffAuthorization(clientId, gameId);
     return true;
   }
@@ -1289,6 +1737,9 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     const leases = this.staffLeases.get(clientId);
     const lease = leases?.get(gameId);
     if (lease?.generation !== generation) return false;
+    this.clearSocketGameRefreshFlights(clientId, gameId);
+    this.gameSnapshotWatermarks.delete(this.roomTransitionKey(clientId, gameId));
+    this.clearPendingGameSnapshotAck(clientId, gameId, generation);
     if (lease.timer !== undefined) clearTimeout(lease.timer);
     leases?.delete(gameId);
     if (leases?.size === 0) this.staffLeases.delete(clientId);
@@ -1297,6 +1748,10 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
   }
 
   private invalidateStaffAuthorization(clientId: string, gameId: string): StaffLease | undefined {
+    this.clearSocketGameRefreshFlights(clientId, gameId);
+    this.clearCommittedEventDeliveryQueue(clientId, gameId);
+    this.gameSnapshotWatermarks.delete(this.roomTransitionKey(clientId, gameId));
+    this.clearPendingGameSnapshotAck(clientId, gameId);
     const generations = this.staffLeaseGenerations.get(clientId) ?? new Map<string, number>();
     generations.set(gameId, (generations.get(gameId) ?? 0) + 1);
     this.staffLeaseGenerations.set(clientId, generations);
@@ -1336,127 +1791,154 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       expiredLease.scope,
     );
     if (rejoinGeneration === undefined) return;
+    const pendingSnapshotAck = this.beginGameSnapshotAck(client.id, expiredLease.gameId, rejoinGeneration);
     this.removeGameSubscription(expiredLease.userId, expiredLease.gameId, client.id);
     try {
-      await this.forceLeaveGameRoom(client, expiredLease.gameId);
-    } catch (error) {
-      this.clearStaffLeaseAttempt(client.id, expiredLease.gameId, rejoinGeneration);
-      this.logger.error(
-        { socketId: client.id, gameId: expiredLease.gameId, err: error },
-        'Failed to leave expired staff room',
-      );
-      this.emitProtocolError(client, { code: 'INTERNAL_ERROR' }, { gameId: expiredLease.gameId });
-      client.disconnect(true);
-      return;
-    }
+      try {
+        await this.forceLeaveGameRoom(client, expiredLease.gameId);
+      } catch (error) {
+        this.clearStaffLeaseAttempt(client.id, expiredLease.gameId, rejoinGeneration);
+        this.logger.error(
+          { socketId: client.id, gameId: expiredLease.gameId, err: error },
+          'Failed to leave expired staff room',
+        );
+        this.emitProtocolError(client, { code: 'INTERNAL_ERROR' }, { gameId: expiredLease.gameId });
+        client.disconnect(true);
+        return;
+      }
 
-    if (
-      this.pendingStaffLeaseAttempts.get(client.id)?.get(expiredLease.gameId)?.generation !== rejoinGeneration
-    ) {
-      return;
-    }
-
-    let promoted = false;
-    try {
-      const game = await this.loadGameForStaffLease(expiredLease.gameId);
-      if (game === null) {
-        if (this.clearStaffLeaseAttempt(client.id, expiredLease.gameId, rejoinGeneration)) {
-          client.emit('game.permission.revoked', { gameId: expiredLease.gameId, assignmentVersion: null });
-        }
-        return;
-      }
-      const scope = gameRealtimeScope(game);
       if (
-        scope === null ||
-        scope.invalid === true ||
-        !this.replaceStaffLeaseAttemptScope(client.id, expiredLease.gameId, rejoinGeneration, scope)
-      ) {
-        if (this.clearStaffLeaseAttempt(client.id, expiredLease.gameId, rejoinGeneration)) {
-          client.emit('game.permission.revoked', { gameId: expiredLease.gameId, assignmentVersion: null });
-        }
-        return;
-      }
-      const principal = await this.tournamentStaffAccess.assertAccess({
-        userId: expiredLease.userId,
-        action: 'read',
-        resource: {
-          tournamentId: scope.tournamentId,
-          fixtureId: scope.fixtureId,
-          ...(scope.fieldId === null ? {} : { fieldId: scope.fieldId }),
-        },
-      });
-      if (!this.matchesAuthorizationVersion(client, principal.assignmentVersion)) {
-        if (this.clearStaffLeaseAttempt(client.id, expiredLease.gameId, rejoinGeneration)) {
-          client.emit('game.permission.revoked', {
-            gameId: expiredLease.gameId,
-            assignmentVersion: principal.assignmentVersion,
-          });
-        }
-        return;
-      }
-      if (principal.expiresAt !== null && principal.expiresAt.getTime() <= Date.now()) {
-        if (this.clearStaffLeaseAttempt(client.id, expiredLease.gameId, rejoinGeneration)) {
-          client.emit('game.permission.revoked', {
-            gameId: expiredLease.gameId,
-            assignmentVersion: principal.assignmentVersion,
-          });
-        }
-        return;
-      }
-      if (
-        !this.promoteStaffLeaseAttempt(
-          client,
-          expiredLease.gameId,
-          rejoinGeneration,
-          principal.expiresAt ?? null,
-        )
+        this.pendingStaffLeaseAttempts.get(client.id)?.get(expiredLease.gameId)?.generation !== rejoinGeneration
       ) {
         return;
       }
-      promoted = true;
-      if (!(await this.joinAuthorizedGameRoom(client, expiredLease.gameId, rejoinGeneration))) return;
-      const backfill = await this.gamesService.listEvents(client.data.authUser!, expiredLease.gameId, 0);
-      if (!this.activateStaffLease(client.id, expiredLease.gameId, rejoinGeneration)) {
-        const cancelled = this.cancelAuthorizedLeaseIfGeneration(client.id, expiredLease.gameId, rejoinGeneration);
-        if (cancelled) await this.leaveAuthorizedGameRoom(client, expiredLease.gameId, rejoinGeneration);
-        return;
-      }
-      this.recordGameSubscription(expiredLease.userId, scope.tournamentId, expiredLease.gameId, client.id);
-      client.emit('game.snapshot', {
-        gameId: expiredLease.gameId,
-        version: backfill.version,
-        state: backfill.state,
-        lastSequence: backfill.lastSequence,
-        events: backfill.events,
-      });
-      if (backfill.gap !== undefined && backfill.gap !== null) client.emit('game.gap', backfill.gap);
-    } catch (error) {
-      const ownedAttempt = this.clearStaffLeaseAttempt(client.id, expiredLease.gameId, rejoinGeneration);
-      const cancelled = promoted
-        ? this.cancelAuthorizedLeaseIfGeneration(client.id, expiredLease.gameId, rejoinGeneration)
-        : false;
-      if (cancelled) {
-        try {
-          await this.leaveAuthorizedGameRoom(client, expiredLease.gameId, rejoinGeneration);
-        } catch (leaveError) {
+
+      let promoted = false;
+      try {
+        const game = await this.loadGameForStaffLease(expiredLease.gameId);
+        if (game === null) {
+          if (this.clearStaffLeaseAttempt(client.id, expiredLease.gameId, rejoinGeneration)) {
+            client.emit('game.permission.revoked', { gameId: expiredLease.gameId, assignmentVersion: null });
+          }
+          return;
+        }
+        const scope = gameRealtimeScope(game);
+        if (
+          scope === null ||
+          scope.invalid === true ||
+          !this.replaceStaffLeaseAttemptScope(client.id, expiredLease.gameId, rejoinGeneration, scope)
+        ) {
+          if (this.clearStaffLeaseAttempt(client.id, expiredLease.gameId, rejoinGeneration)) {
+            client.emit('game.permission.revoked', { gameId: expiredLease.gameId, assignmentVersion: null });
+          }
+          return;
+        }
+        const principal = await this.tournamentStaffAccess.assertAccess({
+          userId: expiredLease.userId,
+          action: 'read',
+          resource: {
+            tournamentId: scope.tournamentId,
+            fixtureId: scope.fixtureId,
+            ...(scope.fieldId === null ? {} : { fieldId: scope.fieldId }),
+          },
+        });
+        if (!this.matchesAuthorizationVersion(client, principal.assignmentVersion)) {
+          if (this.clearStaffLeaseAttempt(client.id, expiredLease.gameId, rejoinGeneration)) {
+            client.emit('game.permission.revoked', {
+              gameId: expiredLease.gameId,
+              assignmentVersion: principal.assignmentVersion,
+            });
+          }
+          return;
+        }
+        if (principal.expiresAt !== null && principal.expiresAt.getTime() <= Date.now()) {
+          if (this.clearStaffLeaseAttempt(client.id, expiredLease.gameId, rejoinGeneration)) {
+            client.emit('game.permission.revoked', {
+              gameId: expiredLease.gameId,
+              assignmentVersion: principal.assignmentVersion,
+            });
+          }
+          return;
+        }
+        if (
+          !this.promoteStaffLeaseAttempt(
+            client,
+            expiredLease.gameId,
+            rejoinGeneration,
+            principal.expiresAt ?? null,
+          )
+        ) {
+          return;
+        }
+        promoted = true;
+        if (!(await this.joinAuthorizedGameRoom(client, expiredLease.gameId, rejoinGeneration))) return;
+        const backfill = await this.gamesService.listEvents(client.data.authUser!, expiredLease.gameId, 0);
+        const room = gameRoom(expiredLease.gameId);
+        const roomKey = this.roomTransitionKey(client.id, expiredLease.gameId);
+        if (this.pendingGameSnapshotAcks.get(roomKey) !== pendingSnapshotAck ||
+          !this.isSocketLive(client) || !client.rooms.has(room) ||
+          !this.isRoomGenerationCurrent(client.id, expiredLease.gameId, rejoinGeneration) ||
+          this.staffRoomOwners.get(roomKey) !== rejoinGeneration) return;
+        const failedRefreshMinimumVersion = pendingSnapshotAck.failedRefreshMinimumVersion;
+        const availableSnapshotVersion = Math.max(
+          backfill.version,
+          pendingSnapshotAck.snapshot?.version ?? -1,
+        );
+        if (failedRefreshMinimumVersion !== undefined && availableSnapshotVersion < failedRefreshMinimumVersion) {
           this.logger.error(
-            { socketId: client.id, gameId: expiredLease.gameId, err: leaveError },
-            'Failed to leave failed staff rejoin room',
+            {
+              socketId: client.id,
+              gameId: expiredLease.gameId,
+              requiredVersion: failedRefreshMinimumVersion,
+              actualVersion: availableSnapshotVersion,
+            },
+            'Expired staff lease rejoin snapshot is behind a failed committed refresh',
           );
-          client.disconnect(true);
+          this.emitProtocolError(client, { code: 'INTERNAL_ERROR' }, { gameId: expiredLease.gameId });
+          this.disconnectGameSubscriberForRecovery(client, expiredLease.gameId, failedRefreshMinimumVersion);
+          return;
         }
+        if (!this.activateStaffLease(client.id, expiredLease.gameId, rejoinGeneration)) {
+          const cancelled = this.cancelAuthorizedLeaseIfGeneration(client.id, expiredLease.gameId, rejoinGeneration);
+          if (cancelled) await this.leaveAuthorizedGameRoom(client, expiredLease.gameId, rejoinGeneration);
+          return;
+        }
+        this.recordGameSubscription(expiredLease.userId, scope.tournamentId, expiredLease.gameId, client.id);
+        const emitted = this.emitGameSnapshotIfNewer(client, expiredLease.gameId, rejoinGeneration, backfill);
+        if (emitted && backfill.gap !== undefined && backfill.gap !== null) client.emit('game.gap', backfill.gap);
+        this.startCommittedEventDelivery(client, expiredLease.gameId);
+      } catch (error) {
+        const ownedAttempt = this.clearStaffLeaseAttempt(client.id, expiredLease.gameId, rejoinGeneration);
+        const cancelled = promoted
+          ? this.cancelAuthorizedLeaseIfGeneration(client.id, expiredLease.gameId, rejoinGeneration)
+          : false;
+        if (cancelled) {
+          try {
+            await this.leaveAuthorizedGameRoom(client, expiredLease.gameId, rejoinGeneration);
+          } catch (leaveError) {
+            this.logger.error(
+              { socketId: client.id, gameId: expiredLease.gameId, err: leaveError },
+              'Failed to leave failed staff rejoin room',
+            );
+            client.disconnect(true);
+          }
+        }
+        if (!ownedAttempt && !cancelled) return;
+        if (error instanceof ForbiddenException) {
+          client.emit('game.permission.revoked', { gameId: expiredLease.gameId, assignmentVersion: null });
+          return;
+        }
+        this.logger.error(
+          { socketId: client.id, gameId: expiredLease.gameId, err: error },
+          'Failed to revalidate expired staff lease',
+        );
+        this.emitProtocolError(client, { code: 'INTERNAL_ERROR' }, { gameId: expiredLease.gameId });
+        client.disconnect(true);
       }
-      if (!ownedAttempt && !cancelled) return;
-      if (error instanceof ForbiddenException) {
-        client.emit('game.permission.revoked', { gameId: expiredLease.gameId, assignmentVersion: null });
-        return;
+    } finally {
+      if (this.clearPendingGameSnapshotAck(client.id, expiredLease.gameId, rejoinGeneration, pendingSnapshotAck)) {
+        this.startCommittedEventDelivery(client, expiredLease.gameId);
       }
-      this.logger.error(
-        { socketId: client.id, gameId: expiredLease.gameId, err: error },
-        'Failed to revalidate expired staff lease',
-      );
-      this.emitProtocolError(client, { code: 'INTERNAL_ERROR' }, { gameId: expiredLease.gameId });
-      client.disconnect(true);
     }
   }
 
@@ -1667,6 +2149,304 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     return scopes;
   }
 
+  /**
+   * Re-read a committed REST command's durable snapshot for each live socket in
+   * the tracked room. Reuse the subscription's per-socket read authorization and
+   * lease checks; never broadcast an operator's HTTP response to the room.
+   */
+  private async refreshGameSubscribers(gameId: string, minimumVersion: number): Promise<void> {
+    const room = gameRoom(gameId);
+    const roomSocketIds = this.server.adapter.rooms.get(room);
+    if (roomSocketIds === undefined) return;
+    const pending: Promise<void>[] = [];
+    for (const socketId of roomSocketIds) {
+      const client = this.socketClients.get(socketId);
+      if (client !== undefined && this.isSocketLive(client) && client.rooms.has(room)) {
+        pending.push(this.requestSocketGameRefresh(client, gameId, minimumVersion));
+      }
+    }
+    await Promise.all(pending);
+  }
+
+  private requestSocketGameRefresh(client: V1Socket, gameId: string, minimumVersion: number): Promise<void> {
+    const generation = this.staffLeaseGenerations.get(client.id)?.get(gameId);
+    if (generation === undefined) return Promise.resolve();
+    const key = `${this.roomTransitionKey(client.id, gameId)}:${generation}`;
+    const pendingAck = this.pendingGameSnapshotAcks.get(this.roomTransitionKey(client.id, gameId));
+    const existing = this.subscriberRefreshFlights.get(key);
+    if (existing !== undefined) {
+      existing.dirty = true;
+      existing.minimumVersion = Math.max(existing.minimumVersion, minimumVersion);
+      if (pendingAck?.generation === generation) existing.pendingAck = pendingAck;
+      return existing.promise;
+    }
+
+    const flight: SubscriberRefreshFlight = {
+      socket: client,
+      gameId,
+      generation,
+      dirty: false,
+      minimumVersion,
+      ...(pendingAck?.generation === generation ? { pendingAck } : {}),
+      passes: 0,
+      promise: Promise.resolve(),
+    };
+    this.subscriberRefreshFlights.set(key, flight);
+    const indexedGames = this.refreshFlightKeysBySocket.get(client.id) ?? new Map<string, Set<string>>();
+    const indexedKeys = indexedGames.get(gameId) ?? new Set<string>();
+    indexedKeys.add(key);
+    indexedGames.set(gameId, indexedKeys);
+    this.refreshFlightKeysBySocket.set(client.id, indexedGames);
+    flight.scheduled = this.refreshScheduler.schedule(gameId, async () => {
+      do {
+        flight.dirty = false;
+        flight.passes += 1;
+        await this.refreshSocketGameSubscriber(
+          flight.socket,
+          flight.gameId,
+          flight.generation,
+          flight.minimumVersion,
+          flight.pendingAck,
+        );
+      } while (flight.dirty && flight.passes < 2 &&
+        this.isRoomGenerationCurrent(client.id, gameId, generation) && this.isSocketLive(client));
+      if (flight.dirty && this.isRoomGenerationCurrent(client.id, gameId, generation) &&
+        this.isSocketLive(client) && !this.isCurrentSnapshotAtLeast(client, gameId, generation, flight.minimumVersion)) {
+        this.disconnectGameSubscriberForRecovery(client, gameId, flight.minimumVersion);
+      }
+      if (!this.pendingGameSnapshotAcks.has(this.roomTransitionKey(client.id, gameId)) &&
+        this.isRoomGenerationCurrent(client.id, gameId, generation) && this.isSocketLive(client) &&
+        client.rooms.has(gameRoom(gameId)) &&
+        !this.isCurrentSnapshotAtLeast(client, gameId, generation, flight.minimumVersion)) {
+        this.disconnectGameSubscriberForRecovery(client, gameId, flight.minimumVersion);
+      }
+    });
+    flight.promise = flight.scheduled.promise.catch((error: unknown) => {
+      this.preserveFailedRefreshFloor(client, gameId, generation, flight.minimumVersion, flight.pendingAck);
+      if (!this.pendingGameSnapshotAcks.has(this.roomTransitionKey(client.id, gameId)) &&
+        this.isSocketLive(client) && client.rooms.has(gameRoom(gameId)) &&
+        this.isRoomGenerationCurrent(client.id, gameId, generation)) {
+        this.disconnectGameSubscriberForRecovery(client, gameId, flight.minimumVersion);
+      }
+      throw error;
+    }).finally(() => {
+      if (this.subscriberRefreshFlights.get(key) === flight) {
+        this.subscriberRefreshFlights.delete(key);
+        const keys = this.refreshFlightKeysBySocket.get(client.id)?.get(gameId);
+        keys?.delete(key);
+        if (keys?.size === 0) this.refreshFlightKeysBySocket.get(client.id)?.delete(gameId);
+        const games = this.refreshFlightKeysBySocket.get(client.id);
+        if (games?.size === 0) this.refreshFlightKeysBySocket.delete(client.id);
+      }
+    });
+    return flight.promise;
+  }
+
+  private isCurrentSnapshotAtLeast(client: V1Socket, gameId: string, generation: number, version: number): boolean {
+    const watermark = this.gameSnapshotWatermarks.get(this.roomTransitionKey(client.id, gameId));
+    return watermark?.generation === generation && watermark.version >= version;
+  }
+
+  private isBackfillAtCurrentRefreshFloor(
+    client: V1Socket,
+    gameId: string,
+    generation: number,
+    version: number,
+  ): boolean {
+    const flight = this.subscriberRefreshFlights.get(`${this.roomTransitionKey(client.id, gameId)}:${generation}`);
+    if (flight !== undefined && version < flight.minimumVersion) {
+      flight.dirty = true;
+      return false;
+    }
+    return true;
+  }
+
+  private disconnectGameSubscriberForRecovery(client: V1Socket, gameId: string, requiredVersion: number): void {
+    this.logger.warn(
+      { socketId: client.id, gameId, requiredVersion },
+      'Disconnecting game subscriber so reconnect can restore a current full snapshot',
+    );
+    this.socketClients.delete(client.id);
+    const userId = client.data.userId;
+    if (userId !== undefined) this.removeSocketSubscriptions(userId, client.id);
+    else {
+      this.clearSocketGameRefreshFlights(client.id);
+      this.clearCommittedEventDeliveryQueue(client.id);
+    }
+    // Close the transport without a namespace DISCONNECT packet. Socket.IO 4.8.3
+    // client managers reconnect after a transport close, while `socket.disconnect(true)`
+    // is an explicit server-namespace disconnect that disables automatic reconnect.
+    client.client.conn.close();
+  }
+
+  private async refreshSocketGameSubscriber(
+    client: V1Socket,
+    gameId: string,
+    generation: number,
+    minimumVersion: number,
+    pendingAck: PendingGameSnapshotAck | undefined,
+  ): Promise<void> {
+    const room = gameRoom(gameId);
+    const roomKey = this.roomTransitionKey(client.id, gameId);
+    const userId = client.data.userId;
+    const authUser = client.data.authUser;
+    if (userId === undefined || authUser === undefined || authUser.id !== userId ||
+      !this.isSocketLive(client) || !client.rooms.has(room) ||
+      !this.isRoomGenerationCurrent(client.id, gameId, generation) ||
+      this.staffRoomOwners.get(roomKey) !== generation) return;
+
+    const lease = this.staffLeases.get(client.id)?.get(gameId);
+    const game = await this.loadGameForStaffLease(gameId);
+    if (game === null) return;
+    const scope = gameRealtimeScope(game);
+    if (scope === null) {
+      if (lease !== undefined) {
+        await this.revokeAuthorizedLease(client, userId, gameId, lease.generation, () => {
+          client.emit('game.permission.revoked', { gameId, assignmentVersion: null });
+        });
+        return;
+      }
+      try {
+        await this.gamesService.assertReadAccess(authUser, gameId);
+        if (!this.isSocketLive(client) || !client.rooms.has(room) ||
+          !this.isRoomGenerationCurrent(client.id, gameId, generation) ||
+          this.staffRoomOwners.get(roomKey) !== generation ||
+          this.staffLeases.get(client.id)?.has(gameId)) return;
+        const currentGame = await this.loadGameForStaffLease(gameId);
+        if (currentGame === null || gameRealtimeScope(currentGame) !== null) {
+          await this.leaveUnscopedGameRoomIfCurrent(client, gameId, generation);
+          return;
+        }
+        const backfill = await this.gamesService.listEvents(authUser, gameId, 0);
+        await this.gamesService.assertReadAccess(authUser, gameId);
+        if (!this.isSocketLive(client) || !client.rooms.has(room) ||
+          !this.isRoomGenerationCurrent(client.id, gameId, generation) ||
+          this.staffRoomOwners.get(roomKey) !== generation ||
+          this.staffLeases.get(client.id)?.has(gameId)) return;
+        if (backfill.version < minimumVersion) {
+          this.logger.error({ socketId: client.id, gameId, minimumVersion, actualVersion: backfill.version }, 'Game snapshot did not meet committed refresh version');
+          this.preserveFailedRefreshFloor(client, gameId, generation, minimumVersion, pendingAck);
+          return;
+        }
+        if (!this.isBackfillAtCurrentRefreshFloor(client, gameId, generation, backfill.version)) return;
+        const emitted = this.emitGameSnapshotIfNewer(client, gameId, generation, backfill);
+        if (emitted && backfill.gap !== undefined && backfill.gap !== null) client.emit('game.gap', backfill.gap);
+      } catch (error: unknown) {
+        if (error instanceof ForbiddenException) {
+          await this.leaveUnscopedGameRoomIfCurrent(client, gameId, generation);
+          return;
+        }
+        this.preserveFailedRefreshFloor(client, gameId, generation, minimumVersion, pendingAck);
+        this.logger.error({ socketId: client.id, gameId, err: error }, 'Failed to refresh unscoped game snapshot');
+      }
+      return;
+    }
+
+    if (lease === undefined) {
+      await this.leaveUnscopedGameRoomIfCurrent(client, gameId, generation);
+      return;
+    }
+    if (scope.invalid === true || !this.sameStaffScope(lease.scope, scope)) {
+      await this.revokeAuthorizedLease(client, userId, gameId, lease.generation, () => {
+        client.emit('game.permission.revoked', { gameId, assignmentVersion: null });
+      });
+      return;
+    }
+    const pendingSnapshotRefresh = lease.state === 'PENDING' &&
+      this.pendingGameSnapshotAcks.get(roomKey)?.generation === lease.generation;
+    if ((lease.state !== 'ACTIVE' && !pendingSnapshotRefresh) || !this.isSocketLive(client) || !client.rooms.has(room) ||
+      !this.isAuthorizedLeaseAdmissible(client.id, gameId, lease.generation) ||
+      this.staffRoomOwners.get(roomKey) !== lease.generation) return;
+
+    try {
+      const principal = await this.tournamentStaffAccess.assertAccess({
+        userId,
+        action: 'read',
+        resource: {
+          tournamentId: scope.tournamentId,
+          fixtureId: scope.fixtureId,
+          ...(scope.fieldId === null ? {} : { fieldId: scope.fieldId }),
+        },
+      });
+      if (!this.isAuthorizedLeaseAdmissible(client.id, gameId, lease.generation)) return;
+      if (!this.matchesAuthorizationVersion(client, principal.assignmentVersion) ||
+        (principal.expiresAt !== null && principal.expiresAt.getTime() <= Date.now())) {
+        await this.revokeAuthorizedLease(client, userId, gameId, lease.generation, () => {
+          client.emit('game.permission.revoked', { gameId, assignmentVersion: principal.assignmentVersion });
+        });
+        return;
+      }
+      if (lease.expiresAt?.getTime() !== (principal.expiresAt?.getTime() ?? undefined)) {
+        this.refreshAuthorizedLeaseExpiry(client, gameId, lease.generation, principal.expiresAt ?? null);
+      }
+
+      const currentGame = await this.loadGameForStaffLease(gameId);
+      const currentScope = currentGame === null ? null : gameRealtimeScope(currentGame);
+      if (currentGame === null || currentScope === null || !this.sameStaffScope(scope, currentScope)) {
+        await this.revokeAuthorizedLease(client, userId, gameId, lease.generation, () => {
+          client.emit('game.permission.revoked', { gameId, assignmentVersion: null });
+        });
+        return;
+      }
+      const backfill = await this.gamesService.listEvents(authUser, gameId, 0);
+      const finalPrincipal = await this.tournamentStaffAccess.assertAccess({
+        userId,
+        action: 'read',
+        resource: {
+          tournamentId: scope.tournamentId,
+          fixtureId: scope.fixtureId,
+          ...(scope.fieldId === null ? {} : { fieldId: scope.fieldId }),
+        },
+      });
+      if (!this.isAuthorizedLeaseAdmissible(client.id, gameId, lease.generation)) return;
+      if (!this.matchesAuthorizationVersion(client, finalPrincipal.assignmentVersion) ||
+        (finalPrincipal.expiresAt !== null && finalPrincipal.expiresAt.getTime() <= Date.now())) {
+        await this.revokeAuthorizedLease(client, userId, gameId, lease.generation, () => {
+          client.emit('game.permission.revoked', { gameId, assignmentVersion: finalPrincipal.assignmentVersion });
+        });
+        return;
+      }
+      if (lease.expiresAt?.getTime() !== (finalPrincipal.expiresAt?.getTime() ?? undefined)) {
+        this.refreshAuthorizedLeaseExpiry(client, gameId, lease.generation, finalPrincipal.expiresAt ?? null);
+      }
+      if (!this.isSocketLive(client) || !client.rooms.has(room) ||
+        !this.isAuthorizedLeaseAdmissible(client.id, gameId, lease.generation) ||
+        this.staffRoomOwners.get(roomKey) !== lease.generation) return;
+      if (backfill.version < minimumVersion) {
+        this.logger.error({ socketId: client.id, gameId, minimumVersion, actualVersion: backfill.version }, 'Game snapshot did not meet committed refresh version');
+        this.preserveFailedRefreshFloor(client, gameId, lease.generation, minimumVersion, pendingAck);
+        return;
+      }
+      if (!this.isBackfillAtCurrentRefreshFloor(client, gameId, lease.generation, backfill.version)) return;
+      const emitted = this.emitGameSnapshotIfNewer(client, gameId, lease.generation, backfill);
+      if (emitted && backfill.gap !== undefined && backfill.gap !== null) client.emit('game.gap', backfill.gap);
+    } catch (error: unknown) {
+      if (error instanceof ForbiddenException) {
+        await this.revokeAuthorizedLease(client, userId, gameId, lease.generation, () => {
+          client.emit('game.permission.revoked', { gameId, assignmentVersion: null });
+        });
+        return;
+      }
+      this.preserveFailedRefreshFloor(client, gameId, lease.generation, minimumVersion, pendingAck);
+      this.logger.error({ socketId: client.id, gameId, err: error }, 'Failed to refresh authorized game snapshot');
+    }
+  }
+
+  private async leaveUnscopedGameRoomIfCurrent(
+    client: V1Socket,
+    gameId: string,
+    generation: number,
+  ): Promise<void> {
+    if (!this.invalidateRoomGenerationIfCurrent(client.id, gameId, generation)) return;
+    try {
+      await this.forceLeaveGameRoom(client, gameId);
+    } catch (error: unknown) {
+      this.logger.error({ socketId: client.id, gameId, err: error }, 'Failed to leave unscoped game room');
+      this.emitProtocolError(client, { code: 'INTERNAL_ERROR' }, { gameId });
+      client.disconnect(true);
+    }
+  }
+
   emitToUser(userId: string, event: string, payload: unknown): void {
     this.server.to(`user:${userId}`).emit(event, payload);
   }
@@ -1685,6 +2465,9 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
 
   onModuleDestroy(): void {
     this.shuttingDown = true;
+    this.refreshScheduler.shutdown();
+    for (const socketId of this.refreshFlightKeysBySocket.keys()) this.clearSocketGameRefreshFlights(socketId);
+    for (const socketId of this.committedEventQueueKeysBySocket.keys()) this.clearCommittedEventDeliveryQueue(socketId);
     for (const leases of this.staffLeases.values()) {
       for (const lease of leases.values()) {
         if (lease.timer !== undefined) clearTimeout(lease.timer);
@@ -1693,6 +2476,13 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     this.staffLeases.clear();
     this.pendingStaffLeaseAttempts.clear();
     this.staffLeaseGenerations.clear();
+    this.gameSnapshotWatermarks.clear();
+    this.pendingGameSnapshotAcks.clear();
+    this.subscriberRefreshFlights.clear();
+    this.committedEventDeliveryQueues.clear();
+    this.refreshFlightKeysBySocket.clear();
+    this.committedEventQueueKeysBySocket.clear();
+    this.pendingCommittedEventsBySocket.clear();
     this.staffRoomOwners.clear();
     this.socketClients.clear();
     this.gameSubscriptions.clear();
@@ -1727,9 +2517,11 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       event: result.event ?? event,
     };
     client.emit('game.event.ack', ack);
-    client.emit('game.event.committed', committed);
-    if (this.server !== undefined) {
-      this.server.to(gameRoom(gameId)).except(client.id).emit('game.event.committed', committed);
+    this.gameBroadcast.emitCommittedEvent(gameId, result.version, committed);
+    if (!client.rooms.has(gameRoom(gameId))) {
+      // Preserve the legacy sender notification for a socket that writes without
+      // holding a game subscription. It still fans out to other subscribers above.
+      client.emit('game.event.committed', committed);
     }
     return {
       status: 'ack',
@@ -1832,6 +2624,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
   }
 
   private removeSocketSubscriptions(userId: string, socketId: string): void {
+    this.clearCommittedEventDeliveryQueue(socketId);
     const tournaments = this.gameSubscriptions.get(userId);
     if (tournaments !== undefined) {
       for (const games of tournaments.values()) {
@@ -1861,6 +2654,21 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     this.staffLeases.delete(socketId);
     this.pendingStaffLeaseAttempts.delete(socketId);
     this.staffLeaseGenerations.delete(socketId);
+    this.clearSocketGameRefreshFlights(socketId);
+    for (const key of this.gameSnapshotWatermarks.keys()) {
+      if (key.startsWith(`${socketId}:`)) this.gameSnapshotWatermarks.delete(key);
+    }
+    const socketPrefix = `${socketId}:`;
+    for (const [key, pendingAck] of this.pendingGameSnapshotAcks) {
+      if (key.startsWith(socketPrefix)) {
+        this.clearPendingGameSnapshotAck(
+          socketId,
+          key.slice(socketPrefix.length),
+          pendingAck.generation,
+          pendingAck,
+        );
+      }
+    }
     for (const key of this.staffRoomOwners.keys()) {
       if (key.startsWith(`${socketId}:`)) this.staffRoomOwners.delete(key);
     }
@@ -2017,19 +2825,23 @@ function correlationEcho(payload: unknown): {
 }
 
 function parseGameEventCommand(payload: unknown): GameEventCommandPayload | null {
+  const requiredKeys = ['gameId', 'expectedVersion', 'clientEventId', 'payloadHash', 'event'];
   if (
-    !isPlainObjectWithKeys(payload, [
-      'gameId',
-      'expectedVersion',
-      'clientEventId',
-      'takeoverToken',
-      'payloadHash',
-      'event',
-    ]) ||
+    !isPlainObjectWithKeys(payload, requiredKeys) &&
+    !isPlainObjectWithKeys(payload, [...requiredKeys, 'takeoverToken'])
+  ) {
+    return null;
+  }
+  let takeoverToken: string | undefined;
+  if (Object.hasOwn(payload, 'takeoverToken')) {
+    const suppliedToken = payload.takeoverToken;
+    if (!isNonemptyString(suppliedToken)) return null;
+    takeoverToken = suppliedToken;
+  }
+  if (
     !isNonemptyString(payload.gameId) ||
     !isSafeNonnegative(payload.expectedVersion) ||
     !isNonemptyString(payload.clientEventId) ||
-    !isNonemptyString(payload.takeoverToken) ||
     !isNonemptyString(payload.payloadHash)
   ) {
     return null;
@@ -2041,26 +2853,30 @@ function parseGameEventCommand(payload: unknown): GameEventCommandPayload | null
         gameId: payload.gameId,
         expectedVersion: payload.expectedVersion,
         clientEventId: payload.clientEventId,
-        takeoverToken: payload.takeoverToken,
+        ...(takeoverToken === undefined ? {} : { takeoverToken }),
         payloadHash: payload.payloadHash,
         event,
       };
 }
 
 function parseGameEventRetry(payload: unknown): GameEventRetryPayload | null {
+  const requiredKeys = ['gameId', 'rebasedExpectedVersion', 'clientEventId', 'payloadHash', 'event'];
   if (
-    !isPlainObjectWithKeys(payload, [
-      'gameId',
-      'rebasedExpectedVersion',
-      'clientEventId',
-      'takeoverToken',
-      'payloadHash',
-      'event',
-    ]) ||
+    !isPlainObjectWithKeys(payload, requiredKeys) &&
+    !isPlainObjectWithKeys(payload, [...requiredKeys, 'takeoverToken'])
+  ) {
+    return null;
+  }
+  let takeoverToken: string | undefined;
+  if (Object.hasOwn(payload, 'takeoverToken')) {
+    const suppliedToken = payload.takeoverToken;
+    if (!isNonemptyString(suppliedToken)) return null;
+    takeoverToken = suppliedToken;
+  }
+  if (
     !isNonemptyString(payload.gameId) ||
     !isSafeNonnegative(payload.rebasedExpectedVersion) ||
     !isNonemptyString(payload.clientEventId) ||
-    !isNonemptyString(payload.takeoverToken) ||
     !isNonemptyString(payload.payloadHash)
   ) {
     return null;
@@ -2072,7 +2888,7 @@ function parseGameEventRetry(payload: unknown): GameEventRetryPayload | null {
         gameId: payload.gameId,
         rebasedExpectedVersion: payload.rebasedExpectedVersion,
         clientEventId: payload.clientEventId,
-        takeoverToken: payload.takeoverToken,
+        ...(takeoverToken === undefined ? {} : { takeoverToken }),
         payloadHash: payload.payloadHash,
         event,
       };
@@ -2145,7 +2961,6 @@ const GAME_EVENT_COMMAND_KEYS = [
   'gameId',
   'expectedVersion',
   'clientEventId',
-  'takeoverToken',
   'payloadHash',
   'event',
 ] as const;
@@ -2153,7 +2968,6 @@ const GAME_EVENT_RETRY_KEYS = [
   'gameId',
   'rebasedExpectedVersion',
   'clientEventId',
-  'takeoverToken',
   'payloadHash',
   'event',
 ] as const;
@@ -2172,7 +2986,8 @@ function diagnoseGameEventEnvelope(
     return { missingKeys: [], unknownKeys: [], invalidFields: ['(payload는 object가 아님)'] };
   }
   const missingKeys = requiredKeys.filter((key) => !Object.hasOwn(payload, key));
-  const unknownKeys = Object.keys(payload).filter((key) => !requiredKeys.includes(key));
+  const allowedKeys = [...requiredKeys, 'takeoverToken'];
+  const unknownKeys = Object.keys(payload).filter((key) => !allowedKeys.includes(key));
   const invalidFields: string[] = [];
   if (Object.hasOwn(payload, 'gameId') && !isNonemptyString(payload.gameId)) {
     invalidFields.push('gameId');

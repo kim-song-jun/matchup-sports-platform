@@ -77,7 +77,6 @@ vi.mock('@/lib/v1-game-operations-socket', () => ({
   setGameOperationsAuthorizationSubjectVersion: vi.fn(),
 }));
 vi.mock('@/lib/api-client', () => ({
-  v1Get: vi.fn(async () => ({ items: [] })),
   v1Post: (...args: unknown[]) => mockV1Post(...args),
 }));
 
@@ -101,9 +100,10 @@ describe('useV1GameOperationsConsole — 소수 clockMs로 이미 실패한 항�
     const { result, unmount } = renderHook(
       () =>
         useV1GameOperationsConsole({
-          tournamentId: null,
           gameId: 'game-1',
-          myUserId: 'user-1',
+          gameDetailGameId: 'game-1',
+          gameDetailStatus: 'success',
+          realtimeAuthorization: { kind: 'unscoped', subjectVersion: 0 },
           initialLastSequence: 0,
         }),
       { wrapper: createWrapper(queryClient) },
@@ -169,9 +169,10 @@ describe('useV1GameOperationsConsole — 소수 clockMs로 이미 실패한 항�
     const { result, unmount } = renderHook(
       () =>
         useV1GameOperationsConsole({
-          tournamentId: null,
           gameId: 'game-1',
-          myUserId: 'user-1',
+          gameDetailGameId: 'game-1',
+          gameDetailStatus: 'success',
+          realtimeAuthorization: { kind: 'unscoped', subjectVersion: 0 },
           initialLastSequence: 0,
         }),
       { wrapper: createWrapper(queryClient) },

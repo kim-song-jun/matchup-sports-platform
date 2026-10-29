@@ -30,7 +30,6 @@ vi.mock('@/lib/v1-game-operations-socket', () => ({
   setGameOperationsAuthorizationSubjectVersion: vi.fn(),
 }));
 vi.mock('@/lib/api-client', () => ({
-  v1Get: vi.fn(async () => ({ items: [] })),
   v1Post: vi.fn(async () => ({})),
 }));
 
@@ -77,9 +76,10 @@ describe('useV1GameOperationsConsole — renew가 TAKEOVER_TOKEN_EXPIRED로 실�
     const { result, unmount } = renderHook(
       () =>
         useV1GameOperationsConsole({
-          tournamentId: null,
           gameId: 'game-1',
-          myUserId: 'user-1',
+          gameDetailGameId: 'game-1',
+          gameDetailStatus: 'success',
+          realtimeAuthorization: { kind: 'unscoped', subjectVersion: 0 },
           initialLastSequence: 0,
         }),
       { wrapper: createWrapper(queryClient) },
@@ -134,7 +134,10 @@ describe('useV1GameOperationsConsole — 다른 운영자가 쥐고 있으면 �
     const { useV1GameOperationsConsole } = await import('./use-v1-game-operations-console');
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const { result, unmount } = renderHook(
-      () => useV1GameOperationsConsole({ tournamentId: null, gameId: 'game-1', myUserId: 'user-1', initialLastSequence: 0 }),
+      () => useV1GameOperationsConsole({ gameId: 'game-1',
+          gameDetailGameId: 'game-1',
+          gameDetailStatus: 'success',
+          realtimeAuthorization: { kind: 'unscoped', subjectVersion: 0 }, initialLastSequence: 0 }),
       { wrapper: createWrapper(queryClient) },
     );
 

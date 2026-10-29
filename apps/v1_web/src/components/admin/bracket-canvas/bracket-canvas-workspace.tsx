@@ -26,7 +26,7 @@ import { buildLeagueStandings } from '@/lib/bracket-league-standings-model';
 import { describeStandingsFill } from '@/lib/bracket-standings-fill-message';
 import { isBracketPublished } from '@/lib/bracket-visibility';
 import { extractErrorMessage } from '@/lib/error-message';
-import type { V1AdminTournamentRegistration, V1TournamentFormat } from '@/types/api';
+import type { V1AdminTournamentRegistration, V1TournamentFormat, V1SixTeamBracket } from '@/types/api';
 import { BracketCanvas, fixtureTitle } from './bracket-canvas';
 import { BracketLeagueGrid } from './bracket-league-grid';
 import { BracketLeagueStandings } from './bracket-league-standings';
@@ -40,6 +40,7 @@ import { BracketTemplateDialog } from './bracket-template-dialog';
 import { focusFixtureOpener } from './fixture-opener-focus';
 
 export type BracketCanvasWorkspaceProps = {
+  sixTeamState?: V1SixTeamBracket | null;
   tournamentId: string;
   format: V1TournamentFormat | undefined;
   registrations: V1AdminTournamentRegistration[];
@@ -52,6 +53,7 @@ export type BracketCanvasWorkspaceProps = {
 };
 
 export function BracketCanvasWorkspace({
+  sixTeamState,
   tournamentId,
   format,
   registrations,
@@ -236,7 +238,7 @@ export function BracketCanvasWorkspace({
           AWAY: fixtureSideLabel(selectedFixture, 'AWAY', labelContext),
         };
 
-  const selectedBye = bracket.slots.find(slot => slot.id === selectedByeSlotId && slot.kind === 'BYE');
+  const selectedBye = bracket.slots.find(slot => slot.id === selectedByeSlotId && (slot.kind === 'BYE' || slot.byeSortOrder != null));
   const selectFixture = (id: string) => { setSelectedByeSlotId(null); setSelectedFixtureId(id); };
   const selectBye = (slotId: string) => { const fixture = bracket.fixtures.find(f => f.homeSlotId === slotId || f.awaySlotId === slotId); if (fixture) { setSelectedByeSlotId(slotId); setSelectedFixtureId(fixture.id); } };
   const panel = selectedBye && selectedFixture ? <ByeSlotEditor key={selectedBye.id} tournamentId={tournamentId} slot={selectedBye} fixture={selectedFixture} groups={bracket.groups} slots={bracket.slots} candidates={confirmedTeams.map(r => ({ registrationId: r.id, teamName: r.teamName ?? r.teamId }))} canWrite={canWrite} registrationsLoaded={registrationsState.status === 'success'} onClose={() => { setSelectedByeSlotId(null); setSelectedFixtureId(null); }} /> :
@@ -412,6 +414,7 @@ export function BracketCanvasWorkspace({
             </div>
           ) : (
             <BracketCanvas
+              sixTeamState={sixTeamState}
               groups={bracket.groups}
               fixtures={bracket.fixtures}
               slots={bracket.slots}

@@ -46,9 +46,8 @@ export function TeamFoulCounterBar({
                 : 'flex flex-wrap items-center justify-between gap-x-2 px-3 py-2'
             }
           >
-            {/* 팀 이름이 길면 이름을 자르고 숫자는 지킨다 — 390px 에서 "파울 / 0" 으로 꺾이던 자리다
-                (F91). 이름은 남는 폭에서만 줄고, 숫자 묶음은 줄어들지도 꺾이지도 않는다. */}
-            <span className="min-w-0 flex-1 truncate text-xs font-medium text-[var(--text-muted)]">{side.displayNameSnapshot}</span>
+            {/* 공통 접두사가 긴 팀도 구별할 수 있게 이름 전체를 표시한다. 파울 숫자는 한 덩어리로 유지한다. */}
+            <span className="min-w-0 flex-1 break-keep text-xs font-medium text-[var(--text-muted)]" style={{ overflowWrap: 'anywhere' }}>{side.displayNameSnapshot}</span>
             <span className="flex shrink-0 items-center gap-1 whitespace-nowrap">
               {warning ? <AlertTriangle size={12} aria-hidden="true" className="text-orange-500" /> : null}
               <span

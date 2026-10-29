@@ -10,13 +10,14 @@ import { PrismaService } from '../../src/prisma/prisma.service';
 import { LINEUP_INCLUDED_NOTIFICATION_TYPE, TeamMatchLineupService } from '../../src/team-matches/team-match-lineup.service';
 import { TeamMatchRecordService } from '../../src/team-matches/team-match-record.service';
 import { createSharedRecordFixture } from '../fixtures/team-match-shared-record.fixture';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 /**
  * Task 180 H1-lineup-included — 친선 참석명단 제출이 같은 트랜잭션에 outbox 행을 남기고, 워커 핸들러가 그 리비전의
  * 선수에게 '참석명단에 올랐어요'를 쓰는지. 다시 제출하면 새로 오른 사람만 받고, 빠진 사람에게는 가지 않는다.
  */
 const prisma = new PrismaService();
-const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 const lineups = new TeamMatchLineupService(prisma, new OperationAuditWriterService());
 const reminders = new LineupReminderService({} as never, prisma);
 

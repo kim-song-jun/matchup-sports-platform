@@ -43,7 +43,7 @@ const ids = {
 } as const;
 
 const prisma = new PrismaService();
-const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 const staffAccess = new TournamentStaffAccessService(prisma);
 const resultReview = new TournamentResultReviewService(prisma, staffAccess, new OperationAuditWriterService());
 
@@ -116,6 +116,7 @@ async function buildTournamentGame(fixtureId: string): Promise<string> {
     ],
     participants: [
       { sourceParticipantId: `host-player-${fixtureId}`, sideKey: V1GameSideKey.HOME, displayNameSnapshot: 'Host One' },
+      { sourceParticipantId: `away-player-${fixtureId}`, sideKey: V1GameSideKey.AWAY, displayNameSnapshot: 'Opponent One' },
     ],
   };
   const created = await prisma.$transaction((tx) =>

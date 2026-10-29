@@ -108,7 +108,15 @@ export function buildBracketGraph(rounds: BracketGraphRound[], groups: V1Tournam
   return { nodes, edges, height: Math.max(cursor, MATCH_HEIGHT) };
 }
 
-export function bracketConnectionPath(start: { x: number; y: number }, end: { x: number; y: number }, side: 'HOME' | 'AWAY') {
-  const junction = start.x + (end.x - start.x) * (side === 'HOME' ? 0.4 : 0.6);
+/** Team rows define the centre independently of labels and time/PK footers. */
+export function bracketContentCenter(card: { top: number; height: number }, rows: Array<{ top: number; height: number }>) {
+  if (rows.length === 0) return card.top + card.height / 2;
+  const first = rows[0];
+  const last = rows[rows.length - 1];
+  return (first.top + last.top + last.height) / 2;
+}
+
+export function bracketConnectionPath(start: { x: number; y: number }, end: { x: number; y: number }) {
+  const junction = (start.x + end.x) / 2;
   return `M ${start.x} ${start.y} H ${junction} V ${end.y} H ${end.x}`;
 }

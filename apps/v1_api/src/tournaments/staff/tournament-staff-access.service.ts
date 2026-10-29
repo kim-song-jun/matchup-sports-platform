@@ -25,6 +25,11 @@ export type TournamentStaffAccessInput = {
   readonly expectedAssignmentVersion?: number;
 };
 
+export type TournamentStaffAccessOptions = {
+  /** Skip mutation-protection row locks for read actions only. */
+  readonly lockMode?: 'required' | 'read_only';
+};
+
 export type TournamentStaffPrincipal = {
   readonly userId: string;
   readonly role: Exclude<TournamentStaffRole, 'public' | 'team_manager'>;
@@ -76,30 +81,35 @@ export class TournamentStaffAccessService {
   /**
    * `client` (Task 18 review P0-3): callers that immediately follow this check with a mutation
    * inside their OWN `$transaction` (e.g. `TournamentOperationsFieldsService`) should pass that
-   * `tx` here instead of relying on the default (root `PrismaService`) client. Passing `tx` does
-   * two things a plain re-read on a separate connection cannot: (1) the admin/assignment reads
-   * below run on the SAME connection as the caller's subsequent write, and (2) this method takes a
-   * `FOR SHARE` row lock on the exact candidate admin/assignment row(s) BEFORE reading them, so a
-   * concurrent revoke's `UPDATE` (which needs an exclusive row lock on that same row) is forced to
-   * wait until the caller's transaction commits or rolls back -- it can no longer race the window
-   * between this decision and the caller's write with unordered outcomes. Either the revoke
-   * commits first (and this recheck's own read then sees it and denies), or this decision's lock
-   * is acquired first (and the concurrent revoke is correctly deferred to take effect only after
-   * this transaction finishes) -- never an in-between state where a write proceeds on
-   * authorization that was already revoked before that write's transaction committed.
+   * `tx` here instead of relying on the default (root `PrismaService`) client. By default, passing
+   * `tx` keeps the admin/assignment reads on the SAME connection as the caller's subsequent write
+   * and takes `FOR SHARE` locks on the candidate rows BEFORE reading them. A concurrent revoke's
+   * `UPDATE` must then wait until the caller's transaction commits or rolls back, so it cannot race
+   * the window between this decision and the caller's write with unordered outcomes. Either the
+   * revoke commits first (and this recheck sees it and denies), or this decision's lock is acquired
+   * first (and the revoke takes effect only after this transaction finishes).
    *
-   * Only takes the lock when `client` is EXPLICITLY supplied: the guard's own single, standalone
-   * call (no caller transaction to protect) and this file's characterization unit tests (whose
-   * fake `PrismaService` stub does not implement `$queryRaw`) both omit it and are completely
-   * unaffected -- `db` still defaults to `this.prisma` and behaves exactly as before.
+   * An explicitly marked `read_only` lookup can skip those mutation-protection locks while still
+   * using the caller's transaction connection. That mode is restricted to the `read` action; all
+   * omitted options preserve the existing locking behavior.
+   *
+   * Only takes the lock when `client` is EXPLICITLY supplied and `lockMode` is not `read_only`:
+   * the guard's own single, standalone call (no caller transaction to protect) and this file's
+   * characterization unit tests (whose fake `PrismaService` stub does not implement `$queryRaw`)
+   * both omit it and are completely unaffected -- `db` still defaults to `this.prisma` and behaves
+   * exactly as before.
    */
   async assertAccess(
     input: TournamentStaffAccessInput,
     client?: Prisma.TransactionClient,
+    options: TournamentStaffAccessOptions = {},
   ): Promise<TournamentStaffPrincipal> {
     const now = this.now();
     const db = client ?? this.prisma;
-    if (client !== undefined) {
+    if (options.lockMode === 'read_only' && input.action !== 'read') {
+      throw new Error('STAFF_ACCESS_READ_ONLY_LOCK_MODE_REQUIRES_READ_ACTION');
+    }
+    if (client !== undefined && options.lockMode !== 'read_only') {
       await client.$queryRaw`SELECT 1 FROM v1_admin_users WHERE user_id = ${input.userId} FOR SHARE`;
       await client.$queryRaw`SELECT 1 FROM v1_tournament_staff_assignments WHERE tournament_id = ${input.resource.tournamentId} AND user_id = ${input.userId} FOR SHARE`;
     }
@@ -144,6 +154,7 @@ export class TournamentStaffAccessService {
           tournamentId: input.resource.tournamentId,
           userId: input.userId,
         },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
         select: {
           id: true,
           tournamentId: true,

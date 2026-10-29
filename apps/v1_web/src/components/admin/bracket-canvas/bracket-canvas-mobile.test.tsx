@@ -112,6 +112,23 @@ function renderMobile(overrides: Partial<BracketCanvasMobileProps> = {}, queryCl
 const card = (name: RegExp) => screen.getByRole('button', { name });
 
 describe('BracketCanvasMobile — 목록', () => {
+  it('6강은 단계 전부와 부전승을 함께 보여주며 결승 카드를 누르면 실제 경기 시트를 연다', () => {
+    const ids: [string, string, string, string, string] = ['six1', 'six2', 'six3', 'sixsemi', 'sixfinal'];
+    const sixGroups = [makeGroup('six', 'quarter', '6강', 0), makeGroup('semi', 'semi', '준결승', 1), makeGroup('final', 'final', '결승', 2)];
+    const sixFixtures = ids.map((id, i) => makeFixture({ id, fixtureNumber: i + 1, groupId: i < 3 ? 'six' : i === 3 ? 'semi' : 'final', round: i < 3 ? '6강' : i === 3 ? '준결승' : '결승', game: makeGame(id) }));
+    const { container } = renderMobile({
+      sixTeamState: { rounds: ids, bye: null, manual: false, winners: {}, needsReview: false },
+      groups: sixGroups, fixtures: sixFixtures, slots: [],
+      rounds: buildBracketMobileRounds({ groups: sixGroups, fixtures: sixFixtures, slots: [] }),
+    });
+    expect(screen.queryByRole('tablist', { name: '라운드' })).toBeNull();
+    expect(screen.getByRole('region', { name: '6강' })).toBeInTheDocument();
+    expect(container.querySelectorAll('[data-connection]')).toHaveLength(2);
+    const finalStage = screen.getByRole('region', { name: '결승' });
+    expect(finalStage).toHaveTextContent('결승 직행팀');
+    fireEvent.click(within(finalStage).getByRole('button'));
+    expect(screen.getByRole('dialog')).toHaveTextContent('결승');
+  });
   it('모바일 경기 시트에서도 등록된 필드를 선택해 같은 경기로 저장한다', () => {
     renderMobile();
     fireEvent.click(card(/8강 · 1번 경기/));

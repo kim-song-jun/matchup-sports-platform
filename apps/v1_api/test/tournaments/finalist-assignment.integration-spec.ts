@@ -8,12 +8,13 @@ import { TournamentBracketService } from '../../src/tournaments/tournament-brack
 import { runTournamentStandingsRecalculation } from '../../src/tournaments/tournament-standings-recalculation';
 import { competitionConfigFixture as ids, seedCompetitionConfigFixture } from '../fixtures/competition-config.fixture';
 import { seedBracketTournament, seedSupportAdmin } from '../helpers/bracket-canvas-fixture';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 jest.setTimeout(120_000);
 const prisma = new PrismaService();
 const user = { id: ids.adminUserId, email: 'finalists@example.test', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
 const adminContext = new AdminContextService(prisma);
-const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 const slots = new TournamentSlotService(prisma, adminContext, games);
 const bracket = new TournamentBracketService(prisma, adminContext, games);
 

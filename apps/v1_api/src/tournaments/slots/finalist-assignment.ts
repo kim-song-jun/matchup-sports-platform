@@ -13,7 +13,7 @@ import { assignSlotsBatchInTx } from './tournament-slot.service';
 import type { FinalistAssignmentDto } from './dto/finalist-assignment.dto';
 
 type Dependencies = { prisma: PrismaService; adminContext: AdminContextService; games: GamesService };
-type Target = { fixtureId: string; side: 'HOME' | 'AWAY'; label: string; groupId: string | null; slotId: string | null; currentRegistrationId: string | null; byeSortOrder: number | null; byePosition: number | null };
+type Target = { fixtureId: string; side: 'HOME' | 'AWAY'; label: string; groupId: string | null; slotId: string | null; currentRegistrationId: string | null; byeSortOrder: number | null; byePosition: number | null; sourceGroupId?: string | null; sourceRank?: number };
 const options = { timeout: 45_000, maxWait: 5_000 } as const;
 const notReady = (message: string) => new ConflictException({ code: 'FINALIST_NOT_READY', message });
 
@@ -49,7 +49,7 @@ export async function loadFinalistPreview(tx: Prisma.TransactionClient, tourname
         points: row?.points ?? 0, goalsFor: row?.goalsFor ?? 0, goalsAgainst: row?.goalsAgainst ?? 0 };
     }).sort((a, b) => (a.position ?? Infinity) - (b.position ?? Infinity) || a.registrationId.localeCompare(b.registrationId));
     const ranks = source.registrationIds.map((_, index) => ({ rank: index + 1, ...resolveGroupRank(source, index + 1) }));
-    return { id: group.id, name: group.name, advanceCount: group.advanceCount ?? 2, teams, ranks,
+    return { id: group.id, name: group.name, advanceCount: group.advanceCount ?? 0, teams, ranks,
       complete: ranks.length > 0 && ranks.every((rank) => rank.state !== 'group_incomplete') && teams.length === source.registrationIds.length };
   });
   const details = await tx.v1TournamentMatchDetails.findMany({
@@ -63,7 +63,7 @@ export async function loadFinalistPreview(tx: Prisma.TransactionClient, tourname
   const byeRows = await tx.v1TournamentByeSlot.findMany({ where: { groupId: { in: byeGroups.map((group) => group.id) } }, orderBy: [{ groupId: 'asc' }, { sortOrder: 'asc' }] });
   const byeTeams = await tx.v1TournamentGroupTeam.findMany({ where: { groupId: { in: byeGroups.map((group) => group.id) }, isBye: true }, orderBy: [{ groupId: 'asc' }, { sortOrder: 'asc' }] });
   const targets: Target[] = [];
-  const phaseOrder = ['round16', 'round12', 'quarter', 'semi', 'final'];
+  const phaseOrder = ['round64', 'round32', 'round16', 'round12', 'quarter', 'semi', 'final'];
   const phaseOf = (groupId: string | null) => groups.find((group) => group.id === groupId)?.phase;
   const firstPhase = phaseOrder.find((phase) => details.some((fixture) => phaseOf(fixture.groupId) === phase));
   let missingLinks = false;
@@ -75,7 +75,7 @@ export async function loadFinalistPreview(tx: Prisma.TransactionClient, tourname
       if (incoming.length !== 2) missingLinks = true;
       continue;
     }
-    if (phase !== undefined && phase !== firstPhase && incoming.length === 0) { missingLinks = true; continue; }
+    if (phase !== undefined && phase !== firstPhase && incoming.length === 0 && !(match.homeSlotId && match.awaySlotId)) { missingLinks = true; continue; }
     for (const side of ['HOME', 'AWAY'] as const) {
       if (edges.some((edge) => edge.targetTeamMatchId === fixture.teamMatchId && edge.targetSide === side)) continue;
       const slotId = side === 'HOME' ? match.homeSlotId : match.awaySlotId;
@@ -89,9 +89,9 @@ export async function loadFinalistPreview(tx: Prisma.TransactionClient, tourname
       const manualByes = sourceRound12 ? [...byeRows, ...byeTeams].filter((row) => row.groupId === sourceRound12.groupId).sort((a, b) => a.sortOrder - b.sortOrder) : [];
       const manualBye = manualByes[quarterIndex];
       if (slotId === null && sourceRound12 && manualBye === undefined) throw notReady('직행할 부전승 자리와 결선 연결을 먼저 확인해 주세요.');
-      const isBye = slot?.kind === 'BYE' || (slotId === null && manualBye !== undefined);
-      const byeSortOrder = slot?.kind === 'BYE' ? slot.byeSortOrder : manualBye?.sortOrder ?? null;
-      targets.push({ fixtureId: fixture.teamMatchId, side, slotId, groupId: slot?.groupId ?? (isBye ? sourceRound12!.groupId : fixture.groupId),
+      const isBye = slot?.kind === 'BYE' || slot?.byeSortOrder != null || (slotId === null && manualBye !== undefined);
+      const byeSortOrder = slot?.byeSortOrder != null ? slot.byeSortOrder : manualBye?.sortOrder ?? null;
+      targets.push({ sourceGroupId: slot?.sourceGroupId, sourceRank: slot?.sourceGroupId ? slot.position : undefined, fixtureId: fixture.teamMatchId, side, slotId, groupId: slot?.groupId ?? (isBye ? sourceRound12!.groupId : fixture.groupId),
         byeSortOrder: isBye ? byeSortOrder : null, byePosition: isBye ? slot?.position ?? quarterIndex + 1 : null,
         label: `${groups.find((group) => group.id === fixture.groupId)?.name ?? fixture.round} #${fixture.fixtureNumber} ${side === 'HOME' ? '홈' : '원정'}${isBye ? ' · 직행' : ''}`,
         currentRegistrationId: side === 'HOME' ? fixture.homeRegistrationId : fixture.awayRegistrationId });
@@ -127,6 +127,12 @@ export function validateFinalistAssignments(preview: Awaited<ReturnType<typeof l
     if (!byKey.has(key) || seenTargets.has(key) || !allowed.has(assignment.registrationId) || seenTeams.has(assignment.registrationId)) {
       throw new UnprocessableEntityException({ code: 'FINALIST_ASSIGNMENT_INVALID', message: '중복 자리·중복 팀 또는 배정할 수 없는 팀이 있어요.' });
     }
+    const target = byKey.get(key)!;
+    if (target.sourceGroupId && target.sourceRank) {
+      const rank = preview.groups.find((group) => group.id === target.sourceGroupId)?.ranks.find((row) => row.rank === target.sourceRank);
+      const permitted = rank?.state === 'ready' ? [rank.registrationId] : rank?.state === 'tied' ? rank.tiedRegistrationIds : [];
+      if (!permitted.includes(assignment.registrationId)) throw notReady('조별 순위 출처와 맞는 진출 팀을 선택해 주세요.');
+    }
     seenTargets.add(key); seenTeams.add(assignment.registrationId);
   }
 }
@@ -152,7 +158,7 @@ export async function applyFinalistAssignment(deps: Dependencies, user: V1AuthUs
         const usages = await tx.v1TeamMatch.count({ where: { deletedAt: null, OR: [{ homeSlotId: slotId }, { awaySlotId: slotId }] } });
         if (usages !== 1) throw notReady('여러 경기가 같은 결선 자리를 공유해 배정할 수 없어요. 자리 연결을 확인해 주세요.');
         const slot = await tx.v1TournamentSlot.findUniqueOrThrow({ where: { id: slotId } });
-        if (slot.kind !== 'BYE') await tx.v1TournamentSlot.update({ where: { id: slotId }, data: { kind: 'GROUP_RANK', sourceGroupId: null } });
+        if (slot.kind !== 'BYE' && !slot.sourceGroupId) await tx.v1TournamentSlot.update({ where: { id: slotId }, data: { kind: 'GROUP_RANK', sourceGroupId: null } });
       } else {
         const slot = await tx.v1TournamentSlot.create({ data: { tournamentId, groupId: target.groupId, kind: target.byePosition === null ? 'GROUP_RANK' : 'BYE', position: target.byePosition ?? preview.targets.indexOf(target) + 1, byeSortOrder: target.byeSortOrder } });
         slotId = slot.id;

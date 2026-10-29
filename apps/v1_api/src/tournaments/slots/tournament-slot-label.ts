@@ -1,5 +1,9 @@
 import type { V1TournamentGroupPhase, V1TournamentSlotKind } from '@prisma/client';
 
+export function isByeSlot<T extends { kind: V1TournamentSlotKind; byeSortOrder?: number | null }>(slot: T | null | undefined): slot is T {
+  return slot != null && (slot.kind === 'BYE' || slot.byeSortOrder != null);
+}
+
 export type TournamentSlotLabelInput = {
   kind: V1TournamentSlotKind;
   position: number;
@@ -59,6 +63,6 @@ export function slotLabelFromRow(row: SlotLabelRow): string {
 
 /** Public placeholder uses the same override authority as the admin fixture. */
 export function publicFixtureSideLabel(slot: SlotLabelRow | null, sideOverride: string | null | undefined): string | null {
-  const override = slot?.kind === 'BYE' ? slot.displayLabel : sideOverride;
+  const override = isByeSlot(slot) ? slot.displayLabel : sideOverride;
   return override ?? (slot ? slotLabelFromRow(slot) : null);
 }

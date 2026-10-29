@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildBracketGraph, bracketConnectionPath } from './tournament-bracket-graph';
+import { buildBracketGraph, bracketConnectionPath, bracketContentCenter } from './tournament-bracket-graph';
 import type { V1TournamentFixture, V1TournamentGroup } from '@/types/api';
 const fixture = (id: string, sources: V1TournamentFixture['bracketSources'] = []): V1TournamentFixture => ({ id, bracketSources: sources } as V1TournamentFixture);
 const source = (fixtureId: string, side: 'HOME' | 'AWAY') => ({ fixtureId, side, outcome: 'WINNER' as const });
@@ -46,7 +46,7 @@ describe('경기별 진출 그래프', () => {
     expect(buildBracketGraph([{ key: 'semi', label: '4강', fixtures: [fixture('s1'), fixture('s2')] }, { key: 'final', label: '결승', fixtures: [fixture('f')] }], []).edges).toEqual([]);
   });
   it('중간 접합점을 통해 실제 팀 자리까지 연결선을 만든다', () => {
-    expect(bracketConnectionPath({ x: 180, y: 50 }, { x: 236, y: 125 }, 'HOME')).toBe('M 180 50 H 202.4 V 125 H 236');
+    expect(bracketConnectionPath({ x: 180, y: 50 }, { x: 236, y: 125 })).toBe('M 180 50 H 208 V 125 H 236');
   });
 });
 
@@ -173,5 +173,22 @@ describe('저장된 부전승 슬롯 연결', () => {
     ], [{ phase: 'round12', groupTeams: [{ id: 'bye', isBye: true, registrationId: 'team', sortOrder: 0,
       byeTarget: { fixtureId: 'q1', side: 'AWAY' } }] }] as V1TournamentGroup[]);
     expect(graph.edges).toEqual([{ source: 'bye-slot:bye', target: 'q1', side: 'AWAY', outcome: 'BYE' }]);
+  });
+});
+
+
+describe('connector symmetry', () => {
+  it('uses one midpoint for upper and lower branches', () => {
+    expect(bracketConnectionPath({ x: 180, y: 40 }, { x: 236, y: 120 })).toBe('M 180 40 H 208 V 120 H 236');
+    expect(bracketConnectionPath({ x: 180, y: 240 }, { x: 236, y: 160 })).toBe('M 180 240 H 208 V 160 H 236');
+  });
+  it('ignores footer height when anchoring the team area', () => {
+    const rows = [{ top: 120, height: 44 }, { top: 165, height: 44 }];
+    expect(bracketContentCenter({ top: 119, height: 91 }, rows)).toBe(164.5);
+    expect(bracketContentCenter({ top: 119, height: 131 }, rows)).toBe(164.5);
+    expect(bracketContentCenter({ top: 119, height: 131 }, rows) - 100).toBe(64.5);
+  });
+  it('uses the tile centre for a bye without two team rows', () => {
+    expect(bracketContentCenter({ top: 24, height: 80 }, [])).toBe(64);
   });
 });

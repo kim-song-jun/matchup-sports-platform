@@ -356,7 +356,7 @@ export function MatchDetailContent({
         </div>
         <Card pad={16}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span style={{ flex: 1, textAlign: 'right', fontSize: 16, fontWeight: 700, color: 'var(--text-strong)' }}>
+            <span style={{ flex: 1, minWidth: 0, wordBreak: 'keep-all', overflowWrap: 'anywhere', textAlign: 'right', fontSize: 16, fontWeight: 700, color: 'var(--text-strong)' }}>
               <SideName side={data.home} from={from} />
             </span>
             <span
@@ -374,7 +374,7 @@ export function MatchDetailContent({
             >
               {formatScoreline(data.score, data.scoreStatus)}
             </span>
-            <span style={{ flex: 1, textAlign: 'left', fontSize: 16, fontWeight: 700, color: 'var(--text-strong)' }}>
+            <span style={{ flex: 1, minWidth: 0, wordBreak: 'keep-all', overflowWrap: 'anywhere', textAlign: 'left', fontSize: 16, fontWeight: 700, color: 'var(--text-strong)' }}>
               <SideName side={data.away} from={from} />
             </span>
           </div>

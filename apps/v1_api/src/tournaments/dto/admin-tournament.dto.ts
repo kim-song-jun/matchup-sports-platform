@@ -75,6 +75,7 @@ export type TournamentGenderCategory = (typeof TOURNAMENT_GENDER_CATEGORIES)[num
 export const TOURNAMENT_RULES_TEXT_MAX_LENGTH = 10_000;
 
 export class CreateTournamentDto {
+  @IsOptional() @IsBoolean() sixTeamMode?: boolean;
   @IsUUID(undefined, { message: '올바른 종목 ID를 입력해 주세요.' })
   sportId!: string;
 
@@ -147,6 +148,7 @@ export class CreateTournamentDto {
 
   /** false면 업로드 이미지와 종목 기본 이미지 모두 상세에서 숨긴다. */
   @IsOptional()
+  @Transform(({ obj }) => obj.showDetailImage, { toClassOnly: true })
   @IsBoolean()
   showDetailImage?: boolean;
 
@@ -309,7 +311,7 @@ export class CreateTournamentDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(500)
+  @MaxLength(4000)
   prizeBreakdown?: string | null;
 
   @IsOptional()
@@ -417,6 +419,7 @@ export class CreateTournamentDto {
 
 /** 모든 필드 optional — 부분 수정(PATCH). status는 별도 엔드포인트로 분리. */
 export class UpdateTournamentDto {
+  @IsOptional() @IsBoolean() sixTeamMode?: boolean;
   // 동시 편집 CAS(낙관적 잠금) — 클라이언트가 폼을 불러온 시점의 updatedAt을 그대로 되돌려 보낸다.
   // tournament-period-settings.dto.ts의 expectedVersion과 같은 관례(문자열 ISO 타임스탬프 비교).
   @IsString()
@@ -501,6 +504,7 @@ export class UpdateTournamentDto {
 
   /** false면 업로드 이미지와 종목 기본 이미지 모두 상세에서 숨긴다. */
   @IsOptional()
+  @Transform(({ obj }) => obj.showDetailImage, { toClassOnly: true })
   @IsBoolean()
   showDetailImage?: boolean;
 
@@ -655,7 +659,7 @@ export class UpdateTournamentDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(500)
+  @MaxLength(4000)
   prizeBreakdown?: string | null;
 
   @IsOptional()

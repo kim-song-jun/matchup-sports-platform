@@ -1,7 +1,26 @@
+## 2026-10-28 — 결과·운영 결선 표시 순서와 단판 합산
+
+[시나리오](./tournament-round-display.md) · [Task20261119](../../.github/tasks/20261119-tournament-round-display.md).
+종료결과는 결승→3위전, 운영은3위전→결승. 단판4강의 가짜 합산 제거, 실제2차전 유지.
+저장데이터·진출·일정 변경0. API221/Web203 PASS, alpha0/3(미배포).
+
+## 2026-10-28 — 6강 결승 직행 토너먼트
+
+[시나리오](./six-team-knockout.md) · [Task 20261118](../../.github/tasks/20261118-six-team-knockout.md).
+A안 코드 구현: 정원6/토너먼트 선택·확정6팀 생성·공식 성적 비교·운영자 진출 지정·전용 공개 대진표.
+API212/Web116·격리 DB 통합4·양쪽 타입/표면·패턴·schema drift0 PASS. Alpha after0/3(미배포), 커밋/PR/배포 없음.
+
 ## 2026-10-23 — 경기 기록 기본 공개
 
 [시나리오](./default-public-player-records.md) · [Task 20261106](../../.github/tasks/20261106-default-public-player-records.md).
 신규 가입 기본 공개·약관 CTA 위 안내 및 기존 미설정 활성 회원만 전환하는 migration 구현. API114/Web106·migration 재생218·DB통합2·양쪽 타입/surface/pattern·migration gate PASS. 명시적 비공개·개별 숨김 유지. PR2049 dev/alpha 배포 완료. alpha 미설정629명 전환·기존 비공개6명 원형 보존, 실제 가입·선수 설정/익명 조회·before/after3폭 PASS. 외부 OAuth 신규 인증 자체는 재실행하지 않음. 버전1.11.6/main 승격 준비 중.
+
+## 2026-10-28 — 6강 연결형 대진표 후속
+
+[시나리오](./six-team-knockout.md) · [Task20261118](../../.github/tasks/20261118-six-team-knockout.md).
+사용자 승인: 6강·준결승·결승을 한 가로 대진표에 배치, 준결승 경기와 부전승 자리에서 결승으로만 연결.
+공개 상세/대진표, 관리자 desktop/mobile 및 생성 미리보기 공통 적용. Web211·타입·패턴 PASS.
+실제 alpha before3/3, after0/3(미배포). 기존 대회 데이터 변경0. [증거](../screenshots/six-team-connected/README.md).
 
 ## 2026-10-22 — 대회·리그 필터·정렬
 

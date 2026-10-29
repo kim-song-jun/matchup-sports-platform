@@ -2,8 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 
 /**
- * Room-scoped realtime fan-out for a single game, decoupled from the concrete
- * Socket.IO gateway.
+ * Per-subscriber committed-event delivery for a single game, decoupled from the
+ * concrete Socket.IO gateway.
  *
  * Why a registry instead of a Nest injection token (the shape
  * `notifications/realtime-notifier.port.ts` uses): `RealtimeModule` already
@@ -17,7 +17,7 @@ import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
  * container).
  *
  * Unregistered is the correct steady state for the worker and for unit tests:
- * `emitToGame` is then a no-op, exactly as a notification is in
+ * `emitCommittedEvent` is then a no-op, exactly as a notification is in
  * `WorkerRealtimeNotifier`.
  *
  * Why this exists at all (2026-08-15): `game.event.committed` used to be
@@ -29,7 +29,12 @@ import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
  * — was told nothing, and only saw the change on the next manual refetch.
  */
 export interface GameRoomBroadcaster {
-  emitToGame(gameId: string, event: string, payload: unknown): void;
+  emitCommittedEvent(
+    gameId: string,
+    minimumVersion: number,
+    payload: unknown,
+  ): void;
+  refreshGameSubscribers(gameId: string, minimumVersion: number): Promise<void>;
 }
 
 @Injectable()
@@ -44,20 +49,28 @@ export class GameBroadcastRegistry implements GameRoomBroadcaster {
     this.delegate = delegate;
   }
 
-  /**
-   * Best-effort. A realtime fan-out failure must never fail the HTTP write that
-   * already committed — the durable sequence in the database stays authoritative
-   * and subscribers recover through HTTP backfill
-   * (`GET /games/:gameId/events?afterSequence=N`) or a fresh subscribe snapshot,
-   * exactly as the frozen realtime contract specifies for a dropped delivery.
-   * The failure is logged rather than swallowed so a broken fan-out is visible.
-   */
-  emitToGame(gameId: string, event: string, payload: unknown): void {
+  /** Preserve each recipient's unfinished subscribe/lifecycle snapshot ordering before event delivery. */
+  emitCommittedEvent(
+    gameId: string,
+    minimumVersion: number,
+    payload: unknown,
+  ): void {
     if (this.delegate === null) return;
     try {
-      this.delegate.emitToGame(gameId, event, payload);
+      this.delegate.emitCommittedEvent(gameId, minimumVersion, payload);
     } catch (error: unknown) {
-      this.logger.warn({ gameId, event, err: error }, 'Game room broadcast failed');
+      this.logger.warn({ gameId, err: error }, 'Game committed event delivery failed');
     }
   }
+
+  /** Refresh durable state for each currently authorized subscriber after a REST command. */
+  async refreshGameSubscribers(gameId: string, minimumVersion: number): Promise<void> {
+    if (this.delegate === null) return;
+    try {
+      await this.delegate.refreshGameSubscribers(gameId, minimumVersion);
+    } catch (error: unknown) {
+      this.logger.warn({ gameId, err: error }, 'Game subscriber refresh failed');
+    }
+  }
+
 }

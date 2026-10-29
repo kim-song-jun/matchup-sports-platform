@@ -10,6 +10,7 @@ import type { OperationAuditWriterService } from '../common/audit/operation-audi
 import type { PrismaService } from '../prisma/prisma.service';
 import { GameTakeoverService } from './game-takeover.service';
 import { GamesService } from './games.service';
+import { TournamentStaffAccessService } from '../tournaments/staff/tournament-staff-access.service';
 
 const ids = {
   game: '68168001-0000-4000-8000-00000000a001',
@@ -76,6 +77,7 @@ function makeService(options: {
     prisma as unknown as PrismaService,
     {} as OperationAuditWriterService,
     new GameTakeoverService(),
+    new TournamentStaffAccessService(prisma as unknown as PrismaService),
   );
   return { service, prisma };
 }

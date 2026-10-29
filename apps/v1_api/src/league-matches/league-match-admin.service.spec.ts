@@ -24,6 +24,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { leagueActiveRegistrationWhere } from './league-active-registration';
 import { LeagueMatchAdminService } from './league-match-admin.service';
+import { TournamentStaffAccessService } from '../tournaments/staff/tournament-staff-access.service';
 
 jest.mock('../tournaments/slots/tournament-slot.service', () => ({
   releaseSlotsForRegistrationInTx: jest.fn().mockResolvedValue(undefined),
@@ -422,6 +423,7 @@ function createFake() {
     prisma,
     { create: async () => undefined } as unknown as OperationAuditWriterService,
     {} as GameTakeoverService,
+    new TournamentStaffAccessService(prisma),
   );
   return { state, prisma, games, tx };
 }

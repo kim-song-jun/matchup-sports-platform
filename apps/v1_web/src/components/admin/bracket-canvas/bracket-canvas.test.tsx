@@ -64,10 +64,25 @@ describe('fixtureTitle', () => {
 });
 
 describe('BracketCanvas', () => {
+  it('기존 6강 템플릿 상태로 부전승과 결승 연결을 표시하고 실제 경기 편집을 연다', () => {
+    const rounds: [string, string, string, string, string] = ['r1', 'r2', 'r3', 's', 'f'];
+    const sixFixtures = rounds.map((id, i) => makeFixture({ id, fixtureNumber: i + 1, groupId: i < 3 ? 'six' : i === 3 ? 'semi' : 'final', round: i < 3 ? '6강' : i === 3 ? '준결승' : '결승' }));
+    const { container, props } = renderCanvas({
+      sixTeamState: { rounds, bye: null, manual: false, winners: {}, needsReview: false },
+      groups: [makeGroup({ id: 'six', name: '6강', phase: 'quarter' }), makeGroup({ id: 'semi', name: '준결승', phase: 'semi' }), makeGroup({ id: 'final', name: '결승', phase: 'final' })],
+      fixtures: sixFixtures,
+      slots: [],
+    });
+    expect(container.querySelectorAll('[data-fixture-id]')).toHaveLength(5);
+    expect(container.querySelectorAll('[data-connection]')).toHaveLength(2);
+    expect(within(screen.getByRole('region', { name: '준결승' })).getByRole('group', { name: '준결승 부전승 · 선정 대기' })).toHaveTextContent('6강 승리팀 중 선정 대기');
+    fireEvent.click(screen.getByRole('button', { name: '홈 결승 직행팀' }));
+    expect(props.onSelectFixture).toHaveBeenCalledWith('f');
+  });
   it('열 이름을 단계 순서(4강 > 결승 > 3·4위전)로 보여 준다', () => {
     renderCanvas();
     const headings = screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent);
-    expect(headings).toEqual(['4강', '결승', '3·4위전']);
+    expect(headings).toEqual(['4강', '3·4위전', '결승']);
   });
 
   it('칸마다 제목과 자리 라벨을 그리고, 연결선은 승자 2 + 패자 2 개를 SVG 로 그린다', () => {
@@ -204,7 +219,7 @@ it.each([null, 'r1'])('부전승 타일은 배정 후 시드 문구를 숨기고
     slots: [makeSlot({ id: 'bye', kind: 'BYE', groupId: 'r12', label: '5번 시드', registrationId, teamName: registrationId ? '확정팀' : null })],
     fixtures: [makeFixture({ id: 'quarter', fixtureNumber: 1, groupId: 'q', round: '8강', homeSlotId: 'bye', homeRegistrationId: registrationId, homeTeamName: registrationId ? '확정팀' : 'TBD' })],
   });
-  const tile = screen.getByRole('button', { name: `12강 부전승 ${registrationId ? '확정팀' : '5번 시드'} 편집` });
+  const tile = screen.getByRole('button', { name: `부전승 ${registrationId ? '확정팀' : '5번 시드'} 편집` });
   if (registrationId) {
     expect(tile).not.toHaveTextContent('5번 시드');
     expect(tile).toHaveStyle({ background: 'var(--blue50)' });

@@ -12,6 +12,13 @@ export function recommendFinalists(preview: FinalistPreview, orders: Record<stri
     .map((id, rank) => ({ id, rank, groupId: group.id })));
   if (new Set(selected.map((team) => team.id)).size !== selected.length) throw new Error('같은 팀이 여러 조에 있어요. 조 편성을 확인해 주세요.');
   if (selected.length !== preview.targets.length) throw new Error(`진출팀 ${selected.length}팀과 결선 자리 ${preview.targets.length}개가 같아야 해요.`);
+  if (preview.targets.every((target) => target.sourceGroupId && target.sourceRank)) {
+    return preview.targets.map((target) => {
+      const id = orders[target.sourceGroupId!]?.[target.sourceRank! - 1];
+      if (!id || !selected.some((team) => team.id === id)) throw new Error('조별 순위 출처에 맞는 진출 팀을 선택해 주세요.');
+      return id;
+    });
+  }
   const seeded = [...selected].sort((a, b) => a.rank - b.rank);
   const result = new Map<number, string>();
   const targetGroups = new Map<string, number[]>();

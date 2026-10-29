@@ -28,9 +28,11 @@ import { getSportAccent } from '@/lib/v1-sport-accent';
 import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
 import { KNOCKOUT_PHASES, competitionMatchLabel, tournamentRoundLabel } from '@/lib/tournament-round-label';
 import { compareTournamentGroupNames } from '@/lib/tournament-display-order';
-import { splitPrizeSegments, isPrizeAmountValue, formatPrizeRowValue } from '@/lib/prize-breakdown';
+import { splitPrizeSegments, parsePrizeRows } from '@/lib/prize-breakdown';
+import { TournamentPrizeList } from '@/components/tournaments/tournament-prize-list';
 import { leagueSideLabel } from '@/lib/league-fixture-meta';
-import { TournamentBracket } from '@/components/tournaments/tournament-bracket';
+import { TournamentBracket, groupFixturesByRound } from '@/components/tournaments/tournament-bracket';
+import { SixTeamBracket } from '@/components/tournaments/six-team-bracket';
 import { LeagueFixtureCard } from '@/components/tournaments/league-fixture-card';
 import {
   CompetitionFixtureCard,
@@ -56,6 +58,7 @@ import {
   formatTournamentDateTimeShort,
   formatTournamentDateRangeWithTime,
   formatTournamentDateTimeLong,
+  formatMonthDay,
   formatEntryFee,
 } from '@/lib/date-utils';
 import {
@@ -195,6 +198,9 @@ export function getCompletedChampionName(tournament: V1TournamentDetail): string
   const finalFixture = tournament.fixtures.find((f) => f.round === 'final' || f.round === '결승');
   if (!finalFixture?.result) return null;
 
+  const selectedWinner = tournament.sixTeamBracket?.winners[finalFixture.id];
+  if (selectedWinner) return selectedWinner === finalFixture.homeRegistrationId ? finalFixture.homeTeamName : selectedWinner === finalFixture.awayRegistrationId ? finalFixture.awayTeamName : null;
+
   const { homeScore, awayScore, hasPenalty, homePenaltyScore, awayPenaltyScore } = finalFixture.result;
   let winnerSide: 'home' | 'away' | null = null;
   if (hasPenalty && homePenaltyScore !== null && awayPenaltyScore !== null) {
@@ -215,13 +221,6 @@ export function getCompletedChampionName(tournament: V1TournamentDetail): string
 export function getPrizeBreakdownChips(prizeBreakdown: string | null): string[] {
   if (!prizeBreakdown) return [];
   return splitPrizeSegments(prizeBreakdown);
-}
-
-function formatPublishedAt(dateStr: string): string {
-  const d = new Date(dateStr);
-  const month = d.getMonth() + 1;
-  const day = d.getDate();
-  return `${month}월 ${day}일`;
 }
 
 function CapacityProgressBar({
@@ -734,9 +733,8 @@ export function TournamentDetailView({
   const bracketCtaLabel = getBracketEntryCtaLabel(tournament.status, isLeagueMirror, isEntryLive);
 
   /* ── Prize card — rendered in left column just after metric strip ── */
-  // 상금 칩 분리: '/'·개행·콤마 구분 지원. 단 "600,000" 같은 천단위 콤마(양옆이 숫자)는
-  // 분리하지 않는다 — dev의 콤마 구분 요구를 더 견고한 getPrizeBreakdownChips 헬퍼(테스트 보유)로 충족.
-  const prizeChips = getPrizeBreakdownChips(tournament.prizeBreakdown);
+  // 저장된 행은 공용 파서로 읽고, 화면에서만 같은 시상의 상품을 묶는다.
+  const prizeRows = parsePrizeRows(tournament.prizeBreakdown ?? '');
   const prizeCard = hasPrize ? (
     <section aria-label="상품 및 상금 안내" style={{ marginTop: 16 }}>
       <Card pad={20} style={{ background: 'var(--orange50)' }}>
@@ -754,38 +752,16 @@ export function TournamentDetailView({
             </div>
           </div>
         </div>
-        {prizeChips.length > 0 ? (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 16 }}>
-            {prizeChips.map((seg, i) => {
-              const m = seg.match(/^(우승|준우승|공동 ?[1-9]위|[1-9]위|MVP|득점왕|도움왕|(?:참가(?:팀|자) )?전원)\s+(.+)$/);
-              return (
-                <span
-                  key={i}
-                  className="tm-text-caption"
-                  // 2026-08-11: 중립 --surface(라이트 흰색/다크 근흑색)를 쓰면 이 칩이 속한
-                  // 주황 카드(Card background: --orange50)와 색이 완전히 분리돼 보인다 —
-                  // 특히 다크모드에서 카드는 따뜻한 주황조인데 칩만 차가운 무채색 검정으로
-                  // 떠 보이는 결함이 실측 확인됐다(라이브 alpha 스크린샷). 카드 톤에 맞춘
-                  // 반투명 --tint-orange(주황 10%, 라이트/다크 공용)로 교체.
-                  style={{ background: 'var(--tint-orange)', border: '1px solid var(--tint-orange-border)', color: 'var(--text-body)', fontWeight: 600, padding: '4px 12px', borderRadius: 'var(--radius-pill)' }}
-                >
-                  {m ? (
-                    <>
-                      <strong style={{ color: 'var(--text-strong)', fontWeight: 800, marginRight: 4 }}>{m[1]}</strong>
-                      {isPrizeAmountValue(m[2]) ? (
-                        formatPrizeRowValue(m[2])
-                      ) : (
-                        <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>{m[2].trim()}</span>
-                      )}
-                    </>
-                  ) : (
-                    seg
-                  )}
-                </span>
-              );
-            })}
+        {prizeRows.length > 0 && (
+          <div style={{ marginTop: 20 }}>
+            <TournamentPrizeList rows={prizeRows} />
           </div>
-        ) : null}
+        )}
+        {tournament.status === 'completed' && (
+          <Link href={childHref(`/tournaments/${tournament.id}/awards`)} style={{ display: 'inline-flex', minHeight: 44, alignItems: 'center', marginTop: 16, fontWeight: 700, color: 'var(--blue700)' }}>
+            시상 결과 보기 →
+          </Link>
+        )}
       </Card>
     </section>
   ) : null;
@@ -824,7 +800,7 @@ export function TournamentDetailView({
         <Trophy size={28} strokeWidth={1.6} />
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <h1 className="tm-text-heading" style={{ color: 'var(--text-strong)', margin: 0, lineHeight: 1.3 }}>
+        <h1 className="tm-text-heading" style={{ color: 'var(--text-strong)', margin: 0, lineHeight: 1.3, wordBreak: 'keep-all', overflowWrap: 'anywhere' }}>
           {tournament.title}
         </h1>
         <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 'var(--spacing-1)', flexWrap: 'wrap' }}>
@@ -1951,18 +1927,25 @@ function BracketSection({ tournament }: { tournament: V1TournamentDetail }) {
      여기서 안 걸리고 아래 group_knockout 경로로 떨어져 **없는 대진표를 그린다**. */
   if (isLeagueCompetition(tournament)) return null;
 
+  const sixTeamState = tournament.sixTeamMode ? tournament.sixTeamBracket : null;
+  const bracketContent = sixTeamState ? (
+    <SixTeamBracket tournamentId={tournament.id} state={sixTeamState} fixtures={knockoutFixtures}
+      stageLabels={Object.fromEntries(groupFixturesByRound(knockoutFixtures, groups).map(round => [round.key, round.label]))} />
+  ) : <TournamentBracket fixtures={knockoutFixtures} groups={groups} />;
+  const connectedBracketWide = !sixTeamState && knockoutFixtures.length > 1 ? 'true' : undefined;
+
   /* knockout: 픽스처가 있을 때만 표시 (모집 중/마감 단계엔 미표시) */
   if (format === 'knockout') {
     if (!hasAnyFixtures) return null;
     return (
-      <div className="tm-tournament-detail-bracket" data-connected-bracket-wide={knockoutFixtures.length > 1 ? 'true' : undefined}>
+      <div className="tm-tournament-detail-bracket" data-connected-bracket-wide={connectedBracketWide}>
         <div className="tm-match-detail-body">
           <section aria-labelledby="bracket-heading" style={{ marginTop: 24 }}>
             <div id="bracket-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>
               대진표
             </div>
             <div style={{ marginTop: 4 }}>
-              <TournamentBracket fixtures={knockoutFixtures} groups={groups} />
+              {bracketContent}
             </div>
           </section>
         </div>
@@ -1976,14 +1959,14 @@ function BracketSection({ tournament }: { tournament: V1TournamentDetail }) {
   if (!hasKnockoutFixtures) return null;
 
   return (
-    <div className="tm-tournament-detail-bracket" data-connected-bracket-wide={knockoutFixtures.length > 1 ? 'true' : undefined}>
+    <div className="tm-tournament-detail-bracket" data-connected-bracket-wide={connectedBracketWide}>
       <div className="tm-match-detail-body">
         <section aria-labelledby="bracket-heading" style={{ marginTop: 24 }}>
           <div id="bracket-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>
             결선 대진표
           </div>
           <div style={{ marginTop: 4 }}>
-            <TournamentBracket fixtures={knockoutFixtures} groups={groups} />
+            {bracketContent}
           </div>
         </section>
       </div>
@@ -2227,7 +2210,7 @@ function AnnouncementCard({ announcement }: { announcement: V1TournamentAnnounce
             {announcement.title}
           </div>
           <span className="tm-text-caption" style={{ color: 'var(--text-caption)', flexShrink: 0 }}>
-            {formatPublishedAt(announcement.publishedAt)}
+            {formatMonthDay(announcement.publishedAt) ?? '날짜 미정'}
           </span>
         </div>
         <span className="tm-badge tm-badge-grey" style={{ marginTop: 8 }}>

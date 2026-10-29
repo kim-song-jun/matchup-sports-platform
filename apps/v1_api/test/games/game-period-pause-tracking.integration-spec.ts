@@ -8,6 +8,7 @@ import type {
   GameSourceCreationInput,
 } from '../../src/games/games.types';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 /**
  * 경과 시간 일시정지 반영 (2026-08) — before this: `pause`/`resume` only ever
@@ -32,7 +33,7 @@ const ids = {
 } as const;
 
 const prisma = new PrismaService();
-const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 
 const authUser = (id: string) => ({
   id,
@@ -148,7 +149,10 @@ describe('game period pause tracking — pausedTotalMs/pausedAt survive multiple
         { sideKey: V1GameSideKey.HOME, teamId: ids.hostTeam, displayNameSnapshot: 'Pause Host' },
         { sideKey: V1GameSideKey.AWAY, teamId: ids.opponentTeam, displayNameSnapshot: 'Pause Opponent' },
       ],
-      participants: [],
+      participants: [
+        { sourceParticipantId: 'pause-home-player', sideKey: V1GameSideKey.HOME, displayNameSnapshot: 'Pause Home Player' },
+        { sourceParticipantId: 'pause-away-player', sideKey: V1GameSideKey.AWAY, displayNameSnapshot: 'Pause Away Player' },
+      ],
     };
     const actor: GameActorScope = {
       actorType: 'USER',

@@ -214,13 +214,15 @@ export function TournamentLiveGate({ children, tournamentId }: TournamentLiveGat
   // 돌아가기'가 맞다. 스태프 표면에서만 `?from=admin` 이 의미를 갖는다.
   const onAdminSurface = isAdminLiveConsolePath(pathname);
   const queryFromAdmin = searchParams.get('from') === 'admin';
+  const queryFromStaff = searchParams.get('from') === 'staff';
   useEffect(() => {
     // 박제는 **쿼리로 온 경우만** 한다. 어드민 표면은 경로만 보면 알 수 있는데도 박제하면,
     // 같은 대회를 스태프 표면에서 여는 사람에게 '대회 관리로 돌아가기'가 남아 그가 갈 수
     // 없는 화면으로 안내하게 된다(sessionStorage 는 대회 단위로만 구분한다).
     if (queryFromAdmin) saveTournamentOpsOrigin(tournamentId, 'admin');
-  }, [queryFromAdmin, tournamentId]);
-  const origin = onAdminSurface || queryFromAdmin ? 'admin' : getTournamentOpsOrigin(tournamentId);
+    else if (queryFromStaff) saveTournamentOpsOrigin(tournamentId, 'staff');
+  }, [queryFromAdmin, queryFromStaff, tournamentId]);
+  const origin = onAdminSurface || queryFromAdmin ? 'admin' : queryFromStaff ? 'staff' : getTournamentOpsOrigin(tournamentId);
   // 셸의 어드민 복귀 목적지(대회 관리 / 리그 관리)를 가른다. 조회 중이면 `undefined`(셸이 링크를
   // 잠시 숨김), 끝났으면 종류 — 실패하면 `null` 이라 예전처럼 대회 관리로 간다.
   const tournamentKind = tournament.isPending ? undefined : (tournament.data?.kind ?? null);

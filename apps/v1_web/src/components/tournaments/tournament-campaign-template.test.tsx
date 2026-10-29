@@ -170,7 +170,7 @@ describe('TournamentCampaignTemplate', () => {
     expect(within(rewards).queryByText('공식 후원사를 준비하고 있어요')).not.toBeInTheDocument();
   });
 
-  it('omits incomplete prize breakdown rows without a value', () => {
+  it('keeps named prize awards visible even without a goods value', () => {
     render(
       <TournamentCampaignTemplate
         campaign={{
@@ -185,7 +185,7 @@ describe('TournamentCampaignTemplate', () => {
 
     expect(screen.getByText('우승')).toBeInTheDocument();
     expect(screen.getByText('30만원')).toBeInTheDocument();
-    expect(screen.queryByText('경품')).not.toBeInTheDocument();
+    expect(screen.getByText('경품')).toBeInTheDocument();
   });
 
   it('renders repeated highlight titles and FAQ questions without duplicate React keys', () => {

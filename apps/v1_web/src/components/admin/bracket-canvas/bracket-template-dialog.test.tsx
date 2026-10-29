@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { V1ApiError } from '@/lib/api-client';
-import { BracketTemplateDialog } from './bracket-template-dialog';
+import { LegacyBracketTemplateDialog as BracketTemplateDialog } from './bracket-template-dialog';
 
 const mocks = vi.hoisted(() => ({ apply: vi.fn() }));
 vi.mock('@/hooks/use-v1-bracket-canvas', () => ({
@@ -237,6 +237,36 @@ describe('BracketTemplateDialog — 리그 방식 대회', () => {
 });
 
 describe('BracketTemplateDialog — 열림', () => {
+  it('페이지 전환·스크롤 컨테이너 밖의 body에 팝업을 띄우고 닫으면 원래 버튼으로 포커스를 돌린다', () => {
+    const onClose = vi.fn();
+    const host = document.createElement('div');
+    host.style.transform = 'translateX(0)';
+    host.style.overflow = 'hidden';
+    document.body.appendChild(host);
+    const trigger = document.createElement('button');
+    trigger.textContent = '팝업 열기';
+    host.appendChild(trigger);
+    trigger.focus();
+    const view = render(<BracketTemplateDialog open tournamentId="t-1" format="knockout"
+      hasExistingBracket={false} onClose={onClose} showToast={vi.fn()} />, { container: host.appendChild(document.createElement('div')) });
+    try {
+      const dialog = screen.getByRole('dialog', { name: '템플릿으로 대진 만들기' });
+      expect(host).not.toContainElement(dialog);
+      expect(dialog.parentElement?.parentElement).toBe(document.body);
+      expect(dialog.parentElement).toHaveStyle({ zIndex: 'var(--z-modal)' });
+      fireEvent.change(screen.getByLabelText('참가 팀 수'), { target: { value: '12' } });
+      expect(screen.getByRole('radio', { name: '12팀 대진 틀' })).toBeChecked();
+      fireEvent.click(screen.getByRole('button', { name: '모달 닫기' }));
+      expect(onClose).toHaveBeenCalledOnce();
+      view.unmount();
+      expect(trigger).toHaveFocus();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    } finally {
+      view.unmount();
+      host.remove();
+    }
+  });
+
   it('닫혀 있으면 아무것도 그리지 않는다', () => {
     renderDialog({ open: false });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();

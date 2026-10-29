@@ -90,7 +90,7 @@ export function bracketMobileSide(fixture: V1AdminBracketFixture, side: SideKey,
     registrationId,
     teamName: registrationId === null ? null : side === 'HOME' ? fixture.homeTeamName : fixture.awayTeamName,
     slotLabel: registrationId === null ? fixtureSideLabel(fixture, side, labels) : null,
-    ...(registrationId !== null && slotId && labels.slotsById.get(slotId)?.kind === 'BYE' ? { byeLabel: fixtureSideDisplayLabel(fixture, side, labels) } : {}),
+    ...(registrationId !== null && slotId && (labels.slotsById.get(slotId)?.kind === 'BYE' || labels.slotsById.get(slotId)?.byeSortOrder != null) ? { byeLabel: fixtureSideDisplayLabel(fixture, side, labels) } : {}),
   };
 }
 
@@ -192,6 +192,8 @@ export function pickableCandidates(
 // 3·4위전은 결승과 같은 탭에 둔다 — 탭이 6개를 넘으면 390 폭에서 한 칸이 너무 좁아진다.
 const PHASE_BUCKET: Record<V1TournamentGroupPhase, { key: string; label: string }> = {
   group: { key: 'group', label: '조별' },
+  round64: { key: 'round64', label: '64강' },
+  round32: { key: 'round32', label: '32강' },
   round16: { key: 'round16', label: '16강' },
   round12: { key: 'round12', label: '12강' },
   quarter: { key: 'quarter', label: '8강' },
@@ -210,7 +212,7 @@ export function buildBracketMobileRounds(input: {
 }): MobileRound[] {
   const labels = buildSideLabelContext(input.groups, input.fixtures, input.slots);
   const groupIds = new Set(input.groups.map((group) => group.id));
-  const order: Record<string, number> = { group: 0, round16: 1, round12: 2, quarter: 3, semi: 4, final: 5, third_place: 6 };
+  const order: Record<string, number> = { group: 0, round64: 0.25, round32: 0.5, round16: 1, round12: 2, quarter: 3, semi: 4, third_place: 5, final: 6 };
   const groups = [...input.groups].sort((a, b) => (order[a.phase] ?? 99) - (order[b.phase] ?? 99) || a.sortOrder - b.sortOrder || a.id.localeCompare(b.id));
   const rounds: MobileRound[] = [];
   const roundByKey = new Map<string, MobileRound>();
@@ -221,8 +223,8 @@ export function buildBracketMobileRounds(input: {
       .filter((f) => f.groupId === group.id)
       .sort(byFixtureOrder)
       .map((f) => bracketMobileNode(f, group.name, group.phase !== 'group', labels));
-    if (group.phase === 'round12') {
-      for (const slot of input.slots.filter(slot => slot.kind === 'BYE' && slot.groupId === group.id).sort((a, b) => (a.byeSortOrder ?? a.position) - (b.byeSortOrder ?? b.position) || a.id.localeCompare(b.id))) {
+    if (group.phase !== 'group') {
+      for (const slot of input.slots.filter(slot => (slot.kind === 'BYE' || slot.byeSortOrder != null) && slot.groupId === group.id).sort((a, b) => (a.byeSortOrder ?? a.position) - (b.byeSortOrder ?? b.position) || a.id.localeCompare(b.id))) {
         const target = input.fixtures.find(f => f.homeSlotId === slot.id || f.awaySlotId === slot.id);
         if (!target) continue;
         const home = target.homeSlotId === slot.id;
@@ -249,7 +251,7 @@ export function buildBracketMobileRounds(input: {
 
   for (const round of rounds) {
     if (round.key === 'group' && round.sections.length === 1) round.label = round.sections[0].heading ?? round.label;
-    round.sections.sort((a, b) => Number(thirdPlaceSectionKeys.has(a.key)) - Number(thirdPlaceSectionKeys.has(b.key)));
+    round.sections.sort((a, b) => Number(thirdPlaceSectionKeys.has(b.key)) - Number(thirdPlaceSectionKeys.has(a.key)));
   }
 
   const orphans = input.fixtures

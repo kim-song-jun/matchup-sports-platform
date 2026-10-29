@@ -8,7 +8,33 @@ import {
   formatPrizeRowValue,
   prizeRowAmountValue,
   prizeRowsTotal,
+  groupPrizeRows,
 } from './prize-breakdown';
+
+describe('groupPrizeRows', () => {
+  it('비연속 항목과 우승·숫자 순위를 같은 묶음으로 모으되 저장 데이터와 상품 수량을 보존한다', () => {
+    const rows = parsePrizeRows('우승 1000000 / MVP 트레이닝복 / 1위 트로피 / 우승 트로피 / MVP 삭스 / 준우승 300000 / 3위 상품권 / 추첨 경품 / 개인어워드 상품권 / 특별 상품');
+    const before = structuredClone(rows);
+    expect(groupPrizeRows(rows)).toEqual([
+      { label: '우승', position: 1, category: '팀 시상', amounts: ['1000000', '트로피', '트로피'] },
+      { label: 'MVP', position: null, category: '개인 시상', amounts: ['트레이닝복', '삭스'] },
+      { label: '준우승', position: 2, category: '팀 시상', amounts: ['300000'] },
+      { label: '3위', position: 3, category: '팀 시상', amounts: ['상품권'] },
+      { label: '추첨', position: null, category: '기타 시상', amounts: ['경품'] },
+      { label: '개인어워드', position: null, category: '개인 시상', amounts: ['상품권'] },
+      { label: '특별', position: null, category: '기타 시상', amounts: ['상품'] },
+    ]);
+    expect(rows).toEqual(before);
+  });
+
+  it('빈 라벨을 생략하고 내용 없는 시상·공동 순위·자유 항목은 보존한다', () => {
+    expect(groupPrizeRows([{ label: ' ', amount: '상품' }, { label: '공동 3위', amount: ' 트로피 ' }, { label: '특별', amount: '' }])).toEqual([
+      { label: '공동 3위', position: 3, category: '팀 시상', amounts: ['트로피'] },
+      { label: '특별', position: null, category: '기타 시상', amounts: [] },
+    ]);
+    expect(groupPrizeRows([])).toEqual([]);
+  });
+});
 
 describe('splitPrizeSegments (공용 스플리터 — 공개 칩·시상/어드민 행 공유)', () => {
   it('splits on "/" and newline', () => {
@@ -200,5 +226,42 @@ describe('isPrizeAmountValue 숫자 최소 1개 요구', () => {
     expect(isPrizeAmountValue(',')).toBe(false);
     expect(isPrizeAmountValue(',,원')).toBe(false);
     expect(isPrizeAmountValue('원')).toBe(false);
+  });
+});
+
+
+describe('명시적 시상 분류 저장 계약', () => {
+  it('공백·구분자가 있는 자유 시상명을 저장하고 재조회해도 개인 분류와 내용을 보존한다', () => {
+    const rows = [{ category: '개인 시상' as const, label: '오늘의 허슬 플레이어', amount: '트로피/상품권, 운동복' }];
+    const saved = serializePrizeRows(rows);
+    const loaded = parsePrizeRows(saved);
+    expect(loaded).toEqual(rows);
+    expect(groupPrizeRows(loaded)).toEqual([{ category: '개인 시상', label: '오늘의 허슬 플레이어', position: null, amounts: ['트로피/상품권, 운동복'] }]);
+    expect(splitPrizeSegments(saved)).toEqual(['오늘의 허슬 플레이어 트로피/상품권, 운동복']);
+  });
+
+  it('우승·1위·1등, 준우승·2위·2등을 같은 팀 시상과 수상팀 순위로 연결한다', () => {
+    const groups = groupPrizeRows(parsePrizeRows('우승 현금 / 1위 트로피 / 1등 상품권 / 준우승 현금 / 2등 트로피 / 2위 상품권 / 3등 상품'));
+    expect(groups.map(({ position, amounts }) => ({ position, amounts }))).toEqual([
+      { position: 1, amounts: ['현금', '트로피', '상품권'] },
+      { position: 2, amounts: ['현금', '트로피', '상품권'] },
+      { position: 3, amounts: ['상품'] },
+    ]);
+  });
+
+  it('같은 이름도 다른 분류라면 합치지 않고 개인 시상에 팀 순위를 연결하지 않는다', () => {
+    const groups = groupPrizeRows(parsePrizeRows(serializePrizeRows([
+      { category: '팀 시상', label: '우승', amount: '트로피' },
+      { category: '개인 시상', label: '우승', amount: '개인 상품' },
+      { category: '기타 시상', label: '득점왕', amount: '' },
+    ])));
+    expect(groups.map(({ category, position }) => ({ category, position }))).toEqual([
+      { category: '팀 시상', position: 1 }, { category: '개인 시상', position: null }, { category: '기타 시상', position: null },
+    ]);
+  });
+
+  it('명시적 빈 목록은 비우고 손상된 분류 데이터는 성공처럼 파싱하지 않는다', () => {
+    expect(serializePrizeRows([{ category: '개인 시상', label: ' ', amount: '상품' }])).toBe('');
+    expect(() => parsePrizeRows('@teameet/prizes/v1:[{"category":"invalid","label":"상","amount":""}]')).toThrow();
   });
 });

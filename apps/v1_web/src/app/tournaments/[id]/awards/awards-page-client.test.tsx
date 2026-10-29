@@ -1,9 +1,10 @@
 import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render as rtlRender, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { serializePrizeRows } from '@/lib/prize-breakdown';
 import { trackEvent } from '@/lib/analytics';
-import type { V1LeagueOverallStandingsResponse, V1TournamentDetail } from '@/types/api';
+import type { V1LeagueOverallStandingsResponse, V1TournamentDetail, V1TournamentFixture } from '@/types/api';
 import type { V1LeaguePlayerRecordRow } from '@/types/league-match';
 import type { PublicTournamentPlayerRecordRow } from '@/components/public-game-records/types';
 import { useShellOverrideForRoute } from '@/components/v1-ui/shell-override';
@@ -174,6 +175,57 @@ function makeCompletedTournament(overrides: Partial<V1TournamentDetail> = {}): V
   };
 }
 
+describe('AwardsPageClient — 존재하는 결선 시상대', () => {
+  function finishedFixture(round: string, home: string, away: string): V1TournamentFixture {
+    return {
+      id: round, groupId: null, round, fixtureNumber: 1, legNumber: 1,
+      scheduledAt: null, venue: null, status: 'completed', liveStatus: 'ended',
+      homeRegistrationId: 'home', homeTeamId: 'home', homeTeamName: home, homeTeamLogoUrl: null,
+      awayRegistrationId: 'away', awayTeamId: 'away', awayTeamName: away, awayTeamLogoUrl: null,
+      homeSlotLabel: null, awaySlotLabel: null, videos: [],
+      result: { homeScore: 2, awayScore: 1, hasPenalty: false, homePenaltyScore: null,
+        awayPenaltyScore: null, note: null, recordedAt: '2026-10-28T00:00:00Z', goals: [] },
+    };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    v1GetMock.mockResolvedValue(emptyOverallStandings);
+  });
+
+  it('3·4위전이 없으면 우승·준우승만 표시하고 빈 3위 단상을 만들지 않는다', () => {
+    awardsApiMocks.useV1Tournament.mockReturnValue({
+      data: makeCompletedTournament({ fixtures: [finishedFixture('final', '우승팀', '준우승팀')] }),
+      isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    });
+
+    render(<AwardsPageClient tournamentId="tournament-1" />);
+
+    const podium = screen.getByLabelText('최종 시상대');
+    expect(within(podium).getByText('우승팀')).toBeInTheDocument();
+    expect(within(podium).getByText('준우승팀')).toBeInTheDocument();
+    expect(within(podium).queryByText('—')).not.toBeInTheDocument();
+    expect(podium.querySelector('.tm-awards-podium-3')).not.toBeInTheDocument();
+  });
+
+  it('3·4위전 결과가 있으면 실제 3위 팀을 표시한다', () => {
+    awardsApiMocks.useV1Tournament.mockReturnValue({
+      data: makeCompletedTournament({ fixtures: [
+        finishedFixture('final', '우승팀', '준우승팀'),
+        finishedFixture('third_place', '3위팀', '4위팀'),
+      ] }),
+      isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    });
+
+    render(<AwardsPageClient tournamentId="tournament-1" />);
+
+    const podium = screen.getByLabelText('최종 시상대');
+    expect(within(podium).getByText('3위팀')).toBeInTheDocument();
+    expect(within(podium).queryByText('4위팀')).not.toBeInTheDocument();
+  });
+
+});
+
 describe('AwardsPageClient GA events', () => {
   const originalShare = navigator.share;
   const originalClipboard = navigator.clipboard;
@@ -295,7 +347,8 @@ describe('AwardsPageClient — regular league player records endpoint', () => {
     expect(awardsApiMocks.useV1LeagueMatchPlayerRecords).toHaveBeenCalledWith('tournament-1');
     expect(awardsApiMocks.usePublicTournamentPlayerRecords).toHaveBeenCalledWith('tournament-1', { enabled: false });
     expect(screen.getByText('리그 득점자')).toBeInTheDocument();
-    expect(screen.getByText('리그 도움자')).toBeInTheDocument();
+    expect(screen.queryByText('리그 도움자')).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '도움 순위' })).not.toBeInTheDocument();
     expect(await screen.findByText('리그 챔피언', { selector: '.tm-awards-podium-name' })).toBeInTheDocument();
   });
 });
@@ -332,9 +385,9 @@ describe('AwardsPageClient — 개인 기록 프로필 링크의 뒤로가기 �
   });
 
   it.each([
-    ['일반 대회', undefined, ['cup-scorer', 'cup-assister']],
-    ['정규 리그', 'regular_league', ['league-scorer', 'league-assister']],
-  ] as const)('%s 득점·도움 랭킹 링크가 시상 화면을 출처로 싣는다', async (_label, kind, userIds) => {
+    ['일반 대회', undefined, ['cup-scorer']],
+    ['정규 리그', 'regular_league', ['league-scorer']],
+  ] as const)('%s 득점 랭킹 링크가 시상 화면을 출처로 싣고 도움 순위는 표시하지 않는다', async (_label, kind, userIds) => {
     if (kind === 'regular_league') {
       v1GetMock.mockResolvedValueOnce(overallStandingsWithChampion('league-champion', '리그 우승팀'));
     }
@@ -355,6 +408,8 @@ describe('AwardsPageClient — 개인 기록 프로필 링크의 뒤로가기 �
       .getAllByRole('link', { name: /공개 프로필 보기/ })
       .map((link) => link.getAttribute('href'));
     expect(hrefs).toEqual(expect.arrayContaining(userIds.map((id) => `/users/${id}${FROM}`)));
+    expect(screen.queryByRole('heading', { name: '도움 순위' })).not.toBeInTheDocument();
+    expect(hrefs.some((href) => href?.includes('assister'))).toBe(false);
     expect(hrefs.filter((href) => href?.startsWith('/users/') && !href.includes('?from='))).toEqual([]);
   });
 });
@@ -453,7 +508,7 @@ describe('AwardsPageClient — 정규 리그 거울 행(kind=regular_league)의 
     expect(screen.getByText('마포 레인저스 · 풋살크루', { selector: '.tm-awards-podium-name' })).toBeInTheDocument();
   });
 
-  it('공동 우승이고 상금이 걸려 있으면 1위 상금란에도 두 팀 이름을 함께 보여준다(한쪽만 남기지 않는다)', async () => {
+  it.each(['1위', '1등', '우승'])('공동 우승이면 %s 상금란에도 두 팀 이름을 함께 보여준다', async (label) => {
     const overall: V1LeagueOverallStandingsResponse = {
       standings: [
         { teamId: 'team-mapo', teamName: '마포 레인저스', position: 1, points: 1, wins: 0, draws: 1, losses: 0, goalsFor: 1, goalsAgainst: 1 },
@@ -475,7 +530,7 @@ describe('AwardsPageClient — 정규 리그 거울 행(kind=regular_league)의 
         groups: [],
         fixtures: [],
         prizePool: 1000000,
-        prizeBreakdown: '1위,1000000',
+        prizeBreakdown: `${label} 1,000,000원`,
       }),
       isLoading: false,
       isError: false,
@@ -489,6 +544,40 @@ describe('AwardsPageClient — 정규 리그 거울 행(kind=regular_league)의 
     // 상금란의 "1위" 행 — teamByPos가 Object.fromEntries였다면 마지막 팀(풋살크루)만
     // 남고 마포 레인저스는 조용히 사라졌을 것이다.
     expect(screen.getByText('마포 레인저스 · 풋살크루', { selector: 'div:not(.tm-awards-podium-name)' })).toBeInTheDocument();
+  });
+
+  it('우승·준우승·숫자 순위의 각 상품에 수상팀을 연결하고 그 외 항목은 연결하지 않는다', async () => {
+    const overall = overallStandingsWithChampion('team-1', '우승팀');
+    overall.standings.push(
+      { ...overall.standings[0], teamId: 'team-2', teamName: '준우승팀', position: 2 },
+      { ...overall.standings[0], teamId: 'team-3', teamName: '펌킨FS', position: 3 },
+    );
+    v1GetMock.mockResolvedValueOnce(overall);
+    awardsApiMocks.useV1Tournament.mockReturnValue({
+      data: makeCompletedTournament({
+        kind: 'regular_league',
+        prizePool: 8000000,
+        prizeBreakdown: '우승 1,000,000원 / 우승 트로피 / 우승 칼치오 상품권 30만원 / 준우승 300,000원 / 준우승 트로피 / 준우승 칼치오 상품권 20만원 / 1위 상품 / 2위 상품 / 3위 칼치오 상품권 10만원 / 추첨 경품 / 개인어워드 상품권 / MVP 트레이닝복',
+      }),
+      isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    });
+
+    render(<AwardsPageClient tournamentId="tournament-1" />);
+    await screen.findByText('우승팀', { selector: '.tm-awards-podium-name' });
+
+    for (const [label, teamName] of [['우승', '우승팀'], ['준우승', '준우승팀'], ['3위', '펌킨FS']]) {
+      for (const item of screen.getAllByText(label, { exact: true })) {
+        expect(item.parentElement).toHaveTextContent(teamName);
+      }
+    }
+    expect(screen.getAllByText('우승', { exact: true })).toHaveLength(1);
+    expect(screen.getByText('우승', { exact: true }).parentElement).toHaveTextContent('칼치오 상품권 30만원');
+    expect(screen.getByText('우승', { exact: true }).parentElement).toHaveTextContent('상품');
+    expect(screen.queryByText('1위', { exact: true })).not.toBeInTheDocument();
+    expect(screen.queryByText('2위', { exact: true })).not.toBeInTheDocument();
+    for (const label of ['추첨', '개인어워드', 'MVP']) {
+      expect(screen.getByText(label, { exact: true }).parentElement).not.toHaveTextContent(/우승팀|준우승팀|펌킨FS/);
+    }
   });
 });
 
@@ -517,7 +606,18 @@ describe('AwardsPageClient — 완료 전 상금 정보 노출 (hasPrizeData 판
 
     render(<AwardsPageClient tournamentId="tournament-1" />);
 
-    expect(screen.getByText('총 상금')).toBeInTheDocument();
+    expect(screen.getByText('상금·상품 총규모')).toBeInTheDocument();
+  });
+
+  it('총상금·요약·상품 없이 자유 개인 시상 이름만 저장해도 공개 개인 구역에 표시한다', () => {
+    awardsApiMocks.useV1Tournament.mockReturnValue({
+      data: makeCompletedTournament({
+        status: 'in_progress', prizePool: null, prizeSummary: null,
+        prizeBreakdown: serializePrizeRows([{ category: '개인 시상', label: '오늘의 허슬 플레이어', amount: '' }]),
+      }), isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    });
+    render(<AwardsPageClient tournamentId="tournament-1" />);
+    expect(screen.getByRole('region', { name: '개인 시상' })).toHaveTextContent('오늘의 허슬 플레이어');
   });
 
   it('진행 중이고 prizePool·prizeSummary·prizeBreakdown 전부 없으면 상금 섹션을 그리지 않는다', () => {
@@ -536,7 +636,7 @@ describe('AwardsPageClient — 완료 전 상금 정보 노출 (hasPrizeData 판
 
     render(<AwardsPageClient tournamentId="tournament-1" />);
 
-    expect(screen.queryByText('총 상금')).not.toBeInTheDocument();
+    expect(screen.queryByText('상금·상품 총규모')).not.toBeInTheDocument();
   });
 });
 

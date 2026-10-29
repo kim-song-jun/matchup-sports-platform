@@ -2,7 +2,7 @@
 // 생기고 서버 계약이 바뀔 때 조용히 갈린다. (league-match.ts 는 이 파일을 import 하지
 // 않으므로 순환이 없다.)
 import type { V1LeagueFixture } from './league-match';
-import type { GamePeriodDuration } from './game-operations';
+import type { GamePeriodDuration, GameRealtimeAuthorization } from './game-operations';
 
 export type ApiEnvelope<T> = {
   status: 'success';
@@ -61,6 +61,11 @@ export type AdminListSummary = {
   byReportReason?: Record<string, number>;
   /** 문의 목록 전용 — 사유 필터만 뺀 같은 조건의 총 건수('전체 사유'). 사유 미지정(null) 신고 포함. */
   reportReasonTotal?: number;
+  /** 회원 목록: 자기 그룹 선택만 제외하고 검색·다른 필터를 적용한 집계. */
+  bySignup?: Record<string, number>;
+  byProvider?: Record<string, number>;
+  signupTotal?: number;
+  providerTotal?: number;
 };
 
 export type AdminCursorPage<T> = CursorPage<T> & {
@@ -1662,6 +1667,7 @@ export type V1Game = {
   periodDurations?: readonly GamePeriodDuration[] | null;
   lineups: V1GameLineupSummary[];
   actorRole: string;
+  realtimeAuthorization: GameRealtimeAuthorization;
   lineupConfig?: V1LineupConfig;
 };
 
@@ -3068,6 +3074,7 @@ export type V1AdminUserRow = {
   gender: 'male' | 'female' | null;
   accountStatus: 'active' | 'suspended' | 'blocked' | 'withdrawal_pending' | 'deleted';
   onboardingStatus: string;
+  signupStage?: 'required_complete' | 'onboarding_complete' | 'terms_required' | 'profile_required' | 'profile_deferred';
   lastLoginAt: string | null;
   createdAt: string;
   hostedMatchCount: number;
@@ -3335,6 +3342,9 @@ export type V1AdminTeamRenameResult = {
 };
 
 export type AdminListFilters = {
+  /** 회원 목록 전용. 쉼표로 구분한 복수 선택 (그룹 안 OR, 그룹 사이 AND). */
+  signup?: string;
+  providers?: string;
   status?: string;
   q?: string;
   sportId?: string;
@@ -3659,7 +3669,7 @@ export type V1TournamentPaymentStatus =
 
 export type V1PlayerEligibilityStatus = 'non_pro' | 'pro' | 'needs_review';
 
-export type V1TournamentGroupPhase = 'group' | 'round16' | 'round12' | 'quarter' | 'semi' | 'final' | 'third_place';
+export type V1TournamentGroupPhase = 'group' | 'round64' | 'round32' | 'round16' | 'round12' | 'quarter' | 'semi' | 'final' | 'third_place';
 
 export type V1AnnouncementAudience =
   | 'public'
@@ -3677,6 +3687,7 @@ export type V1AnnouncementCategory =
 
 /** Serialized by TournamentsReadService.serializeCard — list view */
 export type V1TournamentListItem = {
+  sixTeamMode?: boolean;
   id: string;
   sportId: string;
   /** Enriched sport object — code + name; sportId retained for back-compat */
@@ -3745,6 +3756,8 @@ export type V1TournamentListItem = {
 
 /** Serialized by TournamentsAdminService.serialize — admin view (includes bank / player range) */
 export type V1Tournament = {
+  sixTeamMode?: boolean;
+  sixTeamBracket?: V1SixTeamBracket | null;
   /** 관리자 상세 응답. 실제 시작·기록·결과가 없어 대회 시작을 되돌릴 수 있는가. */
   canRevertStart?: boolean;
   /** 관리자 상세 응답: null이면 형식 변경 가능. */
@@ -4056,7 +4069,12 @@ export type V1TournamentParticipantTeam = {
 };
 
 /** Serialized by TournamentsReadService.get — full public detail */
+export type V1SixTeamBracket = { rounds: [string, string, string, string, string]; bye: string | null;
+  swapSemi?: boolean; swapFinal?: boolean;
+  manual: boolean; winners: Record<string, string>; needsReview: boolean };
 export type V1TournamentDetail = {
+  sixTeamMode?: boolean;
+  sixTeamBracket?: V1SixTeamBracket | null;
   id: string;
   sportId: string;
   /** Enriched sport object — code + name; sportId retained for back-compat */
@@ -4509,7 +4527,22 @@ export type BracketTemplateInput =
     }
   | { kind: 'league'; teamCount: number; legs: 1 | 2 };
 
-export type V1ApplyBracketTemplatePayload = BracketTemplateInput & { replaceExisting?: boolean };
+export type FlexibleBracketInput = {
+  sixTeamMode?: boolean;
+  schemaVersion: 2; kind: 'knockout' | 'group_knockout'; size?: number; participantCount: number;
+  groups?: { name: string; capacity: number; advanceCount: number; legs?: 1 | 2 }[];
+  legs?: 1 | 2; thirdPlace: boolean; drawSeed: number; seedPolicy: 'random' | 'seeded'; registrationIds?: string[];
+};
+export type FlexibleBracketPreview = {
+  warnings?: string[];
+  counts: V1ApplyBracketTemplateResult; previewHash: string; confirmedTeamCount: number;
+  groups: { key: string; name: string; phase: V1TournamentGroupPhase; advanceCount: number | null }[];
+  slots: { key: string; kind: 'ENTRY' | 'BYE' | 'GROUP_RANK'; groupKey: string | null; sourceGroupKey: string | null; position: number; byeSortOrder?: number }[];
+  fixtures: { key: string; groupKey: string; round: string; fixtureNumber: number; homeSlotKey: string | null; awaySlotKey: string | null }[];
+  edges: { sourceFixtureKey: string; targetFixtureKey: string; outcome: 'WINNER' | 'LOSER'; targetSide: 'HOME' | 'AWAY' }[];
+  byeSlots: { groupKey: string; sortOrder: number }[];
+};
+export type V1ApplyBracketTemplatePayload = (BracketTemplateInput | FlexibleBracketInput) & { replaceExisting?: boolean; requestId?: string; previewHash?: string; acknowledgeRematches?: boolean };
 export type V1ApplyBracketTemplateResult = { groups: number; slots: number; fixtures: number; edges: number };
 export type V1AssignSlotResult = { slot: V1AdminBracketSlot; affectedTeamMatchIds: string[] };
 export type V1RandomFillResult = { assignments: { slotId: string; registrationId: string }[] };
@@ -4710,6 +4743,7 @@ export type V1LineupSizeOptions = {
 export type V1SubstitutionMode = 'limited' | 'rolling';
 
 export type V1CreateTournamentPayload = {
+  sixTeamMode?: boolean;
   sportId: string;
   title: string;
   format?: V1TournamentFormat;

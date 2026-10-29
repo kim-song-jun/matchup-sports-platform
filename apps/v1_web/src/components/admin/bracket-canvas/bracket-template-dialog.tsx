@@ -1,6 +1,11 @@
 'use client';
 
+import { SixTeamTemplateDialog } from './six-team-template-dialog';
 import { X } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { useQuery } from '@tanstack/react-query';
+import { v1Get } from '@/lib/api-client';
+import { FlexibleBracketWizard } from './flexible-bracket-wizard';
 import { useEffect, useId, useRef, useState } from 'react';
 import { Button } from '@/components/v1-ui/button';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
@@ -66,7 +71,35 @@ function templateStagePreview(input: BracketTemplateInput): string {
   return [`${input.groupCount}개 조 · 조별 ${groupRounds}라운드`, ...finals[finalists], ...(input.thirdPlace ? ['3·4위전 1경기'] : [])].join(' → ');
 }
 
-export function BracketTemplateDialog({ open, tournamentId, format, confirmedTeamCount = 0, confirmedTeamCountStatus = 'success', hasExistingBracket, onClose, onApplied, showToast }: BracketTemplateDialogProps) {
+export function BracketTemplateDialog(props: BracketTemplateDialogProps) {
+  const [legacy, setLegacy] = useState(false);
+  const [standard, setStandard] = useState(false);
+  useEffect(() => { if (!props.open) setStandard(false); }, [props.open]);
+  useEffect(() => { if (!props.open) setLegacy(false); }, [props.open]);
+  const capabilities = useQuery({ queryKey: ['bracket-template-capabilities', props.tournamentId],
+    queryFn: () => v1Get<{ flexibleEnabled: boolean; sixTeamEligible: boolean }>(`/admin/tournaments/${encodeURIComponent(props.tournamentId)}/bracket/template/capabilities`),
+    enabled: props.open && props.format !== 'league', staleTime: 0, refetchOnWindowFocus: false, refetchOnReconnect: false });
+  if (props.format !== 'league' && !capabilities.data) return <TemplateAvailabilityDialog open={props.open} onClose={props.onClose} error={capabilities.isError} retry={() => void capabilities.refetch()} />;
+  if (capabilities.data?.sixTeamEligible && !standard) return <SixTeamTemplateDialog {...props} onStandard={() => setStandard(true)} />;
+  return !capabilities.data?.flexibleEnabled || props.format === 'league' || legacy
+    ? <LegacyBracketTemplateDialog {...props} />
+    : <FlexibleBracketWizard {...props} onLegacy={() => setLegacy(true)} />;
+}
+
+function TemplateAvailabilityDialog({ open, onClose, error, retry }: { open: boolean; onClose: () => void; error: boolean; retry: () => void }) {
+  const id = useId();
+  const { dialogRef, mounted, onBackdropClick } = useModalA11y({ open, onClose });
+  if (!mounted || typeof document === 'undefined') return null;
+  return createPortal(<div className="fixed inset-0 flex items-center justify-center p-4 tm-modal-scrim" style={{ zIndex: 'var(--z-modal)' }} onClick={onBackdropClick}>
+    <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={id} className="tm-modal-panel w-full max-w-md rounded-2xl bg-[var(--card-surface)] p-5">
+      <h2 id={id} className="tm-text-body-lg font-bold">대진 설정</h2>
+      <p className="my-4 tm-text-body" role={error ? 'alert' : 'status'}>{error ? '대진 설정을 불러오지 못했어요.' : '대진 설정을 불러오고 있어요.'}</p>
+      <div className="flex justify-end gap-2"><Button variant="neutral" onClick={onClose}>닫기</Button>{error && <Button variant="primary" onClick={retry}>다시 시도</Button>}</div>
+    </div>
+  </div>, document.body);
+}
+
+export function LegacyBracketTemplateDialog({ open, tournamentId, format, confirmedTeamCount = 0, confirmedTeamCountStatus = 'success', hasExistingBracket, onClose, onApplied, showToast }: BracketTemplateDialogProps) {
   const idPrefix = useId();
   const apply = useV1ApplyBracketTemplate(tournamentId);
   const { confirm, ConfirmModal } = useConfirm();
@@ -157,13 +190,15 @@ export function BracketTemplateDialog({ open, tournamentId, format, confirmedTea
     });
   };
 
-  if (!mounted) return ConfirmModal;
+  if (!mounted || typeof document === 'undefined') return ConfirmModal;
   const titleId = `${idPrefix}-title`;
 
   return (
     <>
-      <div
-        className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-[2px] tm-modal-scrim${closing ? ' is-closing' : ''}`}
+      {/* 페이지의 transform·overflow와 분리하고, 확인창은 이 portal 뒤에 렌더링한다. */}
+      {createPortal(<div
+        style={{ zIndex: 'var(--z-modal)' }}
+        className={`fixed inset-0 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-[2px] tm-modal-scrim${closing ? ' is-closing' : ''}`}
         onClick={onBackdropClick}
       >
         <div
@@ -392,7 +427,7 @@ export function BracketTemplateDialog({ open, tournamentId, format, confirmedTea
             </Button>
           </div>
         </div>
-      </div>
+      </div>, document.body)}
       {ConfirmModal}
     </>
   );

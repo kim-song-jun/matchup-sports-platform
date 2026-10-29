@@ -72,7 +72,7 @@ export class GamesController {
    */
   private broadcastCommitted(gameId: string, result: GameEventAppendResult): GameEventAppendResult {
     if (result.event === undefined) return result;
-    this.gameBroadcast.emitToGame(gameId, 'game.event.committed', {
+    this.gameBroadcast.emitCommittedEvent(gameId, result.version, {
       gameId,
       sequence: result.sequence,
       version: result.version,
@@ -95,14 +95,18 @@ export class GamesController {
 
   @Post(':gameId/commands/:command')
   @UseGuards(V1AuthGuard)
-  command(
+  async command(
     @CurrentUser() user: V1AuthUser,
     @Param('gameId') gameId: string,
     @Param('command', new ParseEnumPipe(GameCommandName)) command: GameCommandName,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() dto: GameCommandDto,
   ) {
-    return this.gamesService.executeCommand(user, gameId, command, idempotencyKey, dto);
+    const result = await this.gamesService.executeCommand(user, gameId, command, idempotencyKey, dto);
+    if ('replayed' in result && !result.replayed) {
+      void this.gameBroadcast.refreshGameSubscribers(gameId, result.version);
+    }
+    return result;
   }
 
   @Post(':gameId/cancel')

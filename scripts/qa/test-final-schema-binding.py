@@ -3,6 +3,7 @@
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -18,6 +19,19 @@ M11_SHA = '08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323'
 
 
 class FinalSchemaBinding(unittest.TestCase):
+    def test_runtime_image_binds_current_schema(self):
+        dockerfile = (ROOT / 'deploy/Dockerfile.v1-api').read_text()
+        generation = dockerfile.split('RUN npx prisma generate', 1)[1].split('RUN npx nest build', 1)[0]
+        self.assertIn(f'= {CURRENT_SCHEMA} ' + chr(92), generation)
+        attestation = re.search(r"'(\{[^\n]+\})\\n'", generation)
+        self.assertIsNotNone(attestation)
+        self.assertEqual(json.loads(attestation.group(1))['schemaSha256'], CURRENT_SCHEMA)
+
+    def test_manifest_writer_accepts_current_schema(self):
+        writer = (ROOT / 'scripts/release/create-alpha-release-manifest.sh').read_text()
+        final_guard = writer.rsplit('for name in RELEASE_SHA RELEASE_VERSION', 1)[1].split('api_digest=', 1)[0]
+        self.assertIn(f'"$TASK168_SCHEMA_SHA256" == {CURRENT_SCHEMA}', final_guard)
+
     def bind(self, tamper=None):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

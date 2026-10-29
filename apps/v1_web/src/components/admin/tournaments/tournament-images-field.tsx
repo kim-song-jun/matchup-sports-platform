@@ -4,13 +4,13 @@ import { useId } from 'react';
 import { TeamMatchImagesField } from '@/components/team-matches/team-match-images';
 
 export function TournamentImagesField({
-  coverImageUrl, listImageUrl, showDetailImage, sportCode, disabled = false,
+  coverImageUrl, listImageUrl, showDetailImage, sportName, disabled = false,
   onImageChange, onVisibilityChange, onUpload, onUploadingChange,
 }: {
   coverImageUrl: string | null;
   listImageUrl: string | null;
   showDetailImage: boolean;
-  sportCode?: string;
+  sportName?: string;
   disabled?: boolean;
   onImageChange: (field: 'coverImageUrl' | 'listImageUrl', value: string | null) => void;
   onVisibilityChange: (visible: boolean) => void;
@@ -21,7 +21,7 @@ export function TournamentImagesField({
   return <div>
     <TeamMatchImagesField
       images={{ imageUrl: coverImageUrl, listImageUrl }}
-      sport={sportCode}
+      sport={sportName}
       disabled={disabled}
       onUpload={onUpload}
       onUploadingChange={onUploadingChange}
@@ -34,7 +34,7 @@ export function TournamentImagesField({
         className="h-5 w-5 accent-[var(--blue500)]" />
       상세 이미지 표시
     </label>
-    <p id={hintId} className="tm-text-caption mt-1 text-[var(--text-muted)]">
+    <p id={hintId} className="tm-text-caption mt-1 text-[var(--text-muted)]" style={{ wordBreak: 'keep-all', overflowWrap: 'anywhere' }}>
       {showDetailImage
         ? '상세 이미지가 없으면 목록 이미지를 사용하고, 둘 다 없으면 종목 기본 이미지를 보여줘요.'
         : '상세에서 기본 이미지와 이미지 영역을 모두 숨겨요. 목록·홍보 카드와 저장된 사진은 유지돼요.'}

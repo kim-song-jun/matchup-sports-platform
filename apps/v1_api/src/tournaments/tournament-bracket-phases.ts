@@ -1,9 +1,11 @@
 /**
  * Phases a bracket match may take its sources from, keyed by target phase.
  * round16 and round12 are both the stage before quarter and are not used together in one tournament.
- * round16 is the first knockout phase, so it has no key. third_place takes the semi losers.
+ * round64 is the first knockout phase. third_place takes the semi losers.
  */
 export const BRACKET_SOURCE_PHASES: Readonly<Record<string, readonly string[]>> = {
+  round32: ['round64'],
+  round16: ['round32'],
   quarter: ['round16', 'round12'],
   semi: ['quarter'],
   final: ['semi'],

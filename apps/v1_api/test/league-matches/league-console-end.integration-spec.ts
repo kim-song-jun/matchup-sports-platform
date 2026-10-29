@@ -8,6 +8,7 @@ import { PrismaService } from '../../src/prisma/prisma.service';
 import { seedLeagueOnTournamentAxis } from '../fixtures/league-on-tournament-axis.fixture';
 import { GameResultSubmittedEscalationService } from '../../src/jobs/result-escalation/game-result-submitted-escalation.service';
 import type { GameOperationClaim } from '../../src/jobs/v1-game-operations-worker.service';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 /**
  * **리그 대진은 콘솔의 `end` 로 끝난다. 친선 팀매치는 여전히 못 끝낸다(결함 #29).**
@@ -38,7 +39,7 @@ const ids = {
 } as const;
 
 const prisma = new PrismaService();
-const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 const escalation = new GameResultSubmittedEscalationService();
 
 /** 워커가 이 이벤트를 집었을 때와 같은 모양의 claim. */
@@ -121,7 +122,10 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
         { sideKey: V1GameSideKey.HOME, teamId: ids.homeTeam, displayNameSnapshot: '#29 홈' },
         { sideKey: V1GameSideKey.AWAY, teamId: ids.awayTeam, displayNameSnapshot: '#29 원정' },
       ],
-      participants: [],
+      participants: [
+        { sourceParticipantId: `${teamMatchId}-home-player`, sideKey: V1GameSideKey.HOME, displayNameSnapshot: '#29 홈 선수' },
+        { sourceParticipantId: `${teamMatchId}-away-player`, sideKey: V1GameSideKey.AWAY, displayNameSnapshot: '#29 원정 선수' },
+      ],
     };
     const created = await prisma.$transaction((tx) =>
       service.createFromSourceInTransaction(
@@ -142,7 +146,10 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
         { sideKey: V1GameSideKey.HOME, teamId: ids.homeTeam, displayNameSnapshot: '대조군 홈' },
         { sideKey: V1GameSideKey.AWAY, teamId: ids.awayTeam, displayNameSnapshot: '대조군 원정' },
       ],
-      participants: [],
+      participants: [
+        { sourceParticipantId: 'console-fixture-home-player', sideKey: V1GameSideKey.HOME, displayNameSnapshot: '대조군 홈 선수' },
+        { sourceParticipantId: 'console-fixture-away-player', sideKey: V1GameSideKey.AWAY, displayNameSnapshot: '대조군 원정 선수' },
+      ],
     };
     const created = await prisma.$transaction((tx) =>
       service.createFromSourceInTransaction(

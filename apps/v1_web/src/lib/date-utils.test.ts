@@ -9,6 +9,7 @@ import {
   formatAdminKstDateTimeShort,
   formatCardDate,
   formatCardTime,
+  formatMonthDay,
   formatKstDateShort,
   formatKstTime,
   formatTournamentDateRangeWithTime,
@@ -25,6 +26,47 @@ function runtimeModuleUrl(relativePath: string): string {
   });
   return `data:text/javascript;base64,${Buffer.from(outputText).toString('base64')}`;
 }
+
+describe('formatMonthDay', () => {
+  it('실제 초대·신청 timestamp를 호스트 시간대와 무관하게 KST 월·일로 표시한다', () => {
+    const dateUtilsUrl = runtimeModuleUrl('src/lib/date-utils.ts');
+    const script = `
+      import { formatMonthDay } from ${JSON.stringify(dateUtilsUrl)};
+      console.log(JSON.stringify({
+        boundary: formatMonthDay('2026-10-26T18:14:47.468Z'),
+        normalDay: formatMonthDay('2026-10-26T11:00:00.000Z'),
+        dateOnly: formatMonthDay('2026-10-26'),
+        naiveDateTime: formatMonthDay('2026-10-26T23:30'),
+        nullValue: formatMonthDay(null),
+        invalidValue: formatMonthDay('not-a-date'),
+      }));
+    `;
+    const formatIn = (timeZone: string) => {
+      const output = execFileSync(process.execPath, ['--input-type=module', '--eval', script], {
+        env: { ...process.env, TZ: timeZone },
+        encoding: 'utf8',
+        timeout: 10_000,
+      });
+      return JSON.parse(output);
+    };
+
+    const expected = {
+      boundary: '10월 27일',
+      normalDay: '10월 26일',
+      dateOnly: '10월 26일',
+      naiveDateTime: '10월 26일',
+      nullValue: null,
+      invalidValue: null,
+    };
+
+    expect(formatIn('UTC')).toEqual(expected);
+    expect(formatIn('Asia/Seoul')).toEqual(expected);
+    expect(formatIn('America/Los_Angeles')).toEqual(expected);
+    expect(formatMonthDay(null)).toBeNull();
+    expect(formatMonthDay(undefined)).toBeNull();
+    expect(formatMonthDay('')).toBeNull();
+  });
+});
 
 describe('formatAdminKstDateTimeShort / 기존 local admin family (관리자 대회 목록 · MD-QA #27)', () => {
   const dateUtilsUrl = runtimeModuleUrl('src/lib/date-utils.ts');

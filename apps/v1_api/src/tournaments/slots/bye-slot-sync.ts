@@ -45,9 +45,9 @@ export async function findLinkedByeSlotInTx(
   group: { id: string; phase: string },
   sortOrder: number,
 ): Promise<{ id: string } | null> {
-  if (group.phase !== 'round12') return null;
-  return tx.v1TournamentSlot.findFirst({ where: { groupId: group.id, kind: 'BYE', byeSortOrder: sortOrder }, select: { id: true } });
+  if (group.phase === 'group' || group.phase === 'final' || group.phase === 'third_place') return null;
+  return tx.v1TournamentSlot.findFirst({ where: { groupId: group.id, byeSortOrder: sortOrder }, select: { id: true } });
 }
 
 export const slotLinkedBye = () =>
-  new ConflictException({ code: 'SLOT_LINKED', message: '연결된 부전승은 그림의 8강 경기에서 홈·어웨이를 선택해 주세요. 팀 변경은 자리에서 할 수 있어요.' });
+  new ConflictException({ code: 'SLOT_LINKED', message: '연결된 부전승은 다음 경기에서 홈·어웨이를 선택해 주세요. 팀 변경은 자리에서 할 수 있어요.' });

@@ -1,3 +1,9 @@
+[6강 결승 직행 API 계약](./domains/tournaments.md#6강-결승-직행-방식-2026-10-28): 6팀 방식 설정, 템플릿 생성, 진출 조회/수동 결정, 공개 대진표 메타데이터.
+
+대진 v2는 조마다 `groups[].legs`로 1·2회전을 따로 설정한다. 기존 최상위 `legs`와 초안 복원은 호환되며 [대회 계약](./domains/tournaments.md#유연한-대진-v2-2026-10-27)을 따른다.
+
+대회 시상 계획은 팀·개인·기타 분류를 명시해 저장하며, 자유 시상명과 우승·1위·1등 별칭을 지원한다. 기존 텍스트와 신규 분류 문자열 포맷은 [시상 계획 계약](./domains/tournaments.md#categorized-prize-plans)을 따른다.
+
 신규 가입자의 경기 기록은 기본 공개이며, 기존 회원은 활성·가입 완료·미설정인 경우에만 공개로 초기화한다. 직접 비공개 선택과 실명·개별 기록 숨김 정책은 유지한다. [가입 계약](./domains/auth.md#signup-flow) · [설정 계약](./domains/users.md#경기-기록-공개-설정).
 
 자책골은 점수가 올라간 팀 영역에 표시한다. 공개 일정·경기 상세의 `side`, 팀 전적의 `own/opponent`, 공식 결과 득점의 `team`은 득점 귀속 `sideId`를 따른다. 선수 이름·프로필과 `OWN_GOAL`/`ownGoal`·OG 표시는 실제 행위 선수를 유지하며 개인 득점에는 합산하지 않는다. 라이브 이벤트와 공식 revision JSON에 동일하게 적용한다. [공개 기록 계약](./domains/public-records.md#own-goal-display-side-2026-10-22).
@@ -14,7 +20,11 @@
 
 경기별 골키퍼 지정 (2026-10-14): 명단 조회에 `goalkeeper`를 추가하고 팀 일괄 명단 API에 복수 지정 `SET_GOALKEEPER`를 지원한다. [Games 계약](./domains/games.md#경기-명단-gk-지정-task-20261082)을 확인한다.
 
+일반 팀매치 경기 운영의 명령·이벤트 요청은 `takeoverToken` 생략을 transport에서 허용한다. 생략 시에도 GamesService의 기존 host/lease 권한 판정이 최종 기준이며, tournament-scoped 운영은 기존 유효 lease를 요구한다. 제공 값은 공백 문자가 아닌 문자를 하나 이상 포함한 문자열이어야 하며 원문 그대로 전달된다. 빈 문자열·공백 전용 문자열·`null`·잘못된 타입은 계속 validation error다. [Games](./domains/games.md) · [Game realtime](./domains/game-realtime.md).
+
 # Teameet v1 API contracts
+
+대진 v2는 4~64팀 짝수, 조별 인원·진출 수와 홀수 결선, 서버 미리보기·초안·멱등 생성 계약을 제공한다. 활성화와 수동 결선 진출 표시 규칙은 [대회 v2 계약](./domains/tournaments.md#유연한-대진-v2-2026-10-27)을 따른다.
 
 공개 대회 일정의 결선 기본 문구는 저장된 진출 연결로 보완한다(직접 문구·슬롯·실제 팀 우선). [대회 라벨 계약](./domains/tournaments.md)을 따른다.
 
@@ -127,6 +137,8 @@ Current Kakao signup and existing-account linking use the [provider contact conf
 - 조별 결과 기반 공통 결선 배정: [tournaments — 공통 결선 진출팀 배정](./domains/tournaments.md#공통-결선-진출팀-배정-2026-10-21). 수동 대진·불균등 조 지원, 기존 12강 규칙 보존.
 
 대회 목록·상세 이미지 2장과 상세 기본 이미지까지 숨기는 `showDetailImage` 설정은 [대회 이미지 계약](./domains/tournaments.md#목록상세-이미지와-상세-숨김-2026-10-22)을 따른다.
+
+대회 이미지 설정의 JSON boolean 검증과 관리자 종목 기본 이미지 선택도 같은 계약에서 관리한다. `showDetailImage`의 문자열/숫자 강제 변환은 허용하지 않는다.
 
 - 2026-10-24: [경기 계약](domains/games.md#어드민-종료-경기의-출전-정정-2026-10-24)에 owner·ops 어드민의 종료 경기 EXCLUDE/REVOKE 예외 및 결과 이력 보존 계약을 반영했다.
 

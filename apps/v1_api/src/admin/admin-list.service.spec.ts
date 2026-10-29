@@ -168,7 +168,7 @@ describe('AdminService — list/detail endpoints', () => {
   let service: AdminService;
   let prisma: {
     v1AdminUser: { findUnique: jest.Mock };
-    v1User: { findMany: jest.Mock; findUnique: jest.Mock; groupBy: jest.Mock };
+    v1User: { findMany: jest.Mock; findUnique: jest.Mock; groupBy: jest.Mock; count: jest.Mock };
     v1Match: { findMany: jest.Mock; findUnique: jest.Mock; groupBy: jest.Mock };
     v1Team: { findMany: jest.Mock; findUnique: jest.Mock; groupBy: jest.Mock };
     v1TeamMatch: { findMany: jest.Mock; findUnique: jest.Mock; groupBy: jest.Mock };
@@ -185,7 +185,7 @@ describe('AdminService — list/detail endpoints', () => {
   beforeEach(async () => {
     prisma = {
       v1AdminUser: { findUnique: jest.fn() },
-      v1User: { findMany: jest.fn(), findUnique: jest.fn(), groupBy: jest.fn().mockResolvedValue([]) },
+      v1User: { findMany: jest.fn(), findUnique: jest.fn(), groupBy: jest.fn().mockResolvedValue([]), count: jest.fn().mockResolvedValue(0) },
       v1Match: { findMany: jest.fn(), findUnique: jest.fn(), groupBy: jest.fn().mockResolvedValue([]) },
       v1Team: { findMany: jest.fn(), findUnique: jest.fn(), groupBy: jest.fn().mockResolvedValue([]) },
       v1TeamMatch: { findMany: jest.fn(), findUnique: jest.fn(), groupBy: jest.fn().mockResolvedValue([]) },
@@ -299,6 +299,7 @@ describe('AdminService — list/detail endpoints', () => {
     it('returns items and pageInfo with correct shape for active admin', async () => {
       const row = makeUserRow();
       prisma.v1User.findMany.mockResolvedValue([row]);
+      prisma.v1User.count.mockResolvedValue(23);
       prisma.v1User.groupBy.mockResolvedValue([
         { accountStatus: 'active', _count: { _all: 21 } },
         { accountStatus: 'suspended', _count: { _all: 2 } },
@@ -332,7 +333,7 @@ describe('AdminService — list/detail endpoints', () => {
         total: 23,
         totalPages: 2,
       });
-      expect(result.summary).toEqual({
+      expect(result.summary).toMatchObject({
         total: 23,
         byStatus: { active: 21, suspended: 2, blocked: 0, withdrawal_pending: 0, deleted: 0 },
       });
@@ -343,7 +344,7 @@ describe('AdminService — list/detail endpoints', () => {
       await service.listUsers(adminAuthUser, { status: 'suspended' });
 
       const call = prisma.v1User.findMany.mock.calls[0][0] as { where: Record<string, unknown> };
-      expect(call.where).toMatchObject({ accountStatus: 'suspended' });
+      expect(call.where).toMatchObject({ AND: expect.arrayContaining([{ accountStatus: 'suspended' }]) });
     });
 
     it('passes q search as OR on nickname/realName/displayName/email', async () => {
@@ -351,9 +352,8 @@ describe('AdminService — list/detail endpoints', () => {
       await service.listUsers(adminAuthUser, { q: '호스트' });
 
       const call = prisma.v1User.findMany.mock.calls[0][0] as { where: Record<string, unknown> };
-      const where = call.where as { OR?: unknown[] };
-      expect(Array.isArray(where.OR)).toBe(true);
-      expect(where.OR).toHaveLength(4);
+      const where = call.where as { AND: Array<{ OR?: unknown[] }> };
+      expect(where.AND[0].OR).toHaveLength(4);
     });
 
     it('returns hasNext=true and nextCursor when rows exceed limit', async () => {

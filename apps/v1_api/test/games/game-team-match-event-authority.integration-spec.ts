@@ -10,6 +10,7 @@ import type {
 } from '../../src/games/games.types';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { submitFriendlyTeamMatchLineups } from '../helpers/submit-friendly-team-match-lineups';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 // Task T1-1: resolveActor's TEAM_MATCH branch used to forbid event_append/
 // event_reverse unconditionally for every team actor (games.service.ts).
@@ -34,7 +35,7 @@ const ids = {
 } as const;
 
 const prisma = new PrismaService();
-const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 
 const authUser = (id: string) => ({
   id,

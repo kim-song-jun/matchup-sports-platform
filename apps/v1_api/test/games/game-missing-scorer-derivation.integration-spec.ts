@@ -9,6 +9,7 @@ import type {
 } from '../../src/games/games.types';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { FOOTBALL_V1_CONFIG } from '../../src/tournaments/competition-config/competition-config.presets';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 /**
  * Issue #392 — `deriveTournamentRevision`'s `missingScorer` field (the
@@ -58,7 +59,7 @@ const ids = {
 } as const;
 
 const prisma = new PrismaService();
-const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 
 const authUser = (id: string) => ({
   id,
@@ -172,6 +173,7 @@ describe('deriveTournamentRevision — missingScorer excludes reversed goals (is
       ],
       participants: [
         { sourceParticipantId: 'reversed-case-scorer', sideKey: V1GameSideKey.HOME, displayNameSnapshot: 'Valid Scorer' },
+        { sourceParticipantId: 'reversed-case-away-player', sideKey: V1GameSideKey.AWAY, displayNameSnapshot: 'Missing Scorer Away Player' },
       ],
     };
     const actor: GameActorScope = {
@@ -257,6 +259,7 @@ describe('deriveTournamentRevision — missingScorer stays true for an un-revers
       ],
       participants: [
         { sourceParticipantId: 'remains-case-scorer', sideKey: V1GameSideKey.HOME, displayNameSnapshot: 'Valid Scorer 2' },
+        { sourceParticipantId: 'remains-case-away-player', sideKey: V1GameSideKey.AWAY, displayNameSnapshot: 'Missing Scorer Away Player 2' },
       ],
     };
     const actor: GameActorScope = {

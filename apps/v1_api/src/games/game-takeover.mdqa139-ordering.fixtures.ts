@@ -7,6 +7,7 @@ import type { V1GameEvent } from '@prisma/client';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import { OperationAuditWriterService } from '../common/audit/operation-audit-writer.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { TournamentStaffAccessService } from '../tournaments/staff/tournament-staff-access.service';
 import type { AppendGameEventDto } from './dto/game-event.dto';
 import { GameTakeoverService } from './game-takeover.service';
 import { GamesService } from './games.service';
@@ -149,7 +150,7 @@ export async function createOrderingService() {
     v1TeamMembership: { async findMany() { return []; } },
   };
   const moduleRef = await Test.createTestingModule({ providers: [
-    GamesService, GameTakeoverService, OperationAuditWriterService,
+    GamesService, GameTakeoverService, OperationAuditWriterService, TournamentStaffAccessService,
     { provide: PrismaService, useValue: database },
   ] }).compile();
   return {

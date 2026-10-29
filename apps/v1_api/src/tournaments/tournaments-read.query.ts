@@ -58,7 +58,7 @@ export const TOURNAMENT_DETAIL_INCLUDE = {
     orderBy: [{ phase: 'asc' }, { sortOrder: 'asc' }],
     include: {
       byeSlots: true,
-      slots: { where: { kind: 'BYE' }, select: { id: true, kind: true, byeSortOrder: true, displayLabel: true } },
+      slots: { where: { byeSortOrder: { not: null } }, select: { id: true, kind: true, byeSortOrder: true, displayLabel: true } },
       groupTeams: {
         orderBy: { sortOrder: 'asc' },
         include: {

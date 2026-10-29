@@ -12,7 +12,7 @@ import { seedBracketTournament } from '../helpers/bracket-canvas-fixture';
 jest.setTimeout(120_000);
 const prisma = new PrismaService();
 const user = { id: ids.adminUserId, email: 'schedule-labels@example.test', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
-const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 const templates = new BracketTemplateService(prisma, new AdminContextService(prisma), games);
 const records = new PublicTournamentRecordsService(prisma, new TournamentStaffAccessService(prisma));
 

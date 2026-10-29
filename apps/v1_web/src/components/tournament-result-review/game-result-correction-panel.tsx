@@ -26,7 +26,7 @@ import {
   officializeAlwaysAllowed,
 } from './result-review-copy';
 import { AdminListSkeleton } from '@/components/admin/admin-skeleton';
-import { regularPeriodCountOf } from '@/components/tournament-live/operate/period-label';
+import { regularPeriodCountOf } from '@/shared/game-operations';
 import { josa } from '@/lib/korean';
 
 type DirectorGateStatus = 'unknown' | 'enabled' | 'disabled';

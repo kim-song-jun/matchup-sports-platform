@@ -619,6 +619,7 @@ let v1GameFixture = {
   lastSequence: 0,
   competitionConfigVersionId: 'competition-config-v1',
   currentOfficialRevisionId: null as string | null,
+  realtimeAuthorization: { kind: 'unscoped', subjectVersion: 0 } as const,
   sides: [
     { id: 'side-home-1', gameId: 'game-1', sideKey: 'HOME' as const, teamId: 'team-1', displayNameSnapshot: '성수 볼러즈' },
     { id: 'side-away-1', gameId: 'game-1', sideKey: 'AWAY' as const, teamId: 'team-2', displayNameSnapshot: '마포 FC' },
@@ -749,6 +750,7 @@ const v1CompetitionFixturePlaces: Array<{ fixtureId: string; tournamentId: strin
   place: { name: '서울 풋살파크', address: '서울' as string | null, latitude: null, longitude: null, provider: null, providerPlaceId: null } }];
 
 export const v1MswHandlers = [
+  http.get(`${api}/admin/tournaments/:tournamentId/bracket/template/capabilities`, () => ok({ flexibleEnabled: false, schemaVersion: 2, sixTeamEligible: false })),
   ...v1GameRosterMswHandlers,
   ...v1TeamDissolutionMswHandlers,
   ...v1TeamInviteLinkMswHandlers,

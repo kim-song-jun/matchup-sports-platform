@@ -52,12 +52,13 @@ function computeTeamRecord(teamName: string, fixtures: V1TournamentFixture[]) {
 
 interface FinalRankRow { pos: number; name: string; record?: { w: number; gf: number; ga: number; games: number }; }
 
-function buildKnockoutFinalRanking(fixtures: V1TournamentFixture[]): FinalRankRow[] {
+function buildKnockoutFinalRanking(fixtures: V1TournamentFixture[], winners: Record<string, string> = {}): FinalRankRow[] {
   const finalFix = fixtures.find((f) => f.round === 'final' || f.round === '결승');
   const thirdFix = fixtures.find((f) => f.round === 'third_place' || f.round === '3·4위전');
   const rows: FinalRankRow[] = [];
   if (finalFix?.result) {
-    const w = getWinnerSide(finalFix.result);
+    const selectedWinner = winners[finalFix.id];
+    const w = selectedWinner ? selectedWinner === finalFix.homeRegistrationId ? 'home' : selectedWinner === finalFix.awayRegistrationId ? 'away' : null : getWinnerSide(finalFix.result);
     const champion = w === 'home' ? finalFix.homeTeamName : w === 'away' ? finalFix.awayTeamName : null;
     const runner   = w === 'home' ? finalFix.awayTeamName : w === 'away' ? finalFix.homeTeamName : null;
     if (champion) rows.push({ pos: 1, name: champion });
@@ -423,17 +424,17 @@ function KnockoutResultsTable({
 }) {
   if (fixtures.length === 0) return null;
 
-  const semiByMatchup = new Map<number | string, V1TournamentFixture[]>();
+  const semiByMatchup = new Map<string, V1TournamentFixture[]>();
   const finalFixtures: V1TournamentFixture[] = [];
   const thirdFixtures: V1TournamentFixture[] = [];
   const earlierFixtures: V1TournamentFixture[] = [];
 
   for (const f of fixtures) {
-    // 4강은 1·2차전을 대진 번호로 묶는다. 번호가 비어도 4강 카드로는 남겨야 하므로
+    // 4강은 같은 편성과 대진 번호끼리 모으고, 실제 1·2차전만 아래에서 합산한다. 번호가 비어도 남겨야 하므로
     // 경기 id 로 단독 버킷을 만든다 — 결승 카드로 흘려보내면 라벨이 "결승"으로 뒤바뀐다.
     switch (kindOf(f)) {
       case 'semi': {
-        const key = f.fixtureNumber ?? `solo-${f.id}`;
+        const key = f.fixtureNumber == null ? `solo-${f.id}` : `${f.groupId ?? f.round}:${f.fixtureNumber}`;
         const bucket = semiByMatchup.get(key) ?? [];
         bucket.push(f);
         semiByMatchup.set(key, bucket);
@@ -457,15 +458,25 @@ function KnockoutResultsTable({
   }
 
   const calcAggregate = (legs: V1TournamentFixture[]) => {
-    const leg1 = legs.find((f) => f.legNumber === 1 || !f.legNumber);
+    if (legs.length !== 2) return null;
+    const leg1 = legs.find((f) => f.legNumber === 1);
     const leg2 = legs.find((f) => f.legNumber === 2);
-    if (!leg1?.result) return null;
-    const homeTeam = leg1.homeTeamName;
-    const awayTeam = leg1.awayTeamName;
-    const isReversed = leg2 ? leg2.homeTeamName === awayTeam : false;
-    const homeTotal = (leg1.result.homeScore ?? 0) + (isReversed ? (leg2?.result?.awayScore ?? 0) : (leg2?.result?.homeScore ?? 0));
-    const awayTotal = (leg1.result.awayScore ?? 0) + (isReversed ? (leg2?.result?.homeScore ?? 0) : (leg2?.result?.awayScore ?? 0));
-    return { homeTeam, awayTeam, homeTotal, awayTotal, leg1, leg2 };
+    if (!leg1?.result || !leg2?.result) return null;
+    // Team names can be hidden or changed. Only stable identities establish a two-leg matchup.
+    const identity = (fixture: V1TournamentFixture, side: 'home' | 'away') => {
+      const registrationId = side === 'home' ? fixture.homeRegistrationId : fixture.awayRegistrationId;
+      const teamId = side === 'home' ? fixture.homeTeamId : fixture.awayTeamId;
+      return registrationId ? `registration:${registrationId}` : teamId ? `team:${teamId}` : null;
+    };
+    const home = identity(leg1, 'home');
+    const away = identity(leg1, 'away');
+    if (!home || !away || home === away) return null;
+    const reversed = identity(leg2, 'home') === away && identity(leg2, 'away') === home;
+    const sameOrder = identity(leg2, 'home') === home && identity(leg2, 'away') === away;
+    if (!reversed && !sameOrder) return null;
+    return { homeTeam: leg1.homeTeamName, awayTeam: leg1.awayTeamName, leg1, leg2,
+      homeTotal: leg1.result.homeScore + (reversed ? leg2.result.awayScore : leg2.result.homeScore),
+      awayTotal: leg1.result.awayScore + (reversed ? leg2.result.homeScore : leg2.result.awayScore) };
   };
 
   const fmtDate = (s: string | null) => s ? new Date(s).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' }) : '';
@@ -585,15 +596,45 @@ function KnockoutResultsTable({
         );
       })}
 
+      {/* ── 3·4위전 카드 ── */}
+      {thirdFixtures.map((f) => {
+        if (!f.result) return null;
+        const { homeScore, awayScore, hasPenalty, homePenaltyScore, awayPenaltyScore } = f.result;
+        const winner = getWinnerSide(f.result);
+        return (
+          <div key={f.id} style={{ ...cardStyle, background: 'var(--grey50)' }}>
+            <MatchRow
+              label="3·4위전"
+              home={f.homeTeamName} away={f.awayTeamName}
+              homeScore={homeScore} awayScore={awayScore}
+              winner={winner}
+              hasPenalty={hasPenalty} homePK={homePenaltyScore} awayPK={awayPenaltyScore}
+              date={fmtDate(f.scheduledAt)}
+              fixtureId={f.id}
+            />
+          </div>
+        );
+      })}
+
+
       {/* ── 4강 매치업 그룹 카드 ── */}
       {Array.from(semiByMatchup.values()).map((legs) => {
         const agg = calcAggregate(legs);
-        if (!agg) return null;
+        if (!agg) return legs.map((fixture) => fixture.result && (
+          <div key={fixture.id} style={cardStyle}>
+            <MatchRow label={fixture.legNumber > 1 ? `4강 ${fixture.legNumber}차` : '4강'}
+              home={fixture.homeTeamName} away={fixture.awayTeamName}
+              homeScore={fixture.result.homeScore} awayScore={fixture.result.awayScore}
+              winner={getWinnerSide(fixture.result)} hasPenalty={fixture.result.hasPenalty}
+              homePK={fixture.result.homePenaltyScore} awayPK={fixture.result.awayPenaltyScore}
+              date={fmtDate(fixture.scheduledAt)} fixtureId={fixture.id} />
+          </div>
+        ));
         const { homeTeam, awayTeam, homeTotal, awayTotal, leg1, leg2 } = agg;
         const aggWinner = homeTotal > awayTotal ? 'home' : awayTotal > homeTotal ? 'away' : null;
 
         return (
-          <div key={`semi-${homeTeam}`} style={cardStyle}>
+          <div key={`semi-${leg1.id}`} style={cardStyle}>
             {leg1?.result && (
               <MatchRow
                 label="4강 1차" home={leg1.homeTeamName} away={leg1.awayTeamName}
@@ -636,25 +677,6 @@ function KnockoutResultsTable({
         </div>
       ))}
 
-      {/* ── 3·4위전 카드 ── */}
-      {thirdFixtures.map((f) => {
-        if (!f.result) return null;
-        const { homeScore, awayScore, hasPenalty, homePenaltyScore, awayPenaltyScore } = f.result;
-        const winner = getWinnerSide(f.result);
-        return (
-          <div key={f.id} style={{ ...cardStyle, background: 'var(--grey50)' }}>
-            <MatchRow
-              label="3·4위전"
-              home={f.homeTeamName} away={f.awayTeamName}
-              homeScore={homeScore} awayScore={awayScore}
-              winner={winner}
-              hasPenalty={hasPenalty} homePK={homePenaltyScore} awayPK={awayPenaltyScore}
-              date={fmtDate(f.scheduledAt)}
-              fixtureId={f.id}
-            />
-          </div>
-        );
-      })}
 
     </div>
   );
@@ -759,7 +781,7 @@ function VideoGallerySection({
   fixtures: V1TournamentFixture[];
   groups: V1TournamentDetail['groups'];
 }) {
-  const roundOrder: Record<string, number> = { final: 0, '결승': 0, semi: 1, '4강': 1, third_place: 2, '3·4위전': 2, group: 3, '조별리그': 3 };
+  const roundOrder: Record<string, number> = { final: 0, '결승': 0, third_place: 1, '3·4위전': 1, semi: 2, '4강': 2, group: 3, '조별리그': 3 };
   const withVideos = fixtures
     .filter((f) => f.status === 'completed' && f.videos.length > 0)
     .sort((a, b) =>
@@ -821,8 +843,8 @@ function VideoGallerySection({
 /** 결선 카드의 종류. 이 화면이 실제로 그릴 수 있는 세 가지뿐이다. */
 export type KnockoutKind = 'final' | 'semi' | 'quarter' | 'round16' | 'round12' | 'third_place';
 
-/** 결선 섹션 정렬 순서(결승 → 4강 → 3·4위전). */
-const KNOCKOUT_KIND_ORDER: Record<KnockoutKind, number> = { final: 0, semi: 1, quarter: 2, round12: 3, round16: 4, third_place: 5 };
+/** 결선 섹션 정렬 순서(결승 → 3·4위전 → 4강 → 이전 라운드). */
+const KNOCKOUT_KIND_ORDER: Record<KnockoutKind, number> = { final: 0, third_place: 1, semi: 2, quarter: 3, round12: 4, round16: 5 };
 
 /** 편성에 붙지 못한(groupId 없음/편성 삭제됨) 경기용 폴백 — 알려진 라벨만 인정한다. */
 const KNOCKOUT_KIND_BY_LABEL: Record<string, KnockoutKind> = {
@@ -976,11 +998,6 @@ function GroupFixtureRow({
           {away}
         </span>
       </div>
-      <ChevronRight
-        size={16}
-        aria-hidden="true"
-        style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-caption)' }}
-      />
     </Link>
   );
 }
@@ -1084,7 +1101,7 @@ export function ResultsPageContent({ tournament }: { tournament: V1TournamentDet
     ? []
     : isLeague
       ? (needsOverallStandings ? (overallLeague?.rows ?? []) : buildSingleGroupLeagueRanking(tournament))
-      : buildKnockoutFinalRanking(tournament.fixtures);
+      : buildKnockoutFinalRanking(tournament.fixtures, tournament.sixTeamBracket?.winners);
   // 동점 처리 기준을 전부 소진하고도 1위가 안 갈리면(공동 우승) 순차 순위(1,2…) 대신
   // 그 자리를 나눠 가진 팀 전부를 "1위"로 함께 표기한다 — 실제로 갈리지 않은 걸 팀ID
   // 사전순으로 임의 확정해 트로피를 씌우던 결함(실사용자 발견, 2026-09-16)의 화면판.

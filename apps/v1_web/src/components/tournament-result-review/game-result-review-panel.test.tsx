@@ -1,4 +1,4 @@
-import { render, screen, within, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, within, fireEvent, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GameResultReviewPanel } from './game-result-review-panel';
 import type { TournamentGameDetail } from '@/hooks/use-tournament-result-review';
@@ -163,6 +163,22 @@ describe('GameResultReviewPanel — 결과 확정 확인 모달은 캐시가 아
         expect.anything(),
       ),
     );
+  });
+
+  it('공식 확정 성공 콜백은 서버 성공일 때만 호출한다', async () => {
+    const onOfficialized = vi.fn();
+    render(<GameResultReviewPanel gameId={GAME_ID} onOfficialized={onOfficialized} />);
+    fireEvent.click(screen.getByRole('button', { name: '확인' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: '확정' }));
+    await waitFor(() => expect(officializeMutate).toHaveBeenCalled());
+
+    expect(onOfficialized).not.toHaveBeenCalled();
+    const callbacks = officializeMutate.mock.calls[0][1];
+    act(() => callbacks.onError(new Error('failed')));
+    expect(onOfficialized).not.toHaveBeenCalled();
+    act(() => callbacks.onSuccess());
+    expect(onOfficialized).toHaveBeenCalledTimes(1);
   });
 
   /* #379 — 검토자는 점수 숫자만으로 승인/반려를 결정할 수 없다. 골·도움·카드가 언제

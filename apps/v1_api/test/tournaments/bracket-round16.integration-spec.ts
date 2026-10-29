@@ -8,10 +8,11 @@ import { TournamentBracketService } from '../../src/tournaments/tournament-brack
 import { TOURNAMENT_DETAIL_INCLUDE } from '../../src/tournaments/tournaments-read.query';
 import { competitionConfigFixture as ids, seedCompetitionConfigFixture } from '../fixtures/competition-config.fixture';
 import { seedBracketTournament } from '../helpers/bracket-canvas-fixture';
+import { TournamentStaffAccessService } from '../../src/tournaments/staff/tournament-staff-access.service';
 
 const prisma = new PrismaService();
 const adminContext = new AdminContextService(prisma);
-const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService(), new TournamentStaffAccessService(prisma));
 const templates = new BracketTemplateService(prisma, adminContext, games);
 const bracket = new TournamentBracketService(prisma, adminContext, games);
 const user = { id: ids.adminUserId, email: 'round16-admin@example.test', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
@@ -52,12 +53,12 @@ describe('16강 단계 (PostgreSQL)', () => {
     expect(await prisma.v1TournamentSlot.count({ where: { tournamentId, kind: 'BYE' } })).toBe(0);
   });
 
-  it('조는 16강이 조별 다음 첫 결선으로 정렬된다 — 어드민 대진 조회와 공개 상세 조회 둘 다 (enum 순서 = BEFORE round12)', async () => {
+  it('16강은 첫 결선으로 정렬되고, 어드민은 3·4위전 뒤 결승을 표시하며 공개 조회 원본 순서는 보존한다', async () => {
     const { tournamentId } = await seedBracketTournament(prisma, { label: 'ko16-order', format: 'knockout', teamCount: 0 });
     await templates.apply(user, tournamentId, { kind: 'knockout', size: 16, thirdPlace: true });
 
     const admin = await bracket.getBracket(user, tournamentId);
-    expect(admin.groups.map((g) => g.phase)).toEqual(['round16', 'quarter', 'semi', 'final', 'third_place']);
+    expect(admin.groups.map((g) => g.phase)).toEqual(['round16', 'quarter', 'semi', 'third_place', 'final']);
 
     const row = await prisma.v1Tournament.findUniqueOrThrow({ where: { id: tournamentId }, include: TOURNAMENT_DETAIL_INCLUDE });
     expect(row.groups.map((g) => g.phase)).toEqual(['round16', 'quarter', 'semi', 'final', 'third_place']);
@@ -87,12 +88,14 @@ describe('16강 단계 (PostgreSQL)', () => {
     expect(await prisma.v1TournamentMatchAdvancementEdge.count({ where: { tournamentId } })).toBe(2);
   });
 
-  it('16강 조에는 부전승 자리가 생기지 않는다 (12강 전용 규칙이 번지지 않았다는 대조군)', async () => {
+  it('16강 부전승은 가짜 경기 없이 자리를 만들고 범위를 검증한다', async () => {
     const { tournamentId } = await seedBracketTournament(prisma, { label: 'ko16-bye', format: 'knockout', teamCount: 0 });
     const g16 = await bracket.createGroup(user, tournamentId, { name: '16강', phase: 'round16' });
-    await expect(bracket.createBye(user, tournamentId, { groupId: g16.id, sortOrder: 0 }))
-      .rejects.toMatchObject({ response: { code: 'BYE_PHASE_INVALID' } });
-    expect(await prisma.v1TournamentByeSlot.count({ where: { groupId: g16.id } })).toBe(0);
+    await bracket.createBye(user, tournamentId, { groupId: g16.id, sortOrder: 0 });
+    expect(await prisma.v1TournamentByeSlot.count({ where: { groupId: g16.id } })).toBe(1);
+    expect(await prisma.v1TournamentMatchDetails.count({ where: { tournamentId } })).toBe(0);
+    await expect(bracket.createBye(user, tournamentId, { groupId: g16.id, sortOrder: 16 }))
+      .rejects.toMatchObject({ response: { code: 'BYE_POSITION_INVALID' } });
     expect(await prisma.v1TournamentGroupTeam.count({ where: { groupId: g16.id } })).toBe(0);
   });
 });

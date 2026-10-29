@@ -11,11 +11,13 @@ import {
   type SideKey,
 } from '@/lib/bracket-canvas-layout';
 import { competitionMatchLabel } from '@/lib/tournament-round-label';
-import type { V1AdminBracketFixture, V1AdminBracketGroup, V1AdminBracketSlot } from '@/types/api';
+import type { V1AdminBracketFixture, V1AdminBracketGroup, V1AdminBracketSlot, V1SixTeamBracket } from '@/types/api';
+import { SixTeamAdminBracket } from './six-team-admin-bracket';
 import { BracketCanvasNode } from './bracket-canvas-node';
 import { BracketGroupBlock } from './bracket-group-block';
 
 export type BracketCanvasProps = {
+  sixTeamState?: V1SixTeamBracket | null;
   groups: V1AdminBracketGroup[];
   fixtures: V1AdminBracketFixture[];
   slots: V1AdminBracketSlot[];
@@ -42,6 +44,7 @@ const EDGE_STYLE: Record<CanvasEdgeKind, { dash: string | undefined }> = {
 };
 
 export function BracketCanvas({
+  sixTeamState,
   groups,
   fixtures,
   slots,
@@ -74,6 +77,18 @@ export function BracketCanvas({
   const hasBracketEdges = layout.edges.some((edge) => edge.kind !== 'GROUP_RANK');
   const hasRankEdges = layout.edges.some((edge) => edge.kind === 'GROUP_RANK');
 
+  if (sixTeamState) return <SixTeamAdminBracket state={sixTeamState} fixtures={fixtures} groups={groups} renderFixture={(fixture, labels) => <BracketCanvasNode
+    fixture={fixture}
+    title={fixtureTitle(fixture, groups)}
+    sideLabels={labels ?? { HOME: fixtureSideLabel(fixture, 'HOME', labelContext), AWAY: fixtureSideLabel(fixture, 'AWAY', labelContext) }}
+    slots={{ HOME: fixture.homeSlotId ? slotsById.get(fixture.homeSlotId) ?? null : null, AWAY: fixture.awaySlotId ? slotsById.get(fixture.awaySlotId) ?? null : null }}
+    selected={fixture.id === selectedFixtureId}
+    canWrite={canWrite}
+    pendingRegistrationId={pendingRegistrationId}
+    onSelect={onSelectFixture}
+    onAssign={onAssignSlot}
+    onAssignDirect={onAssignDirect}
+  />} />;
   return (
     <div
       role="region"
@@ -106,8 +121,8 @@ export function BracketCanvas({
         {layout.byeNodes.map(position => {
           const slot = slotsById.get(position.slotId);
           if (!slot) return null;
-          return <button key={slot.id} type="button" aria-label={`12강 부전승 ${slot.teamName ?? slot.label} 편집`} onClick={() => onSelectBye ? onSelectBye(slot.id) : onSelectFixture(position.fixtureId)} className="tm-on-tint absolute flex flex-col justify-center gap-1 rounded-2xl border border-[var(--border-strong)] bg-[var(--card-surface)] p-3 text-left focus-visible:outline-2 focus-visible:outline-blue-500" style={{ left: position.x, top: position.y, width: position.width, height: position.height, background: slot.registrationId !== null ? 'var(--blue50)' : undefined }}>
-            <span className="tm-text-caption text-[var(--text-muted)]">12강 부전승</span><span className="tm-text-label truncate font-semibold">{slot.teamName ?? slot.label}</span>
+          return <button key={slot.id} type="button" aria-label={`부전승 ${slot.teamName ?? slot.label} 편집`} onClick={() => onSelectBye ? onSelectBye(slot.id) : onSelectFixture(position.fixtureId)} className="tm-on-tint absolute flex flex-col justify-center gap-1 rounded-2xl border border-[var(--border-strong)] bg-[var(--card-surface)] p-3 text-left focus-visible:outline-2 focus-visible:outline-blue-500" style={{ left: position.x, top: position.y, width: position.width, height: position.height, background: slot.registrationId !== null ? 'var(--blue50)' : undefined }}>
+            <span className="tm-text-caption text-[var(--text-muted)]">부전승</span><span className="tm-text-label truncate font-semibold">{slot.teamName ?? slot.label}</span>
           </button>;
         })}
         {layout.nodes.map((position) => {

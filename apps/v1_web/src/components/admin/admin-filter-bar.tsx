@@ -27,6 +27,9 @@ interface AdminFilterBarProps {
   statusGroupLabel?: string;
   activeStatus?: string;
   onStatusChange?: (value: string) => void;
+  /** 복수 선택은 같은 그룹 안 OR. '전체'는 빈 배열로 전달한다. */
+  selectedStatuses?: readonly string[];
+  onStatusesChange?: (values: string[]) => void;
   /** Optional content injected to the right of the chips row */
   rightSlot?: ReactNode;
 }
@@ -42,6 +45,8 @@ export function AdminFilterBar({
   statusGroupLabel = '상태 필터',
   activeStatus,
   onStatusChange,
+  selectedStatuses,
+  onStatusesChange,
   rightSlot,
 }: AdminFilterBarProps) {
   const inputId = useId();
@@ -83,15 +88,23 @@ export function AdminFilterBar({
       {/* Status chip row */}
       {(statusOptions && statusOptions.length > 0) || rightSlot ? (
         <div className="flex items-center gap-2 flex-wrap">
-          {statusOptions && statusOptions.length > 0 && onStatusChange && (
+          {statusOptions && statusOptions.length > 0 && (onStatusChange || onStatusesChange) && (
             <div className="flex items-center gap-2 flex-wrap" role="group" aria-label={statusGroupLabel}>
               {statusOptions.map((opt) => {
-                const active = activeStatus === opt.value;
+                const active = selectedStatuses
+                  ? opt.value === '' ? selectedStatuses.length === 0 : selectedStatuses.includes(opt.value)
+                  : activeStatus === opt.value;
                 return (
                   <button
                     key={opt.value}
                     type="button"
-                    onClick={() => onStatusChange(opt.value)}
+                    onClick={() => {
+                      if (onStatusesChange) {
+                        onStatusesChange(!opt.value ? [] : active
+                          ? (selectedStatuses ?? []).filter((value) => value !== opt.value)
+                          : [...(selectedStatuses ?? []), opt.value]);
+                      } else onStatusChange?.(opt.value);
+                    }}
                     aria-pressed={active}
                     aria-label={typeof opt.count === 'number' ? `${opt.label} ${opt.count}` : opt.label}
                     className={[

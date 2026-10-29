@@ -28,8 +28,8 @@ import { trackEvent } from '@/lib/analytics';
 import { isUnauthenticatedError, retryTransientFailure, V1ApiError, v1Get } from '@/lib/api-client';
 import { TournamentFlowNav } from '@/components/tournaments/tournament-flow-nav';
 import { formatEntryFee } from '@/lib/date-utils';
-import { parsePrizeRows, isPrizeAmountValue, formatPrizeRowValue } from '@/lib/prize-breakdown';
-import { PrizeRankIcon } from '@/components/tournaments/prize-rank-icon';
+import { parsePrizeRows } from '@/lib/prize-breakdown';
+import { GroupedPrizes } from '@/components/tournaments/grouped-prizes';
 import { PendingReviewsCard } from '@/components/tournaments/pending-review-card';
 import { publicAssetPath } from '@/lib/assets';
 import { TournamentAwardIcon } from '@/components/tournaments/tournament-award-icon';
@@ -98,7 +98,8 @@ export function getTopThree(tournament: V1TournamentDetail): Array<{ pos: number
   const result: Array<{ pos: number; name: string }> = [];
 
   if (finalFixture?.result) {
-    const w = getWinnerSide(finalFixture.result);
+    const selectedWinner = tournament.sixTeamBracket?.winners[finalFixture.id];
+    const w = selectedWinner ? selectedWinner === finalFixture.homeRegistrationId ? 'home' : selectedWinner === finalFixture.awayRegistrationId ? 'away' : null : getWinnerSide(finalFixture.result);
     const champion = w === 'home' ? finalFixture.homeTeamName : w === 'away' ? finalFixture.awayTeamName : null;
     const runner = w === 'home' ? finalFixture.awayTeamName : w === 'away' ? finalFixture.homeTeamName : null;
     if (champion) result.push({ pos: 1, name: champion });
@@ -191,7 +192,7 @@ function AwardsPodium({
     pos === 1
       ? (champions.length > 0 ? { pos: 1, name: champions.map((c) => c.name).join(' · ') } : null)
       : top3.find((t) => t.pos === pos) ?? null,
-  );
+  ).filter((slot) => slot !== null);
   // 3위 → 2위 → 1위 순으로 차오르는 등장 딜레이(챔피언 공개에 살짝 뜸을 둠)
   const REVEAL_DELAY_MS: Record<number, number> = { 3: 0, 2: 140, 1: 300 };
 
@@ -206,9 +207,9 @@ function AwardsPodium({
           <strong>{champions[0].name}</strong>, 우승을 축하드려요! 🎉
         </p>
       ) : null}
-      <div className="tm-awards-podium" aria-label="최종 시상대">
-        {podiumSlots.map((slot, idx) => {
-          const pos = podiumOrder[idx];
+      <div className="tm-awards-podium mx-auto w-full max-w-xl" aria-label="최종 시상대">
+        {podiumSlots.map((slot) => {
+          const pos = slot.pos;
           const posClass = `tm-awards-podium-${pos}` as const;
           return (
             <div
@@ -218,7 +219,7 @@ function AwardsPodium({
             >
             {/* 팀명 (podium 위) */}
             <span className="tm-awards-podium-name">
-              {slot?.name ?? '—'}
+              {slot.name}
             </span>
             <span className={`tm-awards-podium-pos tm-medal-${pos === 1 ? 'gold' : pos === 2 ? 'silver' : 'bronze'}`} aria-hidden="true">
               <Medal size={pos === 1 ? 26 : 22} strokeWidth={2} />
@@ -253,7 +254,7 @@ function AwardsPodium({
 /* ── 상금 상세 — 파서·아이콘은 어드민 미리보기와 공유 (lib/prize-breakdown, prize-rank-icon) ── */
 
 function hasPrizeData(tournament: V1TournamentDetail): boolean {
-  return Boolean(tournament.prizeSummary?.trim() || tournament.prizePool);
+  return Boolean(tournament.prizeSummary?.trim() || tournament.prizePool || tournament.prizeBreakdown?.trim());
 }
 
 function PrizeSection({
@@ -283,37 +284,16 @@ function PrizeSection({
             <span style={{ display: 'inline-flex', marginRight: 12 }} aria-hidden="true">
               <Trophy size={20} className="tm-medal-gold" strokeWidth={2} />
             </span>
-            <span style={{ flex: 1, fontSize: 14, fontWeight: 700, color: 'var(--text-strong)' }}>총 상금</span>
+            <span style={{ flex: 1, fontSize: 14, fontWeight: 700, color: 'var(--text-strong)' }}>상금·상품 총규모</span>
             <span style={{ fontSize: 18, fontWeight: 900, color: 'var(--blue700)', letterSpacing: '-0.01em' }}>{formatEntryFee(tournament.prizePool)}</span>
           </div>
         )}
 
-        {/* 순위별 상금 배분 — 금액 행은 강조 스타일, 물품(goods) 행은 일반 텍스트로 우측에 표시 */}
-        {rows.length > 0 && rows.map((row, idx) => {
-          const posNum = row.label.match(/^(\d+)위$/)?.[1];
-          const teamName = posNum ? teamByPos[Number(posNum)] : undefined;
-          const isAmount = isPrizeAmountValue(row.amount);
-          return (
-            <div key={idx} style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', borderTop: idx > 0 || tournament.prizePool ? '1px solid var(--grey100)' : 'none' }}>
-              <span style={{ display: 'inline-flex', marginRight: 12, flexShrink: 0 }} aria-hidden="true">
-                <PrizeRankIcon label={row.label} />
-              </span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-strong)' }}>{row.label}</div>
-                {teamName && (
-                  <div style={{ fontSize: 12, color: 'var(--text-caption)', marginTop: 1 }}>{teamName}</div>
-                )}
-              </div>
-              {row.amount && (
-                isAmount ? (
-                  <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-strong)', letterSpacing: '-0.01em', flexShrink: 0 }}>{formatPrizeRowValue(row.amount)}</span>
-                ) : (
-                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-caption)', flexShrink: 0, marginLeft: 12, textAlign: 'right', maxWidth: '55%' }}>{row.amount}</span>
-                )
-              )}
-            </div>
-          );
-        })}
+        {rows.length > 0 && (
+          <div style={{ padding: '16px 20px' }}>
+            <GroupedPrizes rows={rows} teamByPosition={teamByPos} />
+          </div>
+        )}
 
         {/* prizeSummary */}
         {tournament.prizeSummary?.trim() && (
@@ -328,7 +308,7 @@ function PrizeSection({
   );
 }
 /**
- * 회고 STATS-1 — 수상 페이지의 개인 득점·도움 랭킹. 리그 수상 페이지가 순위
+ * 수상 페이지의 개인 득점 랭킹. 리그 수상 페이지가 순위
  * 데이터를 함께 보여주는 패턴의 대회판이며, 어워드(수상자)가 "왜 그 사람인지"를
  * 옆에서 뒷받침한다. 기록이 없으면 안내 문구를 보여준다.
  */
@@ -347,13 +327,10 @@ function PlayerRecordsSection({ tournamentId, isRegularLeague }: { tournamentId:
   const goals = isRegularLeague
     ? withProfileHref(leagueRecords.data?.goals ?? [])
     : withProfileHref(tournamentRecords.data?.goals);
-  const assists = isRegularLeague
-    ? withProfileHref(leagueRecords.data?.assists ?? [])
-    : withProfileHref(tournamentRecords.data?.assists);
   return (
     <TournamentPlayerRecordsSections
       goals={goals?.slice(0, 10)}
-      assists={assists?.slice(0, 10)}
+      assists={[]}
       hiddenByEligibility={records.data?.hiddenByEligibility ?? false}
       isLoading={records.isLoading}
       isError={records.isError}

@@ -470,6 +470,6 @@ describe('RecordedEventList — 운영진 실명', () => {
     const row = within(screen.getByRole('list', { name: '기록된 이벤트 목록' })).getByRole('listitem');
     expect(row).toHaveTextContent(text);
     // 이름이 길어져도 두 줄에서 자르지 않는다.
-    expect(screen.getByText(new RegExp(text.replace(/[()]/g, '\\$&'))).closest('p')).not.toHaveClass('line-clamp-2');
+    expect(screen.getByText(text, { exact: true }).closest('p')).not.toHaveClass('line-clamp-2');
   });
 });

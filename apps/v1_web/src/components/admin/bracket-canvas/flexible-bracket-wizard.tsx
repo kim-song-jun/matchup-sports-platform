@@ -12,6 +12,7 @@ import { useV1ApplyBracketTemplate } from '@/hooks/use-v1-bracket-canvas';
 import { V1ApiError, v1Get, v1Post, v1Put } from '@/lib/api-client';
 import { extractErrorMessage } from '@/lib/error-message';
 import { randomUuid } from '@/lib/uuid';
+import { randomIndex } from '@/lib/random-index';
 import { distributeGroupSeeds } from '@/lib/seeded-group-assignment';
 import type { FlexibleBracketInput, FlexibleBracketPreview } from '@/types/api';
 import type { BracketTemplateDialogProps } from './bracket-template-dialog';
@@ -114,7 +115,7 @@ export function FlexibleBracketWizard(props: BracketTemplateDialogProps & { onLe
       setError('시드는 1번부터 빈 순서 없이 선택해 주세요.'); return;
     }
     const ids = teams.map((team) => team.id);
-    for (let i = ids.length - 1; i > 0; i--) { const j = draw() % (i + 1); [ids[i], ids[j]] = [ids[j], ids[i]]; }
+    for (let i = ids.length - 1; i > 0; i--) { const j = randomIndex(i + 1); [ids[i], ids[j]] = [ids[j], ids[i]]; }
     try { setAssignments(seeded ? distributeGroupSeeds(groups.map(group => group.capacity), groupSeeds.filter(Boolean), ids) : ids); mark(); }
     catch (e) { setError(extractErrorMessage(e, '시드 배정을 확인해 주세요.')); }
   }

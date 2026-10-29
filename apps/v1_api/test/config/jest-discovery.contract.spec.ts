@@ -72,9 +72,9 @@ describe('v1_api Jest integration discovery contract', () => {
     try {
       const receipt = join(directory, 'worker-pids');
       for (const name of ['first', 'second']) {
-        writeFileSync(join(directory, `${name}.test.js`), `const fs = require('node:fs'); test('executes ${name}', () => fs.appendFileSync(${JSON.stringify(receipt)}, process.pid + '\\n'));`);
+        writeFileSync(join(directory, `${name}.test.js`), "const fs = require('node:fs'); test('executes worker contract', () => fs.appendFileSync(global.workerPidReceipt, process.pid + '\\n'));\n");
       }
-      const config = { projects: [{ displayName: 'integration', rootDir: directory, testMatch: ['<rootDir>/*.test.js'], testEnvironment: 'node' }] };
+      const config = { projects: [{ displayName: 'integration', rootDir: directory, testMatch: ['<rootDir>/*.test.js'], testEnvironment: 'node', globals: { workerPidReceipt: receipt } }] };
       // A tiny threshold proves real worker recycling without allocating a gigabyte in the test itself.
       const args = integrationArgs.filter(arg => !arg.startsWith('--workerIdleMemoryLimit='));
       const result = JSON.parse(runJestResolver(...args, '--workerIdleMemoryLimit=1MB', '--config', JSON.stringify(config), '--json')) as { numPassedTests: number; numFailedTests: number };

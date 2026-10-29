@@ -4,6 +4,7 @@ import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import userEvent from '@testing-library/user-event';
 import type { V1TournamentDetail } from '@/types/api';
 import { TournamentDetailView } from './tournament-detail-client';
 
@@ -123,7 +124,8 @@ function contrast(a: string, b: string) {
 }
 
 describe('actual tournament prize caption contrast', () => {
-  it.each(['open', 'completed'] as const)('%s 상세에서 반복 시상을 묶고 종료 후에만 결과 링크를 표시한다', (status) => {
+  it.each(['open', 'completed'] as const)('%s 상세에서 반복 시상을 묶고 종료 후에만 결과 링크를 표시한다', async (status) => {
+    const user = userEvent.setup();
     renderPage(<TournamentDetailView tournament={makeTournament({
       id: 'synthetic-grouped-prize', status, format: 'knockout',
       prizeSummary: '총 800만원 상당의 상금 및 상품',
@@ -133,9 +135,15 @@ describe('actual tournament prize caption contrast', () => {
     expect(within(region).getAllByText('우승', { exact: true })).toHaveLength(1);
     expect(within(region).getByText('우승').parentElement).toHaveTextContent('트로피');
     expect(within(region).getByText('우승').parentElement).toHaveTextContent('1,000,000원');
+    expect(within(region).queryByText('MVP', { exact: true })).not.toBeInTheDocument();
+    expect(within(region).getAllByRole('listitem')).toHaveLength(2);
+    await user.click(within(region).getByRole('button', { name: '상품 전체 보기 (총 5개)' }));
     expect(within(region).getAllByText('MVP', { exact: true })).toHaveLength(1);
     expect(within(region).getByText('MVP').parentElement).toHaveTextContent('트레이닝복');
     expect(within(region).getByText('MVP').parentElement).toHaveTextContent('삭스');
+    await user.click(within(region).getByRole('button', { name: '접기' }));
+    expect(within(region).getAllByRole('listitem')).toHaveLength(2);
+    expect(within(region).queryByText('MVP', { exact: true })).not.toBeInTheDocument();
     const link = within(region).queryByRole('link', { name: '시상 결과 보기 →' });
     if (status === 'completed') expect(link).toHaveAttribute('href', '/tournaments/synthetic-grouped-prize/awards');
     else expect(link).not.toBeInTheDocument();

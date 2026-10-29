@@ -31,8 +31,9 @@ export function TournamentPrizeList({ rows }: { rows: readonly PrizeRow[] }) {
           <section key={category} aria-label={category} style={{ marginBottom: 16, borderTop: categoryIndex ? '1px solid var(--tint-orange-border)' : undefined, paddingTop: categoryIndex ? 16 : undefined }}>
             <h3 className="tm-text-label" style={{ margin: '0 0 12px', color: 'var(--text-strong)', fontWeight: 700 }}>{category}</h3>
             {categoryAwards.map((award) => (
-              <div key={award.label} style={{ marginBottom: 12 }}>
-                <strong className="tm-text-caption" style={{ display: 'block', color: 'var(--text-strong)', marginBottom: 8 }}>{award.label}</strong>
+              <dl key={award.label} style={{ margin: '0 0 12px' }}><div>
+                <dt className="tm-text-caption" style={{ display: 'block', color: 'var(--text-strong)', fontWeight: 700, marginBottom: 8 }}>{award.label}</dt>
+                <dd style={{ margin: 0 }}>
                 <ul aria-label={`${category} · ${award.label}`} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: 8, margin: 0, padding: 0, listStyle: 'none' }}>
                   {award.amounts.slice().sort((a, b) => formatPrizeRowValue(a.amount).length - formatPrizeRowValue(b.amount).length).map(({ amount, preview }, itemIndex) => (
                     <li key={itemIndex} hidden={!expanded && !preview} className="tm-on-tint tm-text-caption" style={{ display: !expanded && !preview ? 'none' : undefined, flex: '0 1 auto', minWidth: 0, maxWidth: '100%', padding: '4px 12px', borderRadius: 'var(--radius-container)', background: 'var(--tint-orange)', border: '1px solid var(--tint-orange-border)', color: 'var(--text-body)', overflowWrap: 'anywhere', wordBreak: 'keep-all', whiteSpace: 'normal', lineHeight: 1.6 }}>
@@ -40,7 +41,8 @@ export function TournamentPrizeList({ rows }: { rows: readonly PrizeRow[] }) {
                     </li>
                   ))}
                 </ul>
-              </div>
+                </dd>
+              </div></dl>
             ))}
           </section>
         ))}

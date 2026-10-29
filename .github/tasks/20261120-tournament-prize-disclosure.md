@@ -67,3 +67,11 @@ Created: 2026-10-29
 - First full typecheck failed only on missing validator/isISO8601 and validator/isEmail links in the reused old local installation. The latest package.json already pins validator 13.15.26 and @types/validator 13.15.10. Replaced the PR worktree's app node_modules link with worktree-local dependency symlinks and linked these exact already-installed versions; no tracked dependencies or shared installations were modified. Rechecking after this environment correction.
 
 - Final typecheck: tsc --noEmit --incremental false PASS after correcting worktree-local validator dependency links. Pattern gate initially required an unsandboxed shell and then caught the required tm-on-tint class; applied that shared tint class and reran successfully. Full v1-pattern-check PASS.
+
+
+## PR #2093 monitoring
+- Initial Gates failed because this behavior change omitted a PR-owned changeset. Added `.changeset/tournament-prize-compact-disclosure.md` (v1_web patch), and the release-policy CLI accepts the intended PR paths.
+- Initial Web suite: 9921 passed / 4 failed, all in existing tournament-prize-caption-contrast.test.tsx. Updated the actual detail flow assertions to open personal awards through the button before checking MVP and verify collapse keeps all team items. Restored semantic dl/dt/dd award-name/value markup to preserve the existing accessibility/contrast contract.
+- Existing API migration replay/drift completed successfully; API unit tests were still running during the first monitoring pass. No reviewer comments or review decision yet.
+
+- Monitoring fix verification: failed detail contrast/disclosure suite 7 + prize component 4 = 11/11 PASS, changeset policy PASS, v1 pattern gate PASS, scoped diff/debt check clean.

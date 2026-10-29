@@ -3,6 +3,7 @@ import { useId, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { SectionTitle } from '@/components/v1-ui/primitives';
+import { SixTeamBracketLayout, SixTeamBye } from '@/components/tournaments/six-team-bracket-layout';
 import { Button } from '@/components/v1-ui/button';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
@@ -137,10 +138,22 @@ export function SixTeamTemplateDialog(
             )}
           </fieldset>
           {preview && (
-            <p role="status" className="tm-text-body mb-4">
+            <div className="mb-4 space-y-4">
+            <p role="status" className="tm-text-body">
               6강 3경기 → 결승 직행팀 선정 → 준결승 1경기 → 결승 1경기 · 총{' '}
               {preview.counts.fixtures}경기
             </p>
+            <SixTeamBracketLayout
+              first={<div className="space-y-4">{[0, 1, 2].map(index => <div key={index} className="space-y-2 rounded-xl border border-[var(--border)] p-4">
+                <p className="tm-text-caption">6강 {index + 1}경기</p>
+                <p className="tm-text-label">{confirmed.find(team => team.id === assignments[index * 2])?.teamName}</p>
+                <p className="tm-text-label">{confirmed.find(team => team.id === assignments[index * 2 + 1])?.teamName}</p>
+              </div>)}</div>}
+              semifinal={<div className="space-y-2 rounded-xl border border-[var(--border)] p-4"><p className="tm-text-label">6강 승리팀 중 선정</p><p className="tm-text-label">6강 승리팀 중 선정</p></div>}
+              bye={<SixTeamBye name="선정 대기" pending />}
+              final={<div className="space-y-2 rounded-xl border border-[var(--border)] p-4"><p className="tm-text-label">결승 직행팀</p><p className="tm-text-label">준결승 승리팀</p></div>}
+            />
+            </div>
           )}
           {error && (
             <p

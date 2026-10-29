@@ -74,3 +74,5 @@ main-only 승격 머지 커밋을 release 준비 브랜치를 통해 dev에 흡�
 - Acceptance: targeted tests green, fresh dev PR CI and CodeQL green, release metadata consumed, alpha matches resulting dev, and revalidated main PR checks before merge.
 - Progress: local fixes prepared on fix/main-codeql-2098. Next: narrow validation and publish dev remediation PR. Security findings are not waived by the separate-review waiver.
 - Local validation PASS: frontend 3 files / 43 tests (random rejection, wizard, recorded event list); actual backend worker-recycling contract 1 test (10 unrelated cases intentionally excluded); frontend lint/typecheck PASS. No visual layout or API/DB contract changes. Touched source debt-marker grep clean.
+
+- Remediation PR #2099 (base=dev), pinned head 49e9c6932ef8d3e8e1dfbc28ce4f0a743201f394; CI 40890144186 pending. Main #2098 remains unmerged. Follow-up release/version candidate prepared independently on chore/release-codeql-1.12.2 via Changesets CLI 2.30.0: fixed API/Web 1.12.2 and one consumed Web patch; no extra runtime changes. Publish metadata PR only after #2099 merges and its ancestry is integrated.

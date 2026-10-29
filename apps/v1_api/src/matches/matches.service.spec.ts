@@ -807,6 +807,33 @@ describe('MatchesService', () => {
     ]);
   });
 
+  // 2026-10-29: 레벨 조건을 객체로 펼쳐 위 공개 범위 OR 를 덮어썼다 — 레벨만 골라도 종료·취소 매치가 나왔다.
+  it('list: 레벨 필터는 공개 범위 OR 를 남긴 채 AND 로 더한다', async () => {
+    prisma.v1Match.findMany.mockResolvedValue([]);
+
+    await service.list(null, { levelCodes: 'beginner' });
+
+    const where = prisma.v1Match.findMany.mock.calls[0][0].where;
+    expect(where.OR).toContainEqual(expect.objectContaining({ status: 'completed' }));
+    expect(where.AND).toContainEqual({
+      OR: [{
+        minSportLevel: { is: { code: { in: ['beginner'] } } },
+        maxSportLevel: { is: { code: { in: ['beginner', 'novice', 'intermediate', 'advanced'] } } },
+      }],
+    });
+  });
+
+  it('list: 검색어는 지역명도 찾는다', async () => {
+    prisma.v1Match.findMany.mockResolvedValue([]);
+
+    await service.list(null, { query: '마포' });
+
+    const where = prisma.v1Match.findMany.mock.calls[0][0].where;
+    expect(where.AND).toContainEqual({
+      OR: expect.arrayContaining([{ region: { name: { contains: '마포', mode: 'insensitive' } } }]),
+    });
+  });
+
   // 2026-10-21: 서버가 상태 묶음 순서(진행 중 → 신청 가능 → 경기 예정 → 신청 마감 → 끝난 경기)로 페이지를 채운다.
   // 첫 조회(select)는 공개 범위 전체로 묶음을 정하고, 묶음마다 id 목록으로 읽는다 — 이 mock 은 Prisma 처럼 커서 행을
   // where 와 무관하게 찾아 그 자리부터 읽고 take 만큼 돌려준다(정렬은 넘긴 행 순서를 그대로 쓴다).

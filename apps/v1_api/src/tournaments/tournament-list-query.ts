@@ -86,6 +86,12 @@ function buildFilterSql(query: TournamentListQueryDto): Prisma.Sql {
   if (query.dateFrom || query.dateTo) conditions.push(Prisma.sql`t.scheduled_at IS NOT NULL`);
   if (query.dateFrom) conditions.push(Prisma.sql`COALESCE(t.scheduled_end_at, t.scheduled_at) >= ${new Date(`${query.dateFrom}T00:00:00+09:00`)}`);
   if (query.dateTo) conditions.push(Prisma.sql`t.scheduled_at <= ${new Date(`${query.dateTo}T23:59:59.999+09:00`)}`);
+  // 개최 가까운 순은 일정이 끝난 대회를 뺀다 — 시작일 오름차순이라 지난 대회가 앞을 채웠다(2026-10-29 사용자 확정).
+  // 진행 중과 날짜 미정은 남긴다. 일정 칼럼은 UTC라 UTC로 비교한다.
+  if (query.sort === 'scheduled') {
+    conditions.push(Prisma.sql`t.status::text NOT IN ('completed', 'cancelled')
+      AND (t.scheduled_at IS NULL OR COALESCE(t.scheduled_end_at, t.scheduled_at) >= (now() AT TIME ZONE 'UTC'))`);
+  }
   return Prisma.join(conditions, ' AND ');
 }
 

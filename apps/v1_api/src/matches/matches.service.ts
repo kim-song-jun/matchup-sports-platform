@@ -18,7 +18,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { PlaceProvider, PlaceView, resolvePlaceSnapshot, toPlaceColumns, toPlaceView } from '../places/place-snapshot';
 import { PrismaService } from '../prisma/prisma.service';
 import { assertCreatorProfileComplete } from '../profile/creator-profile.guard';
-import { formatLevelRange, levelCodeWhere, parseLevelCodes, resolveSportLevelRange } from '../sports/level-range';
+import { formatLevelRange, levelCodeConstraints, parseLevelCodes, resolveSportLevelRange } from '../sports/level-range';
 import {
   ApproveMatchApplicationDto,
   ChangeMatchParticipantDto,
@@ -175,9 +175,12 @@ export class MatchesService {
               { title: { contains: query.query, mode: 'insensitive' } },
               { description: { contains: query.query, mode: 'insensitive' } },
               { placeName: { contains: query.query, mode: 'insensitive' } },
+              // 검색창 placeholder 가 "지역"을 약속한다 — 팀매치 검색과 같은 범위로 지역명도 훑는다.
+              { region: { name: { contains: query.query, mode: 'insensitive' } } },
             ],
           } satisfies Prisma.V1MatchWhereInput]
         : []),
+      ...levelCodeConstraints(parseLevelCodes(query.levelCodes)),
     ];
     return {
       deletedAt: null,
@@ -229,7 +232,6 @@ export class MatchesService {
         ? { region: { OR: [{ id: query.regionId }, { parentId: query.regionId }] } }
         : {}),
       ...(query.genderRule ? { genderRule: getGenderRuleWhere(query.genderRule) } : {}),
-      ...levelCodeWhere(parseLevelCodes(query.levelCodes)),
       ...(constraints.length ? { AND: constraints } : {}),
     };
   }

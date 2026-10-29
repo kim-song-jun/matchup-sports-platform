@@ -72,12 +72,15 @@ describe('대회·리그 탐색 (real DB)', () => {
     const result = await read.list({ kind: 'tournament', sportId, genderCategory: 'mixed', format: 'knockout', feeMax: 0, registration: 'open' });
     expect(result.items.map((item) => item.id)).toEqual([ids.available]);
   });
-  it('개최 정렬과 cursor가 중복·누락 없이 이어진다', async () => {
-    await prisma.v1Tournament.update({ where: { id: ids.activeLeague }, data: { scheduledAt: new Date('2099-09-01') } });
-    const first = await read.list({ kind: 'league', sportId, sort: 'scheduled', limit: 1 });
+  it('개최 정렬은 일정이 끝난 대회를 빼고 cursor가 중복·누락 없이 이어진다', async () => {
+    // 시작은 지났어도 일정이 남은 진행 중 리그는 남는다. 끝난 일정(종료일 또는 종료일 없는 시작일)과 종료 상태는 빠진다.
+    await prisma.v1Tournament.update({ where: { id: ids.activeLeague }, data: { scheduledAt: new Date('2000-01-01') } });
+    await prisma.v1Tournament.update({ where: { id: ids.fullLeague }, data: { scheduledAt: new Date('2000-01-01'), scheduledEndAt: new Date('2000-01-02') } });
+    await prisma.v1Tournament.update({ where: { id: ids.closedLeague }, data: { scheduledAt: new Date('2000-01-01'), scheduledEndAt: null } });
+    const first = await read.list({ kind: 'league', sportId, sort: 'scheduled', limit: 1, withTotal: 'true' });
     expect(first.items[0].id).toBe(ids.activeLeague);
+    expect(first.pageInfo.total).toBe(4);
     const second = await read.list({ kind: 'league', sportId, sort: 'scheduled', limit: 10, cursor: first.pageInfo.nextCursor! });
-    expect(second.items).toHaveLength(6);
-    expect(second.items.some((item) => item.id === ids.activeLeague)).toBe(false);
+    expect(second.items.map((item) => item.id).sort()).toEqual([ids.draftLeague, ids.openLeague, ids.noDeadlineLeague].sort());
   });
 });

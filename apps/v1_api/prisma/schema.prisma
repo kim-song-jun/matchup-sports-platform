@@ -1927,6 +1927,9 @@ model V1TeamMatch {
   /// 대진 편집기의 자리(V1TournamentSlot). 대회·정규 리그 경기가 같은 컬럼을 쓴다.
   homeSlotId                 String?           @map("home_slot_id")
   awaySlotId                 String?           @map("away_slot_id")
+  /// 대회·리그 경기 하나만 피리어드를 바꿨다는 표시. true 면 competitionConfigVersionId 가 이 경기 전용
+  /// 피리어드 버전이고, 조·단계·대회 기본 피리어드가 바뀌어도 따라가지 않는다.
+  periodOverride             Boolean           @default(false) @map("period_override")
 
   hostTeam              V1Team?                     @relation("V1HostTeamMatches", fields: [hostTeamId], references: [id], onDelete: Restrict)
   createdByUser         V1User?                     @relation("V1TeamMatchCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
@@ -3070,10 +3073,15 @@ model V1TournamentGroup {
   sortOrder    Int                    @default(0) @map("sort_order")
   // 이 조에서 상위 몇 팀이 다음 단계로 진출하는지(조별리그 진출선 표시용). null이면 진출 표시 없음.
   advanceCount Int?                   @map("advance_count")
+  /// 조별리그 조 하나의 피리어드 재정의. 둘 다 null 이면 단계(조별리그) 설정 → 대회 기본값을 따른다.
+  /// competitionConfigVersionId 는 대회 기본 규칙에 이 피리어드만 바꾼 immutable 버전이다.
+  periods                    Json?
+  competitionConfigVersionId String?                @map("competition_config_version_id")
   createdAt    DateTime               @default(now()) @map("created_at")
   updatedAt    DateTime               @updatedAt @map("updated_at")
 
   tournament V1Tournament            @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  competitionConfig V1CompetitionConfigVersion? @relation("V1TournamentGroupPeriodCompetitionConfig", fields: [competitionConfigVersionId], references: [id], onDelete: Restrict, map: "v1_tournament_groups_competition_config_fk")
   tournamentMatchDetails V1TournamentMatchDetails[]
   groupTeams V1TournamentGroupTeam[]
   byeSlots   V1TournamentByeSlot[]
@@ -3084,6 +3092,7 @@ model V1TournamentGroup {
   @@unique([tournamentId, name], map: "v1_tournament_groups_tournament_id_name_key")
   @@unique([tournamentId, id], map: "v1_tournament_groups_tournament_id_id_key")
   @@index([tournamentId, phase, sortOrder])
+  @@index([competitionConfigVersionId], map: "v1_tournament_groups_competition_config_idx")
   @@map("v1_tournament_groups")
 }
 
@@ -3957,6 +3966,7 @@ model V1CompetitionConfigVersion {
   teamMatches     V1TeamMatch[]             @relation("V1TeamMatchCompetitionConfig")
   tournaments     V1Tournament[]            @relation("V1TournamentCompetitionConfig")
   tournamentStagePeriodSettings V1TournamentStagePeriodSetting[] @relation("V1TournamentStagePeriodCompetitionConfig")
+  tournamentGroups V1TournamentGroup[] @relation("V1TournamentGroupPeriodCompetitionConfig")
 
   @@unique([sportCode, name, version])
   @@map("v1_competition_config_versions")

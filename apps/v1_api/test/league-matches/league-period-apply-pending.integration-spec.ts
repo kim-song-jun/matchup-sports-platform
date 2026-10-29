@@ -118,4 +118,31 @@ describe('리그 피리어드 설정이 시작 전 경기에 반영된다', () =
     // 이미 맞춰진 뒤 또 저장하면 옮길 경기가 없다.
     expect((await savePeriods(leagueId, [15])).fixturesRepointed).toBe(0);
   });
+
+  it('경기 하나만 단판으로 바꾸면 리그 기본값을 바꿔도 그 경기는 그대로고, 위 설정 따르기로 다시 따라간다', async () => {
+    const { leagueId, teamMatchIds } = await leagueWithFixtures('경기별 시간 리그');
+    const [singleId, otherId] = teamMatchIds;
+    const patchMatch = async (body: Record<string, unknown>) => {
+      const current = await request(server()).get(`/api/v1/admin/tournaments/${leagueId}/periods`).set('x-v1-user-id', ownerUserId).expect(200);
+      return request(server()).patch(`/api/v1/admin/tournaments/${leagueId}/periods`).set('x-v1-user-id', ownerUserId)
+        .send({ expectedVersion: current.body.data.expectedVersion, teamMatchId: singleId, ...body }).expect(200);
+    };
+    const leagueBefore = await prisma.v1Tournament.findUniqueOrThrow({ where: { id: leagueId }, select: { competitionConfigVersionId: true } });
+
+    await patchMatch({ periods: [{ durationMinutes: 30 }] });
+    expect((await gameOf(singleId)).periods).toEqual([{ number: 1, state: 'SCHEDULED' }]);
+    // 경기 하나를 바꿔도 리그 기본 설정은 그대로다.
+    expect(await prisma.v1Tournament.findUniqueOrThrow({ where: { id: leagueId }, select: { competitionConfigVersionId: true } })).toEqual(leagueBefore);
+    const read = await request(server()).get(`/api/v1/admin/tournaments/${leagueId}/periods/matches/${singleId}`).set('x-v1-user-id', ownerUserId).expect(200);
+    expect(read.body.data).toMatchObject({ overridden: true, editable: true, inherited: { source: 'default' } });
+
+    await savePeriods(leagueId, [25, 25]);
+    expect((await gameOf(singleId)).periods).toHaveLength(1);
+    expect((await gameOf(otherId)).periods).toHaveLength(2);
+
+    await patchMatch({ inheritDefault: true });
+    const single = await gameOf(singleId);
+    expect(single.periods).toHaveLength(2);
+    expect(single.competitionConfigVersionId).toBe((await gameOf(otherId)).competitionConfigVersionId);
+  });
 });

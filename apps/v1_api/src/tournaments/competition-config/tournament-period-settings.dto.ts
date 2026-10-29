@@ -1,6 +1,6 @@
 import { Type } from 'class-transformer';
 import { V1TournamentGroupPhase } from '@prisma/client';
-import { ArrayMinSize, IsArray, IsBoolean, IsEnum, IsInt, IsOptional, IsString, Min, ValidateIf, ValidateNested } from 'class-validator';
+import { ArrayMinSize, IsArray, IsBoolean, IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, Min, ValidateIf, ValidateNested } from 'class-validator';
 
 export class TournamentPeriodSettingDto {
   @Type(() => Number)
@@ -18,7 +18,19 @@ export class UpdateTournamentPeriodSettingsDto {
   @IsEnum(V1TournamentGroupPhase)
   phase?: V1TournamentGroupPhase;
 
-  /** 단계 재정의를 지우고 대회 기본값을 다시 상속한다. 기본값 수정에는 사용할 수 없다. */
+  /** 조별리그 조 하나의 재정의만 바꾼다. phase·teamMatchId 와 함께 쓸 수 없다. */
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  groupId?: string;
+
+  /** 시작 전 경기 하나의 재정의만 바꾼다. phase·groupId 와 함께 쓸 수 없다. */
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  teamMatchId?: string;
+
+  /** 단계·조·경기 재정의를 지우고 위 설정을 다시 상속한다. 기본값 수정에는 사용할 수 없다. */
   @IsOptional()
   @IsBoolean()
   inheritDefault?: boolean;

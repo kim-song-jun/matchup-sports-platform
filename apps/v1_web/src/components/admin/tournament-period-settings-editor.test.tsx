@@ -15,7 +15,7 @@ const { state } = vi.hoisted(() => {
     ],
     legacyPeriodCount: null,
     requiresDurationInput: false,
-    stageOverrides: [],
+    stageOverrides: [], groupOverrides: [],
   };
   return { state: { settings, mutate: vi.fn(), refetch: vi.fn() } };
 });
@@ -170,7 +170,7 @@ describe('TournamentPeriodSettingsEditor', () => {
         { code: 'FIRST_HALF', label: '전반', durationMinutes: 45, extraTime: false },
         { code: 'SECOND_HALF', label: '후반', durationMinutes: 45, extraTime: false },
       ],
-      stageOverrides: [],
+      stageOverrides: [], groupOverrides: [],
     };
     state.mutate.mockClear();
     const showToast = vi.fn();
@@ -275,7 +275,7 @@ describe('TournamentPeriodSettingsEditor', () => {
       periods: null,
       legacyPeriodCount: 3,
       requiresDurationInput: true,
-      stageOverrides: [],
+      stageOverrides: [], groupOverrides: [],
     };
     const showToast = vi.fn();
     render(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={showToast} />);

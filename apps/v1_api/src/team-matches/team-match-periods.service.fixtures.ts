@@ -36,7 +36,7 @@ export async function teamMatchPeriodsFixture() {
   const configs = new Map<string, ConfigRow>([[baseConfig.id, baseConfig]]);
   const tournament = {
     id: 'tournament-periods', kind: 'regular_tournament', deletedAt: null,
-    competitionConfigVersionId: baseConfig.id, updatedAt: version, stagePeriodSettings: [],
+    competitionConfigVersionId: baseConfig.id, updatedAt: version, stagePeriodSettings: [], groups: [],
   };
   const stagePeriodSettings: Array<{
     id: string; tournamentId: string; phase: 'group' | 'final'; periods: Prisma.JsonValue;

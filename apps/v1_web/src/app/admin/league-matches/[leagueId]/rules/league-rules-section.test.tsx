@@ -28,7 +28,7 @@ function periodSettingsOf(minutes: number[]) {
       legacyPeriodCount: null,
       requiresDurationInput: false,
       kind: 'regular_league',
-      stageOverrides: [],
+      stageOverrides: [], groupOverrides: [],
     },
     isPending: false,
     isError: false,

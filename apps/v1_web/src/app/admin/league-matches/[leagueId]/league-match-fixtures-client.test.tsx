@@ -76,13 +76,17 @@ vi.mock('@/components/admin/bracket-canvas/league-fixture-panel', () => ({
 }));
 
 // League period settings: undefined data by default (editor shows its loading state); tests set a value.
-const { periodSettingsMock, updatePeriodsMutateMock } = vi.hoisted(() => ({
+const { periodSettingsMock, updatePeriodsMutateMock, matchPeriodsMock, updatePeriodsAsyncMock } = vi.hoisted(() => ({
   periodSettingsMock: vi.fn(),
   updatePeriodsMutateMock: vi.fn(),
+  // 경기 수정 창의 경기 방식 칸 — 기본은 불러오는 중이고, 경기 방식 테스트만 값을 넣는다.
+  matchPeriodsMock: vi.fn(() => ({ data: undefined, isPending: true, isError: false })),
+  updatePeriodsAsyncMock: vi.fn(),
 }));
 vi.mock('@/hooks/use-tournament-period-settings', () => ({
   useTournamentPeriodSettings: periodSettingsMock,
-  useUpdateTournamentPeriodSettings: () => ({ mutate: updatePeriodsMutateMock, isPending: false, error: null }),
+  useTournamentMatchPeriods: matchPeriodsMock,
+  useUpdateTournamentPeriodSettings: () => ({ mutate: updatePeriodsMutateMock, mutateAsync: updatePeriodsAsyncMock, isPending: false, error: null }),
 }));
 
 function periodSettingsOf(minutes: number[]) {
@@ -1118,6 +1122,34 @@ describe('LeagueMatchFixturesClient', () => {
 
       expect(await screen.findByText('경기를 저장했어요.')).toBeInTheDocument();
       await waitFor(() => expect(screen.queryByRole('dialog', { name: '경기 수정' })).toBeNull());
+    });
+
+    it('경기 방식만 단판으로 바꾸면 그 경기에만 저장하고, 경기 PATCH 없이 알린다', async () => {
+      const period = (durationMinutes: number, code: string, label: string) => ({ code, label, durationMinutes, extraTime: false });
+      matchPeriodsMock.mockReturnValue({
+        data: {
+          tournamentId: 'league-1', teamMatchId: 'tm-1', expectedVersion: 'v-1', overridden: false, editable: true,
+          periods: [period(20, 'FIRST_HALF', '전반'), period(20, 'SECOND_HALF', '후반')], legacyPeriodCount: null,
+          inherited: { source: 'default', phase: null, groupName: null, periods: [period(20, 'FIRST_HALF', '전반'), period(20, 'SECOND_HALF', '후반')], legacyPeriodCount: null },
+        },
+        isPending: false, isError: false,
+      } as never);
+      updatePeriodsAsyncMock.mockResolvedValue({});
+      const mutate = vi.fn();
+      const modal = renderOneFixture(mutate);
+
+      const inherit = within(modal).getByRole('radio', { name: /리그 기본값 따르기/ });
+      expect(inherit.closest('label')).toHaveTextContent('리그 기본값 · 전·후반 각 20분');
+      fireEvent.click(within(modal).getByRole('radio', { name: '이 경기만 따로' }));
+      fireEvent.click(within(modal).getByRole('button', { name: '단판' }));
+      expect(within(modal).getByLabelText('단판 (분)')).toHaveValue(40);
+      fireEvent.click(within(modal).getByRole('button', { name: '저장' }));
+
+      await waitFor(() => expect(updatePeriodsAsyncMock).toHaveBeenCalledWith({ expectedVersion: 'v-1', teamMatchId: 'tm-1', periods: [{ durationMinutes: 40 }] }));
+      expect(mutate).not.toHaveBeenCalled();
+      expect(await screen.findByText('경기 방식을 저장했어요.')).toBeInTheDocument();
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: '경기 수정' })).toBeNull());
+      matchPeriodsMock.mockReturnValue({ data: undefined, isPending: true, isError: false });
     });
 
     it('저장에 실패하면 모달이 열린 채 서버 메시지를 보여주고 입력을 잃지 않는다', async () => {

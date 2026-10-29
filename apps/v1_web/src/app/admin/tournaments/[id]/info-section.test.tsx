@@ -38,7 +38,7 @@ vi.mock('@/hooks/use-tournament-period-settings', () => ({
       legacyPeriodCount: null,
       requiresDurationInput: false,
       kind: 'regular_tournament',
-      stageOverrides: [],
+      stageOverrides: [], groupOverrides: [],
     },
     isPending: false,
     isError: false,

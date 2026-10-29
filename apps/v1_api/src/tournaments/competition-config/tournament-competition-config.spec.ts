@@ -23,6 +23,8 @@ describe('TournamentCompetitionConfig', () => {
       v1TournamentStanding: { count: jest.fn().mockResolvedValueOnce(8).mockResolvedValueOnce(options.recordedStandings ?? 0) },
       v1Game: { updateMany: jest.fn().mockResolvedValue({ count: 3 }), findMany: jest.fn().mockResolvedValue(options.existingPeriods ? [{ id: 'game-1', periods: options.existingPeriods }] : []) },
       v1GamePeriod: { createMany: jest.fn(), deleteMany: jest.fn() },
+      v1TournamentMatchDetails: { findMany: jest.fn().mockResolvedValue([]) },
+      v1TournamentGroup: { findMany: jest.fn().mockResolvedValue([]) },
       $executeRaw: jest.fn(),
       $queryRaw: jest.fn().mockResolvedValue([]),
     };

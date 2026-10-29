@@ -11,8 +11,8 @@ import { normalizeCompetitionSportCode } from './competition-config';
 import { ChangeTournamentCompetitionConfigDto } from './competition-config.dto';
 import { ALL_COMPETITION_KINDS, findTournamentOnSurface, findTournamentOnSurfaceOrThrow, TOURNAMENT_KINDS } from '../tournament-surface-lookup';
 import { computePeriodCount } from '../../games/games.service';
-import { competitionStagePhase } from '../tournament-stage-rank';
 import { materializePeriodConfigVersion } from './materialize-period-config-version';
+import { inPeriodScope, loadFixturePeriodRows, type PeriodScope } from './tournament-stage-period-config';
 
 type ConfigCountClient = {
   v1TeamMatch: PrismaService['v1TeamMatch'];
@@ -303,26 +303,18 @@ export class TournamentCompetitionConfig {
       });
       if (changed.count !== 1) throw new ConflictException({ code: 'TOURNAMENT_VERSION_CONFLICT', message: '대회 설정이 다른 요청에서 변경됐어요. 다시 확인해 주세요.' });
       // Existing games, periods, lineups, events and revisions stay pinned.
-      // Only untouched canonical TeamMatches/games follow the new pin.
-      const details = lockedTournament.kind === V1CompetitionKind.regular_league || lockedTournament.stagePeriodSettings.length === 0
-        ? []
-        : await tx.v1TournamentMatchDetails.findMany({
-            where: { tournamentId, teamMatch: { deletedAt: null } },
-            select: { teamMatchId: true, round: true, group: { select: { phase: true } } },
-          });
-      const overridePhases = new Set(lockedTournament.stagePeriodSettings.map((setting) => setting.phase));
-      const defaultMatchIds = details.filter((detail) => {
-        const phase = competitionStagePhase({ phase: detail.group?.phase, round: detail.round });
-        return phase === null || !overridePhases.has(phase);
-      }).map((detail) => detail.teamMatchId);
-      const defaultOwnership = details.length === 0 ? matchOwnership : { ...matchOwnership, id: { in: defaultMatchIds } };
-      let teamMatchesRepointed = await repointUntouchedFixtures(tx, defaultOwnership, selected);
-      for (const setting of lockedTournament.stagePeriodSettings) {
-        const materialized = await materializePeriodConfigVersion(tx, {
-          source: selected,
-          periods: setting.periods,
-          createdByUserId: user.id,
-        });
+      // Only untouched canonical TeamMatches/games follow the new pin. 단계·조 재정의는 자기 피리어드를 지킨 채
+      // 새 규칙 위에 다시 만들고, 각 재정의를 따르는 경기만 그 버전으로 옮긴다. 경기별 재정의는 옮기지 않는다 —
+      // 대회·리그 경기는 만들 때 명단 행이 함께 생겨 여기서 옮길 수 있는(명단 없는) 경기가 아니다.
+      const stagePhases = new Set(lockedTournament.stagePeriodSettings.map((setting) => setting.phase));
+      const fixtures = await loadFixturePeriodRows(tx, { tournamentId, kind: lockedTournament.kind, ownership: matchOwnership });
+      const hasOverrides = stagePhases.size > 0 || fixtures.some((fixture) => fixture.groupOverridden || fixture.matchOverridden);
+      const scopeOwnership = (scope: PeriodScope): Prisma.V1TeamMatchWhereInput => scope.kind === 'default' && !hasOverrides ? matchOwnership : {
+        ...matchOwnership,
+        id: { in: fixtures.filter((fixture) => inPeriodScope(fixture, scope, stagePhases)).map((fixture) => fixture.teamMatchId) },
+      };
+      const rebase = async (periods: Prisma.JsonValue, scope: Record<string, string>) => {
+        const materialized = await materializePeriodConfigVersion(tx, { source: selected, periods, createdByUserId: user.id });
         if (materialized.created) {
           await tx.v1AdminActionLog.create({ data: {
             adminUserId: admin.id,
@@ -334,22 +326,31 @@ export class TournamentCompetitionConfig {
               version: materialized.version.version,
               contentHash: materialized.version.contentHash,
               tournamentId,
-              phase: setting.phase,
+              ...scope,
               reason: 'stage_period_rebase',
             },
           } });
         }
+        return materialized.version;
+      };
+      let teamMatchesRepointed = await repointUntouchedFixtures(tx, scopeOwnership({ kind: 'default' }), selected);
+      for (const setting of lockedTournament.stagePeriodSettings) {
+        const version = await rebase(setting.periods, { phase: setting.phase });
         await tx.v1TournamentStagePeriodSetting.update({
           where: { id: setting.id },
-          data: { competitionConfigVersionId: materialized.version.id },
+          data: { competitionConfigVersionId: version.id },
         });
-        const stageMatchIds = details.filter((detail) => competitionStagePhase({ phase: detail.group?.phase, round: detail.round }) === setting.phase)
-          .map((detail) => detail.teamMatchId);
-        teamMatchesRepointed += await repointUntouchedFixtures(
-          tx,
-          { ...matchOwnership, id: { in: stageMatchIds } },
-          materialized.version,
-        );
+        teamMatchesRepointed += await repointUntouchedFixtures(tx, scopeOwnership({ kind: 'stage', phase: setting.phase }), version);
+      }
+      const overriddenGroups = lockedTournament.kind === V1CompetitionKind.regular_league ? [] : await tx.v1TournamentGroup.findMany({
+        where: { tournamentId, competitionConfigVersionId: { not: null } },
+        select: { id: true, periods: true },
+      });
+      for (const group of overriddenGroups) {
+        if (group.periods === null) continue;
+        const version = await rebase(group.periods, { groupId: group.id });
+        await tx.v1TournamentGroup.update({ where: { id: group.id }, data: { competitionConfigVersionId: version.id } });
+        teamMatchesRepointed += await repointUntouchedFixtures(tx, scopeOwnership({ kind: 'group', groupId: group.id }), version);
       }
       await this.adminContext.logAdminAction(
         admin,

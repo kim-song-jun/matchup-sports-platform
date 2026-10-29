@@ -1407,6 +1407,7 @@ export default function LeagueMatchFixturesClient({
           }
           isSubmitting={updateFixture.isPending}
           onSubmit={onScheduleSubmit(scheduleFixture)}
+          onPeriodsSaved={() => showToast('경기 방식을 저장했어요.', 'success')}
           onClose={() => setScheduleFixture(null)}
         />
       ) : null}

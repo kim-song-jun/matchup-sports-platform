@@ -29,7 +29,7 @@ import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
 import { KNOCKOUT_PHASES, competitionMatchLabel, tournamentRoundLabel } from '@/lib/tournament-round-label';
 import { compareTournamentGroupNames } from '@/lib/tournament-display-order';
 import { splitPrizeSegments, parsePrizeRows } from '@/lib/prize-breakdown';
-import { GroupedPrizes } from '@/components/tournaments/grouped-prizes';
+import { TournamentPrizeList } from '@/components/tournaments/tournament-prize-list';
 import { leagueSideLabel } from '@/lib/league-fixture-meta';
 import { TournamentBracket, groupFixturesByRound } from '@/components/tournaments/tournament-bracket';
 import { SixTeamBracket } from '@/components/tournaments/six-team-bracket';
@@ -754,7 +754,7 @@ export function TournamentDetailView({
         </div>
         {prizeRows.length > 0 && (
           <div style={{ marginTop: 20 }}>
-            <GroupedPrizes rows={prizeRows} />
+            <TournamentPrizeList rows={prizeRows} />
           </div>
         )}
         {tournament.status === 'completed' && (

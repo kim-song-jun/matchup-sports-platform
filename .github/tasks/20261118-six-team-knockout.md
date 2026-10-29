@@ -252,3 +252,9 @@ Owned: 위 v1 관련 파일과 이 task. Forbidden: legacy, env 파일, main 승
 - Source snapshot GREEN: 5/5 PASS including canonical LF, repeated CRLF, schema mutation and historical migration mutation rejection.
 - Actual single-worker recycling contract PASS: both scratch tests executed and PID changed between suites; actual package-script discovery still contains every canonical integration suite.
 - Narrow runner-contract2 PASS (other DB recovery contracts intentionally not run locally; CI retains them). No integration test exclusions or worker parallelism added.
+
+## PR #2089 + #2090 deployment follow-up — 2026-10-29
+- Merged dev CI 40794411905: Web 9920 passed / 1 failed. Six-team preview test searched render.container after #2089 moved the dialog to document.body.
+- Scope: test query only. Assert both final connections within the actual accessible preview region; preserve six-team selection, preview POST and apply payload assertions.
+- Local Vitest unavailable and host free RAM about 1.3 GB; use CI for executable verification without installing another dependency tree. No runtime/UI/API changes.
+- Progress: fix prepared; CI and alpha release verification pending.

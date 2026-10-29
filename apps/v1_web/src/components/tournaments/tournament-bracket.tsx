@@ -12,7 +12,7 @@ import { byeRound } from '@/lib/tournament-bracket-rounds';
  */
 
 import { Fragment, useRef, useState, useCallback, useEffect } from 'react';
-import { buildBracketGraph, bracketConnectionPath, type BracketGraphRound } from '@/lib/tournament-bracket-graph';
+import { buildBracketGraph, bracketConnectionPath, bracketContentCenter, type BracketGraphRound } from '@/lib/tournament-bracket-graph';
 import { Trophy } from 'lucide-react';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
@@ -682,7 +682,12 @@ function BracketEmpty() {
   );
 }
 
-/** SVG endpoints are measured from rendered cards/rows, including badges and logos. */
+/** Measure the team area independently of match labels and time/PK footers. */
+function bracketNodeGeometry(node: HTMLElement) {
+  const card = (node.querySelector<HTMLElement>('.tm-bk2-card') ?? node).getBoundingClientRect();
+  const rows = Array.from(node.querySelectorAll<HTMLElement>('[data-bracket-team-row]')).map((row) => row.getBoundingClientRect());
+  return { right: card.right, center: bracketContentCenter(card, rows) };
+}
 function ConnectedBracket({ rounds, groups, champion, sourceRounds = rounds, showChampion = true }: { rounds: BracketGraphRound[]; groups: V1TournamentGroup[]; champion: string | null; sourceRounds?: BracketGraphRound[]; showChampion?: boolean }) {
   const graph = buildBracketGraph(rounds, groups);
   const canvas = useRef<HTMLDivElement>(null);
@@ -693,22 +698,30 @@ function ConnectedBracket({ rounds, groups, champion, sourceRounds = rounds, sho
     const measure = () => {
       const bounds = element.getBoundingClientRect();
       const cards = new Map(Array.from(element.querySelectorAll<HTMLElement>('[data-bracket-node]')).map((card) => [card.dataset.bracketNode!, card]));
+      // Position the team centre at the graph centre before measuring edges.
+      // Footer and match-label heights must not shift downstream branches.
+      for (const node of graph.nodes) {
+        const card = cards.get(node.id);
+        if (!card) continue;
+        const offset = bracketNodeGeometry(card).center - card.getBoundingClientRect().top;
+        card.style.transform = `translateY(-${offset}px)`;
+      }
       const next = graph.edges.flatMap((edge) => {
         const source = cards.get(edge.source);
         const target = cards.get(edge.target);
         const row = target?.querySelectorAll<HTMLElement>('[data-bracket-team-row]')[edge.side === 'HOME' ? 0 : 1];
         if (!source || !target || !row) return [];
-        const from = (source.querySelector<HTMLElement>('.tm-bk2-card') ?? source).getBoundingClientRect();
+        const from = bracketNodeGeometry(source);
         const to = row.getBoundingClientRect();
         const sourceFixture = graph.nodes.find((node) => node.id === edge.source)?.fixture;
-        return [{ id: `${edge.source}:${edge.target}:${edge.side}`, d: bracketConnectionPath({ x: from.right - bounds.left, y: from.top + from.height / 2 - bounds.top }, { x: to.left - bounds.left, y: to.top + to.height / 2 - bounds.top }, edge.side), label: `${sourceFixture ? `${sourceFixture.fixtureNumber}번 경기 ${edge.outcome === 'LOSER' ? '패자' : '승자'}` : '부전승'} → ${graph.nodes.find((node) => node.id === edge.target)?.fixture?.fixtureNumber}번 경기 ${edge.side === 'HOME' ? '홈' : '어웨이'}`, decided: edge.outcome === 'BYE' || (sourceFixture?.status === 'completed' && getWinner(sourceFixture) !== null) }];
+        return [{ id: `${edge.source}:${edge.target}:${edge.side}`, d: bracketConnectionPath({ x: from.right - bounds.left, y: from.center - bounds.top }, { x: to.left - bounds.left, y: to.top + to.height / 2 - bounds.top }), label: `${sourceFixture ? `${sourceFixture.fixtureNumber}번 경기 ${edge.outcome === 'LOSER' ? '패자' : '승자'}` : '부전승'} → ${graph.nodes.find((node) => node.id === edge.target)?.fixture?.fixtureNumber}번 경기 ${edge.side === 'HOME' ? '홈' : '어웨이'}`, decided: edge.outcome === 'BYE' || (sourceFixture?.status === 'completed' && getWinner(sourceFixture) !== null) }];
       });
       const final = rounds.find((round) => round.key === 'final')?.fixtures[0];
       const source = final && cards.get(final.id);
       const trophy = element.querySelector<HTMLElement>('[data-bracket-champion]');
       if (source && trophy) {
-        const from = source.getBoundingClientRect(); const to = trophy.getBoundingClientRect();
-        next.push({ id: 'champion', d: bracketConnectionPath({ x: from.right - bounds.left, y: from.top + from.height / 2 - bounds.top }, { x: to.left - bounds.left, y: to.top + to.height / 2 - bounds.top }, 'HOME'), label: '결승 승자 → 우승', decided: champion !== null });
+        const from = bracketNodeGeometry(source); const to = trophy.getBoundingClientRect();
+        next.push({ id: 'champion', d: bracketConnectionPath({ x: from.right - bounds.left, y: from.center - bounds.top }, { x: to.left - bounds.left, y: to.top + to.height / 2 - bounds.top }), label: '결승 승자 → 우승', decided: champion !== null });
       }
       setPaths(next);
     };

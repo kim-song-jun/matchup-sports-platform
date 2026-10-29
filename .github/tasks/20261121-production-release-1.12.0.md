@@ -53,3 +53,14 @@ main-only 승격 머지 커밋을 release 준비 브랜치를 통해 dev에 흡�
 - 준비 전용 스크립트 PASS: 양쪽 manifest 1.12.0, changeset 33개 소비, main 승격 게이트 통과. 기능 파일 변경 없음. 세부 영향/남은 운영 조건은 docs/ops/prod-readiness-2026-10-29.md.
 
 - main-only 이력 흡수 완료: d76365a64. 흡수 전/후 tree SHA 동일, origin/main이 후보의 조상임을 확인(후보 기준 main-only 0개). committed-tree PR release gate 및 소비 changeset 삭제 이력 복원 방식의 main 승격 게이트 모두 PASS. 다음 단계는 dev PR CI 검토다.
+
+## 2026-10-29 최종 준비 갱신
+
+- 기존 준비 PR #2095는 06:41 UTC에 dev로 머지됐다. 해당 PR CI 40826372452의 Gates/API/Web 모두 성공했다.
+- 이후 #2096이 추가되어 현재 dev는 `14d809045a3db5c5b44ec3b2fc17018688733097`이다. 해당 SHA CI 40839015755와 alpha 40839015809 모두 성공. 기존 #2095 직후 실패한 실행은 이 최신 성공 실행과 구분한다.
+- 10:46 UTC 공개 alpha는 `1.12.1-alpha.20261029.g14d809045a3d`, 동일 dev SHA, API DB health=true. production은 `1.11.10` / `852290b7f01a8e25bc842b1d19fe99467f174037`이다.
+- #2096의 미소비 Changeset 1개 때문에 앞선 1.12.0 준비만으로 현재 dev를 승격할 수 없다. 격리 worktree `_worktrees/release-finish-20261029`, branch `chore/release-finish-20261029`에서 정본 `--prepare-only`를 실행했다. API/Web 1.12.1, 양쪽 changelog 갱신, Changeset 소비, main 승격 게이트 PASS. 기능/DB/배포 소스 변경 없음.
+- Owned: 릴리스 메타데이터 5개 경로와 기존 task/readiness 문서. 공유 루트 WIP는 그대로 유지. 사용자 후속 지시로 이 후보의 커밋·dev PR 게시·CI 후 dev 머지 및 alpha 검증을 진행한다. 사용자가 별도 리뷰는 생략하도록 승인했다. CI와 main 사용자 전용 단계는 유지한다.
+- 다음: 이 후보를 dev 대상 준비 PR로 전달 → 새 dev SHA CI/alpha 성공과 공개 SHA/DB/버전 재확인 → 미소비 Changeset 0 확인 및 승격 게이트 재실행 → 사용자가 main 승격 PR 개설/머지 및 production 승인.
+- 사용자용 비교 링크: https://github.com/kim-song-jun/matchup-sports-platform/compare/main...dev?expand=1 . 새 준비 PR 검증 전에는 최종 승인 준비 완료로 판정하지 않는다.
+- production flexible-bracket 활성 범위 결정과 기존 문서의 수동 QA 잔여 사항은 계속 남는다. 이번 작업은 새 기능 QA를 대체하지 않는다.

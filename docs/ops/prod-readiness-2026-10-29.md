@@ -60,7 +60,7 @@
 
 ## 사용자 최종 승격 전 단계
 
-1. 버전 준비 PR은 **base=dev**로 검토한다. 기능 소스 변경 없이 두 앱 버전/CHANGELOG·changeset 소비·이 문서와 작업 문서만 포함하는지 확인한다. main-only 이전 승격 머지는 이 준비 브랜치를 통해 dev로 흡수한다.
+1. 버전 준비 PR은 **base=dev**로 검토한다. 기능 소스 변경 없이 두 앱 버전/CHANGELOG·changeset 소비·이 문서와 작업 문서만 포함하는지 확인한다. main-only 이전 승격 머지는 준비 브랜치의 `d76365a64`에서 흡수했고 후보 파일 트리가 그대로임을 확인했다. dev PR 머지 시 이 조상 관계도 dev에 반영된다.
 2. 준비 PR이 dev에 반영되면 새 dev SHA의 CI와 alpha 배포를 기다린다. 기존 c7d185fa의 CI/alpha를 새 SHA의 검증으로 대신하지 않는다.
 3. 새 alpha 커밋/릴리스 및 DB health, 미소비 changeset 0개와 main 승격 게이트를 다시 확인한다. 준비 도중 새 기능/changeset이 dev에 들어오면 후보 범위를 다시 고정한다.
 4. 사용자가 `https://github.com/kim-song-jun/matchup-sports-platform/compare/main...dev?expand=1`에서 **base=main, compare=dev**를 확인하고 승격 PR을 직접 연다. 에이전트는 main PR을 만들거나 머지하지 않는다.

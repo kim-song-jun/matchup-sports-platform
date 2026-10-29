@@ -1,6 +1,6 @@
 # Task 20261121: alpha 검증 범위의 main 승격 준비
 
-Status: In Progress
+Status: Review
 Owner: Codex
 Created: 2026-10-29
 
@@ -33,7 +33,7 @@ changeset을 정식 버전 후보로 정리하고, dev 대상 릴리스 PR·승�
 - [x] 정식 후보 버전/CHANGELOG 생성 및 범위 검증.
 - [x] 릴리스 영향·DB 마이그레이션·운영 절차를 기록.
 - [ ] dev 대상 준비 PR 생성 및 검증 상태 제공.
-- [ ] main용 비교 링크와 사용자 전용 단계 명시.
+- [x] main용 비교 링크와 사용자 전용 단계 명시.
 
 ## Tech Debt Resolved
 main-only 승격 머지 커밋을 release 준비 브랜치를 통해 dev에 흡수한다.
@@ -51,3 +51,5 @@ main-only 승격 머지 커밋을 release 준비 브랜치를 통해 dev에 흡�
 준비 worktree /tmp/teameet-release-1.12.0, branch release/version-1.12.0, base c7d185fa. 현재 live alpha == dev이고 Gates/Web/API/alpha 배포 모두 성공. 정본 준비 스크립트 실행/범위 검증 완료. next: release commit 및 main-only 이력 흡수 후 dev PR.
 
 - 준비 전용 스크립트 PASS: 양쪽 manifest 1.12.0, changeset 33개 소비, main 승격 게이트 통과. 기능 파일 변경 없음. 세부 영향/남은 운영 조건은 docs/ops/prod-readiness-2026-10-29.md.
+
+- main-only 이력 흡수 완료: d76365a64. 흡수 전/후 tree SHA 동일, origin/main이 후보의 조상임을 확인(후보 기준 main-only 0개). committed-tree PR release gate 및 소비 changeset 삭제 이력 복원 방식의 main 승격 게이트 모두 PASS. 다음 단계는 dev PR CI 검토다.

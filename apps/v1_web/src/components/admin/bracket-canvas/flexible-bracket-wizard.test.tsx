@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -32,6 +32,55 @@ const next = () => fireEvent.click(screen.getByRole('button', { name: '다음' }
 async function preview() { next(); next(); next(); await screen.findByText(/총 5경기/); }
 
 describe('단계별 대진 설정', () => {
+  it.each([
+    { flexibleEnabled: true, sixTeamEligible: false, title: '전체 대진 만들기' },
+    { flexibleEnabled: false, sixTeamEligible: false, title: '템플릿으로 대진 만들기' },
+    { flexibleEnabled: true, sixTeamEligible: true, title: '6팀 토너먼트 방식' },
+  ])('$title 팝업을 body에 띄우고 배경 클릭으로 닫는다', async (capabilities) => {
+    server.use(http.get(`${base}/capabilities`, () => success(capabilities)));
+    const props = show();
+    const dialog = await screen.findByRole('dialog', { name: capabilities.title });
+    const backdrop = dialog.parentElement!;
+    expect(backdrop.parentElement).toBe(document.body);
+    expect(backdrop).toHaveStyle({ zIndex: 'var(--z-modal)' });
+    fireEvent.click(backdrop);
+    await waitFor(() => expect(props.onClose).toHaveBeenCalledOnce());
+  });
+
+  it('설정 로딩·오류 팝업도 페이지 밖에 띄우고 재시도로 설정을 연다', async () => {
+    let fail = true;
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => { release = resolve; });
+    server.use(http.get(`${base}/capabilities`, async () => {
+      await pending;
+      return fail ? HttpResponse.json({ message: '설정을 불러오지 못했어요.' }, { status: 503 })
+        : success({ flexibleEnabled: true });
+    }));
+    show();
+    const loading = await screen.findByRole('dialog', { name: '대진 설정' });
+    try {
+      expect(loading.parentElement?.parentElement).toBe(document.body);
+      expect(within(loading).getByRole('status')).toBeInTheDocument();
+    } finally { release(); }
+    await screen.findByText('대진 설정을 불러오지 못했어요.');
+    expect(screen.getByRole('dialog').parentElement?.parentElement).toBe(document.body);
+    fail = false;
+    fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+    await screen.findByRole('dialog', { name: '전체 대진 만들기' });
+  });
+
+  it('설정 닫기 확인창을 원래 팝업보다 뒤에 렌더링해 같은 모달 레이어 위에서 확인한다', async () => {
+    const props = show();
+    const dialog = await screen.findByRole('dialog', { name: '전체 대진 만들기' });
+    fireEvent.change(screen.getByLabelText('참가 팀 수'), { target: { value: '8' } });
+    fireEvent.click(screen.getByRole('button', { name: '모달 닫기' }));
+    const confirmation = await screen.findByRole('dialog', { name: '설정 닫기' });
+    expect(dialog.compareDocumentPosition(confirmation) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(props.onClose).not.toHaveBeenCalled();
+    fireEvent.click(within(confirmation).getByRole('button', { name: '나가기' }));
+    await waitFor(() => expect(props.onClose).toHaveBeenCalledOnce());
+  });
+
   it('각 조 회전 수를 따로 선택하고 초안·미리보기·생성에 동일하게 전달한다', async () => {
     const payloads: Record<string, unknown>[] = [];
     server.use(http.put(`${base}/draft`, async ({ request }) => { const input = await request.json() as Record<string, unknown>; payloads.push(input); return success({ input, revision: 1 }); }),

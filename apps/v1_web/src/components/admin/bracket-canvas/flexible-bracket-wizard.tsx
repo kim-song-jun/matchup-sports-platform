@@ -148,7 +148,8 @@ export function FlexibleBracketWizard(props: BracketTemplateDialogProps & { onLe
   const assignmentSlots = format === 'knockout' ? Array.from({ length: validCount ? count : 0 }, (_, i) => `${i + 1}번 시드`)
     : groups.flatMap((group) => Array.from({ length: Number.isInteger(group.capacity) && group.capacity >= 2 && group.capacity <= 8 ? group.capacity : 0 }, (_, i) => `${group.name} ${i + 1}번`));
   if (!mounted || typeof document === 'undefined') return ConfirmModal;
-  return <>{ConfirmModal}{createPortal(<div className={`fixed inset-0 z-50 flex items-center justify-center p-4 tm-modal-scrim${closing ? ' is-closing' : ''}`} onClick={onBackdropClick}>
+  // 확인창 portal을 마지막에 두어 같은 modal 레이어에서 설정창 위로 올라오게 한다.
+  return <>{createPortal(<div style={{ zIndex: 'var(--z-modal)' }} className={`fixed inset-0 flex items-center justify-center p-4 tm-modal-scrim${closing ? ' is-closing' : ''}`} onClick={onBackdropClick}>
     <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={`${prefix}-title`} className="tm-modal-panel flex max-h-[calc(100dvh-32px)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-[var(--card-surface)] text-[var(--text-strong)]">
       <div className="flex shrink-0 items-center justify-between border-b border-[var(--border)] p-4">
         <h2 id={`${prefix}-title`} className="tm-text-body-lg font-bold">전체 대진 만들기</h2>
@@ -222,7 +223,7 @@ export function FlexibleBracketWizard(props: BracketTemplateDialogProps & { onLe
         </div>
       </div>
     </div>
-  </div>, document.body)}</>;
+  </div>, document.body)}{ConfirmModal}</>;
 }
 
 function BracketPlanReview({ plan, input, teams }: { plan: FlexibleBracketPreview; input: FlexibleBracketInput; teams: { id: string; teamName?: string | null }[] }) {

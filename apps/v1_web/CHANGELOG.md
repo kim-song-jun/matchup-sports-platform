@@ -1,5 +1,11 @@
 # v1_web
 
+## 1.12.1
+
+### Patch Changes
+
+- b2373d7: Align knockout connector elbows and team-area centres independently of time and penalty footers.
+
 ## 1.12.0
 
 ### Minor Changes

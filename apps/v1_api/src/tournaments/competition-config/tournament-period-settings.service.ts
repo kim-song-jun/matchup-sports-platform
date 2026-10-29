@@ -54,7 +54,10 @@ export class TournamentPeriodSettingsService {
         message: '현재 대회에 연결된 경기 설정 버전이 없어요. 먼저 유효한 경기 설정 버전을 연결해 주세요.',
       });
     }
-    return this.serialize(row);
+    const matchOverrideCount = await this.prisma.v1TeamMatch.count({
+      where: { ...teamMatchOwnershipWhere(row.kind, row.id), deletedAt: null, periodOverride: true },
+    });
+    return { ...this.serialize(row), matchOverrideCount };
   }
 
   async update(user: V1AuthUser, tournamentId: string, dto: UpdateTournamentPeriodSettingsDto) {
@@ -369,13 +372,30 @@ export class TournamentPeriodSettingsService {
     if (dto.inheritDefault === true) {
       if (!match.periodOverride) return { changed: false, fixturesRepointed: 0, ...this.serialize(row) };
       const inherited = await this.inheritedSource(tx, row, match);
-      const target = await tx.v1CompetitionConfigVersion.findUniqueOrThrow({ where: { id: inherited.competitionConfigVersionId } });
+      const inheritedConfig = await tx.v1CompetitionConfigVersion.findUniqueOrThrow({ where: { id: inherited.competitionConfigVersionId } });
+      const inheritedPeriods = this.readPeriods(inheritedConfig.periods).periods;
+      if (!inheritedPeriods) {
+        throw new UnprocessableEntityException({ code: 'COMPETITION_PERIODS_UNAVAILABLE', message: '이어받을 경기 시간을 읽을 수 없어요.' });
+      }
+      // "위 설정 따르기"는 경기 시간 재정의만 지운다. 이 경기가 다른 출전 인원·결과 규칙에
+      // 고정돼 있다면 그 규칙까지 위 설정 버전으로 바꾸지 않고, 현재 규칙 위에 위 피리어드만 얹는다.
+      const materialized = await materializePeriodConfigVersion(tx, {
+        source: match.competitionConfig,
+        periods: inheritedPeriods as unknown as Prisma.JsonValue,
+        createdByUserId: userId,
+      });
       await tx.v1TeamMatch.update({ where: { id: match.id }, data: { periodOverride: false } });
-      const fixturesRepointed = await repointUntouchedFixtures(tx, ownership, target, { allowSubmittedLineups: true });
+      const fixturesRepointed = await repointUntouchedFixtures(tx, ownership, materialized.version, { allowSubmittedLineups: true });
+      await this.logVersionCreated(tx, admin, row.id, match.competitionConfig, materialized, { teamMatchId: match.id, reason: 'inherit_periods' });
       await this.adminContext.logAdminAction(admin, {
         action: 'tournament.match_period_settings.inherit', targetType: 'team_match', targetId: match.id,
         beforeJson: { tournamentId: row.id, competitionConfigVersionId: match.competitionConfig.id, periods: match.competitionConfig.periods },
-        afterJson: { tournamentId: row.id, competitionConfigVersionId: target.id, source: inherited.source },
+        afterJson: {
+          tournamentId: row.id,
+          competitionConfigVersionId: materialized.version.id,
+          inheritedCompetitionConfigVersionId: inheritedConfig.id,
+          source: inherited.source,
+        },
       }, tx);
       return { changed: true, fixturesRepointed, ...this.serialize(row) };
     }

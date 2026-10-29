@@ -239,6 +239,22 @@ function PeriodSettingsEditor({
         <p className="mt-3 text-[length:var(--font-size-body-sm)] text-amber-700">이전 설정에는 피리어드 수만 저장되어 있어요. 새 경기 생성 전에 각 길이를 입력해 주세요.</p>
       )}
 
+      {!editing && (settingsQuery.data.groupOverrides.length > 0 || (settingsQuery.data.matchOverrideCount ?? 0) > 0) && (
+        <div aria-label="별도 경기 시간 안내" className="mt-3 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
+          <p>{settingsQuery.data.kind === 'regular_league'
+            ? '따로 정한 경기는 리그 기본 경기 시간을 바꿔도 그대로 유지돼요.'
+            : '따로 정한 조·경기는 위 기본값이나 단계별 경기 시간을 바꿔도 그대로 유지돼요.'}</p>
+          <ul className="mt-1 space-y-1">
+            {settingsQuery.data.groupOverrides.length > 0 && (
+              <li>따로 정한 조: {settingsQuery.data.groupOverrides.map((group) => group.name).join(', ')}</li>
+            )}
+            {(settingsQuery.data.matchOverrideCount ?? 0) > 0 && (
+              <li>따로 정한 경기: {settingsQuery.data.matchOverrideCount}개</li>
+            )}
+          </ul>
+        </div>
+      )}
+
       {editing && (
         <div className="mt-4 border-t border-[var(--border)] pt-4">
           <p className="text-[length:var(--font-size-body-sm)] text-[var(--text-muted)]">새로 만들 경기와 아직 시작하지 않은 경기에 적용돼요. 이미 시작했거나 끝난 경기는 그대로예요.</p>

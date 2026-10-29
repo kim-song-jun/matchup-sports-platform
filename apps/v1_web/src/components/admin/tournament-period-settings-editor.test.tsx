@@ -285,4 +285,26 @@ describe('TournamentPeriodSettingsEditor', () => {
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
     expect(showToast).toHaveBeenCalledWith('각 피리어드 시간을 1분 이상 입력해 주세요.', 'error');
   });
+
+  it('shows which narrower overrides will stay unchanged when a parent setting changes', () => {
+    state.settings = {
+      ...state.settings,
+      requiresDurationInput: false,
+      stageOverrides: [],
+      groupOverrides: [{
+        groupId: 'group-b',
+        name: 'B조',
+        competitionConfigVersionId: 'config-group-b',
+        periods: [{ code: 'SINGLE_PERIOD', label: '단일', durationMinutes: 15, extraTime: false }],
+        legacyPeriodCount: null,
+      }],
+      matchOverrideCount: 2,
+    };
+
+    render(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={vi.fn()} />);
+
+    expect(screen.getByLabelText('별도 경기 시간 안내')).toHaveTextContent('따로 정한 조·경기는 위 기본값이나 단계별 경기 시간을 바꿔도 그대로 유지돼요.');
+    expect(screen.getByText('따로 정한 조: B조')).toBeInTheDocument();
+    expect(screen.getByText('따로 정한 경기: 2개')).toBeInTheDocument();
+  });
 });

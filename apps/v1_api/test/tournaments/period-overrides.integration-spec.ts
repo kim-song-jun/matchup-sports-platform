@@ -3,6 +3,7 @@ import request = require('supertest');
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { ManagedTermsRuntimeService } from '../../src/terms/managed-terms-runtime.service';
 import { seedCompetitionConfigVersions } from '../../src/tournaments/competition-config/competition-config-backfill';
+import { competitionConfigContentHash, validateCompetitionConfig } from '../../src/tournaments/competition-config/competition-config';
 import { createV1IntegrationApp } from '../integration/integration-app';
 
 // 경기 시간은 대회 기본값 → 단계 → 조 → 경기 순서로 좁아진다. 좁은 설정은 넓은 설정을 바꿔도 남고,
@@ -95,6 +96,7 @@ describe('조·경기별 경기 시간 재정의', () => {
     expect(await fixtureMinutes(t.f1)).toEqual([20, 20]);
     const read = await settings(t.id);
     expect(read.competitionConfigVersionId).toBe(defaultPin);
+    expect(read.matchOverrideCount).toBe(1);
     expect(minutes(read.periods)).toEqual([20, 20]);
     expect(read.groupOverrides).toEqual([expect.objectContaining({ groupId: t.groupB, name: 'B조', periods: [expect.objectContaining({ label: '전반', durationMinutes: 10 }), expect.objectContaining({ label: '후반', durationMinutes: 10 })] })]);
 
@@ -122,10 +124,46 @@ describe('조·경기별 경기 시간 재정의', () => {
     await save(t.id, { groupId: t.groupB, inheritDefault: true });
     expect(await fixtureMinutes(t.b1)).toEqual([25]);
     expect(await fixtureMinutes(b2)).toEqual([25]);
+    // 경기 전용 설정을 지운다고 피리어드 외 규칙까지 상위 단계 규칙으로 바꾸면 안 된다.
+    // 과거 규칙에 고정된 시작 전 경기를 만들고, 위 설정의 피리어드만 이어받는지 검증한다.
+    const pinned = await prisma.v1TeamMatch.findUniqueOrThrow({
+      where: { id: t.a2 },
+      include: { competitionConfig: true },
+    });
+    const pinnedConfig = pinned.competitionConfig!;
+    const pinnedRules = validateCompetitionConfig({
+      periods: pinnedConfig.periods,
+      events: pinnedConfig.events,
+      lineup: { ...(pinnedConfig.lineup as Record<string, unknown>), maxPlayers: 4 },
+      result: pinnedConfig.result,
+      tieBreak: pinnedConfig.tieBreak,
+      visibility: pinnedConfig.visibility,
+    }, { preserveMissingCatalogKeys: true });
+    const oldRulesVersion = await prisma.v1CompetitionConfigVersion.create({
+      data: {
+        sportCode: pinnedConfig.sportCode,
+        name: `${pinnedConfig.name}-inherit-regression`,
+        version: 1,
+        periods: pinnedRules.periods,
+        events: pinnedRules.events,
+        lineup: pinnedRules.lineup,
+        result: pinnedRules.result,
+        tieBreak: pinnedRules.tieBreak,
+        visibility: pinnedRules.visibility,
+        contentHash: competitionConfigContentHash(pinnedRules),
+      },
+    });
+    await prisma.$transaction([
+      prisma.v1TeamMatch.update({ where: { id: t.a2 }, data: { competitionConfigVersionId: oldRulesVersion.id } }),
+      prisma.v1Game.update({ where: { teamMatchId: t.a2 }, data: { competitionConfigVersionId: oldRulesVersion.id } }),
+    ]);
+
     await save(t.id, { teamMatchId: t.a2, inheritDefault: true });
     expect(await fixtureMinutes(t.a2)).toEqual([25]);
-    expect((await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: t.a2 } })).periodOverride).toBe(false);
-    expect((await settings(t.id)).groupOverrides).toEqual([]);
+    const inheritedMatch = await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: t.a2 }, include: { competitionConfig: true } });
+    expect(inheritedMatch.periodOverride).toBe(false);
+    expect(inheritedMatch.competitionConfig?.lineup).toEqual(oldRulesVersion.lineup);
+    expect((await settings(t.id))).toMatchObject({ groupOverrides: [], matchOverrideCount: 0 });
   });
 
   it('대회 규칙(출전 인원)이 바뀌면 조 설정은 피리어드를 지킨 채 새 규칙 위에 다시 만들어진다', async () => {

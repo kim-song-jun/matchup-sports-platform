@@ -33,6 +33,8 @@ export interface TournamentPeriodSettingsResponse {
     periods: TournamentPeriodSetting[] | null;
     legacyPeriodCount: number | null;
   }>;
+  /** GET 응답에서만 제공 — 이 대회·리그에서 경기 시간을 따로 정한 경기 수. */
+  matchOverrideCount?: number;
   /** 저장(PATCH) 응답에만 있다 — 새 피리어드로 옮긴 시작 전 경기 수. */
   fixturesRepointed?: number;
 }

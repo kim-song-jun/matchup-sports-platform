@@ -65,6 +65,8 @@ Expected result: 대진 탭의 조 수정·경기 수정 창에서 "위 설정 �
 - [x] (조·경기) 대회 기본 규칙(출전 인원) 변경 시 조 설정이 피리어드를 지킨 채 재기반
 - [x] (조·경기) 리그 경기 하나만 단판 → 리그 기본값 변경에도 유지 → 복귀 — `test/league-matches/league-period-apply-pending.integration-spec.ts`
 - [x] (조·경기) 경기 방식만 실패하면 창을 닫지 않고 "경기 정보는 저장됐어요"로 구분 안내 — `bracket-tab.test.tsx`
+- [x] (리뷰 P3) 경기 재정의를 지울 때 현재 경기의 피리어드 외 규칙은 유지
+- [x] (리뷰 P3) 대회 정보에서 별도 조 이름과 별도 경기 수·상위 설정 변경 제외 안내
 
 ### Error paths
 - [x] 강 단계 조 재정의 요청 거절(`TOURNAMENT_GROUP_PERIODS_UNSUPPORTED`), 범위 두 개 이상 거절(`TOURNAMENT_PERIOD_SCOPE_CONFLICT`)

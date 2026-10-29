@@ -64,3 +64,13 @@ main-only 승격 머지 커밋을 release 준비 브랜치를 통해 dev에 흡�
 - 다음: 이 후보를 dev 대상 준비 PR로 전달 → 새 dev SHA CI/alpha 성공과 공개 SHA/DB/버전 재확인 → 미소비 Changeset 0 확인 및 승격 게이트 재실행 → 사용자가 main 승격 PR 개설/머지 및 production 승인.
 - 사용자용 비교 링크: https://github.com/kim-song-jun/matchup-sports-platform/compare/main...dev?expand=1 . 새 준비 PR 검증 전에는 최종 승인 준비 완료로 판정하지 않는다.
 - production flexible-bracket 활성 범위 결정과 기존 문서의 수동 QA 잔여 사항은 계속 남는다. 이번 작업은 새 기능 QA를 대체하지 않는다.
+## 2026-10-29 main PR #2098 / CodeQL gate remediation
+
+- User explicitly requested main execution after the change briefing, overriding the earlier preparation-only boundary for this promotion. Production environment approval remains gated; no bypass is authorized. Separate review was waived, not CI/security checks.
+- #2097 merged dev 0af2e109a; exact-head PR/dev CI and alpha attempt 2 passed, public alpha SHA matched and DB health=true. Main promotion PR #2098 remains OPEN and unmerged.
+- Main PR API/Web/Gates CI 40879939606 passed. CodeQL aggregate check 123469009424 failed with 2 high + 1 medium findings: modulo-based bracket shuffle, partial regex escaping in a UI test, and generated test-code interpolation. No main/prod write occurred.
+- Remediation owned paths: flexible-bracket-wizard.tsx, new lib/random-index.ts and its regression test, recorded-event-list.test.tsx, test/config/jest-discovery.contract.spec.ts, release metadata and this task. Forbidden: unrelated shared WIP, DB/schema changes, feature flags, check dismissal or approval bypass.
+- Replace modulo shuffle with masked rejection sampling; use literal text matching instead of regex construction; keep generated worker source static and pass the receipt through Jest globals. Retain actual worker recycling and PID assertions.
+- Acceptance: targeted tests green, fresh dev PR CI and CodeQL green, release metadata consumed, alpha matches resulting dev, and revalidated main PR checks before merge.
+- Progress: local fixes prepared on fix/main-codeql-2098. Next: narrow validation and publish dev remediation PR. Security findings are not waived by the separate-review waiver.
+- Local validation PASS: frontend 3 files / 43 tests (random rejection, wizard, recorded event list); actual backend worker-recycling contract 1 test (10 unrelated cases intentionally excluded); frontend lint/typecheck PASS. No visual layout or API/DB contract changes. Touched source debt-marker grep clean.

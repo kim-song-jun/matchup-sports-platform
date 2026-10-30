@@ -1053,6 +1053,25 @@ describe('2-G: penalties 형태 오류는 서비스에서도 막아야 한다', 
  * 그래서 서버가 base 리비전의 값을 승계한다(`readStoredPenalties`).
  */
 describe('2-C 역방향: 승부차기로 결정된 결선 경기의 정정이 막히지 않아야 한다', () => {
+  it('승부차기 정정의 명시적 예외 해제는 base 예외를 다시 승계하지 않는다', async () => {
+    const harness = createHarness({ phase: 'semi', hasAdvancementEdge: true, baseScore: {
+      home: 1, away: 1, penalties: { home: 1, away: 0, takenHome: 1, takenAway: 1, operatorOverride: true },
+    } });
+    const error = await captureFailure(() => harness.correct({ score: { home: 1, away: 1, penalties: {
+      home: 1, away: 0, takenHome: 1, takenAway: 1, operatorOverride: false,
+    } } }));
+    expectHttp(error, 422, 'TOURNAMENT_PENALTY_UNDECIDED');
+    expect(harness.createdRevisions).toHaveLength(0);
+  });
+  it('승부차기 정정의 실제 횟수와 예외 해제를 저장한다', async () => {
+    const harness = createHarness({ phase: 'semi', hasAdvancementEdge: true, baseScore: {
+      home: 1, away: 1, penalties: { home: 1, away: 0, takenHome: 1, takenAway: 1, operatorOverride: true },
+    } });
+    await harness.correct({ score: { home: 1, away: 1, penalties: {
+      home: 1, away: 0, takenHome: 3, takenAway: 3, operatorOverride: false,
+    } } });
+    expect(harness.createdRevisions[0].score).toEqual({ home: 1, away: 1, penalties: { home: 1, away: 0, takenHome: 3, takenAway: 3 } });
+  });
   const baseWithPenalties = { home: 1, away: 1, penalties: { home: 5, away: 4 } };
 
   it('폼이 penalties를 떨어뜨려도 base의 승부차기를 승계해 정정이 통과한다', async () => {

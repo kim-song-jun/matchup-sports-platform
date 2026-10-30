@@ -22,6 +22,23 @@ function makeData(overrides: Partial<PublicTournamentScheduleResponse> = {}): Pu
 }
 
 describe('ScheduleContent — 순위표 팀 링크', () => {
+  it('순수 토너먼트는 전체·라운드만 표시하고 시간 미정 경기까지 선택한다', () => {
+    render(<ScheduleContent tournamentId="tour-1" knockoutOnly prioritizeLiveGames data={makeData({
+      items: [fixtureEntry({ fixtureId: 'semi', round: 'semi', groupName: '준결승', status: 'live' })],
+      unscheduled: [fixtureEntry({ fixtureId: 'final', round: 'final', groupName: '결승', scheduledAt: null })],
+    })} />);
+    expect(screen.queryByRole('tab', { name: '결선' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tablist', { name: '경기 일정 보기' })).not.toBeInTheDocument();
+    const rounds = within(screen.getByRole('navigation', { name: '일정 결선 단계 선택' }));
+    expect(rounds.getAllByRole('button').map(button => button.textContent)).toEqual(['전체', '준결승', '결승']);
+    expect(screen.queryByText('4강', { selector: 'a span' })).not.toBeInTheDocument();
+    expect(screen.queryByText('결승', { selector: 'a span' })).not.toBeInTheDocument();
+    fireEvent.click(rounds.getByRole('button', { name: '결승' }));
+    expect(screen.getAllByRole('link')).toHaveLength(1);
+    expect(screen.getByRole('link')).toHaveAttribute('href', '/tournaments/tour-1/matches/final');
+    fireEvent.click(rounds.getByRole('button', { name: '전체' }));
+    expect(screen.getAllByRole('link')).toHaveLength(2);
+  });
   it('선택한 조를 URL과 경기 상세 출처에 보존하고 재마운트 시 복원한다', () => {
     const original = window.location.href;
     const path = '/tournaments/tour-1/bracket';

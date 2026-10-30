@@ -1502,7 +1502,8 @@ export class TournamentResultReviewService {
       //
       // 점수가 base 와 다를 때는 메우지 않는다 — 그때의 base 킥 수는 다른 승부차기를
       // 설명하는 값이라, 옮기면 `home <= takenHome` 같은 불변식이 조용히 깨진다.
-      const carriedOver = this.carryPenaltyAuditFields(submitted, baseScore);
+      // The parser normalizes false to absence. Keep the explicit opt-out for base audit inheritance.
+      const carriedOver = this.carryPenaltyAuditFields(submitted, baseScore, score.penalties?.operatorOverride !== false);
       const applied = assertPenaltiesNotAllowed(regulation, carriedOver, facts);
       // 정정이 승부차기를 **새로 쓰는가**를 base 와 비교해 판정한다. 새로 쓰는 것이면
       // `end` 와 똑같이 킥 수를 요구하고, base 를 그대로 옮기는 것이면 면제한다.
@@ -1611,7 +1612,7 @@ export class TournamentResultReviewService {
    * 이미 저장된 리비전의 승부차기가 지금도 정책상 유효한지 본다(승격 게이트).
    * 저장값을 그대로 읽으므로 킥 수는 요구하지 않는다 — 자세한 근거는 호출부 주석 참고.
    */
-  private carryPenaltyAuditFields(submitted: StoredPenalties, baseScore: Prisma.JsonValue): StoredPenalties {
+  private carryPenaltyAuditFields(submitted: StoredPenalties, baseScore: Prisma.JsonValue, allowInheritedOverride = true): StoredPenalties {
     const base = readStoredPenalties(baseScore);
     if (base === undefined) return submitted;
     if (base.home !== submitted.home || base.away !== submitted.away) return submitted;
@@ -1624,7 +1625,7 @@ export class TournamentResultReviewService {
         ? { takenHome: base.takenHome, takenAway: base.takenAway }
         : {};
     const override =
-      submitted.operatorOverride === undefined && base.operatorOverride === true
+      allowInheritedOverride && submitted.operatorOverride === undefined && base.operatorOverride === true
         ? { operatorOverride: true as const }
         : {};
     // 선축도 **같은 이유로** 메운다. 빠뜨렸다가 2026-08-19 alpha 감사에서 두 가지 피해가

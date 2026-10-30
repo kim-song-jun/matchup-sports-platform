@@ -1,20 +1,18 @@
 import type { V1TournamentStatus } from '@/types/api';
-import { leagueStateLabel, type LeagueStateKey } from './v1-status-labels';
+import { leagueStateLabel } from './v1-status-labels';
 
 export type TournamentStatusConfig = { badgeClass: string; label: string };
 
-/** 모집 가능 여부는 별도 정보다. 리그 시작 전 단계는 모두 모집완료로 표시한다. */
-export function getLeagueStatusConfig(status: string): TournamentStatusConfig {
-  const states: Record<string, LeagueStateKey> = {
-    draft: 'draft', open: 'draft', closed: 'draft', in_progress: 'active',
-    on_hold: 'on_hold', completed: 'completed', cancelled: 'completed',
-  };
-  const state = Object.hasOwn(states, status) ? states[status] : undefined;
-  if (!state) return { badgeClass: 'tm-badge-grey', label: '상태 확인 중' };
-  return {
-    badgeClass: state === 'active' ? 'tm-badge-green' : state === 'on_hold' ? 'tm-badge-orange' : 'tm-badge-grey',
-    label: leagueStateLabel(state),
-  };
+/**
+ * 리그 status → 공개 배지. 대회와 같은 이름(준비 중·모집 중·마감·종료)에 리그 말(시즌 진행 중·보류)만
+ * 다르다(2026-10-27). 접수 중이어도 마감·정원으로 막히면 대회처럼 '모집 마감'이다.
+ */
+export function getLeagueStatusConfig(status: string, registrationBlocked = false): TournamentStatusConfig {
+  if (status === 'in_progress') return { badgeClass: 'tm-badge-green', label: leagueStateLabel('active') };
+  if (status === 'on_hold') return { badgeClass: 'tm-badge-orange', label: leagueStateLabel('on_hold') };
+  // 리그 취소는 없다(보류로 대신한다). 남아 있는 행은 종료로 묶는다.
+  if (status === 'cancelled') return { badgeClass: 'tm-badge-grey', label: leagueStateLabel('completed') };
+  return getTournamentStatusConfig(status as V1TournamentStatus, registrationBlocked);
 }
 
 /**
@@ -26,7 +24,7 @@ export function getTournamentStatusConfig(
   registrationBlocked = false,
   isRegularLeague = false,
 ): TournamentStatusConfig {
-  if (isRegularLeague) return getLeagueStatusConfig(status);
+  if (isRegularLeague) return getLeagueStatusConfig(status, registrationBlocked);
   // open은 저장된 대회 단계라 마감일·정원으로 신청이 막혀도 그대로일 수 있다.
   // 화면의 기존 신청 게이트 결과를 받아 배지를 맞추되 진행·종료 단계는 유지한다.
   if (status === 'open' && registrationBlocked) {

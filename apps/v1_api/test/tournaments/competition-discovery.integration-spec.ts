@@ -53,14 +53,19 @@ describe('대회·리그 탐색 (real DB)', () => {
     const closed = await read.list({ kind: 'tournament', sportId, registration: 'closed' });
     expect(closed.items.map((item) => item.id).sort()).toEqual([ids.full, ids.expired].sort());
   });
-  it('리그 준비는 draft/open/closed를 포함하고 진행 중에도 신청을 받는다', async () => {
+  // 2026-10-27: 리그도 대회처럼 접수 중(open)일 때만 신청을 받는다 — 진행 중 리그는 받지 않는다.
+  it('리그 준비는 draft/open/closed를 포함하고 신청은 접수 중 리그만 받는다', async () => {
     const upcoming = await read.list({ kind: 'league', sportId, phase: 'upcoming' });
     expect(upcoming.items.map((item) => item.id).sort()).toEqual([ids.draftLeague, ids.openLeague, ids.closedLeague, ids.noDeadlineLeague].sort());
+    const accepting = await read.list({ kind: 'league', sportId, registration: 'open' });
+    expect(accepting.items.map((item) => item.id)).toEqual([ids.openLeague]);
+    expect(accepting.items[0].registrationOpen).toBe(true);
     const ongoing = await read.list({ kind: 'league', sportId, phase: 'ongoing', registration: 'open' });
-    expect(ongoing.items.map((item) => item.id)).toEqual([ids.activeLeague]);
-    expect(ongoing.items[0].registrationOpen).toBe(true);
+    expect(ongoing.items).toEqual([]);
     const closed = await read.list({ kind: 'league', sportId, registration: 'closed' });
-    expect(closed.items.map((item) => item.id).sort()).toEqual([ids.noDeadlineLeague, ids.fullLeague, ids.finishedLeague].sort());
+    expect(closed.items.map((item) => item.id).sort()).toEqual(
+      [ids.draftLeague, ids.closedLeague, ids.activeLeague, ids.noDeadlineLeague, ids.fullLeague, ids.finishedLeague].sort(),
+    );
     const impossible = await read.list({ kind: 'league', sportId, phase: 'completed', registration: 'open' });
     expect(impossible.items).toEqual([]);
   });

@@ -1,12 +1,15 @@
-import type { V1AdminBracketFixtureGame, V1AdminBracketSlot, V1PlaceSnapshotPayload, V1PlaceView, V1VenueSnapshotPayload } from './api';
+import type { V1AdminBracketFixtureGame, V1AdminBracketSlot, V1PlaceSnapshotPayload, V1PlaceView, V1TournamentStatus, V1VenueSnapshotPayload } from './api';
+
+/** 리그 저장 상태 — 대회와 같은 값에 보류(on_hold)를 더한다. 초안·접수 중·마감이 따로 보인다(2026-10-27). */
+export type V1LeagueLifecycleStatus = V1TournamentStatus | 'on_hold';
 
 export interface V1AdminLeagueListItem {
   leagueId: string;
   title: string;
   isPublic: boolean;
   state: 'draft' | 'active' | 'completed' | 'on_hold';
-  /** 저장된 리그 단계. draft/open/closed는 모두 운영자 시작 전 모집완료로 표시한다. */
-  lifecycleStatus?: import('./api').V1TournamentStatus | 'on_hold';
+  /** 저장된 리그 상태. 화면 이름은 `leagueLifecycleLabel`(초안·접수 중·마감·시즌 진행 중·종료·보류). */
+  lifecycleStatus?: V1LeagueLifecycleStatus;
   registrationOpen?: boolean;
   teamCount: number;
   fixtureCount: number;
@@ -178,8 +181,8 @@ export interface V1LeagueFixture {
 export interface V1AdminLeagueDetail {
   leagueId: string;
   title: string;
-  /** 기존 state에서 합쳐진 draft/open/closed를 구분한다. */
-  lifecycleStatus?: import('./api').V1TournamentStatus | 'on_hold';
+  /** 저장된 리그 상태. `state` 가 합쳐 보이는 draft/open/closed를 구분한다. */
+  lifecycleStatus?: V1LeagueLifecycleStatus;
   state: 'draft' | 'active' | 'completed' | 'on_hold';
   /** 공개 리그 목록·상세에 노출되는지 여부. 관리자 상세는 항상 값을 내려준다. */
   isPublic: boolean;
@@ -330,6 +333,8 @@ export interface V1CloseLeagueRegistrationPayload {
 
 export interface V1CloseLeagueRegistrationResult {
   leagueId: string;
+  /** 처리 뒤 저장 상태. 접수 중이었다면 `closed`, 아니면 그대로(alreadyProcessed). */
+  lifecycleStatus: V1LeagueLifecycleStatus;
   registrationOpen: false;
   registrationDeadlineAt: string | null;
   alreadyProcessed: boolean;
@@ -389,6 +394,13 @@ export interface V1CreateLeaguePayload {
   /** null·생략 = 참가팀 정원 무제한. */
   maxTeams?: number | null;
   plannedFixtureCount?: number;
+  /** 생략·null = 마감 없이 '접수 마감하기'까지 받는다. */
+  registrationDeadlineAt?: string | null;
+  /** 보내면 참가비를 확정한 것으로 본다(0원 = 무료 확정). 0원 초과면 계좌 세 칸이 필수다. */
+  entryFee?: number;
+  bankName?: string;
+  bankAccount?: string;
+  bankHolder?: string;
 }
 
 export type V1LeagueStateValue = 'draft' | 'active' | 'completed' | 'on_hold';
@@ -747,20 +759,17 @@ export interface V1RecordLeagueForfeitResult {
 }
 
 /** 리그 참가 신청 열기 — `POST /admin/league-matches/:leagueId/open-registration` */
+/** '접수 시작하기' — 대회처럼 저장 상태를 접수 중(open)으로 바꾼다(2026-10-27). */
 export interface V1OpenLeagueRegistrationPayload {
-  /** ISO. 이 시각까지 신청을 받는다(같은 순간은 아직 열려 있다). */
-  registrationDeadlineAt: string;
+  /** ISO. 이 시각까지 받는다(같은 순간은 아직 열려 있다). 생략하면 지금 마감을 그대로, null 이면 마감 없이 받는다. */
+  registrationDeadlineAt?: string | null;
 }
 
 export interface V1OpenLeagueRegistrationResult {
   leagueId: string;
-  /**
-   * 이 호출이 확정한 사실 하나 — **지금부터 신청을 받는다.** 예전엔 `status: 'open'` 이었는데,
-   * 서버는 `status` 를 저장하지 않으므로 그건 리그 상태로 오해를 부르는 값이었다
-   * (대진이 있어 `in_progress` 인 리그도 `open` 으로 보였다).
-   */
+  lifecycleStatus: 'open';
   registrationOpen: true;
-  registrationDeadlineAt: string;
+  registrationDeadlineAt: string | null;
 }
 
 /** 수동 대진 한 경기 — `POST /admin/league-matches/:leagueId/fixtures/manual` */

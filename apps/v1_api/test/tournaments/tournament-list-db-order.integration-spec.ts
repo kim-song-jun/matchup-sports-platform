@@ -77,7 +77,7 @@ describe('대회 공개 목록 DB 정렬·페이지 계약', () => {
     { name: 'o-future-deadline', status: 'open', start: day(19), deadline: FUTURE_DEADLINE },
     { name: 'o-room', status: 'open', start: day(21), capacity: 2, held: 'confirmed' },
     { name: 'o-cancelled-reg', status: 'open', start: day(22), capacity: 1, held: 'cancelled' },
-    // Unlimited leagues ignore historical teamCount and keep their stored status even past the deadline.
+    // Unlimited leagues ignore historical teamCount. Since 2026-10-27 an open league past its deadline is 모집 마감 like a tournament.
     { name: 'lg-expired', status: 'open', kind: 'regular_league', start: day(23), deadline: PAST_DEADLINE },
     { name: 'lg-full', status: 'open', kind: 'regular_league', start: day(24), capacity: 1, held: 'confirmed' },
     // Filter coverage.
@@ -141,28 +141,28 @@ describe('대회 공개 목록 DB 정렬·페이지 계약', () => {
     expect(ids(await list({ limit: 50 }))).toEqual(TOURNAMENT_ORDER);
   });
 
-  it('sorts a stored-open row the card shows as 모집 마감 with the closed group, and leagues keep their stored status', async () => {
+  it('sorts a stored-open row the card shows as 모집 마감 with the closed group, for leagues too', async () => {
     const order = ids(await list({ kind: 'all', limit: 50 }));
-    const closedNames = ['cl-soon', 'cl-late', 'o-expired', 'o-full-confirmed', 'o-full-pending'];
+    const closedNames = ['cl-soon', 'cl-late', 'o-expired', 'o-full-confirmed', 'o-full-pending', 'lg-expired'];
     const firstClosed = Math.min(...closedNames.map((name) => order.indexOf(name)));
     const lastClosed = Math.max(...closedNames.map((name) => order.indexOf(name)));
     expect(firstClosed).toBe(order.indexOf('o-nodate') + 1);
     expect(lastClosed).toBe(order.indexOf('c-new') - 1);
-    for (const name of ['o-future-deadline', 'o-room', 'o-cancelled-reg', 'lg-expired', 'lg-full']) {
+    for (const name of ['o-future-deadline', 'o-room', 'o-cancelled-reg', 'lg-full']) {
       expect(order.indexOf(name)).toBeLessThan(firstClosed);
     }
   });
 
   it('kind=league puts a league draft with recruiting and kind=all merges both kinds in one order', async () => {
     expect(ids(await list({ kind: 'league', limit: 50 }))).toEqual([
-      'lg-draft', 'lg-open', 'lg-expired', 'lg-full', 'lg-done',
+      'lg-draft', 'lg-open', 'lg-full', 'lg-expired', 'lg-done',
     ]);
     const all = ids(await list({ kind: 'all', limit: 50 }));
     expect(all).toEqual([
       'ip-soon', 'ip-late',
       'lg-draft', 'o-soon', 'o-tie-a', 'o-tie-b', 'legacy-null-kind', 'lg-open', 'f-female', 'o-future-deadline',
-      'o-room', 'o-cancelled-reg', 'lg-expired', 'lg-full', 'o-late', 'o-nodate',
-      'o-full-confirmed', 'o-expired', 'cl-soon', 'o-full-pending', 'cl-late', 'c-new', 'c-noend', 'lg-done', 'c-old', 'c-nodate',
+      'o-room', 'o-cancelled-reg', 'lg-full', 'o-late', 'o-nodate',
+      'o-full-confirmed', 'o-expired', 'cl-soon', 'o-full-pending', 'cl-late', 'lg-expired', 'c-new', 'c-noend', 'lg-done', 'c-old', 'c-nodate',
     ]);
   });
 
@@ -242,7 +242,7 @@ describe('대회 공개 목록 DB 정렬·페이지 계약', () => {
   it('filters keep their meaning: status, gender, sport', async () => {
     expect(ids(await list({ status: 'completed', limit: 50 }))).toEqual(['c-new', 'c-noend', 'c-old', 'c-nodate']);
     expect(ids(await list({ status: 'draft', limit: 50 }))).toEqual([]);
-    expect(ids(await list({ kind: 'league', status: 'draft', limit: 50 }))).toEqual(['lg-draft', 'lg-open', 'lg-expired', 'lg-full']);
+    expect(ids(await list({ kind: 'league', status: 'draft', limit: 50 }))).toEqual(['lg-draft', 'lg-open', 'lg-full', 'lg-expired']);
     expect(ids(await list({ genderCategory: 'female', limit: 50 }))).toEqual(['f-female']);
     const other = await read.list({ sportId: otherSportId, limit: 50 } as never);
     expect(ids(other)).toEqual(['f-other-sport']);
@@ -252,7 +252,7 @@ describe('대회 공개 목록 DB 정렬·페이지 계약', () => {
     await db.v1Tournament.update({ where: { id: id('lg-open') }, data: { status: 'closed' } });
     try {
       const result = await list({ kind: 'league', status: 'draft', limit: 50, page: 1 });
-      expect(ids(result)).toEqual(['lg-draft', 'lg-expired', 'lg-full', 'lg-open']);
+      expect(ids(result)).toEqual(['lg-draft', 'lg-full', 'lg-open', 'lg-expired']);
       expect(result.pageInfo).toMatchObject({ total: 4 });
     } finally {
       await db.v1Tournament.update({ where: { id: id('lg-open') }, data: { status: 'open' } });

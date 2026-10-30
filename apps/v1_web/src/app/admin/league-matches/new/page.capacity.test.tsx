@@ -38,6 +38,9 @@ afterAll(() => server.close());
 afterEach(() => { cleanup(); server.resetHandlers(); });
 beforeEach(() => { submitted = undefined; push.mockReset(); });
 
+const next = () => fireEvent.click(screen.getByRole('button', { name: '다음' }));
+
+/** 1단계를 채우고 2단계(참가팀·신청)에서 팀 두 개를 넣는다 — 정원 칸이 있는 단계에 머문다. */
 async function fillForm() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   render(<QueryClientProvider client={client}><AdminLeagueMatchNewPage /></QueryClientProvider>);
@@ -48,36 +51,45 @@ async function fillForm() {
   fireEvent.change(screen.getByLabelText('지역'), { target: { value: 'region-jung' } });
   fireEvent.change(screen.getByLabelText('시작일'), { target: { value: '2098-01-01' } });
   fireEvent.change(screen.getByLabelText('종료일'), { target: { value: '2098-02-01' } });
+  next();
   for (const name of ['팀A', '팀B']) {
-    const picker = screen.getByLabelText('참가 팀 추가 (최소 2팀)');
+    const picker = screen.getByLabelText('참가 팀 직접 추가 (선택)');
     fireEvent.focus(picker);
     fireEvent.change(picker, { target: { value: name } });
     fireEvent.click(await screen.findByText(name));
   }
 }
 
+/** 경기 설정·확인 단계를 지나 리그를 만든다. */
+function createFromGameSettings() {
+  next();
+  fireEvent.click(screen.getByRole('button', { name: '리그 만들기' }));
+}
+
 describe('MD-QA145 리그 생성의 실제 HTTP 참가팀 정원 계약', () => {
-  it('PR1992: 선택한 두 팀보다 작은 정원은 제출을 막고 정원을 늘리면 실제 생성 요청을 보낸다', async () => {
+  it('PR1992: 선택한 두 팀보다 작은 정원은 다음 단계를 막고 정원을 늘리면 실제 생성 요청을 보낸다', async () => {
     await fillForm();
     const capacity = screen.getByLabelText(/^참가팀 정원/);
     fireEvent.change(capacity, { target: { value: '1' } });
-    expect(screen.getByRole('button', { name: '리그 만들기' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '다음' })).toBeDisabled();
     expect(capacity).toHaveAttribute('aria-invalid', 'true');
     expect(submitted).toBeUndefined();
     fireEvent.change(capacity, { target: { value: '2' } });
-    fireEvent.click(screen.getByRole('button', { name: '리그 만들기' }));
+    next();
+    createFromGameSettings();
     await waitFor(() => expect(submitted).toMatchObject({ maxTeams: 2, teamIds: ['team-0', 'team-1'] }));
   });
 
   it.each([2, 60, 2147483647])('참가팀 정원 %i팀을 선수 정원과 별개로 POST한다', async (maxTeams) => {
     // Given: 참가팀을 선택한 실제 생성 폼과 팀당 선수 제한이 있어요.
     await fillForm();
+    fireEvent.change(screen.getByLabelText(/^참가팀 정원/), { target: { value: String(maxTeams) } });
+    next();
     fireEvent.click(screen.getByLabelText('제한 없음'));
     fireEvent.change(screen.getByLabelText('최소 (명)'), { target: { value: '5' } });
     fireEvent.change(screen.getByLabelText('최대 (명)'), { target: { value: '12' } });
-    fireEvent.change(screen.getByLabelText(/^참가팀 정원/), { target: { value: String(maxTeams) } });
     // When: 운영자가 리그를 만들어요.
-    fireEvent.click(screen.getByRole('button', { name: '리그 만들기' }));
+    createFromGameSettings();
     // Then: 실제 API 클라이언트가 두 정원을 서로 다른 필드로 직렬화해요.
     await waitFor(() => expect(submitted).toMatchObject({ maxTeams, minPlayers: 5, maxPlayers: 12, teamIds: ['team-0', 'team-1'] }));
     await waitFor(() => expect(push).toHaveBeenCalledWith('/admin/league-matches/league-created'));
@@ -88,7 +100,8 @@ describe('MD-QA145 리그 생성의 실제 HTTP 참가팀 정원 계약', () => 
     await fillForm();
     expect(screen.getByLabelText(/^참가팀 정원/)).toHaveValue(null);
     // When: 기본값으로 생성해요.
-    fireEvent.click(screen.getByRole('button', { name: '리그 만들기' }));
+    next();
+    createFromGameSettings();
     // Then: 템플릿이나 선택한 팀 수를 정원으로 쓰지 않아요.
     await waitFor(() => expect(submitted).toMatchObject({ maxTeams: null, minPlayers: 1, maxPlayers: null }));
   });
@@ -98,8 +111,8 @@ describe('MD-QA145 리그 생성의 실제 HTTP 참가팀 정원 계약', () => 
     await fillForm();
     // When: 양의 32비트 정수가 아닌 정원을 넣어요.
     fireEvent.change(screen.getByLabelText(/^참가팀 정원/), { target: { value } });
-    // Then: 실제 제출을 막고 잘못 입력한 값을 보존해요.
-    expect(screen.getByRole('button', { name: '리그 만들기' })).toBeDisabled();
+    // Then: 다음 단계를 막고 잘못 입력한 값을 보존해요.
+    expect(screen.getByRole('button', { name: '다음' })).toBeDisabled();
     expect(submitted).toBeUndefined();
     expect(screen.getByLabelText(/^참가팀 정원/)).toHaveValue(Number(value));
   });

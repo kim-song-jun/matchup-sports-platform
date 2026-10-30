@@ -62,18 +62,23 @@ describe('LeagueRegistrationCloseService.close', () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
-  it('열린 리그는 읽은 마감값을 조건으로 now 로 당기고 감사를 같은 트랜잭션에 남긴다', async () => {
-    const before = hours(24);
-    const { service, row, tx, logAdminAction } = setup({ registrationDeadlineAt: before });
+  it('접수 중인 리그를 마감(closed)으로 바꾸고 감사를 같은 트랜잭션에 남긴다 — 마감 시각은 그대로', async () => {
+    const deadline = hours(24);
+    const { service, row, tx, logAdminAction } = setup({ status: 'open', registrationDeadlineAt: deadline });
     const result = await service.close(user, 'league-1', { reason: '정원 마감' });
 
     expect(tx.v1Tournament.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining({ registrationDeadlineAt: before }) }),
+      expect.objectContaining({ where: expect.objectContaining({ status: 'open' }), data: { status: 'closed' } }),
     );
-    expect(result).toMatchObject({ leagueId: 'league-1', registrationOpen: false, alreadyProcessed: false });
-    expect(result.registrationDeadlineAt).toBe(row.registrationDeadlineAt?.toISOString());
-    expect(row.registrationDeadlineAt!.getTime()).toBeLessThanOrEqual(Date.now());
-    expect(row.status).toBe('in_progress');
+    expect(result).toEqual({
+      leagueId: 'league-1',
+      lifecycleStatus: 'closed',
+      registrationOpen: false,
+      registrationDeadlineAt: deadline.toISOString(),
+      alreadyProcessed: false,
+    });
+    expect(row.status).toBe('closed');
+    expect(row.registrationDeadlineAt).toBe(deadline);
     expect(logAdminAction).toHaveBeenCalledWith(
       { userId: 'admin-1' },
       {
@@ -81,62 +86,43 @@ describe('LeagueRegistrationCloseService.close', () => {
         targetType: 'league_match',
         targetId: 'league-1',
         reason: '정원 마감',
-        beforeJson: { registrationDeadlineAt: before.toISOString() },
-        afterJson: { registrationDeadlineAt: row.registrationDeadlineAt!.toISOString() },
+        fromStatus: 'open',
+        toStatus: 'closed',
       },
       tx,
     );
   });
 
-  it('보류 중인 리그도 닫는다(대조: status 는 그대로)', async () => {
-    const { service, row } = setup({ status: 'on_hold' });
-    await expect(service.close(user, 'league-1', {})).resolves.toMatchObject({ alreadyProcessed: false });
-    expect(row.status).toBe('on_hold');
-  });
-
   it('사유가 없으면 감사 reason 은 null 이다', async () => {
-    const { service, logAdminAction } = setup();
+    const { service, logAdminAction } = setup({ status: 'open' });
     await service.close(user, 'league-1', {});
     expect(logAdminAction).toHaveBeenCalledWith(
       expect.anything(), expect.objectContaining({ reason: null }), expect.anything(),
     );
   });
 
-  it.each([
-    ['이미 지난 마감', hours(-1)],
-    ['마감 미설정', null],
-  ])('%s 은 쓰기·감사 없이 alreadyProcessed 로 답한다', async (_label, deadline) => {
-    const { service, row, tx, logAdminAction } = setup({ registrationDeadlineAt: deadline });
-    const result = await service.close(user, 'league-1', {});
-    expect(result).toEqual({
-      leagueId: 'league-1',
-      registrationOpen: false,
-      registrationDeadlineAt: deadline?.toISOString() ?? null,
-      alreadyProcessed: true,
-    });
-    expect(row.registrationDeadlineAt).toBe(deadline);
-    expect(tx.v1Tournament.updateMany).not.toHaveBeenCalled();
-    expect(logAdminAction).not.toHaveBeenCalled();
-  });
+  // 접수 중이 아니면 이미 신청을 안 받는다 — 진행 중·보류·끝난 리그도 상태를 건드리지 않는다.
+  it.each(['draft', 'closed', 'in_progress', 'on_hold', 'completed', 'cancelled'])(
+    '%s 리그는 쓰기·감사 없이 alreadyProcessed 로 답한다',
+    async (status) => {
+      const { service, row, tx, logAdminAction } = setup({ status });
+      const result = await service.close(user, 'league-1', {});
+      expect(result).toMatchObject({ lifecycleStatus: status, registrationOpen: false, alreadyProcessed: true });
+      expect(row.status).toBe(status);
+      expect(tx.v1Tournament.updateMany).not.toHaveBeenCalled();
+      expect(logAdminAction).not.toHaveBeenCalled();
+    },
+  );
 
-  it('조회 뒤 마감이 바뀌면 409 LEAGUE_STATE_CHANGED 이고 감사는 없다', async () => {
-    const racedTo = hours(72);
-    const { service, row, logAdminAction } = setup({}, (r) => {
-      r.registrationDeadlineAt = racedTo;
+  it('조회 뒤 상태가 바뀌면 409 LEAGUE_STATE_CHANGED 이고 감사는 없다', async () => {
+    const { service, row, logAdminAction } = setup({ status: 'open' }, (r) => {
+      r.status = 'in_progress';
     });
     await expect(service.close(user, 'league-1', {})).rejects.toMatchObject({
       status: 409, response: { code: 'LEAGUE_STATE_CHANGED' },
     });
-    expect(row.registrationDeadlineAt).toBe(racedTo);
+    expect(row.status).toBe('in_progress');
     expect(logAdminAction).not.toHaveBeenCalled();
-  });
-
-  it.each(['completed', 'cancelled'])('%s 리그는 409 LEAGUE_REGISTRATION_NOT_ALLOWED', async (status) => {
-    const { service, tx } = setup({ status });
-    await expect(service.close(user, 'league-1', {})).rejects.toMatchObject({
-      status: 409, response: { code: 'LEAGUE_REGISTRATION_NOT_ALLOWED' },
-    });
-    expect(tx.v1Tournament.updateMany).not.toHaveBeenCalled();
   });
 
   it('대회 id 는 404 LEAGUE_NOT_FOUND, 소프트삭제는 409 LEAGUE_MIRROR_MISSING 으로 갈린다', async () => {

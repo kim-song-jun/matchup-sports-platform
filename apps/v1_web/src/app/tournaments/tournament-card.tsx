@@ -119,8 +119,9 @@ export function TournamentCard({
 
   const isNearlyFull = teamCapacity !== null && teamCapacity > 0 && reservedTeamCount / teamCapacity >= 0.8;
   const registrationOpen = item.registrationOpen !== false && capacityInput !== null && !registrationBlocked;
+  // 시작 전 배지는 대회와 리그가 같다(2026-10-27): 접수 전 초안은 '준비 중', 접수 중·마감은 '시작 전'.
   const status = ['draft', 'open', 'closed'].includes(item.status)
-    ? { badgeClass: 'tm-badge-grey', label: isLeague || item.status === 'draft' ? '준비 중' : '시작 전' }
+    ? { badgeClass: 'tm-badge-grey', label: item.status === 'draft' ? '준비 중' : '시작 전' }
     : isLeague ? getLeagueStatusConfig(item.status) : getTournamentStatusConfig(item.status);
   const registrationLabel = registrationOpen ? '신청 접수 중' : isLeague ? '접수 안 함' : '모집 종료';
   // 커버가 없는 대회도 홍보용으로 등록한 실사진이 있으면 아이콘 대신 그 사진을 썸네일로

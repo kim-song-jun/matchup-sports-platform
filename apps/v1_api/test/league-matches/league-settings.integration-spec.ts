@@ -38,15 +38,19 @@ describe('리그 기본 정보 — 실제 HTTP/DB', () => {
     const publicView = await request(app.getHttpServer()).get(`/api/v1/league-matches/${id}`);
     expect(publicView.status).toBe(200);
     expect(publicView.body.data.rulesText).toBe(body.rulesText);
-    expect(publicView.body.data.registrationOpen).toBe(true);
+    // 2026-10-27: 마감을 정하는 것만으로는 열리지 않는다 — 대회처럼 '접수 시작하기'(open)가 연다.
+    expect(publicView.body.data.registrationOpen).toBe(false);
+    await h.prisma.v1Tournament.update({ where: { id }, data: { status: 'open' } });
+    expect((await request(app.getHttpServer()).get(`/api/v1/league-matches/${id}`)).body.data.registrationOpen).toBe(true);
     const stale = await patch(id, { ...body, title: '오래된 화면' });
     expect(stale.status).toBe(409);
     expect(stale.body.code).toBe('LEAGUE_SETTINGS_STALE');
     expect(await h.prisma.v1AdminActionLog.count({ where: { targetId: id, action: 'league_match.update_settings' } })).toBe(1);
-    const close = await patch(id, { ...await snapshot(id), registrationDeadlineAt: null, plannedFixtureCount: null });
-    expect(close.status).toBe(200);
+    const cleared = await patch(id, { ...await snapshot(id), registrationDeadlineAt: null, plannedFixtureCount: null });
+    expect(cleared.status).toBe(200);
     expect((await get(id)).body.data.plannedFixtureCount).toBeNull();
-    expect((await request(app.getHttpServer()).get(`/api/v1/league-matches/${id}`)).body.data.registrationOpen).toBe(false);
+    // 마감을 비우면 '접수 마감하기'를 누를 때까지 받는다(대회와 같다).
+    expect((await request(app.getHttpServer()).get(`/api/v1/league-matches/${id}`)).body.data.registrationOpen).toBe(true);
   });
   it('실제 권한, kind, 종료 상태와 DTO whitelist를 검사한다', async () => {
     const id = await h.makeLeague();

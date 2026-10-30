@@ -148,4 +148,50 @@ describe('league capacity registered MSW HTTP contract', () => {
     await expect(mutation).rejects.toMatchObject({ statusCode: 409, code: 'LEAGUE_SETTINGS_STALE' } satisfies Partial<V1ApiError>);
     expect(await v1Get<CapacitySettings>(`${path}/settings`)).toEqual(before);
   });
+
+  // 2026-10-27: 리그 만들기가 0팀·신청 마감·참가비·계좌를 보낸다. 가짜 API도 서버 DTO와 같은 계약을 따른다.
+  describe('리그 생성 — 팀 없이 신청으로 모으는 새 계약', () => {
+    const future = '2099-11-05T14:00:00.000Z';
+
+    const cases: Array<[string, Partial<CapacityCreate>, Partial<V1AdminLeagueDetail>]> = [
+      ['0팀·마감 없음·참가비 미설정', { teamIds: [] }, { teamIds: [], registrationDeadlineAt: null, entryFee: 0, entryFeeConfiguredAt: null, bankName: null }],
+      ['무료 확정', { teamIds: [], entryFee: 0 }, { entryFee: 0, bankName: null }],
+      ['유료·계좌·마감', { teamIds: [], entryFee: 30000, bankName: '국민은행', bankAccount: '000-00-0000', bankHolder: '팀밋', registrationDeadlineAt: future },
+        { entryFee: 30000, bankName: '국민은행', bankAccount: '000-00-0000', bankHolder: '팀밋', registrationDeadlineAt: future }],
+    ];
+    it.each(cases)('%s 리그를 만들고 초안으로 돌려준다', async (_label, changes, expected) => {
+      const path = await createLeague(changes);
+      const detail = await v1Get<V1AdminLeagueDetail & CapacityCounts>(path);
+      // 새 리그는 초안이라 마감이 남아도 '접수 시작하기' 전에는 신청을 받지 않는다.
+      expect(detail).toMatchObject({ lifecycleStatus: 'draft', registrationOpen: false, ...expected });
+      if ('entryFee' in changes) expect(detail.entryFeeConfiguredAt).not.toBeNull();
+    });
+
+    it('유료인데 계좌를 비우면 422 LEAGUE_PAYMENT_INSTRUCTIONS_REQUIRED', async () => {
+      await expect(createLeague({ teamIds: [], entryFee: 10000 })).rejects.toMatchObject(
+        { statusCode: 422, code: 'LEAGUE_PAYMENT_INSTRUCTIONS_REQUIRED' } satisfies Partial<V1ApiError>,
+      );
+    });
+
+    it('지난 신청 마감은 422 LEAGUE_REGISTRATION_DEADLINE_PAST', async () => {
+      await expect(createLeague({ teamIds: [], registrationDeadlineAt: '2000-01-01T00:00:00.000Z' })).rejects.toMatchObject(
+        { statusCode: 422, code: 'LEAGUE_REGISTRATION_DEADLINE_PAST' } satisfies Partial<V1ApiError>,
+      );
+    });
+
+    it("참가비를 문자열 '0'으로 보내면 무료로 바꾸지 않고 400이다", async () => {
+      await expect(createLeague({ teamIds: [], entryFee: '0' as unknown as number })).rejects.toMatchObject(
+        { statusCode: 400, code: 'VALIDATION_ERROR' } satisfies Partial<V1ApiError>,
+      );
+    });
+
+    it('초안 리그는 설정에서 마감을 미래로 바꿔도 신청이 열리지 않는다', async () => {
+      const path = await createLeague({ teamIds: [] });
+      const before = await v1Get<CapacitySettings>(`${path}/settings`);
+      await v1Patch<CapacitySettings>(`${path}/settings`, {
+        ...commonSettings, registrationDeadlineAt: future, expectedUpdatedAt: before.updatedAt,
+      } satisfies CapacityUpdate);
+      expect(await v1Get<V1AdminLeagueDetail>(path)).toMatchObject({ registrationDeadlineAt: future, registrationOpen: false });
+    });
+  });
 });

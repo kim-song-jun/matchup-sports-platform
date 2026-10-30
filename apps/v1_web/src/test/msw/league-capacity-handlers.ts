@@ -4,13 +4,17 @@ import type { V1CreateLeaguePayload } from '@/types/league-match';
 import type { UpdateLeagueSettings } from '@/types/league-settings';
 import {
   createCapacityLeagueRow, createLeagueCapacityFixtures, LEAGUE_CAPACITY_MSW,
-  leagueCapacityAdminDetail, leagueCapacityCounts, leagueCapacityPublicDetail,
+  leagueCapacityAdminDetail, leagueCapacityCounts, leagueCapacityPublicDetail, leagueRegistrationWindowOpen,
 } from './league-capacity-fixtures';
 
 const api = '*/api/v1';
 type Actor = 'owner' | 'ops' | 'support' | 'member' | 'guest';
 type SettingsPatch = Omit<UpdateLeagueSettings, 'plannedFixtureCount'> & { plannedFixtureCount?: number | null };
-const createFields = ['title', 'sportId', 'regionId', 'startsOn', 'endsOn', 'teamIds', 'minPlayers', 'maxPlayers', 'maxTeams', 'plannedFixtureCount'] as const;
+const createFields = [
+  'title', 'sportId', 'regionId', 'startsOn', 'endsOn', 'teamIds', 'minPlayers', 'maxPlayers', 'maxTeams', 'plannedFixtureCount',
+  'registrationDeadlineAt', 'entryFee', 'bankName', 'bankAccount', 'bankHolder',
+] as const;
+const BANK_FIELD = /^[^\u0000-\u001f\u007f]+$/;
 const settingsFields = ['expectedUpdatedAt', 'title', 'rulesText', 'regionId', 'startsOn', 'endsOn', 'registrationDeadlineAt', 'plannedFixtureCount', 'maxTeams'] as const;
 
 function ok<T>(data: T) {
@@ -48,22 +52,39 @@ function isInteger(value: unknown, maximum: number): value is number {
 function isOptionalInteger(value: unknown, maximum: number): value is number | null | undefined {
   return value === null || value === undefined || isInteger(value, maximum);
 }
+/** 서버 DTO 와 같다 — 앞뒤 공백을 뺀 1~60자, 제어 문자 없음. 안 보내면 undefined. */
+function optionalBankField(value: unknown): string | undefined | null {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed.length >= 1 && trimmed.length <= 60 && BANK_FIELD.test(trimmed) ? trimmed : null;
+}
 async function readBody(request: Request): Promise<unknown> {
   try { return await request.json(); }
   catch (error) { if (error instanceof SyntaxError) return null; throw error; }
 }
 function parseCreate(value: unknown): V1CreateLeaguePayload | null {
   if (!isRecord(value) || Object.keys(value).some(key => !createFields.some(field => field === key))) return null;
-  const { title, sportId, regionId, startsOn, endsOn, teamIds, minPlayers, maxPlayers, maxTeams, plannedFixtureCount } = value;
+  const { title, sportId, regionId, startsOn, endsOn, teamIds, minPlayers, maxPlayers, maxTeams, plannedFixtureCount, registrationDeadlineAt, entryFee } = value;
+  const bankName = optionalBankField(value.bankName);
+  const bankAccount = optionalBankField(value.bankAccount);
+  const bankHolder = optionalBankField(value.bankHolder);
   if (typeof title !== 'string' || title.length > 100 || !isUuid(sportId)
     || typeof regionId !== 'string' || regionId.length === 0 || regionId.length > 100
     || !isDateString(startsOn) || !isDateString(endsOn) || !isUuidList(teamIds)
     || (minPlayers !== undefined && !isInteger(minPlayers, 50))
     || !isOptionalInteger(maxPlayers, 50) || !isOptionalInteger(maxTeams, 2147483647)
-    || (plannedFixtureCount !== undefined && !isInteger(plannedFixtureCount, 500))) return null;
+    || (plannedFixtureCount !== undefined && !isInteger(plannedFixtureCount, 500))
+    || !(registrationDeadlineAt === undefined || registrationDeadlineAt === null || isDateString(registrationDeadlineAt))
+    // 서버는 원본 JSON 값으로 검사한다 — '0'·null·false 를 0원(무료 확정)으로 바꾸지 않는다.
+    || !(entryFee === undefined || (typeof entryFee === 'number' && Number.isInteger(entryFee) && entryFee >= 0 && entryFee <= 100_000_000))
+    || bankName === null || bankAccount === null || bankHolder === null) return null;
   return { title, sportId, regionId, startsOn, endsOn, teamIds,
     ...(minPlayers !== undefined ? { minPlayers } : {}), ...(maxPlayers !== undefined ? { maxPlayers } : {}),
-    ...(maxTeams !== undefined ? { maxTeams } : {}), ...(plannedFixtureCount !== undefined ? { plannedFixtureCount } : {}) };
+    ...(maxTeams !== undefined ? { maxTeams } : {}), ...(plannedFixtureCount !== undefined ? { plannedFixtureCount } : {}),
+    ...(registrationDeadlineAt !== undefined ? { registrationDeadlineAt } : {}), ...(entryFee !== undefined ? { entryFee } : {}),
+    ...(bankName !== undefined ? { bankName } : {}), ...(bankAccount !== undefined ? { bankAccount } : {}),
+    ...(bankHolder !== undefined ? { bankHolder } : {}) };
 }
 function parseSettings(value: unknown): SettingsPatch | null {
   if (!isRecord(value) || Object.keys(value).some(key => !settingsFields.some(field => field === key))) return null;
@@ -90,10 +111,17 @@ export function createV1LeagueCapacityMswHandlers(actor: Actor = 'ops') {
       if (body.maxPlayers !== undefined && body.maxPlayers !== null && body.maxPlayers < (body.minPlayers ?? 1)) {
         return fail(422, 'LEAGUE_ROSTER_RANGE_INVALID', '팀 명단 최대 인원은 최소 인원 이상이어야 해요.');
       }
+      // 팀은 비워 두고 참가 신청으로 모아도 된다(2026-10-27) — 넣은 팀만 종목·활성을 검사한다.
       const teamIds = [...new Set(body.teamIds)];
       const knownTeamIds: readonly string[] = LEAGUE_CAPACITY_MSW.teamIds;
-      if (teamIds.length < 2 || body.sportId !== LEAGUE_CAPACITY_MSW.sportId || teamIds.some(id => !knownTeamIds.includes(id))) {
-        return fail(422, 'LEAGUE_TEAM_INVALID', '리그 종목과 일치하는 활성 팀 2개 이상을 선택해 주세요.');
+      if (body.sportId !== LEAGUE_CAPACITY_MSW.sportId || teamIds.some(id => !knownTeamIds.includes(id))) {
+        return fail(422, 'LEAGUE_TEAM_INVALID', '리그 종목과 일치하는 활성 팀만 등록할 수 있어요.');
+      }
+      if (body.registrationDeadlineAt && Date.parse(body.registrationDeadlineAt) <= Date.now()) {
+        return fail(422, 'LEAGUE_REGISTRATION_DEADLINE_PAST', '신청 마감은 지금보다 뒤여야 해요.');
+      }
+      if (body.entryFee !== undefined && body.entryFee > 0 && (!body.bankName || !body.bankAccount || !body.bankHolder)) {
+        return fail(422, 'LEAGUE_PAYMENT_INSTRUCTIONS_REQUIRED', '유료 리그는 은행명, 계좌번호, 예금주를 모두 입력해야 해요.');
       }
       if (body.regionId !== LEAGUE_CAPACITY_MSW.regionId) return fail(422, 'LEAGUE_REGION_INVALID', '활성화된 시·군·구 지역을 선택해 주세요.');
       if (body.maxTeams !== null && body.maxTeams !== undefined && teamIds.length > body.maxTeams) {
@@ -138,7 +166,7 @@ export function createV1LeagueCapacityMswHandlers(actor: Actor = 'ops') {
       row.detail = { ...row.detail, title: row.settings.title, maxTeams: row.settings.maxTeams,
         startsOn: row.settings.startsOn, plannedFixtureCount: row.settings.plannedFixtureCount,
         registrationDeadlineAt: row.settings.registrationDeadlineAt,
-        registrationOpen: row.settings.registrationDeadlineAt !== null && Date.parse(row.settings.registrationDeadlineAt) >= Date.now() };
+        registrationOpen: leagueRegistrationWindowOpen(row.settings.status, row.settings.registrationDeadlineAt) };
       return ok(row.settings);
     }),
     http.get(`${admin}/:leagueId`, ({ params }) => {

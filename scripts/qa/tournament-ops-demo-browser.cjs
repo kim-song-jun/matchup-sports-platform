@@ -59,7 +59,7 @@ const out = path.resolve('docs/screenshots/tournament-ops-demo');
           case 'screenshot': {
             if (!/^[a-z0-9-]+$/.test(command.file)) throw new Error('Invalid screenshot name');
             fs.mkdirSync(out, { recursive: true });
-            await page.screenshot({ path: path.join(out, `${command.file}.png`), fullPage: true, mask: [page.locator('input[type="email"],input[type="password"]')] });
+            await page.screenshot({ path: path.join(out, `${command.file}.png`), fullPage: command.fullPage ?? true, mask: [page.locator('input[type="email"],input[type="password"]')] });
             result = { file: `${command.file}.png`, width: page.viewportSize().width, horizontalOverflow: await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), errors: errors.splice(0) }; break;
           }
           case 'request': {

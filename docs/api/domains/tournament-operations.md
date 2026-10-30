@@ -384,7 +384,12 @@ revision snapshot—not the frozen raw event stream—is the validation and publ
 projection source. The server returns 422 RESULT_GOAL_TIMELINE_INVALID if its
 score total, scorer side, own-goal opposing side, or participant goal totals
 do not agree. The correction UI also edits knockout penalty home/away scores
-and firstKickSideKey.
+and firstKickSideKey. Score edits include actual `takenHome`/`takenAway` kick
+counts; missing historical counts are not inferred. Both counts must be present
+together and at least the corresponding scored count. A correction that explicitly
+sets `penalties.operatorOverride: false` opts out of inheriting the base revision's
+override, even when the successful-kick scores are unchanged. False is normalized
+to an absent stored override; the normal shootout-conclusion gate still runs.
 
 ## 2026-10-13 정규 리그 운영 조회
 

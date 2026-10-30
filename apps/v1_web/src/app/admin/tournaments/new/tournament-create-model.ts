@@ -1,4 +1,5 @@
 import { placeFromVenueFields, toVenuePayload, type PlaceValue } from '@/lib/place';
+import type { TournamentPeriodPhase } from '@/hooks/use-tournament-period-settings';
 import type {
   V1CreateTournamentPayload,
   V1Tournament,
@@ -36,6 +37,19 @@ export const TOURNAMENT_CREATE_STEPS = [
  * 대회가 초안으로 즉시 생성된다. CONFIRM_STEP_INDEX는 그 결과를 보여주는 새 마지막 단계. */
 export const LAST_INPUT_STEP_INDEX = TOURNAMENT_CREATE_STEPS.length - 2;
 export const CONFIRM_STEP_INDEX = TOURNAMENT_CREATE_STEPS.length - 1;
+
+/** 단계별 경기 시간을 정할 수 있는 대회 단계. 생성 마법사와 대회 정보의 피리어드 편집기가 같이 쓴다. */
+export const TOURNAMENT_PERIOD_PHASES: ReadonlyArray<{ value: TournamentPeriodPhase; label: string }> = [
+  { value: 'group', label: '조별리그' }, { value: 'round64', label: '64강' },
+  { value: 'round32', label: '32강' }, { value: 'round16', label: '16강' },
+  { value: 'round12', label: '12강' }, { value: 'quarter', label: '8강' },
+  { value: 'semi', label: '4강' }, { value: 'final', label: '결승' },
+  { value: 'third_place', label: '3·4위전' },
+];
+
+export function tournamentPeriodPhaseLabel(phase: TournamentPeriodPhase) {
+  return TOURNAMENT_PERIOD_PHASES.find((option) => option.value === phase)?.label ?? phase;
+}
 
 export type TournamentCreateState = {
   step: number;
@@ -75,6 +89,9 @@ export type TournamentCreateState = {
    */
   periodMinutes: string[];
   periodMinutesDirty: boolean;
+  /** 단계별 선택 재정의. 키가 없으면 대회 기본 경기 시간을 상속한다. */
+  stagePeriodMinutes: Partial<Record<TournamentPeriodPhase, string[]>>;
+  stagePeriodMinutesDirty: boolean;
   genderMinMale: string;
   genderMaxMale: string;
   genderMinFemale: string;
@@ -143,6 +160,8 @@ export const INITIAL_TOURNAMENT_CREATE_STATE: TournamentCreateState = {
   maxSubstitutions: '',
   periodMinutes: [],
   periodMinutesDirty: false,
+  stagePeriodMinutes: {},
+  stagePeriodMinutesDirty: false,
   genderMinMale: '',
   genderMaxMale: '',
   genderMinFemale: '',
@@ -178,7 +197,8 @@ export const INITIAL_TOURNAMENT_CREATE_STATE: TournamentCreateState = {
 
 type FormField = Exclude<
   keyof TournamentCreateState,
-  'step' | 'savedPayload' | 'prizeRows' | 'promoHome' | 'promoList' | 'promoFactsDirty' | 'periodMinutes' | 'periodMinutesDirty'
+  'step' | 'savedPayload' | 'prizeRows' | 'promoHome' | 'promoList' | 'promoFactsDirty' |
+  'periodMinutes' | 'periodMinutesDirty' | 'stagePeriodMinutes' | 'stagePeriodMinutesDirty'
 >;
 
 export type TournamentCreateAction =
@@ -201,8 +221,13 @@ export type TournamentCreateAction =
   | { type: 'set-period-minutes'; value: string[] }
   /** 종목 기본값·초안 저장값으로 채운다. 운영자가 이미 고쳤으면 덮어쓰지 않는다. */
   | { type: 'prefill-period-minutes'; value: string[] }
+  | { type: 'set-stage-period-minutes'; phase: TournamentPeriodPhase; value: string[] }
+  | { type: 'remove-stage-period-minutes'; phase: TournamentPeriodPhase }
+  | { type: 'prefill-stage-period-minutes'; value: Partial<Record<TournamentPeriodPhase, string[]>> }
   /** 피리어드 설정 저장 성공 — 다음 PATCH 의 expectedVersion 을 새 updatedAt 으로 맞춘다. */
   | { type: 'periods-saved'; updatedAt: string }
+  /** 경기 시간 저장이 일부만 성공했을 때 — 다음 저장의 expectedVersion 만 맞추고 고친 표시는 남겨 다시 보낸다. */
+  | { type: 'draft-version-synced'; updatedAt: string }
   | { type: 'draft-saved'; tournament: V1Tournament }
   /** 초안 생성/수정 성공 직후 — draftId를 고정하고 확인 단계로 넘어간다. */
   | { type: 'draft-created'; tournament: V1Tournament }
@@ -222,7 +247,7 @@ export function tournamentCreateReducer(
       // 새 종목의 선택지 목록이 로드되면 컴포넌트가 canonical 기본값으로 다시 채운다.
       if (action.field === 'sportId' && action.value !== state.sportId) {
         // 경기 시간도 종목 기본값이 다르다(축구 45·45, 풋살 20·20) — 새 종목 기본값으로 다시 채운다.
-        return { ...state, sportId: action.value as string, lineupMaxPlayers: '', periodMinutes: [], periodMinutesDirty: false };
+        return { ...state, sportId: action.value as string, lineupMaxPlayers: '', periodMinutes: [], periodMinutesDirty: false, stagePeriodMinutes: {}, stagePeriodMinutesDirty: false };
       }
       return syncPromoFacts({ ...state, [action.field]: action.value }, action.field);
     case 'set-scheduled-at': {
@@ -272,8 +297,20 @@ export function tournamentCreateReducer(
     case 'prefill-period-minutes':
       if (state.periodMinutesDirty || state.periodMinutes.join(',') === action.value.join(',')) return state;
       return { ...state, periodMinutes: action.value };
+    case 'set-stage-period-minutes':
+      return { ...state, stagePeriodMinutes: { ...state.stagePeriodMinutes, [action.phase]: action.value }, stagePeriodMinutesDirty: true };
+    case 'remove-stage-period-minutes': {
+      const next = { ...state.stagePeriodMinutes };
+      delete next[action.phase];
+      return { ...state, stagePeriodMinutes: next, stagePeriodMinutesDirty: true };
+    }
+    case 'prefill-stage-period-minutes':
+      if (state.stagePeriodMinutesDirty) return state;
+      return { ...state, stagePeriodMinutes: action.value };
     case 'periods-saved':
-      return { ...state, draftUpdatedAt: action.updatedAt, periodMinutesDirty: false };
+      return { ...state, draftUpdatedAt: action.updatedAt, periodMinutesDirty: false, stagePeriodMinutesDirty: false };
+    case 'draft-version-synced':
+      return { ...state, draftUpdatedAt: action.updatedAt };
     case 'copy-bank':
       return {
         ...state,
@@ -656,6 +693,9 @@ export function validateTournamentCreateStep(state: TournamentCreateState, step 
     }
     if (state.periodMinutes.some((value) => !/^\d+$/.test(value.trim()) || Number(value) < 1 || Number(value) > 240)) {
       errors.periodMinutes = '경기 시간은 피리어드마다 1~240분 사이의 정수로 입력해 주세요.';
+    }
+    if (Object.values(state.stagePeriodMinutes).some((periods) => !periods?.length || periods.some((value) => !/^\d+$/.test(value.trim()) || Number(value) < 1 || Number(value) > 240))) {
+      errors.stagePeriodMinutes = '단계별 경기 시간도 피리어드마다 1~240분 사이의 정수로 입력해 주세요.';
     }
     if (state.substitutionMode === 'limited') {
       // 비워두면 여기서 막는다. 예전엔 통과시켰는데, 그러면 canonical 이 무제한인

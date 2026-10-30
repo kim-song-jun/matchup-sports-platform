@@ -13,6 +13,10 @@ const mocks = vi.hoisted(() => ({
   setSources: vi.fn(),
 }));
 
+vi.mock('@/hooks/use-tournament-period-settings', () => ({
+  useTournamentMatchPeriods: () => ({ data: undefined, isPending: true, isError: false }),
+  useUpdateTournamentPeriodSettings: () => ({ mutateAsync: vi.fn(), isPending: false }),
+}));
 vi.mock('@/hooks/use-v1-bracket-canvas', () => ({
   useV1AssignTournamentSlot: () => ({ mutate: mocks.assign, isPending: false }),
   useV1QuickResult: () => ({ mutate: mocks.quick, isPending: false }),

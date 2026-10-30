@@ -13,7 +13,7 @@ describe('TournamentCompetitionConfig', () => {
         // CAS 갱신 직후 재조회가 `findUniqueOrThrow` → 대회 표면 헬퍼(`findFirst`)로
         // 바뀌었다. 호출 형태를 바꾸면 인라인 mock 이 조용히 안 따라온다(#863 에서 78건).
         findFirst: jest.fn()
-          .mockResolvedValueOnce({ id: 'tournament-1', competitionConfigVersionId: 'config-old', updatedAt, sport: { code: 'futsal' } })
+          .mockResolvedValueOnce({ id: 'tournament-1', kind: 'tournament', competitionConfigVersionId: 'config-old', stagePeriodSettings: [], updatedAt, sport: { code: 'futsal' } })
           .mockResolvedValue({ updatedAt: new Date('2026-08-15T00:01:00.000Z') }),
       },
       v1TeamMatch: {
@@ -23,6 +23,8 @@ describe('TournamentCompetitionConfig', () => {
       v1TournamentStanding: { count: jest.fn().mockResolvedValueOnce(8).mockResolvedValueOnce(options.recordedStandings ?? 0) },
       v1Game: { updateMany: jest.fn().mockResolvedValue({ count: 3 }), findMany: jest.fn().mockResolvedValue(options.existingPeriods ? [{ id: 'game-1', periods: options.existingPeriods }] : []) },
       v1GamePeriod: { createMany: jest.fn(), deleteMany: jest.fn() },
+      v1TournamentMatchDetails: { findMany: jest.fn().mockResolvedValue([]) },
+      v1TournamentGroup: { findMany: jest.fn().mockResolvedValue([]) },
       $executeRaw: jest.fn(),
       $queryRaw: jest.fn().mockResolvedValue([]),
     };
@@ -30,7 +32,9 @@ describe('TournamentCompetitionConfig', () => {
       v1Tournament: {
         findFirst: jest.fn().mockResolvedValue({
           id: 'tournament-1',
+          kind: 'tournament',
           competitionConfigVersionId: 'config-old',
+          stagePeriodSettings: [],
           updatedAt,
           sport: { code: 'futsal' },
         }),

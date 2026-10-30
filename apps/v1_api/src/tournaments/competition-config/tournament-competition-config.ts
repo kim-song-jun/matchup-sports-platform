@@ -11,6 +11,8 @@ import { normalizeCompetitionSportCode } from './competition-config';
 import { ChangeTournamentCompetitionConfigDto } from './competition-config.dto';
 import { ALL_COMPETITION_KINDS, findTournamentOnSurface, findTournamentOnSurfaceOrThrow, TOURNAMENT_KINDS } from '../tournament-surface-lookup';
 import { computePeriodCount } from '../../games/games.service';
+import { materializePeriodConfigVersion } from './materialize-period-config-version';
+import { inPeriodScope, loadFixturePeriodRows, type PeriodScope } from './tournament-stage-period-config';
 
 type ConfigCountClient = {
   v1TeamMatch: PrismaService['v1TeamMatch'];
@@ -278,7 +280,7 @@ export class TournamentCompetitionConfig {
       // explicit OF clause prevents the join from taking an implicit TM lock.
       const lockedTournament = await findTournamentOnSurface(tx, allowedKinds, {
         where: { id: tournamentId, deletedAt: null },
-        include: { sport: true },
+        include: { sport: true, stagePeriodSettings: true },
       });
       if (!lockedTournament || lockedTournament.updatedAt.toISOString() !== dto.expectedVersion) {
         throw new ConflictException({
@@ -301,8 +303,55 @@ export class TournamentCompetitionConfig {
       });
       if (changed.count !== 1) throw new ConflictException({ code: 'TOURNAMENT_VERSION_CONFLICT', message: '대회 설정이 다른 요청에서 변경됐어요. 다시 확인해 주세요.' });
       // Existing games, periods, lineups, events and revisions stay pinned.
-      // Only untouched canonical TeamMatches/games follow the new pin.
-      const teamMatchesRepointed = await repointUntouchedFixtures(tx, matchOwnership, selected);
+      // Only untouched canonical TeamMatches/games follow the new pin. 단계·조 재정의는 자기 피리어드를 지킨 채
+      // 새 규칙 위에 다시 만들고, 각 재정의를 따르는 경기만 그 버전으로 옮긴다. 경기별 재정의는 옮기지 않는다 —
+      // 대회·리그 경기는 만들 때 명단 행이 함께 생겨 여기서 옮길 수 있는(명단 없는) 경기가 아니다.
+      const stagePhases = new Set(lockedTournament.stagePeriodSettings.map((setting) => setting.phase));
+      const fixtures = await loadFixturePeriodRows(tx, { tournamentId, kind: lockedTournament.kind, ownership: matchOwnership });
+      const hasOverrides = stagePhases.size > 0 || fixtures.some((fixture) => fixture.groupOverridden || fixture.matchOverridden);
+      const scopeOwnership = (scope: PeriodScope): Prisma.V1TeamMatchWhereInput => scope.kind === 'default' && !hasOverrides ? matchOwnership : {
+        ...matchOwnership,
+        id: { in: fixtures.filter((fixture) => inPeriodScope(fixture, scope, stagePhases)).map((fixture) => fixture.teamMatchId) },
+      };
+      const rebase = async (periods: Prisma.JsonValue, scope: Record<string, string>) => {
+        const materialized = await materializePeriodConfigVersion(tx, { source: selected, periods, createdByUserId: user.id });
+        if (materialized.created) {
+          await tx.v1AdminActionLog.create({ data: {
+            adminUserId: admin.id,
+            action: 'competition_config.version.create',
+            targetType: 'competition_config',
+            targetId: materialized.version.id,
+            beforeJson: { sourceVersionId: selected.id, sourceVersion: selected.version },
+            afterJson: {
+              version: materialized.version.version,
+              contentHash: materialized.version.contentHash,
+              tournamentId,
+              ...scope,
+              reason: 'stage_period_rebase',
+            },
+          } });
+        }
+        return materialized.version;
+      };
+      let teamMatchesRepointed = await repointUntouchedFixtures(tx, scopeOwnership({ kind: 'default' }), selected);
+      for (const setting of lockedTournament.stagePeriodSettings) {
+        const version = await rebase(setting.periods, { phase: setting.phase });
+        await tx.v1TournamentStagePeriodSetting.update({
+          where: { id: setting.id },
+          data: { competitionConfigVersionId: version.id },
+        });
+        teamMatchesRepointed += await repointUntouchedFixtures(tx, scopeOwnership({ kind: 'stage', phase: setting.phase }), version);
+      }
+      const overriddenGroups = lockedTournament.kind === V1CompetitionKind.regular_league ? [] : await tx.v1TournamentGroup.findMany({
+        where: { tournamentId, competitionConfigVersionId: { not: null } },
+        select: { id: true, periods: true },
+      });
+      for (const group of overriddenGroups) {
+        if (group.periods === null) continue;
+        const version = await rebase(group.periods, { groupId: group.id });
+        await tx.v1TournamentGroup.update({ where: { id: group.id }, data: { competitionConfigVersionId: version.id } });
+        teamMatchesRepointed += await repointUntouchedFixtures(tx, scopeOwnership({ kind: 'group', groupId: group.id }), version);
+      }
       await this.adminContext.logAdminAction(
         admin,
         {

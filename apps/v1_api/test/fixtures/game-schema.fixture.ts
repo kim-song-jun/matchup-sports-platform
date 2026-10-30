@@ -603,7 +603,8 @@ export const gameSchemaSourceManifest = {
   // 2026-10-22: additive V1User.session_epoch integer default 0 (20261022120000_user_session_epoch); historical game migration unchanged.
   // 2026-10-27: additive round64/round32 and bracket draft fields. LF migration replay + drift passed.
   // 2026-10-28: six-team mode adds tournament fields only; historical game migration unchanged.
-  schema: '7cb13512f128b7b6e5eaf8f474938b65b1f30782afb46b833967d7f9be9e6626',
+  // 2026-10-29: additive v1_tournament_stage_period_settings + group/match period override columns; historical game migration unchanged.
+  schema: '3ec98b92af1b34477bb90bfc257e3f150fbeb14f9fe9cc568c4b05d07889edbb',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

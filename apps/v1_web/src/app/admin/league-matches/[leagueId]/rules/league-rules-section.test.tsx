@@ -27,6 +27,8 @@ function periodSettingsOf(minutes: number[]) {
       periods: minutes.map((durationMinutes, i) => ({ code: `P${i}`, label: `${i + 1}`, durationMinutes, extraTime: false })),
       legacyPeriodCount: null,
       requiresDurationInput: false,
+      kind: 'regular_league',
+      stageOverrides: [], groupOverrides: [],
     },
     isPending: false,
     isError: false,

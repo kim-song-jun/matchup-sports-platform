@@ -8,6 +8,7 @@
  */
 import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminContextService } from '../common/admin-context.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -112,7 +113,8 @@ describe('TournamentsAdminService', () => {
     v1StatusChangeLog: { create: jest.Mock; count: jest.Mock };
     v1CompetitionConfigVersion: { findFirst: jest.Mock; findUnique: jest.Mock };
     v1TournamentMatchDetails: { count: jest.Mock; findFirst: jest.Mock };
-    v1TournamentGroup: { count: jest.Mock };
+    v1TournamentGroup: { count: jest.Mock; updateMany: jest.Mock };
+    v1TournamentStagePeriodSetting: { deleteMany: jest.Mock };
     $executeRaw: jest.Mock;
     $queryRaw: jest.Mock;
     v1TournamentStanding: { count: jest.Mock };
@@ -141,7 +143,8 @@ describe('TournamentsAdminService', () => {
       // 아니라 이 경로를 안 타므로 unconfigured mock(undefined 반환)으로 둬도 무해하다.
       v1CompetitionConfigVersion: { findFirst: jest.fn(), findUnique: jest.fn() },
       v1TournamentMatchDetails: { count: jest.fn().mockResolvedValue(0), findFirst: jest.fn().mockResolvedValue(null) },
-      v1TournamentGroup: { count: jest.fn().mockResolvedValue(0) },
+      v1TournamentGroup: { count: jest.fn().mockResolvedValue(0), updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      v1TournamentStagePeriodSetting: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
       $executeRaw: jest.fn().mockResolvedValue(1),
       $queryRaw: jest.fn().mockResolvedValue([{ id: 'tournament-1' }]),
       v1TournamentRegistration: { findMany: jest.fn().mockResolvedValue([]) },
@@ -1106,6 +1109,32 @@ describe('TournamentsAdminService', () => {
           afterJson: expect.objectContaining({ sportId: 'sport-2', competitionConfigVersionId: 'football-default-version' }),
         }),
       });
+    });
+
+    it('clears stage and group period overrides because they stay pinned to the previous sport config', async () => {
+      arrange({ sportId: 'sport-1', competitionConfigVersionId: 'futsal-default-version' });
+      prisma.v1TournamentStagePeriodSetting.deleteMany.mockResolvedValue({ count: 2 });
+      prisma.v1TournamentGroup.updateMany.mockResolvedValue({ count: 1 });
+
+      await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, sportId: 'sport-2' });
+
+      expect(prisma.v1TournamentStagePeriodSetting.deleteMany).toHaveBeenCalledWith({ where: { tournamentId: 'tournament-1' } });
+      expect(prisma.v1TournamentGroup.updateMany).toHaveBeenCalledWith({
+        where: { tournamentId: 'tournament-1', competitionConfigVersionId: { not: null } },
+        data: { periods: Prisma.DbNull, competitionConfigVersionId: null },
+      });
+      expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ afterJson: expect.objectContaining({ periodOverridesCleared: 3 }) }),
+      });
+    });
+
+    it('keeps stage and group period overrides when the sport stays the same', async () => {
+      arrange({ sportId: 'sport-1', competitionConfigVersionId: 'futsal-default-version' });
+
+      await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, sportId: 'sport-1', title: '새 이름' });
+
+      expect(prisma.v1TournamentStagePeriodSetting.deleteMany).not.toHaveBeenCalled();
+      expect(prisma.v1TournamentGroup.updateMany).not.toHaveBeenCalled();
     });
 
     it('a CAS conflict leaves nothing to commit: the single updateMany carries both columns and no audit log is written', async () => {

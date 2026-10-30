@@ -84,7 +84,12 @@ export function resetMobileEditorFixture() {
     http.get(`*/api/v1/admin/tournaments/${MOBILE_LEAGUE_ID}/periods`, () => success({
       tournamentId: MOBILE_LEAGUE_ID, competitionConfigVersionId: 'synthetic-config-138', expectedVersion: 'synthetic-version-138',
       periods: [{ code: 'FIRST', label: '전반', durationMinutes: 20, extraTime: false }, { code: 'SECOND', label: '후반', durationMinutes: 20, extraTime: false }],
-      legacyPeriodCount: null, requiresDurationInput: false,
+      legacyPeriodCount: null, requiresDurationInput: false, stageOverrides: [], groupOverrides: [],
+    })),
+    http.get(`*/api/v1/admin/tournaments/${MOBILE_LEAGUE_ID}/periods/matches/:teamMatchId`, ({ params }) => success({
+      tournamentId: MOBILE_LEAGUE_ID, teamMatchId: params.teamMatchId, expectedVersion: 'synthetic-version-138',
+      overridden: false, editable: true, periods: null, legacyPeriodCount: null,
+      inherited: { source: 'default', phase: null, groupName: null, periods: [{ code: 'FIRST', label: '전반', durationMinutes: 20, extraTime: false }, { code: 'SECOND', label: '후반', durationMinutes: 20, extraTime: false }], legacyPeriodCount: null },
     })),
     http.get(`*/api/v1/admin/tournaments/${MOBILE_LEAGUE_ID}/registrations`, () => success({ items: [], truncated: false })),
     http.get(`*/api/v1/tournament-ops/tournaments/${MOBILE_LEAGUE_ID}/fields`, () => success({ items: [] })),

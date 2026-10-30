@@ -16,6 +16,7 @@ import { toPlaceColumns, type PlaceSnapshot } from '../places/place-snapshot';
 import { parseLineupCatalog } from './competition-config/competition-config.parse';
 import { registerCompetitionPlace, resolveCompetitionFieldPlace } from '../places/competition-field-place';
 import { defaultFixtureEndAt } from './competition-config/fixture-end-at';
+import { resolveTournamentStageCompetitionConfigVersionId } from './competition-config/tournament-stage-period-config';
 
 export type TournamentMatchCreationTeam = {
   id: string | null;
@@ -196,7 +197,10 @@ export async function createTournamentMatchInTx(
       throw new ConflictException({ code: 'COMMAND_IDEMPOTENCY_PAYLOAD_REUSE', message: '같은 대진 생성 키를 다른 내용으로 다시 사용할 수 없어요.' });
     }
     const existing = await tx.v1TeamMatch.findUnique({ where: { id: existingCommand.resourceId }, select: { id: true, tournamentId: true, competitionConfigVersionId: true, tournamentDetails: { select: { teamMatchId: true, tournamentId: true } }, game: { select: { id: true, sourceType: true, teamMatchId: true, competitionConfigVersionId: true, state: true, version: true } } } });
-    if (existing === null || existing.tournamentDetails === null || existing.tournamentDetails.tournamentId !== input.tournamentId || existing.tournamentId !== input.tournamentId || (input.id !== undefined && existing.id !== input.id) || existing.tournamentDetails.teamMatchId !== existing.id || existing.game === null || existing.game.sourceType !== V1GameSourceType.TEAM_MATCH || existing.game.teamMatchId !== existing.id || existing.competitionConfigVersionId !== input.competitionConfigVersionId || existing.game.competitionConfigVersionId !== existing.competitionConfigVersionId) {
+    // 입력의 기본 설정 ID와 직접 비교하지 않는다. 단계별 설정이 있으면 새 경기에는 그 단계의
+    // immutable 버전이 저장되며, 이후 단계 설정이 바뀌어도 같은 커맨드 재시도는 최초 결과를
+    // 그대로 돌려줘야 한다. 입력 자체의 재사용 여부는 위 payloadHash가 이미 검증한다.
+    if (existing === null || existing.tournamentDetails === null || existing.tournamentDetails.tournamentId !== input.tournamentId || existing.tournamentId !== input.tournamentId || (input.id !== undefined && existing.id !== input.id) || existing.tournamentDetails.teamMatchId !== existing.id || existing.game === null || existing.game.sourceType !== V1GameSourceType.TEAM_MATCH || existing.game.teamMatchId !== existing.id || existing.competitionConfigVersionId === null || existing.game.competitionConfigVersionId !== existing.competitionConfigVersionId) {
       throw new ConflictException({ code: 'TEAM_MATCH_IDEMPOTENCY_INCOMPLETE', message: '기존 대진 생성 기록이 완전하지 않아 다시 만들 수 없어요.' });
     }
     const schedulesCreated = await tx.v1TeamSchedule.count({ where: { teamMatchId: existing.id } });
@@ -211,11 +215,17 @@ export async function createTournamentMatchInTx(
       schedulesCreated,
     };
   }
+  const competitionConfigVersionId = await resolveTournamentStageCompetitionConfigVersionId(tx, {
+    tournamentId: input.tournamentId,
+    groupId: input.groupId,
+    round: input.round,
+    defaultCompetitionConfigVersionId: input.competitionConfigVersionId,
+  });
   await assertTournamentReferences(tx, input);
   const goalkeeperDefaults = await assertParticipantRoster(tx, input);
   let participants = [...(input.home.participants ?? []), ...(input.away.participants ?? [])];
   if ([...goalkeeperDefaults.values()].some((value) => value !== null)) {
-    const config = await tx.v1CompetitionConfigVersion.findUnique({ where: { id: input.competitionConfigVersionId }, select: { lineup: true } });
+    const config = await tx.v1CompetitionConfigVersion.findUnique({ where: { id: competitionConfigVersionId }, select: { lineup: true } });
     if (config === null) throw new UnprocessableEntityException({ code: 'COMPETITION_CONFIG_NOT_FOUND', message: '경기 규칙을 찾을 수 없어요.' });
     const goalkeeperCode = parseLineupCatalog(config.lineup).positions.find((position) => position.goalkeeper)?.code ?? 'GK';
     participants = participants.map((participant) => {
@@ -230,7 +240,7 @@ export async function createTournamentMatchInTx(
     throw new ConflictException({ code: 'TEAM_MATCH_ID_COLLISION', message: '같은 대진 ID가 이미 다른 생성 요청에 사용됐어요.' });
   }
   // 종료 시각을 안 받았으면 시작 + 경기 설정의 정규 시간(연장 제외 피리어드 합계)으로 채운다.
-  const endAt = input.endAt ?? await defaultFixtureEndAt(tx, input.competitionConfigVersionId, input.startAt);
+  const endAt = input.endAt ?? await defaultFixtureEndAt(tx, competitionConfigVersionId, input.startAt);
   const place = input.fieldId == null ? input.place : await resolveCompetitionFieldPlace(tx, input.tournamentId, input.fieldId, null);
   const fieldId = input.fieldId ?? await registerCompetitionPlace(tx, input.tournamentId, place);
   const teamMatch = await tx.v1TeamMatch.create({
@@ -250,7 +260,7 @@ export async function createTournamentMatchInTx(
       startAt: input.startAt,
       endAt,
       status: input.status ?? V1TeamMatchStatus.matched,
-      competitionConfigVersionId: input.competitionConfigVersionId,
+      competitionConfigVersionId,
     },
     select: { id: true },
   });
@@ -275,7 +285,7 @@ export async function createTournamentMatchInTx(
     {
       sourceType: V1GameSourceType.TEAM_MATCH,
       sourceId: teamMatch.id,
-      competitionConfigVersionId: input.competitionConfigVersionId,
+      competitionConfigVersionId,
       sides: [
         { sideKey: V1GameSideKey.HOME, teamId: input.home.id, displayNameSnapshot: input.home.name },
         { sideKey: V1GameSideKey.AWAY, teamId: input.away.id, displayNameSnapshot: input.away.name },

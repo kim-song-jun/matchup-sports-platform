@@ -367,6 +367,15 @@ On update, `null` clears nullable bank details when the resulting `entryFee` is 
 
 피리어드 설정 저장은 새 설정 버전을 대회(리그)에 연결하면서 **끝나지 않았고 시작 전인 경기**(게임 `SCHEDULED`, 이벤트·결과·시작된 피리어드 없음 — 라인업 제출은 무관)도 같은 버전으로 옮기고 경기 피리어드 행 수를 맞춘다. 옮기는 대상은 피리어드 말고는 현재 설정과 같은 버전을 따르던 경기뿐이다(라인업·결과 규칙이 다른 버전으로 남은 경기는 그대로). 같은 피리어드를 다시 저장하면 버전은 바뀌지 않고(`changed: false`) 예전 버전에 남은 시작 전 경기만 따라온다. 응답 `fixturesRepointed`가 옮긴 경기 수다. 시작했거나 끝난 경기는 만든 때의 피리어드 그대로다. 경기 종료 예정 시각(`endAt`)은 바꾸지 않는다.
 
+정규 대회는 기본 피리어드에 더해 단계별 재정의를 저장할 수 있다. `GET /api/v1/admin/tournaments/:tournamentId/periods`의 `stageOverrides[]`는 `phase`(`group|round64|round32|round16|round12|quarter|semi|final|third_place`)와 그 단계의 피리어드를 반환한다. 같은 PATCH에 `phase`를 보내면 해당 단계만 저장하고, `phase`와 `inheritDefault: true`를 보내면 재정의를 삭제해 대회 기본값을 다시 상속한다. 단계 재정의가 없는 새 경기는 기본 설정을 고정하고, 재정의가 있으면 해당 단계 설정을 고정한다. 단계 변경은 그 단계의 시작 전 경기만 옮기며 다른 단계·시작한 경기·완료 경기는 그대로다. 대회 기본값 변경도 명시적 단계 재정의를 덮어쓰지 않는다. 종목을 바꾸면(대진이 없을 때만 가능) 단계 재정의는 이전 종목 규칙을 가리키므로 함께 지운다. 정규 리그는 단계 재정의를 지원하지 않는다.
+
+단계 설정은 피리어드만 소유한다. 출전 인원·이벤트·결과 정책 같은 대회 기본 경기 규칙이 다른 버전으로 바뀌면 단계 설정 버전도 같은 트랜잭션에서 새 기본 규칙에 재기반(rebase)하고 자기 피리어드만 유지한다. 따라서 단계 재정의가 다른 규칙을 과거 버전에 고정하지 않는다. 기존 대회에는 단계 행이 없으므로 배포 후에도 지금과 동일하게 기본 설정만 사용한다.
+
+조·경기별 재정의(2026-10-29): 경기 시간은 대회 기본값 → 단계 → 조 → 경기 순서로 좁아지고, 좁은 설정이 있으면 넓은 설정이 바뀌어도 그 범위의 경기는 따라가지 않는다. 어느 범위를 저장해도 대회 기본 설정(`competitionConfigVersionId`)은 바뀌지 않는다. 같은 PATCH에 `phase`·`groupId`·`teamMatchId` 중 **하나만** 보낸다(둘 이상이면 `400 TOURNAMENT_PERIOD_SCOPE_CONFLICT`). `inheritDefault: true`는 그 범위의 재정의를 지우고 바로 위 피리어드를 다시 따른다. 경기별 재정의를 지울 때는 경기의 현재 출전 인원·결과 규칙을 보존하고 위 설정의 피리어드만 적용한다.
+- `groupId`: 조별리그 조(`phase=group`) 하나. 강 단계 조는 블록이 보통 하나라 단계 설정 한 곳에서만 바꾼다(`400 TOURNAMENT_GROUP_PERIODS_UNSUPPORTED`, 정규 리그도 같은 코드). GET 응답의 `groupOverrides[]`(`groupId`, `name`, `competitionConfigVersionId`, `periods`)로 돌려준다. 조 설정이 있는 조에 새 경기를 만들면 그 조 설정을 고정한다. 대회 기본 규칙이 바뀌면 단계 설정처럼 피리어드만 지켜 재기반한다. 종목을 바꾸면 단계 재정의와 함께 지운다.
+- `teamMatchId`: 대회·정규 리그의 시작 전 경기 하나. 그 경기가 지금 따르는 규칙에서 피리어드만 바꾼 버전으로 옮기고 `V1TeamMatch.periodOverride=true`로 표시한다. 시작했거나 끝난 경기는 `409 TEAM_MATCH_PERIODS_LOCKED`. 대회 버전(`expectedVersion`)을 올리지 않아 여러 경기를 이어서 고쳐도 충돌하지 않는다. 설정 GET 응답의 `matchOverrideCount`는 현재 경기별 재정의 수다.
+- `GET /api/v1/admin/tournaments/:tournamentId/periods/matches/:teamMatchId`: 경기 수정 화면용. `{ teamMatchId, expectedVersion, overridden, editable, periods, legacyPeriodCount, inherited: { source: group|stage|default, phase, groupName, periods } }` — `periods`는 경기가 지금 쓰는 값, `inherited`는 경기 설정을 지우면 따를 위 설정이다.
+
 피리어드 이름: 요청은 시간만 보내고 이름·코드는 서버가 정한다. 전·후반을 하나로 줄이면 `SINGLE_PERIOD`(단일), 단판을 다시 둘로 나누면 `FIRST_HALF`·`SECOND_HALF`(전반·후반)로 저장한다(MD-QA #159). 단판을 세 개 이상으로 나누면 이전 `SINGLE_PERIOD`(단일)를 이어 받지 않고 모든 행을 `PERIOD_N`(N피리어드)으로 새로 정한다. 그 밖에는 같은 순서의 기존 이름을 유지하고, 새로 붙는 피리어드만 `PERIOD_N`(N피리어드)이다.
 
 초안 재저장: `PATCH /api/v1/admin/tournaments/:tournamentId`에 출전 인원·교체 정책을 다시 보내거나 변경해도 현재 고정된 설정의 피리어드·이벤트·결과·순위·공개 정책은 유지한다. 별도 이름으로 등록한 설정도 현재 종목/이름 계열에서 동일 버전을 재사용하고, 실제 라인업 변경은 같은 계열의 다른 섹션을 보존한 불변 새 버전으로 처리한다. 기존 v1 설정에서 `lineup.positions/formations` 키가 없으면 버전 쓰기도 부재를 유지한다(읽기 응답은 `[]`로 정규화). 명시적으로 잘못된 포지션/대형 목록의 검증은 그대로 적용한다. 생성 마법사는 피리어드 PATCH 성공 전에는 공개 확인·접수 시작을 허용하지 않는다. 실패 시 초안 ID와 입력을 유지하며 같은 초안에서 재시도한다.
@@ -404,8 +413,8 @@ Paid tournaments (`entryFee > 0`) require `bankName`, `bankAccount`, and `bankHo
 ## Task 6 fixture Game and result gate
 
 `POST /api/v1/admin/tournaments/:tournamentId/fixtures` uses `CreateFixtureDto` and requires an
-authenticated mutation-capable admin. In its source transaction, it copies the tournament's
-active `competitionConfigVersionId` to the fixture and creates exactly one `TEAM_MATCH`
+authenticated mutation-capable admin. In its source transaction, it resolves the effective
+group → stage → tournament-default `competitionConfigVersionId` for the new fixture and creates exactly one `TEAM_MATCH`
 Game with HOME/AWAY side snapshots and the registered participant snapshots. A missing or
 inactive pin fails with `409 COMPETITION_CONFIG_REQUIRED` and rolls back both fixture and Game.
 The deterministic fixture command is derived from tournament, round, fixture number, and leg;

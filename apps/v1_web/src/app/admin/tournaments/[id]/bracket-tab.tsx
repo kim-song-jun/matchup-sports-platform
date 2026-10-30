@@ -50,6 +50,7 @@ import { isoToKstDatetimeLocal, kstDatetimeLocalToIso } from '@/lib/kst-calendar
 import { Button } from '@/components/v1-ui/button';
 import { BracketListTemplateTools } from '@/components/admin/bracket-canvas/bracket-list-template-tools';
 import { CrossGroupRound12Dialog } from '@/components/admin/bracket-canvas/cross-group-round12-dialog';
+import { PeriodOverrideField, useGroupPeriodOverride, useMatchPeriodOverride } from '@/components/admin/period-override-field';
 
 
 /**
@@ -192,6 +193,9 @@ export function BracketTab({
   const [editGroup, setEditGroup] = useState<V1AdminBracketGroup | null>(null);
   const [editGroupName, setEditGroupName] = useState('');
   const [editGroupAdvance, setEditGroupAdvance] = useState('');
+  // 경기 방식은 이 경기·조에만 저장한다 — 단계·대회 기본 설정은 대회 정보에서만 바뀐다.
+  const fixturePeriods = useMatchPeriodOverride(tournamentId, editFixture?.id ?? null, '대회 기본값');
+  const groupPeriods = useGroupPeriodOverride(tournamentId, editGroup?.phase === 'group' ? editGroup.id : null);
 
   // 조 카드 트리 — 그룹 생성 폼·팀 배정 폼·픽스처 생성 폼은 각 조 카드(bracket-group-card.tsx)
   // 안으로 이동했다(설계안 B). 여기 남는 건 "방금 만든 조로 스크롤" 신호뿐.
@@ -283,6 +287,7 @@ export function BracketTab({
     // 로컬 타임존으로 잘못 해석된다. 대칭 함수 kstDatetimeLocalToIso 로 KST 오프셋을 고정해야
     // 값을 안 건드리고 저장만 눌러도 킥오프가 밀리지 않는다.
     setEditFxError(null);
+    if (fixturePeriods.payload && fixturePeriods.error) { setEditFxError(fixturePeriods.error); return; }
     const scheduledAtIso = editFxScheduledAt ? kstDatetimeLocalToIso(editFxScheduledAt) : null;
     if (editFxScheduledAt && scheduledAtIso === null) { setEditFxError('경기 시각을 다시 확인해 주세요.'); return; }
     const labelsPatch = fixtureLabelPatch(editFxLabels, editFixture);
@@ -313,7 +318,20 @@ export function BracketTab({
         await assignTournamentSlot.mutateAsync({ slotId: assignment.slotId, registrationId: assignment.registrationId });
         assignedSides.push(assignment.side === 'HOME' ? '홈' : '어웨이');
       }
-      const complete = (result: Awaited<ReturnType<typeof updateFixture.mutateAsync>> | null) => {
+      const complete = async (result: Awaited<ReturnType<typeof updateFixture.mutateAsync>> | null) => {
+        // 경기 방식이 그대로면 기다리지 않고 바로 닫는다(async 함수는 첫 await 전까지 동기로 돈다).
+        if (fixturePeriods.payload) {
+          try {
+            await fixturePeriods.save();
+          } catch (err) {
+            // 경기 정보는 이미 저장됐다 — 창을 닫지 않고 경기 방식만 다시 저장하게 한다.
+            const errorMessage = `경기 정보는 저장됐어요. 경기 방식은 저장하지 못했어요: ${extractErrorMessage(err, '다시 시도해 주세요.')}`;
+            setEditFxError(errorMessage);
+            showToast(errorMessage, 'error');
+            setSavingFixtureEdit(false);
+            return;
+          }
+        }
         setEditFixture(null);
         showToast(
           result?.startedTeamChange == null
@@ -348,10 +366,10 @@ export function BracketTab({
             ...(directHomeChanged ? { homeRegistrationId: editFxHomeRegId || null } : {}),
             ...(directAwayChanged ? { awayRegistrationId: editFxAwayRegId || null } : {}),
           },
-          { onSuccess: (result) => complete(result), onError: reportFailure },
+          { onSuccess: (result) => void complete(result), onError: reportFailure },
         );
       } else {
-        complete(null);
+        await complete(null);
       }
     } catch (err) {
       setSavingFixtureEdit(false);
@@ -386,6 +404,7 @@ export function BracketTab({
   const handleUpdateGroup = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editGroup || !editGroupName.trim()) return;
+    if (groupPeriods.payload && groupPeriods.error) { showToast(groupPeriods.error, 'error'); return; }
     const parsed = Number.parseInt(editGroupAdvance, 10);
     updateGroup.mutate(
       {
@@ -394,7 +413,18 @@ export function BracketTab({
         ...(Number.isInteger(parsed) && parsed > 0 ? { advanceCount: parsed } : {}),
       },
       {
-        onSuccess: () => { setEditGroup(null); showToast('조 정보를 수정했어요.', 'success'); },
+        onSuccess: async () => {
+          if (groupPeriods.payload) {
+            try {
+              await groupPeriods.save();
+            } catch (err) {
+              showToast(`조 정보는 저장됐어요. 경기 방식은 저장하지 못했어요: ${extractErrorMessage(err, '다시 시도해 주세요.')}`, 'error');
+              return;
+            }
+          }
+          setEditGroup(null);
+          showToast('조 정보를 수정했어요.', 'success');
+        },
         onError: (err) => showToast(extractErrorMessage(err, '조 수정에 실패했어요.'), 'error'),
       },
     );
@@ -1045,6 +1075,16 @@ export function BracketTab({
             />
           </div>
           <button type="button" className="tm-btn tm-btn-sm tm-btn-ghost self-start min-h-[44px]" disabled={savingFixtureEdit || updateFixture.isPending || !editFxScheduledAt} onClick={() => setEditFxScheduledAt('')}>시각 비우기</button>
+          <PeriodOverrideField
+            inheritedSummary={fixturePeriods.inheritedSummary}
+            customLabel="이 경기만 따로"
+            customHint="이 경기만 바뀌어요. 조·단계 설정과 대회 기본값은 그대로예요."
+            status={fixturePeriods.status}
+            choice={fixturePeriods.choice}
+            onChange={fixturePeriods.setChoice}
+            disabled={savingFixtureEdit || updateFixture.isPending}
+            lockedReason={fixturePeriods.lockedReason}
+          />
           <CompetitionFieldPicker tournamentId={tournamentId} value={editFxFieldId} onChange={value => { setEditFxFieldId(value); if (!value) setEditFxVenue(null); }} allowNew={false} allowEmpty emptyLabel="경기장 미정" disabled={savingFixtureEdit || updateFixture.isPending} />
           {!editFxFieldId ? <PlacePicker
             maxLength={PLACE_NAME_MAX_LENGTH.tournament}
@@ -1119,7 +1159,7 @@ export function BracketTab({
         open={editGroup !== null}
         title="조 수정"
         onClose={() => setEditGroup(null)}
-        pending={updateGroup.isPending}
+        pending={updateGroup.isPending || groupPeriods.pending}
       >
         <form onSubmit={handleUpdateGroup} noValidate className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
@@ -1147,6 +1187,18 @@ export function BracketTab({
               className={inputCls}
             />
           </div>
+          {editGroup?.phase === 'group' ? (
+            <PeriodOverrideField
+              inheritLabel={groupPeriods.inheritLabel}
+              inheritedSummary={groupPeriods.inheritedSummary}
+              customLabel="이 조만 따로"
+              customHint="이 조의 시작 전 경기와 앞으로 만들 경기만 바뀌어요. 경기에서 따로 정한 값과 조별리그 설정·대회 기본값은 그대로예요."
+              status={groupPeriods.status}
+              choice={groupPeriods.choice}
+              onChange={groupPeriods.setChoice}
+              disabled={updateGroup.isPending || groupPeriods.pending}
+            />
+          ) : null}
           <div className="flex gap-2 pt-1">
             <button
               type="button"
@@ -1156,8 +1208,8 @@ export function BracketTab({
             >
               취소
             </button>
-            <button type="submit" disabled={updateGroup.isPending || !editGroupName.trim()} className={'flex-1 ' + submitBtnCls}>
-              {updateGroup.isPending ? '저장 중…' : '저장'}
+            <button type="submit" disabled={updateGroup.isPending || groupPeriods.pending || !editGroupName.trim()} className={'flex-1 ' + submitBtnCls}>
+              {updateGroup.isPending || groupPeriods.pending ? '저장 중…' : '저장'}
             </button>
           </div>
         </form>

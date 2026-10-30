@@ -1927,6 +1927,9 @@ model V1TeamMatch {
   /// 대진 편집기의 자리(V1TournamentSlot). 대회·정규 리그 경기가 같은 컬럼을 쓴다.
   homeSlotId                 String?           @map("home_slot_id")
   awaySlotId                 String?           @map("away_slot_id")
+  /// 대회·리그 경기 하나만 피리어드를 바꿨다는 표시. true 면 competitionConfigVersionId 가 이 경기 전용
+  /// 피리어드 버전이고, 조·단계·대회 기본 피리어드가 바뀌어도 따라가지 않는다.
+  periodOverride             Boolean           @default(false) @map("period_override")
 
   hostTeam              V1Team?                     @relation("V1HostTeamMatches", fields: [hostTeamId], references: [id], onDelete: Restrict)
   createdByUser         V1User?                     @relation("V1TeamMatchCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
@@ -2810,6 +2813,7 @@ model V1Tournament {
   series               V1LeagueSeries?                      @relation("V1TournamentSeries", fields: [seriesId], references: [id], onDelete: SetNull, map: "v1_tournaments_series_fk")
   region               V1Region?                            @relation("V1TournamentRegion", fields: [regionId], references: [id], onDelete: Restrict, map: "v1_tournaments_region_fk")
   competitionConfig    V1CompetitionConfigVersion?          @relation("V1TournamentCompetitionConfig", fields: [competitionConfigVersionId], references: [id], onDelete: Restrict, map: "v1_tournaments_competition_config_fk")
+  stagePeriodSettings  V1TournamentStagePeriodSetting[]
   createdByAdmin       V1AdminUser?                         @relation("V1TournamentCreatedByAdmin", fields: [createdByAdminUserId], references: [id], onDelete: SetNull)
   registrations        V1TournamentRegistration[]
   /// BE-5 drop: 리그 대진과 승강 기록이 `V1League` 대신 여기를 가리킨다(kind='regular_league'
@@ -2846,6 +2850,25 @@ model V1Tournament {
   // NULL 이고, Postgres 는 NULL 끼리 충돌로 보지 않으므로 기존 행끼리는 걸리지 않는다.
   @@unique([seriesId, seasonNo, tier], map: "v1_tournaments_series_season_tier_key")
   @@map("v1_tournaments")
+}
+
+/// 대회의 기본 경기 설정을 덮어쓰는 단계별 피리어드 설정.
+/// 행이 없으면 V1Tournament.competitionConfigVersionId를 상속한다. 경기 자체는 생성 시 선택한
+/// immutable config version을 계속 고정하므로 이후 설정 변경이 시작된 경기의 기록을 바꾸지 않는다.
+model V1TournamentStagePeriodSetting {
+  id                         String                     @id @default(uuid())
+  tournamentId               String                     @map("tournament_id")
+  phase                      V1TournamentGroupPhase
+  periods                    Json
+  competitionConfigVersionId String                     @map("competition_config_version_id")
+  createdAt                  DateTime                   @default(now()) @map("created_at")
+  updatedAt                  DateTime                   @updatedAt @map("updated_at")
+  tournament                 V1Tournament               @relation(fields: [tournamentId], references: [id], onDelete: Cascade, map: "v1_tournament_stage_period_settings_tournament_fk")
+  competitionConfig          V1CompetitionConfigVersion @relation("V1TournamentStagePeriodCompetitionConfig", fields: [competitionConfigVersionId], references: [id], onDelete: Restrict, map: "v1_tournament_stage_period_settings_config_fk")
+
+  @@unique([tournamentId, phase], map: "v1_tournament_stage_period_settings_tournament_phase_key")
+  @@index([competitionConfigVersionId], map: "v1_tournament_stage_period_settings_config_idx")
+  @@map("v1_tournament_stage_period_settings")
 }
 
 model V1TournamentCampaign {
@@ -3050,10 +3073,15 @@ model V1TournamentGroup {
   sortOrder    Int                    @default(0) @map("sort_order")
   // 이 조에서 상위 몇 팀이 다음 단계로 진출하는지(조별리그 진출선 표시용). null이면 진출 표시 없음.
   advanceCount Int?                   @map("advance_count")
+  /// 조별리그 조 하나의 피리어드 재정의. 둘 다 null 이면 단계(조별리그) 설정 → 대회 기본값을 따른다.
+  /// competitionConfigVersionId 는 대회 기본 규칙에 이 피리어드만 바꾼 immutable 버전이다.
+  periods                    Json?
+  competitionConfigVersionId String?                @map("competition_config_version_id")
   createdAt    DateTime               @default(now()) @map("created_at")
   updatedAt    DateTime               @updatedAt @map("updated_at")
 
   tournament V1Tournament            @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  competitionConfig V1CompetitionConfigVersion? @relation("V1TournamentGroupPeriodCompetitionConfig", fields: [competitionConfigVersionId], references: [id], onDelete: Restrict, map: "v1_tournament_groups_competition_config_fk")
   tournamentMatchDetails V1TournamentMatchDetails[]
   groupTeams V1TournamentGroupTeam[]
   byeSlots   V1TournamentByeSlot[]
@@ -3064,6 +3092,7 @@ model V1TournamentGroup {
   @@unique([tournamentId, name], map: "v1_tournament_groups_tournament_id_name_key")
   @@unique([tournamentId, id], map: "v1_tournament_groups_tournament_id_id_key")
   @@index([tournamentId, phase, sortOrder])
+  @@index([competitionConfigVersionId], map: "v1_tournament_groups_competition_config_idx")
   @@map("v1_tournament_groups")
 }
 
@@ -3936,6 +3965,8 @@ model V1CompetitionConfigVersion {
   games           V1Game[]                  @relation("V1GameCompetitionConfig")
   teamMatches     V1TeamMatch[]             @relation("V1TeamMatchCompetitionConfig")
   tournaments     V1Tournament[]            @relation("V1TournamentCompetitionConfig")
+  tournamentStagePeriodSettings V1TournamentStagePeriodSetting[] @relation("V1TournamentStagePeriodCompetitionConfig")
+  tournamentGroups V1TournamentGroup[] @relation("V1TournamentGroupPeriodCompetitionConfig")
 
   @@unique([sportCode, name, version])
   @@map("v1_competition_config_versions")

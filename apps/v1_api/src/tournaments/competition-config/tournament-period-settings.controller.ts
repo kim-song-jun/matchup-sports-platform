@@ -15,6 +15,15 @@ export class TournamentPeriodSettingsController {
     return this.service.get(user, tournamentId);
   }
 
+  @Get(':tournamentId/periods/matches/:teamMatchId')
+  getMatch(
+    @CurrentUser() user: V1AuthUser,
+    @Param('tournamentId') tournamentId: string,
+    @Param('teamMatchId') teamMatchId: string,
+  ) {
+    return this.service.getMatch(user, tournamentId, teamMatchId);
+  }
+
   @Patch(':tournamentId/periods')
   update(
     @CurrentUser() user: V1AuthUser,

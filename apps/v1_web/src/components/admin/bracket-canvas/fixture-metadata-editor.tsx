@@ -6,6 +6,7 @@ import { PLACE_NAME_MAX_LENGTH } from '@/lib/place';
 import { fixtureVenueValue, fixtureVenuePatch } from './fixture-venue-patch';
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { CompetitionFieldPicker } from '@/components/admin/competition-field-picker';
+import { PeriodOverrideField, useMatchPeriodOverride } from '@/components/admin/period-override-field';
 import { useV1UpdateFixture } from '@/hooks/use-v1-api';
 import { automaticFixtureSideLabel, buildSideLabelContext } from '@/lib/bracket-canvas-layout';
 import { isoToKstDatetimeLocal, kstDatetimeLocalToIso } from '@/lib/kst-calendar';
@@ -61,15 +62,19 @@ export function FixtureMetadataEditor({ tournamentId, fixture, groups, fixtures,
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const dirty = useRef(false);
+  // 경기 방식은 이 경기에만 저장한다 — 조·단계·대회 기본 설정은 바뀌지 않는다.
+  const periods = useMatchPeriodOverride(tournamentId, fixture.id, '대회 기본값');
   useEffect(() => {
     if (dirty.current) return;
     setNumber(String(fixture.fixtureNumber)); setLabels(fixtureLabelDraft(fixture));
     setTime(isoToKstDatetimeLocal(fixture.scheduledAt)); setFieldId(fixture.fieldId ?? ''); setClearPlace(false); setVenue(fixtureVenueValue(fixture));
   }, [fixture.id, fixture.fixtureNumber, fixture.homeDisplayLabel, fixture.awayDisplayLabel, fixture.scheduledAt, fixture.fieldId]);
-  const disabled = !canWrite || mutation.isPending;
+  const pending = mutation.isPending || periods.pending;
+  const disabled = !canWrite || pending;
   const edit = (action: () => void) => { dirty.current = true; setMessage(null); action(); };
   async function save(event: FormEvent) {
     event.preventDefault(); setError(null); setMessage(null);
+    if (periods.payload && periods.error) { setError(periods.error); return; }
     const fixtureNumber = Number(number);
     if (!Number.isInteger(fixtureNumber) || fixtureNumber < 1 || fixtureNumber > 2147483647) { setError('경기 번호는 1 이상의 정수로 입력해 주세요.'); return; }
     const scheduledAt = time === '' ? null : kstDatetimeLocalToIso(time);
@@ -80,11 +85,18 @@ export function FixtureMetadataEditor({ tournamentId, fixture, groups, fixtures,
       ...(time === isoToKstDatetimeLocal(fixture.scheduledAt) ? {} : { scheduledAt }),
       ...(fieldId ? (fieldId === fixture.fieldId ? {} : { fieldId }) : { ...(fixture.fieldId ? { fieldId: null } : {}), ...fixtureVenuePatch(clearPlace ? null : venue, fixture) }),
     };
-    if (Object.keys(body).length === 0) { setMessage('변경한 항목이 없어요.'); return; }
+    const fixtureChanged = Object.keys(body).length > 0;
+    if (!fixtureChanged && !periods.payload) { setMessage('변경한 항목이 없어요.'); return; }
     try {
-      await mutation.mutateAsync({ fixtureId: fixture.id, ...body });
+      if (fixtureChanged) await mutation.mutateAsync({ fixtureId: fixture.id, ...body });
+    } catch (err) { setError(extractErrorMessage(err, '경기 정보를 저장하지 못했어요. 다시 시도해 주세요.')); return; }
+    try {
+      await periods.save();
       dirty.current = false; setMessage('경기 정보를 저장했어요.');
-    } catch (err) { setError(extractErrorMessage(err, '경기 정보를 저장하지 못했어요. 다시 시도해 주세요.')); }
+    } catch (err) {
+      const reason = extractErrorMessage(err, '경기 방식을 저장하지 못했어요. 다시 시도해 주세요.');
+      setError(fixtureChanged ? `경기 정보는 저장됐어요. 경기 방식은 저장하지 못했어요: ${reason}` : reason);
+    }
   }
   return <form onSubmit={save} className="flex flex-col gap-3" aria-label="경기 정보 편집">
     <label className="flex flex-col gap-1 tm-text-label" htmlFor={`${id}-number`}>경기 번호
@@ -95,6 +107,16 @@ export function FixtureMetadataEditor({ tournamentId, fixture, groups, fixtures,
       <input id={`${id}-time`} className="tm-input" type="datetime-local" value={time} disabled={disabled} onChange={event => edit(() => setTime(event.target.value))} />
     </label>
     <button type="button" className="tm-btn tm-btn-sm tm-btn-ghost self-start min-h-[44px]" disabled={disabled || !time} onClick={() => edit(() => setTime(''))}>시각 비우기</button>
+    <PeriodOverrideField
+      inheritedSummary={periods.inheritedSummary}
+      customLabel="이 경기만 따로"
+      customHint="이 경기만 바뀌어요. 조·단계 설정과 대회 기본값은 그대로예요."
+      status={periods.status}
+      choice={periods.choice}
+      onChange={choice => edit(() => periods.setChoice(choice))}
+      disabled={disabled}
+      lockedReason={periods.lockedReason}
+    />
     <CompetitionFieldPicker tournamentId={tournamentId} value={fieldId} onChange={value => edit(() => { setFieldId(value); setClearPlace(!value); if (!value) setVenue(null); })}
       disabled={disabled} allowNew={false} allowEmpty emptyLabel="경기장 미정" />
     {!fieldId ? <PlacePicker id={`${id}-venue`} label="장소" maxLength={PLACE_NAME_MAX_LENGTH.tournament} value={clearPlace ? null : venue} onChange={value => edit(() => { setClearPlace(false); setVenue(value); })} disabled={disabled} /> : null}
@@ -102,6 +124,6 @@ export function FixtureMetadataEditor({ tournamentId, fixture, groups, fixtures,
       onClick={() => edit(() => { setFieldId(''); setClearPlace(true); setVenue(null); })}>경기장 비우기</button>
     {error ? <p role="alert" className="tm-text-caption text-[var(--red700)]">{error}</p> : null}
     {message ? <p role="status" className="tm-text-caption text-[var(--text-muted)]">{message}</p> : null}
-    {canWrite ? <button type="submit" className="tm-btn tm-btn-md tm-btn-outline" disabled={mutation.isPending}>{mutation.isPending ? '저장 중…' : '경기 정보 저장'}</button> : null}
+    {canWrite ? <button type="submit" className="tm-btn tm-btn-md tm-btn-outline" disabled={pending}>{pending ? '저장 중…' : '경기 정보 저장'}</button> : null}
   </form>;
 }

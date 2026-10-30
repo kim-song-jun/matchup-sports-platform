@@ -12,7 +12,7 @@
  *  ③ 대진 삭제가 서버에서 막히면 그 이유가 토스트에 그대로 나온다 — 예전에는 같은 클릭이
  *     매핑 없는 500 으로 끝나 운영자가 "서버 오류" 만 봤다.
  */
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { V1CreateFixtureResponse, V1AdminBracketFixture, V1AdminBracketFixtureGame, V1AdminTournamentBracket, V1AdminTournamentRegistration } from '@/types/api';
 import { makeGame, makeSlot } from '@/test/bracket-canvas-fixtures';
@@ -86,6 +86,108 @@ const createFixtureMutate = vi.fn();
 let bracketGroups = bracket.groups;
 /** `updateFixture.mutate(body, { onSuccess, onError })` — 실제로 보낸 payload를 검증하는 데 쓴다. */
 const updateFixtureMutate = vi.fn();
+const updateGroupMutate = vi.fn();
+
+const minutes = (values: number[]) => values.map((durationMinutes, index) => ({
+  code: values.length === 1 ? 'SINGLE_PERIOD' : index === 0 ? 'FIRST_HALF' : 'SECOND_HALF',
+  label: values.length === 1 ? '단일' : index === 0 ? '전반' : '후반', durationMinutes, extraTime: false,
+}));
+
+describe('BracketTab — 경기 방식(이 경기·이 조만)', () => {
+  beforeEach(() => {
+    bracketFixtures = [fixtureRow({ fixtureNumber: 1 })];
+    bracketGroups = bracket.groups;
+    updateFixtureMutate.mockReset().mockImplementation((_payload, options) => options.onSuccess({ startedTeamChange: null }));
+    updateGroupMutate.mockReset().mockImplementation((_payload, options) => options.onSuccess());
+    periodMocks.mutateAsync.mockReset().mockResolvedValue({});
+    periodMocks.match = {
+      tournamentId: 't-1', teamMatchId: 'fx-1', expectedVersion: 'v-1', overridden: false, editable: true,
+      periods: minutes([15]), legacyPeriodCount: null,
+      inherited: { source: 'stage', phase: 'group', groupName: 'A조', periods: minutes([15]), legacyPeriodCount: null },
+    };
+    periodMocks.settings = {
+      tournamentId: 't-1', kind: 'regular_tournament', competitionConfigVersionId: 'c-1', expectedVersion: 'v-2',
+      periods: minutes([20, 20]), legacyPeriodCount: null, requiresDurationInput: false,
+      stageOverrides: [{ phase: 'group', competitionConfigVersionId: 'c-g', periods: minutes([15]), legacyPeriodCount: null }],
+      groupOverrides: [],
+    };
+  });
+  afterEach(() => { periodMocks.match = null; periodMocks.settings = null; });
+  const openFixture = () => {
+    fireEvent.click(screen.getAllByRole('button', { name: 'A조 · 조별리그 1라운드 1번 경기 수정' })[0]);
+    return screen.findByRole('dialog', { name: '경기 수정' });
+  };
+
+  it('위 설정 값을 보여 주고, 이 경기만 전·후반으로 바꾸면 그 경기에만 저장한다', async () => {
+    const toast = renderTab();
+    const dialog = await openFixture();
+    const inherit = within(dialog).getByRole('radio', { name: /위 설정 따르기/ });
+    expect(inherit).toBeChecked();
+    expect(inherit.closest('label')).toHaveTextContent('조별리그 설정 · 단판 15분');
+    fireEvent.click(within(dialog).getByRole('radio', { name: '이 경기만 따로' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '전·후반' }));
+    fireEvent.change(within(dialog).getByLabelText('전반 (분)'), { target: { value: '10' } });
+    fireEvent.change(within(dialog).getByLabelText('후반 (분)'), { target: { value: '10' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '경기 수정' })).not.toBeInTheDocument());
+    expect(periodMocks.mutateAsync).toHaveBeenCalledWith({
+      expectedVersion: 'v-1', teamMatchId: 'fx-1', periods: [{ durationMinutes: 10 }, { durationMinutes: 10 }],
+    });
+    expect(periodMocks.mutateAsync.mock.calls[0][0]).not.toHaveProperty('phase');
+    expect(toast).toHaveBeenCalledWith('경기 정보를 수정했어요.', 'success');
+  });
+
+  it('경기 방식을 그대로 두면 경기 시간 저장을 보내지 않는다', async () => {
+    renderTab();
+    const dialog = await openFixture();
+    fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+    expect(screen.queryByRole('dialog', { name: '경기 수정' })).not.toBeInTheDocument();
+    expect(periodMocks.mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('경기 방식만 실패하면 창을 닫지 않고 경기 정보는 저장됐다고 알린다', async () => {
+    periodMocks.mutateAsync.mockRejectedValue(new Error('이미 시작했거나 끝난 경기는 경기 방식을 바꿀 수 없어요.'));
+    const toast = renderTab();
+    const dialog = await openFixture();
+    fireEvent.click(within(dialog).getByRole('radio', { name: '이 경기만 따로' }));
+    fireEvent.change(within(dialog).getByLabelText('단판 (분)'), { target: { value: '12' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+    await waitFor(() => expect(toast).toHaveBeenCalledWith(expect.stringContaining('경기 정보는 저장됐어요. 경기 방식은 저장하지 못했어요'), 'error'));
+    expect(dialog).toBeInTheDocument();
+  });
+
+  it('따로 정한 경기는 위 설정 따르기로 되돌릴 수 있고, 시작한 경기는 바꿀 수 없다', async () => {
+    periodMocks.match = { ...periodMocks.match, overridden: true, periods: minutes([12]) };
+    renderTab();
+    const dialog = await openFixture();
+    expect(within(dialog).getByRole('radio', { name: '이 경기만 따로' })).toBeChecked();
+    fireEvent.click(within(dialog).getByRole('radio', { name: /위 설정 따르기/ }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+    await waitFor(() => expect(periodMocks.mutateAsync).toHaveBeenCalledWith({ expectedVersion: 'v-1', teamMatchId: 'fx-1', inheritDefault: true }));
+
+    cleanup();
+    periodMocks.match = { ...periodMocks.match, overridden: false, editable: false };
+    renderTab();
+    const locked = await openFixture();
+    expect(within(locked).getByRole('radio', { name: /위 설정 따르기/ })).toBeDisabled();
+    expect(locked).toHaveTextContent('이미 시작했거나 끝난 경기라 경기 방식을 바꿀 수 없어요.');
+  });
+
+  it('조 수정에서는 조별리그 설정을 보여 주고 이 조에만 저장한다', async () => {
+    renderTab();
+    fireEvent.click(screen.getAllByRole('button', { name: 'A조 수정' })[0]);
+    const dialog = await screen.findByRole('dialog', { name: '조 수정' });
+    const inherit = within(dialog).getByRole('radio', { name: /조별리그 설정 따르기/ });
+    expect(inherit.closest('label')).toHaveTextContent('단판 15분');
+    fireEvent.click(within(dialog).getByRole('radio', { name: '이 조만 따로' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '전·후반' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+    await waitFor(() => expect(periodMocks.mutateAsync).toHaveBeenCalledWith({
+      expectedVersion: 'v-2', groupId: 'group-a', periods: [{ durationMinutes: 8 }, { durationMinutes: 7 }],
+    }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '조 수정' })).not.toBeInTheDocument());
+  });
+});
 
 describe('BracketTab — 대진 번호 수정', () => {
   beforeEach(() => {
@@ -178,9 +280,23 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1RecalculateStandings: noopMutation,
   useV1UpdateFixture: () => ({ mutate: updateFixtureMutate, mutateAsync: vi.fn(), isPending: false }),
   useV1DeleteFixture: () => ({ mutate: deleteFixtureMutate, mutateAsync: vi.fn(), isPending: false }),
-  useV1UpdateGroup: noopMutation,
+  useV1UpdateGroup: () => ({ mutate: updateGroupMutate, isPending: false }),
   useV1DeleteGroup: noopMutation,
   useV1RemoveGroupTeam: noopMutation,
+}));
+
+/** 경기 방식 칸이 읽는 서버 값 — null 이면 불러오는 중으로 둔다. */
+const periodMocks = vi.hoisted(() => ({
+  match: null as null | Record<string, unknown>,
+  settings: null as null | Record<string, unknown>,
+  mutateAsync: vi.fn(),
+}));
+vi.mock('@/hooks/use-tournament-period-settings', () => ({
+  useTournamentMatchPeriods: (_tournamentId: string, teamMatchId: string | null) => ({
+    data: teamMatchId && periodMocks.match ? periodMocks.match : undefined, isPending: !periodMocks.match, isError: false,
+  }),
+  useTournamentPeriodSettings: () => ({ data: periodMocks.settings ?? undefined, isPending: !periodMocks.settings, isError: false }),
+  useUpdateTournamentPeriodSettings: () => ({ mutateAsync: periodMocks.mutateAsync, isPending: false }),
 }));
 
 vi.mock('@/hooks/use-v1-bracket-canvas', () => ({

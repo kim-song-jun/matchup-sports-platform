@@ -233,6 +233,32 @@ describe('TournamentPeriodSettingsEditor', () => {
       legacyPeriodCount: null,
     });
 
+    it.each(['저장', '기본값 사용'])('단계 편집 중 서버가 갱신돼도 %s는 편집 시작 버전으로 요청한다', async (action) => {
+      const base = { ...state.settings, expectedVersion: 'version-stage-1', kind: 'regular_tournament' as const, stageOverrides: [finalOverride(10)] };
+      state.settings = base;
+      state.mutate.mockClear();
+      const fresh = { ...base, expectedVersion: 'version-stage-2', stageOverrides: [finalOverride(30)] };
+      state.refetch.mockResolvedValue({ data: fresh });
+      const showToast = vi.fn();
+      const view = render(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={showToast} />);
+      fireEvent.click(screen.getAllByRole('button', { name: '수정' })[1]);
+      fireEvent.change(screen.getByLabelText('전반 (분)'), { target: { value: '12' } });
+
+      state.settings = fresh;
+      view.rerender(<TournamentPeriodSettingsEditor tournamentId="tournament-1" canWrite showToast={showToast} />);
+      fireEvent.click(screen.getByRole('button', { name: action }));
+
+      expect(state.mutate.mock.calls[0][0]).toEqual({
+        expectedVersion: 'version-stage-1', phase: 'final', inheritDefault: action === '기본값 사용',
+        ...(action === '저장' ? { periods: [{ durationMinutes: 12 }, { durationMinutes: 10 }] } : {}),
+      });
+      const [, callbacks] = state.mutate.mock.calls[0] as [unknown, { onError: (error: unknown) => Promise<void> }];
+      await act(() => callbacks.onError({ response: { data: { code: 'TOURNAMENT_VERSION_CONFLICT' } } }));
+      expect(state.mutate).toHaveBeenCalledTimes(1);
+      expect(screen.getByLabelText('전반 (분)')).toHaveValue(12);
+      expect(showToast).toHaveBeenCalledWith(expect.stringContaining('결승 경기 시간이 먼저 바뀌었어요'), 'error');
+    });
+
     function saveFinalAfterConflict(freshOverrideMinutes: number) {
       const base = { ...state.settings, expectedVersion: 'version-stage-3', kind: 'regular_tournament' as const, stageOverrides: [finalOverride(10)] };
       state.settings = base;

@@ -47,8 +47,11 @@ export function periodOverrideError(choice: PeriodOverrideChoice): string | null
 
 /** 수정 창이 바꾼 값을 들고 있다가 열린 대상이 바뀌면 서버 값으로 다시 연다. */
 function useDraft(targetId: string | null, initial: PeriodOverrideChoice | null) {
-  const [draft, setDraft] = useState<{ targetId: string; choice: PeriodOverrideChoice } | null>(null);
-  const choice = draft !== null && draft.targetId === targetId ? draft.choice : initial;
+  const [draft, setDraft] = useState<{ targetId: string | null; choice: PeriodOverrideChoice | null }>({ targetId, choice: null });
+  // 부모 수정창을 닫아도 훅은 남는다. 대상 전환(닫을 때의 null 포함)에는 입력을 버려
+  // 같은 대상을 다시 열고 저장할 때 취소한 값이 섞이지 않게 한다.
+  if (draft.targetId !== targetId) setDraft({ targetId, choice: null });
+  const choice = draft.targetId === targetId ? draft.choice ?? initial : initial;
   const payload = initial && choice ? periodOverridePayload(initial, choice) : null;
   return {
     choice,

@@ -53,6 +53,7 @@ function PeriodSettingsEditor({
   const [editingBasePeriods, setEditingBasePeriods] = useState<string | null>(null);
   const [stageEditingPhase, setStageEditingPhase] = useState<TournamentPeriodPhase | null>(null);
   const [stageDraft, setStageDraft] = useState<string[]>([]);
+  const [stageExpectedVersion, setStageExpectedVersion] = useState<string | null>(null);
   // 단계 편집을 시작할 때 본 그 단계 피리어드 — 버전 충돌이 나도 이 값이 그대로면 다른 설정이 행을 바꾼 것뿐이다.
   const [stageBasePeriods, setStageBasePeriods] = useState<string | null>(null);
   const [newPhase, setNewPhase] = useState<TournamentPeriodPhase>('group');
@@ -150,6 +151,8 @@ function PeriodSettingsEditor({
     const existing = settingsQuery.data?.stageOverrides.find((override) => override.phase === phase);
     setStageDraft(existing?.periods?.map((period) => String(period.durationMinutes)) ?? draftFromSettings(settingsQuery.data));
     setStageBasePeriods(JSON.stringify(existing?.periods ?? null));
+    // 기본값 편집과 같이 편집 시작 시점의 버전을 고정한다. 조회 갱신이 CAS를 조용히 통과시키면 안 된다.
+    setStageExpectedVersion(settingsQuery.data?.expectedVersion ?? null);
     setStageEditingPhase(phase);
   };
 
@@ -158,7 +161,7 @@ function PeriodSettingsEditor({
       showToast('현재 계정에는 피리어드 설정을 수정할 권한이 없어요.', 'error');
       return;
     }
-    if (!stageEditingPhase || !settingsQuery.data?.expectedVersion) return;
+    if (!stageEditingPhase || !stageExpectedVersion) return;
     if (!inheritDefault && (!stageDraft.length || !hasValidDurations(stageDraft))) {
       showToast('각 피리어드 시간을 1분 이상 입력해 주세요.', 'error');
       return;
@@ -188,6 +191,7 @@ function PeriodSettingsEditor({
               const fresh = await settingsQuery.refetch();
               const freshPeriods = fresh.data?.stageOverrides.find((override) => override.phase === phase)?.periods ?? null;
               if (retryOnUnrelatedChange && fresh.data?.expectedVersion && JSON.stringify(freshPeriods) === stageBasePeriods) {
+                setStageExpectedVersion(fresh.data.expectedVersion);
                 submit(fresh.data.expectedVersion, false);
                 return;
               }
@@ -198,7 +202,7 @@ function PeriodSettingsEditor({
           },
         },
       );
-    submit(settingsQuery.data.expectedVersion, true);
+    submit(stageExpectedVersion, true);
   };
 
   if (settingsQuery.isPending) {

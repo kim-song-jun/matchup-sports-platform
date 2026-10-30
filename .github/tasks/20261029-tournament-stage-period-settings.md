@@ -12,6 +12,22 @@ Status: Review
 
 대회 기본 경기 시간과 단계별 재정의를 생성 시점에 저장하고, 생성 후에도 단계별로 수정하되 시작한 경기의 고정 설정은 보존한다.
 
+## PR #2091 리뷰 후속 — 2026-10-30
+
+- 범위: 경기·조 수정창의 취소된 시간 입력 초기화, 단계 시간 편집의 시작 시점 버전 보존. 화면 구성·API·DB 계약은 유지한다.
+- Owned files: `period-override-field.tsx`와 회귀 테스트, `tournament-period-settings-editor.tsx`와 회귀 테스트, 이 task, 관련 시나리오·API 문서·changeset.
+- Forbidden files: 다른 PR의 제품 코드, schema/migration, 공유 작업트리의 기존 변경.
+- [x] Phase 1: 취소 후 같은 대상 재진입 및 편집 중 서버 갱신 반례 RED 확인(신규 8개 모두 실패, `/tmp/teameet-pr2091-red.log`).
+- [x] Phase 2: 닫기·대상 전환 시 취소된 입력을 버리고, 단계 편집은 편집 시작 버전으로 저장.
+- [x] Phase 3: 관련 5개 파일 187개 회귀 GREEN, Web 전체 타입 검사 exit 0, 변경 범위·문서 링크·diff 확인.
+- [ ] Alpha: 머지·배포 후 조/경기 취소·재진입과 운영자 간 단계 시간 충돌을 실제 화면에서 확인(현재 미실행).
+
+Acceptance: 취소한 시간은 재진입·후속 저장에 포함되지 않는다. 편집 중 동일 단계가 바뀌면 자동 덮어쓰기 없이 충돌을 알리고, 다른 설정만 바뀐 경우의 한 번 재시도는 유지한다.
+
+Progress Snapshot (후속): 신규 8개는 수정 전 실제 assertion RED다. 수정 후 훅6·설정 편집기15·대회 대진55·메타데이터 편집5·리그 대진106 = 고유187개 PASS. 로그는 `/tmp/teameet-pr2091-red.log`, `/tmp/teameet-pr2091-green.log`, `/tmp/teameet-pr2091-league-green.log`다. 최초 부모 화면 실행의 리그106 실패는 공유 설치의 React Query 5.91.0/persistence 5.102.8 및 별도 React 참조 때문이었다. `/tmp`에 선언 버전5.102.8을 격리하고 React 단일 참조로 맞춘 뒤 실패한 리그 파일만 재실행해106 PASS를 확인했다. 기존 PersistQueryClientProvider의 act 경고는 남고 제품 코드로 숨기지 않았다.
+
+최초 타입 검사에서 새 테스트의 null 재진입 props 타입2건을 명시했고, 설치에 빠진 선언 버전 validator13.15.26/@types13.15.10을 격리 작업트리에 연결했다. 최종 `tsc --noEmit --incremental false` exit0 (`/tmp/teameet-pr2091-types-green.log`). 공유 의존성·manifest·lockfile·schema는 수정하지 않았다. 별도 작업트리 `/tmp/teameet-fix-pr2091`, branch `fix/pr2091-review-20261030`, base PR head `eb6094b82`. 커밋·push·머지·alpha 실측은 미실행이며 로컬 검증을 PR/배포 완료로 계산하지 않는다. 새 서버·브라우저·DB 실행0, 테스트 프로세스 종료.
+
 ## Original Conditions (must all be satisfied)
 
 - [x] 대회 생성 시 기본 경기 시간과 단계별 경기 시간을 미리 지정할 수 있다.

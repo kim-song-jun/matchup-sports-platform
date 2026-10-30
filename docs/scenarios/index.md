@@ -4,6 +4,10 @@
 종료결과는 결승→3위전, 운영은3위전→결승. 단판4강의 가짜 합산 제거, 실제2차전 유지.
 저장데이터·진출·일정 변경0. API221/Web203 PASS, alpha0/3(미배포).
 
+## 2026-10-30 — 단계·조·경기별 시간 편집 리뷰 후속
+
+[Task 20261029](../../.github/tasks/20261029-tournament-stage-period-settings.md) · [시나리오](./tournament-period-overrides.md) · PR #2091. 설정 우선순위·상속·시작 잠금과 취소 후 재진입·운영자 간 단계 시간 충돌을 검증한다. 신규8개 RED → 관련5개 파일 고유187개 GREEN·Web 타입 검사 PASS. 변경 후 alpha 0/9·after viewport 0/3이며 커밋·push·배포는 하지 않았다.
+
 ## 2026-10-28 — 6강 결승 직행 토너먼트
 
 [시나리오](./six-team-knockout.md) · [Task 20261118](../../.github/tasks/20261118-six-team-knockout.md).

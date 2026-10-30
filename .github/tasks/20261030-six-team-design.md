@@ -1,6 +1,6 @@
 # 6강 대진표 디자인 통일
 
-Status: Hotfix Preparation (main target; validation in progress)
+Status: Local Hotfix Validated (remote push/PR approval required; not deployed)
 Owner: Codex (single agent)
 
 ## Context
@@ -79,3 +79,15 @@ origin/dev 2708c6149 기반 격리 worktree. 로컬 프론트엔드는 alpha API
 - Owned: 원본 작업의 25개 소스/테스트/API 문서, 위 두 task 문서, 두 Changeset 및 소비에 따른 API/Web 버전·CHANGELOG. Forbidden: Prisma/DB, 원격 경기 데이터, 무관한 dev 변경. 단일 에이전트로 수행.
 - 진행: main 기준 패치 적용 및 diff --check 통과. main 기준 회귀 검증 중. 이전 로컬 미리보기 증거는 위 기록이며 이번 main 배포 검증을 대신하지 않는다.
 - 남은 검증: main 기반 회귀 테스트/타입 검사, Changesets 소비·버전 게이트, 원격 CI/리뷰, 실제 배포 후 저장·공식화 및 화면 검증.
+
+### main 기준 최종 로컬 검증
+
+- 소스 커밋 `6ffb2d4cf`, 공식 Changesets 소비/릴리스 커밋 `a7d79655e`. 두 앱 `1.12.2 → 1.12.3`, 두 CHANGELOG 갱신, 미소비 Changeset 0. 이력의 두 Changeset 삭제를 포함한 main 릴리스 게이트 PASS.
+- Frontend: Vitest `--maxWorkers=1 --minWorkers=1` 8 files / **280/280 PASS** (635.28s). result-edit-modal54, result-review31, result-review-copy15, bracket-page49, schedule60, admin canvas17/mobile47, public six-team7.
+- Backend: Jest `--selectProjects unit --runInBand --runTestsByPath src/tournament-operations/results/tournament-result-review.service.spec.ts` **61/61 PASS**, ts-jest diagnostics 유지, 67.326s. 실제 DB/원격 저장 검증 아님.
+- Frontend `tsc --noEmit --incremental false` PASS. 패턴 검사는 첫 실행의 sandbox `/bin/sh EPERM`을 기록하고 해당 읽기 전용 검사만 제한 밖에서 재실행해 PASS.
+- Runtime: Node22.23.1, 설치된 Vitest3.2.4/Jest30.3.0. 기존 의존성을 링크해서 검증했고 설치된 Next16.2.10과 manifest16.3.8 차이는 남아 있음. lockfile 기반 CI/build 검증은 원격 게시 후 필요. 의존성 manifest/lockfile 변경 없음(앱 version만 증가).
+- Host: WSL load 약1.5, memory 여유9GB 이상, swap0; 최소 worker 직렬 실행. Docker CLI는 WSL interop 오류로 확인 불가하나 이번 단위 검증은 DB/컨테이너를 사용하지 않음. 새 서버/브라우저는 띄우지 않음. 테스트 프로세스 자연 종료, 이번 검증용 dependency symlink 3개는 종료 후 제거.
+- main 대비 25개 source/test/API docs + task2 + 앱 manifest2/CHANGELOG2 = **31 paths**. Prisma/마이그레이션/배포/워크플로/lockfile diff0, committed-tree `diff --check` PASS, touched TODO/FIXME/HACK/XXX0, 신규 미추적 source import 없음.
+- 사용자 요청에 따라 전용 `hotfix/six-team-penalty-20261030` 브랜치를 준비. 원격 push + main 대상 초안 PR 생성은 자동 승인 검토가 '코드 원격 전송 및 PR 생성에 별도 명시 승인 필요' 사유로 거절해 **미실행**. 재시도/우회 없음. 사용자 승인 대기.
+- 원격 CI/Copilot, 배포 후 실제 저장·공식화 및 390/768/1440 화면 검증은 미완. 로컬 테스트를 배포/시각 검증 완료로 표시하지 않음. 최종 main 머지와 production 승인은 사용자 직접 수행.

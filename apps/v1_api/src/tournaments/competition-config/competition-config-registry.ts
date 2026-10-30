@@ -76,7 +76,7 @@ export class CompetitionConfigRegistry {
   }
 
   async list(user: V1AuthUser, query: CompetitionConfigListQueryDto) {
-    await this.adminContext.getActiveAdmin(user.id);
+    await this.adminContext.getTournamentCatalogReader(user.id);
     const sportCode = query.sportCode
       ? normalizeCompetitionSportCode(query.sportCode)
       : undefined;
@@ -88,7 +88,7 @@ export class CompetitionConfigRegistry {
   }
 
   async listVersions(user: V1AuthUser, configId: string) {
-    await this.adminContext.getActiveAdmin(user.id);
+    await this.adminContext.getTournamentCatalogReader(user.id);
     const source = await this.prisma.v1CompetitionConfigVersion.findUnique({
       where: { id: configId },
     });
@@ -143,8 +143,12 @@ export class CompetitionConfigRegistry {
     user: V1AuthUser,
     configId: string,
     dto: CreateCompetitionConfigVersionDto,
+    tournamentId?: string,
   ) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    // Only internal tournament editing supplies a scope; the global catalogue mutation API stays admin-only.
+    const admin = tournamentId === undefined
+      ? await this.adminContext.getMutationAdmin(user.id)
+      : await this.adminContext.getTournamentMutationAdmin(user.id, { tournamentId });
     const config = validateCompetitionConfig(dto.config, { preserveMissingCatalogKeys: true });
     const created = await this.prisma.$transaction(async (tx) => {
       const source = await tx.v1CompetitionConfigVersion.findUnique({

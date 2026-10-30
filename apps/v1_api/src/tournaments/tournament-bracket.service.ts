@@ -319,7 +319,7 @@ export class TournamentBracketService {
    * 값을 보고 선택지 UI 자체를 숨긴다.
    */
   async getLineupSizeOptions(user: V1AuthUser, query: LineupSizeOptionsQueryDto) {
-    await this.adminContext.getActiveAdmin(user.id);
+    await this.adminContext.getTournamentCatalogReader(user.id);
     const sport = await this.prisma.v1Sport.findUnique({ where: { id: query.sportId } });
     if (!sport) {
       throw new NotFoundException({ code: 'SPORT_NOT_FOUND', message: '종목을 찾을 수 없어요.' });
@@ -356,7 +356,7 @@ export class TournamentBracketService {
   // ─── group ────────────────────────────────────────────────────────────────
 
   async createGroup(user: V1AuthUser, tournamentId: string, dto: CreateGroupDto) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { tournamentId });
     const tournament = await this.loadTournament(tournamentId);
     this.assertStandardBracket(tournament);
     this.assertLeagueGroupShape(tournament.format, tournament.kind, dto.phase ?? 'group', dto.advanceCount);
@@ -380,7 +380,7 @@ export class TournamentBracketService {
   // ─── group-team ───────────────────────────────────────────────────────────
 
   async createGroupTeam(user: V1AuthUser, tournamentId: string, dto: CreateGroupTeamDto) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { tournamentId });
     await this.loadTournament(tournamentId);
 
     const created = await this.prisma.$transaction(async (tx) => {
@@ -482,7 +482,7 @@ export class TournamentBracketService {
 
   /** 부전승은 결과가 있는 경기 대신 라운드의 단독 진출 항목으로 저장한다. */
   async createBye(user: V1AuthUser, tournamentId: string, dto: CreateBracketByeDto) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { tournamentId });
     await this.loadTournament(tournamentId);
     const saved = await this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`league-fixture-generation:${tournamentId}`}, 0))`;
@@ -607,7 +607,7 @@ export class TournamentBracketService {
   }
 
   async createFixture(user: V1AuthUser, tournamentId: string, dto: CreateFixtureDto) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { tournamentId });
     const tournament = await this.loadTournament(tournamentId);
     this.assertStandardBracket(tournament);
 
@@ -961,7 +961,7 @@ export class TournamentBracketService {
 
   /** Persist the next match's HOME/AWAY source. Existing result projection owns promotion. */
   async updateBracketSources(user: V1AuthUser, fixtureId: string, dto: UpdateBracketSourcesDto) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { fixtureId });
     const initial = await this.prisma.v1TournamentMatchDetails.findUnique({ where: { teamMatchId: fixtureId }, select: { tournamentId: true } });
     if (!initial) throw new NotFoundException({ code: 'FIXTURE_NOT_FOUND', message: '경기를 찾을 수 없어요.' });
     this.assertStandardBracket(await this.loadTournament(initial.tournamentId));
@@ -1020,7 +1020,7 @@ export class TournamentBracketService {
 
   /** 경기 일정·장소·대진(홈/어웨이) 수정. 시작된 경기도 결과가 없으면 사유와 함께 팀을 바꾼다(공식 결과가 있으면 409). */
   async updateFixture(user: V1AuthUser, fixtureId: string, dto: UpdateFixtureDto) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { fixtureId });
     rejectPartialPlaceUpdate(dto.venue, [dto.venueAddress, dto.venueLatitude, dto.venueLongitude, dto.venueProvider, dto.venueProviderId]);
     const canonical = await this.prisma.v1TournamentMatchDetails.findUnique({
       where: { teamMatchId: fixtureId },
@@ -1135,7 +1135,7 @@ export class TournamentBracketService {
 
   /** Hide an unstarted fixture while retaining its Game and append-only history. */
   async deleteFixture(user: V1AuthUser, fixtureId: string) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { fixtureId });
     const initial = await this.prisma.v1TournamentMatchDetails.findUnique({ where: { teamMatchId: fixtureId } });
     if (!initial) throw new NotFoundException({ code: 'FIXTURE_NOT_FOUND', message: '경기를 찾을 수 없어요.' });
     return this.prisma.$transaction(async (tx) => {
@@ -1150,7 +1150,7 @@ export class TournamentBracketService {
   }
 
   async deleteFixtureResult(user: V1AuthUser, _fixtureId: string) {
-    await this.adminContext.getMutationAdmin(user.id);
+    await this.adminContext.getTournamentMutationAdmin(user.id, { fixtureId: _fixtureId });
     throw new ConflictException({
       code: 'TOURNAMENT_RESULT_DERIVED_ONLY',
       message: '대회 결과는 삭제할 수 없고 Game 결과 리비전으로만 정정할 수 있어요.',
@@ -1159,7 +1159,7 @@ export class TournamentBracketService {
 
   /** 조 이름·진출 팀 수 수정. */
   async updateGroup(user: V1AuthUser, groupId: string, dto: UpdateGroupDto) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { groupId });
     const group = await this.prisma.v1TournamentGroup.findUnique({
       where: { id: groupId },
       include: { tournament: { select: { format: true, kind: true } } },
@@ -1199,7 +1199,7 @@ export class TournamentBracketService {
 
   /** 조 삭제. 팀 배정·경기·자리가 남아 있으면 실수 방지를 위해 409로 막는다. */
   async deleteGroup(user: V1AuthUser, groupId: string) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { groupId });
     const group = await this.prisma.v1TournamentGroup.findUnique({ where: { id: groupId }, select: { tournamentId: true } });
     if (!group) {
       throw new NotFoundException({ code: 'GROUP_NOT_FOUND', message: '조를 찾을 수 없어요.' });
@@ -1213,7 +1213,7 @@ export class TournamentBracketService {
 
   /** 조 팀 배정 해제 — 해당 팀의 조 순위 행도 함께 정리한다. */
   async removeGroupTeam(user: V1AuthUser, groupTeamId: string) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { groupTeamId });
     const assignedTeam = await this.prisma.v1TournamentGroupTeam.findUnique({
       where: { id: groupTeamId }, include: { group: { select: { tournamentId: true, phase: true } } },
     });
@@ -1272,14 +1272,14 @@ export class TournamentBracketService {
   // ─── result ───────────────────────────────────────────────────────────────
 
   async recordResult(user: V1AuthUser, _fixtureId: string, _dto: RecordResultDto) {
-    await this.adminContext.getMutationAdmin(user.id);
+    await this.adminContext.getTournamentMutationAdmin(user.id, { fixtureId: _fixtureId });
     throw new ConflictException({
       code: 'TOURNAMENT_RESULT_DERIVED_ONLY',
       message: '대회 결과는 Game 종료 명령과 결과 리비전으로만 기록할 수 있어요.',
     });
   }
   async recalculateStandings(user: V1AuthUser, tournamentId: string) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { tournamentId });
     const recalculated = await this.prisma.$transaction(async (tx) => {
       const { audit, ...result } = await recalculateStandingsInTx(tx, tournamentId);
       await this.adminContext.logAdminAction(
@@ -1301,7 +1301,7 @@ export class TournamentBracketService {
   // ─── bracket view ─────────────────────────────────────────────────────────
 
   async getBracket(user: V1AuthUser, tournamentId: string) {
-    const admin = await this.adminContext.getActiveAdmin(user.id);
+    const admin = await this.adminContext.getTournamentAdmin(user.id, { tournamentId });
     const tournament = await this.loadTournament(tournamentId);
 
     const [groups, standings, canonicalMatches, canonicalTeamMatchCandidates, slots] = await Promise.all([
@@ -1398,7 +1398,7 @@ export class TournamentBracketService {
     }
 
     // 득점자 실명은 대회 운영진(플랫폼 운영자)에게만 싣는다 — support 어드민은 닉네임만(경기 명단·라인업과 같은 규칙).
-    if (canAdminViewParticipantIdentity(admin.adminRole)) {
+    if (admin.adminRole === 'tournament_director' || canAdminViewParticipantIdentity(admin.adminRole)) {
       const realNames = await loadRealNames(
         this.prisma,
         [...fixtureRows.values()].flatMap((row) => (row.result?.goals ?? []).flatMap((goal) => (goal.playerUserId === null ? [] : [goal.playerUserId]))),

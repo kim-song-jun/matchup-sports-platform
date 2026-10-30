@@ -183,6 +183,8 @@ describe('TournamentsAdminController (real V1AuthGuard)', () => {
   const prismaMock = {
     v1User: { findFirst: jest.fn() },
     v1AdminUser: { findUnique: jest.fn() },
+
+    v1TournamentStaffAssignment: { findFirst: jest.fn().mockResolvedValue(null) },
     v1Sport: { findUnique: jest.fn() },
     v1Tournament: { findMany: jest.fn(), findFirst: jest.fn(), create: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
     v1AdminActionLog: { create: jest.fn() },

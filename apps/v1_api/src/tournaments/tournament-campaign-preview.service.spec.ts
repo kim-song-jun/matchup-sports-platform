@@ -29,15 +29,15 @@ const previewProjection = {
 
 describe('TournamentCampaignAdminService preview permission', () => {
   const adminContext = {
-    getActiveAdmin: jest.fn(),
-    getMutationAdmin: jest.fn(),
+    getTournamentAdmin: jest.fn(),
+    getTournamentMutationAdmin: jest.fn(),
   };
   const readService = { getPreview: jest.fn() };
   let service: TournamentCampaignAdminService;
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    adminContext.getActiveAdmin.mockResolvedValue({
+    adminContext.getTournamentAdmin.mockResolvedValue({
       id: 'admin-support',
       userId: supportUser.id,
       adminRole: 'support',
@@ -58,8 +58,8 @@ describe('TournamentCampaignAdminService preview permission', () => {
 
   it('returns the public-safe projection to active support without mutation permission', async () => {
     await expect(service.preview(supportUser, 'tournament-1')).resolves.toEqual(previewProjection);
-    expect(adminContext.getActiveAdmin).toHaveBeenCalledWith(supportUser.id);
-    expect(adminContext.getMutationAdmin).not.toHaveBeenCalled();
+    expect(adminContext.getTournamentAdmin).toHaveBeenCalledWith(supportUser.id, { tournamentId: 'tournament-1' });
+    expect(adminContext.getTournamentMutationAdmin).not.toHaveBeenCalled();
     expect(readService.getPreview).toHaveBeenCalledWith('tournament-1');
   });
 });

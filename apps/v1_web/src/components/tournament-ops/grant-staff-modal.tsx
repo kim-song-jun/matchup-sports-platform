@@ -11,7 +11,7 @@ import type {
 } from '@/types/api';
 import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
 import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
-import { TOURNAMENT_STAFF_ENTRY_LABEL } from '@/lib/tournament-staff-entry-label';
+import { TOURNAMENT_STAFF_ENTRY_LABEL, tournamentStaffEntryDestination } from '@/lib/tournament-staff-entry-label';
 import { lockBodyScroll } from '@/lib/body-scroll-lock';
 
 export interface GrantableRoleOption {
@@ -25,6 +25,7 @@ interface GrantStaffModalProps {
   onSubmit: (payload: V1GrantTournamentStaffPayload) => void;
   /** 후보 검색은 대회 단위 권한을 타므로 어느 대회인지 알아야 한다. */
   tournamentId: string;
+  tournamentKind?: string | null;
   roleOptions: GrantableRoleOption[];
   fields: V1TournamentField[];
   pending?: boolean;
@@ -67,6 +68,7 @@ export function GrantStaffModal({
   onClose,
   onSubmit,
   tournamentId,
+  tournamentKind,
   roleOptions,
   fields,
   pending = false,
@@ -427,9 +429,7 @@ export function GrantStaffModal({
             {/* 배정 후 그 사람이 어디로 들어가는지 — 배정만 하고 "이제 뭘 하라고 전해야
                 하는지"를 모르면 배정이 끝나도 현장은 그대로 막힌다. */}
             <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)] leading-relaxed bg-[var(--surface-soft)] rounded-xl px-3 py-2">
-              {requiresField
-                ? `배정하면 그분은 마이페이지 → “${TOURNAMENT_STAFF_ENTRY_LABEL}”에서 담당 경기 기록 화면으로 바로 들어갈 수 있어요.`
-                : `배정하면 그분은 마이페이지 → “${TOURNAMENT_STAFF_ENTRY_LABEL}”에서 이 대회 운영 보드로 들어갈 수 있어요.`}
+                {`배정하면 그분은 마이페이지 → “${TOURNAMENT_STAFF_ENTRY_LABEL}”에서 ${tournamentStaffEntryDestination(role, tournamentKind)} 들어갈 수 있어요.`}
             </p>
 
             {submitAttempted && validationError !== null && (

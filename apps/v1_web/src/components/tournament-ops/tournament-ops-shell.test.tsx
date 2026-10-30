@@ -11,6 +11,11 @@ beforeEach(() => {
 });
 
 describe('TournamentOpsShell 복귀 경로 (T6-2)', () => {
+  it('디렉터는 같은 대회의 전용 관리 화면으로 돌아간다', () => {
+    render(<TournamentOpsShell tournamentId="t-1" role="TOURNAMENT_DIRECTOR" origin="staff" tournamentKind="regular_tournament"><div>content</div></TournamentOpsShell>);
+    expect(screen.getByRole('link', { name: '대회 관리로 돌아가기' })).toHaveAttribute('href', '/tournament-management/tournaments/t-1/overview');
+    expect(screen.getAllByRole('link', { name: '대회 관리' }).every((link) => link.getAttribute('href') === '/tournament-management/tournaments/t-1/overview')).toBe(true);
+  });
   it.each(['PLATFORM_OPS', 'TOURNAMENT_DIRECTOR'] as const)('담당 경기에서 온 %s도 담당 경기 목록으로 돌아간다', (role) => {
     pathnameMock.value = '/tournament-ops/tournaments/t-1/fixtures/fx-1/operate';
     render(<TournamentOpsShell tournamentId="t-1" role={role} origin="staff"><div>content</div></TournamentOpsShell>);

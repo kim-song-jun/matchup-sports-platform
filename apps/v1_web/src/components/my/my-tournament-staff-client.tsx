@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { staffRoleLabel } from '@/components/tournament-ops/badges';
 import { ChevronRightIcon } from '@/components/v1-ui/icons';
 import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
+import { AdminPageSkeleton } from '@/components/admin/admin-skeleton';
 import { useV1MyTournamentStaffAssignments } from '@/hooks/use-v1-api';
 import { myStaffEntryHref } from '@/hooks/use-v1-my-staff-assignments';
 import { getLeagueStatusConfig, getTournamentStatusConfig } from '@/lib/v1-tournament-status';
@@ -16,13 +17,17 @@ import type { V1MyTournamentStaffAssignment, V1MyTournamentStaffGroup } from '@/
  * 유효한 배정이 있었다는 뜻이다 — 다만 그 사이 전부 만료/해제됐을 수 있어 빈 상태는
  * 여전히 다뤄야 한다.
  */
-export function MyTournamentStaffPageClient() {
+export function MyTournamentStaffPageClient({ directorsOnly = false }: { directorsOnly?: boolean }) {
   const query = useV1MyTournamentStaffAssignments();
-  const groups = query.data?.items ?? [];
+  const groups = (query.data?.items ?? []).filter((group) => !directorsOnly ||
+    (group.tournamentKind !== 'regular_league' && group.assignments.some((a) => a.role === 'TOURNAMENT_DIRECTOR' &&
+      (a.expiresAt === null || new Date(a.expiresAt).getTime() > Date.now()))));
+
+  if (directorsOnly && query.isLoading) return <AdminPageSkeleton />;
 
   if (query.isError) {
     return (
-      <div className="tm-my-shell">
+      <div className={directorsOnly ? 'grid gap-4' : 'tm-my-shell'}>
         <ErrorState
           message="담당 대회 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
           onRetry={() => void query.refetch()}
@@ -32,7 +37,7 @@ export function MyTournamentStaffPageClient() {
   }
 
   return (
-    <div className="tm-my-shell tm-content-enter">
+    <div className={directorsOnly ? 'grid gap-4' : 'tm-my-shell tm-content-enter'}>
       <div className="tm-my-settings-desktop">
         {!query.isLoading && groups.length === 0 ? (
           <EmptyState

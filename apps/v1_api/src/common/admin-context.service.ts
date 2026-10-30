@@ -1,6 +1,9 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { randomUUID } from 'node:crypto';
+import { activeDirectorWhere, denyTournamentManagement, getActiveTournamentDirector, type TournamentManagementResource, type V1TournamentManager } from './tournament-management-access';
+export type { V1TournamentManager } from './tournament-management-access';
 
 export type V1ActiveAdmin = {
   id: string;
@@ -52,12 +55,41 @@ export class AdminContextService {
     return admin;
   }
 
+  async getTournamentAdmin(userId: string, resource: TournamentManagementResource, tx?: Prisma.TransactionClient): Promise<V1TournamentManager> {
+    try { return await this.getActiveAdmin(userId, tx); }
+    catch (error) { if (!(error instanceof ForbiddenException)) throw error; }
+    return getActiveTournamentDirector(tx ?? this.prisma, userId, resource);
+  }
+
+  async getTournamentMutationAdmin(userId: string, resource: TournamentManagementResource, tx?: Prisma.TransactionClient): Promise<V1TournamentManager> {
+    try { return await this.getMutationAdmin(userId, tx); }
+    catch (error) { if (!(error instanceof ForbiddenException)) throw error; }
+    return getActiveTournamentDirector(tx ?? this.prisma, userId, resource);
+  }
+
+  /** Used only by the tournament management list; platform admin entry remains unchanged. */
+  async tournamentManagementWhere(userId: string): Promise<Prisma.V1TournamentWhereInput> {
+    try { await this.getActiveAdmin(userId); return {}; }
+    catch (error) { if (!(error instanceof ForbiddenException)) throw error; }
+    const assignment = await this.prisma.v1TournamentStaffAssignment.findFirst({ where: activeDirectorWhere(userId), select: { id: true } });
+    if (!assignment) denyTournamentManagement();
+    return { staffAssignments: { some: activeDirectorWhere(userId) } };
+  }
+
+  /** Immutable catalogues contain no other tournament's participant or configuration assignment data. */
+  async getTournamentCatalogReader(userId: string): Promise<void> {
+    try { await this.getActiveAdmin(userId); return; }
+    catch (error) { if (!(error instanceof ForbiddenException)) throw error; }
+    const assignment = await this.prisma.v1TournamentStaffAssignment.findFirst({ where: activeDirectorWhere(userId), select: { id: true } });
+    if (!assignment) throw new ForbiddenException({ code: 'STAFF_SCOPE_DENIED', message: '대회 운영자 권한이 필요해요.' });
+  }
+
   /**
    * V1AdminActionLog 기록 + (toStatus 제공 시) V1StatusChangeLog 동시 기록.
    * tx를 넘기면 호출자 트랜잭션 안에서 원자적으로 기록한다.
    */
   async logAdminAction(
-    admin: V1ActiveAdmin,
+    admin: V1TournamentManager,
     input: AdminActionLogInput,
     tx?: Prisma.TransactionClient,
   ): Promise<AdminActionLogResult> {
@@ -84,9 +116,31 @@ export type AdminActionLogResult = { actionLogId: string; statusChangeLogId: str
  */
 export async function writeAdminActionLog(
   client: Prisma.TransactionClient | PrismaService,
-  admin: V1ActiveAdmin,
+  admin: V1TournamentManager,
   input: AdminActionLogInput,
 ): Promise<AdminActionLogResult> {
+  if (admin.id === null) {
+    // Never impersonate a platform admin or manufacture an admin FK for a director.
+    // On a transaction client this holds the grant stable until the enclosing mutation commits.
+    await client.$queryRaw`SELECT id FROM v1_tournament_staff_assignments WHERE id = ${admin.assignmentId} FOR SHARE`;
+    const current = await getActiveTournamentDirector(client, admin.userId, { tournamentId: admin.tournamentId });
+    if (current.assignmentId !== admin.assignmentId || current.assignmentVersion !== admin.assignmentVersion) {
+      throw new ForbiddenException({ code: 'STAFF_SCOPE_DENIED', message: '대회 배정이 변경됐어요. 다시 확인해 주세요.' });
+    }
+    const actionLog = await client.v1OperationAudit.create({ data: {
+      actorType: 'USER', actorUserId: admin.userId, action: input.action,
+      resourceType: input.targetType, resourceId: input.targetId, tournamentId: admin.tournamentId,
+      requestId: randomUUID(), reason: input.reason ?? null,
+      before: input.beforeJson,
+      after: { ...(input.afterJson && typeof input.afterJson === 'object' && !Array.isArray(input.afterJson) ? input.afterJson : {}),
+        _authorization: { role: 'tournament_director', assignmentId: admin.assignmentId, assignmentVersion: admin.assignmentVersion } },
+    } });
+    const statusLog = input.toStatus ? await client.v1StatusChangeLog.create({ data: {
+      targetType: input.targetType, targetId: input.targetId, fromStatus: input.fromStatus ?? null,
+      toStatus: input.toStatus, actorType: 'user', actorUserId: admin.userId, reason: input.reason ?? null,
+    } }) : null;
+    return { actionLogId: actionLog.id, statusChangeLogId: statusLog?.id ?? null };
+  }
   const actionLog = await client.v1AdminActionLog.create({
     data: {
       adminUserId: admin.id,

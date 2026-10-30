@@ -12,6 +12,8 @@
 
 # Global v1 API contract
 
+대회 관리 API의 권한은 플랫폼 관리자 또는 해당 대회의 활성 `TOURNAMENT_DIRECTOR` 배정이다. 전역 관리자 게이트는 유지한다. 하위 리소스 ID의 실제 소속 대회를 서버에서 확인하고 범위 밖 요청은 `403 PERMISSION_DENIED`다. 자세한 범위와 예외는 [대회 계약](./domains/tournaments.md#scoped-director-management)을 따른다.
+
 대진 v2 생성은 게임 명령 헤더 대신 body의 `requestId`와 서버 `previewHash`를 사용한다. 각 조의 `groups[].legs`(1·2회전)가 기존 최상위 `legs`보다 우선하며 둘 다 없으면 1회전이다. 초안·미리보기·실제 생성·경기 상한은 같은 조별 회전 설정을 사용한다. 같은 키의 입력 변경·오래된 미리보기·초안 revision 충돌은 409이며 부분 생성은 없다. 권한과 출시 플래그는 [대회 v2 계약](./domains/tournaments.md#유연한-대진-v2-2026-10-27)을 따른다.
 
 공개 대회 일정의 미배정 홈·어웨이는 직접/슬롯 문구가 없으면 저장된 진출 연결의 원천 라운드·경기 번호·승자/패자를 기존 라벨 필드에 제공한다. 삭제된 원천은 제외하고 실제 팀명·가림 정책은 유지한다. [대회 계약](./domains/tournaments.md)을 따른다.

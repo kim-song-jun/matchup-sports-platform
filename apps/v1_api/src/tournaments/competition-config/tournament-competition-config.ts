@@ -232,7 +232,7 @@ export class TournamentCompetitionConfig {
     allowedKinds: readonly V1CompetitionKind[],
     transaction?: Prisma.TransactionClient,
   ) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { tournamentId });
     const db = transaction ?? this.prisma;
     const tournament = await findTournamentOnSurface(db, allowedKinds, {
       where: { id: tournamentId, deletedAt: null },

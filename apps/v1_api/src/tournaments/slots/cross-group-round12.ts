@@ -132,7 +132,7 @@ type Dependencies = { prisma: PrismaService; adminContext: AdminContextService; 
 const options = { timeout: 45_000, maxWait: 5_000 } as const;
 
 export async function previewCrossGroupRound12(deps: Dependencies, user: V1AuthUser, tournamentId: string) {
-  await deps.adminContext.getActiveAdmin(user.id);
+  await deps.adminContext.getTournamentAdmin(user.id, { tournamentId });
   return deps.prisma.$transaction(async (tx) => {
     // 공식 결과와 같은 잠금 순서로 읽어 한 시점의 순위·대진을 표시한다.
     await loadCanonicalStandingsSource(tx, tournamentId);
@@ -142,7 +142,7 @@ export async function previewCrossGroupRound12(deps: Dependencies, user: V1AuthU
 
 export async function applyCrossGroupRound12(deps: Dependencies, user: V1AuthUser, tournamentId: string,
   input: CrossGroupSelection & { version: string; reason: string }) {
-  const admin = await deps.adminContext.getMutationAdmin(user.id);
+  const admin = await deps.adminContext.getTournamentMutationAdmin(user.id, { tournamentId });
   return deps.prisma.$transaction(async (tx) => {
     await loadCanonicalStandingsSource(tx, tournamentId);
     const preview = await loadPreview(tx, tournamentId);

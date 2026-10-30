@@ -127,7 +127,7 @@ export class TournamentAnnouncementsService {
    * active admin이면 support 포함 조회 가능 (읽기 전용이므로 getMutationAdmin 불필요).
    */
   async listByTournament(user: V1AuthUser, tournamentId: string) {
-    await this.adminContext.getActiveAdmin(user.id);
+    await this.adminContext.getTournamentAdmin(user.id, { tournamentId });
 
     // 삭제된 대회의 공지는 id 를 알아도 읽히면 안 된다 — 같은 파일 create() 의
     // 존재 확인은 이미 `deletedAt: null` 을 쓰는데 조회 쪽 두 곳만 빠져 있었다.
@@ -160,7 +160,7 @@ export class TournamentAnnouncementsService {
     tournamentId: string,
     dto: CreateAnnouncementDto,
   ) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { tournamentId });
 
     // 대회 존재 확인 — deletedAt만 체크(모든 status 허용: draft 대회에도 공지 가능).
     const tournament = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
@@ -224,7 +224,7 @@ export class TournamentAnnouncementsService {
     announcementId: string,
     dto: UpdateAnnouncementDto,
   ) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { announcementId });
 
     const announcement = await this.prisma.v1TournamentAnnouncement.findUnique({
       where: { id: announcementId },
@@ -296,7 +296,7 @@ export class TournamentAnnouncementsService {
    * logAdminAction으로 감사 기록.
    */
   async publish(user: V1AuthUser, announcementId: string) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { announcementId });
 
     const announcement = await this.prisma.v1TournamentAnnouncement.findUnique({
       where: { id: announcementId },
@@ -340,7 +340,7 @@ export class TournamentAnnouncementsService {
   }
 
   async remove(user: V1AuthUser, announcementId: string) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { announcementId });
 
     const announcement = await this.prisma.v1TournamentAnnouncement.findUnique({
       where: { id: announcementId },

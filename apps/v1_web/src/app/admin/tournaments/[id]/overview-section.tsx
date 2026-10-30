@@ -19,7 +19,7 @@ import {
  * 비어 있는지, 어디로 가야 고치는지만 보여준다. 편집 진입점은 각 섹션이 갖는다.
  */
 export function TournamentOverviewSection() {
-  const { tournamentId } = useTournamentAdmin();
+  const { tournamentId, basePath: managementBasePath } = useTournamentAdmin();
   const { data: tournament, isPending, isError, error, refetch } = useV1AdminTournament(tournamentId);
 
   if (isPending) return <AdminKpiGridSkeleton count={3} />;
@@ -44,7 +44,7 @@ export function TournamentOverviewSection() {
   const now = new Date();
   const milestone = resolveNextMilestone(tournament, now);
   const checks = buildTournamentChecklist(tournament, now);
-  const basePath = `/admin/tournaments/${tournamentId}`;
+  const basePath = managementBasePath ?? `/admin/tournaments/${tournamentId}`;
   const counts = tournament.operationCounts;
 
   return (
@@ -104,7 +104,7 @@ export function TournamentOverviewSection() {
       <ChecklistCard checks={checks} basePath={basePath} />
 
       <Link
-        href={withFromPath(`/tournaments/${tournamentId}`, `/admin/tournaments/${tournamentId}`)}
+        href={withFromPath(`/tournaments/${tournamentId}`, basePath)}
         className="inline-flex items-center gap-2 self-start min-h-[44px] px-3 rounded-xl text-[length:var(--font-size-label)] font-medium text-[var(--blue700)] bg-[var(--blue50)] hover:bg-[var(--tint-blue)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
       >
         참가자에게 보이는 화면 열기

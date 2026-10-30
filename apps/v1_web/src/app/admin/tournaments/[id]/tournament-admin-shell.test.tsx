@@ -7,7 +7,7 @@
  */
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { TournamentAdminShell } from './tournament-admin-shell';
+import { TournamentAdminShell, TournamentManagementContent } from './tournament-admin-shell';
 
 const { adminRoleMock, tournamentStatusMock } = vi.hoisted(() => ({
   adminRoleMock: { value: 'ops' as 'owner' | 'ops' | 'support' },
@@ -42,6 +42,15 @@ vi.mock('@/hooks/use-v1-api', () => ({
 }));
 
 describe('TournamentAdminShell 섹션 내비', () => {
+  it('디렉터는 전용 관리 경로를 사용하고 플랫폼 전역 팝업 링크를 보지 않는다', () => {
+    render(<TournamentManagementContent id="tournament-1" role="TOURNAMENT_DIRECTOR" staffSurface><div>관리 내용</div></TournamentManagementContent>);
+    expect(screen.getByRole('link', { name: '대회 목록으로' })).toHaveAttribute('href', '/tournament-management');
+    expect(screen.getByRole('link', { name: /개요/ })).toHaveAttribute('href', '/tournament-management/tournaments/tournament-1/overview');
+    expect(screen.getByRole('link', { name: /신청 관리/ })).toHaveAttribute('href', '/tournament-management/tournaments/tournament-1/registrations');
+    expect(screen.queryByRole('link', { name: /팝업/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '운영 보드' })).toHaveAttribute('href', '/tournament-ops/tournaments/tournament-1/operations');
+    expect(screen.getByRole('region', { name: '공개 설정' })).toBeInTheDocument();
+  });
   it('팝업은 대회 하위 탭이 아니라 경로를 프리필한 전역 팝업 링크다', () => {
     render(<TournamentAdminShell id="tournament-1"><div /></TournamentAdminShell>);
 

@@ -1,12 +1,12 @@
 import { NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
-import type { AdminContextService, V1ActiveAdmin } from '../common/admin-context.service';
+import type { AdminContextService, V1TournamentManager } from '../common/admin-context.service';
 import { isByeSlot } from './slots/tournament-slot-label';
 
 type Labels = { homeDisplayLabel?: string | null; awayDisplayLabel?: string | null };
 /** Same competition lock as fixture/slot edits. BYE text belongs to its slot, never a second copy on the quarter-final. */
 export async function updateFixtureDisplayLabelsInTx(tx: Prisma.TransactionClient, adminContext: AdminContextService,
-  admin: V1ActiveAdmin, fixtureId: string, input: Labels) {
+  admin: V1TournamentManager, fixtureId: string, input: Labels) {
   await tx.$queryRaw`SELECT id FROM v1_games WHERE team_match_id = ${fixtureId} FOR UPDATE`;
   await tx.$queryRaw`SELECT team_match_id FROM v1_tournament_match_details WHERE team_match_id = ${fixtureId} FOR UPDATE`;
   await tx.$queryRaw`SELECT id FROM v1_team_matches WHERE id = ${fixtureId} FOR UPDATE`;

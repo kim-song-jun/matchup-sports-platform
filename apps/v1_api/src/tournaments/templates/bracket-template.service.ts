@@ -1,8 +1,9 @@
+import { findTournamentManagementAction } from '../../common/tournament-management-history';
 import { ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { createHash, randomUUID } from 'node:crypto';
 import type { V1AuthUser } from '../../auth/v1-auth-user';
-import { AdminContextService, type V1ActiveAdmin } from '../../common/admin-context.service';
+import { AdminContextService, type V1TournamentManager } from '../../common/admin-context.service';
 import { GamesService } from '../../games/games.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { lockCompetitionForBracketMutationInTx, type LockableCompetition } from '../slots/competition-bracket-lock';
@@ -75,7 +76,7 @@ export class BracketTemplateService {
   }
 
   async preview(user: V1AuthUser, tournamentId: string, dto: ApplyBracketTemplateDto) {
-    await this.adminContext.getMutationAdmin(user.id);
+    await this.adminContext.getTournamentMutationAdmin(user.id, { tournamentId });
     this.assertFlexibleEnabled(tournamentId, dto);
     const input = toBracketTemplateInput(dto);
     const plan = planBracketTemplate(input, { fixtureNumberOffset: 0 });
@@ -96,33 +97,38 @@ export class BracketTemplateService {
   }
 
   async draft(user: V1AuthUser, tournamentId: string) {
-    await this.adminContext.getMutationAdmin(user.id);
+    await this.adminContext.getTournamentMutationAdmin(user.id, { tournamentId });
     const row = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, { where: { id: tournamentId, deletedAt: null }, select: { bracketDraft: true, bracketDraftRevision: true } });
     if (!row) throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
     return { input: row.bracketDraft, revision: row.bracketDraftRevision };
   }
 
   async saveDraft(user: V1AuthUser, tournamentId: string, dto: ApplyBracketTemplateDto) {
-    await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { tournamentId });
     this.assertFlexibleEnabled(tournamentId, dto);
     const input = toBracketTemplateInput(dto);
     planBracketTemplate(input, { fixtureNumberOffset: 0 });
-    if (dto.expectedRevision === undefined) throw new ConflictException({ code: 'BRACKET_DRAFT_STALE', message: '초안을 먼저 불러와 주세요.' });
-    const changed = await this.prisma.v1Tournament.updateMany({ where: { id: tournamentId, deletedAt: null, kind: { in: [...TOURNAMENT_KINDS] }, format: input.kind, bracketDraftRevision: dto.expectedRevision },
-      data: { bracketDraft: JSON.parse(JSON.stringify(input)), bracketDraftRevision: { increment: 1 } } });
-    if (changed.count !== 1) throw new ConflictException({ code: 'BRACKET_DRAFT_STALE', message: '다른 관리자가 설정을 바꿨어요. 초안을 다시 불러와 주세요.' });
-    return { input, revision: dto.expectedRevision + 1 };
+    const expectedRevision = dto.expectedRevision;
+    if (expectedRevision === undefined) throw new ConflictException({ code: 'BRACKET_DRAFT_STALE', message: '초안을 먼저 불러와 주세요.' });
+    return this.prisma.$transaction(async (tx) => {
+      const changed = await tx.v1Tournament.updateMany({ where: { id: tournamentId, deletedAt: null, kind: { in: [...TOURNAMENT_KINDS] }, format: input.kind, bracketDraftRevision: expectedRevision },
+        data: { bracketDraft: JSON.parse(JSON.stringify(input)), bracketDraftRevision: { increment: 1 } } });
+      if (changed.count !== 1) throw new ConflictException({ code: 'BRACKET_DRAFT_STALE', message: '다른 관리자가 설정을 바꿨어요. 초안을 다시 불러와 주세요.' });
+      await this.adminContext.logAdminAction(admin, { action: 'tournament.bracket.draft.save', targetType: 'tournament', targetId: tournamentId,
+        afterJson: { revision: expectedRevision + 1 } }, tx);
+      return { input, revision: expectedRevision + 1 };
+    });
   }
 
   async requestStatus(user: V1AuthUser, tournamentId: string, requestId: string) {
     await this.draft(user, tournamentId);
-    const row = await this.prisma.v1AdminActionLog.findFirst({ where: { targetType: 'tournament', targetId: tournamentId,
-      action: 'tournament.bracket.template.apply', afterJson: { path: ['requestId'], equals: requestId } }, select: { afterJson: true } });
+    const row = await findTournamentManagementAction(this.prisma, { targetType: 'tournament', targetId: tournamentId,
+      action: 'tournament.bracket.template.apply', afterJson: { path: ['requestId'], equals: requestId } });
     return { completed: row !== null, result: row?.afterJson ?? null };
   }
 
   async apply(user: V1AuthUser, tournamentId: string, dto: ApplyBracketTemplateDto) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { tournamentId });
     this.assertFlexibleEnabled(tournamentId, dto);
     const input = toBracketTemplateInput(dto);
     const tournament = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
@@ -149,7 +155,7 @@ export class BracketTemplateService {
 
   private async applyInTx(
     tx: Tx,
-    admin: V1ActiveAdmin,
+    admin: V1TournamentManager,
     tournament: LockableCompetition,
     input: BracketTemplateInput,
     replaceExisting: boolean,
@@ -161,8 +167,8 @@ export class BracketTemplateService {
       throw new ConflictException({ code: 'BRACKET_PREVIEW_REQUIRED', message: '미리보기를 확인한 뒤 생성해 주세요.' });
     }
     if (dto.requestId) {
-      const previous = await tx.v1AdminActionLog.findFirst({ where: { targetType: 'tournament', targetId: tournament.id,
-        action: 'tournament.bracket.template.apply', afterJson: { path: ['requestId'], equals: dto.requestId } }, select: { afterJson: true } });
+      const previous = await findTournamentManagementAction(tx, { targetType: 'tournament', targetId: tournament.id,
+        action: 'tournament.bracket.template.apply', afterJson: { path: ['requestId'], equals: dto.requestId } });
       const saved = previous?.afterJson as { requestHash?: string; groups: number; slots: number; fixtures: number; edges: number } | undefined;
       if (saved) {
         if (saved.requestHash !== requestHash) throw new ConflictException({ code: 'BRACKET_REQUEST_CONFLICT', message: '같은 생성 요청의 설정이 바뀌었어요.' });
@@ -277,7 +283,7 @@ export class BracketTemplateService {
   /** 스펙 S2 순서: 경기(하류 먼저) → 자리 → GroupTeam·Standing·ByeSlot → 조. */
   private async teardown(
     tx: Tx,
-    admin: V1ActiveAdmin,
+    admin: V1TournamentManager,
     tournamentId: string,
     existing: Awaited<ReturnType<BracketTemplateService['loadExisting']>>,
   ) {
@@ -295,7 +301,7 @@ export class BracketTemplateService {
     for (const group of existing.groups) await deleteTournamentGroupInTx(tx, admin, group.id);
   }
 
-  private async materialize(tx: Tx, admin: V1ActiveAdmin, tournament: PinnedTournament, plan: BracketTemplatePlan) {
+  private async materialize(tx: Tx, admin: V1TournamentManager, tournament: PinnedTournament, plan: BracketTemplatePlan) {
     const groupIds = new Map<string, string>();
     for (const group of plan.groups) {
       const created = await createGroupInTx(tx, admin, tournament.id, {

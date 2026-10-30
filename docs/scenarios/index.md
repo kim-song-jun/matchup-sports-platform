@@ -33,6 +33,8 @@ API212/Web116·격리 DB 통합4·양쪽 타입/표면·패턴·schema drift0 PA
 최신 dev 기반 단위·SSR·MSW 및 양쪽 타입/표면·패턴 검사 PASS. 실제 DB0/5·alpha0/8·after viewport0/3.
 사용자 요청으로 dev 대상 PR을 생성한다. 머지·배포 및 alpha 실측은 후속이다.
 
+PR #2094 후속: [레벨·지역 검색·개최순·필터 오류 회귀](./competition-discovery-filters-2026-10-22.md#pr-2094-회귀-시나리오)를 추가했다. KST 오늘/진행 중/날짜 미정 유지·종료 직접 선택 예외와 입력칸 오류·최소 금액 요약을 포함한다. 위 수치는 최초 구현의 과거 증거이며 새 후속 alpha는 0/7·viewport 0/3이다.
+
 [빈 템플릿 조 정리](./empty-template-group-cleanup.md) · Task20261100/PR2019. 로컬 DB·단위·타입 검증 완료, hotfix CI/alpha/main/production 진행 중. 운영 대회는 조회만 수행.
 
 ## 2026-10-21 — 결선 경기일정 기본 문구

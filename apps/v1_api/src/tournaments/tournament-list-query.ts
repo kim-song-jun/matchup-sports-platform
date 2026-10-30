@@ -4,6 +4,7 @@ import type { TournamentListQueryDto } from './dto/tournament-read.dto';
 import { COMPETITION_LIST_SURFACE } from './tournament-surface';
 import { PUBLIC_TOURNAMENT_STATUSES } from './tournaments-read.query';
 import { CAPACITY_HOLD_STATUSES } from './registration-capacity';
+import { kstDayRange } from '../common/pagination/list-facets';
 
 /**
  * Default public list order, evaluated by the database:
@@ -86,6 +87,16 @@ function buildFilterSql(query: TournamentListQueryDto): Prisma.Sql {
   if (query.dateFrom || query.dateTo) conditions.push(Prisma.sql`t.scheduled_at IS NOT NULL`);
   if (query.dateFrom) conditions.push(Prisma.sql`COALESCE(t.scheduled_end_at, t.scheduled_at) >= ${new Date(`${query.dateFrom}T00:00:00+09:00`)}`);
   if (query.dateTo) conditions.push(Prisma.sql`t.scheduled_at <= ${new Date(`${query.dateTo}T23:59:59.999+09:00`)}`);
+  // 개최 가까운 순은 일정이 끝난 대회를 뺀다 — 시작일 오름차순이라 지난 대회가 앞을 채웠다(2026-10-29 사용자 확정).
+  // 진행 중(상태)·오늘(KST) 열리는 대회·날짜 미정은 남긴다. 종료 일시를 비운 하루 대회가 시작하자마자
+  // 빠지지 않게 일 단위로 비교한다(`dateFrom` 과 같은 KST 하루 경계). '종료'를 직접 고르면 빼지 않는다 —
+  // 빼면 그 조합은 늘 빈 목록이다.
+  const completedRequested = query.phase === 'completed' || query.status === 'completed';
+  if (query.sort === 'scheduled' && !completedRequested) {
+    conditions.push(Prisma.sql`t.status::text NOT IN ('completed', 'cancelled')
+      AND (t.scheduled_at IS NULL OR t.status::text = 'in_progress'
+        OR COALESCE(t.scheduled_end_at, t.scheduled_at) >= ${kstDayRange(new Date()).gte})`);
+  }
   return Prisma.join(conditions, ' AND ');
 }
 

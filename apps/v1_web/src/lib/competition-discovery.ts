@@ -84,9 +84,10 @@ export function switchCompetitionKind(filters: CompetitionDiscoveryFilters, kind
   return { ...common, kind };
 }
 
-export function discoveryRangeError(filters: CompetitionDiscoveryFilters): string | null {
-  if (filters.dateFrom && filters.dateTo && filters.dateFrom > filters.dateTo) return '종료 날짜는 시작 날짜 이후로 선택해 주세요.';
-  if (filters.feeMin !== undefined && filters.feeMax !== undefined && filters.feeMin > filters.feeMax) return '최대 참가비는 최소 참가비 이상으로 입력해 주세요.';
+/** 어느 칸의 범위가 틀렸는지 함께 돌려줘 시트가 그 칸 바로 밑에 안내를 띄운다. */
+export function discoveryRangeError(filters: CompetitionDiscoveryFilters): { field: 'date' | 'fee'; message: string } | null {
+  if (filters.dateFrom && filters.dateTo && filters.dateFrom > filters.dateTo) return { field: 'date', message: '종료 날짜는 시작 날짜 이후로 선택해 주세요.' };
+  if (filters.feeMin !== undefined && filters.feeMax !== undefined && filters.feeMin > filters.feeMax) return { field: 'fee', message: '최대 참가비는 최소 참가비 이상으로 입력해 주세요.' };
   return null;
 }
 

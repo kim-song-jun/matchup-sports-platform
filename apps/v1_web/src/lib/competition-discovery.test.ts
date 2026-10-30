@@ -38,8 +38,8 @@ describe('대회·리그 필터 URL 계약', () => {
     expect(read('dateFrom=0000-01-01').dateFrom).toBeUndefined();
   });
   it('기간과 금액 역전은 적용 전 오류를 표시한다', () => {
-    expect(discoveryRangeError(read('dateFrom=2026-11-30&dateTo=2026-11-01'))).toContain('종료 날짜');
-    expect(discoveryRangeError(read('feeMin=100&feeMax=0', 'tournament'))).toContain('최대 참가비');
+    expect(discoveryRangeError(read('dateFrom=2026-11-30&dateTo=2026-11-01'))).toEqual({ field: 'date', message: expect.stringContaining('종료 날짜') });
+    expect(discoveryRangeError(read('feeMin=100&feeMax=0', 'tournament'))).toEqual({ field: 'fee', message: expect.stringContaining('최대 참가비') });
   });
   it('성별 미지정과 무료를 명시적으로 보존한다', () => {
     expect(competitionDiscoveryHref(read('genderCategory=unspecified&feeMax=0', 'tournament'))).toBe('/tournaments?kind=tournament&genderCategory=unspecified&feeMax=0');

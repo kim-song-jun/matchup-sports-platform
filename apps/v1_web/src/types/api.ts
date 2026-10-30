@@ -1822,14 +1822,13 @@ export type V1GameResultScoreInput = {
    * `PenaltyScoreDto`(`apps/v1_api/src/games/dto/game-result.dto.ts`)에 선언돼 있고,
    * `whitelist`는 `@ValidateNested()`가 걸린 중첩 객체 안까지 적용되므로 **선언이 곧
    * 허용**이다. 정정 폼이 이 키를 떨어뜨리면 정정 한 번에 "누가 먼저 찼는지"가 영구히
-   * 사라진다(폼에 선축 입력란이 없어 되살릴 수단도 없다).
+   * 사라진다. 정정 폼은 기존 선축을 초기값으로 읽고 편집한 값을 함께 전송한다.
    */
   penalties?: {
     home: number;
     away: number;
     firstKickSideKey?: 'HOME' | 'AWAY';
-    /** 각 팀이 찬 킥 수. 서버가 결판을 판정하는 근거이고, 정정 화면에는 입력란이
-     * 없어 여기서 떨어뜨리면 되살릴 수단이 없다. 둘은 항상 함께 있거나 함께 없다. */
+    /** 각 팀이 찬 킥 수. 결과 정정에서도 편집하며 둘은 항상 함께 있거나 함께 없다. */
     takenHome?: number;
     takenAway?: number;
     /** 규칙상 미결인 승부차기를 운영자가 명시적으로 닫았다는 감사 기록. */

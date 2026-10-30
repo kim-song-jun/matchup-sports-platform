@@ -168,7 +168,9 @@ describe('TournamentDetailPageClient GA events', () => {
     await screen.findByRole('heading', { name: `결승 직행 · ${bye ? '가팀' : '선정 대기'}` });
     expect(screen.getByText('준결승 부전승 1팀 · 6강 승리팀 중 선정')).toBeInTheDocument();
     expect(screen.getByText(/최다 득점 → 최대 득실차 → 최소 실점/)).toBeInTheDocument();
-    expect(screen.getAllByRole('link', { name: '경기 상세' })).toHaveLength(5);
+    const bracket = screen.getByRole('region', { name: '6강부터 결승까지 대진' });
+    expect(within(bracket).getAllByRole('group', { name: / 대 / })).toHaveLength(5);
+    expect(within(bracket).queryByRole('link', { name: '경기 상세' })).not.toBeInTheDocument();
     expect(container.querySelector('[data-connected-bracket-wide="true"]')).toBeNull();
     expect(screen.getByRole('region', { name: '결승 직행 선정' })).toBeInTheDocument();
   });

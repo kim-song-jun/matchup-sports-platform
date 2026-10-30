@@ -1,3 +1,7 @@
+## 2026-10-30 — 업체 전달용 대회 운영 체험
+
+[시나리오](./tournament-ops-demo.md) · [Task20261123](../../.github/tasks/20261123-tournament-ops-demo.md). 5단계·3개 역할의 명시적 샘플 시뮬레이터, 실제 API 쓰기 없음. local26 tests/tsc/pattern PASS, 신규 Alpha0/5·0/3폭·기능0/12.
+
 ## 2026-10-28 — 결과·운영 결선 표시 순서와 단판 합산
 
 [시나리오](./tournament-round-display.md) · [Task20261119](../../.github/tasks/20261119-tournament-round-display.md).

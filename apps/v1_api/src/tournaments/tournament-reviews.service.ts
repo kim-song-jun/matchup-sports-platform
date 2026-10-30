@@ -441,7 +441,7 @@ export class TournamentReviewsService {
 
   /** 어드민 리뷰 목록 — 숨김 포함 전체 조회. active admin이면 조회 가능 (읽기 전용). */
   async listReviewsAdmin(user: V1AuthUser, tournamentId: string, query: ListTournamentReviewsQueryDto = {}) {
-    await this.adminContext.getActiveAdmin(user.id);
+    await this.adminContext.getTournamentAdmin(user.id, { tournamentId });
     const { rows, total, page, pageSize } = await this.queryReviews(tournamentId, query, false);
     return {
       items: rows.map((r) => ({
@@ -457,7 +457,7 @@ export class TournamentReviewsService {
 
   /** 리뷰 숨김 (멱등 — 이미 숨김이면 alreadyHidden: true) */
   async hideReview(user: V1AuthUser, tournamentId: string, reviewId: string, dto: HideTournamentReviewDto) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { tournamentId });
 
     const review = await this.prisma.v1TournamentReview.findFirst({
       where: { id: reviewId, tournamentId },
@@ -497,7 +497,7 @@ export class TournamentReviewsService {
 
   /** 리뷰 숨김 해제 (멱등 — 이미 노출 중이면 alreadyVisible: true) */
   async unhideReview(user: V1AuthUser, tournamentId: string, reviewId: string) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { tournamentId });
 
     const review = await this.prisma.v1TournamentReview.findFirst({
       where: { id: reviewId, tournamentId },
@@ -558,13 +558,13 @@ export class TournamentReviewsService {
    * active admin이면 support 포함 조회 가능 (읽기 전용이므로 getMutationAdmin 불필요).
    */
   async listAwards(user: V1AuthUser, tournamentId: string) {
-    await this.adminContext.getActiveAdmin(user.id);
+    await this.adminContext.getTournamentAdmin(user.id, { tournamentId });
     return this.listAwardsInternal(tournamentId);
   }
 
   /** 어워드 설정 (어드민 전용, 전체 replace — support 등급은 mutation 불가) */
   async setAwards(user: V1AuthUser, tournamentId: string, dto: SetTournamentAwardsDto) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { tournamentId });
 
     const tournament = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId, deletedAt: null },

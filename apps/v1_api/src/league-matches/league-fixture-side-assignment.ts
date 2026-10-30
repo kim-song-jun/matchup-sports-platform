@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { Prisma, V1GameSideKey } from '@prisma/client';
-import type { V1ActiveAdmin } from '../common/admin-context.service';
+import type { V1TournamentManager } from '../common/admin-context.service';
 import { competitionTeamTargets, enqueueRosterResync, type RosterResyncTarget } from '../games/roster/roster-resync-events';
 import { revokeReplacedSideTeamAdjustments } from '../games/roster/side-team-change';
 import { cascadeCancelTeamMatchSchedulesInTx } from '../team-schedules/team-schedules.service';
@@ -30,7 +30,7 @@ const TEAM_CHANGED_CANCEL_REASON = 'LEAGUE_SLOT_TEAM_CHANGED';
 export async function assignLeagueFixtureSideInTx(
   tx: Tx,
   _deps: BracketTxDeps,
-  admin: V1ActiveAdmin,
+  admin: V1TournamentManager,
   input: LeagueSideAssignmentInput,
 ): Promise<void> {
   const gameRows = await tx.$queryRaw<Array<{ id: string; state: string; currentOfficialRevisionId: string | null }>>`

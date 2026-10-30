@@ -1,7 +1,7 @@
 import { ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { Prisma, V1CompetitionKind } from '@prisma/client';
 import { V1AuthUser } from '../../auth/v1-auth-user';
-import { AdminContextService } from '../../common/admin-context.service';
+import { AdminContextService, type V1TournamentManager } from '../../common/admin-context.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { competitionConfigContentHash, validateCompetitionConfig } from './competition-config';
 import { isReusableCompetitionPeriodConfig, normalizeCompetitionPeriods as normalizeTournamentPeriods } from './competition-config-periods';
@@ -29,7 +29,7 @@ export class TournamentPeriodSettingsService {
   ) {}
 
   async get(user: V1AuthUser, tournamentId: string) {
-    await this.adminContext.getActiveAdmin(user.id);
+    await this.adminContext.getTournamentAdmin(user.id, { tournamentId });
     const row = await findTournamentOnSurface(this.prisma, ALL_COMPETITION_KINDS, {
       where: { id: tournamentId, deletedAt: null },
       include: { competitionConfig: true },
@@ -46,7 +46,7 @@ export class TournamentPeriodSettingsService {
   }
 
   async update(user: V1AuthUser, tournamentId: string, dto: UpdateTournamentPeriodSettingsDto) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { tournamentId });
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
         return await this.prisma.$transaction(async (tx) => {
@@ -103,7 +103,7 @@ export class TournamentPeriodSettingsService {
           message: '동일한 해시의 설정이 다른 종목·비활성 버전이거나 실제 내용이 달라 재사용할 수 없어요.',
         });
       }
-      const version = existingVersion ?? await this.createVersion(tx, row.competitionConfig, config, user.id, admin.id, row.id);
+      const version = existingVersion ?? await this.createVersion(tx, row.competitionConfig, config, user.id, admin, row.id);
       const updated = await tx.v1Tournament.updateMany({
         where: { id: row.id, updatedAt: row.updatedAt },
         data: { competitionConfigVersionId: version.id },
@@ -235,7 +235,7 @@ export class TournamentPeriodSettingsService {
     source: { id: string; sportCode: string; name: string; version: number },
     config: ReturnType<typeof validateCompetitionConfig>,
     userId: string,
-    adminUserId: string,
+    admin: V1TournamentManager,
     tournamentId: string,
   ) {
     const latest = await tx.v1CompetitionConfigVersion.findFirst({
@@ -257,16 +257,13 @@ export class TournamentPeriodSettingsService {
         contentHash: competitionConfigContentHash(config),
       },
     });
-    await tx.v1AdminActionLog.create({
-      data: {
-        adminUserId,
+    await this.adminContext.logAdminAction(admin, {
         action: 'competition_config.version.create',
         targetType: 'competition_config',
         targetId: row.id,
         beforeJson: { sourceVersionId: source.id, sourceVersion: source.version },
         afterJson: { version: row.version, contentHash: row.contentHash, tournamentId },
-      },
-    });
+    }, tx);
     return row;
   }
 

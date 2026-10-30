@@ -75,6 +75,7 @@ export class LineupSizeConfigResolver {
       maxSubstitutions?: number | null;
       baseConfig?: CompetitionConfig;
       baseConfigName?: string;
+      tournamentId?: string;
     },
   ): Promise<{ id: string; version: number; contentHash: string }> {
     const canonical = canonicalCompetitionConfigForSport(normalizedSportCode);
@@ -127,7 +128,7 @@ export class LineupSizeConfigResolver {
       targetMode,
       targetMaxSubstitutions,
     );
-    return this.findOrCreateVersion(user, normalizedSportCode, targetConfig, overrides.baseConfigName);
+    return this.findOrCreateVersion(user, normalizedSportCode, targetConfig, overrides.baseConfigName, overrides.tournamentId);
   }
 
   /**
@@ -140,6 +141,7 @@ export class LineupSizeConfigResolver {
     normalizedSportCode: string,
     targetConfig: CompetitionConfig,
     baseConfigName?: string,
+    tournamentId?: string,
   ): Promise<{ id: string; version: number; contentHash: string }> {
     const contentHash = competitionConfigContentHash(targetConfig);
 
@@ -189,7 +191,7 @@ export class LineupSizeConfigResolver {
     const registry = new CompetitionConfigRegistry(this.prisma, this.adminContext);
     const created = await registry.createVersion(user, latest.id, {
       config: targetConfig as unknown as Record<string, unknown>,
-    });
+    }, tournamentId);
     return { id: created.id, version: created.version, contentHash: created.contentHash };
   }
 }

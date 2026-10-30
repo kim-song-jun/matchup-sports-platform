@@ -1,6 +1,6 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Prisma, V1GameSourceType, type V1TournamentGroup, type V1TournamentGroupPhase } from '@prisma/client';
-import { writeAdminActionLog, type V1ActiveAdmin } from '../common/admin-context.service';
+import { writeAdminActionLog, type V1TournamentManager } from '../common/admin-context.service';
 import { cascadeCancelTeamMatchSchedulesInTx } from '../team-schedules/team-schedules.service';
 import { canonicalGameCommandPayloadHash, type GamesService } from '../games/games.service';
 import {
@@ -27,7 +27,7 @@ type Tx = Prisma.TransactionClient;
 
 export async function createGroupInTx(
   tx: Tx,
-  admin: V1ActiveAdmin,
+  admin: V1TournamentManager,
   tournamentId: string,
   input: { name: string; phase: V1TournamentGroupPhase; sortOrder: number; advanceCount: number | null },
 ): Promise<V1TournamentGroup> {
@@ -182,7 +182,7 @@ export async function assertNotInOppositeFinalStageInTx(
  */
 export async function ensureGroupPhaseTeamsInTx(
   tx: Tx,
-  admin: V1ActiveAdmin,
+  admin: V1TournamentManager,
   tournamentId: string,
   groupId: string,
   groupPhase: string,
@@ -253,7 +253,7 @@ export type TournamentFixtureUpdateInput = {
  * 부전승 팀을 거절하고 조별리그 조에 편성한 뒤, 사이드·팀 일정·명단 재계산 이벤트는 `updateTournamentMatchInTx` 가 맡는다.
  * undefined 인 필드는 건드리지 않고 null 은 "미정으로 비움" 이다.
  */
-export async function updateTournamentFixtureInTx(tx: Tx, admin: V1ActiveAdmin, input: TournamentFixtureUpdateInput) {
+export async function updateTournamentFixtureInTx(tx: Tx, admin: V1TournamentManager, input: TournamentFixtureUpdateInput) {
   const changesTeams = input.homeRegistrationId !== undefined || input.awayRegistrationId !== undefined;
   if (changesTeams) {
     if (input.groupId) {
@@ -333,7 +333,7 @@ export async function updateTournamentFixtureInTx(tx: Tx, admin: V1ActiveAdmin, 
 export async function assignTournamentFixtureSideInTx(
   tx: Tx,
   _deps: BracketTxDeps,
-  admin: V1ActiveAdmin,
+  admin: V1TournamentManager,
   input: { fixtureId: string; side: 'HOME' | 'AWAY'; registrationId: string | null; enrollmentSink: GroupEnrollment[] },
 ): Promise<void> {
   const details = await tx.v1TournamentMatchDetails.findUnique({
@@ -372,7 +372,7 @@ export function assertSidesNotSlotLinked(
  * 시작 전 경기를 숨긴다(Game·감사 이력은 지우지 않는다). 자리 연결(`homeSlotId`·`awaySlotId`)도 같은 update 로 푼다.
  * 경기 한 건의 Game→TeamMatch 행만 잠그며 대회 행·advisory lock 은 호출자가 잡는다.
  */
-export async function softDeleteTournamentFixtureInTx(tx: Tx, admin: V1ActiveAdmin, fixtureId: string): Promise<void> {
+export async function softDeleteTournamentFixtureInTx(tx: Tx, admin: V1TournamentManager, fixtureId: string): Promise<void> {
   await tx.$queryRaw`SELECT id FROM v1_games WHERE team_match_id = ${fixtureId} FOR UPDATE`;
   await tx.$queryRaw`SELECT id FROM v1_team_matches WHERE id = ${fixtureId} FOR UPDATE`;
   const canonical = await tx.v1TournamentMatchDetails.findUnique({ where: { teamMatchId: fixtureId },
@@ -398,7 +398,7 @@ export async function softDeleteTournamentFixtureInTx(tx: Tx, admin: V1ActiveAdm
   await tx.v1TournamentMatchAdvancementEdge.deleteMany({ where: { OR: [{ sourceTeamMatchId: fixtureId }, { targetTeamMatchId: fixtureId }] } });
   // Free the original round/number unique key; the original identity is retained in the audit below.
   await tx.v1TournamentMatchDetails.update({ where: { teamMatchId: fixtureId }, data: { groupId: null, parentTeamMatchId: null, round: canonical.round + ':deleted:' + fixtureId } });
-  await tx.v1StatusChangeLog.create({ data: { targetType: 'team_match', targetId: fixtureId, fromStatus: canonical.teamMatch.status, toStatus: 'archived', actorType: 'admin', actorUserId: admin.userId, reason: 'admin_bracket_deleted_before_start' } });
+  await tx.v1StatusChangeLog.create({ data: { targetType: 'team_match', targetId: fixtureId, fromStatus: canonical.teamMatch.status, toStatus: 'archived', actorType: admin.id === null ? 'user' : 'admin', actorUserId: admin.userId, reason: 'admin_bracket_deleted_before_start' } });
   await writeAdminActionLog(tx, admin, { action: 'tournament.bracket.fixture.delete', targetType: 'team_match', targetId: fixtureId,
     beforeJson: { tournamentId: canonical.tournamentId, groupId: canonical.groupId, round: canonical.round, fixtureNumber: canonical.fixtureNumber, legNumber: canonical.legNumber },
     afterJson: { deleted: true, gameId: game.id, state: 'CANCELLED' } });
@@ -408,7 +408,7 @@ export async function softDeleteTournamentFixtureInTx(tx: Tx, admin: V1ActiveAdm
  * 조 삭제. 실제 팀 배정·경기·참조된 자리는 보호하고, 비어 있는 미사용 템플릿 자리와 고아 편성만 정리한다.
  * 호출자가 대회 advisory lock 을 잡는다.
  */
-export async function deleteTournamentGroupInTx(tx: Tx, admin: V1ActiveAdmin, groupId: string): Promise<void> {
+export async function deleteTournamentGroupInTx(tx: Tx, admin: V1TournamentManager, groupId: string): Promise<void> {
   const group = await tx.v1TournamentGroup.findUnique({
     where: { id: groupId },
     include: { _count: { select: { groupTeams: true, byeSlots: true, tournamentMatchDetails: true, slots: true, rankSlots: true } } },
@@ -463,7 +463,7 @@ export async function deleteTournamentGroupInTx(tx: Tx, admin: V1ActiveAdmin, gr
 export async function createEmptyTournamentFixtureInTx(
   tx: Tx,
   deps: BracketTxDeps,
-  admin: V1ActiveAdmin,
+  admin: V1TournamentManager,
   input: {
     tournament: { id: string; sportId: string; regionId: string | null; competitionConfigVersionId: string; title: string } & TournamentVenueRow;
     groupId: string;
@@ -517,7 +517,7 @@ export async function createEmptyTournamentFixtureInTx(
     competitionConfigVersionId: tournament.competitionConfigVersionId,
     home: { id: null, name: '홈 팀 미정' },
     away: { id: null, name: '어웨이 팀 미정' },
-    actor: { actorType: 'USER', actorUserId: admin.userId, role: 'platform_ops', tournamentId: tournament.id },
+    actor: { actorType: 'USER', actorUserId: admin.userId, role: admin.id === null ? 'tournament_director' : 'platform_ops', tournamentId: tournament.id },
     durableCommandId,
     payloadHash: canonicalGameCommandPayloadHash(commandPayload),
   });
@@ -537,7 +537,7 @@ export async function createEmptyTournamentFixtureInTx(
  */
 export async function releaseUnusedGroupTeamsInTx(
   tx: Tx,
-  admin: V1ActiveAdmin,
+  admin: V1TournamentManager,
   tournamentId: string,
   groupId: string,
   registrationIds: readonly string[],

@@ -5732,11 +5732,18 @@ export function useV1TournamentStaffCandidateSearch(
  * 이후에만 호출해 불필요한 401 재시도를 피한다(useV1MyTeams와 동일한 관례).
  */
 export function useV1MyTournamentStaffAssignments(options?: QueryOptions) {
-  return useQuery({
+  const enabled = options?.enabled ?? true;
+  const query = useQuery({
     queryKey: v1Keys.myTournamentStaffAssignments(),
     queryFn: () => v1Get<V1MyTournamentStaffResponse>('/me/tournament-staff'),
-    enabled: options?.enabled ?? true,
+    enabled,
+    // 관리자가 다른 세션에서 배정·해제해도 메뉴와 관리 게이트가 오래된 권한을 계속 쓰지 않는다.
+    staleTime: 0,
+    refetchOnWindowFocus: 'always',
+    refetchInterval: OPERATIONS_BOARD_POLL_INTERVAL_MS,
   });
+  useV1WindowFocusRefetch(query, enabled, 'always');
+  return query;
 }
 
 /** GET /tournament-ops/tournaments/:tournamentId/fields — 필터 드롭다운용 필드/코트 목록. */

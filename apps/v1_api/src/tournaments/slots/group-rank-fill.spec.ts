@@ -173,6 +173,7 @@ describe('서비스 본문 — 권한·대상·잠금 순서', () => {
     const events: string[] = [];
     const prisma = {
       v1AdminUser: { findUnique: jest.fn().mockResolvedValue(options.role === null ? null : adminRow(options.role ?? 'ops')) },
+      v1TournamentStaffAssignment: { findFirst: jest.fn().mockResolvedValue(null) },
       v1Tournament: { findFirst: kindAwareFindFirst({ id: 'tournament-1', kind: options.kind ?? 'regular_tournament' }) },
       v1AdminActionLog: { create: jest.fn(async () => { events.push('audit'); return { id: 'log-1' }; }) },
       $transaction: jest.fn(async (fn: (tx: unknown) => Promise<unknown>): Promise<unknown> => { events.push('tx'); return fn(prisma); }),
@@ -256,7 +257,7 @@ describe('서비스 본문 — 권한·대상·잠금 순서', () => {
     expect(events).toEqual(['tx', 'lock', 'load']);
   });
 
-  it('미리보기는 support 도 볼 수 있고(getActiveAdmin) 행을 slots 로 감싸 돌려준다, 정규 리그 id 는 404', async () => {
+  it('미리보기는 support 도 볼 수 있고(getTournamentAdmin) 행을 slots 로 감싸 돌려준다, 정규 리그 id 는 404', async () => {
     const support = setup({ role: 'support' });
     await expect(previewGroupRankStandings(support.deps, user, 'tournament-1')).resolves.toEqual({ slots: swapPreview.rows });
     const stranger = setup({ role: null });

@@ -61,7 +61,7 @@ describe('TournamentCompetitionConfig', () => {
       $transaction: jest.fn((callback: (transaction: typeof tx) => unknown) => callback(tx)),
     };
     const adminContext = {
-      getMutationAdmin: jest.fn().mockResolvedValue({ id: 'admin-1' }),
+      getTournamentMutationAdmin: jest.fn().mockResolvedValue({ id: 'admin-1' }),
       logAdminAction: jest.fn().mockResolvedValue(undefined),
     };
     return {

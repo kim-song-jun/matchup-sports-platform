@@ -272,6 +272,8 @@ describe('TournamentReviewsService — awards admin gate', () => {
   let service: TournamentReviewsService;
   let prisma: {
     v1AdminUser: { findUnique: jest.Mock };
+
+    v1TournamentStaffAssignment: { findFirst: jest.Mock };
     v1Tournament: { findFirst: jest.Mock };
     v1TournamentAward: {
       findMany: jest.Mock;
@@ -294,6 +296,8 @@ describe('TournamentReviewsService — awards admin gate', () => {
     (notifications.emitNotification as jest.Mock).mockClear();
     prisma = {
       v1AdminUser: { findUnique: jest.fn() },
+
+      v1TournamentStaffAssignment: { findFirst: jest.fn().mockResolvedValue(null) },
       v1Tournament: { findFirst: jest.fn() },
       v1TournamentAward: {
         findMany: jest.fn(),
@@ -848,6 +852,8 @@ describe('TournamentReviewsService — review hide moderation', () => {
   let service: TournamentReviewsService;
   let prisma: {
     v1AdminUser: { findUnique: jest.Mock };
+
+    v1TournamentStaffAssignment: { findFirst: jest.Mock };
     v1Tournament: { findFirst: jest.Mock };
     v1TournamentReview: {
       findMany: jest.Mock;
@@ -862,6 +868,8 @@ describe('TournamentReviewsService — review hide moderation', () => {
   beforeEach(async () => {
     prisma = {
       v1AdminUser: { findUnique: jest.fn() },
+
+      v1TournamentStaffAssignment: { findFirst: jest.fn().mockResolvedValue(null) },
       v1Tournament: { findFirst: jest.fn().mockResolvedValue({ id: 'tournament-1' }) },
       v1TournamentReview: {
         findMany: jest.fn(),

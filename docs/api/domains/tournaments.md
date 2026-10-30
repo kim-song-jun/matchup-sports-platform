@@ -24,6 +24,19 @@
 
 # V1 Tournaments API
 
+## Scoped director management
+
+Task 20261122: `/tournament-management`는 디렉터 전용 담당 대회 목록이고 `/tournament-management/tournaments/:id/{section}`은 기존 관리자 상세의 10개 섹션을 재사용한다. 공개 대회 탐색 목록은 유지한다.
+
+- 기존 `/admin/tournaments` 목록은 플랫폼 관리자의 경우 기존 범위, 일반 스태프의 경우 활성 디렉터 배정 대회로 제한한다. 상태별 합계에도 같은 범위를 적용한다. 배정이 전혀 없는 일반 계정은 `403 PERMISSION_DENIED`다.
+- 대회 상세·설정·공개 설정·상태/대진 공개·신청/입금확인/취소·명단/자격심사/CSV·대진/자리/편성·공지·협찬·캠페인·후기/시상/통계는 해당 대회의 활성 디렉터가 기존 관리자 API로 수행할 수 있다. DTO·응답·pagination·상태 전이·멱등성·경기 시작 후 변경 보호는 유지한다.
+- 배정은 사용자 계정 활성, 대회 미삭제, regular_tournament 또는 호환 null kind, 시작 시각 도달, 미해제, 미만료를 모두 요구한다. 일반 현장/조회 스태프는 관리 권한을 얻지 않는다. 플랫폼 support는 읽기 전용을 유지한다(별도의 디렉터 배정이 있으면 그 대회의 배정 권한을 사용한다).
+- 신청·선수·경기·조·조편성·자리·공지 ID만 받는 액션은 DB에서 실제 소속 대회를 확인한다. 잘못된 대회 및 타 대회 하위 ID 접근은 `403 PERMISSION_DENIED`다.
+- 디렉터를 플랫폼 관리자처럼 가장하지 않는다. 변경은 `V1OperationAudit`에 실제 `actorUserId`, `tournamentId`, `_authorization`의 역할/배정 ID/배정 버전을 기록하고 상태 이력은 user actor로 남긴다. 대진 생성 재시도·결선 배정·선출 심사는 관리자와 디렉터 양쪽 감사 이력을 조회한다. 관리자 FK가 없는 입금 확인은 기존 nullable 관리자 FK와 실제 사용자 운영 감사 기록을 함께 사용한다. 스키마/마이그레이션 변경은 없다.
+- 대회 생성, mock seed, 공통 경기 설정의 외부 변경, 플랫폼 전역 팝업/회원/리그 관리 권한은 추가하지 않는다. 공통 불변 경기 설정의 조회는 디렉터도 가능하며 대회 편집의 내부 경로에서 필요한 새 불변 버전을 생성할 수 있다.
+- **결과 공식 확정·무효화의 `DIRECTOR_OFFICIALIZE` 제한과 거부 감사는 사용자 선택으로 유지한다.** 디렉터 추가/해제의 기존 플랫폼 권한 경계, takeover 및 경기별 커맨드 검증도 유지한다.
+- 웹은 `마이페이지 → 담당 대회 → 대회 관리`로 진입한다. 운영 보드/스태프 링크와 관리 복귀는 같은 대회를 유지한다. 권한 조회 실패는 재시도, 배정 없음은 접근 거부를 보여준다. UI 숨김에 의존하지 않고 API가 최종 권한을 판정한다.
+
 ## 유연한 대진 v2 (2026-10-27)
 
 모든 경로의 prefix는 `/api/v1/admin/tournaments/:tournamentId/bracket/template`이다. V1AuthGuard와 mutation admin(owner/ops)을 요구하며 support와 비관리자는 거절한다.

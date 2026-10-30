@@ -294,6 +294,8 @@ describe('TournamentBracketService', () => {
   let prisma: {
     v1TournamentField: ReturnType<typeof competitionFieldDelegate>;
     v1AdminUser: { findUnique: jest.Mock };
+
+    v1TournamentStaffAssignment: { findFirst: jest.Mock };
     v1Tournament: { findFirst: jest.Mock };
     v1TournamentSlot: { findMany: jest.Mock; findFirst: jest.Mock };
     v1TournamentGroup: { findFirst: jest.Mock; create: jest.Mock; findMany: jest.Mock; findUnique: jest.Mock; delete: jest.Mock };
@@ -328,6 +330,8 @@ describe('TournamentBracketService', () => {
     prisma = {
       v1TournamentField: competitionFieldDelegate(),
       v1AdminUser: { findUnique: jest.fn() },
+
+      v1TournamentStaffAssignment: { findFirst: jest.fn().mockResolvedValue(null) },
       v1Tournament: { findFirst: jest.fn().mockResolvedValue(tournamentRow({ status: 'closed' })) },
       v1TournamentSlot: { findMany: jest.fn().mockResolvedValue([]), findFirst: jest.fn().mockResolvedValue(null) },
       v1TournamentGroup: { findFirst: jest.fn(), create: jest.fn(), findMany: jest.fn(), findUnique: jest.fn(), delete: jest.fn() },

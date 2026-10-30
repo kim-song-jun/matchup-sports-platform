@@ -26,14 +26,11 @@ export function deriveTournamentAdminRole(principal: TournamentAdminPrincipal): 
 /**
  * 대회 관리(설정·콘텐츠) 화면의 쓰기 허용 여부.
  *
- * 지금은 `PLATFORM_OPS` 만 true 다 — 기존 `capabilities.includes('status:write')` 와
- * **정확히 같은 결과**를 내도록 의도한 것이고(owner/ops→true, support→false), 그 동치성은
- * 테스트로 고정한다. 스태프 역할이 어느 화면까지 쓸 수 있는지는 그 화면을 어드민으로
- * 들여올 때 화면별로 정한다 — 여기서 미리 넓히지 않는다(서버가 막더라도 화면이
- * 쓸 수 있는 것처럼 보이면 그 자체로 결함이다).
+ * 대회 디렉터는 서버가 배정을 확인한 대회에서 플랫폼 운영자와 같은 관리 폼을 쓴다.
+ * 결과 공식 확정·무효화의 별도 플래그는 경기 운영 API가 계속 판정한다.
  */
 export function canWriteTournamentAdmin(role: TournamentAdminRole): boolean {
-  return role === 'PLATFORM_OPS';
+  return role === 'PLATFORM_OPS' || role === 'TOURNAMENT_DIRECTOR';
 }
 
 export const TOURNAMENT_ADMIN_ROLE_LABEL: Record<TournamentAdminRole, string> = {

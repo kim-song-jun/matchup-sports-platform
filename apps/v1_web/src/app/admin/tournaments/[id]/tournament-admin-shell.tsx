@@ -20,7 +20,7 @@ import {
 } from '@/hooks/use-v1-api';
 import type { V1TournamentStatus } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
-import { canWriteTournamentAdmin, deriveTournamentAdminRole } from '@/lib/admin-tournament-role';
+import { canWriteTournamentAdmin, deriveTournamentAdminRole, type TournamentAdminRole } from '@/lib/admin-tournament-role';
 import { TournamentOpsQuickLinks } from './tournament-ops-quick-links';
 import { TournamentAdminProvider } from './tournament-admin-context';
 import {
@@ -109,13 +109,20 @@ const STATUS_CHANGE_CONFIRM: Partial<Record<V1TournamentStatus, ConfirmOptions>>
 };
 
 export function TournamentAdminShell({ id, children }: { id: string; children: ReactNode }) {
-  const { data: tournament, isPending, isError, error, refetch } = useV1AdminTournament(id);
   const { data: adminMe } = useV1AdminMe();
   // 역할이 단일 출처다 — canWrite 는 거기서 파생된다. adminMe 가 아직 없으면 가장 좁은
   // 역할(조회 전용)로 둔다: 로딩 중에 쓰기 버튼이 잠깐 보였다가 사라지면 안 된다.
   const role = adminMe
     ? deriveTournamentAdminRole({ kind: 'platform', adminRole: adminMe.adminRole })
     : 'SUPPORT_READONLY';
+  return <TournamentManagementContent id={id} role={role}>{children}</TournamentManagementContent>;
+}
+
+/** Both surfaces use exactly the same forms; the director entry supplies a verified scoped role. */
+export function TournamentManagementContent({ id, role, staffSurface = false, children }: {
+  id: string; role: TournamentAdminRole; staffSurface?: boolean; children: ReactNode;
+}) {
+  const { data: tournament, isPending, isError, error, refetch } = useV1AdminTournament(id);
   const canWrite = canWriteTournamentAdmin(role);
   const changeStatus = useV1ChangeTournamentStatus(id);
   const [revertOpen, setRevertOpen] = useState(false);
@@ -123,8 +130,9 @@ export function TournamentAdminShell({ id, children }: { id: string; children: R
   const { confirm: confirmStatusChange, ConfirmModal: StatusConfirmModal } = useConfirm();
   const pathname = usePathname();
   // '대회 목록으로'는 대회 목록을 마지막으로 본 주소(검색·필터·페이지)로 돌아간다(MD-QA #21).
-  const listHref = useAdminListReturnHref('/admin/tournaments');
-  const basePath = `/admin/tournaments/${id}`;
+  const adminListHref = useAdminListReturnHref('/admin/tournaments');
+  const listHref = staffSurface ? '/tournament-management' : adminListHref;
+  const basePath = `${staffSurface ? '/tournament-management/tournaments' : '/admin/tournaments'}/${id}`;
 
   // ── Status change ────────────────────────────────────────────────────
   const handleStatusChange = async (nextStatus: V1TournamentStatus) => {
@@ -209,7 +217,7 @@ export function TournamentAdminShell({ id, children }: { id: string; children: R
   const counts = tournament.operationCounts;
   const navGroups: AdminSectionNavGroup[] = SECTION_GROUPS.map((group) => ({
     label: group.label,
-    items: group.items.map((item) => ({
+    items: group.items.filter((item) => !staffSurface || !item.externalHref).map((item) => ({
       slug: item.slug,
       label: item.label,
       count: item.countKey ? counts?.[item.countKey] : undefined,
@@ -219,7 +227,7 @@ export function TournamentAdminShell({ id, children }: { id: string; children: R
   }));
 
   return (
-    <TournamentAdminProvider value={{ tournamentId: id, role, canWrite, showToast }}>
+    <TournamentAdminProvider value={{ tournamentId: id, basePath, role, canWrite, showToast }}>
       {/* ── Back link ─────────────────────────────────────────────────── */}
       <div className="mb-4">
         <Link
@@ -234,7 +242,7 @@ export function TournamentAdminShell({ id, children }: { id: string; children: R
       {/* ── Header ────────────────────────────────────────────────────── */}
       {/* f9: status buttons moved below header to avoid 6-line title wrap on mobile */}
       <AdminPageHeader
-        eyebrow="플랫폼 · 대회"
+        eyebrow={staffSurface ? '담당 대회 관리' : '플랫폼 · 대회'}
         title={tournament.title}
         description={`${TOURNAMENT_STATUS_LABEL[tournament.status] ?? tournament.status} · ${tournament.venue ?? '장소 미정'} · ${scheduleLabel}`}
       />
@@ -293,7 +301,7 @@ export function TournamentAdminShell({ id, children }: { id: string; children: R
       {/* ── Tournament-ops quick links: 이 관리자 콘솔 섹션들과 별개인 대회 현장 운영
           콘솔(스태프 배정·운영 보드)은 여기 말고는 진입 경로가 없었다. T6-5(D-16):
           권한이 없으면 숨기지 않고 비활성 + 사유로 보여준다. */}
-      <TournamentOpsQuickLinks tournamentId={id} />
+      <TournamentOpsQuickLinks tournamentId={id} staffSurface={staffSurface} />
 
       <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
         {/* 섹션 내비 — 데스크톱은 좌측 세로 목록, 모바일은 가로 스크롤 한 줄 */}

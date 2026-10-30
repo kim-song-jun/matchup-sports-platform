@@ -119,7 +119,7 @@ describe('MyTournamentStaffPageClient', () => {
 
       render(<MyTournamentStaffPageClient />);
 
-      expect(hrefOf()).toHaveAttribute('href', '/tournament-ops/tournaments/t-1/operations');
+      expect(hrefOf()).toHaveAttribute('href', '/tournament-management/tournaments/t-1/overview');
     });
 
     it('셸 역할이 하나라도 있으면 운영 보드로 보낸다', () => {

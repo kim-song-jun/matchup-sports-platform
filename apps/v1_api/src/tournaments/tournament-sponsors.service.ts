@@ -32,7 +32,7 @@ export class TournamentSponsorsService {
   ) {}
 
   async listByTournament(user: V1AuthUser, tournamentId: string) {
-    await this.adminContext.getActiveAdmin(user.id);
+    await this.adminContext.getTournamentAdmin(user.id, { tournamentId });
     await this.assertTournamentExists(tournamentId, false);
 
     const rows = await this.prisma.v1TournamentSponsor.findMany({
@@ -48,7 +48,7 @@ export class TournamentSponsorsService {
     tournamentId: string,
     dto: CreateTournamentSponsorDto,
   ) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { tournamentId });
     await this.assertTournamentExists(tournamentId, true);
 
     const sponsor = await this.prisma.$transaction(async (tx) => {
@@ -93,7 +93,7 @@ export class TournamentSponsorsService {
   }
 
   async update(user: V1AuthUser, input: UpdateTournamentSponsorInput) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { tournamentId: input.tournamentId });
     await this.assertTournamentExists(input.tournamentId, true);
     const existing = await this.findSponsor(input.tournamentId, input.sponsorId);
 
@@ -122,7 +122,7 @@ export class TournamentSponsorsService {
   }
 
   async deactivate(user: V1AuthUser, input: TournamentSponsorIdentity) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { tournamentId: input.tournamentId });
     await this.assertTournamentExists(input.tournamentId, true);
     const existing = await this.findSponsor(input.tournamentId, input.sponsorId);
 

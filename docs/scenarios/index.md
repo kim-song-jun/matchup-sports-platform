@@ -1,3 +1,9 @@
+## 2026-10-30 — 배정 대회 디렉터 전체 관리
+
+[시나리오](./scoped-tournament-director-management.md) · [Task 20261122](../../.github/tasks/20261122-scoped-tournament-director-management.md).
+A안(기존 관리 화면 재사용) 선택. 전용 담당 목록과 관리 10개 섹션, 대회/하위 리소스 스코프와 사용자·배정 감사 구현.
+결과 공식 확정·무효화의 기존 제한은 사용자 선택으로 유지. 로컬 계약 검증 PASS(API 관련 25 suite, Web 63 tests, 양쪽 tsc·규칙 검사), alpha 수동 0/10 섹션·0/3 viewport(미배포).
+
 ## 2026-10-28 — 결과·운영 결선 표시 순서와 단판 합산
 
 [시나리오](./tournament-round-display.md) · [Task20261119](../../.github/tasks/20261119-tournament-round-display.md).

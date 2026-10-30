@@ -36,17 +36,17 @@ export class TournamentCampaignAdminService {
   ) {}
 
   async get(user: V1AuthUser, tournamentId: string) {
-    await this.adminContext.getActiveAdmin(user.id);
+    await this.adminContext.getTournamentAdmin(user.id, { tournamentId });
     return serializeTournamentCampaign(await findTournamentCampaign(this.prisma, tournamentId));
   }
 
   async preview(user: V1AuthUser, tournamentId: string) {
-    await this.adminContext.getActiveAdmin(user.id);
+    await this.adminContext.getTournamentAdmin(user.id, { tournamentId });
     return this.readService.getPreview(tournamentId);
   }
 
   async create(user: V1AuthUser, tournamentId: string, dto: CreateTournamentCampaignDto) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { tournamentId });
     const tournament = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId, deletedAt: null },
       select: { id: true, status: true },
@@ -95,7 +95,7 @@ export class TournamentCampaignAdminService {
   }
 
   async update(user: V1AuthUser, tournamentId: string, dto: UpdateTournamentCampaignDto) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { tournamentId });
     if (dto.slug === undefined && dto.content === undefined) {
       this.throwNoChanges();
     }

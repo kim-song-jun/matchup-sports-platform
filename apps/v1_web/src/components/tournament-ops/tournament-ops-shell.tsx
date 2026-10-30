@@ -387,7 +387,14 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
   const [drawerOpen, setDrawerOpen] = useState(false);
   const hamburgerRef = useRef<HTMLButtonElement>(null);
   const isFixtureConsole = fixtureIdFromConsolePath(pathname, tournamentId) !== null;
-  const back = isFixtureConsole && origin === 'admin'
+  const directorManagement = role === 'TOURNAMENT_DIRECTOR' && tournamentKind !== 'regular_league';
+  if (directorManagement) navItems.unshift({
+    label: '대회 관리', href: `/tournament-management/tournaments/${encodeURIComponent(tournamentId)}/overview`,
+    icon: <LayoutDashboard size={18} aria-hidden="true" />,
+  });
+  const back = directorManagement && !isFixtureConsole
+    ? { href: `/tournament-management/tournaments/${encodeURIComponent(tournamentId)}/overview`, label: '대회 관리로 돌아가기' }
+    : isFixtureConsole && origin === 'admin'
     ? { href: `${basePath}/operations`, label: '경기 목록으로 돌아가기' }
     : returnTarget(isFixtureConsole && origin === 'home' ? 'staff' : origin, tournamentId, tournamentKind);
 

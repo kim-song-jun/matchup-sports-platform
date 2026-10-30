@@ -98,6 +98,8 @@ describe('TournamentsAdminService', () => {
   let notifications: { emitNotificationToMany: jest.Mock };
   let prisma: {
     v1AdminUser: { findUnique: jest.Mock };
+
+    v1TournamentStaffAssignment: { findFirst: jest.Mock };
     v1Sport: { findUnique: jest.Mock };
     v1Tournament: {
       findMany: jest.Mock;
@@ -124,6 +126,8 @@ describe('TournamentsAdminService', () => {
   beforeEach(async () => {
     prisma = {
       v1AdminUser: { findUnique: jest.fn() },
+
+      v1TournamentStaffAssignment: { findFirst: jest.fn().mockResolvedValue(null) },
       v1Sport: { findUnique: jest.fn() },
       v1Tournament: {
         findMany: jest.fn(),
@@ -190,6 +194,25 @@ describe('TournamentsAdminService', () => {
   it('list: non-admin → 403', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(null);
     await expect(service.list(nonAdminAuthUser, {})).rejects.toThrow(ForbiddenException);
+  });
+
+  it('list: director sees only assigned tournament rows and the same scoped status counts', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(null);
+    prisma.v1TournamentStaffAssignment.findFirst.mockResolvedValue({ id: 'assignment-1', tournamentId: 'own', version: 1 });
+    const rows = [tournamentRow({ id: 'own', status: 'open' }), tournamentRow({ id: 'other', status: 'open' })]
+      .map((row) => ({ ...row, _count: { registrations: 0 } }));
+    const visible = (where: { staffAssignments?: unknown }) => where.staffAssignments ? rows.slice(0, 1) : rows;
+    prisma.v1Tournament.findMany.mockImplementation(({ where }) => Promise.resolve(visible(where)));
+    prisma.v1Tournament.groupBy.mockImplementation(({ where }) => Promise.resolve([{ status: 'open', _count: { _all: visible(where).length } }]));
+    const result = await service.list(nonAdminAuthUser, {});
+    expect(result.items.map((row) => row.id)).toEqual(['own']);
+    expect(result.summary).toMatchObject({ total: 1, byStatus: { open: 1 } });
+  });
+
+  it('director access to an unassigned tournament is denied before loading its detail', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(null);
+    await expect(service.get(nonAdminAuthUser, 'other')).rejects.toMatchObject({ response: { code: 'PERMISSION_DENIED' } });
+    expect(prisma.v1Tournament.findFirst).not.toHaveBeenCalled();
   });
 
   // ─── create validation ──────────────────────────────────────────────────────
@@ -2034,7 +2057,7 @@ describe('TournamentsAdminService', () => {
       await expect(service.update(ownerAuthUser, 'tournament-1', {
         expectedVersion: TOURNAMENT_ROW_UPDATED_AT, substitutionMode: 'limited', maxSubstitutions: 5,
       })).resolves.toMatchObject({ id: 'tournament-1' });
-      expect(createVersion).toHaveBeenCalledWith(ownerAuthUser, pin.id, expect.objectContaining({ config: expect.objectContaining({ lineup: expect.objectContaining({ substitutions: 'limited', maxSubstitutions: 5 }) }) }));
+      expect(createVersion).toHaveBeenCalledWith(ownerAuthUser, pin.id, expect.objectContaining({ config: expect.objectContaining({ lineup: expect.objectContaining({ substitutions: 'limited', maxSubstitutions: 5 }) }) }), 'tournament-1');
     } finally {
       createVersion.mockRestore();
       change.mockRestore();
@@ -2112,6 +2135,7 @@ describe('TournamentsAdminService', () => {
             }),
           }),
         }),
+        'tournament-1',
       );
     } finally {
       createVersionSpy.mockRestore();

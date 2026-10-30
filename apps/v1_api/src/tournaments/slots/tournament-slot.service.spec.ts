@@ -11,6 +11,7 @@ const adminRow = (adminRole: 'owner' | 'ops' | 'support') => ({
 function build(admin: ReturnType<typeof adminRow> | null) {
   const prisma = {
     v1AdminUser: { findUnique: jest.fn(async () => admin) },
+    v1TournamentStaffAssignment: { findFirst: jest.fn().mockResolvedValue(null) },
     v1TournamentSlot: { findUnique: jest.fn(async () => null) },
     v1Tournament: { findFirst: jest.fn(async () => null) },
     $transaction: jest.fn(),

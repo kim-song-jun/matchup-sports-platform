@@ -92,9 +92,9 @@ describe('formatPeriodFormat', () => {
     expect(formatPeriodFormat([20, 10])).toBe('전반 20분, 후반 10분');
   });
 
-  it('셋 이상(옛 설정)은 피리어드 번호로 나열한다', () => {
-    expect(formatPeriodFormat([10, 10, 10])).toBe('1피리어드 10분, 2피리어드 10분, 3피리어드 10분');
-    expect(formatPeriodFormat([10, 15, 5])).toBe('1피리어드 10분, 2피리어드 15분, 3피리어드 5분');
+  it('셋 이상(옛 설정)은 기록 묶음·콘솔과 같은 이름(전반·후반·3피리어드)으로 나열한다', () => {
+    expect(formatPeriodFormat([10, 10, 10])).toBe('전반 10분, 후반 10분, 3피리어드 10분');
+    expect(formatPeriodFormat([10, 15, 5])).toBe('전반 10분, 후반 15분, 3피리어드 5분');
   });
 
   it.each([[null], [undefined], [[]], [[0]], [[10, 0]], [[-5, 10]], [[Number.NaN]], [[10, Number.POSITIVE_INFINITY]]])(

@@ -1,6 +1,6 @@
 # 운영 콘솔 승부차기 결과 정정
 
-Status: Alpha PR Preparation (main hotfix prepared separately)
+Status: alpha dev PR #2105 Checks/Review Pending
 Owner: Codex (single agent)
 
 ## Context
@@ -60,3 +60,11 @@ http://localhost:3013/admin/live/a90df6d5-47e9-40f9-93ef-f679ce8da858/records/co
 - 원본 dev WIP와 25개 source/test/API docs가 개행을 제외하고 전부 일치. 기존 원본 dev 검증과 main 기준 frontend280/backend61 및 타입·패턴 PASS를 참조. 동일 로컬 전체 검증은 반복하지 않으며 dev 기준 CI를 실행.
 - 두 Changeset 유지, diff --check PASS. main 핫픽스는 별도 브랜치/PR, 최종 main 머지·production 승인은 사용자 직접 수행.
 - dev PR 검사·Copilot 완료 후 dev 머지와 alpha 배포 SHA 확인. 실제 사용자/admin 390/768/1440 및 승부차기 저장·공식화는 접근 가능한 인증/안전한 시나리오 전제하에 검증하고, 미실행 항목은 별도 표시.
+
+### PR CI 후속 — 상세 페이지 회귀 계약 동기화
+
+- main #2104 / alpha(dev) #2105 게시. 사용자가 원격 게시와 alpha 반영을 명시 승인. main 최종 머지·production 승인은 사용자 직접 수행.
+- main Web CI에서 전체9948개 중 상세 페이지의 기존 링크5개 기대2건만 실패(844 files 중843 PASS). 제거된 링크를 요구하는 stale assertion을 실제 경기 카드5개 유지 + 경기 상세 링크0개 계약으로 갱신. CI RED는 run41065438245/job124095377701. 해당 파일만 좁게 재검증 후 양쪽 PR에 동일 반영.
+- Copilot은 gh edit와 공식 REST 요청을 접수했으나 현재 두 head 리뷰0건. clean으로 간주하지 않으며 리뷰 도착을 별도 확인.
+- alpha before: 배포SHA2708c614993e, 공개 대진표·일정390/768/1440 baseline 캡처 완료. 상세링크5/결선탭1 및 선정카드 흰색·이미지없음 확인. console/network/pageerror0, browserPID8510/parent8413 정상종료. 증거는 alpha worktree `tmp/qa-six-team-hotfix/before/`.
+- 상세 페이지 단일 파일 재검증 **38/38 PASS** (86.78s, worker1), CI의 stale 링크 기대2건을 실제카드5/링크0 계약으로 GREEN. 기존341개와 합산 관련379개 검증. main diff32 paths(추가 test1), alpha diff30 paths. 앱 소스 추가 수정 없음.

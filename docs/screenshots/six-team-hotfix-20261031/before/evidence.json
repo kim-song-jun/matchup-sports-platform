@@ -1,0 +1,166 @@
+{
+  "phase": "before",
+  "persona": "anonymous public visitor",
+  "viewports": [
+    {
+      "width": 390,
+      "bracket": {
+        "detailLinks": 5,
+        "knockoutTabs": 1,
+        "overflow": false,
+        "logo": [
+          {
+            "text": "부전승 · 결승 직행승민 테스트팀1",
+            "background": "rgb(255, 255, 255)",
+            "images": []
+          }
+        ]
+      },
+      "schedule": {
+        "phaseTabs": 1,
+        "filters": [],
+        "overflow": false
+      },
+      "verdict": "BASELINE"
+    },
+    {
+      "width": 768,
+      "bracket": {
+        "detailLinks": 5,
+        "knockoutTabs": 1,
+        "overflow": false,
+        "logo": [
+          {
+            "text": "부전승 · 결승 직행승민 테스트팀1",
+            "background": "rgb(255, 255, 255)",
+            "images": []
+          }
+        ]
+      },
+      "schedule": {
+        "phaseTabs": 1,
+        "filters": [],
+        "overflow": false
+      },
+      "verdict": "BASELINE"
+    },
+    {
+      "width": 1440,
+      "bracket": {
+        "detailLinks": 5,
+        "knockoutTabs": 1,
+        "overflow": false,
+        "logo": [
+          {
+            "text": "부전승 · 결승 직행승민 테스트팀1",
+            "background": "rgb(255, 255, 255)",
+            "images": []
+          }
+        ]
+      },
+      "schedule": {
+        "phaseTabs": 1,
+        "filters": [],
+        "overflow": false
+      },
+      "verdict": "BASELINE"
+    }
+  ],
+  "issues": [],
+  "assertions": [
+    {
+      "name": "bracket-390-no-detail-link",
+      "pass": false,
+      "detail": 5
+    },
+    {
+      "name": "bracket-390-no-phase-tab",
+      "pass": false,
+      "detail": 1
+    },
+    {
+      "name": "bracket-390-no-page-overflow",
+      "pass": true,
+      "detail": false
+    },
+    {
+      "name": "schedule-390-no-phase-tab",
+      "pass": false,
+      "detail": 1
+    },
+    {
+      "name": "schedule-390-round-filters",
+      "pass": false,
+      "detail": []
+    },
+    {
+      "name": "schedule-390-no-page-overflow",
+      "pass": true,
+      "detail": false
+    },
+    {
+      "name": "bracket-768-no-detail-link",
+      "pass": false,
+      "detail": 5
+    },
+    {
+      "name": "bracket-768-no-phase-tab",
+      "pass": false,
+      "detail": 1
+    },
+    {
+      "name": "bracket-768-no-page-overflow",
+      "pass": true,
+      "detail": false
+    },
+    {
+      "name": "schedule-768-no-phase-tab",
+      "pass": false,
+      "detail": 1
+    },
+    {
+      "name": "schedule-768-round-filters",
+      "pass": false,
+      "detail": []
+    },
+    {
+      "name": "schedule-768-no-page-overflow",
+      "pass": true,
+      "detail": false
+    },
+    {
+      "name": "bracket-1440-no-detail-link",
+      "pass": false,
+      "detail": 5
+    },
+    {
+      "name": "bracket-1440-no-phase-tab",
+      "pass": false,
+      "detail": 1
+    },
+    {
+      "name": "bracket-1440-no-page-overflow",
+      "pass": true,
+      "detail": false
+    },
+    {
+      "name": "schedule-1440-no-phase-tab",
+      "pass": false,
+      "detail": 1
+    },
+    {
+      "name": "schedule-1440-round-filters",
+      "pass": false,
+      "detail": []
+    },
+    {
+      "name": "schedule-1440-no-page-overflow",
+      "pass": true,
+      "detail": false
+    }
+  ],
+  "cleanup": "Owned browser and context closed",
+  "browserPid": 8510,
+  "parentPid": 8413,
+  "servedCommit": "2708c614993e277978e535afd00ff058bbf22dac"
+}

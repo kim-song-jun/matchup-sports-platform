@@ -1,0 +1,600 @@
+{
+  "phase": "after",
+  "persona": "anonymous public visitor",
+  "viewports": [
+    {
+      "width": 390,
+      "bracket": {
+        "detailLinks": 0,
+        "knockoutTabs": 0,
+        "overflow": false,
+        "logo": [
+          {
+            "text": "부전승 · 결승 직행승민 테스트팀1",
+            "background": "rgb(232, 243, 255)",
+            "nameColor": "rgb(27, 100, 218)",
+            "images": [
+              {
+                "loaded": true
+              }
+            ]
+          }
+        ],
+        "connectors": [
+          {
+            "key": "bye-final",
+            "errorY": 0
+          },
+          {
+            "key": "semifinal-final",
+            "errorY": 0
+          }
+        ],
+        "selectionAlignment": 0
+      },
+      "schedule": {
+        "phaseTabs": 0,
+        "filters": [
+          "전체",
+          "6강",
+          "준결승",
+          "결승"
+        ],
+        "filterCounts": [
+          {
+            "label": "전체",
+            "count": 5,
+            "fixtureIds": [
+              "f5c04a97-32b3-51f0-b72d-4a0624fec195",
+              "757e4ecd-4a62-5401-94a6-91f383b2d0c7",
+              "394c6bbc-38e5-5105-9f03-161a7ab9e2bd",
+              "c2e20e65-d27f-5271-883b-e66b417551f9",
+              "9ba5d242-b85b-54ea-ac94-87b01ca7edfe"
+            ]
+          },
+          {
+            "label": "6강",
+            "count": 3,
+            "fixtureIds": [
+              "f5c04a97-32b3-51f0-b72d-4a0624fec195",
+              "757e4ecd-4a62-5401-94a6-91f383b2d0c7",
+              "394c6bbc-38e5-5105-9f03-161a7ab9e2bd"
+            ]
+          },
+          {
+            "label": "준결승",
+            "count": 1,
+            "fixtureIds": [
+              "c2e20e65-d27f-5271-883b-e66b417551f9"
+            ]
+          },
+          {
+            "label": "결승",
+            "count": 1,
+            "fixtureIds": [
+              "9ba5d242-b85b-54ea-ac94-87b01ca7edfe"
+            ]
+          }
+        ],
+        "overflow": false
+      },
+      "verdict": "PASS"
+    },
+    {
+      "width": 768,
+      "bracket": {
+        "detailLinks": 0,
+        "knockoutTabs": 0,
+        "overflow": false,
+        "logo": [
+          {
+            "text": "부전승 · 결승 직행승민 테스트팀1",
+            "background": "rgb(232, 243, 255)",
+            "nameColor": "rgb(27, 100, 218)",
+            "images": [
+              {
+                "loaded": true
+              }
+            ]
+          }
+        ],
+        "connectors": [
+          {
+            "key": "bye-final",
+            "errorY": 0
+          },
+          {
+            "key": "semifinal-final",
+            "errorY": 0
+          }
+        ],
+        "selectionAlignment": 0
+      },
+      "schedule": {
+        "phaseTabs": 0,
+        "filters": [
+          "전체",
+          "6강",
+          "준결승",
+          "결승"
+        ],
+        "filterCounts": [
+          {
+            "label": "전체",
+            "count": 5,
+            "fixtureIds": [
+              "f5c04a97-32b3-51f0-b72d-4a0624fec195",
+              "757e4ecd-4a62-5401-94a6-91f383b2d0c7",
+              "394c6bbc-38e5-5105-9f03-161a7ab9e2bd",
+              "c2e20e65-d27f-5271-883b-e66b417551f9",
+              "9ba5d242-b85b-54ea-ac94-87b01ca7edfe"
+            ]
+          },
+          {
+            "label": "6강",
+            "count": 3,
+            "fixtureIds": [
+              "f5c04a97-32b3-51f0-b72d-4a0624fec195",
+              "757e4ecd-4a62-5401-94a6-91f383b2d0c7",
+              "394c6bbc-38e5-5105-9f03-161a7ab9e2bd"
+            ]
+          },
+          {
+            "label": "준결승",
+            "count": 1,
+            "fixtureIds": [
+              "c2e20e65-d27f-5271-883b-e66b417551f9"
+            ]
+          },
+          {
+            "label": "결승",
+            "count": 1,
+            "fixtureIds": [
+              "9ba5d242-b85b-54ea-ac94-87b01ca7edfe"
+            ]
+          }
+        ],
+        "overflow": false
+      },
+      "verdict": "PASS"
+    },
+    {
+      "width": 1440,
+      "bracket": {
+        "detailLinks": 0,
+        "knockoutTabs": 0,
+        "overflow": false,
+        "logo": [
+          {
+            "text": "부전승 · 결승 직행승민 테스트팀1",
+            "background": "rgb(232, 243, 255)",
+            "nameColor": "rgb(27, 100, 218)",
+            "images": [
+              {
+                "loaded": true
+              }
+            ]
+          }
+        ],
+        "connectors": [
+          {
+            "key": "bye-final",
+            "errorY": 0
+          },
+          {
+            "key": "semifinal-final",
+            "errorY": 0
+          }
+        ],
+        "selectionAlignment": 0
+      },
+      "schedule": {
+        "phaseTabs": 0,
+        "filters": [
+          "전체",
+          "6강",
+          "준결승",
+          "결승"
+        ],
+        "filterCounts": [
+          {
+            "label": "전체",
+            "count": 5,
+            "fixtureIds": [
+              "f5c04a97-32b3-51f0-b72d-4a0624fec195",
+              "757e4ecd-4a62-5401-94a6-91f383b2d0c7",
+              "394c6bbc-38e5-5105-9f03-161a7ab9e2bd",
+              "c2e20e65-d27f-5271-883b-e66b417551f9",
+              "9ba5d242-b85b-54ea-ac94-87b01ca7edfe"
+            ]
+          },
+          {
+            "label": "6강",
+            "count": 3,
+            "fixtureIds": [
+              "f5c04a97-32b3-51f0-b72d-4a0624fec195",
+              "757e4ecd-4a62-5401-94a6-91f383b2d0c7",
+              "394c6bbc-38e5-5105-9f03-161a7ab9e2bd"
+            ]
+          },
+          {
+            "label": "준결승",
+            "count": 1,
+            "fixtureIds": [
+              "c2e20e65-d27f-5271-883b-e66b417551f9"
+            ]
+          },
+          {
+            "label": "결승",
+            "count": 1,
+            "fixtureIds": [
+              "9ba5d242-b85b-54ea-ac94-87b01ca7edfe"
+            ]
+          }
+        ],
+        "overflow": false
+      },
+      "verdict": "PASS"
+    }
+  ],
+  "issues": [],
+  "assertions": [
+    {
+      "name": "bracket-390-no-detail-link",
+      "pass": true,
+      "detail": 0
+    },
+    {
+      "name": "bracket-390-no-phase-tab",
+      "pass": true,
+      "detail": 0
+    },
+    {
+      "name": "bracket-390-no-page-overflow",
+      "pass": true,
+      "detail": false
+    },
+    {
+      "name": "bracket-390-selected-bye-name-color",
+      "pass": true,
+      "detail": [
+        "rgb(27, 100, 218)"
+      ]
+    },
+    {
+      "name": "bracket-390-selection-left-alignment",
+      "pass": true,
+      "detail": 0
+    },
+    {
+      "name": "bracket-390-two-final-connectors",
+      "pass": true,
+      "detail": [
+        {
+          "key": "bye-final",
+          "errorY": 0
+        },
+        {
+          "key": "semifinal-final",
+          "errorY": 0
+        }
+      ]
+    },
+    {
+      "name": "bracket-390-aligned-final-connectors",
+      "pass": true,
+      "detail": [
+        {
+          "key": "bye-final",
+          "errorY": 0
+        },
+        {
+          "key": "semifinal-final",
+          "errorY": 0
+        }
+      ]
+    },
+    {
+      "name": "bracket-390-selected-bye-background",
+      "pass": true,
+      "detail": [
+        "rgb(232, 243, 255)"
+      ]
+    },
+    {
+      "name": "schedule-390-no-phase-tab",
+      "pass": true,
+      "detail": 0
+    },
+    {
+      "name": "schedule-390-round-filters",
+      "pass": true,
+      "detail": [
+        "전체",
+        "6강",
+        "준결승",
+        "결승"
+      ]
+    },
+    {
+      "name": "schedule-390-전체-fixtures",
+      "pass": true,
+      "detail": [
+        "f5c04a97-32b3-51f0-b72d-4a0624fec195",
+        "757e4ecd-4a62-5401-94a6-91f383b2d0c7",
+        "394c6bbc-38e5-5105-9f03-161a7ab9e2bd",
+        "c2e20e65-d27f-5271-883b-e66b417551f9",
+        "9ba5d242-b85b-54ea-ac94-87b01ca7edfe"
+      ]
+    },
+    {
+      "name": "schedule-390-6강-fixtures",
+      "pass": true,
+      "detail": [
+        "f5c04a97-32b3-51f0-b72d-4a0624fec195",
+        "757e4ecd-4a62-5401-94a6-91f383b2d0c7",
+        "394c6bbc-38e5-5105-9f03-161a7ab9e2bd"
+      ]
+    },
+    {
+      "name": "schedule-390-준결승-fixtures",
+      "pass": true,
+      "detail": [
+        "c2e20e65-d27f-5271-883b-e66b417551f9"
+      ]
+    },
+    {
+      "name": "schedule-390-결승-fixtures",
+      "pass": true,
+      "detail": [
+        "9ba5d242-b85b-54ea-ac94-87b01ca7edfe"
+      ]
+    },
+    {
+      "name": "schedule-390-no-page-overflow",
+      "pass": true,
+      "detail": false
+    },
+    {
+      "name": "bracket-768-no-detail-link",
+      "pass": true,
+      "detail": 0
+    },
+    {
+      "name": "bracket-768-no-phase-tab",
+      "pass": true,
+      "detail": 0
+    },
+    {
+      "name": "bracket-768-no-page-overflow",
+      "pass": true,
+      "detail": false
+    },
+    {
+      "name": "bracket-768-selected-bye-name-color",
+      "pass": true,
+      "detail": [
+        "rgb(27, 100, 218)"
+      ]
+    },
+    {
+      "name": "bracket-768-selection-left-alignment",
+      "pass": true,
+      "detail": 0
+    },
+    {
+      "name": "bracket-768-two-final-connectors",
+      "pass": true,
+      "detail": [
+        {
+          "key": "bye-final",
+          "errorY": 0
+        },
+        {
+          "key": "semifinal-final",
+          "errorY": 0
+        }
+      ]
+    },
+    {
+      "name": "bracket-768-aligned-final-connectors",
+      "pass": true,
+      "detail": [
+        {
+          "key": "bye-final",
+          "errorY": 0
+        },
+        {
+          "key": "semifinal-final",
+          "errorY": 0
+        }
+      ]
+    },
+    {
+      "name": "bracket-768-selected-bye-background",
+      "pass": true,
+      "detail": [
+        "rgb(232, 243, 255)"
+      ]
+    },
+    {
+      "name": "schedule-768-no-phase-tab",
+      "pass": true,
+      "detail": 0
+    },
+    {
+      "name": "schedule-768-round-filters",
+      "pass": true,
+      "detail": [
+        "전체",
+        "6강",
+        "준결승",
+        "결승"
+      ]
+    },
+    {
+      "name": "schedule-768-전체-fixtures",
+      "pass": true,
+      "detail": [
+        "f5c04a97-32b3-51f0-b72d-4a0624fec195",
+        "757e4ecd-4a62-5401-94a6-91f383b2d0c7",
+        "394c6bbc-38e5-5105-9f03-161a7ab9e2bd",
+        "c2e20e65-d27f-5271-883b-e66b417551f9",
+        "9ba5d242-b85b-54ea-ac94-87b01ca7edfe"
+      ]
+    },
+    {
+      "name": "schedule-768-6강-fixtures",
+      "pass": true,
+      "detail": [
+        "f5c04a97-32b3-51f0-b72d-4a0624fec195",
+        "757e4ecd-4a62-5401-94a6-91f383b2d0c7",
+        "394c6bbc-38e5-5105-9f03-161a7ab9e2bd"
+      ]
+    },
+    {
+      "name": "schedule-768-준결승-fixtures",
+      "pass": true,
+      "detail": [
+        "c2e20e65-d27f-5271-883b-e66b417551f9"
+      ]
+    },
+    {
+      "name": "schedule-768-결승-fixtures",
+      "pass": true,
+      "detail": [
+        "9ba5d242-b85b-54ea-ac94-87b01ca7edfe"
+      ]
+    },
+    {
+      "name": "schedule-768-no-page-overflow",
+      "pass": true,
+      "detail": false
+    },
+    {
+      "name": "bracket-1440-no-detail-link",
+      "pass": true,
+      "detail": 0
+    },
+    {
+      "name": "bracket-1440-no-phase-tab",
+      "pass": true,
+      "detail": 0
+    },
+    {
+      "name": "bracket-1440-no-page-overflow",
+      "pass": true,
+      "detail": false
+    },
+    {
+      "name": "bracket-1440-selected-bye-name-color",
+      "pass": true,
+      "detail": [
+        "rgb(27, 100, 218)"
+      ]
+    },
+    {
+      "name": "bracket-1440-selection-left-alignment",
+      "pass": true,
+      "detail": 0
+    },
+    {
+      "name": "bracket-1440-two-final-connectors",
+      "pass": true,
+      "detail": [
+        {
+          "key": "bye-final",
+          "errorY": 0
+        },
+        {
+          "key": "semifinal-final",
+          "errorY": 0
+        }
+      ]
+    },
+    {
+      "name": "bracket-1440-aligned-final-connectors",
+      "pass": true,
+      "detail": [
+        {
+          "key": "bye-final",
+          "errorY": 0
+        },
+        {
+          "key": "semifinal-final",
+          "errorY": 0
+        }
+      ]
+    },
+    {
+      "name": "bracket-1440-selected-bye-background",
+      "pass": true,
+      "detail": [
+        "rgb(232, 243, 255)"
+      ]
+    },
+    {
+      "name": "schedule-1440-no-phase-tab",
+      "pass": true,
+      "detail": 0
+    },
+    {
+      "name": "schedule-1440-round-filters",
+      "pass": true,
+      "detail": [
+        "전체",
+        "6강",
+        "준결승",
+        "결승"
+      ]
+    },
+    {
+      "name": "schedule-1440-전체-fixtures",
+      "pass": true,
+      "detail": [
+        "f5c04a97-32b3-51f0-b72d-4a0624fec195",
+        "757e4ecd-4a62-5401-94a6-91f383b2d0c7",
+        "394c6bbc-38e5-5105-9f03-161a7ab9e2bd",
+        "c2e20e65-d27f-5271-883b-e66b417551f9",
+        "9ba5d242-b85b-54ea-ac94-87b01ca7edfe"
+      ]
+    },
+    {
+      "name": "schedule-1440-6강-fixtures",
+      "pass": true,
+      "detail": [
+        "f5c04a97-32b3-51f0-b72d-4a0624fec195",
+        "757e4ecd-4a62-5401-94a6-91f383b2d0c7",
+        "394c6bbc-38e5-5105-9f03-161a7ab9e2bd"
+      ]
+    },
+    {
+      "name": "schedule-1440-준결승-fixtures",
+      "pass": true,
+      "detail": [
+        "c2e20e65-d27f-5271-883b-e66b417551f9"
+      ]
+    },
+    {
+      "name": "schedule-1440-결승-fixtures",
+      "pass": true,
+      "detail": [
+        "9ba5d242-b85b-54ea-ac94-87b01ca7edfe"
+      ]
+    },
+    {
+      "name": "schedule-1440-no-page-overflow",
+      "pass": true,
+      "detail": false
+    },
+    {
+      "name": "no-console-network-page-errors",
+      "pass": true,
+      "detail": []
+    }
+  ],
+  "cleanup": "Owned browser and context closed",
+  "browserPid": 16257,
+  "parentPid": 16204,
+  "servedCommit": "a7c520c2f3f359b89cf50d26160ceba392c29e2e"
+}

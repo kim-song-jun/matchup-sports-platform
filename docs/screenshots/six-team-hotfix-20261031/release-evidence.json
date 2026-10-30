@@ -1,0 +1,33 @@
+{
+  "main": {
+    "sha": "b50074f90ff602eff47b21b0d2577bcc0377c57b",
+    "release": "1.12.4",
+    "workflow": 41074599489,
+    "workflowVerdict": "SUCCESS",
+    "publicHealth": "success",
+    "db": true,
+    "publicTournamentsHttp": 200
+  },
+  "alphaInitial": {
+    "sha": "a7c520c2f3f359b89cf50d26160ceba392c29e2e",
+    "workflow": 41073748905,
+    "workflowVerdict": "SUCCESS",
+    "publicChecks": 46,
+    "issues": 0,
+    "widths": [
+      390,
+      768,
+      1440
+    ]
+  },
+  "alphaLatest": {
+    "sha": "696bb15336ec6a985088cbd40aa023a6481f4b37",
+    "ci": 41084284698,
+    "deploy": 41084284733,
+    "verdict": "PENDING"
+  },
+  "authenticatedAdmin": {
+    "verdict": "NOT_EXECUTED",
+    "reason": "No test login credentials supplied; no game result writes performed"
+  }
+}

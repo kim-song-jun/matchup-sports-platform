@@ -1,6 +1,6 @@
 # Task 20261122: 배정 대회 디렉터 전체 관리
 
-Status: Review — local checks passed; alpha verification pending
+Status: PR #2101 OPEN — user requested PR + before screenshots only; new Alpha QA deferred
 Owner: Codex (single agent)
 Created: 2026-10-30
 
@@ -79,3 +79,13 @@ alpha는 dev 배포 이후에만 변경 검증 가능하다. 사용자가 스크
 - 배정 안내는 디렉터 관리 화면으로 연결한다. 다른 세션의 배정·해제를 창 복귀와 15초 폴링으로 갱신한다. 추가 web 2파일/20 tests와 web tsc PASS.
 - Headed Chrome은 stdin 비에코, 세션 파일 저장 없음. 브라우저 PID/부모 PID를 기록하며 종료 시 소유한 context/browser만 닫는다.
 - 새 화면은 미배포 상태이며 alpha 0/10, viewport 0/3. 기존 alpha 관리자 로그인 성공.
+## Final Scope — 2026-10-30
+- 사용자 선택: **현재는 PR과 변경 전 캡처까지만 정리**. dev 머지/배포 및 신규 관리 화면 QA를 수행하지 않는다.
+- PR https://github.com/kim-song-jun/matchup-sports-platform/pull/2101 (base dev). 변경 전 갤러리 코멘트 6516343796.
+- 실제 Alpha에서 관리자 → 신규 테스트 4팀 대회 → 첫 디렉터 배정 → 담당 목록 → 운영 보드 → 지원 배정/해제 → 관리자에 의한 디렉터 해제까지 확인했다. 일반 선수·지원 계정 모두 실제 로그인했다.
+- 해제 후 지원/디렉터 운영 접근은 403, 디렉터 담당 목록은 items=[]다. 플랫폼 회원 관리도 차단됐다.
+- 기준 화면 3/3 폭, 신규 관리 화면은 여전히 0/10 섹션·0/3 폭. 기존 화면을 신규 구현 PASS로 표시하지 않는다.
+- 테스트 배정 2건 모두 해제, 신규 테스트 대회 비공개. 파괴적 seed/reset·기존 대회 수정 없음.
+- Headed Chrome 2816/Node 26076: context/browser close 후 stdin Node도 종료. 로컬 web/API 서버 없음.
+- 비공개 전환 후 기존 운영 화면의 공개 상세 API 404와 일반 제목 fallback을 관측했다. 배포 후 비공개 대회 관리/운영 왕복 QA에서 해결 여부를 확인해야 한다.
+- Copilot 공식 요청 REST 201이나 review/run 생성 없음. 최신 head clean 미충족이며 우회하지 않았다. 공통 Gates PASS, API/Web CI는 마지막 관측 시 실행 중.

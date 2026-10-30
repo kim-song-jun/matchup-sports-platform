@@ -72,6 +72,8 @@ const out = path.resolve('docs/screenshots/scoped-director-management');
       }
     }
   } finally {
+    input.close();
+    process.stdin.pause();
     if (process.stdin.isTTY) process.stdin.setRawMode(false);
     for (const { context } of sessions.values()) await context.close();
     await browser.close();

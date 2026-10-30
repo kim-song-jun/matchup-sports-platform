@@ -1,7 +1,7 @@
 # 배정 대회 디렉터 전체 관리
 
 Task: [20261122](../../.github/tasks/20261122-scoped-tournament-director-management.md)
-Status: 로컬 계약 검증 PASS, alpha 미배포
+Status: PR #2101 OPEN — 로컬 계약 검증 PASS, 변경 전 Alpha 캡처 완료. 사용자 선택으로 이번 범위는 PR·기준 캡처까지.
 
 ## 범위
 신규 관리 섹션 10개: overview, info, registrations, bracket, announcements, sponsors, campaign, reviews, awards, statistics.
@@ -29,8 +29,17 @@ Status: 로컬 계약 검증 PASS, alpha 미배포
 - 실행은 단일 worker/직렬. 검증용 web/API 서버와 브라우저를 띄우지 않았다.
 
 ## Alpha 수동 증거
-미실행. 이 작업트리의 변경은 dev/alpha에 배포하지 않았다. 따라서 미배포 코드를 기존 alpha 화면으로 PASS 처리하지 않는다.
+새 구현은 미배포다. 사용자 선택(2026-10-30)으로 PR과 변경 전 캡처까지만 진행한다. 기준 배포 SHA는 `d72b59a37793e048be1387d6f63aeb2de38a13e7`이다.
+- 실제 UI: 관리자/일반 선수/지원 계정 로그인, 신규 테스트 4팀·8경기 대회 생성, 첫 디렉터 배정, 담당 목록 1개 표시, 운영 보드 진입, 디렉터의 지원 배정과 해제, 해제 후 지원 403, 플랫폼 회원 관리 거부를 확인했다.
+- 관리자에 의한 디렉터 해제 후 `/me/tournament-staff`는 items=[]이며 담당 목록이 비었다. 운영 화면 재진입도 403 권한 안내였다.
+- 변경 전 기준 화면은 390/768/1440의 3/3 viewport, document 가로 overflow 없음. 갤러리: https://github.com/kim-song-jun/matchup-sports-platform/pull/2101#issuecomment-6516343796
+- 테스트로 부여한 디렉터·지원 배정 모두 해제, 테스트 대회 비공개. 기존 대회/배정은 변경하지 않았다. 계정·비밀번호·세션 저장 없음.
+- 비공개 전환 뒤 기존 운영 셸의 공개 상세 요청 `/tournaments/:id`가 404가 되어 제목이 일반 문구로 바뀌는 기존 결함을 관측했다. 신규 관리 화면과의 왕복 및 비공개 대회 표시는 배포 후 후속 QA 대상이다.
+- Headed Chrome PID 2816 / 부모 Node PID 26076. 모든 context/browser 종료 확인. 남은 입력 프로세스도 소유 PID만 정리한다.
+- Copilot 요청 REST 201 후 실제 review/run 미생성. 최신 head clean gate를 충족한 것으로 표시하지 않는다. dev 머지/배포 없음.
+
+## 미배포 구현의 남은 검증
 - 10개 관리 섹션: 0/10 수동 검증.
-- 390/768/1440 viewport: 0/3 검증. before/after·console/network 증거 없음.
+- 신규 관리 화면 390/768/1440 viewport: 0/3 검증. after 증거 없음.
 - DB integration/실제 로그인·저장 흐름: 미실행.
-- 임시 실행 서버/브라우저: 없음. 정리할 소유 프로세스 없음.
+- 로컬 web/API 서버는 실행하지 않았다.

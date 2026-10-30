@@ -1,6 +1,6 @@
 # 6강 대진표 디자인 통일
 
-Status: Local Hotfix Validated (remote push/PR approval required; not deployed)
+Status: main PR #2104 Checks/Review Pending
 Owner: Codex (single agent)
 
 ## Context
@@ -91,3 +91,11 @@ origin/dev 2708c6149 기반 격리 worktree. 로컬 프론트엔드는 alpha API
 - main 대비 25개 source/test/API docs + task2 + 앱 manifest2/CHANGELOG2 = **31 paths**. Prisma/마이그레이션/배포/워크플로/lockfile diff0, committed-tree `diff --check` PASS, touched TODO/FIXME/HACK/XXX0, 신규 미추적 source import 없음.
 - 사용자 요청에 따라 전용 `hotfix/six-team-penalty-20261030` 브랜치를 준비. 원격 push + main 대상 초안 PR 생성은 자동 승인 검토가 '코드 원격 전송 및 PR 생성에 별도 명시 승인 필요' 사유로 거절해 **미실행**. 재시도/우회 없음. 사용자 승인 대기.
 - 원격 CI/Copilot, 배포 후 실제 저장·공식화 및 390/768/1440 화면 검증은 미완. 로컬 테스트를 배포/시각 검증 완료로 표시하지 않음. 최종 main 머지와 production 승인은 사용자 직접 수행.
+
+### PR CI 후속 — 상세 페이지 회귀 계약 동기화
+
+- main #2104 / alpha(dev) #2105 게시. 사용자가 원격 게시와 alpha 반영을 명시 승인. main 최종 머지·production 승인은 사용자 직접 수행.
+- main Web CI에서 전체9948개 중 상세 페이지의 기존 링크5개 기대2건만 실패(844 files 중843 PASS). 제거된 링크를 요구하는 stale assertion을 실제 경기 카드5개 유지 + 경기 상세 링크0개 계약으로 갱신. CI RED는 run41065438245/job124095377701. 해당 파일만 좁게 재검증 후 양쪽 PR에 동일 반영.
+- Copilot은 gh edit와 공식 REST 요청을 접수했으나 현재 두 head 리뷰0건. clean으로 간주하지 않으며 리뷰 도착을 별도 확인.
+- alpha before: 배포SHA2708c614993e, 공개 대진표·일정390/768/1440 baseline 캡처 완료. 상세링크5/결선탭1 및 선정카드 흰색·이미지없음 확인. console/network/pageerror0, browserPID8510/parent8413 정상종료. 증거는 alpha worktree `tmp/qa-six-team-hotfix/before/`.
+- 상세 페이지 단일 파일 재검증 **38/38 PASS** (86.78s, worker1), CI의 stale 링크 기대2건을 실제카드5/링크0 계약으로 GREEN. 기존341개와 합산 관련379개 검증. main diff32 paths(추가 test1), alpha diff30 paths. 앱 소스 추가 수정 없음.

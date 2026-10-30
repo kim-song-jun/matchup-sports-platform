@@ -1,6 +1,6 @@
 # 6강 대진표 디자인 통일
 
-Status: Hotfix Preparation (main target; validation in progress)
+Status: Alpha PR Preparation (main hotfix prepared separately)
 Owner: Codex (single agent)
 
 ## Context
@@ -79,3 +79,10 @@ origin/dev 2708c6149 기반 격리 worktree. 로컬 프론트엔드는 alpha API
 - Owned: 원본 작업의 25개 소스/테스트/API 문서, 위 두 task 문서, 두 Changeset 및 소비에 따른 API/Web 버전·CHANGELOG. Forbidden: Prisma/DB, 원격 경기 데이터, 무관한 dev 변경. 단일 에이전트로 수행.
 - 진행: main 기준 패치 적용 및 diff --check 통과. main 기준 회귀 검증 중. 이전 로컬 미리보기 증거는 위 기록이며 이번 main 배포 검증을 대신하지 않는다.
 - 남은 검증: main 기반 회귀 테스트/타입 검사, Changesets 소비·버전 게이트, 원격 CI/리뷰, 실제 배포 후 저장·공식화 및 화면 검증.
+
+## 2026-10-30 alpha 반영 요청
+
+- 사용자가 main 핫픽스와 함께 alpha 반영도 명시 승인. 최신 origin/dev2708c6149 기준 전용 브랜치 `fix/six-team-penalty-alpha-20261030`에 소스 커밋만 적용. main용 1.12.3 버전/Changeset 소비는 포함하지 않음.
+- 원본 dev WIP와 25개 source/test/API docs가 개행을 제외하고 전부 일치. 기존 원본 dev 검증과 main 기준 frontend280/backend61 및 타입·패턴 PASS를 참조. 동일 로컬 전체 검증은 반복하지 않으며 dev 기준 CI를 실행.
+- 두 Changeset 유지, diff --check PASS. main 핫픽스는 별도 브랜치/PR, 최종 main 머지·production 승인은 사용자 직접 수행.
+- dev PR 검사·Copilot 완료 후 dev 머지와 alpha 배포 SHA 확인. 실제 사용자/admin 390/768/1440 및 승부차기 저장·공식화는 접근 가능한 인증/안전한 시나리오 전제하에 검증하고, 미실행 항목은 별도 표시.

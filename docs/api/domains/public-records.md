@@ -256,6 +256,17 @@ projection, computed only when there is no official revision yet:
   events under one "경기 결과" heading instead of "전반"; `null` (no game or an
   unreadable snapshot) keeps the legacy 전반/후반 wording. Present on
   `getMatch`, `getLeagueFixtureRecord` and every `presentScheduleEntry` entry.
+- `periodMinutes` -- `number[] | null`, the *regular* periods' lengths in minutes in
+  config order (extra time excluded), read from the same competition-config snapshot
+  (`regularPeriodMinutes`, `competition-config.parse.ts`). It counts regular periods by
+  the same rule as `periodCount`, so a non-null value always has `periodCount` entries.
+  The web renders it as one "경기 방식" line under the venue/date row of the schedule
+  card and under the date line of the match detail header (tournaments and regular
+  leagues share both components): `[20]` → "단판 20분", `[15, 15]` → "전·후반 15분",
+  `[10, 15]` → "전반 10분, 후반 15분". `null` (no game, unreadable snapshot, legacy
+  `{ count }` shape, or any regular period without a positive length) means "do not
+  guess" -- the web draws no line. Present on `getMatch`, `getLeagueFixtureRecord` and
+  every `presentScheduleEntry` entry.
 
 None of these fields is a new privacy tier: all are derived purely from data
 the `live` mode already exposes elsewhere on the same response (`events[]`

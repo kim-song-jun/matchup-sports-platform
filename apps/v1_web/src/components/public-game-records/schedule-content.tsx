@@ -18,6 +18,7 @@ import {
   eventPresentation,
   fixtureStatusLabel,
   formatGoalMinute,
+  formatPeriodFormat,
   formatScoreline,
   isClockAbnormal,
   isSinglePeriod,
@@ -213,9 +214,11 @@ function MatchEventSummary({ entry }: { entry: PublicScheduleEntry }) {
   const known = items.filter((item) => item.period !== null);
   const unknown = items.filter((item) => item.period === null).sort(byClock);
   // 단판은 구간이 하나다 — 시간대를 모르는 기록도 "기타"로 떼지 않고 목록 끝에 합친다.
-  const sections = (
+  // 구간이 하나뿐이면 가를 말이 없으니 머리말 글자는 그리지 않고 선만 둔다(`hideLabel`) — 이름은 스크린리더용 그룹 이름으로만 남는다.
+  type EventSection = { key: string; label: string; hideLabel?: boolean; items: ScheduleEventItem[] };
+  const sections: EventSection[] = (
     isSinglePeriod(entry.periodCount)
-      ? [{ key: 'single', label: SINGLE_PERIOD_HEADING, items: [...known.sort(byClock), ...unknown] }]
+      ? [{ key: 'single', label: SINGLE_PERIOD_HEADING, hideLabel: true, items: [...known.sort(byClock), ...unknown] }]
       : [
           { key: 'first', label: '전반', items: items.filter((item) => item.period === 1).sort(byClock) },
           { key: 'second', label: '후반', items: known.filter((item) => item.period !== 1).sort(byClock) },
@@ -239,13 +242,18 @@ function MatchEventSummary({ entry }: { entry: PublicScheduleEntry }) {
       {sections.map((section) => (
         <div key={section.key} role="group" aria-label={`${section.label} 기록`} style={{ display: 'grid', gap: 3 }}>
           {/* 예전엔 전/후반 사이에 점선 하나만 그어서 그게 무슨 경계인지 알 수 없었다 —
-              구간 이름을 직접 적는다(디자인 규칙: 의미 구분은 선·색만으로 하지 않는다). */}
+              구간 이름을 직접 적는다(디자인 규칙: 의미 구분은 선·색만으로 하지 않는다).
+              단판은 경계가 아니라 "기록이 여기서 시작한다"는 구분일 뿐이라 글자 없이 선 하나다. */}
           <div aria-hidden="true" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-            <span style={{ fontWeight: 700, color: 'var(--text-caption)', whiteSpace: 'nowrap' }}>
-              {section.label}
-            </span>
-            <span style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+            {section.hideLabel ? null : (
+              <>
+                <span style={{ fontWeight: 700, color: 'var(--text-caption)', whiteSpace: 'nowrap' }}>
+                  {section.label}
+                </span>
+                <span style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+              </>
+            )}
           </div>
           {section.items.map((item) => (
             <ScheduleEventRow key={item.key} item={item} />
@@ -338,6 +346,8 @@ function ScheduleRow({
 }) {
   const dateLabel = formatTournamentDateTimeShort(entry.scheduledAt);
   const venue = venueLabel(entry);
+  // 경기 방식("단판 20분"·"전·후반 15분") — 길이를 모르는 경기는 null 이라 줄 자체가 없다.
+  const periodFormat = formatPeriodFormat(entry.periodMinutes);
   const matchLabel = competitionMatchLabel({
     groupName: entry.groupName,
     round: entry.round,
@@ -384,7 +394,7 @@ function ScheduleRow({
           좌상단으로 올려도 될것같아 카드에서"). 빈 자리를 채우면서 스코어 아래 줄도
           한 줄 짧아진다. 긴 구장명은 말줄임으로 접고 날짜 쪽은 줄이지 않는다 —
           경기 시각은 목록에서 가장 자주 찾는 값이라 잘리면 안 된다. */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '2px 8px', marginBottom: 8 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '2px 8px', marginBottom: periodFormat ? 4 : 8 }}>
         <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', display: 'flex', flexWrap: 'wrap', gap: '2px 8px', alignItems: 'center', minWidth: 0, maxWidth: '100%' }}>
           {/* 경기 이름은 한 줄로 둔다 — 390 에서 "조별리그 2라 / 운드"처럼 단어 가운데서 끊겼다. 장소가 날짜와 한 줄에 안 들어가면
               바깥 머리줄이 줄을 바꿔 장소가 폭 전체를 쓴다(한 줄에 욱여넣으면 "월.." 만 남았다). 조 이름이 아주 길 때만 이름도 말줄임으로 줄어 날짜 쪽으로 넘치지 않는다. */}
@@ -412,6 +422,10 @@ function ScheduleRow({
           <ScheduleResultBadge entry={entry} />
         </span>
       </div>
+      {periodFormat ? (
+        // 장소·일시 줄 바로 아래, 왼쪽 정렬(오너 지정). 머리줄이 줄바꿈돼도 이 줄은 머리줄 전체의 아래에 한 줄로 놓인다.
+        <div style={{ fontSize: 'var(--font-size-caption)', color: 'var(--text-caption)', marginBottom: 8 }}>{periodFormat}</div>
+      ) : null}
       {matchupUndecided(entry) ? (
         // 양쪽이 다 미정인 자리에 `미정  - : -  미정` 을 그리면, 같은 말이 세 번 반복되면서
         // 스코어 pill 까지 빈 채로 남아 "고장난 카드"로 읽힌다(오너 지적: "미정 vs 미정").

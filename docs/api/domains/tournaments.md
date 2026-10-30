@@ -26,6 +26,8 @@
 
 ## Scoped director management
 
+- 수상 추천용 `GET /admin/tournaments/:tournamentId/player-records`도 활성 관리자 또는 해당 대회 디렉터만 조회한다. 타 대회는 `403 PERMISSION_DENIED`이며 기록 집계 전에 거부한다. 공개 랭킹의 동의 필터를 대신 사용하지 않는다.
+
 Task 20261122: `/tournament-management`는 디렉터 전용 담당 대회 목록이고 `/tournament-management/tournaments/:id/{section}`은 기존 관리자 상세의 10개 섹션을 재사용한다. 공개 대회 탐색 목록은 유지한다.
 
 - 기존 `/admin/tournaments` 목록은 플랫폼 관리자의 경우 기존 범위, 일반 스태프의 경우 활성 디렉터 배정 대회로 제한한다. 상태별 합계에도 같은 범위를 적용한다. 배정이 전혀 없는 일반 계정은 `403 PERMISSION_DENIED`다.

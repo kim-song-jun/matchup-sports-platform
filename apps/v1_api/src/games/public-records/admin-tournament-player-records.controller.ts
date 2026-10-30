@@ -8,7 +8,8 @@ import { PublicTournamentRecordsService } from './public-tournament-records.serv
 /**
  * 회고 STATS-3 — 수상 탭 추천 근거용 어드민 랭킹.
  * `tournaments-admin.controller.ts`와 같은 관례: `V1AuthGuard` + 서비스 진입 전
- * `AdminContextService.getActiveAdmin`. 공개 랭킹(`/tournaments/:id/player-records`)
+ * `AdminContextService.getTournamentAdmin`으로 관리자 또는 해당 대회 디렉터만 허용한다.
+ * 공개 랭킹(`/tournaments/:id/player-records`)
  * 과 달리 **동의 게이팅이 없다** — 어드민이 수상자를 고를 때는 진짜 순위가 필요하다.
  */
 @Controller('admin/tournaments')
@@ -24,7 +25,7 @@ export class AdminTournamentPlayerRecordsController {
     @CurrentUser() user: V1AuthUser,
     @Param('tournamentId') tournamentId: string,
   ) {
-    await this.adminContext.getActiveAdmin(user.id);
+    await this.adminContext.getTournamentAdmin(user.id, { tournamentId });
     return this.tournamentRecords.getPlayerRecordsForAdmin(tournamentId);
   }
 }

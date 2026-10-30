@@ -1,3 +1,5 @@
+수상 추천용 관리자 선수 기록 조회는 해당 대회의 활성 디렉터도 허용하며, 다른 대회는 403으로 거부한다. [대회 권한 계약](./domains/tournaments.md#scoped-director-management)을 따른다.
+
 [6강 결승 직행 API 계약](./domains/tournaments.md#6강-결승-직행-방식-2026-10-28): 6팀 방식 설정, 템플릿 생성, 진출 조회/수동 결정, 공개 대진표 메타데이터.
 
 대진 v2는 조마다 `groups[].legs`로 1·2회전을 따로 설정한다. 기존 최상위 `legs`와 초안 복원은 호환되며 [대회 계약](./domains/tournaments.md#유연한-대진-v2-2026-10-27)을 따른다.

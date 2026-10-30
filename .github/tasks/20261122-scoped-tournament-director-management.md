@@ -89,3 +89,10 @@ alpha는 dev 배포 이후에만 변경 검증 가능하다. 사용자가 스크
 - Headed Chrome 2816/Node 26076: context/browser close 후 stdin Node도 종료. 로컬 web/API 서버 없음.
 - 비공개 전환 후 기존 운영 화면의 공개 상세 API 404와 일반 제목 fallback을 관측했다. 배포 후 비공개 대회 관리/운영 왕복 QA에서 해결 여부를 확인해야 한다.
 - Copilot 공식 요청 REST 201이나 review/run 생성 없음. 최신 head clean 미충족이며 우회하지 않았다. 공통 Gates PASS, API/Web CI는 마지막 관측 시 실행 중.
+## Review fixes — 2026-10-30
+- 사용자 직접 리뷰 대체 요청 후 자체 리뷰 d5af8d26c에서 P2(수상 추천 API 403), P3(모바일 대회 관리 메뉴 누락)를 확인했고 수정 요청을 받았다.
+- P2: 선수 기록 controller를 실제 담당 대회 권한 경로로 연결. 관리자 계정 없는 디렉터 허용과 타 대회 거부를 실제 AdminContextService 사용 테스트로 확인했다.
+- P3: 데스크톱에서 구성한 navItems를 모바일 Drawer에도 전달. 메뉴 실제 열기/닫기와 대회 디렉터/리그 디렉터/조회 지원의 링크 범위를 검증했다.
+- RED: 담당 대회 기록 조회가 ForbiddenException으로 실패, 모바일 메뉴의 대회 관리 링크 없음. GREEN: API 2 suite/22 tests, Web 1 file/22 tests PASS.
+- API/Web tsc PASS. 결과 공식 확정 제한은 수정하지 않는다. 머지/배포 없이 같은 PR에 반영한다.
+- 기존 비공개 운영 제목/공개 API 404 문제는 이 두 리뷰 수정의 범위 밖이며 배포 후 QA 잔여 항목이다.

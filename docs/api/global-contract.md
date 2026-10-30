@@ -1,3 +1,5 @@
+수상 추천용 관리자 선수 기록 조회는 해당 대회의 활성 디렉터도 허용하며, 다른 대회는 403으로 거부한다. [대회 권한 계약](./domains/tournaments.md#scoped-director-management)을 따른다.
+
 6강 전용 진출 결정은 기존 관리자 가드/응답 envelope를 따르며, source version 충돌은409, 참가·방식 조합 오류는422이다. [도메인 계약](./domains/tournaments.md#6강-결승-직행-방식-2026-10-28) 참조.
 
 신규 가입자의 경기 기록은 기본 공개이며, 기존 회원은 활성·가입 완료·미설정인 경우에만 공개로 초기화한다. 직접 비공개 선택과 실명·개별 기록 숨김 정책은 유지한다. [가입 계약](./domains/auth.md#signup-flow) · [설정 계약](./domains/users.md#경기-기록-공개-설정).

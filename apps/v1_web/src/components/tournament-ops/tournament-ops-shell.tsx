@@ -228,14 +228,13 @@ interface DrawerProps {
   tournamentCoverImageUrl?: string | null;
   role: V1TournamentStaffRole;
   pathname: string;
-  /** 지금 표면(스태프/어드민)의 nav base — 경로를 하드코딩하면 다른 표면으로 튕긴다. */
-  basePath: string;
+  /** 데스크톱과 같은 권한·대회 종류로 구성된 메뉴를 재사용한다. */
+  navItems: NavItem[];
   triggerRef: React.RefObject<HTMLButtonElement | null>;
 }
 
-function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverImageUrl, role, pathname, basePath, triggerRef }: DrawerProps) {
+function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverImageUrl, role, pathname, navItems, triggerRef }: DrawerProps) {
   const isActive = useIsActive(pathname);
-  const navItems = buildNavItems(basePath, role);
   const panelRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -462,7 +461,7 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
         <Drawer
           open={drawerOpen}
           onClose={closeDrawer}
-          basePath={basePath}
+          navItems={navItems}
           tournamentId={tournamentId}
           tournamentTitle={tournamentTitle}
           tournamentCoverImageUrl={tournamentCoverImageUrl}

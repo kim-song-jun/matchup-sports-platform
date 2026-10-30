@@ -44,6 +44,26 @@ class UnparsableSqlError extends Error {}
 // weakens the gate for exactly one (file, statement) pair and nothing else.
 const REVIEWED_NON_ADDITIVE = [
   {
+    file: "apps/v1_api/prisma/migrations/20261027120000_league_registration_status/migration.sql",
+    statement: "UPDATE \"v1_tournaments\" SET \"status\" = 'open', \"updated_at\" = (now() AT TIME ZONE 'UTC') WHERE \"kind\" = 'regular_league' AND \"deleted_at\" IS NULL AND \"status\" IN ('draft', 'closed') AND \"registration_deadline_at\" >= (now() AT TIME ZONE 'UTC')",
+    reason: "2026-10-27 explicit user decision (league registration follows tournament status): opens only pre-start (draft/closed), nondeleted regular leagues whose registration deadline is still in the future, i.e. exactly the leagues the previous deadline-only rule was accepting. The deadline column is a UTC timestamp without time zone, so the cutoff and updated_at use now() AT TIME ZONE 'UTC' and do not depend on the session TimeZone. No row is deleted and no schema changes. Rollback-safe: the previous API ignores status for league registration (deadline only) and maps open to the same draft state as draft/closed, so an application rollback keeps accepting the same leagues. Approval applies only to this exact statement and file.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20261027120000_league_registration_status/migration.sql",
+    statement: "UPDATE \"v1_tournaments\" SET \"status\" = 'closed', \"updated_at\" = (now() AT TIME ZONE 'UTC') WHERE \"kind\" = 'regular_league' AND \"deleted_at\" IS NULL AND \"status\" = 'open' AND \"registration_deadline_at\" IS NULL",
+    reason: "2026-10-27 explicit user decision: legacy regular leagues stored as open without a deadline were not accepting under the previous deadline-only rule; the new status rule would accept them indefinitely, so they move to closed to keep registration closed at deploy time. Rollback-safe: the previous API treats a null deadline as closed regardless of status and displays open/closed identically. Approval applies only to this exact statement and file.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20261027120000_league_registration_status/migration.sql",
+    statement: "UPDATE \"v1_tournaments\" SET \"held_from_status\" = 'open', \"updated_at\" = (now() AT TIME ZONE 'UTC') WHERE \"kind\" = 'regular_league' AND \"deleted_at\" IS NULL AND \"status\" = 'on_hold' AND \"held_from_status\" IN ('draft', 'closed') AND \"registration_deadline_at\" >= (now() AT TIME ZONE 'UTC')",
+    reason: "2026-10-27 explicit user decision: for held (on_hold) regular leagues, rewrites only the resume target held_from_status with the same rule as statement 1 (pre-start + future deadline -> open). The current status stays on_hold, so nothing becomes visible or accepting at deploy time. Rollback-safe: the previous API restores held_from_status verbatim and judges registration by deadline only. Approval applies only to this exact statement and file.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20261027120000_league_registration_status/migration.sql",
+    statement: "UPDATE \"v1_tournaments\" SET \"held_from_status\" = 'closed', \"updated_at\" = (now() AT TIME ZONE 'UTC') WHERE \"kind\" = 'regular_league' AND \"deleted_at\" IS NULL AND \"status\" = 'on_hold' AND \"held_from_status\" = 'open' AND \"registration_deadline_at\" IS NULL",
+    reason: "2026-10-27 explicit user decision: for held regular leagues, rewrites only the resume target held_from_status with the same rule as statement 2 (open without deadline -> closed). The current status stays on_hold. Rollback-safe for the same reason as statement 2. Approval applies only to this exact statement and file.",
+  },
+  {
     file: "apps/v1_api/prisma/migrations/20261023120000_default_public_user_records/migration.sql",
     statement: "INSERT INTO \"v1_user_record_consents\" (\n  \"user_id\", \"state\", \"effective_at\", \"policy_hash\", \"created_at\", \"updated_at\"\n)\nSELECT\n  u.\"id\", 'GRANTED'::\"V1ConsentState\", CURRENT_TIMESTAMP,\n  'v1-public-record-default-2', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP\nFROM \"v1_users\" u\nWHERE u.\"account_status\" = 'active'\n  AND u.\"deleted_at\" IS NULL\n  AND u.\"onboarding_status\" IN (\n    'signup_done', 'sport_done', 'level_done', 'region_done',\n    'completed', 'deferred', 'social_profile_deferred'\n  )\n  AND NOT EXISTS (\n    SELECT 1 FROM \"v1_user_record_consents\" c WHERE c.\"user_id\" = u.\"id\"\n  )\nON CONFLICT (\"user_id\") DO NOTHING",
     reason: 'Task 20261106, explicit user decision 2026-10-23: initialize only missing public-record preferences for active, non-deleted, signup-complete members. NOT EXISTS plus ON CONFLICT DO NOTHING preserve all explicit private/public history and concurrent choices. Pending/inactive/deleted accounts and participant-level privacy overrides remain excluded. The product-default policy marker is distinct from explicit consent. Existing application versions understand the GRANTED enum and policy row; no schema or existing row is changed. Verified with real PostgreSQL preservation/idempotency tests. Approval applies only to this exact statement and file.',

@@ -208,7 +208,7 @@ export function buildTournamentDescription(
       : `참가비 ${formatEntryFee(tournament.entryFee)}`,
   ];
   const block = resolveTournamentRegistrationBlock(tournament);
-  if (tournament.status === 'open' || (tournament.kind === 'regular_league' && block === null)) {
+  if (tournament.status === 'open') {
     if (tournament.kind !== 'regular_league' && tournament.teamCount) facts.push(`${tournament.teamCount}팀 중 ${tournament.confirmedCount}팀 확정`);
     if (block === 'deadline_passed') facts.push('신청 마감됨');
     else if (block === 'capacity_full') facts.push('정원 마감');

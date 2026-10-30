@@ -998,11 +998,6 @@ function GroupFixtureRow({
           {away}
         </span>
       </div>
-      <ChevronRight
-        size={16}
-        aria-hidden="true"
-        style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-caption)' }}
-      />
     </Link>
   );
 }

@@ -29,7 +29,7 @@ import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
 import { KNOCKOUT_PHASES, competitionMatchLabel, tournamentRoundLabel } from '@/lib/tournament-round-label';
 import { compareTournamentGroupNames } from '@/lib/tournament-display-order';
 import { splitPrizeSegments, parsePrizeRows } from '@/lib/prize-breakdown';
-import { GroupedPrizes } from '@/components/tournaments/grouped-prizes';
+import { TournamentPrizeList } from '@/components/tournaments/tournament-prize-list';
 import { leagueSideLabel } from '@/lib/league-fixture-meta';
 import { TournamentBracket, groupFixturesByRound } from '@/components/tournaments/tournament-bracket';
 import { SixTeamBracket } from '@/components/tournaments/six-team-bracket';
@@ -754,7 +754,7 @@ export function TournamentDetailView({
         </div>
         {prizeRows.length > 0 && (
           <div style={{ marginTop: 20 }}>
-            <GroupedPrizes rows={prizeRows} />
+            <TournamentPrizeList rows={prizeRows} />
           </div>
         )}
         {tournament.status === 'completed' && (
@@ -1170,9 +1170,6 @@ export function TournamentDetailView({
 
   /* ── Desktop right-rail CTA card ── */
   // 리그도 대회와 같은 우측 레일에 진행 입구와 핵심 정보를 모은다.
-  const leagueApplicationCta = isLeagueMirror && registrationBlock === null && !hasActiveRegistration
-    ? <div className="mt-4"><ApplyCTAButtons tournament={tournament} blockReason={null} myRegistration={myRegistration} /></div>
-    : null;
   const nextLeagueInvite = isLeagueMirror && registrationBlock !== null
     ? <div className="mb-4"><LeagueNextRegistrationInvite leagueId={tournament.id} variant="sidebar" /></div>
     : null;
@@ -1324,7 +1321,6 @@ export function TournamentDetailView({
           </div>
         ) : null}
       </div>
-      {leagueApplicationCta}
     </aside>
   ) : tournament.status === 'closed' || (isLeagueMirror && tournament.status === 'in_progress') ? (
     /* 경기 없는 날의 정규 리그도 일정 진입을 유지한다.
@@ -1366,7 +1362,6 @@ export function TournamentDetailView({
           <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>{showsCapacity ? `${reservedTeamCount}/${teamCapacity}팀` : `${tournament.confirmedCount}팀`}</span>
         </div>
       </div>
-      {leagueApplicationCta}
     </aside>
   ) : tournament.status === 'completed' ? (
     <aside className="tm-tournament-rail tm-show-desktop" role="complementary" aria-label="대회 결과">

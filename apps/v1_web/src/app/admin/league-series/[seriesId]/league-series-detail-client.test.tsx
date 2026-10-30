@@ -72,7 +72,7 @@ describe('LeagueSeriesDetailClient promotion state', () => {
       }] }, isPending: false, isError: false, refetch: vi.fn(),
     } as never);
     render(<LeagueSeriesDetailClient seriesId="series-1" />);
-    for (const label of ['모집완료', '시즌 진행 중', '보류', '종료']) {
+    for (const label of ['시작 전', '시즌 진행 중', '보류', '종료']) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
   });

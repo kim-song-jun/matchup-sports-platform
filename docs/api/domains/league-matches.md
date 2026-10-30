@@ -170,35 +170,53 @@ firing): game day-before/kickoff reminders and lineup reminders/todos
 RSVP-deadline and guest-recruitment-close reminders for fixture schedules, and the
 league roster-submission reminder (`src/league-matches/league-hold.ts`).
 
-## Close registration (즉시 마감)
+## Open registration (접수 시작하기)
 
-`POST /api/v1/admin/league-matches/:leagueId/close-registration` (HTTP 200) takes an
-optional `{ "reason": string }` (max 200 chars; whitespace-only becomes `null`) and
-requires an active mutation administrator (support and non-admins get
-`403 PERMISSION_DENIED`). The server moves `registrationDeadlineAt` to the current
-time; the deadline stays the single judge of "open", so the public CTA, `/apply` and
-the submit API close together. `status` is not touched, `on_hold` leagues can be
-closed, and nothing is sent to teams. Submitted registrations stay as they are; only
-new submissions are blocked. Reopening is the existing
-`POST .../open-registration` (deadline moved into the future) — close and open are
-not mixed into one endpoint.
+League registration follows the tournament rule since 2026-10-27: teams can apply only while the
+stored `status` is `open` and the deadline (if any) has not passed (`src/tournaments/registration-window.ts`,
+shared with tournaments, the public list SQL and the web gate). Starting the league (`in_progress`)
+closes registration; `on_hold` never accepts.
 
-Response `data`: `{ leagueId, registrationOpen: false, registrationDeadlineAt, alreadyProcessed }`.
-A league whose deadline is already past or never set returns `alreadyProcessed: true`
-with no write and no audit row (an unset deadline is not rewritten to "now").
-Same-millisecond boundary: a submit with `deadline == now` is still accepted; the next
-judgement is closed.
+`POST /api/v1/admin/league-matches/:leagueId/open-registration` (HTTP 200) moves a pre-start league
+(`draft` or `closed`) to `open`, or only changes the deadline of a league that is already `open`.
+Body `{ "registrationDeadlineAt"?: ISO string | null }`: omitted keeps the stored deadline, `null`
+opens without a deadline (accepting until close-registration), a string sets it. A deadline at or
+before now returns `422 LEAGUE_REGISTRATION_DEADLINE_PAST` — including an omitted deadline whose
+stored value is already past. Response `data`:
+`{ leagueId, lifecycleStatus: 'open', registrationOpen: true, registrationDeadlineAt }`.
 
 | Case | Response |
 |---|---|
 | unknown league id, or a tournament id | `404 LEAGUE_NOT_FOUND` |
 | soft-deleted league | `409 LEAGUE_MIRROR_MISSING` |
-| `completed` / `cancelled` | `409 LEAGUE_REGISTRATION_NOT_ALLOWED` |
-| deadline changed between read and write | `409 LEAGUE_STATE_CHANGED` |
+| `on_hold` | `409 LEAGUE_ON_HOLD` |
+| `in_progress` / `completed` / `cancelled` | `409 LEAGUE_REGISTRATION_NOT_ALLOWED` |
+| status changed between read and write | `409 LEAGUE_STATE_CHANGED` |
 
-The write records `league_match.close_registration` with `reason`,
-`beforeJson.registrationDeadlineAt` and `afterJson.registrationDeadlineAt`
-(no status transition fields).
+The write records `league_match.open_registration` with before/after deadline, and a status change
+log entry when the status actually moves to `open`.
+
+## Close registration (접수 마감하기)
+
+`POST /api/v1/admin/league-matches/:leagueId/close-registration` (HTTP 200) takes an
+optional `{ "reason": string }` (max 200 chars; whitespace-only becomes `null`) and
+requires an active mutation administrator (support and non-admins get
+`403 PERMISSION_DENIED`). It moves an `open` league to `closed`; the deadline and submitted
+registrations stay as they are and nothing is sent to teams. Reopening (before the league starts)
+is `POST .../open-registration`.
+
+Response `data`: `{ leagueId, lifecycleStatus, registrationOpen: false, registrationDeadlineAt, alreadyProcessed }`.
+A league that is not `open` returns `alreadyProcessed: true` with its current `lifecycleStatus`,
+no write and no audit row.
+
+| Case | Response |
+|---|---|
+| unknown league id, or a tournament id | `404 LEAGUE_NOT_FOUND` |
+| soft-deleted league | `409 LEAGUE_MIRROR_MISSING` |
+| status changed between read and write | `409 LEAGUE_STATE_CHANGED` |
+
+The write records `league_match.close_registration` with `reason` and a status change log
+entry `open → closed`.
 
 ## Entry fee and payment instructions (참가비)
 
@@ -318,8 +336,10 @@ Creation requires an authenticated active owner/ops administrator. The existing
 mutation-admin authorization remains unchanged; support administrators cannot create leagues.
 
 `POST /api/v1/admin/league-matches` accepts `title`, UUID `sportId`, ISO
-`startsOn` and `endsOn`, and UUID `teamIds`. `regionId` is a non-empty master
-region identifier. Master data may use stable slugs such as
+`startsOn` and `endsOn`, and UUID `teamIds`. `teamIds` may be empty (teams can be gathered by
+registration instead, 2026-10-27); fixture generation still needs at least two teams. A new league
+starts as `draft` (초안) like a tournament and waits for open-registration or the explicit start.
+`regionId` is a non-empty master region identifier. Master data may use stable slugs such as
 `region-busan-jung`; it is not required to be a UUID.
 
 Optional roster, participant capacity and plan fields:
@@ -338,6 +358,12 @@ Optional roster, participant capacity and plan fields:
   `409 TOURNAMENT_CAPACITY_FULL` and the transaction is rolled back.
 - `plannedFixtureCount` (1–500): total games planned for the league. It is only the default for the
   fixture generation form (see `fixtureCount` below); it never limits manual fixtures.
+- `registrationDeadlineAt` (ISO, optional): stored for open-registration; a past value returns
+  `422 LEAGUE_REGISTRATION_DEADLINE_PAST`. Creating does not open registration.
+- `entryFee` (integer 0–100,000,000, optional) with `bankName` / `bankAccount` / `bankHolder`
+  (same validation as the entry-fee endpoint): sending `entryFee` confirms the fee in the same
+  transaction (`entryFeeConfiguredAt` set; 0 is free). `entryFee > 0` without all three bank fields
+  returns `422 LEAGUE_PAYMENT_INSTRUCTIONS_REQUIRED`. Omitting it leaves the fee unconfigured.
 
 The service then verifies that the region exists, is active, and has level 2.
 An unknown, inactive, or non-district identifier returns `422

@@ -2116,13 +2116,14 @@ describe('대진 날짜 — 달력에서 고른 값이 그대로 나간다', () 
  * 말한다 — 같은 실수가 신청 관리 화면에도 있었다(#1028 리뷰 2회).
  */
 describe('참가 신청 요약 카드', () => {
-  function renderWith(registrationOpen: boolean, registrationDeadlineAt: string | null) {
+  function renderWith(lifecycleStatus: string, registrationOpen: boolean, registrationDeadlineAt: string | null) {
     useV1AdminLeagueMatchMock.mockReturnValue({
       data: {
         leagueId: 'league-1',
         isPublic: true,
         title: '가을 풋살 리그',
-        state: 'active',
+        state: lifecycleStatus === 'in_progress' ? 'active' : 'draft',
+        lifecycleStatus,
         teamIds: ['t1', 't2'],
         startsOn: '2026-09-01T00:00:00.000Z',
         recentVenues: [],
@@ -2139,19 +2140,17 @@ describe('참가 신청 요약 카드', () => {
     );
   }
 
-  it('마감이 있고 열려 있으면 언제까지 받는지 말한다', async () => {
-    // 2026-09-04 사용자 확정 이후 판정자는 마감 하나다 — "열려 있는데 마감이 없는" 상태는
-    // 더는 성립하지 않는다(정본 §6: 안 정하면 안 받는다). 앞선 PR 에서 내가 반대로 적었다.
-    renderWith(true, '2026-09-30T02:00:00.000Z');
-    expect(await screen.findByText('모집 중')).toBeInTheDocument();
+  it('접수 중이면 언제까지 받는지 말한다', async () => {
+    renderWith('open', true, '2026-09-30T02:00:00.000Z');
+    expect(await screen.findByText('신청 받는 중')).toBeInTheDocument();
     expect(screen.getByText(/까지 신청을 받아요\./)).toBeInTheDocument();
-    expect(screen.queryByText(/신청 마감을 정하면/)).not.toBeInTheDocument();
   });
 
-  it('안 받는 중이면 마감을 정하라고 안내한다', async () => {
-    renderWith(false, null);
+  // 2026-10-27: 신청은 대회처럼 '접수 시작하기'가 연다 — 마감을 정하라는 안내 대신 상태가 닫힌 이유를 말한다.
+  it('초안이면 접수 시작하기를 안내한다', async () => {
+    renderWith('draft', false, null);
     expect(await screen.findByText('신청 안 받는 중')).toBeInTheDocument();
-    expect(screen.getByText('신청 마감을 정하면 팀장이 리그 화면에서 바로 신청할 수 있어요.')).toBeInTheDocument();
+    expect(screen.getByText("아직 접수를 시작하지 않았어요. 리그 위의 '접수 시작하기'를 누르면 신청을 받아요.")).toBeInTheDocument();
   });
 });
 

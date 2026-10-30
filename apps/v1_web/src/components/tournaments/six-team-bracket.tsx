@@ -3,6 +3,11 @@ import Link from 'next/link';
 import type { V1SixTeamBracket, V1TournamentFixture } from '@/types/api';
 import { SectionTitle } from '@/components/v1-ui/primitives';
 import { MatchCard } from './tournament-bracket';
+import { SixTeamBracketLayout, SixTeamBye, type SixTeamStageKey } from './six-team-bracket-layout';
+
+const STAGE_KEYS: Readonly<Record<string, SixTeamStageKey>> = {
+  quarter: 'quarter', '6강': 'quarter', semi: 'semi', '준결승': 'semi', final: 'final', '결승': 'final',
+};
 
 export function SixTeamBracket({
   state,
@@ -47,17 +52,27 @@ export function SixTeamBracket({
           : final.awayRegistrationId
         : null
       : null);
+  const renderLaterMatch = (index: 3 | 4) => {
+    const row = rounds[index];
+    if (!row) return <p role="alert">경기 정보를 불러오지 못했어요.</p>;
+    const home = index === 3 ? '6강 승리팀 중 선정' : state.swapFinal ? '준결승 승리팀' : '결승 직행팀';
+    const away = index === 3 ? '6강 승리팀 중 선정' : state.swapFinal ? '결승 직행팀' : '준결승 승리팀';
+    return <SixTeamMatch tournamentId={tournamentId} fixture={{
+      ...row,
+      homeTeamName: row.homeTeamName === 'TBD' ? home : row.homeTeamName,
+      awayTeamName: row.awayTeamName === 'TBD' ? away : row.awayTeamName,
+    }} />;
+  };
   return (
     <div className="space-y-6" aria-label="6강 전용 대진표">
       <p className="tm-text-label text-[var(--text-muted)]">
         6강 토너먼트 · 총 5경기
       </p>
-      {(!selectedRoundKey || selectedRoundKey === 'quarter' || selectedRoundKey === '6강') && <>
-      <section aria-label={stageLabels.quarter ?? '6강'} className="space-y-3">
-        <div role="heading" aria-level={4}>
-          <SectionTitle title={`${stageLabels.quarter ?? '6강'} · 3경기`} />
-        </div>
-        <div className="grid gap-3 xl:grid-cols-3">
+      <SixTeamBracketLayout
+        selectedStage={selectedRoundKey ? STAGE_KEYS[selectedRoundKey] : undefined}
+        labels={stageLabels}
+        swapFinal={state.swapFinal}
+        first={<div className="flex flex-col gap-4">
           {rounds
             .slice(0, 3)
             .map((row, i) =>
@@ -76,8 +91,12 @@ export function SixTeamBracket({
                 <p key={i}>경기 정보를 불러오지 못했어요.</p>
               )
             )}
-        </div>
-      </section>
+        </div>}
+        semifinal={renderLaterMatch(3)}
+        bye={<SixTeamBye name={teamName(state.bye)} pending={!state.bye} />}
+        final={renderLaterMatch(4)}
+      />
+      {(!selectedRoundKey || ['quarter', '6강', 'semi', '준결승'].includes(selectedRoundKey)) && (
       <section
         aria-label="결승 직행 선정"
         className="space-y-3 border-y border-[var(--border)] py-4"
@@ -173,65 +192,7 @@ export function SixTeamBracket({
           </div>
         </details>
       </section>
-      </>}
-      <div className={`grid gap-6${!selectedRoundKey ? ' xl:grid-cols-2' : ''}`}>
-        {[
-          {
-            index: 3,
-            key: 'semi',
-            label: stageLabels.semi ?? '준결승',
-            home: '6강 승리팀 중 선정',
-            away: '6강 승리팀 중 선정',
-          },
-          {
-            index: 4,
-            key: 'final',
-            label: stageLabels.final ?? '결승',
-            home: '결승 직행팀',
-            away: '준결승 승리팀',
-          },
-        ].filter((stage) => !selectedRoundKey || selectedRoundKey === stage.key || selectedRoundKey === (stage.index === 3 ? '준결승' : '결승')).map((stage) => {
-          const row = rounds[stage.index];
-          return (
-            <section
-              key={stage.index}
-              aria-label={stage.label}
-              className="space-y-3"
-            >
-              <div role="heading" aria-level={4}>
-                <SectionTitle title={`${stage.label} · 1경기`} />
-              </div>
-              {stage.index === 4 && (
-                <p className="tm-text-caption text-[var(--text-muted)]">
-                  결승 직행팀 대 준결승 승리팀
-                </p>
-              )}
-              {row ? (
-                <SixTeamMatch
-                  tournamentId={tournamentId}
-                  fixture={{
-                    ...row,
-                    homeTeamName:
-                      row.homeTeamName === 'TBD'
-                        ? stage.index === 4 && state.swapFinal
-                          ? stage.away
-                          : stage.home
-                        : row.homeTeamName,
-                    awayTeamName:
-                      row.awayTeamName === 'TBD'
-                        ? stage.index === 4 && state.swapFinal
-                          ? stage.home
-                          : stage.away
-                        : row.awayTeamName,
-                  }}
-                />
-              ) : (
-                <p>경기 정보를 불러오지 못했어요.</p>
-              )}
-            </section>
-          );
-        })}
-      </div>
+      )}
       {(!selectedRoundKey || selectedRoundKey === 'final' || selectedRoundKey === '결승') && final?.status === 'completed' && (
         <p className="tm-text-body-lg font-bold">
           우승 · {championId ? teamName(championId) : '공식 결과 확인 대기'}

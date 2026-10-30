@@ -50,3 +50,24 @@
 
 - 화면의 “레이아웃 이상”은 CSS 간격뿐 아니라 공개 픽스처 단계 정렬 오류를 포함하는 것으로 판정한다.
 - 모바일은 데스크톱 브래킷을 축소하지 않고 단계 순서를 유지하는 수평 대진 뷰를 사용한다.
+
+
+## Connector symmetry follow-up (2026-10-29)
+Status: In Progress - alpha visual QA pending.
+
+- Context / Goal: screenshot shows staggered elbows and footer-biased centres. Use a shared 50% elbow and team-area centres for placement and outputs.
+- Original conditions / Acceptance: user explicitly selected this geometry correction; retain time/PK, teams, BYE order and saved advancement links.
+- Owned: tournament-bracket.tsx, tournament-bracket-graph.ts and test, this task and scoped changeset. Forbidden: API and shared dirty root files.
+- User scenario: view knockout branches from BYE through final/champion without label/footer height shifting their centres.
+- Test scenarios: common elbow, footer-independent centre, BYE centre, existing graph/render regressions.
+- Parallel work: none; isolated origin/dev worktree, sequential implementation and checks.
+- Tech debt resolved: HOME 40% / AWAY 60% elbows and mixed wrapper/card/team centres.
+- Security: geometry only; no API/auth/data changes.
+- Risks / Dependencies: alpha 390/768/1440 screenshots and console/network review required after deployment; browser startup previously fails.
+- Ambiguity log: explicit user-selected geometry correction; no new screen design or advancement semantics.
+- Progress Snapshot: source diagnosis confirmed, implementation prepared, verification pending. No commit/deployment.
+
+- Verification: PASS, 10 assertions executed against actual graph TypeScript source via Node native type stripping: shared elbow, three footer heights, BYE centre, recursive parent centres, edge count. This is geometry-only evidence, not DOM/visual QA.
+- Vitest: BLOCKED, runner unavailable in isolated worktree (vitest command not found). Existing root dependencies also lack usable Windows runner. No dependency installation performed.
+- git diff --check: PASS; touched-source debt-marker grep: no matches. Scope reviewed: 3 source/test files, task and changeset only. No new imports of untracked dependencies.
+- Remaining: Vitest/render suite, typecheck and alpha visual QA (390/768/1440, console/network). Not PR-ready or visually verified. Changes remain uncommitted on fix/bracket-connector-symmetry.

@@ -33,7 +33,7 @@ describe('MD-QA #145 review follow-up public capacity', () => {
         seriesId: 'series-1', tier: 1, seasonNo: 1, series: { title: '연속 리그' },
       });
       prisma.v1Tournament.findMany.mockResolvedValue([{
-        id: 'next-league-1', title: '다음 회차', tier: 1, seasonNo: 2, status: 'draft',
+        id: 'next-league-1', title: '다음 회차', tier: 1, seasonNo: 2, status: 'open',
         registrationDeadlineAt: new Date('2098-01-01T00:00:00.000Z'),
         scheduledAt: new Date('2098-02-01T00:00:00.000Z'), scheduledEndAt: new Date('2098-12-01T00:00:00.000Z'),
         kind: 'regular_league', teamCount: 8, maxTeams, _count: { registrations: reservedCount },
@@ -63,11 +63,13 @@ describe('MD-QA #145 review follow-up public capacity', () => {
   });
 
   it.each([
-    ['draft', 3, 3, 0, false],
+    ['open', 3, 3, 0, false],
     ['open', 3, 2, 1, false],
     ['in_progress', 3, 2, 1, false],
-    ['draft', 3, 2, 0, true],
-    ['draft', null, 10, 5, true],
+    ['open', 3, 2, 0, true],
+    ['open', null, 10, 5, true],
+    // 접수를 시작하지 않은 초안은 정원이 남아도 받지 않는다(2026-10-27, 대회와 같은 규칙).
+    ['draft', null, 0, 0, false],
   ] as const)('detail %s maxTeams=%s confirmed=%s pending=%s exposes registrationOpen=%s to the public join guide', async (
     status, maxTeams, confirmedCount, pendingPaymentCount, registrationOpen,
   ) => {

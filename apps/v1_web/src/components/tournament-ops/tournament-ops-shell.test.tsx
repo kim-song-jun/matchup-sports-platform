@@ -11,6 +11,19 @@ beforeEach(() => {
 });
 
 describe('TournamentOpsShell 복귀 경로 (T6-2)', () => {
+  it.each(['PLATFORM_OPS', 'TOURNAMENT_DIRECTOR'] as const)('담당 경기에서 온 %s도 담당 경기 목록으로 돌아간다', (role) => {
+    pathnameMock.value = '/tournament-ops/tournaments/t-1/fixtures/fx-1/operate';
+    render(<TournamentOpsShell tournamentId="t-1" role={role} origin="staff"><div>content</div></TournamentOpsShell>);
+    expect(screen.getByRole('link', { name: '담당 경기 목록으로 돌아가기' })).toHaveAttribute('href', '/my/tournament-staff/t-1');
+    expect(screen.queryByRole('link', { name: '서비스로 돌아가기' })).not.toBeInTheDocument();
+  });
+
+  it('어드민 경기 콘솔에서는 운영 경기 목록으로 돌아간다', () => {
+    pathnameMock.value = '/admin/live/t-1/fixtures/fx-1/operate';
+    render(<TournamentOpsShell tournamentId="t-1" role="PLATFORM_OPS" origin="admin"><div>content</div></TournamentOpsShell>);
+    expect(screen.getByRole('link', { name: '경기 목록으로 돌아가기' })).toHaveAttribute('href', '/admin/live/t-1/operations');
+  });
+
   it('origin="admin" → "대회 관리로 돌아가기" → /admin/tournaments/:id', () => {
     render(
       <TournamentOpsShell tournamentId="t-1" role="PLATFORM_OPS" origin="admin" tournamentKind="regular_tournament">

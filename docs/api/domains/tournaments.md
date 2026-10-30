@@ -245,7 +245,7 @@ the web explicitly requests `all` for its default tab.
 | `format` | league/knockout/group_knockout; format is not competition kind |
 | `feeMin`, `feeMax` | integer KRW, inclusive 0–2147483647; max=0 selects free |
 | `dateFrom`, `dateTo` | real calendar date YYYY-MM-DD, inclusive Asia/Seoul day boundaries; period overlap; undated rows excluded |
-| `sort` | latest (createdAt desc), deadline (deadline asc), scheduled (start asc); nulls last, id byte-order asc ties; absent sort retains the existing lifecycle-group ordering |
+| `sort` | latest (createdAt desc), deadline (deadline asc), scheduled (start asc; excludes completed/cancelled rows and rows whose `scheduledEndAt ?? scheduledAt` is before today's Asia/Seoul day start, keeps `in_progress` and undated rows; an explicit `phase=completed`/`status=completed` skips this exclusion); nulls last, id byte-order asc ties; absent sort retains the existing lifecycle-group ordering |
 | `withTotal` | literal string true adds actual total to cursor pageInfo; numbered pages already include total |
 
 `deadline` also enforces registration=open. Tournament admission requires status=open,
@@ -502,7 +502,7 @@ The list (`GET /api/v1/tournaments`) and detail (`GET /api/v1/tournaments/:tourn
 | `POST` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/cancel-request` | user, team manager+ | `CancelRegistrationRequestDto` | `draft` becomes `cancelled`; active statuses become `cancel_requested` |
 | `POST` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/cancel-request/withdraw` | user, team manager+ | empty body | `cancel_requested` returns to its saved previous status |
 
-일반 대회와 정규 리그는 이 신청 경로를 공유한다. 운영자 신청 관리도 같은 등록을 다룬다:
+일반 대회와 정규 리그는 이 신청 경로를 공유한다. 신청은 둘 다 상태가 `open`(접수 중)이고 마감 전일 때만 받는다(2026-10-27 — 리그도 마감 시각만으로 열리지 않는다). 아니면 `409 TOURNAMENT_NOT_OPEN`, 마감이 지났으면 `409 REGISTRATION_DEADLINE_PASSED`이고 판정은 `src/tournaments/registration-window.ts` 하나다. 운영자 신청 관리도 같은 등록을 다룬다:
 
 | Method | Path | Auth | Request | Response |
 |---|---|---|---|---|

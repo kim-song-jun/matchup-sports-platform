@@ -34,7 +34,7 @@ import {
 import { LEAGUE_TIE_BREAK_ORDER } from './league-tie-break';
 import type { LeagueState } from './league-state';
 import { findPublicTournamentOnSurface } from '../tournaments/tournament-surface-lookup';
-import { isLeagueRegistrationOpen } from './league-registration-open';
+import { isRegistrationWindowOpen } from '../tournaments/registration-window';
 import { TOURNAMENT_VENUE_SELECT, tournamentVenueSnapshot } from '../places/tournament-venue';
 import { CAPACITY_HOLD_STATUSES, countPendingCapacityReservations, isCapacityFull } from '../tournaments/registration-capacity';
 
@@ -507,7 +507,7 @@ export class LeagueMatchPublicService {
             rows.map(({ status, _count, kind, teamCount, maxTeams, ...rest }) => ({
               ...rest,
               state: LEAGUE_STATE_BY_STATUS[status],
-              registrationOpen: isLeagueRegistrationOpen(status, rest.registrationDeadlineAt)
+              registrationOpen: isRegistrationWindowOpen(status, rest.registrationDeadlineAt)
                 && !isCapacityFull({ kind, teamCount, maxTeams }, _count.registrations),
             })),
           );
@@ -864,9 +864,8 @@ export class LeagueMatchPublicService {
       teams: registrations,
       registrationDeadlineAt,
       // 내부 모집 창 판정이다. 공개 상세는 확정·결제 대기 점유를 더해 정원도 함께 검사한다.
-      // 마감 미도과·미종료 조건은 등록 서비스와 같은 규칙으로 유지한다.
-      // 마감이 `null` 이면 신청을 받지 않는다(league-registration-open.ts와 같은 규칙).
-      registrationOpen: isLeagueRegistrationOpen(status, registrationDeadlineAt),
+      // 접수 중·마감 전 조건은 등록 서비스와 같은 함수(registration-window.ts)를 쓴다.
+      registrationOpen: isRegistrationWindowOpen(status, registrationDeadlineAt),
     };
   }
 }

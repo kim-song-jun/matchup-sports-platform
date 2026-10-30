@@ -134,16 +134,11 @@ describe('리그 참가 신청 — 대회 스택 재사용', () => {
     ]);
   });
 
-  it('openRegistration 은 마감만 놓는다 — status 는 건드리지 않는다', async () => {
-    // **2026-09-04 사용자 확정으로 계약이 바뀐 자리다.** 예전엔 이 호출이 거울을 `open` 으로
-    // 올렸고, 이 테스트는 그걸 단언해 **옛 계약을 박아 두고 있었다.** 그 결합 때문에
-    // `generateFixtures` 로 `in_progress` 가 된 리그는 신청을 영영 못 열었다(alpha 실측
-    // 409 `LEAGUE_NOT_DRAFT`). 이제 신청 여부의 판정자는 `registrationDeadlineAt` 하나이고
-    // `status` 는 수명주기 표시 전용이다.
-    const before = await prisma.v1Tournament.findUnique({
-      where: { id: leagueId },
-      select: { status: true },
-    });
+  it('새 리그는 초안이고 openRegistration 이 대회처럼 status 를 open 으로 올린다', async () => {
+    // 2026-10-27 사용자 확정: 리그 신청도 대회와 같이 '접수 중(open)'일 때만 받는다.
+    const before = await prisma.v1Tournament.findUnique({ where: { id: leagueId }, select: { status: true } });
+    expect(before?.status).toBe('draft');
+
     const deadline = new Date(Date.now() + 7 * 86_400_000);
     const result = await makeAdminService().openRegistration(auth, leagueId, {
       registrationDeadlineAt: deadline.toISOString(),
@@ -153,54 +148,34 @@ describe('리그 참가 신청 — 대회 스택 재사용', () => {
       where: { id: leagueId },
       select: { status: true, registrationDeadlineAt: true, kind: true, teamCount: true },
     });
+    expect(mirror).toMatchObject({ status: 'open', kind: 'regular_league' });
     expect(mirror?.registrationDeadlineAt?.toISOString()).toBe(deadline.toISOString());
-    expect(mirror?.kind).toBe('regular_league');
-    // **status 불변** — 값을 하드코딩하지 않고 호출 전 값과 대조한다. 무엇이든 간에
-    // 이 호출이 바꾸지 않는다는 것이 계약이다.
-    expect(mirror?.status).toBe(before?.status);
-
-    // 응답도 status 를 말하지 않는다. `status: 'open'` 을 실으면 소비자가 그것을 리그
-    // 상태로 읽는데, 서버는 그 값을 저장한 적이 없다.
-    expect(result).toMatchObject({
+    expect(result).toEqual({
       leagueId,
+      lifecycleStatus: 'open',
       registrationOpen: true,
       registrationDeadlineAt: deadline.toISOString(),
     });
-    expect(result).not.toHaveProperty('status');
-
-    // 거울의 teamCount 는 아무도 정한 적 없는 기본값이다 — 다음 케이스가 이걸 정원으로
-    // 쓰지 않는다는 것을 증명한다.
+    // 거울의 teamCount 는 아무도 정한 적 없는 기본값이다 — 뒤 케이스가 이걸 정원으로 쓰지 않는다는 것을 증명한다.
     expect(mirror?.teamCount).toBe(8);
   });
 
-  it('대진이 생겨 in_progress 가 된 리그도 신청을 다시 열 수 있다 — 이 PR 이 고친 결함', async () => {
-    // 예전 가드(`status !== 'draft' && status !== 'open'` → 409 `LEAGUE_NOT_DRAFT`)가
-    // 막던 바로 그 상태다. 정본 §6 은 **대진 생성이 신청 상태를 건드리지 않는다**고 확정했다.
-    await prisma.v1Tournament.update({
-      where: { id: leagueId },
-      data: { status: 'in_progress' },
-    });
-    const deadline = new Date(Date.now() + 14 * 86_400_000);
-    await expect(
-      makeAdminService().openRegistration(auth, leagueId, {
-        registrationDeadlineAt: deadline.toISOString(),
-      }),
-    ).resolves.toMatchObject({ registrationOpen: true });
-
-    const mirror = await prisma.v1Tournament.findUnique({
-      where: { id: leagueId },
-      select: { status: true, registrationDeadlineAt: true },
-    });
-    // 여기서도 status 는 그대로 `in_progress` 다 — 신청을 열었다고 진행중 리그가 초안으로
-    // 돌아가면 순위·대진 화면이 통째로 뒤집힌다.
-    expect(mirror?.status).toBe('in_progress');
-    expect(mirror?.registrationDeadlineAt?.toISOString()).toBe(deadline.toISOString());
-
+  it('시작한 리그와 보류 중인 리그는 신청을 열 수 없다 — 상태는 그대로다', async () => {
+    for (const [status, code] of [['in_progress', 'LEAGUE_REGISTRATION_NOT_ALLOWED'], ['on_hold', 'LEAGUE_ON_HOLD']] as const) {
+      await prisma.v1Tournament.update({ where: { id: leagueId }, data: { status } });
+      await expect(
+        makeAdminService().openRegistration(auth, leagueId, {
+          registrationDeadlineAt: new Date(Date.now() + 14 * 86_400_000).toISOString(),
+        }),
+      ).rejects.toMatchObject({ response: { code } });
+      const mirror = await prisma.v1Tournament.findUnique({ where: { id: leagueId }, select: { status: true } });
+      expect(mirror?.status).toBe(status);
+    }
     // 뒤 케이스들이 기대하는 상태로 돌려놓는다.
-    await prisma.v1Tournament.update({ where: { id: leagueId }, data: { status: 'draft' } });
+    await prisma.v1Tournament.update({ where: { id: leagueId }, data: { status: 'open' } });
   });
 
-  it('끝난 리그는 신청을 열 수 없다 — 되돌릴 수 없는 상태만 막는다', async () => {
+  it('끝난 리그는 신청을 열 수 없다', async () => {
     await prisma.v1Tournament.update({
       where: { id: leagueId },
       data: { status: 'completed' },
@@ -210,7 +185,7 @@ describe('리그 참가 신청 — 대회 스택 재사용', () => {
         registrationDeadlineAt: new Date(Date.now() + 7 * 86_400_000).toISOString(),
       }),
     ).rejects.toMatchObject({ response: { code: 'LEAGUE_REGISTRATION_NOT_ALLOWED' } });
-    await prisma.v1Tournament.update({ where: { id: leagueId }, data: { status: 'draft' } });
+    await prisma.v1Tournament.update({ where: { id: leagueId }, data: { status: 'open' } });
   });
 
   it('지난 마감으로는 열 수 없다 — 열자마자 닫힌 리그를 만들지 않는다', async () => {
@@ -414,4 +389,32 @@ describe('리그 참가 신청 — 대회 스택 재사용', () => {
     expect(others.every((item) => item.rosterAutoConfirmedAt === null)).toBe(true);
   });
 
+  it('팀 없이도 리그를 만들 수 있고 신청 설정(마감·참가비·계좌)이 같은 트랜잭션에 저장된다', async () => {
+    const deadline = new Date(Date.now() + 10 * 86_400_000);
+    const created = await makeAdminService().create(auth, {
+      title: '신청으로만 모으는 리그',
+      sportId: ids.sportId,
+      regionId: ids.regionId,
+      startsOn: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+      endsOn: new Date(Date.now() + 60 * 86_400_000).toISOString(),
+      teamIds: [],
+      registrationDeadlineAt: deadline.toISOString(),
+      entryFee: 30000,
+      bankName: '국민은행',
+      bankAccount: '000-00-0000',
+      bankHolder: '팀밋',
+    } as never);
+    try {
+      const row = await prisma.v1Tournament.findUnique({
+        where: { id: created.leagueId },
+        select: { status: true, registrationDeadlineAt: true, entryFee: true, entryFeeConfiguredAt: true, bankName: true },
+      });
+      expect(row).toMatchObject({ status: 'draft', entryFee: 30000, bankName: '국민은행' });
+      expect(row?.registrationDeadlineAt?.toISOString()).toBe(deadline.toISOString());
+      expect(row?.entryFeeConfiguredAt).not.toBeNull();
+      await expect(prisma.v1TournamentRegistration.count({ where: { tournamentId: created.leagueId } })).resolves.toBe(0);
+    } finally {
+      await prisma.v1Tournament.deleteMany({ where: { id: created.leagueId } });
+    }
+  });
 });

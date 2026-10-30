@@ -1,5 +1,6 @@
 import { Transform, Type } from 'class-transformer';
-import { ArrayNotEmpty, IsArray, IsBoolean, IsDateString, IsDefined, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateIf, ValidateNested } from 'class-validator';
+import { ArrayNotEmpty, IsArray, IsBoolean, IsDateString, IsDefined, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, MinLength, ValidateIf, ValidateNested } from 'class-validator';
+import { BANK_FIELD_PATTERN, rawValue, trimmedString } from './league-entry-fee.dto';
 import { IsPlaceLatitude, IsPlaceLongitude, IsPlaceProvider, IsPlaceProviderId } from '../../places/place-snapshot';
 
 /** 경기 장소 스냅샷 입력(이름은 각 DTO 의 `placeName`). 규칙은 `places/place-snapshot.ts` 가 소유한다. */
@@ -51,11 +52,8 @@ export class CreateLeagueMatchDto {
   @IsDateString()
   endsOn!: string;
 
-  // 카디널리티 규칙("서로 다른 팀 2개 이상")은 여기 붙이지 않는다 — @ArrayMinSize를 붙이면
-  // teamIds가 1개인 요청이 ValidationPipe 단계에서 400 VALIDATION_ERROR로 먼저 걸려버려서
-  // 서비스가 절대 422 LEAGUE_TEAM_INVALID를 낼 기회를 못 가진다(dedup 후 1개가 되는 케이스도
-  // 마찬가지 — DTO는 원소 개수만 보고 dedup을 모른다). "형식"은 여기서, "도메인 규칙"은
-  // LeagueMatchAdminService.create()가 유일하게 소유한다.
+  // 운영자가 직접 넣는 팀. 비워 두고 참가 신청으로만 모아도 된다(2026-10-27 사용자 확정) —
+  // 대진을 만들 때 2팀 이상인지는 대진 생성이 따로 검사한다.
   @IsArray()
   @IsUUID('4', { each: true })
   teamIds!: string[];
@@ -88,6 +86,43 @@ export class CreateLeagueMatchDto {
   @Min(1)
   @Max(500)
   plannedFixtureCount?: number;
+
+  /** 신청 마감(ISO 8601). 생략·null 이면 마감 없이 '접수 마감하기'를 누를 때까지 받는다. 과거 시각은 거부한다. */
+  @IsOptional()
+  @IsDateString()
+  registrationDeadlineAt?: string | null;
+
+  /** 팀당 참가비. 보내면 참가비를 확정한 것으로 본다(0원 = 무료 확정). 0원 초과면 계좌 세 칸이 필수다. */
+  @IsOptional()
+  @Transform(rawValue)
+  @IsInt({ message: '참가비는 정수여야 해요.' })
+  @Min(0, { message: '참가비는 0원 이상이어야 해요.' })
+  @Max(100_000_000, { message: '참가비는 1억 원을 넘을 수 없어요.' })
+  entryFee?: number;
+
+  @IsOptional()
+  @Transform(trimmedString)
+  @IsString()
+  @MinLength(1)
+  @MaxLength(60)
+  @Matches(BANK_FIELD_PATTERN)
+  bankName?: string;
+
+  @IsOptional()
+  @Transform(trimmedString)
+  @IsString()
+  @MinLength(1)
+  @MaxLength(60)
+  @Matches(BANK_FIELD_PATTERN)
+  bankAccount?: string;
+
+  @IsOptional()
+  @Transform(trimmedString)
+  @IsString()
+  @MinLength(1)
+  @MaxLength(60)
+  @Matches(BANK_FIELD_PATTERN)
+  bankHolder?: string;
 }
 
 /** 리그 상태 변경 — 상태 변경 버튼 하나가 보류·해제·종료·되돌리기·시작을 모두 이 요청으로 보낸다. */
@@ -250,16 +285,17 @@ export class DeleteLeagueFixtureDto {
 // R6: 결과 정정 등으로 completed -> active 역전이할 때, 왜 되돌렸는지 감사 로그에
 // 남기기 위한 선택 필드. 본문 없이 보내도(빈 객체) 유효하다.
 /**
- * 참가 신청을 여는 운영자 액션의 body (D7).
- *
- * 리그 상태는 draft·active·on_hold·completed 4개다. 신청 열기는 저장 status를 바꾸지 않고
- * 명시적 마감 시각을 설정한다. 시작 전 리그는 모집완료로 표시하며, 실제 신청 가능 여부는
- * registrationOpen과 마감·정원으로 별도 안내한다. 신청 열기는 리그 시작이 아니다.
+ * '접수 시작하기' body — 대회처럼 저장 status 를 `open`(접수 중)으로 바꾼다(2026-10-27).
+ * 시작 전 리그(초안·마감)에서만 열 수 있고, 리그 시작이 아니다.
  */
 export class OpenLeagueRegistrationDto {
-  /** 신청 마감 시각(ISO 8601). 과거면 거부한다 — 열자마자 닫힌 리그를 만들지 않는다. */
+  /**
+   * 신청 마감(ISO 8601). 생략하면 지금 마감을 그대로 두고, null 이면 마감 없이 '접수 마감하기'까지
+   * 받는다. 과거 시각은 거부한다 — 열자마자 닫힌 리그를 만들지 않는다.
+   */
+  @IsOptional()
   @IsDateString()
-  registrationDeadlineAt!: string;
+  registrationDeadlineAt?: string | null;
 }
 
 export class RevertLeagueCompletionDto {

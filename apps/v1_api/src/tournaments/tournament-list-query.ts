@@ -4,20 +4,24 @@ import type { TournamentListQueryDto } from './dto/tournament-read.dto';
 import { COMPETITION_LIST_SURFACE } from './tournament-surface';
 import { PUBLIC_TOURNAMENT_STATUSES } from './tournaments-read.query';
 import { CAPACITY_HOLD_STATUSES } from './registration-capacity';
+import { kstDayRange } from '../common/pagination/list-facets';
 
 /**
  * Default public list order, evaluated by the database:
  * in progress -> recruiting (eligible open or regular-league draft) -> recruitment closed -> finished.
  * "Recruitment closed" is the status the card shows: a stored `closed`, or a recruiting row
- * whose applicable deadline has passed or whose capacity is full (the web's
+ * whose deadline has passed or whose capacity is full (the web's
  * `resolveTournamentRegistrationBlock`; leagues use optional maxTeams independently of roster size).
  * Within the first three groups the earliest start comes first; the finished group is most recently
  * ended first (falling back to the start date). Rows without a date sort last in their group, and
  * `id` (byte order) breaks ties. This file is the single source of that order.
  */
-/** A recruiting row the card renders as "모집 마감". `registration_deadline_at` is UTC, so compare in UTC. */
+/**
+ * A recruiting row the card renders as "모집 마감". `registration_deadline_at` is UTC, so compare in UTC.
+ * Only an open row is closed by its deadline (`registration-window.ts`); a league draft is not recruiting yet.
+ */
 const RECRUITMENT_BLOCKED_SQL = Prisma.sql`(
-  (t.kind::text IS DISTINCT FROM 'regular_league' AND t.registration_deadline_at < (now() AT TIME ZONE 'UTC'))
+  (t.status::text = 'open' AND t.registration_deadline_at < (now() AT TIME ZONE 'UTC'))
   OR (SELECT COUNT(*) FROM v1_tournament_registrations r
         WHERE r.tournament_id = t.id AND r.status::text IN (${Prisma.join([...CAPACITY_HOLD_STATUSES])}))
       >= CASE WHEN t.kind::text = 'regular_league' THEN t.max_teams ELSE t.team_count END
@@ -62,11 +66,10 @@ function buildFilterSql(query: TournamentListQueryDto): Prisma.Sql {
   }
   const registration = query.sort === 'deadline' ? 'open' : query.registration;
   if (registration) {
+    // Same rule as `registration-window.ts` for both kinds: operator opened (`open`) and not past the deadline.
     const accepting = Prisma.sql`(
-      (t.kind::text = 'regular_league' AND t.status::text NOT IN ('completed', 'cancelled', 'on_hold')
-        AND t.registration_deadline_at >= (now() AT TIME ZONE 'UTC'))
-      OR ((t.kind IS NULL OR t.kind::text = 'regular_tournament') AND t.status::text = 'open'
-        AND (t.registration_deadline_at IS NULL OR t.registration_deadline_at >= (now() AT TIME ZONE 'UTC')))
+      t.status::text = 'open'
+        AND (t.registration_deadline_at IS NULL OR t.registration_deadline_at >= (now() AT TIME ZONE 'UTC'))
     ) AND (
       (t.kind::text = 'regular_league' AND t.max_teams IS NULL)
       OR (SELECT COUNT(*) FROM v1_tournament_registrations r WHERE r.tournament_id = t.id
@@ -86,6 +89,16 @@ function buildFilterSql(query: TournamentListQueryDto): Prisma.Sql {
   if (query.dateFrom || query.dateTo) conditions.push(Prisma.sql`t.scheduled_at IS NOT NULL`);
   if (query.dateFrom) conditions.push(Prisma.sql`COALESCE(t.scheduled_end_at, t.scheduled_at) >= ${new Date(`${query.dateFrom}T00:00:00+09:00`)}`);
   if (query.dateTo) conditions.push(Prisma.sql`t.scheduled_at <= ${new Date(`${query.dateTo}T23:59:59.999+09:00`)}`);
+  // 개최 가까운 순은 일정이 끝난 대회를 뺀다 — 시작일 오름차순이라 지난 대회가 앞을 채웠다(2026-10-29 사용자 확정).
+  // 진행 중(상태)·오늘(KST) 열리는 대회·날짜 미정은 남긴다. 종료 일시를 비운 하루 대회가 시작하자마자
+  // 빠지지 않게 일 단위로 비교한다(`dateFrom` 과 같은 KST 하루 경계). '종료'를 직접 고르면 빼지 않는다 —
+  // 빼면 그 조합은 늘 빈 목록이다.
+  const completedRequested = query.phase === 'completed' || query.status === 'completed';
+  if (query.sort === 'scheduled' && !completedRequested) {
+    conditions.push(Prisma.sql`t.status::text NOT IN ('completed', 'cancelled')
+      AND (t.scheduled_at IS NULL OR t.status::text = 'in_progress'
+        OR COALESCE(t.scheduled_end_at, t.scheduled_at) >= ${kstDayRange(new Date()).gte})`);
+  }
   return Prisma.join(conditions, ' AND ');
 }
 

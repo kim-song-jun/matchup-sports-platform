@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { PreResultMatchPhase } from '@/lib/competition-status';
-import { leagueStateLabel, matchPhaseLabel, type LeagueStateKey } from '@/lib/v1-status-labels';
+import { leagueLifecycleLabel, leagueStateLabel, matchPhaseLabel, type LeagueStateKey } from '@/lib/v1-status-labels';
 
 // ── Tone → classes ────────────────────────────────────────────────────────
 type Tone = 'blue' | 'green' | 'amber' | 'red' | 'gray';
@@ -261,9 +261,11 @@ export function AdminStatusPill({ status, label }: AdminStatusPillProps) {
 }
 
 /**
- * 리그 상태 알약. 모집완료·진행 중·보류·종료 공통 라벨을 쓰고, 모양은 같은
- * 사실의 대회 상태 알약을 빌린다 — 대회·리그가 한 표에 섞이는 현장 운영 목록에서 "진행 중" 리그가
- * 계정 상태 말("활성")로 읽혔다(G6-V1).
+ * 리그 상태 알약. 모양은 같은 사실의 대회 상태 알약을 빌린다 — 대회·리그가 한 표에 섞이는 현장 운영
+ * 목록에서 "진행 중" 리그가 계정 상태 말("활성")로 읽혔다(G6-V1).
+ *
+ * 저장 상태(`status`)를 주면 대회처럼 초안·접수 중·마감을 나눠 그린다(2026-10-27). 없으면 묶은
+ * 상태(`state`)로 그려 시작 전 단계는 '시작 전' 하나다.
  */
 const LEAGUE_STATE_PILL_KEY: Record<LeagueStateKey, string> = {
   draft: 'closed',
@@ -272,7 +274,11 @@ const LEAGUE_STATE_PILL_KEY: Record<LeagueStateKey, string> = {
   on_hold: 'league_on_hold',
 };
 
-export function AdminLeagueStatePill({ state }: { state: LeagueStateKey }) {
+export function AdminLeagueStatePill({ state, status }: { state: LeagueStateKey; status?: string }) {
+  if (status !== undefined) {
+    const pillKey = status === 'on_hold' ? 'league_on_hold' : status === 'cancelled' ? 'completed' : status;
+    return <AdminStatusPill status={pillKey} label={leagueLifecycleLabel(status)} />;
+  }
   return <AdminStatusPill
     status={LEAGUE_STATE_PILL_KEY[state]}
     label={leagueStateLabel(state)}

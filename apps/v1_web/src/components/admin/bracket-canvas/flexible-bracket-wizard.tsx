@@ -12,6 +12,7 @@ import { useV1ApplyBracketTemplate } from '@/hooks/use-v1-bracket-canvas';
 import { V1ApiError, v1Get, v1Post, v1Put } from '@/lib/api-client';
 import { extractErrorMessage } from '@/lib/error-message';
 import { randomUuid } from '@/lib/uuid';
+import { randomIndex } from '@/lib/random-index';
 import { distributeGroupSeeds } from '@/lib/seeded-group-assignment';
 import type { FlexibleBracketInput, FlexibleBracketPreview } from '@/types/api';
 import type { BracketTemplateDialogProps } from './bracket-template-dialog';
@@ -114,7 +115,7 @@ export function FlexibleBracketWizard(props: BracketTemplateDialogProps & { onLe
       setError('시드는 1번부터 빈 순서 없이 선택해 주세요.'); return;
     }
     const ids = teams.map((team) => team.id);
-    for (let i = ids.length - 1; i > 0; i--) { const j = draw() % (i + 1); [ids[i], ids[j]] = [ids[j], ids[i]]; }
+    for (let i = ids.length - 1; i > 0; i--) { const j = randomIndex(i + 1); [ids[i], ids[j]] = [ids[j], ids[i]]; }
     try { setAssignments(seeded ? distributeGroupSeeds(groups.map(group => group.capacity), groupSeeds.filter(Boolean), ids) : ids); mark(); }
     catch (e) { setError(extractErrorMessage(e, '시드 배정을 확인해 주세요.')); }
   }
@@ -148,7 +149,8 @@ export function FlexibleBracketWizard(props: BracketTemplateDialogProps & { onLe
   const assignmentSlots = format === 'knockout' ? Array.from({ length: validCount ? count : 0 }, (_, i) => `${i + 1}번 시드`)
     : groups.flatMap((group) => Array.from({ length: Number.isInteger(group.capacity) && group.capacity >= 2 && group.capacity <= 8 ? group.capacity : 0 }, (_, i) => `${group.name} ${i + 1}번`));
   if (!mounted || typeof document === 'undefined') return ConfirmModal;
-  return <>{ConfirmModal}{createPortal(<div className={`fixed inset-0 z-50 flex items-center justify-center p-4 tm-modal-scrim${closing ? ' is-closing' : ''}`} onClick={onBackdropClick}>
+  // 확인창 portal을 마지막에 두어 같은 modal 레이어에서 설정창 위로 올라오게 한다.
+  return <>{createPortal(<div style={{ zIndex: 'var(--z-modal)' }} className={`fixed inset-0 flex items-center justify-center p-4 tm-modal-scrim${closing ? ' is-closing' : ''}`} onClick={onBackdropClick}>
     <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={`${prefix}-title`} className="tm-modal-panel flex max-h-[calc(100dvh-32px)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-[var(--card-surface)] text-[var(--text-strong)]">
       <div className="flex shrink-0 items-center justify-between border-b border-[var(--border)] p-4">
         <h2 id={`${prefix}-title`} className="tm-text-body-lg font-bold">전체 대진 만들기</h2>
@@ -222,7 +224,7 @@ export function FlexibleBracketWizard(props: BracketTemplateDialogProps & { onLe
         </div>
       </div>
     </div>
-  </div>, document.body)}</>;
+  </div>, document.body)}{ConfirmModal}</>;
 }
 
 function BracketPlanReview({ plan, input, teams }: { plan: FlexibleBracketPreview; input: FlexibleBracketInput; teams: { id: string; teamName?: string | null }[] }) {

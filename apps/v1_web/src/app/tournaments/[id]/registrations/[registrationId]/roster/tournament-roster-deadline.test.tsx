@@ -165,13 +165,13 @@ describe('TournamentRosterDeadlineCard', () => {
 
   // F98: 정규 리그에는 신청 마감이 없다. 예전엔 그 자리가 항상 "일정 미정 · 일정 미정" 이었다.
   describe('정규 리그(season)', () => {
-    it.each(['draft', 'open', 'closed'] as const)('%s 리그 명단 카드도 모집완료를 표시한다', (status) => {
+    // 2026-10-27: 리그 상태 이름도 대회처럼 나눈다.
+    it.each([['draft', '준비 중'], ['open', '모집 중'], ['closed', '마감']] as const)('%s 리그 명단 카드는 %s를 표시한다', (status, label) => {
       render(<TournamentRosterDeadlineCard deadlineAt={null}
         season={{ startAt: null, endAt: null, status }}
         tournamentStatus={status} isRosterLocked={false}
         isRosterEditBlockedByStatus={false} isRosterDeadlineBlocked={false} />);
-      expect(screen.getByText('모집완료')).toBeInTheDocument();
-      expect(screen.queryByText('준비 중')).not.toBeInTheDocument();
+      expect(screen.getByText(label)).toBeInTheDocument();
     });
 
     const season = (status: 'in_progress' | 'completed' | 'cancelled') => ({

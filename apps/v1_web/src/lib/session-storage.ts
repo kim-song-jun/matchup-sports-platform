@@ -226,18 +226,17 @@ export function getLoginPathForRedirect(target: string) {
 // 다른 대회의 admin 화면을 나중에 열었을 때 엉뚱한 출처가 남아있으면 안 된다.
 const TOURNAMENT_OPS_ORIGIN_PREFIX = 'teameet.v1.tournamentOpsOrigin.';
 
-export type TournamentOpsOrigin = 'admin' | 'home';
+export type TournamentOpsOrigin = 'admin' | 'staff' | 'home';
 
-export function saveTournamentOpsOrigin(tournamentId: string, origin: 'admin') {
+export function saveTournamentOpsOrigin(tournamentId: string, origin: 'admin' | 'staff') {
   if (typeof window === 'undefined') return;
   window.sessionStorage.setItem(`${TOURNAMENT_OPS_ORIGIN_PREFIX}${tournamentId}`, origin);
 }
 
 export function getTournamentOpsOrigin(tournamentId: string): TournamentOpsOrigin {
   if (typeof window === 'undefined') return 'home';
-  return window.sessionStorage.getItem(`${TOURNAMENT_OPS_ORIGIN_PREFIX}${tournamentId}`) === 'admin'
-    ? 'admin'
-    : 'home';
+  const origin = window.sessionStorage.getItem(`${TOURNAMENT_OPS_ORIGIN_PREFIX}${tournamentId}`);
+  return origin === 'admin' || origin === 'staff' ? origin : 'home';
 }
 
 /**

@@ -1,5 +1,36 @@
 # Task 20261057: 어드민 대진 그림 편집기 — 그림 먼저, 팀은 자리에, 결과는 칸에서
 
+## 2026-10-28 후속 — 전체 대진 만들기 팝업 동작 복구
+Status: Implemented / dev PR and Alpha deployment in progress
+
+### Context / Goal / Original Conditions
+- [ ] ‘전체 대진 만들기’가 페이지 전환·스크롤 컨테이너의 영향을 받지 않는 팝업으로 동작한다.
+- 사용자 재지시는 팝업 우선 수정이다. 앞서 요청한 기존 팀 조별 무작위 배치는 요구를 유지하되 배정 유지/재배치 의미 확인 전 변경하지 않는다.
+
+### User Scenarios / Test Scenarios / Acceptance Criteria
+- [ ] 변형·overflow가 있는 페이지에서도 공용 ConfirmModal처럼 body portal과 modal z-index를 사용한다.
+- [x] 컴포넌트 회귀에서 팀 수 입력·선택·취소/닫기·포커스 복원 및 기존 대진 교체 확인 계약을 유지한다.
+- [x] 집중 회귀 테스트 RED → GREEN, touched diff/기술부채 확인.
+- [ ] Alpha 관리자 390/768/1440 실제 클릭·console/network·스크린샷 확인. 접근 불가 시 미검증으로 기록한다.
+
+### Parallel Work Breakdown / Owned / Forbidden
+단일 에이전트 순차: 원인/회귀 → portal 로직 복구 → 집중 검증/문서화.
+Owned: bracket-template-dialog.tsx, flexible-bracket-wizard.tsx, six-team-template-dialog.tsx 및 관련 테스트, 이 문서, 해당 changeset.
+Forbidden: 다른 WIP, backend/DB/랜덤 배정 동작 변경, main 쓰기, 실제 대회 데이터 수정.
+
+### Tech Debt Resolved / Security Notes / Risks & Dependencies / Ambiguity Log
+공용 확인창과 달리 페이지 트리 안에 떠 있던 fixed 팝업을 body로 이동한다. 시각 디자인·정보구조 변경 없이 기존 동작을 복구하는 렌더링 로직 수정이다. 기존 권한·API·교체 확인·pending 잠금을 유지한다.
+Alpha 관리자 세션/브라우저 도구가 현재 제공되지 않았다. 실제 alpha 검증을 합성 컴포넌트 테스트로 대체하지 않는다.
+
+### Progress Snapshot
+최신 origin/dev fetch 성공. 최신 origin/dev=b71a5d031 전용 작업트리 tmp/worktrees/admin-bracket-popup, 브랜치 fix/admin-bracket-popup. 기존 작업트리의 변경은 보존했다. 이전 표준 팝업 신규 회귀 RED 확인 후 최신 dev의 2파일 59계약에서 5개 RED/54개 PASS: 표준·6팀·로딩 팝업의 body 분리 누락, 유연 설정의 modal layer 누락. 3개 소스의 portal/레이어와 확인창 렌더 순서를 복구했다. GREEN 59/59 PASS.
+검증: `pnpm --filter v1_web exec vitest run src/components/admin/bracket-canvas/flexible-bracket-wizard.test.tsx src/components/admin/bracket-canvas/bracket-template-dialog.test.tsx --maxWorkers=1 --minWorkers=1 --reporter=dot`.
+시나리오: 관리자 대진 설정, transform/overflow 부모에서 body 분리, 참가팀 수 입력, 닫기/포커스 복원, 로딩→오류→재시도, 3개 설정 분기, 확인창 동작. jsdom 컴포넌트 검증이며 실제 viewport/alpha 화면 검증은 0/3이다. 실제 대회 데이터·배포 변경 없음. 테스트 cleanup 수행; 로컬 서버/브라우저를 띄우지 않았다.
+`git diff --check` PASS, touched 소스/테스트 TODO/FIXME/HACK/XXX 없음. 신규 런타임 소스 의존성 없음, React DOM 기존 의존성만 사용. 미커밋 작업트리 검증이므로 PR-ready·배포 완료로 주장하지 않는다. `pnpm exec tsc --noEmit --incremental false` PASS. 패턴 검사 최초 sandbox 하위 셸 EPERM 후 같은 읽기 전용 명령을 제한 밖에서 실행해 PASS(규칙 완화 없음).
+
+2026-10-28 사용자 배포 요청으로 이 후속 범위의 dev 대상 PR·리뷰·머지·alpha 배포를 진행한다. main 승격은 포함하지 않는다. 최신 origin/dev=b71a5d031로 코드 차이 없음 확인; 앞선 59계약·타입·패턴 검증 이후 런타임 소스 변경 없음. Alpha 관리자 세션/브라우저 도구 미제공으로 배포 후 시각 QA는 별도 미완료로 추적한다.
+
+
 ## 2026-10-17 후속 — 목록·그림 표시 문구와 경기 정보 편집 통일
 Status: Implementation complete; draft PR / alpha QA pending
 

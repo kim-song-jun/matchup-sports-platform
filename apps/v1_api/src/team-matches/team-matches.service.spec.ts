@@ -930,6 +930,22 @@ describe('TeamMatchesService', () => {
     }
   });
 
+  // 2026-10-29: 레벨 조건을 객체로 펼쳐 대회 경기 제외 OR 를 덮어썼다.
+  it('list: 레벨 필터는 대회 경기 제외 OR 를 남긴 채 AND 로 더한다', async () => {
+    prisma.v1TeamMatch.findMany.mockResolvedValue([]);
+
+    await service.list(null, { levelCodes: 'advanced' });
+
+    const where = prisma.v1TeamMatch.findMany.mock.calls[0][0].where;
+    expect(where.OR).toEqual([{ tournamentId: null }, { leagueId: { not: null } }]);
+    expect(where.AND).toContainEqual({
+      OR: [{
+        minSportLevel: { is: { code: { in: ['beginner', 'novice', 'intermediate', 'advanced'] } } },
+        maxSportLevel: { is: { code: { in: ['advanced'] } } },
+      }],
+    });
+  });
+
   it('list: 기본 조회의 공개 범위는 그대로다 — 경기 전 마감 행도 신청마감으로 노출한다', async () => {
     prisma.v1TeamMatch.findMany.mockResolvedValue([]);
 

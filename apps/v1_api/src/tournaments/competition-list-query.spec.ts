@@ -35,14 +35,14 @@ describe('목록 응답의 신규 신청 접수 판정', () => {
     expect(presentTournamentCard(card({ _count: { registrations: 2 }, registrations: [{ status: 'payment_checking' }, { status: 'paid' }] }), now).registrationOpen).toBe(false);
     expect(presentTournamentCard(card({ _count: { registrations: 2 }, registrations: [{ status: 'payment_checking' }] }), now).registrationOpen).toBe(true);
   });
-  it('대회 마감 미설정은 접수 가능하지만 리그 미설정은 접수하지 않는다', () => {
+  it('대회와 리그 모두 접수 중이면 마감 미설정도 접수한다', () => {
     expect(presentTournamentCard(card({ registrationDeadlineAt: null }), now).registrationOpen).toBe(true);
-    expect(presentTournamentCard(card({ kind: 'regular_league', registrationDeadlineAt: null }), now).registrationOpen).toBe(false);
+    expect(presentTournamentCard(card({ kind: 'regular_league', registrationDeadlineAt: null }), now).registrationOpen).toBe(true);
   });
-  it('리그는 진행 중에도 마감 전이면 정원 없이 접수한다', () => {
-    expect(presentTournamentCard(card({ kind: 'regular_league', status: 'in_progress', teamCount: 0 }), now).registrationOpen).toBe(true);
-    expect(presentTournamentCard(card({ kind: 'regular_league', status: 'in_progress', maxTeams: 1 }), now).registrationOpen).toBe(false);
-    for (const status of ['completed', 'cancelled', 'on_hold']) {
+  it('리그도 접수 중일 때만 받는다 — 시작·보류·종료 상태는 마감이 남아도 닫는다', () => {
+    expect(presentTournamentCard(card({ kind: 'regular_league', teamCount: 0 }), now).registrationOpen).toBe(true);
+    expect(presentTournamentCard(card({ kind: 'regular_league', maxTeams: 1 }), now).registrationOpen).toBe(false);
+    for (const status of ['draft', 'closed', 'in_progress', 'completed', 'cancelled', 'on_hold']) {
       expect(presentTournamentCard(card({ kind: 'regular_league', status }), now).registrationOpen).toBe(false);
     }
   });

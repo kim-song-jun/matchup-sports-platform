@@ -703,6 +703,11 @@ export function OperateConsoleCore({
     () => deriveFoulCounts(ops.liveEvents, periodForDisplay?.number ?? 1),
     [ops.liveEvents, periodForDisplay?.number],
   );
+  // 팀 파울은 피리어드마다 새로 센다 — 다음 피리어드가 있으면(하프타임 포함) 막대가 다시 센다고 알려 준다.
+  const foulPeriodHasNext = useMemo(
+    () => (gameDetail.data?.periods ?? []).some((period) => period.number === (periodForDisplay?.number ?? 1) + 1),
+    [gameDetail.data?.periods, periodForDisplay?.number],
+  );
 
   // 선수 교체: "지금 피치 위" 는 저장된 컬럼이 아니라 started + 확정 SUBSTITUTION
   // 이벤트를 접은 파생값이다(요건 3) — ActionTargetPicker의 1단계(나갈 선수)/
@@ -2027,7 +2032,15 @@ export function OperateConsoleCore({
 
       {/* 팀 파울과 이벤트 패드도 경기가 뛰는 동안에만 둔다. 시작 전·종료 뒤엔 전부 비활성이라
           자리만 차지해, 폰에서 그 단계의 할 일(킥오프 준비·결과 확정 카드)을 첫 화면 밖으로 밀었다. */}
-      {matchInPlay && <TeamFoulCounterBar sides={sides} counts={foulCounts} period={periodForDisplay?.number ?? 1} />}
+      {matchInPlay && (
+        <TeamFoulCounterBar
+          sides={sides}
+          counts={foulCounts}
+          period={periodForDisplay?.number ?? 1}
+          periodCount={periodCount}
+          hasNextPeriod={foulPeriodHasNext}
+        />
+      )}
 
       {/* 액션 우선 리오더: 이 자리는 예전엔 탭 가능한 선수 그리드였다(선수 먼저 →
           액션). 지금은 액션이 먼저이므로, 그 다음 조작이 실제로 일어나는 자리가

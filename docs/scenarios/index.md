@@ -14,10 +14,21 @@
 A안 코드 구현: 정원6/토너먼트 선택·확정6팀 생성·공식 성적 비교·운영자 진출 지정·전용 공개 대진표.
 API212/Web116·격리 DB 통합4·양쪽 타입/표면·패턴·schema drift0 PASS. Alpha after0/3(미배포), 커밋/PR/배포 없음.
 
+## 2026-10-28 — 운영 콘솔 팀 파울 안내 (MD-QA #189)
+
+[Task 20261122](../../.github/tasks/20261122-mdqa-189-team-foul-display.md) · [OPS-FOUL-189](./19-game-operations-result-correction.md#ops-foul-189-팀-파울-피리어드-안내) · PR #2087. 집계 규칙을 유지하고 피리어드 이름·다음 피리어드의 다시 세기만 안내한다. 전반/하프타임/후반·단판·추가 피리어드의 alpha 실행 0/4, after viewport 0/3이다. 기존 결과 정정 화면의 과거 증거와 구분한다.
+
 ## 2026-10-23 — 경기 기록 기본 공개
 
 [시나리오](./default-public-player-records.md) · [Task 20261106](../../.github/tasks/20261106-default-public-player-records.md).
 신규 가입 기본 공개·약관 CTA 위 안내 및 기존 미설정 활성 회원만 전환하는 migration 구현. API114/Web106·migration 재생218·DB통합2·양쪽 타입/surface/pattern·migration gate PASS. 명시적 비공개·개별 숨김 유지. PR2049 dev/alpha 배포 완료. alpha 미설정629명 전환·기존 비공개6명 원형 보존, 실제 가입·선수 설정/익명 조회·before/after3폭 PASS. 외부 OAuth 신규 인증 자체는 재실행하지 않음. 버전1.11.6/main 승격 준비 중.
+
+## 2026-10-28 — 6강 연결형 대진표 후속
+
+[시나리오](./six-team-knockout.md) · [Task20261118](../../.github/tasks/20261118-six-team-knockout.md).
+사용자 승인: 6강·준결승·결승을 한 가로 대진표에 배치, 준결승 경기와 부전승 자리에서 결승으로만 연결.
+공개 상세/대진표, 관리자 desktop/mobile 및 생성 미리보기 공통 적용. Web211·타입·패턴 PASS.
+실제 alpha before3/3, after0/3(미배포). 기존 대회 데이터 변경0. [증거](../screenshots/six-team-connected/README.md).
 
 ## 2026-10-22 — 대회·리그 필터·정렬
 
@@ -25,6 +36,8 @@ API212/Web116·격리 DB 통합4·양쪽 타입/표면·패턴·schema drift0 PA
 진행·모집 상태 분리, 종목·기간 및 대회 부문/방식/참가비, 신청 접수 퀵 필터와 우측 정렬을 구현했다.
 최신 dev 기반 단위·SSR·MSW 및 양쪽 타입/표면·패턴 검사 PASS. 실제 DB0/5·alpha0/8·after viewport0/3.
 사용자 요청으로 dev 대상 PR을 생성한다. 머지·배포 및 alpha 실측은 후속이다.
+
+PR #2094 후속: [레벨·지역 검색·개최순·필터 오류 회귀](./competition-discovery-filters-2026-10-22.md#pr-2094-회귀-시나리오)를 추가했다. KST 오늘/진행 중/날짜 미정 유지·종료 직접 선택 예외와 입력칸 오류·최소 금액 요약을 포함한다. 위 수치는 최초 구현의 과거 증거이며 새 후속 alpha는 0/7·viewport 0/3이다.
 
 [빈 템플릿 조 정리](./empty-template-group-cleanup.md) · Task20261100/PR2019. 로컬 DB·단위·타입 검증 완료, hotfix CI/alpha/main/production 진행 중. 운영 대회는 조회만 수행.
 
@@ -36,7 +49,7 @@ API212/Web116·격리 DB 통합4·양쪽 타입/표면·패턴·schema drift0 PA
 
 [시나리오](./finalist-assignment.md) · [Task 20261099](../../.github/tasks/20261099-finalist-assignment.md). 조별 공식 순위 확인/배정안 조정/자동·수동 배정, 14·15팀 불균등 조 지원 및 기존12강 유지. API36·Web121·실제 임시 DB7 및 양쪽 타입/표면·패턴 PASS. Alpha before3/3(실제 로그인), after0/3(미배포). 지정 대회 데이터 변경 없음.
 
-신규 리그 모집 마감 생성·명시적 시작(2026-10-18): [시나리오](./league-explicit-start.md). PR 호환성 보강: API192·DB68 assertion PASS, 신규 migration 단독 회귀 exit 0. Web38·양쪽 타입·표면/패턴 PASS. 전체 DB runner 종료 대기는 별도 기록, CI 확인과 미배포 alpha 0/3이 후속.
+신규 리그 명시적 시작: [시나리오](./league-explicit-start.md). **PR #2065 / 2026-10-27 결정으로 새 리그는 초안(draft), 신청은 접수 중(open)에서만 허용한다.** 옛 모집 마감 생성·진행 중 접수 기대를 시나리오에서 교체했다. API192·DB68·Web38은 2026-10-18 명시적 시작 구현의 과거 증거이며 #2065의 새 검증 수치가 아니다. 변경 후 alpha 390/768/1440 검증은 0/3이다.
 
 ## 2026-10-17 — 대진 표시 문구·경기 정보 편집
 

@@ -55,7 +55,7 @@ Forbidden: 다른 세션 WIP, main 승격, 운영 DB 직접 변경.
 
 ## Risks & Dependencies
 관리자 전용 감사 로그는 admin FK를 요구하므로 디렉터는 실제 사용자 신원으로 별도 운영 감사에 기록해야 한다.
-alpha는 dev 배포 이후에만 변경 검증 가능하다. 현재 커밋·push·머지는 요청되지 않았다.
+alpha는 dev 배포 이후에만 변경 검증 가능하다. 사용자가 스크린샷과 PR 게시를 요청했다. PR #2101에서 CI·Copilot 게이트 후 dev 반영과 alpha 검증을 진행한다.
 
 ## Ambiguity Log
 | Date | Question | Resolution |
@@ -72,3 +72,10 @@ alpha는 dev 배포 이후에만 변경 검증 가능하다. 현재 커밋·push
 - API/Web tsc PASS. API surface check PASS, Web pattern check PASS. Windows 기본 find/cmd의 POSIX 호환 오류는 검증 프로세스에만 Git 유틸리티/Git Bash를 지정해 해결했다. 저장소/사용자 셸 설정은 변경하지 않았다.
 - 변경 파일 Tech-Debt marker 0. `git diff --check` PASS. 새 import/route 의존성은 같은 작업트리에 포함했다. 커밋·push·PR·배포는 수행하지 않아 committed-tree/PR-ready 판정은 하지 않는다.
 - 시나리오 허브: `docs/scenarios/scoped-tournament-director-management.md`. 미배포이므로 alpha 0/10 섹션, 0/3 viewport.
+
+## PR / Alpha Flow Follow-up
+- PR #2101, head 7fd185dd5. 사용자 제공 Alpha 계정은 메모/로그/증거에 저장하지 않는다.
+- 관리자 로그인 → 테스트 전용 대회 → 일반 선수 디렉터 배정 → 마이페이지 담당 목록 → 10개 관리 섹션 → 타 대회/전역 관리 거부 → 배정 해제를 검증한다.
+- 배정 안내는 디렉터 관리 화면으로 연결한다. 다른 세션의 배정·해제를 창 복귀와 15초 폴링으로 갱신한다. 추가 web 2파일/20 tests와 web tsc PASS.
+- Headed Chrome은 stdin 비에코, 세션 파일 저장 없음. 브라우저 PID/부모 PID를 기록하며 종료 시 소유한 context/browser만 닫는다.
+- 새 화면은 미배포 상태이며 alpha 0/10, viewport 0/3. 기존 alpha 관리자 로그인 성공.

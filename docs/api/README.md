@@ -146,3 +146,6 @@ Current Kakao signup and existing-account linking use the [provider contact conf
 
 카드의 기존 합계와 선택적 시간별 기록(`cards.events`), 정정·재제출 검증 및 공개 프로젝션은
 [games 도메인 문서](./domains/games.md#결과-정정-카드-타임라인-2026-10-24)를 따른다.
+
+승부차기 정정의 성공·시도 횟수와 명시적 `operatorOverride:false`의 예외 승계 해제는
+[대회 운영 계약](./domains/tournament-operations.md)을 따른다. 결과 정정 초안 생성과 공식 확정은 별도 단계다.

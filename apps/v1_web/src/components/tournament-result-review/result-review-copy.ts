@@ -48,6 +48,10 @@ export const KNOWN_ERROR_MESSAGES: Record<string, string> = {
     '승부차기는 결선 경기의 정규시간 무승부에서만 기록할 수 있어요. 경기 종류와 정규시간 점수를 다시 확인해 주세요.',
   TOURNAMENT_PENALTY_INVALID:
     '승부차기 점수가 올바르지 않아요. 양 팀 점수를 0 이상의 정수로, 승자가 갈리도록 입력해 주세요.',
+  TOURNAMENT_PENALTY_KICK_COUNTS_REQUIRED:
+    '승부차기 결과를 변경하려면 양 팀의 실제 시도 횟수를 입력해 주세요.',
+  TOURNAMENT_PENALTY_UNDECIDED:
+    '입력한 성공·시도 횟수로는 승부차기 승자가 확정되지 않아요. 시도 횟수와 먼저 찬 팀을 확인해 주세요.',
 };
 
 /** Extracts a domain error code and maps it to a 해요체 안내 문구, falling

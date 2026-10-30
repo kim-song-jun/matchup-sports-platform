@@ -263,7 +263,7 @@ export function BracketCanvasWorkspace({
     ) : null;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex w-full min-w-0 max-w-full flex-col gap-4">
       {ConfirmModal}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -415,6 +415,7 @@ export function BracketCanvasWorkspace({
           ) : (
             <BracketCanvas
               sixTeamState={sixTeamState}
+              registrations={registrations}
               groups={bracket.groups}
               fixtures={bracket.fixtures}
               slots={bracket.slots}

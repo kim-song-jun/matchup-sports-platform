@@ -49,6 +49,18 @@ afterEach(() => {
   window.history.replaceState(null, '', '/');
 });
 
+it('순수 토너먼트 순위·대진표에는 결선 탭 없이 전체와 라운드 필터만 표시한다', () => {
+  renderBracketStandingsTab(makeTournament({ id: 'tour-1', status: 'closed', format: 'knockout',
+    fixtures: [makeFixture({ id: 'semi', round: 'semi', status: 'scheduled' }), makeFixture({ id: 'final', round: 'final', status: 'scheduled' })],
+  }));
+  expect(screen.queryByRole('tab', { name: '결선' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('tablist', { name: '순위·대진 단계' })).not.toBeInTheDocument();
+  const rounds = within(screen.getByRole('navigation', { name: '결선 단계 선택' }));
+  expect(rounds.getByRole('button', { name: '전체' })).toHaveAttribute('aria-pressed', 'true');
+  fireEvent.click(rounds.getByRole('button', { name: '결승' }));
+  expect(rounds.getByRole('button', { name: '결승' })).toHaveAttribute('aria-pressed', 'true');
+});
+
 /**
  * 조별/리그 순위표에서 팀명을 누르면 **그 자리에서** 그 팀의 경기 상세가 펼쳐져야
  * 한다 — 오너 요청("순위·브래킷에서 팀을 눌렀을 때 히스토리가 안 나옴")의

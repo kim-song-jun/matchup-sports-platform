@@ -19,13 +19,14 @@ import {
 import { bracketNodeStateChip } from '@/lib/competition-status';
 import { formatKstDateShort, formatKstTime } from '@/lib/date-utils';
 import { closeOverlayThenNavigate } from '@/lib/overlay-history';
-import type { V1AdminBracketFixture, V1AdminBracketGroup, V1AdminBracketSlot, V1SixTeamBracket } from '@/types/api';
+import type { V1AdminBracketFixture, V1AdminBracketGroup, V1AdminBracketSlot, V1AdminTournamentRegistration, V1SixTeamBracket } from '@/types/api';
 import { SixTeamAdminBracket } from './six-team-admin-bracket';
 import { MobileNodeSheetBody, type MobileSheetView } from './bracket-canvas-mobile-sheet';
 import type { RegistrationsLoadState } from './bracket-team-tray';
 
 export interface BracketCanvasMobileProps {
   sixTeamState?: V1SixTeamBracket | null;
+  registrations?: readonly V1AdminTournamentRegistration[];
   competitionId: string;
   scope: 'tournament' | 'league';
   rounds: MobileRound[];
@@ -78,6 +79,7 @@ function MobileNodeCard({ node, expanded, onOpen }: { node: MobileNode; expanded
   return (
     <button
       type="button"
+      data-six-fixture-card={node.fixtureId}
       onClick={() => onOpen(node.key ?? node.fixtureId)}
       style={{ background: node.byeSlotId && hasTeam(node.home) ? 'var(--blue50)' : undefined }}
       aria-haspopup="dialog"
@@ -89,9 +91,9 @@ function MobileNodeCard({ node, expanded, onOpen }: { node: MobileNode; expanded
         {!node.byeSlotId ? <StatusChip chip={bracketNodeStateChip(node.state)} /> : null}
       </span>
       {node.byeSlotId ? <SideName side={node.home} /> : <span className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-        <SideName side={node.home} />
+        <span data-bracket-team-row><SideName side={node.home} /></span>
         <span className="text-[length:var(--font-size-caption)] text-[var(--text-caption)]" aria-hidden="true">vs</span>
-        <span className="text-right"><SideName side={node.away} /></span>
+        <span data-bracket-team-row className="text-right"><SideName side={node.away} /></span>
       </span>}
       {node.scoreText ? (
         <span className="text-center text-[length:var(--font-size-body-sm)] font-bold text-[var(--text-strong)]">{node.scoreText}</span>
@@ -111,7 +113,7 @@ function MobileNodeCard({ node, expanded, onOpen }: { node: MobileNode; expanded
   );
 }
 
-export function BracketCanvasMobile({ sixTeamState, competitionId, scope, rounds, focusFixtureId = null, slots, groups, fixtures, candidates, canWrite, registrationsState, showToast, onEditFixture }: BracketCanvasMobileProps) {
+export function BracketCanvasMobile({ sixTeamState, registrations, competitionId, scope, rounds, focusFixtureId = null, slots, groups, fixtures, candidates, canWrite, registrationsState, showToast, onEditFixture }: BracketCanvasMobileProps) {
   const roundSelectId = useId();
   const [pickedRoundKey, setPickedRoundKey] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -153,11 +155,11 @@ export function BracketCanvasMobile({ sixTeamState, competitionId, scope, rounds
         <AlertBanner tone="info" message={onEditFixture ? '경기를 눌러 경기 정보와 결과를 관리해요.' : '대진 구조는 큰 화면에서 편집해요. 여기서는 팀 넣기와 결과 입력을 할 수 있어요.'} />
       ) : null}
 
-      {sixTeamState ? <SixTeamAdminBracket state={sixTeamState} fixtures={[...(fixtures ?? [])]} groups={[...(groups ?? [])]} renderFixture={(fixture, labels) => {
+      {sixTeamState ? <SixTeamAdminBracket state={sixTeamState} fixtures={[...(fixtures ?? [])]} groups={[...(groups ?? [])]} registrations={registrations} renderFixture={(fixture, labels) => {
         const node = findNode(rounds, fixture.id);
         if (!node) return <p role="alert">경기 정보를 불러오지 못했어요.</p>;
         const labeled = labels ? { ...node, home: { ...node.home, slotLabel: labels.HOME }, away: { ...node.away, slotLabel: labels.AWAY } } : node;
-        return <MobileNodeCard node={labeled} expanded={selectedId === fixture.id} onOpen={openNode} />;
+        return <MobileNodeCard node={{ ...labeled, title: `${fixture.fixtureNumber}번 경기` }} expanded={selectedId === fixture.id} onOpen={openNode} />;
       }} /> : rounds.length <= ROUND_TABS_MAX ? (
         <SegmentedTabs
           role="tablist"

@@ -454,6 +454,7 @@ export function BracketScheduleTab({
     <ScheduleContent
       tournamentId={tournamentId}
       prioritizeLiveGames
+      knockoutOnly={tournament?.format === 'knockout'}
       isRegularLeague={isRegularLeague}
       data={combined}
       hasNextPage={hasNextPage}
@@ -720,7 +721,7 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
       <div hidden={activeTab !== 'standings'} style={{ display: activeTab === 'standings' ? 'flex' : 'none', flexDirection: 'column', flex: 1 }}>
           {/* 2열 그리드: 좌=순위표 / 우=대진표 (데스크탑). 아래 흐름 네비게이터(§FlowNav)는 탭과
               무관한 페이지 레벨 이동이라 패널 밖(항상)에 둔다. */}
-          {!isLeague && (hasStandingsColumn || hasBracketColumn) ? (
+          {!isLeague && format !== 'knockout' && (hasStandingsColumn || hasBracketColumn) ? (
             <div role="tablist" aria-label="순위·대진 단계" style={{ display: 'flex', gap: 'var(--spacing-2)', padding: '16px 20px 0' }}>
               {([
                 ...(hasStandingsColumn ? [{ key: 'group_stage' as const, label: '조별리그' }] : []),

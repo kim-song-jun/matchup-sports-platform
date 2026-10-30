@@ -74,6 +74,8 @@ describe('BracketCanvas', () => {
       slots: [],
     });
     expect(container.querySelectorAll('[data-fixture-id]')).toHaveLength(5);
+    expect(within(screen.getByRole('region', { name: '6강' })).getByText('1번 경기')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: '6강' })).queryByText('6강 1번 경기')).not.toBeInTheDocument();
     expect(container.querySelectorAll('[data-connection]')).toHaveLength(2);
     expect(within(screen.getByRole('region', { name: '준결승' })).getByRole('group', { name: '준결승 부전승 · 선정 대기' })).toHaveTextContent('6강 승리팀 중 선정 대기');
     fireEvent.click(screen.getByRole('button', { name: '홈 결승 직행팀' }));

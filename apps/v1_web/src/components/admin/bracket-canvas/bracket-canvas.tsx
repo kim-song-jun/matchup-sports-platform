@@ -11,13 +11,14 @@ import {
   type SideKey,
 } from '@/lib/bracket-canvas-layout';
 import { competitionMatchLabel } from '@/lib/tournament-round-label';
-import type { V1AdminBracketFixture, V1AdminBracketGroup, V1AdminBracketSlot, V1SixTeamBracket } from '@/types/api';
+import type { V1AdminBracketFixture, V1AdminBracketGroup, V1AdminBracketSlot, V1AdminTournamentRegistration, V1SixTeamBracket } from '@/types/api';
 import { SixTeamAdminBracket } from './six-team-admin-bracket';
 import { BracketCanvasNode } from './bracket-canvas-node';
 import { BracketGroupBlock } from './bracket-group-block';
 
 export type BracketCanvasProps = {
   sixTeamState?: V1SixTeamBracket | null;
+  registrations?: readonly V1AdminTournamentRegistration[];
   groups: V1AdminBracketGroup[];
   fixtures: V1AdminBracketFixture[];
   slots: V1AdminBracketSlot[];
@@ -45,6 +46,7 @@ const EDGE_STYLE: Record<CanvasEdgeKind, { dash: string | undefined }> = {
 
 export function BracketCanvas({
   sixTeamState,
+  registrations,
   groups,
   fixtures,
   slots,
@@ -77,9 +79,10 @@ export function BracketCanvas({
   const hasBracketEdges = layout.edges.some((edge) => edge.kind !== 'GROUP_RANK');
   const hasRankEdges = layout.edges.some((edge) => edge.kind === 'GROUP_RANK');
 
-  if (sixTeamState) return <SixTeamAdminBracket state={sixTeamState} fixtures={fixtures} groups={groups} renderFixture={(fixture, labels) => <BracketCanvasNode
+  if (sixTeamState) return <SixTeamAdminBracket state={sixTeamState} fixtures={fixtures} groups={groups} registrations={registrations} renderFixture={(fixture, labels) => <BracketCanvasNode
     fixture={fixture}
-    title={fixtureTitle(fixture, groups)}
+    title={`${fixture.fixtureNumber}번 경기`}
+    fullTitle={fixtureTitle(fixture, groups)}
     sideLabels={labels ?? { HOME: fixtureSideLabel(fixture, 'HOME', labelContext), AWAY: fixtureSideLabel(fixture, 'AWAY', labelContext) }}
     slots={{ HOME: fixture.homeSlotId ? slotsById.get(fixture.homeSlotId) ?? null : null, AWAY: fixture.awaySlotId ? slotsById.get(fixture.awaySlotId) ?? null : null }}
     selected={fixture.id === selectedFixtureId}

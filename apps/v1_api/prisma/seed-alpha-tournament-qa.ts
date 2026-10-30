@@ -354,7 +354,26 @@ export function buildAlphaTournamentCampaignContent(
     faqSectionTitle: FEATURED_QA_DEFAULT_MARKETING.campaignFaqSectionTitle,
     faq: [
       { question: '실제 결제나 송금이 발생하나요?', answer: '아니요. alpha 전용 테스트 데이터이며 실제 결제와 송금은 발생하지 않습니다.' },
-      { question: '신청 마감은 언제인가요?', answer: registrationDeadlineAt.toISOString() },
+      {
+        question: '신청 마감은 언제인가요?',
+        answer: `${new Intl.DateTimeFormat('ko-KR', {
+          timeZone: 'Asia/Seoul',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          weekday: 'short',
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true,
+        }).formatToParts(registrationDeadlineAt).map((part) => {
+          // ICU의 요일 구분 기호와 무관하게 상세 화면과 같은 괄호 표기를 유지한다.
+          if (part.type === 'weekday') return `(${part.value})`;
+          if (part.type === 'dayPeriod' && part.value === 'AM') return '오전';
+          if (part.type === 'dayPeriod' && part.value === 'PM') return '오후';
+          if (part.type === 'literal') return part.value.replace(/[()]/g, '');
+          return part.value;
+        }).join('')} (한국 시간)`,
+      },
       { question: '이 데이터는 프로덕션으로 이동하나요?', answer: '아니요. alpha 데이터베이스에서만 유지되고 프로덕션으로 역동기화되지 않습니다.' },
     ],
   };

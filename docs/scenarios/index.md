@@ -10,6 +10,10 @@
 A안 코드 구현: 정원6/토너먼트 선택·확정6팀 생성·공식 성적 비교·운영자 진출 지정·전용 공개 대진표.
 API212/Web116·격리 DB 통합4·양쪽 타입/표면·패턴·schema drift0 PASS. Alpha after0/3(미배포), 커밋/PR/배포 없음.
 
+## 2026-10-28 — 운영 콘솔 팀 파울 안내 (MD-QA #189)
+
+[Task 20261122](../../.github/tasks/20261122-mdqa-189-team-foul-display.md) · [OPS-FOUL-189](./19-game-operations-result-correction.md#ops-foul-189-팀-파울-피리어드-안내) · PR #2087. 집계 규칙을 유지하고 피리어드 이름·다음 피리어드의 다시 세기만 안내한다. 전반/하프타임/후반·단판·추가 피리어드의 alpha 실행 0/4, after viewport 0/3이다. 기존 결과 정정 화면의 과거 증거와 구분한다.
+
 ## 2026-10-23 — 경기 기록 기본 공개
 
 [시나리오](./default-public-player-records.md) · [Task 20261106](../../.github/tasks/20261106-default-public-player-records.md).

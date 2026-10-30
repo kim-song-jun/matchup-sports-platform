@@ -1,6 +1,6 @@
 # 경기 운영 이벤트·결과 정정
 
-> Status: implementation and headed browser verification complete
+> Status: 기존 결과 정정은 2026-08-19 검증 기록을 따른다. PR #2087 팀 파울 안내는 변경 후 alpha 미검증이다.
 
 ## OPS-RESULT-001 라이브 기록 수정
 
@@ -37,3 +37,19 @@
 - Final headed runs recorded zero console errors and zero HTTP responses with status 400 or higher.
 - The correction modal exposed goal order/type/minute controls, own-goal attribution,
   penalty score and first-kick controls, plus submitted-lineup player options with jersey numbers.
+
+## OPS-FOUL-189 팀 파울 피리어드 안내
+
+[Task 20261122](../../.github/tasks/20261122-mdqa-189-team-foul-display.md) · PR #2087 · 2026-10-28 사용자 결정: **집계 규칙 유지, 표시만 수정**.
+숫자가 바뀐 이유를 설명하는 변경이며 파울 이벤트 삭제·새 누적 방식·대회별 설정을 추가하지 않는다. 공개 관전 화면은 범위 밖이다.
+
+실제 운영 권한을 가진 운영자로 alpha 콘솔에서 아래 흐름을 클릭한다. 현재 실행 0/4, viewport 390/768/1440 각각 0/3이다.
+
+1. 전·후반 경기의 전반에 파울을 기록한다. 전반 팀 파울·현재 숫자·후반에는 0부터 다시 세요를 확인한다.
+2. 전반을 끝내 하프타임으로 이동한다. 전반 숫자가 유지되고 후반 안내가 남아야 한다. 후반을 시작하면 후반 팀 파울·0부터 센 숫자를 보여야 하고 마지막 피리어드에는 다음 안내가 없어야 한다.
+3. 단판 경기는 경기 팀 파울로 표시하고 다음 피리어드 안내가 없어야 한다.
+4. 3피리어드 이상의 행이 있는 경기에서는 3피리어드 팀 파울처럼 표시한다. 다음 행이 있을 때만 다음 피리어드의 0부터 다시 세기 안내를 표시한다.
+
+각 단계 screenshot·실제 파울 이벤트/피리어드·console/network·viewport별 overflow 판정을 기록한다. 검증 중 생성한 데이터의 정리 가능 여부와 소유 브라우저/프로세스 cleanup을 남긴다. 위 2026-08-19 증거는 이 변경의 after 증거가 아니다.
+
+자동 회귀: `apps/v1_web/src/shared/game-operations/team-foul-counter-bar.test.tsx`, `operate-console-core.test.tsx`. 집계 근거는 `deriveFoulCounts`이며 실제 운영 시나리오는 별도 실행한다.

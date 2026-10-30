@@ -1,6 +1,6 @@
 # 운영 콘솔 승부차기 결과 정정
 
-Status: alpha dev PR #2105 Checks/Review Pending
+Status: Rollout In Progress (main/dev merged; deployments pending)
 Owner: Codex (single agent)
 
 ## Context
@@ -54,12 +54,17 @@ http://localhost:3013/admin/live/a90df6d5-47e9-40f9-93ef-f679ce8da858/records/co
 - 진행: main 기준 패치 적용 및 diff --check 통과. main 기준 회귀 검증 중. 이전 로컬 미리보기 증거는 위 기록이며 이번 main 배포 검증을 대신하지 않는다.
 - 남은 검증: main 기반 회귀 테스트/타입 검사, Changesets 소비·버전 게이트, 원격 CI/리뷰, 실제 배포 후 저장·공식화 및 화면 검증.
 
-## 2026-10-30 alpha 반영 요청
+### main 기준 최종 로컬 검증
 
-- 사용자가 main 핫픽스와 함께 alpha 반영도 명시 승인. 최신 origin/dev2708c6149 기준 전용 브랜치 `fix/six-team-penalty-alpha-20261030`에 소스 커밋만 적용. main용 1.12.3 버전/Changeset 소비는 포함하지 않음.
-- 원본 dev WIP와 25개 source/test/API docs가 개행을 제외하고 전부 일치. 기존 원본 dev 검증과 main 기준 frontend280/backend61 및 타입·패턴 PASS를 참조. 동일 로컬 전체 검증은 반복하지 않으며 dev 기준 CI를 실행.
-- 두 Changeset 유지, diff --check PASS. main 핫픽스는 별도 브랜치/PR, 최종 main 머지·production 승인은 사용자 직접 수행.
-- dev PR 검사·Copilot 완료 후 dev 머지와 alpha 배포 SHA 확인. 실제 사용자/admin 390/768/1440 및 승부차기 저장·공식화는 접근 가능한 인증/안전한 시나리오 전제하에 검증하고, 미실행 항목은 별도 표시.
+- 소스 커밋 `6ffb2d4cf`, 공식 Changesets 소비/릴리스 커밋 `a7d79655e`. 두 앱 `1.12.2 → 1.12.3`, 두 CHANGELOG 갱신, 미소비 Changeset 0. 이력의 두 Changeset 삭제를 포함한 main 릴리스 게이트 PASS.
+- Frontend: Vitest `--maxWorkers=1 --minWorkers=1` 8 files / **280/280 PASS** (635.28s). result-edit-modal54, result-review31, result-review-copy15, bracket-page49, schedule60, admin canvas17/mobile47, public six-team7.
+- Backend: Jest `--selectProjects unit --runInBand --runTestsByPath src/tournament-operations/results/tournament-result-review.service.spec.ts` **61/61 PASS**, ts-jest diagnostics 유지, 67.326s. 실제 DB/원격 저장 검증 아님.
+- Frontend `tsc --noEmit --incremental false` PASS. 패턴 검사는 첫 실행의 sandbox `/bin/sh EPERM`을 기록하고 해당 읽기 전용 검사만 제한 밖에서 재실행해 PASS.
+- Runtime: Node22.23.1, 설치된 Vitest3.2.4/Jest30.3.0. 기존 의존성을 링크해서 검증했고 설치된 Next16.2.10과 manifest16.3.8 차이는 남아 있음. lockfile 기반 CI/build 검증은 원격 게시 후 필요. 의존성 manifest/lockfile 변경 없음(앱 version만 증가).
+- Host: WSL load 약1.5, memory 여유9GB 이상, swap0; 최소 worker 직렬 실행. Docker CLI는 WSL interop 오류로 확인 불가하나 이번 단위 검증은 DB/컨테이너를 사용하지 않음. 새 서버/브라우저는 띄우지 않음. 테스트 프로세스 자연 종료, 이번 검증용 dependency symlink 3개는 종료 후 제거.
+- main 대비 25개 source/test/API docs + task2 + 앱 manifest2/CHANGELOG2 = **31 paths**. Prisma/마이그레이션/배포/워크플로/lockfile diff0, committed-tree `diff --check` PASS, touched TODO/FIXME/HACK/XXX0, 신규 미추적 source import 없음.
+- 사용자 요청에 따라 전용 `hotfix/six-team-penalty-20261030` 브랜치를 준비. 원격 push + main 대상 초안 PR 생성은 자동 승인 검토가 '코드 원격 전송 및 PR 생성에 별도 명시 승인 필요' 사유로 거절해 **미실행**. 재시도/우회 없음. 사용자 승인 대기.
+- 원격 CI/Copilot, 배포 후 실제 저장·공식화 및 390/768/1440 화면 검증은 미완. 로컬 테스트를 배포/시각 검증 완료로 표시하지 않음. 최종 main 머지와 production 승인은 사용자 직접 수행.
 
 ### PR CI 후속 — 상세 페이지 회귀 계약 동기화
 
@@ -68,3 +73,23 @@ http://localhost:3013/admin/live/a90df6d5-47e9-40f9-93ef-f679ce8da858/records/co
 - Copilot은 gh edit와 공식 REST 요청을 접수했으나 현재 두 head 리뷰0건. clean으로 간주하지 않으며 리뷰 도착을 별도 확인.
 - alpha before: 배포SHA2708c614993e, 공개 대진표·일정390/768/1440 baseline 캡처 완료. 상세링크5/결선탭1 및 선정카드 흰색·이미지없음 확인. console/network/pageerror0, browserPID8510/parent8413 정상종료. 증거는 alpha worktree `tmp/qa-six-team-hotfix/before/`.
 - 상세 페이지 단일 파일 재검증 **38/38 PASS** (86.78s, worker1), CI의 stale 링크 기대2건을 실제카드5/링크0 계약으로 GREEN. 기존341개와 합산 관련379개 검증. main diff32 paths(추가 test1), alpha diff30 paths. 앱 소스 추가 수정 없음.
+
+
+## 2026-10-30 alpha 반영 요청
+
+- 사용자가 main 핫픽스와 함께 alpha 반영도 명시 승인. 최신 origin/dev2708c6149 기준 전용 브랜치 `fix/six-team-penalty-alpha-20261030`에 소스 커밋만 적용. main용 1.12.3 버전/Changeset 소비는 포함하지 않음.
+- 원본 dev WIP와 25개 source/test/API docs가 개행을 제외하고 전부 일치. 기존 원본 dev 검증과 main 기준 frontend280/backend61 및 타입·패턴 PASS를 참조. 동일 로컬 전체 검증은 반복하지 않으며 dev 기준 CI를 실행.
+- 두 Changeset 유지, diff --check PASS. main 핫픽스는 별도 브랜치/PR, 최종 main 머지·production 승인은 사용자 직접 수행.
+- dev PR 검사·Copilot 완료 후 dev 머지와 alpha 배포 SHA 확인. 실제 사용자/admin 390/768/1440 및 승부차기 저장·공식화는 접근 가능한 인증/안전한 시나리오 전제하에 검증하고, 미실행 항목은 별도 표시.
+
+
+## 2026-10-30 승인 후 머지 및 main → dev 동기화
+
+- 사용자 최신 승인: “진행해줘 main도 다 해줘”. 이번 핫픽스는 Copilot 미생성 상태를 자체 리뷰로 진행하고 main/dev 머지와 배포까지 수행한다. GitHub 보호 정책은 우회하지 않으며 Copilot clean으로 표시하지 않는다.
+- 자체 리뷰는 main4c2e8e536 / alpha67a660f55에 기록. 양쪽 PR의 API/Web/Gates 전체 SUCCESS, main CodeQL SUCCESS, 미해결 스레드0 및 정확한 target/head 검증 후 일반 merge commit 사용.
+- alpha #2105 merge `a7c520c2f3f359b89cf50d26160ceba392c29e2e` (14:40:45UTC), main #2104 merge `b50074f90ff602eff47b21b0d2577bcc0377c57b` (14:46:22UTC). 양쪽 서버 반영은 후속 CI/deploy 진행 중이며 머지=배포 완료로 표시하지 않는다.
+- 저장소 정책에 따라 origin/main을 dev 기준 격리 branch로 흡수. 충돌은 두 task 문서뿐이며 main의 전체 검증 이력과 dev의 alpha 반영 요청을 함께 보존한다. 앱 소스·Prisma·미승격 dev 기능은 유지한다.
+- main에서 이미 소비한 두 Changeset은 dev에서도 제거하고 API/Web package1.12.3 및 CHANGELOG를 동기화한다. 다른 미소비 Changeset은 유지한다.
+- 현 production 공개 header는 release1.12.3 / SHA dcab2c77e4. 기존 배포 계약이 app version1.12.3+patch를 계산하므로 후보 production header는1.12.4다. 버전 계산 스크립트 변경 없음.
+- alpha Wait-for-CI 제한35분이 실제API CI(직전약50분)보다 짧다. 같은 SHA CI 성공 후 대기 시간 초과로 실패한 alpha run만 재실행한다. 진행 중 SSM/서버 activation은 취소하지 않는다.
+- 남은 검증: 최신 alpha/prod serving SHA·health, 공개 대진표/일정390/768/1440 AFTER와 before 비교. 관리자 로그인 수단 미제공이므로 실제 저장·공식화는 아직 미검증이며 원격 경기 결과를 임의 수정하지 않는다.

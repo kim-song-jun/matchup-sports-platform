@@ -4,32 +4,29 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
+import { useV1LinkKakao } from '@/hooks/use-v1-api';
 import { V1ApiError, v1Post } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
+import { getSignupIncompleteRoute } from '@/lib/auth-link-errors';
+import { consumeKakaoOAuthAttempt } from '@/lib/kakao-oauth';
+import { buildLinkResultPath, linkResultFromError, linkResultFromSuccess } from '@/lib/link-result';
 import { clearV1IdentityCache } from '@/lib/query-keys';
 import { clearSavedRedirectPath, getSavedRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
 import type { V1AuthSessionResponse } from '@/types/api';
 import { AUTH_NOTICE_STAGE, AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
-import { isSocialOnboardingRoute, KAKAO_OAUTH_STATE_STORAGE_KEY } from './auth.view-model';
+import { isSocialOnboardingRoute } from './auth.view-model';
+import { routeSocialLoginRecovery } from './login-recovery-route';
 import { extractErrorMessage } from '@/lib/error-message';
 
 function getKakaoRedirectUri() {
   return process.env.NEXT_PUBLIC_KAKAO_REDIRECT_URI;
 }
 
-// 로그인 CSRF(세션 고정) 방지: authorize 이동 시 저장해 둔 state 값을 읽고 즉시 제거한다.
-// 콜백에서 kauth가 돌려준 state와 대조한 뒤에만 code 교환을 진행한다.
-function getStoredKakaoOAuthState() {
-  if (typeof window === 'undefined') return null;
-  const value = window.sessionStorage.getItem(KAKAO_OAUTH_STATE_STORAGE_KEY);
-  window.sessionStorage.removeItem(KAKAO_OAUTH_STATE_STORAGE_KEY);
-  return value;
-}
-
 export function KakaoCallbackClient() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
+  const { mutate: linkKakao } = useV1LinkKakao();
   const calledRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,17 +41,43 @@ export function KakaoCallbackClient() {
     // must leave the address bar before gtag.js loads and reads it.
     window.history.replaceState(window.history.state, '', window.location.pathname);
 
+    // 로그인 CSRF(세션 고정) 방지: 인가를 시작할 때 저장한 시도와 kauth 가 돌려준 state 를 대조한다.
+    // 저장값은 한 번 읽으면 지워지고, 로그인과 연결을 가르는 mode 도 여기서만 알 수 있다.
+    const attempt = consumeKakaoOAuthAttempt(returnedState);
+    const returnTo = attempt?.returnTo ?? null;
+
     if (providerError || !code) {
+      if (attempt?.mode === 'link') {
+        router.replace(buildLinkResultPath({ linkResult: 'failed', provider: 'kakao' }, returnTo));
+        return;
+      }
       trackEvent('login_failed', { method: 'kakao', reason: providerError || 'missing_code' });
       setError('카카오 로그인을 완료하지 못했어요.');
       return;
     }
 
-    const storedState = getStoredKakaoOAuthState();
-
-    if (!returnedState || !storedState || returnedState !== storedState) {
+    if (!attempt) {
       trackEvent('login_failed', { method: 'kakao', reason: 'invalid_state' });
       setError('로그인 요청이 유효하지 않아요. 다시 시도해 주세요.');
+      return;
+    }
+
+    if (attempt.mode === 'link') {
+      const redirectUri = getKakaoRedirectUri();
+      if (!redirectUri) {
+        router.replace(buildLinkResultPath({ linkResult: 'failed', provider: 'kakao' }, returnTo));
+        return;
+      }
+      linkKakao({ code, redirectUri }, {
+        onSuccess: (result) => {
+          router.replace(buildLinkResultPath({ linkResult: linkResultFromSuccess(result), provider: result.provider }, returnTo));
+        },
+        onError: (linkError) => {
+          // 가입이 덜 끝난 계정은 연결 결과가 아니라 가입을 이어 갈 화면으로 보낸다.
+          const signupRoute = getSignupIncompleteRoute(linkError);
+          router.replace(signupRoute ?? buildLinkResultPath({ linkResult: linkResultFromError(linkError), provider: 'kakao' }, returnTo));
+        },
+      });
       return;
     }
 
@@ -80,12 +103,17 @@ export function KakaoCallbackClient() {
         const reason = nextError instanceof V1ApiError ? nextError.code : 'unknown';
         trackEvent('login_failed', { method: 'kakao', reason });
 
-        if (nextError instanceof V1ApiError) {
-          if (nextError.code === 'MISSING_EMAIL') {
-            router.replace('/auth/missing-email');
-            return;
-          }
+        const recovery = routeSocialLoginRecovery(nextError, getSavedRedirectPath());
+        if (recovery?.type === 'navigate') {
+          router.replace(recovery.path);
+          return;
+        }
+        if (recovery) {
+          setError(recovery.message);
+          return;
+        }
 
+        if (nextError instanceof V1ApiError) {
           if (nextError.code === 'PERMISSION_DENIED') {
             router.replace('/auth/blocked');
             return;
@@ -104,7 +132,7 @@ export function KakaoCallbackClient() {
 
         setError(extractErrorMessage(nextError, '카카오 로그인에 실패했어요.'));
       });
-  }, [router, searchParams]);
+  }, [linkKakao, queryClient, router, searchParams]);
 
   if (error) {
     return (

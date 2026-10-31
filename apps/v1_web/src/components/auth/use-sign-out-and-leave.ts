@@ -18,6 +18,11 @@ type SignOutOptions = {
    * 막혀 서버에 등록이 없고, 해지 요청도 같은 가드에 막혀 실패만 보고하게 된다.
    */
   revokePush?: boolean;
+  /**
+   * 로그아웃이 끝나고 세션·저장 칸 정리까지 마친 직후, 이동 직전에 부른다. 로그아웃 정리가 지우는 칸
+   * (대기 연결 토큰 등)에 이동 뒤 화면이 읽을 값을 남기려면 정리보다 늦게 써야 해서 여기서 쓴다.
+   */
+  onSignedOut?: () => void;
 };
 
 /**
@@ -36,7 +41,7 @@ export function useSignOutAndLeave() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const signOutAndLeave = useCallback(async (path: string, { failureMessage, revokePush = true }: SignOutOptions) => {
+  const signOutAndLeave = useCallback(async (path: string, { failureMessage, revokePush = true, onSignedOut }: SignOutOptions) => {
     if (busyRef.current) return;
     busyRef.current = true;
     setPending(true);
@@ -68,6 +73,7 @@ export function useSignOutAndLeave() {
     clearStoredV1Session();
     clearV1IdentityCache(queryClient);
     disconnectV1Socket();
+    onSignedOut?.();
     window.location.replace(path);
   }, [logoutAsync, queryClient, unsubscribePush]);
 

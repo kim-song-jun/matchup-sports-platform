@@ -14,7 +14,7 @@ import { V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
 import { isLoginStepUpResponse, LOGIN_STEP_UP_VERIFY_PATH, saveLoginStepUp } from '@/lib/login-step-up';
 import { isNativeAppleSignInAvailable } from '@/lib/native-apple';
-import { sanitizeRedirectPath } from '@/lib/session-storage';
+import { getSavedRedirectPath, sanitizeRedirectPath } from '@/lib/session-storage';
 import { AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
 import { getEmailLoginViewModel } from './auth.view-model';
 import { completeEmailLogin } from './email-login-completion';
@@ -24,6 +24,7 @@ import {
   STEP_UP_UNAVAILABLE,
   STEP_UP_UNAVAILABLE_MESSAGE,
 } from './login-step-up-errors';
+import { routeToWithdrawalCancel } from './login-recovery-route';
 import { PasswordResetLink } from './password-reset-link';
 
 const RATE_LIMITED_MESSAGE = '로그인 시도가 많아요. 잠시 후 다시 시도해 주세요.';
@@ -90,7 +91,13 @@ export function EmailLoginClient({ redirectPath }: { redirectPath?: string | nul
         },
         onError: (nextError) => {
           trackEvent('login_failed', { method: 'email', reason: nextError instanceof V1ApiError ? nextError.code : 'unknown' });
-          setError(mapEmailLoginError(nextError));
+          const requestedRedirect = new URLSearchParams(window.location.search).get('redirect');
+          const withdrawal = routeToWithdrawalCancel(nextError, sanitizeRedirectPath(requestedRedirect) ?? getSavedRedirectPath());
+          if (withdrawal?.type === 'navigate') {
+            router.push(withdrawal.path);
+            return;
+          }
+          setError(withdrawal ? { message: withdrawal.message } : mapEmailLoginError(nextError));
         },
         onSettled: () => {
           submitBusyRef.current = false;

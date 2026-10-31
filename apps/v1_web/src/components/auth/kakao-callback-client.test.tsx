@@ -1,8 +1,13 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { render as renderUi, screen, waitFor } from '@testing-library/react';
+import type { ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { KakaoCallbackClient } from './kakao-callback-client';
 import { KAKAO_OAUTH_STATE_STORAGE_KEY } from './auth.view-model';
 import { V1ApiError } from '@/lib/api-client';
+import { serializeKakaoOAuthAttempt } from '@/lib/kakao-oauth';
+import { readPendingSocialLink } from '@/lib/pending-social-link';
+import { readWithdrawalCancel } from '@/lib/withdrawal-cancel-storage';
 
 const router = vi.hoisted(() => ({
   replace: vi.fn(),
@@ -23,10 +28,6 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => searchParamsValue,
 }));
 
-vi.mock('@tanstack/react-query', () => ({
-  useQueryClient: () => ({ removeQueries: vi.fn() }),
-}));
-
 vi.mock('@/lib/analytics', () => ({
   trackEvent: analytics.trackEvent,
 }));
@@ -36,10 +37,24 @@ vi.mock('@/lib/api-client', async () => {
   return { ...actual, v1Post: api.v1Post };
 });
 
-function primeValidOAuthState() {
-  window.sessionStorage.setItem(KAKAO_OAUTH_STATE_STORAGE_KEY, 'state-123');
+// 콜백이 연결 모드에서 쓰는 훅(useMutation)까지 실제로 돌도록 QueryClientProvider 아래에서 렌더한다.
+function render(ui: ReactElement) {
+  return renderUi(<QueryClientProvider client={new QueryClient({ defaultOptions: { mutations: { retry: false } } })}>{ui}</QueryClientProvider>);
+}
+
+// 로그인 시도: 옛 형식(state 문자열만)과 새 형식(JSON) 모두 로그인으로 읽혀야 한다.
+function primeValidOAuthState(stored: string = 'state-123') {
+  window.sessionStorage.setItem(KAKAO_OAUTH_STATE_STORAGE_KEY, stored);
   searchParamsValue = new URLSearchParams({ code: 'auth-code', state: 'state-123' });
 }
+
+function primeLinkAttempt(returnTo: string | null = '/my/settings/login-methods') {
+  window.sessionStorage.setItem(KAKAO_OAUTH_STATE_STORAGE_KEY, serializeKakaoOAuthAttempt({ state: 'state-123', mode: 'link', returnTo }));
+  searchParamsValue = new URLSearchParams({ code: 'auth-code', state: 'state-123' });
+}
+
+const apiError = (statusCode: number, code: string, details?: Record<string, unknown>) =>
+  new V1ApiError({ status: 'error', statusCode, code, message: '실패', details, timestamp: '2026-10-31T00:00:00.000Z' });
 
 describe('KakaoCallbackClient address bar', () => {
   beforeEach(() => {

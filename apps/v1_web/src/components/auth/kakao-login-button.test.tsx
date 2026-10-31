@@ -5,8 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { KakaoLoginButton } from './kakao-login-button';
 import { V1ApiError } from '@/lib/api-client';
 import { KAKAO_OAUTH_STATE_STORAGE_KEY } from './auth.view-model';
+import { parseKakaoOAuthAttempt } from '@/lib/kakao-oauth';
+import { readPendingSocialLink } from '@/lib/pending-social-link';
 import { v1Keys } from '@/lib/query-keys';
 import { V1_SESSION_HINT_KEY } from '@/lib/session-storage';
+import { readWithdrawalCancel } from '@/lib/withdrawal-cancel-storage';
 
 const router = vi.hoisted(() => ({ replace: vi.fn(), refresh: vi.fn() }));
 const api = vi.hoisted(() => ({ v1Post: vi.fn() }));
@@ -59,6 +62,11 @@ afterEach(() => {
 });
 
 let queryClient: QueryClient;
+// 버튼이 저장하는 값은 state 만이 아니라 시도 전체(JSON)다. 콜백이 mode 로 로그인·연결을 가른다.
+const storedAttempt = () => parseKakaoOAuthAttempt(window.sessionStorage.getItem(KAKAO_OAUTH_STATE_STORAGE_KEY));
+const storedState = () => storedAttempt()?.state ?? null;
+const apiError = (statusCode: number, code: string, details?: Record<string, unknown>) =>
+  new V1ApiError({ status: 'error', statusCode, code, message: '실패', details, timestamp: '2026-10-31T00:00:00.000Z' });
 const renderButton = () => render(
   <QueryClientProvider client={queryClient}>
     <KakaoLoginButton href={HREF} label="카카오" />
@@ -139,6 +147,50 @@ describe('KakaoLoginButton', () => {
       expect(analytics.trackEvent).toHaveBeenCalledWith('login_failed', { method: 'kakao', reason: 'PERMISSION_DENIED' });
     });
 
+    it.each([
+      ['unverified email', 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL'],
+      ['contact conflict', 'SOCIAL_LINK_CONTACT_CONFLICT'],
+    ])('keeps the link token and opens the sign-in-then-link guide on a 409 (%s)', async (_label, code) => {
+      reply = { accessToken: 'kakao-token' };
+      api.v1Post.mockRejectedValue(apiError(409, code, {
+        next: 'sign_in_then_link', provider: 'kakao', linkToken: 'link-token-1', linkTokenExpiresInSeconds: 600,
+      }));
+      renderButton();
+      await click();
+      await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/auth/account-conflict?provider=kakao'));
+      expect(readPendingSocialLink()).toMatchObject({ linkToken: 'link-token-1', provider: 'kakao' });
+      expect(screen.queryByRole('alert')).toBeNull();
+      expect(analytics.trackEvent).toHaveBeenCalledWith('login_failed', { method: 'kakao', reason: code });
+    });
+
+    it('carries the saved redirect into the guide and the withdrawal screen', async () => {
+      reply = { accessToken: 'kakao-token' };
+      window.location.search = '?redirect=%2Fteams%2Fnew';
+      api.v1Post.mockRejectedValueOnce(apiError(409, 'SOCIAL_LINK_CONTACT_CONFLICT', {
+        next: 'sign_in_then_link', provider: 'kakao', linkToken: 'link-token-2', linkTokenExpiresInSeconds: 600,
+      }));
+      renderButton();
+      await click();
+      await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/auth/account-conflict?provider=kakao&redirect=%2Fteams%2Fnew'));
+
+      api.v1Post.mockRejectedValueOnce(apiError(403, 'ACCOUNT_WITHDRAWAL_PENDING', {
+        withdrawalCancelToken: 'withdrawal-token-1', expiresInSeconds: 600,
+      }));
+      await click();
+      await waitFor(() => expect(router.replace).toHaveBeenLastCalledWith('/auth/withdrawal-cancel'));
+      expect(readWithdrawalCancel()).toMatchObject({ token: 'withdrawal-token-1', returnTo: '/teams/new' });
+    });
+
+    it('shows the server message instead of a guide when the 409 carries no sign-in-then-link details', async () => {
+      reply = { accessToken: 'kakao-token' };
+      api.v1Post.mockRejectedValue(apiError(409, 'SOCIAL_LINK_CONTACT_CONFLICT'));
+      renderButton();
+      await click();
+      expect(await screen.findByRole('alert')).toHaveTextContent('실패');
+      expect(router.replace).not.toHaveBeenCalled();
+      expect(readPendingSocialLink()).toBeNull();
+    });
+
     it('shows a Korean message when the shell never answers (timeout)', async () => {
       vi.useFakeTimers({ shouldAdvanceTime: true });
       try {
@@ -164,7 +216,7 @@ describe('KakaoLoginButton', () => {
         renderButton();
         await click();
         await vi.advanceTimersByTimeAsync(8_000);
-        expect(assigned).toBe(`${HREF}&state=${window.sessionStorage.getItem(KAKAO_OAUTH_STATE_STORAGE_KEY)}`);
+        expect(assigned).toBe(`${HREF}&state=${storedState()}`);
         expect(reporter.reportClientError).toHaveBeenCalledTimes(1);
         complete({ Auth: { authorize } });
         await vi.advanceTimersByTimeAsync(1);
@@ -178,8 +230,9 @@ describe('KakaoLoginButton', () => {
       renderButton();
       await click();
       await waitFor(() => expect(authorize).toHaveBeenCalledTimes(1));
-      const stored = window.sessionStorage.getItem(KAKAO_OAUTH_STATE_STORAGE_KEY);
+      const stored = storedState();
       expect(stored).toMatch(/^[0-9a-f]{32}$/);
+      expect(storedAttempt()).toEqual({ state: stored, mode: 'login', returnTo: null });
       expect(authorize).toHaveBeenCalledWith({
         redirectUri: 'https://teameet.test/callback/kakao',
         scope: 'name,phone_number',
@@ -195,7 +248,7 @@ describe('KakaoLoginButton', () => {
       renderButton();
       await click();
       await waitFor(() => expect(assigned).not.toBeNull());
-      const stored = window.sessionStorage.getItem(KAKAO_OAUTH_STATE_STORAGE_KEY);
+      const stored = storedState();
       expect(assigned).toBe(`${HREF}&state=${stored}`);
       expect(window.TeameetNative.postMessage).not.toHaveBeenCalled();
       expect(authorize).not.toHaveBeenCalled();
@@ -206,9 +259,9 @@ describe('KakaoLoginButton', () => {
       sdk.getInitializedKakaoJsSdk.mockReturnValue(new Promise((resolve) => { release = resolve; }));
       renderButton();
       await click();
-      const firstState = window.sessionStorage.getItem(KAKAO_OAUTH_STATE_STORAGE_KEY);
+      const firstState = storedState();
       await click();
-      expect(window.sessionStorage.getItem(KAKAO_OAUTH_STATE_STORAGE_KEY)).toBe(firstState);
+      expect(storedState()).toBe(firstState);
       release({ Auth: { authorize } });
       await waitFor(() => expect(authorize).toHaveBeenCalledTimes(1));
       expect(authorize).toHaveBeenCalledWith(expect.objectContaining({ state: firstState }));
@@ -219,7 +272,7 @@ describe('KakaoLoginButton', () => {
       renderButton();
       await click();
       await waitFor(() => expect(assigned).not.toBeNull());
-      const stored = window.sessionStorage.getItem(KAKAO_OAUTH_STATE_STORAGE_KEY);
+      const stored = storedState();
       expect(assigned).toBe(`${HREF}&state=${stored}`);
       expect(reporter.reportClientError).toHaveBeenCalledWith(expect.objectContaining({ level: 'warn' }));
       expect(authorize).not.toHaveBeenCalled();

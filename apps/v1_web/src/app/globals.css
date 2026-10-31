@@ -1008,6 +1008,39 @@ button:disabled {
   flex-shrink: 0;
 }
 
+/* 계정 연결 안내(3단계) — 숫자 칩은 .tm-auth-feature-icon 을 쓰고, 글 두 줄이 위로 붙도록 정렬한다. */
+.tm-auth-steps {
+  margin-top: 0;
+  gap: 20px;
+}
+
+.tm-auth-step {
+  align-items: flex-start;
+}
+
+.tm-auth-step-number {
+  color: var(--blue700);
+  font-size: var(--font-size-label);
+  font-weight: 800;
+}
+
+.tm-auth-step-title,
+.tm-auth-step-body {
+  display: block;
+}
+
+.tm-auth-step-body {
+  margin-top: 2px;
+  line-height: 1.5;
+}
+
+.tm-auth-guide-links {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
 /* The guest button sits under the primary login button in the bottom CTA group. */
 .tm-auth-guest-link {
   margin-top: 16px;

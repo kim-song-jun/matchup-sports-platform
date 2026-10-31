@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { Card, DatePickerTextInput } from '@/components/v1-ui/primitives';
@@ -8,6 +8,7 @@ import { Button } from '@/components/v1-ui/button';
 import { PhoneConflictNotice } from '@/components/auth/otp/phone-conflict-notice';
 import { PhoneVerificationCard } from '@/components/auth/phone-verification/phone-verification-card';
 import { useV1AuthMe, useV1CheckNickname, useV1CompleteSocialProfile, useV1DeferSocialProfile } from '@/hooks/use-v1-api';
+import { getSignInThenLinkHint } from '@/lib/auth-link-errors';
 import { useSocialSignupExit } from './use-social-signup-exit';
 import { V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
@@ -25,6 +26,7 @@ import {
   SIGNUP_PROFILE_ERROR_MESSAGES,
 } from './signup-profile-validation';
 import { extractErrorMessage } from '@/lib/error-message';
+import type { V1SignInThenLinkDetails } from '@/types/api';
 
 type FieldErrors = Partial<Record<'nickname' | 'gender', string>>;
 type DuplicateCheckState = {
@@ -58,6 +60,9 @@ export function SocialSignupClient() {
   const [termsRecoveryPending, setTermsRecoveryPending] = useState(false);
   const exitFlow = useSocialSignupExit();
   const [phoneConflict, setPhoneConflict] = useState(false);
+  // 번호 중복 409 가 준 "원래 방법으로 로그인하면 자동 연결" 안내. 토큰이 있어야 자동 연결을 약속할 수 있다.
+  const [conflictHint, setConflictHint] = useState<V1SignInThenLinkDetails | null>(null);
+  const recordConflictHint = useCallback((failure: unknown) => setConflictHint(getSignInThenLinkHint(failure)), []);
   // 카카오가 동의항목 승인 하에 내려준 값(이름·번호·성별)을 자동으로 채운다.
   // 동의항목이 없으면 socialSignupPrefill 이 null 이라 아무것도 하지 않고 직접 입력 흐름 그대로다.
   const authMe = useV1AuthMe();
@@ -68,11 +73,17 @@ export function SocialSignupClient() {
     const redirect = sanitizeRedirectPath(new URLSearchParams(window.location.search).get('redirect')) ?? getSavedRedirectPath();
     return redirect ? `${path}?redirect=${encodeURIComponent(redirect)}` : path;
   };
+  const linkHint = conflictHint?.linkToken ? conflictHint : null;
+  const leaveFromConflict = (path: string, confirmFirst: boolean) => {
+    const target = conflictExitPath(path);
+    return linkHint ? exitFlow.leaveWithPendingLink(target, linkHint, { confirmFirst }) : exitFlow.leaveTo(target);
+  };
   const phoneConflictNotice = (
     <PhoneConflictNotice
       pending={exitFlow.pending}
-      onLogin={() => void exitFlow.leaveTo(conflictExitPath('/login'))}
-      onFindAccount={() => void exitFlow.leaveTo(conflictExitPath('/auth/find-account'))}
+      linkProvider={linkHint?.provider}
+      onLogin={() => void leaveFromConflict('/login', true)}
+      onFindAccount={() => void leaveFromConflict('/auth/find-account', false)}
     />
   );
   // 카카오가 제공한 번호는 추가 인증 없이 사용한다. 다른 번호로 바꾼 경우에만 직접 인증한다.
@@ -248,6 +259,7 @@ export function SocialSignupClient() {
           }
 
           if (nextError instanceof V1ApiError && nextError.code === 'PHONE_CONFLICT') {
+            recordConflictHint(nextError);
             setPhoneConflict(true);
             return;
           }
@@ -422,7 +434,7 @@ export function SocialSignupClient() {
           </label>
 
           {phoneDigits.length === 11 && !contactReady ? (
-            <PhoneVerificationCard mode="authed" phone={phoneDigits} onVerified={() => setPhoneVerified(true)} surface="inset" conflictNotice={phoneConflictNotice} />
+            <PhoneVerificationCard mode="authed" phone={phoneDigits} onVerified={() => setPhoneVerified(true)} surface="inset" conflictNotice={phoneConflictNotice} onFailure={recordConflictHint} />
           ) : null}
 
           {contactReady ? (

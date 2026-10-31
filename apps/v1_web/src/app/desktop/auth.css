@@ -157,7 +157,7 @@
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
- * 5. Exception pages (blocked, account-conflict, missing-email, etc.).
+ * 5. Exception pages (blocked, provider-denied, location-denied, etc.).
  *    Mobile: min-height:100%; padding 72px 24px 42px; centered.
  *    Desktop: natural card height, no big top padding (topbar is gone).
  * ───────────────────────────────────────────────────────────────────────────── */

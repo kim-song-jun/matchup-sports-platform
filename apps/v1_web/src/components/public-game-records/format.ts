@@ -203,6 +203,26 @@ export function periodPrefix(periodNumber: number, periodCount: number | null | 
 }
 
 /**
+ * 경기 방식 한 줄 — 정규 피리어드별 길이(분)로 만든다. 일정 카드와 경기 상세가 장소·일시 줄 아래에 적는다.
+ *
+ * - 길이 하나 → `단판 20분`
+ * - 길이 둘이 같음 → `전·후반 15분`
+ * - 길이 둘이 다름 → `전반 10분, 후반 15분`
+ * - 셋 이상(옛 설정) → `전반 10분, 후반 15분, 3피리어드 10분`
+ *
+ * 길이를 모르면(null·빈 배열·양수가 아닌 값이 하나라도 섞임) **null** — 일부만 적어 "전반 10분" 같은 틀린 말을
+ * 만들지 않고, 줄 자체를 그리지 않는다.
+ */
+export function formatPeriodFormat(periodMinutes: readonly number[] | null | undefined): string | null {
+  if (!periodMinutes || periodMinutes.length === 0) return null;
+  if (periodMinutes.some((minutes) => !Number.isFinite(minutes) || minutes <= 0)) return null;
+  if (periodMinutes.length === 1) return `단판 ${periodMinutes[0]}분`;
+  if (periodMinutes.length === 2 && periodMinutes[0] === periodMinutes[1]) return `전·후반 ${periodMinutes[0]}분`;
+  // 피리어드 이름은 같은 화면의 기록 묶음·운영 콘솔과 같은 `periodLabel` 로 부른다.
+  return periodMinutes.map((minutes, index) => `${periodLabel(index + 1)} ${minutes}분`).join(', ');
+}
+
+/**
  * alpha 실측 사고(2026-08) -- 대회 픽스처 하나의 골 이벤트가 `clockMs`
  * 27,166,083ms(≈452분)로 기록돼 공개 일정 화면에 `452′`가 그대로 나갔다.
  * 원인은 `clockMs`에 상한 검증이 아예 없다는 것(운영자가 경기 종료를 누르지

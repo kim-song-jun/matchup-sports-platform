@@ -13,6 +13,7 @@ import {
   fixtureStatusLabel,
   eventPresentation,
   formatClock,
+  formatPeriodFormat,
   formatScoreline,
   isClockAbnormal,
   periodLabel,
@@ -273,8 +274,9 @@ function EventsSection({
   const periodNumbers = Array.from(byPeriod.keys()).sort((a, b) => a - b);
 
   // 단판은 구간이 하나다 — 시간대 없는 기록도 "기타"로 떼지 않고 목록 끝에 합친다.
-  const groups: Array<{ id: string; label: string; events: readonly PublicMatchEvent[] }> = isSinglePeriod(periodCount)
-    ? [{ id: 'match-events-single', label: SINGLE_PERIOD_HEADING, events: [...periodNumbers.flatMap((period) => byPeriod.get(period)!), ...unknownPeriodEvents] }]
+  // 가를 구간이 없으니 머리말 글자는 그리지 않고 선만 둔다(`hideLabel`) — 이름은 스크린리더용 그룹 이름으로만 남는다.
+  const groups: Array<{ id: string; label: string; hideLabel?: boolean; events: readonly PublicMatchEvent[] }> = isSinglePeriod(periodCount)
+    ? [{ id: 'match-events-single', label: SINGLE_PERIOD_HEADING, hideLabel: true, events: [...periodNumbers.flatMap((period) => byPeriod.get(period)!), ...unknownPeriodEvents] }]
     : [
         ...periodNumbers.map((period) => ({ id: `match-events-period-${period}`, label: periodLabel(period), events: byPeriod.get(period)! })),
         ...(unknownPeriodEvents.length > 0 ? [{ id: 'match-events-period-unknown', label: '기타', events: unknownPeriodEvents }] : []),
@@ -284,9 +286,16 @@ function EventsSection({
     <div role="list" aria-label="득점·카드" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {groups.map((group) => (
         <div key={group.id} role="group" aria-labelledby={group.id}>
-          <div id={group.id} style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', marginBottom: 8 }}>
-            {group.label}
-          </div>
+          {group.hideLabel ? (
+            <>
+              <span id={group.id} className="sr-only">{group.label}</span>
+              <div aria-hidden="true" style={{ height: 1, background: 'var(--border)', marginBottom: 12 }} />
+            </>
+          ) : (
+            <div id={group.id} style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', marginBottom: 8 }}>
+              {group.label}
+            </div>
+          )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {group.events.map((event, index) => (
               <EventRow key={`${event.type}-${event.sideId}-${group.id}-${index}`} event={event} from={from} />
@@ -345,6 +354,7 @@ export function MatchDetailContent({
   placeBadge?: ReactNode;
 }) {
   const isStatusOnly = data.visibilityMode === 'status_only';
+  const periodFormat = formatPeriodFormat(data.periodMinutes);
   return (
     <div style={{ padding: '16px 20px 40px', display: 'flex', flexDirection: 'column', gap: 20 }}>
       <header>
@@ -416,6 +426,10 @@ export function MatchDetailContent({
             </span>
             {data.status === 'live' ? <LiveBadge clock={data.clock} periodBreak={data.periodBreak} periodCount={data.periodCount} /> : null}
           </div>
+          {/* 경기 방식("단판 20분"·"전·후반 15분") — 일시·장소 줄 바로 아래. 길이를 모르는 경기는 null 이라 줄이 없다. */}
+          {periodFormat ? (
+            <div style={{ marginTop: 4, textAlign: 'center', fontSize: 'var(--font-size-caption)', color: 'var(--text-caption)' }}>{periodFormat}</div>
+          ) : null}
           {/* 서버의 pendingProjection 은 진행 중(live)에도 켜진다 — 확정을 "기다리는" 문장은 경기가 끝난 뒤에만 맞다. */}
           {data.pendingProjection && data.status !== 'live' ? (
             <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--blue700)', textAlign: 'center' }}>

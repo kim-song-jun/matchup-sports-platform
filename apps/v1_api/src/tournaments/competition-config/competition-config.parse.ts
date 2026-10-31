@@ -200,3 +200,23 @@ export function regularPeriodCount(value: Prisma.JsonValue | null | undefined): 
   }
   return null;
 }
+
+/**
+ * 정규 피리어드별 길이(분) — 연장(extraTime)을 뺀 것만 설정 순서대로. 공개 화면의 "단판 20분"·"전·후반 15분" 표기용이다.
+ *
+ * `regularPeriodCount` 와 같은 기준으로 정규 피리어드를 센다(배열의 레코드 중 `extraTime !== true`) — 그래서 값이 있으면
+ * 길이는 항상 정규 피리어드 수와 같다. 길이를 읽을 수 없는 정규 피리어드가 하나라도 있으면(양수가 아닌 값·누락) 일부만
+ * 내보내 "전반 10분" 같은 틀린 말을 만들지 않도록 통째로 null 이다. 레거시 `{ count: N }` 모양도 길이가 없어 null,
+ * 정규 피리어드가 없어도 null — 화면은 그때 경기 방식 줄을 그리지 않는다.
+ */
+export function regularPeriodMinutes(value: Prisma.JsonValue | null | undefined): number[] | null {
+  if (!Array.isArray(value)) return null;
+  const minutes: number[] = [];
+  for (const raw of value) {
+    if (!isRecord(raw) || raw.extraTime === true) continue;
+    const durationMinutes = raw.durationMinutes;
+    if (typeof durationMinutes !== 'number' || !Number.isFinite(durationMinutes) || durationMinutes <= 0) return null;
+    minutes.push(durationMinutes);
+  }
+  return minutes.length > 0 ? minutes : null;
+}

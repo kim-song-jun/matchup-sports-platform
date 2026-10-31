@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { FormEvent, useEffect, useId, useRef, useState } from 'react';
+import { FormEvent, MouseEvent, useEffect, useId, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { AlertCircle } from 'lucide-react';
@@ -22,6 +22,7 @@ import { AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
 import { completeEmailLogin } from './email-login-completion';
 import { describeResendFailure, describeVerifyFailure, type StepUpFailure } from './login-step-up-errors';
 import { PasswordResetLink } from './password-reset-link';
+import { describeSocialLoginGuide } from './social-login-guide';
 
 const CODE_LENGTH = 6;
 const TICK_MS = 1000;
@@ -56,6 +57,15 @@ function DeadView({ reason, href }: { reason: DeadReason; href: string }) {
       </div>
     </AuthFrame>
   );
+}
+
+/** 가입 여부와 상관없이 모두에게 같은 안내다(추가 인증 화면이 계정 존재를 드러내지 않는다). */
+function describeNoMailHelp(): string {
+  return [
+    '메일이 오지 않으면 스팸함을 보거나 이메일·비밀번호를 다시 확인해 주세요.',
+    describeSocialLoginGuide(),
+    '비밀번호가 기억나지 않으면 비밀번호를 재설정해 주세요.',
+  ].join(' ');
 }
 
 function msUntil(iso: string, now: number) {
@@ -193,6 +203,10 @@ export function LoginStepUpVerifyClient() {
   };
 
   const requestPending = verify.isPending || resend.isPending;
+  // 확인 요청이 날아가는 중에 떠나면 응답이 세션 쿠키를 심은 채 아무도 모르게 끝난다.
+  const blockWhileRequesting = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (busyRef.current) event.preventDefault();
+  };
 
   return (
     <AuthFrame topTitle="본인 확인" backHref={emailLoginHref} className="tm-auth-email-frame" stage={AUTH_WELCOME_STAGE}>
@@ -237,7 +251,7 @@ export function LoginStepUpVerifyClient() {
               <span className="tm-text-caption">{inlineError.message}</span>
             </div>
           ) : null}
-          {inlineError?.recovery ? <PasswordResetLink redirect={redirect} /> : null}
+          {inlineError?.recovery ? <PasswordResetLink redirect={redirect} onClick={blockWhileRequesting} disabled={requestPending} /> : null}
           {notice?.tone === 'info' ? (
             <p className="tm-text-caption" role="status" style={{ color: 'var(--blue700)' }}>{notice.message}</p>
           ) : null}
@@ -267,20 +281,17 @@ export function LoginStepUpVerifyClient() {
             href={emailLoginHref}
             aria-disabled={requestPending || undefined}
             onClick={(event) => {
-              // 확인 요청이 날아가는 중에 떠나면 응답이 세션 쿠키를 심은 채 아무도 모르게 끝난다.
-              if (busyRef.current) {
-                event.preventDefault();
-                return;
-              }
-              clearLoginStepUp();
+              blockWhileRequesting(event);
+              if (!event.defaultPrevented) clearLoginStepUp();
             }}
           >
             다른 계정으로 로그인
           </Link>
         </div>
         <p className="tm-text-caption tm-auth-sub">
-          메일이 오지 않으면 스팸함을 보거나 이메일·비밀번호를 다시 확인해 주세요.
+          {describeNoMailHelp()}
         </p>
+        {inlineError?.recovery ? null : <PasswordResetLink redirect={redirect} onClick={blockWhileRequesting} disabled={requestPending} />}
       </form>
     </AuthFrame>
   );

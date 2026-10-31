@@ -115,6 +115,12 @@ describe('maskSensitive', () => {
     );
   });
 
+  // 탈퇴 신청 계정의 로그인 거절(403) 응답 details 가 에러 로그에 저장된다 — 토큰이 남으면 로그 열람자가 그 계정의 세션을 얻는다.
+  it('masks the withdrawal cancel token inside an error response body', () => {
+    const body = { code: 'ACCOUNT_WITHDRAWAL_PENDING', details: { withdrawalCancelToken: 'signed.value', expiresInSeconds: 600 } };
+    expect(maskSensitive(body).details).toEqual({ withdrawalCancelToken: '[REDACTED]', expiresInSeconds: 600 });
+  });
+
   // entry-fee 요청이 4xx/5xx 면 본문이 V1ErrorLog 에 무기한 저장된다 — 계좌번호·예금주가 평문으로 남으면 안 된다.
   it('masks league entry-fee bank account and holder (any key spelling), keeps bank name and amount', () => {
     const result = maskSensitive({

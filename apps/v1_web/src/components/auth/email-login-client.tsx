@@ -13,7 +13,6 @@ import { useV1EmailLogin } from '@/hooks/use-v1-api';
 import { V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
 import { isLoginStepUpResponse, LOGIN_STEP_UP_VERIFY_PATH, saveLoginStepUp } from '@/lib/login-step-up';
-import { isNativeAppleSignInAvailable } from '@/lib/native-apple';
 import { sanitizeRedirectPath } from '@/lib/session-storage';
 import { AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
 import { getEmailLoginViewModel } from './auth.view-model';
@@ -25,6 +24,7 @@ import {
   STEP_UP_UNAVAILABLE_MESSAGE,
 } from './login-step-up-errors';
 import { PasswordResetLink } from './password-reset-link';
+import { describeSocialLoginGuide } from './social-login-guide';
 
 const RATE_LIMITED_MESSAGE = '로그인 시도가 많아요. 잠시 후 다시 시도해 주세요.';
 const STEP_UP_STORAGE_FAILED_MESSAGE = '본인 확인 화면으로 이동하지 못했어요. 브라우저의 저장 공간 설정을 확인한 뒤 다시 시도해 주세요.';
@@ -33,12 +33,9 @@ type LoginError = { message: string; recovery?: boolean };
 
 function mapEmailLoginError(err: unknown): LoginError {
   if (err instanceof V1ApiError) {
-    // 계정 존재·가입 경로를 드러내지 않도록 항상 같은 안내를 쓴다. Apple 버튼은 iOS 앱에만 있다.
+    // 계정 존재·가입 경로를 드러내지 않도록 항상 같은 안내를 쓴다.
     if (err.code === 'UNAUTHENTICATED') {
-      const withApple = isNativeAppleSignInAvailable();
-      const signupMethods = withApple ? '카카오나 Apple' : '카카오';
-      const buttons = withApple ? "'카카오' 또는 'Apple로 계속하기'" : "'카카오'";
-      return { message: `이메일 또는 비밀번호가 맞지 않아요. ${signupMethods}로 가입하셨다면 로그인 첫 화면의 ${buttons} 버튼으로 로그인해 주세요.` };
+      return { message: `이메일 또는 비밀번호가 맞지 않아요. ${describeSocialLoginGuide()}` };
     }
     if (err.code === 'PERMISSION_DENIED') return { message: '로그인이 제한된 계정이에요. 고객센터에서 상태를 확인해 주세요.' };
     // 인증번호 발송 상한 — 기다려서 풀리는 게 아니라 비밀번호 재설정이 출구다.

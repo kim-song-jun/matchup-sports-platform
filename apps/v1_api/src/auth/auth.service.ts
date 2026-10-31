@@ -33,6 +33,8 @@ import type { LoginStepUpVerifyDto } from './dto/login-step-up.dto';
 import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
 import { PhoneVerificationService } from '../verification/phone-verification.service';
 import { verifyPhoneProofToken } from '../verification/phone-proof-token';
+import { isPhoneRegistered } from '../verification/phone-registered';
+import { withdrawalPendingException } from './withdrawal-cancel-token';
 
 const SOCIAL_SIGNUP_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -193,18 +195,11 @@ export class AuthService {
       });
     }
 
-    if (phone) {
-      const existingPhone = await this.prisma.v1User.findUnique({
-        where: { phone },
-        select: { id: true },
+    if (phone && (await isPhoneRegistered(this.prisma, phone))) {
+      throw new ConflictException({
+        code: 'PHONE_CONFLICT',
+        message: 'Phone is already registered',
       });
-
-      if (existingPhone) {
-        throw new ConflictException({
-          code: 'PHONE_CONFLICT',
-          message: 'Phone is already registered',
-        });
-      }
     }
 
     const phoneVerificationRequired = this.phoneVerification.enabled;
@@ -387,7 +382,7 @@ export class AuthService {
   /** Shared by the password path and the step-up verify path, so both end in the same session response. */
   private async completeEmailLogin(identity: EmailLoginIdentity, keys: LoginAttemptKeys) {
     if (identity.status !== 'active' || identity.user.accountStatus !== 'active') {
-      this.assertNotWithdrawalPending(identity.user.accountStatus);
+      this.assertNotWithdrawalPending(identity.user.accountStatus, identity.status === 'active' ? identity.user : undefined);
       throw new ForbiddenException({
         code: 'PERMISSION_DENIED',
         message: 'This account cannot sign in',
@@ -477,6 +472,7 @@ export class AuthService {
             onboardingStatus: true,
             createdAt: true,
             updatedAt: true,
+            sessionEpoch: true,
           },
         },
       },
@@ -484,7 +480,10 @@ export class AuthService {
 
     if (existingIdentity) {
       if (existingIdentity.status !== 'active' || existingIdentity.user.accountStatus !== 'active') {
-        this.assertNotWithdrawalPending(existingIdentity.user.accountStatus);
+        this.assertNotWithdrawalPending(
+          existingIdentity.user.accountStatus,
+          existingIdentity.status === 'active' ? existingIdentity.user : undefined,
+        );
         throw new ForbiddenException({
           code: 'PERMISSION_DENIED',
           message: 'This account cannot sign in',
@@ -735,6 +734,7 @@ export class AuthService {
             onboardingStatus: true,
             createdAt: true,
             updatedAt: true,
+            sessionEpoch: true,
           },
         },
       },
@@ -742,7 +742,10 @@ export class AuthService {
 
     if (existingIdentity) {
       if (existingIdentity.status !== 'active' || existingIdentity.user.accountStatus !== 'active') {
-        this.assertNotWithdrawalPending(existingIdentity.user.accountStatus);
+        this.assertNotWithdrawalPending(
+          existingIdentity.user.accountStatus,
+          existingIdentity.status === 'active' ? existingIdentity.user : undefined,
+        );
         throw new ForbiddenException({
           code: 'PERMISSION_DENIED',
           message: 'This account cannot sign in',
@@ -1470,16 +1473,12 @@ export class AuthService {
     return this.sessionResponse(userId, userEmail);
   }
 
-  private assertNotWithdrawalPending(accountStatus: V1AccountStatus) {
-    if (accountStatus === 'withdrawal_pending') {
-      throw new ForbiddenException({
-        code: 'ACCOUNT_WITHDRAWAL_PENDING',
-        message: '탈퇴 신청 중인 계정이에요. 문의는 고객센터로 연락해 주세요.',
-      });
-    }
+  /** `proven` is passed only by a sign-in that verified this account's own credentials; it adds the cancel token to the refusal. */
+  private assertNotWithdrawalPending(accountStatus: V1AccountStatus, proven?: { id: string; sessionEpoch: number }) {
+    if (accountStatus === 'withdrawal_pending') throw withdrawalPendingException(proven);
   }
 
-  private async sessionResponse(
+  async sessionResponse(
     userId: string,
     userEmail: string | null,
     options?: { social?: boolean; sessionEpoch?: number },

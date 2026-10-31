@@ -1,13 +1,22 @@
 import type { ReactNode } from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { PhoneVerifyPageClient } from './phone-verify-page-client';
 import * as api from '@/hooks/use-v1-api';
+import { V1ApiError } from '@/lib/api-client';
+
+const TIMESTAMP = '2026-10-31T00:00:00.000Z';
+const nav = vi.hoisted(() => ({ search: '' }));
+const push = vi.hoisted(() => ({ unsubscribe: vi.fn() }));
+
+vi.mock('@/hooks/use-v1-push-registration', () => ({
+  useV1PushRegistration: () => ({ unsubscribe: push.unsubscribe }),
+}));
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => new URLSearchParams(nav.search),
   usePathname: () => '/my/phone-verify',
 }));
 
@@ -23,6 +32,10 @@ function authMe(phone: string | null) {
     isPending: false,
   } as never;
 }
+
+beforeEach(() => {
+  nav.search = '';
+});
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -99,5 +112,107 @@ describe('PhoneVerifyPageClient — 인증 대상 번호 확인·수정', () => 
 
     expect(screen.getByLabelText('휴대폰 번호')).toBeInTheDocument();
     expect(screen.queryByText('인증번호를 받을 번호')).not.toBeInTheDocument();
+  });
+});
+
+describe('PhoneVerifyPageClient — 번호가 다른 계정에 있을 때', () => {
+  const replace = vi.fn();
+  const logout = vi.fn();
+
+  const originalLocation = window.location;
+
+  beforeEach(() => {
+    replace.mockReset();
+    logout.mockReset().mockResolvedValue({ ok: true });
+    push.unsubscribe.mockReset().mockResolvedValue(true);
+    // jsdom 은 하드 내비게이션을 지원하지 않아 location.replace 만 가로챈다.
+    Object.defineProperty(window, 'location', { configurable: true, value: { ...window.location, replace } });
+    vi.spyOn(api, 'useV1Logout').mockReturnValue({ mutateAsync: logout, isPending: false } as never);
+    vi.spyOn(api, 'useV1AuthedPhoneConfirm').mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    vi.spyOn(api, 'useV1AuthMe').mockReturnValue(authMe('01012345678'));
+  });
+
+  afterEach(() => {
+    Object.defineProperty(window, 'location', { configurable: true, value: originalLocation });
+  });
+
+  async function requestCodeFailingWith(code: string, message: string, statusCode: number) {
+    const requestMock = vi.fn().mockRejectedValue(new V1ApiError({ status: 'error', statusCode, code, message, timestamp: TIMESTAMP }));
+    vi.spyOn(api, 'useV1AuthedPhoneRequest').mockReturnValue({ mutateAsync: requestMock, isPending: false } as never);
+    wrap(<PhoneVerifyPageClient />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '인증번호 받기' }));
+    });
+  }
+
+  it('PHONE_CONFLICT 이면 출구 없는 오류 문구 대신 안내와 두 출구를 보여 준다', async () => {
+    await requestCodeFailingWith('PHONE_CONFLICT', '이미 다른 계정에서 사용 중인 번호예요.', 409);
+
+    expect(screen.getByText(/이 번호로 이미 가입한 계정이 있어요/)).toBeInTheDocument();
+    expect(screen.queryByText('이미 다른 계정에서 사용 중인 번호예요.')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '기존 계정으로 로그인' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '계정 찾기' })).toBeEnabled();
+  });
+
+  it.each([
+    ['기존 계정으로 로그인', '/login'],
+    ['계정 찾기', '/auth/find-account'],
+  ])('%s 를 누르면 로그아웃한 뒤 %s 로 이동한다 — 로그인한 채로는 /login 이 홈으로 되돌려 보낸다', async (label, path) => {
+    await requestCodeFailingWith('PHONE_CONFLICT', '이미 다른 계정에서 사용 중인 번호예요.', 409);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: label }));
+    });
+
+    expect(logout).toHaveBeenCalledTimes(1);
+    expect(replace).toHaveBeenCalledWith(path);
+  });
+
+  it('로그아웃되기 전에 이 기기의 푸시 등록부터 해지한다 — 로그인한 완성 계정이라 등록이 있을 수 있다', async () => {
+    await requestCodeFailingWith('PHONE_CONFLICT', '이미 다른 계정에서 사용 중인 번호예요.', 409);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '기존 계정으로 로그인' }));
+    });
+
+    expect(push.unsubscribe).toHaveBeenCalledWith({ reason: 'sign-out' });
+    expect(push.unsubscribe.mock.invocationCallOrder[0]).toBeLessThan(logout.mock.invocationCallOrder[0]);
+  });
+
+  it('버튼을 누르면 지금 계정에서 로그아웃된다는 것을 미리 알린다', async () => {
+    await requestCodeFailingWith('PHONE_CONFLICT', '이미 다른 계정에서 사용 중인 번호예요.', 409);
+
+    expect(screen.getByText('버튼을 누르면 지금 계정에서 로그아웃돼요.')).toBeInTheDocument();
+  });
+
+  it('막혀서 넘어온 화면의 redirect 를 이동 경로에 이어 붙인다', async () => {
+    nav.search = 'redirect=%2Ftournaments%2Fabc%2Fapply';
+    await requestCodeFailingWith('PHONE_CONFLICT', '이미 다른 계정에서 사용 중인 번호예요.', 409);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '기존 계정으로 로그인' }));
+    });
+
+    expect(replace).toHaveBeenCalledWith('/login?redirect=%2Ftournaments%2Fabc%2Fapply');
+  });
+
+  it('로그아웃이 실패하면 이동하지 않고 알린다', async () => {
+    logout.mockRejectedValue(new V1ApiError({ status: 'error', statusCode: 500, code: 'INTERNAL_ERROR', message: '서버 오류', timestamp: TIMESTAMP }));
+    await requestCodeFailingWith('PHONE_CONFLICT', '이미 다른 계정에서 사용 중인 번호예요.', 409);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '계정 찾기' }));
+    });
+
+    expect(replace).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent('로그아웃하지 못했어요. 잠시 후 다시 시도해 주세요.');
+  });
+
+  it('다른 오류는 기존 문구 그대로 보이고 출구 버튼은 없다', async () => {
+    await requestCodeFailingWith('VERIFICATION_RESEND_COOLDOWN', '조금 뒤에 다시 요청해 주세요.', 429);
+
+    expect(screen.getByText('조금 뒤에 다시 요청해 주세요.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '기존 계정으로 로그인' })).not.toBeInTheDocument();
+    expect(logout).not.toHaveBeenCalled();
   });
 });

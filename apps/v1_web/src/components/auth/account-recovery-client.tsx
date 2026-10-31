@@ -12,6 +12,7 @@ import {
   useV1ResetPasswordByEmail,
 } from '@/hooks/use-v1-api';
 import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
+import { isNativeAppleSignInAvailable } from '@/lib/native-apple';
 import { sanitizeRedirectPath } from '@/lib/session-storage';
 import type { V1FoundAccount } from '@/types/api';
 import { AUTH_NOTICE_STAGE, AuthFrame } from './auth-page';
@@ -38,6 +39,64 @@ function looksLikeEmail(value: string): boolean {
   return /^\S+@\S+\.\S+$/.test(value.trim());
 }
 
+/** 번호로 찾은 계정이 실제로 쓰는 로그인 수단만 안내하고, 수단마다 맞는 화면으로 보낸다. */
+function FoundAccountCard({ account, emailLoginHref, loginHref, onResetPassword }: {
+  account: V1FoundAccount;
+  emailLoginHref: string;
+  loginHref: string;
+  onResetPassword: () => void;
+}) {
+  // 로그인 첫 화면에 없는 제공자(naver 등)는 안내할 수 없어 뺀다. Apple 버튼은 iOS 앱에만 있다.
+  const hasKakao = account.providers.includes('kakao');
+  const hasApple = account.providers.includes('apple');
+  const appleButton = hasApple && isNativeAppleSignInAvailable();
+  const socialNames = [hasKakao ? '카카오' : null, hasApple ? 'Apple' : null].filter(Boolean).join('·');
+  const links = [
+    ...(account.hasPassword ? [{ href: emailLoginHref, label: socialNames ? '이메일로 로그인하기' : '로그인하러 가기' }] : []),
+    ...(hasKakao ? [{ href: loginHref, label: '카카오로 로그인하기' }] : []),
+    ...(appleButton ? [{ href: loginHref, label: 'Apple로 로그인하기' }] : []),
+  ];
+  let guidance: string | null = null;
+  if (!account.hasPassword) {
+    guidance = socialNames
+      ? `이 계정은 ${socialNames} 로그인으로 가입했어요. 가입한 방법으로 로그인해 주세요.`
+      : '이 계정으로 로그인할 수 있는 방법을 확인하지 못했어요. 문의 창구로 알려 주세요.';
+  } else if (socialNames) {
+    guidance = `${socialNames} 로그인도 쓸 수 있어요.`;
+  }
+  let label = '가입한 로그인 방법';
+  if (account.maskedEmail) label = '가입한 이메일';
+  else if (!socialNames) label = '로그인 방법을 확인하지 못했어요';
+  const value = account.maskedEmail ?? (socialNames || null);
+
+  return (
+    <Card pad={16} className="tm-auth-soft-card">
+      <div className="tm-text-body-lg">{label}</div>
+      {value ? <div className="tm-text-heading" style={{ marginTop: 4 }}>{value}</div> : null}
+      {guidance ? <div className="tm-text-caption" style={{ marginTop: 8 }}>{guidance}</div> : null}
+      {hasApple && !appleButton ? <div className="tm-text-caption" style={{ marginTop: 4 }}>Apple 로그인은 iOS 앱에서 쓸 수 있어요.</div> : null}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 16 }}>
+        {links.map((link, index) => (
+          <Link
+            key={link.label}
+            className={`tm-btn tm-btn-lg tm-btn-block ${index === 0 ? 'tm-btn-primary' : 'tm-btn-neutral'}`}
+            href={link.href}
+          >
+            {link.label}
+          </Link>
+        ))}
+        {/* 이 환경에서 쓸 수 있는 로그인 버튼이 없으면 막다른 길이 되지 않게 문의 창구를 준다. */}
+        {links.length === 0 ? (
+          <Link className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" href="/contact">문의 창구 보기</Link>
+        ) : null}
+        {account.hasPassword ? (
+          <Button block onClick={onResetPassword} size="sm" type="button" variant="ghost">비밀번호 재설정하기</Button>
+        ) : null}
+      </div>
+    </Card>
+  );
+}
+
 export function AccountRecoveryClient({ initialMode = 'find-id', backHref = '/login/email', redirectPath }: {
   initialMode?: Mode;
   backHref?: string;
@@ -57,9 +116,9 @@ export function AccountRecoveryClient({ initialMode = 'find-id', backHref = '/lo
   const [emailInput, setEmailInput] = useState('');
   const [emailProofToken, setEmailProofToken] = useState<string | null>(null);
   /**
-   * 카카오 전용 계정이라는 사실은 사서함 주인임을 증명한 **뒤**에야 드러난다 — 요청 단계에서
+   * 소셜 전용 계정이라는 사실은 사서함 주인임을 증명한 **뒤**에야 드러난다 — 요청 단계에서
    * 알려 주면 이메일 하나로 계정 종류를 훑을 수 있기 때문이다. 그래서 서버가 재설정을 막을 때
-   * (PASSWORD_LOGIN_UNAVAILABLE) 비로소 세운다.
+   * (PASSWORD_LOGIN_UNAVAILABLE) 비로소 세운다. 응답은 어느 제공자인지 알려 주지 않는다.
    */
   const [resetBlockedSocialOnly, setResetBlockedSocialOnly] = useState(false);
   const [newPassword, setNewPassword] = useState('');
@@ -146,20 +205,18 @@ export function AccountRecoveryClient({ initialMode = 'find-id', backHref = '/lo
   };
 
   const copy = MODE_COPY[mode];
-  // 번호 조회 결과는 아이디 찾기에만 쓰고, 이메일 재설정은 해당 이메일의 서버 판정을 따른다.
-  const socialOnly = mode === 'find-id' ? found !== null && !found.hasPassword : resetBlockedSocialOnly;
   const resetting = resetPasswordByEmail.isPending;
 
   // 본인 확인을 마쳤고 아직 비밀번호를 못 바꾼 상태에서만 새 비밀번호 입력을 띄운다.
   const verifiedForReset = Boolean(emailProofToken);
   const matchesCurrentAccount = !returnToSettings || Boolean(currentAccount.data
     && normalizedEmail && normalizedEmail === accountEmail.trim().toLowerCase());
-  const passwordFormVisible = mode === 'reset-password' && verifiedForReset && matchesCurrentAccount && !socialOnly && !resetDone;
+  const passwordFormVisible = mode === 'reset-password' && verifiedForReset && matchesCurrentAccount && !resetBlockedSocialOnly && !resetDone;
   const passwordReady = newPassword.length >= 8 && newPassword === passwordConfirm;
 
   const submitReset = async () => {
     if (!mounted.current || mode !== 'reset-password' || emailFlowGeneration !== emailRequestGeneration.current
-      || !passwordReady || resetting || !matchesCurrentAccount || !emailProofToken || socialOnly) return;
+      || !passwordReady || resetting || !matchesCurrentAccount || !emailProofToken || resetBlockedSocialOnly) return;
     const resetGeneration = emailFlowGeneration;
     setError(null);
     try {
@@ -291,25 +348,19 @@ export function AccountRecoveryClient({ initialMode = 'find-id', backHref = '/lo
           )}
 
           {found && mode === 'find-id' ? (
-            <Card pad={16} className="tm-auth-soft-card">
-              <div className="tm-text-body-lg">가입한 이메일</div>
-              <div className="tm-text-heading" style={{ marginTop: 4 }}>{found.maskedEmail ?? '—'}</div>
-              {socialOnly ? (
-                <div className="tm-text-caption" style={{ marginTop: 8 }}>
-                  이 계정은 카카오 로그인으로 가입했어요. 카카오로 로그인해 주세요.
-                </div>
-              ) : null}
-              <Link className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" href={emailLoginHref} style={{ marginTop: 16 }}>
-                로그인하러 가기
-              </Link>
-            </Card>
+            <FoundAccountCard
+              account={found}
+              emailLoginHref={emailLoginHref}
+              loginHref={loginHref}
+              onResetPassword={() => switchMode('reset-password')}
+            />
           ) : null}
 
-          {mode === 'reset-password' && socialOnly ? (
+          {mode === 'reset-password' && resetBlockedSocialOnly ? (
             <Card pad={16} className="tm-auth-soft-card">
               <div className="tm-text-body-lg">비밀번호가 없는 계정이에요</div>
               <div className="tm-text-caption" style={{ marginTop: 4 }}>
-                카카오 로그인으로 가입해서 바꿀 비밀번호가 없어요. 카카오로 로그인해 주세요.
+                카카오나 Apple 같은 소셜 로그인으로 가입해서 바꿀 비밀번호가 없어요. 가입한 방법으로 로그인해 주세요.
               </div>
               <Link className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" href={loginHref} style={{ marginTop: 16 }}>
                 로그인 화면으로

@@ -1,6 +1,7 @@
 import { createHmac } from 'node:crypto';
 import { issueEmailProofToken } from '../verification/email-proof-token';
 import { issuePhoneProofToken, verifyPhoneProofToken } from '../verification/phone-proof-token';
+import { issueWithdrawalCancelToken } from './withdrawal-cancel-token';
 import {
   SOCIAL_LINK_TOKEN_TTL_SECONDS,
   isLinkableSocialProvider,
@@ -127,6 +128,12 @@ describe('social link token', () => {
     expect(readSocialLinkToken(issuePhoneProofToken('01012345678', 'signup', NOW), NOW)).toBeNull();
     expect(readSocialLinkToken(issuePhoneProofToken('01012345678', 'password_reset', NOW), NOW)).toBeNull();
     expect(readSocialLinkToken(issueEmailProofToken('me@example.test', 'password_reset', NOW), NOW)).toBeNull();
+  });
+
+  it('does not accept a withdrawal-cancel token, and cannot be minted through the phone proof issuer', () => {
+    expect(readSocialLinkToken(issueWithdrawalCancelToken('user-1', 0, NOW), NOW)).toBeNull();
+    // A signup phone proof is the bare `{phone}:{exp}`; a "phone" spelled like this token's payload must not mint it.
+    expect(() => issuePhoneProofToken('social_link_pending:abc')).toThrow();
   });
 
   it('cannot be spent as a phone proof either', () => {

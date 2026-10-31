@@ -4,6 +4,7 @@ import { V1AuthProvider } from '@prisma/client';
 import { AppleIdentityService } from './apple-identity.service';
 import { AppleTokenService } from './apple-token.service';
 import { AuthService } from './auth.service';
+import { readWithdrawalCancelToken } from './withdrawal-cancel-token';
 import { LoginSecurityService } from './login-security/login-security.service';
 import { LoginStepUpService } from './login-security/login-step-up.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -253,13 +254,40 @@ describe('AuthService.appleSignIn', () => {
       status: 'active',
       user: {
         id: 'user-1', email: null, accountStatus: 'withdrawal_pending',
-        onboardingStatus: 'completed', createdAt: new Date(), updatedAt: new Date(),
+        onboardingStatus: 'completed', createdAt: new Date(), updatedAt: new Date(), sessionEpoch: 9,
       },
     });
 
     await expect(signIn()).rejects.toMatchObject({
       response: { code: 'ACCOUNT_WITHDRAWAL_PENDING' },
     });
+  });
+
+  /** The Apple token was verified for this very identity, so the refusal carries the way to take the withdrawal back. */
+  it('hands a verified withdrawal-pending account the cancel token, and an unlinked identity none', async () => {
+    const savedSecret = process.env.V1_SESSION_SECRET;
+    process.env.V1_SESSION_SECRET = 'x'.repeat(48);
+    appleIdentity.verifyIdentityToken.mockResolvedValue(claims());
+    const pending = (status: string) => ({
+      id: 'identity-1',
+      status,
+      user: {
+        id: 'user-1', email: null, accountStatus: 'withdrawal_pending',
+        onboardingStatus: 'completed', createdAt: new Date(), updatedAt: new Date(), sessionEpoch: 9,
+      },
+    });
+
+    prisma.v1AuthIdentity.findUnique.mockResolvedValue(pending('active'));
+    const failure = (await signIn().catch((error: unknown) => error)) as {
+      getResponse(): { details: { withdrawalCancelToken: string } };
+    };
+    expect(readWithdrawalCancelToken(failure.getResponse().details.withdrawalCancelToken)).toEqual({ userId: 'user-1', sessionEpoch: 9 });
+
+    prisma.v1AuthIdentity.findUnique.mockResolvedValue(pending('unlinked'));
+    await expect(signIn()).rejects.not.toHaveProperty('response.details');
+
+    if (savedSecret === undefined) delete process.env.V1_SESSION_SECRET;
+    else process.env.V1_SESSION_SECRET = savedSecret;
   });
 
   it('does not touch the database when the token is refused', async () => {

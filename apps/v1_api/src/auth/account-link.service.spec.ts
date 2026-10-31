@@ -357,6 +357,7 @@ describe('AccountLinkService.linkKakao', () => {
     it.each([
       ['has finished signup', { user: { onboardingStatus: 'completed' } }],
       ['is suspended', { user: { accountStatus: 'suspended' } }],
+      ['has a withdrawal pending', { user: { accountStatus: 'withdrawal_pending' } }],
       ['holds an operator role', { user: { adminUser: { id: 'admin-row' } } }],
       ['has a password login', { identity: { passwordHash: 'hash' } }],
       ['has a second login method', { extraIdentities: [identity('apple-on-empty', EMPTY, 'apple', 'apple-sub')] }],
@@ -466,6 +467,13 @@ describe('AccountLinkService.linkKakao', () => {
       expect(transactions[0].$queryRaw).toHaveBeenCalledTimes(1);
       expect(String(transactions[0].$queryRaw.mock.calls[0][0].join(' '))).toMatch(/FOR UPDATE/);
       expect(transactions[0].$queryRaw.mock.calls[0][1]).toBe(CALLER);
+    });
+
+    it('refuses a caller whose withdrawal is pending, so linking cannot be used to act on a withdrawing account', async () => {
+      const { service, state } = build({ users: [user(CALLER, { accountStatus: 'withdrawal_pending' })], identities: [emailLogin(CALLER)] });
+
+      expect(await failure(service.linkKakao(CALLER, TOKEN_FORM, null))).toMatchObject({ code: 'PERMISSION_DENIED' });
+      expect(state.identities).toHaveLength(1);
     });
 
     it('refuses a caller whose account is no longer active', async () => {

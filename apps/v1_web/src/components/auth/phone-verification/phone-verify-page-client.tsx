@@ -3,9 +3,11 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { CheckCircle2 } from 'lucide-react';
-import { Card } from '@/components/v1-ui/primitives';
+import { AlertBanner, Card } from '@/components/v1-ui/primitives';
 import { sanitizeRedirectPath } from '@/lib/session-storage';
 import { useV1AuthMe } from '@/hooks/use-v1-api';
+import { PhoneConflictNotice } from '@/components/auth/otp/phone-conflict-notice';
+import { useSignOutAndLeave } from '@/components/auth/use-sign-out-and-leave';
 import { formatPhone, normalizeSeparatedDigits } from '@/components/auth/signup-profile-validation';
 import { PhoneVerificationCard } from './phone-verification-card';
 
@@ -20,7 +22,9 @@ export function PhoneVerifyPageClient() {
   const searchParams = useSearchParams();
   // 대회 신청처럼 "인증 때문에 막힌 화면"에서 넘어온 경우 그 자리로 돌려보낸다.
   // 외부 URL·javascript: 주입을 막기 위해 상대 경로만 통과시킨다(sanitizeRedirectPath).
-  const redirectTo = sanitizeRedirectPath(searchParams.get('redirect')) ?? '/home';
+  const requestedRedirect = sanitizeRedirectPath(searchParams.get('redirect'));
+  const redirectTo = requestedRedirect ?? '/home';
+  const signOut = useSignOutAndLeave();
   const authMe = useV1AuthMe();
   /**
    * authMe 가 오기 전에는 번호 UI 를 렌더하지 않는다. 로딩 중 existingPhone 이 '' 라
@@ -49,6 +53,25 @@ export function PhoneVerifyPageClient() {
   };
 
   const verified = alreadyVerified || done;
+
+  // 번호 주인은 다른 계정이다. 로그인한 채로는 /login 이 홈으로 되돌려 보내므로 로그아웃하고 나간다.
+  const leaveTo = (path: string) => void signOut.signOutAndLeave(path, {
+    failureMessage: '로그아웃하지 못했어요. 잠시 후 다시 시도해 주세요.',
+  });
+  const withRedirect = (path: string) => (requestedRedirect ? `${path}?redirect=${encodeURIComponent(requestedRedirect)}` : path);
+  const phoneConflictNotice = (
+    <>
+      <PhoneConflictNotice
+        pending={signOut.pending}
+        onLogin={() => leaveTo(withRedirect('/login'))}
+        onFindAccount={() => leaveTo(withRedirect('/auth/find-account'))}
+      />
+      <p className="tm-text-caption" style={{ margin: 0, color: 'var(--text-caption)' }}>
+        버튼을 누르면 지금 계정에서 로그아웃돼요.
+      </p>
+      {signOut.error ? <AlertBanner message={signOut.error} tone="error" /> : null}
+    </>
+  );
 
   return (
     <div className="tm-content-enter" style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: 16 }}>
@@ -122,7 +145,7 @@ export function PhoneVerifyPageClient() {
           )}
 
           {!authLoading && phoneDigits.length === 11 ? (
-            <PhoneVerificationCard mode="authed" phone={phoneDigits} onVerified={handleVerified} />
+            <PhoneVerificationCard mode="authed" phone={phoneDigits} onVerified={handleVerified} conflictNotice={phoneConflictNotice} />
           ) : null}
         </>
       )}

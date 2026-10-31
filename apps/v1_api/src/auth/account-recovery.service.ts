@@ -27,10 +27,27 @@ export function maskEmail(email: string): string {
   return `${head}***@${domain}`;
 }
 
+const SOCIAL_PROVIDER_LABELS: Partial<Record<string, string>> = {
+  kakao: '카카오',
+  apple: 'Apple',
+  naver: '네이버',
+};
+
+/** 비밀번호가 없는 계정에 알려 줄, 그 계정이 실제로 가진 소셜 로그인 안내. */
+export function socialLoginGuidance(providers: readonly string[]): string {
+  const labels = [...new Set(providers.flatMap((provider) => SOCIAL_PROVIDER_LABELS[provider] ?? []))];
+  if (labels.length === 0) return '이 계정은 비밀번호로 로그인할 수 없어요. 처음 가입한 방법으로 로그인해 주세요.';
+  const names = labels.join('·');
+  // Every label ends in a vowel or ㄹ (Apple reads as 애플), so "로" is the right particle for each.
+  return labels.length === 1
+    ? `이 계정은 ${names} 로그인으로 가입했어요. ${names}로 로그인해 주세요.`
+    : `이 계정은 ${names} 로그인으로 가입했어요. ${names} 중 하나로 로그인해 주세요.`;
+}
+
 export interface FoundAccount {
   /** 마스킹된 로그인 이메일. 소셜 전용 계정이라 이메일 로그인이 불가능하면 null. */
   maskedEmail: string | null;
-  /** 이 계정으로 로그인할 수 있는 수단 — 화면이 "카카오로 로그인하세요"를 안내하는 근거. */
+  /** 이 계정으로 로그인할 수 있는 수단 — 화면이 어떤 로그인으로 안내할지 정하는 근거. */
   providers: string[];
   hasPassword: boolean;
 }
@@ -75,7 +92,7 @@ export class AccountRecoveryService {
    * 가입 안 된 주소는 코드를 받는 사람이 없으므로 대조가 성공할 수 없고, 그 실패는 "코드를
    * 틀린 것"과 구분되지 않는다.
    *
-   * 카카오 전용 계정도 메일은 보낸다. 사서함 주인임을 증명한 다음에 "카카오로 로그인하세요"를
+   * 소셜 전용 계정도 메일은 보낸다. 사서함 주인임을 증명한 다음에 실제 로그인 수단을
    * 안내하는 편이, 요청 단계에서 계정 종류를 흘리는 것보다 안전하면서 안내도 정확하다.
    */
   async requestPasswordResetEmail(
@@ -132,12 +149,14 @@ export class AccountRecoveryService {
     const emailIdentity = user.authIdentities.find(
       (identity) => identity.provider === V1AuthProvider.email,
     );
-    // 카카오로만 가입한 계정은 비밀번호라는 개념이 없다. 여기서 비밀번호를 새로 만들어 주면
+    // 소셜로만 가입한 계정은 비밀번호라는 개념이 없다. 여기서 비밀번호를 새로 만들어 주면
     // 소셜 전용 계정에 이메일 로그인 경로를 몰래 열어 주는 셈이라, 안내로 되돌린다.
     if (!emailIdentity) {
+      const providers = user.authIdentities.map((identity) => identity.provider);
       throw new BadRequestException({
         code: 'PASSWORD_LOGIN_UNAVAILABLE',
-        message: '이 계정은 카카오 로그인으로 가입했어요. 카카오로 로그인해 주세요.',
+        message: socialLoginGuidance(providers),
+        details: { providers },
       });
     }
 
@@ -170,8 +189,8 @@ export class AccountRecoveryService {
 
   /**
    * 로그인 이메일로 활성 계정을 찾는다. 로그인은 V1AuthIdentity(provider=email) 를 키로 쓰지만
-   * 여기서는 V1User.email 로 찾는다 — 카카오 전용 계정에는 이메일 신원이 없어서, 신원으로만
-   * 찾으면 그 계정에 "카카오로 로그인하세요" 안내조차 못 하게 된다.
+   * 여기서는 V1User.email 로 찾는다 — 소셜 전용 계정에는 이메일 신원이 없어서, 신원으로만
+   * 찾으면 그 계정에 소셜 로그인 안내조차 못 하게 된다.
    * (두 값은 가입·이메일 인증 시 함께 갱신돼 항상 같은 표준형을 가리킨다.)
    */
   private async findActiveUserByEmail(email: string) {

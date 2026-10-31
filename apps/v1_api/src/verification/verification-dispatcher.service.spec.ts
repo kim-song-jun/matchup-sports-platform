@@ -1,8 +1,13 @@
-import { ServiceUnavailableException } from '@nestjs/common';
+import { Logger, ServiceUnavailableException } from '@nestjs/common';
 import type { SmsEventLogService } from './sms-event-log.service';
 import type { EmailSender } from './email/email-sender';
 import type { SmsSender } from './sms/sms-sender';
+import { recordEmailDeliveryFailure } from './email/email-delivery-failure';
 import { VerificationDispatcherService, isTestAddress } from './verification-dispatcher.service';
+
+// The window folding and payload are covered in email-delivery-failure.spec; here only the hand-off is.
+jest.mock('./email/email-delivery-failure', () => ({ recordEmailDeliveryFailure: jest.fn() }));
+const recordFailure = recordEmailDeliveryFailure as jest.Mock;
 
 function emailMock(enabled = false, send = jest.fn().mockResolvedValue(undefined)): EmailSender {
   return { enabled, send };
@@ -119,6 +124,61 @@ describe('VerificationDispatcherService', () => {
 
     await expect(d.send('email', 'runner@example.com', '123456'))
       .rejects.toMatchObject({ response: { code: 'EMAIL_SEND_FAILED' } });
+  });
+
+  describe('메일 발송 실패 알림', () => {
+    const failing = (purpose?: 'password_reset' | 'login_step_up') => {
+      const error = Object.assign(new Error('not authorized'), { name: 'AccessDeniedException' });
+      const send = jest.fn().mockRejectedValue(error);
+      const prisma = prismaStub();
+      const d = new VerificationDispatcherService(smsMock(false), emailMock(true, send), eventLogStub(), prisma);
+      return { d, error, prisma, run: () => d.send('email', 'runner@example.com', '123456', purpose) };
+    };
+
+    beforeEach(() => recordFailure.mockReset());
+
+    it('발송이 실패하면 용도와 오류를 기록하고 호출자에게는 그대로 EMAIL_SEND_FAILED 를 준다', async () => {
+      const { run, error, prisma } = failing('password_reset');
+
+      await expect(run()).rejects.toMatchObject({ response: { code: 'EMAIL_SEND_FAILED' } });
+
+      expect(recordFailure).toHaveBeenCalledTimes(1);
+      expect(recordFailure).toHaveBeenCalledWith(prisma, { purpose: 'password_reset', error });
+    });
+
+    it('용도를 넘기지 않은 호출은 기본 용도(verify)로 기록한다', async () => {
+      await expect(failing().run()).rejects.toMatchObject({ response: { code: 'EMAIL_SEND_FAILED' } });
+
+      expect(recordFailure).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ purpose: 'verify' }));
+    });
+
+    it('알림 기록이 실패해도 호출자가 받는 오류는 바뀌지 않고, 기록 실패는 로그로 남는다', async () => {
+      recordFailure.mockRejectedValue(new Error('db down'));
+      const logError = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+      const { run } = failing('login_step_up');
+
+      await expect(run()).rejects.toMatchObject({ response: { code: 'EMAIL_SEND_FAILED' } });
+
+      expect(logError).toHaveBeenCalledWith(expect.stringContaining('db down'));
+      logError.mockRestore();
+    });
+
+    it('발송이 성공하면 아무것도 기록하지 않는다', async () => {
+      const d = new VerificationDispatcherService(smsMock(false), emailMock(true), eventLogStub(), prismaStub());
+
+      await d.send('email', 'runner@example.com', '123456');
+
+      expect(recordFailure).not.toHaveBeenCalled();
+    });
+
+    it('SMS 발송 실패는 메일 알림 대상이 아니다', async () => {
+      const sms = smsMock(true, jest.fn().mockRejectedValue(new Error('solapi down')));
+      const d = new VerificationDispatcherService(sms, emailMock(), eventLogStub(), prismaStub());
+
+      await expect(d.send('phone', '01012345678', '123456')).rejects.toMatchObject({ response: { code: 'SMS_SEND_FAILED' } });
+
+      expect(recordFailure).not.toHaveBeenCalled();
+    });
   });
 
   // 실제로 메일을 보내면서 응답에 코드까지 실어 보내면 OTP 를 그대로 노출하는 셈이다.

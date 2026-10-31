@@ -6,7 +6,7 @@ describe('PhoneVerificationPublicController (MT SMS OTP)', () => {
       issueChallenge: jest.fn(),
       verifyCode: jest.fn(),
       issueProof: jest.fn(),
-      isRegistered: jest.fn().mockResolvedValue(false),
+      lookupRegistration: jest.fn().mockResolvedValue({ registered: false, withdrawalPendingUntil: null }),
       ...overrides,
     };
     const controller = new PhoneVerificationPublicController(phoneVerification as never);
@@ -38,20 +38,37 @@ describe('PhoneVerificationPublicController (MT SMS OTP)', () => {
       expect(phoneVerification.verifyCode).toHaveBeenCalledWith('01012345678', '123456');
       // purpose 를 생략하면 기존 동작 그대로 가입용 토큰이 발급된다(service 기본값 'signup').
       expect(phoneVerification.issueProof).toHaveBeenCalledWith('01012345678', undefined);
-      expect(result).toEqual({ verified: true, proofToken: 'proof-token-value', registered: false });
+      expect(result).toEqual({ verified: true, proofToken: 'proof-token-value', registered: false, withdrawalPendingUntil: null });
     });
 
     it.each([true, false])('reports registered=%s from the number lookup next to the proof token', async (registered) => {
       const { controller, phoneVerification } = buildController({
         verifyCode: jest.fn().mockResolvedValue(true),
         issueProof: jest.fn().mockReturnValue('proof-token-value'),
-        isRegistered: jest.fn().mockResolvedValue(registered),
+        lookupRegistration: jest.fn().mockResolvedValue({ registered, withdrawalPendingUntil: null }),
       });
 
       const result = await controller.verify({ phone: '01012345678', code: '123456' });
 
-      expect(phoneVerification.isRegistered).toHaveBeenCalledWith('01012345678');
-      expect(result).toEqual({ verified: true, proofToken: 'proof-token-value', registered });
+      expect(phoneVerification.lookupRegistration).toHaveBeenCalledWith('01012345678');
+      expect(result).toEqual({ verified: true, proofToken: 'proof-token-value', registered, withdrawalPendingUntil: null });
+    });
+
+    it('passes on when the grace period of the withdrawal holding the number ends', async () => {
+      const { controller } = buildController({
+        verifyCode: jest.fn().mockResolvedValue(true),
+        issueProof: jest.fn().mockReturnValue('proof-token-value'),
+        lookupRegistration: jest
+          .fn()
+          .mockResolvedValue({ registered: true, withdrawalPendingUntil: '2026-11-30T00:00:00.000Z' }),
+      });
+
+      await expect(controller.verify({ phone: '01012345678', code: '123456' })).resolves.toEqual({
+        verified: true,
+        proofToken: 'proof-token-value',
+        registered: true,
+        withdrawalPendingUntil: '2026-11-30T00:00:00.000Z',
+      });
     });
 
     // Whether a number has an account is only told to someone who just proved they hold it.
@@ -61,7 +78,7 @@ describe('PhoneVerificationPublicController (MT SMS OTP)', () => {
       });
 
       await expect(controller.verify({ phone: '01012345678', code: '000000' })).rejects.toThrow();
-      expect(phoneVerification.isRegistered).not.toHaveBeenCalled();
+      expect(phoneVerification.lookupRegistration).not.toHaveBeenCalled();
     });
 
     // 계정 찾기·비밀번호 재설정은 가입용 토큰과 섞이면 안 되므로 용도를 그대로 전달해야 한다.

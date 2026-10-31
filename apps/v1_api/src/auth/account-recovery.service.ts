@@ -5,6 +5,7 @@ import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { EmailVerificationService } from '../verification/email-verification.service';
 import { verifyEmailProofToken } from '../verification/email-proof-token';
 import { verifyPhoneProofToken } from '../verification/phone-proof-token';
+import { withdrawalPendingUntil } from '../users/withdrawal-grace';
 import { LoginSecurityService } from './login-security/login-security.service';
 import { normalizeEmail } from './normalize-email';
 import { hashPassword } from './password-hash';
@@ -50,6 +51,10 @@ export interface FoundAccount {
   /** 이 계정으로 로그인할 수 있는 수단 — 화면이 어떤 로그인으로 안내할지 정하는 근거. */
   providers: string[];
   hasPassword: boolean;
+  /**
+   * 이 번호를 쥔 계정이 탈퇴 유예 중이면 그 유예가 끝나는 시각(ISO). 활성 계정이거나 탈퇴 신청 기록이 없으면 null.
+   */
+  withdrawalPendingUntil: string | null;
 }
 
 @Injectable()
@@ -65,12 +70,20 @@ export class AccountRecoveryService {
   ) {}
 
   async findAccountByPhone(dto: FindAccountDto): Promise<FoundAccount> {
-    const user = await this.assertPhoneOwner(dto.phone, dto.proofToken);
+    this.assertPhoneProof(dto.phone, dto.proofToken);
+
+    // 번호는 유일해서 두 계정이 같이 걸릴 수 없지만, 걸리면 쓸 수 있는 활성 계정을 먼저 보여 준다.
+    const active = await this.findPhoneHolder(dto.phone, 'active');
+    const user = active ?? (await this.findPhoneHolder(dto.phone, 'withdrawal_pending'));
+    if (!user) throw accountNotFound();
 
     return {
       maskedEmail: user.email ? maskEmail(user.email) : null,
       providers: user.authIdentities.map((identity) => identity.provider),
       hasPassword: user.authIdentities.some((identity) => Boolean(identity.passwordHash)),
+      withdrawalPendingUntil: active
+        ? null
+        : await withdrawalPendingUntil(this.prisma, { id: user.id, accountStatus: 'withdrawal_pending' }),
     };
   }
 
@@ -212,16 +225,18 @@ export class AccountRecoveryService {
    * 'password_reset' 용도여야 하며 가입·소셜 연결 증명과 구분한다. 이 증명만으로
    * 기존 계정의 비밀번호를 변경할 수는 없다.
    */
-  private async assertPhoneOwner(phone: string, proofToken: string) {
+  private assertPhoneProof(phone: string, proofToken: string) {
     if (!verifyPhoneProofToken(proofToken, phone, 'password_reset')) {
       throw new BadRequestException({
         code: 'PHONE_NOT_VERIFIED',
         message: '휴대폰 본인인증을 다시 진행해 주세요.',
       });
     }
+  }
 
-    const user = await this.prisma.v1User.findFirst({
-      where: { phone, accountStatus: 'active' },
+  private findPhoneHolder(phone: string, accountStatus: 'active' | 'withdrawal_pending') {
+    return this.prisma.v1User.findFirst({
+      where: { phone, accountStatus },
       select: {
         id: true,
         email: true,
@@ -231,16 +246,24 @@ export class AccountRecoveryService {
         },
       },
     });
+  }
+
+  private async assertPhoneOwner(phone: string, proofToken: string) {
+    this.assertPhoneProof(phone, proofToken);
+
+    const user = await this.findPhoneHolder(phone, 'active');
 
     // 번호 주인임을 이미 증명한 뒤라, 가입 여부를 알려 줘도 남의 정보가 새지 않는다
     // (증명 없이 조회하게 두면 번호만으로 가입 여부를 훑을 수 있어 그때는 감춰야 한다).
-    if (!user) {
-      throw new NotFoundException({
-        code: 'ACCOUNT_NOT_FOUND',
-        message: '이 번호로 가입된 계정을 찾지 못했어요.',
-      });
-    }
+    if (!user) throw accountNotFound();
 
     return user;
   }
+}
+
+function accountNotFound() {
+  return new NotFoundException({
+    code: 'ACCOUNT_NOT_FOUND',
+    message: '이 번호로 가입된 계정을 찾지 못했어요.',
+  });
 }

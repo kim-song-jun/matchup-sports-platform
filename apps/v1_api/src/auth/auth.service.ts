@@ -34,6 +34,7 @@ import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.servi
 import { PhoneVerificationService } from '../verification/phone-verification.service';
 import { verifyPhoneProofToken } from '../verification/phone-proof-token';
 import { isPhoneRegistered } from '../verification/phone-registered';
+import { withdrawalPendingUntil } from '../users/withdrawal-grace';
 import { withdrawalPendingException } from './withdrawal-cancel-token';
 
 const SOCIAL_SIGNUP_TTL_MS = 24 * 60 * 60 * 1000;
@@ -1172,13 +1173,19 @@ export class AuthService {
           phone,
           id: { not: userId },
         },
-        select: { id: true },
+        select: { id: true, accountStatus: true },
       });
 
       if (existingPhone) {
         // Only a proven number may carry a link token for its holder's account; otherwise the advice stands alone.
         const claims = pendingAccountLinkClaims(userId, user.authIdentities);
-        if (claims && phoneProven) throw signInThenLinkConflict('PHONE_CONFLICT', claims, [existingPhone.id]);
+        if (claims && phoneProven) {
+          const pendingWithdrawal =
+            existingPhone.accountStatus === 'withdrawal_pending'
+              ? { withdrawalPendingUntil: await withdrawalPendingUntil(this.prisma, existingPhone) }
+              : undefined;
+          throw signInThenLinkConflict('PHONE_CONFLICT', claims, [existingPhone.id], pendingWithdrawal);
+        }
         if (claims) throw signInThenLinkHint('PHONE_CONFLICT', claims.provider);
         throw new ConflictException({
           code: 'PHONE_CONFLICT',

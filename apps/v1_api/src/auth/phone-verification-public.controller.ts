@@ -20,11 +20,14 @@ export class PhoneVerificationPublicController {
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   async verify(@Body() dto: PhoneVerifyDto) {
     await this.phoneVerification.verifyCode(dto.phone, dto.code);
-    // Whether the number already belongs to an account is told only after the code proved the caller holds it.
+    // Whether the number already belongs to an account, and whether that account is a withdrawal waiting out its
+    // grace period, is told only after the code proved the caller holds it.
+    const registration = await this.phoneVerification.lookupRegistration(dto.phone);
     return {
       verified: true,
       proofToken: this.phoneVerification.issueProof(dto.phone, dto.purpose),
-      registered: await this.phoneVerification.isRegistered(dto.phone),
+      registered: registration.registered,
+      withdrawalPendingUntil: registration.withdrawalPendingUntil,
     };
   }
 }

@@ -16,6 +16,8 @@ export const SOCIAL_LINK_ADMIN_FORBIDDEN_CODE = 'SOCIAL_LINK_ADMIN_FORBIDDEN';
 /** 이메일 인증 증명(`emailLinkToken`)이 만료됐거나 이 계정·주소의 것이 아니라는 400 코드. */
 export const EMAIL_LINK_TOKEN_INVALID_CODE = 'EMAIL_LINK_TOKEN_INVALID';
 
-/** 인증 메일을 보낼 수 없다는 503 코드 — 메일 발송이 설정되지 않았거나 이번 발송이 실패했다. 인증번호는 남지 않으므로 잠시 뒤 다시 받을 수 있다. */
-export const EMAIL_SEND_UNAVAILABLE_CODE = 'EMAIL_SEND_UNAVAILABLE';
+/**
+ * 인증 메일 발송이 이번에 실패했다는 503 코드. 인증번호는 남지 않으므로 바로 다시 받을 수 있다.
+ * 메일을 보낼 수단 자체가 없는 503 은 `EMAIL_SEND_UNAVAILABLE`(`auth-link-errors.ts`)이다.
+ */
 export const EMAIL_SEND_FAILED_CODE = 'EMAIL_SEND_FAILED';

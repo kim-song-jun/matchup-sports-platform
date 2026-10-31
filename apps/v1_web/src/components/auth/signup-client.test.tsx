@@ -266,7 +266,7 @@ describe('SignupClient required profile contract', () => {
   });
 
   it('가입이 끝나면 카카오 쪽으로 나갈 때 보관해 둔 이메일도 지운다', async () => {
-    savePendingEmailLink('left-from-earlier@example.com');
+    savePendingEmailLink({ email: 'left-from-earlier@example.com' });
     render(<SignupClient />);
     await advanceToProfile();
     fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '홍길동' } });
@@ -872,13 +872,26 @@ describe('SignupClient 이미 가입된 번호 안내', () => {
 
     clickLink(screen.getByRole('link', { name: /카카오.*로 가입했어요/ }));
 
-    expect(readPendingEmailLink()).toBe('signup@example.com');
+    expect(readPendingEmailLink()).toEqual({ email: 'signup@example.com', returnTo: null });
     const stored = JSON.parse(window.sessionStorage.getItem(PENDING_EMAIL_LINK_STORAGE_KEY) as string) as Record<string, unknown>;
-    expect(Object.keys(stored).sort()).toEqual(['email', 'expiresAt']);
+    expect(Object.keys(stored).sort()).toEqual(['email', 'expiresAt', 'returnTo']);
     const everything = [window.sessionStorage, window.localStorage].flatMap((storage) => (
       Object.keys(storage).map((key) => `${key}=${storage.getItem(key)}`)
     )).join('\n');
     expect(everything).not.toContain('password123');
+  });
+
+  it('원래 가려던 곳(redirect)이 있으면 이메일과 함께 보관해, 로그인 뒤 연결을 마치거나 미루고 돌아갈 수 있게 한다', async () => {
+    hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'PROOF-TOKEN', registered: true });
+    window.sessionStorage.setItem('teameet.v1.savedRedirect', '/matches/abc');
+    render(<SignupClient />);
+    await advanceToVerify();
+    await verifyPhone('01012345678');
+    await screen.findByText(CARD_TITLE);
+
+    clickLink(screen.getByRole('link', { name: /카카오.*로 가입했어요/ }));
+
+    expect(readPendingEmailLink()).toEqual({ email: 'signup@example.com', returnTo: '/matches/abc' });
   });
 
   it('이메일 로그인이나 계정 찾기로 나갈 때는 이메일을 보관하지 않는다', async () => {

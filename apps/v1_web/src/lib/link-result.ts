@@ -9,6 +9,20 @@ export const LOGIN_METHODS_PATH = '/my/settings/login-methods';
 /** 소셜 계정에 이메일·비밀번호 로그인을 더하는 단계 화면. */
 export const EMAIL_LINK_PATH = `${LOGIN_METHODS_PATH}/email`;
 
+/** 연결을 마치거나 미루고 돌아갈 곳. 같은 origin 경로여야 하고, 이 화면 자신이면 돌아갈 곳이 아니다. */
+export function parseEmailLinkReturnTo(value: string | null | undefined): string | null {
+  const path = sanitizeRedirectPath(value);
+  if (!path) return null;
+  const { pathname } = new URL(path, 'https://teameet.internal');
+  return pathname === EMAIL_LINK_PATH || pathname.startsWith(`${EMAIL_LINK_PATH}/`) ? null : path;
+}
+
+/** 이메일 연결 화면 경로. 돌아갈 곳이 있으면 `?redirect=` 로 싣는다(이메일 같은 값은 주소에 싣지 않는다). */
+export function emailLinkPath(returnTo?: string | null): string {
+  const target = parseEmailLinkReturnTo(returnTo);
+  return target ? `${EMAIL_LINK_PATH}?redirect=${encodeURIComponent(target)}` : EMAIL_LINK_PATH;
+}
+
 const LINK_RESULT_QUERY = 'linkResult';
 const LINK_PROVIDER_QUERY = 'provider';
 

@@ -9,7 +9,7 @@ const NOW = Date.parse('2026-10-31T10:00:00.000Z');
 
 function fillAllSlots() {
   savePendingSocialLink({ next: 'sign_in_then_link', provider: 'kakao', linkToken: 'signed-link-token', linkTokenExpiresInSeconds: 600 }, NOW);
-  savePendingEmailLink('typed@example.com', NOW);
+  savePendingEmailLink({ email: 'typed@example.com' }, NOW);
   saveWithdrawalCancel({ token: 'withdrawal-cancel-token-0001', expiresInSeconds: 600 }, '/my', NOW);
 }
 
@@ -22,7 +22,7 @@ describe('clearAuthHandoffStorage', () => {
   it('removes every hand-off slot, so the next person on this tab cannot reuse the previous token or email', () => {
     fillAllSlots();
     expect(peekPendingSocialLink(NOW)).not.toBeNull();
-    expect(readPendingEmailLink(NOW)).toBe('typed@example.com');
+    expect(readPendingEmailLink(NOW)?.email).toBe('typed@example.com');
     expect(readWithdrawalCancel(NOW)).not.toBeNull();
 
     clearAuthHandoffStorage();
@@ -39,7 +39,7 @@ describe('clearAuthHandoffStorage', () => {
     clearStoredV1Session();
 
     expect(peekPendingSocialLink(NOW)).not.toBeNull();
-    expect(readPendingEmailLink(NOW)).toBe('typed@example.com');
+    expect(readPendingEmailLink(NOW)?.email).toBe('typed@example.com');
     expect(readWithdrawalCancel(NOW)).not.toBeNull();
   });
 });

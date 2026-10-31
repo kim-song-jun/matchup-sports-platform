@@ -24,6 +24,8 @@ const storeToken = (token: string, provider: 'kakao' | 'apple' = 'kakao') =>
 let client: QueryClient;
 const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
 const mount = (initial: Account | undefined) => renderHook(({ current }) => usePendingSocialLinkResolver(current), { wrapper, initialProps: { current: initial } });
+/** 리졸버가 결과·약관·가입 이어가기 화면으로 이동을 시작했는지 — 같은 게이트의 다른 자동 이동이 그 화면을 덮어쓰지 않게 보는 표식. */
+const routedOf = (view: ReturnType<typeof mount>) => view.result.current.routed.current;
 
 const linkRequests: unknown[] = [];
 
@@ -101,6 +103,26 @@ describe('usePendingSocialLinkResolver — 로그인 뒤 자동 연결', () => {
     mount(account());
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/signup/social'));
     expect(peekPendingSocialLink()).toBeNull();
+  });
+
+  it('이동을 시작하면 routed 표식이 서고, 이동하지 않은 동안에는 서지 않는다', async () => {
+    const waiting = mount(undefined);
+    expect(routedOf(waiting)).toBe(false);
+    const noToken = mount(account());
+    expect(routedOf(noToken)).toBe(false);
+
+    storeToken(PENDING_LINK_MSW.tokens.kakao);
+    const view = mount(account());
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/my/settings/login-methods?linkResult=linked&provider=kakao'));
+    expect(routedOf(view)).toBe(true);
+  });
+
+  it('만료된 토큰의 안내 이동도 routed 표식을 세운다', () => {
+    savePendingSocialLink({ next: 'sign_in_then_link', provider: 'kakao', linkToken: PENDING_LINK_MSW.tokens.kakao, linkTokenExpiresInSeconds: 60 }, Date.now() - 3_600_000);
+    const view = mount(account());
+
+    expect(router.replace).toHaveBeenCalledWith('/my/settings/login-methods?linkResult=expired&provider=kakao');
+    expect(routedOf(view)).toBe(true);
   });
 
   it('토큰이 없으면 아무 요청도 하지 않는다', async () => {

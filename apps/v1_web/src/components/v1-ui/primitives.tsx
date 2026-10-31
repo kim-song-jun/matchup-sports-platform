@@ -199,17 +199,21 @@ const ALERT_BANNER_STYLES: Record<AlertBannerTone, { bg: string; color: string }
 export function AlertBanner({
   message,
   tone = 'error',
+  assertive = false,
 }: {
   message: string;
   tone?: AlertBannerTone;
+  /** error 가 아닌 tone 도 바로 읽혀야 할 때(사용자가 하던 일이 되돌려진 안내 등) 켠다. 글자 모양은 tone 그대로다. */
+  assertive?: boolean;
 }) {
   const s = ALERT_BANNER_STYLES[tone];
   // error만 즉시 공지(assertive), info/warning은 비긴급이라 polite 공지로 스크린리더를 끊지 않음
   const isError = tone === 'error';
+  const announceNow = isError || assertive;
   return (
     <div
-      role={isError ? 'alert' : 'status'}
-      aria-live={isError ? 'assertive' : 'polite'}
+      role={announceNow ? 'alert' : 'status'}
+      aria-live={announceNow ? 'assertive' : 'polite'}
       style={{
         padding: '12px 16px',
         borderRadius: 'var(--radius-control)',

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import type { RefObject } from 'react';
 import { useRouter } from 'next/navigation';
 import { useV1LinkPending } from '@/hooks/use-v1-api';
 import { isTransientFailure, isUnauthenticatedError, V1ApiError } from '@/lib/api-client';
@@ -43,13 +44,16 @@ function termsReconsentRoute(error: unknown): string | null {
  *   400 토큰 오류·403)만 토큰을 지우고 결과로 이동한다. 401(로그인이 풀림)은 건드리지 않는다.
  *
  * @param account 인증이 확인된 현재 계정(`/auth/me`). 로그인 전이거나 아직 확인 중이면 undefined.
+ * @returns `routed.current` 는 이 훅이 화면 이동(연결 결과·약관·가입 이어가기)을 시작하면 true 가 된다. 같은 게이트의 다른 자동 이동이
+ *   그 화면을 덮어쓰지 않도록 보는 표식이다(이동을 시작하기 직전, 같은 렌더의 뒤 효과가 읽을 수 있게 동기로 바꾼다).
  */
-export function usePendingSocialLinkResolver(account: Pick<V1AuthMe, 'user' | 'termsCompliance'> | undefined) {
+export function usePendingSocialLinkResolver(account: Pick<V1AuthMe, 'user' | 'termsCompliance'> | undefined): { readonly routed: RefObject<boolean> } {
   const router = useRouter();
   const { mutate: linkPending } = useV1LinkPending();
   // 요청이 끝나기 전에 effect 가 다시 돌아도(auth/me 갱신) 같은 토큰을 두 번 보내지 않는다.
   const inFlightTokenRef = useRef<string | null>(null);
   const attemptsRef = useRef(0);
+  const routedRef = useRef(false);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 재시도 가능한 실패 뒤 effect 를 다시 돌리는 신호.
   const [retryTick, setRetryTick] = useState(0);
@@ -68,6 +72,7 @@ export function usePendingSocialLinkResolver(account: Pick<V1AuthMe, 'user' | 't
     const pending = takePendingSocialLink();
     if (!pending) return;
     if (pending.expired) {
+      routedRef.current = true;
       router.replace(buildLinkResultPath({ linkResult: 'expired', provider: pending.provider }));
       return;
     }
@@ -78,6 +83,7 @@ export function usePendingSocialLinkResolver(account: Pick<V1AuthMe, 'user' | 't
       onSuccess: (result) => {
         clearPendingSocialLink();
         inFlightTokenRef.current = null;
+        routedRef.current = true;
         router.replace(buildLinkResultPath({ linkResult: linkResultFromSuccess(result), provider: result.provider }));
       },
       onError: (error) => {
@@ -91,13 +97,17 @@ export function usePendingSocialLinkResolver(account: Pick<V1AuthMe, 'user' | 't
         }
         const reconsentRoute = termsReconsentRoute(error);
         if (reconsentRoute) {
+          routedRef.current = true;
           router.replace(reconsentRoute);
           return;
         }
         clearPendingSocialLink();
+        routedRef.current = true;
         // 이 계정이 가입 도중이면 연결 결과보다 가입을 이어 가는 화면이 먼저다.
         router.replace(getSignupIncompleteRoute(error) ?? buildLinkResultPath({ linkResult: linkResultFromError(error), provider: pending.provider }));
       },
     });
   }, [account, linkPending, retryTick, router]);
+
+  return { routed: routedRef };
 }

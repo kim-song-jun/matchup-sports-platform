@@ -158,8 +158,11 @@ export function getSignupCompleteViewModel(): SignupCompleteViewModel {
   };
 }
 
-/** 소셜 계정에 이메일 로그인을 더한 직후의 완료 화면. 가입 완료 화면과 같은 그래픽·단계 카드를 쓴다. */
-export function getEmailLinkCompleteViewModel(email: string, loginMethodsHref: string): SignupCompleteViewModel {
+/**
+ * 소셜 계정에 이메일 로그인을 더한 직후의 완료 화면. 가입 완료 화면과 같은 그래픽·단계 카드를 쓴다.
+ * 연결하던 도중에 가려던 곳(`returnTo`)이 있으면 그곳으로, 없으면 로그인 방법 화면으로 돌아간다.
+ */
+export function getEmailLinkCompleteViewModel(email: string, loginMethodsHref: string, returnTo: string | null = null): SignupCompleteViewModel {
   return {
     title: '이메일 로그인이 연결됐어요',
     sub: `이제 ${email} 과 비밀번호로도 로그인할 수 있어요.`,
@@ -167,7 +170,9 @@ export function getEmailLinkCompleteViewModel(email: string, loginMethodsHref: s
       { title: '이메일 인증을 마쳤어요', body: '이 이메일이 계정 이메일이 됐어요.', done: true },
       { title: '비밀번호를 정했어요', body: '기존 로그인 방법도 그대로 쓸 수 있어요.', done: true },
     ],
-    primary: { label: '로그인 방법으로 돌아가기', href: loginMethodsHref },
+    primary: returnTo
+      ? { label: '하던 곳으로 돌아가기', href: returnTo }
+      : { label: '로그인 방법으로 돌아가기', href: loginMethodsHref },
   };
 }
 

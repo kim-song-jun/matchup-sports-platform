@@ -25,8 +25,10 @@ const COPY: Record<EmailLinkInterruption, { title: string; body: string }> = {
  * 입력을 바꿔도 풀리지 않는 이유로 흐름이 멈췄을 때의 화면. 단계 화면 대신 나타나고, 갈 곳은 하나다.
  * 다시 로그인(recent-login)은 로그아웃한 뒤 이 연결 화면으로 돌아오는 로그인 경로로 보낸다.
  */
-export function EmailLinkInterruptionView({ kind, onRelogin, relogin }: {
+export function EmailLinkInterruptionView({ kind, backHref, onRelogin, relogin }: {
   kind: EmailLinkInterruption;
+  /** 상단 뒤로 가기가 가는 곳 — 이 화면에 오기 전에 가려던 곳이 있으면 그곳이다. */
+  backHref: string;
   onRelogin: () => void;
   relogin: { pending: boolean; error: string | null };
 }) {
@@ -41,7 +43,7 @@ export function EmailLinkInterruptionView({ kind, onRelogin, relogin }: {
     <AuthFrame
       stage={AUTH_WELCOME_STAGE}
       topTitle="이메일 로그인 연결"
-      backHref={LOGIN_METHODS_PATH}
+      backHref={backHref}
       appBack
       fixedAction={
         kind === 'recent-login' ? (

@@ -540,7 +540,7 @@ export function SignupClient() {
                   socialLoginHref={withRedirect('/login')}
                   findAccountHref={withRedirect('/auth/find-account')}
                   // 이메일만 보관한다. 비밀번호는 가입 화면 밖으로 내보내지 않는다.
-                  onSocialLoginSelect={() => { savePendingEmailLink(normalizedEmail); }}
+                  onSocialLoginSelect={() => { savePendingEmailLink({ email: normalizedEmail, returnTo: currentRedirect() }); }}
                 />
               ) : isSendablePhone && !phoneProofToken ? (
                 <>
@@ -678,9 +678,14 @@ export function SignupClient() {
   );
 }
 
-/** 가입을 떠나 로그인·계정 찾기로 갈 때 원래 가려던 곳을 이어 준다(소셜 가입의 충돌 출구와 같은 출처). */
+/** 가입 화면이 이어받은 원래 가려던 곳(소셜 가입의 충돌 출구와 같은 출처). */
+function currentRedirect() {
+  return sanitizeRedirectPath(new URLSearchParams(window.location.search).get('redirect')) ?? getSavedRedirectPath();
+}
+
+/** 가입을 떠나 로그인·계정 찾기로 갈 때 원래 가려던 곳을 이어 준다. */
 function withRedirect(path: string) {
-  const redirect = sanitizeRedirectPath(new URLSearchParams(window.location.search).get('redirect')) ?? getSavedRedirectPath();
+  const redirect = currentRedirect();
   return redirect ? `${path}?redirect=${encodeURIComponent(redirect)}` : path;
 }
 

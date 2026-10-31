@@ -8,7 +8,10 @@ import { EMAIL_LINK_MSW } from '@/test/msw/auth-link-handlers';
 import { server } from '@/test/msw/server';
 import { EmailLinkClient } from './email-link-client';
 
-const nav = vi.hoisted(() => ({ router: { replace: vi.fn(), push: vi.fn(), back: vi.fn() } }));
+const nav = vi.hoisted(() => ({
+  router: { replace: vi.fn(), push: vi.fn(), back: vi.fn() },
+  params: new URLSearchParams(),
+}));
 const signOut = vi.hoisted(() => ({
   signOutAndLeave: vi.fn(),
   pending: false,
@@ -18,7 +21,7 @@ const signOut = vi.hoisted(() => ({
 vi.mock('next/navigation', () => ({
   usePathname: () => '/my/settings/login-methods/email',
   useRouter: () => nav.router,
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => nav.params,
 }));
 vi.mock('@/components/auth/use-sign-out-and-leave', () => ({ useSignOutAndLeave: () => signOut }));
 
@@ -43,6 +46,7 @@ afterAll(() => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  nav.params = new URLSearchParams();
   window.sessionStorage.clear();
   window.localStorage.clear();
   signOut.pending = false;
@@ -244,6 +248,8 @@ describe('EmailLinkClient — 이메일 단계의 오류', () => {
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('이미 다른 계정에서 쓰는 이메일이에요.');
+    // 고칠 곳이 이 입력칸이라 포커스가 버튼에서 입력칸으로 돌아온다.
+    await waitFor(() => expect(emailField()).toHaveFocus());
     expect(emailField()).toHaveAttribute('aria-invalid', 'true');
     expect(emailField()).toHaveAccessibleDescription('이미 다른 계정에서 쓰는 이메일이에요.');
     expect(screen.getByRole('link', { name: '고객센터에 알려 주세요' })).toHaveAttribute('href', '/my/inquiries/new');
@@ -388,7 +394,8 @@ describe('EmailLinkClient — 인증번호·비밀번호 단계의 오류', () =
     await user.click(screen.getByRole('button', { name: '연결하기' }));
 
     expect(await heading(EMAIL_STEP)).toHaveFocus();
-    expect(screen.getByText('이메일 인증이 만료돼서 처음부터 다시 해야 해요. 인증번호를 다시 받아 주세요.')).toBeInTheDocument();
+    // 하던 일이 되돌려진 안내라 즉시 읽히게(role=alert) 한다.
+    expect(screen.getByRole('alert')).toHaveTextContent('이메일 인증이 만료돼서 처음부터 다시 해야 해요. 인증번호를 다시 받아 주세요.');
     expect(emailField()).toHaveValue(EMAIL_LINK_MSW.emails.ok);
 
     // 되돌아온 첫 단계에서 이미 쓴 인증번호를 건너뛰지 않고 새로 보낸다.
@@ -513,7 +520,7 @@ describe('EmailLinkClient — 비밀번호 단계', () => {
 
 describe('EmailLinkClient — 가입 화면에서 이어 온 이메일', () => {
   it('보관해 둔 이메일이 1단계에 채워지고 "비밀번호는 저장하지 않았다"고 알리며, 칸은 비워진다', async () => {
-    savePendingEmailLink('Typed-Login@Example.com');
+    savePendingEmailLink({ email: 'Typed-Login@Example.com' });
     renderClient();
 
     expect(await heading('이메일을 연결할까요?')).toBeInTheDocument();
@@ -526,7 +533,7 @@ describe('EmailLinkClient — 가입 화면에서 이어 온 이메일', () => {
 
   it('이메일이 채워져 있어도 인증번호와 비밀번호는 새로 거친다', async () => {
     const user = userEvent.setup();
-    savePendingEmailLink(EMAIL_LINK_MSW.emails.ok);
+    savePendingEmailLink({ email: EMAIL_LINK_MSW.emails.ok });
     renderClient();
     await heading('이메일을 연결할까요?');
 
@@ -542,7 +549,7 @@ describe('EmailLinkClient — 가입 화면에서 이어 온 이메일', () => {
 
   it('이메일을 고치면 일반 1단계로 돌아가 안내가 사라진다', async () => {
     const user = userEvent.setup();
-    savePendingEmailLink(EMAIL_LINK_MSW.emails.ok);
+    savePendingEmailLink({ email: EMAIL_LINK_MSW.emails.ok });
     renderClient();
     await heading('이메일을 연결할까요?');
 
@@ -561,7 +568,7 @@ describe('EmailLinkClient — 가입 화면에서 이어 온 이메일', () => {
   });
 
   it('만료된 이메일은 채우지 않는다', async () => {
-    savePendingEmailLink('late@example.com', Date.now() - 31 * 60 * 1000);
+    savePendingEmailLink({ email: 'late@example.com' }, Date.now() - 11 * 60 * 1000);
     renderClient();
 
     expect(await heading(EMAIL_STEP)).toBeInTheDocument();
@@ -598,5 +605,213 @@ describe('EmailLinkClient — 완료', () => {
 
     const keys = invalidate.mock.calls.map(([filters]) => JSON.stringify(filters?.queryKey));
     expect(keys.some((key) => key?.includes('"auth","me"'))).toBe(true);
+  });
+});
+
+describe('EmailLinkClient — 되돌아온 1단계', () => {
+  // 앞뒤 공백은 type=email 입력칸이 값에서 걷어 내 이 화면에 닿지 않는다 — 다른 표기는 대소문자로 만든다.
+  it('인증을 마친 주소를 대소문자만 바꿔 다시 입력해도 인증이 이어지고, 끝까지 연결된다', async () => {
+    const user = userEvent.setup();
+    renderClient();
+    await heading(EMAIL_STEP);
+    await reachPasswordStep(user);
+
+    await user.click(backButton());
+    await user.click(backButton());
+    await heading(EMAIL_STEP);
+    // 같은 주소의 다른 표기다 — 인증도 인증번호 상태도 그대로라서, 지우면 인증번호를 다시 받을 길 없이 막힌다.
+    fireEvent.change(emailField(), { target: { value: EMAIL_LINK_MSW.emails.ok.toUpperCase() } });
+    await user.click(sendButton());
+    await heading(CODE_STEP);
+
+    expect(screen.getByText('이메일 인증이 완료됐어요')).toBeInTheDocument();
+    expect(calls.request).toHaveLength(1);
+    await user.click(screen.getByRole('button', { name: '다음' }));
+    await heading(PASSWORD_STEP);
+    await fillPasswords(user);
+    await user.click(screen.getByRole('button', { name: '연결하기' }));
+
+    expect(await heading('이메일 로그인이 연결됐어요')).toBeInTheDocument();
+    expect(calls.complete).toEqual([{ emailLinkToken: EMAIL_LINK_MSW.tokens.ok, password: PASSWORD, passwordConfirm: PASSWORD }]);
+  });
+
+  it('막힌 주소(complete 의 EMAIL_CONFLICT)를 대소문자만 바꿔 다시 입력해도 막힘 표시가 그대로다', async () => {
+    const user = userEvent.setup();
+    server.use(http.post('*/api/v1/auth/link/email/verify', () => HttpResponse.json({
+      status: 'success',
+      data: { emailLinkToken: EMAIL_LINK_MSW.tokens.taken, expiresInSeconds: EMAIL_LINK_MSW.tokenExpiresInSeconds },
+      timestamp: '2026-11-01T00:00:00.000Z',
+    })));
+    renderClient();
+    await heading(EMAIL_STEP);
+    await reachPasswordStep(user);
+    await fillPasswords(user);
+    await user.click(screen.getByRole('button', { name: '연결하기' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('이미 다른 계정에서 쓰는 이메일이에요.');
+
+    fireEvent.change(emailField(), { target: { value: EMAIL_LINK_MSW.emails.ok.toUpperCase() } });
+
+    expect(screen.getByRole('alert')).toHaveTextContent('이미 다른 계정에서 쓰는 이메일이에요.');
+    expect(sendButton()).toBeDisabled();
+  });
+
+  it('인증번호가 틀려 오류가 떠 있는 채로 뒤로 가도 1단계에는 그 오류가 남지 않는다', async () => {
+    const user = userEvent.setup();
+    renderClient();
+    await heading(EMAIL_STEP);
+    await reachCodeStep(user);
+    fireEvent.change(screen.getByLabelText('인증번호 6자리'), { target: { value: EMAIL_LINK_MSW.codes.wrong } });
+    await user.click(screen.getByRole('button', { name: '인증번호 확인' }));
+    expect(await screen.findByText('인증번호가 올바르지 않아요.')).toBeInTheDocument();
+
+    await user.click(backButton());
+    await heading(EMAIL_STEP);
+
+    expect(screen.queryByText('인증번호가 올바르지 않아요.')).not.toBeInTheDocument();
+    // 받아 둔 인증번호는 살아 있으니 다시 보내지 않고 2단계로 가며, 거기서도 지난 오류는 없다.
+    await user.click(sendButton());
+    await heading(CODE_STEP);
+    expect(screen.queryByText('인증번호가 올바르지 않아요.')).not.toBeInTheDocument();
+    expect(calls.request).toHaveLength(1);
+  });
+});
+
+describe('EmailLinkClient — Enter 와 포커스', () => {
+  it('하단 버튼이 폼의 제출 버튼이라 이메일 칸에서 Enter 로도 인증번호를 보낸다', async () => {
+    const user = userEvent.setup();
+    renderClient();
+    await heading(EMAIL_STEP);
+    await typeEmail(user, EMAIL_LINK_MSW.emails.ok);
+
+    expect((sendButton() as HTMLButtonElement).form).toBe(emailField().closest('form'));
+    expect(sendButton()).toHaveAttribute('type', 'submit');
+    await user.keyboard('{Enter}');
+
+    await heading(CODE_STEP);
+    expect(calls.request).toEqual([{ email: EMAIL_LINK_MSW.emails.ok }]);
+  });
+
+  it('비밀번호 단계의 연결하기도 같은 폼의 제출 버튼이다 — 확인 칸에서 Enter 를 누르면 제출되고, 버튼 클릭은 한 번만 보낸다', async () => {
+    const user = userEvent.setup();
+    renderClient();
+    await heading(EMAIL_STEP);
+    await reachPasswordStep(user);
+    await fillPasswords(user);
+    const form = screen.getByLabelText('비밀번호 확인').closest('form') as HTMLFormElement;
+    const connect = screen.getByRole('button', { name: '연결하기' }) as HTMLButtonElement;
+
+    // 브라우저는 폼에 연결된 기본 제출 버튼을 눌러 제출한다(jsdom 은 이 암묵 제출을 하지 않아 연결을 확인하고 제출 이벤트를 낸다).
+    expect(connect.form).toBe(form);
+    expect(connect).toHaveAttribute('type', 'submit');
+    await user.click(connect);
+
+    expect(await heading('이메일 로그인이 연결됐어요')).toBeInTheDocument();
+    expect(calls.complete).toHaveLength(1);
+  });
+
+  it('제출 이벤트도 연결하기와 같은 일을 하고, 규칙을 채우지 못했으면(버튼이 잠겼으면) 아무것도 보내지 않는다', async () => {
+    const user = userEvent.setup();
+    renderClient();
+    await heading(EMAIL_STEP);
+    await reachPasswordStep(user);
+    const form = screen.getByLabelText('비밀번호').closest('form') as HTMLFormElement;
+    await user.type(screen.getByLabelText('비밀번호'), 'short');
+
+    fireEvent.submit(form);
+    expect(calls.complete).toEqual([]);
+
+    await user.clear(screen.getByLabelText('비밀번호'));
+    await fillPasswords(user);
+    fireEvent.submit(form);
+
+    expect(await heading('이메일 로그인이 연결됐어요')).toBeInTheDocument();
+    expect(calls.complete).toHaveLength(1);
+  });
+
+  it('Enter 로 보내는 동안에도 포커스는 이메일 칸에 남는다 — 잠그지 않고 읽기 전용으로 둔다', async () => {
+    const user = userEvent.setup();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    server.use(http.post('*/api/v1/auth/link/email/request', async () => {
+      await gate;
+      return undefined;
+    }));
+    renderClient();
+    await heading(EMAIL_STEP);
+    await typeEmail(user, EMAIL_LINK_MSW.emails.ok);
+
+    await user.keyboard('{Enter}');
+
+    await waitFor(() => expect(emailField()).toHaveAttribute('readonly'));
+    expect(emailField()).not.toBeDisabled();
+    expect(emailField()).toHaveFocus();
+    release();
+    await heading(CODE_STEP);
+  });
+});
+
+describe('EmailLinkClient — 하던 곳으로 돌아가기', () => {
+  const DESTINATION = '/matches/abc?tab=info';
+
+  it('돌아갈 곳이 있으면 첫 단계의 뒤로 가기와 완료 화면의 버튼이 그곳으로 간다', async () => {
+    const user = userEvent.setup();
+    nav.params = new URLSearchParams({ redirect: DESTINATION });
+    renderClient();
+    await heading(EMAIL_STEP);
+
+    expect(screen.getAllByRole('link', { name: '뒤로가기' })[0]).toHaveAttribute('href', DESTINATION);
+    await reachPasswordStep(user);
+    await fillPasswords(user);
+    await user.click(screen.getByRole('button', { name: '연결하기' }));
+
+    expect(await heading('이메일 로그인이 연결됐어요')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '하던 곳으로 돌아가기' })).toHaveAttribute('href', DESTINATION);
+    expect(screen.queryByRole('link', { name: '로그인 방법으로 돌아가기' })).not.toBeInTheDocument();
+  });
+
+  it('돌아갈 곳이 없으면 로그인 방법으로 간다', async () => {
+    const user = userEvent.setup();
+    renderClient();
+    await heading(EMAIL_STEP);
+    await reachPasswordStep(user);
+    await fillPasswords(user);
+    await user.click(screen.getByRole('button', { name: '연결하기' }));
+
+    expect(await screen.findByRole('link', { name: '로그인 방법으로 돌아가기' })).toHaveAttribute('href', LOGIN_METHODS_PATH);
+    expect(screen.queryByRole('link', { name: '하던 곳으로 돌아가기' })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['외부 주소', 'https://evil.example.com/x'],
+    ['프로토콜 상대 주소', '//evil.example.com'],
+    ['로그인 화면', '/login?redirect=%2Fmy'],
+    ['이 화면 자신', '/my/settings/login-methods/email'],
+  ])('안전하지 않은 redirect(%s)는 무시하고 로그인 방법으로 보낸다', async (_label, redirect) => {
+    const user = userEvent.setup();
+    nav.params = new URLSearchParams({ redirect });
+    renderClient();
+    await heading(EMAIL_STEP);
+
+    expect(screen.getAllByRole('link', { name: '뒤로가기' })[0]).toHaveAttribute('href', LOGIN_METHODS_PATH);
+    await reachPasswordStep(user);
+    await fillPasswords(user);
+    await user.click(screen.getByRole('button', { name: '연결하기' }));
+    expect(await screen.findByRole('link', { name: '로그인 방법으로 돌아가기' })).toHaveAttribute('href', LOGIN_METHODS_PATH);
+  });
+
+  it('다시 로그인해도 돌아갈 곳이 이어지고, 안내 화면의 뒤로 가기도 그곳으로 간다', async () => {
+    const user = userEvent.setup();
+    nav.params = new URLSearchParams({ redirect: DESTINATION });
+    renderClient();
+    await heading(EMAIL_STEP);
+    await typeEmail(user, EMAIL_LINK_MSW.emails.recentLoginRequired);
+    await user.click(sendButton());
+    await heading('보안을 위해 다시 로그인해 주세요');
+
+    expect(screen.getAllByRole('link', { name: '뒤로가기' })[0]).toHaveAttribute('href', DESTINATION);
+    await user.click(screen.getByRole('button', { name: '다시 로그인하기' }));
+
+    const back = encodeURIComponent(`/my/settings/login-methods/email?redirect=${encodeURIComponent(DESTINATION)}`);
+    expect(signOut.signOutAndLeave).toHaveBeenCalledExactlyOnceWith(`/login?redirect=${back}`, expect.any(Object));
   });
 });

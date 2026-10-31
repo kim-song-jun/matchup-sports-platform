@@ -39,8 +39,8 @@ export function PendingSocialSignupGate({ children }: { children: ReactNode }) {
   }, [authMe.error, authMe.isError, authMe.isFetching, hasSessionHint]);
 
   const confirmedAccount = hasSessionHint === true ? authMe.data : undefined;
-  usePendingSocialLinkResolver(confirmedAccount);
-  usePendingEmailLinkOffer(confirmedAccount);
+  const socialLink = usePendingSocialLinkResolver(confirmedAccount);
+  usePendingEmailLinkOffer(confirmedAccount, socialLink.routed);
 
   const onboardingStatus = authMe.data?.user.onboardingStatus;
   const socialRequiredRoute = getPendingSocialSignupRoute(onboardingStatus);

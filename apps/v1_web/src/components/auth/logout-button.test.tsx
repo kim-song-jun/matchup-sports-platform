@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LogoutButton } from './logout-button';
 
 const hooks = vi.hoisted(() => ({
-  logoutMutate: vi.fn(),
+  logoutMutateAsync: vi.fn(),
   pushUnsubscribe: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -24,7 +24,7 @@ vi.mock('@tanstack/react-query', () => ({
 }));
 
 vi.mock('@/hooks/use-v1-api', () => ({
-  useV1Logout: () => ({ mutate: hooks.logoutMutate, isPending: false }),
+  useV1Logout: () => ({ mutateAsync: hooks.logoutMutateAsync, isPending: false }),
 }));
 
 vi.mock('@/hooks/use-v1-push-registration', () => ({
@@ -36,6 +36,8 @@ vi.mock('@/hooks/use-v1-push-registration', () => ({
     isPending: false,
   }),
 }));
+
+vi.mock('@/lib/client-error-reporter', () => ({ reportClientError: vi.fn() }));
 
 vi.mock('@/lib/analytics', () => ({
   trackEvent: analytics.trackEvent,
@@ -52,9 +54,16 @@ vi.mock('@/lib/v1-socket', () => ({
 describe('LogoutButton GA events', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    hooks.logoutMutateAsync.mockResolvedValue({ ok: true });
+    hooks.pushUnsubscribe.mockResolvedValue(undefined);
+    vi.stubGlobal('location', { ...window.location, replace: vi.fn() });
   });
 
-  it('tracks a logout event before firing the logout mutation', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('tracks a logout event before firing the logout mutation', async () => {
     // Given
     render(<LogoutButton />);
 
@@ -63,7 +72,7 @@ describe('LogoutButton GA events', () => {
 
     // Then
     expect(analytics.trackEvent).toHaveBeenCalledWith('logout', {});
-    expect(hooks.logoutMutate).toHaveBeenCalled();
+    await waitFor(() => expect(hooks.logoutMutateAsync).toHaveBeenCalled());
   });
 });
 
@@ -74,10 +83,8 @@ describe('LogoutButton session cleanup', () => {
     vi.clearAllMocks();
     replaceMock = vi.fn();
     vi.stubGlobal('location', { ...window.location, replace: replaceMock });
-    // 로그아웃 mutation이 완료되면 컴포넌트가 넘긴 onSettled 콜백을 즉시 실행하도록 스텁한다.
-    hooks.logoutMutate.mockImplementation((_variables, opts?: { onSettled?: () => void }) => {
-      opts?.onSettled?.();
-    });
+    hooks.logoutMutateAsync.mockResolvedValue({ ok: true });
+    hooks.pushUnsubscribe.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -93,7 +100,7 @@ describe('LogoutButton session cleanup', () => {
 
     // Then — 세션 삭제와 소켓 연결 해제가 함께 일어나야 이전 사용자로 인증된 소켓이
     // 로그아웃 후에도 살아남아 다음 사용자 탭으로 데이터가 새는 것을 막는다.
-    // pushCleanup 프라미스가 resolve 되는 다음 microtask 까지 리다이렉트가 지연되므로 waitFor.
+    // 푸시 해지와 로그아웃 프라미스가 resolve 된 뒤에 리다이렉트되므로 waitFor.
     await waitFor(() => expect(replaceMock).toHaveBeenCalledWith('/login'));
     expect(session.clearStoredV1Session).toHaveBeenCalledTimes(1);
     expect(socket.disconnectV1Socket).toHaveBeenCalledTimes(1);
@@ -127,5 +134,17 @@ describe('LogoutButton session cleanup', () => {
 
     // Then
     await waitFor(() => expect(replaceMock).toHaveBeenCalledWith('/login'));
+  });
+
+  it('로그아웃이 실패하면 로그인 화면으로 보내지 않고 이유를 알린다 — 서버 세션이 남아 있다', async () => {
+    hooks.logoutMutateAsync.mockRejectedValue(new Error('network'));
+    render(<LogoutButton />);
+
+    fireEvent.click(screen.getByRole('button', { name: '로그아웃' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('로그아웃하지 못했어요');
+    expect(replaceMock).not.toHaveBeenCalled();
+    expect(session.clearStoredV1Session).not.toHaveBeenCalled();
+    expect(socket.disconnectV1Socket).not.toHaveBeenCalled();
   });
 });

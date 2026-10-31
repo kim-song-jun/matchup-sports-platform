@@ -13,6 +13,7 @@ import {
 } from '@/hooks/use-v1-api';
 import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
 import { sanitizeRedirectPath } from '@/lib/session-storage';
+import { usableWithdrawalDate } from '@/lib/withdrawal-grace';
 import type { V1FoundAccount } from '@/types/api';
 import { AUTH_NOTICE_STAGE, AuthFrame } from './auth-page';
 import { describeFoundAccount } from './found-account-login';
@@ -194,6 +195,8 @@ export function AccountRecoveryClient({ initialMode = 'find-id', backHref = '/lo
 
   const copy = MODE_COPY[mode];
   const resetting = resetPasswordByEmail.isPending;
+  // 날짜를 모르거나 이미 지났으면 일반 결과 카드다 — 그 계정으로 로그인해도 403 이 탈퇴 취소 화면으로 이어 준다.
+  const withdrawalGraceEnd = found ? usableWithdrawalDate(found.withdrawalPendingUntil) : null;
 
   // 본인 확인을 마쳤고 아직 비밀번호를 못 바꾼 상태에서만 새 비밀번호 입력을 띄운다.
   const verifiedForReset = Boolean(emailProofToken);
@@ -336,10 +339,10 @@ export function AccountRecoveryClient({ initialMode = 'find-id', backHref = '/lo
           )}
 
           {found && mode === 'find-id' ? (
-            typeof found.withdrawalPendingUntil === 'string' ? (
+            withdrawalGraceEnd !== null ? (
               <FoundAccountWithdrawalGuide
                 account={found}
-                until={found.withdrawalPendingUntil}
+                until={withdrawalGraceEnd}
                 emailLoginHref={emailLoginHref}
                 loginHref={loginHref}
               />

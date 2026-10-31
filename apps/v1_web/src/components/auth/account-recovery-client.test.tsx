@@ -1,5 +1,5 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { V1FoundAccount } from '@/types/api';
 import { AccountRecoveryClient } from './account-recovery-client';
 
@@ -239,8 +239,13 @@ describe('AccountRecoveryClient', () => {
   });
 
   describe('번호를 쥔 계정이 탈퇴 유예 중이면 두 가지 방법을 안내한다', () => {
-    // KST 로는 11월 7일 00:30.
+    // KST 로는 11월 7일 00:30. 지났는지도 보므로 시계를 고정한다.
     const UNTIL = '2026-11-06T15:30:00.000Z';
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-10-31T00:00:00.000Z'));
+    });
+    afterEach(() => vi.useRealTimers());
 
     async function findPendingAccount(account: Omit<V1FoundAccount, 'withdrawalPendingUntil'>, props: { redirectPath?: string } = {}) {
       hooks.findAccountMutateAsync.mockResolvedValue({ ...account, withdrawalPendingUntil: UNTIL });
@@ -301,6 +306,27 @@ describe('AccountRecoveryClient', () => {
       fireEvent.change(screen.getByLabelText('휴대폰 번호'), { target: { value: '01099998888' } });
 
       expect(screen.queryByRole('heading', { name: '탈퇴를 신청한 계정이에요' })).not.toBeInTheDocument();
+    });
+
+    it('비밀번호가 있는 계정이면 방법 1 에 고객센터 링크가 있고, 비밀번호가 없는 계정에는 없다', async () => {
+      await findPendingAccount({ maskedEmail: 'ru***@example.com', providers: ['email'], hasPassword: true });
+      expect(screen.getByRole('link', { name: '비밀번호가 기억나지 않으면 고객센터로 알려 주세요' })).toHaveAttribute('href', '/contact');
+      cleanup();
+
+      await findPendingAccount({ maskedEmail: 'ka***@example.com', providers: ['kakao'], hasPassword: false });
+      expect(screen.queryByRole('link', { name: /고객센터로 알려 주세요/ })).not.toBeInTheDocument();
+    });
+
+    it('유예 종료 시각이 이미 지났으면 날짜가 없는 것과 같아 일반 결과 카드가 나오고 로그인 길은 그대로다', async () => {
+      vi.setSystemTime(Date.parse(UNTIL));
+      hooks.findAccountMutateAsync.mockResolvedValue({ maskedEmail: 'ru***@example.com', providers: ['email'], hasPassword: true, withdrawalPendingUntil: UNTIL });
+      render(<AccountRecoveryClient />);
+      enterPhone();
+      fireEvent.click(screen.getByRole('button', { name: '__stub_verify__' }));
+
+      expect(await screen.findByText('가입한 이메일')).toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: /탈퇴를 신청한 계정/ })).not.toBeInTheDocument();
+      expect(screen.getByRole('link', { name: '로그인하러 가기' })).toHaveAttribute('href', '/login/email');
     });
 
     it('날짜가 없으면(null) 일반 결과 카드가 그대로 나온다', async () => {

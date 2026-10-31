@@ -190,8 +190,13 @@ describe('소셜 가입 중 번호 중복 — 원래 계정으로 로그인하�
 });
 
 describe('소셜 가입 중 번호를 쥔 계정이 탈퇴 유예 중일 때', () => {
-  // KST 로는 11월 7일 00:30.
+  // KST 로는 11월 7일 00:30. 읽을 때 지났는지도 보므로 시계를 고정한다.
   const UNTIL = '2026-11-06T15:30:00.000Z';
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-31T00:00:00.000Z'));
+  });
+  afterEach(() => vi.useRealTimers());
   const withdrawalConflict = (withdrawalPendingUntil: string | null) => server.use(
     http.post('*/api/v1/verification/phone/confirm', () => HttpResponse.json({
       status: 'error', statusCode: 409, code: 'PHONE_CONFLICT', message: '이미 다른 계정에서 사용 중인 번호예요.',
@@ -221,8 +226,11 @@ describe('소셜 가입 중 번호를 쥔 계정이 탈퇴 유예 중일 때', (
 
     await user.click(await screen.findByRole('button', { name: '다시 쓰는 방법 보기' }));
     const dialog = await screen.findByRole('dialog');
+    // 확인 창의 제목·버튼도 도착지(두 가지 방법을 보여 주는 안내)와 같은 말이다.
+    expect(within(dialog).getByText('가입을 그만두고 다시 쓰는 방법을 볼까요?')).toBeInTheDocument();
     expect(within(dialog).getByText(/30분 안에 원래 방법으로 로그인하고 탈퇴 신청을 취소하면 카카오 로그인이 그 계정에 자동으로 연결돼요/)).toBeInTheDocument();
-    await user.click(within(dialog).getByRole('button', { name: '로그인하러 가기' }));
+    expect(within(dialog).queryByRole('button', { name: '로그인하러 가기' })).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: '다시 쓰는 방법 보기' }));
 
     await waitFor(() => expect(replace).toHaveBeenCalledWith('/auth/account-conflict?provider=kakao&redirect=%2Fteams%2Fnew'));
     expect(seen.logout).toBe(1);
@@ -236,10 +244,22 @@ describe('소셜 가입 중 번호를 쥔 계정이 탈퇴 유예 중일 때', (
     const user = userEvent.setup();
 
     await user.click(await screen.findByRole('button', { name: '다시 쓰는 방법 보기' }));
-    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '로그인하러 가기' }));
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '다시 쓰는 방법 보기' }));
 
     await waitFor(() => expect(replace).toHaveBeenCalledWith('/auth/account-conflict?provider=kakao'));
     expect(peekPendingSocialLink()).toHaveProperty('withdrawalPendingUntil', null);
+  });
+
+  it('이미 지난 유예 종료 시각은 날짜만 모르는 것(null)으로 보관하고 같은 안내로 간다', async () => {
+    withdrawalConflict('2026-10-30T00:00:00.000Z');
+    await confirmConflictingCode('123456');
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: '다시 쓰는 방법 보기' }));
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '다시 쓰는 방법 보기' }));
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/auth/account-conflict?provider=kakao'));
+    expect(peekPendingSocialLink()).toMatchObject({ linkToken: PENDING_LINK_MSW.tokens.kakao, withdrawalPendingUntil: null });
   });
 
   it('계정 찾기는 기존처럼 확인 없이 계정 찾기로 나간다', async () => {

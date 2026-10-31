@@ -3,12 +3,12 @@
 import Link from 'next/link';
 import { useEffect, useId, useRef } from 'react';
 import { Card, ListItem } from '@/components/v1-ui/primitives';
-import { formatMonthDay } from '@/lib/date-utils';
 import { isNativeAppleSignInAvailable } from '@/lib/native-apple';
+import { usableWithdrawalDate } from '@/lib/withdrawal-grace';
 import { WithdrawalPendingGuide } from './withdrawal-pending-guide';
 
 type Props = {
-  /** 번호를 쥔 계정이 탈퇴 유예 중이면 유예가 끝나는 시각(ISO). 아니면 null. */
+  /** 번호를 쥔 계정이 탈퇴 유예 중이면 유예가 끝나는 시각(ISO). 아니거나 이미 지났으면 null — 일반 안내를 보여 준다. */
   withdrawalPendingUntil: string | null;
   loginHref: string;
   socialLoginHref: string;
@@ -24,7 +24,8 @@ type Props = {
 export function SignupPhoneRegisteredCard({ withdrawalPendingUntil, loginHref, socialLoginHref, findAccountHref }: Props) {
   const titleRef = useRef<HTMLDivElement>(null);
   const descriptionId = useId();
-  const withdrawalGuide = withdrawalPendingUntil !== null;
+  const graceEnd = usableWithdrawalDate(withdrawalPendingUntil);
+  const withdrawalGuide = graceEnd !== null;
   // 인증 단계의 입력칸이 이 카드로 바뀌므로 포커스를 카드로 옮겨 키보드·스크린리더 사용자가 바뀐 줄 알게 한다.
   // 탈퇴 유예 안내는 제목 블록이 스스로 포커스를 가져간다.
   useEffect(() => {
@@ -32,14 +33,13 @@ export function SignupPhoneRegisteredCard({ withdrawalPendingUntil, loginHref, s
   }, [withdrawalGuide]);
 
   if (withdrawalGuide) {
-    const hasWays = formatMonthDay(withdrawalPendingUntil) !== null;
     return (
       <WithdrawalPendingGuide
         focusHeadingOnMount
-        until={withdrawalPendingUntil}
+        until={graceEnd}
         head={{
           title: '이 번호는 탈퇴를 신청한 계정이 쓰고 있어요',
-          lead: hasWays ? '번호 인증은 잘 끝났어요. 이 번호를 다시 쓰는 방법은 두 가지예요.' : '번호 인증은 잘 끝났어요.',
+          lead: '번호 인증은 잘 끝났어요. 이 번호를 다시 쓰는 방법은 두 가지예요.',
         }}
         steps={[
           { title: '가입했던 계정으로 로그인해요' },

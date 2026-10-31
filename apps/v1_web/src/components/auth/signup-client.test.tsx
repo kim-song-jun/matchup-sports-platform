@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { V1ApiError } from '@/lib/api-client';
 import { peekPendingSocialLink, savePendingSocialLink } from '@/lib/pending-social-link';
 import { SignupClient } from './signup-client';
@@ -897,9 +897,14 @@ describe('SignupClient 이미 가입된 번호 안내', () => {
   });
 
   describe('번호를 쥔 계정이 탈퇴 유예 중일 때', () => {
-    // KST 로는 11월 7일 00:30.
+    // KST 로는 11월 7일 00:30. 카드가 유예 종료 시각이 지났는지도 보므로 시계를 고정한다.
     const UNTIL = '2026-11-06T15:30:00.000Z';
     const GUIDE_TITLE = '이 번호는 탈퇴를 신청한 계정이 쓰고 있어요';
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-10-31T00:00:00.000Z'));
+    });
+    afterEach(() => vi.useRealTimers());
 
     async function verifyPendingPhone(): Promise<void> {
       hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'TAKEN-PROOF', registered: true, withdrawalPendingUntil: UNTIL });
@@ -943,6 +948,23 @@ describe('SignupClient 이미 가입된 번호 안내', () => {
       await screen.findByText(GUIDE_TITLE);
       fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: OTHER_PHONE } });
       expect(screen.queryByText(GUIDE_TITLE)).not.toBeInTheDocument();
+    });
+
+    it('방법 1 에 고객센터 링크가 있어 비밀번호를 잊은 사람도 막다른 길이 아니다', async () => {
+      await verifyPendingPhone();
+      expect(screen.getByRole('link', { name: '비밀번호가 기억나지 않으면 고객센터로 알려 주세요' })).toHaveAttribute('href', '/contact');
+    });
+
+    it('유예 종료 시각이 이미 지났으면 일반 "이미 가입돼 있어요" 카드가 나온다', async () => {
+      // 시계(10월 31일)보다 하루 앞선 시각 — 시계를 옮기면 인증번호 입력 시간이 먼저 만료된다.
+      hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'TAKEN-PROOF', registered: true, withdrawalPendingUntil: '2026-10-30T00:00:00.000Z' });
+      render(<SignupClient />);
+      await advanceToVerify();
+      await verifyPhone('01012345678');
+
+      expect(await screen.findByText(CARD_TITLE)).toBeInTheDocument();
+      expect(screen.queryByText(GUIDE_TITLE)).not.toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /이메일로 가입했어요/ })).toHaveAttribute('href', '/login/email');
     });
 
     it('날짜 없이 registered 만 오면 일반 카드가 그대로 나온다', async () => {

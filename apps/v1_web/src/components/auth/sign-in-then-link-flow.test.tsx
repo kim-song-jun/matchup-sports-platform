@@ -165,8 +165,8 @@ describe('카카오 콜백의 탈퇴 철회 갈래', () => {
 });
 
 describe('탈퇴 유예 계정과 충돌 → 안내 → 로그인 → 탈퇴 취소 → 자동 연결', () => {
-  // KST 로는 11월 7일 00:30.
-  const UNTIL = '2026-11-06T15:30:00.000Z';
+  // 시계를 얼리지 않는다(조회 캐시·타이머가 같은 시계를 본다) — 날짜는 지금으로부터 일주일 뒤로 잡는다.
+  const UNTIL = new Date(Date.now() + 7 * 86_400_000).toISOString();
 
   it('안내 화면에서 로그인하면 철회 화면이 나오고, 취소를 마치면 403 을 견딘 같은 토큰으로 연결된다', async () => {
     savePendingSocialLink({
@@ -174,7 +174,7 @@ describe('탈퇴 유예 계정과 충돌 → 안내 → 로그인 → 탈퇴 취
       linkTokenExpiresInSeconds: PENDING_LINK_MSW.expiresInSeconds, withdrawalPendingUntil: UNTIL,
     });
     render(<QueryClientProvider client={client}><Journey initialRoute="/auth/account-conflict?provider=kakao" /></QueryClientProvider>);
-    expect(await screen.findByRole('list', { name: '기다릴 때의 일정' })).toHaveTextContent('11월 7일');
+    expect(await screen.findByRole('list', { name: '기다릴 때의 일정' })).toHaveTextContent(/\d+월 \d+일계정이 삭제돼요/);
     expect(screen.getByRole('link', { name: '이메일로 로그인하기' })).toHaveAttribute('href', '/login/email');
     const user = userEvent.setup();
 

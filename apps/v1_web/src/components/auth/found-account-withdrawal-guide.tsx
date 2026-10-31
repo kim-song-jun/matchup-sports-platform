@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { formatMonthDay } from '@/lib/date-utils';
+import { usableWithdrawalDate } from '@/lib/withdrawal-grace';
 import type { V1FoundAccount } from '@/types/api';
 import { describeFoundAccount } from './found-account-login';
 import { WithdrawalPendingGuide } from './withdrawal-pending-guide';
@@ -25,12 +25,13 @@ export function FoundAccountWithdrawalGuide({ account, until, emailLoginHref, lo
 }) {
   const summary = describeFoundAccount(account, { emailLoginHref, loginHref });
   const [primary, ...others] = summary.links;
-  const hasWays = formatMonthDay(until) !== null;
+  const hasWays = usableWithdrawalDate(until) !== null;
 
   return (
     <WithdrawalPendingGuide
       className="tm-wpg-below-field"
       focusHeadingOnMount
+      passwordHelp={account.hasPassword}
       until={until}
       head={{
         title: '탈퇴를 신청한 계정이에요',

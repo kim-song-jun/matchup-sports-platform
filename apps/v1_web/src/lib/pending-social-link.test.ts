@@ -12,8 +12,16 @@ const hint = { next: 'sign_in_then_link', provider: 'kakao', linkToken: 'signed-
 const stored = () => window.sessionStorage.getItem(PENDING_SOCIAL_LINK_STORAGE_KEY);
 
 describe('pending social link storage', () => {
-  beforeEach(() => window.sessionStorage.clear());
-  afterEach(() => vi.restoreAllMocks());
+  beforeEach(() => {
+    window.sessionStorage.clear();
+    // 읽을 때 유예 종료 시각이 지났는지도 본다 — 시계를 고정해 두어야 고정 날짜가 시간이 가도 그대로 미래다.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(NOW);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
 
   it('keeps the token, provider and expiry in sessionStorage only', () => {
     expect(savePendingSocialLink(hint, NOW)).toBe(true);
@@ -88,19 +96,50 @@ describe('pending social link storage', () => {
       expect(peekPendingSocialLink(NOW)).not.toHaveProperty('withdrawalPendingUntil');
     });
 
+    // 날짜가 깨졌다고 토큰까지 버리면 자동 연결이 조용히 사라진다 — 토큰은 남기고 날짜만 모르는 것(null)으로 읽는다.
     it.each([
       ['an unreadable date', 'someday'],
       ['a number', 1_793_000_000_000],
       ['an object', { until: '2026-11-06T15:30:00.000Z' }],
       ['a boolean', true],
-    ])('rejects the whole stored link when the grace end is %s', (_label, bad) => {
+    ])('keeps the token and reads the grace end as unknown when it is %s', (_label, bad) => {
       window.sessionStorage.setItem(
         PENDING_SOCIAL_LINK_STORAGE_KEY,
-        JSON.stringify({ linkToken: 't', provider: 'kakao', expiresAt: '2026-10-31T10:30:00.000Z', withdrawalPendingUntil: bad }),
+        JSON.stringify({ linkToken: 'surviving-token', provider: 'kakao', expiresAt: '2026-10-31T10:30:00.000Z', withdrawalPendingUntil: bad }),
       );
 
-      expect(takePendingSocialLink(NOW)).toBeNull();
-      expect(stored()).toBeNull();
+      expect(peekPendingSocialLink(NOW)).toEqual({
+        expired: false,
+        linkToken: 'surviving-token',
+        provider: 'kakao',
+        expiresAt: '2026-10-31T10:30:00.000Z',
+        withdrawalPendingUntil: null,
+      });
+      expect(takePendingSocialLink(NOW)).toMatchObject({ expired: false, linkToken: 'surviving-token', withdrawalPendingUntil: null });
+      expect(stored()).not.toBeNull();
+    });
+
+    it('reads a grace end that has already passed as unknown, keeping the withdrawal marker and the token', () => {
+      window.sessionStorage.setItem(
+        PENDING_SOCIAL_LINK_STORAGE_KEY,
+        JSON.stringify({ linkToken: 'surviving-token', provider: 'kakao', expiresAt: '2026-10-31T10:30:00.000Z', withdrawalPendingUntil: '2026-10-30T00:00:00.000Z' }),
+      );
+
+      expect(peekPendingSocialLink(NOW)).toMatchObject({ expired: false, linkToken: 'surviving-token', withdrawalPendingUntil: null });
+    });
+
+    it('does not store a grace end that is already past either', () => {
+      savePendingSocialLink({ ...hint, withdrawalPendingUntil: '2026-10-30T00:00:00.000Z' }, NOW);
+      expect(JSON.parse(stored()!)).toHaveProperty('withdrawalPendingUntil', null);
+    });
+
+    it('turns the date into unknown at the instant it passes, before and after', () => {
+      savePendingSocialLink({ ...hint, linkTokenExpiresInSeconds: 86_400_000, withdrawalPendingUntil: until }, NOW);
+
+      const endsAt = Date.parse(until);
+      expect(peekPendingSocialLink(endsAt - 1)).toMatchObject({ withdrawalPendingUntil: until });
+      expect(peekPendingSocialLink(endsAt)).toMatchObject({ withdrawalPendingUntil: null });
+      expect(peekPendingSocialLink(endsAt + 1)).toMatchObject({ expired: false, linkToken: 'signed-link-token', withdrawalPendingUntil: null });
     });
   });
 

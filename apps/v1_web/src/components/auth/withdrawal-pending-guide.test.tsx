@@ -1,8 +1,16 @@
 import { cleanup, render, screen, within } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WithdrawalPendingGuide } from './withdrawal-pending-guide';
 
-afterEach(cleanup);
+// 렌더가 유예 종료 시각이 지났는지 본다 — 시계를 고정해 고정 날짜가 시간이 가도 미래로 남게 한다.
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-10-31T00:00:00.000Z'));
+});
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 // KST 로는 11월 7일 00:30 — UTC 날짜(11월 6일)와 달라서 한국 달력으로 바꾸는지 가른다.
 const UNTIL = '2026-11-06T15:30:00.000Z';
@@ -48,6 +56,41 @@ describe('WithdrawalPendingGuide', () => {
     expect(screen.queryByText('계정이 삭제돼요')).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '방법 1 지금 바로 쓰기' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '로그인하고 탈퇴 취소하기' })).toHaveAttribute('href', '/login');
+  });
+
+  it('유예 종료 시각이 지나는 순간 방법 2 가 사라지고 방법 1 은 그대로 남는다', () => {
+    vi.setSystemTime(Date.parse(UNTIL) - 1);
+    const { unmount } = renderGuide();
+    expect(screen.getByRole('list', { name: '기다릴 때의 일정' })).toBeInTheDocument();
+    unmount();
+
+    for (const nowMs of [Date.parse(UNTIL), Date.parse(UNTIL) + 86_400_000]) {
+      vi.setSystemTime(nowMs);
+      const view = renderGuide();
+      expect(screen.queryByRole('heading', { name: /방법 2/ })).not.toBeInTheDocument();
+      expect(screen.queryByText('11월 7일')).not.toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: '방법 1 지금 바로 쓰기' })).toBeInTheDocument();
+      view.unmount();
+    }
+  });
+
+  it('비밀번호를 잊은 사람을 위해 방법 1 안에 고객센터 링크를 둔다(44px 버튼 링크)', () => {
+    renderGuide();
+    const link = screen.getByRole('link', { name: '비밀번호가 기억나지 않으면 고객센터로 알려 주세요' });
+    expect(link).toHaveAttribute('href', '/contact');
+    expect(link).toHaveClass('tm-btn', 'tm-btn-sm');
+    // 방법 1 카드 안이다 — 기다리기 일정이 아니다.
+    expect(link.closest('.tm-wpg-way')).toContainElement(screen.getByRole('list', { name: '방법 1 지금 바로 쓰기' }));
+  });
+
+  it('날짜가 없어도(null) 고객센터 링크는 방법 1 에 남고, 비밀번호가 없는 계정을 아는 화면은 끌 수 있다', () => {
+    const { unmount } = renderGuide({ until: null });
+    expect(screen.getByRole('link', { name: /고객센터로 알려 주세요/ })).toBeInTheDocument();
+    unmount();
+
+    renderGuide({ passwordHelp: false, actions: <a href="/login">로그인</a> });
+    expect(screen.queryByRole('link', { name: /고객센터로 알려 주세요/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '로그인' })).toBeInTheDocument();
   });
 
   it('읽을 수 없는 날짜도 "11월 7일" 같은 거짓 날짜를 만들지 않고 방법 2 를 뺀다', () => {

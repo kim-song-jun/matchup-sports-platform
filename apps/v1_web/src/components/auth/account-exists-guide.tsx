@@ -2,8 +2,8 @@
 
 import Link from 'next/link';
 import { useSyncExternalStore } from 'react';
-import { formatMonthDay } from '@/lib/date-utils';
 import { peekPendingSocialLink } from '@/lib/pending-social-link';
+import { usableWithdrawalDate } from '@/lib/withdrawal-grace';
 import { AppleLoginButton } from './apple-login-button';
 import { AUTH_NOTICE_STAGE, AuthFrame } from './auth-page';
 import { buildKakaoAuthUrl } from './auth.view-model';
@@ -46,7 +46,7 @@ function buildWithdrawalSteps(label: string, autoLink: boolean): WithdrawalGuide
 const subscribeNothing = () => () => {};
 const readAutoLinkAvailable = () => peekPendingSocialLink()?.expired === false;
 const serverAutoLinkAvailable = () => null;
-// 충돌한 계정이 탈퇴 유예 중인지(그 계정의 유예 종료 시각, 날짜를 모르면 null)도 저장소만 안다. 없음은 undefined.
+// 충돌한 계정이 탈퇴 유예 중인지(그 계정의 유예 종료 시각, 날짜를 모르거나 이미 지났으면 null)도 저장소만 안다. 없음은 undefined.
 const readWithdrawalPendingUntil = () => peekPendingSocialLink()?.withdrawalPendingUntil;
 const serverWithdrawalPendingUntil = () => undefined;
 
@@ -60,7 +60,7 @@ export function AccountExistsGuide({ provider, redirectPath }: { provider: V1Lin
   const label = linkProviderLabel(provider);
   const steps = buildSteps(label, autoLink !== false);
   const withdrawalPending = withdrawalPendingUntil !== undefined;
-  const hasWays = withdrawalPendingUntil != null && formatMonthDay(withdrawalPendingUntil) !== null;
+  const hasWays = usableWithdrawalDate(withdrawalPendingUntil) !== null;
   const redirectQuery = redirectPath ? `redirect=${encodeURIComponent(redirectPath)}` : '';
   const emailHref = redirectQuery ? `/login/email?${redirectQuery}` : '/login/email';
   const guidePath = provider ? buildAccountConflictPath(provider, redirectPath) : ACCOUNT_CONFLICT_PATH;

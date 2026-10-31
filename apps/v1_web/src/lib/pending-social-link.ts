@@ -1,5 +1,6 @@
 import type { V1LinkableProvider, V1SignInThenLinkDetails } from '@/types/api';
 import { createSessionJsonSlot } from './session-json-slot';
+import { usableWithdrawalDate } from './withdrawal-grace';
 
 /**
  * 카카오·애플 로그인이 기존 계정과 충돌한 뒤, 사용자가 원래 계정으로 로그인하는 동안 연결 토큰을 들고 있는 칸.
@@ -14,8 +15,8 @@ export type PendingSocialLink = {
   /** 이 시각(ISO)부터 토큰은 서버가 받지 않는다. */
   expiresAt: string;
   /**
-   * 충돌한 계정이 탈퇴 유예 중일 때만 있다. 값은 유예가 끝나는 시각(ISO)이고, 서버가 모르면 null.
-   * 없음(undefined)과 null 은 다르다 — 없으면 탈퇴 계정이 아니고, null 이면 탈퇴 계정인데 날짜만 모른다.
+   * 충돌한 계정이 탈퇴 유예 중일 때만 있다. 값은 유예가 끝나는 시각(ISO)이고, 모르면(서버가 못 줬거나 읽을 수 없거나
+   * 이미 지났으면) null. 없음(undefined)과 null 은 다르다 — 없으면 탈퇴 계정이 아니고, null 이면 탈퇴 계정인데 날짜만 모른다.
    */
   withdrawalPendingUntil?: string | null;
 };
@@ -32,10 +33,9 @@ function parsePendingSocialLink(value: unknown): PendingSocialLink | null {
   if (typeof linkToken !== 'string' || linkToken === '') return null;
   if (provider !== 'kakao' && provider !== 'apple') return null;
   if (typeof expiresAt !== 'string' || Number.isNaN(Date.parse(expiresAt))) return null;
+  // 날짜가 깨졌어도 토큰은 버리지 않는다 — 날짜만 모르는 것으로 읽는다.
   if (!('withdrawalPendingUntil' in record)) return { linkToken, provider, expiresAt };
-  const { withdrawalPendingUntil } = record;
-  if (withdrawalPendingUntil !== null && (typeof withdrawalPendingUntil !== 'string' || Number.isNaN(Date.parse(withdrawalPendingUntil)))) return null;
-  return { linkToken, provider, expiresAt, withdrawalPendingUntil };
+  return { linkToken, provider, expiresAt, withdrawalPendingUntil: usableWithdrawalDate(record.withdrawalPendingUntil) };
 }
 
 const slot = createSessionJsonSlot(PENDING_SOCIAL_LINK_STORAGE_KEY, parsePendingSocialLink);
@@ -55,19 +55,17 @@ export function savePendingSocialLink(hint: V1SignInThenLinkDetails, nowMs: numb
     linkToken,
     provider: hint.provider,
     expiresAt: new Date(nowMs + linkTokenExpiresInSeconds * 1000).toISOString(),
-    ...(hint.withdrawalPendingUntil !== undefined ? { withdrawalPendingUntil: hint.withdrawalPendingUntil } : {}),
+    ...(hint.withdrawalPendingUntil !== undefined ? { withdrawalPendingUntil: usableWithdrawalDate(hint.withdrawalPendingUntil, nowMs) } : {}),
   });
 }
 
 function classify(stored: PendingSocialLink, nowMs: number): PendingSocialLinkRead {
-  if (Date.parse(stored.expiresAt) <= nowMs) {
-    return {
-      provider: stored.provider,
-      expired: true,
-      ...(stored.withdrawalPendingUntil !== undefined ? { withdrawalPendingUntil: stored.withdrawalPendingUntil } : {}),
-    };
-  }
-  return { ...stored, expired: false };
+  // 저장한 뒤 유예 종료 시각이 지났을 수 있어 읽는 시각으로 한 번 더 거른다.
+  const grace = stored.withdrawalPendingUntil === undefined
+    ? {}
+    : { withdrawalPendingUntil: usableWithdrawalDate(stored.withdrawalPendingUntil, nowMs) };
+  if (Date.parse(stored.expiresAt) <= nowMs) return { provider: stored.provider, expired: true, ...grace };
+  return { ...stored, ...grace, expired: false };
 }
 
 /**

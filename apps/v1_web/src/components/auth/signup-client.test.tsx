@@ -927,7 +927,8 @@ describe('SignupClient 이미 가입된 번호 안내', () => {
       expect(screen.queryByRole('link', { name: /비밀번호가 기억나지 않아요/ })).not.toBeInTheDocument();
       expect(screen.queryByLabelText(/^이름/)).not.toBeInTheDocument();
       expect(screen.getByRole('button', { name: '다른 번호로 인증하기' })).toBeEnabled();
-      expect(screen.getByRole('heading', { name: GUIDE_TITLE })).toHaveFocus();
+      // The guide takes focus in an effect after it renders.
+      await waitFor(() => expect(screen.getByRole('heading', { name: GUIDE_TITLE })).toHaveFocus());
     });
 
     it('탈퇴 취소 버튼은 이메일·소셜이 함께 있는 로그인 첫 화면으로 가고 원래 가려던 곳을 이어 준다', async () => {

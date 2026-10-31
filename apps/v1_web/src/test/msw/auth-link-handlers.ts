@@ -7,32 +7,40 @@ import { sessionLoginResponse } from './auth-step-up-handlers';
  * 상태를 들고 있지 않아 테스트 간 오염이 없다.
  *
  *  - `POST /auth/link/kakao|apple`: LINK_MSW.credentials 의 값이 시나리오를 정한다. 모르는 값은 401 UNAUTHENTICATED
- *    (제공자 토큰 검증 실패). 본문 모양이 계약(카카오: code+redirectUri 또는 accessToken)과 다르면 400.
+ *    (제공자 토큰 검증 실패). 본문은 서버 DTO(`LinkKakaoDto`, `AppleLoginDto`)와 같은 길이 제한·허용 필드를 따르고, 어기면 400.
  *  - `POST /auth/kakao`·`/auth/kakao/token`·`/auth/apple`: LINK_MSW.loginConflicts 의 값이면 `details.next` 가 붙은
  *    409, 그 외에는 세션.
  *  - `POST /auth/login`: WITHDRAWAL_MSW.email 만 가로챈다(비밀번호가 맞으면 철회 토큰이 실린 403, 틀리면 일반 401).
  *    다른 이메일은 다음 핸들러로 넘긴다.
- *  - `POST /auth/withdrawal/cancel`: WITHDRAWAL_MSW.tokens 가 시나리오를 정한다.
+ *  - `POST /auth/withdrawal/cancel`: WITHDRAWAL_MSW.tokens 가 시나리오를 정한다(토큰은 20~512자, 서버 DTO와 같다).
  */
 const api = '*/api/v1';
 const NOW = '2026-10-31T00:00:00.000Z';
 
 export const LINK_MSW = {
+  // 카카오 accessToken 은 10자, 애플 identityToken 은 20자 이상이어야 서버 DTO를 통과한다.
   credentials: {
-    ok: 'link-ok',
-    alreadyLinked: 'link-already-linked',
-    mergedPending: 'link-merged-pending',
-    providerExists: 'link-provider-exists',
-    providerInUse: 'link-provider-in-use',
-    recentLoginRequired: 'link-recent-login-required',
-    signupIncomplete: 'link-signup-incomplete',
+    ok: 'msw-link-credential-ok',
+    alreadyLinked: 'msw-link-credential-already-linked',
+    mergedPending: 'msw-link-credential-merged-pending',
+    providerExists: 'msw-link-credential-provider-exists',
+    providerInUse: 'msw-link-credential-provider-in-use',
+    recentLoginRequired: 'msw-link-credential-recent-login-required',
+    signupIncomplete: 'msw-link-credential-signup-incomplete',
   },
   loginConflicts: {
-    unverifiedEmail: 'login-conflict-unverified-email',
-    contactConflict: 'login-conflict-contact',
-    accountProof: 'login-conflict-account-proof',
+    unverifiedEmail: 'msw-login-conflict-unverified-email',
+    contactConflict: 'msw-login-conflict-contact',
+    accountProof: 'msw-login-conflict-account-proof',
   },
-  maxAgeSeconds: 300,
+  maxAgeSeconds: 30 * 60,
+  signupIncompleteRoute: '/signup/social',
+} as const;
+
+/** 비밀번호 없이 카카오로만 가입한 계정 — 이메일 본인 확인 뒤 재설정을 시도하면 PASSWORD_LOGIN_UNAVAILABLE 이 온다. */
+export const PASSWORD_UNAVAILABLE_MSW = {
+  email: 'kakao-only@example.com',
+  providers: ['kakao'],
 } as const;
 
 export const WITHDRAWAL_MSW = {
@@ -68,6 +76,13 @@ export function signInThenLinkConflict(code: string, provider: V1LinkableProvide
   return fail(409, code, SIGN_IN_THEN_LINK_MESSAGE, { next: 'sign_in_then_link', provider });
 }
 
+/** 소셜로만 가입한 계정의 비밀번호 재설정 거절 — 안내 문구는 계정이 실제로 가진 로그인 수단을 따른다. */
+export function passwordLoginUnavailableResponse() {
+  return fail(400, 'PASSWORD_LOGIN_UNAVAILABLE', '이 계정은 카카오 로그인으로 가입했어요. 카카오로 로그인해 주세요.', {
+    providers: [...PASSWORD_UNAVAILABLE_MSW.providers],
+  });
+}
+
 function linkResult(provider: V1LinkableProvider, overrides: Partial<V1LinkSocialResult> = {}): V1LinkSocialResult {
   return { provider, alreadyLinked: false, mergedPendingAccount: false, authProviders: ['email', provider], ...overrides };
 }
@@ -87,7 +102,7 @@ function linkOutcome(provider: V1LinkableProvider, credential: unknown) {
     case LINK_MSW.credentials.recentLoginRequired:
       return fail(403, 'RECENT_LOGIN_REQUIRED', '보안을 위해 다시 로그인해 주세요.', { maxAgeSeconds: LINK_MSW.maxAgeSeconds });
     case LINK_MSW.credentials.signupIncomplete:
-      return fail(403, 'SIGNUP_INCOMPLETE', '가입을 먼저 마쳐 주세요.');
+      return fail(403, 'SIGNUP_INCOMPLETE', '가입을 먼저 마무리해 주세요.', { next: { route: LINK_MSW.signupIncompleteRoute } });
     default:
       return fail(401, 'UNAUTHENTICATED', '인증 정보를 확인하지 못했어요.');
   }
@@ -95,6 +110,14 @@ function linkOutcome(provider: V1LinkableProvider, credential: unknown) {
 
 function invalidLinkBody() {
   return fail(400, 'VALIDATION_ERROR', '입력값을 다시 확인해 주세요.');
+}
+
+function isBounded(value: unknown, min: number, max: number): value is string {
+  return typeof value === 'string' && value.length >= min && value.length <= max;
+}
+
+function isAbsentOrBounded(value: unknown, min: number, max: number) {
+  return value === undefined || isBounded(value, min, max);
 }
 
 function loginOutcome(provider: V1LinkableProvider, credential: unknown) {
@@ -111,16 +134,23 @@ function loginOutcome(provider: V1LinkableProvider, credential: unknown) {
 }
 
 export const v1AuthLinkMswHandlers = [
+  // LinkKakaoDto: 웹은 code+redirectUri, 네이티브는 accessToken 하나. 둘을 섞거나 모르는 필드를 보내면 거절한다.
   http.post(`${api}/auth/link/kakao`, async ({ request }) => {
     const { code, redirectUri, accessToken, ...rest } = await readJson(request);
-    const webShape = typeof code === 'string' && typeof redirectUri === 'string' && accessToken === undefined;
-    const nativeShape = typeof accessToken === 'string' && code === undefined && redirectUri === undefined;
-    if (Object.keys(rest).length > 0 || webShape === nativeShape) return invalidLinkBody();
-    return linkOutcome('kakao', webShape ? code : accessToken);
+    if (Object.keys(rest).length > 0) return invalidLinkBody();
+    if (accessToken !== undefined) {
+      if (!isBounded(accessToken, 10, 4096) || code !== undefined || redirectUri !== undefined) return invalidLinkBody();
+      return linkOutcome('kakao', accessToken);
+    }
+    if (!isBounded(code, 1, 2048) || !isBounded(redirectUri, 1, 2048)) return invalidLinkBody();
+    return linkOutcome('kakao', code);
   }),
+  // AppleLoginDto: 애플 로그인과 같은 본문. nonce 는 `/auth/apple/nonce` 에서 받은 값이다.
   http.post(`${api}/auth/link/apple`, async ({ request }) => {
-    const { identityToken, nonce } = await readJson(request);
-    if (typeof identityToken !== 'string' || typeof nonce !== 'string') return invalidLinkBody();
+    const { identityToken, nonce, fullName, authorizationCode, ...rest } = await readJson(request);
+    if (Object.keys(rest).length > 0) return invalidLinkBody();
+    if (!isBounded(identityToken, 20, 8192) || !isBounded(nonce, 8, 512)) return invalidLinkBody();
+    if (!isAbsentOrBounded(fullName, 0, 80) || !isAbsentOrBounded(authorizationCode, 8, 2048)) return invalidLinkBody();
     return linkOutcome('apple', identityToken);
   }),
 
@@ -140,7 +170,8 @@ export const v1AuthLinkMswHandlers = [
     });
   }),
   http.post(`${api}/auth/withdrawal/cancel`, async ({ request }) => {
-    const { token } = await readJson(request);
+    const { token, ...rest } = await readJson(request);
+    if (Object.keys(rest).length > 0 || !isBounded(token, 20, 512)) return invalidLinkBody();
     if (token === WITHDRAWAL_MSW.tokens.valid) return sessionLoginResponse();
     if (token === WITHDRAWAL_MSW.tokens.processed) {
       return fail(409, 'WITHDRAWAL_ALREADY_PROCESSED', '이미 탈퇴가 처리돼 계정을 되살릴 수 없어요.');

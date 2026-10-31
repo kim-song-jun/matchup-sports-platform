@@ -8,7 +8,7 @@ import { v1UserFixture } from './fixtures';
 
 const phone = '01012345678';
 const newPassword = 'synthetic-new-password';
-type PhoneProofPurpose = 'signup' | 'password_reset' | 'social_link';
+type PhoneProofPurpose = 'signup' | 'password_reset';
 
 async function verifyPhone(purpose?: PhoneProofPurpose, targetPhone = phone) {
   await v1Post('/auth/phone/issue', { phone: targetPhone });
@@ -52,12 +52,6 @@ describe('MD-QA #133 shared MSW account-proof HTTP contract', () => {
       .resolves.toEqual({ maskedEmail: 'so***@example.com', providers: ['email'], hasPassword: true });
   });
 
-  it.each(['/auth/recovery/find-account', '/auth/recovery/reset-password'])('%s rejects a social-link proof', async (path) => {
-    const { proofToken } = await verifyPhone('social_link');
-    await expect(v1Post(path, { phone, proofToken, ...(path.endsWith('reset-password') ? { newPassword } : {}) }))
-      .rejects.toMatchObject({ statusCode: 400, code: 'PHONE_NOT_VERIFIED' } satisfies Partial<V1ApiError>);
-  });
-
   it.each(['/auth/recovery/find-account', '/auth/recovery/reset-password'])('%s rejects the default signup-purpose proof', async (path) => {
     const { proofToken } = await verifyPhone();
     await expect(v1Post(path, { phone, proofToken, ...(path.endsWith('reset-password') ? { newPassword } : {}) }))
@@ -91,8 +85,8 @@ describe('MD-QA #133 shared MSW account-proof HTTP contract', () => {
     })).resolves.toEqual({ ok: true });
   });
 
-  it('does not accept the social-link phone proof as an email reset proof', async () => {
-    const { proofToken } = await verifyPhone('social_link');
+  it('does not accept a phone proof as an email reset proof', async () => {
+    const { proofToken } = await verifyPhone('password_reset');
     const result = v1Post<unknown>('/auth/recovery/email/reset-password', {
       email: v1UserFixture.email, proofToken, newPassword,
     });
@@ -127,7 +121,7 @@ describe('MD-QA #133 shared MSW account-proof HTTP contract', () => {
   it('keeps phone verification available without granting account access', async () => {
     const issued = await v1Post<{ expiresAt: string }>('/auth/phone/issue', { phone });
     expect(Number.isNaN(Date.parse(issued.expiresAt))).toBe(false);
-    await expect(v1Post('/auth/phone/verify', { phone, code: '123456', purpose: 'social_link' }))
+    await expect(v1Post('/auth/phone/verify', { phone, code: '123456', purpose: 'password_reset' }))
       .resolves.toMatchObject({ verified: true, proofToken: expect.any(String) });
   });
 
@@ -153,9 +147,9 @@ describe('MD-QA #133 shared MSW account-proof HTTP contract', () => {
       .rejects.toMatchObject({ statusCode: 400, code: 'VERIFICATION_NO_PENDING' } satisfies Partial<V1ApiError>);
   });
 
-  it('rejects an unsupported phone proof purpose at the DTO boundary', async () => {
+  it.each(['login', 'social_link'])('rejects the unsupported phone proof purpose %s at the DTO boundary', async (purpose) => {
     await v1Post('/auth/phone/issue', { phone });
-    await expect(v1Post('/auth/phone/verify', { phone, code: '123456', purpose: 'login' }))
+    await expect(v1Post('/auth/phone/verify', { phone, code: '123456', purpose }))
       .rejects.toMatchObject({ statusCode: 400, code: 'VALIDATION_ERROR' } satisfies Partial<V1ApiError>);
   });
 

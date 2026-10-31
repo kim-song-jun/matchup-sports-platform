@@ -1,13 +1,17 @@
 import { V1ApiError } from './api-client';
+import { sanitizeRedirectPath } from './session-storage';
 import type {
   V1LinkableProvider,
   V1RecentLoginRequiredDetails,
   V1SignInThenLinkDetails,
+  V1SocialLoginProvider,
   V1WithdrawalPendingDetails,
 } from '@/types/api';
 
 export const RECENT_LOGIN_REQUIRED_CODE = 'RECENT_LOGIN_REQUIRED';
+export const SIGNUP_INCOMPLETE_CODE = 'SIGNUP_INCOMPLETE';
 export const ACCOUNT_WITHDRAWAL_PENDING_CODE = 'ACCOUNT_WITHDRAWAL_PENDING';
+export const PASSWORD_LOGIN_UNAVAILABLE_CODE = 'PASSWORD_LOGIN_UNAVAILABLE';
 
 /** 탈퇴 철회를 권하는 403 에서 꺼낸 값. `token` 은 `POST /auth/withdrawal/cancel` 본문에 그대로 넣는다. */
 export type WithdrawalCancelOffer = {
@@ -60,4 +64,30 @@ export function getRecentLoginRequired(error: unknown): V1RecentLoginRequiredDet
   }
   const maxAgeSeconds = asRecord(error.details)?.maxAgeSeconds;
   return isPositiveNumber(maxAgeSeconds) ? { maxAgeSeconds } : null;
+}
+
+/**
+ * 가입이 덜 끝난 계정이 연결을 시도해 403 을 받았을 때, 가입을 이어 갈 화면 경로.
+ * 경로는 서버가 정하지만 이동 전에 같은 origin 의 상대 경로인지 한 번 더 거른다.
+ */
+export function getSignupIncompleteRoute(error: unknown): string | null {
+  if (!(error instanceof V1ApiError) || error.statusCode !== 403 || error.code !== SIGNUP_INCOMPLETE_CODE) return null;
+  const route = asRecord(asRecord(error.details)?.next)?.route;
+  return typeof route === 'string' ? sanitizeRedirectPath(route) : null;
+}
+
+const SOCIAL_LOGIN_PROVIDERS: readonly string[] = ['kakao', 'apple', 'naver'];
+
+/**
+ * 비밀번호가 없는 계정의 재설정이 거절됐을 때, 그 계정이 실제로 가진 소셜 로그인 수단(중복 없이, 서버 순서대로).
+ * 이 오류가 아니거나 알아볼 수 있는 수단이 없으면 빈 배열이다 — 화면은 수단을 특정하지 않는 안내를 쓴다.
+ */
+export function getPasswordLoginUnavailableProviders(error: unknown): V1SocialLoginProvider[] {
+  if (!(error instanceof V1ApiError) || error.statusCode !== 400 || error.code !== PASSWORD_LOGIN_UNAVAILABLE_CODE) return [];
+  const providers = asRecord(error.details)?.providers;
+  if (!Array.isArray(providers)) return [];
+  const known = providers.filter((provider): provider is V1SocialLoginProvider => (
+    typeof provider === 'string' && SOCIAL_LOGIN_PROVIDERS.includes(provider)
+  ));
+  return [...new Set(known)];
 }

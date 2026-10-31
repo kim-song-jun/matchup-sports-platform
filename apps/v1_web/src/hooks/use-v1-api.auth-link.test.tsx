@@ -6,12 +6,14 @@ import type { ReactNode } from 'react';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { V1ApiError, v1Post } from '@/lib/api-client';
 import {
+  getPasswordLoginUnavailableProviders,
   getRecentLoginRequired,
   getSignInThenLinkHint,
+  getSignupIncompleteRoute,
   getWithdrawalCancelOffer,
 } from '@/lib/auth-link-errors';
 import { v1Keys } from '@/lib/query-keys';
-import { LINK_MSW, WITHDRAWAL_MSW } from '@/test/msw/auth-link-handlers';
+import { LINK_MSW, PASSWORD_UNAVAILABLE_MSW, WITHDRAWAL_MSW } from '@/test/msw/auth-link-handlers';
 import { v1MswHandlers } from '@/test/msw/handlers';
 import { v1UserFixture } from '@/test/msw/fixtures';
 import type { V1AuthMe } from '@/types/api';
@@ -125,6 +127,16 @@ describe('useV1LinkKakao', () => {
     expect(staleKeys()).toEqual([]);
   });
 
+  it('tells an unfinished signup where to continue, without mistaking it for a sign-in hint', async () => {
+    const { wrapper } = setup();
+    const { result } = renderHook(() => useV1LinkKakao(), { wrapper });
+
+    const error = await fails(() => result.current.mutateAsync({ accessToken: LINK_MSW.credentials.signupIncomplete }));
+
+    expect(getSignupIncompleteRoute(error)).toBe(LINK_MSW.signupIncompleteRoute);
+    expect(getSignInThenLinkHint(error)).toBeNull();
+  });
+
   it('exposes how recent the login must be when the server asks for a fresh sign-in', async () => {
     const { wrapper } = setup();
     const { result } = renderHook(() => useV1LinkKakao(), { wrapper });
@@ -147,10 +159,21 @@ describe('useV1LinkApple', () => {
     expect(staleKeys()).toEqual(['authMe', 'settings', 'profile', 'notifications']);
   });
 
+  it('accepts the optional fields Apple sends on a first authorization', async () => {
+    const { wrapper } = setup();
+    const { result } = renderHook(() => useV1LinkApple(), { wrapper });
+    await expect(succeeds(() => result.current.mutateAsync({
+      identityToken: LINK_MSW.credentials.ok,
+      nonce: 'server-nonce',
+      authorizationCode: 'one-time-authorization-code',
+      fullName: '김팀밋',
+    }))).resolves.toMatchObject({ provider: 'apple' });
+  });
+
   it('surfaces a provider already used by another account without touching the caches', async () => {
     const { wrapper, staleKeys } = setup();
     const { result } = renderHook(() => useV1LinkApple(), { wrapper });
-    const error = await fails(() => result.current.mutateAsync({ identityToken: LINK_MSW.credentials.providerInUse, nonce: 'n' }));
+    const error = await fails(() => result.current.mutateAsync({ identityToken: LINK_MSW.credentials.providerInUse, nonce: 'server-nonce' }));
     expect(error).toMatchObject({ statusCode: 409, code: 'SOCIAL_LINK_PROVIDER_IN_USE' });
     expect(staleKeys()).toEqual([]);
   });
@@ -160,7 +183,7 @@ describe('sign-in conflict 409s carry the next action in details', () => {
   it.each([
     ['/auth/kakao', { code: LINK_MSW.loginConflicts.unverifiedEmail, redirectUri: 'https://teameet.test/callback/kakao' }, 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', 'kakao'],
     ['/auth/kakao/token', { accessToken: LINK_MSW.loginConflicts.contactConflict }, 'SOCIAL_LINK_CONTACT_CONFLICT', 'kakao'],
-    ['/auth/apple', { identityToken: LINK_MSW.loginConflicts.accountProof, nonce: 'n' }, 'SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF', 'apple'],
+    ['/auth/apple', { identityToken: LINK_MSW.loginConflicts.accountProof, nonce: 'server-nonce' }, 'SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF', 'apple'],
   ])('%s', async (path, body, code, provider) => {
     const error = await fails(() => v1Post(path, body));
     expect(error).toMatchObject({ statusCode: 409, code });
@@ -169,6 +192,19 @@ describe('sign-in conflict 409s carry the next action in details', () => {
 
   it('a successful sign-in has no hint to read', async () => {
     await expect(v1Post('/auth/kakao/token', { accessToken: 'plain-token' })).resolves.toMatchObject({ session: { userId: v1UserFixture.id } });
+  });
+});
+
+describe('password reset on a social-only account', () => {
+  it('names the login methods the account really has', async () => {
+    const email = PASSWORD_UNAVAILABLE_MSW.email;
+    await v1Post('/auth/recovery/email/request', { email });
+    const { proofToken } = await v1Post<{ proofToken: string }>('/auth/recovery/email/confirm', { email, code: '123456' });
+
+    const error = await fails(() => v1Post('/auth/recovery/email/reset-password', { email, proofToken, newPassword: 'synthetic-new-password' }));
+
+    expect(error).toMatchObject({ statusCode: 400, code: 'PASSWORD_LOGIN_UNAVAILABLE' });
+    expect(getPasswordLoginUnavailableProviders(error)).toEqual([...PASSWORD_UNAVAILABLE_MSW.providers]);
   });
 });
 
@@ -200,7 +236,7 @@ describe('withdrawal cancel', () => {
   });
 
   it.each([
-    ['an expired token', 'expired-or-unknown', 400, 'WITHDRAWAL_CANCEL_TOKEN_INVALID'],
+    ['an expired token', 'expired-or-unknown-token', 400, 'WITHDRAWAL_CANCEL_TOKEN_INVALID'],
     ['an account that was already deleted', WITHDRAWAL_MSW.tokens.processed, 409, 'WITHDRAWAL_ALREADY_PROCESSED'],
   ])('leaves the auth snapshot alone for %s', async (_label, token, statusCode, code) => {
     const { queryClient, wrapper } = setup();

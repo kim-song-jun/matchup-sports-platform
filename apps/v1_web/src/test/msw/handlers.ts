@@ -77,7 +77,7 @@ import {
   toAdminInquiryDetail,
   toAdminInquiryRow,
 } from './fixtures';
-import { v1AuthLinkMswHandlers } from './auth-link-handlers';
+import { PASSWORD_UNAVAILABLE_MSW, passwordLoginUnavailableResponse, v1AuthLinkMswHandlers } from './auth-link-handlers';
 import { v1AuthStepUpMswHandlers } from './auth-step-up-handlers';
 import { v1GameRosterMswHandlers } from './game-roster-handlers';
 import { v1TeamDissolutionMswHandlers } from './team-dissolution-handlers';
@@ -113,7 +113,7 @@ function ok<T>(data: T) {
 }
 
 const authAccountPhoneFixture = '01012345678';
-type PhoneProofPurpose = 'signup' | 'password_reset' | 'social_link';
+type PhoneProofPurpose = 'signup' | 'password_reset';
 type PhoneProof = {
   readonly phone: string;
   readonly channel: 'phone';
@@ -183,7 +183,7 @@ function sweepAuthPhoneState() {
 }
 
 function isPhoneProofPurpose(value: string): value is PhoneProofPurpose {
-  return value === 'signup' || value === 'password_reset' || value === 'social_link';
+  return value === 'signup' || value === 'password_reset';
 }
 
 function hasPhoneProof(phone: string, proofToken: string, purpose: PhoneProofPurpose): boolean {
@@ -262,6 +262,7 @@ async function resetPasswordByRecoveryEmail(request: Request) {
   if (!proof || proof.email !== email || proof.channel !== 'email' || proof.purpose !== 'password_reset') {
     return authProofError('EMAIL_NOT_VERIFIED', '이메일 본인인증을 다시 진행해 주세요.');
   }
+  if (email === PASSWORD_UNAVAILABLE_MSW.email) return passwordLoginUnavailableResponse();
   if (email !== v1UserFixture.email?.trim().toLowerCase()) {
     return authProofError('ACCOUNT_NOT_FOUND', '이 이메일로 가입된 계정을 찾지 못했어요.', 404);
   }

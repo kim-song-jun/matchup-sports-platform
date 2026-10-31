@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { V1ApiError } from './api-client';
 import {
+  getPasswordLoginUnavailableProviders,
   getRecentLoginRequired,
   getSignInThenLinkHint,
+  getSignupIncompleteRoute,
   getWithdrawalCancelOffer,
 } from './auth-link-errors';
 
@@ -43,6 +45,12 @@ describe('getSignInThenLinkHint', () => {
   it('ignores the same details on a non-409 response', () => {
     const details = { next: 'sign_in_then_link', provider: 'kakao' };
     expect(getSignInThenLinkHint(apiError(400, 'VALIDATION_ERROR', details))).toBeNull();
+  });
+
+  it('does not read the object-shaped next of SIGNUP_INCOMPLETE as a sign-in hint', () => {
+    const error = apiError(403, 'SIGNUP_INCOMPLETE', { next: { route: '/signup/social' } });
+    expect(getSignInThenLinkHint(error)).toBeNull();
+    expect(getSignInThenLinkHint(apiError(409, 'SOCIAL_LINK_PROVIDER_IN_USE', { next: { route: '/signup/social' } }))).toBeNull();
   });
 
   it('ignores errors that did not come from the API client', () => {
@@ -96,5 +104,53 @@ describe('getRecentLoginRequired', () => {
 
   it('is null for other 403 codes', () => {
     expect(getRecentLoginRequired(apiError(403, 'SIGNUP_INCOMPLETE', { maxAgeSeconds: 300 }))).toBeNull();
+  });
+});
+
+describe('getSignupIncompleteRoute', () => {
+  it.each(['/terms?mode=social', '/signup/social'])('returns the route the server sent (%s)', (route) => {
+    expect(getSignupIncompleteRoute(apiError(403, 'SIGNUP_INCOMPLETE', { next: { route } }))).toBe(route);
+  });
+
+  it.each([
+    ['no details', undefined],
+    ['a string next, the shape of the sign-in hint', { next: 'sign_in_then_link', provider: 'kakao' }],
+    ['a route that is not a string', { next: { route: 7 } }],
+    ['an off-site route', { next: { route: 'https://evil.example/signup' } }],
+    ['a protocol-relative route', { next: { route: '//evil.example' } }],
+  ])('is null with %s', (_label, details) => {
+    expect(getSignupIncompleteRoute(apiError(403, 'SIGNUP_INCOMPLETE', details))).toBeNull();
+  });
+
+  it('is null for another code or status carrying the same details', () => {
+    const details = { next: { route: '/signup/social' } };
+    expect(getSignupIncompleteRoute(apiError(403, 'PERMISSION_DENIED', details))).toBeNull();
+    expect(getSignupIncompleteRoute(apiError(409, 'SIGNUP_INCOMPLETE', details))).toBeNull();
+  });
+});
+
+describe('getPasswordLoginUnavailableProviders', () => {
+  const unavailable = (details: unknown) => apiError(400, 'PASSWORD_LOGIN_UNAVAILABLE', details);
+
+  it('returns the providers the account really has, in server order and without repeats', () => {
+    expect(getPasswordLoginUnavailableProviders(unavailable({ providers: ['apple', 'kakao', 'apple'] }))).toEqual(['apple', 'kakao']);
+  });
+
+  it('drops values that are not social providers instead of offering a login for them', () => {
+    expect(getPasswordLoginUnavailableProviders(unavailable({ providers: ['kakao', 'email', 'google', 3, null] }))).toEqual(['kakao']);
+  });
+
+  it.each([
+    ['no details', undefined],
+    ['providers that is not a list', { providers: 'kakao' }],
+    ['an empty list', { providers: [] }],
+  ])('is empty with %s, so the screen falls back to guidance that names no provider', (_label, details) => {
+    expect(getPasswordLoginUnavailableProviders(unavailable(details))).toEqual([]);
+  });
+
+  it('is empty for a different error that carries providers', () => {
+    expect(getPasswordLoginUnavailableProviders(apiError(400, 'VALIDATION_ERROR', { providers: ['kakao'] }))).toEqual([]);
+    expect(getPasswordLoginUnavailableProviders(apiError(409, 'PASSWORD_LOGIN_UNAVAILABLE', { providers: ['kakao'] }))).toEqual([]);
+    expect(getPasswordLoginUnavailableProviders(new Error('x'))).toEqual([]);
   });
 });

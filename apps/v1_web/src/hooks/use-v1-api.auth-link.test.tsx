@@ -212,10 +212,10 @@ describe('useV1LinkPending', () => {
 
     // ... 사용자가 원래 계정으로 로그인한 직후
     const pending = readPendingSocialLink();
-    expect(pending).not.toBeNull();
+    if (!pending || pending.expired) throw new Error('expected a usable pending link');
     const { wrapper, staleKeys } = setup();
     const { result } = renderHook(() => useV1LinkPending(), { wrapper });
-    const linked = await succeeds(() => result.current.mutateAsync({ linkToken: pending!.linkToken }));
+    const linked = await succeeds(() => result.current.mutateAsync({ linkToken: pending.linkToken }));
     clearPendingSocialLink();
 
     expect(linked).toEqual({ provider: 'kakao', alreadyLinked: false, mergedPendingAccount: false, authProviders: ['email', 'kakao'] });

@@ -13,9 +13,10 @@ const LINK_PROVIDER_QUERY = 'provider';
  * 연결 시도의 결과. 화면 사이를 주소로 넘기므로 값 집합이 곧 계약이다.
  * linked 새로 연결 · merged 만들다 만 가입 계정을 정리하고 옮김 · already 이미 연결돼 있었음 ·
  * in_use 다른 팀밋 계정이 쓰는 중 · exists 이 계정에 같은 제공자의 다른 계정이 있음 ·
- * recent_login 다시 로그인해야 함 · mismatch 안내받은 계정과 다른 계정으로 로그인함 · failed 그 밖의 실패.
+ * recent_login 다시 로그인해야 함 · mismatch 안내받은 계정과 다른 계정으로 로그인함 ·
+ * expired 로그인하기 전에 연결 시간이 지남(서버 응답이 아니라 보관해 둔 토큰의 만료로 정해진다) · failed 그 밖의 실패.
  */
-export const LINK_RESULTS = ['linked', 'merged', 'already', 'in_use', 'exists', 'recent_login', 'mismatch', 'failed'] as const;
+export const LINK_RESULTS = ['linked', 'merged', 'already', 'in_use', 'exists', 'recent_login', 'mismatch', 'expired', 'failed'] as const;
 export type LinkResult = (typeof LINK_RESULTS)[number];
 
 export type LinkOutcome = { linkResult: LinkResult; provider: V1LinkableProvider };

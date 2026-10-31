@@ -113,10 +113,10 @@ describe('SignupClient required profile contract', () => {
     fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01012345678' } });
     fireEvent.click(await screen.findByRole('button', { name: '인증번호 받기' }));
 
-    expect(await screen.findByText('이 번호로 가입된 팀밋 계정이 있어요')).toBeInTheDocument();
+    expect(await screen.findByText('이 번호는 이미 가입돼 있어요')).toBeInTheDocument();
     expect(screen.queryByText('이미 사용 중인 번호예요.')).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /기존 계정으로 로그인/ })).toHaveAttribute('href', '/login/email');
-    expect(screen.getByRole('link', { name: /계정 찾기/ })).toHaveAttribute('href', '/auth/find-account');
+    expect(screen.getByRole('link', { name: /이메일로 가입했어요/ })).toHaveAttribute('href', '/login/email');
+    expect(screen.getByRole('link', { name: /비밀번호가 기억나지 않아요/ })).toHaveAttribute('href', '/auth/find-account');
   });
 
   it('다른 인증 오류는 기존 문구 그대로 보인다', async () => {
@@ -129,8 +129,8 @@ describe('SignupClient required profile contract', () => {
     fireEvent.click(await screen.findByRole('button', { name: '인증번호 받기' }));
 
     expect(await screen.findByText('잠시 후 다시 시도해 주세요.')).toBeInTheDocument();
-    expect(screen.queryByText('이 번호로 가입된 팀밋 계정이 있어요')).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /기존 계정으로 로그인/ })).not.toBeInTheDocument();
+    expect(screen.queryByText('이 번호는 이미 가입돼 있어요')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /이메일로 가입했어요/ })).not.toBeInTheDocument();
   });
 
   it('redirects direct signup entry to terms before accepting account input', async () => {
@@ -707,7 +707,7 @@ describe('SignupClient 본인인증 단계', () => {
 });
 
 describe('SignupClient 이미 가입된 번호 안내', () => {
-  const CARD_TITLE = '이 번호로 가입된 팀밋 계정이 있어요';
+  const CARD_TITLE = '이 번호는 이미 가입돼 있어요';
   const OTHER_PHONE = '01099998888';
 
   beforeEach(() => {
@@ -743,9 +743,11 @@ describe('SignupClient 이미 가입된 번호 안내', () => {
       await verifyPhone('01012345678');
 
       expect(await screen.findByText(CARD_TITLE)).toBeInTheDocument();
-      expect(screen.getByRole('link', { name: /기존 계정으로 로그인/ })).toHaveAttribute('href', '/login/email');
-      expect(screen.getByRole('link', { name: /계정 찾기/ })).toHaveAttribute('href', '/auth/find-account');
+      expect(screen.getByRole('link', { name: /이메일로 가입했어요/ })).toHaveAttribute('href', '/login/email');
+      expect(screen.getByRole('link', { name: /비밀번호가 기억나지 않아요/ })).toHaveAttribute('href', '/auth/find-account');
       expect(screen.getByRole('button', { name: '다른 번호로 인증하기' })).toBeEnabled();
+      // 입력칸이 카드로 바뀌므로 포커스가 body 로 빠지지 않고 카드 제목으로 옮겨 간다.
+      await waitFor(() => expect(screen.getByText(CARD_TITLE)).toHaveFocus());
 
       // 완료 표시도, 인증번호 입력도, 자동 이동도 없다.
       await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
@@ -762,7 +764,7 @@ describe('SignupClient 이미 가입된 번호 안내', () => {
     await advanceToProfile();
 
     expect(screen.queryByText(CARD_TITLE)).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /기존 계정으로 로그인/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /이메일로 가입했어요/ })).not.toBeInTheDocument();
   });
 
   it('로그인·계정 찾기 이동은 원래 가려던 곳(redirect)을 이어 준다', async () => {
@@ -773,9 +775,9 @@ describe('SignupClient 이미 가입된 번호 안내', () => {
     await verifyPhone('01012345678');
     await screen.findByText(CARD_TITLE);
 
-    expect(screen.getByRole('link', { name: /기존 계정으로 로그인/ })).toHaveAttribute('href', '/login/email?redirect=%2Fmatches%2Fabc');
-    expect(screen.getByRole('link', { name: /계정 찾기/ })).toHaveAttribute('href', '/auth/find-account?redirect=%2Fmatches%2Fabc');
-    expect(screen.getByRole('link', { name: /소셜 로그인으로 가입했어요/ })).toHaveAttribute('href', '/login?redirect=%2Fmatches%2Fabc');
+    expect(screen.getByRole('link', { name: /이메일로 가입했어요/ })).toHaveAttribute('href', '/login/email?redirect=%2Fmatches%2Fabc');
+    expect(screen.getByRole('link', { name: /비밀번호가 기억나지 않아요/ })).toHaveAttribute('href', '/auth/find-account?redirect=%2Fmatches%2Fabc');
+    expect(screen.getByRole('link', { name: /카카오.*로 가입했어요/ })).toHaveAttribute('href', '/login?redirect=%2Fmatches%2Fabc');
   });
 
   it('소셜 로그인으로 가입했을 수 있는 사람에게 로그인 첫 화면 안내를 준다(웹에서는 카카오만)', async () => {
@@ -785,9 +787,10 @@ describe('SignupClient 이미 가입된 번호 안내', () => {
     await verifyPhone('01012345678');
     await screen.findByText(CARD_TITLE);
 
-    const row = screen.getByRole('link', { name: /소셜 로그인으로 가입했어요/ });
+    const row = screen.getByRole('link', { name: /카카오.*로 가입했어요/ });
     expect(row).toHaveAttribute('href', '/login');
-    expect(row).toHaveTextContent("카카오로 가입하셨다면 로그인 첫 화면의 '카카오' 버튼으로 로그인해 주세요.");
+    expect(row).toHaveTextContent('카카오로 가입했어요');
+    expect(row).toHaveTextContent('로그인 첫 화면에서 그 버튼을 눌러요');
     // 웹에는 Apple 버튼이 없어 Apple 을 언급하지 않는다.
     expect(row).not.toHaveTextContent('Apple');
   });
@@ -801,9 +804,8 @@ describe('SignupClient 이미 가입된 번호 안내', () => {
       await verifyPhone('01012345678');
       await screen.findByText(CARD_TITLE);
 
-      expect(screen.getByRole('link', { name: /소셜 로그인으로 가입했어요/ })).toHaveTextContent(
-        "카카오나 Apple로 가입하셨다면 로그인 첫 화면의 '카카오' 또는 'Apple로 계속하기' 버튼으로 로그인해 주세요.",
-      );
+      const row = screen.getByRole('link', { name: /카카오·Apple로 가입했어요/ });
+      expect(row).toHaveAttribute('href', '/login');
     } finally {
       delete window.TeameetNative;
     }
@@ -880,8 +882,8 @@ describe('SignupClient 이미 가입된 번호 안내', () => {
       await submitProfile();
 
       expect(await screen.findByText(CARD_TITLE)).toBeInTheDocument();
-      expect(screen.getByRole('link', { name: /기존 계정으로 로그인/ })).toHaveAttribute('href', '/login/email');
-      expect(screen.getByRole('link', { name: /계정 찾기/ })).toHaveAttribute('href', '/auth/find-account');
+      expect(screen.getByRole('link', { name: /이메일로 가입했어요/ })).toHaveAttribute('href', '/login/email');
+      expect(screen.getByRole('link', { name: /비밀번호가 기억나지 않아요/ })).toHaveAttribute('href', '/auth/find-account');
       expect(screen.queryByRole('button', { name: '가입하고 계속' })).not.toBeInTheDocument();
       expect(screen.queryByLabelText(/^이름/)).not.toBeInTheDocument();
       expect(screen.queryByText('이미 사용 중인 번호예요.')).not.toBeInTheDocument();

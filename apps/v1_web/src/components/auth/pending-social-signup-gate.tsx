@@ -12,6 +12,7 @@ import {
 } from '@/lib/session-storage';
 import { disconnectV1Socket } from '@/lib/v1-socket';
 import { SessionFallback } from './session-entry-gate';
+import { usePendingEmailLinkOffer } from './use-pending-email-link-offer';
 import { usePendingSocialLinkResolver } from './use-pending-social-link-resolver';
 import {
   getPendingSocialSignupRoute,
@@ -37,7 +38,9 @@ export function PendingSocialSignupGate({ children }: { children: ReactNode }) {
     setHasSessionHint(false);
   }, [authMe.error, authMe.isError, authMe.isFetching, hasSessionHint]);
 
-  usePendingSocialLinkResolver(hasSessionHint === true ? authMe.data : undefined);
+  const confirmedAccount = hasSessionHint === true ? authMe.data : undefined;
+  usePendingSocialLinkResolver(confirmedAccount);
+  usePendingEmailLinkOffer(confirmedAccount);
 
   const onboardingStatus = authMe.data?.user.onboardingStatus;
   const socialRequiredRoute = getPendingSocialSignupRoute(onboardingStatus);

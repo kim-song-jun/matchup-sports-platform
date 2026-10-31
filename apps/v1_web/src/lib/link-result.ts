@@ -6,6 +6,9 @@ import type { V1LinkableProvider, V1LinkSocialResult } from '@/types/api';
 /** 로그인 방법 화면. 연결 결과는 `?linkResult=&provider=` 로 이 화면에 전달된다. */
 export const LOGIN_METHODS_PATH = '/my/settings/login-methods';
 
+/** 소셜 계정에 이메일·비밀번호 로그인을 더하는 단계 화면. */
+export const EMAIL_LINK_PATH = `${LOGIN_METHODS_PATH}/email`;
+
 const LINK_RESULT_QUERY = 'linkResult';
 const LINK_PROVIDER_QUERY = 'provider';
 

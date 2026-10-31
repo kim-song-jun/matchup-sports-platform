@@ -77,7 +77,7 @@ export type SignupCompleteViewModel = {
   sub: string;
   steps: Array<{ title: string; body: string; done: boolean }>;
   primary: AuthAction;
-  secondary: AuthAction;
+  secondary?: AuthAction;
 };
 
 export type OnboardingStep = 'resume' | 'sport' | 'level' | 'region' | 'confirm';

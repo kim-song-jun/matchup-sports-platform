@@ -7,6 +7,12 @@ import type { LinkOutcome } from '@/lib/link-result';
 
 const PROVIDER_NAME = { kakao: '카카오', apple: 'Apple' } as const;
 
+/** 로그인한 지 오래돼 새 로그인 수단을 붙일 수 없을 때의 안내. 소셜 연결과 이메일 연결이 같은 문구·같은 길(다시 로그인)을 쓴다. */
+export const RECENT_LOGIN_NOTICE = {
+  title: '보안을 위해 다시 로그인해 주세요',
+  body: '로그인한 지 오래돼서 바로 연결할 수 없어요. 다시 로그인하면 이 화면으로 돌아와 이어서 연결할 수 있어요.',
+} as const;
+
 type CardNotice = {
   title: string;
   body: string;
@@ -51,8 +57,7 @@ function noticeFor({ linkResult, provider }: LinkOutcome, canConnectHere: boolea
     case 'recent_login':
       return {
         kind: 'card',
-        title: '보안을 위해 다시 로그인해 주세요',
-        body: '로그인한 지 오래돼서 바로 연결할 수 없어요. 다시 로그인하면 이 화면으로 돌아와 이어서 연결할 수 있어요.',
+        ...RECENT_LOGIN_NOTICE,
         role: 'status',
         actions: ['relogin'],
       };

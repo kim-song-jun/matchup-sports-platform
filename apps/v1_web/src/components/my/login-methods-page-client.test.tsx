@@ -155,14 +155,17 @@ function rowOf(label: string) {
 }
 
 const KAKAO_BUTTON = '카카오 연결하기';
+const EMAIL_LINK = '이메일 연결하기';
 
 describe('LoginMethodsPageClient - 로그인 수단 표시', () => {
   it('이메일만 있는 계정은 이메일을 연결됨으로, 카카오는 연결하기 버튼으로, Apple은 앱 안내로 보인다', async () => {
     await renderLoaded(['email']);
 
-    const email = rowOf('이메일 로그인');
+    const email = rowOf('이메일·비밀번호');
     expect(within(email).getByText('minsu.kim@example.com')).toBeInTheDocument();
     expect(within(email).getByText('연결됨')).toBeInTheDocument();
+    expect(within(email).queryByRole('link', { name: EMAIL_LINK })).not.toBeInTheDocument();
+    expect(screen.queryByText('이메일 로그인')).not.toBeInTheDocument();
     const kakao = within(rowOf('카카오 로그인')).getByRole('button', { name: KAKAO_BUTTON });
     expect(kakao).toBeEnabled();
     // 브랜드색은 클래스가 입힌다 — 인라인 배경은 hover 색 변화를 막는다.
@@ -175,22 +178,37 @@ describe('LoginMethodsPageClient - 로그인 수단 표시', () => {
     expect(screen.getByText(/연결해도 팀과 경기 기록은 그대로예요/)).toBeInTheDocument();
   });
 
-  it('카카오로만 가입한 계정은 이메일 줄을 그리지 않고 카카오를 연결됨으로 보인다', async () => {
+  it('카카오로만 가입한 계정은 이메일·비밀번호 줄에서 전용 화면으로 가는 링크를 보이고, 계정 이메일이 바뀐다는 안내를 준다', async () => {
     await renderLoaded(['kakao']);
 
-    expect(screen.queryByText('이메일 로그인')).not.toBeInTheDocument();
+    const email = rowOf('이메일·비밀번호');
+    expect(within(email).getByText('연결하면 이메일과 비밀번호로도 이 계정에 들어와요')).toBeInTheDocument();
+    expect(within(email).queryByText('연결됨')).not.toBeInTheDocument();
+    // 버튼이 아니라 단계 화면으로 가는 링크다 — 눌러도 이 화면에서 요청이 나가지 않는다.
+    expect(within(email).getByRole('link', { name: EMAIL_LINK })).toHaveAttribute('href', '/my/settings/login-methods/email');
+    expect(screen.getByText(/이메일을 연결하면 계정 이메일이 그 주소로 바뀌어요\. 팀과 경기 기록은 그대로예요\./)).toBeInTheDocument();
     expect(within(rowOf('카카오 로그인')).getByText('연결됨')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: KAKAO_BUTTON })).not.toBeInTheDocument();
     expect(screen.queryByText(/연결해도 팀과 경기 기록은 그대로예요/)).not.toBeInTheDocument();
   });
 
+  it('카카오도 이메일도 없는 계정은 안내를 두 번 반복하지 않는다', async () => {
+    await renderLoaded(['apple']);
+
+    expect(screen.getByRole('link', { name: EMAIL_LINK })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: KAKAO_BUTTON })).toBeInTheDocument();
+    expect(screen.getAllByText(/팀과 경기 기록은 그대로예요/)).toHaveLength(1);
+  });
+
   it('이메일과 카카오가 둘 다 있으면 두 줄 모두 연결됨이고 연결하기 버튼이 없다', async () => {
     await renderLoaded(['email', 'kakao']);
 
-    expect(within(rowOf('이메일 로그인')).getByText('연결됨')).toBeInTheDocument();
+    expect(within(rowOf('이메일·비밀번호')).getByText('연결됨')).toBeInTheDocument();
     expect(within(rowOf('카카오 로그인')).getByText('연결됨')).toBeInTheDocument();
     expect(within(rowOf('Apple 로그인')).queryByText('연결됨')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: KAKAO_BUTTON })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: EMAIL_LINK })).not.toBeInTheDocument();
+    expect(screen.queryByText(/계정 이메일이 그 주소로 바뀌어요/)).not.toBeInTheDocument();
   });
 
   it('Apple이 연결된 계정은 Apple 줄에 연결됨을 보이고 앱 안내는 없다', async () => {
@@ -542,7 +560,7 @@ describe('LoginMethodsPageClient - 결과 카드의 다음 행동', () => {
     setQuery('linkResult=linked&provider=kakao');
     await renderLoaded(['email', 'kakao']);
     expect(within(rowOf('카카오 로그인')).getByText('방금 연결했어요')).toBeInTheDocument();
-    expect(within(rowOf('이메일 로그인')).queryByText('방금 연결했어요')).not.toBeInTheDocument();
+    expect(within(rowOf('이메일·비밀번호')).queryByText('방금 연결했어요')).not.toBeInTheDocument();
   });
 
   it('이미 연결돼 있던 결과나 결과가 없을 때는 평소 문구를 쓴다', async () => {

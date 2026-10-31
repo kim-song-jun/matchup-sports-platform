@@ -368,9 +368,11 @@ type ListItemProps = {
    * 배지 텍스트와 함께 쓴다(호출부 책임).
    */
   style?: CSSProperties;
+  /** `href` 로 이동하기 직전에 부른다. 이동을 막지 않는다. */
+  onNavigate?: () => void;
 };
 
-export function ListItem({ title, sub, trailing, chev, href, style }: ListItemProps) {
+export function ListItem({ title, sub, trailing, chev, href, style, onNavigate }: ListItemProps) {
   const content = (
     <>
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -386,7 +388,7 @@ export function ListItem({ title, sub, trailing, chev, href, style }: ListItemPr
   );
 
   return href ? (
-    <Link className="tm-list-row tm-pressable" href={href} style={style}>
+    <Link className="tm-list-row tm-pressable" href={href} style={style} onClick={onNavigate}>
       {content}
     </Link>
   ) : (

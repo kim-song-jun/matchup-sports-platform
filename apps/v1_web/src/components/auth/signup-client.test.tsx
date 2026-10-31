@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { V1ApiError } from '@/lib/api-client';
+import { PENDING_EMAIL_LINK_STORAGE_KEY, readPendingEmailLink, savePendingEmailLink } from '@/lib/pending-email-link';
 import { peekPendingSocialLink, savePendingSocialLink } from '@/lib/pending-social-link';
 import { SignupClient } from './signup-client';
 
@@ -262,6 +263,21 @@ describe('SignupClient required profile contract', () => {
 
     await waitFor(() => expect(hooks.registerMutateAsync).toHaveBeenCalled());
     await waitFor(() => expect(peekPendingSocialLink()).toBeNull());
+  });
+
+  it('가입이 끝나면 카카오 쪽으로 나갈 때 보관해 둔 이메일도 지운다', async () => {
+    savePendingEmailLink('left-from-earlier@example.com');
+    render(<SignupClient />);
+    await advanceToProfile();
+    fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '홍길동' } });
+    fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
+    fireEvent.click(screen.getByRole('radio', { name: '남' }));
+    expect(readPendingEmailLink()).not.toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: '가입하고 계속' }));
+
+    await waitFor(() => expect(hooks.registerMutateAsync).toHaveBeenCalled());
+    await waitFor(() => expect(readPendingEmailLink()).toBeNull());
   });
 
   it('가입 요청이 실패하면 대기 연결 토큰은 그대로 둔다', async () => {
@@ -825,6 +841,57 @@ describe('SignupClient 이미 가입된 번호 안내', () => {
     expect(row).toHaveTextContent('로그인 첫 화면에서 그 버튼을 눌러요');
     // 웹에는 Apple 버튼이 없어 Apple 을 언급하지 않는다.
     expect(row).not.toHaveTextContent('Apple');
+  });
+
+  /** 링크 핸들러는 그대로 돌리되 jsdom 이 실제 이동을 시도하지 않게 막는다. */
+  function clickLink(link: HTMLElement) {
+    link.addEventListener('click', (event) => event.preventDefault(), { once: true });
+    fireEvent.click(link);
+  }
+
+  it('소셜 줄은 로그인한 뒤 방금 입력한 이메일도 연결할 수 있다고 알린다', async () => {
+    hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'PROOF-TOKEN', registered: true });
+    render(<SignupClient />);
+    await advanceToVerify();
+    await verifyPhone('01012345678');
+    await screen.findByText(CARD_TITLE);
+
+    expect(screen.getByRole('link', { name: /카카오.*로 가입했어요/ })).toHaveTextContent('로그인한 뒤 방금 입력한 이메일도 연결할 수 있어요.');
+    // 이 문장은 소셜 줄에만 있다 — 다른 두 줄은 그 약속을 하지 않는다.
+    expect(screen.getByRole('link', { name: /이메일로 가입했어요/ })).not.toHaveTextContent('연결할 수 있어요');
+    expect(screen.getByRole('link', { name: /비밀번호가 기억나지 않아요/ })).not.toHaveTextContent('연결할 수 있어요');
+  });
+
+  it('소셜 줄을 눌러 로그인 첫 화면으로 나가면 입력했던 이메일만 이 탭에 보관하고, 비밀번호는 어디에도 쓰지 않는다', async () => {
+    hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'PROOF-TOKEN', registered: true });
+    render(<SignupClient />);
+    await advanceToVerify();
+    await verifyPhone('01012345678');
+    await screen.findByText(CARD_TITLE);
+    expect(readPendingEmailLink()).toBeNull();
+
+    clickLink(screen.getByRole('link', { name: /카카오.*로 가입했어요/ }));
+
+    expect(readPendingEmailLink()).toBe('signup@example.com');
+    const stored = JSON.parse(window.sessionStorage.getItem(PENDING_EMAIL_LINK_STORAGE_KEY) as string) as Record<string, unknown>;
+    expect(Object.keys(stored).sort()).toEqual(['email', 'expiresAt']);
+    const everything = [window.sessionStorage, window.localStorage].flatMap((storage) => (
+      Object.keys(storage).map((key) => `${key}=${storage.getItem(key)}`)
+    )).join('\n');
+    expect(everything).not.toContain('password123');
+  });
+
+  it('이메일 로그인이나 계정 찾기로 나갈 때는 이메일을 보관하지 않는다', async () => {
+    hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'PROOF-TOKEN', registered: true });
+    render(<SignupClient />);
+    await advanceToVerify();
+    await verifyPhone('01012345678');
+    await screen.findByText(CARD_TITLE);
+
+    clickLink(screen.getByRole('link', { name: /이메일로 가입했어요/ }));
+    clickLink(screen.getByRole('link', { name: /비밀번호가 기억나지 않아요/ }));
+
+    expect(readPendingEmailLink()).toBeNull();
   });
 
   it('iOS 앱에서는 같은 줄이 Apple 버튼도 안내한다', async () => {

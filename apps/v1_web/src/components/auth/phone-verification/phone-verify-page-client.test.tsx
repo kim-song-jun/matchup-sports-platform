@@ -176,7 +176,7 @@ describe('PhoneVerifyPageClient — 번호가 다른 계정에 있을 때', () =
     });
 
     expect(replace).not.toHaveBeenCalled();
-    expect(screen.getByRole('alert')).toHaveTextContent('서버 오류');
+    expect(screen.getByRole('alert')).toHaveTextContent('로그아웃하지 못했어요. 잠시 후 다시 시도해 주세요.');
   });
 
   it('다른 오류는 기존 문구 그대로 보이고 출구 버튼은 없다', async () => {

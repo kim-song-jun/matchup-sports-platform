@@ -1,12 +1,8 @@
 'use client';
 
-import { useCallback, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { useV1Logout } from '@/hooks/use-v1-api';
-import { clearV1IdentityCache } from '@/lib/query-keys';
-import { clearStoredV1Session } from '@/lib/session-storage';
-import { disconnectV1Socket } from '@/lib/v1-socket';
+import { useCallback } from 'react';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
+import { useSignOutAndLeave } from './use-sign-out-and-leave';
 
 /**
  * 소셜 가입 진행 중(약관·프로필 입력) 화면에서 빠져나가는 유일한 경로.
@@ -17,30 +13,18 @@ import { useConfirm } from '@/components/v1-ui/confirm-modal';
  * 서버도 pending 상태에서 /auth/logout 만은 허용하도록 열어 둔 설계다.
  */
 export function useSocialSignupExit() {
-  const queryClient = useQueryClient();
-  const logout = useV1Logout();
   const { confirm, ConfirmModal } = useConfirm();
-  const [error, setError] = useState<string | null>(null);
+  const { signOutAndLeave, pending, error } = useSignOutAndLeave();
 
   /** 로그아웃 뒤 하드 내비게이션으로 나간다. 실패하면 서버 세션이 남아 게이트가 되돌려 보내므로 알린다. */
-  const leaveTo = useCallback(async (path: string) => {
-    setError(null);
-    try {
-      await logout.mutateAsync();
-    } catch {
-      // 로그아웃이 실패하면 서버 세션이 남아 로그인 화면으로 가도 게이트가 다시 이 화면으로
-      // 끌어온다. 조용히 넘어가면 "눌러도 아무 일도 없는" 원래 증상으로 되돌아가므로 알린다.
-      setError('가입 취소를 완료하지 못했어요. 잠시 후 다시 시도해 주세요.');
-      return;
-    }
-
-    clearStoredV1Session();
-    clearV1IdentityCache(queryClient);
-    disconnectV1Socket();
-    // router.replace 는 prefetch 된 /login 인스턴스를 재사용해 로그아웃 이전 스냅샷에
-    // 멈출 수 있다(session-entry-gate 와 동일한 이유로 하드 내비게이션을 쓴다).
-    window.location.replace(path);
-  }, [logout, queryClient]);
+  const leaveTo = useCallback(
+    // 가입 진행 중 계정은 푸시 등록을 할 수 없어 해지할 것이 없다.
+    (path: string) => signOutAndLeave(path, {
+      failureMessage: '가입 취소를 완료하지 못했어요. 잠시 후 다시 시도해 주세요.',
+      revokePush: false,
+    }),
+    [signOutAndLeave],
+  );
 
   const exit = useCallback(async () => {
     const confirmed = await confirm({
@@ -55,5 +39,5 @@ export function useSocialSignupExit() {
     await leaveTo('/login');
   }, [confirm, leaveTo]);
 
-  return { exit, leaveTo, ConfirmModal, error, pending: logout.isPending };
+  return { exit, leaveTo, ConfirmModal, error, pending };
 }

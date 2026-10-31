@@ -7,7 +7,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Camera } from 'lucide-react';
 import { Card, DatePickerTextInput } from '@/components/v1-ui/primitives';
 import { EyeIcon, EyeOffIcon } from '@/components/v1-ui/icons';
-import { PhoneConflictNotice } from '@/components/auth/otp/phone-conflict-notice';
+import { PHONE_CONFLICT_CODE } from '@/components/auth/otp/phone-conflict-notice';
 import { OtpCodeInput, OtpErrorBanner, OtpRemainingRow } from '@/components/auth/otp/otp-parts';
 import { OTP_CODE_LENGTH, useOtpVerification } from '@/components/auth/otp/use-otp-verification';
 import { usePhoneVerificationRequests } from '@/components/auth/phone-verification/use-phone-verification-requests';
@@ -23,13 +23,14 @@ import { V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
 import { clearV1IdentityCache } from '@/lib/query-keys';
 import { clearPendingSocialLink } from '@/lib/pending-social-link';
-import { saveStoredV1Session } from '@/lib/session-storage';
+import { getSavedRedirectPath, sanitizeRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
 import { displayInitials } from '@/lib/display-initials';
 import {
   clearSignupTermsDocumentIds,
   readSignupTermsDocumentIds,
 } from '@/lib/signup-terms-storage';
 import { AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
+import { SignupPhoneRegisteredCard } from './signup-phone-registered-card';
 import { useDuplicateCheck, type DuplicateCheckStatus } from './use-duplicate-check';
 import {
   formatBirthDate,
@@ -110,7 +111,8 @@ export function SignupClient() {
   const [termsReady, setTermsReady] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [phoneConflict, setPhoneConflict] = useState(false);
+  // 인증한(또는 가입 제출한) 번호가 이미 계정에 쓰이고 있다. 이 동안은 다음 단계로 넘어갈 수 없다.
+  const [phoneRegistered, setPhoneRegistered] = useState(false);
   const nicknameHelperId = useId();
   const emailHelperId = useId();
   const normalizedNickname = nickname.trim();
@@ -127,6 +129,7 @@ export function SignupClient() {
   });
   /** 인증 완료 → 다음 단계 자동 이동 타이머. 언마운트 시 정리해 사라진 화면에 setState 하지 않는다. */
   const advanceTimerRef = useRef<number | null>(null);
+  const phoneInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(
     () => () => {
@@ -140,9 +143,15 @@ export function SignupClient() {
    * 다만 즉시 전환하면 "인증 완료" 표시를 볼 새가 없어 무엇이 처리됐는지 알 수 없으므로,
    * 완료 상태를 잠깐 보여준 뒤 이동한다.
    */
-  const handlePhoneVerified = (token?: string) => {
-    setPhoneProofToken(token ?? null);
+  const handlePhoneVerified = (token?: string, registered?: boolean) => {
     setProfileError(null);
+    // 가입된 번호의 증명은 가입에 쓸 수 없다 — 쥐고 있지 않고 그 자리에서 안내한다.
+    if (registered) {
+      setPhoneProofToken(null);
+      setPhoneRegistered(true);
+      return;
+    }
+    setPhoneProofToken(token ?? null);
     if (!token) return;
     if (advanceTimerRef.current !== null) window.clearTimeout(advanceTimerRef.current);
     advanceTimerRef.current = window.setTimeout(() => {
@@ -152,12 +161,6 @@ export function SignupClient() {
   };
 
   const otpIdPrefix = useId();
-  const phoneConflictNotice = (
-    <PhoneConflictNotice
-      onLogin={() => router.push('/login')}
-      onFindAccount={() => router.push('/auth/find-account')}
-    />
-  );
   const phoneRequests = usePhoneVerificationRequests({ mode: 'public', phone: phoneDigits, onVerified: handlePhoneVerified });
   const otp = useOtpVerification(phoneRequests);
 
@@ -193,6 +196,7 @@ export function SignupClient() {
   const isSendablePhone = /^\d{11}$/.test(phoneDigits);
   const profileDraft = { displayName: realName, phone: phoneDigits, birthDate: birthDateDigits, gender };
   const profileIssue = getSignupProfileIssue(profileDraft);
+  const phoneTaken = phoneRegistered || otp.errorCode === PHONE_CONFLICT_CODE;
   const profileBlocked = register.isPending || updateProfile.isPending || uploadImages.isPending || uploadingProfileImage || profileIssue !== null;
 
   const selectProfileImage = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -245,6 +249,15 @@ export function SignupClient() {
     setStep('verify');
   };
 
+  /** 가입된 번호 안내에서 다른 번호로 돌아간다 — 번호 칸을 비우면 발급·입력 상태도 함께 초기화된다. */
+  const changePhone = () => {
+    setPhoneRegistered(false);
+    setPhoneProofToken(null);
+    setPhoneDigits('');
+    setProfileError(null);
+    phoneInputRef.current?.focus();
+  };
+
   const goProfile = () => {
     if (!phoneProofToken) return;
     setError(null);
@@ -259,7 +272,6 @@ export function SignupClient() {
     if (profileBlocked) return;
     setError(null);
     setProfileError(null);
-    setPhoneConflict(false);
     if (!isCompleteSignupProfile(profileDraft)) {
       const nextProfileIssue = getSignupProfileIssue(profileDraft);
       if (nextProfileIssue) setProfileError(SIGNUP_PROFILE_ERROR_MESSAGES[nextProfileIssue]);
@@ -321,8 +333,10 @@ export function SignupClient() {
           setStep('account');
           return;
         }
-        if (nextError.code === 'PHONE_CONFLICT') {
-          setPhoneConflict(true);
+        if (nextError.code === PHONE_CONFLICT_CODE) {
+          setPhoneProofToken(null);
+          setPhoneRegistered(true);
+          setStep('verify');
           return;
         }
         emailCheck.markTaken(normalizedEmail);
@@ -354,7 +368,15 @@ export function SignupClient() {
           onClick: goVerify,
         }
       : step === 'verify'
-      ? phoneProofToken
+      ? phoneTaken
+        ? {
+            label: '다른 번호로 인증하기',
+            disabled: false,
+            loading: false,
+            neutral: true,
+            onClick: changePhone,
+          }
+        : phoneProofToken
         ? {
             // 인증 성공 시 자동으로 넘어가므로 이 버튼은 되돌아온 사용자를 위한 경로다.
             label: '다음',
@@ -415,7 +437,7 @@ export function SignupClient() {
       fixedAction={
         <>
           <button
-            className={`tm-btn tm-btn-lg ${primary.disabled ? 'tm-btn-neutral' : 'tm-btn-primary'} tm-btn-block`}
+            className={`tm-btn tm-btn-lg ${primary.disabled || primary.neutral ? 'tm-btn-neutral' : 'tm-btn-primary'} tm-btn-block`}
             disabled={primary.disabled}
             type="button"
             onClick={primary.onClick}
@@ -551,6 +573,7 @@ export function SignupClient() {
               <label className="tm-auth-field">
                 <span className="tm-text-label">휴대폰 번호<RequiredMark /></span>
                 <input
+                  ref={phoneInputRef}
                   className="tm-input tm-auth-input"
                   inputMode="numeric"
                   onChange={(event) => {
@@ -558,7 +581,7 @@ export function SignupClient() {
                     // 번호가 바뀌면 직전 번호로 받은 증명은 무효다.
                     setPhoneProofToken(null);
                     setProfileError(null);
-                    setPhoneConflict(false);
+                    setPhoneRegistered(false);
                   }}
                   placeholder="010-0000-0000"
                   required
@@ -566,12 +589,18 @@ export function SignupClient() {
                 />
               </label>
 
-              {isSendablePhone && !phoneProofToken ? (
+              {phoneTaken ? (
+                <SignupPhoneRegisteredCard
+                  loginHref={withRedirect('/login/email')}
+                  socialLoginHref={withRedirect('/login')}
+                  findAccountHref={withRedirect('/auth/find-account')}
+                />
+              ) : isSendablePhone && !phoneProofToken ? (
                 <>
                   {otp.phase === 'sent' ? (
                     <OtpCodeInput idPrefix={otpIdPrefix} otp={otp} verifying={phoneRequests.verifying} />
                   ) : null}
-                  <OtpErrorBanner idPrefix={otpIdPrefix} otp={otp} conflictNotice={phoneConflictNotice} />
+                  <OtpErrorBanner idPrefix={otpIdPrefix} otp={otp} />
                   {otp.phase === 'sent' ? (
                     <div style={{ marginTop: -4 }}>
                       <OtpRemainingRow idPrefix={otpIdPrefix} otp={otp} issuing={phoneRequests.issuing} />
@@ -698,8 +727,6 @@ export function SignupClient() {
           ) : null}
         </form>
 
-        {phoneConflict ? phoneConflictNotice : null}
-
         {profileError ? (
           <Card pad={16} className="tm-auth-soft-card tm-auth-soft-card-error">
             <div className="tm-text-body-lg">프로필 정보를 확인해 주세요</div>
@@ -716,6 +743,12 @@ export function SignupClient() {
       </div>
     </AuthFrame>
   );
+}
+
+/** 가입을 떠나 로그인·계정 찾기로 갈 때 원래 가려던 곳을 이어 준다(소셜 가입의 충돌 출구와 같은 출처). */
+function withRedirect(path: string) {
+  const redirect = sanitizeRedirectPath(new URLSearchParams(window.location.search).get('redirect')) ?? getSavedRedirectPath();
+  return redirect ? `${path}?redirect=${encodeURIComponent(redirect)}` : path;
 }
 
 const DUPLICATE_CHECK_FAILED_MESSAGE = '중복 확인에 실패했어요. 다시 시도해 주세요.';

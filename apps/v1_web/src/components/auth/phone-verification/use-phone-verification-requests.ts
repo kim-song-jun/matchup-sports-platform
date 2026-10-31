@@ -13,8 +13,11 @@ type Options = {
   /** public 모드에서 발급받을 증명 토큰의 용도. 생략하면 가입용. */
   purpose?: 'signup' | 'password_reset';
   phone: string;
-  /** public 모드는 proofToken을 전달하고, authed 모드는 서버가 이미 phoneVerifiedAt을 세팅하므로 인자 없이 호출된다. */
-  onVerified: (proofToken?: string) => void;
+  /**
+   * public 모드는 proofToken 과 `registered`(이 번호로 이미 가입한 계정이 있는지)를 전달하고,
+   * authed 모드는 서버가 이미 phoneVerifiedAt을 세팅하므로 인자 없이 호출된다.
+   */
+  onVerified: (proofToken?: string, registered?: boolean) => void;
 };
 
 /**
@@ -45,7 +48,7 @@ export function usePhoneVerificationRequests({ mode, purpose, phone, onVerified 
       if (mode === 'public') {
         const res = await publicVerify.mutateAsync({ phone, code, purpose });
         if (!res.verified) return false;
-        onVerified(res.proofToken);
+        onVerified(res.proofToken, res.registered);
         return true;
       }
       const res = await authedConfirm.mutateAsync({ code });

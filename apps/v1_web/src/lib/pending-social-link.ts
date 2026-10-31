@@ -7,12 +7,18 @@ import { createSessionJsonSlot } from './session-json-slot';
  */
 export const PENDING_SOCIAL_LINK_STORAGE_KEY = 'teameet.v1.pending_social_link';
 
+/** 저장되는 모양. */
 export type PendingSocialLink = {
   linkToken: string;
   provider: V1LinkableProvider;
   /** 이 시각(ISO)부터 토큰은 서버가 받지 않는다. */
   expiresAt: string;
 };
+
+/** 읽은 결과: 아직 쓸 수 있는 토큰, 또는 기다리는 사이 만료됐다는 한 번뿐인 표식(토큰은 이미 지워졌다). */
+export type PendingSocialLinkRead =
+  | (PendingSocialLink & { expired: false })
+  | { provider: V1LinkableProvider; expired: true };
 
 function parsePendingSocialLink(value: unknown): PendingSocialLink | null {
   if (typeof value !== 'object' || value === null) return null;
@@ -43,15 +49,31 @@ export function savePendingSocialLink(hint: V1SignInThenLinkDetails, nowMs: numb
   });
 }
 
-/** 없거나 깨졌거나 만료됐으면 null 이고, 그 값은 그 자리에서 지운다. */
-export function readPendingSocialLink(nowMs: number = Date.now()): PendingSocialLink | null {
+function classify(stored: PendingSocialLink, nowMs: number): PendingSocialLinkRead {
+  if (Date.parse(stored.expiresAt) <= nowMs) return { provider: stored.provider, expired: true };
+  return { ...stored, expired: false };
+}
+
+/**
+ * 상태를 바꾸지 않고 본다. 없거나 깨졌으면 null, 만료됐으면 `{ provider, expired: true }` — 값은 지우지 않으므로
+ * 배너·안내 화면처럼 여러 곳이 몇 번을 읽어도 같은 답이다.
+ */
+export function peekPendingSocialLink(nowMs: number = Date.now()): PendingSocialLinkRead | null {
+  const stored = slot.peek();
+  return stored ? classify(stored, nowMs) : null;
+}
+
+/**
+ * 로그인 직후 연결을 시도하는 한 곳(리졸버)만 쓴다. `peek` 와 같은 답을 주되, 깨진 값은 지우고 만료된 값은 지운 뒤
+ * `{ provider, expired: true }` 를 딱 한 번 돌려준다(다음 읽기는 null). 쓸 수 있는 토큰은 남겨 두므로,
+ * 결과를 본 뒤 `clearPendingSocialLink` 로 지운다.
+ */
+export function takePendingSocialLink(nowMs: number = Date.now()): PendingSocialLinkRead | null {
   const stored = slot.read();
   if (!stored) return null;
-  if (Date.parse(stored.expiresAt) <= nowMs) {
-    slot.clear();
-    return null;
-  }
-  return stored;
+  const read = classify(stored, nowMs);
+  if (read.expired) slot.clear();
+  return read;
 }
 
 export function clearPendingSocialLink() {

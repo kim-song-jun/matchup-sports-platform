@@ -1034,6 +1034,245 @@ button:disabled {
   line-height: 1.5;
 }
 
+/*
+ * 탈퇴 신청 중 계정 안내(WithdrawalPendingGuide) — 방법 1 은 세로 단계, 방법 2 는 가로 일정.
+ * 단계 숫자·연결선은 위 .tm-auth-step 과 같은 칩 크기이고, 주황은 항상 글자·아이콘과 함께 쓴다(--orange700 만).
+ */
+.tm-wpg {
+  display: grid;
+  gap: var(--spacing-3);
+}
+
+.tm-wpg-head {
+  display: grid;
+  gap: var(--spacing-2);
+  justify-items: start;
+}
+
+.tm-wpg-title {
+  margin: 0;
+  word-break: keep-all;
+}
+
+.tm-wpg-lead {
+  margin: 0;
+  font-size: var(--font-size-body-sm);
+  line-height: 1.55;
+  color: var(--text);
+  word-break: keep-all;
+}
+
+.tm-wpg-account {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: var(--spacing-3) var(--spacing-4);
+  border-radius: var(--radius-field);
+  background: var(--list-row-bg);
+  border: 1px solid var(--list-row-border);
+}
+
+.tm-wpg-account .tm-text-caption {
+  color: var(--text);
+}
+
+.tm-card.tm-wpg-way {
+  display: grid;
+  gap: var(--spacing-4);
+}
+
+.tm-auth-sub.tm-wpg-sub {
+  margin-bottom: var(--spacing-4);
+}
+
+.tm-wpg-below-field {
+  margin-top: var(--spacing-6);
+}
+
+.tm-wpg-actions {
+  display: grid;
+  gap: var(--spacing-2);
+}
+
+.tm-wpg-note {
+  margin: 0;
+}
+
+.tm-wpg-way-head {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  margin: 0;
+}
+
+.tm-wpg-way-no {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 var(--spacing-2);
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-caption);
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.tm-wpg-way-no-one {
+  background: var(--blue50);
+  color: var(--blue700);
+}
+
+.tm-wpg-way-no-two {
+  background: var(--grey100);
+  color: var(--grey800);
+  border: 1px solid var(--border-strong);
+}
+
+.tm-wpg-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+
+.tm-wpg-step {
+  position: relative;
+  display: flex;
+  gap: var(--spacing-3);
+  padding-bottom: var(--spacing-4);
+}
+
+.tm-wpg-step:last-child {
+  padding-bottom: 0;
+}
+
+.tm-wpg-step:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 13px;
+  top: 30px;
+  bottom: 2px;
+  width: 2px;
+  background: var(--border);
+}
+
+.tm-wpg-num {
+  position: relative;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-circle);
+  background: var(--blue50);
+  color: var(--blue700);
+  display: grid;
+  place-items: center;
+  font-size: var(--font-size-label);
+  font-weight: 800;
+}
+
+.tm-wpg-num-done {
+  background: var(--blue500);
+  color: var(--static-white);
+}
+
+.tm-wpg-step-title,
+.tm-wpg-step-body {
+  display: block;
+  word-break: keep-all;
+}
+
+.tm-wpg-step-title {
+  padding-top: var(--spacing-1);
+  font-size: var(--font-size-body);
+  line-height: 20px;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.tm-wpg-step-body {
+  margin-top: 2px;
+  font-size: var(--font-size-caption);
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.tm-wpg-time {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.tm-wpg-node {
+  position: relative;
+  display: grid;
+  align-content: start;
+  justify-items: center;
+  gap: var(--spacing-1);
+  padding: 0 var(--spacing-1);
+  text-align: center;
+}
+
+.tm-wpg-node:not(:first-child)::before {
+  content: "";
+  position: absolute;
+  top: 15px;
+  right: 50%;
+  width: 100%;
+  height: 2px;
+  background: var(--border);
+}
+
+.tm-wpg-dot {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-circle);
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--card-surface);
+}
+
+.tm-wpg-dot-now {
+  background: var(--grey100);
+  color: var(--grey700);
+}
+
+.tm-wpg-dot-due {
+  background: var(--orange50);
+  color: var(--orange700);
+}
+
+.tm-wpg-dot-free {
+  background: var(--blue500);
+  color: var(--static-white);
+}
+
+/* 다크에서 --grey100 은 카드 표면과 같은 값이라 채움이 사라진다. */
+:root.dark .tm-wpg-dot-now,
+:root.dark .tm-wpg-way-no-two {
+  background: var(--grey150);
+}
+
+.tm-wpg-node strong {
+  font-size: var(--font-size-body-sm);
+  line-height: 20px;
+  font-weight: 800;
+  color: var(--text-strong);
+}
+
+.tm-wpg-node-due strong {
+  font-size: var(--font-size-body);
+  color: var(--orange700);
+}
+
+.tm-wpg-node-text {
+  font-size: var(--font-size-caption);
+  line-height: 16px;
+  color: var(--text);
+  word-break: keep-all;
+}
+
 /* 로그인 화면들의 대기 연결 안내(토큰이 있을 때만 그려진다). */
 .tm-auth-pending-link {
   display: flex;

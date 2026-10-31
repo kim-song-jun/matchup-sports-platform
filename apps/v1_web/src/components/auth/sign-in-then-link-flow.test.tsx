@@ -1,19 +1,20 @@
 import { useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { serializeKakaoOAuthAttempt } from '@/lib/kakao-oauth';
-import { peekPendingSocialLink } from '@/lib/pending-social-link';
+import { peekPendingSocialLink, savePendingSocialLink } from '@/lib/pending-social-link';
 import { readWithdrawalCancel } from '@/lib/withdrawal-cancel-storage';
-import { LINK_MSW, PENDING_LINK_MSW } from '@/test/msw/auth-link-handlers';
+import { LINK_MSW, PENDING_LINK_MSW, WITHDRAWAL_MSW } from '@/test/msw/auth-link-handlers';
 import { server } from '@/test/msw/server';
 import { AccountExistsGuide } from './account-exists-guide';
 import { KAKAO_OAUTH_STATE_STORAGE_KEY } from './auth.view-model';
 import { EmailLoginClient } from './email-login-client';
 import { KakaoCallbackClient } from './kakao-callback-client';
 import { PendingSocialSignupGate } from './pending-social-signup-gate';
+import { WithdrawalCancelClient } from './withdrawal-cancel-client';
 
 const navigation = vi.hoisted(() => ({ pathname: '/', replace: vi.fn(), push: vi.fn(), refresh: vi.fn() }));
 vi.mock('next/navigation', () => ({
@@ -47,7 +48,8 @@ function Journey({ initialRoute }: { initialRoute: string }) {
       {url.pathname === '/callback/kakao' ? <KakaoCallbackClient />
         : url.pathname === '/auth/account-conflict' ? <AccountExistsGuide provider={provider === 'kakao' || provider === 'apple' ? provider : null} redirectPath={url.searchParams.get('redirect')} />
           : url.pathname === '/login/email' ? <EmailLoginClient redirectPath={url.searchParams.get('redirect')} />
-            : <h1>{route}</h1>}
+            : url.pathname === '/auth/withdrawal-cancel' ? <WithdrawalCancelClient />
+              : <h1>{route}</h1>}
     </PendingSocialSignupGate>
   );
 }
@@ -157,7 +159,48 @@ describe('카카오 콜백의 탈퇴 철회 갈래', () => {
       details: { withdrawalCancelToken: 'withdrawal-token-1', expiresInSeconds: 600 },
     }, { status: 403 })));
     openCallback('any-code');
-    await screen.findByRole('heading', { level: 1, name: '/auth/withdrawal-cancel' });
+    await screen.findByRole('heading', { level: 1, name: '탈퇴를 신청한 계정이에요' });
     expect(readWithdrawalCancel()).toMatchObject({ token: 'withdrawal-token-1' });
+  });
+});
+
+describe('탈퇴 유예 계정과 충돌 → 안내 → 로그인 → 탈퇴 취소 → 자동 연결', () => {
+  // 시계를 얼리지 않는다(조회 캐시·타이머가 같은 시계를 본다) — 날짜는 지금으로부터 일주일 뒤로 잡는다.
+  const UNTIL = new Date(Date.now() + 7 * 86_400_000).toISOString();
+
+  it('안내 화면에서 로그인하면 철회 화면이 나오고, 취소를 마치면 403 을 견딘 같은 토큰으로 연결된다', async () => {
+    savePendingSocialLink({
+      next: 'sign_in_then_link', provider: 'kakao', linkToken: PENDING_LINK_MSW.tokens.kakao,
+      linkTokenExpiresInSeconds: PENDING_LINK_MSW.expiresInSeconds, withdrawalPendingUntil: UNTIL,
+    });
+    render(<QueryClientProvider client={client}><Journey initialRoute="/auth/account-conflict?provider=kakao" /></QueryClientProvider>);
+    expect(await screen.findByRole('list', { name: '기다릴 때의 일정' })).toHaveTextContent(/\d+월 \d+일계정이 삭제돼요/);
+    expect(screen.getByRole('link', { name: '이메일로 로그인하기' })).toHaveAttribute('href', '/login/email');
+    const user = userEvent.setup();
+
+    // 안내의 로그인 버튼 → 이메일 로그인(탈퇴 취소를 거친다는 연결 안내가 함께 보인다) → 403 → 철회 화면
+    act(() => navigation.push('/login/email'));
+    expect(await screen.findByText(/\d+분 안에 로그인하고 탈퇴 신청을 취소하면 카카오 로그인이 이 계정에 연결돼요\./)).toBeInTheDocument();
+    fireEvent.change(await screen.findByLabelText('이메일'), { target: { value: WITHDRAWAL_MSW.email } });
+    fireEvent.change(screen.getByLabelText('비밀번호'), { target: { value: WITHDRAWAL_MSW.password } });
+    await user.click(screen.getByRole('button', { name: '로그인' }));
+    await user.click(await screen.findByRole('button', { name: '탈퇴 신청 취소하고 다시 쓰기' }));
+
+    // 세션이 없는 동안은 연결이 시도되지 않고, 토큰은 그대로 남아 있다.
+    expect(requests).toEqual(['POST /api/v1/auth/login']);
+    expect(peekPendingSocialLink()).toMatchObject({ linkToken: PENDING_LINK_MSW.tokens.kakao, withdrawalPendingUntil: UNTIL });
+
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('checkbox', { name: '빠진 팀·명단이 돌아오지 않는 것을 이해했어요' }));
+    await user.click(within(dialog).getByRole('button', { name: '취소하고 다시 쓰기' }));
+
+    // 취소가 끝나면 완료 화면이 먼저다. 연결은 거기서 계속하기로 넘어간 직후 앱 전역 게이트가 한 번 건다.
+    await screen.findByRole('heading', { level: 1, name: '탈퇴 신청을 취소했어요' });
+    expect(requests).toEqual(['POST /api/v1/auth/login']);
+    act(() => navigation.push(screen.getByRole('link', { name: '홈으로 가기' }).getAttribute('href')!));
+
+    await screen.findByRole('heading', { level: 1, name: LOGIN_METHODS_RESULT });
+    expect(requests).toEqual(['POST /api/v1/auth/login', 'POST /api/v1/auth/link/pending']);
+    expect(peekPendingSocialLink()).toBeNull();
   });
 });

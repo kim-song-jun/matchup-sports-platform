@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { V1ApiError } from './api-client';
 import {
   getPasswordLoginUnavailableProviders,
@@ -21,6 +21,13 @@ function apiError(statusCode: number, code: string, details?: unknown) {
 }
 
 describe('getSignInThenLinkHint', () => {
+  // 유예 종료 시각이 지났는지도 본다 — 시계를 고정해 고정 날짜가 시간이 가도 미래로 남게 한다.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-31T00:00:00.000Z'));
+  });
+  afterEach(() => vi.useRealTimers());
+
   it.each(['kakao', 'apple'] as const)('reads the %s hint from a 409', (provider) => {
     const error = apiError(409, 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', { next: 'sign_in_then_link', provider });
     expect(getSignInThenLinkHint(error)).toEqual({ next: 'sign_in_then_link', provider });
@@ -46,6 +53,40 @@ describe('getSignInThenLinkHint', () => {
   it('keeps working for PHONE_CONFLICT, which carries the same details', () => {
     const error = apiError(409, 'PHONE_CONFLICT', { next: 'sign_in_then_link', provider: 'kakao' });
     expect(getSignInThenLinkHint(error)).toEqual({ next: 'sign_in_then_link', provider: 'kakao' });
+  });
+
+  it('carries the grace end of a withdrawn number holder, and null when the server could not say', () => {
+    const base = { next: 'sign_in_then_link', provider: 'kakao', linkToken: 'signed-link-token', linkTokenExpiresInSeconds: 1800 };
+    expect(getSignInThenLinkHint(apiError(409, 'PHONE_CONFLICT', { ...base, withdrawalPendingUntil: '2026-11-06T15:30:00.000Z' })))
+      .toEqual({ ...base, withdrawalPendingUntil: '2026-11-06T15:30:00.000Z' });
+    expect(getSignInThenLinkHint(apiError(409, 'PHONE_CONFLICT', { ...base, withdrawalPendingUntil: null })))
+      .toEqual({ ...base, withdrawalPendingUntil: null });
+  });
+
+  it('reads a grace end that has already passed as unknown, before and after the instant', () => {
+    const details = { next: 'sign_in_then_link', provider: 'kakao', withdrawalPendingUntil: '2026-11-06T15:30:00.000Z' };
+    vi.setSystemTime(Date.parse('2026-11-06T15:30:00.000Z') - 1);
+    expect(getSignInThenLinkHint(apiError(409, 'PHONE_CONFLICT', details))).toHaveProperty('withdrawalPendingUntil', '2026-11-06T15:30:00.000Z');
+    vi.setSystemTime(Date.parse('2026-11-06T15:30:00.000Z'));
+    expect(getSignInThenLinkHint(apiError(409, 'PHONE_CONFLICT', details))).toHaveProperty('withdrawalPendingUntil', null);
+  });
+
+  it('leaves the grace field out when the holder is not a withdrawal, so a plain conflict never reads as one', () => {
+    const hint = getSignInThenLinkHint(apiError(409, 'PHONE_CONFLICT', { next: 'sign_in_then_link', provider: 'kakao' }));
+    expect(hint).not.toHaveProperty('withdrawalPendingUntil');
+  });
+
+  it.each([
+    ['an unreadable date', 'next-week'],
+    ['a number', 20261107],
+    ['an object', {}],
+  ])('keeps the withdrawal marker but drops the date when it is %s', (_label, value) => {
+    const details = { next: 'sign_in_then_link', provider: 'kakao', withdrawalPendingUntil: value };
+    expect(getSignInThenLinkHint(apiError(409, 'PHONE_CONFLICT', details))).toStrictEqual({
+      next: 'sign_in_then_link',
+      provider: 'kakao',
+      withdrawalPendingUntil: null,
+    });
   });
 
   it.each([

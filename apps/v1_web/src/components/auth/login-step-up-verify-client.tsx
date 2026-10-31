@@ -58,6 +58,16 @@ function DeadView({ reason, href }: { reason: DeadReason; href: string }) {
   );
 }
 
+/**
+ * 가입 여부와 상관없이 모두에게 같은 안내다(추가 인증 화면이 계정 존재를 드러내지 않는다).
+ * Apple 버튼은 iOS 앱의 로그인 첫 화면에만 있다.
+ */
+const NO_MAIL_HELP = [
+  '메일이 오지 않으면 스팸함을 보거나 이메일·비밀번호를 다시 확인해 주세요.',
+  "카카오로 가입하셨다면 로그인 첫 화면의 '카카오' 버튼으로, Apple로 가입하셨다면 iOS 앱의 'Apple로 계속하기' 버튼으로 로그인해 주세요.",
+  '비밀번호가 기억나지 않으면 비밀번호를 재설정해 주세요.',
+].join(' ');
+
 function msUntil(iso: string, now: number) {
   return Math.max(0, Date.parse(iso) - now);
 }
@@ -279,8 +289,9 @@ export function LoginStepUpVerifyClient() {
           </Link>
         </div>
         <p className="tm-text-caption tm-auth-sub">
-          메일이 오지 않으면 스팸함을 보거나 이메일·비밀번호를 다시 확인해 주세요.
+          {NO_MAIL_HELP}
         </p>
+        {inlineError?.recovery ? null : <PasswordResetLink redirect={redirect} />}
       </form>
     </AuthFrame>
   );

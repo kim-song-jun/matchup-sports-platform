@@ -38,6 +38,58 @@ function looksLikeEmail(value: string): boolean {
   return /^\S+@\S+\.\S+$/.test(value.trim());
 }
 
+/** 로그인 첫 화면(/login)에서 쓸 수 있는 소셜 로그인. naver 처럼 거기 없는 제공자는 안내할 수 없어 뺀다. */
+const SOCIAL_LOGINS = [
+  { provider: 'kakao', label: '카카오' },
+  { provider: 'apple', label: 'Apple' },
+] as const;
+
+/** 번호로 찾은 계정이 실제로 쓰는 로그인 수단만 안내하고, 수단마다 맞는 화면으로 보낸다. */
+function FoundAccountCard({ account, emailLoginHref, loginHref, onResetPassword }: {
+  account: V1FoundAccount;
+  emailLoginHref: string;
+  loginHref: string;
+  onResetPassword: () => void;
+}) {
+  const socials = SOCIAL_LOGINS.filter(({ provider }) => account.providers.includes(provider));
+  const socialNames = socials.map(({ label }) => label).join('·');
+  const hasApple = socials.some(({ provider }) => provider === 'apple');
+  const links = [
+    ...(account.hasPassword ? [{ href: emailLoginHref, label: socials.length > 0 ? '이메일로 로그인하기' : '로그인하러 가기' }] : []),
+    ...socials.map(({ label }) => ({ href: loginHref, label: `${label}로 로그인하기` })),
+  ];
+  const guidance = !account.hasPassword
+    ? (socials.length > 0
+      ? `이 계정은 ${socialNames} 로그인으로 가입했어요. 가입한 방법으로 로그인해 주세요.`
+      : '이 계정으로 로그인할 수 있는 방법을 확인하지 못했어요.')
+    : (socials.length > 0 ? `${socialNames} 로그인도 쓸 수 있어요.` : null);
+
+  return (
+    <Card pad={16} className="tm-auth-soft-card">
+      <div className="tm-text-body-lg">{account.maskedEmail ? '가입한 이메일' : '가입한 로그인 방법'}</div>
+      <div className="tm-text-heading" style={{ marginTop: 4 }}>{account.maskedEmail ?? (socialNames || '—')}</div>
+      {guidance ? <div className="tm-text-caption" style={{ marginTop: 8 }}>{guidance}</div> : null}
+      {hasApple ? <div className="tm-text-caption" style={{ marginTop: 4 }}>Apple 로그인은 iOS 앱에서 쓸 수 있어요.</div> : null}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 16 }}>
+        {links.length > 0 ? links.map((link, index) => (
+          <Link
+            key={link.label}
+            className={`tm-btn tm-btn-lg tm-btn-block ${index === 0 ? 'tm-btn-primary' : 'tm-btn-neutral'}`}
+            href={link.href}
+          >
+            {link.label}
+          </Link>
+        )) : (
+          <Link className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" href={loginHref}>로그인 화면으로</Link>
+        )}
+        {account.hasPassword ? (
+          <Button block onClick={onResetPassword} size="sm" type="button" variant="ghost">비밀번호 재설정하기</Button>
+        ) : null}
+      </div>
+    </Card>
+  );
+}
+
 export function AccountRecoveryClient({ initialMode = 'find-id', backHref = '/login/email', redirectPath }: {
   initialMode?: Mode;
   backHref?: string;
@@ -57,9 +109,9 @@ export function AccountRecoveryClient({ initialMode = 'find-id', backHref = '/lo
   const [emailInput, setEmailInput] = useState('');
   const [emailProofToken, setEmailProofToken] = useState<string | null>(null);
   /**
-   * 카카오 전용 계정이라는 사실은 사서함 주인임을 증명한 **뒤**에야 드러난다 — 요청 단계에서
+   * 소셜 전용 계정이라는 사실은 사서함 주인임을 증명한 **뒤**에야 드러난다 — 요청 단계에서
    * 알려 주면 이메일 하나로 계정 종류를 훑을 수 있기 때문이다. 그래서 서버가 재설정을 막을 때
-   * (PASSWORD_LOGIN_UNAVAILABLE) 비로소 세운다.
+   * (PASSWORD_LOGIN_UNAVAILABLE) 비로소 세운다. 응답은 어느 제공자인지 알려 주지 않는다.
    */
   const [resetBlockedSocialOnly, setResetBlockedSocialOnly] = useState(false);
   const [newPassword, setNewPassword] = useState('');
@@ -146,20 +198,18 @@ export function AccountRecoveryClient({ initialMode = 'find-id', backHref = '/lo
   };
 
   const copy = MODE_COPY[mode];
-  // 번호 조회 결과는 아이디 찾기에만 쓰고, 이메일 재설정은 해당 이메일의 서버 판정을 따른다.
-  const socialOnly = mode === 'find-id' ? found !== null && !found.hasPassword : resetBlockedSocialOnly;
   const resetting = resetPasswordByEmail.isPending;
 
   // 본인 확인을 마쳤고 아직 비밀번호를 못 바꾼 상태에서만 새 비밀번호 입력을 띄운다.
   const verifiedForReset = Boolean(emailProofToken);
   const matchesCurrentAccount = !returnToSettings || Boolean(currentAccount.data
     && normalizedEmail && normalizedEmail === accountEmail.trim().toLowerCase());
-  const passwordFormVisible = mode === 'reset-password' && verifiedForReset && matchesCurrentAccount && !socialOnly && !resetDone;
+  const passwordFormVisible = mode === 'reset-password' && verifiedForReset && matchesCurrentAccount && !resetBlockedSocialOnly && !resetDone;
   const passwordReady = newPassword.length >= 8 && newPassword === passwordConfirm;
 
   const submitReset = async () => {
     if (!mounted.current || mode !== 'reset-password' || emailFlowGeneration !== emailRequestGeneration.current
-      || !passwordReady || resetting || !matchesCurrentAccount || !emailProofToken || socialOnly) return;
+      || !passwordReady || resetting || !matchesCurrentAccount || !emailProofToken || resetBlockedSocialOnly) return;
     const resetGeneration = emailFlowGeneration;
     setError(null);
     try {
@@ -291,25 +341,19 @@ export function AccountRecoveryClient({ initialMode = 'find-id', backHref = '/lo
           )}
 
           {found && mode === 'find-id' ? (
-            <Card pad={16} className="tm-auth-soft-card">
-              <div className="tm-text-body-lg">가입한 이메일</div>
-              <div className="tm-text-heading" style={{ marginTop: 4 }}>{found.maskedEmail ?? '—'}</div>
-              {socialOnly ? (
-                <div className="tm-text-caption" style={{ marginTop: 8 }}>
-                  이 계정은 카카오 로그인으로 가입했어요. 카카오로 로그인해 주세요.
-                </div>
-              ) : null}
-              <Link className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" href={emailLoginHref} style={{ marginTop: 16 }}>
-                로그인하러 가기
-              </Link>
-            </Card>
+            <FoundAccountCard
+              account={found}
+              emailLoginHref={emailLoginHref}
+              loginHref={loginHref}
+              onResetPassword={() => switchMode('reset-password')}
+            />
           ) : null}
 
-          {mode === 'reset-password' && socialOnly ? (
+          {mode === 'reset-password' && resetBlockedSocialOnly ? (
             <Card pad={16} className="tm-auth-soft-card">
               <div className="tm-text-body-lg">비밀번호가 없는 계정이에요</div>
               <div className="tm-text-caption" style={{ marginTop: 4 }}>
-                카카오 로그인으로 가입해서 바꿀 비밀번호가 없어요. 카카오로 로그인해 주세요.
+                카카오나 Apple 같은 소셜 로그인으로 가입해서 바꿀 비밀번호가 없어요. 가입한 방법으로 로그인해 주세요.
               </div>
               <Link className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" href={loginHref} style={{ marginTop: 16 }}>
                 로그인 화면으로

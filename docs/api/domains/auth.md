@@ -67,6 +67,8 @@ the code proved the number is theirs**:
   `recovery/reset-password` (phone) still looks at active accounts only, so a withdrawal holder answers `404 ACCOUNT_NOT_FOUND` there.
 - `/verification/phone/confirm` for an unfinished social signup adds `details.withdrawalPendingUntil` to the sign-in-then-link
   `PHONE_CONFLICT` when the holder is a withdrawal. The key is absent for other holders.
+- `/auth/social-profile` does the same for its sign-in-then-link `PHONE_CONFLICT`, which only carries a link token once the number is
+  proven (the Kakao-supplied number or an SMS-verified one). The token-less advice never carries the key.
 
 `withdrawalPendingUntil` is the latest `withdrawal_pending` status-log time plus 30 days, `null` when that log is missing. Nothing before the
 code (`phone/issue`, `/verification/phone/request`, a wrong code) says anything about the holder.

@@ -77,6 +77,7 @@ import {
   toAdminInquiryDetail,
   toAdminInquiryRow,
 } from './fixtures';
+import { PASSWORD_UNAVAILABLE_MSW, passwordLoginUnavailableResponse, v1AuthLinkMswHandlers } from './auth-link-handlers';
 import { v1AuthStepUpMswHandlers } from './auth-step-up-handlers';
 import { v1GameRosterMswHandlers } from './game-roster-handlers';
 import { v1TeamDissolutionMswHandlers } from './team-dissolution-handlers';
@@ -112,7 +113,7 @@ function ok<T>(data: T) {
 }
 
 const authAccountPhoneFixture = '01012345678';
-type PhoneProofPurpose = 'signup' | 'password_reset' | 'social_link';
+type PhoneProofPurpose = 'signup' | 'password_reset';
 type PhoneProof = {
   readonly phone: string;
   readonly channel: 'phone';
@@ -182,7 +183,7 @@ function sweepAuthPhoneState() {
 }
 
 function isPhoneProofPurpose(value: string): value is PhoneProofPurpose {
-  return value === 'signup' || value === 'password_reset' || value === 'social_link';
+  return value === 'signup' || value === 'password_reset';
 }
 
 function hasPhoneProof(phone: string, proofToken: string, purpose: PhoneProofPurpose): boolean {
@@ -219,22 +220,8 @@ async function verifyAuthPhone(request: Request) {
   authPhoneChallenges.set(body.phone, { ...challenge, verified: true });
   const proofToken = `msw-phone-${purpose}-${randomUuid()}`;
   authPhoneProofs.set(proofToken, { phone: body.phone, channel: 'phone', purpose, expiresAt: Date.now() + 10 * 60 * 1000 });
-  return ok({ verified: true, proofToken });
-}
-
-async function socialLinkAccountProofRequired(request: Request) {
-  const body = parseAuthProofInput(await request.json(), ['phone', 'proofToken']);
-  if (!body || !/^\d{11}$/.test(body.phone ?? '') || !body.proofToken || body.proofToken.length > 512) {
-    return authProofError('VALIDATION_ERROR', '입력값을 다시 확인해 주세요.');
-  }
-  if (!hasPhoneProof(body.phone, body.proofToken, 'social_link') || !authPhoneChallenges.get(body.phone)?.verified) {
-    return authProofError('PHONE_NOT_VERIFIED', '휴대폰 본인인증을 다시 진행해 주세요.');
-  }
-  if (body.phone !== authAccountPhoneFixture) {
-    return authProofError('ACCOUNT_NOT_FOUND', '이 번호로 가입된 계정을 찾지 못했어요.', 404);
-  }
-  return authProofError('SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF',
-    '휴대폰 번호 인증만으로 기존 계정에 연결할 수 없어요. 처음 가입한 방법으로 로그인해 주세요. 비밀번호를 잊었다면 로그인 화면에서 이메일로 재설정해 주세요.', 409);
+  // 번호 소유를 증명한 뒤에만 알려준다. 발급 단계에서는 알리지 않는다.
+  return ok({ verified: true, proofToken, registered: body.phone === authAccountPhoneFixture });
 }
 
 async function requestRecoveryEmail(request: Request) {
@@ -275,6 +262,7 @@ async function resetPasswordByRecoveryEmail(request: Request) {
   if (!proof || proof.email !== email || proof.channel !== 'email' || proof.purpose !== 'password_reset') {
     return authProofError('EMAIL_NOT_VERIFIED', '이메일 본인인증을 다시 진행해 주세요.');
   }
+  if (email === PASSWORD_UNAVAILABLE_MSW.email) return passwordLoginUnavailableResponse();
   if (email !== v1UserFixture.email?.trim().toLowerCase()) {
     return authProofError('ACCOUNT_NOT_FOUND', '이 이메일로 가입된 계정을 찾지 못했어요.', 404);
   }
@@ -760,13 +748,12 @@ export const v1MswHandlers = [
   http.get(`${api}/auth/me`, () => ok(v1UserFixture)),
   http.post(`${api}/auth/phone/issue`, ({ request }) => issueAuthPhone(request)),
   http.post(`${api}/auth/phone/verify`, ({ request }) => verifyAuthPhone(request)),
-  http.post(`${api}/auth/social-link/preview`, ({ request }) => socialLinkAccountProofRequired(request)),
-  http.post(`${api}/auth/social-link`, ({ request }) => socialLinkAccountProofRequired(request)),
   http.post(`${api}/auth/recovery/find-account`, ({ request }) => findAccountByRecoveryPhone(request)),
   http.post(`${api}/auth/recovery/reset-password`, ({ request }) => resetPasswordByRecoveryPhone(request)),
   http.post(`${api}/auth/recovery/email/request`, ({ request }) => requestRecoveryEmail(request)),
   http.post(`${api}/auth/recovery/email/confirm`, ({ request }) => confirmRecoveryEmail(request)),
   http.post(`${api}/auth/recovery/email/reset-password`, ({ request }) => resetPasswordByRecoveryEmail(request)),
+  ...v1AuthLinkMswHandlers,
   ...v1AuthStepUpMswHandlers,
   http.post(`${api}/auth/register`, async ({ request }) => {
     const body = await request.json();

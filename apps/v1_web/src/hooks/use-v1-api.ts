@@ -92,6 +92,12 @@ import type {
   V1AdminUserRow,
   V1AuthMe,
   V1AuthSessionResponse,
+  V1CancelWithdrawalPayload,
+  V1LinkApplePayload,
+  V1LinkKakaoPayload,
+  V1LinkPendingPayload,
+  V1LinkSocialResult,
+  V1PhoneVerifyResult,
   V1EmailLoginResult,
   V1LoginStepUpResendResult,
   V1CurrentSignupTerms,
@@ -357,6 +363,55 @@ export function useV1LoginStepUpResend() {
   });
 }
 
+// 연결로 바뀌는 건 로그인 수단 목록이다 — 그 목록을 담은 스냅샷(auth/me·설정·프로필)과, 서버가 남기는 연결 알림.
+// 같은 계정이라 clearV1IdentityCache 는 하지 않는다.
+function invalidateLoginMethodQueries(queryClient: QueryClient) {
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: v1Keys.authMe() }),
+    queryClient.invalidateQueries({ queryKey: v1Keys.settings() }),
+    queryClient.invalidateQueries({ queryKey: v1Keys.profile() }),
+    queryClient.invalidateQueries({ queryKey: v1Keys.notificationsRoot() }),
+  ]);
+}
+
+/** 로그인한 계정에 카카오를 붙인다. 웹은 인가 코드 + 인가 때 쓴 redirectUri, 네이티브 셸은 SDK 액세스 토큰. */
+export function useV1LinkKakao() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1LinkKakaoPayload) => v1Post<V1LinkSocialResult>('/auth/link/kakao', body),
+    onSuccess: () => invalidateLoginMethodQueries(queryClient),
+  });
+}
+
+export function useV1LinkApple() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1LinkApplePayload) => v1Post<V1LinkSocialResult>('/auth/link/apple', body),
+    onSuccess: () => invalidateLoginMethodQueries(queryClient),
+  });
+}
+
+/** 충돌 409 가 준 연결 토큰으로, 방금 로그인한 계정에 그 제공자를 제공자 재인증 없이 붙인다. */
+export function useV1LinkPending() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1LinkPendingPayload) => v1Post<V1LinkSocialResult>('/auth/link/pending', body),
+    onSuccess: () => invalidateLoginMethodQueries(queryClient),
+  });
+}
+
+/**
+ * 탈퇴 신청을 철회하고 세션을 받는다(로그인 응답과 같은 모양).
+ * 로그인 훅과 같은 규칙으로 응답을 인증 스냅샷에 넣는다 — 세션 힌트 저장과 `clearV1IdentityCache` 는 호출한 화면이 한다.
+ */
+export function useV1CancelWithdrawal() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1CancelWithdrawalPayload) => v1Post<V1AuthSessionResponse>('/auth/withdrawal/cancel', body),
+    onSuccess: (result) => queryClient.setQueryData<V1AuthMe>(v1Keys.authMe(), result),
+  });
+}
+
 export function useV1Register() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -427,8 +482,8 @@ export function useV1PhoneVerify() {
   return useMutation({
     // purpose 를 생략하면 가입용 토큰이 발급된다. 계정 찾기·비밀번호 재설정은
     // 'password_reset' 을 넘겨 가입용 증명과 섞이지 않게 한다.
-    mutationFn: (body: { phone: string; code: string; purpose?: 'signup' | 'password_reset' | 'social_link' }) =>
-      v1Post<{ verified: boolean; proofToken?: string }>('/auth/phone/verify', body),
+    mutationFn: (body: { phone: string; code: string; purpose?: 'signup' | 'password_reset' }) =>
+      v1Post<V1PhoneVerifyResult>('/auth/phone/verify', body),
   });
 }
 

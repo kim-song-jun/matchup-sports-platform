@@ -7,7 +7,7 @@ import { usePhoneVerificationRequests } from './use-phone-verification-requests'
 
 type Props = {
   mode: 'public' | 'authed';
-  purpose?: 'signup' | 'password_reset' | 'social_link';
+  purpose?: 'signup' | 'password_reset';
   phone: string;
   onVerified: (proofToken?: string) => void;
   /**

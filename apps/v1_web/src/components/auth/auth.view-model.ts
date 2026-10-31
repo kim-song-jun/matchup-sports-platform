@@ -34,7 +34,8 @@ export function generateKakaoOAuthState(): string {
 }
 
 // authorize 기본 URL(state 제외)만 만든다. CSRF 방지 state는 클라이언트 버튼이 클릭 시점에 붙인다.
-function buildKakaoAuthUrl() {
+// 로그인과 계정 연결(lib/kakao-oauth.ts)이 같은 redirect URI·scope 를 쓰도록 한 곳에서 만든다.
+export function buildKakaoAuthUrl() {
   const clientId = process.env.NEXT_PUBLIC_KAKAO_CLIENT_ID;
   const redirectUri = process.env.NEXT_PUBLIC_KAKAO_REDIRECT_URI;
   if (!clientId || !redirectUri) return null;

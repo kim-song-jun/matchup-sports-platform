@@ -3,11 +3,11 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import type { ReactNode } from 'react';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { clearPendingSocialLink, readPendingSocialLink, savePendingSocialLink } from '@/lib/pending-social-link';
+import { clearPendingSocialLink, peekPendingSocialLink, savePendingSocialLink, takePendingSocialLink } from '@/lib/pending-social-link';
 import { PENDING_LINK_MSW } from '@/test/msw/auth-link-handlers';
 import { server } from '@/test/msw/server';
 import type { V1AuthMe } from '@/types/api';
-import { usePendingSocialLinkResolver } from './use-pending-social-link-resolver';
+import { RETRY_DELAY_MS, usePendingSocialLinkResolver } from './use-pending-social-link-resolver';
 
 const router = vi.hoisted(() => ({ replace: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => router }));
@@ -56,7 +56,7 @@ describe('usePendingSocialLinkResolver — 로그인 뒤 자동 연결', () => {
     mount(account());
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/my/settings/login-methods?linkResult=linked&provider=kakao'));
     expect(linkRequests).toHaveLength(1);
-    expect(readPendingSocialLink()).toBeNull();
+    expect(peekPendingSocialLink()).toBeNull();
   });
 
   it.each([
@@ -70,7 +70,7 @@ describe('usePendingSocialLinkResolver — 로그인 뒤 자동 연결', () => {
     storeToken(PENDING_LINK_MSW.tokens[scenario]);
     mount(account());
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith(`/my/settings/login-methods?linkResult=${linkResult}&provider=kakao`));
-    expect(readPendingSocialLink()).toBeNull();
+    expect(peekPendingSocialLink()).toBeNull();
   });
 
   it('Apple 토큰은 provider=apple 결과로 돌아온다', async () => {
@@ -83,24 +83,24 @@ describe('usePendingSocialLinkResolver — 로그인 뒤 자동 연결', () => {
     storeToken('msw-unknown-token-that-the-server-rejects');
     mount(account());
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/my/settings/login-methods?linkResult=failed&provider=kakao'));
-    expect(readPendingSocialLink()).toBeNull();
+    expect(peekPendingSocialLink()).toBeNull();
   });
 
-  it('운영자 계정은 연결할 수 없다는 거절(403)을 failed 로 안내하고 토큰을 지운다', async () => {
+  it('운영자 계정은 연결할 수 없다는 거절(403)을 failed 로 안내하고 토큰을 지운다 — 드문 경우라 따로 만들지 않은 결과다', async () => {
     storeToken(PENDING_LINK_MSW.tokens.kakao);
     server.use(http.post('*/api/v1/auth/link/pending', () => HttpResponse.json({
       status: 'error', statusCode: 403, code: 'SOCIAL_LINK_ADMIN_FORBIDDEN', message: '운영자 계정에는 소셜 로그인을 연결할 수 없어요.',
     }, { status: 403 })));
     mount(account());
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/my/settings/login-methods?linkResult=failed&provider=kakao'));
-    expect(readPendingSocialLink()).toBeNull();
+    expect(peekPendingSocialLink()).toBeNull();
   });
 
   it('계정이 가입 도중이면 연결 대신 가입을 이어 가는 화면으로 보낸다', async () => {
     storeToken(PENDING_LINK_MSW.tokens.signupIncomplete);
     mount(account());
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/signup/social'));
-    expect(readPendingSocialLink()).toBeNull();
+    expect(peekPendingSocialLink()).toBeNull();
   });
 
   it('토큰이 없으면 아무 요청도 하지 않는다', async () => {
@@ -115,7 +115,7 @@ describe('usePendingSocialLinkResolver — 로그인 뒤 자동 연결', () => {
     mount(undefined);
     await new Promise((resolve) => setTimeout(resolve, 30));
     expect(linkRequests).toHaveLength(0);
-    expect(readPendingSocialLink()).toMatchObject({ linkToken: PENDING_LINK_MSW.tokens.kakao });
+    expect(peekPendingSocialLink()).toMatchObject({ linkToken: PENDING_LINK_MSW.tokens.kakao });
   });
 
   it.each(['social_terms_required', 'social_profile_required'])('%s 가입 도중 계정에는 붙이지 않고 토큰을 남긴다', async (onboardingStatus) => {
@@ -123,7 +123,7 @@ describe('usePendingSocialLinkResolver — 로그인 뒤 자동 연결', () => {
     mount(account({ onboardingStatus }));
     await new Promise((resolve) => setTimeout(resolve, 30));
     expect(linkRequests).toHaveLength(0);
-    expect(readPendingSocialLink()).toMatchObject({ linkToken: PENDING_LINK_MSW.tokens.kakao });
+    expect(peekPendingSocialLink()).toMatchObject({ linkToken: PENDING_LINK_MSW.tokens.kakao });
   });
 
   it('auth/me 가 여러 번 갱신돼도 같은 토큰은 한 번만 보낸다', async () => {
@@ -135,13 +135,117 @@ describe('usePendingSocialLinkResolver — 로그인 뒤 자동 연결', () => {
     expect(linkRequests).toHaveLength(1);
   });
 
+  it('로그인했는데 대기 값이 만료 표식이면 expired 로 안내하고 연결 요청은 보내지 않는다', async () => {
+    savePendingSocialLink({ next: 'sign_in_then_link', provider: 'apple', linkToken: PENDING_LINK_MSW.tokens.apple, linkTokenExpiresInSeconds: 0.05 });
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    mount(account());
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/my/settings/login-methods?linkResult=expired&provider=apple'));
+    expect(linkRequests).toHaveLength(0);
+    expect(peekPendingSocialLink()).toBeNull();
+  });
+
+  // 만료 표식은 로그인 뒤 리졸버만 소비한다 — 배너·안내 화면이 보는 것(peek)으로는 사라지지 않는다.
+  it('peek 로 몇 번 봐도 만료 표식은 리졸버가 읽을 때까지 남는다', async () => {
+    savePendingSocialLink({ next: 'sign_in_then_link', provider: 'kakao', linkToken: PENDING_LINK_MSW.tokens.kakao, linkTokenExpiresInSeconds: 0.05 });
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    expect(peekPendingSocialLink()).toMatchObject({ provider: 'kakao', expired: true });
+    expect(peekPendingSocialLink()).toMatchObject({ provider: 'kakao', expired: true });
+    mount(account());
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/my/settings/login-methods?linkResult=expired&provider=kakao'));
+    expect(takePendingSocialLink()).toBeNull();
+  });
+
+  it('정보 입력을 미룬 계정도 가입 중처럼 토큰을 남기고 이동 없이 기다린다', async () => {
+    storeToken(PENDING_LINK_MSW.tokens.kakao);
+    mount(account({ onboardingStatus: 'social_profile_deferred' }));
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(linkRequests).toHaveLength(0);
+    expect(router.replace).not.toHaveBeenCalled();
+    expect(peekPendingSocialLink()).toMatchObject({ linkToken: PENDING_LINK_MSW.tokens.kakao });
+  });
+
+  describe('요청 실패의 종류별 처리', () => {
+    const failWith = (statusCode: number, code: string) => server.use(http.post('*/api/v1/auth/link/pending', () => HttpResponse.json({
+      status: 'error', statusCode, code, message: '실패',
+    }, { status: statusCode })));
+
+    afterEach(() => vi.useRealTimers());
+
+    it.each([[503, 'SERVICE_UNAVAILABLE'], [429, 'RATE_LIMITED']])('%s 은 토큰을 둔 채 다시 시도해 성공하면 그때 지운다', async (statusCode, code) => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'], shouldAdvanceTime: true });
+      storeToken(PENDING_LINK_MSW.tokens.kakao);
+      failWith(statusCode, code);
+      mount(account());
+      await waitFor(() => expect(linkRequests).toHaveLength(1));
+      expect(router.replace).not.toHaveBeenCalled();
+      expect(peekPendingSocialLink()).toMatchObject({ linkToken: PENDING_LINK_MSW.tokens.kakao });
+
+      server.resetHandlers();
+      await vi.advanceTimersByTimeAsync(RETRY_DELAY_MS);
+      await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/my/settings/login-methods?linkResult=linked&provider=kakao'));
+      expect(linkRequests).toHaveLength(2);
+      expect(peekPendingSocialLink()).toBeNull();
+    });
+
+    it('계속 실패하면 상한(재시도 2회)에서 멈추고 failed 로 안내하며 토큰을 지운다', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'], shouldAdvanceTime: true });
+      storeToken(PENDING_LINK_MSW.tokens.kakao);
+      failWith(503, 'SERVICE_UNAVAILABLE');
+      mount(account());
+      await waitFor(() => expect(linkRequests).toHaveLength(1));
+      await vi.advanceTimersByTimeAsync(RETRY_DELAY_MS);
+      await waitFor(() => expect(linkRequests).toHaveLength(2));
+      expect(router.replace).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(RETRY_DELAY_MS);
+      await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/my/settings/login-methods?linkResult=failed&provider=kakao'));
+      expect(linkRequests).toHaveLength(3);
+      expect(peekPendingSocialLink()).toBeNull();
+    });
+
+    it('응답을 받지 못한 네트워크 단절도 같은 재시도 대상이다', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'], shouldAdvanceTime: true });
+      storeToken(PENDING_LINK_MSW.tokens.kakao);
+      server.use(http.post('*/api/v1/auth/link/pending', () => HttpResponse.error()));
+      mount(account());
+      await waitFor(() => expect(linkRequests).toHaveLength(1));
+      expect(router.replace).not.toHaveBeenCalled();
+      expect(peekPendingSocialLink()).toMatchObject({ linkToken: PENDING_LINK_MSW.tokens.kakao });
+    });
+
+    it.each([
+      [409, 'SOCIAL_LINK_PROVIDER_IN_USE', 'in_use'],
+      [400, 'SOCIAL_LINK_TOKEN_INVALID', 'failed'],
+      [403, 'SOCIAL_LINK_ADMIN_FORBIDDEN', 'failed'],
+    ])('확정된 거절 %s %s 는 다시 시도하지 않고 토큰을 지운 채 결과로 이동한다', async (statusCode, code, linkResult) => {
+      storeToken(PENDING_LINK_MSW.tokens.kakao);
+      failWith(statusCode, code);
+      mount(account());
+      await waitFor(() => expect(router.replace).toHaveBeenCalledWith(`/my/settings/login-methods?linkResult=${linkResult}&provider=kakao`));
+      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS + 200));
+      expect(linkRequests).toHaveLength(1);
+      expect(peekPendingSocialLink()).toBeNull();
+    }, 10_000);
+
+    // 로그인이 풀린 것이다 — 연결 결과로 보내지도, 토큰을 지우지도, 다시 시도하지도 않는다.
+    it('401 은 토큰을 그대로 두고 이동하지 않는다', async () => {
+      storeToken(PENDING_LINK_MSW.tokens.kakao);
+      failWith(401, 'UNAUTHENTICATED');
+      mount(account());
+      await waitFor(() => expect(linkRequests).toHaveLength(1));
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      expect(router.replace).not.toHaveBeenCalled();
+      expect(peekPendingSocialLink()).toMatchObject({ linkToken: PENDING_LINK_MSW.tokens.kakao });
+      expect(linkRequests).toHaveLength(1);
+    });
+  });
+
   describe('약관 재동의', () => {
     it('동의가 끝날 때까지 기다리고 토큰을 지우지 않는다', async () => {
       storeToken(PENDING_LINK_MSW.tokens.kakao);
       mount(account({ compliant: false }));
       await new Promise((resolve) => setTimeout(resolve, 30));
       expect(linkRequests).toHaveLength(0);
-      expect(readPendingSocialLink()).toMatchObject({ linkToken: PENDING_LINK_MSW.tokens.kakao });
+      expect(peekPendingSocialLink()).toMatchObject({ linkToken: PENDING_LINK_MSW.tokens.kakao });
     });
 
     it('동의를 마치고 돌아오면 같은 토큰으로 이어서 연결한다', async () => {
@@ -152,13 +256,15 @@ describe('usePendingSocialLinkResolver — 로그인 뒤 자동 연결', () => {
       expect(linkRequests).toHaveLength(1);
     });
 
-    it('기다리는 동안 토큰이 만료되면 조용히 사라지지 않고 실패로 안내한다', async () => {
+    it('기다리는 동안 토큰이 만료되면 동의가 끝난 계정에서 한 번 expired 로 안내한다', async () => {
       savePendingSocialLink({ next: 'sign_in_then_link', provider: 'kakao', linkToken: PENDING_LINK_MSW.tokens.kakao, linkTokenExpiresInSeconds: 0.1 });
       const view = mount(account({ compliant: false }));
       await new Promise((resolve) => setTimeout(resolve, 150));
+      expect(router.replace).not.toHaveBeenCalled();
       view.rerender({ current: account({ compliant: true }) });
-      await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/my/settings/login-methods?linkResult=failed&provider=kakao'));
+      await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/my/settings/login-methods?linkResult=expired&provider=kakao'));
       expect(linkRequests).toHaveLength(0);
+      expect(peekPendingSocialLink()).toBeNull();
     });
 
     it('서버가 약관 재동의 403 을 주면 토큰을 지우지 않고 동의 화면으로 보낸다', async () => {
@@ -169,7 +275,7 @@ describe('usePendingSocialLinkResolver — 로그인 뒤 자동 연결', () => {
       }, { status: 403 })));
       mount(account());
       await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/terms?mode=renewal'));
-      expect(readPendingSocialLink()).toMatchObject({ linkToken: PENDING_LINK_MSW.tokens.kakao });
+      expect(peekPendingSocialLink()).toMatchObject({ linkToken: PENDING_LINK_MSW.tokens.kakao });
     });
   });
 });

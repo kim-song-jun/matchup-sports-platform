@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { savePendingSocialLink } from '@/lib/pending-social-link';
+import { peekPendingSocialLink, savePendingSocialLink } from '@/lib/pending-social-link';
 import { AccountExistsGuide } from './account-exists-guide';
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: vi.fn(), push: vi.fn(), refresh: vi.fn() }) }));
@@ -49,6 +49,14 @@ describe('AccountExistsGuide', () => {
     expect(screen.queryByText(/자동으로 연결돼요/)).not.toBeInTheDocument();
     expect(screen.getByText('로그인한 뒤 설정에서 연결해요')).toBeInTheDocument();
     expect(screen.getByText(/"로그인 방법"에서 카카오 로그인을 연결해 주세요/)).toBeInTheDocument();
+  });
+
+  it('만료된 토큰은 자동 연결을 약속하지 않고, 만료 표식은 소비하지 않는다', () => {
+    savePendingSocialLink({ next: 'sign_in_then_link', provider: 'kakao', linkToken: 'link-token-1', linkTokenExpiresInSeconds: 600 }, Date.now() - 601_000);
+    renderGuide({ provider: 'kakao', redirectPath: null });
+    expect(screen.queryByText(/자동으로 연결돼요/)).not.toBeInTheDocument();
+    expect(screen.getByText('로그인한 뒤 설정에서 연결해요')).toBeInTheDocument();
+    expect(peekPendingSocialLink()).toMatchObject({ provider: 'kakao', expired: true });
   });
 
   it('이메일 로그인·계정 찾기·비밀번호 재설정으로 가는 길을 주고 돌아갈 경로를 싣는다', () => {

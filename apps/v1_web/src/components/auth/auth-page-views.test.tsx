@@ -7,7 +7,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { readPendingSocialLink, savePendingSocialLink } from '@/lib/pending-social-link';
+import { peekPendingSocialLink, savePendingSocialLink } from '@/lib/pending-social-link';
 import { AuthExceptionPageView, LoginPageView, SignupCompletePageView } from './auth-page';
 import { getAuthExceptionViewModel, getLoginViewModel, getSignupCompleteViewModel } from './auth.view-model';
 
@@ -78,7 +78,7 @@ describe('로그인 화면', () => {
       const notice = await screen.findByText(/로그인하면 카카오 로그인이 이 계정에 연결돼요\./);
       expect(notice.compareDocumentPosition(container.querySelector('.tm-auth-provider-group')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       screen.getByRole('button', { name: '연결 안 하기' }).click();
-      await vi.waitFor(() => expect(readPendingSocialLink()).toBeNull());
+      await vi.waitFor(() => expect(peekPendingSocialLink()).toBeNull());
     });
 
     it('토큰이 없으면 평소 로그인 화면 그대로다', () => {

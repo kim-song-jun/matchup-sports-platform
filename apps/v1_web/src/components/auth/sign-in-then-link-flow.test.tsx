@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { serializeKakaoOAuthAttempt } from '@/lib/kakao-oauth';
-import { readPendingSocialLink } from '@/lib/pending-social-link';
+import { peekPendingSocialLink } from '@/lib/pending-social-link';
 import { readWithdrawalCancel } from '@/lib/withdrawal-cancel-storage';
 import { LINK_MSW, PENDING_LINK_MSW } from '@/test/msw/auth-link-handlers';
 import { server } from '@/test/msw/server';
@@ -101,7 +101,7 @@ describe('카카오 로그인 충돌 → 원래 계정 로그인 → 자동 연�
     // 1) 충돌 409 → 안내 화면 + 보관된 토큰
     expect(await screen.findByRole('heading', { level: 1, name: '이미 팀밋 계정이 있어요' })).toBeInTheDocument();
     expect(navigation.replace).toHaveBeenCalledWith('/auth/account-conflict?provider=kakao');
-    expect(readPendingSocialLink()).toMatchObject({ linkToken: PENDING_LINK_MSW.tokens.kakao, provider: 'kakao' });
+    expect(peekPendingSocialLink()).toMatchObject({ linkToken: PENDING_LINK_MSW.tokens.kakao, provider: 'kakao' });
     expect(screen.getByText('30분 안에 로그인하면 카카오 로그인이 자동으로 연결돼요')).toBeInTheDocument();
     expect(requests).toEqual(['POST /api/v1/auth/kakao']);
 
@@ -116,7 +116,7 @@ describe('카카오 로그인 충돌 → 원래 계정 로그인 → 자동 연�
     await screen.findByRole('heading', { level: 1, name: LOGIN_METHODS_RESULT });
     expect(window.location.pathname + window.location.search).toBe(LOGIN_METHODS_RESULT);
     expect(requests).toEqual(['POST /api/v1/auth/kakao', 'POST /api/v1/auth/login', 'POST /api/v1/auth/link/pending']);
-    expect(readPendingSocialLink()).toBeNull();
+    expect(peekPendingSocialLink()).toBeNull();
   });
 
   it('연결 안 하기를 누르고 로그인하면 로그인만 되고 연결 요청은 나가지 않는다', async () => {

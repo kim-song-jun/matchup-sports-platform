@@ -10,7 +10,7 @@ import { RequireAuth } from '@/components/auth/require-auth';
 import { server } from '@/test/msw/server';
 import { clearStoredV1Session, saveStoredV1Session, V1_SESSION_HINT_KEY, V1_USER_ID_KEY } from '@/lib/session-storage';
 import { v1Keys } from '@/lib/query-keys';
-import { readPendingSocialLink, savePendingSocialLink } from '@/lib/pending-social-link';
+import { peekPendingSocialLink, savePendingSocialLink } from '@/lib/pending-social-link';
 import { readWithdrawalCancel, saveWithdrawalCancel } from '@/lib/withdrawal-cancel-storage';
 import type { ClientErrorPayload } from '@/lib/client-error-reporter';
 
@@ -150,7 +150,7 @@ describe('WithdrawalPageClient session termination', () => {
     await waitFor(() => expect(documentNavigation.replace).toHaveBeenCalledWith('/login'));
     expect(requestCount).toBe(1);
     expect(queryClient.getQueryCache().findAll({ queryKey: v1Keys.all })).toHaveLength(0);
-    expect(readPendingSocialLink()).toBeNull();
+    expect(peekPendingSocialLink()).toBeNull();
     expect(readWithdrawalCancel()).toBeNull();
     expect(localStorage.getItem(V1_SESSION_HINT_KEY)).toBeNull();
     expect(localStorage.getItem(V1_USER_ID_KEY)).toBeNull();

@@ -6,9 +6,9 @@ import { useV1LinkPending } from '@/hooks/use-v1-api';
 import { isTransientFailure, isUnauthenticatedError, V1ApiError } from '@/lib/api-client';
 import { getSignupIncompleteRoute } from '@/lib/auth-link-errors';
 import { buildLinkResultPath, linkResultFromError, linkResultFromSuccess } from '@/lib/link-result';
-import { clearPendingSocialLink, readPendingSocialLink } from '@/lib/pending-social-link';
+import { clearPendingSocialLink, takePendingSocialLink } from '@/lib/pending-social-link';
 import { sanitizeRedirectPath } from '@/lib/session-storage';
-import type { V1AuthMe, V1LinkableProvider } from '@/types/api';
+import type { V1AuthMe } from '@/types/api';
 import { getPendingSocialSignupRoute } from './social-signup-access';
 
 const TERMS_RECONSENT_REQUIRED_CODE = 'TERMS_RECONSENT_REQUIRED';
@@ -36,7 +36,8 @@ function termsReconsentRoute(error: unknown): string | null {
  *
  * - 가입이 덜 끝난 계정(정보 입력을 미룬 계정 포함 — 서버가 SIGNUP_INCOMPLETE 로 막는다)에는 붙일 수 없다.
  *   토큰을 남기고 이동 없이 기다린다. 약관 재동의가 필요한 계정도 동의가 끝날 때까지 기다린다.
- *   기다리는 동안 토큰이 만료되면 조용히 사라지지 않게 실패 결과로 안내한다.
+ *   기다리는 동안 토큰이 만료됐으면 준비된 계정에서 한 번 `expired` 결과로 안내한다.
+ * - 대기 값을 읽는 곳 중 만료 표식을 소비하는 것은 여기(`takePendingSocialLink`)뿐이다. 배너·안내 화면은 `peek` 만 쓴다.
  * - 약관 재동의 403 은 토큰을 지우지 않고 동의 화면으로 보낸다. 돌아오면 같은 토큰으로 다시 시도한다.
  * - 다시 보내면 달라질 수 있는 실패(네트워크·5xx·429)는 토큰을 둔 채 상한까지 재시도하고, 확정된 거절(409 계열·
  *   400 토큰 오류·403)만 토큰을 지우고 결과로 이동한다. 401(로그인이 풀림)은 건드리지 않는다.
@@ -48,8 +49,6 @@ export function usePendingSocialLinkResolver(account: Pick<V1AuthMe, 'user' | 't
   const { mutate: linkPending } = useV1LinkPending();
   // 요청이 끝나기 전에 effect 가 다시 돌아도(auth/me 갱신) 같은 토큰을 두 번 보내지 않는다.
   const inFlightTokenRef = useRef<string | null>(null);
-  // 약관 동의를 기다리는 토큰의 제공자. 돌아왔을 때 토큰이 없으면 만료된 것이다.
-  const waitingProviderRef = useRef<V1LinkableProvider | null>(null);
   const attemptsRef = useRef(0);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 재시도 가능한 실패 뒤 effect 를 다시 돌리는 신호.
@@ -60,31 +59,21 @@ export function usePendingSocialLinkResolver(account: Pick<V1AuthMe, 'user' | 't
   }, []);
 
   useEffect(() => {
-    if (!account) {
-      waitingProviderRef.current = null;
-      return;
-    }
-    // 가입을 마친 뒤 토큰이 남아 있으면 그때 이어진다.
+    if (!account) return;
+    // 가입을 마친 뒤, 또는 약관 동의를 마친 뒤 토큰이 남아 있으면 그때 이어진다. 기다리는 동안은 대기 값을 읽지도 않는다.
     const { onboardingStatus } = account.user;
     if (getPendingSocialSignupRoute(onboardingStatus) !== null || onboardingStatus === PROFILE_DEFERRED_STATUS) return;
+    if (account.termsCompliance?.compliant === false) return;
 
-    const pending = readPendingSocialLink();
-    if (!pending) {
-      const expiredProvider = waitingProviderRef.current;
-      waitingProviderRef.current = null;
-      if (expiredProvider && inFlightTokenRef.current === null) {
-        router.replace(buildLinkResultPath({ linkResult: 'failed', provider: expiredProvider }));
-      }
-      return;
-    }
-    if (account.termsCompliance?.compliant === false) {
-      waitingProviderRef.current = pending.provider;
+    const pending = takePendingSocialLink();
+    if (!pending) return;
+    if (pending.expired) {
+      router.replace(buildLinkResultPath({ linkResult: 'expired', provider: pending.provider }));
       return;
     }
     if (inFlightTokenRef.current === pending.linkToken) return;
 
     inFlightTokenRef.current = pending.linkToken;
-    waitingProviderRef.current = null;
     linkPending({ linkToken: pending.linkToken }, {
       onSuccess: (result) => {
         clearPendingSocialLink();
@@ -102,7 +91,6 @@ export function usePendingSocialLinkResolver(account: Pick<V1AuthMe, 'user' | 't
         }
         const reconsentRoute = termsReconsentRoute(error);
         if (reconsentRoute) {
-          waitingProviderRef.current = pending.provider;
           router.replace(reconsentRoute);
           return;
         }

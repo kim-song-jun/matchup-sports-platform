@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { EmailLoginClient } from './email-login-client';
 import { V1ApiError } from '@/lib/api-client';
 import { __resetNavigationHistoryForTests, installNavigationHistory } from '@/lib/navigation-history';
-import { readPendingSocialLink, savePendingSocialLink } from '@/lib/pending-social-link';
+import { peekPendingSocialLink, savePendingSocialLink } from '@/lib/pending-social-link';
 import { getSavedRedirectPath, resolveAuthContinuationPath } from '@/lib/session-storage';
 import { readWithdrawalCancel } from '@/lib/withdrawal-cancel-storage';
 
@@ -247,7 +247,7 @@ describe('EmailLoginClient 탈퇴 철회와 대기 연결 안내', () => {
     fireEvent.click(screen.getByRole('button', { name: '연결 안 하기' }));
 
     expect(screen.queryByText(/로그인하면 카카오 로그인이 이 계정에 연결돼요\./)).not.toBeInTheDocument();
-    expect(readPendingSocialLink()).toBeNull();
+    expect(peekPendingSocialLink()).toBeNull();
   });
 
   it('대기 연결 토큰이 없으면 안내를 그리지 않는다', () => {

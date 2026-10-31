@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useSyncExternalStore } from 'react';
-import { readPendingSocialLink } from '@/lib/pending-social-link';
+import { peekPendingSocialLink } from '@/lib/pending-social-link';
 import { AppleLoginButton } from './apple-login-button';
 import { AUTH_NOTICE_STAGE, AuthFrame } from './auth-page';
 import { buildKakaoAuthUrl } from './auth.view-model';
@@ -31,7 +31,7 @@ function buildSteps(label: string, autoLink: boolean): Step[] {
 
 // 연결 토큰이 실제로 남아 있는지는 브라우저 저장소만 안다. 서버 렌더에서는 알 수 없어(null) 흔한 경우인 자동 연결 문구로 그린다.
 const subscribeNothing = () => () => {};
-const readAutoLinkAvailable = () => readPendingSocialLink() !== null;
+const readAutoLinkAvailable = () => peekPendingSocialLink()?.expired === false;
 const serverAutoLinkAvailable = () => null;
 
 /**

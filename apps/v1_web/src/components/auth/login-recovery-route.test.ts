@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { V1ApiError } from '@/lib/api-client';
-import { readPendingSocialLink, savePendingSocialLink } from '@/lib/pending-social-link';
+import { peekPendingSocialLink, savePendingSocialLink } from '@/lib/pending-social-link';
 import { readWithdrawalCancel } from '@/lib/withdrawal-cancel-storage';
 import {
   buildAccountConflictPath,
@@ -24,14 +24,14 @@ afterEach(() => {
 describe('routeToAccountConflict', () => {
   it('연결 토큰을 보관하고 제공자별 안내 화면 경로를 돌려준다', () => {
     expect(routeToAccountConflict(conflict(withToken))).toEqual({ type: 'navigate', path: '/auth/account-conflict?provider=kakao' });
-    expect(readPendingSocialLink()).toMatchObject({ linkToken: 'link-token-1', provider: 'kakao' });
+    expect(peekPendingSocialLink()).toMatchObject({ linkToken: 'link-token-1', provider: 'kakao' });
     expect(routeToAccountConflict(conflict(withToken, 'apple'))).toEqual({ type: 'navigate', path: '/auth/account-conflict?provider=apple' });
   });
 
   it('토큰이 없는 안내는 안내 화면으로만 보내고, 이전에 남은 토큰은 거둔다', () => {
     savePendingSocialLink({ next: 'sign_in_then_link', provider: 'apple', ...withToken });
     expect(routeToAccountConflict(conflict())).toEqual({ type: 'navigate', path: '/auth/account-conflict?provider=kakao' });
-    expect(readPendingSocialLink()).toBeNull();
+    expect(peekPendingSocialLink()).toBeNull();
   });
 
   it('돌아갈 경로는 같은 사이트 경로일 때만 싣는다', () => {
@@ -47,7 +47,7 @@ describe('routeToAccountConflict', () => {
     ['오류가 아닌 값', new Error('network')],
   ])('안내가 아니면 null 이다 (%s)', (_label, error) => {
     expect(routeToAccountConflict(error)).toBeNull();
-    expect(readPendingSocialLink()).toBeNull();
+    expect(peekPendingSocialLink()).toBeNull();
   });
 });
 

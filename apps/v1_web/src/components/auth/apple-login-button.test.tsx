@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import type { ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { V1ApiError } from '@/lib/api-client';
-import { readPendingSocialLink } from '@/lib/pending-social-link';
+import { peekPendingSocialLink } from '@/lib/pending-social-link';
 import { v1Keys } from '@/lib/query-keys';
 import { V1_SESSION_HINT_KEY } from '@/lib/session-storage';
 import { readWithdrawalCancel } from '@/lib/withdrawal-cancel-storage';
@@ -105,7 +105,7 @@ describe('AppleLoginButton', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Apple로 계속하기' }));
 
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/auth/account-conflict?provider=apple&redirect=%2Fteams%2Fnew'));
-    expect(readPendingSocialLink()).toMatchObject({ linkToken: 'apple-link-token', provider: 'apple' });
+    expect(peekPendingSocialLink()).toMatchObject({ linkToken: 'apple-link-token', provider: 'apple' });
     expect(screen.queryByRole('alert')).toBeNull();
   });
 

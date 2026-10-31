@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { V1ApiError } from '@/lib/api-client';
-import { readPendingSocialLink, savePendingSocialLink } from '@/lib/pending-social-link';
+import { peekPendingSocialLink, savePendingSocialLink } from '@/lib/pending-social-link';
 import { SignupClient } from './signup-client';
 
 const router = vi.hoisted(() => ({
@@ -257,12 +257,12 @@ describe('SignupClient required profile contract', () => {
     fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '홍길동' } });
     fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
     fireEvent.click(screen.getByRole('radio', { name: '남' }));
-    expect(readPendingSocialLink()).not.toBeNull();
+    expect(peekPendingSocialLink()).not.toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: '가입하고 계속' }));
 
     await waitFor(() => expect(hooks.registerMutateAsync).toHaveBeenCalled());
-    await waitFor(() => expect(readPendingSocialLink()).toBeNull());
+    await waitFor(() => expect(peekPendingSocialLink()).toBeNull());
   });
 
   it('가입 요청이 실패하면 대기 연결 토큰은 그대로 둔다', async () => {
@@ -277,7 +277,7 @@ describe('SignupClient required profile contract', () => {
     fireEvent.click(screen.getByRole('button', { name: '가입하고 계속' }));
 
     await waitFor(() => expect(hooks.registerMutateAsync).toHaveBeenCalled());
-    expect(readPendingSocialLink()).not.toBeNull();
+    expect(peekPendingSocialLink()).not.toBeNull();
   });
 
   it('인증번호를 받아도 확인하기 전에는 프로필 단계로 넘어갈 수 없다', async () => {

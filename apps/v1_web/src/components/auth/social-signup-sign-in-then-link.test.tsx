@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { clearPendingSocialLink, readPendingSocialLink, savePendingSocialLink } from '@/lib/pending-social-link';
+import { clearPendingSocialLink, peekPendingSocialLink, savePendingSocialLink } from '@/lib/pending-social-link';
 import { PENDING_LINK_MSW, PHONE_CONFLICT_MSW } from '@/test/msw/auth-link-handlers';
 import { server } from '@/test/msw/server';
 import type { V1SignInThenLinkDetails } from '@/types/api';
@@ -12,6 +12,12 @@ import { SocialSignupClient } from './social-signup-client';
 vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: vi.fn(), push: vi.fn() }) }));
 vi.mock('@/lib/analytics', () => ({ trackEvent: vi.fn() }));
 
+// 쓸 수 있는 대기 토큰의 값(없거나 만료 표식이면 null).
+const pendingToken = () => {
+  const read = peekPendingSocialLink();
+  return read && !read.expired ? read.linkToken : null;
+};
+
 type Provider = 'kakao' | 'apple';
 let provider: Provider = 'kakao';
 const prefillPhone = () => PHONE_CONFLICT_MSW.phones[provider];
@@ -19,7 +25,7 @@ const prefillPhone = () => PHONE_CONFLICT_MSW.phones[provider];
 const seen = { logout: 0, tokenAtLogout: undefined as string | null | undefined, tokenAtLeave: undefined as string | null | undefined, left: [] as string[] };
 const replace = vi.fn((path: string) => {
   seen.left.push(path);
-  seen.tokenAtLeave = readPendingSocialLink()?.linkToken ?? null;
+  seen.tokenAtLeave = pendingToken();
 });
 
 const success = (data: unknown) => HttpResponse.json({ status: 'success', data });
@@ -43,7 +49,7 @@ beforeEach(() => {
     http.post('*/api/v1/logs/client-error', () => success({})),
     http.post('*/api/v1/auth/logout', () => {
       seen.logout += 1;
-      seen.tokenAtLogout = readPendingSocialLink()?.linkToken ?? null;
+      seen.tokenAtLogout = pendingToken();
       return success({ ok: true });
     }),
   );
@@ -107,7 +113,7 @@ describe('소셜 가입 중 번호 중복 — 원래 계정으로 로그인하�
     // 로그아웃 시점에는 새 토큰이 아직 없고, 이동 시점에는 정리를 이겨낸 새 토큰만 있다.
     expect(seen.tokenAtLogout).not.toBe(PENDING_LINK_MSW.tokens.kakao);
     expect(seen.tokenAtLeave).toBe(PENDING_LINK_MSW.tokens.kakao);
-    expect(readPendingSocialLink()).toMatchObject({ linkToken: PENDING_LINK_MSW.tokens.kakao, provider: 'kakao' });
+    expect(peekPendingSocialLink()).toMatchObject({ linkToken: PENDING_LINK_MSW.tokens.kakao, provider: 'kakao' });
   });
 
   it('확인 창에서 취소하면 로그아웃도 토큰 저장도 하지 않고 가입 화면에 남는다', async () => {
@@ -120,7 +126,7 @@ describe('소셜 가입 중 번호 중복 — 원래 계정으로 로그인하�
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(seen.logout).toBe(0);
     expect(replace).not.toHaveBeenCalled();
-    expect(readPendingSocialLink()).toBeNull();
+    expect(peekPendingSocialLink()).toBeNull();
     expect(screen.getByRole('button', { name: '원래 방법으로 로그인하기' })).toBeEnabled();
   });
 
@@ -155,7 +161,7 @@ describe('소셜 가입 중 번호 중복 — 원래 계정으로 로그인하�
 
     expect(await screen.findByText('가입 취소를 완료하지 못했어요. 잠시 후 다시 시도해 주세요.')).toBeInTheDocument();
     expect(replace).not.toHaveBeenCalled();
-    expect(readPendingSocialLink()).toBeNull();
+    expect(peekPendingSocialLink()).toBeNull();
   });
 
   // 서버가 연결 토큰 없이 충돌만 알리면 자동 연결을 약속하지 않고 기본 안내와 출구를 쓴다.
@@ -268,11 +274,11 @@ describe('새 계정의 소셜 가입이 끝나면 대기 연결 토큰을 지�
     await user.click(screen.getByRole('button', { name: '중복 확인' }));
     const submit = await screen.findByRole('button', { name: '운동 설정으로 계속' });
     await waitFor(() => expect(submit).toBeEnabled());
-    expect(readPendingSocialLink()).not.toBeNull();
+    expect(peekPendingSocialLink()).not.toBeNull();
 
     await user.click(submit);
 
-    await waitFor(() => expect(readPendingSocialLink()).toBeNull());
+    await waitFor(() => expect(peekPendingSocialLink()).toBeNull());
   });
 
   it('나중에 입력할게요가 성공해도 토큰이 남지 않는다', async () => {
@@ -282,7 +288,7 @@ describe('새 계정의 소셜 가입이 끝나면 대기 연결 토큰을 지�
 
     await userEvent.setup().click(await screen.findByRole('button', { name: '나중에 입력할게요' }));
 
-    await waitFor(() => expect(readPendingSocialLink()).toBeNull());
+    await waitFor(() => expect(peekPendingSocialLink()).toBeNull());
   });
 
   // 번호 중복 출구가 방금 저장한 토큰은 이 지움과 부딪히지 않는다 — 출구는 로그아웃 뒤에 저장하고 가입 완료 경로를 거치지 않는다.
@@ -291,7 +297,7 @@ describe('새 계정의 소셜 가입이 끝나면 대기 연결 토큰을 지�
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: '계정 찾기' }));
     await waitFor(() => expect(replace).toHaveBeenCalledWith('/auth/find-account'));
-    expect(readPendingSocialLink()).toMatchObject({ linkToken: PENDING_LINK_MSW.tokens.kakao });
+    expect(peekPendingSocialLink()).toMatchObject({ linkToken: PENDING_LINK_MSW.tokens.kakao });
   });
 });
 

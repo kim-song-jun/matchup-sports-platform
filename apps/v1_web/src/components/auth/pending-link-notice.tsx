@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/v1-ui/button';
-import { clearPendingSocialLink, readPendingSocialLink, type PendingSocialLink } from '@/lib/pending-social-link';
+import { clearPendingSocialLink, peekPendingSocialLink, type PendingSocialLinkRead } from '@/lib/pending-social-link';
 import { linkProviderLabel } from './sign-in-then-link-copy';
 
 /**
@@ -12,10 +12,11 @@ import { linkProviderLabel } from './sign-in-then-link-copy';
  * (이 화면들은 이미 role=status 안내를 따로 쓴다) 스크린리더는 화면을 읽으며 만난다.
  */
 export function PendingLinkNotice() {
-  const [pending, setPending] = useState<PendingSocialLink | null>(null);
-  useEffect(() => setPending(readPendingSocialLink()), []);
+  const [pending, setPending] = useState<PendingSocialLinkRead | null>(null);
+  // 만료 표식은 로그인 뒤 리졸버가 소비한다 — 여기서는 보기만 하고, 쓸 수 있는 토큰이 있을 때만 알린다.
+  useEffect(() => setPending(peekPendingSocialLink()), []);
 
-  if (!pending) return null;
+  if (!pending || pending.expired) return null;
   return (
     <div className="tm-auth-pending-link">
       <p className="tm-text-label tm-auth-pending-link-message">

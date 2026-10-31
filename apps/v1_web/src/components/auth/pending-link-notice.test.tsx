@@ -1,7 +1,7 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
-import { readPendingSocialLink, savePendingSocialLink } from '@/lib/pending-social-link';
+import { peekPendingSocialLink, savePendingSocialLink, takePendingSocialLink } from '@/lib/pending-social-link';
 import { PendingLinkNotice } from './pending-link-notice';
 
 const store = (provider: 'kakao' | 'apple') =>
@@ -34,12 +34,14 @@ describe('PendingLinkNotice', () => {
     await userEvent.setup().click(await screen.findByRole('button', { name: '연결 안 하기' }));
     expect(screen.queryByText(/이 계정에 연결돼요/)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '연결 안 하기' })).not.toBeInTheDocument();
-    expect(readPendingSocialLink()).toBeNull();
+    expect(peekPendingSocialLink()).toBeNull();
   });
 
-  it('이미 만료된 토큰은 안내하지 않는다', () => {
+  // 만료 표식을 소비하는 것은 로그인 뒤 리졸버뿐이다 — 배너가 먼저 읽어 표식을 없애면 expired 안내가 사라진다.
+  it('이미 만료된 토큰은 안내하지 않고, 만료 표식도 소비하지 않는다', () => {
     savePendingSocialLink({ next: 'sign_in_then_link', provider: 'kakao', linkToken: 'link-token-1', linkTokenExpiresInSeconds: 600 }, Date.now() - 601_000);
     const { container } = render(<PendingLinkNotice />);
     expect(container).toBeEmptyDOMElement();
+    expect(takePendingSocialLink()).toMatchObject({ provider: 'kakao', expired: true });
   });
 });

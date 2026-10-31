@@ -6,7 +6,7 @@ import { KakaoCallbackClient } from './kakao-callback-client';
 import { KAKAO_OAUTH_STATE_STORAGE_KEY } from './auth.view-model';
 import { V1ApiError } from '@/lib/api-client';
 import { serializeKakaoOAuthAttempt } from '@/lib/kakao-oauth';
-import { readPendingSocialLink } from '@/lib/pending-social-link';
+import { peekPendingSocialLink } from '@/lib/pending-social-link';
 import { readWithdrawalCancel } from '@/lib/withdrawal-cancel-storage';
 
 const router = vi.hoisted(() => ({
@@ -203,6 +203,13 @@ describe('KakaoCallbackClient 로그인 충돌과 탈퇴 철회', () => {
     searchParamsValue = new URLSearchParams();
   });
 
+  it('로그인 중에는 로그인을 확인하고 있다고 알린다', async () => {
+    primeValidOAuthState();
+    api.v1Post.mockReturnValue(new Promise(() => {}));
+    render(<KakaoCallbackClient />);
+    expect(await screen.findByRole('heading', { name: '카카오 로그인을 확인하고 있어요' })).toBeInTheDocument();
+  });
+
   it('옛 형식(state 문자열만) 저장값도 로그인으로 읽는다', async () => {
     primeValidOAuthState('state-123');
     api.v1Post.mockResolvedValue({ session: { userId: 'u1', userEmail: null }, next: { route: '/home' } });
@@ -228,7 +235,7 @@ describe('KakaoCallbackClient 로그인 충돌과 탈퇴 철회', () => {
     }));
     render(<KakaoCallbackClient />);
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/auth/account-conflict?provider=kakao&redirect=%2Fteams%2Fnew'));
-    expect(readPendingSocialLink()).toMatchObject({ linkToken: 'link-token-1', provider: 'kakao' });
+    expect(peekPendingSocialLink()).toMatchObject({ linkToken: 'link-token-1', provider: 'kakao' });
     expect(screen.queryByText('로그인을 완료하지 못했어요')).not.toBeInTheDocument();
   });
 
@@ -238,7 +245,7 @@ describe('KakaoCallbackClient 로그인 충돌과 탈퇴 철회', () => {
     render(<KakaoCallbackClient />);
     expect(await screen.findByText('실패')).toBeInTheDocument();
     expect(router.replace).not.toHaveBeenCalled();
-    expect(readPendingSocialLink()).toBeNull();
+    expect(peekPendingSocialLink()).toBeNull();
   });
 
   it('탈퇴 신청 계정의 403 은 철회 토큰을 보관하고 철회 화면으로 보낸다', async () => {
@@ -270,6 +277,14 @@ describe('KakaoCallbackClient 연결 모드', () => {
   afterEach(() => vi.unstubAllEnvs());
 
   const linked = { provider: 'kakao', alreadyLinked: false, mergedPendingAccount: false, authProviders: ['email', 'kakao'] };
+
+  it('연결 중에는 로그인이 아니라 연결을 확인하고 있다고 알린다', async () => {
+    primeLinkAttempt();
+    api.v1Post.mockReturnValue(new Promise(() => {}));
+    render(<KakaoCallbackClient />);
+    expect(await screen.findByRole('heading', { name: '카카오 연결을 확인하고 있어요' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '카카오 로그인을 확인하고 있어요' })).not.toBeInTheDocument();
+  });
 
   it('로그인 API 가 아니라 연결 API 에 code 와 redirectUri 를 보내고 결과를 붙여 돌아간다', async () => {
     primeLinkAttempt('/my/settings/login-methods');

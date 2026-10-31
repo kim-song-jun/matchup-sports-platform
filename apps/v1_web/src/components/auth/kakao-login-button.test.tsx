@@ -6,7 +6,7 @@ import { KakaoLoginButton } from './kakao-login-button';
 import { V1ApiError } from '@/lib/api-client';
 import { KAKAO_OAUTH_STATE_STORAGE_KEY } from './auth.view-model';
 import { parseKakaoOAuthAttempt } from '@/lib/kakao-oauth';
-import { readPendingSocialLink } from '@/lib/pending-social-link';
+import { peekPendingSocialLink } from '@/lib/pending-social-link';
 import { v1Keys } from '@/lib/query-keys';
 import { V1_SESSION_HINT_KEY } from '@/lib/session-storage';
 import { readWithdrawalCancel } from '@/lib/withdrawal-cancel-storage';
@@ -158,7 +158,7 @@ describe('KakaoLoginButton', () => {
       renderButton();
       await click();
       await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/auth/account-conflict?provider=kakao'));
-      expect(readPendingSocialLink()).toMatchObject({ linkToken: 'link-token-1', provider: 'kakao' });
+      expect(peekPendingSocialLink()).toMatchObject({ linkToken: 'link-token-1', provider: 'kakao' });
       expect(screen.queryByRole('alert')).toBeNull();
       expect(analytics.trackEvent).toHaveBeenCalledWith('login_failed', { method: 'kakao', reason: code });
     });
@@ -188,7 +188,7 @@ describe('KakaoLoginButton', () => {
       await click();
       expect(await screen.findByRole('alert')).toHaveTextContent('실패');
       expect(router.replace).not.toHaveBeenCalled();
-      expect(readPendingSocialLink()).toBeNull();
+      expect(peekPendingSocialLink()).toBeNull();
     });
 
     it('shows a Korean message when the shell never answers (timeout)', async () => {

@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LOGIN_STEP_UP_STORAGE_KEY, readLoginStepUp, saveLoginStepUp } from '@/lib/login-step-up';
-import { readPendingSocialLink, savePendingSocialLink } from '@/lib/pending-social-link';
+import { peekPendingSocialLink, savePendingSocialLink } from '@/lib/pending-social-link';
 import { V1_SESSION_HINT_KEY } from '@/lib/session-storage';
 import { readWithdrawalCancel } from '@/lib/withdrawal-cancel-storage';
 import { STEP_UP_MSW, stepUpChallengeFixture } from '@/test/msw/auth-step-up-handlers';
@@ -209,7 +209,7 @@ describe('LoginStepUpVerifyClient', () => {
       expect(await screen.findByText(/로그인하면 Apple 로그인이 이 계정에 연결돼요\./)).toBeInTheDocument();
       fireEvent.click(screen.getByRole('button', { name: '연결 안 하기' }));
       expect(screen.queryByText(/이 계정에 연결돼요/)).not.toBeInTheDocument();
-      expect(readPendingSocialLink()).toBeNull();
+      expect(peekPendingSocialLink()).toBeNull();
     });
 
     it('ends the attempt when the server says the challenge expired', async () => {

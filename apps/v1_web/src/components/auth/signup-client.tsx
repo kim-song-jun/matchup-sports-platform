@@ -589,6 +589,7 @@ export function SignupClient() {
               {phoneTaken ? (
                 <SignupPhoneRegisteredCard
                   loginHref={withRedirect('/login/email')}
+                  socialLoginHref={withRedirect('/login')}
                   findAccountHref={withRedirect('/auth/find-account')}
                 />
               ) : isSendablePhone && !phoneProofToken ? (

@@ -775,6 +775,38 @@ describe('SignupClient 이미 가입된 번호 안내', () => {
 
     expect(screen.getByRole('link', { name: /기존 계정으로 로그인/ })).toHaveAttribute('href', '/login/email?redirect=%2Fmatches%2Fabc');
     expect(screen.getByRole('link', { name: /계정 찾기/ })).toHaveAttribute('href', '/auth/find-account?redirect=%2Fmatches%2Fabc');
+    expect(screen.getByRole('link', { name: /소셜 로그인으로 가입했어요/ })).toHaveAttribute('href', '/login?redirect=%2Fmatches%2Fabc');
+  });
+
+  it('소셜 로그인으로 가입했을 수 있는 사람에게 로그인 첫 화면 안내를 준다(웹에서는 카카오만)', async () => {
+    hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'PROOF-TOKEN', registered: true });
+    render(<SignupClient />);
+    await advanceToVerify();
+    await verifyPhone('01012345678');
+    await screen.findByText(CARD_TITLE);
+
+    const row = screen.getByRole('link', { name: /소셜 로그인으로 가입했어요/ });
+    expect(row).toHaveAttribute('href', '/login');
+    expect(row).toHaveTextContent("카카오로 가입하셨다면 로그인 첫 화면의 '카카오' 버튼으로 로그인해 주세요.");
+    // 웹에는 Apple 버튼이 없어 Apple 을 언급하지 않는다.
+    expect(row).not.toHaveTextContent('Apple');
+  });
+
+  it('iOS 앱에서는 같은 줄이 Apple 버튼도 안내한다', async () => {
+    window.TeameetNative = { supports: ['sign-in-with-apple'], postMessage: vi.fn() };
+    try {
+      hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'PROOF-TOKEN', registered: true });
+      render(<SignupClient />);
+      await advanceToVerify();
+      await verifyPhone('01012345678');
+      await screen.findByText(CARD_TITLE);
+
+      expect(screen.getByRole('link', { name: /소셜 로그인으로 가입했어요/ })).toHaveTextContent(
+        "카카오나 Apple로 가입하셨다면 로그인 첫 화면의 '카카오' 또는 'Apple로 계속하기' 버튼으로 로그인해 주세요.",
+      );
+    } finally {
+      delete window.TeameetNative;
+    }
   });
 
   it('다른 번호로 인증하기는 번호 입력으로 되돌리고 인증 상태를 비운다', async () => {

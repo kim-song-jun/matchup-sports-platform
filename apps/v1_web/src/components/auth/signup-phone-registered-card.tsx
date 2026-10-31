@@ -1,18 +1,21 @@
 'use client';
 
 import { Card, ListItem } from '@/components/v1-ui/primitives';
+import { describeSocialLoginGuide } from './social-login-guide';
 
 type Props = {
   loginHref: string;
+  socialLoginHref: string;
   findAccountHref: string;
 };
 
 /**
  * 이메일 가입에서 인증한 번호가 이미 계정에 쓰이고 있을 때의 안내와 출구.
- * 번호 소유 증명은 그 계정의 주인이라는 증명이 아니므로 가입 수단·이메일은 싣지 않는다.
+ * 번호 소유 증명은 그 계정의 주인이라는 증명이 아니므로 가입 수단·이메일은 싣지 않는다 —
+ * 소셜 로그인 줄도 누구에게나 같은 일반 안내다.
  * "다른 번호로 인증"은 가입 화면의 하단 버튼이 맡는다.
  */
-export function SignupPhoneRegisteredCard({ loginHref, findAccountHref }: Props) {
+export function SignupPhoneRegisteredCard({ loginHref, socialLoginHref, findAccountHref }: Props) {
   return (
     <Card pad={16} className="tm-auth-soft-card" style={{ marginTop: 0 }}>
       <div role="status">
@@ -23,6 +26,7 @@ export function SignupPhoneRegisteredCard({ loginHref, findAccountHref }: Props)
       </div>
       <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
         <ListItem href={loginHref} title="기존 계정으로 로그인" sub="이메일 로그인으로 이동해요" chev />
+        <ListItem href={socialLoginHref} title="소셜 로그인으로 가입했어요" sub={describeSocialLoginGuide()} chev />
         <ListItem href={findAccountHref} title="계정 찾기" sub="가입 방법이나 비밀번호가 기억나지 않아요" chev />
       </div>
     </Card>

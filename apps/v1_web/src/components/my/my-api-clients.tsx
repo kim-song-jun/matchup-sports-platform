@@ -2405,7 +2405,7 @@ export function WithdrawalPageClient() {
     setIsRequestLocked(true);
     void confirm({
       title: '탈퇴 요청',
-      message: '정말 탈퇴 요청할까요? 신청 후에는 직접 취소할 수 없고, 운영팀 확인을 거쳐 처리돼요.',
+      message: '정말 탈퇴 요청할까요? 30일 안에는 다시 로그인해 취소할 수 있지만, 빠진 팀과 경기 명단은 돌아오지 않아요.',
       confirmLabel: '탈퇴 요청',
       tone: 'danger',
     }).then((ok) => {

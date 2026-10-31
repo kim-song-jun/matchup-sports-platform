@@ -130,8 +130,19 @@ describe('WithdrawalPageClient session termination', () => {
   it('shows the 30-day deletion timeline and recovery path before submission', () => {
     renderWithClient(<WithdrawalPageClient />);
 
-    expect(screen.getByText('탈퇴를 요청하면 30일 뒤 계정과 개인정보가 삭제돼요. 그 전에는 고객센터로 복구를 요청할 수 있어요.')).toBeInTheDocument();
+    expect(screen.getByText('탈퇴를 요청하면 30일 뒤 계정과 개인정보가 삭제돼요. 그 전에 다시 로그인하면 직접 취소할 수 있어요. 다만 신청할 때 빠진 팀과 경기 명단은 돌아오지 않아요.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '탈퇴 요청' })).toBeInTheDocument();
+  });
+
+  it('warns in the confirm dialog that the request can be cancelled by signing in but the lost teams and rosters stay lost', async () => {
+    const user = userEvent.setup();
+    renderWithClient(<WithdrawalPageClient />);
+
+    await user.click(screen.getByRole('button', { name: '탈퇴 요청' }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/30일 안에는 다시 로그인해 취소할 수 있지만, 빠진 팀과 경기 명단은 돌아오지 않아요/)).toBeInTheDocument();
+    expect(within(dialog).queryByText(/직접 취소할 수 없/)).not.toBeInTheDocument();
   });
 
   it('clears the real identity cache and session, disconnects the socket, then replaces the document after API success', async () => {

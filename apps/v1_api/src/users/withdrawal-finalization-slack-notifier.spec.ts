@@ -6,6 +6,7 @@ const RUN_AT = '2026-11-30T12:00:00.000Z';
 const payload = {
   runAt: RUN_AT,
   finalizedCount: 3,
+  remainingDue: 0,
   skipped: [
     { userId: 'user-admin', reason: 'active_admin' },
     { userId: 'user-nolog', reason: 'no_request_log' },
@@ -59,6 +60,28 @@ describe('WithdrawalFinalizationSlackNotifier', () => {
     expect(flat).not.toContain('건너뛴 계정');
   });
 
+  it('says how many due accounts were left for the next run, and that a run deletes at most twenty', async () => {
+    const { notifier: instance, fetchFn } = notifier();
+
+    const message = await sentMessage(
+      instance,
+      fetchFn,
+      claim({ payload: { ...payload, finalizedCount: 20, remainingDue: 7, skipped: [] } as never }),
+    );
+
+    const flat = JSON.stringify(message);
+    expect(flat).toContain('삭제 20건');
+    expect(flat).toContain('다음 실행으로 넘긴 계정 7건 (한 번에 최대 20건까지 삭제해요)');
+  });
+
+  it('does not mention a leftover when there is none', async () => {
+    const { notifier: instance, fetchFn } = notifier();
+
+    const message = await sentMessage(instance, fetchFn);
+
+    expect(JSON.stringify(message)).not.toContain('다음 실행으로');
+  });
+
   it('lists at most twenty accounts and counts the rest', async () => {
     const { notifier: instance, fetchFn } = notifier();
     const skipped = Array.from({ length: 25 }, (_, index) => ({ userId: `user-${index}`, reason: 'team_authority' }));
@@ -91,6 +114,7 @@ describe('WithdrawalFinalizationSlackNotifier', () => {
     ['a payload that is not an object', { payload: 'nope' }],
     ['a run time that does not match the outbox row', { aggregateId: '2026-01-01T00:00:00.000Z' }],
     ['a negative count', { payload: { ...payload, finalizedCount: -1 } }],
+    ['a leftover count that is not a count', { payload: { ...payload, remainingDue: 'many' } }],
     ['skipped that is not a list', { payload: { ...payload, skipped: 'u1' } }],
     ['an unknown reason', { payload: { ...payload, skipped: [{ userId: 'u1', reason: 'because' }] } }],
     ['an entry without an id', { payload: { ...payload, skipped: [{ reason: 'active_admin' }] } }],

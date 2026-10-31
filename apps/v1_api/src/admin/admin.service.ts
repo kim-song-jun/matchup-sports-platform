@@ -257,7 +257,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     const result = await this.prisma.$transaction(async (tx) => {
       await this.lockActiveOwnerRows(tx);
       const admin = await this.getTransactionMutationAdmin(tx, user.id);
-      await this.lockUserRow(tx, userId);
+      await lockUserRow(tx, userId);
 
       const target = await tx.v1User.findUnique({ where: { id: userId } });
       if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'User was not found' });
@@ -362,7 +362,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     const result = await this.prisma.$transaction(async (tx) => {
       await this.lockActiveOwnerRows(tx);
       const admin = await this.getTransactionMutationAdmin(tx, user.id);
-      await this.lockUserRow(tx, userId);
+      await lockUserRow(tx, userId);
 
       const target = await tx.v1User.findUnique({ where: { id: userId } });
       if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'User was not found' });
@@ -2738,7 +2738,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     const withUser = await this.prisma.$transaction(async (tx) => {
       await this.lockActiveOwnerRows(tx);
       const actor = await this.getTransactionOwnerAdmin(tx, user.id);
-      await this.lockUserRow(tx, dto.userId);
+      await lockUserRow(tx, dto.userId);
 
       const targetUser = await tx.v1User.findUnique({ where: { id: dto.userId } });
       if (!targetUser) {
@@ -2820,7 +2820,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     const updated = await this.prisma.$transaction(async (tx) => {
       await this.lockActiveOwnerRows(tx);
       const actor = await this.getTransactionOwnerAdmin(tx, user.id);
-      await this.lockUserRow(tx, targetUserId);
+      await lockUserRow(tx, targetUserId);
 
       if (actor.userId === targetUserId) {
         throw new ConflictException({ code: 'SELF_MODIFICATION', message: 'Cannot modify your own admin record' });
@@ -2951,7 +2951,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     await tx.$queryRaw<Array<{ id: string }>>`
       SELECT id FROM "v1_admin_users" WHERE "user_id" = ${userId} FOR UPDATE
     `;
-    await this.lockUserRow(tx, userId);
+    await lockUserRow(tx, userId);
 
     const admin = await tx.v1AdminUser.findUnique({
       where: { userId },
@@ -2977,10 +2977,6 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       ORDER BY id
       FOR UPDATE
     `;
-  }
-
-  private lockUserRow(tx: Prisma.TransactionClient, userId: string) {
-    return lockUserRow(tx, userId);
   }
 
   private async assertAnotherActiveOwner(tx: Prisma.TransactionClient, targetUserId: string) {

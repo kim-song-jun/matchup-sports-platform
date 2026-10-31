@@ -29,7 +29,7 @@ describe('recordWithdrawalFinalizationReport', () => {
   it('queues nothing for a run that did nothing', async () => {
     const { db, rows } = outbox();
 
-    await expect(recordWithdrawalFinalizationReport(db, { finalizedUserIds: [], skipped: [] }, RUN_AT)).resolves.toBe(false);
+    await expect(recordWithdrawalFinalizationReport(db, { finalizedUserIds: [], skipped: [], remainingDue: 0 }, RUN_AT)).resolves.toBe(false);
     expect(rows).toEqual([]);
   });
 
@@ -45,6 +45,7 @@ describe('recordWithdrawalFinalizationReport', () => {
             { userId: 'u9', reason: 'team_authority' },
             { userId: 'u2', reason: 'no_request_log' },
           ],
+          remainingDue: 4,
         },
         RUN_AT,
       ),
@@ -57,6 +58,7 @@ describe('recordWithdrawalFinalizationReport', () => {
       payload: {
         runAt: RUN_AT.toISOString(),
         finalizedCount: 2,
+        remainingDue: 4,
         skipped: [
           { userId: 'u2', reason: 'no_request_log' },
           { userId: 'u9', reason: 'team_authority' },
@@ -72,24 +74,42 @@ describe('recordWithdrawalFinalizationReport', () => {
       { userId: 'u9', reason: 'active_admin' as const },
     ];
 
-    await recordWithdrawalFinalizationReport(db, { finalizedUserIds: [], skipped }, RUN_AT);
+    await recordWithdrawalFinalizationReport(db, { finalizedUserIds: [], skipped, remainingDue: 0 }, RUN_AT);
     const again = await recordWithdrawalFinalizationReport(
       db,
-      { finalizedUserIds: [], skipped: [...skipped].reverse() },
+      { finalizedUserIds: [], skipped: [...skipped].reverse(), remainingDue: 0 },
       new Date(RUN_AT.getTime() + 3 * 60 * 60_000),
     );
     expect(again).toBe(false);
     expect(rows).toHaveLength(1);
 
-    await recordWithdrawalFinalizationReport(db, { finalizedUserIds: [], skipped }, new Date('2026-12-01T00:00:00.000Z'));
+    await recordWithdrawalFinalizationReport(db, { finalizedUserIds: [], skipped, remainingDue: 0 }, new Date('2026-12-01T00:00:00.000Z'));
     expect(rows).toHaveLength(2);
   });
 
   it('reports a different outcome the same day as its own message', async () => {
     const { db, rows } = outbox();
 
-    await recordWithdrawalFinalizationReport(db, { finalizedUserIds: ['u1'], skipped: [] }, RUN_AT);
-    await recordWithdrawalFinalizationReport(db, { finalizedUserIds: ['u2'], skipped: [] }, RUN_AT);
+    await recordWithdrawalFinalizationReport(db, { finalizedUserIds: ['u1'], skipped: [], remainingDue: 0 }, RUN_AT);
+    await recordWithdrawalFinalizationReport(db, { finalizedUserIds: ['u2'], skipped: [], remainingDue: 0 }, RUN_AT);
+
+    expect(rows).toHaveLength(2);
+  });
+
+  it('reports a run that only left due accounts for later', async () => {
+    const { db, rows } = outbox();
+
+    await expect(
+      recordWithdrawalFinalizationReport(db, { finalizedUserIds: [], skipped: [], remainingDue: 3 }, RUN_AT),
+    ).resolves.toBe(true);
+    expect(rows[0]).toMatchObject({ payload: { finalizedCount: 0, skipped: [], remainingDue: 3 } });
+  });
+
+  it('reports a different leftover count the same day as its own message', async () => {
+    const { db, rows } = outbox();
+
+    await recordWithdrawalFinalizationReport(db, { finalizedUserIds: ['u1'], skipped: [], remainingDue: 5 }, RUN_AT);
+    await recordWithdrawalFinalizationReport(db, { finalizedUserIds: ['u1'], skipped: [], remainingDue: 4 }, RUN_AT);
 
     expect(rows).toHaveLength(2);
   });

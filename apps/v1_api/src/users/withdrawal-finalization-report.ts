@@ -11,11 +11,14 @@ export interface WithdrawalFinalizationReportPayload {
   runAt: string;
   finalizedCount: number;
   skipped: { userId: string; reason: WithdrawalSkipReason }[];
+  /** Accounts past their grace period that the run's deletion cap left for the next run. */
+  remainingDue: number;
 }
 
 export interface WithdrawalFinalizationRunResult {
   finalizedUserIds: string[];
   skipped: { userId: string; reason: WithdrawalSkipReason }[];
+  remainingDue: number;
 }
 
 /**
@@ -30,17 +33,18 @@ export async function recordWithdrawalFinalizationReport(
   result: WithdrawalFinalizationRunResult,
   runAt: Date,
 ): Promise<boolean> {
-  if (result.finalizedUserIds.length === 0 && result.skipped.length === 0) return false;
+  if (result.finalizedUserIds.length === 0 && result.skipped.length === 0 && result.remainingDue === 0) return false;
 
   const skipped = [...result.skipped].sort((a, b) => a.userId.localeCompare(b.userId));
   const digest = createHash('sha256')
-    .update(JSON.stringify({ finalized: [...result.finalizedUserIds].sort(), skipped }))
+    .update(JSON.stringify({ finalized: [...result.finalizedUserIds].sort(), skipped, remainingDue: result.remainingDue }))
     .digest('hex')
     .slice(0, 16);
   const payload: WithdrawalFinalizationReportPayload = {
     runAt: runAt.toISOString(),
     finalizedCount: result.finalizedUserIds.length,
     skipped,
+    remainingDue: result.remainingDue,
   };
 
   const created = await db.v1OutboxEvent.createMany({

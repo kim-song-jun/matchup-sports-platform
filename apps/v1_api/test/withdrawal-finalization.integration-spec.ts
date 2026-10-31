@@ -28,6 +28,7 @@ describe('withdrawal grace finalization against PostgreSQL', () => {
         onboardingStatus: 'completed',
         profile: { create: { nickname: `${prefix}-${key}`, realName: '홍길동' } },
         authIdentities: { create: [{ provider: 'email', providerUserKey: `${prefix}-${key}@example.test`, passwordHash: 'hash' }] },
+        onboardingProgress: { create: { currentStep: 'signup', draftJson: { kakaoName: '홍길동', kakaoPhone: '01011112222', kakaoGender: 'male' } } },
       },
     });
     ids[key] = user.id;
@@ -69,6 +70,11 @@ describe('withdrawal grace finalization against PostgreSQL', () => {
     expect(kept).toMatchObject({ accountStatus: 'withdrawal_pending', email: inside.email, phone: inside.phone, deletedAt: null });
     expect(kept.authIdentities[0]).toMatchObject({ status: 'active', passwordHash: 'hash' });
     expect(kept.profile).toMatchObject({ realName: '홍길동', deletedAt: null });
+
+    await expect(prisma.v1UserOnboardingProgress.findUniqueOrThrow({ where: { userId: inside.id } })).resolves.toMatchObject({
+      draftJson: { kakaoName: '홍길동' },
+    });
+    expect((await prisma.v1UserOnboardingProgress.findUniqueOrThrow({ where: { userId: past.id } })).draftJson).toEqual({});
 
     const gone = await prisma.v1User.findUniqueOrThrow({ where: { id: past.id }, include: { authIdentities: true, profile: true } });
     expect(gone).toMatchObject({
@@ -126,6 +132,29 @@ describe('withdrawal grace finalization against PostgreSQL', () => {
     expect(skippedReports).toHaveLength(1);
     expect(skippedReports[0].payload).toMatchObject({ finalizedCount: 0, skipped: expected });
     expect(JSON.stringify(skippedReports[0].payload)).not.toContain('example.test');
+  });
+
+  it('counts a request cancelled and re-filed from the latest one, and ignores logs that are not about the user', async () => {
+    const refiled = await withdrawingUser('refiled', 40 * DAY_MS);
+    const log = (targetType: string, toStatus: string, agoMs: number, fromStatus: string) =>
+      prisma.v1StatusChangeLog.create({
+        data: { targetType, targetId: refiled.id, fromStatus, toStatus, actorType: 'user', actorUserId: refiled.id, createdAt: new Date(NOW.getTime() - agoMs) },
+      });
+    await log('user', 'active', 35 * DAY_MS, 'withdrawal_pending');
+    await log('user', 'withdrawal_pending', 2 * DAY_MS, 'active');
+    const stray = await withdrawingUser('stray', 40 * DAY_MS);
+    await prisma.v1StatusChangeLog.create({
+      data: { targetType: 'team_membership', targetId: stray.id, fromStatus: 'active', toStatus: 'withdrawal_pending', actorType: 'system', createdAt: new Date(NOW.getTime() - DAY_MS) },
+    });
+
+    const result = await newService().finalizeDue(NOW);
+
+    expect(result.finalizedUserIds).toContain(stray.id);
+    expect(result.finalizedUserIds).not.toContain(refiled.id);
+    await expect(prisma.v1User.findUniqueOrThrow({ where: { id: refiled.id } })).resolves.toMatchObject({ accountStatus: 'withdrawal_pending', deletedAt: null });
+
+    const later = await newService().finalizeDue(new Date(NOW.getTime() + 29 * DAY_MS));
+    expect(later.finalizedUserIds).toContain(refiled.id);
   });
 
   it('lets two instances race over the same accounts and deletes each one once', async () => {

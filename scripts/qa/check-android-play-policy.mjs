@@ -78,6 +78,7 @@ for (const [pattern, message] of [
   [/v1UserSportPreference\.deleteMany\(\{ where: \{ userId \} \}\)/, 'Final deletion must remove sport preferences'],
   [/v1SearchHistory\.deleteMany\(\{ where: \{ userId \} \}\)/, 'Final deletion must remove search history'],
   [/v1VerificationToken\.deleteMany\(\{ where: \{ userId \} \}\)/, 'Final deletion must remove verification targets'],
+  [/v1UserOnboardingProgress\.updateMany\(\{ where: \{ userId \}, data: \{ draftJson: \{\} \} \}\)/, 'Final deletion must clear the parked social sign-in profile'],
 ]) requireMatch(finalDeletion, pattern, message);
 
 const deletionPage = read('apps/v1_web/src/app/account-deletion/page.tsx');

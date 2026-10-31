@@ -70,7 +70,7 @@ the code proved the number is theirs**:
 - `/auth/social-profile` does the same for its sign-in-then-link `PHONE_CONFLICT`, which only carries a link token once the number is
   proven (the Kakao-supplied number or an SMS-verified one). The token-less advice never carries the key.
 
-`withdrawalPendingUntil` is the latest `withdrawal_pending` status-log time plus 30 days, `null` when that log is missing. Nothing before the
+`withdrawalPendingUntil` is the latest `withdrawal_pending` status-log time plus 30 days, `null` when that log is missing. The job runs hourly, so the number can stay held for up to about an hour past that instant. Nothing before the
 code (`phone/issue`, `/verification/phone/request`, a wrong code) says anything about the holder.
 
 ## Session Model

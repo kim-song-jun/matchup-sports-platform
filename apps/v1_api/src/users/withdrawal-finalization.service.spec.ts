@@ -1,4 +1,5 @@
 import { WITHDRAWAL_FINALIZATION_REPORT_TYPE } from './withdrawal-finalization-report';
+import { MAX_FINALIZATIONS_PER_RUN } from './withdrawal-grace';
 import { WITHDRAWAL_GRACE_ELAPSED_REASON, WithdrawalFinalizationService } from './withdrawal-finalization.service';
 import { buildDeletedEmail, buildDeletedPhone, buildDeletedProviderUserKey } from './final-account-deletion';
 
@@ -24,7 +25,16 @@ type Log = {
 type Identity = { id: string; userId: string; provider: string; status: string; providerUserKey: string; passwordHash: string | null };
 type Membership = { id: string; userId: string; teamId: string; role: string; status: string };
 type Team = { id: string; name: string; ownerUserId: string; status: string; deletedAt: Date | null; memberCount: number };
-type OutboxRow = { businessKey: string; type: string; aggregateId: string; payload: { finalizedCount: number; skipped: { userId: string; reason: string }[] } };
+type OutboxRow = {
+  businessKey: string;
+  type: string;
+  aggregateId: string;
+  payload: { finalizedCount: number; skipped: { userId: string; reason: string }[]; remainingDue: number };
+};
+type Onboarding = { userId: string; draftJson: unknown };
+type StatusCondition = string | { not: string };
+const statusMatches = (actual: string, condition: StatusCondition) =>
+  typeof condition === 'string' ? actual === condition : actual !== condition.not;
 
 type State = {
   users: User[];
@@ -34,6 +44,7 @@ type State = {
   memberships: Membership[];
   teams: Team[];
   outbox: OutboxRow[];
+  onboarding: Onboarding[];
 };
 
 /**
@@ -41,9 +52,9 @@ type State = {
  * transactions that run one at a time (like the per-user row lock) and roll their changes back on a throw.
  */
 function createDatabase(initial: Partial<State> = {}) {
-  let state: State = { users: [], logs: [], identities: [], admins: [], memberships: [], teams: [], outbox: [], ...initial };
+  let state: State = { users: [], logs: [], identities: [], admins: [], memberships: [], teams: [], outbox: [], onboarding: [], ...initial };
   let nextLogId = 1;
-  const hooks: { afterScan?: () => void; failIdentityLookupFor?: string; failReport?: Error } = {};
+  const hooks: { afterScan?: () => void; onIdentityLookup?: (userId: string) => void; failIdentityLookupFor?: string; failReport?: Error } = {};
   const cleanup = {
     pushSubscription: jest.fn().mockResolvedValue({ count: 1 }),
     pushDevice: jest.fn().mockResolvedValue({ count: 1 }),
@@ -51,9 +62,9 @@ function createDatabase(initial: Partial<State> = {}) {
   };
   let queue: Promise<unknown> = Promise.resolve();
 
-  const latestLog = (userId: string) =>
+  const latestLog = (userId: string, where: { targetType: string; toStatus: string }) =>
     state.logs
-      .filter((row) => row.targetType === 'user' && row.targetId === userId && row.toStatus === 'withdrawal_pending')
+      .filter((row) => row.targetType === where.targetType && row.targetId === userId && row.toStatus === where.toStatus)
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
   const userById = (id: string) => state.users.find((user) => user.id === id);
 
@@ -74,16 +85,16 @@ function createDatabase(initial: Partial<State> = {}) {
       }),
     },
     v1StatusChangeLog: {
-      groupBy: jest.fn(async ({ where }: { where: { targetId: { in: string[] } } }) => {
+      groupBy: jest.fn(async ({ where }: { where: { targetType: string; toStatus: string; targetId: { in: string[] } } }) => {
         const rows = where.targetId.in.flatMap((id) => {
-          const row = latestLog(id);
+          const row = latestLog(id, where);
           return row ? [{ targetId: id, _max: { createdAt: row.createdAt } }] : [];
         });
         hooks.afterScan?.();
         return rows;
       }),
-      findFirst: jest.fn(async ({ where }: { where: { targetId: string } }) => {
-        const row = latestLog(where.targetId);
+      findFirst: jest.fn(async ({ where }: { where: { targetType: string; toStatus: string; targetId: string } }) => {
+        const row = latestLog(where.targetId, where);
         return row ? { createdAt: row.createdAt } : null;
       }),
       create: jest.fn(async ({ data }: { data: Omit<Log, 'id' | 'createdAt' | 'actorUserId' | 'adminUserId'> & Partial<Pick<Log, 'actorUserId' | 'adminUserId'>> }) => {
@@ -96,8 +107,10 @@ function createDatabase(initial: Partial<State> = {}) {
       findUnique: jest.fn(async ({ where }: { where: { userId: string } }) => state.admins.find((admin) => admin.userId === where.userId) ?? null),
     },
     v1Team: {
-      findFirst: jest.fn(async ({ where }: { where: { ownerUserId: string } }) =>
-        state.teams.find((team) => team.ownerUserId === where.ownerUserId && team.status === 'active' && team.deletedAt === null) ?? null,
+      findFirst: jest.fn(async ({ where }: { where: { ownerUserId: string; status: StatusCondition; deletedAt: null } }) =>
+        state.teams.find(
+          (team) => team.ownerUserId === where.ownerUserId && statusMatches(team.status, where.status) && team.deletedAt === where.deletedAt,
+        ) ?? null,
       ),
       update: jest.fn(async ({ where, data }: { where: { id: string }; data: { memberCount?: { decrement: number } } }) => {
         const team = state.teams.find((row) => row.id === where.id);
@@ -106,13 +119,22 @@ function createDatabase(initial: Partial<State> = {}) {
       }),
     },
     v1TeamMembership: {
-      findFirst: jest.fn(async ({ where }: { where: { userId: string; role: { in: string[] } } }) => {
-        const membership = state.memberships.find(
-          (row) => row.userId === where.userId && row.status === 'active' && where.role.in.includes(row.role),
-        );
-        const team = membership && state.teams.find((row) => row.id === membership.teamId && row.status === 'active' && row.deletedAt === null);
-        return membership && team ? { role: membership.role, team: { id: team.id, name: team.name } } : null;
-      }),
+      findFirst: jest.fn(
+        async ({ where }: { where: { userId: string; role: { in: string[] }; team: { status: StatusCondition; deletedAt: null } } }) => {
+          const found = state.memberships.flatMap((row) => {
+            const team = state.teams.find((candidate) => candidate.id === row.teamId);
+            const matches =
+              row.userId === where.userId &&
+              row.status === 'active' &&
+              where.role.in.includes(row.role) &&
+              team &&
+              statusMatches(team.status, where.team.status) &&
+              team.deletedAt === where.team.deletedAt;
+            return matches ? [{ id: row.id, role: row.role, team: { id: team.id, name: team.name } }] : [];
+          });
+          return found[0] ?? null;
+        },
+      ),
       findMany: jest.fn(async ({ where }: { where: { userId: string } }) =>
         state.memberships.filter((row) => row.userId === where.userId && row.status === 'active'),
       ),
@@ -124,6 +146,7 @@ function createDatabase(initial: Partial<State> = {}) {
     v1TournamentPlayer: { findMany: jest.fn().mockResolvedValue([]), updateMany: jest.fn() },
     v1AuthIdentity: {
       findMany: jest.fn(async ({ where }: { where: { userId: string } }) => {
+        hooks.onIdentityLookup?.(where.userId);
         if (hooks.failIdentityLookupFor === where.userId) throw new Error('identity lookup failed');
         return state.identities.filter((row) => row.userId === where.userId).map((row) => ({ id: row.id, provider: row.provider }));
       }),
@@ -133,6 +156,13 @@ function createDatabase(initial: Partial<State> = {}) {
       }),
     },
     v1UserProfile: { updateMany: cleanup.profile },
+    v1UserOnboardingProgress: {
+      updateMany: jest.fn(async ({ where, data }: { where: { userId: string }; data: { draftJson: unknown } }) => {
+        const rows = state.onboarding.filter((row) => row.userId === where.userId);
+        for (const row of rows) row.draftJson = data.draftJson;
+        return { count: rows.length };
+      }),
+    },
     v1UserRecordConsent: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
     v1PushSubscription: { deleteMany: cleanup.pushSubscription },
     v1PushDevice: { deleteMany: cleanup.pushDevice },
@@ -185,6 +215,7 @@ function withdrawing(id: string, requestedAgoMs: number | null, overrides: Parti
   return {
     users: [{ id, accountStatus: 'withdrawal_pending', email: `${id}@example.test`, phone: `010-${id}`, deletedAt: null, ...overrides }],
     identities: [{ id: `identity-${id}`, userId: id, provider: 'email', status: 'active', providerUserKey: `${id}@example.test`, passwordHash: 'hash' }],
+    onboarding: [{ userId: id, draftJson: { kakaoName: `${id}-name`, kakaoPhone: '01011112222', appleName: `${id}-apple` } }],
     logs:
       requestedAgoMs === null
         ? []
@@ -206,7 +237,7 @@ function withdrawing(id: string, requestedAgoMs: number | null, overrides: Parti
 }
 
 function merge(...parts: Partial<State>[]): Partial<State> {
-  const merged: State = { users: [], logs: [], identities: [], admins: [], memberships: [], teams: [], outbox: [] };
+  const merged: State = { users: [], logs: [], identities: [], admins: [], memberships: [], teams: [], outbox: [], onboarding: [] };
   for (const part of parts) {
     for (const key of Object.keys(merged) as (keyof State)[]) {
       (merged[key] as unknown[]).push(...((part[key] as unknown[] | undefined) ?? []));
@@ -235,6 +266,8 @@ describe('WithdrawalFinalizationService', () => {
       expect(result.skipped).toEqual([]);
       expect(db.user('inside')).toMatchObject({ accountStatus: 'withdrawal_pending', email: 'inside@example.test', phone: '010-inside', deletedAt: null });
       expect(db.state.identities.find((row) => row.userId === 'inside')).toMatchObject({ status: 'active', passwordHash: 'hash' });
+      expect(db.state.onboarding.find((row) => row.userId === 'inside')?.draftJson).toMatchObject({ kakaoName: 'inside-name' });
+      expect(db.state.onboarding.find((row) => row.userId === 'past')?.draftJson).toEqual({});
       for (const id of ['past', 'exact']) {
         expect(db.user(id)).toMatchObject({
           accountStatus: 'deleted',
@@ -254,9 +287,13 @@ describe('WithdrawalFinalizationService', () => {
       expect(db.state.users.some((user) => user.phone === '01012345678')).toBe(false);
     });
 
-    it('counts a re-filed request from the newer one', async () => {
-      const refiled = withdrawing('refiled', PAST_GRACE);
-      refiled.logs!.push({ ...refiled.logs![0], id: 'request-again', createdAt: ago(2 * DAY_MS) });
+    it('counts a request cancelled and re-filed from the latest one', async () => {
+      const refiled = withdrawing('refiled', 40 * DAY_MS);
+      const [first] = refiled.logs!;
+      refiled.logs!.push(
+        { ...first, id: 'cancelled', fromStatus: 'withdrawal_pending', toStatus: 'active', createdAt: ago(35 * DAY_MS) },
+        { ...first, id: 'request-again', createdAt: ago(2 * DAY_MS) },
+      );
       const db = createDatabase(refiled);
       const { service } = createService(db);
 
@@ -264,6 +301,36 @@ describe('WithdrawalFinalizationService', () => {
 
       expect(result.finalizedUserIds).toEqual([]);
       expect(db.user('refiled').accountStatus).toBe('withdrawal_pending');
+
+      const later = await service.finalizeDue(new Date(NOW.getTime() + 29 * DAY_MS));
+      expect(later.finalizedUserIds).toEqual(['refiled']);
+    });
+
+    it('ignores a withdrawal_pending log written for something other than the user', async () => {
+      const lookalike = (id: string, createdAt: Date) => ({
+        id,
+        targetType: 'team_membership',
+        targetId: 'wrong-target',
+        fromStatus: 'active',
+        toStatus: 'withdrawal_pending',
+        actorType: 'system',
+        actorUserId: null,
+        adminUserId: null,
+        reason: null,
+        createdAt,
+      });
+      const onlyLookalike = withdrawing('lookalike-only', null);
+      onlyLookalike.logs!.push({ ...lookalike('l1', ago(PAST_GRACE)), targetId: 'lookalike-only' });
+      const recentLookalike = withdrawing('lookalike-recent', PAST_GRACE);
+      recentLookalike.logs!.push({ ...lookalike('l2', ago(DAY_MS)), targetId: 'lookalike-recent' });
+      const db = createDatabase(merge(onlyLookalike, recentLookalike));
+      const { service } = createService(db);
+
+      const result = await service.finalizeDue(NOW);
+
+      // The first has no request of its own; the second's real request is old enough and the stray log is not a restart.
+      expect(result.skipped).toEqual([{ userId: 'lookalike-only', reason: 'no_request_log' }]);
+      expect(result.finalizedUserIds).toEqual(['lookalike-recent']);
     });
   });
 
@@ -280,6 +347,7 @@ describe('WithdrawalFinalizationService', () => {
         passwordHash: null,
       });
       expect(db.cleanup.profile).toHaveBeenCalledWith(expect.objectContaining({ where: { userId: 'past' } }));
+      expect(db.state.onboarding[0].draftJson).toEqual({});
       expect(db.cleanup.pushDevice).toHaveBeenCalledWith({ where: { userId: 'past' } });
       expect(db.cleanup.pushSubscription).toHaveBeenCalledWith({ where: { userId: 'past' } });
       const statusLog = db.state.logs.find((row) => row.toStatus === 'deleted');
@@ -350,6 +418,46 @@ describe('WithdrawalFinalizationService', () => {
       expect(db.state.memberships[0].status).toBe('active');
     });
 
+    it('counts a suspended team, but not an archived or deleted one, as authority that needs a person', async () => {
+      const team = (id: string, ownerUserId: string, status: string, deletedAt: Date | null = null) => ({
+        id,
+        name: id,
+        ownerUserId,
+        status,
+        deletedAt,
+        memberCount: 3,
+      });
+      const db = createDatabase(
+        merge(
+          withdrawing('suspended-owner', PAST_GRACE),
+          withdrawing('suspended-manager', PAST_GRACE),
+          withdrawing('archived-owner', PAST_GRACE),
+          withdrawing('deleted-owner', PAST_GRACE),
+          {
+            teams: [
+              team('t-suspended', 'suspended-owner', 'suspended'),
+              team('t-other-suspended', 'someone-else', 'suspended'),
+              team('t-archived', 'archived-owner', 'archived'),
+              team('t-deleted', 'deleted-owner', 'active', ago(DAY_MS)),
+            ],
+            memberships: [{ id: 'm1', userId: 'suspended-manager', teamId: 't-other-suspended', role: 'manager', status: 'active' }],
+          },
+        ),
+      );
+      const { service } = createService(db);
+
+      const result = await service.finalizeDue(NOW);
+
+      expect([...result.skipped].sort((a, b) => a.userId.localeCompare(b.userId))).toEqual([
+        { userId: 'suspended-manager', reason: 'team_authority' },
+        { userId: 'suspended-owner', reason: 'team_authority' },
+      ]);
+      expect(result.finalizedUserIds.sort()).toEqual(['archived-owner', 'deleted-owner']);
+      for (const id of ['suspended-owner', 'suspended-manager']) {
+        expect(db.user(id)).toMatchObject({ accountStatus: 'withdrawal_pending', deletedAt: null });
+      }
+    });
+
     it('does not count an admin record that has been revoked', async () => {
       const db = createDatabase(merge(withdrawing('former', PAST_GRACE), { admins: [{ userId: 'former', status: 'revoked' }] }));
       const { service } = createService(db);
@@ -387,7 +495,7 @@ describe('WithdrawalFinalizationService', () => {
 
       const result = await service.finalizeDue(NOW);
 
-      expect(result).toEqual({ finalizedUserIds: [], skipped: [] });
+      expect(result).toEqual({ finalizedUserIds: [], skipped: [], remainingDue: 0 });
       expect(db.user('restored')).toMatchObject({ accountStatus: 'active', email: 'restored@example.test', deletedAt: null });
       expect(db.cleanup.profile).not.toHaveBeenCalled();
     });
@@ -401,7 +509,7 @@ describe('WithdrawalFinalizationService', () => {
 
       const result = await service.finalizeDue(NOW);
 
-      expect(result).toEqual({ finalizedUserIds: [], skipped: [] });
+      expect(result).toEqual({ finalizedUserIds: [], skipped: [], remainingDue: 0 });
       expect(db.user('again').accountStatus).toBe('withdrawal_pending');
     });
 
@@ -414,7 +522,7 @@ describe('WithdrawalFinalizationService', () => {
 
       const result = await service.finalizeDue(NOW);
 
-      expect(result).toEqual({ finalizedUserIds: [], skipped: [] });
+      expect(result).toEqual({ finalizedUserIds: [], skipped: [], remainingDue: 0 });
       expect(db.user('taken').deletedAt).toEqual(ago(1_000));
       expect(db.cleanup.profile).not.toHaveBeenCalled();
     });
@@ -426,7 +534,7 @@ describe('WithdrawalFinalizationService', () => {
       await service.finalizeDue(NOW);
       const second = await service.finalizeDue(new Date(NOW.getTime() + 60 * 60_000));
 
-      expect(second).toEqual({ finalizedUserIds: [], skipped: [] });
+      expect(second).toEqual({ finalizedUserIds: [], skipped: [], remainingDue: 0 });
       expect(db.cleanup.profile).toHaveBeenCalledTimes(1);
       expect(db.state.logs.filter((row) => row.toStatus === 'deleted')).toHaveLength(1);
     });
@@ -446,55 +554,124 @@ describe('WithdrawalFinalizationService', () => {
     });
   });
 
-  describe('report', () => {
-    it('says nothing when the run found nothing to do', async () => {
-      const db = createDatabase(withdrawing('inside', INSIDE_GRACE));
+  describe('deletion cap', () => {
+    const due = (count: number, from = 1) =>
+      merge(...Array.from({ length: count }, (_, index) => withdrawing(`u${String(from + index).padStart(2, '0')}`, PAST_GRACE)));
+
+    it('destroys at most the cap per run, leaves the rest untouched, and carries them to the next hour', async () => {
+      expect(MAX_FINALIZATIONS_PER_RUN).toBe(20);
+      const db = createDatabase(due(MAX_FINALIZATIONS_PER_RUN + 1));
       const { service } = createService(db);
 
-      await service.finalizeDue(NOW);
+      const first = await service.finalizeDue(NOW);
 
-      expect(db.state.outbox).toEqual([]);
+      expect(first.finalizedUserIds).toHaveLength(MAX_FINALIZATIONS_PER_RUN);
+      expect(first.remainingDue).toBe(1);
+      expect(first.skipped).toEqual([]);
+      const last = `u${MAX_FINALIZATIONS_PER_RUN + 1}`;
+      expect(db.user(last)).toMatchObject({ accountStatus: 'withdrawal_pending', email: `${last}@example.test`, deletedAt: null });
+      expect(db.state.onboarding.find((row) => row.userId === last)?.draftJson).toMatchObject({ kakaoName: `${last}-name` });
+      expect(db.state.outbox).toHaveLength(1);
+      expect(db.state.outbox[0].payload).toMatchObject({ finalizedCount: MAX_FINALIZATIONS_PER_RUN, remainingDue: 1 });
+
+      const second = await service.finalizeDue(new Date(NOW.getTime() + 60 * 60_000));
+
+      expect(second.finalizedUserIds).toEqual([last]);
+      expect(second.remainingDue).toBe(0);
     });
 
-    it('queues one report with the counts and the ids that need a person, and no personal data', async () => {
-      const db = createDatabase(merge(withdrawing('fine', PAST_GRACE), withdrawing('nolog', null)));
+    it('does not spend the cap on accounts it leaves alone', async () => {
+      const admins = merge(
+        ...['a1', 'a2', 'a3'].map((id) => withdrawing(id, PAST_GRACE)),
+        { admins: ['a1', 'a2', 'a3'].map((userId) => ({ userId, status: 'active' })) },
+      );
+      const db = createDatabase(merge(admins, due(MAX_FINALIZATIONS_PER_RUN, 10)));
+      const { service } = createService(db);
+
+      const result = await service.finalizeDue(NOW);
+
+      expect(result.finalizedUserIds).toHaveLength(MAX_FINALIZATIONS_PER_RUN);
+      expect(result.skipped).toHaveLength(3);
+      expect(result.remainingDue).toBe(0);
+    });
+
+    it('reports an over-cap run even when nothing else happened to be skipped', async () => {
+      const db = createDatabase(due(MAX_FINALIZATIONS_PER_RUN + 5));
       const { service } = createService(db);
 
       await service.finalizeDue(NOW);
 
-      expect(db.state.outbox).toHaveLength(1);
-      const [report] = db.state.outbox;
-      expect(report).toMatchObject({
-        type: WITHDRAWAL_FINALIZATION_REPORT_TYPE,
-        aggregateId: NOW.toISOString(),
-        payload: { finalizedCount: 1, skipped: [{ userId: 'nolog', reason: 'no_request_log' }] },
+      expect(db.state.outbox[0].payload).toMatchObject({ remainingDue: 5, skipped: [] });
+    });
+  });
+
+  describe('shutdown', () => {
+    beforeEach(() => jest.useFakeTimers({ now: NOW }));
+    afterEach(() => jest.useRealTimers());
+
+    it('waits for the run in flight before onModuleDestroy returns', async () => {
+      const db = createDatabase();
+      const { service } = createService(db);
+      let finishRun: () => void = () => undefined;
+      jest.spyOn(service, 'finalizeDue').mockReturnValue(
+        new Promise((resolve) => {
+          finishRun = () => resolve({ finalizedUserIds: [], skipped: [], remainingDue: 0 });
+        }),
+      );
+      service.onModuleInit();
+      let destroyed = false;
+
+      const destroying = service.onModuleDestroy().then(() => {
+        destroyed = true;
       });
-      expect(JSON.stringify(report)).not.toMatch(/example\.test|010-/);
+      await jest.advanceTimersByTimeAsync(10);
+      expect(destroyed).toBe(false);
+
+      finishRun();
+      await destroying;
+      expect(destroyed).toBe(true);
     });
 
-    it('repeats an unchanged list of accounts that need a person once a day, not on every hourly run', async () => {
-      const db = createDatabase(withdrawing('nolog', null));
+    it('starts no new account once shutdown began, and still records what it left', async () => {
+      const db = createDatabase(merge(withdrawing('a', PAST_GRACE), withdrawing('b', PAST_GRACE)));
       const { service } = createService(db);
+      db.hooks.afterScan = () => void service.onModuleDestroy();
 
-      await service.finalizeDue(NOW);
-      await service.finalizeDue(new Date(NOW.getTime() + 60 * 60_000));
-      expect(db.state.outbox).toHaveLength(1);
+      const result = await service.finalizeDue(NOW);
 
-      await service.finalizeDue(new Date(NOW.getTime() + DAY_MS));
-      expect(db.state.outbox).toHaveLength(2);
+      expect(result.finalizedUserIds).toEqual([]);
+      expect(result.remainingDue).toBe(2);
+      expect(db.user('a').accountStatus).toBe('withdrawal_pending');
+      expect(db.state.outbox[0].payload).toMatchObject({ remainingDue: 2 });
     });
 
-    it('logs a report that could not be queued without undoing or failing the deletions', async () => {
+    it('finishes the account it is on, leaves the next ones, and records both', async () => {
+      const db = createDatabase(merge(withdrawing('a', PAST_GRACE), withdrawing('b', PAST_GRACE)));
+      const { service } = createService(db);
+      db.hooks.onIdentityLookup = (userId) => {
+        if (userId === 'a') void service.onModuleDestroy();
+      };
+
+      const result = await service.finalizeDue(NOW);
+
+      expect(result.finalizedUserIds).toEqual(['a']);
+      expect(result.remainingDue).toBe(1);
+      expect(db.user('a').accountStatus).toBe('deleted');
+      expect(db.user('b').accountStatus).toBe('withdrawal_pending');
+      expect(db.state.outbox[0].payload).toMatchObject({ finalizedCount: 1, remainingDue: 1 });
+    });
+
+    it('logs, with the error, a report it could not record while shutting down, and still lets shutdown finish', async () => {
       const db = createDatabase(withdrawing('past', PAST_GRACE));
       db.hooks.failReport = new Error('outbox unavailable');
       const { service, logger } = createService(db);
 
-      const result = await service.finalizeDue(NOW);
+      service.onModuleInit();
+      await service.onModuleDestroy();
 
-      expect(result.finalizedUserIds).toEqual(['past']);
-      expect(db.user('past').accountStatus).toBe('deleted');
+      expect(db.user('past').accountStatus).toBe('withdrawal_pending');
       expect(logger.error).toHaveBeenCalledWith(
-        expect.objectContaining({ err: expect.objectContaining({ message: 'outbox unavailable' }) }),
+        expect.objectContaining({ err: expect.objectContaining({ message: 'outbox unavailable' }), finalized: 0 }),
         expect.any(String),
       );
     });
@@ -507,7 +684,7 @@ describe('WithdrawalFinalizationService', () => {
     it('runs once at start, then hourly, until the module is destroyed', async () => {
       const db = createDatabase();
       const { service } = createService(db);
-      const run = jest.spyOn(service, 'finalizeDue').mockResolvedValue({ finalizedUserIds: [], skipped: [] });
+      const run = jest.spyOn(service, 'finalizeDue').mockResolvedValue({ finalizedUserIds: [], skipped: [], remainingDue: 0 });
 
       service.onModuleInit();
       await jest.advanceTimersByTimeAsync(0);

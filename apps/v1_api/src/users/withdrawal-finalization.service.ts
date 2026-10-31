@@ -1,17 +1,15 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { PrismaService } from '../prisma/prisma.service';
-import {
-  findTeamAuthority,
-  finalizeAccountDeletion,
-  lockUserRow,
-} from './final-account-deletion';
+import { finalizeAccountDeletion, lockUserRow } from './final-account-deletion';
 import {
   recordWithdrawalFinalizationReport,
   type WithdrawalFinalizationRunResult,
   type WithdrawalSkipReason,
 } from './withdrawal-finalization-report';
 import {
+  MAX_FINALIZATIONS_PER_RUN,
   findWithdrawalRequestedAt,
   findWithdrawalRequestedAtByUser,
   isWithdrawalGraceElapsed,
@@ -22,6 +20,10 @@ const RUN_INTERVAL_MS = 60 * 60 * 1000;
 /** Recorded on the status log of every account this job deletes. */
 export const WITHDRAWAL_GRACE_ELAPSED_REASON = 'withdrawal_grace_elapsed';
 
+// Wider than the operator delete, which only refuses an active team: a suspended team still has an owner or manager
+// somebody must hand over. Only archived and deleted teams are let go.
+const TEAM_STILL_RUNNING = { status: { not: 'archived' }, deletedAt: null } satisfies Prisma.V1TeamWhereInput;
+
 type Outcome = { kind: 'finalized' } | { kind: 'skipped'; reason: WithdrawalSkipReason } | { kind: 'unchanged' };
 
 /**
@@ -31,12 +33,14 @@ type Outcome = { kind: 'finalized' } | { kind: 'skipped'; reason: WithdrawalSkip
  * already deleted or finds nothing due.
  *
  * Accounts that need a person (an active admin record, team authority, no request log, or a failed attempt) are
- * left untouched and listed in the run's report.
+ * left untouched and listed in the run's report. A run destroys at most `MAX_FINALIZATIONS_PER_RUN` accounts; the
+ * count of due accounts it left for the next run is in the report too.
  */
 @Injectable()
 export class WithdrawalFinalizationService implements OnModuleInit, OnModuleDestroy {
   private timer?: ReturnType<typeof setInterval>;
   private activeRun?: Promise<void>;
+  private stopping = false;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -51,8 +55,11 @@ export class WithdrawalFinalizationService implements OnModuleInit, OnModuleDest
     void this.runScheduled();
   }
 
-  onModuleDestroy() {
+  /** Lets the run in flight finish its current account and record its report before the process goes away. */
+  async onModuleDestroy() {
     if (this.timer) clearInterval(this.timer);
+    this.stopping = true;
+    await this.activeRun;
   }
 
   private runScheduled(): Promise<void> {
@@ -70,7 +77,7 @@ export class WithdrawalFinalizationService implements OnModuleInit, OnModuleDest
 
   /** One pass over every `withdrawal_pending` account. Exposed with an injectable clock for the boundary tests. */
   async finalizeDue(now: Date = new Date()): Promise<WithdrawalFinalizationRunResult> {
-    const result: WithdrawalFinalizationRunResult = { finalizedUserIds: [], skipped: [] };
+    const result: WithdrawalFinalizationRunResult = { finalizedUserIds: [], skipped: [], remainingDue: 0 };
     const pending = await this.prisma.v1User.findMany({
       where: { accountStatus: 'withdrawal_pending' },
       select: { id: true },
@@ -88,6 +95,10 @@ export class WithdrawalFinalizationService implements OnModuleInit, OnModuleDest
         continue;
       }
       if (!isWithdrawalGraceElapsed(since, now)) continue;
+      if (this.stopping || result.finalizedUserIds.length >= MAX_FINALIZATIONS_PER_RUN) {
+        result.remainingDue += 1;
+        continue;
+      }
 
       try {
         const outcome = await this.finalizeOne(userId, now);
@@ -134,11 +145,11 @@ export class WithdrawalFinalizationService implements OnModuleInit, OnModuleDest
       if (admin?.status === 'active') return { kind: 'skipped', reason: 'active_admin' };
 
       const [authority, ownedTeam] = await Promise.all([
-        findTeamAuthority(tx, userId),
-        tx.v1Team.findFirst({
-          where: { ownerUserId: userId, status: 'active', deletedAt: null },
+        tx.v1TeamMembership.findFirst({
+          where: { userId, status: 'active', role: { in: ['owner', 'manager'] }, team: TEAM_STILL_RUNNING },
           select: { id: true },
         }),
+        tx.v1Team.findFirst({ where: { ownerUserId: userId, ...TEAM_STILL_RUNNING }, select: { id: true } }),
       ]);
       if (authority || ownedTeam) return { kind: 'skipped', reason: 'team_authority' };
 

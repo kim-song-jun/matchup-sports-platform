@@ -3,6 +3,12 @@ import type { Prisma } from '@prisma/client';
 /** How long a withdrawn account is kept (and can still be taken back) before it is destroyed. */
 export const WITHDRAWAL_GRACE_DAYS = 30;
 
+/**
+ * Most accounts one run of the automatic deletion destroys. A deletion cannot be undone, so a run that finds many
+ * due (the first one after deploy, or a bug that backdates requests) stops here and leaves the rest for the next hour.
+ */
+export const MAX_FINALIZATIONS_PER_RUN = 20;
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 type StatusLogReader = Pick<Prisma.TransactionClient, 'v1StatusChangeLog'>;

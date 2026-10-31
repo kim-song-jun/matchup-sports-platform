@@ -69,6 +69,8 @@ export async function clearDeletedAccountData(tx: Prisma.TransactionClient, user
   await tx.v1UserSportPreference.deleteMany({ where: { userId } });
   await tx.v1SearchHistory.deleteMany({ where: { userId } });
   await tx.v1VerificationToken.deleteMany({ where: { userId } });
+  // Kakao/Apple sign-in prefill (name, phone, gender, birth date) is parked here until the signup is finished.
+  await tx.v1UserOnboardingProgress.updateMany({ where: { userId }, data: { draftJson: {} } });
 }
 
 /** Who ends an account: an operator acting through the admin console, or the platform on its own schedule. */

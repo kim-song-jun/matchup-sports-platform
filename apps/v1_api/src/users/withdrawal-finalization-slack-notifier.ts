@@ -1,6 +1,7 @@
 import type { GameOperationClaim, GameOperationHandler } from '../jobs/v1-game-operations-worker.service';
 import { escapeSlackText, postSlackWebhook, requireSlackWebhookUrl } from '../common/slack/slack-webhook';
 import type { WithdrawalFinalizationReportPayload, WithdrawalSkipReason } from './withdrawal-finalization-report';
+import { MAX_FINALIZATIONS_PER_RUN } from './withdrawal-grace';
 
 type WithdrawalFinalizationSlackNotifierOptions = {
   webhookUrl?: string;
@@ -67,6 +68,10 @@ function parsePayload(claim: GameOperationClaim): WithdrawalFinalizationReportPa
   if (typeof finalizedCount !== 'number' || !Number.isInteger(finalizedCount) || finalizedCount < 0) {
     throw new Error('Withdrawal finalization payload finalizedCount must be a non-negative integer');
   }
+  const remainingDue = raw.remainingDue;
+  if (typeof remainingDue !== 'number' || !Number.isInteger(remainingDue) || remainingDue < 0) {
+    throw new Error('Withdrawal finalization payload remainingDue must be a non-negative integer');
+  }
   if (!Array.isArray(raw.skipped)) {
     throw new Error('Withdrawal finalization payload skipped must be an array');
   }
@@ -80,7 +85,7 @@ function parsePayload(claim: GameOperationClaim): WithdrawalFinalizationReportPa
     }
     return { userId: item.userId, reason: item.reason as WithdrawalSkipReason };
   });
-  return { runAt, finalizedCount, skipped };
+  return { runAt, finalizedCount, skipped, remainingDue };
 }
 
 function buildMessage(payload: WithdrawalFinalizationReportPayload, environment: string) {
@@ -88,6 +93,9 @@ function buildMessage(payload: WithdrawalFinalizationReportPayload, environment:
   const summary = [
     `삭제 ${payload.finalizedCount}건`,
     payload.skipped.length > 0 ? `사람이 확인할 계정 ${payload.skipped.length}건` : null,
+    payload.remainingDue > 0
+      ? `다음 실행으로 넘긴 계정 ${payload.remainingDue}건 (한 번에 최대 ${MAX_FINALIZATIONS_PER_RUN}건까지 삭제해요)`
+      : null,
   ]
     .filter(Boolean)
     .join(' · ');

@@ -13,6 +13,7 @@ import { hashPassword, verifyPassword } from '../auth/password-hash';
 import { pendingAccountLinkClaims, signInThenLinkConflict } from '../auth/social-link-conflict';
 import { isUnfinishedSocialSignup } from '../auth/social-signup-access';
 import { V1AuthUser } from '../auth/v1-auth-user';
+import { withdrawalPendingUntil } from '../users/withdrawal-grace';
 import { SMS_EVENT_TYPE, SmsEventLogService } from './sms-event-log.service';
 import { VerificationDispatcherService } from './verification-dispatcher.service';
 
@@ -228,9 +229,14 @@ export class VerificationService {
         // The holder may have claimed the number a moment ago; without one there is no account to link to.
         const holder = await this.prisma.v1User.findFirst({
           where: { phone: token.target, id: { not: authUser.id } },
-          select: { id: true },
+          select: { id: true, accountStatus: true },
         });
-        throw phoneConflict(await this.loadUser(authUser.id), holder?.id);
+        // The code just proved the number is theirs, so saying that a withdrawal is holding it leaks nothing.
+        const pendingWithdrawal =
+          holder?.accountStatus === 'withdrawal_pending'
+            ? { withdrawalPendingUntil: await withdrawalPendingUntil(this.prisma, holder) }
+            : undefined;
+        throw phoneConflict(await this.loadUser(authUser.id), holder?.id, pendingWithdrawal);
       }
       throw error;
     }
@@ -324,10 +330,11 @@ function phoneConflict(
     authIdentities: { provider: string; providerUserKey: string }[];
   },
   holderUserId: string | undefined,
+  pendingWithdrawal?: { withdrawalPendingUntil: string | null },
 ) {
   if (holderUserId !== undefined && isUnfinishedSocialSignup(user.onboardingStatus)) {
     const claims = pendingAccountLinkClaims(user.id, user.authIdentities);
-    if (claims) return signInThenLinkConflict('PHONE_CONFLICT', claims, [holderUserId]);
+    if (claims) return signInThenLinkConflict('PHONE_CONFLICT', claims, [holderUserId], pendingWithdrawal);
   }
   return new ConflictException({
     code: 'PHONE_CONFLICT',

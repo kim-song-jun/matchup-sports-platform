@@ -9,6 +9,7 @@ import { AdminOpsController } from './admin-ops.controller';
 import { AdminOpsService } from './admin-ops.service';
 import { AdminService } from './admin.service';
 import { UploadsModule } from '../uploads/uploads.module';
+import { WithdrawalFinalizationService } from '../users/withdrawal-finalization.service';
 import { AdminTermsController } from './admin-terms.controller';
 import { AdminTermsService } from './admin-terms.service';
 import { GuestInquiryPurgeController } from './guest-inquiry-purge.controller';
@@ -17,6 +18,6 @@ import { GuestInquiryPurgeService } from './guest-inquiry-purge.service';
 @Module({
   imports: [AdminContextModule, NotificationsModule, RealtimeModule, UploadsModule],
   controllers: [AdminController, AdminMonitoringController, AdminOpsController, AdminTermsController, GuestInquiryPurgeController],
-  providers: [AdminService, AdminOpsService, AdminTermsService, GuestInquiryPurgeService, V1AuthGuard],
+  providers: [AdminService, AdminOpsService, AdminTermsService, GuestInquiryPurgeService, WithdrawalFinalizationService, V1AuthGuard],
 })
 export class AdminModule {}

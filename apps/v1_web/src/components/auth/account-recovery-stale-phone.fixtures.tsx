@@ -9,8 +9,8 @@ import { authUiServer, failure, RECOVERY_EMAIL, RECOVERY_PHONE, success, wireCal
 
 export const OTHER_PHONE = '01098765432';
 export const OLD_PHONE_ERROR = '이전 번호의 합성 계정 조회 오류예요.';
-export const SOCIAL_ACCOUNT = { maskedEmail: 'ka***@example.test', providers: ['kakao'], hasPassword: false } satisfies V1FoundAccount;
-export const EMAIL_ACCOUNT = { maskedEmail: 'ow***@example.test', providers: ['email'], hasPassword: true } satisfies V1FoundAccount;
+export const SOCIAL_ACCOUNT = { maskedEmail: 'ka***@example.test', providers: ['kakao'], hasPassword: false, withdrawalPendingUntil: null } satisfies V1FoundAccount;
+export const EMAIL_ACCOUNT = { maskedEmail: 'ow***@example.test', providers: ['email'], hasPassword: true, withdrawalPendingUntil: null } satisfies V1FoundAccount;
 
 function deferredResponse() {
   let accept: ((response: Response) => void) | undefined;

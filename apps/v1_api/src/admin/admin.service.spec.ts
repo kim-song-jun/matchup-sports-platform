@@ -296,9 +296,10 @@ describe('AdminService.deleteUser — realtime disconnect side effect', () => {
     v1Team: { update: jest.Mock };
     $transaction: jest.Mock;
     $queryRaw: jest.Mock;
+    $executeRaw: jest.Mock;
   };
   let realtimeGateway: { forceDisconnectUser: jest.Mock };
-  let logger: { warn: jest.Mock };
+  let logger: { warn: jest.Mock; info: jest.Mock };
 
   function targetUser(accountStatus: string) {
     return { id: targetUserId, accountStatus, email: 'target@teameet.v1', phone: null, deletedAt: null };
@@ -332,6 +333,7 @@ describe('AdminService.deleteUser — realtime disconnect side effect', () => {
       v1Team: { update: jest.fn().mockResolvedValue({}) },
       $transaction: jest.fn(),
       $queryRaw: jest.fn().mockResolvedValue([]),
+      $executeRaw: jest.fn().mockResolvedValue(1),
     };
 
     const p = prisma;
@@ -340,7 +342,7 @@ describe('AdminService.deleteUser — realtime disconnect side effect', () => {
         cb: (
           tx: Pick<
             typeof p,
-            'v1AdminUser' | 'v1User' | 'v1AdminActionLog' | 'v1StatusChangeLog' | 'v1AuthIdentity' | 'v1UserProfile' | 'v1UserRecordConsent' | 'v1PushSubscription' | 'v1PushDevice' | 'v1ChatUserBlock' | 'v1UserRegion' | 'v1UserSportPreference' | 'v1SearchHistory' | 'v1VerificationToken' | 'v1TeamMembership' | 'v1Team' | 'v1TournamentPlayer' | '$queryRaw'
+            'v1AdminUser' | 'v1User' | 'v1AdminActionLog' | 'v1StatusChangeLog' | 'v1AuthIdentity' | 'v1UserProfile' | 'v1UserRecordConsent' | 'v1PushSubscription' | 'v1PushDevice' | 'v1ChatUserBlock' | 'v1UserRegion' | 'v1UserSportPreference' | 'v1SearchHistory' | 'v1VerificationToken' | 'v1TeamMembership' | 'v1Team' | 'v1TournamentPlayer' | '$queryRaw' | '$executeRaw'
           >,
         ) => Promise<unknown>,
       ) =>
@@ -363,11 +365,12 @@ describe('AdminService.deleteUser — realtime disconnect side effect', () => {
           v1Team: p.v1Team,
           v1TournamentPlayer: p.v1TournamentPlayer,
           $queryRaw: p.$queryRaw,
+          $executeRaw: p.$executeRaw,
         }),
     );
 
     realtimeGateway = { forceDisconnectUser: jest.fn() };
-    logger = { warn: jest.fn() };
+    logger = { warn: jest.fn(), info: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -476,6 +479,116 @@ describe('AdminService.deleteUser — realtime disconnect side effect', () => {
       expect.objectContaining({ userId: targetUserId, err: gatewayError }),
       expect.any(String),
     );
+  });
+
+  // The deletion core is shared with the automatic grace-period job; these pin what an operator's delete leaves behind.
+  describe('what an operator delete records', () => {
+    it('names the operator on the action log and the status log and answers with the log ids and deletedAt', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValueOnce(actorAdminRecord).mockResolvedValueOnce(null);
+      prisma.v1User.findUnique.mockResolvedValue(targetUser('active'));
+      prisma.v1User.update.mockResolvedValue(targetUser('deleted'));
+
+      const result = await service.deleteUser(actorAuthUser, targetUserId, { reason: '계정 삭제 요청 처리' });
+
+      expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith({
+        data: {
+          adminUserId: actorAdminRecord.id,
+          action: 'user.delete',
+          targetType: 'user',
+          targetId: targetUserId,
+          reason: '계정 삭제 요청 처리',
+          beforeJson: { accountStatus: 'active', deletedAt: '', hasEmail: 'true', hasPhone: 'false' },
+          afterJson: { accountStatus: 'deleted', deletedAt: expect.any(String), personalDataMasked: 'true' },
+        },
+      });
+      expect(prisma.v1StatusChangeLog.create).toHaveBeenCalledWith({
+        data: {
+          targetType: 'user',
+          targetId: targetUserId,
+          fromStatus: 'active',
+          toStatus: 'deleted',
+          actorType: 'admin',
+          adminUserId: actorAdminRecord.id,
+          reason: '계정 삭제 요청 처리',
+        },
+      });
+      expect(Object.keys(result)).toEqual([
+        'userId',
+        'previousStatus',
+        'status',
+        'actionLogId',
+        'statusChangeLogId',
+        'deletedAt',
+      ]);
+      expect(result).toMatchObject({
+        userId: targetUserId,
+        previousStatus: 'active',
+        status: 'deleted',
+        actionLogId: 'action-log-1',
+        statusChangeLogId: 'status-log-1',
+      });
+    });
+
+    it('replaces the email with its tombstone and frees the verification times', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValueOnce(actorAdminRecord).mockResolvedValueOnce(null);
+      prisma.v1User.findUnique.mockResolvedValue(targetUser('active'));
+      prisma.v1User.update.mockResolvedValue(targetUser('deleted'));
+
+      await service.deleteUser(actorAuthUser, targetUserId, { reason: '계정 삭제 요청 처리' });
+
+      expect(prisma.v1User.update).toHaveBeenCalledWith({
+        where: { id: targetUserId },
+        data: {
+          accountStatus: 'deleted',
+          deletedAt: expect.any(Date),
+          email: `deleted+${targetUserId}@deleted.teameet.local`,
+          phone: null,
+          emailVerifiedAt: null,
+          phoneVerifiedAt: null,
+        },
+      });
+    });
+
+    it('takes the target out of its teams as the operator', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValueOnce(actorAdminRecord).mockResolvedValueOnce(null);
+      prisma.v1User.findUnique.mockResolvedValue(targetUser('active'));
+      prisma.v1User.update.mockResolvedValue(targetUser('deleted'));
+      prisma.v1TeamMembership.findMany.mockResolvedValue([{ id: 'membership-1', teamId: 'team-1', role: 'member' }]);
+
+      await service.deleteUser(actorAuthUser, targetUserId, { reason: '계정 삭제 요청 처리' });
+
+      expect(prisma.v1TeamMembership.update).toHaveBeenCalledWith({
+        where: { id: 'membership-1' },
+        data: { status: 'removed', removedByUserId: actorAuthUser.id, leftAt: expect.any(Date) },
+      });
+      expect(prisma.v1StatusChangeLog.create).toHaveBeenCalledWith({
+        data: {
+          targetType: 'team_membership',
+          targetId: 'membership-1',
+          fromStatus: 'active',
+          toStatus: 'removed',
+          actorType: 'admin',
+          actorUserId: actorAuthUser.id,
+          reason: '계정 삭제 요청 처리',
+        },
+      });
+      expect(logger.info).toHaveBeenCalledWith({ userId: targetUserId, rosters: 0, teams: 1 }, expect.any(String));
+    });
+
+    it('refuses while the target still owns or manages a team, and writes nothing', async () => {
+      prisma.v1AdminUser.findUnique.mockResolvedValueOnce(actorAdminRecord).mockResolvedValueOnce(null);
+      prisma.v1User.findUnique.mockResolvedValue(targetUser('active'));
+      prisma.v1TeamMembership.findFirst.mockResolvedValue({ role: 'owner', team: { id: 'team-1', name: '한강FC' } });
+
+      await expect(
+        service.deleteUser(actorAuthUser, targetUserId, { reason: '계정 삭제 요청 처리' }),
+      ).rejects.toMatchObject({ response: { code: 'USER_HAS_TEAM_AUTHORITY' } });
+
+      expect(prisma.v1User.update).not.toHaveBeenCalled();
+      expect(prisma.v1AdminActionLog.create).not.toHaveBeenCalled();
+      expect(prisma.v1StatusChangeLog.create).not.toHaveBeenCalled();
+      expect(realtimeGateway.forceDisconnectUser).not.toHaveBeenCalled();
+    });
   });
 });
 

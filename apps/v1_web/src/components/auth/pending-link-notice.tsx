@@ -17,10 +17,12 @@ export function PendingLinkNotice() {
   useEffect(() => setPending(peekPendingSocialLink()), []);
 
   if (!pending || pending.expired) return null;
+  // 토큰 수명은 발급 시점부터라, 이 화면에서는 남은 시간을 약속한다.
+  const minutesLeft = Math.max(1, Math.ceil((Date.parse(pending.expiresAt) - Date.now()) / 60_000));
   return (
     <div className="tm-auth-pending-link">
       <p className="tm-text-label tm-auth-pending-link-message">
-        로그인하면 {linkProviderLabel(pending.provider)} 로그인이 이 계정에 연결돼요. 직접 요청한 게 아니라면 연결 안 하기를 눌러 주세요.
+        {minutesLeft}분 안에 로그인하면 {linkProviderLabel(pending.provider)} 로그인이 이 계정에 연결돼요. 직접 요청한 게 아니라면 연결 안 하기를 눌러 주세요.
       </p>
       <Button
         onClick={() => {

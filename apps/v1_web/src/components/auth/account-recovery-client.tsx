@@ -52,9 +52,9 @@ function FoundAccountCard({ account, emailLoginHref, loginHref, onResetPassword 
   const appleButton = hasApple && isNativeAppleSignInAvailable();
   const socialNames = [hasKakao ? '카카오' : null, hasApple ? 'Apple' : null].filter(Boolean).join('·');
   const links = [
-    ...(account.hasPassword ? [{ href: emailLoginHref, label: socialNames ? '이메일로 로그인하기' : '로그인하러 가기' }] : []),
-    ...(hasKakao ? [{ href: loginHref, label: '카카오로 로그인하기' }] : []),
-    ...(appleButton ? [{ href: loginHref, label: 'Apple로 로그인하기' }] : []),
+    ...(account.hasPassword ? [{ href: emailLoginHref, label: socialNames ? '이메일로 로그인하기' : '로그인하러 가기', kakao: false }] : []),
+    ...(hasKakao ? [{ href: loginHref, label: '카카오로 로그인하기', kakao: true }] : []),
+    ...(appleButton ? [{ href: loginHref, label: 'Apple로 로그인하기', kakao: false }] : []),
   ];
   let guidance: string | null = null;
   if (!account.hasPassword) {
@@ -79,7 +79,7 @@ function FoundAccountCard({ account, emailLoginHref, loginHref, onResetPassword 
         {links.map((link, index) => (
           <Link
             key={link.label}
-            className={`tm-btn tm-btn-lg tm-btn-block ${index === 0 ? 'tm-btn-primary' : 'tm-btn-neutral'}`}
+            className={`tm-btn tm-btn-lg tm-btn-block ${link.kakao ? 'tm-auth-kakao' : index === 0 ? 'tm-btn-primary' : 'tm-btn-neutral'}`}
             href={link.href}
           >
             {link.label}

@@ -159,6 +159,8 @@ describe('AccountRecoveryClient', () => {
 
       expect(screen.getByText('이 계정은 카카오 로그인으로 가입했어요. 가입한 방법으로 로그인해 주세요.')).toBeInTheDocument();
       expect(hrefOf('카카오로 로그인하기')).toBe('/login');
+      expect(screen.getByRole('link', { name: '카카오로 로그인하기' })).toHaveClass('tm-auth-kakao');
+      expect(screen.getByRole('link', { name: '카카오로 로그인하기' })).not.toHaveClass('tm-btn-primary');
       expect(screen.queryByRole('link', { name: '로그인하러 가기' })).not.toBeInTheDocument();
       expect(screen.queryByRole('link', { name: '이메일로 로그인하기' })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: '비밀번호 재설정하기' })).not.toBeInTheDocument();

@@ -7,6 +7,7 @@ const calls = vi.hoisted(() => ({
   order: [] as string[],
   logout: vi.fn(),
   unsubscribePush: vi.fn(),
+  pushOptions: [] as unknown[],
   removeQueries: vi.fn(),
 }));
 
@@ -17,7 +18,10 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1Logout: () => ({ mutateAsync: calls.logout, isPending: false }),
 }));
 vi.mock('@/hooks/use-v1-push-registration', () => ({
-  useV1PushRegistration: () => ({ unsubscribe: calls.unsubscribePush }),
+  useV1PushRegistration: (options: unknown) => {
+    calls.pushOptions.push(options);
+    return { unsubscribe: calls.unsubscribePush };
+  },
 }));
 vi.mock('@/lib/session-storage', () => ({
   clearStoredV1Session: () => calls.order.push('session'),
@@ -33,6 +37,7 @@ const replace = vi.fn(() => calls.order.push('navigate'));
 beforeEach(() => {
   vi.mocked(reportClientError).mockClear();
   calls.order = [];
+  calls.pushOptions = [];
   calls.logout.mockReset().mockImplementation(async () => { calls.order.push('logout'); return { ok: true }; });
   calls.unsubscribePush.mockReset().mockImplementation(async () => { calls.order.push('push'); return true; });
   calls.removeQueries.mockReset().mockImplementation(() => calls.order.push('cache'));
@@ -56,13 +61,24 @@ describe('useSignOutAndLeave', () => {
     expect(result.current.error).toBeNull();
   });
 
-  it('skipPushRevoke 면 푸시 해지를 건너뛴다', async () => {
-    const { result } = renderHook(() => useSignOutAndLeave());
+  it('revokePush 가 false 면 푸시 훅을 켜지도 해지하지도 않는다', async () => {
+    const { result } = renderHook(() => useSignOutAndLeave({ revokePush: false }));
 
-    await act(() => result.current.signOutAndLeave('/login', { ...OPTIONS, skipPushRevoke: true }));
+    await act(() => result.current.signOutAndLeave('/login', OPTIONS));
 
+    expect(calls.pushOptions.length).toBeGreaterThan(0);
+    expect(calls.pushOptions.every((options) => (options as { enabled: boolean }).enabled === false)).toBe(true);
     expect(calls.unsubscribePush).not.toHaveBeenCalled();
     expect(calls.order).toEqual(['logout', 'session', 'cache', 'socket', 'navigate']);
+  });
+
+  it('기본값은 푸시 훅을 켜고 해지한다', async () => {
+    const { result } = renderHook(() => useSignOutAndLeave());
+
+    await act(() => result.current.signOutAndLeave('/login', OPTIONS));
+
+    expect(calls.pushOptions.every((options) => (options as { enabled: boolean }).enabled === true)).toBe(true);
+    expect(calls.unsubscribePush).toHaveBeenCalledTimes(1);
   });
 
   it('푸시 해지가 실패(false)해도 로그아웃과 이동은 막히지 않는다', async () => {

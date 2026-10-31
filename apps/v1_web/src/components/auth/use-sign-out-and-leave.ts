@@ -12,14 +12,17 @@ import { disconnectV1Socket } from '@/lib/v1-socket';
 /** 앱 셸이 응답하지 않을 때(native-push 의 응답 상한은 15초) 로그아웃이 그만큼 늦어지지 않게 하는 상한. */
 export const PUSH_REVOKE_TIMEOUT_MS = 3000;
 
+type SignOutHookOptions = {
+  /**
+   * false 면 기기 푸시 등록 해지를 건너뛰고 푸시 훅도 켜지 않는다. 푸시 등록 API 가 서버 가드에 막히는
+   * 계정(가입 대기 상태)은 서버에 등록이 없고 해지 요청도 막혀 실패만 보고하게 된다.
+   */
+  revokePush?: boolean;
+};
+
 type SignOutOptions = {
   /** 로그아웃이 실패했을 때 화면에 보일 문구 — 호출부마다 다르다. */
   failureMessage: string;
-  /**
-   * 기기 푸시 등록 해지를 건너뛴다. 푸시 등록 API 가 서버 가드에 막히는 계정(가입 대기 상태)은
-   * 서버에 등록이 없고 해지 요청도 막혀 실패만 보고하게 된다.
-   */
-  skipPushRevoke?: boolean;
   /** 실제로 로그아웃을 시작할 때 한 번 불린다(연타로 막힌 호출에는 불리지 않는다). */
   onStart?: () => void;
 };
@@ -32,10 +35,10 @@ type SignOutOptions = {
  * 3) 세션·식별 캐시·소켓을 정리하고 `path` 로 이동한다. router.replace 는 prefetch 된 페이지의
  *    로그아웃 이전 스냅샷에 멈출 수 있어 `window.location.replace` 를 쓴다.
  */
-export function useSignOutAndLeave() {
+export function useSignOutAndLeave({ revokePush = true }: SignOutHookOptions = {}) {
   const queryClient = useQueryClient();
   const { mutateAsync: logoutAsync } = useV1Logout();
-  const { unsubscribe: unsubscribePush } = useV1PushRegistration();
+  const { unsubscribe: unsubscribePush } = useV1PushRegistration({ enabled: revokePush });
   // state 는 다음 렌더에야 반영돼 같은 틱의 연타를 못 막는다.
   const busyRef = useRef(false);
   const [pending, setPending] = useState(false);
@@ -58,14 +61,14 @@ export function useSignOutAndLeave() {
     }
   }, [unsubscribePush]);
 
-  const signOutAndLeave = useCallback(async (path: string, { failureMessage, skipPushRevoke = false, onStart }: SignOutOptions) => {
+  const signOutAndLeave = useCallback(async (path: string, { failureMessage, onStart }: SignOutOptions) => {
     if (busyRef.current) return;
     busyRef.current = true;
     setPending(true);
     setError(null);
     onStart?.();
 
-    if (!skipPushRevoke) await revokePushWithinLimit();
+    if (revokePush) await revokePushWithinLimit();
 
     try {
       await logoutAsync();
@@ -81,7 +84,7 @@ export function useSignOutAndLeave() {
     clearV1IdentityCache(queryClient);
     disconnectV1Socket();
     window.location.replace(path);
-  }, [logoutAsync, queryClient, revokePushWithinLimit]);
+  }, [logoutAsync, queryClient, revokePush, revokePushWithinLimit]);
 
   return { signOutAndLeave, pending, error };
 }

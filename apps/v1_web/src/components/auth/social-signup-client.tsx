@@ -56,11 +56,11 @@ export function SocialSignupClient() {
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [error, setError] = useState<string | null>(null);
   const [termsRecoveryPending, setTermsRecoveryPending] = useState(false);
-  const exitFlow = useSocialSignupExit();
   const [phoneConflict, setPhoneConflict] = useState(false);
   // 카카오가 동의항목 승인 하에 내려준 값(이름·번호·성별)을 자동으로 채운다.
   // 동의항목이 없으면 socialSignupPrefill 이 null 이라 아무것도 하지 않고 직접 입력 흐름 그대로다.
   const authMe = useV1AuthMe();
+  const exitFlow = useSocialSignupExit({ onboardingStatus: authMe.data?.user?.onboardingStatus });
   const prefill = authMe.data?.socialSignupPrefill ?? null;
   const providerLabel = socialProviderLabel(authMe.data?.user?.authProvider);
   const authProvider = authMe.data?.user?.authProvider;

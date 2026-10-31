@@ -2,6 +2,12 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AccountRecoveryClient } from './account-recovery-client';
 
+const nativeApple = vi.hoisted(() => ({ available: false }));
+
+vi.mock('@/lib/native-apple', () => ({
+  isNativeAppleSignInAvailable: () => nativeApple.available,
+}));
+
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({ replace: vi.fn(), back: vi.fn() }),
@@ -58,6 +64,7 @@ async function fillNewPassword(value = 'brand-new-pass') {
 describe('AccountRecoveryClient', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    nativeApple.available = false;
     hooks.verifyPurpose = null;
     hooks.emailCardEmail = null;
     hooks.findAccountMutateAsync.mockResolvedValue({
@@ -136,19 +143,95 @@ describe('AccountRecoveryClient', () => {
     expect(screen.getByText('비밀번호가 일치하지 않아요.')).toBeInTheDocument();
   });
 
-  it('아이디 찾기에서 소셜 계정 가입 방법을 안내하고 비밀번호 변경은 호출하지 않는다', async () => {
-    hooks.findAccountMutateAsync.mockResolvedValue({
-      maskedEmail: 'ka***@example.com',
-      providers: ['kakao'],
-      hasPassword: false,
-    });
-    render(<AccountRecoveryClient />);
-    enterPhone();
-    fireEvent.click(screen.getByRole('button', { name: '__stub_verify__' }));
+  describe('아이디 찾기 결과는 계정의 실제 로그인 수단을 따른다', () => {
+    async function findAccount(account: { maskedEmail: string | null; providers: string[]; hasPassword: boolean }, props: { redirectPath?: string } = {}) {
+      hooks.findAccountMutateAsync.mockResolvedValue(account);
+      render(<AccountRecoveryClient {...props} />);
+      enterPhone();
+      fireEvent.click(screen.getByRole('button', { name: '__stub_verify__' }));
+      await screen.findByText(/^(가입한 이메일|가입한 로그인 방법|로그인 방법을 확인하지 못했어요)$/);
+    }
 
-    expect(await screen.findByText('이 계정은 카카오 로그인으로 가입했어요. 카카오로 로그인해 주세요.')).toBeInTheDocument();
-    expect(screen.queryByLabelText('새 비밀번호')).not.toBeInTheDocument();
-    expect(hooks.resetPasswordByEmailMutateAsync).not.toHaveBeenCalled();
+    const hrefOf = (name: string) => screen.getByRole('link', { name }).getAttribute('href');
+
+    it('카카오 전용 계정은 이메일 로그인이 아니라 로그인 첫 화면의 카카오로 보내고 비밀번호 재설정은 권하지 않는다', async () => {
+      await findAccount({ maskedEmail: 'ka***@example.com', providers: ['kakao'], hasPassword: false });
+
+      expect(screen.getByText('이 계정은 카카오 로그인으로 가입했어요. 가입한 방법으로 로그인해 주세요.')).toBeInTheDocument();
+      expect(hrefOf('카카오로 로그인하기')).toBe('/login');
+      expect(screen.queryByRole('link', { name: '로그인하러 가기' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: '이메일로 로그인하기' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: '비밀번호 재설정하기' })).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('새 비밀번호')).not.toBeInTheDocument();
+      expect(hooks.resetPasswordByEmailMutateAsync).not.toHaveBeenCalled();
+    });
+
+    it('웹·안드로이드의 Apple 전용 계정은 쓸 수 없는 Apple 버튼 대신 안내와 문의 창구를 준다', async () => {
+      await findAccount({ maskedEmail: null, providers: ['apple'], hasPassword: false });
+
+      expect(screen.getByText('이 계정은 Apple 로그인으로 가입했어요. 가입한 방법으로 로그인해 주세요.')).toBeInTheDocument();
+      expect(screen.getByText('Apple 로그인은 iOS 앱에서 쓸 수 있어요.')).toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: 'Apple로 로그인하기' })).not.toBeInTheDocument();
+      expect(hrefOf('문의 창구 보기')).toBe('/contact');
+      expect(screen.queryByText(/카카오/)).not.toBeInTheDocument();
+    });
+
+    it('iOS 앱의 Apple 전용 계정은 로그인 첫 화면의 Apple 버튼으로 보낸다', async () => {
+      nativeApple.available = true;
+      await findAccount({ maskedEmail: null, providers: ['apple'], hasPassword: false });
+
+      expect(hrefOf('Apple로 로그인하기')).toBe('/login');
+      expect(screen.queryByText('Apple 로그인은 iOS 앱에서 쓸 수 있어요.')).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: '문의 창구 보기' })).not.toBeInTheDocument();
+    });
+
+    // 로그인 첫 화면에 없는 제공자(naver)뿐이거나 비밀번호 없는 이메일 신원뿐이면 안내할 수단이 없다.
+    it.each([
+      ['naver 전용', { maskedEmail: null, providers: ['naver'], hasPassword: false }],
+      ['비밀번호 없는 이메일 신원', { maskedEmail: 'ru***@example.com', providers: ['email'], hasPassword: false }],
+    ])('%s 계정은 빈 화면 대신 문의 창구를 준다', async (_name, account) => {
+      await findAccount(account);
+
+      expect(screen.getByText('이 계정으로 로그인할 수 있는 방법을 확인하지 못했어요. 문의 창구로 알려 주세요.')).toBeInTheDocument();
+      expect(hrefOf('문의 창구 보기')).toBe('/contact');
+      expect(screen.queryByText('—')).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: /로그인/ })).not.toBeInTheDocument();
+    });
+
+    it('이메일 계정은 이메일 로그인으로 보내고 비밀번호 재설정으로 이어진다', async () => {
+      await findAccount({ maskedEmail: 'ru***@example.com', providers: ['email'], hasPassword: true });
+
+      expect(hrefOf('로그인하러 가기')).toBe('/login/email');
+      expect(screen.queryByRole('link', { name: '카카오로 로그인하기' })).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: '비밀번호 재설정하기' }));
+      expect(screen.getByRole('tab', { name: '비밀번호 재설정' })).toHaveAttribute('aria-selected', 'true');
+      expect(screen.getByLabelText('이메일')).toBeInTheDocument();
+    });
+
+    it('수단이 여럿이면 가진 수단을 모두 보여 주고 없는 수단은 보여 주지 않는다', async () => {
+      await findAccount({ maskedEmail: 'ru***@example.com', providers: ['email', 'kakao'], hasPassword: true });
+
+      expect(hrefOf('이메일로 로그인하기')).toBe('/login/email');
+      expect(hrefOf('카카오로 로그인하기')).toBe('/login');
+      expect(screen.queryByRole('link', { name: 'Apple로 로그인하기' })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '비밀번호 재설정하기' })).toBeInTheDocument();
+    });
+
+    it('카카오와 Apple 둘 다 가입했고 iOS 앱이면 두 버튼을 모두 보여 준다', async () => {
+      nativeApple.available = true;
+      await findAccount({ maskedEmail: 'ka***@example.com', providers: ['kakao', 'apple'], hasPassword: false });
+
+      expect(screen.getByText('이 계정은 카카오·Apple 로그인으로 가입했어요. 가입한 방법으로 로그인해 주세요.')).toBeInTheDocument();
+      expect(hrefOf('카카오로 로그인하기')).toBe('/login');
+      expect(hrefOf('Apple로 로그인하기')).toBe('/login');
+    });
+
+    it('돌아갈 경로는 이메일 로그인과 소셜 로그인 첫 화면 양쪽에 이어진다', async () => {
+      await findAccount({ maskedEmail: 'ru***@example.com', providers: ['email', 'kakao'], hasPassword: true }, { redirectPath: '/my' });
+
+      expect(hrefOf('이메일로 로그인하기')).toBe('/login/email?redirect=%2Fmy');
+      expect(hrefOf('카카오로 로그인하기')).toBe('/login?redirect=%2Fmy');
+    });
   });
 
   // 번호를 고치면 앞 번호로 받은 증명은 더는 유효하지 않다.
@@ -228,7 +311,21 @@ describe('AccountRecoveryClient — 이메일 재설정', () => {
     fireEvent.click(screen.getByRole('button', { name: '비밀번호 바꾸기' }));
 
     expect(await screen.findByText('비밀번호가 없는 계정이에요')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '로그인 화면으로' })).toHaveAttribute('href', '/login');
     expect(screen.queryByLabelText('새 비밀번호')).not.toBeInTheDocument();
+  });
+
+  // 서버는 이 단계에서 제공자를 알려 주지 않는다 — 카카오라고 단정하면 Apple 가입자에게 틀린 안내가 된다.
+  it('소셜 전용 계정 안내는 특정 제공자를 단정하지 않는다', async () => {
+    hooks.resetPasswordByEmailMutateAsync.mockRejectedValue({ code: 'PASSWORD_LOGIN_UNAVAILABLE', message: 'x' });
+    render(<AccountRecoveryClient />);
+    goToEmailReset();
+    enterEmail();
+    fireEvent.click(screen.getByRole('button', { name: '__stub_email_verify__' }));
+    await fillNewPassword();
+    fireEvent.click(screen.getByRole('button', { name: '비밀번호 바꾸기' }));
+
+    expect(await screen.findByText(/카카오나 Apple 같은 소셜 로그인으로 가입해서 바꿀 비밀번호가 없어요/)).toBeInTheDocument();
   });
 
   // 없는 계정이라고 화면이 단정하면, 서버가 감춘 가입 여부를 화면이 대신 알려 주는 셈이 된다.

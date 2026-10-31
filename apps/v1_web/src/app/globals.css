@@ -1140,6 +1140,33 @@ button:disabled {
   color: var(--static-black);
 }
 
+/* 카카오 브랜드 버튼(계정 연결). 배경은 브랜드 고정색이라 라이트·다크가 같다. 공용 .tm-btn-outline 의
+ * 흰 배경·회색 테두리와 hover·disabled 규칙이 브랜드색을 덮지 않도록 특이도로 이긴다(인라인 스타일은
+ * hover 색 변화까지 막는다). */
+.tm-btn.tm-auth-kakao {
+  background: var(--kakao-yellow);
+  color: var(--static-black);
+  border-color: transparent;
+}
+
+@media (hover: hover) {
+  .tm-btn.tm-auth-kakao:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--kakao-yellow) 90%, var(--static-black));
+  }
+}
+
+.tm-btn.tm-auth-kakao:disabled {
+  background: var(--kakao-yellow);
+  color: var(--static-black);
+  border-color: transparent;
+  opacity: 0.58;
+}
+
+/* 처리 중(스피너가 도는 중)에는 흐리게 하지 않는다 — 진행 상황이 안 보이면 안 된다. */
+.tm-btn.tm-auth-kakao:disabled[aria-busy='true'] {
+  opacity: 1;
+}
+
 .tm-auth-provider-note {
   text-align: center;
   color: var(--text-caption);

@@ -129,12 +129,31 @@ export function LoginMethodsPageClient() {
   // 브리지 존재 여부는 브라우저에서만 알 수 있다 — 서버 렌더에는 Apple 버튼이 없고 하이드레이션 뒤에 나타난다.
   useEffect(() => setNativeApple(isNativeAppleSignInAvailable()), []);
 
+  // 카카오 인가 화면으로 넘어가는 중. 이 동안만 돌아옴(visibilitychange)을 시도의 끝으로 본다 —
+  // 앱 인증(브리지)은 자기 응답으로 끝나므로 화면이 다시 보인다는 이유로 풀면 진행 중인 요청 위에 다시 시작하게 된다.
+  const [leavingForAuthorize, setLeavingForAuthorize] = useState(false);
+
   // 뒤로가기(bfcache)로 돌아오면 이동 중이던 시도는 끝난 것이다.
   useEffect(() => {
-    const release = () => setActiveProvider(null);
+    const release = () => {
+      setLeavingForAuthorize(false);
+      setActiveProvider(null);
+    };
     window.addEventListener('pageshow', release);
     return () => window.removeEventListener('pageshow', release);
   }, []);
+
+  // 카카오톡 앱으로 넘어갔다가 인증을 취소하고 돌아오면 페이지는 그대로(pageshow 없음)인데 버튼이 잠긴 채 남는다.
+  useEffect(() => {
+    if (!leavingForAuthorize) return;
+    const release = () => {
+      if (document.visibilityState !== 'visible') return;
+      setLeavingForAuthorize(false);
+      setActiveProvider(null);
+    };
+    document.addEventListener('visibilitychange', release);
+    return () => document.removeEventListener('visibilitychange', release);
+  }, [leavingForAuthorize]);
 
   const present = useCallback((next: LinkOutcome) => {
     setOutcome(next);
@@ -201,11 +220,13 @@ export function LoginMethodsPageClient() {
       return;
     }
     const started = await startKakaoLinkAuthorize({ returnTo: LOGIN_METHODS_PATH });
-    // 인가가 시작되면 화면을 떠나므로 busy 를 유지한다.
+    // 인가가 시작되면 화면을 떠나므로 busy 를 유지한다(돌아오면 위 효과가 푼다).
     if (started.status === 'unavailable') {
       setStartError(KAKAO_START_ERRORS[started.reason]);
       finish();
+      return;
     }
+    setLeavingForAuthorize(true);
   };
 
   const connectApple = async () => {
@@ -225,6 +246,13 @@ export function LoginMethodsPageClient() {
 
   const has = (provider: string) => providers.includes(provider);
   const busy = activeProvider !== null;
+  const justLinked = (provider: V1LinkableProvider) => (
+    outcome?.provider === provider && (outcome.linkResult === 'linked' || outcome.linkResult === 'merged')
+  );
+  // 결과 안내가 "아래에서 연결"을 가리킬 수 있는지 — 그 제공자의 연결 버튼이 이 화면에 실제로 있을 때만.
+  const connectButtonShown = (provider: V1LinkableProvider) => (
+    provider === 'kakao' ? !has('kakao') : !has('apple') && nativeApple
+  );
 
   return (
     <div className="tm-my-shell tm-content-enter">
@@ -245,6 +273,7 @@ export function LoginMethodsPageClient() {
               onDismiss={() => setOutcome(null)}
               onRelogin={reLogin}
               relogin={{ pending: signOut.pending, error: signOut.error }}
+              canConnectHere={connectButtonShown(outcome.provider)}
             />
           ) : null}
           {startError ? (
@@ -265,7 +294,7 @@ export function LoginMethodsPageClient() {
                 <ProviderRow
                   mark="kakao"
                   label="카카오 로그인"
-                  caption="카카오 버튼으로 이 계정에 들어와요"
+                  caption={justLinked('kakao') ? '방금 연결했어요' : '카카오 버튼으로 이 계정에 들어와요'}
                   badge={<ConnectedBadge />}
                   divided={has('email')}
                 />
@@ -280,15 +309,10 @@ export function LoginMethodsPageClient() {
                       size="lg"
                       variant="outline"
                       block
+                      className="tm-auth-kakao"
                       loading={activeProvider === 'kakao'}
                       disabled={busy}
                       onClick={() => void connectKakao()}
-                      style={{
-                        background: 'var(--kakao-yellow)',
-                        color: 'var(--static-black)',
-                        borderColor: 'transparent',
-                        opacity: busy && activeProvider !== 'kakao' ? 0.58 : 1,
-                      }}
                     >
                       {activeProvider === 'kakao' ? '연결 중이에요…' : '카카오 연결하기'}
                     </Button>
@@ -296,7 +320,12 @@ export function LoginMethodsPageClient() {
                 />
               )}
               {has('apple') ? (
-                <ProviderRow mark="apple" label="Apple 로그인" caption="Apple 버튼으로 이 계정에 들어와요" badge={<ConnectedBadge />} />
+                <ProviderRow
+                  mark="apple"
+                  label="Apple 로그인"
+                  caption={justLinked('apple') ? '방금 연결했어요' : 'Apple 버튼으로 이 계정에 들어와요'}
+                  badge={<ConnectedBadge />}
+                />
               ) : nativeApple ? (
                 <ProviderRow
                   mark="apple"

@@ -17,7 +17,14 @@ type CardNotice = {
 
 type Notice = { kind: 'banner'; message: string } | ({ kind: 'card' } & CardNotice);
 
-function noticeFor({ linkResult, provider }: LinkOutcome): Notice {
+/** 다음 행동은 이 화면의 연결 버튼이다. 버튼이 없는 경우(웹의 Apple 등)에는 있지도 않은 버튼을 가리키지 않는다. */
+function mismatchBody(provider: LinkOutcome['provider'], canConnectHere: boolean): string {
+  const base = '처음 안내받은 계정과 달라서 연결하지 않았어요.';
+  if (canConnectHere) return `${base} 이 계정에 연결하려면 아래에서 직접 연결해 주세요.`;
+  return provider === 'apple' ? `${base} Apple 연결은 iOS 앱에서 할 수 있어요.` : base;
+}
+
+function noticeFor({ linkResult, provider }: LinkOutcome, canConnectHere: boolean): Notice {
   const name = PROVIDER_NAME[provider];
   switch (linkResult) {
     case 'linked':
@@ -54,7 +61,7 @@ function noticeFor({ linkResult, provider }: LinkOutcome): Notice {
       return {
         kind: 'card',
         title: '다른 계정에 로그인했어요',
-        body: '처음 안내받은 계정과 달라서 연결하지 않았어요. 이 계정에 연결하려면 아래에서 직접 연결해 주세요.',
+        body: mismatchBody(provider, canConnectHere),
         role: 'status',
         actions: ['dismiss'],
       };
@@ -79,13 +86,16 @@ export function LinkResultNotice({
   onDismiss,
   onRelogin,
   relogin,
+  canConnectHere,
 }: {
   outcome: LinkOutcome;
   onDismiss: () => void;
   onRelogin: () => void;
   relogin: { pending: boolean; error: string | null };
+  /** 이 결과의 제공자를 연결하는 버튼이 지금 이 화면에 있는가. */
+  canConnectHere: boolean;
 }) {
-  const notice = noticeFor(outcome);
+  const notice = noticeFor(outcome, canConnectHere);
   if (notice.kind === 'banner') return <AlertBanner tone="info" message={notice.message} />;
 
   return (

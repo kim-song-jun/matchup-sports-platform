@@ -95,6 +95,7 @@ import type {
   V1CancelWithdrawalPayload,
   V1LinkApplePayload,
   V1LinkKakaoPayload,
+  V1LinkPendingPayload,
   V1LinkSocialResult,
   V1PhoneVerifyResult,
   V1EmailLoginResult,
@@ -386,6 +387,15 @@ export function useV1LinkApple() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: V1LinkApplePayload) => v1Post<V1LinkSocialResult>('/auth/link/apple', body),
+    onSuccess: () => invalidateLoginMethodQueries(queryClient),
+  });
+}
+
+/** 충돌 409 가 준 연결 토큰으로, 방금 로그인한 계정에 그 제공자를 제공자 재인증 없이 붙인다. */
+export function useV1LinkPending() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1LinkPendingPayload) => v1Post<V1LinkSocialResult>('/auth/link/pending', body),
     onSuccess: () => invalidateLoginMethodQueries(queryClient),
   });
 }

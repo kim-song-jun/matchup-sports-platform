@@ -10,6 +10,8 @@ import { sessionLoginResponse } from './auth-step-up-handlers';
  *    (제공자 토큰 검증 실패). 본문은 서버 DTO(`LinkKakaoDto`, `AppleLoginDto`)와 같은 길이 제한·허용 필드를 따르고, 어기면 400.
  *  - `POST /auth/kakao`·`/auth/kakao/token`·`/auth/apple`: LINK_MSW.loginConflicts 의 값이면 `details.next` 가 붙은
  *    409, 그 외에는 세션.
+ *  - 위 409 의 `details` 에는 `linkToken`·`linkTokenExpiresInSeconds` 가 실린다. `POST /auth/link/pending` 은
+ *    PENDING_LINK_MSW.tokens 의 값으로 시나리오를 고르고, 모르는 토큰은 400 SOCIAL_LINK_TOKEN_INVALID.
  *  - `POST /auth/login`: WITHDRAWAL_MSW.email 만 가로챈다(비밀번호가 맞으면 철회 토큰이 실린 403, 틀리면 일반 401).
  *    다른 이메일은 다음 핸들러로 넘긴다.
  *  - `POST /auth/withdrawal/cancel`: WITHDRAWAL_MSW.tokens 가 시나리오를 정한다(토큰은 20~512자, 서버 DTO와 같다).
@@ -35,6 +37,21 @@ export const LINK_MSW = {
   },
   maxAgeSeconds: 30 * 60,
   signupIncompleteRoute: '/signup/social',
+} as const;
+
+/** 충돌 409 가 주는 연결 토큰. `kakao`·`apple` 은 각 제공자 충돌 응답에 실리는 기본 토큰이고, 나머지는 결과별 시나리오다. */
+export const PENDING_LINK_MSW = {
+  expiresInSeconds: 600,
+  tokens: {
+    kakao: 'msw-pending-link-token-kakao',
+    apple: 'msw-pending-link-token-apple',
+    kakaoMerged: 'msw-pending-link-token-kakao-merged',
+    kakaoAlready: 'msw-pending-link-token-kakao-already',
+    providerInUse: 'msw-pending-link-token-in-use',
+    providerExists: 'msw-pending-link-token-exists',
+    recentLoginRequired: 'msw-pending-link-token-recent-login',
+    signupIncomplete: 'msw-pending-link-token-signup-incomplete',
+  },
 } as const;
 
 /** 비밀번호 없이 카카오로만 가입한 계정 — 이메일 본인 확인 뒤 재설정을 시도하면 PASSWORD_LOGIN_UNAVAILABLE 이 온다. */
@@ -71,10 +88,33 @@ async function readJson(request: Request): Promise<Record<string, unknown>> {
 const SIGN_IN_THEN_LINK_MESSAGE =
   '이미 팀밋 계정이 있어요. 원래 가입한 방법으로 로그인한 뒤 설정에서 연결해 주세요.';
 
-/** 로그인·가입 충돌 409 — 코드는 그대로 두고 `details` 로 다음 행동을 알린다. 휴대폰 중복 등 다른 엔드포인트의 핸들러도 이걸 쓴다. */
-export function signInThenLinkConflict(code: string, provider: V1LinkableProvider) {
-  return fail(409, code, SIGN_IN_THEN_LINK_MESSAGE, { next: 'sign_in_then_link', provider });
+/**
+ * 로그인·가입 충돌 409 — 코드는 그대로 두고 `details` 로 다음 행동과 연결 토큰을 알린다.
+ * 휴대폰 중복 등 다른 엔드포인트의 핸들러도 이걸 쓴다. `linkToken` 에 null 을 주면 토큰 없는 안내가 된다.
+ */
+export function signInThenLinkConflict(
+  code: string,
+  provider: V1LinkableProvider,
+  linkToken: string | null = PENDING_LINK_MSW.tokens[provider],
+) {
+  return fail(409, code, SIGN_IN_THEN_LINK_MESSAGE, {
+    next: 'sign_in_then_link',
+    provider,
+    ...(linkToken ? { linkToken, linkTokenExpiresInSeconds: PENDING_LINK_MSW.expiresInSeconds } : {}),
+  });
 }
+
+// 토큰 시나리오는 연결 API 의 자격 시나리오와 같은 결과를 낸다.
+const PENDING_SCENARIOS = new Map<string, { provider: V1LinkableProvider; credential: string }>(Object.entries({
+  [PENDING_LINK_MSW.tokens.kakao]: { provider: 'kakao', credential: LINK_MSW.credentials.ok },
+  [PENDING_LINK_MSW.tokens.apple]: { provider: 'apple', credential: LINK_MSW.credentials.ok },
+  [PENDING_LINK_MSW.tokens.kakaoMerged]: { provider: 'kakao', credential: LINK_MSW.credentials.mergedPending },
+  [PENDING_LINK_MSW.tokens.kakaoAlready]: { provider: 'kakao', credential: LINK_MSW.credentials.alreadyLinked },
+  [PENDING_LINK_MSW.tokens.providerInUse]: { provider: 'kakao', credential: LINK_MSW.credentials.providerInUse },
+  [PENDING_LINK_MSW.tokens.providerExists]: { provider: 'kakao', credential: LINK_MSW.credentials.providerExists },
+  [PENDING_LINK_MSW.tokens.recentLoginRequired]: { provider: 'kakao', credential: LINK_MSW.credentials.recentLoginRequired },
+  [PENDING_LINK_MSW.tokens.signupIncomplete]: { provider: 'kakao', credential: LINK_MSW.credentials.signupIncomplete },
+}));
 
 /** 소셜로만 가입한 계정의 비밀번호 재설정 거절 — 안내 문구는 계정이 실제로 가진 로그인 수단을 따른다. */
 export function passwordLoginUnavailableResponse() {
@@ -152,6 +192,15 @@ export const v1AuthLinkMswHandlers = [
     if (!isBounded(identityToken, 20, 8192) || !isBounded(nonce, 8, 512)) return invalidLinkBody();
     if (!isAbsentOrBounded(fullName, 0, 80) || !isAbsentOrBounded(authorizationCode, 8, 2048)) return invalidLinkBody();
     return linkOutcome('apple', identityToken);
+  }),
+
+  // 연결 토큰은 충돌 409 의 details 에서 온 불투명 값이다. 길이 제한은 서버 DTO 가 정해지면 맞춘다.
+  http.post(`${api}/auth/link/pending`, async ({ request }) => {
+    const { linkToken, ...rest } = await readJson(request);
+    if (Object.keys(rest).length > 0 || !isBounded(linkToken, 1, 2048)) return invalidLinkBody();
+    const scenario = PENDING_SCENARIOS.get(linkToken);
+    if (!scenario) return fail(400, 'SOCIAL_LINK_TOKEN_INVALID', '연결 시간이 지났어요. 로그인 방법에서 다시 연결해 주세요.');
+    return linkOutcome(scenario.provider, scenario.credential);
   }),
 
   http.post(`${api}/auth/kakao`, async ({ request }) => loginOutcome('kakao', (await readJson(request)).code)),

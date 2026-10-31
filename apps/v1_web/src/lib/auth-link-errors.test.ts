@@ -25,6 +25,23 @@ describe('getSignInThenLinkHint', () => {
     expect(getSignInThenLinkHint(error)).toEqual({ next: 'sign_in_then_link', provider });
   });
 
+  it('carries the link token and its lifetime when both are intact', () => {
+    const details = { next: 'sign_in_then_link', provider: 'kakao', linkToken: 'signed-link-token', linkTokenExpiresInSeconds: 600 };
+    expect(getSignInThenLinkHint(apiError(409, 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', details))).toEqual(details);
+  });
+
+  it.each([
+    ['a token without a lifetime', { linkToken: 'signed-link-token' }],
+    ['a lifetime without a token', { linkTokenExpiresInSeconds: 600 }],
+    ['an empty token', { linkToken: '', linkTokenExpiresInSeconds: 600 }],
+    ['a non-string token', { linkToken: 5, linkTokenExpiresInSeconds: 600 }],
+    ['a zero lifetime', { linkToken: 'signed-link-token', linkTokenExpiresInSeconds: 0 }],
+    ['a string lifetime', { linkToken: 'signed-link-token', linkTokenExpiresInSeconds: '600' }],
+  ])('keeps the hint but leaves the token out with %s', (_label, extra) => {
+    const error = apiError(409, 'SOCIAL_LINK_CONTACT_CONFLICT', { next: 'sign_in_then_link', provider: 'apple', ...extra });
+    expect(getSignInThenLinkHint(error)).toStrictEqual({ next: 'sign_in_then_link', provider: 'apple' });
+  });
+
   it('keeps working for PHONE_CONFLICT, which carries the same details', () => {
     const error = apiError(409, 'PHONE_CONFLICT', { next: 'sign_in_then_link', provider: 'kakao' });
     expect(getSignInThenLinkHint(error)).toEqual({ next: 'sign_in_then_link', provider: 'kakao' });

@@ -10,6 +10,7 @@ import type {
 
 export const RECENT_LOGIN_REQUIRED_CODE = 'RECENT_LOGIN_REQUIRED';
 export const SIGNUP_INCOMPLETE_CODE = 'SIGNUP_INCOMPLETE';
+export const SOCIAL_LINK_TOKEN_INVALID_CODE = 'SOCIAL_LINK_TOKEN_INVALID';
 export const ACCOUNT_WITHDRAWAL_PENDING_CODE = 'ACCOUNT_WITHDRAWAL_PENDING';
 export const PASSWORD_LOGIN_UNAVAILABLE_CODE = 'PASSWORD_LOGIN_UNAVAILABLE';
 
@@ -37,12 +38,18 @@ function isPositiveNumber(value: unknown): value is number {
 /**
  * 로그인·가입 충돌 409 가 "원래 방법으로 로그인한 뒤 설정에서 연결"을 안내하는지 확인한다.
  * 같은 409 라도 `details` 가 이 모양이 아니면 null 이다(코드로 분기하지 않는다 — 안내는 `details` 가 정한다).
+ * 연결 토큰은 토큰과 유효 시간이 둘 다 온전할 때만 싣는다 — 유효 시간을 모르는 토큰은 만료를 가릴 수 없어 쓰지 않는다.
  */
 export function getSignInThenLinkHint(error: unknown): V1SignInThenLinkDetails | null {
   if (!(error instanceof V1ApiError) || error.statusCode !== 409) return null;
   const details = asRecord(error.details);
   if (details?.next !== 'sign_in_then_link' || !isLinkableProvider(details.provider)) return null;
-  return { next: 'sign_in_then_link', provider: details.provider };
+  const hint: V1SignInThenLinkDetails = { next: 'sign_in_then_link', provider: details.provider };
+  const { linkToken, linkTokenExpiresInSeconds } = details;
+  if (typeof linkToken === 'string' && linkToken !== '' && isPositiveNumber(linkTokenExpiresInSeconds)) {
+    return { ...hint, linkToken, linkTokenExpiresInSeconds };
+  }
+  return hint;
 }
 
 /** 자격이 맞은 탈퇴 신청 계정의 로그인 403 에서 철회 토큰을 꺼낸다. 토큰이 없으면(자격 불일치 등) null. */

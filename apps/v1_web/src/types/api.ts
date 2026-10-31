@@ -180,6 +180,11 @@ export type V1AuthProvider = 'email' | 'kakao' | 'apple' | 'naver';
 /** 비밀번호가 없는 로그인 수단(소셜). */
 export type V1SocialLoginProvider = Exclude<V1AuthProvider, 'email'>;
 
+/** `POST /auth/link/pending` — 로그인·가입 충돌 409 의 `details.linkToken`. 응답은 `POST /auth/link/{provider}` 와 같다. */
+export type V1LinkPendingPayload = {
+  linkToken: string;
+};
+
 /** 로그인한 채로 계정에 붙일 수 있는 소셜 제공자. */
 export type V1LinkableProvider = 'kakao' | 'apple';
 
@@ -216,6 +221,13 @@ export type V1LinkSocialResult = {
 export type V1SignInThenLinkDetails = {
   next: 'sign_in_then_link';
   provider: V1LinkableProvider;
+  /**
+   * 서버가 이미 검증한 제공자 신원에 서명한 토큰. 원래 계정으로 로그인한 직후 `POST /auth/link/pending` 에 넘기면
+   * 제공자를 다시 거치지 않고 연결된다. 두 값은 함께 오거나 함께 없다.
+   */
+  linkToken?: string;
+  /** `linkToken` 의 남은 유효 시간(초). */
+  linkTokenExpiresInSeconds?: number;
 };
 
 /** 403 `RECENT_LOGIN_REQUIRED` 의 `details` — 세션 발급 후 이 시간(초)이 지나면 다시 로그인해야 연결할 수 있다. */

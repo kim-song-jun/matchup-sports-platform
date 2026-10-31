@@ -12,12 +12,14 @@ import {
   getSignupIncompleteRoute,
   getWithdrawalCancelOffer,
 } from '@/lib/auth-link-errors';
+import { linkResultFromError, linkResultFromSuccess } from '@/lib/link-result';
+import { clearPendingSocialLink, readPendingSocialLink, savePendingSocialLink } from '@/lib/pending-social-link';
 import { v1Keys } from '@/lib/query-keys';
-import { LINK_MSW, PASSWORD_UNAVAILABLE_MSW, WITHDRAWAL_MSW } from '@/test/msw/auth-link-handlers';
+import { LINK_MSW, PASSWORD_UNAVAILABLE_MSW, PENDING_LINK_MSW, WITHDRAWAL_MSW } from '@/test/msw/auth-link-handlers';
 import { v1MswHandlers } from '@/test/msw/handlers';
 import { v1UserFixture } from '@/test/msw/fixtures';
 import type { V1AuthMe } from '@/types/api';
-import { useV1CancelWithdrawal, useV1LinkApple, useV1LinkKakao } from './use-v1-api';
+import { useV1CancelWithdrawal, useV1LinkApple, useV1LinkKakao, useV1LinkPending } from './use-v1-api';
 
 const server = setupServer(
   ...v1MswHandlers,
@@ -184,14 +186,75 @@ describe('sign-in conflict 409s carry the next action in details', () => {
     ['/auth/kakao', { code: LINK_MSW.loginConflicts.unverifiedEmail, redirectUri: 'https://teameet.test/callback/kakao' }, 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', 'kakao'],
     ['/auth/kakao/token', { accessToken: LINK_MSW.loginConflicts.contactConflict }, 'SOCIAL_LINK_CONTACT_CONFLICT', 'kakao'],
     ['/auth/apple', { identityToken: LINK_MSW.loginConflicts.accountProof, nonce: 'server-nonce' }, 'SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF', 'apple'],
-  ])('%s', async (path, body, code, provider) => {
+  ] as const)('%s', async (path, body, code, provider) => {
     const error = await fails(() => v1Post(path, body));
     expect(error).toMatchObject({ statusCode: 409, code });
-    expect(getSignInThenLinkHint(error)).toEqual({ next: 'sign_in_then_link', provider });
+    expect(getSignInThenLinkHint(error)).toEqual({
+      next: 'sign_in_then_link',
+      provider,
+      linkToken: PENDING_LINK_MSW.tokens[provider],
+      linkTokenExpiresInSeconds: PENDING_LINK_MSW.expiresInSeconds,
+    });
   });
 
   it('a successful sign-in has no hint to read', async () => {
     await expect(v1Post('/auth/kakao/token', { accessToken: 'plain-token' })).resolves.toMatchObject({ session: { userId: v1UserFixture.id } });
+  });
+});
+
+describe('useV1LinkPending', () => {
+  afterEach(() => window.sessionStorage.clear());
+
+  it('turns the token a sign-in conflict handed out into a link after the original sign-in', async () => {
+    const conflict = await fails(() => v1Post('/auth/kakao', { code: LINK_MSW.loginConflicts.unverifiedEmail, redirectUri: 'https://teameet.test/callback/kakao' }));
+    const hint = getSignInThenLinkHint(conflict);
+    expect(hint && savePendingSocialLink(hint)).toBe(true);
+
+    // ... 사용자가 원래 계정으로 로그인한 직후
+    const pending = readPendingSocialLink();
+    expect(pending).not.toBeNull();
+    const { wrapper, staleKeys } = setup();
+    const { result } = renderHook(() => useV1LinkPending(), { wrapper });
+    const linked = await succeeds(() => result.current.mutateAsync({ linkToken: pending!.linkToken }));
+    clearPendingSocialLink();
+
+    expect(linked).toEqual({ provider: 'kakao', alreadyLinked: false, mergedPendingAccount: false, authProviders: ['email', 'kakao'] });
+    expect(linkResultFromSuccess(linked)).toBe('linked');
+    expect(staleKeys()).toEqual(['authMe', 'settings', 'profile', 'notifications']);
+    expect(readPendingSocialLink()).toBeNull();
+  });
+
+  it('links an Apple identity from its own token', async () => {
+    const { wrapper } = setup();
+    const { result } = renderHook(() => useV1LinkPending(), { wrapper });
+    await expect(succeeds(() => result.current.mutateAsync({ linkToken: PENDING_LINK_MSW.tokens.apple })))
+      .resolves.toMatchObject({ provider: 'apple', authProviders: ['email', 'apple'] });
+  });
+
+  it.each([
+    [PENDING_LINK_MSW.tokens.kakaoMerged, 'merged'],
+    [PENDING_LINK_MSW.tokens.kakaoAlready, 'already'],
+  ])('reports %s as %s', async (linkToken, expected) => {
+    const { wrapper } = setup();
+    const { result } = renderHook(() => useV1LinkPending(), { wrapper });
+    expect(linkResultFromSuccess(await succeeds(() => result.current.mutateAsync({ linkToken })))).toBe(expected);
+  });
+
+  it.each([
+    [PENDING_LINK_MSW.tokens.providerInUse, 409, 'SOCIAL_LINK_PROVIDER_IN_USE', 'in_use'],
+    [PENDING_LINK_MSW.tokens.providerExists, 409, 'SOCIAL_LINK_PROVIDER_EXISTS', 'exists'],
+    [PENDING_LINK_MSW.tokens.recentLoginRequired, 403, 'RECENT_LOGIN_REQUIRED', 'recent_login'],
+    [PENDING_LINK_MSW.tokens.signupIncomplete, 403, 'SIGNUP_INCOMPLETE', 'failed'],
+    ['expired-or-forged-link-token', 400, 'SOCIAL_LINK_TOKEN_INVALID', 'failed'],
+  ])('maps %s to the %s result without touching the caches', async (linkToken, statusCode, code, expected) => {
+    const { wrapper, staleKeys } = setup();
+    const { result } = renderHook(() => useV1LinkPending(), { wrapper });
+
+    const error = await fails(() => result.current.mutateAsync({ linkToken }));
+
+    expect(error).toMatchObject({ statusCode, code });
+    expect(linkResultFromError(error)).toBe(expected);
+    expect(staleKeys()).toEqual([]);
   });
 });
 

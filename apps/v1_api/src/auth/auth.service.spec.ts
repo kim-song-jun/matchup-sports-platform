@@ -129,7 +129,7 @@ function buildPrismaMock() {
     v1UserRecordConsent: {
       upsert: jest.fn(),
     },
-    v1StatusChangeLog: { create: jest.fn() },
+    v1StatusChangeLog: { create: jest.fn(), findFirst: jest.fn() },
     v1UserTermsConsent: {
       createMany: jest.fn(),
     },
@@ -1025,6 +1025,26 @@ describe('AuthService', () => {
       });
       expect(prisma.v1User.updateMany).not.toHaveBeenCalled();
     });
+    it('says until when a withdrawal holds the Kakao-proven number', async () => {
+      arrange({ kakaoPhone: input.phone }, V1AuthProvider.kakao);
+      prisma.v1User.findFirst.mockResolvedValue({ id: 'other-user', accountStatus: 'withdrawal_pending' });
+      prisma.v1StatusChangeLog.findFirst.mockResolvedValue({ createdAt: new Date('2026-10-08T08:28:00.000Z') });
+      const pending = await service.completeSocialProfile('user-1', input).catch((e) => e);
+      expect(pending.getResponse()).toMatchObject({
+        code: 'PHONE_CONFLICT',
+        details: { next: 'sign_in_then_link', withdrawalPendingUntil: '2026-11-07T08:28:00.000Z' },
+      });
+      expect(prisma.v1StatusChangeLog.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+        where: expect.objectContaining({ targetId: 'other-user', toStatus: 'withdrawal_pending' }),
+      }));
+    });
+    it('says nothing of a withdrawal when an active account holds the Kakao-proven number', async () => {
+      arrange({ kakaoPhone: input.phone }, V1AuthProvider.kakao);
+      prisma.v1User.findFirst.mockResolvedValue({ id: 'other-user', accountStatus: 'active' });
+      const active = await service.completeSocialProfile('user-1', input).catch((e) => e);
+      expect(active.getResponse()).toMatchObject({ code: 'PHONE_CONFLICT', details: { next: 'sign_in_then_link' } });
+      expect(active.getResponse().details).not.toHaveProperty('withdrawalPendingUntil');
+    });
 
     // A typed number is proven by its SMS code before anything is said about who holds it — otherwise the form
     // would tell anyone, holding the number or not, whether it is registered.
@@ -1057,12 +1077,13 @@ describe('AuthService', () => {
     it('gives the advice without a token for a typed number when SMS proof is switched off', async () => {
       arrange({}, V1AuthProvider.kakao);
       phoneVerification.enabled = false;
-      prisma.v1User.findFirst.mockResolvedValue({ id: 'other-user' });
+      prisma.v1User.findFirst.mockResolvedValue({ id: 'other-user', accountStatus: 'withdrawal_pending' });
 
       const error = await service.completeSocialProfile('user-1', input).catch((e) => e);
 
       expect(error.getResponse()).toMatchObject({ code: 'PHONE_CONFLICT', details: { next: 'sign_in_then_link', provider: 'kakao' } });
       expect(error.getResponse().details).not.toHaveProperty('linkToken');
+      expect(error.getResponse().details).not.toHaveProperty('withdrawalPendingUntil');
     });
   });
 

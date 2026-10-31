@@ -40,8 +40,8 @@
 | `POST` | `/api/v1/onboarding/complete` | user | empty body | completed onboarding summary |
 | `POST` | `/api/v1/onboarding/defer` | user | `{ reason?: "skip_now" \| "later" \| "unknown" }` | deferred onboarding summary |
 | `POST` | `/api/v1/auth/phone/issue` | none | `{ phone }` | `{ expiresAt, devCode? }` |
-| `POST` | `/api/v1/auth/phone/verify` | none | `{ phone, code, purpose?: "signup" \| "password_reset" }` | `{ verified, proofToken, registered }` |
-| `POST` | `/api/v1/auth/recovery/find-account` | none | `{ phone, proofToken }` | `{ maskedEmail, providers, hasPassword }` |
+| `POST` | `/api/v1/auth/phone/verify` | none | `{ phone, code, purpose?: "signup" \| "password_reset" }` | `{ verified, proofToken, registered, withdrawalPendingUntil }` |
+| `POST` | `/api/v1/auth/recovery/find-account` | none | `{ phone, proofToken }` | `{ maskedEmail, providers, hasPassword, withdrawalPendingUntil }` |
 | `POST` | `/api/v1/auth/recovery/reset-password` | none | `{ phone, proofToken, newPassword }` | valid phone proof and existing active account: `409 ACCOUNT_RECOVERY_REQUIRES_EMAIL`; no password write |
 | `POST` | `/api/v1/auth/recovery/email/request` | none | `{ email }` | `{ sent: true, expiresAt, devCode? }` |
 | `POST` | `/api/v1/auth/recovery/email/confirm` | none | `{ email, code }` | `{ verified, proofToken }` |
@@ -52,10 +52,29 @@ Account deletion is not on this controller — see `POST /api/v1/me/withdrawal-r
 in [Users](./users.md). Taking it back is `POST /auth/withdrawal/cancel`, described below.
 
 `registered` on `phone/verify` says whether a `v1_users` row still holds that number, whatever its status. It is computed only
-after the code matched, and `phone/issue` still reveals nothing. A number is released only by the admin delete flow
-(`DELETE /admin/users/:userId`), which overwrites it; an account moved to `deleted` through `changeUserStatus` keeps its number, so it
+after the code matched, and `phone/issue` still reveals nothing. A number is released only by the final deletion — the admin delete flow
+(`DELETE /admin/users/:userId`) or the automatic one after the withdrawal grace period — which overwrites it; an account moved to `deleted` through `changeUserStatus` keeps its number, so it
 still reports `registered=true`. `POST /auth/register` keeps answering `409 PHONE_CONFLICT` with the same lookup, and it does so
 before it checks the phone proof, so register can already tell a caller without a proof that the number is taken.
+
+### A number held by a withdrawal waiting out its grace period
+
+A withdrawn account keeps its `phone` for the 30-day grace period (`WITHDRAWAL_GRACE_DAYS`), then an hourly job destroys it
+(see [Users](./users.md)). While it waits the number stays taken, so the person who asks for it is told who holds it, **only after
+the code proved the number is theirs**:
+
+- `phone/verify` adds `withdrawalPendingUntil` (ISO instant, `null` when the holder is not a withdrawal or the number is free). `registered`
+  keeps meaning "a row holds this number".
+- `recovery/find-account` finds the `withdrawal_pending` holder when no `active` account has the number (the `active` one wins if both ever
+  matched) and answers with the usual `maskedEmail`, `providers`, `hasPassword` plus `withdrawalPendingUntil`. Active holders get `null`.
+  `recovery/reset-password` (phone) still looks at active accounts only, so a withdrawal holder answers `404 ACCOUNT_NOT_FOUND` there.
+- `/verification/phone/confirm` for an unfinished social signup adds `details.withdrawalPendingUntil` to the sign-in-then-link
+  `PHONE_CONFLICT` when the holder is a withdrawal. The key is absent for other holders.
+- `/auth/social-profile` does the same for its sign-in-then-link `PHONE_CONFLICT`, which only carries a link token once the number is
+  proven (the Kakao-supplied number or an SMS-verified one). The token-less advice never carries the key.
+
+`withdrawalPendingUntil` is the latest `withdrawal_pending` status-log time plus 30 days, `null` when that log is missing. The job runs hourly, so the number can stay held for up to about an hour past that instant. Nothing before the
+code (`phone/issue`, `/verification/phone/request`, a wrong code) says anything about the holder.
 
 ## Session Model
 

@@ -27,6 +27,8 @@ export function signInThenLinkConflict(
   code: SignInThenLinkCode,
   claims: SocialLinkClaims,
   targetUserIds: readonly string[],
+  /** Present when the account that holds the contact value is a withdrawal waiting out its grace period. */
+  pendingWithdrawal?: { withdrawalPendingUntil: string | null },
 ): ConflictException {
   return new ConflictException({
     code,
@@ -36,6 +38,7 @@ export function signInThenLinkConflict(
       provider: claims.provider,
       linkToken: issueSocialLinkToken(claims, targetUserIds),
       linkTokenExpiresInSeconds: SOCIAL_LINK_TOKEN_TTL_SECONDS,
+      ...(pendingWithdrawal ? { withdrawalPendingUntil: pendingWithdrawal.withdrawalPendingUntil } : {}),
     },
   });
 }

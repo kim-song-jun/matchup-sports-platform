@@ -1,3 +1,4 @@
+import { HttpException } from '@nestjs/common';
 import { readSocialLinkToken, socialLinkAccountDigest } from '../auth/social-link-token';
 import { Prisma } from '@prisma/client';
 import { hashPassword } from '../auth/password-hash';
@@ -403,7 +404,7 @@ describe('VerificationService.requestPhone (MT)', () => {
       jest.restoreAllMocks();
     });
 
-    function arrange(user: Record<string, unknown>, holder: { id: string } | null = { id: HOLDER }) {
+    function arrange(user: Record<string, unknown>, holder: { id: string; accountStatus?: string } | null = { id: HOLDER }) {
       const prisma = buildPrismaMock();
       const handle = prisma as never as {
         v1VerificationToken: { findFirst: jest.Mock; create: jest.Mock };
@@ -485,6 +486,70 @@ describe('VerificationService.requestPhone (MT)', () => {
 
       expect(error).toMatchObject(plain);
       expect(error.getResponse().details).toBeUndefined();
+    });
+
+    describe('when the holder is a withdrawal waiting out its grace period', () => {
+      const REQUESTED_AT = new Date('2026-10-01T00:00:00.000Z');
+      const GRACE_END = '2026-10-31T00:00:00.000Z';
+      const withdrawing = { id: HOLDER, accountStatus: 'withdrawal_pending' };
+
+      function withRequestLog(handle: ReturnType<typeof arrange>['handle'], createdAt: Date | null) {
+        const statusLogs = { findFirst: jest.fn().mockResolvedValue(createdAt ? { createdAt } : null) };
+        (handle as unknown as { v1StatusChangeLog: unknown }).v1StatusChangeLog = statusLogs;
+        // buildPrismaMock hands the same object to the service, so the model is visible to it as well.
+        return statusLogs;
+      }
+
+      it('adds when the grace ends to the answer given after the right code', async () => {
+        const { handle, service } = arrange(kakaoSignup(), withdrawing);
+        withRequestLog(handle, REQUESTED_AT);
+        await pendingCode(handle);
+        handle.v1User.update.mockRejectedValue(holderOwnsNumber());
+
+        const error = await service.confirm(authUser, 'phone', '123456').catch((e) => e);
+
+        expect(error).toMatchObject(SIGN_IN_THEN_LINK('kakao'));
+        expect(error.getResponse().details.withdrawalPendingUntil).toBe(GRACE_END);
+      });
+
+      it('says null for the end when no request log exists', async () => {
+        const { handle, service } = arrange(kakaoSignup(), withdrawing);
+        withRequestLog(handle, null);
+        await pendingCode(handle);
+        handle.v1User.update.mockRejectedValue(holderOwnsNumber());
+
+        const error = await service.confirm(authUser, 'phone', '123456').catch((e) => e);
+
+        expect(error.getResponse().details).toHaveProperty('withdrawalPendingUntil', null);
+      });
+
+      it('adds nothing when the holder is an active account', async () => {
+        const { handle, service } = arrange(kakaoSignup(), { id: HOLDER, accountStatus: 'active' });
+        const statusLogs = withRequestLog(handle, REQUESTED_AT);
+        await pendingCode(handle);
+        handle.v1User.update.mockRejectedValue(holderOwnsNumber());
+
+        const error = await service.confirm(authUser, 'phone', '123456').catch((e) => e);
+
+        expect(error).toMatchObject(SIGN_IN_THEN_LINK('kakao'));
+        expect(error.getResponse().details).not.toHaveProperty('withdrawalPendingUntil');
+        expect(statusLogs.findFirst).not.toHaveBeenCalled();
+      });
+
+      it('reveals nothing at the request step or after a wrong code, whoever holds the number', async () => {
+        for (const user of [kakaoSignup(), { onboardingStatus: 'completed', authIdentities: [{ provider: 'email', providerUserKey: 'a@b.com' }] }]) {
+          const { handle, service } = arrange(user, withdrawing);
+          const statusLogs = withRequestLog(handle, REQUESTED_AT);
+
+          const requested = await service.requestPhone(authUser, '01012345678').catch((e) => e);
+          await pendingCode(handle);
+          const wrongCode = await service.confirm(authUser, 'phone', '000000').catch((e) => e);
+
+          expect(JSON.stringify(requested instanceof HttpException ? requested.getResponse() : requested)).not.toContain('withdrawalPendingUntil');
+          expect(JSON.stringify(wrongCode.getResponse())).not.toContain('withdrawalPendingUntil');
+          expect(statusLogs.findFirst).not.toHaveBeenCalled();
+        }
+      });
     });
 
     it('keeps the plain answer, at the request, for a finished social account and for an email account', async () => {

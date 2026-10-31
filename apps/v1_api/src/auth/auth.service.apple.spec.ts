@@ -173,7 +173,7 @@ describe('AuthService.appleSignIn', () => {
       });
 
     await expect(signIn()).rejects.toMatchObject({
-      response: { code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', details: { next: 'sign_in_then_link', provider: 'apple', linkToken: expect.any(String), linkTokenExpiresInSeconds: 600 } },
+      response: { code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', details: { next: 'sign_in_then_link', provider: 'apple', linkToken: expect.any(String), linkTokenExpiresInSeconds: 1800 } },
     });
     expect(prisma.v1AuthIdentity.create).not.toHaveBeenCalled();
   });
@@ -187,7 +187,7 @@ describe('AuthService.appleSignIn', () => {
     prisma.v1User.updateMany.mockResolvedValue({ count: 0 });
 
     await expect(signIn()).rejects.toMatchObject({
-      response: { code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', details: { next: 'sign_in_then_link', provider: 'apple', linkToken: expect.any(String), linkTokenExpiresInSeconds: 600 } },
+      response: { code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', details: { next: 'sign_in_then_link', provider: 'apple', linkToken: expect.any(String), linkTokenExpiresInSeconds: 1800 } },
     });
     expect(prisma.v1AuthIdentity.create).not.toHaveBeenCalled();
   });
@@ -206,7 +206,7 @@ describe('AuthService.appleSignIn', () => {
     });
 
     await expect(signIn()).rejects.toMatchObject({
-      response: expect.objectContaining({ code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', details: { next: 'sign_in_then_link', provider: 'apple', linkToken: expect.any(String), linkTokenExpiresInSeconds: 600 } }),
+      response: expect.objectContaining({ code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', details: { next: 'sign_in_then_link', provider: 'apple', linkToken: expect.any(String), linkTokenExpiresInSeconds: 1800 } }),
     });
 
     // Neither outcome may happen: no identity attached to the squatting account, and no second

@@ -177,7 +177,7 @@ describe('ErrorLogService.record', () => {
       const stored = prisma.v1ErrorLog.upsert.mock.calls[0][0].create.responseBody;
       expect(JSON.stringify(stored)).not.toContain(linkToken);
       expect(stored.details).toEqual({
-        next: 'sign_in_then_link', provider: 'kakao', linkToken: '[REDACTED]', linkTokenExpiresInSeconds: 600,
+        next: 'sign_in_then_link', provider: 'kakao', linkToken: '[REDACTED]', linkTokenExpiresInSeconds: 1800,
       });
     } finally {
       if (savedSecret === undefined) delete process.env.V1_SESSION_SECRET;

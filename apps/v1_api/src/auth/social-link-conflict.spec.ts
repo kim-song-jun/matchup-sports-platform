@@ -23,7 +23,7 @@ describe('signInThenLinkConflict', () => {
     expect(error.getResponse()).toEqual({
       code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL',
       message: `이미 팀밋 계정이 있어요. 원래 가입한 방법으로 로그인하면 ${label} 로그인이 자동으로 연결돼요.`,
-      details: { next: 'sign_in_then_link', provider, linkToken: expect.any(String), linkTokenExpiresInSeconds: 600 },
+      details: { next: 'sign_in_then_link', provider, linkToken: expect.any(String), linkTokenExpiresInSeconds: 1800 },
     });
   });
 

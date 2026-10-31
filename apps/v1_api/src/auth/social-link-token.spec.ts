@@ -41,8 +41,8 @@ describe('social link token', () => {
     else process.env.V1_SESSION_SECRET = saved;
   });
 
-  it('lives for ten minutes', () => {
-    expect(SOCIAL_LINK_TOKEN_TTL_SECONDS).toBe(600);
+  it('lives for thirty minutes', () => {
+    expect(SOCIAL_LINK_TOKEN_TTL_SECONDS).toBe(1800);
   });
 
   it('returns the identity and the digests of the accounts it may go to', () => {
@@ -88,8 +88,16 @@ describe('social link token', () => {
 
   it('expires after the lifetime', () => {
     const token = issueSocialLinkToken(VERIFIED, [OWNER], NOW);
-    expect(readSocialLinkToken(token, NOW + 10 * 60 * 1000 - 1)).not.toBeNull();
-    expect(readSocialLinkToken(token, NOW + 10 * 60 * 1000 + 1)).toBeNull();
+    expect(readSocialLinkToken(token, NOW + 30 * 60 * 1000 - 1)).not.toBeNull();
+    expect(readSocialLinkToken(token, NOW + 30 * 60 * 1000 + 1)).toBeNull();
+  });
+
+  // The longer lifetime is the link token's own: a finished phone check still has to be used within ten minutes.
+  it('does not stretch the lifetime of the phone proofs it shares a secret with', () => {
+    const at = NOW + 20 * 60 * 1000;
+    expect(readSocialLinkToken(issueSocialLinkToken(VERIFIED, [OWNER], NOW), at)).not.toBeNull();
+    expect(verifyPhoneProofToken(issuePhoneProofToken('01012345678', 'signup', NOW), '01012345678', 'signup', at)).toBe(false);
+    expect(verifyPhoneProofToken(issuePhoneProofToken('01012345678', 'signup', NOW), '01012345678', 'signup', NOW + 10 * 60 * 1000 - 1)).toBe(true);
   });
 
   it('rejects a token signed with another secret and a token whose content was altered', () => {

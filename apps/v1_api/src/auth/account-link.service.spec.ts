@@ -846,7 +846,7 @@ describe('AccountLinkService.linkPending', () => {
   });
 
   describe('tokens that are not good', () => {
-    const past = Date.now() - 11 * 60 * 1000;
+    const past = Date.now() - 31 * 60 * 1000;
     it.each([
       ['a forged value', () => ({ linkToken: 'not-a-link-token-at-all-but-long-enough' })],
       ['an expired token', () => tokenOf(verifiedKakao, [CALLER], past)],

@@ -107,8 +107,8 @@ describe('maskSensitive', () => {
   });
 
   it('masks the social link token wherever it appears, and not its neighbouring fields', () => {
-    expect(maskSensitive({ details: { linkToken: 'signed.value', link_token: 'signed.value', linkTokenExpiresInSeconds: 600, next: 'sign_in_then_link' } })).toEqual({
-      details: { linkToken: '[REDACTED]', link_token: '[REDACTED]', linkTokenExpiresInSeconds: 600, next: 'sign_in_then_link' },
+    expect(maskSensitive({ details: { linkToken: 'signed.value', link_token: 'signed.value', linkTokenExpiresInSeconds: 1800, next: 'sign_in_then_link' } })).toEqual({
+      details: { linkToken: '[REDACTED]', link_token: '[REDACTED]', linkTokenExpiresInSeconds: 1800, next: 'sign_in_then_link' },
     });
     expect(maskSensitiveText('{"details":{"linkToken":"signed.value","provider":"kakao"}}')).toBe(
       '{"details":{"linkToken":"[REDACTED]","provider":"kakao"}}',

@@ -377,7 +377,7 @@ describe('VerificationService.requestPhone (MT)', () => {
     const SIGN_IN_THEN_LINK = (provider: 'kakao' | 'apple') => ({
       response: {
         code: 'PHONE_CONFLICT',
-        details: { next: 'sign_in_then_link', provider, linkToken: expect.any(String), linkTokenExpiresInSeconds: 600 },
+        details: { next: 'sign_in_then_link', provider, linkToken: expect.any(String), linkTokenExpiresInSeconds: 1800 },
       },
     });
     const plain = { response: { code: 'PHONE_CONFLICT' } };

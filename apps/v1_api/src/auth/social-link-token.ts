@@ -1,5 +1,5 @@
 import type { V1AuthProvider } from '@prisma/client';
-import { PROOF_TTL_MS, issueProofToken, proofDigest, verifyProofToken, type ProofPayloadBuilder } from '../verification/proof-token';
+import { issueProofToken, proofDigest, verifyProofToken, type ProofPayloadBuilder } from '../verification/proof-token';
 
 /** Providers an account can attach while signed in (`POST /auth/link/{provider}`). */
 export type LinkableSocialProvider = Extract<V1AuthProvider, 'kakao' | 'apple'>;
@@ -25,7 +25,9 @@ export type SocialLinkTokenContent =
   | { kind: 'verified_identity'; provider: LinkableSocialProvider; providerUserKey: string; email: string | null; allowedAccounts: string[] }
   | { kind: 'pending_account'; provider: LinkableSocialProvider; providerUserKey: string; pendingAccount: string; allowedAccounts: string[] };
 
-export const SOCIAL_LINK_TOKEN_TTL_SECONDS = PROOF_TTL_MS / 1000;
+/** Long enough to sign in the usual way with a password reset on the way; the phone and email proofs keep their own 10 minutes. */
+const SOCIAL_LINK_TOKEN_TTL_MS = 30 * 60 * 1000;
+export const SOCIAL_LINK_TOKEN_TTL_SECONDS = SOCIAL_LINK_TOKEN_TTL_MS / 1000;
 
 /** Leads the signed payload; no other proof token (phone, email) can start with it. */
 const PURPOSE = 'social_link_pending';
@@ -76,7 +78,7 @@ export function issueSocialLinkToken(
   nowMs: number = Date.now(),
 ): string {
   if (targetUserIds.length === 0) throw new Error('A social link token needs at least one target account');
-  return issueProofToken(payloadFor(toContent(claims, targetUserIds)), nowMs);
+  return issueProofToken(payloadFor(toContent(claims, targetUserIds)), nowMs, SOCIAL_LINK_TOKEN_TTL_MS);
 }
 
 /** The content of a genuine, unexpired token of this purpose; null for anything else. */

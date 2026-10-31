@@ -54,9 +54,10 @@ export function proofDigest(label: string, value: string): string {
   return sign(`${label}:${value}`, assertProofSecret());
 }
 
-export function issueProofToken(buildPayload: ProofPayloadBuilder, nowMs: number): string {
+/** `ttlMs` is for a token with its own lifetime (the social link token); the proofs of a finished check keep the default. */
+export function issueProofToken(buildPayload: ProofPayloadBuilder, nowMs: number, ttlMs: number = PROOF_TTL_MS): string {
   const secret = assertProofSecret();
-  const payload = buildPayload(nowMs + PROOF_TTL_MS);
+  const payload = buildPayload(nowMs + ttlMs);
   return `${Buffer.from(payload).toString('base64url')}.${sign(payload, secret)}`;
 }
 

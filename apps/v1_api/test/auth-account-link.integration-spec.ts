@@ -279,7 +279,7 @@ describe('V1 signed-in social account link integration', () => {
       const rejected = await request(app.getHttpServer()).post('/api/v1/auth/kakao/token').send({ accessToken: 'native-sdk-token-0123456789' }).expect(409);
       expect(rejected.body).toMatchObject({
         code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL',
-        details: { next: 'sign_in_then_link', provider: 'kakao', linkTokenExpiresInSeconds: 600 },
+        details: { next: 'sign_in_then_link', provider: 'kakao', linkTokenExpiresInSeconds: 1800 },
       });
       expect(await prisma.v1AuthIdentity.count({ where: { provider: 'kakao', providerUserKey: KAKAO_KEY } })).toBe(0);
 
@@ -315,7 +315,7 @@ describe('V1 signed-in social account link integration', () => {
       const rejected = await confirmCode(asked.body.data.devCode).expect(409);
       expect(rejected.body).toMatchObject({
         code: 'PHONE_CONFLICT',
-        details: { next: 'sign_in_then_link', provider: 'kakao', linkTokenExpiresInSeconds: 600 },
+        details: { next: 'sign_in_then_link', provider: 'kakao', linkTokenExpiresInSeconds: 1800 },
       });
       expect(await prisma.v1User.findUniqueOrThrow({ where: { id: EMPTY } })).toMatchObject({ phone: null, accountStatus: 'active' });
     });

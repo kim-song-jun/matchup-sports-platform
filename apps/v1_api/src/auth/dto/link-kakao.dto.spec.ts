@@ -23,6 +23,11 @@ describe('LinkKakaoDto', () => {
     expect(await invalidFields({})).toEqual(['code', 'redirectUri']);
   });
 
+  it('does not let a null token stand in for the absence of one', async () => {
+    expect(await invalidFields({ accessToken: null })).toEqual(['accessToken']);
+    expect(await invalidFields({ accessToken: null, code: 'auth-code', redirectUri: 'https://teameet.co.kr/auth/kakao/callback' })).toEqual(['accessToken']);
+  });
+
   it('rejects a token too short to be a Kakao token and unknown fields', async () => {
     expect(await invalidFields({ accessToken: 'short' })).toEqual(['accessToken']);
     expect(await invalidFields({ accessToken: 'native-sdk-token-0123456789', userId: 'someone-else' })).toEqual(['userId']);

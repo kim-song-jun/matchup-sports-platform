@@ -1,5 +1,5 @@
 import type { V1AuthProvider } from '@prisma/client';
-import { PROOF_TTL_MS, issueProofToken, verifyProofToken, type ProofPayloadBuilder } from '../verification/proof-token';
+import { PROOF_TTL_MS, issueProofToken, proofDigest, verifyProofToken, type ProofPayloadBuilder } from '../verification/proof-token';
 
 /** Providers an account can attach while signed in (`POST /auth/link/{provider}`). */
 export type LinkableSocialProvider = Extract<V1AuthProvider, 'kakao' | 'apple'>;
@@ -17,41 +17,77 @@ export type SocialLinkClaims =
   | { kind: 'verified_identity'; provider: LinkableSocialProvider; providerUserKey: string; email: string | null }
   | { kind: 'pending_account'; provider: LinkableSocialProvider; providerUserKey: string; pendingUserId: string };
 
+/**
+ * A token's content as it is signed and read back. Account ids never travel in it: the signup account and the
+ * accounts allowed to receive the identity appear only as keyed digests (`socialLinkAccountDigest`).
+ */
+export type SocialLinkTokenContent =
+  | { kind: 'verified_identity'; provider: LinkableSocialProvider; providerUserKey: string; email: string | null; allowedAccounts: string[] }
+  | { kind: 'pending_account'; provider: LinkableSocialProvider; providerUserKey: string; pendingAccount: string; allowedAccounts: string[] };
+
 export const SOCIAL_LINK_TOKEN_TTL_SECONDS = PROOF_TTL_MS / 1000;
 
 /** Leads the signed payload; no other proof token (phone, email) can start with it. */
 const PURPOSE = 'social_link_pending';
+const ACCOUNT_DIGEST_LABEL = 'social_link_account';
+const MAX_ALLOWED_ACCOUNTS = 4;
 
 export function isLinkableSocialProvider(provider: V1AuthProvider | string): provider is LinkableSocialProvider {
   return provider === 'kakao' || provider === 'apple';
 }
 
-function encodeClaims(claims: SocialLinkClaims): string {
-  const tuple =
-    claims.kind === 'pending_account'
-      ? [claims.kind, claims.provider, claims.providerUserKey, claims.pendingUserId]
-      : [claims.kind, claims.provider, claims.providerUserKey, claims.email];
+export function socialLinkAccountDigest(userId: string): string {
+  return proofDigest(ACCOUNT_DIGEST_LABEL, userId);
+}
+
+function toContent(claims: SocialLinkClaims, targetUserIds: readonly string[]): SocialLinkTokenContent {
+  const allowedAccounts = [...new Set(targetUserIds)].map(socialLinkAccountDigest);
+  return claims.kind === 'pending_account'
+    ? {
+        kind: claims.kind,
+        provider: claims.provider,
+        providerUserKey: claims.providerUserKey,
+        pendingAccount: socialLinkAccountDigest(claims.pendingUserId),
+        allowedAccounts,
+      }
+    : { ...claims, allowedAccounts };
+}
+
+function encodeContent(content: SocialLinkTokenContent): string {
+  const tuple = [
+    content.kind,
+    content.provider,
+    content.providerUserKey,
+    content.kind === 'pending_account' ? content.pendingAccount : content.email,
+    content.allowedAccounts,
+  ];
   return Buffer.from(JSON.stringify(tuple)).toString('base64url');
 }
 
-function payloadFor(claims: SocialLinkClaims): ProofPayloadBuilder {
-  const encoded = encodeClaims(claims);
+function payloadFor(content: SocialLinkTokenContent): ProofPayloadBuilder {
+  const encoded = encodeContent(content);
   return (expMs) => `${PURPOSE}:${encoded}:${expMs}`;
 }
 
-export function issueSocialLinkToken(claims: SocialLinkClaims, nowMs: number = Date.now()): string {
-  return issueProofToken(payloadFor(claims), nowMs);
+/** `targetUserIds` are the accounts the identity may be attached to: the candidates the rejected login collided with. */
+export function issueSocialLinkToken(
+  claims: SocialLinkClaims,
+  targetUserIds: readonly string[],
+  nowMs: number = Date.now(),
+): string {
+  if (targetUserIds.length === 0) throw new Error('A social link token needs at least one target account');
+  return issueProofToken(payloadFor(toContent(claims, targetUserIds)), nowMs);
 }
 
-/** The claims of a genuine, unexpired token of this purpose; null for anything else. */
-export function readSocialLinkToken(token: string, nowMs: number = Date.now()): SocialLinkClaims | null {
-  const claims = parseClaims(token);
-  if (!claims) return null;
-  // The payload is rebuilt from the parsed claims and compared with the signed one, so extra or reordered content fails.
-  return verifyProofToken(token, payloadFor(claims), nowMs) ? claims : null;
+/** The content of a genuine, unexpired token of this purpose; null for anything else. */
+export function readSocialLinkToken(token: string, nowMs: number = Date.now()): SocialLinkTokenContent | null {
+  const content = parseContent(token);
+  if (!content) return null;
+  // The payload is rebuilt from the parsed content and compared with the signed one, so extra or reordered content fails.
+  return verifyProofToken(token, payloadFor(content), nowMs) ? content : null;
 }
 
-function parseClaims(token: string): SocialLinkClaims | null {
+function parseContent(token: string): SocialLinkTokenContent | null {
   const [encodedPayload] = token.split('.');
   if (!encodedPayload) return null;
   const segments = Buffer.from(encodedPayload, 'base64url').toString('utf8').split(':');
@@ -64,16 +100,24 @@ function parseClaims(token: string): SocialLinkClaims | null {
     if (error instanceof SyntaxError) return null;
     throw error;
   }
-  if (!Array.isArray(tuple) || tuple.length !== 4) return null;
+  if (!Array.isArray(tuple) || tuple.length !== 5) return null;
 
-  const [kind, provider, providerUserKey, last] = tuple;
+  const [kind, provider, providerUserKey, last, allowedAccounts] = tuple;
   if (typeof provider !== 'string' || !isLinkableSocialProvider(provider)) return null;
   if (typeof providerUserKey !== 'string' || providerUserKey.length === 0) return null;
+  if (
+    !Array.isArray(allowedAccounts) ||
+    allowedAccounts.length === 0 ||
+    allowedAccounts.length > MAX_ALLOWED_ACCOUNTS ||
+    !allowedAccounts.every((digest): digest is string => typeof digest === 'string' && digest.length > 0)
+  ) {
+    return null;
+  }
   if (kind === 'pending_account' && typeof last === 'string' && last.length > 0) {
-    return { kind, provider, providerUserKey, pendingUserId: last };
+    return { kind, provider, providerUserKey, pendingAccount: last, allowedAccounts };
   }
   if (kind === 'verified_identity' && (last === null || (typeof last === 'string' && last.length > 0))) {
-    return { kind, provider, providerUserKey, email: last };
+    return { kind, provider, providerUserKey, email: last, allowedAccounts };
   }
   return null;
 }

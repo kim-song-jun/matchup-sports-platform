@@ -1,5 +1,5 @@
-import { pendingAccountLinkClaims, signInThenLinkConflict } from './social-link-conflict';
-import { readSocialLinkToken, type SocialLinkClaims } from './social-link-token';
+import { pendingAccountLinkClaims, signInThenLinkConflict, signInThenLinkHint } from './social-link-conflict';
+import { readSocialLinkToken, socialLinkAccountDigest, type SocialLinkClaims } from './social-link-token';
 
 describe('signInThenLinkConflict', () => {
   let saved: string | undefined;
@@ -17,7 +17,7 @@ describe('signInThenLinkConflict', () => {
     ['apple', 'Apple'],
   ] as const)('tells a %s user that signing in to the original account links it automatically', (provider, label) => {
     const claims: SocialLinkClaims = { kind: 'verified_identity', provider, providerUserKey: `${provider}-key`, email: null };
-    const error = signInThenLinkConflict('SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', claims);
+    const error = signInThenLinkConflict('SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', claims, ['user-owner']);
 
     expect(error.getStatus()).toBe(409);
     expect(error.getResponse()).toEqual({
@@ -27,16 +27,37 @@ describe('signInThenLinkConflict', () => {
     });
   });
 
-  it('carries a token that reads back as exactly the claims the conflict was built from', () => {
+  it('carries a token that reads back as the identity the conflict was built from, bound to the accounts it collided with', () => {
     const claims: SocialLinkClaims = { kind: 'pending_account', provider: 'kakao', providerUserKey: 'kakao-key', pendingUserId: 'user-pending' };
-    const { details } = signInThenLinkConflict('PHONE_CONFLICT', claims).getResponse() as { details: { linkToken: string } };
+    const { details } = signInThenLinkConflict('PHONE_CONFLICT', claims, ['user-email-owner', 'user-phone-owner']).getResponse() as {
+      details: { linkToken: string };
+    };
 
-    expect(readSocialLinkToken(details.linkToken)).toEqual(claims);
+    expect(readSocialLinkToken(details.linkToken)).toEqual({
+      kind: 'pending_account',
+      provider: 'kakao',
+      providerUserKey: 'kakao-key',
+      pendingAccount: socialLinkAccountDigest('user-pending'),
+      allowedAccounts: [socialLinkAccountDigest('user-email-owner'), socialLinkAccountDigest('user-phone-owner')],
+    });
   });
 
   it('keeps the code it is given', () => {
     const claims: SocialLinkClaims = { kind: 'verified_identity', provider: 'kakao', providerUserKey: 'k', email: null };
-    expect(signInThenLinkConflict('PHONE_CONFLICT', claims).getResponse()).toMatchObject({ code: 'PHONE_CONFLICT' });
+    expect(signInThenLinkConflict('PHONE_CONFLICT', claims, ['user-owner']).getResponse()).toMatchObject({ code: 'PHONE_CONFLICT' });
+  });
+});
+
+describe('signInThenLinkHint', () => {
+  it('gives the manual advice and no token, so nothing can be attached automatically', () => {
+    const error = signInThenLinkHint('PHONE_CONFLICT', 'apple');
+
+    expect(error.getStatus()).toBe(409);
+    expect(error.getResponse()).toEqual({
+      code: 'PHONE_CONFLICT',
+      message: '이미 팀밋 계정이 있어요. 원래 가입한 방법으로 로그인한 뒤 설정 › 로그인 방법에서 Apple 로그인을 연결해 주세요.',
+      details: { next: 'sign_in_then_link', provider: 'apple' },
+    });
   });
 });
 

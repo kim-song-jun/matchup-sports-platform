@@ -1,16 +1,33 @@
 import { createHmac } from 'node:crypto';
 import { issueEmailProofToken } from '../verification/email-proof-token';
 import { issuePhoneProofToken, verifyPhoneProofToken } from '../verification/phone-proof-token';
-import { SOCIAL_LINK_TOKEN_TTL_SECONDS, isLinkableSocialProvider, issueSocialLinkToken, readSocialLinkToken, type SocialLinkClaims } from './social-link-token';
+import {
+  SOCIAL_LINK_TOKEN_TTL_SECONDS,
+  isLinkableSocialProvider,
+  issueSocialLinkToken,
+  readSocialLinkToken,
+  socialLinkAccountDigest,
+  type SocialLinkClaims,
+} from './social-link-token';
 
 const SECRET = 'x'.repeat(48);
 const NOW = Date.UTC(2026, 9, 31, 4, 0, 0);
 
 const VERIFIED: SocialLinkClaims = { kind: 'verified_identity', provider: 'kakao', providerUserKey: 'kakao-key-1', email: 'me@example.test' };
 const PENDING: SocialLinkClaims = { kind: 'pending_account', provider: 'apple', providerUserKey: 'apple-sub-1', pendingUserId: 'user-pending' };
+const OWNER = 'user-owner-1111';
 
 function signedToken(payload: string, secret = SECRET) {
   return `${Buffer.from(payload).toString('base64url')}.${createHmac('sha256', secret).update(payload).digest('base64url')}`;
+}
+function craftedToken(tuple: unknown[]) {
+  return signedToken(`social_link_pending:${Buffer.from(JSON.stringify(tuple)).toString('base64url')}:${NOW + 60_000}`);
+}
+/** The signed payload and the claims inside it, both decoded, as anyone holding the token can read them. */
+function visibleContent(token: string) {
+  const payload = Buffer.from(token.split('.')[0], 'base64url').toString('utf8');
+  const [, claims] = payload.split(':');
+  return `${payload}\n${Buffer.from(claims, 'base64url').toString('utf8')}`;
 }
 
 describe('social link token', () => {
@@ -28,22 +45,55 @@ describe('social link token', () => {
     expect(SOCIAL_LINK_TOKEN_TTL_SECONDS).toBe(600);
   });
 
-  it.each([
-    ['a verified identity', VERIFIED],
-    ['a verified identity without an email', { ...VERIFIED, email: null }],
-    ['an unfinished signup account', PENDING],
-  ])('returns the claims of %s', (_name, claims) => {
-    expect(readSocialLinkToken(issueSocialLinkToken(claims, NOW), NOW + 1_000)).toEqual(claims);
+  it('returns the identity and the digests of the accounts it may go to', () => {
+    const token = issueSocialLinkToken(VERIFIED, [OWNER], NOW);
+
+    expect(readSocialLinkToken(token, NOW + 1_000)).toEqual({ ...VERIFIED, allowedAccounts: [socialLinkAccountDigest(OWNER)] });
+  });
+
+  it('holds an unfinished signup as a digest too', () => {
+    const token = issueSocialLinkToken(PENDING, [OWNER], NOW);
+
+    expect(readSocialLinkToken(token, NOW)).toEqual({
+      kind: 'pending_account',
+      provider: 'apple',
+      providerUserKey: 'apple-sub-1',
+      pendingAccount: socialLinkAccountDigest('user-pending'),
+      allowedAccounts: [socialLinkAccountDigest(OWNER)],
+    });
+  });
+
+  it('names every candidate account once, and never an account id in the clear', () => {
+    const token = issueSocialLinkToken(PENDING, [OWNER, 'user-other-2222', OWNER], NOW);
+
+    expect(readSocialLinkToken(token, NOW)?.allowedAccounts).toEqual([
+      socialLinkAccountDigest(OWNER),
+      socialLinkAccountDigest('user-other-2222'),
+    ]);
+    const visible = visibleContent(token);
+    for (const id of [OWNER, 'user-other-2222', 'user-pending']) expect(visible).not.toContain(id);
+  });
+
+  it('ties account digests to this secret and this purpose', () => {
+    const digest = socialLinkAccountDigest(OWNER);
+    expect(digest).not.toBe(socialLinkAccountDigest('user-other-2222'));
+    expect(digest).not.toContain(OWNER);
+    process.env.V1_SESSION_SECRET = 'y'.repeat(48);
+    expect(socialLinkAccountDigest(OWNER)).not.toBe(digest);
+  });
+
+  it('is not issued without an account to go to', () => {
+    expect(() => issueSocialLinkToken(VERIFIED, [], NOW)).toThrow();
   });
 
   it('expires after the lifetime', () => {
-    const token = issueSocialLinkToken(VERIFIED, NOW);
-    expect(readSocialLinkToken(token, NOW + 10 * 60 * 1000 - 1)).toEqual(VERIFIED);
+    const token = issueSocialLinkToken(VERIFIED, [OWNER], NOW);
+    expect(readSocialLinkToken(token, NOW + 10 * 60 * 1000 - 1)).not.toBeNull();
     expect(readSocialLinkToken(token, NOW + 10 * 60 * 1000 + 1)).toBeNull();
   });
 
   it('rejects a token signed with another secret and a token whose content was altered', () => {
-    const token = issueSocialLinkToken(VERIFIED, NOW);
+    const token = issueSocialLinkToken(VERIFIED, [OWNER], NOW);
     process.env.V1_SESSION_SECRET = 'y'.repeat(48);
     expect(readSocialLinkToken(token, NOW)).toBeNull();
     process.env.V1_SESSION_SECRET = SECRET;
@@ -58,7 +108,7 @@ describe('social link token', () => {
   });
 
   it('is refused without a configured secret', () => {
-    const token = issueSocialLinkToken(VERIFIED, NOW);
+    const token = issueSocialLinkToken(VERIFIED, [OWNER], NOW);
     process.env.V1_SESSION_SECRET = '';
     delete process.env.V1_JWT_SECRET;
     delete process.env.JWT_SECRET;
@@ -72,22 +122,33 @@ describe('social link token', () => {
   });
 
   it('cannot be spent as a phone proof either', () => {
-    const token = issueSocialLinkToken(VERIFIED, NOW);
+    const token = issueSocialLinkToken(VERIFIED, [OWNER], NOW);
     expect(verifyPhoneProofToken(token, '01012345678', 'signup', NOW)).toBe(false);
     expect(verifyPhoneProofToken(token, '01012345678', 'password_reset', NOW)).toBe(false);
   });
 
   it.each([
-    ['not a token', 'garbage'],
-    ['an empty string', ''],
-    ['a payload of another purpose with a valid signature', signedToken(`other_purpose:${Buffer.from('["verified_identity","kakao","k",null]').toString('base64url')}:${NOW + 60_000}`)],
-    ['an unknown claim kind', signedToken(`social_link_pending:${Buffer.from('["something","kakao","k",null]').toString('base64url')}:${NOW + 60_000}`)],
-    ['a provider that cannot be linked', signedToken(`social_link_pending:${Buffer.from('["verified_identity","email","k",null]').toString('base64url')}:${NOW + 60_000}`)],
-    ['a pending account without its user id', signedToken(`social_link_pending:${Buffer.from('["pending_account","kakao","k",""]').toString('base64url')}:${NOW + 60_000}`)],
-    ['claims that are not JSON', signedToken(`social_link_pending:${Buffer.from('not json').toString('base64url')}:${NOW + 60_000}`)],
-    ['extra claims', signedToken(`social_link_pending:${Buffer.from('["verified_identity","kakao","k",null,"extra"]').toString('base64url')}:${NOW + 60_000}`)],
-  ])('rejects %s', (_name, token) => {
-    expect(readSocialLinkToken(token, NOW)).toBeNull();
+    ['not a token', () => 'garbage'],
+    ['an empty string', () => ''],
+    ['a payload of another purpose with a valid signature', () => signedToken(`other_purpose:${Buffer.from('["verified_identity","kakao","k",null,["d"]]').toString('base64url')}:${NOW + 60_000}`)],
+    ['an unknown claim kind', () => craftedToken(['something', 'kakao', 'k', null, ['d']])],
+    ['a provider that cannot be linked', () => craftedToken(['verified_identity', 'email', 'k', null, ['d']])],
+    ['a pending account without its digest', () => craftedToken(['pending_account', 'kakao', 'k', '', ['d']])],
+    ['claims that are not JSON', () => signedToken(`social_link_pending:${Buffer.from('not json').toString('base64url')}:${NOW + 60_000}`)],
+    ['extra claims', () => craftedToken(['verified_identity', 'kakao', 'k', null, ['d'], 'extra'])],
+    ['no allowed accounts', () => craftedToken(['verified_identity', 'kakao', 'k', null, []])],
+    ['allowed accounts that are not a list', () => craftedToken(['verified_identity', 'kakao', 'k', null, 'd'])],
+    ['an empty allowed digest', () => craftedToken(['verified_identity', 'kakao', 'k', null, ['']])],
+    ['more allowed accounts than a conflict can have', () => craftedToken(['verified_identity', 'kakao', 'k', null, ['a', 'b', 'c', 'd', 'e']])],
+    ['the shape from before accounts were bound', () => craftedToken(['verified_identity', 'kakao', 'k', null])],
+  ])('rejects %s', (_name, makeToken) => {
+    expect(readSocialLinkToken(makeToken(), NOW)).toBeNull();
+  });
+
+  it('accepts a hand-signed token of the right shape, which shows the rejections above are about content', () => {
+    expect(readSocialLinkToken(craftedToken(['verified_identity', 'kakao', 'k', null, ['d']]), NOW)).toEqual({
+      kind: 'verified_identity', provider: 'kakao', providerUserKey: 'k', email: null, allowedAccounts: ['d'],
+    });
   });
 });
 

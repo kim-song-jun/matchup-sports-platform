@@ -12,7 +12,9 @@ export type FakeUser = {
   phone: string | null;
   accountStatus: string;
   onboardingStatus: string;
-  adminUser: { id: string } | null;
+  adminUser: { id: string; status?: string } | null;
+  /** Counts of the relations that mean the account was used (teams, matches, chat, ...). Absent = none. */
+  activity?: Record<string, number>;
   deletedAt: Date | null;
   emailVerifiedAt: Date | null;
   phoneVerifiedAt: Date | null;
@@ -62,6 +64,8 @@ export function createFakePrisma(seed: { users: FakeUser[]; identities: FakeIden
     state.identities.filter((identity) => identity.userId === userId && identity.status === 'active');
   const withRelations = (user: FakeUser) => ({
     ...user,
+    adminUser: user.adminUser && { status: 'active', ...user.adminUser },
+    _count: { ...user.activity },
     authIdentities: activeIdentities(user.id).map((identity) => ({ ...identity })),
   });
   const countOf = (rows: unknown[]) => ({ count: rows.length });
@@ -171,6 +175,7 @@ export function createFakePrisma(seed: { users: FakeUser[]; identities: FakeIden
     await previous;
   }
 
+  const transactions: Array<{ $queryRaw: jest.Mock; $executeRaw: jest.Mock }> = [];
   const prisma = {
     ...client,
     $transaction: jest.fn(async (run: (tx: unknown) => Promise<unknown>) => {
@@ -182,7 +187,10 @@ export function createFakePrisma(seed: { users: FakeUser[]; identities: FakeIden
           await acquire(scope, held);
           return 1;
         }),
+        // Row lock on the caller (`SELECT ... FOR UPDATE`); the advisory locks above already order the specs' callers.
+        $queryRaw: jest.fn(async () => []),
       };
+      transactions.push(tx);
       try {
         return await undoLog.run(undo, () => run(tx));
       } catch (error) {
@@ -194,5 +202,5 @@ export function createFakePrisma(seed: { users: FakeUser[]; identities: FakeIden
     }),
   };
 
-  return { prisma, client, state };
+  return { prisma, client, state, transactions };
 }

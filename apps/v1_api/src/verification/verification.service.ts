@@ -67,11 +67,15 @@ export class VerificationService {
 
   async requestPhone(authUser: V1AuthUser, phone: string) {
     const user = await this.loadUser(authUser.id);
-    const owner = await this.prisma.v1User.findFirst({
-      where: { phone, id: { not: user.id } },
-      select: { id: true },
-    });
-    if (owner) throw phoneConflict(user);
+    // An unfinished social signup may ask for a number somebody else holds. Saying so before the code is entered would
+    // hand anyone the link token of whoever owns the number; `confirm` answers once the code proves they hold it.
+    if (!isUnfinishedSocialSignup(user.onboardingStatus)) {
+      const owner = await this.prisma.v1User.findFirst({
+        where: { phone, id: { not: user.id } },
+        select: { id: true },
+      });
+      if (owner) throw phoneConflict(user, owner.id);
+    }
     if (user.phoneVerifiedAt && user.phone === phone) {
       return { sent: false, alreadyVerified: true, channel: 'phone' as const };
     }
@@ -221,7 +225,12 @@ export class VerificationService {
         if (channel === 'email') {
           throw new ConflictException({ code: 'EMAIL_CONFLICT', message: '이미 다른 계정에서 사용 중인 이메일이에요.' });
         }
-        throw phoneConflict(await this.loadUser(authUser.id));
+        // The holder may have claimed the number a moment ago; without one there is no account to link to.
+        const holder = await this.prisma.v1User.findFirst({
+          where: { phone: token.target, id: { not: authUser.id } },
+          select: { id: true },
+        });
+        throw phoneConflict(await this.loadUser(authUser.id), holder?.id);
       }
       throw error;
     }
@@ -308,15 +317,18 @@ export class VerificationService {
  * A number held by another account. For a social signup that has not finished, the holder is the person's own
  * existing account, so the way forward is to sign in there and link the provider; anyone else just picks another number.
  */
-function phoneConflict(user: {
-  id: string;
-  onboardingStatus: string;
-  authIdentities: { provider: string; providerUserKey: string }[];
-}) {
-  const claims = isUnfinishedSocialSignup(user.onboardingStatus)
-    ? pendingAccountLinkClaims(user.id, user.authIdentities)
-    : null;
-  if (claims) return signInThenLinkConflict('PHONE_CONFLICT', claims);
+function phoneConflict(
+  user: {
+    id: string;
+    onboardingStatus: string;
+    authIdentities: { provider: string; providerUserKey: string }[];
+  },
+  holderUserId: string | undefined,
+) {
+  if (holderUserId !== undefined && isUnfinishedSocialSignup(user.onboardingStatus)) {
+    const claims = pendingAccountLinkClaims(user.id, user.authIdentities);
+    if (claims) return signInThenLinkConflict('PHONE_CONFLICT', claims, [holderUserId]);
+  }
   return new ConflictException({
     code: 'PHONE_CONFLICT',
     message: '이미 다른 계정에서 사용 중인 번호예요.',

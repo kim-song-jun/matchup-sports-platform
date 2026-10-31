@@ -16,11 +16,11 @@ export function buildDeletedProviderUserKey(userId: string, identityId: string) 
   return `deleted:${userId}:${identityId}`;
 }
 
-export function buildDeletedNickname(userId: string) {
+function buildDeletedNickname(userId: string) {
   return `deleted_${userId.slice(0, 8)}`;
 }
 
-export function buildDeletedProfileData(userId: string, deletedAt: Date) {
+function buildDeletedProfileData(userId: string, deletedAt: Date) {
   return {
     nickname: buildDeletedNickname(userId),
     displayName: '탈퇴 회원',

@@ -163,7 +163,7 @@ describe('ErrorLogService.record', () => {
     try {
       const conflict = signInThenLinkConflict('SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', {
         kind: 'verified_identity', provider: 'kakao', providerUserKey: 'kakao-key-1', email: null,
-      });
+      }, ['user-owner']);
       const responseBody = { status: 'error', statusCode: 409, ...(conflict.getResponse() as object), requestId: 'req-1' };
       const linkToken = (responseBody as unknown as { details: { linkToken: string } }).details.linkToken;
       expect(linkToken.length).toBeGreaterThan(20);

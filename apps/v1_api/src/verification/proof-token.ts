@@ -46,6 +46,14 @@ function sign(payload: string, secret: string): string {
   return createHmac('sha256', secret).update(payload).digest('base64url');
 }
 
+/**
+ * Keyed digest of a value under the proof secret, namespaced by `label`. Lets a token name an account or other id
+ * without carrying it: the holder can neither read the id back nor produce the digest of another one.
+ */
+export function proofDigest(label: string, value: string): string {
+  return sign(`${label}:${value}`, assertProofSecret());
+}
+
 export function issueProofToken(buildPayload: ProofPayloadBuilder, nowMs: number): string {
   const secret = assertProofSecret();
   const payload = buildPayload(nowMs + PROOF_TTL_MS);

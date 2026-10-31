@@ -8,7 +8,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma, V1AuthProvider } from '@prisma/client';
-import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationsService, type DeliveredNotification } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import {
@@ -18,13 +18,13 @@ import {
 } from '../users/final-account-deletion';
 import { AppleIdentityService } from './apple-identity.service';
 import { AppleTokenService } from './apple-token.service';
-import { AuthService, type KakaoProfile } from './auth.service';
+import { AuthService, kakaoVerifiedEmail, type KakaoProfile } from './auth.service';
 import type { AppleLoginDto } from './dto/apple-login.dto';
 import type { LinkKakaoDto } from './dto/link-kakao.dto';
 import type { LinkPendingDto } from './dto/link-pending.dto';
 import { normalizeEmail } from './normalize-email';
 import { SOCIAL_PROVIDER_LABELS } from './social-link-conflict';
-import { readSocialLinkToken, type LinkableSocialProvider } from './social-link-token';
+import { readSocialLinkToken, socialLinkAccountDigest, type LinkableSocialProvider } from './social-link-token';
 import {
   ACTIVITY_PROFILE_ROUTE,
   getPendingSocialSignupRoute,
@@ -48,14 +48,14 @@ type VerifiedProviderIdentity = {
   providerUserKey: string;
   /** Only a provider-verified address; never a self-declared one. */
   email: string | null;
-  /** When set, the identity may only be taken from this unfinished signup account; anywhere else it is refused. */
-  heldBy?: string;
+  /** Digest of the unfinished signup account the identity may be taken from; held anywhere else it is refused. */
+  heldByAccount?: string;
 };
 
 type LinkOutcome = {
   result: AccountLinkResult;
-  /** Set when a new link was written (not for an idempotent repeat). */
-  linkedIdentityId: string | null;
+  /** The in-app notice created with a new link (not for an idempotent repeat); pushed once the link has committed. */
+  notification: DeliveredNotification | null;
   mergedUserId: string | null;
 };
 
@@ -89,7 +89,7 @@ export class AccountLinkService {
     return this.link(callerId, {
       provider: V1AuthProvider.kakao,
       providerUserKey: profile.providerUserKey,
-      email: profile.email && profile.emailValid && profile.emailVerified ? normalizeEmail(profile.email) : null,
+      email: kakaoVerifiedEmail(profile),
     });
   }
 
@@ -113,17 +113,19 @@ export class AccountLinkService {
 
   /**
    * Attaches the provider identity a rejected social sign-in or signup left behind (`linkToken` from its 409), now
-   * that the person has signed in to the account that sign-in collided with.
+   * that the person has signed in to the account that sign-in collided with. The token names the accounts it may go
+   * to, so a session of any other account is refused: the token alone is not proof of who is holding it.
    */
   async linkPending(callerId: string, dto: LinkPendingDto, sessionAgeSeconds: number | null): Promise<AccountLinkResult> {
     assertRecentLogin(sessionAgeSeconds);
-    const claims = readSocialLinkToken(dto.linkToken);
-    if (!claims) throw socialLinkTokenInvalid();
+    const token = readSocialLinkToken(dto.linkToken);
+    if (!token) throw socialLinkTokenInvalid();
+    if (!token.allowedAccounts.includes(socialLinkAccountDigest(callerId))) throw socialLinkTokenAccountMismatch();
     return this.link(
       callerId,
-      claims.kind === 'pending_account'
-        ? { provider: claims.provider, providerUserKey: claims.providerUserKey, email: null, heldBy: claims.pendingUserId }
-        : { provider: claims.provider, providerUserKey: claims.providerUserKey, email: claims.email },
+      token.kind === 'pending_account'
+        ? { provider: token.provider, providerUserKey: token.providerUserKey, email: null, heldByAccount: token.pendingAccount }
+        : { provider: token.provider, providerUserKey: token.providerUserKey, email: token.email },
     );
   }
 
@@ -154,16 +156,7 @@ export class AccountLinkService {
         this.logger.warn(`socket disconnect after account merge failed: ${errorText(error)}`);
       }
     }
-    if (outcome.linkedIdentityId) {
-      try {
-        await this.notifications.emitNotification(callerId, 'social_identity_linked', null, undefined, {
-          vars: { name: SOCIAL_PROVIDER_LABELS[identity.provider] },
-          businessKey: `social-link:${outcome.linkedIdentityId}`,
-        });
-      } catch (error) {
-        this.logger.warn(`social link notification failed: ${errorText(error)}`);
-      }
-    }
+    if (outcome.notification) this.notifications.deliverCreated(callerId, 'social_identity_linked', outcome.notification);
     return outcome.result;
   }
 
@@ -179,11 +172,15 @@ export class AccountLinkService {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${callerScope}, 0))`;
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${identityScope}, 0))`;
 
+    // Lock the caller's row so a suspension or deletion committing meanwhile is seen, not raced.
+    await tx.$queryRaw`SELECT id FROM "v1_users" WHERE id = ${callerId} FOR UPDATE`;
     const caller = await tx.v1User.findUnique({
       where: { id: callerId },
       select: {
         accountStatus: true,
+        deletedAt: true,
         onboardingStatus: true,
+        adminUser: { select: { status: true } },
         authIdentities: {
           where: { status: 'active' },
           orderBy: { createdAt: 'asc' },
@@ -192,8 +189,15 @@ export class AccountLinkService {
       },
     });
     if (!caller) throw new NotFoundException({ code: 'NOT_FOUND', message: 'V1 user was not found' });
-    if (caller.accountStatus !== 'active') {
+    if (caller.accountStatus !== 'active' || caller.deletedAt !== null) {
       throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: '이용이 제한된 계정이에요.' });
+    }
+    // An operator's account is not changed by a link made from a browser session.
+    if (caller.adminUser && caller.adminUser.status !== 'revoked') {
+      throw new ForbiddenException({
+        code: 'SOCIAL_LINK_ADMIN_FORBIDDEN',
+        message: '운영 권한이 있는 계정에는 소셜 로그인을 연결할 수 없어요.',
+      });
     }
     if (isUnfinishedSocialSignup(caller.onboardingStatus)) throw signupIncomplete(caller.onboardingStatus);
 
@@ -207,7 +211,7 @@ export class AccountLinkService {
           mergedPendingAccount: false,
           authProviders: distinctProviders(caller.authIdentities),
         },
-        linkedIdentityId: null,
+        notification: null,
         mergedUserId: null,
       };
     }
@@ -228,15 +232,16 @@ export class AccountLinkService {
             onboardingStatus: true,
             adminUser: { select: { id: true } },
             authIdentities: { where: { status: 'active' }, select: { id: true } },
+            _count: { select: ACTIVITY_RELATION_COUNTS },
           },
         },
       },
     });
 
-    if (identity.heldBy !== undefined) {
+    if (identity.heldByAccount !== undefined) {
       // The token described an unfinished signup holding this identity; anything else means that moved on.
       if (!holder) throw socialLinkTokenInvalid();
-      if (holder.user.id !== identity.heldBy) throw providerInUse();
+      if (socialLinkAccountDigest(holder.user.id) !== identity.heldByAccount) throw providerInUse();
     }
 
     let linkedIdentityId: string;
@@ -283,6 +288,11 @@ export class AccountLinkService {
       orderBy: { createdAt: 'asc' },
       select: { provider: true },
     });
+    // A security notice, so it ignores notification settings and is stored with the link or not at all.
+    const notification = await this.notifications.createInTransaction(tx, callerId, 'social_identity_linked', {
+      vars: { name: SOCIAL_PROVIDER_LABELS[identity.provider] },
+      businessKey: `social-link:${linkedIdentityId}`,
+    });
     return {
       result: {
         provider: identity.provider,
@@ -290,7 +300,7 @@ export class AccountLinkService {
         mergedPendingAccount: mergedUserId !== null,
         authProviders: distinctProviders(after),
       },
-      linkedIdentityId,
+      notification,
       mergedUserId,
     };
   }
@@ -310,6 +320,8 @@ export class AccountLinkService {
       where: { id: empty.id, accountStatus: 'active', onboardingStatus: { in: [...UNFINISHED_SIGNUP_STATUSES] } },
       data: {
         accountStatus: 'deleted',
+        // Out of the signup steps too, so a signup request still in flight finds nothing to complete.
+        onboardingStatus: 'not_started',
         deletedAt: now,
         email: empty.email ? buildDeletedEmail(empty.id) : null,
         phone: empty.phone ? buildDeletedPhone(empty.id) : null,
@@ -337,7 +349,29 @@ export class AccountLinkService {
   }
 }
 
-/** A signup nobody finished: still on the signup steps, no admin role, no password, and no login but this one. */
+/**
+ * Counts of the relations that mean an account has been used. A signup that was never used has none; it may still
+ * hold inquiries and uploads, which move to the account it merges into.
+ */
+const ACTIVITY_RELATION_COUNTS = {
+  teamMemberships: true,
+  ownedTeams: true,
+  teamJoinApplications: true,
+  hostedMatches: true,
+  matchApplications: true,
+  matchParticipants: true,
+  createdTeamMatches: true,
+  teamMatchApplications: true,
+  chatParticipations: true,
+  chatMessages: true,
+  tournamentRegistrationsApplied: true,
+  tournamentPlayerEntries: true,
+  tournamentStaffAssignments: true,
+  tournamentReviews: true,
+  postEventReviewsWritten: true,
+} as const;
+
+/** A signup nobody finished: on the signup steps, no admin role, no password, no login but this one, and no activity. */
 function isEmptySignupAccount(holder: {
   id: string;
   status: string;
@@ -347,6 +381,7 @@ function isEmptySignupAccount(holder: {
     onboardingStatus: string;
     adminUser: { id: string } | null;
     authIdentities: { id: string }[];
+    _count: Record<string, number>;
   };
 }): boolean {
   return (
@@ -356,7 +391,8 @@ function isEmptySignupAccount(holder: {
     isUnfinishedSocialSignup(holder.user.onboardingStatus) &&
     holder.user.adminUser === null &&
     holder.user.authIdentities.length === 1 &&
-    holder.user.authIdentities[0]?.id === holder.id
+    holder.user.authIdentities[0]?.id === holder.id &&
+    Object.values(holder.user._count).every((count) => count === 0)
   );
 }
 
@@ -364,8 +400,9 @@ function distinctProviders(identities: { provider: V1AuthProvider }[]): V1AuthPr
   return [...new Set(identities.map((identity) => identity.provider))];
 }
 
+/** No session age is only possible with a non-production header identity; production never lets it through. */
 function assertRecentLogin(sessionAgeSeconds: number | null) {
-  if (sessionAgeSeconds !== null && sessionAgeSeconds > RECENT_LOGIN_MAX_AGE_SECONDS) {
+  if (sessionAgeSeconds === null ? process.env.NODE_ENV === 'production' : sessionAgeSeconds > RECENT_LOGIN_MAX_AGE_SECONDS) {
     throw new ForbiddenException({
       code: 'RECENT_LOGIN_REQUIRED',
       message: '보안을 위해 다시 로그인한 뒤 연결해 주세요.',
@@ -401,6 +438,13 @@ function socialLinkTokenInvalid() {
   return new BadRequestException({
     code: 'SOCIAL_LINK_TOKEN_INVALID',
     message: '연결 정보가 만료됐거나 올바르지 않아요. 카카오·Apple 로그인을 처음부터 다시 시도해 주세요.',
+  });
+}
+
+function socialLinkTokenAccountMismatch() {
+  return new ConflictException({
+    code: 'SOCIAL_LINK_TOKEN_ACCOUNT_MISMATCH',
+    message: '안내받은 계정과 다른 계정으로 로그인했어요. 설정 › 로그인 방법에서 직접 연결할 수 있어요.',
   });
 }
 

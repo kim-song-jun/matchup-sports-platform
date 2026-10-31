@@ -18,7 +18,7 @@ const EMPTY_EMAIL = 'account-link-empty@integration.test';
 const EMPTY_PHONE = '01000000186';
 const EMPTY_IDENTITY = `${PREFIX}-identity-empty`;
 const CALLER_PHONE = '01000000187';
-const ENV_KEYS = ['V1_SESSION_SECRET'] as const;
+const ENV_KEYS = ['V1_SESSION_SECRET', 'V1_VERIFICATION_DEV_ECHO', 'SOLAPI_API_KEY', 'SOLAPI_API_SECRET', 'SOLAPI_SENDER_NUMBER'] as const;
 
 describe('V1 signed-in social account link integration', () => {
   let app: INestApplication;
@@ -35,6 +35,11 @@ describe('V1 signed-in social account link integration', () => {
   beforeAll(async () => {
     for (const key of ENV_KEYS) savedEnv[key] = process.env[key];
     process.env.V1_SESSION_SECRET = 'integration-account-link-session-secret-0123456789';
+    // The echoed code is how the specs read the SMS of a 010-0000 test number.
+    process.env.V1_VERIFICATION_DEV_ECHO = 'true';
+    delete process.env.SOLAPI_API_KEY;
+    delete process.env.SOLAPI_API_SECRET;
+    delete process.env.SOLAPI_SENDER_NUMBER;
     ({ app, cleanup: cleanupApp } = await createV1IntegrationApp());
     prisma = app.get(PrismaService);
     auth = app.get(AuthService);
@@ -62,6 +67,7 @@ describe('V1 signed-in social account link integration', () => {
       where: { OR: [{ actorUserId: { in: USER_IDS } }, { targetId: { in: [...USER_IDS, EMPTY_IDENTITY] } }] },
     });
     await prisma.v1Notification.deleteMany({ where: { recipientUserId: { in: USER_IDS } } });
+    await prisma.v1VerificationToken.deleteMany({ where: { userId: { in: USER_IDS } } });
     await prisma.v1UploadAsset.deleteMany({ where: { ownerUserId: { in: USER_IDS } } });
     await prisma.v1ManagedTermsConsentEvent.deleteMany({ where: { userId: { in: USER_IDS } } });
     await prisma.v1User.deleteMany({ where: { id: { in: USER_IDS } } });
@@ -284,28 +290,76 @@ describe('V1 signed-in social account link integration', () => {
         .toMatchObject({ userId: CALLER, email: `${CALLER}@integration.test` });
     });
 
-    it('turns a signup that stopped on a number conflict into a link, and retires that signup', async () => {
+    /** An unfinished Kakao signup (EMPTY) that asks to verify the number CALLER holds. */
+    async function signupAsksForOwnersNumber() {
       await prisma.v1User.update({ where: { id: CALLER }, data: { phone: CALLER_PHONE } });
       await seedEmptySignup();
       await prisma.v1User.update({ where: { id: EMPTY }, data: { phone: null, phoneVerifiedAt: null } });
+      const asked = await request(app.getHttpServer()).post('/api/v1/verification/phone/request')
+        .set('x-v1-user-id', EMPTY).send({ phone: CALLER_PHONE });
+      return asked;
+    }
+    const confirmCode = (code: string) =>
+      request(app.getHttpServer()).post('/api/v1/verification/phone/confirm').set('x-v1-user-id', EMPTY).send({ code });
 
-      const rejected = await request(app.getHttpServer()).post('/api/v1/verification/phone/request')
-        .set('x-v1-user-id', EMPTY).send({ phone: CALLER_PHONE }).expect(409);
-      expect(rejected.body).toMatchObject({ code: 'PHONE_CONFLICT', details: { next: 'sign_in_then_link', provider: 'kakao' } });
+    it('sends the code for a number somebody holds without saying so, and answers only once the code proves the number', async () => {
+      const asked = await signupAsksForOwnersNumber();
+      // No conflict and no token yet: a stranger's number typed in must not yield a link to that stranger's account.
+      expect(asked.status).toBe(200);
+      expect(JSON.stringify(asked.body)).not.toContain('linkToken');
+      expect(asked.body.data.sent).toBe(true);
+
+      const wrong = await confirmCode(asked.body.data.devCode === '000000' ? '111111' : '000000').expect(400);
+      expect(JSON.stringify(wrong.body)).not.toContain('linkToken');
+
+      const rejected = await confirmCode(asked.body.data.devCode).expect(409);
+      expect(rejected.body).toMatchObject({
+        code: 'PHONE_CONFLICT',
+        details: { next: 'sign_in_then_link', provider: 'kakao', linkTokenExpiresInSeconds: 600 },
+      });
+      expect(await prisma.v1User.findUniqueOrThrow({ where: { id: EMPTY } })).toMatchObject({ phone: null, accountStatus: 'active' });
+    });
+
+    it('turns a signup that stopped on a number conflict into a link for the number owner, and retires that signup', async () => {
+      const asked = await signupAsksForOwnersNumber();
+      const rejected = await confirmCode(asked.body.data.devCode).expect(409);
 
       const linked = await linkPending(CALLER, rejected.body.details.linkToken).expect(200);
 
       expect(linked.body.data).toMatchObject({ provider: 'kakao', mergedPendingAccount: true });
       expect(await prisma.v1AuthIdentity.findUniqueOrThrow({ where: { id: EMPTY_IDENTITY } })).toMatchObject({ userId: CALLER });
-      expect(await prisma.v1User.findUniqueOrThrow({ where: { id: EMPTY } })).toMatchObject({ accountStatus: 'deleted' });
+      expect(await prisma.v1User.findUniqueOrThrow({ where: { id: EMPTY } })).toMatchObject({ accountStatus: 'deleted', onboardingStatus: 'not_started' });
+    });
+
+    it('refuses that token to any other account, creating and moving nothing', async () => {
+      await seedMember(OTHER_CALLER);
+      const asked = await signupAsksForOwnersNumber();
+      const rejected = await confirmCode(asked.body.data.devCode).expect(409);
+
+      const refused = await linkPending(OTHER_CALLER, rejected.body.details.linkToken).expect(409);
+
+      expect(refused.body.code).toBe('SOCIAL_LINK_TOKEN_ACCOUNT_MISMATCH');
+      expect(await prisma.v1AuthIdentity.findUniqueOrThrow({ where: { id: EMPTY_IDENTITY } })).toMatchObject({ userId: EMPTY });
+      expect(await prisma.v1User.findUniqueOrThrow({ where: { id: EMPTY } })).toMatchObject({ accountStatus: 'active' });
+      expect(await prisma.v1AuthIdentity.count({ where: { userId: OTHER_CALLER, provider: 'kakao' } })).toBe(0);
+    });
+
+    it('refuses a Kakao login token to a member whose email Kakao did not name', async () => {
+      await seedMember(OTHER_CALLER);
+      jest.spyOn(auth, 'fetchKakaoProfileForToken').mockResolvedValue({
+        ...kakaoProfile(), email: `${CALLER}@integration.test`, emailValid: true, emailVerified: true,
+      });
+      const rejected = await request(app.getHttpServer()).post('/api/v1/auth/kakao/token').send({ accessToken: 'native-sdk-token-0123456789' }).expect(409);
+
+      const refused = await linkPending(OTHER_CALLER, rejected.body.details.linkToken).expect(409);
+
+      expect(refused.body.code).toBe('SOCIAL_LINK_TOKEN_ACCOUNT_MISMATCH');
+      expect(await prisma.v1AuthIdentity.count({ where: { provider: 'kakao', providerUserKey: KAKAO_KEY } })).toBe(0);
     });
 
     it('refuses that token once the signup has become a real account', async () => {
-      await prisma.v1User.update({ where: { id: CALLER }, data: { phone: CALLER_PHONE } });
-      await seedEmptySignup();
-      await prisma.v1User.update({ where: { id: EMPTY }, data: { phone: null, phoneVerifiedAt: null } });
-      const rejected = await request(app.getHttpServer()).post('/api/v1/verification/phone/request')
-        .set('x-v1-user-id', EMPTY).send({ phone: CALLER_PHONE }).expect(409);
+      const asked = await signupAsksForOwnersNumber();
+      const rejected = await confirmCode(asked.body.data.devCode).expect(409);
       await prisma.v1User.update({ where: { id: EMPTY }, data: { onboardingStatus: 'completed' } });
 
       const response = await linkPending(CALLER, rejected.body.details.linkToken).expect(409);

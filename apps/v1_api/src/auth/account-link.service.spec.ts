@@ -74,7 +74,8 @@ function build(seed: { users: FakeUser[]; identities: FakeIdentity[] }) {
   };
   const appleIdentity = { verifyIdentityToken: jest.fn() };
   const appleTokens = { storeFromAuthorizationCode: jest.fn().mockResolvedValue(undefined) };
-  const notifications = { emitNotification: jest.fn().mockResolvedValue(undefined) };
+  const notice = { id: 'notice-1', targetType: 'system', targetId: null, title: '로그인 수단이 연결됐어요', body: null, deepLink: '/my/settings' };
+  const notifications = { createInTransaction: jest.fn().mockResolvedValue(notice), deliverCreated: jest.fn() };
   const realtime = { forceDisconnectUser: jest.fn() };
   const service = new AccountLinkService(
     fake.prisma as never,
@@ -125,10 +126,14 @@ describe('AccountLinkService.linkKakao', () => {
     expect(state.logs).toEqual([
       expect.objectContaining({ targetType: 'auth_identity', targetId: added?.id, toStatus: 'linked', actorUserId: CALLER, reason: 'account_link:kakao' }),
     ]);
-    expect(notifications.emitNotification).toHaveBeenCalledWith(CALLER, 'social_identity_linked', null, undefined, {
-      vars: { name: '카카오' },
-      businessKey: `social-link:${added?.id}`,
-    });
+    // Stored in the link's own transaction (it receives the transaction client), pushed after it committed.
+    expect(notifications.createInTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({ $executeRaw: expect.any(Function) }),
+      CALLER,
+      'social_identity_linked',
+      { vars: { name: '카카오' }, businessKey: `social-link:${added?.id}` },
+    );
+    expect(notifications.deliverCreated).toHaveBeenCalledWith(CALLER, 'social_identity_linked', expect.objectContaining({ id: 'notice-1' }));
   });
 
   it('stores the Kakao email only when Kakao vouches for it', async () => {
@@ -184,7 +189,8 @@ describe('AccountLinkService.linkKakao', () => {
       expect(result).toEqual({ provider: 'kakao', alreadyLinked: true, mergedPendingAccount: false, authProviders: ['email', 'kakao'] });
       expect(state.identities).toHaveLength(2);
       expect(state.logs).toHaveLength(0);
-      expect(notifications.emitNotification).not.toHaveBeenCalled();
+      expect(notifications.createInTransaction).not.toHaveBeenCalled();
+      expect(notifications.deliverCreated).not.toHaveBeenCalled();
     });
 
     it('refuses a second, different Kakao account on the same login', async () => {
@@ -240,6 +246,8 @@ describe('AccountLinkService.linkKakao', () => {
         ]);
         expect(state.users.find((row) => row.id === EMPTY)).toMatchObject({
           accountStatus: 'deleted',
+          // Out of the signup steps as well, so a signup request still in flight cannot complete it.
+          onboardingStatus: 'not_started',
           email: `deleted+${EMPTY}@deleted.teameet.local`,
           phone: `deleted-${EMPTY}`,
           emailVerifiedAt: null,
@@ -288,7 +296,28 @@ describe('AccountLinkService.linkKakao', () => {
       expect(state.inquiries).toEqual([{ id: 'inquiry-1', userId: EMPTY }]);
       expect(state.logs).toHaveLength(0);
       expect(realtime.forceDisconnectUser).not.toHaveBeenCalled();
-      expect(notifications.emitNotification).not.toHaveBeenCalled();
+      expect(notifications.createInTransaction).not.toHaveBeenCalled();
+      expect(notifications.deliverCreated).not.toHaveBeenCalled();
+    });
+
+    // Status alone is not "unused": any real relation keeps the account where it is.
+    it.each([
+      'teamMemberships', 'ownedTeams', 'teamJoinApplications', 'hostedMatches', 'matchApplications', 'matchParticipants',
+      'createdTeamMatches', 'teamMatchApplications', 'chatParticipations', 'chatMessages', 'tournamentRegistrationsApplied',
+      'tournamentPlayerEntries', 'tournamentStaffAssignments', 'tournamentReviews', 'postEventReviewsWritten',
+    ])('leaves a signup account alone once it has %s', async (relation) => {
+      const { service, state } = build(withEmptySignup('social_profile_deferred', { user: { activity: { [relation]: 1 } } }));
+
+      expect(await failure(service.linkKakao(CALLER, TOKEN_FORM, null))).toMatchObject({ code: 'SOCIAL_LINK_PROVIDER_IN_USE' });
+      expect(state.identities.find((row) => row.id === 'kakao-on-empty')?.userId).toBe(EMPTY);
+      expect(state.users.find((row) => row.id === EMPTY)?.accountStatus).toBe('active');
+    });
+
+    it('treats zero counts of every relation as unused', async () => {
+      const zeros = Object.fromEntries(['teamMemberships', 'ownedTeams', 'chatMessages'].map((relation) => [relation, 0]));
+      const { service } = build(withEmptySignup('social_profile_deferred', { user: { activity: zeros } }));
+
+      await expect(service.linkKakao(CALLER, TOKEN_FORM, null)).resolves.toMatchObject({ mergedPendingAccount: true });
     });
 
     it('refuses when the empty account finished signup between the read and the retire', async () => {
@@ -327,6 +356,42 @@ describe('AccountLinkService.linkKakao', () => {
       expect(state.identities).toHaveLength(1);
     });
 
+    it.each(['active', 'suspended'])('refuses a caller who holds an operator role (%s) and changes nothing', async (status) => {
+      const seed = callerWithEmailLogin();
+      seed.users[0].adminUser = { id: 'admin-row', status };
+      const { service, state, notifications } = build(seed);
+
+      expect(await failure(service.linkKakao(CALLER, TOKEN_FORM, null))).toMatchObject({ code: 'SOCIAL_LINK_ADMIN_FORBIDDEN' });
+      expect(state.identities).toHaveLength(1);
+      expect(notifications.createInTransaction).not.toHaveBeenCalled();
+    });
+
+    it('does not count a revoked operator role', async () => {
+      const seed = callerWithEmailLogin();
+      seed.users[0].adminUser = { id: 'admin-row', status: 'revoked' };
+      const { service } = build(seed);
+
+      await expect(service.linkKakao(CALLER, TOKEN_FORM, null)).resolves.toMatchObject({ alreadyLinked: false });
+    });
+
+    it('refuses a caller whose account was deleted even if its status still reads active', async () => {
+      const { service, state } = build({ users: [user(CALLER, { deletedAt: new Date() })], identities: [emailLogin(CALLER)] });
+
+      expect(await failure(service.linkKakao(CALLER, TOKEN_FORM, null))).toMatchObject({ code: 'PERMISSION_DENIED' });
+      expect(state.identities).toHaveLength(1);
+    });
+
+    it('locks the caller row inside the link transaction before reading it', async () => {
+      const { service, transactions } = build(callerWithEmailLogin());
+
+      await service.linkKakao(CALLER, TOKEN_FORM, null);
+
+      expect(transactions).toHaveLength(1);
+      expect(transactions[0].$queryRaw).toHaveBeenCalledTimes(1);
+      expect(String(transactions[0].$queryRaw.mock.calls[0][0].join(' '))).toMatch(/FOR UPDATE/);
+      expect(transactions[0].$queryRaw.mock.calls[0][1]).toBe(CALLER);
+    });
+
     it('refuses a caller whose account is no longer active', async () => {
       const { service } = build({ users: [user(CALLER, { accountStatus: 'suspended' })], identities: [emailLogin(CALLER)] });
 
@@ -347,6 +412,21 @@ describe('AccountLinkService.linkKakao', () => {
       expect(state.identities).toHaveLength(1);
     });
 
+    it('refuses a request without a session age in production, and still accepts a recent session there', async () => {
+      const savedEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'production';
+      try {
+        const { service, auth, state } = build(callerWithEmailLogin());
+
+        expect(await failure(service.linkKakao(CALLER, TOKEN_FORM, null))).toMatchObject({ code: 'RECENT_LOGIN_REQUIRED' });
+        expect(auth.fetchKakaoProfileForToken).not.toHaveBeenCalled();
+        expect(state.identities).toHaveLength(1);
+        await expect(service.linkKakao(CALLER, TOKEN_FORM, 60)).resolves.toMatchObject({ alreadyLinked: false });
+      } finally {
+        process.env.NODE_ENV = savedEnv;
+      }
+    });
+
     it('accepts a session exactly at the limit, and a header identity that has no session age', async () => {
       const atLimit = build(callerWithEmailLogin());
       await expect(atLimit.service.linkKakao(CALLER, TOKEN_FORM, RECENT_LOGIN_MAX_AGE_SECONDS)).resolves.toMatchObject({ alreadyLinked: false });
@@ -357,12 +437,23 @@ describe('AccountLinkService.linkKakao', () => {
   });
 
   describe('side effects after the link is stored', () => {
-    it('still succeeds when the notification cannot be created', async () => {
+    it('stores the notice with the link or not at all', async () => {
       const { service, state, notifications } = build(callerWithEmailLogin());
-      notifications.emitNotification.mockRejectedValue(new Error('push provider down'));
+      notifications.createInTransaction.mockRejectedValue(new Error('notification table unavailable'));
+
+      await expect(service.linkKakao(CALLER, TOKEN_FORM, null)).rejects.toThrow('notification table unavailable');
+      expect(state.identities).toHaveLength(1);
+      expect(state.logs).toHaveLength(0);
+      expect(notifications.deliverCreated).not.toHaveBeenCalled();
+    });
+
+    it('still links when the notice could not be worded (nothing to push)', async () => {
+      const { service, state, notifications } = build(callerWithEmailLogin());
+      notifications.createInTransaction.mockResolvedValue(null);
 
       await expect(service.linkKakao(CALLER, TOKEN_FORM, null)).resolves.toMatchObject({ alreadyLinked: false });
       expect(state.identities.some((row) => row.provider === 'kakao')).toBe(true);
+      expect(notifications.deliverCreated).not.toHaveBeenCalled();
     });
 
     it('still succeeds when the retired account’s socket cannot be closed', async () => {
@@ -457,7 +548,7 @@ describe('AccountLinkService.linkApple', () => {
       clientId: 'kr.co.teameet.app',
       authorizationCode: 'apple-auth-code',
     });
-    expect(notifications.emitNotification).toHaveBeenCalledWith(CALLER, 'social_identity_linked', null, undefined, expect.objectContaining({ vars: { name: 'Apple' } }));
+    expect(notifications.createInTransaction).toHaveBeenCalledWith(expect.anything(), CALLER, 'social_identity_linked', expect.objectContaining({ vars: { name: 'Apple' } }));
   });
 
   it('stores the Apple email only when verified, and skips the token exchange without a code', async () => {
@@ -498,7 +589,8 @@ describe('AccountLinkService.linkApple', () => {
 describe('AccountLinkService.linkPending', () => {
   const verifiedKakao: SocialLinkClaims = { kind: 'verified_identity', provider: 'kakao', providerUserKey: KAKAO_KEY, email: 'me@example.test' };
   const pendingKakao = (pendingUserId = EMPTY): SocialLinkClaims => ({ kind: 'pending_account', provider: 'kakao', providerUserKey: KAKAO_KEY, pendingUserId });
-  const tokenOf = (claims: SocialLinkClaims, nowMs?: number) => ({ linkToken: issueSocialLinkToken(claims, nowMs) });
+  /** A token for `claims` that the accounts in `targets` (the collided-with members) may spend. */
+  const tokenOf = (claims: SocialLinkClaims, targets: string[] = [CALLER], nowMs?: number) => ({ linkToken: issueSocialLinkToken(claims, targets, nowMs) });
 
   describe('a token for an identity no account holds yet', () => {
     it('attaches it to the account that just signed in, with the verified email, a log and a notification', async () => {
@@ -509,14 +601,15 @@ describe('AccountLinkService.linkPending', () => {
       expect(result).toEqual({ provider: 'kakao', alreadyLinked: false, mergedPendingAccount: false, authProviders: ['email', 'kakao'] });
       expect(state.identities.find((row) => row.provider === 'kakao')).toMatchObject({ userId: CALLER, providerUserKey: KAKAO_KEY, email: 'me@example.test' });
       expect(state.logs[0]).toMatchObject({ reason: 'account_link:kakao', actorUserId: CALLER });
-      expect(notifications.emitNotification).toHaveBeenCalledTimes(1);
+      expect(notifications.createInTransaction).toHaveBeenCalledTimes(1);
+      expect(notifications.deliverCreated).toHaveBeenCalledTimes(1);
       // No new proof is asked of the provider: the token already is the proof.
       expect(auth.fetchKakaoProfileForToken).not.toHaveBeenCalled();
       expect(appleIdentity.verifyIdentityToken).not.toHaveBeenCalled();
     });
 
     it('works with the token exactly as a conflict response hands it out', async () => {
-      const { details } = signInThenLinkConflict('SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', verifiedKakao).getResponse() as { details: { linkToken: string } };
+      const { details } = signInThenLinkConflict('SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', verifiedKakao, [CALLER]).getResponse() as { details: { linkToken: string } };
       const { service, state } = build(callerWithEmailLogin());
 
       await expect(service.linkPending(CALLER, { linkToken: details.linkToken }, null)).resolves.toMatchObject({ provider: 'kakao', alreadyLinked: false });
@@ -542,9 +635,9 @@ describe('AccountLinkService.linkPending', () => {
       expect(await failure(other.service.linkPending(CALLER, tokenOf(verifiedKakao), null))).toMatchObject({ code: 'SOCIAL_LINK_PROVIDER_EXISTS' });
     });
 
-    it('lets exactly one of two accounts spend the same token', async () => {
+    it('lets exactly one of two accounts that both may spend a token spend it', async () => {
       const { service, state } = build({ users: [user(CALLER), user(OTHER_CALLER)], identities: [emailLogin(CALLER), emailLogin(OTHER_CALLER)] });
-      const token = tokenOf(verifiedKakao);
+      const token = tokenOf(verifiedKakao, [CALLER, OTHER_CALLER]);
 
       const settled = await Promise.allSettled([service.linkPending(CALLER, token, null), service.linkPending(OTHER_CALLER, token, null)]);
 
@@ -610,19 +703,86 @@ describe('AccountLinkService.linkPending', () => {
     });
   });
 
+  // The token is a bearer value: whoever is signed in when it is spent is who it attaches to. It therefore names the
+  // accounts it may go to, and anybody else's session is refused.
+  describe('a session of an account the token was not issued for', () => {
+    const otherMember = () => ({
+      users: [user(CALLER), user(OTHER_CALLER)],
+      identities: [emailLogin(CALLER), emailLogin(OTHER_CALLER)],
+    });
+
+    it.each([
+      ['an unclaimed identity', () => tokenOf(verifiedKakao, [CALLER])],
+      ['a login on an unfinished signup', () => tokenOf(pendingKakao(), [CALLER])],
+    ])('is refused for %s, with nothing created or moved', async (_name, makeToken) => {
+      const seed = withEmptySignup('social_profile_required');
+      seed.users.push(user(OTHER_CALLER));
+      seed.identities.push(emailLogin(OTHER_CALLER));
+      const { service, state, notifications, realtime } = build(seed);
+      const before = JSON.stringify([state.users, state.identities]);
+
+      const refused = await failure(service.linkPending(OTHER_CALLER, makeToken(), null));
+
+      expect(refused).toMatchObject({
+        code: 'SOCIAL_LINK_TOKEN_ACCOUNT_MISMATCH',
+        message: '안내받은 계정과 다른 계정으로 로그인했어요. 설정 › 로그인 방법에서 직접 연결할 수 있어요.',
+      });
+      expect(JSON.stringify([state.users, state.identities])).toBe(before);
+      expect(state.logs).toHaveLength(0);
+      expect(notifications.createInTransaction).not.toHaveBeenCalled();
+      expect(realtime.forceDisconnectUser).not.toHaveBeenCalled();
+    });
+
+    it('does not say which account the token was for', async () => {
+      const { service } = build(otherMember());
+
+      const refused = await failure(service.linkPending(OTHER_CALLER, tokenOf(verifiedKakao, [CALLER]), null));
+
+      expect(JSON.stringify(refused)).not.toContain(CALLER);
+    });
+
+    it('is refused even when the identity is free and the session is perfectly recent', async () => {
+      const { service, state } = build(otherMember());
+
+      expect(await failure(service.linkPending(OTHER_CALLER, tokenOf(verifiedKakao, [CALLER]), 1))).toMatchObject({ code: 'SOCIAL_LINK_TOKEN_ACCOUNT_MISMATCH' });
+      expect(state.identities.some((row) => row.provider === 'kakao')).toBe(false);
+    });
+
+    it('is accepted for the account it was issued for, whichever of several candidates signs in', async () => {
+      for (const signedInAs of [CALLER, OTHER_CALLER]) {
+        const { service, state } = build(otherMember());
+
+        await expect(service.linkPending(signedInAs, tokenOf(verifiedKakao, [CALLER, OTHER_CALLER]), null)).resolves.toMatchObject({ alreadyLinked: false });
+        expect(state.identities.find((row) => row.provider === 'kakao')?.userId).toBe(signedInAs);
+      }
+    });
+
+    it('does not widen to a third account when two candidates were named', async () => {
+      const seed = otherMember();
+      seed.users.push(user('user-third'));
+      seed.identities.push(emailLogin('user-third'));
+      const { service } = build(seed);
+
+      expect(await failure(service.linkPending('user-third', tokenOf(verifiedKakao, [CALLER, OTHER_CALLER]), null))).toMatchObject({
+        code: 'SOCIAL_LINK_TOKEN_ACCOUNT_MISMATCH',
+      });
+    });
+  });
+
   describe('tokens that are not good', () => {
     const past = Date.now() - 11 * 60 * 1000;
     it.each([
       ['a forged value', () => ({ linkToken: 'not-a-link-token-at-all-but-long-enough' })],
-      ['an expired token', () => tokenOf(verifiedKakao, past)],
-      ['a token with its signature cut', () => ({ linkToken: issueSocialLinkToken(verifiedKakao).slice(0, -3) })],
+      ['an expired token', () => tokenOf(verifiedKakao, [CALLER], past)],
+      ['a token with its signature cut', () => ({ linkToken: issueSocialLinkToken(verifiedKakao, [CALLER]).slice(0, -3) })],
     ])('answers %s with SOCIAL_LINK_TOKEN_INVALID and writes nothing', async (_name, makeDto) => {
       const { service, state, notifications } = build(callerWithEmailLogin());
 
       expect(await failure(service.linkPending(CALLER, makeDto(), null))).toMatchObject({ code: 'SOCIAL_LINK_TOKEN_INVALID' });
       expect(state.identities).toHaveLength(1);
       expect(state.logs).toHaveLength(0);
-      expect(notifications.emitNotification).not.toHaveBeenCalled();
+      expect(notifications.createInTransaction).not.toHaveBeenCalled();
+      expect(notifications.deliverCreated).not.toHaveBeenCalled();
     });
 
     it('does not take a token signed for another purpose', async () => {

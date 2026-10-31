@@ -50,6 +50,14 @@ function noticeFor({ linkResult, provider }: LinkOutcome): Notice {
         role: 'status',
         actions: ['relogin'],
       };
+    case 'mismatch':
+      return {
+        kind: 'card',
+        title: '다른 계정에 로그인했어요',
+        body: '처음 안내받은 계정과 달라서 연결하지 않았어요. 이 계정에 연결하려면 아래에서 직접 연결해 주세요.',
+        role: 'status',
+        actions: ['dismiss'],
+      };
     case 'failed':
       return {
         kind: 'card',

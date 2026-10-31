@@ -392,6 +392,7 @@ describe('LoginMethodsPageClient - 카카오를 다녀온 결과(주소 쿼리)'
     ['in_use', '이미 다른 계정에 연결된 카카오 계정이에요'],
     ['exists', '이미 다른 카카오 계정이 연결돼 있어요'],
     ['recent_login', '보안을 위해 다시 로그인해 주세요'],
+    ['mismatch', '다른 계정에 로그인했어요'],
     ['failed', '카카오 로그인을 연결하지 못했어요'],
   ])('linkResult=%s 를 안내하고 주소에서 지운다', async (linkResult, text) => {
     setQuery(`linkResult=${linkResult}&provider=kakao`);
@@ -486,6 +487,17 @@ describe('LoginMethodsPageClient - 결과 카드의 다음 행동', () => {
     await userEvent.click(screen.getByRole('button', { name: '닫기' }));
 
     expect(screen.queryByText('이미 다른 계정에 연결된 카카오 계정이에요')).not.toBeInTheDocument();
+  });
+
+  it('안내받은 계정과 다른 계정이면 어느 계정인지 말하지 않고, 이 화면의 연결하기 버튼으로 이어 준다', async () => {
+    setQuery('linkResult=mismatch&provider=kakao');
+    await renderLoaded(['email']);
+
+    expect(await screen.findByText('다른 계정에 로그인했어요')).toBeInTheDocument();
+    expect(screen.getByText('처음 안내받은 계정과 달라서 연결하지 않았어요. 이 계정에 연결하려면 아래에서 직접 연결해 주세요.')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '고객센터 문의' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '다시 로그인하기' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: KAKAO_BUTTON })).toBeEnabled();
   });
 
   it('새 연결을 시작하면 앞 결과 안내를 거둔다', async () => {

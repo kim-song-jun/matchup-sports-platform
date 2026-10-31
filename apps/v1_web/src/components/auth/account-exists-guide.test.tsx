@@ -31,7 +31,7 @@ describe('AccountExistsGuide', () => {
     const steps = within(screen.getByRole('list')).getAllByRole('listitem');
     expect(steps).toHaveLength(3);
     expect(steps[0]).toHaveTextContent('원래 가입한 방법으로 로그인해요');
-    expect(steps[1]).toHaveTextContent('로그인하면 카카오 로그인이 자동으로 연결돼요');
+    expect(steps[1]).toHaveTextContent('30분 안에 로그인하면 카카오 로그인이 자동으로 연결돼요');
     expect(steps[2]).toHaveTextContent('다음부터는 같은 계정으로 들어와요');
   });
 
@@ -39,7 +39,7 @@ describe('AccountExistsGuide', () => {
     storeToken('apple');
     renderGuide({ provider: 'apple', redirectPath: null });
     expect(screen.getByText(/Apple로 새로 가입할 수 없어요/)).toBeInTheDocument();
-    expect(screen.getByText('로그인하면 Apple 로그인이 자동으로 연결돼요')).toBeInTheDocument();
+    expect(screen.getByText('30분 안에 로그인하면 Apple 로그인이 자동으로 연결돼요')).toBeInTheDocument();
     expect(screen.queryByText(/카카오 로그인이 자동으로/)).not.toBeInTheDocument();
   });
 

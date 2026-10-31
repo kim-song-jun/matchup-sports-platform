@@ -68,7 +68,7 @@ describe('소셜 가입 중 번호 중복 — 원래 계정으로 로그인하�
   it('번호 인증을 맞춘 뒤에야 안내가 뜨고, 로그인하면 자동 연결된다고 약속한다', async () => {
     await confirmConflictingCode();
 
-    expect(await screen.findByText(/이미 팀밋 계정이 있어요\. 원래 방법으로 로그인하면 카카오 로그인이 그 계정에 자동으로 연결돼요/)).toBeInTheDocument();
+    expect(await screen.findByText(/이미 팀밋 계정이 있어요\. 30분 안에 원래 방법으로 로그인하면 카카오 로그인이 그 계정에 자동으로 연결돼요/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '원래 방법으로 로그인하기' })).toBeEnabled();
     expect(screen.getByRole('button', { name: '계정 찾기' })).toBeEnabled();
     expect(screen.queryByRole('button', { name: '기존 계정으로 로그인' })).not.toBeInTheDocument();
@@ -78,7 +78,7 @@ describe('소셜 가입 중 번호 중복 — 원래 계정으로 로그인하�
   it('Apple 가입 중이면 Apple 로그인이 연결된다고 안내한다', async () => {
     provider = 'apple';
     await confirmConflictingCode();
-    expect(await screen.findByText(/원래 방법으로 로그인하면 Apple 로그인이 그 계정에 자동으로 연결돼요/)).toBeInTheDocument();
+    expect(await screen.findByText(/30분 안에 원래 방법으로 로그인하면 Apple 로그인이 그 계정에 자동으로 연결돼요/)).toBeInTheDocument();
   });
 
   it('번호 인증을 요청하는 단계에서는 번호 주인 여부를 알리지 않는다', async () => {
@@ -98,7 +98,7 @@ describe('소셜 가입 중 번호 중복 — 원래 계정으로 로그인하�
     await user.click(await screen.findByRole('button', { name: '원래 방법으로 로그인하기' }));
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText('가입을 그만두고 로그인할까요?')).toBeInTheDocument();
-    expect(within(dialog).getByText(/원래 방법으로 로그인하면 카카오 로그인이 그 계정에 자동으로 연결돼요/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/30분 안에 원래 방법으로 로그인하면 카카오 로그인이 그 계정에 자동으로 연결돼요/)).toBeInTheDocument();
     expect(seen.logout).toBe(0);
     await user.click(within(dialog).getByRole('button', { name: '로그인하러 가기' }));
 
@@ -234,7 +234,7 @@ describe('소셜 가입 제출에서 번호 중복이 드러난 경우', () => {
     await waitFor(() => expect(submit).toBeEnabled());
     await user.click(submit);
 
-    expect(await screen.findByText(/원래 방법으로 로그인하면 카카오 로그인이 그 계정에 자동으로 연결돼요/)).toBeInTheDocument();
+    expect(await screen.findByText(/30분 안에 원래 방법으로 로그인하면 카카오 로그인이 그 계정에 자동으로 연결돼요/)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '계정 찾기' }));
     await waitFor(() => expect(replace).toHaveBeenCalledWith('/auth/find-account'));
     expect(seen.tokenAtLeave).toBe(PENDING_LINK_MSW.tokens.kakao);

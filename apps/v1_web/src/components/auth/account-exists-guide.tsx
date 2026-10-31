@@ -8,7 +8,7 @@ import { AUTH_NOTICE_STAGE, AuthFrame } from './auth-page';
 import { buildKakaoAuthUrl } from './auth.view-model';
 import { ACCOUNT_CONFLICT_PATH, buildAccountConflictPath } from './login-recovery-route';
 import { KakaoLoginButton } from './kakao-login-button';
-import { linkProviderLabel } from './sign-in-then-link-copy';
+import { LINK_TOKEN_WINDOW_MINUTES, linkProviderLabel } from './sign-in-then-link-copy';
 import type { V1LinkableProvider } from '@/types/api';
 
 type Step = { title: string; body: string };
@@ -20,7 +20,7 @@ function buildSteps(label: string, autoLink: boolean): Step[] {
       body: '처음 가입할 때 쓴 방법으로 로그인해요. 이메일로 가입했다면 이메일 로그인을, 소셜로 가입했다면 해당 로그인 버튼을 눌러요.',
     },
     autoLink
-      ? { title: `로그인하면 ${label} 로그인이 자동으로 연결돼요`, body: '연결이 끝나면 설정의 "로그인 방법" 화면으로 이동해요.' }
+      ? { title: `${LINK_TOKEN_WINDOW_MINUTES}분 안에 로그인하면 ${label} 로그인이 자동으로 연결돼요`, body: '연결이 끝나면 설정의 "로그인 방법" 화면으로 이동해요.' }
       : { title: '로그인한 뒤 설정에서 연결해요', body: `설정의 "로그인 방법"에서 ${label} 로그인을 연결해 주세요.` },
     {
       title: '다음부터는 같은 계정으로 들어와요',

@@ -75,8 +75,7 @@ describe('로그인 화면', () => {
     it('토큰이 있으면 소셜 로그인 버튼 위에 연결 안내와 연결 안 하기를 보여 준다', async () => {
       savePendingSocialLink({ next: 'sign_in_then_link', provider: 'kakao', linkToken: 'link-token-1', linkTokenExpiresInSeconds: 600 });
       const { container } = renderWithClient(<LoginPageView model={getLoginViewModel(null)} />);
-      const notice = await screen.findByRole('status');
-      expect(notice).toHaveTextContent('로그인하면 카카오 로그인이 이 계정에 연결돼요.');
+      const notice = await screen.findByText(/로그인하면 카카오 로그인이 이 계정에 연결돼요\./);
       expect(notice.compareDocumentPosition(container.querySelector('.tm-auth-provider-group')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       screen.getByRole('button', { name: '연결 안 하기' }).click();
       await vi.waitFor(() => expect(readPendingSocialLink()).toBeNull());
@@ -84,7 +83,7 @@ describe('로그인 화면', () => {
 
     it('토큰이 없으면 평소 로그인 화면 그대로다', () => {
       renderWithClient(<LoginPageView model={getLoginViewModel(null)} />);
-      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+      expect(screen.queryByText(/이 계정에 연결돼요/)).not.toBeInTheDocument();
     });
   });
 

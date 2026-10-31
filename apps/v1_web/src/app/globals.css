@@ -1034,6 +1034,23 @@ button:disabled {
   line-height: 1.5;
 }
 
+/* 로그인 화면들의 대기 연결 안내(토큰이 있을 때만 그려진다). */
+.tm-auth-pending-link {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-1);
+  margin: var(--spacing-4) 0;
+}
+
+.tm-auth-pending-link-message {
+  margin: 0;
+  padding: var(--spacing-3) var(--spacing-4);
+  border-radius: var(--radius-control);
+  background: var(--blue50);
+  color: var(--blue700);
+  line-height: 1.55;
+}
+
 .tm-auth-guide-links {
   display: flex;
   align-items: center;

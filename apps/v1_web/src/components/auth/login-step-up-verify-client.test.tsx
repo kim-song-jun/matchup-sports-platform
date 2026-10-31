@@ -206,9 +206,9 @@ describe('LoginStepUpVerifyClient', () => {
       storeChallenge();
       renderVerify();
 
-      expect(await screen.findByRole('status')).toHaveTextContent('로그인하면 Apple 로그인이 이 계정에 연결돼요.');
+      expect(await screen.findByText(/로그인하면 Apple 로그인이 이 계정에 연결돼요\./)).toBeInTheDocument();
       fireEvent.click(screen.getByRole('button', { name: '연결 안 하기' }));
-      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+      expect(screen.queryByText(/이 계정에 연결돼요/)).not.toBeInTheDocument();
       expect(readPendingSocialLink()).toBeNull();
     });
 

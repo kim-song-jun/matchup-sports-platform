@@ -7,7 +7,10 @@ export function linkProviderLabel(provider: V1LinkableProvider | null): string {
   return '소셜';
 }
 
+/** 서버가 연결 토큰을 받아 주는 시간(`linkTokenExpiresInSeconds` 1800). 문구가 이 숫자를 약속한다. */
+export const LINK_TOKEN_WINDOW_MINUTES = 30;
+
 /** 안내 화면·번호 중복 안내·가입 그만두기 확인 창이 같은 약속을 같은 말로 하도록 한 곳에 둔다. */
 export function autoLinkPromise(provider: V1LinkableProvider | null): string {
-  return `원래 방법으로 로그인하면 ${linkProviderLabel(provider)} 로그인이 그 계정에 자동으로 연결돼요.`;
+  return `${LINK_TOKEN_WINDOW_MINUTES}분 안에 원래 방법으로 로그인하면 ${linkProviderLabel(provider)} 로그인이 그 계정에 자동으로 연결돼요.`;
 }

@@ -102,14 +102,14 @@ describe('카카오 로그인 충돌 → 원래 계정 로그인 → 자동 연�
     expect(await screen.findByRole('heading', { level: 1, name: '이미 팀밋 계정이 있어요' })).toBeInTheDocument();
     expect(navigation.replace).toHaveBeenCalledWith('/auth/account-conflict?provider=kakao');
     expect(readPendingSocialLink()).toMatchObject({ linkToken: PENDING_LINK_MSW.tokens.kakao, provider: 'kakao' });
-    expect(screen.getByText('로그인하면 카카오 로그인이 자동으로 연결돼요')).toBeInTheDocument();
+    expect(screen.getByText('30분 안에 로그인하면 카카오 로그인이 자동으로 연결돼요')).toBeInTheDocument();
     expect(requests).toEqual(['POST /api/v1/auth/kakao']);
 
     // 2) 안내 화면의 "이메일로 로그인하기" → 이메일 로그인 화면(연결 안내가 함께 보인다)
     expect(screen.getByRole('link', { name: '이메일로 로그인하기' })).toHaveAttribute('href', '/login/email');
     const user = userEvent.setup();
     act(() => navigation.push('/login/email'));
-    expect(await screen.findByRole('status')).toHaveTextContent('로그인하면 카카오 로그인이 이 계정에 연결돼요.');
+    expect(await screen.findByText(/로그인하면 카카오 로그인이 이 계정에 연결돼요\./)).toBeInTheDocument();
 
     // 3) 로그인 → 앱 전역 게이트가 토큰으로 한 번 연결하고 결과와 함께 로그인 방법 화면으로 보낸다
     await loginWithEmail(user);

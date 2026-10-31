@@ -243,10 +243,10 @@ describe('EmailLoginClient 탈퇴 철회와 대기 연결 안내', () => {
     savePendingSocialLink({ next: 'sign_in_then_link', provider: 'kakao', linkToken: 'link-token-1', linkTokenExpiresInSeconds: 600 });
     render(<EmailLoginClient />);
 
-    expect(await screen.findByRole('status')).toHaveTextContent('로그인하면 카카오 로그인이 이 계정에 연결돼요.');
+    expect(await screen.findByText(/로그인하면 카카오 로그인이 이 계정에 연결돼요\./)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '연결 안 하기' }));
 
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.queryByText(/로그인하면 카카오 로그인이 이 계정에 연결돼요\./)).not.toBeInTheDocument();
     expect(readPendingSocialLink()).toBeNull();
   });
 

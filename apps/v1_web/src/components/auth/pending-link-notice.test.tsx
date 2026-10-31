@@ -24,7 +24,7 @@ describe('PendingLinkNotice', () => {
   ] as const)('%s 토큰이 있으면 어떤 로그인이 연결되는지 알리고 연결 안 하기를 준다', async (provider, label) => {
     store(provider);
     render(<PendingLinkNotice />);
-    expect(await screen.findByRole('status')).toHaveTextContent(`로그인하면 ${label} 로그인이 이 계정에 연결돼요.`);
+    expect(await screen.findByText(new RegExp(`로그인하면 ${label} 로그인이 이 계정에 연결돼요\\.`))).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '연결 안 하기' })).toBeEnabled();
   });
 
@@ -32,7 +32,7 @@ describe('PendingLinkNotice', () => {
     store('kakao');
     render(<PendingLinkNotice />);
     await userEvent.setup().click(await screen.findByRole('button', { name: '연결 안 하기' }));
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.queryByText(/이 계정에 연결돼요/)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '연결 안 하기' })).not.toBeInTheDocument();
     expect(readPendingSocialLink()).toBeNull();
   });

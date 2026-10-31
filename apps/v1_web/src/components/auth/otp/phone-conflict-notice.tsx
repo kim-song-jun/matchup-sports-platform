@@ -5,8 +5,6 @@ import { Button } from '@/components/v1-ui/button';
 import { autoLinkPromise } from '../sign-in-then-link-copy';
 import type { V1LinkableProvider } from '@/types/api';
 
-export const PHONE_CONFLICT_CODE = 'PHONE_CONFLICT';
-
 type Props = {
   onLogin: () => void;
   onFindAccount: () => void;

@@ -1,5 +1,6 @@
 import { V1ApiError } from './api-client';
 import { sanitizeRedirectPath } from './session-storage';
+import { SIGN_IN_THEN_LINK_NEXT } from './auth-error-codes';
 import type {
   V1LinkableProvider,
   V1RecentLoginRequiredDetails,
@@ -42,8 +43,8 @@ function isPositiveNumber(value: unknown): value is number {
 export function getSignInThenLinkHint(error: unknown): V1SignInThenLinkDetails | null {
   if (!(error instanceof V1ApiError) || error.statusCode !== 409) return null;
   const details = asRecord(error.details);
-  if (details?.next !== 'sign_in_then_link' || !isLinkableProvider(details.provider)) return null;
-  const hint: V1SignInThenLinkDetails = { next: 'sign_in_then_link', provider: details.provider };
+  if (details?.next !== SIGN_IN_THEN_LINK_NEXT || !isLinkableProvider(details.provider)) return null;
+  const hint: V1SignInThenLinkDetails = { next: SIGN_IN_THEN_LINK_NEXT, provider: details.provider };
   const { linkToken, linkTokenExpiresInSeconds } = details;
   if (typeof linkToken === 'string' && linkToken !== '' && isPositiveNumber(linkTokenExpiresInSeconds)) {
     return { ...hint, linkToken, linkTokenExpiresInSeconds };

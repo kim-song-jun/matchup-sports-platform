@@ -3,7 +3,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { CheckCircle2, KeyRound } from 'lucide-react';
 import { AlertBanner } from '@/components/v1-ui/primitives';
-import { PHONE_CONFLICT_CODE } from './phone-conflict-notice';
+import { PHONE_CONFLICT_CODE } from '@/lib/auth-error-codes';
 import { OtpCodeInput, OtpErrorBanner, OtpRemainingRow } from './otp-parts';
 import { OTP_CODE_LENGTH, useOtpVerification, type OtpVerificationOptions } from './use-otp-verification';
 

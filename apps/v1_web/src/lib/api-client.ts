@@ -2,6 +2,7 @@ import type { ApiEnvelope, ApiErrorBody } from '@/types/api';
 import { getStoredV1Session } from './session-storage';
 import { randomUuid } from './uuid';
 import { reportClientError } from './client-error-reporter';
+import { PHONE_CONFLICT_CODE, SIGN_IN_THEN_LINK_NEXT } from './auth-error-codes';
 import {
   PHONE_VERIFICATION_REQUIRED_CODE,
   notifyPhoneVerificationRequired,
@@ -170,7 +171,7 @@ export async function v1Api<T>(path: string, init: RequestInit = {}): Promise<T>
     const activityProfileRequired = error.code === ACTIVITY_PROFILE_REQUIRED_CODE;
     // 번호 중복과 "원래 계정으로 로그인 뒤 연결" 안내도 같은 이유로 제품 상태다.
     const accountExistsGuidance = error.statusCode === 409
-      && (error.code === 'PHONE_CONFLICT' || (error.details as { next?: unknown } | null)?.next === 'sign_in_then_link');
+      && (error.code === PHONE_CONFLICT_CODE || (error.details as { next?: unknown } | null)?.next === SIGN_IN_THEN_LINK_NEXT);
     if (!phoneVerificationRequired && !activityProfileRequired && !accountExistsGuidance && !isExpectedGuestAuthProbe(path, init, error)) {
       reportClientError({
         message: error.message,

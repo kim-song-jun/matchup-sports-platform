@@ -7,7 +7,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Camera } from 'lucide-react';
 import { Card, DatePickerTextInput } from '@/components/v1-ui/primitives';
 import { EyeIcon, EyeOffIcon } from '@/components/v1-ui/icons';
-import { PHONE_CONFLICT_CODE } from '@/components/auth/otp/phone-conflict-notice';
+import { PHONE_CONFLICT_CODE } from '@/lib/auth-error-codes';
 import { OtpCodeInput, OtpErrorBanner, OtpRemainingRow } from '@/components/auth/otp/otp-parts';
 import { OTP_CODE_LENGTH, useOtpVerification } from '@/components/auth/otp/use-otp-verification';
 import { usePhoneVerificationRequests } from '@/components/auth/phone-verification/use-phone-verification-requests';

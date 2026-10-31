@@ -8,6 +8,7 @@
  * "Mock-verifying-mock" tests (asserting a mock returned what we told it) are
  * forbidden.  All tests compile and run with jest --runInBand.
  */
+import { readSocialLinkToken } from './social-link-token';
 import {
   BadRequestException,
   ConflictException,
@@ -136,6 +137,16 @@ function buildPrismaMock() {
 }
 
 // ─── suite ──────────────────────────────────────────────────────────────────
+
+// Conflict responses carry a signed link token, which needs the session secret.
+const savedSessionSecret = process.env.V1_SESSION_SECRET;
+beforeAll(() => {
+  process.env.V1_SESSION_SECRET = 'x'.repeat(48);
+});
+afterAll(() => {
+  if (savedSessionSecret === undefined) delete process.env.V1_SESSION_SECRET;
+  else process.env.V1_SESSION_SECRET = savedSessionSecret;
+});
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -928,7 +939,7 @@ describe('AuthService', () => {
       prisma.v1User.findUnique
         .mockResolvedValueOnce(pendingSocialUserRow({
           onboardingStatus: 'social_profile_required', createdAt: new Date(), updatedAt: new Date(),
-          onboardingProgress: { draftJson: draft }, authIdentities: [{ id: 'i', provider }],
+          onboardingProgress: { draftJson: draft }, authIdentities: [{ id: 'i', provider, providerUserKey: `${provider}-key-1` }],
         }))
         .mockResolvedValueOnce(completedUserRow({ onboardingStatus: 'signup_done' }));
     }
@@ -962,8 +973,14 @@ describe('AuthService', () => {
       async (provider) => {
         arrange({ kakaoPhone: input.phone }, provider);
         prisma.v1User.findFirst.mockResolvedValue({ id: 'other-user' });
-        await expect(service.completeSocialProfile('user-1', input)).rejects.toMatchObject({
-          response: { code: 'PHONE_CONFLICT', details: { next: 'sign_in_then_link', provider } },
+        const error = await service.completeSocialProfile('user-1', input).catch((e) => e);
+        expect(error.getResponse()).toMatchObject({
+          code: 'PHONE_CONFLICT',
+          details: { next: 'sign_in_then_link', provider, linkTokenExpiresInSeconds: 600 },
+        });
+        // The token names this very signup and its login, so linking can later move exactly that identity.
+        expect(readSocialLinkToken(error.getResponse().details.linkToken)).toEqual({
+          kind: 'pending_account', provider, providerUserKey: `${provider}-key-1`, pendingUserId: 'user-1',
         });
         expect(prisma.v1User.updateMany).not.toHaveBeenCalled();
       },
@@ -1454,9 +1471,15 @@ describe('AuthService', () => {
         id: 'victim-local', email: 'victim@example.com', accountStatus: 'active', emailVerifiedAt: NOW,
       });
 
-      await expect(service.kakaoTokenLogin({ accessToken: TOKEN })).rejects.toMatchObject({
-        status: 409,
-        response: { code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', details: { next: 'sign_in_then_link', provider: 'kakao' } },
+      const error = await service.kakaoTokenLogin({ accessToken: TOKEN }).catch((e) => e);
+      expect(error.getStatus()).toBe(409);
+      expect(error.getResponse()).toMatchObject({
+        code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL',
+        details: { next: 'sign_in_then_link', provider: 'kakao', linkToken: expect.any(String), linkTokenExpiresInSeconds: 600 },
+      });
+      // The token holds what Kakao just vouched for — the identity, and no email because Kakao did not verify it.
+      expect(readSocialLinkToken(error.getResponse().details.linkToken)).toEqual({
+        kind: 'verified_identity', provider: 'kakao', providerUserKey: '779', email: null,
       });
       expect(prisma.v1AuthIdentity.create).not.toHaveBeenCalled();
     });
@@ -1538,7 +1561,7 @@ describe('AuthService', () => {
       prisma.v1User.findUnique.mockResolvedValue(contactOwner);
       // When / Then: attaching a new identity cannot authenticate the older account.
       await expect(service.kakaoTokenLogin({ accessToken: TOKEN })).rejects.toMatchObject({
-        status: 409, response: { code: 'SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF', details: { next: 'sign_in_then_link', provider: 'kakao' } },
+        status: 409, response: { code: 'SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF', details: { next: 'sign_in_then_link', provider: 'kakao', linkToken: expect.any(String), linkTokenExpiresInSeconds: 600 } },
       });
       expect(prisma.v1AuthIdentity.create).not.toHaveBeenCalled();
       expect(prisma.v1AuthIdentity.update).not.toHaveBeenCalled();
@@ -1551,7 +1574,7 @@ describe('AuthService', () => {
       stubKakao([tokenInfo(123456), me({ id: 4994014420, kakao_account: verifiedKakaoAccount })]);
       prisma.v1User.findUnique.mockResolvedValue(contactOwner);
       prisma.v1User.findFirst.mockResolvedValue({ ...contactOwner, id: 'different-phone-owner' });
-      await expect(service.kakaoTokenLogin({ accessToken: TOKEN })).rejects.toMatchObject({ response: { code: 'SOCIAL_LINK_CONTACT_CONFLICT', details: { next: 'sign_in_then_link', provider: 'kakao' } } });
+      await expect(service.kakaoTokenLogin({ accessToken: TOKEN })).rejects.toMatchObject({ response: { code: 'SOCIAL_LINK_CONTACT_CONFLICT', details: { next: 'sign_in_then_link', provider: 'kakao', linkToken: expect.any(String), linkTokenExpiresInSeconds: 600 } } });
       expect(prisma.v1AuthIdentity.create).not.toHaveBeenCalled();
       expect(prisma.v1User.updateMany).not.toHaveBeenCalled();
     });
@@ -1560,7 +1583,7 @@ describe('AuthService', () => {
       prisma.v1User.findFirst.mockResolvedValue(contactOwner);
       prisma.v1User.findUnique.mockResolvedValue({ ...contactOwner, phoneVerifiedAt: null });
       stubKakao([tokenInfo(123456), me(profile)]);
-      await expect(service.kakaoTokenLogin({ accessToken: TOKEN })).rejects.toMatchObject({ response: { code: 'SOCIAL_LINK_CONTACT_CONFLICT', details: { next: 'sign_in_then_link', provider: 'kakao' } } });
+      await expect(service.kakaoTokenLogin({ accessToken: TOKEN })).rejects.toMatchObject({ response: { code: 'SOCIAL_LINK_CONTACT_CONFLICT', details: { next: 'sign_in_then_link', provider: 'kakao', linkToken: expect.any(String), linkTokenExpiresInSeconds: 600 } } });
       expect(prisma.v1AuthIdentity.create).not.toHaveBeenCalled();
       expect(prisma.v1User.updateMany).not.toHaveBeenCalled();
     });
@@ -1569,7 +1592,7 @@ describe('AuthService', () => {
       prisma.v1User.findFirst.mockResolvedValue(contactOwner);
       prisma.v1User.updateMany.mockResolvedValue({ count: 0 });
       stubKakao([tokenInfo(123456), me({ id: 4994014420, kakao_account: verifiedKakaoAccount })]);
-      await expect(service.kakaoTokenLogin({ accessToken: TOKEN })).rejects.toMatchObject({ response: { code: 'SOCIAL_LINK_CONTACT_CONFLICT', details: { next: 'sign_in_then_link', provider: 'kakao' } } });
+      await expect(service.kakaoTokenLogin({ accessToken: TOKEN })).rejects.toMatchObject({ response: { code: 'SOCIAL_LINK_CONTACT_CONFLICT', details: { next: 'sign_in_then_link', provider: 'kakao', linkToken: expect.any(String), linkTokenExpiresInSeconds: 600 } } });
       expect(prisma.v1AuthIdentity.create).not.toHaveBeenCalled();
       expect(prisma.v1StatusChangeLog.create).not.toHaveBeenCalled();
     });
@@ -1647,7 +1670,7 @@ describe('AuthService', () => {
 
       await expect(service.kakaoLogin({ code: 'auth-code' })).rejects.toMatchObject({
         status: 409,
-        response: { code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', details: { next: 'sign_in_then_link', provider: 'kakao' } },
+        response: { code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', details: { next: 'sign_in_then_link', provider: 'kakao', linkToken: expect.any(String), linkTokenExpiresInSeconds: 600 } },
       });
       expect(prisma.v1AuthIdentity.create).not.toHaveBeenCalled();
       expect(prisma.v1User.create).not.toHaveBeenCalled();
@@ -1705,7 +1728,7 @@ describe('AuthService', () => {
 
       await expect(service.kakaoLogin({ code: 'auth-code' })).rejects.toMatchObject({
         status: 409,
-        response: { code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', details: { next: 'sign_in_then_link', provider: 'kakao' } },
+        response: { code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', details: { next: 'sign_in_then_link', provider: 'kakao', linkToken: expect.any(String), linkTokenExpiresInSeconds: 600 } },
       });
 
       // 붙이지도, 새로 만들지도 않아야 한다. email 은 unique 라 조용히 흘려보내면 P2002 → 500 이다.
@@ -1770,7 +1793,7 @@ describe('AuthService', () => {
 
       await expect(service.kakaoLogin({ code: 'auth-code' })).rejects.toMatchObject({
         status: 409,
-        response: { code: 'SOCIAL_LINK_CONTACT_CONFLICT', details: { next: 'sign_in_then_link', provider: 'kakao' } },
+        response: { code: 'SOCIAL_LINK_CONTACT_CONFLICT', details: { next: 'sign_in_then_link', provider: 'kakao', linkToken: expect.any(String), linkTokenExpiresInSeconds: 600 } },
       });
       expect(prisma.v1AuthIdentity.create).not.toHaveBeenCalled();
     });

@@ -106,6 +106,15 @@ describe('maskSensitive', () => {
     });
   });
 
+  it('masks the social link token wherever it appears, and not its neighbouring fields', () => {
+    expect(maskSensitive({ details: { linkToken: 'signed.value', link_token: 'signed.value', linkTokenExpiresInSeconds: 600, next: 'sign_in_then_link' } })).toEqual({
+      details: { linkToken: '[REDACTED]', link_token: '[REDACTED]', linkTokenExpiresInSeconds: 600, next: 'sign_in_then_link' },
+    });
+    expect(maskSensitiveText('{"details":{"linkToken":"signed.value","provider":"kakao"}}')).toBe(
+      '{"details":{"linkToken":"[REDACTED]","provider":"kakao"}}',
+    );
+  });
+
   // entry-fee 요청이 4xx/5xx 면 본문이 V1ErrorLog 에 무기한 저장된다 — 계좌번호·예금주가 평문으로 남으면 안 된다.
   it('masks league entry-fee bank account and holder (any key spelling), keeps bank name and amount', () => {
     const result = maskSensitive({

@@ -18,7 +18,7 @@ const appleIdentityDouble = () => ({
 import { AccountLinkService } from './account-link.service';
 import { AuthService } from './auth.service';
 
-const accountLinkDouble = () => ({ linkKakao: jest.fn(), linkApple: jest.fn() });
+const accountLinkDouble = () => ({ linkKakao: jest.fn(), linkApple: jest.fn(), linkPending: jest.fn() });
 
 describe('AuthController', () => {
   it('returns the current v1 user summary', async () => {
@@ -505,7 +505,11 @@ describe('AuthController', () => {
       })}`;
 
     const buildApp = async (onboardingStatus = 'completed') => {
-      const accountLink = { linkKakao: jest.fn().mockResolvedValue(LINKED), linkApple: jest.fn().mockResolvedValue({ ...LINKED, provider: 'apple' }) };
+      const accountLink = {
+        linkKakao: jest.fn().mockResolvedValue(LINKED),
+        linkApple: jest.fn().mockResolvedValue({ ...LINKED, provider: 'apple' }),
+        linkPending: jest.fn().mockResolvedValue(LINKED),
+      };
       const prisma = {
         v1User: {
           findFirst: jest.fn().mockResolvedValue({
@@ -574,6 +578,46 @@ describe('AuthController', () => {
 
       expect(accountLink.linkKakao).not.toHaveBeenCalled();
       await app.close();
+    });
+
+    it('hands a pending link token and the session age to the service and answers 200', async () => {
+      const { app, accountLink } = await buildApp();
+      const body = { linkToken: 'l'.repeat(40) };
+
+      const res = await request(app.getHttpServer()).post('/auth/link/pending').set('Cookie', cookieIssuedAgo(40 * 60)).send(body).expect(200);
+
+      expect(res.body).toEqual(LINKED);
+      const [userId, dto, age] = accountLink.linkPending.mock.calls[0];
+      expect([userId, dto]).toEqual(['user-1', body]);
+      expect(age).toBeGreaterThanOrEqual(2_400);
+      expect(age).toBeLessThan(2_460);
+      await app.close();
+    });
+
+    it.each([
+      { name: 'no token', body: {} },
+      { name: 'a token too short to be one', body: { linkToken: 'short' } },
+      { name: 'a field outside the contract', body: { linkToken: 'l'.repeat(40), userId: 'someone-else' } },
+    ])('rejects $name for a pending link with 400 before the service', async ({ body }) => {
+      const { app, accountLink } = await buildApp();
+
+      await request(app.getHttpServer()).post('/auth/link/pending').set('Cookie', cookieIssuedAgo(5)).send(body).expect(400);
+
+      expect(accountLink.linkPending).not.toHaveBeenCalled();
+      await app.close();
+    });
+
+    it('needs a session for a pending link too, and keeps an unfinished signup out', async () => {
+      const anonymous = await buildApp();
+      await request(anonymous.app.getHttpServer()).post('/auth/link/pending').send({ linkToken: 'l'.repeat(40) }).expect(401);
+      await anonymous.app.close();
+
+      const pending = await buildApp('social_profile_required');
+      const res = await request(pending.app.getHttpServer())
+        .post('/auth/link/pending').set('Cookie', cookieIssuedAgo(5)).send({ linkToken: 'l'.repeat(40) }).expect(403);
+      expect(res.body.code).toBe('SIGNUP_INCOMPLETE');
+      expect(pending.accountLink.linkPending).not.toHaveBeenCalled();
+      await pending.app.close();
     });
 
     it('requires a session', async () => {

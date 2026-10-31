@@ -18,6 +18,16 @@ import { PhoneVerificationService } from '../verification/phone-verification.ser
  * value the account is keyed on, and when an Apple sign-in is allowed to take over an
  * account that already exists.
  */
+// Conflict responses carry a signed link token, which needs the session secret.
+const savedSessionSecret = process.env.V1_SESSION_SECRET;
+beforeAll(() => {
+  process.env.V1_SESSION_SECRET = 'x'.repeat(48);
+});
+afterAll(() => {
+  if (savedSessionSecret === undefined) delete process.env.V1_SESSION_SECRET;
+  else process.env.V1_SESSION_SECRET = savedSessionSecret;
+});
+
 describe('AuthService.appleSignIn', () => {
   const SUBJECT = '001234.abcdef.0000';
 
@@ -163,7 +173,7 @@ describe('AuthService.appleSignIn', () => {
       });
 
     await expect(signIn()).rejects.toMatchObject({
-      response: { code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', details: { next: 'sign_in_then_link', provider: 'apple' } },
+      response: { code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', details: { next: 'sign_in_then_link', provider: 'apple', linkToken: expect.any(String), linkTokenExpiresInSeconds: 600 } },
     });
     expect(prisma.v1AuthIdentity.create).not.toHaveBeenCalled();
   });
@@ -177,7 +187,7 @@ describe('AuthService.appleSignIn', () => {
     prisma.v1User.updateMany.mockResolvedValue({ count: 0 });
 
     await expect(signIn()).rejects.toMatchObject({
-      response: { code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', details: { next: 'sign_in_then_link', provider: 'apple' } },
+      response: { code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', details: { next: 'sign_in_then_link', provider: 'apple', linkToken: expect.any(String), linkTokenExpiresInSeconds: 600 } },
     });
     expect(prisma.v1AuthIdentity.create).not.toHaveBeenCalled();
   });
@@ -196,7 +206,7 @@ describe('AuthService.appleSignIn', () => {
     });
 
     await expect(signIn()).rejects.toMatchObject({
-      response: expect.objectContaining({ code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', details: { next: 'sign_in_then_link', provider: 'apple' } }),
+      response: expect.objectContaining({ code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', details: { next: 'sign_in_then_link', provider: 'apple', linkToken: expect.any(String), linkTokenExpiresInSeconds: 600 } }),
     });
 
     // Neither outcome may happen: no identity attached to the squatting account, and no second

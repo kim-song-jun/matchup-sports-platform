@@ -51,6 +51,16 @@ function buildPrismaMock() {
   return prisma as never;
 }
 
+// Conflict responses carry a signed link token, which needs the session secret.
+const savedSessionSecret = process.env.V1_SESSION_SECRET;
+beforeAll(() => {
+  process.env.V1_SESSION_SECRET = 'x'.repeat(48);
+});
+afterAll(() => {
+  if (savedSessionSecret === undefined) delete process.env.V1_SESSION_SECRET;
+  else process.env.V1_SESSION_SECRET = savedSessionSecret;
+});
+
 describe('VerificationService.confirm', () => {
   it('rejects when there is no pending token', async () => {
     const prisma = buildPrismaMock();
@@ -363,7 +373,10 @@ describe('VerificationService.requestPhone (MT)', () => {
 
   describe('PHONE_CONFLICT for a social signup that has not finished', () => {
     const SIGN_IN_THEN_LINK = (provider: 'kakao' | 'apple') => ({
-      response: { code: 'PHONE_CONFLICT', details: { next: 'sign_in_then_link', provider } },
+      response: {
+        code: 'PHONE_CONFLICT',
+        details: { next: 'sign_in_then_link', provider, linkToken: expect.any(String), linkTokenExpiresInSeconds: 600 },
+      },
     });
     const plain = { response: { code: 'PHONE_CONFLICT' } };
 
@@ -379,14 +392,14 @@ describe('VerificationService.requestPhone (MT)', () => {
       ['social_profile_required', 'kakao'],
       ['social_profile_deferred', 'apple'],
     ] as const)('points a %s %s account at sign-in-then-link', async (onboardingStatus, provider) => {
-      await expect(requestWith({ onboardingStatus, authIdentities: [{ provider }] })).rejects.toMatchObject(SIGN_IN_THEN_LINK(provider));
+      await expect(requestWith({ onboardingStatus, authIdentities: [{ provider, providerUserKey: `${provider}-key-1` }] })).rejects.toMatchObject(SIGN_IN_THEN_LINK(provider));
     });
 
     it('keeps the plain conflict for a finished social account and for an email account', async () => {
-      const finished = await requestWith({ onboardingStatus: 'completed', authIdentities: [{ provider: 'kakao' }] }).catch((e) => e);
+      const finished = await requestWith({ onboardingStatus: 'completed', authIdentities: [{ provider: 'kakao', providerUserKey: 'kakao-key-1' }] }).catch((e) => e);
       expect(finished).toMatchObject(plain);
       expect(finished.getResponse().details).toBeUndefined();
-      const email = await requestWith({ onboardingStatus: 'social_profile_required', authIdentities: [{ provider: 'email' }] }).catch((e) => e);
+      const email = await requestWith({ onboardingStatus: 'social_profile_required', authIdentities: [{ provider: 'email', providerUserKey: 'a@b.com' }] }).catch((e) => e);
       expect(email).toMatchObject(plain);
       expect(email.getResponse().details).toBeUndefined();
     });
@@ -402,7 +415,7 @@ describe('VerificationService.requestPhone (MT)', () => {
       handle.v1User.update.mockRejectedValue(new Prisma.PrismaClientKnownRequestError('Unique constraint failed', { code: 'P2002', clientVersion: 'test' }));
       handle.v1User.findUnique.mockResolvedValue({
         id: 'u1', email: null, phone: null, emailVerifiedAt: null, phoneVerifiedAt: null,
-        onboardingStatus: 'social_profile_required', authIdentities: [{ provider: 'apple' }],
+        onboardingStatus: 'social_profile_required', authIdentities: [{ provider: 'apple', providerUserKey: 'apple-sub-1' }],
       });
 
       await expect(new VerificationService(prisma, dispatcher, eventLogStub()).confirm(authUser, 'phone', '123456'))

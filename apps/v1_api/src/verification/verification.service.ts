@@ -10,7 +10,7 @@ import { Prisma, V1AuthProvider, V1VerificationChannel } from '@prisma/client';
 import { randomInt } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { hashPassword, verifyPassword } from '../auth/password-hash';
-import { isLinkableSocialProvider, signInThenLinkConflict } from '../auth/social-link-conflict';
+import { pendingAccountLinkClaims, signInThenLinkConflict } from '../auth/social-link-conflict';
 import { isUnfinishedSocialSignup } from '../auth/social-signup-access';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { SMS_EVENT_TYPE, SmsEventLogService } from './sms-event-log.service';
@@ -294,7 +294,7 @@ export class VerificationService {
         emailVerifiedAt: true,
         phoneVerifiedAt: true,
         onboardingStatus: true,
-        authIdentities: { where: { status: 'active' }, select: { provider: true } },
+        authIdentities: { where: { status: 'active' }, select: { provider: true, providerUserKey: true } },
       },
     });
     if (!user) {
@@ -309,13 +309,14 @@ export class VerificationService {
  * existing account, so the way forward is to sign in there and link the provider; anyone else just picks another number.
  */
 function phoneConflict(user: {
+  id: string;
   onboardingStatus: string;
-  authIdentities: { provider: V1AuthProvider }[];
+  authIdentities: { provider: string; providerUserKey: string }[];
 }) {
-  const provider = isUnfinishedSocialSignup(user.onboardingStatus)
-    ? user.authIdentities.map((identity) => identity.provider).find(isLinkableSocialProvider)
-    : undefined;
-  if (provider) return signInThenLinkConflict('PHONE_CONFLICT', provider);
+  const claims = isUnfinishedSocialSignup(user.onboardingStatus)
+    ? pendingAccountLinkClaims(user.id, user.authIdentities)
+    : null;
+  if (claims) return signInThenLinkConflict('PHONE_CONFLICT', claims);
   return new ConflictException({
     code: 'PHONE_CONFLICT',
     message: '이미 다른 계정에서 사용 중인 번호예요.',

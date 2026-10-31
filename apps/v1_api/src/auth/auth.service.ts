@@ -18,7 +18,8 @@ import {
 import { generateSocialNickname } from './social-nickname';
 import { isPendingSocialSignup } from './social-signup-access';
 import { normalizeEmail } from './normalize-email';
-import { isLinkableSocialProvider, signInThenLinkConflict, type LinkableSocialProvider } from './social-link-conflict';
+import { pendingAccountLinkClaims, signInThenLinkConflict } from './social-link-conflict';
+import type { LinkableSocialProvider, SocialLinkClaims } from './social-link-token';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { isSignupAgeEligible, isValidBirthDateDigits, normalizeSignupDisplayName } from './dto/required-signup-profile.dto';
@@ -66,9 +67,18 @@ const SOCIAL_AUTH_PROVIDERS: V1AuthProvider[] = [V1AuthProvider.kakao, V1AuthPro
  * 못 찾은 척하면 아래 create 가 P2002 로 터져 500 이 된다. 사용자에게는 무엇을 해야
  * 하는지 말해 주는 편이 낫다.
  */
-function assertLinkableByEmail(user: { emailVerifiedAt: Date | null }, provider: LinkableSocialProvider): void {
+function assertLinkableByEmail(user: { emailVerifiedAt: Date | null }, claims: SocialLinkClaims): void {
   if (user.emailVerifiedAt) return;
-  throw signInThenLinkConflict('SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', provider);
+  throw signInThenLinkConflict('SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', claims);
+}
+
+function kakaoLinkClaims(profile: KakaoProfile): SocialLinkClaims {
+  return {
+    kind: 'verified_identity',
+    provider: V1AuthProvider.kakao,
+    providerUserKey: profile.providerUserKey,
+    email: profile.email && profile.emailValid && profile.emailVerified ? normalizeEmail(profile.email) : null,
+  };
 }
 
 export type KakaoProfile = {
@@ -519,12 +529,12 @@ export class AuthService {
       select: { id: true, email: true, phone: true, accountStatus: true, emailVerifiedAt: true, phoneVerifiedAt: true },
     }) : null;
     if (existingUser && phoneOwner && existingUser.id !== phoneOwner.id) {
-      throw this.kakaoContactConflict();
+      throw this.kakaoContactConflict(profile);
     }
     const candidate = existingUser ?? phoneOwner;
     if (candidate) {
       if (existingUser && !providerEmailVerified && !phoneOwner?.phoneVerifiedAt) {
-        throw signInThenLinkConflict('SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', V1AuthProvider.kakao);
+        throw signInThenLinkConflict('SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', kakaoLinkClaims(profile));
       }
       const linked = await this.linkExistingKakaoIdentity(candidate.id, profile, now);
       return this.sessionResponse(linked.id, linked.email, { social: true });
@@ -581,8 +591,8 @@ export class AuthService {
     return this.sessionResponse(user.id, user.email, { social: true });
   }
 
-  private kakaoContactConflict() {
-    return signInThenLinkConflict('SOCIAL_LINK_CONTACT_CONFLICT', V1AuthProvider.kakao);
+  private kakaoContactConflict(profile: KakaoProfile) {
+    return signInThenLinkConflict('SOCIAL_LINK_CONTACT_CONFLICT', kakaoLinkClaims(profile));
   }
 
   /** A concurrent edit moved the contact under an already-linked Kakao login; nothing to link, only to retry. */
@@ -628,23 +638,23 @@ export class AuthService {
         where: { id: userId },
         select: { id: true, email: true, phone: true, emailVerifiedAt: true, phoneVerifiedAt: true, accountStatus: true },
       });
-      if (!candidate) throw this.kakaoContactConflict();
+      if (!candidate) throw this.kakaoContactConflict(profile);
       this.assertNotWithdrawalPending(candidate.accountStatus);
       if (candidate.accountStatus !== 'active') {
         throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'This account cannot sign in' });
       }
       if ((email && candidate.email && email !== candidate.email) || (phone && candidate.phone && phone !== candidate.phone)) {
-        throw this.kakaoContactConflict();
+        throw this.kakaoContactConflict(profile);
       }
       const emailMatches = Boolean(email && candidate.email === email && candidate.emailVerifiedAt);
       // A historical phone verification cannot authenticate the current number owner as this member.
       // Attaching a new identity requires independent matching service/provider email proof.
       if (!emailMatches) {
-        if (email && candidate.email === email) assertLinkableByEmail(candidate, V1AuthProvider.kakao);
+        if (email && candidate.email === email) assertLinkableByEmail(candidate, kakaoLinkClaims(profile));
         if (phone && candidate.phone === phone && candidate.phoneVerifiedAt) {
-          throw signInThenLinkConflict('SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF', V1AuthProvider.kakao);
+          throw signInThenLinkConflict('SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF', kakaoLinkClaims(profile));
         }
-        throw this.kakaoContactConflict();
+        throw this.kakaoContactConflict(profile);
       }
       // Lock and recheck the verified contact. A concurrent profile edit must invalidate this claim.
       const claimed = await tx.v1User.updateMany({
@@ -659,7 +669,7 @@ export class AuthService {
           ...(phone ? { phone, phoneVerifiedAt: now } : {}),
         },
       });
-      if (claimed.count !== 1) throw this.kakaoContactConflict();
+      if (claimed.count !== 1) throw this.kakaoContactConflict(profile);
       const identity = await tx.v1AuthIdentity.create({
         data: { userId, provider: V1AuthProvider.kakao, providerUserKey: profile.providerUserKey, email, status: 'active', lastLoginAt: now },
       });
@@ -860,6 +870,12 @@ export class AuthService {
     existingUserId: string;
     now: Date;
   }): Promise<{ id: string; email: string }> {
+    const claims: SocialLinkClaims = {
+      kind: 'verified_identity',
+      provider: input.provider,
+      providerUserKey: input.providerUserKey,
+      email: input.email,
+    };
     return this.prisma.$transaction(async (tx) => {
       const candidate = await tx.v1User.findUnique({
         where: { id: input.existingUserId },
@@ -867,13 +883,13 @@ export class AuthService {
       });
 
       if (!candidate || candidate.email !== input.email) {
-        throw signInThenLinkConflict('SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', input.provider);
+        throw signInThenLinkConflict('SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', claims);
       }
       if (candidate.accountStatus !== 'active') {
         this.assertNotWithdrawalPending(candidate.accountStatus);
         throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'This account cannot sign in' });
       }
-      assertLinkableByEmail(candidate, input.provider);
+      assertLinkableByEmail(candidate, claims);
 
       const claimed = await tx.v1User.updateMany({
         where: {
@@ -885,7 +901,7 @@ export class AuthService {
         data: { lastLoginAt: input.now },
       });
       if (claimed.count !== 1) {
-        throw signInThenLinkConflict('SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', input.provider);
+        throw signInThenLinkConflict('SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', claims);
       }
 
       await tx.v1AuthIdentity.create({
@@ -1051,7 +1067,7 @@ export class AuthService {
         onboardingProgress: { select: { draftJson: true } },
         authIdentities: {
           where: { provider: { in: SOCIAL_AUTH_PROVIDERS }, status: 'active' },
-          select: { id: true, provider: true },
+          select: { id: true, provider: true, providerUserKey: true },
         },
         termsConsents: {
           where: {
@@ -1130,8 +1146,8 @@ export class AuthService {
       });
 
       if (existingPhone) {
-        const provider = user.authIdentities.map((identity) => identity.provider).find(isLinkableSocialProvider);
-        if (provider) throw signInThenLinkConflict('PHONE_CONFLICT', provider);
+        const claims = pendingAccountLinkClaims(userId, user.authIdentities);
+        if (claims) throw signInThenLinkConflict('PHONE_CONFLICT', claims);
         throw new ConflictException({
           code: 'PHONE_CONFLICT',
           message: 'Phone is already registered',

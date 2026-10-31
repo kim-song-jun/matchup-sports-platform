@@ -25,6 +25,7 @@ import { LoginDto } from './dto/login.dto';
 import { LoginStepUpResendDto, LoginStepUpVerifyDto } from './dto/login-step-up.dto';
 import { RegisterDto } from './dto/register.dto';
 import { LinkKakaoDto } from './dto/link-kakao.dto';
+import { LinkPendingDto } from './dto/link-pending.dto';
 import { SocialProfileDto, SocialTermsDto } from './dto/social-profile.dto';
 import type { V1AuthUser } from './v1-auth-user';
 import { OptionalV1AuthGuard } from './optional-v1-auth.guard';
@@ -158,6 +159,18 @@ export class AuthController {
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   linkApple(@CurrentUser() user: V1AuthUser, @Body() dto: AppleLoginDto, @Req() request: Pick<Request, 'headers'>) {
     return this.accountLink.linkApple(user.id, dto, readCurrentV1SessionAgeSeconds(request.headers.cookie));
+  }
+
+  /**
+   * Attaches the provider identity from a `linkToken` (carried by a social sign-in/signup 409) to the account the
+   * caller just signed in to.
+   */
+  @Post('link/pending')
+  @HttpCode(200)
+  @UseGuards(V1AuthGuard)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  linkPending(@CurrentUser() user: V1AuthUser, @Body() dto: LinkPendingDto, @Req() request: Pick<Request, 'headers'>) {
+    return this.accountLink.linkPending(user.id, dto, readCurrentV1SessionAgeSeconds(request.headers.cookie));
   }
 
   @Post('social-terms')

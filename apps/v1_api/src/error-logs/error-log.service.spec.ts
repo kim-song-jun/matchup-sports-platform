@@ -1,3 +1,4 @@
+import { signInThenLinkConflict } from '../auth/social-link-conflict';
 import { ErrorLogService, computeFingerprint, normalizeForFingerprint } from './error-log.service';
 
 describe('normalizeForFingerprint / computeFingerprint', () => {
@@ -153,6 +154,35 @@ describe('ErrorLogService.record', () => {
     expect(JSON.stringify(call.create.requestBody)).not.toContain('hunter2');
     expect(call.create.requestHeaders).toEqual({ authorization: '[REDACTED]', cookie: '[REDACTED]' });
     expect(JSON.stringify(call.create.requestHeaders)).not.toContain('Bearer abc');
+  });
+
+  // 소셜 로그인 충돌 409 의 본문은 V1ErrorLog.responseBody 에 무기한 남는다 — 연결 토큰이 평문이면 보존 기간 내내 쓸 수 있는 신원 증명이 된다.
+  it('keeps the social link token of a 409 response body out of the stored responseBody', async () => {
+    const savedSecret = process.env.V1_SESSION_SECRET;
+    process.env.V1_SESSION_SECRET = 'x'.repeat(48);
+    try {
+      const conflict = signInThenLinkConflict('SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', {
+        kind: 'verified_identity', provider: 'kakao', providerUserKey: 'kakao-key-1', email: null,
+      });
+      const responseBody = { status: 'error', statusCode: 409, ...(conflict.getResponse() as object), requestId: 'req-1' };
+      const linkToken = (responseBody as unknown as { details: { linkToken: string } }).details.linkToken;
+      expect(linkToken.length).toBeGreaterThan(20);
+
+      const prisma = buildPrismaMock();
+      new ErrorLogService(prisma as never, logger as never).record({
+        source: 'server', level: 'warn', statusCode: 409, route: '/api/v1/auth/kakao', message: 'conflict', responseBody,
+      });
+      await flushMicrotasks();
+
+      const stored = prisma.v1ErrorLog.upsert.mock.calls[0][0].create.responseBody;
+      expect(JSON.stringify(stored)).not.toContain(linkToken);
+      expect(stored.details).toEqual({
+        next: 'sign_in_then_link', provider: 'kakao', linkToken: '[REDACTED]', linkTokenExpiresInSeconds: 600,
+      });
+    } finally {
+      if (savedSecret === undefined) delete process.env.V1_SESSION_SECRET;
+      else process.env.V1_SESSION_SECRET = savedSecret;
+    }
   });
 
   it('masks sensitive query-string values embedded in the message text (e.g. NestJS 404 "Cannot GET /path?token=...")', async () => {

@@ -16,6 +16,8 @@ export const SENSITIVE_KEYS: readonly string[] = [
   'idToken',
   // 로그인 추가 인증 챌린지 토큰 — 코드(code)와 함께 있어야 로그인이 완료되므로 에러 로그에 남기지 않는다.
   'challengeToken',
+  // 소셜 로그인 충돌 409 가 내려주는 대기 연결 토큰 — 응답 본문이 에러 로그에 무기한 남으므로 가린다.
+  'linkToken',
   'code',
   'authorization',
   'cookie',

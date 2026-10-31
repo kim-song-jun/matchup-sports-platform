@@ -4,8 +4,21 @@ import {
   type FakeIdentity,
   type FakeUser,
 } from '../../test/helpers/account-link-fake-prisma';
+import { issuePhoneProofToken } from '../verification/phone-proof-token';
 import { AccountLinkService, RECENT_LOGIN_MAX_AGE_SECONDS } from './account-link.service';
 import type { AuthService, KakaoProfile } from './auth.service';
+import { signInThenLinkConflict } from './social-link-conflict';
+import { issueSocialLinkToken, type SocialLinkClaims } from './social-link-token';
+
+// Link tokens are signed with the session secret.
+const savedSessionSecret = process.env.V1_SESSION_SECRET;
+beforeAll(() => {
+  process.env.V1_SESSION_SECRET = 'x'.repeat(48);
+});
+afterAll(() => {
+  if (savedSessionSecret === undefined) delete process.env.V1_SESSION_SECRET;
+  else process.env.V1_SESSION_SECRET = savedSessionSecret;
+});
 
 const CALLER = 'user-caller';
 const OTHER_CALLER = 'user-other-caller';
@@ -479,5 +492,163 @@ describe('AccountLinkService.linkApple', () => {
     await expect(forged.service.linkApple(CALLER, APPLE_DTO, null)).rejects.toThrow('Apple login failed');
     expect(forged.state.identities).toHaveLength(1);
     expect(forged.appleTokens.storeFromAuthorizationCode).not.toHaveBeenCalled();
+  });
+});
+
+describe('AccountLinkService.linkPending', () => {
+  const verifiedKakao: SocialLinkClaims = { kind: 'verified_identity', provider: 'kakao', providerUserKey: KAKAO_KEY, email: 'me@example.test' };
+  const pendingKakao = (pendingUserId = EMPTY): SocialLinkClaims => ({ kind: 'pending_account', provider: 'kakao', providerUserKey: KAKAO_KEY, pendingUserId });
+  const tokenOf = (claims: SocialLinkClaims, nowMs?: number) => ({ linkToken: issueSocialLinkToken(claims, nowMs) });
+
+  describe('a token for an identity no account holds yet', () => {
+    it('attaches it to the account that just signed in, with the verified email, a log and a notification', async () => {
+      const { service, state, notifications, auth, appleIdentity } = build(callerWithEmailLogin());
+
+      const result = await service.linkPending(CALLER, tokenOf(verifiedKakao), 60);
+
+      expect(result).toEqual({ provider: 'kakao', alreadyLinked: false, mergedPendingAccount: false, authProviders: ['email', 'kakao'] });
+      expect(state.identities.find((row) => row.provider === 'kakao')).toMatchObject({ userId: CALLER, providerUserKey: KAKAO_KEY, email: 'me@example.test' });
+      expect(state.logs[0]).toMatchObject({ reason: 'account_link:kakao', actorUserId: CALLER });
+      expect(notifications.emitNotification).toHaveBeenCalledTimes(1);
+      // No new proof is asked of the provider: the token already is the proof.
+      expect(auth.fetchKakaoProfileForToken).not.toHaveBeenCalled();
+      expect(appleIdentity.verifyIdentityToken).not.toHaveBeenCalled();
+    });
+
+    it('works with the token exactly as a conflict response hands it out', async () => {
+      const { details } = signInThenLinkConflict('SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', verifiedKakao).getResponse() as { details: { linkToken: string } };
+      const { service, state } = build(callerWithEmailLogin());
+
+      await expect(service.linkPending(CALLER, { linkToken: details.linkToken }, null)).resolves.toMatchObject({ provider: 'kakao', alreadyLinked: false });
+      expect(state.identities.some((row) => row.provider === 'kakao' && row.userId === CALLER)).toBe(true);
+    });
+
+    it('moves it off an abandoned signup that has taken it in the meantime', async () => {
+      const { service, state } = build(withEmptySignup('social_profile_required'));
+
+      const result = await service.linkPending(CALLER, tokenOf(verifiedKakao), null);
+
+      expect(result).toMatchObject({ mergedPendingAccount: true });
+      expect(state.identities.find((row) => row.id === 'kakao-on-empty')?.userId).toBe(CALLER);
+      expect(state.users.find((row) => row.id === EMPTY)?.accountStatus).toBe('deleted');
+    });
+
+    it('refuses it when a real account has taken it, and when this account has another login of that provider', async () => {
+      const taken = build({ users: [user(CALLER), user('user-real-owner')], identities: [emailLogin(CALLER), identity('kakao-owned', 'user-real-owner', 'kakao', KAKAO_KEY)] });
+      expect(await failure(taken.service.linkPending(CALLER, tokenOf(verifiedKakao), null))).toMatchObject({ code: 'SOCIAL_LINK_PROVIDER_IN_USE' });
+      expect(taken.state.identities.find((row) => row.id === 'kakao-owned')?.userId).toBe('user-real-owner');
+
+      const other = build({ users: [user(CALLER)], identities: [emailLogin(CALLER), identity('kakao-own', CALLER, 'kakao', 'someone-elses-kakao')] });
+      expect(await failure(other.service.linkPending(CALLER, tokenOf(verifiedKakao), null))).toMatchObject({ code: 'SOCIAL_LINK_PROVIDER_EXISTS' });
+    });
+
+    it('lets exactly one of two accounts spend the same token', async () => {
+      const { service, state } = build({ users: [user(CALLER), user(OTHER_CALLER)], identities: [emailLogin(CALLER), emailLogin(OTHER_CALLER)] });
+      const token = tokenOf(verifiedKakao);
+
+      const settled = await Promise.allSettled([service.linkPending(CALLER, token, null), service.linkPending(OTHER_CALLER, token, null)]);
+
+      expect(settled.filter((outcome) => outcome.status === 'fulfilled')).toHaveLength(1);
+      expect(state.identities.filter((row) => row.provider === 'kakao')).toHaveLength(1);
+    });
+  });
+
+  describe('a token for the login of an unfinished signup that stopped on a number conflict', () => {
+    it('moves that login to the account that just signed in and retires the signup', async () => {
+      const { service, state, realtime } = build(withEmptySignup('social_profile_required'));
+      state.inquiries.push({ id: 'inquiry-1', userId: EMPTY });
+
+      const result = await service.linkPending(CALLER, tokenOf(pendingKakao()), 90);
+
+      expect(result).toEqual({ provider: 'kakao', alreadyLinked: false, mergedPendingAccount: true, authProviders: ['email', 'kakao'] });
+      expect(state.identities.find((row) => row.id === 'kakao-on-empty')?.userId).toBe(CALLER);
+      expect(state.users.find((row) => row.id === EMPTY)).toMatchObject({ accountStatus: 'deleted', phone: `deleted-${EMPTY}` });
+      expect(state.inquiries).toEqual([{ id: 'inquiry-1', userId: CALLER }]);
+      expect(realtime.forceDisconnectUser).toHaveBeenCalledWith(EMPTY);
+    });
+
+    it('answers a second use by the same account as already linked', async () => {
+      const { service, state } = build(withEmptySignup('social_profile_required'));
+      const token = tokenOf(pendingKakao());
+      await service.linkPending(CALLER, token, null);
+
+      expect(await service.linkPending(CALLER, token, null)).toMatchObject({ alreadyLinked: true, mergedPendingAccount: false });
+      expect(state.identities.filter((row) => row.provider === 'kakao')).toHaveLength(1);
+    });
+
+    // The signup is what the token vouches for; once it is a real account the login is no longer free to move.
+    it('refuses when that signup has become a real account in the meantime', async () => {
+      const { service, state } = build(withEmptySignup('completed'));
+
+      expect(await failure(service.linkPending(CALLER, tokenOf(pendingKakao()), null))).toMatchObject({ code: 'SOCIAL_LINK_PROVIDER_IN_USE' });
+      expect(state.identities.find((row) => row.id === 'kakao-on-empty')?.userId).toBe(EMPTY);
+      expect(state.users.find((row) => row.id === EMPTY)?.accountStatus).toBe('active');
+    });
+
+    it('refuses when the login has moved to some other account since', async () => {
+      const seed = withEmptySignup('social_profile_required');
+      seed.users.push(user('user-someone-else'));
+      seed.identities.find((row) => row.id === 'kakao-on-empty')!.userId = 'user-someone-else';
+      const { service, state } = build(seed);
+
+      expect(await failure(service.linkPending(CALLER, tokenOf(pendingKakao()), null))).toMatchObject({ code: 'SOCIAL_LINK_PROVIDER_IN_USE' });
+      expect(state.identities.find((row) => row.id === 'kakao-on-empty')?.userId).toBe('user-someone-else');
+    });
+
+    it('is invalid once the login is gone, and does not create one from the token', async () => {
+      const { service, state } = build(callerWithEmailLogin());
+
+      expect(await failure(service.linkPending(CALLER, tokenOf(pendingKakao()), null))).toMatchObject({ code: 'SOCIAL_LINK_TOKEN_INVALID' });
+      expect(state.identities).toHaveLength(1);
+    });
+
+    it('does not let a token for one signup move a login held by another signup', async () => {
+      const { service, state } = build(withEmptySignup('social_profile_required'));
+
+      expect(await failure(service.linkPending(CALLER, tokenOf(pendingKakao('user-some-other-signup')), null))).toMatchObject({ code: 'SOCIAL_LINK_PROVIDER_IN_USE' });
+      expect(state.identities.find((row) => row.id === 'kakao-on-empty')?.userId).toBe(EMPTY);
+    });
+  });
+
+  describe('tokens that are not good', () => {
+    const past = Date.now() - 11 * 60 * 1000;
+    it.each([
+      ['a forged value', () => ({ linkToken: 'not-a-link-token-at-all-but-long-enough' })],
+      ['an expired token', () => tokenOf(verifiedKakao, past)],
+      ['a token with its signature cut', () => ({ linkToken: issueSocialLinkToken(verifiedKakao).slice(0, -3) })],
+    ])('answers %s with SOCIAL_LINK_TOKEN_INVALID and writes nothing', async (_name, makeDto) => {
+      const { service, state, notifications } = build(callerWithEmailLogin());
+
+      expect(await failure(service.linkPending(CALLER, makeDto(), null))).toMatchObject({ code: 'SOCIAL_LINK_TOKEN_INVALID' });
+      expect(state.identities).toHaveLength(1);
+      expect(state.logs).toHaveLength(0);
+      expect(notifications.emitNotification).not.toHaveBeenCalled();
+    });
+
+    it('does not take a token signed for another purpose', async () => {
+      const { service } = build(callerWithEmailLogin());
+      const phoneProof = issuePhoneProofToken('01012345678');
+
+      expect(await failure(service.linkPending(CALLER, { linkToken: phoneProof }, null))).toMatchObject({ code: 'SOCIAL_LINK_TOKEN_INVALID' });
+    });
+  });
+
+  describe('who may call', () => {
+    it('asks for a recent login before it looks at the token', async () => {
+      const { service, state } = build(callerWithEmailLogin());
+
+      expect(await failure(service.linkPending(CALLER, tokenOf(verifiedKakao), RECENT_LOGIN_MAX_AGE_SECONDS + 1))).toMatchObject({
+        code: 'RECENT_LOGIN_REQUIRED',
+        details: { maxAgeSeconds: 1800 },
+      });
+      expect(state.identities).toHaveLength(1);
+    });
+
+    it('keeps a caller whose own signup is unfinished out', async () => {
+      const { service, state } = build({ users: [user(CALLER, { onboardingStatus: 'social_profile_required' })], identities: [identity('login-pending', CALLER, 'apple', 'apple-sub')] });
+
+      expect(await failure(service.linkPending(CALLER, tokenOf(verifiedKakao), null))).toMatchObject({ code: 'SIGNUP_INCOMPLETE' });
+      expect(state.identities).toHaveLength(1);
+    });
   });
 });

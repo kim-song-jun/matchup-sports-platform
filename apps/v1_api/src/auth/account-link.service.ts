@@ -14,18 +14,17 @@ import { RealtimeGateway } from '../realtime/realtime.gateway';
 import {
   buildDeletedEmail,
   buildDeletedPhone,
-  buildDeletedProfileData,
-} from '../users/deleted-account-values';
+  clearDeletedAccountData,
+} from '../users/final-account-deletion';
 import { AppleIdentityService } from './apple-identity.service';
 import { AppleTokenService } from './apple-token.service';
 import { AuthService, type KakaoProfile } from './auth.service';
 import type { AppleLoginDto } from './dto/apple-login.dto';
 import type { LinkKakaoDto } from './dto/link-kakao.dto';
+import type { LinkPendingDto } from './dto/link-pending.dto';
 import { normalizeEmail } from './normalize-email';
-import {
-  SOCIAL_PROVIDER_LABELS,
-  type LinkableSocialProvider,
-} from './social-link-conflict';
+import { SOCIAL_PROVIDER_LABELS } from './social-link-conflict';
+import { readSocialLinkToken, type LinkableSocialProvider } from './social-link-token';
 import {
   ACTIVITY_PROFILE_ROUTE,
   getPendingSocialSignupRoute,
@@ -49,6 +48,8 @@ type VerifiedProviderIdentity = {
   providerUserKey: string;
   /** Only a provider-verified address; never a self-declared one. */
   email: string | null;
+  /** When set, the identity may only be taken from this unfinished signup account; anywhere else it is refused. */
+  heldBy?: string;
 };
 
 type LinkOutcome = {
@@ -108,6 +109,22 @@ export class AccountLinkService {
       });
     }
     return result;
+  }
+
+  /**
+   * Attaches the provider identity a rejected social sign-in or signup left behind (`linkToken` from its 409), now
+   * that the person has signed in to the account that sign-in collided with.
+   */
+  async linkPending(callerId: string, dto: LinkPendingDto, sessionAgeSeconds: number | null): Promise<AccountLinkResult> {
+    assertRecentLogin(sessionAgeSeconds);
+    const claims = readSocialLinkToken(dto.linkToken);
+    if (!claims) throw socialLinkTokenInvalid();
+    return this.link(
+      callerId,
+      claims.kind === 'pending_account'
+        ? { provider: claims.provider, providerUserKey: claims.providerUserKey, email: null, heldBy: claims.pendingUserId }
+        : { provider: claims.provider, providerUserKey: claims.providerUserKey, email: claims.email },
+    );
   }
 
   private verifyKakao(dto: LinkKakaoDto): Promise<KakaoProfile> {
@@ -216,6 +233,12 @@ export class AccountLinkService {
       },
     });
 
+    if (identity.heldBy !== undefined) {
+      // The token described an unfinished signup holding this identity; anything else means that moved on.
+      if (!holder) throw socialLinkTokenInvalid();
+      if (holder.user.id !== identity.heldBy) throw providerInUse();
+    }
+
     let linkedIdentityId: string;
     let mergedUserId: string | null = null;
     if (!holder) {
@@ -296,18 +319,7 @@ export class AccountLinkService {
     });
     if (retired.count !== 1) throw providerInUse();
 
-    await tx.v1UserProfile.updateMany({ where: { userId: empty.id }, data: buildDeletedProfileData(empty.id, now) });
-    await tx.v1UserRecordConsent.updateMany({
-      where: { userId: empty.id, state: 'GRANTED' },
-      data: { state: 'REVOKED', effectiveAt: now },
-    });
-    await tx.v1PushSubscription.deleteMany({ where: { userId: empty.id } });
-    await tx.v1PushDevice.deleteMany({ where: { userId: empty.id } });
-    await tx.v1ChatUserBlock.deleteMany({ where: { OR: [{ blockerUserId: empty.id }, { blockedUserId: empty.id }] } });
-    await tx.v1UserRegion.deleteMany({ where: { userId: empty.id } });
-    await tx.v1UserSportPreference.deleteMany({ where: { userId: empty.id } });
-    await tx.v1SearchHistory.deleteMany({ where: { userId: empty.id } });
-    await tx.v1VerificationToken.deleteMany({ where: { userId: empty.id } });
+    await clearDeletedAccountData(tx, empty.id, now);
 
     await tx.v1Inquiry.updateMany({ where: { userId: empty.id }, data: { userId: callerId } });
     await tx.v1UploadAsset.updateMany({ where: { ownerUserId: empty.id }, data: { ownerUserId: callerId } });
@@ -382,6 +394,13 @@ function providerInUse() {
   return new ConflictException({
     code: 'SOCIAL_LINK_PROVIDER_IN_USE',
     message: '이미 다른 팀밋 계정에 연결된 로그인이에요. 그 계정으로 로그인해 주세요.',
+  });
+}
+
+function socialLinkTokenInvalid() {
+  return new BadRequestException({
+    code: 'SOCIAL_LINK_TOKEN_INVALID',
+    message: '연결 정보가 만료됐거나 올바르지 않아요. 카카오·Apple 로그인을 처음부터 다시 시도해 주세요.',
   });
 }
 

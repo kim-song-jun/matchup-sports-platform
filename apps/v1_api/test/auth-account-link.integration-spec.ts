@@ -17,6 +17,7 @@ const KAKAO_KEY = `${PREFIX}-kakao-key`;
 const EMPTY_EMAIL = 'account-link-empty@integration.test';
 const EMPTY_PHONE = '01000000186';
 const EMPTY_IDENTITY = `${PREFIX}-identity-empty`;
+const CALLER_PHONE = '01000000187';
 const ENV_KEYS = ['V1_SESSION_SECRET'] as const;
 
 describe('V1 signed-in social account link integration', () => {
@@ -258,6 +259,75 @@ describe('V1 signed-in social account link integration', () => {
     const response = await linkKakao(CALLER).expect(403);
 
     expect(response.body).toMatchObject({ code: 'SIGNUP_INCOMPLETE', details: { next: { route: '/signup/social' } } });
+  });
+
+  describe('linking after a rejected social login (the person signs in to the original account once)', () => {
+    const linkPending = (callerId: string, linkToken: string) =>
+      request(app.getHttpServer()).post('/api/v1/auth/link/pending').set('x-v1-user-id', callerId).send({ linkToken });
+
+    it('turns a Kakao login rejected for an unverified service email into a link after one sign-in', async () => {
+      // Kakao vouches for CALLER's address, but the account never verified it: the login is refused, with a token.
+      jest.spyOn(auth, 'fetchKakaoProfileForToken').mockResolvedValue({
+        ...kakaoProfile(), email: `${CALLER}@integration.test`, emailValid: true, emailVerified: true,
+      });
+      const rejected = await request(app.getHttpServer()).post('/api/v1/auth/kakao/token').send({ accessToken: 'native-sdk-token-0123456789' }).expect(409);
+      expect(rejected.body).toMatchObject({
+        code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL',
+        details: { next: 'sign_in_then_link', provider: 'kakao', linkTokenExpiresInSeconds: 600 },
+      });
+      expect(await prisma.v1AuthIdentity.count({ where: { provider: 'kakao', providerUserKey: KAKAO_KEY } })).toBe(0);
+
+      const linked = await linkPending(CALLER, rejected.body.details.linkToken).expect(200);
+
+      expect(linked.body.data).toEqual({ provider: 'kakao', alreadyLinked: false, mergedPendingAccount: false, authProviders: ['email', 'kakao'] });
+      expect(await prisma.v1AuthIdentity.findUniqueOrThrow({ where: { provider_providerUserKey: { provider: 'kakao', providerUserKey: KAKAO_KEY } } }))
+        .toMatchObject({ userId: CALLER, email: `${CALLER}@integration.test` });
+    });
+
+    it('turns a signup that stopped on a number conflict into a link, and retires that signup', async () => {
+      await prisma.v1User.update({ where: { id: CALLER }, data: { phone: CALLER_PHONE } });
+      await seedEmptySignup();
+      await prisma.v1User.update({ where: { id: EMPTY }, data: { phone: null, phoneVerifiedAt: null } });
+
+      const rejected = await request(app.getHttpServer()).post('/api/v1/verification/phone/request')
+        .set('x-v1-user-id', EMPTY).send({ phone: CALLER_PHONE }).expect(409);
+      expect(rejected.body).toMatchObject({ code: 'PHONE_CONFLICT', details: { next: 'sign_in_then_link', provider: 'kakao' } });
+
+      const linked = await linkPending(CALLER, rejected.body.details.linkToken).expect(200);
+
+      expect(linked.body.data).toMatchObject({ provider: 'kakao', mergedPendingAccount: true });
+      expect(await prisma.v1AuthIdentity.findUniqueOrThrow({ where: { id: EMPTY_IDENTITY } })).toMatchObject({ userId: CALLER });
+      expect(await prisma.v1User.findUniqueOrThrow({ where: { id: EMPTY } })).toMatchObject({ accountStatus: 'deleted' });
+    });
+
+    it('refuses that token once the signup has become a real account', async () => {
+      await prisma.v1User.update({ where: { id: CALLER }, data: { phone: CALLER_PHONE } });
+      await seedEmptySignup();
+      await prisma.v1User.update({ where: { id: EMPTY }, data: { phone: null, phoneVerifiedAt: null } });
+      const rejected = await request(app.getHttpServer()).post('/api/v1/verification/phone/request')
+        .set('x-v1-user-id', EMPTY).send({ phone: CALLER_PHONE }).expect(409);
+      await prisma.v1User.update({ where: { id: EMPTY }, data: { onboardingStatus: 'completed' } });
+
+      const response = await linkPending(CALLER, rejected.body.details.linkToken).expect(409);
+
+      expect(response.body.code).toBe('SOCIAL_LINK_PROVIDER_IN_USE');
+      expect(await prisma.v1AuthIdentity.findUniqueOrThrow({ where: { id: EMPTY_IDENTITY } })).toMatchObject({ userId: EMPTY });
+      expect(await prisma.v1User.findUniqueOrThrow({ where: { id: EMPTY } })).toMatchObject({ accountStatus: 'active' });
+    });
+
+    it('answers an unusable token with 400 and a repeat of a good one as already linked', async () => {
+      await linkPending(CALLER, 'not-a-link-token-at-all-but-long-enough').expect(400).expect((res) => {
+        expect(res.body.code).toBe('SOCIAL_LINK_TOKEN_INVALID');
+      });
+
+      jest.spyOn(auth, 'fetchKakaoProfileForToken').mockResolvedValue({
+        ...kakaoProfile(), email: `${CALLER}@integration.test`, emailValid: true, emailVerified: true,
+      });
+      const rejected = await request(app.getHttpServer()).post('/api/v1/auth/kakao/token').send({ accessToken: 'native-sdk-token-0123456789' }).expect(409);
+      await linkPending(CALLER, rejected.body.details.linkToken).expect(200);
+      const repeat = await linkPending(CALLER, rejected.body.details.linkToken).expect(200);
+      expect(repeat.body.data).toMatchObject({ alreadyLinked: true });
+    });
   });
 
   it('needs a session', async () => {

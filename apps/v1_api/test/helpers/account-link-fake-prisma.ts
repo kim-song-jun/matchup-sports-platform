@@ -177,6 +177,7 @@ export function createFakePrisma(seed: { users: FakeUser[]; identities: FakeIden
     v1UserSportPreference: { deleteMany: jest.fn(async () => ({ count: 0 })) },
     v1SearchHistory: { deleteMany: jest.fn(async () => ({ count: 0 })) },
     v1VerificationToken: { deleteMany: jest.fn(async () => ({ count: 0 })) },
+    v1UserOnboardingProgress: { updateMany: jest.fn(async () => ({ count: 0 })) },
     v1StatusChangeLog: {
       create: jest.fn(async ({ data }: { data: Record<string, unknown> }) => {
         await tick();

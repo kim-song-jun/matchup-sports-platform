@@ -12,10 +12,12 @@ import {
   useV1ResetPasswordByEmail,
 } from '@/hooks/use-v1-api';
 import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
-import { isNativeAppleSignInAvailable } from '@/lib/native-apple';
 import { sanitizeRedirectPath } from '@/lib/session-storage';
+import { usableWithdrawalDate } from '@/lib/withdrawal-grace';
 import type { V1FoundAccount } from '@/types/api';
 import { AUTH_NOTICE_STAGE, AuthFrame } from './auth-page';
+import { describeFoundAccount } from './found-account-login';
+import { FoundAccountWithdrawalGuide } from './found-account-withdrawal-guide';
 import { formatPhone, normalizeSeparatedDigits } from './signup-profile-validation';
 
 type Mode = 'find-id' | 'reset-password';
@@ -46,16 +48,7 @@ function FoundAccountCard({ account, emailLoginHref, loginHref, onResetPassword 
   loginHref: string;
   onResetPassword: () => void;
 }) {
-  // 로그인 첫 화면에 없는 제공자(naver 등)는 안내할 수 없어 뺀다. Apple 버튼은 iOS 앱에만 있다.
-  const hasKakao = account.providers.includes('kakao');
-  const hasApple = account.providers.includes('apple');
-  const appleButton = hasApple && isNativeAppleSignInAvailable();
-  const socialNames = [hasKakao ? '카카오' : null, hasApple ? 'Apple' : null].filter(Boolean).join('·');
-  const links = [
-    ...(account.hasPassword ? [{ href: emailLoginHref, label: socialNames ? '이메일로 로그인하기' : '로그인하러 가기', kakao: false }] : []),
-    ...(hasKakao ? [{ href: loginHref, label: '카카오로 로그인하기', kakao: true }] : []),
-    ...(appleButton ? [{ href: loginHref, label: 'Apple로 로그인하기', kakao: false }] : []),
-  ];
+  const { label, value, socialNames, appleUnavailable, links } = describeFoundAccount(account, { emailLoginHref, loginHref });
   let guidance: string | null = null;
   if (!account.hasPassword) {
     guidance = socialNames
@@ -64,17 +57,13 @@ function FoundAccountCard({ account, emailLoginHref, loginHref, onResetPassword 
   } else if (socialNames) {
     guidance = `${socialNames} 로그인도 쓸 수 있어요.`;
   }
-  let label = '가입한 로그인 방법';
-  if (account.maskedEmail) label = '가입한 이메일';
-  else if (!socialNames) label = '로그인 방법을 확인하지 못했어요';
-  const value = account.maskedEmail ?? (socialNames || null);
 
   return (
     <Card pad={16} className="tm-auth-soft-card">
       <div className="tm-text-body-lg">{label}</div>
       {value ? <div className="tm-text-heading" style={{ marginTop: 4 }}>{value}</div> : null}
       {guidance ? <div className="tm-text-caption" style={{ marginTop: 8 }}>{guidance}</div> : null}
-      {hasApple && !appleButton ? <div className="tm-text-caption" style={{ marginTop: 4 }}>Apple 로그인은 iOS 앱에서 쓸 수 있어요.</div> : null}
+      {appleUnavailable ? <div className="tm-text-caption" style={{ marginTop: 4 }}>Apple 로그인은 iOS 앱에서 쓸 수 있어요.</div> : null}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 16 }}>
         {links.map((link, index) => (
           <Link
@@ -206,6 +195,8 @@ export function AccountRecoveryClient({ initialMode = 'find-id', backHref = '/lo
 
   const copy = MODE_COPY[mode];
   const resetting = resetPasswordByEmail.isPending;
+  // 날짜를 모르거나 이미 지났으면 일반 결과 카드다 — 그 계정으로 로그인해도 403 이 탈퇴 취소 화면으로 이어 준다.
+  const withdrawalGraceEnd = found ? usableWithdrawalDate(found.withdrawalPendingUntil) : null;
 
   // 본인 확인을 마쳤고 아직 비밀번호를 못 바꾼 상태에서만 새 비밀번호 입력을 띄운다.
   const verifiedForReset = Boolean(emailProofToken);
@@ -348,12 +339,21 @@ export function AccountRecoveryClient({ initialMode = 'find-id', backHref = '/lo
           )}
 
           {found && mode === 'find-id' ? (
-            <FoundAccountCard
-              account={found}
-              emailLoginHref={emailLoginHref}
-              loginHref={loginHref}
-              onResetPassword={() => switchMode('reset-password')}
-            />
+            withdrawalGraceEnd !== null ? (
+              <FoundAccountWithdrawalGuide
+                account={found}
+                until={withdrawalGraceEnd}
+                emailLoginHref={emailLoginHref}
+                loginHref={loginHref}
+              />
+            ) : (
+              <FoundAccountCard
+                account={found}
+                emailLoginHref={emailLoginHref}
+                loginHref={loginHref}
+                onResetPassword={() => switchMode('reset-password')}
+              />
+            )
           ) : null}
 
           {mode === 'reset-password' && resetBlockedSocialOnly ? (

@@ -15,7 +15,11 @@ export function manualLinkPromise(provider: V1LinkableProvider | null): string {
   return `원래 방법으로 로그인한 뒤 설정의 "로그인 방법"에서 ${linkProviderLabel(provider)} 로그인을 연결해 주세요.`;
 }
 
-/** 안내 화면·번호 중복 안내·가입 그만두기 확인 창이 같은 약속을 같은 말로 하도록 한 곳에 둔다. */
-export function autoLinkPromise(provider: V1LinkableProvider | null): string {
-  return `${LINK_TOKEN_WINDOW_MINUTES}분 안에 원래 방법으로 로그인하면 ${linkProviderLabel(provider)} 로그인이 그 계정에 자동으로 연결돼요.`;
+/**
+ * 안내 화면·번호 중복 안내·가입 그만두기 확인 창이 같은 약속을 같은 말로 하도록 한 곳에 둔다.
+ * 그 계정이 탈퇴 유예 중이면(`withdrawalPending`) 로그인만으로는 세션이 열리지 않아 탈퇴 취소가 한 단계 끼어든다.
+ */
+export function autoLinkPromise(provider: V1LinkableProvider | null, { withdrawalPending = false }: { withdrawalPending?: boolean } = {}): string {
+  const login = withdrawalPending ? '원래 방법으로 로그인하고 탈퇴 신청을 취소하면' : '원래 방법으로 로그인하면';
+  return `${LINK_TOKEN_WINDOW_MINUTES}분 안에 ${login} ${linkProviderLabel(provider)} 로그인이 그 계정에 자동으로 연결돼요.`;
 }

@@ -114,7 +114,8 @@ export function SignupClient() {
   const [profileError, setProfileError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   // 인증한(또는 가입 제출한) 번호가 이미 계정에 쓰이고 있다. 이 동안은 다음 단계로 넘어갈 수 없다.
-  const [phoneRegistered, setPhoneRegistered] = useState(false);
+  // 그 계정이 탈퇴 유예 중이면 유예가 끝나는 시각을 함께 쥔다(인증으로 번호를 증명한 뒤에만 서버가 알려 준다).
+  const [registeredPhone, setRegisteredPhone] = useState<{ withdrawalPendingUntil: string | null } | null>(null);
   const nicknameHelperId = useId();
   const emailHelperId = useId();
   const normalizedNickname = nickname.trim();
@@ -145,12 +146,12 @@ export function SignupClient() {
    * 다만 즉시 전환하면 "인증 완료" 표시를 볼 새가 없어 무엇이 처리됐는지 알 수 없으므로,
    * 완료 상태를 잠깐 보여준 뒤 이동한다.
    */
-  const handlePhoneVerified = (token?: string, registered?: boolean) => {
+  const handlePhoneVerified = (token?: string, registered?: boolean, withdrawalPendingUntil?: string | null) => {
     setProfileError(null);
     // 가입된 번호의 증명은 가입에 쓸 수 없다 — 쥐고 있지 않고 그 자리에서 안내한다.
     if (registered) {
       setPhoneProofToken(null);
-      setPhoneRegistered(true);
+      setRegisteredPhone({ withdrawalPendingUntil: withdrawalPendingUntil ?? null });
       return;
     }
     setPhoneProofToken(token ?? null);
@@ -198,7 +199,7 @@ export function SignupClient() {
   const isSendablePhone = /^\d{11}$/.test(phoneDigits);
   const profileDraft = { displayName: realName, phone: phoneDigits, birthDate: birthDateDigits, gender };
   const profileIssue = getSignupProfileIssue(profileDraft);
-  const phoneTaken = phoneRegistered || otp.errorCode === PHONE_CONFLICT_CODE;
+  const phoneTaken = registeredPhone !== null || otp.errorCode === PHONE_CONFLICT_CODE;
   const profileBlocked = register.isPending || updateProfile.isPending || uploadImages.isPending || uploadingProfileImage || profileIssue !== null;
 
   const selectProfileImage = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -253,7 +254,7 @@ export function SignupClient() {
 
   /** 가입된 번호 안내에서 다른 번호로 돌아간다 — 번호 칸을 비우면 발급·입력 상태도 함께 초기화된다. */
   const changePhone = () => {
-    setPhoneRegistered(false);
+    setRegisteredPhone(null);
     setPhoneProofToken(null);
     setPhoneDigits('');
     setProfileError(null);
@@ -338,7 +339,7 @@ export function SignupClient() {
         }
         if (nextError.code === PHONE_CONFLICT_CODE) {
           setPhoneProofToken(null);
-          setPhoneRegistered(true);
+          setRegisteredPhone({ withdrawalPendingUntil: null });
           setStep('verify');
           return;
         }
@@ -524,7 +525,7 @@ export function SignupClient() {
                     // 번호가 바뀌면 직전 번호로 받은 증명은 무효다.
                     setPhoneProofToken(null);
                     setProfileError(null);
-                    setPhoneRegistered(false);
+                    setRegisteredPhone(null);
                   }}
                   placeholder="010-0000-0000"
                   required
@@ -534,6 +535,7 @@ export function SignupClient() {
 
               {phoneTaken ? (
                 <SignupPhoneRegisteredCard
+                  withdrawalPendingUntil={registeredPhone?.withdrawalPendingUntil ?? null}
                   loginHref={withRedirect('/login/email')}
                   socialLoginHref={withRedirect('/login')}
                   findAccountHref={withRedirect('/auth/find-account')}

@@ -49,7 +49,7 @@ describe('MD-QA #133 shared MSW account-proof HTTP contract', () => {
   it('preserves the masked account lookup after purpose-bound phone verification', async () => {
     const { proofToken } = await verifyPhone('password_reset');
     await expect(v1Post<V1FoundAccount>('/auth/recovery/find-account', { phone, proofToken }))
-      .resolves.toEqual({ maskedEmail: 'so***@example.com', providers: ['email'], hasPassword: true });
+      .resolves.toEqual({ maskedEmail: 'so***@example.com', providers: ['email'], hasPassword: true, withdrawalPendingUntil: null });
   });
 
   it.each(['/auth/recovery/find-account', '/auth/recovery/reset-password'])('%s rejects the default signup-purpose proof', async (path) => {
@@ -129,7 +129,7 @@ describe('MD-QA #133 shared MSW account-proof HTTP contract', () => {
     const issued = await v1Post<Record<string, unknown>>('/auth/phone/issue', { phone });
     expect(issued).not.toHaveProperty('registered');
     await expect(v1Post('/auth/phone/verify', { phone, code: '000000' })).rejects.toMatchObject({ code: 'VERIFICATION_CODE_MISMATCH' });
-    await expect(v1Post('/auth/phone/verify', { phone, code: '123456' })).resolves.toMatchObject({ verified: true, registered: true });
+    await expect(v1Post('/auth/phone/verify', { phone, code: '123456' })).resolves.toMatchObject({ verified: true, registered: true, withdrawalPendingUntil: null });
 
     const freePhone = '01077778888';
     await v1Post('/auth/phone/issue', { phone: freePhone });

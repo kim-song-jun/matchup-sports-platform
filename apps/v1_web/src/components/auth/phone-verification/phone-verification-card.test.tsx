@@ -61,7 +61,7 @@ describe('PhoneVerificationCard', () => {
     vi.spyOn(api, 'useV1PhoneIssue').mockReturnValue(
       mutation({ expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString() }),
     );
-    const verifyMock = vi.fn().mockResolvedValue({ verified: true, proofToken: 'PROOF', registered: false });
+    const verifyMock = vi.fn().mockResolvedValue({ verified: true, proofToken: 'PROOF', registered: false, withdrawalPendingUntil: null });
     vi.spyOn(api, 'useV1PhoneVerify').mockReturnValue({ mutateAsync: verifyMock, isPending: false } as never);
     const onVerified = vi.fn();
 
@@ -78,8 +78,30 @@ describe('PhoneVerificationCard', () => {
     await flush();
 
     expect(verifyMock).toHaveBeenCalledWith({ phone: '01012345678', code: '123456' });
-    expect(onVerified).toHaveBeenCalledWith('PROOF', false);
+    expect(onVerified).toHaveBeenCalledWith('PROOF', false, null);
     expect(screen.getByText('휴대폰 본인인증이 완료됐어요.')).toBeInTheDocument();
+  });
+
+  it('public: 번호를 쥔 계정이 탈퇴 유예 중이면 유예가 끝나는 시각까지 onVerified 로 넘긴다', async () => {
+    vi.spyOn(api, 'useV1PhoneIssue').mockReturnValue(
+      mutation({ expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString() }),
+    );
+    const verifyMock = vi.fn().mockResolvedValue({ verified: true, proofToken: 'PROOF', registered: true, withdrawalPendingUntil: '2026-11-06T15:30:00.000Z' });
+    vi.spyOn(api, 'useV1PhoneVerify').mockReturnValue({ mutateAsync: verifyMock, isPending: false } as never);
+    const onVerified = vi.fn();
+
+    wrap(<PhoneVerificationCard mode="public" phone="01012345678" onVerified={onVerified} />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '인증번호 받기' }));
+    });
+    await flush();
+    fireEvent.change(screen.getByLabelText('인증번호 6자리'), { target: { value: '123456' } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '확인' }));
+    });
+    await flush();
+
+    expect(onVerified).toHaveBeenCalledWith('PROOF', true, '2026-11-06T15:30:00.000Z');
   });
 
   it('authed: 코드 입력 후 확인 클릭 시 confirm을 호출하고 성공하면 인자 없이 onVerified를 호출한다', async () => {

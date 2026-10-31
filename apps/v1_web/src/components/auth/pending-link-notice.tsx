@@ -32,10 +32,12 @@ export function PendingLinkNotice() {
   // 모자라게 약속한다 — 9분 30초 남았으면 "9분 안에".
   const minutesLeft = Math.floor((Date.parse(pending.expiresAt) - now) / 60_000);
   const timeLimit = minutesLeft >= 1 ? `${minutesLeft}분 안에` : '1분 이내에';
+  // 탈퇴 유예 중인 계정은 로그인만으로는 세션이 열리지 않는다 — 탈퇴 신청을 취소해야 연결까지 이어진다.
+  const action = pending.withdrawalPendingUntil === undefined ? '로그인하면' : '로그인하고 탈퇴 신청을 취소하면';
   return (
     <div className="tm-auth-pending-link">
       <p className="tm-text-label tm-auth-pending-link-message">
-        {timeLimit} 로그인하면 {linkProviderLabel(pending.provider)} 로그인이 이 계정에 연결돼요. 직접 요청한 게 아니라면 연결 안 하기를 눌러 주세요.
+        {timeLimit} {action} {linkProviderLabel(pending.provider)} 로그인이 이 계정에 연결돼요. 직접 요청한 게 아니라면 연결 안 하기를 눌러 주세요.
       </p>
       <Button
         onClick={() => {

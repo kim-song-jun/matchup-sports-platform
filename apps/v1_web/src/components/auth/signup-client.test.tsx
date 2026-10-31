@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { V1ApiError } from '@/lib/api-client';
 import { PENDING_EMAIL_LINK_STORAGE_KEY, readPendingEmailLink, savePendingEmailLink } from '@/lib/pending-email-link';
 import { peekPendingSocialLink, savePendingSocialLink } from '@/lib/pending-social-link';
@@ -103,7 +103,7 @@ describe('SignupClient required profile contract', () => {
     hooks.phoneIssueMutateAsync.mockResolvedValue({
       expiresAt: new Date(Date.now() + 300000).toISOString(),
     });
-    hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'PROOF-TOKEN', registered: false });
+    hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'PROOF-TOKEN', registered: false, withdrawalPendingUntil: null });
   });
 
   it('인증번호 발급이 번호 중복(409)으로 거절돼도 같은 안내 카드와 출구를 보여 준다', async () => {
@@ -632,7 +632,7 @@ describe('SignupClient 닉네임·이메일 자동 중복 확인', () => {
 
   it('가입 요청이 닉네임 중복(409)으로 거절되면 가입 정보 단계에서 그 사실을 알린다', async () => {
     hooks.phoneIssueMutateAsync.mockResolvedValue({ expiresAt: new Date(Date.now() + 300000).toISOString() });
-    hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'PROOF-TOKEN', registered: false });
+    hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'PROOF-TOKEN', registered: false, withdrawalPendingUntil: null });
     hooks.registerMutateAsync.mockRejectedValue(new V1ApiError({
       status: 'error',
       statusCode: 409,
@@ -666,7 +666,7 @@ describe('SignupClient 본인인증 단계', () => {
     hooks.phoneIssueMutateAsync.mockResolvedValue({
       expiresAt: new Date(Date.now() + 300000).toISOString(),
     });
-    hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'PROOF-TOKEN', registered: false });
+    hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'PROOF-TOKEN', registered: false, withdrawalPendingUntil: null });
   });
 
   it('제목은 인증할 일만 말하고, 하단 버튼 하나가 인증번호 받기에서 인증번호 확인으로 바뀐다', async () => {
@@ -773,7 +773,7 @@ describe('SignupClient 이미 가입된 번호 안내', () => {
     hooks.phoneIssueMutateAsync.mockResolvedValue({
       expiresAt: new Date(Date.now() + 300000).toISOString(),
     });
-    hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'PROOF-TOKEN', registered: false });
+    hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'PROOF-TOKEN', registered: false, withdrawalPendingUntil: null });
   });
 
   /** 번호를 넣고 인증번호를 받아 6자리를 확인한다(2단계 화면에서 시작). */
@@ -785,7 +785,7 @@ describe('SignupClient 이미 가입된 번호 안내', () => {
   it('인증 응답이 registered:true 면 다음 단계로 가지 않고 그 자리에서 안내 카드와 세 갈래를 보여 준다', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
-      hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'PROOF-TOKEN', registered: true });
+      hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'PROOF-TOKEN', registered: true, withdrawalPendingUntil: null });
       render(<SignupClient />);
       await advanceToVerify();
       await verifyPhone('01012345678');
@@ -816,7 +816,7 @@ describe('SignupClient 이미 가입된 번호 안내', () => {
   });
 
   it('로그인·계정 찾기 이동은 원래 가려던 곳(redirect)을 이어 준다', async () => {
-    hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'PROOF-TOKEN', registered: true });
+    hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'PROOF-TOKEN', registered: true, withdrawalPendingUntil: null });
     window.sessionStorage.setItem('teameet.v1.savedRedirect', '/matches/abc');
     render(<SignupClient />);
     await advanceToVerify();
@@ -829,7 +829,7 @@ describe('SignupClient 이미 가입된 번호 안내', () => {
   });
 
   it('소셜 로그인으로 가입했을 수 있는 사람에게 로그인 첫 화면 안내를 준다(웹에서는 카카오만)', async () => {
-    hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'PROOF-TOKEN', registered: true });
+    hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'PROOF-TOKEN', registered: true, withdrawalPendingUntil: null });
     render(<SignupClient />);
     await advanceToVerify();
     await verifyPhone('01012345678');
@@ -897,7 +897,7 @@ describe('SignupClient 이미 가입된 번호 안내', () => {
   it('iOS 앱에서는 같은 줄이 Apple 버튼도 안내한다', async () => {
     window.TeameetNative = { supports: ['sign-in-with-apple'], postMessage: vi.fn() };
     try {
-      hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'PROOF-TOKEN', registered: true });
+      hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'PROOF-TOKEN', registered: true, withdrawalPendingUntil: null });
       render(<SignupClient />);
       await advanceToVerify();
       await verifyPhone('01012345678');
@@ -911,7 +911,7 @@ describe('SignupClient 이미 가입된 번호 안내', () => {
   });
 
   it('다른 번호로 인증하기는 번호 입력으로 되돌리고 인증 상태를 비운다', async () => {
-    hooks.phoneVerifyMutateAsync.mockResolvedValueOnce({ verified: true, proofToken: 'TAKEN-PROOF', registered: true });
+    hooks.phoneVerifyMutateAsync.mockResolvedValueOnce({ verified: true, proofToken: 'TAKEN-PROOF', registered: true, withdrawalPendingUntil: null });
     render(<SignupClient />);
     await advanceToVerify();
     await verifyPhone('01012345678');
@@ -928,7 +928,7 @@ describe('SignupClient 이미 가입된 번호 안내', () => {
   });
 
   it('다른 번호로 인증하면 새 증명으로 프로필 단계에 들어가고 그 증명으로 가입한다', async () => {
-    hooks.phoneVerifyMutateAsync.mockResolvedValueOnce({ verified: true, proofToken: 'TAKEN-PROOF', registered: true });
+    hooks.phoneVerifyMutateAsync.mockResolvedValueOnce({ verified: true, proofToken: 'TAKEN-PROOF', registered: true, withdrawalPendingUntil: null });
     render(<SignupClient />);
     await advanceToVerify();
     await verifyPhone('01012345678');
@@ -951,7 +951,7 @@ describe('SignupClient 이미 가입된 번호 안내', () => {
   });
 
   it('번호 칸을 직접 고치면 안내 카드가 사라지고 다시 인증할 수 있다', async () => {
-    hooks.phoneVerifyMutateAsync.mockResolvedValueOnce({ verified: true, proofToken: 'TAKEN-PROOF', registered: true });
+    hooks.phoneVerifyMutateAsync.mockResolvedValueOnce({ verified: true, proofToken: 'TAKEN-PROOF', registered: true, withdrawalPendingUntil: null });
     render(<SignupClient />);
     await advanceToVerify();
     await verifyPhone('01012345678');
@@ -961,6 +961,100 @@ describe('SignupClient 이미 가입된 번호 안내', () => {
 
     expect(screen.queryByText(CARD_TITLE)).not.toBeInTheDocument();
     expect(await screen.findByRole('button', { name: '인증번호 받기' })).toBeEnabled();
+  });
+
+  describe('번호를 쥔 계정이 탈퇴 유예 중일 때', () => {
+    // KST 로는 11월 7일 00:30. 카드가 유예 종료 시각이 지났는지도 보므로 시계를 고정한다.
+    const UNTIL = '2026-11-06T15:30:00.000Z';
+    const GUIDE_TITLE = '이 번호는 탈퇴를 신청한 계정이 쓰고 있어요';
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-10-31T00:00:00.000Z'));
+    });
+    afterEach(() => vi.useRealTimers());
+
+    async function verifyPendingPhone(): Promise<void> {
+      hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'TAKEN-PROOF', registered: true, withdrawalPendingUntil: UNTIL });
+      render(<SignupClient />);
+      await advanceToVerify();
+      await verifyPhone('01012345678');
+      await screen.findByText(GUIDE_TITLE);
+    }
+
+    it('일반 "이미 가입돼 있어요" 카드 대신 두 가지 방법과 삭제일을 보여 주고 가입 단계로는 넘어가지 않는다', async () => {
+      await verifyPendingPhone();
+
+      expect(screen.queryByText(CARD_TITLE)).not.toBeInTheDocument();
+      expect(screen.getByText('번호 인증은 잘 끝났어요. 이 번호를 다시 쓰는 방법은 두 가지예요.')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: '방법 1 지금 바로 쓰기' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: '방법 2 기다리기' })).toBeInTheDocument();
+      expect(screen.getByText('11월 7일')).toBeInTheDocument();
+      expect(screen.getByText('이 번호로 새로 가입할 수 있어요')).toBeInTheDocument();
+      // 이 안내는 가입 수단을 모른다 — 이메일·계정 찾기 갈래를 싣지 않는다.
+      expect(screen.queryByRole('link', { name: /비밀번호가 기억나지 않아요/ })).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/^이름/)).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '다른 번호로 인증하기' })).toBeEnabled();
+      expect(screen.getByRole('heading', { name: GUIDE_TITLE })).toHaveFocus();
+    });
+
+    it('탈퇴 취소 버튼은 이메일·소셜이 함께 있는 로그인 첫 화면으로 가고 원래 가려던 곳을 이어 준다', async () => {
+      window.sessionStorage.setItem('teameet.v1.savedRedirect', '/matches/abc');
+      await verifyPendingPhone();
+
+      expect(screen.getByRole('link', { name: '로그인하고 탈퇴 취소하기' })).toHaveAttribute('href', '/login?redirect=%2Fmatches%2Fabc');
+    });
+
+    it('다른 번호로 인증하기를 누르면 안내가 사라지고, 번호를 직접 고쳐도 사라진다', async () => {
+      await verifyPendingPhone();
+      fireEvent.click(screen.getByRole('button', { name: '다른 번호로 인증하기' }));
+      expect(screen.queryByText(GUIDE_TITLE)).not.toBeInTheDocument();
+      expect(screen.getByLabelText(/^휴대폰 번호/)).toHaveValue('');
+
+      hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'TAKEN-PROOF', registered: true, withdrawalPendingUntil: UNTIL });
+      await verifyPhone('01012345678');
+      await screen.findByText(GUIDE_TITLE);
+      fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: OTHER_PHONE } });
+      expect(screen.queryByText(GUIDE_TITLE)).not.toBeInTheDocument();
+    });
+
+    it('방법 1 에 고객센터 링크가 있어 비밀번호를 잊은 사람도 막다른 길이 아니다', async () => {
+      await verifyPendingPhone();
+      expect(screen.getByRole('link', { name: '비밀번호가 기억나지 않으면 고객센터로 알려 주세요' })).toHaveAttribute('href', '/contact');
+    });
+
+    it('유예 종료 시각이 이미 지났으면 일반 "이미 가입돼 있어요" 카드가 나온다', async () => {
+      // 시계(10월 31일)보다 하루 앞선 시각 — 시계를 옮기면 인증번호 입력 시간이 먼저 만료된다.
+      hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'TAKEN-PROOF', registered: true, withdrawalPendingUntil: '2026-10-30T00:00:00.000Z' });
+      render(<SignupClient />);
+      await advanceToVerify();
+      await verifyPhone('01012345678');
+
+      expect(await screen.findByText(CARD_TITLE)).toBeInTheDocument();
+      expect(screen.queryByText(GUIDE_TITLE)).not.toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /이메일로 가입했어요/ })).toHaveAttribute('href', '/login/email');
+    });
+
+    it('날짜 없이 registered 만 오면 일반 카드가 그대로 나온다', async () => {
+      hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'TAKEN-PROOF', registered: true, withdrawalPendingUntil: null });
+      render(<SignupClient />);
+      await advanceToVerify();
+      await verifyPhone('01012345678');
+
+      expect(await screen.findByText(CARD_TITLE)).toBeInTheDocument();
+      expect(screen.queryByText(GUIDE_TITLE)).not.toBeInTheDocument();
+    });
+
+    it('이전 번호의 탈퇴 안내가 다음 번호의 일반 가입 카드에 새어 나오지 않는다', async () => {
+      await verifyPendingPhone();
+      fireEvent.click(screen.getByRole('button', { name: '다른 번호로 인증하기' }));
+
+      hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'TAKEN-PROOF', registered: true, withdrawalPendingUntil: null });
+      await verifyPhone(OTHER_PHONE);
+
+      expect(await screen.findByText(CARD_TITLE)).toBeInTheDocument();
+      expect(screen.queryByText(GUIDE_TITLE)).not.toBeInTheDocument();
+      expect(screen.queryByText('11월 7일')).not.toBeInTheDocument();
+    });
   });
 
   describe('가입 제출의 409 PHONE_CONFLICT(최종 방어)', () => {

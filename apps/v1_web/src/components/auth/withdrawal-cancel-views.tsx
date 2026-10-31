@@ -10,9 +10,6 @@ import type { AuthExceptionViewModel } from './auth.types';
 
 export type WithdrawalCancelNotice = 'login-required' | 'token-invalid' | 'already-processed';
 
-/** 서버가 준 철회 토큰의 유효 시간(10분, 600초)과 같아야 한다. */
-const CANCEL_WINDOW_LABEL = '10분';
-
 /** 철회를 이어 갈 수 없는 세 갈래의 안내. 모두 다음에 할 수 있는 행동 링크 하나가 중심이다. */
 export function getWithdrawalCancelNoticeModel(kind: WithdrawalCancelNotice, returnTo: string | null): AuthExceptionViewModel {
   const loginHref = getLoginPathForRedirect(returnTo ?? '');
@@ -29,18 +26,19 @@ export function getWithdrawalCancelNoticeModel(kind: WithdrawalCancelNotice, ret
     case 'token-invalid':
       return {
         backHref: '/login',
-        badge: '시간 초과',
-        title: '시간이 지났어요',
-        body: `취소할 수 있는 시간(${CANCEL_WINDOW_LABEL})이 지났어요. 다시 로그인하면 이어서 취소할 수 있어요.`,
+        badge: '다시 로그인 필요',
+        title: '이 요청은 더 이상 쓸 수 없어요',
+        // 만료 말고도 다른 탭에서 이미 취소한 경우가 같은 코드로 온다.
+        body: '다시 로그인해 주세요. 탈퇴 신청이 아직 남아 있다면 이어서 취소할 수 있어요.',
         tone: 'orange',
         primary: { label: '다시 로그인하기', href: loginHref },
       };
     case 'already-processed':
       return {
         backHref: '/login',
-        badge: '삭제된 계정',
-        title: '이미 삭제된 계정이에요',
-        body: '30일이 지나 계정이 삭제됐어요. 같은 정보로 새로 가입할 수 있어요.',
+        badge: '탈퇴 완료',
+        title: '이미 탈퇴 처리가 끝난 계정이에요',
+        body: '이 화면에서는 되살릴 수 없어요. 다시 이용하려면 새로 가입하거나 고객센터에 문의해 주세요.',
         tone: 'red',
         primary: { label: '새로 가입하기', href: '/terms?mode=signup' },
         secondary: { label: '문의하기', href: '/contact', tone: 'neutral' },

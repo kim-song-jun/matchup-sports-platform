@@ -16,6 +16,10 @@ import { WithdrawalCancelClient } from './withdrawal-cancel-client';
 
 const router = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn(), back: vi.fn() }));
 
+const analytics = vi.hoisted(() => ({ trackEvent: vi.fn() }));
+
+vi.mock('@/lib/analytics', () => ({ trackEvent: analytics.trackEvent }));
+
 vi.mock('next/navigation', () => ({
   useRouter: () => router,
   useSearchParams: () => new URLSearchParams(),
@@ -136,6 +140,7 @@ describe('WithdrawalCancelClient confirmation', () => {
     renderScreen();
 
     const dialog = await openConfirm(user);
+    expect(within(dialog).getByText(/팀에 다시 가입 신청을 해 주세요/)).toBeInTheDocument();
     const confirm = within(dialog).getByRole('button', { name: CONFIRM_LABEL });
     expect(confirm).toBeDisabled();
 
@@ -180,6 +185,7 @@ describe('WithdrawalCancelClient success', () => {
     expect(cancelRequests).toHaveLength(1);
     await expect(cancelRequests[0].json()).resolves.toEqual({ token: WITHDRAWAL_MSW.tokens.valid });
     expect(window.localStorage.getItem(V1_SESSION_HINT_KEY)).toBe('active');
+    expect(analytics.trackEvent).toHaveBeenCalledWith('login', { method: 'withdrawal_cancel' });
     expect(queryClient.getQueryCache().findAll({ queryKey: v1Keys.all })).toHaveLength(0);
     expect(readWithdrawalCancel()).toBeNull();
   });
@@ -237,22 +243,23 @@ describe('WithdrawalCancelClient failures', () => {
 
     await acknowledgeAndConfirm(user, await openConfirm(user));
 
-    expect(await screen.findByRole('heading', { level: 1, name: '시간이 지났어요' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: '이 요청은 더 이상 쓸 수 없어요' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '다시 로그인하기' })).toHaveAttribute('href', '/login?redirect=%2Fmatches%2F42');
     expect(window.localStorage.getItem(V1_SESSION_HINT_KEY)).toBeNull();
     expect(readWithdrawalCancel()).toBeNull();
   });
 
-  it('tells the user the account is already gone and offers sign-up and contact', async () => {
+  it('tells the user the withdrawal is already processed and offers sign-up and contact without promising a re-signup', async () => {
     seedToken(WITHDRAWAL_MSW.tokens.processed);
     const user = userEvent.setup();
     renderScreen();
 
     await acknowledgeAndConfirm(user, await openConfirm(user));
 
-    expect(await screen.findByRole('heading', { level: 1, name: '이미 삭제된 계정이에요' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: '이미 탈퇴 처리가 끝난 계정이에요' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '새로 가입하기' })).toHaveAttribute('href', '/terms?mode=signup');
     expect(screen.getByRole('link', { name: '문의하기' })).toHaveAttribute('href', '/contact');
+    expect(screen.queryByText(/같은 정보로/)).not.toBeInTheDocument();
     expect(window.localStorage.getItem(V1_SESSION_HINT_KEY)).toBeNull();
     expect(readWithdrawalCancel()).toBeNull();
   });

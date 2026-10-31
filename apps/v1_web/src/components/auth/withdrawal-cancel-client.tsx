@@ -6,10 +6,10 @@ import { useRouter } from 'next/navigation';
 import { ConfirmModal } from '@/components/v1-ui/confirm-modal';
 import { useV1CancelWithdrawal } from '@/hooks/use-v1-api';
 import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
-import { clearV1IdentityCache } from '@/lib/query-keys';
-import { getLoginPathForRedirect, resolveAuthContinuationPath, saveStoredV1Session } from '@/lib/session-storage';
+import { getLoginPathForRedirect } from '@/lib/session-storage';
 import { clearWithdrawalCancel, readWithdrawalCancel, type StoredWithdrawalCancel } from '@/lib/withdrawal-cancel-storage';
 import { AUTH_NOTICE_STAGE, AuthExceptionPageView, AuthFrame } from './auth-page';
+import { completeSignIn } from './email-login-completion';
 import {
   getWithdrawalCancelNoticeModel,
   WithdrawalCancelDoneView,
@@ -25,7 +25,7 @@ const CANCEL_FAILURE_FALLBACK = '탈퇴 신청을 취소하지 못했어요. 잠
 
 /**
  * 로그인 403 이 맡긴 철회 토큰(저장소)으로 탈퇴 신청을 취소하는 화면. 토큰이 없거나 만료됐으면 다시 로그인하게 한다.
- * 취소가 끝나면 이메일 로그인과 같이 세션 힌트를 저장하고 식별 캐시를 비운다.
+ * 취소가 끝나면 로그인과 같은 후처리(`completeSignIn`)를 거친다.
  */
 export function WithdrawalCancelClient() {
   const router = useRouter();
@@ -57,11 +57,15 @@ export function WithdrawalCancelClient() {
     setConfirmError(null);
     cancelWithdrawal.mutate({ token: stored.token }, {
       onSuccess: (result) => {
-        saveStoredV1Session(result.session);
-        clearV1IdentityCache(queryClient);
+        const destination = completeSignIn({
+          result,
+          queryClient,
+          requestedRedirect: stored.returnTo,
+          method: 'withdrawal_cancel',
+        });
         clearWithdrawalCancel();
         setConfirmOpen(false);
-        setOutcome({ kind: 'done', destination: resolveAuthContinuationPath(result.next?.route, stored.returnTo) });
+        setOutcome({ kind: 'done', destination });
       },
       onError: (error) => {
         const code = extractErrorCode(error);
@@ -100,7 +104,7 @@ export function WithdrawalCancelClient() {
       <ConfirmModal
         open={confirmOpen}
         title="탈퇴 신청을 취소하고 다시 쓸까요?"
-        message="계정이 다시 활성화돼요. 신청할 때 빠진 팀과 경기 명단은 돌아오지 않아서, 필요하면 다시 가입하거나 신청해야 해요."
+        message="계정이 다시 활성화돼요. 신청할 때 빠진 팀과 경기 명단은 돌아오지 않아요. 필요하면 팀에 다시 가입 신청을 해 주세요."
         acknowledgement="빠진 팀·명단이 돌아오지 않는 것을 이해했어요"
         confirmLabel="취소하고 다시 쓰기"
         cancelLabel="그대로 두기"

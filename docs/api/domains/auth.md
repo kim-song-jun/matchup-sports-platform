@@ -42,16 +42,16 @@
 | `POST` | `/api/v1/auth/recovery/email/request` | none | `{ email }` | `{ sent: true, expiresAt, devCode? }` |
 | `POST` | `/api/v1/auth/recovery/email/confirm` | none | `{ email, code }` | `{ verified, proofToken }` |
 | `POST` | `/api/v1/auth/recovery/email/reset-password` | none | `{ email, proofToken, newPassword }` | `{ ok: true }` |
-
 | `POST` | `/api/v1/auth/withdrawal/cancel` | none (the token is the credential) | `{ token }` | login-shaped session response + `teameet_v1_session` cookie |
 
 Account deletion is not on this controller — see `POST /api/v1/me/withdrawal-request`
 in [Users](./users.md). Taking it back is `POST /auth/withdrawal/cancel`, described below.
 
-`registered` on `phone/verify` says whether an account row already holds that number (any status except a deleted
-account, whose number was released). It is computed only after the code matched, so it is never an answer to someone who has
-not proven they hold the number; `phone/issue` still reveals nothing. `POST /auth/register` keeps answering `409 PHONE_CONFLICT`
-as the final check, using the same lookup.
+`registered` on `phone/verify` says whether a `v1_users` row still holds that number, whatever its status. It is computed only
+after the code matched, and `phone/issue` still reveals nothing. A number is released only by the admin delete flow
+(`DELETE /admin/users/:userId`), which overwrites it; an account moved to `deleted` through `changeUserStatus` keeps its number, so it
+still reports `registered=true`. `POST /auth/register` keeps answering `409 PHONE_CONFLICT` with the same lookup, and it does so
+before it checks the phone proof, so register can already tell a caller without a proof that the number is taken.
 
 ## Session Model
 
@@ -88,6 +88,12 @@ session cookie. Teams, rosters and push registrations the request released are *
 `400 WITHDRAWAL_CANCEL_TOKEN_INVALID` (bad, expired, replayed, or the account is no longer `withdrawal_pending`) and
 `409 WITHDRAWAL_ALREADY_PROCESSED` (an admin already deleted the account). Neither login-attempt record nor step-up state is
 touched by a cancel. The admin user detail shows the withdrawal request message only while the account is `withdrawal_pending` or `deleted`.
+
+Any `withdrawal_pending` account can be taken back, including one an admin put there through `changeUserStatus`: `withdrawal_pending`
+is the account owner's own state, and operator sanctions use `suspended` / `blocked`, which are never cancellable.
+
+The cancel response does not say what the request released. Clients must show fixed copy that teams, rosters and push
+registrations are not restored and the person has to rejoin or register them again.
 
 ## Email login step-up
 
@@ -148,7 +154,8 @@ the worker to the inquiry webhook with a `[보안] 로그인 실패 급증 (alph
 **Mail delivery failures.** Every failed SES send of a verification, password-reset or step-up mail writes to one outbox event per
 UTC hour (`EMAIL_DELIVERY_FAILED`, business key `email-delivery-failed:{windowStart}`): the first failure opens it, available a minute
 later so a burst is counted together; later failures in that hour only raise `failureCount` and the per-purpose counts while it is
-still waiting. The worker posts it to the same inquiry webhook with a `[메일] 인증 메일 발송 실패 (alpha|prod)` first line. The payload and
+still waiting (once the worker has claimed the event they are not counted). The windows are fixed UTC hours, so a burst across :00
+yields two alerts. The worker posts it to the same inquiry webhook with a `[메일] 인증 메일 발송 실패 (alpha|prod)` first line. The payload and
 message hold the window start, counts per purpose (`verify`, `password_reset`, `login_step_up`) and the SES error class name — never a
 recipient address or a code. Recording is best effort: if it fails, the caller still gets `503 EMAIL_SEND_FAILED`.
 

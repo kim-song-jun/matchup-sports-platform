@@ -5,7 +5,11 @@ import type { OtpEmailPurpose } from './otp-email-template';
 /** Outbox event type the worker turns into a Slack message. */
 export const EMAIL_DELIVERY_FAILED_TYPE = 'EMAIL_DELIVERY_FAILED';
 
-/** Failures inside one window share a single alert, so a broken mail setup pages once an hour, not once per request. */
+/**
+ * Failures inside one window share a single alert, so a broken mail setup pages once an hour, not once per request.
+ * Windows are fixed UTC hours: a burst across :00 yields two alerts, and failures after the worker claimed an
+ * event are not counted.
+ */
 export const EMAIL_FAILURE_WINDOW_MS = 60 * 60_000;
 
 /** The alert waits this long after the window's first failure so a burst is counted in one message. */

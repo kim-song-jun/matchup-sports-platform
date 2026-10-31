@@ -9,7 +9,8 @@ import { readWithdrawalCancelToken } from './withdrawal-cancel-token';
  * by the same interceptor.
  *
  * Teams and rosters the request released are not restored: the account comes back as an ordinary member
- * without them.
+ * without them. Any `withdrawal_pending` account qualifies, including one an admin set that way; operator
+ * sanctions are `suspended` / `blocked`, which this never lifts.
  */
 @Injectable()
 export class WithdrawalRecoveryService {

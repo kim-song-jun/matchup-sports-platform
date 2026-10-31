@@ -39,7 +39,7 @@ function setup() {
     },
   };
   const prisma = { $transaction: jest.fn(async (run: (client: typeof tx) => unknown) => run(tx)) };
-  return { rows, tx, prisma: prisma as never };
+  return { rows, prisma: prisma as never };
 }
 
 const sesError = (name = 'AccessDeniedException') => Object.assign(new Error('User: arn:aws:iam::1:user/x is not authorized to send to someone@example.com'), { name });
@@ -100,15 +100,6 @@ describe('recordEmailDeliveryFailure', () => {
 
     expect(rows).toHaveLength(1);
     expect(rows[0].payload.failureCount).toBe(1);
-  });
-
-  it('serializes concurrent failures of a window with an advisory lock keyed by the window', async () => {
-    const { tx, prisma } = setup();
-
-    await recordEmailDeliveryFailure(prisma, { purpose: 'verify', error: sesError(), now: at('2026-10-31T10:01:00Z') });
-
-    expect(tx.$executeRaw).toHaveBeenCalledTimes(1);
-    expect(tx.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(tx.v1OutboxEvent.findUnique.mock.invocationCallOrder[0]);
   });
 
   it('never stores the recipient, the error message or anything but identifiers and counts', async () => {

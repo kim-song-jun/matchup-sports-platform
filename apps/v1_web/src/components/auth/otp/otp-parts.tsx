@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { AlertBanner } from '@/components/v1-ui/primitives';
-import { PHONE_CONFLICT_CODE } from './phone-conflict-notice';
+import { PHONE_CONFLICT_CODE } from '@/lib/auth-error-codes';
 import { OTP_CODE_LENGTH, type OtpVerification } from './use-otp-verification';
 
 /**

@@ -297,6 +297,16 @@ describe('설정의 로그아웃 진입점', () => {
   });
 });
 
+describe('설정의 로그인 방법 진입 경로', () => {
+  it('계정 메뉴의 첫 줄이 로그인 방법 화면으로 간다', () => {
+    render(<SettingsPageView model={settingsModel} />);
+    const row = screen.getByRole('link', { name: /^로그인 방법/ });
+    expect(row).toHaveAttribute('href', '/my/settings/login-methods');
+    expect(row).toHaveTextContent('카카오·Apple을 연결해 한 계정으로 로그인해요');
+    expect(row.closest('section')?.querySelector('a.tm-my-menu-row')).toBe(row);
+  });
+});
+
 describe('설정의 비밀번호·약관 진입 경로', () => {
   it('비밀번호 변경은 본인인증 재설정 화면과 설정 복귀 경로에 연결한다', () => {
     render(<SettingsPageView model={{ ...settingsModel, account: {

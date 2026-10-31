@@ -21,6 +21,11 @@ export const MY_SETTINGS_ROUTES: RouteChromeEntry[] = [
     chrome: { title: '운동 정보', activeTab: 'my', bottomNav: false, backHref: '/my' },
   },
   {
+    // LoginMethodsPageClient(components/my/login-methods-page-client.tsx). 제목 헤드는 화면이 직접 그린다(Theme 과 같은 구조).
+    pattern: '/my/settings/login-methods',
+    chrome: { title: '로그인 방법', activeTab: 'my', bottomNav: false, backHref: '/my/settings' },
+  },
+  {
     // LocationSettingsPageClient(:1242). AppChrome 호출 1곳뿐.
     pattern: '/my/settings/location',
     chrome: { title: '위치 및 활동 지역', activeTab: 'my', bottomNav: false, backHref: '/my/settings' },

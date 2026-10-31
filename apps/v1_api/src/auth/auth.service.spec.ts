@@ -22,6 +22,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AppleIdentityService } from './apple-identity.service';
 import { AppleTokenService } from './apple-token.service';
 import { AuthService } from './auth.service';
+import { readWithdrawalCancelToken } from './withdrawal-cancel-token';
 import { LoginSecurityService } from './login-security/login-security.service';
 import { LoginStepUpService } from './login-security/login-step-up.service';
 import type { RegisterDto } from './dto/register.dto';
@@ -615,12 +616,11 @@ describe('AuthService', () => {
     });
   });
 
-  it('login: accountStatus=withdrawal_pending 계정 → 403 ACCOUNT_WITHDRAWAL_PENDING (일반 PERMISSION_DENIED와 구분되는 메시지)', async () => {
-    const correctHash = await hashPassword('ValidPass1!');
-    prisma.v1AuthIdentity.findUnique.mockResolvedValue({
+  describe('login: withdrawal_pending account', () => {
+    const pendingIdentity = async (status = 'active') => ({
       id: 'identity-1',
-      passwordHash: correctHash,
-      status: 'active',
+      passwordHash: await hashPassword('ValidPass1!'),
+      status,
       user: {
         id: 'user-1',
         email: 'user@teameet.v1',
@@ -628,14 +628,50 @@ describe('AuthService', () => {
         onboardingStatus: 'completed',
         createdAt: NOW,
         updatedAt: NOW,
+        sessionEpoch: 6,
       },
     });
+    const secret = process.env.V1_SESSION_SECRET;
+    beforeAll(() => { process.env.V1_SESSION_SECRET = 'x'.repeat(48); });
+    afterAll(() => {
+      if (secret === undefined) delete process.env.V1_SESSION_SECRET;
+      else process.env.V1_SESSION_SECRET = secret;
+    });
 
-    await expect(
-      service.login({ email: 'user@teameet.v1', password: 'ValidPass1!' }, CLIENT),
-    ).rejects.toMatchObject({
-      status: 403,
-      response: { code: 'ACCOUNT_WITHDRAWAL_PENDING' },
+    it('right password → 403 ACCOUNT_WITHDRAWAL_PENDING carrying a cancel token bound to the account and its epoch', async () => {
+      prisma.v1AuthIdentity.findUnique.mockResolvedValue(await pendingIdentity());
+
+      const failure = (await service
+        .login({ email: 'user@teameet.v1', password: 'ValidPass1!' }, CLIENT)
+        .catch((error: unknown) => error)) as {
+        getStatus(): number;
+        getResponse(): { code: string; details: { withdrawalCancelToken: string; expiresInSeconds: number } };
+      };
+
+      expect(failure.getStatus()).toBe(403);
+      expect(failure.getResponse().code).toBe('ACCOUNT_WITHDRAWAL_PENDING');
+      expect(failure.getResponse().details.expiresInSeconds).toBe(600);
+      expect(readWithdrawalCancelToken(failure.getResponse().details.withdrawalCancelToken)).toEqual({ userId: 'user-1', sessionEpoch: 6 });
+    });
+
+    it('wrong password → the same generic 401 as any account, with no sign of the account state', async () => {
+      prisma.v1AuthIdentity.findUnique.mockResolvedValue(await pendingIdentity());
+
+      await expect(
+        service.login({ email: 'user@teameet.v1', password: 'WrongPass1!' }, CLIENT),
+      ).rejects.toMatchObject({ status: 401, response: { code: 'UNAUTHENTICATED' } });
+      expect(loginSecurity.record).toHaveBeenCalledWith('failed', expect.anything());
+    });
+
+    it('right password but a suspended sign-in identity → still no token', async () => {
+      prisma.v1AuthIdentity.findUnique.mockResolvedValue(await pendingIdentity('suspended'));
+
+      await expect(
+        service.login({ email: 'user@teameet.v1', password: 'ValidPass1!' }, CLIENT),
+      ).rejects.toMatchObject({ status: 403, response: { code: 'ACCOUNT_WITHDRAWAL_PENDING' } });
+      await expect(
+        service.login({ email: 'user@teameet.v1', password: 'ValidPass1!' }, CLIENT),
+      ).rejects.not.toHaveProperty('response.details');
     });
   });
 
@@ -1388,6 +1424,30 @@ describe('AuthService', () => {
       expect(fetchMock.mock.calls[1][0]).toBe('https://kapi.kakao.com/v2/user/me');
       expect(fetchMock.mock.calls[1][1].headers.authorization).toBe(`Bearer ${TOKEN}`);
       expect(prisma.v1User.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('탈퇴 신청 중인 계정은 토큰이 검증된 경우에만 철회 토큰과 함께 403 을 받는다', async () => {
+      process.env.V1_SESSION_SECRET = 'x'.repeat(48);
+      const pending = (status: string) => ({
+        id: 'identity-1',
+        status,
+        user: { id: 'user-1', email: null, accountStatus: 'withdrawal_pending', onboardingStatus: 'completed', createdAt: NOW, updatedAt: NOW, sessionEpoch: 2 },
+      });
+
+      stubKakao([tokenInfo(123456), me()]);
+      prisma.v1AuthIdentity.findUnique.mockResolvedValue(pending('active'));
+      const failure = (await service.kakaoTokenLogin({ accessToken: TOKEN }).catch((error: unknown) => error)) as {
+        getResponse(): { code: string; details: { withdrawalCancelToken: string } };
+      };
+      expect(failure.getResponse().code).toBe('ACCOUNT_WITHDRAWAL_PENDING');
+      expect(readWithdrawalCancelToken(failure.getResponse().details.withdrawalCancelToken)).toEqual({ userId: 'user-1', sessionEpoch: 2 });
+
+      stubKakao([tokenInfo(123456), me()]);
+      prisma.v1AuthIdentity.findUnique.mockResolvedValue(pending('unlinked'));
+      await expect(service.kakaoTokenLogin({ accessToken: TOKEN })).rejects.not.toHaveProperty('response.details');
+
+      stubKakao([tokenInfo(999999)]);
+      await expect(service.kakaoTokenLogin({ accessToken: TOKEN })).rejects.toMatchObject({ status: 401 });
     });
 
     it('KAKAO_APP_ID 가 없으면 카카오를 호출하기 전에 400 OAUTH_NOT_CONFIGURED', async () => {

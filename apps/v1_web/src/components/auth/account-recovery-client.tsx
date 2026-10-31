@@ -12,6 +12,7 @@ import {
   useV1ResetPasswordByEmail,
 } from '@/hooks/use-v1-api';
 import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
+import { isNativeAppleSignInAvailable } from '@/lib/native-apple';
 import { sanitizeRedirectPath } from '@/lib/session-storage';
 import type { V1FoundAccount } from '@/types/api';
 import { AUTH_NOTICE_STAGE, AuthFrame } from './auth-page';
@@ -38,12 +39,6 @@ function looksLikeEmail(value: string): boolean {
   return /^\S+@\S+\.\S+$/.test(value.trim());
 }
 
-/** 로그인 첫 화면(/login)에서 쓸 수 있는 소셜 로그인. naver 처럼 거기 없는 제공자는 안내할 수 없어 뺀다. */
-const SOCIAL_LOGINS = [
-  { provider: 'kakao', label: '카카오' },
-  { provider: 'apple', label: 'Apple' },
-] as const;
-
 /** 번호로 찾은 계정이 실제로 쓰는 로그인 수단만 안내하고, 수단마다 맞는 화면으로 보낸다. */
 function FoundAccountCard({ account, emailLoginHref, loginHref, onResetPassword }: {
   account: V1FoundAccount;
@@ -51,27 +46,37 @@ function FoundAccountCard({ account, emailLoginHref, loginHref, onResetPassword 
   loginHref: string;
   onResetPassword: () => void;
 }) {
-  const socials = SOCIAL_LOGINS.filter(({ provider }) => account.providers.includes(provider));
-  const socialNames = socials.map(({ label }) => label).join('·');
-  const hasApple = socials.some(({ provider }) => provider === 'apple');
+  // 로그인 첫 화면에 없는 제공자(naver 등)는 안내할 수 없어 뺀다. Apple 버튼은 iOS 앱에만 있다.
+  const hasKakao = account.providers.includes('kakao');
+  const hasApple = account.providers.includes('apple');
+  const appleButton = hasApple && isNativeAppleSignInAvailable();
+  const socialNames = [hasKakao ? '카카오' : null, hasApple ? 'Apple' : null].filter(Boolean).join('·');
   const links = [
-    ...(account.hasPassword ? [{ href: emailLoginHref, label: socials.length > 0 ? '이메일로 로그인하기' : '로그인하러 가기' }] : []),
-    ...socials.map(({ label }) => ({ href: loginHref, label: `${label}로 로그인하기` })),
+    ...(account.hasPassword ? [{ href: emailLoginHref, label: socialNames ? '이메일로 로그인하기' : '로그인하러 가기' }] : []),
+    ...(hasKakao ? [{ href: loginHref, label: '카카오로 로그인하기' }] : []),
+    ...(appleButton ? [{ href: loginHref, label: 'Apple로 로그인하기' }] : []),
   ];
-  const guidance = !account.hasPassword
-    ? (socials.length > 0
+  let guidance: string | null = null;
+  if (!account.hasPassword) {
+    guidance = socialNames
       ? `이 계정은 ${socialNames} 로그인으로 가입했어요. 가입한 방법으로 로그인해 주세요.`
-      : '이 계정으로 로그인할 수 있는 방법을 확인하지 못했어요.')
-    : (socials.length > 0 ? `${socialNames} 로그인도 쓸 수 있어요.` : null);
+      : '이 계정으로 로그인할 수 있는 방법을 확인하지 못했어요. 문의 창구로 알려 주세요.';
+  } else if (socialNames) {
+    guidance = `${socialNames} 로그인도 쓸 수 있어요.`;
+  }
+  let label = '가입한 로그인 방법';
+  if (account.maskedEmail) label = '가입한 이메일';
+  else if (!socialNames) label = '로그인 방법을 확인하지 못했어요';
+  const value = account.maskedEmail ?? (socialNames || null);
 
   return (
     <Card pad={16} className="tm-auth-soft-card">
-      <div className="tm-text-body-lg">{account.maskedEmail ? '가입한 이메일' : '가입한 로그인 방법'}</div>
-      <div className="tm-text-heading" style={{ marginTop: 4 }}>{account.maskedEmail ?? (socialNames || '—')}</div>
+      <div className="tm-text-body-lg">{label}</div>
+      {value ? <div className="tm-text-heading" style={{ marginTop: 4 }}>{value}</div> : null}
       {guidance ? <div className="tm-text-caption" style={{ marginTop: 8 }}>{guidance}</div> : null}
-      {hasApple ? <div className="tm-text-caption" style={{ marginTop: 4 }}>Apple 로그인은 iOS 앱에서 쓸 수 있어요.</div> : null}
+      {hasApple && !appleButton ? <div className="tm-text-caption" style={{ marginTop: 4 }}>Apple 로그인은 iOS 앱에서 쓸 수 있어요.</div> : null}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 16 }}>
-        {links.length > 0 ? links.map((link, index) => (
+        {links.map((link, index) => (
           <Link
             key={link.label}
             className={`tm-btn tm-btn-lg tm-btn-block ${index === 0 ? 'tm-btn-primary' : 'tm-btn-neutral'}`}
@@ -79,9 +84,11 @@ function FoundAccountCard({ account, emailLoginHref, loginHref, onResetPassword 
           >
             {link.label}
           </Link>
-        )) : (
-          <Link className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" href={loginHref}>로그인 화면으로</Link>
-        )}
+        ))}
+        {/* 이 환경에서 쓸 수 있는 로그인 버튼이 없으면 막다른 길이 되지 않게 문의 창구를 준다. */}
+        {links.length === 0 ? (
+          <Link className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" href="/contact">문의 창구 보기</Link>
+        ) : null}
         {account.hasPassword ? (
           <Button block onClick={onResetPassword} size="sm" type="button" variant="ghost">비밀번호 재설정하기</Button>
         ) : null}

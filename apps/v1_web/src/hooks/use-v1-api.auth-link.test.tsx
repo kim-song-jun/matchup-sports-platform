@@ -13,7 +13,7 @@ import {
   getWithdrawalCancelOffer,
 } from '@/lib/auth-link-errors';
 import { linkResultFromError, linkResultFromSuccess } from '@/lib/link-result';
-import { clearPendingSocialLink, readPendingSocialLink, savePendingSocialLink } from '@/lib/pending-social-link';
+import { clearPendingSocialLink, peekPendingSocialLink, savePendingSocialLink, takePendingSocialLink } from '@/lib/pending-social-link';
 import { v1Keys } from '@/lib/query-keys';
 import { LINK_MSW, PASSWORD_UNAVAILABLE_MSW, PENDING_LINK_MSW, PHONE_CONFLICT_MSW, WITHDRAWAL_MSW } from '@/test/msw/auth-link-handlers';
 import { v1MswHandlers } from '@/test/msw/handlers';
@@ -211,7 +211,7 @@ describe('useV1LinkPending', () => {
     expect(hint && savePendingSocialLink(hint)).toBe(true);
 
     // ... 사용자가 원래 계정으로 로그인한 직후
-    const pending = readPendingSocialLink();
+    const pending = takePendingSocialLink();
     if (!pending || pending.expired) throw new Error('expected a usable pending link');
     const { wrapper, staleKeys } = setup();
     const { result } = renderHook(() => useV1LinkPending(), { wrapper });
@@ -221,7 +221,7 @@ describe('useV1LinkPending', () => {
     expect(linked).toEqual({ provider: 'kakao', alreadyLinked: false, mergedPendingAccount: false, authProviders: ['email', 'kakao'] });
     expect(linkResultFromSuccess(linked)).toBe('linked');
     expect(staleKeys()).toEqual(['authMe', 'settings', 'profile', 'notifications']);
-    expect(readPendingSocialLink()).toBeNull();
+    expect(peekPendingSocialLink()).toBeNull();
   });
 
   it('links an Apple identity from its own token', async () => {

@@ -12,6 +12,11 @@ import { LoginStepUpVerifyClient } from './login-step-up-verify-client';
 const mocks = vi.hoisted(() => ({
   replace: vi.fn(),
   trackEvent: vi.fn(),
+  nativeApple: false,
+}));
+
+vi.mock('@/lib/native-apple', () => ({
+  isNativeAppleSignInAvailable: () => mocks.nativeApple,
 }));
 
 vi.mock('next/navigation', () => ({
@@ -47,6 +52,7 @@ describe('LoginStepUpVerifyClient', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.nativeApple = false;
     window.localStorage.clear();
     window.sessionStorage.clear();
   });
@@ -75,12 +81,22 @@ describe('LoginStepUpVerifyClient', () => {
       renderVerify();
 
       const help = await screen.findByText(/메일이 오지 않으면/);
-      expect(help).toHaveTextContent("카카오로 가입하셨다면 로그인 첫 화면의 '카카오' 버튼으로");
-      expect(help).toHaveTextContent("Apple로 가입하셨다면 iOS 앱의 'Apple로 계속하기' 버튼으로 로그인해 주세요");
+      expect(help).toHaveTextContent("카카오로 가입하셨다면 로그인 첫 화면의 '카카오' 버튼으로 로그인해 주세요.");
+      expect(help).not.toHaveTextContent('Apple');
       expect(help).toHaveTextContent('비밀번호가 기억나지 않으면 비밀번호를 재설정해 주세요');
       expect(screen.getByRole('link', { name: '비밀번호 재설정하기' }))
         .toHaveAttribute('href', '/auth/find-account?mode=reset-password&redirect=%2Fmy');
       expect(screen.queryByText(/가입되지 않|없는 계정|존재하지/)).not.toBeInTheDocument();
+    });
+
+    it('mentions the Apple button only in the iOS app, with the same wording as the email login screen', async () => {
+      mocks.nativeApple = true;
+      storeChallenge();
+      renderVerify();
+
+      const help = await screen.findByText(/메일이 오지 않으면/);
+
+      expect(help).toHaveTextContent("카카오나 Apple로 가입하셨다면 로그인 첫 화면의 '카카오' 또는 'Apple로 계속하기' 버튼으로 로그인해 주세요.");
     });
 
     it('keeps only digits, at most six, and enables the button once the code is complete', async () => {
@@ -247,6 +263,34 @@ describe('LoginStepUpVerifyClient', () => {
       fireEvent.click(await screen.findByRole('button', { name: '인증번호 다시 받기' }));
 
       expect(await screen.findByRole('alert')).toHaveTextContent('지금은 인증 메일을 보낼 수 없어');
+    });
+
+    it('does not let the password reset link leave while the code is being checked', async () => {
+      let release!: () => void;
+      const held = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      server.use(http.post('*/api/v1/auth/login/step-up/verify', async () => {
+        await held;
+        return HttpResponse.json(
+          { status: 'error', statusCode: 400, code: 'STEP_UP_CODE_INVALID', message: 'x', details: null, timestamp: PAST },
+          { status: 400 },
+        );
+      }));
+      storeChallenge();
+      renderVerify();
+      await screen.findByLabelText('인증번호 6자리');
+
+      typeCode('111111');
+      fireEvent.click(screen.getByRole('button', { name: '확인하고 로그인' }));
+      const resetLink = screen.getByRole('link', { name: '비밀번호 재설정하기' });
+      await waitFor(() => expect(resetLink).toHaveAttribute('aria-disabled', 'true'));
+
+      // fireEvent.click 은 기본 동작이 막히면 false 를 돌려준다.
+      expect(fireEvent.click(resetLink)).toBe(false);
+
+      release();
+      await waitFor(() => expect(resetLink).not.toHaveAttribute('aria-disabled'));
     });
 
     it('sends one request for a double click on resend', async () => {

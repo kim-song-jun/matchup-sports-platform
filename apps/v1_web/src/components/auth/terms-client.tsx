@@ -29,7 +29,8 @@ export function TermsClient() {
   const searchParams = useSearchParams();
   const socialTerms = useV1CompleteSocialTerms();
   const acceptTerms = useV1AcceptSignupTerms();
-  const exitFlow = useSocialSignupExit();
+  // 이 화면의 가입 그만두기 출구는 social 모드에만 있고, 그 모드는 약관 미동의 가입 대기 계정만 들어온다.
+  const exitFlow = useSocialSignupExit({ onboardingStatus: 'social_terms_required' });
   const mode = searchParams.get('mode');
   const document = searchParams.get('document');
   const isSocialMode = mode === 'social';

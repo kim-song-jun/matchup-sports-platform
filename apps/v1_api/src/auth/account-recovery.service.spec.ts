@@ -333,9 +333,41 @@ describe('AccountRecoveryService — 비밀번호 재설정(이메일)', () => {
         proofToken: issueEmailProofToken('kakao@example.com'),
         newPassword: 'brand-new-password',
       }),
-    ).rejects.toMatchObject({ response: { code: 'PASSWORD_LOGIN_UNAVAILABLE' } });
+    ).rejects.toMatchObject({
+      response: {
+        code: 'PASSWORD_LOGIN_UNAVAILABLE',
+        message: '이 계정은 카카오 로그인으로 가입했어요. 카카오로 로그인해 주세요.',
+        details: { providers: ['kakao'] },
+      },
+    });
     expect(update).not.toHaveBeenCalled();
     expect(loginSecurity.forgetEmail).not.toHaveBeenCalled();
+  });
+
+  // 애플·복수 소셜 계정에 "카카오" 를 안내하면 사용자가 없는 로그인 수단을 찾게 된다.
+  it.each([
+    [['apple'], 'Apple', 'Apple로 로그인해 주세요.'],
+    [['kakao', 'apple'], '카카오·Apple', '카카오·Apple 중 하나로 로그인해 주세요.'],
+  ])('소셜 전용 계정의 안내는 실제 로그인 수단(%j)을 따른다', async (providers, names, instruction) => {
+    const socialUser = {
+      id: 'u3',
+      email: 'social@example.com',
+      authIdentities: providers.map((provider, index) => ({ id: `identity-${index}`, provider, passwordHash: null })),
+    };
+    const svc = service(prismaByEmail({ 'social@example.com': socialUser }));
+
+    const failure = await svc
+      .resetPasswordByEmail({
+        email: 'social@example.com',
+        proofToken: issueEmailProofToken('social@example.com'),
+        newPassword: 'brand-new-password',
+      })
+      .catch((error: unknown) => error as BadRequestException);
+    const body = (failure as BadRequestException).getResponse() as { message: string; details: { providers: string[] } };
+
+    expect(body.message).toBe(`이 계정은 ${names} 로그인으로 가입했어요. ${instruction}`);
+    expect(body.details.providers).toEqual(providers);
+    if (!providers.includes('kakao')) expect(body.message).not.toContain('카카오');
   });
 
   it('그 사이 계정이 사라졌으면 ACCOUNT_NOT_FOUND', async () => {

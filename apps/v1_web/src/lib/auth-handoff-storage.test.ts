@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { clearAuthHandoffStorage } from './auth-handoff-storage';
-import { readPendingSocialLink, savePendingSocialLink } from './pending-social-link';
+import { peekPendingSocialLink, savePendingSocialLink } from './pending-social-link';
 import { clearStoredV1Session, saveStoredV1Session } from './session-storage';
 import { readWithdrawalCancel, saveWithdrawalCancel } from './withdrawal-cancel-storage';
 
@@ -19,12 +19,12 @@ describe('clearAuthHandoffStorage', () => {
 
   it('removes every hand-off slot, so the next person on this tab cannot reuse the previous token', () => {
     fillBothSlots();
-    expect(readPendingSocialLink(NOW)).not.toBeNull();
+    expect(peekPendingSocialLink(NOW)).not.toBeNull();
     expect(readWithdrawalCancel(NOW)).not.toBeNull();
 
     clearAuthHandoffStorage();
 
-    expect(readPendingSocialLink(NOW)).toBeNull();
+    expect(peekPendingSocialLink(NOW)).toBeNull();
     expect(readWithdrawalCancel(NOW)).toBeNull();
   });
 
@@ -34,7 +34,7 @@ describe('clearAuthHandoffStorage', () => {
 
     clearStoredV1Session();
 
-    expect(readPendingSocialLink(NOW)).not.toBeNull();
+    expect(peekPendingSocialLink(NOW)).not.toBeNull();
     expect(readWithdrawalCancel(NOW)).not.toBeNull();
   });
 });

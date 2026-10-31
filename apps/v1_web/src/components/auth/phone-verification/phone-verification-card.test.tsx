@@ -61,7 +61,7 @@ describe('PhoneVerificationCard', () => {
     vi.spyOn(api, 'useV1PhoneIssue').mockReturnValue(
       mutation({ expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString() }),
     );
-    const verifyMock = vi.fn().mockResolvedValue({ verified: true, proofToken: 'PROOF' });
+    const verifyMock = vi.fn().mockResolvedValue({ verified: true, proofToken: 'PROOF', registered: false });
     vi.spyOn(api, 'useV1PhoneVerify').mockReturnValue({ mutateAsync: verifyMock, isPending: false } as never);
     const onVerified = vi.fn();
 
@@ -78,7 +78,7 @@ describe('PhoneVerificationCard', () => {
     await flush();
 
     expect(verifyMock).toHaveBeenCalledWith({ phone: '01012345678', code: '123456' });
-    expect(onVerified).toHaveBeenCalledWith('PROOF');
+    expect(onVerified).toHaveBeenCalledWith('PROOF', false);
     expect(screen.getByText('휴대폰 본인인증이 완료됐어요.')).toBeInTheDocument();
   });
 

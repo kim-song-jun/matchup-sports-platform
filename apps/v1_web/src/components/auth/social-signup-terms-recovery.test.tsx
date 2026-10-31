@@ -12,7 +12,7 @@ import { PendingSocialSignupGate } from './pending-social-signup-gate';
 import { SocialSignupClient } from './social-signup-client';
 import { TermsClient } from './terms-client';
 import { OnboardingClient } from './onboarding-client';
-import { authSession, createRedirectFixture, DOCUMENT, stepForRoute } from './social-link-required-redirect-fixtures';
+import { authSession, createRedirectFixture, DOCUMENT, stepForRoute } from './required-step-redirect.fixtures';
 
 const navigation = vi.hoisted(() => ({ pathname: '/signup/social', replace: vi.fn(), push: vi.fn() }));
 vi.mock('next/navigation', () => ({

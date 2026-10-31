@@ -715,10 +715,20 @@ enum V1VerificationChannel {
   phone
 }
 
+/// 코드가 증명하는 일. 한 계정의 코드는 같은 목적의 흐름에서만 대조·소비·폐기된다 — 다른 흐름이 만든 코드로
+/// 이쪽 증명을 통과하거나(최근 로그인 확인 우회), 새 코드가 다른 흐름의 코드를 지우지 못하게 한다.
+enum V1VerificationPurpose {
+  /// 내 연락처(이메일·휴대폰) 인증: /verification/*
+  contact
+  /// 이메일 로그인 추가: /auth/link/email/*
+  email_login_link
+}
+
 model V1VerificationToken {
   id           String                @id @default(uuid())
   userId       String                @map("user_id")
   channel      V1VerificationChannel
+  purpose      V1VerificationPurpose @default(contact)
   target       String
   codeHash     String                @map("code_hash")
   expiresAt    DateTime              @map("expires_at")

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { V1ApiError } from './api-client';
 import {
   getPasswordLoginUnavailableProviders,
+  isEmailSendUnavailable,
   getRecentLoginRequired,
   getSignInThenLinkHint,
   getSignupIncompleteRoute,
@@ -169,5 +170,20 @@ describe('getPasswordLoginUnavailableProviders', () => {
     expect(getPasswordLoginUnavailableProviders(apiError(400, 'VALIDATION_ERROR', { providers: ['kakao'] }))).toEqual([]);
     expect(getPasswordLoginUnavailableProviders(apiError(409, 'PASSWORD_LOGIN_UNAVAILABLE', { providers: ['kakao'] }))).toEqual([]);
     expect(getPasswordLoginUnavailableProviders(new Error('x'))).toEqual([]);
+  });
+});
+
+describe('isEmailSendUnavailable', () => {
+  it('recognises the 503 the server gives when no mail can be sent at all', () => {
+    expect(isEmailSendUnavailable(apiError(503, 'EMAIL_SEND_UNAVAILABLE'))).toBe(true);
+  });
+
+  it.each([
+    ['a mail that failed to send', apiError(503, 'EMAIL_SEND_FAILED')],
+    ['the same code with another status', apiError(400, 'EMAIL_SEND_UNAVAILABLE')],
+    ['an unrelated error', new Error('network')],
+    ['nothing', null],
+  ])('does not mistake %s for it', (_name, error) => {
+    expect(isEmailSendUnavailable(error)).toBe(false);
   });
 });

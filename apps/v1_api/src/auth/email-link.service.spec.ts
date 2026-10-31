@@ -116,6 +116,11 @@ function createDatabase(seed: { users: Row[]; identities: Row[] }) {
         apply(found, data);
         return found;
       }),
+      updateMany: jest.fn(async ({ where, data }: Row) => {
+        const rows = state.users.filter((row) => matches(row, where));
+        rows.forEach((row) => apply(row, data));
+        return { count: rows.length };
+      }),
     },
     v1AuthIdentity: {
       findUnique: jest.fn(async ({ where }: Row) => {
@@ -204,19 +209,22 @@ const kakaoCaller = (callerOverrides: Row = {}): Seed => ({
   identities: [identity('kakao-1', CALLER, 'kakao', 'kakao-key-1', { email: 'contact@kakao-mail.example' })],
 });
 
-async function build(seed: Seed, options: { echo?: boolean; sendFails?: boolean } = {}) {
+async function build(seed: Seed, options: { echo?: boolean; sendFails?: boolean; undeliverable?: boolean } = {}) {
   const db = createDatabase(seed);
-  const sent: { channel: string; target: string; code: string }[] = [];
+  const sent: { channel: string; target: string; code: string; emailPurpose?: string }[] = [];
   const dispatcher = {
-    send: jest.fn(async (channel: string, target: string, code: string) => {
+    send: jest.fn(async (channel: string, target: string, code: string, emailPurpose?: string) => {
       if (options.sendFails) throw new Error('mail transport down');
-      sent.push({ channel, target, code });
+      sent.push({ channel, target, code, emailPurpose });
     }),
     mayEchoCode: jest.fn(async () => options.echo ?? false),
+    emailDeliverable: !options.undeliverable,
   };
   const smsEventLog = { record: jest.fn().mockResolvedValue(undefined) };
   const verification = new VerificationService(db.prisma as never, dispatcher as never, smsEventLog as never);
-  const service = new EmailLinkService(db.prisma as never, verification);
+  const notice = { id: 'notice-1', targetType: 'system', targetId: null, title: '로그인 수단이 연결됐어요', body: null, deepLink: '/my/settings' };
+  const notifications = { createInTransaction: jest.fn().mockResolvedValue(notice), deliverCreated: jest.fn() };
+  const service = new EmailLinkService(db.prisma as never, verification, notifications as never);
 
   const loginSecurity = {
     isStepUpRequired: jest.fn().mockResolvedValue(false),
@@ -236,7 +244,7 @@ async function build(seed: Seed, options: { echo?: boolean; sendFails?: boolean 
   };
   const complete = (emailLinkToken: string, callerId = CALLER, password = NEW_PASSWORD) =>
     service.complete(callerId, { emailLinkToken, password, passwordConfirm: password });
-  return { service, verification, auth, recovery, dispatcher, smsEventLog, sent, lastCode, verified, complete, ...db };
+  return { service, verification, auth, recovery, dispatcher, smsEventLog, notifications, sent, lastCode, verified, complete, ...db };
 }
 
 async function failure(promise: Promise<unknown>) {
@@ -255,8 +263,11 @@ describe('EmailLinkService.requestCode', () => {
     const result = await service.requestCode(CALLER, { email: '  Runner@Example.com ' }, AGE);
 
     expect(result).toEqual({ sent: true, maskedTarget: 'ru***@example.com', expiresInSeconds: 300, resendAvailableInSeconds: 30 });
-    expect(sent).toEqual([{ channel: 'email', target: NEW_EMAIL, code: expect.stringMatching(/^\d{6}$/) }]);
-    expect(state.tokens).toEqual([expect.objectContaining({ userId: CALLER, channel: 'email', target: NEW_EMAIL, attemptCount: 0, consumedAt: null })]);
+    // The mail carries its own wording, not the generic "이메일 인증".
+    expect(sent).toEqual([{ channel: 'email', target: NEW_EMAIL, code: expect.stringMatching(/^\d{6}$/), emailPurpose: 'login_email_link' }]);
+    expect(state.tokens).toEqual([
+      expect.objectContaining({ userId: CALLER, channel: 'email', purpose: 'email_login_link', target: NEW_EMAIL, attemptCount: 0, consumedAt: null }),
+    ]);
     expect(await verifyPassword(sent[0].code, state.tokens[0].codeHash)).toBe(true);
     expect(state.tokens[0].codeHash).not.toContain(sent[0].code);
   });
@@ -386,6 +397,24 @@ describe('EmailLinkService.requestCode', () => {
 
     expect(state.tokens).toHaveLength(0);
   });
+
+  it('answers 503 EMAIL_SEND_UNAVAILABLE when no mail can reach anyone, instead of pretending a code was sent', async () => {
+    const { service, sent, state, dispatcher } = await build(kakaoCaller(), { undeliverable: true });
+
+    expect(await failure(service.requestCode(CALLER, { email: NEW_EMAIL }, AGE))).toMatchObject({ code: 'EMAIL_SEND_UNAVAILABLE', status: 503 });
+
+    expect(sent).toHaveLength(0);
+    expect(dispatcher.send).not.toHaveBeenCalled();
+    expect(state.tokens).toHaveLength(0);
+  });
+
+  it('still reports the refusals that do not depend on mail first (stale session, address in use)', async () => {
+    const stale = await build(kakaoCaller(), { undeliverable: true });
+    const taken = await build({ users: [...kakaoCaller().users, user(OTHER, { email: NEW_EMAIL })], identities: kakaoCaller().identities }, { undeliverable: true });
+
+    expect(await failure(stale.service.requestCode(CALLER, { email: NEW_EMAIL }, RECENT_LOGIN_MAX_AGE_SECONDS + 1))).toMatchObject({ code: 'RECENT_LOGIN_REQUIRED' });
+    expect(await failure(taken.service.requestCode(CALLER, { email: NEW_EMAIL }, AGE))).toMatchObject({ code: 'EMAIL_CONFLICT' });
+  });
 });
 
 describe('EmailLinkService.verifyCode', () => {
@@ -445,6 +474,68 @@ describe('EmailLinkService.verifyCode', () => {
   });
 });
 
+describe('codes are bound to their purpose', () => {
+  const authUser = { id: CALLER, email: 'contact@kakao-mail.example', accountStatus: 'active', onboardingStatus: 'completed' } as never;
+
+  it('a code asked for at /verification/email/request does not open the link, so the recent-login rule cannot be skipped by asking there', async () => {
+    const { service, verification, sent, lastCode, state } = await build(kakaoCaller());
+    // The route that never looks at the session age, mailing the account's own contact email.
+    await verification.requestEmail(authUser);
+    const contactCode = lastCode();
+    expect(sent[0]).toMatchObject({ target: 'contact@kakao-mail.example', emailPurpose: 'verify' });
+
+    expect(await failure(service.verifyCode(CALLER, { code: contactCode }))).toMatchObject({ code: 'VERIFICATION_NO_PENDING', status: 400 });
+
+    expect(state.tokens[0]).toMatchObject({ purpose: 'contact', consumedAt: null, attemptCount: 0 });
+    // The refusal is about the purpose: the same code still does its own job.
+    await expect(verification.confirm(authUser, 'email', contactCode)).resolves.toMatchObject({ verified: true, channel: 'email' });
+  });
+
+  it('a link code is refused by /verification/email/confirm, and that attempt does not spend it', async () => {
+    const { service, verification, lastCode, state } = await build(kakaoCaller());
+    await service.requestCode(CALLER, { email: NEW_EMAIL }, AGE);
+    const linkCode = lastCode();
+
+    expect(await failure(verification.confirm(authUser, 'email', linkCode))).toMatchObject({ code: 'VERIFICATION_NO_PENDING', status: 400 });
+
+    expect(state.tokens[0]).toMatchObject({ purpose: 'email_login_link', consumedAt: null, attemptCount: 0 });
+    await expect(service.verifyCode(CALLER, { code: linkCode })).resolves.toMatchObject({ expiresInSeconds: 600 });
+  });
+
+  it('asking for a link code leaves a pending contact code usable', async () => {
+    const { service, verification, lastCode, state } = await build(kakaoCaller());
+    await verification.requestEmail(authUser);
+    const contactCode = lastCode();
+    await service.requestCode(CALLER, { email: NEW_EMAIL }, AGE);
+    const linkCode = lastCode();
+
+    expect(state.tokens.map((token) => [token.purpose, token.consumedAt === null])).toEqual([['contact', true], ['email_login_link', true]]);
+    await expect(verification.confirm(authUser, 'email', contactCode)).resolves.toMatchObject({ verified: true });
+    await expect(service.verifyCode(CALLER, { code: linkCode })).resolves.toMatchObject({ expiresInSeconds: 600 });
+  });
+
+  it('asking for a contact code leaves a pending link code usable', async () => {
+    const { service, verification, lastCode, state } = await build(kakaoCaller());
+    await service.requestCode(CALLER, { email: NEW_EMAIL }, AGE);
+    const linkCode = lastCode();
+    await verification.requestEmail(authUser);
+    const contactCode = lastCode();
+
+    expect(state.tokens.map((token) => [token.purpose, token.consumedAt === null])).toEqual([['email_login_link', true], ['contact', true]]);
+    await expect(service.verifyCode(CALLER, { code: linkCode })).resolves.toMatchObject({ expiresInSeconds: 600 });
+    await expect(verification.confirm(authUser, 'email', contactCode)).resolves.toMatchObject({ verified: true });
+  });
+
+  it('still retires an older code of its own purpose', async () => {
+    const { service, state } = await build(kakaoCaller());
+    await service.requestCode(CALLER, { email: NEW_EMAIL }, AGE);
+    state.tokens[0].createdAt = new Date(Date.now() - 60_000);
+    await service.requestCode(CALLER, { email: NEW_EMAIL }, AGE);
+
+    expect(state.tokens.map((token) => token.consumedAt !== null)).toEqual([true, false]);
+  });
+});
+
 describe('EmailLinkService.complete', () => {
   it('adds the email login, makes the address the account email, and records it', async () => {
     const { verified, complete, state } = await build(kakaoCaller());
@@ -463,6 +554,46 @@ describe('EmailLinkService.complete', () => {
     expect(state.logs).toEqual([
       expect.objectContaining({ targetType: 'auth_identity', targetId: added?.id, toStatus: 'linked', actorType: 'user', actorUserId: CALLER, reason: 'email_login_added' }),
     ]);
+  });
+
+  it('tells the owner as a social link does: stored with the link, delivered once it committed', async () => {
+    const { verified, complete, notifications, state } = await build(kakaoCaller());
+    const token = await verified();
+
+    await complete(token);
+
+    const added = state.identities.find((row) => row.provider === 'email');
+    expect(notifications.createInTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({ $executeRaw: expect.any(Function) }),
+      CALLER,
+      'social_identity_linked',
+      { vars: { name: '이메일·비밀번호' }, businessKey: `email-link:${added?.id}` },
+    );
+    expect(notifications.deliverCreated).toHaveBeenCalledTimes(1);
+    expect(notifications.deliverCreated).toHaveBeenCalledWith(CALLER, 'social_identity_linked', expect.objectContaining({ id: 'notice-1' }));
+  });
+
+  it('undoes the link when the notice cannot be stored, and delivers nothing', async () => {
+    const { verified, complete, notifications, state } = await build(kakaoCaller());
+    const token = await verified();
+    notifications.createInTransaction.mockRejectedValueOnce(new Error('inbox down'));
+
+    await expect(complete(token)).rejects.toThrow('inbox down');
+
+    expect(state.identities.filter((row) => row.provider === 'email')).toHaveLength(0);
+    expect(state.users[0]).toMatchObject({ email: 'contact@kakao-mail.example', emailVerifiedAt: null });
+    expect(state.logs).toHaveLength(0);
+    expect(notifications.deliverCreated).not.toHaveBeenCalled();
+  });
+
+  it('sends no notice when nothing was linked', async () => {
+    const { verified, complete, notifications, state } = await build(kakaoCaller());
+    const token = await verified();
+    state.users.push(user(OTHER, { email: NEW_EMAIL }));
+
+    await failure(complete(token));
+
+    expect(notifications.deliverCreated).not.toHaveBeenCalled();
   });
 
   describe('afterwards', () => {

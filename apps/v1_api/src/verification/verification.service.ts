@@ -4,9 +4,11 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
+  Logger,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
-import { Prisma, V1AuthProvider, V1VerificationChannel } from '@prisma/client';
+import { Prisma, V1AuthProvider, V1VerificationChannel, V1VerificationPurpose } from '@prisma/client';
 import { randomInt } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { hashPassword, verifyPassword } from '../auth/password-hash';
@@ -14,6 +16,7 @@ import { pendingAccountLinkClaims, signInThenLinkConflict } from '../auth/social
 import { isUnfinishedSocialSignup } from '../auth/social-signup-access';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { SMS_EVENT_TYPE, SmsEventLogService } from './sms-event-log.service';
+import type { OtpEmailPurpose } from './email/otp-email-template';
 import { VerificationDispatcherService } from './verification-dispatcher.service';
 
 const CODE_TTL_MS = 5 * 60 * 1000;
@@ -41,8 +44,16 @@ const SEND_QUOTA_WINDOW_MS = 24 * 60 * 60 * 1000;
 const MAX_SENDS_PER_TARGET = 5;
 const MAX_SENDS_PER_USER = 10;
 
+/** 코드의 목적마다 보낼 메일 문구. 휴대폰 코드는 문구를 고르지 않는다. */
+const EMAIL_PURPOSE_OF: Record<V1VerificationPurpose, OtpEmailPurpose> = {
+  contact: 'verify',
+  email_login_link: 'login_email_link',
+};
+
 @Injectable()
 export class VerificationService {
+  private readonly logger = new Logger(VerificationService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly dispatcher: VerificationDispatcherService,
@@ -62,7 +73,7 @@ export class VerificationService {
     }
     // 상한은 issue() 안에서 잠금 아래 확인한다 — 이메일도 같은 상한을 쓴다(유료는
     // 아니지만 발신 도메인 평판을 태우고, 남의 주소로 반복 발송하는 괴롭힘 경로는 동일).
-    return this.issue('email', user.id, user.email);
+    return this.issue('email', user.id, user.email, 'contact');
   }
 
   async requestPhone(authUser: V1AuthUser, phone: string) {
@@ -80,12 +91,13 @@ export class VerificationService {
       return { sent: false, alreadyVerified: true, channel: 'phone' as const };
     }
     await this.assertResendCooldown('phone', phone);
-    return this.issue('phone', user.id, phone);
+    return this.issue('phone', user.id, phone, 'contact');
   }
 
   /**
    * 대상(번호·이메일) 기준 재발송 쿨다운 — 로그인 사용자가 임의 대상으로 유료 SMS·메일을 반복 발송하는 남용 차단.
    * 마지막 발송 기록은 발송 실패 시 `issue()` 가 지우므로 실패한 시도는 쿨다운을 걸지 않는다.
+   * 쿨다운과 발송 상한은 목적을 가리지 않고 센다 — 막으려는 것은 코드의 종류가 아니라 그 대상에게 나간 메일·문자의 양이다.
    */
   private async assertResendCooldown(channel: V1VerificationChannel, target: string) {
     const recent = await this.prisma.v1VerificationToken.findFirst({
@@ -144,7 +156,7 @@ export class VerificationService {
   }
 
   async confirm(authUser: V1AuthUser, channel: V1VerificationChannel, code: string) {
-    const token = await this.checkPendingCode(authUser.id, channel, code);
+    const token = await this.checkPendingCode(authUser.id, channel, 'contact', code);
 
     const now = new Date();
     try {
@@ -209,11 +221,11 @@ export class VerificationService {
 
   /**
    * 사용자의 가장 최근 미사용 코드를 대조한다 — 만료·시도 상한·불일치는 여기서 거절하고, 맞으면 그 토큰을 돌려준다
-   * (소비는 호출자가 자기 쓰기와 함께 한다).
+   * (소비는 호출자가 자기 쓰기와 함께 한다). 같은 목적으로 보낸 코드만 본다.
    */
-  private async checkPendingCode(userId: string, channel: V1VerificationChannel, code: string) {
+  private async checkPendingCode(userId: string, channel: V1VerificationChannel, purpose: V1VerificationPurpose, code: string) {
     const token = await this.prisma.v1VerificationToken.findFirst({
-      where: { userId, channel, consumedAt: null, expiresAt: { gt: new Date() } },
+      where: { userId, channel, purpose, consumedAt: null, expiresAt: { gt: new Date() } },
       orderBy: { createdAt: 'desc' },
     });
     if (!token) {
@@ -266,8 +278,16 @@ export class VerificationService {
    * 주소를 다른 계정이 쓰는지·계정이 추가할 수 있는 상태인지는 호출자가 이미 확인했다. 여기서는 발송 쿨다운·총량 상한만 건다.
    */
   async requestEmailLinkCode(userId: string, email: string) {
+    // 메일을 보낼 수단도, 코드를 응답에 싣는 개발 환경도 없으면 아무도 이 단계를 끝낼 수 없다.
+    if (!this.dispatcher.emailDeliverable) {
+      this.logger.error('email login link requested but email delivery is not configured (SES_REGION/EMAIL_FROM)');
+      throw new ServiceUnavailableException({
+        code: 'EMAIL_SEND_UNAVAILABLE',
+        message: '지금은 인증 메일을 보낼 수 없어요. 잠시 후 다시 시도해 주세요.',
+      });
+    }
     await this.assertResendCooldown('email', email);
-    const issued = await this.issue('email', userId, email);
+    const issued = await this.issue('email', userId, email, 'email_login_link');
     return {
       sent: true as const,
       maskedTarget: issued.target,
@@ -279,7 +299,7 @@ export class VerificationService {
 
   /** `requestEmailLinkCode` 로 보낸 코드를 대조해 소비하고, 코드를 받은 주소를 돌려준다. */
   async consumeEmailLinkCode(userId: string, code: string): Promise<string> {
-    const token = await this.checkPendingCode(userId, 'email', code);
+    const token = await this.checkPendingCode(userId, 'email', 'email_login_link', code);
     const consumed = await this.prisma.v1VerificationToken.updateMany({
       where: { id: token.id, consumedAt: null },
       data: { consumedAt: new Date() },
@@ -293,7 +313,7 @@ export class VerificationService {
     return token.target;
   }
 
-  private async issue(channel: V1VerificationChannel, userId: string, target: string) {
+  private async issue(channel: V1VerificationChannel, userId: string, target: string, purpose: V1VerificationPurpose) {
     const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
     const codeHash = await hashPassword(code);
 
@@ -313,17 +333,18 @@ export class VerificationService {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${userScope}, 0))`;
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${targetScope}, 0))`;
       await this.assertSendQuota(tx, channel, userId, target);
+      // 새 코드는 같은 목적의 이전 코드만 폐기한다 — 다른 흐름이 보낸 코드는 그대로 쓸 수 있어야 한다.
       await tx.v1VerificationToken.updateMany({
-        where: { userId, channel, consumedAt: null },
+        where: { userId, channel, purpose, consumedAt: null },
         data: { consumedAt: new Date() },
       });
       return tx.v1VerificationToken.create({
-        data: { userId, channel, target, codeHash, expiresAt },
+        data: { userId, channel, purpose, target, codeHash, expiresAt },
       });
     });
 
     try {
-      await this.dispatcher.send(channel, target, code);
+      await this.dispatcher.send(channel, target, code, EMAIL_PURPOSE_OF[purpose]);
     } catch (err) {
       // 발송 실패 시 방금 만든 토큰을 삭제해, 사용자가 재발송 쿨다운(대상 번호 기준)에 걸리지 않고 즉시 재요청할 수 있게 한다.
       await this.prisma.v1VerificationToken.deleteMany({ where: { id: created.id } });

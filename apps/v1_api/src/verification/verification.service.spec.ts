@@ -73,6 +73,19 @@ describe('VerificationService.confirm', () => {
     });
   });
 
+  it.each(['email', 'phone'] as const)('only looks at codes asked for to verify the account contact (%s)', async (channel) => {
+    const prisma = buildPrismaMock();
+    const handle = prisma as never as { v1VerificationToken: { findFirst: jest.Mock } };
+    handle.v1VerificationToken.findFirst.mockResolvedValue(null);
+    const service = new VerificationService(prisma, dispatcher, eventLogStub());
+
+    await expect(service.confirm(authUser, channel, '123456')).rejects.toMatchObject({ response: { code: 'VERIFICATION_NO_PENDING' } });
+
+    expect(handle.v1VerificationToken.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ userId: 'u1', channel, purpose: 'contact', consumedAt: null }) }),
+    );
+  });
+
   it('rejects a wrong code and records the attempt', async () => {
     const prisma = buildPrismaMock();
     const codeHash = await hashPassword('123456');
@@ -330,9 +343,9 @@ describe('VerificationService.requestPhone (MT)', () => {
 
     expect(result).toMatchObject({ sent: true, channel: 'phone', expiresAt: expect.any(String) });
     expect(handle.v1VerificationToken.create).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ channel: 'phone', target: '01012345678' }) }),
+      expect.objectContaining({ data: expect.objectContaining({ channel: 'phone', purpose: 'contact', target: '01012345678' }) }),
     );
-    expect(sendSpy).toHaveBeenCalledWith('phone', '01012345678', expect.stringMatching(/^\d{6}$/));
+    expect(sendSpy).toHaveBeenCalledWith('phone', '01012345678', expect.stringMatching(/^\d{6}$/), 'verify');
     expect(echoSpy).toHaveBeenCalledWith({ channel: 'phone', address: '01012345678', userId: 'u1' });
     sendSpy.mockRestore();
     echoSpy.mockRestore();

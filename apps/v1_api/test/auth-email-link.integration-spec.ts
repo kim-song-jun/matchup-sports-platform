@@ -64,6 +64,7 @@ describe('V1 adding an email login to a social account integration', () => {
 
   async function cleanupFixtures() {
     if (!prisma) return;
+    await prisma.v1Notification.deleteMany({ where: { recipientUserId: { in: USER_IDS } } });
     await prisma.v1StatusChangeLog.deleteMany({ where: { actorUserId: { in: USER_IDS } } });
     await prisma.v1VerificationToken.deleteMany({ where: { userId: { in: USER_IDS } } });
     await prisma.v1PhoneVerificationChallenge.deleteMany({ where: { phone: { in: [CALLER_PHONE, RIVAL_PHONE, HOLDER_PHONE] } } });
@@ -157,6 +158,12 @@ describe('V1 adding an email login to a social account integration', () => {
     expect(await prisma.v1StatusChangeLog.findFirst({ where: { targetId: identity.id, toStatus: 'linked' } })).toMatchObject({
       targetType: 'auth_identity', actorUserId: CALLER, reason: 'email_login_added',
     });
+    // The owner is told the way a social link tells them: a security notice stored with the link.
+    expect(await prisma.v1Notification.findFirst({ where: { recipientUserId: CALLER, title: '로그인 수단이 연결됐어요' } })).toMatchObject({
+      targetType: 'system',
+      deepLink: '/my/settings',
+      body: '이메일·비밀번호 로그인이 연결됐어요. 본인이 아니라면 고객센터로 문의해 주세요.',
+    });
 
     // Email sign-in works for this account.
     const wrong = await request(app.getHttpServer()).post(api('/auth/login')).send({ email: NEW_EMAIL, password: RESET_PASSWORD });
@@ -213,6 +220,65 @@ describe('V1 adding an email login to a social account integration', () => {
 
     expect([stale.status, stale.body.code]).toEqual([403, 'RECENT_LOGIN_REQUIRED']);
     expect(fresh.status).toBe(200);
+  });
+
+  describe('codes are bound to their purpose', () => {
+    const staleCookie = () =>
+      `${V1_SESSION_COOKIE_NAME}=${createV1SessionToken({ userId: CALLER, sessionEpoch: 0, secret: SESSION_SECRET, issuedAtMs: Date.now() - 31 * 60_000 })}`;
+    const withStaleSession = (path: string, body: Record<string, unknown>) =>
+      request(app.getHttpServer()).post(api(path)).set('Cookie', staleCookie()).send(body);
+
+    it('a session past the recent-login limit cannot mint a link code through /verification/email/request', async () => {
+      // The account email is whatever the account says it is (PATCH /me/profile sets it freely): here, an address the caller reads.
+      const attackerMailbox = `${PREFIX}-attacker@integration.test`;
+      await prisma.v1User.update({ where: { id: CALLER }, data: { email: attackerMailbox } });
+      const refused = await withStaleSession('/auth/link/email/request', { email: NEW_EMAIL });
+      expect([refused.status, refused.body.code]).toEqual([403, 'RECENT_LOGIN_REQUIRED']);
+
+      const contact = await withStaleSession('/verification/email/request', {}).expect(200);
+      const contactCode: string = contact.body.data.devCode;
+      expect(contactCode).toMatch(/^\d{6}$/);
+
+      const attempt = await withStaleSession('/auth/link/email/verify', { code: contactCode });
+      expect([attempt.status, attempt.body.code]).toEqual([400, 'VERIFICATION_NO_PENDING']);
+      expect(attempt.body.data?.emailLinkToken).toBeUndefined();
+      expect(await prisma.v1VerificationToken.findFirstOrThrow({ where: { userId: CALLER } })).toMatchObject({
+        purpose: 'contact', target: attackerMailbox, consumedAt: null, attemptCount: 0,
+      });
+      // The refusal is about the purpose: the same code still verifies the contact email.
+      const confirmed = await withStaleSession('/verification/email/confirm', { code: contactCode }).expect(200);
+      expect(confirmed.body.data).toMatchObject({ verified: true, channel: 'email' });
+    });
+
+    it('a link code is refused by /verification/email/confirm and is still good for the link', async () => {
+      const { devCode } = await requestCode(CALLER, NEW_EMAIL);
+
+      const confirm = await post('/verification/email/confirm', CALLER, { code: devCode });
+      expect([confirm.status, confirm.body.code]).toEqual([400, 'VERIFICATION_NO_PENDING']);
+      expect(await prisma.v1VerificationToken.findFirstOrThrow({ where: { userId: CALLER } })).toMatchObject({
+        purpose: 'email_login_link', target: NEW_EMAIL, consumedAt: null, attemptCount: 0,
+      });
+      await post('/auth/link/email/verify', CALLER, { code: devCode }).expect(200);
+    });
+
+    it('asking for one flow\'s code leaves the other flow\'s code usable, in either order', async () => {
+      const contact = await post('/verification/email/request', CALLER, {}).expect(200);
+      const { devCode: linkCode } = await requestCode(CALLER, NEW_EMAIL);
+      expect((await prisma.v1VerificationToken.findMany({ where: { userId: CALLER }, orderBy: { createdAt: 'asc' } })).map((token) => [token.purpose, token.consumedAt === null]))
+        .toEqual([['contact', true], ['email_login_link', true]]);
+
+      await post('/verification/email/confirm', CALLER, { code: contact.body.data.devCode }).expect(200);
+      await post('/auth/link/email/verify', CALLER, { code: linkCode }).expect(200);
+    });
+
+    it('a contact code the database gives its default purpose to is not a link code', async () => {
+      // A row written without a purpose, as a writer that predates the column would.
+      await prisma.v1VerificationToken.create({
+        data: { userId: CALLER, channel: 'email', target: NEW_EMAIL, codeHash: 'not-a-real-hash', expiresAt: new Date(Date.now() + 60_000) },
+      });
+
+      expect(await prisma.v1VerificationToken.findFirstOrThrow({ where: { userId: CALLER } })).toMatchObject({ purpose: 'contact' });
+    });
   });
 
   it('counts wrong codes and refuses the right one once the attempts are used up', async () => {

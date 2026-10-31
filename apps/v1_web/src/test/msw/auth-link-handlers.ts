@@ -89,6 +89,7 @@ export const EMAIL_LINK_MSW = {
     alreadyHasEmailLogin: 'has-login@example.com',
     recentLoginRequired: 'stale-login@example.com',
     cooldown: 'cooldown-login@example.com',
+    mailUnavailable: 'no-mail-login@example.com',
   },
   codes: {
     ok: '123456',
@@ -246,6 +247,8 @@ function emailLinkRequestOutcome(rawEmail: string) {
       return fail(409, 'SOCIAL_LINK_PROVIDER_EXISTS', '이 계정에는 이미 이메일 로그인이 연결돼 있어요.');
     case EMAIL_LINK_MSW.emails.taken:
       return fail(409, 'EMAIL_CONFLICT', '이미 다른 계정에서 쓰는 이메일이에요.');
+    case EMAIL_LINK_MSW.emails.mailUnavailable:
+      return fail(503, 'EMAIL_SEND_UNAVAILABLE', '지금은 인증 메일을 보낼 수 없어요. 잠시 후 다시 시도해 주세요.');
     case EMAIL_LINK_MSW.emails.cooldown:
       return fail(400, 'VERIFICATION_RESEND_COOLDOWN', `잠시 후 다시 시도해 주세요. (${EMAIL_LINK_MSW.resendAvailableInSeconds}초 뒤에 다시 받을 수 있어요)`);
     default: {

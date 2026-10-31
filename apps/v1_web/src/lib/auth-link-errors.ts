@@ -13,6 +13,7 @@ export const RECENT_LOGIN_REQUIRED_CODE = 'RECENT_LOGIN_REQUIRED';
 export const SIGNUP_INCOMPLETE_CODE = 'SIGNUP_INCOMPLETE';
 export const ACCOUNT_WITHDRAWAL_PENDING_CODE = 'ACCOUNT_WITHDRAWAL_PENDING';
 export const PASSWORD_LOGIN_UNAVAILABLE_CODE = 'PASSWORD_LOGIN_UNAVAILABLE';
+export const EMAIL_SEND_UNAVAILABLE_CODE = 'EMAIL_SEND_UNAVAILABLE';
 
 /** 탈퇴 철회를 권하는 403 에서 꺼낸 값. `token` 은 `POST /auth/withdrawal/cancel` 본문에 그대로 넣는다. */
 export type WithdrawalCancelOffer = {
@@ -71,6 +72,14 @@ export function getRecentLoginRequired(error: unknown): V1RecentLoginRequiredDet
   }
   const maxAgeSeconds = asRecord(error.details)?.maxAgeSeconds;
   return isPositiveNumber(maxAgeSeconds) ? { maxAgeSeconds } : null;
+}
+
+/**
+ * 이메일 로그인 추가의 인증번호 요청이 "지금은 메일을 보낼 수 없다"며 503 으로 거절됐는지 확인한다.
+ * 서버 설정 문제라 사용자가 입력을 고쳐도 소용없다 — 같은 503 이라도 메일 발송이 실패한 `EMAIL_SEND_FAILED` 와는 다른 안내(나중에 다시)다.
+ */
+export function isEmailSendUnavailable(error: unknown): boolean {
+  return error instanceof V1ApiError && error.statusCode === 503 && error.code === EMAIL_SEND_UNAVAILABLE_CODE;
 }
 
 /**

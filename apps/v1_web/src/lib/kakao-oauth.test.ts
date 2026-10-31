@@ -17,7 +17,10 @@ const STATE = 'a1b2c3d4e5f60718293a4b5c6d7e8f90';
 const stored = () => window.sessionStorage.getItem(KAKAO_OAUTH_STATE_STORAGE_KEY);
 
 describe('Kakao OAuth attempt storage', () => {
-  afterEach(() => window.sessionStorage.clear());
+  afterEach(() => {
+    vi.restoreAllMocks();
+    window.sessionStorage.clear();
+  });
 
   describe('parseKakaoOAuthAttempt', () => {
     it('round-trips a link attempt with its return path', () => {
@@ -84,6 +87,13 @@ describe('Kakao OAuth attempt storage', () => {
     });
 
     it('rejects when nothing was stored', () => {
+      expect(consumeKakaoOAuthAttempt(STATE)).toBeNull();
+    });
+
+    it('returns null instead of throwing when the browser blocks storage', () => {
+      vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+        throw new DOMException('blocked', 'SecurityError');
+      });
       expect(consumeKakaoOAuthAttempt(STATE)).toBeNull();
     });
 

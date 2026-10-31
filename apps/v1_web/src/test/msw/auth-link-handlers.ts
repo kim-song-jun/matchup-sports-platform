@@ -11,7 +11,11 @@ import { sessionLoginResponse } from './auth-step-up-handlers';
  *  - `POST /auth/kakao`·`/auth/kakao/token`·`/auth/apple`: LINK_MSW.loginConflicts 의 값이면 `details.next` 가 붙은
  *    409, 그 외에는 세션.
  *  - 위 409 의 `details` 에는 `linkToken`·`linkTokenExpiresInSeconds` 가 실린다. `POST /auth/link/pending` 은
- *    PENDING_LINK_MSW.tokens 의 값으로 시나리오를 고르고, 모르는 토큰은 400 SOCIAL_LINK_TOKEN_INVALID.
+ *    PENDING_LINK_MSW.tokens 의 값으로 시나리오를 고르고(토큰은 20~2048자), 모르는 토큰은 400 SOCIAL_LINK_TOKEN_INVALID.
+ *  - 가입 중인 소셜 계정의 PHONE_CONFLICT: 번호 소유를 증명한 뒤에만 알려 준다. `POST /verification/phone/confirm` 이
+ *    PHONE_CONFLICT_MSW.codes 의 코드로, `POST /auth/social-profile` 이 PHONE_CONFLICT_MSW.phones 의 번호로 같은 `details` 를
+ *    가진 409 를 낸다. 같은 번호의 `request` 는 일반 요청처럼 성공한다.
+ *  - 활성 계정(`/my/phone-verify`)은 PHONE_CONFLICT_MSW.activeAccountPhone 으로 `request` 에서 바로 409 이고 `details` 가 없다.
  *  - `POST /auth/login`: WITHDRAWAL_MSW.email 만 가로챈다(비밀번호가 맞으면 철회 토큰이 실린 403, 틀리면 일반 401).
  *    다른 이메일은 다음 핸들러로 넘긴다.
  *  - `POST /auth/withdrawal/cancel`: WITHDRAWAL_MSW.tokens 가 시나리오를 정한다(토큰은 20~512자, 서버 DTO와 같다).
@@ -51,7 +55,19 @@ export const PENDING_LINK_MSW = {
     providerExists: 'msw-pending-link-token-exists',
     recentLoginRequired: 'msw-pending-link-token-recent-login',
     signupIncomplete: 'msw-pending-link-token-signup-incomplete',
+    accountMismatch: 'msw-pending-link-token-account-mismatch',
   },
+} as const;
+
+/**
+ * 가입 중인 소셜 계정이 다른 계정이 쓰는 번호를 쓰려 할 때의 충돌. 번호(social-profile)나 코드(confirm)로 제공자를 고른다.
+ * 서버는 그 계정에 연결 가능한 소셜 로그인이 있을 때만 `details` 를 싣는다.
+ * `activeAccountPhone` 은 이미 가입을 마친 계정이 번호를 바꾸다 겪는 충돌이라 연결 안내가 없다.
+ */
+export const PHONE_CONFLICT_MSW = {
+  phones: { kakao: '01099990001', apple: '01099990002' },
+  codes: { kakao: '999991', apple: '999992' },
+  activeAccountPhone: '01099990003',
 } as const;
 
 /** 비밀번호 없이 카카오로만 가입한 계정 — 이메일 본인 확인 뒤 재설정을 시도하면 PASSWORD_LOGIN_UNAVAILABLE 이 온다. */
@@ -85,19 +101,18 @@ async function readJson(request: Request): Promise<Record<string, unknown>> {
   return typeof body === 'object' && body !== null && !Array.isArray(body) ? (body as Record<string, unknown>) : {};
 }
 
-const SIGN_IN_THEN_LINK_MESSAGE =
-  '이미 팀밋 계정이 있어요. 원래 가입한 방법으로 로그인한 뒤 설정에서 연결해 주세요.';
+const PROVIDER_LABELS: Record<V1LinkableProvider, string> = { kakao: '카카오', apple: 'Apple' };
 
 /**
  * 로그인·가입 충돌 409 — 코드는 그대로 두고 `details` 로 다음 행동과 연결 토큰을 알린다.
- * 휴대폰 중복 등 다른 엔드포인트의 핸들러도 이걸 쓴다. `linkToken` 에 null 을 주면 토큰 없는 안내가 된다.
+ * 소셜 로그인 3종과 PHONE_CONFLICT 핸들러가 쓴다. `linkToken` 에 null 을 주면 토큰 없는 안내가 된다.
  */
 export function signInThenLinkConflict(
   code: string,
   provider: V1LinkableProvider,
   linkToken: string | null = PENDING_LINK_MSW.tokens[provider],
 ) {
-  return fail(409, code, SIGN_IN_THEN_LINK_MESSAGE, {
+  return fail(409, code, `이미 팀밋 계정이 있어요. 원래 가입한 방법으로 로그인하면 ${PROVIDER_LABELS[provider]} 로그인이 자동으로 연결돼요.`, {
     next: 'sign_in_then_link',
     provider,
     ...(linkToken ? { linkToken, linkTokenExpiresInSeconds: PENDING_LINK_MSW.expiresInSeconds } : {}),
@@ -136,11 +151,11 @@ function linkOutcome(provider: V1LinkableProvider, credential: unknown) {
     case LINK_MSW.credentials.mergedPending:
       return ok(linkResult(provider, { mergedPendingAccount: true }));
     case LINK_MSW.credentials.providerExists:
-      return fail(409, 'SOCIAL_LINK_PROVIDER_EXISTS', '이미 다른 계정이 이 계정에 연결돼 있어요.');
+      return fail(409, 'SOCIAL_LINK_PROVIDER_EXISTS', `이 계정에는 이미 다른 ${PROVIDER_LABELS[provider]} 계정이 연결돼 있어요.`);
     case LINK_MSW.credentials.providerInUse:
-      return fail(409, 'SOCIAL_LINK_PROVIDER_IN_USE', '이미 다른 팀밋 계정에서 쓰고 있어요.');
+      return fail(409, 'SOCIAL_LINK_PROVIDER_IN_USE', '이미 다른 팀밋 계정에 연결된 로그인이에요. 그 계정으로 로그인해 주세요.');
     case LINK_MSW.credentials.recentLoginRequired:
-      return fail(403, 'RECENT_LOGIN_REQUIRED', '보안을 위해 다시 로그인해 주세요.', { maxAgeSeconds: LINK_MSW.maxAgeSeconds });
+      return fail(403, 'RECENT_LOGIN_REQUIRED', '보안을 위해 다시 로그인한 뒤 연결해 주세요.', { maxAgeSeconds: LINK_MSW.maxAgeSeconds });
     case LINK_MSW.credentials.signupIncomplete:
       return fail(403, 'SIGNUP_INCOMPLETE', '가입을 먼저 마무리해 주세요.', { next: { route: LINK_MSW.signupIncompleteRoute } });
     default:
@@ -158,6 +173,12 @@ function isBounded(value: unknown, min: number, max: number): value is string {
 
 function isAbsentOrBounded(value: unknown, min: number, max: number) {
   return value === undefined || isBounded(value, min, max);
+}
+
+function phoneConflictProvider(value: unknown, byProvider: Readonly<Record<V1LinkableProvider, string>>): V1LinkableProvider | null {
+  if (value === byProvider.kakao) return 'kakao';
+  if (value === byProvider.apple) return 'apple';
+  return null;
 }
 
 function loginOutcome(provider: V1LinkableProvider, credential: unknown) {
@@ -194,18 +215,44 @@ export const v1AuthLinkMswHandlers = [
     return linkOutcome('apple', identityToken);
   }),
 
-  // 연결 토큰은 충돌 409 의 details 에서 온 불투명 값이다. 길이 제한은 서버 DTO 가 정해지면 맞춘다.
+  // LinkPendingDto: 충돌 409 의 details.linkToken. 서버가 서명한 불투명 값이다.
   http.post(`${api}/auth/link/pending`, async ({ request }) => {
     const { linkToken, ...rest } = await readJson(request);
-    if (Object.keys(rest).length > 0 || !isBounded(linkToken, 1, 2048)) return invalidLinkBody();
+    if (Object.keys(rest).length > 0 || !isBounded(linkToken, 20, 2048)) return invalidLinkBody();
+    if (linkToken === PENDING_LINK_MSW.tokens.accountMismatch) {
+      return fail(409, 'SOCIAL_LINK_TOKEN_ACCOUNT_MISMATCH', '안내받은 계정과 다른 계정으로 로그인했어요. 설정 › 로그인 방법에서 직접 연결할 수 있어요.');
+    }
     const scenario = PENDING_SCENARIOS.get(linkToken);
-    if (!scenario) return fail(400, 'SOCIAL_LINK_TOKEN_INVALID', '연결 시간이 지났어요. 로그인 방법에서 다시 연결해 주세요.');
+    if (!scenario) {
+      return fail(400, 'SOCIAL_LINK_TOKEN_INVALID', '연결 정보가 만료됐거나 올바르지 않아요. 카카오·Apple 로그인을 처음부터 다시 시도해 주세요.');
+    }
     return linkOutcome(scenario.provider, scenario.credential);
   }),
 
   http.post(`${api}/auth/kakao`, async ({ request }) => loginOutcome('kakao', (await readJson(request)).code)),
   http.post(`${api}/auth/kakao/token`, async ({ request }) => loginOutcome('kakao', (await readJson(request)).accessToken)),
   http.post(`${api}/auth/apple`, async ({ request }) => loginOutcome('apple', (await readJson(request)).identityToken)),
+
+  // 휴대폰 중복. 가입 중인 소셜 계정은 인증번호를 맞춘 뒤(confirm)에야 알게 되고, 활성 계정은 요청 단계에서 바로 거절된다.
+  http.post(`${api}/verification/phone/request`, async ({ request }) => {
+    const { phone } = await readJson(request);
+    if (phone === PHONE_CONFLICT_MSW.activeAccountPhone) {
+      return fail(409, 'PHONE_CONFLICT', '이미 다른 계정에서 사용 중인 번호예요.');
+    }
+    return ok({ sent: true, channel: 'phone', expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(), devCode: '123456' });
+  }),
+  http.post(`${api}/verification/phone/confirm`, async ({ request }) => {
+    const { code } = await readJson(request);
+    const conflict = phoneConflictProvider(code, PHONE_CONFLICT_MSW.codes);
+    if (conflict) return signInThenLinkConflict('PHONE_CONFLICT', conflict);
+    return ok({ verified: true, verification: { emailVerified: false, phoneVerified: true } });
+  }),
+  http.post(`${api}/auth/social-profile`, async ({ request }) => {
+    const { phone } = await readJson(request);
+    const conflict = phoneConflictProvider(phone, PHONE_CONFLICT_MSW.phones);
+    if (conflict) return signInThenLinkConflict('PHONE_CONFLICT', conflict);
+    return sessionLoginResponse();
+  }),
 
   http.post(`${api}/auth/login`, async ({ request }) => {
     const { email, password } = await readJson(request);

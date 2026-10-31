@@ -3,7 +3,7 @@
  * 읽을 때 `parse` 가 null 을 주면(깨졌거나 모양이 다르면) 그 값은 지우고 없는 것으로 다룬다.
  */
 export interface SessionJsonSlot<T> {
-  /** 스토리지가 막힌 환경(프라이빗 모드 등)이면 false — 호출부가 다른 길을 찾아야 한다. */
+  /** 쓰지 못했으면 false — 그때 이전 값도 지워서, 저장하려던 값 대신 옛 값이 읽히는 일이 없다. */
   save(value: T): boolean;
   read(): T | null;
   /** 지웠으면 true. 스토리지가 막혀 있으면 값을 쓸 수도 없었으므로 false 여도 남은 값은 없다. */
@@ -27,6 +27,7 @@ export function createSessionJsonSlot<T>(key: string, parse: (value: unknown) =>
         window.sessionStorage.setItem(key, JSON.stringify(value));
         return true;
       } catch {
+        clear();
         return false;
       }
     },

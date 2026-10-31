@@ -1,6 +1,6 @@
 # Task 20261124: 로그인 복구와 소셜 계정 연결을 근본적으로 고치기
 
-Status: In Progress
+Status: Review
 **Owner**: 오케스트레이터(Opus) → 레인 L0~L5(Sonnet)
 **Created**: 2026-10-31
 
@@ -19,9 +19,9 @@ Status: In Progress
 기존 회원이 어떤 로그인 수단으로 들어와도 자기 계정에 닿을 수 있는 길이 하나 이상 있고, 그 길이 휴대폰 단독 소유로 남의 계정을 여는 일(#133)을 다시 허용하지 않는다.
 
 ## Original Conditions (must all be satisfied)
-- [ ] "기존 카카오 이용자랑 email 가입한 사람 … 전화번호 인증 이슈랑 로그인 이슈" 를 전부 근본적으로 해결한다
-- [ ] 모두 병렬로 진행한다
-- [ ] 화면 변경은 A·B·C 3안 → 사용자 선택 뒤 구현(저장소 규칙)
+- [x] "기존 카카오 이용자랑 email 가입한 사람 … 전화번호 인증 이슈랑 로그인 이슈" 를 전부 근본적으로 해결한다
+- [x] 모두 병렬로 진행한다
+- [x] 화면 변경은 A·B·C 3안 → 사용자 선택 뒤 구현(저장소 규칙)
 
 ## User Scenarios
 ### 이메일 가입자가 카카오로 들어온다
@@ -35,37 +35,41 @@ Status: In Progress
 
 ## Test Scenarios
 ### Happy path
-- [ ] 연결: 신원 없음 → 생성 / 빈 가입 계정의 신원 → 이동 + 정리 / 같은 계정 → 멱등
-- [ ] 가입 인증 성공 응답 `registered` true·false
-- [ ] 철회 토큰 → active + 세션
+- [x] 연결: 신원 없음 → 생성 / 빈 가입 계정의 신원 → 이동 + 정리 / 같은 계정 → 멱등
+- [x] 가입 인증 성공 응답 `registered` true·false
+- [x] 철회 토큰 → active + 세션
 ### Edge cases
-- [ ] 같은 신원을 두 계정이 동시에 연결 → 한쪽만 성공
-- [ ] 옛 형식 카카오 OAuth state 도 로그인 모드로 동작
+- [x] 같은 신원을 두 계정이 동시에 연결 → 한쪽만 성공
+- [x] 옛 형식 카카오 OAuth state 도 로그인 모드로 동작
 ### Error paths
-- [ ] 실사용 계정에 붙은 신원 409 `SOCIAL_LINK_PROVIDER_IN_USE`, 다른 카카오 이미 있음 409 `SOCIAL_LINK_PROVIDER_EXISTS`
-- [ ] 비밀번호가 틀린 탈퇴 신청 계정은 철회 토큰 없이 일반 실패
-- [ ] SES 실패 → `EMAIL_DELIVERY_FAILED` 알림이 시간 창당 1건
+- [x] 실사용 계정에 붙은 신원 409 `SOCIAL_LINK_PROVIDER_IN_USE`, 다른 카카오 이미 있음 409 `SOCIAL_LINK_PROVIDER_EXISTS`
+- [x] 비밀번호가 틀린 탈퇴 신청 계정은 철회 토큰 없이 일반 실패
+- [x] SES 실패 → `EMAIL_DELIVERY_FAILED` 알림이 시간 창당 1건
 ### Mock data updates needed
-- [ ] `apps/v1_web/src/test/msw/` 새 엔드포인트·409 details·`registered`
+- [x] `apps/v1_web/src/test/msw/` 새 엔드포인트·409 details·`registered`
 
 ## Parallel Work Breakdown
 ### Infra
 - [x] L0 운영 역할에 `TeameetProdSesSend`(도메인 한정 `ses:SendEmail`) — `scripts/infra/provision-prod-ses-send.sh`, SES 시뮬레이터 발송 성공 확인
 ### Backend
-- [ ] L1 로그인 상태 소셜 연결 API, 충돌 409 `details.next`, 항상 실패하던 `/auth/social-link*` 삭제
-- [ ] L2 `registered`, 탈퇴 철회, 메일 실패 Slack 알림, 계정 찾기 안내 문구
+- [x] L1 로그인 상태 소셜 연결 API, 충돌 409 `details.next`, 항상 실패하던 `/auth/social-link*` 삭제
+- [x] L2 `registered`, 탈퇴 철회, 메일 실패 Slack 알림, 계정 찾기 안내 문구
 ### Frontend
-- [ ] L4 훅·타입·MSW·카카오 OAuth 연결 모드 배관
-- [ ] L5 계정 찾기 버튼·step-up 안내·`/my/phone-verify` 충돌 안내(기존 컴포넌트 안 버그 수정)
-- [ ] L3 새 화면 4곳 A·B·C 결정 페이지 → 사용자 선택 → 2차 UI 레인
+- [x] L4 훅·타입·MSW·카카오 OAuth 연결 모드 배관
+- [x] L5 계정 찾기 버튼·step-up 안내·`/my/phone-verify` 충돌 안내(기존 컴포넌트 안 버그 수정)
+- [x] L3 새 화면 4곳 A·B·C 결정 페이지 → 사용자 선택 → 2차 UI 레인
+  - 사용자 결정(2026-10-31): ① 별도 "로그인 방법" 화면 + 원래 계정에 한 번 로그인하면 자동 연결 ② 3단계 안내 + 로그인 뒤 자동 이동 ③ 가입 번호 중복 전용 카드 + 세 갈래 ④ 탈퇴 철회 허용 + 전용 화면 + 체크 확인
 ### Sequential
-- [ ] 레인 PR 리뷰·dev 머지 → alpha 실측(390/768/1440 갤러리)
+- [x] 레인 PR 리뷰·dev 머지 → alpha 실측(390/768/1440 갤러리)
+  - dev 머지: #2107·#2115(SES) · #2108 · #2109 · #2110 · #2111 · #2112 · #2113 · #2114 · #2116, 후속 #2117
+  - 리뷰: Copilot 요청이 들어가지 않아 PR 마다 독립 리뷰로 대체 기록(보안 PR 은 적대 리뷰 + 반증 검증)
+  - alpha 갤러리 16화면(쓰기 없이 브라우저 안 가로채기로 상태 재현) 전부 PASS — 각 PR 코멘트
 
 ## Acceptance Criteria
-- [ ] Original conditions 전부 충족, 새 화면은 사용자 선택안대로
-- [ ] 레인별 타깃 테스트 green, 통합 스펙 CI green
-- [ ] 범위 내 tech debt 0(죽은 엔드포인트 삭제 포함)
-- [ ] Code review: Critical=0, Warning=0
+- [x] Original conditions 전부 충족, 새 화면은 사용자 선택안대로
+- [x] 레인별 타깃 테스트 green, 통합 스펙 CI green
+- [x] 범위 내 tech debt 0(죽은 엔드포인트 삭제 포함)
+- [x] Code review: Critical=0, Warning=0
 
 ## Tech Debt Resolved
 - 항상 409 를 던지던 `/auth/social-link`·`/preview` 와 DTO·허용 목록
@@ -73,15 +77,24 @@ Status: In Progress
 
 ## Security Notes
 - 연결의 소유 증명은 기존 계정 세션 + 제공자 토큰 검증이다. 휴대폰 단독 증명은 계속 거부한다(#133).
-- 오래된 세션으로는 연결할 수 없다(세션 발급 시각 기준). 연결은 계정 알림·상태 로그로 남긴다.
+- 오래된 세션(30분 초과)으로는 연결할 수 없다. 연결은 계정 알림(설정 무관)·상태 로그로 남긴다. 운영자 계정은 연결하지 않는다.
+- 대기 연결 토큰(30분)은 충돌한 계정(HMAC)에만 쓰인다. 가입 중 번호 충돌 토큰은 인증번호 확인 뒤에만 발급한다(남의 번호를 입력해 묶인 토큰을 얻는 공용 PC 함정 차단).
 - 철회 토큰은 자격 검증 뒤에만 발급한다(계정 상태 노출 없음). 사용자 ID·sessionEpoch 에 묶이고 10분 뒤 만료된다.
-- SES 권한은 검증된 도메인 identity 와 `ses:FromAddress` 조건으로 한정한다.
+- SES 권한은 검증된 도메인 identity 와 운영 발신 주소 하나(`ses:FromAddress`)로 한정한다.
 
 ## Risks & Dependencies
 - 네이티브 앱의 카카오·애플 연결 모드는 기존 브리지 계약 안에서만 동작해야 한다(앱 업데이트 없이).
 - 이메일 플로우의 alpha 실측은 테스트 주소 dev-echo 경로로만 한다(alpha 인스턴스 역할에는 SES 권한을 주지 않음).
 
+## 남은 것(사용자 결정·후속)
+- 개인정보처리방침 7절에 "로그인해 직접 탈퇴를 철회할 수 있다"를 넣을지(약관 버전 변경 — 법무 결정). 지금 문구("고객센터로 복구 요청")도 사실이다.
+- 실데이터 E2E: 카카오 연결·탈퇴 철회는 alpha 데이터를 바꾸므로 사용자 승인 뒤 실제 계정으로 확인한다.
+- 스키마 후속: `v1_auth_identities` 에 `(user_id, provider)` 유니크가 없다(동시 연결 경합의 마지막 방어선).
+- alpha 배포가 같은 커밋 CI 를 35분만 기다리는데 API CI 가 35분을 넘겨 시간 초과한다(10/30부터). 이번에는 CI 성공 뒤 배포를 다시 실행해 올렸다.
+
 ## Ambiguity Log
 | Date | Raised by | Question | Resolution |
 |------|-----------|----------|------------|
-| 2026-10-31 | 오케스트레이터 | 탈퇴 철회 허용 여부 | 계약 체크리스트가 withdrawal_pending 을 "복구 가능"으로 정의 → 서버는 구현, 화면·정책 최종 선택은 L3 결정 페이지 |
+| 2026-10-31 | 오케스트레이터 | 탈퇴 철회 허용 여부 | 사용자 결정 ④ — 허용(전용 화면 + 체크 확인, 빠진 팀·명단은 복구 안 함) |
+| 2026-10-31 | 사용자 | 이메일 가입자가 카카오로 들어오면 자동 연결? | 완전 자동(이메일만 같으면 연결)은 사전 계정 탈취 위험 → "원래 계정에 한 번 로그인하면 자동 연결"로 결정 |
+| 2026-10-31 | 오케스트레이터 | 관리자가 지정한 탈퇴 대기도 본인 철회? | 허용 — 탈퇴 대기는 본인 요청 상태, 운영 제재는 정지·차단 |

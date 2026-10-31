@@ -1,4 +1,6 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { fireEvent, render as renderUi, screen } from '@testing-library/react';
+import type { ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { __resetNavigationHistoryForTests, installNavigationHistory, markEntryAuthGated, markEntryReplacedByDocument } from '@/lib/navigation-history';
 import { LoginPageView } from './auth-page';
@@ -18,6 +20,9 @@ beforeEach(() => {
   installNavigationHistory();
 });
 afterEach(() => __resetNavigationHistoryForTests());
+
+// 로그인 화면의 Apple·카카오 버튼이 세션 캐시를 비우려고 QueryClient 를 읽는다.
+const render = (ui: ReactElement) => renderUi(<QueryClientProvider client={new QueryClient()}>{ui}</QueryClientProvider>);
 
 function renderLogin() {
   render(<LoginPageView model={getLoginViewModel('/tournaments/t1/my')} />);

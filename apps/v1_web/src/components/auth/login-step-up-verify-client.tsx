@@ -18,8 +18,11 @@ import {
   updateLoginStepUpTimes,
   type StoredLoginStepUp,
 } from '@/lib/login-step-up';
+import { getSavedRedirectPath } from '@/lib/session-storage';
 import { AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
 import { completeEmailLogin } from './email-login-completion';
+import { routeToWithdrawalCancel } from './login-recovery-route';
+import { PendingLinkNotice } from './pending-link-notice';
 import { describeResendFailure, describeVerifyFailure, type StepUpFailure } from './login-step-up-errors';
 import { PasswordResetLink } from './password-reset-link';
 import { describeSocialLoginGuide } from './social-login-guide';
@@ -162,6 +165,17 @@ export function LoginStepUpVerifyClient() {
           completeEmailLogin({ result, queryClient, replace: (path) => router.replace(path), requestedRedirect: redirect });
         },
         onError: (error) => {
+          // 인증번호까지 맞은 탈퇴 신청 계정: 이 확인 절차는 끝났으니 철회 화면으로 넘긴다.
+          const withdrawal = routeToWithdrawalCancel(error, redirect ?? getSavedRedirectPath());
+          if (withdrawal?.type === 'navigate') {
+            clearLoginStepUp();
+            router.push(withdrawal.path);
+            return;
+          }
+          if (withdrawal) {
+            setNotice({ message: withdrawal.message, tone: 'error' });
+            return;
+          }
           const failure = describeVerifyFailure(error);
           trackEvent('login_step_up_failed', { reason: error instanceof V1ApiError ? error.code : 'unknown' });
           fail(failure);
@@ -218,6 +232,7 @@ export function LoginStepUpVerifyClient() {
         <p className="tm-text-body tm-auth-sub">
           최근 로그인 실패가 있어 입력하신 메일({challenge.maskedEmail})로 인증번호를 보냈어요.
         </p>
+        <PendingLinkNotice />
         <div className="tm-auth-form">
           <div className="tm-auth-field">
             <label className="tm-text-label" htmlFor={inputId}>인증번호 6자리</label>

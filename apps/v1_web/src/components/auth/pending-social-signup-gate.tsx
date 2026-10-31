@@ -12,6 +12,7 @@ import {
 } from '@/lib/session-storage';
 import { disconnectV1Socket } from '@/lib/v1-socket';
 import { SessionFallback } from './session-entry-gate';
+import { usePendingSocialLinkResolver } from './use-pending-social-link-resolver';
 import {
   getPendingSocialSignupRoute,
   isPendingSocialSignupRouteAllowed,
@@ -35,6 +36,8 @@ export function PendingSocialSignupGate({ children }: { children: ReactNode }) {
     disconnectV1Socket();
     setHasSessionHint(false);
   }, [authMe.error, authMe.isError, authMe.isFetching, hasSessionHint]);
+
+  usePendingSocialLinkResolver(hasSessionHint === true ? authMe.data : undefined);
 
   const onboardingStatus = authMe.data?.user.onboardingStatus;
   const socialRequiredRoute = getPendingSocialSignupRoute(onboardingStatus);

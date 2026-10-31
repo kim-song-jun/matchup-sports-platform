@@ -21,6 +21,7 @@ import { UserAvatar } from '@/components/v1-ui/user-avatar';
 import { extractErrorMessage } from '@/lib/error-message';
 import { TOURNAMENT_STAFF_ENTRY_LABEL } from '@/lib/tournament-staff-entry-label';
 import { reportClientError } from '@/lib/client-error-reporter';
+import { clearAuthHandoffStorage } from '@/lib/auth-handoff-storage';
 import { clearStoredV1Session, sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { clearV1IdentityCache } from '@/lib/query-keys';
 import { disconnectV1Socket } from '@/lib/v1-socket';
@@ -2302,6 +2303,8 @@ export function WithdrawalPageClient() {
         context: { flow: 'withdrawal-session-cleanup' },
       });
     }
+    // 이 탭에서 이어 로그인하는 다른 계정이 연결·철회 토큰을 쓰지 않게 비운다.
+    clearAuthHandoffStorage();
     try {
       disconnectV1Socket();
     } catch (error) {

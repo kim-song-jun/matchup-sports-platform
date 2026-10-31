@@ -1,6 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { reportClientError } from '@/lib/client-error-reporter';
+import { peekPendingSocialLink, savePendingSocialLink } from '@/lib/pending-social-link';
 import { PUSH_REVOKE_TIMEOUT_MS, useSignOutAndLeave } from './use-sign-out-and-leave';
 
 const calls = vi.hoisted(() => ({
@@ -30,6 +31,12 @@ vi.mock('@/lib/v1-socket', () => ({
   disconnectV1Socket: () => calls.order.push('socket'),
 }));
 vi.mock('@/lib/client-error-reporter', () => ({ reportClientError: vi.fn() }));
+
+// 쓸 수 있는 대기 토큰의 값(없거나 만료 표식이면 null).
+const pendingToken = () => {
+  const read = peekPendingSocialLink();
+  return read && !read.expired ? read.linkToken : null;
+};
 
 const OPTIONS = { failureMessage: '로그아웃하지 못했어요.' };
 const replace = vi.fn(() => calls.order.push('navigate'));
@@ -171,5 +178,57 @@ describe('useSignOutAndLeave', () => {
     });
 
     expect(onStart).toHaveBeenCalledTimes(1);
+  });
+
+  describe('대기 연결 토큰', () => {
+    const hint = { next: 'sign_in_then_link', provider: 'kakao', linkToken: 'link-token-1', linkTokenExpiresInSeconds: 600 } as const;
+    afterEach(() => window.sessionStorage.clear());
+
+    it('로그아웃이 끝나면 앞 사람이 남긴 대기 연결 토큰을 지운다', async () => {
+      savePendingSocialLink(hint);
+      const { result } = renderHook(() => useSignOutAndLeave());
+
+      await act(() => result.current.signOutAndLeave('/login', OPTIONS));
+
+      expect(peekPendingSocialLink()).toBeNull();
+    });
+
+    it('로그아웃이 실패하면 아직 로그인 중이므로 토큰도 그대로 둔다', async () => {
+      savePendingSocialLink(hint);
+      calls.logout.mockRejectedValue(new Error('503'));
+      const { result } = renderHook(() => useSignOutAndLeave());
+
+      await act(() => result.current.signOutAndLeave('/login', OPTIONS));
+
+      expect(peekPendingSocialLink()).toMatchObject({ linkToken: 'link-token-1' });
+    });
+
+    // 로그아웃 정리가 토큰 칸을 지우므로, 이동 뒤 화면이 읽을 토큰은 정리보다 늦게 써야 살아남는다.
+    it('onSignedOut 은 정리 뒤·이동 앞에 불려 그 안에서 저장한 토큰이 이동 뒤까지 남는다', async () => {
+      savePendingSocialLink({ ...hint, linkToken: 'left-by-previous-person' });
+      const seenInCallback: Array<string | null> = [];
+      const onSignedOut = vi.fn(() => {
+        calls.order.push('signed-out');
+        seenInCallback.push(pendingToken());
+        savePendingSocialLink(hint);
+      });
+      const { result } = renderHook(() => useSignOutAndLeave());
+
+      await act(() => result.current.signOutAndLeave('/login', { ...OPTIONS, onSignedOut }));
+
+      expect(calls.order).toEqual(['push', 'logout', 'session', 'cache', 'socket', 'signed-out', 'navigate']);
+      expect(seenInCallback).toEqual([null]);
+      expect(peekPendingSocialLink()).toMatchObject({ linkToken: 'link-token-1' });
+    });
+
+    it('onSignedOut 은 로그아웃이 실패하면 불리지 않는다', async () => {
+      calls.logout.mockRejectedValue(new Error('503'));
+      const onSignedOut = vi.fn();
+      const { result } = renderHook(() => useSignOutAndLeave());
+
+      await act(() => result.current.signOutAndLeave('/login', { ...OPTIONS, onSignedOut }));
+
+      expect(onSignedOut).not.toHaveBeenCalled();
+    });
   });
 });

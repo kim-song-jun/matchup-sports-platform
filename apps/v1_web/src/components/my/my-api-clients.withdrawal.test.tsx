@@ -10,6 +10,8 @@ import { RequireAuth } from '@/components/auth/require-auth';
 import { server } from '@/test/msw/server';
 import { clearStoredV1Session, saveStoredV1Session, V1_SESSION_HINT_KEY, V1_USER_ID_KEY } from '@/lib/session-storage';
 import { v1Keys } from '@/lib/query-keys';
+import { peekPendingSocialLink, savePendingSocialLink } from '@/lib/pending-social-link';
+import { readWithdrawalCancel, saveWithdrawalCancel } from '@/lib/withdrawal-cancel-storage';
 import type { ClientErrorPayload } from '@/lib/client-error-reporter';
 
 const socket = vi.hoisted(() => ({ disconnect: vi.fn() }));
@@ -139,6 +141,8 @@ describe('WithdrawalPageClient session termination', () => {
     const { queryClient } = renderWithClient(<WithdrawalPageClient />);
     queryClient.setQueryData(v1Keys.profile(), { userId: 'withdrawal-user' });
     queryClient.setQueryData(v1Keys.authMe(), { userId: 'withdrawal-user' });
+    savePendingSocialLink({ next: 'sign_in_then_link', provider: 'kakao', linkToken: 'left-by-someone', linkTokenExpiresInSeconds: 600 });
+    saveWithdrawalCancel({ token: 'left-by-someone-else', expiresInSeconds: 600 }, '/home');
 
     await user.click(screen.getByRole('button', { name: '탈퇴 요청' }));
     await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /^탈퇴 요청$/ }));
@@ -146,6 +150,8 @@ describe('WithdrawalPageClient session termination', () => {
     await waitFor(() => expect(documentNavigation.replace).toHaveBeenCalledWith('/login'));
     expect(requestCount).toBe(1);
     expect(queryClient.getQueryCache().findAll({ queryKey: v1Keys.all })).toHaveLength(0);
+    expect(peekPendingSocialLink()).toBeNull();
+    expect(readWithdrawalCancel()).toBeNull();
     expect(localStorage.getItem(V1_SESSION_HINT_KEY)).toBeNull();
     expect(localStorage.getItem(V1_USER_ID_KEY)).toBeNull();
     expect(socket.disconnect).toHaveBeenCalledTimes(1);

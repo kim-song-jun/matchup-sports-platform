@@ -8,7 +8,7 @@ import { EmailLoginClient } from './email-login-client';
 import { PendingSocialSignupGate } from './pending-social-signup-gate';
 import { OnboardingClient } from './onboarding-client';
 import { TermsClient } from './terms-client';
-import { createRedirectFixture, requiredRoutes, stepForRoute } from './social-link-required-redirect-fixtures';
+import { createRedirectFixture, requiredRoutes, stepForRoute } from './required-step-redirect.fixtures';
 
 const navigation = vi.hoisted(() => ({ pathname: '/login/email', replace: vi.fn(), push: vi.fn() }));
 vi.mock('next/navigation', () => ({
@@ -60,7 +60,7 @@ async function loginAccount() {
   await user.click(screen.getByRole('button', { name: '로그인' }));
   await waitFor(() => expect(navigation.pathname).toBe(state.renewalRequired ? '/terms' : state.requiredRoute.split('?')[0]));
   expect(state.loginRequests).toBe(1);
-  expect(state.phoneOnlyRequests).toBe(0);
+  expect(state.linkRequests).toBe(0);
   return user;
 }
 async function finishOnboarding(user: ReturnType<typeof userEvent.setup>) {

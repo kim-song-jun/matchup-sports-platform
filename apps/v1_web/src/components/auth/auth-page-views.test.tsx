@@ -3,8 +3,11 @@
  * 그래픽은 0장이었다. 카드는 삭제하고 그래픽 슬롯이 그 자리를 맡는다 — 카드가 되살아나거나
  * 그래픽이 빠지면 여기서 잡는다.
  */
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import type { ReactElement } from 'react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { peekPendingSocialLink, savePendingSocialLink } from '@/lib/pending-social-link';
 import { AuthExceptionPageView, LoginPageView, SignupCompletePageView } from './auth-page';
 import { getAuthExceptionViewModel, getLoginViewModel, getSignupCompleteViewModel } from './auth.view-model';
 
@@ -13,6 +16,9 @@ vi.mock('next/link', () => ({
     <a href={href} {...rest}>{children}</a>
   ),
 }));
+
+// 로그인 화면의 Apple·카카오 버튼이 세션 캐시를 비우려고 QueryClient 를 읽는다.
+const renderWithClient = (ui: ReactElement) => render(<QueryClientProvider client={new QueryClient()}>{ui}</QueryClientProvider>);
 
 const srcOf = (img: Element) => decodeURIComponent(img.getAttribute('src') ?? '');
 
@@ -37,7 +43,7 @@ vi.mock('next/navigation', () => ({
 
 describe('로그인 화면', () => {
   it('로고 원 대신 auth-welcome 그래픽을 쓰고 두 진입 CTA를 유지한다', () => {
-    const { container } = render(<LoginPageView model={getLoginViewModel(null)} />);
+    const { container } = renderWithClient(<LoginPageView model={getLoginViewModel(null)} />);
     expect(container.querySelector('.tm-auth-logo')).toBeNull();
     expect([...container.querySelectorAll('img.tm-auth-illustration')].some((img) => srcOf(img).includes('auth-welcome-640.webp'))).toBe(true);
     expect(screen.getByRole('link', { name: '이메일로 로그인' })).toBeInTheDocument();
@@ -54,7 +60,7 @@ describe('로그인 화면', () => {
    * 소셜 로그인이 위, 이메일이 아래. 순서가 뒤집히면 Apple 이 권장하는 배치가 아니게 된다.
    */
   it('소셜 로그인을 이메일 진입보다 위에 둔다', () => {
-    const { container } = render(<LoginPageView model={getLoginViewModel(null)} />);
+    const { container } = renderWithClient(<LoginPageView model={getLoginViewModel(null)} />);
     const providerGroup = container.querySelector('.tm-auth-provider-group');
     const emailLink = screen.getByRole('link', { name: '이메일로 로그인' });
 
@@ -63,9 +69,27 @@ describe('로그인 화면', () => {
       .toBeTruthy();
   });
 
+  describe('대기 연결 토큰 안내', () => {
+    afterEach(() => window.sessionStorage.clear());
+
+    it('토큰이 있으면 소셜 로그인 버튼 위에 연결 안내와 연결 안 하기를 보여 준다', async () => {
+      savePendingSocialLink({ next: 'sign_in_then_link', provider: 'kakao', linkToken: 'link-token-1', linkTokenExpiresInSeconds: 600 });
+      const { container } = renderWithClient(<LoginPageView model={getLoginViewModel(null)} />);
+      const notice = await screen.findByText(/로그인하면 카카오 로그인이 이 계정에 연결돼요\./);
+      expect(notice.compareDocumentPosition(container.querySelector('.tm-auth-provider-group')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      screen.getByRole('button', { name: '연결 안 하기' }).click();
+      await vi.waitFor(() => expect(peekPendingSocialLink()).toBeNull());
+    });
+
+    it('토큰이 없으면 평소 로그인 화면 그대로다', () => {
+      renderWithClient(<LoginPageView model={getLoginViewModel(null)} />);
+      expect(screen.queryByText(/이 계정에 연결돼요/)).not.toBeInTheDocument();
+    });
+  });
+
   /** 브라우저에는 브리지가 없으므로 Apple 버튼이 그려지지 않는다. */
   it('브리지가 없는 브라우저에서는 Apple 버튼을 그리지 않는다', () => {
-    render(<LoginPageView model={getLoginViewModel(null)} />);
+    renderWithClient(<LoginPageView model={getLoginViewModel(null)} />);
     expect(screen.queryByRole('button', { name: 'Apple로 계속하기' })).toBeNull();
   });
 });

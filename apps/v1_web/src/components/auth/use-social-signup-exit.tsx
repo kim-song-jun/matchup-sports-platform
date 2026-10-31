@@ -2,8 +2,24 @@
 
 import { useCallback } from 'react';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
+import { savePendingSocialLink } from '@/lib/pending-social-link';
+import type { V1SignInThenLinkDetails } from '@/types/api';
+import { autoLinkPromise, manualLinkPromise } from './sign-in-then-link-copy';
 import { getPendingSocialSignupRoute } from './social-signup-access';
 import { useSignOutAndLeave } from './use-sign-out-and-leave';
+
+const STORAGE_PROBE_KEY = 'teameet.v1.storage_probe';
+
+// 연결 토큰은 sessionStorage 에 둔다. 쓸 수 없는 브라우저에서는 자동 연결을 약속하지 않는다.
+function isSessionStorageWritable(): boolean {
+  try {
+    window.sessionStorage.setItem(STORAGE_PROBE_KEY, '1');
+    window.sessionStorage.removeItem(STORAGE_PROBE_KEY);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * 소셜 가입 진행 중(약관·프로필 입력) 화면에서 빠져나가는 유일한 경로.
@@ -22,8 +38,9 @@ export function useSocialSignupExit({ onboardingStatus }: { onboardingStatus?: s
 
   /** 로그아웃 뒤 하드 내비게이션으로 나간다. 실패하면 서버 세션이 남아 게이트가 되돌려 보내므로 알린다. */
   const leaveTo = useCallback(
-    (path: string) => signOutAndLeave(path, {
+    (path: string, onSignedOut?: () => void) => signOutAndLeave(path, {
       failureMessage: '가입 취소를 완료하지 못했어요. 잠시 후 다시 시도해 주세요.',
+      onSignedOut,
     }),
     [signOutAndLeave],
   );
@@ -41,5 +58,30 @@ export function useSocialSignupExit({ onboardingStatus }: { onboardingStatus?: s
     await leaveTo('/login');
   }, [confirm, leaveTo]);
 
-  return { exit, leaveTo, ConfirmModal, error, pending };
+  /**
+   * 번호 중복으로 "원래 방법으로 로그인"해야 할 때의 출구. 로그아웃이 끝난 뒤 연결 토큰을 보관하고 이동하면,
+   * 로그인 직후 앱 전역 게이트가 그 토큰으로 이 소셜 로그인을 원래 계정에 자동 연결한다.
+   * 토큰은 로그아웃 정리(대기 칸 삭제)보다 늦게 써야 하므로 로그아웃 전에는 저장하지 않는다.
+   * 토큰을 보관할 수 없는 브라우저면 자동 연결 대신 "설정에서 직접 연결" 안내로 나간다.
+   * `confirmFirst` 는 입력 중이던 가입 내용을 버리는 선택(로그인)에 쓴다.
+   */
+  const leaveWithPendingLink = useCallback(async (
+    path: string,
+    hint: V1SignInThenLinkDetails,
+    { confirmFirst }: { confirmFirst: boolean },
+  ) => {
+    const canAutoLink = isSessionStorageWritable();
+    if (confirmFirst) {
+      const confirmed = await confirm({
+        title: '가입을 그만두고 로그인할까요?',
+        message: `지금까지 입력한 내용은 저장되지 않아요. ${canAutoLink ? autoLinkPromise(hint.provider) : manualLinkPromise(hint.provider)}`,
+        confirmLabel: '로그인하러 가기',
+        cancelLabel: '취소',
+      });
+      if (!confirmed) return;
+    }
+    await leaveTo(path, canAutoLink ? () => { savePendingSocialLink(hint); } : undefined);
+  }, [confirm, leaveTo]);
+
+  return { exit, leaveTo, leaveWithPendingLink, ConfirmModal, error, pending };
 }

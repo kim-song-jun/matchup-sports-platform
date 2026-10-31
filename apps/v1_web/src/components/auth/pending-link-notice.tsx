@@ -16,7 +16,7 @@ export function PendingLinkNotice() {
 
   if (!pending) return null;
   return (
-    <div className="tm-auth-pending-link" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+    <div className="tm-auth-pending-link" style={{ display: 'flex', flexDirection: 'column', gap: 4, margin: '16px 0' }}>
       <AlertBanner
         tone="info"
         message={`로그인하면 ${linkProviderLabel(pending.provider)} 로그인이 이 계정에 연결돼요. 직접 요청한 게 아니라면 연결 안 하기를 눌러 주세요.`}

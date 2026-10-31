@@ -1,19 +1,36 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { render as renderUi, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { V1ApiError } from '@/lib/api-client';
+import { readPendingSocialLink } from '@/lib/pending-social-link';
+import { v1Keys } from '@/lib/query-keys';
+import { V1_SESSION_HINT_KEY } from '@/lib/session-storage';
+import { readWithdrawalCancel } from '@/lib/withdrawal-cancel-storage';
 import { AppleLoginButton } from './apple-login-button';
 
 const router = vi.hoisted(() => ({ replace: vi.fn(), refresh: vi.fn() }));
 const api = vi.hoisted(() => ({ v1Post: vi.fn() }));
 
 vi.mock('next/navigation', () => ({ useRouter: () => router }));
-vi.mock('@/lib/api-client', () => ({ v1Post: api.v1Post }));
+vi.mock('@/lib/api-client', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/api-client')>()),
+  v1Post: api.v1Post,
+}));
+
+// 로그인 성공이 세션 캐시를 비우므로 QueryClient 아래에서 렌더한다.
+let queryClient: QueryClient;
+const render = (ui: ReactElement) => renderUi(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+const apiError = (statusCode: number, code: string, details?: Record<string, unknown>) =>
+  new V1ApiError({ status: 'error', statusCode, code, message: '실패', details, timestamp: '2026-10-31T00:00:00.000Z' });
 
 /** What the shell replies with; each test sets it before tapping. */
 let reply: Record<string, unknown> = {};
 
 beforeEach(() => {
   vi.clearAllMocks();
+  queryClient = new QueryClient();
   window.TeameetNative = {
     supports: ['sign-in-with-apple'],
     postMessage: vi.fn((message: string) => {
@@ -26,11 +43,12 @@ beforeEach(() => {
   api.v1Post.mockImplementation((path: string) =>
     path === '/auth/apple/nonce'
       ? Promise.resolve({ nonce: 'server-nonce' })
-      : Promise.resolve({ next: { route: '/home' } }));
+      : Promise.resolve({ session: { userId: 'u1', userEmail: null }, next: { route: '/home' } }));
 });
 
 afterEach(() => {
   delete window.TeameetNative;
+  window.localStorage.clear();
   window.sessionStorage.clear();
   window.history.pushState({}, '', '/');
 });
@@ -57,6 +75,54 @@ describe('AppleLoginButton', () => {
     });
   });
 
+  it('records the session hint and drops the previous identity cache, so the app-wide gate sees the login', async () => {
+    reply = { ok: true, identityToken: 'identity.token' };
+    queryClient.setQueryData([...v1Keys.all, 'chat-rooms'], ['previous-user-room']);
+    api.v1Post.mockImplementation((path: string) =>
+      path === '/auth/apple/nonce'
+        ? Promise.resolve({ nonce: 'server-nonce' })
+        : Promise.resolve({ session: { userId: 'u1', userEmail: null }, next: { route: '/home' } }));
+    render(<AppleLoginButton />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Apple로 계속하기' }));
+
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/home'));
+    expect(window.localStorage.getItem(V1_SESSION_HINT_KEY)).toBe('active');
+    expect(queryClient.getQueryData([...v1Keys.all, 'chat-rooms'])).toBeUndefined();
+  });
+
+  it('keeps the link token and opens the sign-in-then-link guide when the Apple account already has a Teameet account', async () => {
+    reply = { ok: true, identityToken: 'identity.token' };
+    window.history.pushState({}, '', '/login?redirect=%2Fteams%2Fnew');
+    api.v1Post.mockImplementation((path: string) =>
+      path === '/auth/apple/nonce'
+        ? Promise.resolve({ nonce: 'server-nonce' })
+        : Promise.reject(apiError(409, 'SOCIAL_LINK_CONTACT_CONFLICT', {
+          next: 'sign_in_then_link', provider: 'apple', linkToken: 'apple-link-token', linkTokenExpiresInSeconds: 600,
+        })));
+    render(<AppleLoginButton />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Apple로 계속하기' }));
+
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/auth/account-conflict?provider=apple&redirect=%2Fteams%2Fnew'));
+    expect(readPendingSocialLink()).toMatchObject({ linkToken: 'apple-link-token', provider: 'apple' });
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('sends a withdrawal-pending account to the cancel screen with its token', async () => {
+    reply = { ok: true, identityToken: 'identity.token' };
+    api.v1Post.mockImplementation((path: string) =>
+      path === '/auth/apple/nonce'
+        ? Promise.resolve({ nonce: 'server-nonce' })
+        : Promise.reject(apiError(403, 'ACCOUNT_WITHDRAWAL_PENDING', { withdrawalCancelToken: 'withdrawal-token-1', expiresInSeconds: 600 })));
+    render(<AppleLoginButton />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Apple로 계속하기' }));
+
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/auth/withdrawal-cancel'));
+    expect(readWithdrawalCancel()).toMatchObject({ token: 'withdrawal-token-1' });
+  });
+
   /** A shell built before the code was forwarded still signs in; the field is simply absent. */
   it('keeps the saved redirect while the server sends a new account to social terms', async () => {
     reply = { ok: true, identityToken: 'identity.token' };
@@ -64,7 +130,7 @@ describe('AppleLoginButton', () => {
     api.v1Post.mockImplementation((path: string) =>
       path === '/auth/apple/nonce'
         ? Promise.resolve({ nonce: 'server-nonce' })
-        : Promise.resolve({ next: { route: '/terms?mode=social' } }));
+        : Promise.resolve({ session: { userId: 'u1', userEmail: null }, next: { route: '/terms?mode=social' } }));
     render(<AppleLoginButton />);
 
     await userEvent.click(screen.getByRole('button', { name: 'Apple로 계속하기' }));

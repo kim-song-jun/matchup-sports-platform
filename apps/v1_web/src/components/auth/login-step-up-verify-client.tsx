@@ -22,6 +22,7 @@ import { getSavedRedirectPath } from '@/lib/session-storage';
 import { AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
 import { completeEmailLogin } from './email-login-completion';
 import { routeToWithdrawalCancel } from './login-recovery-route';
+import { PendingLinkNotice } from './pending-link-notice';
 import { describeResendFailure, describeVerifyFailure, type StepUpFailure } from './login-step-up-errors';
 import { PasswordResetLink } from './password-reset-link';
 import { describeSocialLoginGuide } from './social-login-guide';
@@ -231,6 +232,7 @@ export function LoginStepUpVerifyClient() {
         <p className="tm-text-body tm-auth-sub">
           최근 로그인 실패가 있어 입력하신 메일({challenge.maskedEmail})로 인증번호를 보냈어요.
         </p>
+        <PendingLinkNotice />
         <div className="tm-auth-form">
           <div className="tm-auth-field">
             <label className="tm-text-label" htmlFor={inputId}>인증번호 6자리</label>

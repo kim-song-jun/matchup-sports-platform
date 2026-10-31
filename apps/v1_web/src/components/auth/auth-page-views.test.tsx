@@ -6,7 +6,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import type { ReactElement } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { readPendingSocialLink, savePendingSocialLink } from '@/lib/pending-social-link';
 import { AuthExceptionPageView, LoginPageView, SignupCompletePageView } from './auth-page';
 import { getAuthExceptionViewModel, getLoginViewModel, getSignupCompleteViewModel } from './auth.view-model';
 
@@ -66,6 +67,25 @@ describe('로그인 화면', () => {
     expect(providerGroup).not.toBeNull();
     expect(providerGroup!.compareDocumentPosition(emailLink) & Node.DOCUMENT_POSITION_FOLLOWING)
       .toBeTruthy();
+  });
+
+  describe('대기 연결 토큰 안내', () => {
+    afterEach(() => window.sessionStorage.clear());
+
+    it('토큰이 있으면 소셜 로그인 버튼 위에 연결 안내와 연결 안 하기를 보여 준다', async () => {
+      savePendingSocialLink({ next: 'sign_in_then_link', provider: 'kakao', linkToken: 'link-token-1', linkTokenExpiresInSeconds: 600 });
+      const { container } = renderWithClient(<LoginPageView model={getLoginViewModel(null)} />);
+      const notice = await screen.findByRole('status');
+      expect(notice).toHaveTextContent('로그인하면 카카오 로그인이 이 계정에 연결돼요.');
+      expect(notice.compareDocumentPosition(container.querySelector('.tm-auth-provider-group')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      screen.getByRole('button', { name: '연결 안 하기' }).click();
+      await vi.waitFor(() => expect(readPendingSocialLink()).toBeNull());
+    });
+
+    it('토큰이 없으면 평소 로그인 화면 그대로다', () => {
+      renderWithClient(<LoginPageView model={getLoginViewModel(null)} />);
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    });
   });
 
   /** 브라우저에는 브리지가 없으므로 Apple 버튼이 그려지지 않는다. */

@@ -79,25 +79,31 @@ export class VerificationService {
     if (user.phoneVerifiedAt && user.phone === phone) {
       return { sent: false, alreadyVerified: true, channel: 'phone' as const };
     }
-    // 대상 번호 기준 재발송 쿨다운 — 로그인 사용자가 임의 번호로 유료 SMS 를 반복 발송하는 남용 차단.
+    await this.assertResendCooldown('phone', phone);
+    return this.issue('phone', user.id, phone);
+  }
+
+  /**
+   * 대상(번호·이메일) 기준 재발송 쿨다운 — 로그인 사용자가 임의 대상으로 유료 SMS·메일을 반복 발송하는 남용 차단.
+   * 마지막 발송 기록은 발송 실패 시 `issue()` 가 지우므로 실패한 시도는 쿨다운을 걸지 않는다.
+   */
+  private async assertResendCooldown(channel: V1VerificationChannel, target: string) {
     const recent = await this.prisma.v1VerificationToken.findFirst({
-      where: { channel: 'phone', target: phone },
+      where: { channel, target },
       orderBy: { createdAt: 'desc' },
       select: { createdAt: true },
     });
-    if (recent && Date.now() - recent.createdAt.getTime() < RESEND_COOLDOWN_MS) {
-      const retryAfter = Math.ceil((RESEND_COOLDOWN_MS - (Date.now() - recent.createdAt.getTime())) / 1000);
-      await this.smsEventLog.record({
-        eventType: SMS_EVENT_TYPE.RESEND_COOLDOWN,
-        phone,
-        detail: `channel=phone 재발송 쿨다운 ${retryAfter}초 남음`,
-      });
-      throw new BadRequestException({
-        code: 'VERIFICATION_RESEND_COOLDOWN',
-        message: `잠시 후 다시 시도해 주세요. (${retryAfter}초 뒤에 다시 받을 수 있어요)`,
-      });
-    }
-    return this.issue('phone', user.id, phone);
+    if (!recent || Date.now() - recent.createdAt.getTime() >= RESEND_COOLDOWN_MS) return;
+    const retryAfter = Math.ceil((RESEND_COOLDOWN_MS - (Date.now() - recent.createdAt.getTime())) / 1000);
+    await this.smsEventLog.record({
+      eventType: SMS_EVENT_TYPE.RESEND_COOLDOWN,
+      phone: target,
+      detail: `channel=${channel} 재발송 쿨다운 ${retryAfter}초 남음`,
+    });
+    throw new BadRequestException({
+      code: 'VERIFICATION_RESEND_COOLDOWN',
+      message: `잠시 후 다시 시도해 주세요. (${retryAfter}초 뒤에 다시 받을 수 있어요)`,
+    });
   }
 
   /**
@@ -138,52 +144,7 @@ export class VerificationService {
   }
 
   async confirm(authUser: V1AuthUser, channel: V1VerificationChannel, code: string) {
-    const token = await this.prisma.v1VerificationToken.findFirst({
-      where: { userId: authUser.id, channel, consumedAt: null, expiresAt: { gt: new Date() } },
-      orderBy: { createdAt: 'desc' },
-    });
-    if (!token) {
-      throw new BadRequestException({
-        code: 'VERIFICATION_NO_PENDING',
-        message: '유효한 인증 요청이 없어요. 인증번호를 다시 받아 주세요.',
-      });
-    }
-    // 인증 실패 기록은 email 채널에서도 남긴다("인증 실패" 트래킹이 목적) — 다만 저장
-    // 컬럼은 번호 끝 4자리(phoneMasked)라, 전화번호 형태가 아닌 이메일 대상은 항상
-    // '****' 로 마스킹된다(로컬파트 숫자 유출 방지). 어느 채널인지는 detail 로 구분한다.
-    // 시도는 대조보다 먼저, 상한 조건을 단 한 번의 갱신으로 예약한다 — 읽고 나서 올리면 동시 추측이 상한을 넘긴다.
-    let attemptCount: number;
-    try {
-      ({ attemptCount } = await this.prisma.v1VerificationToken.update({
-        where: { id: token.id, attemptCount: { lt: MAX_ATTEMPTS } },
-        data: { attemptCount: { increment: 1 } },
-        select: { attemptCount: true },
-      }));
-    } catch (error) {
-      if (!(error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025')) throw error;
-      await this.smsEventLog.record({
-        eventType: SMS_EVENT_TYPE.TOO_MANY_ATTEMPTS,
-        phone: token.target,
-        detail: `channel=${channel} 인증 시도 ${MAX_ATTEMPTS}회 초과`,
-      });
-      throw new BadRequestException({
-        code: 'VERIFICATION_TOO_MANY_ATTEMPTS',
-        message: '시도 횟수를 초과했어요. 인증번호를 다시 받아 주세요.',
-      });
-    }
-
-    const matches = await verifyPassword(code, token.codeHash);
-    if (!matches) {
-      await this.smsEventLog.record({
-        eventType: SMS_EVENT_TYPE.CODE_MISMATCH,
-        phone: token.target,
-        detail: `channel=${channel} 인증 시도 ${attemptCount}/${MAX_ATTEMPTS}`,
-      });
-      throw new BadRequestException({
-        code: 'VERIFICATION_CODE_MISMATCH',
-        message: '인증번호가 올바르지 않아요.',
-      });
-    }
+    const token = await this.checkPendingCode(authUser.id, channel, code);
 
     const now = new Date();
     try {
@@ -244,6 +205,92 @@ export class VerificationService {
         phoneVerified: Boolean(refreshed.phoneVerifiedAt),
       },
     };
+  }
+
+  /**
+   * 사용자의 가장 최근 미사용 코드를 대조한다 — 만료·시도 상한·불일치는 여기서 거절하고, 맞으면 그 토큰을 돌려준다
+   * (소비는 호출자가 자기 쓰기와 함께 한다).
+   */
+  private async checkPendingCode(userId: string, channel: V1VerificationChannel, code: string) {
+    const token = await this.prisma.v1VerificationToken.findFirst({
+      where: { userId, channel, consumedAt: null, expiresAt: { gt: new Date() } },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!token) {
+      throw new BadRequestException({
+        code: 'VERIFICATION_NO_PENDING',
+        message: '유효한 인증 요청이 없어요. 인증번호를 다시 받아 주세요.',
+      });
+    }
+    // 인증 실패 기록은 email 채널에서도 남긴다("인증 실패" 트래킹이 목적) — 다만 저장
+    // 컬럼은 번호 끝 4자리(phoneMasked)라, 전화번호 형태가 아닌 이메일 대상은 항상
+    // '****' 로 마스킹된다(로컬파트 숫자 유출 방지). 어느 채널인지는 detail 로 구분한다.
+    // 시도는 대조보다 먼저, 상한 조건을 단 한 번의 갱신으로 예약한다 — 읽고 나서 올리면 동시 추측이 상한을 넘긴다.
+    let attemptCount: number;
+    try {
+      ({ attemptCount } = await this.prisma.v1VerificationToken.update({
+        where: { id: token.id, attemptCount: { lt: MAX_ATTEMPTS } },
+        data: { attemptCount: { increment: 1 } },
+        select: { attemptCount: true },
+      }));
+    } catch (error) {
+      if (!(error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025')) throw error;
+      await this.smsEventLog.record({
+        eventType: SMS_EVENT_TYPE.TOO_MANY_ATTEMPTS,
+        phone: token.target,
+        detail: `channel=${channel} 인증 시도 ${MAX_ATTEMPTS}회 초과`,
+      });
+      throw new BadRequestException({
+        code: 'VERIFICATION_TOO_MANY_ATTEMPTS',
+        message: '시도 횟수를 초과했어요. 인증번호를 다시 받아 주세요.',
+      });
+    }
+
+    const matches = await verifyPassword(code, token.codeHash);
+    if (!matches) {
+      await this.smsEventLog.record({
+        eventType: SMS_EVENT_TYPE.CODE_MISMATCH,
+        phone: token.target,
+        detail: `channel=${channel} 인증 시도 ${attemptCount}/${MAX_ATTEMPTS}`,
+      });
+      throw new BadRequestException({
+        code: 'VERIFICATION_CODE_MISMATCH',
+        message: '인증번호가 올바르지 않아요.',
+      });
+    }
+    return token;
+  }
+
+  /**
+   * 로그인한 계정에 이메일 로그인을 추가하기 위해, 아직 이 계정의 것이 아닌 주소로 인증번호를 보낸다.
+   * 주소를 다른 계정이 쓰는지·계정이 추가할 수 있는 상태인지는 호출자가 이미 확인했다. 여기서는 발송 쿨다운·총량 상한만 건다.
+   */
+  async requestEmailLinkCode(userId: string, email: string) {
+    await this.assertResendCooldown('email', email);
+    const issued = await this.issue('email', userId, email);
+    return {
+      sent: true as const,
+      maskedTarget: issued.target,
+      expiresInSeconds: CODE_TTL_MS / 1000,
+      resendAvailableInSeconds: RESEND_COOLDOWN_MS / 1000,
+      ...(issued.devCode === undefined ? {} : { devCode: issued.devCode }),
+    };
+  }
+
+  /** `requestEmailLinkCode` 로 보낸 코드를 대조해 소비하고, 코드를 받은 주소를 돌려준다. */
+  async consumeEmailLinkCode(userId: string, code: string): Promise<string> {
+    const token = await this.checkPendingCode(userId, 'email', code);
+    const consumed = await this.prisma.v1VerificationToken.updateMany({
+      where: { id: token.id, consumedAt: null },
+      data: { consumedAt: new Date() },
+    });
+    if (consumed.count !== 1) {
+      throw new ConflictException({
+        code: 'ALREADY_PROCESSED',
+        message: '이미 사용된 인증번호예요. 인증번호를 다시 받아 주세요.',
+      });
+    }
+    return token.target;
   }
 
   private async issue(channel: V1VerificationChannel, userId: string, target: string) {

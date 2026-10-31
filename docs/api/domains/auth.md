@@ -2,8 +2,8 @@
 
 ## Source Of Truth Priority
 
-1. `apps/v1_api/src/auth/auth.controller.ts`, `account-recovery.controller.ts`, `phone-verification-public.controller.ts`
-2. `apps/v1_api/src/auth/dto/` (`login.dto.ts`, `login-step-up.dto.ts`, `register.dto.ts`, `kakao-login.dto.ts`, `apple-login.dto.ts`, `social-profile.dto.ts`)
+1. `apps/v1_api/src/auth/auth.controller.ts`, `email-link.controller.ts`, `account-recovery.controller.ts`, `phone-verification-public.controller.ts`
+2. `apps/v1_api/src/auth/dto/` (`login.dto.ts`, `login-step-up.dto.ts`, `register.dto.ts`, `link-email.dto.ts`, `kakao-login.dto.ts`, `apple-login.dto.ts`, `social-profile.dto.ts`)
 3. `apps/v1_api/src/auth/auth.service.ts`, `account-recovery.service.ts`, `login-security/` (attempt counting, spray detection, step-up challenges)
 4. `apps/v1_api/src/auth/*.spec.ts`
 5. `apps/v1_web/src/lib/api-client.ts`, `apps/v1_web/src/hooks/use-v1-api.ts`
@@ -28,6 +28,9 @@
 | `POST` | `/api/v1/auth/link/kakao` | user (finished signup; session issued ≤ 30 min ago) | `{ code, redirectUri }` (web) **or** `{ accessToken }` (native) | `{ provider, alreadyLinked, mergedPendingAccount, authProviders }` — see [Linking a social login while signed in](#linking-a-social-login-while-signed-in) |
 | `POST` | `/api/v1/auth/link/apple` | user (same) | same body as `/auth/apple` (`identityToken`, `nonce` from `/auth/apple/nonce`, `fullName?`, `authorizationCode?`) | same as `link/kakao` |
 | `POST` | `/api/v1/auth/link/pending` | user (same) | `{ linkToken }` — the `details.linkToken` of a [sign-in-then-link](#sign-in-then-link) `409` | same as `link/kakao`; `400 SOCIAL_LINK_TOKEN_INVALID` for a forged, expired or other-purpose token |
+| `POST` | `/api/v1/auth/link/email/request` | user (finished signup; session issued ≤ 30 min ago) | `{ email }` | `{ sent: true, maskedTarget, expiresInSeconds, resendAvailableInSeconds, devCode? }` — see [Adding an email login to a social account](#adding-an-email-login-to-a-social-account) |
+| `POST` | `/api/v1/auth/link/email/verify` | user (finished signup) | `{ code }` (6 digits) | `{ emailLinkToken, expiresInSeconds }` |
+| `POST` | `/api/v1/auth/link/email/complete` | user (finished signup) | `{ emailLinkToken, password, passwordConfirm }` | `{ linked: true, email }` |
 | `GET` | `/api/v1/auth/check-email` | none | `?email=` | `{ available: boolean }` |
 | `GET` | `/api/v1/auth/check-nickname` | optional | `?nickname=` | `{ available: boolean }` |
 | `GET` | `/api/v1/terms/current?context=signup\|tournament_application\|footer` | optional user | active context | effective current documents; signup adds per-user compliance |
@@ -204,6 +207,7 @@ the payload is what separates them. Signing, expiry, and constant-time compariso
 phone  signup          {phone}:{exp}                      ← legacy shape, must not change
 phone  password_reset  password_reset:{phone}:{exp}
 email  password_reset  email:password_reset:{email}:{exp}  ← channel label
+email  login link      email_login_link:{account digest}:{email}:{exp}  ← adding an email login; bound to the account
 ```
 
 `/auth/phone/verify` takes `purpose` from the caller for compatibility. The email path does not:
@@ -246,7 +250,7 @@ Primary tables:
 - `v1_user_regions`
 - `v1_user_terms_consents`
 - `v1_notification_preferences`
-- `v1_verification_tokens` — logged-in verification; requires `user_id`
+- `v1_verification_tokens` — logged-in verification (own email/phone, and the code of [adding an email login](#adding-an-email-login-to-a-social-account)); requires `user_id`
 - `v1_phone_verification_challenges` — pre-session phone OTP, keyed by phone
 - `v1_email_verification_challenges` — pre-session email OTP, keyed by email. Separate from
   `v1_verification_tokens` precisely because a row must exist for addresses that belong to no
@@ -354,6 +358,24 @@ After the person signs in to the original account (email, or the other social lo
 The token is stateless and signed with the session secret (`verification/proof-token.ts`, purpose `social_link_pending`, 30 minutes — the phone and email proofs keep their 10); a phone or email proof is not accepted as a link token, nor the other way round. Because a `409` body is stored in `v1_error_logs.response_body` indefinitely, `linkToken` is a masked key (`common/logging/mask-sensitive.ts`).
 
 The phone-only `/auth/social-link` and `/auth/social-link/preview` endpoints (they always answered `409`) and the `social_link` OTP purpose are removed.
+
+### Adding an email login to a social account
+
+The reverse of linking a social login: a Kakao/Apple account adds email + password sign-in. One person keeps one account that signs in with Kakao, Apple or email. A new login method is attached only to an account the person is signed in to; a phone number alone never proves ownership of an account (a reassigned number would hand it to a stranger), and an email address only proves the mailbox, not the account. Three steps, all `V1AuthGuard`, all `200`:
+
+1. `POST /auth/link/email/request { email }` — mails a 6-digit code to the address (normalized with `normalizeEmail`: trimmed, lower-cased). Response `{ sent: true, maskedTarget, expiresInSeconds: 300, resendAvailableInSeconds: 30 }` (`devCode` too where dev-echo allows, test addresses only). Rate limit 5/min.
+2. `POST /auth/link/email/verify { code }` — checks the caller's newest pending code, spends it and returns `{ emailLinkToken, expiresInSeconds: 600 }`. Rate limit 10/min.
+3. `POST /auth/link/email/complete { emailLinkToken, password, passwordConfirm }` — sets the password and attaches the login. Response `{ linked: true, email }`. Rate limit 10/min. The password rule is signup's (`IsAccountPassword`: a string of 8 or more characters); `passwordConfirm` must equal it (`400 VALIDATION_ERROR`, `details` names `passwordConfirm`). The address is not in the body: it is the one the token vouches for.
+
+- **Guards** (shared with the social links, `auth/link-caller-guards.ts`): an operator account gets `403 SOCIAL_LINK_ADMIN_FORBIDDEN`; a caller who is not active gets `403 PERMISSION_DENIED`; a social signup that has not finished gets `403 SIGNUP_INCOMPLETE`. `request` and `complete` both check them (in `complete`, inside the transaction on the locked row).
+- **Recent login**: only `request` checks it — a cookie session issued more than 30 minutes ago gets `403 RECENT_LOGIN_REQUIRED` (`details: { maxAgeSeconds: 1800 }`) before anything is read or mailed. `verify` and `complete` do not re-check; the token exists only after a mailed code was entered, and its 10 minutes bound the window for the write.
+- **Conflicts**: `409 SOCIAL_LINK_PROVIDER_EXISTS` when the account already has an active email login. `409 EMAIL_CONFLICT` ("이미 다른 계정에서 쓰는 이메일이에요.") when any other user holds the address as `v1_users.email` or as an email login key; nothing else about that account is said. The address the account itself carries as a contact email is allowed. `request` checks this before mailing; `complete` checks it again inside the transaction.
+- **Codes**: the same machinery and error codes as `/verification/*` — 5 minutes TTL, 5 attempts (`400 VERIFICATION_CODE_MISMATCH`, `400 VERIFICATION_TOO_MANY_ATTEMPTS`), an expired or missing code is `400 VERIFICATION_NO_PENDING`, resend cooldown 30 s per address (`400 VERIFICATION_RESEND_COOLDOWN`), and the 24-hour send quota of 5 per address and 10 per account (`429 VERIFICATION_SEND_QUOTA_EXCEEDED`). Asking again retires the earlier code. A mail that could not be sent (`503 EMAIL_SEND_FAILED`) leaves no code behind, so the person can ask again at once.
+- **`emailLinkToken`**: stateless, signed with the session secret (`auth/email-link-token.ts`, `verification/proof-token.ts`), 10 minutes, bound to the account (as a keyed digest, never the id) and the address. A token of another account, an altered address, an expired or any other proof token is `400 EMAIL_LINK_TOKEN_INVALID`. It is a masked key in error logs (`common/logging/mask-sensitive.ts`).
+- **`complete` writes, in one transaction** (caller row locked `FOR UPDATE`, advisory locks caller then address): an email identity as signup creates it (provider `email`, `providerUserKey` and `email` = the normalized address, scrypt `passwordHash`, active); `v1_users.email` = the address and `emailVerifiedAt` = now (the address becomes the account email and replaces a contact email); a `v1_status_change_logs` row (`auth_identity`, `unlinked` → `linked`, reason `email_login_added`). A unique-index violation (`P2002`, e.g. a signup took the address a moment ago) is `409 EMAIL_CONFLICT`. Two accounts completing the same address at once: one succeeds, the other gets `EMAIL_CONFLICT`.
+- **Afterwards**, with no other change: `POST /auth/login` works with the address and password; `POST /auth/recovery/email/*` resets that password (the address is now `v1_users.email` with an email identity); `POST /auth/recovery/find-account` lists `email` among `providers` with `hasPassword: true`.
+
+Errors: `401 UNAUTHENTICATED`; `403 RECENT_LOGIN_REQUIRED` (request); `403 SIGNUP_INCOMPLETE`; `403 PERMISSION_DENIED`; `403 SOCIAL_LINK_ADMIN_FORBIDDEN`; `409 SOCIAL_LINK_PROVIDER_EXISTS`; `409 EMAIL_CONFLICT`; `400 VALIDATION_ERROR` (address, 6-digit code, token length, password pair); `400 VERIFICATION_NO_PENDING` / `VERIFICATION_CODE_MISMATCH` / `VERIFICATION_TOO_MANY_ATTEMPTS` / `VERIFICATION_RESEND_COOLDOWN` (request, verify); `429 VERIFICATION_SEND_QUOTA_EXCEEDED` (request); `409 ALREADY_PROCESSED` (a code spent by a parallel call); `400 EMAIL_LINK_TOKEN_INVALID` (complete); `503 EMAIL_SEND_FAILED`.
 
 `GET /api/v1/auth/me` includes account login metadata under `user`: `authProvider`, `authProviders`, and `hasPassword`. Clients must use `hasPassword` to decide whether email/password account controls are applicable.
 

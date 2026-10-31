@@ -95,6 +95,12 @@ import type {
   V1CancelWithdrawalPayload,
   V1LinkApplePayload,
   V1LinkKakaoPayload,
+  V1LinkEmailCompletePayload,
+  V1LinkEmailCompleteResult,
+  V1LinkEmailRequestPayload,
+  V1LinkEmailRequestResult,
+  V1LinkEmailVerifyPayload,
+  V1LinkEmailVerifyResult,
   V1LinkPendingPayload,
   V1LinkSocialResult,
   V1PhoneVerifyResult,
@@ -396,6 +402,29 @@ export function useV1LinkPending() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: V1LinkPendingPayload) => v1Post<V1LinkSocialResult>('/auth/link/pending', body),
+    onSuccess: () => invalidateLoginMethodQueries(queryClient),
+  });
+}
+
+/** 소셜 계정에 이메일 로그인을 더하는 1단계: 입력한 주소로 인증번호를 보낸다. 계정에는 아무것도 쓰지 않는다. */
+export function useV1LinkEmailRequest() {
+  return useMutation({
+    mutationFn: (body: V1LinkEmailRequestPayload) => v1Post<V1LinkEmailRequestResult>('/auth/link/email/request', body),
+  });
+}
+
+/** 2단계: 인증번호를 맞추고 `emailLinkToken` 을 받는다. */
+export function useV1LinkEmailVerify() {
+  return useMutation({
+    mutationFn: (body: V1LinkEmailVerifyPayload) => v1Post<V1LinkEmailVerifyResult>('/auth/link/email/verify', body),
+  });
+}
+
+/** 3단계: 비밀번호를 정해 이메일 로그인을 붙인다. 로그인 수단 목록과 계정 이메일이 바뀌므로 연결 훅과 같은 곳을 새로 읽는다. */
+export function useV1LinkEmailComplete() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1LinkEmailCompletePayload) => v1Post<V1LinkEmailCompleteResult>('/auth/link/email/complete', body),
     onSuccess: () => invalidateLoginMethodQueries(queryClient),
   });
 }

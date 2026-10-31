@@ -18,6 +18,8 @@ export const SENSITIVE_KEYS: readonly string[] = [
   'challengeToken',
   // 소셜 로그인 충돌 409 가 내려주는 대기 연결 토큰 — 응답 본문이 에러 로그에 무기한 남으므로 가린다.
   'linkToken',
+  // 이메일 로그인 추가에서 인증번호를 맞춘 증명 — 가진 쪽이 비밀번호만 더해 그 계정에 이메일 로그인을 붙인다.
+  'emailLinkToken',
   // 탈퇴 신청 중 계정의 로그인 거절 응답(details)에 실리는 철회 토큰 — 가진 쪽이 그 계정의 세션을 받는다.
   'withdrawalCancelToken',
   'code',

@@ -215,6 +215,54 @@ export type V1LinkSocialResult = {
 };
 
 /**
+ * 소셜 계정에 이메일·비밀번호 로그인을 더하는 세 단계. 로그인한 세션이 계정을, 메일로 받은 인증번호가 주소를 증명한다
+ * (휴대폰 번호는 계정 소유 증명이 아니라 쓰지 않는다).
+ */
+
+/** `POST /auth/link/email/request` — 서버가 정규화(소문자·공백 제거)해서 보낸다. 로그인한 지 30분이 넘으면 403 `RECENT_LOGIN_REQUIRED`. */
+export type V1LinkEmailRequestPayload = {
+  email: string;
+};
+
+export type V1LinkEmailRequestResult = {
+  sent: true;
+  /** 가린 주소(예: `ru***@example.com`). 화면에 "○○로 보냈어요" 로 보여 준다. */
+  maskedTarget: string;
+  /** 인증번호 유효 시간(초). */
+  expiresInSeconds: number;
+  /** 이 시간(초) 뒤에야 같은 주소로 다시 받을 수 있다. 그 전에 요청하면 400 `VERIFICATION_RESEND_COOLDOWN`. */
+  resendAvailableInSeconds: number;
+  /** 인증번호 에코가 켜진 환경(alpha)에서 시험용 주소로 요청했을 때만 온다. */
+  devCode?: string;
+};
+
+/** `POST /auth/link/email/verify` */
+export type V1LinkEmailVerifyPayload = {
+  /** 메일로 받은 숫자 6자리. */
+  code: string;
+};
+
+export type V1LinkEmailVerifyResult = {
+  /** 이 계정·이 주소에만 쓸 수 있는 증명. 주소에 싣지 않고 다음 단계까지 메모리로만 넘긴다. */
+  emailLinkToken: string;
+  /** `emailLinkToken` 의 남은 유효 시간(초). */
+  expiresInSeconds: number;
+};
+
+/** `POST /auth/link/email/complete` — 비밀번호 규칙은 가입과 같다(8자 이상). 두 칸이 다르면 400 `VALIDATION_ERROR`. */
+export type V1LinkEmailCompletePayload = {
+  emailLinkToken: string;
+  password: string;
+  passwordConfirm: string;
+};
+
+export type V1LinkEmailCompleteResult = {
+  linked: true;
+  /** 이제 이 계정의 로그인 이메일. */
+  email: string;
+};
+
+/**
  * 로그인·가입 충돌 409 의 `details` — 이미 팀밋 계정이 있으니 원래 방법으로 로그인한 뒤
  * 설정에서 `provider` 를 연결하라는 안내다. 코드(SOCIAL_LINK_*·PHONE_CONFLICT)는 그대로다.
  */

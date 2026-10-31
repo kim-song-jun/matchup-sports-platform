@@ -115,6 +115,20 @@ describe('maskSensitive', () => {
     );
   });
 
+  // 이메일 로그인 추가의 verify 응답·complete 요청 본문이 에러 로그에 저장될 수 있다 — 토큰과 비밀번호가 함께 남으면 안 된다.
+  it('masks the email link token, its password pair and the verification code', () => {
+    expect(
+      maskSensitive({ emailLinkToken: 'signed.value', email_link_token: 'signed.value', password: 'secret-1', passwordConfirm: 'secret-1', code: '123456', expiresInSeconds: 600 }),
+    ).toEqual({
+      emailLinkToken: '[REDACTED]',
+      email_link_token: '[REDACTED]',
+      password: '[REDACTED]',
+      passwordConfirm: '[REDACTED]',
+      code: '[REDACTED]',
+      expiresInSeconds: 600,
+    });
+  });
+
   // 탈퇴 신청 계정의 로그인 거절(403) 응답 details 가 에러 로그에 저장된다 — 토큰이 남으면 로그 열람자가 그 계정의 세션을 얻는다.
   it('masks the withdrawal cancel token inside an error response body', () => {
     const body = { code: 'ACCOUNT_WITHDRAWAL_PENDING', details: { withdrawalCancelToken: 'signed.value', expiresInSeconds: 600 } };

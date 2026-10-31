@@ -5,8 +5,9 @@ import {
   type FakeUser,
 } from '../../test/helpers/account-link-fake-prisma';
 import { issuePhoneProofToken } from '../verification/phone-proof-token';
-import { AccountLinkService, RECENT_LOGIN_MAX_AGE_SECONDS } from './account-link.service';
+import { AccountLinkService } from './account-link.service';
 import type { AuthService, KakaoProfile } from './auth.service';
+import { RECENT_LOGIN_MAX_AGE_SECONDS } from './link-caller-guards';
 import { signInThenLinkConflict } from './social-link-conflict';
 import { issueSocialLinkToken, type SocialLinkClaims } from './social-link-token';
 

@@ -73,4 +73,15 @@ describe('pending social link storage', () => {
     });
     expect(savePendingSocialLink(hint, NOW)).toBe(false);
   });
+
+  it('does not leave the previous token behind when the new one cannot be written', () => {
+    savePendingSocialLink(hint, NOW);
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('quota', 'QuotaExceededError');
+    });
+
+    expect(savePendingSocialLink({ ...hint, provider: 'apple', linkToken: 'second-token' }, NOW)).toBe(false);
+
+    expect(readPendingSocialLink(NOW)).toBeNull();
+  });
 });

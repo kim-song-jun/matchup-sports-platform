@@ -36,15 +36,22 @@
 | `POST` | `/api/v1/onboarding/complete` | user | empty body | completed onboarding summary |
 | `POST` | `/api/v1/onboarding/defer` | user | `{ reason?: "skip_now" \| "later" \| "unknown" }` | deferred onboarding summary |
 | `POST` | `/api/v1/auth/phone/issue` | none | `{ phone }` | `{ expiresAt, devCode? }` |
-| `POST` | `/api/v1/auth/phone/verify` | none | `{ phone, code, purpose?: "signup" \| "password_reset" \| "social_link" }` | `{ verified, proofToken }` |
+| `POST` | `/api/v1/auth/phone/verify` | none | `{ phone, code, purpose?: "signup" \| "password_reset" \| "social_link" }` | `{ verified, proofToken, registered }` |
 | `POST` | `/api/v1/auth/recovery/find-account` | none | `{ phone, proofToken }` | `{ maskedEmail, providers, hasPassword }` |
 | `POST` | `/api/v1/auth/recovery/reset-password` | none | `{ phone, proofToken, newPassword }` | valid phone proof and existing active account: `409 ACCOUNT_RECOVERY_REQUIRES_EMAIL`; no password write |
 | `POST` | `/api/v1/auth/recovery/email/request` | none | `{ email }` | `{ sent: true, expiresAt, devCode? }` |
 | `POST` | `/api/v1/auth/recovery/email/confirm` | none | `{ email, code }` | `{ verified, proofToken }` |
 | `POST` | `/api/v1/auth/recovery/email/reset-password` | none | `{ email, proofToken, newPassword }` | `{ ok: true }` |
+| `POST` | `/api/v1/auth/withdrawal/cancel` | none (the token is the credential) | `{ token }` | login-shaped session response + `teameet_v1_session` cookie |
 
 Account deletion is not on this controller — see `POST /api/v1/me/withdrawal-request`
-in [Users](./users.md).
+in [Users](./users.md). Taking it back is `POST /auth/withdrawal/cancel`, described below.
+
+`registered` on `phone/verify` says whether a `v1_users` row still holds that number, whatever its status. It is computed only
+after the code matched, and `phone/issue` still reveals nothing. A number is released only by the admin delete flow
+(`DELETE /admin/users/:userId`), which overwrites it; an account moved to `deleted` through `changeUserStatus` keeps its number, so it
+still reports `registered=true`. `POST /auth/register` keeps answering `409 PHONE_CONFLICT` with the same lookup, and it does so
+before it checks the phone proof, so register can already tell a caller without a proof that the number is taken.
 
 ## Session Model
 
@@ -65,6 +72,28 @@ and fails the socket handshake. Logout still only clears this device's cookie.
 return `401 UNAUTHENTICATED` ("Email or password is incorrect") — the two failure modes are not
 distinguished. A non-active identity or account status returns `403 PERMISSION_DENIED`, except a
 `withdrawal_pending` account status, which returns `403 ACCOUNT_WITHDRAWAL_PENDING`.
+
+### Taking a withdrawal back
+
+A `withdrawal_pending` account that signs in with its own credentials — the right password on `login` (or `login/step-up/verify`),
+a verified Kakao token on `kakao` / `kakao/token`, or a verified Apple token on `apple` — still gets
+`403 ACCOUNT_WITHDRAWAL_PENDING`, now with `details: { withdrawalCancelToken, expiresInSeconds: 600 }`. A wrong password answers the
+generic `401` and a login matched only by email or phone (account linking) gets the bare refusal without `details`, so the state
+is never shown to someone who has not proven the credentials. The token is signed with the proof-token secret
+(`withdrawal_cancel:{userId}:{sessionEpoch}:{exp}`), lives 10 minutes and is bound to the epoch read with the credentials.
+
+`POST /auth/withdrawal/cancel { token }` (10/min) sets the account back to `active`, bumps `sessionEpoch` (so the token works
+once), writes a `v1_status_change_logs` row (`withdrawal_pending` → `active`) and answers like a completed login, including the
+session cookie. Teams, rosters and push registrations the request released are **not** restored. Failures:
+`400 WITHDRAWAL_CANCEL_TOKEN_INVALID` (bad, expired, replayed, or the account is no longer `withdrawal_pending`) and
+`409 WITHDRAWAL_ALREADY_PROCESSED` (an admin already deleted the account). Neither login-attempt record nor step-up state is
+touched by a cancel. The admin user detail shows the withdrawal request message only while the account is `withdrawal_pending` or `deleted`.
+
+Any `withdrawal_pending` account can be taken back, including one an admin put there through `changeUserStatus`: `withdrawal_pending`
+is the account owner's own state, and operator sanctions use `suspended` / `blocked`, which are never cancellable.
+
+The cancel response does not say what the request released. Clients must show fixed copy that teams, rosters and push
+registrations are not restored and the person has to rejoin or register them again.
 
 ## Email login step-up
 
@@ -122,6 +151,14 @@ never the raw values), the result (`success | failed | step_up_issued`) and the 
 the worker to the inquiry webhook with a `[보안] 로그인 실패 급증 (alpha|prod)` first line). The admin monitoring hub shows the signal through
 `GET /api/v1/admin/monitoring/summary` → `loginAnomalies`.
 
+**Mail delivery failures.** Every failed SES send of a verification, password-reset or step-up mail writes to one outbox event per
+UTC hour (`EMAIL_DELIVERY_FAILED`, business key `email-delivery-failed:{windowStart}`): the first failure opens it, available a minute
+later so a burst is counted together; later failures in that hour only raise `failureCount` and the per-purpose counts while it is
+still waiting (once the worker has claimed the event they are not counted). The windows are fixed UTC hours, so a burst across :00
+yields two alerts. The worker posts it to the same inquiry webhook with a `[메일] 인증 메일 발송 실패 (alpha|prod)` first line. The payload and
+message hold the window start, counts per purpose (`verify`, `password_reset`, `login_step_up`) and the SES error class name — never a
+recipient address or a code. Recording is best effort: if it fails, the caller still gets `503 EMAIL_SEND_FAILED`.
+
 All thresholds live in `LOGIN_SECURITY_POLICY` (`apps/v1_api/src/auth/login-security/login-security.policy.ts`).
 
 `POST /api/v1/auth/dev-session` requires the caller to already be authenticated (`V1AuthGuard`),
@@ -154,7 +191,7 @@ the separate email proof channel. Only the phone channel looks up the signup ema
 | Resend cooldown | 30s per target, enforced per phone number and per email address (`VERIFICATION_RESEND_COOLDOWN`). |
 | Attempt cap | 5 wrong codes per challenge (`VERIFICATION_TOO_MANY_ATTEMPTS`). A correct code still succeeds at the cap, so a resubmit is never blocked by earlier typos. |
 | Code TTL | 5 minutes. Proof token TTL 10 minutes. |
-| Social-only accounts | Kakao-only accounts are never given a password. Email reset answers `PASSWORD_LOGIN_UNAVAILABLE` only after email ownership is proven, never at request time. Phone reset answers `ACCOUNT_RECOVERY_REQUIRES_EMAIL` after its existing proof/account preconditions, regardless of whether the account has a password. |
+| Social-only accounts | Social-only accounts are never given a password. Email reset answers `PASSWORD_LOGIN_UNAVAILABLE` only after email ownership is proven, never at request time; its message and `details.providers` name the account's real sign-in methods (Kakao, Apple, Naver), never Kakao by default. Phone reset answers `ACCOUNT_RECOVERY_REQUIRES_EMAIL` after its existing proof/account preconditions, regardless of whether the account has a password. |
 
 ### Proof tokens do not cross channels
 

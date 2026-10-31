@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { randomInt } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { hashPassword, verifyPassword } from '../auth/password-hash';
+import { isPhoneRegistered } from './phone-registered';
 import { isPhoneVerificationEnforced } from './phone-verification-access';
 import { issuePhoneProofToken, type PhoneProofPurpose } from './phone-proof-token';
 import { SMS_EVENT_TYPE, SmsEventLogService } from './sms-event-log.service';
@@ -117,6 +118,11 @@ export class PhoneVerificationService {
         message: '시도 횟수를 초과했어요. 인증번호를 다시 받아 주세요.',
       });
     }
+  }
+
+  /** Only answer this after verifyCode() has proven the caller holds the number. */
+  isRegistered(phone: string): Promise<boolean> {
+    return isPhoneRegistered(this.prisma, phone);
   }
 
   issueProof(phone: string, purpose: PhoneProofPurpose = 'signup'): string {

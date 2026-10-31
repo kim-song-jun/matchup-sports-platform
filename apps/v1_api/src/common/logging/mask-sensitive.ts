@@ -16,6 +16,8 @@ export const SENSITIVE_KEYS: readonly string[] = [
   'idToken',
   // 로그인 추가 인증 챌린지 토큰 — 코드(code)와 함께 있어야 로그인이 완료되므로 에러 로그에 남기지 않는다.
   'challengeToken',
+  // 탈퇴 신청 중 계정의 로그인 거절 응답(details)에 실리는 철회 토큰 — 가진 쪽이 그 계정의 세션을 받는다.
+  'withdrawalCancelToken',
   'code',
   'authorization',
   'cookie',

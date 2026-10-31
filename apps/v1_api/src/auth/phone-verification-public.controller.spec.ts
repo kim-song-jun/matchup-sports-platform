@@ -6,6 +6,7 @@ describe('PhoneVerificationPublicController (MT SMS OTP)', () => {
       issueChallenge: jest.fn(),
       verifyCode: jest.fn(),
       issueProof: jest.fn(),
+      isRegistered: jest.fn().mockResolvedValue(false),
       ...overrides,
     };
     const controller = new PhoneVerificationPublicController(phoneVerification as never);
@@ -37,7 +38,30 @@ describe('PhoneVerificationPublicController (MT SMS OTP)', () => {
       expect(phoneVerification.verifyCode).toHaveBeenCalledWith('01012345678', '123456');
       // purpose 를 생략하면 기존 동작 그대로 가입용 토큰이 발급된다(service 기본값 'signup').
       expect(phoneVerification.issueProof).toHaveBeenCalledWith('01012345678', undefined);
-      expect(result).toEqual({ verified: true, proofToken: 'proof-token-value' });
+      expect(result).toEqual({ verified: true, proofToken: 'proof-token-value', registered: false });
+    });
+
+    it.each([true, false])('reports registered=%s from the number lookup next to the proof token', async (registered) => {
+      const { controller, phoneVerification } = buildController({
+        verifyCode: jest.fn().mockResolvedValue(true),
+        issueProof: jest.fn().mockReturnValue('proof-token-value'),
+        isRegistered: jest.fn().mockResolvedValue(registered),
+      });
+
+      const result = await controller.verify({ phone: '01012345678', code: '123456' });
+
+      expect(phoneVerification.isRegistered).toHaveBeenCalledWith('01012345678');
+      expect(result).toEqual({ verified: true, proofToken: 'proof-token-value', registered });
+    });
+
+    // Whether a number has an account is only told to someone who just proved they hold it.
+    it('does not look the number up when the code is wrong', async () => {
+      const { controller, phoneVerification } = buildController({
+        verifyCode: jest.fn().mockRejectedValue(new Error('VERIFICATION_CODE_MISMATCH')),
+      });
+
+      await expect(controller.verify({ phone: '01012345678', code: '000000' })).rejects.toThrow();
+      expect(phoneVerification.isRegistered).not.toHaveBeenCalled();
     });
 
     // 계정 찾기·비밀번호 재설정은 가입용 토큰과 섞이면 안 되므로 용도를 그대로 전달해야 한다.

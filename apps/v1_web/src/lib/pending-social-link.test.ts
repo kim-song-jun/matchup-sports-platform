@@ -7,7 +7,7 @@ import {
 } from './pending-social-link';
 
 const NOW = Date.parse('2026-10-31T10:00:00.000Z');
-const hint = { next: 'sign_in_then_link', provider: 'kakao', linkToken: 'signed-link-token', linkTokenExpiresInSeconds: 600 } as const;
+const hint = { next: 'sign_in_then_link', provider: 'kakao', linkToken: 'signed-link-token', linkTokenExpiresInSeconds: 1800 } as const;
 const stored = () => window.sessionStorage.getItem(PENDING_SOCIAL_LINK_STORAGE_KEY);
 
 describe('pending social link storage', () => {
@@ -17,18 +17,28 @@ describe('pending social link storage', () => {
   it('keeps the token, provider and expiry in sessionStorage only', () => {
     expect(savePendingSocialLink(hint, NOW)).toBe(true);
 
-    expect(JSON.parse(stored()!)).toEqual({ linkToken: 'signed-link-token', provider: 'kakao', expiresAt: '2026-10-31T10:10:00.000Z' });
+    expect(JSON.parse(stored()!)).toEqual({ linkToken: 'signed-link-token', provider: 'kakao', expiresAt: '2026-10-31T10:30:00.000Z' });
     expect(window.localStorage.getItem(PENDING_SOCIAL_LINK_STORAGE_KEY)).toBeNull();
-    expect(readPendingSocialLink(NOW + 1_000)).toEqual({ linkToken: 'signed-link-token', provider: 'kakao', expiresAt: '2026-10-31T10:10:00.000Z' });
+    expect(readPendingSocialLink(NOW + 1_000)).toEqual({ expired: false, linkToken: 'signed-link-token', provider: 'kakao', expiresAt: '2026-10-31T10:30:00.000Z' });
   });
 
-  it('treats the expiry instant as expired, deletes the value, and stays empty afterwards', () => {
+  it('hands out an expired marker exactly once at the expiry instant, then reads as empty', () => {
     savePendingSocialLink(hint, NOW);
 
-    expect(readPendingSocialLink(NOW + 600_000 - 1)).not.toBeNull();
-    expect(readPendingSocialLink(NOW + 600_000)).toBeNull();
+    expect(readPendingSocialLink(NOW + 1_800_000 - 1)).toMatchObject({ expired: false });
+    expect(readPendingSocialLink(NOW + 1_800_000)).toEqual({ provider: 'kakao', expired: true });
     expect(stored()).toBeNull();
-    expect(readPendingSocialLink(NOW)).toBeNull();
+    expect(readPendingSocialLink(NOW + 1_800_000)).toBeNull();
+  });
+
+  it('keeps the provider in the expired marker so the screen can say which login timed out', () => {
+    savePendingSocialLink({ ...hint, provider: 'apple' }, NOW);
+    expect(readPendingSocialLink(NOW + 3_600_000)).toEqual({ provider: 'apple', expired: true });
+  });
+
+  it('does not offer the token of an expired value', () => {
+    savePendingSocialLink(hint, NOW);
+    expect(readPendingSocialLink(NOW + 3_600_000)).not.toHaveProperty('linkToken');
   });
 
   it('does not store a hint that carries no token, and drops the older token so it cannot link the wrong provider later', () => {

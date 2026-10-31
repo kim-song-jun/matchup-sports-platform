@@ -45,7 +45,7 @@ export const LINK_MSW = {
 
 /** 충돌 409 가 주는 연결 토큰. `kakao`·`apple` 은 각 제공자 충돌 응답에 실리는 기본 토큰이고, 나머지는 결과별 시나리오다. */
 export const PENDING_LINK_MSW = {
-  expiresInSeconds: 600,
+  expiresInSeconds: 30 * 60,
   tokens: {
     kakao: 'msw-pending-link-token-kakao',
     apple: 'msw-pending-link-token-apple',

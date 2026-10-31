@@ -268,6 +268,82 @@ describe('AccountLinkService.linkKakao', () => {
       },
     );
 
+    describe('waiting team invitations of the abandoned signup', () => {
+      const invitation = (id: string, teamId: string, overrides: Record<string, unknown> = {}) => ({
+        id, teamId, invitedUserId: EMPTY, invitedByUserId: 'user-team-owner', status: 'pending', ...overrides,
+      });
+
+      it('go to the account that takes over, still waiting', async () => {
+        const { service, state } = build(withEmptySignup('social_profile_required'));
+        state.invitations.push(invitation('inv-a', 'team-a'), invitation('inv-b', 'team-b'));
+
+        await service.linkKakao(CALLER, TOKEN_FORM, null);
+
+        expect(state.invitations).toEqual([
+          expect.objectContaining({ id: 'inv-a', invitedUserId: CALLER, status: 'pending' }),
+          expect.objectContaining({ id: 'inv-b', invitedUserId: CALLER, status: 'pending' }),
+        ]);
+      });
+
+      it('are cancelled, not duplicated, where the caller is already in the team, already invited, or sent them', async () => {
+        const { service, state } = build(withEmptySignup('social_profile_required'));
+        state.memberships.push({ teamId: 'team-member', userId: CALLER, status: 'active' });
+        state.invitations.push(
+          invitation('inv-member', 'team-member'),
+          invitation('inv-already', 'team-already'),
+          invitation('inv-own', 'team-own', { invitedByUserId: CALLER }),
+          invitation('inv-moves', 'team-moves'),
+          { ...invitation('inv-callers', 'team-already'), invitedUserId: CALLER },
+        );
+
+        await service.linkKakao(CALLER, TOKEN_FORM, null);
+
+        const byId = Object.fromEntries(state.invitations.map((row) => [row.id, row]));
+        expect(byId['inv-moves']).toMatchObject({ invitedUserId: CALLER, status: 'pending' });
+        for (const id of ['inv-member', 'inv-already', 'inv-own']) {
+          expect(byId[id]).toMatchObject({ invitedUserId: EMPTY, status: 'cancelled', respondedAt: expect.any(Date) });
+        }
+        // The caller's own waiting invitation is untouched and stays the only one for its team.
+        expect(byId['inv-callers']).toMatchObject({ invitedUserId: CALLER, status: 'pending' });
+        expect(state.invitations.filter((row) => row.invitedUserId === CALLER && row.status === 'pending' && row.teamId === 'team-already')).toHaveLength(1);
+      });
+
+      it('does not count a membership the caller has left as being in the team', async () => {
+        const { service, state } = build(withEmptySignup('social_profile_required'));
+        state.memberships.push({ teamId: 'team-left', userId: CALLER, status: 'left' });
+        state.invitations.push(invitation('inv-left', 'team-left'));
+
+        await service.linkKakao(CALLER, TOKEN_FORM, null);
+
+        expect(state.invitations[0]).toMatchObject({ invitedUserId: CALLER, status: 'pending' });
+      });
+
+      it('leave finished invitations and other people’s invitations where they are', async () => {
+        const { service, state } = build(withEmptySignup('social_profile_required'));
+        state.invitations.push(
+          invitation('inv-accepted', 'team-a', { status: 'accepted' }),
+          invitation('inv-declined', 'team-b', { status: 'declined' }),
+          invitation('inv-else', 'team-c', { invitedUserId: 'user-someone-else' }),
+        );
+
+        await service.linkKakao(CALLER, TOKEN_FORM, null);
+
+        expect(state.invitations.map((row) => [row.id, row.invitedUserId, row.status])).toEqual([
+          ['inv-accepted', EMPTY, 'accepted'],
+          ['inv-declined', EMPTY, 'declined'],
+          ['inv-else', 'user-someone-else', 'pending'],
+        ]);
+      });
+
+      it('stay with the signup when the link is refused', async () => {
+        const { service, state } = build(withEmptySignup('completed'));
+        state.invitations.push(invitation('inv-a', 'team-a'));
+
+        expect(await failure(service.linkKakao(CALLER, TOKEN_FORM, null))).toMatchObject({ code: 'SOCIAL_LINK_PROVIDER_IN_USE' });
+        expect(state.invitations[0]).toMatchObject({ invitedUserId: EMPTY, status: 'pending' });
+      });
+    });
+
     it('frees the retired account’s email and phone for their real owner', async () => {
       const { service, state } = build(withEmptySignup('social_profile_required'));
       await service.linkKakao(CALLER, TOKEN_FORM, null);

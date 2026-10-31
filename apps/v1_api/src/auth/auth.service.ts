@@ -1146,6 +1146,23 @@ export class AuthService {
       : null;
     const acceptedKakaoPhone = Boolean(phone && kakaoPhone === phone);
 
+    // A typed number is proven by its SMS code before anything is said about who holds it; a number Kakao handed over
+    // was proven by Kakao. Answering "already registered" earlier would let anyone probe numbers without holding them.
+    let phoneProven = acceptedKakaoPhone;
+    if (this.phoneVerification.enabled && !acceptedKakaoPhone) {
+      const verified = await this.prisma.v1User.findUnique({
+        where: { id: userId },
+        select: { phone: true, phoneVerifiedAt: true },
+      });
+      if (!verified?.phoneVerifiedAt || verified.phone !== phone) {
+        throw new BadRequestException({
+          code: 'PHONE_NOT_VERIFIED',
+          message: '휴대폰 본인인증을 먼저 완료해 주세요.',
+        });
+      }
+      phoneProven = true;
+    }
+
     if (phone) {
       const existingPhone = await this.prisma.v1User.findFirst({
         where: {
@@ -1156,27 +1173,13 @@ export class AuthService {
       });
 
       if (existingPhone) {
-        // Only a number Kakao handed over is known to be this person's. A typed one is not proven yet, so it gets the
-        // advice without a token — otherwise anyone could type a stranger's number and receive a link to their account.
+        // Only a proven number may carry a link token for its holder's account; otherwise the advice stands alone.
         const claims = pendingAccountLinkClaims(userId, user.authIdentities);
-        if (claims && acceptedKakaoPhone) throw signInThenLinkConflict('PHONE_CONFLICT', claims, [existingPhone.id]);
+        if (claims && phoneProven) throw signInThenLinkConflict('PHONE_CONFLICT', claims, [existingPhone.id]);
         if (claims) throw signInThenLinkHint('PHONE_CONFLICT', claims.provider);
         throw new ConflictException({
           code: 'PHONE_CONFLICT',
           message: 'Phone is already registered',
-        });
-      }
-    }
-
-    if (this.phoneVerification.enabled && !acceptedKakaoPhone) {
-      const verified = await this.prisma.v1User.findUnique({
-        where: { id: userId },
-        select: { phone: true, phoneVerifiedAt: true },
-      });
-      if (!verified?.phoneVerifiedAt || verified.phone !== phone) {
-        throw new BadRequestException({
-          code: 'PHONE_NOT_VERIFIED',
-          message: '휴대폰 본인인증을 먼저 완료해 주세요.',
         });
       }
     }

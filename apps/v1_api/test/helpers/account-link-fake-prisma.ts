@@ -38,6 +38,8 @@ export function createFakePrisma(seed: { users: FakeUser[]; identities: FakeIden
     users: seed.users,
     identities: seed.identities,
     inquiries: [] as { id: string; userId: string }[],
+    invitations: [] as { id: string; teamId: string; invitedUserId: string; invitedByUserId: string; status: string; respondedAt?: Date }[],
+    memberships: [] as { teamId: string; userId: string; status: string }[],
     uploads: [] as { id: string; ownerUserId: string }[],
     profileMasks: [] as string[],
     logs: [] as Record<string, unknown>[],
@@ -146,6 +148,25 @@ export function createFakePrisma(seed: { users: FakeUser[]; identities: FakeIden
         restoreRows(rows);
         rows.forEach((row) => (row.ownerUserId = data.ownerUserId));
         return countOf(rows);
+      }),
+    },
+    v1TeamInvitation: {
+      findMany: jest.fn(async ({ where }: { where: Where }) => {
+        await tick();
+        return state.invitations.filter((row) => matches(row as unknown as Record<string, unknown>, where)).map((row) => ({ ...row }));
+      }),
+      updateMany: jest.fn(async ({ where, data }: { where: Where; data: Record<string, unknown> }) => {
+        await tick();
+        const rows = state.invitations.filter((row) => matches(row as unknown as Record<string, unknown>, where));
+        restoreRows(rows);
+        rows.forEach((row) => Object.assign(row, data));
+        return countOf(rows);
+      }),
+    },
+    v1TeamMembership: {
+      findMany: jest.fn(async ({ where }: { where: Where }) => {
+        await tick();
+        return state.memberships.filter((row) => matches(row as unknown as Record<string, unknown>, where)).map((row) => ({ ...row }));
       }),
     },
     v1UserRecordConsent: { updateMany: jest.fn(async () => ({ count: 0 })) },

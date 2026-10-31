@@ -306,6 +306,44 @@ export class AccountLinkService {
   }
 
   /**
+   * A team can invite a signup by its email before the signup is finished; those waiting invitations belong to the
+   * person, so they move to the account that takes over. Where the caller is already a member or already has a
+   * waiting invitation from the same team (one per team and person), or the caller sent it, the invitation is
+   * cancelled instead of duplicated.
+   */
+  private async handOverTeamInvitations(tx: Prisma.TransactionClient, fromUserId: string, toUserId: string, now: Date) {
+    const waiting = await tx.v1TeamInvitation.findMany({
+      where: { invitedUserId: fromUserId, status: 'pending' },
+      select: { id: true, teamId: true, invitedByUserId: true },
+    });
+    if (waiting.length === 0) return;
+
+    const teamIds = [...new Set(waiting.map((invitation) => invitation.teamId))];
+    const [memberships, callerInvitations] = await Promise.all([
+      tx.v1TeamMembership.findMany({ where: { userId: toUserId, status: 'active', teamId: { in: teamIds } }, select: { teamId: true } }),
+      tx.v1TeamInvitation.findMany({ where: { invitedUserId: toUserId, status: 'pending', teamId: { in: teamIds } }, select: { teamId: true } }),
+    ]);
+    const covered = new Set([...memberships, ...callerInvitations].map((row) => row.teamId));
+    const moved: string[] = [];
+    const redundant: string[] = [];
+    for (const invitation of waiting) {
+      // One move per team: two waiting invitations from the same team cannot both exist, but stay safe.
+      const duplicate = covered.has(invitation.teamId) || invitation.invitedByUserId === toUserId;
+      (duplicate ? redundant : moved).push(invitation.id);
+      covered.add(invitation.teamId);
+    }
+    if (moved.length > 0) {
+      await tx.v1TeamInvitation.updateMany({ where: { id: { in: moved }, status: 'pending' }, data: { invitedUserId: toUserId } });
+    }
+    if (redundant.length > 0) {
+      await tx.v1TeamInvitation.updateMany({
+        where: { id: { in: redundant }, status: 'pending' },
+        data: { status: 'cancelled', respondedAt: now },
+      });
+    }
+  }
+
+  /**
    * Retires an abandoned signup the same way an operator deletion does (placeholders free the unique email, phone and
    * nickname) and hands what it left behind to the caller. The guarded update doubles as the row lock: if the
    * account finished signup in the meantime it no longer matches and the link is refused.
@@ -335,6 +373,7 @@ export class AccountLinkService {
 
     await tx.v1Inquiry.updateMany({ where: { userId: empty.id }, data: { userId: callerId } });
     await tx.v1UploadAsset.updateMany({ where: { ownerUserId: empty.id }, data: { ownerUserId: callerId } });
+    await this.handOverTeamInvitations(tx, empty.id, callerId, now);
     await tx.v1StatusChangeLog.create({
       data: {
         targetType: 'user',

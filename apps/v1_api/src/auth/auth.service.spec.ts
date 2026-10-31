@@ -934,14 +934,18 @@ describe('AuthService', () => {
 
   describe('Kakao signup without duplicate phone verification', () => {
     const input = { nickname: '카카오회원', displayName: '회원', phone: '01012345678', gender: 'female' as const, birthDate: '20000229' };
-    function arrange(draft: Record<string, unknown>, provider: V1AuthProvider = V1AuthProvider.kakao) {
+    function arrange(
+      draft: Record<string, unknown>,
+      provider: V1AuthProvider = V1AuthProvider.kakao,
+      proof?: { phone: string; phoneVerifiedAt: Date },
+    ) {
       phoneVerification.enabled = true;
       prisma.v1User.findUnique
         .mockResolvedValueOnce(pendingSocialUserRow({
           onboardingStatus: 'social_profile_required', createdAt: new Date(), updatedAt: new Date(),
           onboardingProgress: { draftJson: draft }, authIdentities: [{ id: 'i', provider, providerUserKey: `${provider}-key-1` }],
         }))
-        .mockResolvedValueOnce(completedUserRow({ onboardingStatus: 'signup_done' }));
+        .mockResolvedValueOnce(proof ?? completedUserRow({ onboardingStatus: 'signup_done' }));
     }
     it('still returns provider prefill when a member resumes a deferred profile', async () => {
       prisma.v1User.findUnique.mockResolvedValue(completedUserRow({
@@ -986,19 +990,43 @@ describe('AuthService', () => {
       expect(prisma.v1User.updateMany).not.toHaveBeenCalled();
     });
 
-    // A number typed into the form has not been proven to be this person's; a token for its owner would let anyone
-    // type a stranger's number and receive a link to that stranger's account.
+    // A typed number is proven by its SMS code before anything is said about who holds it — otherwise the form
+    // would tell anyone, holding the number or not, whether it is registered.
     it.each([
       ['a Kakao signup that typed another number', {}, V1AuthProvider.kakao],
       ['a Kakao signup whose Kakao number is a different one', { kakaoPhone: '01099998888' }, V1AuthProvider.kakao],
       ['an Apple signup', { kakaoPhone: input.phone }, V1AuthProvider.apple],
-    ])('gives %s the advice without a link token', async (_name, draft, provider) => {
+    ])('asks %s for the SMS proof first and does not look up the holder', async (_name, draft, provider) => {
       arrange(draft, provider);
       prisma.v1User.findFirst.mockResolvedValue({ id: 'other-user' });
+
       const error = await service.completeSocialProfile('user-1', input).catch((e) => e);
-      expect(error.getResponse()).toMatchObject({ code: 'PHONE_CONFLICT', details: { next: 'sign_in_then_link', provider } });
-      expect(error.getResponse().details).not.toHaveProperty('linkToken');
+
+      expect(error.getResponse()).toMatchObject({ code: 'PHONE_NOT_VERIFIED' });
+      expect(JSON.stringify(error.getResponse())).not.toContain('PHONE_CONFLICT');
+      expect(prisma.v1User.findFirst).not.toHaveBeenCalled();
       expect(prisma.v1User.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('answers a typed number that was proven by SMS with the holder-bound token', async () => {
+      arrange({}, V1AuthProvider.apple, { phone: input.phone, phoneVerifiedAt: new Date() });
+      prisma.v1User.findFirst.mockResolvedValue({ id: 'other-user' });
+
+      const error = await service.completeSocialProfile('user-1', input).catch((e) => e);
+
+      expect(error.getResponse()).toMatchObject({ code: 'PHONE_CONFLICT', details: { provider: 'apple', linkTokenExpiresInSeconds: 600 } });
+      expect(readSocialLinkToken(error.getResponse().details.linkToken)?.allowedAccounts).toEqual([socialLinkAccountDigest('other-user')]);
+    });
+
+    it('gives the advice without a token for a typed number when SMS proof is switched off', async () => {
+      arrange({}, V1AuthProvider.kakao);
+      phoneVerification.enabled = false;
+      prisma.v1User.findFirst.mockResolvedValue({ id: 'other-user' });
+
+      const error = await service.completeSocialProfile('user-1', input).catch((e) => e);
+
+      expect(error.getResponse()).toMatchObject({ code: 'PHONE_CONFLICT', details: { next: 'sign_in_then_link', provider: 'kakao' } });
+      expect(error.getResponse().details).not.toHaveProperty('linkToken');
     });
   });
 

@@ -69,7 +69,8 @@ export type NotificationEventType =
   | 'team_contact_accepted'
   | 'team_contact_declined'
   | 'inquiry_answered'
-  // 소셜 로그인이 휴대폰 주인의 기존 계정에 연결됐을 때 그 계정에게(MD-QA #126). 보안 알림이라 importantEnabled.
+  // 로그인한 계정에 카카오·Apple 로그인이 연결됐을 때 그 계정에게. 보안 알림이라 알림 설정과 무관하게
+  // 연결과 같은 트랜잭션에서 남긴다(createInTransaction — emitNotification 의 설정 확인을 거치지 않는다).
   | 'social_identity_linked'
   // H3: 팀장·어드민이 팀을 보관(해체)하면 팀원 전원과 가입 신청자에게 한 번 알린다. 도착지는 해체된 팀 페이지.
   | 'team_dissolved'

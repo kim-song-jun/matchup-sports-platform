@@ -8,6 +8,7 @@ import { V1ApiError, v1Post } from '@/lib/api-client';
 import {
   getPasswordLoginUnavailableProviders,
   getRecentLoginRequired,
+  isEmailSendUnavailable,
   getSignInThenLinkHint,
   getSignupIncompleteRoute,
   getWithdrawalCancelOffer,
@@ -308,6 +309,17 @@ describe('adding an email login to a social account', () => {
     const error = await fails(() => result.current.mutateAsync({ email: EMAIL_LINK_MSW.emails.recentLoginRequired }));
 
     expect(getRecentLoginRequired(error)).toEqual({ maxAgeSeconds: LINK_MSW.maxAgeSeconds });
+  });
+
+  it('request: a server that cannot send mail says so with 503 instead of claiming a code went out', async () => {
+    const { wrapper, staleKeys } = setup();
+    const { result } = renderHook(() => useV1LinkEmailRequest(), { wrapper });
+
+    const error = await fails(() => result.current.mutateAsync({ email: EMAIL_LINK_MSW.emails.mailUnavailable }));
+
+    expect(error).toMatchObject({ statusCode: 503, code: 'EMAIL_SEND_UNAVAILABLE' });
+    expect(isEmailSendUnavailable(error)).toBe(true);
+    expect(staleKeys()).toEqual([]);
   });
 
   it('request: a malformed address never reaches the mailer (400 as the server answers)', async () => {

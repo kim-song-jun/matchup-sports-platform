@@ -1,5 +1,6 @@
 import { ConflictException, BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, V1AuthProvider } from '@prisma/client';
+import { NotificationsService, type DeliveredNotification } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { VerificationService } from '../verification/verification.service';
 import type { LinkEmailCompleteDto, LinkEmailRequestDto, LinkEmailVerifyDto } from './dto/link-email.dto';
@@ -10,6 +11,9 @@ import { hashPassword } from './password-hash';
 
 /** `Prisma.TransactionClient` and `PrismaService` both satisfy this, so the conflict check runs inside or outside a transaction. */
 type EmailLookupClient = Pick<Prisma.TransactionClient, 'v1User'>;
+
+/** Names the new login in the owner's security notice ("{name} 로그인이 연결됐어요"). */
+const EMAIL_LOGIN_LABEL = '이메일·비밀번호';
 
 /**
  * Adds an email + password login to the account the caller is signed in as (the reverse of `AccountLinkService`).
@@ -25,6 +29,7 @@ export class EmailLinkService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly verification: VerificationService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   /** `sessionAgeSeconds` is null when the request has no cookie session (non-production header identity). */
@@ -55,17 +60,24 @@ export class EmailLinkService {
     if (!email) throw emailLinkTokenInvalid();
     const passwordHash = await hashPassword(dto.password);
 
+    let notification: DeliveredNotification | null;
     try {
-      await this.prisma.$transaction((tx) => this.completeInTransaction(tx, callerId, email, passwordHash));
+      notification = await this.prisma.$transaction((tx) => this.completeInTransaction(tx, callerId, email, passwordHash));
     } catch (error) {
       // Another account took the address between the check and the write (unique index on users.email or on the identity key).
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw emailConflict();
       throw error;
     }
+    if (notification) this.notifications.deliverCreated(callerId, 'social_identity_linked', notification);
     return { linked: true as const, email };
   }
 
-  private async completeInTransaction(tx: Prisma.TransactionClient, callerId: string, email: string, passwordHash: string) {
+  private async completeInTransaction(
+    tx: Prisma.TransactionClient,
+    callerId: string,
+    email: string,
+    passwordHash: string,
+  ): Promise<DeliveredNotification | null> {
     // Same two locks, caller first, as `AccountLinkService`: one account adds one email login at a time, and two
     // accounts cannot claim the same address at once. Signup takes no lock; the unique indexes cover that race.
     const callerScope = JSON.stringify(['account-link-caller', callerId, V1AuthProvider.email]);
@@ -109,6 +121,11 @@ export class EmailLinkService {
         actorUserId: callerId,
         reason: 'email_login_added',
       },
+    });
+    // The same security notice a social link leaves: it ignores notification settings and is stored with the link or not at all.
+    return this.notifications.createInTransaction(tx, callerId, 'social_identity_linked', {
+      vars: { name: EMAIL_LOGIN_LABEL },
+      businessKey: `email-link:${identity.id}`,
     });
   }
 }

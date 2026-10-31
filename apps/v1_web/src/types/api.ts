@@ -221,7 +221,10 @@ export type V1LinkSocialResult = {
  * (휴대폰 번호는 계정 소유 증명이 아니라 쓰지 않는다).
  */
 
-/** `POST /auth/link/email/request` — 서버가 정규화(소문자·공백 제거)해서 보낸다. 로그인한 지 30분이 넘으면 403 `RECENT_LOGIN_REQUIRED`. */
+/**
+ * `POST /auth/link/email/request` — 서버가 정규화(소문자·공백 제거)해서 보낸다. 로그인한 지 30분이 넘으면 403 `RECENT_LOGIN_REQUIRED`.
+ * 메일을 보낼 수단이 없는 서버는 `sent: true` 로 속이지 않고 503 `EMAIL_SEND_UNAVAILABLE` 로 답한다(`isEmailSendUnavailable`).
+ */
 export type V1LinkEmailRequestPayload = {
   email: string;
 };

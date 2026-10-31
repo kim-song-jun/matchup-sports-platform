@@ -15,6 +15,7 @@ const PURPOSE_LABELS: Record<OtpEmailPurpose, string> = {
   verify: '이메일 인증',
   password_reset: '비밀번호 재설정',
   login_step_up: '로그인 추가 인증',
+  login_email_link: '로그인 이메일 연결',
 };
 
 /**

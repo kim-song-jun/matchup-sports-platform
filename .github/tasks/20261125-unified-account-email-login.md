@@ -28,6 +28,10 @@ Status: In Progress
 - [x] 완료 뒤 이메일 로그인, 이메일 비밀번호 재설정(`/auth/recovery/email/*`), 휴대폰 계정 찾기의 `providers` 에 `email` 이 모두 동작하고 테스트로 증명한다
 - [x] 로그인한 지 얼마 안 됐는지는 **`request` 에서만** 확인한다. `complete` 는 다시 확인하지 않고 10분짜리 `emailLinkToken` 이 창을 정한다 (사용자 결정, 아래 Ambiguity Log)
 - [x] `emailLinkToken` 을 에러 로그 마스킹 키에 추가한다
+- [x] 인증번호는 **목적에 묶는다**: `v1_verification_tokens.purpose`(`contact` | `email_login_link`, 기본 `contact`). 이메일 연결의 `verify` 는 연결용 코드만 받고, `/verification/*` 는 연락처용 코드만 받으며, 한쪽이 코드를 새로 만들어도 다른 쪽 코드는 폐기되지 않는다 (리뷰 지적: 연락처 코드로 최근 로그인 확인을 우회할 수 있었다)
+- [x] 이메일 로그인이 추가되면 소셜 연결과 같은 보안 알림(`social_identity_linked`)을 같은 트랜잭션에서 남기고 커밋 뒤에 전달한다
+- [x] 인증 메일은 전용 문구("로그인 이메일 연결 인증번호")를 쓴다
+- [x] 메일을 보낼 수단이 없으면 `request` 는 `sent: true` 로 속이지 않고 503 `EMAIL_SEND_UNAVAILABLE` 로 답한다
 - [x] 문서(`docs/api/domains/auth.md`·`auth-and-session.md`)와 웹 데이터 계층(타입·MSW·변이 훅)을 같은 PR에서 갱신한다. 화면은 이 PR에 넣지 않는다
 - [ ] 화면: B안 — 전용 단계 흐름 `/my/settings/login-methods/email` (진행 막대, 화면당 질문 하나). **별도 웹 PR**
 - [ ] 화면: 가입 화면의 "이미 가입한 번호" 카드에서 원래 계정으로 로그인한 직후, 입력해 둔 이메일을 채운 채 위 흐름으로 바로 이동한다. **별도 웹 PR**
@@ -68,6 +72,8 @@ Expected result: 같은 계정이 이메일·비밀번호로도 로그인된다.
 - [x] 같은 이메일을 두 계정이 동시에 `complete` → 한쪽만 성공, 다른 쪽 `EMAIL_CONFLICT`, 반쯤 쓰인 행 없음 (통합)
 - [x] 철회된 운영 권한(`revoked`)은 통과, 활성 운영 권한은 거절
 - [x] `complete` 는 세션 나이를 보지 않는다 (토큰이 창을 정한다)
+- [x] 연락처 코드(`/verification/email/request`)로는 연결을 끝낼 수 없다 / 연결 코드는 `/verification/email/confirm` 에서 거절된다 / 한쪽 코드를 새로 받아도 다른 쪽 코드는 그대로 쓸 수 있다 (단위 + 통합, 실제 HTTP 로 오래된 세션이 우회를 시도)
+- [x] 메일이 못 나가는 서버는 503 `EMAIL_SEND_UNAVAILABLE`, 완료 시 알림이 저장되지 않으면 연결도 취소된다
 ### Error paths
 - [x] 활성 이메일 신원이 있는 계정 `SOCIAL_LINK_PROVIDER_EXISTS`
 - [x] 다른 사용자가 `v1_users.email` 로 쓰는 주소 / 이메일 신원 키로 쓰는 주소 `EMAIL_CONFLICT` (메일 발송·토큰 생성 없음)
@@ -80,7 +86,8 @@ Expected result: 같은 계정이 이메일·비밀번호로도 로그인된다.
 ### Mock data updates needed
 - [x] `apps/v1_web/src/test/msw/auth-link-handlers.ts` 에 세 엔드포인트 핸들러(`EMAIL_LINK_MSW` 시나리오 값, 서버 DTO와 같은 검증)
 - [x] `apps/v1_web/src/types/api.ts` 응답·본문 타입, `hooks/use-v1-api.ts` 변이 훅 3개와 훅 테스트
-- [x] `apps/v1_api` 스키마 변경 없음 → 픽스처·시드 변경 없음
+- [x] `V1VerificationToken` 에 `purpose` 가 생겼다(마이그레이션 `20261101090000_v1_verification_token_purpose`). 이 표의 행을 직접 만드는 픽스처·시드는 없다(통합 스펙은 기본값 `contact` 를 쓰고, 정리용 `deleteMany` 만 있다)
+- [x] 웹 MSW 에 `EMAIL_LINK_MSW.emails.mailUnavailable`(503), `lib/auth-link-errors.ts` 에 `isEmailSendUnavailable`
 
 ## Parallel Work Breakdown
 ### Backend
@@ -88,6 +95,8 @@ Expected result: 같은 계정이 이메일·비밀번호로도 로그인된다.
 - [x] `auth/email-link-token.ts`, `email-link.service.ts`, `email-link.controller.ts`, `dto/link-email.dto.ts`, `dto/account-password.decorator.ts`(가입과 같은 비밀번호 규칙을 한 곳에)
 - [x] `VerificationService` — 재발송 쿨다운·코드 대조를 이름 붙은 메서드로 분리해 이메일 연결이 재사용(휴대폰 동작은 그대로), `VerificationModule` 이 서비스를 내보냄
 - [x] `common/logging/mask-sensitive.ts` 에 `emailLinkToken`
+- [x] 목적 묶음: `prisma/schema.prisma` 의 `V1VerificationPurpose` + `V1VerificationToken.purpose`, 추가만 하는 멱등 마이그레이션(enum 생성은 `duplicate_object` 가드, 열은 `ADD COLUMN IF NOT EXISTS ... NOT NULL DEFAULT 'contact'`), `VerificationService` 의 대조·소비·폐기·발송을 목적으로 한정
+- [x] 전용 메일 문구(`login_email_link`), 발송 불가 503, 완료 시 알림 (`EmailLinkService`)
 ### Frontend (데이터 계층만)
 - [x] 타입·MSW·변이 훅 — 화면 없음
 - [ ] 화면(B안)과 가입 → 로그인 → 이메일 붙이기 진입점은 이 위에 쌓는 **별도 웹 PR**  ← UI 변경이므로 사용자가 B안을 이미 골랐고(아래), 구현 PR 에서 갤러리를 첨부한다
@@ -113,7 +122,7 @@ Expected result: 같은 계정이 이메일·비밀번호로도 로그인된다.
 
 ## Security Notes
 - **소유 증명**: 계정은 로그인한 세션으로, 이메일 주소는 메일로 받은 인증번호로 증명한다. 휴대폰 번호는 계정 소유를 증명하지 않는다(번호 재배정으로 낯선 사람에게 계정이 넘어가는 위험이라 다시 기각).
-- **최근 로그인 확인은 `request` 에서만**(사용자 결정): `complete` 는 다시 확인하지 않는다. `emailLinkToken` 은 메일로 받은 인증번호를 맞춘 뒤에만 나오고(그 번호는 보통 최근 로그인을 통과한 `request` 가 보낸 것이다), 10분 뒤 만료되며, 계정과 주소에 묶여 있다. 그 창 안에서 세션을 훔친 쪽이 비밀번호를 정해 로그인 수단을 더할 수 있다는 위험은 이 10분으로 한정된다. 나중에 다시 확인하기로 바꾸면 컨트롤러가 `request` 처럼 세션 나이를 넘기게 하고 `complete` 맨 앞에 `assertRecentLogin` 한 줄을 더하면 된다.
+- **최근 로그인 확인은 `request` 에서만**(사용자 결정): `complete` 는 다시 확인하지 않는다. 이 결정이 성립하려면 `verify` 가 받는 코드가 반드시 최근 로그인을 통과한 `request` 가 만든 것이어야 한다. 처음 구현은 이 전제가 깨져 있었다 — `verify` 가 이메일 채널의 미사용 코드를 아무거나 받았고, 세션 나이를 보지 않는 `/verification/email/request` 가 계정 이메일(`PATCH /me/profile` 로 자유롭게 정할 수 있다)로 코드를 만들어 주었으므로 30분 넘은 세션이 연결을 끝낼 수 있었다. 그래서 **코드를 목적에 묶었다**: 코드마다 `purpose` 를 저장하고(`contact` | `email_login_link`), 대조·소비·폐기를 모두 한 목적 안에서만 한다. 연락처 코드는 `verify` 에서, 연결 코드는 `/verification/email/confirm` 에서 `VERIFICATION_NO_PENDING` 으로 거절되고, 한쪽이 새 코드를 만들어도 다른 쪽 코드는 폐기되지 않는다. 쿨다운과 24시간 발송 상한만은 목적을 가리지 않고 센다(막으려는 것은 그 주소로 나간 메일의 양이다). `emailLinkToken` 은 메일로 받은 연결용 인증번호를 맞춘 뒤에만 나오고, 10분 뒤 만료되며, 계정과 주소에 묶여 있다. 그 창 안에서 세션을 훔친 쪽이 비밀번호를 정해 로그인 수단을 더할 수 있다는 위험은 이 10분으로 한정된다. 나중에 다시 확인하기로 바꾸면 컨트롤러가 `request` 처럼 세션 나이를 넘기게 하고 `complete` 맨 앞에 `assertRecentLogin` 한 줄을 더하면 된다.
 - **토큰**: `V1_SESSION_SECRET` 으로 서명한 무상태 토큰(`verification/proof-token.ts`), 목적 접두어 `email_login_link`, 계정은 키 달린 다이제스트로만 싣는다. 다른 증명(휴대폰·이메일 재설정·소셜 연결)과 서로 통하지 않는다. 비밀 값이 없으면 발급은 예외, 검증은 거절(fail-closed). 에러 로그에서 `emailLinkToken`·`password`·`passwordConfirm`·`code` 는 가려진다.
 - **남용**: 메일 발송 경로는 분당 5회 + 주소 쿨다운 30초 + 24시간 상한(주소당 5, 계정당 10). 6자리 코드는 토큰당 5회 시도 + 분당 10회.
 - **열거**: 다른 계정이 쓰는 주소는 `EMAIL_CONFLICT` 하나로만 알린다. 로그인한 사용자만 호출할 수 있고 `GET /auth/check-email` 이 이미 공개로 같은 사실을 답한다.
@@ -123,8 +132,8 @@ Expected result: 같은 계정이 이메일·비밀번호로도 로그인된다.
 
 ## Risks & Dependencies
 - 운영 메일 발송 권한(SES)은 20261124 L0 에서 열었다. 발송이 막히면 `503 EMAIL_SEND_FAILED` 가 나고 코드는 남지 않는다.
-- 메일 본문은 기존 "이메일 인증" 문구를 쓴다. 로그인 수단 추가 전용 문구가 필요하면 `OtpEmailPurpose` 에 목적을 더하는 별도 변경이다.
-- 연결 알림(`social_identity_linked`)과 같은 보안 알림을 이메일 로그인 추가에도 보낼지는 정해지지 않았다 — 세션 탈취 뒤 조용히 로그인 수단이 늘어나는 것을 본인이 알 수 있게 하는 후속으로 제안한다.
+- `purpose` 열은 이 PR 의 마이그레이션이 만든다(추가만 하는 변경이라 롤링 배포 중 옛 API 가 쓴 행도 기본값 `contact` 가 된다). 옛 API 는 연결용 코드를 만들 일이 없다.
+- 보안 알림의 알림함 행은 연결과 같은 트랜잭션에 저장하므로, 저장이 실패하면 연결도 취소된다(소셜 연결과 같은 선택).
 - 같은 계정의 `(user_id, provider)` 유니크가 없다는 앞선 작업의 후속(스키마)은 그대로다. 이메일 신원은 계정 잠금으로 직렬화한다.
 - 화면 PR 은 이 PR 위에 쌓는다(타입·훅·MSW 를 그대로 쓴다).
 
@@ -138,5 +147,7 @@ Expected result: 같은 계정이 이메일·비밀번호로도 로그인된다.
 | 2026-10-31 | 오케스트레이터 | 연결된 줄의 기존 라벨 "이메일 로그인" | 사용자 결정(2026-11-01): "이메일·비밀번호"로 바꾼다 |
 | 2026-10-31 | 오케스트레이터 | 완료 화면의 그래픽 | 사용자 결정(2026-11-01): 가입 완료 그래픽 재사용 |
 | 2026-10-31 | 오케스트레이터 | "방금 입력한 이메일을 붙일까요?" 제안을 몇 번 보이나 | 사용자 결정(2026-11-01): 한 번만 |
-| 2026-11-01 | 서버 레인 | 이메일 연결 시 보안 알림(`social_identity_linked` 같은)을 보낼지 | 미정 — 이번 PR 범위 밖. 화면 PR 또는 후속에서 사용자가 정한다 |
-| 2026-11-01 | 서버 레인 | 인증 메일 문구를 로그인 수단 추가용으로 따로 둘지 | 미정 — 기존 "이메일 인증" 문구 사용. 필요하면 후속 |
+| 2026-11-01 | 서버 레인 | 이메일 연결 시 보안 알림(`social_identity_linked` 같은)을 보낼지 | 조정자 결정(2026-11-01): 소셜 연결이 이미 알리므로 이메일 로그인 추가도 같은 방식으로 알린다 — 같은 타입(`name` = "이메일·비밀번호")을 같은 트랜잭션에서 만들고 커밋 뒤 전달. 웹 알림 목록은 서버의 제목·본문과 `targetType`(`system`) 으로 그리므로 화면 쪽 새 라벨은 필요 없다 |
+| 2026-11-01 | 서버 레인 | 인증 메일 문구를 로그인 수단 추가용으로 따로 둘지 | 조정자 결정(2026-11-01): 전용 문구 — 제목 "[Teameet] 로그인 이메일 연결 인증번호", `OtpEmailPurpose` 에 `login_email_link` 추가(발송 실패 알림 라벨 포함) |
+| 2026-11-01 | 독립 리뷰 | `verify` 가 이메일 채널의 아무 미사용 코드나 받아 `/verification/email/request` 코드로 최근 로그인 확인을 우회할 수 있다 | 조정자 결정(2026-11-01): 코드를 목적에 묶는다(`purpose` 열 + 마이그레이션). 최근 로그인은 `request` 에서만 확인한다는 사용자 결정은 그대로 — 목적 묶음으로 그 전제가 다시 성립한다 |
+| 2026-11-01 | 독립 리뷰 | 메일을 보낼 수단이 없는 서버가 `sent: true` 로 답한다 | 조정자 결정(2026-11-01): 로그인 추가 인증과 같게 503 `EMAIL_SEND_UNAVAILABLE` |

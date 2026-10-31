@@ -431,7 +431,7 @@ describe('AdminService — list/detail endpoints', () => {
 
     it('returns full detail shape including optional reputationSummary', async () => {
       prisma.v1User.findUnique.mockResolvedValue({
-        ...makeUserRow(),
+        ...makeUserRow({ accountStatus: 'withdrawal_pending' }),
         reputationSummary: {
           trustState: 'estimated',
           mannerScore: 4.5,
@@ -484,6 +484,26 @@ describe('AdminService — list/detail endpoints', () => {
       expect(result.teamRoleCounts).toEqual({ owner: 1, manager: 0, member: 1 });
       expect(result.teamMemberships).toHaveLength(2);
       expect(result.withdrawalRequest).toMatchObject({ reason: '잠시 쉬고 싶어요' });
+    });
+
+    // 철회로 다시 active 가 된 계정의 옛 탈퇴 요청 로그가 상세 화면에 '탈퇴 요청 메시지' 로 남으면 안 된다.
+    it.each([
+      ['withdrawal_pending', true],
+      ['deleted', true],
+      ['active', false],
+    ])('shows the latest withdrawal request only while the account is %s -> %s', async (accountStatus, shown) => {
+      prisma.v1User.findUnique.mockResolvedValue({
+        ...makeUserRow({ accountStatus }),
+        reputationSummary: null,
+        hostedMatches: [],
+        ownedTeams: [],
+        teamMemberships: [],
+        statusLogs: [{ reason: '잠시 쉬고 싶어요', createdAt: new Date('2026-05-20T00:00:00.000Z') }],
+      });
+
+      const result = await service.getUser(adminAuthUser, 'u-1');
+
+      expect(result.withdrawalRequest !== null).toBe(shown);
     });
 
     it('returns null gender for a legacy member without a saved gender', async () => {

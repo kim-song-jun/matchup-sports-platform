@@ -2,6 +2,7 @@
 
 import { useCallback } from 'react';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
+import { getPendingSocialSignupRoute } from './social-signup-access';
 import { useSignOutAndLeave } from './use-sign-out-and-leave';
 
 /**
@@ -12,16 +13,17 @@ import { useSignOutAndLeave } from './use-sign-out-and-leave';
  * 게이트를 푸는 대신 "가입을 그만두고 로그아웃"이라는 명시적 출구를 준다 —
  * 서버도 pending 상태에서 /auth/logout 만은 허용하도록 열어 둔 설계다.
  */
-export function useSocialSignupExit() {
+export function useSocialSignupExit({ onboardingStatus }: { onboardingStatus?: string | null } = {}) {
   const { confirm, ConfirmModal } = useConfirm();
-  const { signOutAndLeave, pending, error } = useSignOutAndLeave();
+  // 약관·프로필 단계의 가입 대기 계정은 서버 가드가 푸시 등록 API 를 막아 등록이 없다. 프로필을
+  // 미룬(social_profile_deferred) 계정은 알림 쓰기가 열려 있어 등록했을 수 있으므로 해지를 시도한다.
+  const revokePush = getPendingSocialSignupRoute(onboardingStatus) === null;
+  const { signOutAndLeave, pending, error } = useSignOutAndLeave({ revokePush });
 
   /** 로그아웃 뒤 하드 내비게이션으로 나간다. 실패하면 서버 세션이 남아 게이트가 되돌려 보내므로 알린다. */
   const leaveTo = useCallback(
-    // 가입 진행 중 계정은 푸시 등록을 할 수 없어 해지할 것이 없다.
     (path: string) => signOutAndLeave(path, {
       failureMessage: '가입 취소를 완료하지 못했어요. 잠시 후 다시 시도해 주세요.',
-      revokePush: false,
     }),
     [signOutAndLeave],
   );

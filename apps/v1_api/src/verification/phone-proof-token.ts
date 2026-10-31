@@ -20,11 +20,23 @@ function payloadFor(phone: string, purpose: PhoneProofPurpose): ProofPayloadBuil
   return (expMs) => (purpose === 'signup' ? `${phone}:${expMs}` : `${purpose}:${phone}:${expMs}`);
 }
 
+/**
+ * The legacy signup payload is the bare `{phone}:{exp}`, so a "phone" spelled like another token family's payload
+ * (`withdrawal_cancel:{user}:{epoch}`) would mint that family's token. Real numbers are digits; the HTTP
+ * boundary already enforces 11 of them, and this keeps the bare form closed to anything else.
+ */
+function isBareSignupPhone(phone: string): boolean {
+  return /^\d+$/.test(phone);
+}
+
 export function issuePhoneProofToken(
   phone: string,
   purpose: PhoneProofPurpose = 'signup',
   nowMs: number = Date.now(),
 ): string {
+  if (purpose === 'signup' && !isBareSignupPhone(phone)) {
+    throw new Error('A signup phone proof can only be issued for a digit-only phone number');
+  }
   return issueProofToken(payloadFor(phone, purpose), nowMs);
 }
 
@@ -34,5 +46,6 @@ export function verifyPhoneProofToken(
   purpose: PhoneProofPurpose = 'signup',
   nowMs: number = Date.now(),
 ): boolean {
+  if (purpose === 'signup' && !isBareSignupPhone(phone)) return false;
   return verifyProofToken(token, payloadFor(phone, purpose), nowMs);
 }

@@ -22,6 +22,7 @@ import { loginEmailKey } from './login-security/login-security.policy';
 import { LoginSecurityService } from './login-security/login-security.service';
 import { LoginStepUpService } from './login-security/login-step-up.service';
 import { hashPassword } from './password-hash';
+import { readWithdrawalCancelToken } from './withdrawal-cancel-token';
 
 jest.mock('crypto', () => {
   const actual = jest.requireActual<typeof import('crypto')>('crypto');
@@ -52,6 +53,7 @@ async function build(options: { accountStatus?: string; devEcho?: boolean } = {}
       onboardingStatus: 'completed',
       createdAt: T0,
       updatedAt: T0,
+      sessionEpoch: 3,
     },
   };
   state.identities.push(identity);
@@ -194,6 +196,45 @@ describe('AuthService.login once step-up applies', () => {
     const again = await service.login({ email: EMAIL, password: PASSWORD }, CLIENT);
     expect(again).toMatchObject({ session: { userId: 'user-1' } });
     expect(state.attempts.map((row) => row.result)).toEqual(['failed', 'failed', 'failed', 'step_up_issued', 'success', 'success']);
+  });
+
+  describe('withdrawal-pending account', () => {
+    const savedSecret = process.env.V1_SESSION_SECRET;
+    beforeAll(() => { process.env.V1_SESSION_SECRET = 'x'.repeat(48); });
+    afterAll(() => {
+      if (savedSecret === undefined) delete process.env.V1_SESSION_SECRET;
+      else process.env.V1_SESSION_SECRET = savedSecret;
+    });
+
+    it('gets nothing but the challenge for the right password, and the cancel token only once the mailed code is verified', async () => {
+      const { service, state, dispatcher, flush } = await build({ accountStatus: 'withdrawal_pending' });
+      seedFailures(state, EMAIL, 3);
+
+      const challenged = await service.login({ email: EMAIL, password: PASSWORD }, CLIENT);
+      await flush();
+      expect(Object.keys(challenged)).toEqual(['stepUp']);
+      expect(JSON.stringify(challenged)).not.toMatch(/withdraw|cancel/i);
+
+      const code = dispatcher.send.mock.calls[0][2] as string;
+      const failure = (await service
+        .verifyLoginStepUp({ challengeToken: stepUpOf(challenged).challengeToken as string, code }, CLIENT)
+        .catch((error: unknown) => error)) as { getStatus(): number; getResponse(): { code: string; details: { withdrawalCancelToken: string } } };
+
+      expect(failure.getStatus()).toBe(403);
+      expect(failure.getResponse().code).toBe('ACCOUNT_WITHDRAWAL_PENDING');
+      expect(readWithdrawalCancelToken(failure.getResponse().details.withdrawalCancelToken)).toEqual({ userId: 'user-1', sessionEpoch: 3 });
+    });
+
+    it('never carries the account state in the challenge for a wrong password', async () => {
+      const { service, state, dispatcher, flush } = await build({ accountStatus: 'withdrawal_pending' });
+      seedFailures(state, EMAIL, 3);
+
+      const challenged = await service.login({ email: EMAIL, password: 'wrong-password-1' }, CLIENT);
+      await flush();
+
+      expect(Object.keys(challenged)).toEqual(['stepUp']);
+      expect(dispatcher.send).not.toHaveBeenCalled();
+    });
   });
 
   it('refuses the session after a correct code when the account cannot sign in', async () => {

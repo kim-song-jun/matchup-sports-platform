@@ -10,16 +10,19 @@ import { OptionalV1AuthGuard } from './optional-v1-auth.guard';
 import { PhoneVerificationPublicController } from './phone-verification-public.controller';
 import { V1AuthGuard } from './v1-auth.guard';
 import { V1SessionCookieInterceptor } from './v1-session.interceptor';
+import { WithdrawalRecoveryController } from './withdrawal-recovery.controller';
+import { WithdrawalRecoveryService } from './withdrawal-recovery.service';
 import { RealtimeModule } from '../realtime/realtime.module';
 import { TermsModule } from '../terms/terms.module';
 import { VerificationModule } from '../verification/verification.module';
 
 @Module({
   imports: [TermsModule, VerificationModule, AppleTokenModule, RealtimeModule],
-  controllers: [AuthController, PhoneVerificationPublicController, AccountRecoveryController],
+  controllers: [AuthController, PhoneVerificationPublicController, AccountRecoveryController, WithdrawalRecoveryController],
   providers: [
     AuthService,
     AccountRecoveryService,
+    WithdrawalRecoveryService,
     LoginSecurityService,
     LoginStepUpService,
     V1AuthGuard,

@@ -20,6 +20,11 @@ export class PhoneVerificationPublicController {
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   async verify(@Body() dto: PhoneVerifyDto) {
     await this.phoneVerification.verifyCode(dto.phone, dto.code);
-    return { verified: true, proofToken: this.phoneVerification.issueProof(dto.phone, dto.purpose) };
+    // Whether the number already belongs to an account is told only after the code proved the caller holds it.
+    return {
+      verified: true,
+      proofToken: this.phoneVerification.issueProof(dto.phone, dto.purpose),
+      registered: await this.phoneVerification.isRegistered(dto.phone),
+    };
   }
 }

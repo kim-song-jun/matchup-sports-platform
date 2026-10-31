@@ -71,10 +71,14 @@ describe('withdrawal cancel storage', () => {
     expect(stored()).toBeNull();
   });
 
-  it('reports false when the browser blocks storage', () => {
+  it('reports false when the browser blocks storage, and does not leave the previous token behind', () => {
+    saveWithdrawalCancel(offer, null, NOW);
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
       throw new DOMException('quota', 'QuotaExceededError');
     });
-    expect(saveWithdrawalCancel(offer, null, NOW)).toBe(false);
+
+    expect(saveWithdrawalCancel({ ...offer, token: 'withdrawal-cancel-token-0002' }, null, NOW)).toBe(false);
+
+    expect(readWithdrawalCancel(NOW)).toBeNull();
   });
 });

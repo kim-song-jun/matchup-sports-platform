@@ -1069,7 +1069,8 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         role: membership.role,
         joinedAt: membership.joinedAt,
       })),
-      withdrawalRequest: row.statusLogs[0]
+      // A cancelled request must not keep showing on an account that is active again.
+      withdrawalRequest: row.statusLogs[0] && (row.accountStatus === 'withdrawal_pending' || row.accountStatus === 'deleted')
         ? {
             reason: row.statusLogs[0].reason,
             requestedAt: row.statusLogs[0].createdAt,

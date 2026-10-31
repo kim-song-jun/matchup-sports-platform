@@ -31,7 +31,7 @@ export function serializeKakaoOAuthAttempt(attempt: KakaoOAuthAttempt): string {
 /** 저장된 문자열을 읽는다. 알아볼 수 없는 값은 로그인으로 가정하지 않고 null 로 거절한다. */
 export function parseKakaoOAuthAttempt(raw: string | null): KakaoOAuthAttempt | null {
   if (!raw) return null;
-  // 예전에는 state(hex 문자열)만 저장했다. JSON 객체는 항상 '{' 로 시작하므로 그 밖은 로그인 시도다.
+  // 로그인 버튼은 아직 state 문자열만 저장한다. JSON 객체는 항상 '{' 로 시작하므로 그 밖은 로그인 시도다.
   // JSON.parse 로 먼저 열면 숫자만 있는 state 가 숫자로 읽혀 버린다.
   if (!raw.startsWith('{')) return { state: raw, mode: 'login', returnTo: null };
 
@@ -57,12 +57,17 @@ export function storeKakaoOAuthAttempt(attempt: KakaoOAuthAttempt): void {
 
 /**
  * 콜백에서 kauth 가 돌려준 state 를 저장해 둔 시도와 대조한다. 일치하면 그 시도를, 아니면 null.
- * 저장값은 일치 여부와 상관없이 한 번 읽으면 지운다(재사용 불가).
+ * 저장값은 일치 여부와 상관없이 한 번 읽으면 지운다(재사용 불가). 스토리지가 막힌 환경에서는 던지지 않고 null 이다.
  */
 export function consumeKakaoOAuthAttempt(returnedState: string | null): KakaoOAuthAttempt | null {
   if (typeof window === 'undefined') return null;
-  const raw = window.sessionStorage.getItem(KAKAO_OAUTH_STATE_STORAGE_KEY);
-  window.sessionStorage.removeItem(KAKAO_OAUTH_STATE_STORAGE_KEY);
+  let raw: string | null;
+  try {
+    raw = window.sessionStorage.getItem(KAKAO_OAUTH_STATE_STORAGE_KEY);
+    window.sessionStorage.removeItem(KAKAO_OAUTH_STATE_STORAGE_KEY);
+  } catch {
+    return null;
+  }
   const attempt = parseKakaoOAuthAttempt(raw);
   return attempt && returnedState && attempt.state === returnedState ? attempt : null;
 }

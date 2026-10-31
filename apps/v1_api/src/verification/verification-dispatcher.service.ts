@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger, ServiceUnavailableException } from '@nestjs
 import { V1VerificationChannel } from '@prisma/client';
 import { normalizeEmail } from '../auth/normalize-email';
 import { PrismaService } from '../prisma/prisma.service';
+import { recordEmailDeliveryFailure } from './email/email-delivery-failure';
 import { EMAIL_SENDER, EmailSender } from './email/email-sender';
 import {
   buildOtpEmailHtml,
@@ -119,6 +120,7 @@ export class VerificationDispatcherService {
         this.logger.warn(
           `[verification:email] 메일 발송 실패 → ${masked}: ${err instanceof Error ? err.message : String(err)}`,
         );
+        await this.reportEmailFailure(emailPurpose, err);
         throw new ServiceUnavailableException({
           code: 'EMAIL_SEND_FAILED',
           message: '인증번호 발송에 실패했어요. 잠시 후 다시 시도해 주세요.',
@@ -134,6 +136,17 @@ export class VerificationDispatcherService {
     this.logger.log(
       `[verification:email] dispatched code to ${masked}${this.devEchoActive ? ` (dev code=${code})` : ''}`,
     );
+  }
+
+  /** The alert is best effort: failing to record it must not replace the 503 the caller is owed. */
+  private async reportEmailFailure(purpose: OtpEmailPurpose, error: unknown): Promise<void> {
+    try {
+      await recordEmailDeliveryFailure(this.prisma, { purpose, error });
+    } catch (recordError) {
+      this.logger.error(
+        `[verification:email] 발송 실패 알림을 기록하지 못했어요: ${recordError instanceof Error ? recordError.message : String(recordError)}`,
+      );
+    }
   }
 
   private async isPrivilegedAccount(target: {

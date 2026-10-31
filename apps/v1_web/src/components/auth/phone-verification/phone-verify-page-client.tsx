@@ -66,6 +66,9 @@ export function PhoneVerifyPageClient() {
         onLogin={() => leaveTo(withRedirect('/login'))}
         onFindAccount={() => leaveTo(withRedirect('/auth/find-account'))}
       />
+      <p className="tm-text-caption" style={{ margin: 0, color: 'var(--text-caption)' }}>
+        버튼을 누르면 지금 계정에서 로그아웃돼요.
+      </p>
       {signOut.error ? <AlertBanner message={signOut.error} tone="error" /> : null}
     </>
   );

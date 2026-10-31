@@ -37,18 +37,6 @@ afterAll(() => { server.close(); vi.unstubAllEnvs(); });
 afterEach(() => { server.resetHandlers(); vi.restoreAllMocks(); });
 
 describe('MD-QA #133 shared MSW account-proof HTTP contract', () => {
-  it.each(['/auth/social-link/preview', '/auth/social-link'])('%s rejects current-number proof instead of returning holder data or a session', async (path) => {
-    // The proof must come from the same public producer as a browser consumer uses.
-    const { proofToken } = await verifyPhone('social_link');
-    // When: the production API client submits it through the shared MSW handlers.
-    const result = v1Post<unknown>(path, { phone, proofToken });
-    // Then: both API routes retain the new explicit independent-account-proof boundary.
-    await expect(result).rejects.toMatchObject({
-      statusCode: 409, code: 'SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF',
-      displayableMessage: true,
-    } satisfies Partial<V1ApiError>);
-  });
-
   it('phone password reset requires independent email proof', async () => {
     const { proofToken } = await verifyPhone('password_reset');
     const body = { phone, proofToken, newPassword };
@@ -70,21 +58,14 @@ describe('MD-QA #133 shared MSW account-proof HTTP contract', () => {
       .rejects.toMatchObject({ statusCode: 400, code: 'PHONE_NOT_VERIFIED' } satisfies Partial<V1ApiError>);
   });
 
-  it.each(['/auth/social-link/preview', '/auth/social-link'])('%s rejects a recovery-purpose proof', async (path) => {
-    const { proofToken } = await verifyPhone('password_reset');
-    await expect(v1Post(path, { phone, proofToken }))
-      .rejects.toMatchObject({ statusCode: 400, code: 'PHONE_NOT_VERIFIED' } satisfies Partial<V1ApiError>);
-  });
-
-  it.each(['/auth/recovery/find-account', '/auth/recovery/reset-password', '/auth/social-link'])('%s rejects the default signup-purpose proof', async (path) => {
+  it.each(['/auth/recovery/find-account', '/auth/recovery/reset-password'])('%s rejects the default signup-purpose proof', async (path) => {
     const { proofToken } = await verifyPhone();
     await expect(v1Post(path, { phone, proofToken, ...(path.endsWith('reset-password') ? { newPassword } : {}) }))
       .rejects.toMatchObject({ statusCode: 400, code: 'PHONE_NOT_VERIFIED' } satisfies Partial<V1ApiError>);
   });
 
-  it.each(['/auth/recovery/find-account', '/auth/recovery/reset-password', '/auth/social-link'])('%s binds the proof to the verified phone', async (path) => {
-    const purpose = path.includes('social-link') ? 'social_link' : 'password_reset';
-    const { proofToken } = await verifyPhone(purpose, '01098765432');
+  it.each(['/auth/recovery/find-account', '/auth/recovery/reset-password'])('%s binds the proof to the verified phone', async (path) => {
+    const { proofToken } = await verifyPhone('password_reset', '01098765432');
     await expect(v1Post(path, { phone, proofToken, ...(path.endsWith('reset-password') ? { newPassword } : {}) }))
       .rejects.toMatchObject({ statusCode: 400, code: 'PHONE_NOT_VERIFIED' } satisfies Partial<V1ApiError>);
   });
@@ -120,7 +101,7 @@ describe('MD-QA #133 shared MSW account-proof HTTP contract', () => {
     } satisfies Partial<V1ApiError>);
   });
 
-  it.each(['/auth/recovery/find-account', '/auth/recovery/reset-password', '/auth/social-link'])('%s rejects an email-channel proof', async (path) => {
+  it.each(['/auth/recovery/find-account', '/auth/recovery/reset-password'])('%s rejects an email-channel proof', async (path) => {
     const email = v1UserFixture.email;
     await v1Post('/auth/recovery/email/request', { email });
     const { proofToken } = await v1Post<{ proofToken: string }>('/auth/recovery/email/confirm', { email, code: '123456' });
@@ -150,6 +131,17 @@ describe('MD-QA #133 shared MSW account-proof HTTP contract', () => {
       .resolves.toMatchObject({ verified: true, proofToken: expect.any(String) });
   });
 
+  it('tells the verifier whether the number already has an account only after the code proved ownership', async () => {
+    const issued = await v1Post<Record<string, unknown>>('/auth/phone/issue', { phone });
+    expect(issued).not.toHaveProperty('registered');
+    await expect(v1Post('/auth/phone/verify', { phone, code: '000000' })).rejects.toMatchObject({ code: 'VERIFICATION_CODE_MISMATCH' });
+    await expect(v1Post('/auth/phone/verify', { phone, code: '123456' })).resolves.toMatchObject({ verified: true, registered: true });
+
+    const freePhone = '01077778888';
+    await v1Post('/auth/phone/issue', { phone: freePhone });
+    await expect(v1Post('/auth/phone/verify', { phone: freePhone, code: '123456' })).resolves.toMatchObject({ verified: true, registered: false });
+  });
+
   it('does not mint a phone proof for a wrong verification code', async () => {
     await v1Post('/auth/phone/issue', { phone });
     await expect(v1Post('/auth/phone/verify', { phone, code: '000000', purpose: 'password_reset' }))
@@ -177,14 +169,15 @@ describe('MD-QA #133 shared MSW account-proof HTTP contract', () => {
   });
 
   it.each([
-    { elapsed: 6 * 60 * 1000, statusCode: 409, code: 'SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF' },
-    { elapsed: 10 * 60 * 1000 + 1, statusCode: 400, code: 'PHONE_NOT_VERIFIED' },
-  ])('social-link proof retains its own lifetime at $elapsed ms', async ({ elapsed, statusCode, code }) => {
+    { elapsed: 6 * 60 * 1000, outcome: 'accepted' },
+    { elapsed: 10 * 60 * 1000 + 1, outcome: 'expired' },
+  ])('a phone proof is $outcome at $elapsed ms', async ({ elapsed, outcome }) => {
     const verifiedAt = Date.now();
     const mockNow = vi.spyOn(Date, 'now').mockReturnValue(verifiedAt);
-    const { proofToken } = await verifyPhone('social_link');
+    const { proofToken } = await verifyPhone('password_reset');
     mockNow.mockReturnValue(verifiedAt + elapsed);
-    await expect(v1Post('/auth/social-link', { phone, proofToken }))
-      .rejects.toMatchObject({ statusCode, code } satisfies Partial<V1ApiError>);
+    const lookup = v1Post('/auth/recovery/find-account', { phone, proofToken });
+    if (outcome === 'accepted') await expect(lookup).resolves.toMatchObject({ providers: ['email'] });
+    else await expect(lookup).rejects.toMatchObject({ statusCode: 400, code: 'PHONE_NOT_VERIFIED' } satisfies Partial<V1ApiError>);
   });
 });

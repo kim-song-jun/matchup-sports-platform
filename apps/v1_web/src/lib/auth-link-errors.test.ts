@@ -1,0 +1,100 @@
+import { describe, expect, it } from 'vitest';
+import { V1ApiError } from './api-client';
+import {
+  getRecentLoginRequired,
+  getSignInThenLinkHint,
+  getWithdrawalCancelOffer,
+} from './auth-link-errors';
+
+function apiError(statusCode: number, code: string, details?: unknown) {
+  return new V1ApiError({
+    status: 'error',
+    statusCode,
+    code,
+    message: '메시지',
+    details,
+    timestamp: '2026-10-31T00:00:00.000Z',
+  });
+}
+
+describe('getSignInThenLinkHint', () => {
+  it.each(['kakao', 'apple'] as const)('reads the %s hint from a 409', (provider) => {
+    const error = apiError(409, 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', { next: 'sign_in_then_link', provider });
+    expect(getSignInThenLinkHint(error)).toEqual({ next: 'sign_in_then_link', provider });
+  });
+
+  it('keeps working for PHONE_CONFLICT, which carries the same details', () => {
+    const error = apiError(409, 'PHONE_CONFLICT', { next: 'sign_in_then_link', provider: 'kakao' });
+    expect(getSignInThenLinkHint(error)).toEqual({ next: 'sign_in_then_link', provider: 'kakao' });
+  });
+
+  it.each([
+    ['no details', undefined],
+    ['null details', null],
+    ['string details', 'sign_in_then_link'],
+    ['array details', [{ next: 'sign_in_then_link', provider: 'kakao' }]],
+    ['a different next action', { next: 'verify_email', provider: 'kakao' }],
+    ['a provider that cannot be linked', { next: 'sign_in_then_link', provider: 'naver' }],
+    ['a missing provider', { next: 'sign_in_then_link' }],
+  ])('returns null for %s', (_label, details) => {
+    expect(getSignInThenLinkHint(apiError(409, 'PHONE_CONFLICT', details))).toBeNull();
+  });
+
+  it('ignores the same details on a non-409 response', () => {
+    const details = { next: 'sign_in_then_link', provider: 'kakao' };
+    expect(getSignInThenLinkHint(apiError(400, 'VALIDATION_ERROR', details))).toBeNull();
+  });
+
+  it('ignores errors that did not come from the API client', () => {
+    expect(getSignInThenLinkHint(Object.assign(new Error('x'), { statusCode: 409, details: { next: 'sign_in_then_link', provider: 'kakao' } }))).toBeNull();
+    expect(getSignInThenLinkHint(null)).toBeNull();
+  });
+});
+
+describe('getWithdrawalCancelOffer', () => {
+  const details = { withdrawalCancelToken: 'cancel-token', expiresInSeconds: 600 };
+
+  it('returns the token in the shape the cancel endpoint takes', () => {
+    expect(getWithdrawalCancelOffer(apiError(403, 'ACCOUNT_WITHDRAWAL_PENDING', details)))
+      .toEqual({ token: 'cancel-token', expiresInSeconds: 600 });
+  });
+
+  it('is null when the server sent no token (credentials were not proven)', () => {
+    expect(getWithdrawalCancelOffer(apiError(403, 'ACCOUNT_WITHDRAWAL_PENDING'))).toBeNull();
+    expect(getWithdrawalCancelOffer(apiError(403, 'ACCOUNT_WITHDRAWAL_PENDING', { expiresInSeconds: 600 }))).toBeNull();
+  });
+
+  it.each([
+    ['an empty token', { ...details, withdrawalCancelToken: '' }],
+    ['a non-string token', { ...details, withdrawalCancelToken: 7 }],
+    ['a missing lifetime', { withdrawalCancelToken: 'cancel-token' }],
+    ['a zero lifetime', { ...details, expiresInSeconds: 0 }],
+    ['a string lifetime', { ...details, expiresInSeconds: '600' }],
+  ])('rejects %s', (_label, bad) => {
+    expect(getWithdrawalCancelOffer(apiError(403, 'ACCOUNT_WITHDRAWAL_PENDING', bad))).toBeNull();
+  });
+
+  it('does not offer a token for another 403 that happens to carry one', () => {
+    expect(getWithdrawalCancelOffer(apiError(403, 'PERMISSION_DENIED', details))).toBeNull();
+    expect(getWithdrawalCancelOffer(apiError(401, 'ACCOUNT_WITHDRAWAL_PENDING', details))).toBeNull();
+  });
+});
+
+describe('getRecentLoginRequired', () => {
+  it('reads the allowed session age', () => {
+    expect(getRecentLoginRequired(apiError(403, 'RECENT_LOGIN_REQUIRED', { maxAgeSeconds: 300 })))
+      .toEqual({ maxAgeSeconds: 300 });
+  });
+
+  it.each([
+    ['no details', undefined],
+    ['a string age', { maxAgeSeconds: '300' }],
+    ['a negative age', { maxAgeSeconds: -1 }],
+  ])('is null with %s', (_label, details) => {
+    expect(getRecentLoginRequired(apiError(403, 'RECENT_LOGIN_REQUIRED', details))).toBeNull();
+  });
+
+  it('is null for other 403 codes', () => {
+    expect(getRecentLoginRequired(apiError(403, 'SIGNUP_INCOMPLETE', { maxAgeSeconds: 300 }))).toBeNull();
+  });
+});

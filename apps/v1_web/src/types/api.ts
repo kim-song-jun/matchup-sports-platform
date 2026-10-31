@@ -174,6 +174,68 @@ export type V1EmailLoginResult = V1AuthSessionResponse | V1LoginStepUpResponse;
 /** 재발송은 에코 환경에서도 인증번호를 싣지 않는다 — 챌린지별 답이 되면 비밀번호가 맞았는지 드러난다. */
 export type V1LoginStepUpResendResult = Pick<V1LoginStepUpChallenge, 'expiresAt' | 'resendAvailableAt'>;
 
+/** 계정의 로그인 수단 종류. */
+export type V1AuthProvider = 'email' | 'kakao' | 'apple' | 'naver';
+
+/** 로그인한 채로 계정에 붙일 수 있는 소셜 제공자. */
+export type V1LinkableProvider = 'kakao' | 'apple';
+
+/** `POST /auth/link/kakao` — 웹은 인가 코드(+ 인가 때 쓴 redirectUri), 네이티브 셸은 SDK 액세스 토큰을 보낸다. */
+export type V1LinkKakaoPayload =
+  | { code: string; redirectUri: string }
+  | { accessToken: string };
+
+/** `POST /auth/link/apple` — 애플 로그인(`POST /auth/apple`)과 같은 본문이다. */
+export type V1LinkApplePayload = {
+  identityToken: string;
+  nonce: string;
+  authorizationCode?: string;
+  fullName?: string;
+};
+
+export type V1LinkSocialResult = {
+  provider: V1LinkableProvider;
+  /** 이 계정에 같은 제공자 신원이 이미 붙어 있었다(다시 호출해도 같은 결과). */
+  alreadyLinked: boolean;
+  /** 그 제공자로 만들다 만 가입 계정을 정리하고 신원을 옮겼다. */
+  mergedPendingAccount: boolean;
+  /** 연결 뒤 이 계정의 로그인 수단. */
+  authProviders: V1AuthProvider[];
+};
+
+/**
+ * 로그인·가입 충돌 409 의 `details` — 이미 팀밋 계정이 있으니 원래 방법으로 로그인한 뒤
+ * 설정에서 `provider` 를 연결하라는 안내다. 코드(SOCIAL_LINK_*·PHONE_CONFLICT)는 그대로다.
+ */
+export type V1SignInThenLinkDetails = {
+  next: 'sign_in_then_link';
+  provider: V1LinkableProvider;
+};
+
+/** 403 `RECENT_LOGIN_REQUIRED` 의 `details` — 세션 발급 후 이 시간(초)이 지나면 다시 로그인해야 연결할 수 있다. */
+export type V1RecentLoginRequiredDetails = {
+  maxAgeSeconds: number;
+};
+
+/** 로그인 자격이 맞은 탈퇴 신청 계정이 받는 403 `ACCOUNT_WITHDRAWAL_PENDING` 의 `details`. */
+export type V1WithdrawalPendingDetails = {
+  withdrawalCancelToken: string;
+  expiresInSeconds: number;
+};
+
+/** `POST /auth/withdrawal/cancel` — 성공하면 로그인 응답과 같은 세션이 발급된다. */
+export type V1CancelWithdrawalPayload = {
+  token: string;
+};
+
+/** `POST /auth/phone/verify` 결과. `registered` 는 인증번호로 번호 소유를 증명한 뒤에만 알려준다. */
+export type V1PhoneVerifyResult = {
+  verified: boolean;
+  proofToken?: string;
+  /** 이 번호로 이미 가입한 계정이 있다. */
+  registered: boolean;
+};
+
 export type V1Sport = {
   id: string;
   code?: string;

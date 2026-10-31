@@ -15,7 +15,7 @@ import {
 import { linkResultFromError, linkResultFromSuccess } from '@/lib/link-result';
 import { clearPendingSocialLink, readPendingSocialLink, savePendingSocialLink } from '@/lib/pending-social-link';
 import { v1Keys } from '@/lib/query-keys';
-import { LINK_MSW, PASSWORD_UNAVAILABLE_MSW, PENDING_LINK_MSW, WITHDRAWAL_MSW } from '@/test/msw/auth-link-handlers';
+import { LINK_MSW, PASSWORD_UNAVAILABLE_MSW, PENDING_LINK_MSW, PHONE_CONFLICT_MSW, WITHDRAWAL_MSW } from '@/test/msw/auth-link-handlers';
 import { v1MswHandlers } from '@/test/msw/handlers';
 import { v1UserFixture } from '@/test/msw/fixtures';
 import type { V1AuthMe } from '@/types/api';
@@ -244,6 +244,7 @@ describe('useV1LinkPending', () => {
     [PENDING_LINK_MSW.tokens.providerInUse, 409, 'SOCIAL_LINK_PROVIDER_IN_USE', 'in_use'],
     [PENDING_LINK_MSW.tokens.providerExists, 409, 'SOCIAL_LINK_PROVIDER_EXISTS', 'exists'],
     [PENDING_LINK_MSW.tokens.recentLoginRequired, 403, 'RECENT_LOGIN_REQUIRED', 'recent_login'],
+    [PENDING_LINK_MSW.tokens.accountMismatch, 409, 'SOCIAL_LINK_TOKEN_ACCOUNT_MISMATCH', 'mismatch'],
     [PENDING_LINK_MSW.tokens.signupIncomplete, 403, 'SIGNUP_INCOMPLETE', 'failed'],
     ['expired-or-forged-link-token', 400, 'SOCIAL_LINK_TOKEN_INVALID', 'failed'],
   ])('maps %s to the %s result without touching the caches', async (linkToken, statusCode, code, expected) => {
@@ -255,6 +256,39 @@ describe('useV1LinkPending', () => {
     expect(error).toMatchObject({ statusCode, code });
     expect(linkResultFromError(error)).toBe(expected);
     expect(staleKeys()).toEqual([]);
+  });
+});
+
+describe('PHONE_CONFLICT of an unfinished social signup carries the same hint, only after the code proved the number', () => {
+  const unfinishedSignup = [
+    ['/verification/phone/confirm', (provider: 'kakao' | 'apple') => ({ code: PHONE_CONFLICT_MSW.codes[provider] })],
+    ['/auth/social-profile', (provider: 'kakao' | 'apple') => ({ nickname: '팀밋', gender: 'male', phone: PHONE_CONFLICT_MSW.phones[provider], birthDate: '1990-01-01' })],
+  ] as const;
+
+  it.each(unfinishedSignup.flatMap(([path, body]) => (['kakao', 'apple'] as const).map((provider) => [path, body, provider] as const)))(
+    '%s (%s)',
+    async (path, body, provider) => {
+      const error = await fails(() => v1Post(path, body(provider)));
+
+      expect(error).toMatchObject({ statusCode: 409, code: 'PHONE_CONFLICT' });
+      expect(getSignInThenLinkHint(error)).toMatchObject({ next: 'sign_in_then_link', provider, linkToken: PENDING_LINK_MSW.tokens[provider] });
+    },
+  );
+
+  it.each(['kakao', 'apple'] as const)('does not reveal that the %s signup number has an owner when only the SMS is requested', async (provider) => {
+    await expect(v1Post('/verification/phone/request', { phone: PHONE_CONFLICT_MSW.phones[provider] })).resolves.toMatchObject({ sent: true });
+  });
+
+  it('an active account changing its number is refused at the request, with no link hint', async () => {
+    const error = await fails(() => v1Post('/verification/phone/request', { phone: PHONE_CONFLICT_MSW.activeAccountPhone }));
+
+    expect(error).toMatchObject({ statusCode: 409, code: 'PHONE_CONFLICT' });
+    expect(getSignInThenLinkHint(error)).toBeNull();
+  });
+
+  it('lets a number nobody else uses through', async () => {
+    await expect(v1Post('/verification/phone/request', { phone: '01012340000' })).resolves.toMatchObject({ sent: true });
+    await expect(v1Post('/verification/phone/confirm', { code: '123456' })).resolves.toMatchObject({ verified: true });
   });
 });
 

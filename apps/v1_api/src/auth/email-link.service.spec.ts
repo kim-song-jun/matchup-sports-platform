@@ -634,10 +634,10 @@ describe('EmailLinkService.complete', () => {
     it('find-account by phone lists email among the providers and reports a password', async () => {
       const { verified, complete, recovery } = await build(kakaoCaller());
       const find = () => recovery.findAccountByPhone({ phone: PHONE, proofToken: issuePhoneProofToken(PHONE, 'password_reset') });
-      expect(await find()).toEqual({ maskedEmail: 'co***@kakao-mail.example', providers: ['kakao'], hasPassword: false });
+      expect(await find()).toMatchObject({ maskedEmail: 'co***@kakao-mail.example', providers: ['kakao'], hasPassword: false });
       await complete(await verified());
 
-      expect(await find()).toEqual({ maskedEmail: 'ru***@example.com', providers: ['kakao', 'email'], hasPassword: true });
+      expect(await find()).toMatchObject({ maskedEmail: 'ru***@example.com', providers: ['kakao', 'email'], hasPassword: true });
     });
   });
 

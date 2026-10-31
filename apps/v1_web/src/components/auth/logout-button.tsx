@@ -14,9 +14,10 @@ export function LogoutButton() {
         className="tm-logout-ghost"
         loading={pending}
         onClick={() => {
-          if (pending) return;
-          trackEvent('logout', {});
-          void signOutAndLeave('/login', { failureMessage: '로그아웃하지 못했어요. 잠시 후 다시 시도해 주세요.' });
+          void signOutAndLeave('/login', {
+            failureMessage: '로그아웃하지 못했어요. 잠시 후 다시 시도해 주세요.',
+            onStart: () => trackEvent('logout', {}),
+          });
         }}
         size="md"
         type="button"
@@ -25,7 +26,7 @@ export function LogoutButton() {
         로그아웃
       </Button>
       {error ? (
-        <p className="tm-text-caption" role="alert" style={{ margin: 0, color: 'var(--red700)' }}>{error}</p>
+        <p className="tm-text-caption" role="alert" style={{ margin: 0, color: 'var(--red700)', textAlign: 'center' }}>{error}</p>
       ) : null}
     </div>
   );

@@ -15,6 +15,8 @@ import { SECURITY_LOGIN_ANOMALY_TYPE } from '../auth/login-security/login-securi
 import { EMAIL_DELIVERY_FAILED_TYPE } from '../verification/email/email-delivery-failure';
 import { EmailDeliveryFailureSlackNotifier } from '../verification/email/email-delivery-failure-slack-notifier';
 import { LineupTodoService } from '../team-lineups/lineup-todo.service';
+import { WITHDRAWAL_FINALIZATION_REPORT_TYPE } from '../users/withdrawal-finalization-report';
+import { WithdrawalFinalizationSlackNotifier } from '../users/withdrawal-finalization-slack-notifier';
 import { LINEUP_INCLUDED_NOTIFICATION_TYPE } from '../team-matches/team-match-lineup.service';
 import {
   SCHEDULE_CANCELLED_NOTIFICATION_TYPE,
@@ -60,9 +62,14 @@ async function bootstrap(): Promise<void> {
       environment: securityEnvironmentLabel(process.env.V1_PUSH_ENVIRONMENT),
     });
     worker.registerHandler(EMAIL_DELIVERY_FAILED_TYPE, emailDeliverySlack.handler);
+    const withdrawalFinalizationSlack = new WithdrawalFinalizationSlackNotifier({
+      webhookUrl: process.env.SLACK_INQUIRY_WEBHOOK_URL,
+      environment: securityEnvironmentLabel(process.env.V1_PUSH_ENVIRONMENT),
+    });
+    worker.registerHandler(WITHDRAWAL_FINALIZATION_REPORT_TYPE, withdrawalFinalizationSlack.handler);
   } else {
     new Logger('InquirySlackNotifier').warn(
-      'SLACK_INQUIRY_WEBHOOK_URL is not configured; inquiry, login-anomaly and email-delivery Slack outbox events have no handler and retry until POISONED',
+      'SLACK_INQUIRY_WEBHOOK_URL is not configured; inquiry, login-anomaly, email-delivery and withdrawal-finalization Slack outbox events have no handler and retry until POISONED',
     );
   }
   worker.registerDurableAuditHandler('GAME_OPERATION_FLAG_CHANGED');

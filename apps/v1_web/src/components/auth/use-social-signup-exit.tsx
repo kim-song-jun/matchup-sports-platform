@@ -71,11 +71,13 @@ export function useSocialSignupExit({ onboardingStatus }: { onboardingStatus?: s
     { confirmFirst }: { confirmFirst: boolean },
   ) => {
     const canAutoLink = isSessionStorageWritable();
+    // 탈퇴 유예 중인 계정이면 이동 도착지가 로그인 화면이 아니라 두 가지 방법을 보여 주는 안내다.
+    const withdrawalPending = hint.withdrawalPendingUntil !== undefined;
     if (confirmFirst) {
       const confirmed = await confirm({
-        title: '가입을 그만두고 로그인할까요?',
-        message: `지금까지 입력한 내용은 저장되지 않아요. ${canAutoLink ? autoLinkPromise(hint.provider) : manualLinkPromise(hint.provider)}`,
-        confirmLabel: '로그인하러 가기',
+        title: withdrawalPending ? '가입을 그만두고 다시 쓰는 방법을 볼까요?' : '가입을 그만두고 로그인할까요?',
+        message: `지금까지 입력한 내용은 저장되지 않아요. ${canAutoLink ? autoLinkPromise(hint.provider, { withdrawalPending }) : manualLinkPromise(hint.provider)}`,
+        confirmLabel: withdrawalPending ? '다시 쓰는 방법 보기' : '로그인하러 가기',
         cancelLabel: '취소',
       });
       if (!confirmed) return;

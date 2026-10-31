@@ -189,6 +189,101 @@ describe('소셜 가입 중 번호 중복 — 원래 계정으로 로그인하�
   });
 });
 
+describe('소셜 가입 중 번호를 쥔 계정이 탈퇴 유예 중일 때', () => {
+  // KST 로는 11월 7일 00:30. 읽을 때 지났는지도 보므로 시계를 고정한다.
+  const UNTIL = '2026-11-06T15:30:00.000Z';
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-31T00:00:00.000Z'));
+  });
+  afterEach(() => vi.useRealTimers());
+  const withdrawalConflict = (withdrawalPendingUntil: string | null) => server.use(
+    http.post('*/api/v1/verification/phone/confirm', () => HttpResponse.json({
+      status: 'error', statusCode: 409, code: 'PHONE_CONFLICT', message: '이미 다른 계정에서 사용 중인 번호예요.',
+      details: {
+        next: 'sign_in_then_link', provider: 'kakao', linkToken: PENDING_LINK_MSW.tokens.kakao,
+        linkTokenExpiresInSeconds: PENDING_LINK_MSW.expiresInSeconds, withdrawalPendingUntil,
+      },
+    }, { status: 409 })),
+  );
+
+  it('"로그인하면 자동 연결" 대신 탈퇴 취소 안내로 바뀌고, 버튼은 두 가지 방법을 보여 주는 안내 화면으로 이어진다', async () => {
+    withdrawalConflict(UNTIL);
+    await confirmConflictingCode('123456');
+
+    expect(await screen.findByText('이미 팀밋 계정이 있지만 탈퇴를 신청한 상태예요. 취소하고 다시 쓰는 방법을 안내해 드려요.')).toBeInTheDocument();
+    expect(screen.queryByText(/자동으로 연결돼요/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '원래 방법으로 로그인하기' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '다시 쓰는 방법 보기' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '계정 찾기' })).toBeEnabled();
+  });
+
+  it('확인 창이 탈퇴 취소를 거친다고 약속하고, 로그아웃 뒤 날짜를 실은 토큰을 저장한 채 안내 화면(돌아갈 경로 포함)으로 간다', async () => {
+    window.location.search = '?redirect=%2Fteams%2Fnew';
+    withdrawalConflict(UNTIL);
+    await confirmConflictingCode('123456');
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: '다시 쓰는 방법 보기' }));
+    const dialog = await screen.findByRole('dialog');
+    // 확인 창의 제목·버튼도 도착지(두 가지 방법을 보여 주는 안내)와 같은 말이다.
+    expect(within(dialog).getByText('가입을 그만두고 다시 쓰는 방법을 볼까요?')).toBeInTheDocument();
+    expect(within(dialog).getByText(/30분 안에 원래 방법으로 로그인하고 탈퇴 신청을 취소하면 카카오 로그인이 그 계정에 자동으로 연결돼요/)).toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: '로그인하러 가기' })).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: '다시 쓰는 방법 보기' }));
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/auth/account-conflict?provider=kakao&redirect=%2Fteams%2Fnew'));
+    expect(seen.logout).toBe(1);
+    expect(seen.tokenAtLeave).toBe(PENDING_LINK_MSW.tokens.kakao);
+    expect(peekPendingSocialLink()).toMatchObject({ linkToken: PENDING_LINK_MSW.tokens.kakao, withdrawalPendingUntil: UNTIL });
+  });
+
+  it('날짜를 모르는 탈퇴 유예(null)도 같은 안내로 가고 null 을 그대로 저장한다', async () => {
+    withdrawalConflict(null);
+    await confirmConflictingCode('123456');
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: '다시 쓰는 방법 보기' }));
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '다시 쓰는 방법 보기' }));
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/auth/account-conflict?provider=kakao'));
+    expect(peekPendingSocialLink()).toHaveProperty('withdrawalPendingUntil', null);
+  });
+
+  it('이미 지난 유예 종료 시각은 날짜만 모르는 것(null)으로 보관하고 같은 안내로 간다', async () => {
+    withdrawalConflict('2026-10-30T00:00:00.000Z');
+    await confirmConflictingCode('123456');
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: '다시 쓰는 방법 보기' }));
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '다시 쓰는 방법 보기' }));
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/auth/account-conflict?provider=kakao'));
+    expect(peekPendingSocialLink()).toMatchObject({ linkToken: PENDING_LINK_MSW.tokens.kakao, withdrawalPendingUntil: null });
+  });
+
+  it('계정 찾기는 기존처럼 확인 없이 계정 찾기로 나간다', async () => {
+    withdrawalConflict(UNTIL);
+    await confirmConflictingCode('123456');
+
+    await userEvent.setup().click(await screen.findByRole('button', { name: '계정 찾기' }));
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/auth/find-account'));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('탈퇴 계정이 아닌 일반 충돌은 지금처럼 로그인 화면으로 간다', async () => {
+    await confirmConflictingCode();
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: '원래 방법으로 로그인하기' }));
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '로그인하러 가기' }));
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/login'));
+    expect(peekPendingSocialLink()).not.toHaveProperty('withdrawalPendingUntil');
+  });
+});
+
 describe('소셜 가입 제출에서 번호 중복이 드러난 경우', () => {
   // 카카오가 준 번호가 아니라 직접 입력한 번호면 서버는 연결 토큰 없이 충돌만 알린다 — 연결을 약속하지 않는다.
   it('토큰 없는 프로필 제출 409 는 기존 로그인·계정 찾기 출구만 보여 준다', async () => {

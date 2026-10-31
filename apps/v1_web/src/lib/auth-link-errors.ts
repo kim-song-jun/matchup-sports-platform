@@ -1,6 +1,7 @@
 import { V1ApiError } from './api-client';
 import { sanitizeRedirectPath } from './session-storage';
 import { SIGN_IN_THEN_LINK_NEXT } from './auth-error-codes';
+import { usableWithdrawalDate } from './withdrawal-grace';
 import type {
   V1LinkableProvider,
   V1RecentLoginRequiredDetails,
@@ -39,12 +40,17 @@ function isPositiveNumber(value: unknown): value is number {
  * 로그인·가입 충돌 409 가 "원래 방법으로 로그인한 뒤 설정에서 연결"을 안내하는지 확인한다.
  * 같은 409 라도 `details` 가 이 모양이 아니면 null 이다(코드로 분기하지 않는다 — 안내는 `details` 가 정한다).
  * 연결 토큰은 토큰과 유효 시간이 둘 다 온전할 때만 싣는다 — 유효 시간을 모르는 토큰은 만료를 가릴 수 없어 쓰지 않는다.
+ * `withdrawalPendingUntil` 은 키가 있을 때만 싣는다(번호를 쥔 계정이 탈퇴 유예 중). 값은 아직 오지 않은 ISO 시각이거나 null.
  */
 export function getSignInThenLinkHint(error: unknown): V1SignInThenLinkDetails | null {
   if (!(error instanceof V1ApiError) || error.statusCode !== 409) return null;
   const details = asRecord(error.details);
   if (details?.next !== SIGN_IN_THEN_LINK_NEXT || !isLinkableProvider(details.provider)) return null;
   const hint: V1SignInThenLinkDetails = { next: SIGN_IN_THEN_LINK_NEXT, provider: details.provider };
+  // 키가 있다는 것 자체가 "탈퇴 유예 중인 계정"이라는 신호다 — 값이 읽히지 않거나 이미 지났으면 날짜만 모르는 것으로 둔다.
+  if ('withdrawalPendingUntil' in details) {
+    hint.withdrawalPendingUntil = usableWithdrawalDate(details.withdrawalPendingUntil);
+  }
   const { linkToken, linkTokenExpiresInSeconds } = details;
   if (typeof linkToken === 'string' && linkToken !== '' && isPositiveNumber(linkTokenExpiresInSeconds)) {
     return { ...hint, linkToken, linkTokenExpiresInSeconds };

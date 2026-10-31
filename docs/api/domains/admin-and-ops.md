@@ -129,6 +129,7 @@ type AdminListSummary = {
   - Body: `{ reason: string }`
   - v1에서는 `accountStatus=deleted`, `deletedAt` 기록, 이메일/전화번호/프로필 마스킹, auth identity unlink, provider key 마스킹, 감사 로그 기록으로 처리한다. 이미 연결된 실시간 소켓도 강제 종료한다.
   - 이메일 계정과 카카오 계정 모두 원본 unique key를 비우므로 같은 이메일/카카오 계정으로 재가입할 수 있다.
+  - 삭제 코어(`finalizeAccountDeletion`)는 탈퇴 30일 유예 자동 삭제와 공유한다. 운영자 삭제는 `V1AdminActionLog`(`user.delete`)와 `actorType=admin` 상태 로그를 남기고, 자동 삭제는 `actorType=system` 상태 로그만 남긴다([Users](./users.md)).
   - `GET /admin/users/:id`는 `withdrawalRequest.reason`으로 사용자가 탈퇴 대기 요청 때 작성한 메시지를 노출한다.
   - 팀 정보는 소유 팀(`ownerUserId` 기준, 보관 팀 포함·최근 5건 목록과 전체 개수), 팀장/매니저/멤버 역할 카운트, active 소속팀 목록을 분리해 제공한다. 소유 팀은 소속 팀의 owner(팀장) 역할과 같은 개념이다.
   - 회원 목록·상세의 `membershipCount`는 역할 카운트·상세 소속 배열과 동일한 `V1TeamMembership.status=active` 기준이며 `owner + manager + member` 합계와 같다. 과거 탈퇴(`left`)·제명(`removed`) 이력은 제외하며 현재 소속이 없으면 0이다. 팀 자체 상태는 이 membership 상태 필터를 변경하지 않는다.

@@ -190,7 +190,7 @@ export function useV1PushRegistration(): V1PushRegistration {
       // subscribe() 안에서만 등록하므로(이 파일의 register 호출이 유일하다), 푸시를
       // 켠 적 없는 브라우저에는 등록 자체가 없다. 그때 `ready` 는 reject 하는 게
       // 아니라 **영원히 미결**로 남는다 — 호출부의 .catch 로도 못 잡는다. 로그아웃이
-      // 이 프로미스를 기다린 뒤 리다이렉트하므로(logout-button.tsx), 푸시를 안 쓴
+      // 이 프로미스를 기다린 뒤 리다이렉트하므로(use-sign-out-and-leave.ts), 푸시를 안 쓴
       // 대다수 사용자의 로그아웃이 그대로 멈춰 선다.
       // `getRegistration()` 은 등록이 없으면 undefined 로 **항상 결정**된다.
       const registration = await navigator.serviceWorker.getRegistration();

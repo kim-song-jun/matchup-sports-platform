@@ -122,18 +122,28 @@ describe('LogoutButton session cleanup', () => {
     expect(hooks.pushUnsubscribe).toHaveBeenCalledWith({ reason: 'sign-out' });
   });
 
-  it('여전히 리다이렉트한다 — 푸시 구독 해지가 실패해도 로그아웃 자체는 막히지 않는다', async () => {
-    // Given — 서버 요청 실패 등으로 unsubscribe() 가 reject 해도(훅 내부에서 보통 삼키지만,
-    // 방어적으로) 로그아웃 리다이렉트는 반드시 일어나야 한다 — 그렇지 않으면 사용자가
-    // 로그아웃 버튼을 눌렀는데 화면에 아무 반응이 없는 것처럼 보인다.
-    hooks.pushUnsubscribe.mockRejectedValueOnce(new Error('network'));
+  it('여전히 리다이렉트한다 — 푸시 구독 해지가 실패(false)해도 로그아웃 자체는 막히지 않는다', async () => {
+    // 해지 훅은 실패해도 던지지 않고 false 를 돌려준다. 사용자가 로그아웃을 눌렀는데 아무 반응이
+    // 없는 것처럼 보이면 안 되므로 그 경우에도 로그아웃과 이동은 일어나야 한다.
+    hooks.pushUnsubscribe.mockResolvedValueOnce(false);
     render(<LogoutButton />);
 
-    // When
     fireEvent.click(screen.getByRole('button', { name: '로그아웃' }));
 
-    // Then
     await waitFor(() => expect(replaceMock).toHaveBeenCalledWith('/login'));
+    expect(hooks.logoutMutateAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it('연타하거나 실패해도 logout 이벤트는 시도마다 한 번만 기록한다', async () => {
+    render(<LogoutButton />);
+    const button = screen.getByRole('button', { name: '로그아웃' });
+
+    fireEvent.click(button);
+    fireEvent.click(button);
+
+    await waitFor(() => expect(replaceMock).toHaveBeenCalledWith('/login'));
+    expect(analytics.trackEvent).toHaveBeenCalledTimes(1);
+    expect(hooks.logoutMutateAsync).toHaveBeenCalledTimes(1);
   });
 
   it('로그아웃이 실패하면 로그인 화면으로 보내지 않고 이유를 알린다 — 서버 세션이 남아 있다', async () => {

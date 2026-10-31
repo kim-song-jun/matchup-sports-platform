@@ -20,6 +20,9 @@
 | POST | `/auth/link/kakao` | Yes | 로그인한 계정에 카카오 로그인 연결(웹 `code`+`redirectUri` / 네이티브 `accessToken`) — 자세한 계약은 `domains/auth.md` |
 | POST | `/auth/link/apple` | Yes | 로그인한 계정에 Apple 로그인 연결 — 자세한 계약은 `domains/auth.md` |
 | POST | `/auth/link/pending` | Yes | 소셜 로그인 충돌 409 의 `linkToken` 으로, 원래 계정에 로그인한 직후 그 소셜 로그인을 자동 연결 — 자세한 계약은 `domains/auth.md` |
+| POST | `/auth/link/email/request` | Yes | 소셜 계정에 이메일·비밀번호 로그인을 더하기 1단계: 입력한 주소로 인증번호 발송(로그인한 지 30분 이내) — 자세한 계약은 `domains/auth.md` |
+| POST | `/auth/link/email/verify` | Yes | 2단계: 인증번호를 맞추고 10분짜리 `emailLinkToken` 받기 |
+| POST | `/auth/link/email/complete` | Yes | 3단계: `emailLinkToken` + 비밀번호로 이메일 로그인 연결, 그 주소가 계정 이메일이 된다 |
 | POST | `/auth/refresh` | No | refresh token으로 재발급 |
 | GET | `/auth/me` | Yes | 현재 사용자 조회 |
 | DELETE | `/auth/withdraw` | Yes | 소프트 삭제 탈퇴 |

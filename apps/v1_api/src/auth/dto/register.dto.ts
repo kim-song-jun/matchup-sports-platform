@@ -1,4 +1,5 @@
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsDefined, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
+import { IsAccountPassword } from './account-password.decorator';
 import { RequiredSignupProfileDto } from './required-signup-profile.dto';
 
 export class RegisterDto extends RequiredSignupProfileDto {
@@ -10,8 +11,7 @@ export class RegisterDto extends RequiredSignupProfileDto {
   @MinLength(3)
   email!: string;
 
-  @IsString()
-  @MinLength(8)
+  @IsAccountPassword()
   password!: string;
 
   @IsBoolean()

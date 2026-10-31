@@ -3,6 +3,8 @@ import { AccountLinkService } from './account-link.service';
 import { AccountRecoveryController } from './account-recovery.controller';
 import { AccountRecoveryService } from './account-recovery.service';
 import { AuthController } from './auth.controller';
+import { EmailLinkController } from './email-link.controller';
+import { EmailLinkService } from './email-link.service';
 import { AppleTokenModule } from './apple-token.module';
 import { AuthService } from './auth.service';
 import { LoginSecurityService } from './login-security/login-security.service';
@@ -20,10 +22,11 @@ import { VerificationModule } from '../verification/verification.module';
 
 @Module({
   imports: [TermsModule, VerificationModule, AppleTokenModule, RealtimeModule, NotificationsServiceModule],
-  controllers: [AuthController, PhoneVerificationPublicController, AccountRecoveryController, WithdrawalRecoveryController],
+  controllers: [AuthController, EmailLinkController, PhoneVerificationPublicController, AccountRecoveryController, WithdrawalRecoveryController],
   providers: [
     AuthService,
     AccountLinkService,
+    EmailLinkService,
     AccountRecoveryService,
     WithdrawalRecoveryService,
     LoginSecurityService,

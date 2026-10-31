@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   Inject,
   Injectable,
   Logger,
@@ -22,17 +21,11 @@ import { AuthService, kakaoVerifiedEmail, type KakaoProfile } from './auth.servi
 import type { AppleLoginDto } from './dto/apple-login.dto';
 import type { LinkKakaoDto } from './dto/link-kakao.dto';
 import type { LinkPendingDto } from './dto/link-pending.dto';
+import { assertLinkableCaller, assertRecentLogin, LINK_CALLER_SELECT } from './link-caller-guards';
 import { normalizeEmail } from './normalize-email';
 import { SOCIAL_PROVIDER_LABELS } from './social-link-conflict';
 import { readSocialLinkToken, socialLinkAccountDigest, type LinkableSocialProvider } from './social-link-token';
-import {
-  ACTIVITY_PROFILE_ROUTE,
-  getPendingSocialSignupRoute,
-  isUnfinishedSocialSignup,
-} from './social-signup-access';
-
-/** A session older than this must sign in again before it can attach a login method. */
-export const RECENT_LOGIN_MAX_AGE_SECONDS = 30 * 60;
+import { isUnfinishedSocialSignup } from './social-signup-access';
 
 export type AccountLinkResult = {
   provider: LinkableSocialProvider;
@@ -177,10 +170,7 @@ export class AccountLinkService {
     const caller = await tx.v1User.findUnique({
       where: { id: callerId },
       select: {
-        accountStatus: true,
-        deletedAt: true,
-        onboardingStatus: true,
-        adminUser: { select: { status: true } },
+        ...LINK_CALLER_SELECT,
         authIdentities: {
           where: { status: 'active' },
           orderBy: { createdAt: 'asc' },
@@ -189,17 +179,7 @@ export class AccountLinkService {
       },
     });
     if (!caller) throw new NotFoundException({ code: 'NOT_FOUND', message: 'V1 user was not found' });
-    if (caller.accountStatus !== 'active' || caller.deletedAt !== null) {
-      throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: '이용이 제한된 계정이에요.' });
-    }
-    // An operator's account is not changed by a link made from a browser session.
-    if (caller.adminUser && caller.adminUser.status !== 'revoked') {
-      throw new ForbiddenException({
-        code: 'SOCIAL_LINK_ADMIN_FORBIDDEN',
-        message: '운영 권한이 있는 계정에는 소셜 로그인을 연결할 수 없어요.',
-      });
-    }
-    if (isUnfinishedSocialSignup(caller.onboardingStatus)) throw signupIncomplete(caller.onboardingStatus);
+    assertLinkableCaller(caller, 'social');
 
     const sameProvider = caller.authIdentities.find((existing) => existing.provider === identity.provider);
     if (sameProvider) {
@@ -437,25 +417,6 @@ function isEmptySignupAccount(holder: {
 
 function distinctProviders(identities: { provider: V1AuthProvider }[]): V1AuthProvider[] {
   return [...new Set(identities.map((identity) => identity.provider))];
-}
-
-/** No session age is only possible with a non-production header identity; production never lets it through. */
-function assertRecentLogin(sessionAgeSeconds: number | null) {
-  if (sessionAgeSeconds === null ? process.env.NODE_ENV === 'production' : sessionAgeSeconds > RECENT_LOGIN_MAX_AGE_SECONDS) {
-    throw new ForbiddenException({
-      code: 'RECENT_LOGIN_REQUIRED',
-      message: '보안을 위해 다시 로그인한 뒤 연결해 주세요.',
-      details: { maxAgeSeconds: RECENT_LOGIN_MAX_AGE_SECONDS },
-    });
-  }
-}
-
-function signupIncomplete(onboardingStatus: string) {
-  return new ForbiddenException({
-    code: 'SIGNUP_INCOMPLETE',
-    message: '가입을 먼저 마무리해 주세요.',
-    details: { next: { route: getPendingSocialSignupRoute(onboardingStatus) ?? ACTIVITY_PROFILE_ROUTE } },
-  });
 }
 
 function providerExists(provider: LinkableSocialProvider) {

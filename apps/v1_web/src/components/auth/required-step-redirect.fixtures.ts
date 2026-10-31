@@ -71,7 +71,7 @@ type RedirectFixtureState = {
   consentResult: 'accepted' | 'partial' | 'failure';
   loginRequests: number;
   profileRequests: number;
-  phoneOnlyRequests: number;
+  linkRequests: number;
   completeRequests: number;
   acceptRequests: number;
   savedSteps: PreferenceStep[];
@@ -81,7 +81,7 @@ function initialState(): RedirectFixtureState {
     auth: makeAuth('social_profile_required'),
     onboarding: { status: 'signup_done', currentStep: 'sport', canResume: true, missing: ['sports'], sports: [], regions: [], regionOptional: true },
     requiredRoute: '/onboarding/sport', renewalRequired: false, acceptedTerms: false, additionalTermsAccepted: false, consentResult: 'accepted',
-    loginRequests: 0, profileRequests: 0, phoneOnlyRequests: 0, completeRequests: 0, acceptRequests: 0, savedSteps: [],
+    loginRequests: 0, profileRequests: 0, linkRequests: 0, completeRequests: 0, acceptRequests: 0, savedSteps: [],
   };
 }
 function currentTerms(state: RedirectFixtureState): TermsSnapshot {
@@ -128,11 +128,10 @@ export function createRedirectFixture() {
       state.auth.user.phone = '01087654321';
       return authenticatedEntry(state);
     }),
-    ...['auth/phone/issue', 'auth/phone/verify', 'auth/social-link/preview', 'auth/social-link'].map((path) =>
+    ...['auth/link/kakao', 'auth/link/apple', 'auth/link/pending'].map((path) =>
       http.post('*/api/v1/' + path, () => {
-        state.phoneOnlyRequests += 1;
-        return HttpResponse.json({ status: 'error', statusCode: 409, code: 'SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF',
-          message: '기존 계정으로 로그인해 주세요.' }, { status: 409 });
+        state.linkRequests += 1;
+        return HttpResponse.json({ status: 'error', statusCode: 500, code: 'INTERNAL_ERROR', message: '연결 요청이 나가면 안 돼요' }, { status: 500 });
       })),
     http.get('*/api/v1/master/sports', () => success([{ id: SPORT, code: 'futsal', name: '풋살', levels: [{ id: LEVEL, name: '초급' }] }])),
     http.get('*/api/v1/master/regions', () => success([{ id: REGION, name: '서울', parentId: null, level: 1, children: [{ id: DISTRICT, name: '마포구', parentId: REGION, level: 2 }] }])),

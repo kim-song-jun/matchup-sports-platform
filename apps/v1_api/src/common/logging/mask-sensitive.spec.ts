@@ -106,6 +106,15 @@ describe('maskSensitive', () => {
     });
   });
 
+  it('masks the social link token wherever it appears, and not its neighbouring fields', () => {
+    expect(maskSensitive({ details: { linkToken: 'signed.value', link_token: 'signed.value', linkTokenExpiresInSeconds: 1800, next: 'sign_in_then_link' } })).toEqual({
+      details: { linkToken: '[REDACTED]', link_token: '[REDACTED]', linkTokenExpiresInSeconds: 1800, next: 'sign_in_then_link' },
+    });
+    expect(maskSensitiveText('{"details":{"linkToken":"signed.value","provider":"kakao"}}')).toBe(
+      '{"details":{"linkToken":"[REDACTED]","provider":"kakao"}}',
+    );
+  });
+
   // 탈퇴 신청 계정의 로그인 거절(403) 응답 details 가 에러 로그에 저장된다 — 토큰이 남으면 로그 열람자가 그 계정의 세션을 얻는다.
   it('masks the withdrawal cancel token inside an error response body', () => {
     const body = { code: 'ACCOUNT_WITHDRAWAL_PENDING', details: { withdrawalCancelToken: 'signed.value', expiresInSeconds: 600 } };

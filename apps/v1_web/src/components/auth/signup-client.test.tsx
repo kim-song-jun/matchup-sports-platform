@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { V1ApiError } from '@/lib/api-client';
+import { peekPendingSocialLink, savePendingSocialLink } from '@/lib/pending-social-link';
 import { SignupClient } from './signup-client';
 
 const router = vi.hoisted(() => ({
@@ -245,6 +246,37 @@ describe('SignupClient required profile contract', () => {
 
     // Then
     await waitFor(() => expect(analytics.trackEvent).toHaveBeenCalledWith('sign_up_complete', { method: 'email' }));
+  });
+
+  // 앞서 안내받은 다른 계정용 토큰이 새로 만든 계정의 도착 화면을 가로채면 안 된다.
+  it('가입이 끝나면 남아 있던 대기 연결 토큰을 지운다', async () => {
+    savePendingSocialLink({ next: 'sign_in_then_link', provider: 'kakao', linkToken: 'left-from-earlier-409', linkTokenExpiresInSeconds: 1800 });
+    render(<SignupClient />);
+    await advanceToProfile();
+    fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '홍길동' } });
+    fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
+    fireEvent.click(screen.getByRole('radio', { name: '남' }));
+    expect(peekPendingSocialLink()).not.toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: '가입하고 계속' }));
+
+    await waitFor(() => expect(hooks.registerMutateAsync).toHaveBeenCalled());
+    await waitFor(() => expect(peekPendingSocialLink()).toBeNull());
+  });
+
+  it('가입 요청이 실패하면 대기 연결 토큰은 그대로 둔다', async () => {
+    savePendingSocialLink({ next: 'sign_in_then_link', provider: 'kakao', linkToken: 'left-from-earlier-409', linkTokenExpiresInSeconds: 1800 });
+    hooks.registerMutateAsync.mockRejectedValue(new Error('network'));
+    render(<SignupClient />);
+    await advanceToProfile();
+    fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '홍길동' } });
+    fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
+    fireEvent.click(screen.getByRole('radio', { name: '남' }));
+
+    fireEvent.click(screen.getByRole('button', { name: '가입하고 계속' }));
+
+    await waitFor(() => expect(hooks.registerMutateAsync).toHaveBeenCalled());
+    expect(peekPendingSocialLink()).not.toBeNull();
   });
 
   it('인증번호를 받아도 확인하기 전에는 프로필 단계로 넘어갈 수 없다', async () => {

@@ -18,6 +18,8 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AuthMe: (...args: unknown[]) => mocks.useV1AuthMe(...args),
+  // 대기 연결 토큰이 없는 이 파일의 시나리오에서는 호출되지 않는다(자동 연결은 resolver 테스트가 따로 본다).
+  useV1LinkPending: () => ({ mutate: vi.fn() }),
 }));
 
 vi.mock('@/lib/session-storage', () => ({

@@ -3,13 +3,16 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LOGIN_STEP_UP_STORAGE_KEY, readLoginStepUp, saveLoginStepUp } from '@/lib/login-step-up';
+import { peekPendingSocialLink, savePendingSocialLink } from '@/lib/pending-social-link';
 import { V1_SESSION_HINT_KEY } from '@/lib/session-storage';
+import { readWithdrawalCancel } from '@/lib/withdrawal-cancel-storage';
 import { STEP_UP_MSW, stepUpChallengeFixture } from '@/test/msw/auth-step-up-handlers';
 import { server } from '@/test/msw/server';
 import type { V1LoginStepUpChallenge } from '@/types/api';
 import { LoginStepUpVerifyClient } from './login-step-up-verify-client';
 
 const mocks = vi.hoisted(() => ({
+  push: vi.fn(),
   replace: vi.fn(),
   trackEvent: vi.fn(),
   nativeApple: false,
@@ -20,7 +23,7 @@ vi.mock('@/lib/native-apple', () => ({
 }));
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn(), replace: mocks.replace, back: vi.fn() }),
+  useRouter: () => ({ push: mocks.push, replace: mocks.replace, back: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }));
 vi.mock('@/lib/analytics', () => ({ trackEvent: mocks.trackEvent }));
@@ -178,6 +181,35 @@ describe('LoginStepUpVerifyClient', () => {
       expect(window.localStorage.getItem(V1_SESSION_HINT_KEY)).toBeNull();
       expect(readLoginStepUp()).not.toBeNull();
       expect(mocks.trackEvent).toHaveBeenCalledWith('login_step_up_failed', { reason: 'STEP_UP_CODE_INVALID' });
+    });
+
+    it('sends a withdrawal-pending account to the cancel screen with its token and ends the identity check', async () => {
+      storeChallenge({}, '/my');
+      server.use(http.post('*/api/v1/auth/login/step-up/verify', () => HttpResponse.json({
+        status: 'error', statusCode: 403, code: 'ACCOUNT_WITHDRAWAL_PENDING', message: '탈퇴 신청 중인 계정이에요.',
+        details: { withdrawalCancelToken: 'withdrawal-token-1', expiresInSeconds: 600 },
+      }, { status: 403 })));
+      renderVerify();
+      await screen.findByLabelText('인증번호 6자리');
+
+      typeCode(STEP_UP_MSW.code);
+      fireEvent.click(screen.getByRole('button', { name: '확인하고 로그인' }));
+
+      await waitFor(() => expect(mocks.push).toHaveBeenCalledWith('/auth/withdrawal-cancel'));
+      expect(readWithdrawalCancel()).toMatchObject({ token: 'withdrawal-token-1', returnTo: '/my' });
+      expect(readLoginStepUp()).toBeNull();
+      expect(mocks.replace).not.toHaveBeenCalled();
+    });
+
+    it('shows the pending-link notice while a link token is waiting, and lets the reader drop it', async () => {
+      savePendingSocialLink({ next: 'sign_in_then_link', provider: 'apple', linkToken: 'link-token-1', linkTokenExpiresInSeconds: 600 });
+      storeChallenge();
+      renderVerify();
+
+      expect(await screen.findByText(/로그인하면 Apple 로그인이 이 계정에 연결돼요\./)).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: '연결 안 하기' }));
+      expect(screen.queryByText(/이 계정에 연결돼요/)).not.toBeInTheDocument();
+      expect(peekPendingSocialLink()).toBeNull();
     });
 
     it('ends the attempt when the server says the challenge expired', async () => {

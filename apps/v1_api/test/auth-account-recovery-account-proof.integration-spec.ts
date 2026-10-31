@@ -117,10 +117,10 @@ describe('V1 account recovery requires independent email proof', () => {
     expect(await accountState()).toEqual(before);
   });
 
-  it.each(['signup', 'social_link'] as const)('retains the %s proof-purpose rejection before account lookup or writes', async (purpose) => {
+  it('retains the signup proof-purpose rejection before account lookup or writes', async () => {
     const before = await accountState();
     const response = await request(app.getHttpServer()).post('/api/v1/auth/recovery/reset-password')
-      .send({ phone: EMAIL_PHONE, proofToken: issuePhoneProofToken(EMAIL_PHONE, purpose), newPassword: REPLACEMENT_PASSWORD });
+      .send({ phone: EMAIL_PHONE, proofToken: issuePhoneProofToken(EMAIL_PHONE, 'signup'), newPassword: REPLACEMENT_PASSWORD });
 
     expect({ status: response.status, code: response.body.code }).toEqual({ status: 400, code: 'PHONE_NOT_VERIFIED' });
     expect(response.headers['set-cookie']).toBeUndefined();

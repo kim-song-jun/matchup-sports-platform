@@ -1008,6 +1008,56 @@ button:disabled {
   flex-shrink: 0;
 }
 
+/* 계정 연결 안내(3단계) — 숫자 칩은 .tm-auth-feature-icon 을 쓰고, 글 두 줄이 위로 붙도록 정렬한다. */
+.tm-auth-steps {
+  margin-top: 0;
+  gap: 20px;
+}
+
+.tm-auth-step {
+  align-items: flex-start;
+}
+
+.tm-auth-step-number {
+  color: var(--blue700);
+  font-size: var(--font-size-label);
+  font-weight: 800;
+}
+
+.tm-auth-step-title,
+.tm-auth-step-body {
+  display: block;
+}
+
+.tm-auth-step-body {
+  margin-top: 2px;
+  line-height: 1.5;
+}
+
+/* 로그인 화면들의 대기 연결 안내(토큰이 있을 때만 그려진다). */
+.tm-auth-pending-link {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-1);
+  margin: var(--spacing-4) 0;
+}
+
+.tm-auth-pending-link-message {
+  margin: 0;
+  padding: var(--spacing-3) var(--spacing-4);
+  border-radius: var(--radius-control);
+  background: var(--blue50);
+  color: var(--blue700);
+  line-height: 1.55;
+}
+
+.tm-auth-guide-links {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
 /* The guest button sits under the primary login button in the bottom CTA group. */
 .tm-auth-guest-link {
   margin-top: 16px;
@@ -1138,6 +1188,33 @@ button:disabled {
 :root.dark .tm-btn.tm-auth-apple:disabled {
   background: var(--static-white);
   color: var(--static-black);
+}
+
+/* 카카오 브랜드 버튼(계정 연결). 배경은 브랜드 고정색이라 라이트·다크가 같다. 공용 .tm-btn-outline 의
+ * 흰 배경·회색 테두리와 hover·disabled 규칙이 브랜드색을 덮지 않도록 특이도로 이긴다(인라인 스타일은
+ * hover 색 변화까지 막는다). */
+.tm-btn.tm-auth-kakao {
+  background: var(--kakao-yellow);
+  color: var(--static-black);
+  border-color: transparent;
+}
+
+@media (hover: hover) {
+  .tm-btn.tm-auth-kakao:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--kakao-yellow) 90%, var(--static-black));
+  }
+}
+
+.tm-btn.tm-auth-kakao:disabled {
+  background: var(--kakao-yellow);
+  color: var(--static-black);
+  border-color: transparent;
+  opacity: 0.58;
+}
+
+/* 처리 중(스피너가 도는 중)에는 흐리게 하지 않는다 — 진행 상황이 안 보이면 안 된다. */
+.tm-btn.tm-auth-kakao:disabled[aria-busy='true'] {
+  opacity: 1;
 }
 
 .tm-auth-provider-note {

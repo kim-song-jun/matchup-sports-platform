@@ -22,6 +22,7 @@ import { cssUrl } from '@/lib/assets';
 import { V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
 import { clearV1IdentityCache } from '@/lib/query-keys';
+import { clearPendingSocialLink } from '@/lib/pending-social-link';
 import { getSavedRedirectPath, sanitizeRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
 import { displayInitials } from '@/lib/display-initials';
 import {
@@ -299,6 +300,8 @@ export function SignupClient() {
       });
 
       saveStoredV1Session(result.session);
+      // 새 계정은 앞서 안내받은 계정이 아니다 — 남은 대기 연결 토큰이 이 계정의 도착 화면을 가로채지 않게 지운다.
+      clearPendingSocialLink();
       clearV1IdentityCache(queryClient);
       trackEvent('sign_up_complete', { method: 'email' });
 

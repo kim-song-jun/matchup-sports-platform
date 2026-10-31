@@ -18,10 +18,11 @@ import {
 import { generateSocialNickname } from './social-nickname';
 import { isPendingSocialSignup } from './social-signup-access';
 import { normalizeEmail } from './normalize-email';
+import { pendingAccountLinkClaims, signInThenLinkConflict, signInThenLinkHint } from './social-link-conflict';
+import type { LinkableSocialProvider, SocialLinkClaims } from './social-link-token';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { isSignupAgeEligible, isValidBirthDateDigits, normalizeSignupDisplayName } from './dto/required-signup-profile.dto';
-import { SocialLinkDto } from './dto/social-link.dto';
 import { SocialProfileDto, SocialTermsDto } from './dto/social-profile.dto';
 import { recordSignupConsent } from './signup-record-consent';
 import { hashPassword, verifyPasswordConstantCost } from './password-hash';
@@ -68,15 +69,26 @@ const SOCIAL_AUTH_PROVIDERS: V1AuthProvider[] = [V1AuthProvider.kakao, V1AuthPro
  * 못 찾은 척하면 아래 create 가 P2002 로 터져 500 이 된다. 사용자에게는 무엇을 해야
  * 하는지 말해 주는 편이 낫다.
  */
-function assertLinkableByEmail(user: { emailVerifiedAt: Date | null }): void {
+function assertLinkableByEmail(user: { id: string; emailVerifiedAt: Date | null }, claims: SocialLinkClaims): void {
   if (user.emailVerifiedAt) return;
-  throw new ConflictException({
-    code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL',
-    message: '이 이메일을 쓰는 계정이 이미 있는데 이메일 인증이 끝나지 않았어요. 기존 방법으로 로그인해 이메일 인증을 마친 뒤 다시 시도해 주세요.',
-  });
+  throw signInThenLinkConflict('SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', claims, [user.id]);
 }
 
-type KakaoProfile = {
+function kakaoLinkClaims(profile: KakaoProfile): SocialLinkClaims {
+  return {
+    kind: 'verified_identity',
+    provider: V1AuthProvider.kakao,
+    providerUserKey: profile.providerUserKey,
+    email: kakaoVerifiedEmail(profile),
+  };
+}
+
+/** The address Kakao vouches for (valid and verified), normalized; null when it vouches for none. */
+export function kakaoVerifiedEmail(profile: Pick<KakaoProfile, 'email' | 'emailValid' | 'emailVerified'>): string | null {
+  return profile.email && profile.emailValid && profile.emailVerified ? normalizeEmail(profile.email) : null;
+}
+
+export type KakaoProfile = {
   providerUserKey: string;
   email: string | null;
   emailValid: boolean;
@@ -396,12 +408,21 @@ export class AuthService {
   }
 
   async kakaoLogin(dto: KakaoLoginDto) {
-    const accessToken = await this.exchangeKakaoCode(dto.code, dto.redirectUri);
-    return this.kakaoSession(await this.fetchKakaoProfileByToken(accessToken));
+    return this.kakaoSession(await this.fetchKakaoProfileForCode(dto.code, dto.redirectUri));
   }
 
-  /** Native SDK / token flow. The token must belong to our Kakao app, or any app's token would sign in. */
   async kakaoTokenLogin(dto: KakaoTokenLoginDto) {
+    return this.kakaoSession(await this.fetchKakaoProfileForToken(dto.accessToken));
+  }
+
+  /** Web OAuth flow: exchanges the authorization code and returns the Kakao-asserted profile. Writes nothing. */
+  async fetchKakaoProfileForCode(code: string, redirectUri?: string): Promise<KakaoProfile> {
+    const accessToken = await this.exchangeKakaoCode(code, redirectUri);
+    return this.fetchKakaoProfileByToken(accessToken);
+  }
+
+  /** Native SDK / token flow. The token must belong to our Kakao app, or any app's token would sign in. Writes nothing. */
+  async fetchKakaoProfileForToken(accessToken: string): Promise<KakaoProfile> {
     const expectedAppId = process.env.KAKAO_APP_ID;
     if (!expectedAppId || !Number.isFinite(Number(expectedAppId))) {
       throw new BadRequestException({
@@ -412,7 +433,7 @@ export class AuthService {
 
     const info = (await this.kakaoApiGet(
       'https://kapi.kakao.com/v1/user/access_token_info',
-      dto.accessToken,
+      accessToken,
     )) as { id?: number | string; app_id?: number | string };
     if (!info.id || info.app_id === undefined || Number(info.app_id) !== Number(expectedAppId)) {
       throw new UnauthorizedException({
@@ -421,14 +442,14 @@ export class AuthService {
       });
     }
 
-    const profile = await this.fetchKakaoProfileByToken(dto.accessToken);
+    const profile = await this.fetchKakaoProfileByToken(accessToken);
     if (profile.providerUserKey !== String(info.id)) {
       throw new UnauthorizedException({
         code: 'UNAUTHENTICATED',
         message: 'Kakao token is not valid for this app',
       });
     }
-    return this.kakaoSession(profile);
+    return profile;
   }
 
   private async kakaoSession(profile: KakaoProfile) {
@@ -512,15 +533,12 @@ export class AuthService {
       select: { id: true, email: true, phone: true, accountStatus: true, emailVerifiedAt: true, phoneVerifiedAt: true },
     }) : null;
     if (existingUser && phoneOwner && existingUser.id !== phoneOwner.id) {
-      throw this.kakaoContactConflict();
+      throw this.kakaoContactConflict(profile, [existingUser.id, phoneOwner.id]);
     }
     const candidate = existingUser ?? phoneOwner;
     if (candidate) {
       if (existingUser && !providerEmailVerified && !phoneOwner?.phoneVerifiedAt) {
-        throw new ConflictException({
-          code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL',
-          message: '카카오에서 이메일 소유 확인이 되지 않아 기존 계정과 연결할 수 없어요. 카카오 이메일 인증 후 다시 시도해 주세요.',
-        });
+        throw signInThenLinkConflict('SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', kakaoLinkClaims(profile), [candidate.id]);
       }
       const linked = await this.linkExistingKakaoIdentity(candidate.id, profile, now);
       return this.sessionResponse(linked.id, linked.email, { social: true });
@@ -577,16 +595,21 @@ export class AuthService {
     return this.sessionResponse(user.id, user.email, { social: true });
   }
 
-  private kakaoContactConflict() {
+  private kakaoContactConflict(profile: KakaoProfile, candidateIds: readonly string[]) {
+    return signInThenLinkConflict('SOCIAL_LINK_CONTACT_CONFLICT', kakaoLinkClaims(profile), candidateIds);
+  }
+
+  /** A concurrent edit moved the contact under an already-linked Kakao login; nothing to link, only to retry. */
+  private kakaoContactChanged() {
     return new ConflictException({
       code: 'SOCIAL_LINK_CONTACT_CONFLICT',
-      message: '카카오 정보와 기존 계정 정보가 일치하지 않아요. 기존 가입 방법으로 로그인해 계정 정보를 확인해 주세요.',
+      message: '계정 정보가 바뀌었어요. 잠시 후 다시 시도해 주세요.',
     });
   }
 
   /** Established Kakao identities also benefit from provider contact confirmation on their next login. */
   private async acceptExistingKakaoContacts(userId: string, profile: KakaoProfile, now: Date) {
-    const email = profile.email && profile.emailValid && profile.emailVerified ? normalizeEmail(profile.email) : null;
+    const email = kakaoVerifiedEmail(profile);
     const phone = profile.signupPrefill?.phone ?? null;
     if (!email && !phone) return;
     await this.prisma.$transaction(async (tx) => {
@@ -594,7 +617,7 @@ export class AuthService {
         where: { id: userId },
         select: { email: true, phone: true, emailVerifiedAt: true, phoneVerifiedAt: true },
       });
-      if (!user) throw this.kakaoContactConflict();
+      if (!user) throw this.kakaoContactChanged();
       // Do not overwrite a separate service contact or claim a number belonging to another member.
       const acceptEmail = Boolean(email && user.email === email && !user.emailVerifiedAt);
       const acceptPhone = Boolean(phone && user.phone === phone && !user.phoneVerifiedAt);
@@ -603,7 +626,7 @@ export class AuthService {
         where: { id: userId, accountStatus: 'active', email: user.email, phone: user.phone },
         data: { ...(acceptEmail ? { emailVerifiedAt: now } : {}), ...(acceptPhone ? { phoneVerifiedAt: now } : {}) },
       });
-      if (updated.count !== 1) throw this.kakaoContactConflict();
+      if (updated.count !== 1) throw this.kakaoContactChanged();
       await tx.v1StatusChangeLog.create({
         data: { targetType: 'user_contact', targetId: userId, fromStatus: 'unverified', toStatus: 'confirmed', actorType: 'user', actorUserId: userId, reason: 'kakao_provided_contact' },
       });
@@ -612,30 +635,30 @@ export class AuthService {
 
   /** Provider assertions are fetched by the server, never accepted from the login request body. */
   private async linkExistingKakaoIdentity(userId: string, profile: KakaoProfile, now: Date) {
-    const email = profile.email && profile.emailValid && profile.emailVerified ? normalizeEmail(profile.email) : null;
+    const email = kakaoVerifiedEmail(profile);
     const phone = profile.signupPrefill?.phone ?? null;
     return this.prisma.$transaction(async (tx) => {
       const candidate = await tx.v1User.findUnique({
         where: { id: userId },
         select: { id: true, email: true, phone: true, emailVerifiedAt: true, phoneVerifiedAt: true, accountStatus: true },
       });
-      if (!candidate) throw this.kakaoContactConflict();
+      if (!candidate) throw this.kakaoContactConflict(profile, [userId]);
       this.assertNotWithdrawalPending(candidate.accountStatus);
       if (candidate.accountStatus !== 'active') {
         throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'This account cannot sign in' });
       }
       if ((email && candidate.email && email !== candidate.email) || (phone && candidate.phone && phone !== candidate.phone)) {
-        throw this.kakaoContactConflict();
+        throw this.kakaoContactConflict(profile, [userId]);
       }
       const emailMatches = Boolean(email && candidate.email === email && candidate.emailVerifiedAt);
       // A historical phone verification cannot authenticate the current number owner as this member.
       // Attaching a new identity requires independent matching service/provider email proof.
       if (!emailMatches) {
-        if (email && candidate.email === email) assertLinkableByEmail(candidate);
+        if (email && candidate.email === email) assertLinkableByEmail(candidate, kakaoLinkClaims(profile));
         if (phone && candidate.phone === phone && candidate.phoneVerifiedAt) {
-          throw this.socialLinkAccountProofRequired();
+          throw signInThenLinkConflict('SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF', kakaoLinkClaims(profile), [userId]);
         }
-        throw this.kakaoContactConflict();
+        throw this.kakaoContactConflict(profile, [userId]);
       }
       // Lock and recheck the verified contact. A concurrent profile edit must invalidate this claim.
       const claimed = await tx.v1User.updateMany({
@@ -650,7 +673,7 @@ export class AuthService {
           ...(phone ? { phone, phoneVerifiedAt: now } : {}),
         },
       });
-      if (claimed.count !== 1) throw this.kakaoContactConflict();
+      if (claimed.count !== 1) throw this.kakaoContactConflict(profile, [userId]);
       const identity = await tx.v1AuthIdentity.create({
         data: { userId, provider: V1AuthProvider.kakao, providerUserKey: profile.providerUserKey, email, status: 'active', lastLoginAt: now },
       });
@@ -849,12 +872,18 @@ export class AuthService {
    * affect zero rows and no identity is created.
    */
   private async linkExistingSocialIdentity(input: {
-    provider: V1AuthProvider;
+    provider: LinkableSocialProvider;
     providerUserKey: string;
     email: string;
     existingUserId: string;
     now: Date;
   }): Promise<{ id: string; email: string }> {
+    const claims: SocialLinkClaims = {
+      kind: 'verified_identity',
+      provider: input.provider,
+      providerUserKey: input.providerUserKey,
+      email: input.email,
+    };
     return this.prisma.$transaction(async (tx) => {
       const candidate = await tx.v1User.findUnique({
         where: { id: input.existingUserId },
@@ -862,16 +891,13 @@ export class AuthService {
       });
 
       if (!candidate || candidate.email !== input.email) {
-        throw new ConflictException({
-          code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL',
-          message: '이메일 계정 정보가 바뀌어 소셜 계정을 연결할 수 없어요. 다시 시도해 주세요.',
-        });
+        throw signInThenLinkConflict('SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', claims, [input.existingUserId]);
       }
       if (candidate.accountStatus !== 'active') {
         this.assertNotWithdrawalPending(candidate.accountStatus);
         throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'This account cannot sign in' });
       }
-      assertLinkableByEmail(candidate);
+      assertLinkableByEmail(candidate, claims);
 
       const claimed = await tx.v1User.updateMany({
         where: {
@@ -883,10 +909,7 @@ export class AuthService {
         data: { lastLoginAt: input.now },
       });
       if (claimed.count !== 1) {
-        throw new ConflictException({
-          code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL',
-          message: '이메일 계정 정보가 바뀌어 소셜 계정을 연결할 수 없어요. 다시 시도해 주세요.',
-        });
+        throw signInThenLinkConflict('SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', claims, [input.existingUserId]);
       }
 
       await tx.v1AuthIdentity.create({
@@ -1052,7 +1075,7 @@ export class AuthService {
         onboardingProgress: { select: { draftJson: true } },
         authIdentities: {
           where: { provider: { in: SOCIAL_AUTH_PROVIDERS }, status: 'active' },
-          select: { id: true, provider: true },
+          select: { id: true, provider: true, providerUserKey: true },
         },
         termsConsents: {
           where: {
@@ -1121,27 +1144,14 @@ export class AuthService {
       });
     }
 
-    if (phone) {
-      const existingPhone = await this.prisma.v1User.findFirst({
-        where: {
-          phone,
-          id: { not: userId },
-        },
-        select: { id: true },
-      });
-
-      if (existingPhone) {
-        throw new ConflictException({
-          code: 'PHONE_CONFLICT',
-          message: 'Phone is already registered',
-        });
-      }
-    }
-
     const kakaoPhone = user.authIdentities.some((identity) => identity.provider === V1AuthProvider.kakao)
       ? readKakaoSignupPrefill(user.onboardingProgress?.draftJson)?.phone
       : null;
     const acceptedKakaoPhone = Boolean(phone && kakaoPhone === phone);
+
+    // A typed number is proven by its SMS code before anything is said about who holds it; a number Kakao handed over
+    // was proven by Kakao. Answering "already registered" earlier would let anyone probe numbers without holding them.
+    let phoneProven = acceptedKakaoPhone;
     if (this.phoneVerification.enabled && !acceptedKakaoPhone) {
       const verified = await this.prisma.v1User.findUnique({
         where: { id: userId },
@@ -1153,11 +1163,33 @@ export class AuthService {
           message: '휴대폰 본인인증을 먼저 완료해 주세요.',
         });
       }
+      phoneProven = true;
+    }
+
+    if (phone) {
+      const existingPhone = await this.prisma.v1User.findFirst({
+        where: {
+          phone,
+          id: { not: userId },
+        },
+        select: { id: true },
+      });
+
+      if (existingPhone) {
+        // Only a proven number may carry a link token for its holder's account; otherwise the advice stands alone.
+        const claims = pendingAccountLinkClaims(userId, user.authIdentities);
+        if (claims && phoneProven) throw signInThenLinkConflict('PHONE_CONFLICT', claims, [existingPhone.id]);
+        if (claims) throw signInThenLinkHint('PHONE_CONFLICT', claims.provider);
+        throw new ConflictException({
+          code: 'PHONE_CONFLICT',
+          message: 'Phone is already registered',
+        });
+      }
     }
 
     await this.prisma.$transaction(async (transaction) => {
       const transition = await transaction.v1User.updateMany({
-        where: { id: userId, onboardingStatus: previousStatus },
+        where: { id: userId, accountStatus: 'active', onboardingStatus: previousStatus },
         data: {
           onboardingStatus: wasDeferred ? 'deferred' : 'signup_done', phone,
           ...(acceptedKakaoPhone ? { phoneVerifiedAt: new Date() } : {}),
@@ -1408,145 +1440,6 @@ export class AuthService {
         trustState: user.reputationSummary?.trustState ?? 'none',
       },
     };
-  }
-
-  /**
-   * Current phone possession cannot prove ownership of an older account.
-   * This compatibility endpoint rejects until an independent account-proof contract exists.
-   */
-  async linkSocialToPhoneOwner(callerId: string, dto: SocialLinkDto): Promise<never> {
-    return this.assertSocialLinkAccountProof(callerId, dto);
-  }
-
-  /** The preview shares the account-proof boundary and reveals no holder login metadata. */
-  async previewSocialLink(callerId: string, dto: SocialLinkDto): Promise<never> {
-    return this.assertSocialLinkAccountProof(callerId, dto);
-  }
-
-  /** Validate existing preconditions, then require proof that this phone-only DTO cannot supply. */
-  private async assertSocialLinkAccountProof(callerId: string, dto: SocialLinkDto): Promise<never> {
-    const phone = dto.phone;
-    if (!verifyPhoneProofToken(dto.proofToken, phone, 'social_link')) {
-      throw this.phoneNotVerified();
-    }
-
-    const caller = await this.prisma.v1User.findUnique({
-      where: { id: callerId },
-      select: {
-        id: true,
-        accountStatus: true,
-        onboardingStatus: true,
-        createdAt: true,
-        updatedAt: true,
-        profile: { select: { id: true } },
-        authIdentities: {
-          where: { status: 'active' },
-          select: { id: true, provider: true },
-        },
-      },
-    });
-    if (!caller || caller.accountStatus !== 'active') {
-      throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: '이 계정으로는 연결할 수 없어요.' });
-    }
-    const [identity] = caller.authIdentities;
-    // A deferred caller owns an auto-generated profile; a required one has none yet.
-    const isLinkableSignupState =
-      caller.onboardingStatus === 'social_profile_deferred' ||
-      (caller.onboardingStatus === 'social_profile_required' && !caller.profile);
-    if (
-      !isLinkableSignupState ||
-      caller.authIdentities.length !== 1 ||
-      !identity ||
-      !SOCIAL_AUTH_PROVIDERS.includes(identity.provider)
-    ) {
-      throw new ConflictException({
-        code: 'SOCIAL_LINK_NOT_PENDING',
-        message: '가입을 진행 중인 소셜 계정에서만 기존 계정에 연결할 수 있어요.',
-      });
-    }
-    if (isExpiredSocialSignup(caller)) {
-      await this.resetExpiredSocialSignup(callerId);
-      throw new UnauthorizedException({
-        code: 'SOCIAL_SIGNUP_EXPIRED',
-        message: 'Social signup session expired. Please sign in again.',
-      });
-    }
-
-    const holder = await this.prisma.v1User.findFirst({
-      where: { phone },
-      select: { id: true, email: true, accountStatus: true, phoneVerifiedAt: true },
-    });
-    if (!holder) {
-      throw new NotFoundException({
-        code: 'ACCOUNT_NOT_FOUND',
-        message: '이 번호로 가입된 계정을 찾지 못했어요.',
-      });
-    }
-    this.assertNotWithdrawalPending(holder.accountStatus);
-    if (holder.accountStatus !== 'active') {
-      throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: '이 계정으로는 연결할 수 없어요.' });
-    }
-    if (holder.id === caller.id) {
-      throw new ConflictException({
-        code: 'SOCIAL_LINK_SAME_ACCOUNT',
-        message: '이미 이 계정으로 로그인하고 있어요.',
-      });
-    }
-    // A number the holder never proved may belong to someone else (typo, legacy signup); proving it
-    // now must not hand that person the holder's account.
-    if (!holder.phoneVerifiedAt) {
-      throw new ConflictException({
-        code: 'SOCIAL_LINK_PHONE_UNVERIFIED',
-        message: '기존 계정에서 인증되지 않은 번호라 연결할 수 없어요. 처음 가입한 방법으로 로그인해 주세요.',
-      });
-    }
-    await this.assertHolderLinkable(this.prisma, holder.id, identity.provider);
-    const proofStillValid = await this.prisma.v1PhoneVerificationChallenge.count({
-      where: { phone, verifiedAt: { not: null } },
-    });
-    if (proofStillValid !== 1) throw this.phoneNotVerified();
-    throw this.socialLinkAccountProofRequired();
-  }
-
-  private async assertHolderLinkable(
-    db: Pick<Prisma.TransactionClient, 'v1AdminUser' | 'v1AuthIdentity'>,
-    holderId: string,
-    provider: V1AuthProvider,
-  ) {
-    const admin = await db.v1AdminUser.findUnique({
-      where: { userId: holderId },
-      select: { status: true },
-    });
-    if (admin && admin.status !== 'revoked') {
-      throw new ConflictException({
-        code: 'SOCIAL_LINK_ADMIN_FORBIDDEN',
-        message: '운영 권한이 있는 계정에는 연결할 수 없어요. 기존 방법으로 로그인해 주세요.',
-      });
-    }
-    const sameProvider = await db.v1AuthIdentity.findFirst({
-      where: { userId: holderId, provider, status: 'active' },
-      select: { id: true },
-    });
-    if (sameProvider) {
-      throw new ConflictException({
-        code: 'SOCIAL_LINK_PROVIDER_EXISTS',
-        message: '이미 같은 종류의 소셜 로그인이 연결된 계정이에요. 그 계정으로 로그인해 주세요.',
-      });
-    }
-  }
-
-  private phoneNotVerified() {
-    return new BadRequestException({
-      code: 'PHONE_NOT_VERIFIED',
-      message: '휴대폰 본인인증을 다시 진행해 주세요.',
-    });
-  }
-
-  private socialLinkAccountProofRequired() {
-    return new ConflictException({
-      code: 'SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF',
-      message: '휴대폰 번호 인증만으로 기존 계정에 연결할 수 없어요. 처음 가입한 방법으로 로그인해 주세요. 비밀번호를 잊었다면 로그인 화면에서 이메일로 재설정해 주세요.',
-    });
   }
 
   private async resetExpiredSocialSignup(userId: string) {

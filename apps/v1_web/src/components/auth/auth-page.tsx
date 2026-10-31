@@ -10,6 +10,7 @@ import { ChevronLeftIcon, MatchIcon, TeamMatchIcon, TrophyIcon } from '@/compone
 import { BrandMark } from '@/components/v1-ui/brand-logo';
 import { AppleLoginButton } from './apple-login-button';
 import { KakaoLoginButton } from './kakao-login-button';
+import { PendingLinkNotice } from './pending-link-notice';
 import type { AuthAction, AuthExceptionViewModel, LoginProvider, LoginViewModel, SignupCompleteViewModel } from './auth.types';
 
 export function LoginPageView({ model }: { model: LoginViewModel }) {
@@ -37,6 +38,7 @@ export function LoginPageView({ model }: { model: LoginViewModel }) {
           </ul>
         </div>
         <div>
+          <PendingLinkNotice />
           {/* 소셜 로그인이 위, 이메일이 아래 — Apple 이 권장하는 배치이고, App Store 심사
               가이드라인 4.8 이 요구하는 "동등한 선택지" 가 눈으로도 그렇게 보인다.
               Apple 버튼은 네이티브 셸에서만 나타난다(웹 리다이렉트 흐름은 임베디드 웹뷰에서

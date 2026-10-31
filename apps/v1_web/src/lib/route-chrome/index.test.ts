@@ -102,6 +102,7 @@ describe('ROUTE_CHROME_TABLE — 골든 샘플(전 세그먼트 통합, U39)', (
     ['reviews', '/my/reviews', '리뷰'],
     ['my-home', '/my', '마이페이지'],
     ['my-settings', '/my/settings/theme', '화면 테마'],
+    ['my-settings', '/my/settings/login-methods', '로그인 방법'],
     ['my-secondary', '/my/inquiries', '문의'],
     ['my-secondary', '/my/phone-verify', '휴대폰 본인인증'],
   ])('[%s] %s → title=%s', (_fragment, pathname, expectedTitle) => {

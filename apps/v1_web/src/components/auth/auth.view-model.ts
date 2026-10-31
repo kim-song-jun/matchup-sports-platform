@@ -84,15 +84,6 @@ export function getAuthExceptionViewModel(kind: AuthExceptionKind): AuthExceptio
       primary: { label: '다시 로그인하기', href: '/login' },
       secondary: { label: '다른 방법 선택', href: '/login', tone: 'neutral' },
     },
-    'missing-email': {
-      backHref: '/login',
-      badge: '이메일 누락',
-      title: '확인 가능한 이메일이 필요해요',
-      body: '소셜 계정에서 이메일을 받을 수 없었어요. 이메일을 직접 입력하고 인증한 뒤 가입을 계속할 수 있어요.',
-      tone: 'orange',
-      primary: { label: '이메일 직접 인증', href: '/login/email' },
-      secondary: { label: '소셜 계정 바꾸기', href: '/login', tone: 'neutral' },
-    },
     blocked: {
       backHref: '/login',
       badge: '계정 제한',
@@ -101,15 +92,6 @@ export function getAuthExceptionViewModel(kind: AuthExceptionKind): AuthExceptio
       tone: 'red',
       primary: { label: '고객센터 문의', disabled: true, tone: 'danger' },
       secondary: { label: '로그인으로 돌아가기', href: '/login', tone: 'neutral' },
-    },
-    'account-conflict': {
-      backHref: '/login',
-      badge: '계정 충돌',
-      title: '이미 가입된 정보가 있어요',
-      body: '같은 이메일 또는 휴대폰 번호가 다른 로그인 방법과 연결되어 있어요. 기존 계정으로 먼저 로그인해 주세요.',
-      tone: 'orange',
-      primary: { label: '기존 계정 확인', href: '/login/email' },
-      secondary: { label: '다른 방법 선택', href: '/login', tone: 'neutral' },
     },
     'location-denied': {
       backHref: '/onboarding/region',

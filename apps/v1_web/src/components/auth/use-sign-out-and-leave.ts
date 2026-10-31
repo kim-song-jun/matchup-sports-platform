@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useV1Logout } from '@/hooks/use-v1-api';
 import { useV1PushRegistration } from '@/hooks/use-v1-push-registration';
 import { reportClientError } from '@/lib/client-error-reporter';
+import { clearAuthHandoffStorage } from '@/lib/auth-handoff-storage';
 import { clearV1IdentityCache } from '@/lib/query-keys';
 import { clearStoredV1Session } from '@/lib/session-storage';
 import { disconnectV1Socket } from '@/lib/v1-socket';
@@ -25,6 +26,11 @@ type SignOutOptions = {
   failureMessage: string;
   /** 실제로 로그아웃을 시작할 때 한 번 불린다(연타로 막힌 호출에는 불리지 않는다). */
   onStart?: () => void;
+  /**
+   * 로그아웃이 끝나고 세션·저장 칸 정리까지 마친 직후, 이동 직전에 부른다. 로그아웃 정리가 지우는 칸
+   * (대기 연결 토큰 등)에 이동 뒤 화면이 읽을 값을 남기려면 정리보다 늦게 써야 해서 여기서 쓴다.
+   */
+  onSignedOut?: () => void;
 };
 
 /**
@@ -61,7 +67,7 @@ export function useSignOutAndLeave({ revokePush = true }: SignOutHookOptions = {
     }
   }, [unsubscribePush]);
 
-  const signOutAndLeave = useCallback(async (path: string, { failureMessage, onStart }: SignOutOptions) => {
+  const signOutAndLeave = useCallback(async (path: string, { failureMessage, onStart, onSignedOut }: SignOutOptions) => {
     if (busyRef.current) return;
     busyRef.current = true;
     setPending(true);
@@ -81,8 +87,10 @@ export function useSignOutAndLeave({ revokePush = true }: SignOutHookOptions = {
     }
 
     clearStoredV1Session();
+    clearAuthHandoffStorage();
     clearV1IdentityCache(queryClient);
     disconnectV1Socket();
+    onSignedOut?.();
     window.location.replace(path);
   }, [logoutAsync, queryClient, revokePush, revokePushWithinLimit]);
 

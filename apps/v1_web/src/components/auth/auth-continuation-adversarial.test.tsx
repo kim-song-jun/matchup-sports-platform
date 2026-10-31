@@ -4,6 +4,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { parseKakaoOAuthAttempt } from '@/lib/kakao-oauth';
 import { getSavedRedirectPath, saveRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
 import { RequireAuth } from './require-auth';
 import { PendingSocialSignupGate } from './pending-social-signup-gate';
@@ -13,7 +14,7 @@ import { TermsClient } from './terms-client';
 import { KakaoLoginButton } from './kakao-login-button';
 import { KakaoCallbackClient } from './kakao-callback-client';
 import { KAKAO_OAUTH_STATE_STORAGE_KEY } from './auth.view-model';
-import { authSession, compliance, createRedirectFixture, makeAuth, PENDING, stepForRoute } from './social-link-required-redirect-fixtures';
+import { authSession, compliance, createRedirectFixture, makeAuth, PENDING, stepForRoute } from './required-step-redirect.fixtures';
 
 const navigation = vi.hoisted(() => ({ pathname: '/', replace: vi.fn(), push: vi.fn(), refresh: vi.fn() }));
 const sdk = vi.hoisted(() => ({ authorize: vi.fn() }));
@@ -82,7 +83,7 @@ async function completeSignup(user: ReturnType<typeof userEvent.setup>) {
   await user.click(submit);
   await screen.findByRole('button', { name: /풋살/ });
   expect(state.profileRequests).toBe(1);
-  expect(state.phoneOnlyRequests).toBe(0);
+  expect(state.linkRequests).toBe(0);
 }
 async function finishOnboarding(user: ReturnType<typeof userEvent.setup>) {
   await user.click(await screen.findByRole('button', { name: /풋살/ }));
@@ -120,7 +121,7 @@ describe('적대적 인증 continuation의 실제 consumer 계약', () => {
     await user.click(screen.getByRole('link', { name: '카카오로 로그인' }));
     await waitFor(() => expect(sdk.authorize).toHaveBeenCalledTimes(1));
     expect(getSavedRedirectPath()).toBe(nested);
-    const oauthState = window.sessionStorage.getItem(KAKAO_OAUTH_STATE_STORAGE_KEY);
+    const oauthState = parseKakaoOAuthAttempt(window.sessionStorage.getItem(KAKAO_OAUTH_STATE_STORAGE_KEY))?.state;
     if (!oauthState) throw new Error('OAuth state가 실제 버튼에서 저장되지 않았어요.');
     act(() => navigation.replace(`/callback/kakao?code=fixture-code&state=${encodeURIComponent(oauthState)}`));
     await screen.findByRole('button', { name: '나중에 입력할게요' });

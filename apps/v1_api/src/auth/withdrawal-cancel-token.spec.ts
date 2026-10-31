@@ -51,7 +51,6 @@ describe('withdrawal cancel token', () => {
     // 나머지 용도·이메일은 고정 라벨이 맨 앞에 붙어 입력이 무엇이든 'withdrawal_cancel' 로 시작할 수 없다.
     for (const token of [
       issuePhoneProofToken('withdrawal_cancel:u:1', 'password_reset'),
-      issuePhoneProofToken('withdrawal_cancel:u:1', 'social_link'),
       issueEmailProofToken('withdrawal_cancel:u:1'),
     ]) {
       expect(readWithdrawalCancelToken(token)).toBeNull();

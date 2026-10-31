@@ -70,6 +70,19 @@ describe('LoginStepUpVerifyClient', () => {
       expect(screen.getByRole('link', { name: '다른 계정으로 로그인' })).toHaveAttribute('href', '/login/email?redirect=%2Fmy');
     });
 
+    it('tells readers whose mail never arrives where else to sign in, without saying whether an account exists', async () => {
+      storeChallenge({}, '/my');
+      renderVerify();
+
+      const help = await screen.findByText(/메일이 오지 않으면/);
+      expect(help).toHaveTextContent("카카오로 가입하셨다면 로그인 첫 화면의 '카카오' 버튼으로");
+      expect(help).toHaveTextContent("Apple로 가입하셨다면 iOS 앱의 'Apple로 계속하기' 버튼으로 로그인해 주세요");
+      expect(help).toHaveTextContent('비밀번호가 기억나지 않으면 비밀번호를 재설정해 주세요');
+      expect(screen.getByRole('link', { name: '비밀번호 재설정하기' }))
+        .toHaveAttribute('href', '/auth/find-account?mode=reset-password&redirect=%2Fmy');
+      expect(screen.queryByText(/가입되지 않|없는 계정|존재하지/)).not.toBeInTheDocument();
+    });
+
     it('keeps only digits, at most six, and enables the button once the code is complete', async () => {
       storeChallenge();
       renderVerify();

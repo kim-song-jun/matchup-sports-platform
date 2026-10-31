@@ -2,10 +2,16 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2 } from 'lucide-react';
-import { Card } from '@/components/v1-ui/primitives';
-import { sanitizeRedirectPath } from '@/lib/session-storage';
-import { useV1AuthMe } from '@/hooks/use-v1-api';
+import { AlertBanner, Card } from '@/components/v1-ui/primitives';
+import { clearStoredV1Session, sanitizeRedirectPath } from '@/lib/session-storage';
+import { extractErrorMessage } from '@/lib/error-message';
+import { clearV1IdentityCache } from '@/lib/query-keys';
+import { disconnectV1Socket } from '@/lib/v1-socket';
+import { useV1AuthMe, useV1Logout } from '@/hooks/use-v1-api';
+import { useV1PushRegistration } from '@/hooks/use-v1-push-registration';
+import { PhoneConflictNotice } from '@/components/auth/otp/phone-conflict-notice';
 import { formatPhone, normalizeSeparatedDigits } from '@/components/auth/signup-profile-validation';
 import { PhoneVerificationCard } from './phone-verification-card';
 
@@ -20,7 +26,12 @@ export function PhoneVerifyPageClient() {
   const searchParams = useSearchParams();
   // 대회 신청처럼 "인증 때문에 막힌 화면"에서 넘어온 경우 그 자리로 돌려보낸다.
   // 외부 URL·javascript: 주입을 막기 위해 상대 경로만 통과시킨다(sanitizeRedirectPath).
-  const redirectTo = sanitizeRedirectPath(searchParams.get('redirect')) ?? '/home';
+  const requestedRedirect = sanitizeRedirectPath(searchParams.get('redirect'));
+  const redirectTo = requestedRedirect ?? '/home';
+  const queryClient = useQueryClient();
+  const logout = useV1Logout();
+  const pushRegistration = useV1PushRegistration();
+  const [leaveError, setLeaveError] = useState<string | null>(null);
   const authMe = useV1AuthMe();
   /**
    * authMe 가 오기 전에는 번호 UI 를 렌더하지 않는다. 로딩 중 existingPhone 이 '' 라
@@ -49,6 +60,37 @@ export function PhoneVerifyPageClient() {
   };
 
   const verified = alreadyVerified || done;
+
+  /**
+   * 번호 주인은 다른 계정이다. 로그인한 채로는 /login 이 홈으로 되돌려 보내므로, 세션을 끝낸 뒤
+   * 이동한다. 로그아웃 뒤에는 서버 구독 해지를 인증할 수 없어 이 기기의 구독만 끊는다.
+   */
+  const leaveTo = async (path: string) => {
+    if (logout.isPending) return;
+    setLeaveError(null);
+    try {
+      await logout.mutateAsync();
+    } catch (err) {
+      setLeaveError(extractErrorMessage(err, '로그아웃하지 못했어요. 잠시 후 다시 시도해 주세요.'));
+      return;
+    }
+    clearStoredV1Session();
+    disconnectV1Socket();
+    clearV1IdentityCache(queryClient);
+    await pushRegistration.unsubscribe({ reason: 'sign-out', skipServerUnsubscribe: true });
+    window.location.replace(path);
+  };
+  const withRedirect = (path: string) => (requestedRedirect ? `${path}?redirect=${encodeURIComponent(requestedRedirect)}` : path);
+  const phoneConflictNotice = (
+    <>
+      <PhoneConflictNotice
+        pending={logout.isPending}
+        onLogin={() => void leaveTo(withRedirect('/login'))}
+        onFindAccount={() => void leaveTo(withRedirect('/auth/find-account'))}
+      />
+      {leaveError ? <AlertBanner message={leaveError} tone="error" /> : null}
+    </>
+  );
 
   return (
     <div className="tm-content-enter" style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: 16 }}>
@@ -122,7 +164,7 @@ export function PhoneVerifyPageClient() {
           )}
 
           {!authLoading && phoneDigits.length === 11 ? (
-            <PhoneVerificationCard mode="authed" phone={phoneDigits} onVerified={handleVerified} />
+            <PhoneVerificationCard mode="authed" phone={phoneDigits} onVerified={handleVerified} conflictNotice={phoneConflictNotice} />
           ) : null}
         </>
       )}

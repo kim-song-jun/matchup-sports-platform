@@ -2,8 +2,10 @@ import { Test } from '@nestjs/testing';
 import request = require('supertest');
 import { createGlobalValidationPipe } from '../common/global-validation-pipe';
 import { PrismaService } from '../prisma/prisma.service';
+import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
 import { AuthController } from './auth.controller';
 import { AppleIdentityService } from './apple-identity.service';
+import { createV1SessionToken, V1_SESSION_COOKIE_NAME } from './v1-session';
 
 /**
  * The controller only forwards to this service; what it actually does is covered by
@@ -13,7 +15,10 @@ const appleIdentityDouble = () => ({
   issueNonce: jest.fn().mockReturnValue({ nonce: 'a1.value.9999999999.signature' }),
   verifyIdentityToken: jest.fn(),
 });
+import { AccountLinkService } from './account-link.service';
 import { AuthService } from './auth.service';
+
+const accountLinkDouble = () => ({ linkKakao: jest.fn(), linkApple: jest.fn() });
 
 describe('AuthController', () => {
   it('returns the current v1 user summary', async () => {
@@ -38,6 +43,7 @@ describe('AuthController', () => {
           useValue: {},
         },
         { provide: AppleIdentityService, useValue: appleIdentityDouble() },
+        { provide: AccountLinkService, useValue: accountLinkDouble() },
       ],
     }).compile();
 
@@ -72,6 +78,7 @@ describe('AuthController', () => {
         { provide: AuthService, useValue: authService },
         { provide: PrismaService, useValue: {} },
         { provide: AppleIdentityService, useValue: appleIdentityDouble() },
+        { provide: AccountLinkService, useValue: accountLinkDouble() },
       ],
     }).compile();
 
@@ -104,6 +111,7 @@ describe('AuthController', () => {
         { provide: AuthService, useValue: authService },
         { provide: PrismaService, useValue: {} },
         { provide: AppleIdentityService, useValue: appleIdentityDouble() },
+        { provide: AccountLinkService, useValue: accountLinkDouble() },
       ],
     }).compile();
 
@@ -138,6 +146,7 @@ describe('AuthController', () => {
         { provide: AuthService, useValue: authService },
         { provide: PrismaService, useValue: {} },
         { provide: AppleIdentityService, useValue: appleIdentityDouble() },
+        { provide: AccountLinkService, useValue: accountLinkDouble() },
       ],
     }).compile();
 
@@ -179,6 +188,7 @@ describe('AuthController', () => {
         { provide: AuthService, useValue: authService },
         { provide: PrismaService, useValue: {} },
         { provide: AppleIdentityService, useValue: appleIdentityDouble() },
+        { provide: AccountLinkService, useValue: accountLinkDouble() },
       ],
     }).compile();
 
@@ -204,6 +214,7 @@ describe('AuthController', () => {
         { provide: AuthService, useValue: authService },
         { provide: PrismaService, useValue: {} },
         { provide: AppleIdentityService, useValue: appleIdentityDouble() },
+        { provide: AccountLinkService, useValue: accountLinkDouble() },
       ],
     }).compile();
 
@@ -234,6 +245,7 @@ describe('AuthController', () => {
         { provide: AuthService, useValue: authService },
         { provide: PrismaService, useValue: {} },
         { provide: AppleIdentityService, useValue: appleIdentityDouble() },
+        { provide: AccountLinkService, useValue: accountLinkDouble() },
       ],
     }).compile();
 
@@ -275,6 +287,7 @@ describe('AuthController', () => {
         { provide: AuthService, useValue: authService },
         { provide: PrismaService, useValue: {} },
         { provide: AppleIdentityService, useValue: appleIdentityDouble() },
+        { provide: AccountLinkService, useValue: accountLinkDouble() },
       ],
     }).compile();
 
@@ -313,6 +326,7 @@ describe('AuthController', () => {
           { provide: AuthService, useValue: authService },
           { provide: PrismaService, useValue: {} },
           { provide: AppleIdentityService, useValue: appleIdentityDouble() },
+          { provide: AccountLinkService, useValue: accountLinkDouble() },
         ],
       }).compile();
       const app = moduleRef.createNestApplication();
@@ -394,6 +408,7 @@ describe('AuthController', () => {
           // The session cookie interceptor signs the cookie with the user's epoch.
           { provide: PrismaService, useValue: { v1User: { findUniqueOrThrow: jest.fn().mockResolvedValue({ sessionEpoch: 0 }) } } },
           { provide: AppleIdentityService, useValue: appleIdentityDouble() },
+          { provide: AccountLinkService, useValue: accountLinkDouble() },
         ],
       }).compile();
       const app = moduleRef.createNestApplication();
@@ -464,6 +479,123 @@ describe('AuthController', () => {
       expect(res.body).toEqual({ expiresAt: '2026-10-21T12:05:31.000Z', resendAvailableAt: '2026-10-21T12:01:01.000Z' });
       expect(authService.resendLoginStepUp).toHaveBeenCalledWith('c'.repeat(43));
       await request(app.getHttpServer()).post('/auth/login/step-up/resend').send({}).expect(400);
+      await app.close();
+    });
+  });
+  describe('account link HTTP contract', () => {
+    const SESSION_SECRET = 'account-link-controller-session-secret-0123456789';
+    const savedSecret = process.env.V1_SESSION_SECRET;
+    const KAKAO_BODY = { accessToken: 'native-sdk-token-0123456789' };
+    const LINKED = { provider: 'kakao', alreadyLinked: false, mergedPendingAccount: false, authProviders: ['email', 'kakao'] };
+
+    beforeAll(() => {
+      process.env.V1_SESSION_SECRET = SESSION_SECRET;
+    });
+    afterAll(() => {
+      if (savedSecret === undefined) delete process.env.V1_SESSION_SECRET;
+      else process.env.V1_SESSION_SECRET = savedSecret;
+    });
+
+    const cookieIssuedAgo = (seconds: number) =>
+      `${V1_SESSION_COOKIE_NAME}=${createV1SessionToken({
+        userId: 'user-1',
+        sessionEpoch: 0,
+        secret: SESSION_SECRET,
+        issuedAtMs: Date.now() - seconds * 1_000,
+      })}`;
+
+    const buildApp = async (onboardingStatus = 'completed') => {
+      const accountLink = { linkKakao: jest.fn().mockResolvedValue(LINKED), linkApple: jest.fn().mockResolvedValue({ ...LINKED, provider: 'apple' }) };
+      const prisma = {
+        v1User: {
+          findFirst: jest.fn().mockResolvedValue({
+            id: 'user-1',
+            email: 'user@example.com',
+            accountStatus: 'active',
+            onboardingStatus,
+            phoneVerifiedAt: new Date(),
+            adminUser: null,
+          }),
+        },
+      };
+      const moduleRef = await Test.createTestingModule({
+        controllers: [AuthController],
+        providers: [
+          { provide: AuthService, useValue: {} },
+          { provide: PrismaService, useValue: prisma },
+          { provide: ManagedTermsRuntimeService, useValue: { signupCompliance: jest.fn().mockResolvedValue({ compliant: true }) } },
+          { provide: AppleIdentityService, useValue: appleIdentityDouble() },
+          { provide: AccountLinkService, useValue: accountLink },
+        ],
+      }).compile();
+      const app = moduleRef.createNestApplication();
+      app.useGlobalPipes(createGlobalValidationPipe());
+      await app.init();
+      return { app, accountLink };
+    };
+
+    it('hands the signed-in user, the body and the session age to the service and answers 200', async () => {
+      const { app, accountLink } = await buildApp();
+
+      const res = await request(app.getHttpServer())
+        .post('/auth/link/kakao')
+        .set('Cookie', cookieIssuedAgo(40 * 60))
+        .send(KAKAO_BODY)
+        .expect(200);
+
+      expect(res.body).toEqual(LINKED);
+      const [userId, body, age] = accountLink.linkKakao.mock.calls[0];
+      expect(userId).toBe('user-1');
+      expect(body).toEqual(KAKAO_BODY);
+      expect(age).toBeGreaterThanOrEqual(2_400);
+      expect(age).toBeLessThan(2_460);
+      await app.close();
+    });
+
+    it('does the same for Apple, with the Apple login body', async () => {
+      const { app, accountLink } = await buildApp();
+      const body = { identityToken: 'a'.repeat(40), nonce: 'nonce-0123456789', authorizationCode: 'apple-auth-code' };
+
+      const res = await request(app.getHttpServer()).post('/auth/link/apple').set('Cookie', cookieIssuedAgo(5)).send(body).expect(200);
+
+      expect(res.body).toMatchObject({ provider: 'apple' });
+      expect(accountLink.linkApple).toHaveBeenCalledWith('user-1', body, expect.any(Number));
+      await app.close();
+    });
+
+    it.each([
+      { name: 'an empty body', body: {} },
+      { name: 'a code without its redirect URI', body: { code: 'auth-code' } },
+      { name: 'a field outside the contract', body: { ...KAKAO_BODY, userId: 'someone-else' } },
+    ])('rejects $name with 400 before the service', async ({ body }) => {
+      const { app, accountLink } = await buildApp();
+
+      await request(app.getHttpServer()).post('/auth/link/kakao').set('Cookie', cookieIssuedAgo(5)).send(body).expect(400);
+
+      expect(accountLink.linkKakao).not.toHaveBeenCalled();
+      await app.close();
+    });
+
+    it('requires a session', async () => {
+      const { app, accountLink } = await buildApp();
+
+      await request(app.getHttpServer()).post('/auth/link/kakao').send(KAKAO_BODY).expect(401);
+      await request(app.getHttpServer()).post('/auth/link/apple').send({}).expect(401);
+
+      expect(accountLink.linkKakao).not.toHaveBeenCalled();
+      await app.close();
+    });
+
+    it.each([
+      ['social_terms_required', '/terms?mode=social'],
+      ['social_profile_required', '/signup/social'],
+    ])('keeps a caller whose signup is %s out with 403 SIGNUP_INCOMPLETE', async (onboardingStatus, route) => {
+      const { app, accountLink } = await buildApp(onboardingStatus);
+
+      const res = await request(app.getHttpServer()).post('/auth/link/kakao').set('Cookie', cookieIssuedAgo(5)).send(KAKAO_BODY).expect(403);
+
+      expect(res.body).toMatchObject({ code: 'SIGNUP_INCOMPLETE', details: { next: { route } } });
+      expect(accountLink.linkKakao).not.toHaveBeenCalled();
       await app.close();
     });
   });

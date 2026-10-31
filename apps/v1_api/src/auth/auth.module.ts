@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AccountLinkService } from './account-link.service';
 import { AccountRecoveryController } from './account-recovery.controller';
 import { AccountRecoveryService } from './account-recovery.service';
 import { AuthController } from './auth.controller';
@@ -10,15 +11,17 @@ import { OptionalV1AuthGuard } from './optional-v1-auth.guard';
 import { PhoneVerificationPublicController } from './phone-verification-public.controller';
 import { V1AuthGuard } from './v1-auth.guard';
 import { V1SessionCookieInterceptor } from './v1-session.interceptor';
+import { NotificationsServiceModule } from '../notifications/notifications-service.module';
 import { RealtimeModule } from '../realtime/realtime.module';
 import { TermsModule } from '../terms/terms.module';
 import { VerificationModule } from '../verification/verification.module';
 
 @Module({
-  imports: [TermsModule, VerificationModule, AppleTokenModule, RealtimeModule],
+  imports: [TermsModule, VerificationModule, AppleTokenModule, RealtimeModule, NotificationsServiceModule],
   controllers: [AuthController, PhoneVerificationPublicController, AccountRecoveryController],
   providers: [
     AuthService,
+    AccountLinkService,
     AccountRecoveryService,
     LoginSecurityService,
     LoginStepUpService,

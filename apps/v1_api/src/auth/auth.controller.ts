@@ -7,12 +7,15 @@ import {
   Ip,
   Post,
   Query,
+  Req,
   Res,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
+import type { Request } from 'express';
 import { CurrentUser } from './current-user.decorator';
+import { AccountLinkService } from './account-link.service';
 import { AuthService } from './auth.service';
 import { AppleLoginDto } from './dto/apple-login.dto';
 import { AppleIdentityService } from './apple-identity.service';
@@ -21,19 +24,21 @@ import { KakaoLoginDto, KakaoTokenLoginDto } from './dto/kakao-login.dto';
 import { LoginDto } from './dto/login.dto';
 import { LoginStepUpResendDto, LoginStepUpVerifyDto } from './dto/login-step-up.dto';
 import { RegisterDto } from './dto/register.dto';
-import { SocialLinkDto } from './dto/social-link.dto';
+import { LinkKakaoDto } from './dto/link-kakao.dto';
 import { SocialProfileDto, SocialTermsDto } from './dto/social-profile.dto';
 import type { V1AuthUser } from './v1-auth-user';
 import { OptionalV1AuthGuard } from './optional-v1-auth.guard';
 import { V1AuthGuard } from './v1-auth.guard';
 import { NonProductionGuard } from './non-production.guard';
 import { V1SessionCookieInterceptor } from './v1-session.interceptor';
+import { readCurrentV1SessionAgeSeconds } from './v1-session';
 
 @Controller('auth')
 @UseInterceptors(V1SessionCookieInterceptor)
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
+    private readonly accountLink: AccountLinkService,
     private readonly appleIdentity: AppleIdentityService,
   ) {}
 
@@ -135,22 +140,24 @@ export class AuthController {
     return this.authService.deferSocialProfile(user.id);
   }
 
-  /** Rejects phone-only account linking after validating the caller and OTP proof. */
-  @Post('social-link')
-  @HttpCode(200)
-  @UseGuards(V1AuthGuard)
-  @Throttle({ default: { limit: 5, ttl: 60_000 } })
-  linkSocialToPhoneOwner(@CurrentUser() user: V1AuthUser, @Body() dto: SocialLinkDto) {
-    return this.authService.linkSocialToPhoneOwner(user.id, dto);
-  }
-
-  /** Rejects phone-only account previews without consuming proof or exposing the holder. */
-  @Post('social-link/preview')
+  /**
+   * Attaches a Kakao login to the signed-in account. The session proves the account, the Kakao token proves the
+   * identity; a session older than 30 minutes is refused.
+   */
+  @Post('link/kakao')
   @HttpCode(200)
   @UseGuards(V1AuthGuard)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
-  previewSocialLink(@CurrentUser() user: V1AuthUser, @Body() dto: SocialLinkDto) {
-    return this.authService.previewSocialLink(user.id, dto);
+  linkKakao(@CurrentUser() user: V1AuthUser, @Body() dto: LinkKakaoDto, @Req() request: Pick<Request, 'headers'>) {
+    return this.accountLink.linkKakao(user.id, dto, readCurrentV1SessionAgeSeconds(request.headers.cookie));
+  }
+
+  @Post('link/apple')
+  @HttpCode(200)
+  @UseGuards(V1AuthGuard)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  linkApple(@CurrentUser() user: V1AuthUser, @Body() dto: AppleLoginDto, @Req() request: Pick<Request, 'headers'>) {
+    return this.accountLink.linkApple(user.id, dto, readCurrentV1SessionAgeSeconds(request.headers.cookie));
   }
 
   @Post('social-terms')

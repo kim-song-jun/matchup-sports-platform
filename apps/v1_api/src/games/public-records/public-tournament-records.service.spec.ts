@@ -1178,7 +1178,7 @@ describe('PublicTournamentRecordsService.getMatch -- 대회 경기 기록 실명
     expect(result.events).toEqual([expect.objectContaining({ participantName: '닉네임러' })]);
   });
 
-  // 탈퇴 회원은 nickname이 `deleted_<8자>`(admin.service.ts buildDeletedNickname)라
+  // 탈퇴 회원은 nickname이 `deleted_<8자>`(users/deleted-account-values.ts buildDeletedNickname)라
   // 화면에 그대로 내보낼 수 없다. 탈퇴 시 displayName만 '탈퇴 회원'으로 덮어쓰므로
   // 이 경우에만 displayName을 쓴다.
   it('탈퇴 회원은 deleted_ 닉네임 대신 익명화된 displayName을 보여준다', async () => {

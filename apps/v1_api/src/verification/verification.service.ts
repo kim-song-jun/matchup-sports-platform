@@ -10,6 +10,8 @@ import { Prisma, V1AuthProvider, V1VerificationChannel } from '@prisma/client';
 import { randomInt } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { hashPassword, verifyPassword } from '../auth/password-hash';
+import { isLinkableSocialProvider, signInThenLinkConflict } from '../auth/social-link-conflict';
+import { isUnfinishedSocialSignup } from '../auth/social-signup-access';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { SMS_EVENT_TYPE, SmsEventLogService } from './sms-event-log.service';
 import { VerificationDispatcherService } from './verification-dispatcher.service';
@@ -69,12 +71,7 @@ export class VerificationService {
       where: { phone, id: { not: user.id } },
       select: { id: true },
     });
-    if (owner) {
-      throw new ConflictException({
-        code: 'PHONE_CONFLICT',
-        message: '이미 다른 계정에서 사용 중인 번호예요.',
-      });
-    }
+    if (owner) throw phoneConflict(user);
     if (user.phoneVerifiedAt && user.phone === phone) {
       return { sent: false, alreadyVerified: true, channel: 'phone' as const };
     }
@@ -221,12 +218,10 @@ export class VerificationService {
       });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        throw new ConflictException({
-          code: channel === 'email' ? 'EMAIL_CONFLICT' : 'PHONE_CONFLICT',
-          message: channel === 'email'
-            ? '이미 다른 계정에서 사용 중인 이메일이에요.'
-            : '이미 다른 계정에서 사용 중인 번호예요.',
-        });
+        if (channel === 'email') {
+          throw new ConflictException({ code: 'EMAIL_CONFLICT', message: '이미 다른 계정에서 사용 중인 이메일이에요.' });
+        }
+        throw phoneConflict(await this.loadUser(authUser.id));
       }
       throw error;
     }
@@ -292,13 +287,39 @@ export class VerificationService {
   private async loadUser(id: string) {
     const user = await this.prisma.v1User.findUnique({
       where: { id },
-      select: { id: true, email: true, phone: true, emailVerifiedAt: true, phoneVerifiedAt: true },
+      select: {
+        id: true,
+        email: true,
+        phone: true,
+        emailVerifiedAt: true,
+        phoneVerifiedAt: true,
+        onboardingStatus: true,
+        authIdentities: { where: { status: 'active' }, select: { provider: true } },
+      },
     });
     if (!user) {
       throw new NotFoundException({ code: 'NOT_FOUND', message: '사용자를 찾을 수 없어요.' });
     }
     return user;
   }
+}
+
+/**
+ * A number held by another account. For a social signup that has not finished, the holder is the person's own
+ * existing account, so the way forward is to sign in there and link the provider; anyone else just picks another number.
+ */
+function phoneConflict(user: {
+  onboardingStatus: string;
+  authIdentities: { provider: V1AuthProvider }[];
+}) {
+  const provider = isUnfinishedSocialSignup(user.onboardingStatus)
+    ? user.authIdentities.map((identity) => identity.provider).find(isLinkableSocialProvider)
+    : undefined;
+  if (provider) return signInThenLinkConflict('PHONE_CONFLICT', provider);
+  return new ConflictException({
+    code: 'PHONE_CONFLICT',
+    message: '이미 다른 계정에서 사용 중인 번호예요.',
+  });
 }
 
 function maskTarget(channel: V1VerificationChannel, target: string) {

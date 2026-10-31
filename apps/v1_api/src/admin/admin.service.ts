@@ -31,6 +31,12 @@ import { UploadedFile, UploadsService } from '../uploads/uploads.service';
 import { enqueueRosterResync, teamMembersTargets } from '../games/roster/roster-resync-events';
 import { removeUserFromActiveRosters } from '../tournaments/roster-cleanup';
 import { formatLevelRange } from '../sports/level-range';
+import {
+  buildDeletedEmail,
+  buildDeletedPhone,
+  buildDeletedProfileData,
+  buildDeletedProviderUserKey,
+} from '../users/deleted-account-values';
 import { TOURNAMENT_SURFACE_KIND } from '../tournaments/tournament-surface';
 import {
   AdminListQueryDto,
@@ -421,19 +427,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       );
       await tx.v1UserProfile.updateMany({
         where: { userId },
-        data: {
-          nickname: buildDeletedNickname(userId),
-          displayName: '탈퇴 회원',
-          realName: null,
-          gender: null,
-          birthDate: null,
-          bio: null,
-          profileImageUrl: null,
-          displayRegion: null,
-          visibility: 'private',
-          tournamentRealNameVisible: false,
-          deletedAt,
-        },
+        data: buildDeletedProfileData(userId, deletedAt),
       });
       // 공개 개인 기록 게이트(`isParticipantPubliclyEligible`, public-consent.ts)는
       // `V1UserRecordConsent.state`가 GRANTED인지만 본다 -- 여기서 REVOKED로 함께
@@ -3571,22 +3565,6 @@ function getCapabilities(role: ActiveAdmin['adminRole']) {
   if (role === 'owner') return ['overview:read', 'status:write', 'logs:read', 'admin:owner'];
   if (role === 'ops') return ['overview:read', 'status:write', 'logs:read'];
   return ['overview:read', 'logs:read'];
-}
-
-function buildDeletedEmail(userId: string) {
-  return `deleted+${userId}@deleted.teameet.local`;
-}
-
-function buildDeletedPhone(userId: string) {
-  return `deleted-${userId}`;
-}
-
-function buildDeletedProviderUserKey(userId: string, identityId: string) {
-  return `deleted:${userId}:${identityId}`;
-}
-
-function buildDeletedNickname(userId: string) {
-  return `deleted_${userId.slice(0, 8)}`;
 }
 
 /**

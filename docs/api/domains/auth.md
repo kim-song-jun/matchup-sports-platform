@@ -25,8 +25,8 @@
 | `POST` | `/api/v1/auth/social-terms` | user | `{ requiredTermsAccepted: true, ageConfirmed: true, acceptedTermsDocumentIds: uuid[] }` | social session + onboarding route |
 | `POST` | `/api/v1/auth/social-profile` | user | `SocialProfileDto` | compatibility profile completion (also finishes a deferred profile) |
 | `POST` | `/api/v1/auth/social-profile/defer` | user | empty body | skip the profile form; social session without `next` |
-| `POST` | `/api/v1/auth/social-link/preview` | user (pending social: `social_profile_required` without a profile, or `social_profile_deferred`) | `{ phone, proofToken }` | `409 SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF` after existing preconditions; no holder metadata, proof consumption or writes |
-| `POST` | `/api/v1/auth/social-link` | user (pending social: `social_profile_required` without a profile, or `social_profile_deferred`) | `{ phone, proofToken }` | `409 SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF` after existing preconditions; no identity transfer, account deletion or holder session |
+| `POST` | `/api/v1/auth/link/kakao` | user (finished signup; session issued ≤ 30 min ago) | `{ code, redirectUri }` (web) **or** `{ accessToken }` (native) | `{ provider, alreadyLinked, mergedPendingAccount, authProviders }` — see [Linking a social login while signed in](#linking-a-social-login-while-signed-in) |
+| `POST` | `/api/v1/auth/link/apple` | user (same) | same body as `/auth/apple` (`identityToken`, `nonce` from `/auth/apple/nonce`, `fullName?`, `authorizationCode?`) | same as `link/kakao` |
 | `GET` | `/api/v1/auth/check-email` | none | `?email=` | `{ available: boolean }` |
 | `GET` | `/api/v1/auth/check-nickname` | optional | `?nickname=` | `{ available: boolean }` |
 | `GET` | `/api/v1/terms/current?context=signup\|tournament_application\|footer` | optional user | active context | effective current documents; signup adds per-user compliance |
@@ -36,7 +36,7 @@
 | `POST` | `/api/v1/onboarding/complete` | user | empty body | completed onboarding summary |
 | `POST` | `/api/v1/onboarding/defer` | user | `{ reason?: "skip_now" \| "later" \| "unknown" }` | deferred onboarding summary |
 | `POST` | `/api/v1/auth/phone/issue` | none | `{ phone }` | `{ expiresAt, devCode? }` |
-| `POST` | `/api/v1/auth/phone/verify` | none | `{ phone, code, purpose?: "signup" \| "password_reset" \| "social_link" }` | `{ verified, proofToken }` |
+| `POST` | `/api/v1/auth/phone/verify` | none | `{ phone, code, purpose?: "signup" \| "password_reset" }` | `{ verified, proofToken }` |
 | `POST` | `/api/v1/auth/recovery/find-account` | none | `{ phone, proofToken }` | `{ maskedEmail, providers, hasPassword }` |
 | `POST` | `/api/v1/auth/recovery/reset-password` | none | `{ phone, proofToken, newPassword }` | valid phone proof and existing active account: `409 ACCOUNT_RECOVERY_REQUIRES_EMAIL`; no password write |
 | `POST` | `/api/v1/auth/recovery/email/request` | none | `{ email }` | `{ sent: true, expiresAt, devCode? }` |
@@ -165,7 +165,6 @@ the payload is what separates them. Signing, expiry, and constant-time compariso
 ```
 phone  signup          {phone}:{exp}                      ← legacy shape, must not change
 phone  password_reset  password_reset:{phone}:{exp}
-phone  social_link     social_link:{phone}:{exp}
 email  password_reset  email:password_reset:{email}:{exp}  ← channel label
 ```
 
@@ -290,13 +289,27 @@ For an unlinked Kakao identity, automatic linking requires a valid, provider-ver
 
 `GET /auth/me.socialSignupPrefill` includes nullable `name`, `phone`, `gender`, and `birthDate` during pending/deferred profile completion. `birthDate` combines complete `birthyear` and `birthday` only when `birthday_type = SOLAR`; lunar, incomplete or invalid dates require manual input and the existing 14+ gate applies. An unchanged server-stored Kakao phone skips OTP at profile completion and records `kakao_provided_phone` in the status audit log. An edited number or an Apple signup does not inherit that exception. The UI omits the OTP card for the Kakao number.
 
-### Phone-only pending social-link compatibility endpoints
+### Linking a social login while signed in
 
-When a pending social signup encounters `409 PHONE_CONFLICT`, clients must direct the person to their existing account login and email recovery. `social-link` and `social-link/preview` retain the old `{ phone, proofToken }` DTO for compatibility, but a valid `purpose: "social_link"` OTP cannot supply independent proof of account ownership. The caller must still be an active account with exactly one active kakao/apple identity, in either `social_profile_required` without a profile or `social_profile_deferred` (which may already have a profile). Completed accounts are not eligible.
+`POST /auth/link/kakao` and `POST /auth/link/apple` attach a Kakao or Apple login to the account the caller is signed in as. Ownership of the account is proven by the session (the caller signed in with that account's own login method); ownership of the provider identity is proven by the provider token, verified by the same code as the login endpoints (Kakao `app_id` check or code exchange, Apple signature/audience/nonce). A phone number or an email address takes no part, so neither can be used to take over an account.
 
-After validating proof purpose, caller state, holder state and provider restrictions, both endpoints return `409 SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF`. They do not move identities, inquiries or upload ownership; delete either account or profile; consume the phone challenge; add status/audit notifications; or issue a holder session or replacement cookie. Preview does not disclose a masked email or login methods. Existing data and restrictive foreign keys remain intact. Expired pending callers retain the existing signup-reset and `SOCIAL_SIGNUP_EXPIRED` behavior.
+- **Guards**: `V1AuthGuard`. A caller still in social signup (`social_terms_required`, `social_profile_required`) gets `403 SIGNUP_INCOMPLETE` from the guard; a caller who skipped the profile step (`social_profile_deferred`) gets the same code from the service with `details.next.route=/signup/social`. Rate limit 10/min.
+- **Recent login**: a cookie session issued more than 30 minutes ago gets `403 RECENT_LOGIN_REQUIRED` with `details: { maxAgeSeconds: 1800 }`, before any provider call. Non-production header identities have no session age and skip the check.
+- **Success** is `200` with `{ provider, alreadyLinked, mergedPendingAccount, authProviders }`. `alreadyLinked` is the idempotent repeat (same provider identity already on this account): nothing is written and no notification is sent. `authProviders` lists the account's active login methods after the call.
+- **Abandoned signup**: if the provider identity sits on an account that never finished signup — onboarding status `social_terms_required`, `social_profile_required` or `social_profile_deferred`, active, no operator role, no password, and that identity as its only active login — the identity row moves to the caller and `mergedPendingAccount` is `true`. That account is retired the way an operator deletion retires one (status `deleted`; email, phone, nickname and provider keys replaced by placeholders so the unique values are free again; push devices, regions, preferences, search history and verification tokens removed), and its inquiries and upload assets are handed to the caller. All in one transaction; the retire step is a guarded update, so an account that finished signup in the meantime is refused.
+- **Concurrency**: the call takes two advisory locks (caller + provider, then the external identity), so two accounts cannot claim the same identity and one account cannot end up with two identities of one provider. The loser gets the ordinary `409` below.
+- **Records**: a `v1_status_change_logs` row (`auth_identity`, `unlinked`/`pending_social_account` → `linked`, reason `account_link:<provider>` plus `;merged_pending_user` when an account was retired; a second `user` row records the retired account) and a `social_identity_linked` in-app notification (best effort — a notification failure never fails the link).
 
-Errors: `400 PHONE_NOT_VERIFIED` (bad, expired, wrong-purpose or unavailable verified proof), `404 ACCOUNT_NOT_FOUND` (no account owns the phone), `403 ACCOUNT_WITHDRAWAL_PENDING` / `403 PERMISSION_DENIED` (inactive caller or holder), `401 SOCIAL_SIGNUP_EXPIRED`, `409 SOCIAL_LINK_NOT_PENDING`, `409 SOCIAL_LINK_SAME_ACCOUNT`, `409 SOCIAL_LINK_PHONE_UNVERIFIED`, `409 SOCIAL_LINK_ADMIN_FORBIDDEN`, `409 SOCIAL_LINK_PROVIDER_EXISTS`, and `409 SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF`. Link rate limit is 5/min; preview is 10/min. Neither endpoint has a phone-only success path.
+Errors: `401 UNAUTHENTICATED`; `403 RECENT_LOGIN_REQUIRED`; `403 SIGNUP_INCOMPLETE`; `403 PERMISSION_DENIED` (caller not active); `409 SOCIAL_LINK_PROVIDER_EXISTS` (the account already has a *different* Kakao/Apple identity); `409 SOCIAL_LINK_PROVIDER_IN_USE` (the identity belongs to another account that is in real use, or lost a race); `400 VALIDATION_ERROR` (Kakao body mixes both forms); and the login endpoints' token errors (`400 OAUTH_NOT_CONFIGURED`, `401 UNAUTHENTICATED`, `503` when the provider is unreachable).
+
+### Sign in, then link
+
+A social login or signup that collides with an existing account cannot be settled by proving a phone number or an email. These `409` responses carry `details: { next: 'sign_in_then_link', provider: 'kakao' | 'apple' }` and a message that tells the person to sign in with the original method and link the provider from settings:
+
+- `/auth/kakao`, `/auth/kakao/token`, `/auth/apple`: `SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL`, `SOCIAL_LINK_CONTACT_CONFLICT`, `SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF`.
+- `PHONE_CONFLICT` from `/verification/phone/request`, `/verification/phone/confirm` and `/auth/social-profile`, only for a social account whose signup is unfinished (`social_profile_required`, `social_profile_deferred`) — `provider` is that account's own provider. Other callers get the plain `PHONE_CONFLICT` without `details`.
+
+The phone-only `/auth/social-link` and `/auth/social-link/preview` endpoints (they always answered `409`) and the `social_link` OTP purpose are removed.
 
 `GET /api/v1/auth/me` includes account login metadata under `user`: `authProvider`, `authProviders`, and `hasPassword`. Clients must use `hasPassword` to decide whether email/password account controls are applicable.
 

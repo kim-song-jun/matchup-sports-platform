@@ -361,6 +361,55 @@ describe('VerificationService.requestPhone (MT)', () => {
     expect(handle.v1VerificationToken.create).not.toHaveBeenCalled();
   });
 
+  describe('PHONE_CONFLICT for a social signup that has not finished', () => {
+    const SIGN_IN_THEN_LINK = (provider: 'kakao' | 'apple') => ({
+      response: { code: 'PHONE_CONFLICT', details: { next: 'sign_in_then_link', provider } },
+    });
+    const plain = { response: { code: 'PHONE_CONFLICT' } };
+
+    async function requestWith(user: Record<string, unknown>) {
+      const prisma = buildPrismaMock();
+      const handle = prisma as never as { v1User: { findUnique: jest.Mock; findFirst: jest.Mock } };
+      handle.v1User.findUnique.mockResolvedValue({ id: 'u1', email: null, phone: null, emailVerifiedAt: null, phoneVerifiedAt: null, ...user });
+      handle.v1User.findFirst.mockResolvedValue({ id: 'other-user' });
+      return new VerificationService(prisma, dispatcher, eventLogStub()).requestPhone(authUser, '01012345678');
+    }
+
+    it.each([
+      ['social_profile_required', 'kakao'],
+      ['social_profile_deferred', 'apple'],
+    ] as const)('points a %s %s account at sign-in-then-link', async (onboardingStatus, provider) => {
+      await expect(requestWith({ onboardingStatus, authIdentities: [{ provider }] })).rejects.toMatchObject(SIGN_IN_THEN_LINK(provider));
+    });
+
+    it('keeps the plain conflict for a finished social account and for an email account', async () => {
+      const finished = await requestWith({ onboardingStatus: 'completed', authIdentities: [{ provider: 'kakao' }] }).catch((e) => e);
+      expect(finished).toMatchObject(plain);
+      expect(finished.getResponse().details).toBeUndefined();
+      const email = await requestWith({ onboardingStatus: 'social_profile_required', authIdentities: [{ provider: 'email' }] }).catch((e) => e);
+      expect(email).toMatchObject(plain);
+      expect(email.getResponse().details).toBeUndefined();
+    });
+
+    it('carries the same details when the number is taken while confirming', async () => {
+      const prisma = buildPrismaMock();
+      const codeHash = await hashPassword('123456');
+      const handle = prisma as never as {
+        v1VerificationToken: { findFirst: jest.Mock };
+        v1User: { findUnique: jest.Mock; update: jest.Mock };
+      };
+      handle.v1VerificationToken.findFirst.mockResolvedValue({ id: 't1', channel: 'phone', target: '01012345678', codeHash, attemptCount: 0 });
+      handle.v1User.update.mockRejectedValue(new Prisma.PrismaClientKnownRequestError('Unique constraint failed', { code: 'P2002', clientVersion: 'test' }));
+      handle.v1User.findUnique.mockResolvedValue({
+        id: 'u1', email: null, phone: null, emailVerifiedAt: null, phoneVerifiedAt: null,
+        onboardingStatus: 'social_profile_required', authIdentities: [{ provider: 'apple' }],
+      });
+
+      await expect(new VerificationService(prisma, dispatcher, eventLogStub()).confirm(authUser, 'phone', '123456'))
+        .rejects.toMatchObject(SIGN_IN_THEN_LINK('apple'));
+    });
+  });
+
   it('rejects a phone resend within the cooldown window (paid-SMS abuse guard)', async () => {
     const prisma = buildPrismaMock();
     const handle = prisma as never as {

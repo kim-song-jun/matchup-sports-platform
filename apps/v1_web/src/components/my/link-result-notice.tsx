@@ -17,11 +17,10 @@ type CardNotice = {
 
 type Notice = { kind: 'banner'; message: string } | ({ kind: 'card' } & CardNotice);
 
-/** 다음 행동은 이 화면의 연결 버튼이다. 버튼이 없는 경우(웹의 Apple 등)에는 있지도 않은 버튼을 가리키지 않는다. */
-function mismatchBody(provider: LinkOutcome['provider'], canConnectHere: boolean): string {
-  const base = '처음 안내받은 계정과 달라서 연결하지 않았어요.';
-  if (canConnectHere) return `${base} 이 계정에 연결하려면 아래에서 직접 연결해 주세요.`;
-  return provider === 'apple' ? `${base} Apple 연결은 iOS 앱에서 할 수 있어요.` : base;
+/** 연결하지 않은 이유 뒤에 다음 행동을 붙인다. 다음 행동은 이 화면의 연결 버튼이고, 버튼이 없는 경우(웹의 Apple 등)에는 없는 버튼을 가리키지 않는다. */
+function withNextStep(reason: string, provider: LinkOutcome['provider'], canConnectHere: boolean): string {
+  if (canConnectHere) return `${reason} 이 계정에 연결하려면 아래에서 직접 연결해 주세요.`;
+  return provider === 'apple' ? `${reason} Apple 연결은 iOS 앱에서 할 수 있어요.` : reason;
 }
 
 function noticeFor({ linkResult, provider }: LinkOutcome, canConnectHere: boolean): Notice {
@@ -61,7 +60,15 @@ function noticeFor({ linkResult, provider }: LinkOutcome, canConnectHere: boolea
       return {
         kind: 'card',
         title: '다른 계정에 로그인했어요',
-        body: mismatchBody(provider, canConnectHere),
+        body: withNextStep('처음 안내받은 계정과 달라서 연결하지 않았어요.', provider, canConnectHere),
+        role: 'status',
+        actions: ['dismiss'],
+      };
+    case 'expired':
+      return {
+        kind: 'card',
+        title: '연결 시간이 지났어요',
+        body: withNextStep('로그인하기 전에 연결 시간이 지나서 연결하지 않았어요.', provider, canConnectHere),
         role: 'status',
         actions: ['dismiss'],
       };

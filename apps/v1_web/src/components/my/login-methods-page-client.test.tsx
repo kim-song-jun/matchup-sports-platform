@@ -432,7 +432,7 @@ describe('LoginMethodsPageClient - 앱에서 연결', () => {
 });
 
 describe('LoginMethodsPageClient - 카카오를 다녀온 결과(주소 쿼리)', () => {
-  // 8가지 결과 모두: 안내가 보이고, 주소에서는 결과 쿼리가 지워진다.
+  // 9가지 결과 모두: 안내가 보이고, 주소에서는 결과 쿼리가 지워진다.
   it.each([
     ['linked', '카카오 로그인이 연결됐어요. 이제 카카오로도 같은 계정에 들어올 수 있어요.'],
     ['merged', '카카오 로그인이 연결됐어요. 카카오로 가입하다 멈춘 계정은 정리하고 이 계정으로 옮겼어요.'],
@@ -441,6 +441,7 @@ describe('LoginMethodsPageClient - 카카오를 다녀온 결과(주소 쿼리)'
     ['exists', '이미 다른 카카오 계정이 연결돼 있어요'],
     ['recent_login', '보안을 위해 다시 로그인해 주세요'],
     ['mismatch', '다른 계정에 로그인했어요'],
+    ['expired', '연결 시간이 지났어요'],
     ['failed', '카카오 로그인을 연결하지 못했어요'],
   ])('linkResult=%s 를 안내하고 주소에서 지운다', async (linkResult, text) => {
     setQuery(`linkResult=${linkResult}&provider=kakao`);
@@ -556,6 +557,20 @@ describe('LoginMethodsPageClient - 결과 카드의 다음 행동', () => {
     await renderLoaded(['email']);
 
     expect(await screen.findByText('처음 안내받은 계정과 달라서 연결하지 않았어요. Apple 연결은 iOS 앱에서 할 수 있어요.')).toBeInTheDocument();
+    expect(screen.queryByText(/아래에서 직접 연결해 주세요/)).not.toBeInTheDocument();
+  });
+
+  it('연결 시간이 지났으면 이 화면의 연결하기 버튼으로 이어 주고, 웹의 Apple이면 iOS 앱 안내로 바꾼다', async () => {
+    setQuery('linkResult=expired&provider=kakao');
+    await renderLoaded(['email']);
+    expect(await screen.findByText('로그인하기 전에 연결 시간이 지나서 연결하지 않았어요. 이 계정에 연결하려면 아래에서 직접 연결해 주세요.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: KAKAO_BUTTON })).toBeEnabled();
+  });
+
+  it('웹에서 Apple 연결 시간이 지났으면 없는 버튼 대신 iOS 앱 안내를 한다', async () => {
+    setQuery('linkResult=expired&provider=apple');
+    await renderLoaded(['email']);
+    expect(await screen.findByText('로그인하기 전에 연결 시간이 지나서 연결하지 않았어요. Apple 연결은 iOS 앱에서 할 수 있어요.')).toBeInTheDocument();
     expect(screen.queryByText(/아래에서 직접 연결해 주세요/)).not.toBeInTheDocument();
   });
 

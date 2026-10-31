@@ -33,6 +33,7 @@ describe('linkResultFromError', () => {
     [409, 'SOCIAL_LINK_PROVIDER_IN_USE', 'in_use'],
     [409, 'SOCIAL_LINK_PROVIDER_EXISTS', 'exists'],
     [403, 'RECENT_LOGIN_REQUIRED', 'recent_login'],
+    [409, 'SOCIAL_LINK_TOKEN_ACCOUNT_MISMATCH', 'mismatch'],
     [400, 'SOCIAL_LINK_TOKEN_INVALID', 'failed'],
     [403, 'SIGNUP_INCOMPLETE', 'failed'],
     [401, 'UNAUTHENTICATED', 'failed'],
@@ -44,6 +45,7 @@ describe('linkResultFromError', () => {
   it('does not trust a code on the wrong status, or an error that is not from the API client', () => {
     expect(linkResultFromError(apiError(500, 'SOCIAL_LINK_PROVIDER_IN_USE'))).toBe('failed');
     expect(linkResultFromError(apiError(409, 'RECENT_LOGIN_REQUIRED'))).toBe('failed');
+    expect(linkResultFromError(apiError(400, 'SOCIAL_LINK_TOKEN_ACCOUNT_MISMATCH'))).toBe('failed');
     expect(linkResultFromError(new Error('SOCIAL_LINK_PROVIDER_IN_USE'))).toBe('failed');
     expect(linkResultFromError(undefined)).toBe('failed');
   });

@@ -56,6 +56,16 @@ describe('phone-proof-token', () => {
     expect(payload).toMatch(/^01012345678:\d+$/);
   });
 
+  // 가입 증명은 `{phone}:{exp}` 맨몸 형식이라, 번호 자리에 다른 토큰 계열의 페이로드 머리말을 넣으면 그 계열 토큰이 된다.
+  it('refuses to issue or accept a bare signup proof for anything but digits', () => {
+    expect(() => issuePhoneProofToken('withdrawal_cancel:u:1')).toThrow(/digit-only/);
+    expect(() => issuePhoneProofToken('01012345678:extra')).toThrow(/digit-only/);
+    expect(() => issuePhoneProofToken('01012345678', 'signup')).not.toThrow();
+    expect(verifyPhoneProofToken(issuePhoneProofToken('01012345678'), 'withdrawal_cancel:u:1')).toBe(false);
+    // 다른 용도는 맨 앞에 고정 용도 라벨이 붙어 번호 자리가 무엇이든 다른 계열과 겹치지 않는다.
+    expect(() => issuePhoneProofToken('withdrawal_cancel:u:1', 'password_reset')).not.toThrow();
+  });
+
   it('rejects a tampered signature', () => {
     const token = issuePhoneProofToken('01012345678');
     const tampered = `${token.slice(0, -2)}xy`;

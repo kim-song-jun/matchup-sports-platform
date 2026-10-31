@@ -121,9 +121,105 @@ describe('AccountRecoveryService — 계정 찾기', () => {
       maskedEmail: 'ru***@example.com',
       providers: ['email'],
       hasPassword: true,
+      withdrawalPendingUntil: null,
     });
     // 전체 주소가 새면 번호만 가진 쪽에 이메일을 넘겨주는 셈이 된다.
     expect(JSON.stringify(result)).not.toContain('runner@example.com');
+  });
+});
+
+describe('AccountRecoveryService — 탈퇴 유예 중인 계정이 번호를 쥐고 있을 때', () => {
+  const REQUESTED_AT = new Date('2026-10-01T00:00:00.000Z');
+
+  beforeEach(() => {
+    process.env.V1_SESSION_SECRET = 'x'.repeat(48);
+  });
+
+  /** 상태별로 번호를 쥔 계정을 돌려주고, 탈퇴 신청 기록은 사용자 id 로 찾아 주는 데이터베이스. */
+  function prismaWithHolders(
+    holders: { active?: unknown; withdrawal_pending?: unknown },
+    requestedAt: Date | null = REQUESTED_AT,
+  ) {
+    const findFirst = jest.fn(async ({ where }: { where: { accountStatus: 'active' | 'withdrawal_pending' } }) =>
+      holders[where.accountStatus] ?? null,
+    );
+    const statusLogFindFirst = jest.fn(async ({ where }: { where: { targetId: string } }) =>
+      requestedAt && where.targetId === withdrawingUser.id ? { createdAt: requestedAt } : null,
+    );
+    const prisma = {
+      v1User: { findFirst },
+      v1StatusChangeLog: { findFirst: statusLogFindFirst },
+    } as unknown as PrismaService;
+    return { prisma, findFirst, statusLogFindFirst };
+  }
+
+  const withdrawingUser = {
+    id: 'u-withdrawing',
+    email: 'moved@example.com',
+    authIdentities: [{ id: 'identity-3', provider: 'kakao', passwordHash: null }],
+  };
+  const proof = () => issuePhoneProofToken(PHONE, 'password_reset');
+
+  it('번호를 증명한 뒤에는 같은 모양으로 답하고 유예가 끝나는 시각을 덧붙인다', async () => {
+    const { prisma } = prismaWithHolders({ withdrawal_pending: withdrawingUser });
+
+    const result = await service(prisma).findAccountByPhone({ phone: PHONE, proofToken: proof() });
+
+    expect(result).toEqual({
+      maskedEmail: 'mo***@example.com',
+      providers: ['kakao'],
+      hasPassword: false,
+      withdrawalPendingUntil: '2026-10-31T00:00:00.000Z',
+    });
+    expect(JSON.stringify(result)).not.toContain('moved@example.com');
+  });
+
+  it('탈퇴 신청 기록이 없으면 끝나는 시각은 null 이다', async () => {
+    const { prisma } = prismaWithHolders({ withdrawal_pending: withdrawingUser }, null);
+
+    await expect(service(prisma).findAccountByPhone({ phone: PHONE, proofToken: proof() })).resolves.toMatchObject({
+      providers: ['kakao'],
+      withdrawalPendingUntil: null,
+    });
+  });
+
+  it('활성 계정과 탈퇴 유예 계정이 함께 걸리면 활성 계정을 보여 주고 유예는 말하지 않는다', async () => {
+    const { prisma, statusLogFindFirst } = prismaWithHolders({
+      active: emailUser,
+      withdrawal_pending: withdrawingUser,
+    });
+
+    const result = await service(prisma).findAccountByPhone({ phone: PHONE, proofToken: proof() });
+
+    expect(result).toMatchObject({ maskedEmail: 'ru***@example.com', providers: ['email'], withdrawalPendingUntil: null });
+    expect(statusLogFindFirst).not.toHaveBeenCalled();
+  });
+
+  // 인증번호로 번호 주인임을 증명하기 전에는 이 번호를 쥔 계정이 있는지조차 읽지 않는다.
+  it('증명이 틀리면 계정도 탈퇴 기록도 조회하지 않는다', async () => {
+    const { prisma, findFirst, statusLogFindFirst } = prismaWithHolders({ withdrawal_pending: withdrawingUser });
+
+    await expect(
+      service(prisma).findAccountByPhone({ phone: PHONE, proofToken: issuePhoneProofToken(PHONE) }),
+    ).rejects.toMatchObject({ response: { code: 'PHONE_NOT_VERIFIED' } });
+    expect(findFirst).not.toHaveBeenCalled();
+    expect(statusLogFindFirst).not.toHaveBeenCalled();
+  });
+
+  it('번호를 쥔 계정이 없으면 여전히 ACCOUNT_NOT_FOUND', async () => {
+    const { prisma } = prismaWithHolders({});
+
+    await expect(service(prisma).findAccountByPhone({ phone: PHONE, proofToken: proof() })).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+
+  it('비밀번호 재설정(휴대폰)은 탈퇴 유예 계정을 찾지 않는다', async () => {
+    const { prisma } = prismaWithHolders({ withdrawal_pending: withdrawingUser });
+
+    await expect(
+      service(prisma).resetPasswordByPhone({ phone: PHONE, proofToken: proof(), newPassword: 'brand-new-password' }),
+    ).rejects.toMatchObject({ response: { code: 'ACCOUNT_NOT_FOUND' }, status: 404 });
   });
 });
 

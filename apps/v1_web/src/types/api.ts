@@ -91,6 +91,8 @@ export type V1FoundAccount = {
   maskedEmail: string | null;
   providers: string[];
   hasPassword: boolean;
+  /** 이 번호를 쥔 계정이 탈퇴 유예 중이면 유예가 끝나는 시각(ISO). 활성 계정이거나 탈퇴 신청 기록이 없으면 null. */
+  withdrawalPendingUntil: string | null;
 };
 
 export type V1AuthMe = {
@@ -228,6 +230,11 @@ export type V1SignInThenLinkDetails = {
   linkToken?: string;
   /** `linkToken` 의 남은 유효 시간(초). */
   linkTokenExpiresInSeconds?: number;
+  /**
+   * 번호를 쥔 계정이 탈퇴 유예 중일 때만 온다(`PHONE_CONFLICT`, 인증번호로 번호를 증명한 뒤의 409). 유예가 끝나는
+   * 시각(ISO)이고, 탈퇴 신청 기록이 없으면 null.
+   */
+  withdrawalPendingUntil?: string | null;
 };
 
 /** 403 `RECENT_LOGIN_REQUIRED` 의 `details` — 세션 발급 후 이 시간(초)이 지나면 다시 로그인해야 연결할 수 있다. */
@@ -265,6 +272,8 @@ export type V1PhoneVerifyResult = {
   proofToken?: string;
   /** 이 번호로 이미 가입한 계정이 있다. */
   registered: boolean;
+  /** 그 계정이 탈퇴 유예 중이면 유예가 끝나는 시각(ISO). 아니거나 탈퇴 신청 기록이 없으면 null. */
+  withdrawalPendingUntil: string | null;
 };
 
 export type V1Sport = {

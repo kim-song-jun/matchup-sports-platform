@@ -61,7 +61,7 @@ describe('PhoneVerificationCard', () => {
     vi.spyOn(api, 'useV1PhoneIssue').mockReturnValue(
       mutation({ expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString() }),
     );
-    const verifyMock = vi.fn().mockResolvedValue({ verified: true, proofToken: 'PROOF', registered: false });
+    const verifyMock = vi.fn().mockResolvedValue({ verified: true, proofToken: 'PROOF', registered: false, withdrawalPendingUntil: null });
     vi.spyOn(api, 'useV1PhoneVerify').mockReturnValue({ mutateAsync: verifyMock, isPending: false } as never);
     const onVerified = vi.fn();
 

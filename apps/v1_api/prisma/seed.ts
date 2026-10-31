@@ -1628,9 +1628,11 @@ async function upsertCoverageUser(input: {
   // 번호가 있는 시드 계정은 인증까지 끝난 상태로 둔다 — 미인증이면 쓰기 전역 게이트에 걸려
   // 로그인만 되고 아무 동작도 못 하는 계정이 된다.
   const phoneVerifiedAt = input.phone ? seedNow : null;
+  // Keyed by id: the withdrawal fixture can be destroyed by the grace-period job (email and phone tombstoned),
+  // and a lookup by email would then miss it and collide on the fixed id.
   const user = await prisma.v1User.upsert({
-    where: { email: input.email },
-    update: { phone: input.phone, phoneVerifiedAt, accountStatus, onboardingStatus, deletedAt },
+    where: { id: input.id },
+    update: { email: input.email, phone: input.phone, phoneVerifiedAt, accountStatus, onboardingStatus, deletedAt },
     create: {
       id: input.id,
       email: input.email,
@@ -2578,6 +2580,23 @@ async function seedCoverageChatNotificationsAndAdmin(userIds: Record<string, str
       },
     });
   }
+
+  // The 30-day grace counts from this log, so every seed run restarts it; without one the account is reported
+  // as needing a person on every automatic-deletion run.
+  const withdrawalUserId = userIds['coverage-withdrawal@teameet.v1'];
+  await prisma.v1StatusChangeLog.upsert({
+    where: { id: '00000000-0000-4000-8000-000000001714' },
+    update: { createdAt: new Date() },
+    create: {
+      id: '00000000-0000-4000-8000-000000001714',
+      targetType: 'user',
+      targetId: withdrawalUserId,
+      fromStatus: 'active',
+      toStatus: 'withdrawal_pending',
+      actorType: 'user',
+      actorUserId: withdrawalUserId,
+    },
+  });
 }
 
 async function main() {

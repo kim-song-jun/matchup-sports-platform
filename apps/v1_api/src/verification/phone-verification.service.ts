@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { randomInt } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { hashPassword, verifyPassword } from '../auth/password-hash';
-import { isPhoneRegistered } from './phone-registered';
+import { findPhoneRegistration } from './phone-registered';
 import { isPhoneVerificationEnforced } from './phone-verification-access';
 import { issuePhoneProofToken, type PhoneProofPurpose } from './phone-proof-token';
 import { SMS_EVENT_TYPE, SmsEventLogService } from './sms-event-log.service';
@@ -121,8 +121,8 @@ export class PhoneVerificationService {
   }
 
   /** Only answer this after verifyCode() has proven the caller holds the number. */
-  isRegistered(phone: string): Promise<boolean> {
-    return isPhoneRegistered(this.prisma, phone);
+  lookupRegistration(phone: string) {
+    return findPhoneRegistration(this.prisma, phone);
   }
 
   issueProof(phone: string, purpose: PhoneProofPurpose = 'signup'): string {

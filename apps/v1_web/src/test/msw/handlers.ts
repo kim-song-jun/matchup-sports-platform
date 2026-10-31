@@ -221,7 +221,7 @@ async function verifyAuthPhone(request: Request) {
   const proofToken = `msw-phone-${purpose}-${randomUuid()}`;
   authPhoneProofs.set(proofToken, { phone: body.phone, channel: 'phone', purpose, expiresAt: Date.now() + 10 * 60 * 1000 });
   // 번호 소유를 증명한 뒤에만 알려준다. 발급 단계에서는 알리지 않는다.
-  return ok({ verified: true, proofToken, registered: body.phone === authAccountPhoneFixture });
+  return ok({ verified: true, proofToken, registered: body.phone === authAccountPhoneFixture, withdrawalPendingUntil: null });
 }
 
 async function requestRecoveryEmail(request: Request) {
@@ -298,7 +298,7 @@ async function findAccountByRecoveryPhone(request: Request) {
   const email = v1UserFixture.email;
   const [local = '', domain] = email?.split('@') ?? [];
   const maskedEmail = email ? (domain ? `${local.length > 2 ? local.slice(0, 2) : ''}***@${domain}` : '***') : null;
-  return ok({ maskedEmail, providers: ['email'], hasPassword: true });
+  return ok({ maskedEmail, providers: ['email'], hasPassword: true, withdrawalPendingUntil: null });
 }
 
 function notFound(message: string) {

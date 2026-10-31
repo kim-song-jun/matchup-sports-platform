@@ -16,7 +16,7 @@ describe('AccountDeletionPage', () => {
       expect.stringMatching(/^mailto:teameetsports@naver\.com\?/),
     );
     expect(screen.getByText(/본인 확인을 추가로 요청할 수 있어요/)).toBeInTheDocument();
-    expect(screen.getByText(/로그인과 푸시 알림 등록을 즉시 중지해요/)).toBeInTheDocument();
+    expect(screen.getByText(/서비스 이용과 푸시 알림 등록을 즉시 중지해요/)).toBeInTheDocument();
     expect(screen.getByText(/활동 지역과 검색 기록을 삭제하거나 식별할 수 없게 처리해요/)).toBeInTheDocument();
     expect(screen.getByText(/제한적으로 보관될 수 있어요/)).toBeInTheDocument();
     expect(screen.getByText(/진행 중인 매치나 팀 운영 권한이 있으면 먼저 정리가 필요할 수 있어요/)).toBeInTheDocument();
@@ -27,7 +27,7 @@ describe('AccountDeletionPage', () => {
     render(<AccountDeletionPage />);
 
     expect(
-      screen.getByText('탈퇴를 요청하면 30일 뒤 계정과 개인정보가 삭제돼요. 그 전에는 고객센터로 복구를 요청할 수 있어요.'),
+      screen.getByText('탈퇴를 요청하면 30일 뒤 계정과 개인정보가 삭제돼요. 그 전에 다시 로그인하면 직접 취소할 수 있어요. 다만 신청할 때 빠진 팀과 경기 명단은 돌아오지 않아요.'),
     ).toBeInTheDocument();
   });
 });

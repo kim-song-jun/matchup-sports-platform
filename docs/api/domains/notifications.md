@@ -143,8 +143,8 @@ fan-out되며, 한 채널의 개별 발송 실패는 알림 row 자체나 다른
 1:1 문의에 어드민이 답변하면 문의한 회원에게 `inquiry_answered`(targetType `inquiry`, 딥링크
 `/my/inquiries/:inquiryId`)를 emit한다 — 게스트 문의는 계정이 없으므로 연락처로 대신 응답한다. 이
 이벤트는 `activityEnabled`가 아니라 `importantEnabled`로 게이팅된다.
-소셜 로그인이 휴대폰 주인의 기존 계정에 연결되면 그 계정에 `social_identity_linked`(targetType `system`, 딥링크
-`/my/settings`)를 emit한다 — 보안 알림이라 같은 `importantEnabled`로 게이팅된다.
+로그인한 계정에 카카오·Apple 로그인이 연결되면(`POST /auth/link/{provider}`) 그 계정에 `social_identity_linked`(targetType `system`, 딥링크
+`/my/settings`)를 남긴다 — 보안 알림이라 알림 설정과 무관하게 항상 남고, 알림함 행은 연결과 같은 트랜잭션 안에서 만든다(푸시·실시간 전달은 커밋 뒤).
 
 팀 초대를 받으면 `team_invitation_received`(targetType `team`, targetId는 팀 id)를 emit하고 딥링크는 팀 상세가
 아니라 수락·거절을 하는 `/my/invitations`다. 딥링크는 알림 생성 시 `V1Notification.deepLink`에 저장되므로

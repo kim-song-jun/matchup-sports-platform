@@ -20,6 +20,7 @@ describe('Kakao confirmed contacts and existing membership', () => {
   const originalFetch = global.fetch;
   const savedAppId = process.env.KAKAO_APP_ID;
   const savedPhoneDisabled = process.env.V1_PHONE_VERIFICATION_DISABLED;
+  const savedSessionSecret = process.env.V1_SESSION_SECRET;
   const holderId = 'integration-kakao-contact-holder';
   const otherId = 'integration-kakao-contact-other';
   const email = 'kakao-contact-holder@integration.test';
@@ -31,6 +32,7 @@ describe('Kakao confirmed contacts and existing membership', () => {
   beforeAll(async () => {
     process.env.KAKAO_APP_ID = '1604606';
     process.env.V1_PHONE_VERIFICATION_DISABLED = 'false';
+    process.env.V1_SESSION_SECRET = 'integration-kakao-contact-session-secret-0123456789';
     ({ app, cleanup: cleanupApp } = await createV1IntegrationApp());
     prisma = app.get(PrismaService);
     await cleanupFixtures();
@@ -68,6 +70,7 @@ describe('Kakao confirmed contacts and existing membership', () => {
     await cleanupApp?.();
     if (savedAppId === undefined) delete process.env.KAKAO_APP_ID; else process.env.KAKAO_APP_ID = savedAppId;
     if (savedPhoneDisabled === undefined) delete process.env.V1_PHONE_VERIFICATION_DISABLED; else process.env.V1_PHONE_VERIFICATION_DISABLED = savedPhoneDisabled;
+    if (savedSessionSecret === undefined) delete process.env.V1_SESSION_SECRET; else process.env.V1_SESSION_SECRET = savedSessionSecret;
   });
   async function cleanupFixtures() {
     if (!prisma) return;
@@ -121,6 +124,7 @@ describe('Kakao confirmed contacts and existing membership', () => {
     const before = await memberState();
     const response = await kakao({ phone_number: '+82 10-5555-0991' }).expect(409);
     expect(response.body.code).toBe('SOCIAL_LINK_REQUIRES_ACCOUNT_PROOF');
+    expect(response.body.details).toEqual({ next: 'sign_in_then_link', provider: 'kakao', linkToken: expect.any(String), linkTokenExpiresInSeconds: 1800 });
     expect(response.body).not.toHaveProperty('data.session');
     expect(response.headers['set-cookie']).toBeUndefined();
     expect(await memberState()).toEqual(before);
@@ -146,6 +150,7 @@ describe('Kakao confirmed contacts and existing membership', () => {
     const before = await memberState();
     const response = await kakao({ email, is_email_valid: true, is_email_verified: true, phone_number: '+82 10-5555-0992' }).expect(409);
     expect(response.body.code).toBe('SOCIAL_LINK_CONTACT_CONFLICT');
+    expect(response.body.details).toEqual({ next: 'sign_in_then_link', provider: 'kakao', linkToken: expect.any(String), linkTokenExpiresInSeconds: 1800 });
     expect(response.body).not.toHaveProperty('data.session');
     expect(response.headers['set-cookie']).toBeUndefined();
     expect(await memberState()).toEqual(before);

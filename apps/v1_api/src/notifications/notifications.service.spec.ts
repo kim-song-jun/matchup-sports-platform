@@ -198,31 +198,55 @@ describe('NotificationsService', () => {
     });
   });
 
-  it('소셜 연결 알림은 system 타입·설정 화면 딥링크이고 중요 알림 설정만 따른다', async () => {
-    prisma.v1NotificationPreference.findUnique.mockResolvedValue({ importantEnabled: false, activityEnabled: true });
-    await service.emitNotification('user-1', 'social_identity_linked', null, undefined, {
+  it('소셜 연결 보안 알림은 알림 설정과 무관하게 호출자 트랜잭션 안에서 system 타입·설정 화면 딥링크로 만든다', async () => {
+    // 모든 알림을 끈 사람에게도 "내 계정에 로그인 수단이 붙었다"는 알림은 남아야 한다.
+    prisma.v1NotificationPreference.findUnique.mockResolvedValue({ importantEnabled: false, activityEnabled: false });
+    prisma.v1Notification.findUnique.mockResolvedValue(null);
+    prisma.v1Notification.create.mockImplementation(async ({ data }) => makeNotification(data));
+    const tx = prisma as unknown as Prisma.TransactionClient;
+
+    const created = await service.createInTransaction(tx, 'user-1', 'social_identity_linked', {
       vars: { name: '카카오' },
       businessKey: 'social-link:identity-1',
     });
-    await new Promise(setImmediate);
-    expect(prisma.v1Notification.create).not.toHaveBeenCalled();
 
-    prisma.v1NotificationPreference.findUnique.mockResolvedValue({ importantEnabled: true, activityEnabled: false });
-    prisma.v1Notification.create.mockImplementation(async ({ data }) => makeNotification(data));
-    await service.emitNotification('user-1', 'social_identity_linked', null, undefined, {
-      vars: { name: '카카오' },
-      businessKey: 'social-link:identity-2',
-    });
-    await new Promise(setImmediate);
+    expect(created).toMatchObject({ targetType: 'system', deepLink: '/my/settings' });
     expect(prisma.v1Notification.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         recipientUserId: 'user-1',
+        businessKey: 'social-link:identity-1:user-1',
         targetType: 'system',
         title: '로그인 수단이 연결됐어요',
         body: '카카오 로그인이 연결됐어요. 본인이 아니라면 고객센터로 문의해 주세요.',
         deepLink: '/my/settings',
       }),
     });
+    expect(prisma.v1NotificationPreference.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('같은 businessKey 의 보안 알림이 이미 있으면 두 번 만들지 않는다', async () => {
+    prisma.v1Notification.findUnique.mockResolvedValue({ id: 'existing' });
+
+    const created = await service.createInTransaction(prisma as unknown as Prisma.TransactionClient, 'user-1', 'social_identity_linked', {
+      vars: { name: 'Apple' },
+      businessKey: 'social-link:identity-1',
+    });
+
+    expect(created).toBeNull();
+    expect(prisma.v1Notification.create).not.toHaveBeenCalled();
+  });
+
+  it('커밋 뒤 전달은 실시간으로 알리고, 전달이 실패해도 던지지 않는다', async () => {
+    const notification = makeNotification({ targetType: 'system', targetId: null, deepLink: '/my/settings' });
+    realtimeNotifier.emitToUser.mockImplementationOnce(() => {
+      throw new Error('socket down');
+    });
+
+    expect(() => service.deliverCreated('user-1', 'social_identity_linked', notification)).not.toThrow();
+    await new Promise(setImmediate);
+
+    expect(realtimeNotifier.emitToUser).toHaveBeenCalledWith('user-1', 'notification:new', notification);
+    expect(webPushService.sendToUser).toHaveBeenCalledWith('user-1', expect.objectContaining({ url: '/my/settings' }));
   });
 
   it('사용자가 해당 카테고리를 비활성화했을 때 알림 DB row를 생성하지 않는다', async () => {

@@ -69,7 +69,8 @@ export type NotificationEventType =
   | 'team_contact_accepted'
   | 'team_contact_declined'
   | 'inquiry_answered'
-  // 소셜 로그인이 휴대폰 주인의 기존 계정에 연결됐을 때 그 계정에게(MD-QA #126). 보안 알림이라 importantEnabled.
+  // 로그인한 계정에 카카오·Apple 로그인이 연결됐을 때 그 계정에게. 보안 알림이라 알림 설정과 무관하게
+  // 연결과 같은 트랜잭션에서 남긴다(createInTransaction — emitNotification 의 설정 확인을 거치지 않는다).
   | 'social_identity_linked'
   // H3: 팀장·어드민이 팀을 보관(해체)하면 팀원 전원과 가입 신청자에게 한 번 알린다. 도착지는 해체된 팀 페이지.
   | 'team_dissolved'
@@ -228,7 +229,7 @@ export function renderNotificationCopy(template: string, vars: NotificationCopyV
 function preferenceFieldForEvent(type: NotificationEventType): NotificationPrefField {
   // 사용자가 직접 접수한 1:1 문의의 답변은 놓치면 안 되는 알림이므로
   // 활동 알림(activityEnabled)이 아니라 중요 알림(importantEnabled)으로 게이트한다.
-  if (type === 'inquiry_answered' || type === 'social_identity_linked') {
+  if (type === 'inquiry_answered') {
     return 'importantEnabled';
   }
   if (type === 'team_dissolved') {
@@ -777,7 +778,7 @@ function lockNotificationLine(tx: Prisma.TransactionClient, key: string) {
   return tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`;
 }
 
-type DeliveredNotification = {
+export type DeliveredNotification = {
   id: string;
   targetType: V1NotificationTargetType;
   targetId: string | null;
@@ -1022,10 +1023,28 @@ export class NotificationsService {
     options: NotificationEmitOptions | undefined,
   ): void {
     if (userIds.length === 0) return;
+    const message = this.renderMessage(type, targetId, body, options);
+    if (message === null) return;
+    const { targetType } = message;
+    const prefField = preferenceFieldForEvent(type);
+    void this.pushAllowedNow(type, targetType, targetId).then((pushAllowed) => {
+      for (const userId of userIds) {
+        this.createNotificationWithPrefCheck(userId, message, prefField, pushAllowed, options?.businessKey).catch((err: unknown) => {
+          this.logger.warn({ userId, targetType, targetId, err }, '알림 생성 실패');
+        });
+      }
+    });
+  }
+
+  private renderMessage(
+    type: NotificationEventType,
+    targetId: string | null,
+    body: string | undefined,
+    options: NotificationEmitOptions | undefined,
+  ): { targetType: V1NotificationTargetType; targetId: string | null; title: string; body: string; deepLink: string | null } | null {
     const targetType = targetTypeForEvent(type);
-    let message: { targetType: V1NotificationTargetType; targetId: string | null; title: string; body: string; deepLink: string | null };
     try {
-      message = {
+      return {
         targetType,
         targetId,
         title: renderNotificationCopy(
@@ -1037,16 +1056,37 @@ export class NotificationsService {
       };
     } catch (err) {
       this.logger.warn({ type, targetId, err }, '알림 문구를 채우지 못해 발송하지 않습니다');
-      return;
+      return null;
     }
-    const prefField = preferenceFieldForEvent(type);
-    void this.pushAllowedNow(type, targetType, targetId).then((pushAllowed) => {
-      for (const userId of userIds) {
-        this.createNotificationWithPrefCheck(userId, message, prefField, pushAllowed, options?.businessKey).catch((err: unknown) => {
-          this.logger.warn({ userId, targetType, targetId, err }, '알림 생성 실패');
-        });
-      }
+  }
+
+  /**
+   * 수신 설정과 무관하게 남기는 보안 알림(로그인 수단 연결 등)의 알림함 행을 호출자의 트랜잭션 안에서 만든다 —
+   * 보안 사건과 그 기록이 함께 커밋되거나 함께 사라지게 한다. 같은 `businessKey` 행이 이미 있거나 문구를 못 채우면
+   * null. 실시간·푸시 전달은 커밋 뒤 `deliverCreated` 로 한다.
+   */
+  async createInTransaction(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    type: NotificationEventType,
+    options?: NotificationEmitOptions,
+  ): Promise<DeliveredNotification | null> {
+    const message = this.renderMessage(type, null, undefined, options);
+    if (message === null) return null;
+    const businessKey = options?.businessKey === undefined ? undefined : `${options.businessKey}:${userId}`;
+    if (businessKey !== undefined && (await tx.v1Notification.findUnique({ where: { businessKey }, select: { id: true } }))) return null;
+    return tx.v1Notification.create({
+      data: { recipientUserId: userId, ...message, ...(businessKey === undefined ? {} : { businessKey }) },
     });
+  }
+
+  /** `createInTransaction` 로 만든 행을 커밋 뒤에 실시간으로 알리고 푸시한다. 실패해도 던지지 않는다. */
+  deliverCreated(userId: string, type: NotificationEventType, notification: DeliveredNotification): void {
+    void this.pushAllowedNow(type, notification.targetType, notification.targetId)
+      .then((pushAllowed) => this.deliver(userId, notification, pushAllowed))
+      .catch((err: unknown) => {
+        this.logger.warn({ userId, type, err }, '보안 알림 전달 실패');
+      });
   }
 
   /**

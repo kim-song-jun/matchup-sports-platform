@@ -240,3 +240,81 @@ describe('소셜 가입 제출에서 번호 중복이 드러난 경우', () => {
     expect(seen.tokenAtLeave).toBe(PENDING_LINK_MSW.tokens.kakao);
   });
 });
+
+describe('새 계정의 소셜 가입이 끝나면 대기 연결 토큰을 지운다', () => {
+  const meWithPrefill = (phone: string) => http.get('*/api/v1/auth/me', () => success({
+    user: { id: 'pending-user', email: null, phone: null, accountStatus: 'active', onboardingStatus: 'social_profile_required', authProvider: 'kakao' },
+    profile: { displayName: '가입중회원', nickname: '가입중회원' },
+    verification: { emailVerified: false, phoneVerified: false },
+    socialSignupPrefill: { name: '김러너', phone, gender: 'female', birthDate: '20000229' },
+  }));
+  const sessionResponse = () => success({
+    user: { id: 'pending-user', email: null, onboardingStatus: 'social_profile_required' },
+    profile: { displayName: '김러너' },
+    session: { userId: 'pending-user', userEmail: null },
+    next: { route: '/onboarding/sport' },
+  });
+
+  it('프로필 제출이 성공하면 앞서 안내받은 계정용 토큰이 남지 않는다', async () => {
+    savePendingSocialLink(STALE_TOKEN);
+    server.use(
+      meWithPrefill('01012345678'),
+      http.get('*/api/v1/auth/check-nickname', () => success({ available: true })),
+      http.post('*/api/v1/auth/social-profile', sessionResponse),
+    );
+    renderSignup();
+    const user = userEvent.setup();
+    fireEvent.change(await screen.findByLabelText('닉네임'), { target: { value: '카카오러너' } });
+    await user.click(screen.getByRole('button', { name: '중복 확인' }));
+    const submit = await screen.findByRole('button', { name: '운동 설정으로 계속' });
+    await waitFor(() => expect(submit).toBeEnabled());
+    expect(readPendingSocialLink()).not.toBeNull();
+
+    await user.click(submit);
+
+    await waitFor(() => expect(readPendingSocialLink()).toBeNull());
+  });
+
+  it('나중에 입력할게요가 성공해도 토큰이 남지 않는다', async () => {
+    savePendingSocialLink(STALE_TOKEN);
+    server.use(meWithPrefill('01012345678'), http.post('*/api/v1/auth/social-profile/defer', sessionResponse));
+    renderSignup();
+
+    await userEvent.setup().click(await screen.findByRole('button', { name: '나중에 입력할게요' }));
+
+    await waitFor(() => expect(readPendingSocialLink()).toBeNull());
+  });
+
+  // 번호 중복 출구가 방금 저장한 토큰은 이 지움과 부딪히지 않는다 — 출구는 로그아웃 뒤에 저장하고 가입 완료 경로를 거치지 않는다.
+  it('가입 완료 경로의 삭제는 번호 중복 출구가 저장한 새 토큰을 건드리지 않는다', async () => {
+    await confirmConflictingCode();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: '계정 찾기' }));
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/auth/find-account'));
+    expect(readPendingSocialLink()).toMatchObject({ linkToken: PENDING_LINK_MSW.tokens.kakao });
+  });
+});
+
+describe('토큰을 보관할 수 없는 브라우저', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('확인 창이 자동 연결 대신 설정에서 직접 연결하라고 안내하고, 로그아웃과 이동은 그대로 진행한다', async () => {
+    await confirmConflictingCode();
+    const original = Storage.prototype.setItem;
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function setItem(this: Storage, key: string, value: string) {
+      if (key.includes('storage_probe')) throw new DOMException('quota', 'QuotaExceededError');
+      original.call(this, key, value);
+    });
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: '원래 방법으로 로그인하기' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/설정의 "로그인 방법"에서 카카오 로그인을 연결해 주세요/)).toBeInTheDocument();
+    expect(within(dialog).queryByText(/자동으로 연결돼요/)).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: '로그인하러 가기' }));
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/login'));
+    expect(seen.logout).toBe(1);
+    expect(seen.tokenAtLeave).toBeNull();
+  });
+});

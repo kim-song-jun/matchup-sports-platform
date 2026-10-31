@@ -29,6 +29,7 @@ export function KakaoCallbackClient() {
   const { mutate: linkKakao } = useV1LinkKakao();
   const calledRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
+  const [linking, setLinking] = useState(false);
 
   useEffect(() => {
     if (calledRef.current) return;
@@ -63,6 +64,7 @@ export function KakaoCallbackClient() {
     }
 
     if (attempt.mode === 'link') {
+      setLinking(true);
       const redirectUri = getKakaoRedirectUri();
       if (!redirectUri) {
         router.replace(buildLinkResultPath({ linkResult: 'failed', provider: 'kakao' }, returnTo));
@@ -152,7 +154,7 @@ export function KakaoCallbackClient() {
   return (
     <AuthFrame stage={AUTH_WELCOME_STAGE}>
       <div className="tm-auth-body tm-auth-center">
-        <h1 className="tm-text-heading tm-auth-heading">카카오 로그인을 확인하고 있어요</h1>
+        <h1 className="tm-text-heading tm-auth-heading">{linking ? '카카오 연결을 확인하고 있어요' : '카카오 로그인을 확인하고 있어요'}</h1>
         <p className="tm-text-body tm-auth-sub">잠시만 기다려 주세요.</p>
       </div>
     </AuthFrame>

@@ -13,20 +13,29 @@ export type PendingSocialLink = {
   provider: V1LinkableProvider;
   /** 이 시각(ISO)부터 토큰은 서버가 받지 않는다. */
   expiresAt: string;
+  /**
+   * 충돌한 계정이 탈퇴 유예 중일 때만 있다. 값은 유예가 끝나는 시각(ISO)이고, 서버가 모르면 null.
+   * 없음(undefined)과 null 은 다르다 — 없으면 탈퇴 계정이 아니고, null 이면 탈퇴 계정인데 날짜만 모른다.
+   */
+  withdrawalPendingUntil?: string | null;
 };
 
 /** 읽은 결과: 아직 쓸 수 있는 토큰, 또는 기다리는 사이 만료됐다는 한 번뿐인 표식(토큰은 이미 지워졌다). */
 export type PendingSocialLinkRead =
   | (PendingSocialLink & { expired: false })
-  | { provider: V1LinkableProvider; expired: true };
+  | (Pick<PendingSocialLink, 'provider' | 'withdrawalPendingUntil'> & { expired: true });
 
 function parsePendingSocialLink(value: unknown): PendingSocialLink | null {
   if (typeof value !== 'object' || value === null) return null;
-  const { linkToken, provider, expiresAt } = value as Record<string, unknown>;
+  const record = value as Record<string, unknown>;
+  const { linkToken, provider, expiresAt } = record;
   if (typeof linkToken !== 'string' || linkToken === '') return null;
   if (provider !== 'kakao' && provider !== 'apple') return null;
   if (typeof expiresAt !== 'string' || Number.isNaN(Date.parse(expiresAt))) return null;
-  return { linkToken, provider, expiresAt };
+  if (!('withdrawalPendingUntil' in record)) return { linkToken, provider, expiresAt };
+  const { withdrawalPendingUntil } = record;
+  if (withdrawalPendingUntil !== null && (typeof withdrawalPendingUntil !== 'string' || Number.isNaN(Date.parse(withdrawalPendingUntil)))) return null;
+  return { linkToken, provider, expiresAt, withdrawalPendingUntil };
 }
 
 const slot = createSessionJsonSlot(PENDING_SOCIAL_LINK_STORAGE_KEY, parsePendingSocialLink);
@@ -46,11 +55,18 @@ export function savePendingSocialLink(hint: V1SignInThenLinkDetails, nowMs: numb
     linkToken,
     provider: hint.provider,
     expiresAt: new Date(nowMs + linkTokenExpiresInSeconds * 1000).toISOString(),
+    ...(hint.withdrawalPendingUntil !== undefined ? { withdrawalPendingUntil: hint.withdrawalPendingUntil } : {}),
   });
 }
 
 function classify(stored: PendingSocialLink, nowMs: number): PendingSocialLinkRead {
-  if (Date.parse(stored.expiresAt) <= nowMs) return { provider: stored.provider, expired: true };
+  if (Date.parse(stored.expiresAt) <= nowMs) {
+    return {
+      provider: stored.provider,
+      expired: true,
+      ...(stored.withdrawalPendingUntil !== undefined ? { withdrawalPendingUntil: stored.withdrawalPendingUntil } : {}),
+    };
+  }
   return { ...stored, expired: false };
 }
 

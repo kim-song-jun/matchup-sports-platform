@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { V1FoundAccount } from '@/types/api';
 import { AccountRecoveryClient } from './account-recovery-client';
 
 const nativeApple = vi.hoisted(() => ({ available: false }));
@@ -71,6 +72,7 @@ describe('AccountRecoveryClient', () => {
       maskedEmail: 'ru***@example.com',
       providers: ['email'],
       hasPassword: true,
+      withdrawalPendingUntil: null,
     });
     hooks.resetPasswordByEmailMutateAsync.mockResolvedValue({ ok: true });
   });
@@ -144,8 +146,8 @@ describe('AccountRecoveryClient', () => {
   });
 
   describe('아이디 찾기 결과는 계정의 실제 로그인 수단을 따른다', () => {
-    async function findAccount(account: { maskedEmail: string | null; providers: string[]; hasPassword: boolean }, props: { redirectPath?: string } = {}) {
-      hooks.findAccountMutateAsync.mockResolvedValue(account);
+    async function findAccount(account: Omit<V1FoundAccount, 'withdrawalPendingUntil'>, props: { redirectPath?: string } = {}) {
+      hooks.findAccountMutateAsync.mockResolvedValue({ ...account, withdrawalPendingUntil: null });
       render(<AccountRecoveryClient {...props} />);
       enterPhone();
       fireEvent.click(screen.getByRole('button', { name: '__stub_verify__' }));
@@ -233,6 +235,83 @@ describe('AccountRecoveryClient', () => {
 
       expect(hrefOf('이메일로 로그인하기')).toBe('/login/email?redirect=%2Fmy');
       expect(hrefOf('카카오로 로그인하기')).toBe('/login?redirect=%2Fmy');
+    });
+  });
+
+  describe('번호를 쥔 계정이 탈퇴 유예 중이면 두 가지 방법을 안내한다', () => {
+    // KST 로는 11월 7일 00:30.
+    const UNTIL = '2026-11-06T15:30:00.000Z';
+
+    async function findPendingAccount(account: Omit<V1FoundAccount, 'withdrawalPendingUntil'>, props: { redirectPath?: string } = {}) {
+      hooks.findAccountMutateAsync.mockResolvedValue({ ...account, withdrawalPendingUntil: UNTIL });
+      render(<AccountRecoveryClient {...props} />);
+      enterPhone();
+      fireEvent.click(screen.getByRole('button', { name: '__stub_verify__' }));
+      await screen.findByRole('heading', { name: '탈퇴를 신청한 계정이에요' });
+    }
+
+    it('마스킹 이메일과 함께 방법 1(로그인해서 취소)과 방법 2(삭제일까지 기다리기)를 보여 주고 일반 결과 카드는 그리지 않는다', async () => {
+      await findPendingAccount({ maskedEmail: 'ru***@example.com', providers: ['email'], hasPassword: true });
+
+      expect(screen.getByText('ru***@example.com')).toBeInTheDocument();
+      expect(screen.getByText('이 번호를 다시 쓰는 방법은 두 가지예요.')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: '방법 1 지금 바로 쓰기' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: '방법 2 기다리기' })).toBeInTheDocument();
+      expect(screen.getByText('11월 7일')).toBeInTheDocument();
+      expect(screen.getByText('위 이메일로 가입한 계정이에요.')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: '비밀번호 재설정하기' })).not.toBeInTheDocument();
+    });
+
+    it('이메일 계정이면 버튼이 이메일 로그인으로, 돌아갈 경로를 이어서 간다', async () => {
+      await findPendingAccount({ maskedEmail: 'ru***@example.com', providers: ['email'], hasPassword: true }, { redirectPath: '/my' });
+
+      expect(screen.getByRole('link', { name: '로그인하고 탈퇴 취소하기' })).toHaveAttribute('href', '/login/email?redirect=%2Fmy');
+    });
+
+    it('카카오 전용 계정이면 로그인 첫 화면으로 보내고 어느 수단으로 가입했는지 말해 준다', async () => {
+      await findPendingAccount({ maskedEmail: 'ka***@example.com', providers: ['kakao'], hasPassword: false });
+
+      expect(screen.getByRole('link', { name: '로그인하고 탈퇴 취소하기' })).toHaveAttribute('href', '/login');
+      expect(screen.getByText('카카오 로그인으로 가입한 계정이에요.')).toBeInTheDocument();
+    });
+
+    it('수단이 여럿이면 주된 길은 탈퇴 취소 버튼이고 나머지 수단은 이어서 보여 준다', async () => {
+      await findPendingAccount({ maskedEmail: 'ru***@example.com', providers: ['email', 'kakao'], hasPassword: true });
+
+      expect(screen.getByRole('link', { name: '로그인하고 탈퇴 취소하기' })).toHaveAttribute('href', '/login/email');
+      expect(screen.getByRole('link', { name: '카카오로 로그인하기' })).toHaveAttribute('href', '/login');
+    });
+
+    it('이 환경에서 쓸 수 있는 로그인 수단이 없으면 막다른 길 대신 문의 창구로 보낸다', async () => {
+      await findPendingAccount({ maskedEmail: null, providers: ['apple'], hasPassword: false });
+
+      expect(screen.queryByRole('link', { name: '로그인하고 탈퇴 취소하기' })).not.toBeInTheDocument();
+      expect(screen.getByRole('link', { name: '문의 창구 보기' })).toHaveAttribute('href', '/contact');
+      expect(screen.getByText('Apple 로그인은 iOS 앱에서 쓸 수 있어요.')).toBeInTheDocument();
+    });
+
+    it('결과가 뜨면 포커스가 제목으로 옮겨 간다', async () => {
+      await findPendingAccount({ maskedEmail: 'ru***@example.com', providers: ['email'], hasPassword: true });
+      expect(screen.getByRole('heading', { name: '탈퇴를 신청한 계정이에요' })).toHaveFocus();
+    });
+
+    it('번호를 고치면 탈퇴 안내도 함께 사라진다', async () => {
+      await findPendingAccount({ maskedEmail: 'ru***@example.com', providers: ['email'], hasPassword: true });
+
+      fireEvent.change(screen.getByLabelText('휴대폰 번호'), { target: { value: '01099998888' } });
+
+      expect(screen.queryByRole('heading', { name: '탈퇴를 신청한 계정이에요' })).not.toBeInTheDocument();
+    });
+
+    it('날짜가 없으면(null) 일반 결과 카드가 그대로 나온다', async () => {
+      hooks.findAccountMutateAsync.mockResolvedValue({ maskedEmail: 'ru***@example.com', providers: ['email'], hasPassword: true, withdrawalPendingUntil: null });
+      render(<AccountRecoveryClient />);
+      enterPhone();
+      fireEvent.click(screen.getByRole('button', { name: '__stub_verify__' }));
+
+      expect(await screen.findByText('가입한 이메일')).toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: /탈퇴를 신청한 계정/ })).not.toBeInTheDocument();
+      expect(screen.getByRole('link', { name: '로그인하러 가기' })).toBeInTheDocument();
     });
   });
 

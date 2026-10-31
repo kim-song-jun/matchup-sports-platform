@@ -46,7 +46,7 @@ export const authUiServer = setupServer(
   }),
   http.post('*/api/v1/auth/recovery/find-account', async ({ request }) => {
     wireCalls.findAccount.push(await request.json());
-    return success({ maskedEmail: 'ow***@example.test', providers: ['email'], hasPassword: true });
+    return success({ maskedEmail: 'ow***@example.test', providers: ['email'], hasPassword: true, withdrawalPendingUntil: null });
   }),
   http.post('*/api/v1/auth/recovery/reset-password', () => {
     wireCalls.phoneReset += 1;

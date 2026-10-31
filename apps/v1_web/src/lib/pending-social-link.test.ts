@@ -58,6 +58,52 @@ describe('pending social link storage', () => {
     expect(takePendingSocialLink(NOW)).toMatchObject({ linkToken: 'second-token', provider: 'apple' });
   });
 
+  describe('withdrawal grace carried with the token', () => {
+    const until = '2026-11-06T15:30:00.000Z';
+
+    it('stores the grace end next to the token and reads it back live and expired', () => {
+      savePendingSocialLink({ ...hint, withdrawalPendingUntil: until }, NOW);
+
+      expect(JSON.parse(stored()!)).toMatchObject({ withdrawalPendingUntil: until });
+      expect(peekPendingSocialLink(NOW + 1_000)).toMatchObject({ expired: false, linkToken: 'signed-link-token', withdrawalPendingUntil: until });
+      // 토큰이 만료돼도 "탈퇴 계정이라는 사실과 날짜"는 남아 안내 화면이 같은 말을 한다.
+      expect(peekPendingSocialLink(NOW + 3_600_000)).toEqual({ provider: 'kakao', expired: true, withdrawalPendingUntil: until });
+    });
+
+    it('keeps "withdrawal but no date" (null) apart from "not a withdrawal" (absent)', () => {
+      savePendingSocialLink({ ...hint, withdrawalPendingUntil: null }, NOW);
+      expect(JSON.parse(stored()!)).toHaveProperty('withdrawalPendingUntil', null);
+      expect(peekPendingSocialLink(NOW)).toHaveProperty('withdrawalPendingUntil', null);
+
+      savePendingSocialLink(hint, NOW);
+      expect(JSON.parse(stored()!)).not.toHaveProperty('withdrawalPendingUntil');
+      expect(peekPendingSocialLink(NOW)).not.toHaveProperty('withdrawalPendingUntil');
+    });
+
+    it('replaces a withdrawal marker left by an earlier conflict instead of merging it into a plain one', () => {
+      savePendingSocialLink({ ...hint, withdrawalPendingUntil: until }, NOW);
+      savePendingSocialLink({ ...hint, linkToken: 'second-token' }, NOW);
+
+      expect(peekPendingSocialLink(NOW)).toMatchObject({ linkToken: 'second-token' });
+      expect(peekPendingSocialLink(NOW)).not.toHaveProperty('withdrawalPendingUntil');
+    });
+
+    it.each([
+      ['an unreadable date', 'someday'],
+      ['a number', 1_793_000_000_000],
+      ['an object', { until: '2026-11-06T15:30:00.000Z' }],
+      ['a boolean', true],
+    ])('rejects the whole stored link when the grace end is %s', (_label, bad) => {
+      window.sessionStorage.setItem(
+        PENDING_SOCIAL_LINK_STORAGE_KEY,
+        JSON.stringify({ linkToken: 't', provider: 'kakao', expiresAt: '2026-10-31T10:30:00.000Z', withdrawalPendingUntil: bad }),
+      );
+
+      expect(takePendingSocialLink(NOW)).toBeNull();
+      expect(stored()).toBeNull();
+    });
+  });
+
   it('clears on request', () => {
     savePendingSocialLink(hint, NOW);
     clearPendingSocialLink();

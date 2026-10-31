@@ -74,7 +74,7 @@ export function useSocialSignupExit({ onboardingStatus }: { onboardingStatus?: s
     if (confirmFirst) {
       const confirmed = await confirm({
         title: '가입을 그만두고 로그인할까요?',
-        message: `지금까지 입력한 내용은 저장되지 않아요. ${canAutoLink ? autoLinkPromise(hint.provider) : manualLinkPromise(hint.provider)}`,
+        message: `지금까지 입력한 내용은 저장되지 않아요. ${canAutoLink ? autoLinkPromise(hint.provider, { withdrawalPending: hint.withdrawalPendingUntil !== undefined }) : manualLinkPromise(hint.provider)}`,
         confirmLabel: '로그인하러 가기',
         cancelLabel: '취소',
       });

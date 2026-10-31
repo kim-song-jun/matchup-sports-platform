@@ -47,6 +47,32 @@ describe('getSignInThenLinkHint', () => {
     expect(getSignInThenLinkHint(error)).toEqual({ next: 'sign_in_then_link', provider: 'kakao' });
   });
 
+  it('carries the grace end of a withdrawn number holder, and null when the server could not say', () => {
+    const base = { next: 'sign_in_then_link', provider: 'kakao', linkToken: 'signed-link-token', linkTokenExpiresInSeconds: 1800 };
+    expect(getSignInThenLinkHint(apiError(409, 'PHONE_CONFLICT', { ...base, withdrawalPendingUntil: '2026-11-06T15:30:00.000Z' })))
+      .toEqual({ ...base, withdrawalPendingUntil: '2026-11-06T15:30:00.000Z' });
+    expect(getSignInThenLinkHint(apiError(409, 'PHONE_CONFLICT', { ...base, withdrawalPendingUntil: null })))
+      .toEqual({ ...base, withdrawalPendingUntil: null });
+  });
+
+  it('leaves the grace field out when the holder is not a withdrawal, so a plain conflict never reads as one', () => {
+    const hint = getSignInThenLinkHint(apiError(409, 'PHONE_CONFLICT', { next: 'sign_in_then_link', provider: 'kakao' }));
+    expect(hint).not.toHaveProperty('withdrawalPendingUntil');
+  });
+
+  it.each([
+    ['an unreadable date', 'next-week'],
+    ['a number', 20261107],
+    ['an object', {}],
+  ])('keeps the withdrawal marker but drops the date when it is %s', (_label, value) => {
+    const details = { next: 'sign_in_then_link', provider: 'kakao', withdrawalPendingUntil: value };
+    expect(getSignInThenLinkHint(apiError(409, 'PHONE_CONFLICT', details))).toStrictEqual({
+      next: 'sign_in_then_link',
+      provider: 'kakao',
+      withdrawalPendingUntil: null,
+    });
+  });
+
   it.each([
     ['no details', undefined],
     ['null details', null],

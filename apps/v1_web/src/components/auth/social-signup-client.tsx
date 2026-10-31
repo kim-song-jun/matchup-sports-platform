@@ -16,6 +16,7 @@ import { trackEvent } from '@/lib/analytics';
 import { clearV1IdentityCache } from '@/lib/query-keys';
 import { getSavedRedirectPath, resolveAuthContinuationPath, sanitizeRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
 import { AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
+import { buildAccountConflictPath } from './login-recovery-route';
 import {
   formatBirthDate,
   formatPhone,
@@ -70,21 +71,27 @@ export function SocialSignupClient() {
   const prefill = authMe.data?.socialSignupPrefill ?? null;
   const providerLabel = socialProviderLabel(authMe.data?.user?.authProvider);
   const authProvider = authMe.data?.user?.authProvider;
+  const conflictRedirect = () => sanitizeRedirectPath(new URLSearchParams(window.location.search).get('redirect')) ?? getSavedRedirectPath();
   const conflictExitPath = (path: string) => {
-    const redirect = sanitizeRedirectPath(new URLSearchParams(window.location.search).get('redirect')) ?? getSavedRedirectPath();
+    const redirect = conflictRedirect();
     return redirect ? `${path}?redirect=${encodeURIComponent(redirect)}` : path;
   };
   const linkHint = conflictHint?.linkToken ? conflictHint : null;
-  const leaveFromConflict = (path: string, confirmFirst: boolean) => {
-    const target = conflictExitPath(path);
-    return linkHint ? exitFlow.leaveWithPendingLink(target, linkHint, { confirmFirst }) : exitFlow.leaveTo(target);
-  };
+  // 번호를 쥔 계정이 탈퇴 유예 중이면 로그인 첫 화면 대신 두 가지 방법을 보여 주는 안내로 나간다 — 로그인 버튼은 거기에 있다.
+  const withdrawalPending = linkHint !== null && linkHint.withdrawalPendingUntil !== undefined;
+  const loginExitPath = () => (
+    linkHint && withdrawalPending ? buildAccountConflictPath(linkHint.provider, conflictRedirect()) : conflictExitPath('/login')
+  );
+  const leaveFromConflict = (target: string, confirmFirst: boolean) => (
+    linkHint ? exitFlow.leaveWithPendingLink(target, linkHint, { confirmFirst }) : exitFlow.leaveTo(target)
+  );
   const phoneConflictNotice = (
     <PhoneConflictNotice
       pending={exitFlow.pending}
       linkProvider={linkHint?.provider}
-      onLogin={() => void leaveFromConflict('/login', true)}
-      onFindAccount={() => void leaveFromConflict('/auth/find-account', false)}
+      withdrawalPending={withdrawalPending}
+      onLogin={() => void leaveFromConflict(loginExitPath(), true)}
+      onFindAccount={() => void leaveFromConflict(conflictExitPath('/auth/find-account'), false)}
     />
   );
   // 카카오가 제공한 번호는 추가 인증 없이 사용한다. 다른 번호로 바꾼 경우에만 직접 인증한다.

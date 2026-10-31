@@ -27,6 +27,18 @@ describe('PendingLinkNotice', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it('탈퇴 유예 중인 계정과 충돌한 토큰이면 로그인만으로는 연결되지 않고 탈퇴 취소를 거친다고 알린다', async () => {
+    savePendingSocialLink(
+      { next: 'sign_in_then_link', provider: 'kakao', linkToken: 'link-token-1', linkTokenExpiresInSeconds: 600, withdrawalPendingUntil: null },
+      Date.now() - 30_000,
+    );
+    render(<PendingLinkNotice />);
+
+    expect(await screen.findByText(/9분 안에 로그인하고 탈퇴 신청을 취소하면 카카오 로그인이 이 계정에 연결돼요\./)).toBeInTheDocument();
+    expect(screen.queryByText(/9분 안에 로그인하면/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '연결 안 하기' })).toBeEnabled();
+  });
+
   it.each([
     ['kakao', '카카오'],
     ['apple', 'Apple'],

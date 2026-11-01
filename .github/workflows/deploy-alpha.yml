@@ -114,15 +114,16 @@ jobs:
 
       # 판정 규칙(그 커밋의 push run 만 인정)은 select-matching-ci-run.sh 에 있어서
       # 체크아웃이 이 스텝보다 앞서야 한다.
+      # The API CI job alone takes about 40 minutes; this wait has to outlast the whole run.
       - name: Wait for matching CI success
-        timeout-minutes: 35
+        timeout-minutes: 60
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_SHA: ${{ steps.release.outputs.sha }}
           REPOSITORY: ${{ github.repository }}
         run: |
           set -Eeuo pipefail
-          for attempt in $(seq 1 210); do
+          for attempt in $(seq 1 360); do
             verdict="$(gh api \
               "repos/${REPOSITORY}/actions/workflows/deploy.yml/runs?branch=dev&head_sha=${RELEASE_SHA}&per_page=100" |
               bash scripts/release/select-matching-ci-run.sh "${RELEASE_SHA}")"
@@ -140,7 +141,7 @@ jobs:
             esac
             sleep 10
           done
-          echo "Matching CI did not finish within 35 minutes" >&2
+          echo "Matching CI did not finish within 60 minutes" >&2
           exit 1
 
       - name: Resolve Changesets alpha version

@@ -8,6 +8,7 @@ import { V1ApiError, v1Post } from '@/lib/api-client';
 import {
   getPasswordLoginUnavailableProviders,
   getRecentLoginRequired,
+  isEmailSendUnavailable,
   getSignInThenLinkHint,
   getSignupIncompleteRoute,
   getWithdrawalCancelOffer,
@@ -15,11 +16,19 @@ import {
 import { linkResultFromError, linkResultFromSuccess } from '@/lib/link-result';
 import { clearPendingSocialLink, peekPendingSocialLink, savePendingSocialLink, takePendingSocialLink } from '@/lib/pending-social-link';
 import { v1Keys } from '@/lib/query-keys';
-import { LINK_MSW, PASSWORD_UNAVAILABLE_MSW, PENDING_LINK_MSW, PHONE_CONFLICT_MSW, WITHDRAWAL_MSW } from '@/test/msw/auth-link-handlers';
+import { EMAIL_LINK_MSW, LINK_MSW, PASSWORD_UNAVAILABLE_MSW, PENDING_LINK_MSW, PHONE_CONFLICT_MSW, WITHDRAWAL_MSW } from '@/test/msw/auth-link-handlers';
 import { v1MswHandlers } from '@/test/msw/handlers';
 import { v1UserFixture } from '@/test/msw/fixtures';
 import type { V1AuthMe } from '@/types/api';
-import { useV1CancelWithdrawal, useV1LinkApple, useV1LinkKakao, useV1LinkPending } from './use-v1-api';
+import {
+  useV1CancelWithdrawal,
+  useV1LinkApple,
+  useV1LinkEmailComplete,
+  useV1LinkEmailRequest,
+  useV1LinkEmailVerify,
+  useV1LinkKakao,
+  useV1LinkPending,
+} from './use-v1-api';
 
 const server = setupServer(
   ...v1MswHandlers,
@@ -256,6 +265,129 @@ describe('useV1LinkPending', () => {
     expect(error).toMatchObject({ statusCode, code });
     expect(linkResultFromError(error)).toBe(expected);
     expect(staleKeys()).toEqual([]);
+  });
+});
+
+describe('adding an email login to a social account', () => {
+  const PASSWORD = 'a-new-password-1';
+
+  it('request: asks the server to mail a code and leaves every cache alone', async () => {
+    const { wrapper, staleKeys } = setup();
+    const { result } = renderHook(() => useV1LinkEmailRequest(), { wrapper });
+
+    const sent = await succeeds(() => result.current.mutateAsync({ email: EMAIL_LINK_MSW.emails.ok }));
+
+    expect(sent).toEqual({
+      sent: true,
+      maskedTarget: 'ne***@example.com',
+      expiresInSeconds: EMAIL_LINK_MSW.codeExpiresInSeconds,
+      resendAvailableInSeconds: EMAIL_LINK_MSW.resendAvailableInSeconds,
+      devCode: EMAIL_LINK_MSW.codes.ok,
+    });
+    expect(staleKeys()).toEqual([]);
+  });
+
+  it.each([
+    [EMAIL_LINK_MSW.emails.taken, 409, 'EMAIL_CONFLICT'],
+    [EMAIL_LINK_MSW.emails.alreadyHasEmailLogin, 409, 'SOCIAL_LINK_PROVIDER_EXISTS'],
+    [EMAIL_LINK_MSW.emails.cooldown, 400, 'VERIFICATION_RESEND_COOLDOWN'],
+    [EMAIL_LINK_MSW.emails.recentLoginRequired, 403, 'RECENT_LOGIN_REQUIRED'],
+  ])('request: surfaces %s as %i %s', async (email, statusCode, code) => {
+    const { wrapper } = setup();
+    const { result } = renderHook(() => useV1LinkEmailRequest(), { wrapper });
+
+    const error = await fails(() => result.current.mutateAsync({ email }));
+
+    expect(error).toBeInstanceOf(V1ApiError);
+    expect(error).toMatchObject({ statusCode, code });
+  });
+
+  it('request: a stale session says how recent the sign-in must be', async () => {
+    const { wrapper } = setup();
+    const { result } = renderHook(() => useV1LinkEmailRequest(), { wrapper });
+
+    const error = await fails(() => result.current.mutateAsync({ email: EMAIL_LINK_MSW.emails.recentLoginRequired }));
+
+    expect(getRecentLoginRequired(error)).toEqual({ maxAgeSeconds: LINK_MSW.maxAgeSeconds });
+  });
+
+  it('request: a server that cannot send mail says so with 503 instead of claiming a code went out', async () => {
+    const { wrapper, staleKeys } = setup();
+    const { result } = renderHook(() => useV1LinkEmailRequest(), { wrapper });
+
+    const error = await fails(() => result.current.mutateAsync({ email: EMAIL_LINK_MSW.emails.mailUnavailable }));
+
+    expect(error).toMatchObject({ statusCode: 503, code: 'EMAIL_SEND_UNAVAILABLE' });
+    expect(isEmailSendUnavailable(error)).toBe(true);
+    expect(staleKeys()).toEqual([]);
+  });
+
+  it('request: a malformed address never reaches the mailer (400 as the server answers)', async () => {
+    const { wrapper } = setup();
+    const { result } = renderHook(() => useV1LinkEmailRequest(), { wrapper });
+
+    const error = await fails(() => result.current.mutateAsync({ email: 'not-an-email' }));
+
+    expect(error).toMatchObject({ statusCode: 400, code: 'VALIDATION_ERROR' });
+  });
+
+  it('verify: trades the right code for a token and leaves every cache alone', async () => {
+    const { wrapper, staleKeys } = setup();
+    const { result } = renderHook(() => useV1LinkEmailVerify(), { wrapper });
+
+    const verified = await succeeds(() => result.current.mutateAsync({ code: EMAIL_LINK_MSW.codes.ok }));
+
+    expect(verified).toEqual({ emailLinkToken: EMAIL_LINK_MSW.tokens.ok, expiresInSeconds: EMAIL_LINK_MSW.tokenExpiresInSeconds });
+    expect(staleKeys()).toEqual([]);
+  });
+
+  it.each([
+    [EMAIL_LINK_MSW.codes.wrong, 'VERIFICATION_CODE_MISMATCH'],
+    [EMAIL_LINK_MSW.codes.expired, 'VERIFICATION_NO_PENDING'],
+    [EMAIL_LINK_MSW.codes.exhausted, 'VERIFICATION_TOO_MANY_ATTEMPTS'],
+  ])('verify: surfaces code %s as 400 %s', async (code, errorCode) => {
+    const { wrapper } = setup();
+    const { result } = renderHook(() => useV1LinkEmailVerify(), { wrapper });
+
+    expect(await fails(() => result.current.mutateAsync({ code }))).toMatchObject({ statusCode: 400, code: errorCode });
+  });
+
+  it('complete: attaches the login and refreshes every place that lists login methods', async () => {
+    const { wrapper, staleKeys, unrelatedIsStale } = setup();
+    const { result } = renderHook(() => useV1LinkEmailComplete(), { wrapper });
+
+    const linked = await succeeds(() => result.current.mutateAsync({
+      emailLinkToken: EMAIL_LINK_MSW.tokens.ok,
+      password: PASSWORD,
+      passwordConfirm: PASSWORD,
+    }));
+
+    expect(linked).toEqual({ linked: true, email: EMAIL_LINK_MSW.emails.ok });
+    expect(staleKeys()).toEqual(['authMe', 'settings', 'profile', 'notifications']);
+    expect(unrelatedIsStale()).toBe(false);
+  });
+
+  it.each([
+    ['an address another account took meanwhile', EMAIL_LINK_MSW.tokens.taken, 409, 'EMAIL_CONFLICT'],
+    ['a token that expired or belongs to someone else', 'msw-email-link-token-unknown-0123456789', 400, 'EMAIL_LINK_TOKEN_INVALID'],
+  ])('complete: %s keeps the caches as they were', async (_name, emailLinkToken, statusCode, code) => {
+    const { wrapper, staleKeys } = setup();
+    const { result } = renderHook(() => useV1LinkEmailComplete(), { wrapper });
+
+    const error = await fails(() => result.current.mutateAsync({ emailLinkToken, password: PASSWORD, passwordConfirm: PASSWORD }));
+
+    expect(error).toMatchObject({ statusCode, code });
+    expect(staleKeys()).toEqual([]);
+  });
+
+  it('complete: a password pair that differs or is too short is a 400 the screen should have caught', async () => {
+    const { wrapper } = setup();
+    const { result } = renderHook(() => useV1LinkEmailComplete(), { wrapper });
+
+    expect(await fails(() => result.current.mutateAsync({ emailLinkToken: EMAIL_LINK_MSW.tokens.ok, password: PASSWORD, passwordConfirm: 'another-password-1' })))
+      .toMatchObject({ statusCode: 400, code: 'VALIDATION_ERROR' });
+    expect(await fails(() => result.current.mutateAsync({ emailLinkToken: EMAIL_LINK_MSW.tokens.ok, password: 'short', passwordConfirm: 'short' })))
+      .toMatchObject({ statusCode: 400, code: 'VALIDATION_ERROR' });
   });
 });
 

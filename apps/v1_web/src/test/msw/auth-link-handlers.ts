@@ -1,5 +1,11 @@
 import { http, HttpResponse } from 'msw';
-import type { V1LinkableProvider, V1LinkSocialResult } from '@/types/api';
+import type {
+  V1LinkableProvider,
+  V1LinkEmailCompleteResult,
+  V1LinkEmailRequestResult,
+  V1LinkEmailVerifyResult,
+  V1LinkSocialResult,
+} from '@/types/api';
 import { sessionLoginResponse } from './auth-step-up-handlers';
 
 /**
@@ -19,6 +25,8 @@ import { sessionLoginResponse } from './auth-step-up-handlers';
  *  - `POST /auth/login`: WITHDRAWAL_MSW.email 만 가로챈다(비밀번호가 맞으면 철회 토큰이 실린 403, 틀리면 일반 401).
  *    다른 이메일은 다음 핸들러로 넘긴다.
  *  - `POST /auth/withdrawal/cancel`: WITHDRAWAL_MSW.tokens 가 시나리오를 정한다(토큰은 20~512자, 서버 DTO와 같다).
+ *  - `POST /auth/link/email/request|verify|complete`: 소셜 계정에 이메일 로그인을 더하는 세 단계. EMAIL_LINK_MSW 의 주소·인증번호·토큰이
+ *    시나리오를 정한다. 본문은 서버 DTO(`LinkEmailRequestDto`·`LinkEmailVerifyDto`·`LinkEmailCompleteDto`)와 같은 형식·허용 필드를 따르고 어기면 400.
  */
 const api = '*/api/v1';
 const NOW = '2026-10-31T00:00:00.000Z';
@@ -68,6 +76,34 @@ export const PHONE_CONFLICT_MSW = {
   phones: { kakao: '01099990001', apple: '01099990002' },
   codes: { kakao: '999991', apple: '999992' },
   activeAccountPhone: '01099990003',
+} as const;
+
+/**
+ * 이메일 로그인 추가. 주소(request)·인증번호(verify)·토큰(complete)이 각 단계의 시나리오를 고른다.
+ * 모르는 값은 성공이 아니라 실패다: 주소는 `ok` 만 메일이 나가고, 코드는 `ok` 만 맞고, 토큰은 `ok`·`taken` 만 서버가 서명한 값이다.
+ */
+export const EMAIL_LINK_MSW = {
+  emails: {
+    ok: 'new-login@example.com',
+    taken: 'taken-login@example.com',
+    alreadyHasEmailLogin: 'has-login@example.com',
+    recentLoginRequired: 'stale-login@example.com',
+    cooldown: 'cooldown-login@example.com',
+    mailUnavailable: 'no-mail-login@example.com',
+  },
+  codes: {
+    ok: '123456',
+    wrong: '000000',
+    expired: '111111',
+    exhausted: '222222',
+  },
+  tokens: {
+    ok: 'msw-email-link-token-ok-0123456789',
+    taken: 'msw-email-link-token-taken-0123456789',
+  },
+  codeExpiresInSeconds: 300,
+  resendAvailableInSeconds: 30,
+  tokenExpiresInSeconds: 600,
 } as const;
 
 /** 비밀번호 없이 카카오로만 가입한 계정 — 이메일 본인 확인 뒤 재설정을 시도하면 PASSWORD_LOGIN_UNAVAILABLE 이 온다. */
@@ -194,6 +230,68 @@ function loginOutcome(provider: V1LinkableProvider, credential: unknown) {
   }
 }
 
+// 서버 maskTarget 과 같다: 앞 2자만 남긴다.
+function maskedEmail(email: string) {
+  const [local, domain] = email.split('@');
+  return `${local.slice(0, 2)}***@${domain}`;
+}
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function emailLinkRequestOutcome(rawEmail: string) {
+  const email = rawEmail.trim().toLowerCase();
+  switch (email) {
+    case EMAIL_LINK_MSW.emails.recentLoginRequired:
+      return fail(403, 'RECENT_LOGIN_REQUIRED', '보안을 위해 다시 로그인한 뒤 연결해 주세요.', { maxAgeSeconds: LINK_MSW.maxAgeSeconds });
+    case EMAIL_LINK_MSW.emails.alreadyHasEmailLogin:
+      return fail(409, 'SOCIAL_LINK_PROVIDER_EXISTS', '이 계정에는 이미 이메일 로그인이 연결돼 있어요.');
+    case EMAIL_LINK_MSW.emails.taken:
+      return fail(409, 'EMAIL_CONFLICT', '이미 다른 계정에서 쓰는 이메일이에요.');
+    case EMAIL_LINK_MSW.emails.mailUnavailable:
+      return fail(503, 'EMAIL_SEND_UNAVAILABLE', '지금은 인증 메일을 보낼 수 없어요. 잠시 후 다시 시도해 주세요.');
+    case EMAIL_LINK_MSW.emails.cooldown:
+      return fail(400, 'VERIFICATION_RESEND_COOLDOWN', `잠시 후 다시 시도해 주세요. (${EMAIL_LINK_MSW.resendAvailableInSeconds}초 뒤에 다시 받을 수 있어요)`);
+    default: {
+      const result: V1LinkEmailRequestResult = {
+        sent: true,
+        maskedTarget: maskedEmail(email),
+        expiresInSeconds: EMAIL_LINK_MSW.codeExpiresInSeconds,
+        resendAvailableInSeconds: EMAIL_LINK_MSW.resendAvailableInSeconds,
+        devCode: EMAIL_LINK_MSW.codes.ok,
+      };
+      return ok(result);
+    }
+  }
+}
+
+function emailLinkVerifyOutcome(code: string) {
+  switch (code) {
+    case EMAIL_LINK_MSW.codes.ok: {
+      const result: V1LinkEmailVerifyResult = { emailLinkToken: EMAIL_LINK_MSW.tokens.ok, expiresInSeconds: EMAIL_LINK_MSW.tokenExpiresInSeconds };
+      return ok(result);
+    }
+    case EMAIL_LINK_MSW.codes.expired:
+      return fail(400, 'VERIFICATION_NO_PENDING', '유효한 인증 요청이 없어요. 인증번호를 다시 받아 주세요.');
+    case EMAIL_LINK_MSW.codes.exhausted:
+      return fail(400, 'VERIFICATION_TOO_MANY_ATTEMPTS', '시도 횟수를 초과했어요. 인증번호를 다시 받아 주세요.');
+    default:
+      return fail(400, 'VERIFICATION_CODE_MISMATCH', '인증번호가 올바르지 않아요.');
+  }
+}
+
+function emailLinkCompleteOutcome(token: string) {
+  switch (token) {
+    case EMAIL_LINK_MSW.tokens.ok: {
+      const result: V1LinkEmailCompleteResult = { linked: true, email: EMAIL_LINK_MSW.emails.ok };
+      return ok(result);
+    }
+    case EMAIL_LINK_MSW.tokens.taken:
+      return fail(409, 'EMAIL_CONFLICT', '이미 다른 계정에서 쓰는 이메일이에요.');
+    default:
+      return fail(400, 'EMAIL_LINK_TOKEN_INVALID', '이메일 인증이 만료됐거나 올바르지 않아요. 인증번호를 다시 받아 주세요.');
+  }
+}
+
 export const v1AuthLinkMswHandlers = [
   // LinkKakaoDto: 웹은 code+redirectUri, 네이티브는 accessToken 하나. 둘을 섞거나 모르는 필드를 보내면 거절한다.
   http.post(`${api}/auth/link/kakao`, async ({ request }) => {
@@ -227,6 +325,26 @@ export const v1AuthLinkMswHandlers = [
       return fail(400, 'SOCIAL_LINK_TOKEN_INVALID', '연결 정보가 만료됐거나 올바르지 않아요. 카카오·Apple 로그인을 처음부터 다시 시도해 주세요.');
     }
     return linkOutcome(scenario.provider, scenario.credential);
+  }),
+
+  // LinkEmailRequestDto: 이메일 하나. 주소 형식이 아니거나 254자를 넘으면 거절한다.
+  http.post(`${api}/auth/link/email/request`, async ({ request }) => {
+    const { email, ...rest } = await readJson(request);
+    if (Object.keys(rest).length > 0 || typeof email !== 'string' || email.length > 254 || !EMAIL_PATTERN.test(email)) return invalidLinkBody();
+    return emailLinkRequestOutcome(email);
+  }),
+  // LinkEmailVerifyDto: 숫자 6자리.
+  http.post(`${api}/auth/link/email/verify`, async ({ request }) => {
+    const { code, ...rest } = await readJson(request);
+    if (Object.keys(rest).length > 0 || typeof code !== 'string' || !/^\d{6}$/.test(code)) return invalidLinkBody();
+    return emailLinkVerifyOutcome(code);
+  }),
+  // LinkEmailCompleteDto: 토큰(20~2048자) + 8자 이상 비밀번호 + 같은 값의 확인 칸. 주소는 토큰에 들어 있어 본문에 없다.
+  http.post(`${api}/auth/link/email/complete`, async ({ request }) => {
+    const { emailLinkToken, password, passwordConfirm, ...rest } = await readJson(request);
+    if (Object.keys(rest).length > 0 || !isBounded(emailLinkToken, 20, 2048)) return invalidLinkBody();
+    if (typeof password !== 'string' || password.length < 8 || passwordConfirm !== password) return invalidLinkBody();
+    return emailLinkCompleteOutcome(emailLinkToken);
   }),
 
   http.post(`${api}/auth/kakao`, async ({ request }) => loginOutcome('kakao', (await readJson(request)).code)),

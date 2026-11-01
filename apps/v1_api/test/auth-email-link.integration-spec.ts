@@ -138,6 +138,14 @@ describe('V1 adding an email login to a social account integration', () => {
   const sessionCookieOf = (response: request.Response) =>
     ([] as string[]).concat(response.headers['set-cookie'] ?? []).find((cookie) => cookie.startsWith(`${V1_SESSION_COOKIE_NAME}=`))?.split(';')[0];
 
+  it('admin capability returned by auth/me matches the link endpoint restriction', async () => {
+    await prisma.v1AdminUser.create({ data: { userId: CALLER, adminRole: 'ops', status: 'active' } });
+    const me = await request(app.getHttpServer()).get(api('/auth/me')).set(as(CALLER)).expect(200);
+    expect(me.body.data.user).toMatchObject({ id: CALLER, canLinkLoginMethods: false, canLinkAfterSignup: false });
+    const denied = await post('/auth/link/email/request', CALLER, { email: NEW_EMAIL }).expect(403);
+    expect(denied.body.code).toBe('SOCIAL_LINK_ADMIN_FORBIDDEN');
+  });
+
   it('request -> verify -> complete adds the login; email sign-in, password reset and find-account all see it', async () => {
     const { devCode, body } = await requestCode(CALLER, NEW_EMAIL);
     expect(body).toMatchObject({ sent: true, maskedTarget: 'in***@integration.test', expiresInSeconds: 300, resendAvailableInSeconds: 30 });
@@ -172,7 +180,7 @@ describe('V1 adding an email login to a social account integration', () => {
     const cookie = sessionCookieOf(signedIn);
     if (!cookie) throw new EmailLinkFixtureError('Login did not set a session cookie');
     const me = await request(app.getHttpServer()).get(api('/auth/me')).set('Cookie', cookie).expect(200);
-    expect(me.body.data.user).toMatchObject({ id: CALLER, email: NEW_EMAIL });
+    expect(me.body.data.user).toMatchObject({ id: CALLER, email: NEW_EMAIL, canLinkLoginMethods: true });
 
     // Find-account by phone lists email among the providers.
     const issuedPhone = await request(app.getHttpServer()).post(api('/auth/phone/issue')).send({ phone: CALLER_PHONE }).expect(200);

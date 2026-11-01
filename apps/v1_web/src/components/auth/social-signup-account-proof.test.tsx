@@ -7,6 +7,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import type { V1AuthMe } from '@/types/api';
 import { getSavedRedirectPath, saveRedirectPath } from '@/lib/session-storage';
 import { SocialSignupClient } from './social-signup-client';
+import { advanceSocialSignupToPhone } from './social-signup-test-steps';
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: vi.fn(), push: vi.fn() }) }));
 vi.mock('@/lib/analytics', () => ({ trackEvent: vi.fn() }));
@@ -27,6 +28,7 @@ const auth = (): V1AuthMe => ({
   verification: { emailVerified: false, phoneVerified: false }, socialSignupPrefill: null,
 });
 const server = setupServer(
+  http.get('*/api/v1/auth/check-nickname', () => success({ available: true })),
   http.get('*/api/v1/auth/me', () => success(auth())),
   http.post('*/api/v1/logs/client-error', () => success({})),
   http.post('*/api/v1/verification/phone/request', () => phoneStatus === 409
@@ -57,6 +59,7 @@ beforeEach(() => {
 afterEach(() => { cleanup(); client.clear(); server.resetHandlers(); });
 async function requestConflict() {
   render(<QueryClientProvider client={client}><SocialSignupClient /></QueryClientProvider>);
+  await advanceSocialSignupToPhone();
   fireEvent.change(await screen.findByLabelText('휴대폰 번호'), { target: { value: '01012345678' } });
   await userEvent.setup().click(await screen.findByRole('button', { name: '인증번호 받기' }));
 }

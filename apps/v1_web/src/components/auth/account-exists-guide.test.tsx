@@ -23,6 +23,13 @@ afterEach(() => {
 });
 
 describe('AccountExistsGuide', () => {
+  it('이미 다른 소셜 계정이 연결된 경우 자동 연결이 보장되지 않음을 안내한다', () => {
+    storeToken('kakao');
+    renderGuide({ provider: 'kakao', redirectPath: null });
+    expect(screen.getByText(/이미 다른 카카오 계정이 연결돼 있으면/)).toBeInTheDocument();
+    expect(screen.queryByText('30분 안에 로그인하면 카카오 로그인이 자동으로 연결돼요')).not.toBeInTheDocument();
+  });
+
   it('이미 팀밋 계정이 있다고 알리고 원래 방법으로 로그인하는 3단계를 번호 순서로 보여 준다', () => {
     storeToken('kakao');
     renderGuide({ provider: 'kakao', redirectPath: null });
@@ -31,8 +38,8 @@ describe('AccountExistsGuide', () => {
     const steps = within(screen.getByRole('list')).getAllByRole('listitem');
     expect(steps).toHaveLength(3);
     expect(steps[0]).toHaveTextContent('원래 가입한 방법으로 로그인해요');
-    expect(steps[1]).toHaveTextContent('30분 안에 로그인하면 카카오 로그인이 자동으로 연결돼요');
-    expect(steps[2]).toHaveTextContent('다음부터는 같은 계정으로 들어와요');
+    expect(steps[1]).toHaveTextContent('카카오 로그인 연결을 시도해요');
+    expect(steps[2]).toHaveTextContent('연결 결과를 확인해요');
   });
 
   it('3단계 뒤에, 번호를 새로 받았다면 고객센터에 알려 달라는 한 줄이 붙는다 — 로그인 버튼 쪽 길이 먼저다', () => {
@@ -43,7 +50,7 @@ describe('AccountExistsGuide', () => {
     const help = screen.getByRole('link', { name: '고객센터에 알려 주세요' });
     // 돌아갈 경로 같은 쿼리를 싣지 않는다.
     expect(help).toHaveAttribute('href', '/contact');
-    const lastStep = screen.getByText('다음부터는 같은 계정으로 들어와요');
+    const lastStep = screen.getByText('연결 결과를 확인해요');
     expect(lastStep.compareDocumentPosition(help) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
@@ -51,7 +58,7 @@ describe('AccountExistsGuide', () => {
     storeToken('apple');
     renderGuide({ provider: 'apple', redirectPath: null });
     expect(screen.getByText(/Apple로 새로 가입할 수 없어요/)).toBeInTheDocument();
-    expect(screen.getByText('30분 안에 로그인하면 Apple 로그인이 자동으로 연결돼요')).toBeInTheDocument();
+    expect(screen.getByText('Apple 로그인 연결을 시도해요')).toBeInTheDocument();
     expect(screen.queryByText(/카카오 로그인이 자동으로/)).not.toBeInTheDocument();
   });
 
@@ -130,8 +137,8 @@ describe('AccountExistsGuide — 충돌한 계정이 탈퇴 유예 중일 때', 
     expect(wayOne).toHaveLength(3);
     expect(wayOne[0]).toHaveTextContent('원래 가입한 방법으로 로그인해요');
     expect(wayOne[1]).toHaveTextContent('탈퇴 신청을 취소해요');
-    expect(wayOne[2]).toHaveTextContent('카카오 로그인이 자동으로 연결돼요30분 안에 로그인하고 탈퇴 신청을 취소해 주세요.');
-    expect(screen.queryByText('다음부터는 같은 계정으로 들어와요')).not.toBeInTheDocument();
+    expect(wayOne[2]).toHaveTextContent('카카오 로그인 연결을 시도해요30분 안에 로그인하고 탈퇴 신청을 취소해 주세요. 이미 다른 카카오 계정이 연결돼 있으면 결과를 알려 드려요.');
+    expect(screen.queryByText('연결 결과를 확인해요')).not.toBeInTheDocument();
 
     const wayTwo = within(screen.getByRole('list', { name: '기다릴 때의 일정' })).getAllByRole('listitem');
     expect(wayTwo[1]).toHaveTextContent('11월 7일계정이 삭제돼요');
@@ -142,7 +149,7 @@ describe('AccountExistsGuide — 충돌한 계정이 탈퇴 유예 중일 때', 
     storeWithdrawal('apple', UNTIL);
     renderGuide({ provider: 'apple', redirectPath: null });
 
-    expect(screen.getByText('Apple 로그인이 자동으로 연결돼요')).toBeInTheDocument();
+    expect(screen.getByText('Apple 로그인 연결을 시도해요')).toBeInTheDocument();
     expect(screen.getByText('Apple로 새로 가입할 수 있어요')).toBeInTheDocument();
   });
 
@@ -188,7 +195,7 @@ describe('AccountExistsGuide — 충돌한 계정이 탈퇴 유예 중일 때', 
     expect(screen.queryByRole('list', { name: '기다릴 때의 일정' })).not.toBeInTheDocument();
     expect(screen.getByText('가입했던 계정이 탈퇴 신청 중이라, 카카오로 새로 가입할 수 없어요.')).toBeInTheDocument();
     expect(screen.getByRole('list', { name: '방법 1 지금 바로 쓰기' })).toBeInTheDocument();
-    expect(screen.queryByText('다음부터는 같은 계정으로 들어와요')).not.toBeInTheDocument();
+    expect(screen.queryByText('연결 결과를 확인해요')).not.toBeInTheDocument();
   });
 
   it('번호 재배정 안내는 싣지 않는다 — 방법 1 에 자기 문구의 고객센터 링크가 있다', () => {
@@ -205,7 +212,7 @@ describe('AccountExistsGuide — 충돌한 계정이 탈퇴 유예 중일 때', 
     renderGuide({ provider: 'kakao', redirectPath: null });
 
     expect(screen.queryByRole('list', { name: '기다릴 때의 일정' })).not.toBeInTheDocument();
-    expect(screen.getByText('다음부터는 같은 계정으로 들어와요')).toBeInTheDocument();
+    expect(screen.getByText('연결 결과를 확인해요')).toBeInTheDocument();
   });
 
   it('로그인 버튼과 계정 찾기 길은 그대로 두어 어느 방법으로 가입했든 거기서 탈퇴 취소로 이어진다', () => {

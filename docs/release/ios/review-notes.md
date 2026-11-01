@@ -65,7 +65,7 @@ Contact for review: <연락처 — 저장소 밖에서 전달>
 | 팀 컨택 신고·차단 | `components/community/team-contact-status-card.tsx:239` "신고하기", API `team-contacts.controller.ts` `contact-blocks` |
 | 일반 신고(문의) | `components/my/my-inquiries-client.tsx:53` 카테고리 `report`, 사유 5종 `lib/v1-status-labels.ts:104` |
 | 어드민 조치 | 신고 팀 차단 `admin.controller.ts:308`, 후기 숨김 `reviews.controller.ts:72` |
-| 약관의 금지 행위 | `terms-client.tsx:480` (욕설·비방·차별·혐오·성희롱·위협·폭력, 광고·스팸) 및 제재 조항 |
+| 약관의 금지 행위 | 서비스 이용약관(`/terms?document=terms`)의 금지 행위(욕설·비방·차별·혐오·성희롱·위협·폭력, 광고·스팸) 및 제재 조항 |
 | 푸시·사전 안내 | `Push/PushCoordinator.swift`, `Push/PushPromptView.swift`, 탭 착지 `Navigation/DeepLinkRoute.swift` |
 | 유니버설 링크 | `Navigation/UniversalLink.swift`, entitlements `applinks:$(TEAMEET_APP_LINK_HOST)` |
 | 오프라인·오류 화면 | `WebShell/LoadFailureView.swift`, `WebShell/NetworkReachability.swift`, `WebShell/WebShellFailurePolicy.swift` |

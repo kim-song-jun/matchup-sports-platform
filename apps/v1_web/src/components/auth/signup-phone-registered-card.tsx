@@ -5,6 +5,7 @@ import { useEffect, useId, useRef } from 'react';
 import { Card, ListItem } from '@/components/v1-ui/primitives';
 import { isNativeAppleSignInAvailable } from '@/lib/native-apple';
 import { usableWithdrawalDate } from '@/lib/withdrawal-grace';
+import { RecycledNumberHelp } from './recycled-number-help';
 import { WithdrawalPendingGuide } from './withdrawal-pending-guide';
 
 type Props = {
@@ -78,6 +79,7 @@ export function SignupPhoneRegisteredCard({ withdrawalPendingUntil, loginHref, s
         />
         <ListItem href={findAccountHref} title="비밀번호가 기억나지 않아요" sub="계정 찾기에서 다시 설정해요" chev />
       </div>
+      <RecycledNumberHelp spaced />
     </Card>
   );
 }

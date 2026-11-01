@@ -35,6 +35,18 @@ describe('AccountExistsGuide', () => {
     expect(steps[2]).toHaveTextContent('다음부터는 같은 계정으로 들어와요');
   });
 
+  it('3단계 뒤에, 번호를 새로 받았다면 고객센터에 알려 달라는 한 줄이 붙는다 — 로그인 버튼 쪽 길이 먼저다', () => {
+    storeToken('kakao');
+    renderGuide({ provider: 'kakao', redirectPath: '/teams/new' });
+
+    expect(screen.getByText('번호를 최근에 새로 받았나요? 전에 이 번호를 쓰던 계정이 남아 있을 수 있어요.')).toBeInTheDocument();
+    const help = screen.getByRole('link', { name: '고객센터에 알려 주세요' });
+    // 돌아갈 경로 같은 쿼리를 싣지 않는다.
+    expect(help).toHaveAttribute('href', '/contact');
+    const lastStep = screen.getByText('다음부터는 같은 계정으로 들어와요');
+    expect(lastStep.compareDocumentPosition(help) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('Apple 충돌이면 문구도 Apple 로 바뀐다', () => {
     storeToken('apple');
     renderGuide({ provider: 'apple', redirectPath: null });
@@ -177,6 +189,15 @@ describe('AccountExistsGuide — 충돌한 계정이 탈퇴 유예 중일 때', 
     expect(screen.getByText('가입했던 계정이 탈퇴 신청 중이라, 카카오로 새로 가입할 수 없어요.')).toBeInTheDocument();
     expect(screen.getByRole('list', { name: '방법 1 지금 바로 쓰기' })).toBeInTheDocument();
     expect(screen.queryByText('다음부터는 같은 계정으로 들어와요')).not.toBeInTheDocument();
+  });
+
+  it('번호 재배정 안내는 싣지 않는다 — 방법 1 에 자기 문구의 고객센터 링크가 있다', () => {
+    storeWithdrawal('kakao', UNTIL);
+    renderGuide({ provider: 'kakao', redirectPath: null });
+
+    expect(screen.queryByText(/번호를 최근에 새로 받았나요/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '고객센터에 알려 주세요' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '비밀번호가 기억나지 않으면 고객센터로 알려 주세요' })).toBeInTheDocument();
   });
 
   it('탈퇴 계정이 아닌 일반 충돌은 기존 3단계 그대로다', () => {

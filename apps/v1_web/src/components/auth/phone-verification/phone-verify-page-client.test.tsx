@@ -154,6 +154,24 @@ describe('PhoneVerifyPageClient — 번호가 다른 계정에 있을 때', () =
     expect(screen.getByRole('button', { name: '계정 찾기' })).toBeEnabled();
   });
 
+  it('로그인·계정 찾기 출구와 로그아웃 안내 뒤에, 번호를 새로 받았다면 고객센터에 알려 달라는 한 줄이 붙는다', async () => {
+    await requestCodeFailingWith('PHONE_CONFLICT', '이미 다른 계정에서 사용 중인 번호예요.', 409);
+
+    expect(screen.getByText('번호를 최근에 새로 받았나요? 전에 이 번호를 쓰던 계정이 남아 있을 수 있어요.')).toBeInTheDocument();
+    const help = screen.getByRole('link', { name: '고객센터에 알려 주세요' });
+    expect(help).toHaveAttribute('href', '/contact');
+    const logoutNotice = screen.getByText('버튼을 누르면 지금 계정에서 로그아웃돼요.');
+    expect(logoutNotice.compareDocumentPosition(help) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // 로그아웃을 부르지 않는 단순 링크라 로그인한 채로 문의 창구에 갈 수 있다.
+    expect(logout).not.toHaveBeenCalled();
+  });
+
+  it('번호 충돌이 아닌 다른 오류에는 이 안내가 없다', async () => {
+    await requestCodeFailingWith('VERIFICATION_RESEND_COOLDOWN', '잠시 후 다시 시도해 주세요.', 429);
+
+    expect(screen.queryByRole('link', { name: '고객센터에 알려 주세요' })).not.toBeInTheDocument();
+  });
+
   it.each([
     ['기존 계정으로 로그인', '/login'],
     ['계정 찾기', '/auth/find-account'],

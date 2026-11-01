@@ -21,6 +21,17 @@ export { lockGameRows } from './game-row-lock';
 
 type Tx = Prisma.TransactionClient;
 
+interface ReaddedPlayerExclusions {
+  readonly userId: string;
+  readonly adjustmentIds: readonly string[];
+}
+
+interface CompetitionTeamSyncTarget {
+  readonly competitionId: string;
+  readonly teamId: string;
+  readonly readdedPlayerExclusions?: ReaddedPlayerExclusions;
+}
+
 export const TOURNAMENT_ROSTER_SYNC_ACTION = 'TOURNAMENT_ROSTER_SYNCED';
 export const LEAGUE_ROSTER_SYNC_ACTION = 'LEAGUE_ROSTER_SYNCED';
 /**
@@ -228,7 +239,7 @@ async function syncLockedGameSide(
   tx: Tx,
   target: { gameId: string; sideId: string },
   preloaded: GameRosterPreload,
-  options: { allowStarted?: boolean } = {},
+  options: { allowStarted?: boolean; readdedPlayerExclusions?: ReaddedPlayerExclusions } = {},
 ): Promise<boolean> {
   const context = await loadGameRosterContext(tx, target);
   if (context === null) return false;
@@ -236,18 +247,41 @@ async function syncLockedGameSide(
     // Only a bracket team change on a started fixture rewrites a non-SCHEDULED lineup; any other trigger must not.
     if (options.allowStarted !== true || context.gameState === V1GameState.CANCELLED) return false;
   }
-  const loaded = await loadGameRosterForContext(tx, context, preloaded);
+  let loaded = await loadGameRosterForContext(tx, context, preloaded);
   if (loaded === null) return false;
-  const { computation } = loaded;
 
   const latest = await tx.v1GameLineup.findFirst({
     where: { gameId: context.gameId, sideId: context.sideId, invalidatedAt: null },
     orderBy: { revision: 'desc' },
   });
   if (latest === null) return false;
+  if (options.readdedPlayerExclusions !== undefined) {
+    const reset = options.readdedPlayerExclusions;
+    // 경기 잠금 후 현재 사이드·상태를 확인한 범위만. 감사 행은 남기고 재추가 전에 캡처한
+    // 제외만 되돌리므로, 중복/늦은 이벤트도 새 제외나 진행·공식 경기 이력을 바꾸지 않는다.
+    const { count } = await tx.v1GameRosterAdjustment.updateMany({
+      where: {
+        id: { in: [...reset.adjustmentIds] },
+        gameId: context.gameId,
+        sideId: context.sideId,
+        teamId: context.teamId,
+        userId: reset.userId,
+        action: 'EXCLUDE',
+        revokedAt: null,
+        game: { state: V1GameState.SCHEDULED, currentOfficialRevisionId: null },
+      },
+      data: { revokedAt: new Date(), revokedByUserId: null, revokedByRole: 'SYSTEM' },
+    });
+    if (count > 0) {
+      loaded = await loadGameRosterForContext(tx, context, preloaded);
+      if (loaded === null) return false;
+    }
+  }
+  // 미이관 팀 제출본은 재작성하지 않는다. 재추가 전 제외의 되돌림은 명단 이관과 별개다.
   if (context.isLeague && (await isUnmigratedTeamAuthoredLineup(tx, context.gameId, context.sideId, latest))) {
     return false;
   }
+  const { computation } = loaded;
 
   const current = await tx.v1GameParticipant.findMany({
     where: { lineupId: latest.id },
@@ -380,11 +414,14 @@ export function upcomingCompetitionGameWhere(
  */
 export async function syncLockedCompetitionTeam(
   tx: Tx,
-  input: { competitionId: string; teamId: string },
+  input: CompetitionTeamSyncTarget,
   locked: ReadonlySet<string>,
 ): Promise<number> {
   const games = await tx.v1Game.findMany({
-    where: upcomingCompetitionGameWhere(input.competitionId, input.teamId, new Date()),
+    where: {
+      ...upcomingCompetitionGameWhere(input.competitionId, input.teamId, new Date()),
+      ...(input.readdedPlayerExclusions === undefined ? {} : { currentOfficialRevisionId: null }),
+    },
     orderBy: { id: 'asc' },
     select: {
       id: true,
@@ -410,7 +447,9 @@ export async function syncLockedCompetitionTeam(
   let synced = 0;
   for (const game of games) {
     for (const side of game.sides) {
-      if (await syncLockedGameSide(tx, { gameId: game.id, sideId: side.id }, { base, orderedGames })) synced += 1;
+      if (await syncLockedGameSide(tx, { gameId: game.id, sideId: side.id }, { base, orderedGames }, {
+        readdedPlayerExclusions: input.readdedPlayerExclusions,
+      })) synced += 1;
     }
   }
   return synced;
@@ -422,7 +461,7 @@ export async function syncLockedCompetitionTeam(
  */
 async function syncCompetitionTeams(
   tx: Tx,
-  targets: ReadonlyArray<{ competitionId: string; teamId: string }>,
+  targets: readonly CompetitionTeamSyncTarget[],
 ): Promise<number> {
   const unique = [...new Map(targets.map((target) => [`${target.competitionId}:${target.teamId}`, target])).values()];
   const planned = await findUpcomingTeamSides(tx, unique, new Date());
@@ -575,6 +614,12 @@ export async function handleCompetitionRosterResync(
   switch (target.scope) {
     case 'competitionTeam':
       return syncCompetitionTeamRosters(tx, target);
+    case 'competitionPlayerReadded':
+      return syncCompetitionTeams(tx, [{
+        competitionId: target.competitionId,
+        teamId: target.teamId,
+        readdedPlayerExclusions: { userId: target.userId, adjustmentIds: target.adjustmentIds },
+      }]);
     case 'teamMembers':
       return syncTeamMemberFallbackRosters(tx, [target.teamId]);
     case 'teamPeriod':

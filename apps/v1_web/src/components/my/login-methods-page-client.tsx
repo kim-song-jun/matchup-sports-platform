@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
+import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Check, Link2, Mail, MessageCircle } from 'lucide-react';
 import { useSignOutAndLeave } from '@/components/auth/use-sign-out-and-leave';
@@ -17,6 +18,7 @@ import { getSignupIncompleteRoute } from '@/lib/auth-link-errors';
 import { reportClientError } from '@/lib/client-error-reporter';
 import { startKakaoLinkAuthorize } from '@/lib/kakao-oauth';
 import {
+  EMAIL_LINK_PATH,
   LOGIN_METHODS_PATH,
   linkResultFromError,
   linkResultFromSuccess,
@@ -265,7 +267,7 @@ export function LoginMethodsPageClient() {
         </div>
         <div style={{ display: 'grid', gap: 16 }}>
           <p className="tm-text-body" style={{ margin: 0, color: 'var(--text-muted)', wordBreak: 'keep-all' }}>
-            이 계정에 연결된 로그인 방법이에요. 카카오나 Apple을 연결하면 같은 계정으로 바로 로그인할 수 있어요.
+            이 계정에 연결된 로그인 방법이에요. 카카오·Apple·이메일을 연결하면 같은 계정으로 바로 로그인할 수 있어요.
           </p>
           {outcome ? (
             <LinkResultNotice
@@ -284,26 +286,36 @@ export function LoginMethodsPageClient() {
               {has('email') ? (
                 <ProviderRow
                   mark="email"
-                  label="이메일 로그인"
+                  label="이메일·비밀번호"
                   caption={authMe.data.user.email ?? '이메일과 비밀번호로 로그인해요'}
                   badge={<ConnectedBadge />}
                   divided={false}
                 />
-              ) : null}
+              ) : (
+                <ProviderRow
+                  mark="email"
+                  label="이메일·비밀번호"
+                  caption="연결하면 이메일과 비밀번호로도 이 계정에 들어와요"
+                  divided={false}
+                  action={
+                    <Link className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block" href={EMAIL_LINK_PATH}>
+                      이메일 연결하기
+                    </Link>
+                  }
+                />
+              )}
               {has('kakao') ? (
                 <ProviderRow
                   mark="kakao"
                   label="카카오 로그인"
                   caption={justLinked('kakao') ? '방금 연결했어요' : '카카오 버튼으로 이 계정에 들어와요'}
                   badge={<ConnectedBadge />}
-                  divided={has('email')}
                 />
               ) : (
                 <ProviderRow
                   mark="kakao"
                   label="카카오 로그인"
                   caption="연결하면 카카오 버튼으로도 이 계정에 들어와요"
-                  divided={has('email')}
                   action={
                     <Button
                       size="lg"
@@ -360,6 +372,11 @@ export function LoginMethodsPageClient() {
           {!has('kakao') ? (
             <p className="tm-text-caption" style={{ margin: 0, paddingInline: 4 }}>
               연결할 때 카카오 화면으로 이동했다가 돌아와요. 연결해도 팀과 경기 기록은 그대로예요.
+            </p>
+          ) : null}
+          {!has('email') ? (
+            <p className="tm-text-caption" style={{ margin: 0, paddingInline: 4 }}>
+              이메일을 연결하면 계정 이메일이 그 주소로 바뀌어요.{has('kakao') ? ' 팀과 경기 기록은 그대로예요.' : ''}
             </p>
           ) : null}
         </div>

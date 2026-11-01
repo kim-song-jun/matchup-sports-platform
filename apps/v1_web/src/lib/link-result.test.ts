@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { V1ApiError } from './api-client';
 import {
   buildLinkResultPath,
+  emailLinkPath,
   LINK_RESULTS,
   linkResultFromError,
   linkResultFromSuccess,
   LOGIN_METHODS_PATH,
+  parseEmailLinkReturnTo,
   readLinkResultQuery,
   withoutLinkResultQuery,
 } from './link-result';
@@ -102,5 +104,33 @@ describe('withoutLinkResultQuery', () => {
 
   it('returns the bare path when nothing else is left', () => {
     expect(withoutLinkResultQuery(LOGIN_METHODS_PATH, new URLSearchParams('linkResult=linked&provider=kakao'))).toBe(LOGIN_METHODS_PATH);
+  });
+});
+
+describe('emailLinkPath and parseEmailLinkReturnTo', () => {
+  it('goes to the step screen alone when there is nowhere to return to', () => {
+    expect(emailLinkPath()).toBe('/my/settings/login-methods/email');
+    expect(emailLinkPath(null)).toBe('/my/settings/login-methods/email');
+  });
+
+  it('carries the destination as an encoded redirect, keeping its own query and hash', () => {
+    expect(emailLinkPath('/matches/abc?tab=info#top')).toBe('/my/settings/login-methods/email?redirect=%2Fmatches%2Fabc%3Ftab%3Dinfo%23top');
+  });
+
+  it.each([
+    ['an external address', 'https://evil.example.com'],
+    ['a protocol-relative address', '//evil.example.com'],
+    ['the login screen', '/login'],
+    ['not a path', 'matches/abc'],
+    ['this screen itself', '/my/settings/login-methods/email'],
+    ['this screen with a query', '/my/settings/login-methods/email?redirect=%2Fhome'],
+  ])('does not return to %s', (_label, value) => {
+    expect(parseEmailLinkReturnTo(value)).toBeNull();
+    expect(emailLinkPath(value)).toBe('/my/settings/login-methods/email');
+  });
+
+  it('keeps the login methods screen and other settings screens as a destination', () => {
+    expect(parseEmailLinkReturnTo('/my/settings/login-methods')).toBe('/my/settings/login-methods');
+    expect(parseEmailLinkReturnTo('/my/settings')).toBe('/my/settings');
   });
 });

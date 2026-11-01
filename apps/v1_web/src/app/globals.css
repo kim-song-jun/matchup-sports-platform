@@ -1548,7 +1548,15 @@ button:disabled {
 }
 
 .tm-auth-field-helper-success {
-  color: var(--green500);
+  /* [a11y] green500 은 흰 배경에서 2.77:1 로 미달. green700 은 라이트 5.4:1, 다크는 토큰이 밝은 민트로 재정의된다. */
+  color: var(--green700);
+}
+
+/* 안내 문장 속 링크: 색만으로 구분하지 않도록 밑줄을 함께 둔다. */
+.tm-auth-inline-link {
+  color: var(--blue700);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .tm-auth-optional {

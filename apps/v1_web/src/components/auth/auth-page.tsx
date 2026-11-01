@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import type { ReactNode } from 'react';
+import type { ReactNode, Ref } from 'react';
 import { Card } from '@/components/v1-ui/primitives';
 import { AppBackLink } from '@/components/v1-ui/app-back-link';
 import { AuthBackButton } from './auth-back-button';
@@ -94,13 +94,17 @@ export function AuthExceptionPageView({ model }: { model: AuthExceptionViewModel
   );
 }
 
-export function SignupCompletePageView({ model }: { model: SignupCompleteViewModel }) {
+export function SignupCompletePageView({ model, headingRef }: {
+  model: SignupCompleteViewModel;
+  /** 이 화면이 앞 화면을 대신해 나타날 때(단계 안에서 완료로 넘어갈 때) 제목으로 포커스를 옮기도록 받는다. */
+  headingRef?: Ref<HTMLHeadingElement>;
+}) {
   return (
     <AuthFrame fixedAction={<SignupActions primary={model.primary} secondary={model.secondary} />} stage={JOURNEY_DONE_STAGE}>
       <div className="tm-auth-complete">
         {/* 완료 순간의 그래픽(트로피). .tm-complete-check 키프레임은 그대로 살려 등장 피드백으로 쓴다. */}
         <AuthIllustration name={JOURNEY_DONE_STAGE.illustration} className="tm-hide-desktop tm-complete-check" />
-        <h1 className="tm-text-heading tm-auth-heading">{model.title}</h1>
+        <h1 ref={headingRef} tabIndex={headingRef ? -1 : undefined} className="tm-text-heading tm-auth-heading">{model.title}</h1>
         <p className="tm-text-body tm-auth-sub">{model.sub}</p>
         <div className="tm-auth-stack">
           {model.steps.map((step) => (
@@ -321,12 +325,12 @@ function ExceptionActions({ model }: { model: AuthExceptionViewModel }) {
   );
 }
 
-function SignupActions({ primary, secondary }: { primary: AuthAction; secondary: AuthAction }) {
+function SignupActions({ primary, secondary }: { primary: AuthAction; secondary?: AuthAction }) {
   /* #22: 픽셀 스페이서 div → gap으로 교체 */
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <AuthActionButton action={primary} />
-      <AuthActionButton action={secondary} />
+      {secondary ? <AuthActionButton action={secondary} /> : null}
     </div>
   );
 }

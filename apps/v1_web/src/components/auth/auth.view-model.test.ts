@@ -75,6 +75,6 @@ describe('auth view models', () => {
     expect(model.title).toContain('완료');
     expect(model.steps.every((step) => step.done === true)).toBe(true);
     expect(model.primary.href).toBe('/onboarding/sport');
-    expect(model.secondary.href).toBe('/home');
+    expect(model.secondary?.href).toBe('/home');
   });
 });

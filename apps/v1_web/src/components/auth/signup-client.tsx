@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { Camera } from 'lucide-react';
 import { Card, DatePickerTextInput } from '@/components/v1-ui/primitives';
-import { EyeIcon, EyeOffIcon } from '@/components/v1-ui/icons';
 import { PHONE_CONFLICT_CODE } from '@/lib/auth-error-codes';
 import { OtpCodeInput, OtpErrorBanner, OtpRemainingRow } from '@/components/auth/otp/otp-parts';
 import { OTP_CODE_LENGTH, useOtpVerification } from '@/components/auth/otp/use-otp-verification';
@@ -22,6 +21,7 @@ import { cssUrl } from '@/lib/assets';
 import { V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
 import { clearV1IdentityCache } from '@/lib/query-keys';
+import { clearPendingEmailLink, savePendingEmailLink } from '@/lib/pending-email-link';
 import { clearPendingSocialLink } from '@/lib/pending-social-link';
 import { getSavedRedirectPath, sanitizeRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
 import { displayInitials } from '@/lib/display-initials';
@@ -30,6 +30,10 @@ import {
   readSignupTermsDocumentIds,
 } from '@/lib/signup-terms-storage';
 import { AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
+import { AuthPasswordField } from './auth-password-field';
+import { AuthStepCta } from './auth-step-cta';
+import { AuthStepHeader } from './auth-step-header';
+import { AuthVerifiedInset } from './auth-verified-inset';
 import { SignupPhoneRegisteredCard } from './signup-phone-registered-card';
 import { useDuplicateCheck, type DuplicateCheckStatus } from './use-duplicate-check';
 import {
@@ -97,8 +101,6 @@ export function SignupClient() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
   const [profileImageUrl, setProfileImageUrl] = useState('');
   const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
   const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
@@ -303,6 +305,7 @@ export function SignupClient() {
       saveStoredV1Session(result.session);
       // 새 계정은 앞서 안내받은 계정이 아니다 — 남은 대기 연결 토큰이 이 계정의 도착 화면을 가로채지 않게 지운다.
       clearPendingSocialLink();
+      clearPendingEmailLink();
       clearV1IdentityCache(queryClient);
       trackEvent('sign_up_complete', { method: 'email' });
 
@@ -435,46 +438,10 @@ export function SignupClient() {
       topTitle="회원가입"
       backHref={step === 'account' ? '/terms?mode=signup' : undefined}
       onBack={step === 'account' ? undefined : goBack}
-      fixedAction={
-        <>
-          <button
-            className={`tm-btn tm-btn-lg ${primary.disabled || primary.neutral ? 'tm-btn-neutral' : 'tm-btn-primary'} tm-btn-block`}
-            disabled={primary.disabled}
-            type="button"
-            onClick={primary.onClick}
-          >
-            {primary.loading ? <span className="tm-spinner" aria-hidden="true" /> : null}
-            {primary.label}
-          </button>
-          {disabledHint ? (
-            <p className="tm-text-caption" role="status" style={{ margin: '8px 0 0', textAlign: 'center' }}>
-              {disabledHint}
-            </p>
-          ) : null}
-        </>
-      }
+      fixedAction={<AuthStepCta action={primary} hint={disabledHint} />}
     >
       <div className="tm-auth-body">
-        <p className="sr-only" aria-live="polite" aria-atomic="true">
-          {`${STEP_ORDER.length}단계 중 ${stepIndex + 1}단계: ${copy.title.replace(/\n/g, ' ')}`}
-        </p>
-        <div
-          className="tm-signup-progress"
-          role="progressbar"
-          aria-label={`회원가입 진행 단계 ${stepIndex + 1} / ${STEP_ORDER.length}`}
-          aria-valuenow={stepIndex + 1}
-          aria-valuemin={1}
-          aria-valuemax={STEP_ORDER.length}
-          style={{ ['--signup-steps' as string]: STEP_ORDER.length }}
-        >
-          {STEP_ORDER.map((value, index) => (
-            <span key={value} data-on={index <= stepIndex} aria-hidden="true" />
-          ))}
-        </div>
-        <div className={`tm-signup-hero${copy.sub ? '' : ' tm-signup-hero-title-only'}`}>
-          <h1 className="tm-text-heading tm-auth-heading">{copy.title}</h1>
-          {copy.sub ? <p className="tm-text-body tm-auth-sub">{copy.sub}</p> : null}
-        </div>
+        <AuthStepHeader name="회원가입" steps={STEP_ORDER} index={stepIndex} title={copy.title} sub={copy.sub} />
 
         {/* 별표를 aria-hidden 으로만 두면 "표시는 필수 입력이에요"로 읽혀 무엇에 대한 설명인지
             사라진다. 시각 사용자는 기호로, 보조공학은 sr-only 단어로 같은 문장을 받게 한다. */}
@@ -519,53 +486,29 @@ export function SignupClient() {
                 <DuplicateHelper id={emailHelperId} status={emailCheck.status} error={emailError} availableMessage="사용 가능한 이메일이에요." />
               </label>
 
-              <label className="tm-auth-field">
-                <span className="tm-text-label">비밀번호<RequiredMark /></span>
-                <span className="tm-auth-password-field">
-                  <input
-                    className={`tm-input tm-auth-input ${passwordTooShort ? 'tm-auth-input-error' : passwordLongEnough ? 'tm-auth-input-success' : ''}`}
-                    minLength={8}
-                    onChange={(event) => setPassword(event.target.value)}
-                    placeholder="8자 이상"
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    aria-invalid={passwordTooShort ? true : undefined}
-                    aria-describedby={passwordTooShort || passwordLongEnough ? 'signup-password-helper' : undefined}
-                  />
-                  <button className="tm-auth-password-toggle" type="button" aria-label={showPassword ? '비밀번호 숨기기' : '비밀번호 보기'} aria-pressed={showPassword} onClick={() => setShowPassword((value) => !value)}>
-                    {showPassword ? <EyeOffIcon size={20} strokeWidth={1.8} /> : <EyeIcon size={20} strokeWidth={1.8} />}
-                  </button>
-                </span>
-                {passwordTooShort ? (
-                  <span id="signup-password-helper" role="alert" className="tm-text-caption tm-auth-field-helper tm-auth-field-helper-error">8자 이상 입력해 주세요.</span>
-                ) : passwordLongEnough ? (
-                  <span id="signup-password-helper" className="tm-text-caption tm-auth-field-helper tm-auth-field-helper-success">사용할 수 있는 비밀번호예요.</span>
-                ) : null}
-              </label>
+              <AuthPasswordField
+                label={<>비밀번호<RequiredMark /></>}
+                value={password}
+                onChange={setPassword}
+                placeholder="8자 이상"
+                feedback={passwordTooShort
+                  ? { kind: 'error', message: '8자 이상 입력해 주세요.' }
+                  : passwordLongEnough
+                    ? { kind: 'success', message: '사용할 수 있는 비밀번호예요.' }
+                    : null}
+              />
 
-              <label className="tm-auth-field">
-                <span className="tm-text-label">비밀번호 확인<RequiredMark /></span>
-                <span className="tm-auth-password-field">
-                  <input
-                    className={`tm-input tm-auth-input ${passwordMismatch ? 'tm-auth-input-error' : passwordMatch ? 'tm-auth-input-success' : ''}`}
-                    minLength={8}
-                    onChange={(event) => setPasswordConfirm(event.target.value)}
-                    placeholder="비밀번호 다시 입력"
-                    type={showPasswordConfirm ? 'text' : 'password'}
-                    value={passwordConfirm}
-                    aria-invalid={passwordMismatch ? true : undefined}
-                    aria-describedby={passwordMismatch || passwordMatch ? 'signup-password-confirm-helper' : undefined}
-                  />
-                  <button className="tm-auth-password-toggle" type="button" aria-label={showPasswordConfirm ? '비밀번호 숨기기' : '비밀번호 보기'} aria-pressed={showPasswordConfirm} onClick={() => setShowPasswordConfirm((value) => !value)}>
-                    {showPasswordConfirm ? <EyeOffIcon size={20} strokeWidth={1.8} /> : <EyeIcon size={20} strokeWidth={1.8} />}
-                  </button>
-                </span>
-                {passwordMismatch ? (
-                  <span id="signup-password-confirm-helper" role="alert" className="tm-text-caption tm-auth-field-helper tm-auth-field-helper-error">비밀번호가 일치하지 않아요.</span>
-                ) : passwordMatch ? (
-                  <span id="signup-password-confirm-helper" className="tm-text-caption tm-auth-field-helper tm-auth-field-helper-success">비밀번호가 일치해요.</span>
-                ) : null}
-              </label>
+              <AuthPasswordField
+                label={<>비밀번호 확인<RequiredMark /></>}
+                value={passwordConfirm}
+                onChange={setPasswordConfirm}
+                placeholder="비밀번호 다시 입력"
+                feedback={passwordMismatch
+                  ? { kind: 'error', message: '비밀번호가 일치하지 않아요.' }
+                  : passwordMatch
+                    ? { kind: 'success', message: '비밀번호가 일치해요.' }
+                    : null}
+              />
             </>
           ) : null}
 
@@ -596,6 +539,8 @@ export function SignupClient() {
                   loginHref={withRedirect('/login/email')}
                   socialLoginHref={withRedirect('/login')}
                   findAccountHref={withRedirect('/auth/find-account')}
+                  // 이메일만 보관한다. 비밀번호는 가입 화면 밖으로 내보내지 않는다.
+                  onSocialLoginSelect={() => { savePendingEmailLink({ email: normalizedEmail, returnTo: currentRedirect() }); }}
                 />
               ) : isSendablePhone && !phoneProofToken ? (
                 <>
@@ -611,21 +556,7 @@ export function SignupClient() {
                 </>
               ) : null}
 
-              {phoneProofToken ? (
-                <div
-                  className="tm-auth-inset"
-                  role="status"
-                  style={{ padding: 16, display: 'flex', alignItems: 'center', gap: 8, background: 'var(--blue50)' }}
-                >
-                  <span
-                    aria-hidden="true"
-                    style={{ width: 6, height: 6, borderRadius: 'var(--radius-circle)', background: 'var(--blue500)', display: 'inline-block' }}
-                  />
-                  <span className="tm-text-label" style={{ color: 'var(--blue700)' }}>
-                    휴대폰 본인인증이 완료됐어요
-                  </span>
-                </div>
-              ) : null}
+              {phoneProofToken ? <AuthVerifiedInset message="휴대폰 본인인증이 완료됐어요" /> : null}
             </>
           ) : null}
 
@@ -747,9 +678,14 @@ export function SignupClient() {
   );
 }
 
-/** 가입을 떠나 로그인·계정 찾기로 갈 때 원래 가려던 곳을 이어 준다(소셜 가입의 충돌 출구와 같은 출처). */
+/** 가입 화면이 이어받은 원래 가려던 곳(소셜 가입의 충돌 출구와 같은 출처). */
+function currentRedirect() {
+  return sanitizeRedirectPath(new URLSearchParams(window.location.search).get('redirect')) ?? getSavedRedirectPath();
+}
+
+/** 가입을 떠나 로그인·계정 찾기로 갈 때 원래 가려던 곳을 이어 준다. */
 function withRedirect(path: string) {
-  const redirect = sanitizeRedirectPath(new URLSearchParams(window.location.search).get('redirect')) ?? getSavedRedirectPath();
+  const redirect = currentRedirect();
   return redirect ? `${path}?redirect=${encodeURIComponent(redirect)}` : path;
 }
 

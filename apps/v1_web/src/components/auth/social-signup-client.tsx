@@ -9,6 +9,7 @@ import { PhoneConflictNotice } from '@/components/auth/otp/phone-conflict-notice
 import { PhoneVerificationCard } from '@/components/auth/phone-verification/phone-verification-card';
 import { useV1AuthMe, useV1CheckNickname, useV1CompleteSocialProfile, useV1DeferSocialProfile } from '@/hooks/use-v1-api';
 import { getSignInThenLinkHint } from '@/lib/auth-link-errors';
+import { clearPendingEmailLink } from '@/lib/pending-email-link';
 import { clearPendingSocialLink } from '@/lib/pending-social-link';
 import { useSocialSignupExit } from './use-social-signup-exit';
 import { V1ApiError } from '@/lib/api-client';
@@ -190,6 +191,7 @@ export function SocialSignupClient() {
       onSuccess: (result) => {
         saveStoredV1Session(result.session);
         clearPendingSocialLink();
+        clearPendingEmailLink();
         clearV1IdentityCache(queryClient);
         trackEvent('sign_up_complete', {
           method: authMe.data?.user?.authProvider ?? 'social',
@@ -248,8 +250,9 @@ export function SocialSignupClient() {
       {
         onSuccess: (result) => {
           saveStoredV1Session(result.session);
-          // 새 계정의 가입이 끝났다 — 앞서 안내받은 계정용 대기 연결 토큰은 이 계정에 붙지 않게 지운다.
+          // 새 계정의 가입이 끝났다 — 앞서 안내받은 계정용 대기 연결 토큰과 입력해 둔 이메일은 이 계정에 쓰이지 않게 지운다.
           clearPendingSocialLink();
+          clearPendingEmailLink();
           clearV1IdentityCache(queryClient);
           const method = authMe.data?.user?.authProvider ?? 'social';
           // No next route means the server finished a deferred profile — possibly deferred in another

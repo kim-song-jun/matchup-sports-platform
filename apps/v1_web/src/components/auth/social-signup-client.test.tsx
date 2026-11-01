@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SocialSignupClient } from './social-signup-client';
 import { V1ApiError } from '@/lib/api-client';
+import { readPendingEmailLink, savePendingEmailLink } from '@/lib/pending-email-link';
 
 const router = vi.hoisted(() => ({
   replace: vi.fn(),
@@ -194,6 +195,26 @@ describe('SocialSignupClient required profile contract', () => {
 
     // Then
     await waitFor(() => expect(analytics.trackEvent).toHaveBeenCalledWith('sign_up_complete', { method: 'kakao' }));
+  });
+
+  // 이메일 가입에서 입력해 둔 이메일은 원래 계정에 연결하자는 제안용이다 — 방금 만든 새 계정에는 제안되지 않아야 한다.
+  it('가입을 마치면 이메일 가입 화면에서 보관해 둔 이메일을 지운다', async () => {
+    savePendingEmailLink({ email: 'left-from-email-signup@example.com' });
+    hooks.completeProfileMutate.mockImplementation((_body: unknown, callbacks: CompleteProfileCallbacks) =>
+      callbacks.onSuccess({ session: { userId: 'social-user', userEmail: null }, next: { route: '/onboarding/region' } }),
+    );
+    render(<SocialSignupClient />);
+    await verifyNicknameAndSelectGender();
+    fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '김러너' } });
+    fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01087654321' } });
+    fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
+    await completePhoneVerification();
+    expect(readPendingEmailLink()).not.toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: '운동 설정으로 계속' }));
+
+    await waitFor(() => expect(hooks.completeProfileMutate).toHaveBeenCalled());
+    expect(readPendingEmailLink()).toBeNull();
   });
 
   it('Apple 가입 완료는 method=apple 로 기록한다', async () => {
@@ -541,6 +562,16 @@ describe('SocialSignupClient 나중에 입력할게요', () => {
   const deferResult = {
     session: { userId: 'u-1', userEmail: null },
   };
+
+  it('나중에 입력하기로 가입을 마쳐도 이메일 가입 화면에서 보관해 둔 이메일은 지운다', () => {
+    savePendingEmailLink({ email: 'left-from-email-signup@example.com' });
+    hooks.deferMutate.mockImplementation((_v: undefined, cb: CompleteProfileCallbacks) => cb.onSuccess(deferResult));
+    render(<SocialSignupClient />);
+
+    fireEvent.click(screen.getByRole('button', { name: '나중에 입력할게요' }));
+
+    expect(readPendingEmailLink()).toBeNull();
+  });
 
   it('입력 없이 건너뛰면 defer 를 호출하고 홈으로 가며 sign_up_complete(profile=deferred)를 남긴다', () => {
     hooks.deferMutate.mockImplementation((_v: undefined, cb: CompleteProfileCallbacks) => cb.onSuccess(deferResult));

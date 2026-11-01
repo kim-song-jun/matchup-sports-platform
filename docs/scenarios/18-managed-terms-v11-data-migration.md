@@ -8,9 +8,9 @@
 
 ### TERMS-DATA-001 — canonical baseline
 
-- Given 현재 v1 고정 문구가 source of truth다.
-- When `node scripts/qa/generate-v1-managed-terms-baseline.mjs`를 실행한다.
-- Then snapshot과 migration은 12개 policy/document, 12개 placement, 전 문서 `version=v1.1`, source-derived SHA-256 hash와 일치해야 한다.
+- Given v1.1 baseline은 snapshot(`apps/v1_api/prisma/data/managed-terms-v1.1.json`)과 마이그레이션 `20260722090000_v1_managed_terms_v11_baseline`으로 고정된 불변 이력이다. 웹 코드에는 원문 사본이 없고 화면은 서버가 내려 주는 문서를 렌더한다.
+- When `managed-terms-baseline.spec.ts`를 실행한다.
+- Then snapshot과 migration은 12개 policy/document, 12개 placement, 전 문서 `version=v1.1`, 본문 SHA-256 hash와 일치해야 한다.
 - And `signup_location`은 signup의 optional 문서이며 footer `location_terms`와 ID가 다른 독립 관리 문서여야 한다.
 - And 회원가입 이용약관과 하단 이용약관은 본문이 같아도 서로 다른 policy/document ID를 가져 독립적으로 관리되어야 한다.
 

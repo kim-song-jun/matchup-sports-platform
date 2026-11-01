@@ -65,7 +65,7 @@ Contact for review: <연락처 — 저장소 밖에서 전달>
 | 팀 컨택 신고·차단 | `components/community/team-contact-status-card.tsx:239` "신고하기", API `team-contacts.controller.ts` `contact-blocks` |
 | 일반 신고(문의) | `components/my/my-inquiries-client.tsx:53` 카테고리 `report`, 사유 5종 `lib/v1-status-labels.ts:104` |
 | 어드민 조치 | 신고 팀 차단 `admin.controller.ts:308`, 후기 숨김 `reviews.controller.ts:72` |
-| 약관의 금지 행위 | `terms-client.tsx:480` (욕설·비방·차별·혐오·성희롱·위협·폭력, 광고·스팸) 및 제재 조항 |
+| 약관의 금지 행위 | 서비스 이용약관(`/terms?document=terms`)의 금지 행위(욕설·비방·차별·혐오·성희롱·위협·폭력, 광고·스팸) 및 제재 조항 |
 | 푸시·사전 안내 | `Push/PushCoordinator.swift`, `Push/PushPromptView.swift`, 탭 착지 `Navigation/DeepLinkRoute.swift` |
 | 유니버설 링크 | `Navigation/UniversalLink.swift`, entitlements `applinks:$(TEAMEET_APP_LINK_HOST)` |
 | 오프라인·오류 화면 | `WebShell/LoadFailureView.swift`, `WebShell/NetworkReachability.swift`, `WebShell/WebShellFailurePolicy.swift` |
@@ -90,8 +90,8 @@ Contact for review: <연락처 — 저장소 밖에서 전달>
    키 등록 전에 로그인한 사용자는 저장된 토큰이 없어 해지 대상이 아니다 — 등록 후 다시 로그인해야 저장된다.
 4. **[5.1.1(v)] 삭제는 "요청 → 30일 유예 → 삭제"** — Apple 은 수동 절차를 허용하되 "소요 시간을 알릴 것"을 요구한다.
    탈퇴 화면에 "탈퇴를 요청하면 30일 뒤 계정과 개인정보가 삭제돼요. 그 전에 다시 로그인하면 직접 취소할 수 있어요. 다만 신청할 때 빠진 팀과 경기 명단은 돌아오지 않아요."를
-   보여 주고, 개인정보처리방침 v1.4 7절에 같은 30일 유예를 적었다(2026-09-26 사용자 결정). 유예 중 복구는 사용자가
-   다시 로그인해 `/auth/withdrawal-cancel` 에서 직접 취소하거나, 어드민이 계정 상태를 `active` 로 되돌리는 경로다. 30일 뒤 삭제는 아직 자동 잡이 없어 **운영자가 어드민 삭제로 처리**해야 한다.
+   보여 주고, 개인정보처리방침 7절에 같은 30일 유예를 적었다(2026-09-26 사용자 결정으로 v1.4 에서 시작, 2026-11-01 v1.7 에서 직접 철회·자동 파기·유예기간 중 이메일·휴대전화번호 사용 안내로 갱신). 유예 중 복구는 사용자가
+   다시 로그인해 `/auth/withdrawal-cancel` 에서 직접 취소하거나, 어드민이 계정 상태를 `active` 로 되돌리는 경로다. 30일이 지나면 API 의 매시간 잡(`WithdrawalFinalizationService`)이 계정을 파기하고, 사람 확인이 필요한 계정(활성 어드민 기록·팀 권한 등)만 보고서에 남겨 둔다.
    공개 `/account-deletion` 페이지에도 같은 문장을 보여 준다.
    또한 팀장·운영진은 탈퇴가 막힌다(`assertWithdrawable`) — 권한 이전 방법 안내가 화면에 있는지 확인.
 5. **[1.2] 자동 필터 없음, 신고 버튼이 채팅·팀 컨택에만 있음** — 1.2 는 "부적절한 콘텐츠를 걸러내는 방법"을 요구한다.

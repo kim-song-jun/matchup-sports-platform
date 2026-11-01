@@ -45,7 +45,7 @@
   WKWebView 에서 위치 요청이 항상 실패한다.
 - [x] **[#1280에서 해결]** 마이크·사진 권한 문구(`NSMicrophoneUsageDescription` 등)와 `PrivacyInfo.xcprivacy` — PR #1280(fix/native-audit)이 추가한다. 머지 후 빌드의 Info.plist 에 들어갔는지 확인.
 - [ ] 개인정보처리방침에 **iOS 앱 절**(APNs 토큰·기기 정보, Apple 로그인으로 받는 이름·이메일, 카메라·위치
-  권한 사용 조건) 추가 — 현재는 Android 절(11항)만 있다. `apps/v1_web/src/components/auth/terms-client.tsx`.
+  권한 사용 조건) 추가 — 현재는 Android 절(11항)만 있다. 본문은 관리 약관 문서(`privacy_policy`)이므로 새 리비전으로 게시한다.
 - [ ] Apple 로그인 계정 삭제 시 **Apple 토큰 폐기(REST `/auth/revoke`)** — 심사 5.1.1(v) 요구. 현재 셸은
   `identityToken` 만 보내고 `authorizationCode` 를 전달하지 않아 서버가 폐기할 수단이 없다. 자세한 내용은
   [`review-notes.md`](./review-notes.md#위험-항목).

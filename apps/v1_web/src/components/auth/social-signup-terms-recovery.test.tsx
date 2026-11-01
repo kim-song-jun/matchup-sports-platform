@@ -124,7 +124,9 @@ async function prepareProfile() {
   fireEvent.change(screen.getByLabelText(/^닉네임/), { target: { value: '카카오러너' } });
   fireEvent.click(screen.getByRole('button', { name: '중복 확인' }));
   await screen.findByText('사용 가능한 닉네임이에요.');
+  fireEvent.click(screen.getByRole('button', { name: '다음' }));
   fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '1995-01-15' } });
+  fireEvent.click(screen.getByRole('button', { name: '다음' }));
   const submit = await screen.findByRole('button', { name: '운동 설정으로 계속' });
   expect(submit).toBeEnabled();
   return submit;
@@ -297,7 +299,7 @@ describe('필수 약관이 변경된 소셜 가입의 실제 인증 캐시 복�
     const completeButton = await prepareProfile();
     const deferButton = screen.getByRole('button', { name: '나중에 입력할게요' });
     const trigger = action === 'defer' ? deferButton : completeButton;
-    const signupForm = screen.getByLabelText(/^닉네임/).closest('form');
+    const signupForm = document.getElementById('v1-social-signup-form');
     if (!signupForm) throw new Error('실제 가입 폼을 찾지 못했어요.');
 
     try {

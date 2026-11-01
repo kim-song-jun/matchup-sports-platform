@@ -41,14 +41,22 @@ const ADMIN_REFUSAL_MESSAGES = {
  * Refuses a caller whose login methods may not be changed from a browser session: a restricted account, an operator's
  * account, or a social signup that has not finished.
  */
+export function linkCallerRestriction(caller: LinkCaller): 'account' | 'admin' | 'signup' | null {
+  if (caller.accountStatus !== 'active' || caller.deletedAt !== null) return 'account';
+  if (caller.adminUser && caller.adminUser.status !== 'revoked') return 'admin';
+  if (isUnfinishedSocialSignup(caller.onboardingStatus)) return 'signup';
+  return null;
+}
+
 export function assertLinkableCaller(caller: LinkCaller, method: keyof typeof ADMIN_REFUSAL_MESSAGES) {
-  if (caller.accountStatus !== 'active' || caller.deletedAt !== null) {
+  const restriction = linkCallerRestriction(caller);
+  if (restriction === 'account') {
     throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: '이용이 제한된 계정이에요.' });
   }
-  if (caller.adminUser && caller.adminUser.status !== 'revoked') {
+  if (restriction === 'admin') {
     throw new ForbiddenException({ code: 'SOCIAL_LINK_ADMIN_FORBIDDEN', message: ADMIN_REFUSAL_MESSAGES[method] });
   }
-  if (isUnfinishedSocialSignup(caller.onboardingStatus)) {
+  if (restriction === 'signup') {
     throw new ForbiddenException({
       code: 'SIGNUP_INCOMPLETE',
       message: '가입을 먼저 마무리해 주세요.',

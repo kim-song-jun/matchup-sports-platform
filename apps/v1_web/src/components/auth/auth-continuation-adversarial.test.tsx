@@ -10,6 +10,7 @@ import { RequireAuth } from './require-auth';
 import { PendingSocialSignupGate } from './pending-social-signup-gate';
 import { SocialSignupClient } from './social-signup-client';
 import { OnboardingClient } from './onboarding-client';
+import { EmailLinkClient } from '@/components/my/email-link-client';
 import { TermsClient } from './terms-client';
 import { KakaoLoginButton } from './kakao-login-button';
 import { KakaoCallbackClient } from './kakao-callback-client';
@@ -47,6 +48,7 @@ function Journey({ initialRoute }: { initialRoute: string }) {
     : pathname === '/callback/kakao' ? <KakaoCallbackClient />
       : pathname === '/signup/social' ? <SocialSignupClient />
         : pathname === '/terms' ? <TermsClient />
+          : pathname === '/my/settings/login-methods/email' ? <EmailLinkClient />
           : step ? <RequireAuth key={pathname}><OnboardingClient key={pathname} step={step} /></RequireAuth>
             : <h1>{route}</h1>}</PendingSocialSignupGate>;
 }
@@ -78,6 +80,8 @@ const newSignupPrefill = { name: '김러너', phone: '01087654321', gender: 'fem
 async function completeSignup(user: ReturnType<typeof userEvent.setup>) {
   fireEvent.change(await screen.findByLabelText('닉네임'), { target: { value: '카카오러너' } });
   await user.click(screen.getByRole('button', { name: '중복 확인' }));
+  await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled());
+  await user.click(screen.getByRole('button', { name: '다음' }));
   const submit = await screen.findByRole('button', { name: '운동 설정으로 계속' });
   await waitFor(() => expect(submit).toBeEnabled());
   await user.click(submit);
@@ -105,6 +109,90 @@ async function expectDestination(path: string) {
 }
 
 describe('적대적 인증 continuation의 실제 consumer 계약', () => {
+  it('이메일 연결 선택 중 재동의가 필요해도 약관 다음에 연결하고 원 목적지까지 돌아간다', async () => {
+    state.auth.socialSignupPrefill = newSignupPrefill;
+    saveStoredV1Session({ userId: PENDING });
+    saveRedirectPath('/teams/new?from=signup');
+    server.use(
+      http.post('*/api/v1/auth/social-profile', async () => {
+        state.profileRequests++;
+        state.auth = makeAuth('signup_done', PENDING, true);
+        state.auth.termsCompliance = compliance(false);
+        return success(authSession(state.auth, '/terms?mode=renewal'));
+      }),
+      http.post('*/api/v1/auth/link/email/request', () => success({ sent: true, maskedTarget: 'r***@example.com', expiresInSeconds: 300, resendAvailableInSeconds: 30, devCode: '123456' })),
+      http.post('*/api/v1/auth/link/email/verify', () => success({ emailLinkToken: 'synthetic-email-link-token-long', expiresInSeconds: 600 })),
+      http.post('*/api/v1/auth/link/email/complete', () => success({ linked: true, email: 'runner@example.com' })),
+    );
+    const user = openJourney('/signup/social');
+    fireEvent.change(await screen.findByLabelText('닉네임'), { target: { value: '카카오러너' } });
+    await user.click(screen.getByRole('button', { name: '중복 확인' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled());
+    await user.click(screen.getByRole('button', { name: '다음' }));
+    await user.click(screen.getByRole('checkbox', { name: /이메일.*로그인/ }));
+    await user.click(screen.getByRole('button', { name: '이메일 로그인 연결' }));
+    await user.click(await screen.findByRole('button', { name: /전체 동의/ }));
+    await user.click(screen.getByRole('button', { name: '동의하고 계속하기' }));
+    await screen.findByRole('heading', { name: '이메일을 입력해 주세요' });
+    await user.type(screen.getByLabelText('이메일'), 'runner@example.com');
+    await user.click(screen.getByRole('button', { name: '인증번호 받기' }));
+    await screen.findByRole('heading', { name: '인증번호를 입력해 주세요' });
+    await user.click(screen.getByRole('button', { name: '인증번호 확인' }));
+    await screen.findByRole('heading', { name: '비밀번호를 정해 주세요' });
+    await user.type(screen.getByLabelText('비밀번호'), 'synthetic-pass-123');
+    await user.type(screen.getByLabelText('비밀번호 확인'), 'synthetic-pass-123');
+    await user.click(screen.getByRole('button', { name: '연결하기' }));
+    const next = await screen.findByRole('link', { name: '하던 곳으로 돌아가기' });
+    expect(next).toHaveAttribute('href', '/onboarding/sport?redirect=%2Fteams%2Fnew%3Ffrom%3Dsignup');
+    act(() => navigation.replace(next.getAttribute('href')!));
+    await finishOnboarding(user);
+    await expectDestination('/teams/new?from=signup');
+    expect(state.acceptRequests).toBe(1);
+  });
+
+  it('소셜 가입 후 이메일 인증과 비밀번호 연결을 마치면 실제 온보딩으로 이어진다', async () => {
+    state.auth.socialSignupPrefill = newSignupPrefill;
+    saveStoredV1Session({ userId: PENDING });
+    let requests = 0, verified = 0, completed = 0;
+    server.use(
+      http.post('*/api/v1/auth/link/email/request', async ({ request }) => {
+        expect(await request.json()).toEqual({ email: 'runner@example.com' }); requests++;
+        return success({ sent: true, maskedTarget: 'r***@example.com', expiresInSeconds: 300, resendAvailableInSeconds: 30, devCode: '123456' });
+      }),
+      http.post('*/api/v1/auth/link/email/verify', async ({ request }) => {
+        expect(await request.json()).toEqual({ code: '123456' }); verified++;
+        return success({ emailLinkToken: 'synthetic-email-link-token-long', expiresInSeconds: 600 });
+      }),
+      http.post('*/api/v1/auth/link/email/complete', async ({ request }) => {
+        expect(await request.json()).toEqual({ emailLinkToken: 'synthetic-email-link-token-long', password: 'synthetic-pass-123', passwordConfirm: 'synthetic-pass-123' }); completed++;
+        return success({ linked: true, email: 'runner@example.com' });
+      }),
+    );
+    const user = openJourney('/signup/social');
+    fireEvent.change(await screen.findByLabelText('닉네임'), { target: { value: '카카오러너' } });
+    await user.click(screen.getByRole('button', { name: '중복 확인' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled());
+    await user.click(screen.getByRole('button', { name: '다음' }));
+    await user.click(screen.getByRole('checkbox', { name: /이메일.*로그인/ }));
+    await user.click(screen.getByRole('button', { name: '이메일 로그인 연결' }));
+    await screen.findByRole('heading', { name: '이메일을 입력해 주세요' });
+    await user.type(screen.getByLabelText('이메일'), 'runner@example.com');
+    await user.click(screen.getByRole('button', { name: '인증번호 받기' }));
+    await screen.findByRole('heading', { name: '인증번호를 입력해 주세요' });
+    await user.click(screen.getByRole('button', { name: '인증번호 확인' }));
+    await screen.findByRole('heading', { name: '비밀번호를 정해 주세요' });
+    await user.type(screen.getByLabelText('비밀번호'), 'synthetic-pass-123');
+    await user.type(screen.getByLabelText('비밀번호 확인'), 'synthetic-pass-123');
+    await user.click(screen.getByRole('button', { name: '연결하기' }));
+    expect(await screen.findByRole('heading', { name: '이메일 로그인이 연결됐어요' })).toBeVisible();
+    const next = screen.getByRole('link', { name: '하던 곳으로 돌아가기' });
+    expect(next).toHaveAttribute('href', '/onboarding/sport');
+    // jsdom does not navigate anchors; exercise the same href through the Next navigation harness.
+    act(() => navigation.replace(next.getAttribute('href')!));
+    expect(await screen.findByRole('button', { name: /풋살/ })).toBeVisible();
+    expect([state.profileRequests, requests, verified, completed]).toEqual([1, 1, 1, 1]);
+  });
+
   it('RequireAuth→OAuth에 저장한 nested 원 목적지는 가입 완료와 온보딩 네 단계를 마친 뒤 복귀한다', async () => {
     state.auth.socialSignupPrefill = newSignupPrefill;
     let oauthRequests = 0;
@@ -159,6 +247,11 @@ describe('적대적 인증 continuation의 실제 consumer 계약', () => {
       return success(authSession(state.auth, '/terms?mode=renewal'));
     }));
     const user = openJourney('/signup/social');
+    if (mode === 'activity') {
+      await screen.findByRole('heading', { name: '어떤 닉네임으로 활동할까요?' });
+      await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled());
+      await user.click(screen.getByRole('button', { name: '다음' }));
+    }
     const submit = await screen.findByRole('button', { name: mode === 'defer' ? '나중에 입력할게요' : '입력 완료하고 계속하기' });
     await waitFor(() => expect(submit).toBeEnabled());
     await user.click(submit);

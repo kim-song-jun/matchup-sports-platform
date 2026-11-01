@@ -104,7 +104,7 @@ describe('카카오 로그인 충돌 → 원래 계정 로그인 → 자동 연�
     expect(await screen.findByRole('heading', { level: 1, name: '이미 팀밋 계정이 있어요' })).toBeInTheDocument();
     expect(navigation.replace).toHaveBeenCalledWith('/auth/account-conflict?provider=kakao');
     expect(peekPendingSocialLink()).toMatchObject({ linkToken: PENDING_LINK_MSW.tokens.kakao, provider: 'kakao' });
-    expect(screen.getByText('30분 안에 로그인하면 카카오 로그인이 자동으로 연결돼요')).toBeInTheDocument();
+    expect(screen.getByText('카카오 로그인 연결을 시도해요')).toBeInTheDocument();
     expect(requests).toEqual(['POST /api/v1/auth/kakao']);
 
     // 2) 안내 화면의 "이메일로 로그인하기" → 이메일 로그인 화면(연결 안내가 함께 보인다)

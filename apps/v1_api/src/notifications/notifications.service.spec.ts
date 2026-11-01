@@ -224,6 +224,27 @@ describe('NotificationsService', () => {
     expect(prisma.v1NotificationPreference.findUnique).not.toHaveBeenCalled();
   });
 
+  it('운영자 번호 해제 알림은 알림 설정과 무관하게 만들고 휴대폰 인증 화면으로 보낸다', async () => {
+    prisma.v1NotificationPreference.findUnique.mockResolvedValue({ importantEnabled: false, activityEnabled: false });
+    prisma.v1Notification.findUnique.mockResolvedValue(null);
+    prisma.v1Notification.create.mockImplementation(async ({ data }) => makeNotification(data));
+
+    const created = await service.createInTransaction(prisma as unknown as Prisma.TransactionClient, 'user-1', 'phone_released_by_operator', {
+      businessKey: 'phone-release:log-1',
+    });
+
+    expect(created).toMatchObject({ targetType: 'system', targetId: null, deepLink: '/my/phone-verify' });
+    expect(prisma.v1Notification.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        recipientUserId: 'user-1',
+        businessKey: 'phone-release:log-1:user-1',
+        title: '휴대폰 번호가 해제됐어요',
+        body: '운영자가 이 계정의 휴대폰 번호를 해제했어요. 계정은 그대로이고, 휴대폰 번호를 다시 인증해 주세요.',
+      }),
+    });
+    expect(prisma.v1NotificationPreference.findUnique).not.toHaveBeenCalled();
+  });
+
   it('같은 businessKey 의 보안 알림이 이미 있으면 두 번 만들지 않는다', async () => {
     prisma.v1Notification.findUnique.mockResolvedValue({ id: 'existing' });
 

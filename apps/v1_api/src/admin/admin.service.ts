@@ -60,12 +60,14 @@ import {
   CreateAdminPopupDto,
   DeleteAdminUserDto,
   GrantAdminDto,
+  ReleaseAdminUserPhoneDto,
   ReplyInquiryDto,
   UpdateAdminNoticeDto,
   UpdateAdminPopupDto,
   UpdateAdminDto,
 } from './dto/admin.dto';
 import { SetMatchOnlineDto } from './dto/set-match-online.dto';
+import { maskPhoneTail } from '../verification/sms-event-log.service';
 
 type ActiveAdmin = {
   id: string;
@@ -411,6 +413,70 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     }
 
     return result;
+  }
+
+  /**
+   * Frees a phone number so another person can register it (carriers reassign old numbers). Only the contact is
+   * cleared; status, sessions and logins stay, and the phone gate asks the account to verify a number again.
+   */
+  async releaseUserPhone(user: V1AuthUser, userId: string, dto: ReleaseAdminUserPhoneDto) {
+    const outcome = await this.prisma.$transaction(async (tx) => {
+      await this.lockActiveOwnerRows(tx);
+      const admin = await this.getTransactionMutationAdmin(tx, user.id);
+      await lockUserRow(tx, userId);
+
+      const target = await tx.v1User.findUnique({
+        where: { id: userId },
+        select: { accountStatus: true, deletedAt: true, phone: true, phoneVerifiedAt: true },
+      });
+      if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'User was not found' });
+
+      // A deleted account only holds a tombstone value, and its number was freed when it was deleted.
+      if (target.accountStatus === 'deleted' && target.deletedAt !== null) {
+        throw new ConflictException({
+          code: 'USER_DELETED_IRREVERSIBLE',
+          message: '이미 삭제된 계정이에요. 휴대폰 번호는 삭제할 때 이미 해제됐어요.',
+        });
+      }
+      if (target.phone === null) {
+        throw new ConflictException({ code: 'PHONE_NOT_SET', message: '해제할 휴대폰 번호가 없어요.' });
+      }
+
+      const targetAdminRecord = await tx.v1AdminUser.findUnique({ where: { userId } });
+      if (targetAdminRecord?.status === 'active' && admin.adminRole !== 'owner') {
+        throw new ForbiddenException({
+          code: 'PERMISSION_DENIED',
+          message: '운영자 계정의 휴대폰 번호는 owner만 해제할 수 있어요.',
+        });
+      }
+
+      await tx.v1User.update({ where: { id: userId }, data: { phone: null, phoneVerifiedAt: null } });
+
+      const logged = await this.writeAdminStatusLogs(
+        admin,
+        {
+          action: 'user.phone.release',
+          targetType: 'user',
+          statusLogTargetType: 'user_contact',
+          targetId: userId,
+          previousStatus: target.phoneVerifiedAt ? 'confirmed' : 'unverified',
+          status: 'released',
+          reason: dto.reason,
+          beforeState: { phoneLast4: maskPhoneTail(target.phone), phoneVerified: target.phoneVerifiedAt ? 'true' : 'false' },
+          afterState: { phoneLast4: null, phoneVerified: 'false' },
+          responseIdKey: 'userId',
+        },
+        tx,
+      );
+      const notification =
+        (await this.notifications?.createInTransaction(tx, userId, 'phone_released_by_operator', {
+          businessKey: `phone-release:${logged.statusChangeLogId}`,
+        })) ?? null;
+      return { logged, notification };
+    });
+
+    if (outcome.notification) this.notifications?.deliverCreated(userId, 'phone_released_by_operator', outcome.notification);
+    return outcome.logged;
   }
 
   async changeMatchStatus(user: V1AuthUser, matchId: string, dto: ChangeMatchStatusDto) {
@@ -3001,6 +3067,8 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     input: {
       action: string;
       targetType: string;
+      /** Target type of the status change row when it differs from the action log's. */
+      statusLogTargetType?: string;
       targetId: string;
       previousStatus: string;
       status: string;
@@ -3025,7 +3093,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     });
     const statusChangeLog = await client.v1StatusChangeLog.create({
       data: {
-        targetType: input.targetType,
+        targetType: input.statusLogTargetType ?? input.targetType,
         targetId: input.targetId,
         fromStatus: input.previousStatus,
         toStatus: input.status,

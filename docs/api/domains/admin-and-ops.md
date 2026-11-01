@@ -44,6 +44,7 @@
 | `GET` | `/api/v1/admin/users/:userId` | - | active admin | 사용자 상세·연락처·인증 상태·프로필·탈퇴 사유·팀 역할 요약 |
 | `POST` | `/api/v1/admin/users/:userId/status` | `ChangeUserStatusDto` | owner/ops | 사용자 상태 변경 |
 | `DELETE` | `/api/v1/admin/users/:userId` | `DeleteAdminUserDto` | owner/ops | 사용자 삭제 처리 |
+| `POST` | `/api/v1/admin/users/:userId/phone/release` | `ReleaseAdminUserPhoneDto` | owner/ops | 계정에서 휴대폰 번호만 해제 |
 | `GET` | `/api/v1/admin/matches` | `AdminMatchListQueryDto` | active admin | 매치 목록 |
 | `GET` | `/api/v1/admin/matches/:matchId` | - | active admin | 매치 상세 |
 | `POST` | `/api/v1/admin/matches/:matchId/status` | `ChangeMatchStatusDto` | owner/ops | 매치 상태 변경 |
@@ -133,6 +134,23 @@ type AdminListSummary = {
   - `GET /admin/users/:id`는 `withdrawalRequest.reason`으로 사용자가 탈퇴 대기 요청 때 작성한 메시지를 노출한다.
   - 팀 정보는 소유 팀(`ownerUserId` 기준, 보관 팀 포함·최근 5건 목록과 전체 개수), 팀장/매니저/멤버 역할 카운트, active 소속팀 목록을 분리해 제공한다. 소유 팀은 소속 팀의 owner(팀장) 역할과 같은 개념이다.
   - 회원 목록·상세의 `membershipCount`는 역할 카운트·상세 소속 배열과 동일한 `V1TeamMembership.status=active` 기준이며 `owner + manager + member` 합계와 같다. 과거 탈퇴(`left`)·제명(`removed`) 이력은 제외하며 현재 소속이 없으면 0이다. 팀 자체 상태는 이 membership 상태 필터를 변경하지 않는다.
+
+### 휴대폰 번호 해제 (`POST /admin/users/:userId/phone/release`)
+
+한 번호는 한 계정만 가질 수 있다(`v1_users.phone` unique). 통신사가 번호를 새 주인에게 다시 배정해도 이전 주인의 계정이 번호를 쥐고 있으면 새 주인은 그 번호로 인증도 가입도 할 수 없다. 새 주인이 고객센터에 문의하면 운영자가 확인한 뒤 이전 계정에서 번호만 떼어 낸다.
+
+- Body: `{ reason: string }` — 앞뒤 공백을 뺀 1~500자. 모르는 필드는 400.
+- 권한: owner/ops(support는 403 `PERMISSION_DENIED`). 대상이 활성 운영자 계정이면 owner만 할 수 있다.
+- 한 트랜잭션에서 `phone = null`, `phoneVerifiedAt = null`만 바꾼다. 계정 상태·세션·로그인 수단은 그대로다. 실시간 소켓도 끊지 않는다.
+- 응답: `{ userId, previousStatus: 'confirmed' | 'unverified', status: 'released', actionLogId, statusChangeLogId }`. `previousStatus`는 해제 직전 `phoneVerifiedAt` 유무다.
+- 오류:
+  - 409 `PHONE_NOT_SET` — 번호가 없는 계정(동시에 두 번 보내면 하나만 성공하고 나머지가 이 오류).
+  - 409 `USER_DELETED_IRREVERSIBLE` — 삭제 처리를 마친 계정(`accountStatus=deleted` + `deletedAt`). 번호는 삭제할 때 이미 풀렸다.
+  - 404 `NOT_FOUND` — 없는 회원.
+- 감사 기록(같은 트랜잭션): `V1AdminActionLog`(`user.phone.release`, `targetType=user`, `beforeJson={ phoneLast4, phoneVerified }`, `afterJson={ phoneLast4: null, phoneVerified: 'false' }`)와 `V1StatusChangeLog`(`targetType=user_contact`, `confirmed|unverified → released`, `actorType=admin`, 사유). 번호는 끝 4자리만 남기고 전체 번호는 어디에도 쓰지 않는다.
+- 알림: 그 계정에 `phone_released_by_operator`(targetType `system`, 딥링크 `/my/phone-verify`)를 남긴다. 보안 알림이라 알림 설정과 무관하고, 알림함 행은 해제와 같은 트랜잭션에서 만든다(실시간·푸시 전달은 커밋 뒤). [Notifications](./notifications.md)
+- 이후 그 계정: 세션은 유지된다. `phoneVerifiedAt`이 비었으므로 휴대폰 인증 전역 게이트(`V1AuthGuard`)가 조회는 열어 두고 쓰기를 403 `PHONE_VERIFICATION_REQUIRED`(`details.next.route=/my/phone-verify`)로 막는다. `/verification`·`/auth`·`/me`·`/onboarding`·`/notifications`·`/inquiries` 등 허용 경로와 활성 운영자 계정은 막히지 않는다. 같은 번호를 인증하려 하면, 그 사이 다른 계정이 가져갔다면 409 `PHONE_CONFLICT`다.
+- 해제한 번호는 다른 계정이 `POST /verification/phone/request` → `confirm`으로 바로 인증할 수 있다.
 
 아래 "사용자·운영자 접근 불변식" 절은 같은 사용자 상태 변경/삭제 계약을 DTO 레벨(`ChangeUserStatusDto`/`DeleteAdminUserDto`)에서 상세히 다룬다.
 

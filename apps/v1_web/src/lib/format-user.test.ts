@@ -8,6 +8,7 @@ import {
   formatGender,
   formatOnboardingStatus,
   formatUserTitle,
+  maskPhoneNumber,
 } from './format-user';
 
 describe('formatUserTitle', () => {
@@ -61,5 +62,18 @@ describe('formatAuthProviders', () => {
     expect(formatAuthProviders(['google'])).toBe('google');
     expect(formatAuthProviders([])).toBe('로그인 수단 없음');
     expect(formatAuthProviders(null)).toBe('로그인 수단 없음');
+  });
+});
+
+describe('maskPhoneNumber', () => {
+  it('구분자가 있든 없든 끝 4자리만 남기고 가운데를 가린다', () => {
+    expect(maskPhoneNumber('01012345678')).toBe('010-****-5678');
+    expect(maskPhoneNumber('010-1234-5678')).toBe('010-****-5678');
+  });
+
+  it('짧은 번호는 끝 4자리만, 4자리가 안 되면 전부 가린다', () => {
+    expect(maskPhoneNumber('0212345')).toBe('****2345');
+    expect(maskPhoneNumber('123')).toBe('****');
+    expect(maskPhoneNumber(null)).toBe('****');
   });
 });

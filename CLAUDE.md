@@ -21,6 +21,13 @@
 
 ## Git 브랜치 정책 (Critical — 2026-07-31 실측 기준 정정)
 
+**2026-11-01 사용자 확정 — Teameet 전용 작업 방식:** 전역의 브랜치 생성·전환 및 worktree 생성
+금지는 이 저장소에 적용하지 않는다. 작업을 시작할 때 `git fetch origin dev` 후 최신 `origin/dev`에서
+작업별 브랜치와 격리 worktree를 만들고, 그 안에서 수정·검증·dev 대상 PR·머지·Alpha 검증을 진행한다.
+머지와 필요한 검증을 마치면 **이번 작업이 만든** worktree·브랜치·프로세스·임시 자원을 상태와 소유권을
+확인한 뒤 정리한다. 미커밋 변경이나 미병합 커밋이 있는 worktree를 강제 삭제하지 않으며 다른 세션의
+작업 공간은 정리하지 않는다. 운영 승격은 아래 별도 사용자 전용 규칙을 따른다.
+
 `promote-main.yml`이 default branch에 없어 dispatch가 404이면 격리 feature 브랜치에서
 `CONFIRMATION=PROMOTE bash scripts/release/promote-main.sh --prepare-only`로 릴리스 diff를 준비한다.
 이 모드는 stage/commit/push/dispatch 없이 로컬 Changeset 소비와 승격 게이트만 실행한다.

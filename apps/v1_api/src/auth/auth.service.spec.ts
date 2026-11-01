@@ -58,6 +58,8 @@ function completedUserRow(overrides: Record<string, unknown> = {}) {
     id: 'user-1',
     email: 'user@teameet.v1',
     phone: null,
+    deletedAt: null,
+    adminUser: null,
     accountStatus: 'active',
     onboardingStatus: 'completed',
     emailVerifiedAt: null,
@@ -2200,6 +2202,19 @@ describe('AuthService', () => {
       status: 403,
       response: { code: 'PERMISSION_DENIED' },
     });
+  });
+
+  it.each([
+    ['일반 계정', null, 'completed', true],
+    ['활성 관리자', { status: 'active' }, 'completed', false],
+    ['정지 관리자', { status: 'suspended' }, 'completed', false],
+    ['권한 회수 관리자', { status: 'revoked' }, 'completed', true],
+    ['미완료 소셜 가입', null, 'social_profile_required', false],
+  ] as const)('me: %s의 로그인 수단 연결 가능 여부를 서버 가드와 같이 제공한다', async (_label, adminUser, onboardingStatus, allowed) => {
+    prisma.v1User.findUnique.mockResolvedValue(completedUserRow({ adminUser, onboardingStatus, deletedAt: null }));
+    const result = await service.me('user-1');
+    expect(result.user.canLinkLoginMethods).toBe(allowed);
+    expect(result.user.canLinkAfterSignup).toBe(adminUser === null || adminUser.status === 'revoked');
   });
 
   it('me: 정상 완료 사용자 → onboarding.status=completed, next route 없음', async () => {

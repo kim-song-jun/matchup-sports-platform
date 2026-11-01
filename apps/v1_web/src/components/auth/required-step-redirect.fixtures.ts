@@ -31,7 +31,7 @@ export const terms = (accepted: boolean): TermsSnapshot => ({
   compliance: compliance(accepted),
 });
 export const makeAuth = (status: FixtureStatus, id = PENDING, phoneVerified = false): V1AuthMe => ({
-  user: { id, email: null, phone: phoneVerified ? '01012345678' : null, accountStatus: 'active', onboardingStatus: status, authProvider: 'kakao' },
+  user: { id, email: null, phone: phoneVerified ? '01012345678' : null, accountStatus: 'active', onboardingStatus: status, authProvider: 'kakao', canLinkAfterSignup: true, canLinkLoginMethods: status !== 'social_profile_required' && status !== 'social_profile_deferred' },
   profile: { displayName: '김러너', nickname: '카카오러너' },
   verification: { emailVerified: false, phoneVerified },
   socialSignupPrefill: null,

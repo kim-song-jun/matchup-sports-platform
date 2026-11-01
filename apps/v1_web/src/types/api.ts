@@ -120,6 +120,10 @@ export type V1AuthMe = {
     createdAt?: string;
     authProvider?: 'email' | 'kakao' | 'naver' | 'apple' | null;
     authProviders?: Array<'email' | 'kakao' | 'naver' | 'apple' | string>;
+    /** Server capability; absent in stale responses from older API versions. */
+    canLinkLoginMethods?: boolean;
+    /** Whether linking would be permitted after required signup is completed. */
+    canLinkAfterSignup?: boolean;
     hasPassword?: boolean;
   };
   profile: {

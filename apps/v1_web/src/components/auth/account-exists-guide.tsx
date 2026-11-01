@@ -23,11 +23,11 @@ function buildSteps(label: string, autoLink: boolean): Step[] {
       body: '처음 가입할 때 쓴 방법으로 로그인해요. 이메일로 가입했다면 이메일 로그인을, 소셜로 가입했다면 해당 로그인 버튼을 눌러요.',
     },
     autoLink
-      ? { title: `${LINK_TOKEN_WINDOW_MINUTES}분 안에 로그인하면 ${label} 로그인이 자동으로 연결돼요`, body: '연결이 끝나면 설정의 "로그인 방법" 화면으로 이동해요.' }
+      ? { title: `${label} 로그인 연결을 시도해요`, body: `${LINK_TOKEN_WINDOW_MINUTES}분 안에 로그인해 주세요. 이미 다른 ${label} 계정이 연결돼 있으면 결과를 알려 드려요.` }
       : { title: '로그인한 뒤 설정에서 연결해요', body: `설정의 "로그인 방법"에서 ${label} 로그인을 연결해 주세요.` },
     {
-      title: '다음부터는 같은 계정으로 들어와요',
-      body: `${label} 버튼으로도 원래 계정에 로그인할 수 있어요.`,
+      title: '연결 결과를 확인해요',
+      body: `연결이 완료되면 ${label} 버튼으로도 원래 계정에 로그인할 수 있어요.`,
     },
   ];
 }
@@ -38,12 +38,12 @@ function buildWithdrawalSteps(label: string, autoLink: boolean): WithdrawalGuide
     { title: '원래 가입한 방법으로 로그인해요', body: '아래 버튼에서 골라요.' },
     { title: '탈퇴 신청을 취소해요', body: '로그인하면 취소할 수 있는 화면이 나와요.' },
     autoLink
-      ? { title: `${label} 로그인이 자동으로 연결돼요`, body: `${LINK_TOKEN_WINDOW_MINUTES}분 안에 로그인하고 탈퇴 신청을 취소해 주세요.` }
+      ? { title: `${label} 로그인 연결을 시도해요`, body: `${LINK_TOKEN_WINDOW_MINUTES}분 안에 로그인하고 탈퇴 신청을 취소해 주세요. 이미 다른 ${label} 계정이 연결돼 있으면 결과를 알려 드려요.` }
       : { title: '로그인한 뒤 설정에서 연결해요', body: `설정의 "로그인 방법"에서 ${label} 로그인을 연결해 주세요.` },
   ];
 }
 
-// 연결 토큰이 실제로 남아 있는지는 브라우저 저장소만 안다. 서버 렌더에서는 알 수 없어(null) 흔한 경우인 자동 연결 문구로 그린다.
+// 연결 토큰이 실제로 남아 있는지는 브라우저 저장소만 안다. 서버 렌더에서는 알 수 없어(null) 흔한 경우인 연결 시도 문구로 그린다.
 const subscribeNothing = () => () => {};
 const readAutoLinkAvailable = () => peekPendingSocialLink()?.expired === false;
 const serverAutoLinkAvailable = () => null;

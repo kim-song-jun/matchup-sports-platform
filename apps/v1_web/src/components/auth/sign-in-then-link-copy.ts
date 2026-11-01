@@ -21,5 +21,5 @@ export function manualLinkPromise(provider: V1LinkableProvider | null): string {
  */
 export function autoLinkPromise(provider: V1LinkableProvider | null, { withdrawalPending = false }: { withdrawalPending?: boolean } = {}): string {
   const login = withdrawalPending ? '원래 방법으로 로그인하고 탈퇴 신청을 취소하면' : '원래 방법으로 로그인하면';
-  return `${LINK_TOKEN_WINDOW_MINUTES}분 안에 ${login} ${linkProviderLabel(provider)} 로그인이 그 계정에 자동으로 연결돼요.`;
+  return `${LINK_TOKEN_WINDOW_MINUTES}분 안에 ${login} ${linkProviderLabel(provider)} 로그인 연결을 시도해요. 이미 다른 ${linkProviderLabel(provider)} 계정이 연결돼 있으면 결과를 알려 드려요.`;
 }

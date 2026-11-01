@@ -5,6 +5,7 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SocialSignupClient } from './social-signup-client';
+import { advanceSocialSignupToPhone } from './social-signup-test-steps';
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
@@ -15,6 +16,7 @@ const failure = (code: string, message: string, statusCode: number) =>
   HttpResponse.json({ status: 'error', statusCode, code, message }, { status: statusCode });
 
 const server = setupServer(
+  http.get('*/api/v1/auth/check-nickname', () => HttpResponse.json({ status: 'success', data: { available: true } })),
   http.get('*/api/v1/auth/me', () =>
     HttpResponse.json({ status: 'success', data: { user: { onboardingStatus: 'social_profile_required' }, socialSignupPrefill: null } }),
   ),
@@ -47,6 +49,7 @@ async function requestPhoneCode() {
       <SocialSignupClient />
     </QueryClientProvider>,
   );
+  await advanceSocialSignupToPhone();
   fireEvent.change(await screen.findByLabelText('휴대폰 번호'), { target: { value: '01012345678' } });
   fireEvent.click(await screen.findByRole('button', { name: '인증번호 받기' }));
 }

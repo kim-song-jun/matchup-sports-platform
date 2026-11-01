@@ -17,6 +17,7 @@ import {
 } from './kakao-profile';
 import { generateSocialNickname } from './social-nickname';
 import { isPendingSocialSignup } from './social-signup-access';
+import { linkCallerRestriction } from './link-caller-guards';
 import { normalizeEmail } from './normalize-email';
 import { pendingAccountLinkClaims, signInThenLinkConflict, signInThenLinkHint } from './social-link-conflict';
 import type { LinkableSocialProvider, SocialLinkClaims } from './social-link-token';
@@ -1356,6 +1357,7 @@ export class AuthService {
       where: { id: userId },
       include: {
         profile: true,
+        adminUser: { select: { status: true } },
         onboardingProgress: true,
         sportPreferences: {
           include: {
@@ -1425,6 +1427,8 @@ export class AuthService {
         createdAt: user.createdAt,
         authProvider: user.authIdentities[0]?.provider ?? null,
         authProviders: user.authIdentities.map((identity) => identity.provider),
+        canLinkLoginMethods: linkCallerRestriction(user) === null,
+        canLinkAfterSignup: linkCallerRestriction({ ...user, onboardingStatus: 'signup_done' }) === null,
         hasPassword: user.authIdentities.some((identity) => Boolean(identity.passwordHash)),
       },
       verification: {

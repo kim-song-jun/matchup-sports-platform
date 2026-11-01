@@ -84,6 +84,7 @@ function me(providers: string[] | undefined, email: string | null = 'minsu.kim@e
       id: 'user-1',
       email,
       onboardingStatus: 'completed',
+      canLinkLoginMethods: true,
       ...(providers ? { authProviders: providers } : {}),
     },
     profile: { displayName: '민수' },
@@ -158,6 +159,26 @@ const KAKAO_BUTTON = '카카오 연결하기';
 const EMAIL_LINK = '이메일 연결하기';
 
 describe('LoginMethodsPageClient - 로그인 수단 표시', () => {
+  it('운영 권한 계정은 연결할 수 없는 로그인 추가 버튼을 보여 주지 않는다', async () => {
+    server.use(http.get('*/api/v1/auth/me', () => ok({ ...me(['email']), user: { ...me(['email']).user, canLinkLoginMethods: false } })));
+    render(<LoginMethodsPageClient />);
+    await screen.findByRole('list', { name: '로그인 방법 목록' });
+    expect(screen.getByText('이 계정에서는 로그인 방법을 추가할 수 없어요.')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: EMAIL_LINK })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: KAKAO_BUTTON })).not.toBeInTheDocument();
+    expect(within(rowOf('이메일·비밀번호')).getByText('연결됨')).toBeInTheDocument();
+  });
+
+
+  it('서버가 연결 권한을 제공하지 않으면 연결 버튼 대신 재시도를 안내한다', async () => {
+    const stale = me(['kakao']);
+    const { canLinkLoginMethods: _omitted, ...user } = stale.user;
+    server.use(http.get('*/api/v1/auth/me', () => ok({ ...stale, user })));
+    render(<LoginMethodsPageClient />);
+    expect(await screen.findByText('로그인 방법 변경 권한을 확인하지 못했어요. 다시 시도해 주세요.')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: EMAIL_LINK })).not.toBeInTheDocument();
+  });
+
   it('이메일만 있는 계정은 이메일을 연결됨으로, 카카오는 연결하기 버튼으로, Apple은 앱 안내로 보인다', async () => {
     await renderLoaded(['email']);
 

@@ -9,6 +9,7 @@ import { AUTH_NOTICE_STAGE, AuthFrame } from './auth-page';
 import { buildKakaoAuthUrl } from './auth.view-model';
 import { ACCOUNT_CONFLICT_PATH, buildAccountConflictPath } from './login-recovery-route';
 import { KakaoLoginButton } from './kakao-login-button';
+import { RecycledNumberHelp } from './recycled-number-help';
 import { LINK_TOKEN_WINDOW_MINUTES, linkProviderLabel } from './sign-in-then-link-copy';
 import { WithdrawalPendingGuide, type WithdrawalGuideStep } from './withdrawal-pending-guide';
 import type { V1LinkableProvider } from '@/types/api';
@@ -122,6 +123,7 @@ export function AccountExistsGuide({ provider, redirectPath }: { provider: V1Lin
                 </li>
               ))}
             </ol>
+            <RecycledNumberHelp spaced />
           </>
         )}
       </div>

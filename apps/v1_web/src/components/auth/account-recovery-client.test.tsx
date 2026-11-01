@@ -212,6 +212,23 @@ describe('AccountRecoveryClient', () => {
       expect(screen.getByLabelText('이메일')).toBeInTheDocument();
     });
 
+    it('내 계정이 아닌 사람을 위해, 번호를 새로 받았다면 고객센터에 알려 달라는 한 줄이 로그인 길 뒤에 붙는다', async () => {
+      await findAccount({ maskedEmail: 'ru***@example.com', providers: ['email'], hasPassword: true });
+
+      const help = screen.getByRole('link', { name: '고객센터에 알려 주세요' });
+      expect(help).toHaveAttribute('href', '/contact');
+      expect(help.closest('p')).toHaveTextContent('내 계정이 아닌가요? 번호를 최근에 새로 받았다면고객센터에 알려 주세요');
+      const lastExit = screen.getByRole('button', { name: '비밀번호 재설정하기' });
+      expect(lastExit.compareDocumentPosition(help) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it('소셜 전용 계정이어도, 이 환경에서 쓸 로그인 길이 없어 문의 창구 버튼이 이미 있어도 같은 한 줄이 붙는다', async () => {
+      await findAccount({ maskedEmail: null, providers: ['apple'], hasPassword: false });
+
+      expect(screen.getByRole('link', { name: '문의 창구 보기' })).toHaveAttribute('href', '/contact');
+      expect(screen.getByRole('link', { name: '고객센터에 알려 주세요' })).toHaveAttribute('href', '/contact');
+    });
+
     it('수단이 여럿이면 가진 수단을 모두 보여 주고 없는 수단은 보여 주지 않는다', async () => {
       await findAccount({ maskedEmail: 'ru***@example.com', providers: ['email', 'kakao'], hasPassword: true });
 
@@ -265,6 +282,14 @@ describe('AccountRecoveryClient', () => {
       expect(screen.getByText('11월 7일')).toBeInTheDocument();
       expect(screen.getByText('위 이메일로 가입한 계정이에요.')).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: '비밀번호 재설정하기' })).not.toBeInTheDocument();
+    });
+
+    it('"내 계정이 아닌가요?" 한 줄은 싣지 않는다 — 비밀번호를 잊은 사람용 고객센터 링크는 방법 1 에 이미 있다', async () => {
+      await findPendingAccount({ maskedEmail: 'ru***@example.com', providers: ['email'], hasPassword: true });
+
+      expect(screen.queryByText(/내 계정이 아닌가요/)).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: '고객센터에 알려 주세요' })).not.toBeInTheDocument();
+      expect(screen.getByRole('link', { name: '비밀번호가 기억나지 않으면 고객센터로 알려 주세요' })).toHaveAttribute('href', '/contact');
     });
 
     it('이메일 계정이면 버튼이 이메일 로그인으로, 돌아갈 경로를 이어서 간다', async () => {

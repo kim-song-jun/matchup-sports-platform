@@ -18,6 +18,7 @@ import type { V1FoundAccount } from '@/types/api';
 import { AUTH_NOTICE_STAGE, AuthFrame } from './auth-page';
 import { describeFoundAccount } from './found-account-login';
 import { FoundAccountWithdrawalGuide } from './found-account-withdrawal-guide';
+import { RecycledNumberHelp } from './recycled-number-help';
 import { formatPhone, normalizeSeparatedDigits } from './signup-profile-validation';
 
 type Mode = 'find-id' | 'reset-password';
@@ -82,6 +83,7 @@ function FoundAccountCard({ account, emailLoginHref, loginHref, onResetPassword 
           <Button block onClick={onResetPassword} size="sm" type="button" variant="ghost">비밀번호 재설정하기</Button>
         ) : null}
       </div>
+      <RecycledNumberHelp variant="not-mine" spaced />
     </Card>
   );
 }

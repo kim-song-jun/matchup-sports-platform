@@ -119,6 +119,7 @@ describe('SignupClient required profile contract', () => {
     expect(screen.queryByText('이미 사용 중인 번호예요.')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: /이메일로 가입했어요/ })).toHaveAttribute('href', '/login/email');
     expect(screen.getByRole('link', { name: /비밀번호가 기억나지 않아요/ })).toHaveAttribute('href', '/auth/find-account');
+    expect(screen.getByRole('link', { name: '고객센터에 알려 주세요' })).toHaveAttribute('href', '/contact');
   });
 
   it('다른 인증 오류는 기존 문구 그대로 보인다', async () => {
@@ -813,6 +814,22 @@ describe('SignupClient 이미 가입된 번호 안내', () => {
 
     expect(screen.queryByText(CARD_TITLE)).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /이메일로 가입했어요/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '고객센터에 알려 주세요' })).not.toBeInTheDocument();
+  });
+
+  it('세 갈래 뒤에, 번호를 새로 받았다면 고객센터에 알려 달라는 한 줄이 붙는다', async () => {
+    hooks.phoneVerifyMutateAsync.mockResolvedValue({ verified: true, proofToken: 'PROOF-TOKEN', registered: true, withdrawalPendingUntil: null });
+    render(<SignupClient />);
+    await advanceToVerify();
+    await verifyPhone('01012345678');
+    await screen.findByText(CARD_TITLE);
+
+    expect(screen.getByText('번호를 최근에 새로 받았나요? 전에 이 번호를 쓰던 계정이 남아 있을 수 있어요.')).toBeInTheDocument();
+    const help = screen.getByRole('link', { name: '고객센터에 알려 주세요' });
+    expect(help).toHaveAttribute('href', '/contact');
+    // 로그인·계정 찾기 길이 먼저다.
+    const lastExit = screen.getByRole('link', { name: /비밀번호가 기억나지 않아요/ });
+    expect(lastExit.compareDocumentPosition(help) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('로그인·계정 찾기 이동은 원래 가려던 곳(redirect)을 이어 준다', async () => {
@@ -1034,6 +1051,12 @@ describe('SignupClient 이미 가입된 번호 안내', () => {
     it('방법 1 에 고객센터 링크가 있어 비밀번호를 잊은 사람도 막다른 길이 아니다', async () => {
       await verifyPendingPhone();
       expect(screen.getByRole('link', { name: '비밀번호가 기억나지 않으면 고객센터로 알려 주세요' })).toHaveAttribute('href', '/contact');
+    });
+
+    it('번호 재배정 안내는 싣지 않는다 — 이 안내에는 자기 문구의 고객센터 링크가 있다', async () => {
+      await verifyPendingPhone();
+      expect(screen.queryByText(/번호를 최근에 새로 받았나요/)).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: '고객센터에 알려 주세요' })).not.toBeInTheDocument();
     });
 
     it('유예 종료 시각이 이미 지났으면 일반 "이미 가입돼 있어요" 카드가 나온다', async () => {

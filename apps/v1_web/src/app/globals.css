@@ -1098,6 +1098,29 @@ button:disabled {
   margin: 0;
 }
 
+/*
+ * 다시 배정된 번호 안내(RecycledNumberHelp) — 기존 출구 아래에 붙는 낮은 강조의 한 줄.
+ * 링크는 위 방법 1 의 고객센터 링크와 같은 .tm-btn-sm.tm-btn-ghost 라 44px 터치 높이와 대비를 그대로 쓴다.
+ * 글자색은 --text-caption 대신 --text 다: 회색 카드(--grey50) 위에서도 4.5:1 을 넘긴다.
+ */
+.tm-recycled-help {
+  display: grid;
+  gap: var(--spacing-1);
+  margin: 0;
+  text-align: center;
+}
+
+.tm-recycled-help-spaced {
+  margin-top: var(--spacing-4);
+}
+
+.tm-recycled-help-lead {
+  font-size: var(--font-size-caption);
+  line-height: 1.5;
+  color: var(--text);
+  word-break: keep-all;
+}
+
 .tm-wpg-way-head {
   display: flex;
   align-items: center;

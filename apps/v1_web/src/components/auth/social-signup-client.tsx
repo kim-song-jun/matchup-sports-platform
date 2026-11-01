@@ -91,6 +91,7 @@ export function SocialSignupClient() {
       pending={exitFlow.pending}
       linkProvider={linkHint?.provider}
       withdrawalPending={withdrawalPending}
+      recycledNumberHelp
       onLogin={() => void leaveFromConflict(loginExitPath(), true)}
       onFindAccount={() => void leaveFromConflict(conflictExitPath('/auth/find-account'), false)}
     />

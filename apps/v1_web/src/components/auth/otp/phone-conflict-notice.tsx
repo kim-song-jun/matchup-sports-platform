@@ -2,6 +2,7 @@
 
 import { AlertBanner } from '@/components/v1-ui/primitives';
 import { Button } from '@/components/v1-ui/button';
+import { RecycledNumberHelp } from '../recycled-number-help';
 import { autoLinkPromise } from '../sign-in-then-link-copy';
 import type { V1LinkableProvider } from '@/types/api';
 
@@ -16,10 +17,12 @@ type Props = {
   linkProvider?: V1LinkableProvider;
   /** 번호를 쥔 계정이 탈퇴 유예 중이다. 로그인 버튼은 두 가지 방법을 보여 주는 안내 화면으로 이어진다. */
   withdrawalPending?: boolean;
+  /** 번호를 새로 받은 사람을 위한 고객센터 링크 한 줄을 끝에 붙인다. 탈퇴 신청 중 안내에는 붙지 않는다. */
+  recycledNumberHelp?: boolean;
 };
 
 /** 번호가 이미 다른 계정에 있을 때의 막다른 오류 대신 보여 주는 안내와 출구. */
-export function PhoneConflictNotice({ onLogin, onFindAccount, pending = false, linkProvider, withdrawalPending = false }: Props) {
+export function PhoneConflictNotice({ onLogin, onFindAccount, pending = false, linkProvider, withdrawalPending = false, recycledNumberHelp = false }: Props) {
   const withdrawal = withdrawalPending && linkProvider !== undefined;
   const bannerMessage = withdrawal
     ? '이미 팀밋 계정이 있지만 탈퇴를 신청한 상태예요. 취소하고 다시 쓰는 방법을 안내해 드려요.'
@@ -44,6 +47,7 @@ export function PhoneConflictNotice({ onLogin, onFindAccount, pending = false, l
       <Button block disabled={pending} onClick={onFindAccount} size="lg" type="button" variant="neutral">
         계정 찾기
       </Button>
+      {recycledNumberHelp && !withdrawal ? <RecycledNumberHelp /> : null}
     </div>
   );
 }

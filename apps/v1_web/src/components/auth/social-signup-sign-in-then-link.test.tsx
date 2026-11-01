@@ -164,6 +164,15 @@ describe('소셜 가입 중 번호 중복 — 원래 계정으로 로그인하�
     expect(peekPendingSocialLink()).toBeNull();
   });
 
+  it('원래 방법으로 로그인하기 뒤에도, 번호를 새로 받았다면 고객센터에 알려 달라는 한 줄이 붙는다', async () => {
+    await confirmConflictingCode();
+
+    const lastExit = await screen.findByRole('button', { name: '계정 찾기' });
+    const help = screen.getByRole('link', { name: '고객센터에 알려 주세요' });
+    expect(help).toHaveAttribute('href', '/contact');
+    expect(lastExit.compareDocumentPosition(help) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   // 서버가 연결 토큰 없이 충돌만 알리면 자동 연결을 약속하지 않고 기본 안내와 출구를 쓴다.
   it('연결 토큰이 없는 번호 중복은 자동 연결을 약속하지 않는 기본 안내다', async () => {
     server.use(http.post('*/api/v1/verification/phone/confirm', () => HttpResponse.json({
@@ -216,6 +225,9 @@ describe('소셜 가입 중 번호를 쥔 계정이 탈퇴 유예 중일 때', (
     expect(screen.queryByRole('button', { name: '원래 방법으로 로그인하기' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '다시 쓰는 방법 보기' })).toBeEnabled();
     expect(screen.getByRole('button', { name: '계정 찾기' })).toBeEnabled();
+    // 이 흐름이 이어지는 안내 화면에 자기 문구의 고객센터 링크가 있다.
+    expect(screen.queryByText(/번호를 최근에 새로 받았나요/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '고객센터에 알려 주세요' })).not.toBeInTheDocument();
   });
 
   it('확인 창이 탈퇴 취소를 거친다고 약속하고, 로그아웃 뒤 날짜를 실은 토큰을 저장한 채 안내 화면(돌아갈 경로 포함)으로 간다', async () => {

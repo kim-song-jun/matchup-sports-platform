@@ -67,6 +67,22 @@ describe('소셜 가입 휴대폰 인증 번호 중복', () => {
     expect(screen.getByRole('button', { name: '계정 찾기' })).toBeEnabled();
   });
 
+  it('두 출구 뒤에, 번호를 새로 받았다면 고객센터에 알려 달라는 한 줄이 붙는다', async () => {
+    server.use(
+      http.post('*/api/v1/verification/phone/request', () =>
+        failure('PHONE_CONFLICT', '이미 다른 계정에서 사용 중인 번호예요.', 409),
+      ),
+    );
+
+    await requestPhoneCode();
+
+    const lastExit = await screen.findByRole('button', { name: '계정 찾기' });
+    expect(screen.getByText('번호를 최근에 새로 받았나요? 전에 이 번호를 쓰던 계정이 남아 있을 수 있어요.')).toBeInTheDocument();
+    const help = screen.getByRole('link', { name: '고객센터에 알려 주세요' });
+    expect(help).toHaveAttribute('href', '/contact');
+    expect(lastExit.compareDocumentPosition(help) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it.each([
     ['기존 계정으로 로그인', '/login'],
     ['계정 찾기', '/auth/find-account'],
@@ -110,5 +126,6 @@ describe('소셜 가입 휴대폰 인증 번호 중복', () => {
 
     expect(await screen.findByText('조금 뒤에 다시 요청해 주세요.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '기존 계정으로 로그인' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '고객센터에 알려 주세요' })).not.toBeInTheDocument();
   });
 });

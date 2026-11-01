@@ -9,6 +9,7 @@ import { useV1AuthMe } from '@/hooks/use-v1-api';
 import { PhoneConflictNotice } from '@/components/auth/otp/phone-conflict-notice';
 import { useSignOutAndLeave } from '@/components/auth/use-sign-out-and-leave';
 import { formatPhone, normalizeSeparatedDigits } from '@/components/auth/signup-profile-validation';
+import { RecycledNumberHelp } from '@/components/auth/recycled-number-help';
 import { PhoneVerificationCard } from './phone-verification-card';
 
 /**
@@ -70,6 +71,7 @@ export function PhoneVerifyPageClient() {
         버튼을 누르면 지금 계정에서 로그아웃돼요.
       </p>
       {signOut.error ? <AlertBanner message={signOut.error} tone="error" /> : null}
+      <RecycledNumberHelp />
     </>
   );
 

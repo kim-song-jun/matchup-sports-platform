@@ -19,6 +19,7 @@ export { AdminFilterBar } from './admin-filter-bar';
 export type { StatusOption } from './admin-filter-bar';
 
 // ── Modals ────────────────────────────────────────────────────────────────
+export { AdminReasonConfirmDialog } from './admin-reason-confirm-dialog';
 export { AdminReasonModal } from './admin-reason-modal';
 export type { ReasonStatusOption } from './admin-reason-modal';
 export { AdminTeamRenameModal } from './admin-team-rename-modal';

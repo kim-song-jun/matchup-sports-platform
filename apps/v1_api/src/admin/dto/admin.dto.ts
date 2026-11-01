@@ -6,6 +6,7 @@ import {
   IsDateString,
   IsIn,
   IsInt,
+  IsNotEmpty,
   IsOptional,
   IsObject,
   IsString,
@@ -442,6 +443,14 @@ export class ChangeUserStatusDto {
 
 export class DeleteAdminUserDto {
   @IsString()
+  @MaxLength(500)
+  reason!: string;
+}
+
+export class ReleaseAdminUserPhoneDto {
+  @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @IsNotEmpty()
   @MaxLength(500)
   reason!: string;
 }

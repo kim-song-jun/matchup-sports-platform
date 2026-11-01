@@ -80,6 +80,7 @@ import {
 import { PASSWORD_UNAVAILABLE_MSW, passwordLoginUnavailableResponse, v1AuthLinkMswHandlers } from './auth-link-handlers';
 import { v1AuthStepUpMswHandlers } from './auth-step-up-handlers';
 import { v1GameRosterMswHandlers } from './game-roster-handlers';
+import { v1AdminUserPhoneReleaseMswHandlers } from './admin-user-phone-release-handlers';
 import { v1TeamDissolutionMswHandlers } from './team-dissolution-handlers';
 import { v1TeamInviteLinkMswHandlers } from './team-invite-link-handlers';
 import { v1LeagueVisibilityMswHandlers } from './league-visibility-handlers';
@@ -740,6 +741,7 @@ const v1CompetitionFixturePlaces: Array<{ fixtureId: string; tournamentId: strin
 export const v1MswHandlers = [
   http.get(`${api}/admin/tournaments/:tournamentId/bracket/template/capabilities`, () => ok({ flexibleEnabled: false, schemaVersion: 2, sixTeamEligible: false })),
   ...v1GameRosterMswHandlers,
+  ...v1AdminUserPhoneReleaseMswHandlers,
   ...v1TeamDissolutionMswHandlers,
   ...v1TeamInviteLinkMswHandlers,
   ...v1LeagueCapacityMswHandlers,

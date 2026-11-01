@@ -88,6 +88,8 @@ import type {
   V1AdminTeamMatchRow,
   V1AdminTeamRow,
   V1AdminDeleteUserPayload,
+  V1AdminReleaseUserPhonePayload,
+  V1AdminReleaseUserPhoneResult,
   V1AdminUserDetail,
   V1AdminUserRow,
   V1AuthMe,
@@ -3716,6 +3718,18 @@ export function useV1DeleteAdminUser(userId: string) {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminUser(userId) });
       queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'users'] });
       queryClient.invalidateQueries({ queryKey: v1Keys.adminOverview() });
+    },
+  });
+}
+
+export function useV1ReleaseAdminUserPhone(userId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1AdminReleaseUserPhonePayload) =>
+      v1Post<V1AdminReleaseUserPhoneResult>(`/admin/users/${userId}/phone/release`, body),
+    onSuccess: () => {
+      // 상세와 목록이 같은 접두사를 쓴다 — 번호·인증 표시가 두 화면에서 함께 바뀐다.
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'users'] });
     },
   });
 }

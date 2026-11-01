@@ -41,6 +41,13 @@ export function formatOnboardingStatus(status: string | null | undefined): strin
   return ONBOARDING_STATUS_LABEL[status] ?? status;
 }
 
+/** 가운데를 가린 휴대폰 번호 — 확인 모달처럼 번호를 다시 보여 줄 필요가 없는 곳에 쓴다. */
+export function maskPhoneNumber(phone: string | null | undefined): string {
+  const digits = (phone ?? '').replace(/\D/g, '');
+  if (digits.length < 4) return '****';
+  return digits.length >= 10 ? `${digits.slice(0, 3)}-****-${digits.slice(-4)}` : `****${digits.slice(-4)}`;
+}
+
 export function formatGender(gender: string | null | undefined): string {
   if (gender === 'male') return '남';
   if (gender === 'female') return '여';

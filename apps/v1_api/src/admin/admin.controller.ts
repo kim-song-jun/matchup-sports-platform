@@ -41,6 +41,7 @@ import {
   CreateAdminPopupDto,
   DeleteAdminUserDto,
   GrantAdminDto,
+  ReleaseAdminUserPhoneDto,
   ReplyInquiryDto,
   UpdateAdminNoticeDto,
   UpdateAdminPopupDto,
@@ -94,6 +95,15 @@ export class AdminController {
     @Body() dto: ChangeUserStatusDto,
   ) {
     return this.adminService.changeUserStatus(user, userId, dto);
+  }
+
+  @Post('users/:userId/phone/release')
+  releaseUserPhone(
+    @CurrentUser() user: V1AuthUser,
+    @Param('userId') userId: string,
+    @Body() dto: ReleaseAdminUserPhoneDto,
+  ) {
+    return this.adminService.releaseUserPhone(user, userId, dto);
   }
 
   @Post('matches/:matchId/status')

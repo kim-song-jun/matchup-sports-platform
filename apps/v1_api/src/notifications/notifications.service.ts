@@ -4,6 +4,7 @@ import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { isQuietHour, nightPushAllowed } from '../common/quiet-hours';
 import { PrismaService } from '../prisma/prisma.service';
+import { PHONE_VERIFICATION_ROUTE } from '../verification/phone-verification-access';
 import {
   NotificationsQueryDto,
   ReadAllNotificationsDto,
@@ -72,6 +73,9 @@ export type NotificationEventType =
   // 로그인한 계정에 카카오·Apple 로그인이 연결됐을 때 그 계정에게. 보안 알림이라 알림 설정과 무관하게
   // 연결과 같은 트랜잭션에서 남긴다(createInTransaction — emitNotification 의 설정 확인을 거치지 않는다).
   | 'social_identity_linked'
+  // 운영자가 이 계정의 휴대폰 번호를 해제했을 때 그 계정에게. 보안 알림이라 social_identity_linked 와 같이
+  // 설정과 무관하게 해제와 같은 트랜잭션에서 남긴다. 도착지는 번호를 다시 인증하는 화면이다.
+  | 'phone_released_by_operator'
   // H3: 팀장·어드민이 팀을 보관(해체)하면 팀원 전원과 가입 신청자에게 한 번 알린다. 도착지는 해체된 팀 페이지.
   | 'team_dissolved'
   // Task 12, reminders lane: fired by the durable worker (jobs/schedule-reminders/schedule-reminder.service.ts)
@@ -325,7 +329,7 @@ function targetTypeForEvent(type: NotificationEventType): V1NotificationTargetTy
   if (type === 'inquiry_answered') {
     return 'inquiry';
   }
-  if (type === 'social_identity_linked') {
+  if (type === 'social_identity_linked' || type === 'phone_released_by_operator') {
     return 'system';
   }
   if (type === 'team_dissolved') {
@@ -474,6 +478,9 @@ function deepLinkForEvent(
   }
   if (type === 'social_identity_linked') {
     return '/my/settings';
+  }
+  if (type === 'phone_released_by_operator') {
+    return PHONE_VERIFICATION_ROUTE;
   }
   // 새 팀장·나간 멤버 알림은 멤버 관리(멤버 탭)로 — 나머지 역할 알림은 기본 팀 상세로 간다.
   if ((type === 'team_owner_received' || type === 'team_member_left') && targetId) {
@@ -629,6 +636,7 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   team_schedule_cancelled: '일정이 취소됐어요',
   inquiry_answered: '문의에 답변이 등록됐어요',
   social_identity_linked: '로그인 수단이 연결됐어요',
+  phone_released_by_operator: '휴대폰 번호가 해제됐어요',
   team_dissolved: '팀이 해체됐어요',
   schedule_rsvp_deadline_reminder: '참석 여부를 알려주세요',
   schedule_guest_recruitment_close_reminder: '용병 모집이 곧 마감돼요',
@@ -718,6 +726,7 @@ const EVENT_BODIES: Record<NotificationEventType, string> = {
   team_schedule_cancelled: '"{team}" · {title}({when}) · {reason}',
   inquiry_answered: '답변 내용을 확인해 주세요.',
   social_identity_linked: '{name} 로그인이 연결됐어요. 본인이 아니라면 고객센터로 문의해 주세요.',
+  phone_released_by_operator: '운영자가 이 계정의 휴대폰 번호를 해제했어요. 계정은 그대로이고, 휴대폰 번호를 다시 인증해 주세요.',
   team_dissolved: '지난 기록은 그대로 남아요.',
   schedule_rsvp_deadline_reminder: 'RSVP 마감 전에 참석 여부를 남겨주세요.',
   schedule_guest_recruitment_close_reminder: '모집 마감 전에 신청 현황을 확인해 주세요.',

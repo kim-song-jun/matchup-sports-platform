@@ -3275,6 +3275,19 @@ export type V1AdminDeleteUserPayload = {
   reason: string;
 };
 
+/** `POST /admin/users/:userId/phone/release` — 번호만 계정에서 떼어 낸다. 계정은 남고 휴대폰 인증을 다시 해야 한다. */
+export type V1AdminReleaseUserPhonePayload = {
+  reason: string;
+};
+
+export type V1AdminReleaseUserPhoneResult = {
+  userId: string;
+  previousStatus: 'confirmed' | 'unverified';
+  status: 'released';
+  actionLogId: string;
+  statusChangeLogId: string;
+};
+
 export type V1AdminMatchRow = {
   matchId: string;
   title: string;

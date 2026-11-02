@@ -1,4 +1,4 @@
-import { assertNamedAwardScopes } from './multi-finals/multi-finals-scope';
+import { assertNamedAwardScopes, assertLegacyAwardScopes } from './multi-finals/multi-finals-scope';
 import {
   BadRequestException,
   ForbiddenException,
@@ -583,6 +583,7 @@ export class TournamentReviewsService {
     }
 
     const requestedTracks = new Set(dto.awards.map((award) => award.bracketTrack ?? V1TournamentBracketTrack.overall));
+    assertLegacyAwardScopes(tournament.format, [...requestedTracks]);
     if (
       tournament.kind !== 'regular_tournament' &&
       [...requestedTracks].some((track) => track !== V1TournamentBracketTrack.overall)

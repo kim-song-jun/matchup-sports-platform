@@ -10,3 +10,10 @@ export async function assertNamedAwardScopes(tx: Prisma.TransactionClient, tourn
   const allowed = new Set(['overall', ...(config?.finals?.map(f => f.name) ?? [])]);
   if (scopes.some(scope => !allowed.has(scope))) throw new BadRequestException({ code: 'AWARD_TRACK_UNSUPPORTED', message: '이 대회에 설정된 토너먼트의 시상 범위를 선택해 주세요.' });
 }
+
+/** Existing formats keep their three legacy scopes; named scopes belong to the new format only. */
+export function assertLegacyAwardScopes(format: string | undefined, scopes: readonly string[]) {
+  if (format !== 'league_knockouts' && scopes.some(scope => !['overall', 'upper', 'lower'].includes(scope))) {
+    throw new BadRequestException({ code: 'AWARD_TRACK_UNSUPPORTED', message: '이 대회 진행 방식에서는 전체·상위·하위 시상 범위를 선택해 주세요.' });
+  }
+}

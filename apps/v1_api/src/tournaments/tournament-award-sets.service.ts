@@ -1,4 +1,4 @@
-import { assertNamedAwardScopes } from './multi-finals/multi-finals-scope';
+import { assertNamedAwardScopes, assertLegacyAwardScopes } from './multi-finals/multi-finals-scope';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { V1TournamentBracketTrack } from '@prisma/client';
 import { Type } from 'class-transformer';
@@ -87,6 +87,7 @@ export class TournamentAwardSetsService {
     const tournament = await this.findRegularTournament(tournamentId);
 
     const tracks = dto.awardSets.map((entry) => entry.bracketTrack);
+    assertLegacyAwardScopes(tournament.format, tracks);
     if (tracks.some(track => !track.trim() || track === 'overall')) throw new BadRequestException({ code: 'AWARD_TRACK_UNSUPPORTED', message: '토너먼트 시상 범위를 선택해 주세요.' });
     if (new Set(tracks).size !== tracks.length) {
       throw new BadRequestException({

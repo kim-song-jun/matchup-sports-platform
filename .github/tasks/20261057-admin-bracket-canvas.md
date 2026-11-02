@@ -1071,3 +1071,7 @@ PR1858 latest-dev merge 30개 충돌 파일. generated Prisma client/의존성 �
 - 새 CI run41413245625의 API/Gates/Web 시작 확인. 현재 remote CI는 진행 중이며 아직 PASS로 표기하지 않는다. 이 문서 업데이트 후 최신 head의 Checks를 최종 기준으로 사용한다.
 - local typecheck 양쪽0, 생성기11/11, 실제 DB통합9/9, migration229개·drift0, 실제 커밋3d59a4277의 expand/contract PASS. 이후 N개 결선 구조 편집 안내 UI20/20·모바일59/59 PASS. 신규 alpha0/10·after0/3.
 - Git tree clean 및 commit scope127개 파일 확인. 원본 공유 트리 WIP 보존. Linux git 인증 부재는 기존 Windows gh.exe의 활성 keyring 인증을 명령 단위로 사용해 해결; 전역 인증/설정 변경 없음.
+
+### 최종 범위 검증 보완
+
+고정 enum DTO를 이름 범위로 확장하면서 기존 대회 방식에도 임의 범위가 열리지 않도록 서비스 검증을 분리했다. 기존 방식은 overall/upper/lower만, 새 방식은 실제 설정된 토너먼트 이름만 허용한다. 범위 검증 + 시상/개인상 관련3개 스위트96 tests PASS. 원격 CI는 이 보완을 포함한 최신 PR head 기준으로 확인한다.

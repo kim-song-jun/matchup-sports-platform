@@ -55,7 +55,7 @@ export function stepUpChallengeFixture(overrides: Partial<V1LoginStepUpChallenge
 
 export function sessionLoginResponse() {
   return ok<V1AuthSessionResponse>({
-    user: { id: v1UserFixture.id, email: v1UserFixture.email, onboardingStatus: v1UserFixture.onboardingStatus, canLinkLoginMethods: true, canLinkAfterSignup: true },
+    user: { id: v1UserFixture.id, email: v1UserFixture.email, onboardingStatus: v1UserFixture.onboardingStatus, canLinkLoginMethods: true, canLinkAfterSignup: true, signupEmailLoginRequired: false },
     profile: { displayName: v1UserFixture.displayName },
     session: { userId: v1UserFixture.id, userEmail: v1UserFixture.email },
   });

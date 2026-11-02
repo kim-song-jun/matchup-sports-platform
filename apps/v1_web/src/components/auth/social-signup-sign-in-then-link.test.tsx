@@ -322,7 +322,7 @@ describe('소셜 가입 제출에서 번호 중복이 드러난 경우', () => {
     await user.click(screen.getByRole('button', { name: '중복 확인' }));
     await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled());
     await user.click(screen.getByRole('button', { name: '다음' }));
-    const submit = await screen.findByRole('button', { name: '운동 설정으로 계속' });
+    const submit = await screen.findByRole('button', { name: '확인하고 계속' });
     await waitFor(() => expect(submit).toBeEnabled());
     await user.click(submit);
 
@@ -351,7 +351,7 @@ describe('소셜 가입 제출에서 번호 중복이 드러난 경우', () => {
     await user.click(screen.getByRole('button', { name: '중복 확인' }));
     await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled());
     await user.click(screen.getByRole('button', { name: '다음' }));
-    const submit = await screen.findByRole('button', { name: '운동 설정으로 계속' });
+    const submit = await screen.findByRole('button', { name: '확인하고 계속' });
     await waitFor(() => expect(submit).toBeEnabled());
     await user.click(submit);
 
@@ -389,7 +389,7 @@ describe('새 계정의 소셜 가입이 끝나면 대기 연결 토큰을 지�
     await user.click(screen.getByRole('button', { name: '중복 확인' }));
     await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled());
     await user.click(screen.getByRole('button', { name: '다음' }));
-    const submit = await screen.findByRole('button', { name: '운동 설정으로 계속' });
+    const submit = await screen.findByRole('button', { name: '확인하고 계속' });
     await waitFor(() => expect(submit).toBeEnabled());
     expect(peekPendingSocialLink()).not.toBeNull();
 

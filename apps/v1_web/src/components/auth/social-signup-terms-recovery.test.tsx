@@ -127,7 +127,7 @@ async function prepareProfile() {
   fireEvent.click(screen.getByRole('button', { name: '다음' }));
   fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '1995-01-15' } });
   fireEvent.click(screen.getByRole('button', { name: '다음' }));
-  const submit = await screen.findByRole('button', { name: '운동 설정으로 계속' });
+  const submit = await screen.findByRole('button', { name: '확인하고 계속' });
   expect(submit).toBeEnabled();
   return submit;
 }
@@ -296,9 +296,7 @@ describe('필수 약관이 변경된 소셜 가입의 실제 인증 캐시 복�
       }),
     );
     await openSignup();
-    const completeButton = await prepareProfile();
-    const deferButton = screen.getByRole('button', { name: '나중에 입력할게요' });
-    const trigger = action === 'defer' ? deferButton : completeButton;
+    const trigger = action === 'defer' ? screen.getByRole('button', { name: '나중에 입력할게요' }) : await prepareProfile();
     const signupForm = document.getElementById('v1-social-signup-form');
     if (!signupForm) throw new Error('실제 가입 폼을 찾지 못했어요.');
 
@@ -310,12 +308,10 @@ describe('필수 약관이 변경된 소셜 가입의 실제 인증 캐시 복�
         expect(client.getQueryState(v1Keys.authMe())?.fetchStatus).toBe('fetching');
       });
 
-      // Then: mutation의 종료와 별개로 복구 중 표시와 두 가입 액션의 잠금을 유지한다.
+      // Then: mutation 종료와 별개로 현재 화면의 가입 액션을 잠근다.
       expect(trigger).toHaveAttribute('aria-busy', 'true');
-      expect(completeButton).toBeDisabled();
-      expect(deferButton).toBeDisabled();
+      expect(trigger).toBeDisabled();
       fireEvent.click(trigger);
-      fireEvent.click(deferButton);
       fireEvent.submit(signupForm);
 
       releaseAuth();
@@ -326,8 +322,7 @@ describe('필수 약관이 변경된 소셜 가입의 실제 인증 캐시 복�
       } else {
         await screen.findByText('인증 상태를 확인하지 못했어요.');
         expect(authReads).toBe(4);
-        expect(completeButton).toBeEnabled();
-        expect(deferButton).toBeEnabled();
+        expect(trigger).toBeEnabled();
         expect(trigger).not.toHaveAttribute('aria-busy', 'true');
         expect(navigation.pathname).toBe('/signup/social');
       }

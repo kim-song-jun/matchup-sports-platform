@@ -1072,6 +1072,7 @@ export class AuthService {
         email: true,
         accountStatus: true,
         onboardingStatus: true,
+        adminUser: { select: { status: true } },
         createdAt: true,
         updatedAt: true,
         onboardingProgress: { select: { draftJson: true } },
@@ -1200,6 +1201,7 @@ export class AuthService {
         where: { id: userId, accountStatus: 'active', onboardingStatus: previousStatus },
         data: {
           onboardingStatus: wasDeferred ? 'deferred' : 'signup_done', phone,
+          ...(!wasDeferred ? { signupEmailLoginRequired: !user.adminUser || user.adminUser.status === 'revoked' } : {}),
           ...(acceptedKakaoPhone ? { phoneVerifiedAt: new Date() } : {}),
         },
       });
@@ -1258,6 +1260,7 @@ export class AuthService {
         email: true,
         accountStatus: true,
         onboardingStatus: true,
+        adminUser: { select: { status: true } },
         createdAt: true,
         updatedAt: true,
         onboardingProgress: { select: { draftJson: true } },
@@ -1326,7 +1329,7 @@ export class AuthService {
     await this.prisma.$transaction(async (transaction) => {
       const transition = await transaction.v1User.updateMany({
         where: { id: userId, onboardingStatus: 'social_profile_required' },
-        data: { onboardingStatus: 'social_profile_deferred' },
+        data: { onboardingStatus: 'social_profile_deferred', signupEmailLoginRequired: !user.adminUser || user.adminUser.status === 'revoked' },
       });
       if (transition.count !== 1) {
         throw new BadRequestException({
@@ -1429,6 +1432,7 @@ export class AuthService {
         authProviders: user.authIdentities.map((identity) => identity.provider),
         canLinkLoginMethods: linkCallerRestriction(user) === null,
         canLinkAfterSignup: linkCallerRestriction({ ...user, onboardingStatus: 'signup_done' }) === null,
+        signupEmailLoginRequired: user.signupEmailLoginRequired,
         hasPassword: user.authIdentities.some((identity) => Boolean(identity.passwordHash)),
       },
       verification: {
@@ -1496,10 +1500,14 @@ export class AuthService {
   ) {
     const snapshot = await this.me(userId);
     const onboardingRoute = getAuthNextRoute(snapshot.onboarding, options);
-    const nextRoute = onboardingRoute
-      ?? (snapshot.termsCompliance?.compliant === false
-        ? snapshot.termsCompliance.nextRoute ?? '/terms?mode=renewal'
-        : null);
+    const termsRoute = snapshot.termsCompliance?.compliant === false
+      ? snapshot.termsCompliance.nextRoute ?? '/terms?mode=renewal' : null;
+    const emailSetupRoute = snapshot.user.signupEmailLoginRequired
+      ? snapshot.user.onboardingStatus === 'social_profile_deferred'
+        ? '/my/settings/login-methods/email?redirect=%2Fhome'
+        : '/my/settings/login-methods/email?redirect=%2Fonboarding%2Fsport'
+      : null;
+    const nextRoute = emailSetupRoute ? termsRoute ?? emailSetupRoute : onboardingRoute ?? termsRoute;
 
     return {
       session: {

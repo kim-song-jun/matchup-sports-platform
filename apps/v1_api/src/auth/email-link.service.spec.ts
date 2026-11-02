@@ -38,6 +38,7 @@ const user = (id: string, overrides: Row = {}): Row => ({
   phone: null,
   accountStatus: 'active',
   onboardingStatus: 'completed',
+  signupEmailLoginRequired: false,
   deletedAt: null,
   emailVerifiedAt: null,
   phoneVerifiedAt: null,
@@ -233,7 +234,7 @@ async function build(seed: Seed, options: { echo?: boolean; sendFails?: boolean;
     forgetEmail: jest.fn().mockResolvedValue(undefined),
   };
   const auth = new AuthService({} as never, db.prisma as never, {} as never, {} as never, {} as never, loginSecurity as never, {} as never);
-  jest.spyOn(auth, 'me').mockResolvedValue({ onboarding: { status: 'completed', missing: [] } } as never);
+  jest.spyOn(auth, 'me').mockResolvedValue({ user: { signupEmailLoginRequired: false }, onboarding: { status: 'completed', missing: [] } } as never);
   const recovery = new AccountRecoveryService(db.prisma as never, {} as never, loginSecurity as never, { forceDisconnectUser: jest.fn() });
 
   const lastCode = () => sent[sent.length - 1].code;
@@ -537,6 +538,17 @@ describe('codes are bound to their purpose', () => {
 });
 
 describe('EmailLinkService.complete', () => {
+  it('clears the required signup gate only after email and password are linked', async () => {
+    const seed = kakaoCaller();
+    seed.users[0].onboardingStatus = 'social_profile_deferred';
+    seed.users[0].signupEmailLoginRequired = true;
+    const { verified, complete, state } = await build(seed);
+    const token = await verified();
+    expect(state.users[0].signupEmailLoginRequired).toBe(true);
+    await complete(token);
+    expect(state.users[0].signupEmailLoginRequired).toBe(false);
+    expect(state.identities.some((row) => row.provider === 'email')).toBe(true);
+  });
   it('adds the email login, makes the address the account email, and records it', async () => {
     const { verified, complete, state } = await build(kakaoCaller());
     const token = await verified();

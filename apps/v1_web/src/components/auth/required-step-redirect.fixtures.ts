@@ -31,7 +31,7 @@ export const terms = (accepted: boolean): TermsSnapshot => ({
   compliance: compliance(accepted),
 });
 export const makeAuth = (status: FixtureStatus, id = PENDING, phoneVerified = false): V1AuthMe => ({
-  user: { id, email: null, phone: phoneVerified ? '01012345678' : null, accountStatus: 'active', onboardingStatus: status, authProvider: 'kakao', canLinkAfterSignup: true, canLinkLoginMethods: status !== 'social_profile_required' && status !== 'social_profile_deferred' },
+  user: { id, email: null, phone: phoneVerified ? '01012345678' : null, accountStatus: 'active', onboardingStatus: status, authProvider: 'kakao', canLinkAfterSignup: true, signupEmailLoginRequired: false, canLinkLoginMethods: status !== 'social_profile_required' && status !== 'social_profile_deferred' },
   profile: { displayName: '김러너', nickname: '카카오러너' },
   verification: { emailVerified: false, phoneVerified },
   socialSignupPrefill: null,
@@ -102,7 +102,8 @@ function authenticatedEntry(state: RedirectFixtureState) {
   if (state.requiredRoute.startsWith('/terms')) state.onboarding = { ...state.onboarding, status: 'completed', currentStep: 'done', canResume: false, missing: [],
     sports: [{ sportId: SPORT, sportName: '풋살', levelId: LEVEL, levelName: '초급' }],
   };
-  const response = success(authSession(state.auth, state.requiredRoute));
+  const nextRoute = state.auth.user.signupEmailLoginRequired && !state.requiredRoute.startsWith('/terms') ? '/my/settings/login-methods/email?redirect=%2Fonboarding%2Fsport' : state.requiredRoute;
+  const response = success(authSession(state.auth, nextRoute));
   if (state.acceptedTerms) state.auth = { ...state.auth, termsCompliance: compliance(true) };
   return response;
 }
@@ -125,9 +126,13 @@ export function createRedirectFixture() {
         birthDate: '20000229', gender: 'female' });
       state.profileRequests += 1;
       state.auth = makeAuth('signup_done', PENDING, true);
+      state.auth.user.signupEmailLoginRequired = true;
       state.auth.user.phone = '01087654321';
       return authenticatedEntry(state);
     }),
+    http.post('*/api/v1/auth/link/email/request', () => success({ sent: true, maskedTarget: 'r***@example.com', expiresInSeconds: 300, resendAvailableInSeconds: 30, devCode: '123456' })),
+    http.post('*/api/v1/auth/link/email/verify', () => success({ emailLinkToken: 'synthetic-email-link-token-long', expiresInSeconds: 600 })),
+    http.post('*/api/v1/auth/link/email/complete', () => { state.auth.user.signupEmailLoginRequired = false; return success({ linked: true, email: 'runner@example.com' }); }),
     ...['auth/link/kakao', 'auth/link/apple', 'auth/link/pending'].map((path) =>
       http.post('*/api/v1/' + path, () => {
         state.linkRequests += 1;

@@ -1,7 +1,9 @@
 import type { INestApplication } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import request = require('supertest');
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ManagedTermsRuntimeService } from '../src/terms/managed-terms-runtime.service';
+import { issueEmailLinkToken } from '../src/auth/email-link-token';
 import { createV1IntegrationApp } from './integration/integration-app';
 
 const deferringUserId = 'integration-social-defer-user';
@@ -21,6 +23,7 @@ describe('V1 social profile deferral integration', () => {
   let app: INestApplication;
   let cleanupApp: (() => Promise<void>) | undefined;
   let prisma: PrismaService;
+  let ownedTermsPolicyId: string | undefined;
 
   beforeAll(async () => {
     ({ app, cleanup: cleanupApp } = await createV1IntegrationApp());
@@ -81,17 +84,34 @@ describe('V1 social profile deferral integration', () => {
     // Reconsent runs before the activity gate; keep every fixture compliant so only the
     // onboarding status differs between users.
     const termsService = app.get(ManagedTermsRuntimeService);
-    const terms = await termsService.currentSignupTerms();
+    let terms = await termsService.currentSignupTerms();
+    if (!terms.ready) {
+      const policy = await prisma.v1ManagedTermsPolicy.create({ data: { code: 'integration-social-defer-policy', name: '프로필 유예 테스트 약관' } });
+      ownedTermsPolicyId = policy.id;
+      const content = '프로필 유예 검증을 위한 약관입니다.';
+      await prisma.v1ManagedTermsDocument.create({ data: {
+        policyId: policy.id, version: '1', title: '프로필 유예 테스트 약관', content,
+        contentHash: createHash('sha256').update(content).digest('hex'), status: 'published',
+        publishedAt: new Date('2026-01-01T00:00:00.000Z'), effectiveAt: new Date('2026-01-01T00:00:00.000Z'),
+      } });
+      await prisma.v1ManagedTermsPlacement.create({ data: { policyId: policy.id, context: 'signup', requirement: 'required' } });
+      terms = await termsService.currentSignupTerms();
+    }
     const required = terms.items
       .filter((item) => item.requirement === 'required')
       .map((item) => item.documentId);
     await Promise.all(
       ids.map((id) => termsService.acceptSignupTerms(id, required)),
     );
-  });
+  }, 60_000);
 
   afterAll(async () => {
     await cleanupFixtures();
+    if (ownedTermsPolicyId) {
+      await prisma.v1ManagedTermsPlacement.deleteMany({ where: { policyId: ownedTermsPolicyId } });
+      await prisma.v1ManagedTermsDocument.deleteMany({ where: { policyId: ownedTermsPolicyId } });
+      await prisma.v1ManagedTermsPolicy.delete({ where: { id: ownedTermsPolicyId } });
+    }
     await cleanupApp?.();
   });
 
@@ -105,6 +125,7 @@ describe('V1 social profile deferral integration', () => {
     const teamIds = teams.map((team) => team.id);
     // Team creation writes a chat room, owner membership and profile (cascade from the team) plus status logs and a system chat line.
     await prisma.v1ChatMessage.deleteMany({ where: { senderUserId: { in: ids } } });
+    await prisma.v1Notification.deleteMany({ where: { recipientUserId: { in: ids } } });
     await prisma.v1StatusChangeLog.deleteMany({ where: { OR: [{ actorUserId: { in: ids } }, { targetId: { in: teamIds } }] } });
     await prisma.v1Team.deleteMany({ where: { id: { in: teamIds } } });
     await prisma.v1Sport.deleteMany({ where: { id: sportId } });
@@ -125,11 +146,28 @@ describe('V1 social profile deferral integration', () => {
 
     const user = await prisma.v1User.findUniqueOrThrow({
       where: { id: deferringUserId },
-      select: { onboardingStatus: true, profile: { select: { nickname: true, realName: true } } },
+      select: { onboardingStatus: true, signupEmailLoginRequired: true, profile: { select: { nickname: true, realName: true } } },
     });
     expect(user.onboardingStatus).toBe('social_profile_deferred');
+    expect(user.signupEmailLoginRequired).toBe(true);
     expect(user.profile?.nickname).toMatch(/^디퍼카카오\d{2,4}$/);
     expect(user.profile?.realName).toBeNull();
+  });
+
+  it('requires email login after deferral and resumes deferred access once it is linked', async () => {
+    const blocked = await request(app.getHttpServer()).get('/api/v1/me/profile').set('x-v1-user-id', deferringUserId).expect(403);
+    expect(blocked.body.code).toBe('EMAIL_LOGIN_SETUP_REQUIRED');
+    const previous = process.env.V1_SESSION_SECRET;
+    process.env.V1_SESSION_SECRET = 'integration-social-defer-secret-0123456789';
+    try {
+      const token = issueEmailLinkToken(deferringUserId, 'social-defer-required@integration.test');
+      await request(app.getHttpServer()).post('/api/v1/auth/link/email/complete').set('x-v1-user-id', deferringUserId)
+        .send({ emailLinkToken: token, password: 'test-password-123', passwordConfirm: 'test-password-123' }).expect(200);
+    } finally {
+      if (previous === undefined) delete process.env.V1_SESSION_SECRET;
+      else process.env.V1_SESSION_SECRET = previous;
+    }
+    expect((await prisma.v1User.findUniqueOrThrow({ where: { id: deferringUserId } })).signupEmailLoginRequired).toBe(false);
   });
 
   it('sends an account without the 14+ confirmation back to terms instead of deferring', async () => {

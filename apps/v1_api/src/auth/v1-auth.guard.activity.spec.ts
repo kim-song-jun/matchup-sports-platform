@@ -80,6 +80,17 @@ describe('V1AuthGuard activity profile gate', () => {
   });
 
   describe('control: everyone else is unchanged', () => {
+    it('blocks onboarding when signup email setup is required', async () => {
+      mockUser({ onboardingStatus: 'signup_done', signupEmailLoginRequired: true });
+      await expect(guard.canActivate(context('POST', '/api/v1/onboarding/preferences'))).rejects.toMatchObject({
+        response: { code: 'EMAIL_LOGIN_SETUP_REQUIRED' },
+      });
+    });
+
+    it('allows the email setup endpoints while setup is required', async () => {
+      mockUser({ onboardingStatus: 'signup_done', signupEmailLoginRequired: true });
+      await expect(guard.canActivate(context('POST', '/api/v1/auth/link/email/request'))).resolves.toBe(true);
+    });
     it('lets a completed, verified user write', async () => {
       mockUser({ onboardingStatus: 'completed' });
 
@@ -113,6 +124,7 @@ describe('V1AuthGuard activity profile gate', () => {
 
   function mockUser(overrides: {
     onboardingStatus: string;
+    signupEmailLoginRequired?: boolean;
     phoneVerifiedAt?: Date | null;
     adminUser?: { status: string } | null;
   }) {
@@ -121,6 +133,7 @@ describe('V1AuthGuard activity profile gate', () => {
       email: null,
       accountStatus: 'active',
       onboardingStatus: overrides.onboardingStatus,
+      signupEmailLoginRequired: overrides.signupEmailLoginRequired ?? false,
       phoneVerifiedAt:
         overrides.phoneVerifiedAt === undefined
           ? new Date('2026-07-20T00:00:00.000Z')

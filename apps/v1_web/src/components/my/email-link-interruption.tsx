@@ -25,12 +25,13 @@ const COPY: Record<EmailLinkInterruption, { title: string; body: string }> = {
  * 입력을 바꿔도 풀리지 않는 이유로 흐름이 멈췄을 때의 화면. 단계 화면 대신 나타나고, 갈 곳은 하나다.
  * 다시 로그인(recent-login)은 로그아웃한 뒤 이 연결 화면으로 돌아오는 로그인 경로로 보낸다.
  */
-export function EmailLinkInterruptionView({ kind, backHref, onRelogin, relogin }: {
+export function EmailLinkInterruptionView({ kind, backHref, onRelogin, relogin, mandatory = false }: {
   kind: EmailLinkInterruption;
   /** 상단 뒤로 가기가 가는 곳 — 이 화면에 오기 전에 가려던 곳이 있으면 그곳이다. */
   backHref: string;
   onRelogin: () => void;
   relogin: { pending: boolean; error: string | null };
+  mandatory?: boolean;
 }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
   // 화면이 통째로 바뀌므로 스크린리더가 새 상태를 알도록 제목으로 포커스를 옮긴다.
@@ -43,8 +44,8 @@ export function EmailLinkInterruptionView({ kind, backHref, onRelogin, relogin }
     <AuthFrame
       stage={AUTH_WELCOME_STAGE}
       topTitle="이메일 로그인 연결"
-      backHref={backHref}
-      appBack
+      backHref={mandatory ? undefined : backHref}
+      appBack={!mandatory}
       fixedAction={
         kind === 'recent-login' ? (
           <>
@@ -58,8 +59,8 @@ export function EmailLinkInterruptionView({ kind, backHref, onRelogin, relogin }
             ) : null}
           </>
         ) : (
-          <Link className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" href={LOGIN_METHODS_PATH}>
-            로그인 방법으로 돌아가기
+          <Link className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" href={mandatory ? '/my/inquiries/new' : LOGIN_METHODS_PATH}>
+            {mandatory ? '고객센터 문의하기' : '로그인 방법으로 돌아가기'}
           </Link>
         )
       }
@@ -67,7 +68,7 @@ export function EmailLinkInterruptionView({ kind, backHref, onRelogin, relogin }
       <div className="tm-auth-body">
         <div className="tm-signup-hero">
           <h1 ref={headingRef} tabIndex={-1} className="tm-text-heading tm-auth-heading">{copy.title}</h1>
-          <p className="tm-text-body tm-auth-sub">{copy.body}</p>
+          <p className="tm-text-body tm-auth-sub">{mandatory && kind === 'exists' ? '이미 연결된 이메일 로그인 정보가 확인되지 않아요. 고객센터에 문의해 주세요.' : copy.body}</p>
         </div>
       </div>
     </AuthFrame>

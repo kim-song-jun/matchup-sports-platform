@@ -433,6 +433,7 @@ export function RegistrationsTab({
   canWrite,
   requireCancelReason = false,
   isFreeEntry = false,
+  rosterDeadlineAt = null,
 }: {
   tournamentId: string;
   showToast: (msg: string, v?: 'success' | 'error') => void;
@@ -448,6 +449,11 @@ export function RegistrationsTab({
    */
   requireCancelReason?: boolean;
   isFreeEntry?: boolean;
+  /**
+   * 명단 제출 마감. 없으면(리그는 늘 없다) 마감 예외가 아무 차이를 만들지 않으므로 '마감 예외 허용'을
+   * 숨긴다(MD-QA #202). 이미 준 예외를 거두는 '예외 해제'는 그대로 보인다.
+   */
+  rosterDeadlineAt?: string | null;
 }) {
   const { data, isPending, isError, error, refetch } = useV1AdminTournamentRegistrations(tournamentId);
   const confirmPayment = useV1ConfirmPayment();
@@ -989,7 +995,7 @@ export function RegistrationsTab({
                     label="예외 해제"
                     tone="gray"
                   />
-                ) : (
+                ) : rosterDeadlineAt === null ? null : (
                   <ActionButton
                     onClick={() => handleRosterDeadlineOverrideGrant(reg)}
                     disabled={rosterDeadlineOverrideGrant.isPending}

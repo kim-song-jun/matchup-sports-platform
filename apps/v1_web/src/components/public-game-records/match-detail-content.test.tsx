@@ -158,6 +158,24 @@ describe('MatchDetailContent — 단판 경기 구간 표기', () => {
     render(<MatchDetailContent data={makeDetail({ periodCount: 2, events: [events[0]] })} />);
     expect(screen.getByRole('group', { name: '전반' })).toBeInTheDocument();
   });
+
+  it('단판의 "경기 결과" 머리말은 화면에서 감추고(스크린리더용으로만 남김) 그 자리에 선 하나를 둔다', () => {
+    render(<MatchDetailContent data={makeDetail({ periodCount: 1, events })} />);
+
+    const group = screen.getByRole('group', { name: '경기 결과' });
+    const label = within(group).getByText('경기 결과');
+    expect(label).toHaveClass('sr-only');
+    // 머리말 자리에는 글자 없는 구분선이 온다.
+    const separator = group.querySelector('[aria-hidden="true"]');
+    expect(separator).not.toBeNull();
+    expect(separator?.textContent).toBe('');
+  });
+
+  it('전·후반 경기의 머리말(전반·후반)은 지금처럼 눈에 보이는 글자다', () => {
+    render(<MatchDetailContent data={makeDetail({ periodCount: 2, events })} />);
+
+    expect(within(screen.getByRole('group', { name: '전반' })).getByText('전반')).not.toHaveClass('sr-only');
+  });
 });
 
 describe('MatchDetailContent — 카드 색상', () => {
@@ -558,5 +576,24 @@ describe('MatchDetailContent — 장소 카드', () => {
 
     render(<MatchDetailContent data={makeDetail({ place: null })} />);
     expect(screen.queryByRole('heading', { name: '장소' })).toBeNull();
+  });
+});
+
+describe('MatchDetailContent — 경기 방식 줄(일시·장소 줄 아래)', () => {
+  it.each([
+    [[20], '단판 20분'],
+    [[15, 15], '전·후반 15분'],
+    [[10, 15], '전반 10분, 후반 15분'],
+  ])('periodMinutes=%j 이면 "%s" 를 일시 줄 바로 아래에 적는다', (periodMinutes, expected) => {
+    render(<MatchDetailContent data={makeDetail({ periodMinutes, venue: '청계천' })} />);
+
+    const line = screen.getByText(expected);
+    expect(line.previousElementSibling).toHaveTextContent('청계천');
+  });
+
+  it.each([[null], [undefined], [[]]])('길이를 모르면(%j) 줄을 그리지 않는다', (periodMinutes) => {
+    render(<MatchDetailContent data={makeDetail({ periodMinutes: periodMinutes as never })} />);
+
+    expect(screen.queryByText(/단판|전·후반|피리어드/)).toBeNull();
   });
 });

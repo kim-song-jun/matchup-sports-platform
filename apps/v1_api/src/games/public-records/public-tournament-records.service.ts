@@ -62,7 +62,7 @@ import { LEAGUE_TIE_BREAK_ORDER } from '../../league-matches/league-tie-break';
 import { SLOT_LABEL_SELECT, publicFixtureSideLabel } from '../../tournaments/slots/tournament-slot-label';
 import { tournamentRoundLabel } from '../../tournaments/tournament-round-label';
 import { PUBLIC_COMPETITION_STATUS_WHERE } from '../../tournaments/tournaments-read.query';
-import { regularPeriodCount } from '../../tournaments/competition-config/competition-config.parse';
+import { regularPeriodCount, regularPeriodMinutes } from '../../tournaments/competition-config/competition-config.parse';
 import { PLACE_SELECT } from '../../places/place-select';
 import { toPlaceView, type PlaceView } from '../../places/place-snapshot';
 
@@ -1321,6 +1321,7 @@ export class PublicTournamentRecordsService {
       clock,
       periodBreak,
       periodCount: gamePeriodCount(fixture.game),
+      periodMinutes: gamePeriodMinutes(fixture.game),
       lineup,
       events,
       mvp,
@@ -2030,6 +2031,7 @@ export class PublicTournamentRecordsService {
       clock,
       periodBreak,
       periodCount: gamePeriodCount(teamMatch.game),
+      periodMinutes: gamePeriodMinutes(teamMatch.game),
       lineup,
       events,
       mvp,
@@ -2380,6 +2382,14 @@ function gamePeriodCount(game: { competitionConfig?: { periods: Prisma.JsonValue
   return regularPeriodCount(game?.competitionConfig?.periods);
 }
 
+/**
+ * 경기의 정규 피리어드별 길이(분, 연장 제외). 화면이 "단판 20분"·"전·후반 15분"을 적는 데 쓴다.
+ * 경기 레코드가 없거나 길이를 읽을 수 없으면 null — 화면은 그때 경기 방식 줄을 그리지 않는다.
+ */
+function gamePeriodMinutes(game: { competitionConfig?: { periods: Prisma.JsonValue } | null } | null | undefined): number[] | null {
+  return regularPeriodMinutes(game?.competitionConfig?.periods);
+}
+
 function presentScheduleEntry(
   fixture: FixtureScheduleRow,
   publicLiveEnabled: boolean,
@@ -2504,6 +2514,7 @@ function presentScheduleEntry(
     clock,
     periodBreak,
     periodCount: gamePeriodCount(fixture.game),
+    periodMinutes: gamePeriodMinutes(fixture.game),
     scorers,
     cards,
     // **이 뷰의 점수 공개 게이트를 그대로 따른다.** outcome 전용 조건을 따로 만들지

@@ -1061,5 +1061,13 @@ PR1858 latest-dev merge 30개 충돌 파일. generated Prisma client/의존성 �
 - API/Web 전체 typecheck PASS. API surface752개 파일 PASS, Web pattern PASS, debt marker는 task 문서의 과거 검사 기록뿐(소스0), diff whitespace PASS.
 - 검증용 Git tree945e0d65794cb7b0bbb96fbafc862af48542c899의 expand/contract gate 및 negative/self controls PASS. 이후 UI 제약·상태 잠금 보완의 최신 tree는 PR 반영 전 재검증.
 - UI 전용 ego/headed browser 도구 없음 및 alpha 미배포: 실제 사용자/viewport 검증 미실행. 단위/DB 테스트를 alpha PASS로 표기하지 않는다.
-- 운영 DB·공유 원본 작업트리 변경0. 임시 PostgreSQL 127.0.0.1:55483, 소유 runner PID48657만 사용하며 최종 검증 후 종료한다.
+- 운영 DB·공유 원본 작업트리 변경0. 임시 PostgreSQL 127.0.0.1:55483, 소유 runner PID48657만 사용하며 최종 검증 후 종료했다(PID48657 runner와 PostgreSQL 정상 종료 확인).
 - 배포/운영 반영은 미실행. PR은 draft 유지.
+
+### 2026-11-02 PR 반영 cursor
+
+- 구현 커밋 `04b4892d561d43a52e537083989e5e179c54a9e5`, PR1858 원본8커밋 이력 보존 병합 `3d59a4277ea8affa938f88797a1a07b8da182fde`.
+- 기존 draft PR1858 브랜치에 fast-forward push 완료. 제목/본문을 정규리그 + N개 토너먼트·직접 진출팀 편집 범위로 갱신. base=dev/draft=true 재확인. dev/main push·머지·배포 없음.
+- 새 CI run41413245625의 API/Gates/Web 시작 확인. 현재 remote CI는 진행 중이며 아직 PASS로 표기하지 않는다. 이 문서 업데이트 후 최신 head의 Checks를 최종 기준으로 사용한다.
+- local typecheck 양쪽0, 생성기11/11, 실제 DB통합9/9, migration229개·drift0, 실제 커밋3d59a4277의 expand/contract PASS. 이후 N개 결선 구조 편집 안내 UI20/20·모바일59/59 PASS. 신규 alpha0/10·after0/3.
+- Git tree clean 및 commit scope127개 파일 확인. 원본 공유 트리 WIP 보존. Linux git 인증 부재는 기존 Windows gh.exe의 활성 keyring 인증을 명령 단위로 사용해 해결; 전역 인증/설정 변경 없음.

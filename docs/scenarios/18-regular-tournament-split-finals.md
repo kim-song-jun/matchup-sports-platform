@@ -51,3 +51,7 @@ Status: Implementation / local verification; alpha pending.
 로컬 증거: 새 생성기11 tests PASS, 실제 PostgreSQL 통합9 scenarios PASS, 전체 migration229개 replay와 schema drift0. UI API 연동3 tests PASS. 기존 회귀 결과는 최종 task snapshot에 기록한다. 새 alpha 수동 시나리오0/10, after viewport0/3. 현재 세션에 ego/headed browser 연결 도구가 없고 코드가 alpha에 배포되지 않았다. 단위·임시 DB 증거를 alpha 화면 검증으로 계산하지 않는다. 기존 운영 데이터 변경0.
 
 DB: `v1_tournaments.multi_finals/multi_finals_revision`, 그룹/개인상/팀시상의 `bracket_track` 텍스트 확장. 기존 upper/lower/overall 값은 보존한다. 새 범위 데이터가 저장된 뒤 구 버전으로 rollback하려면 범위와 새 format의 명시적 데이터 조정이 필요하다. 임시 DB만 사용하고 생성한 프로세스는 검증 종료 시 회수한다.
+
+### PR 반영 / 재개 위치
+
+2026-11-02: 원본 draft PR1858을 `정규리그 + N개 토너먼트와 진출팀 편집`으로 갱신했다. 구현04b4892d5 / 원본 이력 보존3d59a4277. CI는 PR Checks의 최신 head 기준으로 확인한다. 임시 PostgreSQL runner48657 종료, 운영 DB 변경0. 기능 구현·로컬 검증과 alpha 화면 QA는 분리하며 alpha0/10·after0/3을 유지한다.

@@ -9,6 +9,7 @@ import { PhoneVerificationCard } from '@/components/auth/phone-verification/phon
 import {
   useV1AuthMe,
   useV1FindAccountByPhone,
+  useV1FindAccountByEmail,
   useV1ResetPasswordByEmail,
 } from '@/hooks/use-v1-api';
 import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
@@ -22,6 +23,7 @@ import { RecycledNumberHelp } from './recycled-number-help';
 import { formatPhone, normalizeSeparatedDigits } from './signup-profile-validation';
 
 type Mode = 'find-id' | 'reset-password';
+type FindMethod = 'phone' | 'email';
 
 const MODE_COPY: Record<Mode, { title: string; sub: string }> = {
   'find-id': {
@@ -43,11 +45,12 @@ function looksLikeEmail(value: string): boolean {
 }
 
 /** 번호로 찾은 계정이 실제로 쓰는 로그인 수단만 안내하고, 수단마다 맞는 화면으로 보낸다. */
-function FoundAccountCard({ account, emailLoginHref, loginHref, onResetPassword }: {
+function FoundAccountCard({ account, emailLoginHref, loginHref, onResetPassword, showRecycledNumberHelp }: {
   account: V1FoundAccount;
   emailLoginHref: string;
   loginHref: string;
   onResetPassword: () => void;
+  showRecycledNumberHelp: boolean;
 }) {
   const { label, value, socialNames, appleUnavailable, links } = describeFoundAccount(account, { emailLoginHref, loginHref });
   let guidance: string | null = null;
@@ -83,7 +86,7 @@ function FoundAccountCard({ account, emailLoginHref, loginHref, onResetPassword 
           <Button block onClick={onResetPassword} size="sm" type="button" variant="ghost">비밀번호 재설정하기</Button>
         ) : null}
       </div>
-      <RecycledNumberHelp variant="not-mine" spaced />
+      {showRecycledNumberHelp ? <RecycledNumberHelp variant="not-mine" spaced /> : null}
     </Card>
   );
 }
@@ -101,6 +104,7 @@ export function AccountRecoveryClient({ initialMode = 'find-id', backHref = '/lo
   const returnToSettings = backHref === '/my/settings';
   const currentAccount = useV1AuthMe({ enabled: returnToSettings });
   const [mode, setMode] = useState<Mode>(initialMode);
+  const [findMethod, setFindMethod] = useState<FindMethod>('phone');
   const [phoneDigits, setPhoneDigits] = useState('');
   const [proofToken, setProofToken] = useState<string | null>(null);
   const [found, setFound] = useState<V1FoundAccount | null>(null);
@@ -130,6 +134,7 @@ export function AccountRecoveryClient({ initialMode = 'find-id', backHref = '/lo
   }, []);
 
   const findAccount = useV1FindAccountByPhone();
+  const findAccountByEmail = useV1FindAccountByEmail();
   const resetPasswordByEmail = useV1ResetPasswordByEmail();
 
   const normalizedEmail = emailInput.trim().toLowerCase();
@@ -171,9 +176,14 @@ export function AccountRecoveryClient({ initialMode = 'find-id', backHref = '/lo
     resetProgress();
   };
 
+  const switchFindMethod = (next: FindMethod) => {
+    setFindMethod(next);
+    resetProgress();
+  };
+
   const onPhoneVerified = async (token?: string) => {
     // 인증 중 번호/방법이 바뀌거나 화면을 떠나면 이전 카드의 증명으로 조회를 시작하지 않는다.
-    if (!token || !mounted.current || mode !== 'find-id' || phoneFlowGeneration !== phoneRequestGeneration.current) return;
+    if (!token || !mounted.current || mode !== 'find-id' || findMethod !== 'phone' || phoneFlowGeneration !== phoneRequestGeneration.current) return;
     const lookupGeneration = ++phoneRequestGeneration.current;
     setPhoneFlowGeneration(lookupGeneration);
     setProofToken(token);
@@ -189,13 +199,31 @@ export function AccountRecoveryClient({ initialMode = 'find-id', backHref = '/lo
     }
   };
 
-  const onEmailVerified = (token?: string) => {
-    if (!token || !mounted.current || mode !== 'reset-password' || emailFlowGeneration !== emailRequestGeneration.current) return;
+  const onEmailVerified = async (token?: string) => {
+    if (!token || !mounted.current || emailFlowGeneration !== emailRequestGeneration.current) return;
     setEmailProofToken(token);
     setError(null);
+    if (mode !== 'find-id' || findMethod !== 'email') return;
+    const lookupGeneration = emailRequestGeneration.current;
+    try {
+      const account = await findAccountByEmail.mutateAsync({ email: normalizedEmail, proofToken: token });
+      if (!mounted.current || lookupGeneration !== emailRequestGeneration.current) return;
+      setFound(account);
+    } catch (err) {
+      if (!mounted.current || lookupGeneration !== emailRequestGeneration.current) return;
+      setFound(null);
+      if (extractErrorCode(err) === 'EMAIL_NOT_VERIFIED') {
+        emailRequestGeneration.current += 1;
+        setEmailFlowGeneration(emailRequestGeneration.current);
+        setEmailProofToken(null);
+      }
+      setError(extractErrorMessage(err, '계정을 찾지 못했어요.'));
+    }
   };
 
-  const copy = MODE_COPY[mode];
+  const copy = mode === 'find-id' && findMethod === 'email'
+    ? { title: '가입한 로그인 방법을 찾아요', sub: '등록한 이메일을 인증하면 사용 중인 로그인 방법을 알려드려요.' }
+    : MODE_COPY[mode];
   const resetting = resetPasswordByEmail.isPending;
   // 날짜를 모르거나 이미 지났으면 일반 결과 카드다 — 그 계정으로 로그인해도 403 이 탈퇴 취소 화면으로 이어 준다.
   const withdrawalGraceEnd = found ? usableWithdrawalDate(found.withdrawalPendingUntil) : null;
@@ -250,6 +278,13 @@ export function AccountRecoveryClient({ initialMode = 'find-id', backHref = '/lo
           </button>
         </div>
 
+        {mode === 'find-id' ? (
+          <div className="tm-auth-segmented" role="group" aria-label="계정 찾는 방법">
+            <button className={`tm-auth-segment ${findMethod === 'phone' ? 'tm-auth-segment-active' : ''}`} type="button" aria-pressed={findMethod === 'phone'} onClick={() => switchFindMethod('phone')}>휴대폰으로 찾기</button>
+            <button className={`tm-auth-segment ${findMethod === 'email' ? 'tm-auth-segment-active' : ''}`} type="button" aria-pressed={findMethod === 'email'} onClick={() => switchFindMethod('email')}>이메일로 찾기</button>
+          </div>
+        ) : null}
+
         <h1 className="tm-text-heading tm-auth-heading">{copy.title}</h1>
         <p className="tm-text-body tm-auth-sub">
           {copy.sub}
@@ -262,7 +297,7 @@ export function AccountRecoveryClient({ initialMode = 'find-id', backHref = '/lo
         ) : null}
 
         <div className="tm-auth-form">
-          {mode === 'find-id' ? (
+          {mode === 'find-id' && findMethod === 'phone' ? (
             <>
               <label className="tm-auth-field" htmlFor={`${fieldId}-phone`}>
                 <span className="tm-text-label">휴대폰 번호</span>
@@ -310,6 +345,7 @@ export function AccountRecoveryClient({ initialMode = 'find-id', backHref = '/lo
                     setEmailInput(event.target.value);
                     // 주소를 고치면 앞 주소로 받은 증명은 더는 유효하지 않다.
                     setEmailProofToken(null);
+                    setFound(null);
                     setResetBlockedSocialOnly(false);
                     setResetDone(false);
                   }}
@@ -325,7 +361,7 @@ export function AccountRecoveryClient({ initialMode = 'find-id', backHref = '/lo
                   <EmailVerificationCard
                     key={emailFlowGeneration}
                     email={normalizedEmail}
-                    onVerified={onEmailVerified}
+                    onVerified={(token) => void onEmailVerified(token)}
                   />
                   {/* 가입 여부는 서버도 알려 주지 않는다(아무나 이메일만으로 가입 여부를 훑지
                       못하게). 메일이 오지 않는 이유를 사용자가 스스로 좁힐 수 있게 안내한다. */}
@@ -354,6 +390,7 @@ export function AccountRecoveryClient({ initialMode = 'find-id', backHref = '/lo
                 emailLoginHref={emailLoginHref}
                 loginHref={loginHref}
                 onResetPassword={() => switchMode('reset-password')}
+                showRecycledNumberHelp={findMethod === 'phone'}
               />
             )
           ) : null}
@@ -426,7 +463,10 @@ export function AccountRecoveryClient({ initialMode = 'find-id', backHref = '/lo
           {error ? (
             <Card pad={16} className="tm-auth-soft-card tm-auth-soft-card-error">
               <div className="tm-text-body-lg">계정을 확인하지 못했어요</div>
-              <div className="tm-text-caption">{error}</div>
+              <div className="tm-text-caption" role="alert">{error}</div>
+              {mode === 'find-id' && findMethod === 'email' && emailProofToken ? (
+                <Button type="button" variant="neutral" size="sm" loading={findAccountByEmail.isPending} onClick={() => void onEmailVerified(emailProofToken)}>다시 확인하기</Button>
+              ) : null}
             </Card>
           ) : null}
         </div>

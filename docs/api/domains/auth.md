@@ -24,13 +24,13 @@
 | `POST` | `/api/v1/auth/apple` | none | `{ identityToken, nonce, fullName? }` | social session + onboarding route |
 | `POST` | `/api/v1/auth/social-terms` | user | `{ requiredTermsAccepted: true, ageConfirmed: true, acceptedTermsDocumentIds: uuid[] }` | social session + onboarding route |
 | `POST` | `/api/v1/auth/social-profile` | user | `SocialProfileDto` | compatibility profile completion (also finishes a deferred profile) |
-| `POST` | `/api/v1/auth/social-profile/defer` | user | empty body | defer the profile; a new signup must still complete the email login step |
+| `POST` | `/api/v1/auth/social-profile/defer` | user | empty body | defer the profile without requiring email/password setup |
 | `POST` | `/api/v1/auth/link/kakao` | user (finished signup; session issued ≤ 30 min ago) | `{ code, redirectUri }` (web) **or** `{ accessToken }` (native) | `{ provider, alreadyLinked, mergedPendingAccount, authProviders }` — see [Linking a social login while signed in](#linking-a-social-login-while-signed-in) |
 | `POST` | `/api/v1/auth/link/apple` | user (same) | same body as `/auth/apple` (`identityToken`, `nonce` from `/auth/apple/nonce`, `fullName?`, `authorizationCode?`) | same as `link/kakao` |
 | `POST` | `/api/v1/auth/link/pending` | user (same) | `{ linkToken }` — the `details.linkToken` of a [sign-in-then-link](#sign-in-then-link) `409` | same as `link/kakao`; `400 SOCIAL_LINK_TOKEN_INVALID` for a forged, expired or other-purpose token |
-| `POST` | `/api/v1/auth/link/email/request` | user (finished signup or mandatory deferred signup; session issued ≤ 30 min ago) | `{ email }` | `{ sent: true, maskedTarget, expiresInSeconds, resendAvailableInSeconds, devCode? }` — see [Adding an email login to a social account](#adding-an-email-login-to-a-social-account) |
-| `POST` | `/api/v1/auth/link/email/verify` | user (finished signup or mandatory deferred signup) | `{ code }` (6 digits) | `{ emailLinkToken, expiresInSeconds }` |
-| `POST` | `/api/v1/auth/link/email/complete` | user (finished signup or mandatory deferred signup) | `{ emailLinkToken, password, passwordConfirm }` | `{ linked: true, email }` |
+| `POST` | `/api/v1/auth/link/email/request` | user (finished signup; session issued ≤ 30 min ago) | `{ email }` | `{ sent: true, maskedTarget, expiresInSeconds, resendAvailableInSeconds, devCode? }` — see [Adding an email login to a social account](#adding-an-email-login-to-a-social-account) |
+| `POST` | `/api/v1/auth/link/email/verify` | user (finished signup) | `{ code }` (6 digits) | `{ emailLinkToken, expiresInSeconds }` |
+| `POST` | `/api/v1/auth/link/email/complete` | user (finished signup) | `{ emailLinkToken, password, passwordConfirm }` | `{ linked: true, email }` |
 | `GET` | `/api/v1/auth/check-email` | none | `?email=` | `{ available: boolean }` |
 | `GET` | `/api/v1/auth/check-nickname` | optional | `?nickname=` | `{ available: boolean }` |
 | `GET` | `/api/v1/terms/current?context=signup\|tournament_application\|footer` | optional user | active context | effective current documents; signup adds per-user compliance |
@@ -45,6 +45,7 @@
 | `POST` | `/api/v1/auth/recovery/reset-password` | none | `{ phone, proofToken, newPassword }` | valid phone proof and existing active account: `409 ACCOUNT_RECOVERY_REQUIRES_EMAIL`; no password write |
 | `POST` | `/api/v1/auth/recovery/email/request` | none | `{ email }` | `{ sent: true, expiresAt, devCode? }` |
 | `POST` | `/api/v1/auth/recovery/email/confirm` | none | `{ email, code }` | `{ verified, proofToken }` |
+| `POST` | `/api/v1/auth/recovery/email/find-account` | none | `{ email, proofToken }` | `{ maskedEmail, providers, hasPassword, withdrawalPendingUntil: null }` after email proof |
 | `POST` | `/api/v1/auth/recovery/email/reset-password` | none | `{ email, proofToken, newPassword }` | `{ ok: true }` |
 | `POST` | `/api/v1/auth/withdrawal/cancel` | none (the token is the credential) | `{ token }` | login-shaped session response + `teameet_v1_session` cookie |
 
@@ -206,11 +207,11 @@ Finding the signup email and resetting a password happen while logged out, so th
 possession of a number and permits account lookup; it does not prove ownership of an existing
 account. The compatibility phone reset endpoint keeps proof/account preconditions, then returns
 `409 ACCOUNT_RECOVERY_REQUIRES_EMAIL` without changing credentials. Password reset requires
-the separate email proof channel. Only the phone channel looks up the signup email.
+the separate email proof channel. Phone proof and email proof can each look up available sign-in methods; email lookup only returns active accounts, whereas phone lookup also reports withdrawal grace.
 
 | Concern | Contract |
 |---|---|
-| Rate limit | `phone/verify`, `find-account`, `email/confirm` 10/min · `phone/issue`, `email/request`, both reset paths 5/min. Resetting is always at most as wide as looking up, and the paths that send a message are the narrowest. |
+| Rate limit | `phone/verify`, `find-account`, `email/confirm`, `email/find-account` 10/min · `phone/issue`, `email/request`, both reset paths 5/min. Resetting is always at most as wide as looking up, and the paths that send a message are the narrowest. |
 | Resend cooldown | 30s per target, enforced per phone number and per email address (`VERIFICATION_RESEND_COOLDOWN`). |
 | Attempt cap | 5 wrong codes per challenge (`VERIFICATION_TOO_MANY_ATTEMPTS`). A correct code still succeeds at the cap, so a resubmit is never blocked by earlier typos. |
 | Code TTL | 5 minutes. Proof token TTL 10 minutes. |
@@ -230,7 +231,7 @@ email  login link      email_login_link:{account digest}:{email}:{exp}  ← addi
 ```
 
 `/auth/phone/verify` takes `purpose` from the caller for compatibility. The email path does not:
-the server pins it to `password_reset`, so the caller cannot widen what the proof is good for.
+the server pins it to `password_reset`; it permits email recovery lookup and email-password reset only, never social identity linking or phone verification.
 A missing secret is fail-closed — issuing throws, verifying always rejects.
 
 ### Account enumeration
@@ -239,9 +240,10 @@ Anyone can try any email address, so `email/request` must not reveal whether it 
 account. It always answers `{ sent: true, expiresAt }` and always writes a challenge row; only a
 registered address is actually mailed. Nobody can guess a code that was never sent, so an
 unregistered address and a wrong code fail identically (`VERIFICATION_CODE_MISMATCH`). `devCode`
-appears only where no real delivery channel is configured (dev-echo) *and* mail was actually sent,
-because otherwise its presence alone would answer the question — and, like every dev echo, only for a
-test address that no admin or tournament staff account owns. Expired challenges are swept on
+appears only for a registered reserved test address simulated through dev-echo, because otherwise its presence alone
+would answer the question — and, like every dev echo, only for a test address that no admin or tournament staff
+account owns. When real delivery is not configured, requests for real addresses return the same
+`EMAIL_SEND_UNAVAILABLE` regardless of account existence. Expired challenges are swept on
 each issue so the table stays short — it grows with addresses tried, not with accounts.
 
 The phone path does not need this: `find-account` answers `ACCOUNT_NOT_FOUND` openly, but only
@@ -382,7 +384,7 @@ The phone-only `/auth/social-link` and `/auth/social-link/preview` endpoints (th
 
 The reverse of linking a social login: a Kakao/Apple account adds email + password sign-in. One person keeps one account that signs in with Kakao, Apple or email. A new login method is attached only to an account the person is signed in to; a phone number alone never proves ownership of an account (a reassigned number would hand it to a stranger), and an email address only proves the mailbox, not the account. Three steps, all `V1AuthGuard`, all `200`:
 
-1. `POST /auth/link/email/request { email }` — mails a 6-digit code to the address (normalized with `normalizeEmail`: trimmed, lower-cased), in a mail of its own ("로그인 이메일 연결 인증번호"). Response `{ sent: true, maskedTarget, expiresInSeconds: 300, resendAvailableInSeconds: 30 }` (`devCode` too where dev-echo allows, test addresses only). Rate limit 5/min. When the server has no way to deliver mail and no dev-echo, it answers `503 EMAIL_SEND_UNAVAILABLE` instead of `sent: true` (nobody could finish the flow), after the refusals that do not depend on mail (stale session, guards, address in use).
+1. `POST /auth/link/email/request { email }` — mails a 6-digit code to the address (normalized with `normalizeEmail`: trimmed, lower-cased), in a mail of its own ("로그인 이메일 연결 인증번호"). Response `{ sent: true, maskedTarget, expiresInSeconds: 300, resendAvailableInSeconds: 30 }` (`devCode` too where dev-echo allows, test addresses only). Rate limit 5/min. When the address cannot receive mail and cannot use the reserved test-address path, the server answers `503 EMAIL_SEND_UNAVAILABLE` instead of `sent: true`, after refusals that do not depend on mail (stale session, guards, address in use).
 2. `POST /auth/link/email/verify { code }` — checks the caller's newest pending code, spends it and returns `{ emailLinkToken, expiresInSeconds: 600 }`. Rate limit 10/min.
 3. `POST /auth/link/email/complete { emailLinkToken, password, passwordConfirm }` — sets the password and attaches the login. Response `{ linked: true, email }`. Rate limit 10/min. The password rule is signup's (`IsAccountPassword`: a string of 8 or more characters); `passwordConfirm` must equal it (`400 VALIDATION_ERROR`, `details` names `passwordConfirm`). The address is not in the body: it is the one the token vouches for.
 
@@ -397,9 +399,9 @@ The reverse of linking a social login: a Kakao/Apple account adds email + passwo
 
 Errors: `401 UNAUTHENTICATED`; `403 RECENT_LOGIN_REQUIRED` (request); `403 SIGNUP_INCOMPLETE`; `403 PERMISSION_DENIED`; `403 SOCIAL_LINK_ADMIN_FORBIDDEN`; `409 SOCIAL_LINK_PROVIDER_EXISTS`; `409 EMAIL_CONFLICT`; `400 VALIDATION_ERROR` (address, 6-digit code, token length, password pair); `400 VERIFICATION_NO_PENDING` / `VERIFICATION_CODE_MISMATCH` / `VERIFICATION_TOO_MANY_ATTEMPTS` / `VERIFICATION_RESEND_COOLDOWN` (request, verify); `429 VERIFICATION_SEND_QUOTA_EXCEEDED` (request); `409 ALREADY_PROCESSED` (a code spent by a parallel call); `400 EMAIL_LINK_TOKEN_INVALID` (complete); `503 EMAIL_SEND_FAILED` (a mail that failed to send); `503 EMAIL_SEND_UNAVAILABLE` (request: the server cannot deliver mail at all).
 
-`GET /api/v1/auth/me` includes account login metadata under `user`: `authProvider`, `authProviders`, and `hasPassword`. Clients must use `hasPassword` to decide whether email/password account controls are applicable. `user.canLinkLoginMethods` reflects the same account, admin, and unfinished-signup restrictions as the server link guards. A false value normally means no new login method can be added; the mandatory deferred-signup email setup is the explicit exception. Existing methods remain usable. `user.canLinkAfterSignup` reports whether adding a login method would be allowed after completing the pending signup; it does not permit early linking. The server remains authoritative and can reject a request if account status changes.
+`GET /api/v1/auth/me` includes account login metadata under `user`: `authProvider`, `authProviders`, and `hasPassword`. Clients must use `hasPassword` to decide whether email/password account controls are applicable. `user.canLinkLoginMethods` reflects the same account, admin, and unfinished-signup restrictions as the server link guards. A false value means no new login method can be added. Existing methods remain usable. `user.canLinkAfterSignup` reports whether adding a login method would be allowed after completing the pending signup; it does not permit early linking. The server remains authoritative and can reject a request if account status changes.
 
-For newly completed or deferred social signups, `user.signupEmailLoginRequired` is true until verified email/password setup commits. Existing accounts default to false. While true, guarded APIs outside email setup, required terms, account exit and support return `403 EMAIL_LOGIN_SETUP_REQUIRED` with `details.next.route`; reopening the app resumes setup. A deferred social profile can use only the email-link exception, not social linking. Complete clears the requirement atomically with creation of the email identity. Required terms take precedence; the user can log out or contact support if mail fails. `canLinkLoginMethods` may remain false for a deferred profile even though its required email setup is permitted.
+Kakao and Apple signup do not require email/password setup. `user.signupEmailLoginRequired` remains in responses as a compatibility field and is always false; `GET /auth/me` also clears any old true value left by the previous Alpha release. The database column remains for safe rolling deployment and rollback compatibility. No email identity is created unless a member explicitly completes the separate email-login link flow. A deferred social profile must complete the profile before adding any login method.
 
 `GET /api/v1/auth/me` and successful session responses also include `termsCompliance`. After the configured enforcement time, a completed existing user with pending required documents receives `403 TERMS_RECONSENT_REQUIRED` from other protected APIs, with pending document IDs and `next.route=/terms?mode=renewal`. Email login follows that route immediately and preserves a safe original redirect. The global gate does not race the login callback, and the renewal screen has no back action and prevents browser-history bypass until compliance succeeds. The guard keeps `/auth/me`, `/auth/logout`, `/terms/current`, and `/terms/consents` reachable so the user can inspect and complete the requirement. Previously satisfied items remain checked and disabled; only newly required IDs are posted.
 
@@ -430,10 +432,11 @@ Frontend auth/session work must not assume old app auth storage is shared with v
 
 ### Dev echo
 
-`devCode` exists so local runs, CI and alpha can finish code flows without SMS or mail. Wherever it appears
-(`phone/issue`, `recovery/email/request`, `me/verification/*` requests, step-up `login`) it is returned only when
-no real sender is configured, `V1_VERIFICATION_DEV_ECHO=true`, the target cannot reach a real person — a reserved
-domain (`.test`, `example.com`/`.net`/`.org`) or the unassigned `010-0000-xxxx` block — and the target does not belong
-to an active admin or a live tournament staff assignment (the code also proves ownership for password resets and
-social linking). Anything else gets the same response without `devCode`. The rule lives in
-`VerificationDispatcherService.mayEchoCode`.
+`devCode` exists so local runs, CI and alpha can finish code flows without sending to reserved test addresses.
+Wherever it appears (`phone/issue`, `recovery/email/request`, `me/verification/*` requests, step-up `login`),
+`V1_VERIFICATION_DEV_ECHO=true` must be set, the target must be a reserved domain
+(`.test`, `example.com`/`.net`/`.org`) or the unassigned `010-0000-xxxx` block, and neither the caller nor the address
+owner may be an active admin or live tournament staff member. These reserved test addresses are simulated even when
+an actual sender is configured; no code is logged or sent to the provider. Real addresses never receive `devCode`,
+and a missing real sender returns `EMAIL_SEND_UNAVAILABLE` or `SMS_NOT_CONFIGURED` instead of pretending to send.
+The rule lives in `VerificationDispatcherService.mayEchoCode` and `send`.

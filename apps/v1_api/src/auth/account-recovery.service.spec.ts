@@ -128,6 +128,32 @@ describe('AccountRecoveryService — 계정 찾기', () => {
   });
 });
 
+describe('AccountRecoveryService — 이메일로 로그인 방법 찾기', () => {
+  beforeEach(() => { process.env.V1_SESSION_SECRET = 'x'.repeat(48); });
+
+  it('인증된 이메일로 소셜 로그인 방법을 찾고 비밀번호를 만들지 않는다', async () => {
+    const prisma = prismaByEmail({ 'kakao@example.com': kakaoOnlyUser });
+    const svc = service(prisma) as AccountRecoveryService & { findAccountByEmail(dto: { email: string; proofToken: string }): Promise<unknown> };
+    await expect(svc.findAccountByEmail({ email: 'kakao@example.com', proofToken: issueEmailProofToken('kakao@example.com', 'password_reset') }))
+      .resolves.toEqual({ maskedEmail: 'ka***@example.com', providers: ['kakao'], hasPassword: false, withdrawalPendingUntil: null });
+    expect(prisma.v1AuthIdentity.update).not.toHaveBeenCalled();
+  });
+
+  it('다른 이메일이나 휴대폰용 증명으로는 계정을 조회하지 않는다', async () => {
+    const prisma = prismaByEmail({ 'kakao@example.com': kakaoOnlyUser });
+    const svc = service(prisma) as AccountRecoveryService & { findAccountByEmail(dto: { email: string; proofToken: string }): Promise<unknown> };
+    for (const proofToken of [issueEmailProofToken('other@example.com', 'password_reset'), issuePhoneProofToken(PHONE, 'password_reset')]) {
+      await expect(svc.findAccountByEmail({ email: 'kakao@example.com', proofToken })).rejects.toMatchObject({ response: { code: 'EMAIL_NOT_VERIFIED' } });
+    }
+    expect(prisma.v1User.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('인증한 주소에 활성 계정이 없으면 조회 결과를 찾을 수 없다고 알린다', async () => {
+    const svc = service(prismaByEmail({})) as AccountRecoveryService & { findAccountByEmail(dto: { email: string; proofToken: string }): Promise<unknown> };
+    await expect(svc.findAccountByEmail({ email: EMAIL, proofToken: issueEmailProofToken(EMAIL, 'password_reset') })).rejects.toMatchObject({ response: { code: 'ACCOUNT_NOT_FOUND', message: '이 이메일로 가입된 계정을 찾지 못했어요.' } });
+  });
+});
+
 describe('AccountRecoveryService — 탈퇴 유예 중인 계정이 번호를 쥐고 있을 때', () => {
   const REQUESTED_AT = new Date('2026-10-01T00:00:00.000Z');
 

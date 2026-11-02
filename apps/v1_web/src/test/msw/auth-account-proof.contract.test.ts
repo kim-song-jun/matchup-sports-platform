@@ -85,6 +85,18 @@ describe('MD-QA #133 shared MSW account-proof HTTP contract', () => {
     })).resolves.toEqual({ ok: true });
   });
 
+  it('only reveals email account login methods after matching email proof', async () => {
+    const email = v1UserFixture.email;
+    await expect(v1Post('/auth/recovery/email/find-account', { email, proofToken: 'wrong' }))
+      .rejects.toMatchObject({ statusCode: 400, code: 'EMAIL_NOT_VERIFIED' });
+    await v1Post('/auth/recovery/email/request', { email });
+    const { proofToken } = await v1Post<{ proofToken: string }>('/auth/recovery/email/confirm', { email, code: '123456' });
+    await expect(v1Post<V1FoundAccount>('/auth/recovery/email/find-account', { email, proofToken }))
+      .resolves.toEqual({ maskedEmail: 'so***@example.com', providers: ['email'], hasPassword: true, withdrawalPendingUntil: null });
+    await expect(v1Post('/auth/recovery/email/find-account', { email: 'other@example.com', proofToken }))
+      .rejects.toMatchObject({ statusCode: 400, code: 'EMAIL_NOT_VERIFIED' });
+  });
+
   it('does not accept a phone proof as an email reset proof', async () => {
     const { proofToken } = await verifyPhone('password_reset');
     const result = v1Post<unknown>('/auth/recovery/email/reset-password', {

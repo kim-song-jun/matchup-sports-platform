@@ -18,7 +18,7 @@ import { clearV1IdentityCache } from '@/lib/query-keys';
 import { getSavedRedirectPath, resolveAuthContinuationPath, sanitizeRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
 import { AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
 import { AuthStepHeader } from './auth-step-header';
-import { emailLinkPath, EMAIL_LINK_PATH } from '@/lib/link-result';
+import { EMAIL_LINK_PATH, parseEmailLinkReturnTo } from '@/lib/link-result';
 import { buildAccountConflictPath } from './login-recovery-route';
 import {
   formatBirthDate,
@@ -69,7 +69,6 @@ export function SocialSignupClient() {
   const [step, setStep] = useState<SocialStep>('nickname');
   const [editPhone, setEditPhone] = useState(false);
   const [editBirthDate, setEditBirthDate] = useState(false);
-  const [postSignupDestination, setPostSignupDestination] = useState<{ path: string; denied: boolean; termsFirst: boolean } | null>(null);
   const [phoneConflict, setPhoneConflict] = useState(false);
   // 번호 중복 409 가 준 기존 계정 로그인·연결 시도 안내. 토큰이 있어야 연결을 시도할 수 있다.
   const [conflictHint, setConflictHint] = useState<V1SignInThenLinkDetails | null>(null);
@@ -105,7 +104,7 @@ export function SocialSignupClient() {
       onFindAccount={() => void leaveFromConflict(conflictExitPath('/auth/find-account'), false)}
     />
   );
-  // 카카오가 제공한 번호는 추가 인증 없이 사용한다. 다른 번호로 바꾼 경우에만 직접 인증한다.
+  // 카카오가 제공한 번호는 가입 중 잠그고, 추가 인증 없이 사용한다.
   const lockedName = Boolean(prefill?.name);
   const lockedGender = Boolean(prefill?.gender);
   const kakaoPhoneAccepted = authProvider === 'kakao' && Boolean(prefill?.phone) && prefill?.phone === phoneDigits;
@@ -116,6 +115,7 @@ export function SocialSignupClient() {
   const statusPending = authMe.isPending === true;
   // 건너뛰기는 가입 직후 상태가 확인된 때만 — 조회 실패나 이미 미룬 계정에는 보이지 않는다.
   const signupMode = authMe.data?.user?.onboardingStatus === 'social_profile_required';
+  const lockedKakaoPhone = signupMode && authProvider === 'kakao' && Boolean(prefill?.phone);
   const [activitySeeded, setActivitySeeded] = useState(false);
   useEffect(() => {
     if (!activityMode || activitySeeded || !authMe.data) return;
@@ -135,14 +135,14 @@ export function SocialSignupClient() {
     if (!prefill || prefillApplied) return;
     // 보통은 게이트가 이미 /auth/me 를 받아 둔 뒤라 첫 렌더에 값이 있지만, 캐시가 비어
     // 늦게 도착할 수 있다. 그때 이미 입력 중이던 값을 덮어쓰면 입력이 유실된다.
-    // 잠기는 필드(이름·성별)는 카카오 값이 권위이므로 그대로 반영하고,
-    // 사용자가 직접 고치라고 열어 둔 전화번호만 비어 있을 때에만 채운다.
+    // 가입 중 카카오가 제공한 값은 권위 있는 원본이므로 늦게 도착해도 그대로 적용한다.
+    // 정보를 미룬 뒤 돌아온 화면은 기존에 직접 입력한 번호를 보존한다.
     if (prefill.name) setDisplayName(prefill.name);
     if (prefill.gender) setGender(prefill.gender);
-    if (prefill.phone) setPhoneDigits((current) => (current.length > 0 ? current : prefill.phone!));
+    if (prefill.phone) setPhoneDigits((current) => (lockedKakaoPhone ? prefill.phone! : current || prefill.phone!));
     if (prefill.birthDate) setBirthDateDigits((current) => current || prefill.birthDate!);
     setPrefillApplied(true);
-  }, [prefill, prefillApplied]);
+  }, [prefill, prefillApplied, lockedKakaoPhone]);
 
   const nicknameVerified = nicknameCheck.status === 'available' && nicknameCheck.value === nickname.trim();
   const profileDraft = { displayName, phone: phoneDigits, birthDate: birthDateDigits, gender };
@@ -201,9 +201,15 @@ export function SocialSignupClient() {
     });
   };
 
-  const continuationPath = (nextRoute?: string | null) => resolveAuthContinuationPath(
-    nextRoute, new URLSearchParams(window.location.search).get('redirect'),
-  );
+  const continuationPath = (nextRoute?: string | null) => {
+    const safeNext = sanitizeRedirectPath(nextRoute);
+    const next = safeNext ? new URL(safeNext, window.location.origin) : null;
+    // Older servers can still return the retired mandatory email route during rollout.
+    const destination = next?.pathname === EMAIL_LINK_PATH
+      ? parseEmailLinkReturnTo(next.searchParams.get('redirect'))
+      : safeNext;
+    return resolveAuthContinuationPath(destination, new URLSearchParams(window.location.search).get('redirect'));
+  };
 
   const recoverRequiredTerms = async () => {
     // 서버가 가입 상태를 되돌린 오류라 fresh 캐시도 재조회해야 약관 게이트에 갇히지 않는다.
@@ -235,17 +241,7 @@ export function SocialSignupClient() {
           method: authMe.data?.user?.authProvider ?? 'social',
           profile: 'deferred',
         });
-        const destination = continuationPath(result.next?.route);
-        if (result.user?.signupEmailLoginRequired === true && destination.startsWith('/terms?mode=renewal')) {
-          const terms = new URL(destination, window.location.origin);
-          terms.searchParams.set('redirect', emailLinkPath(getSavedRedirectPath() ?? '/home'));
-          router.replace(`${terms.pathname}${terms.search}${terms.hash}`);
-        } else {
-          if (result.user?.signupEmailLoginRequired === true) {
-            const returnTo = getSavedRedirectPath();
-            router.replace(destination.startsWith(EMAIL_LINK_PATH) ? (returnTo ? emailLinkPath(returnTo) : destination) : emailLinkPath(destination));
-          } else router.replace(destination);
-        }
+        router.replace(continuationPath(result.next?.route));
       },
       onError: async (nextError) => {
         if (nextError instanceof V1ApiError && nextError.code === 'TERMS_REQUIRED') {
@@ -312,21 +308,14 @@ export function SocialSignupClient() {
             trackEvent('sign_up_complete', { method });
           }
           const destination = continuationPath(nextRoute);
-          const termsFirst = nextRoute?.startsWith('/terms?mode=renewal') === true;
-          if (signupMode && result.user?.signupEmailLoginRequired === true && (nextRoute?.startsWith('/onboarding/') || termsFirst)) {
-            if (result.user?.canLinkLoginMethods === true) {
-              if (termsFirst) {
-                const onboarding = new URL('/onboarding/sport', window.location.origin);
-                const originalDestination = getSavedRedirectPath();
-                if (originalDestination) onboarding.searchParams.set('redirect', originalDestination);
-                const terms = new URL(destination, window.location.origin);
-                terms.searchParams.set('redirect', emailLinkPath(`${onboarding.pathname}${onboarding.search}`));
-                router.replace(`${terms.pathname}${terms.search}${terms.hash}`);
-              } else router.replace(emailLinkPath(destination));
-            } else setPostSignupDestination({ path: destination, denied: result.user?.canLinkLoginMethods === false, termsFirst });
-            return;
-          }
-          router.replace(destination);
+          if (signupMode && nextRoute?.startsWith('/terms?mode=renewal')) {
+            const onboarding = new URL('/onboarding/sport', window.location.origin);
+            const originalDestination = getSavedRedirectPath();
+            if (originalDestination) onboarding.searchParams.set('redirect', originalDestination);
+            const terms = new URL(destination, window.location.origin);
+            terms.searchParams.set('redirect', `${onboarding.pathname}${onboarding.search}`);
+            router.replace(`${terms.pathname}${terms.search}${terms.hash}`);
+          } else router.replace(destination);
         },
         onError: async (nextError) => {
           if (nextError instanceof V1ApiError && nextError.code === 'NICKNAME_CONFLICT') {
@@ -379,15 +368,6 @@ export function SocialSignupClient() {
     submit(event);
   };
 
-  if (postSignupDestination) {
-    return <AuthFrame stage={AUTH_WELCOME_STAGE} topTitle="이메일 로그인 연결">
-      <div className="tm-auth-body">
-        <h1 className="tm-text-heading">이메일 로그인을 연결하지 못했어요</h1>
-        <p className="tm-text-body tm-auth-sub">{postSignupDestination.denied ? '이 계정은 현재 로그인 방법을 변경할 수 없어요.' : '이 계정의 로그인 방법 변경 권한을 확인하지 못했어요.'} {postSignupDestination.termsFirst ? '먼저 필수 약관을 확인해 주세요.' : '고객센터에 문의해 주세요.'}</p>
-        <Button block size="lg" type="button" variant="primary" onClick={() => router.replace(postSignupDestination.termsFirst ? postSignupDestination.path : '/my/inquiries/new')}>{postSignupDestination.termsFirst ? '필수 약관 확인하기' : '고객센터 문의하기'}</Button>
-      </div>
-    </AuthFrame>;
-  }
 
   return (
     <AuthFrame
@@ -424,7 +404,7 @@ export function SocialSignupClient() {
           </label> : null}
           {step === 'phone' ? <>
             <label className="tm-auth-field"><span className="tm-text-label">휴대폰 번호</span>
-              <input className="tm-input tm-auth-input" inputMode="numeric" onChange={(event) => { setPhoneDigits(normalizeSeparatedDigits(event.target.value)); setPhoneVerified(false); setPhoneConflict(false); }} placeholder="010-0000-0000" required value={formatPhone(phoneDigits)} />
+              <input className="tm-input tm-auth-input" inputMode="numeric" onChange={(event) => { if (lockedKakaoPhone) return; setPhoneDigits(normalizeSeparatedDigits(event.target.value)); setPhoneVerified(false); setPhoneConflict(false); }} placeholder="010-0000-0000" readOnly={lockedKakaoPhone} required value={formatPhone(phoneDigits)} />
             </label>
             {phoneDigits.length === 11 && !contactReady ? <PhoneVerificationCard mode="authed" phone={phoneDigits} onVerified={() => setPhoneVerified(true)} surface="inset" conflictNotice={phoneConflictNotice} onFailure={recordConflictHint} /> : null}
             {contactReady ? <div className="tm-text-caption" role="status" style={{ color: 'var(--blue700)' }}>{kakaoPhoneAccepted ? '카카오에서 받은 전화번호예요. 추가 인증 없이 사용할 수 있어요.' : '휴대폰 본인인증이 완료됐어요'}</div> : null}
@@ -439,12 +419,10 @@ export function SocialSignupClient() {
               <div className={styles.row}><dt>닉네임</dt><dd>{nickname}</dd></div>
               <div className={styles.row}><dt>이름</dt><dd>{displayName}{lockedName ? <span className={styles.source}>{providerLabel ?? '소셜'} 제공</span> : null}</dd></div>
               <div className={styles.row}><dt>성별</dt><dd>{gender === 'male' ? '남' : '여'}{lockedGender ? <span className={styles.source}>{providerLabel ?? '소셜'} 제공</span> : null}</dd></div>
-              <div className={styles.row}><dt>휴대폰</dt><dd>{formatPhone(phoneDigits)}<span className={styles.source}>{kakaoPhoneAccepted ? `${providerLabel ?? '소셜'} 제공` : '인증 완료'}</span></dd><button className={styles.edit} type="button" onClick={() => { setEditPhone(true); setStep('phone'); }}>번호 변경</button></div>
+              <div className={styles.row}><dt>휴대폰</dt><dd>{formatPhone(phoneDigits)}<span className={styles.source}>{kakaoPhoneAccepted ? `${providerLabel ?? '소셜'} 제공` : '인증 완료'}</span></dd>{!lockedKakaoPhone ? <button className={styles.edit} type="button" onClick={() => { setEditPhone(true); setStep('phone'); }}>번호 변경</button> : null}</div>
               <div className={styles.row}><dt>생년월일</dt><dd>{formatBirthDate(birthDateDigits)}</dd><button className={styles.edit} type="button" onClick={() => { setEditBirthDate(true); setStep('birthDate'); }}>생년월일 변경</button></div>
             </dl>
-            {signupMode && authMe.data?.user.canLinkAfterSignup === false ? <p className="tm-text-caption">이 계정은 현재 이메일 로그인을 연결할 수 없어요.</p> : null}
-            {signupMode && authMe.data?.user.canLinkAfterSignup === undefined ? <p className="tm-text-caption">이메일 로그인 연결 가능 여부를 확인하지 못했어요. 가입 후 로그인 방법 설정에서 다시 확인해 주세요.</p> : null}
-            {signupMode && authMe.data?.user.canLinkAfterSignup === true ? <p className={styles.next}>다음으로 이메일을 인증하고 비밀번호를 설정해요.</p> : null}
+            {signupMode ? <p className={styles.next}>다음으로 관심 종목을 선택해요.</p> : null}
           </> : null}
         </div>
         {error ? <Card pad={16} className="tm-auth-soft-card tm-auth-soft-card-error"><div className="tm-text-body-lg">가입을 완료하지 못했어요</div><div className="tm-text-caption">{error}</div></Card> : null}

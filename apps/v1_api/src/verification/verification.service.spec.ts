@@ -346,7 +346,7 @@ describe('VerificationService.requestPhone (MT)', () => {
     expect(handle.v1VerificationToken.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ channel: 'phone', purpose: 'contact', target: '01012345678' }) }),
     );
-    expect(sendSpy).toHaveBeenCalledWith('phone', '01012345678', expect.stringMatching(/^\d{6}$/), 'verify');
+    expect(sendSpy).toHaveBeenCalledWith('phone', '01012345678', expect.stringMatching(/^\d{6}$/), 'verify', 'u1');
     expect(echoSpy).toHaveBeenCalledWith({ channel: 'phone', address: '01012345678', userId: 'u1' });
     sendSpy.mockRestore();
     echoSpy.mockRestore();

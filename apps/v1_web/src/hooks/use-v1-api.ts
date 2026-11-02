@@ -525,8 +525,16 @@ export function useV1FindAccountByPhone() {
   });
 }
 
+/** 인증된 이메일의 계정에서 사용 가능한 로그인 수단을 조회한다. */
+export function useV1FindAccountByEmail() {
+  return useMutation({
+    mutationFn: (body: { email: string; proofToken: string }) =>
+      v1Post<V1FoundAccount>('/auth/recovery/email/find-account', body),
+  });
+}
+
 /**
- * 비로그인 이메일 OTP — 비밀번호 재설정 전용. 로그인 후 이메일 인증(/verification/email/*)은
+ * 비로그인 이메일 OTP — 계정 찾기와 비밀번호 재설정에 사용. 로그인 후 이메일 인증(/verification/email/*)은
  * 인증 가드 뒤라 여기 쓸 수 없어 공개 엔드포인트가 따로 있다.
  *
  * 응답은 가입 여부를 드러내지 않는다(계정 열거 방어) — 화면도 "가입된 주소면 보냈다"는 식으로만
@@ -542,7 +550,7 @@ export function useV1RecoveryEmailIssue() {
 
 export function useV1RecoveryEmailVerify() {
   return useMutation({
-    // 용도(purpose)를 보내지 않는다 — 이 경로가 발급하는 증명은 서버가 재설정용으로 고정한다.
+    // 용도(purpose)는 서버가 복구용으로 고정한다.
     mutationFn: (body: { email: string; code: string }) =>
       v1Post<{ verified: boolean; proofToken?: string }>('/auth/recovery/email/confirm', body),
   });

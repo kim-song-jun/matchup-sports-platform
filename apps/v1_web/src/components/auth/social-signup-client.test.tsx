@@ -128,10 +128,11 @@ describe('SocialSignupClient required profile contract', () => {
     expect(screen.getByText('김러너')).toBeVisible();
     expect(screen.getByText('010-1234-5678')).toBeVisible();
     expect(screen.queryByRole('checkbox', { name: /이메일.*로그인/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/이메일을 인증하고 비밀번호를 설정/)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '나중에 입력할게요' })).not.toBeInTheDocument();
   });
 
-  it('별도 선택 없이 프로필 저장 후 이메일 설정으로 이어지고 온보딩 목적지를 보존한다', async () => {
+  it('소셜 프로필 저장 후 이메일 설정 없이 온보딩으로 이어진다', async () => {
     hooks.authMe.socialSignupPrefill = { name: '김러너', phone: '01012345678', gender: 'female', birthDate: '20000229' };
     hooks.completeProfileMutate.mockImplementation((_body: unknown, callbacks: CompleteProfileCallbacks) => callbacks.onSuccess({ session: { userId: 'social-user', userEmail: null }, user: { canLinkLoginMethods: true, signupEmailLoginRequired: true }, next: { route: '/onboarding/sport' } }));
     render(<SocialSignupClient />);
@@ -139,10 +140,10 @@ describe('SocialSignupClient required profile contract', () => {
     fireEvent.click(screen.getByRole('button', { name: '중복 확인' }));
     fireEvent.click(screen.getByRole('button', { name: '다음' }));
     fireEvent.click(screen.getByRole('button', { name: '확인하고 계속' }));
-    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/my/settings/login-methods/email?redirect=%2Fonboarding%2Fsport'));
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/onboarding/sport'));
   });
 
-  it('프로필 저장 중 연결 권한이 사라지면 실패를 알리고 운동 설정으로 계속한다', async () => {
+  it('이메일 연결 권한이 없어도 가입 후 온보딩으로 계속한다', async () => {
     hooks.authMe.socialSignupPrefill = { name: '김러너', phone: '01012345678', gender: 'female', birthDate: '20000229' };
     hooks.completeProfileMutate.mockImplementation((_body: unknown, callbacks: CompleteProfileCallbacks) => callbacks.onSuccess({ session: { userId: 'social-user', userEmail: null }, user: { canLinkLoginMethods: false, signupEmailLoginRequired: true }, next: { route: '/onboarding/sport' } }));
     render(<SocialSignupClient />);
@@ -150,9 +151,8 @@ describe('SocialSignupClient required profile contract', () => {
     fireEvent.click(screen.getByRole('button', { name: '중복 확인' }));
     fireEvent.click(screen.getByRole('button', { name: '다음' }));
     fireEvent.click(screen.getByRole('button', { name: '확인하고 계속' }));
-    expect(screen.getByRole('heading', { name: '이메일 로그인을 연결하지 못했어요' })).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: '고객센터 문의하기' }));
-    expect(router.replace).toHaveBeenCalledWith('/my/inquiries/new');
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/onboarding/sport'));
+    expect(screen.queryByRole('heading', { name: '이메일 로그인을 연결하지 못했어요' })).not.toBeInTheDocument();
   });
 
   it('가입 후에도 연결할 수 없는 계정에는 이메일 연결 선택을 보이지 않는다', () => {
@@ -163,21 +163,21 @@ describe('SocialSignupClient required profile contract', () => {
     fireEvent.click(screen.getByRole('button', { name: '중복 확인' }));
     fireEvent.click(screen.getByRole('button', { name: '다음' }));
     expect(screen.queryByRole('checkbox', { name: /이메일.*로그인/ })).not.toBeInTheDocument();
-    expect(screen.getByText('이 계정은 현재 이메일 로그인을 연결할 수 없어요.')).toBeVisible();
+    expect(screen.queryByText(/이메일 로그인/)).not.toBeInTheDocument();
   });
 
-  it('연결 가능 여부를 받지 못하면 확인할 수 없다고 알린다', () => {
+  it('연결 가능 여부와 상관없이 가입에서 이메일 연결을 요구하지 않는다', () => {
     hooks.authMe.socialSignupPrefill = { name: '김러너', phone: '01012345678', gender: 'female', birthDate: '20000229' };
     hooks.authMe.user.canLinkAfterSignup = undefined;
     render(<SocialSignupClient />);
     fireEvent.change(screen.getByLabelText('닉네임'), { target: { value: '카카오러너' } });
     fireEvent.click(screen.getByRole('button', { name: '중복 확인' }));
     fireEvent.click(screen.getByRole('button', { name: '다음' }));
-    expect(screen.getByText(/이메일 로그인 연결 가능 여부를 확인하지 못했어요/)).toBeVisible();
+    expect(screen.queryByText(/이메일 로그인/)).not.toBeInTheDocument();
     expect(screen.queryByRole('checkbox', { name: /이메일.*로그인/ })).not.toBeInTheDocument();
   });
 
-  it('이메일 연결을 골라도 필수 약관 복구 경로가 먼저다', async () => {
+  it('필수 약관이 남으면 이메일 설정 없이 약관 복구 경로를 따른다', async () => {
     hooks.authMe.socialSignupPrefill = { name: '김러너', phone: '01012345678', gender: 'female', birthDate: '20000229' };
     hooks.completeProfileMutate.mockImplementation((_body: unknown, callbacks: CompleteProfileCallbacks) => callbacks.onSuccess({ session: { userId: 'social-user', userEmail: null }, user: { canLinkLoginMethods: true, signupEmailLoginRequired: true }, next: { route: '/terms?mode=renewal' } }));
     render(<SocialSignupClient />);
@@ -185,8 +185,7 @@ describe('SocialSignupClient required profile contract', () => {
     fireEvent.click(screen.getByRole('button', { name: '중복 확인' }));
     fireEvent.click(screen.getByRole('button', { name: '다음' }));
     fireEvent.click(screen.getByRole('button', { name: '확인하고 계속' }));
-    const emailRoute = '/my/settings/login-methods/email?redirect=%2Fonboarding%2Fsport';
-    await waitFor(() => expect(router.replace).toHaveBeenCalledWith(`/terms?mode=renewal&redirect=${encodeURIComponent(emailRoute)}`));
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/terms?mode=renewal&redirect=%2Fonboarding%2Fsport'));
   });
 
   it('연결이 금지된 관리자 계정은 가입 후 온보딩으로 진행한다', async () => {
@@ -562,6 +561,10 @@ describe('SocialSignupClient 카카오 자동 채움', () => {
     hooks.checkNicknameMutate.mockImplementation((_v: string, cb: AvailabilityCallbacks) => cb.onSuccess({ available: true }));
   });
 
+  afterEach(() => {
+    hooks.authMe.user.onboardingStatus = 'social_profile_required';
+  });
+
   const nicknameNext = () => {
     fireEvent.change(screen.getByLabelText('닉네임'), { target: { value: '카카오회원' } });
     fireEvent.click(screen.getByRole('button', { name: '중복 확인' }));
@@ -589,7 +592,7 @@ describe('SocialSignupClient 카카오 자동 채움', () => {
     expect(screen.queryByRole('radio', { name: '여' })).not.toBeInTheDocument();
   });
 
-  it('프리필이 늦게 와도 이미 입력한 전화번호를 덮어쓰지 않는다', async () => {
+  it('카카오 번호가 늦게 도착하면 가입 중 직접 입력한 번호 대신 제공 번호로 잠근다', async () => {
     const { rerender } = render(<SocialSignupClient />);
     nicknameNext();
     fireEvent.click(screen.getByRole('radio', { name: '여' }));
@@ -599,16 +602,16 @@ describe('SocialSignupClient 카카오 자동 채움', () => {
     fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01087654321' } });
     hooks.authMe.socialSignupPrefill = { name: null, phone: '01012345678', gender: null };
     rerender(<SocialSignupClient />);
-    await waitFor(() => expect(screen.getByLabelText(/^휴대폰 번호/)).toHaveValue('010-8765-4321'));
+    await waitFor(() => expect(screen.getByLabelText(/^휴대폰 번호/)).toHaveValue('010-1234-5678'));
+    expect(screen.getByLabelText(/^휴대폰 번호/)).toHaveAttribute('readonly');
   });
 
-  it('제공받은 전화번호는 확인 화면에서 수정할 수 있다', () => {
+  it('카카오 제공 전화번호는 가입 확인 화면에서 수정할 수 없다', () => {
     hooks.authMe.socialSignupPrefill = { name: '회원', phone: '01012345678', gender: 'female', birthDate: '20000229' };
     render(<SocialSignupClient />);
     nicknameNext();
-    fireEvent.click(screen.getByRole('button', { name: '번호 변경' }));
-    expect(screen.getByLabelText(/^휴대폰 번호/)).toHaveValue('010-1234-5678');
-    expect(screen.getByLabelText(/^휴대폰 번호/)).not.toHaveAttribute('readonly');
+    expect(screen.getByText('010-1234-5678')).toBeVisible();
+    expect(screen.queryByRole('button', { name: '번호 변경' })).not.toBeInTheDocument();
   });
 
   it('카카오 번호와 생년월일은 자동 입력하고 인증 요청 없이 가입을 제출한다', () => {
@@ -623,7 +626,8 @@ describe('SocialSignupClient 카카오 자동 채움', () => {
     expect(hooks.authedPhoneRequestMutateAsync).not.toHaveBeenCalled();
   });
 
-  it('다른 번호를 입력하면 카카오 제공 번호의 인증 상태를 재사용하지 않는다', () => {
+  it('정보 입력을 미룬 뒤 돌아온 경우에는 번호 변경 시 문자 인증이 필요하다', () => {
+    hooks.authMe.user.onboardingStatus = 'social_profile_deferred';
     hooks.authMe.socialSignupPrefill = { name: '회원', phone: '01012345678', gender: 'female', birthDate: '20000229' };
     render(<SocialSignupClient />);
     nicknameNext();
@@ -690,7 +694,7 @@ describe('SocialSignupClient 나중에 입력할게요', () => {
     session: { userId: 'u-1', userEmail: null },
   };
 
-  it('프로필을 미뤄도 이메일을 설정하고 원래 가려던 곳으로 돌아간다', () => {
+  it('프로필을 미루면 이전 서버의 이메일 경로를 건너뛰고 원래 가려던 곳으로 돌아간다', () => {
     hooks.deferMutate.mockImplementation((_v: undefined, cb: CompleteProfileCallbacks) => cb.onSuccess({
       session: { userId: 'u-1', userEmail: null },
       user: { canLinkLoginMethods: false, signupEmailLoginRequired: true },
@@ -699,7 +703,7 @@ describe('SocialSignupClient 나중에 입력할게요', () => {
     setSearch('?redirect=%2Fteams%2Fnew');
     render(<SocialSignupClient />);
     fireEvent.click(screen.getByRole('button', { name: '나중에 입력할게요' }));
-    expect(router.replace).toHaveBeenCalledWith('/my/settings/login-methods/email?redirect=%2Fteams%2Fnew');
+    expect(router.replace).toHaveBeenCalledWith('/teams/new');
   });
 
   it('나중에 입력하기로 가입을 마쳐도 이메일 가입 화면에서 보관해 둔 이메일은 지운다', () => {

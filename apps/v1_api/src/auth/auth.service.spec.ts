@@ -1003,12 +1003,17 @@ describe('AuthService', () => {
     });
     it.each([
       [{}, V1AuthProvider.kakao],
-      [{ kakaoPhone: '01099998888' }, V1AuthProvider.kakao],
       [{ kakaoPhone: input.phone }, V1AuthProvider.apple],
-    ])('does not accept a missing, changed or unrelated provider phone', async (draft, provider) => {
+    ])('does not accept a missing or unrelated provider phone without verification', async (draft, provider) => {
       arrange(draft, provider);
       await expect(service.completeSocialProfile('user-1', input)).rejects.toMatchObject({ response: { code: 'PHONE_NOT_VERIFIED' } });
       expect(prisma.v1User.updateMany).not.toHaveBeenCalled();
+    });
+    it('rejects a changed Kakao-provided phone during signup even if the alternate number was SMS verified', async () => {
+      arrange({ kakaoPhone: '01099998888' }, V1AuthProvider.kakao, { phone: input.phone, phoneVerifiedAt: new Date() });
+      await expect(service.completeSocialProfile('user-1', input)).rejects.toMatchObject({ response: { code: 'KAKAO_PHONE_CHANGE_FORBIDDEN' } });
+      expect(prisma.v1User.updateMany).not.toHaveBeenCalled();
+      expect(prisma.v1User.findFirst).not.toHaveBeenCalled();
     });
     it('does not transfer a phone already owned by another user, and for the number Kakao itself handed over links the signup to that owner', async () => {
       arrange({ kakaoPhone: input.phone }, V1AuthProvider.kakao);
@@ -1052,7 +1057,6 @@ describe('AuthService', () => {
     // would tell anyone, holding the number or not, whether it is registered.
     it.each([
       ['a Kakao signup that typed another number', {}, V1AuthProvider.kakao],
-      ['a Kakao signup whose Kakao number is a different one', { kakaoPhone: '01099998888' }, V1AuthProvider.kakao],
       ['an Apple signup', { kakaoPhone: input.phone }, V1AuthProvider.apple],
     ])('asks %s for the SMS proof first and does not look up the holder', async (_name, draft, provider) => {
       arrange(draft, provider);
@@ -1142,7 +1146,7 @@ describe('AuthService', () => {
     );
     expect(prisma.v1User.updateMany).toHaveBeenCalledWith({
       where: { id: 'user-1', accountStatus: 'active', onboardingStatus: 'social_profile_required' },
-      data: { onboardingStatus: 'signup_done', phone: '01087654321', signupEmailLoginRequired: true },
+      data: { onboardingStatus: 'signup_done', phone: '01087654321', signupEmailLoginRequired: false },
     });
   });
 
@@ -1295,7 +1299,7 @@ describe('AuthService', () => {
 
       expect(prisma.v1User.updateMany).toHaveBeenCalledWith({
         where: { id: 'user-1', onboardingStatus: 'social_profile_required' },
-        data: { onboardingStatus: 'social_profile_deferred', signupEmailLoginRequired: true },
+        data: { onboardingStatus: 'social_profile_deferred', signupEmailLoginRequired: false },
       });
       expect(prisma.v1UserProfile.upsert).toHaveBeenCalledWith({
         where: { userId: 'user-1' },
@@ -1431,7 +1435,7 @@ describe('AuthService', () => {
       }));
       expect(prisma.v1User.updateMany).toHaveBeenCalledWith({
         where: { id: 'user-1', accountStatus: 'active', onboardingStatus: 'social_profile_deferred' },
-        data: { onboardingStatus: 'deferred', phone: '01087654321' },
+        data: { onboardingStatus: 'deferred', phone: '01087654321', signupEmailLoginRequired: false },
       });
       expect(prisma.v1UserOnboardingProgress.upsert).toHaveBeenCalledWith(expect.objectContaining({
         update: { currentStep: 'confirm' },
@@ -1457,7 +1461,7 @@ describe('AuthService', () => {
 
       expect(prisma.v1User.updateMany).toHaveBeenCalledWith({
         where: { id: 'user-1', accountStatus: 'active', onboardingStatus: 'social_profile_required' },
-        data: { onboardingStatus: 'signup_done', phone: '01087654321', signupEmailLoginRequired: true },
+        data: { onboardingStatus: 'signup_done', phone: '01087654321', signupEmailLoginRequired: false },
       });
     });
   });
@@ -2227,20 +2231,29 @@ describe('AuthService', () => {
     expect(result.onboarding.canResume).toBe(false);
   });
 
-  it('sessionResponse: 이메일 설정이 남은 가입자는 온보딩보다 이메일 설정으로 이어진다', async () => {
+  it('sessionResponse: 이전 필수 이메일 설정을 해제하고 온보딩으로 이어진다', async () => {
     prisma.v1User.findUnique.mockResolvedValue(completedUserRow({
       onboardingStatus: 'signup_done', signupEmailLoginRequired: true, onboardingProgress: { currentStep: 'sport' },
     }));
     const result = await service.sessionResponse('user-1', 'user@teameet.v1');
-    expect(result.user.signupEmailLoginRequired).toBe(true);
-    expect(result.next?.route).toBe('/my/settings/login-methods/email?redirect=%2Fonboarding%2Fsport');
+    expect(result.user.signupEmailLoginRequired).toBe(false);
+    expect(prisma.v1User.updateMany).toHaveBeenCalledWith({ where: { id: 'user-1', signupEmailLoginRequired: true }, data: { signupEmailLoginRequired: false } });
+    expect(result.next?.route).toBe('/onboarding/sport');
   });
 
-  it('sessionResponse: 프로필을 미룬 계정도 이메일을 설정한 뒤 홈으로 돌아간다', async () => {
+  it('sessionResponse: 가입 후 새 필수 약관이 있으면 온보딩보다 약관을 먼저 안내한다', async () => {
+    prisma.v1User.findUnique.mockResolvedValue(completedUserRow({ onboardingStatus: 'signup_done', onboardingProgress: { currentStep: 'sport' } }));
+    managedTerms.signupCompliance.mockResolvedValueOnce({ compliant: false, pendingRequiredDocumentIds: ['new-document'], nextRoute: '/terms?mode=renewal' });
+    const result = await service.sessionResponse('user-1', 'user@teameet.v1', { social: true });
+    expect(result.next?.route).toBe('/terms?mode=renewal');
+  });
+
+  it('sessionResponse: 프로필을 미룬 계정은 이메일 설정 없이 계속한다', async () => {
     prisma.v1User.findUnique.mockResolvedValue(completedUserRow({
       onboardingStatus: 'social_profile_deferred', signupEmailLoginRequired: true,
     }));
     const result = await service.sessionResponse('user-1', 'user@teameet.v1');
-    expect(result.next?.route).toBe('/my/settings/login-methods/email?redirect=%2Fhome');
+    expect(result.user.signupEmailLoginRequired).toBe(false);
+    expect(result.next).toBeUndefined();
   });
 });

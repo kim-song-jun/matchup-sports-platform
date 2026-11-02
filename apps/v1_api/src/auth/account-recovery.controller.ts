@@ -5,6 +5,7 @@ import {
   EmailRecoveryConfirmDto,
   EmailRecoveryRequestDto,
   FindAccountDto,
+  FindAccountByEmailDto,
   ResetPasswordByEmailDto,
   ResetPasswordDto,
 } from './dto/account-recovery.dto';
@@ -20,7 +21,7 @@ import {
  * 재설정에 쓸 수 없어, 여기 아래에 공개 OTP 를 따로 둔다. 이쪽 증명 토큰은 비밀번호 재설정
  * 용도로만 발급되며 휴대폰 증명과 서로 통하지 않는다(email-proof-token).
  *
- * 아이디(이메일) 찾기는 휴대폰 경로에만 있다 — 이메일로 이메일을 찾을 이유가 없다.
+ * 이메일 소유 증명 후에는 해당 계정의 로그인 수단도 조회할 수 있다.
  */
 @Controller('auth/recovery')
 export class AccountRecoveryController {
@@ -31,6 +32,13 @@ export class AccountRecoveryController {
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   async findAccount(@Body() dto: FindAccountDto) {
     return this.accountRecovery.findAccountByPhone(dto);
+  }
+
+  @Post('email/find-account')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  async findAccountByEmail(@Body() dto: FindAccountByEmailDto) {
+    return this.accountRecovery.findAccountByEmail(dto);
   }
 
   // 유효한 휴대폰 증명으로 기존 계정을 찾아도 409 ACCOUNT_RECOVERY_REQUIRES_EMAIL을 반환한다.

@@ -60,9 +60,9 @@ async function build(options: { accountStatus?: string; devEcho?: boolean } = {}
   state.users.push({ id: 'user-1', email: EMAIL, accountStatus: 'active', authIdentities: [identity] });
   const dispatcher = {
     send: jest.fn().mockResolvedValue(undefined),
-    devEchoActive: options.devEcho ?? false,
     mayEchoCode: jest.fn(async () => options.devEcho ?? false),
     emailDeliverable: true,
+    assertDeliveryAvailable: jest.fn(),
   };
   const moduleRef = await Test.createTestingModule({
     providers: [
@@ -163,7 +163,7 @@ describe('AuthService.login once step-up applies', () => {
       'gh***@example.com',
     ]);
     expect(dispatcher.send).toHaveBeenCalledTimes(1);
-    expect(dispatcher.send).toHaveBeenCalledWith('email', EMAIL, expect.stringMatching(/^\d{6}$/), 'login_step_up');
+    expect(dispatcher.send).toHaveBeenCalledWith('email', EMAIL, expect.stringMatching(/^\d{6}$/), 'login_step_up', 'user-1');
     expect(state.challenges.map((row) => row.userId)).toEqual(['user-1', null, null]);
   });
 

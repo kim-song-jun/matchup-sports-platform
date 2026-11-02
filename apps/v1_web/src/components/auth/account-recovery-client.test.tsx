@@ -16,6 +16,7 @@ vi.mock('next/navigation', () => ({
 
 const hooks = vi.hoisted(() => ({
   findAccountMutateAsync: vi.fn(),
+  findAccountByEmailMutateAsync: vi.fn(),
   resetPasswordByEmailMutateAsync: vi.fn(),
   verifyPurpose: null as null | string,
   emailCardEmail: null as null | string,
@@ -24,6 +25,7 @@ const hooks = vi.hoisted(() => ({
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AuthMe: () => ({ data: { user: { email: 'runner@example.com', phone: '01012345678' } }, isError: false }),
   useV1FindAccountByPhone: () => ({ mutateAsync: hooks.findAccountMutateAsync, isPending: false }),
+  useV1FindAccountByEmail: () => ({ mutateAsync: hooks.findAccountByEmailMutateAsync, isPending: false }),
   useV1ResetPasswordByEmail: () => ({
     mutateAsync: hooks.resetPasswordByEmailMutateAsync,
     isPending: false,
@@ -119,6 +121,44 @@ describe('AccountRecoveryClient', () => {
       phone: '01012345678',
       proofToken: 'RESET-TOKEN',
     });
+  });
+
+  it.each(['kakao', 'apple'])('이메일 인증 후에만 %s 소셜 로그인 방법을 보여 준다', async (provider) => {
+    hooks.findAccountByEmailMutateAsync.mockResolvedValue({ maskedEmail: 'ru***@example.com', providers: [provider], hasPassword: false, withdrawalPendingUntil: null });
+    render(<AccountRecoveryClient />);
+    fireEvent.click(screen.getByRole('button', { name: '이메일로 찾기' }));
+    enterEmail();
+    expect(hooks.findAccountByEmailMutateAsync).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: '__stub_email_verify__' }));
+    const label = provider === 'kakao' ? '카카오' : 'Apple';
+    expect(await screen.findByText(new RegExp(`${label} 로그인으로 가입했어요`))).toBeVisible();
+    expect(hooks.findAccountByEmailMutateAsync).toHaveBeenCalledWith({ email: 'runner@example.com', proofToken: 'EMAIL-RESET-TOKEN' });
+    expect(hooks.resetPasswordByEmailMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('이메일 인증 뒤 조회가 일시 실패하면 다시 조회할 수 있다', async () => {
+    hooks.findAccountByEmailMutateAsync.mockRejectedValueOnce(new Error('일시 오류')).mockResolvedValueOnce({ maskedEmail: 'ru***@example.com', providers: ['kakao'], hasPassword: false, withdrawalPendingUntil: null });
+    render(<AccountRecoveryClient />);
+    fireEvent.click(screen.getByRole('button', { name: '이메일로 찾기' }));
+    enterEmail();
+    fireEvent.click(screen.getByRole('button', { name: '__stub_email_verify__' }));
+    expect(await screen.findByText('일시 오류')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: '다시 확인하기' }));
+    expect(await screen.findByText(/카카오 로그인으로 가입했어요/)).toBeVisible();
+    expect(hooks.findAccountByEmailMutateAsync).toHaveBeenCalledTimes(2);
+  });
+
+  it('이메일 조회가 늦게 끝나도 번호 찾기로 전환한 화면에 이전 결과를 보여주지 않는다', async () => {
+    let resolveLookup: ((value: V1FoundAccount) => void) | undefined;
+    hooks.findAccountByEmailMutateAsync.mockImplementation(() => new Promise<V1FoundAccount>((resolve) => { resolveLookup = resolve; }));
+    render(<AccountRecoveryClient />);
+    fireEvent.click(screen.getByRole('button', { name: '이메일로 찾기' }));
+    enterEmail();
+    fireEvent.click(screen.getByRole('button', { name: '__stub_email_verify__' }));
+    fireEvent.click(screen.getByRole('button', { name: '휴대폰으로 찾기' }));
+    resolveLookup?.({ maskedEmail: 'old***@example.com', providers: ['kakao'], hasPassword: false, withdrawalPendingUntil: null });
+    await waitFor(() => expect(screen.getByLabelText('휴대폰 번호')).toBeVisible());
+    expect(screen.queryByText('old***@example.com')).not.toBeInTheDocument();
   });
 
   it('전화번호 조회 후 재설정으로 바꿔도 새 이메일 증명 없이 비밀번호를 저장하지 않는다', async () => {

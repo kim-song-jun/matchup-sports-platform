@@ -1072,7 +1072,6 @@ export class AuthService {
         email: true,
         accountStatus: true,
         onboardingStatus: true,
-        adminUser: { select: { status: true } },
         createdAt: true,
         updatedAt: true,
         onboardingProgress: { select: { draftJson: true } },
@@ -1150,6 +1149,12 @@ export class AuthService {
     const kakaoPhone = user.authIdentities.some((identity) => identity.provider === V1AuthProvider.kakao)
       ? readKakaoSignupPrefill(user.onboardingProgress?.draftJson)?.phone
       : null;
+    if (!wasDeferred && kakaoPhone && phone !== kakaoPhone) {
+      throw new BadRequestException({
+        code: 'KAKAO_PHONE_CHANGE_FORBIDDEN',
+        message: '카카오에서 받은 번호는 가입 중에 변경할 수 없어요.',
+      });
+    }
     const acceptedKakaoPhone = Boolean(phone && kakaoPhone === phone);
 
     // A typed number is proven by its SMS code before anything is said about who holds it; a number Kakao handed over
@@ -1201,7 +1206,7 @@ export class AuthService {
         where: { id: userId, accountStatus: 'active', onboardingStatus: previousStatus },
         data: {
           onboardingStatus: wasDeferred ? 'deferred' : 'signup_done', phone,
-          ...(!wasDeferred ? { signupEmailLoginRequired: !user.adminUser || user.adminUser.status === 'revoked' } : {}),
+          signupEmailLoginRequired: false,
           ...(acceptedKakaoPhone ? { phoneVerifiedAt: new Date() } : {}),
         },
       });
@@ -1260,7 +1265,6 @@ export class AuthService {
         email: true,
         accountStatus: true,
         onboardingStatus: true,
-        adminUser: { select: { status: true } },
         createdAt: true,
         updatedAt: true,
         onboardingProgress: { select: { draftJson: true } },
@@ -1329,7 +1333,7 @@ export class AuthService {
     await this.prisma.$transaction(async (transaction) => {
       const transition = await transaction.v1User.updateMany({
         where: { id: userId, onboardingStatus: 'social_profile_required' },
-        data: { onboardingStatus: 'social_profile_deferred', signupEmailLoginRequired: !user.adminUser || user.adminUser.status === 'revoked' },
+        data: { onboardingStatus: 'social_profile_deferred', signupEmailLoginRequired: false },
       });
       if (transition.count !== 1) {
         throw new BadRequestException({
@@ -1403,6 +1407,15 @@ export class AuthService {
       });
     }
 
+    // Retire the old Alpha-only gate for members already waiting in email setup.
+    // Keep the column for rolling-deploy compatibility with the previous release.
+    if (user.signupEmailLoginRequired) {
+      await this.prisma.v1User.updateMany({
+        where: { id: user.id, signupEmailLoginRequired: true },
+        data: { signupEmailLoginRequired: false },
+      });
+    }
+
     const onboarding = buildOnboardingSummary({
       onboardingStatus: user.onboardingStatus,
       currentStep: user.onboardingProgress?.currentStep ?? null,
@@ -1432,7 +1445,7 @@ export class AuthService {
         authProviders: user.authIdentities.map((identity) => identity.provider),
         canLinkLoginMethods: linkCallerRestriction(user) === null,
         canLinkAfterSignup: linkCallerRestriction({ ...user, onboardingStatus: 'signup_done' }) === null,
-        signupEmailLoginRequired: user.signupEmailLoginRequired,
+        signupEmailLoginRequired: false,
         hasPassword: user.authIdentities.some((identity) => Boolean(identity.passwordHash)),
       },
       verification: {
@@ -1502,12 +1515,11 @@ export class AuthService {
     const onboardingRoute = getAuthNextRoute(snapshot.onboarding, options);
     const termsRoute = snapshot.termsCompliance?.compliant === false
       ? snapshot.termsCompliance.nextRoute ?? '/terms?mode=renewal' : null;
-    const emailSetupRoute = snapshot.user.signupEmailLoginRequired
-      ? snapshot.user.onboardingStatus === 'social_profile_deferred'
-        ? '/my/settings/login-methods/email?redirect=%2Fhome'
-        : '/my/settings/login-methods/email?redirect=%2Fonboarding%2Fsport'
-      : null;
-    const nextRoute = emailSetupRoute ? termsRoute ?? emailSetupRoute : onboardingRoute ?? termsRoute;
+    // Pending social signup must reach its own terms/profile steps; after signup,
+    // renewed required terms take precedence before any onboarding work.
+    const nextRoute = isPendingSocialSignup(snapshot.user.onboardingStatus)
+      ? onboardingRoute ?? termsRoute
+      : termsRoute ?? onboardingRoute;
 
     return {
       session: {

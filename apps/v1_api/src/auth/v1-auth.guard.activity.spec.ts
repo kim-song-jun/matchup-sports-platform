@@ -80,11 +80,9 @@ describe('V1AuthGuard activity profile gate', () => {
   });
 
   describe('control: everyone else is unchanged', () => {
-    it('blocks onboarding when signup email setup is required', async () => {
+    it('lets legacy email-setup flags continue onboarding without adding another login method', async () => {
       mockUser({ onboardingStatus: 'signup_done', signupEmailLoginRequired: true });
-      await expect(guard.canActivate(context('POST', '/api/v1/onboarding/preferences'))).rejects.toMatchObject({
-        response: { code: 'EMAIL_LOGIN_SETUP_REQUIRED' },
-      });
+      await expect(guard.canActivate(context('POST', '/api/v1/onboarding/preferences'))).resolves.toBe(true);
     });
 
     it('allows the email setup endpoints while setup is required', async () => {

@@ -31,9 +31,9 @@ const COPY: Record<OtpEmailPurpose, Copy> = {
     notice: IGNORE_NOTICE,
   },
   password_reset: {
-    subject: '[Teameet] 비밀번호 재설정 인증번호',
-    heading: '비밀번호 재설정',
-    lead: '아래 인증번호를 입력하면 새 비밀번호를 정할 수 있어요.',
+    subject: '[Teameet] 계정 확인 인증번호',
+    heading: '계정 확인',
+    lead: '아래 인증번호를 입력해 이메일 주소를 확인해 주세요.',
     notice: IGNORE_NOTICE,
   },
   login_email_link: {

@@ -24,4 +24,4 @@
   SES 메일박스 시뮬레이터라서 실제 수신자가 없다.
   실패하면 오류 이름이 원인을 말해 준다(`AccessDeniedException` 은 권한, `MessageRejected` 는 identity 문제다).
 - **알림**: 발송 실패는 API 가 `EMAIL_DELIVERY_FAILED` outbox 이벤트로 Slack 에 시간 창당 1건 알린다(Task 20261124).
-- alpha 인스턴스 역할에는 SES 권한을 주지 않는다. alpha 의 메일 흐름은 테스트 주소의 dev-echo 로 확인한다.
+- Alpha는 인스턴스 역할에 SES 권한을 주지 않는다. Alpha 전용 발신 주소와 IAM 키, 문자 발송 계정 연결 및 키 교체 절차는 [Alpha 인증 발송](alpha-verification-delivery.md)을 따른다.

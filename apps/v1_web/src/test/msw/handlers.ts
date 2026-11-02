@@ -252,6 +252,26 @@ async function confirmRecoveryEmail(request: Request) {
   return ok({ verified: true, proofToken });
 }
 
+async function findAccountByRecoveryEmail(request: Request) {
+  const body = parseAuthProofInput(await request.json(), ['email', 'proofToken']);
+  const email = recoveryEmail(body);
+  if (!email || typeof body?.proofToken !== 'string' || body.proofToken.length > 2048) {
+    return authProofError('VALIDATION_ERROR', '입력값을 다시 확인해 주세요.');
+  }
+  sweepRecoveryEmailState();
+  const proof = recoveryEmailProofs.get(body.proofToken);
+  if (!proof || proof.email !== email || proof.channel !== 'email' || proof.purpose !== 'password_reset') {
+    return authProofError('EMAIL_NOT_VERIFIED', '이메일 인증을 다시 진행해 주세요.');
+  }
+  const social = email === PASSWORD_UNAVAILABLE_MSW.email;
+  if (!social && email !== v1UserFixture.email?.trim().toLowerCase()) {
+    return authProofError('ACCOUNT_NOT_FOUND', '가입된 계정을 찾지 못했어요.', 404);
+  }
+  const [local, domain] = email.split('@');
+  const maskedEmail = domain ? `${local.length > 2 ? local.slice(0, 2) : ''}***@${domain}` : '***';
+  return ok({ maskedEmail, providers: social ? [...PASSWORD_UNAVAILABLE_MSW.providers] : ['email'], hasPassword: !social, withdrawalPendingUntil: null });
+}
+
 async function resetPasswordByRecoveryEmail(request: Request) {
   const body = parseAuthProofInput(await request.json(), ['email', 'proofToken', 'newPassword']);
   const email = recoveryEmail(body);
@@ -761,6 +781,7 @@ export const v1MswHandlers = [
   http.post(`${api}/auth/recovery/reset-password`, ({ request }) => resetPasswordByRecoveryPhone(request)),
   http.post(`${api}/auth/recovery/email/request`, ({ request }) => requestRecoveryEmail(request)),
   http.post(`${api}/auth/recovery/email/confirm`, ({ request }) => confirmRecoveryEmail(request)),
+  http.post(`${api}/auth/recovery/email/find-account`, ({ request }) => findAccountByRecoveryEmail(request)),
   http.post(`${api}/auth/recovery/email/reset-password`, ({ request }) => resetPasswordByRecoveryEmail(request)),
   ...v1AuthLinkMswHandlers,
   ...v1AuthStepUpMswHandlers,

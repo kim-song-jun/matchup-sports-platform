@@ -1,5 +1,15 @@
 import { buildOtpEmailHtml, buildOtpEmailText, otpEmailSubject } from './otp-email-template';
 
+describe('account recovery mail', () => {
+  it('describes email ownership without implying that social account lookup sets a password', () => {
+    expect(otpEmailSubject('password_reset')).toBe('[Teameet] 계정 확인 인증번호');
+    for (const body of [buildOtpEmailText('123456', 'password_reset'), buildOtpEmailHtml('123456', 'password_reset')]) {
+      expect(body).toContain('이메일 주소를 확인해 주세요');
+      expect(body).not.toContain('새 비밀번호를 정할 수');
+    }
+  });
+});
+
 describe('login_step_up mail', () => {
   it('carries the code and tells a non-requester to change the password, in text and html', () => {
     expect(otpEmailSubject('login_step_up')).toBe('[Teameet] 로그인 인증번호');

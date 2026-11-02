@@ -751,7 +751,7 @@ export const v1MswHandlers = [
     socialSignupPrefill: null,
     user: { id: v1UserFixture.id, email: v1UserFixture.email, phone: null, accountStatus: 'active',
       onboardingStatus: v1UserFixture.onboardingStatus, authProvider: 'email', authProviders: ['email'],
-      hasPassword: true, canLinkLoginMethods: true, canLinkAfterSignup: true },
+      hasPassword: true, canLinkLoginMethods: true, canLinkAfterSignup: true, signupEmailLoginRequired: false },
     profile: { displayName: v1UserFixture.displayName, nickname: v1UserFixture.displayName },
     verification: { emailVerified: true, phoneVerified: false },
   })),

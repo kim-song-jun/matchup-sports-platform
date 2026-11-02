@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useV1AuthMe } from '@/hooks/use-v1-api';
 import { V1ApiError } from '@/lib/api-client';
 import { browserAppRoute } from '@/lib/app-route';
+import { emailLinkPath, EMAIL_LINK_PATH } from '@/lib/link-result';
 import {
   clearStoredV1Session,
   hasStoredV1Session,
@@ -53,10 +54,14 @@ export function PendingSocialSignupGate({ children }: { children: ReactNode }) {
   const renewalRoute = termsRequired && pathname !== '/terms' && !isLoginRoute
     ? `/terms?mode=renewal&redirect=${encodeURIComponent(pathname)}`
     : null;
-  const requiredRoute = socialRequiredRoute ?? renewalRoute;
+  const emailRequired = authMe.data?.user.signupEmailLoginRequired === true;
+  const emailSetupRoute = emailRequired && pathname !== EMAIL_LINK_PATH && pathname !== '/terms' && !pathname.startsWith('/my/inquiries') && !isLoginRoute
+    ? emailLinkPath(onboardingStatus === 'social_profile_deferred' ? '/home' : '/onboarding/sport')
+    : null;
+  const requiredRoute = socialRequiredRoute ?? renewalRoute ?? emailSetupRoute;
   const routeAllowed = socialRequiredRoute
     ? isPendingSocialSignupRouteAllowed(onboardingStatus, pathname, currentMode)
-    : !renewalRoute;
+    : !renewalRoute && !emailSetupRoute;
 
   useEffect(() => {
     if (!requiredRoute || routeAllowed) return;

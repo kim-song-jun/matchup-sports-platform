@@ -22,6 +22,7 @@ export const LINK_CALLER_SELECT = {
   accountStatus: true,
   deletedAt: true,
   onboardingStatus: true,
+  signupEmailLoginRequired: true,
   adminUser: { select: { status: true } },
 } as const;
 
@@ -29,6 +30,7 @@ export type LinkCaller = {
   accountStatus: string;
   deletedAt: Date | null;
   onboardingStatus: string;
+  signupEmailLoginRequired?: boolean;
   adminUser: { status: string } | null;
 };
 
@@ -39,7 +41,8 @@ const ADMIN_REFUSAL_MESSAGES = {
 
 /**
  * Refuses a caller whose login methods may not be changed from a browser session: a restricted account, an operator's
- * account, or a social signup that has not finished.
+ * account, or a social signup that has not finished. The one exception is required email setup
+ * for a newly deferred social signup; social account linking remains forbidden there.
  */
 export function linkCallerRestriction(caller: LinkCaller): 'account' | 'admin' | 'signup' | null {
   if (caller.accountStatus !== 'active' || caller.deletedAt !== null) return 'account';
@@ -56,7 +59,7 @@ export function assertLinkableCaller(caller: LinkCaller, method: keyof typeof AD
   if (restriction === 'admin') {
     throw new ForbiddenException({ code: 'SOCIAL_LINK_ADMIN_FORBIDDEN', message: ADMIN_REFUSAL_MESSAGES[method] });
   }
-  if (restriction === 'signup') {
+  if (restriction === 'signup' && !(method === 'email' && caller.onboardingStatus === 'social_profile_deferred' && caller.signupEmailLoginRequired)) {
     throw new ForbiddenException({
       code: 'SIGNUP_INCOMPLETE',
       message: '가입을 먼저 마무리해 주세요.',

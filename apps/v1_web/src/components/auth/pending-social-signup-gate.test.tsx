@@ -22,7 +22,8 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1LinkPending: () => ({ mutate: vi.fn() }),
 }));
 
-vi.mock('@/lib/session-storage', () => ({
+vi.mock('@/lib/session-storage', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/lib/session-storage')>(),
   hasStoredV1Session: () => true,
   clearStoredV1Session: mocks.clearStoredV1Session,
 }));
@@ -35,6 +36,20 @@ describe('PendingSocialSignupGate required terms renewal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.pathname = '/my';
+  });
+
+  it.each([
+    ['signup_done', '/onboarding/sport'],
+    ['social_profile_deferred', '/home'],
+  ])('returns %s to mandatory email setup after navigation or reload', async (onboardingStatus, destination) => {
+    mocks.pathname = '/home';
+    mocks.useV1AuthMe.mockReturnValue({ isSuccess: true, isError: false, data: {
+      user: { onboardingStatus, signupEmailLoginRequired: true },
+      termsCompliance: { compliant: true, pendingRequiredDocumentIds: [], nextRoute: null },
+    } });
+    render(<PendingSocialSignupGate><div>홈 화면</div></PendingSocialSignupGate>);
+    await waitFor(() => expect(mocks.replace).toHaveBeenCalledWith(`/my/settings/login-methods/email?redirect=${encodeURIComponent(destination)}`));
+    expect(screen.queryByText('홈 화면')).not.toBeInTheDocument();
   });
 
   it('redirects an authenticated existing user to renewal before rendering the protected page', async () => {

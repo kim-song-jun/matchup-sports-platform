@@ -1142,7 +1142,7 @@ describe('AuthService', () => {
     );
     expect(prisma.v1User.updateMany).toHaveBeenCalledWith({
       where: { id: 'user-1', accountStatus: 'active', onboardingStatus: 'social_profile_required' },
-      data: { onboardingStatus: 'signup_done', phone: '01087654321' },
+      data: { onboardingStatus: 'signup_done', phone: '01087654321', signupEmailLoginRequired: true },
     });
   });
 
@@ -1295,7 +1295,7 @@ describe('AuthService', () => {
 
       expect(prisma.v1User.updateMany).toHaveBeenCalledWith({
         where: { id: 'user-1', onboardingStatus: 'social_profile_required' },
-        data: { onboardingStatus: 'social_profile_deferred' },
+        data: { onboardingStatus: 'social_profile_deferred', signupEmailLoginRequired: true },
       });
       expect(prisma.v1UserProfile.upsert).toHaveBeenCalledWith({
         where: { userId: 'user-1' },
@@ -1457,7 +1457,7 @@ describe('AuthService', () => {
 
       expect(prisma.v1User.updateMany).toHaveBeenCalledWith({
         where: { id: 'user-1', accountStatus: 'active', onboardingStatus: 'social_profile_required' },
-        data: { onboardingStatus: 'signup_done', phone: '01087654321' },
+        data: { onboardingStatus: 'signup_done', phone: '01087654321', signupEmailLoginRequired: true },
       });
     });
   });
@@ -2225,5 +2225,22 @@ describe('AuthService', () => {
     expect(result.user.id).toBe('user-1');
     expect(result.onboarding.status).toBe('completed');
     expect(result.onboarding.canResume).toBe(false);
+  });
+
+  it('sessionResponse: 이메일 설정이 남은 가입자는 온보딩보다 이메일 설정으로 이어진다', async () => {
+    prisma.v1User.findUnique.mockResolvedValue(completedUserRow({
+      onboardingStatus: 'signup_done', signupEmailLoginRequired: true, onboardingProgress: { currentStep: 'sport' },
+    }));
+    const result = await service.sessionResponse('user-1', 'user@teameet.v1');
+    expect(result.user.signupEmailLoginRequired).toBe(true);
+    expect(result.next?.route).toBe('/my/settings/login-methods/email?redirect=%2Fonboarding%2Fsport');
+  });
+
+  it('sessionResponse: 프로필을 미룬 계정도 이메일을 설정한 뒤 홈으로 돌아간다', async () => {
+    prisma.v1User.findUnique.mockResolvedValue(completedUserRow({
+      onboardingStatus: 'social_profile_deferred', signupEmailLoginRequired: true,
+    }));
+    const result = await service.sessionResponse('user-1', 'user@teameet.v1');
+    expect(result.next?.route).toBe('/my/settings/login-methods/email?redirect=%2Fhome');
   });
 });

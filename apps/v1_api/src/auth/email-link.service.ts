@@ -110,7 +110,7 @@ export class EmailLinkService {
       select: { id: true },
     });
     // The address that proved itself becomes the account's email, replacing a contact email the account carried.
-    await tx.v1User.update({ where: { id: callerId }, data: { email, emailVerifiedAt: now } });
+    await tx.v1User.update({ where: { id: callerId }, data: { email, emailVerifiedAt: now, signupEmailLoginRequired: false } });
     await tx.v1StatusChangeLog.create({
       data: {
         targetType: 'auth_identity',

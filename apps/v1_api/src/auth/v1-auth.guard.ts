@@ -74,6 +74,7 @@ export class V1AuthGuard implements CanActivate {
         email: true,
         accountStatus: true,
         onboardingStatus: true,
+        signupEmailLoginRequired: true,
         phoneVerifiedAt: true,
         // 휴대폰 인증 게이트의 관리자 면제 판정용. V1AdminUser.userId 가 @unique 라
         // 중첩 select 로 붙어 별도 쿼리가 생기지 않는다.
@@ -120,6 +121,16 @@ export class V1AuthGuard implements CanActivate {
           },
         });
       }
+    }
+
+    const pathname = requestUrl.split('?')[0]?.replace(/\/+$/, '') ?? '';
+    const emailSetupAllowed = ['/auth/me', '/auth/logout', '/auth/link/email/request', '/auth/link/email/verify', '/auth/link/email/complete', '/terms/current', '/terms/consents', '/inquiries'].some((suffix) => pathname.endsWith(suffix));
+    if (user.signupEmailLoginRequired && !emailSetupAllowed) {
+      throw new ForbiddenException({
+        code: 'EMAIL_LOGIN_SETUP_REQUIRED',
+        message: '가입을 완료하려면 이메일 로그인 설정이 필요해요.',
+        details: { next: { route: user.onboardingStatus === 'social_profile_deferred' ? '/my/settings/login-methods/email?redirect=%2Fhome' : '/my/settings/login-methods/email?redirect=%2Fonboarding%2Fsport' } },
+      });
     }
 
     // 가입 정보 입력을 건너뛴 계정은 휴대폰 게이트와 같은 허용 목록 밖의 쓰기를 막는다.

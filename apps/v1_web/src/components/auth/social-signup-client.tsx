@@ -18,7 +18,7 @@ import { clearV1IdentityCache } from '@/lib/query-keys';
 import { getSavedRedirectPath, resolveAuthContinuationPath, sanitizeRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
 import { AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
 import { AuthStepHeader } from './auth-step-header';
-import { emailLinkPath } from '@/lib/link-result';
+import { emailLinkPath, EMAIL_LINK_PATH } from '@/lib/link-result';
 import { buildAccountConflictPath } from './login-recovery-route';
 import {
   formatBirthDate,
@@ -32,6 +32,7 @@ import {
 } from './signup-profile-validation';
 import { extractErrorMessage } from '@/lib/error-message';
 import type { V1SignInThenLinkDetails } from '@/types/api';
+import styles from './social-signup-review.module.css';
 
 type SocialStep = 'nickname' | 'gender' | 'name' | 'phone' | 'birthDate' | 'review';
 
@@ -68,7 +69,6 @@ export function SocialSignupClient() {
   const [step, setStep] = useState<SocialStep>('nickname');
   const [editPhone, setEditPhone] = useState(false);
   const [editBirthDate, setEditBirthDate] = useState(false);
-  const [addEmailLogin, setAddEmailLogin] = useState(false);
   const [postSignupDestination, setPostSignupDestination] = useState<{ path: string; denied: boolean; termsFirst: boolean } | null>(null);
   const [phoneConflict, setPhoneConflict] = useState(false);
   // 번호 중복 409 가 준 기존 계정 로그인·연결 시도 안내. 토큰이 있어야 연결을 시도할 수 있다.
@@ -235,7 +235,17 @@ export function SocialSignupClient() {
           method: authMe.data?.user?.authProvider ?? 'social',
           profile: 'deferred',
         });
-        router.replace(continuationPath(result.next?.route));
+        const destination = continuationPath(result.next?.route);
+        if (result.user?.signupEmailLoginRequired === true && destination.startsWith('/terms?mode=renewal')) {
+          const terms = new URL(destination, window.location.origin);
+          terms.searchParams.set('redirect', emailLinkPath(getSavedRedirectPath() ?? '/home'));
+          router.replace(`${terms.pathname}${terms.search}${terms.hash}`);
+        } else {
+          if (result.user?.signupEmailLoginRequired === true) {
+            const returnTo = getSavedRedirectPath();
+            router.replace(destination.startsWith(EMAIL_LINK_PATH) ? (returnTo ? emailLinkPath(returnTo) : destination) : emailLinkPath(destination));
+          } else router.replace(destination);
+        }
       },
       onError: async (nextError) => {
         if (nextError instanceof V1ApiError && nextError.code === 'TERMS_REQUIRED') {
@@ -303,7 +313,7 @@ export function SocialSignupClient() {
           }
           const destination = continuationPath(nextRoute);
           const termsFirst = nextRoute?.startsWith('/terms?mode=renewal') === true;
-          if (addEmailLogin && signupMode && authMe.data?.user.canLinkAfterSignup === true && (nextRoute?.startsWith('/onboarding/') || termsFirst)) {
+          if (signupMode && result.user?.signupEmailLoginRequired === true && (nextRoute?.startsWith('/onboarding/') || termsFirst)) {
             if (result.user?.canLinkLoginMethods === true) {
               if (termsFirst) {
                 const onboarding = new URL('/onboarding/sport', window.location.origin);
@@ -373,8 +383,8 @@ export function SocialSignupClient() {
     return <AuthFrame stage={AUTH_WELCOME_STAGE} topTitle="이메일 로그인 연결">
       <div className="tm-auth-body">
         <h1 className="tm-text-heading">이메일 로그인을 연결하지 못했어요</h1>
-        <p className="tm-text-body tm-auth-sub">{postSignupDestination.denied ? '가입은 완료됐지만 이 계정은 현재 로그인 방법을 변경할 수 없어요.' : '가입은 완료됐지만 이 계정의 로그인 방법 변경 권한을 확인하지 못했어요.'} {postSignupDestination.termsFirst ? '필수 약관을 확인한 뒤 로그인 방법을 다시 확인해 주세요.' : '운동 설정을 계속하고 나중에 로그인 방법을 확인해 주세요.'}</p>
-        <Button block size="lg" type="button" variant="primary" onClick={() => router.replace(postSignupDestination.path)}>{postSignupDestination.termsFirst ? '필수 약관 확인하기' : '운동 설정으로 계속'}</Button>
+        <p className="tm-text-body tm-auth-sub">{postSignupDestination.denied ? '이 계정은 현재 로그인 방법을 변경할 수 없어요.' : '이 계정의 로그인 방법 변경 권한을 확인하지 못했어요.'} {postSignupDestination.termsFirst ? '먼저 필수 약관을 확인해 주세요.' : '고객센터에 문의해 주세요.'}</p>
+        <Button block size="lg" type="button" variant="primary" onClick={() => router.replace(postSignupDestination.termsFirst ? postSignupDestination.path : '/my/inquiries/new')}>{postSignupDestination.termsFirst ? '필수 약관 확인하기' : '고객센터 문의하기'}</Button>
       </div>
     </AuthFrame>;
   }
@@ -425,30 +435,25 @@ export function SocialSignupClient() {
             <span className="tm-text-caption" role="status" style={{ color: birthDateDigits.length === 8 && !isSignupAgeEligible(birthDateDigits) ? 'var(--red700)' : 'var(--text-caption)' }}>만 14세 이상만 가입할 수 있어요.</span>
           </label> : null}
           {step === 'review' ? <>
-            <Card pad={16} className="tm-auth-soft-card"><div className="tm-auth-stack">
-              <div><span className="tm-text-label">닉네임</span><div className="tm-text-body">{nickname}</div></div>
-              <div><span className="tm-text-label">이름{lockedName ? ` · ${providerLabel ?? '소셜'} 제공` : ''}</span><div className="tm-text-body">{displayName}</div></div>
-              <div><span className="tm-text-label">성별{lockedGender ? ` · ${providerLabel ?? '소셜'} 제공` : ''}</span><div className="tm-text-body">{gender === 'male' ? '남' : '여'}</div></div>
-              <div><span className="tm-text-label">휴대폰 번호{kakaoPhoneAccepted ? ` · ${providerLabel ?? '소셜'} 제공` : ' · 인증 완료'}</span><div className="tm-text-body">{formatPhone(phoneDigits)}</div>
-                <Button size="sm" type="button" variant="ghost" onClick={() => { setEditPhone(true); setStep('phone'); }}>번호 변경</Button></div>
-              <div><span className="tm-text-label">생년월일</span><div className="tm-text-body">{formatBirthDate(birthDateDigits)}</div><Button size="sm" type="button" variant="ghost" onClick={() => { setEditBirthDate(true); setStep('birthDate'); }}>생년월일 변경</Button></div>
-            </div></Card>
-            {signupMode && authMe.data?.user.canLinkAfterSignup === true ? <label className="tm-auth-field" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44 }}>
-              <input type="checkbox" checked={addEmailLogin} onChange={(event) => setAddEmailLogin(event.target.checked)} />
-              <span>이메일·비밀번호 로그인도 연결할게요 (선택)</span>
-            </label> : null}
+            <dl className={styles.summary}>
+              <div className={styles.row}><dt>닉네임</dt><dd>{nickname}</dd></div>
+              <div className={styles.row}><dt>이름</dt><dd>{displayName}{lockedName ? <span className={styles.source}>{providerLabel ?? '소셜'} 제공</span> : null}</dd></div>
+              <div className={styles.row}><dt>성별</dt><dd>{gender === 'male' ? '남' : '여'}{lockedGender ? <span className={styles.source}>{providerLabel ?? '소셜'} 제공</span> : null}</dd></div>
+              <div className={styles.row}><dt>휴대폰</dt><dd>{formatPhone(phoneDigits)}<span className={styles.source}>{kakaoPhoneAccepted ? `${providerLabel ?? '소셜'} 제공` : '인증 완료'}</span></dd><button className={styles.edit} type="button" onClick={() => { setEditPhone(true); setStep('phone'); }}>번호 변경</button></div>
+              <div className={styles.row}><dt>생년월일</dt><dd>{formatBirthDate(birthDateDigits)}</dd><button className={styles.edit} type="button" onClick={() => { setEditBirthDate(true); setStep('birthDate'); }}>생년월일 변경</button></div>
+            </dl>
             {signupMode && authMe.data?.user.canLinkAfterSignup === false ? <p className="tm-text-caption">이 계정은 현재 이메일 로그인을 연결할 수 없어요.</p> : null}
             {signupMode && authMe.data?.user.canLinkAfterSignup === undefined ? <p className="tm-text-caption">이메일 로그인 연결 가능 여부를 확인하지 못했어요. 가입 후 로그인 방법 설정에서 다시 확인해 주세요.</p> : null}
-            {addEmailLogin && signupMode && authMe.data?.user.canLinkAfterSignup === true ? <p className="tm-text-caption">가입을 마친 뒤 이메일 인증과 비밀번호 설정을 진행해요.</p> : null}
+            {signupMode && authMe.data?.user.canLinkAfterSignup === true ? <p className={styles.next}>다음으로 이메일을 인증하고 비밀번호를 설정해요.</p> : null}
           </> : null}
         </div>
         {error ? <Card pad={16} className="tm-auth-soft-card tm-auth-soft-card-error"><div className="tm-text-body-lg">가입을 완료하지 못했어요</div><div className="tm-text-caption">{error}</div></Card> : null}
         {exitFlow.error ? <Card pad={16} className="tm-auth-soft-card tm-auth-soft-card-error"><div className="tm-text-body-lg">가입을 취소하지 못했어요</div><div className="tm-text-caption">{exitFlow.error}</div></Card> : null}
         <div style={{ marginTop: 24 }}>
           <Button block disabled={!stepReady || signupPending || checkNickname.isPending} loading={completeProfile.isPending || termsRecoveryPending} size="lg" type="submit" variant={stepReady ? 'primary' : 'neutral'}>
-            {step === 'review' ? activityMode ? '입력 완료하고 계속하기' : addEmailLogin && authMe.data?.user.canLinkAfterSignup === true ? '이메일 로그인 연결' : '운동 설정으로 계속' : '다음'}
+            {step === 'review' ? activityMode ? '입력 완료하고 계속하기' : '확인하고 계속' : '다음'}
           </Button>
-          {signupMode ? <><div className="tm-auth-fixed-skip-row" style={{ justifyContent: 'center' }}><Button disabled={signupPending} loading={deferProfile.isPending || termsRecoveryPending} onClick={deferSignup} size="sm" type="button" variant="ghost">나중에 입력할게요</Button></div><div className="tm-text-micro tm-auth-fixed-reason">팀 만들기·참가 신청처럼 활동을 시작할 때 다시 물어볼게요.</div></> : null}
+          {signupMode && step !== 'review' ? <><div className="tm-auth-fixed-skip-row" style={{ justifyContent: 'center' }}><Button disabled={signupPending} loading={deferProfile.isPending || termsRecoveryPending} onClick={deferSignup} size="sm" type="button" variant="ghost">나중에 입력할게요</Button></div><div className="tm-text-micro tm-auth-fixed-reason">팀 만들기·참가 신청처럼 활동을 시작할 때 다시 물어볼게요.</div></> : null}
         </div>
       </form>
       {exitFlow.ConfirmModal}

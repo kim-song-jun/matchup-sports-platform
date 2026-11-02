@@ -83,6 +83,33 @@ function renderClient() {
   return render(<QueryClientProvider client={client}><EmailLinkClient /></QueryClientProvider>);
 }
 
+it('필수 가입 설정은 제공받은 이메일을 제안하고 나중에 가는 뒤로가기를 제공하지 않는다', async () => {
+  server.use(http.get('*/api/v1/auth/me', () => HttpResponse.json({ status: 'success', data: {
+    user: { id: 'new-social', email: 'provided@example.test', onboardingStatus: 'signup_done', signupEmailLoginRequired: true },
+    profile: { displayName: '테스트' },
+  } })));
+  renderClient();
+  await waitFor(() => expect(emailField()).toHaveValue('provided@example.test'));
+  expect(screen.getByText('가입을 마치려면 이메일 인증과 비밀번호 설정이 필요해요.')).toBeVisible();
+  expect(screen.queryByRole('link', { name: '뒤로가기' })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '로그아웃' })).toBeVisible();
+});
+
+it('필수 설정 중 권한이 바뀌면 되돌아가기 반복 대신 고객센터로 안내한다', async () => {
+  server.use(
+    http.get('*/api/v1/auth/me', () => HttpResponse.json({ status: 'success', data: {
+      user: { id: 'new-social', email: null, onboardingStatus: 'signup_done', signupEmailLoginRequired: true }, profile: { displayName: '테스트' },
+    } })),
+    http.post('*/api/v1/auth/link/email/request', () => failure(403, 'SOCIAL_LINK_ADMIN_FORBIDDEN', '운영자 계정')),
+  );
+  renderClient();
+  await screen.findByText('가입을 마치려면 이메일 인증과 비밀번호 설정이 필요해요.');
+  await userEvent.type(emailField(), 'runner@example.com');
+  await userEvent.click(sendButton());
+  expect(await screen.findByRole('link', { name: '고객센터 문의하기' })).toHaveAttribute('href', '/my/inquiries/new');
+  expect(screen.queryByRole('link', { name: '로그인 방법으로 돌아가기' })).not.toBeInTheDocument();
+});
+
 const heading = (name: string) => screen.findByRole('heading', { level: 1, name });
 const emailField = () => screen.getByLabelText('이메일');
 const sendButton = () => screen.getByRole('button', { name: '인증번호 받기' });

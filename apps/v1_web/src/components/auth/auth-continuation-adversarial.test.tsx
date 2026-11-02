@@ -82,9 +82,20 @@ async function completeSignup(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: '중복 확인' }));
   await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled());
   await user.click(screen.getByRole('button', { name: '다음' }));
-  const submit = await screen.findByRole('button', { name: '운동 설정으로 계속' });
+  const submit = await screen.findByRole('button', { name: '확인하고 계속' });
   await waitFor(() => expect(submit).toBeEnabled());
   await user.click(submit);
+  await screen.findByRole('heading', { name: '이메일을 입력해 주세요' });
+  await user.type(screen.getByLabelText('이메일'), 'runner@example.com');
+  await user.click(screen.getByRole('button', { name: '인증번호 받기' }));
+  await screen.findByRole('heading', { name: '인증번호를 입력해 주세요' });
+  await user.click(screen.getByRole('button', { name: '인증번호 확인' }));
+  await screen.findByRole('heading', { name: '비밀번호를 정해 주세요' });
+  await user.type(screen.getByLabelText('비밀번호'), 'synthetic-pass-123');
+  await user.type(screen.getByLabelText('비밀번호 확인'), 'synthetic-pass-123');
+  await user.click(screen.getByRole('button', { name: '연결하기' }));
+  const next = await screen.findByRole('link', { name: '하던 곳으로 돌아가기' });
+  act(() => navigation.replace(next.getAttribute('href')!));
   await screen.findByRole('button', { name: /풋살/ });
   expect(state.profileRequests).toBe(1);
   expect(state.linkRequests).toBe(0);
@@ -117,20 +128,20 @@ describe('적대적 인증 continuation의 실제 consumer 계약', () => {
       http.post('*/api/v1/auth/social-profile', async () => {
         state.profileRequests++;
         state.auth = makeAuth('signup_done', PENDING, true);
+        state.auth.user.signupEmailLoginRequired = true;
         state.auth.termsCompliance = compliance(false);
         return success(authSession(state.auth, '/terms?mode=renewal'));
       }),
       http.post('*/api/v1/auth/link/email/request', () => success({ sent: true, maskedTarget: 'r***@example.com', expiresInSeconds: 300, resendAvailableInSeconds: 30, devCode: '123456' })),
       http.post('*/api/v1/auth/link/email/verify', () => success({ emailLinkToken: 'synthetic-email-link-token-long', expiresInSeconds: 600 })),
-      http.post('*/api/v1/auth/link/email/complete', () => success({ linked: true, email: 'runner@example.com' })),
+      http.post('*/api/v1/auth/link/email/complete', () => { state.auth.user.signupEmailLoginRequired = false; return success({ linked: true, email: 'runner@example.com' }); }),
     );
     const user = openJourney('/signup/social');
     fireEvent.change(await screen.findByLabelText('닉네임'), { target: { value: '카카오러너' } });
     await user.click(screen.getByRole('button', { name: '중복 확인' }));
     await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled());
     await user.click(screen.getByRole('button', { name: '다음' }));
-    await user.click(screen.getByRole('checkbox', { name: /이메일.*로그인/ }));
-    await user.click(screen.getByRole('button', { name: '이메일 로그인 연결' }));
+    await user.click(screen.getByRole('button', { name: '확인하고 계속' }));
     await user.click(await screen.findByRole('button', { name: /전체 동의/ }));
     await user.click(screen.getByRole('button', { name: '동의하고 계속하기' }));
     await screen.findByRole('heading', { name: '이메일을 입력해 주세요' });
@@ -165,6 +176,7 @@ describe('적대적 인증 continuation의 실제 consumer 계약', () => {
       }),
       http.post('*/api/v1/auth/link/email/complete', async ({ request }) => {
         expect(await request.json()).toEqual({ emailLinkToken: 'synthetic-email-link-token-long', password: 'synthetic-pass-123', passwordConfirm: 'synthetic-pass-123' }); completed++;
+        state.auth.user.signupEmailLoginRequired = false;
         return success({ linked: true, email: 'runner@example.com' });
       }),
     );
@@ -173,8 +185,7 @@ describe('적대적 인증 continuation의 실제 consumer 계약', () => {
     await user.click(screen.getByRole('button', { name: '중복 확인' }));
     await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled());
     await user.click(screen.getByRole('button', { name: '다음' }));
-    await user.click(screen.getByRole('checkbox', { name: /이메일.*로그인/ }));
-    await user.click(screen.getByRole('button', { name: '이메일 로그인 연결' }));
+    await user.click(screen.getByRole('button', { name: '확인하고 계속' }));
     await screen.findByRole('heading', { name: '이메일을 입력해 주세요' });
     await user.type(screen.getByLabelText('이메일'), 'runner@example.com');
     await user.click(screen.getByRole('button', { name: '인증번호 받기' }));

@@ -117,9 +117,14 @@ export function groupFixturesByRound(
   }
 
   for (const round of roundMap.values()) {
-    const names = [...new Set(groups.filter((group) => (group.phase === round.key || round.fixtures.some(fixture => fixture.groupId === group.id)) &&
-      (round.fixtures.some((fixture) => fixture.groupId === group.id) || group.groupTeams.some((team) => team.isBye)))
-      .map((group) => group.name.trim()).filter(Boolean))];
+    const names = [...new Set(groups.filter((group) => {
+      // A legacy group can contain multiple phases. Only a persisted large-round
+      // fixture expands the phase vocabulary; group membership alone cannot rename a final.
+      const large = group.id ? fixtures.find(fixture => fixture.groupId === group.id && /^\d+강$/.test(fixture.round.trim()) && Number(fixture.round.trim().slice(0, -1)) > 64) : undefined;
+      const groupRoundKey = large?.round ?? group.phase;
+      return groupRoundKey === round.key &&
+        (round.fixtures.some(fixture => fixture.groupId === group.id) || group.groupTeams.some(team => team.isBye));
+    }).map(group => group.name.trim()).filter(Boolean))];
     if (names.length) round.label = names.join(' · ');
     round.fixtures.sort((a, b) => a.fixtureNumber - b.fixtureNumber);
   }

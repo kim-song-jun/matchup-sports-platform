@@ -1079,3 +1079,9 @@ PR1858 latest-dev merge 30개 충돌 파일. generated Prisma client/의존성 �
 ### 편집 재진입 UX 보완
 
 기존 설정을 단순 조회하며 진출팀 편집 단계로 이동할 때는 no-op 저장/결선 삭제를 하지 않는다. 저장 명단의 참가 확정이 해제된 팀은 안내와 명시적 제외 액션으로 제거한 뒤 편집을 계속할 수 있다. 실제 API payload·재시도/실패 상태를 검증하는 전용 설정 UI4/4 tests PASS.
+
+### 원격 CI RED → GREEN 보완
+
+- CI run41414776750 Gates의 `test_modified_m11_does_not_publish_binding`가 OR/AND 우선순위 오류를 검출했다. 새/기존 schema SHA 허용 조건을 괄호로 묶어 모든 경우 M11 SHA를 함께 검사하도록 수정. 공식 jq1.8.1을 /tmp에 SHA256 검증 후 준비해 실제 binding tests9/9 PASS(가짜 jq 없음).
+- 같은 run의 Web 전체878개 파일·10747 tests 중 라운드 이름2개 실패(10745 PASS). 128강 지원의 group-name 선택이 기존 같은 조의 결승까지 준결승 이름으로 바꾸던 회귀를 수정했다. 기존 테스트를 약화하지 않았고 128강/64강·부전승 이름 분리 회귀를 추가해 관련4개 파일61 tests PASS.
+- 위 두 수정은 실제 실패 원인을 고친 것이며, 이전 CI를 PASS로 표기하지 않는다. 최신 head의 원격 CI 재검증이 필요하다.

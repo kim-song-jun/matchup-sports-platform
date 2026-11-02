@@ -120,12 +120,21 @@ describe('V1 phone verification (MT SMS OTP) integration', () => {
       .expect(400);
   });
 
-  // 서비스를 직접 부른다 — 검증 라우트의 분당 요청 상한이 동시 시도를 대조 전에 끊어 버리면 시도 상한을 재지 못한다.
-  it('withholds the dev code from a number that could reach a real person', async () => {
-    const issued = await app.get(PhoneVerificationService).issueChallenge('01012345678');
-    expect(issued.devCode).toBeUndefined();
+  it('rejects a real number when no SMS provider can deliver its code and leaves no usable challenge', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/api/v1/auth/phone/issue')
+      .send({ phone: '01012345678' })
+      .expect(503);
+    expect(response.body.code).toBe('SMS_NOT_CONFIGURED');
+    expect(response.body.data?.devCode).toBeUndefined();
+    const verify = await request(app.getHttpServer())
+      .post('/api/v1/auth/phone/verify')
+      .send({ phone: '01012345678', code: '123456' })
+      .expect(400);
+    expect(verify.body.code).toBe('VERIFICATION_NO_PENDING');
   });
 
+  // 서비스를 직접 부른다 — 검증 라우트의 분당 요청 상한이 동시 시도를 대조 전에 끊어 버리면 시도 상한을 재지 못한다.
   it('refuses the right code after five wrong ones, and compares only five of many concurrent guesses', async () => {
     const service = app.get(PhoneVerificationService);
     const capped = '01000000101';

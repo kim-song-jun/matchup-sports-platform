@@ -53,7 +53,7 @@ export class LoginStepUpService implements OnApplicationShutdown {
   }
 
   async start(input: { email: string; emailKey: string; userId: string | null }): Promise<LoginStepUpChallengeView> {
-    this.assertMailDeliverable();
+    this.assertMailDeliverable(input.email);
     const now = new Date();
     const token = randomBytes(32).toString('base64url');
     const code = newCode();
@@ -165,8 +165,16 @@ export class LoginStepUpService implements OnApplicationShutdown {
   }
 
   /** Without a mail transport (and no echo) nobody could ever finish step-up; every caller gets the same 503. */
-  private assertMailDeliverable(): void {
-    if (this.dispatcher.emailDeliverable) return;
+  private assertMailDeliverable(email?: string): void {
+    if (this.dispatcher.emailDeliverable) {
+      if (!email) return;
+      try {
+        this.dispatcher.assertDeliveryAvailable('email', email);
+        return;
+      } catch (error) {
+        if (!(error instanceof ServiceUnavailableException)) throw error;
+      }
+    }
     this.logger.error('login step-up requested but email delivery is not configured (SES_REGION/EMAIL_FROM)');
     throw new ServiceUnavailableException({
       code: 'STEP_UP_UNAVAILABLE',

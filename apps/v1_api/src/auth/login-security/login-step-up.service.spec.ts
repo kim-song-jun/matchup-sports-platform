@@ -7,7 +7,7 @@ const T0 = new Date('2026-10-21T12:00:00.000Z');
 const EMAIL = 'runner@example.com';
 const USER_ID = 'user-1';
 
-function setup(options: { devEcho?: boolean; deliverable?: boolean } = {}) {
+function setup(options: { devEcho?: boolean; deliverable?: boolean; unavailableAddress?: boolean } = {}) {
   const { prisma, state } = createLoginSecurityFakePrisma();
   state.identities.push({ id: 'identity-1', userId: USER_ID, provider: 'email', providerUserKey: EMAIL });
   const dispatcher = {
@@ -15,6 +15,9 @@ function setup(options: { devEcho?: boolean; deliverable?: boolean } = {}) {
     // The address rules are the dispatcher's own (verification-dispatcher.service.spec); here every address qualifies.
     mayEchoCode: jest.fn(async () => options.devEcho ?? false),
     emailDeliverable: options.deliverable ?? true,
+    assertDeliveryAvailable: jest.fn(() => {
+      if (options.unavailableAddress) throw new ServiceUnavailableException();
+    }),
   };
   const service = new LoginStepUpService(prisma as never, dispatcher as never);
   return { prisma, state, dispatcher, service };
@@ -316,5 +319,16 @@ describe('LoginStepUpService.resend', () => {
     expect(state.challenges).toHaveLength(0);
     expect(dispatcher.send).not.toHaveBeenCalled();
     expect(logError).toHaveBeenCalledWith(expect.stringContaining('email delivery is not configured'));
+  });
+
+  it('refuses real-address step-up before creating either a real or decoy challenge when only test echo is available', async () => {
+    const logError = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+    const { service, state } = setup({ deliverable: true, unavailableAddress: true });
+    const real = await rejection(service.start({ email: 'runner@gmail.com', emailKey: 'key-a', userId: USER_ID }));
+    const decoy = await rejection(service.start({ email: 'runner@gmail.com', emailKey: 'key-a', userId: null }));
+    expect(real).toMatchObject({ status: 503, code: 'STEP_UP_UNAVAILABLE' });
+    expect(decoy).toMatchObject({ status: real.status, code: real.code });
+    expect(state.challenges).toHaveLength(0);
+    logError.mockRestore();
   });
 });

@@ -62,6 +62,11 @@ Android WebView 로그인, 작성 취소 모달, 대회 필터의 하단 가림 
 - `/my` 계열 19개 경로에서 390x844 Chromium 초기/스크롤 끝 캡처를 시도했다. `/my/reviews/received`는 `/my/reviews`로 이동, `/my/team-contacts`는 이동 중 화면을 캡처했다. 각 상태·상호작용·플랫폼을 완료한 증거는 아니며 144개 전면 검수 수치에 포함하지 않는다. 임시 결과 `/tmp/teameet-mobile-audit-20261103/my-captures.json`.
 - 로컬 변경 단위 검증: BottomSheet 15/15, ConfirmModal 12/12, AuthFrame 10/10, globals 90/90. 범위별 사용자 화면 실제 검증 및 변경 후 Alpha는 아직 미실행.
 - `pnpm --filter v1_web lint`: TypeScript 및 v1 pattern 검사 통과. E2E 세 시나리오 수집 성공. 수정 전 Alpha의 로그인·필터 두 시나리오는 의도한 레이아웃/스크롤 주장으로 실패했고 수정 후 Alpha GREEN은 미확인.
+- 추가 실측: Alpha 팀매치 `/team-matches/469a1730-e96c-4982-ac27-75870a0f9b71`의 지도 선택 `ActionSheet`에서 390x844, 48px inset 모사 시 네이버 지도 항목 끝 y=824 > 안전 경계 y=796. padding 임시 적용 후 y=776. 390x640 자동 E2E는 620 > 592로 RED. 수정 후 Alpha 및 실제 기기 결과는 미확인. ActionSheet·PlaceCard 단위 테스트 27/27 통과(jsdom navigation 미구현 경고 출력).
+- 액션 시트 후속 수정 뒤 `pnpm --filter v1_web lint` 통과. 사용자가 실기기 없이 시뮬레이션으로 진행하고 실기기는 추후 확인하기로 결정했다.
+- 다음 조사 후보: `JerseyNumberDialog`, 개인매치 신청창, 팀 컨택 신고창은 하단 정렬 overlay에 안전 영역을 직접 반영하지 않는 코드가 보인다. 이 항목들은 아직 실제 화면에서 재현하지 않았고 결함으로 확정하지 않았다. 대회 문의 시트는 footer에 안전 영역 계산이 있다.
+- iOS 27.1 runtime은 iPhone Duo만 지원한다. iOS Alpha 앱 빌드·설치·실행은 성공했으나 직후 load 400 이상, swap 급증(약 1.8→3.4GB)으로 테스트를 중단하고 이 작업이 시작한 시뮬레이터를 shutdown, iOS 27.0 추가 다운로드를 취소했다. 화면 상호작용·스크린샷은 미실행. Node 43(시작 41), MCP 11(시작 11); 급증 원인은 미확정.
+- Alpha Chromium 390x844에서 공개·생성 계열 27개 경로의 초기/스크롤 끝 캡처를 추가했다. `/league-matches`는 `/tournaments`로 이동했고 일부 생성 단계는 선행 데이터·로딩 확인이 필요하다. 캡처만으로 전 플랫폼 PASS는 아니다. 임시 결과 `/tmp/teameet-mobile-audit-20261103/public-captures.json`.
 - 사용자는 실기기 연결 불가, 시뮬레이션으로 진행하고 실기기는 나중에 확인하기로 했다. Android 에뮬레이터와 iOS Simulator runtime 미설치 상태를 확인했고, iOS 27.1 simulator runtime 다운로드 진행 중. Android/iOS 실기기/OS/키보드는 미실행.
 
 ## Route inventory (0/144 fully audited; 67 admin-only exclusions)

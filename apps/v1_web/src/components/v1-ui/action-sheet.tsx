@@ -90,6 +90,7 @@ export function ActionSheet({ open, title, subtitle, actions, onClose }: ActionS
         aria-modal="true"
         aria-labelledby={titleId}
         className="flex max-h-[85vh] w-full max-w-[440px] flex-col rounded-t-2xl bg-[var(--card-surface)] p-5 sm:rounded-2xl"
+        style={{ paddingBottom: 'calc(20px + var(--v1-shell-safe-bottom, 0px))' }}
       >
         <div className={`flex items-center justify-between gap-2 ${subtitle ? '' : 'mb-3'}`}>
           <h2

@@ -84,9 +84,14 @@ describe('TeamMatchApplyTeamSheet 팀 선택', () => {
     expect(screen.getByRole('button', { name: '가나다FC로 신청하기' })).toBeTruthy();
   });
 
-  it('시트 빈 곳에서 시작한 포인터는 여전히 드래그로 잡는다(대조)', () => {
+  it('본문은 스크롤에 양보하고 손잡이는 드래그로 잡는다', () => {
     renderSheet([makeTeam('t1', '가나다FC'), makeTeam('t2', '라마바FC')]);
-    fireEvent.pointerDown(screen.getByRole('dialog'), { pointerId: 1, clientY: 0 });
+    const dialog = screen.getByRole('dialog');
+    fireEvent.pointerDown(dialog, { pointerId: 1, clientY: 0 });
+    expect(setCapture).not.toHaveBeenCalled();
+    const handle = dialog.querySelector('.tm-filter-sheet-handle');
+    expect(handle).not.toBeNull();
+    fireEvent.pointerDown(handle!, { pointerId: 2, clientY: 0 });
     expect(setCapture).toHaveBeenCalledTimes(1);
   });
 });

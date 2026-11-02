@@ -914,7 +914,7 @@ button:disabled {
 
 .tm-auth-scroll {
   position: absolute;
-  inset: 56px 0 0;
+  inset: 56px 0 var(--v1-shell-safe-bottom);
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -1978,7 +1978,7 @@ button:disabled {
   left: 0;
   right: 0;
   bottom: 0;
-  padding: 16px 20px 24px;
+  padding: 16px 20px calc(24px + var(--v1-shell-safe-bottom));
   border-top: 1px solid var(--grey100);
   background: var(--bg);
   z-index: var(--z-chrome);
@@ -4142,7 +4142,7 @@ label.tm-btn:focus-within {
   border-radius: var(--radius-hero) var(--radius-hero) 0 0;
   background: var(--bg);
   box-shadow: 0 -16px 32px rgba(25, 31, 40, 0.14);
-  touch-action: none;
+  touch-action: pan-y;
   animation: tm-filter-sheet-up .22s ease-out;
   /* 드래그-닫기(BottomSheet) 미달-임계치 복귀용 — 진입/퇴장 `animation` 은 이 속성에서
    * 항상 우선하므로(같은 프로퍼티에 animation 과 transition 이 동시에 걸리면 animation 승) 여기
@@ -4161,6 +4161,22 @@ label.tm-btn:focus-within {
  * 마다 transform 을 바꾸면 각 프레임이 짧게 트랜지션되며 손가락보다 한 박자 늦게 쫓아온다. */
 .tm-filter-sheet.is-dragging {
   transition: none;
+}
+
+/* 손잡이가 없는 기존 공통 시트는 패널 전체의 드래그-닫기 동작을 유지한다. */
+.tm-scrollable-drag-sheet:not(:has(.tm-filter-sheet-handle)) {
+  touch-action: none;
+}
+
+.tm-scrollable-drag-sheet .tm-filter-sheet-handle {
+  position: relative;
+  touch-action: none;
+}
+
+.tm-scrollable-drag-sheet .tm-filter-sheet-handle::before {
+  content: '';
+  position: absolute;
+  inset: -10px -8px;
 }
 
 /* initialFocus="sheet" 시트의 패널은 tabIndex -1 컨테이너라 링을 그리지 않는다(docs/design/a11y-decisions.md). */

@@ -196,7 +196,11 @@ export function ConfirmModal({
     /* Backdrop */
     <div
       className="fixed inset-0 flex items-end justify-center sm:items-center p-4"
-      style={{ zIndex: 'var(--z-modal)', background: 'color-mix(in srgb, var(--static-ink) 45%, transparent)' }}
+      style={{
+        zIndex: 'var(--z-modal)',
+        background: 'color-mix(in srgb, var(--static-ink) 45%, transparent)',
+        paddingBottom: 'calc(16px + var(--v1-shell-safe-bottom, 0px))',
+      }}
       onClick={onBackdropClick}
     >
       {/* Panel */}
@@ -210,6 +214,8 @@ export function ConfirmModal({
         style={{
           background: 'var(--surface)',
           boxShadow: 'var(--shadow-modal)',
+          maxHeight: '100%',
+          overflowY: 'auto',
         }}
         onClick={(e) => e.stopPropagation()}
       >

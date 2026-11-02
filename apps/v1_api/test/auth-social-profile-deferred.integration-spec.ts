@@ -3,7 +3,6 @@ import { createHash } from 'node:crypto';
 import request = require('supertest');
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ManagedTermsRuntimeService } from '../src/terms/managed-terms-runtime.service';
-import { issueEmailLinkToken } from '../src/auth/email-link-token';
 import { createV1IntegrationApp } from './integration/integration-app';
 
 const deferringUserId = 'integration-social-defer-user';
@@ -149,25 +148,16 @@ describe('V1 social profile deferral integration', () => {
       select: { onboardingStatus: true, signupEmailLoginRequired: true, profile: { select: { nickname: true, realName: true } } },
     });
     expect(user.onboardingStatus).toBe('social_profile_deferred');
-    expect(user.signupEmailLoginRequired).toBe(true);
+    expect(user.signupEmailLoginRequired).toBe(false);
     expect(user.profile?.nickname).toMatch(/^디퍼카카오\d{2,4}$/);
     expect(user.profile?.realName).toBeNull();
   });
 
-  it('requires email login after deferral and resumes deferred access once it is linked', async () => {
-    const blocked = await request(app.getHttpServer()).get('/api/v1/me/profile').set('x-v1-user-id', deferringUserId).expect(403);
-    expect(blocked.body.code).toBe('EMAIL_LOGIN_SETUP_REQUIRED');
-    const previous = process.env.V1_SESSION_SECRET;
-    process.env.V1_SESSION_SECRET = 'integration-social-defer-secret-0123456789';
-    try {
-      const token = issueEmailLinkToken(deferringUserId, 'social-defer-required@integration.test');
-      await request(app.getHttpServer()).post('/api/v1/auth/link/email/complete').set('x-v1-user-id', deferringUserId)
-        .send({ emailLinkToken: token, password: 'test-password-123', passwordConfirm: 'test-password-123' }).expect(200);
-    } finally {
-      if (previous === undefined) delete process.env.V1_SESSION_SECRET;
-      else process.env.V1_SESSION_SECRET = previous;
-    }
-    expect((await prisma.v1User.findUniqueOrThrow({ where: { id: deferringUserId } })).signupEmailLoginRequired).toBe(false);
+  it('allows deferred profile reads without linking an email login', async () => {
+    await request(app.getHttpServer()).get('/api/v1/me/profile').set('x-v1-user-id', deferringUserId).expect(200);
+    const user = await prisma.v1User.findUniqueOrThrow({ where: { id: deferringUserId }, include: { authIdentities: true } });
+    expect(user.signupEmailLoginRequired).toBe(false);
+    expect(user.authIdentities.some((identity) => identity.provider === 'email')).toBe(false);
   });
 
   it('sends an account without the 14+ confirmation back to terms instead of deferring', async () => {

@@ -110,7 +110,7 @@ const storeOf = (prisma: unknown) => (prisma as { __store: Store }).__store;
 function dispatcherMock(devEcho = true) {
   return {
     devEcho,
-    devEchoActive: devEcho,
+    assertDeliveryAvailable: jest.fn(),
     mayEchoCode: jest.fn().mockResolvedValue(devEcho),
     send: jest.fn().mockResolvedValue(undefined),
   } as unknown as VerificationDispatcherService;
@@ -120,6 +120,14 @@ const EMAIL = 'runner@example.com';
 
 describe('EmailVerificationService (공개 이메일 OTP)', () => {
   const OLD_SECRET = process.env.V1_SESSION_SECRET;
+  it.each([true, false])('메일 미설정은 가입 여부(deliver=%s)와 관계없이 같은 오류로 표시한다', async (deliver) => {
+    const prisma = prismaMock();
+    const dispatcher = dispatcherMock(false);
+    (dispatcher.assertDeliveryAvailable as jest.Mock).mockImplementation(() => { throw new Error('EMAIL_SEND_UNAVAILABLE'); });
+    const svc = new EmailVerificationService(prisma, dispatcher, eventLogStub());
+    await expect(svc.issueChallenge('real@gmail.com', { deliver })).rejects.toThrow('EMAIL_SEND_UNAVAILABLE');
+    expect(storeOf(prisma).size).toBe(0);
+  });
   beforeEach(() => {
     jest.clearAllMocks();
     process.env.V1_SESSION_SECRET = 'x'.repeat(48);

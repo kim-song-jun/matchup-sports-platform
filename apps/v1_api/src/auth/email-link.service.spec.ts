@@ -538,9 +538,9 @@ describe('codes are bound to their purpose', () => {
 });
 
 describe('EmailLinkService.complete', () => {
-  it('clears the required signup gate only after email and password are linked', async () => {
+  it('clears a legacy signup flag after an optional email login is linked', async () => {
     const seed = kakaoCaller();
-    seed.users[0].onboardingStatus = 'social_profile_deferred';
+    seed.users[0].onboardingStatus = 'signup_done';
     seed.users[0].signupEmailLoginRequired = true;
     const { verified, complete, state } = await build(seed);
     const token = await verified();

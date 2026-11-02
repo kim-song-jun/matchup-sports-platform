@@ -13,6 +13,7 @@ import {
   EmailRecoveryConfirmDto,
   EmailRecoveryRequestDto,
   FindAccountDto,
+  FindAccountByEmailDto,
   ResetPasswordByEmailDto,
   ResetPasswordDto,
 } from './dto/account-recovery.dto';
@@ -46,7 +47,7 @@ export function socialLoginGuidance(providers: readonly string[]): string {
 }
 
 export interface FoundAccount {
-  /** 마스킹된 로그인 이메일. 소셜 전용 계정이라 이메일 로그인이 불가능하면 null. */
+  /** 마스킹된 계정 이메일. 이메일 로그인 가능 여부는 hasPassword로 구분한다. */
   maskedEmail: string | null;
   /** 이 계정으로 로그인할 수 있는 수단 — 화면이 어떤 로그인으로 안내할지 정하는 근거. */
   providers: string[];
@@ -84,6 +85,24 @@ export class AccountRecoveryService {
       withdrawalPendingUntil: active
         ? null
         : await withdrawalPendingUntil(this.prisma, { id: user.id, accountStatus: 'withdrawal_pending' }),
+    };
+  }
+
+  /** Inbox proof is required before revealing which providers belong to this account. */
+  async findAccountByEmail(dto: FindAccountByEmailDto): Promise<FoundAccount> {
+    const email = normalizeEmail(dto.email);
+    if (!verifyEmailProofToken(dto.proofToken, email, 'password_reset')) {
+      throw new BadRequestException({ code: 'EMAIL_NOT_VERIFIED', message: '이메일 인증을 다시 진행해 주세요.' });
+    }
+    const user = await this.findActiveUserByEmail(email);
+    if (!user) {
+      throw new NotFoundException({ code: 'ACCOUNT_NOT_FOUND', message: '이 이메일로 가입된 계정을 찾지 못했어요.' });
+    }
+    return {
+      maskedEmail: user.email ? maskEmail(user.email) : null,
+      providers: user.authIdentities.map((identity) => identity.provider),
+      hasPassword: user.authIdentities.some((identity) => Boolean(identity.passwordHash)),
+      withdrawalPendingUntil: null,
     };
   }
 

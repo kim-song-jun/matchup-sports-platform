@@ -350,7 +350,7 @@ export class VerificationService {
     });
 
     try {
-      await this.dispatcher.send(channel, target, code, EMAIL_PURPOSE_OF[purpose]);
+      await this.dispatcher.send(channel, target, code, EMAIL_PURPOSE_OF[purpose], userId);
     } catch (err) {
       // 발송 실패 시 방금 만든 토큰을 삭제해, 사용자가 재발송 쿨다운(대상 번호 기준)에 걸리지 않고 즉시 재요청할 수 있게 한다.
       await this.prisma.v1VerificationToken.deleteMany({ where: { id: created.id } });

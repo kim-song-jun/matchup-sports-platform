@@ -146,20 +146,13 @@ describe('V1 adding an email login to a social account integration', () => {
     expect(denied.body.code).toBe('SOCIAL_LINK_ADMIN_FORBIDDEN');
   });
 
-  it('requires email setup across requests and clears the gate only after successful linking', async () => {
-    await prisma.v1User.update({ where: { id: CALLER }, data: { onboardingStatus: 'social_profile_deferred', signupEmailLoginRequired: true } });
-    const blocked = await request(app.getHttpServer()).get(api('/onboarding')).set(as(CALLER)).expect(403);
-    expect(blocked.body.code).toBe('EMAIL_LOGIN_SETUP_REQUIRED');
+  it('releases a legacy mandatory flag without creating an email login', async () => {
+    await prisma.v1User.update({ where: { id: CALLER }, data: { onboardingStatus: 'signup_done', signupEmailLoginRequired: true } });
     const me = await request(app.getHttpServer()).get(api('/auth/me')).set(as(CALLER)).expect(200);
-    expect(me.body.data.user.signupEmailLoginRequired).toBe(true);
-    const { devCode } = await requestCode(CALLER, NEW_EMAIL);
-    const wrongCode = devCode === '000000' ? '111111' : '000000';
-    await post('/auth/link/email/verify', CALLER, { code: wrongCode }).expect(400);
-    expect((await prisma.v1User.findUniqueOrThrow({ where: { id: CALLER } })).signupEmailLoginRequired).toBe(true);
-    const verified = await post('/auth/link/email/verify', CALLER, { code: devCode }).expect(200);
-    await complete(CALLER, verified.body.data.emailLinkToken).expect(200);
-    expect((await prisma.v1User.findUniqueOrThrow({ where: { id: CALLER } })).signupEmailLoginRequired).toBe(false);
-    expect((await request(app.getHttpServer()).get(api('/auth/me')).set(as(CALLER)).expect(200)).body.data.user.signupEmailLoginRequired).toBe(false);
+    expect(me.body.data.user.signupEmailLoginRequired).toBe(false);
+    const user = await prisma.v1User.findUniqueOrThrow({ where: { id: CALLER }, include: { authIdentities: true } });
+    expect(user.signupEmailLoginRequired).toBe(false);
+    expect(user.authIdentities.some((identity) => identity.provider === 'email')).toBe(false);
   });
 
   it('request -> verify -> complete adds the login; email sign-in, password reset and find-account all see it', async () => {

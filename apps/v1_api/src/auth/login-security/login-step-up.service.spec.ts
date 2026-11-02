@@ -12,7 +12,6 @@ function setup(options: { devEcho?: boolean; deliverable?: boolean } = {}) {
   state.identities.push({ id: 'identity-1', userId: USER_ID, provider: 'email', providerUserKey: EMAIL });
   const dispatcher = {
     send: jest.fn().mockResolvedValue(undefined),
-    devEchoActive: options.devEcho ?? false,
     // The address rules are the dispatcher's own (verification-dispatcher.service.spec); here every address qualifies.
     mayEchoCode: jest.fn(async () => options.devEcho ?? false),
     emailDeliverable: options.deliverable ?? true,
@@ -59,7 +58,7 @@ describe('LoginStepUpService.start', () => {
     await service.onApplicationShutdown();
 
     expect(dispatcher.send).toHaveBeenCalledTimes(1);
-    expect(dispatcher.send).toHaveBeenCalledWith('email', EMAIL, expect.stringMatching(/^\d{6}$/), 'login_step_up');
+    expect(dispatcher.send).toHaveBeenCalledWith('email', EMAIL, expect.stringMatching(/^\d{6}$/), 'login_step_up', expect.any(String));
     expect(view).toEqual({
       challengeToken: expect.any(String),
       maskedEmail: 'ru***@example.com',

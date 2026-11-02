@@ -17,7 +17,7 @@ import { isPlausibleEmail } from '@/components/auth/signup-profile-validation';
 import { useSignOutAndLeave } from '@/components/auth/use-sign-out-and-leave';
 import { AlertBanner, Card } from '@/components/v1-ui/primitives';
 import { Button } from '@/components/v1-ui/button';
-import { useV1AuthMe, useV1LinkEmailComplete, useV1LinkEmailRequest, useV1LinkEmailVerify } from '@/hooks/use-v1-api';
+import { useV1LinkEmailComplete, useV1LinkEmailRequest, useV1LinkEmailVerify } from '@/hooks/use-v1-api';
 import {
   EMAIL_CONFLICT_CODE,
   EMAIL_LINK_TOKEN_INVALID_CODE,
@@ -65,8 +65,6 @@ export function EmailLinkClient() {
   const verifyEmail = useV1LinkEmailVerify();
   const completeLink = useV1LinkEmailComplete();
   const signOut = useSignOutAndLeave();
-  const authMe = useV1AuthMe();
-  const mandatory = authMe.data?.user.signupEmailLoginRequired === true;
   const returnTo = parseEmailLinkReturnTo(useSearchParams().get('redirect'));
 
   // 렌더 중에는 읽기만 한다(개발 모드의 이중 렌더에서도 같은 값). 칸은 마운트 뒤에 비운다.
@@ -77,11 +75,6 @@ export function EmailLinkClient() {
 
   const [step, setStep] = useState<Step>('email');
   const [email, setEmail] = useState(offeredEmail ?? '');
-  const [emailEdited, setEmailEdited] = useState(false);
-  useEffect(() => {
-    if (mandatory && !emailEdited && !offeredEmail && authMe.data?.user.email) setEmail(authMe.data.user.email);
-  }, [mandatory, emailEdited, offeredEmail, authMe.data?.user.email]);
-  // 보관해 둔 이메일을 제안하는 중인지. 사용자가 입력을 고치면 일반 1단계로 돌아간다.
   const [offerActive, setOfferActive] = useState(offeredEmail !== null);
   const [emailLinkToken, setEmailLinkToken] = useState<string | null>(null);
   const [password, setPassword] = useState('');
@@ -180,7 +173,6 @@ export function EmailLinkClient() {
   };
 
   const changeEmail = (value: string) => {
-    setEmailEdited(true);
     setEmail(value);
     // 대소문자·앞뒤 공백만 다른 입력은 같은 주소다 — 인증번호 상태(주소가 바뀌어야 새로 시작한다)와 같은 기준으로 가른다.
     if (value.trim().toLowerCase() === normalizedEmail) return;
@@ -198,7 +190,6 @@ export function EmailLinkClient() {
     return (
       <EmailLinkInterruptionView
         kind={interruption}
-        mandatory={mandatory}
         backHref={returnTo ?? LOGIN_METHODS_PATH}
         onRelogin={() => {
           void signOut.signOutAndLeave(getLoginPathForRedirect(emailLinkPath(returnTo)), {
@@ -275,8 +266,8 @@ export function EmailLinkClient() {
     <AuthFrame
       stage={AUTH_WELCOME_STAGE}
       topTitle="이메일 로그인 연결"
-      backHref={step === 'email' && !mandatory ? returnTo ?? LOGIN_METHODS_PATH : undefined}
-      appBack={step === 'email' && !mandatory}
+      backHref={step === 'email' ? returnTo ?? LOGIN_METHODS_PATH : undefined}
+      appBack={step === 'email'}
       onBack={step === 'email' ? undefined : goBack}
       fixedAction={
         <AuthStepCta
@@ -296,8 +287,6 @@ export function EmailLinkClient() {
           sub={copy.sub}
           focusOnChange
         />
-
-        {mandatory && step === 'email' ? <div className="tm-text-caption" style={{ marginTop: 16 }}>가입을 마치려면 이메일 인증과 비밀번호 설정이 필요해요.</div> : null}
 
         {step === 'email' && tokenInvalid ? <AlertBanner tone="warning" assertive message={TOKEN_INVALID_MESSAGE} /> : null}
         <form
@@ -395,11 +384,6 @@ export function EmailLinkClient() {
             </>
           ) : null}
         </form>
-
-        {mandatory && step === 'email' ? <>
-          <Button type="button" variant="ghost" size="sm" disabled={signOut.pending} onClick={() => void signOut.signOutAndLeave('/login', { failureMessage: '로그아웃하지 못했어요. 잠시 후 다시 시도해 주세요.' })}>로그아웃</Button>
-          {signOut.error ? <p className="tm-text-caption" role="alert">{signOut.error}</p> : null}
-        </> : null}
 
         {completeError ? (
           <Card pad={16} className="tm-auth-soft-card tm-auth-soft-card-error">

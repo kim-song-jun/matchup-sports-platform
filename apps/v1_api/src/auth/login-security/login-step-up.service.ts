@@ -194,7 +194,7 @@ export class LoginStepUpService implements OnApplicationShutdown {
         select: { providerUserKey: true },
       });
       if (!identity) throw new Error('email identity not found for step-up challenge');
-      await this.dispatcher.send('email', identity.providerUserKey, code, 'login_step_up');
+      await this.dispatcher.send('email', identity.providerUserKey, code, 'login_step_up', userId);
     } catch (error) {
       await this.recordSendFailure(challengeId, error);
       throw error;

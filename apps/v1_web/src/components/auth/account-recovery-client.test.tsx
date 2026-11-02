@@ -52,7 +52,7 @@ function enterPhone() {
 }
 
 function goToEmailReset() {
-  fireEvent.click(screen.getByRole('tab', { name: '비밀번호 재설정' }));
+  fireEvent.click(screen.getByRole('button', { name: '비밀번호 재설정' }));
 }
 
 function enterEmail(value = 'runner@example.com') {
@@ -65,6 +65,21 @@ async function fillNewPassword(value = 'brand-new-pass') {
 }
 
 describe('AccountRecoveryClient', () => {
+  it('로그인 방법과 인증 수단을 한 흐름으로 고르고 재설정에서 돌아올 수 있다', () => {
+    render(<AccountRecoveryClient />);
+    expect(screen.getByRole('heading', { name: '가입한 로그인 방법을 찾아요' })).toBeVisible();
+    expect(screen.queryByRole('tablist', { name: '찾기 방법' })).not.toBeInTheDocument();
+    expect(screen.getByRole('group', { name: '본인 확인 방법' })).toBeVisible();
+    expect(screen.getByRole('button', { name: '휴대폰으로 찾기' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: '이메일로 찾기' }));
+    expect(screen.getByLabelText('이메일')).toBeVisible();
+    expect(screen.getByRole('button', { name: '이메일로 찾기' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: '비밀번호 재설정' }));
+    expect(screen.getByRole('heading', { name: '비밀번호를 다시 설정해요' })).toBeVisible();
+    expect(screen.queryByRole('group', { name: '본인 확인 방법' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '로그인 방법 찾기' }));
+    expect(screen.getByLabelText('이메일')).toBeVisible();
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     nativeApple.available = false;
@@ -81,7 +96,7 @@ describe('AccountRecoveryClient', () => {
 
   it('설정에서 비밀번호 재설정으로 진입하고 인증·저장 후 설정으로 복귀한다', async () => {
     render(<AccountRecoveryClient initialMode="reset-password" backHref="/my/settings" />);
-    expect(screen.getByRole('tab', { name: '비밀번호 재설정' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('heading', { name: '비밀번호를 다시 설정해요' })).toBeVisible();
     screen.getAllByRole('link', { name: '뒤로가기' }).forEach((link) => expect(link).toHaveAttribute('href', '/my/settings'));
     expect(screen.getByLabelText('이메일')).toHaveValue('runner@example.com');
     fireEvent.click(screen.getByRole('button', { name: '__stub_email_verify__' }));
@@ -166,7 +181,7 @@ describe('AccountRecoveryClient', () => {
     enterPhone();
     fireEvent.click(screen.getByRole('button', { name: '__stub_verify__' }));
     await screen.findByText('ru***@example.com');
-    goToEmailReset();
+    fireEvent.click(screen.getByRole('button', { name: '비밀번호 재설정하기' }));
     expect(screen.getByLabelText('이메일')).toBeInTheDocument();
     expect(screen.queryByLabelText('새 비밀번호')).not.toBeInTheDocument();
     expect(hooks.resetPasswordByEmailMutateAsync).not.toHaveBeenCalled();
@@ -206,6 +221,7 @@ describe('AccountRecoveryClient', () => {
       expect(screen.queryByRole('link', { name: '로그인하러 가기' })).not.toBeInTheDocument();
       expect(screen.queryByRole('link', { name: '이메일로 로그인하기' })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: '비밀번호 재설정하기' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: '비밀번호 재설정' })).not.toBeInTheDocument();
       expect(screen.queryByLabelText('새 비밀번호')).not.toBeInTheDocument();
       expect(hooks.resetPasswordByEmailMutateAsync).not.toHaveBeenCalled();
     });
@@ -248,7 +264,7 @@ describe('AccountRecoveryClient', () => {
       expect(hrefOf('로그인하러 가기')).toBe('/login/email');
       expect(screen.queryByRole('link', { name: '카카오로 로그인하기' })).not.toBeInTheDocument();
       fireEvent.click(screen.getByRole('button', { name: '비밀번호 재설정하기' }));
-      expect(screen.getByRole('tab', { name: '비밀번호 재설정' })).toHaveAttribute('aria-selected', 'true');
+      expect(screen.getByRole('heading', { name: '비밀번호를 다시 설정해요' })).toBeVisible();
       expect(screen.getByLabelText('이메일')).toBeInTheDocument();
     });
 
@@ -322,6 +338,7 @@ describe('AccountRecoveryClient', () => {
       expect(screen.getByText('11월 7일')).toBeInTheDocument();
       expect(screen.getByText('위 이메일로 가입한 계정이에요.')).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: '비밀번호 재설정하기' })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '비밀번호 재설정' })).toBeVisible();
     });
 
     it('"내 계정이 아닌가요?" 한 줄은 싣지 않는다 — 비밀번호를 잊은 사람용 고객센터 링크는 방법 1 에 이미 있다', async () => {
@@ -430,7 +447,7 @@ describe('AccountRecoveryClient — 이메일 재설정', () => {
     render(<AccountRecoveryClient />);
     expect(screen.queryByRole('tab', { name: '이메일' })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('tab', { name: '비밀번호 재설정' }));
+    fireEvent.click(screen.getByRole('button', { name: '비밀번호 재설정' }));
     expect(screen.getByLabelText('이메일')).toBeInTheDocument();
     expect(screen.queryByLabelText('휴대폰 번호')).not.toBeInTheDocument();
     expect(screen.queryByRole('tab', { name: '휴대폰' })).not.toBeInTheDocument();
@@ -545,7 +562,7 @@ describe('AccountRecoveryClient — 이메일 재설정', () => {
     fireEvent.click(screen.getByRole('button', { name: '__stub_email_verify__' }));
     expect(await screen.findByLabelText('새 비밀번호')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('tab', { name: '아이디 찾기' }));
+    fireEvent.click(screen.getByRole('button', { name: '로그인 방법 찾기' }));
 
     expect(screen.queryByLabelText('새 비밀번호')).not.toBeInTheDocument();
     expect(screen.getByLabelText('휴대폰 번호')).toBeInTheDocument();

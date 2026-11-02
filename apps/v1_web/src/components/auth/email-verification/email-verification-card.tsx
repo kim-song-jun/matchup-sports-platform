@@ -10,7 +10,7 @@ type Props = {
   email: string;
   /** 대조에 성공하면 비밀번호 재설정용 증명 토큰을 넘긴다. */
   onVerified: (proofToken?: string) => void;
-  surface?: 'card' | 'inset';
+  surface?: 'card' | 'inset' | 'plain';
 };
 
 /**

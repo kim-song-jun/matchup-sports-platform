@@ -91,7 +91,7 @@ export async function verifyPhone(phone = RECOVERY_PHONE) {
 }
 
 export async function verifyIndependentEmail() {
-  fireEvent.click(screen.getByRole('tab', { name: '비밀번호 재설정' }));
+  fireEvent.click(screen.getByRole('button', { name: '비밀번호 재설정' }));
   fireEvent.change(screen.getByLabelText('이메일'), { target: { value: RECOVERY_EMAIL } });
   const user = userEvent.setup();
   await user.click(await screen.findByRole('button', { name: '인증번호 받기' }));

@@ -25,8 +25,8 @@ afterEach(() => { cleanup(); flow.releaseAll(); authUiServer.resetHandlers(); })
 
 const renderEmailRecovery = () => renderRecovery(<StrictMode><AccountRecoveryClient initialMode="reset-password" /></StrictMode>);
 const returnToEmailMode = () => {
-  fireEvent.click(screen.getByRole('tab', { name: '아이디 찾기' }));
-  fireEvent.click(screen.getByRole('tab', { name: '비밀번호 재설정' }));
+  fireEvent.click(screen.getByRole('button', { name: '로그인 방법 찾기' }));
+  fireEvent.click(screen.getByRole('button', { name: '비밀번호 재설정' }));
 };
 const expectUnverifiedEmail = () => {
   expect(screen.queryByLabelText('새 비밀번호')).not.toBeInTheDocument();

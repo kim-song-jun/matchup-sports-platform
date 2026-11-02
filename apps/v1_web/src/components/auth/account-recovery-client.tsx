@@ -21,14 +21,15 @@ import { describeFoundAccount } from './found-account-login';
 import { FoundAccountWithdrawalGuide } from './found-account-withdrawal-guide';
 import { RecycledNumberHelp } from './recycled-number-help';
 import { formatPhone, normalizeSeparatedDigits } from './signup-profile-validation';
+import styles from './account-recovery.module.css';
 
 type Mode = 'find-id' | 'reset-password';
 type FindMethod = 'phone' | 'email';
 
 const MODE_COPY: Record<Mode, { title: string; sub: string }> = {
   'find-id': {
-    title: '가입한 이메일을 찾아요',
-    sub: '가입할 때 등록한 휴대폰 번호로 본인인증하면 로그인에 쓰는 이메일을 알려드려요.',
+    title: '가입한 로그인 방법을 찾아요',
+    sub: '등록한 휴대폰 번호를 인증하면 사용 중인 로그인 방법을 알려드려요.',
   },
   'reset-password': {
     title: '비밀번호를 다시 설정해요',
@@ -177,6 +178,7 @@ export function AccountRecoveryClient({ initialMode = 'find-id', backHref = '/lo
   };
 
   const switchFindMethod = (next: FindMethod) => {
+    if (next === findMethod) return;
     setFindMethod(next);
     resetProgress();
   };
@@ -257,38 +259,15 @@ export function AccountRecoveryClient({ initialMode = 'find-id', backHref = '/lo
   return (
     <AuthFrame topTitle={returnToSettings ? '비밀번호 변경' : '계정 찾기'} backHref={recoveryBackHref} appBack={returnToSettings} stage={AUTH_NOTICE_STAGE}>
       <div className="tm-auth-body">
-        <div className="tm-auth-segmented" role="tablist" aria-label="찾기 방법">
-          <button
-            className={`tm-auth-segment ${mode === 'find-id' ? 'tm-auth-segment-active' : ''}`}
-            type="button"
-            role="tab"
-            aria-selected={mode === 'find-id'}
-            onClick={() => switchMode('find-id')}
-          >
-            아이디 찾기
-          </button>
-          <button
-            className={`tm-auth-segment ${mode === 'reset-password' ? 'tm-auth-segment-active' : ''}`}
-            type="button"
-            role="tab"
-            aria-selected={mode === 'reset-password'}
-            onClick={() => switchMode('reset-password')}
-          >
-            비밀번호 재설정
-          </button>
-        </div>
+        <h1 className="tm-text-heading tm-auth-heading">{copy.title}</h1>
+        <p className="tm-text-body tm-auth-sub">{copy.sub}</p>
 
         {mode === 'find-id' ? (
-          <div className="tm-auth-segmented" role="group" aria-label="계정 찾는 방법">
-            <button className={`tm-auth-segment ${findMethod === 'phone' ? 'tm-auth-segment-active' : ''}`} type="button" aria-pressed={findMethod === 'phone'} onClick={() => switchFindMethod('phone')}>휴대폰으로 찾기</button>
-            <button className={`tm-auth-segment ${findMethod === 'email' ? 'tm-auth-segment-active' : ''}`} type="button" aria-pressed={findMethod === 'email'} onClick={() => switchFindMethod('email')}>이메일로 찾기</button>
+          <div className={styles.methodGroup} role="group" aria-label="본인 확인 방법">
+            <button className={styles.method} type="button" aria-pressed={findMethod === 'phone'} onClick={() => switchFindMethod('phone')}>휴대폰으로 찾기</button>
+            <button className={styles.method} type="button" aria-pressed={findMethod === 'email'} onClick={() => switchFindMethod('email')}>이메일로 찾기</button>
           </div>
         ) : null}
-
-        <h1 className="tm-text-heading tm-auth-heading">{copy.title}</h1>
-        <p className="tm-text-body tm-auth-sub">
-          {copy.sub}
-        </p>
 
         {returnToSettings && currentAccount.isError ? (
           <Card pad={16} className="tm-auth-soft-card-error"><div role="alert">{extractErrorMessage(currentAccount.error, '계정 정보를 확인하지 못했어요. 설정에서 다시 시도해 주세요.')}</div></Card>
@@ -325,6 +304,7 @@ export function AccountRecoveryClient({ initialMode = 'find-id', backHref = '/lo
                   key={phoneFlowGeneration}
                   mode="public"
                   purpose="password_reset"
+                  surface="plain"
                   phone={phoneDigits}
                   onVerified={(token) => void onPhoneVerified(token)}
                 />
@@ -361,6 +341,7 @@ export function AccountRecoveryClient({ initialMode = 'find-id', backHref = '/lo
                   <EmailVerificationCard
                     key={emailFlowGeneration}
                     email={normalizedEmail}
+                    surface="plain"
                     onVerified={(token) => void onEmailVerified(token)}
                   />
                   {/* 가입 여부는 서버도 알려 주지 않는다(아무나 이메일만으로 가입 여부를 훑지
@@ -470,6 +451,15 @@ export function AccountRecoveryClient({ initialMode = 'find-id', backHref = '/lo
             </Card>
           ) : null}
         </div>
+
+        {(!returnToSettings || mode === 'find-id') && (!found || (withdrawalGraceEnd !== null && found.hasPassword)) ? (
+          <div className={styles.alternative}>
+            <span>{mode === 'find-id' ? '비밀번호를 잊으셨나요?' : '가입한 로그인 방법이 궁금하신가요?'}</span>
+            <button type="button" onClick={() => switchMode(mode === 'find-id' ? 'reset-password' : 'find-id')}>
+              {mode === 'find-id' ? '비밀번호 재설정' : '로그인 방법 찾기'}
+            </button>
+          </div>
+        ) : null}
       </div>
     </AuthFrame>
   );

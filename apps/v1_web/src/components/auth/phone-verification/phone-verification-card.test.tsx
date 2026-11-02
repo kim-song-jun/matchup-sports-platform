@@ -39,6 +39,22 @@ afterEach(() => {
 });
 
 describe('PhoneVerificationCard', () => {
+  it('본문에 이어진 인증도 번호를 요청하고 확인해 증명을 전달한다', async () => {
+    vi.spyOn(api, 'useV1PhoneIssue').mockReturnValue(
+      mutation({ expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString() }),
+    );
+    const verify = vi.fn().mockResolvedValue({ verified: true, proofToken: 'PROOF', registered: false, withdrawalPendingUntil: null });
+    vi.spyOn(api, 'useV1PhoneVerify').mockReturnValue({ mutateAsync: verify, isPending: false } as never);
+    const onVerified = vi.fn();
+    wrap(<PhoneVerificationCard mode="public" phone="01012345678" surface="plain" onVerified={onVerified} />);
+    expect(screen.getByRole('group', { name: '휴대폰 본인인증' })).not.toHaveClass('tm-card');
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '인증번호 받기' })); });
+    fireEvent.change(screen.getByLabelText('인증번호 6자리'), { target: { value: '123456' } });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '확인' })); });
+    expect(verify).toHaveBeenCalledWith({ phone: '01012345678', code: '123456' });
+    expect(onVerified).toHaveBeenCalledWith('PROOF', false, null);
+    expect(screen.getByRole('status')).toHaveTextContent('휴대폰 본인인증이 완료됐어요.');
+  });
   it('"인증번호 받기" 클릭 시 issue를 호출하고 코드 입력 필드·확인 버튼을 노출한다', async () => {
     const issueMock = vi.fn().mockResolvedValue({ expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString() });
     vi.spyOn(api, 'useV1PhoneIssue').mockReturnValue({ mutateAsync: issueMock, isPending: false } as never);

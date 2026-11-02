@@ -692,6 +692,9 @@ function BasicStep({
           <CompetitionTemplateCard mode="radio" name="format" value="group_knockout" checked={state.format === 'group_knockout'}
             onChange={(value) => setField('format', value as V1TournamentFormat)} graphic="groups"
             title="조별리그 + 토너먼트" description="조별 경기 순위에 따라 결선에 진출해요." meta="조별 예선 → 결선 대진" />
+          <CompetitionTemplateCard mode="radio" name="format" value="league_knockouts" checked={state.format === 'league_knockouts'}
+            onChange={(value) => setField('format', value as V1TournamentFormat)} graphic="groups"
+            title="정규리그 + N개 토너먼트" description="예선 조별리그 뒤 여러 토너먼트를 운영해요. 진출팀은 순위로 제안받고 직접 편집해요." meta="예선 → 진출팀 편집 → 복수 결선" />
           <CompetitionTemplateCard mode="radio" name="format" value="knockout" checked={state.format === 'knockout'}
             onChange={(value) => setField('format', value as V1TournamentFormat)} graphic="knockout"
             title="토너먼트만" description="정해진 대진으로 경기하고, 패하면 탈락해요." meta="4·8·12·16팀 템플릿 지원" />
@@ -957,7 +960,7 @@ function ParticipationStep({
           value={state.teamCount}
           onChange={(value) => setField('teamCount', value)}
           min={2}
-          max={64}
+          max={state.format === 'league_knockouts' ? undefined : 64}
           disabled={pending}
           error={errors.teamCount}
           required
@@ -1597,7 +1600,7 @@ function NumberField({
   value: string;
   onChange: (value: string) => void;
   min: number;
-  max: number;
+  max?: number;
   disabled: boolean;
   error?: string;
   required?: boolean;

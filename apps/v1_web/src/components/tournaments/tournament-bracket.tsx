@@ -16,6 +16,7 @@ import { buildBracketGraph, bracketConnectionPath, bracketContentCenter, type Br
 import { Trophy } from 'lucide-react';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
+import { bracketTrackLabel, effectiveBracketTrack } from '@/lib/bracket-track';
 import type { V1TournamentFixture, V1TournamentGroup } from '@/types/api';
 
 /* ── 라운드 그룹핑 (기존 pure logic 유지) ── */
@@ -94,8 +95,9 @@ export function groupFixturesByRound(
     const fixturePhase = getFixturePhase(fixture.round);
 
     const group = fixture.groupId ? groupById.get(fixture.groupId) : undefined;
-    key = fixturePhase ?? group?.phase ?? fixture.round;
-    sortIndex = PHASE_ORDER[key] ?? 100;
+    const largeRound = /^(\d+)강$/.exec(fixture.round.trim());
+    key = largeRound && Number(largeRound[1]) > 64 ? fixture.round : fixturePhase ?? group?.phase ?? fixture.round;
+    sortIndex = largeRound && Number(largeRound[1]) > 64 ? -Math.log2(Number(largeRound[1])) : PHASE_ORDER[key] ?? 100;
 
     const existing = roundMap.get(key);
     if (existing) {
@@ -115,7 +117,7 @@ export function groupFixturesByRound(
   }
 
   for (const round of roundMap.values()) {
-    const names = [...new Set(groups.filter((group) => group.phase === round.key &&
+    const names = [...new Set(groups.filter((group) => (group.phase === round.key || round.fixtures.some(fixture => fixture.groupId === group.id)) &&
       (round.fixtures.some((fixture) => fixture.groupId === group.id) || group.groupTeams.some((team) => team.isBye)))
       .map((group) => group.name.trim()).filter(Boolean))];
     if (names.length) round.label = names.join(' · ');
@@ -772,7 +774,7 @@ export interface TournamentBracketProps {
   selectedRoundKey?: string | null;
 }
 
-export function TournamentBracket({ fixtures, groups, selectedRoundKey }: TournamentBracketProps) {
+function SingleTournamentBracket({ fixtures, groups, selectedRoundKey }: TournamentBracketProps) {
   const rounds = groupFixturesByRound(fixtures, groups);
 
 
@@ -949,6 +951,30 @@ export function TournamentBracket({ fixtures, groups, selectedRoundKey }: Tourna
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+export function TournamentBracket({ fixtures, groups, selectedRoundKey }: TournamentBracketProps) {
+  const splitTracks = ([...new Set(groups.map(group => group.bracketTrack).filter((track): track is string => Boolean(track) && track !== 'overall'))]).filter((track) =>
+    groups.some((group) => effectiveBracketTrack(group.bracketTrack) === track),
+  );
+  if (splitTracks.length === 0) return <SingleTournamentBracket fixtures={fixtures} groups={groups} selectedRoundKey={selectedRoundKey} />;
+
+  return (
+    <div className="flex flex-col gap-6">
+      {splitTracks.map((track) => {
+        const trackGroups = groups.filter((group) => effectiveBracketTrack(group.bracketTrack) === track);
+        const trackGroupIds = new Set(trackGroups.map((group) => group.id));
+        const trackFixtures = fixtures.filter((fixture) => fixture.groupId !== null && trackGroupIds.has(fixture.groupId));
+        const label = bracketTrackLabel(track)!;
+        return (
+          <section key={track} aria-label={label}>
+            <h4 className="tm-text-body-lg font-bold mb-3" style={{ color: 'var(--text-strong)' }}>{label}</h4>
+            <SingleTournamentBracket fixtures={trackFixtures} groups={trackGroups} selectedRoundKey={selectedRoundKey} />
+          </section>
+        );
+      })}
     </div>
   );
 }

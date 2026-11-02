@@ -13,6 +13,7 @@ import {
 import { competitionMatchLabel } from '@/lib/tournament-round-label';
 import type { V1AdminBracketFixture, V1AdminBracketGroup, V1AdminBracketSlot, V1AdminTournamentRegistration, V1SixTeamBracket } from '@/types/api';
 import { SixTeamAdminBracket } from './six-team-admin-bracket';
+import { bracketTrackLabel } from '@/lib/bracket-track';
 import { BracketCanvasNode } from './bracket-canvas-node';
 import { BracketGroupBlock } from './bracket-group-block';
 
@@ -31,9 +32,15 @@ export type BracketCanvasProps = {
   onAssignDirect: (fixtureId: string, side: SideKey, registrationId: string) => void;
 };
 
+// The shared API type is being updated separately; read the server's track field locally here.
+type BracketSlotWithTrack = V1AdminBracketSlot & { bracketTrack?: string };
+
 export function fixtureTitle(fixture: V1AdminBracketFixture, groups: readonly V1AdminBracketGroup[]): string {
-  const groupName = groups.find((group) => group.id === fixture.groupId)?.name ?? null;
-  return `${competitionMatchLabel({ groupName, round: fixture.round, legNumber: fixture.legNumber })} ${fixture.fixtureNumber}번 경기`;
+  const group = groups.find((candidate) => candidate.id === fixture.groupId);
+  const groupName = group?.name ?? null;
+  const trackLabel = bracketTrackLabel(group?.bracketTrack);
+  const title = `${competitionMatchLabel({ groupName, round: fixture.round, legNumber: fixture.legNumber })} ${fixture.fixtureNumber}번 경기`;
+  return trackLabel ? `${trackLabel} · ${title}` : title;
 }
 
 // 선 모양으로도 종류를 구분한다 — 색만으로 전달하지 않는다.
@@ -143,7 +150,7 @@ export function BracketCanvas({
                 AWAY: fixture.awaySlotId === null ? null : (slotsById.get(fixture.awaySlotId) ?? null),
               }}
               selected={fixture.id === selectedFixtureId}
-              canWrite={canWrite}
+              canWrite={canWrite && !groups.some(group => group.id === fixture.groupId && group.bracketTrack && !['overall', 'upper', 'lower'].includes(group.bracketTrack))}
               pendingRegistrationId={pendingRegistrationId}
               onSelect={onSelectFixture}
               onAssign={onAssignSlot}
@@ -155,6 +162,12 @@ export function BracketCanvas({
           <BracketGroupBlock
             key={block.groupId}
             block={block}
+            hasSplitQualification={slots.some((slot) => {
+              const trackedSlot = slot as BracketSlotWithTrack;
+              return trackedSlot.kind === 'GROUP_RANK'
+                && trackedSlot.sourceGroupId === block.groupId
+                && trackedSlot.bracketTrack === 'lower';
+            })}
             canWrite={canWrite}
             lockedSlotIds={lockedSlotIds}
             pendingRegistrationId={pendingRegistrationId}

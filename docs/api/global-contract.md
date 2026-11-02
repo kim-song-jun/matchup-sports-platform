@@ -246,3 +246,5 @@ status inputs are defined in [Tournaments](./domains/tournaments.md#competition-
 
 
 대회 생성·수정의 `prizeBreakdown`은 nullable string(최대 4,000자)이다. 기존 구분자 텍스트와 `@teameet/prizes/v1:` 접두의 분류 JSON 문자열을 지원하며, 소비자는 공용 파서로 읽는다. 이 필드를 원문 그대로 사용자에게 렌더하지 않는다. [대회 시상 계획 계약](./domains/tournaments.md#categorized-prize-plans) 참고.
+
+- 정규대회 진행 방식 `league_knockouts`는 한 대회의 예선 조별리그와 이름을 가진 N개 토너먼트다. 정규리그 시즌/승강과 별개이며 기존 `group_knockout`은 유지한다. 이 방식의 시상 `bracketTrack`은 고정 enum 대신 설정된 토너먼트 이름을 받으며 서비스가 대회 소속을 검증한다. 상세는 [대회 계약](./domains/tournaments.md#정규리그--n개-토너먼트-league_knockouts).

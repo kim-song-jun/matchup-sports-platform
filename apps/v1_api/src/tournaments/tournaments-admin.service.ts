@@ -291,6 +291,7 @@ export class TournamentsAdminService {
         message: '참가 팀 수를 입력해 주세요.',
       });
     }
+    if (dto.format !== 'league_knockouts' && (dto.teamCount ?? 0) > 64) throw new BadRequestException({ code: 'TOURNAMENT_TEAM_COUNT_INVALID', message: '이 진행 방식은 최대 64팀까지 설정할 수 있어요.' });
     if (dto.sixTeamMode && (dto.teamCount !== 6 || dto.format !== 'knockout')) throw new BadRequestException({ code: 'SIX_TEAM_FORMAT_INVALID', message: '6강 결승 직행 방식은 모집 정원 6팀의 토너먼트에서 선택해 주세요.' });
     this.assertPlayerRange(dto.minPlayers, dto.maxPlayers);
     this.assertSubstitutionPolicyPair(dto.substitutionMode, dto.maxSubstitutions);
@@ -435,6 +436,7 @@ export class TournamentsAdminService {
     if (existing.sixTeamBracket != null && ((dto.teamCount !== undefined && dto.teamCount !== 6) || (dto.format !== undefined && dto.format !== 'knockout') || dto.sixTeamMode === false)) {
       throw new ConflictException({ code: 'SIX_TEAM_SETTINGS_LOCKED', message: '6강 대진을 만든 뒤에는 모집 정원과 진행 방식을 바꿀 수 없어요.' });
     }
+    if ((dto.format ?? existing.format) !== 'league_knockouts' && (dto.teamCount ?? existing.teamCount) > 64) throw new BadRequestException({ code: 'TOURNAMENT_TEAM_COUNT_INVALID', message: '이 진행 방식은 최대 64팀까지 설정할 수 있어요.' });
     const sixTeamMode = dto.sixTeamMode ?? (existing.sixTeamMode && (dto.teamCount ?? existing.teamCount) === 6 && (dto.format ?? existing.format) === 'knockout');
     if (sixTeamMode && ((dto.teamCount ?? existing.teamCount) !== 6 || (dto.format ?? existing.format) !== 'knockout')) throw new BadRequestException({ code: 'SIX_TEAM_FORMAT_INVALID', message: '6강 방식은 모집 정원 6팀의 토너먼트에서만 선택할 수 있어요.' });
     const formatChanged = dto.format !== undefined && dto.format !== existing.format;

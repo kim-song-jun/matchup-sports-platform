@@ -177,7 +177,9 @@ export function BracketNodePanel({
     const slot = slotId === null ? undefined : slotsById.get(slotId);
     const source = classifyFixtureSide(fixture, side, slotsById);
     let body: React.ReactNode;
-    if (source === 'direct') {
+    if (groups.some(group => group.id === fixture.groupId && group.bracketTrack && !['overall', 'upper', 'lower'].includes(group.bracketTrack))) {
+      body = <p className="tm-text-caption text-[var(--text-muted)]">진출팀은 예선·토너먼트 설정에서 편집해요.</p>;
+    } else if (source === 'direct') {
       const current = side === 'HOME' ? fixture.homeRegistrationId : fixture.awayRegistrationId;
       if (teamChangeAccess === 'official' || teamChangeAccess === 'cancelled') {
         body = (

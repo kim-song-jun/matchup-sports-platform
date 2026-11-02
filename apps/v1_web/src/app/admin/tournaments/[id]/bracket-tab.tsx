@@ -152,7 +152,7 @@ export function BracketTab({
   bracketPublishedAt: string | null | undefined;
   bracketPublishScheduledAt: string | null | undefined;
   canWrite: boolean;
-  tournamentFormat?: 'knockout' | 'league' | 'group_knockout';
+  tournamentFormat?: 'knockout' | 'league' | 'group_knockout' | 'league_knockouts';
 }) {
   const { data: bracket, isPending, isError, error, refetch } = useV1AdminBracket(tournamentId);
   const [round12AutoOpen, setRound12AutoOpen] = useState(false);
@@ -797,7 +797,7 @@ export function BracketTab({
 
     <div className="flex flex-col gap-6">
 
-      {canWrite && tournamentFormat ? <BracketListTemplateTools tournamentId={tournamentId} format={tournamentFormat}
+      {canWrite && tournamentFormat && tournamentFormat !== 'league_knockouts' ? <BracketListTemplateTools tournamentId={tournamentId} format={tournamentFormat}
         hasExistingBracket={groups.length > 0 || fixtures.length > 0 || (bracket?.slots?.length ?? 0) > 0}
         groups={groups} slots={bracket?.slots ?? []} registrations={registrations}
         confirmedTeamCount={confirmedTeamCount} confirmedTeamCountStatus={confirmedTeamCountStatus} showToast={showToast} /> : null}
@@ -821,16 +821,16 @@ export function BracketTab({
         )}
       </div>
 
-      <BracketGroupQuickAdd
+      {tournamentFormat !== 'league_knockouts' && canWrite ? <BracketGroupQuickAdd
         existingGroups={groups}
         createGroup={createGroup}
         showToast={showToast}
         onCreated={(id) => setFocusGroupId(id)}
-      />
+      /> : null}
 
       {/* ── 조 카드 목록 (설계안 B) — 조 1개 = 카드 1개, 배정·순위·대진이 카드 안에서 끝난다 ── */}
       {groups.length === 0 ? (
-        <AdminEmpty title="아직 만든 조가 없어요" description="위에서 원하는 유형을 눌러 조를 만들어 보세요." />
+        <AdminEmpty title="아직 만든 조가 없어요" description={tournamentFormat === 'league_knockouts' ? '예선·토너먼트 설정에서 예선 조를 편성해 주세요.' : '위에서 원하는 유형을 눌러 조를 만들어 보세요.'} />
       ) : (
         <div className="flex flex-col gap-4">
           {groups.map((group) => (
@@ -839,6 +839,7 @@ export function BracketTab({
                 ? <div className="flex justify-end"><Button variant="outline" size="md" onClick={() => setRound12AutoOpen(true)}>12강 진출팀 자동 배정</Button></div> : null}
               <BracketGroupCard
                 tournamentId={tournamentId}
+                structureEditable={canWrite && tournamentFormat !== 'league_knockouts'}
                 slots={bracket?.slots ?? []}
                 group={group}
                 managedEntrySlots={(bracket?.slots ?? []).some((slot) => slot.kind === 'ENTRY' && slot.groupId === group.id)}

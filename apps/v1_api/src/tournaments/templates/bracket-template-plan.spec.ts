@@ -71,7 +71,7 @@ describe('planBracketTemplate — 개수 계약(스펙 Test Scenarios)', () => {
   it('league 6팀 2회전 = 30경기, 같은 쌍이 정확히 두 번이고 홈/원정이 교대한다', () => {
     const p = plan({ kind: 'league', teamCount: 6, legs: 2 });
     expect(p.fixtures).toHaveLength(30);
-    expect(p.groups).toEqual([{ key: 'league', name: '리그', phase: 'group', sortOrder: 0, advanceCount: null }]);
+    expect(p.groups).toEqual([{ key: 'league', name: '리그', phase: 'group', sortOrder: 0, advanceCount: null, bracketTrack: 'overall' }]);
     expect(p.slots.map((s) => [s.key, s.kind, s.position, s.groupKey])).toEqual(
       [1, 2, 3, 4, 5, 6].map((n) => [`entry-${n}`, 'ENTRY', n, 'league']),
     );

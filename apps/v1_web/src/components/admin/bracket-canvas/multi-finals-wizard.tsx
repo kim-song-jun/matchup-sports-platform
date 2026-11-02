@@ -51,6 +51,7 @@ export function MultiFinalsWizard({ tournamentId, open, onClose, onApplied }: {
         setStep(1); return;
       }
       if (step === 1) {
+        if (configured && !dirty) { setStep(2); return; }
         if (!finals.length || finals.some(f => !f.name.trim()) || new Set(finals.map(f => f.name.trim())).size !== finals.length) throw new Error('토너먼트 이름을 중복 없이 입력해 주세요.');
         if (server?.generated && !await confirm({ title: '결선 설정 변경', message: '저장하면 아직 시작하지 않은 기존 결선 대진을 비우고 새 명단으로 다시 만들어요. 예선 경기와 결과는 유지돼요.', confirmLabel: '설정 저장' })) return;
         const result = configured
@@ -77,6 +78,10 @@ export function MultiFinalsWizard({ tournamentId, open, onClose, onApplied }: {
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
         {!server ? api.view.isError ? <div role="alert"><p>설정을 불러오지 못했어요.</p><Button variant="neutral" onClick={() => void api.view.refetch()}>다시 시도</Button></div> : <p role="status">설정을 불러오고 있어요.</p> : <>
           {error ? <AlertBanner tone="error" message={error} /> : null}
+          {finals.some(final => final.registrationIds?.some(id => !registrations.some(reg => reg.id === id))) ? <div className="space-y-2">
+            <AlertBanner tone="warning" message="선택한 팀 중 확정 참가 명단에서 빠진 팀이 있어요. 해당 팀을 제외한 뒤 새 진출팀을 선택해 주세요." />
+            <Button variant="neutral" onClick={() => { setFinals(rows => rows.map(final => ({ ...final, registrationIds: final.registrationIds == null ? final.registrationIds : final.registrationIds.filter(id => registrations.some(reg => reg.id === id)) }))); setDirty(true); }}>확정 명단에 없는 팀 제외</Button>
+          </div> : null}
           {step === 0 ? <>
             <SectionTitle title="예선 조 편성" /><p className="tm-text-label text-[var(--text-muted)]">팀 수의 고정 상한은 없어요. 예선 대진 생성 후에는 대진 화면에서 빈 자리에 팀을 배정할 수 있어요.</p>
             {groups.map((g, index) => <fieldset key={g.id} className="space-y-3 border-b border-[var(--border)] pb-4"><legend className="tm-text-body font-semibold">{g.name || `${index + 1}번째 조`}</legend>
@@ -139,7 +144,7 @@ export function MultiFinalsWizard({ tournamentId, open, onClose, onApplied }: {
       <div className="flex shrink-0 justify-end gap-2 border-t border-[var(--border)] p-4">
         <Button variant="neutral" disabled={busy} onClick={() => void close()}>닫기</Button>
         {step > (configured ? 1 : 0) ? <Button variant="neutral" disabled={busy} onClick={() => setStep(value => value - 1)}>이전</Button> : null}
-        <Button variant="primary" disabled={!server || busy} onClick={() => void next()}>{busy ? '처리 중…' : step === 3 ? '확인하고 결선 생성' : step === 1 ? configured ? '규칙 저장 후 진출팀 편집' : '예선 대진 생성 후 계속' : step === 2 ? '명단 저장 후 미리보기' : '다음'}</Button>
+        <Button variant="primary" disabled={!server || busy} onClick={() => void next()}>{busy ? '처리 중…' : step === 3 ? '확인하고 결선 생성' : step === 1 ? configured ? dirty ? '규칙 저장 후 진출팀 편집' : '진출팀 편집' : '예선 대진 생성 후 계속' : step === 2 ? '명단 저장 후 미리보기' : '다음'}</Button>
       </div>
     </div>{ConfirmModal}
   </div>, document.body);

@@ -36,7 +36,7 @@ describe('MD-QA #133 실제 계정 찾기 페이지의 로그인 복귀', () => 
     renderAuthUi(await FindAccountPage({ searchParams: Promise.resolve({ redirect, from: '/my/settings' }) }));
     screen.getAllByRole('link', { name: '뒤로가기' }).forEach((link) => expect(link).toHaveAttribute('href', '/my/settings'));
     expect(screen.getByLabelText('휴대폰 번호')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('tab', { name: '비밀번호 재설정' }));
+    fireEvent.click(screen.getByRole('button', { name: '비밀번호 재설정' }));
     expect(screen.getByLabelText('이메일')).toBeInTheDocument();
     expect(wireCalls.emailReset).toHaveLength(0);
   });

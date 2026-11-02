@@ -13,8 +13,9 @@ type Props = {
   /**
    * card: 페이지 배경 위에 단독으로 놓일 때(예: /my/phone-verify).
    * inset: 이미 카드인 폼 안에 끼워질 때.
+   * plain: 카드 없이 폼의 입력 흐름에 이어질 때.
    */
-  surface?: 'card' | 'inset';
+  surface?: 'card' | 'inset' | 'plain';
   conflictNotice?: ReactNode;
   /** 발급·대조가 실패할 때 그 오류를 그대로 알린다. 오류는 카드가 이어서 보여 주므로 삼키지 않는다. */
   onFailure?: (error: unknown) => void;

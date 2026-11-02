@@ -27,8 +27,9 @@ type Props = OtpVerificationOptions & {
    * card: 페이지 배경 위에 단독으로 놓일 때(예: /my/phone-verify).
    * inset: 이미 카드인 폼 안에 끼워질 때 — 카드 안 카드로 테두리가 겹쳐 보이지 않도록
    * 흰 카드 대신 폼 내부 보조 영역(tint) 표면을 쓴다.
+   * plain: 카드 없이 입력 흐름에 인증을 이어 붙인다.
    */
-  surface?: 'card' | 'inset';
+  surface?: 'card' | 'inset' | 'plain';
   /** 번호 중복(PHONE_CONFLICT)일 때 오류 배너 대신 보여 줄 안내와 출구. */
   conflictNotice?: ReactNode;
 };
@@ -73,14 +74,15 @@ export function OtpVerificationCard({
   }, [phase, verified, surface]);
 
   // 'inset'은 이미 카드인 폼 안에 들어갈 때 쓰는 표면 — 흰 카드 위 흰 카드로 테두리가 겹치지 않게 한다.
-  const surfaceClass = surface === 'inset' ? 'tm-auth-inset' : 'tm-card';
+  const surfaceClass = surface === 'plain' ? undefined : surface === 'inset' ? 'tm-auth-inset' : 'tm-card';
 
   if (verified) {
     return (
       <div
         ref={rootRef}
         className={surfaceClass}
-        style={{ padding: 16, display: 'flex', alignItems: 'center', gap: 8, background: 'var(--blue50)' }}
+        role="status"
+        style={{ padding: 16, display: 'flex', alignItems: 'center', gap: 8, background: 'var(--blue50)', borderRadius: surface === 'plain' ? 'var(--radius-control)' : undefined }}
       >
         <CheckCircle2 size={20} color="var(--blue500)" aria-hidden="true" />
         <p className="tm-text-label" style={{ margin: 0, color: 'var(--blue700)' }}>
@@ -94,11 +96,11 @@ export function OtpVerificationCard({
     <div
       ref={rootRef}
       className={surfaceClass}
-      style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}
+      role={surface === 'plain' ? 'group' : undefined}
+      aria-label={surface === 'plain' ? title : undefined}
+      style={{ padding: surface === 'plain' ? 0 : 20, display: 'flex', flexDirection: 'column', gap: 16 }}
     >
-      <p className="tm-text-label" style={{ margin: 0 }}>
-        {title}
-      </p>
+      {surface !== 'plain' ? <p className="tm-text-label" style={{ margin: 0 }}>{title}</p> : null}
 
       {phase === 'idle' ? (
         <button

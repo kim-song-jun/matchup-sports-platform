@@ -98,8 +98,8 @@ describe('MD-QA #133 이전 휴대폰 조회는 현재 복구 흐름을 덮어�
   it('아이디→이메일→아이디로 돌아와도 이전 모드의 늦은 결과를 표시하지 않는다', async () => {
     renderRecovery(<AccountRecoveryClient />);
     await startPhoneLookup();
-    fireEvent.click(screen.getByRole('tab', { name: '비밀번호 재설정' }));
-    fireEvent.click(screen.getByRole('tab', { name: '아이디 찾기' }));
+    fireEvent.click(screen.getByRole('button', { name: '비밀번호 재설정' }));
+    fireEvent.click(screen.getByRole('button', { name: '로그인 방법 찾기' }));
     await settleRequests(() => flow.releaseFind(0, SOCIAL_ACCOUNT));
 
     expect(screen.queryByText(SOCIAL_ACCOUNT.maskedEmail)).not.toBeInTheDocument();

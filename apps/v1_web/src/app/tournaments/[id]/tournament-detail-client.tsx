@@ -56,6 +56,7 @@ import { isLeagueCompetition } from '@/lib/competition-kind';
 import {
   formatTournamentDateShort,
   formatTournamentDateTimeShort,
+  formatTournamentDateRangeShort,
   formatTournamentDateRangeWithTime,
   formatTournamentDateTimeLong,
   formatMonthDay,
@@ -905,7 +906,7 @@ export function TournamentDetailView({
           ) : null}
           {/* 일정·참가비 (모바일 전용 — 데스크탑은 우측 레일) */}
           <div className="tm-hide-desktop">
-            <InfoRow label="일정" value={formatTournamentDateRangeWithTime(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정'} />
+            <InfoRow label="일정" value={scheduleLabel(tournament)} />
             <ScheduleNoticeCaption style={{ padding: '12px 16px 16px', marginTop: 0, borderBottom: '1px solid var(--grey100)' }} />
             {showsEntryFee ? <InfoRow label="참가비" value={formatEntryFee(tournament.entryFee)} /> : null}
           </div>
@@ -1023,7 +1024,7 @@ export function TournamentDetailView({
           기본 정보
         </div>
         <Card pad={0}>
-          <InfoRow label="일정" value={formatTournamentDateRangeWithTime(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정'} />
+          <InfoRow label="일정" value={scheduleLabel(tournament)} />
           <ScheduleNoticeCaption style={{ padding: '12px 16px 16px', marginTop: 0, borderBottom: '1px solid var(--grey100)' }} />
           <InfoRow
             label="참가팀"
@@ -1252,7 +1253,7 @@ export function TournamentDetailView({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>일정</span>
           <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>
-            {formatTournamentDateRangeWithTime(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정'}
+            {scheduleLabel(tournament)}
           </span>
         </div>
         <ScheduleNoticeCaption style={{ marginTop: 0 }} />
@@ -1301,7 +1302,7 @@ export function TournamentDetailView({
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>일정</span>
-          <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>{formatTournamentDateRangeWithTime(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정'}</span>
+          <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>{scheduleLabel(tournament)}</span>
         </div>
         <ScheduleNoticeCaption style={{ marginTop: 0 }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1354,7 +1355,7 @@ export function TournamentDetailView({
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>일정</span>
-          <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>{formatTournamentDateRangeWithTime(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정'}</span>
+          <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>{scheduleLabel(tournament)}</span>
         </div>
         <ScheduleNoticeCaption style={{ marginTop: 0 }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1386,7 +1387,7 @@ export function TournamentDetailView({
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>일정</span>
-          <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>{formatTournamentDateRangeWithTime(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정'}</span>
+          <span className="tm-text-caption" style={{ color: 'var(--text-strong)', fontWeight: 500 }}>{scheduleLabel(tournament)}</span>
         </div>
         <ScheduleNoticeCaption style={{ marginTop: 0 }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -2054,6 +2055,15 @@ function FixturesPlaceholder() {
 }
 
 /* ── InfoRow ── */
+
+/**
+ * 상세 '일정' 칸. 리그는 시작일·종료일(날짜)만 정하므로 날짜만 보인다 — 시각을 붙이면 저장된
+ * UTC 자정이 '09:00'으로 보인다(MD-QA #196). 대회는 실제 개최 시각이 있어 시각까지 보인다.
+ */
+function scheduleLabel(tournament: Pick<V1TournamentDetail, 'kind' | 'scheduledAt' | 'scheduledEndAt'>): string {
+  const format = tournament.kind === 'regular_league' ? formatTournamentDateRangeShort : formatTournamentDateRangeWithTime;
+  return format(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정';
+}
 
 function InfoRow({
   label,

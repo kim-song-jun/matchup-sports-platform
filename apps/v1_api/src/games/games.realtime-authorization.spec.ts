@@ -80,6 +80,7 @@ function createGameService(options: {
     v1AdminUser: { findUnique: jest.fn().mockResolvedValue(options.admin ?? null) },
     v1TournamentStaffAssignment: { findMany: jest.fn().mockResolvedValue(options.assignments ?? [assignment]) },
     v1TeamMembership: { findMany: jest.fn().mockResolvedValue(options.memberships ?? []) },
+    v1TeamMatch: { findMany: jest.fn().mockResolvedValue([]) },
     v1CompetitionConfigVersion: { findUnique: jest.fn().mockResolvedValue(null) },
     v1TournamentMatchDetails: { findUnique: jest.fn().mockResolvedValue(null) },
   };

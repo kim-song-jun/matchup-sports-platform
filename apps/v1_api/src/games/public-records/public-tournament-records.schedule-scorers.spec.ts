@@ -762,6 +762,7 @@ describe('PublicTournamentRecordsService.getSchedule -- 참가팀 공개 정책 
   ): TournamentStaffAccessService {
     const fakeAccessPrisma = {
       v1AdminUser: { async findUnique() { return null; } },
+      v1TeamMatch: { async findMany() { return []; } },
       v1TournamentStaffAssignment: {
         async findMany() {
           return assignments.map((assignment, index) => ({

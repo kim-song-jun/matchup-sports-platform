@@ -20,6 +20,7 @@ import {
   type TournamentStaffPrincipal,
 } from './tournament-staff-access.service';
 import { ALL_COMPETITION_KINDS, findTournamentOnSurface } from '../tournament-surface-lookup';
+import { findOwnTeamFixtureIds } from './own-team-fixture';
 
 export const TOURNAMENT_STAFF_MANAGEMENT_CLOCK = Symbol('TOURNAMENT_STAFF_MANAGEMENT_CLOCK');
 export type TournamentStaffManagementClock = () => Date;
@@ -206,6 +207,17 @@ export class TournamentStaffService {
           normalized.fieldId,
           normalized.fixtureIds,
         );
+        // 필드 단위 배정은 아직 정해지지 않은 경기까지 덮으므로 여기서는 못 거른다 — 그 경우는
+        // 접근 판정(TournamentStaffAccessService·GamesService#resolveActor)이 경기마다 막는다.
+        if (
+          normalized.role === V1TournamentStaffRole.FIELD_OPERATOR &&
+          (await findOwnTeamFixtureIds(tx, normalized.targetUserId, normalized.fixtureIds)).size > 0
+        ) {
+          throw new ConflictException({
+            code: 'STAFF_OWN_TEAM_FIXTURE',
+            message: '참가팀 선수는 자기 팀 경기의 현장 담당자로 배정할 수 없어요.',
+          });
+        }
 
         const created = await tx.v1TournamentStaffAssignment.create({
           data: {

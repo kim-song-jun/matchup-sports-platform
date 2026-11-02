@@ -648,6 +648,20 @@ describe('TournamentDetailPageClient — 신청 마감은 시각까지 보여요
     expect(screen.getAllByText('2099년 8월 10일 (월) 오후 11:59').length).toBeGreaterThan(0);
   });
 
+  // 리그 기간은 날짜만 저장한다(UTC 자정) — 시각을 붙이면 '09:00'이 보였다(MD-QA #196).
+  it.each(['open', 'completed'] as const)('리그(%s) 일정은 날짜만 적고 시각을 붙이지 않아요', async (status) => {
+    renderWithDeadline({ kind: 'regular_league', status, scheduledAt: '2099-11-14T00:00:00.000Z', scheduledEndAt: '2099-12-12T00:00:00.000Z' });
+    await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
+    expect(screen.getAllByText('11/14 (토)~12/12 (토)').length).toBeGreaterThan(0);
+    expect(screen.queryByText(/09:00/)).not.toBeInTheDocument();
+  });
+
+  it('대조군: 대회 일정은 개최 시각까지 적어요', async () => {
+    renderWithDeadline({ kind: 'regular_tournament', status: 'open', scheduledAt: '2099-11-14T01:00:00.000Z', scheduledEndAt: '2099-11-14T09:00:00.000Z' });
+    await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
+    expect(screen.getAllByText('11/14 (토) 10:00~18:00').length).toBeGreaterThan(0);
+  });
+
   it('리그 데스크톱 레일의 신청 마감도 시각까지 적혀요', async () => {
     renderWithDeadline({ kind: 'regular_league', status: 'open' });
     await screen.findByRole('heading', { level: 1, name: '테스트 대회' });

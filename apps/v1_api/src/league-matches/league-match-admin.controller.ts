@@ -11,6 +11,7 @@ import {
   ChangeLeagueStateDto,
   CreateLeagueMatchDto,
   CreateManualLeagueFixtureDto,
+  CreateManualLeagueFixturesBatchDto,
   DeleteLeagueFixtureDto,
   GenerateLeagueFixturesDto,
   OpenLeagueRegistrationDto,
@@ -159,6 +160,16 @@ export class LeagueMatchAdminController {
     @Body() dto: CreateManualLeagueFixtureDto,
   ) {
     return this.service.createManualFixture(user, leagueId, dto);
+  }
+
+  /** 수동 대진 여러 경기를 한 트랜잭션으로 만든다(주차 단위 추가). 세그먼트 수가 달라 `:teamMatchId/cancel` 과 겹치지 않는다. */
+  @Post(':leagueId/fixtures/manual/batch')
+  createManualFixtures(
+    @CurrentUser() user: V1AuthUser,
+    @Param('leagueId', leagueIdPipe) leagueId: string,
+    @Body() dto: CreateManualLeagueFixturesBatchDto,
+  ) {
+    return this.service.createManualFixtures(user, leagueId, dto.fixtures);
   }
 
   // 자리 기반 빈 대진 템플릿. 정적 세그먼트('template')라 `POST :leagueId/fixtures`·`/manual`·`/regenerate` 와 충돌하지 않는다.

@@ -12,6 +12,7 @@ import { MAX_VIDEOS_PER_FIXTURE } from '../tournaments/videos/tournament-fixture
 import type { CreateFixtureVideoDto } from '../tournaments/videos/dto/fixture-video.dto';
 import { findTournamentOnSurface } from '../tournaments/tournament-surface-lookup';
 import { enqueueUploadedVideoCleanup, enqueueUploadedVideoCleanupInTx, lockVideoUrl } from '../games/video-url-lock';
+import { leagueWeekCounter } from './league-week-number';
 
 /**
  * 리그 대진(팀매치) 경기 영상 등록·삭제.
@@ -79,16 +80,14 @@ export class LeagueFixtureVideosService {
       return { ...fixture, startAt };
     });
 
-    // 주차 라벨 — 공개 기록(getLeagueFixtureRecord)의 resolveLeagueWeekNumber 와 같은
-    // KST 경기일 파생 규칙. 같은 경기가 화면마다 다른 주차로 불리면 안 된다.
-    const days = Array.from(new Set(validFixtures.map((fixture) => KST_DAY.format(fixture.startAt)))).sort();
+    // 주차 라벨 — 공개 기록과 같은 단일 규칙(league-week-number.ts). 같은 경기가 화면마다 다른 주차로 불리면 안 된다.
+    const weekOf = leagueWeekCounter(validFixtures.map((fixture) => fixture.startAt));
 
     return {
       items: validFixtures.map((fixture) => {
-        const weekIndex = days.indexOf(KST_DAY.format(fixture.startAt));
         return {
           fixtureId: fixture.id,
-          round: `${weekIndex >= 0 ? weekIndex + 1 : 1}주차`,
+          round: `${weekOf(fixture.startAt)}주차`,
           fixtureNumber: 1,
           legNumber: 1,
           scheduledAt: fixture.startAt.toISOString(),
@@ -255,4 +254,3 @@ export class LeagueFixtureVideosService {
   }
 }
 
-const KST_DAY = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' });

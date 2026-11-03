@@ -283,7 +283,10 @@ function createFake() {
       }),
       // 수동 대진의 기본 제목이 주차를 파생할 때 읽는 형제 목록.
       // 기본값은 "이미 두 경기일이 있는 리그" — 새로 넣는 경기가 3번째 날이면 3주차다.
-      findMany: track('v1TeamMatch.findMany', async () => state.siblingStartAts.map((startAt) => ({ startAt }))),
+      // 주차 제목 맞추기(syncLeagueFixtureWeekTitles)도 같은 목록을 읽는다 — 제목은 각자의 주차와 이미 맞아 고칠 것이 없다.
+      findMany: track('v1TeamMatch.findMany', async () => state.siblingStartAts.map((startAt, index) => ({
+        id: `sibling-${index}`, title: `테스트 리그 ${index + 1}주차`, startAt, endAt: null,
+      }))),
       // updateFixture 의 잠금 밖 사전 조회 + 갱신. 장소만 바꾸는 요청이라 시각은 그대로 둔다.
       findFirst: track('v1TeamMatch.findFirst', async () => ({
         id: 'tm-1', leagueId: 'league-1', title: '테스트 리그 1주차',
@@ -757,8 +760,8 @@ describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신�
      * `title` 은 두므로 저장된 주차가 낡는다. 여기서 다른 규칙을 쓰면 새로 넣은 경기만
      * 화면과 다른 주차로 불린다.
      */
-    it('제목 미지정: 그 리그의 경기일을 세어 주차를 파생한다 (새 날짜 = 3번째 날 → 3주차)', async () => {
-      // 형제 경기일 두 개(9/5, 9/12) + 새 경기 9/19 → 3번째 날.
+    it('제목 미지정: 그 리그의 경기 주를 세어 주차를 파생한다 (새 주 = 3번째 주 → 3주차)', async () => {
+      // 형제 경기 두 주(9/5, 9/12) + 새 경기 9/19 → 3번째 주.
       await service.createManualFixture(adminUser, 'league-1', { ...manual });
 
       expect(state.teamMatchCreates[0].title).toBe('테스트 리그 3주차');
@@ -772,6 +775,34 @@ describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신�
 
       // 같은 KST 날짜에 이미 경기가 있으므로 새 날이 아니다 — 4주차가 되면 안 된다.
       expect(state.teamMatchCreates[0].title).toBe('테스트 리그 1주차');
+    });
+
+    // 2026-11-03 사용자 확정: 주차는 달력 주(월~일)다 — 토요일 경기가 있는 주의 일요일은 새 주차가 아니다.
+    it('제목 미지정: 같은 주 일요일에 넣으면 그 주의 주차를 쓴다 (9/5 토 → 9/6 일도 1주차)', async () => {
+      await service.createManualFixture(adminUser, 'league-1', {
+        ...manual,
+        startsAt: '2026-09-06T01:00:00.000Z',
+      });
+      expect(state.teamMatchCreates[0].title).toBe('테스트 리그 1주차');
+    });
+
+    it('createManualFixtures: 여러 경기를 한 트랜잭션에서 만들고 만든 순서대로 id 를 돌려준다', async () => {
+      const result = await service.createManualFixtures(adminUser, 'league-1', [
+        { ...manual },
+        { ...manual, startsAt: '2026-09-19T03:00:00.000Z' },
+      ]);
+      expect(state.teamMatchCreates).toHaveLength(2);
+      expect(result).toEqual({ leagueId: 'league-1', teamMatchIds: ['team-match-1', 'team-match-1'] });
+      // 리그 행 잠금은 한 번 — 경기마다 따로 잠그지 않는다.
+      expect(state.rawSql.filter((sql) => /v1_tournaments.*FOR UPDATE/s.test(sql))).toHaveLength(1);
+    });
+
+    it('createManualFixtures: 한 경기라도 같은 팀끼리면 아무 경기도 만들지 않는다', async () => {
+      await expect(service.createManualFixtures(adminUser, 'league-1', [
+        { ...manual },
+        { ...manual, awayTeamId: manual.homeTeamId },
+      ])).rejects.toMatchObject({ response: { code: 'LEAGUE_TEAM_INVALID' } });
+      expect(state.teamMatchCreates).toHaveLength(0);
     });
 
     it('제목을 주면 그대로 쓴다 (공백만 준 것은 미지정으로 본다)', async () => {

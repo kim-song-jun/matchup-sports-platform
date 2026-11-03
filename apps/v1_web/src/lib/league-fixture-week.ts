@@ -1,22 +1,30 @@
 import type { V1LeagueFixture } from '@/types/league-match';
-
-const KST_DAY = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' });
+import { toKstDateString } from './kst-calendar';
 
 type FixtureStart = Pick<V1LeagueFixture, 'startAt'>;
 
 /**
- * 리그 경기의 주차(1부터). 대진은 주 단위 템플릿으로 생성되므로 KST 기준 "몇 번째 경기 날짜인가"가
- * 곧 주차다. 저장된 대진 제목의 주차는 생성 시점 값이라 재일정 뒤 어긋난다 — 화면에 보이는
- * 주차는 항상 이 함수에서 파생한다.
+ * 경기가 속한 KST 달력 주의 키 — 그 주 월요일의 `'YYYY-MM-DD'`. 문자열 정렬이 곧 주 순서다.
+ * 서버 `league-week-number.ts` 의 `kstWeekKey` 와 같은 규칙이다(2026-11-03 사용자 확정 — 주차는 달력 주).
+ */
+export function kstWeekKey(instant: Date): string {
+  const date = new Date(`${toKstDateString(instant)}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() - ((date.getUTCDay() + 6) % 7));
+  return date.toISOString().slice(0, 10);
+}
+
+/**
+ * 리그 경기의 주차(1부터). KST 월~일을 한 주로 묶고 **경기가 있는 주만** 순서대로 센다 — 토·일에 나눠 치러도
+ * 같은 주차이고 쉬는 주는 번호를 건너뛰지 않는다. 서버(`league-week-number.ts`)와 같은 규칙이라 화면마다 주차가 갈리지 않는다.
  */
 export function leagueFixtureWeekNumber(fixtures: readonly FixtureStart[], target: FixtureStart): number | null {
-  const days = [...new Set(fixtures.map((fixture) => KST_DAY.format(new Date(fixture.startAt))))].sort();
-  const index = days.indexOf(KST_DAY.format(new Date(target.startAt)));
+  const weeks = [...new Set(fixtures.map((fixture) => kstWeekKey(new Date(fixture.startAt))))].sort();
+  const index = weeks.indexOf(kstWeekKey(new Date(target.startAt)));
   return index >= 0 ? index + 1 : null;
 }
 
-/** 저장된 제목의 "N주차" 토큰만 파생 주차로 바꾼다. 토큰이 없는 사용자 지정 제목은 그대로 둔다. */
+/** 저장된 제목 끝의 "N주차" 토큰만 파생 주차로 바꾼다. 끝에 토큰이 없는 사용자 지정 제목은 그대로 둔다. */
 export function withDerivedWeek(storedTitle: string, week: number | null): string {
   if (week === null) return storedTitle;
-  return storedTitle.replace(/\d+주차/, `${week}주차`);
+  return storedTitle.replace(/ \d+주차(?=( \d+경기)?$)/, ` ${week}주차`);
 }

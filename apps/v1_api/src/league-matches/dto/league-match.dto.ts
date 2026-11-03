@@ -1,5 +1,5 @@
 import { Transform, Type } from 'class-transformer';
-import { ArrayNotEmpty, IsArray, IsBoolean, IsDateString, IsDefined, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, MinLength, ValidateIf, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, ArrayNotEmpty, IsArray, IsBoolean, IsDateString, IsDefined, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, MinLength, ValidateIf, ValidateNested } from 'class-validator';
 import { BANK_FIELD_PATTERN, rawValue, trimmedString } from './league-entry-fee.dto';
 import { IsPlaceLatitude, IsPlaceLongitude, IsPlaceProvider, IsPlaceProviderId } from '../../places/place-snapshot';
 
@@ -391,7 +391,7 @@ export class ListLeagueMatchesQueryDto {
  * (`createLeagueFixture`) — 부수효과가 한쪽에만 빠지지 않게 하려는 것이다.
  *
  * ⚠️ **주차(round)를 받지 않는다.** `V1TeamMatch` 에 주차 컬럼이 없고 순위 계산도 쓰지
- * 않는다 — 화면의 "N주차" 는 그 리그의 서로 다른 경기일을 세어 `startAt` 에서 파생한다
+ * 않는다 — 화면의 "N주차" 는 그 리그에서 경기가 있는 달력 주를 세어 `startAt` 에서 파생한다
  * (`league-week-number.ts`). 받아 봐야 저장되지 않는 값이라 API 표면에 두지 않는다
  * (2026-09-02 사용자 확정, Task 164 Ambiguity 3).
  */
@@ -427,6 +427,20 @@ export class CreateManualLeagueFixtureDto extends LeaguePlaceSnapshotDto {
   @IsString()
   @MaxLength(100)
   title?: string;
+}
+
+/**
+ * 수동 대진 여러 경기를 **한 번에** 만든다(2026-11-03 사용자 확정 — 주차 단위 추가).
+ * 한 트랜잭션이라 하나라도 거부되면 아무 경기도 남지 않는다 — 한 주차의 절반만 생긴 채로 남지 않게 한다.
+ * 30경기는 주차 하나(20팀 리그 10경기)를 넉넉히 덮고, 트랜잭션 45초 안에 끝나는 크기다.
+ */
+export class CreateManualLeagueFixturesBatchDto {
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayMaxSize(30)
+  @ValidateNested({ each: true })
+  @Type(() => CreateManualLeagueFixtureDto)
+  fixtures!: CreateManualLeagueFixtureDto[];
 }
 
 /**

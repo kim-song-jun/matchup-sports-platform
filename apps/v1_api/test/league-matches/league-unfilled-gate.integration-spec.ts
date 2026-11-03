@@ -28,7 +28,8 @@ describe('정규 리그 빈 경기 공개 게이트', () => {
     // 공개 상세는 draft 를 숨기므로 진행 중 리그로 만든다.
     leagueId = await h.makeLeague({ teams: Object.values(teams), state: 'active' });
     const slots = await h.makeSlots(leagueId, 8);
-    const day = (offset: number) => new Date(Date.now() + (10 + offset) * 86_400_000);
+    // 주차는 달력 주라(2026-11-03) 경기마다 한 주씩 띄운다 — 하루씩이면 다섯 경기가 한 주차로 묶여 아래 주차 단언이 무의미해진다.
+    const day = (offset: number) => new Date(Date.now() + (10 + offset * 7) * 86_400_000);
     ids = {
       empty: await h.createFixture(leagueId, { homeSlotId: slots[0].id, awaySlotId: slots[1].id, startAt: day(0) }),
       homeOnly: await h.createFixture(leagueId, { homeTeamId: teams.A.id, homeSlotId: slots[2].id, awaySlotId: slots[3].id, startAt: day(1) }),
@@ -93,7 +94,7 @@ describe('정규 리그 빈 경기 공개 게이트', () => {
       expect(res.status).toBe(200);
       const items: Array<{ fixtureId: string; round: string }> = res.body.data.items;
       expect(sorted(items.map((item) => item.fixtureId))).toEqual(sorted(visible));
-      // 경기일 순서가 a<b<c<d<e 이므로 d=4주차, e=5주차 — 게이트가 주차 집합까지 걸렀다면 1주차·2주차가 된다.
+      // 경기 주 순서가 a<b<c<d<e 이므로 d=4주차, e=5주차 — 게이트가 주차 집합까지 걸렀다면 1주차·2주차가 된다.
       expect(items.find((item) => item.fixtureId === ids.filled)?.round).toBe('4주차');
       expect(items.find((item) => item.fixtureId === ids.legacy)?.round).toBe('5주차');
     });

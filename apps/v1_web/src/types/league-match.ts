@@ -788,6 +788,12 @@ export interface V1CreateManualLeagueFixturePayload extends V1PlaceSnapshotPaylo
   title?: string;
 }
 
+/** `POST /admin/league-matches/:leagueId/fixtures/manual/batch` — 만든 순서대로의 경기 id. */
+export interface V1CreateManualLeagueFixturesResult {
+  leagueId: string;
+  teamMatchIds: string[];
+}
+
 /** `POST /admin/league-matches/:leagueId/fixtures/template` */
 export interface V1ApplyLeagueTemplatePayload extends V1PlaceSnapshotPayload {
   /** 3~20. */

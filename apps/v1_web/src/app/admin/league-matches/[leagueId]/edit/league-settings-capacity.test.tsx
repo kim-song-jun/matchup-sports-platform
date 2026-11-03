@@ -10,7 +10,7 @@ vi.mock('@/hooks/use-admin-can-write', () => ({ useAdminCanWrite: () => true }))
 const initial: LeagueSettings = {
   leagueId: 'league-capacity', title: '정원 리그', rulesText: '', regionId: 'region-jung',
   startsOn: '2098-01-01T00:00:00.000Z', endsOn: '2098-02-01T00:00:00.000Z',
-  registrationDeadlineAt: '2097-12-31T00:00:00.000Z', plannedFixtureCount: 12, maxTeams: 6,
+  registrationDeadlineAt: '2097-12-31T00:00:00.000Z', plannedFixtureCount: 12, maxTeams: 6, genderCategory: null,
   updatedAt: '2026-10-15T00:00:00.000Z', status: 'open', sportName: '풋살',
 };
 const path = '*/api/v1/admin/league-matches/league-capacity/settings';

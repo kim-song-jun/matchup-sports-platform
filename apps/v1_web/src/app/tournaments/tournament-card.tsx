@@ -152,13 +152,18 @@ export function TournamentCard({
                    `tier` 숫자만 주고, 표시 라벨은 시리즈마다 다른 커스텀 값(`tierLabels`)이라
                    `${tier}부` 로 지어내면 커스텀 라벨을 쓰는 시리즈에서 틀린 이름이 뜬다.
                    서버가 `tierLabel` 을 이 목록에 실어주면 그때 붙인다. */
-                <span className="tm-badge tm-badge-grey" aria-label="정규 리그">
-                  리그
-                </span>
+                <>
+                  <span className="tm-badge tm-badge-grey" aria-label="정규 리그">
+                    리그
+                  </span>
+                  {/* 성별을 받기 전에 만든 리그는 null 이다 — 그 카드에 "성별 부문 미지정" 을 붙이면 소음이라 고른 리그만 그린다. */}
+                  {item.genderCategory ? (
+                    <span className="tm-badge tm-badge-grey" aria-label={`성별 카테고리: ${getGenderCategoryLabel(item.genderCategory)}`}>
+                      {getGenderCategoryLabel(item.genderCategory)}
+                    </span>
+                  ) : null}
+                </>
               ) : (
-                /* 성별 배지는 대회에만 그린다. 리그 거울은 `genderCategory` 를 채우는 경로가
-                   아예 없어 항상 null 이고, 그러면 모든 리그 카드에 "성별 구분 없음" 이 붙는다
-                   — 정보가 아니라 소음이다(`teamCount` 를 리그에서 뺀 것과 같은 이유). */
                 <span
                   className="tm-badge tm-badge-grey"
                   aria-label={`성별 카테고리: ${getGenderCategoryLabel(item.genderCategory)}`}

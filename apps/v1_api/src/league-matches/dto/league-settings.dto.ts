@@ -1,5 +1,6 @@
 import { Transform } from 'class-transformer';
-import { IsDateString, IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min, ValidateIf } from 'class-validator';
+import { IsDateString, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min, ValidateIf } from 'class-validator';
+import { TOURNAMENT_GENDER_CATEGORIES, type TournamentGenderCategory } from '../../tournaments/dto/admin-tournament.dto';
 
 /** Full editable settings snapshot. UI-only state is never part of this contract. */
 export class UpdateLeagueSettingsDto {
@@ -45,4 +46,9 @@ export class UpdateLeagueSettingsDto {
   @Min(1)
   @Max(2147483647)
   maxTeams?: number | null;
+
+  /** 생략은 기존 성별 유지. 미지정으로 되돌리는 길은 두지 않는다(대회 정보 수정과 같다). */
+  @IsOptional()
+  @IsIn(TOURNAMENT_GENDER_CATEGORIES, { message: '성별 카테고리가 올바르지 않아요.' })
+  genderCategory?: TournamentGenderCategory;
 }

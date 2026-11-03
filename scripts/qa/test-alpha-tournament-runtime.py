@@ -104,6 +104,24 @@ restore_active_release
         mutant = segment.replace('ALPHA_TOURNAMENT_RUNTIME_STARTED=true', '')
         self.assertNotEqual(subprocess.run(['bash', '-ec', prefix + mutant], capture_output=True).returncode, 0)
 
+    def test_first_immutable_conversion_refuses_legacy_restore_after_writers_start(self):
+        source = (ROOT / 'deploy/deploy-alpha.sh').read_text()
+        function = 'restore_legacy_runtime() {' + source.split('restore_legacy_runtime() {', 1)[1].split('\nif ! command -v rsync', 1)[0]
+        marker = self.repo / 'legacy-source-restored'
+        command = r'''
+alpha_restore_step() { local name="$1"; shift; "$@"; }
+restore_legacy_alpha_source() { touch "$restore_marker"; return 1; }
+legacy_api_image=legacy-api; legacy_web_image=legacy-web
+restore_marker="$2"; ALPHA_TOURNAMENT_RUNTIME_STARTED="$3"
+''' + function + '\nrestore_legacy_runtime\n'
+        for started, reaches_legacy in [('false', True), ('true', False)]:
+            marker.unlink(missing_ok=True)
+            result = self.shell(command, str(marker), started)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(marker.exists(), reaches_legacy, result.stderr)
+            if started == 'true':
+                self.assertIn('legacy runtime compatibility is unproven', result.stderr)
+
 
 if __name__ == '__main__':
     unittest.main()

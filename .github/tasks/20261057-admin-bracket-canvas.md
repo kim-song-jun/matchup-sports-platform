@@ -1107,3 +1107,13 @@ PR1858 latest-dev merge 30개 충돌 파일. generated Prisma client/의존성 �
 - 기존 release-state shell 검사는 sandbox의 sudo 실행 제한으로 중단(보완 코드를 성공으로 간주하지 않음). 더 좁은 실제 rollback/restore 경로와 manifest 양성/음성 검증으로 변경 계약을 확인했고 전체 반복은 원격 CI에 맡긴다.
 
 - 최종 좁은 Web 통합: 공개 결과16 + 공용 MSW8 + wizard4 + 기존 shared MSW facet14 = 42/42 PASS. runtime version7/7 및 현재·과거 schema binding9/9 PASS. 이전 P1/P2 세 항목의 코드 수정은 완료, 새 head CI 및 신규 alpha after QA는 별도 gate로 유지한다.
+
+### 2026-11-03 alpha 배포 요청 후속
+
+- 사용자 요청: PR1858 기능을 alpha에 배포. main 승격은 범위 밖이다.
+- Phase A completed: 최신 origin/dev `84ebe114e`에서 별도 Windows worktree를 만들고 PR head `6154cca39`를 충돌 없이 통합했다. 원본 dirty tree는 수정하지 않았다.
+- Phase B completed: 최초 immutable 전환의 `restore_legacy_runtime`도 후보 writer 시작 이후에는 구버전 복구를 거절한다. 실제 복구 함수의 source 전환 여부를 검증하는 회귀를 추가했다.
+- Phase B completed: preview는 살아 있는 예선 최대 경기 번호 다음부터 결선을 계산하며 generate는 검증된 preview plan을 그대로 저장한다. 재미리보기에서 기존 결선 번호가 누적되지 않는다. API 문서 및 실제 DB 통합 시나리오에 미리보기/저장 번호 일치 검증을 추가했다.
+- 좁은 검증: service/plan 단위 13/13 PASS, WSL의 실제 bash/git/jq로 runtime rollback 8/8 PASS, bash syntax PASS. jq1.8.1 공식 배포 바이너리의 SHA256을 공식 checksum과 대조했다. 운영 DB rollback 실험은 하지 않았다.
+- Phase C in_progress: API/Web typecheck0, API surface752 PASS, diff-check PASS. Web pattern checker는 Windows cmd의 POSIX find/grep 구문 비호환으로 실행 실패했으며 성공으로 집계하지 않는다. 전체 pattern/실제 DB 통합 검증은 최신 head의 Linux CI에서 확인한다. exact-path commit 및 PR 갱신 후 최신 CI 통과, dev merge와 alpha 배포 상태 확인을 진행한다.
+- Progress Snapshot: alpha 미배포 상태의 신규 수동 QA0/10·viewport0/3은 그대로 유지한다. 배포 완료 후 실제 serving SHA 및 health를 별도로 기록한다.

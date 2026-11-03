@@ -83,10 +83,14 @@ describe('N개 결선 실제 DB 저장·공식 순위·수동 편집·재생성'
     await prisma.$transaction(tx => recalculateStandingsInTx(tx, tournamentId));
     expect((await service.get(user, tournamentId)).finals.map(f => f.registrationIds)).toEqual(finals.map(f => f.registrationIds));
     const preview = await service.preview(user, tournamentId); expect(preview.counts).toEqual({ tournaments: 3, fixtures: 8, byes: 2 });
+    expect(preview.plan.fixtures.map(f => f.fixtureNumber)).toEqual([21, 22, 23, 24, 25, 26, 27, 28]);
     const dto = { expectedRevision: saved.revision, previewHash: preview.previewHash, requestId: randomUUID() };
     const generated = await service.generate(user, tournamentId, dto); expect(generated.replayed).toBe(false);
     expect((await service.generate(user, tournamentId, dto)).replayed).toBe(true);
     expect(await preliminarySnapshot()).toEqual(before);
+    const generatedFixtures = await prisma.v1TournamentMatchDetails.findMany({ where: { tournamentId, group: { phase: { not: 'group' } }, teamMatch: { deletedAt: null } }, orderBy: { fixtureNumber: 'asc' }, select: { fixtureNumber: true } });
+    expect(generatedFixtures.map(f => f.fixtureNumber)).toEqual(preview.plan.fixtures.map(f => f.fixtureNumber));
+    expect((await service.preview(user, tournamentId)).plan.fixtures.map(f => f.fixtureNumber)).toEqual(preview.plan.fixtures.map(f => f.fixtureNumber));
     expect(await prisma.v1TournamentGroup.count({ where: { tournamentId, phase: 'final' } })).toBe(3);
     const slots = await prisma.v1TournamentSlot.findMany({ where: { tournamentId, group: { phase: { not: 'group' } } } });
     expect(slots).toHaveLength(10); expect(new Set(slots.map(s => s.registrationId)).size).toBe(10);

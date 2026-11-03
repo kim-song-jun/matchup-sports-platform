@@ -872,7 +872,7 @@ PR1858의 정규대회 분리 결선을 일반화한 별도 `format`이다. `kin
 | GET `/` | `revision`, 예선 `groups`, 이름·규칙·저장 명단·`suggestedRegistrationIds`·`unresolved`·`manual`을 포함한 `finals`, 확정 참가팀 `registrations`, `generated` |
 | POST `/setup` | `{ expectedRevision, groups:[{name,capacity,legs,registrationIds?}], finals:[{name,rules:[{groupId,rank}],thirdPlace,registrationIds?}] }`. 초기 `groupId`는 groups 배열의 0부터 시작하는 인덱스 문자열. 예선 조·자리·풀리그만 생성하고 반환 시 실제 group UUID로 바꾼다. 이미 예선이 있으면 409. |
 | PUT `/selection` | `{ expectedRevision, finals }`. 이후 `rule.groupId`는 실제 예선 UUID. 기존 예선을 보존하고 시작 전 결선을 비운 뒤 새 규칙/명단을 저장한다. 시작/결과/이벤트가 있는 결선은 409. |
-| POST `/preview` | 저장된 명단 또는 공식 예선 순위를 사용해 `plan`, 결선별 명단, `counts`, `revision`, `previewHash`를 반환. 동률/미확정 자동 명단은 409. |
+| POST `/preview` | 저장된 명단 또는 공식 예선 순위를 사용해 `plan`, 결선별 명단, `counts`, `revision`, `previewHash`를 반환. 경기 번호는 삭제되지 않은 예선의 최대 번호 다음부터 시작하며 생성 시 검증된 같은 plan을 저장한다. 기존 결선은 번호 기준에서 제외한다. 동률/미확정 자동 명단은 409. |
 | POST `/generate` | `{ expectedRevision, previewHash, requestId }`. 대회 잠금 안에서 다시 검증한 뒤 N개 결선과 부전승/승자·패자 연결을 원자적으로 생성. 같은 requestId/hash는 기존 결과 반환; hash가 다르면 409. |
 
 `registrationIds` 생략/null은 순위 기반 제안이다. 명시적인 배열은 수동 명단이며 빈 배열도 저장할 수 있지만 2팀 미만 결선은 생성할 수 없다. 예선 결과와 무관하게 같은 대회 확정팀을 추가·제외·교체·이동할 수 있다. 하나의 팀은 한 결선만 참가하며 각 순위 출처 역시 한 결선으로만 연결한다. 생성 후 승인 명단을 저장하므로 순위 재계산으로 덮어쓰지 않는다. 순위 채우기 API는 이 결선의 직접 선택 시드를 변경하지 않는다.

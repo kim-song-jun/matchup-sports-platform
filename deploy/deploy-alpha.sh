@@ -153,6 +153,10 @@ container_image_state() {
 }
 
 restore_legacy_runtime() {
+  if [[ "${ALPHA_TOURNAMENT_RUNTIME_STARTED:-false}" == true ]]; then
+    echo '[alpha-deploy] Candidate writers started; legacy runtime compatibility is unproven. Use a compatible forward fix or the reviewed backup/restore procedure.' >&2
+    return 1
+  fi
   alpha_restore_step legacy_api_image_known test -n "${legacy_api_image}" || return 1
   alpha_restore_step legacy_web_image_known test -n "${legacy_web_image}" || return 1
   alpha_restore_step legacy_source restore_legacy_alpha_source || return 1

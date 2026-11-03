@@ -146,7 +146,8 @@ export class MultiFinalsService {
     validateNamedFinals(finals, new Map(view.groups.map(g => [g.id, g.capacity])));
     this.assertTeams(finals, new Set(view.registrations.map(r => r.id)));
     if (!finals.length) invalidMultiFinal('예선 편성을 먼저 저장해 주세요.');
-    const plan = planNamedFinals(finals);
+    const max = await tx.v1TournamentMatchDetails.aggregate({ where: { tournamentId: id, group: { phase: 'group' }, teamMatch: { deletedAt: null } }, _max: { fixtureNumber: true } });
+    const plan = planNamedFinals(finals, max._max.fixtureNumber ?? 0);
     const fixtures = await this.assertUnstarted(tx, id);
     return { finals, plan, revision: view.revision, previewHash: hash({ view, fixtures, finals, plan }), counts: { fixtures: plan.fixtures.length, byes: plan.byeSlots.length, tournaments: finals.length } };
   }
@@ -169,8 +170,7 @@ export class MultiFinalsService {
       const tournament = await this.tournament(tx, id); this.assertMutable(tournament.status);
       if (!tournament.competitionConfigVersionId) invalidMultiFinal('경기 규칙이 필요해요.');
       await this.clearFinals(tx, admin, id);
-      const max = await tx.v1TournamentMatchDetails.aggregate({ where: { tournamentId: id, teamMatch: { deletedAt: null } }, _max: { fixtureNumber: true } });
-      const plan = planNamedFinals(preview.finals, max._max.fixtureNumber ?? 0);
+      const plan = preview.plan;
       const materialized = await this.templates.materialize(tx, admin, { ...tournament, competitionConfigVersionId: tournament.competitionConfigVersionId! }, plan);
       await assignSlotsBatchInTx(tx, { admin, adminContext: this.admins, games: this.games }, preview.finals.flatMap((f, i) => f.registrationIds!.map((registrationId, j) => ({ slotId: materialized.slotIds.get(`seed:${i}:${j}`)!, registrationId }))));
       const config = this.config(tournament.multiFinals)!;

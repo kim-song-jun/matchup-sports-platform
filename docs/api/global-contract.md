@@ -1,3 +1,7 @@
+토너먼트별 최종 순위는 공식 결승 및 3·4위전 결과를 범위별로 표시한다. N개 결선 미리보기는 예선 최대 경기 번호 다음부터 시작하며 검증된 같은 plan을 저장한다. 시상 저장·초기화와 공용 MSW 계약은 [대회 계약](./domains/tournaments.md)을 따른다.
+
+관리자 대회 CRUD 응답은 저장된 nullable `kind`를 포함하며 대진·시상 기능의 종류 판정에 사용한다. [대회 계약](./domains/tournaments.md)을 따른다.
+
 6강 전용 진출 결정은 기존 관리자 가드/응답 envelope를 따르며, source version 충돌은409, 참가·방식 조합 오류는422이다. [도메인 계약](./domains/tournaments.md#6강-결승-직행-방식-2026-10-28) 참조.
 
 신규 가입자의 경기 기록은 기본 공개이며, 기존 회원은 활성·가입 완료·미설정인 경우에만 공개로 초기화한다. 직접 비공개 선택과 실명·개별 기록 숨김 정책은 유지한다. [가입 계약](./domains/auth.md#signup-flow) · [설정 계약](./domains/users.md#경기-기록-공개-설정).
@@ -246,3 +250,5 @@ status inputs are defined in [Tournaments](./domains/tournaments.md#competition-
 
 
 대회 생성·수정의 `prizeBreakdown`은 nullable string(최대 4,000자)이다. 기존 구분자 텍스트와 `@teameet/prizes/v1:` 접두의 분류 JSON 문자열을 지원하며, 소비자는 공용 파서로 읽는다. 이 필드를 원문 그대로 사용자에게 렌더하지 않는다. [대회 시상 계획 계약](./domains/tournaments.md#categorized-prize-plans) 참고.
+
+- 정규대회 진행 방식 `league_knockouts`는 한 대회의 예선 조별리그와 이름을 가진 N개 토너먼트다. 정규리그 시즌/승강과 별개이며 기존 `group_knockout`은 유지한다. 이 방식의 시상 `bracketTrack`은 고정 enum 대신 설정된 토너먼트 이름을 받으며 서비스가 대회 소속을 검증한다. 상세는 [대회 계약](./domains/tournaments.md#정규리그--n개-토너먼트-league_knockouts).

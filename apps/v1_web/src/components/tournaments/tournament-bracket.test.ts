@@ -256,3 +256,13 @@ describe('16강 결선 정렬', () => {
     expect(rounds.map((round) => round.label)).toEqual(['16강']);
   });
 });
+
+it('128강과 64강의 저장 phase가 같아도 부전승 조의 이름을 다른 라운드에 붙이지 않는다', () => {
+  const large = makeGroup({ id: 'large', phase: 'round64', name: '챔피언 · 128강', groupTeams: [{ id: 'bye', registrationId: 'r-bye', teamId: 't-bye', teamName: '부전승팀', teamLogoUrl: null, sortOrder: 0, isBye: true }] });
+  const small = makeGroup({ id: 'small', phase: 'round64', name: '챔피언 · 64강' });
+  const rounds = groupFixturesByRound([
+    makeFixture({ id: 'r128', fixtureNumber: 1, round: '128강', groupId: 'large' }),
+    makeFixture({ id: 'r64', fixtureNumber: 2, round: '64강', groupId: 'small' }),
+  ], [large, small]);
+  expect(rounds.map(({ key, label }) => [key, label])).toEqual([['128강', '챔피언 · 128강'], ['round64', '챔피언 · 64강']]);
+});

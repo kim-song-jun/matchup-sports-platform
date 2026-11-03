@@ -826,6 +826,89 @@ PR 은 순서대로 dev 에 머지하고 매번 alpha 에서 확인한다(dev �
 - **동률 조의 공개 순위표(회차 6, 2026-10-11 사용자 결정 A → `fix/bracket-tie-standings`, 아래 결정 표):** 완전 동률 조에서 어드민이 직접 고른 팀이 4강에 들어가도, 공개 「순위·대진표」 조별 순위표는 임의로 붙은 순위 숫자 기준으로 상위 팀을 진출로 칠한다(`bracket-page-client.tsx` `GroupStandingsSection`). 실측: A조 03·06 이 진출로 칠해졌지만 4강에는 04·06 이 들어갔다. 정본 §5 의 「남은 동률은 공동 순위」와도 다르다.
 - 1440 어드민 그림에서 8팀 대진의 결승 열은 가로 스크롤해야 보인다. 공개 390 대진표는 긴 팀 이름을 말줄임한다(회차 6).
 
+## 2026-10-12 Extension: 정규대회 하나 · 상위/하위 결선 · 시상 두 세트
+
+Extension Status: In Progress
+
+### Original Conditions and Selected Design
+
+- 대상은 `kind=regular_tournament`의 조별리그+토너먼트다. 정규리그는 제외한다.
+- 첨부 요구: 각 조 1·2위는 상위, 3·4위는 하위 토너먼트로 이어진다.
+- 사용자 선택: 첫 번째 A안, 기존 대진 그림과 템플릿을 확장한다. 대회·신청·명단은 하나이며 결선 결과와 시상은 두 갈래다.
+- 사용자 추가 확정: 팀 시상과 개인상 모두 어드민에서 조절 가능해야 한다. 팀 시상은 대회 전체 안내 또는 상·하위별 안내, 개인상은 각 항목의 전체/상위/하위 범위를 선택한다.
+- 한 구간은 경기/단판, 두 구간은 전반/후반 표기를 기존 경기 설정에서 가져온다. 조별 회전·토너먼트 번호와 혼동하지 않는다.
+- 목표 시각은 2026-10-12 17:00 KST. 실제 검증 전 완료로 보고하지 않는다.
+- 사용자 추가 강조: 실제 참가자의 공개 화면도 중요하다. HTML에 조별 진행/결선 배정/대회 종료의 단계 전환 미리보기를 추가했다. 제품 공개 화면은 경기 전부터 1·2위→상위, 3·4위→하위를 설명하고, 분리 진출 요약이 null일 때 기존 상위 2팀 진출로 오해시키지 않고 확인 중 상태를 표시한다.
+- 구현 전 로컬 HTML에 A/B/C, 추천, 선택·복사 control, 대진·기간 예시를 제공했다. alpha 기존 단일 결선 템플릿의 before 이미지를 확보했다.
+
+### Implementation Plan and Interfaces
+
+**Architecture:** 기존 순위 슬롯과 결과 진출 그래프를 재사용하며 라운드(`phase`)와 결선 범위(`bracketTrack`)를 분리한다. 기존 데이터의 범위는 `overall`, 신규 분리 결선은 `upper`/`lower`다. 두 팀 시상 안내는 별도 행으로 저장하고 개인상은 동일 범위 enum을 사용한다.
+
+1. 공통 스키마를 먼저 고정한다.
+   - enum `V1TournamentBracketTrack { overall upper lower }`.
+   - `V1TournamentGroup.bracketTrack`, `V1TournamentAward.bracketTrack`: default `overall`.
+   - 개인상 unique는 `[tournamentId, bracketTrack, awardType]`. 과거 개인상은 전체 범위로 보존한다.
+   - `V1TournamentAwardSet`: `id`, `tournamentId`, `bracketTrack`, nullable `prizePool`, `prizeSummary`, `prizeBreakdown`, timestamps; unique `[tournamentId, bracketTrack]`. API는 이 행의 `upper`/`lower`만 허용한다.
+   - additive migration과 Prisma client 생성. 기존 대회/등록/경기/결과/시상 삭제·재생성 없음.
+2. 템플릿과 순위 계약을 확장한다.
+   - `group_knockout` 입력에 optional `lowerBracket:boolean` 추가. 생략/false면 기존 단일 결선 계약 그대로.
+   - true는 `advancePerGroup=2`, `groupCount in [2,4,8]`, `teamsPerGroup>=4`를 요구한다. 기존 조당 3~6팀 범위는 유지하며 5·6위는 분리 결선에 진출하지 않는다.
+   - 상위 rank1/2, 하위 rank3/4 자리; 그룹/fixture/edge 키는 track별로 분리; 첫 결선은 같은 조를 피한다. 3·4위전은 선택 시 양쪽에 생성한다.
+   - 모든 수동/자동 연결은 같은 `bracketTrack`만 허용한다. 결과 정정·무효도 다른 결선에 영향을 주면 안 된다.
+   - 순위 override 상한을 최대 32로 맞춘다. 미확정·동률 확인 계약은 유지한다.
+   - 공개 group에 `qualificationByTrack`을 추가한다. 기존 `qualification`은 단일/상위 판정으로 유지하고 하위 실제 배정이 상위 진출 표시를 밀어내지 않게 한다.
+3. 시상 API를 확장한다.
+   - `GET/PUT /api/v1/admin/tournaments/:id/award-sets`, PUT `{awardSets:[{bracketTrack:'upper'|'lower',prizePool?,prizeSummary?,prizeBreakdown?}]}`. 빈 배열은 분리 시상 안내를 해제하며 최대 두 행, track 중복 거절.
+   - 개인상 GET/PUT에 `bracketTrack`(생략은 `overall`) 추가. 중복 판정·알림 변화 key에 범위를 포함한다. 수상자 실제 명단·공개 동의 기존 가드 유지.
+   - 공개 정규대회 detail에 `awardSets`와 개인상 범위를 노출한다. 기록의 개인상에도 범위를 전달한다.
+4. A안 화면을 연결한다.
+   - 기존 템플릿 대화상자에 단일/분리 옵션과 정확한 경기 수, 지원하지 않는 조합 안내.
+   - 대진 그림·목록·순위·연결 후보를 track별로 구분한다. 공개 그래프는 두 독립 대진으로 렌더한다.
+   - 완료 화면은 두 결승 승자를 각각 표시한다. 하위 결승을 임의로 대회 전체 우승으로 선택하지 않는다.
+   - 어드민 시상 화면에서 팀 시상 전체/분리와 개인상 항목별 범위 설정. 공개 시상 페이지는 저장된 범위를 그대로 구분한다.
+5. 리뷰·검증·반영을 순차 수행한다.
+   - 최소 단위/계약 테스트 → 변경 범위 typecheck/lint 1회 → Sol 독립 리뷰 → pathspec 커밋/커밋본 검사.
+   - 검토 가능한 변경을 준비한 다음 원격 반영 게이트를 진행한다. PR base는 dev, main 승격은 범위 밖.
+   - 배포 SHA 확인 후 alpha 테스트 대회에서 생성→팀 배정→조별 결과→순위 배정→두 결승·시상 저장까지 검증한다.
+
+### Parallel Work Breakdown / Owned Files
+
+- Root: 이 task extension, 공통 Prisma schema/migration, 변경 이력·검증 실행·alpha ego task space·최종 책임. 기존 shared tree의 타 세션 변경은 제외한다.
+- Backend bracket (Luna): `src/tournaments/templates/*`, `slots/*`, `tournament-bracket*`, group DTO/helpers, 정규대회 read query/presenter 및 이에 필요한 테스트. 시상 write 서비스/controller와 프론트는 금지.
+- Backend awards (Luna): 시상 안내 새 service/controller/DTO, `tournament-reviews.service.ts`의 개인상 범위·알림, 개인상 records mapper, 관련 테스트. schema·read presenter·template·frontend는 금지.
+- Frontend (Luna): `src/types/api.ts`의 이번 계약, 관련 훅, 템플릿·대진 canvas/public bracket/완료 화면·시상 설정/표시 및 관련 테스트. backend·task·migration은 금지.
+- Independent review (Sol): 전 변경의 실제 코드·경계 조건 검토, 구현자 주장 그대로 승인 금지. 테스트는 root가 직렬로 실행한다.
+- 모든 worker는 혼자 작업하지 않는다. 타 변경 revert·자가 commit·branch 전환·fanout·빌드/테스트·배포 금지. 공통 계약 이후에만 parallel 구현한다.
+
+### Acceptance / Test Scenarios
+
+- [x] 분리 결선 계약을 실제 planner에 적용하는 RED 테스트: 2조×4팀에서 예상 18경기, 기존 15경기로 실패 관찰(기존 39개 pass).
+- [x] 2/4/8조 분리 planner: rank1/2와 rank3/4의 독립 결선, 유일 경기 번호, track별 WINNER/LOSER 연결, 상한·입력 거절(단위 계약).
+- [x] 수동 연결은 상위↔하위 및 tracked↔전체 범위 혼합을 거절한다(단위 계약).
+- [x] 동률·미확정 조는 임의 배정되지 않으며 실제 하위 배정은 상위 진출 표시를 바꾸지 않는다(단위 계약).
+- [x] 팀 시상 안내 전체/분리 저장·조회, 개인상 동일 종류를 다른 범위에 지정, 같은 범위 중복 거절, 수상자 명단 가드·알림 identity 검증(단위 계약).
+- [x] 공개 완료·대진·시상 화면에서 상위와 하위 결과를 각각 표시한다. 기존 단일 결선·전체 개인상은 그대로 동작한다(컴포넌트 계약, alpha 시각 검증 대기).
+- [ ] 실제 저장 가능한 모든 control과 오류/빈 상태를 확인한다. fixture/MSW/API 문서 sync, debt marker 및 diff/import 검사.
+- [ ] alpha 로그인·실제 테스트 대회 한 바퀴, 모바일390/태블릿768/데스크톱1440, console/network, before/after, cleanup 증거.
+
+### Risks / Security / Progress Snapshot
+
+- 조회가 phase/final만 기준으로 묶이면 두 결선이 섞인다. structured track 기준으로 분리하며 이름 문자열로 분기하지 않는다.
+- 개인상 unique와 알림 diff 모두 범위를 포함해야 한다. 전체 기존 수상자는 `overall`로 보존한다.
+- 정규리그 API는 변경하지 않는다. 어드민 권한, 명단·동률·결과 revision 가드는 유지한다.
+- 2026-10-12 시작 HEAD=origin/dev=`a4b7c2d78`. current tree는 detached이고 branch/worktree 전환 없이 시작했다. 타 세션의 untracked `release-files.txt`는 이번 범위가 아니다.
+- 호스트 baseline: load21.37/15.56/19.69, Node128, browser67, swap10.9GB. 13:36 load13.58/18.03/18.99, Node212, browser90, swap11.6GB; 새 동일 Node signature 증가 최대15, 54개 증식 signature 없음. 부하 작업은 최소·직렬, 타 세션 프로세스는 종료하지 않는다.
+- 14:25 현재: HTML A 선택과 팀/개인상 어드민 조절 확정. 공통 schema/migration/client·backend·frontend 첫 구현 완료, API 계약과 정본 결정 이력 sync. Sol 독립 리뷰의 수동 배정 우회·advanceCount·시상 동시 저장·분리 결선 해제/시상 보존·로딩 중 범위 보존을 보완 중이다. 구현 완료 및 alpha 완료로 보고하지 않는다.
+- 15:08 현재: 참가자 null 진출 요약의 잘못된 상위 2팀 문구를 수정했다. 로컬 HTML 참가자 단계 전환 및 두 우승팀 표시 확인. Web 10파일 첫 실행 216/224 통과; 표시 assertion 2건과 5초 timeout 6건은 2파일로 좁혀 재검증 중이다. Backend 직접 경기 생성 및 분리 시상을 둔 단일 결선 교체의 유효한 RED를 관찰했다. 수동 배정 fixture 오류는 성공 증거로 쓰지 않는다. 스키마/마이그레이션/현재 릴리스 바인더 4파일과 참가자 문구 수정은 Sol static PASS; DB 적용·CI·변경 후 alpha QA는 미실행이다. 호스트 15:05 load247.61, swap15.3GB, Node272(직전 signature 증가40 이상 없음), 테스트는 최소 worker 직렬로 실행한다.
+- 16:01 현재: Backend 521개, Web 224개, schema-binding 7개 계약이 좁은 재실행을 포함해 누적 통과했다. Sol 독립 static review critical0. API typecheck/lint PASS, Web typecheck PASS이며 오류 상태의 폰트 token 패턴 2건을 정리하고 패턴 검사만 재실행한다. DB 적용·커밋본 CI·변경 후 alpha 화면은 아직 검증 전이다. 호스트15:57 load215.75, swap13.7GB, Node383. 새 cua_node/node_repl69개는 다른 Codex 실행들의 parent로 관찰되어 종료하지 않았다. 이번 owned lint/test는 직렬 종료를 확인하고, 새 fan-out은 추가하지 않는다.
+- 16:13 현재: 변경84파일을 pathspec 커밋060ec427c로 고정하고 최신 dev7570bd809를 비파괴 merge한 head2f5514f로 PR#1858을 열었다. API/Web 타입과 Web 패턴, 커밋본 마이그레이션 게이트 PASS. Sol 전체 frontend 검토에서 모바일 단계 순서 및 support 하위 시상 조회 P2 두 건을 찾아 수정했으며 독립 재검토 PASS, 실제 반례 계약2/2 PASS(누적 Web226). 수정 head CI 대기. GitHub AI code scan은 코드 결함 판정 전에 Model claude-opus-5 unavailable로 실패했고 기본 CI Gates는 PASS; API migration replay/Web unit은 실행 중이다. 새 QA 대회·결과 생성은 기존 task의 명시 승인 규칙에 따라 사용자 답변을 기다리며 변경 후 alpha QA는 미실행이다.
+- 16:26 현재: GitHub Codex review의 source snapshot pin P1 및 공개 수상 이력·조별 진출 배지 P2를 보완했다. 스키마 snapshot5개와 웹 선택검증15개(신규 반례3개 포함) PASS, Web typecheck/pattern PASS, Sol 좁은 독립 재검토 블로커0. 사용자가 새 QA 대회로 끝까지 검증 및 관리자 로그인 완료를 명시했다. 기존 대회는 변경하지 않으며 새 검증 대회만 종료 후 비공개 처리한다. 수정 커밋본 CI·alpha 실제 플로우는 이어서 실행한다.
+- 18:16 현재 PR #1858 CI 수정을 격리 WT `codex/ci-pr1858-repair` (기준 `40a9633d`)에서 재적용했다. API integration CI의 실제 실패는 `getBracket` 자리 직렬화 계약에 새 `bracketTrack: 'overall'` 필드가 추가됐는데 deep-equality 기대값이 누락된 것이다. Web CI 실패는 진행 중인 기존 원천 `q1`이 신규 후보에서 걸러지면서 선택값이 빈 문자열로 바뀐 것이다. Web 계약 테스트에서 실패를 재현한 뒤 현재 링크 보존·비활성 `현재 연결` 표시와 split track 대조군을 보강했고, 좁은 Vitest 2 passed, 8 skipped, worker 1로 통과했다. 별도 GitHub Advanced Security 실패는 코드 결과가 아니라 외부 agent의 `claude-opus-5` 미지원 오류다. 실제 DB API integration, 전체 Web CI, typecheck, alpha 수동 검증은 아직 미실행이다. 호스트 load 40.30/61.43/105.39, swap 19.4GB, Node 251, browser 70였으며 테스트는 사용자의 명시 지시에 따라 worker 1로 실행했고 owned Vitest 트리는 종료 확인했다. 본문 worktree의 `node_modules`와 `apps/v1_web/node_modules`는 공유 의존성 심볼릭 링크다.
+- 18:59 Sol 재리뷰에서 `isFixtureLocked`의 `latestRevision !== null`이 API가 검사하지 않는 최신 DRAFT까지 막는 false negative를 지적했다. DRAFT 원천의 기존 연결을 저장하는 행동 테스트를 먼저 추가해 RED(`연결 저장` disabled)를 재현한 뒤 helper를 응답 필드 기준 `game.state=SCHEDULED && !game.hasOfficialResult`로 바꿔 최신 DRAFT를 막지 않게 했다. 기존 잠금·대상 노출 테스트와 정상 save 테스트를 함께 GREEN(7 passed, 7 skipped, worker 1) 확인. API는 `currentOfficialRevisionId === null`을 검사하지만 Web 응답은 포인터 id 대신 `hasOfficialResult`(포인터 상태가 OFFICIAL인지)만 노출하므로 완전히 같은 포인터 판정은 표현할 수 없다. VOID 포인터는 생성 경로상 공식화 뒤 game state ENDED에 남아 현재 SCHEDULED gate로 차단되는 코드 흐름을 확인했으나 운영 데이터 실측은 하지 않았다. 또 Web `fixture.status='scheduled'`은 API raw status `matched`의 direct exposure가 아니라 serializer가 몇 상태를 합쳐 투영한 값이다. 이 항목의 도달성은 입증하지 않았고 API 계약/정책은 확장하지 않았다. 실행 전 host: load 125.33/204.15/147.31, swap 16.8GB, Node 242, browser 35, Docker daemon unavailable; RED shell PID 85879/PPID 50452, GREEN shell PID 99138/PPID 50452, 실행 후 Vitest/tinypool 프로세스 없음. API DB integration, 나머지 Web suite/typecheck/build 및 alpha QA는 미실행이다.
+- 검증: planner 18경기 계약, scoped 개인상, frontend 분리 화면 RED 관찰. 공개 presenter 48개 pass(유효한 RED 이전 구현된 테스트이며 RED 증거로 쓰지 않음). 수동 순위 guard 추가 검증은 fixture/type 오류를 수정하고 다시 좁게 실행 중. 60초 제한 실행은 timeout이며 pass 아님. 첫 장시간 실행의 DTO namespace 오류와 lock 대상 kind 선택 누락은 수정했다.
+- 런타임/호스트: 로컬 web 서버 없이 alpha ego task325 재사용, HTML 핵심 control/복사와 최신 결정 설명 확인. 14:14 host load83.53, Node274, browser61, swap14.9GB; 최소 worker·직렬 검증 유지. 공유 체크아웃 HEAD는 다른 릴리스의 FF로 `37a06cea0`(Teameet1.7.0)로 갱신됐으며 이번 변경과 무관한 파일은 보존한다. owned timed-out test75922 트리 및 종료 test97839는 잔존 없음 확인; 다른 세션 프로세스는 종료하지 않는다.
+
 ## Ambiguity Log
 
 | Date | Raised by | Question | Resolution |
@@ -916,3 +999,121 @@ Status: In Progress
 - Web tsc PASS. 패턴 검사는 sandbox spawnSync EPERM으로 중단되어 해당 단계만 권한 있는 셸에서 재실행 PASS. API lint 결과 및 PR/CI는 아래에 기록한다.
 
 - API tsc/surface PASS. Web 패턴 PASS. diff whitespace/debt marker 검사 PASS. 새 응답 타입은 optional로 추가해 기존 MSW/수동 대진 호환을 유지했다. PR에는 수정 전 3폭을 포함하고 after 갤러리는 머지·alpha 배포 뒤 채운다.
+
+## 2026-11-02 extension — 정규리그 + N개 토너먼트
+
+Status: Review — local validation passed; alpha pending
+
+### Context / Goal
+PR #1858의 고정 상위·하위 결선을 일반화한다. 기존 조별+토너먼트는 보존하고 별도 진행 방식 `league_knockouts`(표시명: 정규리그 + N개 토너먼트)를 추가한다. 여기서 정규리그는 한 정규대회의 예선 조별리그이며 시즌 승강 정규리그와 별개다.
+
+### Original Conditions
+- [x] 예선 조별리그의 팀 수에 고정 상한을 두지 않는다.
+- [x] 토너먼트 개수·이름을 운영자가 설정한다.
+- [x] 각 예선 조의 순위별 토너먼트 목적지와 진출 팀 수를 설정한다.
+- [x] 순위는 기본 배정이다. 확정 참가팀을 직접 추가·제외·교체·이동할 수 있다.
+- [x] 수동 편집된 배정은 순위 재계산으로 덮어쓰지 않는다.
+- [x] 토너먼트별 대진·부전승·결과·팀/개인 시상을 같은 대회에서 관리한다.
+
+### User Scenarios
+예선 편성 → N개 토너먼트 이름/진출 규칙 설정 → 공식 결과로 기본 명단 제안 → 운영자가 명단 편집 → 확정 명단으로 토너먼트 대진 미리보기/생성. 참가자 화면은 각 결선을 이름으로 구분한다.
+
+### Test Scenarios / Acceptance Criteria
+- [ ] 5조 및 조당 9팀 이상 설정; 홀수 총 참가 수 허용.
+- [ ] 3개 이상 토너먼트와 서로 다른 조별 진출 규칙.
+- [ ] 순위 범위 밖 참가팀 수동 추가/제외/이동, 순위 재계산 뒤 편집 유지.
+- [ ] 다른 대회·미확정 참가팀, 중복 순위 출처·중복 참가팀 거절.
+- [ ] 3/5/6/10팀 결선의 부전승과 경기 연결; 실제 시작 경기 변경 차단.
+- [ ] 권한·stale preview·동시 요청·rollback·시상 범위 검증.
+- [ ] 기존 단일 결선·6강·12강·순위 채우기·시간 재정의 회귀.
+- [ ] API/Web 계약 동기화, migration replay/drift, alpha 390/768/1440 evidence.
+
+### Parallel Work Breakdown / Ownership
+단일 세션 순차 실행. Phase 1: PR1858/latest-dev 통합 및 계약. Phase 2: DB/API/생성/수동배정. Phase 3: 프론트/시상/공개. Phase 4: 검증/문서.
+Owned: apps/v1_api tournament·schema·migration·관련 테스트, apps/v1_web 대회·대진·계약·관련 테스트, docs/api·시나리오·정본 결정 및 schema digest 바인딩 파일.
+Forbidden: 공유 원본 트리의 WIP, main 승격, 운영 데이터 변경/seed/reset, 무관한 auth 기능.
+
+### Security Notes
+기존 admin mutation 권한·대회 잠금·같은 대회 확정팀 검증·시작 경기 보호·감사 로그 유지. 순위 외 배정을 권한 우회로 취급하지 않고 명시적 수동 편집으로 기록한다.
+
+### Tech Debt Resolved
+고정 upper/lower enum 및 순위 범위 하드코딩을 이름을 가진 독립 토너먼트 계약으로 일반화.
+
+### Risks & Dependencies
+PR1858 latest-dev merge 30개 충돌 파일. generated Prisma client/의존성 준비 및 alpha UI QA 환경 필요. 기존 521/226 테스트 결과는 이번 확장 증거로 재사용하지 않는다.
+
+### Ambiguity Log
+| Date | Question | Resolution |
+|---|---|---|
+| 2026-11-02 | 화면 구성 | 사용자 A안 선택: 예선 편성 → 토너먼트·순위 규칙 → 진출팀 편집 → 미리보기. |
+| 2026-11-02 | 중복 진출 | 기본적으로 같은 팀은 한 토너먼트만. 이동은 원래 명단에서 제외 후 추가하는 원자적 처리. |
+| 2026-11-02 | 최소 결선 팀 수 | 대진 생성 시 2팀 이상. 명단 초안은 빈 목록 허용. |
+| 2026-11-02 | 진행 후 편집 | 해당 결선에 시작/결과가 있으면 명단·대진 재생성 거절. 예선 결과는 보존. |
+
+### Progress Snapshot
+- 격리 worktree: /tmp/teameet-multi-finals-20261102; base origin/dev ddbe6a5ce.
+- 원본 PR1858 head f8d2b5326 통합 중. 기존 공유 작업트리 변경 없음.
+- Phase 1/2/3 completed. Phase 4 local validation PASS; alpha 0/10·after 0/3 pending.
+- PR1858/latest-dev 충돌 30개 모두 해소. 최신 대진·6강·부전승·시간 재정의 보존.
+- DB 전체 migration229개 재생 PASS, drift0. 실제 PostgreSQL 통합9/9: 275경기 저장, 순위 추천, 수동 팀 편집/재계산 유지, 예선 보존, 중복/타 대회, 동시 CAS, stale preview/일정 덮어쓰기 차단, 시작/완료 잠금, 시상 범위, support 권한, DB 강제 실패 rollback.
+- 생성기11/11 PASS. 최초 API 회귀17개 스위트의 기존 고정 enum DTO 기대값2개를 새 계약에 맞게 수정한 뒤 관련6개 스위트516 tests PASS(중복 합산 안 함).
+- Web 최초16개 스위트의7개 실패는 병합 시 설명 문구 누락과 새 시상 라벨/최신 상금 제목의 기대값 drift였다. 수정 후3개 스위트99 PASS. 추가 생성/그래프/모바일 모델/설정6개 스위트190 PASS, N개 시상·팀 수 계약47 PASS, 캔버스·목록90 PASS, 모바일59 PASS, 전용 구조 안내20 PASS(각 실행은 중복 포함, 합산 안 함).
+- API/Web 전체 typecheck PASS. API surface752개 파일 PASS, Web pattern PASS, debt marker는 task 문서의 과거 검사 기록뿐(소스0), diff whitespace PASS.
+- 검증용 Git tree945e0d65794cb7b0bbb96fbafc862af48542c899의 expand/contract gate 및 negative/self controls PASS. 이후 UI 제약·상태 잠금 보완의 최신 tree는 PR 반영 전 재검증.
+- UI 전용 ego/headed browser 도구 없음 및 alpha 미배포: 실제 사용자/viewport 검증 미실행. 단위/DB 테스트를 alpha PASS로 표기하지 않는다.
+- 운영 DB·공유 원본 작업트리 변경0. 임시 PostgreSQL 127.0.0.1:55483, 소유 runner PID48657만 사용하며 최종 검증 후 종료했다(PID48657 runner와 PostgreSQL 정상 종료 확인).
+- 배포/운영 반영은 미실행. PR은 draft 유지.
+
+### 2026-11-02 PR 반영 cursor
+
+- 구현 커밋 `04b4892d561d43a52e537083989e5e179c54a9e5`, PR1858 원본8커밋 이력 보존 병합 `3d59a4277ea8affa938f88797a1a07b8da182fde`.
+- 기존 draft PR1858 브랜치에 fast-forward push 완료. 제목/본문을 정규리그 + N개 토너먼트·직접 진출팀 편집 범위로 갱신. base=dev/draft=true 재확인. dev/main push·머지·배포 없음.
+- 새 CI run41413245625의 API/Gates/Web 시작 확인. 현재 remote CI는 진행 중이며 아직 PASS로 표기하지 않는다. 이 문서 업데이트 후 최신 head의 Checks를 최종 기준으로 사용한다.
+- local typecheck 양쪽0, 생성기11/11, 실제 DB통합9/9, migration229개·drift0, 실제 커밋3d59a4277의 expand/contract PASS. 이후 N개 결선 구조 편집 안내 UI20/20·모바일59/59 PASS. 신규 alpha0/10·after0/3.
+- Git tree clean 및 commit scope127개 파일 확인. 원본 공유 트리 WIP 보존. Linux git 인증 부재는 기존 Windows gh.exe의 활성 keyring 인증을 명령 단위로 사용해 해결; 전역 인증/설정 변경 없음.
+
+### 최종 범위 검증 보완
+
+고정 enum DTO를 이름 범위로 확장하면서 기존 대회 방식에도 임의 범위가 열리지 않도록 서비스 검증을 분리했다. 기존 방식은 overall/upper/lower만, 새 방식은 실제 설정된 토너먼트 이름만 허용한다. 범위 검증 + 시상/개인상 관련3개 스위트96 tests PASS. 원격 CI는 이 보완을 포함한 최신 PR head 기준으로 확인한다.
+
+### 편집 재진입 UX 보완
+
+기존 설정을 단순 조회하며 진출팀 편집 단계로 이동할 때는 no-op 저장/결선 삭제를 하지 않는다. 저장 명단의 참가 확정이 해제된 팀은 안내와 명시적 제외 액션으로 제거한 뒤 편집을 계속할 수 있다. 실제 API payload·재시도/실패 상태를 검증하는 전용 설정 UI4/4 tests PASS.
+
+### 원격 CI RED → GREEN 보완
+
+- CI run41414776750 Gates의 `test_modified_m11_does_not_publish_binding`가 OR/AND 우선순위 오류를 검출했다. 새/기존 schema SHA 허용 조건을 괄호로 묶어 모든 경우 M11 SHA를 함께 검사하도록 수정. 공식 jq1.8.1을 /tmp에 SHA256 검증 후 준비해 실제 binding tests9/9 PASS(가짜 jq 없음).
+- 같은 run의 Web 전체878개 파일·10747 tests 중 라운드 이름2개 실패(10745 PASS). 128강 지원의 group-name 선택이 기존 같은 조의 결승까지 준결승 이름으로 바꾸던 회귀를 수정했다. 기존 테스트를 약화하지 않았고 128강/64강·부전승 이름 분리 회귀를 추가해 관련4개 파일61 tests PASS.
+- 위 두 수정은 실제 실패 원인을 고친 것이며, 이전 CI를 PASS로 표기하지 않는다. 최신 head의 원격 CI 재검증이 필요하다.
+
+### 2026-11-03 PR 미해결 리뷰 후속
+
+- 이전 head6c931c765의 원격 CI Gates/API/Web 모두 SUCCESS 확인(run41416672719). alpha 배포는 실행하지 않았다.
+- 미해결5개 thread를 최신 코드로 재검토: 모바일 동일 sortOrder의 upper/lower 순서를 UUID보다 먼저 고정, 공통 slot 타입에 실제 API의 bracketTrack을 추가하고 지역 cast 제거, 동일 모듈 중복 import 병합.
+- 관리자 serialize에 실제로 누락됐던 `kind` 추가: 시상 화면과 split 대진 허용 판단의 공통 원인을 수정. API 계약 문서와 생성 응답 회귀 assertion도 함께 반영.
+- Owned paths: tournaments-admin.service.ts/spec.ts, bracket-canvas-mobile-model.ts/test.ts, bracket-canvas.tsx, bracket-fixture-tools-dialog.tsx, types/api.ts, 이 task 및 docs/api/domains/tournaments.md. 원본 공유 작업트리 변경 없음.
+- 검증: API admin service134/134, web mobile model 및 fixture tools46/46 PASS. UUID 역순 upper/lower의 준결승·결승 회귀를 포함한다. API/Web typecheck0 및 diff-check PASS.
+- alpha 수동 QA0/10·viewport0/3 유지. 현재 세션 도구 목록에는 ego-browser/Playwright/browser 도구가 없으며 PR은 draft·미배포 상태다. 로컬 Next를 QA 대체로 실행하지 않았다.
+
+### 2026-11-03 재리뷰 3건 수정 (active)
+
+- Phase A completed: manifest 생성·재사용 및 수동 rollback의 runtime version=2 검증. 후보 앱/시드 writer 시작 뒤 자동 실패 복구도 호환성 검증을 통과해야 하며, 시작 전 실패의 기존 복구는 유지. 실제 git history·manifest pairs·실제 restore 함수·배포 seed 실행 block의 mutation 회귀7/7 PASS.
+- Phase B completed: group phase로 track별 결승/3·4위전을 구분하고 승부차기 포함 공식 3/4위를 표시. 새 회귀2건 RED(기존14 PASS) 확인 후 전체16/16 GREEN.
+- Phase C completed: server/browser가 함께 사용하는 v1MswHandlers에 named-final sample fixture와 stateful handler 등록. 시상 저장→GET→공개 상세→빈 배열 초기화, invalid 입력의 상태 보존, 시상 재범위, 수동 명단·preview·생성·idempotence·stale 및 support/member/guest 권한8/8 PASS.
+- Phase D in_progress: 좁은 회귀·typecheck·정적 검토 완료, 명시 경로 커밋 및 PR1858 갱신. 최신 이전 head c67554fab의 Gates/API/Web SUCCESS 확인.
+- 사용자 수정 승인: 재리뷰 P1/P2 3건 전체. 기존 3폭 alpha baseline은 PR review5745573131에 게시. 새 기능 after 화면은 미배포로 남아 있으며 이번 코드 검증과 구분한다.
+
+- Phase D 검증: Web typecheck0, rollback compatibility7/7, immutable manifest self-test PASS, StageB manifest21/21, immutable-deploy checker PASS, shell syntax·diff check PASS. 실제 trap 복구 검사는 현재 bash5.3에서 원래 bare-return 결함 재현이 없어 정적 guard만 유효하다는 제한을 그대로 기록한다. 운영 DB/이미지/배포 변경0, schema/migration 추가0.
+- 기존 release-state shell 검사는 sandbox의 sudo 실행 제한으로 중단(보완 코드를 성공으로 간주하지 않음). 더 좁은 실제 rollback/restore 경로와 manifest 양성/음성 검증으로 변경 계약을 확인했고 전체 반복은 원격 CI에 맡긴다.
+
+- 최종 좁은 Web 통합: 공개 결과16 + 공용 MSW8 + wizard4 + 기존 shared MSW facet14 = 42/42 PASS. runtime version7/7 및 현재·과거 schema binding9/9 PASS. 이전 P1/P2 세 항목의 코드 수정은 완료, 새 head CI 및 신규 alpha after QA는 별도 gate로 유지한다.
+
+### 2026-11-03 alpha 배포 요청 후속
+
+- 사용자 요청: PR1858 기능을 alpha에 배포. main 승격은 범위 밖이다.
+- Phase A completed: 최신 origin/dev `84ebe114e`에서 별도 Windows worktree를 만들고 PR head `6154cca39`를 충돌 없이 통합했다. 원본 dirty tree는 수정하지 않았다.
+- Phase B completed: 최초 immutable 전환의 `restore_legacy_runtime`도 후보 writer 시작 이후에는 구버전 복구를 거절한다. 실제 복구 함수의 source 전환 여부를 검증하는 회귀를 추가했다.
+- Phase B completed: preview는 살아 있는 예선 최대 경기 번호 다음부터 결선을 계산하며 generate는 검증된 preview plan을 그대로 저장한다. 재미리보기에서 기존 결선 번호가 누적되지 않는다. API 문서 및 실제 DB 통합 시나리오에 미리보기/저장 번호 일치 검증을 추가했다.
+- 좁은 검증: service/plan 단위 13/13 PASS, WSL의 실제 bash/git/jq로 runtime rollback 8/8 PASS, bash syntax PASS. jq1.8.1 공식 배포 바이너리의 SHA256을 공식 checksum과 대조했다. 운영 DB rollback 실험은 하지 않았다.
+- Phase C in_progress: API/Web typecheck0, API surface752 PASS, diff-check PASS. Web pattern checker는 Windows cmd의 POSIX find/grep 구문 비호환으로 실행 실패했으며 성공으로 집계하지 않는다. 전체 pattern/실제 DB 통합 검증은 최신 head의 Linux CI에서 확인한다. exact-path commit 및 PR 갱신 후 최신 CI 통과, dev merge와 alpha 배포 상태 확인을 진행한다.
+- Progress Snapshot: alpha 미배포 상태의 신규 수동 QA0/10·viewport0/3은 그대로 유지한다. 배포 완료 후 실제 serving SHA 및 health를 별도로 기록한다.

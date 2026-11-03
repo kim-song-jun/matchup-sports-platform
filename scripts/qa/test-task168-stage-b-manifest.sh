@@ -233,6 +233,7 @@ echo "== test-task168-stage-b-manifest =="
   printf 'V1_DB_USER=teameet_v1\n' > "${live}/deploy/.env"
   ln -s "${ROOT}/deploy/alpha-release-common.sh" "${live}/deploy/alpha-release-common.sh"
   ln -s "${ROOT}/deploy/alpha-manifest-common.sh" "${live}/deploy/alpha-manifest-common.sh"
+  ln -s "${ROOT}/deploy/alpha-tournament-runtime.sh" "${live}/deploy/alpha-tournament-runtime.sh"
   ln -s "${ROOT}/deploy/alpha-source-common.sh" "${live}/deploy/alpha-source-common.sh"
   manifest="${WORK}/rollback-active.json"
   make_stage_b_manifest "${manifest}"
@@ -390,6 +391,7 @@ EOF
   # resolve outside this temp root entirely.
   mkdir -p "${dir}/scripts/release" "${dir}/deploy"
   cp "${ROOT}/deploy/alpha-manifest-common.sh" "${dir}/deploy/alpha-manifest-common.sh"
+  cp "${ROOT}/deploy/alpha-tournament-runtime.sh" "${dir}/deploy/alpha-tournament-runtime.sh"
   mutated="${dir}/scripts/release/create-alpha-release-manifest-mutated.sh"
   python3 - "${ROOT}/scripts/release/create-alpha-release-manifest.sh" "${mutated}" <<'PY'
 import sys

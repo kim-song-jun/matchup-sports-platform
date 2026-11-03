@@ -17,7 +17,7 @@ export type CompetitionDiscoveryFilters = {
   genderCategory?: 'mixed' | 'male' | 'female' | 'unspecified';
   dateFrom?: string;
   dateTo?: string;
-  format?: 'league' | 'knockout' | 'group_knockout';
+  format?: 'league' | 'knockout' | 'group_knockout' | 'league_knockouts';
   feeMin?: number;
   feeMax?: number;
   sort?: CompetitionSort;
@@ -40,7 +40,7 @@ function amount(raw: string | null): number | undefined {
 /** 기존 status 링크를 진행·모집 축으로 옮기고 알려진 입력만 서버에 전달한다. */
 export function readCompetitionDiscovery(params: URLSearchParams, kind: CompetitionKind): CompetitionDiscoveryFilters {
   const tournamentCondition = choice(params.get('genderCategory'), ['male', 'female', 'mixed', 'unspecified'] as const)
-    || choice(params.get('format'), ['league', 'knockout', 'group_knockout'] as const)
+    || choice(params.get('format'), ['league', 'knockout', 'group_knockout', 'league_knockouts'] as const)
     || amount(params.get('feeMin')) !== undefined || amount(params.get('feeMax')) !== undefined;
   // 기존 전체 탭의 부문 공유 링크는 대회 탭으로 명확히 좁혀 조건을 보존한다.
   const effectiveKind = kind === 'all' && tournamentCondition ? 'tournament' : kind;
@@ -58,7 +58,7 @@ export function readCompetitionDiscovery(params: URLSearchParams, kind: Competit
     dateTo: date(params.get('dateTo')),
     ...(effectiveKind === 'tournament' ? {
       genderCategory: choice(params.get('genderCategory'), ['male', 'female', 'mixed', 'unspecified'] as const),
-      format: choice(params.get('format'), ['league', 'knockout', 'group_knockout'] as const),
+      format: choice(params.get('format'), ['league', 'knockout', 'group_knockout', 'league_knockouts'] as const),
       feeMin: amount(params.get('feeMin')),
       feeMax: amount(params.get('feeMax')),
     } : {}),

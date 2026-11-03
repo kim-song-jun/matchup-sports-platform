@@ -29,6 +29,7 @@ const supportAdminRecord = { id: 'support-admin-id', userId: 'support-user-id', 
 function tournamentRow(overrides: Record<string, unknown> = {}) {
   return {
     id: 'tournament-1',
+    kind: 'regular_tournament',
     sportId: 'sport-1',
     title: '테스트 대회',
     status: 'draft',
@@ -272,6 +273,7 @@ describe('TournamentsAdminService', () => {
 
     expect(result).toMatchObject({
       id: 'tournament-1',
+      kind: 'regular_tournament',
       status: 'draft',
       registrationCount: 0,
       entryFee: 120000,

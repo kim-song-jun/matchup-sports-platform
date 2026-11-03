@@ -71,8 +71,8 @@ export class TournamentListQueryDto {
   sort?: 'latest' | 'deadline' | 'scheduled';
 
   @IsOptional()
-  @IsIn(['league', 'knockout', 'group_knockout'])
-  format?: 'league' | 'knockout' | 'group_knockout';
+  @IsIn(['league', 'knockout', 'group_knockout', 'league_knockouts'])
+  format?: 'league' | 'knockout' | 'group_knockout' | 'league_knockouts';
 
   @IsOptional()
   @IsDateString({ strict: true })

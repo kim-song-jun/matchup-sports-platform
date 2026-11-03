@@ -680,8 +680,8 @@ export function validateTournamentCreateStep(state: TournamentCreateState, step 
     const minPlayers = numeric(state.minPlayers);
     const maxPlayers = numeric(state.maxPlayers);
     const entryFee = numeric(state.entryFee);
-    if (teamCount === null || !Number.isInteger(teamCount) || teamCount < 2 || teamCount > 64) {
-      errors.teamCount = '참가 팀 수는 2~64개여야 해요.';
+    if (teamCount === null || !Number.isInteger(teamCount) || teamCount < 2 || (state.format !== 'league_knockouts' && teamCount > 64)) {
+      errors.teamCount = state.format === 'league_knockouts' ? '참가 팀 수는 2 이상의 정수여야 해요.' : '참가 팀 수는 2~64개여야 해요.';
     }
     if (minPlayers === null || !Number.isInteger(minPlayers) || minPlayers < 1 || minPlayers > 50) {
       errors.minPlayers = '최소 선수 수는 1~50명이어야 해요.';

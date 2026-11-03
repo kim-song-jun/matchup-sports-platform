@@ -12,6 +12,7 @@ readonly COMPOSE_PROD="${LIVE_DIR}/deploy/docker-compose.prod.yml"
 readonly COMPOSE_ALPHA="${LIVE_DIR}/deploy/docker-compose.alpha.yml"
 
 source "${LIVE_DIR}/deploy/alpha-release-common.sh"
+source "${LIVE_DIR}/deploy/alpha-tournament-runtime.sh"
 
 exec 9>"${ALPHA_HOME_DIR}/.teameet-alpha-deploy.lock"
 if ! flock -n 9; then
@@ -67,6 +68,8 @@ case "$(jq -r '.database.task168.stage // "none"' "${active_tmp}")" in
     exit 1
     ;;
 esac
+
+assert_alpha_tournament_rollback_runtime "${active_tmp}" "${PREVIOUS_MANIFEST}"
 
 previous_sha="$(jq -er '.release.sha' "${PREVIOUS_MANIFEST}")"
 if [[ "$(jq -r '.database.rollbackCompatibleWith // ""' "${active_tmp}")" != "${previous_sha}" ]]; then

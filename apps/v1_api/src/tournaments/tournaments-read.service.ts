@@ -234,7 +234,7 @@ export class TournamentsReadService {
     const now = new Date();
     const groupStandingSummaries =
       row.kind !== V1CompetitionKind.regular_league &&
-      row.format === 'group_knockout' &&
+      (row.format === 'group_knockout' || row.format === 'league_knockouts') &&
       isBracketPublished(row.bracketPublishedAt, row.bracketPublishScheduledAt, now)
         ? await loadGroupStandingSummaries(this.prisma, tournamentId)
         : new Map<string, GroupStandingSummary>();

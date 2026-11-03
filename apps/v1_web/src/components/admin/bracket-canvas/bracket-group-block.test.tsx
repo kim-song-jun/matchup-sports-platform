@@ -23,6 +23,7 @@ const block: GroupBlockLayout = {
 function renderBlock(overrides: Partial<React.ComponentProps<typeof BracketGroupBlock>> = {}) {
   const props = {
     block,
+    hasSplitQualification: false,
     canWrite: true,
     lockedSlotIds: new Set<string>(),
     pendingRegistrationId: null,
@@ -49,6 +50,12 @@ describe('BracketGroupBlock', () => {
   it('진출 수가 없으면 배지를 그리지 않는다', () => {
     renderBlock({ block: { ...block, advanceCount: null } });
     expect(screen.queryByText(/팀 진출/)).not.toBeInTheDocument();
+  });
+
+  it('분리 결선에서는 상·하위 진출 규칙을 보여 준다', () => {
+    renderBlock({ hasSplitQualification: true });
+    expect(screen.getByText('1·2위 상위 · 3·4위 하위')).toBeInTheDocument();
+    expect(screen.queryByText('상위 2팀 진출')).not.toBeInTheDocument();
   });
 
   it('행 높이는 44px 터치 타겟이다', () => {

@@ -27,6 +27,7 @@ export type BracketTemplateDialogProps = {
   open: boolean;
   tournamentId: string;
   format: 'knockout' | 'league' | 'group_knockout';
+  allowSplitBracket?: boolean;
   confirmedTeamCount?: number;
   confirmedTeamCountStatus?: 'pending' | 'success' | 'error';
   hasExistingBracket: boolean;
@@ -99,7 +100,7 @@ function TemplateAvailabilityDialog({ open, onClose, error, retry }: { open: boo
   </div>, document.body);
 }
 
-export function LegacyBracketTemplateDialog({ open, tournamentId, format, confirmedTeamCount = 0, confirmedTeamCountStatus = 'success', hasExistingBracket, onClose, onApplied, showToast }: BracketTemplateDialogProps) {
+export function LegacyBracketTemplateDialog({ open, tournamentId, format, confirmedTeamCount = 0, confirmedTeamCountStatus = 'success', hasExistingBracket, allowSplitBracket = false, onClose, onApplied, showToast }: BracketTemplateDialogProps) {
   const idPrefix = useId();
   const apply = useV1ApplyBracketTemplate(tournamentId);
   const { confirm, ConfirmModal } = useConfirm();
@@ -158,9 +159,23 @@ export function LegacyBracketTemplateDialog({ open, tournamentId, format, confir
         : null
       : format === 'group_knockout'
         ? groupKnockout.qualificationMode === 'cross_group_round12'
-          ? teamCount === 20 ? { kind: 'group_knockout', ...groupKnockout } : null
+          ? teamCount === 20 ? {
+              kind: 'group_knockout',
+              groupCount: groupKnockout.groupCount,
+              teamsPerGroup: groupKnockout.teamsPerGroup,
+              advancePerGroup: groupKnockout.advancePerGroup,
+              legs: groupKnockout.legs,
+              thirdPlace: groupKnockout.thirdPlace,
+              qualificationMode: 'cross_group_round12',
+            } : null
           : groupTeamCountValid && groupShape !== null
-            ? { kind: 'group_knockout', ...groupKnockout, ...groupShape }
+            ? {
+                kind: 'group_knockout',
+                ...groupShape,
+                legs: groupKnockout.legs,
+                thirdPlace: groupKnockout.thirdPlace,
+                ...(allowSplitBracket && groupKnockout.lowerBracket ? { lowerBracket: true } : {}),
+              }
             : null
         : teamCountValid
           ? { kind: 'league', teamCount, legs }
@@ -346,7 +361,7 @@ export function LegacyBracketTemplateDialog({ open, tournamentId, format, confir
                           onChange={() => {
                             draftTouchedRef.current = true;
                             setTeamCountText('20');
-                            setGroupKnockout((current) => ({ ...current, groupCount: 5, teamsPerGroup: 4, advancePerGroup: 2, legs: 1, qualificationMode: 'cross_group_round12' }));
+                            setGroupKnockout((current) => ({ ...current, groupCount: 5, teamsPerGroup: 4, advancePerGroup: 2, legs: 1, lowerBracket: false, qualificationMode: 'cross_group_round12' }));
                           }} graphic="knockout-12" title="5개 조 × 4팀 → 12강"
                           description="조 1·2위 10팀과 3위 상위 2팀이 진출해요. 조 1위 상위 4팀은 8강으로 직행해요."
                           meta="20팀 · 12강 4경기 + 부전승 4자리" />
@@ -363,7 +378,7 @@ export function LegacyBracketTemplateDialog({ open, tournamentId, format, confir
                     <p className="tm-text-caption mt-2 font-semibold" style={{ color: 'var(--text-strong)' }}>선택 미리보기: {templateStagePreview(input ?? { kind: 'group_knockout', ...groupKnockout })}</p>
                   </div>
                 ) : null}
-                <GroupKnockoutFields value={groupKnockout} onChange={(value) => { draftTouchedRef.current = true; setGroupKnockout(value); setTeamCountText(String(value.groupCount * value.teamsPerGroup)); }} disabled={apply.isPending} lockShape={groupShape !== null || groupKnockout.qualificationMode === 'cross_group_round12'} showCrossGroupRound12Preset={false} />
+                <GroupKnockoutFields value={groupKnockout} onChange={(value) => { draftTouchedRef.current = true; setGroupKnockout(value); setTeamCountText(String(value.groupCount * value.teamsPerGroup)); }} disabled={apply.isPending} allowLowerBracket={allowSplitBracket} lockShape={groupShape !== null || groupKnockout.qualificationMode === 'cross_group_round12'} showCrossGroupRound12Preset={false} />
               </>
             ) : (
               <>

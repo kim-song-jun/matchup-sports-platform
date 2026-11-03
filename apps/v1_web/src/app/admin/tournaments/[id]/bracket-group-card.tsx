@@ -165,6 +165,7 @@ interface BracketGroupCardProps {
   autoFocus: boolean;
   showToast: (msg: string, v?: 'success' | 'error') => void;
   managedEntrySlots?: boolean;
+  structureEditable?: boolean;
   onFixtureCreated?: (fixtureId: string) => void;
 }
 
@@ -187,6 +188,7 @@ export function BracketGroupCard({
   autoFocus,
   showToast,
   managedEntrySlots = false,
+  structureEditable = true,
   onFixtureCreated,
 }: BracketGroupCardProps) {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -370,11 +372,11 @@ export function BracketGroupCard({
             <span className="block text-xs text-[var(--text-muted)] mt-0.5">
               {teamLabel} · {fixtureLabel}{group.groupTeams.some((team) => team.isBye) && ` · 부전승 ${group.groupTeams.filter((team) => team.isBye).length}자리`}
               {group.advanceCount != null && ` · 상위 ${group.advanceCount}팀 진출`}
-              {group.phase === 'group' && group.advanceCount == null && ' · 진출 수 미설정 (조 수정에서 설정)'}
+              {group.phase === 'group' && group.advanceCount == null && structureEditable && ' · 진출 수 미설정 (조 수정에서 설정)'}
             </span>
           </span>
         </button>
-        <div className="flex items-center gap-0.5 shrink-0">
+        {structureEditable ? <div className="flex items-center gap-0.5 shrink-0">
           <button
             type="button"
             onClick={() => onEditGroup(group)}
@@ -391,7 +393,7 @@ export function BracketGroupCard({
           >
             <Trash2 size={14} aria-hidden="true" />
           </button>
-        </div>
+        </div> : null}
       </div>
 
       {expanded && (
@@ -407,10 +409,10 @@ export function BracketGroupCard({
                   >
                     {gt.teamName ?? gt.registrationId ?? '팀 미정'}
                     {gt.isBye && <span> · {gt.sortOrder + 1}번 위치 · {byeRound(group.phase)?.label} 부전승 · {byeRound(group.phase)?.nextLabel} 직행</span>}
-                    {gt.isBye && createBye && <button type="button" aria-label={`부전승 ${gt.sortOrder + 1}번 자리 수정`}
+                    {structureEditable && gt.isBye && createBye && <button type="button" aria-label={`부전승 ${gt.sortOrder + 1}번 자리 수정`}
                       onClick={() => { setEditingByeId(gt.id); setFixtureRound(byeRound(group.phase)?.label ?? ''); setEntryType('bye'); setByePosition(String(gt.sortOrder + 1)); setFixtureHomeRegId(gt.registrationId ?? ''); setFixtureAwayRegId(''); setManualFixtureOpen(true); }}
                       className="inline-flex items-center justify-center w-[44px] h-[44px] rounded-lg text-[var(--text-muted)] hover:text-[var(--blue700)]"><Pencil size={14} aria-hidden="true" /></button>}
-                    {!managedEntrySlots && <button
+                    {structureEditable && !managedEntrySlots && <button
                       type="button"
                       onClick={() => onRemoveGroupTeam(gt.id, gt.teamName ?? (gt.isBye ? '팀 미정 부전승 자리' : '이 팀'))}
                       aria-label={gt.isBye ? `부전승 ${gt.sortOrder + 1}번 자리 삭제` : `${gt.teamName ?? '팀'} 배정 해제`}
@@ -444,7 +446,7 @@ export function BracketGroupCard({
           </div>
 
           {/* ── 팀 배정 ── */}
-          {managedKnockout ? <p className="tm-text-caption text-[var(--text-muted)]">결선 진출 자리는 대진표에서 확인하고 배정해 주세요.</p> : managedEntrySlots ? <p className="tm-text-caption text-[var(--text-muted)]">위의 ‘조별 팀 자리 편집’에서 팀을 선택해 주세요. 연결된 조별 경기들에 함께 반영돼요.</p> : <TeamStagingPicker
+          {!structureEditable ? <p className="tm-text-caption text-[var(--text-muted)]">그림 보기에서 예선 팀을 배정하고, 예선·토너먼트 설정에서 결선 진출팀을 편집해요.</p> : managedKnockout ? <p className="tm-text-caption text-[var(--text-muted)]">결선 진출 자리는 대진표에서 확인하고 배정해 주세요.</p> : managedEntrySlots ? <p className="tm-text-caption text-[var(--text-muted)]">위의 ‘조별 팀 자리 편집’에서 팀을 선택해 주세요. 연결된 조별 경기들에 함께 반영돼요.</p> : <TeamStagingPicker
             pickerId={`bracket-group-${group.id}-team-search`}
             suggestedTeams={existingKnockout ? [] : suggestedTeams}
             searchPoolItems={searchPoolItems}
@@ -454,7 +456,7 @@ export function BracketGroupCard({
 
           {/* ── 경기 일정 ── */}
           <div className="flex flex-col gap-3 pt-1 border-t border-[var(--border)]">
-            <div className="flex flex-wrap items-center gap-2 pt-4">
+            {structureEditable ? <div className="flex flex-wrap items-center gap-2 pt-4">
               {!existingKnockout && <button
                 type="button"
                 onClick={() => onAutoGenerate(group.id)}
@@ -473,15 +475,15 @@ export function BracketGroupCard({
               >
                 직접 입력 {manualFixtureOpen ? '닫기' : '›'}
               </button>
-            </div>
+            </div> : null}
 
-            {needsMoreTeams && (
+            {structureEditable && needsMoreTeams && (
               <p id={autoGenerateHintId} className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
                 조에 팀을 2팀 이상 배정하면 대진을 자동으로 만들 수 있어요.
               </p>
             )}
 
-            {manualFixtureOpen && (
+            {structureEditable && manualFixtureOpen && (
               <form onSubmit={handleCreateFixture} noValidate className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1">
                   <label htmlFor={`fixture-round-${group.id}`} className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">라운드</label>

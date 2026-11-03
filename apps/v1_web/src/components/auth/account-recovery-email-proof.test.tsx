@@ -20,6 +20,7 @@ afterEach(() => { cleanup(); authUiServer.resetHandlers(); });
 async function verifyEmail(address = RECOVERY_EMAIL) {
   fireEvent.change(await screen.findByLabelText('이메일'), { target: { value: address } });
   const user = userEvent.setup();
+  await user.click(screen.getByRole('button', { name: '다음' }));
   await user.click(await screen.findByRole('button', { name: '인증번호 받기' }));
   await user.click(await screen.findByRole('button', { name: '확인' }));
   await screen.findByLabelText('새 비밀번호');
@@ -42,6 +43,9 @@ describe('MD-QA #133 비밀번호 복구는 독립 이메일 증명을 사용한
 
   it('아이디 찾기에서 재설정으로 전환하면 전화번호 증명을 이어 쓰지 않는다', async () => {
     renderAuthUi(<AccountRecoveryClient />);
+    fireEvent.click(screen.getByRole('button', { name: '아이디·로그인 방법 찾기' }));
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
     fireEvent.change(screen.getByLabelText('휴대폰 번호'), { target: { value: RECOVERY_PHONE } });
     fireEvent.click(screen.getByRole('button', { name: '비밀번호 재설정' }));
 
@@ -95,9 +99,13 @@ describe('MD-QA #133 비밀번호 복구는 독립 이메일 증명을 사용한
     }));
     renderAuthUi(<AccountRecoveryClient />);
     const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: '아이디·로그인 방법 찾기' }));
+    await user.click(screen.getByRole('button', { name: '다음' }));
     await user.click(screen.getByRole('button', { name: '이메일로 찾기' }));
+    await user.click(screen.getByRole('button', { name: '다음' }));
     fireEvent.change(screen.getByLabelText('이메일'), { target: { value: RECOVERY_EMAIL } });
     expect(lookups).toHaveLength(0);
+    await user.click(screen.getByRole('button', { name: '다음' }));
     await user.click(screen.getByRole('button', { name: '인증번호 받기' }));
     await user.click(await screen.findByRole('button', { name: '확인' }));
     const label = provider === 'kakao' ? '카카오' : 'Apple';
@@ -108,11 +116,14 @@ describe('MD-QA #133 비밀번호 복구는 독립 이메일 증명을 사용한
 
   it('아이디 찾기의 기존 전화번호 조회는 비밀번호 변경 없이 유지한다', async () => {
     renderAuthUi(<AccountRecoveryClient />);
-    fireEvent.change(screen.getByLabelText('휴대폰 번호'), { target: { value: RECOVERY_PHONE } });
     const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: '아이디·로그인 방법 찾기' }));
+    await user.click(screen.getByRole('button', { name: '다음' }));
+    await user.click(screen.getByRole('button', { name: '다음' }));
+    fireEvent.change(screen.getByLabelText('휴대폰 번호'), { target: { value: RECOVERY_PHONE } });
+    await user.click(screen.getByRole('button', { name: '다음' }));
     await user.click(screen.getByRole('button', { name: '인증번호 받기' }));
     await screen.findByRole('button', { name: '확인' });
-    await user.click(screen.getByRole('button', { name: '휴대폰으로 찾기' }));
     await user.click(screen.getByRole('button', { name: '확인' }));
 
     expect(await screen.findByText('ow***@example.test')).toBeInTheDocument();

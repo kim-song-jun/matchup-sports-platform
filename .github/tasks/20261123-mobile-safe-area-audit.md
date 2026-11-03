@@ -228,3 +228,5 @@ Android WebView 로그인, 작성 취소 모달, 대회 필터의 하단 가림 
 - [ ] `/users/[id]/card` — 미검수
 - [ ] `/users/[id]` — 미검수
 - [ ] `/users/[id]/records` — 미검수
+
+- 2026-11-03: Alpha 360×640, native 48px 가정에서 스크롤 끝 고정 CTA가 매치 입력란 2px, 빈 팀매치 안내 링크 35px, 팀 만들기 꾸미기 버튼 23px을 덮는 RED 확인. CTA 크기에 맞는 공간을 계산해 각 create 폼과 뒤늦은 inset 변화를 검증한다.

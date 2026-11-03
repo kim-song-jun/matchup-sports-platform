@@ -77,18 +77,16 @@ function buildKnockoutFinalRanking(fixtures: V1TournamentFixture[], winners: Rec
 
 function buildSplitFinalResults(tournament: V1TournamentDetail) {
   return ([...new Set(tournament.groups.map(group => group.bracketTrack).filter((track): track is string => Boolean(track) && track !== 'overall'))]).map((track) => {
-    const finalGroupIds = new Set(
-      tournament.groups
-        .filter((group) => group.phase === 'final' && effectiveBracketTrack(group.bracketTrack) === track)
-        .map((group) => group.id),
-    );
-    const fixture = tournament.fixtures.find((item) => finalGroupIds.has(item.groupId ?? '') && item.result !== null);
-    const winnerSide = fixture?.result ? getWinnerSide(fixture.result) : null;
-    return {
-      track,
-      label: bracketTrackLabel(track)!,
-      winner: fixture && winnerSide ? (winnerSide === 'home' ? fixture.homeTeamName : fixture.awayTeamName) : null,
-      runnerUp: fixture && winnerSide ? (winnerSide === 'home' ? fixture.awayTeamName : fixture.homeTeamName) : null,
+    const phases = new Map(tournament.groups
+      .filter(group => effectiveBracketTrack(group.bracketTrack) === track && ['final', 'third_place'].includes(group.phase))
+      .map(group => [group.id, group.phase]));
+    const fixtures = tournament.fixtures
+      .filter(fixture => phases.has(fixture.groupId ?? '') && fixture.status === 'completed' && fixture.result !== null)
+      .map(fixture => ({ ...fixture, round: phases.get(fixture.groupId!)! }));
+    const rows = buildKnockoutFinalRanking(fixtures, tournament.sixTeamBracket?.winners);
+    return { track, label: bracketTrackLabel(track)!, rows,
+      winner: rows.find(row => row.pos === 1)?.name ?? null,
+      runnerUp: rows.find(row => row.pos === 2)?.name ?? null,
     };
   });
 }
@@ -1250,6 +1248,7 @@ export function ResultsPageContent({ tournament }: { tournament: V1TournamentDet
                     <h4 className="tm-text-body font-bold" style={{ color: 'var(--text-strong)' }}>{result.label}</h4>
                     <p className="mt-2 mb-0 tm-text-label">{result.winner ? `우승 · ${result.winner}` : '결승 결과가 아직 등록되지 않았어요.'}</p>
                     {result.runnerUp ? <p className="mt-1 mb-0 tm-text-caption" style={{ color: 'var(--text-muted)' }}>준우승 · {result.runnerUp}</p> : null}
+                    {result.rows.filter(row => row.pos >= 3).map(row => <p key={row.pos} className="mt-1 mb-0 tm-text-caption" style={{ color: 'var(--text-muted)' }}>{row.pos}위 · {row.name}</p>)}
                   </section>
                 ))}
               </div>

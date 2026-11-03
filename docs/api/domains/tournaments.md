@@ -882,3 +882,10 @@ PR1858의 정규대회 분리 결선을 일반화한 별도 `format`이다. `kin
 결선 범위 `bracketTrack`은 이 방식에서 토너먼트 이름(중복 불가)이다. `overall/upper/lower`는 기존 범위를 위해 예약한다. 대진 그룹·시상·개인상 유일키·알림 identity가 이 범위를 사용한다. 토너먼트 삭제/이름 변경 시 연결된 시상을 먼저 재지정해야 한다. 결선 참가팀을 바꾸는 일반 자리/직접 경기 편집 대신 위 selection API를 사용한다. 기존 slot 배정 API로 예선 빈 자리는 배정할 수 있다.
 
 오류: `MULTI_FINAL_INVALID`(422: 잘못된 순위/중복/다른 대회·미확정 팀), `MULTI_FINAL_STALE`(409: revision/preview 변경), `MULTI_FINAL_RANK_UNRESOLVED`(409: 자동 순위 미확정), `MULTI_FINAL_SELECTION_REQUIRED`(409: 전용 편집 필요), `BRACKET_LOCKED`, `BRACKET_TRACK_AWARDS_REQUIRE_RESCOPING`. 기존 응답 envelope/권한 오류 계약은 동일하다. 운영자 변경 전후 명단·규칙과 생성 요청을 감사 로그로 남긴다.
+
+
+### 토너먼트별 최종 순위와 공용 mock 계약 (2026-11-03)
+
+분리·이름 결선의 공개 결과 화면은 각 `groups[].bracketTrack` 안에서 공식 완료된 `final` 및 `third_place` 경기만 사용한다. 결승의 우승/준우승과 3·4위전의 3/4위를 각각 표시하며 정규 점수가 같으면 공식 승부차기 점수를 따른다. 표시용 round 이름이 달라도 group phase가 판정 기준이며 다른 토너먼트의 결과와 섞지 않는다.
+
+공용 MSW의 named-finals fixture는 샘플 4팀·예선 2개 조로 이미 설정된 대회다. `named-finals-fixtures.ts`와 `named-finals-handlers.ts`가 시상 GET/PUT 및 공개 상세를 같은 상태로 제공하며 빈 배열 저장은 두 응답 모두 초기화한다. 실제 api-client wire 검증은 MSW 공용 등록을 사용해 실패 시 이전 상태 보존·권한·시상 범위·수동 명단·stale preview·중복 생성 재생을 확인한다. 미확정 순위는 성공으로 꾸미지 않고 409로 반환한다. 샘플에는 새 예선 생성이 없으며 setup은 실제 이미 설정된 대회처럼 409다. 이는 실제 DB/alpha QA를 대체하지 않는다.

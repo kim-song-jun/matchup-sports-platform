@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ResultsPageContent } from './results-page-client';
 import type {
@@ -500,4 +500,20 @@ describe('ResultsPageContent — 16강 결선 결과', () => {
     expect(screen.getByRole('link', { name: /성수 FC 3 대 1 한강 유나이티드/ })).toBeInTheDocument();
     expect(screen.getAllByText('16강').length).toBeGreaterThan(0);
   });
+});
+
+
+it.each(['upper', '챔피언 토너먼트'])('공식 3·4위와 승부차기 승패를 %s 최종 순위에 반영한다', track => {
+  const groups = ['final', 'third_place'].map((phase, i) => ({
+    id: `tracked-${phase}`, name: phase, phase, sortOrder: i, advanceCount: null, groupTeams: [], standings: [], qualification: null, bracketTrack: track,
+  } as V1TournamentGroup));
+  const fixtures = groups.map((group, i) => ({
+    ...leagueFixtureWithVideo(), id: `tracked-fixture-${i}`, groupId: group.id, round: group.phase,
+    homeTeamName: i === 0 ? '우승팀' : '4위팀', awayTeamName: i === 0 ? '준우승팀' : '3위팀',
+    result: { ...leagueFixtureWithVideo().result!, homeScore: i === 0 ? 3 : 1, awayScore: 1, hasPenalty: i === 1, homePenaltyScore: i === 1 ? 2 : null, awayPenaltyScore: i === 1 ? 4 : null }, videos: [],
+  }));
+  render(<ResultsPageContent tournament={baseTournament({ format: track === 'upper' ? 'group_knockout' : 'league_knockouts', groups, fixtures })} />);
+  const ranking = within(screen.getByRole('region', { name: `${track === 'upper' ? '상위 결선' : track} 순위` }));
+  expect(ranking.getByText('3위 · 3위팀')).toBeInTheDocument();
+  expect(ranking.getByText('4위 · 4위팀')).toBeInTheDocument();
 });

@@ -1,3 +1,5 @@
+토너먼트별 최종 순위는 공식 결승 및 3·4위전 결과를 범위별로 표시한다. 시상 저장·초기화와 공용 MSW 계약은 [대회 계약](./domains/tournaments.md)을 따른다.
+
 관리자 대회 CRUD 응답은 저장된 nullable `kind`를 포함하며 대진·시상 기능의 종류 판정에 사용한다. [대회 계약](./domains/tournaments.md)을 따른다.
 
 6강 전용 진출 결정은 기존 관리자 가드/응답 envelope를 따르며, source version 충돌은409, 참가·방식 조합 오류는422이다. [도메인 계약](./domains/tournaments.md#6강-결승-직행-방식-2026-10-28) 참조.

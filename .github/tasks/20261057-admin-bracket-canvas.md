@@ -1094,3 +1094,16 @@ PR1858 latest-dev merge 30개 충돌 파일. generated Prisma client/의존성 �
 - Owned paths: tournaments-admin.service.ts/spec.ts, bracket-canvas-mobile-model.ts/test.ts, bracket-canvas.tsx, bracket-fixture-tools-dialog.tsx, types/api.ts, 이 task 및 docs/api/domains/tournaments.md. 원본 공유 작업트리 변경 없음.
 - 검증: API admin service134/134, web mobile model 및 fixture tools46/46 PASS. UUID 역순 upper/lower의 준결승·결승 회귀를 포함한다. API/Web typecheck0 및 diff-check PASS.
 - alpha 수동 QA0/10·viewport0/3 유지. 현재 세션 도구 목록에는 ego-browser/Playwright/browser 도구가 없으며 PR은 draft·미배포 상태다. 로컬 Next를 QA 대체로 실행하지 않았다.
+
+### 2026-11-03 재리뷰 3건 수정 (active)
+
+- Phase A completed: manifest 생성·재사용 및 수동 rollback의 runtime version=2 검증. 후보 앱/시드 writer 시작 뒤 자동 실패 복구도 호환성 검증을 통과해야 하며, 시작 전 실패의 기존 복구는 유지. 실제 git history·manifest pairs·실제 restore 함수·배포 seed 실행 block의 mutation 회귀7/7 PASS.
+- Phase B completed: group phase로 track별 결승/3·4위전을 구분하고 승부차기 포함 공식 3/4위를 표시. 새 회귀2건 RED(기존14 PASS) 확인 후 전체16/16 GREEN.
+- Phase C completed: server/browser가 함께 사용하는 v1MswHandlers에 named-final sample fixture와 stateful handler 등록. 시상 저장→GET→공개 상세→빈 배열 초기화, invalid 입력의 상태 보존, 시상 재범위, 수동 명단·preview·생성·idempotence·stale 및 support/member/guest 권한8/8 PASS.
+- Phase D in_progress: 좁은 회귀·typecheck·정적 검토 완료, 명시 경로 커밋 및 PR1858 갱신. 최신 이전 head c67554fab의 Gates/API/Web SUCCESS 확인.
+- 사용자 수정 승인: 재리뷰 P1/P2 3건 전체. 기존 3폭 alpha baseline은 PR review5745573131에 게시. 새 기능 after 화면은 미배포로 남아 있으며 이번 코드 검증과 구분한다.
+
+- Phase D 검증: Web typecheck0, rollback compatibility7/7, immutable manifest self-test PASS, StageB manifest21/21, immutable-deploy checker PASS, shell syntax·diff check PASS. 실제 trap 복구 검사는 현재 bash5.3에서 원래 bare-return 결함 재현이 없어 정적 guard만 유효하다는 제한을 그대로 기록한다. 운영 DB/이미지/배포 변경0, schema/migration 추가0.
+- 기존 release-state shell 검사는 sandbox의 sudo 실행 제한으로 중단(보완 코드를 성공으로 간주하지 않음). 더 좁은 실제 rollback/restore 경로와 manifest 양성/음성 검증으로 변경 계약을 확인했고 전체 반복은 원격 CI에 맡긴다.
+
+- 최종 좁은 Web 통합: 공개 결과16 + 공용 MSW8 + wizard4 + 기존 shared MSW facet14 = 42/42 PASS. runtime version7/7 및 현재·과거 schema binding9/9 PASS. 이전 P1/P2 세 항목의 코드 수정은 완료, 새 head CI 및 신규 alpha after QA는 별도 gate로 유지한다.

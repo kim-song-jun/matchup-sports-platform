@@ -640,6 +640,8 @@ now includes nullable `rulesText`, rendered as operating guidance only when popu
 
 ## 독립 리그의 리그 체계 전환 (2026-11-03)
 
+- 어드민 리그 상세 `GET /admin/league-matches/:leagueId`는 `seriesId: string|null`을 반환한다. 종료 + `seriesId === null`인 독립 리그에서만 전환 메뉴를 제공한다. 구버전 응답에 필드가 없으면 메뉴를 숨긴다.
+
 - `GET /admin/league-matches/:leagueId/series-conversion`: active admin, `{seriesId: string|null}`. 기존 전환 연결 조회.
 - `POST .../series-conversion/preview`: mutation admin(owner/ops), `{tierSizes: number[]}`. 1~3티어·각 2팀 이상·확정 참가팀 수 합계 일치. 응답 `{fingerprint, entries:[{teamId,teamName,position,points,suggestedTier,...}],boundaryTies:[{teamIds}]}`.
 - `POST .../series-conversion/commit`: mutation admin, 위 tierSizes + `{title,startsOn,endsOn,fingerprint,entries:[{teamId,tier,reason?}]}`. 응답 `{seriesId,leagues:[{id,title,tier}]}`.

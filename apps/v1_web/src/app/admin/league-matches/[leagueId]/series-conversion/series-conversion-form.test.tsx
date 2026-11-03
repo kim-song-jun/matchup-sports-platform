@@ -5,9 +5,10 @@ import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import { LeagueConversionForm } from './series-conversion-form';
 const push = vi.fn();
+const leagueState = vi.hoisted(() => ({ teamIds: ['a', 'b', 'c', 'd', 'e', 'f'] }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
 vi.mock('@/hooks/use-admin-can-write', () => ({ useAdminCanWrite: () => true }));
-vi.mock('@/hooks/use-v1-api', () => ({ useV1AdminLeagueMatch: () => ({ data: { state: 'completed', teamIds: ['a', 'b', 'c', 'd', 'e', 'f'] } }) }));
+vi.mock('@/hooks/use-v1-api', () => ({ useV1AdminLeagueMatch: () => ({ data: { state: 'completed', teamIds: leagueState.teamIds } }) }));
 const path = '*/api/v1/admin/league-matches/source/series-conversion';
 const entries = ['a', 'b', 'c', 'd', 'e', 'f'].map((teamId, i) => ({ teamId, teamName: `팀${teamId}`, position: i + 1, points: 18 - i, suggestedTier: i < 3 ? 1 : 2 }));
 const success = (data: unknown) => HttpResponse.json({ status: 'success', data });
@@ -21,7 +22,7 @@ const server = setupServer(
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterAll(() => server.close());
 afterEach(() => { cleanup(); server.resetHandlers(); });
-beforeEach(() => { submitted = undefined; push.mockClear(); });
+beforeEach(() => { submitted = undefined; push.mockClear(); leagueState.teamIds = ['a', 'b', 'c', 'd', 'e', 'f']; });
 function mount() { return render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })}><LeagueConversionForm leagueId="source" /></QueryClientProvider>); }
 async function fill() {
   mount();
@@ -56,4 +57,12 @@ it('서버 충돌을 알리고 입력을 유지한다', async () => {
   expect(await screen.findByRole('alert')).toHaveTextContent('순위가 바뀌었어요.');
   expect(screen.getByLabelText('리그 체계 이름')).toHaveValue('서울 풋살');
   expect(push).not.toHaveBeenCalled();
+});
+
+it.each([[8, 4, 4], [7, 4, 3]])('%i팀 리그는 처음부터 %i/%i팀으로 나누고 미리보기를 사용할 수 있다', async (count, first, second) => {
+  leagueState.teamIds = Array.from({ length: count }, (_, i) => `team-${i}`);
+  mount();
+  expect(await screen.findByLabelText('1부 팀 수')).toHaveValue(first);
+  expect(screen.getByLabelText('2부 팀 수')).toHaveValue(second);
+  expect(screen.getByRole('button', { name: '배정 미리보기' })).toBeEnabled();
 });

@@ -82,7 +82,7 @@ export function createCapacityLeagueRow(input: V1CreateLeaguePayload & { readonl
       updatedAt: '2026-10-15T00:00:00.000Z', status: 'draft', sportName: '풋살',
     },
     detail: {
-      leagueId: input.leagueId, title: input.title, state: 'draft', lifecycleStatus: 'draft', isPublic: true,
+      leagueId: input.leagueId, seriesId: null, title: input.title, state: 'draft', lifecycleStatus: 'draft', isPublic: true,
       sportId: input.sportId, teamIds: [], startsOn: new Date(input.startsOn).toISOString(),
       minPlayers: input.minPlayers ?? 1, maxPlayers: input.maxPlayers ?? null, maxTeams: input.maxTeams ?? null,
       plannedFixtureCount: input.plannedFixtureCount ?? null,

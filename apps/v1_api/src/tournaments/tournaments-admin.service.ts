@@ -1402,6 +1402,7 @@ export class TournamentsAdminService {
   ) {
     return {
       id: row.id,
+      kind: row.kind,
       sportId: row.sportId,
       title: row.title,
       status: row.status,

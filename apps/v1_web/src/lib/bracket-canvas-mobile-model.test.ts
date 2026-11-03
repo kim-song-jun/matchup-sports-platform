@@ -267,6 +267,21 @@ describe('buildBracketMobileRounds', () => {
     expect(rounds[3].sections.map((section) => section.heading)).toEqual(['하위 결선 · 결승']);
   });
 
+  it('동일 정렬값에서도 UUID와 무관하게 각 라운드의 상위·하위 순서를 유지한다', () => {
+    const groups = ['semi', 'final'].flatMap((phase) => [
+      makeGroup({ id: `a-${phase}-lower`, phase, name: phase === 'semi' ? '4강' : '결승', sortOrder: 0, bracketTrack: 'lower' }),
+      makeGroup({ id: `z-${phase}-upper`, phase, name: phase === 'semi' ? '4강' : '결승', sortOrder: 0, bracketTrack: 'upper' }),
+    ]);
+    const rounds = buildBracketMobileRounds({
+      groups,
+      fixtures: groups.map((group, index) => makeFixture({ id: `fixture-${index}`, groupId: group.id, fixtureNumber: index + 1 })),
+      slots: [],
+    });
+    for (const round of rounds) {
+      expect(round.sections.map((section) => section.heading?.split(' · ')[0])).toEqual(['상위 결선', '하위 결선']);
+    }
+  });
+
   it('같은 경기 번호는 차수(leg) 순이다', () => {
     const [round] = buildBracketMobileRounds({
       groups: [makeGroup({ id: 'g-q', phase: 'quarter', name: '8강', sortOrder: 1 })],

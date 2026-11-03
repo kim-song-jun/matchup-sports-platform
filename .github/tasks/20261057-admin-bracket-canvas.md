@@ -1085,3 +1085,12 @@ PR1858 latest-dev merge 30개 충돌 파일. generated Prisma client/의존성 �
 - CI run41414776750 Gates의 `test_modified_m11_does_not_publish_binding`가 OR/AND 우선순위 오류를 검출했다. 새/기존 schema SHA 허용 조건을 괄호로 묶어 모든 경우 M11 SHA를 함께 검사하도록 수정. 공식 jq1.8.1을 /tmp에 SHA256 검증 후 준비해 실제 binding tests9/9 PASS(가짜 jq 없음).
 - 같은 run의 Web 전체878개 파일·10747 tests 중 라운드 이름2개 실패(10745 PASS). 128강 지원의 group-name 선택이 기존 같은 조의 결승까지 준결승 이름으로 바꾸던 회귀를 수정했다. 기존 테스트를 약화하지 않았고 128강/64강·부전승 이름 분리 회귀를 추가해 관련4개 파일61 tests PASS.
 - 위 두 수정은 실제 실패 원인을 고친 것이며, 이전 CI를 PASS로 표기하지 않는다. 최신 head의 원격 CI 재검증이 필요하다.
+
+### 2026-11-03 PR 미해결 리뷰 후속
+
+- 이전 head6c931c765의 원격 CI Gates/API/Web 모두 SUCCESS 확인(run41416672719). alpha 배포는 실행하지 않았다.
+- 미해결5개 thread를 최신 코드로 재검토: 모바일 동일 sortOrder의 upper/lower 순서를 UUID보다 먼저 고정, 공통 slot 타입에 실제 API의 bracketTrack을 추가하고 지역 cast 제거, 동일 모듈 중복 import 병합.
+- 관리자 serialize에 실제로 누락됐던 `kind` 추가: 시상 화면과 split 대진 허용 판단의 공통 원인을 수정. API 계약 문서와 생성 응답 회귀 assertion도 함께 반영.
+- Owned paths: tournaments-admin.service.ts/spec.ts, bracket-canvas-mobile-model.ts/test.ts, bracket-canvas.tsx, bracket-fixture-tools-dialog.tsx, types/api.ts, 이 task 및 docs/api/domains/tournaments.md. 원본 공유 작업트리 변경 없음.
+- 검증: API admin service134/134, web mobile model 및 fixture tools46/46 PASS. UUID 역순 upper/lower의 준결승·결승 회귀를 포함한다. API/Web typecheck0 및 diff-check PASS.
+- alpha 수동 QA0/10·viewport0/3 유지. 현재 세션 도구 목록에는 ego-browser/Playwright/browser 도구가 없으며 PR은 draft·미배포 상태다. 로컬 Next를 QA 대체로 실행하지 않았다.

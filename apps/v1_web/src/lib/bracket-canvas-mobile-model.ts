@@ -223,7 +223,12 @@ export function buildBracketMobileRounds(input: {
   const labels = buildSideLabelContext(input.groups, input.fixtures, input.slots);
   const groupIds = new Set(input.groups.map((group) => group.id));
   const order: Record<string, number> = { group: 0, round64: 0.25, round32: 0.5, round16: 1, round12: 2, quarter: 3, semi: 4, third_place: 5, final: 6 };
-  const groups = [...input.groups].sort((a, b) => (order[a.phase] ?? 99) - (order[b.phase] ?? 99) || a.sortOrder - b.sortOrder || a.id.localeCompare(b.id));
+  const trackOrder = (track: string | undefined) => ({ overall: 0, upper: 1, lower: 2 }[track ?? 'overall'] ?? 3);
+  const groups = [...input.groups].sort((a, b) => (order[a.phase] ?? 99) - (order[b.phase] ?? 99)
+    || a.sortOrder - b.sortOrder
+    || trackOrder(a.bracketTrack) - trackOrder(b.bracketTrack)
+    || (a.bracketTrack ?? 'overall').localeCompare(b.bracketTrack ?? 'overall')
+    || a.id.localeCompare(b.id));
   const rounds: MobileRound[] = [];
   const roundByKey = new Map<string, MobileRound>();
   const thirdPlaceSectionKeys = new Set<string>();

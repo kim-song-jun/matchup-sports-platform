@@ -4672,6 +4672,7 @@ export type V1AdminBracketSlotKind = 'ENTRY' | 'BYE' | 'GROUP_RANK';
 
 /** 팀이 들어갈 칸. 라벨("A조 1번", "부전승 1")은 서버가 계산해서 준다. */
 export type V1AdminBracketSlot = {
+  bracketTrack?: V1TournamentBracketTrack;
   automaticLabel?: string;
   displayLabel?: string | null;
   id: string;

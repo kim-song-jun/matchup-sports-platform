@@ -6,9 +6,8 @@ import { Button } from '@/components/v1-ui/button';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { useV1AddBracketFixture, useV1SetBracketSources } from '@/hooks/use-v1-bracket-canvas';
 import { describeBracketCanvasError } from '@/lib/bracket-canvas-errors';
-import { bracketExistingSource, bracketSourceCandidates, isFixtureLinkable, knockoutRoundLabel } from '@/lib/bracket-fixture-tools';
+import { bracketExistingSource, bracketSourceCandidates, bracketSourceSideOptions, isFixtureLinkable, knockoutRoundLabel } from '@/lib/bracket-fixture-tools';
 import { bracketTrackLabel } from '@/lib/bracket-track';
-import { bracketSourceSideOptions } from '@/lib/bracket-fixture-tools';
 import type { V1AdminBracketFixture, V1AdminTournamentBracket, V1TournamentFormat } from '@/types/api';
 import { BracketLeagueAddFixtureForm, type LeagueAddSubmit } from './bracket-league-add-fixture-form';
 

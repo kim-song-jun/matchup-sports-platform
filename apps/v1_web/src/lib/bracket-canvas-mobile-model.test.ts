@@ -240,6 +240,48 @@ describe('buildBracketMobileRounds', () => {
     expect(rounds[0].sections[0].nodes[0].knockout).toBe(true);
   });
 
+  it('조별·결선 단계 순으로 정렬하고 split 트랙의 라벨을 유지한다(sortOrder 중복·UUID 순서 반례)', () => {
+    const rounds = buildBracketMobileRounds({
+      groups: [
+        makeGroup({ id: 'a-final-lower', phase: 'final', name: '결승', sortOrder: 0, bracketTrack: 'lower' }),
+        makeGroup({ id: 'b-semi-upper', phase: 'semi', name: '4강', sortOrder: 0, bracketTrack: 'upper' }),
+        makeGroup({ id: 'c-group-upper', phase: 'group', name: 'A조', sortOrder: 0, bracketTrack: 'upper' }),
+        makeGroup({ id: 'd-quarter-lower', phase: 'quarter', name: '8강', sortOrder: 1, bracketTrack: 'lower' }),
+        makeGroup({ id: 'e-group-lower', phase: 'group', name: 'B조', sortOrder: 1, bracketTrack: 'lower' }),
+        makeGroup({ id: 'f-semi-lower', phase: 'semi', name: '4강', sortOrder: 1, bracketTrack: 'lower' }),
+      ],
+      fixtures: [
+        makeFixture({ id: 'final-lower', groupId: 'a-final-lower', fixtureNumber: 1 }),
+        makeFixture({ id: 'semi-upper', groupId: 'b-semi-upper', fixtureNumber: 1 }),
+        makeFixture({ id: 'group-upper', groupId: 'c-group-upper', fixtureNumber: 1 }),
+        makeFixture({ id: 'quarter-lower', groupId: 'd-quarter-lower', fixtureNumber: 1 }),
+        makeFixture({ id: 'group-lower', groupId: 'e-group-lower', fixtureNumber: 1 }),
+        makeFixture({ id: 'semi-lower', groupId: 'f-semi-lower', fixtureNumber: 1 }),
+      ],
+      slots: [],
+    });
+
+    expect(rounds.map((round) => round.label)).toEqual(['조별', '8강', '4강', '결승']);
+    expect(rounds[0].sections.map((section) => section.heading)).toEqual(['상위 결선 · A조', '하위 결선 · B조']);
+    expect(rounds[2].sections.map((section) => section.heading)).toEqual(['상위 결선 · 4강', '하위 결선 · 4강']);
+    expect(rounds[3].sections.map((section) => section.heading)).toEqual(['하위 결선 · 결승']);
+  });
+
+  it('동일 정렬값에서도 UUID와 무관하게 각 라운드의 상위·하위 순서를 유지한다', () => {
+    const groups = ['semi', 'final'].flatMap((phase) => [
+      makeGroup({ id: `a-${phase}-lower`, phase, name: phase === 'semi' ? '4강' : '결승', sortOrder: 0, bracketTrack: 'lower' }),
+      makeGroup({ id: `z-${phase}-upper`, phase, name: phase === 'semi' ? '4강' : '결승', sortOrder: 0, bracketTrack: 'upper' }),
+    ]);
+    const rounds = buildBracketMobileRounds({
+      groups,
+      fixtures: groups.map((group, index) => makeFixture({ id: `fixture-${index}`, groupId: group.id, fixtureNumber: index + 1 })),
+      slots: [],
+    });
+    for (const round of rounds) {
+      expect(round.sections.map((section) => section.heading?.split(' · ')[0])).toEqual(['상위 결선', '하위 결선']);
+    }
+  });
+
   it('같은 경기 번호는 차수(leg) 순이다', () => {
     const [round] = buildBracketMobileRounds({
       groups: [makeGroup({ id: 'g-q', phase: 'quarter', name: '8강', sortOrder: 1 })],

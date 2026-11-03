@@ -1,3 +1,7 @@
+토너먼트별 최종 순위는 공식 결승 및 3·4위전 결과를 범위별로 표시한다. 시상 저장·초기화와 공용 MSW 계약은 [대회 계약](./domains/tournaments.md)을 따른다.
+
+관리자 대회 CRUD 응답은 저장된 nullable `kind`를 포함하며 대진·시상 기능의 종류 판정에 사용한다. [대회 계약](./domains/tournaments.md)을 따른다.
+
 [6강 결승 직행 API 계약](./domains/tournaments.md#6강-결승-직행-방식-2026-10-28): 6팀 방식 설정, 템플릿 생성, 진출 조회/수동 결정, 공개 대진표 메타데이터.
 
 대진 v2는 조마다 `groups[].legs`로 1·2회전을 따로 설정한다. 기존 최상위 `legs`와 초안 복원은 호환되며 [대회 계약](./domains/tournaments.md#유연한-대진-v2-2026-10-27)을 따른다.
@@ -60,7 +64,7 @@ Competition venue/field selection (2026-10-14): leagues and tournaments share a 
 - [Matches](./domains/matches.md)
 - [Teams](./domains/teams.md)
 - [Team matches](./domains/team-matches.md)
-- [Tournaments](./domains/tournaments.md) — competition discovery filters/sort and registration capacity — 어드민 선수별 등번호·GK 저장, 대회 형식 수정·잠금 사유, 대진 생성·번호 수정·진출 연결 및 결과 계약, 5조·20팀→12강 추천·일괄 배정
+- [Tournaments](./domains/tournaments.md) — 정규리그 + N개 토너먼트·수동 진출팀·범위별 시상, competition discovery filters/sort and registration capacity — 어드민 선수별 등번호·GK 저장, 대회 형식 수정·잠금 사유, 대진 생성·번호 수정·진출 연결 및 결과 계약, 5조·20팀→12강 추천·일괄 배정
 - [League matches](./domains/league-matches.md)
 - [Regular league public visibility](./domains/league-matches.md#public-visibility) — publication control, admin access and public read gates.
 - [Games](./domains/games.md)

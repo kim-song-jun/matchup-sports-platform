@@ -1,3 +1,10 @@
+## 2026-11-02 — 정규리그 + N개 토너먼트 확장
+
+[작업 문서](../../.github/tasks/20261057-admin-bracket-canvas.md#2026-11-02-extension--정규리그--n개-토너먼트) · [시나리오](./18-regular-tournament-split-finals.md#2026-11-02-extension--n개-토너먼트와-진출팀-직접-선택). PR1858 고정 두 결선을 별도 format으로 일반화. 순위 제안 뒤 참가팀 추가·제외·이동, 예선 보존, N개 결선/범위 시상. 구현·로컬 검증 진행, alpha0/10·after0/3이며 배포/운영 변경 없음.
+
+## 2026-10-12 — 정규대회 상·하위 결선과 시상
+
+[작업 문서](../../.github/tasks/20261057-admin-bracket-canvas.md#2026-10-12-extension-정규대회-하나--상위하위-결선--시상-두-세트) · [실행 시나리오](./18-regular-tournament-split-finals.md). 하나의 대회에서 조 1·2위는 상위, 3·4위는 하위 결선으로 배정한다. 팀 시상 안내와 개인상 범위는 어드민이 설정한다. Backend521·Web226·스키마 바인딩7개 계약은 좁은 재실행을 포함해 통과했다. 독립 Sol static review의 모바일 단계 순서·읽기 권한 두 결함은 수정·재검토 PASS. PR#1858 커밋본 CI와 변경 후 alpha/3폭 QA는 대기 중이며 전체 완료를 의미하지 않는다.
 ## 2026-10-30 — 업체 전달용 대회 운영 체험
 
 [시나리오](./tournament-ops-demo.md) · [Task20261123](../../.github/tasks/20261123-tournament-ops-demo.md). 5단계·3개 역할의 명시적 샘플 시뮬레이터, 실제 API 쓰기 없음. local26 tests/tsc/pattern PASS, 신규 Alpha0/5·0/3폭·기능0/12.

@@ -7,6 +7,11 @@ export const BYE_ROUNDS = {
   semi: { label: '4강', next: 'final', nextLabel: '결승', positions: 4 },
 } as const;
 export function byeRound(phase: string) {
+  const large = /^(\d+)강$/.exec(phase);
+  if (large && Number(large[1]) > 64) {
+    const size = Number(large[1]);
+    return { label: phase, next: size / 2 === 64 ? 'round64' : `${size / 2}강`, nextLabel: `${size / 2}강`, positions: size };
+  }
   return BYE_ROUNDS[phase as keyof typeof BYE_ROUNDS];
 }
 

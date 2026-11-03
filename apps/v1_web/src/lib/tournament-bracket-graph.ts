@@ -24,13 +24,14 @@ export function buildBracketGraph(rounds: BracketGraphRound[], groups: V1Tournam
   }
   const seen = new Set<string>();
   for (const group of groups) {
-    const meta = byeRound(group.phase);
-    if (!meta || !rounds.some((round) => round.key === group.phase)) continue;
+    const roundKey = (group.id ? rounds.find(round => round.fixtures.some(fixture => fixture.groupId === group.id))?.key : undefined) ?? group.phase;
+    const meta = byeRound(roundKey);
+    if (!meta || !rounds.some((round) => round.key === roundKey)) continue;
     for (const bye of group.groupTeams.filter((team) => team.isBye)) {
-      const key = group.phase + ':' + (bye.registrationId ?? bye.id);
+      const key = roundKey + ':' + (bye.registrationId ?? bye.id);
       if (seen.has(key)) continue;
       seen.add(key);
-      const node: BracketGraphNode = { id: bye.id ? 'bye-slot:' + bye.id : group.phase === 'round12' ? 'bye:' + bye.registrationId : 'bye:' + key, round: group.phase, bye, y: 0 };
+      const node: BracketGraphNode = { id: bye.id ? 'bye-slot:' + bye.id : group.phase === 'round12' ? 'bye:' + bye.registrationId : 'bye:' + key, round: roundKey, bye, y: 0 };
       nodes.push(node); byId.set(node.id, node);
       for (const target of nodes.filter((candidate) => candidate.round === meta.next && candidate.fixture)) {
         for (const side of ['HOME', 'AWAY'] as const) {

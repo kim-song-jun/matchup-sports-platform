@@ -287,3 +287,10 @@ alpha를 완전히 삭제할 때는 먼저 필요한 QA 증거만 보존하고 �
 5. alpha artifact bucket, IAM roles, instance profile, GitHub repository variables를 삭제한다.
 6. 로컬 `~/.ssh/teameet-alpha-*` 파일을 안전하게 삭제한다.
 7. CloudTrail과 결제 내역에서 잔존 리소스가 없는지 확인한다.
+
+
+### 정규대회 데이터와 이미지 롤백 호환성 (PR1858)
+
+`league_knockouts`와 이름을 가진 결선·시상 데이터는 구버전 Prisma/시상 writer로 되돌릴 수 없다. 신규 alpha manifest는 `database.tournamentRuntimeVersion: 2`를 기록한다. manifest 생성기는 이전 commit의 `deploy/alpha-tournament-runtime.sh`에 같은 버전이 명시된 final 릴리스에만 `rollbackCompatibleWith`를 설정하며, 확인되지 않은 git 이력은 생성을 중단한다. 예전 final 릴리스나 Stage A, 이전 릴리스 없음은 호환 대상으로 기록하지 않는다.
+
+수동 `rollback-alpha.sh`는 SHA뿐 아니라 active/previous 양쪽 runtime metadata가 현재 버전과 일치해야 실행한다. 배포 실패 복구도 후보 앱/시드 writer 시작 뒤에는 같은 검증을 거친다. 새 writer 시작 전 실패는 기존 복구 경로를 유지한다. 이전 릴리스 metadata가 없거나 불일치하면 자동 legacy/image 복구를 시도하지 않고 명시적으로 실패한다. 호환 가능한 forward fix 또는 검토된 backup/restore 절차를 사용한다. 이 변경은 운영 DB 롤백을 실행하지 않으며 schema/migration은 추가하지 않는다.

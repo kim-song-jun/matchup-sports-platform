@@ -1,4 +1,7 @@
 'use client';
+import { MultiFinalsWizard } from '@/components/admin/bracket-canvas/multi-finals-wizard';
+import { useState } from 'react';
+import { Button } from '@/components/v1-ui/button';
 
 import { Suspense } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -28,6 +31,7 @@ export default function AdminTournamentBracketPage() {
 
 function BracketPageBody() {
   const { tournamentId, canWrite, showToast } = useTournamentAdmin();
+  const [multiFinalsOpen, setMultiFinalsOpen] = useState(false);
   const { data: tournament } = useV1AdminTournament(tournamentId);
   // 확정 팀 목록은 대진 편성에 필요하다. 셸이 아니라 이 섹션에서만 구독한다.
   const { data: regData, isError: regIsError, error: regError, refetch: refetchRegistrations } = useV1AdminTournamentRegistrations(tournamentId);
@@ -56,6 +60,10 @@ function BracketPageBody() {
 
   return (
     <div className="flex flex-col gap-4">
+      {tournament?.format === 'league_knockouts' && canWrite ? <>
+        <div><Button variant="primary" onClick={() => setMultiFinalsOpen(true)}>예선·토너먼트 설정</Button></div>
+        <MultiFinalsWizard tournamentId={tournamentId} open={multiFinalsOpen} onClose={() => setMultiFinalsOpen(false)} onApplied={() => showToast('토너먼트 대진을 생성했어요.', 'success')} />
+      </> : null}
       <SegmentedTabs
         ariaLabel="대진 보기 방식"
         role="tablist"
@@ -70,6 +78,7 @@ function BracketPageBody() {
               tournamentId={tournamentId}
               format={tournament?.format}
               sixTeamState={tournament?.sixTeamBracket}
+              kind={tournament?.kind}
               registrations={registrations}
               registrationsState={registrationsState}
               bracketPublishedAt={tournament?.bracketPublishedAt}

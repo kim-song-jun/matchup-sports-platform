@@ -105,6 +105,24 @@ test.describe('mobile safe area and touch', () => {
     }
   });
 
+  test('profile notice remains above a taller validation action bar', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 640 });
+    await loginAs(page, personas.owner.email);
+    await page.goto('/my/profile/edit');
+    await page.locator('#v1-profile-nickname').fill('임시검수이름');
+    await expect(page.getByText('변경한 닉네임과 이메일은 중복 확인 후 저장할 수 있어요.')).toBeVisible();
+    const notice = page.locator('#v1-profile-edit-form .tm-on-tint');
+    const scroller = page.locator('.tm-scroll-area');
+    const actions = page.locator('.tm-my-profile-edit-cta');
+    await setNativeBottom(page, 48);
+    await expect.poll(async () => {
+      await scroller.evaluate((node) => { node.scrollTop = node.scrollHeight; });
+      const target = await notice.boundingBox();
+      const cta = await actions.boundingBox();
+      return target && cta ? Math.round(target.y + target.height - cta.y) : null;
+    }).toBeLessThanOrEqual(0);
+  });
+
   for (const [name, route] of [
     ['match', '/matches/new'],
     ['team match', '/team-matches/new'],

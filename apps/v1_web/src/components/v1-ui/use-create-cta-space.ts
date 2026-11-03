@@ -5,8 +5,9 @@ import { useLayoutEffect, type RefObject } from 'react';
 const CTA_HEIGHT_VAR = '--tm-create-cta-height';
 
 /** Keep the last form field above its viewport-fixed action bar, including late native insets. */
-export function useCreateCtaSpace(ref: RefObject<HTMLDivElement | null>) {
+export function useCreateCtaSpace(ref: RefObject<HTMLDivElement | null>, enabled = true) {
   useLayoutEffect(() => {
+    if (!enabled) return undefined;
     const cta = ref.current;
     const scroll = cta?.closest<HTMLElement>('.tm-scroll-area');
     if (!cta || !scroll) return undefined;
@@ -25,5 +26,5 @@ export function useCreateCtaSpace(ref: RefObject<HTMLDivElement | null>) {
       window.removeEventListener('resize', sync);
       scroll.style.removeProperty(CTA_HEIGHT_VAR);
     };
-  }, [ref]);
+  }, [ref, enabled]);
 }

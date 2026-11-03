@@ -40,10 +40,13 @@
 .subMatchList { display: grid; gap: 16px; }
 .subMatchCard { border: 1px solid var(--border); border-radius: var(--radius-container); padding: 20px; display: grid; gap: 16px; }
 .subMatchHead { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; min-width: 0; }
-.subMatchSummary { min-width: 0; }
+.subMatchSummary { flex: 1; min-width: 0; }
 .subMatchHead > .actions { flex: 0 0 auto; justify-content: flex-end; }
 .subMatchTitle { min-width: 0; font-size: var(--font-size-body-lg); font-weight: 750; overflow-wrap: anywhere; }
-.subScore { font-size: var(--font-size-subhead); font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.subScore { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 8px; font-size: var(--font-size-subhead); font-weight: 800; font-variant-numeric: tabular-nums; }
+.subScore span { min-width: 0; overflow-wrap: anywhere; }
+.subScore span:last-child { text-align: right; }
+.subScore strong { white-space: nowrap; }
 .goalList { display: grid; }
 .goalRow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 16px 0; border-bottom: 1px solid var(--border); }
 .goalRow:last-child { border-bottom: 0; }
@@ -89,4 +92,4 @@
 .playerChoice strong { overflow-wrap: anywhere; }
 .playerChoice small { color: var(--text-caption); font-size: var(--font-size-caption); }
 @media(max-width: 640px) { .goalRow { grid-template-columns: minmax(0, 1fr); gap: 8px; } .goalActions { padding-left: 52px; } }
-@media(max-width: 767px) { .sectionHead { align-items: stretch; flex-direction: column; } .inlineForm { grid-template-columns: 1fr; } .subMatchHead { flex-direction: column; } .subMatchHead > .actions { justify-content: flex-start; } .playerChoices { grid-template-columns: 1fr; } }
+@media(max-width: 767px) { .sectionHead { align-items: stretch; flex-direction: column; } .inlineForm { grid-template-columns: 1fr; } .subMatchHead { flex-direction: column; align-items: stretch; } .subMatchHead > .actions { justify-content: flex-start; } .playerChoices { grid-template-columns: 1fr; } }

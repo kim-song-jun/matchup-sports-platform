@@ -6931,6 +6931,7 @@ textarea.tm-chat-input-placeholder::placeholder {
 
 .tm-profile-edit-shell {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   padding-top: 20px;
   /* CTA validation messages can grow the bar after the profile has loaded. */
@@ -6941,6 +6942,15 @@ textarea.tm-chat-input-placeholder::placeholder {
   margin: 0;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-container);
+}
+
+.tm-profile-edit-shell .tm-my-profile-head > div:last-child {
+  min-width: 0;
+}
+
+.tm-profile-edit-shell .tm-auth-profile-upload-body .tm-text-caption {
+  overflow: visible;
+  white-space: normal;
 }
 
 .tm-my-profile-stats {

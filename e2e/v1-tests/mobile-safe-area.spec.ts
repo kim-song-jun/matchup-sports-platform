@@ -123,6 +123,20 @@ test.describe('mobile safe area and touch', () => {
     }).toBeLessThanOrEqual(0);
   });
 
+  test('profile form fits inside a narrow mobile scroll area', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 568 });
+    await loginAs(page, personas.owner.email);
+    await page.goto('/my/profile/edit');
+    await expect(page.locator('#v1-profile-nickname')).toBeVisible();
+    const scroll = page.locator('.tm-scroll-area');
+    await expect.poll(() => scroll.evaluate((node) => node.scrollWidth - node.clientWidth)).toBeLessThanOrEqual(0);
+    const guidance = page.locator('#v1-profile-edit-form .tm-auth-profile-upload-body .tm-text-caption');
+    await expect.poll(() => guidance.evaluate((node) => node.scrollWidth - node.clientWidth)).toBeLessThanOrEqual(0);
+    const card = await page.locator('#v1-profile-edit-form .tm-on-tint').boundingBox();
+    expect(card).not.toBeNull();
+    expect(card!.x + card!.width).toBeLessThanOrEqual(320);
+  });
+
   for (const [name, route] of [
     ['match', '/matches/new'],
     ['team match', '/team-matches/new'],

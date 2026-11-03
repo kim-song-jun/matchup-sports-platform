@@ -1,30 +1,30 @@
-/* 인증 수단은 본문 안에서 한 번만 선택한다. */
-.methodGroup {
+.choiceGroup {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  flex-direction: column;
+  gap: 12px;
   margin-top: 24px;
 }
 
-.method {
-  min-height: 44px;
-  padding: 0 16px;
+.choice {
+  min-height: 56px;
+  padding: 16px;
   border: 1px solid var(--border);
   border-radius: var(--radius-control);
   background: var(--bg);
   color: var(--text-body);
-  font-size: 14px;
+  text-align: left;
+  font-size: var(--font-size-body);
   font-weight: 700;
   cursor: pointer;
 }
 
-.method[aria-pressed='true'] {
-  border-color: var(--blue700);
+.choice[aria-pressed='true'] {
+  border-color: var(--blue500);
   background: var(--blue50);
   color: var(--blue700);
 }
 
-.method:focus-visible,
+.choice:focus-visible,
 .alternative button:focus-visible {
   outline: 2px solid var(--blue700);
   outline-offset: 2px;
@@ -40,7 +40,7 @@
   padding-top: 16px;
   border-top: 1px solid var(--border);
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: var(--font-size-label);
 }
 
 .alternative button {

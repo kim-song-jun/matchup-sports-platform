@@ -4,7 +4,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { AccountRecoveryClient } from './account-recovery-client';
 import { authUiServer, RECOVERY_EMAIL, RECOVERY_PHONE, resetWireScenario, wireCalls } from './mdqa133-auth-ui.fixtures';
 import {
-  EMAIL_ACCOUNT, installDeferredPhoneFlow, OLD_PHONE_ERROR, OTHER_PHONE, renderRecovery,
+  backToIdentity, EMAIL_ACCOUNT, installDeferredPhoneFlow, OLD_PHONE_ERROR, OTHER_PHONE, renderRecovery,
   resetIndependentEmailPassword, settleRequests, SOCIAL_ACCOUNT, verifyIndependentEmail, verifyPhone,
 } from './account-recovery-stale-phone.fixtures';
 
@@ -59,6 +59,7 @@ describe('MD-QA #133 이전 휴대폰 조회는 현재 복구 흐름을 덮어�
   it('번호를 바꾼 뒤 이전 성공을 버리고 새 번호를 인증한 조회만 표시한다', async () => {
     renderRecovery(<AccountRecoveryClient />);
     await startPhoneLookup();
+    backToIdentity();
     fireEvent.change(screen.getByLabelText('휴대폰 번호'), { target: { value: OTHER_PHONE } });
     await settleRequests(() => flow.releaseFind(0, SOCIAL_ACCOUNT));
     expect(screen.queryByText(SOCIAL_ACCOUNT.maskedEmail)).not.toBeInTheDocument();
@@ -86,24 +87,27 @@ describe('MD-QA #133 이전 휴대폰 조회는 현재 복구 흐름을 덮어�
   it('번호 A→B→A로 돌아와도 첫 A의 늦은 결과는 새 인증으로 취급하지 않는다', async () => {
     renderRecovery(<AccountRecoveryClient />);
     await startPhoneLookup();
+    backToIdentity();
     fireEvent.change(screen.getByLabelText('휴대폰 번호'), { target: { value: OTHER_PHONE } });
     fireEvent.change(screen.getByLabelText('휴대폰 번호'), { target: { value: RECOVERY_PHONE } });
     await settleRequests(() => flow.releaseFind(0, SOCIAL_ACCOUNT));
 
     expect(screen.queryByText(SOCIAL_ACCOUNT.maskedEmail)).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '인증번호 받기' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '다음' })).toBeEnabled();
     expect(wireCalls.findAccount).toHaveLength(1);
   });
 
   it('아이디→이메일→아이디로 돌아와도 이전 모드의 늦은 결과를 표시하지 않는다', async () => {
     renderRecovery(<AccountRecoveryClient />);
     await startPhoneLookup();
+    backToIdentity();
     fireEvent.click(screen.getByRole('button', { name: '비밀번호 재설정' }));
     fireEvent.click(screen.getByRole('button', { name: '로그인 방법 찾기' }));
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
     await settleRequests(() => flow.releaseFind(0, SOCIAL_ACCOUNT));
 
     expect(screen.queryByText(SOCIAL_ACCOUNT.maskedEmail)).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '인증번호 받기' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '다음' })).toBeEnabled();
   });
 
   it('현재 번호의 실제 조회 실패는 숨기지 않고 원인을 표시한다', async () => {
@@ -114,6 +118,11 @@ describe('MD-QA #133 이전 휴대폰 조회는 현재 복구 흐름을 덮어�
     expect(screen.getByText(OLD_PHONE_ERROR)).toBeInTheDocument();
     expect(screen.queryByText(EMAIL_ACCOUNT.maskedEmail)).not.toBeInTheDocument();
     expect(wireCalls.emailReset).toHaveLength(0);
+    fireEvent.click(screen.getByRole('button', { name: '다시 확인하기' }));
+    await waitFor(() => expect(flow.finds).toHaveLength(2));
+    expect(flow.finds[1].body).toEqual({ phone: RECOVERY_PHONE, proofToken: `phone-proof:${RECOVERY_PHONE}` });
+    await settleRequests(() => flow.releaseFind(1, EMAIL_ACCOUNT));
+    expect(screen.getByText(EMAIL_ACCOUNT.maskedEmail)).toBeInTheDocument();
   });
 
   it('휴대폰 인증 대조 중 화면을 떠나면 늦은 인증이 계정 조회를 새로 시작하지 않는다', async () => {
@@ -133,11 +142,12 @@ describe('MD-QA #133 이전 휴대폰 조회는 현재 복구 흐름을 덮어�
     renderRecovery(<StrictMode><AccountRecoveryClient /></StrictMode>);
     await verifyPhone();
     await waitFor(() => expect(flow.verifications).toHaveLength(1));
+    backToIdentity();
     fireEvent.change(screen.getByLabelText('휴대폰 번호'), { target: { value: currentPhone } });
     await settleRequests(() => flow.releaseVerification());
 
     expect(screen.queryByText('휴대폰 본인인증이 완료됐어요.')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '인증번호 받기' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '다음' })).toBeEnabled();
     expect(wireCalls.findAccount).toHaveLength(0);
     await verifyPhone(currentPhone);
     await waitFor(() => expect(flow.verifications).toHaveLength(2));

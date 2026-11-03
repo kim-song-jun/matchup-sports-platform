@@ -1277,6 +1277,8 @@ export function SettingsPageClient() {
 type LocationStatus = 'idle' | 'requesting' | 'matched' | 'denied' | 'unsupported' | 'unmatched' | 'saved';
 
 export function LocationSettingsPageClient() {
+  const fixedCtaRef = useRef<HTMLDivElement>(null);
+  useCreateCtaSpace(fixedCtaRef);
   const profile = useV1Profile();
   const regionsQuery = useV1MasterRegions();
   const resolveLocation = useV1ResolveLocation();
@@ -1362,7 +1364,7 @@ export function LocationSettingsPageClient() {
 
   return (
     <>
-      <div className="tm-my-shell tm-content-enter">
+      <div className="tm-my-shell tm-my-fixed-cta-shell tm-content-enter">
         <div className="tm-my-location-desktop">
           <div className="tm-desktop-page-head tm-show-desktop">
             <AppBackLink className="tm-desktop-back" fallbackHref={"/my/settings"}>
@@ -1410,7 +1412,7 @@ export function LocationSettingsPageClient() {
           </Card>
         </div>
       </div>
-      <div className="tm-fixed-cta tm-my-location-cta">
+      <div ref={fixedCtaRef} className="tm-fixed-cta tm-my-location-cta">
         <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" type="button" disabled={!selectedRegionId || updateRegion.isPending} onClick={save}>
           {updateRegion.isPending ? '저장 중' : '활동 지역 저장'}
         </button>
@@ -2428,7 +2430,7 @@ export function WithdrawalPageClient() {
   return (
     <>
       {ConfirmModal}
-      <div className="tm-my-shell tm-my-withdrawal-shell tm-content-enter">
+      <div className="tm-my-shell tm-my-fixed-cta-shell tm-content-enter">
         <div className="tm-my-withdrawal-desktop">
           <div className="tm-desktop-page-head tm-show-desktop">
             <AppBackLink className="tm-desktop-back" fallbackHref={"/my/settings"}>

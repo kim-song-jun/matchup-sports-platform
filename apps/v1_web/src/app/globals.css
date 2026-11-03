@@ -6760,7 +6760,7 @@ textarea.tm-chat-input-placeholder::placeholder {
 }
 
 @media (max-width: 1023px) {
-  .tm-my-withdrawal-shell {
+  .tm-my-fixed-cta-shell {
     padding-bottom: max(124px, calc(var(--tm-create-cta-height, 0px) + 16px));
   }
 }

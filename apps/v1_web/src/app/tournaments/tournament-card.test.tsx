@@ -79,17 +79,17 @@ describe('TournamentCard — 신청 마감 계약', () => {
   });
 
   it.each([
-    { condition: '마감 직전', now: '2026-10-07T23:59:59.999Z', overrides: {}, expected: '신청 접수 중' },
-    { condition: '마감과 같은 시각', now: deadline, overrides: {}, expected: '신청 접수 중' },
-    { condition: '마감 직후', now: '2026-10-08T00:00:00.001Z', overrides: {}, expected: '모집 종료' },
-    { condition: '마감 후 정원이 거의 찬 대회', now: '2026-10-08T00:00:00.001Z', overrides: { confirmedCount: 5 }, expected: '모집 종료' },
-    { condition: '마감 전 정원이 거의 찬 대회', now: '2026-10-07T23:59:59.999Z', overrides: { confirmedCount: 5 }, expected: '신청 접수 중' },
-    { condition: '마감 전 정원이 찬 대회', now: '2026-10-07T23:59:59.999Z', overrides: { confirmedCount: 6 }, expected: '모집 종료' },
-    { condition: '마감 전 대기 팀으로 정원이 찬 대회', now: '2026-10-07T23:59:59.999Z', overrides: { pendingPaymentCount: 6 }, expected: '모집 종료' },
-    { condition: '정원이 0인 대회', now: deadline, overrides: { teamCount: 0 }, expected: '모집 종료' },
-    { condition: '마감을 정하지 않은 대회', now: '2026-10-08T00:00:00.001Z', overrides: { registrationDeadlineAt: null }, expected: '신청 접수 중' },
+    { condition: '마감 직전', now: '2026-10-07T23:59:59.999Z', overrides: {}, expected: '접수 중' },
+    { condition: '마감과 같은 시각', now: deadline, overrides: {}, expected: '접수 중' },
+    { condition: '마감 직후', now: '2026-10-08T00:00:00.001Z', overrides: {}, expected: '접수 마감' },
+    { condition: '마감 후 정원이 거의 찬 대회', now: '2026-10-08T00:00:00.001Z', overrides: { confirmedCount: 5 }, expected: '접수 마감' },
+    { condition: '마감 전 정원이 거의 찬 대회', now: '2026-10-07T23:59:59.999Z', overrides: { confirmedCount: 5 }, expected: '접수 중' },
+    { condition: '마감 전 정원이 찬 대회', now: '2026-10-07T23:59:59.999Z', overrides: { confirmedCount: 6 }, expected: '접수 마감' },
+    { condition: '마감 전 대기 팀으로 정원이 찬 대회', now: '2026-10-07T23:59:59.999Z', overrides: { pendingPaymentCount: 6 }, expected: '접수 마감' },
+    { condition: '정원이 0인 대회', now: deadline, overrides: { teamCount: 0 }, expected: '접수 마감' },
+    { condition: '마감을 정하지 않은 대회', now: '2026-10-08T00:00:00.001Z', overrides: { registrationDeadlineAt: null }, expected: '접수 중' },
     { condition: '마감 후 준비 중인 대회', now: '2026-10-08T00:00:00.001Z', overrides: { status: 'draft' }, expected: '준비 중' },
-    { condition: '마감 후 닫힌 대회', now: '2026-10-08T00:00:00.001Z', overrides: { status: 'closed' }, expected: '모집 종료' },
+    { condition: '마감 후 닫힌 대회', now: '2026-10-08T00:00:00.001Z', overrides: { status: 'closed' }, expected: '접수 마감' },
     { condition: '마감 후 진행 중인 대회', now: '2026-10-08T00:00:00.001Z', overrides: { status: 'in_progress' }, expected: '진행 중' },
     { condition: '마감 후 종료된 대회', now: '2026-10-08T00:00:00.001Z', overrides: { status: 'completed' }, expected: '종료' },
     { condition: '마감 후 취소된 대회', now: '2026-10-08T00:00:00.001Z', overrides: { status: 'cancelled' }, expected: '취소' },
@@ -127,8 +127,8 @@ describe('TournamentCard — 화면 체류 중 신청 마감', () => {
   });
 
   it.each([
-    { confirmedCount: 0, initialLabel: '신청 접수 중' },
-    { confirmedCount: 5, initialLabel: '신청 접수 중' },
+    { confirmedCount: 0, initialLabel: '접수 중' },
+    { confirmedCount: 5, initialLabel: '접수 중' },
   ])('$initialLabel 카드를 열어 둔 채 마감이 지나면 배지와 링크 이름을 갱신해요', ({ confirmedCount, initialLabel }) => {
     // Given: 30초 뒤 마감될 실제 카드가 목록에 남아 있어요.
     const item = buildItem({ teamCount: 6, confirmedCount, registrationDeadlineAt: deadline });
@@ -139,9 +139,9 @@ describe('TournamentCard — 화면 체류 중 신청 마감', () => {
     act(() => { vi.advanceTimersByTime(60_000); });
 
     // Then: 동일한 상세 링크를 유지하면서 보이는 상태와 접근성 이름만 마감으로 바꿔요.
-    expect(screen.getByText('모집 종료', { exact: true })).toBeInTheDocument();
+    expect(screen.getByText('접수 마감', { exact: true })).toBeInTheDocument();
     expect(screen.queryByText(initialLabel, { exact: true })).not.toBeInTheDocument();
-    expect(screen.getByRole('link')).toHaveAccessibleName(`${item.title} — 풋살 — 시작 전 · 모집 종료`);
+    expect(screen.getByRole('link')).toHaveAccessibleName(`${item.title} — 풋살 — 접수 마감`);
     expect(screen.getByRole('link')).toHaveAttribute('href', `/tournaments/${item.id}`);
     expect(vi.getTimerCount()).toBe(0);
   });
@@ -240,17 +240,18 @@ describe('TournamentCard — 커버 이미지 fallback', () => {
 
 /** 무제한 리그는 거울 teamCount를 정원으로 쓰지 않고 진행바도 그리지 않는다. */
 describe('TournamentCard — 무제한 리그는 정원 진행바를 그리지 않는다', () => {
-  // 2026-10-27: 리그도 대회처럼 초안은 '준비 중', 접수 중·마감은 '시작 전'이고 신청은 접수 중일 때만 받는다.
+  // 2026-11-03: 오른쪽 위 배지는 상태 하나 — 초안은 '준비 중', 접수 중은 '접수 중', 마감은 '접수 마감'이다.
   it.each([
-    ['draft', '준비 중', '접수 안 함'],
-    ['open', '시작 전', '신청 접수 중'],
-    ['closed', '시작 전', '접수 안 함'],
-  ] as const)('%s 리그는 %s · %s로 표시한다', (status, badge, registration) => {
+    ['draft', '준비 중'],
+    ['open', '접수 중'],
+    ['closed', '접수 마감'],
+  ] as const)('%s 리그는 %s로 표시한다', (status, badge) => {
     const item = buildItem({ kind: 'regular_league', status, registrationDeadlineAt: '2099-01-01T00:00:00.000Z' });
     render(<TournamentCard item={item} />);
-    expect(screen.getByRole('link')).toHaveAccessibleName(expect.stringContaining(`— ${badge}`));
-    expect(screen.getByText(badge, { exact: true })).toBeInTheDocument();
-    expect(screen.getByText(registration, { exact: true })).toBeInTheDocument();
+    expect(screen.getByRole('link')).toHaveAccessibleName(`${item.title} — 풋살 — ${badge}`);
+    expect(screen.getAllByText(badge, { exact: true })).toHaveLength(1);
+    expect(screen.queryByText('시작 전', { exact: true })).not.toBeInTheDocument();
+    expect(screen.queryByText('접수 안 함', { exact: true })).not.toBeInTheDocument();
   });
 
   /** 리그의 참가팀 정원은 nullable maxTeams로 말한다. */
@@ -317,7 +318,7 @@ describe('TournamentCard — 정원이 다 찼으면 상태가 open이어도 마
       <TournamentCard item={buildItem({ status: 'open', teamCount: 4, confirmedCount: 4 })} />,
     );
     const text = (container.textContent ?? '').replace(/\s+/g, ' ');
-    expect(text).not.toContain('신청 접수 중');
+    expect(text).not.toContain('접수 중');
   });
 
   it('입금대기 팀까지 합쳐 정원이 찼어도 마감으로 본다', () => {
@@ -327,7 +328,7 @@ describe('TournamentCard — 정원이 다 찼으면 상태가 open이어도 마
       />,
     );
     const text = (container.textContent ?? '').replace(/\s+/g, ' ');
-    expect(text).not.toContain('신청 접수 중');
+    expect(text).not.toContain('접수 중');
   });
 
   it('정원이 남아 있으면 그대로 "모집 중"을 보여준다 — 대조군', () => {
@@ -335,17 +336,17 @@ describe('TournamentCard — 정원이 다 찼으면 상태가 open이어도 마
       <TournamentCard item={buildItem({ status: 'open', teamCount: 4, confirmedCount: 2 })} />,
     );
     const text = (container.textContent ?? '').replace(/\s+/g, ' ');
-    expect(text).toContain('신청 접수 중');
+    expect(text).toContain('접수 중');
   });
 
-  it('접수 중인 무제한 리그는 정원과 상관없이 시작 전 · 신청 접수 중이다', () => {
+  it('접수 중인 무제한 리그는 정원과 상관없이 접수 중이다', () => {
     const item = buildItem({ kind: 'regular_league', status: 'open', maxTeams: null,
       registrationDeadlineAt: '2099-08-10T14:59:00.000Z', confirmedCount: 2 });
     delete item.teamCount;
     const { container } = render(<TournamentCard item={item} />);
     const text = (container.textContent ?? '').replace(/\s+/g, ' ');
-    expect(text).toContain('시작 전');
-    expect(text).toContain('신청 접수 중');
+    expect(text).not.toContain('시작 전');
+    expect(text).toContain('접수 중');
   });
 });
 
@@ -371,19 +372,23 @@ describe('TournamentCard — 통합 목록에서 리그를 알아볼 수 있다'
   });
 
   /**
-   * 성별을 받기 전에 만든 리그는 `genderCategory` 가 null 이라 라벨이 "성별 부문 미지정" 으로
-   * 떨어진다 — 그런 리그 카드마다 같은 배지가 붙으면 소음이라 그리지 않는다.
-   * 2026-11-03 부터 리그도 만들 때 성별을 고르므로, 고른 리그에는 대회처럼 성별 배지를 그린다.
+   * 이름 아래 배지는 종목 / 리그·대회 / 성별 조건 세 가지다(2026-11-03). 성별을 받기 전에 만든 리그는
+   * `genderCategory` 가 null 이라 같은 "성별 부문 미지정" 배지가 카드마다 붙으면 소음이므로 그리지 않고,
+   * 성별을 고른 리그에는 대회처럼 그린다.
    */
-  it('성별이 없는 리그 카드에는 성별 배지를 그리지 않는다', () => {
-    render(<TournamentCard item={{ ...leagueItem(), genderCategory: null }} />);
+  it('리그 카드는 성별 조건이 있으면 성별 배지를 그리고 비어 있으면 그리지 않는다', () => {
+    const { rerender } = render(<TournamentCard item={{ ...leagueItem(), genderCategory: 'female' }} />);
+    expect(screen.getByLabelText('성별 카테고리: 여성부')).toBeInTheDocument();
+    rerender(<TournamentCard item={{ ...leagueItem(), genderCategory: null }} />);
     expect(screen.queryByLabelText(/^성별 카테고리:/)).toBeNull();
   });
 
-  it('성별을 고른 리그 카드에는 리그 배지 옆에 성별 배지를 그린다', () => {
-    render(<TournamentCard item={{ ...leagueItem(), genderCategory: 'male' }} />);
-    expect(screen.getByLabelText('정규 리그')).toBeInTheDocument();
-    expect(screen.getByLabelText('성별 카테고리: 남성부')).toBeInTheDocument();
+  it('대회 카드에는 "대회" 배지가 있고 리그 카드에는 "리그" 배지가 있다', () => {
+    const { rerender } = render(<TournamentCard item={buildItem({ teamCount: 16, confirmedCount: 4 })} />);
+    expect(screen.getByLabelText('정규 대회')).toHaveTextContent('대회');
+    rerender(<TournamentCard item={leagueItem()} />);
+    expect(screen.getByLabelText('정규 리그')).toHaveTextContent('리그');
+    expect(screen.queryByLabelText('정규 대회')).toBeNull();
   });
 
   it('대회 카드에는 성별 배지가 있다 — 대조군', () => {
@@ -416,12 +421,12 @@ describe('TournamentCard — 통합 목록에서 리그를 알아볼 수 있다'
 
 describe('TournamentCard — 모집 상태와 하단 정보', () => {
   it.each([
-    { status: 'open', confirmedCount: 14, pendingPaymentCount: 1, expected: '신청 접수 중' },
-    { status: 'open', confirmedCount: 11, pendingPaymentCount: 5, expected: '신청 접수 중' },
-    { status: 'open', confirmedCount: 16, pendingPaymentCount: 0, expected: '신청 접수 중' },
-    { status: 'open', confirmedCount: 19, pendingPaymentCount: 0, expected: '신청 접수 중' },
-    { status: 'open', confirmedCount: 15, pendingPaymentCount: 5, expected: '모집 종료' },
-    { status: 'closed', confirmedCount: 4, pendingPaymentCount: 0, expected: '모집 종료' },
+    { status: 'open', confirmedCount: 14, pendingPaymentCount: 1, expected: '접수 중' },
+    { status: 'open', confirmedCount: 11, pendingPaymentCount: 5, expected: '접수 중' },
+    { status: 'open', confirmedCount: 16, pendingPaymentCount: 0, expected: '접수 중' },
+    { status: 'open', confirmedCount: 19, pendingPaymentCount: 0, expected: '접수 중' },
+    { status: 'open', confirmedCount: 15, pendingPaymentCount: 5, expected: '접수 마감' },
+    { status: 'closed', confirmedCount: 4, pendingPaymentCount: 0, expected: '접수 마감' },
     { status: 'in_progress', confirmedCount: 18, pendingPaymentCount: 0, expected: '진행 중' },
     { status: 'completed', confirmedCount: 20, pendingPaymentCount: 0, expected: '종료' },
     { status: 'cancelled', confirmedCount: 18, pendingPaymentCount: 0, expected: '취소' },
@@ -429,7 +434,7 @@ describe('TournamentCard — 모집 상태와 하단 정보', () => {
     render(<TournamentCard item={buildItem({ ...values, teamCount: 20 })} />);
     expect(screen.getByRole('link')).toHaveAccessibleName(expect.stringContaining(expected));
     expect(screen.getAllByText(expected, { exact: true })).toHaveLength(1);
-    if (expected !== '신청 접수 중') expect(screen.queryByText('신청 접수 중')).not.toBeInTheDocument();
+    if (expected !== '접수 중') expect(screen.queryByText('접수 중')).not.toBeInTheDocument();
   });
 
   it('확정과 입금 대기 수를 나눈 예약 현황과 금액을 표시하고 막대는 하나만 유지한다', () => {
@@ -491,21 +496,30 @@ describe('TournamentCard — 참가비 표시', () => {
   });
 });
 
-describe('TournamentCard — 진행·모집 상태 분리', () => {
-  it('상태가 open이어도 마감이 지났으면 모집 종료로 표시한다', () => {
+describe('TournamentCard — 상태 하나로 표시', () => {
+  it('상태가 open이어도 마감이 지났으면 접수 마감으로 표시한다', () => {
     render(<TournamentCard item={buildItem({ registrationDeadlineAt: '2000-01-01T00:00:00Z' })} />);
-    expect(screen.getByText('시작 전', { exact: true })).toBeInTheDocument();
-    expect(screen.getByText('모집 종료', { exact: true })).toBeInTheDocument();
-    expect(screen.queryByText('신청 접수 중', { exact: true })).not.toBeInTheDocument();
+    expect(screen.getByText('접수 마감', { exact: true })).toBeInTheDocument();
+    expect(screen.queryByText('시작 전', { exact: true })).not.toBeInTheDocument();
+    expect(screen.queryByText('접수 중', { exact: true })).not.toBeInTheDocument();
   });
-  it('진행 중인 리그는 마감이 남아도 신청을 받지 않는다', () => {
+  it('진행 중인 리그는 마감이 남아도 시즌 진행 중 하나만 표시한다', () => {
     render(<TournamentCard item={buildItem({ kind: 'regular_league', status: 'in_progress', teamCount: undefined, registrationDeadlineAt: '2099-12-01T00:00:00Z' })} />);
     expect(screen.getByText('시즌 진행 중', { exact: true })).toBeInTheDocument();
-    expect(screen.getByText('접수 안 함', { exact: true })).toBeInTheDocument();
+    expect(screen.queryByText('접수 안 함', { exact: true })).not.toBeInTheDocument();
+    expect(screen.queryByText('접수 중', { exact: true })).not.toBeInTheDocument();
   });
-  it('리그의 마감 미설정은 준비 중·접수 안 함으로 표시한다', () => {
+  it('리그의 마감 미설정 초안은 준비 중으로 표시한다', () => {
     render(<TournamentCard item={buildItem({ kind: 'regular_league', status: 'draft', teamCount: undefined, registrationDeadlineAt: null })} />);
     expect(screen.getByText('준비 중', { exact: true })).toBeInTheDocument();
-    expect(screen.getByText('접수 안 함', { exact: true })).toBeInTheDocument();
+    expect(screen.queryByText('접수 안 함', { exact: true })).not.toBeInTheDocument();
+  });
+  it('접수 중이고 정원이 80% 이상 찼을 때만 잔여 자리 적음을 덧붙인다', () => {
+    const { rerender } = render(<TournamentCard item={buildItem({ teamCount: 10, confirmedCount: 8 })} />);
+    expect(screen.getByText('잔여 자리 적음')).toBeInTheDocument();
+    rerender(<TournamentCard item={buildItem({ teamCount: 10, confirmedCount: 10 })} />);
+    expect(screen.queryByText('잔여 자리 적음')).not.toBeInTheDocument();
+    rerender(<TournamentCard item={buildItem({ teamCount: 10, confirmedCount: 2 })} />);
+    expect(screen.queryByText('잔여 자리 적음')).not.toBeInTheDocument();
   });
 });

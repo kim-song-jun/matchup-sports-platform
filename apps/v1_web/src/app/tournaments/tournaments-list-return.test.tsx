@@ -129,7 +129,7 @@ const server = setupServer(
   http.get('*/api/v1/tournaments', ({ request }) => {
     const params = new URL(request.url).searchParams;
     const kind = params.get('kind');
-    const status = params.get('status') ?? (params.get('phase') === 'ongoing' ? 'in_progress' : params.get('phase') === 'completed' ? 'completed' : null);
+    const status = params.get('status') ?? (params.get('stage') === 'ongoing' ? 'in_progress' : params.get('stage') === 'completed' ? 'completed' : null);
     const filtered = items.filter((item) => (
       (!status || item.status === status)
       && (kind === 'tournament' ? item.kind === 'regular_tournament' : kind === 'league' ? item.kind === 'regular_league' : true)
@@ -253,7 +253,7 @@ describe('MD-QA #42 — 대회 목록 페이지 복귀', () => {
         const params = new URL(request.url).searchParams;
         const page = Number(params.get('page') ?? 1);
         const limit = Number(params.get('limit') ?? 20);
-        const status = params.get('status') ?? (params.get('phase') === 'ongoing' ? 'in_progress' : params.get('phase') === 'completed' ? 'completed' : null);
+        const status = params.get('status') ?? (params.get('stage') === 'ongoing' ? 'in_progress' : params.get('stage') === 'completed' ? 'completed' : null);
         const filtered = leagues.filter((item) => !status || item.status === status);
         return ok({
           items: filtered.slice((page - 1) * limit, page * limit),
@@ -467,7 +467,7 @@ describe('MD-QA #42 — 대회 목록 페이지 복귀', () => {
 
     // Then: URL의 페이지도 지우고 바뀐 필터의 1–20 결과를 조회한다.
     const params = new URL(navigation.path, 'https://teameet.example').searchParams;
-    expect(params.get('phase')).toBe('ongoing');
+    expect(params.get('stage')).toBe('ongoing');
     expect(params.has('page')).toBe(false);
     await screen.findByText(/전체 22건 중 1–20/);
   });
@@ -519,7 +519,7 @@ describe('MD-QA #55 — 모바일 대회 목록 더 보기 복귀', () => {
     await expectMobileCards(20);
     await user.click(screen.getByRole('button', { name: '더 보기' }));
     await expectMobileCards(40);
-    await user.click(screen.getByRole('link', { name: '모바일 대회 1 — 풋살 — 진행 중 · 모집 종료' }));
+    await user.click(screen.getByRole('link', { name: '모바일 대회 1 — 풋살 — 진행 중' }));
     await screen.findByRole('heading', { level: 1, name: '모바일 대회 1' });
 
     // When: 상세 상단 액션 또는 브라우저 history로 목록에 돌아간다.

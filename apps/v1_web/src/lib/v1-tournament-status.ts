@@ -1,5 +1,5 @@
 import type { V1TournamentStatus } from '@/types/api';
-import { leagueStateLabel } from './v1-status-labels';
+import { COMPETITION_STAGE_LABEL, leagueStateLabel, type CompetitionStage } from './v1-status-labels';
 
 export type TournamentStatusConfig = { badgeClass: string; label: string };
 
@@ -47,4 +47,29 @@ export function getTournamentStatusConfig(
       // 서버가 웹 타입보다 먼저 새 상태를 내려도 영문 코드를 화면에 노출하지 않는다.
       return { badgeClass: 'tm-badge-grey', label: '상태 확인 중' };
   }
+}
+
+const CARD_STAGE_BADGE: Record<CompetitionStage, string> = {
+  preparing: 'tm-badge-grey',
+  recruiting: 'tm-badge-blue',
+  recruit_closed: 'tm-badge-grey',
+  ongoing: 'tm-badge-green',
+  completed: 'tm-badge-grey',
+};
+
+/**
+ * 목록 카드 오른쪽 위 상태 배지 — 단계 배지와 신청 배지를 하나로 합친 5개 상태(2026-11-03).
+ * 저장된 `open` 은 마감 시각·정원으로 막히면 '접수 마감'이다(서버 정렬 그룹·상태 필터와 같은 기준).
+ * 그 밖의 상태(취소·보류·모르는 값)는 기존 설정을 그대로 쓴다.
+ */
+export function getCompetitionCardStatus(status: string, registrationOpen: boolean, isRegularLeague: boolean): TournamentStatusConfig {
+  const stage: CompetitionStage | null = status === 'draft' ? 'preparing'
+    : status === 'open' ? (registrationOpen ? 'recruiting' : 'recruit_closed')
+    : status === 'closed' ? 'recruit_closed'
+    : status === 'in_progress' ? 'ongoing'
+    : status === 'completed' ? 'completed'
+    : null;
+  if (stage === null) return isRegularLeague ? getLeagueStatusConfig(status) : getTournamentStatusConfig(status as V1TournamentStatus);
+  const label = stage === 'ongoing' && isRegularLeague ? leagueStateLabel('active') : COMPETITION_STAGE_LABEL[stage];
+  return { badgeClass: CARD_STAGE_BADGE[stage], label };
 }

@@ -148,7 +148,7 @@ describe('/tournaments 서버 렌더', () => {
 
     const html = await serverHtml('kind=tournament&status=in_progress&sportId=8c0ae163-e4d0-4037-8cf2-4e18216fe0f8&genderCategory=mixed');
 
-    expect(requestedPath('/tournaments?kind=tournament&limit=20&phase=ongoing&sportId=8c0ae163-e4d0-4037-8cf2-4e18216fe0f8&genderCategory=mixed&sort=latest&withTotal=true')).toBe(true);
+    expect(requestedPath('/tournaments?kind=tournament&limit=20&stage=ongoing&sportId=8c0ae163-e4d0-4037-8cf2-4e18216fe0f8&genderCategory=mixed&withTotal=true')).toBe(true);
     expect(markup(html)).toContain('풋살 필터 대회');
     expect(itemListNames(html)).toEqual([]);
     expect(html).not.toContain('application/ld+json');
@@ -163,7 +163,7 @@ describe('/tournaments 서버 렌더', () => {
 
     const html = await serverHtml('kind=unknown&status=open&genderCategory=unknown&sportId=unknown-sport');
 
-    expect(requestedPath('/tournaments?kind=all&limit=20&registration=open&sort=latest&withTotal=true')).toBe(true);
+    expect(requestedPath('/tournaments?kind=all&limit=20&stage=recruiting&withTotal=true')).toBe(true);
     expect(requested.some((url) => url.includes('status=open') || url.includes('genderCategory=unknown') || url.includes('sportId=unknown-sport'))).toBe(false);
     expect(markup(html)).toContain('정규화된 전체 목록 대회');
     expect(itemListNames(html)).toEqual([]);
@@ -189,7 +189,7 @@ describe('/tournaments 서버 렌더', () => {
 
     await serverHtml('kind=tournament&status=draft');
 
-    expect(requestedPath('/tournaments?kind=tournament&limit=20&phase=upcoming&sort=latest&withTotal=true')).toBe(true);
+    expect(requestedPath('/tournaments?kind=tournament&limit=20&withTotal=true')).toBe(true);
     expect(requested.some((url) => url.includes('status=draft'))).toBe(false);
   });
 

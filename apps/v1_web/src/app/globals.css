@@ -6759,6 +6759,12 @@ textarea.tm-chat-input-placeholder::placeholder {
   padding: 20px var(--v1-shell-page-x) 124px;
 }
 
+@media (max-width: 1023px) {
+  .tm-my-withdrawal-shell {
+    padding-bottom: max(124px, calc(var(--tm-create-cta-height, 0px) + 16px));
+  }
+}
+
 /* 내 매치 목록은 API에서 팀명·장소·매치명을 그대로 받는다. 공백 없는 긴 값이 들어와도
    grid의 min-content 폭이 모바일 앱 프레임보다 커지지 않도록 이 화면의 단일 열을 명시한다. */
 .tm-my-matches-desktop {

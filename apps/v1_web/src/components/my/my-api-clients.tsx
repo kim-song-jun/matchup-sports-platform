@@ -12,6 +12,7 @@ import { AppBackLink } from '@/components/v1-ui/app-back-link';
 import { AlertTriangleIcon, ChevronLeftIcon, ChevronRightIcon, InfoCircleIcon } from '@/components/v1-ui/icons';
 import { Card, DatePickerTextInput, ListItem } from '@/components/v1-ui/primitives';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
+import { useCreateCtaSpace } from '@/components/v1-ui/use-create-cta-space';
 import { Check, Lock } from 'lucide-react';
 import { formatBirthDate, isValidBirthDateDigits, normalizeSeparatedDigits } from '@/components/auth/signup-profile-validation';
 import { PhoneVerificationCard } from '@/components/auth/phone-verification/phone-verification-card';
@@ -2255,6 +2256,8 @@ export function ThemeSettingsPageClient() {
 }
 
 export function WithdrawalPageClient() {
+  const fixedCtaRef = useRef<HTMLDivElement>(null);
+  useCreateCtaSpace(fixedCtaRef);
   const queryClient = useQueryClient();
   const pushRegistration = useV1PushRegistration();
   const [reason, setReason] = useState('');
@@ -2425,7 +2428,7 @@ export function WithdrawalPageClient() {
   return (
     <>
       {ConfirmModal}
-      <div className="tm-my-shell tm-content-enter">
+      <div className="tm-my-shell tm-my-withdrawal-shell tm-content-enter">
         <div className="tm-my-withdrawal-desktop">
           <div className="tm-desktop-page-head tm-show-desktop">
             <AppBackLink className="tm-desktop-back" fallbackHref={"/my/settings"}>
@@ -2483,7 +2486,7 @@ export function WithdrawalPageClient() {
           {withdrawal.isError ? <WithdrawalErrorCard error={withdrawal.error} /> : null}
         </div>
       </div>
-      <div className="tm-fixed-cta tm-my-withdrawal-cta">
+      <div ref={fixedCtaRef} className="tm-fixed-cta tm-my-withdrawal-cta">
         <button
           className="tm-btn tm-btn-lg tm-btn-danger tm-btn-block"
           type="button"

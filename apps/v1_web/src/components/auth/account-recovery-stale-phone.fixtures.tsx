@@ -83,17 +83,32 @@ export function renderRecovery(content: ReactNode) {
   return { ...view, unmountRecovery: () => view.rerender(<MutationProgress />) };
 }
 
+export function backToIdentity() {
+  while (!screen.queryByLabelText('휴대폰 번호') && !screen.queryByLabelText('이메일')) {
+    fireEvent.click(screen.getAllByRole('button', { name: '이전 단계' })[0]);
+  }
+}
+
 export async function verifyPhone(phone = RECOVERY_PHONE) {
+  if (screen.queryByRole('group', { name: '찾을 항목' })) {
+    fireEvent.click(screen.getByRole('button', { name: '아이디·로그인 방법 찾기' }));
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    fireEvent.click(screen.getByRole('button', { name: '휴대폰으로 찾기' }));
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+  } else if (!screen.queryByLabelText('휴대폰 번호')) backToIdentity();
   fireEvent.change(screen.getByLabelText('휴대폰 번호'), { target: { value: phone } });
   const user = userEvent.setup();
+  await user.click(screen.getByRole('button', { name: '다음' }));
   await user.click(await screen.findByRole('button', { name: '인증번호 받기' }));
   await user.click(await screen.findByRole('button', { name: '확인' }));
 }
 
 export async function verifyIndependentEmail() {
+  backToIdentity();
   fireEvent.click(screen.getByRole('button', { name: '비밀번호 재설정' }));
   fireEvent.change(screen.getByLabelText('이메일'), { target: { value: RECOVERY_EMAIL } });
   const user = userEvent.setup();
+  await user.click(screen.getByRole('button', { name: '다음' }));
   await user.click(await screen.findByRole('button', { name: '인증번호 받기' }));
   await user.click(await screen.findByRole('button', { name: '확인' }));
   await screen.findByLabelText('새 비밀번호');

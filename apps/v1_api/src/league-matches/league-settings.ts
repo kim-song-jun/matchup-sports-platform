@@ -9,7 +9,7 @@ import { countCapacityReservations } from '../tournaments/registration-capacity'
 
 const select = {
   id: true, title: true, rulesText: true, regionId: true, scheduledAt: true, scheduledEndAt: true,
-  registrationDeadlineAt: true, plannedFixtureCount: true, maxTeams: true, updatedAt: true, status: true,
+  registrationDeadlineAt: true, plannedFixtureCount: true, maxTeams: true, genderCategory: true, updatedAt: true, status: true,
   sport: { select: { name: true } },
 } satisfies Prisma.V1TournamentSelect;
 
@@ -24,6 +24,7 @@ function view(row: Awaited<ReturnType<typeof load>>) {
     registrationDeadlineAt: row.registrationDeadlineAt?.toISOString() ?? null,
     plannedFixtureCount: row.plannedFixtureCount,
     maxTeams: row.maxTeams,
+    genderCategory: row.genderCategory,
     updatedAt: row.updatedAt.toISOString(), status: row.status, sportName: row.sport.name };
 }
 export async function getLeagueSettings(prisma: PrismaService, admins: AdminContextService, user: V1AuthUser, id: string) {
@@ -65,6 +66,7 @@ export async function updateLeagueSettings(prisma: PrismaService, admins: AdminC
       scheduledAt: startsOn, scheduledEndAt: endsOn, registrationDeadlineAt: deadline,
       ...(dto.plannedFixtureCount !== undefined ? { plannedFixtureCount: dto.plannedFixtureCount } : {}),
       ...(dto.maxTeams !== undefined ? { maxTeams: dto.maxTeams } : {}),
+      ...(dto.genderCategory !== undefined ? { genderCategory: dto.genderCategory } : {}),
     }, select });
     await admins.logAdminAction(admin, { action: 'league_match.update_settings', targetType: 'league_match', targetId: id,
       beforeJson: view(current), afterJson: view(updated) }, tx);

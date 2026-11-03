@@ -31,6 +31,29 @@ test.describe('mobile safe area and touch', () => {
     await expectAboveSystemBar(business, 48);
   });
 
+  test('a late native inset keeps the last auth content above its fixed actions', async ({ page }) => {
+    await page.goto('/auth/account-conflict');
+    const content = page.locator('.tm-auth-scroll');
+    const actions = page.locator('.tm-auth-fixed-cta');
+    const help = page.getByRole('link', { name: '고객센터에 알려 주세요' });
+    await expect(help).toBeAttached();
+    await setNativeBottom(page, 0);
+    await expect.poll(() => actions.evaluate((node) => node.closest<HTMLElement>('.tm-auth-frame')!.style.getPropertyValue('--tm-auth-cta-height')))
+      .toBe(`${await actions.evaluate((node) => node.offsetHeight)}px`);
+    await setNativeBottom(page, 48);
+    await expect.poll(async () => {
+      const scrollBox = await content.boundingBox();
+      const actionBox = await actions.boundingBox();
+      return scrollBox && actionBox ? Math.round(scrollBox.y + scrollBox.height - actionBox.y) : null;
+    }).toBeLessThanOrEqual(0);
+    await content.evaluate((node) => { node.scrollTop = node.scrollHeight; });
+    const helpBox = await help.boundingBox();
+    const actionBox = await actions.boundingBox();
+    expect(helpBox).not.toBeNull();
+    expect(actionBox).not.toBeNull();
+    expect(helpBox!.y + helpBox!.height).toBeLessThanOrEqual(actionBox!.y);
+  });
+
   test('the unsaved team form dialog keeps both actions above the native navigation area', async ({ page }) => {
     await loginAs(page, personas.owner.email);
     await page.goto('/teams/new');

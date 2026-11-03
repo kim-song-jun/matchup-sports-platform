@@ -7,6 +7,7 @@ import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
 import { AdminPageHeader, AdminToasts, useAdminToast } from '@/components/admin';
 import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-picker';
 import { WizardStepper } from '@/components/admin/wizard-stepper';
+import { GenderCategoryField, genderCategoryLabel } from '@/components/admin/gender-category-field';
 import { periodLabels, switchPeriodCount } from '@/app/admin/tournaments/new/tournament-create-model';
 import { v1Get } from '@/lib/api-client';
 import {
@@ -29,13 +30,14 @@ import { LEAGUE_TIE_BREAK_ORDER, formatTieBreakRule } from '@/lib/league-tie-bre
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
 import { LeaguePlannedFixtureField, LeagueRosterLimitField, LeagueTeamCapacityField, leagueTeamCapacityError, rosterLimitError, type RosterLimitValue } from '../league-settings-fields';
 import type { V1CreateLeaguePayload } from '@/types/league-match';
+import type { V1TournamentGenderCategory } from '@/types/api';
 
 /** 페이지 로컬 팀 선택 상태 — EntityPickerItem에 종목 판정에 필요한 필드만 얹는다. */
 type LeagueTeamPick = EntityPickerItem & { sportId: string };
 
 /** 대회 만들기처럼 단계로 나눈다(2026-10-27 사용자 선택). 마지막 확인 단계에서 리그를 만든다. */
 const LEAGUE_CREATE_STEPS = [
-  { title: '기본 정보', description: '이름·종목·지역·기간' },
+  { title: '기본 정보', description: '이름·종목·지역·기간·성별' },
   { title: '참가팀·신청', description: '직접 넣을 팀과 신청 조건' },
   { title: '경기 설정', description: '명단 인원·경기 수·시간' },
   { title: '확인', description: '입력한 내용 확인' },
@@ -52,6 +54,8 @@ export default function AdminLeagueMatchNewPage() {
   const [regionId, setRegionId] = useState('');
   const [startsOn, setStartsOn] = useState('');
   const [endsOn, setEndsOn] = useState('');
+  // 기본값 없이 고르게 한다 — 대회는 혼성으로 시작하지만 리그는 운영자가 꼭 정하고 넘어가야 한다(2026-11-03 사용자 요청).
+  const [genderCategory, setGenderCategory] = useState<V1TournamentGenderCategory | ''>('');
   const [selectedTeams, setSelectedTeams] = useState<LeagueTeamPick[]>([]);
   const [pickerValue, setPickerValue] = useState<EntityPickerItem | null>(null);
   const [teamSearch, setTeamSearch] = useState('');
@@ -148,6 +152,7 @@ export default function AdminLeagueMatchNewPage() {
       if (regionId === '') return '지역을 선택해 주세요.';
       if (startsOn === '' || endsOn === '') return '시작일·종료일을 입력해 주세요.';
       if (endsBeforeStart) return '종료일을 바로잡아 주세요.';
+      if (genderCategory === '') return '성별 카테고리를 선택해 주세요.';
       return null;
     }
     if (target === 1) {
@@ -195,6 +200,7 @@ export default function AdminLeagueMatchNewPage() {
     startsOn: new Date(`${startsOn}T00:00:00`).toISOString(),
     endsOn: new Date(`${endsOn}T23:59:59.999`).toISOString(),
     teamIds: selectedTeams.map((t) => t.id),
+    ...(genderCategory !== '' ? { genderCategory } : {}),
     // 제한 없음이면 최소 인원도 1 로 둔다 — 남겨 두면 신청 화면이 '최소 6명'을 계속 재촉한다.
     minPlayers: rosterLimit.unlimited ? 1 : Number(rosterLimit.minPlayers),
     maxPlayers: rosterLimit.unlimited ? null : Number(rosterLimit.maxPlayers),
@@ -292,6 +298,14 @@ export default function AdminLeagueMatchNewPage() {
               regions={regionOptions}
               sportLocked={isSportLocked}
               sportHint={isSportLocked ? '팀을 넣어서 잠겼어요 · 바꾸려면 다음 단계에서 넣은 팀을 모두 지우세요' : undefined}
+              disabled={locked}
+            />
+          )}
+          {step === 0 && (
+            <GenderCategoryField
+              value={genderCategory}
+              onChange={setGenderCategory}
+              hint="남성부·여성부는 그 성별 선수만 참가 명단에 올릴 수 있어요."
               disabled={locked}
             />
           )}
@@ -464,6 +478,7 @@ export default function AdminLeagueMatchNewPage() {
                 ['종목', selectedSport?.name ?? '-'],
                 ['지역', regionOptions.find((region) => region.id === regionId)?.name ?? '-'],
                 ['기간', `${startsOn} ~ ${endsOn}`],
+                ['성별', genderCategory === '' ? '-' : genderCategoryLabel(genderCategory)],
                 ['직접 넣는 팀', selectedTeams.length === 0 ? '없음 — 참가 신청으로 모아요' : `${selectedTeams.length}팀 · ${selectedTeams.map((team) => team.label).join(', ')}`],
                 ['참가팀 정원', maxTeams.trim() === '' ? '제한 없음' : `${maxTeams}팀`],
                 ['신청 마감', deadlineIso === null ? '마감 없음 — 접수 마감하기로 닫아요' : formatTournamentDateTimeLong(deadlineIso)],

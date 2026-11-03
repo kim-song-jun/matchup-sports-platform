@@ -108,6 +108,7 @@ function fillBasics() {
   fireEvent.change(screen.getByLabelText('지역'), { target: { value: 'region-1' } });
   fireEvent.change(screen.getByLabelText('시작일'), { target: { value: '2026-09-01' } });
   fireEvent.change(screen.getByLabelText('종료일'), { target: { value: '2026-10-20' } });
+  fireEvent.click(screen.getByRole('radio', { name: '남성부' }));
 }
 
 async function pickTeams(names: string[]) {
@@ -139,6 +140,7 @@ describe('AdminLeagueMatchNewPage — 대회처럼 단계로 만든다', () => {
     // 확인 단계는 입력한 내용을 그대로 되짚는다.
     expect(screen.getByRole('heading', { name: '확인' })).toBeInTheDocument();
     expect(screen.getByText('2팀 · 팀A, 팀B')).toBeInTheDocument();
+    expect(screen.getByText('남성부', { selector: 'dd' })).toBeInTheDocument();
     expect(screen.getByText('마감 없음 — 접수 마감하기로 닫아요')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '리그 만들기' }));
 
@@ -149,6 +151,7 @@ describe('AdminLeagueMatchNewPage — 대회처럼 단계로 만든다', () => {
       startsOn: new Date('2026-09-01T00:00:00').toISOString(),
       endsOn: new Date('2026-10-20T23:59:59.999').toISOString(),
       teamIds: ['team-a', 'team-b'],
+      genderCategory: 'male',
       // 리그는 팀 전원이 명단에 오르는 게 기본이라 팀 명단 인원은 '제한 없음'으로 시작한다.
       minPlayers: 1,
       maxPlayers: null,
@@ -225,6 +228,26 @@ describe('AdminLeagueMatchNewPage — 대회처럼 단계로 만든다', () => {
     expect(screen.getByRole('button', { name: /^2단계 참가팀·신청/ })).toBeDisabled();
     fillBasics();
     expect(screen.getByRole('button', { name: /^2단계 참가팀·신청/ })).toBeEnabled();
+  });
+
+  // 2026-11-03 사용자 요청: 대회처럼 성별을 고르되, 리그는 기본값 없이 골라야 넘어간다.
+  it('성별 카테고리를 고르기 전에는 다음 단계로 가지 않고, 혼성·남성부·여성부를 보여 준다', async () => {
+    mockData();
+    mockCreate();
+    renderPage();
+    fireEvent.change(screen.getByLabelText('리그 이름'), { target: { value: '가을 풋살 리그' } });
+    fireEvent.change(screen.getByLabelText('종목'), { target: { value: 'sport-futsal' } });
+    fireEvent.change(screen.getByLabelText('지역'), { target: { value: 'region-1' } });
+    fireEvent.change(screen.getByLabelText('시작일'), { target: { value: '2026-09-01' } });
+    fireEvent.change(screen.getByLabelText('종료일'), { target: { value: '2026-10-20' } });
+    const group = screen.getByRole('group', { name: '성별 카테고리' });
+    expect(within(group).getAllByRole('radio').map((radio) => radio.closest('label')?.textContent)).toEqual(['혼성', '남성부', '여성부']);
+    expect(within(group).getAllByRole('radio').every((radio) => !(radio as HTMLInputElement).checked)).toBe(true);
+    expect(screen.getByRole('button', { name: '다음' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '다음' })).toHaveAccessibleDescription('성별 카테고리를 선택해 주세요.');
+    expect(screen.getByRole('button', { name: /^2단계 참가팀·신청/ })).toBeDisabled();
+    fireEvent.click(within(group).getByRole('radio', { name: '혼성' }));
+    expect(screen.getByRole('button', { name: '다음' })).toBeEnabled();
   });
 
   it('팀 명단 인원을 직접 정하고 총 경기 수를 넣으면 함께 보낸다', async () => {

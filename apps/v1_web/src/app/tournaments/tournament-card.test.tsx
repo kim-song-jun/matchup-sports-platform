@@ -371,13 +371,19 @@ describe('TournamentCard — 통합 목록에서 리그를 알아볼 수 있다'
   });
 
   /**
-   * 리그 거울은 `genderCategory` 를 채우는 경로가 없어 항상 null 이고, 그러면 라벨이
-   * "성별 구분 없음" 으로 떨어진다 — 모든 리그 카드에 같은 배지가 하나씩 더 붙는다.
-   * 정원(`teamCount`) 을 뺀 것과 같은 이유로 이 자리도 안 그린다.
+   * 성별을 받기 전에 만든 리그는 `genderCategory` 가 null 이라 라벨이 "성별 부문 미지정" 으로
+   * 떨어진다 — 그런 리그 카드마다 같은 배지가 붙으면 소음이라 그리지 않는다.
+   * 2026-11-03 부터 리그도 만들 때 성별을 고르므로, 고른 리그에는 대회처럼 성별 배지를 그린다.
    */
-  it('리그 카드에 성별 배지를 그리지 않는다', () => {
-    render(<TournamentCard item={leagueItem()} />);
+  it('성별이 없는 리그 카드에는 성별 배지를 그리지 않는다', () => {
+    render(<TournamentCard item={{ ...leagueItem(), genderCategory: null }} />);
     expect(screen.queryByLabelText(/^성별 카테고리:/)).toBeNull();
+  });
+
+  it('성별을 고른 리그 카드에는 리그 배지 옆에 성별 배지를 그린다', () => {
+    render(<TournamentCard item={{ ...leagueItem(), genderCategory: 'male' }} />);
+    expect(screen.getByLabelText('정규 리그')).toBeInTheDocument();
+    expect(screen.getByLabelText('성별 카테고리: 남성부')).toBeInTheDocument();
   });
 
   it('대회 카드에는 성별 배지가 있다 — 대조군', () => {

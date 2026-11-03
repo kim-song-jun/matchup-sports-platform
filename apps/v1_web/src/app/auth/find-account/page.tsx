@@ -6,7 +6,7 @@ export default async function FindAccountPage({ searchParams }: {
 }) {
   const query = await searchParams;
   return <AccountRecoveryClient
-    initialMode={query.mode === 'reset-password' ? 'reset-password' : 'find-id'}
+    initialMode={query.mode === 'reset-password' ? 'reset-password' : undefined}
     backHref={sanitizeRedirectPath(typeof query.from === 'string' ? query.from : null) ?? '/login/email'}
     redirectPath={sanitizeRedirectPath(typeof query.redirect === 'string' ? query.redirect : null)}
   />;

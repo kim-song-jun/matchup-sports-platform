@@ -28,8 +28,8 @@ describe('리그 시즌 승계 — 같은 티어 값 복사', () => {
     return prisma.v1Team.create({ data: { ownerUserId: adminUserId, sportId, regionId, name: `carry-${suiteId}-${teamSeq}` } });
   };
 
-  const TIER1 = { coverImageUrl: '/uploads/2026/10/tier1.webp', entryFee: 70000, bankName: '국민은행', bankAccount: `T1-${suiteId}`, bankHolder: '일부팀' };
-  const TIER2 = { coverImageUrl: '/uploads/2026/10/tier2.webp', entryFee: 50000, bankName: '신한은행', bankAccount: `T2-${suiteId}`, bankHolder: '이부팀' };
+  const TIER1 = { coverImageUrl: '/uploads/2026/10/tier1.webp', entryFee: 70000, bankName: '국민은행', bankAccount: `T1-${suiteId}`, bankHolder: '일부팀', genderCategory: 'male' as const };
+  const TIER2 = { coverImageUrl: '/uploads/2026/10/tier2.webp', entryFee: 50000, bankName: '신한은행', bankAccount: `T2-${suiteId}`, bankHolder: '이부팀', genderCategory: 'female' as const };
 
   async function officializeFixture(teamMatchId: string, score: { home: number; away: number }) {
     const game = await prisma.v1Game.findUniqueOrThrow({ where: { teamMatchId } });
@@ -63,7 +63,7 @@ describe('리그 시즌 승계 — 같은 티어 값 복사', () => {
   });
   afterAll(async () => cleanup?.());
 
-  it('새 시즌은 같은 티어의 이미지·참가비·계좌를 이어받고(서로 바뀌지 않음) 설정 시각은 비워 둔다', async () => {
+  it('새 시즌은 같은 티어의 이미지·참가비·계좌·성별을 이어받고(서로 바뀌지 않음) 설정 시각은 비워 둔다', async () => {
     const teams = [await createTeam(), await createTeam(), await createTeam(), await createTeam()];
     const created = await asAdmin(http().post('/api/v1/admin/league-series')).send({
       title: `승계 ${suiteId}`, sportId, regionId, tierCount: 2,

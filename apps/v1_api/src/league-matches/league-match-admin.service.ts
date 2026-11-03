@@ -269,6 +269,7 @@ export class LeagueMatchAdminService {
           ...(dto.maxPlayers !== undefined ? { maxPlayers: dto.maxPlayers } : {}),
           ...(dto.maxTeams !== undefined ? { maxTeams: dto.maxTeams } : {}),
           ...(dto.plannedFixtureCount !== undefined ? { plannedFixtureCount: dto.plannedFixtureCount } : {}),
+          ...(dto.genderCategory !== undefined ? { genderCategory: dto.genderCategory } : {}),
           registrationDeadlineAt,
           // 참가비를 보냈으면 확정한 것이다(0원 = 무료 확정). 안 보냈으면 미설정으로 남겨 신청 관리가 확인을 받는다.
           ...(dto.entryFee !== undefined
@@ -302,6 +303,7 @@ export class LeagueMatchAdminService {
             teamIds: uniqueTeamIds,
             registrationDeadlineAt: registrationDeadlineAt?.toISOString() ?? null,
             ...(dto.entryFee !== undefined ? { entryFee: dto.entryFee } : {}),
+            ...(dto.genderCategory !== undefined ? { genderCategory: dto.genderCategory } : {}),
           },
         },
         tx,

@@ -52,6 +52,12 @@ Android WebView 로그인, 작성 취소 모달, 대회 필터의 하단 가림 
 | 2026-11-03 | `/admin-content-preview`, `/tournament-ops-demo`의 사용자용 여부 | 소스에서 전자는 관리자 권한 전용 미리보기라 제외, 후자는 공개 체험 페이지라 포함. |
 
 ## Progress Snapshot
+- 2026-11-03: PR #2133·#2134 머지 후 Alpha `84ebe114ebea19973d2cc276b50691c05f8ac33f` 배포와 API DB health 정상 확인. 144개 route 중 133개는 진입 또는 캡처를 시도했으나 권한 거부·로딩·리디렉션도 포함하고 전 플랫폼 검증 PASS는 아니다. 상세 `/Users/sungjun/.codex/qa-evidence/teameet-mobile-20261103/route-attempts.json`.
+- 변경 후 대회 필터는 390x844 Chromium 터치 스와이프에서 scrollTop 0→125; 로그인·약관 관련 10개 화면에서 360x640 및 하단 48px 모사 시 보이는 컨트롤의 안전 경계 침범 후보는 없었다. 화면별 고정 영역에 가려진 본문까지 이 수치로 보장하지 않는다.
+- 배포 후 계정 충돌 화면에서 native inset이 렌더 이후 0→48px로 바뀌면 고정 CTA는 48px 커지지만 ResizeObserver의 기본 content-box 관찰은 padding 변화를 감지하지 않아 본문이 CTA 뒤에 48px 겹쳤다. 실제 Alpha E2E는 겹침 48px로 RED. CTA의 border-box 크기를 관찰하도록 보완하고 수정 후 재검증한다.
+- iPhone 16 iOS 27.0 시뮬레이터의 Alpha 앱 팀매치 검색에서 소프트웨어 키보드가 열리면 입력칸은 보이고 하단 메뉴가 숨겨졌다. 해당 한 화면의 수정 전 결과이며 다른 입력 폼·실기기는 미검증.
+- 대회 문의창은 360x640·하단 48px 모사에서 마지막 버튼이 안전 경계에 닿고 터치로 본문 끝까지 스크롤됐다. 프로필 사진 크롭은 테스트 이미지만 선택하고 취소했으며 업로드·저장은 하지 않았다. 운영 체험은 별도 탭의 샘플 데이터만 사용했다.
+- 현재 계정으로 실제 대회 운영 6개 경로의 권한 안내까지만 확인했다. 경기 기록의 명단 연결은 `Actor scope is not permitted`로 목록을 열지 못했다. 정상 운영·팀장 권한 상태 및 Android 에뮬레이터는 미검증.
 - 2026-11-03: 원격 dev/Alpha `fbf6fb9b139e0be49955103be867a900a55b5879`; Alpha API health DB true.
 - 211개 page 파일 중 admin 66과 관리자 권한 전용 `/admin-content-preview` 1을 제외한 사용자 대상 144개. 대회 운영진이 쓰는 `tournament-ops` 6개와 공개 체험 `/tournament-ops-demo`도 포함한다. 상태별·플랫폼별 검수는 미완료.
 - 일반 Chromium 모바일 크기 390x844, 로그인된 Alpha 팀 만들기에서 임시 텍스트 입력 후 뒤로가기 확인창을 열고 native bottom 48px을 CSS로 모사: 버튼 하단 y=804, 안전 경계 y=796으로 8px 겹침. 실제 Android/iOS 기기 재현 아님. 저장은 하지 않음.

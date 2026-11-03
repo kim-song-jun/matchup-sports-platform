@@ -6933,13 +6933,8 @@ textarea.tm-chat-input-placeholder::placeholder {
   display: grid;
   gap: 16px;
   padding-top: 20px;
-  /*
-   * (1) 모바일 fixed CTA가 생년월일 등 하단 필드를 가리는 버그 수정.
-   * 버튼 높이 56px + CTA 상단 패딩 14px + 여백 16px = 86px + safe-area.
-   * tm-create-shell의 하드코딩 124px보다 이 값이 적용 순서상 뒤에 오므로
-   * specificity로 덮어씌우기 위해 별도 속성으로 선언합니다.
-   */
-  padding-bottom: calc(88px + var(--v1-shell-safe-bottom) + 16px);
+  /* CTA validation messages can grow the bar after the profile has loaded. */
+  padding-bottom: max(calc(88px + var(--v1-shell-safe-bottom) + 16px), calc(var(--tm-create-cta-height, 0px) + 16px));
 }
 
 .tm-profile-edit-shell .tm-my-profile-head {

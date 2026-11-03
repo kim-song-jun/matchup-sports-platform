@@ -351,6 +351,8 @@ export function ProfileEditPageClient() {
     ?? sanitizeRedirectPath(searchParams.get('returnTo'))
     ?? '/my';
   const profile = useV1Profile();
+  const fixedCtaRef = useRef<HTMLDivElement>(null);
+  useCreateCtaSpace(fixedCtaRef, !profile.isPending && !profile.isError && Boolean(profile.data));
   const profileAuthMe = useV1AuthMe();
   const update = useV1UpdateProfile();
   const uploadImages = useV1UploadImages();
@@ -867,7 +869,7 @@ export function ProfileEditPageClient() {
         (2) 데스크톱: position:static 으로 전환해 폼 흐름 맨 끝에 위치시킵니다.
             tm-my-profile-edit-cta 데스크톱 override는 desktop/my.css에서 처리합니다.
       */}
-      <div className="tm-fixed-cta tm-my-profile-edit-cta">
+      <div ref={fixedCtaRef} className="tm-fixed-cta tm-my-profile-edit-cta">
         <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" type="submit" form="v1-profile-edit-form" disabled={isBlocked}>
           {update.isPending ? '저장 중' : '프로필 저장'}
         </button>

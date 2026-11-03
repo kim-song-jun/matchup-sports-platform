@@ -9,9 +9,24 @@ function Form() {
   return <main className="tm-scroll-area"><div ref={ref} className="tm-fixed-cta" style={{ position: 'fixed' }} /></main>;
 }
 
+function LoadedForm({ loaded }: { loaded: boolean }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useCreateCtaSpace(ref, loaded);
+  return <main className="tm-scroll-area">{loaded ? <div ref={ref} className="tm-fixed-cta" style={{ position: 'fixed' }} /> : null}</main>;
+}
+
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe('create form fixed action space', () => {
+  it('reserves space when an asynchronously loaded form mounts its action bar', () => {
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(161);
+    const { container, rerender } = render(<LoadedForm loaded={false} />);
+    const scroll = container.querySelector<HTMLElement>('.tm-scroll-area')!;
+    expect(scroll.style.getPropertyValue('--tm-create-cta-height')).toBe('');
+    rerender(<LoadedForm loaded />);
+    expect(scroll.style.getPropertyValue('--tm-create-cta-height')).toBe('161px');
+  });
+
   it('updates the reserved space when the action bar grows after an inset arrives', () => {
     let height = 137;
     let notify: ResizeObserverCallback | undefined;

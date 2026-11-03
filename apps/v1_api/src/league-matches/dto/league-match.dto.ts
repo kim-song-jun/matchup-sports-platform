@@ -2,6 +2,7 @@ import { Transform, Type } from 'class-transformer';
 import { ArrayNotEmpty, IsArray, IsBoolean, IsDateString, IsDefined, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, MinLength, ValidateIf, ValidateNested } from 'class-validator';
 import { BANK_FIELD_PATTERN, rawValue, trimmedString } from './league-entry-fee.dto';
 import { IsPlaceLatitude, IsPlaceLongitude, IsPlaceProvider, IsPlaceProviderId } from '../../places/place-snapshot';
+import { TOURNAMENT_GENDER_CATEGORIES, type TournamentGenderCategory } from '../../tournaments/dto/admin-tournament.dto';
 
 /** 경기 장소 스냅샷 입력(이름은 각 DTO 의 `placeName`). 규칙은 `places/place-snapshot.ts` 가 소유한다. */
 export abstract class LeaguePlaceSnapshotDto {
@@ -123,6 +124,11 @@ export class CreateLeagueMatchDto {
   @MaxLength(60)
   @Matches(BANK_FIELD_PATTERN)
   bankHolder?: string;
+
+  /** 대회와 같은 성별 카테고리. 화면은 필수로 고르게 하고, 서버는 대회 DTO 처럼 생략을 허용한다(생략 = 미지정). */
+  @IsOptional()
+  @IsIn(TOURNAMENT_GENDER_CATEGORIES, { message: '성별 카테고리가 올바르지 않아요.' })
+  genderCategory?: TournamentGenderCategory;
 }
 
 /** 리그 상태 변경 — 상태 변경 버튼 하나가 보류·해제·종료·되돌리기·시작을 모두 이 요청으로 보낸다. */

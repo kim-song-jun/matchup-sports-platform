@@ -17,9 +17,10 @@ import {
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage, extractErrorCode } from '@/lib/error-message';
 import { formatWithComma, onlyDigits } from '@/lib/number-format';
-import type { V1Tournament, V1TournamentFormat, V1TournamentGenderCategory } from '@/types/api';
+import type { V1Tournament, V1TournamentFormat } from '@/types/api';
 import { AdminPageHeader, AdminToasts, useAdminToast } from '@/components/admin';
 import { WizardStepper } from '@/components/admin/wizard-stepper';
+import { GenderCategoryField } from '@/components/admin/gender-category-field';
 import { TournamentImagesField } from '@/components/admin/tournaments/tournament-images-field';
 import {
   PrizeBreakdownEditor,
@@ -707,44 +708,11 @@ function BasicStep({
         </div>
       </fieldset>
 
-      <fieldset className="min-w-0">
-        <legend className="text-sm font-semibold text-[var(--text-body)]">성별 카테고리</legend>
-        <p className="mt-1 text-xs text-[var(--text-caption)]">
-          혼성 대회는 3단계에서 남녀 최소·최대 인원을 설정할 수 있어요.
-        </p>
-        <div className="mt-2 grid grid-cols-3 gap-2">
-          {([
-            ['mixed', '혼성'],
-            ['male', '남성부'],
-            ['female', '여성부'],
-          ] as const).map(([value, label]) => (
-            <label
-              key={value}
-              className={[
-                'grid min-h-[52px] cursor-pointer place-items-center rounded-xl border text-sm font-bold transition-colors',
-                state.genderCategory === value
-                  ? 'border-blue-500 bg-[var(--blue50)] text-[var(--blue700)]'
-                  : 'border-[var(--border)] text-[var(--text-body)]',
-              ].join(' ')}
-            >
-              <input
-                type="radio"
-                name="gender-category"
-                checked={state.genderCategory === value}
-                onChange={() => {
-                  dispatch({
-                    type: 'set-field',
-                    field: 'genderCategory',
-                    value: value as V1TournamentGenderCategory,
-                  });
-                }}
-                className="sr-only"
-              />
-              {label}
-            </label>
-          ))}
-        </div>
-      </fieldset>
+      <GenderCategoryField
+        value={state.genderCategory}
+        onChange={(value) => dispatch({ type: 'set-field', field: 'genderCategory', value })}
+        hint="혼성 대회는 3단계에서 남녀 최소·최대 인원을 설정할 수 있어요."
+      />
     </div>
   );
 }

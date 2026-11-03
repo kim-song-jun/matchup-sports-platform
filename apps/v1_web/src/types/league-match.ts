@@ -1,4 +1,4 @@
-import type { V1AdminBracketFixtureGame, V1AdminBracketSlot, V1PlaceSnapshotPayload, V1PlaceView, V1TournamentStatus, V1VenueSnapshotPayload } from './api';
+import type { V1AdminBracketFixtureGame, V1AdminBracketSlot, V1PlaceSnapshotPayload, V1PlaceView, V1TournamentGenderCategory, V1TournamentStatus, V1VenueSnapshotPayload } from './api';
 
 /** 리그 저장 상태 — 대회와 같은 값에 보류(on_hold)를 더한다. 초안·접수 중·마감이 따로 보인다(2026-10-27). */
 export type V1LeagueLifecycleStatus = V1TournamentStatus | 'on_hold';
@@ -401,6 +401,8 @@ export interface V1CreateLeaguePayload {
   bankName?: string;
   bankAccount?: string;
   bankHolder?: string;
+  /** 대회와 같은 성별 카테고리. 화면은 필수로 고르게 하고, 서버는 생략을 허용한다. */
+  genderCategory?: V1TournamentGenderCategory;
 }
 
 export type V1LeagueStateValue = 'draft' | 'active' | 'completed' | 'on_hold';

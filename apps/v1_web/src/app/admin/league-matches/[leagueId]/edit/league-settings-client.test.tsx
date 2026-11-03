@@ -10,7 +10,7 @@ vi.mock('@/hooks/use-admin-can-write', () => ({ useAdminCanWrite: () => mocks.ca
 vi.mock('@/hooks/use-v1-api', () => ({ useV1MasterRegions: () => ({ data: [], isError: false }) }));
 const initial = { leagueId: 'league-test', title: '기존 리그', rulesText: '운영 안내', regionId: 'region-test',
   startsOn: '2097-12-31T15:00:00.123Z', endsOn: '2098-12-31T14:59:59.999Z',
-  registrationDeadlineAt: '2098-01-01T03:12:34.567Z', plannedFixtureCount: 12, maxTeams: null,
+  registrationDeadlineAt: '2098-01-01T03:12:34.567Z', plannedFixtureCount: 12, maxTeams: null, genderCategory: null as string | null,
   updatedAt: '2026-10-13T00:00:00.123Z', status: 'draft', sportName: '풋살' };
 const path = '*/api/v1/admin/league-matches/league-test/settings';
 let stored = { ...initial };
@@ -59,6 +59,23 @@ describe('실제 설정 hook/API를 통한 별도 리그 수정 화면', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('종료일은 시작일보다 빠를 수 없어요.');
     expect(screen.getByRole('button', { name: '변경사항 저장' })).toBeDisabled();
     expect(submitted).toBeUndefined();
+  });
+  it('성별을 받기 전 리그(null)는 성별을 비워 둔 채 저장하고, 고르면 그 값을 보낸다 (2026-11-03)', async () => {
+    mount(); await screen.findByLabelText('리그 이름');
+    const group = screen.getByRole('group', { name: '성별 카테고리' });
+    expect(within(group).getAllByRole('radio').every((radio) => !(radio as HTMLInputElement).checked)).toBe(true);
+    fireEvent.click(within(group).getByRole('radio', { name: '여성부' }));
+    fireEvent.click(screen.getByRole('button', { name: '변경사항 저장' }));
+    await waitFor(() => expect(submitted).toMatchObject({ genderCategory: 'female' }));
+  });
+  it('저장된 성별을 바꾸지 않으면 성별을 보내지 않는다', async () => {
+    stored = { ...initial, genderCategory: 'male' }; mount();
+    const title = await screen.findByLabelText('리그 이름');
+    expect(within(screen.getByRole('group', { name: '성별 카테고리' })).getByRole('radio', { name: '남성부' })).toBeChecked();
+    fireEvent.change(title, { target: { value: '변경 리그' } });
+    fireEvent.click(screen.getByRole('button', { name: '변경사항 저장' }));
+    await waitFor(() => expect(submitted).toBeDefined());
+    expect(submitted).not.toHaveProperty('genderCategory');
   });
   it('총 경기 수를 변경할 수 있다', async () => {
     mount(); await screen.findByLabelText('리그 이름');

@@ -51,6 +51,7 @@ async function fillForm() {
   fireEvent.change(screen.getByLabelText('지역'), { target: { value: 'region-jung' } });
   fireEvent.change(screen.getByLabelText('시작일'), { target: { value: '2098-01-01' } });
   fireEvent.change(screen.getByLabelText('종료일'), { target: { value: '2098-02-01' } });
+  fireEvent.click(screen.getByRole('radio', { name: '여성부' }));
   next();
   for (const name of ['팀A', '팀B']) {
     const picker = screen.getByLabelText('참가 팀 직접 추가 (선택)');

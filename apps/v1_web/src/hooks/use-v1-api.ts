@@ -5052,6 +5052,8 @@ export function useV1ConfirmRegistration() {
         queryKey: [...v1Keys.all, 'admin', 'tournaments'],
       });
       queryClient.invalidateQueries({ queryKey: v1Keys.tournament(_data.tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(_data.tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
     },
   });
 }
@@ -5072,6 +5074,8 @@ export function useV1CancelRegistrationAdmin() {
         queryKey: [...v1Keys.all, 'admin', 'tournaments'],
       });
       queryClient.invalidateQueries({ queryKey: v1Keys.tournament(_data.tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(_data.tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
     },
   });
 }

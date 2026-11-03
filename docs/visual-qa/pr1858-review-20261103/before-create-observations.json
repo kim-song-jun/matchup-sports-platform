@@ -1,0 +1,33 @@
+{
+  "observations": [
+    {
+      "width": 390,
+      "path": "/admin/tournaments/new",
+      "overflowX": false,
+      "title": "Teameet"
+    },
+    {
+      "width": 768,
+      "path": "/admin/tournaments/new",
+      "overflowX": false,
+      "title": "Teameet"
+    },
+    {
+      "width": 1440,
+      "path": "/admin/tournaments/new",
+      "overflowX": false,
+      "title": "Teameet"
+    }
+  ],
+  "errors": [
+    {
+      "type": "http",
+      "status": 401,
+      "path": "/api/v1/auth/me"
+    },
+    {
+      "type": "console",
+      "message": "Failed to load resource: the server responded with a status of 401 ()"
+    }
+  ]
+}

@@ -272,6 +272,7 @@ function buildFakeAccessService(
         return null;
       },
     },
+    v1TeamMatch: { async findMany() { return []; } },
     v1TournamentStaffAssignment: {
       async findMany() {
         return assignments.map((assignment, index) => ({

@@ -96,7 +96,7 @@ export async function createOrderingService() {
         return { ...game };
       },
     },
-    v1TeamMatch: { async findUnique() { return teamMatch; } },
+    v1TeamMatch: { async findUnique() { return teamMatch; }, async findMany() { return []; } },
     v1UserProfile: {
       async findMany({ where }: { where: { userId: { in: string[] } } }) {
         return where.userId.in.map((userId) => ({

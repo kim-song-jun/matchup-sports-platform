@@ -387,9 +387,11 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
   const [drawerOpen, setDrawerOpen] = useState(false);
   const hamburgerRef = useRef<HTMLButtonElement>(null);
   const isFixtureConsole = fixtureIdFromConsolePath(pathname, tournamentId) !== null;
-  const back = isFixtureConsole && origin === 'admin'
+  // 경기 콘솔은 들어온 목록으로 돌아간다 — 담당 경기 화면에서 왔으면(staff) 거기로, 아니면 운영 보드로.
+  // 이 셸을 쓰는 디렉터·조회 전용은 경기 범위가 없어 담당 경기 화면이 늘 비어 있다(MD-QA #195).
+  const back = isFixtureConsole && origin !== 'staff'
     ? { href: `${basePath}/operations`, label: '경기 목록으로 돌아가기' }
-    : returnTarget(isFixtureConsole && origin === 'home' ? 'staff' : origin, tournamentId, tournamentKind);
+    : returnTarget(origin, tournamentId, tournamentKind);
 
   const openDrawer = useCallback(() => setDrawerOpen(true), []);
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);

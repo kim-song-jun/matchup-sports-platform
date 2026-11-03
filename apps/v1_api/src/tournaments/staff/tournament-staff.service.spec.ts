@@ -58,6 +58,7 @@ function setup() {
     v1TeamMatch: {
       findMany: jest.fn().mockResolvedValue([]),
     },
+    v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
     v1TournamentStaffAssignment: {
       count: jest.fn().mockResolvedValue(0),
       create: jest.fn().mockResolvedValue(assignment()),
@@ -645,6 +646,43 @@ describe('TournamentStaffService', () => {
         select: { id: true },
       }),
     );
+  });
+
+  it('refuses to make a participating team member the field operator of their own team fixture (MD-QA #193)', async () => {
+    const context = setup();
+    context.access.assertAccess.mockResolvedValue({
+      userId: IDS.actor,
+      role: 'platform_ops',
+      tournamentId: IDS.tournament,
+      assignmentId: null,
+      assignmentVersion: null,
+    });
+    context.tx.v1AdminUser.findUnique.mockResolvedValue({
+      adminRole: 'ops', status: 'active', revokedAt: null, user: { accountStatus: 'active' },
+    });
+    context.tx.v1Tournament.findFirst.mockImplementation(
+      kindAwareFindFirst({ id: IDS.tournament, kind: 'regular_league' }),
+    );
+    context.tx.v1TeamMatch.findMany.mockResolvedValue([
+      { id: IDS.fixture, hostTeamId: 'home-team', approvedApplicantTeamId: 'away-team', tournamentDetails: null },
+    ]);
+    context.tx.v1TeamMembership.findMany.mockResolvedValue([{ teamId: 'away-team' }]);
+
+    await expect(
+      context.service.grantStaff({
+        actorUserId: IDS.actor,
+        tournamentId: IDS.tournament,
+        targetUserId: IDS.target,
+        role: 'FIELD_OPERATOR',
+        fixtureIds: [IDS.fixture],
+        audit: AUDIT,
+      }),
+    ).rejects.toMatchObject({ response: { code: 'STAFF_OWN_TEAM_FIXTURE' } });
+
+    expect(context.tx.v1TeamMembership.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId: IDS.target, status: 'active', teamId: { in: ['home-team', 'away-team'] } } }),
+    );
+    expect(context.tx.v1TournamentStaffAssignment.create).not.toHaveBeenCalled();
   });
 
   it('denies a director whose authority changed after access preflight with zero assignment, audit, and disconnect writes', async () => {

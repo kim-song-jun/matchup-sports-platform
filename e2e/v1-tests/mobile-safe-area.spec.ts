@@ -67,6 +67,44 @@ test.describe('mobile safe area and touch', () => {
     await dialog.getByRole('button', { name: '계속 작성' }).click();
   });
 
+  test('withdrawal reason remains above fixed actions as the native inset changes', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 640 });
+    await loginAs(page, personas.owner.email);
+    await page.goto('/my/settings/withdrawal');
+    const reason = page.getByPlaceholder('선택 입력');
+    const scroller = page.locator('.tm-scroll-area');
+    const actions = page.locator('.tm-my-withdrawal-cta');
+    await expect(reason).toBeVisible();
+    for (const bottom of [0, 34, 48, 64]) {
+      await setNativeBottom(page, bottom);
+      await expect.poll(async () => {
+        await scroller.evaluate((node) => { node.scrollTop = node.scrollHeight; });
+        const target = await reason.boundingBox();
+        const cta = await actions.boundingBox();
+        return target && cta ? Math.round(target.y + target.height - cta.y) : null;
+      }).toBeLessThanOrEqual(0);
+    }
+  });
+
+  test('location status card remains above fixed actions as the native inset changes', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 640 });
+    await loginAs(page, personas.owner.email);
+    await page.goto('/my/settings/location');
+    const status = page.locator('.tm-my-location-desktop .tm-on-tint');
+    const scroller = page.locator('.tm-scroll-area');
+    const actions = page.locator('.tm-my-location-cta');
+    await expect(status).toBeVisible();
+    for (const bottom of [0, 34, 48, 64]) {
+      await setNativeBottom(page, bottom);
+      await expect.poll(async () => {
+        await scroller.evaluate((node) => { node.scrollTop = node.scrollHeight; });
+        const target = await status.boundingBox();
+        const cta = await actions.boundingBox();
+        return target && cta ? Math.round(target.y + target.height - cta.y) : null;
+      }).toBeLessThanOrEqual(0);
+    }
+  });
+
   for (const [name, route] of [
     ['match', '/matches/new'],
     ['team match', '/team-matches/new'],

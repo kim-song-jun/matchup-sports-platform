@@ -67,6 +67,33 @@ test.describe('mobile safe area and touch', () => {
     await dialog.getByRole('button', { name: '계속 작성' }).click();
   });
 
+  for (const [name, route] of [
+    ['match', '/matches/new'],
+    ['team match', '/team-matches/new'],
+    ['team', '/teams/new'],
+  ] as const) {
+    test(`${name} creation keeps its final control above the fixed actions after an inset arrives`, async ({ page }) => {
+      await loginAs(page, personas.owner.email);
+      await page.goto(route);
+      const shell = page.locator('.tm-create-shell');
+      const scroller = page.locator('.tm-scroll-area');
+      const actions = page.locator('.tm-fixed-cta');
+      await expect(shell).toBeVisible();
+      await expect(actions).toBeVisible();
+      await setNativeBottom(page, 0);
+      await setNativeBottom(page, 48);
+      await scroller.evaluate((node) => { node.scrollTop = node.scrollHeight; });
+      const lastControl = shell.locator('a:visible, button:visible, input:visible, select:visible, textarea:visible').last();
+      await expect(lastControl).toBeVisible();
+      await expect.poll(async () => {
+        await scroller.evaluate((node) => { node.scrollTop = node.scrollHeight; });
+        const target = await lastControl.boundingBox();
+        const cta = await actions.boundingBox();
+        return target && cta ? Math.round(target.y + target.height - cta.y) : null;
+      }).toBeLessThanOrEqual(0);
+    });
+  }
+
   test('map action sheet keeps every app choice above the native navigation area', async ({ page }) => {
     const matchId = process.env.TEAMEET_QA_TEAM_MATCH_ID ?? '00000000-0000-4000-8000-000000000301';
     await page.goto(`/team-matches/${matchId}`);

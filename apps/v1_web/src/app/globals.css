@@ -4398,11 +4398,11 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 }
 
 .tm-create-shell {
-  padding: 12px 20px 124px;
+  padding: 12px 20px max(124px, calc(var(--tm-create-cta-height, 0px) + 16px));
 }
 
 .tm-create-shell-edit {
-  padding-bottom: calc(168px + var(--v1-shell-safe-bottom));
+  padding-bottom: max(calc(168px + var(--v1-shell-safe-bottom)), calc(var(--tm-create-cta-height, 0px) + 16px));
 }
 
 .tm-match-edit-management {

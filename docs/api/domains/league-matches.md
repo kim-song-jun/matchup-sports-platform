@@ -637,3 +637,13 @@ now includes nullable `rulesText`, rendered as operating guidance only when popu
 - `PATCH /admin/league-matches/:leagueId`의 `yellowAccumulationLimit`, `redCardSuspensionMatches`는 리그 상세에서 설정한다. 1~20 정수, `null`은 미적용이며 LIVE·PAUSED·ENDED 경기가 있으면 `LEAGUE_DISCIPLINE_LOCKED`다.
 - 빈 확정 명단의 자동 채움은 활성 팀 멤버십 등번호를 참가 명단에 함께 저장한다. 번호를 임의로 생성하거나 기존 참가 명단을 백필하지 않는다.
 - 결과 미입력 리마인더에 두 팀 이름을 표시하고 해당 경기 결과 검토로 연결한다. 단일 경기 취소 알림도 두 팀 이름을 표시한다.
+
+## 독립 리그의 리그 체계 전환 (2026-11-03)
+
+- `GET /admin/league-matches/:leagueId/series-conversion`: active admin, `{seriesId: string|null}`. 기존 전환 연결 조회.
+- `POST .../series-conversion/preview`: mutation admin(owner/ops), `{tierSizes: number[]}`. 1~3티어·각 2팀 이상·확정 참가팀 수 합계 일치. 응답 `{fingerprint, entries:[{teamId,teamName,position,points,suggestedTier,...}],boundaryTies:[{teamIds}]}`.
+- `POST .../series-conversion/commit`: mutation admin, 위 tierSizes + `{title,startsOn,endsOn,fingerprint,entries:[{teamId,tier,reason?}]}`. 응답 `{seriesId,leagues:[{id,title,tier}]}`.
+- 원본은 종료된 독립 regular_league이며 유효 경기 최소 1개, 모든 유효 경기 OFFICIAL 필수. 취소/VOID는 기존 집계 규칙을 따른다. 빈 경기·미확정 경기는 차단한다.
+- 409: `LEAGUE_ALREADY_CONVERTED`, `LEAGUE_NOT_COMPLETED`, `LEAGUE_RESULTS_PENDING`, `LEAGUE_CONVERSION_STALE`, `LEAGUE_CONVERSION_CONFLICT`. 400: 배정 중복/누락/인원 불일치 `LEAGUE_CONVERSION_ENTRIES_INVALID`, 변경·경계 동률 사유 없음 `LEAGUE_CONVERSION_REASON_REQUIRED`. 422: 티어 인원 계약 오류.
+- 기존 경기·선수 기록·참가 명단은 원본에 보존. 새 리그 참가팀은 seeded confirmed 등록이며 명단은 기존 제출/자격 검증 흐름을 따른다. 금액/계좌는 설정값만 승계하고 입금 상태는 복사하지 않는다. 신규 대진은 별도 생성한다.
+- 원본/결과/확정 참가팀과 전환 감사 로그를 Serializable로 읽고, 새 체계·리그·등록·전환 감사를 원자적으로 기록한다. 전환 이력 `league_series.convert_independent`는 삭제하지 않는다. 스키마 변경/마이그레이션 없음.

@@ -67,3 +67,8 @@ Status: In Progress
 - 이 마이그레이션은 아직 dev 미머지이며, Prisma 적용 이력으로 한 번 실행한다. 이미 적용된 운영 마이그레이션은 수정하지 않는다.
 - 격리 PostgreSQL 16에서 기존 2행 보존·새 값 NULL, 다음 시즌 중복 거절, 없는 이전 시즌 FK 거절, ID 갱신 전파, 삭제 시 NULL 동작을 확인했다.
 - schema.prisma 바이트는 그대로이므로 앞서 갱신한 스키마 해시는 유효하다. 커밋본에서 expand-contract 게이트와 final-schema binding 검사를 확인한다.
+
+## PR #2144 Web CI 후속
+- CI 41642472317의 Web은 상세 화면 테스트 한 파일에서 `No QueryClient set`으로 42개 실패했다(다른 885파일은 통과). 팀 역할 조회 훅을 추가하면서 기존 뷰 테스트의 QueryClientProvider 보완이 빠졌다.
+- `tournament-detail-client.test.ts`의 렌더 헬퍼가 테스트마다 독립 QueryClient를 생성하도록 수정했다. 기존 화면 단언과 실제 역할 조회 훅은 유지한다.
+- 실패 파일 83개와 재참가 CTA 파일 64개, 합계 147개 통과. 기존 React act 경고는 남아 있다. 웹 타입·패턴 검사는 커밋 전에 확인한다.

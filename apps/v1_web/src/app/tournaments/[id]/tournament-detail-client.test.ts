@@ -1,5 +1,6 @@
 import { createElement } from 'react';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render as rtlRender, screen, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
 import {
   getTournamentPostEventCards,
@@ -7,6 +8,14 @@ import {
 } from '@/components/tournaments/tournament-venue-retention-sections';
 import { v1Get } from '@/lib/api-client';
 import { getTournamentSponsorCards } from '@/components/tournaments/tournament-sponsor-section';
+
+// 상세 화면의 실제 팀 역할 조회 훅도 앱과 같은 QueryClient 환경에서 실행한다.
+function render(ui: Parameters<typeof rtlRender>[0]) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  return rtlRender(createElement(QueryClientProvider, { client }, ui));
+}
 
 // 데스크톱 뒤로가기(AppBackLink)가 ?from= 을 읽는다 — 라우터 없이 뷰만 렌더하므로 빈 쿼리를 준다.
 vi.mock('next/navigation', async (importOriginal) => ({

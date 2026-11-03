@@ -6055,6 +6055,7 @@ import type {
   V1UpdateLeagueVenueResult,
 
   V1CreateManualLeagueFixturePayload,
+  V1AddPreviousSeasonTeamsResult,
 
   V1LeagueFixture,
 } from '@/types/league-match';
@@ -6355,6 +6356,20 @@ export function useV1AddLeagueTeam(leagueId: string) {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
       // 목록 화면이 "참가 팀" 수를 보여주므로 팀을 더한 뒤에도 목록을 무효화한다 —
       // 제거(useV1RemoveLeagueTeam)만 무효화하고 추가는 빼면 두 조작의 결과가 달라 보인다.
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
+    },
+  });
+}
+
+/** 지난 시즌 팀 한 번에 넣기(독립 리그의 다음 시즌, 2026-11-03) — 팀 추가와 같은 화면들을 무효화한다. */
+export function useV1AddPreviousSeasonTeams(leagueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (teamIds: string[]) =>
+      v1Post<V1AddPreviousSeasonTeamsResult>(`/admin/league-matches/${leagueId}/previous-season-teams`, { teamIds }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueTeams(leagueId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
       queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
     },
   });

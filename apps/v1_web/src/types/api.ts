@@ -4250,6 +4250,8 @@ export type V1SixTeamBracket = { rounds: [string, string, string, string, string
   swapSemi?: boolean; swapFinal?: boolean;
   manual: boolean; winners: Record<string, string>; needsReview: boolean };
 export type V1TournamentDetail = {
+  /** 정규 리그가 이어 가는 지난 시즌(독립 리그 → 독립 리그, 공개된 리그만). 대회·옛 응답은 없음. */
+  previousSeason?: { leagueId: string; title: string } | null;
   sixTeamMode?: boolean;
   sixTeamBracket?: V1SixTeamBracket | null;
   id: string;

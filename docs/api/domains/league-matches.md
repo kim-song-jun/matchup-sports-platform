@@ -656,3 +656,16 @@ now includes nullable `rulesText`, rendered as operating guidance only when popu
 - 409: `LEAGUE_ALREADY_CONVERTED`, `LEAGUE_NOT_COMPLETED`, `LEAGUE_RESULTS_PENDING`, `LEAGUE_CONVERSION_STALE`, `LEAGUE_CONVERSION_CONFLICT`. 400: 배정 중복/누락/인원 불일치 `LEAGUE_CONVERSION_ENTRIES_INVALID`, 변경·경계 동률 사유 없음 `LEAGUE_CONVERSION_REASON_REQUIRED`. 422: 티어 인원 계약 오류.
 - 기존 경기·선수 기록·참가 명단은 원본에 보존. 새 리그 참가팀은 seeded confirmed 등록이며 명단은 기존 제출/자격 검증 흐름을 따른다. 금액/계좌는 설정값만 승계하고 입금 상태는 복사하지 않는다. 신규 대진은 별도 생성한다.
 - 원본/결과/확정 참가팀과 전환 감사 로그를 Serializable로 읽고, 새 체계·리그·등록·전환 감사를 원자적으로 기록한다. 전환 이력 `league_series.convert_independent`는 삭제하지 않는다. 스키마 변경/마이그레이션 없음.
+
+## 독립 리그의 다음 시즌 (2026-11-03)
+
+독립 리그(`seriesId === null`) → 독립 리그. 리그 체계 전환과 둘 중 하나만 한다.
+
+- `POST /admin/league-matches` 에 `previousLeagueId?: uuid`. 지난 리그는 같은 종목의 진행 중(`in_progress`)·종료(`completed`) 독립 리그여야 한다. 422 `LEAGUE_PREVIOUS_SEASON_INVALID`(없음·체계 소속·시작 전·다른 종목), 409 `LEAGUE_ALREADY_CONVERTED`(체계로 전환한 리그), 409 `LEAGUE_NEXT_SEASON_EXISTS`(이미 다음 시즌이 있음 — 지운 다음 시즌은 연결을 풀고 새로 잇는다). 감사 `league_match.create` 의 `afterJson.previousLeagueId`.
+- `GET /admin/league-matches/:leagueId` 에 `previousSeason`·`nextSeason`(`{leagueId,title}|null`)과 `convertedToSeries: boolean`.
+- `POST /admin/league-matches/:leagueId/previous-season-teams` — mutation admin, `{teamIds: uuid[]}`(1~50). 모든 팀이 지난 시즌 확정 팀이어야 하고(422 `LEAGUE_TEAM_INVALID`), 지난 시즌이 없으면 422 `LEAGUE_PREVIOUS_SEASON_MISSING`. 팀마다 참가팀 추가와 같은 입장 판정(`findLeagueAdmissionBlocker`, 422 `팀 이름: 이유`) 뒤 seeded confirmed 등록을 만들고 지난 명단을 옮긴다. 한 팀이라도 막히면 아무 팀도 들어가지 않는다. 201 `{leagueId, teamIds, carriedPlayerCount, hasExistingFixtures}`. 감사 `league_match.add_previous_season_teams`.
+- 지난 명단 옮기기(`copyPreviousSeasonRoster`): 위 한 번에 넣기와, 재참가 팀의 신청 제출(`POST /tournaments/:id/registrations/:registrationId/submit`) 트랜잭션에서 돈다. 행이 한 번도 없던 명단만 대상이고, 지난 시즌 살아 있는 선수 중 지금도 팀의 활성 멤버이며 자동 채움과 같은 자격(`evaluateRosterCandidate`)을 통과한 선수를 지난 번호·골키퍼 지정 그대로 `needs_review` 로 넣는다. 제출 알림 문구에 옮긴 인원이 붙는다.
+- 접수 시작(`open-registration`)이 처음 열 때(`justOpened`) 지난 시즌 확정 팀 중 이 리그에 살아 있는 신청이 없는 팀의 팀장·매니저에게 `league_next_season_registration_opened`(대상 `tournament`, 딥링크 `/tournaments/:id/apply`)를 보낸다. 받는 사람마다 한 번(`businessKey`).
+- 공개 `GET /league-matches/:leagueId`: 독립 리그의 `nextRound` 는 이어진 다음 시즌(`seasonNo: null`)이고, `previousRound: {leagueId,title}|null` 이 붙는다. 공개 `GET /tournaments/:id` 는 정규 리그에 `previousSeason: {leagueId,title}|null`(공개된 지난 리그만).
+- 리그 체계 전환 `series-conversion/preview·commit` 은 다음 시즌이 이어진 리그를 409 `LEAGUE_NEXT_SEASON_EXISTS` 로 막는다. 전환과 다음 시즌 생성은 원본 리그 행을 먼저 잠가 겹치면 한쪽만 성공한다.
+- 마이그레이션 `20261103120000_v1_league_previous_season`: `v1_tournaments.previous_league_id`(nullable, unique, FK `ON DELETE SET NULL`).

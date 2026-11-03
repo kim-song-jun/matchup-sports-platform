@@ -105,6 +105,9 @@ export type NotificationEventType =
   | 'league_promotion_relegated'
   | 'league_promotion_stayed'
   | 'league_promotion_withdrawn'
+  // 독립 리그의 다음 시즌(2026-11-03): 이어진 새 리그가 접수를 시작하면 지난 시즌 확정 팀의 팀장·매니저에게 알린다.
+  // targetId 는 새 리그 id 이고, 누르면 그 리그 신청 화면으로 간다(deepLinkForEvent).
+  | 'league_next_season_registration_opened'
   // 리그 알림 문구 전용화(2026-08-25): 위 team_match_completed는 일반 팀매치 문구
   // ("팀매치가 완료됐어요. 리뷰를 남겨보세요!")로 고정돼 있어 리그 대진에는 맞지 않는다
   // (리그는 순위에 반영되는 확정 결과지, 리뷰를 남기는 흐름이 아니다 — Task 166 이
@@ -387,7 +390,8 @@ function targetTypeForEvent(type: NotificationEventType): V1NotificationTargetTy
     type === 'tournament_identity_attest_requested' ||
     type === 'tournament_identity_attest_expired' ||
     type === 'tournament_identity_attest_approved' ||
-    type === 'tournament_identity_attest_rejected'
+    type === 'tournament_identity_attest_rejected' ||
+    type === 'league_next_season_registration_opened'
   ) {
     return 'tournament';
   }
@@ -538,6 +542,10 @@ function deepLinkForEvent(
       return `/teams/${teamId}/schedules/${scheduleId}`;
     }
   }
+  // 다음 시즌 신청 안내는 리그 상세가 아니라 곧바로 신청 화면으로 보낸다 — 재참가가 이 알림의 목적이다.
+  if (type === 'league_next_season_registration_opened' && targetId) {
+    return `/tournaments/${targetId}/apply`;
+  }
   // 신원 연결 승인 요청·승인·거절(대회 판): targetId 는 "${tournamentId}:${fixtureId}" 복합 —
   // 승인 카드/내 연결 상태가 실리는 경기 상세로 보낸다(위 schedule 복합 targetId 와 같은 패턴).
   // 팀매치·리그 판(team_match_identity_attest_*)은 기본 /team-matches/:id 로 충분하다 —
@@ -646,6 +654,7 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   league_promotion_relegated: '다음 시즌 하위 리그로 강등됐어요',
   league_promotion_stayed: '다음 시즌에도 같은 리그예요',
   league_promotion_withdrawn: '리그 참가가 종료됐어요',
+  league_next_season_registration_opened: '다음 시즌 신청이 열렸어요',
   league_team_match_completed: '경기 결과가 확정됐어요',
   tournament_match_completed: '대회 경기 결과가 확정됐어요',
   tournament_match_result_corrected: '대회 경기 결과가 정정됐어요',
@@ -736,6 +745,7 @@ const EVENT_BODIES: Record<NotificationEventType, string> = {
   league_promotion_relegated: '아쉽지만 다음 시즌은 하위 리그에서 시작해요.',
   league_promotion_stayed: '현재 리그에서 다음 시즌을 계속해요.',
   league_promotion_withdrawn: '이번 시즌을 끝으로 리그 참가가 종료됐어요.',
+  league_next_season_registration_opened: '지난 시즌에 함께한 팀이라면 바로 재참가 신청할 수 있어요.',
   league_team_match_completed: '확정된 경기 결과를 확인해 보세요.',
   tournament_match_completed: '확정된 경기 결과를 확인해 보세요.',
   tournament_match_result_corrected: '정정된 경기 결과를 확인해 보세요.',

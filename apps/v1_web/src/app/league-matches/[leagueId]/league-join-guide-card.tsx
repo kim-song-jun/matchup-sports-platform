@@ -104,7 +104,7 @@ export function LeagueJoinGuideCard({
       ? '참가팀 정원이 모두 차서 신청이 마감됐어요.'
       : hasDeadline ? `${formatTournamentDateTimeLong(registrationDeadlineAt)}에 마감됐어요.` : null;
     const nextRows: { label: string; value: string }[] = nextRound === null ? [] : [
-      { label: '다음 회차', value: `${nextRound.seasonNo}시즌 · ${nextRound.title}` },
+      { label: '다음 회차', value: nextRound.seasonNo === null ? nextRound.title : `${nextRound.seasonNo}시즌 · ${nextRound.title}` },
       { label: '리그 기간', value: formatTournamentDateRangeShort(nextRound.startsOn, nextRound.endsOn) ?? '' },
       ...(nextRound.registrationOpen && nextRound.registrationDeadlineAt !== null
         ? [{ label: '신청 마감', value: formatTournamentDateTimeLong(nextRound.registrationDeadlineAt) }]

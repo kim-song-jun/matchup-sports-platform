@@ -24,7 +24,8 @@ function setup() {
   };
   tx.v1GameOfficialFact.findMany.mockImplementation(async (args: { where: { revisionId: { in: string[] } } }) => facts.filter((f) => args.where.revisionId.in.includes(`r${f.gameId.slice(1)}`)));
   // 새 리그와 원본 조회를 구분하고 실제 참가팀 등록 헬퍼의 정원 검증을 통과한다.
-  tx.v1Tournament.findFirst.mockImplementation(async (args) => JSON.stringify(args).includes('source') ? source : { id: 'new', kind: 'regular_league', maxTeams: null });
+  // 이어진 다음 시즌 찾기(`previousLeagueId`, 2026-11-03)는 기본 없음 — 테스트가 갈아끼운다.
+  tx.v1Tournament.findFirst.mockImplementation(async (args) => JSON.stringify(args).includes('previousLeagueId') ? null : JSON.stringify(args).includes('source') ? source : { id: 'new', kind: 'regular_league', maxTeams: null });
   const prisma = { $transaction: jest.fn(async (fn: (client: typeof tx) => unknown) => fn(tx)) };
   const admins = { getMutationAdmin: jest.fn().mockResolvedValue({ id: 'admin' }), logAdminAction: jest.fn().mockResolvedValue({}) };
   const service = new LeagueSeriesConversionService(prisma as unknown as PrismaService, admins as unknown as AdminContextService);
@@ -35,6 +36,14 @@ async function bodyOf(s: ReturnType<typeof setup>) {
   return { title: '정규 리그', startsOn: '2030-01-01T00:00:00Z', endsOn: '2030-03-01T00:00:00Z', tierSizes: [3, 3], fingerprint: preview.fingerprint, entries: preview.entries.map((e) => ({ teamId: e.teamId, tier: e.suggestedTier, reason: '' })) };
 }
 describe('독립 리그 최초 티어 배정', () => {
+  // 2026-11-03 사용자 선택: 끝난 독립 리그는 다음 시즌 잇기와 리그 체계 전환 중 하나만 한다.
+  it('다음 시즌을 이은 리그는 전환을 막고, 원본 행 잠금이 첫 문장이다', async () => {
+    const s = setup();
+    s.tx.v1Tournament.findFirst.mockImplementation(async (args) => JSON.stringify(args).includes('previousLeagueId') ? { id: 'next', title: '다음 시즌' } : s.source);
+    await expect(s.service.preview(actor, 'source', { tierSizes: [3, 3] })).rejects.toMatchObject({ response: { code: 'LEAGUE_NEXT_SEASON_EXISTS' } });
+    expect(String(s.tx.$queryRaw.mock.calls[0][0].join('?'))).toMatch(/v1_tournaments.*FOR UPDATE/s);
+  });
+
   it('6팀 공식 결과 순위를 3팀씩 나누며 원본 경기·결과를 쓰지 않는다', async () => {
     const s = setup(); const body = await bodyOf(s);
     expect(body.entries.map((e) => e.teamId)).toEqual(['t0', 't1', 't2', 't3', 't4', 't5']);

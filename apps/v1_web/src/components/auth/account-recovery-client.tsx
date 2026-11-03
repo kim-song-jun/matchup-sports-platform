@@ -96,6 +96,7 @@ export function AccountRecoveryClient({ initialMode, backHref = '/login/email', 
   const recoveryBackHref = backHref === '/login/email' ? emailLoginHref : backHref;
   const returnToSettings = backHref === '/my/settings';
   const currentAccount = useV1AuthMe({ enabled: returnToSettings });
+  const [ready, setReady] = useState(false);
   const [mode, setMode] = useState<Mode>(initialMode ?? 'find-id');
   const [step, setStep] = useState<RecoveryStep>(initialMode ? 'identity' : 'purpose');
   const [findMethod, setFindMethod] = useState<FindMethod>('phone');
@@ -124,6 +125,7 @@ export function AccountRecoveryClient({ initialMode, backHref = '/login/email', 
 
   useEffect(() => {
     mounted.current = true;
+    setReady(true);
     return () => { mounted.current = false; };
   }, []);
 
@@ -282,14 +284,14 @@ export function AccountRecoveryClient({ initialMode, backHref = '/login/email', 
     else if (step === 'identity') setStep(mode === 'find-id' ? 'method' : 'purpose');
     else setStep('identity');
   };
-  const nextDisabled = step === 'identity' && (phoneFlow ? phoneDigits.length !== 11 : !looksLikeEmail(emailInput));
+  const nextDisabled = !ready || (step === 'identity' && (phoneFlow ? phoneDigits.length !== 11 : !looksLikeEmail(emailInput)));
   const next = () => {
     if (step === 'purpose') switchMode(mode);
     else if (step === 'method') setStep('identity');
     else if (step === 'identity' && !nextDisabled) setStep('verify');
   };
   const fixedAction = ['purpose', 'method', 'identity'].includes(step)
-    ? <AuthStepCta action={{ label: '다음', disabled: nextDisabled, loading: false, onClick: next }} />
+    ? <AuthStepCta action={{ label: '다음', disabled: nextDisabled, loading: !ready, onClick: next }} hint={ready ? null : '화면을 준비하고 있어요.'} />
     : undefined;
 
   return (
@@ -307,15 +309,15 @@ export function AccountRecoveryClient({ initialMode, backHref = '/login/email', 
 
         {step === 'purpose' ? (
           <div className={styles.choiceGroup} role="group" aria-label="찾을 항목">
-            <button className={styles.choice} type="button" aria-pressed={mode === 'find-id'} onClick={() => setMode('find-id')}>아이디·로그인 방법 찾기</button>
-            <button className={styles.choice} type="button" aria-pressed={mode === 'reset-password'} onClick={() => setMode('reset-password')}>비밀번호 재설정</button>
+            <button className={styles.choice} type="button" disabled={!ready} aria-pressed={mode === 'find-id'} onClick={() => setMode('find-id')}>아이디·로그인 방법 찾기</button>
+            <button className={styles.choice} type="button" disabled={!ready} aria-pressed={mode === 'reset-password'} onClick={() => setMode('reset-password')}>비밀번호 재설정</button>
           </div>
         ) : null}
 
         {step === 'method' ? (
           <div className={styles.choiceGroup} role="group" aria-label="본인 확인 방법">
-            <button className={styles.choice} type="button" aria-pressed={findMethod === 'phone'} onClick={() => switchFindMethod('phone')}>휴대폰으로 찾기</button>
-            <button className={styles.choice} type="button" aria-pressed={findMethod === 'email'} onClick={() => switchFindMethod('email')}>이메일로 찾기</button>
+            <button className={styles.choice} type="button" disabled={!ready} aria-pressed={findMethod === 'phone'} onClick={() => switchFindMethod('phone')}>휴대폰으로 찾기</button>
+            <button className={styles.choice} type="button" disabled={!ready} aria-pressed={findMethod === 'email'} onClick={() => switchFindMethod('email')}>이메일로 찾기</button>
           </div>
         ) : null}
 
@@ -329,7 +331,7 @@ export function AccountRecoveryClient({ initialMode, backHref = '/login/email', 
           {step === 'identity' && phoneFlow ? (
             <label className="tm-auth-field" htmlFor={`${fieldId}-phone`}>
               <span className="tm-text-label">휴대폰 번호</span>
-              <input id={`${fieldId}-phone`} className="tm-input tm-auth-input" inputMode="numeric" placeholder="010-0000-0000" value={formatPhone(phoneDigits)} onChange={(event) => {
+              <input id={`${fieldId}-phone`} className="tm-input tm-auth-input" disabled={!ready} inputMode="numeric" placeholder="010-0000-0000" value={formatPhone(phoneDigits)} onChange={(event) => {
                 resetProgress();
                 setPhoneDigits(normalizeSeparatedDigits(event.target.value));
               }} />
@@ -339,7 +341,7 @@ export function AccountRecoveryClient({ initialMode, backHref = '/login/email', 
           {step === 'identity' && !phoneFlow ? (
             <label className="tm-auth-field" htmlFor={`${fieldId}-email`}>
               <span className="tm-text-label">이메일</span>
-              <input id={`${fieldId}-email`} autoComplete="email" className="tm-input tm-auth-input" inputMode="email" placeholder="you@example.com" type="email" value={emailInput} onChange={(event) => {
+              <input id={`${fieldId}-email`} autoComplete="email" className="tm-input tm-auth-input" disabled={!ready} inputMode="email" placeholder="you@example.com" type="email" value={emailInput} onChange={(event) => {
                 resetProgress();
                 setEmailInput(event.target.value);
               }} />
@@ -413,7 +415,7 @@ export function AccountRecoveryClient({ initialMode, backHref = '/login/email', 
         {(!returnToSettings && step === 'identity') || (step === 'result' && mode === 'find-id' && withdrawalGraceEnd !== null && found?.hasPassword) ? (
           <div className={styles.alternative}>
             <span>{mode === 'find-id' ? '비밀번호를 잊으셨나요?' : '가입한 로그인 방법이 궁금하신가요?'}</span>
-            <button type="button" onClick={() => switchMode(mode === 'find-id' ? 'reset-password' : 'find-id')}>
+            <button type="button" disabled={!ready} onClick={() => switchMode(mode === 'find-id' ? 'reset-password' : 'find-id')}>
               {mode === 'find-id' ? '비밀번호 재설정' : '로그인 방법 찾기'}
             </button>
           </div>

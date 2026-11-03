@@ -18,6 +18,11 @@
   cursor: pointer;
 }
 
+.choice:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
 .choice[aria-pressed='true'] {
   border-color: var(--blue500);
   background: var(--blue50);

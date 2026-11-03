@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, render as rtlRender, screen, within } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApplyCTA, TournamentDetailView, getBracketEntryCtaLabel, showsNextLeagueInvite } from './tournament-detail-client';
 import type { V1TournamentDetail, V1TournamentGroup, V1TournamentRegistration, V1TournamentStatus } from '@/types/api';
 
@@ -14,6 +14,17 @@ import type { V1TournamentDetail, V1TournamentGroup, V1TournamentRegistration, V
 
 // TournamentInquirySection(leftContent/completedLeftContent 맨 끝)이 next/navigation의
 // useRouter를 쓴다 — tournament-detail-page-client.test.tsx와 동일한 최소 mock.
+const { myTeamsMock } = vi.hoisted(() => ({
+  myTeamsMock: vi.fn<() => { data: { teamId: string; role: string }[] | undefined; isError: boolean }>(
+    () => ({ data: [], isError: false }),
+  ),
+}));
+vi.mock('@/hooks/use-v1-api', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/hooks/use-v1-api')>(),
+  useV1MyTeams: myTeamsMock,
+}));
+beforeEach(() => myTeamsMock.mockReturnValue({ data: [], isError: false }));
+
 vi.mock('next/navigation', () => ({
   usePathname: () => '/tournaments/t-1',
   useRouter: () => ({
@@ -460,9 +471,22 @@ describe('정규 리그 — 다음 시즌 입구', () => {
     expect(showsNextLeagueInvite(makeTournament({ id: 't-1', status: 'completed', format: 'knockout' }), false, null)).toBe(false);
   });
 
-  it('끝난 리그에 참가 확정됐던 팀에게 모바일 하단에서 그 팀으로 재참가 안내를 띄운다', () => {
+  it.each(['owner', 'manager'])('끝난 리그의 확정 팀 %s에게 모바일·데스크톱 재참가를 안내한다', (role) => {
+    myTeamsMock.mockReturnValue({ data: [{ teamId: 'team-a', role }], isError: false });
     render(<ApplyCTA tournament={league('completed')} myRegistration={registration('confirmed')} />);
     expect(screen.getByTestId('next-league-invite-mobile')).toHaveTextContent('재참가 팀 team-a');
+    render(<TournamentDetailView tournament={league('in_progress')} myRegistration={registration('confirmed')} />);
+    expect(screen.getByTestId('next-league-invite-sidebar')).toHaveTextContent('재참가 팀 team-a');
+  });
+
+  it.each(['member', 'other-team', 'loading', 'error'])('%s이면 두 화면에서 특정 팀의 재참가를 안내하지 않는다', (state) => {
+    const data = state === 'loading' ? undefined
+      : [{ teamId: state === 'other-team' ? 'team-b' : 'team-a', role: state === 'member' ? 'member' : 'owner' }];
+    myTeamsMock.mockReturnValue({ data, isError: state === 'error' });
+    render(<ApplyCTA tournament={league('completed')} myRegistration={registration('confirmed')} />);
+    render(<TournamentDetailView tournament={league('in_progress')} myRegistration={registration('confirmed')} />);
+    expect(screen.getByTestId('next-league-invite-mobile')).toHaveTextContent('재참가 팀 없음');
+    expect(screen.getByTestId('next-league-invite-sidebar')).toHaveTextContent('재참가 팀 없음');
   });
 
   it('확정되지 않은 신청이면 재참가 팀으로 보지 않는다', () => {

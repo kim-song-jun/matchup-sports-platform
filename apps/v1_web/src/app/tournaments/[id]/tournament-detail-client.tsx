@@ -12,7 +12,7 @@ import { FormattedText } from '@/components/v1-ui/formatted-text';
 import { BlockedAction } from '@/components/v1-ui/blocked-action';
 import { TournamentCampaignMedia } from '@/components/tournaments/tournament-campaign-media';
 import { Trophy, Goal, ChevronLeft, ChevronRight } from 'lucide-react';
-import { useV1Tournament, useV1MyRegistrations } from '@/hooks/use-v1-api';
+import { useV1Tournament, useV1MyRegistrations, useV1MyTeams } from '@/hooks/use-v1-api';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { isTransientFailure, v1Get } from '@/lib/api-client';
 import { placeFromVenueFields, placeToView } from '@/lib/place';
@@ -415,9 +415,15 @@ export function showsNextLeagueInvite(
   return blockReason !== null && !hasActiveRegistration;
 }
 
-/** 이 리그에서 참가 확정됐던 내 팀 — 다음 시즌 재참가 신청이 이 팀을 골라 둔다. */
-function returningTeamIdOf(myRegistration: V1TournamentRegistration | null): string | null {
-  return myRegistration?.status === 'confirmed' ? myRegistration.teamId : null;
+/** 지난 시즌 확정 팀의 현재 팀장·매니저에게만 재참가 신청을 안내한다. */
+function useReturningTeamId(myRegistration: V1TournamentRegistration | null): string | null {
+  const teamId = myRegistration?.status === 'confirmed' ? myRegistration.teamId : null;
+  const { data, isError } = useV1MyTeams(undefined, { enabled: teamId !== null });
+  const teams = data && ('items' in data ? data.items : data);
+  if (!teamId || isError) return null;
+  return teams?.some((team) => team.teamId === teamId && (team.role === 'owner' || team.role === 'manager'))
+    ? teamId
+    : null;
 }
 
 export function ApplyCTA({
@@ -427,13 +433,14 @@ export function ApplyCTA({
   tournament: V1TournamentDetail;
   myRegistration: V1TournamentRegistration | null;
 }) {
+  const returningTeamId = useReturningTeamId(myRegistration);
   const hasActiveRegistration = myRegistration !== null && myRegistration.status !== 'cancelled';
   const blockReason = resolveTournamentRegistrationBlock(tournament);
   if (showsNextLeagueInvite(tournament, hasActiveRegistration, blockReason)) {
     return (
       /* Mobile-only fixed CTA — hidden on desktop via .tm-hide-desktop */
       <div className="tm-fixed-cta tm-hide-desktop">
-        <LeagueNextRegistrationInvite leagueId={tournament.id} returningTeamId={returningTeamIdOf(myRegistration)} />
+        <LeagueNextRegistrationInvite leagueId={tournament.id} returningTeamId={returningTeamId} />
       </div>
     );
   }
@@ -674,6 +681,7 @@ export function TournamentDetailView({
   entrySection?: ReactNode;
 }) {
   const isDesktop = useMediaQuery('(min-width: 1024px)');
+  const returningTeamId = useReturningTeamId(myRegistration);
   const childHref = useChildHref();
   const participantFrom = useContext(DetailChainFromContext) ?? `/tournaments/${tournament.id}`;
   const sportAccent = getSportAccent(tournament.sport.code);
@@ -1211,7 +1219,7 @@ export function TournamentDetailView({
   /* ── Desktop right-rail CTA card ── */
   // 리그도 대회와 같은 우측 레일에 진행 입구와 핵심 정보를 모은다.
   const nextLeagueInvite = isLeagueMirror && registrationBlock !== null
-    ? <div className="mb-4"><LeagueNextRegistrationInvite leagueId={tournament.id} variant="sidebar" returningTeamId={returningTeamIdOf(myRegistration)} /></div>
+    ? <div className="mb-4"><LeagueNextRegistrationInvite leagueId={tournament.id} variant="sidebar" returningTeamId={returningTeamId} /></div>
     : null;
   const leagueUsesProgressRail = isLeagueMirror && (tournament.status === 'in_progress' || tournament.status === 'closed');
   const railCTA = isOpen && !leagueUsesProgressRail ? (

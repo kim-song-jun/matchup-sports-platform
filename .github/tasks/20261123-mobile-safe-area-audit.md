@@ -62,6 +62,16 @@ Android WebView 로그인, 작성 취소 모달, 대회 필터의 하단 가림 
 - `/my` 계열 19개 경로에서 390x844 Chromium 초기/스크롤 끝 캡처를 시도했다. `/my/reviews/received`는 `/my/reviews`로 이동, `/my/team-contacts`는 이동 중 화면을 캡처했다. 각 상태·상호작용·플랫폼을 완료한 증거는 아니며 144개 전면 검수 수치에 포함하지 않는다. 임시 결과 `/tmp/teameet-mobile-audit-20261103/my-captures.json`.
 - 로컬 변경 단위 검증: BottomSheet 15/15, ConfirmModal 12/12, AuthFrame 10/10, globals 90/90. 범위별 사용자 화면 실제 검증 및 변경 후 Alpha는 아직 미실행.
 - `pnpm --filter v1_web lint`: TypeScript 및 v1 pattern 검사 통과. E2E 세 시나리오 수집 성공. 수정 전 Alpha의 로그인·필터 두 시나리오는 의도한 레이아웃/스크롤 주장으로 실패했고 수정 후 Alpha GREEN은 미확인.
+- 추가 실측: Alpha 팀매치 `/team-matches/469a1730-e96c-4982-ac27-75870a0f9b71`의 지도 선택 `ActionSheet`에서 390x844, 48px inset 모사 시 네이버 지도 항목 끝 y=824 > 안전 경계 y=796. padding 임시 적용 후 y=776. 390x640 자동 E2E는 620 > 592로 RED. 수정 후 Alpha 및 실제 기기 결과는 미확인. ActionSheet·PlaceCard 단위 테스트 27/27 통과(jsdom navigation 미구현 경고 출력).
+- 액션 시트 후속 수정 뒤 `pnpm --filter v1_web lint` 통과. 사용자가 실기기 없이 시뮬레이션으로 진행하고 실기기는 추후 확인하기로 결정했다.
+- 다음 조사 후보: `JerseyNumberDialog`, 개인매치 신청창, 팀 컨택 신고창은 하단 정렬 overlay에 안전 영역을 직접 반영하지 않는 코드가 보인다. 이 항목들은 아직 실제 화면에서 재현하지 않았고 결함으로 확정하지 않았다. 대회 문의 시트는 footer에 안전 영역 계산이 있다.
+- 추가 코드 탐색 후보: 선수 선택·어시스트 선택·경기 비정상 종료·승부차기·라인업 불러오기/저장·대회 결과 편집/사유 모달의 하단 정렬 및 긴 콘텐츠/키보드 상태. 각 사용처의 실제 역할·화면 진입과 안전 영역 소비를 검증해야 한다.
+- iOS 27.1 runtime은 iPhone Duo만 지원한다. iOS Alpha 앱 빌드·설치·실행은 성공했으나 직후 load 400 이상, swap 급증(약 1.8→3.4GB)으로 테스트를 중단하고 이 작업이 시작한 시뮬레이터를 shutdown, iOS 27.0 추가 다운로드를 취소했다. 화면 상호작용·스크린샷은 미실행. Node 43(시작 41), MCP 11(시작 11); 급증 원인은 미확정.
+- Alpha Chromium 390x844에서 공개·생성 계열 27개 경로의 초기/스크롤 끝 캡처를 추가했다. `/league-matches`는 `/tournaments`로 이동했고 일부 생성 단계는 선행 데이터·로딩 확인이 필요하다. 캡처만으로 전 플랫폼 PASS는 아니다. 임시 결과 `/tmp/teameet-mobile-audit-20261103/public-captures.json`.
+- iPhone 16 / iOS 27.0 시뮬레이터에서 Alpha iOS 앱을 빌드·실행했다. 비로그인 로그인 화면은 Apple 로그인 버튼을 포함하며 맨 아래로 스와이프 시 사업자 정보가 보였다. 앱 대회 필터는 본문을 두 곳에서 위로 스와이프해도 날짜 입력란이 고정 버튼 밑에 남았다. 같은 시뮬레이터의 Safari는 주소창으로 가용 높이가 더 짧고 본문 스와이프가 역시 움직이지 않았다. 전부 수정 전 Alpha 관찰이며 실제 iPhone은 미검증. 이미지 `/tmp/teameet-mobile-audit-20261103/ios-{app-login-bottom,app-filter,safari-filter}-before.jpg`.
+- CI에서 팀매치 시트 사용처의 기존 본문 드래그 대조 테스트 1개가 바뀐 계약과 충돌했다. 손잡이 드래그·본문 스크롤 계약으로 갱신했고 해당 파일 8/8 통과; 새 PR head 기준 CI는 재진행 중이다. 테스트 중 기존 React `act` 경고 1건이 출력됐다.
+- iOS 앱·Safari 확인 뒤 swap이 약 3.3→4.5GB로 다시 증가해 이번 작업의 iPhone 16 simulator를 shutdown했고 자동 로그 helper, DeviceHub 및 이번 작업이 시작한 adb 서버를 종료했다. load는 약 12.7로 내려갔으나 swap은 4.5GB로 남아 있으며 원인은 확정되지 않았다.
+- 46개 기본 경로에서 Chromium 390x844·CSS native inset 48px 모사 후 화면 내 interactive 요소의 안전경계 침범을 기계적으로 탐색했고 후보 0개였다. 일부 hydration/리디렉션 경계 및 overlay·키보드·역할 상태는 탐색하지 못하므로 전면 검수 PASS가 아니다. 결과 `/tmp/teameet-mobile-audit-20261103/simulated-inset-route-scan.json`.
 - 사용자는 실기기 연결 불가, 시뮬레이션으로 진행하고 실기기는 나중에 확인하기로 했다. Android 에뮬레이터와 iOS Simulator runtime 미설치 상태를 확인했고, iOS 27.1 simulator runtime 다운로드 진행 중. Android/iOS 실기기/OS/키보드는 미실행.
 
 ## Route inventory (0/144 fully audited; 67 admin-only exclusions)

@@ -44,6 +44,18 @@ test.describe('mobile safe area and touch', () => {
     await dialog.getByRole('button', { name: '계속 작성' }).click();
   });
 
+  test('map action sheet keeps every app choice above the native navigation area', async ({ page }) => {
+    const matchId = process.env.TEAMEET_QA_TEAM_MATCH_ID ?? '00000000-0000-4000-8000-000000000301';
+    await page.goto(`/team-matches/${matchId}`);
+    await page.getByRole('button', { name: /^(길찾기|지도 앱에서 찾기)$/ }).click();
+    const dialog = page.getByRole('dialog', { name: /^(길찾기|지도 앱에서 찾기)$/ });
+    await expect(dialog).toBeVisible();
+    await setNativeBottom(page, 48);
+    const choices = dialog.locator('li a, li button');
+    expect(await choices.count()).toBeGreaterThan(0);
+    for (const choice of await choices.all()) await expectAboveSystemBar(choice, 48);
+  });
+
   test('a touch swipe scrolls a long competition filter without closing it', async ({ page }) => {
     await page.goto('/tournaments?kind=tournament&filter=1');
     const dialog = page.getByRole('dialog', { name: '대회·리그 필터' });

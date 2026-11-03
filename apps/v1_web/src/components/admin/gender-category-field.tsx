@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useId, type ReactNode } from 'react';
 import type { V1TournamentGenderCategory } from '@/types/api';
 
 export const GENDER_CATEGORY_OPTIONS = [
@@ -28,6 +28,7 @@ export function GenderCategoryField({
   hint?: ReactNode;
   disabled?: boolean;
 }) {
+  const groupName = useId();
   return (
     <fieldset className="min-w-0" disabled={disabled}>
       <legend className="text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-body)]">성별 카테고리</legend>
@@ -45,7 +46,7 @@ export function GenderCategoryField({
           >
             <input
               type="radio"
-              name="gender-category"
+              name={groupName}
               checked={value === option}
               onChange={() => onChange(option)}
               className="sr-only"

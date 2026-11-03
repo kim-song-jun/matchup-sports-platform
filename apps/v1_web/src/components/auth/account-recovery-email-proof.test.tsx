@@ -85,6 +85,7 @@ describe('MD-QA #133 비밀번호 복구는 독립 이메일 증명을 사용한
     await verifyEmail();
     await submitPassword();
 
+    expect(await screen.findByRole('alert')).toHaveTextContent('비밀번호가 없는 계정이에요');
     expect(await screen.findByRole('link', { name: '로그인 화면으로' })).toHaveAttribute('href', '/login');
     expect(screen.queryByLabelText('새 비밀번호')).not.toBeInTheDocument();
     expect(screen.queryByText('비밀번호를 바꿨어요')).not.toBeInTheDocument();

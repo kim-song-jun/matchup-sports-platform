@@ -369,7 +369,7 @@ export function AccountRecoveryClient({ initialMode, backHref = '/login/email', 
 
           {step === 'result' && mode === 'reset-password' && resetBlockedSocialOnly ? (
             <Card pad={16} className="tm-auth-soft-card">
-              <div className="tm-text-body-lg">비밀번호가 없는 계정이에요</div>
+              <div className="tm-text-body-lg" role="alert">비밀번호가 없는 계정이에요</div>
               <div className="tm-text-caption" style={{ marginTop: 4 }}>카카오나 Apple 같은 소셜 로그인으로 가입해서 바꿀 비밀번호가 없어요. 가입한 방법으로 로그인해 주세요.</div>
               <Link className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" href={loginHref} style={{ marginTop: 16 }}>로그인 화면으로</Link>
             </Card>

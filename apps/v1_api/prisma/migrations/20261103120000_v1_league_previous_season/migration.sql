@@ -4,11 +4,7 @@ ALTER TABLE "v1_tournaments" ADD COLUMN IF NOT EXISTS "previous_league_id" TEXT;
 
 CREATE UNIQUE INDEX IF NOT EXISTS "v1_tournaments_previous_league_id_key" ON "v1_tournaments"("previous_league_id");
 
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'v1_tournaments_previous_league_fk') THEN
-    ALTER TABLE "v1_tournaments"
-      ADD CONSTRAINT "v1_tournaments_previous_league_fk"
-      FOREIGN KEY ("previous_league_id") REFERENCES "v1_tournaments"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-  END IF;
-END $$;
+-- Prisma가 적용 이력을 관리한다. 새 nullable 컬럼의 기존 값은 모두 NULL이므로 직접 FK를 추가해도 기존 행을 거절하지 않는다.
+ALTER TABLE "v1_tournaments"
+  ADD CONSTRAINT "v1_tournaments_previous_league_fk"
+  FOREIGN KEY ("previous_league_id") REFERENCES "v1_tournaments"("id") ON DELETE SET NULL ON UPDATE CASCADE;

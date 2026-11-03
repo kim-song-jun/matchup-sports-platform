@@ -61,3 +61,9 @@ Status: In Progress
 - P1: 현재 스키마 SHA256 `b0c1313b36e6a93e0f84a56a17e7950826bbd5f38b284f22eb72fb3570292960`를 API 이미지·런타임 attestation·manifest 생성/검증·입력 준비·게임 fixture에 맞췄다. 기존 dev 해시는 historical 허용 목록에 보존했다.
 - 검증: 상세 CTA 테스트 64개, final-schema binding 검사 9개, 웹 lint(tsc·패턴) 통과. 기존 테스트의 React act 경고는 남아 있다.
 - 변경 후 alpha UI는 아직 미검증이며 머지·배포 후 확인한다. 스키마·마이그레이션 자체는 이번 리뷰 후속에서 바꾸지 않았다.
+
+## PR #2144 Gates 후속
+- 실패한 expand-contract 검사는 FK 추가를 감싼 `DO $$` 블록을 정적으로 판정하지 못했다. 새 nullable 컬럼 뒤에 직접 `ALTER TABLE ... ADD CONSTRAINT ... FOREIGN KEY`를 실행하도록 수정했다. 검사기와 허용 목록은 바꾸지 않는다.
+- 이 마이그레이션은 아직 dev 미머지이며, Prisma 적용 이력으로 한 번 실행한다. 이미 적용된 운영 마이그레이션은 수정하지 않는다.
+- 격리 PostgreSQL 16에서 기존 2행 보존·새 값 NULL, 다음 시즌 중복 거절, 없는 이전 시즌 FK 거절, ID 갱신 전파, 삭제 시 NULL 동작을 확인했다.
+- schema.prisma 바이트는 그대로이므로 앞서 갱신한 스키마 해시는 유효하다. 커밋본에서 expand-contract 게이트와 final-schema binding 검사를 확인한다.

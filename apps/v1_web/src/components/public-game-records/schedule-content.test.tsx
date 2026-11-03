@@ -343,6 +343,62 @@ describe('ScheduleContent — 단판 경기 기록 요약', () => {
   });
 });
 
+describe('ScheduleContent — 단판 기록 머리말은 글자 없이 선만 그린다', () => {
+  const scorers = [{ side: 'home' as const, participantName: '김선수', jerseyNumber: 9, period: 1, clockMs: 600_000 }];
+  const renderWith = (periodCount: number | null | undefined) =>
+    render(<ScheduleContent tournamentId="tour-1" data={{ ...makeData(), items: [fixtureEntry({ periodCount, scorers })] }} />);
+  /** 기록 묶음의 머리줄 — `aria-hidden` 으로 가려진 첫 칸(선·글자만 든다). */
+  const headerRow = () => screen.getByRole('group', { name: /기록$/ }).firstElementChild as HTMLElement;
+
+  it('단판이면 "경기 결과"·"전반" 글자가 화면에 없고 선 하나만 남는다 — 그룹 이름은 스크린리더용으로 유지된다', () => {
+    renderWith(1);
+
+    expect(screen.queryByText('경기 결과')).toBeNull();
+    expect(screen.queryByText('전반')).toBeNull();
+    expect(screen.getByRole('group', { name: '경기 결과 기록' })).toBeInTheDocument();
+    expect(headerRow()).toHaveAttribute('aria-hidden', 'true');
+    expect(headerRow().textContent).toBe('');
+    expect(headerRow().children).toHaveLength(1);
+  });
+
+  it.each([[2], [null], [undefined]])('전·후반(periodCount=%s)이면 머리말 글자와 양옆 선이 그대로다', (periodCount) => {
+    renderWith(periodCount);
+
+    expect(headerRow().textContent).toBe('전반');
+    expect(headerRow().children).toHaveLength(3);
+  });
+});
+
+describe('ScheduleContent — 경기 방식 줄(장소·일시 줄 아래)', () => {
+  const renderWith = (periodMinutes: readonly number[] | null | undefined) =>
+    render(<ScheduleContent tournamentId="tour-1" data={{ ...makeData(), items: [fixtureEntry({ periodMinutes, venue: '경기대 케이풋살파크 B구장' })] }} />);
+
+  it.each([
+    [[20], '단판 20분'],
+    [[15, 15], '전·후반 15분'],
+    [[10, 15], '전반 10분, 후반 15분'],
+  ])('periodMinutes=%j 이면 "%s" 를 한 줄로 적는다', (periodMinutes, expected) => {
+    renderWith(periodMinutes);
+
+    expect(screen.getByText(expected)).toBeInTheDocument();
+  });
+
+  it('장소·일시 줄과 스코어 줄 사이에 놓인다', () => {
+    renderWith([15, 15]);
+
+    const line = screen.getByText('전·후반 15분');
+    const head = screen.getByText('경기대 케이풋살파크 B구장').closest('div');
+    expect(head?.nextElementSibling).toBe(line);
+    expect(line.nextElementSibling).toHaveTextContent('홈팀');
+  });
+
+  it.each([[null], [undefined], [[]], [[0]]])('길이를 모르면(%j) 줄을 그리지 않는다', (periodMinutes) => {
+    renderWith(periodMinutes as never);
+
+    expect(screen.queryByText(/단판|전·후반|전반 \d+분|피리어드/)).toBeNull();
+  });
+});
+
 describe('ScheduleContent — 이상 클럭 경고 표식(alpha 452′ 사고)', () => {
   it('득점자의 clockMs가 이상값이면 분을 올림해 표시하고 경고 표식을 붙인다', () => {
     const data = { ...makeData(), items: [fixtureEntry({

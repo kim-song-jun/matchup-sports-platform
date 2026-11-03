@@ -54,6 +54,8 @@ type FakeFixture = {
     sides: { id: string; sideKey: 'HOME' | 'AWAY' }[];
     periods: never[];
     participants: { id: string; sideId: string; userId: string | null; displayNameSnapshot: string; jerseyNumber: number | null }[];
+    /** 경기 설정 스냅샷 — `periodCount`/`periodMinutes` 산출용. 생략하면 설정 없음. */
+    competitionConfig?: { periods: unknown } | null;
   } | null;
 };
 
@@ -1144,5 +1146,32 @@ describe('PublicTournamentRecordsService.getSchedule -- 자리 라벨 (homeSlotL
   it('배정된 실제 팀은 연결 문구로 대체하지 않는다', async () => {
     const result = await scheduleWith({ advancementTargets: sources }, {});
     expect(result.items[0]).toMatchObject({ home: { teamName: '홈팀' }, homeSlotLabel: null, awaySlotLabel: null });
+  });
+});
+
+describe('PublicTournamentRecordsService.getSchedule -- periodMinutes (일정 카드의 경기 방식 줄)', () => {
+  const period = (code: string, durationMinutes: number, extraTime = false) => ({ code, label: code, durationMinutes, extraTime });
+  const entryWith = async (competitionConfig: { periods: unknown } | null) => {
+    const fixture = makeFixture({ game: { ...makeFixture({}).game!, competitionConfig } });
+    const prisma = buildFakePrisma({ fixtures: [fixture], consentLinks: [], consentSnapshots: [], goalEvents: [] });
+    const result = await new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE).getSchedule(TOURNAMENT_ID, {});
+    return result.items[0];
+  };
+
+  it('단판은 길이 하나, 전·후반은 설정 순서대로 둘을 싣고 연장은 뺀다', async () => {
+    expect((await entryWith({ periods: [period('FULL', 20)] })).periodMinutes).toEqual([20]);
+    expect((await entryWith({ periods: [period('H1', 10), period('H2', 15), period('ET', 5, true)] })).periodMinutes).toEqual([10, 15]);
+  });
+
+  it('피리어드 수와 길이는 같은 설정에서 나오므로 개수가 항상 같다', async () => {
+    const entry = await entryWith({ periods: [period('H1', 15), period('H2', 15)] });
+    expect(entry.periodCount).toBe(2);
+    expect(entry.periodMinutes).toHaveLength(entry.periodCount ?? -1);
+  });
+
+  it('설정이 없거나 길이를 읽을 수 없으면 null 이다', async () => {
+    expect((await entryWith(null)).periodMinutes).toBeNull();
+    expect((await entryWith({ periods: { count: 2 } })).periodMinutes).toBeNull();
+    expect((await entryWith({ periods: [period('H1', 15), period('H2', 0)] })).periodMinutes).toBeNull();
   });
 });

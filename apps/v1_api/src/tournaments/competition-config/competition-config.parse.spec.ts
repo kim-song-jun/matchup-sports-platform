@@ -4,6 +4,7 @@ import {
   parsePeriodDurations,
   parseResultPolicy,
   regularPeriodCount,
+  regularPeriodMinutes,
   regulationMinutes,
 } from './competition-config.parse';
 import { FOOTBALL_V1_CONFIG, FUTSAL_V1_CONFIG } from './competition-config.presets';
@@ -267,6 +268,41 @@ describe('regularPeriodCount', () => {
     '읽을 수 없으면 null이다 (%j)',
     (value) => {
       expect(regularPeriodCount(value as never)).toBeNull();
+    },
+  );
+});
+
+describe('regularPeriodMinutes', () => {
+  const period = (durationMinutes: number | string | null, extraTime = false) => ({ code: 'P', label: 'P', durationMinutes, extraTime });
+
+  it('연장을 뺀 정규 피리어드 길이를 설정 순서대로 돌려준다', () => {
+    expect(regularPeriodMinutes([period(20)])).toEqual([20]);
+    expect(regularPeriodMinutes([period(10), period(15)])).toEqual([10, 15]);
+    expect(regularPeriodMinutes([period(15), period(15), period(5, true)])).toEqual([15, 15]);
+    expect(regularPeriodMinutes([period(40), period(5, true)])).toEqual([40]);
+  });
+
+  it('값이 있으면 길이는 항상 regularPeriodCount 와 같다', () => {
+    const periods = [period(10), period(15), period(5, true)];
+    expect(regularPeriodMinutes(periods)).toHaveLength(regularPeriodCount(periods) ?? -1);
+  });
+
+  it('길이를 읽을 수 없는 정규 피리어드가 하나라도 있으면 일부만 내보내지 않고 통째로 null 이다', () => {
+    expect(regularPeriodMinutes([period(10), period(0)])).toBeNull();
+    expect(regularPeriodMinutes([period(10), period(-5)])).toBeNull();
+    expect(regularPeriodMinutes([period(10), period('15')])).toBeNull();
+    expect(regularPeriodMinutes([period(10), period(null)])).toBeNull();
+    expect(regularPeriodMinutes([period(Number.NaN), period(10)])).toBeNull();
+  });
+
+  it('길이가 망가져도 연장 피리어드는 정규 길이에 영향을 주지 않는다', () => {
+    expect(regularPeriodMinutes([period(20), period(0, true)])).toEqual([20]);
+  });
+
+  it.each([[null], [undefined], [[]], [[period(5, true)]], [{ count: 2 }], [{}], ['x']])(
+    '정규 길이를 알 수 없으면 null 이다 (%j)',
+    (value) => {
+      expect(regularPeriodMinutes(value as never)).toBeNull();
     },
   );
 });

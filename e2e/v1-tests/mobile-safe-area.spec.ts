@@ -164,6 +164,25 @@ test.describe('mobile safe area and touch', () => {
     });
   }
 
+  test('recorded team names and score fit a narrow mobile screen', async ({ page }) => {
+    const matchId = process.env.TEAMEET_QA_TEAM_MATCH_RECORD_ID;
+    test.skip(!matchId, 'Requires a QA team match with recorded submatches.');
+    await page.setViewportSize({ width: 320, height: 568 });
+    await page.goto(`/team-matches/${matchId}/record`);
+    const score = page.locator('[class*="subScore"]').first();
+    await expect(score).toBeVisible();
+    await expect(score.locator('span')).toHaveCount(2);
+    const scroll = page.locator('.tm-scroll-area');
+    await expect.poll(() => scroll.evaluate((node) => node.scrollWidth - node.clientWidth)).toBeLessThanOrEqual(0);
+    for (const team of await score.locator('span').all()) {
+      const box = await team.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.x).toBeGreaterThanOrEqual(0);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(320);
+      await expect.poll(() => team.evaluate((node) => node.scrollWidth - node.clientWidth)).toBeLessThanOrEqual(0);
+    }
+  });
+
   test('map action sheet keeps every app choice above the native navigation area', async ({ page }) => {
     const matchId = process.env.TEAMEET_QA_TEAM_MATCH_ID ?? '00000000-0000-4000-8000-000000000301';
     await page.goto(`/team-matches/${matchId}`);

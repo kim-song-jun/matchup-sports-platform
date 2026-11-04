@@ -53,9 +53,12 @@ import {
 } from './league-fixture-creation';
 import { resolveLeagueFixtureDates } from './league-fixture-dates';
 import { resolveLeagueWeekNumbers } from './league-week-number';
+import { assertNextSeasonSourceInTx, findNextSeasonLeague, readLeagueConversion } from './league-season-link';
+import { copyPreviousSeasonRoster } from './league-roster-autofill';
 import { loadFirstGamePlayerNotices } from './league-fixture-scheduled-notice';
 import {
   AddLeagueTeamDto,
+  AddPreviousSeasonTeamsDto,
   ApplyLeagueTemplateDto,
   LeagueFixtureScheduleDto,
   CancelLeagueFixtureDto,
@@ -235,6 +238,10 @@ export class LeagueMatchAdminService {
     }
 
     const league = await this.prisma.$transaction(async (tx) => {
+      // 다음 시즌 잇기 — 지난 리그를 먼저 잠그고 판정한다(리그 체계 전환과 둘 중 하나만, `league-season-link.ts`).
+      if (dto.previousLeagueId !== undefined) {
+        await assertNextSeasonSourceInTx(tx, { previousLeagueId: dto.previousLeagueId, sportId: dto.sportId });
+      }
       // BE-5 drop: 통합 축이 **정본**이다. 예전에는 `V1League` 를 만들고 거울을 함께 썼는데
       // (dual-write), 그 테이블이 사라지면서 여기가 곧 리그 생성 자체가 됐다. 매핑은 여전히
       // `leagueMirrorCreateData` 한 곳만 안다 — 값 만드는 규칙을 두 벌로 두지 않는다.
@@ -271,6 +278,7 @@ export class LeagueMatchAdminService {
           ...(dto.maxTeams !== undefined ? { maxTeams: dto.maxTeams } : {}),
           ...(dto.plannedFixtureCount !== undefined ? { plannedFixtureCount: dto.plannedFixtureCount } : {}),
           ...(dto.genderCategory !== undefined ? { genderCategory: dto.genderCategory } : {}),
+          ...(dto.previousLeagueId !== undefined ? { previousLeagueId: dto.previousLeagueId } : {}),
           registrationDeadlineAt,
           // 참가비를 보냈으면 확정한 것이다(0원 = 무료 확정). 안 보냈으면 미설정으로 남겨 신청 관리가 확인을 받는다.
           ...(dto.entryFee !== undefined
@@ -305,11 +313,19 @@ export class LeagueMatchAdminService {
             registrationDeadlineAt: registrationDeadlineAt?.toISOString() ?? null,
             ...(dto.entryFee !== undefined ? { entryFee: dto.entryFee } : {}),
             ...(dto.genderCategory !== undefined ? { genderCategory: dto.genderCategory } : {}),
+            ...(dto.previousLeagueId !== undefined ? { previousLeagueId: dto.previousLeagueId } : {}),
           },
         },
         tx,
       );
       return created;
+    }).catch((error: unknown) => {
+      // 같은 지난 리그에 다음 시즌을 동시에 둘 만들면 유니크 인덱스가 늦은 쪽을 막는다 — 500 대신 판정과 같은 409.
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002'
+        && JSON.stringify(error.meta?.target ?? '').includes('previous_league')) {
+        throw new ConflictException({ code: 'LEAGUE_NEXT_SEASON_EXISTS', message: '이미 다음 시즌이 이어진 리그예요.' });
+      }
+      throw error;
     });
     return { leagueId: league.id, title: league.title, state: league.state };
   }
@@ -475,11 +491,26 @@ export class LeagueMatchAdminService {
       orderBy: [{ position: 'asc' }],
       include: adminBracketSlotInclude,
     });
+    // 독립 리그 이어가기(2026-11-03) — 사후 메뉴가 '다음 시즌 만들기'와 '리그 체계로 전환' 중 하나만 보이고,
+    // 참가팀 관리가 지난 시즌 팀을 불러온다.
+    const [previousSeason, nextSeason, conversion] = await Promise.all([
+      league.previousLeagueId === null
+        ? null
+        : findTournamentOnSurface(this.prisma, ['regular_league'], {
+            where: { id: league.previousLeagueId, deletedAt: null },
+            select: { id: true, title: true },
+          }),
+      findNextSeasonLeague(this.prisma, leagueId),
+      readLeagueConversion(this.prisma, leagueId),
+    ]);
     return {
       leagueId: league.id,
       title: league.title,
       isPublic: league.isPublic,
       seriesId: league.seriesId,
+      previousSeason: previousSeason === null ? null : { leagueId: previousSeason.id, title: previousSeason.title },
+      nextSeason: nextSeason === null ? null : { leagueId: nextSeason.id, title: nextSeason.title },
+      convertedToSeries: conversion !== undefined,
       state: league.state,
       lifecycleStatus: league.lifecycleStatus,
       // **대진 일정 폼이 요일을 날짜로 전개하는 기준일이다.** BE-2 이후 서버는 요일을 모르고
@@ -820,6 +851,65 @@ export class LeagueMatchAdminService {
       teamCount: league.teams.length + 1,
       hasExistingFixtures: existingFixtureCount > 0,
     };
+  }
+
+  /**
+   * 지난 시즌 팀 한 번에 넣기(2026-11-03 사용자 선택 — 독립 리그의 다음 시즌). 이어진 지난 시즌에서 확정됐던 팀만 받는다.
+   * 팀마다 `addTeam` 과 같은 판정(`findLeagueAdmissionBlocker`)과 같은 등록(`createLeagueRosterRegistration` — 정원은
+   * 리그 행을 잠그고 그 안에서 본다)을 지나고, 지난 시즌 명단을 이어받는다(`copyPreviousSeasonRoster`).
+   * 한 트랜잭션이라 한 팀이라도 막히면 아무 팀도 들어가지 않는다 — 어느 팀까지 들어갔는지 운영자가 맞혀 볼 일이 없다.
+   */
+  async addPreviousSeasonTeams(user: V1AuthUser, leagueId: string, dto: AddPreviousSeasonTeamsDto) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const league = await this.loadLeague(leagueId);
+    const previousLeagueId = league.previousLeagueId;
+    if (previousLeagueId === null) {
+      throw new UnprocessableEntityException({ code: 'LEAGUE_PREVIOUS_SEASON_MISSING', message: '지난 시즌이 이어진 리그가 아니에요.' });
+    }
+    const teamIds = [...new Set(dto.teamIds)];
+    const previousTeams = await this.prisma.v1TournamentRegistration.findMany({
+      where: { tournamentId: previousLeagueId, status: 'confirmed', teamId: { in: teamIds } },
+      select: { teamId: true, team: { select: { name: true } } },
+    });
+    if (previousTeams.length !== teamIds.length) {
+      throw new UnprocessableEntityException({ code: 'LEAGUE_TEAM_INVALID', message: '지난 시즌에 참가하지 않은 팀이 섞여 있어요.' });
+    }
+    const nameByTeamId = new Map(previousTeams.map((row) => [row.teamId, row.team.name]));
+    const existingFixtureCount = await this.prisma.v1TeamMatch.count({ where: { leagueId, deletedAt: null } });
+    const carriedPlayerCount = await this.prisma.$transaction(async (tx) => {
+      let carried = 0;
+      for (const teamId of teamIds) {
+        const blocker = await findLeagueAdmissionBlocker(tx, { leagueId, teamId });
+        if (blocker !== null) {
+          throw new UnprocessableEntityException({
+            code: 'LEAGUE_TEAM_INVALID',
+            message: `${nameByTeamId.get(teamId) ?? '팀'}: ${leagueAdmissionBlockerMessage(blocker)}`,
+          });
+        }
+        await createLeagueRosterRegistration(tx, { leagueId, teamId, entrySource: 'seeded' });
+        const registration = await tx.v1TournamentRegistration.findUniqueOrThrow({
+          where: { tournamentId_teamId: { tournamentId: leagueId, teamId } },
+          select: { id: true },
+        });
+        carried += (await copyPreviousSeasonRoster(tx, leagueId, { id: registration.id, teamId })).added;
+      }
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'league_match.add_previous_season_teams',
+          targetType: 'league_match',
+          targetId: leagueId,
+          afterJson: { previousLeagueId, teamIds, carriedPlayerCount: carried },
+        },
+        tx,
+      );
+      return carried;
+    }, {
+      // 팀마다 리그 행 잠금 안에서 등록·명단을 쓴다 — 일괄 생성 레인과 같은 45초 + maxWait 5초(ALB 60초 안).
+      timeout: 45_000,
+      maxWait: 5_000,
+    });
+    return { leagueId, teamIds, carriedPlayerCount, hasExistingFixtures: existingFixtureCount > 0 };
   }
 
   // 그룹 B 감사 결함 1: 개설 후 참가팀 제거. checkLeagueTeamRemovalAllowed()의 두 게이트
@@ -1834,11 +1924,11 @@ export class LeagueMatchAdminService {
    */
   async openRegistration(user: V1AuthUser, leagueId: string, dto: OpenLeagueRegistrationDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
-    return this.prisma.$transaction(async (tx) => {
+    const opened = await this.prisma.$transaction(async (tx) => {
       // `deletedAt` 을 필터가 아니라 값으로 읽는다 — 삭제된 리그와 없는 리그는 운영자에게 다른 사건이다.
       const league = await findTournamentOnSurface(tx, ['regular_league'], {
         where: { id: leagueId },
-        select: { id: true, status: true, deletedAt: true, registrationDeadlineAt: true },
+        select: { id: true, title: true, status: true, deletedAt: true, registrationDeadlineAt: true, previousLeagueId: true },
       });
       if (league === null) {
         throw new NotFoundException({ code: 'LEAGUE_NOT_FOUND', message: '리그를 찾을 수 없어요.' });
@@ -1897,12 +1987,56 @@ export class LeagueMatchAdminService {
       }, tx);
 
       return {
-        leagueId,
-        lifecycleStatus: 'open' as const,
-        registrationOpen: true as const,
-        registrationDeadlineAt: deadline?.toISOString() ?? null,
+        response: {
+          leagueId,
+          lifecycleStatus: 'open' as const,
+          registrationOpen: true as const,
+          registrationDeadlineAt: deadline?.toISOString() ?? null,
+        },
+        // 마감만 바꾼 재호출(이미 접수 중)은 '신청이 열렸다'가 아니다 — 처음 열릴 때만 지난 시즌 팀에 알린다.
+        justOpened: league.status !== 'open',
+        title: league.title,
+        previousLeagueId: league.previousLeagueId,
       };
     });
+    if (opened.justOpened && opened.previousLeagueId !== null) {
+      this.notifyNextSeasonRegistrationOpened(leagueId, opened.title, opened.previousLeagueId);
+    }
+    return opened.response;
+  }
+
+  /**
+   * 독립 리그의 다음 시즌 접수 시작 알림(2026-11-03 사용자 선택). 지난 시즌 확정 팀 중 이 리그에 아직 살아 있는 신청이
+   * 없는 팀의 팀장·매니저에게 보낸다. 받는 사람마다 한 번뿐이다(businessKey) — 접수를 닫았다 다시 열어도 또 보내지 않는다.
+   * 커밋 뒤에 부른다(다른 리그 알림과 같다 — emitToManyDeferred 는 트랜잭션과 무관한 fire-and-forget).
+   */
+  private notifyNextSeasonRegistrationOpened(leagueId: string, leagueTitle: string, previousLeagueId: string): void {
+    this.notifications.emitToManyDeferred(
+      async () => {
+        const [previousTeams, applied] = await Promise.all([
+          this.prisma.v1TournamentRegistration.findMany({
+            where: { tournamentId: previousLeagueId, status: 'confirmed' },
+            select: { teamId: true },
+          }),
+          this.prisma.v1TournamentRegistration.findMany({
+            where: { tournamentId: leagueId, status: { not: 'cancelled' } },
+            select: { teamId: true },
+          }),
+        ]);
+        const appliedTeamIds = new Set(applied.map((row) => row.teamId));
+        const teamIds = previousTeams.map((row) => row.teamId).filter((teamId) => !appliedTeamIds.has(teamId));
+        if (teamIds.length === 0) return [];
+        const managers = await this.prisma.v1TeamMembership.findMany({
+          where: { teamId: { in: teamIds }, status: 'active', role: { in: ['owner', 'manager'] } },
+          select: { userId: true },
+        });
+        return [...new Set(managers.map((member) => member.userId))];
+      },
+      'league_next_season_registration_opened',
+      leagueId,
+      `"${leagueTitle}" 다음 시즌 신청이 열렸어요. 지난 시즌에 함께한 팀이라면 바로 재참가 신청할 수 있어요.`,
+      { businessKey: `league-next-season-open:${leagueId}` },
+    );
   }
 
   /**
@@ -2320,6 +2454,7 @@ export class LeagueMatchAdminService {
         registrationDeadlineAt: true,
         sportId: true,
         seriesId: true,
+        previousLeagueId: true,
         competitionConfigVersionId: true,
         regionId: true,
         // 징계(출전정지) 규정 — 어드민 화면이 **현재 값**을 보여줘야 옵트인 여부를 알 수

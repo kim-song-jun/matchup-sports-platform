@@ -4,7 +4,8 @@ import { LeagueMatchPublicService } from './league-match-public.service';
 const SECRET = { bankName: 'SENTINEL-BANK', bankAccount: 'SENTINEL-ACCOUNT-1', bankHolder: 'SENTINEL-HOLDER' };
 
 function makeService(row: Record<string, unknown>, pendingPaymentCount = 0) {
-  const findFirst = jest.fn().mockResolvedValue({
+  // 첫 조회는 리그 자신이고, 그다음(독립 리그의 이어진 다음 시즌 찾기, 2026-11-03)은 없음이다.
+  const findFirst = jest.fn().mockResolvedValueOnce({
     id: 'league-1', title: '리그', status: 'draft', registrationDeadlineAt: null,
     scheduledAt: new Date('2026-10-30T00:00:00.000Z'), scheduledEndAt: new Date('2026-12-30T00:00:00.000Z'),
     seriesId: null, tier: null, seasonNo: null,
@@ -13,8 +14,9 @@ function makeService(row: Record<string, unknown>, pendingPaymentCount = 0) {
     kind: 'regular_league', teamCount: 8, maxTeams: null,
     coverImageUrl: null, entryFee: 0, entryFeeConfiguredAt: null,
     ...SECRET, // 목은 select 를 지키지 않는다 — 서비스가 응답에 새로 싣지 않는지까지 본다.
+    previousLeagueId: null,
     ...row,
-  });
+  }).mockResolvedValue(null);
   const prisma = {
     v1Tournament: { findFirst, findMany: jest.fn().mockResolvedValue([]) },
     v1TournamentRegistration: { count: jest.fn().mockResolvedValue(pendingPaymentCount) },

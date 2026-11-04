@@ -6,6 +6,7 @@ import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import {
   AddLeagueTeamDto,
+  AddPreviousSeasonTeamsDto,
   ApplyLeagueTemplateDto,
   CancelLeagueFixtureDto,
   ChangeLeagueStateDto,
@@ -110,6 +111,16 @@ export class LeagueMatchAdminController {
     @Body() dto: AddLeagueTeamDto,
   ) {
     return this.service.addTeam(user, leagueId, dto);
+  }
+
+  /** 지난 시즌 확정 팀을 골라 한 번에 참가 확정으로 넣고 지난 명단을 이어받는다(독립 리그의 다음 시즌). */
+  @Post(':leagueId/previous-season-teams')
+  addPreviousSeasonTeams(
+    @CurrentUser() user: V1AuthUser,
+    @Param('leagueId', leagueIdPipe) leagueId: string,
+    @Body() dto: AddPreviousSeasonTeamsDto,
+  ) {
+    return this.service.addPreviousSeasonTeams(user, leagueId, dto);
   }
 
   // 그룹 B 감사 결함 1: 개설 후 참가팀 제거. 이 팀이 낀 대진에 공식 결과가 확정돼 있으면

@@ -1595,6 +1595,9 @@ describe('LeagueMatchAdminService.detail — 대진의 gameState', () => {
       v1TournamentSlot: { findMany: jest.fn().mockResolvedValue([]) },
       v1GameOfficialFact: { findMany: jest.fn().mockResolvedValue([]) },
       v1TournamentRegistration: { count: jest.fn().mockResolvedValue(0) },
+      // 다음 시즌 잇기(2026-11-03) — 이어진 다음 시즌·리그 체계 전환 기록 조회. 이 픽스처는 둘 다 없다.
+      v1Tournament: { findFirst: jest.fn().mockResolvedValue(null) },
+      v1AdminActionLog: { findFirst: jest.fn().mockResolvedValue(null) },
     };
     const module = await Test.createTestingModule({
       providers: [
@@ -1611,6 +1614,7 @@ describe('LeagueMatchAdminService.detail — 대진의 gameState', () => {
       title: '리그',
       isPublic: false,
       seriesId,
+      previousLeagueId: null,
       status: 'in_progress',
       sportId: 'sport-1',
       registrations: [],
@@ -1667,14 +1671,16 @@ describe('LeagueMatchAdminService.detail — 참가비·대표 이미지 필드'
   async function detailOf(row: Record<string, unknown>, activeCount: number) {
     const prisma = {
       v1Tournament: {
-        findFirst: jest.fn().mockResolvedValue({
+        // 첫 조회는 리그 자신, 그다음(이어진 다음 시즌 찾기)은 없음.
+        findFirst: jest.fn().mockResolvedValueOnce({
           id: 'league-1', title: '리그', isPublic: true, status: 'draft', registrationDeadlineAt: null,
           sportId: 'sport-1', regionId: 'region-1', yellowAccumulationLimit: null, redCardSuspensionMatches: null,
           scheduledAt: new Date('2026-10-30T00:00:00.000Z'), competitionConfigVersionId: 'config-1', sport: { code: 'futsal' },
           coverImageUrl: null, entryFee: 0, entryFeeConfiguredAt: null, bankName: null, bankAccount: null, bankHolder: null,
-          registrations: [{ teamId: 'team-a' }], ...row,
-        }),
+          previousLeagueId: null, registrations: [{ teamId: 'team-a' }], ...row,
+        }).mockResolvedValue(null),
       },
+      v1AdminActionLog: { findFirst: jest.fn().mockResolvedValue(null) },
       v1TeamMatch: { findMany: jest.fn().mockResolvedValue([]) },
       v1TournamentSlot: { findMany: jest.fn().mockResolvedValue([]) },
       v1GameOfficialFact: { findMany: jest.fn().mockResolvedValue([]) },

@@ -14,8 +14,9 @@ import { bucketLeagueFixtures } from './league-standings-source';
 import { DEFAULT_PROMOTION_RULE } from './league-promotion';
 import { planLeagueConversion, validateLeagueConversionEntries } from './league-series-conversion-plan';
 import { CommitLeagueConversionDto, PreviewLeagueConversionDto } from './dto/league-series-conversion.dto';
+import { findNextSeasonLeague, LEAGUE_CONVERSION_ACTION } from './league-season-link';
 
-const ACTION = 'league_series.convert_independent';
+const ACTION = LEAGUE_CONVERSION_ACTION;
 @Injectable()
 export class LeagueSeriesConversionService {
   constructor(
@@ -42,6 +43,9 @@ export class LeagueSeriesConversionService {
   }
 
   private async load(tx: Prisma.TransactionClient, leagueId: string, dto: PreviewLeagueConversionDto) {
+    // 첫 문장으로 원본 행을 잠근다 — 다음 시즌 잇기(`assertNextSeasonSourceInTx`)가 같은 행을 갱신하므로 둘이 겹치면
+    // 한쪽이 기다리거나 직렬화 충돌(409)로 끝난다. 둘 중 하나만 한다(2026-11-03 사용자 선택).
+    await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${leagueId} AND kind = 'regular_league' FOR UPDATE`;
     const source = await findTournamentOnSurface(tx, ['regular_league'], {
       where: { id: leagueId, deletedAt: null },
       include: { sport: true, registrations: { where: { status: 'confirmed' }, include: { team: true } } },
@@ -54,6 +58,11 @@ export class LeagueSeriesConversionService {
     });
     if (source.seriesId || previous)
       throw new ConflictException({ code: 'LEAGUE_ALREADY_CONVERTED', message: '이미 리그 체계에 연결된 리그예요.' });
+    if (await findNextSeasonLeague(tx, leagueId))
+      throw new ConflictException({
+        code: 'LEAGUE_NEXT_SEASON_EXISTS',
+        message: '다음 시즌을 이은 리그는 리그 체계로 전환할 수 없어요.',
+      });
     if (source.status !== 'completed')
       throw new ConflictException({ code: 'LEAGUE_NOT_COMPLETED', message: '리그를 종료한 뒤 전환해 주세요.' });
     const teams = source.registrations.map((r) => r.team);

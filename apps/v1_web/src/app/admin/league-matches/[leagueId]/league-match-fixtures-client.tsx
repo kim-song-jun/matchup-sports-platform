@@ -28,6 +28,7 @@ import {
 import { describeLeagueRegistrationWindow } from '@/lib/league-registration-copy';
 import { leagueFixtureMatchupLabel } from '@/lib/league-fixture-meta';
 import { LeagueManualFixtureModal, nextKickoffTime } from './league-manual-fixture-modal';
+import { LeaguePreviousSeasonTeams } from './league-previous-season-teams';
 import { LeagueFixtureScheduleModal, type LeagueFixtureSchedulePatch } from './league-fixture-schedule-modal';
 import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
 import { useTournamentPeriodSettings } from '@/hooks/use-tournament-period-settings';
@@ -893,6 +894,16 @@ export default function LeagueMatchFixturesClient({
           placeholder="팀 이름으로 검색"
           emptyText="검색 결과가 없어요"
         />
+        {/* 독립 리그의 다음 시즌(2026-11-03) — 지난 시즌 팀을 골라 한 번에 넣는다. */}
+        {series.previousSeason ? (
+          <LeaguePreviousSeasonTeams
+            leagueId={leagueId}
+            previousSeason={series.previousSeason}
+            currentTeamIds={existingTeamIds}
+            disabled={!canWrite || leagueEnded}
+            showToast={showToast}
+          />
+        ) : null}
       </div>
 
       {manualFixtureEntry}
@@ -1273,6 +1284,16 @@ export default function LeagueMatchFixturesClient({
               placeholder="팀 이름으로 검색"
               emptyText="검색 결과가 없어요"
             />
+            {/* 독립 리그의 다음 시즌(2026-11-03) — 지난 시즌 팀을 골라 한 번에 넣는다. */}
+            {series.previousSeason ? (
+              <LeaguePreviousSeasonTeams
+                leagueId={leagueId}
+                previousSeason={series.previousSeason}
+                currentTeamIds={existingTeamIds}
+                disabled={!canWrite || leagueEnded}
+                showToast={showToast}
+              />
+            ) : null}
           </div>
 
           {/* 우천 순연 재편성·대체 경기는 대진이 **이미 있는** 리그에서 필요하므로 분기 밖에 둔다. */}

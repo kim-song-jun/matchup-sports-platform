@@ -178,9 +178,21 @@ export interface V1LeagueFixture {
   game?: V1AdminBracketFixtureGame | null;
 }
 
+/** 이어진 지난·다음 시즌 한 건(독립 리그 → 독립 리그, 2026-11-03). */
+export interface V1LeagueSeasonLink {
+  leagueId: string;
+  title: string;
+}
+
 export interface V1AdminLeagueDetail {
   /** 독립 리그는 null. 이전 API 응답에는 없을 수 있어 전환 메뉴는 명시적인 null만 허용한다. */
   seriesId?: string | null;
+  /** 이 리그가 이어 가는 지난 시즌. optional 은 API 가 먼저 배포되지 않은 창의 구버전 응답용이다. */
+  previousSeason?: V1LeagueSeasonLink | null;
+  /** 이 리그를 이어 가는 다음 시즌. */
+  nextSeason?: V1LeagueSeasonLink | null;
+  /** 리그 체계로 전환한 리그인지 — 다음 시즌 잇기와 둘 중 하나만 한다. */
+  convertedToSeries?: boolean;
   leagueId: string;
   title: string;
   /** 저장된 리그 상태. `state` 가 합쳐 보이는 draft/open/closed를 구분한다. */
@@ -317,12 +329,15 @@ export interface V1PublicLeagueDetail extends Omit<V1AdminLeagueDetail, V1AdminO
    * 단발 리그거나 다음 시즌이 아직 없으면 null. optional 은 API 가 먼저 배포되지 않은 창의 구버전 응답용이다.
    */
   nextRound?: V1LeagueNextRound | null;
+  /** 독립 리그가 이어 가는 지난 시즌(공개된 리그만). */
+  previousRound?: V1LeagueSeasonLink | null;
 }
 
 export interface V1LeagueNextRound {
   leagueId: string;
   title: string;
-  seasonNo: number;
+  /** 리그 체계의 다음 시즌 번호. 어드민이 이어 둔 독립 리그의 다음 시즌은 번호가 없다(null). */
+  seasonNo: number | null;
   startsOn: string;
   endsOn: string;
   registrationOpen: boolean;
@@ -405,6 +420,8 @@ export interface V1CreateLeaguePayload {
   bankHolder?: string;
   /** 대회와 같은 성별 카테고리. 화면은 필수로 고르게 하고, 서버는 생략을 허용한다. */
   genderCategory?: V1TournamentGenderCategory;
+  /** 이어 갈 지난 시즌(다음 시즌 만들기). */
+  previousLeagueId?: string;
 }
 
 export type V1LeagueStateValue = 'draft' | 'active' | 'completed' | 'on_hold';
@@ -796,6 +813,14 @@ export interface V1CreateManualLeagueFixturePayload extends V1PlaceSnapshotPaylo
 export interface V1CreateManualLeagueFixturesResult {
   leagueId: string;
   teamMatchIds: string[];
+}
+
+/** `POST /admin/league-matches/:leagueId/previous-season-teams` */
+export interface V1AddPreviousSeasonTeamsResult {
+  leagueId: string;
+  teamIds: string[];
+  carriedPlayerCount: number;
+  hasExistingFixtures: boolean;
 }
 
 /** `POST /admin/league-matches/:leagueId/fixtures/template` */

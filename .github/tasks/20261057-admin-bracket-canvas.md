@@ -1124,6 +1124,9 @@ PR1858 latest-dev merge 30개 충돌 파일. generated Prisma client/의존성 �
 - UI 재진입: 저장된 예선을 건너뛰지 않고 읽기 전용으로 확인→다음 가능. 생성 화면은 팀 선택 단계를 거치지 않는다. 단계 이동/검증 실패 시 본문 스크롤을 상단으로 초기화한다.
 - Phase3 제한: alpha 기능0/7·viewport0/3. `cua.getState()`가 sandbox 초기화 오류로 브라우저 생성 전에 종료됨. 미배포·미수동검증이며 완료/PR-ready로 표기하지 않는다. 상세는 `docs/scenarios/multi-finals-deferred-teams-20261104.md`.
 - 검증 환경: 기존 공유 client가 구 schema라 최초 단위 실행이 type mismatch로 중단됨. 최신 v1 의존성을 읽기 전용 링크로 재사용해 해결. 임시 PostgreSQL55484 runner는 종료됨. 전체 migration replay는 기존 Android policy materialization gate에서 중단됐고, 별도 빈 DB에 최신 schema를 준비한 기능 통합만 PASS로 집계한다.
+- 사용자 후속 요청: 공개 사용자 순위표에서 조별 순위·결선이 모두 빠지는 문제 확인/수정. API는 두 데이터를 제공하지만 bracket-page-client의 3개 표시 gate가 group_knockout만 허용해 league_knockouts를 제외한다. 기존 공개 순위표·이름별 결선 컴포넌트를 그대로 복구하는 조건/분류 로직 수정이며 신규 UI 설계는 없다.
+- 후속 Owned: 공개 bracket-page-client.tsx/test.tsx, 이 task·시나리오·changeset/API 설명. 이전 PR2149의 후속 커밋으로 전달. 회귀 RED→GREEN으로 조별 전체 순위·N개 미정 결선·공식 배정 후 진출 표시를 확인한다.
+- 공개 후속 검증: 최초 3개 UI 회귀 RED → 표시 gate 수정 후 신규5개 포함 공개 순위/분류/결선/최종결과177/177 PASS, Web tsc0·pattern PASS. alpha 공개 API에서 해당 대회의 예선3조/42경기와 결선8개 편성/전체58경기 존재를 확인했으나 예선 팀 배정·순위행·완료는 모두0이다. 데이터 쓰기0, API 읽기를 브라우저 PASS로 집계하지 않는다.
 
 ### 2026-11-03 alpha 배포 요청 후속
 

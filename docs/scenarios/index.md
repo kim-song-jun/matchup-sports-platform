@@ -2,6 +2,8 @@
 
 [시나리오](./multi-finals-deferred-teams-20261104.md) · [task](../../.github/tasks/20261057-admin-bracket-canvas.md). 사용자 B안: 대진 생성과 배정 화면 분리. API15/Web146/실제PG10 tests, 양쪽 typecheck·surface/pattern PASS. 미정 시드 선생성, 전체 순위/동률 수동 선택, 기존 경기 ID/일정 보존을 검증했다. alpha 기능0/7·viewport0/3이며 브라우저 도구 초기화 오류와 미배포가 blocker다.
 
+사용자 공개 순위표 후속: league_knockouts의 조별/결선 표시 gate 누락 수정. 신규 회귀 RED3→신규5개 포함 공개177/177·Web tsc/pattern PASS. 실제 alpha 공개 API는 예선3조·42경기/결선8편성을 제공하지만 예선 배정팀·순위행·완료0이다. API 읽기와 브라우저 검증을 구분하며 신규 화면 검증은 여전히 미실행이다.
+
 ## 2026-11-02 — 정규리그 + N개 토너먼트 확장
 
 [작업 문서](../../.github/tasks/20261057-admin-bracket-canvas.md#2026-11-02-extension--정규리그--n개-토너먼트) · [시나리오](./18-regular-tournament-split-finals.md#2026-11-02-extension--n개-토너먼트와-진출팀-직접-선택). PR1858 고정 두 결선을 별도 format으로 일반화. 순위 제안 뒤 참가팀 추가·제외·이동, 예선 보존, N개 결선/범위 시상. 구현·로컬 검증 진행, alpha0/10·after0/3이며 배포/운영 변경 없음.

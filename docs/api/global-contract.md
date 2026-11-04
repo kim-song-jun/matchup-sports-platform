@@ -2,6 +2,10 @@
 
 수상 추천용 관리자 선수 기록 조회는 해당 대회의 활성 디렉터도 허용하며, 다른 대회는 403으로 거부한다. [대회 권한 계약](./domains/tournaments.md#scoped-director-management)을 따른다.
 
+토너먼트별 최종 순위는 공식 결승 및 3·4위전 결과를 범위별로 표시한다. N개 결선의 미확정/동률 자동 명단은 409 대신 null로 유지하며 진출 규칙 수만큼 미정 시드를 선생성한다. 같은 구조의 후속 배정은 기존 경기와 일정을 유지한다. [대회 계약](./domains/tournaments.md)을 따른다.
+
+관리자 대회 CRUD 응답은 저장된 nullable `kind`를 포함하며 대진·시상 기능의 종류 판정에 사용한다. [대회 계약](./domains/tournaments.md)을 따른다.
+
 6강 전용 진출 결정은 기존 관리자 가드/응답 envelope를 따르며, source version 충돌은409, 참가·방식 조합 오류는422이다. [도메인 계약](./domains/tournaments.md#6강-결승-직행-방식-2026-10-28) 참조.
 
 신규 가입자의 경기 기록은 기본 공개이며, 기존 회원은 활성·가입 완료·미설정인 경우에만 공개로 초기화한다. 직접 비공개 선택과 실명·개별 기록 숨김 정책은 유지한다. [가입 계약](./domains/auth.md#signup-flow) · [설정 계약](./domains/users.md#경기-기록-공개-설정).
@@ -71,7 +75,7 @@ All responses use `{status,data,timestamp}`. Collection reads use `limit` (defau
 | `POST /api/v1/games/:gameId/result-revisions/:revisionId/supersede-and-submit` | `{expectedVersion,score,actualParticipants,eventsHash,mvpParticipantId?,reason}` → atomically creates a content-immutable superseding revision, moves it `DRAFT→SUBMITTED`, and starts a fresh review SLA | tournament_director/platform_ops; base must be `SUBMITTED` (Task 166 — 어드민이 제출된 결과를 그 자리에서 고친다), otherwise `409 RESULT_RESUBMISSION_NOT_ALLOWED` |
 | `POST /api/v1/games/:gameId/result-revisions/:revisionId/officialize` | `{expectedVersion,projectionPreviewHash}` → official revision/outbox watermark | platform_ops; tournament_director only when audited flag enabled |
 | `POST /api/v1/games/:gameId/result-revisions/:revisionId/void` | `{expectedVersion,reason}` → append-only void revision/current pointer/outbox watermark | platform_ops; audited tournament_director only when flag enabled |
-| `POST /api/v1/games/:gameId/corrections` | `{expectedVersion,baseRevisionId,reason,changes}` → superseding draft revision | platform_ops/tournament_director |
+| `POST /api/v1/games/:gameId/corrections` | `{expectedVersion,baseRevisionId,reason,changes}` → superseding draft revision; changed shootout scores require actual paired kick counts on event-backed games; explicit `changes.score.penalties.operatorOverride:false` prevents base override inheritance | platform_ops/tournament_director |
 | `GET /api/v1/tournaments/:tournamentId/fixtures/:fixtureId/claimable-participants` · `GET /api/v1/league-matches/:leagueId/fixtures/:teamMatchId/claimable-participants` · `GET /api/v1/team-matches/:teamMatchId/claimable-participants` | → `{gameId,version,rosterCount,rosterSubmitted,participants[]}`; `participants` are the roster rows not yet linked or pending, `rosterCount` counts the whole roster with the official-result selector (per side: submitted lineup, else latest draft) so an empty list can tell "no roster yet" (`0`) from "everyone is linked"; `rosterSubmitted` is `true` once at least one side has a submitted (SUBMITTED/LOCKED) lineup — a draft-only roster still counts and lists candidates, but with no candidates the screen says "no submitted roster yet" instead of "everyone is linked" (tournament/league rosters are always submitted) | member of either participating team (`participant_identity`) |
 | `POST /api/v1/games/:gameId/participants/:participantId/identity-link-requests` | `{expectedVersion}` → `{requestId,state:"pending_attestation",version,effectiveAt,expiresAt}` | authenticated user is server-derived; database transaction time is `effectiveAt`, expiry is database `effectiveAt+24h`; caller identity/time fields are forbidden |
 | `POST /api/v1/games/:gameId/participants/:participantId/identity-link-requests/:requestId/attest` | `{expectedVersion,decision:approve|reject,reason}` → append-only attestation event and active/rejected link state | owning team_owner or platform_ops; cannot self-attest; expired/race-lost request returns `409 IDENTITY_LINK_REQUEST_EXPIRED` |
@@ -252,3 +256,5 @@ status inputs are defined in [Tournaments](./domains/tournaments.md#competition-
 
 
 대회 생성·수정의 `prizeBreakdown`은 nullable string(최대 4,000자)이다. 기존 구분자 텍스트와 `@teameet/prizes/v1:` 접두의 분류 JSON 문자열을 지원하며, 소비자는 공용 파서로 읽는다. 이 필드를 원문 그대로 사용자에게 렌더하지 않는다. [대회 시상 계획 계약](./domains/tournaments.md#categorized-prize-plans) 참고.
+
+- 정규대회 진행 방식 `league_knockouts`는 한 대회의 예선 조별리그와 이름을 가진 N개 토너먼트다. 정규리그 시즌/승강과 별개이며 기존 `group_knockout`은 유지한다. 이 방식의 시상 `bracketTrack`은 고정 enum 대신 설정된 토너먼트 이름을 받으며 서비스가 대회 소속을 검증한다. 상세는 [대회 계약](./domains/tournaments.md#정규리그--n개-토너먼트-league_knockouts).

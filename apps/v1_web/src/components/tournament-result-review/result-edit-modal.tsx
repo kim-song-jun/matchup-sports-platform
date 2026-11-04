@@ -212,8 +212,8 @@ function participantFitsGoal(
  * 그래서 **허용 키 목록을 여기서 빠뜨리면 그 값은 조용히 사라진다.** 선축
  * (`firstKickSideKey`)이 정확히 그 자리다 -- 서버 `PenaltyScoreDto` 가 받아 주는 허용
  * 키이므로 재조립에 포함해야 한다. 빠뜨리면 승부차기로 승자가 갈린 결선 경기를 한 번만
- * 정정해도 "누가 먼저 찼는지"가 영구히 사라진다(이 폼에는 선축 입력란이 없어 되살릴
- * 수단도 없다). 값이 'HOME'/'AWAY' 가 아니면 선축만 떨어뜨리고 점수는 살린다 -- 서버
+ * 정정해도 "누가 먼저 찼는지"가 사라진다. 초기값과 편집값 모두 이 허용 키를 유지한다.
+ * 값이 'HOME'/'AWAY' 가 아니면 선축만 떨어뜨리고 점수는 살린다 -- 서버
  * `readStoredPenalties` 와 같은 관용 기준이다(여기서 점수까지 버리면 결선 정정이 통째로
  * 막힌다).
  */
@@ -233,9 +233,7 @@ function readSubmittablePenalties(raw: unknown): GameResultScoreInput['penalties
   if (home === away) return null;
   const side: { firstKickSideKey?: 'HOME' | 'AWAY' } =
     firstKickSideKey === 'HOME' || firstKickSideKey === 'AWAY' ? { firstKickSideKey } : {};
-  // 킥 수와 우회 표식도 **함께 옮긴다.** 이 화면에는 승부차기 입력란이 아예 없어서
-  // (2026-08-18 실측: 폼 필드 186개 중 0개) 여기서 떨어뜨리면 운영자가 되살릴 수단이 없고,
-  // 정정 한 번에 "이 결과는 규칙과 다르게 닫혔다"는 감사 기록이 영구히 사라진다.
+  // 기존 킥 수와 운영자 예외도 읽어 둔다. 무수정 저장에서 감사 기록을 잃지 않는다.
   // 킥 수는 둘 다 유효할 때만 옮긴다 — 한쪽만 옮기면 어느 팀이 몇 번 찼는지 모르는 채로
   // 서버 판정이 돌아간다.
   const countsValid =
@@ -358,6 +356,8 @@ export function ResultEditModal({
   const initialPenalties = readSubmittablePenalties(readGameResultScore(base.score)?.penalties);
   const [penaltyHome, setPenaltyHome] = useState(initialPenalties?.home ?? 0);
   const [penaltyAway, setPenaltyAway] = useState(initialPenalties?.away ?? 0);
+  const [takenHome, setTakenHome] = useState<number | null>(initialPenalties?.takenHome ?? null);
+  const [takenAway, setTakenAway] = useState<number | null>(initialPenalties?.takenAway ?? null);
   const [firstKickSideKey, setFirstKickSideKey] = useState<'' | 'HOME' | 'AWAY'>(
     initialPenalties?.firstKickSideKey ?? '',
   );
@@ -441,20 +441,26 @@ export function ResultEditModal({
 
   const trimmedReason = reason.trim();
   const baseScore = readGameResultScore(base.score);
-  // 승부차기 점수는 이 폼에서 편집하지 않고 base 스냅샷에서 읽어 **서버가 받아 주는
-  // 상태일 때만** 이어서 보낸다(`readGameResultScore` 가 중첩 `penalty`(단수)까지
-  // `penalties`(복수)로 정규화해 돌려주므로 형태별 분기는 여기서 필요 없다). 편집
-  // 대상이 아니라서 state 로 두지 않는다 -- 정규시간 점수만 고치는 정정이 결선 경기의
-  // 승자(승부차기)를 조용히 지우지 않게 보존하는 것이 목적이다. 승부차기 자체를 폼에서
-  // 고치는 입력란은 아직 이 폼의 범위가 아니므로, 이어서 보낼 수 없는 상태에서는 값을
-  // 떨어뜨리고 그 사실을 경고로 드러낸다(아래 `penaltyWarning`).
+  // 점수와 실제 시도 횟수를 함께 편집한다. 과거에 없던 횟수를 성공 수로 추정하지 않는다.
   const rawPenalties: unknown = baseScore?.penalties;
+  const penaltyScoreChanged = penaltyHome !== (initialPenalties?.home ?? 0) || penaltyAway !== (initialPenalties?.away ?? 0);
+  const penaltyCountsChanged = takenHome !== (initialPenalties?.takenHome ?? null) || takenAway !== (initialPenalties?.takenAway ?? null);
+  const penaltyInputsChanged = penaltyScoreChanged || penaltyCountsChanged || firstKickSideKey !== (initialPenalties?.firstKickSideKey ?? '');
+  const hasKickCounts = takenHome !== null && takenAway !== null;
+  const penaltyCountsWarning = (penaltyScoreChanged || takenHome !== null || takenAway !== null) && !hasKickCounts
+    ? '승부차기 결과를 변경하려면 양 팀의 실제 시도 횟수를 입력해 주세요.'
+    : hasKickCounts && (takenHome < penaltyHome || takenAway < penaltyAway)
+      ? '승부차기 시도 횟수는 성공 횟수보다 적을 수 없어요.'
+      : null;
   const submittablePenalties =
     penaltyHome !== penaltyAway
       ? {
           home: penaltyHome,
           away: penaltyAway,
           ...(firstKickSideKey ? { firstKickSideKey } : {}),
+          ...(hasKickCounts ? { takenHome, takenAway } : {}),
+          // 같은 성공 수라면 서버도 base 예외를 보완한다. 편집 시 false를 명시해 예외 재승계를 막는다.
+          ...(initialPenalties?.operatorOverride === true ? { operatorOverride: !penaltyInputsChanged } : {}),
         }
       : null;
   /**
@@ -468,7 +474,7 @@ export function ResultEditModal({
    *
    * 그래서 그 두 경우에는 base 에 승부차기 값이 있어도 **싣지 않는다**. 무조건 통과시키면
    * (a) 서버 가드가 배포된 뒤에는 결선 경기의 정규시간 점수 정정이 아예 불가능해지고
-   * (폼에 승부차기 입력란이 없어 값을 지울 수단이 없다), (b) 그 전에는
+   * (b) 그 전에는
    * `{home:1, away:2, penalties:{4,3}}` 처럼 **서로 모순된 공식 스코어**가 저장된다 --
    * 브래킷 진출자는 정규시간 우선으로 AWAY 를 올리는데
    * (`game-result-bracket-projection.service.ts` 의 `resolveWinnerSide`) 공개 화면은
@@ -498,7 +504,7 @@ export function ResultEditModal({
     // 승부차기가 떨어져 나가는 것도 "점수 변경"이다 -- 정규시간 점수를 안 건드린 정정에서
     // 승부차기만 사라지는 경우(결선이 아닌 픽스처의 레거시 승부차기 등)에 diff 가 침묵하면
     // 운영자가 무엇을 잃는지 확정 직전에 확인할 수 없다.
-    penaltiesDropped;
+    penaltiesDropped || (penaltiesAllowed && penaltyInputsChanged);
   /**
    * 승부차기 정합성을 저장 **전에** 알려준다. 서버 가드에 걸려 저장이 튕기거나, 기존
    * 승부차기 기록이 함께 지워지는 상황을 저장 버튼을 누르기 전에 드러낸다.
@@ -508,11 +514,10 @@ export function ResultEditModal({
    * 안내 문구에 "무효화 후 재입력"을 해결책으로 적지 않는다 -- 무효화는 다음 라운드
    * 픽스처가 이미 `scheduled` 를 벗어났으면 409 `NEXT_FIXTURE_CONFLICT` 로 막히므로
    * (`tournament-result-review.service.ts`) 그 경우 안내대로 해도 두 번 실패한다.
-   * 승부차기 자체를 폼에서 입력·수정하는 입력란은 이 pass 의 범위가 아니다.
    */
   const penaltyWarning = penaltiesAllowed
     ? submittablePenalties
-      ? null
+      ? penaltyCountsWarning
       : rawPenalties !== undefined
         ? '기존 승부차기 기록을 그대로 이어서 저장할 수 없어요(양 팀 점수가 0 이상의 정수이고 승자가 갈려야 해요). 결선 경기는 정규시간 무승부로 확정할 수 없으니 승부차기 결과를 다시 기록해야 해요.'
         : '결선 경기는 정규시간 무승부로 확정할 수 없어요. 승부차기 결과가 필요하니 점수를 다시 확인해 주세요.'
@@ -568,6 +573,7 @@ export function ResultEditModal({
   const canSubmit =
     trimmedReason.length > 0 &&
     (!penaltiesAllowed || submittablePenalties !== null) &&
+    (!penaltiesAllowed || penaltyCountsWarning === null) &&
     timelineMismatch === null &&
     !submitting;
 
@@ -745,7 +751,13 @@ export function ResultEditModal({
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
                 <StatNumberField id={`${idPrefix}-penalty-home`} label="홈 성공" value={penaltyHome} onValueChange={setPenaltyHome} />
                 <StatNumberField id={`${idPrefix}-penalty-away`} label="원정 성공" value={penaltyAway} onValueChange={setPenaltyAway} />
+                <StatNumberField id={`${idPrefix}-taken-home`} label="홈 시도" value={takenHome} onValueChange={setTakenHome} />
+                <StatNumberField id={`${idPrefix}-taken-away`} label="원정 시도" value={takenAway} onValueChange={setTakenAway} />
               </div>
+              <p className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>시도 횟수에는 성공과 실패를 모두 포함해요. 기존 기록이 없으면 실제 횟수를 확인해 입력해 주세요.</p>
+              {penaltyCountsChanged ? <p className="tm-text-caption" style={{ color: 'var(--blue700)', marginTop: 8 }}>
+                승부차기 시도 횟수 변경: 홈 {initialPenalties?.takenHome ?? '기록 없음'} · 원정 {initialPenalties?.takenAway ?? '기록 없음'} → 홈 {takenHome ?? '미입력'}회 · 원정 {takenAway ?? '미입력'}회
+              </p> : null}
               <fieldset style={{ marginTop: 12 }}>
                 <legend className="tm-text-caption" style={{ marginBottom: 8 }}>먼저 차는 팀</legend>
                 <div style={{ display: 'flex', gap: 16 }}>

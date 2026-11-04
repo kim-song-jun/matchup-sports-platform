@@ -12,8 +12,8 @@ export function useCompetitionDiscovery(
   seed?: TournamentListSeed['page'],
 ) {
   return useQuery({
-    queryKey: v1Keys.tournaments({ ...params, sort: params.sort ?? 'latest', withTotal: 'true' }),
-    queryFn: () => v1Get<CompetitionDiscoveryPage>('/tournaments', { ...params, sort: params.sort ?? 'latest', withTotal: 'true' }),
+    queryKey: v1Keys.tournaments({ ...params, withTotal: 'true' }),
+    queryFn: () => v1Get<CompetitionDiscoveryPage>('/tournaments', { ...params, withTotal: 'true' }),
     placeholderData: (previous) => previous ?? seed,
     // 시각 기반 마감·정원 정보를 다시 확인한다. 창 복귀 시에도 기본 refetch가 동작한다.
     refetchInterval: 30_000,

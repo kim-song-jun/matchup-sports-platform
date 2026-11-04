@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
+import { useCreateCtaSpace } from '@/components/v1-ui/use-create-cta-space';
 import { Card, EmptyState, ErrorState, SectionTitle } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { PlaceCard } from '@/components/v1-ui/place-card';
@@ -880,6 +881,8 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
 }
 
 export function TeamMatchCreatePageView({ model }: { model: TeamMatchCreateViewModel }) {
+  const fixedCtaRef = useRef<HTMLDivElement>(null);
+  useCreateCtaSpace(fixedCtaRef);
   const edit = model.step === 'edit' || model.step === 'edit-rules';
   const rulesStep = model.step === 'rules' || model.step === 'edit-rules';
   const step = edit ? 3 : stepToNumber(model.step);
@@ -927,7 +930,7 @@ export function TeamMatchCreatePageView({ model }: { model: TeamMatchCreateViewM
           {model.rules?.error ? <ErrorState compact title="경기 규칙을 다시 확인해 주세요" message={model.rules.error} onRetry={model.rules.onRetry} retryPending={model.rules.retryPending} /> : null}
         </>) : null}
       </div>
-      <div className="tm-fixed-cta tm-create-fixed-cta">
+      <div ref={fixedCtaRef} className="tm-fixed-cta tm-create-fixed-cta">
         {primaryDisabledReason ? <div role="status" className="tm-text-caption" style={{ marginBottom: 8, textAlign: 'center' }}>{primaryDisabledReason}</div> : null}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
           {secondaryAction ? <button className="tm-btn tm-btn-lg tm-btn-neutral" type="button" onClick={secondaryAction}>{model.step === 'edit-rules' ? '수정 화면으로' : edit ? '변경 취소' : model.step === 'team' ? '취소' : '이전'}</button> : <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={prevHref(model.step)}>{edit ? '변경 취소' : model.step === 'team' ? '취소' : '이전'}</Link>}

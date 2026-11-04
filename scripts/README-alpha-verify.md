@@ -172,3 +172,7 @@ alpha 에는 보통 시작 전 대회 경기가 **하나도 없다**(전수 확�
 **경기를 시작하지 않으면** 대회에 되돌릴 수 없는 잠금도 안 생긴다.
 
 자격증명은 전부 환경변수로만 받는다(`ALPHA_EMAIL`/`ALPHA_PASSWORD`) — 이 저장소는 PUBLIC 이다.
+
+## 운영 콘솔 체험 수동 캡처
+
+scripts/qa/tournament-ops-demo-browser.cjs는 Alpha headed Chrome을 열어 JSON stdin 명령으로 실제 화면을 클릭·캡처해요. 자격증명은 비에코 stdin으로만 받으며 세션 파일은 만들지 않아요. activity는 API 요청 method/path와 console/pageerror를 관측해요. 종료 명령은 close이며 소유 context/browser/입력을 finally에서 닫아요. 생성 경로는 docs/screenshots/tournament-ops-demo예요.

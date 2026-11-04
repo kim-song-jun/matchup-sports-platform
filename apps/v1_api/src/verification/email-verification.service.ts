@@ -41,6 +41,8 @@ export class EmailVerificationService {
     { deliver }: { deliver: boolean },
   ): Promise<{ expiresAt: string; devCode?: string }> {
     const email = normalizeEmail(rawEmail);
+    // 미설정 오류도 가입된 주소와 미가입 주소에서 같아야 계정 존재 여부가 드러나지 않는다.
+    this.dispatcher.assertDeliveryAvailable('email', email);
     await this.assertResendCooldown(email);
     await this.sweepExpired();
 

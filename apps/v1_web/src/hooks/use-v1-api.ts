@@ -88,10 +88,24 @@ import type {
   V1AdminTeamMatchRow,
   V1AdminTeamRow,
   V1AdminDeleteUserPayload,
+  V1AdminReleaseUserPhonePayload,
+  V1AdminReleaseUserPhoneResult,
   V1AdminUserDetail,
   V1AdminUserRow,
   V1AuthMe,
   V1AuthSessionResponse,
+  V1CancelWithdrawalPayload,
+  V1LinkApplePayload,
+  V1LinkKakaoPayload,
+  V1LinkEmailCompletePayload,
+  V1LinkEmailCompleteResult,
+  V1LinkEmailRequestPayload,
+  V1LinkEmailRequestResult,
+  V1LinkEmailVerifyPayload,
+  V1LinkEmailVerifyResult,
+  V1LinkPendingPayload,
+  V1LinkSocialResult,
+  V1PhoneVerifyResult,
   V1EmailLoginResult,
   V1LoginStepUpResendResult,
   V1CurrentSignupTerms,
@@ -219,6 +233,8 @@ import type {
   V1TournamentReviewsPage,
   V1AdminTournamentReviewsPage,
   V1TournamentAward,
+  V1AdminTournamentAwardSet,
+  V1TournamentAwardSetInput,
   V1TournamentRegistration,
   V1TournamentRosterResponse,
   V1AdminTournamentRosterResponse,
@@ -357,6 +373,78 @@ export function useV1LoginStepUpResend() {
   });
 }
 
+// 연결로 바뀌는 건 로그인 수단 목록이다 — 그 목록을 담은 스냅샷(auth/me·설정·프로필)과, 서버가 남기는 연결 알림.
+// 같은 계정이라 clearV1IdentityCache 는 하지 않는다.
+function invalidateLoginMethodQueries(queryClient: QueryClient) {
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: v1Keys.authMe() }),
+    queryClient.invalidateQueries({ queryKey: v1Keys.settings() }),
+    queryClient.invalidateQueries({ queryKey: v1Keys.profile() }),
+    queryClient.invalidateQueries({ queryKey: v1Keys.notificationsRoot() }),
+  ]);
+}
+
+/** 로그인한 계정에 카카오를 붙인다. 웹은 인가 코드 + 인가 때 쓴 redirectUri, 네이티브 셸은 SDK 액세스 토큰. */
+export function useV1LinkKakao() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1LinkKakaoPayload) => v1Post<V1LinkSocialResult>('/auth/link/kakao', body),
+    onSuccess: () => invalidateLoginMethodQueries(queryClient),
+  });
+}
+
+export function useV1LinkApple() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1LinkApplePayload) => v1Post<V1LinkSocialResult>('/auth/link/apple', body),
+    onSuccess: () => invalidateLoginMethodQueries(queryClient),
+  });
+}
+
+/** 충돌 409 가 준 연결 토큰으로, 방금 로그인한 계정에 그 제공자를 제공자 재인증 없이 붙인다. */
+export function useV1LinkPending() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1LinkPendingPayload) => v1Post<V1LinkSocialResult>('/auth/link/pending', body),
+    onSuccess: () => invalidateLoginMethodQueries(queryClient),
+  });
+}
+
+/** 소셜 계정에 이메일 로그인을 더하는 1단계: 입력한 주소로 인증번호를 보낸다. 계정에는 아무것도 쓰지 않는다. */
+export function useV1LinkEmailRequest() {
+  return useMutation({
+    mutationFn: (body: V1LinkEmailRequestPayload) => v1Post<V1LinkEmailRequestResult>('/auth/link/email/request', body),
+  });
+}
+
+/** 2단계: 인증번호를 맞추고 `emailLinkToken` 을 받는다. */
+export function useV1LinkEmailVerify() {
+  return useMutation({
+    mutationFn: (body: V1LinkEmailVerifyPayload) => v1Post<V1LinkEmailVerifyResult>('/auth/link/email/verify', body),
+  });
+}
+
+/** 3단계: 비밀번호를 정해 이메일 로그인을 붙인다. 로그인 수단 목록과 계정 이메일이 바뀌므로 연결 훅과 같은 곳을 새로 읽는다. */
+export function useV1LinkEmailComplete() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1LinkEmailCompletePayload) => v1Post<V1LinkEmailCompleteResult>('/auth/link/email/complete', body),
+    onSuccess: () => invalidateLoginMethodQueries(queryClient),
+  });
+}
+
+/**
+ * 탈퇴 신청을 철회하고 세션을 받는다(로그인 응답과 같은 모양).
+ * 로그인 훅과 같은 규칙으로 응답을 인증 스냅샷에 넣는다 — 세션 힌트 저장과 `clearV1IdentityCache` 는 호출한 화면이 한다.
+ */
+export function useV1CancelWithdrawal() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1CancelWithdrawalPayload) => v1Post<V1AuthSessionResponse>('/auth/withdrawal/cancel', body),
+    onSuccess: (result) => queryClient.setQueryData<V1AuthMe>(v1Keys.authMe(), result),
+  });
+}
+
 export function useV1Register() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -427,8 +515,8 @@ export function useV1PhoneVerify() {
   return useMutation({
     // purpose 를 생략하면 가입용 토큰이 발급된다. 계정 찾기·비밀번호 재설정은
     // 'password_reset' 을 넘겨 가입용 증명과 섞이지 않게 한다.
-    mutationFn: (body: { phone: string; code: string; purpose?: 'signup' | 'password_reset' | 'social_link' }) =>
-      v1Post<{ verified: boolean; proofToken?: string }>('/auth/phone/verify', body),
+    mutationFn: (body: { phone: string; code: string; purpose?: 'signup' | 'password_reset' }) =>
+      v1Post<V1PhoneVerifyResult>('/auth/phone/verify', body),
   });
 }
 
@@ -439,8 +527,16 @@ export function useV1FindAccountByPhone() {
   });
 }
 
+/** 인증된 이메일의 계정에서 사용 가능한 로그인 수단을 조회한다. */
+export function useV1FindAccountByEmail() {
+  return useMutation({
+    mutationFn: (body: { email: string; proofToken: string }) =>
+      v1Post<V1FoundAccount>('/auth/recovery/email/find-account', body),
+  });
+}
+
 /**
- * 비로그인 이메일 OTP — 비밀번호 재설정 전용. 로그인 후 이메일 인증(/verification/email/*)은
+ * 비로그인 이메일 OTP — 계정 찾기와 비밀번호 재설정에 사용. 로그인 후 이메일 인증(/verification/email/*)은
  * 인증 가드 뒤라 여기 쓸 수 없어 공개 엔드포인트가 따로 있다.
  *
  * 응답은 가입 여부를 드러내지 않는다(계정 열거 방어) — 화면도 "가입된 주소면 보냈다"는 식으로만
@@ -456,7 +552,7 @@ export function useV1RecoveryEmailIssue() {
 
 export function useV1RecoveryEmailVerify() {
   return useMutation({
-    // 용도(purpose)를 보내지 않는다 — 이 경로가 발급하는 증명은 서버가 재설정용으로 고정한다.
+    // 용도(purpose)는 서버가 복구용으로 고정한다.
     mutationFn: (body: { email: string; code: string }) =>
       v1Post<{ verified: boolean; proofToken?: string }>('/auth/recovery/email/confirm', body),
   });
@@ -3636,6 +3732,18 @@ export function useV1DeleteAdminUser(userId: string) {
   });
 }
 
+export function useV1ReleaseAdminUserPhone(userId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1AdminReleaseUserPhonePayload) =>
+      v1Post<V1AdminReleaseUserPhoneResult>(`/admin/users/${userId}/phone/release`, body),
+    onSuccess: () => {
+      // 상세와 목록이 같은 접두사를 쓴다 — 번호·인증 표시가 두 화면에서 함께 바뀐다.
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'users'] });
+    },
+  });
+}
+
 export function useV1ChangeMatchStatus() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -4251,12 +4359,34 @@ export function useV1SetTournamentAwards(tournamentId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (awards: {
-      awardType: string; awardLabel: string; recipientName: string; recipientUserId: string;
+      awardType: string; awardLabel: string; recipientName: string; recipientUserId: string; bracketTrack?: string;
       iconKey?: string; teamName?: string; note?: string; sortOrder?: number;
     }[]) => v1Put<V1TournamentAward[]>(`/admin/tournaments/${tournamentId}/awards`, { awards }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
       void queryClient.invalidateQueries({ queryKey: ['admin-tournament-awards', tournamentId] });
+    },
+  });
+}
+
+/** 어드민: 상·하위 결선의 팀 시상 안내 조회 */
+export function useV1AdminTournamentAwardSets(tournamentId: string, enabled = true) {
+  return useQuery({
+    queryKey: ['admin-tournament-award-sets', tournamentId],
+    queryFn: () => v1Get<V1AdminTournamentAwardSet[]>(`/admin/tournaments/${tournamentId}/award-sets`),
+    enabled: !!tournamentId && enabled,
+  });
+}
+
+/** 어드민: 상·하위 결선 팀 시상 안내 저장 */
+export function useV1SetTournamentAwardSets(tournamentId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (awardSets: V1TournamentAwardSetInput[]) =>
+      v1Put<V1AdminTournamentAwardSet[]>(`/admin/tournaments/${tournamentId}/award-sets`, { awardSets }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: v1Keys.tournament(tournamentId) });
+      void queryClient.invalidateQueries({ queryKey: ['admin-tournament-award-sets', tournamentId] });
     },
   });
 }
@@ -4716,7 +4846,7 @@ export function useV1MockSeedAvailability() {
 }
 
 export type CreateMockTournamentInput = {
-  format?: 'league' | 'knockout' | 'group_knockout';
+  format?: 'league' | 'knockout' | 'group_knockout' | 'league_knockouts';
   teamCount?: number;
   status?: 'open' | 'in_progress' | 'completed';
   withResults?: boolean;
@@ -4922,6 +5052,8 @@ export function useV1ConfirmRegistration() {
         queryKey: [...v1Keys.all, 'admin', 'tournaments'],
       });
       queryClient.invalidateQueries({ queryKey: v1Keys.tournament(_data.tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(_data.tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
     },
   });
 }
@@ -4942,6 +5074,8 @@ export function useV1CancelRegistrationAdmin() {
         queryKey: [...v1Keys.all, 'admin', 'tournaments'],
       });
       queryClient.invalidateQueries({ queryKey: v1Keys.tournament(_data.tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(_data.tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
     },
   });
 }
@@ -5932,6 +6066,8 @@ import type {
   V1UpdateLeagueVenueResult,
 
   V1CreateManualLeagueFixturePayload,
+  V1CreateManualLeagueFixturesResult,
+  V1AddPreviousSeasonTeamsResult,
 
   V1LeagueFixture,
 } from '@/types/league-match';
@@ -6159,11 +6295,12 @@ export function useV1UpdateLeagueVenue(leagueId: string) {
  * 화면이 없었다**(2026-09-04 실측: FE 호출 0건). 그래서 라운드로빈 일괄 생성 말고는 경기를
  * 추가할 방법이 없었다 — 우천 순연 재편성이나 대체 경기가 그래서 불가능했다.
  */
-export function useV1CreateManualLeagueFixture(leagueId: string) {
+/** 경기 추가(주차 단위) — 여러 경기를 한 트랜잭션으로 만든다. 한 경기만 보내도 같은 경로다. */
+export function useV1CreateManualLeagueFixtures(leagueId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: V1CreateManualLeagueFixturePayload) =>
-      v1Post<V1LeagueFixture>(`/admin/league-matches/${leagueId}/fixtures/manual`, body),
+    mutationFn: (fixtures: V1CreateManualLeagueFixturePayload[]) =>
+      v1Post<V1CreateManualLeagueFixturesResult>(`/admin/league-matches/${leagueId}/fixtures/manual/batch`, { fixtures }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
       queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
@@ -6232,6 +6369,20 @@ export function useV1AddLeagueTeam(leagueId: string) {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
       // 목록 화면이 "참가 팀" 수를 보여주므로 팀을 더한 뒤에도 목록을 무효화한다 —
       // 제거(useV1RemoveLeagueTeam)만 무효화하고 추가는 빼면 두 조작의 결과가 달라 보인다.
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
+    },
+  });
+}
+
+/** 지난 시즌 팀 한 번에 넣기(독립 리그의 다음 시즌, 2026-11-03) — 팀 추가와 같은 화면들을 무효화한다. */
+export function useV1AddPreviousSeasonTeams(leagueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (teamIds: string[]) =>
+      v1Post<V1AddPreviousSeasonTeamsResult>(`/admin/league-matches/${leagueId}/previous-season-teams`, { teamIds }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueTeams(leagueId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
       queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
     },
   });

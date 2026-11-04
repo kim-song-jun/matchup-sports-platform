@@ -69,6 +69,7 @@ export function BracketCanvasMobileScreen({ sixTeamState, tournamentId, registra
       ) : null}
       <BracketCanvasMobile
         sixTeamState={sixTeamState}
+        registrations={registrations}
         competitionId={tournamentId}
         scope="tournament"
         rounds={rounds}

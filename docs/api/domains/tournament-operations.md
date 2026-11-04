@@ -65,10 +65,11 @@ Response: `{platformRole, items[]}`. Each group includes `tournamentKind` (store
 | HTTP | Code | Meaning |
 |---|---|---|
 | `401` | — | unauthenticated |
-| `403` | `STAFF_SCOPE_DENIED` | no eligible read/authorize scope for the requesting actor (`details.reason` is one of `ASSIGNMENT_REQUIRED\|ASSIGNMENT_ROLE_MISMATCH\|ASSIGNMENT_REVOKED\|ASSIGNMENT_NOT_STARTED\|ASSIGNMENT_EXPIRED\|CROSS_TOURNAMENT_SCOPE\|FIXTURE_SCOPE_REQUIRED\|FIXTURE_SCOPE_DENIED\|FIELD_SCOPE_REQUIRED\|FIELD_SCOPE_DENIED\|ROLE_ACTION_DENIED`) |
+| `403` | `STAFF_SCOPE_DENIED` | no eligible read/authorize scope for the requesting actor (`details.reason` is one of `ASSIGNMENT_REQUIRED\|ASSIGNMENT_ROLE_MISMATCH\|ASSIGNMENT_REVOKED\|ASSIGNMENT_NOT_STARTED\|ASSIGNMENT_EXPIRED\|CROSS_TOURNAMENT_SCOPE\|FIXTURE_SCOPE_REQUIRED\|FIXTURE_SCOPE_DENIED\|FIELD_SCOPE_REQUIRED\|FIELD_SCOPE_DENIED\|ROLE_ACTION_DENIED\|OWN_TEAM_FIXTURE`). `OWN_TEAM_FIXTURE`: a field operator who is an active member of either team in that fixture (field-scoped grant, or joined the team after the grant) |
 | `403` | `STAFF_MANAGEMENT_DENIED` | grant/revoke role-authority rule violated (`details.reason` one of `DIRECTOR_AUTHORITY_REQUIRED\|PLATFORM_OPS_ASSIGNMENT_FORBIDDEN\|DIRECTOR_CANNOT_GRANT_DIRECTOR\|DIRECTOR_CANNOT_REVOKE_DIRECTOR\|CROSS_TOURNAMENT_SCOPE\|FIRST_DIRECTOR_REQUIRES_BOOTSTRAP\|FIRST_DIRECTOR_REQUIRES_PLATFORM_OPS\|ACTOR_AUTHORITY_CHANGED`) |
 | `404` | `TOURNAMENT_NOT_FOUND` \| `STAFF_TARGET_NOT_FOUND` \| `STAFF_ASSIGNMENT_NOT_FOUND` | tournament, grant target, or revoke target does not exist (or the assignment does not belong to this tournament) |
 | `409` | `STAFF_TARGET_INACTIVE` | grant target's `accountStatus` is not `active` |
+| `409` | `STAFF_OWN_TEAM_FIXTURE` | `FIELD_OPERATOR` grant whose `fixtureIds` include a fixture where the target is an active member of the home or away team (2026-11-02, MD-QA #193) |
 | `409` | `STAFF_DIRECTOR_ALREADY_BOOTSTRAPPED` | bootstrap raced against an existing active director |
 | `409` | `STAFF_ASSIGNMENT_ALREADY_REVOKED` | revoke target already has `revokedAt` set |
 | `409` | `STALE_STAFF_ASSIGNMENT_VERSION` | `expectedVersion` on revoke did not match the current row |
@@ -384,7 +385,12 @@ revision snapshot—not the frozen raw event stream—is the validation and publ
 projection source. The server returns 422 RESULT_GOAL_TIMELINE_INVALID if its
 score total, scorer side, own-goal opposing side, or participant goal totals
 do not agree. The correction UI also edits knockout penalty home/away scores
-and firstKickSideKey.
+and firstKickSideKey. Score edits include actual `takenHome`/`takenAway` kick
+counts; missing historical counts are not inferred. Both counts must be present
+together and at least the corresponding scored count. A correction that explicitly
+sets `penalties.operatorOverride: false` opts out of inheriting the base revision's
+override, even when the successful-kick scores are unchanged. False is normalized
+to an absent stored override; the normal shootout-conclusion gate still runs.
 
 ## 2026-10-13 정규 리그 운영 조회
 

@@ -3,6 +3,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render as rtlRender, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackEvent } from '@/lib/analytics';
+import { v1Get } from '@/lib/api-client';
+import { useShellOverrideForRoute } from '@/components/v1-ui/shell-override';
 import type { V1TournamentDetail } from '@/types/api';
 import { TournamentDetailPageClient } from './tournament-detail-client';
 import { queryImageBySrc } from '@/test/next-image';
@@ -168,7 +170,9 @@ describe('TournamentDetailPageClient GA events', () => {
     await screen.findByRole('heading', { name: `결승 직행 · ${bye ? '가팀' : '선정 대기'}` });
     expect(screen.getByText('준결승 부전승 1팀 · 6강 승리팀 중 선정')).toBeInTheDocument();
     expect(screen.getByText(/최다 득점 → 최대 득실차 → 최소 실점/)).toBeInTheDocument();
-    expect(screen.getAllByRole('link', { name: '경기 상세' })).toHaveLength(5);
+    const bracket = screen.getByRole('region', { name: '6강부터 결승까지 대진' });
+    expect(within(bracket).getAllByRole('group', { name: / 대 / })).toHaveLength(5);
+    expect(within(bracket).queryByRole('link', { name: '경기 상세' })).not.toBeInTheDocument();
     expect(container.querySelector('[data-connected-bracket-wide="true"]')).toBeNull();
     expect(screen.getByRole('region', { name: '결승 직행 선정' })).toBeInTheDocument();
   });
@@ -221,8 +225,9 @@ describe('TournamentDetailPageClient GA events', () => {
 
   it('keeps the shared application contract in a regular-league rail without tournament capacity facts', async () => {
     tournamentApiMocks.useV1Tournament.mockReturnValue({
+      // 2026-10-27: 리그도 접수 중(open)일 때만 신청 레일이 있다.
       data: makeTournament({
-        status: 'in_progress',
+        status: 'open',
         kind: 'regular_league',
         entryFeeConfigured: false,
         registrationDeadlineAt: '2099-08-10T14:59:00.000Z',
@@ -238,7 +243,7 @@ describe('TournamentDetailPageClient GA events', () => {
     render(<TournamentDetailPageClient tournamentId="tournament-1" />);
 
     await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
-    const rail = screen.getByRole('complementary', { name: '리그 진행 상태' });
+    const rail = screen.getByRole('complementary', { name: '리그 참가 신청' });
     expect(within(rail).getByRole('link', { name: '참가 신청하기' })).toHaveAttribute(
       'href', '/tournaments/tournament-1/my',
     );
@@ -475,6 +480,33 @@ describe('TournamentDetailPageClient — 우리 팀 참가 카드(Task 180 R-1 A
     await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
     expect(screen.queryByRole('heading', { name: '우리 팀 참가' })).not.toBeInTheDocument();
   });
+
+  it('전체 신청 목록을 셸 CTA로 전달해 운영 중인 확정 팀의 다음 시즌 신청으로 연결한다', async () => {
+    tournamentApiMocks.useV1Tournament.mockReturnValue({
+      data: makeTournament({ kind: 'regular_league', format: 'league', status: 'completed' }),
+      isPending: false, isError: false, error: null, refetch: vi.fn(),
+    });
+    tournamentApiMocks.useV1MyRegistrations.mockReturnValue({ data: [
+      { id: 'reg-b', teamId: 'team-b', status: 'confirmed' },
+      { id: 'reg-a', teamId: 'team-a', status: 'confirmed' },
+    ] });
+    const get = vi.mocked(v1Get);
+    const originalGet = get.getMockImplementation()!;
+    get.mockImplementation((path, ...args) => path === '/league-matches/tournament-1'
+      ? Promise.resolve({ nextRound: { leagueId: 'next-league', registrationOpen: true } })
+      : originalGet(path, ...args));
+    function FloatingCTA() {
+      const shell = useShellOverrideForRoute('/tournaments/tournament-1');
+      return <>{shell.floatingSlot}</>;
+    }
+    try {
+      render(<><TournamentDetailPageClient tournamentId="tournament-1" /><FloatingCTA /></>);
+      expect(await screen.findByRole('link', { name: '다음 시즌 재참가 신청' }))
+        .toHaveAttribute('href', '/tournaments/next-league/apply?team=team-a');
+    } finally {
+      get.mockImplementation(originalGet);
+    }
+  });
 });
 
 describe('TournamentDetailPageClient — 리그 방식 일정', () => {
@@ -643,6 +675,20 @@ describe('TournamentDetailPageClient — 신청 마감은 시각까지 보여요
     renderWithDeadline({ kind: 'regular_tournament', status: 'open' });
     await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
     expect(screen.getAllByText('2099년 8월 10일 (월) 오후 11:59').length).toBeGreaterThan(0);
+  });
+
+  // 리그 기간은 날짜만 저장한다(UTC 자정) — 시각을 붙이면 '09:00'이 보였다(MD-QA #196).
+  it.each(['open', 'completed'] as const)('리그(%s) 일정은 날짜만 적고 시각을 붙이지 않아요', async (status) => {
+    renderWithDeadline({ kind: 'regular_league', status, scheduledAt: '2099-11-14T00:00:00.000Z', scheduledEndAt: '2099-12-12T00:00:00.000Z' });
+    await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
+    expect(screen.getAllByText('11/14 (토)~12/12 (토)').length).toBeGreaterThan(0);
+    expect(screen.queryByText(/09:00/)).not.toBeInTheDocument();
+  });
+
+  it('대조군: 대회 일정은 개최 시각까지 적어요', async () => {
+    renderWithDeadline({ kind: 'regular_tournament', status: 'open', scheduledAt: '2099-11-14T01:00:00.000Z', scheduledEndAt: '2099-11-14T09:00:00.000Z' });
+    await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
+    expect(screen.getAllByText('11/14 (토) 10:00~18:00').length).toBeGreaterThan(0);
   });
 
   it('리그 데스크톱 레일의 신청 마감도 시각까지 적혀요', async () => {

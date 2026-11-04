@@ -33,11 +33,19 @@ export interface V1PushRegistration {
   isPending: boolean;
 }
 
-export function useV1PushRegistration(): V1PushRegistration {
+export interface UseV1PushRegistrationOptions {
+  /**
+   * false 면 이 훅은 푸시를 쓸 수 없는 환경처럼 동작한다: 앱 셸 상태 조회·focus 리스너·구독 확인을
+   * 걸지 않고 subscribe/unsubscribe 는 아무것도 하지 않는다. 푸시 등록이 있을 수 없는 계정의 화면용.
+   */
+  enabled?: boolean;
+}
+
+export function useV1PushRegistration({ enabled = true }: UseV1PushRegistrationOptions = {}): V1PushRegistration {
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isPending, setIsPending] = useState(false);
-  const nativeSupported = isNativePushAvailable();
-  const browserSupported = typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window;
+  const nativeSupported = enabled && isNativePushAvailable();
+  const browserSupported = enabled && typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window;
   // 권한은 state로 들고 requestPermission 결과로 갱신한다. 렌더 중 Notification.permission을
   // 직접 읽으면 사용자가 권한 팝업에서 '차단'을 눌러도 리렌더가 없어 UI가 계속 '허용 가능'으로
   // 남는다(구독 실패 → 상태 변화 없음 → 리렌더 없음).
@@ -190,7 +198,7 @@ export function useV1PushRegistration(): V1PushRegistration {
       // subscribe() 안에서만 등록하므로(이 파일의 register 호출이 유일하다), 푸시를
       // 켠 적 없는 브라우저에는 등록 자체가 없다. 그때 `ready` 는 reject 하는 게
       // 아니라 **영원히 미결**로 남는다 — 호출부의 .catch 로도 못 잡는다. 로그아웃이
-      // 이 프로미스를 기다린 뒤 리다이렉트하므로(logout-button.tsx), 푸시를 안 쓴
+      // 이 프로미스를 기다린 뒤 리다이렉트하므로(use-sign-out-and-leave.ts), 푸시를 안 쓴
       // 대다수 사용자의 로그아웃이 그대로 멈춰 선다.
       // `getRegistration()` 은 등록이 없으면 undefined 로 **항상 결정**된다.
       const registration = await navigator.serviceWorker.getRegistration();

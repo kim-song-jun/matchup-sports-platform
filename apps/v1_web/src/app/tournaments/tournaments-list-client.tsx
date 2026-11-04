@@ -161,7 +161,7 @@ function TournamentsListContent({ seed }: { readonly seed?: TournamentListSeed }
 
   // 모바일은 커서 페이지를 누적한다 — 필터 되감기·상세 복귀 복원은 useCursorPagination(매치·팀매치와 같은 훅).
   const mobileFilters: TournamentListFilters = {
-    ...filters, sort: filters.sort ?? 'latest', limit: TOURNAMENT_LIST_PAGE_SIZE, sportId: querySportId, withTotal: 'true',
+    ...filters, limit: TOURNAMENT_LIST_PAGE_SIZE, sportId: querySportId, withTotal: 'true',
   };
   const { cursor, accumulated: allItems, setPagination, snapshotKey } = useCursorPagination<V1TournamentListItem>(
     v1Keys.tournaments(),
@@ -296,9 +296,9 @@ function TournamentsListContent({ seed }: { readonly seed?: TournamentListSeed }
           <EmptyState
             illustration={{ name: 'journey-done' }}
             title={`선택한 조건에 맞는 ${activeKind === 'league' ? '리그가' : activeKind === 'tournament' ? '대회가' : '대회·리그가'} 없어요`}
-            sub={filters.phase === 'completed' && filters.registration === 'open' ? '종료된 항목은 신청을 받지 않아요. 진행 상태나 모집 상태를 바꿔 주세요.' : '필터를 바꾸거나 초기화해서 다시 찾아보세요.'}
+            sub="필터를 바꾸거나 초기화해서 다시 찾아보세요."
             cta="필터 초기화"
-            ctaHref={competitionDiscoveryHref({ kind: activeKind, sort: filters.sort === 'deadline' ? undefined : filters.sort })}
+            ctaHref={competitionDiscoveryHref({ kind: activeKind })}
           />
         ) : (
           <>

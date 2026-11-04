@@ -161,7 +161,7 @@ export class TeamMatchCompletionNotificationService {
         awayTeamId: revision.awayTeamId,
       }),
       loadResultTeamNames(tx, revision.homeTeamId, revision.awayTeamId),
-      // 주차는 저장된 제목이 아니라 경기일 순번으로 파생한다(league-week-number.ts) — 취소된 대진도 센다.
+      // 주차는 저장된 제목이 아니라 달력 주 순번으로 파생한다(league-week-number.ts) — 취소된 대진도 센다.
       tx.v1TeamMatch.findMany({ where: { leagueId: teamMatch.leagueId, deletedAt: null }, select: { startAt: true } }),
     ]);
     const week = resolveLeagueWeekNumbers(

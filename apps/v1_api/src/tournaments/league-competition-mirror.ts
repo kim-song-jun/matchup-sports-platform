@@ -1,4 +1,4 @@
-import { Prisma, V1TournamentStatus } from '@prisma/client';
+import { Prisma, V1TournamentStatus, type V1TournamentGenderCategory } from '@prisma/client';
 // BE-5 drop: `V1LeagueState` enum 이 사라졌다. 응답 어휘는 손 유니온으로 남는다 —
 // **문자열 리터럴을 여기서 다시 선언하지 않는다**(league-state.ts 의 doc 참조).
 import { LeagueStateValue, type LeagueState } from '../league-matches/league-state';
@@ -88,6 +88,8 @@ export interface LeagueMirrorSource {
     maxPlayers: number | null;
     /** 같은 티어의 선택적 참가팀 정원. 이전 계약 입력은 생략할 수 있고 무제한을 유지한다. */
     maxTeams?: number | null;
+    /** 성별 카테고리. 이전 계약 입력은 생략할 수 있고 미지정(null)으로 둔다. */
+    genderCategory?: V1TournamentGenderCategory | null;
   };
 }
 
@@ -133,6 +135,7 @@ export function leagueMirrorCreateData(
           minPlayers: league.inherited.minPlayers,
           maxPlayers: league.inherited.maxPlayers,
           maxTeams: league.inherited.maxTeams ?? null,
+          genderCategory: league.inherited.genderCategory ?? null,
         }),
   };
 }

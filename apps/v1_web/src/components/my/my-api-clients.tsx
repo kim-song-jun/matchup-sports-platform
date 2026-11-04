@@ -12,6 +12,7 @@ import { AppBackLink } from '@/components/v1-ui/app-back-link';
 import { AlertTriangleIcon, ChevronLeftIcon, ChevronRightIcon, InfoCircleIcon } from '@/components/v1-ui/icons';
 import { Card, DatePickerTextInput, ListItem } from '@/components/v1-ui/primitives';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
+import { useCreateCtaSpace } from '@/components/v1-ui/use-create-cta-space';
 import { Check, Lock } from 'lucide-react';
 import { formatBirthDate, isValidBirthDateDigits, normalizeSeparatedDigits } from '@/components/auth/signup-profile-validation';
 import { PhoneVerificationCard } from '@/components/auth/phone-verification/phone-verification-card';
@@ -21,6 +22,7 @@ import { UserAvatar } from '@/components/v1-ui/user-avatar';
 import { extractErrorMessage } from '@/lib/error-message';
 import { TOURNAMENT_STAFF_ENTRY_LABEL } from '@/lib/tournament-staff-entry-label';
 import { reportClientError } from '@/lib/client-error-reporter';
+import { clearAuthHandoffStorage } from '@/lib/auth-handoff-storage';
 import { clearStoredV1Session, sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { clearV1IdentityCache } from '@/lib/query-keys';
 import { disconnectV1Socket } from '@/lib/v1-socket';
@@ -349,6 +351,8 @@ export function ProfileEditPageClient() {
     ?? sanitizeRedirectPath(searchParams.get('returnTo'))
     ?? '/my';
   const profile = useV1Profile();
+  const fixedCtaRef = useRef<HTMLDivElement>(null);
+  useCreateCtaSpace(fixedCtaRef, !profile.isPending && !profile.isError && Boolean(profile.data));
   const profileAuthMe = useV1AuthMe();
   const update = useV1UpdateProfile();
   const uploadImages = useV1UploadImages();
@@ -865,7 +869,7 @@ export function ProfileEditPageClient() {
         (2) 데스크톱: position:static 으로 전환해 폼 흐름 맨 끝에 위치시킵니다.
             tm-my-profile-edit-cta 데스크톱 override는 desktop/my.css에서 처리합니다.
       */}
-      <div className="tm-fixed-cta tm-my-profile-edit-cta">
+      <div ref={fixedCtaRef} className="tm-fixed-cta tm-my-profile-edit-cta">
         <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" type="submit" form="v1-profile-edit-form" disabled={isBlocked}>
           {update.isPending ? '저장 중' : '프로필 저장'}
         </button>
@@ -1275,6 +1279,8 @@ export function SettingsPageClient() {
 type LocationStatus = 'idle' | 'requesting' | 'matched' | 'denied' | 'unsupported' | 'unmatched' | 'saved';
 
 export function LocationSettingsPageClient() {
+  const fixedCtaRef = useRef<HTMLDivElement>(null);
+  useCreateCtaSpace(fixedCtaRef);
   const profile = useV1Profile();
   const regionsQuery = useV1MasterRegions();
   const resolveLocation = useV1ResolveLocation();
@@ -1360,7 +1366,7 @@ export function LocationSettingsPageClient() {
 
   return (
     <>
-      <div className="tm-my-shell tm-content-enter">
+      <div className="tm-my-shell tm-my-fixed-cta-shell tm-content-enter">
         <div className="tm-my-location-desktop">
           <div className="tm-desktop-page-head tm-show-desktop">
             <AppBackLink className="tm-desktop-back" fallbackHref={"/my/settings"}>
@@ -1408,7 +1414,7 @@ export function LocationSettingsPageClient() {
           </Card>
         </div>
       </div>
-      <div className="tm-fixed-cta tm-my-location-cta">
+      <div ref={fixedCtaRef} className="tm-fixed-cta tm-my-location-cta">
         <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" type="button" disabled={!selectedRegionId || updateRegion.isPending} onClick={save}>
           {updateRegion.isPending ? '저장 중' : '활동 지역 저장'}
         </button>
@@ -2254,6 +2260,8 @@ export function ThemeSettingsPageClient() {
 }
 
 export function WithdrawalPageClient() {
+  const fixedCtaRef = useRef<HTMLDivElement>(null);
+  useCreateCtaSpace(fixedCtaRef);
   const queryClient = useQueryClient();
   const pushRegistration = useV1PushRegistration();
   const [reason, setReason] = useState('');
@@ -2302,6 +2310,8 @@ export function WithdrawalPageClient() {
         context: { flow: 'withdrawal-session-cleanup' },
       });
     }
+    // 이 탭에서 이어 로그인하는 다른 계정이 연결·철회 토큰을 쓰지 않게 비운다.
+    clearAuthHandoffStorage();
     try {
       disconnectV1Socket();
     } catch (error) {
@@ -2405,7 +2415,7 @@ export function WithdrawalPageClient() {
     setIsRequestLocked(true);
     void confirm({
       title: '탈퇴 요청',
-      message: '정말 탈퇴 요청할까요? 신청 후에는 직접 취소할 수 없고, 운영팀 확인을 거쳐 처리돼요.',
+      message: '정말 탈퇴 요청할까요? 30일 안에는 다시 로그인해 취소할 수 있지만, 빠진 팀과 경기 명단은 돌아오지 않아요.',
       confirmLabel: '탈퇴 요청',
       tone: 'danger',
     }).then((ok) => {
@@ -2422,7 +2432,7 @@ export function WithdrawalPageClient() {
   return (
     <>
       {ConfirmModal}
-      <div className="tm-my-shell tm-content-enter">
+      <div className="tm-my-shell tm-my-fixed-cta-shell tm-content-enter">
         <div className="tm-my-withdrawal-desktop">
           <div className="tm-desktop-page-head tm-show-desktop">
             <AppBackLink className="tm-desktop-back" fallbackHref={"/my/settings"}>
@@ -2480,7 +2490,7 @@ export function WithdrawalPageClient() {
           {withdrawal.isError ? <WithdrawalErrorCard error={withdrawal.error} /> : null}
         </div>
       </div>
-      <div className="tm-fixed-cta tm-my-withdrawal-cta">
+      <div ref={fixedCtaRef} className="tm-fixed-cta tm-my-withdrawal-cta">
         <button
           className="tm-btn tm-btn-lg tm-btn-danger tm-btn-block"
           type="button"

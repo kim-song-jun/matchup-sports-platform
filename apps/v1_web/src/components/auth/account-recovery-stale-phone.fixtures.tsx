@@ -9,8 +9,8 @@ import { authUiServer, failure, RECOVERY_EMAIL, RECOVERY_PHONE, success, wireCal
 
 export const OTHER_PHONE = '01098765432';
 export const OLD_PHONE_ERROR = '이전 번호의 합성 계정 조회 오류예요.';
-export const SOCIAL_ACCOUNT = { maskedEmail: 'ka***@example.test', providers: ['kakao'], hasPassword: false } satisfies V1FoundAccount;
-export const EMAIL_ACCOUNT = { maskedEmail: 'ow***@example.test', providers: ['email'], hasPassword: true } satisfies V1FoundAccount;
+export const SOCIAL_ACCOUNT = { maskedEmail: 'ka***@example.test', providers: ['kakao'], hasPassword: false, withdrawalPendingUntil: null } satisfies V1FoundAccount;
+export const EMAIL_ACCOUNT = { maskedEmail: 'ow***@example.test', providers: ['email'], hasPassword: true, withdrawalPendingUntil: null } satisfies V1FoundAccount;
 
 function deferredResponse() {
   let accept: ((response: Response) => void) | undefined;
@@ -83,17 +83,32 @@ export function renderRecovery(content: ReactNode) {
   return { ...view, unmountRecovery: () => view.rerender(<MutationProgress />) };
 }
 
+export function backToIdentity() {
+  while (!screen.queryByLabelText('휴대폰 번호') && !screen.queryByLabelText('이메일')) {
+    fireEvent.click(screen.getAllByRole('button', { name: '이전 단계' })[0]);
+  }
+}
+
 export async function verifyPhone(phone = RECOVERY_PHONE) {
+  if (screen.queryByRole('group', { name: '찾을 항목' })) {
+    fireEvent.click(screen.getByRole('button', { name: '아이디·로그인 방법 찾기' }));
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    fireEvent.click(screen.getByRole('button', { name: '휴대폰으로 찾기' }));
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+  } else if (!screen.queryByLabelText('휴대폰 번호')) backToIdentity();
   fireEvent.change(screen.getByLabelText('휴대폰 번호'), { target: { value: phone } });
   const user = userEvent.setup();
+  await user.click(screen.getByRole('button', { name: '다음' }));
   await user.click(await screen.findByRole('button', { name: '인증번호 받기' }));
   await user.click(await screen.findByRole('button', { name: '확인' }));
 }
 
 export async function verifyIndependentEmail() {
-  fireEvent.click(screen.getByRole('tab', { name: '비밀번호 재설정' }));
+  backToIdentity();
+  fireEvent.click(screen.getByRole('button', { name: '비밀번호 재설정' }));
   fireEvent.change(screen.getByLabelText('이메일'), { target: { value: RECOVERY_EMAIL } });
   const user = userEvent.setup();
+  await user.click(screen.getByRole('button', { name: '다음' }));
   await user.click(await screen.findByRole('button', { name: '인증번호 받기' }));
   await user.click(await screen.findByRole('button', { name: '확인' }));
   await screen.findByLabelText('새 비밀번호');

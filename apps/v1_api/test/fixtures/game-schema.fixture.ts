@@ -603,7 +603,11 @@ export const gameSchemaSourceManifest = {
   // 2026-10-22: additive V1User.session_epoch integer default 0 (20261022120000_user_session_epoch); historical game migration unchanged.
   // 2026-10-27: additive round64/round32 and bracket draft fields. LF migration replay + drift passed.
   // 2026-10-28: six-team mode adds tournament fields only; historical game migration unchanged.
-  schema: '7cb13512f128b7b6e5eaf8f474938b65b1f30782afb46b833967d7f9be9e6626',
+  // 2026-10-29: additive v1_tournament_stage_period_settings + group/match period override columns; historical game migration unchanged.
+  // 2026-11-01: additive V1VerificationToken.purpose enum (20261101090000_v1_verification_token_purpose); historical game migration unchanged.
+  // 2026-11-02: add V1User.signupEmailLoginRequired; historical game migration is unchanged.
+  // 2026-11-03: additive V1Tournament.previousLeagueId; historical game migration unchanged.
+  schema: 'b0c1313b36e6a93e0f84a56a17e7950826bbd5f38b284f22eb72fb3570292960',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

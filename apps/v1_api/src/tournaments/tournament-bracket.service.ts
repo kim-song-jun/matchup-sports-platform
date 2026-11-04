@@ -64,6 +64,8 @@ import { tournamentTeamMatchBracketInclude, serializeTournamentTeamMatchBracket 
 import { competitionMatchLabel } from './tournament-round-label';
 import { updateFixtureDisplayLabelsInTx } from './fixture-display-label';
 import { acceptsBracketSource } from './tournament-bracket-phases';
+import { assertSameBracketTrack } from './bracket-track';
+import { assertBracketTrackRegistrationEligible } from './slots/bracket-track-eligibility';
 import { PLACE_SELECT } from '../places/place-select';
 import { rejectPartialPlaceUpdate, resolvePlaceSnapshot, toPlaceView, type PlaceView } from '../places/place-snapshot';
 import { TOURNAMENT_VENUE_SELECT, tournamentVenueSnapshot } from '../places/tournament-venue';
@@ -359,21 +361,28 @@ export class TournamentBracketService {
     const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { tournamentId });
     const tournament = await this.loadTournament(tournamentId);
     this.assertStandardBracket(tournament);
-    this.assertLeagueGroupShape(tournament.format, tournament.kind, dto.phase ?? 'group', dto.advanceCount);
+    const phase = dto.phase ?? 'group';
+    const bracketTrack = dto.bracketTrack ?? 'overall';
+    this.assertLeagueGroupShape(tournament.format, tournament.kind, phase, dto.advanceCount);
+    if ((phase === 'group' && bracketTrack !== 'overall') || (bracketTrack !== 'overall' && tournament.kind !== 'regular_tournament')) {
+      throw new UnprocessableEntityException({ code: 'BRACKET_TRACK_INVALID', message: '조별 단계는 전체 범위이며 분리 결선은 정규대회에서만 만들 수 있어요.' });
+    }
 
     const created = await this.prisma.$transaction((tx) =>
       createGroupInTx(tx, admin, tournamentId, {
         name: dto.name,
-        phase: dto.phase ?? 'group',
+        phase,
         sortOrder: dto.sortOrder ?? 0,
         advanceCount: dto.advanceCount ?? null,
+        bracketTrack,
       }),
     );
 
     return this.serializeGroup(created);
   }
 
-  private assertStandardBracket(tournament: { sixTeamBracket?: unknown }) {
+  private assertStandardBracket(tournament: { sixTeamBracket?: unknown; format?: string }) {
+    if (tournament.format === 'league_knockouts') throw new ConflictException({ code: 'MULTI_FINAL_SELECTION_REQUIRED', message: '예선·토너먼트 설정에서 대진을 관리해 주세요.' });
     if (tournament.sixTeamBracket != null) throw new ConflictException({ code: 'SIX_TEAM_STRUCTURE_LOCKED', message: '6강 전용 대진은 5경기로 구성돼요. 진출팀은 6강 진출 관리에서 변경해 주세요.' });
   }
 
@@ -395,6 +404,8 @@ export class TournamentBracketService {
           message: '해당 대회의 조를 찾을 수 없어요.',
         });
       }
+
+      if (group.phase !== 'group' && group.bracketTrack && !['overall', 'upper', 'lower'].includes(group.bracketTrack)) throw new ConflictException({ code: 'MULTI_FINAL_SELECTION_REQUIRED', message: '예선·토너먼트 설정에서 진출팀을 편집해 주세요.' });
 
       if (dto.isBye && group.phase !== 'round12') {
         throw new BadRequestException({ code: 'BYE_PHASE_INVALID', message: '부전승은 12강 단계에서만 지정할 수 있어요.' });
@@ -433,6 +444,15 @@ export class TournamentBracketService {
         throw new ConflictException({
           code: 'TEAM_ALREADY_IN_GROUP',
           message: '이미 해당 조에 배정된 팀이에요.',
+        });
+      }
+
+      if (group.phase !== 'group' && (group.bracketTrack === 'upper' || group.bracketTrack === 'lower')) {
+        await assertBracketTrackRegistrationEligible(tx, {
+          tournamentId,
+          groupId: group.id,
+          bracketTrack: group.bracketTrack,
+          registrationId: dto.registrationId,
         });
       }
 
@@ -488,6 +508,7 @@ export class TournamentBracketService {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`league-fixture-generation:${tournamentId}`}, 0))`;
       const group = await tx.v1TournamentGroup.findFirst({ where: { id: dto.groupId, tournamentId } });
       if (!group) throw new NotFoundException({ code: 'GROUP_NOT_FOUND', message: '해당 대회의 조를 찾을 수 없어요.' });
+      if (group.bracketTrack && !['overall', 'upper', 'lower'].includes(group.bracketTrack)) throw new ConflictException({ code: 'MULTI_FINAL_SELECTION_REQUIRED', message: '예선·토너먼트 설정에서 부전승을 포함한 대진을 생성해 주세요.' });
       const limits: Record<string, { teams: number; byes: number }> = {
         round64: { teams: 64, byes: 32 }, round32: { teams: 32, byes: 16 }, round16: { teams: 16, byes: 8 },
         round12: { teams: 12, byes: 4 }, quarter: { teams: 8, byes: 4 }, semi: { teams: 4, byes: 2 },
@@ -516,6 +537,14 @@ export class TournamentBracketService {
         const registration = await tx.v1TournamentRegistration.findFirst({ where: { id: registrationId, tournamentId } });
         if (!registration) throw new NotFoundException({ code: 'REGISTRATION_NOT_FOUND', message: '해당 대회의 신청을 찾을 수 없어요.' });
         if (registration.status !== 'confirmed') throw new ConflictException({ code: 'REGISTRATION_NOT_CONFIRMED', message: '확정된 신청만 부전승으로 등록할 수 있어요.' });
+        if (group.phase !== 'group' && (group.bracketTrack === 'upper' || group.bracketTrack === 'lower')) {
+          await assertBracketTrackRegistrationEligible(tx, {
+            tournamentId,
+            groupId: group.id,
+            bracketTrack: group.bracketTrack,
+            registrationId,
+          });
+        }
         const booked = await tx.v1TournamentMatchDetails.findFirst({ where: {
           tournamentId, group: { phase: group.phase },
           OR: [{ homeRegistrationId: registrationId }, { awayRegistrationId: registrationId }], teamMatch: { deletedAt: null },
@@ -715,10 +744,21 @@ export class TournamentBracketService {
       const payloadHash = canonicalGameCommandPayloadHash(commandPayload);
       await tx.$executeRawUnsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', durableCommandId);
       const group = dto.groupId
-        ? await tx.v1TournamentGroup.findFirst({ where: { id: dto.groupId, tournamentId }, select: { name: true, phase: true } })
+        ? await tx.v1TournamentGroup.findFirst({ where: { id: dto.groupId, tournamentId }, select: { name: true, phase: true, bracketTrack: true } })
         : null;
       if (dto.groupId && group === null) {
         throw new NotFoundException({ code: 'GROUP_NOT_FOUND', message: '해당 대회의 조를 찾을 수 없어요.' });
+      }
+      if (group && group.phase !== 'group' && (group.bracketTrack === 'upper' || group.bracketTrack === 'lower')) {
+        for (const registrationId of [dto.homeRegistrationId, dto.awayRegistrationId]) {
+          if (registrationId === undefined || registrationId === null) continue;
+          await assertBracketTrackRegistrationEligible(tx, {
+            tournamentId,
+            groupId: dto.groupId!,
+            bracketTrack: group.bracketTrack,
+            registrationId,
+          });
+        }
       }
       if (dto.groupId && group && ['round64', 'round32', 'round16', 'round12', 'quarter', 'semi'].includes(group.phase)) {
         const byeTeam = await tx.v1TournamentGroupTeam.findFirst({ where: {
@@ -977,11 +1017,16 @@ export class TournamentBracketService {
       // UUID ordering across phases can deadlock with officialization.
       const phases = await tx.v1TournamentMatchDetails.findMany({
         where: { tournamentId: initial.tournamentId, teamMatchId: { in: ids }, teamMatch: { deletedAt: null } },
-        select: { teamMatchId: true, group: { select: { phase: true } } },
+        select: { teamMatchId: true, group: { select: { phase: true, bracketTrack: true } } },
       });
       if (phases.length !== ids.length) throw new BadRequestException({ code: 'BRACKET_SOURCE_INVALID', message: '같은 대회의 삭제되지 않은 경기만 연결할 수 있어요.' });
       const targetPhase = phases.find((match) => match.teamMatchId === fixtureId)?.group?.phase;
+      const targetTrack = phases.find((match) => match.teamMatchId === fixtureId)?.group?.bracketTrack ?? 'overall';
       const upstreamIds = ids.filter((id) => id !== fixtureId);
+      for (const sourceId of desired.flatMap((source) => source.id === null ? [] : [source.id])) {
+        const sourceTrack = phases.find((match) => match.teamMatchId === sourceId)?.group?.bracketTrack ?? 'overall';
+        assertSameBracketTrack(sourceTrack, targetTrack);
+      }
       if (desired.some((source) => source.id === fixtureId) || upstreamIds.some((id) => {
         const phase = phases.find((match) => match.teamMatchId === id)?.group?.phase;
         return !acceptsBracketSource(targetPhase, phase);
@@ -1109,6 +1154,28 @@ export class TournamentBracketService {
         // Same lock as assignment/creation: a concurrent bye designation cannot
         // race between the participant check and the canonical match update.
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`league-fixture-generation:${canonical.tournamentId}`}, 0))`;
+        if (canonical.groupId !== null) {
+          const group = await tx.v1TournamentGroup.findFirst({
+            where: { id: canonical.groupId },
+            select: { phase: true, bracketTrack: true },
+          });
+          if (group && group.phase !== 'group' && group.bracketTrack && !['overall', 'upper', 'lower'].includes(group.bracketTrack) && (dto.homeRegistrationId !== undefined || dto.awayRegistrationId !== undefined)) throw new ConflictException({ code: 'MULTI_FINAL_SELECTION_REQUIRED', message: '예선·토너먼트 설정에서 진출팀을 편집해 주세요.' });
+          if (group && group.phase !== 'group' && (group.bracketTrack === 'upper' || group.bracketTrack === 'lower')) {
+            const requestedChanges = [
+              ['home', dto.homeRegistrationId, canonical.homeRegistrationId],
+              ['away', dto.awayRegistrationId, canonical.awayRegistrationId],
+            ] as const;
+            for (const [, registrationId, currentRegistrationId] of requestedChanges) {
+              if (registrationId === undefined || registrationId === null || registrationId === currentRegistrationId) continue;
+              await assertBracketTrackRegistrationEligible(tx, {
+                tournamentId: canonical.tournamentId,
+                groupId: canonical.groupId,
+                bracketTrack: group.bracketTrack,
+                registrationId,
+              });
+            }
+          }
+        }
         const row = await updateTournamentFixtureInTx(tx, admin, {
           fixtureId,
           tournamentId: canonical.tournamentId,
@@ -1174,6 +1241,23 @@ export class TournamentBracketService {
       if (!previous) {
         throw new NotFoundException({ code: 'GROUP_NOT_FOUND', message: '조를 찾을 수 없어요.' });
       }
+      if (dto.advanceCount !== undefined && dto.advanceCount !== previous.advanceCount && previous.phase === 'group') {
+        const trackedRankSlot = await tx.v1TournamentSlot.findFirst({
+          where: {
+            tournamentId: previous.tournamentId,
+            sourceGroupId: previous.id,
+            kind: 'GROUP_RANK',
+            group: { phase: { not: 'group' }, bracketTrack: { in: ['upper', 'lower'] } },
+          },
+          select: { id: true },
+        });
+        if (trackedRankSlot !== null && dto.advanceCount !== 2) {
+          throw new ConflictException({
+            code: 'BRACKET_TRACK_ADVANCE_COUNT_LOCKED',
+            message: '상·하위 결선에 연결된 조는 상위 2팀·하위 2팀 구성을 유지해야 해요.',
+          });
+        }
+      }
       const row = await tx.v1TournamentGroup.update({
         where: { id: groupId },
         data: {
@@ -1215,15 +1299,16 @@ export class TournamentBracketService {
   async removeGroupTeam(user: V1AuthUser, groupTeamId: string) {
     const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { groupTeamId });
     const assignedTeam = await this.prisma.v1TournamentGroupTeam.findUnique({
-      where: { id: groupTeamId }, include: { group: { select: { tournamentId: true, phase: true } } },
+      where: { id: groupTeamId }, include: { group: { select: { tournamentId: true, phase: true, bracketTrack: true } } },
     });
     const emptySlot = assignedTeam ? null : await this.prisma.v1TournamentByeSlot.findUnique({
-      where: { id: groupTeamId }, include: { group: { select: { tournamentId: true, phase: true } } },
+      where: { id: groupTeamId }, include: { group: { select: { tournamentId: true, phase: true, bracketTrack: true } } },
     });
     const groupTeam = assignedTeam ?? (emptySlot ? { ...emptySlot, registrationId: null } : null);
     if (!groupTeam) {
       throw new NotFoundException({ code: 'GROUP_TEAM_NOT_FOUND', message: '조 팀 배정을 찾을 수 없어요.' });
     }
+    if (groupTeam.group.phase !== 'group' && groupTeam.group.bracketTrack && !['overall', 'upper', 'lower'].includes(groupTeam.group.bracketTrack)) throw new ConflictException({ code: 'MULTI_FINAL_SELECTION_REQUIRED', message: '예선·토너먼트 설정에서 진출팀을 편집해 주세요.' });
     await this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`league-fixture-generation:${groupTeam.group.tournamentId}`}, 0))`;
       const current = emptySlot
@@ -1438,6 +1523,7 @@ export class TournamentBracketService {
       tournamentId: row.tournamentId,
       name: row.name,
       phase: row.phase,
+      bracketTrack: row.bracketTrack,
       sortOrder: row.sortOrder,
       advanceCount: row.advanceCount,
       createdAt: row.createdAt.toISOString(),

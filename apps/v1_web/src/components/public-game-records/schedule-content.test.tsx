@@ -22,6 +22,23 @@ function makeData(overrides: Partial<PublicTournamentScheduleResponse> = {}): Pu
 }
 
 describe('ScheduleContent — 순위표 팀 링크', () => {
+  it('순수 토너먼트는 전체·라운드만 표시하고 시간 미정 경기까지 선택한다', () => {
+    render(<ScheduleContent tournamentId="tour-1" knockoutOnly prioritizeLiveGames data={makeData({
+      items: [fixtureEntry({ fixtureId: 'semi', round: 'semi', groupName: '준결승', status: 'live' })],
+      unscheduled: [fixtureEntry({ fixtureId: 'final', round: 'final', groupName: '결승', scheduledAt: null })],
+    })} />);
+    expect(screen.queryByRole('tab', { name: '결선' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tablist', { name: '경기 일정 보기' })).not.toBeInTheDocument();
+    const rounds = within(screen.getByRole('navigation', { name: '일정 결선 단계 선택' }));
+    expect(rounds.getAllByRole('button').map(button => button.textContent)).toEqual(['전체', '준결승', '결승']);
+    expect(screen.queryByText('4강', { selector: 'a span' })).not.toBeInTheDocument();
+    expect(screen.queryByText('결승', { selector: 'a span' })).not.toBeInTheDocument();
+    fireEvent.click(rounds.getByRole('button', { name: '결승' }));
+    expect(screen.getAllByRole('link')).toHaveLength(1);
+    expect(screen.getByRole('link')).toHaveAttribute('href', '/tournaments/tour-1/matches/final');
+    fireEvent.click(rounds.getByRole('button', { name: '전체' }));
+    expect(screen.getAllByRole('link')).toHaveLength(2);
+  });
   it('선택한 조를 URL과 경기 상세 출처에 보존하고 재마운트 시 복원한다', () => {
     const original = window.location.href;
     const path = '/tournaments/tour-1/bracket';
@@ -323,6 +340,62 @@ describe('ScheduleContent — 단판 경기 기록 요약', () => {
     expect(screen.getByRole('group', { name: '전반 기록' })).toHaveTextContent('김선수');
     expect(screen.getByRole('group', { name: '기타 기록' })).toHaveTextContent('박선수');
     expect(screen.queryByRole('group', { name: '경기 결과 기록' })).toBeNull();
+  });
+});
+
+describe('ScheduleContent — 단판 기록 머리말은 글자 없이 선만 그린다', () => {
+  const scorers = [{ side: 'home' as const, participantName: '김선수', jerseyNumber: 9, period: 1, clockMs: 600_000 }];
+  const renderWith = (periodCount: number | null | undefined) =>
+    render(<ScheduleContent tournamentId="tour-1" data={{ ...makeData(), items: [fixtureEntry({ periodCount, scorers })] }} />);
+  /** 기록 묶음의 머리줄 — `aria-hidden` 으로 가려진 첫 칸(선·글자만 든다). */
+  const headerRow = () => screen.getByRole('group', { name: /기록$/ }).firstElementChild as HTMLElement;
+
+  it('단판이면 "경기 결과"·"전반" 글자가 화면에 없고 선 하나만 남는다 — 그룹 이름은 스크린리더용으로 유지된다', () => {
+    renderWith(1);
+
+    expect(screen.queryByText('경기 결과')).toBeNull();
+    expect(screen.queryByText('전반')).toBeNull();
+    expect(screen.getByRole('group', { name: '경기 결과 기록' })).toBeInTheDocument();
+    expect(headerRow()).toHaveAttribute('aria-hidden', 'true');
+    expect(headerRow().textContent).toBe('');
+    expect(headerRow().children).toHaveLength(1);
+  });
+
+  it.each([[2], [null], [undefined]])('전·후반(periodCount=%s)이면 머리말 글자와 양옆 선이 그대로다', (periodCount) => {
+    renderWith(periodCount);
+
+    expect(headerRow().textContent).toBe('전반');
+    expect(headerRow().children).toHaveLength(3);
+  });
+});
+
+describe('ScheduleContent — 경기 방식 줄(장소·일시 줄 아래)', () => {
+  const renderWith = (periodMinutes: readonly number[] | null | undefined) =>
+    render(<ScheduleContent tournamentId="tour-1" data={{ ...makeData(), items: [fixtureEntry({ periodMinutes, venue: '경기대 케이풋살파크 B구장' })] }} />);
+
+  it.each([
+    [[20], '단판 20분'],
+    [[15, 15], '전·후반 15분'],
+    [[10, 15], '전반 10분, 후반 15분'],
+  ])('periodMinutes=%j 이면 "%s" 를 한 줄로 적는다', (periodMinutes, expected) => {
+    renderWith(periodMinutes);
+
+    expect(screen.getByText(expected)).toBeInTheDocument();
+  });
+
+  it('장소·일시 줄과 스코어 줄 사이에 놓인다', () => {
+    renderWith([15, 15]);
+
+    const line = screen.getByText('전·후반 15분');
+    const head = screen.getByText('경기대 케이풋살파크 B구장').closest('div');
+    expect(head?.nextElementSibling).toBe(line);
+    expect(line.nextElementSibling).toHaveTextContent('홈팀');
+  });
+
+  it.each([[null], [undefined], [[]], [[0]]])('길이를 모르면(%j) 줄을 그리지 않는다', (periodMinutes) => {
+    renderWith(periodMinutes as never);
+
+    expect(screen.queryByText(/단판|전·후반|전반 \d+분|피리어드/)).toBeNull();
   });
 });
 

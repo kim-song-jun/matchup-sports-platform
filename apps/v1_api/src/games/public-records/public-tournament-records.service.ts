@@ -59,10 +59,11 @@ import {
 } from '../../league-matches/league-fixture-list-source';
 import { excludeUnfilledSlotFixturesWhere } from '../../common/competition/unfilled-slot-gate';
 import { LEAGUE_TIE_BREAK_ORDER } from '../../league-matches/league-tie-break';
+import { leagueWeekCounter } from '../../league-matches/league-week-number';
 import { SLOT_LABEL_SELECT, publicFixtureSideLabel } from '../../tournaments/slots/tournament-slot-label';
 import { tournamentRoundLabel } from '../../tournaments/tournament-round-label';
 import { PUBLIC_COMPETITION_STATUS_WHERE } from '../../tournaments/tournaments-read.query';
-import { regularPeriodCount } from '../../tournaments/competition-config/competition-config.parse';
+import { regularPeriodCount, regularPeriodMinutes } from '../../tournaments/competition-config/competition-config.parse';
 import { PLACE_SELECT } from '../../places/place-select';
 import { toPlaceView, type PlaceView } from '../../places/place-snapshot';
 
@@ -980,7 +981,7 @@ export class PublicTournamentRecordsService {
    *   소비처가 **행 식별자** 로만 쓰기 때문이다 -- `toLeagueScheduleRow` 주석 참조.)
    *
    * ## 페이지네이션을 메모리에서 하는 이유
-   * 주차 번호는 **리그 전체의 경기일 집합**을 알아야 정해진다(N번째 경기일 = N주차).
+   * 주차 번호는 **리그 전체의 경기 날짜 집합**을 알아야 정해진다(경기가 있는 N번째 달력 주 = N주차).
    * DB 에서 페이지만 잘라 오면 그 집합을 모르므로 2페이지의 첫 경기가 1주차가 된다.
    * 리그 한 시즌의 대진 수는 팀 수의 제곱 규모(수십 건)라 전량 조회가 문제되지 않는다.
    */
@@ -1321,6 +1322,7 @@ export class PublicTournamentRecordsService {
       clock,
       periodBreak,
       periodCount: gamePeriodCount(fixture.game),
+      periodMinutes: gamePeriodMinutes(fixture.game),
       lineup,
       events,
       mvp,
@@ -2030,6 +2032,7 @@ export class PublicTournamentRecordsService {
       clock,
       periodBreak,
       periodCount: gamePeriodCount(teamMatch.game),
+      periodMinutes: gamePeriodMinutes(teamMatch.game),
       lineup,
       events,
       mvp,
@@ -2125,15 +2128,15 @@ export class PublicTournamentRecordsService {
   }
 
   /**
-   * 주차 라벨 — 리그 대진은 주 단위 템플릿으로 일괄 생성되므로(weeksCount) KST 기준
-   * "몇 번째 경기 날짜인가"가 곧 주차다. 리그 상세 화면(league-fixture-detail-client)의
-   * 클라이언트 파생과 같은 규칙을 쓴다 — 같은 경기가 화면마다 다른 주차로 불리면 안 된다.
+   * 주차 라벨 — `league-week-number.ts` 의 단일 규칙(KST 달력 주, 경기가 있는 주만 센다).
+   * 리그 상세 화면(league-fixture-detail-client)의 클라이언트 파생과 같은 규칙이다 — 같은 경기가
+   * 화면마다 다른 주차로 불리면 안 된다.
    */
   private async resolveLeagueWeekNumber(leagueId: string, startAt: Date): Promise<number> {
     const fixtures = await this.prisma.v1TeamMatch.findMany({
-      // 이후 주차의 대진은 이 경기의 순번에 영향을 주지 않는다 — 더 이른 KST 날짜의
-      // 대진은 전부 startAt 이 더 작고, 같은 날짜의 늦은 대진은 잘려도 그 날짜 자체가
-      // 이 경기로 이미 세어진다. 라이브 폴링(10초)마다 리그 전체를 훑지 않기 위한
+      // 이후 주차의 대진은 이 경기의 순번에 영향을 주지 않는다 — 더 이른 주의 대진은
+      // 전부 startAt 이 더 작고, 같은 주의 늦은 대진은 잘려도 그 주 자체가 이 경기로 이미
+      // 세어진다. 라이브 폴링(10초)마다 리그 전체를 훑지 않기 위한
       // 범위 축소다(Copilot 리뷰 #747).
       where: { leagueId, deletedAt: null, startAt: { lte: startAt } },
       select: { startAt: true },
@@ -2148,13 +2151,9 @@ export class PublicTournamentRecordsService {
       }
       return { startAt: fixture.startAt };
     });
-    const days = Array.from(new Set(scheduledFixtures.map((fixture) => KST_DAY.format(fixture.startAt)))).sort();
-    const index = days.indexOf(KST_DAY.format(startAt));
-    return index >= 0 ? index + 1 : 1;
+    return leagueWeekCounter(scheduledFixtures.map((fixture) => fixture.startAt))(startAt);
   }
 }
-
-const KST_DAY = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' });
 
 /**
  * 팀매치(리그 대진)의 공개 진행 상태 — 취소를 먼저 반영한 뒤 게임 상태를 따른다.
@@ -2263,18 +2262,15 @@ type LeagueScheduleRow = Prisma.V1TeamMatchGetPayload<{ select: typeof LEAGUE_SC
 
 /**
  * 대진마다 주차 번호를 매긴다. **한 번에 계산한다** -- `resolveLeagueWeekNumber` 는 대진
- * 하나마다 쿼리를 던지므로 목록에 쓰면 N+1 이 된다. 규칙은 그것과 같다(KST 날짜를 모아
- * 정렬하고 인덱스+1).
- *
- * 같은 규칙을 쓰는 곳이 셋이다 -- 이 목록, `resolveLeagueFixtureRecord`, 그리고 프론트의
- * 리그 상세. 규칙이 갈리면 **같은 경기가 화면마다 다른 주차로 불린다.**
+ * 하나마다 쿼리를 던지므로 목록에 쓰면 N+1 이 된다. 규칙은 둘 다 `league-week-number.ts` 하나다
+ * (KST 달력 주, 경기가 있는 주만 센다). 프론트의 리그 상세도 같은 규칙을 쓴다 — 규칙이 갈리면
+ * **같은 경기가 화면마다 다른 주차로 불린다.**
  *
  * @param siblingStartAts 주차를 세는 날짜 집합 -- 표시 목록이 아니라 비삭제 전체(가려진 경기 포함).
  */
 function leagueWeekNumbers(siblingStartAts: readonly Date[], fixtures: readonly { startAt: Date }[]): number[] {
-  const days = [...new Set(siblingStartAts.map((startAt) => KST_DAY.format(startAt)))].sort();
-  const indexByDay = new Map(days.map((day, index) => [day, index + 1]));
-  return fixtures.map((fixture) => indexByDay.get(KST_DAY.format(fixture.startAt)) ?? 1);
+  const weekOf = leagueWeekCounter(siblingStartAts);
+  return fixtures.map((fixture) => weekOf(fixture.startAt));
 }
 
 /**
@@ -2378,6 +2374,14 @@ function assertLeagueTeamMatchOperationalInvariant<T extends LeagueTeamMatchOper
 /** 경기의 정규 피리어드 수. 경기 레코드가 없거나 설정을 읽을 수 없으면 null — 화면은 지금 동작을 유지한다. */
 function gamePeriodCount(game: { competitionConfig?: { periods: Prisma.JsonValue } | null } | null | undefined): number | null {
   return regularPeriodCount(game?.competitionConfig?.periods);
+}
+
+/**
+ * 경기의 정규 피리어드별 길이(분, 연장 제외). 화면이 "단판 20분"·"전·후반 15분"을 적는 데 쓴다.
+ * 경기 레코드가 없거나 길이를 읽을 수 없으면 null — 화면은 그때 경기 방식 줄을 그리지 않는다.
+ */
+function gamePeriodMinutes(game: { competitionConfig?: { periods: Prisma.JsonValue } | null } | null | undefined): number[] | null {
+  return regularPeriodMinutes(game?.competitionConfig?.periods);
 }
 
 function presentScheduleEntry(
@@ -2504,6 +2508,7 @@ function presentScheduleEntry(
     clock,
     periodBreak,
     periodCount: gamePeriodCount(fixture.game),
+    periodMinutes: gamePeriodMinutes(fixture.game),
     scorers,
     cards,
     // **이 뷰의 점수 공개 게이트를 그대로 따른다.** outcome 전용 조건을 따로 만들지

@@ -410,6 +410,38 @@ describe('ResultEditModal — result-revisions 의 중첩(regulation) 스코어 
  * 돌려준다.
  */
 describe('ResultEditModal — 승부차기(penalties) 점수 보존', () => {
+  it('승부차기 실제정정: PK만 수정해도 변경 요약과 성공·시도 횟수를 전송한다', () => {
+    const { onConfirm } = submitEdit({ score: { home: 0, away: 0, penalties: { home: 2, away: 1, takenHome: 3, takenAway: 3, firstKickSideKey: 'HOME' } } }, ({ confirmLabel }) => {
+      expect(screen.getByLabelText('홈 시도')).toHaveValue(3);
+      fireEvent.change(screen.getByLabelText('홈 성공'), { target: { value: '3' } });
+      expect(screen.getByText(/점수 변경:/)).toHaveTextContent('승부차기 3:1');
+      fireEvent.change(screen.getByLabelText('사유'), { target: { value: '승부차기 성공 정정' } });
+      fireEvent.click(screen.getByRole('button', { name: confirmLabel }));
+    }, { isKnockoutFixture: true });
+    expect(onConfirm.mock.calls[0][0].score.penalties).toEqual({ home: 3, away: 1, takenHome: 3, takenAway: 3, firstKickSideKey: 'HOME' });
+  });
+  it('승부차기 실제정정: 기존에 시도 기록이 없으면 변경할 때 양쪽 횟수를 직접 입력해야 한다', () => {
+    const { onConfirm } = submitEdit({ score: { home: 0, away: 0, penalties: { home: 2, away: 1 } } }, ({ confirmLabel }) => {
+      fireEvent.change(screen.getByLabelText('홈 성공'), { target: { value: '3' } });
+      fireEvent.change(screen.getByLabelText('사유'), { target: { value: '승부차기 정정' } });
+      expect(screen.getByRole('button', { name: confirmLabel })).toBeDisabled();
+      fireEvent.change(screen.getByLabelText('홈 시도'), { target: { value: '3' } });
+      expect(screen.getByRole('button', { name: confirmLabel })).toBeDisabled();
+      fireEvent.change(screen.getByLabelText('원정 시도'), { target: { value: '3' } });
+      fireEvent.click(screen.getByRole('button', { name: confirmLabel }));
+    }, { isKnockoutFixture: true });
+    expect(onConfirm.mock.calls[0][0].score.penalties).toEqual({ home: 3, away: 1, takenHome: 3, takenAway: 3 });
+  });
+  it('승부차기 실제정정: 시도 수만 변경해도 표시하고 기존 예외를 새 결과로 자동 승계하지 않는다', () => {
+    const { onConfirm } = submitEdit({ score: { home: 0, away: 0, penalties: { home: 2, away: 1, takenHome: 3, takenAway: 3, operatorOverride: true } } }, ({ confirmLabel }) => {
+      fireEvent.change(screen.getByLabelText('홈 시도'), { target: { value: '4' } });
+      fireEvent.change(screen.getByLabelText('원정 시도'), { target: { value: '4' } });
+      expect(screen.getByText(/승부차기 시도 횟수 변경:/)).toHaveTextContent('홈 4회 · 원정 4회');
+      fireEvent.change(screen.getByLabelText('사유'), { target: { value: '킥 횟수 정정' } });
+      fireEvent.click(screen.getByRole('button', { name: confirmLabel }));
+    }, { isKnockoutFixture: true });
+    expect(onConfirm.mock.calls[0][0].score.penalties).toHaveProperty('operatorOverride', false);
+  });
   it('결선 무승부 정정에서는 중첩(regulation/penalty) base 의 승부차기 점수가 penalties 로 살아서 나간다', () => {
     const { onConfirm } = submitEdit(
       {
@@ -761,6 +793,8 @@ describe('ResultEditModal — 결선 무승부 사전 경고', () => {
     expect(confirmButton).toBeDisabled();
     fireEvent.change(screen.getByLabelText('홈 성공'), { target: { value: '4' } });
     fireEvent.change(screen.getByLabelText('원정 성공'), { target: { value: '3' } });
+    fireEvent.change(screen.getByLabelText('홈 시도'), { target: { value: '5' } });
+    fireEvent.change(screen.getByLabelText('원정 시도'), { target: { value: '5' } });
     fireEvent.click(screen.getByLabelText('원정'));
     expect(confirmButton).toBeEnabled();
     fireEvent.click(confirmButton);
@@ -769,6 +803,8 @@ describe('ResultEditModal — 결선 무승부 사전 경고', () => {
       home: 4,
       away: 3,
       firstKickSideKey: 'AWAY',
+      takenHome: 5,
+      takenAway: 5,
     });
   });
 

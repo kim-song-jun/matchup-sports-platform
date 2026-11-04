@@ -69,7 +69,7 @@ Web Push(VAPID) + 운영 실패 대시보드(#93) · realtime Socket.IO gateway(
   - 단계: 온보딩 sport 단계에서 종목 선택만 하고 이탈(sessionStorage draft만 존재) → 재로그인 → `/onboarding/resume` → 저장된 진행 상태 요약 확인 → '저장된 선택 확인'.
   - 기대 결과: `GET /onboarding` 응답의 `currentStep`/`sportPreferences`가 정확히 반영되고, `sessionStorage` draft가 있으면 그 값이 우선 사용된다. '처음부터 다시 선택' 클릭 시 draft가 초기화된다.
 
-### Edge Case (13)
+### Edge Case (12)
 
 - [ ] **프로필 필수값(성별/휴대폰/생년월일) 검증 우선순위** — 이름·휴대폰·생년월일·성별 중 하나라도 비면 `getSignupProfileIssue()`가 필드 우선순위(displayName→phone→birthDate→gender)대로 첫 미충족 필드 에러를 반환하고 CTA는 항상 disabled. 서버 `RequiredSignupProfileDto`도 동일 규칙(`phone: ^\d{11}$`, `IsCalendarBirthDate`, `gender: IsIn`)을 강제해 프론트 우회 시에도 400.
 - [ ] **닉네임/이메일 중복확인 후 값 변경 시 재검증 요구** — 중복확인 통과 후 입력값을 재수정하면 검증 status가 idle로 리셋되어 CTA가 다시 disabled(`nicknameCheck.value`/`emailCheck.value`가 현재 입력값과 불일치 시 stale 처리).
@@ -82,7 +82,6 @@ Web Push(VAPID) + 운영 실패 대시보드(#93) · realtime Socket.IO gateway(
 - [ ] **온보딩 '나중에 설정하기'(defer) 후 재진입** — 레벨 미입력 상태로 defer 시 `onboardingStatus='deferred'`, `missing`에 `levels` 남고 `limited:true`. 종목 0개 상태에서도 defer가 성공하는지 별도 검증 필요(오픈 포인트).
 - [ ] **위치 권한 거부 후 지역 직접 선택** — geolocation 거부 시 `locationStatus='denied'` 주황 안내, `draft.currentLocation` 미설정. 수동 선택 지역만으로 `POST /onboarding/preferences` 정상 저장.
 - [ ] **체크-이메일/체크-닉네임 rate limit** — 중복확인 버튼 60초당 30회 초과 클릭 시 `@Throttle limit=30/60s`로 31번째부터 429. 버튼이 무한 로딩 상태로 멈추지 않아야 함.
-- [ ] **약관 상세보기 다이얼로그 접근성** — `LegalDocumentDialog`가 ESC/backdrop 클릭으로 닫히고 내부 콘텐츠 클릭 시엔 유지(`stopPropagation`). `role='dialog' aria-modal='true'`.
 - [ ] **회원가입 폼 이중 제출 방지** — '가입하고 계속' 더블클릭 시 `POST /auth/register`가 정확히 1회만 발생하는지, 2회 발생 시 두 번째가 409 `EMAIL_CONFLICT`로 안전 실패해 계정이 1개만 생성되는지 실측 필요.
 - [ ] **🔴 11종목 vs 4종목 표시 불일치 재확인** — 온보딩 종목 선택 화면에서 실제로 선택 가능한 종목 수를 실측해 랜딩 페이지 광고 종목 수(11개)와 일치하는지 확인. 오픈 디시전이므로 불일치가 재확인되면 제품팀에 즉시 에스컬레이션.
 

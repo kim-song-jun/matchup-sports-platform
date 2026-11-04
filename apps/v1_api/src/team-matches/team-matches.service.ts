@@ -47,7 +47,7 @@ import { readTeamMatchRulesGame, repinTeamMatchRules, teamMatchRulesEditable } f
 import { hydrateApprovedTeamMatchAwaySnapshot } from './team-match-game-snapshot';
 import { assertCreatorProfileComplete } from '../profile/creator-profile.guard';
 import { computePublicTeamRatingBatch, computeRevealedTeamTrustBatch } from '../reviews/team-trust-aggregation';
-import { formatLevelRange, levelCodeWhere, parseLevelCodes, resolveSportLevelRange } from '../sports/level-range';
+import { formatLevelRange, levelCodeConstraints, parseLevelCodes, resolveSportLevelRange } from '../sports/level-range';
 import {
   CancelTeamMatchDto,
   CloseTeamMatchDto,
@@ -290,6 +290,7 @@ export class TeamMatchesService {
         // 취소·보관된 모집은 status 필터를 직접 지정해도 공개 검색에 노출하지 않는다.
         { status: { notIn: ['cancelled', 'archived'] } },
         ...staleFriendlyTeamMatchWhere(now),
+        ...levelCodeConstraints(parseLevelCodes(query.levelCodes)),
       ],
       ...(status === 'expired'
         ? { startAt: { lt: now } }
@@ -319,7 +320,6 @@ export class TeamMatchesService {
           ? { leagueId: { not: null } }
           : {}),
       ...(query.genderRule ? { genderRule: genderRuleColumnFilter(query.genderRule) } : {}),
-      ...levelCodeWhere(parseLevelCodes(query.levelCodes)),
       // 검색창 placeholder 가 "지역, 팀 이름, 경기조건"을 약속하므로 그 셋을 모두 훑는다.
       // hostTeam·region 이 빠져 있어서 팀 이름이나 지역명으로 검색하면 실제로 존재하는
       // 경기가 0건으로 나왔다.

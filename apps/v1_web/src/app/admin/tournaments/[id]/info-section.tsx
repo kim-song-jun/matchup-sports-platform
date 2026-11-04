@@ -242,8 +242,8 @@ export function TournamentInfoSection() {
     const teamCount = Number(editTeamCount);
     const minPlayers = Number(editMinPlayers);
     const maxPlayers = Number(editMaxPlayers);
-    if (!Number.isInteger(teamCount) || teamCount < 2 || teamCount > 64) {
-      showToast('참가 팀 수는 2~64 사이의 정수여야 해요.', 'error');
+    if (!Number.isInteger(teamCount) || teamCount < 2 || (editFormat !== 'league_knockouts' && teamCount > 64)) {
+      showToast(editFormat === 'league_knockouts' ? '참가 팀 수는 2 이상의 정수여야 해요.' : '참가 팀 수는 2~64 사이의 정수여야 해요.', 'error');
       return;
     }
     if (
@@ -1289,7 +1289,7 @@ export function TournamentInfoSection() {
 const TOURNAMENT_FORMAT_LABEL: Record<string, string> = {
   league: '리그 방식 (순위전)',
   knockout: '토너먼트 (녹아웃)',
-  group_knockout: '조별리그 + 토너먼트',
+  group_knockout: '조별리그 + 토너먼트', league_knockouts: '정규리그 + N개 토너먼트',
 };
 
 function GenderQuotaInput({

@@ -82,6 +82,13 @@ export function useOtpVerification({
     setErrorTone(code === 'VERIFICATION_RESEND_COOLDOWN' ? 'info' : 'error');
   }, []);
 
+  /** 화면이 바뀌어 지난 단계의 오류가 더는 해당하지 않을 때 비운다. 발급·입력 상태는 그대로 둔다. */
+  const clearError = useCallback(() => {
+    setError(null);
+    setErrorTone('error');
+    setErrorCode(null);
+  }, []);
+
   const requestCode = useCallback(async () => {
     setError(null);
     setErrorTone('error');
@@ -143,5 +150,6 @@ export function useOtpVerification({
     resendRemainingMs,
     requestCode,
     submitCode,
+    clearError,
   };
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { TournamentOpsDemoEntry } from '@/components/tournament-ops-demo/demo-entry';
 import { staffRoleLabel } from '@/components/tournament-ops/badges';
 import { ChevronRightIcon } from '@/components/v1-ui/icons';
 import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
@@ -39,6 +40,7 @@ export function MyTournamentStaffPageClient({ directorsOnly = false }: { directo
   return (
     <div className={directorsOnly ? 'grid gap-4' : 'tm-my-shell tm-content-enter'}>
       <div className="tm-my-settings-desktop">
+        <TournamentOpsDemoEntry />
         {!query.isLoading && groups.length === 0 ? (
           <EmptyState
             fill

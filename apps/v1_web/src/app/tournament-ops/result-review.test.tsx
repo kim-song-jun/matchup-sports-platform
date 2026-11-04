@@ -808,6 +808,8 @@ describe('결선 무승부는 저장 전에 폼이 알려준다', () => {
     expect(submitButton).toBeDisabled();
     fireEvent.change(within(dialog).getByLabelText('홈 성공'), { target: { value: '4' } });
     fireEvent.change(within(dialog).getByLabelText('원정 성공'), { target: { value: '3' } });
+    fireEvent.change(within(dialog).getByLabelText('홈 시도'), { target: { value: '5' } });
+    fireEvent.change(within(dialog).getByLabelText('원정 시도'), { target: { value: '5' } });
     await user.click(within(dialog).getByLabelText('홈'));
     expect(submitButton).toBeEnabled();
     await user.click(submitButton);

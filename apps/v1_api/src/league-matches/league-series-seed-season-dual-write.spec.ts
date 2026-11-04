@@ -119,8 +119,8 @@ describe('seedSeason — 통합 축 거울 dual-write', () => {
       regionId: 'region-1',
       tier: 1,
       seasonNo: 1,
-      // 신규 시즌은 모집 마감에서 운영자 시작을 기다린다.
-      status: 'closed',
+      // 신규 시즌은 대회처럼 초안에서 운영자의 접수 시작이나 리그 시작을 기다린다.
+      status: 'draft',
       requiresExplicitStart: true,
     });
   });

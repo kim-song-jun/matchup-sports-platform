@@ -1,4 +1,4 @@
-import { competitionStageRank } from './tournament-stage-rank';
+import { competitionStagePhase, competitionStageRank } from './tournament-stage-rank';
 
 describe('competitionStageRank', () => {
   it('조의 phase 가 단계 순서를 정한다', () => {
@@ -23,5 +23,14 @@ describe('competitionStageRank', () => {
 
   it('단계를 알 수 없는 운영자 입력 라운드는 null 이다', () => {
     expect(competitionStageRank({ phase: null, round: '친선 한마당' })).toBeNull();
+  });
+});
+
+describe('competitionStagePhase', () => {
+  it('prefers the stored group phase and maps group-less round labels', () => {
+    expect(competitionStagePhase({ phase: 'round12', round: '결승' })).toBe('round12');
+    expect(competitionStagePhase({ phase: null, round: '준결승' })).toBe('semi');
+    expect(competitionStagePhase({ phase: null, round: 'league_r3' })).toBe('group');
+    expect(competitionStagePhase({ phase: null, round: '친선 한마당' })).toBeNull();
   });
 });

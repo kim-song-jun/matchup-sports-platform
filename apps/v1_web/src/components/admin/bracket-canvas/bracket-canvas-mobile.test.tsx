@@ -126,6 +126,8 @@ describe('BracketCanvasMobile — 목록', () => {
     expect(container.querySelectorAll('[data-connection]')).toHaveLength(2);
     const finalStage = screen.getByRole('region', { name: '결승' });
     expect(finalStage).toHaveTextContent('결승 직행팀');
+    expect(within(finalStage).getByRole('button')).toHaveTextContent('5번 경기');
+    expect(within(finalStage).getByRole('button')).not.toHaveTextContent('결승 · 5번 경기');
     fireEvent.click(within(finalStage).getByRole('button'));
     expect(screen.getByRole('dialog')).toHaveTextContent('결승');
   });

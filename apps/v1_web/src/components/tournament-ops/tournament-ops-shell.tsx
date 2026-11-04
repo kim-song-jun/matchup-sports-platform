@@ -393,9 +393,9 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
   });
   const back = directorManagement && !isFixtureConsole
     ? { href: `/tournament-management/tournaments/${encodeURIComponent(tournamentId)}/overview`, label: '대회 관리로 돌아가기' }
-    : isFixtureConsole && origin === 'admin'
+    : isFixtureConsole && origin !== 'staff'
     ? { href: `${basePath}/operations`, label: '경기 목록으로 돌아가기' }
-    : returnTarget(isFixtureConsole && origin === 'home' ? 'staff' : origin, tournamentId, tournamentKind);
+    : returnTarget(origin, tournamentId, tournamentKind);
 
   const openDrawer = useCallback(() => setDrawerOpen(true), []);
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);

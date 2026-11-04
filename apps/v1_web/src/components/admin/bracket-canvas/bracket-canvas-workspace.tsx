@@ -27,6 +27,7 @@ import { describeStandingsFill } from '@/lib/bracket-standings-fill-message';
 import { isBracketPublished } from '@/lib/bracket-visibility';
 import { extractErrorMessage } from '@/lib/error-message';
 import type { V1AdminTournamentRegistration, V1TournamentFormat, V1SixTeamBracket } from '@/types/api';
+import type { V1CompetitionKind } from '@/types/api';
 import { BracketCanvas, fixtureTitle } from './bracket-canvas';
 import { BracketLeagueGrid } from './bracket-league-grid';
 import { BracketLeagueStandings } from './bracket-league-standings';
@@ -43,6 +44,7 @@ export type BracketCanvasWorkspaceProps = {
   sixTeamState?: V1SixTeamBracket | null;
   tournamentId: string;
   format: V1TournamentFormat | undefined;
+  kind?: V1CompetitionKind | null;
   registrations: V1AdminTournamentRegistration[];
   registrationsState: RegistrationsLoadState;
   bracketPublishedAt: string | null | undefined;
@@ -56,6 +58,7 @@ export function BracketCanvasWorkspace({
   sixTeamState,
   tournamentId,
   format,
+  kind,
   registrations,
   registrationsState,
   bracketPublishedAt,
@@ -263,7 +266,7 @@ export function BracketCanvasWorkspace({
     ) : null;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex w-full min-w-0 max-w-full flex-col gap-4">
       {ConfirmModal}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -293,7 +296,7 @@ export function BracketCanvasWorkspace({
               </Button>
             ) : null}
             {!isEmpty && canWrite && format === 'group_knockout' ? <FinalistAssignmentButton tournamentId={tournamentId} groups={bracket.groups} showToast={showToast} /> : null}
-            {!isEmpty && canWrite ? (
+            {!isEmpty && canWrite && format !== 'league_knockouts' ? (
               <BracketStandingsFillButton
                 tournamentId={tournamentId}
                 slots={bracket.slots}
@@ -303,7 +306,7 @@ export function BracketCanvasWorkspace({
                 onError={(message) => showToast(message, 'error')}
               />
             ) : null}
-            {!isEmpty ? (
+            {!isEmpty && format !== 'league_knockouts' ? (
               <>
                 <Button
                   variant="outline"
@@ -354,11 +357,11 @@ export function BracketCanvasWorkspace({
         <EmptyState
           title="아직 대진이 없어요"
           sub={
-            templateFormat === null
+            format === 'league_knockouts' ? '페이지 위의 예선·토너먼트 대진 생성에서 예선 조를 편성해 주세요.' : templateFormat === null
               ? '조별+결선 방식은 목록 보기에서 조를 만들어 시작해 주세요.'
               : '템플릿으로 시작하면 경기와 팀 자리가 한 번에 만들어져요. 팀은 나중에 넣어도 돼요.'
           }
-          cta={!canWrite ? undefined : templateFormat === null ? '목록으로 보기' : '템플릿으로 시작'}
+          cta={!canWrite || format === 'league_knockouts' ? undefined : templateFormat === null ? '목록으로 보기' : '템플릿으로 시작'}
           onCta={templateFormat === null ? onShowList : () => setTemplateOpen(true)}
         />
       ) : (
@@ -415,6 +418,7 @@ export function BracketCanvasWorkspace({
           ) : (
             <BracketCanvas
               sixTeamState={sixTeamState}
+              registrations={registrations}
               groups={bracket.groups}
               fixtures={bracket.fixtures}
               slots={bracket.slots}
@@ -469,6 +473,7 @@ export function BracketCanvasWorkspace({
           open={templateOpen}
           tournamentId={tournamentId}
           format={templateFormat}
+          allowSplitBracket={kind === 'regular_tournament'}
           confirmedTeamCount={registrations.filter((registration) => registration.status === 'confirmed').length}
           confirmedTeamCountStatus={registrationsState.status}
           hasExistingBracket={!isEmpty}

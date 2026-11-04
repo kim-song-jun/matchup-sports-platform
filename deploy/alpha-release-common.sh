@@ -273,6 +273,10 @@ restore_active_release() {
     jq -er '.activeManifestSha256' "${ALPHA_RELEASE_STATE_FILE}")" || return 1
   alpha_restore_step validate_stored_manifest \
     validate_stored_alpha_manifest "${active_tmp}" "${ALPHA_ECR_REGISTRY}" "${active_checksum}" || return 1
+  if [[ "${ALPHA_TOURNAMENT_RUNTIME_STARTED:-false}" == true ]]; then
+    alpha_restore_step tournament_runtime_compatibility \
+      assert_alpha_tournament_rollback_runtime "${ALPHA_MANIFEST_FILE}" "${active_tmp}" || return 1
+  fi
   active_source_key="$(alpha_restore_step read_active_source_key \
     alpha_release_source_key "${active_tmp}")" || return 1
   alpha_restore_step activate_source activate_alpha_release_source "${active_source_key}" || return 1

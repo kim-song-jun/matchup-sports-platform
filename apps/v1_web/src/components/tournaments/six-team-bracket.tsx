@@ -1,5 +1,4 @@
 'use client';
-import Link from 'next/link';
 import type { V1SixTeamBracket, V1TournamentFixture } from '@/types/api';
 import { SectionTitle } from '@/components/v1-ui/primitives';
 import { MatchCard } from './tournament-bracket';
@@ -12,7 +11,6 @@ const STAGE_KEYS: Readonly<Record<string, SixTeamStageKey>> = {
 export function SixTeamBracket({
   state,
   fixtures,
-  tournamentId,
   selectedRoundKey,
   stageLabels = {},
 }: {
@@ -36,6 +34,9 @@ export function SixTeamBracket({
     return '비공개';
   };
   const final = rounds[4];
+  const byeFixture = state.bye ? fixtures.find(row => row.homeRegistrationId === state.bye || row.awayRegistrationId === state.bye) : undefined;
+  const byeHome = byeFixture?.homeRegistrationId === state.bye;
+  const byePublic = byeFixture && (byeHome ? byeFixture.homeTeamName : byeFixture.awayTeamName) !== null;
   const championId =
     state.winners[state.rounds[4]] ??
     (final?.result
@@ -57,7 +58,7 @@ export function SixTeamBracket({
     if (!row) return <p role="alert">경기 정보를 불러오지 못했어요.</p>;
     const home = index === 3 ? '6강 승리팀 중 선정' : state.swapFinal ? '준결승 승리팀' : '결승 직행팀';
     const away = index === 3 ? '6강 승리팀 중 선정' : state.swapFinal ? '결승 직행팀' : '준결승 승리팀';
-    return <SixTeamMatch tournamentId={tournamentId} fixture={{
+    return <SixTeamMatch fixture={{
       ...row,
       homeTeamName: row.homeTeamName === 'TBD' ? home : row.homeTeamName,
       awayTeamName: row.awayTeamName === 'TBD' ? away : row.awayTeamName,
@@ -72,7 +73,7 @@ export function SixTeamBracket({
         selectedStage={selectedRoundKey ? STAGE_KEYS[selectedRoundKey] : undefined}
         labels={stageLabels}
         swapFinal={state.swapFinal}
-        first={<div className="flex flex-col gap-4">
+        first={<div className="flex flex-col gap-6">
           {rounds
             .slice(0, 3)
             .map((row, i) =>
@@ -80,7 +81,6 @@ export function SixTeamBracket({
                 <SixTeamMatch
                   key={row.id}
                   fixture={row}
-                  tournamentId={tournamentId}
                   manualWinner={
                     state.winners[row.id]
                       ? teamName(state.winners[row.id])
@@ -93,7 +93,9 @@ export function SixTeamBracket({
             )}
         </div>}
         semifinal={renderLaterMatch(3)}
-        bye={<SixTeamBye name={teamName(state.bye)} pending={!state.bye} />}
+        bye={<SixTeamBye name={teamName(state.bye)} pending={!state.bye}
+          teamId={byePublic ? byeHome ? byeFixture.homeTeamId : byeFixture.awayTeamId : null}
+          logoUrl={byePublic ? byeHome ? byeFixture.homeTeamLogoUrl : byeFixture.awayTeamLogoUrl : null} />}
         final={renderLaterMatch(4)}
       />
       {(!selectedRoundKey || ['quarter', '6강', 'semi', '준결승'].includes(selectedRoundKey)) && (
@@ -102,7 +104,7 @@ export function SixTeamBracket({
         className="space-y-3 border-y border-[var(--border)] py-4"
       >
         <div role="heading" aria-level={4}>
-          <SectionTitle title={`결승 직행 · ${teamName(state.bye)}`} />
+          <SectionTitle compact title={`결승 직행 · ${teamName(state.bye)}`} />
         </div>
         <p className="tm-text-label">준결승 부전승 1팀 · 6강 승리팀 중 선정</p>
         <p className="tm-text-caption text-[var(--text-muted)]">
@@ -205,27 +207,18 @@ export function SixTeamBracket({
 
 function SixTeamMatch({
   fixture,
-  tournamentId,
   manualWinner,
 }: {
   fixture: V1TournamentFixture;
-  tournamentId: string;
   manualWinner?: string | null;
 }) {
   return (
     <div className="space-y-1">
+      <p className="tm-text-micro mb-1 text-[var(--text-caption)]">{fixture.fixtureNumber}번 경기</p>
       <MatchCard fixture={fixture} fluid />
       {manualWinner && (
         <p className="tm-text-caption">운영자 지정 진출팀 · {manualWinner}</p>
       )}
-      <Link
-        className="inline-flex min-h-11 items-center tm-text-label text-[var(--blue600)]"
-        href={`/tournaments/${encodeURIComponent(
-          tournamentId
-        )}/matches/${encodeURIComponent(fixture.id)}`}
-      >
-        경기 상세
-      </Link>
     </div>
   );
 }

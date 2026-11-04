@@ -110,7 +110,7 @@ const storeOf = (prisma: unknown) => (prisma as { __store: Store }).__store;
 function dispatcherMock(devEcho = true) {
   return {
     devEcho,
-    devEchoActive: devEcho,
+    assertDeliveryAvailable: jest.fn(),
     mayEchoCode: jest.fn().mockResolvedValue(devEcho),
     send: jest.fn().mockResolvedValue(undefined),
   } as unknown as VerificationDispatcherService;
@@ -120,6 +120,14 @@ const EMAIL = 'runner@example.com';
 
 describe('EmailVerificationService (공개 이메일 OTP)', () => {
   const OLD_SECRET = process.env.V1_SESSION_SECRET;
+  it.each([true, false])('메일 미설정은 가입 여부(deliver=%s)와 관계없이 같은 오류로 표시한다', async (deliver) => {
+    const prisma = prismaMock();
+    const dispatcher = dispatcherMock(false);
+    (dispatcher.assertDeliveryAvailable as jest.Mock).mockImplementation(() => { throw new Error('EMAIL_SEND_UNAVAILABLE'); });
+    const svc = new EmailVerificationService(prisma, dispatcher, eventLogStub());
+    await expect(svc.issueChallenge('real@gmail.com', { deliver })).rejects.toThrow('EMAIL_SEND_UNAVAILABLE');
+    expect(storeOf(prisma).size).toBe(0);
+  });
   beforeEach(() => {
     jest.clearAllMocks();
     process.env.V1_SESSION_SECRET = 'x'.repeat(48);
@@ -129,7 +137,7 @@ describe('EmailVerificationService (공개 이메일 OTP)', () => {
     else process.env.V1_SESSION_SECRET = OLD_SECRET;
   });
 
-  it('비밀번호 재설정 문구로 메일을 보내고 코드는 해시로만 저장한다', async () => {
+  it('계정 복구 용도로 메일을 보내고 코드는 해시로만 저장한다', async () => {
     const prisma = prismaMock();
     const dispatcher = dispatcherMock(true);
     const svc = new EmailVerificationService(prisma, dispatcher, eventLogStub());
@@ -137,7 +145,7 @@ describe('EmailVerificationService (공개 이메일 OTP)', () => {
     const res = await svc.issueChallenge(EMAIL, { deliver: true });
 
     expect(res.devCode).toMatch(/^\d{6}$/);
-    // 메일 문구가 'verify'(이메일 인증)로 나가면 비밀번호를 바꾸려던 사용자가 엉뚱한 안내를 받는다.
+    // 계정 찾기와 비밀번호 재설정은 동일한 이메일 소유 증명 경로를 쓴다.
     expect(dispatcher.send).toHaveBeenCalledWith('email', EMAIL, res.devCode, 'password_reset');
     expect(dispatcher.mayEchoCode).toHaveBeenCalledWith({ channel: 'email', address: EMAIL });
     const row = storeOf(prisma).get(EMAIL)!;

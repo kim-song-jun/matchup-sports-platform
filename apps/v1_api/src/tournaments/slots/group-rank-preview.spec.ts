@@ -184,6 +184,18 @@ describe('summarizeGroupStanding', () => {
   });
 
   describe('qualification', () => {
+    it('분리 결선은 상위 진출과 하위 실제 배정을 분리하고 qualification 은 상위만 유지한다', () => {
+      const summary = summarizeGroupStanding(sourceOf(['A', 'B', 'C', 'D'], FOUR_CLEAN), 2, new Set(['C', 'D']), {
+        splitBracket: true,
+        placedByTrack: new Map([['lower' as const, new Set(['C', 'D'])]]),
+      });
+      expect(summary?.qualification).toEqual({ advancingRegistrationIds: ['A', 'B'], undecided: false });
+      expect(summary?.qualificationByTrack).toEqual({
+        upper: { advancingRegistrationIds: ['A', 'B'], undecided: false },
+        lower: { advancingRegistrationIds: ['C', 'D'], undecided: false },
+      });
+    });
+
     it('결선에 들어간 팀이 있으면 순위와 무관하게 그 팀들이 진출 팀이다 — 다른 조 팀은 무시한다', () => {
       const summary = summarizeGroupStanding(sourceOf(['A', 'B', 'C'], TIE_THREE), 2, new Set(['C', 'B', 'OTHER-GROUP']));
       expect(summary?.qualification).toEqual({ advancingRegistrationIds: ['B', 'C'], undecided: false });

@@ -44,24 +44,27 @@ describe('대회·리그 탐색 (real DB)', () => {
     await prisma.v1Sport.deleteMany({ where: { id: sportId } });
     await prisma.$disconnect();
   });
-  it('대회의 마감·예약 정원을 전체 목록에 적용하고 초안·취소를 감춘다', async () => {
-    const result = await read.list({ kind: 'tournament', sportId, registration: 'open', page: 1, limit: 1 });
+  it('대회의 마감·예약 정원을 상태 필터에 적용하고 초안·취소를 감춘다', async () => {
+    const result = await read.list({ kind: 'tournament', sportId, stage: 'recruiting', page: 1, limit: 1 });
     expect(result.items.map((item) => item.id)).toEqual([ids.available]);
     expect(result.pageInfo).toMatchObject({ total: 1, hasNext: false });
     expect(result.items[0].registrationOpen).toBe(true);
-    const closed = await read.list({ kind: 'tournament', sportId, registration: 'closed' });
+    const closed = await read.list({ kind: 'tournament', sportId, stage: 'recruit_closed' });
     expect(closed.items.map((item) => item.id).sort()).toEqual([ids.full, ids.expired].sort());
+    // 대회 초안은 운영자 준비 단계라 어떤 필터로도 나오지 않는다.
+    expect((await read.list({ kind: 'tournament', sportId, stage: 'preparing' })).items).toEqual([]);
   });
-  it('리그 준비는 draft/open/closed를 포함하고 진행 중에도 신청을 받는다', async () => {
-    const upcoming = await read.list({ kind: 'league', sportId, phase: 'upcoming' });
-    expect(upcoming.items.map((item) => item.id).sort()).toEqual([ids.draftLeague, ids.openLeague, ids.closedLeague, ids.noDeadlineLeague].sort());
-    const ongoing = await read.list({ kind: 'league', sportId, phase: 'ongoing', registration: 'open' });
-    expect(ongoing.items.map((item) => item.id)).toEqual([ids.activeLeague]);
-    expect(ongoing.items[0].registrationOpen).toBe(true);
-    const closed = await read.list({ kind: 'league', sportId, registration: 'closed' });
-    expect(closed.items.map((item) => item.id).sort()).toEqual([ids.noDeadlineLeague, ids.fullLeague, ids.finishedLeague].sort());
-    const impossible = await read.list({ kind: 'league', sportId, phase: 'completed', registration: 'open' });
-    expect(impossible.items).toEqual([]);
+  // 2026-10-27: 리그도 대회처럼 접수 중(open)일 때만 신청을 받는다 — 진행 중 리그는 받지 않는다.
+  it('리그 상태 필터는 카드 배지와 같은 그룹만 고른다', async () => {
+    const stage = async (value: 'preparing' | 'recruiting' | 'recruit_closed' | 'ongoing' | 'completed') =>
+      (await read.list({ kind: 'league', sportId, stage: value })).items.map((item) => item.id).sort();
+    expect(await stage('preparing')).toEqual([ids.draftLeague, ids.noDeadlineLeague].sort());
+    expect(await stage('recruiting')).toEqual([ids.openLeague]);
+    expect(await stage('recruit_closed')).toEqual([ids.closedLeague]);
+    expect(await stage('ongoing')).toEqual([ids.activeLeague, ids.fullLeague].sort());
+    expect(await stage('completed')).toEqual([ids.finishedLeague]);
+    const accepting = await read.list({ kind: 'league', sportId, stage: 'recruiting' });
+    expect(accepting.items[0].registrationOpen).toBe(true);
   });
   it('시즌 시작일이 선택 기간보다 앞이어도 겹치는 시즌을 조회한다', async () => {
     const result = await read.list({ kind: 'league', sportId, dateFrom: '2099-11-01', dateTo: '2099-11-30', withTotal: 'true' });
@@ -69,15 +72,29 @@ describe('대회·리그 탐색 (real DB)', () => {
     expect(result.pageInfo.total).toBe(7);
   });
   it('대회 부문·방식·무료 조건을 AND 적용한다', async () => {
-    const result = await read.list({ kind: 'tournament', sportId, genderCategory: 'mixed', format: 'knockout', feeMax: 0, registration: 'open' });
+    const result = await read.list({ kind: 'tournament', sportId, genderCategory: 'mixed', format: 'knockout', feeMax: 0, stage: 'recruiting' });
     expect(result.items.map((item) => item.id)).toEqual([ids.available]);
   });
-  it('개최 정렬과 cursor가 중복·누락 없이 이어진다', async () => {
-    await prisma.v1Tournament.update({ where: { id: ids.activeLeague }, data: { scheduledAt: new Date('2099-09-01') } });
-    const first = await read.list({ kind: 'league', sportId, sort: 'scheduled', limit: 1 });
-    expect(first.items[0].id).toBe(ids.activeLeague);
-    const second = await read.list({ kind: 'league', sportId, sort: 'scheduled', limit: 10, cursor: first.pageInfo.nextCursor! });
-    expect(second.items).toHaveLength(6);
-    expect(second.items.some((item) => item.id === ids.activeLeague)).toBe(false);
+  it('기본 정렬은 진행 중 → 접수 중 → 준비 중 → 접수 마감 → 종료이고 그룹 안은 최근 등록순이며 cursor가 중복·누락 없이 이어진다', async () => {
+    await prisma.v1Tournament.update({ where: { id: ids.fullLeague }, data: { createdAt: new Date('2099-01-02') } });
+    await prisma.v1Tournament.update({ where: { id: ids.activeLeague }, data: { createdAt: new Date('2099-01-01') } });
+    await prisma.v1Tournament.update({ where: { id: ids.draftLeague }, data: { createdAt: new Date('2099-01-02') } });
+    await prisma.v1Tournament.update({ where: { id: ids.noDeadlineLeague }, data: { createdAt: new Date('2099-01-01') } });
+    const first = await read.list({ kind: 'league', sportId, limit: 3, withTotal: 'true' });
+    expect(first.items.map((item) => item.id)).toEqual([ids.fullLeague, ids.activeLeague, ids.openLeague]);
+    expect(first.pageInfo.total).toBe(7);
+    const second = await read.list({ kind: 'league', sportId, limit: 10, cursor: first.pageInfo.nextCursor! });
+    expect(second.items.map((item) => item.id)).toEqual([ids.draftLeague, ids.noDeadlineLeague, ids.closedLeague, ids.finishedLeague]);
+  });
+  it('전체 탭도 대회와 리그를 같은 그룹 순서로 섞는다', async () => {
+    const result = await read.list({ kind: 'all', sportId, limit: 20 });
+    const order = result.items.map((item) => item.id);
+    const position = (id: string) => order.indexOf(id);
+    // 진행 중 < 접수 중 < 준비 중(리그만) < 접수 마감 < 종료
+    expect(position(ids.activeLeague)).toBeLessThan(position(ids.available));
+    expect(position(ids.available)).toBeLessThan(position(ids.draftLeague));
+    expect(position(ids.draftLeague)).toBeLessThan(position(ids.full));
+    expect(position(ids.expired)).toBeLessThan(position(ids.finishedLeague));
+    expect(order).not.toContain(ids.hidden);
   });
 });

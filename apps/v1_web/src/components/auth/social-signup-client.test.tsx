@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SocialSignupClient } from './social-signup-client';
 import { V1ApiError } from '@/lib/api-client';
+import { readPendingEmailLink, savePendingEmailLink } from '@/lib/pending-email-link';
 
 const router = vi.hoisted(() => ({
   replace: vi.fn(),
@@ -21,7 +22,7 @@ const hooks = vi.hoisted(() => ({
   // 카카오 동의항목 미승인이 기본값 — 프리필 없이 직접 입력하는 기존 흐름.
   authMe: {
     socialSignupPrefill: null as null | { name: string | null; phone: string | null; gender: 'male' | 'female' | null; birthDate?: string | null },
-    user: { authProvider: 'kakao' as string | null, onboardingStatus: 'social_profile_required', phone: null as string | null },
+    user: { authProvider: 'kakao' as string | null, onboardingStatus: 'social_profile_required', phone: null as string | null, canLinkAfterSignup: true as boolean | undefined },
     profile: { nickname: null as string | null },
     verification: { phoneVerified: false },
   },
@@ -64,6 +65,7 @@ type AvailabilityCallbacks = {
 type CompleteProfileCallbacks = {
   readonly onSuccess: (result: {
     readonly session: { readonly userId: string; readonly userEmail: string | null };
+    readonly user?: { readonly canLinkLoginMethods: boolean; readonly signupEmailLoginRequired?: boolean };
     readonly next?: { readonly route: string };
   }) => void;
   readonly onError?: (error: unknown) => void;
@@ -72,8 +74,10 @@ type CompleteProfileCallbacks = {
 async function verifyNicknameAndSelectGender(): Promise<void> {
   fireEvent.change(screen.getByLabelText('닉네임'), { target: { value: '카카오러너' } });
   fireEvent.click(screen.getByRole('button', { name: '중복 확인' }));
-  fireEvent.click(screen.getByRole('radio', { name: '여' }));
   await waitFor(() => expect(screen.getByText('사용 가능한 닉네임이에요.')).toBeInTheDocument());
+  fireEvent.click(screen.getByRole('button', { name: '다음' }));
+  fireEvent.click(screen.getByRole('radio', { name: '여' }));
+  fireEvent.click(screen.getByRole('button', { name: '다음' }));
 }
 
 // 부모는 완성 게이트만 검증한다. 카드 내부(자동 발급·폴링)와 디커플하기 위해 stub으로 대체.
@@ -92,6 +96,8 @@ async function completePhoneVerification(): Promise<void> {
 describe('SocialSignupClient required profile contract', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    hooks.authMe.socialSignupPrefill = null;
+    hooks.authMe.user.canLinkAfterSignup = true;
     hooks.authMe.user.authProvider = 'kakao';
     hooks.authMe.user.onboardingStatus = 'social_profile_required';
     hooks.authMe.user.phone = null;
@@ -110,31 +116,132 @@ describe('SocialSignupClient required profile contract', () => {
     });
   });
 
-  it.each([
-    ['display name', /^이름/],
-    ['phone', /^휴대폰 번호/],
-    ['birth date', /^생년월일/],
-  ] as const)('renders a required %s input for social signup', (_field, label) => {
-    // Given
+  it('카카오 제공 정보는 확인 화면에 모으고 닉네임부터 단계별로 진행한다', async () => {
+    hooks.authMe.socialSignupPrefill = { name: '김러너', phone: '01012345678', gender: 'female', birthDate: '20000229' };
     render(<SocialSignupClient />);
-
-    // When
-    const input = screen.getByLabelText(label);
-
-    // Then
-    expect(input).toBeRequired();
+    expect(screen.getByLabelText('닉네임')).toBeVisible();
+    expect(screen.queryByLabelText(/^휴대폰 번호/)).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('닉네임'), { target: { value: '카카오러너' } });
+    fireEvent.click(screen.getByRole('button', { name: '중복 확인' }));
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    expect(await screen.findByText('입력한 정보를 확인해 주세요')).toBeVisible();
+    expect(screen.getByText('김러너')).toBeVisible();
+    expect(screen.getByText('010-1234-5678')).toBeVisible();
+    expect(screen.queryByRole('checkbox', { name: /이메일.*로그인/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/이메일을 인증하고 비밀번호를 설정/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '나중에 입력할게요' })).not.toBeInTheDocument();
   });
 
-  it('keeps social signup blocked while the required profile inputs are empty', async () => {
-    // Given
+  it('소셜 프로필 저장 후 이메일 설정 없이 온보딩으로 이어진다', async () => {
+    hooks.authMe.socialSignupPrefill = { name: '김러너', phone: '01012345678', gender: 'female', birthDate: '20000229' };
+    hooks.completeProfileMutate.mockImplementation((_body: unknown, callbacks: CompleteProfileCallbacks) => callbacks.onSuccess({ session: { userId: 'social-user', userEmail: null }, user: { canLinkLoginMethods: true, signupEmailLoginRequired: true }, next: { route: '/onboarding/sport' } }));
+    render(<SocialSignupClient />);
+    fireEvent.change(screen.getByLabelText('닉네임'), { target: { value: '카카오러너' } });
+    fireEvent.click(screen.getByRole('button', { name: '중복 확인' }));
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    fireEvent.click(screen.getByRole('button', { name: '확인하고 계속' }));
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/onboarding/sport'));
+  });
+
+  it('이메일 연결 권한이 없어도 가입 후 온보딩으로 계속한다', async () => {
+    hooks.authMe.socialSignupPrefill = { name: '김러너', phone: '01012345678', gender: 'female', birthDate: '20000229' };
+    hooks.completeProfileMutate.mockImplementation((_body: unknown, callbacks: CompleteProfileCallbacks) => callbacks.onSuccess({ session: { userId: 'social-user', userEmail: null }, user: { canLinkLoginMethods: false, signupEmailLoginRequired: true }, next: { route: '/onboarding/sport' } }));
+    render(<SocialSignupClient />);
+    fireEvent.change(screen.getByLabelText('닉네임'), { target: { value: '카카오러너' } });
+    fireEvent.click(screen.getByRole('button', { name: '중복 확인' }));
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    fireEvent.click(screen.getByRole('button', { name: '확인하고 계속' }));
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/onboarding/sport'));
+    expect(screen.queryByRole('heading', { name: '이메일 로그인을 연결하지 못했어요' })).not.toBeInTheDocument();
+  });
+
+  it('가입 후에도 연결할 수 없는 계정에는 이메일 연결 선택을 보이지 않는다', () => {
+    hooks.authMe.socialSignupPrefill = { name: '김러너', phone: '01012345678', gender: 'female', birthDate: '20000229' };
+    hooks.authMe.user.canLinkAfterSignup = false;
+    render(<SocialSignupClient />);
+    fireEvent.change(screen.getByLabelText('닉네임'), { target: { value: '카카오러너' } });
+    fireEvent.click(screen.getByRole('button', { name: '중복 확인' }));
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    expect(screen.queryByRole('checkbox', { name: /이메일.*로그인/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/이메일 로그인/)).not.toBeInTheDocument();
+  });
+
+  it('연결 가능 여부와 상관없이 가입에서 이메일 연결을 요구하지 않는다', () => {
+    hooks.authMe.socialSignupPrefill = { name: '김러너', phone: '01012345678', gender: 'female', birthDate: '20000229' };
+    hooks.authMe.user.canLinkAfterSignup = undefined;
+    render(<SocialSignupClient />);
+    fireEvent.change(screen.getByLabelText('닉네임'), { target: { value: '카카오러너' } });
+    fireEvent.click(screen.getByRole('button', { name: '중복 확인' }));
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    expect(screen.queryByText(/이메일 로그인/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: /이메일.*로그인/ })).not.toBeInTheDocument();
+  });
+
+  it('필수 약관이 남으면 이메일 설정 없이 약관 복구 경로를 따른다', async () => {
+    hooks.authMe.socialSignupPrefill = { name: '김러너', phone: '01012345678', gender: 'female', birthDate: '20000229' };
+    hooks.completeProfileMutate.mockImplementation((_body: unknown, callbacks: CompleteProfileCallbacks) => callbacks.onSuccess({ session: { userId: 'social-user', userEmail: null }, user: { canLinkLoginMethods: true, signupEmailLoginRequired: true }, next: { route: '/terms?mode=renewal' } }));
+    render(<SocialSignupClient />);
+    fireEvent.change(screen.getByLabelText('닉네임'), { target: { value: '카카오러너' } });
+    fireEvent.click(screen.getByRole('button', { name: '중복 확인' }));
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    fireEvent.click(screen.getByRole('button', { name: '확인하고 계속' }));
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/terms?mode=renewal&redirect=%2Fonboarding%2Fsport'));
+  });
+
+  it('연결이 금지된 관리자 계정은 가입 후 온보딩으로 진행한다', async () => {
+    hooks.authMe.user.canLinkAfterSignup = false;
+    hooks.authMe.socialSignupPrefill = { name: '김러너', phone: '01012345678', gender: 'female', birthDate: '20000229' };
+    hooks.completeProfileMutate.mockImplementation((_body: unknown, callbacks: CompleteProfileCallbacks) => callbacks.onSuccess({ session: { userId: 'social-user', userEmail: null }, next: { route: '/onboarding/sport' } }));
+    render(<SocialSignupClient />);
+    fireEvent.change(screen.getByLabelText('닉네임'), { target: { value: '카카오러너' } });
+    fireEvent.click(screen.getByRole('button', { name: '중복 확인' }));
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    fireEvent.click(screen.getByRole('button', { name: '확인하고 계속' }));
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/onboarding/sport'));
+  });
+
+  it('이전 단계로 돌아가도 닉네임과 확인 결과를 유지한다', () => {
+    render(<SocialSignupClient />);
+    fireEvent.change(screen.getByLabelText('닉네임'), { target: { value: '카카오러너' } });
+    fireEvent.click(screen.getByRole('button', { name: '중복 확인' }));
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    fireEvent.click(screen.getAllByRole('button', { name: '이전 단계' })[0]);
+    expect(screen.getByLabelText(/^닉네임/)).toHaveValue('카카오러너');
+    expect(screen.getByRole('button', { name: '다음' })).toBeEnabled();
+  });
+
+  it('제공되지 않은 성별·이름·번호·생년월일을 단계별로 받고 번호 인증 뒤 실제 프로필을 제출한다', async () => {
+    hooks.authMe.socialSignupPrefill = null;
+    render(<SocialSignupClient />);
+    fireEvent.change(screen.getByLabelText('닉네임'), { target: { value: '카카오러너' } });
+    fireEvent.click(screen.getByRole('button', { name: '중복 확인' }));
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    fireEvent.click(screen.getByRole('radio', { name: '여' }));
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    fireEvent.change(screen.getByLabelText('이름'), { target: { value: '김러너' } });
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    fireEvent.change(screen.getByLabelText('휴대폰 번호'), { target: { value: '01087654321' } });
+    expect(screen.getByRole('button', { name: '다음' })).toBeDisabled();
+    await completePhoneVerification();
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    fireEvent.click(screen.getByRole('button', { name: '확인하고 계속' }));
+    expect(hooks.completeProfileMutate).toHaveBeenCalledWith({ nickname: '카카오러너', displayName: '김러너', phone: '01087654321', birthDate: '20000229', gender: 'female' }, expect.any(Object));
+  });
+
+  it('각 단계에서 이름·번호·생년월일을 필수로 받는다', async () => {
     render(<SocialSignupClient />);
     await verifyNicknameAndSelectGender();
-
-    // When
-    const submitButton = screen.getByRole('button', { name: /입력 확인 후 계속|운동 설정으로 계속/ });
-
-    // Then
-    expect(submitButton).toBeDisabled();
+    expect(screen.getByLabelText(/^이름/)).toBeRequired();
+    expect(screen.getByRole('button', { name: '다음' })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '김러너' } });
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    expect(screen.getByLabelText(/^휴대폰 번호/)).toBeRequired();
+    fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01087654321' } });
+    await completePhoneVerification();
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    expect(screen.getByLabelText(/^생년월일/)).toBeRequired();
   });
 
   it('submits all four required profile values for social signup', async () => {
@@ -142,12 +249,15 @@ describe('SocialSignupClient required profile contract', () => {
     render(<SocialSignupClient />);
     await verifyNicknameAndSelectGender();
     fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '김러너' } });
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
     fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01087654321' } });
-    fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
     await completePhoneVerification();
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
 
     // When
-    fireEvent.click(screen.getByRole('button', { name: '운동 설정으로 계속' }));
+    fireEvent.click(screen.getByRole('button', { name: '확인하고 계속' }));
 
     // Then
     await waitFor(() =>
@@ -168,11 +278,14 @@ describe('SocialSignupClient required profile contract', () => {
     render(<SocialSignupClient />);
     await verifyNicknameAndSelectGender();
     fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '김러너' } });
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
     fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01087654321' } });
-    fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
     await completePhoneVerification();
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
     expect(screen.queryByRole('switch', { name: '경기 기록 공개' })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '운동 설정으로 계속' }));
+    fireEvent.click(screen.getByRole('button', { name: '확인하고 계속' }));
     await waitFor(() => expect(hooks.completeProfileMutate).toHaveBeenCalled());
     expect(hooks.completeProfileMutate.mock.calls[0][0]).not.toHaveProperty('recordConsent');
   });
@@ -185,15 +298,41 @@ describe('SocialSignupClient required profile contract', () => {
     render(<SocialSignupClient />);
     await verifyNicknameAndSelectGender();
     fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '김러너' } });
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
     fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01087654321' } });
-    fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
     await completePhoneVerification();
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
 
     // When
-    fireEvent.click(screen.getByRole('button', { name: '운동 설정으로 계속' }));
+    fireEvent.click(screen.getByRole('button', { name: '확인하고 계속' }));
 
     // Then
     await waitFor(() => expect(analytics.trackEvent).toHaveBeenCalledWith('sign_up_complete', { method: 'kakao' }));
+  });
+
+  // 이메일 가입에서 입력해 둔 이메일은 원래 계정에 연결하자는 제안용이다 — 방금 만든 새 계정에는 제안되지 않아야 한다.
+  it('가입을 마치면 이메일 가입 화면에서 보관해 둔 이메일을 지운다', async () => {
+    savePendingEmailLink({ email: 'left-from-email-signup@example.com' });
+    hooks.completeProfileMutate.mockImplementation((_body: unknown, callbacks: CompleteProfileCallbacks) =>
+      callbacks.onSuccess({ session: { userId: 'social-user', userEmail: null }, next: { route: '/onboarding/region' } }),
+    );
+    render(<SocialSignupClient />);
+    await verifyNicknameAndSelectGender();
+    fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '김러너' } });
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01087654321' } });
+    await completePhoneVerification();
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    expect(readPendingEmailLink()).not.toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: '확인하고 계속' }));
+
+    await waitFor(() => expect(hooks.completeProfileMutate).toHaveBeenCalled());
+    expect(readPendingEmailLink()).toBeNull();
   });
 
   it('Apple 가입 완료는 method=apple 로 기록한다', async () => {
@@ -204,11 +343,14 @@ describe('SocialSignupClient required profile contract', () => {
     render(<SocialSignupClient />);
     await verifyNicknameAndSelectGender();
     fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '김러너' } });
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
     fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01087654321' } });
-    fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
     await completePhoneVerification();
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
 
-    fireEvent.click(screen.getByRole('button', { name: '운동 설정으로 계속' }));
+    fireEvent.click(screen.getByRole('button', { name: '확인하고 계속' }));
 
     await waitFor(() => expect(analytics.trackEvent).toHaveBeenCalledWith('sign_up_complete', { method: 'apple' }));
   });
@@ -233,11 +375,14 @@ describe('SocialSignupClient required profile contract', () => {
     render(<SocialSignupClient />);
     await verifyNicknameAndSelectGender();
     fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '김러너' } });
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
     fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01087654321' } });
-    fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
     await completePhoneVerification();
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
 
-    fireEvent.click(screen.getByRole('button', { name: '운동 설정으로 계속' }));
+    fireEvent.click(screen.getByRole('button', { name: '확인하고 계속' }));
 
     await waitFor(() => expect(screen.getByText(`가입 가능 시간이 지났어요. ${expected}`)).toBeInTheDocument());
   });
@@ -253,12 +398,15 @@ describe('SocialSignupClient required profile contract', () => {
     render(<SocialSignupClient />);
     await verifyNicknameAndSelectGender();
     fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '김러너' } });
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
     fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01087654321' } });
-    fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
     await completePhoneVerification();
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
 
     // When
-    fireEvent.click(screen.getByRole('button', { name: '운동 설정으로 계속' }));
+    fireEvent.click(screen.getByRole('button', { name: '확인하고 계속' }));
 
     // Then
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/onboarding/region'));
@@ -273,75 +421,68 @@ describe('SocialSignupClient required profile contract', () => {
     render(<SocialSignupClient />);
     await verifyNicknameAndSelectGender();
     fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '김러너' } });
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
     fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01087654321' } });
-    fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
     await completePhoneVerification();
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
 
-    fireEvent.click(screen.getByRole('button', { name: '운동 설정으로 계속' }));
+    fireEvent.click(screen.getByRole('button', { name: '확인하고 계속' }));
 
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/home'));
     expect(analytics.trackEvent).toHaveBeenCalledWith('activity_profile_complete', { method: 'kakao' });
     expect(analytics.trackEvent).not.toHaveBeenCalledWith('sign_up_complete', expect.anything());
   });
 
-  it('blocks social signup submission until phone verification is completed', async () => {
-    // Given
+  it('휴대폰 인증을 마치기 전에는 다음 단계와 가입을 막는다', async () => {
     render(<SocialSignupClient />);
     await verifyNicknameAndSelectGender();
     fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '김러너' } });
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
     fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01087654321' } });
-    fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
-
-    // When — submitting without completing phone verification
-    fireEvent.click(screen.getByRole('button', { name: '운동 설정으로 계속' }));
-
-    // Then
-    await waitFor(() => expect(screen.getByText('휴대폰 본인인증을 완료해 주세요.')).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: '다음' })).toBeDisabled();
     expect(hooks.completeProfileMutate).not.toHaveBeenCalled();
   });
 
   it.each([
-    ['phone', /^휴대폰 번호/, '010876543210'],
-    ['phone', /^휴대폰 번호/, '0108765abcd'],
-    ['birth date', /^생년월일/, '200002290'],
-    ['birth date', /^생년월일/, '2000ab29'],
-  ] as const)('blocks social signup when raw %s input is %s', async (_field, label, rawValue) => {
-    // Given
+    ['phone', '010876543210'], ['phone', '0108765abcd'],
+    ['birth', '200002290'], ['birth', '2000ab29'],
+  ] as const)('잘못된 %s 입력 %s는 다음 단계로 넘어가지 않는다', async (field, value) => {
     render(<SocialSignupClient />);
     await verifyNicknameAndSelectGender();
     fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '김러너' } });
-    fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01087654321' } });
-    fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
-    fireEvent.change(screen.getByLabelText(label), { target: { value: rawValue } });
-
-    // When
-    fireEvent.click(screen.getByRole('button', { name: /입력 확인 후 계속|운동 설정으로 계속/ }));
-
-    // Then
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: field === 'phone' ? value : '01087654321' } });
+    if (field === 'birth') {
+      await completePhoneVerification();
+      fireEvent.click(screen.getByRole('button', { name: '다음' }));
+      fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value } });
+    }
+    expect(screen.getByRole('button', { name: '다음' })).toBeDisabled();
     expect(hooks.completeProfileMutate).not.toHaveBeenCalled();
   });
 
   it.each([
-    ['phone', /^휴대폰 번호/, '01087654321', '0', '010-8765-43210'],
-    ['birth date', /^생년월일/, '20000229', '0', '2000-02-290'],
-  ] as const)('retains an extra typed %s digit and disables social signup', async (_field, label, validValue, extraDigit, expectedValue) => {
-    // Given
+    ['phone', '01087654321', '010-8765-43210'], ['birth', '20000229', '2000-02-290'],
+  ] as const)('추가로 입력한 %s 숫자를 유지하고 다음 단계를 막는다', async (field, valid, expected) => {
     const user = userEvent.setup();
     render(<SocialSignupClient />);
     await verifyNicknameAndSelectGender();
     fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '김러너' } });
-    fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01087654321' } });
-    fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '20000229' } });
-    const input = screen.getByLabelText(label);
-    fireEvent.change(input, { target: { value: validValue } });
-
-    // When
-    await user.type(input, extraDigit);
-
-    // Then
-    expect(input).toHaveValue(expectedValue);
-    expect(screen.getByRole('button', { name: /입력 확인 후 계속|운동 설정으로 계속/ })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: field === 'phone' ? valid : '01087654321' } });
+    if (field === 'birth') {
+      await completePhoneVerification();
+      fireEvent.click(screen.getByRole('button', { name: '다음' }));
+      fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: valid } });
+    }
+    const input = screen.getByLabelText(field === 'phone' ? /^휴대폰 번호/ : /^생년월일/);
+    await user.type(input, '0');
+    expect(input).toHaveValue(expected);
+    expect(screen.getByRole('button', { name: '다음' })).toBeDisabled();
   });
+
 });
 
 // PendingSocialSignupGate 가 이 단계에서 다른 경로를 전부 되돌리므로, 이 버튼이 없으면
@@ -417,69 +558,83 @@ describe('SocialSignupClient 카카오 자동 채움', () => {
     hooks.authMe.user.authProvider = 'kakao';
     hooks.authMe.user.onboardingStatus = 'social_profile_required';
     hooks.authMeFailed = false;
-  });
-
-  it('카카오 값이 없으면 기존처럼 직접 입력한다', () => {
-    render(<SocialSignupClient />);
-    expect(screen.getByLabelText(/^이름/)).toHaveValue('');
-    expect(screen.getByLabelText(/^이름/)).not.toHaveAttribute('readonly');
-    expect(screen.getByRole('radio', { name: '남' })).toBeEnabled();
-  });
-
-  it('이름·성별은 채우고 수정하지 못하게 잠근다', async () => {
-    hooks.authMe.socialSignupPrefill = { name: '홍길동', phone: null, gender: 'female' };
-    render(<SocialSignupClient />);
-
-    await waitFor(() => expect(screen.getByLabelText(/^이름/)).toHaveValue('홍길동'));
-    expect(screen.getByLabelText(/^이름/)).toHaveAttribute('readonly');
-    expect(screen.getByRole('radio', { name: '여' })).toBeDisabled();
-    expect(screen.getByRole('radio', { name: '남' })).toBeDisabled();
-  });
-
-  // 게이트가 /auth/me 를 먼저 받아 두지만 캐시가 비면 프리필이 늦게 도착할 수 있다.
-  // 그때 이미 입력 중이던 번호를 덮어쓰면 사용자의 입력이 소리 없이 사라진다.
-  it('프리필이 늦게 와도 이미 입력한 전화번호를 덮어쓰지 않는다', async () => {
-    const { rerender } = render(<SocialSignupClient />);
-    fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01087654321' } });
-
-    hooks.authMe.socialSignupPrefill = { name: null, phone: '01012345678', gender: null };
-    rerender(<SocialSignupClient />);
-
-    await waitFor(() => expect(screen.getByLabelText(/^휴대폰 번호/)).toHaveValue('010-8765-4321'));
-  });
-
-  // 카카오 번호와 실제 쓰는 번호가 다를 수 있는데 잠그면 OTP 본인인증을 통과할 방법이 없어진다.
-  it('전화번호는 채우되 수정할 수 있게 둔다', async () => {
-    hooks.authMe.socialSignupPrefill = { name: null, phone: '01012345678', gender: null };
-    render(<SocialSignupClient />);
-
-    const phone = screen.getByLabelText(/^휴대폰 번호/);
-    await waitFor(() => expect(phone).toHaveValue('010-1234-5678'));
-    expect(phone).not.toHaveAttribute('readonly');
-  });
-
-  it('카카오 번호와 생년월일은 자동 입력하고 인증 요청 없이 가입을 제출한다', async () => {
-    hooks.authMe.socialSignupPrefill = { name: '회원', phone: '01012345678', gender: 'female', birthDate: '20000229' };
     hooks.checkNicknameMutate.mockImplementation((_v: string, cb: AvailabilityCallbacks) => cb.onSuccess({ available: true }));
-    render(<SocialSignupClient />);
-    await waitFor(() => expect(screen.getByLabelText(/^휴대폰 번호/)).toHaveValue('010-1234-5678'));
-    expect(screen.getByLabelText(/^생년월일/)).toHaveValue('2000-02-29');
-    expect(screen.queryByRole('button', { name: '__stub_verify__' })).not.toBeInTheDocument();
-    expect(screen.getByText('카카오에서 받은 전화번호예요. 추가 인증 없이 사용할 수 있어요.')).toBeInTheDocument();
+  });
+
+  afterEach(() => {
+    hooks.authMe.user.onboardingStatus = 'social_profile_required';
+  });
+
+  const nicknameNext = () => {
     fireEvent.change(screen.getByLabelText('닉네임'), { target: { value: '카카오회원' } });
     fireEvent.click(screen.getByRole('button', { name: '중복 확인' }));
-    fireEvent.submit(document.getElementById('v1-social-signup-form')!);
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+  };
+
+  it('카카오 값이 없으면 성별과 이름을 직접 입력한다', () => {
+    render(<SocialSignupClient />);
+    nicknameNext();
+    expect(screen.getByRole('radio', { name: '남' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('radio', { name: '남' }));
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    expect(screen.getByLabelText(/^이름/)).toHaveValue('');
+    expect(screen.getByLabelText(/^이름/)).not.toHaveAttribute('readonly');
+  });
+
+  it('카카오 제공 이름·성별은 확인 화면에 출처와 함께 보이고 편집 입력은 없다', () => {
+    hooks.authMe.socialSignupPrefill = { name: '홍길동', phone: '01012345678', gender: 'female', birthDate: '20000229' };
+    render(<SocialSignupClient />);
+    nicknameNext();
+    expect(screen.getByText('홍길동')).toBeVisible();
+    expect(screen.getAllByText('카카오 제공')[0]).toBeVisible();
+    expect(screen.getAllByText('카카오 제공')[1]).toBeVisible();
+    expect(screen.queryByLabelText(/^이름/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: '여' })).not.toBeInTheDocument();
+  });
+
+  it('카카오 번호가 늦게 도착하면 가입 중 직접 입력한 번호 대신 제공 번호로 잠근다', async () => {
+    const { rerender } = render(<SocialSignupClient />);
+    nicknameNext();
+    fireEvent.click(screen.getByRole('radio', { name: '여' }));
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '김러너' } });
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01087654321' } });
+    hooks.authMe.socialSignupPrefill = { name: null, phone: '01012345678', gender: null };
+    rerender(<SocialSignupClient />);
+    await waitFor(() => expect(screen.getByLabelText(/^휴대폰 번호/)).toHaveValue('010-1234-5678'));
+    expect(screen.getByLabelText(/^휴대폰 번호/)).toHaveAttribute('readonly');
+  });
+
+  it('카카오 제공 전화번호는 가입 확인 화면에서 수정할 수 없다', () => {
+    hooks.authMe.socialSignupPrefill = { name: '회원', phone: '01012345678', gender: 'female', birthDate: '20000229' };
+    render(<SocialSignupClient />);
+    nicknameNext();
+    expect(screen.getByText('010-1234-5678')).toBeVisible();
+    expect(screen.queryByRole('button', { name: '번호 변경' })).not.toBeInTheDocument();
+  });
+
+  it('카카오 번호와 생년월일은 자동 입력하고 인증 요청 없이 가입을 제출한다', () => {
+    hooks.authMe.socialSignupPrefill = { name: '회원', phone: '01012345678', gender: 'female', birthDate: '20000229' };
+    render(<SocialSignupClient />);
+    nicknameNext();
+    expect(screen.getByText('010-1234-5678')).toBeVisible();
+    expect(screen.getByText('2000-02-29')).toBeVisible();
+    expect(screen.queryByRole('button', { name: '__stub_verify__' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '확인하고 계속' }));
     expect(hooks.completeProfileMutate).toHaveBeenCalledWith(expect.objectContaining({ phone: '01012345678', birthDate: '20000229' }), expect.any(Object));
     expect(hooks.authedPhoneRequestMutateAsync).not.toHaveBeenCalled();
   });
 
-  it('사용자가 다른 번호를 입력하면 카카오 제공 번호의 인증 상태를 재사용하지 않는다', async () => {
-    hooks.authMe.socialSignupPrefill = { name: null, phone: '01012345678', gender: null };
+  it('정보 입력을 미룬 뒤 돌아온 경우에는 번호 변경 시 문자 인증이 필요하다', () => {
+    hooks.authMe.user.onboardingStatus = 'social_profile_deferred';
+    hooks.authMe.socialSignupPrefill = { name: '회원', phone: '01012345678', gender: 'female', birthDate: '20000229' };
     render(<SocialSignupClient />);
-    await waitFor(() => expect(screen.getByLabelText(/^휴대폰 번호/)).toHaveValue('010-1234-5678'));
+    nicknameNext();
+    fireEvent.click(screen.getByRole('button', { name: '번호 변경' }));
     fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01087654321' } });
     expect(screen.getByRole('button', { name: '__stub_verify__' })).toBeInTheDocument();
-    expect(screen.queryByText('카카오에서 받은 전화번호예요. 추가 인증 없이 사용할 수 있어요.')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '다음' })).toBeDisabled();
   });
 });
 
@@ -495,8 +650,6 @@ describe('SocialSignupClient 가입 방식 문구', () => {
     render(<SocialSignupClient />);
 
     expect(screen.getAllByText('Apple 가입').length).toBeGreaterThan(0);
-    expect(screen.getByText(/Apple 계정 확인이 됐어요\./)).toBeInTheDocument();
-    expect(screen.getByText('Apple 계정에서 가져온 정보예요.')).toBeInTheDocument();
     expect(screen.queryByText(/카카오/)).not.toBeInTheDocument();
   });
 
@@ -505,7 +658,6 @@ describe('SocialSignupClient 가입 방식 문구', () => {
     render(<SocialSignupClient />);
 
     expect(screen.getAllByText('카카오 가입').length).toBeGreaterThan(0);
-    expect(screen.getByText(/카카오 계정 확인이 됐어요\./)).toBeInTheDocument();
   });
 
   it('가입 방식을 아직 모르면 특정 서비스를 단정하지 않는다', () => {
@@ -541,6 +693,28 @@ describe('SocialSignupClient 나중에 입력할게요', () => {
   const deferResult = {
     session: { userId: 'u-1', userEmail: null },
   };
+
+  it('프로필을 미루면 이전 서버의 이메일 경로를 건너뛰고 원래 가려던 곳으로 돌아간다', () => {
+    hooks.deferMutate.mockImplementation((_v: undefined, cb: CompleteProfileCallbacks) => cb.onSuccess({
+      session: { userId: 'u-1', userEmail: null },
+      user: { canLinkLoginMethods: false, signupEmailLoginRequired: true },
+      next: { route: '/my/settings/login-methods/email?redirect=%2Fhome' },
+    }));
+    setSearch('?redirect=%2Fteams%2Fnew');
+    render(<SocialSignupClient />);
+    fireEvent.click(screen.getByRole('button', { name: '나중에 입력할게요' }));
+    expect(router.replace).toHaveBeenCalledWith('/teams/new');
+  });
+
+  it('나중에 입력하기로 가입을 마쳐도 이메일 가입 화면에서 보관해 둔 이메일은 지운다', () => {
+    savePendingEmailLink({ email: 'left-from-email-signup@example.com' });
+    hooks.deferMutate.mockImplementation((_v: undefined, cb: CompleteProfileCallbacks) => cb.onSuccess(deferResult));
+    render(<SocialSignupClient />);
+
+    fireEvent.click(screen.getByRole('button', { name: '나중에 입력할게요' }));
+
+    expect(readPendingEmailLink()).toBeNull();
+  });
 
   it('입력 없이 건너뛰면 defer 를 호출하고 홈으로 가며 sign_up_complete(profile=deferred)를 남긴다', () => {
     hooks.deferMutate.mockImplementation((_v: undefined, cb: CompleteProfileCallbacks) => cb.onSuccess(deferResult));
@@ -620,11 +794,11 @@ describe('SocialSignupClient 나중에 입력할게요', () => {
     hooks.authMe.profile.nickname = '카카오러너';
     render(<SocialSignupClient />);
 
-    expect(screen.getByRole('heading', { name: '활동 정보 입력' })).toBeInTheDocument();
-    expect(screen.getByText('입력을 마치면 하던 화면으로 돌아가요.')).toBeInTheDocument();
+    expect(screen.getAllByText('활동 정보 입력').length).toBeGreaterThan(0);
+    expect(screen.getByRole('heading', { name: '어떤 닉네임으로 활동할까요?' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '나중에 입력할게요' })).not.toBeInTheDocument();
     expect(screen.getByLabelText(/^닉네임/)).toHaveValue('카카오러너');
-    expect(screen.getByRole('button', { name: /입력 확인 후 계속|입력 완료하고 계속하기/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '다음' })).toBeEnabled();
   });
 
   it('이어 입력 모드 완료는 activity_profile_complete 를 남기고 redirect 로 돌아간다', async () => {
@@ -635,11 +809,16 @@ describe('SocialSignupClient 나중에 입력할게요', () => {
       cb.onSuccess({ session: { userId: 'u-1', userEmail: null } }));
     render(<SocialSignupClient />);
 
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
     fireEvent.click(screen.getByRole('radio', { name: '여' }));
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
     fireEvent.change(screen.getByLabelText(/^이름/), { target: { value: '김팀밋' } });
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
     fireEvent.change(screen.getByLabelText(/^휴대폰 번호/), { target: { value: '01012345678' } });
     await completePhoneVerification();
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
     fireEvent.change(screen.getByLabelText(/^생년월일/), { target: { value: '1995-01-15' } });
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
     fireEvent.click(await screen.findByRole('button', { name: '입력 완료하고 계속하기' }));
 
     expect(analytics.trackEvent).toHaveBeenCalledWith('activity_profile_complete', { method: 'kakao' });

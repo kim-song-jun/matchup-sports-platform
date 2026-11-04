@@ -41,6 +41,13 @@ describe('TournamentOpsShell 복귀 경로 (T6-2)', () => {
     expect(screen.queryByRole('link', { name: '서비스로 돌아가기' })).not.toBeInTheDocument();
   });
 
+  it.each(['TOURNAMENT_DIRECTOR', 'SUPPORT_READONLY'] as const)('운영 보드에서 들어온 %s는 경기 콘솔에서 운영 보드로 돌아간다 (MD-QA #195)', (role) => {
+    pathnameMock.value = '/tournament-ops/tournaments/t-1/fixtures/fx-1/operate';
+    render(<TournamentOpsShell tournamentId="t-1" role={role} origin="home"><div>content</div></TournamentOpsShell>);
+    expect(screen.getByRole('link', { name: '경기 목록으로 돌아가기' })).toHaveAttribute('href', '/tournament-ops/tournaments/t-1/operations');
+    expect(screen.queryByRole('link', { name: '담당 경기 목록으로 돌아가기' })).not.toBeInTheDocument();
+  });
+
   it('어드민 경기 콘솔에서는 운영 경기 목록으로 돌아간다', () => {
     pathnameMock.value = '/admin/live/t-1/fixtures/fx-1/operate';
     render(<TournamentOpsShell tournamentId="t-1" role="PLATFORM_OPS" origin="admin"><div>content</div></TournamentOpsShell>);

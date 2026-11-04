@@ -12,6 +12,8 @@ import {
 } from '@/lib/session-storage';
 import { disconnectV1Socket } from '@/lib/v1-socket';
 import { SessionFallback } from './session-entry-gate';
+import { usePendingEmailLinkOffer } from './use-pending-email-link-offer';
+import { usePendingSocialLinkResolver } from './use-pending-social-link-resolver';
 import {
   getPendingSocialSignupRoute,
   isPendingSocialSignupRouteAllowed,
@@ -35,6 +37,10 @@ export function PendingSocialSignupGate({ children }: { children: ReactNode }) {
     disconnectV1Socket();
     setHasSessionHint(false);
   }, [authMe.error, authMe.isError, authMe.isFetching, hasSessionHint]);
+
+  const confirmedAccount = hasSessionHint === true ? authMe.data : undefined;
+  const socialLink = usePendingSocialLinkResolver(confirmedAccount);
+  usePendingEmailLinkOffer(confirmedAccount, socialLink.routed);
 
   const onboardingStatus = authMe.data?.user.onboardingStatus;
   const socialRequiredRoute = getPendingSocialSignupRoute(onboardingStatus);

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { MockTournamentSeedService, readLineupMinPlayers } from './mock-tournament-seed.service';
+import { MockTournamentSeedService, mockGroupCapacities, mockNamedFinals, readLineupMinPlayers } from './mock-tournament-seed.service';
 import type { V1AuthUser } from '../../auth/v1-auth-user';
 import { competitionFieldDelegate } from '../../../test/helpers/competition-field-delegate';
 
@@ -74,7 +74,7 @@ function makeWorld(teamCount = 4) {
   const registrationTeams = new Map<string, string>();
   const tx = {
     v1TournamentField: competitionFieldDelegate(),
-    v1Tournament: { create: jest.fn(async ({ data }: never) => ({ ...(data as object), id: 'tour-1' })) },
+    v1Tournament: { create: jest.fn(async ({ data }: never) => ({ ...(data as object), id: 'tour-1', multiFinalsRevision: 0 })) },
     v1TournamentRegistration: {
       create: jest.fn(async ({ data }: never) => {
         const id = `reg-${registrationTeams.size + 1}`;
@@ -109,6 +109,8 @@ function makeWorld(teamCount = 4) {
       findUnique: jest.fn().mockResolvedValue(null),
     },
     v1TournamentMatchDetails: { create: jest.fn(async ({ data }: never) => data) },
+    // 단계별 경기 시간 재정의 — 시드 대회에는 없으므로 기본 설정을 쓴다.
+    v1TournamentStagePeriodSetting: { findUnique: jest.fn(async () => null) },
     v1IdempotencyRecord: { findFirst: jest.fn().mockResolvedValue(null), create: jest.fn() },
     v1TeamSchedule: { count: jest.fn().mockResolvedValue(0), create: jest.fn() },
     $executeRaw: jest.fn(),
@@ -137,6 +139,9 @@ function makeWorld(teamCount = 4) {
       findUnique: jest.fn(async ({ where }: { where: { id: string } }) => ({ id: where.id, score: { home: 0, away: 0 }, goalEvents: [], eventsHash: 'events-hash', mvpParticipantId: null })),
     },
     v1Team: { findMany: jest.fn().mockResolvedValue(teams) },
+    v1TournamentMatchDetails: { findMany: jest.fn().mockResolvedValue([]), count: jest.fn().mockResolvedValue(12) },
+    v1GameSide: { findMany: jest.fn().mockResolvedValue([]) },
+    v1GameLineup: { findMany: jest.fn().mockResolvedValue([{ sideId: 'side-1' }, { sideId: 'side-2' }]) },
     $transaction: jest.fn(async (cb: (t: unknown) => Promise<unknown>) => cb(tx)),
   };
   const adminContext = {
@@ -179,8 +184,13 @@ function makeWorld(teamCount = 4) {
       return { gameId };
     }),
   };
-  const service = new MockTournamentSeedService(prisma as never, adminContext as never, gamesService as never, resultReview as never);
-  return { service, prisma, tx, results, players, teamMatches, games, events, operationHeaders, actorContexts, adminContext, gamesService, resultReview };
+  const multiFinals = {
+    setup: jest.fn().mockResolvedValue({}),
+    preview: jest.fn().mockResolvedValue({ revision: 1, previewHash: 'hash' }),
+    generate: jest.fn().mockResolvedValue({}),
+  };
+  const service = new MockTournamentSeedService(prisma as never, adminContext as never, gamesService as never, resultReview as never, multiFinals as never);
+  return { service, prisma, tx, results, players, teamMatches, games, events, operationHeaders, actorContexts, adminContext, gamesService, resultReview, multiFinals };
 }
 
 describe('MockTournamentSeedService', () => {
@@ -511,6 +521,88 @@ describe('MockTournamentSeedService', () => {
     await service.createTournament(user, { format: 'league', teamCount: 4, reviewReady: true });
 
     expect(results).toHaveLength(teamMatches.length);
+  });
+
+  it('토너먼트 라운드 이름은 대진 크기를 따른다 (32팀 → 32강)', async () => {
+    const { service, tx } = makeWorld(32);
+
+    await service.createTournament(user, { format: 'knockout', teamCount: 32 });
+
+    const rounds = tx.v1TournamentMatchDetails.create.mock.calls.map(([arg]) => (arg as { data: { round: string } }).data.round);
+    expect(rounds).toEqual(Array(16).fill('32강'));
+  });
+
+  it('조는 4팀 안팎으로 고르게 나눈다', () => {
+    expect(mockGroupCapacities(32)).toEqual([4, 4, 4, 4, 4, 4, 4, 4]);
+    expect(mockGroupCapacities(10)).toEqual([4, 3, 3]);
+    expect(mockGroupCapacities(6)).toEqual([3, 3]);
+    expect(mockGroupCapacities(5)).toEqual([5]);
+    expect(mockGroupCapacities(2)).toEqual([2]);
+  });
+
+  it('결선은 각 조 윗순위 절반이 상위, 나머지가 하위 토너먼트로 간다 — 각 결선은 2팀 이상', () => {
+    for (const teamCount of [2, 3, 4, 5, 6, 7, 10, 16, 32]) {
+      const capacities = mockGroupCapacities(teamCount);
+      const finals = mockNamedFinals(capacities);
+      // 모든 조의 모든 순위가 정확히 한 결선에 연결된다.
+      expect(finals.flatMap((final) => final.rules)).toHaveLength(teamCount);
+      for (const final of finals) expect(final.rules.length).toBeGreaterThanOrEqual(2);
+    }
+    expect(mockNamedFinals([4, 4]).map((final) => final.rules)).toEqual([
+      [{ groupId: '0', rank: 1 }, { groupId: '0', rank: 2 }, { groupId: '1', rank: 1 }, { groupId: '1', rank: 2 }],
+      [{ groupId: '0', rank: 3 }, { groupId: '0', rank: 4 }, { groupId: '1', rank: 3 }, { groupId: '1', rank: 4 }],
+    ]);
+  });
+
+  it('정규리그+N개 토너먼트는 실제 예선 편성 경로로 4팀씩 조를 짜고 결선 규칙을 저장한다', async () => {
+    const { service, multiFinals, teamMatches } = makeWorld(8);
+
+    await service.createTournament(user, { format: 'league_knockouts', teamCount: 8 });
+
+    expect(teamMatches).toHaveLength(0);
+    expect(multiFinals.setup).toHaveBeenCalledWith(user, 'tour-1', expect.objectContaining({
+      expectedRevision: 0,
+      groups: [
+        { name: 'A조', capacity: 4, legs: 1, registrationIds: ['reg-1', 'reg-2', 'reg-3', 'reg-4'] },
+        { name: 'B조', capacity: 4, legs: 1, registrationIds: ['reg-5', 'reg-6', 'reg-7', 'reg-8'] },
+      ],
+      finals: mockNamedFinals([4, 4]),
+    }));
+    // 결과를 채우지 않으면 예선 순위가 없으니 결선 대진은 만들지 않는다.
+    expect(multiFinals.generate).not.toHaveBeenCalled();
+  });
+
+  it('정규리그+N개 토너먼트의 라인업 제출 수는 명단 동기화가 올린 제출본 사이드 수다', async () => {
+    const { service, prisma } = makeWorld(8);
+
+    const result = await service.createTournament(user, { format: 'league_knockouts', teamCount: 8, withLineups: true });
+
+    expect(result.lineupsSubmitted).toBe(2);
+    expect(prisma.v1GameLineup.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ state: 'SUBMITTED', invalidatedAt: null }),
+      distinct: ['sideId'],
+    }));
+  });
+
+  it('정규리그+N개 토너먼트는 결선 결과를 채우지 않으므로 종료 상태로 만들지 않는다', async () => {
+    const { service, prisma } = makeWorld(8);
+
+    await expect(service.createTournament(user, { format: 'league_knockouts', teamCount: 8, status: 'completed' }))
+      .rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('한 조 라운드로빈에 결과까지 채우는 건 16팀까지만 — 그 위는 프록시 시간 안에 못 끝난다', async () => {
+    const { service, prisma } = makeWorld(32);
+
+    for (const dto of [
+      { format: 'league' as const, teamCount: 17, withResults: true },
+      { format: 'group_knockout' as const, teamCount: 32, status: 'completed' as const },
+      { format: 'league' as const, teamCount: 20, reviewReady: true },
+    ]) {
+      await expect(service.createTournament(user, dto)).rejects.toMatchObject({ response: { code: 'MOCK_SEED_TOO_MANY_RESULTS' } });
+    }
+    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
   it('명단을 채울 팀이 부족하면 반쪽 대회를 만들지 않고 실패한다', async () => {

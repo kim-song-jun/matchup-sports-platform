@@ -27,14 +27,14 @@ function render(ui: ReactElement) {
 }
 
 describe('MyTournamentStaffPageClient', () => {
-  it.each(['draft', 'open', 'closed'])('%s 리그 담당 항목은 모집완료로 표시한다', (status) => {
+  // 2026-10-27: 리그 상태 이름도 대회처럼 나눈다.
+  it.each([['draft', '준비 중'], ['open', '모집 중'], ['closed', '마감']])('%s 리그 담당 항목은 %s로 표시한다', (status, label) => {
     apiMocks.useV1MyTournamentStaffAssignments.mockReturnValue({
       data: { items: [{ tournamentId: 'league-1', tournamentTitle: '담당 리그', tournamentKind: 'regular_league', tournamentStatus: status, assignments: [], fixtures: [] }] },
       isLoading: false, isError: false,
     });
     render(<MyTournamentStaffPageClient />);
-    expect(screen.getByText('모집완료')).toBeInTheDocument();
-    expect(screen.queryByText('준비 중')).not.toBeInTheDocument();
+    expect(screen.getByText(label)).toBeInTheDocument();
   });
 
   it('배정이 없으면 빈 상태를 보여준다', () => {

@@ -8,12 +8,13 @@ const props = { filters: { kind: 'tournament' as const }, sports: [{ id: 'sport-
 afterEach(cleanup);
 beforeEach(() => vi.clearAllMocks());
 
-describe('필터 선택·적용과 목록 정렬', () => {
-  it('총 건수 옆에서 정렬을 선택하고 모집 조건까지 URL에 전달한다', () => {
+describe('필터 선택·적용', () => {
+  it('정렬 선택은 없고 총 건수와 필터만 보여 준다', () => {
     render(<CompetitionDiscoveryControls {...props} />);
     expect(screen.getByText('총 12개')).toBeInTheDocument();
-    fireEvent.change(screen.getByRole('combobox', { name: '대회·리그 정렬' }), { target: { value: 'deadline' } });
-    expect(navigation.replace).toHaveBeenCalledWith('/tournaments?kind=tournament&registration=open&sort=deadline', { scroll: false });
+    expect(screen.getByRole('link', { name: '필터 열기 — 현재 전체' })).toBeInTheDocument();
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    expect(screen.queryByText('정렬')).not.toBeInTheDocument();
   });
   it('필터 시트를 열고 닫을 때 현재 페이지를 유지한다', () => {
     const view = render(<CompetitionDiscoveryControls {...props} page={3} />);
@@ -33,19 +34,29 @@ describe('필터 선택·적용과 목록 정렬', () => {
     fireEvent.click(dialog.getByRole('button', { name: '결과 보기' }));
     expect(navigation.replace).toHaveBeenCalledWith('/tournaments?kind=tournament&sportId=sport-1&genderCategory=mixed', { scroll: false });
   });
-  it('리그 시트는 성별·참가비·경기 방식을 노출하지 않는다', () => {
+  it('리그 시트는 성별·참가비·경기 방식을 노출하지 않고 상태를 하나만 고른다', () => {
     render(<CompetitionDiscoveryControls {...props} filters={{ kind: 'league' }} sheetOpen />);
     const dialog = within(screen.getByRole('dialog', { name: '대회·리그 필터' }));
     expect(dialog.queryByText('성별 부문')).not.toBeInTheDocument();
     expect(dialog.queryByText('참가비')).not.toBeInTheDocument();
     expect(dialog.queryByText('경기 방식')).not.toBeInTheDocument();
-    fireEvent.click(dialog.getByRole('button', { name: '준비 중' }));
-    fireEvent.click(dialog.getByRole('button', { name: '신청 접수 중' }));
+    expect(dialog.queryByText('모집 상태')).not.toBeInTheDocument();
+    expect(dialog.queryByText('진행 상태')).not.toBeInTheDocument();
+    const stages = within(dialog.getByRole('group', { name: '상태' }));
+    expect(stages.getAllByRole('button').map((button) => button.textContent)).toEqual(['전체', '준비 중', '접수 중', '접수 마감', '진행 중', '종료']);
+    fireEvent.click(stages.getByRole('button', { name: '준비 중' }));
+    fireEvent.click(stages.getByRole('button', { name: '접수 중' }));
+    expect(stages.getByRole('button', { name: '준비 중' })).toHaveAttribute('aria-pressed', 'false');
     fireEvent.click(dialog.getByRole('button', { name: '결과 보기' }));
-    expect(navigation.replace).toHaveBeenCalledWith('/tournaments?kind=league&phase=upcoming&registration=open', { scroll: false });
+    expect(navigation.replace).toHaveBeenCalledWith('/tournaments?kind=league&stage=recruiting', { scroll: false });
+  });
+  it('대회 시트의 상태에는 준비 중이 없다', () => {
+    render(<CompetitionDiscoveryControls {...props} sheetOpen />);
+    const stages = within(within(screen.getByRole('dialog', { name: '대회·리그 필터' })).getByRole('group', { name: '상태' }));
+    expect(stages.getAllByRole('button').map((button) => button.textContent)).toEqual(['전체', '접수 중', '접수 마감', '진행 중', '종료']);
   });
   it('시트 초기화는 임시값만 해제하고 현재 유형을 보존한다', () => {
-    render(<CompetitionDiscoveryControls {...props} filters={{ kind: 'league', sportId: 'sport-1', phase: 'ongoing' }} sheetOpen />);
+    render(<CompetitionDiscoveryControls {...props} filters={{ kind: 'league', sportId: 'sport-1', stage: 'ongoing' }} sheetOpen />);
     const dialog = within(screen.getByRole('dialog', { name: '대회·리그 필터' }));
     fireEvent.click(dialog.getByRole('button', { name: '초기화' }));
     expect(navigation.replace).not.toHaveBeenCalled();
@@ -58,56 +69,53 @@ describe('필터 선택·적용과 목록 정렬', () => {
     fireEvent.change(screen.getByLabelText('종료 날짜'), { target: { value: '2026-11-01' } });
     fireEvent.click(screen.getByRole('button', { name: '결과 보기' }));
     expect(navigation.replace).not.toHaveBeenCalled();
-    expect(screen.getByRole('alert')).toHaveTextContent('종료 날짜');
+    // 시트 맨 아래가 아니라 날짜 칸 바로 밑에 띄운다 — 아래에 두면 '결과 보기'가 반응하지 않는 것처럼 보였다.
+    expect(within(screen.getByRole('group', { name: '개최 기간' })).getByRole('alert')).toHaveTextContent('종료 날짜');
   });
-  it('모바일 정렬은 선택 시트를 열고 선택한 정렬을 적용한다', () => {
-    render(<CompetitionDiscoveryControls {...props} desktop={false} />);
-    fireEvent.click(screen.getByRole('button', { name: /최신 등록순/ }));
-    const sheet = screen.getByRole('dialog', { name: '정렬' });
-    expect(sheet.querySelectorAll('.tm-filter-sheet-handle')).toHaveLength(1);
-    const dialog = within(sheet);
-    fireEvent.click(dialog.getByRole('button', { name: '개최 가까운 순' }));
-    expect(navigation.replace).toHaveBeenCalledWith('/tournaments?kind=tournament&sort=scheduled', { scroll: false });
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  it('참가비 역전 안내는 참가비 칸 바로 밑에 띄운다', () => {
+    render(<CompetitionDiscoveryControls {...props} sheetOpen />);
+    fireEvent.change(screen.getByLabelText('최소 금액(원)'), { target: { value: '50000' } });
+    fireEvent.change(screen.getByLabelText('최대 금액(원)'), { target: { value: '10000' } });
+    fireEvent.click(screen.getByRole('button', { name: '결과 보기' }));
+    expect(navigation.replace).not.toHaveBeenCalled();
+    expect(within(screen.getByRole('group', { name: '참가비' })).getByRole('alert')).toHaveTextContent('최대 참가비');
+    expect(within(screen.getByRole('group', { name: '개최 기간' })).queryByRole('alert')).not.toBeInTheDocument();
+  });
+  it('최소 금액만 고르면 요약을 "N원 이상"으로 보여 준다', () => {
+    render(<CompetitionDiscoveryControls {...props} filters={{ kind: 'tournament', feeMin: 100000 }} />);
+    expect(screen.getByText('100,000원 이상')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '필터 열기 — 현재 100,000원 이상' })).toBeInTheDocument();
   });
 });
 
 describe('모바일 B안 — 한 줄 목록 조작', () => {
-  it('건수·필터·정렬을 같은 영역에 두고 외부 접수 토글·요약·초기화를 반복하지 않는다', () => {
-    render(<CompetitionDiscoveryControls {...props} desktop={false} filters={{ kind: 'tournament', registration: 'open' }} total={1} />);
-    const controls = within(screen.getByRole('group', { name: '대회 목록 필터 및 정렬' }));
+  it('건수와 필터를 같은 영역에 두고 정렬 버튼·외부 접수 토글·요약·초기화를 두지 않는다', () => {
+    render(<CompetitionDiscoveryControls {...props} desktop={false} filters={{ kind: 'tournament', stage: 'recruiting' }} total={1} />);
+    const controls = within(screen.getByRole('group', { name: '대회 목록 필터' }));
     expect(controls.getByText('총 1개')).toBeInTheDocument();
-    expect(controls.getByRole('link', { name: '필터 열기 — 현재 신청 접수 중' })).toHaveTextContent('필터 1');
-    expect(controls.getByRole('button', { name: /최신 등록순/ })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: '신청 접수 중만' })).not.toBeInTheDocument();
-    expect(screen.queryByText('신청 접수 중', { exact: true })).not.toBeInTheDocument();
+    expect(controls.getByRole('link', { name: '필터 열기 — 현재 접수 중' })).toHaveTextContent('필터 1');
+    expect(screen.queryByRole('button', { name: /최신 등록순|정렬/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '접수 중만' })).not.toBeInTheDocument();
+    expect(screen.queryByText('접수 중', { exact: true })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: '초기화' })).not.toBeInTheDocument();
   });
-  it('모바일 접수 상태와 초기화는 필터 시트에서 적용하며 페이지를 첫 장으로 돌린다', () => {
-    const filters = { kind: 'tournament' as const, registration: 'open' as const, sort: 'scheduled' as const };
+  it('모바일 상태와 초기화는 필터 시트에서 적용하며 페이지를 첫 장으로 돌린다', () => {
+    const filters = { kind: 'tournament' as const, stage: 'recruiting' as const };
     const view = render(<CompetitionDiscoveryControls {...props} desktop={false} filters={filters} page={3} />);
-    expect(screen.getByRole('link', { name: '필터 열기 — 현재 신청 접수 중' })).toHaveAttribute('href', '/tournaments?kind=tournament&registration=open&sort=scheduled&page=3&filter=1');
+    expect(screen.getByRole('link', { name: '필터 열기 — 현재 접수 중' })).toHaveAttribute('href', '/tournaments?kind=tournament&stage=recruiting&page=3&filter=1');
     view.rerender(<CompetitionDiscoveryControls {...props} desktop={false} filters={filters} page={3} sheetOpen />);
     const dialog = within(screen.getByRole('dialog', { name: '대회·리그 필터' }));
-    expect(dialog.getByRole('button', { name: /^신청 접수 중$/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(dialog.getByRole('button', { name: /^접수 중$/ })).toHaveAttribute('aria-pressed', 'true');
     fireEvent.click(dialog.getByRole('button', { name: '초기화' }));
     expect(navigation.replace).not.toHaveBeenCalled();
     fireEvent.click(dialog.getByRole('button', { name: '결과 보기' }));
-    expect(navigation.replace).toHaveBeenCalledWith('/tournaments?kind=tournament&sort=scheduled', { scroll: false });
+    expect(navigation.replace).toHaveBeenCalledWith('/tournaments?kind=tournament', { scroll: false });
   });
-  it('모바일 마감 정렬은 시트에서 접수 조건을 안내하고 적용한다', () => {
-    render(<CompetitionDiscoveryControls {...props} desktop={false} />);
-    fireEvent.click(screen.getByRole('button', { name: /최신 등록순/ }));
-    const dialog = within(screen.getByRole('dialog', { name: '정렬' }));
-    expect(dialog.getByText('마감 가까운 순은 신청 접수 중인 항목만 보여줘요.')).toBeInTheDocument();
-    fireEvent.click(dialog.getByRole('button', { name: '마감 가까운 순' }));
-    expect(navigation.replace).toHaveBeenCalledWith('/tournaments?kind=tournament&registration=open&sort=deadline', { scroll: false });
-  });
-  it('PC에서는 기존 접수 토글·조건 요약·초기화와 정렬 선택을 유지한다', () => {
-    render(<CompetitionDiscoveryControls {...props} filters={{ kind: 'tournament', registration: 'open' }} />);
-    expect(screen.getByRole('link', { name: '신청 접수 중만' })).toBeInTheDocument();
-    expect(screen.getByText('신청 접수 중', { exact: true })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '초기화' })).toBeInTheDocument();
-    expect(screen.getByRole('combobox', { name: '대회·리그 정렬' })).toBeInTheDocument();
+  it('PC에서는 조건 요약·초기화를 두고 접수 토글과 정렬 선택은 두지 않는다', () => {
+    render(<CompetitionDiscoveryControls {...props} filters={{ kind: 'tournament', stage: 'recruiting' }} />);
+    expect(screen.queryByRole('link', { name: '접수 중만' })).not.toBeInTheDocument();
+    expect(screen.getByText('접수 중', { exact: true })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '초기화' })).toHaveAttribute('href', '/tournaments?kind=tournament');
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
   });
 });

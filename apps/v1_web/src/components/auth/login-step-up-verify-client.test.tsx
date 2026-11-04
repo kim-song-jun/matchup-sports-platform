@@ -3,19 +3,27 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LOGIN_STEP_UP_STORAGE_KEY, readLoginStepUp, saveLoginStepUp } from '@/lib/login-step-up';
+import { peekPendingSocialLink, savePendingSocialLink } from '@/lib/pending-social-link';
 import { V1_SESSION_HINT_KEY } from '@/lib/session-storage';
+import { readWithdrawalCancel } from '@/lib/withdrawal-cancel-storage';
 import { STEP_UP_MSW, stepUpChallengeFixture } from '@/test/msw/auth-step-up-handlers';
 import { server } from '@/test/msw/server';
 import type { V1LoginStepUpChallenge } from '@/types/api';
 import { LoginStepUpVerifyClient } from './login-step-up-verify-client';
 
 const mocks = vi.hoisted(() => ({
+  push: vi.fn(),
   replace: vi.fn(),
   trackEvent: vi.fn(),
+  nativeApple: false,
+}));
+
+vi.mock('@/lib/native-apple', () => ({
+  isNativeAppleSignInAvailable: () => mocks.nativeApple,
 }));
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn(), replace: mocks.replace, back: vi.fn() }),
+  useRouter: () => ({ push: mocks.push, replace: mocks.replace, back: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }));
 vi.mock('@/lib/analytics', () => ({ trackEvent: mocks.trackEvent }));
@@ -47,6 +55,7 @@ describe('LoginStepUpVerifyClient', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.nativeApple = false;
     window.localStorage.clear();
     window.sessionStorage.clear();
   });
@@ -68,6 +77,29 @@ describe('LoginStepUpVerifyClient', () => {
       expect(screen.getByRole('button', { name: '확인하고 로그인' })).toBeDisabled();
       expect(screen.getByText(/메일이 오지 않으면 스팸함을 보거나 이메일·비밀번호를 다시 확인해 주세요/)).toBeInTheDocument();
       expect(screen.getByRole('link', { name: '다른 계정으로 로그인' })).toHaveAttribute('href', '/login/email?redirect=%2Fmy');
+    });
+
+    it('tells readers whose mail never arrives where else to sign in, without saying whether an account exists', async () => {
+      storeChallenge({}, '/my');
+      renderVerify();
+
+      const help = await screen.findByText(/메일이 오지 않으면/);
+      expect(help).toHaveTextContent("카카오로 가입하셨다면 로그인 첫 화면의 '카카오' 버튼으로 로그인해 주세요.");
+      expect(help).not.toHaveTextContent('Apple');
+      expect(help).toHaveTextContent('비밀번호가 기억나지 않으면 비밀번호를 재설정해 주세요');
+      expect(screen.getByRole('link', { name: '비밀번호 재설정하기' }))
+        .toHaveAttribute('href', '/auth/find-account?mode=reset-password&redirect=%2Fmy');
+      expect(screen.queryByText(/가입되지 않|없는 계정|존재하지/)).not.toBeInTheDocument();
+    });
+
+    it('mentions the Apple button only in the iOS app, with the same wording as the email login screen', async () => {
+      mocks.nativeApple = true;
+      storeChallenge();
+      renderVerify();
+
+      const help = await screen.findByText(/메일이 오지 않으면/);
+
+      expect(help).toHaveTextContent("카카오나 Apple로 가입하셨다면 로그인 첫 화면의 '카카오' 또는 'Apple로 계속하기' 버튼으로 로그인해 주세요.");
     });
 
     it('keeps only digits, at most six, and enables the button once the code is complete', async () => {
@@ -149,6 +181,35 @@ describe('LoginStepUpVerifyClient', () => {
       expect(window.localStorage.getItem(V1_SESSION_HINT_KEY)).toBeNull();
       expect(readLoginStepUp()).not.toBeNull();
       expect(mocks.trackEvent).toHaveBeenCalledWith('login_step_up_failed', { reason: 'STEP_UP_CODE_INVALID' });
+    });
+
+    it('sends a withdrawal-pending account to the cancel screen with its token and ends the identity check', async () => {
+      storeChallenge({}, '/my');
+      server.use(http.post('*/api/v1/auth/login/step-up/verify', () => HttpResponse.json({
+        status: 'error', statusCode: 403, code: 'ACCOUNT_WITHDRAWAL_PENDING', message: '탈퇴 신청 중인 계정이에요.',
+        details: { withdrawalCancelToken: 'withdrawal-token-1', expiresInSeconds: 600 },
+      }, { status: 403 })));
+      renderVerify();
+      await screen.findByLabelText('인증번호 6자리');
+
+      typeCode(STEP_UP_MSW.code);
+      fireEvent.click(screen.getByRole('button', { name: '확인하고 로그인' }));
+
+      await waitFor(() => expect(mocks.push).toHaveBeenCalledWith('/auth/withdrawal-cancel'));
+      expect(readWithdrawalCancel()).toMatchObject({ token: 'withdrawal-token-1', returnTo: '/my' });
+      expect(readLoginStepUp()).toBeNull();
+      expect(mocks.replace).not.toHaveBeenCalled();
+    });
+
+    it('shows the pending-link notice while a link token is waiting, and lets the reader drop it', async () => {
+      savePendingSocialLink({ next: 'sign_in_then_link', provider: 'apple', linkToken: 'link-token-1', linkTokenExpiresInSeconds: 600 });
+      storeChallenge();
+      renderVerify();
+
+      expect(await screen.findByText(/로그인하면 Apple 로그인이 이 계정에 연결돼요\./)).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: '연결 안 하기' }));
+      expect(screen.queryByText(/이 계정에 연결돼요/)).not.toBeInTheDocument();
+      expect(peekPendingSocialLink()).toBeNull();
     });
 
     it('ends the attempt when the server says the challenge expired', async () => {
@@ -234,6 +295,34 @@ describe('LoginStepUpVerifyClient', () => {
       fireEvent.click(await screen.findByRole('button', { name: '인증번호 다시 받기' }));
 
       expect(await screen.findByRole('alert')).toHaveTextContent('지금은 인증 메일을 보낼 수 없어');
+    });
+
+    it('does not let the password reset link leave while the code is being checked', async () => {
+      let release!: () => void;
+      const held = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      server.use(http.post('*/api/v1/auth/login/step-up/verify', async () => {
+        await held;
+        return HttpResponse.json(
+          { status: 'error', statusCode: 400, code: 'STEP_UP_CODE_INVALID', message: 'x', details: null, timestamp: PAST },
+          { status: 400 },
+        );
+      }));
+      storeChallenge();
+      renderVerify();
+      await screen.findByLabelText('인증번호 6자리');
+
+      typeCode('111111');
+      fireEvent.click(screen.getByRole('button', { name: '확인하고 로그인' }));
+      const resetLink = screen.getByRole('link', { name: '비밀번호 재설정하기' });
+      await waitFor(() => expect(resetLink).toHaveAttribute('aria-disabled', 'true'));
+
+      // fireEvent.click 은 기본 동작이 막히면 false 를 돌려준다.
+      expect(fireEvent.click(resetLink)).toBe(false);
+
+      release();
+      await waitFor(() => expect(resetLink).not.toHaveAttribute('aria-disabled'));
     });
 
     it('sends one request for a double click on resend', async () => {

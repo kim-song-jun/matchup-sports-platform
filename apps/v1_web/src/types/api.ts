@@ -91,6 +91,8 @@ export type V1FoundAccount = {
   maskedEmail: string | null;
   providers: string[];
   hasPassword: boolean;
+  /** 이 번호를 쥔 계정이 탈퇴 유예 중이면 유예가 끝나는 시각(ISO). 활성 계정이거나 탈퇴 신청 기록이 없으면 null. */
+  withdrawalPendingUntil: string | null;
 };
 
 export type V1AuthMe = {
@@ -118,6 +120,11 @@ export type V1AuthMe = {
     createdAt?: string;
     authProvider?: 'email' | 'kakao' | 'naver' | 'apple' | null;
     authProviders?: Array<'email' | 'kakao' | 'naver' | 'apple' | string>;
+    /** Server capability; absent in stale responses from older API versions. */
+    canLinkLoginMethods?: boolean;
+    /** Whether linking would be permitted after required signup is completed. */
+    canLinkAfterSignup?: boolean;
+    signupEmailLoginRequired?: boolean;
     hasPassword?: boolean;
   };
   profile: {
@@ -173,6 +180,157 @@ export type V1EmailLoginResult = V1AuthSessionResponse | V1LoginStepUpResponse;
 
 /** 재발송은 에코 환경에서도 인증번호를 싣지 않는다 — 챌린지별 답이 되면 비밀번호가 맞았는지 드러난다. */
 export type V1LoginStepUpResendResult = Pick<V1LoginStepUpChallenge, 'expiresAt' | 'resendAvailableAt'>;
+
+/** 계정의 로그인 수단 종류. */
+export type V1AuthProvider = 'email' | 'kakao' | 'apple' | 'naver';
+
+/** 비밀번호가 없는 로그인 수단(소셜). */
+export type V1SocialLoginProvider = Exclude<V1AuthProvider, 'email'>;
+
+/** `POST /auth/link/pending` — 로그인·가입 충돌 409 의 `details.linkToken`. 응답은 `POST /auth/link/{provider}` 와 같다. */
+export type V1LinkPendingPayload = {
+  linkToken: string;
+};
+
+/** 로그인한 채로 계정에 붙일 수 있는 소셜 제공자. */
+export type V1LinkableProvider = 'kakao' | 'apple';
+
+/** `POST /auth/link/kakao` — 웹은 인가 코드(+ 인가 때 쓴 redirectUri), 네이티브 셸은 SDK 액세스 토큰을 보낸다. */
+export type V1LinkKakaoPayload =
+  | { code: string; redirectUri: string }
+  | { accessToken: string };
+
+/**
+ * `POST /auth/link/apple` — 애플 로그인(`POST /auth/apple`)과 같은 본문(`AppleLoginDto`)이다.
+ * `nonce` 는 로그인처럼 `POST /auth/apple/nonce` 로 서버에서 먼저 받은 값이어야 한다.
+ */
+export type V1LinkApplePayload = {
+  identityToken: string;
+  nonce: string;
+  authorizationCode?: string;
+  fullName?: string;
+};
+
+export type V1LinkSocialResult = {
+  provider: V1LinkableProvider;
+  /** 이 계정에 같은 제공자 신원이 이미 붙어 있었다(다시 호출해도 같은 결과). */
+  alreadyLinked: boolean;
+  /** 그 제공자로 만들다 만 가입 계정을 정리하고 신원을 옮겼다. */
+  mergedPendingAccount: boolean;
+  /** 연결 뒤 이 계정의 로그인 수단. */
+  authProviders: V1AuthProvider[];
+};
+
+/**
+ * 소셜 계정에 이메일·비밀번호 로그인을 더하는 세 단계. 로그인한 세션이 계정을, 메일로 받은 인증번호가 주소를 증명한다
+ * (휴대폰 번호는 계정 소유 증명이 아니라 쓰지 않는다).
+ */
+
+/**
+ * `POST /auth/link/email/request` — 서버가 정규화(소문자·공백 제거)해서 보낸다. 로그인한 지 30분이 넘으면 403 `RECENT_LOGIN_REQUIRED`.
+ * 메일을 보낼 수단이 없는 서버는 `sent: true` 로 속이지 않고 503 `EMAIL_SEND_UNAVAILABLE` 로 답한다(`isEmailSendUnavailable`).
+ */
+export type V1LinkEmailRequestPayload = {
+  email: string;
+};
+
+export type V1LinkEmailRequestResult = {
+  sent: true;
+  /** 가린 주소(예: `ru***@example.com`). 화면에 "○○로 보냈어요" 로 보여 준다. */
+  maskedTarget: string;
+  /** 인증번호 유효 시간(초). */
+  expiresInSeconds: number;
+  /** 이 시간(초) 뒤에야 같은 주소로 다시 받을 수 있다. 그 전에 요청하면 400 `VERIFICATION_RESEND_COOLDOWN`. */
+  resendAvailableInSeconds: number;
+  /** 인증번호 에코가 켜진 환경(alpha)에서 시험용 주소로 요청했을 때만 온다. */
+  devCode?: string;
+};
+
+/** `POST /auth/link/email/verify` */
+export type V1LinkEmailVerifyPayload = {
+  /** 메일로 받은 숫자 6자리. */
+  code: string;
+};
+
+export type V1LinkEmailVerifyResult = {
+  /** 이 계정·이 주소에만 쓸 수 있는 증명. 주소에 싣지 않고 다음 단계까지 메모리로만 넘긴다. */
+  emailLinkToken: string;
+  /** `emailLinkToken` 의 남은 유효 시간(초). */
+  expiresInSeconds: number;
+};
+
+/** `POST /auth/link/email/complete` — 비밀번호 규칙은 가입과 같다(8자 이상). 두 칸이 다르면 400 `VALIDATION_ERROR`. */
+export type V1LinkEmailCompletePayload = {
+  emailLinkToken: string;
+  password: string;
+  passwordConfirm: string;
+};
+
+export type V1LinkEmailCompleteResult = {
+  linked: true;
+  /** 이제 이 계정의 로그인 이메일. */
+  email: string;
+};
+
+/**
+ * 로그인·가입 충돌 409 의 `details` — 이미 팀밋 계정이 있으니 원래 방법으로 로그인한 뒤
+ * 설정에서 `provider` 를 연결하라는 안내다. 코드(SOCIAL_LINK_*·PHONE_CONFLICT)는 그대로다.
+ */
+export type V1SignInThenLinkDetails = {
+  next: 'sign_in_then_link';
+  provider: V1LinkableProvider;
+  /**
+   * 서버가 이미 검증한 제공자 신원에 서명한 토큰. 원래 계정으로 로그인한 직후 `POST /auth/link/pending` 에 넘기면
+   * 제공자를 다시 거치지 않고 연결된다. 두 값은 함께 오거나 함께 없다.
+   */
+  linkToken?: string;
+  /** `linkToken` 의 남은 유효 시간(초). */
+  linkTokenExpiresInSeconds?: number;
+  /**
+   * 번호를 쥔 계정이 탈퇴 유예 중일 때만 온다(`PHONE_CONFLICT`, 인증번호로 번호를 증명한 뒤의 409). 유예가 끝나는
+   * 시각(ISO)이고, 탈퇴 신청 기록이 없으면 null.
+   */
+  withdrawalPendingUntil?: string | null;
+};
+
+/** 403 `RECENT_LOGIN_REQUIRED` 의 `details` — 세션 발급 후 이 시간(초)이 지나면 다시 로그인해야 연결할 수 있다. */
+export type V1RecentLoginRequiredDetails = {
+  maxAgeSeconds: number;
+};
+
+/**
+ * 403 `SIGNUP_INCOMPLETE`(가입이 덜 끝난 계정이 연결을 시도) 의 `details`.
+ * `next` 가 문자열인 `V1SignInThenLinkDetails` 와 이름만 같고 모양이 다르다 — 이쪽은 `route` 를 가진 객체다.
+ */
+export type V1SignupIncompleteDetails = {
+  next: { route: string };
+};
+
+/** 400 `PASSWORD_LOGIN_UNAVAILABLE`(소셜로만 가입한 계정의 비밀번호 재설정) 의 `details` — 그 계정이 실제로 가진 로그인 수단. */
+export type V1PasswordLoginUnavailableDetails = {
+  providers: V1SocialLoginProvider[];
+};
+
+/** 로그인 자격이 맞은 탈퇴 신청 계정이 받는 403 `ACCOUNT_WITHDRAWAL_PENDING` 의 `details`. */
+export type V1WithdrawalPendingDetails = {
+  withdrawalCancelToken: string;
+  expiresInSeconds: number;
+};
+
+/** `POST /auth/withdrawal/cancel` — 성공하면 로그인 응답과 같은 세션이 발급된다. */
+export type V1CancelWithdrawalPayload = {
+  token: string;
+};
+
+/** `POST /auth/phone/verify` 결과. `registered` 는 인증번호로 번호 소유를 증명한 뒤에만 알려준다. */
+export type V1PhoneVerifyResult = {
+  verified: boolean;
+  proofToken?: string;
+  /** 이 번호로 이미 가입한 계정이 있다. */
+  registered: boolean;
+  /** 그 계정이 탈퇴 유예 중이면 유예가 끝나는 시각(ISO). 아니거나 탈퇴 신청 기록이 없으면 null. */
+  withdrawalPendingUntil: string | null;
+};
 
 export type V1Sport = {
   id: string;
@@ -1822,14 +1980,13 @@ export type V1GameResultScoreInput = {
    * `PenaltyScoreDto`(`apps/v1_api/src/games/dto/game-result.dto.ts`)에 선언돼 있고,
    * `whitelist`는 `@ValidateNested()`가 걸린 중첩 객체 안까지 적용되므로 **선언이 곧
    * 허용**이다. 정정 폼이 이 키를 떨어뜨리면 정정 한 번에 "누가 먼저 찼는지"가 영구히
-   * 사라진다(폼에 선축 입력란이 없어 되살릴 수단도 없다).
+   * 사라진다. 정정 폼은 기존 선축을 초기값으로 읽고 편집한 값을 함께 전송한다.
    */
   penalties?: {
     home: number;
     away: number;
     firstKickSideKey?: 'HOME' | 'AWAY';
-    /** 각 팀이 찬 킥 수. 서버가 결판을 판정하는 근거이고, 정정 화면에는 입력란이
-     * 없어 여기서 떨어뜨리면 되살릴 수단이 없다. 둘은 항상 함께 있거나 함께 없다. */
+    /** 각 팀이 찬 킥 수. 결과 정정에서도 편집하며 둘은 항상 함께 있거나 함께 없다. */
     takenHome?: number;
     takenAway?: number;
     /** 규칙상 미결인 승부차기를 운영자가 명시적으로 닫았다는 감사 기록. */
@@ -3123,6 +3280,19 @@ export type V1AdminDeleteUserPayload = {
   reason: string;
 };
 
+/** `POST /admin/users/:userId/phone/release` — 번호만 계정에서 떼어 낸다. 계정은 남고 휴대폰 인증을 다시 해야 한다. */
+export type V1AdminReleaseUserPhonePayload = {
+  reason: string;
+};
+
+export type V1AdminReleaseUserPhoneResult = {
+  userId: string;
+  previousStatus: 'confirmed' | 'unverified';
+  status: 'released';
+  actionLogId: string;
+  statusChangeLogId: string;
+};
+
 export type V1AdminMatchRow = {
   matchId: string;
   title: string;
@@ -3608,7 +3778,7 @@ export type V1TournamentStatus =
   | 'completed'
   | 'cancelled';
 
-export type V1TournamentFormat = 'league' | 'knockout' | 'group_knockout';
+export type V1TournamentFormat = 'league' | 'knockout' | 'group_knockout' | 'league_knockouts';
 
 /**
  * 대회 종류 — **`V1TournamentFormat` 과 다른 질문에 답한다.**
@@ -3768,6 +3938,8 @@ export type V1Tournament = {
   /** 관리자 응답에만 온다 — false 면 일반 사용자 화면(목록·검색·상세·기록)에서 숨겨져 있다. */
   isPublic?: boolean;
   status: V1TournamentStatus;
+  /** 대회 종류. `format` 으로 결선 가능 여부를 추론하지 않는다. */
+  kind?: V1CompetitionKind | null;
   format: V1TournamentFormat;
   registrationDeadlineAt: string | null;
   /** 명단(선수단) 제출 마감일 — 지나면 신청 팀의 명단 추가/삭제/수정이 차단된다(팀별 예외 부여 가능) */
@@ -3915,6 +4087,8 @@ export type V1TournamentGroupQualification = {
   undecided: boolean;
 };
 
+export type V1TournamentBracketTrack = string;
+
 export type V1TournamentGroup = {
   id: string;
   name: string;
@@ -3924,6 +4098,9 @@ export type V1TournamentGroup = {
   groupTeams: V1TournamentGroupTeam[];
   standings: V1TournamentStanding[];
   qualification: V1TournamentGroupQualification | null;
+  /** Older serialized groups may omit this; omission has the same meaning as overall. */
+  bracketTrack?: V1TournamentBracketTrack;
+  qualificationByTrack?: Record<string, V1TournamentGroupQualification | null>;
 };
 
 /** 경기 득점자 — 명단에 있으면 playerId, 비회원/대타는 playerId=null + playerName만 */
@@ -4073,6 +4250,8 @@ export type V1SixTeamBracket = { rounds: [string, string, string, string, string
   swapSemi?: boolean; swapFinal?: boolean;
   manual: boolean; winners: Record<string, string>; needsReview: boolean };
 export type V1TournamentDetail = {
+  /** 정규 리그가 이어 가는 지난 시즌(독립 리그 → 독립 리그, 공개된 리그만). 대회·옛 응답은 없음. */
+  previousSeason?: { leagueId: string; title: string } | null;
   sixTeamMode?: boolean;
   sixTeamBracket?: V1SixTeamBracket | null;
   id: string;
@@ -4177,6 +4356,7 @@ export type V1TournamentDetail = {
   reviewsTotalCount: number;
   /** 어드민이 입력한 개인 어워드 (MVP, 득점왕 등) */
   awards: V1TournamentAward[];
+  awardSets?: V1TournamentAwardSet[];
   createdAt: string;
   updatedAt: string;
 };
@@ -4230,6 +4410,24 @@ export type V1TournamentAward = {
   recipientProfileImageUrl?: string | null;
   teamName: string | null;
   note: string | null;
+  bracketTrack?: V1TournamentBracketTrack;
+};
+
+export type V1TournamentAwardSet = {
+  bracketTrack: string;
+  prizePool: number | null;
+  prizeSummary: string | null;
+  prizeBreakdown: string | null;
+};
+
+/** Admin award-set GET/PUT adds its row id; public detail emits the four fields above. */
+export type V1AdminTournamentAwardSet = V1TournamentAwardSet & { id: string };
+
+export type V1TournamentAwardSetInput = {
+  bracketTrack: string;
+  prizePool?: number | null;
+  prizeSummary?: string | null;
+  prizeBreakdown?: string | null;
 };
 
 export type V1TournamentAwardIconKey =
@@ -4394,6 +4592,7 @@ export type V1AdminBracketGroup = {
   createdAt: string;
   updatedAt: string;
   groupTeams: V1AdminBracketGroupTeam[];
+  bracketTrack?: V1TournamentBracketTrack;
 };
 
 export type V1AdminBracketGroupTeam = {
@@ -4475,6 +4674,7 @@ export type V1AdminBracketSlotKind = 'ENTRY' | 'BYE' | 'GROUP_RANK';
 
 /** 팀이 들어갈 칸. 라벨("A조 1번", "부전승 1")은 서버가 계산해서 준다. */
 export type V1AdminBracketSlot = {
+  bracketTrack?: V1TournamentBracketTrack;
   automaticLabel?: string;
   displayLabel?: string | null;
   id: string;
@@ -4524,6 +4724,7 @@ export type BracketTemplateInput =
       advancePerGroup: 1 | 2;
       legs: 1 | 2;
       thirdPlace: boolean;
+      lowerBracket?: boolean;
     }
   | { kind: 'league'; teamCount: number; legs: 1 | 2 };
 

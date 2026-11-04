@@ -7,9 +7,13 @@ import { V1AuthUser } from '../../auth/v1-auth-user';
 import { canonicalGameCommandPayloadHash, GamesService } from '../../games/games.service';
 import type { GameCreationResult } from '../../games/games.types';
 import { createTournamentMatchInTx } from '../tournament-match-creation';
+import { recalculateStandingsInTx } from '../tournament-bracket-tx';
 import { TournamentResultReviewService } from '../../tournament-operations/results/tournament-result-review.service';
+import { syncGameSideRoster } from '../../games/roster/game-roster-sync';
+import { MultiFinalsService } from '../multi-finals/multi-finals.service';
+import type { NamedFinalDto } from '../multi-finals/multi-finals.dto';
 import { isMockSeedEnabled } from './mock-seed.config';
-import { CreateMockTournamentDto, type MockSeedStatus } from './mock-tournament-seed.dto';
+import { CreateMockTournamentDto, MOCK_SEED_MAX_TEAMS, MOCK_SEED_MAX_TEAMS_WITH_RESULTS, type MockSeedStatus } from './mock-tournament-seed.dto';
 import { participantDisplayName } from '../participant-display-name';
 
 /**
@@ -35,6 +39,30 @@ type SeedRegistration = {
   participants: Array<{ sourceParticipantId: string; userId: string; displayNameSnapshot: string; sideKey: V1GameSideKey }>;
 };
 type SeedFixture = { teamMatchId: string; game: GameCreationResult; homeScore: number; awayScore: number };
+type SeedResult = { gameId: string; homeScore: number; awayScore: number };
+
+/** 조를 4팀 안팎으로 고르게 나눈 각 조의 팀 수. 32팀 → 4팀 × 8조, 6팀 → 3팀 × 2조. */
+export function mockGroupCapacities(teamCount: number): number[] {
+  const groupCount = Math.max(1, Math.round(teamCount / 4));
+  return Array.from({ length: groupCount }, (_, i) => Math.floor(teamCount / groupCount) + (i < teamCount % groupCount ? 1 : 0));
+}
+
+/**
+ * 정규리그+N개 토너먼트 목업의 결선 — 각 조 윗순위 절반은 상위 토너먼트, 나머지는 하위 토너먼트.
+ * 조가 하나고 3팀 이하면 하위가 1팀이 돼 결선을 못 만드니 전원을 한 토너먼트로 보낸다.
+ * groupId 는 setup 이 받는 조 순번(문자열)이다.
+ */
+export function mockNamedFinals(capacities: readonly number[]): NamedFinalDto[] {
+  const ranks = capacities.flatMap((capacity, group) => Array.from({ length: capacity }, (_, i) => ({ groupId: String(group), rank: i + 1, capacity })));
+  if (capacities.length === 1 && capacities[0] < 4) {
+    return [{ name: '본선 토너먼트', thirdPlace: false, rules: ranks.map(({ groupId, rank }) => ({ groupId, rank })) }];
+  }
+  const upper = (rank: number, capacity: number) => rank <= Math.floor(capacity / 2);
+  return [
+    { name: '상위 토너먼트', thirdPlace: false, rules: ranks.filter((r) => upper(r.rank, r.capacity)).map(({ groupId, rank }) => ({ groupId, rank })) },
+    { name: '하위 토너먼트', thirdPlace: false, rules: ranks.filter((r) => !upper(r.rank, r.capacity)).map(({ groupId, rank }) => ({ groupId, rank })) },
+  ];
+}
 
 /**
  * 검증용 목업 대회를 한 번에 만든다 — 대회 생성 → 팀 등록(확정) → 명단 채우기 → 조 편성 →
@@ -53,6 +81,7 @@ export class MockTournamentSeedService {
     private readonly adminContext: AdminContextService,
     private readonly games: GamesService,
     private readonly resultReview: TournamentResultReviewService,
+    private readonly multiFinals: MultiFinalsService,
   ) {}
 
   async createTournament(user: V1AuthUser, dto: CreateMockTournamentDto) {
@@ -70,6 +99,17 @@ export class MockTournamentSeedService {
     const reviewReady = dto.reviewReady ?? false;
     const withLineups = dto.withLineups ?? false;
     const withResults = dto.withResults || reviewReady || status === 'completed';
+    // 정규리그+N개 토너먼트는 결선을 예선 순위로 만든 뒤 운영자가 진행하는 구조라 결선 결과까지 채우지 않는다.
+    // 결선이 비어 있는 '종료' 대회는 실제로 생길 수 없는 모양이라 막는다.
+    if (format === 'league_knockouts' && status === 'completed') {
+      throw new BadRequestException({ code: 'MOCK_SEED_STATUS_UNSUPPORTED', message: '정규리그+N개 토너먼트 목업은 모집중·진행중으로만 만들 수 있어요.' });
+    }
+    if (withResults && (format === 'league' || format === 'group_knockout') && teamCount > MOCK_SEED_MAX_TEAMS_WITH_RESULTS) {
+      throw new BadRequestException({
+        code: 'MOCK_SEED_TOO_MANY_RESULTS',
+        message: `리그·조별리그+토너먼트는 결과까지 채우면 ${MOCK_SEED_MAX_TEAMS_WITH_RESULTS}팀까지만 만들 수 있어요. 팀 수를 줄이거나 결과 없이 만들어 주세요.`,
+      });
+    }
 
     const sport = await this.pickSport();
     if (!sport) throw new BadRequestException({ code: 'NO_SPORT', message: '종목 데이터가 없어요.' });
@@ -98,6 +138,8 @@ export class MockTournamentSeedService {
     const label = dto.titleSuffix?.trim() || this.autoLabel(format, teamCount, status, reviewReady);
     const title = `(목업) ${this.stamp(now)} ${label}`;
 
+    // 32팀 한 조 라운드로빈은 496경기다(로컬 10초). 앱 상한을 alpha 프록시 60초 아래(최악 55초)에 둬서
+    // 화면이 타임아웃을 받으면 곧 롤백이 되게 한다(deploy/nginx.alpha.conf 의 대진 생성 설명과 같은 이유).
     const created = await this.prisma.$transaction(async (tx) => {
       const tournament = await tx.v1Tournament.create({
         data: {
@@ -179,7 +221,8 @@ export class MockTournamentSeedService {
         });
       }
 
-      const fixtures = await this.buildFixtures(
+      // 정규리그+N개 토너먼트는 아래에서 실제 예선 편성 경로(MultiFinalsService.setup)로 만든다.
+      const fixtures = format === 'league_knockouts' ? [] : await this.buildFixtures(
         tx,
         tournament.id,
         format,
@@ -189,15 +232,22 @@ export class MockTournamentSeedService {
         sport.id,
         user.id,
       );
-      return { tournament, registrationCount: registrations.length, fixtures };
-    }, { timeout: 30_000 });
+      return { tournament, registrationIds: registrations.map((registration) => registration.id), fixtures };
+    }, { timeout: 50_000, maxWait: 5_000 });
 
-    const lineupsSubmitted = withLineups
-      ? await this.submitLineups(created.tournament.id, minPlayers)
-      : 0;
-    const gamesCreated = withResults
-      ? await this.materializeResults(user, created.fixtures)
-      : created.fixtures.length;
+    let fixtureCount = created.fixtures.length;
+    let lineupsSubmitted = 0;
+    let gamesCreated = 0;
+    if (format === 'league_knockouts') {
+      ({ fixtureCount, lineupsSubmitted, gamesCreated } = await this.seedLeagueKnockouts(
+        user, created.tournament.id, created.tournament.multiFinalsRevision, created.registrationIds, withResults,
+      ));
+    } else {
+      lineupsSubmitted = withLineups ? await this.submitLineups(created.tournament.id, minPlayers) : 0;
+      gamesCreated = withResults
+        ? await this.materializeResults(user, created.fixtures.map((fixture) => ({ gameId: fixture.game.gameId, homeScore: fixture.homeScore, awayScore: fixture.awayScore })))
+        : created.fixtures.length;
+    }
 
     await this.adminContext.logAdminAction(admin, {
       action: 'tournament.mock_seed',
@@ -211,8 +261,8 @@ export class MockTournamentSeedService {
       tournamentId: created.tournament.id,
       title,
       format,
-      teamCount: created.registrationCount,
-      fixtureCount: created.fixtures.length,
+      teamCount: created.registrationIds.length,
+      fixtureCount,
       status: created.tournament.status,
       reviewReady,
       route: `/tournaments/${created.tournament.id}`,
@@ -269,7 +319,7 @@ export class MockTournamentSeedService {
     return {
       enabled: true,
       usableTeamCount: usable.length,
-      maxTeamCount: Math.min(usable.length, 16),
+      maxTeamCount: Math.min(usable.length, MOCK_SEED_MAX_TEAMS),
       minPlayersPerTeam: minPlayers,
     };
   }
@@ -319,13 +369,83 @@ export class MockTournamentSeedService {
   }
 
   /**
+   * 정규리그+N개 토너먼트 — 운영자가 누르는 것과 같은 경로로 예선 조 편성(4팀 안팎씩)과 상위·하위
+   * 토너먼트 규칙을 저장한다. 결과를 채우면 예선을 앞 순번 팀이 늘 이기게 끝내(동률 없이 순위가 정해진다)
+   * 결선 대진까지 생성한다. 결선 경기 결과는 채우지 않는다.
+   * 자리 배정 뒤 명단 동기화가 라인업을 명단 그대로 제출본으로 올리므로 `submitLineups` 는 부르지 않는다
+   * (부르면 남은 DRAFT 가 없어 늘 0건이다). 제출된 사이드 수를 그대로 센다.
+   */
+  private async seedLeagueKnockouts(
+    user: V1AuthUser,
+    tournamentId: string,
+    revision: number,
+    registrationIds: readonly string[],
+    withResults: boolean,
+  ) {
+    const capacities = mockGroupCapacities(registrationIds.length);
+    let offset = 0;
+    await this.multiFinals.setup(user, tournamentId, {
+      expectedRevision: revision,
+      groups: capacities.map((capacity, index) => ({
+        name: `${String.fromCharCode(65 + index)}조`,
+        capacity,
+        legs: 1,
+        registrationIds: registrationIds.slice(offset, (offset += capacity)),
+      })),
+      finals: mockNamedFinals(capacities),
+    });
+    await this.syncSeatedRosters(tournamentId);
+    if (withResults) {
+      const preliminaries = await this.prisma.v1TournamentMatchDetails.findMany({
+        where: { tournamentId, teamMatch: { deletedAt: null } },
+        select: { fixtureNumber: true, homeRegistrationId: true, awayRegistrationId: true, teamMatch: { select: { game: { select: { id: true } } } } },
+        orderBy: { fixtureNumber: 'asc' },
+      });
+      await this.materializeResults(user, preliminaries.map((fixture, index) => {
+        const gameId = fixture.teamMatch.game?.id;
+        if (!gameId) throw new ConflictException({ code: 'MOCK_GAME_NOT_FOUND', message: '목업 경기를 찾을 수 없어요.' });
+        const homeWins = registrationIds.indexOf(fixture.homeRegistrationId ?? '') < registrationIds.indexOf(fixture.awayRegistrationId ?? '');
+        const winner = (index % 3) + 1;
+        return { gameId, homeScore: homeWins ? winner : 0, awayScore: homeWins ? 0 : winner };
+      }));
+      // 순위 재계산도 결과 확정 뒤 워커가 한다 — 기다리지 않고 지금 계산해야 결선 진출팀이 정해진다.
+      await this.prisma.$transaction((tx) => recalculateStandingsInTx(tx, tournamentId));
+      const preview = await this.multiFinals.preview(user, tournamentId);
+      await this.multiFinals.generate(user, tournamentId, { expectedRevision: preview.revision, previewHash: preview.previewHash, requestId: randomUUID() });
+      await this.syncSeatedRosters(tournamentId);
+    }
+    const fixtureCount = await this.prisma.v1TournamentMatchDetails.count({ where: { tournamentId, teamMatch: { deletedAt: null } } });
+    const lineupsSubmitted = (await this.prisma.v1GameLineup.findMany({
+      where: { state: 'SUBMITTED', invalidatedAt: null, game: { teamMatch: { tournamentId, deletedAt: null } } },
+      distinct: ['sideId'],
+      select: { sideId: true },
+    })).length;
+    return { fixtureCount, lineupsSubmitted, gamesCreated: fixtureCount };
+  }
+
+  /**
+   * 자리 배정은 경기 명단 채우기를 워커(outbox)에 맡긴다. 목업은 곧바로 라인업·결과를 넣으므로
+   * 워커를 기다리지 않고 같은 동기화 함수로 지금 맞춘다(워커가 나중에 다시 돌아도 바뀐 게 없어 그대로다).
+   */
+  private async syncSeatedRosters(tournamentId: string) {
+    const sides = await this.prisma.v1GameSide.findMany({
+      where: { teamId: { not: null }, game: { state: 'SCHEDULED', teamMatch: { tournamentId, deletedAt: null } } },
+      select: { id: true, gameId: true },
+      orderBy: { id: 'asc' },
+    });
+    for (const side of sides) {
+      await this.prisma.$transaction((tx) => syncGameSideRoster(tx, { gameId: side.gameId, sideId: side.id }));
+    }
+  }
+
+  /**
    * 완료 목업도 실제 운영 경로를 통과시킨다. 직접 revision/result 행을 심거나
    * 별도 seed 결과 행을 직접 심으면 운영 콘솔에서 만든 경기와 상태·감사·
    * idempotency 계약이 달라진다.
    */
-  private async materializeResults(user: V1AuthUser, fixtures: readonly SeedFixture[]): Promise<number> {
+  private async materializeResults(user: V1AuthUser, fixtures: readonly SeedResult[]): Promise<number> {
     for (const fixture of fixtures) {
-      const gameId = fixture.game.gameId;
+      const gameId = fixture.gameId;
       const snapshot = await this.prisma.v1Game.findUnique({
         where: { id: gameId },
         select: {
@@ -410,7 +530,10 @@ export class MockTournamentSeedService {
 
   /** 대회 이름에 조건이 드러나야 목록에서 어떤 테스트용인지 바로 읽힌다. */
   private autoLabel(format: string, teamCount: number, status: MockSeedStatus, reviewReady: boolean) {
-    const formatLabel = format === 'league' ? '리그' : format === 'knockout' ? '토너먼트' : '조별리그+토너먼트';
+    const formatLabel = format === 'league' ? '리그'
+      : format === 'knockout' ? '토너먼트'
+      : format === 'league_knockouts' ? '정규리그+N개 토너먼트'
+      : '조별리그+토너먼트';
     const statusLabel = status === 'open' ? '모집중' : status === 'in_progress' ? '진행중' : '종료';
     return `${formatLabel} ${teamCount}팀 ${statusLabel}${reviewReady ? ' 후기가능' : ''}`;
   }
@@ -503,8 +626,10 @@ export class MockTournamentSeedService {
     const pairs: Array<{ home: string; away: string; round: string; groupId: string | null }> = [];
 
     if (format === 'knockout') {
+      const width = 2 ** Math.ceil(Math.log2(registrations.length));
+      const round = width === 2 ? '결승' : `${width}강`;
       for (let i = 0; i + 1 < registrations.length; i += 2) {
-        pairs.push({ home: registrations[i].id, away: registrations[i + 1].id, round: '8강', groupId: null });
+        pairs.push({ home: registrations[i].id, away: registrations[i + 1].id, round, groupId: null });
       }
     } else {
       // league / group_knockout — 한 조에 몰아넣고 라운드로빈. 조별리그+토너먼트도 조별 라운드는 같다.
@@ -572,7 +697,7 @@ export class MockTournamentSeedService {
       });
       const homeScore = (index % 3) + 1;
       const regulationAwayScore = index % 2;
-      const isEliminationRound = pair.round === '8강' || pair.round === '4강';
+      const isEliminationRound = pair.groupId === null;
       const awayScore = isEliminationRound && homeScore === regulationAwayScore
         ? regulationAwayScore + 1
         : regulationAwayScore;

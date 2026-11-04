@@ -1,5 +1,6 @@
 'use client';
 import { CompetitionFieldPicker } from '@/components/admin/competition-field-picker';
+import { PeriodOverrideField, useMatchPeriodOverride } from '@/components/admin/period-override-field';
 
 import { useId, useState } from 'react';
 import { Button } from '@/components/v1-ui/button';
@@ -44,6 +45,7 @@ const fieldClass =
  * 이 모달로 한다 — 표 안 입력칸이 열 폭을 먹고 탭만 지나가도 저장이 나가던 자리를 한 번의 명시적
  * 저장으로 바꾼 것이다. 값이 그대로면 저장 버튼이 눌리지 않아 불필요한 쓰기가 나가지 않는다.
  * 팀은 시작 전·결과 없는 경기만 바꿀 수 있고, 자리 방식 경기는 일정 보드의 자리에서 바꾼다(`teamLockedReason`).
+ * 경기 방식(단판·전후반)은 이 경기에만 저장한다 — 리그 기본 설정은 규칙 화면에서만 바뀐다.
  */
 export function LeagueFixtureScheduleModal({
   leagueId,
@@ -55,6 +57,7 @@ export function LeagueFixtureScheduleModal({
   teamLockedReason,
   isSubmitting,
   onSubmit,
+  onPeriodsSaved,
   onClose,
 }: {
   leagueId: string;
@@ -68,6 +71,8 @@ export function LeagueFixtureScheduleModal({
   teamLockedReason: string | null;
   isSubmitting: boolean;
   onSubmit: (patch: LeagueFixtureSchedulePatch) => Promise<unknown>;
+  /** 경기 방식만 저장했을 때 알린다 — 경기 정보도 저장했으면 onSubmit 쪽 알림 하나로 끝낸다. */
+  onPeriodsSaved: () => void;
   onClose: () => void;
 }) {
   const startsAtId = useId();
@@ -89,11 +94,13 @@ export function LeagueFixtureScheduleModal({
   const [homeTeamId, setHomeTeamId] = useState(fixture.homeTeamId ?? '');
   const [awayTeamId, setAwayTeamId] = useState(fixture.awayTeamId ?? '');
   const [error, setError] = useState<string | null>(null);
+  const periods = useMatchPeriodOverride(leagueId, fixture.teamMatchId, '리그 기본값');
+  const saving = isSubmitting || periods.pending;
   // 제출 중 ESC·배경 클릭으로 닫히면 요청은 날아가는데 화면은 사라져 저장 여부를 알 수 없다.
   const { dialogRef, onBackdropClick } = useModalA11y<HTMLElement, HTMLDivElement>({
     open: true,
     onClose,
-    pending: isSubmitting,
+    pending: saving,
   });
 
   const changed = {
@@ -104,11 +111,16 @@ export function LeagueFixtureScheduleModal({
     home: homeTeamId !== (fixture.homeTeamId ?? ''),
     away: awayTeamId !== (fixture.awayTeamId ?? ''),
   };
-  const dirty = Object.values(changed).some(Boolean);
+  const fixtureDirty = Object.values(changed).some(Boolean);
+  const dirty = fixtureDirty || periods.payload !== null;
 
   const submit = async () => {
-    if (isSubmitting || !dirty) return;
+    if (saving || !dirty) return;
     setError(null);
+    if (periods.payload && periods.error) {
+      setError(periods.error);
+      return;
+    }
     const patch: LeagueFixtureSchedulePatch = {};
     if (changed.title) {
       if (title.trim() === '') {
@@ -143,10 +155,17 @@ export function LeagueFixtureScheduleModal({
       Object.assign(patch, placeChoice.mode === 'custom' ? toLeaguePlacePayload(placeChoice.place) : { placeName: '' });
     }
     try {
-      await onSubmit(patch);
-      onClose();
+      if (fixtureDirty) await onSubmit(patch);
     } catch (err) {
       setError(extractErrorMessage(err, '경기를 저장하지 못했어요.'));
+      return;
+    }
+    try {
+      if (await periods.save() && !fixtureDirty) onPeriodsSaved();
+      onClose();
+    } catch (err) {
+      const message = extractErrorMessage(err, '경기 방식을 저장하지 못했어요.');
+      setError(fixtureDirty ? `경기 정보는 저장됐어요. 경기 방식은 저장하지 못했어요: ${message}` : message);
     }
   };
 
@@ -226,16 +245,27 @@ export function LeagueFixtureScheduleModal({
           />
           ) : null}
         </div>
+        <PeriodOverrideField
+          inheritLabel="리그 기본값 따르기"
+          inheritedSummary={periods.inheritedSummary}
+          customLabel="이 경기만 따로"
+          customHint="이 경기만 바뀌어요. 리그 기본값은 그대로예요."
+          status={periods.status}
+          choice={periods.choice}
+          onChange={periods.setChoice}
+          disabled={saving}
+          lockedReason={periods.lockedReason}
+        />
         {error ? (
           <p role="alert" className="text-[length:var(--font-size-label)] font-medium text-[var(--red700)]">
             {error}
           </p>
         ) : null}
         <div className="flex gap-2">
-          <Button variant="outline" block onClick={onClose} disabled={isSubmitting}>
+          <Button variant="outline" block onClick={onClose} disabled={saving}>
             취소
           </Button>
-          <Button variant="primary" block onClick={() => void submit()} disabled={!dirty} loading={isSubmitting}>
+          <Button variant="primary" block onClick={() => void submit()} disabled={!dirty} loading={saving}>
             저장
           </Button>
         </div>

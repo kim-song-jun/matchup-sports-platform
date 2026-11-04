@@ -292,6 +292,7 @@ export class TournamentsAdminService {
         message: '참가 팀 수를 입력해 주세요.',
       });
     }
+    if (dto.format !== 'league_knockouts' && (dto.teamCount ?? 0) > 64) throw new BadRequestException({ code: 'TOURNAMENT_TEAM_COUNT_INVALID', message: '이 진행 방식은 최대 64팀까지 설정할 수 있어요.' });
     if (dto.sixTeamMode && (dto.teamCount !== 6 || dto.format !== 'knockout')) throw new BadRequestException({ code: 'SIX_TEAM_FORMAT_INVALID', message: '6강 결승 직행 방식은 모집 정원 6팀의 토너먼트에서 선택해 주세요.' });
     this.assertPlayerRange(dto.minPlayers, dto.maxPlayers);
     this.assertSubstitutionPolicyPair(dto.substitutionMode, dto.maxSubstitutions);
@@ -436,6 +437,7 @@ export class TournamentsAdminService {
     if (existing.sixTeamBracket != null && ((dto.teamCount !== undefined && dto.teamCount !== 6) || (dto.format !== undefined && dto.format !== 'knockout') || dto.sixTeamMode === false)) {
       throw new ConflictException({ code: 'SIX_TEAM_SETTINGS_LOCKED', message: '6강 대진을 만든 뒤에는 모집 정원과 진행 방식을 바꿀 수 없어요.' });
     }
+    if ((dto.format ?? existing.format) !== 'league_knockouts' && (dto.teamCount ?? existing.teamCount) > 64) throw new BadRequestException({ code: 'TOURNAMENT_TEAM_COUNT_INVALID', message: '이 진행 방식은 최대 64팀까지 설정할 수 있어요.' });
     const sixTeamMode = dto.sixTeamMode ?? (existing.sixTeamMode && (dto.teamCount ?? existing.teamCount) === 6 && (dto.format ?? existing.format) === 'knockout');
     if (sixTeamMode && ((dto.teamCount ?? existing.teamCount) !== 6 || (dto.format ?? existing.format) !== 'knockout')) throw new BadRequestException({ code: 'SIX_TEAM_FORMAT_INVALID', message: '6강 방식은 모집 정원 6팀의 토너먼트에서만 선택할 수 있어요.' });
     const formatChanged = dto.format !== undefined && dto.format !== existing.format;
@@ -704,6 +706,15 @@ export class TournamentsAdminService {
           message: '대회 정보가 다른 곳에서 이미 수정됐어요. 새로고침 후 다시 시도해 주세요.',
         });
       }
+      // 단계·조별 경기 시간은 이전 종목의 규칙 버전을 가리키므로 종목과 함께 지운다. 종목은 대진이 없을 때만
+      // 바뀌어 옮길 경기(경기별 재정의)도 없다 — 단계·조 설정은 새 종목 기본값 위에서 다시 정한다.
+      const periodOverridesCleared = sportChanged
+        ? (await tx.v1TournamentStagePeriodSetting.deleteMany({ where: { tournamentId } })).count
+          + (await tx.v1TournamentGroup.updateMany({
+            where: { tournamentId, competitionConfigVersionId: { not: null } },
+            data: { periods: Prisma.DbNull, competitionConfigVersionId: null },
+          })).count
+        : 0;
       await this.adminContext.logAdminAction(
         admin,
         {
@@ -724,6 +735,7 @@ export class TournamentsAdminService {
             ...(sportChanged && {
               sportId: dto.sportId,
               competitionConfigVersionId: sportChangeConfigVersionId,
+              periodOverridesCleared,
             }),
           },
         },
@@ -1392,6 +1404,7 @@ export class TournamentsAdminService {
   ) {
     return {
       id: row.id,
+      kind: row.kind,
       sportId: row.sportId,
       title: row.title,
       status: row.status,

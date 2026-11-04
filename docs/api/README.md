@@ -2,6 +2,10 @@
 
 수상 추천용 관리자 선수 기록 조회는 해당 대회의 활성 디렉터도 허용하며, 다른 대회는 403으로 거부한다. [대회 권한 계약](./domains/tournaments.md#scoped-director-management)을 따른다.
 
+토너먼트별 최종 순위는 공식 결승 및 3·4위전 결과를 범위별로 표시한다. N개 결선은 팀 미정 상태로 선생성할 수 있고, 조별 전체 순위·동률을 확인해 후속 배정할 때 같은 구조의 경기 ID와 일정을 유지한다. 미리보기·시상·공용 MSW 계약은 [대회 계약](./domains/tournaments.md)을 따른다.
+
+관리자 대회 CRUD 응답은 저장된 nullable `kind`를 포함하며 대진·시상 기능의 종류 판정에 사용한다. [대회 계약](./domains/tournaments.md)을 따른다.
+
 [6강 결승 직행 API 계약](./domains/tournaments.md#6강-결승-직행-방식-2026-10-28): 6팀 방식 설정, 템플릿 생성, 진출 조회/수동 결정, 공개 대진표 메타데이터.
 
 대진 v2는 조마다 `groups[].legs`로 1·2회전을 따로 설정한다. 기존 최상위 `legs`와 초안 복원은 호환되며 [대회 계약](./domains/tournaments.md#유연한-대진-v2-2026-10-27)을 따른다.
@@ -66,7 +70,7 @@ Competition venue/field selection (2026-10-14): leagues and tournaments share a 
 - [Matches](./domains/matches.md)
 - [Teams](./domains/teams.md)
 - [Team matches](./domains/team-matches.md)
-- [Tournaments](./domains/tournaments.md) — competition discovery filters/sort and registration capacity — 어드민 선수별 등번호·GK 저장, 대회 형식 수정·잠금 사유, 대진 생성·번호 수정·진출 연결 및 결과 계약, 5조·20팀→12강 추천·일괄 배정
+- [Tournaments](./domains/tournaments.md) — 정규리그 + N개 토너먼트·수동 진출팀·범위별 시상, competition discovery filters/sort and registration capacity — 어드민 선수별 등번호·GK 저장, 대회 형식 수정·잠금 사유, 대진 생성·번호 수정·진출 연결 및 결과 계약, 5조·20팀→12강 추천·일괄 배정
 - [League matches](./domains/league-matches.md)
 - [Regular league public visibility](./domains/league-matches.md#public-visibility) — publication control, admin access and public read gates.
 - [Games](./domains/games.md)
@@ -152,3 +156,6 @@ Current Kakao signup and existing-account linking use the [provider contact conf
 
 카드의 기존 합계와 선택적 시간별 기록(`cards.events`), 정정·재제출 검증 및 공개 프로젝션은
 [games 도메인 문서](./domains/games.md#결과-정정-카드-타임라인-2026-10-24)를 따른다.
+
+승부차기 정정의 성공·시도 횟수와 명시적 `operatorOverride:false`의 예외 승계 해제는
+[대회 운영 계약](./domains/tournament-operations.md)을 따른다. 결과 정정 초안 생성과 공식 확정은 별도 단계다.

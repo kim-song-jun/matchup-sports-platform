@@ -106,7 +106,7 @@ DB evidence:
 | V1-01-001 | Email signup requires current terms consent | Required terms gate signup; successful signup creates user/profile/identity/consents |
 | V1-01-002 | Signup field validation | Duplicate email/nickname and password mismatch stay inline with input preserved |
 | V1-01-003 | Email login success and account-state routing | Completed user enters `/home`; incomplete user resumes onboarding; blocked user cannot enter app |
-| V1-01-004 | OAuth provider callback states | signed-in, needs-terms, missing-email, conflict, denied, and blocked states route correctly |
+| V1-01-004 | OAuth provider callback states | signed-in, needs-terms, conflict (3-step guide, then auto link after signing in to the original account), denied, and blocked states route correctly |
 | V1-01-005 | Onboarding sport/level/region save | Sport minimum guard, level required per sport, region empty allowed |
 | V1-01-006 | Onboarding resume after reload | Partial selections hydrate from API and current step is restored |
 | V1-01-007 | Onboarding complete/defer | Complete requires sport+level; defer enters limited home and records deferred status |

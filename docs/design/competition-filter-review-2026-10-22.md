@@ -357,6 +357,6 @@
 - [공개 상태 범위](../../apps/v1_api/src/tournaments/tournaments-read.query.ts)
 - [카드 응답·리그 정원 제외](../../apps/v1_api/src/tournaments/tournament-card.presenter.ts)
 - [신청 허용·정원 판정](../../apps/v1_api/src/tournaments/tournament-registrations.service.ts)
-- [리그 신청 접수 판정](../../apps/v1_api/src/league-matches/league-registration-open.ts)
+- [대회·리그 신청 접수 판정](../../apps/v1_api/src/tournaments/registration-window.ts)
 - [리그 상태 매핑](../../apps/v1_api/src/tournaments/league-competition-mirror.ts)
 - [경기 상태 표시 모델](../../apps/v1_web/src/lib/competition-status.ts)

@@ -1,3 +1,5 @@
+import { HttpException } from '@nestjs/common';
+import { readSocialLinkToken, socialLinkAccountDigest } from '../auth/social-link-token';
 import { Prisma } from '@prisma/client';
 import { hashPassword } from '../auth/password-hash';
 import type { SmsEventLogService } from './sms-event-log.service';
@@ -51,6 +53,16 @@ function buildPrismaMock() {
   return prisma as never;
 }
 
+// Conflict responses carry a signed link token, which needs the session secret.
+const savedSessionSecret = process.env.V1_SESSION_SECRET;
+beforeAll(() => {
+  process.env.V1_SESSION_SECRET = 'x'.repeat(48);
+});
+afterAll(() => {
+  if (savedSessionSecret === undefined) delete process.env.V1_SESSION_SECRET;
+  else process.env.V1_SESSION_SECRET = savedSessionSecret;
+});
+
 describe('VerificationService.confirm', () => {
   it('rejects when there is no pending token', async () => {
     const prisma = buildPrismaMock();
@@ -60,6 +72,19 @@ describe('VerificationService.confirm', () => {
     await expect(service.confirm(authUser, 'email', '123456')).rejects.toMatchObject({
       response: { code: 'VERIFICATION_NO_PENDING' },
     });
+  });
+
+  it.each(['email', 'phone'] as const)('only looks at codes asked for to verify the account contact (%s)', async (channel) => {
+    const prisma = buildPrismaMock();
+    const handle = prisma as never as { v1VerificationToken: { findFirst: jest.Mock } };
+    handle.v1VerificationToken.findFirst.mockResolvedValue(null);
+    const service = new VerificationService(prisma, dispatcher, eventLogStub());
+
+    await expect(service.confirm(authUser, channel, '123456')).rejects.toMatchObject({ response: { code: 'VERIFICATION_NO_PENDING' } });
+
+    expect(handle.v1VerificationToken.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ userId: 'u1', channel, purpose: 'contact', consumedAt: null }) }),
+    );
   });
 
   it('rejects a wrong code and records the attempt', async () => {
@@ -319,9 +344,9 @@ describe('VerificationService.requestPhone (MT)', () => {
 
     expect(result).toMatchObject({ sent: true, channel: 'phone', expiresAt: expect.any(String) });
     expect(handle.v1VerificationToken.create).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ channel: 'phone', target: '01012345678' }) }),
+      expect.objectContaining({ data: expect.objectContaining({ channel: 'phone', purpose: 'contact', target: '01012345678' }) }),
     );
-    expect(sendSpy).toHaveBeenCalledWith('phone', '01012345678', expect.stringMatching(/^\d{6}$/));
+    expect(sendSpy).toHaveBeenCalledWith('phone', '01012345678', expect.stringMatching(/^\d{6}$/), 'verify', 'u1');
     expect(echoSpy).toHaveBeenCalledWith({ channel: 'phone', address: '01012345678', userId: 'u1' });
     sendSpy.mockRestore();
     echoSpy.mockRestore();
@@ -359,6 +384,186 @@ describe('VerificationService.requestPhone (MT)', () => {
       response: { code: 'PHONE_CONFLICT' },
     });
     expect(handle.v1VerificationToken.create).not.toHaveBeenCalled();
+  });
+
+  // A number somebody else holds: a signup that has not finished is told only once its code proved the number.
+  describe('PHONE_CONFLICT for a social signup that has not finished', () => {
+    const SIGN_IN_THEN_LINK = (provider: 'kakao' | 'apple') => ({
+      response: {
+        code: 'PHONE_CONFLICT',
+        details: { next: 'sign_in_then_link', provider, linkToken: expect.any(String), linkTokenExpiresInSeconds: 1800 },
+      },
+    });
+    const plain = { response: { code: 'PHONE_CONFLICT' } };
+    const HOLDER = 'holder-1';
+
+    beforeEach(() => {
+      jest.spyOn(dispatcher, 'send').mockResolvedValue(undefined);
+    });
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    function arrange(user: Record<string, unknown>, holder: { id: string; accountStatus?: string } | null = { id: HOLDER }) {
+      const prisma = buildPrismaMock();
+      const handle = prisma as never as {
+        v1VerificationToken: { findFirst: jest.Mock; create: jest.Mock };
+        v1User: { findUnique: jest.Mock; findFirst: jest.Mock; update: jest.Mock };
+      };
+      handle.v1User.findUnique.mockResolvedValue({ id: 'u1', email: null, phone: null, emailVerifiedAt: null, phoneVerifiedAt: null, ...user });
+      handle.v1User.findFirst.mockResolvedValue(holder);
+      return { prisma, handle, service: new VerificationService(prisma, dispatcher, eventLogStub()) };
+    }
+
+    /** The phone token an `issue()` just stored, and the code that went with it. */
+    async function pendingCode(handle: ReturnType<typeof arrange>['handle'], target = '01012345678') {
+      const codeHash = await hashPassword('123456');
+      handle.v1VerificationToken.findFirst.mockResolvedValue({ id: 't1', channel: 'phone', target, codeHash, attemptCount: 0 });
+    }
+    const holderOwnsNumber = () => new Prisma.PrismaClientKnownRequestError('Unique constraint failed', { code: 'P2002', clientVersion: 'test' });
+    const kakaoSignup = (onboardingStatus = 'social_profile_required') => ({
+      onboardingStatus,
+      authIdentities: [{ provider: 'kakao', providerUserKey: 'kakao-key-1' }],
+    });
+
+    it.each(['social_profile_required', 'social_profile_deferred'])(
+      'sends the code for a %s signup even though somebody holds the number, and says nothing about the holder',
+      async (onboardingStatus) => {
+        const { handle, service } = arrange(kakaoSignup(onboardingStatus));
+
+        const result = await service.requestPhone(authUser, '01012345678');
+
+        expect(result).toMatchObject({ sent: true, channel: 'phone' });
+        expect(JSON.stringify(result)).not.toContain('linkToken');
+        expect(handle.v1VerificationToken.create).toHaveBeenCalledTimes(1);
+        // Whether the number is taken is not looked up, let alone revealed, before the code is entered.
+        expect(handle.v1User.findFirst).not.toHaveBeenCalled();
+      },
+    );
+
+    it('still applies the resend cooldown to that request', async () => {
+      const { handle, service } = arrange(kakaoSignup());
+      handle.v1VerificationToken.findFirst.mockResolvedValue({ createdAt: new Date() });
+
+      await expect(service.requestPhone(authUser, '01012345678')).rejects.toMatchObject({ response: { code: 'VERIFICATION_RESEND_COOLDOWN' } });
+      expect(handle.v1VerificationToken.create).not.toHaveBeenCalled();
+    });
+
+    it.each(['kakao', 'apple'] as const)('answers a %s signup with the holder-bound token only after the right code', async (provider) => {
+      const { handle, service } = arrange({ onboardingStatus: 'social_profile_required', authIdentities: [{ provider, providerUserKey: `${provider}-key-1` }] });
+      await pendingCode(handle);
+      handle.v1User.update.mockRejectedValue(holderOwnsNumber());
+
+      const error = await service.confirm(authUser, 'phone', '123456').catch((e) => e);
+
+      expect(error).toMatchObject(SIGN_IN_THEN_LINK(provider));
+      expect(readSocialLinkToken(error.getResponse().details.linkToken)).toEqual({
+        kind: 'pending_account',
+        provider,
+        providerUserKey: `${provider}-key-1`,
+        pendingAccount: socialLinkAccountDigest('u1'),
+        allowedAccounts: [socialLinkAccountDigest(HOLDER)],
+      });
+    });
+
+    it('gives no token, and does not look the holder up, when the code is wrong', async () => {
+      const { handle, service } = arrange(kakaoSignup());
+      await pendingCode(handle);
+
+      const error = await service.confirm(authUser, 'phone', '000000').catch((e) => e);
+
+      expect(error).toMatchObject({ response: { code: 'VERIFICATION_CODE_MISMATCH' } });
+      expect(JSON.stringify(error.getResponse())).not.toContain('linkToken');
+      expect(handle.v1User.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('has nobody to link to, so stays plain, when the number has no other holder any more', async () => {
+      const { handle, service } = arrange(kakaoSignup(), null);
+      await pendingCode(handle);
+      handle.v1User.update.mockRejectedValue(holderOwnsNumber());
+
+      const error = await service.confirm(authUser, 'phone', '123456').catch((e) => e);
+
+      expect(error).toMatchObject(plain);
+      expect(error.getResponse().details).toBeUndefined();
+    });
+
+    describe('when the holder is a withdrawal waiting out its grace period', () => {
+      const REQUESTED_AT = new Date('2026-10-01T00:00:00.000Z');
+      const GRACE_END = '2026-10-31T00:00:00.000Z';
+      const withdrawing = { id: HOLDER, accountStatus: 'withdrawal_pending' };
+
+      function withRequestLog(handle: ReturnType<typeof arrange>['handle'], createdAt: Date | null) {
+        const statusLogs = { findFirst: jest.fn().mockResolvedValue(createdAt ? { createdAt } : null) };
+        (handle as unknown as { v1StatusChangeLog: unknown }).v1StatusChangeLog = statusLogs;
+        // buildPrismaMock hands the same object to the service, so the model is visible to it as well.
+        return statusLogs;
+      }
+
+      it('adds when the grace ends to the answer given after the right code', async () => {
+        const { handle, service } = arrange(kakaoSignup(), withdrawing);
+        withRequestLog(handle, REQUESTED_AT);
+        await pendingCode(handle);
+        handle.v1User.update.mockRejectedValue(holderOwnsNumber());
+
+        const error = await service.confirm(authUser, 'phone', '123456').catch((e) => e);
+
+        expect(error).toMatchObject(SIGN_IN_THEN_LINK('kakao'));
+        expect(error.getResponse().details.withdrawalPendingUntil).toBe(GRACE_END);
+      });
+
+      it('says null for the end when no request log exists', async () => {
+        const { handle, service } = arrange(kakaoSignup(), withdrawing);
+        withRequestLog(handle, null);
+        await pendingCode(handle);
+        handle.v1User.update.mockRejectedValue(holderOwnsNumber());
+
+        const error = await service.confirm(authUser, 'phone', '123456').catch((e) => e);
+
+        expect(error.getResponse().details).toHaveProperty('withdrawalPendingUntil', null);
+      });
+
+      it('adds nothing when the holder is an active account', async () => {
+        const { handle, service } = arrange(kakaoSignup(), { id: HOLDER, accountStatus: 'active' });
+        const statusLogs = withRequestLog(handle, REQUESTED_AT);
+        await pendingCode(handle);
+        handle.v1User.update.mockRejectedValue(holderOwnsNumber());
+
+        const error = await service.confirm(authUser, 'phone', '123456').catch((e) => e);
+
+        expect(error).toMatchObject(SIGN_IN_THEN_LINK('kakao'));
+        expect(error.getResponse().details).not.toHaveProperty('withdrawalPendingUntil');
+        expect(statusLogs.findFirst).not.toHaveBeenCalled();
+      });
+
+      it('reveals nothing at the request step or after a wrong code, whoever holds the number', async () => {
+        for (const user of [kakaoSignup(), { onboardingStatus: 'completed', authIdentities: [{ provider: 'email', providerUserKey: 'a@b.com' }] }]) {
+          const { handle, service } = arrange(user, withdrawing);
+          const statusLogs = withRequestLog(handle, REQUESTED_AT);
+
+          const requested = await service.requestPhone(authUser, '01012345678').catch((e) => e);
+          await pendingCode(handle);
+          const wrongCode = await service.confirm(authUser, 'phone', '000000').catch((e) => e);
+
+          expect(JSON.stringify(requested instanceof HttpException ? requested.getResponse() : requested)).not.toContain('withdrawalPendingUntil');
+          expect(JSON.stringify(wrongCode.getResponse())).not.toContain('withdrawalPendingUntil');
+          expect(statusLogs.findFirst).not.toHaveBeenCalled();
+        }
+      });
+    });
+
+    it('keeps the plain answer, at the request, for a finished social account and for an email account', async () => {
+      for (const user of [
+        { onboardingStatus: 'completed', authIdentities: [{ provider: 'kakao', providerUserKey: 'kakao-key-1' }] },
+        { onboardingStatus: 'completed', authIdentities: [{ provider: 'email', providerUserKey: 'a@b.com' }] },
+      ]) {
+        const { handle, service } = arrange(user);
+        const error = await service.requestPhone(authUser, '01012345678').catch((e) => e);
+        expect(error).toMatchObject(plain);
+        expect(error.getResponse().details).toBeUndefined();
+        expect(handle.v1VerificationToken.create).not.toHaveBeenCalled();
+      }
+    });
   });
 
   it('rejects a phone resend within the cooldown window (paid-SMS abuse guard)', async () => {

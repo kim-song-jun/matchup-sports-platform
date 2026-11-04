@@ -6,32 +6,42 @@ import { PUBLIC_TOURNAMENT_STATUSES } from './tournaments-read.query';
 import { CAPACITY_HOLD_STATUSES } from './registration-capacity';
 
 /**
- * Default public list order, evaluated by the database:
- * in progress -> recruiting (eligible open or regular-league draft) -> recruitment closed -> finished.
- * "Recruitment closed" is the status the card shows: a stored `closed`, or a recruiting row
- * whose applicable deadline has passed or whose capacity is full (the web's
- * `resolveTournamentRegistrationBlock`; leagues use optional maxTeams independently of roster size).
- * Within the first three groups the earliest start comes first; the finished group is most recently
- * ended first (falling back to the start date). Rows without a date sort last in their group, and
- * `id` (byte order) breaks ties. This file is the single source of that order.
+ * The only public list order, evaluated by the database. A row's group is the state its card shows:
+ * in progress -> recruiting -> preparing (regular-league draft) -> recruitment closed -> finished.
+ * "Recruitment closed" is a stored `closed`, or an `open` row whose deadline has passed or whose capacity
+ * is full (the web's `resolveTournamentRegistrationBlock`; leagues use optional maxTeams independently of
+ * roster size). Inside a group the most recently registered row comes first; the finished group is most
+ * recently ended first (falling back to the start date). Rows without a date sort last in their group, and
+ * `id` (byte order) breaks ties. This file is the single source of that order, and `stage` filters on the
+ * same group so the badge, the filter and the order never disagree.
  */
-/** A recruiting row the card renders as "모집 마감". `registration_deadline_at` is UTC, so compare in UTC. */
+/**
+ * An `open` row the card renders as "접수 마감". `registration_deadline_at` is UTC, so compare in UTC.
+ * Only an open row is closed by its deadline (`registration-window.ts`).
+ */
 const RECRUITMENT_BLOCKED_SQL = Prisma.sql`(
-  (t.kind::text IS DISTINCT FROM 'regular_league' AND t.registration_deadline_at < (now() AT TIME ZONE 'UTC'))
+  (t.status::text = 'open' AND t.registration_deadline_at < (now() AT TIME ZONE 'UTC'))
   OR (SELECT COUNT(*) FROM v1_tournament_registrations r
         WHERE r.tournament_id = t.id AND r.status::text IN (${Prisma.join([...CAPACITY_HOLD_STATUSES])}))
       >= CASE WHEN t.kind::text = 'regular_league' THEN t.max_teams ELSE t.team_count END
 )`;
 
-// Group rank: 0 in progress, 1 recruiting, 2 recruitment closed, 3 finished (FINISHED_RANK), 4 anything else.
+// Group rank: 0 in progress, 1 recruiting, 2 preparing (draft), 3 recruitment closed, 4 finished, 5 anything else.
 const GROUP_RANK_SQL = Prisma.sql`CASE t.status::text
   WHEN 'in_progress' THEN 0
-  WHEN 'draft' THEN (CASE WHEN ${RECRUITMENT_BLOCKED_SQL} THEN 2 ELSE 1 END)
-  WHEN 'open' THEN (CASE WHEN ${RECRUITMENT_BLOCKED_SQL} THEN 2 ELSE 1 END)
-  WHEN 'closed' THEN 2 WHEN 'completed' THEN 3
-  ELSE 4 END`;
+  WHEN 'open' THEN (CASE WHEN ${RECRUITMENT_BLOCKED_SQL} THEN 3 ELSE 1 END)
+  WHEN 'draft' THEN 2
+  WHEN 'closed' THEN 3
+  WHEN 'completed' THEN 4
+  ELSE 5 END`;
 
-const FINISHED_RANK = Prisma.raw('3');
+const STAGE_RANK: Record<NonNullable<TournamentListQueryDto['stage']>, number> = {
+  ongoing: 0,
+  recruiting: 1,
+  preparing: 2,
+  recruit_closed: 3,
+  completed: 4,
+};
 
 /**
  * Must stay equivalent to the Prisma `where` the public surface constants express
@@ -56,25 +66,8 @@ function buildFilterSql(query: TournamentListQueryDto): Prisma.Sql {
     conditions.push(Prisma.sql`t.status::text = ${query.status}`);
   }
   if (query.sportId) conditions.push(Prisma.sql`t.sport_id = ${query.sportId}`);
-  if (query.phase) {
-    conditions.push(query.phase === 'upcoming' ? Prisma.sql`t.status::text IN ('draft', 'open', 'closed')`
-      : Prisma.sql`t.status::text = ${query.phase === 'ongoing' ? 'in_progress' : 'completed'}`);
-  }
-  const registration = query.sort === 'deadline' ? 'open' : query.registration;
-  if (registration) {
-    const accepting = Prisma.sql`(
-      (t.kind::text = 'regular_league' AND t.status::text NOT IN ('completed', 'cancelled', 'on_hold')
-        AND t.registration_deadline_at >= (now() AT TIME ZONE 'UTC'))
-      OR ((t.kind IS NULL OR t.kind::text = 'regular_tournament') AND t.status::text = 'open'
-        AND (t.registration_deadline_at IS NULL OR t.registration_deadline_at >= (now() AT TIME ZONE 'UTC')))
-    ) AND (
-      (t.kind::text = 'regular_league' AND t.max_teams IS NULL)
-      OR (SELECT COUNT(*) FROM v1_tournament_registrations r WHERE r.tournament_id = t.id
-          AND r.status::text IN (${Prisma.join([...CAPACITY_HOLD_STATUSES])}))
-        < CASE WHEN t.kind::text = 'regular_league' THEN t.max_teams ELSE t.team_count END
-    )`;
-    conditions.push(registration === 'open' ? Prisma.sql`COALESCE((${accepting}), FALSE)` : Prisma.sql`NOT COALESCE((${accepting}), FALSE)`);
-  }
+  // The card's single state badge is the list's group, so the filter selects exactly the rows showing that badge.
+  if (query.stage) conditions.push(Prisma.sql`(${GROUP_RANK_SQL}) = ${STAGE_RANK[query.stage]}`);
   if (query.genderCategory) conditions.push(query.genderCategory === 'unspecified'
     ? Prisma.sql`t.gender_category IS NULL` : Prisma.sql`t.gender_category::text = ${query.genderCategory}`);
   if (query.format) conditions.push(Prisma.sql`t.format::text = ${query.format}`);
@@ -89,23 +82,16 @@ function buildFilterSql(query: TournamentListQueryDto): Prisma.Sql {
   return Prisma.join(conditions, ' AND ');
 }
 
-// 명시적 정렬은 한 그룹에서 동작한다. 기존 keyset의 3그룹은 내림차순,
-// 0그룹은 오름차순이라 같은 microsecond 보존 cursor 비교를 재사용할 수 있다.
+// sort_at: registration time (newest first), except a finished row, which sorts by when it ended.
 const FILTERED_SQL = (query: TournamentListQueryDto) => Prisma.sql`filtered AS (
   SELECT t.id,
-    ${query.sort === 'latest' ? Prisma.sql`3` : query.sort ? Prisma.sql`0` : GROUP_RANK_SQL} AS grp,
-    ${query.sort === 'latest' ? Prisma.sql`t.created_at`
-      : query.sort === 'deadline' ? Prisma.sql`t.registration_deadline_at`
-      : query.sort === 'scheduled' ? Prisma.sql`t.scheduled_at`
-      : Prisma.sql`CASE WHEN t.status::text = 'completed' THEN COALESCE(t.scheduled_end_at, t.scheduled_at) ELSE t.scheduled_at END`} AS sort_at
+    ${GROUP_RANK_SQL} AS grp,
+    CASE WHEN t.status::text = 'completed' THEN COALESCE(t.scheduled_end_at, t.scheduled_at) ELSE t.created_at END AS sort_at
   FROM v1_tournaments t
   WHERE ${buildFilterSql(query)}
 )`;
 
-const ORDER_SQL = Prisma.sql`f.grp ASC, (f.sort_at IS NULL) ASC,
-  CASE WHEN f.grp < ${FINISHED_RANK} THEN f.sort_at END ASC,
-  CASE WHEN f.grp = ${FINISHED_RANK} THEN f.sort_at END DESC,
-  f.id COLLATE "C" ASC`;
+const ORDER_SQL = Prisma.sql`f.grp ASC, (f.sort_at IS NULL) ASC, f.sort_at DESC, f.id COLLATE "C" ASC`;
 
 /** Rows strictly after the cursor row `c` in `ORDER_SQL` order (keyset comparison). */
 const AFTER_CURSOR_SQL = Prisma.sql`(
@@ -114,8 +100,7 @@ const AFTER_CURSOR_SQL = Prisma.sql`(
     OR (c.sort_at IS NOT NULL AND (
       f.sort_at IS NULL
       OR (f.sort_at = c.sort_at AND f.id COLLATE "C" > c.id COLLATE "C")
-      OR (c.grp < ${FINISHED_RANK} AND f.sort_at > c.sort_at)
-      OR (c.grp = ${FINISHED_RANK} AND f.sort_at < c.sort_at)
+      OR f.sort_at < c.sort_at
     ))
   ))
 )`;
@@ -139,7 +124,6 @@ interface CursorKey {
   /** `timestamp` rendered as text, so microseconds survive the round trip. */
   sortAt: string | null;
   id: string;
-  sort?: 'latest' | 'deadline' | 'scheduled';
 }
 
 const SORT_AT_TEXT = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})(\.\d{1,6})?$/;
@@ -166,7 +150,7 @@ function isRealTimestampText(text: string): boolean {
  * and the next page would skip or repeat rows.
  */
 function encodeCursor(key: CursorKey): string {
-  return Buffer.from(JSON.stringify(key.sort ? [key.grp, key.sortAt, key.id, key.sort] : [key.grp, key.sortAt, key.id])).toString('base64url');
+  return Buffer.from(JSON.stringify([key.grp, key.sortAt, key.id])).toString('base64url');
 }
 
 function decodeCursor(token: string): CursorKey | null {
@@ -176,13 +160,12 @@ function decodeCursor(token: string): CursorKey | null {
   } catch {
     return null;
   }
-  if (!Array.isArray(parsed) || (parsed.length !== 3 && parsed.length !== 4)) return null;
-  const [grp, sortAt, id, sort] = parsed;
-  if (!Number.isInteger(grp) || grp < 0 || grp > 4) return null;
+  if (!Array.isArray(parsed) || parsed.length !== 3) return null;
+  const [grp, sortAt, id] = parsed;
+  if (!Number.isInteger(grp) || grp < 0 || grp > 5) return null;
   if (sortAt !== null && !(typeof sortAt === 'string' && isRealTimestampText(sortAt))) return null;
   if (typeof id !== 'string' || id.length === 0 || id.length > 64) return null;
-  if (sort !== undefined && !['latest', 'deadline', 'scheduled'].includes(sort)) return null;
-  return { grp, sortAt, id, sort };
+  return { grp, sortAt, id };
 }
 
 /** One page window plus one lookahead row, in default list order. */
@@ -196,7 +179,7 @@ export async function listTournamentIds(
   let rows: Row[];
   if (window.cursor !== undefined && window.cursor !== '') {
     const key = decodeCursor(window.cursor);
-    if (!key || key.sort !== query.sort) return [];
+    if (!key) return [];
     rows = await prisma.$queryRaw<Row[]>`
         WITH ${FILTERED_SQL(query)},
           c AS (SELECT ${key.grp}::int AS grp, ${key.sortAt}::timestamp AS sort_at, ${key.id}::text AS id)
@@ -210,7 +193,7 @@ export async function listTournamentIds(
   }
   return rows.map((row) => ({
     id: row.id,
-    cursor: encodeCursor({ grp: row.grp, sortAt: row.sort_at, id: row.id, sort: query.sort }),
+    cursor: encodeCursor({ grp: row.grp, sortAt: row.sort_at, id: row.id }),
   }));
 }
 

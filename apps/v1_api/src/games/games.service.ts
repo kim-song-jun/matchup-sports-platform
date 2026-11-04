@@ -58,6 +58,7 @@ import {
   type StoredPenalties,
 } from './core/knockout-penalties';
 import { GameTakeoverService, type GameTakeoverRequestReservation } from './game-takeover.service';
+import { findOwnTeamFixtureIds } from '../tournaments/staff/own-team-fixture';
 import { TournamentStaffAccessService } from '../tournaments/staff/tournament-staff-access.service';
 import {
   loadParticipantConsentEligibility,
@@ -5680,6 +5681,14 @@ export class GamesService {
             ...(assignment.fieldId === null ? {} : { fieldId: assignment.fieldId }),
           },
         });
+        // 참가팀 선수는 자기 팀 경기의 현장 담당자가 될 수 없다(MD-QA #193) — 필드 단위 배정·배정 뒤 입단도 여기서 막는다.
+        if (
+          decision.allowed &&
+          role === 'field_operator' &&
+          (await findOwnTeamFixtureIds(tx, userId, [fixture.id])).size > 0
+        ) {
+          continue;
+        }
         if (decision.allowed) {
           return {
             actorType: 'USER',

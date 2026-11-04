@@ -8,6 +8,7 @@ const ACTION_LABEL_MAP: Record<string, string> = {
   // 회원 · 매치 · 팀
   'user.status.update': '회원 상태 변경',
   'user.delete': '회원 삭제',
+  'user.phone.release': '휴대폰 번호 해제',
   'match.status.update': '매치 상태 변경',
   'match.online.update': '매치 온라인 장소 분류 변경',
   'team.status.update': '팀 상태 변경',
@@ -52,6 +53,7 @@ export function adminActionLabel(action: string): string {
 const TARGET_TYPE_LABEL_MAP: Record<string, string> = {
   user: '회원',
   user_onboarding: '회원 온보딩',
+  user_contact: '회원 연락처',
   match: '매치',
   match_application: '매치 신청',
   team: '팀',

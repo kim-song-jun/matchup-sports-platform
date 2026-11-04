@@ -42,6 +42,7 @@ fi
 for required_path in \
   "${ALPHA_SOURCE_DIR}/deploy/deploy-alpha.sh" \
   "${ALPHA_SOURCE_DIR}/deploy/alpha-release-common.sh" \
+  "${ALPHA_SOURCE_DIR}/deploy/alpha-tournament-runtime.sh" \
   "${ALPHA_SOURCE_DIR}/deploy/alpha-manifest-common.sh" \
   "${ALPHA_SOURCE_DIR}/deploy/task168-final-steady-migrate.sh" \
   "${ALPHA_SOURCE_DIR}/deploy/alpha-source-common.sh" \
@@ -57,6 +58,7 @@ for required_path in \
 done
 
 source "${ALPHA_SOURCE_DIR}/deploy/alpha-release-common.sh"
+source "${ALPHA_SOURCE_DIR}/deploy/alpha-tournament-runtime.sh"
 validate_alpha_final_release_manifest \
   "${ALPHA_MANIFEST_FILE}" \
   "${ALPHA_SHA}" \
@@ -71,6 +73,7 @@ if [[ -f "${ALPHA_RELEASE_STATE_FILE}" ]]; then
   had_active=true
 fi
 runtime_mutated=false
+ALPHA_TOURNAMENT_RUNTIME_STARTED=false
 source_activated=false
 task168_irreversible=false
 legacy_api_image=''
@@ -150,6 +153,10 @@ container_image_state() {
 }
 
 restore_legacy_runtime() {
+  if [[ "${ALPHA_TOURNAMENT_RUNTIME_STARTED:-false}" == true ]]; then
+    echo '[alpha-deploy] Candidate writers started; legacy runtime compatibility is unproven. Use a compatible forward fix or the reviewed backup/restore procedure.' >&2
+    return 1
+  fi
   alpha_restore_step legacy_api_image_known test -n "${legacy_api_image}" || return 1
   alpha_restore_step legacy_web_image_known test -n "${legacy_web_image}" || return 1
   alpha_restore_step legacy_source restore_legacy_alpha_source || return 1
@@ -295,6 +302,8 @@ bash "${ALPHA_SOURCE_DIR}/deploy/task168-final-steady-migrate.sh" \
 # 돌기 때문에, 이걸 안 돌리면 갓 배포된 환경의 대회 운영 보드가 500 GAME_READ_FLAG_MISSING
 # 으로 죽는다(실제로 alpha 가 그 상태였다 — v1_game_operation_flags 0행).
 # 멱등하며 운영자가 바꾼 값을 되돌리지 않는다.
+# Candidate application/seed writers may now persist data unknown to old images.
+ALPHA_TOURNAMENT_RUNTIME_STARTED=true
 "${compose[@]}" run --rm --no-deps -T v1_api sh -c \
   'cd /app/apps/v1_api && node dist/src/config/game-operation-flags-seed.cli.js'
 "${compose[@]}" exec -T v1_postgres \

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { TournamentTitle } from '@/components/tournaments/tournament-title';
 import { Trophy } from 'lucide-react';
 import { pendingCapacityLabel, resolveTournamentCapacity, resolveTournamentRegistrationBlock, type TournamentCapacityInput } from '@/lib/tournament-registration-availability';
-import { getLeagueStatusConfig, getTournamentStatusConfig } from '@/lib/v1-tournament-status';
+import { getCompetitionCardStatus } from '@/lib/v1-tournament-status';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { formatTournamentDateRangeShort, formatEntryFee } from '@/lib/date-utils';
 import { resolveTournamentImage } from '@/lib/tournament-promo';
@@ -119,10 +119,11 @@ export function TournamentCard({
 
   const isNearlyFull = teamCapacity !== null && teamCapacity > 0 && reservedTeamCount / teamCapacity >= 0.8;
   const registrationOpen = item.registrationOpen !== false && capacityInput !== null && !registrationBlocked;
-  const status = ['draft', 'open', 'closed'].includes(item.status)
-    ? { badgeClass: 'tm-badge-grey', label: isLeague || item.status === 'draft' ? '준비 중' : '시작 전' }
-    : isLeague ? getLeagueStatusConfig(item.status) : getTournamentStatusConfig(item.status);
-  const registrationLabel = registrationOpen ? '신청 접수 중' : isLeague ? '접수 안 함' : '모집 종료';
+  // 오른쪽 위 배지는 상태 하나(2026-11-03): 준비 중 / 접수 중 / 접수 마감 / 진행 중 / 종료. 서버 정렬 그룹·상태 필터와 같다.
+  const status = getCompetitionCardStatus(item.status, registrationOpen, isLeague);
+  /* 성별을 받기 전에 만든 리그는 `genderCategory` 가 null 이다 — 그 카드에 "성별 부문 미지정" 을 붙이면 소음이라
+     고른 리그만 그린다. 대회는 미지정도 값이라 그대로 보여 준다. */
+  const showGenderBadge = !isLeague || item.genderCategory != null;
   // 커버가 없는 대회도 홍보용으로 등록한 실사진이 있으면 아이콘 대신 그 사진을 썸네일로
   // 재사용한다 (셋 다 없으면 종목색 그라디언트+아이콘 폴백).
   const thumbnailImageUrl = resolveTournamentImage(item, 'cover');
@@ -133,7 +134,7 @@ export function TournamentCard({
         interactive={interactive}
         // 통합 목록은 리그도 소개·신청 정보가 있는 기존 상세로 연결하고 목록 필터를 보존한다.
         href={withFromPath(`/tournaments/${item.id}`, fromPath)}
-        ariaLabel={`${item.title} — ${sportAccent.label} — ${status.label} · ${registrationLabel}`}
+        ariaLabel={`${item.title} — ${sportAccent.label} — ${status.label}`}
       >
         <CompetitionCardHeader
           sportCode={item.sport.code}
@@ -142,22 +143,13 @@ export function TournamentCard({
           statusBadge={{ label: status.label, badgeClass: status.badgeClass }}
           meta={
             <>
-              {!['completed', 'cancelled', 'on_hold'].includes(item.status) && <span className={`tm-badge ${registrationOpen ? 'tm-badge-blue' : 'tm-badge-grey'}`}>{registrationLabel}</span>}
               {registrationOpen && isNearlyFull && <span className="tm-text-caption">잔여 자리 적음</span>}
-              {isLeague ? (
-                /* 한 목록에 두 종류가 섞이므로 "이건 리그다" 를 카드에서 알려야 한다.
-                   상태 배지(진행중 등)는 대회와 글자가 같아서 구분이 안 된다.
-                   티어("1부")도 함께 띄우고 싶지만 **지금은 못 만든다** — 통합 목록 API 는
-                   `tier` 숫자만 주고, 표시 라벨은 시리즈마다 다른 커스텀 값(`tierLabels`)이라
-                   `${tier}부` 로 지어내면 커스텀 라벨을 쓰는 시리즈에서 틀린 이름이 뜬다.
-                   서버가 `tierLabel` 을 이 목록에 실어주면 그때 붙인다. */
-                <span className="tm-badge tm-badge-grey" aria-label="정규 리그">
-                  리그
-                </span>
-              ) : (
-                /* 성별 배지는 대회에만 그린다. 리그 거울은 `genderCategory` 를 채우는 경로가
-                   아예 없어 항상 null 이고, 그러면 모든 리그 카드에 "성별 구분 없음" 이 붙는다
-                   — 정보가 아니라 소음이다(`teamCount` 를 리그에서 뺀 것과 같은 이유). */
+              {/* 이름 아래 배지는 종목(헤더 칩) / 리그·대회 / 성별 조건, 이 셋이다(2026-11-03).
+                  `isLeague` 는 `kind` 로만 고른다 — `format==='league'` 인 리그 방식 대회에 "리그" 를 붙이면 대회를 리그라고 말하는 것이다. */}
+              <span className="tm-badge tm-badge-grey" aria-label={isLeague ? '정규 리그' : '정규 대회'}>
+                {isLeague ? '리그' : '대회'}
+              </span>
+              {showGenderBadge && (
                 <span
                   className="tm-badge tm-badge-grey"
                   aria-label={`성별 카테고리: ${getGenderCategoryLabel(item.genderCategory)}`}

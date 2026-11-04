@@ -11,13 +11,15 @@ import {
   type SideKey,
 } from '@/lib/bracket-canvas-layout';
 import { competitionMatchLabel } from '@/lib/tournament-round-label';
-import type { V1AdminBracketFixture, V1AdminBracketGroup, V1AdminBracketSlot, V1SixTeamBracket } from '@/types/api';
+import type { V1AdminBracketFixture, V1AdminBracketGroup, V1AdminBracketSlot, V1AdminTournamentRegistration, V1SixTeamBracket } from '@/types/api';
 import { SixTeamAdminBracket } from './six-team-admin-bracket';
+import { bracketTrackLabel } from '@/lib/bracket-track';
 import { BracketCanvasNode } from './bracket-canvas-node';
 import { BracketGroupBlock } from './bracket-group-block';
 
 export type BracketCanvasProps = {
   sixTeamState?: V1SixTeamBracket | null;
+  registrations?: readonly V1AdminTournamentRegistration[];
   groups: V1AdminBracketGroup[];
   fixtures: V1AdminBracketFixture[];
   slots: V1AdminBracketSlot[];
@@ -31,8 +33,11 @@ export type BracketCanvasProps = {
 };
 
 export function fixtureTitle(fixture: V1AdminBracketFixture, groups: readonly V1AdminBracketGroup[]): string {
-  const groupName = groups.find((group) => group.id === fixture.groupId)?.name ?? null;
-  return `${competitionMatchLabel({ groupName, round: fixture.round, legNumber: fixture.legNumber })} ${fixture.fixtureNumber}번 경기`;
+  const group = groups.find((candidate) => candidate.id === fixture.groupId);
+  const groupName = group?.name ?? null;
+  const trackLabel = bracketTrackLabel(group?.bracketTrack);
+  const title = `${competitionMatchLabel({ groupName, round: fixture.round, legNumber: fixture.legNumber })} ${fixture.fixtureNumber}번 경기`;
+  return trackLabel ? `${trackLabel} · ${title}` : title;
 }
 
 // 선 모양으로도 종류를 구분한다 — 색만으로 전달하지 않는다.
@@ -45,6 +50,7 @@ const EDGE_STYLE: Record<CanvasEdgeKind, { dash: string | undefined }> = {
 
 export function BracketCanvas({
   sixTeamState,
+  registrations,
   groups,
   fixtures,
   slots,
@@ -77,9 +83,10 @@ export function BracketCanvas({
   const hasBracketEdges = layout.edges.some((edge) => edge.kind !== 'GROUP_RANK');
   const hasRankEdges = layout.edges.some((edge) => edge.kind === 'GROUP_RANK');
 
-  if (sixTeamState) return <SixTeamAdminBracket state={sixTeamState} fixtures={fixtures} groups={groups} renderFixture={(fixture, labels) => <BracketCanvasNode
+  if (sixTeamState) return <SixTeamAdminBracket state={sixTeamState} fixtures={fixtures} groups={groups} registrations={registrations} renderFixture={(fixture, labels) => <BracketCanvasNode
     fixture={fixture}
-    title={fixtureTitle(fixture, groups)}
+    title={`${fixture.fixtureNumber}번 경기`}
+    fullTitle={fixtureTitle(fixture, groups)}
     sideLabels={labels ?? { HOME: fixtureSideLabel(fixture, 'HOME', labelContext), AWAY: fixtureSideLabel(fixture, 'AWAY', labelContext) }}
     slots={{ HOME: fixture.homeSlotId ? slotsById.get(fixture.homeSlotId) ?? null : null, AWAY: fixture.awaySlotId ? slotsById.get(fixture.awaySlotId) ?? null : null }}
     selected={fixture.id === selectedFixtureId}
@@ -140,7 +147,7 @@ export function BracketCanvas({
                 AWAY: fixture.awaySlotId === null ? null : (slotsById.get(fixture.awaySlotId) ?? null),
               }}
               selected={fixture.id === selectedFixtureId}
-              canWrite={canWrite}
+              canWrite={canWrite && !groups.some(group => group.id === fixture.groupId && group.bracketTrack && !['overall', 'upper', 'lower'].includes(group.bracketTrack))}
               pendingRegistrationId={pendingRegistrationId}
               onSelect={onSelectFixture}
               onAssign={onAssignSlot}
@@ -152,6 +159,11 @@ export function BracketCanvas({
           <BracketGroupBlock
             key={block.groupId}
             block={block}
+            hasSplitQualification={slots.some((slot) => {
+              return slot.kind === 'GROUP_RANK'
+                && slot.sourceGroupId === block.groupId
+                && slot.bracketTrack === 'lower';
+            })}
             canWrite={canWrite}
             lockedSlotIds={lockedSlotIds}
             pendingRegistrationId={pendingRegistrationId}

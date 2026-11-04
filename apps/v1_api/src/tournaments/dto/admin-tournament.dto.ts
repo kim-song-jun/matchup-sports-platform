@@ -68,7 +68,7 @@ export class AdminTournamentListQueryDto {
   limit?: number;
 }
 
-export const TOURNAMENT_FORMATS = ['league', 'knockout', 'group_knockout'] as const;
+export const TOURNAMENT_FORMATS = ['league', 'knockout', 'group_knockout', 'league_knockouts'] as const;
 export type TournamentFormat = (typeof TOURNAMENT_FORMATS)[number];
 export const TOURNAMENT_GENDER_CATEGORIES = ['mixed', 'male', 'female'] as const;
 export type TournamentGenderCategory = (typeof TOURNAMENT_GENDER_CATEGORIES)[number];
@@ -156,7 +156,6 @@ export class CreateTournamentDto {
   @Type(() => Number)
   @IsInt({ message: '참가 팀 수는 정수여야 해요.' })
   @Min(2, { message: '참가 팀 수는 2개 이상이어야 해요.' })
-  @Max(64, { message: '참가 팀 수는 64개를 넘을 수 없어요.' })
   teamCount?: number;
 
   @IsOptional()
@@ -512,7 +511,6 @@ export class UpdateTournamentDto {
   @Type(() => Number)
   @IsInt({ message: '참가 팀 수는 정수여야 해요.' })
   @Min(2, { message: '참가 팀 수는 2개 이상이어야 해요.' })
-  @Max(64, { message: '참가 팀 수는 64개를 넘을 수 없어요.' })
   teamCount?: number;
 
   @IsOptional()

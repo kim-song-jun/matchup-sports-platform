@@ -4,6 +4,7 @@ import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { isQuietHour, nightPushAllowed } from '../common/quiet-hours';
 import { PrismaService } from '../prisma/prisma.service';
+import { PHONE_VERIFICATION_ROUTE } from '../verification/phone-verification-access';
 import {
   NotificationsQueryDto,
   ReadAllNotificationsDto,
@@ -69,8 +70,12 @@ export type NotificationEventType =
   | 'team_contact_accepted'
   | 'team_contact_declined'
   | 'inquiry_answered'
-  // 소셜 로그인이 휴대폰 주인의 기존 계정에 연결됐을 때 그 계정에게(MD-QA #126). 보안 알림이라 importantEnabled.
+  // 로그인한 계정에 카카오·Apple 로그인이 연결됐을 때 그 계정에게. 보안 알림이라 알림 설정과 무관하게
+  // 연결과 같은 트랜잭션에서 남긴다(createInTransaction — emitNotification 의 설정 확인을 거치지 않는다).
   | 'social_identity_linked'
+  // 운영자가 이 계정의 휴대폰 번호를 해제했을 때 그 계정에게. 보안 알림이라 social_identity_linked 와 같이
+  // 설정과 무관하게 해제와 같은 트랜잭션에서 남긴다. 도착지는 번호를 다시 인증하는 화면이다.
+  | 'phone_released_by_operator'
   // H3: 팀장·어드민이 팀을 보관(해체)하면 팀원 전원과 가입 신청자에게 한 번 알린다. 도착지는 해체된 팀 페이지.
   | 'team_dissolved'
   // Task 12, reminders lane: fired by the durable worker (jobs/schedule-reminders/schedule-reminder.service.ts)
@@ -100,6 +105,9 @@ export type NotificationEventType =
   | 'league_promotion_relegated'
   | 'league_promotion_stayed'
   | 'league_promotion_withdrawn'
+  // 독립 리그의 다음 시즌(2026-11-03): 이어진 새 리그가 접수를 시작하면 지난 시즌 확정 팀의 팀장·매니저에게 알린다.
+  // targetId 는 새 리그 id 이고, 누르면 그 리그 신청 화면으로 간다(deepLinkForEvent).
+  | 'league_next_season_registration_opened'
   // 리그 알림 문구 전용화(2026-08-25): 위 team_match_completed는 일반 팀매치 문구
   // ("팀매치가 완료됐어요. 리뷰를 남겨보세요!")로 고정돼 있어 리그 대진에는 맞지 않는다
   // (리그는 순위에 반영되는 확정 결과지, 리뷰를 남기는 흐름이 아니다 — Task 166 이
@@ -228,7 +236,7 @@ export function renderNotificationCopy(template: string, vars: NotificationCopyV
 function preferenceFieldForEvent(type: NotificationEventType): NotificationPrefField {
   // 사용자가 직접 접수한 1:1 문의의 답변은 놓치면 안 되는 알림이므로
   // 활동 알림(activityEnabled)이 아니라 중요 알림(importantEnabled)으로 게이트한다.
-  if (type === 'inquiry_answered' || type === 'social_identity_linked') {
+  if (type === 'inquiry_answered') {
     return 'importantEnabled';
   }
   if (type === 'team_dissolved') {
@@ -324,7 +332,7 @@ function targetTypeForEvent(type: NotificationEventType): V1NotificationTargetTy
   if (type === 'inquiry_answered') {
     return 'inquiry';
   }
-  if (type === 'social_identity_linked') {
+  if (type === 'social_identity_linked' || type === 'phone_released_by_operator') {
     return 'system';
   }
   if (type === 'team_dissolved') {
@@ -382,7 +390,8 @@ function targetTypeForEvent(type: NotificationEventType): V1NotificationTargetTy
     type === 'tournament_identity_attest_requested' ||
     type === 'tournament_identity_attest_expired' ||
     type === 'tournament_identity_attest_approved' ||
-    type === 'tournament_identity_attest_rejected'
+    type === 'tournament_identity_attest_rejected' ||
+    type === 'league_next_season_registration_opened'
   ) {
     return 'tournament';
   }
@@ -474,6 +483,9 @@ function deepLinkForEvent(
   if (type === 'social_identity_linked') {
     return '/my/settings';
   }
+  if (type === 'phone_released_by_operator') {
+    return PHONE_VERIFICATION_ROUTE;
+  }
   // 새 팀장·나간 멤버 알림은 멤버 관리(멤버 탭)로 — 나머지 역할 알림은 기본 팀 상세로 간다.
   if ((type === 'team_owner_received' || type === 'team_member_left') && targetId) {
     return `/teams/${targetId}/members`;
@@ -529,6 +541,10 @@ function deepLinkForEvent(
     if (teamId && scheduleId) {
       return `/teams/${teamId}/schedules/${scheduleId}`;
     }
+  }
+  // 다음 시즌 신청 안내는 리그 상세가 아니라 곧바로 신청 화면으로 보낸다 — 재참가가 이 알림의 목적이다.
+  if (type === 'league_next_season_registration_opened' && targetId) {
+    return `/tournaments/${targetId}/apply`;
   }
   // 신원 연결 승인 요청·승인·거절(대회 판): targetId 는 "${tournamentId}:${fixtureId}" 복합 —
   // 승인 카드/내 연결 상태가 실리는 경기 상세로 보낸다(위 schedule 복합 targetId 와 같은 패턴).
@@ -628,6 +644,7 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   team_schedule_cancelled: '일정이 취소됐어요',
   inquiry_answered: '문의에 답변이 등록됐어요',
   social_identity_linked: '로그인 수단이 연결됐어요',
+  phone_released_by_operator: '휴대폰 번호가 해제됐어요',
   team_dissolved: '팀이 해체됐어요',
   schedule_rsvp_deadline_reminder: '참석 여부를 알려주세요',
   schedule_guest_recruitment_close_reminder: '용병 모집이 곧 마감돼요',
@@ -637,6 +654,7 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   league_promotion_relegated: '다음 시즌 하위 리그로 강등됐어요',
   league_promotion_stayed: '다음 시즌에도 같은 리그예요',
   league_promotion_withdrawn: '리그 참가가 종료됐어요',
+  league_next_season_registration_opened: '다음 시즌 신청이 열렸어요',
   league_team_match_completed: '경기 결과가 확정됐어요',
   tournament_match_completed: '대회 경기 결과가 확정됐어요',
   tournament_match_result_corrected: '대회 경기 결과가 정정됐어요',
@@ -717,6 +735,7 @@ const EVENT_BODIES: Record<NotificationEventType, string> = {
   team_schedule_cancelled: '"{team}" · {title}({when}) · {reason}',
   inquiry_answered: '답변 내용을 확인해 주세요.',
   social_identity_linked: '{name} 로그인이 연결됐어요. 본인이 아니라면 고객센터로 문의해 주세요.',
+  phone_released_by_operator: '운영자가 이 계정의 휴대폰 번호를 해제했어요. 계정은 그대로이고, 휴대폰 번호를 다시 인증해 주세요.',
   team_dissolved: '지난 기록은 그대로 남아요.',
   schedule_rsvp_deadline_reminder: 'RSVP 마감 전에 참석 여부를 남겨주세요.',
   schedule_guest_recruitment_close_reminder: '모집 마감 전에 신청 현황을 확인해 주세요.',
@@ -726,6 +745,7 @@ const EVENT_BODIES: Record<NotificationEventType, string> = {
   league_promotion_relegated: '아쉽지만 다음 시즌은 하위 리그에서 시작해요.',
   league_promotion_stayed: '현재 리그에서 다음 시즌을 계속해요.',
   league_promotion_withdrawn: '이번 시즌을 끝으로 리그 참가가 종료됐어요.',
+  league_next_season_registration_opened: '지난 시즌에 함께한 팀이라면 바로 재참가 신청할 수 있어요.',
   league_team_match_completed: '확정된 경기 결과를 확인해 보세요.',
   tournament_match_completed: '확정된 경기 결과를 확인해 보세요.',
   tournament_match_result_corrected: '정정된 경기 결과를 확인해 보세요.',
@@ -777,7 +797,7 @@ function lockNotificationLine(tx: Prisma.TransactionClient, key: string) {
   return tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`;
 }
 
-type DeliveredNotification = {
+export type DeliveredNotification = {
   id: string;
   targetType: V1NotificationTargetType;
   targetId: string | null;
@@ -1022,10 +1042,28 @@ export class NotificationsService {
     options: NotificationEmitOptions | undefined,
   ): void {
     if (userIds.length === 0) return;
+    const message = this.renderMessage(type, targetId, body, options);
+    if (message === null) return;
+    const { targetType } = message;
+    const prefField = preferenceFieldForEvent(type);
+    void this.pushAllowedNow(type, targetType, targetId).then((pushAllowed) => {
+      for (const userId of userIds) {
+        this.createNotificationWithPrefCheck(userId, message, prefField, pushAllowed, options?.businessKey).catch((err: unknown) => {
+          this.logger.warn({ userId, targetType, targetId, err }, '알림 생성 실패');
+        });
+      }
+    });
+  }
+
+  private renderMessage(
+    type: NotificationEventType,
+    targetId: string | null,
+    body: string | undefined,
+    options: NotificationEmitOptions | undefined,
+  ): { targetType: V1NotificationTargetType; targetId: string | null; title: string; body: string; deepLink: string | null } | null {
     const targetType = targetTypeForEvent(type);
-    let message: { targetType: V1NotificationTargetType; targetId: string | null; title: string; body: string; deepLink: string | null };
     try {
-      message = {
+      return {
         targetType,
         targetId,
         title: renderNotificationCopy(
@@ -1037,16 +1075,37 @@ export class NotificationsService {
       };
     } catch (err) {
       this.logger.warn({ type, targetId, err }, '알림 문구를 채우지 못해 발송하지 않습니다');
-      return;
+      return null;
     }
-    const prefField = preferenceFieldForEvent(type);
-    void this.pushAllowedNow(type, targetType, targetId).then((pushAllowed) => {
-      for (const userId of userIds) {
-        this.createNotificationWithPrefCheck(userId, message, prefField, pushAllowed, options?.businessKey).catch((err: unknown) => {
-          this.logger.warn({ userId, targetType, targetId, err }, '알림 생성 실패');
-        });
-      }
+  }
+
+  /**
+   * 수신 설정과 무관하게 남기는 보안 알림(로그인 수단 연결 등)의 알림함 행을 호출자의 트랜잭션 안에서 만든다 —
+   * 보안 사건과 그 기록이 함께 커밋되거나 함께 사라지게 한다. 같은 `businessKey` 행이 이미 있거나 문구를 못 채우면
+   * null. 실시간·푸시 전달은 커밋 뒤 `deliverCreated` 로 한다.
+   */
+  async createInTransaction(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    type: NotificationEventType,
+    options?: NotificationEmitOptions,
+  ): Promise<DeliveredNotification | null> {
+    const message = this.renderMessage(type, null, undefined, options);
+    if (message === null) return null;
+    const businessKey = options?.businessKey === undefined ? undefined : `${options.businessKey}:${userId}`;
+    if (businessKey !== undefined && (await tx.v1Notification.findUnique({ where: { businessKey }, select: { id: true } }))) return null;
+    return tx.v1Notification.create({
+      data: { recipientUserId: userId, ...message, ...(businessKey === undefined ? {} : { businessKey }) },
     });
+  }
+
+  /** `createInTransaction` 로 만든 행을 커밋 뒤에 실시간으로 알리고 푸시한다. 실패해도 던지지 않는다. */
+  deliverCreated(userId: string, type: NotificationEventType, notification: DeliveredNotification): void {
+    void this.pushAllowedNow(type, notification.targetType, notification.targetId)
+      .then((pushAllowed) => this.deliver(userId, notification, pushAllowed))
+      .catch((err: unknown) => {
+        this.logger.warn({ userId, type, err }, '보안 알림 전달 실패');
+      });
   }
 
   /**

@@ -8,6 +8,8 @@ import { REGISTRATION_DRAG_MIME } from './bracket-canvas-dnd';
 
 export type BracketGroupBlockProps = {
   block: GroupBlockLayout;
+  /** GROUP_RANK 슬롯이 상·하위 결선으로 나뉘는 대회인지 여부 */
+  hasSplitQualification: boolean;
   canWrite: boolean;
   /** 이 자리를 쓰는 경기 중 시작했거나 결과가 있는 경기가 있는 자리 — 서버 SLOT_LOCKED 와 같은 기준 */
   lockedSlotIds: ReadonlySet<string>;
@@ -17,7 +19,7 @@ export type BracketGroupBlockProps = {
   onOpenSlot: (slotId: string) => void;
 };
 
-export function BracketGroupBlock({ block, canWrite, lockedSlotIds, pendingRegistrationId, onPlace, onOpenSlot }: BracketGroupBlockProps) {
+export function BracketGroupBlock({ block, hasSplitQualification, canWrite, lockedSlotIds, pendingRegistrationId, onPlace, onOpenSlot }: BracketGroupBlockProps) {
   return (
     <section
       role="group"
@@ -37,7 +39,9 @@ export function BracketGroupBlock({ block, canWrite, lockedSlotIds, pendingRegis
         <span className="tm-text-label min-w-0 truncate font-semibold" style={{ color: 'var(--text-strong)' }}>
           {block.name}
         </span>
-        {block.advanceCount ? (
+        {hasSplitQualification ? (
+          <span className="tm-badge tm-badge-sm tm-badge-blue shrink-0">1·2위 상위 · 3·4위 하위</span>
+        ) : block.advanceCount ? (
           <span className="tm-badge tm-badge-sm tm-badge-blue shrink-0">상위 {block.advanceCount}팀 진출</span>
         ) : null}
       </div>

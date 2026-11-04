@@ -15,6 +15,7 @@ import { syncByeSlotInTx } from './bye-slot-sync';
 import { setByeSideInTx } from './bye-side';
 import { lockCompetitionForBracketMutationInTx, lockCompetitionForSlotReleaseInTx } from './competition-bracket-lock';
 import { fillSlotsFromStandings, previewGroupRankStandings, type FillOverride } from './group-rank-fill';
+import { assertBracketTrackRegistrationEligible } from './bracket-track-eligibility';
 import { pickRandomAssignments } from './random-assignment';
 import { previewFinalistAssignment, applyFinalistAssignment } from './finalist-assignment';
 import type { FinalistAssignmentDto } from './dto/finalist-assignment.dto';
@@ -60,7 +61,7 @@ const alreadyPlaced = () =>
 
 async function assertPlaceable(
   tx: Tx,
-  slot: { id: string; tournamentId: string; kind: V1TournamentSlotKind; groupId: string | null },
+  slot: { id: string; tournamentId: string; kind: V1TournamentSlotKind; groupId: string | null; group?: { phase: string; bracketTrack: string } | null },
   registrationId: string,
 ): Promise<void> {
   const registration = await tx.v1TournamentRegistration.findFirst({
@@ -89,6 +90,18 @@ async function assertPlaceable(
     select: { id: true },
   });
   if (placed !== null) throw alreadyPlaced();
+  if (
+    slot.kind === 'GROUP_RANK' && slot.groupId !== null && slot.group?.phase !== 'group' &&
+    (slot.group?.bracketTrack === 'upper' || slot.group?.bracketTrack === 'lower')
+  ) {
+    await assertBracketTrackRegistrationEligible(tx, {
+      tournamentId: slot.tournamentId,
+      groupId: slot.groupId,
+      bracketTrack: slot.group.bracketTrack,
+      registrationId,
+      slotId: slot.id,
+    });
+  }
 }
 
 async function assignSlotCore(
@@ -100,7 +113,16 @@ async function assignSlotCore(
 ): Promise<{ tournamentId: string; fixtureIds: string[] }> {
   const slot = await tx.v1TournamentSlot.findUnique({
     where: { id: slotId },
-    select: { id: true, tournamentId: true, kind: true, groupId: true, position: true, byeSortOrder: true, registrationId: true },
+    select: {
+      id: true,
+      tournamentId: true,
+      kind: true,
+      groupId: true,
+      position: true,
+      byeSortOrder: true,
+      registrationId: true,
+      group: { select: { phase: true, bracketTrack: true } },
+    },
   });
   if (slot === null) throw slotNotFound();
   const competition = await findTournamentOnSurface(tx, ALL_COMPETITION_KINDS, {
@@ -293,9 +315,10 @@ export class TournamentSlotService {
 
   async assignSlot(user: V1AuthUser, slotId: string, registrationId: string | null) {
     const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { slotId });
-    const slot = await this.prisma.v1TournamentSlot.findUnique({ where: { id: slotId }, select: { tournamentId: true } });
+    const slot = await this.prisma.v1TournamentSlot.findUnique({ where: { id: slotId }, select: { tournamentId: true, group: { select: { phase: true } } } });
     if (slot === null) throw slotNotFound();
     const competition = await this.loadCompetition(this.prisma, slot.tournamentId);
+    if (competition.format === 'league_knockouts' && slot.group?.phase !== 'group') throw new ConflictException({ code: 'MULTI_FINAL_SELECTION_REQUIRED', message: '토너먼트 설정에서 진출팀을 편집한 뒤 대진을 다시 생성해 주세요.' });
     return this.prisma.$transaction(async (tx) => {
       await lockCompetitionForBracketMutationInTx(tx, competition);
       const affectedTeamMatchIds = await assignSlotInTx(tx, this.context(admin), slotId, registrationId);

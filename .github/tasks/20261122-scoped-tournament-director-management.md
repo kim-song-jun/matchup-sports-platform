@@ -123,3 +123,7 @@ Status: In Progress — 기존 PR 작업트리에서 후속 수정, 미배포
 - RED: 셸/게이트 3건 실패, 공개 설정 3건 실패 확인. API 권한·감사·결과 4 suite/115 tests PASS. 최종 웹 회귀·타입 검사·캡처는 계속 진행 중.
 - GitHub 최신 dev 4a22824a5와 기존 PR 충돌을 확인. 리뷰 수정 커밋 후 dev 병합으로 해소하고 최종 diff와 검증을 확인한다.
 - 로컬 런타임: 설치된 Next 16.2.10, 선언된 16.3.8과 차이 있음. API는 명시적인 테스트 데이터이며 실제 로그인·DB 저장·서버 권한 검증의 증거가 아니다. Docker 연결 불가, 실시간 Socket.IO 연결 및 공개 비공개 상세 404는 로그에 그대로 기록한다.
+
+- 최신 dev 병합의 8개 충돌을 정리했다. 신규 다중 결선·결선별 시상·경기 시간 조회/파생 설정 버전 감사도 담당 대회 권한으로 통합하고, 생성 재시도는 관리자/디렉터 양쪽 이력을 확인한다. 기존 결선 경기 ID·일정 보존 및 리그 경기 복귀 동작을 유지했다.
+- 최종 병합 트리: API 9 suite/148 tests PASS(신규 실제 AdminContextService 경유 21개 담당/타 대회/해제 회귀 포함), API/Web tsc PASS. 웹 수정 5 files/65 tests PASS, dev 병합 후 셸 25 tests PASS.
+- Prisma 생성물이 최신 dev 스키마보다 오래되어 최초 타입 검사가 실패했다. 공유 node_modules를 수정하지 않고 격리 clone에만 최신 schema로 Prisma Client를 생성한 뒤 재검증했다. DB 스키마 변경·migration·seed 실행 없음.

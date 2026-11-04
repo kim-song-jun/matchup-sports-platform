@@ -118,7 +118,7 @@ Status: Review
 - [x] 최근 신청이 일반 멤버인 다른 팀이거나 미확정이어도, 전체 신청 중 현재 운영 권한이 있는 확정 팀의 다음 시즌 신청으로 연결한다. 모바일·데스크톱에 같은 판정을 쓴다.
 - [x] 경기 시간 조회 실패(캐시 유무 모두)를 표시하고 재시도한다. 실패한 값을 종목 기본값으로 숨겨 개설하지 않는다.
 - [x] 테스트와 타입·패턴 검사, committed-tree 검증 결과를 기록한다.
-- [ ] 통합 브랜치를 push하고 base=dev PR을 생성·확인한다.
+- [x] 통합 브랜치를 push하고 base=dev PR을 생성·확인한다.
 
 ### Security / QA / Risks
 - 재참가 대상은 confirmed 신청과 현재 owner·manager 권한의 교집합으로 고른다. API 권한은 변경하지 않는다.
@@ -132,3 +132,5 @@ Status: Review
 - 실제 페이지 테스트는 전체 신청 목록이 셸 CTA에 전달되어 `/tournaments/next-league/apply?team=team-a`로 연결되는지 확인한다. 운영 중인 팀이 미확정이면 선택하지 않는 대조군도 추가했다.
 - 웹 `tsc --noEmit --incremental false` + `scripts/v1-pattern-check.mjs` 통과. touched-path debt marker와 `git diff --check` 확인. 패키지·lockfile 변경 없음.
 - 새 화면 설계나 API/DB 변경은 없다. alpha의 수정 후 시각 증거와 통합 트리의 API/DB 테스트는 미완료이므로 Draft PR로 제출한다.
+- 제출: [Draft PR #2150](https://github.com/kim-song-jun/matchup-sports-platform/pull/2150), base=`dev`, head=`fix/league-pr-integration-20261104`. P2 수정 커밋 `349f3203e`이며 CI Gates/API/Web은 생성 시 진행 중이었다. 원본 5개 PR·dev/main은 변경하지 않았다.
+- PR 전체 범위의 base-relative diff 검사에서 병합된 `league-fixture-videos.service.ts`의 EOF 빈 줄 1개를 추가 정리했다. API 로직·계약에는 변화가 없다. 후속 커밋은 이 공백 정리와 PR 기록뿐이며 이미 검증한 웹 소스는 그대로다.

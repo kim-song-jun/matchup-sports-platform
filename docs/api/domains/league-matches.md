@@ -685,3 +685,5 @@ now includes nullable `rulesText`, rendered as operating guidance only when popu
 - 공개 `GET /league-matches/:leagueId`: 독립 리그의 `nextRound` 는 이어진 다음 시즌(`seasonNo: null`)이고, `previousRound: {leagueId,title}|null` 이 붙는다. 공개 `GET /tournaments/:id` 는 정규 리그에 `previousSeason: {leagueId,title}|null`(공개된 지난 리그만).
 - 리그 체계 전환 `series-conversion/preview·commit` 은 다음 시즌이 이어진 리그를 409 `LEAGUE_NEXT_SEASON_EXISTS` 로 막는다. 전환과 다음 시즌 생성은 원본 리그 행을 먼저 잠가 겹치면 한쪽만 성공한다.
 - 마이그레이션 `20261103120000_v1_league_previous_season`: `v1_tournaments.previous_league_id`(nullable, unique, FK `ON DELETE SET NULL`).
+- (2026-11-04) 한 번에 넣기는 이 리그에 신청이 진행 중인 팀(`draft`·`cancelled`·`confirmed` 가 아닌 신청)을 422 `LEAGUE_TEAM_ALREADY_APPLIED` 로 막는다.
+- (2026-11-04) 리그 체계 전환 commit 은 티어 등록마다 원본 리그를 출처로 `copyPreviousSeasonRoster` 를 돌린다. 공개 `GET /league-matches/:leagueId` 는 체계로 전환한 종료 독립 리그에 `nextSeasonTiers: Array<{leagueId,title,tier,teamIds}>`(첫 시즌 공개 티어, 1부부터, 확정 팀)를 싣고 그 밖에는 빈 배열이다.

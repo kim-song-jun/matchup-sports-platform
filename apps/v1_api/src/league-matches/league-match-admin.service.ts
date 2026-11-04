@@ -886,6 +886,18 @@ export class LeagueMatchAdminService {
             message: `${nameByTeamId.get(teamId) ?? '팀'}: ${leagueAdmissionBlockerMessage(blocker)}`,
           });
         }
+        // 이미 신청이 진행 중인 팀(입금 대기·확인 중 등)은 여기서 넣지 않는다 — 넣으면 결제는 '대기'인 채 참가 확정이 된다
+        // (2026-11-04 알파 QA). 그 팀은 신청 관리에서 입금을 확인해 확정한다.
+        const applying = await tx.v1TournamentRegistration.findFirst({
+          where: { tournamentId: leagueId, teamId, status: { notIn: ['draft', 'cancelled', 'confirmed'] } },
+          select: { id: true },
+        });
+        if (applying !== null) {
+          throw new UnprocessableEntityException({
+            code: 'LEAGUE_TEAM_ALREADY_APPLIED',
+            message: `${nameByTeamId.get(teamId) ?? '팀'}: 이미 참가 신청한 팀이에요. 신청 관리에서 입금을 확인해 확정해 주세요.`,
+          });
+        }
         await createLeagueRosterRegistration(tx, { leagueId, teamId, entrySource: 'seeded' });
         const registration = await tx.v1TournamentRegistration.findUniqueOrThrow({
           where: { tournamentId_teamId: { tournamentId: leagueId, teamId } },

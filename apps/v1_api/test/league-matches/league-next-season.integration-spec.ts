@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { INestApplication } from '@nestjs/common';
 import request = require('supertest');
+import { GameResultOfficialProjectionService } from '../../src/game-operations/game-result-official-projection.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { ManagedTermsRuntimeService } from '../../src/terms/managed-terms-runtime.service';
 import { TournamentRegistrationsService } from '../../src/tournaments/tournament-registrations.service';
@@ -193,5 +194,59 @@ describe('독립 리그 다음 시즌 잇기', () => {
       select: { status: true, entrySource: true },
     })).toEqual({ status: 'confirmed', entrySource: 'seeded' });
     expect(await playersOf(season2, team.b)).toEqual([{ userId: players.b1, jerseyNumber: 13, eligibilityStatus: 'needs_review' }]);
+  });
+
+  // 2026-11-04 알파 QA: 입금 대기 팀을 넣으면 결제가 '대기'인 채 참가 확정이 됐다.
+  it('이미 신청이 진행 중인 팀(입금 확인 중)은 한 번에 넣기로 넣지 않는다', async () => {
+    const res = await http().post(`/api/v1/admin/league-matches/${season2}/previous-season-teams`)
+      .set('x-v1-user-id', admin).send({ teamIds: [team.a] }).expect(422);
+    expect(res.body.code).toBe('LEAGUE_TEAM_ALREADY_APPLIED');
+    expect((await prisma.v1TournamentRegistration.findUniqueOrThrow({
+      where: { tournamentId_teamId: { tournamentId: season2, teamId: team.a } },
+      select: { status: true },
+    })).status).not.toBe('confirmed');
+  });
+
+  // 2026-11-04 사용자 확정: 리그 체계 전환도 다음 시즌 잇기처럼 지난 명단을 옮긴다. 전환한 리그의 공개 화면은
+  // 첫 시즌 티어와 편성 팀을 준다(전엔 다음 시즌 링크가 비어 리그 목록으로만 갔다).
+  it('리그 체계로 전환하면 첫 시즌 티어에 원본 리그 명단을 옮기고, 원본 공개 화면이 티어를 잇는다', async () => {
+    const source = (await createLeague({ title: `전환 원본 ${suiteId}`, teamIds: [team.a, team.b, team.c] }).expect(201)).body.data.leagueId;
+    const rosterOf = async (teamId: string) =>
+      (await prisma.v1TournamentRegistration.findUniqueOrThrow({ where: { tournamentId_teamId: { tournamentId: source, teamId } } })).id;
+    await prisma.v1TournamentPlayer.create({ data: { registrationId: await rosterOf(team.a), userId: players.a1, realName: players.a1, jerseyNumber: 8, eligibilityStatus: 'non_pro' } });
+    await prisma.v1TournamentPlayer.create({ data: { registrationId: await rosterOf(team.b), userId: players.b1, realName: players.b1, jerseyNumber: 4, eligibilityStatus: 'non_pro' } });
+    await http().post(`/api/v1/admin/league-matches/${source}/state`).set('x-v1-user-id', admin).send({ state: 'active' }).expect(200);
+    const fixtures = await http().post(`/api/v1/admin/league-matches/${source}/fixtures`).set('x-v1-user-id', admin).send({ weeksCount: 1 }).expect(201);
+    const projection = new GameResultOfficialProjectionService();
+    for (const [index, teamMatchId] of (fixtures.body.data.teamMatchIds as string[]).entries()) {
+      const game = await prisma.v1Game.findUniqueOrThrow({ where: { teamMatchId } });
+      const revision = await prisma.v1GameResultRevision.create({
+        data: {
+          gameId: game.id, revision: 1, state: 'OFFICIAL', score: { home: index + 1, away: 0 }, eventsHash: `conv-${randomUUID()}`,
+          createdByActorType: 'SYSTEM', createdBySystemActor: 'NEXT_SEASON_TEST', submittedAt: new Date(), officialAt: new Date(),
+        },
+      });
+      await prisma.v1Game.update({ where: { id: game.id }, data: { currentOfficialRevisionId: revision.id } });
+      await prisma.$transaction((tx) => projection.handler({ payload: { revisionId: revision.id } } as never, tx));
+    }
+    expect((await prisma.v1Tournament.findUniqueOrThrow({ where: { id: source } })).status).toBe('completed');
+
+    const path = `/api/v1/admin/league-matches/${source}/series-conversion`;
+    const preview = (await http().post(`${path}/preview`).set('x-v1-user-id', admin).send({ tierSizes: [3] }).expect(201)).body.data;
+    const committed = (await http().post(`${path}/commit`).set('x-v1-user-id', admin).send({
+      title: `전환 체계 ${suiteId}`, tierSizes: [3], fingerprint: preview.fingerprint,
+      startsOn: new Date(Date.now() + 70 * 86_400_000).toISOString(), endsOn: new Date(Date.now() + 120 * 86_400_000).toISOString(),
+      entries: (preview.entries as Array<{ teamId: string; suggestedTier: number }>).map((e) => ({ teamId: e.teamId, tier: e.suggestedTier })),
+    }).expect(201)).body.data;
+    const tier1 = committed.leagues[0].id as string;
+
+    expect(await playersOf(tier1, team.a)).toEqual([{ userId: players.a1, jerseyNumber: 8, eligibilityStatus: 'needs_review' }]);
+    expect(await playersOf(tier1, team.b)).toEqual([{ userId: players.b1, jerseyNumber: 4, eligibilityStatus: 'needs_review' }]);
+
+    const publicSource = (await http().get(`/api/v1/league-matches/${source}`).expect(200)).body.data;
+    expect(publicSource.nextRound).toBeNull();
+    expect(publicSource.nextSeasonTiers).toEqual([
+      { leagueId: tier1, title: `전환 체계 ${suiteId} 1시즌 1부`, tier: 1, teamIds: expect.arrayContaining([team.a, team.b, team.c]) },
+    ]);
   });
 });

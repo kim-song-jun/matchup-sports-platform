@@ -37,6 +37,7 @@ import { findPublicTournamentOnSurface } from '../tournaments/tournament-surface
 import { isRegistrationWindowOpen } from '../tournaments/registration-window';
 import { TOURNAMENT_VENUE_SELECT, tournamentVenueSnapshot } from '../places/tournament-venue';
 import { CAPACITY_HOLD_STATUSES, countPendingCapacityReservations, isCapacityFull } from '../tournaments/registration-capacity';
+import { readLeagueConversion } from './league-season-link';
 
 const PLAYER_RECORDS_LIMIT = 30;
 const LEAGUE_LIST_DEFAULT_LIMIT = 20;
@@ -521,6 +522,12 @@ export class LeagueMatchPublicService {
           .filter((sibling) => sibling.tier === league.tier && (sibling.seasonNo ?? 0) > (league.seasonNo ?? 0))
           .sort((a, b) => (a.seasonNo ?? 0) - (b.seasonNo ?? 0))[0];
     const previousRound = league.previousLeagueId === null ? undefined : await this.loadLinkedSeason({ id: league.previousLeagueId });
+    // 리그 체계로 전환한 독립 리그는 다음 시즌이 티어마다 따로라 nextRound 하나로 가리킬 수 없다 — 첫 시즌 티어를
+    // 편성 팀과 함께 준다. 화면이 보는 사람의 팀이 든 티어로 보낸다(2026-11-04 알파 QA: 전환 뒤 리그 목록으로만 갔다).
+    // 전환은 종료된 리그만 할 수 있어 종료된 리그만 본다.
+    const nextSeasonTiers = league.seriesId === null && nextRound === undefined && league.state === 'completed'
+      ? await this.loadConvertedSeasonTiers(league.id)
+      : [];
 
     return {
       leagueId: league.id,
@@ -576,6 +583,7 @@ export class LeagueMatchPublicService {
           },
       // 독립 리그가 이어 가는 지난 시즌. 공개되지 않은 리그면 null 이다.
       previousRound: previousRound === undefined ? null : { leagueId: previousRound.id, title: previousRound.title },
+      nextSeasonTiers,
       teamIds: league.teams.map((entry) => entry.teamId),
       // 미확정 대진의 점수를 null 로 두는 것, 몰수를 boolean 하나로만 내보내는 것(사유
       // 원문 비공개)은 `league-fixture-list-source.ts` 가 지킨다 — 대회 표면의 리그
@@ -811,6 +819,21 @@ export class LeagueMatchPublicService {
       assists: rows.filter((row) => row.assists > 0).sort((a, b) => b.assists - a.assists).slice(0, PLAYER_RECORDS_LIMIT),
       hiddenByEligibility,
     };
+  }
+
+  /** 리그 체계로 전환한 리그면 그 체계 첫 시즌의 공개 티어 리그들(1부부터)과 확정 팀. 전환하지 않았으면 빈 배열. */
+  private async loadConvertedSeasonTiers(leagueId: string) {
+    const conversion = await readLeagueConversion(this.prisma, leagueId);
+    if (conversion?.seriesId == null) return [];
+    const leagues = await this.prisma.v1Tournament.findMany({
+      where: { kind: 'regular_league', deletedAt: null, isPublic: true, seriesId: conversion.seriesId },
+      orderBy: [{ seasonNo: 'asc' }, { tier: 'asc' }],
+      select: { id: true, title: true, tier: true, seasonNo: true, registrations: { where: { status: 'confirmed' }, select: { teamId: true } } },
+    });
+    const firstSeason = leagues[0]?.seasonNo;
+    return leagues
+      .filter((row) => row.seasonNo === firstSeason)
+      .map((row) => ({ leagueId: row.id, title: row.title, tier: row.tier, teamIds: row.registrations.map((r) => r.teamId) }));
   }
 
   /** 이어진 지난·다음 시즌 한 건(공개 조건 그대로). 다음 회차 카드가 쓰는 신청 가능 여부를 형제 리그와 같은 판정으로 붙인다. */

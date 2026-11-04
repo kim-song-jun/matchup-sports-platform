@@ -501,8 +501,10 @@ describe('TournamentDetailPageClient — 우리 팀 참가 카드(Task 180 R-1 A
     }
     try {
       render(<><TournamentDetailPageClient tournamentId="tournament-1" /><FloatingCTA /></>);
-      expect(await screen.findByRole('link', { name: '다음 시즌 재참가 신청' }))
-        .toHaveAttribute('href', '/tournaments/next-league/apply?team=team-a');
+      // 모바일 셸 CTA와 데스크톱 우측 레일(끝난 리그도, 2026-11-04) 둘 다 같은 신청으로 잇는다.
+      const links = await screen.findAllByRole('link', { name: '다음 시즌 재참가 신청' });
+      expect(links).toHaveLength(2);
+      for (const link of links) expect(link).toHaveAttribute('href', '/tournaments/next-league/apply?team=team-a');
     } finally {
       get.mockImplementation(originalGet);
     }

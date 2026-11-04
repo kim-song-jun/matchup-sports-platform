@@ -4,6 +4,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AdminContextService } from '../common/admin-context.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { planLeagueConversion } from './league-series-conversion-plan';
+import { copyPreviousSeasonRoster } from './league-roster-autofill';
+
+// 명단 옮기기는 실제 DB 로 따로 본다(league-next-season.integration-spec) — 여기선 원본 리그를 넘기는지만 본다.
+jest.mock('./league-roster-autofill', () => ({ copyPreviousSeasonRoster: jest.fn().mockResolvedValue({ added: 0, skipped: [] }) }));
 
 const actor = { id: 'operator' } as V1AuthUser;
 function setup() {
@@ -17,7 +21,10 @@ function setup() {
     v1GameOfficialFact: { findMany: jest.fn().mockResolvedValue(facts) },
     v1LeagueSeries: { create: jest.fn().mockResolvedValue({ id: 'series' }) },
     v1Team: { findUnique: jest.fn().mockResolvedValue({ ownerUserId: 'owner' }) },
-    v1TournamentRegistration: { upsert: jest.fn().mockResolvedValue({}) },
+    v1TournamentRegistration: {
+      upsert: jest.fn().mockResolvedValue({}),
+      findUniqueOrThrow: jest.fn(async (args: { where: { tournamentId_teamId: { teamId: string } } }) => ({ id: `reg-${args.where.tournamentId_teamId.teamId}` })),
+    },
     v1OutboxJob: { createMany: jest.fn().mockResolvedValue({}) },
     $queryRaw: jest.fn().mockResolvedValue([]),
     $executeRaw: jest.fn().mockResolvedValue(1),
@@ -51,6 +58,10 @@ describe('독립 리그 최초 티어 배정', () => {
     expect(result.leagues.map((e) => e.tier)).toEqual([1, 2]);
     expect(s.tx.v1Tournament.create.mock.calls.map((c) => c[0].data)).toEqual(expect.arrayContaining([expect.objectContaining({ seasonNo: 1, tier: 1, seriesId: 'series' }), expect.objectContaining({ seasonNo: 1, tier: 2 })]));
     expect(s.admins.logAdminAction).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ targetId: 'source', afterJson: expect.objectContaining({ seriesId: 'series' }) }), s.tx);
+    // 2026-11-04 사용자 확정: 전환도 원본 리그의 명단을 팀마다 옮긴다.
+    const copied = jest.mocked(copyPreviousSeasonRoster).mock.calls;
+    expect(copied.map(([, , registration]) => registration.teamId)).toEqual(['t0', 't1', 't2', 't3', 't4', 't5']);
+    expect(copied.every(([, , registration, options]) => registration.id === `reg-${registration.teamId}` && options?.sourceLeagueId === 'source')).toBe(true);
   });
   it('미확정 결과는 티어 배정에 사용하지 않는다', async () => {
     const s = setup(); s.matches[0].game.currentOfficialRevision.state = 'SUBMITTED';

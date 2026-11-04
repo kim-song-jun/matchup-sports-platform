@@ -60,3 +60,5 @@ Status: PR #2101 OPEN — 로컬 계약 검증 PASS, 변경 전 Alpha 캡처 완
 - 비공개 대회/리그의 자기 배정 메타데이터로 운영 셸 제목과 종류를 유지한다. 종류 미확인 상태에서는 대회 전용 관리 메뉴를 열지 않는다.
 - 사용자 요청에 따라 로컬 Next + 명시적 API fixture로 390/768/1440 캡처한다. 실제 DB 저장·서버 권한/Alpha 검증과 구별한다.
 - 신규 관리 Alpha 실측은 여전히 0/10 섹션, 0/3 viewport다. 로컬 캡처는 Alpha 완료 증거를 대체하지 않는다.
+
+- 최종 로컬 증거: [24장 갤러리](../screenshots/pr2101-local/README.md). 관리 개요/정보2/10·3/3폭, after pageerror0·overflow0/18. 공개 설정 fixture503 실제 오류 노출과 관리 복귀 링크 클릭 확인. 최신 dev 통합 API148 tests/API·Web tsc PASS, 웹65 tests 및 통합 셸25 tests PASS.

@@ -127,3 +127,6 @@ Status: In Progress — 기존 PR 작업트리에서 후속 수정, 미배포
 - 최신 dev 병합의 8개 충돌을 정리했다. 신규 다중 결선·결선별 시상·경기 시간 조회/파생 설정 버전 감사도 담당 대회 권한으로 통합하고, 생성 재시도는 관리자/디렉터 양쪽 이력을 확인한다. 기존 결선 경기 ID·일정 보존 및 리그 경기 복귀 동작을 유지했다.
 - 최종 병합 트리: API 9 suite/148 tests PASS(신규 실제 AdminContextService 경유 21개 담당/타 대회/해제 회귀 포함), API/Web tsc PASS. 웹 수정 5 files/65 tests PASS, dev 병합 후 셸 25 tests PASS.
 - Prisma 생성물이 최신 dev 스키마보다 오래되어 최초 타입 검사가 실패했다. 공유 node_modules를 수정하지 않고 격리 clone에만 최신 schema로 Prisma Client를 생성한 뒤 재검증했다. DB 스키마 변경·migration·seed 실행 없음.
+
+- 최종 로컬 수동 증거: `docs/screenshots/pr2101-local/README.md`. before6 + after18 = 24장, 390/768/1440 3/3폭·관리 개요/정보 2/10 섹션 렌더. after pageerror0·document overflow0/18. 실제 복귀 링크 클릭과 공개 설정 fixture503 오류 노출 확인. Alpha0/10·0/3/실제DB 저장 미검증은 유지한다.
+- API surface/Web pattern PASS. 최종 구현 커밋 5030fd8f9, 증거만 추가하는 후속 커밋으로 PR에 게시한다. 최신 Copilot 리뷰는 요청 후 도착 여부를 별도 확인한다.

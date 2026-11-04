@@ -1,3 +1,7 @@
+## 2026-11-04 — 독립 대진 초기화와 예선 수정·팀 배정
+
+[작업](../../.github/tasks/20261111-preliminary-edit-reset.md). 예선·결선 대진 초기화와 예선 편집을 독립 처리한다. 대진이 없는 상태에서 조별리그 편성 및 확정팀 수동/무작위/부분 배정을 저장한다. API27/Web21·양쪽 타입검사 PASS, 실제 DB 시나리오 추가 후 CI 대기. Alpha 기능 0/5(초기화/차단/편성 수정/수동 배정/자동 배정), viewport 0/3. Alpha 실제 데이터 초기화는 실행하지 않았다.
+
 ## 2026-11-04 — 미정 결선 선생성과 별도 진출팀 배정
 
 [시나리오](./multi-finals-deferred-teams-20261104.md) · [task](../../.github/tasks/20261057-admin-bracket-canvas.md). 사용자 B안: 대진 생성과 배정 화면 분리. API15/Web146/실제PG10 tests, 양쪽 typecheck·surface/pattern PASS. 미정 시드 선생성, 전체 순위/동률 수동 선택, 기존 경기 ID/일정 보존을 검증했다. alpha 기능0/7·viewport0/3이며 브라우저 도구 초기화 오류와 미배포가 blocker다.

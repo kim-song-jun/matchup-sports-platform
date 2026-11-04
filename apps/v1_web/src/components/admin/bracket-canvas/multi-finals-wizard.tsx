@@ -8,6 +8,7 @@ import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useMultiFinals, type MultiFinalDefinition, type MultiFinalGroup, type MultiFinalView } from '@/hooks/use-multi-finals';
 import { extractErrorMessage } from '@/lib/error-message';
 import { randomUuid } from '@/lib/uuid';
+import { randomIndex } from '@/lib/random-index';
 import { BracketLeagueStandings } from './bracket-league-standings';
 
 type DraftGroup = MultiFinalGroup & { registrationIds?: string[] };
@@ -23,12 +24,13 @@ export function MultiFinalsWizard({ tournamentId, open, onClose, onApplied, mode
   const [step, setStep] = useState(0); const [groups, setGroups] = useState<DraftGroup[]>([]);
   const [finals, setFinals] = useState<MultiFinalDefinition[]>([]); const [server, setServer] = useState<MultiFinalView | null>(null);
   const [error, setError] = useState(''); const [dirty, setDirty] = useState(false); const initialized = useRef(false); const requestId = useRef<string | null>(null);
+  const [notice, setNotice] = useState('');
   const contentRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     // Steps share a scroll container. Keeping the previous offset hides the next heading or validation error.
     if (contentRef.current) contentRef.current.scrollTop = 0;
   }, [step, error]);
-  const busy = api.setup.isPending || api.select.isPending || api.preview.isPending || api.generate.isPending;
+  const busy = api.setup.isPending || api.select.isPending || api.updatePreliminary.isPending || api.reset.isPending || api.preview.isPending || api.generate.isPending;
   const { confirm, ConfirmModal } = useConfirm();
   async function close() { if (busy) return; if (dirty && !await confirm({ title: '설정 닫기', message: '저장하지 않은 변경을 닫을까요?', confirmLabel: '닫기' })) return; onClose(); }
   const { dialogRef, mounted, onBackdropClick } = useModalA11y({ open, onClose: () => void close(), pending: busy });
@@ -38,7 +40,7 @@ export function MultiFinalsWizard({ tournamentId, open, onClose, onApplied, mode
   useEffect(() => {
     if (!open) { initialized.current = false; setServer(null); return; }
     if (!api.view.data || api.view.isFetching || api.view.isError || initialized.current) return;
-    initialized.current = true; const view = api.view.data; hydrate(view); setDirty(false); setError(''); api.preview.reset(); requestId.current = null;
+    initialized.current = true; const view = api.view.data; hydrate(view); setDirty(false); setError(''); setNotice(''); api.preview.reset(); requestId.current = null;
     if (!view.groups.length && !assigning) {
       setGroups([{ id: '0', name: 'A조', capacity: 4, legs: 1 }, { id: '1', name: 'B조', capacity: 4, legs: 1 }]);
       setFinals([{ name: '상위 토너먼트', rules: [{ groupId: '0', rank: 1 }, { groupId: '1', rank: 1 }], thirdPlace: false, registrationIds: null }]); setStep(0);
@@ -46,8 +48,23 @@ export function MultiFinalsWizard({ tournamentId, open, onClose, onApplied, mode
   }, [open, assigning, api.view.data, api.view.isFetching, api.view.isError]);
   if (!mounted || typeof document === 'undefined') return null;
   const configured = Boolean(server?.groups.length);
+  const editable = !configured || server?.preliminaryFixtureCount === 0 && !server.generated;
   const registrations = server?.registrations ?? [];
   const allGroupsComplete = Boolean(server?.groupStandings?.length) && server!.groupStandings!.every(group => group.complete);
+  async function resetBracket() {
+    if (!server || busy || !await confirm({ title: '대진 초기화', message: '예선과 결선의 모든 대진·일정·대진 자리와 진출팀 선택을 삭제해요. 참가 신청, 예선 조 설정과 팀 선택, 토너먼트 규칙은 유지해요. 시작했거나 기록·결과가 있는 경기가 있으면 초기화할 수 없어요. 초기화할까요?', confirmLabel: '대진 초기화', tone: 'danger' })) return;
+    try {
+      const result = await api.reset.mutateAsync({ expectedRevision: server.revision });
+      hydrate(result); setDirty(false); setError(''); setNotice('대진을 초기화했어요. 예선 편성과 팀 선택을 수정한 뒤 별도로 저장해 주세요.'); api.preview.reset(); requestId.current = null; setStep(0);
+    } catch (e) { setError(extractErrorMessage(e, '대진을 초기화하지 못했어요.')); }
+  }
+  function autoAssign() {
+    const ids = registrations.map(reg => reg.id);
+    for (let i = ids.length - 1; i > 0; i--) { const j = randomIndex(i + 1); [ids[i], ids[j]] = [ids[j], ids[i]]; }
+    let offset = 0;
+    setGroups(rows => rows.map(group => { const registrationIds = ids.slice(offset, offset + group.capacity); offset += group.capacity; return { ...group, registrationIds }; }));
+    setDirty(true); setError(''); setNotice('확정 참가팀을 무작위로 배정했어요. 정원을 넘는 팀은 미배정으로 남고, 팀이 부족한 자리는 미정으로 남아요. 저장 전에 확인해 주세요.'); api.preview.reset();
+  }
   function changeFinal(index: number, patch: Partial<MultiFinalDefinition>) { setFinals(rows => rows.map((f, i) => i === index ? { ...f, ...patch } : f)); setDirty(true); api.preview.reset(); }
   function selectedIds(index: number): string[] { return finals[index].registrationIds ?? server?.finals.find(f => f.name === finals[index].name)?.suggestedRegistrationIds ?? []; }
   function withSelected(): MultiFinalDefinition[] { return finals.map((f, i) => ({ ...f, registrationIds: selectedIds(i) })); }
@@ -58,15 +75,18 @@ export function MultiFinalsWizard({ tournamentId, open, onClose, onApplied, mode
       if (step === 0) {
         if (!groups.length || groups.some(g => !g.name.trim() || !Number.isSafeInteger(g.capacity) || g.capacity < 2)) throw new Error('예선 조 이름과 2팀 이상의 팀 수를 입력해 주세요.');
         if (new Set(groups.map(g => g.name.trim())).size !== groups.length) throw new Error('예선 조 이름은 중복 없이 입력해 주세요.');
+        const selected = groups.flatMap(g => g.registrationIds?.filter(Boolean) ?? []);
+        if (editable && (new Set(selected).size !== selected.length || selected.some(id => !registrations.some(reg => reg.id === id)))) throw new Error('확정 참가팀을 중복 없이 선택해 주세요.');
         setStep(1); return;
       }
       if (step === 1) {
-        if (configured && !dirty) { await preview(); return; }
+        if (configured && !dirty && !editable) { await preview(); return; }
         if (!finals.length || finals.some(f => !f.name.trim()) || new Set(finals.map(f => f.name.trim())).size !== finals.length) throw new Error('토너먼트 이름을 중복 없이 입력해 주세요.');
         if (server?.generated && !await confirm({ title: '결선 설정 변경', message: '저장하면 아직 시작하지 않은 기존 결선 대진을 비우고 새 명단으로 다시 만들어요. 예선 경기와 결과는 유지돼요.', confirmLabel: '설정 저장' })) return;
-        const result = configured
+        const setupInput = { expectedRevision: server!.revision, groups: groups.map(({ id: _id, ...g }) => ({ ...g, registrationIds: g.registrationIds?.filter(Boolean) })), finals: finals.map(f => ({ ...f, registrationIds: null, rules: f.rules.map(rule => ({ ...rule, groupId: String(groups.findIndex(g => g.id === rule.groupId)) })) })) };
+        const result = configured && !editable
           ? await api.select.mutateAsync({ expectedRevision: server!.revision, finals })
-          : await api.setup.mutateAsync({ expectedRevision: server!.revision, groups: groups.map(({ id: _id, ...g }) => ({ ...g, registrationIds: g.registrationIds?.some(Boolean) ? g.registrationIds : undefined })), finals: finals.map(f => ({ ...f, rules: f.rules.map(rule => ({ ...rule, groupId: String(groups.findIndex(g => g.id === rule.groupId)) })) })) });
+          : configured ? await api.updatePreliminary.mutateAsync(setupInput) : await api.setup.mutateAsync(setupInput);
         hydrate(result); setDirty(false); await preview(); return;
       }
       if (step === 2) {
@@ -87,23 +107,39 @@ export function MultiFinalsWizard({ tournamentId, open, onClose, onApplied, mode
         <ol aria-label="설정 단계" className="mt-3 flex flex-wrap gap-3 tm-text-caption">{steps.map(({ value, label }, i) => <li key={label} aria-current={step === value ? 'step' : undefined} className={step === value ? 'font-bold text-[var(--text-strong)]' : 'text-[var(--text-muted)]'}>{i + 1}. {label}</li>)}</ol>
       </div>
       <div ref={contentRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
-        {!server ? api.view.isError ? <div role="alert"><p>설정을 불러오지 못했어요.</p><Button variant="neutral" onClick={() => void api.view.refetch()}>다시 시도</Button></div> : <p role="status">설정을 불러오고 있어요.</p> : <>
+        {!server ? api.view.isError ? <div role="alert"><p>설정을 불러오지 못했어요.</p><Button variant="neutral" onClick={() => void api.view.refetch()}>다시 시도</Button></div> : <p role="status">설정을 불러오고 있어요.</p> : <fieldset disabled={busy} className="min-w-0 space-y-4">
           {error ? <AlertBanner tone="error" message={error} /> : null}
+          {notice && <p role="status" className="tm-text-label">{notice}</p>}
           {finals.some(final => final.registrationIds?.some(id => !registrations.some(reg => reg.id === id))) ? <div className="space-y-2">
             <AlertBanner tone="warning" message="선택한 팀 중 확정 참가 명단에서 빠진 팀이 있어요. 해당 팀을 제외한 뒤 새 진출팀을 선택해 주세요." />
             <Button variant="neutral" onClick={() => { setFinals(rows => rows.map(final => ({ ...final, registrationIds: final.registrationIds == null ? final.registrationIds : final.registrationIds.filter(id => registrations.some(reg => reg.id === id)) }))); setDirty(true); }}>확정 명단에 없는 팀 제외</Button>
           </div> : null}
           {step === 0 ? <>
-            <SectionTitle title="예선 조 편성" /><p className="tm-text-label text-[var(--text-muted)]">팀 수의 고정 상한은 없어요. 예선 대진 생성 후에는 대진 화면에서 빈 자리에 팀을 배정할 수 있어요.</p>
-            {configured ? <><p className="tm-text-label">저장된 예선 편성이에요. 다음 단계에서 토너먼트 규칙을 확인할 수 있어요.</p>{groups.map(g => <p key={g.id} className="tm-text-label">{g.name} · {g.capacity}팀 · {g.legs}회전</p>)}</> : <>
+            <SectionTitle title="예선 조 편성" /><p className="tm-text-label text-[var(--text-muted)]">예선은 조별리그로 진행해요. 확정 참가팀을 직접 선택하거나 자동 배정할 수 있고, 빈 자리는 생성 후에도 채울 수 있어요.</p>
+            {configured && <Button variant="outline" disabled={busy || server.preliminaryFixtureCount === 0 && !server.generated} onClick={() => void resetBracket()}>대진 초기화</Button>}
+            {!editable ? <><p className="tm-text-label">기존 대진이 있어 예선 편성을 수정할 수 없어요. 수정하려면 별도의 대진 초기화를 먼저 실행해 주세요.</p>{groups.map(g => <p key={g.id} className="tm-text-label">{g.name} · {g.capacity}팀 · {g.legs}회전</p>)}</> : <>
+            {configured && <p role="status" className="tm-text-label">대진이 없어 저장된 예선 편성을 수정할 수 있어요. 저장하면 예선 대진을 다시 만들어요.</p>}
+            <p className="tm-text-caption">확정 참가 {registrations.length}팀 · 예선 정원 {groups.reduce((sum, g) => sum + (Number.isSafeInteger(g.capacity) ? g.capacity : 0), 0)}팀 · 선택 {groups.reduce((sum, g) => sum + (g.registrationIds?.filter(Boolean).length ?? 0), 0)}팀 · 미배정 {registrations.filter(reg => !groups.some(g => g.registrationIds?.includes(reg.id))).length}팀</p>
+            <Button variant="neutral" disabled={busy || !registrations.length || groups.some(g => !Number.isSafeInteger(g.capacity) || g.capacity < 2)} onClick={() => {
+              if (groups.some(g => g.registrationIds?.some(Boolean))) { void confirm({ title: '예선 팀 자동 배정', message: '현재 팀 선택을 지우고 확정 참가팀을 무작위로 다시 배정할까요?', confirmLabel: '자동 배정' }).then(ok => { if (ok) autoAssign(); }); }
+              else autoAssign();
+            }}>참가팀 자동 배정</Button>
+            {!registrations.length && <p className="tm-text-caption">확정된 참가팀이 없어요. 참가 신청을 확정하거나 빈 대진을 먼저 만들어 주세요.</p>}
             {groups.map((g, index) => <fieldset key={g.id} className="space-y-3 border-b border-[var(--border)] pb-4"><legend className="tm-text-body font-semibold">{g.name || `${index + 1}번째 조`}</legend>
               <div className="grid gap-3 sm:grid-cols-3"><label className="tm-text-label">조 이름<input aria-label={`${index + 1}번째 조 이름`} className={control} maxLength={80} value={g.name} onChange={e => { setGroups(rows => rows.map((row, i) => i === index ? { ...row, name: e.target.value } : row)); setDirty(true); }} /></label>
               <label className="tm-text-label">팀 수<input aria-label={`${index + 1}번째 조 팀 수`} className={control} type="number" min={2} value={g.capacity} onChange={e => { setGroups(rows => rows.map((row, i) => i === index ? { ...row, capacity: Number(e.target.value), registrationIds: undefined } : row)); setFinals(rows => rows.map(f => ({ ...f, rules: f.rules.filter(rule => rule.groupId !== g.id || rule.rank <= Number(e.target.value)) }))); setDirty(true); }} /></label>
               <label className="tm-text-label">회전 수<select className={control} value={g.legs} onChange={e => { setGroups(rows => rows.map((row, i) => i === index ? { ...row, legs: Number(e.target.value) as 1 | 2 } : row)); setDirty(true); }}><option value={1}>1회전</option><option value={2}>2회전</option></select></label></div>
               <p className="tm-text-caption">예상 {Number.isSafeInteger(g.capacity) && g.capacity >= 2 ? g.capacity * (g.capacity - 1) / 2 * g.legs : 0}경기</p>
+              <div className="grid gap-3 sm:grid-cols-2">{Array.from({ length: Number.isSafeInteger(g.capacity) && g.capacity >= 2 ? g.capacity : 0 }, (_, position) => <label key={position} className="tm-text-label">{g.name} {position + 1}번 팀
+                <select aria-label={`${g.name} ${position + 1}번 팀`} className={control} value={g.registrationIds?.[position] ?? ''} onChange={e => {
+                  const value = e.target.value;
+                  setGroups(rows => rows.map((row, i) => i !== index ? row : { ...row, registrationIds: Array.from({ length: row.capacity }, (_, j) => j === position ? value : row.registrationIds?.[j] ?? '') })); setDirty(true);
+                }}><option value="">팀 미정</option>{g.registrationIds?.[position] && !registrations.some(reg => reg.id === g.registrationIds![position]) && <option value={g.registrationIds[position]}>확정 명단에서 제외된 팀 · 다시 선택해 주세요</option>}
+                  {registrations.map(reg => <option key={reg.id} value={reg.id} disabled={groups.some((row, i) => row.registrationIds?.some((id, j) => id === reg.id && (i !== index || j !== position)))}>{reg.team.name}</option>)}
+                </select></label>)}</div>
               <Button variant="neutral" onClick={() => { setGroups(rows => rows.filter((_, i) => i !== index)); setFinals(rows => rows.map(f => ({ ...f, rules: f.rules.filter(rule => rule.groupId !== g.id) }))); setDirty(true); }}>조 삭제</Button>
             </fieldset>)}
-            <Button variant="neutral" onClick={() => { setGroups(rows => [...rows, { id: String(Math.max(-1, ...rows.map(g => Number(g.id))) + 1), name: `${rows.length + 1}조`, capacity: 4, legs: 1 }]); setDirty(true); }}>예선 조 추가</Button>
+            <Button variant="neutral" onClick={() => { setGroups(rows => [...rows, { id: randomUuid(), name: `${rows.length + 1}조`, capacity: 4, legs: 1 }]); setDirty(true); }}>예선 조 추가</Button>
             </>}
           </> : null}
           {step === 1 ? <>
@@ -164,7 +200,7 @@ export function MultiFinalsWizard({ tournamentId, open, onClose, onApplied, mode
             </section>)}
             <p className="tm-text-label">{assigning ? '확인하면 기존 결선 대진에 선택한 팀을 배정해요. 경기 일정과 예선 결과는 유지돼요.' : '진출팀을 고르지 않아도 대진을 생성할 수 있어요. 예선 종료 후 진출팀 배정 화면에서 팀을 채워 주세요.'}</p>
           </> : null}
-        </>}
+        </fieldset>}
       </div>
       <div className="flex shrink-0 justify-end gap-2 border-t border-[var(--border)] p-4">
         <Button variant="neutral" disabled={busy} onClick={() => void close()}>닫기</Button>

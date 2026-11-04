@@ -32,7 +32,7 @@ export function planPreliminaryGroups(groups: readonly PreliminaryGroupDto[]): B
   groups.forEach((group, index) => {
     if (!group.name.trim() || names.has(group.name.trim()) || !Number.isSafeInteger(group.capacity) || group.capacity < 2 || ![1, 2].includes(group.legs)) invalidMultiFinal('조 이름·팀 수·회전 수를 확인해 주세요.');
     names.add(group.name.trim());
-    if (group.registrationIds && group.registrationIds.length !== group.capacity) invalidMultiFinal('예선 자리 수에 맞게 참가팀을 선택해 주세요.');
+    if (group.registrationIds && group.registrationIds.length > group.capacity) invalidMultiFinal('예선 자리 수보다 많은 참가팀을 배정할 수 없어요.');
     for (const id of group.registrationIds ?? []) { if (teams.has(id)) invalidMultiFinal('예선 참가팀을 중복 배정할 수 없어요.'); teams.add(id); }
     const key = String(index);
     plan.groups.push({ key, name: group.name.trim(), phase: 'group', sortOrder: index, advanceCount: null });

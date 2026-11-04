@@ -16,7 +16,7 @@ describe('N개 결선 미리보기 경기 번호', () => {
       v1TournamentGroupTeam: { findMany: jest.fn().mockResolvedValue([]) },
       v1TournamentStanding: { findMany: jest.fn().mockResolvedValue([]) },
       v1TournamentGroup: { count: jest.fn().mockResolvedValue(0) },
-      v1TournamentMatchDetails: { findMany: jest.fn().mockResolvedValue([]), aggregate: jest.fn().mockResolvedValue({ _max: { fixtureNumber: 6 } }) },
+      v1TournamentMatchDetails: { count: jest.fn().mockResolvedValue(0), findMany: jest.fn().mockResolvedValue([]), aggregate: jest.fn().mockResolvedValue({ _max: { fixtureNumber: 6 } }) },
     };
     const prisma = { $transaction: jest.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)) };
     const admins = { getMutationAdmin: jest.fn().mockResolvedValue({ id: 'admin' }) };
@@ -40,7 +40,7 @@ describe('N개 결선 미리보기 경기 번호', () => {
       v1TournamentGroupTeam: { findMany: jest.fn().mockResolvedValue([]) },
       v1TournamentStanding: { findMany: jest.fn().mockResolvedValue([]) },
       v1TournamentGroup: { count: jest.fn().mockResolvedValue(0) },
-      v1TournamentMatchDetails: { findMany: jest.fn().mockResolvedValue([]), aggregate: jest.fn().mockResolvedValue({ _max: { fixtureNumber: maximum } }) },
+      v1TournamentMatchDetails: { count: jest.fn().mockResolvedValue(0), findMany: jest.fn().mockResolvedValue([]), aggregate: jest.fn().mockResolvedValue({ _max: { fixtureNumber: maximum } }) },
     };
     const prisma = { $transaction: jest.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)) };
     const admins = { getMutationAdmin: jest.fn().mockResolvedValue({ id: 'admin' }) };

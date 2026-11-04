@@ -14,7 +14,7 @@ import { deleteTournamentGroupInTx, softDeleteTournamentFixtureInTx } from '../t
 import { orderFixturesForTeardown } from '../templates/bracket-teardown-order';
 import { TOURNAMENT_VENUE_SELECT } from '../../places/tournament-venue';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from '../tournament-surface-lookup';
-import { MultiFinalGenerateDto, MultiFinalSelectionDto, MultiFinalSetupDto, NamedFinalDto } from './multi-finals.dto';
+import { MultiFinalGenerateDto, MultiFinalResetDto, MultiFinalSelectionDto, MultiFinalSetupDto, NamedFinalDto } from './multi-finals.dto';
 import { invalidMultiFinal, planNamedFinals, planPreliminaryGroups, sameNamedFinalStructure, validateNamedFinals } from './multi-finals-plan';
 
 type Tx = Prisma.TransactionClient;
@@ -48,11 +48,11 @@ export class MultiFinalsService {
   private assertTeams(finals: readonly NamedFinalDto[], confirmed: ReadonlySet<string>) {
     for (const f of finals) for (const id of f.registrationIds ?? []) if (!confirmed.has(id)) invalidMultiFinal('이 대회의 확정 참가팀만 선택할 수 있어요.');
   }
-  private async assertUnstarted(tx: Tx, id: string) {
-    const fixtures = await tx.v1TournamentMatchDetails.findMany({ where: { tournamentId: id, group: { phase: { not: 'group' } }, teamMatch: { deletedAt: null } }, orderBy: { teamMatchId: 'asc' },
+  private async assertUnstarted(tx: Tx, id: string, all = false) {
+    const fixtures = await tx.v1TournamentMatchDetails.findMany({ where: { tournamentId: id, ...(!all ? { group: { phase: { not: 'group' as const } } } : {}), teamMatch: { deletedAt: null } }, orderBy: { teamMatchId: 'asc' },
       select: { teamMatchId: true, updatedAt: true, teamMatch: { select: { updatedAt: true, status: true, game: { select: { version: true, state: true, currentOfficialRevisionId: true, _count: { select: { events: true } } } } } } } });
     if (fixtures.some(f => f.teamMatch.status !== 'matched' || !f.teamMatch.game || f.teamMatch.game.state !== 'SCHEDULED' || f.teamMatch.game.currentOfficialRevisionId || f.teamMatch.game._count.events > 0)) {
-      throw new ConflictException({ code: 'BRACKET_LOCKED', message: '시작했거나 기록이 있는 결선은 명단과 대진을 변경할 수 없어요.' });
+      throw new ConflictException({ code: 'BRACKET_LOCKED', message: all ? '시작했거나 기록·결과가 있는 경기가 있어 대진을 초기화할 수 없어요.' : '시작했거나 기록이 있는 결선은 명단과 대진을 변경할 수 없어요.' });
     }
     return fixtures;
   }
@@ -72,7 +72,9 @@ export class MultiFinalsService {
   private async view(tx: Tx, id: string) {
     const tournament = await this.tournament(tx, id); const config = this.config(tournament.multiFinals);
     const registrations = await this.confirmed(tx, id);
-    if (!config) return { revision: tournament.multiFinalsRevision, groups: [], finals: [], registrations, generated: false, groupStandings: [] };
+    if (!config) return { revision: tournament.multiFinalsRevision, groups: [], finals: [], registrations, generated: false, preliminaryFixtureCount: 0, groupStandings: [] };
+    const preliminaryFixtureCount = await tx.v1TournamentMatchDetails.count({ where: { tournamentId: id, group: { phase: 'group' }, teamMatch: { deletedAt: null } } });
+    const assignments = await tx.v1TournamentGroupTeam.findMany({ where: { groupId: { in: config.groups.map(g => g.id) } }, select: { groupId: true, registrationId: true }, orderBy: { sortOrder: 'asc' } });
     const sources = await loadGroupRankSources(tx, id, config.groups.map(g => g.id));
     const standingRows = await tx.v1TournamentStanding.findMany({
       where: { groupId: { in: config.groups.map(g => g.id) } },
@@ -102,13 +104,13 @@ export class MultiFinalsService {
       return { ...final, suggestedRegistrationIds: candidates, unresolved, manual: final.registrationIds !== null && final.registrationIds !== undefined };
     });
     const generated = await tx.v1TournamentGroup.count({ where: { tournamentId: id, phase: { not: 'group' } } }) > 0;
-    return { revision: tournament.multiFinalsRevision, groups: config.groups, finals, registrations, generated, groupStandings };
+    return { revision: tournament.multiFinalsRevision, groups: config.groups.map(g => ({ ...g, registrationIds: assignments.filter(a => a.groupId === g.id).map(a => a.registrationId) })), finals, registrations, generated, preliminaryFixtureCount, groupStandings };
   }
   async get(user: V1AuthUser, id: string) {
     await this.admins.getActiveAdmin(user.id);
     return this.prisma.$transaction(tx => this.view(tx, id), { ...options, isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
   }
-  async setup(user: V1AuthUser, id: string, dto: MultiFinalSetupDto) {
+  async setup(user: V1AuthUser, id: string, dto: MultiFinalSetupDto, editing = false) {
     const admin = await this.admins.getMutationAdmin(user.id);
     const plan = planPreliminaryGroups(dto.groups);
     validateNamedFinals(dto.finals, new Map(dto.groups.map((g, i) => [String(i), g.capacity])));
@@ -116,19 +118,59 @@ export class MultiFinalsService {
       const initial = await this.tournament(tx, id); await lockCompetitionForBracketMutationInTx(tx, initial);
       const tournament = await this.tournament(tx, id); this.assertMutable(tournament.status);
       if (tournament.multiFinalsRevision !== dto.expectedRevision) throw stale();
-      if (tournament.multiFinals || await tx.v1TournamentGroup.count({ where: { tournamentId: id } }) || await tx.v1TournamentMatchDetails.count({ where: { tournamentId: id, teamMatch: { deletedAt: null } } })) {
-        throw new ConflictException({ code: 'BRACKET_NOT_EMPTY', message: '예선 대진이 이미 있어요. 기존 예선은 유지하고 결선 설정을 편집해 주세요.' });
+      const existingFixtures = await tx.v1TournamentMatchDetails.count({ where: { tournamentId: id, teamMatch: { deletedAt: null } } });
+      if (existingFixtures || !editing && (tournament.multiFinals || await tx.v1TournamentGroup.count({ where: { tournamentId: id } }))) {
+        throw new ConflictException({ code: 'BRACKET_NOT_EMPTY', message: '기존 대진이 있어 예선 편성을 수정할 수 없어요. 별도의 대진 초기화를 먼저 실행해 주세요.' });
       }
+      if (editing && !tournament.multiFinals) throw stale();
       if (!tournament.competitionConfigVersionId) throw new ConflictException({ code: 'COMPETITION_CONFIG_REQUIRED', message: '대회 경기 규칙을 먼저 저장해 주세요.' });
       const confirmed = new Set((await this.confirmed(tx, id)).map(r => r.id)); this.assertTeams(dto.finals, confirmed);
       for (const group of dto.groups) for (const reg of group.registrationIds ?? []) if (!confirmed.has(reg)) invalidMultiFinal('이 대회의 확정 참가팀만 선택할 수 있어요.');
+      if (editing) {
+        const scopes = dto.finals.map(f => f.name.trim());
+        if (await tx.v1TournamentAward.count({ where: { tournamentId: id, bracketTrack: { notIn: ['overall', ...scopes] } } })
+          || await tx.v1TournamentAwardSet.count({ where: { tournamentId: id, bracketTrack: { notIn: scopes } } })) {
+          throw new ConflictException({ code: 'BRACKET_TRACK_AWARDS_REQUIRE_RESCOPING', message: '삭제·이름 변경할 토너먼트의 시상 범위를 먼저 정리해 주세요.' });
+        }
+        await tx.v1TournamentSlot.deleteMany({ where: { tournamentId: id } });
+        await tx.v1TournamentStanding.deleteMany({ where: { group: { tournamentId: id } } });
+        await tx.v1TournamentGroupTeam.deleteMany({ where: { group: { tournamentId: id } } });
+        await tx.v1TournamentByeSlot.deleteMany({ where: { group: { tournamentId: id } } });
+        const oldGroups = await tx.v1TournamentGroup.findMany({ where: { tournamentId: id }, select: { id: true } });
+        for (const group of oldGroups) await deleteTournamentGroupInTx(tx, admin, group.id);
+      }
       const materialized = await this.templates.materialize(tx, admin, { ...tournament, competitionConfigVersionId: tournament.competitionConfigVersionId! }, plan);
       const assignments = dto.groups.flatMap((g, i) => (g.registrationIds ?? []).map((registrationId, j) => ({ slotId: materialized.slotIds.get(`${i}:${j}`)!, registrationId })));
       if (assignments.length) await assignSlotsBatchInTx(tx, { admin, adminContext: this.admins, games: this.games }, assignments);
       const config: Config = { groups: dto.groups.map((g, i) => ({ id: materialized.groupIds.get(String(i))!, name: g.name.trim(), capacity: g.capacity, legs: g.legs })),
         finals: dto.finals.map(f => ({ ...f, name: f.name.trim(), rules: f.rules.map(rule => ({ ...rule, groupId: materialized.groupIds.get(rule.groupId)! })) })) };
       await tx.v1Tournament.update({ where: { id }, data: { multiFinals: JSON.parse(JSON.stringify(config)), multiFinalsRevision: { increment: 1 } } });
-      await this.admins.logAdminAction(admin, { action: 'tournament.multi_finals.setup', targetType: 'tournament', targetId: id, afterJson: JSON.parse(JSON.stringify(config)) }, tx);
+      await this.admins.logAdminAction(admin, { action: editing ? 'tournament.multi_finals.preliminary.update' : 'tournament.multi_finals.setup', targetType: 'tournament', targetId: id, beforeJson: tournament.multiFinals ?? undefined, afterJson: JSON.parse(JSON.stringify(config)) }, tx);
+      return this.view(tx, id);
+    }, options);
+  }
+  async reset(user: V1AuthUser, id: string, dto: MultiFinalResetDto) {
+    const admin = await this.admins.getMutationAdmin(user.id);
+    return this.prisma.$transaction(async tx => {
+      const initial = await this.tournament(tx, id); await lockCompetitionForBracketMutationInTx(tx, initial);
+      const tournament = await this.tournament(tx, id); this.assertMutable(tournament.status);
+      const config = this.config(tournament.multiFinals);
+      if (!config || tournament.multiFinalsRevision !== dto.expectedRevision) throw stale();
+      // Serialize with score/event writers before checking whether any game has started.
+      await tx.$queryRaw`SELECT g.id FROM v1_games g JOIN v1_tournament_match_details d ON d.team_match_id = g.team_match_id JOIN v1_team_matches m ON m.id = d.team_match_id WHERE d.tournament_id = ${id} AND m.deleted_at IS NULL ORDER BY g.id FOR UPDATE OF g`;
+      const fixtures = await this.assertUnstarted(tx, id, true);
+      const edges = await tx.v1TournamentMatchAdvancementEdge.findMany({ where: { tournamentId: id }, select: { sourceTeamMatchId: true, targetTeamMatchId: true } });
+      for (const fixtureId of orderFixturesForTeardown(fixtures.map(f => f.teamMatchId), edges)) await softDeleteTournamentFixtureInTx(tx, admin, fixtureId);
+      await tx.v1TournamentSlot.deleteMany({ where: { tournamentId: id } });
+      await tx.v1TournamentStanding.deleteMany({ where: { group: { tournamentId: id } } });
+      await tx.v1TournamentByeSlot.deleteMany({ where: { group: { tournamentId: id } } });
+      const finalGroups = await tx.v1TournamentGroup.findMany({ where: { tournamentId: id, phase: { not: 'group' } }, select: { id: true } });
+      await tx.v1TournamentGroupTeam.deleteMany({ where: { groupId: { in: finalGroups.map(g => g.id) } } });
+      for (const group of finalGroups) await deleteTournamentGroupInTx(tx, admin, group.id);
+      const next: Config = { ...config, finals: config.finals.map(f => ({ ...f, registrationIds: null })) };
+      await tx.v1Tournament.update({ where: { id }, data: { multiFinals: JSON.parse(JSON.stringify(next)), multiFinalsRevision: { increment: 1 } } });
+      await this.admins.logAdminAction(admin, { action: 'tournament.multi_finals.reset', targetType: 'tournament', targetId: id,
+        beforeJson: JSON.parse(JSON.stringify(config)), afterJson: { deletedFixtureCount: fixtures.length, config: JSON.parse(JSON.stringify(next)) } }, tx);
       return this.view(tx, id);
     }, options);
   }

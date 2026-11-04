@@ -158,7 +158,7 @@ export function buildLeagueBoard({ fixtures, slots, teamNameById }: BuildInput):
 
 /** 취소·무효가 아닌 경기 — 쉬는 팀·중복·안 붙은 대진은 실제로 치를 경기로만 센다. */
 function isLive(node: LeagueBoardNode): boolean {
-  return node.state !== 'cancelled';
+  return node.state !== 'cancelled' && node.state !== 'voided';
 }
 
 const byKoreanName = (left: string, right: string) => left.localeCompare(right, 'ko');

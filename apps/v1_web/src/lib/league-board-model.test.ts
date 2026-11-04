@@ -86,6 +86,21 @@ describe('buildLeagueBoard', () => {
     expect(summary.unplayedPairCount).toBe(0);
   });
 
+  it('PR 통합 회귀: 무효 경기는 주차 경기 수·중복·미편성 대진 집계에서 제외한다', () => {
+    const names = new Map([...NAMES, ['t3', '사자FC']]);
+    const { columns, summary } = buildLeagueBoard({
+      fixtures: [
+        fixture({ teamMatchId: 'live', homeTeamId: 't1', awayTeamId: 't2' }),
+        fixture({ teamMatchId: 'void', homeTeamId: 't1', awayTeamId: 't3', resultStage: 'voided' }),
+      ],
+      slots: [],
+      teamNameById: names,
+    });
+    expect(columns[0].nodes).toHaveLength(2);
+    expect(columns[0].summary).toEqual({ gameCount: 1, restingTeamNames: ['사자FC'], doubleBookedTeamNames: [] });
+    expect(summary.unplayedPairCount).toBe(2);
+  });
+
   it('사이드 라벨: 팀이 있으면 이름, 자리만 있으면 자리 라벨, 자리도 없는 원정은 부전승', () => {
     const { columns } = buildLeagueBoard({
       fixtures: [

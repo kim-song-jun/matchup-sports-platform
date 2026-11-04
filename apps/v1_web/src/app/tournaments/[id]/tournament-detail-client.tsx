@@ -416,24 +416,25 @@ export function showsNextLeagueInvite(
 }
 
 /** 지난 시즌 확정 팀의 현재 팀장·매니저에게만 재참가 신청을 안내한다. */
-function useReturningTeamId(myRegistration: V1TournamentRegistration | null): string | null {
-  const teamId = myRegistration?.status === 'confirmed' ? myRegistration.teamId : null;
-  const { data, isError } = useV1MyTeams(undefined, { enabled: teamId !== null });
+function useReturningTeamId(registrations: readonly V1TournamentRegistration[]): string | null {
+  const hasConfirmedRegistration = registrations.some((registration) => registration.status === 'confirmed');
+  const { data, isError } = useV1MyTeams(undefined, { enabled: hasConfirmedRegistration });
   const teams = data && ('items' in data ? data.items : data);
-  if (!teamId || isError) return null;
-  return teams?.some((team) => team.teamId === teamId && (team.role === 'owner' || team.role === 'manager'))
-    ? teamId
-    : null;
+  if (!hasConfirmedRegistration || isError || !teams) return null;
+  const managedTeamIds = new Set(teams.filter((team) => team.role === 'owner' || team.role === 'manager').map((team) => team.teamId));
+  return registrations.find((registration) => registration.status === 'confirmed' && managedTeamIds.has(registration.teamId))?.teamId ?? null;
 }
 
 export function ApplyCTA({
   tournament,
   myRegistration,
+  myRegistrations = myRegistration === null ? [] : [myRegistration],
 }: {
   tournament: V1TournamentDetail;
   myRegistration: V1TournamentRegistration | null;
+  myRegistrations?: readonly V1TournamentRegistration[];
 }) {
-  const returningTeamId = useReturningTeamId(myRegistration);
+  const returningTeamId = useReturningTeamId(myRegistrations);
   const hasActiveRegistration = myRegistration !== null && myRegistration.status !== 'cancelled';
   const blockReason = resolveTournamentRegistrationBlock(tournament);
   if (showsNextLeagueInvite(tournament, hasActiveRegistration, blockReason)) {
@@ -610,7 +611,7 @@ export function TournamentDetailPageClient({
           // 셸이 이 슬롯을 페이지 트리 밖에 그리므로 체인 출처를 따로 감싼다.
           floatingSlot: (
             <DetailChainFromContext.Provider value={chainFrom}>
-              <ApplyCTA tournament={displayData} myRegistration={myRegistration} />
+              <ApplyCTA tournament={displayData} myRegistration={myRegistration} myRegistrations={myRegistrations} />
             </DetailChainFromContext.Provider>
           ),
         }
@@ -654,6 +655,7 @@ export function TournamentDetailPageClient({
       <TournamentDetailView
         tournament={displayData}
         myRegistration={myRegistration}
+        myRegistrations={myRegistrations}
         backHref="/tournaments"
         entrySection={
           <CompetitionEntrySection competitionId={tournamentId} competition={displayData} headingLevel={2} style={{ marginBottom: 16 }} />
@@ -671,17 +673,19 @@ export function TournamentDetailPageClient({
 export function TournamentDetailView({
   tournament,
   myRegistration,
+  myRegistrations = myRegistration === null ? [] : [myRegistration],
   backHref = '/tournaments',
   entrySection = null,
 }: {
   tournament: V1TournamentDetail;
   myRegistration: V1TournamentRegistration | null;
+  myRegistrations?: readonly V1TournamentRegistration[];
   backHref?: string;
   /** 모바일은 제목 아래, 데스크톱 참가팀은 우측에 표시하는 카드. */
   entrySection?: ReactNode;
 }) {
   const isDesktop = useMediaQuery('(min-width: 1024px)');
-  const returningTeamId = useReturningTeamId(myRegistration);
+  const returningTeamId = useReturningTeamId(myRegistrations);
   const childHref = useChildHref();
   const participantFrom = useContext(DetailChainFromContext) ?? `/tournaments/${tournament.id}`;
   const sportAccent = getSportAccent(tournament.sport.code);

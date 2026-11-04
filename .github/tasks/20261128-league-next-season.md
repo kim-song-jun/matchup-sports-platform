@@ -100,3 +100,35 @@ Status: In Progress
 - 웹 `tsc --noEmit --incremental false`와 `scripts/v1-pattern-check.mjs` 통과. 첫 타입 검사는 설치된 validator·타입 패키지의 누락 링크만 3건 보고했으며, 격리 clone에서 lockfile 버전(validator 13.15.26 / @types/validator 13.15.10) 링크를 복구한 뒤 성공했다.
 - `git diff --check`, staged diff 검사, 충돌 marker 검사, touched-path debt grep 통과. 테스트·타입 검사 이후 소스 코드는 추가 수정하지 않았다.
 - 범위 제한: API/DB 통합 테스트·alpha 브라우저 실측·원격 PR 갱신·dev/main 머지는 수행하지 않았다. 이번 결과는 충돌 해결과 로컬 웹 검증 완료이며, 기존 P2 3건과 배포 후 QA를 완료한 것으로 보지 않는다.
+
+## P2 수정 및 통합 PR — 2026-11-04
+
+Status: Review
+
+### Context / Goal
+사용자 요청: "수정 진행해서 pr 올려줘". 위 충돌 해결 브랜치에서 리뷰 P2 3건을 수정하고 dev 대상 통합 PR을 올린다. 기존 5개 PR의 기능은 보존한다.
+
+### Owned / Forbidden / Sequence
+- Owned: `league-board-model.ts`와 테스트, `tournament-detail-client.tsx`와 상세 테스트, `next-season/league-next-season-create.tsx`와 테스트, 웹 patch changeset, 이 task.
+- Forbidden: API/DB 스키마·마이그레이션의 추가 변경, 원본 PR 브랜치 수정·종료, dev/main 직접 push·머지, 원래 공유 작업트리의 WIP.
+- 단일 에이전트 순차 실행: 회귀 테스트 RED → 3건 수정 → 관련 테스트 GREEN → 웹 타입·패턴 검사 → 커밋·브랜치 push·dev 대상 PR 생성.
+
+### Original Conditions / User Scenarios / Acceptance Criteria
+- [x] 무효 경기 카드는 보존하되 주차 경기 수·쉬는 팀·두 경기 팀·미편성 대진 집계에서 제외한다.
+- [x] 최근 신청이 일반 멤버인 다른 팀이거나 미확정이어도, 전체 신청 중 현재 운영 권한이 있는 확정 팀의 다음 시즌 신청으로 연결한다. 모바일·데스크톱에 같은 판정을 쓴다.
+- [x] 경기 시간 조회 실패(캐시 유무 모두)를 표시하고 재시도한다. 실패한 값을 종목 기본값으로 숨겨 개설하지 않는다.
+- [x] 테스트와 타입·패턴 검사, committed-tree 검증 결과를 기록한다.
+- [ ] 통합 브랜치를 push하고 base=dev PR을 생성·확인한다.
+
+### Security / QA / Risks
+- 재참가 대상은 confirmed 신청과 현재 owner·manager 권한의 교집합으로 고른다. API 권한은 변경하지 않는다.
+- 기존 ErrorState·재시도 패턴을 재사용한다. 새 디자인/정보구조를 도입하지 않는다.
+- 새 통합 코드가 alpha에 없고 이 실행에 브라우저 도구도 없어 alpha의 수정 후 화면·console/network 증거는 수집할 수 없다. 로컬 Next 서버로 대체하지 않는다. PR에는 이 미검증 상태를 명시한다.
+- 원본 5개 PR은 모두 OPEN이며 head는 위 기준과 동일함을 재확인했다. 기존 PR의 자동 종료 키워드는 PR 본문에 사용하지 않는다.
+
+### Validation / Progress Snapshot
+- RED: 신규 재현 테스트 6개 전부 실패(무효 집계 1, 최신 신청이 다른 팀인 경우 3, 경기 시간 조회 실패의 캐시 유무 2).
+- GREEN: 관련 4파일 131개 전부 통과. 보드 모델 11, 상세 CTA 68, 실제 상세 페이지 42, 다음 시즌 개설 10. 기존 React act 경고는 남아 있다.
+- 실제 페이지 테스트는 전체 신청 목록이 셸 CTA에 전달되어 `/tournaments/next-league/apply?team=team-a`로 연결되는지 확인한다. 운영 중인 팀이 미확정이면 선택하지 않는 대조군도 추가했다.
+- 웹 `tsc --noEmit --incremental false` + `scripts/v1-pattern-check.mjs` 통과. touched-path debt marker와 `git diff --check` 확인. 패키지·lockfile 변경 없음.
+- 새 화면 설계나 API/DB 변경은 없다. alpha의 수정 후 시각 증거와 통합 트리의 API/DB 테스트는 미완료이므로 Draft PR로 제출한다.

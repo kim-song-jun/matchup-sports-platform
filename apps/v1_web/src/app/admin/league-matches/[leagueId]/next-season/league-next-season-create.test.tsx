@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { V1AdminLeagueDetail } from '@/types/league-match';
 import type { LeagueSettings } from '@/types/league-settings';
@@ -6,16 +6,20 @@ import { LeagueNextSeasonCreate, nextSeasonPrefill } from './league-next-season-
 
 const canWrite = vi.hoisted(() => ({ value: true }));
 const league = vi.hoisted(() => ({ value: {} as Record<string, unknown> }));
+const periodQuery = vi.hoisted(() => ({ value: {} as Record<string, unknown>, refetch: vi.fn() }));
 vi.mock('@/hooks/use-admin-can-write', () => ({ useAdminCanWrite: () => canWrite.value }));
 vi.mock('@/hooks/use-v1-api', () => ({ useV1AdminLeagueMatch: () => league.value }));
 vi.mock('@/hooks/use-league-settings', () => ({
   useLeagueSettings: () => ({ data: { regionId: 'region-1', genderCategory: 'mixed' }, isPending: false, refetch: vi.fn() }),
 }));
 vi.mock('@/hooks/use-tournament-period-settings', () => ({
-  useTournamentPeriodSettings: () => ({ data: { periods: [{ durationMinutes: 25 }, { durationMinutes: 25 }] }, isPending: false }),
+  useTournamentPeriodSettings: () => ({ ...periodQuery.value, refetch: periodQuery.refetch }),
 }));
 vi.mock('../../league-create-wizard', () => ({
-  LeagueCreateWizard: ({ prefill }: { prefill: { title: string } }) => <p>{`개설 화면 · ${prefill.title}`}</p>,
+  LeagueCreateWizard: ({ prefill }: { prefill: { title: string; periodMinutes: string[] | null } }) => <>
+    <p>{`개설 화면 · ${prefill.title}`}</p>
+    <p>{`경기 시간 · ${prefill.periodMinutes?.join(',') ?? '종목 기본값'}`}</p>
+  </>,
 }));
 
 const base = {
@@ -56,6 +60,8 @@ describe('LeagueNextSeasonCreate', () => {
   beforeEach(() => {
     canWrite.value = true;
     league.value = loaded();
+    periodQuery.refetch.mockReset();
+    periodQuery.value = { data: { periods: [{ durationMinutes: 25 }, { durationMinutes: 25 }] }, isPending: false, isError: false };
   });
 
   it('이을 수 있으면 지난 시즌 설정을 채운 개설 화면을 연다', () => {
@@ -86,5 +92,19 @@ describe('LeagueNextSeasonCreate', () => {
     canWrite.value = false;
     render(<LeagueNextSeasonCreate leagueId="league-1" />);
     expect(screen.getByText('조회 권한으로는 다음 시즌을 만들 수 없어요.')).toBeInTheDocument();
+  });
+
+  it.each([false, true])('PR 통합 회귀: 경기 시간 조회가 실패하면 기본값으로 숨기지 않고 재시도한다 (캐시 %s)', (cached) => {
+    const success = periodQuery.value;
+    periodQuery.value = { ...success, data: cached ? success.data : undefined, isError: true, error: new Error('경기 시간 조회 실패') };
+    const { rerender } = render(<LeagueNextSeasonCreate leagueId="league-1" />);
+    expect(screen.getByText('경기 시간 조회 실패')).toBeInTheDocument();
+    expect(screen.queryByText(/개설 화면/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /다시 시도/ }));
+    expect(periodQuery.refetch).toHaveBeenCalledOnce();
+    periodQuery.value = success;
+    rerender(<LeagueNextSeasonCreate leagueId="league-1" />);
+    expect(screen.getByText('개설 화면 · 가을 리그 다음 시즌')).toBeInTheDocument();
+    expect(screen.getByText('경기 시간 · 25,25')).toBeInTheDocument();
   });
 });

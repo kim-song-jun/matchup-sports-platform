@@ -54,13 +54,14 @@ export function LeagueNextSeasonCreate({ leagueId }: { leagueId: string }) {
   const periods = useTournamentPeriodSettings(leagueId);
 
   if (league.isPending || settings.isPending || periods.isPending) return <AdminPageSkeleton />;
-  if (!league.data || !settings.data) {
+  if (!league.data || !settings.data || periods.isError || !periods.data) {
     return (
       <ErrorState
-        message={extractErrorMessage(league.error ?? settings.error, '지난 시즌 정보를 불러오지 못했어요.')}
+        message={extractErrorMessage(league.error ?? settings.error ?? periods.error, '지난 시즌 정보를 불러오지 못했어요.')}
         onRetry={() => {
           void league.refetch();
           void settings.refetch();
+          void periods.refetch();
         }}
       />
     );
@@ -86,6 +87,5 @@ export function LeagueNextSeasonCreate({ leagueId }: { leagueId: string }) {
     );
   }
   if (blocked !== null) return <AlertBanner tone="info" message={blocked} />;
-  // 경기 시간을 못 읽어도 개설은 막지 않는다 — 종목 기본값으로 시작한다.
-  return <LeagueCreateWizard key={leagueId} prefill={nextSeasonPrefill(data, settings.data, periods.data?.periods)} />;
+  return <LeagueCreateWizard key={leagueId} prefill={nextSeasonPrefill(data, settings.data, periods.data.periods)} />;
 }

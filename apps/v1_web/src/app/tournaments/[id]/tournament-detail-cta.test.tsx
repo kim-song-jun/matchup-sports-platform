@@ -479,6 +479,20 @@ describe('정규 리그 — 다음 시즌 입구', () => {
     expect(screen.getByTestId('next-league-invite-sidebar')).toHaveTextContent('재참가 팀 team-a');
   });
 
+  it.each(['confirmed', 'draft', 'awaiting_payment'] as const)(
+    'PR 통합 회귀: 최근 신청(%s)이 다른 팀이어도 운영 중인 확정 팀의 재참가를 안내한다', (status) => {
+      const latest = { ...registration(status), id: 'reg-b', teamId: 'team-b' };
+      const registrations = [latest, registration('confirmed')];
+      myTeamsMock.mockReturnValue({
+        data: [{ teamId: 'team-b', role: 'member' }, { teamId: 'team-a', role: 'manager' }], isError: false,
+      });
+      render(<ApplyCTA tournament={league('completed')} myRegistration={latest} myRegistrations={registrations} />);
+      render(<TournamentDetailView tournament={league('in_progress')} myRegistration={latest} myRegistrations={registrations} />);
+      expect(screen.getByTestId('next-league-invite-mobile')).toHaveTextContent('재참가 팀 team-a');
+      expect(screen.getByTestId('next-league-invite-sidebar')).toHaveTextContent('재참가 팀 team-a');
+    },
+  );
+
   it.each(['member', 'other-team', 'loading', 'error'])('%s이면 두 화면에서 특정 팀의 재참가를 안내하지 않는다', (state) => {
     const data = state === 'loading' ? undefined
       : [{ teamId: state === 'other-team' ? 'team-b' : 'team-a', role: state === 'member' ? 'member' : 'owner' }];
@@ -491,6 +505,13 @@ describe('정규 리그 — 다음 시즌 입구', () => {
 
   it('확정되지 않은 신청이면 재참가 팀으로 보지 않는다', () => {
     render(<ApplyCTA tournament={league('completed')} myRegistration={registration('awaiting_payment')} />);
+    expect(screen.getByTestId('next-league-invite-mobile')).toHaveTextContent('재참가 팀 없음');
+  });
+
+  it('다른 팀의 확정 신청이 있어도 운영 중인 팀이 미확정이면 재참가 대상으로 고르지 않는다', () => {
+    const latest = { ...registration('confirmed'), teamId: 'team-b' };
+    myTeamsMock.mockReturnValue({ data: [{ teamId: 'team-a', role: 'owner' }, { teamId: 'team-b', role: 'member' }], isError: false });
+    render(<ApplyCTA tournament={league('completed')} myRegistration={latest} myRegistrations={[latest, registration('draft')]} />);
     expect(screen.getByTestId('next-league-invite-mobile')).toHaveTextContent('재참가 팀 없음');
   });
 

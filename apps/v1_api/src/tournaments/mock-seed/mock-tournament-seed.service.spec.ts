@@ -141,6 +141,7 @@ function makeWorld(teamCount = 4) {
     v1Team: { findMany: jest.fn().mockResolvedValue(teams) },
     v1TournamentMatchDetails: { findMany: jest.fn().mockResolvedValue([]), count: jest.fn().mockResolvedValue(12) },
     v1GameSide: { findMany: jest.fn().mockResolvedValue([]) },
+    v1GameLineup: { findMany: jest.fn().mockResolvedValue([{ sideId: 'side-1' }, { sideId: 'side-2' }]) },
     $transaction: jest.fn(async (cb: (t: unknown) => Promise<unknown>) => cb(tx)),
   };
   const adminContext = {
@@ -569,6 +570,18 @@ describe('MockTournamentSeedService', () => {
     }));
     // 결과를 채우지 않으면 예선 순위가 없으니 결선 대진은 만들지 않는다.
     expect(multiFinals.generate).not.toHaveBeenCalled();
+  });
+
+  it('정규리그+N개 토너먼트의 라인업 제출 수는 명단 동기화가 올린 제출본 사이드 수다', async () => {
+    const { service, prisma } = makeWorld(8);
+
+    const result = await service.createTournament(user, { format: 'league_knockouts', teamCount: 8, withLineups: true });
+
+    expect(result.lineupsSubmitted).toBe(2);
+    expect(prisma.v1GameLineup.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ state: 'SUBMITTED', invalidatedAt: null }),
+      distinct: ['sideId'],
+    }));
   });
 
   it('정규리그+N개 토너먼트는 결선 결과를 채우지 않으므로 종료 상태로 만들지 않는다', async () => {

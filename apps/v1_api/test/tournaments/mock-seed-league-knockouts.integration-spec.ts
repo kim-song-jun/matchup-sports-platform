@@ -66,6 +66,8 @@ describe('목업 대회 — 정규리그+N개 토너먼트 (실제 DB)', () => {
     expect(preliminary.every((f) => f.teamMatch.game?.currentOfficialRevisionId)).toBe(true);
     expect(fixtures.filter((f) => f.group?.phase !== 'group' && !f.teamMatch.game?.currentOfficialRevisionId)).toHaveLength(6);
     expect(result.fixtureCount).toBe(18);
+    // 팀이 정해진 사이드(예선 12경기 + 결선 첫 판 4경기)는 명단 동기화로 제출본이 된다.
+    expect(result.lineupsSubmitted).toBe(32);
 
     // 상위 = 각 조 1·2위, 하위 = 3·4위. 앞 순번 팀이 늘 이기므로 조 안 순서가 곧 순위다.
     const registrations = await prisma.v1TournamentRegistration.findMany({ where: { tournamentId: result.tournamentId }, select: { id: true, team: { select: { name: true } } } });

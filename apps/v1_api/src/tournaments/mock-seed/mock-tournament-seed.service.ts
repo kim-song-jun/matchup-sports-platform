@@ -240,7 +240,7 @@ export class MockTournamentSeedService {
     let gamesCreated = 0;
     if (format === 'league_knockouts') {
       ({ fixtureCount, lineupsSubmitted, gamesCreated } = await this.seedLeagueKnockouts(
-        user, created.tournament.id, created.tournament.multiFinalsRevision, created.registrationIds, minPlayers, withLineups, withResults,
+        user, created.tournament.id, created.tournament.multiFinalsRevision, created.registrationIds, withResults,
       ));
     } else {
       lineupsSubmitted = withLineups ? await this.submitLineups(created.tournament.id, minPlayers) : 0;
@@ -372,14 +372,14 @@ export class MockTournamentSeedService {
    * 정규리그+N개 토너먼트 — 운영자가 누르는 것과 같은 경로로 예선 조 편성(4팀 안팎씩)과 상위·하위
    * 토너먼트 규칙을 저장한다. 결과를 채우면 예선을 앞 순번 팀이 늘 이기게 끝내(동률 없이 순위가 정해진다)
    * 결선 대진까지 생성한다. 결선 경기 결과는 채우지 않는다.
+   * 자리 배정 뒤 명단 동기화가 라인업을 명단 그대로 제출본으로 올리므로 `submitLineups` 는 부르지 않는다
+   * (부르면 남은 DRAFT 가 없어 늘 0건이다). 제출된 사이드 수를 그대로 센다.
    */
   private async seedLeagueKnockouts(
     user: V1AuthUser,
     tournamentId: string,
     revision: number,
     registrationIds: readonly string[],
-    minPlayers: number,
-    withLineups: boolean,
     withResults: boolean,
   ) {
     const capacities = mockGroupCapacities(registrationIds.length);
@@ -395,7 +395,6 @@ export class MockTournamentSeedService {
       finals: mockNamedFinals(capacities),
     });
     await this.syncSeatedRosters(tournamentId);
-    let lineupsSubmitted = withLineups ? await this.submitLineups(tournamentId, minPlayers) : 0;
     if (withResults) {
       const preliminaries = await this.prisma.v1TournamentMatchDetails.findMany({
         where: { tournamentId, teamMatch: { deletedAt: null } },
@@ -414,9 +413,13 @@ export class MockTournamentSeedService {
       const preview = await this.multiFinals.preview(user, tournamentId);
       await this.multiFinals.generate(user, tournamentId, { expectedRevision: preview.revision, previewHash: preview.previewHash, requestId: randomUUID() });
       await this.syncSeatedRosters(tournamentId);
-      if (withLineups) lineupsSubmitted += await this.submitLineups(tournamentId, minPlayers);
     }
     const fixtureCount = await this.prisma.v1TournamentMatchDetails.count({ where: { tournamentId, teamMatch: { deletedAt: null } } });
+    const lineupsSubmitted = (await this.prisma.v1GameLineup.findMany({
+      where: { state: 'SUBMITTED', invalidatedAt: null, game: { teamMatch: { tournamentId, deletedAt: null } } },
+      distinct: ['sideId'],
+      select: { sideId: true },
+    })).length;
     return { fixtureCount, lineupsSubmitted, gamesCreated: fixtureCount };
   }
 

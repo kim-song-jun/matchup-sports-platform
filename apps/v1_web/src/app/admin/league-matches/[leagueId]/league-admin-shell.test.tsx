@@ -37,7 +37,7 @@ const fixture = (id: string, status: string, resultStage: string) => ({
 function loaded(overrides: Record<string, unknown> = {}) {
   return {
     data: {
-      leagueId: 'league-1', isPublic: true, title: '가을 풋살 리그', state: 'active',
+      leagueId: 'league-1', seriesId: null, isPublic: true, title: '가을 풋살 리그', state: 'active',
       teamIds: ['t1', 't2'], startsOn: '2026-09-01T00:00:00.000Z',
       fixtures: [fixture('tm-1', 'completed', 'official'), fixture('tm-2', 'matched', 'not_entered')],
       entryFee: 0, entryFeeConfiguredAt: null, registrationDeadlineAt: null,
@@ -73,6 +73,19 @@ describe('LeagueAdminShell', () => {
   });
 
   describe('섹션 바', () => {
+    it.each([
+      ['completed', null, true],
+      ['completed', 'series-1', false],
+      ['active', null, false],
+      ['completed', undefined, false],
+    ])('상태 %s·체계 %s에서 전환 메뉴를 올바르게 표시한다', (state, seriesId, visible) => {
+      query.value = loaded({ state, seriesId });
+      renderShell();
+      const link = screen.queryByRole('link', { name: '리그 체계로 전환' });
+      if (visible) expect(link).toHaveAttribute('href', '/admin/league-matches/league-1/series-conversion');
+      else expect(link).not.toBeInTheDocument();
+    });
+
     it('운영·설정·사후로 묶고, 각 섹션은 리그 아래 자기 주소를 가진다', () => {
       renderShell();
 

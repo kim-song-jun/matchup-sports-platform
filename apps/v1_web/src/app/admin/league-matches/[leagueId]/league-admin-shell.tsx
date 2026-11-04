@@ -94,6 +94,9 @@ export function LeagueAdminShell({ leagueId, children }: { leagueId: string; chi
       items: [
         { slug: 'videos', label: '경기 영상' },
         { slug: 'reviews', label: '리뷰 관리' },
+        ...(canWrite && series.state === 'completed' && series.seriesId === null
+          ? [{ slug: 'series-conversion', label: '리그 체계로 전환' }]
+          : []),
       ],
     },
   ];

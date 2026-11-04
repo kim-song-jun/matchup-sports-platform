@@ -1558,7 +1558,7 @@ describe('LeagueMatchAdminService.detail — 대진의 gameState', () => {
     };
   }
 
-  async function detailWith(fixtures: ReturnType<typeof fixtureRow>[]) {
+  async function detailWith(fixtures: ReturnType<typeof fixtureRow>[], seriesId: string | null = null) {
     const prisma = {
       v1TeamMatch: { findMany: jest.fn().mockResolvedValue(fixtures) },
       v1TournamentSlot: { findMany: jest.fn().mockResolvedValue([]) },
@@ -1579,6 +1579,7 @@ describe('LeagueMatchAdminService.detail — 대진의 gameState', () => {
       id: 'league-1',
       title: '리그',
       isPublic: false,
+      seriesId,
       status: 'in_progress',
       sportId: 'sport-1',
       registrations: [],
@@ -1598,6 +1599,11 @@ describe('LeagueMatchAdminService.detail — 대진의 gameState', () => {
     } as never);
     return service.detail(adminUser, 'league-1');
   }
+
+  it.each([null, 'series-1'])('어드민 상세에 원본 체계 ID %s를 내려준다', async (seriesId) => {
+    const detail = await detailWith([fixtureRow('scheduled', { state: 'SCHEDULED' })], seriesId);
+    expect(detail.seriesId).toBe(seriesId);
+  });
 
   it('경기의 진행 상태를 대진마다 그대로 내려준다 (진행 중과 시작 전을 구분한다)', async () => {
     const result = await detailWith([

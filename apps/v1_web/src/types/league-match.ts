@@ -179,6 +179,8 @@ export interface V1LeagueFixture {
 }
 
 export interface V1AdminLeagueDetail {
+  /** 독립 리그는 null. 이전 API 응답에는 없을 수 있어 전환 메뉴는 명시적인 null만 허용한다. */
+  seriesId?: string | null;
   leagueId: string;
   title: string;
   /** 저장된 리그 상태. `state` 가 합쳐 보이는 draft/open/closed를 구분한다. */

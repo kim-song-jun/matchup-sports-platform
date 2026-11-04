@@ -478,6 +478,7 @@ export class LeagueMatchAdminService {
       leagueId: league.id,
       title: league.title,
       isPublic: league.isPublic,
+      seriesId: league.seriesId,
       state: league.state,
       lifecycleStatus: league.lifecycleStatus,
       // **대진 일정 폼이 요일을 날짜로 전개하는 기준일이다.** BE-2 이후 서버는 요일을 모르고
@@ -2294,6 +2295,7 @@ export class LeagueMatchAdminService {
         status: true,
         registrationDeadlineAt: true,
         sportId: true,
+        seriesId: true,
         competitionConfigVersionId: true,
         regionId: true,
         // 징계(출전정지) 규정 — 어드민 화면이 **현재 값**을 보여줘야 옵트인 여부를 알 수

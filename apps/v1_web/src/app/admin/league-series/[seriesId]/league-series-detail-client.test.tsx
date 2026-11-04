@@ -62,6 +62,16 @@ function setup() {
 }
 
 describe('LeagueSeriesDetailClient promotion state', () => {
+  it('1티어도 종료 후 다음 시즌 준비를 기존 편성 API로 요청한다', () => {
+    setup();
+    const mutate = vi.fn();
+    useSeries.mockReturnValue({ data: { ...SERIES, tierCount: 1, tierLabels: ['1부'] }, isPending: false, isError: false, refetch: vi.fn() } as never);
+    usePreview.mockReturnValue({ mutate, isPending: false } as never);
+    render(<LeagueSeriesDetailClient seriesId="series-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '다음 시즌 준비' }));
+    expect(mutate).toHaveBeenCalledWith(1, expect.objectContaining({ onSuccess: expect.any(Function) }));
+  });
+
   it('시즌 티어의 실제 공통 pill은 네 리그 상태를 같은 용어로 표시한다', () => {
     setup();
     useSeries.mockReturnValue({

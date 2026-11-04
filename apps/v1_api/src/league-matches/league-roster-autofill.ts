@@ -3,6 +3,7 @@ import { Prisma, V1TournamentStatus } from '@prisma/client';
 import { evaluateRosterCandidate, normalizeGender } from '../tournaments/tournament-players.service';
 import { isPhoneVerificationEnforced } from '../verification/phone-verification-access';
 import { findTournamentOnSurfaceOrThrow } from '../tournaments/tournament-surface-lookup';
+import { compareRosterOrder } from '../common/roster-order';
 
 const logger = new Logger('LeagueRosterAutofill');
 
@@ -33,6 +34,18 @@ async function lockActiveMemberships(tx: Prisma.TransactionClient, teamId: strin
   const ids = rows.map((row) => row.id);
   await tx.$queryRaw`SELECT id FROM v1_team_memberships WHERE id IN (${Prisma.join(ids)}) ORDER BY id FOR SHARE`;
   return ids;
+}
+
+/**
+ * 감사 finding #50 과 같은 규칙 — **같은 리그의 다른 팀 명단에 이미 있는 사람**은 넣지 않는다.
+ * 한 번에 읽고 Set 으로 판정한다(멤버마다 쿼리하면 팀 인원수만큼 왕복한다).
+ */
+async function loadUserIdsOnOtherTeams(tx: Prisma.TransactionClient, leagueId: string, registrationId: string): Promise<Set<string>> {
+  const rows = await tx.v1TournamentPlayer.findMany({
+    where: { removedAt: null, registrationId: { not: registrationId }, registration: { tournamentId: leagueId } },
+    select: { userId: true },
+  });
+  return new Set(rows.flatMap((row) => (row.userId === null ? [] : [row.userId])));
 }
 
 /**
@@ -121,20 +134,7 @@ export async function fillLeagueTeamRoster(
     },
   });
 
-  // 감사 finding #50 과 같은 규칙 — **같은 리그의 다른 팀 명단에 이미 있는 사람**은
-  // 넣지 않는다. 한 번에 읽고 Set 으로 판정한다(멤버마다 쿼리하면 팀 인원수만큼 왕복한다).
-  const takenUserIds = new Set(
-    (
-      await tx.v1TournamentPlayer.findMany({
-        where: {
-          removedAt: null,
-          registrationId: { not: registration.id },
-          registration: { tournamentId: leagueId },
-        },
-        select: { userId: true },
-      })
-    ).flatMap((row) => (row.userId === null ? [] : [row.userId])),
-  );
+  const takenUserIds = await loadUserIdsOnOtherTeams(tx, leagueId, registration.id);
 
   // 끝난 리그는 명단을 만들지 않는다 — 예약(또는 대진 생성)과 실행 사이에 리그가
   // 완료·취소될 수 있고, 그때 선수 row 를 새로 세우면 끝난 대회의 기록이 바뀐다.
@@ -240,6 +240,123 @@ export async function fillLeagueTeamRoster(
     added,
     skipped,
   };
+}
+
+/** 지난 시즌 명단을 옮겨 담을 수 없는 신청 상태 — 취소됐거나 취소를 요청한 신청은 명단을 바꾸지 않는다. */
+const ROSTER_FROZEN_REGISTRATION_STATUSES: ReadonlySet<string> = new Set(['cancelled', 'cancel_requested']);
+
+/**
+ * 독립 리그의 다음 시즌(2026-11-03 사용자 확정 — 지난 명단 이어받기). 재참가 팀의 새 신청에 **지난 시즌 참가 명단**을
+ * 옮겨 담는다. 팀장이 신청을 낼 때(`TournamentRegistrationsService.submit`)와 어드민이 지난 시즌 팀을 넣을 때 부른다.
+ *
+ * - 지난 시즌(`previousLeagueId`) 확정 신청의 살아 있는 선수만, 지난 시즌 등번호·골키퍼 표시와 함께 옮긴다.
+ * - 지금도 팀의 활성 멤버이고 자격 판정(`evaluateRosterCandidate` — 실명·생년월일·휴대폰·성별부·정원·다른 팀 명단)을
+ *   통과한 사람만이다. 위 자동 채움과 **같은 판정·같은 잠금 순서**(신청 → 계정 → 멤버십)다.
+ * - 새 신청에 선수 행이 하나라도 있었으면(팀이 이미 손댔거나 지난 사이클의 행) 건드리지 않는다 — 자동 채움과 같은 계약.
+ * - 옮긴 선수도 직접 올린 선수와 같은 심사 대기로 들어간다. 옮길 사람이 없으면 아무것도 안 하고, 그러면 대진 생성 때의
+ *   자동 채움(팀원 전원)이 지금처럼 돈다.
+ */
+export async function copyPreviousSeasonRoster(
+  tx: Prisma.TransactionClient,
+  leagueId: string,
+  registration: { id: string; teamId: string },
+): Promise<{ added: number; skipped: Array<{ userId: string; reason: string }> }> {
+  const nothing = { added: 0, skipped: [] };
+  await tx.$queryRaw`SELECT id FROM v1_tournament_registrations WHERE id = ${registration.id} FOR UPDATE`;
+  const fresh = await tx.v1TournamentRegistration.findFirst({
+    where: { id: registration.id, players: { none: {} } },
+    select: { status: true },
+  });
+  if (fresh === null || ROSTER_FROZEN_REGISTRATION_STATUSES.has(fresh.status)) return nothing;
+  const league = await findTournamentOnSurfaceOrThrow(tx, ['regular_league'], {
+    where: { id: leagueId },
+    select: { previousLeagueId: true, maxPlayers: true, genderCategory: true, status: true },
+  });
+  if (
+    league.previousLeagueId == null ||
+    league.status === V1TournamentStatus.completed ||
+    league.status === V1TournamentStatus.cancelled
+  ) {
+    return nothing;
+  }
+  const previous = await tx.v1TournamentRegistration.findFirst({
+    where: { tournamentId: league.previousLeagueId, teamId: registration.teamId, status: 'confirmed' },
+    select: {
+      players: {
+        where: { removedAt: null },
+        select: { id: true, userId: true, realName: true, jerseyNumber: true, goalkeeper: true },
+      },
+    },
+  });
+  if (previous === null || previous.players.length === 0) return nothing;
+  // 지난 명단 순서(등번호 → 이름) 그대로 — 정원을 넘으면 앞쪽부터 담는다.
+  const previousPlayers = [...previous.players].sort((a, b) =>
+    compareRosterOrder({ id: a.id, name: a.realName, jerseyNumber: a.jerseyNumber }, { id: b.id, name: b.realName, jerseyNumber: b.jerseyNumber }));
+
+  const lockedMembershipIds = await lockActiveMemberships(tx, registration.teamId);
+  const members = await tx.v1TeamMembership.findMany({
+    where: {
+      teamId: registration.teamId,
+      status: 'active',
+      id: { in: lockedMembershipIds },
+      userId: { in: previousPlayers.map((player) => player.userId) },
+    },
+    select: {
+      userId: true,
+      user: {
+        select: {
+          phone: true,
+          phoneVerifiedAt: true,
+          profile: { select: { realName: true, birthDate: true, gender: true } },
+        },
+      },
+    },
+  });
+  const memberByUserId = new Map(members.map((member) => [member.userId, member]));
+  const takenUserIds = await loadUserIdsOnOtherTeams(tx, leagueId, registration.id);
+
+  const skipped: Array<{ userId: string; reason: string }> = [];
+  const candidates: Prisma.V1TournamentPlayerCreateManyInput[] = [];
+  for (const player of previousPlayers) {
+    const member = memberByUserId.get(player.userId) ?? null;
+    const block = evaluateRosterCandidate({
+      alreadyOnRoster: false,
+      alreadyOnOtherTeamInTournament: takenUserIds.has(player.userId),
+      tournamentMutable: true,
+      registrationMutable: true,
+      rosterCount: candidates.length,
+      maxPlayers: league.maxPlayers,
+      member: member === null
+        ? null
+        : {
+            realName: member.user.profile?.realName?.trim() ?? null,
+            birthDate: member.user.profile?.birthDate?.trim() ?? null,
+            phone: member.user.phone?.trim() ?? null,
+            gender: normalizeGender(member.user.profile?.gender),
+            phoneVerifiedAt: member.user.phoneVerifiedAt,
+          },
+      genderCategory: league.genderCategory,
+      phoneEnforced: isPhoneVerificationEnforced(),
+    });
+    if (block !== null || member === null) {
+      skipped.push({ userId: player.userId, reason: block?.listReason ?? '팀의 활성 멤버가 아니에요' });
+      continue;
+    }
+    candidates.push({
+      registrationId: registration.id,
+      userId: player.userId,
+      jerseyNumber: player.jerseyNumber,
+      goalkeeper: player.goalkeeper,
+      realName: member.user.profile!.realName!.trim(),
+      birthDateSnapshot: member.user.profile!.birthDate!.trim(),
+      genderSnapshot: normalizeGender(member.user.profile?.gender),
+      eligibilityStatus: 'needs_review',
+    });
+  }
+  if (candidates.length === 0) return { added: 0, skipped };
+  // 자동 채움과 같은 이유로 한 번에 `skipDuplicates` — 같은 등록을 동시에 채우는 다른 경로와 부딪혀도 예외 없이 건너뛴다.
+  const result = await tx.v1TournamentPlayer.createMany({ data: candidates, skipDuplicates: true });
+  return { added: result.count, skipped };
 }
 
 /**

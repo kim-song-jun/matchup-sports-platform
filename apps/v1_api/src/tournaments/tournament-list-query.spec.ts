@@ -41,7 +41,7 @@ describe('MD-QA #145 public list capacity SQL binding', () => {
     expect(statements[0].text).toContain("t.kind::text = 'regular_league' AND t.status::text IN ('draft', 'open', 'closed')");
   });
 
-  it('MD-QA #145 review follow-up draft rank: actual SQL applies capacity before ranking a league draft as recruiting', async () => {
+  it('group rank: only an open row is ranked by capacity and a draft is its own preparing group', async () => {
     const statements: Prisma.Sql[] = [];
     const queryRaw = jest.fn(async (strings: TemplateStringsArray, ...values: unknown[]) => {
       statements.push(Prisma.sql(strings, ...values));
@@ -50,9 +50,10 @@ describe('MD-QA #145 public list capacity SQL binding', () => {
     await listTournamentIds({ $queryRaw: queryRaw } as never, { kind: 'league' }, { limit: 5 });
     const statement = statements[0];
     if (statement === undefined) throw new Error('The actual public list query was not built');
-    const draftRankClause = statement.text.match(/WHEN 'draft' THEN([\s\S]*?)WHEN 'open'/)?.[1];
     // Actual generated SQL is the database consumer contract; this does not claim PostgreSQL ordering execution.
-    expect(draftRankClause).toMatch(/CASE WHEN[\s\S]*t\.max_teams[\s\S]*THEN 2 ELSE 1 END/);
+    expect(statement.text).toMatch(
+      /WHEN 'in_progress' THEN 0\s+WHEN 'open' THEN \(CASE WHEN[\s\S]*t\.max_teams[\s\S]*THEN 3 ELSE 1 END\)\s+WHEN 'draft' THEN 2\s+WHEN 'closed' THEN 3\s+WHEN 'completed' THEN 4\s+ELSE 5 END/,
+    );
     expect(statement.values).toEqual(expect.arrayContaining(['confirmed', 'awaiting_payment', 'payment_checking', 'paid']));
   });
 
@@ -76,27 +77,37 @@ describe('MD-QA #145 public list capacity SQL binding', () => {
   });
 });
 
-describe('Task 20261103 explicit sort cursor', () => {
-  it('carries the selected sort and refuses a cursor from another sort mode', async () => {
-    const queryRaw = jest.fn().mockResolvedValue([{ id: 'a', grp: 3, sort_at: '2026-11-01 09:00:00.123456' }]);
-    const rows = await listTournamentIds({ $queryRaw: queryRaw } as never, { sort: 'latest' }, { limit: 1 });
-    expect(JSON.parse(Buffer.from(rows[0].cursor, 'base64url').toString('utf8'))).toEqual([3, '2026-11-01 09:00:00.123456', 'a', 'latest']);
-    queryRaw.mockClear();
-    expect(await listTournamentIds({ $queryRaw: queryRaw } as never, { sort: 'scheduled' }, { limit: 1, cursor: rows[0].cursor })).toEqual([]);
-    expect(queryRaw).not.toHaveBeenCalled();
-    await listTournamentIds({ $queryRaw: queryRaw } as never, { sort: 'latest' }, { limit: 1, cursor: rows[0].cursor });
-    expect(queryRaw).toHaveBeenCalledTimes(1);
-  });
-
-  it('closed registration keeps null-deadline leagues by negating a non-null boolean', async () => {
+describe('single state order and filter', () => {
+  const build = async (query: Parameters<typeof listTournamentIds>[1]) => {
     const statements: Prisma.Sql[] = [];
     const queryRaw = jest.fn(async (strings: TemplateStringsArray, ...values: unknown[]) => {
       statements.push(Prisma.sql(strings, ...values)); return [];
     });
-    await listTournamentIds({ $queryRaw: queryRaw } as never, { kind: 'league', registration: 'closed', phase: 'upcoming' }, { limit: 5 });
-    expect(statements[0].text).toContain('NOT COALESCE(');
-    expect(statements[0].text).toContain("t.status::text IN ('draft', 'open', 'closed')");
-    expect(statements[0].text).toContain('t.max_teams IS NULL');
-    expect(statements[0].text).toContain('t.is_public = true');
+    await listTournamentIds({ $queryRaw: queryRaw } as never, query, { limit: 5 });
+    return statements[0];
+  };
+
+  it('orders by group, newest registration first, with rows lacking a date last', async () => {
+    const statement = await build({ kind: 'all' });
+    expect(statement.text).toContain('ORDER BY f.grp ASC, (f.sort_at IS NULL) ASC, f.sort_at DESC, f.id COLLATE "C" ASC');
+    expect(statement.text).toContain("CASE WHEN t.status::text = 'completed' THEN COALESCE(t.scheduled_end_at, t.scheduled_at) ELSE t.created_at END AS sort_at");
+  });
+
+  it.each([
+    ['ongoing', 0], ['recruiting', 1], ['preparing', 2], ['recruit_closed', 3], ['completed', 4],
+  ] as const)('stage %s filters on the same group rank the order uses (%i)', async (stage, rank) => {
+    const statement = await build({ kind: 'league', stage });
+    expect(statement.text).toContain(') = $');
+    expect(statement.values).toContain(rank);
+    expect(statement.text).toContain('t.is_public = true');
+  });
+
+  it('carries only [group, sortAt, id] in the cursor and refuses the old four-part cursor', async () => {
+    const queryRaw = jest.fn().mockResolvedValue([{ id: 'a', grp: 1, sort_at: '2026-11-01 09:00:00.123456' }]);
+    const rows = await listTournamentIds({ $queryRaw: queryRaw } as never, {}, { limit: 1 });
+    expect(JSON.parse(Buffer.from(rows[0].cursor, 'base64url').toString('utf8'))).toEqual([1, '2026-11-01 09:00:00.123456', 'a']);
+    queryRaw.mockClear();
+    expect(await listTournamentIds({ $queryRaw: queryRaw } as never, {}, { limit: 1, cursor: token([1, '2026-11-01 09:00:00', 'a', 'latest']) })).toEqual([]);
+    expect(queryRaw).not.toHaveBeenCalled();
   });
 });

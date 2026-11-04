@@ -465,6 +465,21 @@ LEAGUE_REGION_INVALID` for an unknown or unsuitable region.
   regulation time (non-extra-time period total: both halves, or the single
   period of a one-period match).
   A completed or cancelled league returns `409 LEAGUE_ENDED`; a league on hold is allowed.
+- `POST /api/v1/admin/league-matches/:leagueId/fixtures/manual/batch` (2026-11-03, weekly add) takes
+  `{ fixtures: [...] }` with 1–30 items of the same shape as `fixtures/manual` (`400 VALIDATION_ERROR` for an
+  empty or longer list) and returns `201 { leagueId, teamMatchIds }` in request order. All fixtures are created in
+  **one transaction** under one league-row lock: if any item is rejected (`LEAGUE_TEAM_INVALID` for the same
+  team on both sides, an unregistered or inactive team; `409 LEAGUE_ENDED`) no fixture is created. The single
+  `fixtures/manual` endpoint is the same code path with one item. Two fixtures for the same team in the same week
+  are allowed (rematches, postponed games); the admin screen only warns.
+- **Week number (`N주차`, 2026-11-03):** the KST calendar week (Monday–Sunday) counted over the weeks that have
+  fixtures (`league-week-number.ts`). Saturday and Sunday games of one week share a number and an empty week
+  is not skipped in the numbering. Every path that changes the league's fixture dates (manual and batch add,
+  bulk generation and regeneration, template, rescheduling via update-fixture, delete) rewrites the stored
+  titles' trailing `N주차` token — and the team schedule titles — to the current week in the same transaction
+  (`syncLeagueFixtureWeekTitles`). Titles without a trailing week token (operator-chosen names) are kept. When
+  another fixture's title has to change, that path takes the league row with `FOR UPDATE NOWAIT` first and
+  returns `409 COMMAND_CONCURRENCY_CONFLICT` instead of waiting (retryable).
 - `POST /api/v1/admin/league-matches/:leagueId/fixtures` (and `preview`,
   `regenerate`) accept `timing.gameDurationMinutes` as optional. When omitted,
   the regulation time of the league's own competition config (the version edited
@@ -535,7 +550,8 @@ A league can be drawn first and filled with teams later. A **slot** (`V1Tourname
   dates), and each day's games run back to back on one pitch from `time`, `gameDurationMinutes + breakMinutes`
   apart, with `endAt = startAt + gameDurationMinutes`. `gameDurationMinutes` defaults to the league config's
   regulation time (`422 LEAGUE_FIXTURE_DURATION_REQUIRED` when unknown); `breakMinutes` defaults to 0. The
-  title's `N주차` is the day number. `placeName`
+  title's `N주차` is first written with the day number and then rewritten to the calendar week (see the week
+  number rule above). `placeName`
   defaults to `장소 미정`. More than 240 fixtures returns `422 BRACKET_TEMPLATE_TOO_LARGE`. The league
   `status` is **not** changed.
   - Locks the league row (`FOR UPDATE`) and applies the same guard as bulk generation: `409 LEAGUE_ON_HOLD`
@@ -644,3 +660,28 @@ now includes nullable `rulesText`, rendered as operating guidance only when popu
 - `PATCH /admin/league-matches/:leagueId`의 `yellowAccumulationLimit`, `redCardSuspensionMatches`는 리그 상세에서 설정한다. 1~20 정수, `null`은 미적용이며 LIVE·PAUSED·ENDED 경기가 있으면 `LEAGUE_DISCIPLINE_LOCKED`다.
 - 빈 확정 명단의 자동 채움은 활성 팀 멤버십 등번호를 참가 명단에 함께 저장한다. 번호를 임의로 생성하거나 기존 참가 명단을 백필하지 않는다.
 - 결과 미입력 리마인더에 두 팀 이름을 표시하고 해당 경기 결과 검토로 연결한다. 단일 경기 취소 알림도 두 팀 이름을 표시한다.
+
+## 독립 리그의 리그 체계 전환 (2026-11-03)
+
+- 어드민 리그 상세 `GET /admin/league-matches/:leagueId`는 `seriesId: string|null`을 반환한다. 종료 + `seriesId === null`인 독립 리그에서만 전환 메뉴를 제공한다. 구버전 응답에 필드가 없으면 메뉴를 숨긴다.
+
+- `GET /admin/league-matches/:leagueId/series-conversion`: active admin, `{seriesId: string|null}`. 기존 전환 연결 조회.
+- `POST .../series-conversion/preview`: mutation admin(owner/ops), `{tierSizes: number[]}`. 1~3티어·각 2팀 이상·확정 참가팀 수 합계 일치. 응답 `{fingerprint, entries:[{teamId,teamName,position,points,suggestedTier,...}],boundaryTies:[{teamIds}]}`.
+- `POST .../series-conversion/commit`: mutation admin, 위 tierSizes + `{title,startsOn,endsOn,fingerprint,entries:[{teamId,tier,reason?}]}`. 응답 `{seriesId,leagues:[{id,title,tier}]}`.
+- 원본은 종료된 독립 regular_league이며 유효 경기 최소 1개, 모든 유효 경기 OFFICIAL 필수. 취소/VOID는 기존 집계 규칙을 따른다. 빈 경기·미확정 경기는 차단한다.
+- 409: `LEAGUE_ALREADY_CONVERTED`, `LEAGUE_NOT_COMPLETED`, `LEAGUE_RESULTS_PENDING`, `LEAGUE_CONVERSION_STALE`, `LEAGUE_CONVERSION_CONFLICT`. 400: 배정 중복/누락/인원 불일치 `LEAGUE_CONVERSION_ENTRIES_INVALID`, 변경·경계 동률 사유 없음 `LEAGUE_CONVERSION_REASON_REQUIRED`. 422: 티어 인원 계약 오류.
+- 기존 경기·선수 기록·참가 명단은 원본에 보존. 새 리그 참가팀은 seeded confirmed 등록이며 명단은 기존 제출/자격 검증 흐름을 따른다. 금액/계좌는 설정값만 승계하고 입금 상태는 복사하지 않는다. 신규 대진은 별도 생성한다.
+- 원본/결과/확정 참가팀과 전환 감사 로그를 Serializable로 읽고, 새 체계·리그·등록·전환 감사를 원자적으로 기록한다. 전환 이력 `league_series.convert_independent`는 삭제하지 않는다. 스키마 변경/마이그레이션 없음.
+
+## 독립 리그의 다음 시즌 (2026-11-03)
+
+독립 리그(`seriesId === null`) → 독립 리그. 리그 체계 전환과 둘 중 하나만 한다.
+
+- `POST /admin/league-matches` 에 `previousLeagueId?: uuid`. 지난 리그는 같은 종목의 진행 중(`in_progress`)·종료(`completed`) 독립 리그여야 한다. 422 `LEAGUE_PREVIOUS_SEASON_INVALID`(없음·체계 소속·시작 전·다른 종목), 409 `LEAGUE_ALREADY_CONVERTED`(체계로 전환한 리그), 409 `LEAGUE_NEXT_SEASON_EXISTS`(이미 다음 시즌이 있음 — 지운 다음 시즌은 연결을 풀고 새로 잇는다). 감사 `league_match.create` 의 `afterJson.previousLeagueId`.
+- `GET /admin/league-matches/:leagueId` 에 `previousSeason`·`nextSeason`(`{leagueId,title}|null`)과 `convertedToSeries: boolean`.
+- `POST /admin/league-matches/:leagueId/previous-season-teams` — mutation admin, `{teamIds: uuid[]}`(1~50). 모든 팀이 지난 시즌 확정 팀이어야 하고(422 `LEAGUE_TEAM_INVALID`), 지난 시즌이 없으면 422 `LEAGUE_PREVIOUS_SEASON_MISSING`. 팀마다 참가팀 추가와 같은 입장 판정(`findLeagueAdmissionBlocker`, 422 `팀 이름: 이유`) 뒤 seeded confirmed 등록을 만들고 지난 명단을 옮긴다. 한 팀이라도 막히면 아무 팀도 들어가지 않는다. 201 `{leagueId, teamIds, carriedPlayerCount, hasExistingFixtures}`. 감사 `league_match.add_previous_season_teams`.
+- 지난 명단 옮기기(`copyPreviousSeasonRoster`): 위 한 번에 넣기와, 재참가 팀의 신청 제출(`POST /tournaments/:id/registrations/:registrationId/submit`) 트랜잭션에서 돈다. 행이 한 번도 없던 명단만 대상이고, 지난 시즌 살아 있는 선수 중 지금도 팀의 활성 멤버이며 자동 채움과 같은 자격(`evaluateRosterCandidate`)을 통과한 선수를 지난 번호·골키퍼 지정 그대로 `needs_review` 로 넣는다. 제출 알림 문구에 옮긴 인원이 붙는다.
+- 접수 시작(`open-registration`)이 처음 열 때(`justOpened`) 지난 시즌 확정 팀 중 이 리그에 살아 있는 신청이 없는 팀의 팀장·매니저에게 `league_next_season_registration_opened`(대상 `tournament`, 딥링크 `/tournaments/:id/apply`)를 보낸다. 받는 사람마다 한 번(`businessKey`).
+- 공개 `GET /league-matches/:leagueId`: 독립 리그의 `nextRound` 는 이어진 다음 시즌(`seasonNo: null`)이고, `previousRound: {leagueId,title}|null` 이 붙는다. 공개 `GET /tournaments/:id` 는 정규 리그에 `previousSeason: {leagueId,title}|null`(공개된 지난 리그만).
+- 리그 체계 전환 `series-conversion/preview·commit` 은 다음 시즌이 이어진 리그를 409 `LEAGUE_NEXT_SEASON_EXISTS` 로 막는다. 전환과 다음 시즌 생성은 원본 리그 행을 먼저 잠가 겹치면 한쪽만 성공한다.
+- 마이그레이션 `20261103120000_v1_league_previous_season`: `v1_tournaments.previous_league_id`(nullable, unique, FK `ON DELETE SET NULL`).

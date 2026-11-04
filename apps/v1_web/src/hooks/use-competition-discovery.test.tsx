@@ -39,7 +39,7 @@ function setup(initial: CompetitionDiscoveryFilters) {
 describe('목록 훅 → HTTP → 필터·정렬 응답 계약', () => {
   it('모집·종목·부문·기간·무료 조건을 전달해 정원 마감 항목을 제외한다', async () => {
     server.use(...createCompetitionDiscoveryHandlers(api, fixtures));
-    const params: CompetitionDiscoveryFilters = { kind: 'tournament', registration: 'open', sportId, genderCategory: 'mixed', format: 'knockout', feeMax: 0, dateFrom: '2099-11-01', dateTo: '2099-11-30' };
+    const params: CompetitionDiscoveryFilters = { kind: 'tournament', stage: 'recruiting', sportId, genderCategory: 'mixed', format: 'knockout', feeMax: 0, dateFrom: '2099-11-01', dateTo: '2099-11-30' };
     const { wrapper, client } = setup(params);
     const hook = renderHook(() => useCompetitionDiscovery({ ...params, limit: 20 }), { wrapper });
     await waitFor(() => expect(hook.result.current.isSuccess).toBe(true));
@@ -48,13 +48,24 @@ describe('목록 훅 → HTTP → 필터·정렬 응답 계약', () => {
     hook.unmount(); client.clear();
   });
   // 2026-10-27: 리그도 대회처럼 접수 중일 때만 신청을 받는다 — 진행 중 리그는 신청 가능 목록에 없다.
-  it('시작 전 접수 중 리그는 신청 가능으로 조회되고 진행 중 리그는 빠진다', async () => {
+  it('접수 중 리그는 접수 중 상태로 조회되고 진행 중 리그는 따로 조회된다', async () => {
     server.use(...createCompetitionDiscoveryHandlers(api, fixtures));
     const { wrapper, client } = setup({ kind: 'league' });
-    const hook = renderHook(({ phase }: { phase: 'upcoming' | 'ongoing' }) => useCompetitionDiscovery({ kind: 'league', registration: 'open', phase, limit: 20 }), { wrapper, initialProps: { phase: 'upcoming' } });
+    const hook = renderHook(({ stage }: { stage: 'recruiting' | 'ongoing' }) => useCompetitionDiscovery({ kind: 'league', stage, limit: 20 }), { wrapper, initialProps: { stage: 'recruiting' } });
     await waitFor(() => expect(hook.result.current.data?.items.map((item) => item.id)).toEqual(['upcoming-league']));
-    hook.rerender({ phase: 'ongoing' });
-    await waitFor(() => expect(hook.result.current.data?.items).toEqual([]));
+    hook.rerender({ stage: 'ongoing' });
+    await waitFor(() => expect(hook.result.current.data?.items.map((item) => item.id).sort()).toEqual(['active-league', 'full-league']));
+    hook.unmount(); client.clear();
+  });
+  it('정렬은 진행 중 → 접수 중 → 접수 마감 순이다', async () => {
+    server.use(...createCompetitionDiscoveryHandlers(api, fixtures));
+    const { wrapper, client } = setup({ kind: 'all' });
+    const hook = renderHook(() => useCompetitionDiscovery({ kind: 'all', limit: 20 }), { wrapper });
+    await waitFor(() => expect(hook.result.current.isSuccess).toBe(true));
+    const order = hook.result.current.data!.items.map((item) => item.id);
+    expect(order.indexOf('active-league')).toBeLessThan(order.indexOf('available'));
+    expect(order.indexOf('available')).toBeLessThan(order.indexOf('full'));
+    expect(order).not.toContain('hidden');
     hook.unmount(); client.clear();
   });
   it('필터 API 실패를 빈 결과나 성공으로 숨기지 않는다', async () => {

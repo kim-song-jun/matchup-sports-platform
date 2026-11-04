@@ -5052,6 +5052,8 @@ export function useV1ConfirmRegistration() {
         queryKey: [...v1Keys.all, 'admin', 'tournaments'],
       });
       queryClient.invalidateQueries({ queryKey: v1Keys.tournament(_data.tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(_data.tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
     },
   });
 }
@@ -5072,6 +5074,8 @@ export function useV1CancelRegistrationAdmin() {
         queryKey: [...v1Keys.all, 'admin', 'tournaments'],
       });
       queryClient.invalidateQueries({ queryKey: v1Keys.tournament(_data.tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(_data.tournamentId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
     },
   });
 }
@@ -6055,6 +6059,8 @@ import type {
   V1UpdateLeagueVenueResult,
 
   V1CreateManualLeagueFixturePayload,
+  V1CreateManualLeagueFixturesResult,
+  V1AddPreviousSeasonTeamsResult,
 
   V1LeagueFixture,
 } from '@/types/league-match';
@@ -6282,11 +6288,12 @@ export function useV1UpdateLeagueVenue(leagueId: string) {
  * 화면이 없었다**(2026-09-04 실측: FE 호출 0건). 그래서 라운드로빈 일괄 생성 말고는 경기를
  * 추가할 방법이 없었다 — 우천 순연 재편성이나 대체 경기가 그래서 불가능했다.
  */
-export function useV1CreateManualLeagueFixture(leagueId: string) {
+/** 경기 추가(주차 단위) — 여러 경기를 한 트랜잭션으로 만든다. 한 경기만 보내도 같은 경로다. */
+export function useV1CreateManualLeagueFixtures(leagueId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: V1CreateManualLeagueFixturePayload) =>
-      v1Post<V1LeagueFixture>(`/admin/league-matches/${leagueId}/fixtures/manual`, body),
+    mutationFn: (fixtures: V1CreateManualLeagueFixturePayload[]) =>
+      v1Post<V1CreateManualLeagueFixturesResult>(`/admin/league-matches/${leagueId}/fixtures/manual/batch`, { fixtures }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
       queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
@@ -6355,6 +6362,20 @@ export function useV1AddLeagueTeam(leagueId: string) {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
       // 목록 화면이 "참가 팀" 수를 보여주므로 팀을 더한 뒤에도 목록을 무효화한다 —
       // 제거(useV1RemoveLeagueTeam)만 무효화하고 추가는 빼면 두 조작의 결과가 달라 보인다.
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
+    },
+  });
+}
+
+/** 지난 시즌 팀 한 번에 넣기(독립 리그의 다음 시즌, 2026-11-03) — 팀 추가와 같은 화면들을 무효화한다. */
+export function useV1AddPreviousSeasonTeams(leagueId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (teamIds: string[]) =>
+      v1Post<V1AddPreviousSeasonTeamsResult>(`/admin/league-matches/${leagueId}/previous-season-teams`, { teamIds }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueTeams(leagueId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
       queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });
     },
   });

@@ -499,3 +499,17 @@ export function rosterGenderLabel(value: 'male' | 'female' | null | undefined): 
   if (!value) return '미입력';
   return { male: '남성', female: '여성' }[value];
 }
+
+/**
+ * 대회·리그 목록의 상태 — 카드 오른쪽 위 배지·상태 필터·정렬 그룹이 같은 5개를 쓴다(2026-11-03).
+ * 서버 `stage` 파라미터 값(`tournament-read.dto.ts`)이고, 배열 순서는 필터에 보이는 순서다.
+ */
+export const COMPETITION_STAGES = ['preparing', 'recruiting', 'recruit_closed', 'ongoing', 'completed'] as const;
+export type CompetitionStage = (typeof COMPETITION_STAGES)[number];
+export const COMPETITION_STAGE_LABEL: Record<CompetitionStage, string> = {
+  preparing: '준비 중',
+  recruiting: '접수 중',
+  recruit_closed: '접수 마감',
+  ongoing: '진행 중',
+  completed: '종료',
+};

@@ -142,7 +142,7 @@ beforeEach(() => {
 });
 
 describe('LeagueScheduleBoard — 렌더', () => {
-  it('경기일마다 "N주차 · 날짜" 열을 만들고 자리 라벨·팀 이름·상태를 카드에 싣는다', () => {
+  it('주마다 "N주차 · 날짜 범위" 칸을 만들고 자리 라벨·팀 이름·상태를 카드에 싣는다', () => {
     renderBoard();
 
     const headings = screen.getAllByRole('heading', { level: 3 });
@@ -163,6 +163,41 @@ describe('LeagueScheduleBoard — 렌더', () => {
     expect(within(full).getByText('확정')).toBeInTheDocument();
     expect(within(full).getByText('2 : 1')).toBeInTheDocument();
     expect(within(full).getByText('어드민 빠른 입력')).toBeInTheDocument();
+  });
+
+  // 2026-11-03 사용자 확정: 칸은 달력 주(월~일)이고 칸마다 경기 수·쉬는 팀·두 경기 팀을 요약한다.
+  it('주차 칸 제목은 그 주 월~일 날짜 범위이고, 요약 줄에 경기 수와 쉬는 팀을 보인다', () => {
+    renderBoard();
+    expect(screen.getAllByRole('heading', { level: 3 })[0]).toHaveTextContent('1주차 · 1/7 (월)~1/13 (일)');
+    // 1주차는 팀 없는 자리 경기 하나 — 참가팀 셋이 모두 쉰다.
+    expect(screen.getByText('1경기 · 쉬는 팀 독수리FC, 사자FC, 호랑이FC')).toBeInTheDocument();
+    // 2주차(사자 vs 호랑이)는 독수리만 쉰다.
+    expect(screen.getAllByText('1경기 · 쉬는 팀 독수리FC').length).toBeGreaterThan(0);
+  });
+
+  it('같은 주에 두 경기인 팀을 경고하고, 토·일로 나뉜 주는 카드에 날짜를 같이 보인다', () => {
+    renderBoard({
+      fixtures: [
+        fixture({ teamMatchId: 'sat', homeTeamId: 't1', awayTeamId: 't2', startAt: '2030-01-12T01:00:00.000Z' }),
+        fixture({ teamMatchId: 'sun', homeTeamId: 't1', awayTeamId: 't3', startAt: '2030-01-13T01:00:00.000Z' }),
+      ],
+      slots: [],
+    });
+    expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent('1주차 · 1/7 (월)~1/13 (일)');
+    expect(screen.getByText('두 경기 이상: 독수리FC')).toBeInTheDocument();
+    expect(within(cardOf('독수리FC 대 사자FC 경기')).getByText(/1\/13 \(일\) 10:00/)).toBeInTheDocument();
+    // 여섯 쌍이 아니라 세 팀 세 쌍 중 호랑이-사자만 아직 안 붙었다.
+    expect(screen.getByText(/아직 안 붙은 대진 1개/)).toBeInTheDocument();
+  });
+
+  it("'이 주에 경기 추가'는 그 주 칸을 넘기고, 콜백이 없으면(읽기 전용·끝난 리그) 버튼이 없다", () => {
+    const onAddToWeek = vi.fn();
+    const { unmount } = renderBoard({ onAddToWeek });
+    fireEvent.click(screen.getByRole('button', { name: '2주차에 경기 추가' }));
+    expect(onAddToWeek).toHaveBeenCalledWith(expect.objectContaining({ weekNumber: 2, startDate: '2030-01-14', endDate: '2030-01-20' }));
+    unmount();
+    renderBoard();
+    expect(screen.queryByRole('button', { name: /주차에 경기 추가/ })).toBeNull();
   });
 
   it('공개 대기 표시는 팀이 빈 자리 경기에만 붙는다 — 다 찬 경기·자리 없는 기존 경기에는 없다', () => {

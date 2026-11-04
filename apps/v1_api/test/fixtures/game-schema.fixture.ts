@@ -606,7 +606,8 @@ export const gameSchemaSourceManifest = {
   // 2026-10-29: additive v1_tournament_stage_period_settings + group/match period override columns; historical game migration unchanged.
   // 2026-11-01: additive V1VerificationToken.purpose enum (20261101090000_v1_verification_token_purpose); historical game migration unchanged.
   // 2026-11-02: add V1User.signupEmailLoginRequired; historical game migration is unchanged.
-  schema: '82b78e0a3a1cbdb4fab8fd1809f7da903330ca0d6bd38dc97335189f5ce84112',
+  // 2026-11-03: additive V1Tournament.previousLeagueId; historical game migration unchanged.
+  schema: 'b0c1313b36e6a93e0f84a56a17e7950826bbd5f38b284f22eb72fb3570292960',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

@@ -2828,9 +2828,15 @@ model V1Tournament {
   regionId                   String?                     @map("region_id")
   tier                       Int?
   seasonNo                   Int?                        @map("season_no")
+  /// 독립 정규 리그의 지난 시즌(2026-11-03 사용자 확정 — 독립 리그 → 독립 리그 이어가기). 새 리그가 지난 리그를
+  /// 가리키고, 한 리그의 다음 시즌은 하나뿐이라 유니크다. 리그 체계(seriesId) 리그는 쓰지 않는다 — 그쪽은 승강이 잇는다.
+  /// 지난 리그가 지워지면 연결만 풀린다.
+  previousLeagueId           String?                     @unique @map("previous_league_id")
 
   sport                V1Sport                              @relation(fields: [sportId], references: [id], onDelete: Restrict)
   series               V1LeagueSeries?                      @relation("V1TournamentSeries", fields: [seriesId], references: [id], onDelete: SetNull, map: "v1_tournaments_series_fk")
+  previousLeague       V1Tournament?                        @relation("V1TournamentPreviousLeague", fields: [previousLeagueId], references: [id], onDelete: SetNull, map: "v1_tournaments_previous_league_fk")
+  nextLeague           V1Tournament?                        @relation("V1TournamentPreviousLeague")
   region               V1Region?                            @relation("V1TournamentRegion", fields: [regionId], references: [id], onDelete: Restrict, map: "v1_tournaments_region_fk")
   competitionConfig    V1CompetitionConfigVersion?          @relation("V1TournamentCompetitionConfig", fields: [competitionConfigVersionId], references: [id], onDelete: Restrict, map: "v1_tournaments_competition_config_fk")
   stagePeriodSettings  V1TournamentStagePeriodSetting[]

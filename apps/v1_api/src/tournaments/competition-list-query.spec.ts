@@ -14,11 +14,14 @@ const card = (overrides: Record<string, unknown> = {}) => ({
 } as unknown as Row);
 
 describe('목록 API 입력 검증', () => {
-  it('모집·진행·기간·무료 조건과 총 건수 입력을 변환한다', async () => {
-    await expect(parse({ kind: 'tournament', phase: 'upcoming', registration: 'open', dateFrom: '2026-11-01', feeMax: '0', withTotal: 'true' })).resolves.toMatchObject({ feeMax: 0, phase: 'upcoming', registration: 'open', withTotal: 'true' });
+  it('상태·기간·무료 조건과 총 건수 입력을 변환한다', async () => {
+    await expect(parse({ kind: 'tournament', stage: 'recruiting', dateFrom: '2026-11-01', feeMax: '0', withTotal: 'true' })).resolves.toMatchObject({ feeMax: 0, stage: 'recruiting', withTotal: 'true' });
+  });
+  it.each(['preparing', 'recruiting', 'recruit_closed', 'ongoing', 'completed'])('상태 필터 %s 를 받는다', async (stage) => {
+    await expect(parse({ stage })).resolves.toMatchObject({ stage });
   });
   it.each([
-    { phase: 'draft' }, { registration: 'yes' }, { sort: 'random' }, { format: 'unknown' },
+    { stage: 'draft' }, { stage: 'upcoming' }, { sort: 'latest' }, { phase: 'upcoming' }, { registration: 'open' }, { format: 'unknown' },
     { feeMin: '-1' }, { feeMax: '3.5' }, { feeMax: '99999999999' },
     { dateFrom: '0000-01-01' }, { dateFrom: '2026-02-30' }, { dateTo: '2026-11-01T00:00:00Z' }, { withTotal: 'false' }, { arbitrary: 'value' },
   ])('잘못된 필터를 400으로 거절한다: %j', async (input) => {

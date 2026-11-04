@@ -13,7 +13,7 @@ import {
   useV1AddLeagueTeam,
   useV1AdminLeagueMatch,
   useV1AdminLeagueTeams,
-  useV1CreateManualLeagueFixture,
+  useV1CreateManualLeagueFixtures,
   useV1AdminTeam,
   useV1CancelLeagueFixture,
   useV1GenerateLeagueFixtures,
@@ -27,7 +27,8 @@ import {
 } from '@/hooks/use-v1-api';
 import { describeLeagueRegistrationWindow } from '@/lib/league-registration-copy';
 import { leagueFixtureMatchupLabel } from '@/lib/league-fixture-meta';
-import { LeagueManualFixtureModal } from './league-manual-fixture-modal';
+import { LeagueManualFixtureModal, nextKickoffTime } from './league-manual-fixture-modal';
+import { LeaguePreviousSeasonTeams } from './league-previous-season-teams';
 import { LeagueFixtureScheduleModal, type LeagueFixtureSchedulePatch } from './league-fixture-schedule-modal';
 import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
 import { useTournamentPeriodSettings } from '@/hooks/use-tournament-period-settings';
@@ -38,7 +39,7 @@ import { leagueFixtureResultCell } from '@/lib/competition-status';
 import { extractErrorMessage } from '@/lib/error-message';
 import { josa } from '@/lib/korean';
 import { expandWeeklyFixtureDates, WEEKDAY_OPTIONS } from '@/lib/league-fixture-dates';
-import { toKstDateString } from '@/lib/kst-calendar';
+import { DAY_MS, isoToKstDatetimeLocal, toKstDateString } from '@/lib/kst-calendar';
 import { LeagueFixtureDatePicker } from './league-fixture-date-picker';
 import { LeagueWeeksPlanField } from './league-weeks-plan-field';
 import { resolveFixturePlan, type WeeksPlan } from '@/lib/league-round-robin-plan';
@@ -59,6 +60,7 @@ import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
 import { useV1ApplyLeagueTemplate } from '@/hooks/use-v1-bracket-canvas';
 import { LeagueTemplateDialog } from './league-template-dialog';
 import { buildLeagueMobileRounds, candidatesFromLeagueTeams } from '@/lib/bracket-canvas-mobile-model';
+import { buildLeagueBoard, type LeagueBoardColumn } from '@/lib/league-board-model';
 import {
   computeDailyPlan,
   dayOffsetLabel,
@@ -106,7 +108,7 @@ function fixtureHasStartedOrResult(fixture: V1LeagueFixture): boolean {
 function manualFixtureHint(canAdd: boolean, leagueEnded: boolean): string {
   if (leagueEnded) return '끝난 리그에는 경기를 추가할 수 없어요. 먼저 위 ‘상태 변경’에서 진행 중으로 바꿔 주세요.';
   return canAdd
-    ? '대진을 한꺼번에 만들지 않고 한 경기씩 운영하거나, 우천 순연·대체 경기를 넣을 때 써요.'
+    ? '한 주의 경기를 한 번에 넣거나, 우천 순연·대체 경기를 넣을 때 써요. 주차 칸의 ‘이 주에 경기 추가’는 그 주 날짜로 열려요.'
     : '참가팀이 2팀 이상이어야 경기를 추가할 수 있어요.';
 }
 
@@ -158,8 +160,21 @@ export default function LeagueMatchFixturesClient({
     [series, teamsData],
   );
   const mobileCandidates = useMemo(() => candidatesFromLeagueTeams(teamsData?.teams ?? []), [teamsData]);
-  const createManualFixture = useV1CreateManualLeagueFixture(leagueId);
-  const [manualFixtureOpen, setManualFixtureOpen] = useState(false);
+  // 주차 칸·모바일 주차 머리의 요약과 '이 주에 경기 추가'가 쓰는 주차 칸. 보드와 같은 모델이다.
+  const boardWeeks = useMemo(
+    () =>
+      series
+        ? buildLeagueBoard({
+            fixtures: series.fixtures,
+            slots: series.slots ?? [],
+            teamNameById: new Map((teamsData?.teams ?? []).map((team) => [team.teamId, team.name])),
+          }).columns
+        : [],
+    [series, teamsData],
+  );
+  const createManualFixtures = useV1CreateManualLeagueFixtures(leagueId);
+  // 경기 추가 창을 어느 날짜·시각으로 열었는지. null 이면 닫혀 있다.
+  const [addFixtureTarget, setAddFixtureTarget] = useState<{ date: string; time: string; weekLabel: string | null } | null>(null);
   const recordForfeit = useV1RecordLeagueForfeit(leagueId);
   const { toasts, showToast } = useAdminToast();
   const { confirm, ConfirmModal: confirmModal } = useConfirm();
@@ -715,19 +730,38 @@ export default function LeagueMatchFixturesClient({
     );
   };
 
+  // 경기 추가 창을 여는 두 길(2026-11-03 A안). 시각은 경기 시간(없으면 60분) 간격으로 이어 붙인다.
+  const kickoffGapMinutes = periodDefaultMinutes ?? 60;
+  // 주차 칸에서: 그 주의 마지막 경기일, 마지막 경기 다음 시각으로 연다 — 같은 날 경기를 이어 넣는 일이 가장 흔하다.
+  const openAddFixtureForWeek = (column: LeagueBoardColumn) => {
+    const last = isoToKstDatetimeLocal(column.nodes[column.nodes.length - 1].startAt);
+    setAddFixtureTarget({ date: last.slice(0, 10), time: nextKickoffTime(last.slice(11, 16), kickoffGapMinutes), weekLabel: `${column.weekNumber}주차` });
+  };
+  // 주차 밖에서: 마지막 경기일 1주 뒤 그날 첫 경기 시각(다음 주차), 경기가 없으면 리그 시작일 10시로 연다.
+  const openAddFixture = () => {
+    const starts = series.fixtures.map((fixture) => isoToKstDatetimeLocal(fixture.startAt)).filter(Boolean).sort();
+    const lastDay = starts.at(-1)?.slice(0, 10);
+    if (lastDay === undefined) {
+      setAddFixtureTarget({ date: toKstDateString(leagueStartsOnAt !== null && hasLeagueStartsOn ? leagueStartsOnAt : new Date()), time: '10:00', weekLabel: null });
+      return;
+    }
+    const firstTimeThatDay = starts.find((start) => start.startsWith(lastDay))?.slice(11, 16) ?? '10:00';
+    setAddFixtureTarget({ date: toKstDateString(new Date(Date.parse(`${lastDay}T00:00:00+09:00`) + 7 * DAY_MS)), time: firstTimeThatDay, weekLabel: null });
+  };
+
   // 대진이 있든 없든 같은 자리(보드·목록 공통)에 둔다 — 한 경기씩 운영하는 리그는 이게 주 입구라 접이식 안에 숨기면 매번 찾아 들어가야 한다.
   const manualFixtureEntry = (
     <div className="mb-3 flex flex-wrap items-center gap-3">
       <button
         type="button"
-        onClick={() => setManualFixtureOpen(true)}
+        onClick={openAddFixture}
         // **팀을 못 고르는 모달을 열지 않는다.** 홈·어웨이를 골라야 하는데 참가팀이
         // 아직 안 왔거나(로딩) 2팀 미만이면, 열어 봐야 빈 피커 두 개만 보이고 저장은
         // 항상 막힌다 — 빈 약속이다. 그 상태를 버튼 옆에서 먼저 말한다.
         disabled={!canAddManualFixture || leagueEnded}
         className="min-h-[44px] rounded-xl border border-[var(--border)] px-4 text-sm font-semibold text-[var(--text-strong)] disabled:opacity-50"
       >
-        경기 하나 추가
+        경기 추가
       </button>
       <span className="text-xs text-[var(--text-muted)]">
         {manualFixtureHint(canAddManualFixture, leagueEnded)}
@@ -768,6 +802,7 @@ export default function LeagueMatchFixturesClient({
                 setCancelTarget(series.fixtures.find((fixture) => fixture.teamMatchId === teamMatchId) ?? null)
               }
               onShowList={() => setView('list')}
+              onAddToWeek={canWrite && !leagueEnded && canAddManualFixture ? openAddFixtureForWeek : undefined}
             />
           }
           narrow={
@@ -794,6 +829,9 @@ export default function LeagueMatchFixturesClient({
               canEditFixture={canWrite && !leagueEnded}
               registrationsState={registrationsState}
               showToast={showToast}
+              weeks={boardWeeks}
+              teamsKnown={teamsData !== undefined}
+              onAddToWeek={canWrite && !leagueEnded && canAddManualFixture ? openAddFixtureForWeek : undefined}
             />
           }
         />
@@ -856,6 +894,16 @@ export default function LeagueMatchFixturesClient({
           placeholder="팀 이름으로 검색"
           emptyText="검색 결과가 없어요"
         />
+        {/* 독립 리그의 다음 시즌(2026-11-03) — 지난 시즌 팀을 골라 한 번에 넣는다. */}
+        {series.previousSeason ? (
+          <LeaguePreviousSeasonTeams
+            leagueId={leagueId}
+            previousSeason={series.previousSeason}
+            currentTeamIds={existingTeamIds}
+            disabled={!canWrite || leagueEnded}
+            showToast={showToast}
+          />
+        ) : null}
       </div>
 
       {manualFixtureEntry}
@@ -872,25 +920,34 @@ export default function LeagueMatchFixturesClient({
 {manualFixtureEntry}
 </>
 )}
-      {manualFixtureOpen && (
+      {addFixtureTarget !== null && (
         <LeagueManualFixtureModal
           teams={(teamsData?.teams ?? []).map((team) => ({ id: team.teamId, label: team.name }))}
+          fixtures={series.fixtures.map((fixture) => ({
+            startAt: fixture.startAt,
+            homeTeamId: fixture.homeTeamId,
+            awayTeamId: fixture.awayTeamId,
+            cancelled: fixture.status === 'cancelled',
+          }))}
+          initialDate={addFixtureTarget.date}
+          initialTime={addFixtureTarget.time}
+          weekLabel={addFixtureTarget.weekLabel}
           defaultPlace={series.defaultPlace ?? null}
           recentVenues={series.recentVenues}
           defaultDuration={periodDefaultMinutes === null ? null : { minutes: periodDefaultMinutes, label: periodDefaultHint ?? `${periodDefaultMinutes}분` }}
-          isSubmitting={createManualFixture.isPending}
-          onSubmit={async (payload) => {
+          isSubmitting={createManualFixtures.isPending}
+          onSubmit={async (payloads) => {
             try {
-              const created = await createManualFixture.mutateAsync(payload);
-              // 보던 화면에 머문다 — 다음 경기를 바로 이어서 추가할 수 있게(2026-10-13 모바일 QA).
-              setFocusFixtureId(created.teamMatchId);
-              showToast('경기를 만들었어요.', 'success');
+              const created = await createManualFixtures.mutateAsync(payloads);
+              // 보던 화면에 머문다 — 다음 주차를 바로 이어서 넣을 수 있게(2026-10-13 모바일 QA). 첫 경기를 짚어 준다.
+              setFocusFixtureId(created.teamMatchIds[0] ?? null);
+              showToast(`경기 ${created.teamMatchIds.length}개를 만들었어요.`, 'success');
             } catch (error) {
               showToast(extractErrorMessage(error, '경기를 만들지 못했어요.'), 'error');
               throw error;
             }
           }}
-          onClose={() => setManualFixtureOpen(false)}
+          onClose={() => setAddFixtureTarget(null)}
         />
       )}
 
@@ -1227,6 +1284,16 @@ export default function LeagueMatchFixturesClient({
               placeholder="팀 이름으로 검색"
               emptyText="검색 결과가 없어요"
             />
+            {/* 독립 리그의 다음 시즌(2026-11-03) — 지난 시즌 팀을 골라 한 번에 넣는다. */}
+            {series.previousSeason ? (
+              <LeaguePreviousSeasonTeams
+                leagueId={leagueId}
+                previousSeason={series.previousSeason}
+                currentTeamIds={existingTeamIds}
+                disabled={!canWrite || leagueEnded}
+                showToast={showToast}
+              />
+            ) : null}
           </div>
 
           {/* 우천 순연 재편성·대체 경기는 대진이 **이미 있는** 리그에서 필요하므로 분기 밖에 둔다. */}

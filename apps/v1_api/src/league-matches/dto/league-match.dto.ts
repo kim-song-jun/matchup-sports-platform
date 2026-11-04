@@ -1,5 +1,5 @@
 import { Transform, Type } from 'class-transformer';
-import { ArrayNotEmpty, IsArray, IsBoolean, IsDateString, IsDefined, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, MinLength, ValidateIf, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, ArrayNotEmpty, IsArray, IsBoolean, IsDateString, IsDefined, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, MinLength, ValidateIf, ValidateNested } from 'class-validator';
 import { BANK_FIELD_PATTERN, rawValue, trimmedString } from './league-entry-fee.dto';
 import { IsPlaceLatitude, IsPlaceLongitude, IsPlaceProvider, IsPlaceProviderId } from '../../places/place-snapshot';
 import { TOURNAMENT_GENDER_CATEGORIES, type TournamentGenderCategory } from '../../tournaments/dto/admin-tournament.dto';
@@ -129,6 +129,14 @@ export class CreateLeagueMatchDto {
   @IsOptional()
   @IsIn(TOURNAMENT_GENDER_CATEGORIES, { message: '성별 카테고리가 올바르지 않아요.' })
   genderCategory?: TournamentGenderCategory;
+
+  /**
+   * 이 리그가 이어 가는 지난 시즌(독립 리그 → 독립 리그, 2026-11-03). 주면 그 리그의 다음 시즌으로 잇는다 —
+   * 판정은 `league-season-link.ts` 의 `assertNextSeasonSourceInTx` 한 곳이다.
+   */
+  @IsOptional()
+  @IsUUID()
+  previousLeagueId?: string;
 }
 
 /** 리그 상태 변경 — 상태 변경 버튼 하나가 보류·해제·종료·되돌리기·시작을 모두 이 요청으로 보낸다. */
@@ -148,6 +156,15 @@ export class ChangeLeagueStateDto {
 export class AddLeagueTeamDto {
   @IsUUID()
   teamId!: string;
+}
+
+/** 지난 시즌 팀 한 번에 넣기(독립 리그의 다음 시즌, 2026-11-03). 한 트랜잭션이라 한 팀이라도 막히면 아무 팀도 안 들어간다. */
+export class AddPreviousSeasonTeamsDto {
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayMaxSize(50)
+  @IsUUID(undefined, { each: true })
+  teamIds!: string[];
 }
 
 /**
@@ -397,7 +414,7 @@ export class ListLeagueMatchesQueryDto {
  * (`createLeagueFixture`) — 부수효과가 한쪽에만 빠지지 않게 하려는 것이다.
  *
  * ⚠️ **주차(round)를 받지 않는다.** `V1TeamMatch` 에 주차 컬럼이 없고 순위 계산도 쓰지
- * 않는다 — 화면의 "N주차" 는 그 리그의 서로 다른 경기일을 세어 `startAt` 에서 파생한다
+ * 않는다 — 화면의 "N주차" 는 그 리그에서 경기가 있는 달력 주를 세어 `startAt` 에서 파생한다
  * (`league-week-number.ts`). 받아 봐야 저장되지 않는 값이라 API 표면에 두지 않는다
  * (2026-09-02 사용자 확정, Task 164 Ambiguity 3).
  */
@@ -433,6 +450,20 @@ export class CreateManualLeagueFixtureDto extends LeaguePlaceSnapshotDto {
   @IsString()
   @MaxLength(100)
   title?: string;
+}
+
+/**
+ * 수동 대진 여러 경기를 **한 번에** 만든다(2026-11-03 사용자 확정 — 주차 단위 추가).
+ * 한 트랜잭션이라 하나라도 거부되면 아무 경기도 남지 않는다 — 한 주차의 절반만 생긴 채로 남지 않게 한다.
+ * 30경기는 주차 하나(20팀 리그 10경기)를 넉넉히 덮고, 트랜잭션 45초 안에 끝나는 크기다.
+ */
+export class CreateManualLeagueFixturesBatchDto {
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayMaxSize(30)
+  @ValidateNested({ each: true })
+  @Type(() => CreateManualLeagueFixtureDto)
+  fixtures!: CreateManualLeagueFixtureDto[];
 }
 
 /**

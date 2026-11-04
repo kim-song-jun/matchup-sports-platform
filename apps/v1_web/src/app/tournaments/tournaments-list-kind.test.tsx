@@ -6,7 +6,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { TournamentsListPageClient as TournamentsPage } from './tournaments-list-client';
 import { tournamentListSeedPath } from '@/lib/public-list-seed';
 import { readCompetitionDiscovery, competitionDiscoveryHref } from '@/lib/competition-discovery';
-const phaseFor = (status: string | null) => status === 'draft' ? 'upcoming' : status === 'in_progress' ? 'ongoing' : status === 'completed' ? 'completed' : undefined;
+const stageFor = (status: string | null) => status === 'open' ? 'recruiting' : status === 'in_progress' ? 'ongoing' : status === 'completed' ? 'completed' : undefined;
 
 // 목록은 상세 복귀 복원에 QueryClient 를 쓴다(useCursorPagination) — API 훅을 mock 해도 provider 는 필요하다.
 function render(ui: ReactElement) {
@@ -75,7 +75,7 @@ describe('#1543 대회 목록 — 상태와 모순되지 않는 영역 이름', 
 
   describe.each([false, true])('결과 카드 있음: %s', (hasItems) => {
     it.each([
-      [null, '전체'], ['draft', '시작 전'], ['in_progress', '진행 중'], ['completed', '종료'],
+      [null, '전체'], ['open', '접수 중'], ['in_progress', '진행 중'], ['completed', '종료'],
     ] as const)('%s 상태에서 영역·필터·결과 의미를 유지한다', (status, label) => {
       const params = new URLSearchParams({ sportId: SWIMMING_ID, genderCategory: 'male' });
       if (status) params.set('status', status);
@@ -102,7 +102,7 @@ describe('#1543 대회 목록 — 상태와 모순되지 않는 영역 이름', 
       expect(region).toContainElement(accessibleHeading);
       expect(accessibleHeading).toHaveTextContent(/^대회 목록$/);
       expect(tournamentsMock.mock.calls.at(-1)?.[0]).toMatchObject({
-        kind: 'tournament', phase: phaseFor(status), sportId: SWIMMING_ID, genderCategory: 'male',
+        kind: 'tournament', stage: stageFor(status), sportId: SWIMMING_ID, genderCategory: 'male',
       });
       const summary = `${status ? `${label} · ` : ''}수영 · 남성부`;
       expect(within(region).getByRole('link', { name: `필터 열기 — 현재 ${summary}` }))
@@ -133,7 +133,7 @@ describe('#1543 대회 목록 — 상태와 모순되지 않는 영역 이름', 
     render(<TournamentsPage />);
     const region = screen.getByRole('region', { name: '대회 목록' });
     expect(within(region).getByRole('link', { name: '정규 리그' })).toHaveAttribute('aria-current', 'page');
-    expect(tournamentsMock.mock.calls.at(-1)?.[0]).toMatchObject({ kind: 'league', phase: 'completed' });
+    expect(tournamentsMock.mock.calls.at(-1)?.[0]).toMatchObject({ kind: 'league', stage: 'completed' });
   });
 });
 
@@ -141,7 +141,7 @@ describe('#1516 대회 목록 — 조건에 맞는 정상 빈 결과', () => {
   describe.each([false, true])('종목 선택: %s', (withSport) => {
     it.each([
       ['in_progress', '진행 중'],
-      ['draft', '시작 전'],
+      ['open', '접수 중'],
       ['completed', '종료'],
       [null, '전체'],
     ] as const)('%s 상태의 요청·요약·빈 안내가 모순되지 않는다', (status, label) => {
@@ -155,13 +155,13 @@ describe('#1516 대회 목록 — 조건에 맞는 정상 빈 결과', () => {
       render(<TournamentsPage />);
 
       expect(tournamentsMock.mock.calls.at(-1)?.[0]).toMatchObject({
-        phase: phaseFor(status),
+        stage: stageFor(status),
         sportId: withSport ? SWIMMING_ID : undefined,
         ...(withSport ? { genderCategory: 'male' } : {}),
       });
       const summary = withSport
         ? `${status ? `${label} · ` : ''}수영 · 남성부`
-        : status === 'draft' ? '시작 전·준비 중' : label;
+        : label;
       expect(screen.getByRole('link', { name: `필터 열기 — 현재 ${summary}` })).toHaveAttribute(
         'href', competitionDiscoveryHref(readCompetitionDiscovery(params, 'all'), { filter: true }),
       );

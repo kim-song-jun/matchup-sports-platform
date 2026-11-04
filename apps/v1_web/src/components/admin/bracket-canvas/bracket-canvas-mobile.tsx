@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Zap } from 'lucide-react';
 import type { AdminToastVariant } from '@/components/admin';
 import { AlertBanner, EmptyState } from '@/components/v1-ui/primitives';
@@ -40,6 +40,8 @@ export interface BracketCanvasMobileProps {
   registrationsState: RegistrationsLoadState;
   showToast: (message: string, variant?: AdminToastVariant) => void;
   onEditFixture?: (fixtureId: string) => void;
+  /** 고른 라운드 경기 목록 위에 붙일 머리(리그 주차의 날짜·요약·'이 주에 경기 추가'). 없으면 그리지 않는다. */
+  renderRoundHeader?: (roundKey: string) => ReactNode;
 }
 
 // 390 폭에서 탭 한 칸이 44px 터치 타깃과 3~4글자 라벨을 담을 수 있는 한계. 넘으면 셀렉트로 바꾼다.
@@ -113,7 +115,7 @@ function MobileNodeCard({ node, expanded, onOpen }: { node: MobileNode; expanded
   );
 }
 
-export function BracketCanvasMobile({ sixTeamState, registrations, competitionId, scope, rounds, focusFixtureId = null, slots, groups, fixtures, candidates, canWrite, registrationsState, showToast, onEditFixture }: BracketCanvasMobileProps) {
+export function BracketCanvasMobile({ sixTeamState, registrations, competitionId, scope, rounds, focusFixtureId = null, slots, groups, fixtures, candidates, canWrite, registrationsState, showToast, onEditFixture, renderRoundHeader }: BracketCanvasMobileProps) {
   const roundSelectId = useId();
   const [pickedRoundKey, setPickedRoundKey] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -190,6 +192,7 @@ export function BracketCanvasMobile({ sixTeamState, registrations, competitionId
 
       {!sixTeamState && activeRound ? (
         <div role="tabpanel" aria-label={activeRound.label} className="flex flex-col gap-4">
+          {renderRoundHeader?.(activeRound.key)}
           {activeRound.sections.map((section) => (
             <section key={section.key} className="flex flex-col gap-2">
               {activeRound.sections.length > 1 && section.heading ? (

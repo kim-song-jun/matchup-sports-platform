@@ -238,24 +238,24 @@ the web explicitly requests `all` for its default tab.
 
 | Query | Values / behavior |
 |---|---|
-| `phase` | `upcoming` = draft/open/closed intersected with public gate; `ongoing` = in_progress; `completed` = completed |
-| `registration` | `open` = accepting new registrations; `closed` = remaining public competitions |
+| `stage` | The state the card shows (one badge): `preparing` = draft (regular leagues only; a tournament draft stays hidden), `recruiting` = `open`, deadline not passed, capacity left, `recruit_closed` = stored `closed`, or `open` whose deadline passed or capacity is full, `ongoing` = in_progress, `completed` = completed. It filters on the same group rank the list order uses, so badge, filter and order cannot disagree |
 | `sportId` | UUID, existing sport filter |
 | `genderCategory` | mixed/male/female/unspecified; unspecified matches null |
 | `format` | league/knockout/group_knockout; format is not competition kind |
 | `feeMin`, `feeMax` | integer KRW, inclusive 0–2147483647; max=0 selects free |
 | `dateFrom`, `dateTo` | real calendar date YYYY-MM-DD, inclusive Asia/Seoul day boundaries; period overlap; undated rows excluded |
-| `sort` | latest (createdAt desc), deadline (deadline asc), scheduled (start asc; excludes completed/cancelled rows and rows whose `scheduledEndAt ?? scheduledAt` is before today's Asia/Seoul day start, keeps `in_progress` and undated rows; an explicit `phase=completed`/`status=completed` skips this exclusion); nulls last, id byte-order asc ties; absent sort retains the existing lifecycle-group ordering |
 | `withTotal` | literal string true adds actual total to cursor pageInfo; numbered pages already include total |
 
-`deadline` also enforces registration=open. Tournament admission requires status=open,
+**Order (2026-11-03).** There is no `sort` parameter; the list has one fixed order: in progress → recruiting → preparing → recruitment closed → finished. Inside a group the most recently registered row (`createdAt`) comes first; the finished group is most recently ended first (`scheduledEndAt ?? scheduledAt`). Rows without that date sort last in their group and `id` (byte order) breaks ties. The old `phase`, `registration` and `sort` parameters are removed; the global `forbidNonWhitelisted` pipe answers them with 400, and the web no longer sends them.
+
+Tournament admission requires status=open,
 no expired deadline (null is permitted), and confirmed + awaiting_payment + payment_checking +
 paid registrations below teamCount. Leagues require a non-null unexpired deadline and a
 nonterminal lifecycle; optional maxTeams is checked against the same reserved registrations (null means unlimited), and in_progress leagues can still accept entries.
 The deadline equality instant is open. `registrationOpen` on every list item uses the same
 window/capacity semantics, independent of the viewer's individual team eligibility.
 
-All conditions and sort apply before pagination in the existing SQL keyset query. Default cursors remain compatible; explicit-sort cursors carry their sort mode and cannot be reused across modes.
+All conditions apply before pagination in the existing SQL keyset query. The cursor carries `[group, sortAt, id]`; a cursor from the removed sort modes (four parts) is rejected as an empty window.
 Legacy `status` is retained and intersects new filters. Contradictory filters return an empty
 list. Reversed date or fee ranges return 400 `INVALID_FILTER_RANGE`; malformed/unknown inputs
 are rejected by the existing DTO validation pipe. Gender/format/fee conditions narrow to

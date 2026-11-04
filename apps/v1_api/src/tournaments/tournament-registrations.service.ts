@@ -25,6 +25,7 @@ import {
 import { CAPACITY_HOLD_STATUSES, capacityLimitOf, countCapacityReservations, isCapacityFull } from './registration-capacity';
 import { isRegistrationWindowOpen } from './registration-window';
 import { ALL_COMPETITION_KINDS, findTournamentOnSurface, findTournamentOnSurfaceOrThrow } from './tournament-surface-lookup';
+import { copyPreviousSeasonRoster } from '../league-matches/league-roster-autofill';
 
 /** cancel-request로 어드민 처리가 필요한 상태(이미 운영에 반영됨). */
 const CANCELLABLE_VIA_REQUEST: V1TournamentRegistration['status'][] = [
@@ -439,18 +440,26 @@ export class TournamentRegistrationsService {
           data: { tournamentRealNameVisible: true },
         });
       }
-      return { updated, payment, tournament: lockedTournament };
+      // 독립 리그의 다음 시즌(2026-11-03): 재참가 팀이면 지난 시즌 명단을 옮겨 담는다 — 같은 트랜잭션이라 제출이 실패하면
+      // 옮긴 명단도 남지 않는다. 판정·잠금은 자동 채움과 같은 함수 계열(`copyPreviousSeasonRoster`)이 한다.
+      const carried = lockedTournament.kind === 'regular_league' && lockedTournament.previousLeagueId != null
+        ? await copyPreviousSeasonRoster(tx, tournamentId, { id: registrationId, teamId: registration.teamId })
+        : null;
+      return { updated, payment, tournament: lockedTournament, carriedPlayers: carried?.added ?? 0 };
     });
 
     // 알림: 신청자에게 접수 안내 (fire-and-forget — 트랜잭션 실패와 무관)
     const noun = competitionNounFor(result.tournament.kind);
+    const carriedNote = result.carriedPlayers > 0 ? ` 지난 시즌 명단 ${result.carriedPlayers}명을 옮겨 왔어요. 확인해 주세요.` : '';
     void this.notifications.emitNotification(
       result.updated.appliedByUserId,
       'tournament_registration_submitted',
       tournamentId,
       result.tournament.entryFee > 0
-        ? `"${result.tournament.title}" ${noun} 입금 안내를 확인해 주세요.`
-        : `"${result.tournament.title}" ${noun} 신청이 접수됐어요. 명단을 등록해 주세요.`,
+        ? `"${result.tournament.title}" ${noun} 입금 안내를 확인해 주세요.${carriedNote}`
+        : result.carriedPlayers > 0
+          ? `"${result.tournament.title}" ${noun} 신청이 접수됐어요.${carriedNote}`
+          : `"${result.tournament.title}" ${noun} 신청이 접수됐어요. 명단을 등록해 주세요.`,
       { competitionKind: result.tournament.kind },
     );
 

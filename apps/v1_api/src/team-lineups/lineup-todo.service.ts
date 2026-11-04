@@ -54,7 +54,7 @@ export type LineupTodo = {
    * 리그의 주차는 `V1TeamMatch.title`에 박제된 값을 쓰지 않는다 — 그 제목은 대진 생성
    * 시점에 굳고 재일정(`updateFixture`)에서 갱신되지 않아서, 그대로 쓰면 같은 경기를
    * 공개 경기기록·어드민 영상 화면과 **다른 주차로 부르게 된다**. 저 두 화면과 같은
-   * 규칙(KST 경기일 순번)으로 `startAt`에서 매번 파생한다.
+   * 규칙(KST 달력 주 순번)으로 `startAt`에서 매번 파생한다.
    */
   title: string;
   opponentName: string | null;
@@ -329,7 +329,7 @@ export class LineupTodoService {
       // `V1TeamMatch.title`("<리그명> N주차 M경기")을 쓰지 않는 이유는 그 값이 대진 생성
       // 시점에 굳고 재일정에서 갱신되지 않기 때문이다 — 운영자가 경기를 앞당기면 제목만
       // 옛 주차로 남아, 같은 경기를 공개 경기기록·어드민 영상 화면과 다른 주차로 부르게 된다.
-      // 그래서 주차는 저 화면들과 같은 규칙(KST 경기일 순번)으로 startAt에서 파생한다.
+      // 그래서 주차는 저 화면들과 같은 규칙(KST 달력 주 순번)으로 startAt에서 파생한다.
       // 그날의 경기 순번("M경기")도 붙이지 않는다. timing 을 지정한 리그는 한 팀이 하루에
       // 여러 경기를 뛰므로(팀당 하루 N경기) 순번이 행을 구분해 주긴 했지만, 그 값 역시
       // 제목과 함께 굳어 재일정 뒤에는 실제 킥오프 순서와 어긋난다 — 틀린 순번을 말하느니
@@ -380,7 +380,7 @@ export class LineupTodoService {
    *
    * 규칙은 공개 경기기록(`public-tournament-records.service.ts`의 `resolveLeagueWeekNumber`)·
    * 어드민 영상 화면(`league-fixture-videos.service.ts`)과 **완전히 같다**: 그 리그의 서로 다른
-   * KST 경기일을 오름차순으로 세어 몇 번째 날인지가 곧 주차다. 같은 경기가 화면마다 다른
+   * 경기가 있는 KST 달력 주를 오름차순으로 세어 몇 번째 주인지가 곧 주차다. 같은 경기가 화면마다 다른
    * 주차로 불리면 안 되므로 규칙을 여기서 새로 만들지 않는다.
    *
    * 저쪽이 `startAt <= 대상`으로 범위를 좁히는 것은 비용 최적화일 뿐이다(뒤 날짜는 앞

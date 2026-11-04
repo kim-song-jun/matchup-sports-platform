@@ -37,7 +37,7 @@ const fixture = (id: string, status: string, resultStage: string) => ({
 function loaded(overrides: Record<string, unknown> = {}) {
   return {
     data: {
-      leagueId: 'league-1', isPublic: true, title: '가을 풋살 리그', state: 'active',
+      leagueId: 'league-1', seriesId: null, isPublic: true, title: '가을 풋살 리그', state: 'active',
       teamIds: ['t1', 't2'], startsOn: '2026-09-01T00:00:00.000Z',
       fixtures: [fixture('tm-1', 'completed', 'official'), fixture('tm-2', 'matched', 'not_entered')],
       entryFee: 0, entryFeeConfiguredAt: null, registrationDeadlineAt: null,
@@ -73,6 +73,49 @@ describe('LeagueAdminShell', () => {
   });
 
   describe('섹션 바', () => {
+    it.each([
+      ['completed', null, true],
+      ['completed', 'series-1', false],
+      ['active', null, false],
+      ['completed', undefined, false],
+    ])('상태 %s·체계 %s에서 전환 메뉴를 올바르게 표시한다', (state, seriesId, visible) => {
+      query.value = loaded({ state, seriesId });
+      renderShell();
+      const link = screen.queryByRole('link', { name: '리그 체계로 전환' });
+      if (visible) expect(link).toHaveAttribute('href', '/admin/league-matches/league-1/series-conversion');
+      else expect(link).not.toBeInTheDocument();
+    });
+
+    // 2026-11-03: 끝난 독립 리그는 다음 시즌 잇기와 리그 체계 전환 중 하나만 한다.
+    it.each([
+      ['active', null, undefined, false, true],
+      ['completed', null, undefined, false, true],
+      ['draft', null, undefined, false, false],
+      ['completed', 'series-1', undefined, false, false],
+      ['completed', null, undefined, true, false],
+    ])('상태 %s·체계 %s에서 다음 시즌 만들기 노출(이은 시즌 %s·전환 %s → %s)', (state, seriesId, nextSeason, convertedToSeries, visible) => {
+      query.value = loaded({ state, seriesId, nextSeason, convertedToSeries });
+      renderShell();
+      const link = screen.queryByRole('link', { name: '다음 시즌 만들기' });
+      if (visible) expect(link).toHaveAttribute('href', '/admin/league-matches/league-1/next-season');
+      else expect(link).not.toBeInTheDocument();
+    });
+
+    it('다음 시즌을 이은 리그는 다음 시즌 보기만 두고 리그 체계 전환을 숨긴다', () => {
+      query.value = loaded({ state: 'completed', nextSeason: { leagueId: 'league-2', title: '겨울 리그' } });
+      renderShell();
+      expect(screen.getByRole('link', { name: '다음 시즌 보기' })).toHaveAttribute('href', '/admin/league-matches/league-1/next-season');
+      expect(screen.queryByRole('link', { name: '다음 시즌 만들기' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: '리그 체계로 전환' })).not.toBeInTheDocument();
+    });
+
+    it('조회 전용 관리자에게는 다음 시즌 만들기가 없다', () => {
+      adminCanWrite.value = false;
+      query.value = loaded({ state: 'completed' });
+      renderShell();
+      expect(screen.queryByRole('link', { name: '다음 시즌 만들기' })).not.toBeInTheDocument();
+    });
+
     it('운영·설정·사후로 묶고, 각 섹션은 리그 아래 자기 주소를 가진다', () => {
       renderShell();
 

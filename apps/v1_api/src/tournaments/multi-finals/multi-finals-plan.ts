@@ -44,12 +44,25 @@ export function planPreliminaryGroups(groups: readonly PreliminaryGroupDto[]): B
   return plan;
 }
 
+/** Pending participants occupy real seeds. Only leaves outside the capacity are byes. */
+export function namedFinalSize(final: NamedFinalDto): number {
+  return final.registrationIds == null ? final.rules.length : final.registrationIds.length;
+}
+
+/** Team changes with identical topology can fill existing games without losing their schedule. */
+export function sameNamedFinalStructure(left: readonly NamedFinalDto[], right: readonly NamedFinalDto[]): boolean {
+  return left.length === right.length && left.every((final, index) => {
+    const other = right[index];
+    return final.name.trim() === other.name.trim() && final.thirdPlace === other.thirdPlace && namedFinalSize(final) === namedFinalSize(other);
+  });
+}
+
 /** A seed's first rank is strongest. Missing leaves become byes, never empty games. */
 export function planNamedFinals(finals: readonly NamedFinalDto[], offset = 0): BracketTemplatePlan {
   const plan = empty(); let number = offset;
   type Origin = { slot: PlanSlot } | { fixture: PlanFixture };
   for (const [trackIndex, final] of finals.entries()) {
-    const size = final.registrationIds?.length ?? 0;
+    const size = namedFinalSize(final);
     if (size < 2 || final.thirdPlace && size < 4) invalidMultiFinal('결선은 2팀 이상, 3·4위전은 4팀 이상이어야 해요.');
     const width = 2 ** Math.ceil(Math.log2(size));
     let seedOrder = [1, 2];

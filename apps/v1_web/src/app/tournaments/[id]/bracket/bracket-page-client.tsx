@@ -326,14 +326,16 @@ function BracketEmpty({
   bracketPublishScheduledAt,
 }: {
   detailHref: string;
-  format: 'knockout' | 'group_knockout';
+  format: V1TournamentDetail['format'];
   status: V1TournamentDetail['status'];
   teamCount: number;
   confirmedCount: number;
   registrationDeadlineAt: string | null;
   bracketPublishScheduledAt: string | null;
 }) {
-  const sub = format === 'group_knockout'
+  const sub = format === 'league_knockouts'
+    ? '토너먼트 대진이 생성되면 여기에서 확인할 수 있어요.'
+    : format === 'group_knockout'
     ? '대진표는 조별리그가 끝난 후 공개돼요.'
     : '대진 편성이 완료되면 대진표가 공개돼요.';
 
@@ -512,6 +514,8 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
    * 대회 7건(alpha 실측)의 문구까지 바뀐다.
    */
   const isRegularLeague = tournament.kind === 'regular_league';
+  // Both formats have preliminary groups and a knockout phase; named finals use the same public surfaces.
+  const hasGroupStage = format === 'group_knockout' || format === 'league_knockouts';
   /**
    * **정규 리그의 순위는 대회 축 `groups` 에 없다.** 거울 행에는 `V1TournamentGroup` 이
    * 하나도 없어서(그 행을 만드는 코드가 전부 대회 게이트 뒤다) 아래 `allLeagueRows` 가
@@ -641,10 +645,10 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
     : fixtures.length === 0;
   // 리그는 순위 행이 0이어도(편성 팀이 없고 경기만 있는 대회) 칼럼을 유지한다 — 순위표가 스스로 빈 상태
   // 안내를 그린다. 칼럼을 빼면 리그에는 대진표 칼럼도 없어 이 탭이 통째로 비어 보인다.
-  const hasStandingsColumn = isLeague || (format === 'group_knockout' && hasGroupStandings);
+  const hasStandingsColumn = isLeague || (hasGroupStage && hasGroupStandings);
   // 리그엔 토너먼트 대진이 없다. isLeague 를 안 빼면 거울 행(group_knockout)이 여기서
   // 참이 되어 **빈 대진표 칼럼**이 생긴다 — 이 화면이 리그에서 가장 크게 틀어지는 자리다.
-  const hasBracketColumn = !isLeague && (format === 'knockout' || format === 'group_knockout');
+  const hasBracketColumn = !isLeague && (format === 'knockout' || hasGroupStage);
   const showGroupStandings = hasStandingsColumn && (!hasBracketColumn || standingsPhase === 'group_stage');
   const showKnockoutBracket = hasBracketColumn && (!hasStandingsColumn || standingsPhase === 'knockout');
 
@@ -800,7 +804,7 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
                 </section>
               )}
 
-              {!isLeague && format === 'group_knockout' && hasGroupStandings && (
+              {!isLeague && hasGroupStage && hasGroupStandings && (
                 <section>
                   {visibleGroups.map((g) => (
                     <GroupStandingsSection key={g.id} group={g} isMyGroup={isMyGroup(g)} fixtures={fixtures} fromHref={bracketSelfHref ?? undefined} />

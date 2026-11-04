@@ -1108,6 +1108,26 @@ PR1858 latest-dev merge 30개 충돌 파일. generated Prisma client/의존성 �
 
 - 최종 좁은 Web 통합: 공개 결과16 + 공용 MSW8 + wizard4 + 기존 shared MSW facet14 = 42/42 PASS. runtime version7/7 및 현재·과거 schema binding9/9 PASS. 이전 P1/P2 세 항목의 코드 수정은 완료, 새 head CI 및 신규 alpha after QA는 별도 gate로 유지한다.
 
+### 2026-11-04 미정 결선 선생성 및 예선 종료 후 배정 (active)
+
+- Status: In Progress. 기존 task의 N개 결선 기능 후속이며 단일 세션 순차 실행.
+- Original Conditions: [ ] 예선 편성 다음 단계 이동, [ ] 팀 선택 없이 규칙의 자리 수로 대진 생성, [ ] 예선 종료 후 전체 순위·동률 표시와 자동/수동 배정.
+- Phase 1 in_progress: 현행 계약/회귀 및 미정 결선 API. Phase 2 pending: 사용자 화면 선택 후 wizard 연결. Phase 3 pending: 좁은 테스트·타입·리뷰·alpha QA.
+- Owned: multi-finals API/plan/tests, wizard/hooks/MSW/tests, API 문서·changeset·본 task 및 별도 QA 시나리오. Forbidden: 공유 원본 WIP, main 승격, 운영 DB 변경.
+- Acceptance: 미정 팀을 부전승으로 처리하지 않음; 규칙으로 결선 규모 결정; 공식 순위만 자동 추천하고 동률은 운영자 선택; 동일 구조의 후속 팀 배정은 경기 ID/일정 유지; 시작/기록/중복/권한/CAS 보호 유지.
+- User/Test Scenarios: 최초 편성→규칙→미정 대진 생성→예선 공식 종료→전체 순위 확인→자동 선택/동률 수동 선택→기존 대진에 배정. 미정/동률·stale·중복·API 실패도 검증.
+- Risks: 원본 트리는 오래된 dev 및 다수 WIP. 최신 origin/dev 185043dcb에서 `_worktrees/multi-finals-deferred-teams` / `fix/multi-finals-deferred-teams-20261104` 격리. 기본 터미널 초기화 실패는 escalated 실행으로 해결. 사용자 B안 선택: 생성과 배정을 독립 진입점/화면으로 분리.
+- Security: mutation admin, 대회 잠금, 확정 참가팀 검증·결선 시작 보호·감사 로그 유지. schema 변경 없이 기존 multiFinals JSON과 슬롯 사용.
+- Tech Debt Resolved: 실제 명단과 대진 자리 수의 결합 해제; 순위 미확정 상태의 명시적 보존.
+- Ambiguity: 빈 자동 명단은 규칙 자리 수로 미정 대진을 생성. 규칙도 팀도 없는 결선은 크기를 추측하지 않고 거절.
+- Progress Snapshot: Phase1/2 코드 완료. API15/15, Web146/146, 실제 PostgreSQL10/10, 양쪽 tsc0·API surface753·Web pattern PASS. 순위/동률·일정 보존과 권한/CAS/rollback을 검증했다. schema/migration 변경0.
+- UI 재진입: 저장된 예선을 건너뛰지 않고 읽기 전용으로 확인→다음 가능. 생성 화면은 팀 선택 단계를 거치지 않는다. 단계 이동/검증 실패 시 본문 스크롤을 상단으로 초기화한다.
+- Phase3 제한: alpha 기능0/7·viewport0/3. `cua.getState()`가 sandbox 초기화 오류로 브라우저 생성 전에 종료됨. 미배포·미수동검증이며 완료/PR-ready로 표기하지 않는다. 상세는 `docs/scenarios/multi-finals-deferred-teams-20261104.md`.
+- 검증 환경: 기존 공유 client가 구 schema라 최초 단위 실행이 type mismatch로 중단됨. 최신 v1 의존성을 읽기 전용 링크로 재사용해 해결. 임시 PostgreSQL55484 runner는 종료됨. 전체 migration replay는 기존 Android policy materialization gate에서 중단됐고, 별도 빈 DB에 최신 schema를 준비한 기능 통합만 PASS로 집계한다.
+- 사용자 후속 요청: 공개 사용자 순위표에서 조별 순위·결선이 모두 빠지는 문제 확인/수정. API는 두 데이터를 제공하지만 bracket-page-client의 3개 표시 gate가 group_knockout만 허용해 league_knockouts를 제외한다. 기존 공개 순위표·이름별 결선 컴포넌트를 그대로 복구하는 조건/분류 로직 수정이며 신규 UI 설계는 없다.
+- 후속 Owned: 공개 bracket-page-client.tsx/test.tsx, 이 task·시나리오·changeset/API 설명. 이전 PR2149의 후속 커밋으로 전달. 회귀 RED→GREEN으로 조별 전체 순위·N개 미정 결선·공식 배정 후 진출 표시를 확인한다.
+- 공개 후속 검증: 최초 3개 UI 회귀 RED → 표시 gate 수정 후 신규5개 포함 공개 순위/분류/결선/최종결과177/177 PASS, Web tsc0·pattern PASS. alpha 공개 API에서 해당 대회의 예선3조/42경기와 결선8개 편성/전체58경기 존재를 확인했으나 예선 팀 배정·순위행·완료는 모두0이다. 데이터 쓰기0, API 읽기를 브라우저 PASS로 집계하지 않는다.
+
 ### 2026-11-03 alpha 배포 요청 후속
 
 - 사용자 요청: PR1858 기능을 alpha에 배포. main 승격은 범위 밖이다.

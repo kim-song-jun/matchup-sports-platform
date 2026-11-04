@@ -61,17 +61,17 @@ export function createNamedFinalsMsw(actor: Actor = 'ops') {
   // The fixture has no official preliminary results. Manual selections remain
   // available; it never invents resolved ranks or successful result confirmation.
   function preview(): MultiFinalPreview | Response {
-    if (view.finals.some(f => f.registrationIds == null && f.unresolved.length > 0)) return fail(409, 'MULTI_FINAL_RANK_UNRESOLVED', '예선 순위가 미확정이에요. 진출팀을 직접 선택해 주세요.');
-    const finals = view.finals.map(f => ({ ...f, registrationIds: f.registrationIds ?? f.suggestedRegistrationIds }));
-    if (finals.some(f => f.registrationIds.length < 2 || f.thirdPlace && f.registrationIds.length < 4)) return invalid();
+    const finals = view.finals.map(f => ({ ...f, registrationIds: f.registrationIds ?? (f.unresolved.length ? null : f.suggestedRegistrationIds) }));
+    const capacity = (f: MultiFinalDefinition) => f.registrationIds?.length ?? f.rules.length;
+    if (finals.some(f => capacity(f) < 2 || f.thirdPlace && capacity(f) < 4)) return invalid();
     const plan: NonNullable<MultiFinalPreview['plan']> & { groups: Array<{ key: string; name: string; bracketTrack: string; phase: string }> } = { groups: [], slots: [], fixtures: [], edges: [] };
     let number = detail.fixtures.filter(f => f.groupId?.startsWith('group-')).length, byes = 0;
     for (const [index, final] of finals.entries()) {
-      const ids = final.registrationIds!; const width = 2 ** Math.ceil(Math.log2(ids.length)); byes += width - ids.length;
+      const size = capacity(final); const width = 2 ** Math.ceil(Math.log2(size)); byes += width - size;
       let seeds = [1, 2]; while (seeds.length < width) { const sum = seeds.length * 2 + 1; seeds = seeds.flatMap(seed => [seed, sum - seed]); }
       type Origin = { slot: string } | { fixture: string } | null;
-      let origins: Origin[] = seeds.map(seed => seed > ids.length ? null : { slot: `seed:${index}:${seed}` });
-      plan.slots.push(...ids.map((_, i) => ({ key: `seed:${index}:${i + 1}`, groupKey: `final:${index}:${width}`, position: i + 1 })));
+      let origins: Origin[] = seeds.map(seed => seed > size ? null : { slot: `seed:${index}:${seed}` });
+      plan.slots.push(...Array.from({ length: size }, (_, i) => ({ key: `seed:${index}:${i + 1}`, groupKey: `final:${index}:${width}`, position: i + 1 })));
       for (let size = width; size >= 2; size /= 2) {
         const key = `final:${index}:${size}`; const phase = size === 2 ? 'final' : 'semi';
         plan.groups.push({ key, name: `${final.name} · ${size === 2 ? '결승' : `${size}강`}`, bracketTrack: final.name, phase });
@@ -123,8 +123,14 @@ export function createNamedFinalsMsw(actor: Actor = 'ops') {
       if (input.expectedRevision !== view.revision) return stale();
       const finals = parseFinals(input.finals); if (!finals) return invalid();
       if (awardSets.some(row => !finals.some(f => f.name === row.bracketTrack))) return fail(409, 'BRACKET_TRACK_AWARDS_REQUIRE_RESCOPING', '시상 범위를 먼저 정리해 주세요.');
-      view = { ...view, revision: view.revision + 1, generated: false, finals: finals.map(f => ({ ...f, manual: f.registrationIds != null, suggestedRegistrationIds: [], unresolved: f.rules.map(rule => ({ ...rule, state: 'group_incomplete', tiedRegistrationIds: [] })) })) };
-      detail.groups = preliminaryGroups(); detail.fixtures = detail.fixtures.filter(f => f.groupId?.startsWith('group-')); return ok(view);
+      const sameStructure = finals.length === view.finals.length && finals.every((final, i) => {
+        const previous = view.finals[i];
+        return final.name === previous.name && final.thirdPlace === previous.thirdPlace
+          && (final.registrationIds?.length ?? final.rules.length) === (previous.registrationIds?.length ?? previous.rules.length);
+      });
+      view = { ...view, revision: view.revision + 1, generated: sameStructure && view.generated, finals: finals.map(f => ({ ...f, manual: f.registrationIds != null, suggestedRegistrationIds: [], unresolved: f.rules.map(rule => ({ ...rule, state: 'group_incomplete', tiedRegistrationIds: [] })) })) };
+      if (!sameStructure) { detail.groups = preliminaryGroups(); detail.fixtures = detail.fixtures.filter(f => f.groupId?.startsWith('group-')); }
+      return ok(view);
     }),
     http.post(`${path}/preview`, () => { const denied = auth(true); if (denied) return denied; const value = preview(); return value instanceof Response ? value : ok(value); }),
     http.post(`${path}/generate`, async ({ request }) => {
@@ -141,7 +147,8 @@ export function createNamedFinalsMsw(actor: Actor = 'ops') {
         const final = view.finals.find(f => f.name === group.bracketTrack)!;
         const team = (slotKey: string | null) => { const slot = plan.slots.find(s => s.key === slotKey); return view.registrations.find(r => r.id === final.registrationIds?.[(slot?.position ?? 0) - 1]); };
         const home = team(fixture.homeSlotKey), away = team(fixture.awaySlotKey);
-        return { id: fixture.key, groupId: group.key, round: group.name, fixtureNumber: fixture.fixtureNumber, legNumber: 1, scheduledAt: null, venue: null, status: 'scheduled', liveStatus: 'scheduled', homeRegistrationId: home?.id ?? null, awayRegistrationId: away?.id ?? null, homeTeamId: home?.team.id ?? null, awayTeamId: away?.team.id ?? null, homeTeamName: home?.team.name ?? 'TBD', awayTeamName: away?.team.name ?? 'TBD', homeTeamLogoUrl: null, awayTeamLogoUrl: null, homeSlotLabel: null, awaySlotLabel: null, result: null, videos: [] };
+        const previous = detail.fixtures.find(row => row.id === fixture.key);
+        return { id: fixture.key, groupId: group.key, round: group.name, fixtureNumber: fixture.fixtureNumber, legNumber: 1, scheduledAt: previous?.scheduledAt ?? null, venue: previous?.venue ?? null, status: 'scheduled', liveStatus: 'scheduled', homeRegistrationId: home?.id ?? null, awayRegistrationId: away?.id ?? null, homeTeamId: home?.team.id ?? null, awayTeamId: away?.team.id ?? null, homeTeamName: home?.team.name ?? 'TBD', awayTeamName: away?.team.name ?? 'TBD', homeTeamLogoUrl: null, awayTeamLogoUrl: null, homeSlotLabel: null, awaySlotLabel: null, result: null, videos: [] };
       })];
       replays.set(input.requestId, { hash: value.previewHash, revision: view.revision }); return ok({ revision: view.revision, counts: value.counts, replayed: false });
     }),

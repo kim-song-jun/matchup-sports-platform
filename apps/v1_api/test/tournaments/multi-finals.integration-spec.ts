@@ -26,12 +26,12 @@ async function setup() {
   return service.setup(user, tournamentId, { expectedRevision: 0, groups: [0, 1].map(i => ({ name: `${i + 1}조`, capacity: 5, legs: 1 as const, registrationIds: registrationIds.slice(i * 5, i * 5 + 5) })),
     finals: [{ name: '챔피언', thirdPlace: false, rules: [{ groupId: '0', rank: 1 }, { groupId: '1', rank: 1 }], registrationIds: null }] });
 }
-async function finishPreliminary() {
+async function finishPreliminary(tied = false) {
   const rows = await prisma.v1TournamentMatchDetails.findMany({ where: { tournamentId, group: { phase: 'group' } }, include: { teamMatch: { include: { game: true } } } });
   for (const row of rows) {
     const game = row.teamMatch.game!;
     const revision = await prisma.v1GameResultRevision.create({ data: { gameId: game.id, revision: 1, state: 'OFFICIAL',
-      score: { home: 10 - registrationIds.indexOf(row.homeRegistrationId!), away: 10 - registrationIds.indexOf(row.awayRegistrationId!) },
+      score: tied ? { home: 0, away: 0 } : { home: 10 - registrationIds.indexOf(row.homeRegistrationId!), away: 10 - registrationIds.indexOf(row.awayRegistrationId!) },
       goalEvents: [], missingScorer: true, eventsHash: `multi-${game.id}`, createdByActorType: 'SYSTEM', createdBySystemActor: 'GAME_BACKFILL', officialAt: new Date(), submittedAt: new Date() } });
     await prisma.v1Game.update({ where: { id: game.id }, data: { state: 'ENDED', currentOfficialRevisionId: revision.id } });
     await prisma.v1TeamMatch.update({ where: { id: row.teamMatchId }, data: { status: 'completed' } });
@@ -66,11 +66,25 @@ describe('N개 결선 실제 DB 저장·공식 순위·수동 편집·재생성'
   }, 60000);
   it('예선 미완료는 자동 진출을 확정하지 않고 공식 결과 후 조별 1위를 제안한다', async () => {
     const first = await setup(); expect(first.finals[0].unresolved).toHaveLength(2);
-    await expect(service.preview(user, tournamentId)).rejects.toMatchObject({ response: { code: 'MULTI_FINAL_RANK_UNRESOLVED' } });
+    const pending = await service.preview(user, tournamentId);
+    expect(pending.finals[0].registrationIds).toBeNull();
+    expect(pending.plan.slots).toHaveLength(2);
+    await service.generate(user, tournamentId, { expectedRevision: pending.revision, previewHash: pending.previewHash, requestId: randomUUID() });
+    const before = await prisma.v1TournamentMatchDetails.findFirstOrThrow({ where: { tournamentId, group: { phase: 'final' }, teamMatch: { deletedAt: null } } });
+    const scheduledAt = new Date('2026-12-01T09:00:00Z');
+    await prisma.v1TeamMatch.update({ where: { id: before.teamMatchId }, data: { startAt: scheduledAt } });
     await finishPreliminary();
     const view = await service.get(user, tournamentId);
     expect(view.finals[0].suggestedRegistrationIds).toEqual([registrationIds[0], registrationIds[5]]);
     expect(view.finals[0].manual).toBe(false);
+    expect(view.groupStandings.every(group => group.complete)).toBe(true);
+    expect(view.groupStandings.map(group => group.rows.length)).toEqual([5, 5]);
+    const fill = await service.preview(user, tournamentId);
+    await service.generate(user, tournamentId, { expectedRevision: fill.revision, previewHash: fill.previewHash, requestId: randomUUID() });
+    const after = await prisma.v1TournamentMatchDetails.findFirstOrThrow({ where: { tournamentId, group: { phase: 'final' }, teamMatch: { deletedAt: null } }, include: { teamMatch: true } });
+    expect(after.teamMatchId).toBe(before.teamMatchId);
+    expect(after.teamMatch.startAt).toEqual(scheduledAt);
+    expect([after.homeRegistrationId, after.awayRegistrationId]).toEqual([registrationIds[0], registrationIds[5]]);
   });
   it('순위 밖 팀을 포함해 3개 결선 명단을 저장하고 재계산 뒤에도 유지하며 예선을 보존한다', async () => {
     const first = await setup(); await finishPreliminary(); const before = await preliminarySnapshot();
@@ -98,6 +112,27 @@ describe('N개 결선 실제 DB 저장·공식 순위·수동 편집·재생성'
     const changed = await service.select(user, tournamentId, { expectedRevision: next.revision, finals: [{ ...finals[0], registrationIds: [registrationIds[0], registrationIds[9]] }] });
     expect(changed.generated).toBe(false); expect(await preliminarySnapshot()).toEqual(before);
   }, 30000);
+  it('완전 동률은 전체 순위와 후보를 제공하고 수동 선택을 기존 미정 대진에 배정한다', async () => {
+    await setup();
+    const pending = await service.preview(user, tournamentId);
+    await service.generate(user, tournamentId, { expectedRevision: pending.revision, previewHash: pending.previewHash, requestId: randomUUID() });
+    const before = await prisma.v1TournamentMatchDetails.findFirstOrThrow({ where: { tournamentId, group: { phase: 'final' } } });
+    await finishPreliminary(true);
+    const view = await service.get(user, tournamentId);
+    expect(view.groupStandings.every(group => group.complete && group.rows.length === 5)).toBe(true);
+    expect(view.finals[0].suggestedRegistrationIds).toEqual([]);
+    expect(view.finals[0].unresolved.map(rule => rule.state)).toEqual(['tied', 'tied']);
+    expect(view.finals[0].unresolved[0].tiedRegistrationIds).toHaveLength(5);
+    expect((await service.preview(user, tournamentId)).finals[0].registrationIds).toBeNull();
+    const selected = await service.select(user, tournamentId, { expectedRevision: view.revision,
+      finals: [{ name: '챔피언', thirdPlace: false, rules: view.finals[0].rules, registrationIds: [registrationIds[2], registrationIds[7]] }] });
+    expect(selected.generated).toBe(true);
+    const preview = await service.preview(user, tournamentId);
+    await service.generate(user, tournamentId, { expectedRevision: selected.revision, previewHash: preview.previewHash, requestId: randomUUID() });
+    const after = await prisma.v1TournamentMatchDetails.findUniqueOrThrow({ where: { teamMatchId: before.teamMatchId } });
+    expect([after.homeRegistrationId, after.awayRegistrationId]).toEqual([registrationIds[2], registrationIds[7]]);
+    expect(await prisma.v1TournamentMatchDetails.count({ where: { tournamentId, group: { phase: 'final' }, teamMatch: { deletedAt: null } } })).toBe(1);
+  });
   it('다른 대회 팀·중복 팀·중복 순위 목적지를 거절하고 기존 명단을 보존한다', async () => {
     const view = await setup();
     for (const bad of [

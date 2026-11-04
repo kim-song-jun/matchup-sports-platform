@@ -446,7 +446,7 @@ export function BracketGroupCard({
           </div>
 
           {/* ── 팀 배정 ── */}
-          {!structureEditable ? <p className="tm-text-caption text-[var(--text-muted)]">그림 보기에서 예선 팀을 배정하고, 예선·토너먼트 설정에서 결선 진출팀을 편집해요.</p> : managedKnockout ? <p className="tm-text-caption text-[var(--text-muted)]">결선 진출 자리는 대진표에서 확인하고 배정해 주세요.</p> : managedEntrySlots ? <p className="tm-text-caption text-[var(--text-muted)]">위의 ‘조별 팀 자리 편집’에서 팀을 선택해 주세요. 연결된 조별 경기들에 함께 반영돼요.</p> : <TeamStagingPicker
+          {!structureEditable ? <p className="tm-text-caption text-[var(--text-muted)]">그림 보기에서 예선 팀을 배정하고, 진출팀 배정 화면에서 결선 진출팀을 편집해요.</p> : managedKnockout ? <p className="tm-text-caption text-[var(--text-muted)]">결선 진출 자리는 대진표에서 확인하고 배정해 주세요.</p> : managedEntrySlots ? <p className="tm-text-caption text-[var(--text-muted)]">위의 ‘조별 팀 자리 편집’에서 팀을 선택해 주세요. 연결된 조별 경기들에 함께 반영돼요.</p> : <TeamStagingPicker
             pickerId={`bracket-group-${group.id}-team-search`}
             suggestedTeams={existingKnockout ? [] : suggestedTeams}
             searchPoolItems={searchPoolItems}

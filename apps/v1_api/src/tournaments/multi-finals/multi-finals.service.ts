@@ -15,7 +15,7 @@ import { orderFixturesForTeardown } from '../templates/bracket-teardown-order';
 import { TOURNAMENT_VENUE_SELECT } from '../../places/tournament-venue';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from '../tournament-surface-lookup';
 import { MultiFinalGenerateDto, MultiFinalSelectionDto, MultiFinalSetupDto, NamedFinalDto } from './multi-finals.dto';
-import { invalidMultiFinal, planNamedFinals, planPreliminaryGroups, validateNamedFinals } from './multi-finals-plan';
+import { invalidMultiFinal, planNamedFinals, planPreliminaryGroups, sameNamedFinalStructure, validateNamedFinals } from './multi-finals-plan';
 
 type Tx = Prisma.TransactionClient;
 type Config = { groups: Array<{ id: string; name: string; capacity: number; legs: 1 | 2 }>; finals: NamedFinalDto[] };
@@ -72,20 +72,37 @@ export class MultiFinalsService {
   private async view(tx: Tx, id: string) {
     const tournament = await this.tournament(tx, id); const config = this.config(tournament.multiFinals);
     const registrations = await this.confirmed(tx, id);
-    if (!config) return { revision: tournament.multiFinalsRevision, groups: [], finals: [], registrations, generated: false };
+    if (!config) return { revision: tournament.multiFinalsRevision, groups: [], finals: [], registrations, generated: false, groupStandings: [] };
     const sources = await loadGroupRankSources(tx, id, config.groups.map(g => g.id));
+    const standingRows = await tx.v1TournamentStanding.findMany({
+      where: { groupId: { in: config.groups.map(g => g.id) } },
+      select: { groupId: true, registrationId: true, position: true, points: true, wins: true, draws: true, losses: true, goalsFor: true, goalsAgainst: true },
+      orderBy: [{ position: 'asc' }, { registrationId: 'asc' }],
+    });
+    const groupStandings = config.groups.map(group => {
+      const source = sources.get(group.id)!;
+      return { groupId: group.id, name: group.name,
+        complete: source.registrationIds.length === group.capacity && resolveGroupRank(source, 1).state !== 'group_incomplete',
+        rows: standingRows.filter(row => row.groupId === group.id).map(row => {
+          const resolution = row.position === null ? null : resolveGroupRank(source, row.position);
+          return { ...row, teamName: source.teamNameById.get(row.registrationId) ?? '',
+            tiedRegistrationIds: resolution?.state === 'tied' ? resolution.tiedRegistrationIds : [] };
+        }),
+      };
+    });
     const finals = config.finals.map(final => {
       const candidates: string[] = []; const unresolved: Array<{ groupId: string; rank: number; state: string; tiedRegistrationIds: string[] }> = [];
       for (const rule of final.rules) {
         const source = sources.get(rule.groupId);
-        const result = source ? resolveGroupRank(source, rule.rank) : { state: 'group_incomplete' as const };
+        const group = config.groups.find(g => g.id === rule.groupId);
+        const result = source && source.registrationIds.length === group?.capacity ? resolveGroupRank(source, rule.rank) : { state: 'group_incomplete' as const };
         if (result.state === 'ready') candidates.push(result.registrationId);
         else unresolved.push({ ...rule, state: result.state, tiedRegistrationIds: result.state === 'tied' ? result.tiedRegistrationIds : [] });
       }
       return { ...final, suggestedRegistrationIds: candidates, unresolved, manual: final.registrationIds !== null && final.registrationIds !== undefined };
     });
     const generated = await tx.v1TournamentGroup.count({ where: { tournamentId: id, phase: { not: 'group' } } }) > 0;
-    return { revision: tournament.multiFinalsRevision, groups: config.groups, finals, registrations, generated };
+    return { revision: tournament.multiFinalsRevision, groups: config.groups, finals, registrations, generated, groupStandings };
   }
   async get(user: V1AuthUser, id: string) {
     await this.admins.getActiveAdmin(user.id);
@@ -130,7 +147,8 @@ export class MultiFinalsService {
         tx.v1TournamentAwardSet.count({ where: { tournamentId: id, bracketTrack: { notIn: scopes } } }),
       ]);
       if (awards || awardSets) throw new ConflictException({ code: 'BRACKET_TRACK_AWARDS_REQUIRE_RESCOPING', message: '삭제·이름 변경할 토너먼트의 시상 범위를 먼저 정리해 주세요.' });
-      await this.clearFinals(tx, admin, id);
+      if (sameNamedFinalStructure(config.finals, dto.finals)) await this.assertUnstarted(tx, id);
+      else await this.clearFinals(tx, admin, id);
       const next: Config = { ...config, finals: dto.finals.map(f => ({ ...f, name: f.name.trim() })) };
       await tx.v1Tournament.update({ where: { id }, data: { multiFinals: JSON.parse(JSON.stringify(next)), multiFinalsRevision: { increment: 1 } } });
       await this.admins.logAdminAction(admin, { action: 'tournament.multi_finals.selection', targetType: 'tournament', targetId: id, beforeJson: JSON.parse(JSON.stringify(config)), afterJson: JSON.parse(JSON.stringify(next)) }, tx);
@@ -140,8 +158,9 @@ export class MultiFinalsService {
   private async previewInTx(tx: Tx, id: string) {
     const view = await this.view(tx, id);
     const finals: NamedFinalDto[] = view.finals.map(f => {
-      if (!f.manual && f.unresolved.length) throw new ConflictException({ code: 'MULTI_FINAL_RANK_UNRESOLVED', message: '예선 순위가 미확정이거나 동률이에요. 결과를 확정하거나 진출팀을 직접 선택해 주세요.' });
-      return { ...f, registrationIds: f.manual ? f.registrationIds : f.suggestedRegistrationIds };
+      // Preserve the entire pending roster: a partial suggestion must never shrink the bracket.
+      return { name: f.name, rules: f.rules, thirdPlace: f.thirdPlace,
+        registrationIds: f.manual ? f.registrationIds : f.unresolved.length || !view.groupStandings.every(group => group.complete) ? null : f.suggestedRegistrationIds };
     });
     validateNamedFinals(finals, new Map(view.groups.map(g => [g.id, g.capacity])));
     this.assertTeams(finals, new Set(view.registrations.map(r => r.id)));
@@ -169,10 +188,30 @@ export class MultiFinalsService {
       if (preview.previewHash !== dto.previewHash || preview.revision !== dto.expectedRevision) throw stale();
       const tournament = await this.tournament(tx, id); this.assertMutable(tournament.status);
       if (!tournament.competitionConfigVersionId) invalidMultiFinal('경기 규칙이 필요해요.');
-      await this.clearFinals(tx, admin, id);
       const plan = preview.plan;
-      const materialized = await this.templates.materialize(tx, admin, { ...tournament, competitionConfigVersionId: tournament.competitionConfigVersionId! }, plan);
-      await assignSlotsBatchInTx(tx, { admin, adminContext: this.admins, games: this.games }, preview.finals.flatMap((f, i) => f.registrationIds!.map((registrationId, j) => ({ slotId: materialized.slotIds.get(`seed:${i}:${j}`)!, registrationId }))));
+      const existing = await tx.v1TournamentSlot.findMany({
+        where: { tournamentId: id, kind: 'GROUP_RANK', group: { phase: { not: 'group' } } },
+        select: { id: true, position: true, group: { select: { name: true, bracketTrack: true } } },
+      });
+      const slotIds = new Map<string, string>();
+      for (const slot of plan.slots) {
+        const group = plan.groups.find(g => g.key === slot.groupKey)!;
+        const match = existing.find(row => row.group !== null && row.group.bracketTrack === group.bracketTrack && row.group.name === group.name && row.position === slot.position);
+        if (match) slotIds.set(slot.key, match.id);
+      }
+      const fixtureCount = await tx.v1TournamentMatchDetails.count({ where: { tournamentId: id, group: { phase: { not: 'group' } }, teamMatch: { deletedAt: null } } });
+      const groupCount = await tx.v1TournamentGroup.count({ where: { tournamentId: id, phase: { not: 'group' } } });
+      // Identical topology keeps fixture IDs, schedules, venues and progression edges intact.
+      if (existing.length !== plan.slots.length || slotIds.size !== plan.slots.length || fixtureCount !== plan.fixtures.length || groupCount !== plan.groups.length) {
+        await this.clearFinals(tx, admin, id);
+        const materialized = await this.templates.materialize(tx, admin, { ...tournament, competitionConfigVersionId: tournament.competitionConfigVersionId! }, plan);
+        for (const [key, value] of materialized.slotIds) slotIds.set(key, value);
+      }
+      await assignSlotsBatchInTx(tx, { admin, adminContext: this.admins, games: this.games }, plan.slots.map(slot => {
+        const group = plan.groups.find(g => g.key === slot.groupKey)!;
+        const final = preview.finals.find(f => f.name === group.bracketTrack)!;
+        return { slotId: slotIds.get(slot.key)!, registrationId: final.registrationIds?.[slot.position - 1] ?? null };
+      }));
       const config = this.config(tournament.multiFinals)!;
       // Freeze the approved roster. Result recalculation never reselects or refills these seeds.
       const next = { ...config, finals: preview.finals.map(f => ({ name: f.name, rules: f.rules, thirdPlace: f.thirdPlace, registrationIds: f.registrationIds })) };

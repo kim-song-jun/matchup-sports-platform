@@ -200,6 +200,72 @@ function makeFixture(
   };
 }
 
+describe('정규리그 + N개 토너먼트 공개 순위와 결선', () => {
+  function namedTournament(withFinals = true): V1TournamentDetail {
+    return makeTournament({ id: 'public-named-finals', kind: 'regular_tournament', format: 'league_knockouts', status: 'in_progress',
+      bracketPublishedAt: '2026-11-04T00:00:00Z',
+      groups: [
+        makeGroup({ id: 'pre-a', phase: 'group', name: 'A조', standings: [makeStanding('r-a', '공개 A팀', 1, { points: 6 })] }),
+        makeGroup({ id: 'pre-b', phase: 'group', name: 'B조', standings: [makeStanding('r-b', '공개 B팀', 1, { points: 4 })] }),
+        ...(withFinals ? ['챔피언', '챌린지', '프렌즈'].map((name, i) => makeGroup({ id: `named-${i}`, phase: 'final', name: `${name} · 결승`, bracketTrack: name })) : []),
+      ],
+      fixtures: withFinals ? ['챔피언', '챌린지', '프렌즈'].map((_, i) => makeFixture({ id: `named-game-${i}`, groupId: `named-${i}`, round: '결승', fixtureNumber: 20 + i,
+        status: 'scheduled', homeTeamId: null, awayTeamId: null, homeTeamName: 'TBD', awayTeamName: 'TBD', homeSlotLabel: `미정 홈 ${i}`, awaySlotLabel: `미정 원정 ${i}` })) : [],
+    });
+  }
+
+  it('조별 순위표와 결선 탭을 표시하고 조 선택으로 실제 순위 행을 좁힌다', () => {
+    renderBracketStandingsTab(namedTournament());
+    expect(screen.getByRole('tab', { name: '조별리그' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: '결선' })).toBeInTheDocument();
+    expect(screen.getByRole('table', { name: 'A조 순위표' })).toHaveTextContent('공개 A팀');
+    expect(screen.getByRole('table', { name: 'B조 순위표' })).toHaveTextContent('공개 B팀');
+    fireEvent.click(within(screen.getByRole('navigation', { name: '조 선택' })).getByRole('button', { name: 'B조' }));
+    expect(screen.queryByRole('table', { name: 'A조 순위표' })).not.toBeInTheDocument();
+    expect(screen.getByRole('table', { name: 'B조 순위표' })).toHaveTextContent('공개 B팀');
+  });
+
+  it('결선 탭에서 3개 토너먼트의 미정 대진을 각각 보여주고 조별 순위로 돌아올 수 있다', () => {
+    renderBracketStandingsTab(namedTournament());
+    fireEvent.click(screen.getByRole('tab', { name: '결선' }));
+    ['챔피언', '챌린지', '프렌즈'].forEach((name, i) => {
+      const final = screen.getByRole('region', { name });
+      expect(final).toHaveTextContent(`미정 홈 ${i}`);
+      expect(final).toHaveTextContent(`미정 원정 ${i}`);
+    });
+    expect(screen.queryByRole('table', { name: 'A조 순위표' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: '조별리그' }));
+    expect(screen.getByRole('table', { name: 'A조 순위표' })).toHaveTextContent('공개 A팀');
+  });
+
+  it('결선 생성 전에도 조별 순위는 표시하며 결선은 준비 상태로 보여준다', () => {
+    renderBracketStandingsTab(namedTournament(false));
+    expect(screen.getByRole('table', { name: 'A조 순위표' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: '결선' }));
+    expect(screen.getByRole('heading', { name: '토너먼트 대진' })).toBeInTheDocument();
+    expect(screen.getByText('토너먼트 대진이 생성되면 여기에서 확인할 수 있어요.')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '챔피언' })).not.toBeInTheDocument();
+  });
+
+  it('예선에 팀이나 성적이 없어도 조별 영역을 없애지 않고 임의 순위 행도 만들지 않는다', () => {
+    const tournament = namedTournament();
+    tournament.groups.filter(group => group.phase === 'group').forEach(group => { group.standings = []; group.groupTeams = []; });
+    renderBracketStandingsTab(tournament);
+    expect(screen.getByRole('region', { name: 'A조 순위' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'B조 순위' })).toBeInTheDocument();
+    expect(screen.queryByText('공개 A팀')).not.toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: '결선' })).toBeInTheDocument();
+  });
+
+  it('예선 종료 후 API가 확정한 이름별 진출팀 표시를 조별 순위에 연결한다', () => {
+    const tournament = namedTournament();
+    tournament.groups[0].qualificationByTrack = { '챔피언': { advancingRegistrationIds: ['r-a'], undecided: false } };
+    tournament.fixtures.push(makeFixture({ id: 'pre-a-finished', groupId: 'pre-a', status: 'completed', homeRegistrationId: 'r-a', awayRegistrationId: 'other-a' }));
+    renderBracketStandingsTab(tournament);
+    expect(within(screen.getByRole('region', { name: 'A조 순위' })).getByText('챔피언 진출')).toBeInTheDocument();
+  });
+});
+
 /**
  * 오너 지시 — 이 화면에 들어오면 "경기 일정"이 먼저 보여야 한다(순위·대진표는 결과가
  * 쌓인 뒤에 보는 정보). 기본 탭이 순위·대진표로 되돌아가거나 세그먼트 탭 나열 순서가

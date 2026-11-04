@@ -386,7 +386,7 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
   const [drawerOpen, setDrawerOpen] = useState(false);
   const hamburgerRef = useRef<HTMLButtonElement>(null);
   const isFixtureConsole = fixtureIdFromConsolePath(pathname, tournamentId) !== null;
-  const directorManagement = role === 'TOURNAMENT_DIRECTOR' && tournamentKind !== 'regular_league';
+  const directorManagement = role === 'TOURNAMENT_DIRECTOR' && tournamentKind !== undefined && tournamentKind !== 'regular_league';
   if (directorManagement) navItems.unshift({
     label: '대회 관리', href: `/tournament-management/tournaments/${encodeURIComponent(tournamentId)}/overview`,
     icon: <LayoutDashboard size={18} aria-hidden="true" />,

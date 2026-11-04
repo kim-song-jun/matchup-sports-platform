@@ -210,3 +210,15 @@ describe('TournamentOpsShell 모바일 상단 제목 (Task 180 G6-V4)', () => {
     expect(mobileTitle()).toBe('운영 보드');
   });
 });
+
+
+describe('unknown competition kind', () => {
+  it('does not give a league director tournament management links while kind is pending', async () => {
+    const user = userEvent.setup();
+    render(<TournamentOpsShell tournamentId="league-1" role="TOURNAMENT_DIRECTOR" origin="staff"><div>content</div></TournamentOpsShell>);
+    expect(screen.queryByRole('link', { name: '대회 관리로 돌아가기' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '대회 관리' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '메뉴 열기' }));
+    expect(within(screen.getByRole('dialog', { name: '대회 운영 메뉴' })).queryByRole('link', { name: '대회 관리' })).not.toBeInTheDocument();
+  });
+});

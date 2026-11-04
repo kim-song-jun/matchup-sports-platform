@@ -137,3 +137,10 @@ Status: In Progress — 기존 PR 작업트리에서 후속 수정, 미배포
 - 원인: 최신 dev의 `TournamentOpsDemoEntry` 링크2개가 목록에 추가되어 화면 전체 link 개수1을 기대한 기존 회귀와 충돌했다. 실제 담당 대회 필터는 정상이다.
 - 수정: 관리 목적지 링크만1개인지 확인하고, 데모 링크2개·실제 담당 대회 목적지·FIELD_OPERATOR/SUPPORT_READONLY/만료 대회 제외를 함께 검사한다. 테스트를 skip하거나 비담당 제외 검증을 제거하지 않았다.
 - 검증: CI RED를 근거로 수정 후 담당 목록 관련2파일/10 tests GREEN, diff check PASS. 앱 코드·레이아웃·API 변경은 없어 기존24장 캡처는 그대로 유효하다. 새 head CI 확인은 별도로 진행한다.
+
+
+## 2026-11-04 API CI 확인 후속
+- head1154f643e CI: Gates/Web PASS. API는 마이그레이션 재생·드리프트0 및 DB integration193 suite/1419 tests PASS(기존3 skipped) 후 단위 테스트에서1 suite/3 tests 실패(500 suite/7768 tests PASS).
+- 원인: `tournament-sponsors-mutations.service.spec.ts`의 권한 mock이 이전 `getMutationAdmin` 이름을 유지했다. 런타임은 담당 대회 범위의 `getTournamentMutationAdmin`을 사용한다.
+- 수정: mock 메서드 이름1줄을 현재 계약으로 동기화. 수정/비활성화의 저장값·감사 기록·타 대회 협찬 거부 assertion은 그대로 유지한다. 런타임 권한 검사·API·화면 변경 없음.
+- 검증: 로컬 RED3 확인 후 협찬 관련2 suite/6 tests GREEN, diff check PASS, 새 debt marker0. 기존24장 캡처는 유효하다. 최신 head CI는 push 후 재실행하며 직전 head 결과를 최신 통과로 표시하지 않는다.

@@ -57,6 +57,12 @@ describe('N개 토너먼트 단계형 설정과 실제 API payload', () => {
     fireEvent.click(screen.getByRole('button', { name: '다음' }));
     await screen.findByRole('textbox', { name: '토너먼트 1 이름' });
   });
+  it('조 밖에 수동 추가한 대진이 남아 있으면 편집을 잠그되 초기화는 허용한다', async () => {
+    server.use(http.get(base, () => success({ ...savedView(), fixtureCount: 1, preliminaryFixtureCount: 0 })));
+    show('create');
+    expect(await screen.findByRole('button', { name: '대진 초기화' })).toBeEnabled();
+    expect(screen.queryByRole('spinbutton', { name: '1번째 조 팀 수' })).not.toBeInTheDocument();
+  });
   it('독립 초기화 후 설정을 hydrate하고 별도 예선 저장으로 새 조 ID에 규칙을 연결한다', async () => {
     let view = { ...savedView(), preliminaryFixtureCount: 6, generated: true };
     view.groups[0].registrationIds = ['reg-0', 'reg-1'];

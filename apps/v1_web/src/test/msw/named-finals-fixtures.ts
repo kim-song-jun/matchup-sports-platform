@@ -7,7 +7,7 @@ export const namedFinalRegistrations = ['샘플 가팀', '샘플 나팀', '샘�
 }));
 export function namedFinalView(): MultiFinalView {
   const groups = ['A조', 'B조'].map((name, i) => ({ id: `group-${i}`, name, capacity: 2, legs: 1 as const, registrationIds: namedFinalRegistrations.slice(i * 2, i * 2 + 2).map(reg => reg.id) }));
-  return { revision: 1, generated: false, preliminaryFixtureCount: 2, groups, registrations: structuredClone(namedFinalRegistrations),
+  return { revision: 1, generated: false, fixtureCount: 2, preliminaryFixtureCount: 2, groups, registrations: structuredClone(namedFinalRegistrations),
     groupStandings: groups.map(group => ({ groupId: group.id, name: group.name, complete: false, rows: [] })),
     finals: ['챔피언', '챌린지'].map((name, index) => ({ name, rules: groups.map(group => ({ groupId: group.id, rank: index + 1 })),
       thirdPlace: false, registrationIds: [namedFinalRegistrations[index].id, namedFinalRegistrations[index + 2].id], manual: true,

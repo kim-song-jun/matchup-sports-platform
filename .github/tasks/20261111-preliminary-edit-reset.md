@@ -42,9 +42,13 @@ mutation admin, 대회 advisory lock, optimistic revision, 감사 로그 사용.
 
 ## Progress Snapshot
 - 최신 origin/dev 4a22824a5 기준 feat/preliminary-edit-reset 격리 worktree.
-- Phase 1 API, Phase 2 UI 구현. API 28 tests / Web·공용 MSW 고유 21 tests PASS. API/Web tsc --noEmit --incremental false PASS. surface/pattern 및 diff whitespace·debt marker 검사 PASS.
+- Phase 1 API, Phase 2 UI 구현. API 28 tests / Web·공용 MSW 고유 22 tests PASS. API/Web tsc --noEmit --incremental false PASS. surface/pattern 및 diff whitespace·debt marker 검사 PASS.
 - PR #2151 (dev), 초기 HEAD 5da742413. 실제 자리와 GroupTeam 생성 순서가 다를 때 hydrate/초기화 뒤 순서를 보존하는 회귀도 검증했다.
 - API 첫 실행은 공유 Prisma Client가 구버전이라 컴파일 실패. 공유 생성물은 보존하고 격리 Client를 현행 스키마로 생성해 재실행 PASS.
 - 실제 DB 통합 시나리오 2개 추가 및 support 권한 시나리오 확장. 로컬 PostgreSQL/Docker 없음으로 실행은 CI에 위임.
-- Phase 3 진행 중: PR/CI/Copilot 검증 및 Alpha 수동 QA. 브라우저 도구가 없어 Alpha 시각 검증은 아직 수행하지 않았다.
+- Phase 3 진행 중: PR/CI/Copilot 및 Alpha 변경 후 QA. ffb004a59의 CI Gates/Web PASS, API 실제 PostgreSQL 검증은 진행 중이다. 후속 전체 경기 수 잠금 보완은 로컬 회귀 PASS 후 별도 커밋한다.
+- Copilot 요청은 CLI와 공식 REST 모두 성공 응답이나 requested_reviewers=[], review_requested 이벤트/실제 리뷰 0이다. 보안 AI 스캔 성공을 Copilot clean으로 대체하지 않았고 dev 머지는 보류했다. 권한·요금제·머지 규칙을 변경하지 않았다.
+- Alpha 관리자 UI 로그인 및 before 390/768/1440 screenshot PASS. uncaught/console 오류 0, 실패 HTTP 응답 0, 가로 overflow 없음. after 기능 0/5·viewport 0/3: 미머지·미배포.
+- QA 전용 비공개 대회와 본인 소유 임시 팀 2개만 생성했다. 기준선 캡처 후 대회 cancelled + isPublic=false, 두 QA 팀 해체 완료. 기존 대회·팀 수정 0. 자격증명·쿠키·팀/대회 UUID는 커밋하지 않았다.
+- Headed Chrome PID/Node PPID: 35420/18588, 17548/13228, 11472/28932, 26004/32164, 14528/30448, 15180/10424, 33376/12200, 33436/14488, 33224/1832. 각 시도는 finally에서 browser/context/server 종료 확인. 로그인 1차 load 대기와 후속 hydration/networkidle 대기는 harness 실패로 기록하며 API 실패로 오인하지 않는다. 최종 harness는 React 폼 hydration 이후 로그인했다.
 - 스키마·migration 변경 없음. 관련 모델: Tournament/Group/GroupTeam/Standing/Slot/MatchDetails/TeamMatch/Game/AdvancementEdge 및 일정·감사 기록.

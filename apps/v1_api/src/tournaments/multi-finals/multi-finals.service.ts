@@ -72,7 +72,8 @@ export class MultiFinalsService {
   private async view(tx: Tx, id: string) {
     const tournament = await this.tournament(tx, id); const config = this.config(tournament.multiFinals);
     const registrations = await this.confirmed(tx, id);
-    if (!config) return { revision: tournament.multiFinalsRevision, groups: [], finals: [], registrations, generated: false, preliminaryFixtureCount: 0, groupStandings: [] };
+    if (!config) return { revision: tournament.multiFinalsRevision, groups: [], finals: [], registrations, generated: false, fixtureCount: 0, preliminaryFixtureCount: 0, groupStandings: [] };
+    const fixtureCount = await tx.v1TournamentMatchDetails.count({ where: { tournamentId: id, teamMatch: { deletedAt: null } } });
     const preliminaryFixtureCount = await tx.v1TournamentMatchDetails.count({ where: { tournamentId: id, group: { phase: 'group' }, teamMatch: { deletedAt: null } } });
     const assignments = await tx.v1TournamentGroupTeam.findMany({ where: { groupId: { in: config.groups.map(g => g.id) } }, select: { groupId: true, registrationId: true }, orderBy: { sortOrder: 'asc' } });
     const entries = await tx.v1TournamentSlot.findMany({ where: { tournamentId: id, kind: 'ENTRY', groupId: { in: config.groups.map(g => g.id) } },
@@ -112,7 +113,7 @@ export class MultiFinalsService {
       return { ...g, registrationIds: groupEntries.length
         ? groupEntries.flatMap(entry => entry.registrationId === null ? [] : [entry.registrationId])
         : g.registrationIds?.filter(id => members.includes(id)) ?? members };
-    }), finals, registrations, generated, preliminaryFixtureCount, groupStandings };
+    }), finals, registrations, generated, fixtureCount, preliminaryFixtureCount, groupStandings };
   }
   async get(user: V1AuthUser, id: string) {
     await this.admins.getActiveAdmin(user.id);

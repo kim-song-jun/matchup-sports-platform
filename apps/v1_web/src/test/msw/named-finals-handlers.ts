@@ -115,7 +115,7 @@ export function createNamedFinalsMsw(actor: Actor = 'ops') {
       }
       awardSets = next; detail.awardSets = next.map(({ id: _id, ...row }) => row); return ok(awardSets);
     }),
-    http.get(path, () => auth(false) ?? ok(view)),
+    http.get(path, () => auth(false) ?? ok({ ...view, fixtureCount: detail.fixtures.length })),
     http.post(`${path}/setup`, () => auth(true) ?? fail(409, 'BRACKET_NOT_EMPTY', '예선 대진이 이미 있어요.')),
     http.post(`${path}/reset`, async ({ request }) => {
       const denied = auth(true); if (denied) return denied;
@@ -123,7 +123,7 @@ export function createNamedFinalsMsw(actor: Actor = 'ops') {
       if (!record(input) || Object.keys(input).some(key => key !== 'expectedRevision') || !Number.isInteger(input.expectedRevision)) return invalid();
       if (input.expectedRevision !== view.revision) return stale();
       if (['completed', 'cancelled', 'archived'].includes(detail.status) || detail.fixtures.some(f => f.result != null || f.status !== 'scheduled' || f.liveStatus !== 'scheduled')) return fail(409, 'BRACKET_LOCKED', '시작했거나 기록이 있는 경기는 초기화할 수 없어요.');
-      view = { ...view, revision: view.revision + 1, generated: false, preliminaryFixtureCount: 0,
+      view = { ...view, revision: view.revision + 1, generated: false, fixtureCount: 0, preliminaryFixtureCount: 0,
         groupStandings: view.groups.map(g => ({ groupId: g.id, name: g.name, complete: false, rows: [] })),
         finals: view.finals.map(f => ({ ...f, registrationIds: null, manual: false, suggestedRegistrationIds: [], unresolved: f.rules.map(rule => ({ ...rule, state: 'group_incomplete', tiedRegistrationIds: [] })) })) };
       detail.groups = preliminaryGroups(); detail.fixtures = []; return ok(view);
@@ -160,6 +160,7 @@ export function createNamedFinalsMsw(actor: Actor = 'ops') {
           status: 'scheduled', liveStatus: 'scheduled', homeRegistrationId: home?.id ?? null, awayRegistrationId: away?.id ?? null, homeTeamId: home?.team.id ?? null, awayTeamId: away?.team.id ?? null,
           homeTeamName: home?.team.name ?? 'TBD', awayTeamName: away?.team.name ?? 'TBD', homeTeamLogoUrl: null, awayTeamLogoUrl: null, homeSlotLabel: null, awaySlotLabel: null, result: null, videos: [] });
       }
+      view.fixtureCount = detail.fixtures.length;
       return ok(view);
     }),
     http.put(`${path}/selection`, async ({ request }) => {

@@ -11,7 +11,7 @@ export type MultiFinalGroupStanding = {
     wins: number; draws: number; losses: number; goalsFor: number; goalsAgainst: number; tiedRegistrationIds: string[] }>;
 };
 export type MultiFinalView = {
-  revision: number; groups: MultiFinalGroup[]; generated: boolean; preliminaryFixtureCount?: number;
+  revision: number; groups: MultiFinalGroup[]; generated: boolean; fixtureCount?: number; preliminaryFixtureCount?: number;
   groupStandings?: MultiFinalGroupStanding[];
   registrations: Array<{ id: string; team: { id: string; name: string } }>;
   finals: Array<MultiFinalDefinition & { suggestedRegistrationIds: string[]; manual: boolean; unresolved: Array<MultiFinalRule & { state: string; tiedRegistrationIds: string[] }> }>;

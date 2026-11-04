@@ -48,7 +48,8 @@ export function MultiFinalsWizard({ tournamentId, open, onClose, onApplied, mode
   }, [open, assigning, api.view.data, api.view.isFetching, api.view.isError]);
   if (!mounted || typeof document === 'undefined') return null;
   const configured = Boolean(server?.groups.length);
-  const editable = !configured || server?.preliminaryFixtureCount === 0 && !server.generated;
+  const remainingFixtures = server?.fixtureCount ?? server?.preliminaryFixtureCount;
+  const editable = !configured || remainingFixtures === 0 && !server?.generated;
   const registrations = server?.registrations ?? [];
   const allGroupsComplete = Boolean(server?.groupStandings?.length) && server!.groupStandings!.every(group => group.complete);
   async function resetBracket() {
@@ -116,7 +117,7 @@ export function MultiFinalsWizard({ tournamentId, open, onClose, onApplied, mode
           </div> : null}
           {step === 0 ? <>
             <SectionTitle title="예선 조 편성" /><p className="tm-text-label text-[var(--text-muted)]">예선은 조별리그로 진행해요. 확정 참가팀을 직접 선택하거나 자동 배정할 수 있고, 빈 자리는 생성 후에도 채울 수 있어요.</p>
-            {configured && <Button variant="outline" disabled={busy || server.preliminaryFixtureCount === 0 && !server.generated} onClick={() => void resetBracket()}>대진 초기화</Button>}
+            {configured && <Button variant="outline" disabled={busy || remainingFixtures === 0 && !server.generated} onClick={() => void resetBracket()}>대진 초기화</Button>}
             {!editable ? <><p className="tm-text-label">기존 대진이 있어 예선 편성을 수정할 수 없어요. 수정하려면 별도의 대진 초기화를 먼저 실행해 주세요.</p>{groups.map(g => <p key={g.id} className="tm-text-label">{g.name} · {g.capacity}팀 · {g.legs}회전</p>)}</> : <>
             {configured && <p role="status" className="tm-text-label">대진이 없어 저장된 예선 편성을 수정할 수 있어요. 저장하면 예선 대진을 다시 만들어요.</p>}
             <p className="tm-text-caption">확정 참가 {registrations.length}팀 · 예선 정원 {groups.reduce((sum, g) => sum + (Number.isSafeInteger(g.capacity) ? g.capacity : 0), 0)}팀 · 선택 {groups.reduce((sum, g) => sum + (g.registrationIds?.filter(Boolean).length ?? 0), 0)}팀 · 미배정 {registrations.filter(reg => !groups.some(g => g.registrationIds?.includes(reg.id))).length}팀</p>

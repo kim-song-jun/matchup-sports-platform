@@ -32,6 +32,7 @@ export default function AdminTournamentBracketPage() {
 function BracketPageBody() {
   const { tournamentId, canWrite, showToast } = useTournamentAdmin();
   const [multiFinalsOpen, setMultiFinalsOpen] = useState(false);
+  const [multiFinalsMode, setMultiFinalsMode] = useState<'create' | 'assign'>('create');
   const { data: tournament } = useV1AdminTournament(tournamentId);
   // 확정 팀 목록은 대진 편성에 필요하다. 셸이 아니라 이 섹션에서만 구독한다.
   const { data: regData, isError: regIsError, error: regError, refetch: refetchRegistrations } = useV1AdminTournamentRegistrations(tournamentId);
@@ -61,8 +62,11 @@ function BracketPageBody() {
   return (
     <div className="flex flex-col gap-4">
       {tournament?.format === 'league_knockouts' && canWrite ? <>
-        <div><Button variant="primary" onClick={() => setMultiFinalsOpen(true)}>예선·토너먼트 설정</Button></div>
-        <MultiFinalsWizard tournamentId={tournamentId} open={multiFinalsOpen} onClose={() => setMultiFinalsOpen(false)} onApplied={() => showToast('토너먼트 대진을 생성했어요.', 'success')} />
+        <div className="flex flex-wrap gap-2">
+          <Button variant="primary" onClick={() => { setMultiFinalsMode('create'); setMultiFinalsOpen(true); }}>예선·토너먼트 대진 생성</Button>
+          <Button variant="neutral" onClick={() => { setMultiFinalsMode('assign'); setMultiFinalsOpen(true); }}>진출팀 배정</Button>
+        </div>
+        <MultiFinalsWizard tournamentId={tournamentId} mode={multiFinalsMode} open={multiFinalsOpen} onClose={() => setMultiFinalsOpen(false)} onApplied={() => showToast(multiFinalsMode === 'assign' ? '진출팀을 대진에 배정했어요.' : '토너먼트 대진을 생성했어요.', 'success')} />
       </> : null}
       <SegmentedTabs
         ariaLabel="대진 보기 방식"

@@ -71,7 +71,10 @@ describe('공용 MSW — named finals 및 시상 wire 계약', () => {
     const duplicate = structuredClone(finals); duplicate[1].registrationIds = duplicate[0].registrationIds;
     await expect(v1Put(`${path}/selection`, { expectedRevision: view.revision, finals: duplicate })).rejects.toMatchObject({ code: 'MULTI_FINAL_INVALID' });
     await v1Put(`${path}/selection`, { expectedRevision: view.revision, finals: finals.map(f => ({ ...f, registrationIds: null })) });
-    await expect(v1Post(`${path}/preview`, {})).rejects.toMatchObject({ code: 'MULTI_FINAL_RANK_UNRESOLVED' });
+    const preview = await v1Post<MultiFinalPreview>(`${path}/preview`, {});
+    expect(preview.finals.every(final => final.registrationIds === null)).toBe(true);
+    expect(preview.plan?.slots).toHaveLength(4);
+    expect(preview.counts).toEqual({ tournaments: 2, fixtures: 2, byes: 0 });
   });
   it.each(['support', 'member', 'guest'] as const)('%s 권한은 실제 wire에서 쓰기를 거절한다', async actor => {
     server.use(...createNamedFinalsMsw(actor).handlers);

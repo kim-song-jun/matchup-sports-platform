@@ -869,19 +869,21 @@ PR1858의 정규대회 분리 결선을 일반화한 별도 `format`이다. `kin
 
 | Method/path | Contract |
 |---|---|
-| GET `/` | `revision`, 예선 `groups`, 이름·규칙·저장 명단·`suggestedRegistrationIds`·`unresolved`·`manual`을 포함한 `finals`, 확정 참가팀 `registrations`, `generated` |
+| GET `/` | `revision`, 예선 `groups`, 이름·규칙·저장 명단·`suggestedRegistrationIds`·`unresolved`·`manual`을 포함한 `finals`, 확정 참가팀 `registrations`, `generated`, 조별 전체 `groupStandings`(groupId/name/complete/rows). rows는 registrationId/teamName/position/points/wins/draws/losses/goalsFor/goalsAgainst/tiedRegistrationIds. complete는 모든 자리 배정·공식 결과·최신 순위 반영까지 확인한다. |
 | POST `/setup` | `{ expectedRevision, groups:[{name,capacity,legs,registrationIds?}], finals:[{name,rules:[{groupId,rank}],thirdPlace,registrationIds?}] }`. 초기 `groupId`는 groups 배열의 0부터 시작하는 인덱스 문자열. 예선 조·자리·풀리그만 생성하고 반환 시 실제 group UUID로 바꾼다. 이미 예선이 있으면 409. |
-| PUT `/selection` | `{ expectedRevision, finals }`. 이후 `rule.groupId`는 실제 예선 UUID. 기존 예선을 보존하고 시작 전 결선을 비운 뒤 새 규칙/명단을 저장한다. 시작/결과/이벤트가 있는 결선은 409. |
-| POST `/preview` | 저장된 명단 또는 공식 예선 순위를 사용해 `plan`, 결선별 명단, `counts`, `revision`, `previewHash`를 반환. 경기 번호는 삭제되지 않은 예선의 최대 번호 다음부터 시작하며 생성 시 검증된 같은 plan을 저장한다. 기존 결선은 번호 기준에서 제외한다. 동률/미확정 자동 명단은 409. |
-| POST `/generate` | `{ expectedRevision, previewHash, requestId }`. 대회 잠금 안에서 다시 검증한 뒤 N개 결선과 부전승/승자·패자 연결을 원자적으로 생성. 같은 requestId/hash는 기존 결과 반환; hash가 다르면 409. |
+| PUT `/selection` | `{ expectedRevision, finals }`. 이후 `rule.groupId`는 실제 예선 UUID. 같은 이름·순서·참가 자리 수·3/4위전 구조면 기존 대진을 보존하고 명단만 저장한다. 구조가 달라지면 시작 전 결선만 비운다. 시작/결과/이벤트가 있는 결선은 409. |
+| POST `/preview` | 저장된 명단 또는 공식 예선 순위를 사용해 `plan`, 결선별 명단, `counts`, `revision`, `previewHash`를 반환. 자동 명단에서 미확정/동률이 있거나 어느 예선 조라도 종료/순위 반영 전이면 registrationIds=null로 유지하고 rules.length만큼 실제 미정 시드를 만든다. 경기 번호는 살아 있는 예선 최대 번호 다음부터 시작한다. |
+| POST `/generate` | `{ expectedRevision, previewHash, requestId }`. 대회 잠금 안에서 재검증 후 N개 결선과 부전승/승자·패자 연결을 원자적으로 생성. 미정 명단은 슬롯을 비운 상태로 생성한다. 같은 구조의 후속 배정은 기존 경기 ID·일정·장소·진출 연결을 유지하고 시드를 일괄 교체한다. 같은 requestId/hash는 기존 결과 반환; hash가 다르면 409. |
 
-`registrationIds` 생략/null은 순위 기반 제안이다. 명시적인 배열은 수동 명단이며 빈 배열도 저장할 수 있지만 2팀 미만 결선은 생성할 수 없다. 예선 결과와 무관하게 같은 대회 확정팀을 추가·제외·교체·이동할 수 있다. 하나의 팀은 한 결선만 참가하며 각 순위 출처 역시 한 결선으로만 연결한다. 생성 후 승인 명단을 저장하므로 순위 재계산으로 덮어쓰지 않는다. 순위 채우기 API는 이 결선의 직접 선택 시드를 변경하지 않는다.
+`registrationIds` 생략/null은 순위 기반 제안이다. 팀이 아직 미정이면 진출 규칙 수로 대진을 먼저 만들며, 미정 자리를 부전승으로 취급하지 않는다. 실제 참가팀을 배정한 뒤에는 승인 명단을 저장하므로 순위 재계산으로 덮어쓰지 않는다. 명시적인 배열은 수동 명단이며 빈 배열도 초안으로 저장할 수 있지만 명시적 2팀 미만 결선은 생성할 수 없다. 규칙과 팀이 모두 없는 결선도 규모를 추측하지 않고 422로 거절한다. 같은 대회 확정팀의 수동 교체·이동과 한 팀/순위 출처당 한 결선 제한은 유지한다. 순위 채우기 API는 이 결선의 직접 선택 시드를 변경하지 않는다.
+
+관리자 UI는 대진 생성(예선 편성→토너먼트 규칙→미리보기)과 진출팀 배정(전체 순위/동률·자동 선택/수동 변경→미리보기)을 분리한다. 배정 UI는 전체 예선 공식 순위 반영 뒤 활성화하며 기존 자리 수에 맞는 명단을 요구한다. 동률은 후보를 보여주되 임의 확정하지 않는다.
 
 예선 조 수·팀 수에 기존 8/16/64팀 또는 240경기 템플릿 상한을 적용하지 않는다. 최소 조당 2팀, 1/2회전이다. 서버/DB의 정수·요청 및 트랜잭션 자원 한계는 여전히 적용되며 실패를 부분 성공으로 처리하지 않는다. 결선은 2팀 이상이며 3·4위전은 4팀 이상에서 가능하다.
 
 결선 범위 `bracketTrack`은 이 방식에서 토너먼트 이름(중복 불가)이다. `overall/upper/lower`는 기존 범위를 위해 예약한다. 대진 그룹·시상·개인상 유일키·알림 identity가 이 범위를 사용한다. 토너먼트 삭제/이름 변경 시 연결된 시상을 먼저 재지정해야 한다. 결선 참가팀을 바꾸는 일반 자리/직접 경기 편집 대신 위 selection API를 사용한다. 기존 slot 배정 API로 예선 빈 자리는 배정할 수 있다.
 
-오류: `MULTI_FINAL_INVALID`(422: 잘못된 순위/중복/다른 대회·미확정 팀), `MULTI_FINAL_STALE`(409: revision/preview 변경), `MULTI_FINAL_RANK_UNRESOLVED`(409: 자동 순위 미확정), `MULTI_FINAL_SELECTION_REQUIRED`(409: 전용 편집 필요), `BRACKET_LOCKED`, `BRACKET_TRACK_AWARDS_REQUIRE_RESCOPING`. 기존 응답 envelope/권한 오류 계약은 동일하다. 운영자 변경 전후 명단·규칙과 생성 요청을 감사 로그로 남긴다.
+오류: `MULTI_FINAL_INVALID`(422: 잘못된 순위/중복/다른 대회·미확정 팀/자리 수 부족), `MULTI_FINAL_STALE`(409: revision/preview 변경), `MULTI_FINAL_SELECTION_REQUIRED`(409: 전용 편집 필요), `BRACKET_LOCKED`, `BRACKET_TRACK_AWARDS_REQUIRE_RESCOPING`. 미확정 순위는 더 이상 대진 선생성을 409로 막지 않는다. 기존 응답 envelope/권한 오류 계약은 동일하다. 운영자 변경 전후 명단·규칙과 생성 요청을 감사 로그로 남긴다.
 
 
 ### 토너먼트별 최종 순위와 공용 mock 계약 (2026-11-03)

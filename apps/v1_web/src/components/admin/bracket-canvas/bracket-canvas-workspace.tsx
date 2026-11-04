@@ -357,7 +357,7 @@ export function BracketCanvasWorkspace({
         <EmptyState
           title="아직 대진이 없어요"
           sub={
-            format === 'league_knockouts' ? '페이지 위의 예선·토너먼트 설정에서 예선 조를 편성해 주세요.' : templateFormat === null
+            format === 'league_knockouts' ? '페이지 위의 예선·토너먼트 대진 생성에서 예선 조를 편성해 주세요.' : templateFormat === null
               ? '조별+결선 방식은 목록 보기에서 조를 만들어 시작해 주세요.'
               : '템플릿으로 시작하면 경기와 팀 자리가 한 번에 만들어져요. 팀은 나중에 넣어도 돼요.'
           }

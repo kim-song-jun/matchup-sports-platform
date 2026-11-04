@@ -1,3 +1,7 @@
+## 2026-11-04 — 미정 결선 선생성과 별도 진출팀 배정
+
+[시나리오](./multi-finals-deferred-teams-20261104.md) · [task](../../.github/tasks/20261057-admin-bracket-canvas.md). 사용자 B안: 대진 생성과 배정 화면 분리. API15/Web146/실제PG10 tests, 양쪽 typecheck·surface/pattern PASS. 미정 시드 선생성, 전체 순위/동률 수동 선택, 기존 경기 ID/일정 보존을 검증했다. alpha 기능0/7·viewport0/3이며 브라우저 도구 초기화 오류와 미배포가 blocker다.
+
 ## 2026-11-02 — 정규리그 + N개 토너먼트 확장
 
 [작업 문서](../../.github/tasks/20261057-admin-bracket-canvas.md#2026-11-02-extension--정규리그--n개-토너먼트) · [시나리오](./18-regular-tournament-split-finals.md#2026-11-02-extension--n개-토너먼트와-진출팀-직접-선택). PR1858 고정 두 결선을 별도 format으로 일반화. 순위 제안 뒤 참가팀 추가·제외·이동, 예선 보존, N개 결선/범위 시상. 구현·로컬 검증 진행, alpha0/10·after0/3이며 배포/운영 변경 없음.

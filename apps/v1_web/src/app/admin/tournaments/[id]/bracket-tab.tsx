@@ -830,7 +830,7 @@ export function BracketTab({
 
       {/* ── 조 카드 목록 (설계안 B) — 조 1개 = 카드 1개, 배정·순위·대진이 카드 안에서 끝난다 ── */}
       {groups.length === 0 ? (
-        <AdminEmpty title="아직 만든 조가 없어요" description={tournamentFormat === 'league_knockouts' ? '예선·토너먼트 설정에서 예선 조를 편성해 주세요.' : '위에서 원하는 유형을 눌러 조를 만들어 보세요.'} />
+        <AdminEmpty title="아직 만든 조가 없어요" description={tournamentFormat === 'league_knockouts' ? '예선·토너먼트 대진 생성에서 예선 조를 편성해 주세요.' : '위에서 원하는 유형을 눌러 조를 만들어 보세요.'} />
       ) : (
         <div className="flex flex-col gap-4">
           {groups.map((group) => (

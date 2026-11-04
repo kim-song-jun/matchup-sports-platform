@@ -5,8 +5,14 @@ import { v1Get, v1Post, v1Put } from '@/lib/api-client';
 export type MultiFinalRule = { groupId: string; rank: number };
 export type MultiFinalDefinition = { name: string; thirdPlace: boolean; rules: MultiFinalRule[]; registrationIds?: string[] | null };
 export type MultiFinalGroup = { id: string; name: string; capacity: number; legs: 1 | 2 };
+export type MultiFinalGroupStanding = {
+  groupId: string; name: string; complete: boolean;
+  rows: Array<{ registrationId: string; teamName: string; position: number | null; points: number;
+    wins: number; draws: number; losses: number; goalsFor: number; goalsAgainst: number; tiedRegistrationIds: string[] }>;
+};
 export type MultiFinalView = {
   revision: number; groups: MultiFinalGroup[]; generated: boolean;
+  groupStandings?: MultiFinalGroupStanding[];
   registrations: Array<{ id: string; team: { id: string; name: string } }>;
   finals: Array<MultiFinalDefinition & { suggestedRegistrationIds: string[]; manual: boolean; unresolved: Array<MultiFinalRule & { state: string; tiedRegistrationIds: string[] }> }>;
 };

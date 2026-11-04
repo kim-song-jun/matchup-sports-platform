@@ -130,3 +130,10 @@ Status: In Progress — 기존 PR 작업트리에서 후속 수정, 미배포
 
 - 최종 로컬 수동 증거: `docs/screenshots/pr2101-local/README.md`. before6 + after18 = 24장, 390/768/1440 3/3폭·관리 개요/정보 2/10 섹션 렌더. after pageerror0·document overflow0/18. 실제 복귀 링크 클릭과 공개 설정 fixture503 오류 노출 확인. Alpha0/10·0/3/실제DB 저장 미검증은 유지한다.
 - API surface/Web pattern PASS. 최종 구현 커밋 5030fd8f9, 증거만 추가하는 후속 커밋으로 PR에 게시한다. 최신 Copilot 리뷰는 요청 후 도착 여부를 별도 확인한다.
+
+
+## 2026-11-04 CI 확인 후속
+- head7c7d076e9 CI: Gates PASS, Web은894파일/10,930 tests 중 `my-tournament-director-list.test.tsx` 1건 실패(893파일/10,929 tests PASS). API의 `V1 migration replay + drift gate` 단계에는 전체 DB integration 실행도 포함되며 마지막 확인 시 진행 중이다.
+- 원인: 최신 dev의 `TournamentOpsDemoEntry` 링크2개가 목록에 추가되어 화면 전체 link 개수1을 기대한 기존 회귀와 충돌했다. 실제 담당 대회 필터는 정상이다.
+- 수정: 관리 목적지 링크만1개인지 확인하고, 데모 링크2개·실제 담당 대회 목적지·FIELD_OPERATOR/SUPPORT_READONLY/만료 대회 제외를 함께 검사한다. 테스트를 skip하거나 비담당 제외 검증을 제거하지 않았다.
+- 검증: CI RED를 근거로 수정 후 담당 목록 관련2파일/10 tests GREEN, diff check PASS. 앱 코드·레이아웃·API 변경은 없어 기존24장 캡처는 그대로 유효하다. 새 head CI 확인은 별도로 진행한다.

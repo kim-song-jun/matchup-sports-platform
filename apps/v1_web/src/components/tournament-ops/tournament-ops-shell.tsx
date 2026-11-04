@@ -228,14 +228,13 @@ interface DrawerProps {
   tournamentCoverImageUrl?: string | null;
   role: V1TournamentStaffRole;
   pathname: string;
-  /** 지금 표면(스태프/어드민)의 nav base — 경로를 하드코딩하면 다른 표면으로 튕긴다. */
-  basePath: string;
+  /** 데스크톱과 같은 권한·대회 종류로 구성된 메뉴를 재사용한다. */
+  navItems: NavItem[];
   triggerRef: React.RefObject<HTMLButtonElement | null>;
 }
 
-function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverImageUrl, role, pathname, basePath, triggerRef }: DrawerProps) {
+function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverImageUrl, role, pathname, navItems, triggerRef }: DrawerProps) {
   const isActive = useIsActive(pathname);
-  const navItems = buildNavItems(basePath, role);
   const panelRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -387,9 +386,14 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
   const [drawerOpen, setDrawerOpen] = useState(false);
   const hamburgerRef = useRef<HTMLButtonElement>(null);
   const isFixtureConsole = fixtureIdFromConsolePath(pathname, tournamentId) !== null;
-  // 경기 콘솔은 들어온 목록으로 돌아간다 — 담당 경기 화면에서 왔으면(staff) 거기로, 아니면 운영 보드로.
-  // 이 셸을 쓰는 디렉터·조회 전용은 경기 범위가 없어 담당 경기 화면이 늘 비어 있다(MD-QA #195).
-  const back = isFixtureConsole && origin !== 'staff'
+  const directorManagement = role === 'TOURNAMENT_DIRECTOR' && tournamentKind !== undefined && tournamentKind !== 'regular_league';
+  if (directorManagement) navItems.unshift({
+    label: '대회 관리', href: `/tournament-management/tournaments/${encodeURIComponent(tournamentId)}/overview`,
+    icon: <LayoutDashboard size={18} aria-hidden="true" />,
+  });
+  const back = directorManagement && !isFixtureConsole
+    ? { href: `/tournament-management/tournaments/${encodeURIComponent(tournamentId)}/overview`, label: '대회 관리로 돌아가기' }
+    : isFixtureConsole && origin !== 'staff'
     ? { href: `${basePath}/operations`, label: '경기 목록으로 돌아가기' }
     : returnTarget(origin, tournamentId, tournamentKind);
 
@@ -457,7 +461,7 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
         <Drawer
           open={drawerOpen}
           onClose={closeDrawer}
-          basePath={basePath}
+          navItems={navItems}
           tournamentId={tournamentId}
           tournamentTitle={tournamentTitle}
           tournamentCoverImageUrl={tournamentCoverImageUrl}

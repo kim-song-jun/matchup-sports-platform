@@ -1,17 +1,28 @@
-import type { AdminContextService } from '../../common/admin-context.service';
+import { AdminContextService } from '../../common/admin-context.service';
 import type { GamesService } from '../../games/games.service';
 import type { PrismaService } from '../../prisma/prisma.service';
 import type { BracketTemplateService } from '../templates/bracket-template.service';
 import { MultiFinalsService } from './multi-finals.service';
 
 const user = { id: 'admin', email: 'admin@example.test', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
-function harness() {
+function harness(options: { director?: boolean; revoked?: boolean; expiresAt?: Date; readonlyRole?: boolean } = {}) {
+  const actor = options.director ? { ...user, id: 'director' } : user;
   const row = { id: 't', kind: 'regular_tournament', format: 'league_knockouts', status: 'open',
     competitionConfigVersionId: 'config', multiFinalsRevision: 2,
     multiFinals: { groups: [{ id: 'g', name: 'A조', capacity: 4, legs: 1 }],
       finals: [{ name: '결선', rules: [{ groupId: 'g', rank: 1 }, { groupId: 'g', rank: 2 }], thirdPlace: false, registrationIds: ['r1', 'r2'] as string[] | null }] } };
   const tx = {
     $executeRaw: jest.fn(), $queryRaw: jest.fn().mockResolvedValue([]),
+    v1AdminUser: { findUnique: jest.fn().mockResolvedValue(options.director ? null : {
+      id: 'a', userId: actor.id, adminRole: 'owner', status: 'active', user: { accountStatus: 'active' },
+    }) },
+    v1TournamentStaffAssignment: { findFirst: jest.fn(async ({ where }) =>
+      options.director && !options.revoked && !options.readonlyRole &&
+      (!options.expiresAt || options.expiresAt > new Date()) &&
+      where.userId === actor.id && where.tournamentId === 't' && where.role === 'TOURNAMENT_DIRECTOR'
+        ? { id: 'director-grant', tournamentId: 't', version: 2 } : null) },
+    v1AdminActionLog: { create: jest.fn().mockResolvedValue({ id: 'admin-log' }) },
+    v1OperationAudit: { create: jest.fn().mockResolvedValue({ id: 'director-log' }) },
     v1Tournament: { findFirst: jest.fn(async () => row), update: jest.fn(async ({ data }) => {
       row.multiFinals = data.multiFinals; row.multiFinalsRevision++; return row;
     }) },
@@ -24,9 +35,10 @@ function harness() {
     v1TournamentGroupTeam: { deleteMany: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
     v1TournamentRegistration: { findMany: jest.fn().mockResolvedValue([]) },
   };
-  const admins = { getMutationAdmin: jest.fn().mockResolvedValue({ id: 'a', userId: user.id }), logAdminAction: jest.fn() };
-  const prisma = { $transaction: jest.fn(async (fn: (client: typeof tx) => unknown) => fn(tx)) };
-  return { row, tx, admins, service: new MultiFinalsService(prisma as unknown as PrismaService, admins as unknown as AdminContextService, {} as GamesService, {} as BracketTemplateService) };
+  const prisma = { ...tx, $transaction: jest.fn(async (fn: (client: typeof tx) => unknown) => fn(tx)) };
+  const context = new AdminContextService(prisma as unknown as PrismaService);
+  const admins = { getTournamentMutationAdmin: jest.spyOn(context, 'getTournamentMutationAdmin'), logAdminAction: jest.spyOn(context, 'logAdminAction') };
+  return { row, tx, admins, actor, service: new MultiFinalsService(prisma as unknown as PrismaService, context, {} as GamesService, {} as BracketTemplateService) };
 }
 describe('대진 초기화와 별도 예선 수정 보호', () => {
   it.each([
@@ -50,7 +62,7 @@ describe('대진 초기화와 별도 예선 수정 보호', () => {
   it('오래된 revision과 권한 없는 관리자는 쓰기 전에 거절한다', async () => {
     const { tx, admins, service } = harness();
     await expect(service.reset(user, 't', { expectedRevision: 1 })).rejects.toMatchObject({ response: { code: 'MULTI_FINAL_STALE' } });
-    admins.getMutationAdmin.mockRejectedValueOnce(new Error('forbidden'));
+    admins.getTournamentMutationAdmin.mockRejectedValueOnce(new Error('forbidden'));
     await expect(service.reset(user, 't', { expectedRevision: 2 })).rejects.toThrow('forbidden');
     expect(tx.v1Tournament.update).not.toHaveBeenCalled();
   });
@@ -65,9 +77,9 @@ describe('대진 초기화와 별도 예선 수정 보호', () => {
     expect(result.finals[0].rules).toEqual([{ groupId: 'g', rank: 1 }, { groupId: 'g', rank: 2 }]);
     expect(admins.logAdminAction).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ action: 'tournament.multi_finals.reset' }), expect.anything());
   });
-  it('대진이 있으면 예선 수정으로 우회 삭제할 수 없다', async () => {
-    const { tx, service } = harness(); tx.v1TournamentMatchDetails.count.mockResolvedValue(1);
-    await expect(service.setup(user, 't', { expectedRevision: 2, groups: [{ name: 'A조', capacity: 2, legs: 1 }], finals: [{ name: '결선', thirdPlace: false, rules: [] }] }, true)).rejects.toMatchObject({ response: { code: 'BRACKET_NOT_EMPTY' } });
+  it.each([false, true])('대진이 있으면 예선 수정으로 우회 삭제할 수 없다 (director=%s)', async director => {
+    const { tx, service, actor } = harness({ director }); tx.v1TournamentMatchDetails.count.mockResolvedValue(1);
+    await expect(service.setup(actor, 't', { expectedRevision: 2, groups: [{ name: 'A조', capacity: 2, legs: 1 }], finals: [{ name: '결선', thirdPlace: false, rules: [] }] }, true)).rejects.toMatchObject({ response: { code: 'BRACKET_NOT_EMPTY' } });
     expect(tx.v1TournamentSlot.deleteMany).not.toHaveBeenCalled();
   });
   it('GroupTeam 생성 순서가 달라도 실제 자리 순서로 hydrate하고 초기화 뒤에도 유지한다', async () => {
@@ -77,5 +89,33 @@ describe('대진 초기화와 별도 예선 수정 보호', () => {
     tx.v1TournamentSlot.deleteMany.mockImplementation(async () => { tx.v1TournamentSlot.findMany.mockResolvedValue([]); });
     const result = await service.reset(user, 't', { expectedRevision: 2 });
     expect(result.groups[0].registrationIds).toEqual(['r1', 'r2']);
+  });
+});
+
+describe('배정 디렉터 초기화 권한과 실제 감사 경로', () => {
+  it('플랫폼 관리자 계정 없이 담당 대회를 초기화하고 실제 배정 신원으로 기록한다', async () => {
+    const { service, actor, tx } = harness({ director: true });
+    const result = await service.reset(actor, 't', { expectedRevision: 2 });
+    expect(result.revision).toBe(3);
+    expect(tx.v1Tournament.update).toHaveBeenCalled();
+    expect(tx.v1OperationAudit.create).toHaveBeenCalledWith({ data: expect.objectContaining({
+      actorType: 'USER', actorUserId: actor.id, tournamentId: 't', action: 'tournament.multi_finals.reset',
+      after: expect.objectContaining({ _authorization: { role: 'tournament_director', assignmentId: 'director-grant', assignmentVersion: 2 } }),
+    }) });
+    expect(tx.v1AdminActionLog.create).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { name: '타 대회', tournamentId: 'foreign', options: {} },
+    { name: '해제 배정', tournamentId: 't', options: { revoked: true } },
+    { name: '만료 배정', tournamentId: 't', options: { expiresAt: new Date(0) } },
+    { name: '조회 역할', tournamentId: 't', options: { readonlyRole: true } },
+  ])('$name은 읽기·삭제·감사 전에 거절한다', async ({ tournamentId, options }) => {
+    const { service, actor, tx } = harness({ director: true, ...options });
+    await expect(service.reset(actor, tournamentId, { expectedRevision: 2 })).rejects.toMatchObject({ response: { code: 'PERMISSION_DENIED' } });
+    expect(tx.v1Tournament.findFirst).not.toHaveBeenCalled();
+    expect(tx.v1TournamentSlot.deleteMany).not.toHaveBeenCalled();
+    expect(tx.v1Tournament.update).not.toHaveBeenCalled();
+    expect(tx.v1OperationAudit.create).not.toHaveBeenCalled();
   });
 });

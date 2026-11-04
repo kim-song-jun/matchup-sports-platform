@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TournamentOpsShell } from './tournament-ops-shell';
 
@@ -11,6 +12,28 @@ beforeEach(() => {
 });
 
 describe('TournamentOpsShell 복귀 경로 (T6-2)', () => {
+  it.each([
+    ['TOURNAMENT_DIRECTOR', 'regular_tournament', true],
+    ['TOURNAMENT_DIRECTOR', 'regular_league', false],
+    ['SUPPORT_READONLY', 'regular_tournament', false],
+  ] as const)('%s의 %s 모바일 메뉴도 대회 관리 범위를 따른다', async (role, kind, hasManagement) => {
+    const user = userEvent.setup();
+    render(<TournamentOpsShell tournamentId="t-1" role={role} origin="staff" tournamentKind={kind}><div>content</div></TournamentOpsShell>);
+    await user.click(screen.getByRole('button', { name: '메뉴 열기' }));
+    const menu = within(screen.getByRole('dialog', { name: '대회 운영 메뉴' }));
+    if (hasManagement) {
+      expect(menu.getByRole('link', { name: '대회 관리' })).toHaveAttribute('href', '/tournament-management/tournaments/t-1/overview');
+    } else {
+      expect(menu.queryByRole('link', { name: '대회 관리' })).not.toBeInTheDocument();
+    }
+    await user.click(menu.getByRole('button', { name: '메뉴 닫기' }));
+    expect(screen.queryByRole('dialog', { name: '대회 운영 메뉴' })).not.toBeInTheDocument();
+  });
+  it('디렉터는 같은 대회의 전용 관리 화면으로 돌아간다', () => {
+    render(<TournamentOpsShell tournamentId="t-1" role="TOURNAMENT_DIRECTOR" origin="staff" tournamentKind="regular_tournament"><div>content</div></TournamentOpsShell>);
+    expect(screen.getByRole('link', { name: '대회 관리로 돌아가기' })).toHaveAttribute('href', '/tournament-management/tournaments/t-1/overview');
+    expect(screen.getAllByRole('link', { name: '대회 관리' }).every((link) => link.getAttribute('href') === '/tournament-management/tournaments/t-1/overview')).toBe(true);
+  });
   it.each(['PLATFORM_OPS', 'TOURNAMENT_DIRECTOR'] as const)('담당 경기에서 온 %s도 담당 경기 목록으로 돌아간다', (role) => {
     pathnameMock.value = '/tournament-ops/tournaments/t-1/fixtures/fx-1/operate';
     render(<TournamentOpsShell tournamentId="t-1" role={role} origin="staff"><div>content</div></TournamentOpsShell>);
@@ -192,5 +215,17 @@ describe('TournamentOpsShell 모바일 상단 제목 (Task 180 G6-V4)', () => {
       </TournamentOpsShell>,
     );
     expect(mobileTitle()).toBe('운영 보드');
+  });
+});
+
+
+describe('unknown competition kind', () => {
+  it('does not give a league director tournament management links while kind is pending', async () => {
+    const user = userEvent.setup();
+    render(<TournamentOpsShell tournamentId="league-1" role="TOURNAMENT_DIRECTOR" origin="staff"><div>content</div></TournamentOpsShell>);
+    expect(screen.queryByRole('link', { name: '대회 관리로 돌아가기' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '대회 관리' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '메뉴 열기' }));
+    expect(within(screen.getByRole('dialog', { name: '대회 운영 메뉴' })).queryByRole('link', { name: '대회 관리' })).not.toBeInTheDocument();
   });
 });

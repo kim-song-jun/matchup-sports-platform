@@ -55,6 +55,10 @@ export function coversFixture(
  */
 export function myStaffEntryHref(group: V1MyTournamentStaffGroup): string {
   const tournamentId = encodeURIComponent(group.tournamentId);
+  if (group.tournamentKind !== 'regular_league' && group.assignments.some((a) => a.role === 'TOURNAMENT_DIRECTOR' &&
+    (a.expiresAt === null || new Date(a.expiresAt).getTime() > Date.now()))) {
+    return `/tournament-management/tournaments/${tournamentId}/overview`;
+  }
   const hasShellRole = group.assignments.some((assignment) => assignment.role !== 'FIELD_OPERATOR');
   if (hasShellRole) return `/tournament-ops/tournaments/${tournamentId}/operations`;
   return `/my/tournament-staff/${tournamentId}`;

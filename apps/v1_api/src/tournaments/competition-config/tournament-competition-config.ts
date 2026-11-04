@@ -234,7 +234,7 @@ export class TournamentCompetitionConfig {
     allowedKinds: readonly V1CompetitionKind[],
     transaction?: Prisma.TransactionClient,
   ) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { tournamentId });
     const db = transaction ?? this.prisma;
     const tournament = await findTournamentOnSurface(db, allowedKinds, {
       where: { id: tournamentId, deletedAt: null },
@@ -316,8 +316,7 @@ export class TournamentCompetitionConfig {
       const rebase = async (periods: Prisma.JsonValue, scope: Record<string, string>) => {
         const materialized = await materializePeriodConfigVersion(tx, { source: selected, periods, createdByUserId: user.id });
         if (materialized.created) {
-          await tx.v1AdminActionLog.create({ data: {
-            adminUserId: admin.id,
+          await this.adminContext.logAdminAction(admin, {
             action: 'competition_config.version.create',
             targetType: 'competition_config',
             targetId: materialized.version.id,
@@ -329,7 +328,7 @@ export class TournamentCompetitionConfig {
               ...scope,
               reason: 'stage_period_rebase',
             },
-          } });
+          }, tx);
         }
         return materialized.version;
       };

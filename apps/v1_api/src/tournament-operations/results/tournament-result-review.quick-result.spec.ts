@@ -235,8 +235,8 @@ function expectNoWrites(harness: Harness): void {
 }
 
 describe('quickResult — 권한·경계', () => {
-  it('platform_ops 가 아닌 주체(대회 디렉터)는 PERMISSION_DENIED 403 이고 아무것도 쓰지 않는다', async () => {
-    const harness = createHarness({ role: 'tournament_director' });
+  it('리그 디렉터의 빠른 입력은 기존처럼 403이고 아무것도 쓰지 않는다', async () => {
+    const harness = createHarness({ role: 'tournament_director', source: 'league' });
 
     expectHttp(await captureFailure(() => harness.run({ home: 1, away: 0 })), 403, 'PERMISSION_DENIED');
     expectNoWrites(harness);
@@ -595,3 +595,14 @@ describe('quickResult — 승부차기(킥 수는 요구하지 않는다)', () =
   });
 });
 
+
+describe('assigned tournament full management', () => {
+  it('director persists an official quick result without the rollout flag', async () => {
+    const h = createHarness({ role: 'tournament_director' });
+    const result = await h.run({ home: 1, away: 0 });
+    expect(result.score).toEqual({ home: 1, away: 0 });
+    expect(h.created).toHaveLength(1);
+    expect(h.revisionUpdates).toContainEqual(expect.objectContaining({ data: expect.objectContaining({ state: 'OFFICIAL' }) }));
+    expect(h.gameUpdates).toContainEqual(expect.objectContaining({ data: expect.objectContaining({ currentOfficialRevisionId: 'quick-rev-1' }) }));
+  });
+});

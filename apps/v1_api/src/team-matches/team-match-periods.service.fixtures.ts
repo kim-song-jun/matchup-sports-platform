@@ -188,7 +188,7 @@ export async function teamMatchPeriodsFixture() {
   const module = await Test.createTestingModule({ providers: [
     TeamMatchesService, TournamentPeriodSettingsService,
     { provide: PrismaService, useValue: prisma }, { provide: GamesService, useValue: games },
-    { provide: AdminContextService, useValue: { getMutationAdmin: jest.fn().mockResolvedValue({ id: 'admin-periods', userId: periodsActor.id, adminRole: 'owner', status: 'active' }), logAdminAction: jest.fn().mockResolvedValue(undefined) } },
+    { provide: AdminContextService, useValue: { getTournamentAdmin: jest.fn().mockResolvedValue({ id: 'admin-periods', userId: periodsActor.id, adminRole: 'owner', status: 'active' }), getTournamentMutationAdmin: jest.fn().mockResolvedValue({ id: 'admin-periods', userId: periodsActor.id, adminRole: 'owner', status: 'active' }), logAdminAction: jest.fn().mockResolvedValue(undefined) } },
     { provide: NotificationsService, useValue: { emitToManyDeferred: jest.fn() } },
   ] }).compile();
   tx = module.get<PrismaService>(PrismaService);

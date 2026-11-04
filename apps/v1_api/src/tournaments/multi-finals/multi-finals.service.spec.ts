@@ -20,7 +20,7 @@ describe('N개 결선 미리보기 경기 번호', () => {
       v1TournamentMatchDetails: { count: jest.fn().mockResolvedValue(0), findMany: jest.fn().mockResolvedValue([]), aggregate: jest.fn().mockResolvedValue({ _max: { fixtureNumber: 6 } }) },
     };
     const prisma = { $transaction: jest.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)) };
-    const admins = { getMutationAdmin: jest.fn().mockResolvedValue({ id: 'admin' }) };
+    const admins = { getTournamentMutationAdmin: jest.fn().mockResolvedValue({ id: 'admin' }) };
     const service = new MultiFinalsService(prisma as unknown as PrismaService, admins as unknown as AdminContextService,
       {} as GamesService, {} as BracketTemplateService);
     const result = await service.preview({ id: 'admin', email: 'admin@example.test', accountStatus: 'active', onboardingStatus: 'completed' }, 'tournament');
@@ -45,7 +45,7 @@ describe('N개 결선 미리보기 경기 번호', () => {
       v1TournamentMatchDetails: { count: jest.fn().mockResolvedValue(0), findMany: jest.fn().mockResolvedValue([]), aggregate: jest.fn().mockResolvedValue({ _max: { fixtureNumber: maximum } }) },
     };
     const prisma = { $transaction: jest.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)) };
-    const admins = { getMutationAdmin: jest.fn().mockResolvedValue({ id: 'admin' }) };
+    const admins = { getTournamentMutationAdmin: jest.fn().mockResolvedValue({ id: 'admin' }) };
     const service = new MultiFinalsService(prisma as unknown as PrismaService, admins as unknown as AdminContextService,
       {} as GamesService, {} as BracketTemplateService);
     const result = await service.preview({ id: 'admin', email: 'admin@example.test', accountStatus: 'active', onboardingStatus: 'completed' }, 'tournament');

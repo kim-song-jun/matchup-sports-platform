@@ -271,7 +271,7 @@ Making bracket advancement actually reachable (the fix above) exposed a second, 
 | Method and route | Body | Result | Actor |
 |---|---|---|---|
 | `POST /api/v1/games/:gameId/result-revisions/:revisionId/supersede-and-submit` | `SupersedeAndSubmitGameResultRevisionDto {expectedVersion,clientCommandId,score,actualParticipants,eventsHash,mvpParticipantId?,reason}` | atomically creates and submits a same-game successor with a fresh 24h/48h review SLA; base must be `SUBMITTED`, otherwise `409 RESULT_RESUBMISSION_NOT_ALLOWED` with zero new rows | `tournament_director`/`platform_ops` |
-| `POST /api/v1/games/:gameId/result-revisions/:revisionId/officialize` | `OfficializeGameResultRevisionDto {expectedVersion,clientCommandId,projectionPreviewHash}` | moves a `SUBMITTED` revision (STANDARD flow) or a correction `DRAFT` (CORRECTION flow) to `OFFICIAL`, atomically swaps `currentOfficialRevisionId`, writes `GAME_RESULT_OFFICIAL` outbox | `platform_ops`; `tournament_director` only while `DIRECTOR_OFFICIALIZE=on` (re-checked fresh on every call -- `403 DIRECTOR_OFFICIALIZE_DISABLED` otherwise) |
+| `POST /api/v1/games/:gameId/result-revisions/:revisionId/officialize` | `OfficializeGameResultRevisionDto {expectedVersion,clientCommandId,projectionPreviewHash}` | moves a `SUBMITTED` revision (STANDARD flow) or a correction `DRAFT` (CORRECTION flow) to `OFFICIAL`, atomically swaps `currentOfficialRevisionId`, writes `GAME_RESULT_OFFICIAL` outbox | `platform_ops`; `tournament_director` for assigned tournaments without a flag; league directors require `DIRECTOR_OFFICIALIZE=on` (re-checked on every call) |
 | `POST /api/v1/games/:gameId/result-revisions/:revisionId/void` | `VoidGameResultRevisionDto {expectedVersion,clientCommandId,reason}` | appends an immutable `VOID` revision and swaps the current pointer; `revisionId` must be the game's CURRENT official revision (`409 REVISION_MUST_BE_SUPERSEDED` otherwise); `409 NEXT_FIXTURE_CONFLICT` before the pointer swap if a downstream bracket fixture already advanced past `scheduled` | same as officialize |
 | `POST /api/v1/games/:gameId/corrections` | `CreateGameResultCorrectionDto {expectedVersion,clientCommandId,baseRevisionId,reason,changes:{score,actualParticipants,eventsHash,mvpParticipantId?}}` | creates a same-game superseding `DRAFT`; creation alone never swaps the pointer. `baseRevisionId` 는 게임의 현재 포인터여야 하고, 그 리비전이 `OFFICIAL` 이면 정정(CORRECTION), `VOID` 면 무효 후 재입력(VOID_REENTRY)으로 동작해요 | `tournament_director`/`platform_ops` (not flag-gated) |
 
@@ -285,7 +285,7 @@ Every route requires `V1AuthGuard` and reuses the [game aggregate](./games.md)'s
 |---|---|---|
 | `401` | — | unauthenticated |
 | `403` | `STAFF_SCOPE_DENIED` | actor is not `platform_ops` and holds no `tournament_director` assignment for this game's tournament |
-| `403` | `DIRECTOR_OFFICIALIZE_DISABLED` | a `tournament_director` attempted officialize/void while the flag is `off` |
+| `403` | `DIRECTOR_OFFICIALIZE_DISABLED` | a league `tournament_director` attempted officialize/void while the flag is `off`; assigned tournament directors are exempt |
 | `404` | `GAME_NOT_FOUND` | game not found, or not `TOURNAMENT_FIXTURE`-sourced |
 | `404` | `RESULT_REVISION_NOT_FOUND` | `revisionId`/`baseRevisionId` does not belong to this game |
 | `409` | `VERSION_CONFLICT` \| `IDEMPOTENCY_PAYLOAD_CONFLICT` \| `COMMAND_CONCURRENCY_CONFLICT` | standard versioned-mutation/idempotency races |
@@ -303,7 +303,7 @@ Every route requires `V1AuthGuard` and reuses the [game aggregate](./games.md)'s
 
 | Method and route | Body | Result | Actor |
 |---|---|---|---|
-| `POST /api/v1/admin/games/:gameId/quick-result` + 헤더 `Idempotency-Key` | `QuickResultDto {clientCommandId(uuid),expectedVersion,score:{home,away,penalties?:{home,away}}}` | `201 {gameId,revisionId,version,score}` | 플랫폼 어드민 `owner`·`ops` 만. `support`·대회 디렉터·일반 사용자는 `403 PERMISSION_DENIED` |
+| `POST /api/v1/admin/games/:gameId/quick-result` + 헤더 `Idempotency-Key` | `QuickResultDto {clientCommandId(uuid),expectedVersion,score:{home,away,penalties?:{home,away}}}` | `201 {gameId,revisionId,version,score}` | 플랫폼 어드민 `owner`·`ops` 또는 해당 대회의 활성 디렉터. 리그 디렉터·비배정 사용자·support 단독은 `403 PERMISSION_DENIED` |
 
 - 한 Serializable 트랜잭션에서 `DRAFT` 리비전(점수, `goalEvents=[]`, `eventsHash=hash([])`, `reason='[quick-result]'`) → 참가자(최신 라인업 리비전의 선수 전원, `started=true`, 기록 0) → `OFFICIAL`(상태 머신 흐름 `ADMIN_QUICK`)로 쓰고, 게임을 `ENDED` 로 옮긴 뒤 열린 피리어드를 닫고 팀매치를 `completed` 로 만들어요. 대회 경기는 같은 트랜잭션에서 승자를 다음 칸으로 진출시켜요(`409 NEXT_FIXTURE_CONFLICT` — 다음 경기가 이미 시작됐어요).
 - outbox 는 `GAME_RESULT_OFFICIAL` 하나뿐이에요(`GAME_RESULT_SUBMITTED` 없음). 순위·전적·개인 기록(출전)·리그 완료·알림은 일반 확정과 같은 워커가 처리해요. 운영 감사 액션은 `QUICK_RESULT` 예요.
@@ -315,7 +315,7 @@ Every route requires `V1AuthGuard` and reuses the [game aggregate](./games.md)'s
 
 | HTTP | Code | 언제 |
 |---|---|---|
-| `403` | `PERMISSION_DENIED` | 플랫폼 운영자(owner·ops)가 아니에요 |
+| `403` | `PERMISSION_DENIED` | 플랫폼 운영자(owner·ops) 또는 해당 대회의 활성 디렉터가 아니에요 |
 | `409` | `QUICK_RESULT_UNSUPPORTED` | 대회·정규 리그 팀매치가 아니에요(친선 등) |
 | `409` | `QUICK_RESULT_NOT_AVAILABLE` | 진행 중이거나 결과가 이미 있어요(확정 전 결과 포함 — 정정·확인을 써요) |
 | `409` | `QUICK_RESULT_FIXTURE_CANCELLED` | 팀매치가 취소됐어요 |

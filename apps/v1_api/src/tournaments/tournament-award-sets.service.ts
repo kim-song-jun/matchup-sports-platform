@@ -77,13 +77,13 @@ export class TournamentAwardSetsService {
   }
 
   async listAwardSets(user: V1AuthUser, tournamentId: string) {
-    await this.adminContext.getActiveAdmin(user.id);
+    await this.adminContext.getTournamentAdmin(user.id, { tournamentId });
     await this.findRegularTournament(tournamentId);
     return this.listAwardSetsInternal(tournamentId);
   }
 
   async setAwardSets(user: V1AuthUser, tournamentId: string, dto: SetTournamentAwardSetsDto) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { tournamentId });
     const tournament = await this.findRegularTournament(tournamentId);
 
     const tracks = dto.awardSets.map((entry) => entry.bracketTrack);

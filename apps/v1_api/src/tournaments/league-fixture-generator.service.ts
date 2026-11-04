@@ -457,7 +457,7 @@ export class LeagueFixtureGeneratorService {
   ) {}
 
   async generate(user: V1AuthUser, tournamentId: string, dto: GenerateLeagueFixturesDto) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { tournamentId });
 
     const tournament = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId },

@@ -2,6 +2,7 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { Prisma } from '@prisma/client';
 import { createHash } from 'node:crypto';
 import type { V1AuthUser } from '../../auth/v1-auth-user';
+import { findTournamentManagementAction } from '../../common/tournament-management-history';
 import { AdminContextService } from '../../common/admin-context.service';
 import { GamesService } from '../../games/games.service';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -56,7 +57,7 @@ export class MultiFinalsService {
     }
     return fixtures;
   }
-  private async clearFinals(tx: Tx, admin: Awaited<ReturnType<AdminContextService['getMutationAdmin']>>, id: string) {
+  private async clearFinals(tx: Tx, admin: Awaited<ReturnType<AdminContextService['getTournamentMutationAdmin']>>, id: string) {
     const fixtures = await this.assertUnstarted(tx, id);
     const edges = await tx.v1TournamentMatchAdvancementEdge.findMany({ where: { tournamentId: id }, select: { sourceTeamMatchId: true, targetTeamMatchId: true } });
     const ids = new Set(fixtures.map(f => f.teamMatchId));
@@ -116,11 +117,11 @@ export class MultiFinalsService {
     }), finals, registrations, generated, fixtureCount, preliminaryFixtureCount, groupStandings };
   }
   async get(user: V1AuthUser, id: string) {
-    await this.admins.getActiveAdmin(user.id);
+    await this.admins.getTournamentAdmin(user.id, { tournamentId: id });
     return this.prisma.$transaction(tx => this.view(tx, id), { ...options, isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
   }
   async setup(user: V1AuthUser, id: string, dto: MultiFinalSetupDto, editing = false) {
-    const admin = await this.admins.getMutationAdmin(user.id);
+    const admin = await this.admins.getTournamentMutationAdmin(user.id, { tournamentId: id });
     const plan = planPreliminaryGroups(dto.groups);
     validateNamedFinals(dto.finals, new Map(dto.groups.map((g, i) => [String(i), g.capacity])));
     return this.prisma.$transaction(async tx => {
@@ -159,7 +160,7 @@ export class MultiFinalsService {
     }, options);
   }
   async reset(user: V1AuthUser, id: string, dto: MultiFinalResetDto) {
-    const admin = await this.admins.getMutationAdmin(user.id);
+    const admin = await this.admins.getTournamentMutationAdmin(user.id, { tournamentId: id });
     return this.prisma.$transaction(async tx => {
       const initial = await this.tournament(tx, id); await lockCompetitionForBracketMutationInTx(tx, initial);
       const tournament = await this.tournament(tx, id); this.assertMutable(tournament.status);
@@ -185,7 +186,7 @@ export class MultiFinalsService {
     }, options);
   }
   async select(user: V1AuthUser, id: string, dto: MultiFinalSelectionDto) {
-    const admin = await this.admins.getMutationAdmin(user.id);
+    const admin = await this.admins.getTournamentMutationAdmin(user.id, { tournamentId: id });
     return this.prisma.$transaction(async tx => {
       const initial = await this.tournament(tx, id); await lockCompetitionForBracketMutationInTx(tx, initial);
       const tournament = await this.tournament(tx, id); this.assertMutable(tournament.status); const config = this.config(tournament.multiFinals);
@@ -223,14 +224,14 @@ export class MultiFinalsService {
     return { finals, plan, revision: view.revision, previewHash: hash({ view, fixtures, finals, plan }), counts: { fixtures: plan.fixtures.length, byes: plan.byeSlots.length, tournaments: finals.length } };
   }
   async preview(user: V1AuthUser, id: string) {
-    await this.admins.getMutationAdmin(user.id);
+    await this.admins.getTournamentMutationAdmin(user.id, { tournamentId: id });
     return this.prisma.$transaction(tx => this.previewInTx(tx, id), { ...options, isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
   }
   async generate(user: V1AuthUser, id: string, dto: MultiFinalGenerateDto) {
-    const admin = await this.admins.getMutationAdmin(user.id);
+    const admin = await this.admins.getTournamentMutationAdmin(user.id, { tournamentId: id });
     return this.prisma.$transaction(async tx => {
       const initial = await this.tournament(tx, id); await lockCompetitionForBracketMutationInTx(tx, initial);
-      const prior = await tx.v1AdminActionLog.findFirst({ where: { targetType: 'tournament', targetId: id, action: 'tournament.multi_finals.generate', afterJson: { path: ['requestId'], equals: dto.requestId } }, select: { afterJson: true } });
+      const prior = await findTournamentManagementAction(tx, { targetType: 'tournament', targetId: id, action: 'tournament.multi_finals.generate', afterJson: { path: ['requestId'], equals: dto.requestId } });
       if (prior) {
         const saved = prior.afterJson as { previewHash: string; revision: number };
         if (saved.previewHash !== dto.previewHash) throw stale();

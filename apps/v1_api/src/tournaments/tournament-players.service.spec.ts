@@ -154,9 +154,11 @@ describe('TournamentPlayersService', () => {
       updateMany: jest.Mock;
     };
     v1AdminUser: { findUnique: jest.Mock };
+
+    v1TournamentStaffAssignment: { findFirst: jest.Mock };
     v1AdminActionLog: { create: jest.Mock; findFirst: jest.Mock };
     v1StatusChangeLog: { create: jest.Mock };
-    v1OperationAudit: { create: jest.Mock };
+    v1OperationAudit: { create: jest.Mock; findFirst: jest.Mock };
     $transaction: jest.Mock;
     $queryRaw: jest.Mock;
     $executeRaw: jest.Mock;
@@ -182,13 +184,15 @@ describe('TournamentPlayersService', () => {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       v1AdminUser: { findUnique: jest.fn() },
+
+      v1TournamentStaffAssignment: { findFirst: jest.fn().mockResolvedValue(null) },
       v1AdminActionLog: {
         create: jest.fn().mockResolvedValue({ id: 'action-log-1' }),
         // 기본은 "어드민이 아직 선출 여부를 확정하지 않음".
         findFirst: jest.fn().mockResolvedValue(null),
       },
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'status-log-1' }) },
-      v1OperationAudit: { create: jest.fn().mockResolvedValue({ id: 'operation-audit-1' }) },
+      v1OperationAudit: { create: jest.fn().mockResolvedValue({ id: 'operation-audit-1' }), findFirst: jest.fn().mockResolvedValue(null) },
       $transaction: jest.fn(),
       // Prisma 의 `$queryRaw` 는 **행 배열**을 준다. `undefined` 로 두면 결과를 순회하는
       // 코드가 mock 에서만 터진다 — 등번호 조회(raw)가 실제로 그랬다.
@@ -1850,7 +1854,7 @@ describe('TournamentPlayersService', () => {
   });
 
   // 이 목록은 "추가" 폼 전용인데 명단 밖 팀원의 실명까지 담는다. 추가 권한이 없는 support 가
-  // 읽을 이유가 없으므로 조회 게이트를 쓰기 게이트와 같은 높이(getMutationAdmin)로 둔다.
+  // 읽을 이유가 없으므로 조회 게이트를 쓰기 게이트와 같은 높이(getTournamentMutationAdmin)로 둔다.
   it('listEligiblePlayersForAdmin: support 어드민은 추가 권한이 없으므로 후보도 못 본다', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(supportAdminRecord);
 

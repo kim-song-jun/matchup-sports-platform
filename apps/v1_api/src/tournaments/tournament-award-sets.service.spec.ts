@@ -29,7 +29,7 @@ describe('TournamentAwardSetsService', () => {
     $executeRaw: jest.Mock;
     $queryRaw: jest.Mock;
   };
-  let adminContext: { getActiveAdmin: jest.Mock; getMutationAdmin: jest.Mock; logAdminAction: jest.Mock };
+  let adminContext: { getTournamentAdmin: jest.Mock; getTournamentMutationAdmin: jest.Mock; logAdminAction: jest.Mock };
 
   beforeEach(async () => {
     prisma = {
@@ -43,8 +43,8 @@ describe('TournamentAwardSetsService', () => {
       callback(prisma),
     );
     adminContext = {
-      getActiveAdmin: jest.fn().mockResolvedValue(adminRecord),
-      getMutationAdmin: jest.fn().mockResolvedValue(adminRecord),
+      getTournamentAdmin: jest.fn().mockResolvedValue(adminRecord),
+      getTournamentMutationAdmin: jest.fn().mockResolvedValue(adminRecord),
       logAdminAction: jest.fn().mockResolvedValue(undefined),
     };
 

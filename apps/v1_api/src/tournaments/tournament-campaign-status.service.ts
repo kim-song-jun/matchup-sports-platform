@@ -32,7 +32,7 @@ export class TournamentCampaignStatusService {
     tournamentId: string,
     dto: ChangeTournamentCampaignStatusDto,
   ) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { tournamentId });
     try {
       return await this.prisma.$transaction(async (tx) => {
         const existing = await findTournamentCampaign(tx, tournamentId);

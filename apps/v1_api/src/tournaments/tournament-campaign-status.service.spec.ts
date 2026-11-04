@@ -43,14 +43,14 @@ describe('TournamentCampaignStatusService', () => {
     $transaction: jest.fn(),
   };
   const adminContext = {
-    getMutationAdmin: jest.fn(),
+    getTournamentMutationAdmin: jest.fn(),
     logAdminAction: jest.fn(),
   };
   let service: TournamentCampaignStatusService;
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    adminContext.getMutationAdmin.mockResolvedValue(admin);
+    adminContext.getTournamentMutationAdmin.mockResolvedValue(admin);
     adminContext.logAdminAction.mockResolvedValue({ actionLogId: 'log-1', statusChangeLogId: 'status-log-1' });
     prisma.$transaction.mockImplementation(async (callback) => callback(prisma));
     const moduleRef = await Test.createTestingModule({

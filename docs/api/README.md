@@ -1,4 +1,8 @@
-N개 토너먼트 대회의 독립 대진 초기화, 대진이 없는 상태의 예선 수정, 수동·자동·부분 팀 배정은 [대회 계약](./domains/tournaments.md)을 따른다.
+배정된 대회의 활성 디렉터는 빠른 결과 입력·공식 확정·무효화도 허용한다. 게임 ID의 실제 소속 대회를 확인하며 리그 디렉터의 별도 제한은 유지한다. [대회 권한 계약](./domains/tournaments.md#scoped-director-management).
+
+수상 추천용 관리자 선수 기록 조회는 해당 대회의 활성 디렉터도 허용하며, 다른 대회는 403으로 거부한다. [대회 권한 계약](./domains/tournaments.md#scoped-director-management)을 따른다.
+
+N개 토너먼트 대회의 독립 대진 초기화와 예선 수정도 활성 디렉터의 담당 대회 권한으로 보호한다. 대진이 없는 상태의 예선 수정, 수동·자동·부분 팀 배정은 [대회 계약](./domains/tournaments.md)을 따른다.
 
 토너먼트별 최종 순위는 공식 결승 및 3·4위전 결과를 범위별로 표시한다. N개 결선은 팀 미정 상태로 선생성할 수 있고, 조별 전체 순위·동률을 확인해 후속 배정할 때 같은 구조의 경기 ID와 일정을 유지한다. 미리보기·시상·공용 MSW 계약은 [대회 계약](./domains/tournaments.md)을 따른다.
 
@@ -29,6 +33,8 @@ N개 토너먼트 대회의 독립 대진 초기화, 대진이 없는 상태의 
 일반 팀매치 경기 운영의 명령·이벤트 요청은 `takeoverToken` 생략을 transport에서 허용한다. 생략 시에도 GamesService의 기존 host/lease 권한 판정이 최종 기준이며, tournament-scoped 운영은 기존 유효 lease를 요구한다. 제공 값은 공백 문자가 아닌 문자를 하나 이상 포함한 문자열이어야 하며 원문 그대로 전달된다. 빈 문자열·공백 전용 문자열·`null`·잘못된 타입은 계속 validation error다. [Games](./domains/games.md) · [Game realtime](./domains/game-realtime.md).
 
 # Teameet v1 API contracts
+
+대회 디렉터의 배정 대회 전체 관리는 [대회 관리 권한 계약](./domains/tournaments.md#scoped-director-management)을 따른다. 기존 관리자 API를 대회 범위로 재사용하며 플랫폼 관리자 계정은 만들지 않는다.
 
 대진 v2는 4~64팀 짝수, 조별 인원·진출 수와 홀수 결선, 서버 미리보기·초안·멱등 생성 계약을 제공한다. 활성화와 수동 결선 진출 표시 규칙은 [대회 v2 계약](./domains/tournaments.md#유연한-대진-v2-2026-10-27)을 따른다.
 

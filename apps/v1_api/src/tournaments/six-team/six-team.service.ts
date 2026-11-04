@@ -55,13 +55,13 @@ export class SixTeamService {
     };
   }
   async preview(user: V1AuthUser, id: string) {
-    await this.admins.getActiveAdmin(user.id);
+    await this.admins.getTournamentAdmin(user.id, { tournamentId: id });
     return this.prisma.$transaction((tx) => this.load(tx, id), {
       isolationLevel: 'RepeatableRead',
     });
   }
   async decide(user: V1AuthUser, id: string, dto: SixTeamDecisionDto) {
-    const admin = await this.admins.getMutationAdmin(user.id);
+    const admin = await this.admins.getTournamentMutationAdmin(user.id, { tournamentId: id });
     return this.prisma.$transaction(
       async (tx) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`league-fixture-generation:${id}`}, 0))`;

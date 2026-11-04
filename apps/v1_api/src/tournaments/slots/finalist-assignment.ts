@@ -1,3 +1,4 @@
+import { findTournamentManagementAction } from '../../common/tournament-management-history';
 import { createHash } from 'node:crypto';
 import { ConflictException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
@@ -106,7 +107,7 @@ export async function loadFinalistPreview(tx: Prisma.TransactionClient, tourname
       ? '결선에 시작했거나 결과·기록이 있는 경기가 있어 배정할 수 없어요.'
       : targets.length === 0 ? '직접 배정할 결선 자리가 없어요. 결선 대진과 경기 연결을 확인해 주세요.' : null;
   const sourceVersion = createHash('sha256').update(JSON.stringify({ groups: previewGroups, sources: [...sources], standings })).digest('hex');
-  const previous = await tx.v1AdminActionLog.findFirst({ where: { targetType: 'tournament', targetId: tournamentId, action: 'tournament.bracket.assign_finalists' }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], select: { afterJson: true } });
+  const previous = await findTournamentManagementAction(tx, { targetType: 'tournament', targetId: tournamentId, action: 'tournament.bracket.assign_finalists' });
   const savedSource = previous?.afterJson !== null && typeof previous?.afterJson === 'object' && !Array.isArray(previous.afterJson) ? previous.afterJson.sourceVersion : undefined;
   const standingsChanged = typeof savedSource === 'string' && savedSource !== sourceVersion;
   const version = createHash('sha256').update(JSON.stringify({ groups: previewGroups, sources: [...sources], standings, registrations, details, edges, slots, byeRows, byeTeams })).digest('hex');
@@ -138,7 +139,7 @@ export function validateFinalistAssignments(preview: Awaited<ReturnType<typeof l
 }
 
 export async function previewFinalistAssignment(deps: Dependencies, user: V1AuthUser, tournamentId: string) {
-  await deps.adminContext.getActiveAdmin(user.id);
+  await deps.adminContext.getTournamentAdmin(user.id, { tournamentId });
   return deps.prisma.$transaction(async (tx) => {
     await loadCanonicalStandingsSource(tx, tournamentId);
     return loadFinalistPreview(tx, tournamentId);
@@ -146,7 +147,7 @@ export async function previewFinalistAssignment(deps: Dependencies, user: V1Auth
 }
 
 export async function applyFinalistAssignment(deps: Dependencies, user: V1AuthUser, tournamentId: string, input: FinalistAssignmentDto) {
-  const admin = await deps.adminContext.getMutationAdmin(user.id);
+  const admin = await deps.adminContext.getTournamentMutationAdmin(user.id, { tournamentId });
   return deps.prisma.$transaction(async (tx) => {
     await loadCanonicalStandingsSource(tx, tournamentId);
     const preview = await loadFinalistPreview(tx, tournamentId);

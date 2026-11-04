@@ -14,7 +14,7 @@ describe('BracketTemplateService format concurrency', () => {
     const groups = { findMany: jest.fn(), create: jest.fn() };
     const tx = { v1Tournament: { findFirst }, v1TournamentGroup: groups, $executeRaw: jest.fn().mockResolvedValue(1) };
     const prisma = { ...tx, $transaction: jest.fn(async (callback: (client: typeof tx) => Promise<unknown>) => callback(tx)) };
-    const admin = { getMutationAdmin: jest.fn().mockResolvedValue({ id: 'admin-1' }) };
+    const admin = { getTournamentMutationAdmin: jest.fn().mockResolvedValue({ id: 'admin-1' }) };
     const service = new BracketTemplateService(prisma as unknown as PrismaService, admin as unknown as AdminContextService, {} as GamesService);
 
     await expect(service.apply({ id: 'user-1' } as V1AuthUser, 't-1', { kind: 'knockout', size: 4 }))
@@ -41,10 +41,12 @@ describe('유연한 대진 미리보기와 요청 보호', () => {
       v1TournamentMatchDetails: { findMany: jest.fn().mockResolvedValue([]) },
       v1TournamentRegistration: { findMany: jest.fn().mockResolvedValue([]) },
       v1TournamentMatchAdvancementEdge: { findMany: jest.fn().mockResolvedValue([]) },
+      v1OperationAudit: { findFirst: jest.fn().mockResolvedValue(null) },
+
       v1AdminActionLog: { findFirst: jest.fn().mockResolvedValue(null) },
     };
     const prisma = { ...tx, $transaction: jest.fn(async (fn: (client: typeof tx) => unknown) => fn(tx)) };
-    const admin = { getMutationAdmin: jest.fn().mockResolvedValue({ id: 'admin' }) };
+    const admin = { getTournamentMutationAdmin: jest.fn().mockResolvedValue({ id: 'admin' }) };
     const service = new BracketTemplateService(prisma as unknown as PrismaService, admin as unknown as AdminContextService, {} as GamesService);
     return { service, tx, admin };
   }
@@ -83,7 +85,7 @@ describe('유연한 대진 미리보기와 요청 보호', () => {
   });
   it('권한 거절 시 대회 정보도 조회하지 않는다', async () => {
     const { service, tx, admin } = setup();
-    admin.getMutationAdmin.mockRejectedValue(new Error('forbidden'));
+    admin.getTournamentMutationAdmin.mockRejectedValue(new Error('forbidden'));
     await expect(service.preview(user, 't', dto)).rejects.toThrow('forbidden');
     expect(tx.v1Tournament.findFirst).not.toHaveBeenCalled();
   });

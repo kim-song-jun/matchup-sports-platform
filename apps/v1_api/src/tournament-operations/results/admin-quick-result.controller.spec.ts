@@ -26,14 +26,14 @@ describe('AdminQuickResultController', () => {
 
   it('어드민 mutation 게이트가 거부하면(support 등) 서비스를 부르지 않는다', async () => {
     const quickResult = jest.fn();
-    const getMutationAdmin = jest.fn().mockRejectedValue(
+    const getTournamentMutationAdmin = jest.fn().mockRejectedValue(
       new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Support admins cannot mutate' }),
     );
-    const controller = new AdminQuickResultController({ getMutationAdmin } as never, { quickResult } as never);
+    const controller = new AdminQuickResultController({ getTournamentMutationAdmin } as never, { quickResult } as never);
 
     await expect(controller.quickResult(user, 'game-1', 'key-1', dto)).rejects.toBeInstanceOf(ForbiddenException);
 
-    expect(getMutationAdmin).toHaveBeenCalledWith(user.id);
+    expect(getTournamentMutationAdmin).toHaveBeenCalledWith(user.id, { gameId: 'game-1' });
     expect(quickResult).not.toHaveBeenCalled();
   });
 
@@ -41,7 +41,7 @@ describe('AdminQuickResultController', () => {
     const response = { gameId: 'game-1', revisionId: 'rev-1', version: 3, score: { home: 3, away: 1 } };
     const quickResult = jest.fn().mockResolvedValue(response);
     const controller = new AdminQuickResultController(
-      { getMutationAdmin: jest.fn().mockResolvedValue({ adminRole: 'ops' }) } as never,
+      { getTournamentMutationAdmin: jest.fn().mockResolvedValue({ adminRole: 'ops' }) } as never,
       { quickResult } as never,
     );
 

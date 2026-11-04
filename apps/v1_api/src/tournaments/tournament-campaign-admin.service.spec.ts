@@ -51,8 +51,8 @@ describe('TournamentCampaignAdminService read/create/update', () => {
     $transaction: jest.fn(),
   };
   const adminContext = {
-    getActiveAdmin: jest.fn(),
-    getMutationAdmin: jest.fn(),
+    getTournamentAdmin: jest.fn(),
+    getTournamentMutationAdmin: jest.fn(),
     logAdminAction: jest.fn(),
   };
   const statusService = { changeStatus: jest.fn() };
@@ -61,8 +61,8 @@ describe('TournamentCampaignAdminService read/create/update', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    adminContext.getActiveAdmin.mockResolvedValue(admin);
-    adminContext.getMutationAdmin.mockResolvedValue(admin);
+    adminContext.getTournamentAdmin.mockResolvedValue(admin);
+    adminContext.getTournamentMutationAdmin.mockResolvedValue(admin);
     adminContext.logAdminAction.mockResolvedValue({ actionLogId: 'log-1', statusChangeLogId: null });
     prisma.$transaction.mockImplementation(async (callback) => callback(prisma));
     const moduleRef = await Test.createTestingModule({
@@ -89,7 +89,7 @@ describe('TournamentCampaignAdminService read/create/update', () => {
       createdAt: '2026-07-13T09:00:00.000Z',
       updatedAt: '2026-07-13T09:00:00.000Z',
     });
-    expect(adminContext.getActiveAdmin).toHaveBeenCalledWith(user.id);
+    expect(adminContext.getTournamentAdmin).toHaveBeenCalledWith(user.id, { tournamentId: 'tournament-1' });
   });
 
   it('returns TOURNAMENT_CAMPAIGN_NOT_FOUND for an absent admin campaign', async () => {
@@ -111,7 +111,7 @@ describe('TournamentCampaignAdminService read/create/update', () => {
     });
 
     expect(result.status).toBe('draft');
-    expect(adminContext.getMutationAdmin).toHaveBeenCalledWith(user.id);
+    expect(adminContext.getTournamentMutationAdmin).toHaveBeenCalledWith(user.id, { tournamentId: 'tournament-1' });
     expect(prisma.v1TournamentCampaign.create).toHaveBeenCalledWith({
       data: { tournamentId: 'tournament-1', slug: 'summer-futsal-cup', status: 'draft', content },
     });

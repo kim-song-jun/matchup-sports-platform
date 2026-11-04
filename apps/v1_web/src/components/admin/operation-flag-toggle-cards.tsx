@@ -33,8 +33,8 @@ const TOGGLES: readonly ToggleDef[] = [
   {
     key: 'DIRECTOR_OFFICIALIZE',
     label: '결과 확정 권한',
-    onEffect: '대회 진행 요원(디렉터)이 경기 결과를 공식 기록으로 확정할 수 있게 해요.',
-    offEffect: '끄면 디렉터의 결과 확정 요청이 거부돼요 — 이미 확정된 결과는 유지되지만 새로 확정할 수는 없어요.',
+    onEffect: '리그 디렉터의 결과 확정·무효화를 허용해요. 배정된 대회의 디렉터는 이 설정과 관계없이 관리할 수 있어요.',
+    offEffect: '끄면 리그 디렉터의 결과 확정 요청이 거부돼요. 배정된 대회의 디렉터 권한과 이미 확정된 결과는 유지돼요.',
     techNote: 'DIRECTOR_OFFICIALIZE',
   },
 ] as const;

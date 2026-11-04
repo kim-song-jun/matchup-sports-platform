@@ -1,3 +1,5 @@
+배정된 대회의 활성 디렉터는 빠른 결과 입력·공식 확정·무효화도 허용한다. 게임 ID의 실제 소속 대회를 확인하며 리그 디렉터의 별도 제한은 유지한다. [대회 권한 계약](./domains/tournaments.md#scoped-director-management).
+
 수상 추천용 관리자 선수 기록 조회는 해당 대회의 활성 디렉터도 허용하며, 다른 대회는 403으로 거부한다. [대회 권한 계약](./domains/tournaments.md#scoped-director-management)을 따른다.
 
 6강 전용 진출 결정은 기존 관리자 가드/응답 envelope를 따르며, source version 충돌은409, 참가·방식 조합 오류는422이다. [도메인 계약](./domains/tournaments.md#6강-결승-직행-방식-2026-10-28) 참조.

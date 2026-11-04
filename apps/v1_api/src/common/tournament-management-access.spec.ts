@@ -15,6 +15,7 @@ function setup() {
       (a.expiresAt === null || a.expiresAt > where.OR[1].expiresAt.gt) &&
       a.accountStatus === where.user.accountStatus && a.deletedAt === where.user.deletedAt &&
       where.tournament.OR.some((kind: { kind: string | null }) => kind.kind === a.kind)) ?? null) },
+    v1Game: { findUnique: jest.fn(async ({ where }) => ({ teamMatch: { tournamentId: where.id } })) },
     v1TournamentRegistration: { findUnique: jest.fn(async ({ where }) => ({ tournamentId: where.id })) },
     v1TournamentPlayer: { findUnique: jest.fn(async ({ where }) => ({ registration: { tournamentId: where.id } })) },
     v1TournamentMatchDetails: { findUnique: jest.fn(async ({ where }) => ({ tournamentId: where.teamMatchId })) },
@@ -39,7 +40,7 @@ describe('scoped full tournament management', () => {
     await expect(service.getTournamentAdmin('director', { tournamentId: 'other' })).rejects.toMatchObject({ response: { code: 'PERMISSION_DENIED' } });
   });
 
-  it.each(['registrationId', 'playerId', 'fixtureId', 'groupId', 'groupTeamId', 'slotId', 'announcementId'] as const)(
+  it.each(['gameId', 'registrationId', 'playerId', 'fixtureId', 'groupId', 'groupTeamId', 'slotId', 'announcementId'] as const)(
     'authorizes the actual tournament of a %s, including foreign child rejection', async (key) => {
       const { service } = setup();
       await expect(service.getTournamentMutationAdmin('director', { [key]: 'own' } as TournamentManagementResource)).resolves.toMatchObject({ tournamentId: 'own' });

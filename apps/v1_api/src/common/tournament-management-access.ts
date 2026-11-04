@@ -15,6 +15,7 @@ export type V1TournamentDirector = {
 export type V1TournamentManager = V1ActiveAdmin | V1TournamentDirector;
 export type TournamentManagementResource =
   | { tournamentId: string }
+  | { gameId: string }
   | { registrationId: string }
   | { playerId: string }
   | { fixtureId: string }
@@ -33,7 +34,10 @@ export function denyTournamentManagement(): never {
 export async function managementTournamentId(db: Db, resource: TournamentManagementResource): Promise<string> {
   if ('tournamentId' in resource) return resource.tournamentId;
   let row: { tournamentId: string | null } | null;
-  if ('registrationId' in resource) {
+  if ('gameId' in resource) {
+    const game = await db.v1Game.findUnique({ where: { id: resource.gameId }, select: { teamMatch: { select: { tournamentId: true } } } });
+    row = game?.teamMatch ?? null;
+  } else if ('registrationId' in resource) {
     row = await db.v1TournamentRegistration.findUnique({ where: { id: resource.registrationId }, select: { tournamentId: true } });
   } else if ('playerId' in resource) {
     const player = await db.v1TournamentPlayer.findUnique({ where: { id: resource.playerId }, select: { registration: { select: { tournamentId: true } } } });

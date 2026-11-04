@@ -415,7 +415,7 @@ export class TournamentResultReviewService {
    * Officializes a SUBMITTED revision (STANDARD flow, tournament review
    * pass) or a correction DRAFT created via createResultCorrection
    * (CORRECTION flow). platform_ops always; tournament_director only while
-   * DIRECTOR_OFFICIALIZE is 'on'. Atomically swaps the game's current
+   * DIRECTOR_OFFICIALIZE is 'on' for leagues; assigned tournament directors always have this permission. Atomically swaps the game's current
    * official pointer and writes the same GAME_RESULT_OFFICIAL outbox event
    * the team-match approve path already uses, so the existing projection
    * worker (facts/cache/bracket/terminal/watermarks) applies unchanged.
@@ -1155,7 +1155,9 @@ export class TournamentResultReviewService {
             },
             tx,
           );
-          if (input.requiredRole !== undefined && principal.role !== input.requiredRole) {
+          // Active, scoped tournament directors manage all tournament results. League policy remains separate.
+          const fullTournamentDirector = principal.role === 'tournament_director' && source.tournamentKind !== 'regular_league';
+          if (input.requiredRole !== undefined && principal.role !== input.requiredRole && !fullTournamentDirector) {
             throw new ForbiddenException({
               code: 'PERMISSION_DENIED',
               message: '플랫폼 운영자만 쓸 수 있는 기능이에요.',
@@ -1189,7 +1191,7 @@ export class TournamentResultReviewService {
           // written. `directorOfficializeFlag` is the flag's exact
           // value/version *at the moment this command evaluated it*.
           let directorOfficializeFlag: DirectorOfficializeFlagSnapshot | null = null;
-          if (input.staffAction === 'result_officialize' && principal.role === 'tournament_director') {
+          if (input.staffAction === 'result_officialize' && principal.role === 'tournament_director' && !fullTournamentDirector) {
             directorOfficializeFlag = await this.readDirectorOfficializeFlagSnapshot(tx);
             if (directorOfficializeFlag.value !== 'on') {
               deniedAuditInput = {
@@ -1278,6 +1280,7 @@ export class TournamentResultReviewService {
               actorRole: principal.role,
               authorizationSubject: principal.authorizationSubject,
               ...(directorOfficializeFlag === null ? {} : { directorOfficializeFlag }),
+              ...(fullTournamentDirector ? { authorizationPolicy: 'assigned_tournament_full_management' } : {}),
             },
             tournamentId: source.tournamentId,
             teamMatchId: game.teamMatchId,

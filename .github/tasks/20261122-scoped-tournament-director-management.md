@@ -1,6 +1,6 @@
 # Task 20261122: 배정 대회 디렉터 전체 관리
 
-Status: PR #2101 OPEN — user requested PR + before screenshots only; new Alpha QA deferred
+Status: In Progress — PR #2101 follow-up; local permission changes verified, Alpha QA pending
 Owner: Codex (single agent)
 Created: 2026-10-30
 
@@ -96,3 +96,18 @@ alpha는 dev 배포 이후에만 변경 검증 가능하다. 사용자가 스크
 - RED: 담당 대회 기록 조회가 ForbiddenException으로 실패, 모바일 메뉴의 대회 관리 링크 없음. GREEN: API 2 suite/22 tests, Web 1 file/22 tests PASS.
 - API/Web tsc PASS. 결과 공식 확정 제한은 수정하지 않는다. 머지/배포 없이 같은 PR에 반영한다.
 - 기존 비공개 운영 제목/공개 API 404 문제는 이 두 리뷰 수정의 범위 밖이며 배포 후 QA 잔여 항목이다.
+## 2026-11-04 사용자 후속 요청
+Status: In Progress — 기존 PR 작업트리에서 후속 수정, 미배포
+- 기존 A안(관리 화면 재사용)과 모바일 Drawer 연결은 유지한다. UI 구조 변경 없음.
+- 최신 사용자 요청: 배정된 대회의 모든 수정·운영을 모바일 대회운영에서 허용. 이전 결과 확정·무효화 예외를 이번 요청으로 변경한다.
+- 빠른 결과 API는 실제 게임 소속 대회의 활성 배정으로 권한 검사한다. 결과 확정·무효화도 배정된 대회는 플래그와 독립적으로 허용한다.
+- 리그 권한, 플랫폼 전역 관리·디렉터 임명 권한, 버전/CAS/멱등·감사·결과 상태 가드는 유지한다.
+- 다른 세션의 tournament-staff.service.spec.ts WIP는 수정하지 않는다.
+- Alpha 신규 관리 화면 실측은 배포 전이므로 0/10 섹션, 0/3 viewport이며 완료로 판정하지 않는다.
+
+### 후속 검증 기록
+- API 변경 관련 4 suite 중 3 suite 83 tests PASS + 빠른 결과 1 suite 32 tests PASS(최종 수정 후). Web 4 files 42 tests PASS. API tsc PASS, diff check PASS.
+- DB 통합 시나리오 3파일을 새 계약으로 동기화했으나 DB 환경 미확보로 실행하지 않음. Docker 상태 명령이 응답하지 않아 종료. 서버/DB 변경 없음.
+- 사용자 요청으로 추가 수정을 같은 PR #2101에 커밋·push한다. dev 머지·배포는 수행하지 않는다.
+
+- 추가 리그 플래그 회귀 포함 API 최종 116 tests PASS(4 suite 합산). 이번에 추가한 리그 거부·대회 무효화 61 tests suite 재확인 PASS.

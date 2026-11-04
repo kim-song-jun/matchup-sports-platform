@@ -76,6 +76,7 @@ type CreatedRevision = {
 type CreatedParticipant = { participantId: string; sideId: string; goals: number };
 
 type HarnessOptions = {
+  readonly role?: 'platform_ops' | 'tournament_director';
   /** 경기장 미정이면 권한 리소스에 fieldId 키 자체를 보내지 않는다. */
   readonly fieldId?: string | null;
   /** 'group' = 조별리그, 'semi' = 결선. 승부차기 가드의 단일 판정 기준. */
@@ -233,6 +234,7 @@ function createHarness(options: HarnessOptions = {}): Harness {
         ? { group: { phase }, _count: { advancementSources: advancementEdges.length } }
         : null,
     },
+    v1GameOperationFlag: { findUnique: async () => ({ value: 'off', version: 0 }) },
     v1IdempotencyRecord: {
       findUnique: async () => null,
       create: async () => ({}),
@@ -343,8 +345,8 @@ function createHarness(options: HarnessOptions = {}): Harness {
     assertAccess: async (input: { resource: Record<string, string> }) => {
       staffAccessInputs.push(input);
       return {
-        role: 'platform_ops' as const,
-        authorizationSubject: `platform_ops:${ids.user}@1`,
+        role: options.role ?? 'platform_ops',
+        authorizationSubject: `${options.role ?? 'platform_ops'}:${ids.user}@1`,
         assignmentId: null,
         assignmentVersion: null,
       };
@@ -1396,5 +1398,22 @@ describe('득점 기록이 없는 경기의 정정 — 승부차기 킥 수 면�
 
     expectHttp(error, 422, 'TOURNAMENT_PENALTY_UNDECIDED');
     expect(harness.createdRevisions).toHaveLength(0);
+  });
+});
+
+describe('assigned tournament director result permissions', () => {
+  it('can void an official result without reading the rollout flag', async () => {
+    const h = createHarness({ role: 'tournament_director' });
+    await h.voidRevision();
+    expect(h.createdRevisions).toHaveLength(1);
+    expect(h.createdRevisions[0].state).toBe('VOID');
+  });
+});
+
+describe('league director rollout boundary', () => {
+  it('continues to reject league void when the flag is off without creating a revision', async () => {
+    const h = createHarness({ role: 'tournament_director', canonicalLeague: true });
+    await expect(h.voidRevision()).rejects.toMatchObject({ response: { code: 'DIRECTOR_OFFICIALIZE_DISABLED' } });
+    expect(h.createdRevisions).toHaveLength(0);
   });
 });

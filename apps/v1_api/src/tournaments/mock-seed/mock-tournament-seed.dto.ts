@@ -4,6 +4,13 @@ import { TOURNAMENT_FORMATS, type TournamentFormat } from '../dto/admin-tourname
 
 export const MOCK_SEED_STATUSES = ['open', 'in_progress', 'completed'] as const;
 export type MockSeedStatus = (typeof MOCK_SEED_STATUSES)[number];
+/** 목업 한 번에 넣을 수 있는 최대 팀 수. */
+export const MOCK_SEED_MAX_TEAMS = 32;
+/**
+ * 한 조 라운드로빈(리그·조별리그+토너먼트)에 결과까지 채울 수 있는 최대 팀 수. 결과는 경기마다 실제 콘솔
+ * 명령을 밟아서 32팀(496경기)이면 로컬에서도 53초가 걸려 alpha 프록시 60초에 잘린다. 16팀(120경기)까지만.
+ */
+export const MOCK_SEED_MAX_TEAMS_WITH_RESULTS = 16;
 
 /**
  * 목업 대회 생성 조건.
@@ -17,12 +24,12 @@ export class CreateMockTournamentDto {
   @IsIn(TOURNAMENT_FORMATS)
   format?: TournamentFormat;
 
-  /** 참가 팀 수. 조별리그+토너먼트는 4의 배수가 자연스럽다. */
+  /** 참가 팀 수. 조별리그+토너먼트·정규리그+N개 토너먼트는 4팀씩 조를 나눈다. */
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(2)
-  @Max(16)
+  @Max(MOCK_SEED_MAX_TEAMS)
   teamCount?: number;
 
   @IsOptional()

@@ -15,6 +15,7 @@ const FORMATS: Array<{ value: NonNullable<CreateMockTournamentInput['format']>; 
   { value: 'league', label: '리그' },
   { value: 'knockout', label: '토너먼트' },
   { value: 'group_knockout', label: '조별리그+토너먼트' },
+  { value: 'league_knockouts', label: '정규리그+N개 토너먼트' },
 ];
 
 const STATUSES: Array<{ value: NonNullable<CreateMockTournamentInput['status']>; label: string }> = [
@@ -22,6 +23,21 @@ const STATUSES: Array<{ value: NonNullable<CreateMockTournamentInput['status']>;
   { value: 'in_progress', label: '진행중' },
   { value: 'completed', label: '종료' },
 ];
+
+/** 서버 MOCK_SEED_MAX_TEAMS_WITH_RESULTS 와 같은 값 — 한 조 라운드로빈에 결과까지 채울 수 있는 팀 수. */
+const MAX_TEAMS_WITH_RESULTS = 16;
+
+/** 서버가 400 으로 막는 조합을 누르기 전에 알려준다. 막히지 않으면 null. */
+export function mockSeedBlockReason(input: Pick<CreateMockTournamentInput, 'format' | 'teamCount' | 'status' | 'withResults' | 'reviewReady'>): string | null {
+  if (input.format === 'league_knockouts' && input.status === 'completed') {
+    return '정규리그+N개 토너먼트는 결선 결과를 채우지 않아 모집중·진행중으로만 만들 수 있어요.';
+  }
+  const withResults = input.withResults || input.reviewReady || input.status === 'completed';
+  if (withResults && (input.format === 'league' || input.format === 'group_knockout') && (input.teamCount ?? 0) > MAX_TEAMS_WITH_RESULTS) {
+    return `리그·조별리그+토너먼트는 결과까지 채우면 ${MAX_TEAMS_WITH_RESULTS}팀까지만 만들 수 있어요.`;
+  }
+  return null;
+}
 
 const FIELD_CLASS =
   'h-[44px] px-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-[length:var(--font-size-label)] text-gray-900 dark:text-white focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2';
@@ -49,10 +65,11 @@ export function MockSeedPanel() {
 
   if (!availability.data?.enabled) return null;
 
-  const maxTeamCount = availability.data.maxTeamCount ?? 16;
+  const maxTeamCount = availability.data.maxTeamCount ?? 32;
   const usableTeamCount = availability.data.usableTeamCount ?? 0;
   const minPlayersPerTeam = availability.data.minPlayersPerTeam ?? 0;
   const teamCountTooHigh = teamCount > maxTeamCount;
+  const blockReason = mockSeedBlockReason({ format, teamCount, status, withResults, reviewReady });
 
   const submit = () => {
     setError(null);
@@ -144,12 +161,24 @@ export function MockSeedPanel() {
         <button
           type="button"
           onClick={submit}
-          disabled={createMock.isPending || teamCountTooHigh}
+          disabled={createMock.isPending || teamCountTooHigh || blockReason !== null}
+          aria-describedby={blockReason ? 'mock-seed-block-reason' : undefined}
           className="inline-flex items-center gap-2 h-[44px] px-4 rounded-xl text-[length:var(--font-size-label)] font-semibold text-white bg-amber-700 hover:bg-amber-800 disabled:opacity-60 transition-colors focus-visible:outline-2 focus-visible:outline-amber-500 focus-visible:outline-offset-2"
         >
           {createMock.isPending ? '만드는 중…' : '목업 대회 만들기'}
         </button>
       </div>
+
+      {format === 'league_knockouts' ? (
+        <p className="mt-3 text-[length:var(--font-size-caption)] text-gray-600 dark:text-[var(--text-muted)]">
+          4팀 안팎으로 조를 나누고, 각 조 윗순위 절반은 상위 토너먼트·나머지는 하위 토너먼트로 보내요.
+          <strong> 경기 결과까지</strong>를 켜면 예선 결과와 결선 대진까지 만들어요(결선 경기 결과는 비워 둬요).
+        </p>
+      ) : null}
+
+      {blockReason ? (
+        <p id="mock-seed-block-reason" className="mt-3 text-[length:var(--font-size-caption)] text-amber-800 dark:text-amber-300">{blockReason}</p>
+      ) : null}
 
       {error ? (
         <p role="alert" className="mt-3 text-[length:var(--font-size-caption)] text-red-600 dark:text-red-400">{error}</p>

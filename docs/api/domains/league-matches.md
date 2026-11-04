@@ -465,6 +465,21 @@ LEAGUE_REGION_INVALID` for an unknown or unsuitable region.
   regulation time (non-extra-time period total: both halves, or the single
   period of a one-period match).
   A completed or cancelled league returns `409 LEAGUE_ENDED`; a league on hold is allowed.
+- `POST /api/v1/admin/league-matches/:leagueId/fixtures/manual/batch` (2026-11-03, weekly add) takes
+  `{ fixtures: [...] }` with 1–30 items of the same shape as `fixtures/manual` (`400 VALIDATION_ERROR` for an
+  empty or longer list) and returns `201 { leagueId, teamMatchIds }` in request order. All fixtures are created in
+  **one transaction** under one league-row lock: if any item is rejected (`LEAGUE_TEAM_INVALID` for the same
+  team on both sides, an unregistered or inactive team; `409 LEAGUE_ENDED`) no fixture is created. The single
+  `fixtures/manual` endpoint is the same code path with one item. Two fixtures for the same team in the same week
+  are allowed (rematches, postponed games); the admin screen only warns.
+- **Week number (`N주차`, 2026-11-03):** the KST calendar week (Monday–Sunday) counted over the weeks that have
+  fixtures (`league-week-number.ts`). Saturday and Sunday games of one week share a number and an empty week
+  is not skipped in the numbering. Every path that changes the league's fixture dates (manual and batch add,
+  bulk generation and regeneration, template, rescheduling via update-fixture, delete) rewrites the stored
+  titles' trailing `N주차` token — and the team schedule titles — to the current week in the same transaction
+  (`syncLeagueFixtureWeekTitles`). Titles without a trailing week token (operator-chosen names) are kept. When
+  another fixture's title has to change, that path takes the league row with `FOR UPDATE NOWAIT` first and
+  returns `409 COMMAND_CONCURRENCY_CONFLICT` instead of waiting (retryable).
 - `POST /api/v1/admin/league-matches/:leagueId/fixtures` (and `preview`,
   `regenerate`) accept `timing.gameDurationMinutes` as optional. When omitted,
   the regulation time of the league's own competition config (the version edited
@@ -535,7 +550,8 @@ A league can be drawn first and filled with teams later. A **slot** (`V1Tourname
   dates), and each day's games run back to back on one pitch from `time`, `gameDurationMinutes + breakMinutes`
   apart, with `endAt = startAt + gameDurationMinutes`. `gameDurationMinutes` defaults to the league config's
   regulation time (`422 LEAGUE_FIXTURE_DURATION_REQUIRED` when unknown); `breakMinutes` defaults to 0. The
-  title's `N주차` is the day number. `placeName`
+  title's `N주차` is first written with the day number and then rewritten to the calendar week (see the week
+  number rule above). `placeName`
   defaults to `장소 미정`. More than 240 fixtures returns `422 BRACKET_TEMPLATE_TOO_LARGE`. The league
   `status` is **not** changed.
   - Locks the league row (`FOR UPDATE`) and applies the same guard as bulk generation: `409 LEAGUE_ON_HOLD`

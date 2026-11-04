@@ -48,6 +48,7 @@ import {
   createLeagueFixture,
   leagueFixtureTitle,
   loadLeagueTeamRosters,
+  syncLeagueFixtureWeekTitles,
   type LeagueFixtureTeam,
 } from './league-fixture-creation';
 import { resolveLeagueFixtureDates } from './league-fixture-dates';
@@ -1387,6 +1388,8 @@ export class LeagueMatchAdminService {
           awaySlotId: slotIds[fixture.awayPosition - 1],
         });
       }
+      // 템플릿 제목의 "N주차" 도 경기일 순번이라 달력 주 규칙으로 다시 맞춘다.
+      await syncLeagueFixtureWeekTitles(tx, leagueId);
       await this.adminContext.logAdminAction(
         admin,
         {
@@ -1460,20 +1463,36 @@ export class LeagueMatchAdminService {
    * 그 사이 `removeTeam` 이 커밋됐을 때 이미 빠진 팀으로 대진이 생긴다.
    */
   async createManualFixture(user: V1AuthUser, leagueId: string, dto: CreateManualLeagueFixtureDto) {
+    const [teamMatchId] = await this.createManualFixturesInOneTransaction(user, leagueId, [dto]);
+    return { leagueId, teamMatchId };
+  }
+
+  /**
+   * 주차 단위 추가(2026-11-03 사용자 확정) — 여러 경기를 **한 트랜잭션**으로 만든다. 하나라도 거부되면
+   * 아무 경기도 남지 않는다. 한 경기 추가와 같은 경로라 검증·잠금·부수효과가 갈리지 않는다.
+   */
+  async createManualFixtures(user: V1AuthUser, leagueId: string, dtos: readonly CreateManualLeagueFixtureDto[]) {
+    const teamMatchIds = await this.createManualFixturesInOneTransaction(user, leagueId, dtos);
+    return { leagueId, teamMatchIds };
+  }
+
+  private async createManualFixturesInOneTransaction(
+    user: V1AuthUser,
+    leagueId: string,
+    dtos: readonly CreateManualLeagueFixtureDto[],
+  ): Promise<string[]> {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     const league = await this.loadLeague(leagueId);
-    if (dto.homeTeamId === dto.awayTeamId) {
+    if (dtos.some((dto) => dto.homeTeamId === dto.awayTeamId)) {
       throw new UnprocessableEntityException({
         code: 'LEAGUE_TEAM_INVALID',
         message: '같은 팀끼리 경기를 만들 수 없어요.',
       });
     }
     const config = leagueCompetitionConfig(league);
+    const teamIds = [...new Set(dtos.flatMap((dto) => [dto.homeTeamId, dto.awayTeamId]))];
 
-    const startAt = new Date(dto.startsAt);
-    const trimmedTitle = dto.title?.trim();
-
-    const teamMatchId = await this.prisma.$transaction(async (tx) => {
+    return this.prisma.$transaction(async (tx) => {
       // 일괄 생성과 같은 락. 같은 리그에 동시에 손대는 두 요청이 서로의 주차 계산을
       // 어긋나게 만들지 않는다 — 아래 형제 목록 조회가 이 락 안에서 일어나야 한다.
       await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${leagueId} FOR UPDATE`;
@@ -1484,52 +1503,55 @@ export class LeagueMatchAdminService {
       // 생기고**, 그 대진은 로스터에 없는 팀을 가리킨 채 남는다(제거 경로가 취소할 대상
       // 목록을 읽을 때는 아직 없던 대진이다).
       //
-      // 락 순서는 `removeTeam`(:529)·`generateFixtures`(:307)·`regenerateFixtures`(:794)와
+      // 락 순서는 `removeTeam`·`generateFixtures`·`regenerateFixtures`와
       // 같다 — **리그 행 먼저**. 순서가 같으므로 서로 데드락하지 않는다.
       const registeredNow = await tx.v1TournamentRegistration.findMany({
-        where: {
-          tournamentId: leagueId,
-          teamId: { in: [dto.homeTeamId, dto.awayTeamId] },
-          status: 'confirmed',
-        },
+        where: { tournamentId: leagueId, teamId: { in: teamIds }, status: 'confirmed' },
         select: { teamId: true },
       });
       const registeredIds = new Set(registeredNow.map((row) => row.teamId));
-      if (!registeredIds.has(dto.homeTeamId) || !registeredIds.has(dto.awayTeamId)) {
+      if (teamIds.some((teamId) => !registeredIds.has(teamId))) {
         throw new UnprocessableEntityException({
           code: 'LEAGUE_TEAM_INVALID',
           message: '이 리그에 등록되지 않은 팀이에요.',
         });
       }
-      const teamsById = await loadLeagueTeamRosters(tx,leagueId, [dto.homeTeamId, dto.awayTeamId]);
-      const home = teamsById.get(dto.homeTeamId);
-      const away = teamsById.get(dto.awayTeamId);
-      if (home === undefined || away === undefined) {
-        // league.teams 에는 남아 있어도 그 사이 비활성/소프트삭제된 팀은 여기 없다
-        // (loadTeamsWithMembers 의 active 필터) — 일괄 생성과 같은 도메인 오류로 거부한다.
-        throw new UnprocessableEntityException({
-          code: 'LEAGUE_TEAM_INVALID',
-          message: '비활성화되었거나 삭제된 팀이 포함돼 있어요.',
-        });
+      const teamsById = await loadLeagueTeamRosters(tx, leagueId, teamIds);
+      const created: string[] = [];
+      for (const dto of dtos) {
+        const home = teamsById.get(dto.homeTeamId);
+        const away = teamsById.get(dto.awayTeamId);
+        if (home === undefined || away === undefined) {
+          // league.teams 에는 남아 있어도 그 사이 비활성/소프트삭제된 팀은 여기 없다
+          // (loadTeamsWithMembers 의 active 필터) — 일괄 생성과 같은 도메인 오류로 거부한다.
+          throw new UnprocessableEntityException({
+            code: 'LEAGUE_TEAM_INVALID',
+            message: '비활성화되었거나 삭제된 팀이 포함돼 있어요.',
+          });
+        }
+        const startAt = new Date(dto.startsAt);
+        const trimmedTitle = dto.title?.trim();
+        created.push(await createLeagueFixture(tx, this.games, {
+          leagueId: league.id,
+          adminUserId: admin.userId,
+          sportId: league.sportId,
+          regionId: league.regionId,
+          competitionConfigId: config.id,
+          title: trimmedTitle ? trimmedTitle : await this.defaultManualFixtureTitle(tx, league.id, league.title, startAt),
+          place: await resolveLeagueFixturePlace(tx, leagueId, dto),
+          startAt,
+          // `== null` 로 **null 도 미지정**으로 본다. `@IsOptional()` 은 null 을 통과시키고
+          // `@Type(() => Number)` 도 null 을 숫자로 바꾸지 않아서(실측), `=== undefined` 만
+          // 보면 `null * 60_000 === 0` 이 되어 **종료 = 시작인 0분 경기**가 저장된다.
+          endAt: dto.durationMinutes == null ? null : new Date(startAt.getTime() + dto.durationMinutes * 60_000),
+          home,
+          away,
+        }));
       }
-      const created = await createLeagueFixture(tx, this.games, {
-        leagueId: league.id,
-        adminUserId: admin.userId,
-        sportId: league.sportId,
-        regionId: league.regionId,
-        competitionConfigId: config.id,
-        title: trimmedTitle ? trimmedTitle : await this.defaultManualFixtureTitle(tx, league.id, league.title, startAt),
-        place: await resolveLeagueFixturePlace(tx, leagueId, dto),
-        startAt,
-        // `== null` 로 **null 도 미지정**으로 본다. `@IsOptional()` 은 null 을 통과시키고
-        // `@Type(() => Number)` 도 null 을 숫자로 바꾸지 않아서(실측), `=== undefined` 만
-        // 보면 `null * 60_000 === 0` 이 되어 **종료 = 시작인 0분 경기**가 저장된다.
-        endAt: dto.durationMinutes == null ? null : new Date(startAt.getTime() + dto.durationMinutes * 60_000),
-        home,
-        away,
-      });
-      // 끼어든 경기로 팀 경기 순서(출전정지)가 바뀐다 — 대회 대진 생성과 같이 양 팀을 다시 계산한다.
-      await enqueueRosterResync(tx, competitionTeamTargets(league.id, [dto.homeTeamId, dto.awayTeamId]));
+      // 끼어든 경기로 팀 경기 순서(출전정지)가 바뀐다 — 대회 대진 생성과 같이 관련 팀을 다시 계산한다.
+      await enqueueRosterResync(tx, competitionTeamTargets(league.id, teamIds));
+      // 끼어든 경기 때문에 뒤 주차가 밀렸으면 저장된 제목도 따라간다.
+      await syncLeagueFixtureWeekTitles(tx, league.id);
       return created;
     }, {
       // 리그 행 락을 기다린다 — 템플릿·재생성이 그 락을 45초까지 쥘 수 있어 Prisma 기본 5초면 정상 대기도 만료된다.
@@ -1537,13 +1559,11 @@ export class LeagueMatchAdminService {
       timeout: 45_000,
       maxWait: 5_000,
     });
-
-    return { leagueId, teamMatchId };
   }
 
   /**
    * 수동 대진의 기본 제목. 주차는 **화면과 같은 규칙**으로 파생한다
-   * (`league-week-number.ts` — 그 리그의 서로 다른 KST 경기일을 세어 몇 번째 날인지).
+   * (`league-week-number.ts` — 그 리그에서 경기가 있는 KST 달력 주를 세어 몇 번째 주인지).
    *
    * 저장된 제목을 흉내 내지 않는 이유가 그 모듈 docblock 에 있다: 재일정(`updateFixture`)은
    * `startAt` 만 바꾸고 `title` 은 그대로 둬서 저장된 주차가 **낡는다**. 그래서 세 화면이
@@ -1647,6 +1667,8 @@ export class LeagueMatchAdminService {
           tx,
           competitionTeamTargets(leagueId, [teamMatch.hostTeamId, teamMatch.approvedApplicantTeamId]),
         );
+        // 옮긴 경기 때문에 이 경기와 다른 경기들의 주차가 바뀌었을 수 있다 — 저장된 제목을 다시 맞춘다.
+        await syncLeagueFixtureWeekTitles(tx, leagueId);
       }
       await this.adminContext.logAdminAction(
         admin,
@@ -1760,6 +1782,8 @@ export class LeagueMatchAdminService {
       if (hidden.count !== 1) {
         throw new ConflictException({ code: 'LEAGUE_FIXTURE_CHANGED', message: '경기가 방금 바뀌었어요. 새로고침한 뒤 다시 시도해 주세요.' });
       }
+      // 지운 경기만 있던 주가 사라지면 뒤 주차가 당겨진다 — 저장된 제목을 다시 맞춘다.
+      await syncLeagueFixtureWeekTitles(tx, leagueId);
       await this.adminContext.logAdminAction(
         admin,
         {
@@ -2475,6 +2499,8 @@ export class LeagueMatchAdminService {
         pairings.flatMap(({ home, away }) => [home.id, away.id]),
       ),
     );
+    // 제목의 "N주차" 는 경기일 순번(matchday)으로 지었다 — 달력 주 규칙으로 다시 맞춘다(재생성은 취소된 옛 대진도 센다).
+    await syncLeagueFixtureWeekTitles(tx, input.leagueId);
     return { ids, place };
   }
 

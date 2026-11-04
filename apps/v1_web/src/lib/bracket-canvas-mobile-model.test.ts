@@ -66,16 +66,16 @@ describe('leagueMobileSide', () => {
   const slotsById = new Map([['s-1', makeSlot({ id: 's-1', kind: 'ENTRY' })]]);
 
   it('보드 사이드에서 팀 이름·자리 라벨을 갈라 받고 자리 종류를 자리 목록에서 찾는다', () => {
-    expect(leagueMobileSide({ slotId: 's-1', label: '강남FC', filled: true, registrationId: 'r-1' }, slotsById)).toEqual({
+    expect(leagueMobileSide({ slotId: 's-1', label: '강남FC', filled: true, registrationId: 'r-1', teamId: 't-1' }, slotsById)).toEqual({
       slotId: 's-1', slotKind: 'ENTRY', source: 'slot', registrationId: 'r-1', teamName: '강남FC', slotLabel: null,
     });
-    expect(leagueMobileSide({ slotId: 's-1', label: '1번 자리', filled: false, registrationId: null }, slotsById)).toEqual({
+    expect(leagueMobileSide({ slotId: 's-1', label: '1번 자리', filled: false, registrationId: null, teamId: null }, slotsById)).toEqual({
       slotId: 's-1', slotKind: 'ENTRY', source: 'slot', registrationId: null, teamName: null, slotLabel: '1번 자리',
     });
   });
 
   it('자리가 없는 사이드(예전 경기)는 자리 종류가 없고, 부전승 라벨도 그대로 보인다', () => {
-    const bye = leagueMobileSide({ slotId: null, label: '부전승', filled: false, registrationId: null }, slotsById);
+    const bye = leagueMobileSide({ slotId: null, label: '부전승', filled: false, registrationId: null, teamId: null }, slotsById);
     expect(bye.slotKind).toBeNull();
     expect(sideDisplayName(bye)).toBe('부전승');
   });
@@ -190,8 +190,8 @@ describe('bracketMobileNode — 상태·점수·입력 방식', () => {
 describe('leagueMobileNode', () => {
   const boardNode = (overrides: Partial<LeagueBoardNode> = {}): LeagueBoardNode => ({
     fixtureId: 'm-1', title: '1주차', startAt: '2026-10-12T05:00:00.000Z', placeName: '구장', state: 'scheduled', hiddenFromPublic: false,
-    home: { slotId: 's-1', label: '강남FC', filled: true, registrationId: 'r-1' },
-    away: { slotId: 's-2', label: '2번 자리', filled: false, registrationId: null },
+    home: { slotId: 's-1', label: '강남FC', filled: true, registrationId: 'r-1', teamId: 't-1' },
+    away: { slotId: 's-2', label: '2번 자리', filled: false, registrationId: null, teamId: null },
     game: null, ...overrides,
   });
   const slotsById = new Map([
@@ -374,17 +374,17 @@ describe('buildLeagueMobileRounds', () => {
   const leagueFixture = (o: Partial<V1LeagueFixture> & { teamMatchId: string; startAt: string }): V1LeagueFixture =>
     ({ title: '', homeTeamId: null, awayTeamId: null, placeName: '구장', status: 'matched', ...o }) as unknown as V1LeagueFixture;
 
-  it('KST 날짜별로 묶여 N주차 라운드가 된다 — 자정 직전·직후 경계의 양쪽 대조군 포함', () => {
+  it('KST 달력 주별로 묶여 N주차 라운드가 된다 — 일요일 자정 직전·월요일 직후 경계의 양쪽 대조군 포함', () => {
     const rounds = buildLeagueMobileRounds({
       fixtures: [
-        leagueFixture({ teamMatchId: 'm-late', startAt: '2026-10-11T14:59:00.000Z' }), // KST 10/11 23:59
-        leagueFixture({ teamMatchId: 'm-0', startAt: '2026-10-11T15:00:00.000Z' }), // KST 10/12 00:00
+        leagueFixture({ teamMatchId: 'm-late', startAt: '2026-10-11T14:59:00.000Z' }), // KST 10/11(일) 23:59
+        leagueFixture({ teamMatchId: 'm-0', startAt: '2026-10-11T15:00:00.000Z' }), // KST 10/12(월) 00:00
         leagueFixture({ teamMatchId: 'm-1', startAt: '2026-10-12T05:00:00.000Z' }), // KST 10/12 14:00
       ],
       slots: [],
       teamNameById: new Map(),
     });
-    expect(rounds.map((r) => [r.key, r.label])).toEqual([['2026-10-11', '1주차'], ['2026-10-12', '2주차']]);
+    expect(rounds.map((r) => [r.key, r.label])).toEqual([['2026-10-05', '1주차'], ['2026-10-12', '2주차']]);
     expect(rounds[1].sections[0].nodes.map((n) => n.fixtureId)).toEqual(['m-0', 'm-1']);
     expect(rounds[1].sections[0].nodes[0].knockout).toBe(false);
   });

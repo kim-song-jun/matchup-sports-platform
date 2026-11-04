@@ -1,10 +1,10 @@
-import { kstDayKey, resolveLeagueWeekNumbers } from './league-week-number';
+import { kstDayKey, kstWeekKey, resolveLeagueWeekNumbers } from './league-week-number';
 
 /** 2026-09-09 22:00 KST = 2026-09-09T13:00Z */
 const kst = (iso: string) => new Date(iso);
 
 describe('resolveLeagueWeekNumbers', () => {
-  it('서로 다른 KST 경기일을 오름차순으로 세어 주차를 매긴다', () => {
+  it('경기가 있는 KST 달력 주를 오름차순으로 세어 주차를 매긴다', () => {
     const days = [kst('2026-09-09T13:00:00Z'), kst('2026-09-16T13:00:00Z'), kst('2026-09-23T13:00:00Z')];
     const weeks = resolveLeagueWeekNumbers(
       new Map([['lg', days]]),
@@ -44,6 +44,34 @@ describe('resolveLeagueWeekNumbers', () => {
     expect(kstDayKey(kst('2026-09-08T15:00:00Z'))).toBe(kstDayKey(kst('2026-09-09T13:00:00Z')));
   });
 
+  // 2026-11-03 사용자 확정: 주차는 경기일 순번이 아니라 달력 주(월~일)다.
+  it('토·일에 나눠 치른 한 주는 같은 주차이고, 다음 주가 다음 주차다', () => {
+    const sat = kst('2026-11-21T01:00:00Z'); // 11/21(토) 10:00 KST
+    const sun = kst('2026-11-22T01:00:00Z'); // 11/22(일) 10:00 KST
+    const nextSat = kst('2026-11-28T01:00:00Z');
+    const weeks = resolveLeagueWeekNumbers(new Map([['lg', [sat, sun, nextSat]]]), [
+      { id: 'sat', leagueId: 'lg', startAt: sat },
+      { id: 'sun', leagueId: 'lg', startAt: sun },
+      { id: 'next', leagueId: 'lg', startAt: nextSat },
+    ]);
+    expect([weeks.get('sat'), weeks.get('sun'), weeks.get('next')]).toEqual([1, 1, 2]);
+  });
+
+  it('경기가 없는 주는 번호를 건너뛰지 않는다 — 쉬는 주 다음 경기는 바로 다음 주차다', () => {
+    const first = kst('2026-11-14T01:00:00Z');
+    const afterBreak = kst('2026-11-28T01:00:00Z'); // 11/21 주는 경기 없음
+    const weeks = resolveLeagueWeekNumbers(new Map([['lg', [first, afterBreak]]]), [
+      { id: 'after', leagueId: 'lg', startAt: afterBreak },
+    ]);
+    expect(weeks.get('after')).toBe(2);
+  });
+
+  it('주의 경계는 KST 월요일 0시다 — 일요일 23:30 과 월요일 0:30 은 다른 주다', () => {
+    expect(kstWeekKey(kst('2026-11-22T14:30:00Z'))).toBe('2026-11-16'); // 11/22(일) 23:30 KST
+    expect(kstWeekKey(kst('2026-11-22T15:30:00Z'))).toBe('2026-11-23'); // 11/23(월) 00:30 KST
+    expect(kstWeekKey(kst('2026-11-16T00:00:00Z'))).toBe('2026-11-16'); // 월요일 09:00 KST 그 자신
+  });
+
   it('친선 팀매치(leagueId=null)는 결과에 담기지 않는다', () => {
     const weeks = resolveLeagueWeekNumbers(new Map(), [
       { id: 'friendly', leagueId: null, startAt: kst('2026-09-09T13:00:00Z') },
@@ -51,7 +79,7 @@ describe('resolveLeagueWeekNumbers', () => {
     expect(weeks.has('friendly')).toBe(false);
   });
 
-  it('형제 목록에서 자기 경기일을 못 찾으면 1주차로 폴백한다', () => {
+  it('형제 목록에서 자기 주를 못 찾으면 1주차로 폴백한다', () => {
     const weeks = resolveLeagueWeekNumbers(new Map([['lg', [kst('2026-09-09T13:00:00Z')]]]), [
       { id: 'orphan', leagueId: 'lg', startAt: kst('2026-10-01T13:00:00Z') },
     ]);

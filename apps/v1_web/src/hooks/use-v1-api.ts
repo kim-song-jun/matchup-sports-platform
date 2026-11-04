@@ -6055,8 +6055,7 @@ import type {
   V1UpdateLeagueVenueResult,
 
   V1CreateManualLeagueFixturePayload,
-
-  V1LeagueFixture,
+  V1CreateManualLeagueFixturesResult,
 } from '@/types/league-match';
 import type {
   V1CommitPromotionsPayload,
@@ -6282,11 +6281,12 @@ export function useV1UpdateLeagueVenue(leagueId: string) {
  * 화면이 없었다**(2026-09-04 실측: FE 호출 0건). 그래서 라운드로빈 일괄 생성 말고는 경기를
  * 추가할 방법이 없었다 — 우천 순연 재편성이나 대체 경기가 그래서 불가능했다.
  */
-export function useV1CreateManualLeagueFixture(leagueId: string) {
+/** 경기 추가(주차 단위) — 여러 경기를 한 트랜잭션으로 만든다. 한 경기만 보내도 같은 경로다. */
+export function useV1CreateManualLeagueFixtures(leagueId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: V1CreateManualLeagueFixturePayload) =>
-      v1Post<V1LeagueFixture>(`/admin/league-matches/${leagueId}/fixtures/manual`, body),
+    mutationFn: (fixtures: V1CreateManualLeagueFixturePayload[]) =>
+      v1Post<V1CreateManualLeagueFixturesResult>(`/admin/league-matches/${leagueId}/fixtures/manual/batch`, { fixtures }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatch(leagueId) });
       queryClient.invalidateQueries({ queryKey: v1Keys.adminLeagueMatchList() });

@@ -144,3 +144,20 @@ Status: In Progress — 기존 PR 작업트리에서 후속 수정, 미배포
 - 원인: `tournament-sponsors-mutations.service.spec.ts`의 권한 mock이 이전 `getMutationAdmin` 이름을 유지했다. 런타임은 담당 대회 범위의 `getTournamentMutationAdmin`을 사용한다.
 - 수정: mock 메서드 이름1줄을 현재 계약으로 동기화. 수정/비활성화의 저장값·감사 기록·타 대회 협찬 거부 assertion은 그대로 유지한다. 런타임 권한 검사·API·화면 변경 없음.
 - 검증: 로컬 RED3 확인 후 협찬 관련2 suite/6 tests GREEN, diff check PASS, 새 debt marker0. 기존24장 캡처는 유효하다. 최신 head CI는 push 후 재실행하며 직전 head 결과를 최신 통과로 표시하지 않는다.
+
+
+## 2026-11-05 최신 dev 충돌 정리 및 초기화 권한 통합
+- 사용자 요청: 앞서 설명한 충돌4개·reset 디렉터 권한·회귀 검증·PR/CI 모니터링을 모두 진행한다. 후속 사용자 명시 승인으로 검증 통과 후 리뷰 대기 없이 dev 머지·Alpha 배포까지 수행한다.
+- 기준: PR head30443eeb9, 최신 dev0eed744874(#2151). 격리 clone에서 순차 수행한다. 원본 공유 WIP와 다른 작업은 수정하지 않는다.
+- Owned: multi-finals 서비스/관련 reset·권한 회귀, API 계약 문서3개 및 scenarios 허브, 기존 task/시나리오, changeset. Forbidden: 전역 관리자 권한 완화, 시작·이벤트·결과 경기 초기화 보호 제거, 실제 사용자 대회 초기화·DB seed/reset, main 승격·프로덕션 배포.
+- [x] Phase1: 충돌4개를 양쪽 기능 보존으로 해소. setup editing 인자와 scoped 권한 동시 유지.
+- [x] Phase2: 새 reset도 scoped 권한·실제 사용자 감사로 연결. 담당 성공/타 대회·해제·만료·조회 역할 거부 및 초기화 보호 회귀.
+- [x] Phase3 로컬 검증: API4 suite/66 tests, API/Web tsc, API surface/Web pattern, 충돌 marker·diff·debt 확인 PASS. 같은 PR에 merge commit을 push한다.
+- [ ] Phase4: 최신 head CI 확인 후 dev 머지·Alpha 배포 및 실제 서비스 SHA/health 확인. 사용자 명시 승인으로 Copilot 리뷰 대기를 생략한다. 통과 전 head의 결과를 최신 결과로 대체하지 않는다.
+- 범위 내 데이터 변경은 기존 V1Tournament/MatchDetails/Slot/Group/StaffAssignment/OperationAudit 사용이며 새 schema/migration은 필요 없다. 기존 초기화의 잠금·revision·감사·원자성 계약을 유지한다.
+
+- Phase1/2 검증: 실제 권한·감사 헬퍼를 사용하는 reset 테스트에서 RED2 확인(담당 디렉터403 및 scoped gate 미사용). reset을 scoped gate로 연결한 뒤 관련4 suite/66 tests GREEN. 기존 예선/자리 순서·초기화 보호와 관리자 동작을 함께 검증했다.
+- 실제 DB 시나리오 추가: 일반 디렉터의 초기화·예선 수정 저장/재조회·실제 사용자/배정 감사, 타 대회·해제 배정 쓰기0, 공식 결과 있는 경기 초기화 차단. 로컬 Docker 접근 불가로 실제 DB 실행은 CI에 맡긴다.
+- API/Web tsc 및 surface/pattern PASS. 새 schema/migration·실제 대회 데이터 변경 없음.
+- Ambiguity Log: “확인되면 리뷰 없어도 pr alpha에 배포해줘”를 최신 승인으로 적용한다. 이전 미배포 범위를 대체하며 dev 머지→자동 Alpha 배포만 수행한다. main/프로덕션 승격은 금지한다.
+- Progress Snapshot: 충돌4개 해소, reset 권한 통합, 로컬 검증 완료. 최신 merge commit CI와 Alpha 배포 증거는 PR 댓글로 남긴다.

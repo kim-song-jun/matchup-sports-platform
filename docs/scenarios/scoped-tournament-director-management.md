@@ -62,3 +62,10 @@ Status: PR #2101 OPEN — 로컬 계약 검증 PASS, 변경 전 Alpha 캡처 완
 - 신규 관리 Alpha 실측은 여전히 0/10 섹션, 0/3 viewport다. 로컬 캡처는 Alpha 완료 증거를 대체하지 않는다.
 
 - 최종 로컬 증거: [24장 갤러리](../screenshots/pr2101-local/README.md). 관리 개요/정보2/10·3/3폭, after pageerror0·overflow0/18. 공개 설정 fixture503 실제 오류 노출과 관리 복귀 링크 클릭 확인. 최신 dev 통합 API148 tests/API·Web tsc PASS, 웹65 tests 및 통합 셸25 tests PASS.
+
+
+## 2026-11-05 예선 편집·초기화 권한 통합
+- dev #2151의 초기화·편성 수정·자리 순서 보존을 유지하며, setup의 editing 인자와 담당 디렉터 권한을 함께 적용한다.
+- 플랫폼 관리자 계정 없는 활성 디렉터가 담당 대회를 초기화하고 예선 편집을 저장한다. 실제 사용자·배정 ID/버전의 운영 감사를 확인한다.
+- 타 대회·해제·만료·조회 역할은 변경 전에 403이며, 시작·이벤트·공식 결과·누락 Game·stale revision 보호를 유지한다.
+- 실제 DB 회귀는 격리 CI에서 실행한다. 실제 사용자 대회 초기화나 seed/reset은 수행하지 않는다. Alpha 수동 0/10·0/3은 유지한다.

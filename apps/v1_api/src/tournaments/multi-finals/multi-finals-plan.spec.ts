@@ -1,6 +1,12 @@
 import { planNamedFinals, planPreliminaryGroups, validateNamedFinals } from './multi-finals-plan';
 
 describe('정규리그 + N개 토너먼트 plans', () => {
+  it('부분 팀 배정을 허용하고 초과·중복 배정은 거절한다', () => {
+    expect(planPreliminaryGroups([{ name: 'A조', capacity: 4, legs: 1, registrationIds: ['r1', 'r2'] }]).fixtures).toHaveLength(6);
+    expect(() => planPreliminaryGroups([{ name: 'A조', capacity: 2, legs: 1, registrationIds: ['r1', 'r2', 'r3'] }])).toThrow();
+    expect(() => planPreliminaryGroups([{ name: 'A조', capacity: 4, legs: 1, registrationIds: ['r1', 'r1'] }])).toThrow();
+    expect(() => planPreliminaryGroups([{ name: 'A조', capacity: 2, legs: 1, registrationIds: ['r1'] }, { name: 'B조', capacity: 2, legs: 1, registrationIds: ['r1'] }])).toThrow();
+  });
   it('진출팀 미정이어도 순위 규칙의 자리 수로 결선과 부전승을 만든다', () => {
     const rules = Array.from({ length: 5 }, (_, i) => ({ groupId: `g${i}`, rank: 1 }));
     const plan = planNamedFinals([{ name: '미정 결선', rules, thirdPlace: true, registrationIds: null }]);

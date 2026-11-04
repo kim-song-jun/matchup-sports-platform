@@ -32,3 +32,7 @@ export class MultiFinalGenerateDto {
   @IsString() @MaxLength(64) previewHash!: string;
   @IsString() @MaxLength(80) requestId!: string;
 }
+
+export class MultiFinalResetDto {
+  @IsInt() @Min(0) expectedRevision!: number;
+}

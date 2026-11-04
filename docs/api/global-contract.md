@@ -2,6 +2,8 @@
 
 수상 추천용 관리자 선수 기록 조회는 해당 대회의 활성 디렉터도 허용하며, 다른 대회는 403으로 거부한다. [대회 권한 계약](./domains/tournaments.md#scoped-director-management)을 따른다.
 
+N개 결선 대회의 초기화와 예선 수정은 owner/ops 또는 해당 대회 활성 디렉터의 별도 변경 액션이다. expectedRevision, 대회 advisory lock, 경기 행 잠금, 감사 로그와 원자적 저장을 사용한다. 시작/기록/결과가 있으면 초기화는 409이며 예선 수정은 기존 대진이 없을 때만 허용한다. [대회 계약](./domains/tournaments.md)을 따른다.
+
 토너먼트별 최종 순위는 공식 결승 및 3·4위전 결과를 범위별로 표시한다. N개 결선의 미확정/동률 자동 명단은 409 대신 null로 유지하며 진출 규칙 수만큼 미정 시드를 선생성한다. 같은 구조의 후속 배정은 기존 경기와 일정을 유지한다. [대회 계약](./domains/tournaments.md)을 따른다.
 
 관리자 대회 CRUD 응답은 저장된 nullable `kind`를 포함하며 대진·시상 기능의 종류 판정에 사용한다. [대회 계약](./domains/tournaments.md)을 따른다.

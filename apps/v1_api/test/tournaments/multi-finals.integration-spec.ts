@@ -43,6 +43,15 @@ async function preliminarySnapshot() {
     select: { teamMatchId: true, homeRegistrationId: true, awayRegistrationId: true, teamMatch: { select: { deletedAt: true, game: { select: { currentOfficialRevisionId: true, state: true } } } } } });
 }
 
+async function assignedDirector() {
+  const actor = { ...user, id: randomUUID(), email: `director-${randomUUID()}@example.test` };
+  await prisma.v1User.create({ data: actor });
+  const grant = await prisma.v1TournamentStaffAssignment.create({ data: {
+    tournamentId, userId: actor.id, role: 'TOURNAMENT_DIRECTOR', grantedByUserId: user.id,
+  } });
+  return { actor, grant };
+}
+
 describe('N개 결선 실제 DB 저장·공식 순위·수동 편집·재생성', () => {
   beforeAll(async () => { await prisma.$connect(); await seedCompetitionConfigFixture(prisma, user); });
   afterAll(async () => { await prisma.$disconnect(); });
@@ -199,10 +208,86 @@ describe('N개 결선 실제 DB 저장·공식 순위·수동 편집·재생성'
     expect((await service.get(reader, tournamentId)).groups).toHaveLength(2);
     await expect(service.select(reader, tournamentId, { expectedRevision: 1, finals: [] })).rejects.toThrow();
     await expect(service.preview(reader, tournamentId)).rejects.toThrow();
+    await expect(service.reset(reader, tournamentId, { expectedRevision: 1 })).rejects.toThrow();
+    await expect(service.setup(reader, tournamentId, { expectedRevision: 1, groups: [], finals: [] }, true)).rejects.toThrow();
     expect((await service.get(user, tournamentId)).revision).toBe(1);
     await prisma.v1Tournament.update({ where: { id: tournamentId }, data: { status: 'completed' } });
     await expect(service.select(user, tournamentId, { expectedRevision: 1, finals: [] })).rejects.toMatchObject({ response: { code: 'BRACKET_LOCKED' } });
     expect((await service.get(reader, tournamentId)).finals).toHaveLength(1);
+  });
+
+  it('초기화는 실제 대진·연결을 지우고 조 설정·배정을 유지하며 별도 편성 저장에서 재생성한다', async () => {
+    const first = await setup();
+    const preview = await service.preview(user, tournamentId);
+    await service.generate(user, tournamentId, { expectedRevision: first.revision, previewHash: preview.previewHash, requestId: randomUUID() });
+    const before = await service.get(user, tournamentId);
+    expect(before.generated).toBe(true);
+    const originalIds = (await preliminarySnapshot()).map(f => f.teamMatchId);
+    const reset = await service.reset(user, tournamentId, { expectedRevision: before.revision });
+    expect(reset.preliminaryFixtureCount).toBe(0); expect(reset.generated).toBe(false);
+    expect(reset.groups.map(g => g.id)).toEqual(before.groups.map(g => g.id));
+    expect(reset.groups.map(g => g.registrationIds)).toEqual(before.groups.map(g => g.registrationIds));
+    expect(reset.finals[0].rules).toEqual(before.finals[0].rules);
+    expect(reset.finals[0].registrationIds).toBeNull();
+    expect(await prisma.v1TournamentRegistration.count({ where: { tournamentId } })).toBe(10);
+    expect(await prisma.v1TournamentSlot.count({ where: { tournamentId } })).toBe(0);
+    expect(await prisma.v1TournamentMatchAdvancementEdge.count({ where: { tournamentId } })).toBe(0);
+    expect(await prisma.v1TeamMatch.count({ where: { id: { in: originalIds }, deletedAt: { not: null } } })).toBe(20);
+    await expect(service.reset(user, tournamentId, { expectedRevision: before.revision })).rejects.toMatchObject({ response: { code: 'MULTI_FINAL_STALE' } });
+    const edited = await service.setup(user, tournamentId, { expectedRevision: reset.revision,
+      groups: [{ name: '수정 A조', capacity: 3, legs: 2, registrationIds: registrationIds.slice(0, 2) }, { name: 'B조', capacity: 7, legs: 1, registrationIds: registrationIds.slice(3) }],
+      finals: [{ name: '챔피언', thirdPlace: false, rules: [{ groupId: '0', rank: 1 }, { groupId: '1', rank: 1 }], registrationIds: null }] }, true);
+    expect(edited.preliminaryFixtureCount).toBe(27);
+    expect(edited.groups[0]).toMatchObject({ name: '수정 A조', capacity: 3, legs: 2, registrationIds: registrationIds.slice(0, 2) });
+    expect(edited.finals[0].rules.map(rule => rule.groupId)).toEqual(edited.groups.map(g => g.id));
+    expect(edited.groups[0].id).not.toBe(first.groups[0].id);
+    expect((await service.get(user, tournamentId)).groups).toEqual(edited.groups);
+    await expect(service.setup(user, tournamentId, { expectedRevision: edited.revision,
+      groups: [{ name: 'A조', capacity: 2, legs: 1 }], finals: [{ name: '챔피언', thirdPlace: false, rules: [] }] }, true)).rejects.toMatchObject({ response: { code: 'BRACKET_NOT_EMPTY' } });
+  });
+  it('배정 디렉터는 초기화·예선 수정을 저장하고 타 대회·해제 배정은 쓰기 없이 거부한다', async () => {
+    await setup();
+    const { actor, grant } = await assignedDirector();
+    expect(await prisma.v1AdminUser.findUnique({ where: { userId: actor.id } })).toBeNull();
+    const before = await service.get(actor, tournamentId);
+    const reset = await service.reset(actor, tournamentId, { expectedRevision: before.revision });
+    expect(reset.fixtureCount).toBe(0);
+    expect(reset.revision).toBe(before.revision + 1);
+    expect(reset.groups.map(group => group.registrationIds)).toEqual(before.groups.map(group => group.registrationIds));
+    const audit = await prisma.v1OperationAudit.findFirstOrThrow({ where: {
+      tournamentId, actorUserId: actor.id, action: 'tournament.multi_finals.reset',
+    } });
+    expect(audit.actorType).toBe('USER');
+    expect(audit.after).toMatchObject({ _authorization: {
+      role: 'tournament_director', assignmentId: grant.id, assignmentVersion: grant.version,
+    } });
+    expect(await prisma.v1AdminActionLog.count({ where: { targetId: tournamentId, action: 'tournament.multi_finals.reset' } })).toBe(0);
+    const edited = await service.setup(actor, tournamentId, { expectedRevision: reset.revision,
+      groups: [0, 1].map(i => ({ name: `디렉터 수정 ${i + 1}조`, capacity: 5, legs: 1 as const, registrationIds: registrationIds.slice(i * 5, i * 5 + 5) })),
+      finals: [{ name: '챔피언', thirdPlace: false, rules: [{ groupId: '0', rank: 1 }, { groupId: '1', rank: 1 }], registrationIds: null }],
+    }, true);
+    expect(edited.preliminaryFixtureCount).toBe(20);
+    expect((await service.get(actor, tournamentId)).groups).toEqual(edited.groups);
+    const foreign = await prisma.v1Tournament.create({ data: { kind: 'regular_tournament', format: 'league_knockouts',
+      sportId: ids.soccerSportId, title: '타 대회 권한 검증', teamCount: 10, competitionConfigVersionId: '11111111-1111-4111-8111-111111111111' } });
+    await expect(service.reset(actor, foreign.id, { expectedRevision: 0 })).rejects.toMatchObject({ response: { code: 'PERMISSION_DENIED' } });
+    expect((await prisma.v1Tournament.findUniqueOrThrow({ where: { id: foreign.id } })).multiFinalsRevision).toBe(0);
+    await prisma.v1TournamentStaffAssignment.update({ where: { id: grant.id }, data: { revokedAt: new Date(), version: { increment: 1 } } });
+    await expect(service.reset(actor, tournamentId, { expectedRevision: edited.revision })).rejects.toMatchObject({ response: { code: 'PERMISSION_DENIED' } });
+    expect((await service.get(user, tournamentId)).revision).toBe(edited.revision);
+    expect(await prisma.v1TournamentMatchDetails.count({ where: { tournamentId, teamMatch: { deletedAt: null } } })).toBe(20);
+    expect(await prisma.v1OperationAudit.count({ where: { tournamentId: foreign.id, actorUserId: actor.id } })).toBe(0);
+  }, 30000);
+
+  it.each([false, true])('공식 결과가 있는 예선은 초기화하지 않고 모든 경기·편성·revision을 유지한다 (director=%s)', async director => {
+    const first = await setup(); await finishPreliminary();
+    const actor = director ? (await assignedDirector()).actor : user;
+    const before = await preliminarySnapshot();
+    await expect(service.reset(actor, tournamentId, { expectedRevision: first.revision })).rejects.toMatchObject({ response: { code: 'BRACKET_LOCKED' } });
+    expect(await preliminarySnapshot()).toEqual(before);
+    expect((await service.get(user, tournamentId)).revision).toBe(first.revision);
+    expect(await prisma.v1AdminActionLog.count({ where: { targetId: tournamentId, action: 'tournament.multi_finals.reset' } })).toBe(0);
+    expect(await prisma.v1OperationAudit.count({ where: { tournamentId, action: 'tournament.multi_finals.reset' } })).toBe(0);
   });
 
 });

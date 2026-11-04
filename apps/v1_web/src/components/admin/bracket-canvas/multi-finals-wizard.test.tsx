@@ -24,6 +24,76 @@ function show(mode: 'create' | 'assign' = 'assign') {
 }
 
 describe('N개 토너먼트 단계형 설정과 실제 API payload', () => {
+  it('예선 팀을 직접 선택하고 빈 자리를 남긴 payload로 조별리그를 저장한다', async () => {
+    let view: MultiFinalView = { revision: 0, groups: [], finals: [], registrations, generated: false };
+    let submitted: { groups: Array<{ registrationIds: string[] }> } | undefined;
+    server.use(http.get(base, () => success(view)), http.post(`${base}/setup`, async ({ request }) => {
+      submitted = await request.json() as typeof submitted;
+      view = savedView(); return success(view);
+    }), http.post(`${base}/preview`, () => success({ revision: 1, previewHash: 'manual', finals: view.finals, counts: { tournaments: 1, fixtures: 1, byes: 0 } })));
+    show('create');
+    fireEvent.change(await screen.findByRole('combobox', { name: 'A조 1번 팀' }), { target: { value: 'reg-0' } });
+    fireEvent.change(screen.getByRole('combobox', { name: 'B조 2번 팀' }), { target: { value: 'reg-1' } });
+    expect(within(screen.getByRole('combobox', { name: 'B조 1번 팀' })).getByRole('option', { name: '가팀' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    fireEvent.click(await screen.findByRole('button', { name: '대진 미리보기' }));
+    await screen.findByText('결선 대진 미리보기');
+    expect(submitted?.groups.map(g => g.registrationIds)).toEqual([['reg-0'], ['reg-1']]);
+  });
+  it('자동 배정은 확정 팀을 중복 없이 채우며 남은 자리는 미정으로 둔다', async () => {
+    server.use(http.get(base, () => success({ revision: 0, groups: [], finals: [], registrations, generated: false })));
+    show('create');
+    fireEvent.click(await screen.findByRole('button', { name: '참가팀 자동 배정' }));
+    const ids = screen.getAllByRole('combobox').map(node => (node as HTMLSelectElement).value).filter(id => id.startsWith('reg-'));
+    expect(ids).toHaveLength(4); expect(new Set(ids).size).toBe(4);
+    expect(ids.sort()).toEqual(registrations.map(reg => reg.id));
+  });
+  it('대진이 있는 읽기 전용 예선의 과거 참가팀 이탈은 결선 규칙 확인을 막지 않는다', async () => {
+    const view = { ...savedView(), preliminaryFixtureCount: 6 };
+    view.groups[0].registrationIds = ['withdrawn-team'];
+    server.use(http.get(base, () => success(view)));
+    show('create');
+    await screen.findByRole('button', { name: '대진 초기화' });
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    await screen.findByRole('textbox', { name: '토너먼트 1 이름' });
+  });
+  it('조 밖에 수동 추가한 대진이 남아 있으면 편집을 잠그되 초기화는 허용한다', async () => {
+    server.use(http.get(base, () => success({ ...savedView(), fixtureCount: 1, preliminaryFixtureCount: 0 })));
+    show('create');
+    expect(await screen.findByRole('button', { name: '대진 초기화' })).toBeEnabled();
+    expect(screen.queryByRole('spinbutton', { name: '1번째 조 팀 수' })).not.toBeInTheDocument();
+  });
+  it('독립 초기화 후 설정을 hydrate하고 별도 예선 저장으로 새 조 ID에 규칙을 연결한다', async () => {
+    let view = { ...savedView(), preliminaryFixtureCount: 6, generated: true };
+    view.groups[0].registrationIds = ['reg-0', 'reg-1'];
+    let resetInput: unknown; let updateInput: unknown;
+    server.use(http.get(base, () => success(view)), http.post(`${base}/reset`, async ({ request }) => {
+      resetInput = await request.json(); view = { ...view, revision: 2, preliminaryFixtureCount: 0, generated: false }; return success(view);
+    }), http.put(`${base}/preliminary`, async ({ request }) => {
+      updateInput = await request.json(); view = { ...view, revision: 3, preliminaryFixtureCount: 3 }; return success(view);
+    }), http.post(`${base}/preview`, () => success({ revision: 3, previewHash: 'edited', finals: view.finals, counts: { tournaments: 1, fixtures: 1, byes: 0 } })));
+    const props = show('create');
+    fireEvent.click(await screen.findByRole('button', { name: '대진 초기화' }));
+    const confirmation = await screen.findByRole('dialog', { name: '대진 초기화' });
+    fireEvent.click(within(confirmation).getByRole('button', { name: '대진 초기화' }));
+    const capacity = await screen.findByRole('spinbutton', { name: '1번째 조 팀 수' });
+    expect(resetInput).toEqual({ expectedRevision: 1 }); expect(updateInput).toBeUndefined(); expect(props.onApplied).not.toHaveBeenCalled();
+    expect(screen.getByRole('combobox', { name: 'A조 1번 팀' })).toHaveValue('reg-0');
+    fireEvent.change(capacity, { target: { value: '3' } });
+    fireEvent.change(screen.getByRole('combobox', { name: 'A조 1번 팀' }), { target: { value: 'reg-2' } });
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    fireEvent.click(await screen.findByRole('button', { name: '대진 미리보기' }));
+    await screen.findByText('결선 대진 미리보기');
+    expect(updateInput).toEqual(expect.objectContaining({ expectedRevision: 2, groups: [expect.objectContaining({ capacity: 3, registrationIds: ['reg-2'] })], finals: [expect.objectContaining({ rules: [{ groupId: '0', rank: 1 }, { groupId: '0', rank: 2 }] })] }));
+  });
+  it('초기화 API가 거절하면 오류를 표시하고 저장된 편성을 잠근 채 유지한다', async () => {
+    server.use(http.get(base, () => success({ ...savedView(), preliminaryFixtureCount: 6 })), http.post(`${base}/reset`, () => HttpResponse.json({ status: 'error', statusCode: 409, code: 'BRACKET_LOCKED', message: '결과가 있는 경기는 초기화할 수 없어요.' }, { status: 409 })));
+    show('create'); fireEvent.click(await screen.findByRole('button', { name: '대진 초기화' }));
+    fireEvent.click(within(await screen.findByRole('dialog', { name: '대진 초기화' })).getByRole('button', { name: '대진 초기화' }));
+    await screen.findByText('결과가 있는 경기는 초기화할 수 없어요.');
+    expect(screen.queryByRole('spinbutton', { name: '1번째 조 팀 수' })).not.toBeInTheDocument();
+    expect(screen.getByText('A조 · 4팀 · 1회전')).toBeInTheDocument();
+  });
   it('최초 예선 편성에서 다음으로 이동하고 팀 선택 없이 결선 대진을 생성한다', async () => {
     let view: MultiFinalView = { revision: 0, groups: [], finals: [], registrations, generated: false, groupStandings: [] };
     let setupInput: unknown; let generateInput: unknown;

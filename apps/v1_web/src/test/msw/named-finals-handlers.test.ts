@@ -17,6 +17,26 @@ beforeEach(() => namedFinalsMsw.reset());
 afterEach(() => server.resetHandlers());
 afterAll(() => { server.close(); vi.unstubAllEnvs(); });
 describe('공용 MSW — named finals 및 시상 wire 계약', () => {
+  it('독립 초기화 뒤 별도 예선 수정에서 부분 배정과 새 진출 규칙을 저장한다', async () => {
+    const before = await v1Get<MultiFinalView>(path);
+    const input = { expectedRevision: before.revision, groups: [{ name: '수정 예선', capacity: 3, legs: 2, registrationIds: [before.registrations[0].id] }],
+      finals: [{ name: '챔피언', thirdPlace: false, rules: [{ groupId: '0', rank: 1 }, { groupId: '0', rank: 2 }], registrationIds: null }] };
+    await expect(v1Put(`${path}/preliminary`, input)).rejects.toMatchObject({ code: 'BRACKET_NOT_EMPTY' });
+    const cleared = await v1Post<MultiFinalView>(`${path}/reset`, { expectedRevision: before.revision });
+    expect(cleared.preliminaryFixtureCount).toBe(0);
+    expect(cleared.groups).toEqual(before.groups);
+    expect((await v1Get<V1TournamentDetail>(publicPath)).fixtures).toEqual([]);
+    expect(cleared.finals.every(f => f.registrationIds === null)).toBe(true);
+    await expect(v1Post(`${path}/reset`, { expectedRevision: before.revision })).rejects.toMatchObject({ code: 'MULTI_FINAL_STALE' });
+    const saved = await v1Put<MultiFinalView>(`${path}/preliminary`, { ...input, expectedRevision: cleared.revision });
+    expect(saved.groups[0]).toMatchObject({ name: '수정 예선', capacity: 3, legs: 2, registrationIds: [before.registrations[0].id] });
+    expect(saved.finals[0].rules.every(rule => rule.groupId === saved.groups[0].id)).toBe(true);
+    expect(await v1Get(path)).toEqual(saved);
+    const publicDetail = await v1Get<V1TournamentDetail>(publicPath);
+    expect(publicDetail.fixtures).toHaveLength(6);
+    expect(publicDetail.groups[0].groupTeams).toHaveLength(1);
+    expect(publicDetail.fixtures.some(f => f.homeRegistrationId === before.registrations[0].id || f.awayRegistrationId === before.registrations[0].id)).toBe(true);
+  });
   it('저장→관리자 재조회→공개 상세가 동일하고 빈 배열 저장으로 모두 초기화한다', async () => {
     const saved = await v1Put<V1AdminTournamentAwardSet[]>(`${admin}/award-sets`, { awardSets: [{ bracketTrack: '챔피언', prizePool: 120000, prizeSummary: '샘플 우승 상금' }, { bracketTrack: '챌린지', prizePool: 0 }] });
     expect(await v1Get(`${admin}/award-sets`)).toEqual(saved);
@@ -80,6 +100,8 @@ describe('공용 MSW — named finals 및 시상 wire 계약', () => {
     server.use(...createNamedFinalsMsw(actor).handlers);
     await expect(v1Put(`${admin}/award-sets`, { awardSets: [] })).rejects.toMatchObject({ statusCode: actor === 'guest' ? 401 : 403 });
     await expect(v1Post(`${path}/preview`, {})).rejects.toMatchObject({ statusCode: actor === 'guest' ? 401 : 403 });
+    await expect(v1Post(`${path}/reset`, { expectedRevision: 1 })).rejects.toMatchObject({ statusCode: actor === 'guest' ? 401 : 403 });
+    await expect(v1Put(`${path}/preliminary`, {})).rejects.toMatchObject({ statusCode: actor === 'guest' ? 401 : 403 });
     if (actor === 'support') expect((await v1Get<MultiFinalView>(path)).finals).toHaveLength(2);
   });
 });

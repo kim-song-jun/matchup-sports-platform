@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import type { MultiFinalDefinition, MultiFinalPreview } from '@/hooks/use-multi-finals';
+import type { MultiFinalDefinition, MultiFinalGroup, MultiFinalPreview } from '@/hooks/use-multi-finals';
 import type { V1AdminTournamentAwardSet, V1TournamentFixture, V1TournamentGroup } from '@/types/api';
 import { NAMED_FINALS_ID, namedFinalPublicDetail, namedFinalView } from './named-finals-fixtures';
 
@@ -17,7 +17,7 @@ export function createNamedFinalsMsw(actor: Actor = 'ops') {
   let view = namedFinalView(); let detail = namedFinalPublicDetail(); let awardSets: V1AdminTournamentAwardSet[] = [];
   const replays = new Map<string, { hash: string; revision: number }>();
   const preliminaryGroups = (): V1TournamentGroup[] => view.groups.map((group, i) => ({ id: group.id, name: group.name, phase: 'group',
-    sortOrder: i, advanceCount: null, bracketTrack: 'overall', groupTeams: view.registrations.slice(i * 2, i * 2 + 2).map((reg, j) => ({ id: `group-team-${i}-${j}`, registrationId: reg.id, teamId: reg.team.id, teamName: reg.team.name, teamLogoUrl: null, sortOrder: j })), standings: [], qualification: null }));
+    sortOrder: i, advanceCount: null, bracketTrack: 'overall', groupTeams: (group.registrationIds ?? []).map(id => view.registrations.find(reg => reg.id === id)!).map((reg, j) => ({ id: `group-team-${i}-${j}`, registrationId: reg.id, teamId: reg.team.id, teamName: reg.team.name, teamLogoUrl: null, sortOrder: j })), standings: [], qualification: null }));
   function reset() {
     view = namedFinalView(); detail = namedFinalPublicDetail(); detail.groups = preliminaryGroups();
     detail.fixtures = view.groups.map((group, i) => {
@@ -34,7 +34,7 @@ export function createNamedFinalsMsw(actor: Actor = 'ops') {
     if (actor === 'member' || mutation && actor === 'support') return fail(403, 'PERMISSION_DENIED', '관리자 권한을 확인해 주세요.');
     return null;
   }
-  function parseFinals(value: unknown): MultiFinalDefinition[] | null {
+  function parseFinals(value: unknown, groups = view.groups): MultiFinalDefinition[] | null {
     if (!Array.isArray(value) || !value.length) return null;
     const names = new Set<string>(), rules = new Set<string>(), teams = new Set<string>();
     const finals: MultiFinalDefinition[] = [];
@@ -46,7 +46,7 @@ export function createNamedFinalsMsw(actor: Actor = 'ops') {
       const parsedRules: MultiFinalDefinition['rules'] = [];
       for (const r of f.rules) {
         if (!record(r) || typeof r.groupId !== 'string' || typeof r.rank !== 'number' || !Number.isInteger(r.rank)
-          || r.rank < 1 || r.rank > (view.groups.find(group => group.id === r.groupId)?.capacity ?? 0)
+          || r.rank < 1 || r.rank > (groups.find(group => group.id === r.groupId)?.capacity ?? 0)
           || Object.keys(r).some(key => !['groupId', 'rank'].includes(key))) return null;
         const key = JSON.stringify([r.groupId, r.rank]); if (rules.has(key)) return null; rules.add(key);
         parsedRules.push({ groupId: r.groupId, rank: r.rank });
@@ -115,8 +115,54 @@ export function createNamedFinalsMsw(actor: Actor = 'ops') {
       }
       awardSets = next; detail.awardSets = next.map(({ id: _id, ...row }) => row); return ok(awardSets);
     }),
-    http.get(path, () => auth(false) ?? ok(view)),
+    http.get(path, () => auth(false) ?? ok({ ...view, fixtureCount: detail.fixtures.length })),
     http.post(`${path}/setup`, () => auth(true) ?? fail(409, 'BRACKET_NOT_EMPTY', '예선 대진이 이미 있어요.')),
+    http.post(`${path}/reset`, async ({ request }) => {
+      const denied = auth(true); if (denied) return denied;
+      const input = await body(request);
+      if (!record(input) || Object.keys(input).some(key => key !== 'expectedRevision') || !Number.isInteger(input.expectedRevision)) return invalid();
+      if (input.expectedRevision !== view.revision) return stale();
+      if (['completed', 'cancelled', 'archived'].includes(detail.status) || detail.fixtures.some(f => f.result != null || f.status !== 'scheduled' || f.liveStatus !== 'scheduled')) return fail(409, 'BRACKET_LOCKED', '시작했거나 기록이 있는 경기는 초기화할 수 없어요.');
+      view = { ...view, revision: view.revision + 1, generated: false, fixtureCount: 0, preliminaryFixtureCount: 0,
+        groupStandings: view.groups.map(g => ({ groupId: g.id, name: g.name, complete: false, rows: [] })),
+        finals: view.finals.map(f => ({ ...f, registrationIds: null, manual: false, suggestedRegistrationIds: [], unresolved: f.rules.map(rule => ({ ...rule, state: 'group_incomplete', tiedRegistrationIds: [] })) })) };
+      detail.groups = preliminaryGroups(); detail.fixtures = []; return ok(view);
+    }),
+    http.put(`${path}/preliminary`, async ({ request }) => {
+      const denied = auth(true); if (denied) return denied;
+      const input = await body(request);
+      if (!record(input) || Object.keys(input).some(key => !['expectedRevision', 'groups', 'finals'].includes(key)) || !Array.isArray(input.groups) || !input.groups.length) return invalid();
+      if (input.expectedRevision !== view.revision) return stale();
+      if (detail.fixtures.length) return fail(409, 'BRACKET_NOT_EMPTY', '대진 초기화를 먼저 실행해 주세요.');
+      if (['completed', 'cancelled', 'archived'].includes(detail.status)) return fail(409, 'BRACKET_LOCKED', '종료된 대회는 변경할 수 없어요.');
+      const groups: MultiFinalGroup[] = []; const assigned = new Set<string>(); const names = new Set<string>();
+      for (const [i, g] of input.groups.entries()) {
+        if (!record(g) || Object.keys(g).some(key => !['name', 'capacity', 'legs', 'registrationIds'].includes(key)) || typeof g.name !== 'string' || !g.name.trim() || g.name.length > 80 || names.has(g.name.trim()) || typeof g.capacity !== 'number' || !Number.isSafeInteger(g.capacity) || g.capacity < 2 || ![1, 2].includes(g.legs as number)) return invalid();
+        const ids = g.registrationIds ?? [];
+        if (!Array.isArray(ids) || ids.length > g.capacity || ids.some(id => typeof id !== 'string' || assigned.has(id) || !view.registrations.some(reg => reg.id === id))) return invalid();
+        for (const id of ids) { if (assigned.has(id)) return invalid(); assigned.add(id); }
+        names.add(g.name.trim());
+        groups.push({ id: `group-${view.revision + 1}-${i}`, name: g.name.trim(), capacity: g.capacity, legs: g.legs as 1 | 2, registrationIds: ids });
+      }
+      if (!Array.isArray(input.finals)) return invalid();
+      const mapped = input.finals.map(f => record(f) && Array.isArray(f.rules) ? { ...f, rules: f.rules.map(r => record(r) ? { ...r, groupId: groups[Number(r.groupId)]?.id ?? '' } : r) } : f);
+      const finals = parseFinals(mapped, groups); if (!finals) return invalid();
+      if (awardSets.some(row => !finals.some(f => f.name === row.bracketTrack))) return fail(409, 'BRACKET_TRACK_AWARDS_REQUIRE_RESCOPING', '시상 범위를 먼저 정리해 주세요.');
+      view = { ...view, revision: view.revision + 1, groups, generated: false,
+        preliminaryFixtureCount: groups.reduce((sum, g) => sum + g.capacity * (g.capacity - 1) / 2 * g.legs, 0),
+        groupStandings: groups.map(g => ({ groupId: g.id, name: g.name, complete: false, rows: [] })),
+        finals: finals.map(f => ({ ...f, manual: f.registrationIds != null, suggestedRegistrationIds: [], unresolved: f.rules.map(rule => ({ ...rule, state: 'group_incomplete', tiedRegistrationIds: [] })) })) };
+      detail.groups = preliminaryGroups(); detail.fixtures = [];
+      for (const group of groups) for (let leg = 0; leg < group.legs; leg++) for (let homeIndex = 0; homeIndex < group.capacity; homeIndex++) for (let awayIndex = homeIndex + 1; awayIndex < group.capacity; awayIndex++) {
+        const home = view.registrations.find(reg => reg.id === group.registrationIds?.[leg ? awayIndex : homeIndex]);
+        const away = view.registrations.find(reg => reg.id === group.registrationIds?.[leg ? homeIndex : awayIndex]);
+        detail.fixtures.push({ id: `pre-fixture-${view.revision}-${detail.fixtures.length}`, groupId: group.id, round: 'league', fixtureNumber: detail.fixtures.length + 1, legNumber: leg + 1, scheduledAt: null, venue: null,
+          status: 'scheduled', liveStatus: 'scheduled', homeRegistrationId: home?.id ?? null, awayRegistrationId: away?.id ?? null, homeTeamId: home?.team.id ?? null, awayTeamId: away?.team.id ?? null,
+          homeTeamName: home?.team.name ?? 'TBD', awayTeamName: away?.team.name ?? 'TBD', homeTeamLogoUrl: null, awayTeamLogoUrl: null, homeSlotLabel: null, awaySlotLabel: null, result: null, videos: [] });
+      }
+      view.fixtureCount = detail.fixtures.length;
+      return ok(view);
+    }),
     http.put(`${path}/selection`, async ({ request }) => {
       const denied = auth(true); if (denied) return denied;
       const input = await body(request); if (!record(input) || Object.keys(input).some(key => !['expectedRevision', 'finals'].includes(key))) return invalid();

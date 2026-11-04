@@ -207,6 +207,16 @@ describe('독립 리그 다음 시즌 잇기', () => {
     })).status).not.toBe('confirmed');
   });
 
+  it('한 팀씩 넣는 팀 추가도 신청이 진행 중인 팀은 넣지 않는다', async () => {
+    const res = await http().post(`/api/v1/admin/league-matches/${season2}/teams`)
+      .set('x-v1-user-id', admin).send({ teamId: team.a }).expect(422);
+    expect(res.body.code).toBe('LEAGUE_TEAM_ALREADY_APPLIED');
+    expect((await prisma.v1TournamentRegistration.findUniqueOrThrow({
+      where: { tournamentId_teamId: { tournamentId: season2, teamId: team.a } },
+      select: { status: true },
+    })).status).not.toBe('confirmed');
+  });
+
   // 2026-11-04 사용자 확정: 리그 체계 전환도 다음 시즌 잇기처럼 지난 명단을 옮긴다. 전환한 리그의 공개 화면은
   // 첫 시즌 티어와 편성 팀을 준다(전엔 다음 시즌 링크가 비어 리그 목록으로만 갔다).
   it('리그 체계로 전환하면 첫 시즌 티어에 원본 리그 명단을 옮기고, 원본 공개 화면이 티어를 잇는다', async () => {

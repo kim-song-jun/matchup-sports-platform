@@ -23,6 +23,7 @@ function setup() {
     v1Team: { findUnique: jest.fn().mockResolvedValue({ ownerUserId: 'owner' }) },
     v1TournamentRegistration: {
       upsert: jest.fn().mockResolvedValue({}),
+      findUnique: jest.fn().mockResolvedValue(null),
       findUniqueOrThrow: jest.fn(async (args: { where: { tournamentId_teamId: { teamId: string } } }) => ({ id: `reg-${args.where.tournamentId_teamId.teamId}` })),
     },
     v1OutboxJob: { createMany: jest.fn().mockResolvedValue({}) },

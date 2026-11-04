@@ -18,7 +18,7 @@ import { MultiFinalGenerateDto, MultiFinalResetDto, MultiFinalSelectionDto, Mult
 import { invalidMultiFinal, planNamedFinals, planPreliminaryGroups, sameNamedFinalStructure, validateNamedFinals } from './multi-finals-plan';
 
 type Tx = Prisma.TransactionClient;
-type Config = { groups: Array<{ id: string; name: string; capacity: number; legs: 1 | 2 }>; finals: NamedFinalDto[] };
+type Config = { groups: Array<{ id: string; name: string; capacity: number; legs: 1 | 2; registrationIds?: string[] }>; finals: NamedFinalDto[] };
 const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const stale = () => new ConflictException({ code: 'MULTI_FINAL_STALE', message: '설정이나 경기 상태가 바뀌었어요. 다시 불러와 주세요.' });
 const options = { timeout: 45_000, maxWait: 5_000 };
@@ -75,6 +75,8 @@ export class MultiFinalsService {
     if (!config) return { revision: tournament.multiFinalsRevision, groups: [], finals: [], registrations, generated: false, preliminaryFixtureCount: 0, groupStandings: [] };
     const preliminaryFixtureCount = await tx.v1TournamentMatchDetails.count({ where: { tournamentId: id, group: { phase: 'group' }, teamMatch: { deletedAt: null } } });
     const assignments = await tx.v1TournamentGroupTeam.findMany({ where: { groupId: { in: config.groups.map(g => g.id) } }, select: { groupId: true, registrationId: true }, orderBy: { sortOrder: 'asc' } });
+    const entries = await tx.v1TournamentSlot.findMany({ where: { tournamentId: id, kind: 'ENTRY', groupId: { in: config.groups.map(g => g.id) } },
+      select: { groupId: true, registrationId: true }, orderBy: { position: 'asc' } });
     const sources = await loadGroupRankSources(tx, id, config.groups.map(g => g.id));
     const standingRows = await tx.v1TournamentStanding.findMany({
       where: { groupId: { in: config.groups.map(g => g.id) } },
@@ -104,7 +106,13 @@ export class MultiFinalsService {
       return { ...final, suggestedRegistrationIds: candidates, unresolved, manual: final.registrationIds !== null && final.registrationIds !== undefined };
     });
     const generated = await tx.v1TournamentGroup.count({ where: { tournamentId: id, phase: { not: 'group' } } }) > 0;
-    return { revision: tournament.multiFinalsRevision, groups: config.groups.map(g => ({ ...g, registrationIds: assignments.filter(a => a.groupId === g.id).map(a => a.registrationId) })), finals, registrations, generated, preliminaryFixtureCount, groupStandings };
+    return { revision: tournament.multiFinalsRevision, groups: config.groups.map(g => {
+      const groupEntries = entries.filter(entry => entry.groupId === g.id);
+      const members = assignments.filter(a => a.groupId === g.id).map(a => a.registrationId);
+      return { ...g, registrationIds: groupEntries.length
+        ? groupEntries.flatMap(entry => entry.registrationId === null ? [] : [entry.registrationId])
+        : g.registrationIds?.filter(id => members.includes(id)) ?? members };
+    }), finals, registrations, generated, preliminaryFixtureCount, groupStandings };
   }
   async get(user: V1AuthUser, id: string) {
     await this.admins.getActiveAdmin(user.id);
@@ -159,6 +167,7 @@ export class MultiFinalsService {
       // Serialize with score/event writers before checking whether any game has started.
       await tx.$queryRaw`SELECT g.id FROM v1_games g JOIN v1_tournament_match_details d ON d.team_match_id = g.team_match_id JOIN v1_team_matches m ON m.id = d.team_match_id WHERE d.tournament_id = ${id} AND m.deleted_at IS NULL ORDER BY g.id FOR UPDATE OF g`;
       const fixtures = await this.assertUnstarted(tx, id, true);
+      const before = await this.view(tx, id);
       const edges = await tx.v1TournamentMatchAdvancementEdge.findMany({ where: { tournamentId: id }, select: { sourceTeamMatchId: true, targetTeamMatchId: true } });
       for (const fixtureId of orderFixturesForTeardown(fixtures.map(f => f.teamMatchId), edges)) await softDeleteTournamentFixtureInTx(tx, admin, fixtureId);
       await tx.v1TournamentSlot.deleteMany({ where: { tournamentId: id } });
@@ -167,7 +176,7 @@ export class MultiFinalsService {
       const finalGroups = await tx.v1TournamentGroup.findMany({ where: { tournamentId: id, phase: { not: 'group' } }, select: { id: true } });
       await tx.v1TournamentGroupTeam.deleteMany({ where: { groupId: { in: finalGroups.map(g => g.id) } } });
       for (const group of finalGroups) await deleteTournamentGroupInTx(tx, admin, group.id);
-      const next: Config = { ...config, finals: config.finals.map(f => ({ ...f, registrationIds: null })) };
+      const next: Config = { ...config, groups: before.groups, finals: config.finals.map(f => ({ ...f, registrationIds: null })) };
       await tx.v1Tournament.update({ where: { id }, data: { multiFinals: JSON.parse(JSON.stringify(next)), multiFinalsRevision: { increment: 1 } } });
       await this.admins.logAdminAction(admin, { action: 'tournament.multi_finals.reset', targetType: 'tournament', targetId: id,
         beforeJson: JSON.parse(JSON.stringify(config)), afterJson: { deletedFixtureCount: fixtures.length, config: JSON.parse(JSON.stringify(next)) } }, tx);

@@ -42,7 +42,8 @@ mutation admin, 대회 advisory lock, optimistic revision, 감사 로그 사용.
 
 ## Progress Snapshot
 - 최신 origin/dev 4a22824a5 기준 feat/preliminary-edit-reset 격리 worktree.
-- Phase 1 API, Phase 2 UI 구현. API 27 tests / Web·공용 MSW 고유 21 tests PASS. API/Web tsc --noEmit --incremental false PASS. surface/pattern 및 diff whitespace·debt marker 검사 PASS.
+- Phase 1 API, Phase 2 UI 구현. API 28 tests / Web·공용 MSW 고유 21 tests PASS. API/Web tsc --noEmit --incremental false PASS. surface/pattern 및 diff whitespace·debt marker 검사 PASS.
+- PR #2151 (dev), 초기 HEAD 5da742413. 실제 자리와 GroupTeam 생성 순서가 다를 때 hydrate/초기화 뒤 순서를 보존하는 회귀도 검증했다.
 - API 첫 실행은 공유 Prisma Client가 구버전이라 컴파일 실패. 공유 생성물은 보존하고 격리 Client를 현행 스키마로 생성해 재실행 PASS.
 - 실제 DB 통합 시나리오 2개 추가 및 support 권한 시나리오 확장. 로컬 PostgreSQL/Docker 없음으로 실행은 CI에 위임.
 - Phase 3 진행 중: PR/CI/Copilot 검증 및 Alpha 수동 QA. 브라우저 도구가 없어 Alpha 시각 검증은 아직 수행하지 않았다.

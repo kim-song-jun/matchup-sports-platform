@@ -17,7 +17,7 @@ function harness() {
     }) },
     v1TournamentMatchDetails: { count: jest.fn().mockResolvedValue(0), findMany: jest.fn().mockResolvedValue([]) },
     v1TournamentMatchAdvancementEdge: { findMany: jest.fn().mockResolvedValue([]) },
-    v1TournamentSlot: { deleteMany: jest.fn() },
+    v1TournamentSlot: { deleteMany: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
     v1TournamentStanding: { deleteMany: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
     v1TournamentByeSlot: { deleteMany: jest.fn() },
     v1TournamentGroup: { findMany: jest.fn().mockResolvedValue([]), count: jest.fn().mockResolvedValue(0) },
@@ -69,5 +69,13 @@ describe('대진 초기화와 별도 예선 수정 보호', () => {
     const { tx, service } = harness(); tx.v1TournamentMatchDetails.count.mockResolvedValue(1);
     await expect(service.setup(user, 't', { expectedRevision: 2, groups: [{ name: 'A조', capacity: 2, legs: 1 }], finals: [{ name: '결선', thirdPlace: false, rules: [] }] }, true)).rejects.toMatchObject({ response: { code: 'BRACKET_NOT_EMPTY' } });
     expect(tx.v1TournamentSlot.deleteMany).not.toHaveBeenCalled();
+  });
+  it('GroupTeam 생성 순서가 달라도 실제 자리 순서로 hydrate하고 초기화 뒤에도 유지한다', async () => {
+    const { tx, service } = harness();
+    tx.v1TournamentGroupTeam.findMany.mockResolvedValue([{ groupId: 'g', registrationId: 'r2', registration: { team: { name: '둘' } } }, { groupId: 'g', registrationId: 'r1', registration: { team: { name: '하나' } } }] as never);
+    tx.v1TournamentSlot.findMany.mockResolvedValue([{ groupId: 'g', registrationId: 'r1' }, { groupId: 'g', registrationId: 'r2' }, { groupId: 'g', registrationId: null }] as never);
+    tx.v1TournamentSlot.deleteMany.mockImplementation(async () => { tx.v1TournamentSlot.findMany.mockResolvedValue([]); });
+    const result = await service.reset(user, 't', { expectedRevision: 2 });
+    expect(result.groups[0].registrationIds).toEqual(['r1', 'r2']);
   });
 });

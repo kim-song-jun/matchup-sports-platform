@@ -20,11 +20,15 @@ describe('실제 어드민 화면용 체험 데이터 계약', () => {
     for (const reg of state.registrations) send('PATCH', `/admin/registrations/${reg.id}/confirm`, {});
     send('POST', `${base}/bracket/template`, { kind: 'knockout', size: 4, thirdPlace: false });
     send('POST', `${base}/slots/random-fill`);
+    send('POST', `${base}/status`, { status: 'closed' });
+    send('POST', `${base}/status`, { status: 'in_progress' });
     send('POST', '/admin/games/sample-game-1/quick-result', { expectedVersion: 1, score: { home: 2, away: 1 } });
     send('POST', '/admin/games/sample-game-2/quick-result', { expectedVersion: 1, score: { home: 0, away: 1 } });
     expect(state.bracket.fixtures[2].homeTeamName).toBe('블루 FC');
     expect(state.bracket.fixtures[2].awayTeamName).toBe('화이트 FS');
     expect(state.bracket.fixtures[0].result?.homeScore).toBe(2);
+    expect(state.tournament.canRevertStart).toBe(false);
+    expect(() => runAdminDemo(state, 'POST', `${base}/status`, { status: 'closed' })).toThrow('시작 전 상태로 되돌릴 수 없어요');
     expect(state.tournament.operationCounts?.fixtures).toBe(3);
     expect(restoreAdminDemo(JSON.stringify({ version: 2, commands })).state).toEqual(state);
   });

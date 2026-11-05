@@ -93,6 +93,7 @@ export function runAdminDemo(current: AdminDemoState, method: string, rawPath: s
   const path = rawPath.split('?')[0];
   const state = clone(current);
   const data = method === 'GET' ? read(state, path, new URLSearchParams(rawPath.split('?')[1])) : write(state, method, path, body);
+  state.tournament.canRevertStart = !state.bracket.fixtures.some((fixture) => fixture.result !== null);
   state.tournament.operationCounts = {
     registrations: state.registrations.length, fixtures: state.bracket.fixtures.length,
     announcements: state.collections.announcements.length,
@@ -218,6 +219,7 @@ function write(state: AdminDemoState, method: string, path: string, value: unkno
     const transitions: Record<string, string[]> = { draft: ['open', 'cancelled'], open: ['closed', 'cancelled'], closed: ['open', 'in_progress', 'cancelled'], in_progress: ['completed', 'closed', 'cancelled'], completed: ['in_progress'], cancelled: ['draft'] };
     if (!transitions[state.tournament.status]?.includes(String(body.status))) fail('현재 상태에서는 변경할 수 없어요.');
     if (body.status === 'in_progress' && state.bracket.fixtures.length === 0) fail('대진을 먼저 만들어 주세요.');
+    if (state.tournament.status === 'in_progress' && body.status === 'closed' && state.bracket.fixtures.some((fixture) => fixture.result !== null)) fail('결과가 있는 대회는 시작 전 상태로 되돌릴 수 없어요.');
     if (body.status === 'completed' && state.bracket.fixtures.some((f) => !f.result)) fail('모든 경기 결과를 먼저 확정해 주세요.');
     state.tournament.status = body.status as V1Tournament['status'];
     return { tournament: state.tournament, alreadyInStatus: false };

@@ -13,6 +13,7 @@ import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { useToast } from '@/components/v1-ui/toast';
 import { useV1AuthMe, useV1LinkApple, useV1LinkKakao } from '@/hooks/use-v1-api';
+import { buildActivityProfileHref } from '@/lib/activity-profile-required';
 import { V1ApiError } from '@/lib/api-client';
 import { getSignupIncompleteRoute } from '@/lib/auth-link-errors';
 import { reportClientError } from '@/lib/client-error-reporter';
@@ -251,6 +252,8 @@ export function LoginMethodsPageClient() {
     return <ErrorState message="로그인 방법 변경 권한을 확인하지 못했어요. 다시 시도해 주세요." onRetry={() => void authMe.refetch()} />;
   }
   const has = (provider: string) => providers.includes(provider);
+  const needsSignup = !canLink && authMe.data.user.canLinkAfterSignup === true;
+  const unavailableCaption = needsSignup ? '가입 정보를 입력한 뒤 연결할 수 있어요' : '이 계정에는 추가할 수 없어요';
   const busy = activeProvider !== null;
   const justLinked = (provider: V1LinkableProvider) => (
     outcome?.provider === provider && (outcome.linkResult === 'linked' || outcome.linkResult === 'merged')
@@ -273,7 +276,16 @@ export function LoginMethodsPageClient() {
           <p className="tm-text-body" style={{ margin: 0, color: 'var(--text-muted)', wordBreak: 'keep-all' }}>
             {canLink ? '이 계정에 연결된 로그인 방법이에요. 카카오·Apple·이메일을 연결하면 같은 계정으로 바로 로그인할 수 있어요.' : '이 계정에 연결된 로그인 방법이에요.'}
           </p>
-          {!canLink ? <p className="tm-text-caption">이 계정에서는 로그인 방법을 추가할 수 없어요.</p> : null}
+          {needsSignup ? (
+            <div style={{ display: 'grid', gap: 12 }}>
+              <p className="tm-text-body" style={{ margin: 0, color: 'var(--text-muted)' }}>
+                가입 정보를 입력하면 이 계정에 로그인 방법을 추가할 수 있어요. 입력을 마치면 여기로 돌아와요.
+              </p>
+              <Link className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" href={buildActivityProfileHref(LOGIN_METHODS_PATH)}>
+                가입 정보 입력하기
+              </Link>
+            </div>
+          ) : !canLink ? <p className="tm-text-caption">이 계정에서는 로그인 방법을 추가할 수 없어요.</p> : null}
           {outcome ? (
             <LinkResultNotice
               outcome={outcome}
@@ -300,7 +312,7 @@ export function LoginMethodsPageClient() {
                 <ProviderRow
                   mark="email"
                   label="이메일·비밀번호"
-                  caption={canLink ? '연결하면 이메일과 비밀번호로도 이 계정에 들어와요' : '이 계정에는 추가할 수 없어요'}
+                  caption={canLink ? '연결하면 이메일과 비밀번호로도 이 계정에 들어와요' : unavailableCaption}
                   divided={false}
                   action={canLink ? (
                     <Link className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block" href={EMAIL_LINK_PATH}>
@@ -320,7 +332,7 @@ export function LoginMethodsPageClient() {
                 <ProviderRow
                   mark="kakao"
                   label="카카오 로그인"
-                  caption={canLink ? '연결하면 카카오 버튼으로도 이 계정에 들어와요' : '이 계정에는 추가할 수 없어요'}
+                  caption={canLink ? '연결하면 카카오 버튼으로도 이 계정에 들어와요' : unavailableCaption}
                   action={canLink ? (
                     <Button
                       size="lg"
@@ -365,7 +377,7 @@ export function LoginMethodsPageClient() {
                 <ProviderRow
                   mark="apple"
                   label="Apple 로그인"
-                  caption={canLink ? 'Apple 연결은 iOS 앱에서 할 수 있어요' : '이 계정에서는 로그인 방법을 추가할 수 없어요'}
+                  caption={canLink ? 'Apple 연결은 iOS 앱에서 할 수 있어요' : needsSignup ? '가입 정보를 입력한 뒤 iOS 앱에서 연결할 수 있어요' : '이 계정에서는 로그인 방법을 추가할 수 없어요'}
                   badge={canLink ? <span className="tm-badge tm-badge-grey">앱에서만</span> : undefined}
                 />
               )}

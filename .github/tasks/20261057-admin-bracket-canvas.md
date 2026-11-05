@@ -1137,3 +1137,39 @@ PR1858 latest-dev merge 30개 충돌 파일. generated Prisma client/의존성 �
 - 좁은 검증: service/plan 단위 13/13 PASS, WSL의 실제 bash/git/jq로 runtime rollback 8/8 PASS, bash syntax PASS. jq1.8.1 공식 배포 바이너리의 SHA256을 공식 checksum과 대조했다. 운영 DB rollback 실험은 하지 않았다.
 - Phase C in_progress: API/Web typecheck0, API surface752 PASS, diff-check PASS. Web pattern checker는 Windows cmd의 POSIX find/grep 구문 비호환으로 실행 실패했으며 성공으로 집계하지 않는다. 전체 pattern/실제 DB 통합 검증은 최신 head의 Linux CI에서 확인한다. exact-path commit 및 PR 갱신 후 최신 CI 통과, dev merge와 alpha 배포 상태 확인을 진행한다.
 - Progress Snapshot: alpha 미배포 상태의 신규 수동 QA0/10·viewport0/3은 그대로 유지한다. 배포 완료 후 실제 serving SHA 및 health를 별도로 기록한다.
+
+## 2026-11-06 extension — N개 토너먼트별 독립 진출팀 확정
+
+Status: In Progress
+
+### Context / Goal
+예선·결선 대진 생성과 실제 진출팀 확정을 분리하고, `league_knockouts`의 토너먼트 하나만 독립적으로 배정한다. 현재 배정은 모든 결선의 명단 저장/재생성을 한 번에 실행해 한 결선의 미확정 상태가 다른 결선을 막는다. 순위표는 대회 계산기, 추천은 리그 계산기를 사용해 순위 불일치를 동률로 표시한다.
+
+### Original Conditions / Acceptance Criteria
+- [x] `league_knockouts`에만 적용하며 기존 조별+결선 계약은 유지한다.
+- [x] 대진 생성/진출 규칙 설정/토너먼트별 진출팀 확정을 구분한다.
+- [x] 선택한 토너먼트만 원자적으로 확정하고 다른 결선의 명단·진행 상태·일정·경기 ID를 보존한다.
+- [x] 예선 미완료·미확정 팀·중복·자리 수 불일치·stale revision·선택한 결선의 시작/기록은 서버에서 거절한다.
+- [x] 순위표와 추천은 대회 계산기로 저장된 공식 순위를 함께 사용한다. 기존 시드 배정에 4개 조 12팀의 교차 배치 옵션을 추가했다.
+- [x] A/B/C 제시 후 사용자 A안 선택. 기존 모달에서 토너먼트 선택→명단/시드→해당 대진 확인→독립 확정하며 기존 두 결선 일괄 저장 단계를 제거했다.
+
+### User Scenarios / Test Scenarios
+- 예선과 빈 결선을 만든 뒤 프리미어만 선택/확정해 대진에 반영한다. 챌린지 미확정 상태는 유지한다.
+- 다른 결선이 시작됐어도 아직 시작하지 않은 선택 결선의 배정은 허용한다.
+- 확정 전 미리보기/취소는 명단이나 경기 데이터를 저장하지 않는다.
+- 권한, CAS, 다른 대회 팀, 중복 시드, 미완료 조, 시작한 결선은 실패 원인을 노출한다.
+
+### Parallel Work Breakdown / Ownership
+서브에이전트 없이 순차 실행. Owned: multi-finals API/DTO/service/tests, hook/wizard/page/tests, API 문서, canonical flow 변경 이력, 본 task·시나리오·changeset. Forbidden: 원본 dirty tree WIP, 다른 진행 방식 변경, 실대회 데이터 변경, main 승격.
+
+### Tech Debt Resolved / Security Notes
+기존 대회별 권한/슬롯 배치/감사/게임 잠금을 재사용한다. 토너먼트별 확정은 전체 결선 재생성 API를 사용하지 않는다. 개인정보·로그인 정보는 저장하지 않는다.
+
+### Risks & Dependencies / Ambiguity Log
+- 사용자 A안 선택 완료. 새 기준은 순위 계산 옵션이 아니라 시드 배치 옵션이다. 후속 확인: 1위4팀은 8강 직행, 2·3위8팀은 12강4경기. A/B/C/D의 8강 1위 상대 쪽에 B/C/D/A의 2위 고정, 3위는 두 상대 조를 피해 균등 추첨한다. 미리 본 배열을 그대로 저장한다.
+- Docker daemon 연결 실패(npipe dockerDesktopLinuxEngine 없음)로 실제 DB 통합은 로컬 미실행. headed Playwright는 임시 라이브러리 추출로 준비했고 alpha 변경 전 1440/768/390 캡처 및 console/network 확인 완료(0오류), 쓰기0. controller PID5751/browser5763 트리는 종료했다. 증거 `/tmp/teameet-multi-finals-evidence/`. 변경 후 alpha 수동 QA는 미배포 상태라 대기.
+
+### Progress Snapshot
+- Phase 1 completed: 최신 origin/dev `0b7720cb7d06`에서 `/tmp/teameet-multi-finals-20261106`, `fix/multi-finals-independent-assignment-20261106` 격리. 기존 원본 트리 수정 없음.
+- Phase 2 completed: 화면/DTO/hook/선택 정책/미리보기 sourceVersion/대상 결선 독립 확정 구현. 새로운 옵션은 적합한12팀 결선에서만 표시하며 수동 편집 시 기본 방식으로 전환한다.
+- Phase 3 in_progress: API99 + 추가기록보호1 회귀, Web15, 양쪽 tsc0, Web pattern PASS/API surface761 PASS, diff-check PASS. 실제 DB 통합 회귀는 추가했으나 daemon 없음으로 로컬 미실행. 변경 전 alpha3/3폭 PASS, 변경 후 alpha0/3폭·기능0/7. 커밋본 CI/리뷰와 alpha 검증 대기.

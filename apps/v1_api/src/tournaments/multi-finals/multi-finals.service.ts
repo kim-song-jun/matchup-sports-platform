@@ -8,15 +8,16 @@ import { GamesService } from '../../games/games.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { lockCompetitionForBracketMutationInTx } from '../slots/competition-bracket-lock';
 import { loadGroupRankSources } from '../slots/load-group-rank-preview';
-import { resolveGroupRank } from '../slots/group-rank-preview';
+import { resolveStoredGroupRank } from '../slots/group-rank-preview';
 import { assignSlotsBatchInTx } from '../slots/tournament-slot.service';
 import { BracketTemplateService } from '../templates/bracket-template.service';
 import { deleteTournamentGroupInTx, softDeleteTournamentFixtureInTx } from '../tournament-bracket-tx';
 import { orderFixturesForTeardown } from '../templates/bracket-teardown-order';
 import { TOURNAMENT_VENUE_SELECT } from '../../places/tournament-venue';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from '../tournament-surface-lookup';
-import { MultiFinalGenerateDto, MultiFinalResetDto, MultiFinalSelectionDto, MultiFinalSetupDto, NamedFinalDto } from './multi-finals.dto';
-import { invalidMultiFinal, planNamedFinals, planPreliminaryGroups, sameNamedFinalStructure, validateNamedFinals } from './multi-finals-plan';
+import { MultiFinalAssignmentDto, MultiFinalAssignmentPreviewDto, MultiFinalGenerateDto, MultiFinalResetDto, MultiFinalSelectionDto, MultiFinalSetupDto, NamedFinalDto } from './multi-finals.dto';
+import { crossGroupTopThree, supportsCrossGroupTopThree, validCrossGroupTopThree } from './multi-finals-seeding';
+import { invalidMultiFinal, namedFinalSize, planNamedFinals, planPreliminaryGroups, sameNamedFinalStructure, validateNamedFinals } from './multi-finals-plan';
 
 type Tx = Prisma.TransactionClient;
 type Config = { groups: Array<{ id: string; name: string; capacity: number; legs: 1 | 2; registrationIds?: string[] }>; finals: NamedFinalDto[] };
@@ -49,8 +50,8 @@ export class MultiFinalsService {
   private assertTeams(finals: readonly NamedFinalDto[], confirmed: ReadonlySet<string>) {
     for (const f of finals) for (const id of f.registrationIds ?? []) if (!confirmed.has(id)) invalidMultiFinal('이 대회의 확정 참가팀만 선택할 수 있어요.');
   }
-  private async assertUnstarted(tx: Tx, id: string, all = false) {
-    const fixtures = await tx.v1TournamentMatchDetails.findMany({ where: { tournamentId: id, ...(!all ? { group: { phase: { not: 'group' as const } } } : {}), teamMatch: { deletedAt: null } }, orderBy: { teamMatchId: 'asc' },
+  private async assertUnstarted(tx: Tx, id: string, all = false, track?: string) {
+    const fixtures = await tx.v1TournamentMatchDetails.findMany({ where: { tournamentId: id, ...(!all ? { group: { phase: { not: 'group' as const }, ...(track === undefined ? {} : { bracketTrack: track }) } } : {}), teamMatch: { deletedAt: null } }, orderBy: { teamMatchId: 'asc' },
       select: { teamMatchId: true, updatedAt: true, teamMatch: { select: { updatedAt: true, status: true, game: { select: { version: true, state: true, currentOfficialRevisionId: true, _count: { select: { events: true } } } } } } } });
     if (fixtures.some(f => f.teamMatch.status !== 'matched' || !f.teamMatch.game || f.teamMatch.game.state !== 'SCHEDULED' || f.teamMatch.game.currentOfficialRevisionId || f.teamMatch.game._count.events > 0)) {
       throw new ConflictException({ code: 'BRACKET_LOCKED', message: all ? '시작했거나 기록·결과가 있는 경기가 있어 대진을 초기화할 수 없어요.' : '시작했거나 기록이 있는 결선은 명단과 대진을 변경할 수 없어요.' });
@@ -88,9 +89,9 @@ export class MultiFinalsService {
     const groupStandings = config.groups.map(group => {
       const source = sources.get(group.id)!;
       return { groupId: group.id, name: group.name,
-        complete: source.registrationIds.length === group.capacity && resolveGroupRank(source, 1).state !== 'group_incomplete',
+        complete: source.registrationIds.length === group.capacity && resolveStoredGroupRank(source, 1).state !== 'group_incomplete',
         rows: standingRows.filter(row => row.groupId === group.id).map(row => {
-          const resolution = row.position === null ? null : resolveGroupRank(source, row.position);
+          const resolution = row.position === null ? null : resolveStoredGroupRank(source, row.position);
           return { ...row, teamName: source.teamNameById.get(row.registrationId) ?? '',
             tiedRegistrationIds: resolution?.state === 'tied' ? resolution.tiedRegistrationIds : [] };
         }),
@@ -101,11 +102,11 @@ export class MultiFinalsService {
       for (const rule of final.rules) {
         const source = sources.get(rule.groupId);
         const group = config.groups.find(g => g.id === rule.groupId);
-        const result = source && source.registrationIds.length === group?.capacity ? resolveGroupRank(source, rule.rank) : { state: 'group_incomplete' as const };
+        const result = source && source.registrationIds.length === group?.capacity ? resolveStoredGroupRank(source, rule.rank) : { state: 'group_incomplete' as const };
         if (result.state === 'ready') candidates.push(result.registrationId);
         else unresolved.push({ ...rule, state: result.state, tiedRegistrationIds: result.state === 'tied' ? result.tiedRegistrationIds : [] });
       }
-      return { ...final, suggestedRegistrationIds: candidates, unresolved, manual: final.registrationIds !== null && final.registrationIds !== undefined };
+      return { ...final, crossGroupTopThreeAvailable: supportsCrossGroupTopThree(final, config.groups.map(group => group.id)), suggestedRegistrationIds: candidates, unresolved, manual: final.registrationIds !== null && final.registrationIds !== undefined };
     });
     const generated = await tx.v1TournamentGroup.count({ where: { tournamentId: id, phase: { not: 'group' } } }) > 0;
     return { revision: tournament.multiFinalsRevision, groups: config.groups.map(g => {
@@ -208,12 +209,77 @@ export class MultiFinalsService {
       return this.view(tx, id);
     }, options);
   }
+  private seedGroups(view: Awaited<ReturnType<MultiFinalsService['view']>>) {
+    return view.groups.map(group => ({ id: group.id, ranks: [1, 2, 3].flatMap(rank => {
+      const row = view.groupStandings.find(standing => standing.groupId === group.id)?.rows.find(row => row.position === rank);
+      return row ? [row.registrationId] : [];
+    }) }));
+  }
+  async assignmentPreview(user: V1AuthUser, id: string, dto: MultiFinalAssignmentPreviewDto) {
+    await this.admins.getTournamentMutationAdmin(user.id, { tournamentId: id });
+    return this.prisma.$transaction(async tx => {
+      const view = await this.view(tx, id);
+      if (dto.expectedRevision !== view.revision) throw stale();
+      const final = view.finals.find(final => final.name === dto.finalName);
+      if (!final) return invalidMultiFinal('배정할 토너먼트를 찾을 수 없어요.');
+      if (!view.groupStandings.length || view.groupStandings.some(group => !group.complete) || final.unresolved.length) {
+        throw new ConflictException({ code: 'MULTI_FINAL_PRELIMINARY_INCOMPLETE', message: '예선 공식 결과와 순위 반영이 완료된 뒤 추천 배치를 만들 수 있어요.' });
+      }
+      const policy = dto.assignmentPolicy ?? 'rank_order';
+      if (policy === 'cross_group_top3' && !final.crossGroupTopThreeAvailable) return invalidMultiFinal('4개 조의 1~3위가 진출하는 토너먼트에서만 교차 배치할 수 있어요.');
+      const registrationIds = policy === 'cross_group_top3' ? crossGroupTopThree(this.seedGroups(view)) : final.suggestedRegistrationIds.length === namedFinalSize(final) ? final.suggestedRegistrationIds : final.registrationIds ?? [];
+      if (registrationIds.length !== namedFinalSize(final)) return invalidMultiFinal('진출 규칙과 대진 자리 수를 먼저 맞춰 주세요.');
+      return { revision: view.revision, finalName: final.name, assignmentPolicy: policy, registrationIds, sourceVersion: hash(view.groupStandings) };
+    }, { ...options, isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
+  }
+  async assign(user: V1AuthUser, id: string, dto: MultiFinalAssignmentDto) {
+    const admin = await this.admins.getTournamentMutationAdmin(user.id, { tournamentId: id });
+    return this.prisma.$transaction(async tx => {
+      const initial = await this.tournament(tx, id);
+      await lockCompetitionForBracketMutationInTx(tx, initial);
+      const tournament = await this.tournament(tx, id);
+      this.assertMutable(tournament.status);
+      const config = this.config(tournament.multiFinals);
+      if (!config || dto.expectedRevision !== tournament.multiFinalsRevision) throw stale();
+      const selected = config.finals.find(final => final.name === dto.finalName);
+      if (!selected) return invalidMultiFinal('배정할 토너먼트를 찾을 수 없어요. 다시 불러와 주세요.');
+      if (dto.registrationIds.length !== namedFinalSize(selected)) invalidMultiFinal('해당 토너먼트의 대진 자리 수에 맞게 진출팀을 선택해 주세요.');
+      const finals = config.finals.map(final => final.name === dto.finalName ? { ...final, registrationIds: dto.registrationIds, assignmentPolicy: dto.assignmentPolicy ?? 'rank_order' } : final);
+      validateNamedFinals(finals, new Map(config.groups.map(group => [group.id, group.capacity])));
+      this.assertTeams([{ ...selected, registrationIds: dto.registrationIds }], new Set((await this.confirmed(tx, id)).map(row => row.id)));
+      await tx.$queryRaw`SELECT g.id FROM v1_games g JOIN v1_tournament_match_details d ON d.team_match_id = g.team_match_id JOIN v1_team_matches m ON m.id = d.team_match_id JOIN v1_tournament_groups tg ON tg.id = d.group_id WHERE d.tournament_id = ${id} AND (tg.phase = 'group' OR tg.bracket_track = ${dto.finalName}) AND m.deleted_at IS NULL ORDER BY g.id FOR UPDATE OF g`;
+      const view = await this.view(tx, id);
+      if (dto.sourceVersion !== undefined && dto.sourceVersion !== hash(view.groupStandings)) throw stale();
+      if (dto.assignmentPolicy === 'cross_group_top3' && (!supportsCrossGroupTopThree(selected, config.groups.map(group => group.id)) || !validCrossGroupTopThree(this.seedGroups(view), dto.registrationIds))) {
+        return invalidMultiFinal('1위 부전승·2위 교차 고정·3위 동일 조 회피 규칙에 맞지 않는 배치예요. 추천 배치를 다시 만들어 주세요.');
+      }
+      if (!view.groupStandings.length || view.groupStandings.some(group => !group.complete)) {
+        throw new ConflictException({ code: 'MULTI_FINAL_PRELIMINARY_INCOMPLETE', message: '예선 경기가 모두 끝나고 공식 순위가 반영된 뒤 진출팀을 배정할 수 있어요.' });
+      }
+      // Other finals may already be live; only this track's start/record state blocks its assignment.
+      const fixtures = await this.assertUnstarted(tx, id, false, dto.finalName);
+      const slots = await tx.v1TournamentSlot.findMany({
+        where: { tournamentId: id, kind: 'GROUP_RANK', group: { bracketTrack: dto.finalName, phase: { not: 'group' } } },
+        select: { id: true, position: true }, orderBy: { position: 'asc' },
+      });
+      if (!fixtures.length || slots.length !== dto.registrationIds.length || slots.some((slot, index) => slot.position !== index + 1)) {
+        throw new ConflictException({ code: 'MULTI_FINAL_BRACKET_REQUIRED', message: '해당 토너먼트의 빈 대진을 먼저 생성해 주세요.' });
+      }
+      await assignSlotsBatchInTx(tx, { admin, adminContext: this.admins, games: this.games },
+        slots.map((slot, index) => ({ slotId: slot.id, registrationId: dto.registrationIds[index] })));
+      const next: Config = { ...config, finals };
+      await tx.v1Tournament.update({ where: { id }, data: { multiFinals: JSON.parse(JSON.stringify(next)), multiFinalsRevision: { increment: 1 } } });
+      await this.admins.logAdminAction(admin, { action: 'tournament.multi_finals.assign', targetType: 'tournament', targetId: id,
+        beforeJson: JSON.parse(JSON.stringify(selected)), afterJson: { finalName: dto.finalName, registrationIds: dto.registrationIds, assignmentPolicy: dto.assignmentPolicy ?? 'rank_order' } }, tx);
+      return this.view(tx, id);
+    }, options);
+  }
   private async previewInTx(tx: Tx, id: string) {
     const view = await this.view(tx, id);
     const finals: NamedFinalDto[] = view.finals.map(f => {
       // Preserve the entire pending roster: a partial suggestion must never shrink the bracket.
-      return { name: f.name, rules: f.rules, thirdPlace: f.thirdPlace,
-        registrationIds: f.manual ? f.registrationIds : f.unresolved.length || !view.groupStandings.every(group => group.complete) ? null : f.suggestedRegistrationIds };
+      return { name: f.name, rules: f.rules, thirdPlace: f.thirdPlace, assignmentPolicy: f.assignmentPolicy,
+        registrationIds: f.registrationIds ?? null };
     });
     validateNamedFinals(finals, new Map(view.groups.map(g => [g.id, g.capacity])));
     this.assertTeams(finals, new Set(view.registrations.map(r => r.id)));
@@ -267,7 +333,7 @@ export class MultiFinalsService {
       }));
       const config = this.config(tournament.multiFinals)!;
       // Freeze the approved roster. Result recalculation never reselects or refills these seeds.
-      const next = { ...config, finals: preview.finals.map(f => ({ name: f.name, rules: f.rules, thirdPlace: f.thirdPlace, registrationIds: f.registrationIds })) };
+      const next = { ...config, finals: preview.finals.map(f => ({ name: f.name, rules: f.rules, thirdPlace: f.thirdPlace, registrationIds: f.registrationIds, assignmentPolicy: f.assignmentPolicy })) };
       await tx.v1Tournament.update({ where: { id }, data: { multiFinals: JSON.parse(JSON.stringify(next)), multiFinalsRevision: { increment: 1 } } });
       const revision = tournament.multiFinalsRevision + 1;
       await this.admins.logAdminAction(admin, { action: 'tournament.multi_finals.generate', targetType: 'tournament', targetId: id, afterJson: { requestId: dto.requestId, previewHash: dto.previewHash, revision, counts: preview.counts, finals: JSON.parse(JSON.stringify(next.finals)) } }, tx);

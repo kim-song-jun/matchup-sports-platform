@@ -1,3 +1,4 @@
+import { createHash, webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { KAKAO_OAUTH_STATE_STORAGE_KEY } from '@/components/auth/auth.view-model';
 import {
@@ -16,6 +17,9 @@ vi.mock('./client-error-reporter', () => ({ reportClientError: reporter.reportCl
 const STATE = 'a1b2c3d4e5f60718293a4b5c6d7e8f90';
 const stored = () => window.sessionStorage.getItem(KAKAO_OAUTH_STATE_STORAGE_KEY);
 
+beforeEach(() => { vi.stubGlobal('crypto', webcrypto); });
+afterEach(() => { vi.unstubAllGlobals(); });
+
 describe('Kakao OAuth attempt storage', () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -23,16 +27,16 @@ describe('Kakao OAuth attempt storage', () => {
   });
 
   describe('parseKakaoOAuthAttempt', () => {
-    it('round-trips a link attempt with its return path', () => {
+    it('round-trips a link attempt with its return path', async () => {
       const attempt = { state: STATE, mode: 'link', returnTo: '/my/settings?tab=login#methods' } as const;
-      expect(parseKakaoOAuthAttempt(serializeKakaoOAuthAttempt(attempt))).toEqual(attempt);
+      expect(parseKakaoOAuthAttempt(await serializeKakaoOAuthAttempt(attempt))).toEqual({ ...attempt, state: `sha256:${createHash('sha256').update(STATE).digest('hex')}` });
     });
 
-    it('treats a bare state string from the previous format as a login attempt', () => {
+    it('treats a bare state string from the previous format as a login attempt', async () => {
       expect(parseKakaoOAuthAttempt(STATE)).toEqual({ state: STATE, mode: 'login', returnTo: null });
     });
 
-    it('keeps an all-digit legacy state a string instead of letting JSON turn it into a number', () => {
+    it('keeps an all-digit legacy state a string instead of letting JSON turn it into a number', async () => {
       const digits = '12345678901234567890123456789012';
       expect(parseKakaoOAuthAttempt(digits)).toEqual({ state: digits, mode: 'login', returnTo: null });
     });
@@ -55,51 +59,65 @@ describe('Kakao OAuth attempt storage', () => {
       ['a protocol-relative URL', '//evil.example/steal'],
       ['a path that normalizes to a protocol-relative URL', '/..//evil.example'],
       ['the login screen', '/login'],
-    ])('drops %s from the return path, in what is stored and in what is read back', (_label, returnTo) => {
-      expect(JSON.parse(serializeKakaoOAuthAttempt({ state: STATE, mode: 'link', returnTo })).returnTo).toBeNull();
+    ])('drops %s from the return path, in what is stored and in what is read back', async (_label, returnTo) => {
+      expect(JSON.parse(await serializeKakaoOAuthAttempt({ state: STATE, mode: 'link', returnTo })).returnTo).toBeNull();
       const tampered = JSON.stringify({ state: STATE, mode: 'link', returnTo });
       expect(parseKakaoOAuthAttempt(tampered)).toEqual({ state: STATE, mode: 'link', returnTo: null });
     });
   });
 
   describe('consumeKakaoOAuthAttempt', () => {
-    it('returns the attempt when the returned state matches, and clears it', () => {
-      storeKakaoOAuthAttempt({ state: STATE, mode: 'link', returnTo: '/my/settings' });
-      expect(consumeKakaoOAuthAttempt(STATE)).toEqual({ state: STATE, mode: 'link', returnTo: '/my/settings' });
+    it('returns the attempt when the returned state matches, and clears it', async () => {
+      await storeKakaoOAuthAttempt({ state: STATE, mode: 'link', returnTo: '/my/settings' });
+      expect(await consumeKakaoOAuthAttempt(STATE)).toEqual({ state: STATE, mode: 'link', returnTo: '/my/settings' });
       expect(stored()).toBeNull();
     });
 
-    it('cannot be replayed with the same state', () => {
-      storeKakaoOAuthAttempt({ state: STATE, mode: 'link', returnTo: null });
-      expect(consumeKakaoOAuthAttempt(STATE)).not.toBeNull();
-      expect(consumeKakaoOAuthAttempt(STATE)).toBeNull();
-    });
-
-    it('rejects a different state and still clears the stored attempt', () => {
-      storeKakaoOAuthAttempt({ state: STATE, mode: 'link', returnTo: null });
-      expect(consumeKakaoOAuthAttempt('attacker-state')).toBeNull();
+    it('allows only one consumer while the verifier hash is pending', async () => {
+      await storeKakaoOAuthAttempt({ state: STATE, mode: 'link', returnTo: null });
+      const results = await Promise.all([consumeKakaoOAuthAttempt(STATE), consumeKakaoOAuthAttempt(STATE)]);
+      expect(results.filter(Boolean)).toHaveLength(1);
       expect(stored()).toBeNull();
     });
 
-    it.each([null, ''])('rejects a missing returned state (%s)', (returned) => {
-      storeKakaoOAuthAttempt({ state: STATE, mode: 'login', returnTo: null });
-      expect(consumeKakaoOAuthAttempt(returned)).toBeNull();
+    it('fails closed and consumes the attempt when hashing is unavailable', async () => {
+      await storeKakaoOAuthAttempt({ state: STATE, mode: 'link', returnTo: null });
+      vi.spyOn(crypto.subtle, 'digest').mockRejectedValue(new Error('hash unavailable'));
+      expect(await consumeKakaoOAuthAttempt(STATE)).toBeNull();
+      expect(stored()).toBeNull();
     });
 
-    it('rejects when nothing was stored', () => {
-      expect(consumeKakaoOAuthAttempt(STATE)).toBeNull();
+    it('cannot be replayed with the same state', async () => {
+      await storeKakaoOAuthAttempt({ state: STATE, mode: 'link', returnTo: null });
+      expect(await consumeKakaoOAuthAttempt(STATE)).not.toBeNull();
+      expect(await consumeKakaoOAuthAttempt(STATE)).toBeNull();
     });
 
-    it('returns null instead of throwing when the browser blocks storage', () => {
+    it('rejects a different state and still clears the stored attempt', async () => {
+      await storeKakaoOAuthAttempt({ state: STATE, mode: 'link', returnTo: null });
+      expect(await consumeKakaoOAuthAttempt('attacker-state')).toBeNull();
+      expect(stored()).toBeNull();
+    });
+
+    it.each([null, ''])('rejects a missing returned state (%s)', async (returned) => {
+      await storeKakaoOAuthAttempt({ state: STATE, mode: 'login', returnTo: null });
+      expect(await consumeKakaoOAuthAttempt(returned)).toBeNull();
+    });
+
+    it('rejects when nothing was stored', async () => {
+      expect(await consumeKakaoOAuthAttempt(STATE)).toBeNull();
+    });
+
+    it('returns null instead of throwing when the browser blocks storage', async () => {
       vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
         throw new DOMException('blocked', 'SecurityError');
       });
-      expect(consumeKakaoOAuthAttempt(STATE)).toBeNull();
+      expect(await consumeKakaoOAuthAttempt(STATE)).toBeNull();
     });
 
-    it('still accepts a callback whose attempt was stored as a bare state string, as a login', () => {
+    it('still accepts a callback whose attempt was stored as a bare state string, as a login', async () => {
       window.sessionStorage.setItem(KAKAO_OAUTH_STATE_STORAGE_KEY, STATE);
-      expect(consumeKakaoOAuthAttempt(STATE)).toEqual({ state: STATE, mode: 'login', returnTo: null });
+      expect(await consumeKakaoOAuthAttempt(STATE)).toEqual({ state: STATE, mode: 'login', returnTo: null });
     });
   });
 });
@@ -110,6 +128,7 @@ describe('startKakaoLinkAuthorize', () => {
   let assigned: string | null;
 
   beforeEach(() => {
+  vi.stubGlobal('crypto', webcrypto);
     vi.clearAllMocks();
     assigned = null;
     Object.defineProperty(window, 'location', {
@@ -136,12 +155,15 @@ describe('startKakaoLinkAuthorize', () => {
 
     const attempt = JSON.parse(stored()!);
     expect(attempt).toMatchObject({ mode: 'link', returnTo: '/my/settings' });
-    expect(attempt.state).toMatch(/^[0-9a-f]{32}$/);
+    const rawState = authorize.mock.calls[0][0].state;
+    expect(rawState).toMatch(/^[0-9a-f]{32}$/);
+    expect(attempt.state).toBe(`sha256:${createHash('sha256').update(rawState).digest('hex')}`);
+    expect(stored()).not.toContain(rawState);
     expect(sdk.getInitializedKakaoJsSdk).toHaveBeenCalledWith('login-js-key');
     expect(authorize).toHaveBeenCalledTimes(1);
     expect(authorize.mock.calls[0][0]).toEqual({
       redirectUri: 'https://teameet.test/callback/kakao',
-      state: attempt.state,
+      state: rawState,
       throughTalk: true,
     });
     expect(assigned).toBeNull();
@@ -158,12 +180,14 @@ describe('startKakaoLinkAuthorize', () => {
 
     const attempt = JSON.parse(stored()!);
     const target = new URL(assigned!);
+    const rawState = target.searchParams.get('state')!;
+    expect(attempt.state).toBe(`sha256:${createHash('sha256').update(rawState).digest('hex')}`);
     expect(`${target.origin}${target.pathname}`).toBe('https://kauth.kakao.com/oauth/authorize');
     expect(Object.fromEntries(target.searchParams)).toEqual({
       client_id: 'rest-key',
       redirect_uri: 'https://teameet.test/callback/kakao',
       response_type: 'code',
-      state: attempt.state,
+      state: rawState,
     });
     expect(sdk.getInitializedKakaoJsSdk).not.toHaveBeenCalled();
   });
@@ -173,7 +197,7 @@ describe('startKakaoLinkAuthorize', () => {
     await expect(startKakaoLinkAuthorize({ returnTo: null })).resolves.toEqual({ status: 'redirecting' });
 
     expect(authorize).not.toHaveBeenCalled();
-    expect(new URL(assigned!).searchParams.get('state')).toBe(JSON.parse(stored()!).state);
+    expect(JSON.parse(stored()!).state).toBe(`sha256:${createHash('sha256').update(new URL(assigned!).searchParams.get('state')!).digest('hex')}`);
     expect(reporter.reportClientError).toHaveBeenCalledWith(expect.objectContaining({ level: 'warn' }));
   });
 

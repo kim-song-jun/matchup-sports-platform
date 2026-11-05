@@ -20,9 +20,14 @@ export interface KakaoOAuthAttempt {
   returnTo: string | null;
 }
 
-export function serializeKakaoOAuthAttempt(attempt: KakaoOAuthAttempt): string {
+async function fingerprintState(state: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(state));
+  return `sha256:${Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')}`;
+}
+
+export async function serializeKakaoOAuthAttempt(attempt: KakaoOAuthAttempt): Promise<string> {
   return JSON.stringify({
-    state: attempt.state,
+    state: await fingerprintState(attempt.state),
     mode: attempt.mode,
     returnTo: sanitizeRedirectPath(attempt.returnTo),
   });
@@ -51,15 +56,16 @@ export function parseKakaoOAuthAttempt(raw: string | null): KakaoOAuthAttempt | 
 }
 
 /** 저장소를 쓸 수 없으면(프라이빗 모드·quota) 던진다 — state 대조 없이 인가를 시작하면 안 된다. */
-export function storeKakaoOAuthAttempt(attempt: KakaoOAuthAttempt): void {
-  window.sessionStorage.setItem(KAKAO_OAUTH_STATE_STORAGE_KEY, serializeKakaoOAuthAttempt(attempt));
+export async function storeKakaoOAuthAttempt(attempt: KakaoOAuthAttempt): Promise<void> {
+  // Only a verifier crosses the redirect in storage, never the raw OAuth nonce.
+  window.sessionStorage.setItem(KAKAO_OAUTH_STATE_STORAGE_KEY, await serializeKakaoOAuthAttempt(attempt));
 }
 
 /**
  * 콜백에서 kauth 가 돌려준 state 를 저장해 둔 시도와 대조한다. 일치하면 그 시도를, 아니면 null.
  * 저장값은 일치 여부와 상관없이 한 번 읽으면 지운다(재사용 불가). 스토리지가 막힌 환경에서는 던지지 않고 null 이다.
  */
-export function consumeKakaoOAuthAttempt(returnedState: string | null): KakaoOAuthAttempt | null {
+export async function consumeKakaoOAuthAttempt(returnedState: string | null): Promise<KakaoOAuthAttempt | null> {
   if (typeof window === 'undefined') return null;
   let raw: string | null;
   try {
@@ -69,7 +75,14 @@ export function consumeKakaoOAuthAttempt(returnedState: string | null): KakaoOAu
     return null;
   }
   const attempt = parseKakaoOAuthAttempt(raw);
-  return attempt && returnedState && attempt.state === returnedState ? attempt : null;
+  if (!attempt || !returnedState) return null;
+  try {
+    // Accept an in-flight redirect started before deployment; new attempts are always hashed.
+    const verifier = attempt.state.startsWith('sha256:') ? await fingerprintState(returnedState) : returnedState;
+    return attempt.state === verifier ? { ...attempt, state: returnedState } : null;
+  } catch {
+    return null;
+  }
 }
 
 export type KakaoLinkStartResult =
@@ -127,7 +140,7 @@ export async function startKakaoLinkAuthorize(options: { returnTo: string | null
 
   const state = generateKakaoOAuthState();
   try {
-    storeKakaoOAuthAttempt({ state, mode: 'link', returnTo: options.returnTo });
+    await storeKakaoOAuthAttempt({ state, mode: 'link', returnTo: options.returnTo });
   } catch {
     return { status: 'unavailable', reason: 'storage-unavailable' };
   }

@@ -1,3 +1,4 @@
+import { webcrypto } from 'node:crypto';
 import { useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -15,6 +16,8 @@ import { KakaoLoginButton } from './kakao-login-button';
 import { KakaoCallbackClient } from './kakao-callback-client';
 import { KAKAO_OAUTH_STATE_STORAGE_KEY } from './auth.view-model';
 import { authSession, compliance, createRedirectFixture, makeAuth, PENDING, stepForRoute } from './required-step-redirect.fixtures';
+
+afterEach(() => { vi.unstubAllGlobals(); });
 
 const navigation = vi.hoisted(() => ({ pathname: '/', replace: vi.fn(), push: vi.fn(), refresh: vi.fn() }));
 const sdk = vi.hoisted(() => ({ authorize: vi.fn() }));
@@ -59,6 +62,8 @@ function openJourney(path: string) {
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterAll(() => server.close());
 beforeEach(() => {
+
+  vi.stubGlobal('crypto', webcrypto);
   cleanup();
   window.localStorage.clear();
   window.sessionStorage.clear();
@@ -159,7 +164,8 @@ describe('적대적 인증 continuation의 실제 consumer 계약', () => {
     await user.click(screen.getByRole('link', { name: '카카오로 로그인' }));
     await waitFor(() => expect(sdk.authorize).toHaveBeenCalledTimes(1));
     expect(getSavedRedirectPath()).toBe(nested);
-    const oauthState = parseKakaoOAuthAttempt(window.sessionStorage.getItem(KAKAO_OAUTH_STATE_STORAGE_KEY))?.state;
+    const oauthState = sdk.authorize.mock.calls[0]?.[0]?.state;
+    expect(parseKakaoOAuthAttempt(window.sessionStorage.getItem(KAKAO_OAUTH_STATE_STORAGE_KEY))?.state).toMatch(/^sha256:/);
     if (!oauthState) throw new Error('OAuth state가 실제 버튼에서 저장되지 않았어요.');
     act(() => navigation.replace(`/callback/kakao?code=fixture-code&state=${encodeURIComponent(oauthState)}`));
     await screen.findByRole('button', { name: '나중에 입력할게요' });

@@ -10,9 +10,9 @@ function observe(page) {
   const errors = [], activity = [];
   page.on('pageerror', e => errors.push({ type: 'pageerror', message: e.message }));
   page.on('console', msg => { if (msg.type() === 'error') errors.push({ type: 'console', message: msg.text() }); });
-  page.on('request', req => { if (req.url().startsWith(origin + '/api/v1/')) activity.push({ method: req.method(), path: new URL(req.url()).pathname.replace(/[a-f0-9]{8}-[a-f0-9-]{27}/gi, '[id]') }); });
+  page.on('request', req => { if (new URL(req.url()).origin === origin && new URL(req.url()).pathname.startsWith('/api/v1/')) activity.push({ method: req.method(), path: new URL(req.url()).pathname.replace(/[a-f0-9]{8}-[a-f0-9-]{27}/gi, '[id]') }); });
   page.on('response', r => {
-    if (r.status() >= 400 && r.url().startsWith(origin)) errors.push({ type: 'network', status: r.status(), path: new URL(r.url()).pathname.replace(/[a-f0-9]{8}-[a-f0-9-]{27}/gi, '[id]') });
+    if (r.status() >= 400 && new URL(r.url()).origin === origin) errors.push({ type: 'network', status: r.status(), path: new URL(r.url()).pathname.replace(/[a-f0-9]{8}-[a-f0-9-]{27}/gi, '[id]') });
   });
   return { errors, activity };
 }

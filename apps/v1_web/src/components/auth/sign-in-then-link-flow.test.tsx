@@ -1,3 +1,4 @@
+import { webcrypto } from 'node:crypto';
 import { useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -15,6 +16,8 @@ import { EmailLoginClient } from './email-login-client';
 import { KakaoCallbackClient } from './kakao-callback-client';
 import { PendingSocialSignupGate } from './pending-social-signup-gate';
 import { WithdrawalCancelClient } from './withdrawal-cancel-client';
+
+afterEach(() => { vi.unstubAllGlobals(); });
 
 const navigation = vi.hoisted(() => ({ pathname: '/', replace: vi.fn(), push: vi.fn(), refresh: vi.fn() }));
 vi.mock('next/navigation', () => ({
@@ -54,8 +57,8 @@ function Journey({ initialRoute }: { initialRoute: string }) {
   );
 }
 
-function openCallback(code: string) {
-  window.sessionStorage.setItem(KAKAO_OAUTH_STATE_STORAGE_KEY, serializeKakaoOAuthAttempt({ state: 'state-1', mode: 'login', returnTo: null }));
+async function openCallback(code: string) {
+  window.sessionStorage.setItem(KAKAO_OAUTH_STATE_STORAGE_KEY, await serializeKakaoOAuthAttempt({ state: 'state-1', mode: 'login', returnTo: null }));
   const path = `/callback/kakao?code=${code}&state=state-1`;
   window.history.replaceState({}, '', path);
   navigation.pathname = '/callback/kakao';
@@ -71,6 +74,8 @@ async function loginWithEmail(user: ReturnType<typeof userEvent.setup>) {
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterAll(() => server.close());
 beforeEach(() => {
+
+  vi.stubGlobal('crypto', webcrypto);
   window.localStorage.clear();
   window.sessionStorage.clear();
   requests.length = 0;
@@ -98,7 +103,7 @@ afterEach(() => { cleanup(); client.clear(); server.resetHandlers(); vi.unstubAl
 
 describe('카카오 로그인 충돌 → 원래 계정 로그인 → 자동 연결', () => {
   it('409 에서 토큰을 보관하고 안내 화면을 거쳐, 이메일 로그인 한 번으로 연결 결과 화면까지 간다', async () => {
-    openCallback(LINK_MSW.loginConflicts.unverifiedEmail);
+    await openCallback(LINK_MSW.loginConflicts.unverifiedEmail);
 
     // 1) 충돌 409 → 안내 화면 + 보관된 토큰
     expect(await screen.findByRole('heading', { level: 1, name: '이미 팀밋 계정이 있어요' })).toBeInTheDocument();
@@ -122,7 +127,7 @@ describe('카카오 로그인 충돌 → 원래 계정 로그인 → 자동 연�
   });
 
   it('연결 안 하기를 누르고 로그인하면 로그인만 되고 연결 요청은 나가지 않는다', async () => {
-    openCallback(LINK_MSW.loginConflicts.unverifiedEmail);
+    await openCallback(LINK_MSW.loginConflicts.unverifiedEmail);
     await screen.findByRole('heading', { level: 1, name: '이미 팀밋 계정이 있어요' });
     const user = userEvent.setup();
     act(() => navigation.push('/login/email'));
@@ -137,7 +142,7 @@ describe('카카오 로그인 충돌 → 원래 계정 로그인 → 자동 연�
   });
 
   it('로그인 방법 화면까지 갔더라도 같은 토큰으로 다시 연결하지 않는다', async () => {
-    openCallback(LINK_MSW.loginConflicts.contactConflict);
+    await openCallback(LINK_MSW.loginConflicts.contactConflict);
     await screen.findByRole('heading', { level: 1, name: '이미 팀밋 계정이 있어요' });
     const user = userEvent.setup();
     act(() => navigation.push('/login/email'));
@@ -158,7 +163,7 @@ describe('카카오 콜백의 탈퇴 철회 갈래', () => {
       status: 'error', statusCode: 403, code: 'ACCOUNT_WITHDRAWAL_PENDING', message: '탈퇴 신청 중인 계정이에요.',
       details: { withdrawalCancelToken: 'withdrawal-token-1', expiresInSeconds: 600 },
     }, { status: 403 })));
-    openCallback('any-code');
+    await openCallback('any-code');
     await screen.findByRole('heading', { level: 1, name: '탈퇴를 신청한 계정이에요' });
     expect(readWithdrawalCancel()).toMatchObject({ token: 'withdrawal-token-1' });
   });

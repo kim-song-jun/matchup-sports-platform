@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { createHash, randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -149,6 +149,13 @@ export class LeagueSeriesConversionService {
 
   async commit(user: V1AuthUser, leagueId: string, dto: CommitLeagueConversionDto) {
     const admin = await this.admins.getMutationAdmin(user.id);
+    const tierCount = dto.tierSizes.length;
+    if (!Number.isInteger(tierCount) || tierCount < 1 || tierCount > 3) {
+      throw new UnprocessableEntityException({
+        code: 'LEAGUE_CONVERSION_SIZES_INVALID',
+        message: '각 티어에 2팀 이상, 모든 참가팀을 한 번씩 배정해 주세요.',
+      });
+    }
     const startsOn = new Date(dto.startsOn),
       endsOn = new Date(dto.endsOn);
     if (
@@ -177,14 +184,14 @@ export class LeagueSeriesConversionService {
               title: dto.title.trim(),
               sportId: source.sportId,
               regionId: source.regionId!,
-              tierCount: dto.tierSizes.length,
+              tierCount,
               promotionRuleJson: DEFAULT_PROMOTION_RULE as object,
               state: 'active',
               createdByAdminUserId: admin.id,
             },
           });
           const leagues = [];
-          for (let tier = 1; tier <= dto.tierSizes.length; tier++) {
+          for (let tier = 1; tier <= tierCount; tier++) {
             const id = randomUUID();
             const title = `${dto.title.trim()} 1시즌 ${tier}부`;
             const data = leagueMirrorCreateData({

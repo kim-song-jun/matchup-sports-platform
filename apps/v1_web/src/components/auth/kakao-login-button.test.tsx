@@ -1,3 +1,4 @@
+import { webcrypto } from 'node:crypto';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -10,6 +11,8 @@ import { peekPendingSocialLink } from '@/lib/pending-social-link';
 import { v1Keys } from '@/lib/query-keys';
 import { V1_SESSION_HINT_KEY } from '@/lib/session-storage';
 import { readWithdrawalCancel } from '@/lib/withdrawal-cancel-storage';
+
+afterEach(() => { vi.unstubAllGlobals(); });
 
 const router = vi.hoisted(() => ({ replace: vi.fn(), refresh: vi.fn() }));
 const api = vi.hoisted(() => ({ v1Post: vi.fn() }));
@@ -42,6 +45,9 @@ function installShell() {
 }
 
 beforeEach(() => {
+
+
+  vi.stubGlobal('crypto', webcrypto);
   vi.clearAllMocks();
   queryClient = new QueryClient();
   assigned = null;
@@ -64,7 +70,7 @@ afterEach(() => {
 let queryClient: QueryClient;
 // 버튼이 저장하는 값은 state 만이 아니라 시도 전체(JSON)다. 콜백이 mode 로 로그인·연결을 가른다.
 const storedAttempt = () => parseKakaoOAuthAttempt(window.sessionStorage.getItem(KAKAO_OAUTH_STATE_STORAGE_KEY));
-const storedState = () => storedAttempt()?.state ?? null;
+const storedState = () => authorize.mock.calls[0]?.[0]?.state ?? (assigned ? new URL(assigned).searchParams.get('state') : null);
 const apiError = (statusCode: number, code: string, details?: Record<string, unknown>) =>
   new V1ApiError({ status: 'error', statusCode, code, message: '실패', details, timestamp: '2026-10-31T00:00:00.000Z' });
 const renderButton = () => render(
@@ -232,7 +238,7 @@ describe('KakaoLoginButton', () => {
       await waitFor(() => expect(authorize).toHaveBeenCalledTimes(1));
       const stored = storedState();
       expect(stored).toMatch(/^[0-9a-f]{32}$/);
-      expect(storedAttempt()).toEqual({ state: stored, mode: 'login', returnTo: null });
+      expect(storedAttempt()).toEqual({ state: expect.stringMatching(/^sha256:[0-9a-f]{64}$/), mode: 'login', returnTo: null });
       expect(authorize).toHaveBeenCalledWith({
         redirectUri: 'https://teameet.test/callback/kakao',
         scope: 'name,phone_number',
@@ -259,12 +265,12 @@ describe('KakaoLoginButton', () => {
       sdk.getInitializedKakaoJsSdk.mockReturnValue(new Promise((resolve) => { release = resolve; }));
       renderButton();
       await click();
-      const firstState = storedState();
+      const firstVerifier = storedAttempt()?.state;
       await click();
-      expect(storedState()).toBe(firstState);
+      expect(storedAttempt()?.state).toBe(firstVerifier);
       release({ Auth: { authorize } });
       await waitFor(() => expect(authorize).toHaveBeenCalledTimes(1));
-      expect(authorize).toHaveBeenCalledWith(expect.objectContaining({ state: firstState }));
+      expect(authorize).toHaveBeenCalledWith(expect.objectContaining({ state: expect.stringMatching(/^[0-9a-f]{32}$/) }));
     });
 
     it('falls back to the authorize URL with state and logs when the JS key is missing', async () => {

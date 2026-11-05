@@ -36,6 +36,13 @@ async function bodyOf(s: ReturnType<typeof setup>) {
   return { title: '정규 리그', startsOn: '2030-01-01T00:00:00Z', endsOn: '2030-03-01T00:00:00Z', tierSizes: [3, 3], fingerprint: preview.fingerprint, entries: preview.entries.map((e) => ({ teamId: e.teamId, tier: e.suggestedTier, reason: '' })) };
 }
 describe('독립 리그 최초 티어 배정', () => {
+  it.each([{ tierSizes: [] }, { tierSizes: [2, 2, 2, 2] }])('rejects invalid tier counts before opening a write transaction: %j', async ({ tierSizes }) => {
+    const s = setup();
+    const body = await bodyOf(s);
+    s.prisma.$transaction.mockClear();
+    await expect(s.service.commit(actor, 'source', { ...body, tierSizes })).rejects.toMatchObject({ response: { code: 'LEAGUE_CONVERSION_SIZES_INVALID' } });
+    expect(s.prisma.$transaction).not.toHaveBeenCalled();
+  });
   // 2026-11-03 사용자 선택: 끝난 독립 리그는 다음 시즌 잇기와 리그 체계 전환 중 하나만 한다.
   it('다음 시즌을 이은 리그는 전환을 막고, 원본 행 잠금이 첫 문장이다', async () => {
     const s = setup();

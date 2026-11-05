@@ -44,96 +44,98 @@ export function KakaoCallbackClient() {
 
     // 로그인 CSRF(세션 고정) 방지: 인가를 시작할 때 저장한 시도와 kauth 가 돌려준 state 를 대조한다.
     // 저장값은 한 번 읽으면 지워지고, 로그인과 연결을 가르는 mode 도 여기서만 알 수 있다.
-    const attempt = consumeKakaoOAuthAttempt(returnedState);
-    const returnTo = attempt?.returnTo ?? null;
+    void (async () => {
+      const attempt = await consumeKakaoOAuthAttempt(returnedState);
+      const returnTo = attempt?.returnTo ?? null;
 
-    if (providerError || !code) {
-      if (attempt?.mode === 'link') {
-        router.replace(buildLinkResultPath({ linkResult: 'failed', provider: 'kakao' }, returnTo));
-        return;
-      }
-      trackEvent('login_failed', { method: 'kakao', reason: providerError || 'missing_code' });
-      setError('카카오 로그인을 완료하지 못했어요.');
-      return;
-    }
-
-    if (!attempt) {
-      trackEvent('login_failed', { method: 'kakao', reason: 'invalid_state' });
-      setError('로그인 요청이 유효하지 않아요. 다시 시도해 주세요.');
-      return;
-    }
-
-    if (attempt.mode === 'link') {
-      setLinking(true);
-      const redirectUri = getKakaoRedirectUri();
-      if (!redirectUri) {
-        router.replace(buildLinkResultPath({ linkResult: 'failed', provider: 'kakao' }, returnTo));
-        return;
-      }
-      linkKakao({ code, redirectUri }, {
-        onSuccess: (result) => {
-          router.replace(buildLinkResultPath({ linkResult: linkResultFromSuccess(result), provider: result.provider }, returnTo));
-        },
-        onError: (linkError) => {
-          // 가입이 덜 끝난 계정은 연결 결과가 아니라 가입을 이어 갈 화면으로 보낸다.
-          const signupRoute = getSignupIncompleteRoute(linkError);
-          router.replace(signupRoute ?? buildLinkResultPath({ linkResult: linkResultFromError(linkError), provider: 'kakao' }, returnTo));
-        },
-      });
-      return;
-    }
-
-    v1Post<V1AuthSessionResponse>('/auth/kakao', {
-      code,
-      redirectUri: getKakaoRedirectUri(),
-    })
-      .then((result) => {
-        saveStoredV1Session(result.session);
-        clearV1IdentityCache(queryClient);
-        const nextRoute = result.next?.route ?? getSavedRedirectPath() ?? '/home';
-        // next.route가 사회 가입 미완료 상태로 안내하면 신규 가입 진행 중, 그 외에는 기존 계정 로그인.
-        // 가입 중에는 저장된 redirect 를 가입 마지막 화면이 쓰도록 남긴다.
-        if (isSocialOnboardingRoute(nextRoute)) {
-          trackEvent('sign_up_start', { method: 'kakao' });
-        } else {
-          clearSavedRedirectPath();
-          trackEvent('login', { method: 'kakao' });
+      if (providerError || !code) {
+        if (attempt?.mode === 'link') {
+          router.replace(buildLinkResultPath({ linkResult: 'failed', provider: 'kakao' }, returnTo));
+          return;
         }
-        router.replace(nextRoute);
+        trackEvent('login_failed', { method: 'kakao', reason: providerError || 'missing_code' });
+        setError('카카오 로그인을 완료하지 못했어요.');
+        return;
+      }
+
+      if (!attempt) {
+        trackEvent('login_failed', { method: 'kakao', reason: 'invalid_state' });
+        setError('로그인 요청이 유효하지 않아요. 다시 시도해 주세요.');
+        return;
+      }
+
+      if (attempt.mode === 'link') {
+        setLinking(true);
+        const redirectUri = getKakaoRedirectUri();
+        if (!redirectUri) {
+          router.replace(buildLinkResultPath({ linkResult: 'failed', provider: 'kakao' }, returnTo));
+          return;
+        }
+        linkKakao({ code, redirectUri }, {
+          onSuccess: (result) => {
+            router.replace(buildLinkResultPath({ linkResult: linkResultFromSuccess(result), provider: result.provider }, returnTo));
+          },
+          onError: (linkError) => {
+            // 가입이 덜 끝난 계정은 연결 결과가 아니라 가입을 이어 갈 화면으로 보낸다.
+            const signupRoute = getSignupIncompleteRoute(linkError);
+            router.replace(signupRoute ?? buildLinkResultPath({ linkResult: linkResultFromError(linkError), provider: 'kakao' }, returnTo));
+          },
+        });
+        return;
+      }
+
+      v1Post<V1AuthSessionResponse>('/auth/kakao', {
+        code,
+        redirectUri: getKakaoRedirectUri(),
       })
-      .catch((nextError) => {
-        const reason = nextError instanceof V1ApiError ? nextError.code : 'unknown';
-        trackEvent('login_failed', { method: 'kakao', reason });
+        .then((result) => {
+          saveStoredV1Session(result.session);
+          clearV1IdentityCache(queryClient);
+          const nextRoute = result.next?.route ?? getSavedRedirectPath() ?? '/home';
+          // next.route가 사회 가입 미완료 상태로 안내하면 신규 가입 진행 중, 그 외에는 기존 계정 로그인.
+          // 가입 중에는 저장된 redirect 를 가입 마지막 화면이 쓰도록 남긴다.
+          if (isSocialOnboardingRoute(nextRoute)) {
+            trackEvent('sign_up_start', { method: 'kakao' });
+          } else {
+            clearSavedRedirectPath();
+            trackEvent('login', { method: 'kakao' });
+          }
+          router.replace(nextRoute);
+        })
+        .catch((nextError) => {
+          const reason = nextError instanceof V1ApiError ? nextError.code : 'unknown';
+          trackEvent('login_failed', { method: 'kakao', reason });
 
-        const recovery = routeSocialLoginRecovery(nextError, getSavedRedirectPath());
-        if (recovery?.type === 'navigate') {
-          router.replace(recovery.path);
-          return;
-        }
-        if (recovery) {
-          setError(recovery.message);
-          return;
-        }
-
-        if (nextError instanceof V1ApiError) {
-          if (nextError.code === 'PERMISSION_DENIED') {
-            router.replace('/auth/blocked');
+          const recovery = routeSocialLoginRecovery(nextError, getSavedRedirectPath());
+          if (recovery?.type === 'navigate') {
+            router.replace(recovery.path);
+            return;
+          }
+          if (recovery) {
+            setError(recovery.message);
             return;
           }
 
-          if (nextError.code === 'OAUTH_NOT_CONFIGURED') {
-            setError('카카오 로그인 설정이 아직 완료되지 않았어요.');
-            return;
+          if (nextError instanceof V1ApiError) {
+            if (nextError.code === 'PERMISSION_DENIED') {
+              router.replace('/auth/blocked');
+              return;
+            }
+
+            if (nextError.code === 'OAUTH_NOT_CONFIGURED') {
+              setError('카카오 로그인 설정이 아직 완료되지 않았어요.');
+              return;
+            }
+
+            if (nextError.code === 'UNAUTHENTICATED') {
+              setError('카카오 인증 시간이 만료됐거나 인증 코드가 유효하지 않아요. 다시 로그인해 주세요.');
+              return;
+            }
           }
 
-          if (nextError.code === 'UNAUTHENTICATED') {
-            setError('카카오 인증 시간이 만료됐거나 인증 코드가 유효하지 않아요. 다시 로그인해 주세요.');
-            return;
-          }
-        }
-
-        setError(extractErrorMessage(nextError, '카카오 로그인에 실패했어요.'));
-      });
+          setError(extractErrorMessage(nextError, '카카오 로그인에 실패했어요.'));
+        });
+    })();
   }, [linkKakao, queryClient, router, searchParams]);
 
   if (error) {

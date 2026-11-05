@@ -68,6 +68,16 @@ describe('공통 명단 관리의 실제 탭·저장 흐름', () => {
     fireEvent.click(tab(entry === 'match' ? '참가 선수' : '경기 출전'));
     await waitFor(() => expect(tab(entry === 'match' ? '참가 선수' : '경기 출전')).toHaveAttribute('aria-selected', 'true'));
   });
+  it('MD-QA #201: 시작 전 경기 목록이 비어도 경기 자체가 없다고 안내하지 않는다', async () => {
+    server.use(http.get('*/api/v1/teams/:id/game-rosters', () => ok({ teamId, viewerRole: 'TEAM_OWNER', games: [], players: [] })));
+    open('registration');
+    fireEvent.click(await screen.findByRole('tab', { name: '경기 출전' }));
+    expect(await screen.findByText('출전을 수정할 수 있는 경기가 없어요')).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: '출전을 수정할 수 있는 경기 없음' })).toBeInTheDocument();
+    expect(screen.queryByText('등록된 경기가 없어요')).not.toBeInTheDocument();
+    expect(screen.getByText(/시작한 경기는 경기 상세에서/)).toBeInTheDocument();
+  });
+
   it('출전 제외를 저장하고 참가 탭으로 이동한 뒤 돌아와도 선택 경기와 제외가 남는다', async () => {
     open(); await screen.findByRole('checkbox', { name: '김민재 이번 경기 출전' });
     fireEvent.click(checkbox()); fireEvent.click(tab('참가 선수'));

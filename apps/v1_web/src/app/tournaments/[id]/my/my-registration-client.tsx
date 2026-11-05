@@ -969,7 +969,7 @@ function RegistrationDetailView({
                 {/* 이 카드는 확정·결제 전 신청에만 뜬다(확정 뒤엔 패스 카드가 명단을 맡는다). */}
                 {belowMinimum && !isRosterEditBlockedByStatus ? (
                   <p className="tm-text-caption" style={{ marginTop: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-                    최소 인원을 채워야 참가 확정이 가능해요.
+                    현재 선수 명단이 최소 {tournament.minPlayers}명보다 적어요. 참가 확정 여부와 별개로 경기 출전에 필요한 명단을 확인해 주세요.
                   </p>
                 ) : null}
               </Card>

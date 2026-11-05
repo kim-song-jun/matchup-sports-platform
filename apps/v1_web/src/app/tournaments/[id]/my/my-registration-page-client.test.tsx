@@ -189,6 +189,26 @@ describe('MyRegistrationPageClient — 셸 backHref override', () => {
     myRegistrationApiMocks.useV1Team.mockReturnValue({ data: undefined });
   });
 
+  it.each(['regular_league', 'regular_tournament'] as const)('MD-QA #198: %s의 빈 명단은 참가 확정의 차단 조건으로 안내하지 않는다', kind => {
+    searchParams = new URLSearchParams('reg=registration-1');
+    myRegistrationApiMocks.useV1Tournament.mockReturnValue({ data: makeTournament({ kind }), isLoading: false });
+    myRegistrationApiMocks.useV1MyRegistrations.mockReturnValue({ data: [makeRegistration({ status: 'submitted', confirmedAt: null })], isLoading: false, isError: false });
+    myRegistrationApiMocks.useV1TournamentPlayers.mockReturnValue({ data: { players: [], belowMinimum: true } });
+    render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+    expect(screen.queryByText('최소 인원을 채워야 참가 확정이 가능해요.')).not.toBeInTheDocument();
+    expect(screen.getByText(/참가 확정 여부와 별개로/)).toHaveTextContent('최소 5명');
+  });
+
+  it.each([
+    ['submitted', false], ['cancelled', true], ['cancel_requested', true],
+  ] as const)('MD-QA #198: %s·최소 미달 %s에서 불필요한 명단 안내를 숨긴다', (status, belowMinimum) => {
+    searchParams = new URLSearchParams('reg=registration-1');
+    myRegistrationApiMocks.useV1MyRegistrations.mockReturnValue({ data: [makeRegistration({ status, confirmedAt: null })], isLoading: false, isError: false });
+    myRegistrationApiMocks.useV1TournamentPlayers.mockReturnValue({ data: { players: [], belowMinimum } });
+    render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+    expect(screen.queryByText(/참가 확정 여부와 별개로/)).not.toBeInTheDocument();
+  });
+
   // 페이지를 먼저 완전히 커밋시켜 레이아웃 이펙트가 store에 게시하게 한 뒤 Probe를 별도로
   // 마운트한다 — Probe가 첫 렌더에서 바로 최신 값을 읽는다.
   it('참가비가 없는 대회의 목록 카드에는 결제 문구가 하나도 없다', () => {

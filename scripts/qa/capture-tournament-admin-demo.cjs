@@ -14,6 +14,11 @@ const report = { mode, origin, persona: 'anonymous sample operator', pid: null, 
 fs.mkdirSync(output, { recursive: true });
 
 async function runFlow(page) {
+  await page.getByRole('navigation', { name: '대회 관리 섹션' }).getByRole('link', { name: '대회 정보', exact: true }).click();
+  await page.getByRole('button', { name: '대회 정보 수정', exact: true }).click();
+  await page.getByRole('dialog').getByLabel(/^대회명/).fill('파트너컵 운영 체험');
+  await page.getByRole('dialog').getByRole('button', { name: '저장', exact: true }).click();
+  await page.getByRole('heading', { name: '파트너컵 운영 체험', exact: true }).waitFor();
   await page.getByRole('navigation', { name: '대회 관리 섹션' }).getByRole('link', { name: /^신청 관리/ }).click();
   for (const name of ['블루 FC', '오렌지 FS', '그린 FC', '화이트 FS']) {
     const team = page.getByText(name, { exact: true });
@@ -33,7 +38,7 @@ async function runFlow(page) {
   await dialog.getByText('총 3경기 · 참가 4팀 · 부전승 0팀', { exact: true }).waitFor();
   await dialog.getByRole('button', { name: '이 설정으로 대진 만들기', exact: true }).click();
   await dialog.waitFor({ state: 'detached' });
-  await page.reload();
+  await page.reload({ waitUntil: 'domcontentloaded' });
   await page.getByRole('navigation', { name: '대회 관리 섹션' }).getByRole('link', { name: '대진 관리 3' }).waitFor();
   await page.getByRole('button', { name: /1번 경기 열기$/ }).click();
   const panel = page.getByRole('complementary', { name: '칸 상세' });
@@ -84,6 +89,13 @@ async function runFlow(page) {
         report.screenshots.push(file);
         report.verdicts.push({ route, width, overflow, verdict: overflow ? 'FAIL' : 'PASS' });
       }
+    }
+    if (mode === 'after') {
+      await page.getByRole('button', { name: '체험 초기화', exact: true }).click();
+      await page.getByRole('dialog').getByRole('button', { name: '체험 초기화', exact: true }).click();
+      await page.getByRole('heading', { name: 'Teameet 파트너컵 · 샘플', exact: true }).waitFor();
+      await page.getByRole('navigation', { name: '대회 관리 섹션' }).getByRole('link', { name: '대진 관리 0', exact: true }).waitFor();
+      report.verdicts.push({ flow: 'healthy sample reset restores default title and empty bracket', verdict: 'PASS' });
     }
     assert(!report.apiRequests.some((r) => /sample-partner-cup|sample-registration|sample-fixture|sample-game/.test(r.path)), 'Sample reached a live API');
     assert(!report.errors.some((e) => e.type === 'pageerror'), 'Runtime page error');

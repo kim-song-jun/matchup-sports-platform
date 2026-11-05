@@ -77,10 +77,11 @@ Next prefetch·새 탭 열기까지 막고 비활성 사유를 표시한다. 정
 
 ## Progress Snapshot
 - Worktree: `_worktrees/tournament-demo-admin-parity`, branch `fix/tournament-demo-admin-parity-20261105`.
-- Actual UI tests 19 PASS, model tests 5 PASS, navigation scope tests 2 PASS. 기존 셸·빠른 대진·신청·결과 invalidation 회귀 41 PASS.
+- Actual UI tests 19 PASS, model tests 5 PASS, navigation scope tests 2 PASS. 기존 셸·빠른 대진·신청·결과 invalidation 회귀 41 PASS, 운영 보드 회귀 30 PASS(총97).
 - tsc PASS. Windows의 POSIX find 호환 문제로 패턴 게이트는 동일 source를 WSL에서 실행해 PASS.
 - Alpha before: `0b7720cb7`, 390/768/1440 3/3, page/console errors 0, 가로 overflow 0.
 - Alpha after: 미배포, 0/13개 화면·0/3폭. 완료로 표기하지 않는다.
 - Evidence: `docs/screenshots/tournament-admin-demo-20261105/`, runner `scripts/qa/capture-tournament-admin-demo.cjs`.
 - QA는 별도 headed Chrome을 사용했고 소유 PID/PPID 및 종료를 JSON report에 기록했다.
-- PR #2168: base dev, 첫 head `130390d86`. CI와 Copilot 리뷰 진행 중. 링크 prefetch 격리 보완을 다음 head에 포함한다.
+- PR #2168: base dev, runtime head `b9c945630`. CI 전체 Web 10,975개 중 운영 보드 테스트 1개가 새 loader 인자(4번째 인자) 계약 미동기화로 실패했다.
+  기존 목록 유지·추가 페이지 반영 검증을 유지하며 실제 기본 v1Get 인자를 확인하도록 수정했고 해당30개 PASS. CI 재검증과 Copilot 리뷰 대기.

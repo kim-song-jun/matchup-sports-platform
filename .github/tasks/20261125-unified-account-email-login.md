@@ -5,7 +5,7 @@ Status: In Progress
 **Created**: 2026-11-01
 **Related**: [20261124-auth-recovery-account-linking.md](./20261124-auth-recovery-account-linking.md) (소셜 연결 API·"원래 계정에 로그인하면 자동 연결"까지 끝낸 앞선 작업)
 
-## 2026-11-05 통합 검증 재개
+## 2026-11-05 최초 재개 기록
 
 사용자 목표: 모바일 UI/UX 수정부터 카카오·이메일·Apple을 같은 계정의 로그인 수단으로 연결하고 Alpha와 main 배포에서 실제 테스트·확인까지 완료한다. 기존 5B 계정 소유 증명과 B안 단계 화면 결정을 유지한다. 아래의 옛 화면 미구현 체크는 현재 소스와 차이가 있어 이번 검증에서 근거에 맞게 갱신한다.
 
@@ -25,8 +25,9 @@ Status: In Progress
 - PR #2165는 dev `982ca40bc3e9c824ce7e6dfe64c489a69d78b793`에 머지했고 matching CI 42017212392·Alpha 배포 42017212314가 통과했다. 실제 Alpha Web/API 헤더와 DB health를 확인했다. 가입을 미룬 상태는 브라우저 한정 auth/me fixture로 안내 → `/signup/social` → 로그인 방법 왕복을 확인하고 fixture를 제거했다. 실계정의 가입 완료·이메일 연결 완료 증거로 세지 않는다.
 - 실제 인증 증거: Alpha 카카오 인증 후 원래 계정 복원, 운영 카카오 인증 후 지정 목적지 복귀, 일회용 QA 계정의 이메일 로그인·이메일/휴대폰 계정 찾기·이메일 비밀번호 재설정 후 같은 QA 계정 재로그인. 휴대폰만으로 비밀번호 재설정은 409로 거절되며 기존 계정 세션이 유지됐다. 실제 메일/SMS 수신과 카카오+이메일이 연결된 한 실계정의 양쪽 재로그인은 미검증이다.
 - 이메일 연결 보호: 기존 QA 계정의 오래된 세션은 403 `RECENT_LOGIN_REQUIRED`, 재로그인 후 같은 계정으로 연결 화면 복귀, 이미 가진 이메일 수단은 409 `SOCIAL_LINK_PROVIDER_EXISTS` 안내를 확인했다. 인증번호 발송·신원 추가·공유 QA 비밀번호 변경은 하지 않았다.
-- 모바일 후속 PR #2166은 dev `0b7720cb7d068b05735039e3445ef4b374642ed7`에 머지됐다. PR exact-head `74a3f7e32a5261f7896c493be61cb79d130b845e` CI 42023072760은 통과했다. 새 dev CI 42030531109는 Web·Gates 통과, API 마이그레이션 재생 검사 진행 중이고 Alpha 42030531284는 해당 CI를 기다린다. 이 시점 실제 Alpha는 `982ca40b`이므로 다섯 모바일 수정의 배포본 검수는 미완료다.
-- 릴리스 준비: 미소비 patch Changeset 3개(다음 시즌 링크 #2161, 가입 보완 안내 #2165, 모바일 수정 #2166). 릴리스 계약 24/24 통과. main에만 있던 `de8082bd` 머지 이력은 로컬 준비 브랜치의 `3aaad5ae`로 흡수했고 파일 트리는 dev `0b7720cb`와 동일하다. 아직 버전 소비·dev 릴리스 PR·main 승격은 하지 않았다. source가 검증된 `origin/dev`와 같음을 확인한 뒤 `DEV_REF=origin/dev`를 지정해 정본 `--prepare-only`로 준비한다.
+- 모바일 후속 PR #2166은 dev `0b7720cb7d068b05735039e3445ef4b374642ed7`에 머지됐다. PR exact-head `74a3f7e32a5261f7896c493be61cb79d130b845e` CI 42023072760, 새 dev 전체 CI 42030531109, Alpha 배포 42030531284가 모두 통과했다. Web/API가 `0b7720cb`와 `1.13.1-alpha.20261105.g0b7720cb7d06`을 서빙하며 DB health 정상이다. 다섯 모바일 수정의 동일 50조건 화면 재검수는 새 검수 공간 확인 대기로 남는다.
+- 릴리스 준비 브랜치: `codex/unified-account-release-20261105`. main에만 있던 `de8082bd` 머지 이력은 로컬 `3aaad5ae`로 흡수했고 앱 코드 내용은 dev `0b7720cb`와 같다. matching CI·Alpha SHA/health 확인 뒤 `CONFIRMATION=PROMOTE DEV_REF=origin/dev bash scripts/release/promote-main.sh --prepare-only`가 통과했다. patch Changeset 3개(#2161 다음 시즌 링크, #2165 가입 보완, #2166 모바일 수정)를 소비해 API/Web 매니페스트를 함께 `1.13.0 → 1.13.1`로 올리고 두 CHANGELOG를 갱신했다. 현재 리졸버가 계산하는 실제 배포 버전은 `1.13.2`다. 릴리스 계약 24/24 통과. dev 릴리스 PR과 main 승격은 아직이며, 화면 재검수 미완료 조건을 유지한다.
+- 앱·웹 경계 소스 점검: Android는 하단 시스템 영역·키보드 상태를 root CSS 변수/속성으로 쓰고 페이지 로드 후 다시 발행한다. iOS도 두 하단 변수와 키보드 상태를 전달하며 키보드 프레임 변경 때 강제 발행한다. 현재 Web은 브라우저 safe area와 native bottom의 최댓값을 쓴다. 이번 후보의 Android/iOS 소스는 main과 같으며 설치본·스토어 버전·실기기 동작은 추정하지 않는다. 네이티브 빌드·시뮬레이터는 이번 후속 검수에서 실행하지 않았다.
 - 브라우저 재개 조건: 기존 ego TaskSpace 69가 더 이상 존재하지 않는다. 현재 남은 사용자 소유 공간 0은 건드리지 않았다. 새 검수 공간 생성은 사용자 확인 대기이며 재생성·다른 브라우저 우회는 하지 않았다. 앞선 캡처와 측정은 과거 실측 증거로 유지한다.
 - 사용자 보류는 유지: 실계정 이메일 인증번호·비밀번호 직접 입력, Android·iPhone 실기기, 실제 Apple 인증. 전체 목표를 완료로 표시하지 않는다. main 승격 PR 생성·머지는 저장소 정본에 따라 사용자가 수행한다.
 - 비공개 증거: `teameet-unified-auth-20261105`의 `progress-checkpoint.json`, `mobile-pr-ci-test-proof.json`, `alpha-deferred-state-fixture-results.json`, `alpha-email-link-relogin-and-duplicate.json`, `role-api-preconditions*.json`, `route-coverage-matrix.json`. 자격증명·코드·쿠키·개인 식별자는 커밋하지 않는다.

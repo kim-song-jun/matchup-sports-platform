@@ -27,7 +27,7 @@ const out = path.resolve('docs/screenshots/scoped-director-management');
           const errors = [];
           page.on('pageerror', e => errors.push({ type: 'pageerror', message: e.message }));
           page.on('response', r => {
-            if (r.status() >= 400 && r.url().startsWith(origin)) errors.push({ type: 'network', status: r.status(), path: new URL(r.url()).pathname.replace(/[a-f0-9]{8}-[a-f0-9-]{27}/gi, '[id]') });
+            if (r.status() >= 400 && new URL(r.url()).origin === origin) errors.push({ type: 'network', status: r.status(), path: new URL(r.url()).pathname.replace(/[a-f0-9]{8}-[a-f0-9-]{27}/gi, '[id]') });
           });
           sessions.set(name, { context, page, errors });
         }

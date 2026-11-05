@@ -138,7 +138,7 @@ export function KakaoLoginButton({
     }
   };
 
-  const handleClick = (event: MouseEvent<HTMLAnchorElement>) => {
+  const handleClick = async (event: MouseEvent<HTMLAnchorElement>) => {
     event.preventDefault();
     if (busyRef.current) return;
     setError(null);
@@ -147,11 +147,13 @@ export function KakaoLoginButton({
       void signInNative();
       return;
     }
+    busyRef.current = true;
     const state = generateKakaoOAuthState();
     try {
-      storeKakaoOAuthAttempt({ state, mode: 'login', returnTo: null });
+      await storeKakaoOAuthAttempt({ state, mode: 'login', returnTo: null });
       saveRedirectPath(new URLSearchParams(window.location.search).get('redirect'));
     } catch {
+      busyRef.current = false;
       // sessionStorage 사용 불가(프라이빗 모드/quota 초과) 시 CSRF 방지 state를 저장할 수 없어
       // 안전한 로그인이 불가능하다. 조용히 실패하지 않고 사용자에게 알린 뒤 중단한다(fail-closed).
       window.alert('브라우저 설정으로 로그인을 진행할 수 없어요. 시크릿/프라이빗 모드를 끄고 다시 시도해 주세요.');

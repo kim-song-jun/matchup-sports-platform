@@ -76,3 +76,18 @@ main-only 승격 머지 커밋을 release 준비 브랜치를 통해 dev에 흡�
 - Local validation PASS: frontend 3 files / 43 tests (random rejection, wizard, recorded event list); actual backend worker-recycling contract 1 test (10 unrelated cases intentionally excluded); frontend lint/typecheck PASS. No visual layout or API/DB contract changes. Touched source debt-marker grep clean.
 
 - Remediation PR #2099 (base=dev), pinned head 49e9c6932ef8d3e8e1dfbc28ce4f0a743201f394; CI 40890144186 pending. Main #2098 remains unmerged. Follow-up release/version candidate prepared independently on chore/release-codeql-1.12.2 via Changesets CLI 2.30.0: fixed API/Web 1.12.2 and one consumed Web patch; no extra runtime changes. Publish metadata PR only after #2099 merges and its ancestry is integrated.
+
+## 2026-11-05: Promotion PR #2153 / 1.13.0 preparation
+
+- User authorized fixing promotion blockers, delivering a dev PR and preparing main promotion. Main merge/production approval remain user-only.
+- Base: dev 3a4db97fe; main b50074f90. Draft main PR #2153 has 53 unconsumed Changesets, next fixed version 1.13.0, and 7 new CodeQL high findings.
+- Owned: Kakao OAuth state storage/callers and regression tests; league-series-conversion service/spec; two Alpha QA URL filters; this task; Changesets, app package versions and changelogs. No schema changes, security alert dismissal, feature PR #2152 merge, or production operations.
+- Acceptance: targeted OAuth and conversion tests; committed-tree validation; dev PR CI and CodeQL; release gate; latest Alpha commit/release; main PR #2153 checks ready.
+- Plan: [ ] security fixes and focused validation; [ ] consume Changesets / 1.13.0; [ ] dev PR and CI; [ ] dev merge / Alpha; [ ] refresh promotion PR.
+- Implementation: store SHA-256 OAuth verifiers (single-use and legacy in-flight redirects preserved), bound tier loop locally to 1..3, compare parsed URL origins exactly. No visible layout/API schema changes.
+- Environment: existing shared dependencies were Linux links; isolated worktree has its own frozen-lockfile Windows installation. Host: 28 logical CPUs, load 2%, available RAM ~6.5 GiB; tests use one worker. Docker status command stalled; no DB or integration workload is started.
+- Progress Snapshot: isolated branch fix/release-ready-2153 in _worktrees/release-ready-2153; fixes under focused validation. #2152 remains outside release scope.
+
+- Focused validation: OAuth 5 files / 88 tests passed (one stale raw-nonce assertion corrected, utility file rerun); API conversion 14 tests passed. Concurrent callback consumption and hash failure explicitly covered.
+
+- API lint/typecheck and surface checker PASS. Web typecheck PASS; pattern checker first failed because Windows cmd resolved POSIX commands incorrectly, then the unchanged checker PASS under Git Bash via a temporary Node child-process shell adapter. No gate rules were changed. QA script syntax checks and touched-source debt grep clean.

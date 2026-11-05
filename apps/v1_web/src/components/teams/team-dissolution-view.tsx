@@ -108,7 +108,7 @@ export function TeamDissolutionReadyView({
   const notify = preview.cleanup.notifyMemberCount;
   return (
     <>
-      <div className="tm-content-enter" style={pageStyle}>
+      <div className="tm-create-shell tm-content-enter" style={pageStyle}>
         <h2 className="tm-text-heading" style={{ overflowWrap: 'anywhere' }}>{preview.teamName} 팀을<br />해체할까요?</h2>
         <div className="tm-text-caption" style={{ marginTop: 8, lineHeight: 1.55 }}>
           해체하면 팀이 목록과 검색에서 사라지고 새 활동이 모두 멈춰요. 지난 경기 기록은 그대로 남아요.
@@ -220,7 +220,7 @@ export function TeamDissolutionBlockedView({
   ].filter(Boolean).join(' ');
   return (
     <>
-      <div className="tm-content-enter" style={pageStyle}>
+      <div className="tm-create-shell tm-content-enter" style={pageStyle}>
         <h2 className="tm-text-heading">지금은 해체할 수 없어요</h2>
         <div className="tm-text-caption" style={{ marginTop: 8, lineHeight: 1.55 }}>
           아래 {count}가지를 먼저 정리해 주세요. 정리하고 나면 바로 해체할 수 있어요.

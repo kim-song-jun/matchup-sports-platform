@@ -4,7 +4,7 @@ import { v1Get, v1Post, v1Put } from '@/lib/api-client';
 
 export type MultiFinalRule = { groupId: string; rank: number };
 export type MultiFinalPolicy = 'rank_order' | 'cross_group_top3';
-export type MultiFinalDefinition = { assignmentPolicy?: MultiFinalPolicy; name: string; thirdPlace: boolean; rules: MultiFinalRule[]; registrationIds?: string[] | null };
+export type MultiFinalDefinition = { capacity?: number; assignmentPolicy?: MultiFinalPolicy; name: string; thirdPlace: boolean; rules: MultiFinalRule[]; registrationIds?: string[] | null };
 export type MultiFinalGroup = { id: string; name: string; capacity: number; legs: 1 | 2; registrationIds?: string[] };
 export type MultiFinalGroupStanding = {
   groupId: string; name: string; complete: boolean;

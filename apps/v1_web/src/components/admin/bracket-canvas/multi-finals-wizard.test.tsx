@@ -112,10 +112,12 @@ describe('N개 토너먼트 단계형 설정과 실제 API payload', () => {
     fireEvent.click(screen.getByRole('button', { name: '다음' }));
     await screen.findByRole('textbox', { name: '토너먼트 1 이름' });
     expect(content.scrollTop).toBe(0);
+    expect(screen.getByRole('spinbutton', { name: '토너먼트 1 자리 수' })).toHaveValue(2);
+    expect(screen.queryByRole('combobox', { name: 'A조 1위 진출 토너먼트' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '대진 미리보기' }));
     await screen.findByText('상위 토너먼트 · 2자리 · 진출팀 미정');
     expect(screen.queryByRole('checkbox', { name: '가팀' })).not.toBeInTheDocument();
-    expect(setupInput).toEqual(expect.objectContaining({ finals: [expect.objectContaining({ registrationIds: null, rules: [{ groupId: '0', rank: 1 }, { groupId: '1', rank: 1 }] })] }));
+    expect(setupInput).toEqual(expect.objectContaining({ finals: [expect.objectContaining({ capacity: 2, registrationIds: null, rules: [] })] }));
     fireEvent.click(screen.getByRole('button', { name: '확인하고 결선 생성' }));
     await waitFor(() => expect(props.onApplied).toHaveBeenCalledOnce());
     expect(generateInput).toEqual(expect.objectContaining({ expectedRevision: 1, previewHash: 'pending' }));
@@ -132,6 +134,8 @@ describe('N개 토너먼트 단계형 설정과 실제 API payload', () => {
 it('토너먼트 배정 규칙은 예선 편성 단계 없이 독립 진입한다', async () => {
   server.use(http.get(base, () => success({ ...savedView(), generated: true, fixtureCount: 7 })));
   show('rules');
-  expect(await screen.findByRole('textbox', { name: '토너먼트 1 이름' })).toHaveValue('챔피언');
+  expect(await screen.findByText('챔피언 · 2자리 · 2개 순위 연결')).toBeInTheDocument();
+  expect(screen.getByRole('combobox', { name: 'A조 1위 진출 토너먼트' })).toHaveValue('0');
+  expect(screen.queryByRole('textbox', { name: '토너먼트 1 이름' })).not.toBeInTheDocument();
   expect(screen.queryByText('예선 조 편성')).not.toBeInTheDocument();
 });

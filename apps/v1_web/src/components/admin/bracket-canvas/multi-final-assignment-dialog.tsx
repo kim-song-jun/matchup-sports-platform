@@ -56,7 +56,8 @@ export function MultiFinalAssignmentDialog({ tournamentId, open, onClose, onAppl
   const slots = bracket.data?.slots.filter(slot => slot.kind === 'GROUP_RANK' && slot.groupId !== null && groupIds.has(slot.groupId)).sort((a, b) => a.position - b.position) ?? [];
   const fixtures = bracket.data?.fixtures.filter(fixture => fixture.groupId !== null && groupIds.has(fixture.groupId)).sort((a, b) => a.fixtureNumber - b.fixtureNumber) ?? [];
   const started = fixtures.some(fixture => fixture.status !== 'scheduled' || fixture.game === null || fixture.game.state !== 'SCHEDULED' || fixture.game.hasLiveRecords || fixture.game.hasOfficialResult);
-  const ready = complete && Boolean(view?.generated) && slots.length > 0 && fixtures.length > 0 && !started && !api.view.isError && !bracket.isError;
+  const rulesConfigured = slots.length > 0 && (final?.rules.length === slots.length || final?.registrationIds?.length === slots.length);
+  const ready = rulesConfigured && complete && Boolean(view?.generated) && slots.length > 0 && fixtures.length > 0 && !started && !api.view.isError && !bracket.isError;
   const teamName = (id: string) => registrations.find(row => row.id === id)?.team.name ?? '확정 명단에 없는 팀';
   const otherIds = new Set(view?.finals.filter(row => row.name !== name).flatMap(row => row.registrationIds ?? []) ?? []);
   async function chooseFinal(next: string) {
@@ -116,6 +117,7 @@ export function MultiFinalAssignmentDialog({ tournamentId, open, onClose, onAppl
           </select></label>
           {api.view.isError && <AlertBanner tone="warning" message="설정을 다시 불러오지 못했어요. 최신 설정 다시 불러오기를 눌러 주세요." />}
           {!view.generated && <AlertBanner tone="warning" message="예선·토너먼트 대진 생성에서 빈 결선 대진을 먼저 만들어 주세요." />}
+          {view.generated && slots.length > 0 && !rulesConfigured && <AlertBanner tone="warning" message="토너먼트 배정 규칙에서 자리 수에 맞게 순위별 목적지를 먼저 설정해 주세요." />}
           {!complete && <AlertBanner tone="warning" message="예선 경기가 모두 끝나고 공식 순위가 반영된 뒤 배정할 수 있어요." />}
           {bracket.isError ? <div role="alert"><p>대진을 불러오지 못했어요.</p><Button variant="neutral" onClick={() => void bracket.refetch()}>대진 다시 시도</Button></div> : bracket.isLoading ? <p role="status">대진을 불러오고 있어요.</p> : null}
           {started && <AlertBanner tone="warning" message="이 토너먼트는 시작했거나 기록·결과가 있어 진출팀을 다시 배정할 수 없어요." />}

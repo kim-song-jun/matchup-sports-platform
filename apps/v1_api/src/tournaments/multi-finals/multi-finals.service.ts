@@ -288,7 +288,7 @@ export class MultiFinalsService {
     const view = await this.view(tx, id);
     const finals: NamedFinalDto[] = view.finals.map(f => {
       // Preserve the entire pending roster: a partial suggestion must never shrink the bracket.
-      return { name: f.name, rules: f.rules, thirdPlace: f.thirdPlace, assignmentPolicy: f.assignmentPolicy,
+      return { name: f.name, capacity: f.capacity, rules: f.rules, thirdPlace: f.thirdPlace, assignmentPolicy: f.assignmentPolicy,
         registrationIds: f.registrationIds ?? null };
     });
     validateNamedFinals(finals, new Map(view.groups.map(g => [g.id, g.capacity])));
@@ -343,7 +343,7 @@ export class MultiFinalsService {
       }));
       const config = this.config(tournament.multiFinals)!;
       // Freeze the approved roster. Result recalculation never reselects or refills these seeds.
-      const next = { ...config, finals: preview.finals.map(f => ({ name: f.name, rules: f.rules, thirdPlace: f.thirdPlace, registrationIds: f.registrationIds, assignmentPolicy: f.assignmentPolicy })) };
+      const next = { ...config, finals: preview.finals.map(f => ({ name: f.name, rules: f.rules, thirdPlace: f.thirdPlace, capacity: f.capacity, registrationIds: f.registrationIds, assignmentPolicy: f.assignmentPolicy })) };
       await tx.v1Tournament.update({ where: { id }, data: { multiFinals: JSON.parse(JSON.stringify(next)), multiFinalsRevision: { increment: 1 } } });
       const revision = tournament.multiFinalsRevision + 1;
       await this.admins.logAdminAction(admin, { action: 'tournament.multi_finals.generate', targetType: 'tournament', targetId: id, afterJson: { requestId: dto.requestId, previewHash: dto.previewHash, revision, counts: preview.counts, finals: JSON.parse(JSON.stringify(next.finals)) } }, tx);

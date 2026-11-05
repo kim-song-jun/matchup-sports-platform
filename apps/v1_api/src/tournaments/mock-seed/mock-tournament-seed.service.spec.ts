@@ -597,6 +597,36 @@ describe('MockTournamentSeedService', () => {
     expect(prisma.$transaction).toHaveBeenCalledTimes(3);
   });
 
+  it('명단 동기화 409 가 5번 이어지면 멈추고 409 를 올린다', async () => {
+    jest.useFakeTimers();
+    try {
+      const { service, prisma, tx } = makeWorld(8);
+      prisma.v1GameSide.findMany.mockResolvedValue([{ id: 'side-1', gameId: 'game-1' }]);
+      prisma.$transaction
+        .mockImplementationOnce(async (cb: (t: unknown) => Promise<unknown>) => cb(tx))
+        .mockRejectedValue(new ConflictException({ code: 'COMMAND_CONCURRENCY_CONFLICT' }));
+
+      const created = expect(service.createTournament(user, { format: 'league_knockouts', teamCount: 8 }))
+        .rejects.toBeInstanceOf(ConflictException);
+      await jest.runAllTimersAsync();
+      await created;
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1 + 5);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('409 가 아닌 명단 동기화 오류는 다시 하지 않는다', async () => {
+    const { service, prisma, tx } = makeWorld(8);
+    prisma.v1GameSide.findMany.mockResolvedValue([{ id: 'side-1', gameId: 'game-1' }]);
+    prisma.$transaction
+      .mockImplementationOnce(async (cb: (t: unknown) => Promise<unknown>) => cb(tx))
+      .mockRejectedValue(new Error('boom'));
+
+    await expect(service.createTournament(user, { format: 'league_knockouts', teamCount: 8 })).rejects.toThrow('boom');
+    expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+  });
+
   it('정규리그+N개 토너먼트는 결선 결과를 채우지 않으므로 종료 상태로 만들지 않는다', async () => {
     const { service, prisma } = makeWorld(8);
 

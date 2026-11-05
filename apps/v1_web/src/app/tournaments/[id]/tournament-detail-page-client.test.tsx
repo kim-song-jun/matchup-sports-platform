@@ -190,6 +190,24 @@ describe('TournamentDetailPageClient GA events', () => {
     expect(image).toHaveClass('object-contain');
   });
 
+  it('MD-QA #197: 리그 상세가 신청·일정·문의·진행 안내에 리그 문구를 전달한다', async () => {
+    tournamentApiMocks.useV1Tournament.mockReturnValue({
+      data: makeTournament({ kind: 'regular_league', status: 'open', entryFee: 10000,
+        entryFeeConfigured: true, registrationDeadlineAt: '2099-01-01T00:00:00Z',
+        scheduledAt: '2099-02-01T00:00:00Z', scheduledEndAt: '2099-03-01T00:00:00Z',
+        rosterDeadlineAt: null }),
+      isLoading: false, isError: false, error: null, refetch: vi.fn(),
+    });
+    render(<TournamentDetailPageClient tournamentId="tournament-1" />);
+    expect(await screen.findByText('이 리그는 팀 단위로 신청해요')).toBeInTheDocument();
+    expect(screen.queryByText('2시간 내 입금 확인')).not.toBeInTheDocument();
+    expect(screen.getAllByText(/^리그 일정 및 경기 방식/).length).toBeGreaterThan(0);
+    expect(screen.getByRole('region', { name: '리그 문의' })).toHaveTextContent('리그 문의는 회원가입');
+    const flow = screen.getByRole('region', { name: '리그 진행 방식' });
+    expect(flow).toHaveTextContent('시즌 종료');
+    expect(flow).not.toHaveTextContent('상금');
+  });
+
   it('tracks tournament_view once the tournament detail loads', async () => {
     tournamentApiMocks.useV1Tournament.mockReturnValue({
       data: makeTournament(),
@@ -594,9 +612,9 @@ describe('TournamentDetailPageClient — 대회 종류별 진행 안내', () => 
     ['시상', '최종 순위에 따라 상금과 순위를 시상해요.'],
   ] as const;
   const seasonLeagueSteps = [
-    ['풀리그', '참가한 모든 팀이 서로 맞붙어요. 맞붙는 횟수는 시즌 주차 수에 따라 달라져요.'],
+    ['풀리그', '참가한 모든 팀이 서로 맞붙어요. 몇 번씩 맞붙는지는 대진표에서 확인할 수 있어요.'],
     ['순위 집계', '승점과 득실차로 최종 순위를 가려요.'],
-    ['시상', '최종 순위에 따라 상금과 순위를 시상해요.'],
+    ['시즌 종료', '확정된 경기 결과와 최종 순위를 확인해요. 시상이 있는 경우 리그 안내를 확인해 주세요.'],
   ] as const;
   const groupSteps = [
     ['조별 리그', '같은 조 팀끼리 돌아가며 맞붙어 조 안에서 순위를 가려요.'],
@@ -640,17 +658,15 @@ describe('TournamentDetailPageClient — 대회 종류별 진행 안내', () => 
     // When: 참가자가 읽는 상세 페이지를 렌더해요.
     render(<TournamentDetailPageClient tournamentId="tournament-1" />);
 
-    // Then: 형식 라벨과 기존 세 단계는 유지하고 시즌 주차 안내는 실제 정규 리그에만 보여요.
-    const flow = within(await screen.findByRole('region', { name: '대회 진행 방식' }));
+    // Then: 리그와 대회를 구분하고 존재하지 않는 주차·상금을 약속하지 않아요.
+    const flow = within(await screen.findByRole('region', { name: kind === 'regular_league' ? '리그 진행 방식' : '대회 진행 방식' }));
     expect(flow.getByText(formatLabel, { exact: true })).toBeInTheDocument();
     expect(flow.getAllByRole('listitem')).toHaveLength(3);
     steps.forEach(([title, body]) => {
       expect(flow.getByText(title, { exact: true })).toBeInTheDocument();
       expect(flow.getByText(body, { exact: true })).toBeInTheDocument();
     });
-    if (kind !== 'regular_league') {
-      expect(flow.queryByText(/시즌 주차 수/)).not.toBeInTheDocument();
-    }
+    expect(flow.queryByText(/시즌 주차 수/)).not.toBeInTheDocument();
   });
 });
 

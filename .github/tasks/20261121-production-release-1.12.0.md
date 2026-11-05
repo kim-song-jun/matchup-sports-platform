@@ -91,3 +91,10 @@ main-only 승격 머지 커밋을 release 준비 브랜치를 통해 dev에 흡�
 - Focused validation: OAuth 5 files / 88 tests passed (one stale raw-nonce assertion corrected, utility file rerun); API conversion 14 tests passed. Concurrent callback consumption and hash failure explicitly covered.
 
 - API lint/typecheck and surface checker PASS. Web typecheck PASS; pattern checker first failed because Windows cmd resolved POSIX commands incorrectly, then the unchanged checker PASS under Git Bash via a temporary Node child-process shell adapter. No gate rules were changed. QA script syntax checks and touched-source debt grep clean.
+
+### Follow-up CodeQL evidence (2026-11-05)
+- Scan 41973741588 completed; URL findings resolved, but 5 high findings remain. Official CodeQL models treat serializeKakaoOAuthAttempt as a heuristic sensitive source and only recognize protect/encode/encrypt call barriers; the existing SHA-256 verifier is non-secret and independently tested. Rename the actual hash+JSON operation to encodeKakaoStateVerifier (no raw state storage, no suppression).
+- Loop query requires proof of an actual array or structural early exit. Add Array.isArray service guard and a literal maximum of 3 iterations with a tierCount break, plus array-like payload regression.
+- Owned follow-up paths: conversion service/spec; verifier helper and its three test callers; Changeset; this task. Existing #2156 candidate is held until this follow-up merges and its release metadata is refreshed.
+
+- Follow-up local validation PASS: OAuth 3 files / 64 tests; conversion 15 tests including array-like object rejection; Web/API typechecks; diff check and touched-source debt grep clean. Source-based CodeQL review used official CleartextStorageCustomizations/SensitiveActions and LoopBoundInjection models; no alerts dismissed and no query configuration changed.

@@ -62,10 +62,11 @@ function OpenRegistrationAction({ leagueId, league, showToast }: {
   const feeUnconfigured = league.entryFeeConfiguredAt === null;
   const inheritedFee = feeUnconfigured && league.entryFee > 0;
   const busy = openRegistration.isPending || updateFee.isPending;
+  const savedDeadline = futureDeadlineLocal(league.registrationDeadlineAt);
 
   const openModal = () => {
     // 이미 정해 둔 미래 마감이 있으면 그대로 채운다. 없으면 비워 두고 '마감 없이 받기'를 직접 고르게 한다.
-    setDeadline(futureDeadlineLocal(league.registrationDeadlineAt));
+    setDeadline(savedDeadline);
     setNoDeadline(false);
     setError(null);
     setModalOpen(true);
@@ -139,6 +140,12 @@ function OpenRegistrationAction({ leagueId, league, showToast }: {
                 onChange={(event) => setDeadline(event.target.value)}
                 className="block min-h-[44px] w-full rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-[length:var(--font-size-body-sm)] text-[var(--text-strong)] disabled:opacity-50"
               />
+              {/* MD-QA #211: 정해 둔 마감이 있으면 아래 '마감 없이 받기' 때문에 마감이 사라지는 것처럼 보였다. */}
+              {savedDeadline !== '' && !noDeadline ? (
+                <p className="mt-1 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
+                  정해 둔 마감이 채워져 있어요. 그대로 두면 이 마감까지 받아요.
+                </p>
+              ) : null}
             </div>
             <label htmlFor={noDeadlineId} className="flex min-h-[44px] cursor-pointer items-center gap-2 text-[length:var(--font-size-label)] text-[var(--text-strong)]">
               <input

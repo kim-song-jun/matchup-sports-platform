@@ -53,6 +53,15 @@ describe.each(['mobile', 'sidebar'] as const)('다음 리그 CTA (%s)', (variant
     expect(screen.getByText(/지난 시즌 명단도 옮겨 와요/)).toBeInTheDocument();
   });
 
+  // MD-QA #208: 다음 시즌에 이미 확정된 팀에게 재참가 신청을 다시 걸지 않는다.
+  it('다음 시즌에 이미 확정된 팀이면 재참가 신청 대신 다음 시즌 상세로 보낸다', async () => {
+    get.mockResolvedValue({ ...league, nextRound: { ...league.nextRound, teamIds: ['team-a'] } });
+    render(<LeagueNextRegistrationInvite leagueId="current-league" variant={variant} returningTeamId="team-a" />);
+    expect(await screen.findByRole('link', { name: '다음 시즌 보기' })).toHaveAttribute('href', '/tournaments/next-league');
+    expect(screen.getByText('우리 팀은 다음 시즌에 참가 확정됐어요.')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '다음 시즌 재참가 신청' })).not.toBeInTheDocument();
+  });
+
   it('재참가 팀인데 다음 시즌이 아직 신청을 안 받으면 열리면 알려 준다고 말한다', async () => {
     get.mockResolvedValue({ ...league, nextRound: { ...league.nextRound, registrationOpen: false } });
     render(<LeagueNextRegistrationInvite leagueId="current-league" variant={variant} returningTeamId="team-a" />);

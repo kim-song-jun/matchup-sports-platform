@@ -97,9 +97,15 @@ function LeagueNextRegistrationInviteContent({ leagueId, variant, returningTeamI
   }
   const tiers = state.data.nextSeasonTiers ?? [];
   const nextRound = state.data.nextRound ?? null;
-  const { href, label, description } = nextRound === null && tiers.length > 0
-    ? convertedSeasonInviteAction(tiers, myTeamIds)
-    : nextLeagueInviteAction(nextRound, returningTeamId);
+  // 다음 시즌에 이미 확정된 내 팀이 있으면 재참가 신청 대신 그 시즌으로 보낸다(MD-QA #208).
+  const joinedNext = nextRound !== null
+    && (nextRound.teamIds ?? []).some((teamId) => teamId === returningTeamId || myTeamIds.includes(teamId));
+  const converted = nextRound === null && tiers.length > 0;
+  const { href, label, description } = joinedNext
+    ? { href: `/tournaments/${nextRound.leagueId}`, label: '다음 시즌 보기', description: '우리 팀은 다음 시즌에 참가 확정됐어요.' }
+    : converted
+      ? convertedSeasonInviteAction(tiers, myTeamIds)
+      : nextLeagueInviteAction(nextRound, returningTeamId);
   if (variant === 'sidebar') {
     return <div style={{ display: 'grid', gap: 'var(--spacing-2)' }}>
       <p className="tm-text-caption text-[var(--text-muted)]" style={{ margin: 0 }}>{description}</p>
@@ -114,7 +120,7 @@ function LeagueNextRegistrationInviteContent({ leagueId, variant, returningTeamI
       className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
       style={{ fontSize: 'var(--font-size-body-lg)' }}
     >
-      {(returningTeamId !== null && nextRound?.registrationOpen === true) || (nextRound === null && tiers.length > 0) ? label : '다음 리그에서 함께 뛰어요'}
+      {joinedNext || converted || (returningTeamId !== null && nextRound?.registrationOpen === true) ? label : '다음 리그에서 함께 뛰어요'}
     </Link>
     <p className="tm-text-caption" style={{ margin: 0, color: 'var(--text-muted)', textAlign: 'center' }}>
       {description}

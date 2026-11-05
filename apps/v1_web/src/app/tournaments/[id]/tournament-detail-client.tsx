@@ -739,7 +739,8 @@ export function TournamentDetailView({
      QueryClientProvider 없이 단독 렌더되는 기존 테스트가 있다(tournament-detail-cta.test.tsx). */
   const [participantAnnouncements, setParticipantAnnouncements] = useState<V1TournamentAnnouncement[]>([]);
   useEffect(() => {
-    if (!hasActiveRegistration) {
+    // 공지는 정규 대회에만 있다 — 리그로 부르면 404 가 콘솔에 찍힌다(MD-QA #209).
+    if (!hasActiveRegistration || isLeagueMirror) {
       setParticipantAnnouncements([]);
       return;
     }
@@ -758,7 +759,7 @@ export function TournamentDetailView({
     return () => {
       cancelled = true;
     };
-  }, [tournament.id, hasActiveRegistration]);
+  }, [tournament.id, hasActiveRegistration, isLeagueMirror]);
 
   const allAnnouncements = (() => {
     if (participantAnnouncements.length === 0) return tournament.announcements;

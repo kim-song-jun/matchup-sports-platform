@@ -499,6 +499,7 @@ export class LeagueMatchPublicService {
               teamCount: true,
               maxTeams: true,
               _count: { select: { registrations: { where: { status: { in: [...CAPACITY_HOLD_STATUSES] } } } } },
+              registrations: { where: { status: 'confirmed' }, select: { teamId: true } },
               registrationDeadlineAt: true,
               scheduledAt: true,
               scheduledEndAt: true,
@@ -580,6 +581,8 @@ export class LeagueMatchPublicService {
             endsOn: nextRound.scheduledEndAt,
             registrationOpen: nextRound.registrationOpen,
             registrationDeadlineAt: nextRound.registrationDeadlineAt?.toISOString() ?? null,
+            // 다음 시즌에 이미 확정된 팀 — 화면이 그 팀에게 재참가 신청 대신 '다음 시즌 보기'를 건다(MD-QA #208).
+            teamIds: nextRound.registrations.map((entry) => entry.teamId),
           },
       // 독립 리그가 이어 가는 지난 시즌. 공개되지 않은 리그면 null 이다.
       previousRound: previousRound === undefined ? null : { leagueId: previousRound.id, title: previousRound.title },
@@ -849,6 +852,7 @@ export class LeagueMatchPublicService {
         teamCount: true,
         maxTeams: true,
         _count: { select: { registrations: { where: { status: { in: [...CAPACITY_HOLD_STATUSES] } } } } },
+        registrations: { where: { status: 'confirmed' }, select: { teamId: true } },
         registrationDeadlineAt: true,
         scheduledAt: true,
         scheduledEndAt: true,

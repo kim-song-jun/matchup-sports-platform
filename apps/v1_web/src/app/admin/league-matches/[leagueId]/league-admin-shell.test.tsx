@@ -297,7 +297,19 @@ describe('LeagueAdminShell', () => {
       expect(within(dialog).getByRole('button', { name: '무료로 접수 시작' })).toBeInTheDocument();
     });
 
-    it('접수 중인 리그는 접수 마감하기로 닫는다', () => {
+    // MD-QA #211: 정해 둔 마감이 있으면 채워진 채 열리고, 그대로 연다는 안내가 붙는다.
+    it('정해 둔 마감이 있으면 그 마감을 채워 두고 그대로 연다', () => {
+      query.value = loaded({ state: 'draft', lifecycleStatus: 'draft', ...configuredFee, registrationDeadlineAt: '2099-01-01T14:00:00.000Z' });
+      renderShell();
+      fireEvent.click(screen.getByRole('button', { name: '접수 시작하기' }));
+      const dialog = screen.getByRole('dialog', { name: '접수를 시작할까요?' });
+      expect(within(dialog).getByLabelText('신청 마감 (한국 시간)')).toHaveValue('2099-01-01T23:00');
+      expect(within(dialog).getByText('정해 둔 마감이 채워져 있어요. 그대로 두면 이 마감까지 받아요.')).toBeInTheDocument();
+      fireEvent.click(within(dialog).getByRole('button', { name: '접수 시작' }));
+      expect(openMutate).toHaveBeenCalledWith({ registrationDeadlineAt: '2099-01-01T14:00:00.000Z' }, expect.anything());
+    });
+
+        it('접수 중인 리그는 접수 마감하기로 닫는다', () => {
       query.value = loaded({ state: 'draft', lifecycleStatus: 'open', ...configuredFee, registrationDeadlineAt: '2099-01-01T00:00:00.000Z', activeRegistrationCount: 3, confirmedRegistrationCount: 1 });
       renderShell();
       expect(screen.queryByRole('button', { name: '접수 시작하기' })).not.toBeInTheDocument();

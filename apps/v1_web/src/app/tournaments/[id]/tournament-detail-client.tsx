@@ -415,6 +415,11 @@ export function showsNextLeagueInvite(
   return blockReason !== null && !hasActiveRegistration;
 }
 
+/** 이 리그에 확정됐던 내 팀 전부(팀원 포함) — 체계로 전환한 리그에서 내 팀이 편성된 티어를 찾는다. */
+function confirmedTeamIdsOf(registrations: readonly V1TournamentRegistration[]): string[] {
+  return registrations.filter((registration) => registration.status === 'confirmed').map((registration) => registration.teamId);
+}
+
 /** 지난 시즌 확정 팀의 현재 팀장·매니저에게만 재참가 신청을 안내한다. */
 function useReturningTeamId(registrations: readonly V1TournamentRegistration[]): string | null {
   const hasConfirmedRegistration = registrations.some((registration) => registration.status === 'confirmed');
@@ -441,7 +446,7 @@ export function ApplyCTA({
     return (
       /* Mobile-only fixed CTA — hidden on desktop via .tm-hide-desktop */
       <div className="tm-fixed-cta tm-hide-desktop">
-        <LeagueNextRegistrationInvite leagueId={tournament.id} returningTeamId={returningTeamId} />
+        <LeagueNextRegistrationInvite leagueId={tournament.id} returningTeamId={returningTeamId} myTeamIds={confirmedTeamIdsOf(myRegistrations)} />
       </div>
     );
   }
@@ -1222,8 +1227,9 @@ export function TournamentDetailView({
 
   /* ── Desktop right-rail CTA card ── */
   // 리그도 대회와 같은 우측 레일에 진행 입구와 핵심 정보를 모은다.
-  const nextLeagueInvite = isLeagueMirror && registrationBlock !== null
-    ? <div className="mb-4"><LeagueNextRegistrationInvite leagueId={tournament.id} variant="sidebar" returningTeamId={returningTeamId} /></div>
+  // 종료된 리그도 다음 시즌 입구를 보인다 — 모바일 하단 CTA(showsNextLeagueInvite)와 같게(2026-11-04 알파 QA: 데스크톱에만 없었다).
+  const nextLeagueInvite = isLeagueMirror && (registrationBlock !== null || tournament.status === 'completed')
+    ? <div className="mb-4"><LeagueNextRegistrationInvite leagueId={tournament.id} variant="sidebar" returningTeamId={returningTeamId} myTeamIds={confirmedTeamIdsOf(myRegistrations)} /></div>
     : null;
   const leagueUsesProgressRail = isLeagueMirror && (tournament.status === 'in_progress' || tournament.status === 'closed');
   const railCTA = isOpen && !leagueUsesProgressRail ? (
@@ -1435,6 +1441,7 @@ export function TournamentDetailView({
         <span style={{ flex: 1, fontSize: 'var(--font-size-body-lg)', fontWeight: 800, color: '#fff', letterSpacing: '-0.01em' }}>최종 결과 · 시상 보기</span>
         <ChevronRight size={17} strokeWidth={2.5} style={{ color: 'rgba(255,255,255,0.55)', flexShrink: 0 }} aria-hidden="true" />
       </Link>
+      {nextLeagueInvite}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>일정</span>

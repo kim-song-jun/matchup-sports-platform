@@ -1,7 +1,7 @@
 'use client';
 
 import { useId, useState } from 'react';
-import { useV1AddPreviousSeasonTeams, useV1AdminLeagueTeams } from '@/hooks/use-v1-api';
+import { useV1AddPreviousSeasonTeams, useV1AdminLeagueTeams, useV1AdminTournamentRegistrations } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import type { V1LeagueSeasonLink } from '@/types/league-match';
 
@@ -28,10 +28,17 @@ export function LeaguePreviousSeasonTeams({
   const id = useId();
   const previousTeams = useV1AdminLeagueTeams(previousSeason.leagueId);
   const addTeams = useV1AddPreviousSeasonTeams(leagueId);
+  // 이미 신청이 진행 중인 팀(입금 대기 등)은 신청 관리에서 확정한다 — 여기서 넣으면 결제가 '대기'인 채 확정된다(서버도 막는다).
+  const registrations = useV1AdminTournamentRegistrations(leagueId);
+  const applyingTeamIds = new Set(
+    (registrations.data?.items ?? [])
+      .filter((registration) => !['draft', 'cancelled', 'confirmed'].includes(registration.status))
+      .map((registration) => registration.teamId),
+  );
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
   const candidates = (previousTeams.data?.teams ?? []).filter((team) => !currentTeamIds.has(team.teamId));
   // 이미 넣었거나 사라진 팀은 고른 목록에서도 뺀다 — 화면에 없는 팀을 보내지 않는다.
-  const pickedIds = candidates.filter((team) => picked.has(team.teamId)).map((team) => team.teamId);
+  const pickedIds = candidates.filter((team) => picked.has(team.teamId) && !applyingTeamIds.has(team.teamId)).map((team) => team.teamId);
 
   const toggle = (teamId: string) =>
     setPicked((current) => {
@@ -73,6 +80,7 @@ export function LeaguePreviousSeasonTeams({
           <ul className="mb-2 flex flex-col gap-1">
             {candidates.map((team) => {
               const inactive = team.status !== 'active';
+              const applying = applyingTeamIds.has(team.teamId);
               return (
                 <li key={team.teamId}>
                   <label className="flex min-h-[44px] cursor-pointer items-center gap-3 rounded-xl border border-[var(--border)] px-3 text-[length:var(--font-size-body-sm)] text-[var(--text-body)] has-[:checked]:border-[var(--blue500)] has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50">
@@ -80,12 +88,13 @@ export function LeaguePreviousSeasonTeams({
                       type="checkbox"
                       checked={picked.has(team.teamId)}
                       onChange={() => toggle(team.teamId)}
-                      disabled={inactive}
+                      disabled={inactive || applying}
                       aria-describedby={`${id}-hint`}
                       className="h-5 w-5 accent-[var(--blue500)]"
                     />
                     <span className="min-w-0 flex-1 truncate">{team.name}</span>
                     {inactive ? <span className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">활동하지 않는 팀</span> : null}
+                    {!inactive && applying ? <span className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">신청 진행 중 · 신청 관리에서 확정</span> : null}
                   </label>
                 </li>
               );

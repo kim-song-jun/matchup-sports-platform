@@ -74,3 +74,29 @@ it('우측 안내 제목은 데이터 조회와 hydration 전 서버 HTML에도 
   expect(html).toContain('다음 리그에서 함께 뛰어요');
   expect(html).toContain('다음 리그 확인 중');
 });
+
+// 2026-11-04 알파 QA: 리그 체계로 전환한 리그는 다음 시즌 링크가 비어 리그 목록으로만 갔다.
+describe('리그 체계로 전환한 리그의 다음 시즌 입구', () => {
+  const converted = {
+    ...league,
+    nextRound: null,
+    nextSeasonTiers: [
+      { leagueId: 'tier-1', title: '체계 1시즌 1부', tier: 1, teamIds: ['team-a'] },
+      { leagueId: 'tier-2', title: '체계 1시즌 2부', tier: 2, teamIds: ['team-b'] },
+    ],
+  };
+
+  it.each(['mobile', 'sidebar'] as const)('내 팀이 편성된 티어로 보낸다 (%s)', async (variant) => {
+    get.mockResolvedValue(converted);
+    render(<LeagueNextRegistrationInvite leagueId="current-league" variant={variant} myTeamIds={['team-b']} />);
+    expect(await screen.findByRole('link', { name: '다음 시즌 보기' })).toHaveAttribute('href', '/tournaments/tier-2');
+    expect(screen.getByText('우리 팀은 "체계 1시즌 2부"에 편성됐어요.')).toBeInTheDocument();
+  });
+
+  it('편성된 팀이 없으면 첫 티어로 보낸다', async () => {
+    get.mockResolvedValue(converted);
+    render(<LeagueNextRegistrationInvite leagueId="current-league" variant="sidebar" />);
+    expect(await screen.findByRole('link', { name: '다음 시즌 보기' })).toHaveAttribute('href', '/tournaments/tier-1');
+    expect(screen.getByText('리그 체계 첫 시즌이 시작돼요.')).toBeInTheDocument();
+  });
+});

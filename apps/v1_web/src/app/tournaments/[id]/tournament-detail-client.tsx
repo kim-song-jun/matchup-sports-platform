@@ -887,18 +887,22 @@ export function TournamentDetailView({
             {sportAccent.label}
           </span>
         </div>
-        {/* 독립 리그가 이어 가는 지난 시즌(2026-11-03) — 공개된 지난 리그만 서버가 싣는다. */}
-        {tournament.previousSeason ? (
-          <p className="tm-text-caption" style={{ margin: 'var(--spacing-1) 0 0', color: 'var(--text-muted)' }}>
-            {'지난 시즌 · '}
+        {/* 독립 리그가 이어 가는 지난·다음 시즌(2026-11-03, 다음 시즌은 2026-11-05) — 공개된 리그만 서버가 싣는다.
+            종료된 지난 시즌은 우승팀만 보여 다음 시즌으로 이어진 줄 몰랐다 — 같은 자리에 다음 시즌 링크를 둔다. */}
+        {[
+          { label: '지난 시즌', link: tournament.previousSeason },
+          { label: '다음 시즌', link: tournament.nextSeason },
+        ].map(({ label, link }) => link ? (
+          <p key={label} className="tm-text-caption" style={{ margin: 'var(--spacing-1) 0 0', color: 'var(--text-muted)' }}>
+            {`${label} · `}
             <Link
-              href={`/tournaments/${encodeURIComponent(tournament.previousSeason.leagueId)}`}
+              href={`/tournaments/${encodeURIComponent(link.leagueId)}`}
               className="font-medium text-[var(--blue700)] underline underline-offset-2"
             >
-              {tournament.previousSeason.title}
+              {link.title}
             </Link>
           </p>
-        ) : null}
+        ) : null)}
       </div>
     </div>
     </>

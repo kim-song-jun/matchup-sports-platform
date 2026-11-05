@@ -239,13 +239,23 @@ export class TournamentsReadService {
         ? await loadGroupStandingSummaries(this.prisma, tournamentId)
         : new Map<string, GroupStandingSummary>();
 
-    // 독립 리그가 이어 가는 지난 시즌(2026-11-03) — 공개 상세의 '지난 시즌' 링크. 공개 조건을 통과한 리그만 싣는다.
-    const previousSeason = row.kind === V1CompetitionKind.regular_league && row.previousLeagueId !== null
-      ? await findPublicTournamentOnSurface(this.prisma, ['regular_league'], {
-          where: { id: row.previousLeagueId, deletedAt: null },
-          select: { id: true, title: true },
-        })
-      : null;
+    // 독립 리그가 이어 가는 지난·다음 시즌(2026-11-03, 다음 시즌은 2026-11-05) — 공개 상세 제목 아래 링크.
+    // 공개 조건을 통과한 리그만 싣는다. 종료된 지난 시즌에서 이어진 다음 시즌으로 바로 넘어가게 한다.
+    const isLeague = row.kind === V1CompetitionKind.regular_league;
+    const [previousSeason, nextSeason] = await Promise.all([
+      isLeague && row.previousLeagueId !== null
+        ? findPublicTournamentOnSurface(this.prisma, ['regular_league'], {
+            where: { id: row.previousLeagueId, deletedAt: null },
+            select: { id: true, title: true },
+          })
+        : null,
+      isLeague
+        ? findPublicTournamentOnSurface(this.prisma, ['regular_league'], {
+            where: { previousLeagueId: row.id, deletedAt: null },
+            select: { id: true, title: true },
+          })
+        : null,
+    ]);
 
     return {
       ...presentTournamentDetail(
@@ -258,6 +268,7 @@ export class TournamentsReadService {
         groupStandingSummaries,
       ),
       previousSeason: previousSeason === null ? null : { leagueId: previousSeason.id, title: previousSeason.title },
+      nextSeason: nextSeason === null ? null : { leagueId: nextSeason.id, title: nextSeason.title },
     };
   }
 

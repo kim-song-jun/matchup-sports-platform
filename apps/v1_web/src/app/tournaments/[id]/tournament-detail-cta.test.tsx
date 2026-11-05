@@ -527,9 +527,17 @@ describe('정규 리그 — 다음 시즌 입구', () => {
     expect(screen.getAllByRole('link', { name: '가을 리그' })[0]).toHaveAttribute('href', '/tournaments/league-0');
   });
 
-  it('대조군: 지난 시즌이 없으면 링크도 없다', () => {
+  // 2026-11-05: 종료된 지난 시즌 화면에서 이어진 다음 시즌으로 바로 넘어간다.
+  it('다음 시즌이 있으면 제목 아래에 다음 시즌 리그로 가는 링크를 둔다', () => {
+    render(<TournamentDetailView tournament={league('completed', { nextSeason: { leagueId: 'league-2', title: '겨울 리그' } })} myRegistration={null} />);
+    expect(screen.getByText(/다음 시즌 ·/)).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: '겨울 리그' })[0]).toHaveAttribute('href', '/tournaments/league-2');
+  });
+
+  it('대조군: 지난·다음 시즌이 없으면 링크도 없다', () => {
     render(<TournamentDetailView tournament={league('open')} myRegistration={null} />);
     expect(screen.queryByText(/지난 시즌 ·/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/다음 시즌 ·/)).not.toBeInTheDocument();
   });
 });
 

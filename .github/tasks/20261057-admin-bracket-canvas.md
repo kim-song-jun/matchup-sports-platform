@@ -1180,3 +1180,7 @@ Status: In Progress
 - Flow completeness fix: 생성 단계의 필수 순위 매핑을 제거했다. 신규 `capacity`로 이름·자리 수·3/4위전만 정해 빈 결선을 만들고, 별도 rules 화면에서 목적지를 연결한다. 이전 JSON/클라이언트의 capacity 생략은 기존 명단/규칙 수를 사용한다. 규칙 편집 시 기존 크기를 고정해 연결 수 변경으로 경기/일정이 재생성되는 것을 방지한다. 규칙 미설정 결선은 배정 UI에서 명시적으로 안내한다.
 
 - Capacity follow-up validation: 규칙 없는12자리 생성/진출 규칙 연결/명단 확정의 실제 DB 통합 회귀를 추가했다(CI 대상). 로컬 API101·Web15, 양쪽 타입 검사 PASS. 생성 단계의 순위 선택 제거와 별도 규칙 단계 진입을 실제 렌더/API payload로 검증했다. 기존 PR head의 Web/Gates CI는 PASS, API migration replay는 진행 중이며 이 후속 커밋은 새 CI 대상이다.
+
+- Rule-only correction: 순위 목적지를 수정해도 기존 승인 명단을 null로 만들지 않는다. 같은 크기의 규칙 저장은 현재 실제 슬롯과 명단을 그대로 보존하고 새 추천 적용은 독립 assignment 확정으로만 수행한다. UI→실제 selection payload 회귀를 추가했다.
+
+- Final UI boundary validation: 규칙 화면은 단일 저장 액션으로 완료하고 결선 preview/generate를 호출하지 않는다. 기존 승인 명단/크기는 유지하며 변경되는 것은 목적지 규칙뿐이다. 신규 rule-only 회귀 포함 Web16/16 PASS. 최신 로컬 API101 PASS/양쪽 tsc PASS. 이후 CI·리뷰 결과를 최종 SHA 기준으로 확인한다.

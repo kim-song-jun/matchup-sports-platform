@@ -139,3 +139,24 @@ it('토너먼트 배정 규칙은 예선 편성 단계 없이 독립 진입한�
   expect(screen.queryByRole('textbox', { name: '토너먼트 1 이름' })).not.toBeInTheDocument();
   expect(screen.queryByText('예선 조 편성')).not.toBeInTheDocument();
 });
+
+it('순위 목적지 수정은 확정 명단을 비우지 않고 규칙만 저장한다', async () => {
+  const view = savedView(); view.generated = true; view.fixtureCount = 8;
+  view.finals[0].registrationIds = ['reg-0', 'reg-1']; view.finals[0].manual = true;
+  view.finals.push({ ...view.finals[0], name: '챌린지', rules: [{ groupId: 'g-1', rank: 3 }, { groupId: 'g-1', rank: 4 }], registrationIds: ['reg-2', 'reg-3'] });
+  let submitted: { finals: MultiFinalView['finals'] } | undefined;
+  server.use(http.get(base, () => success(view)), http.put(`${base}/selection`, async ({ request }) => {
+    submitted = await request.json() as typeof submitted; return success({ ...view, revision: 2 });
+  }), http.post(`${base}/preview`, () => success({ revision: 2, previewHash: 'rules-only', counts: { tournaments: 2, fixtures: 2, byes: 0 }, finals: view.finals })));
+  show('rules');
+  fireEvent.change(await screen.findByRole('combobox', { name: 'A조 1위 진출 토너먼트' }), { target: { value: '1' } });
+  fireEvent.change(screen.getByRole('combobox', { name: 'A조 3위 진출 토너먼트' }), { target: { value: '0' } });
+  fireEvent.click(screen.getByRole('button', { name: '배정 규칙 저장' }));
+  const confirmation = await screen.findByRole('dialog', { name: '진출 규칙 변경' });
+  fireEvent.click(within(confirmation).getByRole('button', { name: '규칙 저장' }));
+  await waitFor(() => expect(submitted).toBeDefined());
+  expect(screen.queryByText('결선 대진 미리보기')).not.toBeInTheDocument();
+  expect(submitted?.finals.map(final => final.registrationIds)).toEqual([['reg-0', 'reg-1'], ['reg-2', 'reg-3']]);
+  expect(submitted?.finals[0].rules).toEqual([{ groupId: 'g-1', rank: 2 }, { groupId: 'g-1', rank: 3 }]);
+  expect(submitted?.finals[0].capacity).toBe(2);
+});

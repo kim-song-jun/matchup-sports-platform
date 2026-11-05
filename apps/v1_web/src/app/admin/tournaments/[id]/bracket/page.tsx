@@ -67,7 +67,7 @@ function BracketPageBody() {
           <Button variant="neutral" onClick={() => { setMultiFinalsMode('rules'); setMultiFinalsOpen(true); }}>토너먼트 배정 규칙</Button>
           <Button variant="neutral" onClick={() => { setMultiFinalsMode('assign'); setMultiFinalsOpen(true); }}>토너먼트별 진출팀 배정</Button>
         </div>
-        <MultiFinalsWizard tournamentId={tournamentId} mode={multiFinalsMode} open={multiFinalsOpen} onClose={() => setMultiFinalsOpen(false)} onApplied={() => showToast(multiFinalsMode === 'assign' ? '진출팀을 대진에 배정했어요.' : '토너먼트 대진을 생성했어요.', 'success')} />
+        <MultiFinalsWizard tournamentId={tournamentId} mode={multiFinalsMode} open={multiFinalsOpen} onClose={() => setMultiFinalsOpen(false)} onApplied={() => showToast(multiFinalsMode === 'assign' ? '진출팀을 대진에 배정했어요.' : multiFinalsMode === 'rules' ? '토너먼트 배정 규칙을 저장했어요.' : '토너먼트 대진을 생성했어요.', 'success')} />
       </> : null}
       <SegmentedTabs
         ariaLabel="대진 보기 방식"

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { MockTournamentSeedService, mockGroupCapacities, mockNamedFinals, readLineupMinPlayers } from './mock-tournament-seed.service';
 import type { V1AuthUser } from '../../auth/v1-auth-user';
 import { competitionFieldDelegate } from '../../../test/helpers/competition-field-delegate';
@@ -582,6 +582,19 @@ describe('MockTournamentSeedService', () => {
       where: expect.objectContaining({ state: 'SUBMITTED', invalidatedAt: null }),
       distinct: ['sideId'],
     }));
+  });
+
+  it('정규리그+N개 토너먼트의 명단 동기화가 워커와 겹쳐 409 를 받으면 잠깐 뒤 다시 한다', async () => {
+    const { service, prisma, tx } = makeWorld(8);
+    prisma.v1GameSide.findMany.mockResolvedValue([{ id: 'side-1', gameId: 'game-1' }]);
+    prisma.$transaction
+      .mockImplementationOnce(async (cb: (t: unknown) => Promise<unknown>) => cb(tx))
+      .mockRejectedValueOnce(new ConflictException({ code: 'COMMAND_CONCURRENCY_CONFLICT' }))
+      .mockResolvedValueOnce(true);
+
+    await service.createTournament(user, { format: 'league_knockouts', teamCount: 8 });
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(3);
   });
 
   it('정규리그+N개 토너먼트는 결선 결과를 채우지 않으므로 종료 상태로 만들지 않는다', async () => {

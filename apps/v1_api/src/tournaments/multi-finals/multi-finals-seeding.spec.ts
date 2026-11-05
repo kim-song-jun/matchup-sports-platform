@@ -1,4 +1,4 @@
-import { crossGroupTopThree, validCrossGroupTopThree, supportsCrossGroupTopThree } from './multi-finals-seeding';
+import { crossGroupTopThree, validCrossGroupBracket, validCrossGroupTopThree, supportsCrossGroupTopThree } from './multi-finals-seeding';
 import { planNamedFinals } from './multi-finals-plan';
 const groups = ['A', 'B', 'C', 'D'].map(id => ({ id, ranks: [1, 2, 3].map(rank => `${id}${rank}`) }));
 const rules = groups.flatMap(group => [1, 2, 3].map(rank => ({ groupId: group.id, rank })));
@@ -12,6 +12,15 @@ describe('4개 조 12팀 교차 시드 배치', () => {
       expect(seeds).toHaveLength(12); expect(new Set(seeds).size).toBe(12);
       expect(validCrossGroupTopThree(groups, seeds)).toBe(true);
       const plan = planNamedFinals([{ name: '프리미어', rules, thirdPlace: true, registrationIds: seeds }]);
+      const graph = plan.fixtures.map(fixture => ({ id: fixture.key, phase: plan.groups.find(group => group.key === fixture.groupKey)!.phase,
+        homeSlotId: fixture.homeSlotKey, awaySlotId: fixture.awaySlotKey,
+        incoming: plan.edges.filter(edge => edge.targetFixtureKey === fixture.key).map(edge => ({ sourceId: edge.sourceFixtureKey, outcome: edge.outcome })) }));
+      const slots = plan.slots.map(slot => ({ id: slot.key, position: slot.position }));
+      expect(validCrossGroupBracket(groups, seeds, slots, graph)).toBe(true);
+      const changed = structuredClone(graph);
+      const quarters = changed.filter(fixture => fixture.phase === 'quarter');
+      [quarters[0].incoming, quarters[1].incoming] = [quarters[1].incoming, quarters[0].incoming];
+      expect(validCrossGroupBracket(groups, seeds, slots, changed)).toBe(false);
       expect(plan.byeSlots).toHaveLength(4);
       expect(plan.fixtures.filter(row => row.groupKey === 'final:0:16')).toHaveLength(4);
       const team = (key: string | null) => seeds[plan.slots.find(slot => slot.key === key)!.position - 1];
@@ -42,6 +51,7 @@ describe('4개 조 12팀 교차 시드 배치', () => {
     expect(supportsCrossGroupTopThree(final, groups.map(g => g.id))).toBe(true);
     expect(supportsCrossGroupTopThree({ ...final, rules: rules.map(rule => ({ ...rule, rank: rule.rank + 3 })) }, groups.map(g => g.id))).toBe(false);
     expect(supportsCrossGroupTopThree(final, ['A', 'B', 'C'])).toBe(false);
+    expect(supportsCrossGroupTopThree({ ...final, registrationIds: ['A1', 'B1'] }, groups.map(g => g.id))).toBe(false);
     expect(() => crossGroupTopThree(groups.slice(0, 3))).toThrow();
   });
 });

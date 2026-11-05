@@ -16,7 +16,7 @@ import { orderFixturesForTeardown } from '../templates/bracket-teardown-order';
 import { TOURNAMENT_VENUE_SELECT } from '../../places/tournament-venue';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from '../tournament-surface-lookup';
 import { MultiFinalAssignmentDto, MultiFinalAssignmentPreviewDto, MultiFinalGenerateDto, MultiFinalResetDto, MultiFinalSelectionDto, MultiFinalSetupDto, NamedFinalDto } from './multi-finals.dto';
-import { crossGroupTopThree, supportsCrossGroupTopThree, validCrossGroupTopThree } from './multi-finals-seeding';
+import { crossGroupTopThree, supportsCrossGroupTopThree, validCrossGroupBracket, validCrossGroupTopThree } from './multi-finals-seeding';
 import { invalidMultiFinal, namedFinalSize, planNamedFinals, planPreliminaryGroups, sameNamedFinalStructure, validateNamedFinals } from './multi-finals-plan';
 
 type Tx = Prisma.TransactionClient;
@@ -215,6 +215,14 @@ export class MultiFinalsService {
       return row ? [row.registrationId] : [];
     }) }));
   }
+  private async assertCrossGroupBracket(tx: Tx, id: string, name: string, view: Awaited<ReturnType<MultiFinalsService['view']>>, seeds: string[]) {
+    const slots = await tx.v1TournamentSlot.findMany({ where: { tournamentId: id, kind: 'GROUP_RANK', group: { bracketTrack: name } }, select: { id: true, position: true } });
+    const fixtures = await tx.v1TournamentMatchDetails.findMany({ where: { tournamentId: id, group: { bracketTrack: name }, teamMatch: { deletedAt: null } },
+      select: { teamMatchId: true, group: { select: { phase: true } }, teamMatch: { select: { homeSlotId: true, awaySlotId: true } }, advancementTargets: { select: { sourceTeamMatchId: true, sourceOutcome: true } } } });
+    const graph = fixtures.map(fixture => ({ id: fixture.teamMatchId, phase: fixture.group?.phase ?? '', ...fixture.teamMatch,
+      incoming: fixture.advancementTargets.map(edge => ({ sourceId: edge.sourceTeamMatchId, outcome: edge.sourceOutcome })) }));
+    if (!validCrossGroupBracket(this.seedGroups(view), seeds, slots, graph)) invalidMultiFinal('저장된 12강·8강 연결이 교차 배치 규칙과 달라요. 대진 연결을 확인하거나 기본 수동 배치를 사용해 주세요.');
+  }
   async assignmentPreview(user: V1AuthUser, id: string, dto: MultiFinalAssignmentPreviewDto) {
     await this.admins.getTournamentMutationAdmin(user.id, { tournamentId: id });
     return this.prisma.$transaction(async tx => {
@@ -229,6 +237,7 @@ export class MultiFinalsService {
       if (policy === 'cross_group_top3' && !final.crossGroupTopThreeAvailable) return invalidMultiFinal('4개 조의 1~3위가 진출하는 토너먼트에서만 교차 배치할 수 있어요.');
       const registrationIds = policy === 'cross_group_top3' ? crossGroupTopThree(this.seedGroups(view)) : final.suggestedRegistrationIds.length === namedFinalSize(final) ? final.suggestedRegistrationIds : final.registrationIds ?? [];
       if (registrationIds.length !== namedFinalSize(final)) return invalidMultiFinal('진출 규칙과 대진 자리 수를 먼저 맞춰 주세요.');
+      if (policy === 'cross_group_top3') await this.assertCrossGroupBracket(tx, id, final.name, view, registrationIds);
       return { revision: view.revision, finalName: final.name, assignmentPolicy: policy, registrationIds, sourceVersion: hash(view.groupStandings) };
     }, { ...options, isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
   }
@@ -265,6 +274,7 @@ export class MultiFinalsService {
       if (!fixtures.length || slots.length !== dto.registrationIds.length || slots.some((slot, index) => slot.position !== index + 1)) {
         throw new ConflictException({ code: 'MULTI_FINAL_BRACKET_REQUIRED', message: '해당 토너먼트의 빈 대진을 먼저 생성해 주세요.' });
       }
+      if (dto.assignmentPolicy === 'cross_group_top3') await this.assertCrossGroupBracket(tx, id, dto.finalName, view, dto.registrationIds);
       await assignSlotsBatchInTx(tx, { admin, adminContext: this.admins, games: this.games },
         slots.map((slot, index) => ({ slotId: slot.id, registrationId: dto.registrationIds[index] })));
       const next: Config = { ...config, finals };

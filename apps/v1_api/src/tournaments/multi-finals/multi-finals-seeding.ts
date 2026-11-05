@@ -1,10 +1,10 @@
 import { randomInt } from 'node:crypto';
-import { invalidMultiFinal } from './multi-finals-plan';
+import { invalidMultiFinal, namedFinalSize } from './multi-finals-plan';
 import type { NamedFinalDto } from './multi-finals.dto';
 
 export type SeedGroup = { id: string; ranks: string[] };
 export function supportsCrossGroupTopThree(final: NamedFinalDto, groupIds: string[]): boolean {
-  return groupIds.length === 4 && final.rules.length === 12 && groupIds.every(groupId =>
+  return groupIds.length === 4 && namedFinalSize(final) === 12 && final.rules.length === 12 && groupIds.every(groupId =>
     [1, 2, 3].every(rank => final.rules.filter(rule => rule.groupId === groupId && rule.rank === rank).length === 1));
 }
 function permutations<T>(items: T[]): T[][] {
@@ -35,4 +35,34 @@ export function validCrossGroupTopThree(groups: SeedGroup[], seeds: readonly str
     return seeds[winner] === group.ranks[0] && seeds[CROSS_GROUP_LANES[winner].second - 1] === groups[(winner + 1) % 4].ranks[1]
       && third >= 0 && third !== winner && third !== (winner + 1) % 4;
   });
+}
+
+/** Validate the saved graph too: operators can edit advancement links after generation. */
+export function validCrossGroupBracket(groups: SeedGroup[], seeds: readonly string[], slots: Array<{ id: string; position: number }>, fixtures: Array<{
+  id: string; phase: string; homeSlotId: string | null; awaySlotId: string | null;
+  incoming: Array<{ sourceId: string; outcome: string }>;
+}>): boolean {
+  const quarters = fixtures.filter(fixture => fixture.phase === 'quarter');
+  const round12 = fixtures.filter(fixture => fixture.phase === 'round16');
+  if (groups.length !== 4 || seeds.length !== 12 || quarters.length !== 4 || round12.length !== 4) return false;
+  const team = (slotId: string | null) => {
+    const slot = slots.find(slot => slot.id === slotId);
+    return slot ? seeds[slot.position - 1] : undefined;
+  };
+  const used = new Set<string>();
+  const seenTeams: string[] = [];
+  for (const quarter of quarters) {
+    const direct = [team(quarter.homeSlotId), team(quarter.awaySlotId)].filter((id): id is string => id !== undefined);
+    const winner = groups.findIndex(group => group.ranks[0] === direct[0]);
+    if (direct.length !== 1 || winner < 0 || quarter.incoming.length !== 1 || quarter.incoming[0].outcome !== 'WINNER') return false;
+    const source = round12.find(fixture => fixture.id === quarter.incoming[0].sourceId);
+    if (!source || used.has(source.id) || source.incoming.length !== 0) return false;
+    used.add(source.id);
+    const players = [team(source.homeSlotId), team(source.awaySlotId)];
+    if (!players.includes(groups[(winner + 1) % 4].ranks[1])) return false;
+    const third = groups.findIndex(group => players.includes(group.ranks[2]));
+    if (third < 0 || third === winner || third === (winner + 1) % 4) return false;
+    seenTeams.push(direct[0], ...players.filter((id): id is string => id !== undefined));
+  }
+  return used.size === 4 && seenTeams.length === 12 && new Set(seenTeams).size === 12;
 }

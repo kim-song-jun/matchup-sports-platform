@@ -1173,3 +1173,6 @@ Status: In Progress
 - Phase 1 completed: 최신 origin/dev `0b7720cb7d06`에서 `/tmp/teameet-multi-finals-20261106`, `fix/multi-finals-independent-assignment-20261106` 격리. 기존 원본 트리 수정 없음.
 - Phase 2 completed: 화면/DTO/hook/선택 정책/미리보기 sourceVersion/대상 결선 독립 확정 구현. 새로운 옵션은 적합한12팀 결선에서만 표시하며 수동 편집 시 기본 방식으로 전환한다.
 - Phase 3 in_progress: API99 + 추가기록보호1 회귀, Web15, 양쪽 tsc0, Web pattern PASS/API surface761 PASS, diff-check PASS. 실제 DB 통합 회귀는 추가했으나 daemon 없음으로 로컬 미실행. 변경 전 alpha3/3폭 PASS, 변경 후 alpha0/3폭·기능0/7. 커밋본 CI/리뷰와 alpha 검증 대기.
+
+- Review follow-up: 교차 배치 옵션은 실제12자리일 때만 제공한다. 생성 뒤 운영자가 편집한 실제12강→8강 연결도 검증해 같은 조 회피가 깨지는 그래프를 거절한다. 순위/시드 배열만 보고 성공 처리하지 않는다. 유효 순열 전수 및 실제plan의 승자 연결 변조 회귀로 확인했다.
+- Delivery cursor: dev 대상 draft PR2169, 최초 커밋 daf8ca3c5. 원격 credential helper의 오래된 경로는 해당 push에서만 gh helper로 override했으며 전역 설정 변경0. 커밋본 CI 진행 중.

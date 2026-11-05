@@ -1,7 +1,9 @@
 import { NotFoundException } from '@nestjs/common';
 import { Prisma, V1GameSideKey, V1GameSourceType } from '@prisma/client';
 import { canonicalGameCommandPayloadHash, GamesService } from '../games/games.service';
-import { createTeamMatchScheduleInTx } from '../team-schedules/team-schedules.service';
+import { createTeamMatchScheduleInTx, syncTeamMatchScheduleInTx } from '../team-schedules/team-schedules.service';
+import { leagueWeekCounter } from './league-week-number';
+import { lockLeagueRowForFixtureTitlesInTx } from './league-fixture-generation-guard';
 import { scheduleLeagueResultEntryReminder } from '../jobs/league-reminders/league-result-entry-reminder.service';
 import { parseLineupCatalog } from '../tournaments/competition-config/competition-config.parse';
 import { participantDisplayName } from '../tournaments/participant-display-name';
@@ -87,8 +89,9 @@ export interface LeagueFixtureTeam {
  * - 없으면 "N주차".
  *
  * ⚠️ `round`(주차 번호)는 **어디에도 저장되지 않는다** — `V1TeamMatch` 에 컬럼이 없고
- * 순위 계산(`league-standings.ts`)도 쓰지 않는다. 화면의 주차 라벨은 `startAt` 순서에서
- * 파생한다(`league-fixture-videos.service.ts`). 그래서 수동 대진은 주차를 받지 않고
+ * 순위 계산(`league-standings.ts`)도 쓰지 않는다. 화면의 주차 라벨은 `startAt` 에서 파생한다
+ * (`league-week-number.ts`, 달력 주). 여기서 지은 "N주차" 는 같은 트랜잭션 끝의
+ * `syncLeagueFixtureWeekTitles` 가 그 규칙으로 다시 맞춘다. 그래서 수동 대진은 주차를 받지 않고
  * 제목만 받는다(2026-09-02 사용자 확정, Task 164 Ambiguity 3).
  */
 export function leagueFixtureTitle(input: {
@@ -101,6 +104,38 @@ export function leagueFixtureTitle(input: {
     return `${input.leagueTitle} ${input.matchday}주차 ${input.orderInDay}경기`;
   }
   return `${input.leagueTitle} ${input.round}주차`;
+}
+
+/** 자동 제목의 맨 끝 주차 토큰 — "<리그명> N주차" 또는 "<리그명> N주차 M경기". 리그명 안의 숫자는 건드리지 않는다. */
+const TRAILING_WEEK_TOKEN = / \d+주차(?=( \d+경기)?$)/;
+
+/**
+ * 저장된 대진 제목의 "N주차" 를 지금 일정 기준 주차(`league-week-number.ts`)로 다시 맞춘다.
+ *
+ * 경기를 끼워 넣거나 옮기거나 지우면 뒤 주차가 밀리는데, 제목에는 생성 시점의 주차가 박제돼
+ * 있어 목록·카드·콘솔·팀 일정이 보드와 다른 주차를 말했다(알파 1103sj1: 11/15 경기를 끼우자
+ * 11/21 경기가 보드는 3주차, 목록은 2주차). 일정이 바뀌는 쓰기 경로가 같은 트랜잭션 끝에서 부른다.
+ * 끝에 주차 토큰이 없는 운영자 지정 제목은 그대로 둔다. 팀 일정 제목도 같은 값으로 맞춘다.
+ */
+export async function syncLeagueFixtureWeekTitles(tx: Prisma.TransactionClient, leagueId: string): Promise<void> {
+  // 취소된 대진도 센다 — 주차 규칙의 형제 집합(`deletedAt: null` 만)과 같아야 한다.
+  const rows = await tx.v1TeamMatch.findMany({
+    where: { leagueId, deletedAt: null },
+    select: { id: true, title: true, startAt: true, endAt: true },
+  });
+  const scheduled = rows.flatMap((row) => (row.startAt === null ? [] : [{ ...row, startAt: row.startAt }]));
+  const weekOf = leagueWeekCounter(scheduled.map((row) => row.startAt));
+  const changes = scheduled.flatMap((row) => {
+    const title = row.title.replace(TRAILING_WEEK_TOKEN, ` ${weekOf(row.startAt)}주차`);
+    return title === row.title ? [] : [{ ...row, title }];
+  });
+  if (changes.length === 0) return;
+  // 다른 경기 행을 고치기 전에 리그 행을 기다리지 않고 잡는다 — 교착 대신 재시도 가능한 409(이유는 그 함수 주석).
+  await lockLeagueRowForFixtureTitlesInTx(tx, leagueId);
+  for (const row of changes) {
+    await tx.v1TeamMatch.update({ where: { id: row.id }, data: { title: row.title } });
+    await syncTeamMatchScheduleInTx(tx, row.id, row.title, row.startAt, row.endAt);
+  }
 }
 
 export interface LeagueRosterEntry {

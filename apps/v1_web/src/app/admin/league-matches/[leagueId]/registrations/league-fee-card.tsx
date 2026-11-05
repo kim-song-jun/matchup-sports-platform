@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { ConfirmModal } from '@/components/v1-ui/confirm-modal';
 import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
 import { useV1UpdateLeagueEntryFee } from '@/hooks/use-v1-api';
@@ -84,12 +84,9 @@ function changeTitle({ feeChanged, bankChanged }: PendingChange) {
 export function LeagueFeeCard({
   league,
   leagueId,
-  focusRequest,
 }: {
   league: LeagueFeeSource;
   leagueId: string;
-  /** 값이 바뀔 때마다 참가비 입력으로 포커스를 옮긴다(열기 전 확인창의 "참가비 먼저 정할게요"). */
-  focusRequest: number;
 }) {
   const ids = useId();
   const feeId = `${ids}-fee`;
@@ -118,14 +115,6 @@ export function LeagueFeeCard({
   const [pending, setPending] = useState<PendingChange | null>(null);
   const [reason, setReason] = useState('');
   const [modalError, setModalError] = useState<string | null>(null);
-
-  const lastFocusRequest = useRef(focusRequest);
-  useEffect(() => {
-    if (focusRequest === lastFocusRequest.current) return;
-    lastFocusRequest.current = focusRequest;
-    feeRef.current?.focus();
-    feeRef.current?.scrollIntoView?.({ block: 'center' });
-  }, [focusRequest]);
 
   const configured = league.entryFeeConfiguredAt !== null;
   const inherited = !configured && league.entryFee > 0;

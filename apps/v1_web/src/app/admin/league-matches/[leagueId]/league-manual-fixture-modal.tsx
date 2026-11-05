@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
-import { EntityPicker, type EntityPickerItem } from '@/components/admin/entity-picker';
+import { useId, useMemo, useState } from 'react';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { extractErrorMessage } from '@/lib/error-message';
+import { formatTournamentDateTimeShort } from '@/lib/date-utils';
 import type { V1CreateManualLeagueFixturePayload } from '@/types/league-match';
-import { kstDatetimeLocalToIso } from '@/lib/kst-calendar';
+import { DATE_INPUT_MAX, kstDatetimeLocalToIso, kstMidnightMs } from '@/lib/kst-calendar';
+import { kstWeekKey } from '@/lib/league-fixture-week';
 import type { V1PlaceView } from '@/types/api';
 import {
   DEFAULT_LEAGUE_PLACE_CHOICE,
@@ -16,23 +17,49 @@ import {
 } from './league-fixture-place-field';
 import { PLACE_NAME_MAX_LENGTH } from '@/lib/place';
 
+/** 한 번에 만들 수 있는 경기 수 — 서버 묶음 추가 DTO 의 `@ArrayMaxSize(30)` 과 같다. */
+const MAX_ROWS = 30;
+/** 경기 시간을 비웠을 때 다음 줄 시작 시각을 띄우는 간격(분). 운영자가 줄마다 고칠 수 있다. */
+const FALLBACK_GAP_MINUTES = 60;
+
+type Row = { key: number; time: string; homeTeamId: string; awayTeamId: string };
+
+/** 리그의 다른 경기 — 고른 날짜가 속한 주의 기존 경기와 같은 주 두 경기 팀을 보여 주는 데만 쓴다. */
+export type LeagueManualFixtureContext = {
+  startAt: string;
+  homeTeamId: string | null;
+  awayTeamId: string | null;
+  cancelled: boolean;
+};
+
+/** `HH:mm` 에 분을 더한다. 자정을 넘기면 원래 시각 그대로 — 다음 날로 넘기는 것은 운영자가 정한다. */
+export function nextKickoffTime(time: string, minutes: number): string {
+  const match = /^(\d{2}):(\d{2})$/.exec(time);
+  if (match === null) return time;
+  const total = Number(match[1]) * 60 + Number(match[2]) + minutes;
+  if (total >= 24 * 60) return time;
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+}
 
 /**
- * 리그에 **한 경기만** 추가하는 모달(사용자 B안, 2026-09-04 — 전체화면 모달 + EntityPicker 재사용).
+ * 리그 경기 추가 창(2026-11-03 사용자 선택 A안 — 기존 '경기 하나 추가' 창을 키웠다).
  *
- * ## 왜 필요한가
- * 지금까지 리그 경기는 **라운드로빈 일괄 생성**으로만 만들 수 있었다. 그래서 우천 순연으로
- * 한 경기를 다시 잡거나, 대체 경기를 끼워 넣는 일이 화면에서 불가능했다 — BE 는
- * `POST …/fixtures/manual` 을 진작에 갖고 있었는데 **부르는 화면이 없었다**(FE 호출 0건).
+ * 날짜·경기 시간·장소는 한 번만 정하고 홈·원정·시작 시각을 줄마다 넣는다. 한 경기만 넣으면 예전의
+ * 한 경기 추가(우천 순연·대체 경기)와 같다. 저장은 서버 묶음 추가 한 번이라 하나라도 거부되면
+ * 아무 경기도 생기지 않는다 — 한 주차의 절반만 남지 않는다.
  *
  * ## 검증을 화면에서 먼저 한다
- * 서버도 막지만, 저장 순간에야 알면 운영자는 무엇이 틀렸는지 폼을 다시 훑어야 한다.
- * 여기서 막는 것: 두 팀 미선택 · **같은 팀끼리** · 시작 일시 없음/형식 오류.
- * 종료 시각은 받지 않는다 — **시작보다 이른 종료를 만들 수 있는 입력을 애초에 두지 않는다**
- * (서버 DTO 도 같은 이유로 `durationMinutes` 만 받는다).
+ * 서버도 막지만, 저장 순간에야 알면 운영자는 무엇이 틀렸는지 폼을 다시 훑어야 한다. 여기서 막는 것:
+ * 날짜 없음 · 팀 미선택 · 같은 팀끼리 · 시작 시각 없음. 같은 주에 두 경기인 팀은 막지 않고 알려만 준다
+ * (재대결·순연 경기는 정상 운영이다). 종료 시각은 받지 않는다 — 시작보다 이른 종료를 만들 수 있는 입력을
+ * 애초에 두지 않는다(서버 DTO 도 `durationMinutes` 만 받는다).
  */
 export function LeagueManualFixtureModal({
   teams,
+  fixtures = [],
+  initialDate,
+  initialTime = '10:00',
+  weekLabel = null,
   defaultPlace,
   recentVenues,
   defaultDuration = null,
@@ -41,7 +68,15 @@ export function LeagueManualFixtureModal({
   onClose,
 }: {
   /** 리그 참가팀. 홈·어웨이 후보는 여기서만 고른다 — 리그 밖 팀은 서버가 거부한다. */
-  teams: EntityPickerItem[];
+  teams: ReadonlyArray<{ id: string; label: string }>;
+  /** 리그의 기존 경기. 고른 날짜의 주에 이미 있는 경기를 보여 주고 같은 주 두 경기 팀을 알린다. */
+  fixtures?: ReadonlyArray<LeagueManualFixtureContext>;
+  /** 처음 채울 날짜(KST `YYYY-MM-DD`). 주차 칸에서 열면 그 주의 경기일이다. */
+  initialDate: string;
+  /** 첫 줄 시작 시각(KST `HH:mm`). */
+  initialTime?: string;
+  /** 주차 칸에서 열었으면 '2주차' — 창 제목에 붙인다. */
+  weekLabel?: string | null;
   /** 리그 기본 장소 — "기본 장소 사용" 이 가리키는 곳. */
   defaultPlace: V1PlaceView | null;
   recentVenues?: ReadonlyArray<V1PlaceView>;
@@ -50,47 +85,78 @@ export function LeagueManualFixtureModal({
   isSubmitting: boolean;
   /**
    * **계약 타입을 그대로 쓴다** — 인라인으로 다시 적으면 서버 DTO 가 바뀌었을 때
-   * 이 모달만 옛 모양으로 남아도 타입이 잡아 주지 않는다.
+   * 이 창만 옛 모양으로 남아도 타입이 잡아 주지 않는다.
    */
-  onSubmit: (payload: V1CreateManualLeagueFixturePayload) => Promise<unknown>;
+  onSubmit: (payloads: V1CreateManualLeagueFixturePayload[]) => Promise<unknown>;
   onClose: () => void;
 }) {
-  const [home, setHome] = useState<EntityPickerItem | null>(null);
-  const [away, setAway] = useState<EntityPickerItem | null>(null);
-  const [startsAtLocal, setStartsAtLocal] = useState('');
+  const id = useId();
+  const [date, setDate] = useState(initialDate);
   // null = 아직 안 건드림 — 리그 설정 값을 보여 준다. 설정이 늦게 와도 그대로 따라온다.
   const [durationInput, setDuration] = useState<string | null>(null);
   const duration = durationInput ?? (defaultDuration === null ? '' : String(defaultDuration.minutes));
+  const [rows, setRows] = useState<Row[]>([{ key: 0, time: initialTime, homeTeamId: '', awayTeamId: '' }]);
+  const [nextKey, setNextKey] = useState(1);
   const [placeChoice, setPlaceChoice] = useState<LeaguePlaceChoice>(DEFAULT_LEAGUE_PLACE_CHOICE);
   const [error, setError] = useState<string | null>(null);
   // ESC·focus trap·body 스크롤 잠금은 어드민 모달 공용 훅이 담당한다. **`pending` 을 넘기는
   // 것이 핵심** — 제출 중 ESC 로 닫히면 요청은 날아가는데 화면은 사라져, 운영자는 경기가
-  // 만들어졌는지 알 수 없고 입력도 잃는다.
-  // `initialFocusRef` 는 안 쓴다 — 훅이 패널 안 첫 focusable(홈 팀 입력)로 폴백한다.
-  // `onBackdropClick` 도 안 쓴다: 이 모달은 **전체화면**이라 backdrop 이 없고, 배경처럼
-  // 보이는 영역이 곧 패널이다. 붙이면 폼 여백을 클릭한 것이 닫기가 된다.
-  const { dialogRef } = useModalA11y({
-    open: true,
-    onClose,
-    pending: isSubmitting,
-  });
+  // 만들어졌는지 알 수 없고 입력도 잃는다. 이 창은 **전체화면**이라 backdrop 클릭 닫기를 쓰지 않는다.
+  const { dialogRef } = useModalA11y({ open: true, onClose, pending: isSubmitting });
+
+  const teamName = useMemo(() => new Map(teams.map((team) => [team.id, team.label])), [teams]);
+  const nameOf = (teamId: string | null) => (teamId === null ? '미정' : teamName.get(teamId) ?? '팀');
+
+  const weekKey = /^\d{4}-\d{2}-\d{2}$/.test(date) ? kstWeekKey(new Date(kstMidnightMs(date))) : null;
+  const weekFixtures = weekKey === null
+    ? []
+    : fixtures
+        .filter((fixture) => !fixture.cancelled && kstWeekKey(new Date(fixture.startAt)) === weekKey)
+        .sort((left, right) => left.startAt.localeCompare(right.startAt));
+  const gamesByTeam = new Map<string, number>();
+  for (const teamId of [
+    ...weekFixtures.flatMap((fixture) => [fixture.homeTeamId, fixture.awayTeamId]),
+    ...rows.flatMap((row) => [row.homeTeamId, row.awayTeamId]),
+  ]) {
+    if (teamId) gamesByTeam.set(teamId, (gamesByTeam.get(teamId) ?? 0) + 1);
+  }
+  const doubleBooked = [...gamesByTeam].filter(([, count]) => count > 1).map(([teamId]) => nameOf(teamId));
+
+  const updateRow = (key: number, patch: Partial<Row>) =>
+    setRows((current) => current.map((row) => (row.key === key ? { ...row, ...patch } : row)));
+
+  const addRow = () => {
+    const gap = /^\d{1,3}$/.test(duration.trim()) ? Number(duration) : FALLBACK_GAP_MINUTES;
+    const last = rows[rows.length - 1];
+    setRows((current) => [...current, { key: nextKey, time: nextKickoffTime(last.time, gap), homeTeamId: '', awayTeamId: '' }]);
+    setNextKey((key) => key + 1);
+  };
 
   const submit = async () => {
     if (isSubmitting) return;
     setError(null);
-    if (home === null || away === null) {
-      setError('홈 팀과 어웨이 팀을 모두 골라 주세요.');
+    if (weekKey === null) {
+      setError('날짜를 골라 주세요.');
       return;
     }
-    if (home.id === away.id) {
-      // 서버도 막지만, 두 칸에 같은 팀이 들어간 것은 **화면에서 보이는 실수**라 여기서 잡는다.
-      setError('같은 팀끼리는 경기를 만들 수 없어요.');
-      return;
-    }
-    const startsAt = kstDatetimeLocalToIso(startsAtLocal);
-    if (startsAt === null) {
-      setError('경기 시작 일시를 입력해 주세요.');
-      return;
+    const startsAts: string[] = [];
+    for (const [index, row] of rows.entries()) {
+      const nth = `${index + 1}번째 경기`;
+      if (!row.homeTeamId || !row.awayTeamId) {
+        setError(`${nth}의 홈 팀과 어웨이 팀을 모두 골라 주세요.`);
+        return;
+      }
+      if (row.homeTeamId === row.awayTeamId) {
+        // 서버도 막지만, 두 칸에 같은 팀이 들어간 것은 **화면에서 보이는 실수**라 여기서 잡는다.
+        setError(`${nth}는 같은 팀끼리예요. 다른 팀을 골라 주세요.`);
+        return;
+      }
+      const startsAt = kstDatetimeLocalToIso(`${date}T${row.time}`);
+      if (startsAt === null) {
+        setError(`${nth}의 시작 시각을 입력해 주세요.`);
+        return;
+      }
+      startsAts.push(startsAt);
     }
     const trimmedDuration = duration.trim();
     if (trimmedDuration !== '' && !/^\d{1,3}$/.test(trimmedDuration)) {
@@ -109,13 +175,15 @@ export function LeagueManualFixtureModal({
       return;
     }
     try {
-      await onSubmit({
-        homeTeamId: home.id,
-        awayTeamId: away.id,
-        startsAt,
-        ...(durationMinutes === undefined ? {} : { durationMinutes }),
-        ...leaguePlacePayload(placeChoice),
-      });
+      await onSubmit(
+        rows.map((row, index) => ({
+          homeTeamId: row.homeTeamId,
+          awayTeamId: row.awayTeamId,
+          startsAt: startsAts[index],
+          ...(durationMinutes === undefined ? {} : { durationMinutes }),
+          ...leaguePlacePayload(placeChoice),
+        })),
+      );
       onClose();
     } catch (err) {
       // 레포 표준 — axios 에러의 서버 메시지를 먼저 꺼낸다. `err.message` 만 보면
@@ -124,17 +192,19 @@ export function LeagueManualFixtureModal({
     }
   };
 
+  const selectClass = 'tm-input min-h-[44px] w-full';
+
   return (
     <div
       ref={dialogRef}
       role="dialog"
       aria-modal="true"
-      aria-labelledby="manual-fixture-heading"
+      aria-labelledby={`${id}-heading`}
       className="fixed inset-0 z-50 flex flex-col bg-[var(--surface)]"
     >
       <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
-        <h2 id="manual-fixture-heading" className="text-base font-semibold text-[var(--text-strong)]">
-          경기 하나 추가
+        <h2 id={`${id}-heading`} className="text-base font-semibold text-[var(--text-strong)]">
+          {weekLabel ? `${weekLabel} 경기 추가` : '경기 추가'}
         </h2>
         <button
           type="button"
@@ -151,90 +221,153 @@ export function LeagueManualFixtureModal({
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 py-4">
-        <p className="mb-4 text-xs text-[var(--text-muted)]">
-          두 팀을 골라 한 경기를 만들어요. 한 경기씩 운영하는 리그나 우천 순연·대체 경기에 써요.
-        </p>
-
-        <div className="mb-4">
-          <label htmlFor="manual-fixture-home" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">
-            홈 팀
-          </label>
-          <EntityPicker
-            id="manual-fixture-home"
-            value={home}
-            onChange={setHome}
-            items={teams.filter((team) => team.id !== away?.id)}
-            placeholder="참가팀에서 고르기"
-            emptyText="참가팀이 없어요"
-          />
-        </div>
-
-        <div className="mb-4">
-          <label htmlFor="manual-fixture-away" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">
-            어웨이 팀
-          </label>
-          <EntityPicker
-            id="manual-fixture-away"
-            value={away}
-            onChange={setAway}
-            items={teams.filter((team) => team.id !== home?.id)}
-            placeholder="참가팀에서 고르기"
-            emptyText="참가팀이 없어요"
-          />
-        </div>
-
-        <div className="mb-4">
-          <label htmlFor="manual-fixture-starts-at" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">
-            시작 일시
-          </label>
-          <input
-            id="manual-fixture-starts-at"
-            type="datetime-local"
-            value={startsAtLocal}
-            onChange={(event) => setStartsAtLocal(event.target.value)}
-            className="tm-input min-h-[44px] w-full"
-          />
-        </div>
-
-        <div className="mb-4">
-          <label htmlFor="manual-fixture-duration" className="mb-1 block text-sm font-medium text-[var(--text-strong)]">
-            경기 시간(분)
-          </label>
-          {/* 종료 시각을 직접 받지 않는다 — 시작보다 이른 종료를 만들 수 있는 입력을 두지 않는다. */}
-          <input
-            id="manual-fixture-duration"
-            type="text"
-            inputMode="numeric"
-            maxLength={3}
-            value={duration}
-            onChange={(event) => setDuration(event.target.value)}
-            placeholder="비우면 종료 시각 없이 만들어요"
-            aria-describedby={durationInput === null && defaultDuration !== null ? 'manual-fixture-duration-hint' : undefined}
-            className="tm-input min-h-[44px] w-full"
-          />
-          {durationInput === null && defaultDuration !== null ? (
-            <p id="manual-fixture-duration-hint" className="mt-1 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
-              이 리그의 피리어드 설정({defaultDuration.label})에서 가져왔어요. 일정의 종료 시각에만 쓰여요.
-            </p>
-          ) : null}
-        </div>
-
-        <div className="mb-4 grid">
-          <LeagueFixturePlaceField
-            maxLength={PLACE_NAME_MAX_LENGTH.leagueManualFixture}
-            defaultPlace={defaultPlace}
-            recentVenues={recentVenues}
-            choice={placeChoice}
-            onChange={setPlaceChoice}
-            disabled={isSubmitting}
-          />
-        </div>
-
-        {error !== null && (
-          <p role="alert" className="text-xs text-[var(--red700)]">
-            {error}
+        <div className="mx-auto flex max-w-2xl flex-col gap-4">
+          <p className="text-xs text-[var(--text-muted)]">
+            날짜·경기 시간·장소는 한 번만 정하고 경기를 줄마다 넣어요. 저장하면 모두 한 번에 만들고, 하나라도 문제가 있으면 아무것도 만들지 않아요.
           </p>
-        )}
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label htmlFor={`${id}-date`} className="mb-1 block text-sm font-medium text-[var(--text-strong)]">
+                날짜
+              </label>
+              <input
+                id={`${id}-date`}
+                type="date"
+                max={DATE_INPUT_MAX}
+                value={date}
+                onChange={(event) => setDate(event.target.value)}
+                className="tm-input min-h-[44px] w-full"
+              />
+            </div>
+            <div>
+              <label htmlFor={`${id}-duration`} className="mb-1 block text-sm font-medium text-[var(--text-strong)]">
+                경기 시간(분)
+              </label>
+              {/* 종료 시각을 직접 받지 않는다 — 시작보다 이른 종료를 만들 수 있는 입력을 두지 않는다. */}
+              <input
+                id={`${id}-duration`}
+                type="text"
+                inputMode="numeric"
+                maxLength={3}
+                value={duration}
+                onChange={(event) => setDuration(event.target.value)}
+                placeholder="비우면 종료 시각 없이 만들어요"
+                aria-describedby={durationInput === null && defaultDuration !== null ? `${id}-duration-hint` : undefined}
+                className="tm-input min-h-[44px] w-full"
+              />
+              {durationInput === null && defaultDuration !== null ? (
+                <p id={`${id}-duration-hint`} className="mt-1 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
+                  이 리그의 피리어드 설정({defaultDuration.label})에서 가져왔어요. 일정의 종료 시각에만 쓰여요.
+                </p>
+              ) : null}
+            </div>
+          </div>
+
+          <fieldset className="m-0 flex min-w-0 flex-col gap-2 border-0 p-0" disabled={isSubmitting}>
+            <legend className="mb-1 text-sm font-medium text-[var(--text-strong)]">경기</legend>
+            {rows.map((row, index) => {
+              const nth = `${index + 1}번째 경기`;
+              return (
+                <div key={row.key} className="grid grid-cols-[6.5rem_minmax(0,1fr)_minmax(0,1fr)_44px] items-center gap-2">
+                  <input
+                    type="time"
+                    aria-label={`${nth} 시작 시각`}
+                    value={row.time}
+                    onChange={(event) => updateRow(row.key, { time: event.target.value })}
+                    className="tm-input min-h-[44px] w-full"
+                  />
+                  <select
+                    aria-label={`${nth} 홈 팀`}
+                    value={row.homeTeamId}
+                    onChange={(event) => updateRow(row.key, { homeTeamId: event.target.value })}
+                    className={selectClass}
+                  >
+                    <option value="">홈 팀</option>
+                    {teams.map((team) => (
+                      <option key={team.id} value={team.id} disabled={team.id === row.awayTeamId}>
+                        {team.label}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    aria-label={`${nth} 어웨이 팀`}
+                    value={row.awayTeamId}
+                    onChange={(event) => updateRow(row.key, { awayTeamId: event.target.value })}
+                    className={selectClass}
+                  >
+                    <option value="">어웨이 팀</option>
+                    {teams.map((team) => (
+                      <option key={team.id} value={team.id} disabled={team.id === row.homeTeamId}>
+                        {team.label}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    aria-label={`${nth} 지우기`}
+                    onClick={() => setRows((current) => current.filter((candidate) => candidate.key !== row.key))}
+                    disabled={rows.length === 1}
+                    className="tm-btn tm-btn-sm tm-btn-ghost disabled:opacity-40"
+                    style={{ minHeight: 44, minWidth: 44 }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              );
+            })}
+            <button
+              type="button"
+              onClick={addRow}
+              disabled={rows.length >= MAX_ROWS}
+              className="min-h-[44px] rounded-xl border border-dashed border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--text-body)] disabled:opacity-50"
+            >
+              + 경기 줄 추가
+            </button>
+            <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
+              새 줄의 시작 시각은 앞 경기 시작에 경기 시간을 더해 채워요. 한 번에 {MAX_ROWS}경기까지 만들 수 있어요.
+            </p>
+          </fieldset>
+
+          <div className="grid">
+            <LeagueFixturePlaceField
+              customLabel="이 경기들만 다른 장소"
+              maxLength={PLACE_NAME_MAX_LENGTH.leagueManualFixture}
+              defaultPlace={defaultPlace}
+              recentVenues={recentVenues}
+              choice={placeChoice}
+              onChange={setPlaceChoice}
+              disabled={isSubmitting}
+            />
+          </div>
+
+          <section
+            aria-label="이 주의 경기"
+            className="tm-on-tint flex flex-col gap-1 rounded-xl bg-[var(--surface-soft)] px-4 py-3 text-[length:var(--font-size-body-sm)] text-[var(--text-body)]"
+          >
+            <p className="font-semibold text-[var(--text-strong)]">
+              {weekFixtures.length === 0 ? '이 주에는 아직 경기가 없어요' : `이 주에 이미 있는 경기 ${weekFixtures.length}`}
+            </p>
+            {weekFixtures.length > 0 ? (
+              <ul className="flex flex-col gap-0.5">
+                {weekFixtures.map((fixture, index) => (
+                  <li key={`${fixture.startAt}-${index}`}>
+                    {formatTournamentDateTimeShort(fixture.startAt)} · {nameOf(fixture.homeTeamId)} vs {nameOf(fixture.awayTeamId)}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            {doubleBooked.length > 0 ? (
+              <p className="font-semibold text-[var(--orange700)]">같은 주에 두 경기 이상: {doubleBooked.join(', ')}</p>
+            ) : null}
+          </section>
+
+          {error !== null && (
+            <p role="alert" className="text-xs text-[var(--red700)]">
+              {error}
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="flex gap-2 border-t border-[var(--border)] px-5 py-4">
@@ -254,7 +387,7 @@ export function LeagueManualFixtureModal({
           style={{ minHeight: 44 }}
           disabled={isSubmitting}
         >
-          {isSubmitting ? '만드는 중…' : '경기 만들기'}
+          {isSubmitting ? '만드는 중…' : `경기 ${rows.length}개 만들기`}
         </button>
       </div>
     </div>

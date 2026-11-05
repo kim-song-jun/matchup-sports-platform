@@ -58,21 +58,17 @@ export class TournamentListQueryDto {
   @IsIn(['true'])
   withTotal?: 'true';
 
+  /**
+   * 카드 오른쪽 위 상태 배지와 1:1인 목록 필터. 목록 정렬 그룹과 같은 값이라 배지·필터·순서가 어긋나지 않는다
+   * (`tournament-list-query.ts` 의 `GROUP_RANK_SQL`). `preparing` 은 정규 리그 초안만 담는다 — 대회 초안은 비공개다.
+   */
   @IsOptional()
-  @IsIn(['upcoming', 'ongoing', 'completed'])
-  phase?: 'upcoming' | 'ongoing' | 'completed';
+  @IsIn(['preparing', 'recruiting', 'recruit_closed', 'ongoing', 'completed'])
+  stage?: 'preparing' | 'recruiting' | 'recruit_closed' | 'ongoing' | 'completed';
 
   @IsOptional()
-  @IsIn(['open', 'closed'])
-  registration?: 'open' | 'closed';
-
-  @IsOptional()
-  @IsIn(['latest', 'deadline', 'scheduled'])
-  sort?: 'latest' | 'deadline' | 'scheduled';
-
-  @IsOptional()
-  @IsIn(['league', 'knockout', 'group_knockout'])
-  format?: 'league' | 'knockout' | 'group_knockout';
+  @IsIn(['league', 'knockout', 'group_knockout', 'league_knockouts'])
+  format?: 'league' | 'knockout' | 'group_knockout' | 'league_knockouts';
 
   @IsOptional()
   @IsDateString({ strict: true })

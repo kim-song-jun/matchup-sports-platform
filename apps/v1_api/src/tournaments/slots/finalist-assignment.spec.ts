@@ -26,6 +26,8 @@ function setup(sizes = [4, 4, 3, 3]) {
   let nextSlot = 0;
   const tx = {
     v1TournamentGroup: { findMany: jest.fn(async () => [...groups, { id: 'q', name: '8강', phase: 'quarter', sortOrder: 5, advanceCount: null }]) },
+    v1OperationAudit: { findFirst: jest.fn().mockResolvedValue(null) },
+
     v1AdminActionLog: { findFirst: jest.fn(async () => null as null | { afterJson: { sourceVersion: string } }) },
     v1TournamentByeSlot: { findMany: jest.fn(async () => []) },
     v1TournamentGroupTeam: { findMany: jest.fn(async () => []) },
@@ -36,7 +38,7 @@ function setup(sizes = [4, 4, 3, 3]) {
     v1TournamentSlot: { findMany: jest.fn(async () => []), create: jest.fn(async () => ({ id: `slot-${++nextSlot}` })), update: jest.fn(), findUniqueOrThrow: jest.fn() },
     v1TeamMatch: { update: jest.fn(), count: jest.fn(async () => 1) },
   };
-  const adminContext = { getActiveAdmin: jest.fn(), getMutationAdmin: jest.fn(async () => ({ id: 'admin' })), logAdminAction: jest.fn() };
+  const adminContext = { getTournamentAdmin: jest.fn(), getTournamentMutationAdmin: jest.fn(async () => ({ id: 'admin' })), logAdminAction: jest.fn() };
   const deps = { prisma: { $transaction: jest.fn(async (fn: (client: typeof tx) => unknown) => fn(tx)) }, adminContext, games: {} } as never;
   jest.mocked(findTournamentOnSurface).mockResolvedValue({ id: 't', format: 'group_knockout', status: 'in_progress' } as never);
   jest.mocked(loadGroupRankSources).mockResolvedValue(sources);
@@ -103,10 +105,10 @@ describe('공통 결선 배정', () => {
   });
   it('활성 관리자 읽기/쓰기 검증 실패 시 데이터에 접근하지 않는다', async () => {
     const { deps, adminContext, tx } = setup();
-    adminContext.getActiveAdmin.mockRejectedValue(new Error('Forbidden'));
+    adminContext.getTournamentAdmin.mockRejectedValue(new Error('Forbidden'));
     await expect(previewFinalistAssignment(deps, user, 't')).rejects.toThrow('Forbidden');
     expect(tx.v1TournamentGroup.findMany).not.toHaveBeenCalled();
-    adminContext.getMutationAdmin.mockRejectedValue(new Error('Read only'));
+    adminContext.getTournamentMutationAdmin.mockRejectedValue(new Error('Read only'));
     await expect(applyFinalistAssignment(deps, user, 't', {} as never)).rejects.toThrow('Read only');
     expect(tx.v1TeamMatch.update).not.toHaveBeenCalled();
   });

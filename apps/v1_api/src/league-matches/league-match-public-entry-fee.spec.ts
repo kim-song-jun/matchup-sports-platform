@@ -4,7 +4,8 @@ import { LeagueMatchPublicService } from './league-match-public.service';
 const SECRET = { bankName: 'SENTINEL-BANK', bankAccount: 'SENTINEL-ACCOUNT-1', bankHolder: 'SENTINEL-HOLDER' };
 
 function makeService(row: Record<string, unknown>, pendingPaymentCount = 0) {
-  const findFirst = jest.fn().mockResolvedValue({
+  // 첫 조회는 리그 자신이고, 그다음(독립 리그의 이어진 다음 시즌 찾기, 2026-11-03)은 없음이다.
+  const findFirst = jest.fn().mockResolvedValueOnce({
     id: 'league-1', title: '리그', status: 'draft', registrationDeadlineAt: null,
     scheduledAt: new Date('2026-10-30T00:00:00.000Z'), scheduledEndAt: new Date('2026-12-30T00:00:00.000Z'),
     seriesId: null, tier: null, seasonNo: null,
@@ -13,8 +14,9 @@ function makeService(row: Record<string, unknown>, pendingPaymentCount = 0) {
     kind: 'regular_league', teamCount: 8, maxTeams: null,
     coverImageUrl: null, entryFee: 0, entryFeeConfiguredAt: null,
     ...SECRET, // 목은 select 를 지키지 않는다 — 서비스가 응답에 새로 싣지 않는지까지 본다.
+    previousLeagueId: null,
     ...row,
-  });
+  }).mockResolvedValue(null);
   const prisma = {
     v1Tournament: { findFirst, findMany: jest.fn().mockResolvedValue([]) },
     v1TournamentRegistration: { count: jest.fn().mockResolvedValue(pendingPaymentCount) },
@@ -33,16 +35,18 @@ describe('MD-QA #145 review follow-up public capacity', () => {
         seriesId: 'series-1', tier: 1, seasonNo: 1, series: { title: '연속 리그' },
       });
       prisma.v1Tournament.findMany.mockResolvedValue([{
-        id: 'next-league-1', title: '다음 회차', tier: 1, seasonNo: 2, status: 'draft',
+        id: 'next-league-1', title: '다음 회차', tier: 1, seasonNo: 2, status: 'open',
         registrationDeadlineAt: new Date('2098-01-01T00:00:00.000Z'),
         scheduledAt: new Date('2098-02-01T00:00:00.000Z'), scheduledEndAt: new Date('2098-12-01T00:00:00.000Z'),
         kind: 'regular_league', teamCount: 8, maxTeams, _count: { registrations: reservedCount },
+        registrations: [{ teamId: 'team-confirmed' }],
       }]);
       const result = await service.detail('league-1');
       expect(result.nextRound).toMatchObject({ leagueId: 'next-league-1', registrationOpen });
       expect(Object.keys(result.nextRound as NonNullable<typeof result.nextRound>).sort()).toEqual([
-        'endsOn', 'leagueId', 'registrationDeadlineAt', 'registrationOpen', 'seasonNo', 'startsOn', 'title',
+        'endsOn', 'leagueId', 'registrationDeadlineAt', 'registrationOpen', 'seasonNo', 'startsOn', 'teamIds', 'title',
       ]);
+      expect(result.nextRound?.teamIds).toEqual(['team-confirmed']);
       expect(Object.keys(result.seriesSiblings[0]).sort()).toEqual(['leagueId', 'seasonNo', 'state', 'tier', 'tierLabel']);
     },
   );
@@ -63,11 +67,13 @@ describe('MD-QA #145 review follow-up public capacity', () => {
   });
 
   it.each([
-    ['draft', 3, 3, 0, false],
+    ['open', 3, 3, 0, false],
     ['open', 3, 2, 1, false],
     ['in_progress', 3, 2, 1, false],
-    ['draft', 3, 2, 0, true],
-    ['draft', null, 10, 5, true],
+    ['open', 3, 2, 0, true],
+    ['open', null, 10, 5, true],
+    // 접수를 시작하지 않은 초안은 정원이 남아도 받지 않는다(2026-10-27, 대회와 같은 규칙).
+    ['draft', null, 0, 0, false],
   ] as const)('detail %s maxTeams=%s confirmed=%s pending=%s exposes registrationOpen=%s to the public join guide', async (
     status, maxTeams, confirmedCount, pendingPaymentCount, registrationOpen,
   ) => {

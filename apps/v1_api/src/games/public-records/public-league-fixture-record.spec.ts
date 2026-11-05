@@ -373,3 +373,24 @@ describe('리그 자동 명단의 사이드별 공개', () => {
     expect(result.score).toEqual({ home: 0, away: 0, penalties: null });
   });
 });
+
+describe('PublicTournamentRecordsService.getLeagueFixtureRecord -- 경기 방식(periodCount·periodMinutes)', () => {
+  const period = (code: string, durationMinutes: number, extraTime = false) => ({ code, label: code, durationMinutes, extraTime });
+
+  it('경기 설정이 있으면 정규 피리어드 수와 길이(분)를 함께 싣는다 — 리그 경기 상세도 같은 경기 방식 줄을 그린다', async () => {
+    const service = buildService({
+      fixture: makeFixtureRow({
+        game: makeGame({ competitionConfig: { periods: [period('FIRST_HALF', 10), period('SECOND_HALF', 15), period('ET', 5, true)] } }),
+      }),
+    });
+    const result = await service.getLeagueFixtureRecord(LEAGUE_ID, TEAM_MATCH_ID);
+    expect(result.periodCount).toBe(2);
+    expect(result.periodMinutes).toEqual([10, 15]);
+  });
+
+  it('경기 설정이 없으면 길이는 null 이다 — 화면은 경기 방식 줄을 그리지 않는다', async () => {
+    const result = await buildService({}).getLeagueFixtureRecord(LEAGUE_ID, TEAM_MATCH_ID);
+    expect(result.periodCount).toBeNull();
+    expect(result.periodMinutes).toBeNull();
+  });
+});

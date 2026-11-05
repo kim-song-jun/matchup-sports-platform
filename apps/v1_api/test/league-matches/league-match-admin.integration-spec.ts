@@ -101,7 +101,8 @@ describe('POST /admin/league-matches + fixtures', () => {
       });
     expect(createRes.status).toBe(201);
     const leagueId = createRes.body.data.leagueId;
-    expect((await prisma.v1Tournament.findUniqueOrThrow({ where: { id: leagueId } })).status).toBe('closed');
+    // 2026-10-27: 새 리그는 대회처럼 초안으로 시작한다.
+    expect((await prisma.v1Tournament.findUniqueOrThrow({ where: { id: leagueId } })).status).toBe('draft');
     expect((await prisma.v1Tournament.findUniqueOrThrow({ where: { id: leagueId } })).requiresExplicitStart).toBe(true);
 
     const fixturesRes = await request(app.getHttpServer())
@@ -110,10 +111,10 @@ describe('POST /admin/league-matches + fixtures', () => {
       .send({ weeksCount: 1 });
     expect(fixturesRes.status).toBe(201);
     expect(fixturesRes.body.data.teamMatchIds).toHaveLength(1);
-    expect((await prisma.v1Tournament.findUniqueOrThrow({ where: { id: leagueId } })).status).toBe('closed');
+    expect((await prisma.v1Tournament.findUniqueOrThrow({ where: { id: leagueId } })).status).toBe('draft');
     const beforeStart = await request(app.getHttpServer()).get(`/api/v1/admin/league-matches/${leagueId}`)
       .set('x-v1-user-id', ownerUserId).expect(200);
-    expect(beforeStart.body.data).toMatchObject({ state: 'draft', lifecycleStatus: 'closed', registrationOpen: false });
+    expect(beforeStart.body.data).toMatchObject({ state: 'draft', lifecycleStatus: 'draft', registrationOpen: false });
     await request(app.getHttpServer()).post(`/api/v1/admin/league-matches/${leagueId}/state`)
       .set('x-v1-user-id', regularUserId).send({ state: 'active' }).expect(403);
     await request(app.getHttpServer()).post(`/api/v1/admin/league-matches/${leagueId}/state`)
@@ -489,40 +490,44 @@ describe('POST /admin/league-matches + fixtures', () => {
     expect(secondRes.body.code).toBe('LEAGUE_FIXTURES_EXIST');
   });
 
-  it('팀이 1개뿐이면 422 LEAGUE_TEAM_INVALID (DTO 검증이 아니라 서비스 도메인 규칙이 걸려야 한다)', async () => {
+  // 2026-10-27: 팀은 비워 두고 참가 신청으로 모아도 된다 — 0팀·1팀(중복 제거 후)도 만든다.
+  it.each([
+    ['팀 없이', [] as string[], 0],
+    ['중복 팀ID(dedup 후 1팀)', ['A', 'A'], 1],
+  ])('%s 리그를 만들 수 있다', async (_label, teamKeys, expectedRoster) => {
     const res = await request(app.getHttpServer())
       .post('/api/v1/admin/league-matches')
       .set('x-v1-user-id', ownerUserId)
       .send({
-        title: '단독팀 리그',
+        title: `신청형 리그 ${expectedRoster}`,
         sportId,
         regionId,
         startsOn: new Date().toISOString(),
         endsOn: new Date(Date.now() + 86_400_000).toISOString(),
-        teamIds: [teamAId],
+        teamIds: teamKeys.map(() => teamAId),
       });
-    expect(res.status).toBe(422);
-    expect(res.body.code).toBe('LEAGUE_TEAM_INVALID');
+    expect(res.status).toBe(201);
+    await expect(prisma.v1TournamentRegistration.count({
+      where: { tournamentId: res.body.data.leagueId, status: 'confirmed' },
+    })).resolves.toBe(expectedRoster);
   });
 
-  it(
-    '중복 팀ID로 요청하면(배열 길이는 2 이상이지만 dedup 후 1개) 여전히 422 LEAGUE_TEAM_INVALID',
-    async () => {
-      const res = await request(app.getHttpServer())
-        .post('/api/v1/admin/league-matches')
-        .set('x-v1-user-id', ownerUserId)
-        .send({
-          title: '중복팀 리그',
-          sportId,
-          regionId,
-          startsOn: new Date().toISOString(),
-          endsOn: new Date(Date.now() + 86_400_000).toISOString(),
-          teamIds: [teamAId, teamAId],
-        });
-      expect(res.status).toBe(422);
-      expect(res.body.code).toBe('LEAGUE_TEAM_INVALID');
-    },
-  );
+  it('유료로 만들면서 계좌를 비우면 422 LEAGUE_PAYMENT_INSTRUCTIONS_REQUIRED', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/admin/league-matches')
+      .set('x-v1-user-id', ownerUserId)
+      .send({
+        title: '계좌 없는 유료 리그',
+        sportId,
+        regionId,
+        startsOn: new Date().toISOString(),
+        endsOn: new Date(Date.now() + 86_400_000).toISOString(),
+        teamIds: [],
+        entryFee: 10000,
+      });
+    expect(res.status).toBe(422);
+    expect(res.body.code).toBe('LEAGUE_PAYMENT_INSTRUCTIONS_REQUIRED');
+  });
 
   // 이 프로젝트에서 리그 admin은 AdminContextService(전역 owner/ops)만 쓰고 시리즈/대회 단위로
   // 스코프된 admin 신원이 없다(D-3). "다른 대회 admin이 남의 시리즈를 건드릴 때 거부"의

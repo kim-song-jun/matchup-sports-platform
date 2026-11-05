@@ -32,7 +32,7 @@
 
 | 필드 | 타입 | 필수 | 비고 |
 |---|---|---|---|
-| `query` | string | No | title/description/place 검색 |
+| `query` | string | No | title/description/place/region name 검색 |
 | `sportId` | uuid | No | `v1_master_sports.id` |
 | `regionId` | uuid | No | district region |
 | `levelCodes` | comma string | No | `beginner,novice,intermediate,advanced` 중 다중 선택 |

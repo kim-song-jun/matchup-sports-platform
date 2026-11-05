@@ -7,7 +7,7 @@
 | # | 페르소나 | 역할/맥락 | 플로우 경로 | 라이브 감사 |
 |---|----------|-----------|-------------|-------------|
 | P01 | 신규 방문자(이메일 가입) | 첫 방문, 가입→온보딩 황금경로 | `/`→landing→login→signup→terms→signup/complete→onboarding/{sport,level,region,confirm}→home | landing✅·home✅ / 온보딩·signup ⏳ |
-| P02 | 소셜 로그인(카카오) | OAuth + 에러분기 | login→callback/kakao→[signup/social→onboarding→home] \| [account-conflict/missing-email/provider-denied/blocked] | ⏳ |
+| P02 | 소셜 로그인(카카오) | OAuth + 에러분기 | login→callback/kakao→[signup/social→onboarding→home] \| [account-conflict/provider-denied/blocked] | ⏳ |
 | P03 | 캐주얼 매치 참가자 | 개인 매치 탐색·신청 | home→matches→(?filter)→matches/[id]→matches/joined→my/matches/joined | matches✅ / 상세·joined ⏳ |
 | P04 | 매치 호스트 | 매치 생성·신청자 관리 | matches/new/{sport,place-time,confirm,complete}→matches/[id]/applications→edit→my/matches/created | applications✅(Rank4) / wizard ⏳ |
 | P05 | 팀 창단자 | 팀 생성·탐색 | home→teams→teams/search→teams/new→teams/[id]→my/teams | teams✅ / new·detail ⏳ |

@@ -245,7 +245,7 @@ export function buildTournamentStages(tournament: V1TournamentDetail): Tournamen
     return [
       // 진행 방식 배지("리그 방식")가 같은 헤더에 이미 있다 — 단계 이름까지 같으면 "리그 방식 리그 방식"으로 읽힌다.
       { key: 'league', label: '풀리그', status: leagueStatus },
-      { key: 'awards', label: '시상', status: allDone ? 'active' : 'upcoming' },
+      { key: 'awards', label: tournament.kind === 'regular_league' ? '시즌 종료' : '시상', status: allDone ? 'active' : 'upcoming' },
     ];
   }
 

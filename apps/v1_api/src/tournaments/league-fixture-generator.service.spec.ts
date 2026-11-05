@@ -295,6 +295,7 @@ describe('LeagueFixtureGeneratorService.generate', () => {
     v1TournamentMatchAdvancementEdge: { findMany: jest.fn() },
     v1TournamentPlayer: { findMany: jest.fn() },
     v1IdempotencyRecord: { findFirst: jest.fn() },
+    v1TournamentStagePeriodSetting: { findUnique: jest.fn().mockResolvedValue(null) },
     v1TournamentMatchDetails: {
       findMany: jest.fn(),
       findFirst: jest.fn(),
@@ -317,7 +318,7 @@ describe('LeagueFixtureGeneratorService.generate', () => {
     $queryRaw: jest.fn(),
     $executeRaw: jest.fn(),
   };
-  const adminContext = { getMutationAdmin: jest.fn(), logAdminAction: jest.fn() };
+  const adminContext = { getTournamentMutationAdmin: jest.fn(), logAdminAction: jest.fn() };
   const games = { createFromSourceInTransaction: jest.fn() };
 
   let service: LeagueFixtureGeneratorService;
@@ -474,7 +475,7 @@ describe('LeagueFixtureGeneratorService.generate', () => {
     jest.clearAllMocks();
     writeLog = [];
     prisma.$transaction.mockImplementation((cb: (tx: typeof prisma) => Promise<unknown>) => cb(prisma));
-    adminContext.getMutationAdmin.mockResolvedValue(admin);
+    adminContext.getTournamentMutationAdmin.mockResolvedValue(admin);
     adminContext.logAdminAction.mockResolvedValue({ actionLogId: 'log-1', statusChangeLogId: null });
     prisma.v1Tournament.findFirst.mockResolvedValue({
       id: 't1',

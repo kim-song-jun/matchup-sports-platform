@@ -1,5 +1,5 @@
 import type { PrismaService } from '../../prisma/prisma.service';
-import type { AdminContextService } from '../../common/admin-context.service';
+import { AdminContextService } from '../../common/admin-context.service';
 import type { GamesService } from '../../games/games.service';
 import type { V1AuthUser } from '../../auth/v1-auth-user';
 import { BracketTemplateService } from './bracket-template.service';
@@ -14,7 +14,7 @@ describe('BracketTemplateService format concurrency', () => {
     const groups = { findMany: jest.fn(), create: jest.fn() };
     const tx = { v1Tournament: { findFirst }, v1TournamentGroup: groups, $executeRaw: jest.fn().mockResolvedValue(1) };
     const prisma = { ...tx, $transaction: jest.fn(async (callback: (client: typeof tx) => Promise<unknown>) => callback(tx)) };
-    const admin = { getMutationAdmin: jest.fn().mockResolvedValue({ id: 'admin-1' }) };
+    const admin = { getTournamentMutationAdmin: jest.fn().mockResolvedValue({ id: 'admin-1' }) };
     const service = new BracketTemplateService(prisma as unknown as PrismaService, admin as unknown as AdminContextService, {} as GamesService);
 
     await expect(service.apply({ id: 'user-1' } as V1AuthUser, 't-1', { kind: 'knockout', size: 4 }))
@@ -41,10 +41,12 @@ describe('유연한 대진 미리보기와 요청 보호', () => {
       v1TournamentMatchDetails: { findMany: jest.fn().mockResolvedValue([]) },
       v1TournamentRegistration: { findMany: jest.fn().mockResolvedValue([]) },
       v1TournamentMatchAdvancementEdge: { findMany: jest.fn().mockResolvedValue([]) },
+      v1OperationAudit: { findFirst: jest.fn().mockResolvedValue(null) },
+
       v1AdminActionLog: { findFirst: jest.fn().mockResolvedValue(null) },
     };
     const prisma = { ...tx, $transaction: jest.fn(async (fn: (client: typeof tx) => unknown) => fn(tx)) };
-    const admin = { getMutationAdmin: jest.fn().mockResolvedValue({ id: 'admin' }) };
+    const admin = { getTournamentMutationAdmin: jest.fn().mockResolvedValue({ id: 'admin' }) };
     const service = new BracketTemplateService(prisma as unknown as PrismaService, admin as unknown as AdminContextService, {} as GamesService);
     return { service, tx, admin };
   }
@@ -83,7 +85,7 @@ describe('유연한 대진 미리보기와 요청 보호', () => {
   });
   it('권한 거절 시 대회 정보도 조회하지 않는다', async () => {
     const { service, tx, admin } = setup();
-    admin.getMutationAdmin.mockRejectedValue(new Error('forbidden'));
+    admin.getTournamentMutationAdmin.mockRejectedValue(new Error('forbidden'));
     await expect(service.preview(user, 't', dto)).rejects.toThrow('forbidden');
     expect(tx.v1Tournament.findFirst).not.toHaveBeenCalled();
   });
@@ -92,5 +94,49 @@ describe('유연한 대진 미리보기와 요청 보호', () => {
     const { service, tx } = setup();
     await expect(service.preview(user, 't', dto)).rejects.toMatchObject({ response: { code: 'BRACKET_V2_DISABLED' } });
     expect(tx.v1Tournament.findFirst).not.toHaveBeenCalled();
+  });
+});
+
+describe('BracketTemplateService split-bracket lifecycle', () => {
+  it('single-track replacement preserves and blocks scoped awards until the operator re-scopes them', async () => {
+    const admin = { id: 'admin-1', userId: 'user-1', adminRole: 'owner', status: 'active', user: { accountStatus: 'active' } };
+    const tournament = {
+      id: 'tournament-1', format: 'group_knockout', kind: 'regular_tournament', sportId: 'sport-1', regionId: null,
+      title: '대회', competitionConfigVersionId: 'config-1', venueId: null, venueName: null, venueAddress: null,
+      latitude: null, longitude: null,
+    };
+    const prisma = {
+      v1AdminUser: { findUnique: jest.fn().mockResolvedValue(admin) },
+      v1Tournament: { findFirst: jest.fn().mockResolvedValue(tournament) },
+      v1TournamentMatchDetails: { findMany: jest.fn().mockResolvedValue([]), aggregate: jest.fn().mockResolvedValue({ _max: { fixtureNumber: 0 } }) },
+      v1TournamentGroup: { findMany: jest.fn().mockResolvedValue([
+        { id: 'upper', phase: 'final', bracketTrack: 'upper' },
+        { id: 'lower', phase: 'final', bracketTrack: 'lower' },
+      ]) },
+      v1TournamentSlot: { count: jest.fn().mockResolvedValue(4) },
+      v1TournamentAward: { findMany: jest.fn().mockResolvedValue([]) },
+      v1TournamentAwardSet: { findMany: jest.fn().mockResolvedValue([{ bracketTrack: 'upper', prizePool: 100000 }]) },
+      $executeRaw: jest.fn(),
+      $transaction: jest.fn(),
+    };
+    prisma.$transaction.mockImplementation(async (work: (tx: typeof prisma) => Promise<unknown>) => work(prisma));
+    const adminContext = new AdminContextService(prisma as unknown as PrismaService);
+    jest.spyOn(adminContext, 'logAdminAction').mockResolvedValue({ actionLogId: 'audit-1', statusChangeLogId: null });
+    const service = new BracketTemplateService(
+      prisma as unknown as PrismaService,
+      adminContext,
+      {} as never,
+    );
+    const boundary = service as unknown as { teardown: () => Promise<void>; materialize: () => Promise<void> };
+    const teardown = jest.spyOn(boundary, 'teardown').mockResolvedValue(undefined);
+    jest.spyOn(boundary, 'materialize').mockResolvedValue(undefined);
+
+    await expect(service.apply({ id: 'user-1', email: 'owner@test.v1', accountStatus: 'active', onboardingStatus: 'completed' }, 'tournament-1', {
+      kind: 'group_knockout', groupCount: 2, teamsPerGroup: 4, advancePerGroup: 2, legs: 1,
+      thirdPlace: false, lowerBracket: false, replaceExisting: true,
+    })).rejects.toMatchObject({ response: { code: 'BRACKET_TRACK_AWARDS_REQUIRE_RESCOPING' } });
+    expect(prisma.v1TournamentAwardSet.findMany).toHaveBeenCalled();
+    expect(prisma.v1TournamentAward.findMany).toHaveBeenCalled();
+    expect(teardown).not.toHaveBeenCalled();
   });
 });

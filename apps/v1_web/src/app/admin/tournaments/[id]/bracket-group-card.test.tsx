@@ -443,3 +443,13 @@ describe('BracketGroupCard — 결선 조 배정 안내', () => {
     expect(screen.getByText('강남FC')).toBeInTheDocument();
   });
 });
+
+it('N개 토너먼트의 목록 보기는 구조 변경 버튼 대신 전용 설정 안내를 표시한다', () => {
+  const group = { id: 'named', tournamentId: 't-1', name: '챔피언 · 결승', phase: 'final', bracketTrack: '챔피언', sortOrder: 0, advanceCount: null, groupTeams: [], createdAt: '', updatedAt: '' } as V1AdminBracketGroup;
+  render(<BracketGroupCard group={group} allGroups={[group]} allStandings={[]} fixtures={[]} structureEditable={false}
+    confirmedTeamItems={[]} assignGroupTeam={noopMutation() as unknown as ReturnType<typeof import('@/hooks/use-v1-api').useV1AssignGroupTeam>}
+    createFixture={noopMutation()} isAutoGenerating={false} onAutoGenerate={vi.fn()} onEditGroup={vi.fn()}
+    onDeleteGroup={vi.fn()} onRemoveGroupTeam={vi.fn()} autoFocus={false} showToast={vi.fn()} />);
+  expect(screen.queryByRole('button', { name: /수정|삭제|대진 자동 생성|직접 입력/ })).not.toBeInTheDocument();
+  expect(screen.getByText('그림 보기에서 예선 팀을 배정하고, 진출팀 배정 화면에서 결선 진출팀을 편집해요.')).toBeInTheDocument();
+});

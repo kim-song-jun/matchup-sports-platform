@@ -53,8 +53,8 @@ function setup() {
     $transaction: jest.fn(async (fn: (tx: unknown) => unknown) => fn(tx)),
   };
   const admins = {
-    getActiveAdmin: jest.fn().mockResolvedValue({ id: 'admin' }),
-    getMutationAdmin: jest.fn().mockResolvedValue({ id: 'admin' }),
+    getTournamentAdmin: jest.fn().mockResolvedValue({ id: 'admin' }),
+    getTournamentMutationAdmin: jest.fn().mockResolvedValue({ id: 'admin' }),
     logAdminAction: jest.fn(),
   };
   const service = new SixTeamService(prisma as never, admins as never);
@@ -63,7 +63,7 @@ function setup() {
 describe('6강 관리자 계약', () => {
   it('읽기 권한 없는 사용자는 대진을 읽지 못한다', async () => {
     const { service, admins, tx } = setup();
-    admins.getActiveAdmin.mockRejectedValue(new Error('FORBIDDEN'));
+    admins.getTournamentAdmin.mockRejectedValue(new Error('FORBIDDEN'));
     await expect(service.preview({ id: 'user' } as never, 't')).rejects.toThrow(
       'FORBIDDEN'
     );
@@ -71,7 +71,7 @@ describe('6강 관리자 계약', () => {
   });
   it('쓰기 권한 없는 사용자는 진출 결정을 바꾸지 못한다', async () => {
     const { service, admins, tx } = setup();
-    admins.getMutationAdmin.mockRejectedValue(new Error('FORBIDDEN'));
+    admins.getTournamentMutationAdmin.mockRejectedValue(new Error('FORBIDDEN'));
     await expect(
       service.decide({ id: 'user' } as never, 't', {} as never)
     ).rejects.toThrow('FORBIDDEN');

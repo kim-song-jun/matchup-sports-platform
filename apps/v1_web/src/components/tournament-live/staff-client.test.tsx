@@ -260,6 +260,19 @@ describe('StaffClient', () => {
     expect(document.body.textContent).not.toContain('대회 운영을 맡고 있어요');
   });
 
+  it('대회 디렉터 배정 안내가 전용 대회 관리 화면으로 이어진다', async () => {
+    setRole('PLATFORM_OPS');
+    const user = userEvent.setup();
+    render(<StaffClient tournamentId="t-1" />);
+    await user.click(screen.getByRole('button', { name: '스태프 배정' }));
+    await user.selectOptions(screen.getByLabelText('역할'), 'TOURNAMENT_DIRECTOR');
+    expect(screen.getByRole('dialog')).toHaveTextContent('이 대회 관리 화면으로');
+    await pickCandidate(user, '이승민');
+    mocks.grantMutate.mockImplementation((_payload: unknown, options: { onSuccess: () => void }) => options.onSuccess());
+    await user.click(screen.getByRole('button', { name: '배정하기' }));
+    expect(screen.getByText(/배정했어요\. 그분은 마이페이지/)).toHaveTextContent('“담당 대회 운영”에서 이 대회 관리 화면으로');
+  });
+
   /* 종전에는 이 자리가 사용자 UUID 직접 입력이었고, 안내는 "어드민 > 사용자 관리에서 ID를
      복사해 오라"였다 — 어드민이 아닌 대회 디렉터는 그 화면에 못 들어가므로 스태프를 배정할
      방법이 사실상 없었다(2026-08-13 사용자 제보). 검색해서 고른 사람의 id 가 그대로 배정

@@ -6,11 +6,13 @@ import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import {
   AddLeagueTeamDto,
+  AddPreviousSeasonTeamsDto,
   ApplyLeagueTemplateDto,
   CancelLeagueFixtureDto,
   ChangeLeagueStateDto,
   CreateLeagueMatchDto,
   CreateManualLeagueFixtureDto,
+  CreateManualLeagueFixturesBatchDto,
   DeleteLeagueFixtureDto,
   GenerateLeagueFixturesDto,
   OpenLeagueRegistrationDto,
@@ -111,6 +113,16 @@ export class LeagueMatchAdminController {
     return this.service.addTeam(user, leagueId, dto);
   }
 
+  /** 지난 시즌 확정 팀을 골라 한 번에 참가 확정으로 넣고 지난 명단을 이어받는다(독립 리그의 다음 시즌). */
+  @Post(':leagueId/previous-season-teams')
+  addPreviousSeasonTeams(
+    @CurrentUser() user: V1AuthUser,
+    @Param('leagueId', leagueIdPipe) leagueId: string,
+    @Body() dto: AddPreviousSeasonTeamsDto,
+  ) {
+    return this.service.addPreviousSeasonTeams(user, leagueId, dto);
+  }
+
   // 그룹 B 감사 결함 1: 개설 후 참가팀 제거. 이 팀이 낀 대진에 공식 결과가 확정돼 있으면
   // 서비스가 409로 거부한다(league-lifecycle-rules.checkLeagueTeamRemovalAllowed 참고 —
   // standings 계산이 로스터 기준으로 팀을 필터링해 데이터 손상으로 이어지기 때문).
@@ -159,6 +171,16 @@ export class LeagueMatchAdminController {
     @Body() dto: CreateManualLeagueFixtureDto,
   ) {
     return this.service.createManualFixture(user, leagueId, dto);
+  }
+
+  /** 수동 대진 여러 경기를 한 트랜잭션으로 만든다(주차 단위 추가). 세그먼트 수가 달라 `:teamMatchId/cancel` 과 겹치지 않는다. */
+  @Post(':leagueId/fixtures/manual/batch')
+  createManualFixtures(
+    @CurrentUser() user: V1AuthUser,
+    @Param('leagueId', leagueIdPipe) leagueId: string,
+    @Body() dto: CreateManualLeagueFixturesBatchDto,
+  ) {
+    return this.service.createManualFixtures(user, leagueId, dto.fixtures);
   }
 
   // 자리 기반 빈 대진 템플릿. 정적 세그먼트('template')라 `POST :leagueId/fixtures`·`/manual`·`/regenerate` 와 충돌하지 않는다.

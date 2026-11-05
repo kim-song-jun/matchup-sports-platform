@@ -34,9 +34,10 @@ import {
 import { LEAGUE_TIE_BREAK_ORDER } from './league-tie-break';
 import type { LeagueState } from './league-state';
 import { findPublicTournamentOnSurface } from '../tournaments/tournament-surface-lookup';
-import { isLeagueRegistrationOpen } from './league-registration-open';
+import { isRegistrationWindowOpen } from '../tournaments/registration-window';
 import { TOURNAMENT_VENUE_SELECT, tournamentVenueSnapshot } from '../places/tournament-venue';
 import { CAPACITY_HOLD_STATUSES, countPendingCapacityReservations, isCapacityFull } from '../tournaments/registration-capacity';
+import { readLeagueConversion } from './league-season-link';
 
 const PLAYER_RECORDS_LIMIT = 30;
 const LEAGUE_LIST_DEFAULT_LIMIT = 20;
@@ -498,6 +499,7 @@ export class LeagueMatchPublicService {
               teamCount: true,
               maxTeams: true,
               _count: { select: { registrations: { where: { status: { in: [...CAPACITY_HOLD_STATUSES] } } } } },
+              registrations: { where: { status: 'confirmed' }, select: { teamId: true } },
               registrationDeadlineAt: true,
               scheduledAt: true,
               scheduledEndAt: true,
@@ -507,15 +509,26 @@ export class LeagueMatchPublicService {
             rows.map(({ status, _count, kind, teamCount, maxTeams, ...rest }) => ({
               ...rest,
               state: LEAGUE_STATE_BY_STATUS[status],
-              registrationOpen: isLeagueRegistrationOpen(status, rest.registrationDeadlineAt)
+              registrationOpen: isRegistrationWindowOpen(status, rest.registrationDeadlineAt)
                 && !isCapacityFull({ kind, teamCount, maxTeams }, _count.registrations),
             })),
           );
     // 신청이 마감된 리그가 "다음 회차로 신청하기"를 걸 대상 — 같은 티어의 바로 다음 시즌.
     // ponytail: 같은 티어만 본다. 신규 팀의 입문 티어를 따로 정하면 그 규칙으로 바꾼다.
-    const nextRound = siblings
-      .filter((sibling) => sibling.tier === league.tier && (sibling.seasonNo ?? 0) > (league.seasonNo ?? 0))
-      .sort((a, b) => (a.seasonNo ?? 0) - (b.seasonNo ?? 0))[0];
+    // 독립 리그는 어드민이 이어 둔 다음 시즌이다(2026-11-03, `previousLeagueId`). 공개 상세와 같은 공개 조건으로만 찾는다 —
+    // 비공개·보류 리그로 보내면 그 화면이 404 다.
+    const nextRound = league.seriesId === null
+      ? await this.loadLinkedSeason({ previousLeagueId: league.id })
+      : siblings
+          .filter((sibling) => sibling.tier === league.tier && (sibling.seasonNo ?? 0) > (league.seasonNo ?? 0))
+          .sort((a, b) => (a.seasonNo ?? 0) - (b.seasonNo ?? 0))[0];
+    const previousRound = league.previousLeagueId === null ? undefined : await this.loadLinkedSeason({ id: league.previousLeagueId });
+    // 리그 체계로 전환한 독립 리그는 다음 시즌이 티어마다 따로라 nextRound 하나로 가리킬 수 없다 — 첫 시즌 티어를
+    // 편성 팀과 함께 준다. 화면이 보는 사람의 팀이 든 티어로 보낸다(2026-11-04 알파 QA: 전환 뒤 리그 목록으로만 갔다).
+    // 전환은 종료된 리그만 할 수 있어 종료된 리그만 본다.
+    const nextSeasonTiers = league.seriesId === null && nextRound === undefined && league.state === 'completed'
+      ? await this.loadConvertedSeasonTiers(league.id)
+      : [];
 
     return {
       leagueId: league.id,
@@ -557,18 +570,23 @@ export class LeagueMatchPublicService {
         seasonNo: sibling.seasonNo as number,
         state: sibling.state,
       })),
-      // 다음 회차가 없으면(단발 리그 포함) null — 화면은 "다음 회차에 신청해 주세요"만 적는다.
+      // 다음 회차가 없으면 null — 화면은 "다음 회차에 신청해 주세요"만 적는다. 독립 리그의 다음 시즌은 시즌 번호가 없다(null).
       nextRound: nextRound === undefined || nextRound.scheduledAt === null || nextRound.scheduledEndAt === null
         ? null
         : {
             leagueId: nextRound.id,
             title: nextRound.title,
-            seasonNo: nextRound.seasonNo as number,
+            seasonNo: nextRound.seasonNo,
             startsOn: nextRound.scheduledAt,
             endsOn: nextRound.scheduledEndAt,
             registrationOpen: nextRound.registrationOpen,
             registrationDeadlineAt: nextRound.registrationDeadlineAt?.toISOString() ?? null,
+            // 다음 시즌에 이미 확정된 팀 — 화면이 그 팀에게 재참가 신청 대신 '다음 시즌 보기'를 건다(MD-QA #208).
+            teamIds: nextRound.registrations.map((entry) => entry.teamId),
           },
+      // 독립 리그가 이어 가는 지난 시즌. 공개되지 않은 리그면 null 이다.
+      previousRound: previousRound === undefined ? null : { leagueId: previousRound.id, title: previousRound.title },
+      nextSeasonTiers,
       teamIds: league.teams.map((entry) => entry.teamId),
       // 미확정 대진의 점수를 null 로 두는 것, 몰수를 boolean 하나로만 내보내는 것(사유
       // 원문 비공개)은 `league-fixture-list-source.ts` 가 지킨다 — 대회 표면의 리그
@@ -806,6 +824,49 @@ export class LeagueMatchPublicService {
     };
   }
 
+  /** 리그 체계로 전환한 리그면 그 체계 첫 시즌의 공개 티어 리그들(1부부터)과 확정 팀. 전환하지 않았으면 빈 배열. */
+  private async loadConvertedSeasonTiers(leagueId: string) {
+    const conversion = await readLeagueConversion(this.prisma, leagueId);
+    if (conversion?.seriesId == null) return [];
+    const leagues = await this.prisma.v1Tournament.findMany({
+      where: { kind: 'regular_league', deletedAt: null, isPublic: true, seriesId: conversion.seriesId },
+      orderBy: [{ seasonNo: 'asc' }, { tier: 'asc' }],
+      select: { id: true, title: true, tier: true, seasonNo: true, registrations: { where: { status: 'confirmed' }, select: { teamId: true } } },
+    });
+    const firstSeason = leagues[0]?.seasonNo;
+    return leagues
+      .filter((row) => row.seasonNo === firstSeason)
+      .map((row) => ({ leagueId: row.id, title: row.title, tier: row.tier, teamIds: row.registrations.map((r) => r.teamId) }));
+  }
+
+  /** 이어진 지난·다음 시즌 한 건(공개 조건 그대로). 다음 회차 카드가 쓰는 신청 가능 여부를 형제 리그와 같은 판정으로 붙인다. */
+  private async loadLinkedSeason(where: { id: string } | { previousLeagueId: string }) {
+    const row = await findPublicTournamentOnSurface(this.prisma, ['regular_league'], {
+      where: { ...where, deletedAt: null },
+      select: {
+        id: true,
+        title: true,
+        seasonNo: true,
+        status: true,
+        kind: true,
+        teamCount: true,
+        maxTeams: true,
+        _count: { select: { registrations: { where: { status: { in: [...CAPACITY_HOLD_STATUSES] } } } } },
+        registrations: { where: { status: 'confirmed' }, select: { teamId: true } },
+        registrationDeadlineAt: true,
+        scheduledAt: true,
+        scheduledEndAt: true,
+      },
+    });
+    if (row === null) return undefined;
+    const { status, _count, kind, teamCount, maxTeams, ...rest } = row;
+    return {
+      ...rest,
+      registrationOpen: isRegistrationWindowOpen(status, rest.registrationDeadlineAt)
+        && !isCapacityFull({ kind, teamCount, maxTeams }, _count.registrations),
+    };
+  }
+
   private async loadLeague(leagueId: string) {
     const row = await findPublicTournamentOnSurface(this.prisma, ['regular_league'], {
       where: { id: leagueId, deletedAt: null },
@@ -823,6 +884,7 @@ export class LeagueMatchPublicService {
         seriesId: true,
         tier: true,
         seasonNo: true,
+        previousLeagueId: true,
         // 공개 allow-list — 입금 계좌(bank*)는 절대 select 하지 않는다. 설정 시각 원값도 응답에 싣지 않는다.
         coverImageUrl: true,
         listImageUrl: true,
@@ -864,9 +926,8 @@ export class LeagueMatchPublicService {
       teams: registrations,
       registrationDeadlineAt,
       // 내부 모집 창 판정이다. 공개 상세는 확정·결제 대기 점유를 더해 정원도 함께 검사한다.
-      // 마감 미도과·미종료 조건은 등록 서비스와 같은 규칙으로 유지한다.
-      // 마감이 `null` 이면 신청을 받지 않는다(league-registration-open.ts와 같은 규칙).
-      registrationOpen: isLeagueRegistrationOpen(status, registrationDeadlineAt),
+      // 접수 중·마감 전 조건은 등록 서비스와 같은 함수(registration-window.ts)를 쓴다.
+      registrationOpen: isRegistrationWindowOpen(status, registrationDeadlineAt),
     };
   }
 }

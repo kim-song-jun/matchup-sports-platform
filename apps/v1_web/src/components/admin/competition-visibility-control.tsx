@@ -2,7 +2,6 @@
 
 import { useId } from 'react';
 import type { UseMutationResult } from '@tanstack/react-query';
-import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
 import { extractErrorMessage } from '@/lib/error-message';
 import { SectionTitle } from '@/components/v1-ui/primitives';
 
@@ -18,6 +17,7 @@ import { SectionTitle } from '@/components/v1-ui/primitives';
  */
 export function CompetitionVisibilityControl({
   isPublic,
+  canWrite,
   publicDescription,
   privateDescription,
   mutation,
@@ -25,6 +25,7 @@ export function CompetitionVisibilityControl({
   exposureNote,
 }: {
   isPublic: boolean;
+  canWrite: boolean;
   publicDescription: string;
   privateDescription: string;
   mutation: UseMutationResult<unknown, unknown, { isPublic: boolean }>;
@@ -32,7 +33,6 @@ export function CompetitionVisibilityControl({
   exposureNote?: string;
 }) {
   const headingId = useId();
-  const canWrite = useAdminCanWrite();
 
   return (
     <section

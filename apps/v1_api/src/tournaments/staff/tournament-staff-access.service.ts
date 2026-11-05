@@ -7,6 +7,7 @@ import {
   type TournamentStaffDecisionReason,
   type TournamentStaffRole,
 } from './tournament-staff-policy';
+import { findOwnTeamFixtureIds } from './own-team-fixture';
 
 export const TOURNAMENT_STAFF_CLOCK = Symbol('TOURNAMENT_STAFF_CLOCK');
 export type TournamentStaffClock = () => Date;
@@ -45,7 +46,8 @@ export type TournamentStaffPrincipal = {
 
 export type TournamentStaffRuntimeDenialReason =
   | Exclude<TournamentStaffDecisionReason, 'ALLOWED'>
-  | 'STALE_ASSIGNMENT_VERSION';
+  | 'STALE_ASSIGNMENT_VERSION'
+  | 'OWN_TEAM_FIXTURE';
 
 type AssignmentRecord = {
   readonly id: string;
@@ -199,6 +201,16 @@ export class TournamentStaffAccessService {
           ...(assignment.fieldId === null ? {} : { fieldId: assignment.fieldId }),
         },
       });
+      if (
+        decision.allowed &&
+        role === 'field_operator' &&
+        input.resource.fixtureId !== undefined &&
+        (await findOwnTeamFixtureIds(db, input.userId, [input.resource.fixtureId])).size > 0
+      ) {
+        // 필드 단위 배정이 자기 팀 경기까지 덮거나 배정 뒤 그 팀에 들어온 경우(MD-QA #193).
+        denialReason = 'OWN_TEAM_FIXTURE';
+        continue;
+      }
       if (decision.allowed) {
         return this.principal(input, {
           role,

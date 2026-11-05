@@ -68,6 +68,16 @@ describe('공통 명단 관리의 실제 탭·저장 흐름', () => {
     fireEvent.click(tab(entry === 'match' ? '참가 선수' : '경기 출전'));
     await waitFor(() => expect(tab(entry === 'match' ? '참가 선수' : '경기 출전')).toHaveAttribute('aria-selected', 'true'));
   });
+  it('MD-QA #201: 시작 전 경기 목록이 비어도 경기 자체가 없다고 안내하지 않는다', async () => {
+    server.use(http.get('*/api/v1/teams/:id/game-rosters', () => ok({ teamId, viewerRole: 'TEAM_OWNER', games: [], players: [] })));
+    open('registration');
+    fireEvent.click(await screen.findByRole('tab', { name: '경기 출전' }));
+    expect(await screen.findByText('출전을 수정할 수 있는 경기가 없어요')).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: '출전을 수정할 수 있는 경기 없음' })).toBeInTheDocument();
+    expect(screen.queryByText('등록된 경기가 없어요')).not.toBeInTheDocument();
+    expect(screen.getByText(/시작한 경기는 경기 상세에서/)).toBeInTheDocument();
+  });
+
   it('출전 제외를 저장하고 참가 탭으로 이동한 뒤 돌아와도 선택 경기와 제외가 남는다', async () => {
     open(); await screen.findByRole('checkbox', { name: '김민재 이번 경기 출전' });
     fireEvent.click(checkbox()); fireEvent.click(tab('참가 선수'));
@@ -85,7 +95,7 @@ describe('공통 명단 관리의 실제 탭·저장 흐름', () => {
     open('registration');
     const noun = value === 'regular_league' ? '리그' : '대회';
     expect(await screen.findByText((_, element) => element?.tagName === 'P' &&
-      element.textContent === `선수 명단·등번호·골레이 설정은 ${noun}의 모든 경기에 공통으로 적용돼요.첫 경기가 시작되면 변경할 수 없어요.경기 시작 후 수정이 필요하면 운영진에게 문의해 주세요.`)).toBeInTheDocument();
+      element.textContent === `선수 명단·등번호·골레이 설정은 ${noun}의 모든 경기에 공통으로 적용돼요.바꾼 내용은 아직 시작하지 않은 경기에 반영되고, 이미 시작한 경기의 출전 기록은 그대로예요.시작한 경기의 기록을 고쳐야 하면 운영진에게 문의해 주세요.`)).toBeInTheDocument();
   });
   it.each([false, true])('통합 명단 선수 추가는 골레이 %s를 POST에 전달한다', async goalkeeper => {
     let body: Record<string, unknown> | undefined;

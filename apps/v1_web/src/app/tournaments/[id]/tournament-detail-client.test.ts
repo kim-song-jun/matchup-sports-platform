@@ -1,5 +1,6 @@
 import { createElement } from 'react';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render as rtlRender, screen, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
 import {
   getTournamentPostEventCards,
@@ -7,6 +8,14 @@ import {
 } from '@/components/tournaments/tournament-venue-retention-sections';
 import { v1Get } from '@/lib/api-client';
 import { getTournamentSponsorCards } from '@/components/tournaments/tournament-sponsor-section';
+
+// 상세 화면의 실제 팀 역할 조회 훅도 앱과 같은 QueryClient 환경에서 실행한다.
+function render(ui: Parameters<typeof rtlRender>[0]) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  return rtlRender(createElement(QueryClientProvider, { client }, ui));
+}
 
 // 데스크톱 뒤로가기(AppBackLink)가 ?from= 을 읽는다 — 라우터 없이 뷰만 렌더하므로 빈 쿼리를 준다.
 vi.mock('next/navigation', async (importOriginal) => ({
@@ -778,7 +787,7 @@ describe('TournamentDetailView — completed vs non-completed section rendering'
     expect(screen.queryByText(/시즌 주차 수/)).not.toBeInTheDocument();
   });
 
-  it('keeps the season-week explanation for a regular league mirror row (group_knockout format)', () => {
+  it('uses fixture-based guidance and season completion for a regular league mirror row', () => {
     const tournament = makeTournament({
       id: 't1',
       status: 'open',
@@ -790,9 +799,10 @@ describe('TournamentDetailView — completed vs non-completed section rendering'
 
     render(createElement(TournamentDetailView, { tournament, myRegistration: null }));
 
-    expect(screen.getByText('참가한 모든 팀이 서로 맞붙어요. 맞붙는 횟수는 시즌 주차 수에 따라 달라져요.')).toBeInTheDocument();
+    expect(screen.getByText('참가한 모든 팀이 서로 맞붙어요. 몇 번씩 맞붙는지는 대진표에서 확인할 수 있어요.')).toBeInTheDocument();
     expect(screen.queryByText('결선 진출')).not.toBeInTheDocument();
-    expect(screen.queryByText(/대진표에서 확인할 수 있어요/)).not.toBeInTheDocument();
+    expect(screen.getByText('시즌 종료')).toBeInTheDocument();
+    expect(screen.queryByText(/최종 순위에 따라 상금/)).not.toBeInTheDocument();
   });
 
   it('keeps the application guide, flow explainer, and standings-moved notice for open tournaments (non-destructive)', () => {
@@ -860,7 +870,8 @@ describe('TournamentDetailView — completed vs non-completed section rendering'
     expect(screen.getByText('팀원은 미선택 상태로 진행하거나 추후 수정할 수 있어요.', { exact: false })).toBeInTheDocument();
     expect(screen.getByText('입금 확인 후 대회 참가가 확정돼요.', { exact: false })).toBeInTheDocument();
     expect(screen.getByText('선수단 확정')).toBeInTheDocument();
-    expect(screen.getByText('마감일 전까지 등록을 완료해 주세요.', { exact: false })).toBeInTheDocument();
+    expect(screen.getAllByText('선수단은 명단이 잠기기 전까지 등록·수정할 수 있어요.', { exact: false })).toHaveLength(2);
+    expect(screen.queryByText('마감일 전까지 등록을 완료해 주세요.', { exact: false })).not.toBeInTheDocument();
     expect(screen.queryByText('운영진 검토')).not.toBeInTheDocument();
   });
 
@@ -1231,16 +1242,17 @@ describe('TournamentDetailView — 정규 리그 거울 행', () => {
     expect(container.querySelector('[aria-label="참가 신청"]')).toBeNull();
   });
 
-  it('미래 마감 정규 리그에는 정원·참가비 없는 공통 참가 신청 레일이 있다', async () => {
+  // 2026-10-27: 리그도 대회처럼 접수 중일 때만 신청을 받는다 — 신청 레일은 접수 중 리그에만 있다.
+  it('접수 중 정규 리그에는 정원·참가비 없는 공통 참가 신청 레일이 있다', async () => {
     vi.mocked(v1Get).mockResolvedValueOnce(standingsResponse);
     render(
       createElement(TournamentDetailView, {
-        tournament: makeMirror({ registrationDeadlineAt: '2099-08-10T14:59:00.000Z' }),
+        tournament: makeMirror({ status: 'open', registrationDeadlineAt: '2099-08-10T14:59:00.000Z' }),
         myRegistration: null,
       }),
     );
     await screen.findByText('통합 순위');
-    const rail = screen.getByRole('complementary', { name: '리그 진행 상태' });
+    const rail = screen.getByRole('complementary', { name: '리그 참가 신청' });
     expect(within(rail).getByRole('link', { name: '참가 신청하기' })).toHaveAttribute(
       'href', '/tournaments/league-1/my',
     );

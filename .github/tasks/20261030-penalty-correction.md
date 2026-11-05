@@ -1,6 +1,6 @@
 # 운영 콘솔 승부차기 결과 정정
 
-Status: main PR #2104 Checks/Review Pending
+Status: Rollout In Progress (main/dev merged; deployments pending)
 Owner: Codex (single agent)
 
 ## Context
@@ -73,3 +73,23 @@ http://localhost:3013/admin/live/a90df6d5-47e9-40f9-93ef-f679ce8da858/records/co
 - Copilot은 gh edit와 공식 REST 요청을 접수했으나 현재 두 head 리뷰0건. clean으로 간주하지 않으며 리뷰 도착을 별도 확인.
 - alpha before: 배포SHA2708c614993e, 공개 대진표·일정390/768/1440 baseline 캡처 완료. 상세링크5/결선탭1 및 선정카드 흰색·이미지없음 확인. console/network/pageerror0, browserPID8510/parent8413 정상종료. 증거는 alpha worktree `tmp/qa-six-team-hotfix/before/`.
 - 상세 페이지 단일 파일 재검증 **38/38 PASS** (86.78s, worker1), CI의 stale 링크 기대2건을 실제카드5/링크0 계약으로 GREEN. 기존341개와 합산 관련379개 검증. main diff32 paths(추가 test1), alpha diff30 paths. 앱 소스 추가 수정 없음.
+
+
+## 2026-10-30 alpha 반영 요청
+
+- 사용자가 main 핫픽스와 함께 alpha 반영도 명시 승인. 최신 origin/dev2708c6149 기준 전용 브랜치 `fix/six-team-penalty-alpha-20261030`에 소스 커밋만 적용. main용 1.12.3 버전/Changeset 소비는 포함하지 않음.
+- 원본 dev WIP와 25개 source/test/API docs가 개행을 제외하고 전부 일치. 기존 원본 dev 검증과 main 기준 frontend280/backend61 및 타입·패턴 PASS를 참조. 동일 로컬 전체 검증은 반복하지 않으며 dev 기준 CI를 실행.
+- 두 Changeset 유지, diff --check PASS. main 핫픽스는 별도 브랜치/PR, 최종 main 머지·production 승인은 사용자 직접 수행.
+- dev PR 검사·Copilot 완료 후 dev 머지와 alpha 배포 SHA 확인. 실제 사용자/admin 390/768/1440 및 승부차기 저장·공식화는 접근 가능한 인증/안전한 시나리오 전제하에 검증하고, 미실행 항목은 별도 표시.
+
+
+## 2026-10-30 승인 후 머지 및 main → dev 동기화
+
+- 사용자 최신 승인: “진행해줘 main도 다 해줘”. 이번 핫픽스는 Copilot 미생성 상태를 자체 리뷰로 진행하고 main/dev 머지와 배포까지 수행한다. GitHub 보호 정책은 우회하지 않으며 Copilot clean으로 표시하지 않는다.
+- 자체 리뷰는 main4c2e8e536 / alpha67a660f55에 기록. 양쪽 PR의 API/Web/Gates 전체 SUCCESS, main CodeQL SUCCESS, 미해결 스레드0 및 정확한 target/head 검증 후 일반 merge commit 사용.
+- alpha #2105 merge `a7c520c2f3f359b89cf50d26160ceba392c29e2e` (14:40:45UTC), main #2104 merge `b50074f90ff602eff47b21b0d2577bcc0377c57b` (14:46:22UTC). 양쪽 서버 반영은 후속 CI/deploy 진행 중이며 머지=배포 완료로 표시하지 않는다.
+- 저장소 정책에 따라 origin/main을 dev 기준 격리 branch로 흡수. 충돌은 두 task 문서뿐이며 main의 전체 검증 이력과 dev의 alpha 반영 요청을 함께 보존한다. 앱 소스·Prisma·미승격 dev 기능은 유지한다.
+- main에서 이미 소비한 두 Changeset은 dev에서도 제거하고 API/Web package1.12.3 및 CHANGELOG를 동기화한다. 다른 미소비 Changeset은 유지한다.
+- 현 production 공개 header는 release1.12.3 / SHA dcab2c77e4. 기존 배포 계약이 app version1.12.3+patch를 계산하므로 후보 production header는1.12.4다. 버전 계산 스크립트 변경 없음.
+- alpha Wait-for-CI 제한35분이 실제API CI(직전약50분)보다 짧다. 같은 SHA CI 성공 후 대기 시간 초과로 실패한 alpha run만 재실행한다. 진행 중 SSM/서버 activation은 취소하지 않는다.
+- 남은 검증: 최신 alpha/prod serving SHA·health, 공개 대진표/일정390/768/1440 AFTER와 before 비교. 관리자 로그인 수단 미제공이므로 실제 저장·공식화는 아직 미검증이며 원격 경기 결과를 임의 수정하지 않는다.

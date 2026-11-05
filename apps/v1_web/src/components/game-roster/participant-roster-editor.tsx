@@ -122,8 +122,8 @@ export function ParticipantRosterEditor({ tournamentId, registrationId }: { tour
     {team.isError ? <ErrorState title="수정 권한을 확인하지 못했어요" message={extractErrorMessage(team.error, '팀 조회에 실패했어요.')} onRetry={() => void team.refetch()} /> : null}
     <p className="tm-text-caption">
       선수 명단·등번호·골레이 설정은 {noun}의 모든 경기에 공통으로 적용돼요.<br />
-      첫 경기가 시작되면 변경할 수 없어요.<br />
-      경기 시작 후 수정이 필요하면 운영진에게 문의해 주세요.
+      바꾼 내용은 아직 시작하지 않은 경기에 반영되고, 이미 시작한 경기의 출전 기록은 그대로예요.<br />
+      시작한 경기의 기록을 고쳐야 하면 운영진에게 문의해 주세요.
     </p>
     {roster.data.belowMinimum ? <AlertBanner tone="warning" message={`최소 ${tournament.data.minPlayers}명 이상 등록해야 해요. 현재 ${Math.max(0, tournament.data.minPlayers - players.length)}명이 부족해요.`} /> : null}
     {tournament.data.rosterDeadlineAt ? <p className="tm-text-caption">명단 제출 마감 · {formatTournamentDateTimeLong(tournament.data.rosterDeadlineAt)}{deadline.overridden ? ' · 운영진이 수정 예외를 허용했어요.' : ''}</p> : null}

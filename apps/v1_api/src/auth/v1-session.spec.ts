@@ -5,6 +5,7 @@ import {
   assertV1SessionRuntimeConfiguration,
   createV1SessionToken,
   readV1Session,
+  readV1SessionAgeSeconds,
   v1IdentityUserWhere,
   resolveV1RequestIdentity,
   clearV1SessionCookie,
@@ -32,6 +33,20 @@ describe('v1 signed session', () => {
 
     // Then
     expect(session).toEqual({ userId: 'user-1', sessionEpoch: 3 });
+  });
+
+  it('reports how long ago the cookie session was issued, and nothing for a cookie that does not verify', () => {
+    const token = createV1SessionToken({ userId: 'user-1', sessionEpoch: 0, secret: SESSION_SECRET, issuedAtMs: NOW_MS });
+    const cookie = `${V1_SESSION_COOKIE_NAME}=${token}`;
+
+    expect(readV1SessionAgeSeconds(cookie, { secret: SESSION_SECRET, nowMs: NOW_MS + 90_000 })).toBe(90);
+    expect(readV1SessionAgeSeconds(cookie, { secret: SESSION_SECRET, nowMs: NOW_MS + 2 * 60 * 60 * 1_000 })).toBe(7_200);
+    // A forged or foreign-secret cookie has no age: it must not read as a fresh login.
+    expect(readV1SessionAgeSeconds(cookie, { secret: 'another-secret-that-is-also-32-bytes-long', nowMs: NOW_MS })).toBeNull();
+    expect(readV1SessionAgeSeconds(`${cookie}x`, { secret: SESSION_SECRET, nowMs: NOW_MS })).toBeNull();
+    expect(readV1SessionAgeSeconds(undefined, { secret: SESSION_SECRET, nowMs: NOW_MS })).toBeNull();
+    // Past the seven-day lifetime the cookie is no session at all.
+    expect(readV1SessionAgeSeconds(cookie, { secret: SESSION_SECRET, nowMs: NOW_MS + 8 * 24 * 60 * 60 * 1_000 })).toBeNull();
   });
 
   it('reads a cookie signed before the epoch existed as epoch 0, so deploying revokes nobody', () => {

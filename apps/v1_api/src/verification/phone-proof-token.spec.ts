@@ -29,16 +29,6 @@ describe('phone-proof-token', () => {
     expect(verifyPhoneProofToken(token, '01012345678')).toBe(false);
   });
 
-  it('social_link 증명은 signup·password_reset 과 서로 통하지 않는다', () => {
-    const phone = '01012345678';
-    const link = issuePhoneProofToken(phone, 'social_link');
-    expect(verifyPhoneProofToken(link, phone, 'social_link')).toBe(true);
-    expect(verifyPhoneProofToken(link, phone, 'signup')).toBe(false);
-    expect(verifyPhoneProofToken(link, phone, 'password_reset')).toBe(false);
-    expect(verifyPhoneProofToken(issuePhoneProofToken(phone, 'signup'), phone, 'social_link')).toBe(false);
-    expect(verifyPhoneProofToken(issuePhoneProofToken(phone, 'password_reset'), phone, 'social_link')).toBe(false);
-  });
-
   // 용도가 페이로드에 없으면 "가입하려고 받은 증명"으로 남의 비밀번호를 재설정할 수 있다.
   it('용도가 다른 토큰은 서로 통하지 않는다', () => {
     const signupToken = issuePhoneProofToken('01012345678');
@@ -54,6 +44,16 @@ describe('phone-proof-token', () => {
     const token = issuePhoneProofToken('01012345678');
     const payload = Buffer.from(token.split('.')[0], 'base64url').toString('utf8');
     expect(payload).toMatch(/^01012345678:\d+$/);
+  });
+
+  // 가입 증명은 `{phone}:{exp}` 맨몸 형식이라, 번호 자리에 다른 토큰 계열의 페이로드 머리말을 넣으면 그 계열 토큰이 된다.
+  it('refuses to issue or accept a bare signup proof for anything but digits', () => {
+    expect(() => issuePhoneProofToken('withdrawal_cancel:u:1')).toThrow(/digit-only/);
+    expect(() => issuePhoneProofToken('01012345678:extra')).toThrow(/digit-only/);
+    expect(() => issuePhoneProofToken('01012345678', 'signup')).not.toThrow();
+    expect(verifyPhoneProofToken(issuePhoneProofToken('01012345678'), 'withdrawal_cancel:u:1')).toBe(false);
+    // 다른 용도는 맨 앞에 고정 용도 라벨이 붙어 번호 자리가 무엇이든 다른 계열과 겹치지 않는다.
+    expect(() => issuePhoneProofToken('withdrawal_cancel:u:1', 'password_reset')).not.toThrow();
   });
 
   it('rejects a tampered signature', () => {

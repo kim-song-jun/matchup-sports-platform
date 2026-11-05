@@ -10,13 +10,14 @@ set -Eeuo pipefail
 #
 # rollbackCompatibleWith is final<->final only (item 8): it is set only when
 # the caller attests the previous active release was ALSO the final policy
-# (PREVIOUS_STAGE=final). A previous StageA release, or no previous release,
+# (PREVIOUS_STAGE=final) and has the same tournament runtime epoch. A previous StageA release, or no previous release,
 # leaves it null so rollback-alpha.sh cannot be pointed at a StageA release.
 
 # Sourced only for validate_alpha_stage_b_final_manifest (StageB path below) —
 # the final path's validate_existing_manifest keeps its own inline schema.
 # shellcheck disable=SC1091
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../deploy" && pwd)/alpha-manifest-common.sh"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../deploy" && pwd)/alpha-tournament-runtime.sh"
 
 # Task 168 name list, order fixed (identical to
 # deploy/task168-stage-b-migrate.sh's ALL_MIGRATIONS[0:10] + M11).
@@ -89,6 +90,7 @@ validate_existing_manifest() {
     --arg previous "$PREVIOUS_SHA" --arg previousStage "$PREVIOUS_STAGE" --arg migrationBase "$MIGRATION_BASE_SHA" \
     --arg schema "$TASK168_SCHEMA_SHA256" --arg m11 "$TASK168_M11_SHA256" \
     --arg rollbackCompatible "$rollback_compatible_with" \
+    --argjson tournamentRuntime "$ALPHA_TOURNAMENT_RUNTIME_VERSION" \
     '.schemaVersion == 1 and .environment == "alpha" and
      .release.sha == $sha and .release.version == $version and
      .source.bucket == $bucket and .source.key == ("releases/" + $sha + ".tar.gz") and
@@ -97,6 +99,7 @@ validate_existing_manifest() {
      .images.web.repository == $webRepository and .images.web.digest == $webDigest and .images.web.uri == ($webRepository + "@" + $webDigest) and
      .database.migrationPolicy == "task168-final" and .database.rollbackMode == "final-only" and
      .database.compatibilityCheck == "expand-contract-sql-v1" and
+     .database.tournamentRuntimeVersion == $tournamentRuntime and
      ((.database.migrationValidatedFrom == null) or (.database.migrationValidatedFrom | test("^[0-9a-f]{40}$"))) and
      (($migrationBase == $sha) or .database.migrationValidatedFrom == (if $migrationBase == "none" then null else $migrationBase end)) and
      ((.database.rollbackCompatibleWith == null) or (.database.rollbackCompatibleWith | test("^[0-9a-f]{40}$"))) and
@@ -117,7 +120,7 @@ if [[ "${1:-}" == '--self-test' ]]; then
   PREVIOUS_SHA="$RELEASE_SHA"
   PREVIOUS_STAGE=final
   MIGRATION_BASE_SHA="$RELEASE_SHA"
-  TASK168_SCHEMA_SHA256=96cf396f434e0fba80e9c2fa84e79ee347471ae56387ca6493b6d11f09c93a42
+  TASK168_SCHEMA_SHA256=b0c1313b36e6a93e0f84a56a17e7950826bbd5f38b284f22eb72fb3570292960
   TASK168_M11_SHA256=08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323
   api_digest=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
   web_digest=sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
@@ -128,7 +131,7 @@ if [[ "${1:-}" == '--self-test' ]]; then
   jq -n \
     --arg sha "$RELEASE_SHA" --arg version "$RELEASE_VERSION" --arg bucket "$DEPLOY_BUCKET" --arg sourceVersion "$SOURCE_VERSION_ID" --arg sourceSha "$SOURCE_SHA256" --arg registry "$REGISTRY" \
     --arg apiDigest "$api_digest" --arg webDigest "$web_digest" --arg schema "$TASK168_SCHEMA_SHA256" --arg m11 "$TASK168_M11_SHA256" --arg rollbackCompatible "$rollback_compatible_with" \
-    '{schemaVersion:1,environment:"alpha",release:{sha:$sha,version:$version},source:{bucket:$bucket,key:("releases/"+$sha+".tar.gz"),versionId:$sourceVersion,sha256:$sourceSha},database:{migrationPolicy:"task168-final",rollbackMode:"final-only",compatibilityCheck:"expand-contract-sql-v1",migrationValidatedFrom:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",rollbackCompatibleWith:$rollbackCompatible,task168:{stage:"final",schemaSha256:$schema,runtimeClientSchemaSha256:$schema,m11Sha256:$m11}},images:{api:{repository:($registry+"/teameet-alpha-v1-api"),digest:$apiDigest,uri:($registry+"/teameet-alpha-v1-api@"+$apiDigest)},web:{repository:($registry+"/teameet-alpha-v1-web"),digest:$webDigest,uri:($registry+"/teameet-alpha-v1-web@"+$webDigest)}}}' > "$fixture"
+    '{schemaVersion:1,environment:"alpha",release:{sha:$sha,version:$version},source:{bucket:$bucket,key:("releases/"+$sha+".tar.gz"),versionId:$sourceVersion,sha256:$sourceSha},database:{tournamentRuntimeVersion:2,migrationPolicy:"task168-final",rollbackMode:"final-only",compatibilityCheck:"expand-contract-sql-v1",migrationValidatedFrom:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",rollbackCompatibleWith:$rollbackCompatible,task168:{stage:"final",schemaSha256:$schema,runtimeClientSchemaSha256:$schema,m11Sha256:$m11}},images:{api:{repository:($registry+"/teameet-alpha-v1-api"),digest:$apiDigest,uri:($registry+"/teameet-alpha-v1-api@"+$apiDigest)},web:{repository:($registry+"/teameet-alpha-v1-web"),digest:$webDigest,uri:($registry+"/teameet-alpha-v1-web@"+$webDigest)}}}' > "$fixture"
   validate_existing_manifest "$fixture"
 
   # A same-SHA rerun observes this release as active, but its immutable
@@ -142,6 +145,8 @@ if [[ "${1:-}" == '--self-test' ]]; then
 
   for mutation in \
     '.database.rollbackCompatibleWith = "invalid"' \
+    '.database.tournamentRuntimeVersion = 1' \
+    '.database.tournamentRuntimeVersion = null' \
     '.release.sha = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"' \
     '.source.versionId = "different-source-version"' \
     '.images.api.digest = "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"'; do
@@ -169,7 +174,7 @@ if [[ "${1:-}" == '--self-test' ]]; then
   jq -n \
     --arg sha "$RELEASE_SHA" --arg version "$RELEASE_VERSION" --arg bucket "$DEPLOY_BUCKET" --arg sourceVersion "$SOURCE_VERSION_ID" --arg sourceSha "$SOURCE_SHA256" --arg registry "$REGISTRY" \
     --arg apiDigest "$api_digest" --arg webDigest "$web_digest" --arg schema "$TASK168_SCHEMA_SHA256" --arg m11 "$TASK168_M11_SHA256" \
-    '{schemaVersion:1,environment:"alpha",release:{sha:$sha,version:$version},source:{bucket:$bucket,key:("releases/"+$sha+".tar.gz"),versionId:$sourceVersion,sha256:$sourceSha},database:{migrationPolicy:"task168-final",rollbackMode:"final-only",compatibilityCheck:"expand-contract-sql-v1",migrationValidatedFrom:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",rollbackCompatibleWith:null,task168:{stage:"final",schemaSha256:$schema,runtimeClientSchemaSha256:$schema,m11Sha256:$m11}},images:{api:{repository:($registry+"/teameet-alpha-v1-api"),digest:$apiDigest,uri:($registry+"/teameet-alpha-v1-api@"+$apiDigest)},web:{repository:($registry+"/teameet-alpha-v1-web"),digest:$webDigest,uri:($registry+"/teameet-alpha-v1-web@"+$webDigest)}}}' > "$fixture"
+    '{schemaVersion:1,environment:"alpha",release:{sha:$sha,version:$version},source:{bucket:$bucket,key:("releases/"+$sha+".tar.gz"),versionId:$sourceVersion,sha256:$sourceSha},database:{tournamentRuntimeVersion:2,migrationPolicy:"task168-final",rollbackMode:"final-only",compatibilityCheck:"expand-contract-sql-v1",migrationValidatedFrom:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",rollbackCompatibleWith:null,task168:{stage:"final",schemaSha256:$schema,runtimeClientSchemaSha256:$schema,m11Sha256:$m11}},images:{api:{repository:($registry+"/teameet-alpha-v1-api"),digest:$apiDigest,uri:($registry+"/teameet-alpha-v1-api@"+$apiDigest)},web:{repository:($registry+"/teameet-alpha-v1-web"),digest:$webDigest,uri:($registry+"/teameet-alpha-v1-web@"+$webDigest)}}}' > "$fixture"
   validate_existing_manifest "$fixture"
 
   # Negative: a manifest that binds rollbackCompatibleWith to a StageA
@@ -181,7 +186,7 @@ if [[ "${1:-}" == '--self-test' ]]; then
   jq -n \
     --arg sha "$RELEASE_SHA" --arg version "$RELEASE_VERSION" --arg bucket "$DEPLOY_BUCKET" --arg sourceVersion "$SOURCE_VERSION_ID" --arg sourceSha "$SOURCE_SHA256" --arg registry "$REGISTRY" \
     --arg apiDigest "$api_digest" --arg webDigest "$web_digest" --arg schema "$TASK168_SCHEMA_SHA256" --arg m11 "$TASK168_M11_SHA256" --arg previous "$PREVIOUS_SHA" \
-    '{schemaVersion:1,environment:"alpha",release:{sha:$sha,version:$version},source:{bucket:$bucket,key:("releases/"+$sha+".tar.gz"),versionId:$sourceVersion,sha256:$sourceSha},database:{migrationPolicy:"task168-final",rollbackMode:"final-only",compatibilityCheck:"expand-contract-sql-v1",migrationValidatedFrom:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",rollbackCompatibleWith:$previous,task168:{stage:"final",schemaSha256:$schema,runtimeClientSchemaSha256:$schema,m11Sha256:$m11}},images:{api:{repository:($registry+"/teameet-alpha-v1-api"),digest:$apiDigest,uri:($registry+"/teameet-alpha-v1-api@"+$apiDigest)},web:{repository:($registry+"/teameet-alpha-v1-web"),digest:$webDigest,uri:($registry+"/teameet-alpha-v1-web@"+$webDigest)}}}' > "$fixture"
+    '{schemaVersion:1,environment:"alpha",release:{sha:$sha,version:$version},source:{bucket:$bucket,key:("releases/"+$sha+".tar.gz"),versionId:$sourceVersion,sha256:$sourceSha},database:{tournamentRuntimeVersion:2,migrationPolicy:"task168-final",rollbackMode:"final-only",compatibilityCheck:"expand-contract-sql-v1",migrationValidatedFrom:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",rollbackCompatibleWith:$previous,task168:{stage:"final",schemaSha256:$schema,runtimeClientSchemaSha256:$schema,m11Sha256:$m11}},images:{api:{repository:($registry+"/teameet-alpha-v1-api"),digest:$apiDigest,uri:($registry+"/teameet-alpha-v1-api@"+$apiDigest)},web:{repository:($registry+"/teameet-alpha-v1-web"),digest:$webDigest,uri:($registry+"/teameet-alpha-v1-web@"+$webDigest)}}}' > "$fixture"
   if validate_existing_manifest "$fixture"; then
     echo 'A StageA predecessor was accepted as rollback-compatible with a final release' >&2
     exit 1
@@ -193,7 +198,7 @@ if [[ "${1:-}" == '--self-test' ]]; then
   jq -n \
     --arg sha "$RELEASE_SHA" --arg version "$RELEASE_VERSION" --arg bucket "$DEPLOY_BUCKET" --arg sourceVersion "$SOURCE_VERSION_ID" --arg sourceSha "$SOURCE_SHA256" --arg registry "$REGISTRY" \
     --arg apiDigest "$api_digest" --arg webDigest "$web_digest" --arg schema "$TASK168_SCHEMA_SHA256" --arg m11 "$TASK168_M11_SHA256" --arg rollbackCompatible "$rollback_compatible_with" \
-    '{schemaVersion:1,environment:"alpha",release:{sha:$sha,version:$version},source:{bucket:$bucket,key:("releases/"+$sha+".tar.gz"),versionId:$sourceVersion,sha256:$sourceSha},database:{migrationPolicy:"task168-final",rollbackMode:"final-only",compatibilityCheck:"expand-contract-sql-v1",migrationValidatedFrom:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",rollbackCompatibleWith:$rollbackCompatible,task168:{stage:"final",schemaSha256:$schema,runtimeClientSchemaSha256:$schema,m11Sha256:$m11}},images:{api:{repository:($registry+"/teameet-alpha-v1-api"),digest:$apiDigest,uri:($registry+"/teameet-alpha-v1-api@"+$apiDigest)},web:{repository:($registry+"/teameet-alpha-v1-web"),digest:$webDigest,uri:($registry+"/teameet-alpha-v1-web@"+$webDigest)}}}' > "$fixture"
+    '{schemaVersion:1,environment:"alpha",release:{sha:$sha,version:$version},source:{bucket:$bucket,key:("releases/"+$sha+".tar.gz"),versionId:$sourceVersion,sha256:$sourceSha},database:{tournamentRuntimeVersion:2,migrationPolicy:"task168-final",rollbackMode:"final-only",compatibilityCheck:"expand-contract-sql-v1",migrationValidatedFrom:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",rollbackCompatibleWith:$rollbackCompatible,task168:{stage:"final",schemaSha256:$schema,runtimeClientSchemaSha256:$schema,m11Sha256:$m11}},images:{api:{repository:($registry+"/teameet-alpha-v1-api"),digest:$apiDigest,uri:($registry+"/teameet-alpha-v1-api@"+$apiDigest)},web:{repository:($registry+"/teameet-alpha-v1-web"),digest:$webDigest,uri:($registry+"/teameet-alpha-v1-web@"+$webDigest)}}}' > "$fixture"
   if validate_existing_manifest "$fixture"; then
     echo 'Mismatched non-idempotent migration provenance was accepted' >&2
     exit 1
@@ -336,7 +341,12 @@ fi
 for name in RELEASE_SHA RELEASE_VERSION REGISTRY DEPLOY_BUCKET EXPECTED_BUCKET_OWNER SOURCE_VERSION_ID SOURCE_SHA256 IMAGE_TAG PREVIOUS_SHA PREVIOUS_STAGE MIGRATION_BASE_SHA TASK168_SCHEMA_SHA256 TASK168_M11_SHA256; do
   [[ -n "${!name:-}" ]] || { echo "$name is required" >&2; exit 1; }
 done
-[[ "$TASK168_SCHEMA_SHA256" == 7cb13512f128b7b6e5eaf8f474938b65b1f30782afb46b833967d7f9be9e6626 \
+[[ "$TASK168_SCHEMA_SHA256" == b0c1313b36e6a93e0f84a56a17e7950826bbd5f38b284f22eb72fb3570292960 \
+  || "$TASK168_SCHEMA_SHA256" == 82b78e0a3a1cbdb4fab8fd1809f7da903330ca0d6bd38dc97335189f5ce84112 \
+  || "$TASK168_SCHEMA_SHA256" == 082bac1bb887f76b131dbd17ac4acbb11979b79fdf2bcc957d18fc06db57b04f \
+  || "$TASK168_SCHEMA_SHA256" == 1f9a9917691c053189e39f60af3640dfc4c4b8ff5ec62a29a32b500961893aad \
+  || "$TASK168_SCHEMA_SHA256" == 3ec98b92af1b34477bb90bfc257e3f150fbeb14f9fe9cc568c4b05d07889edbb \
+  || "$TASK168_SCHEMA_SHA256" == 7cb13512f128b7b6e5eaf8f474938b65b1f30782afb46b833967d7f9be9e6626 \
   || "$TASK168_SCHEMA_SHA256" == de8b01ba4d2aa2538dcc2879dd4af58dfa5356e6afc34694e5622c84b681a69f \
   || "$TASK168_SCHEMA_SHA256" == c8c382bd8c3659e3d754703b12d4c55c5522b91af928cddfb3ae8649a8f2bc3e \
   || "$TASK168_SCHEMA_SHA256" == df6fc250677a43c796ee145190b7053a2a7ed791f503f7e1940ddb7d3d214e16 \
@@ -348,11 +358,7 @@ done
   && [[ "$TASK168_M11_SHA256" == 08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323 ]] \
   || { echo 'Task168 final-policy binding mismatch' >&2; exit 1; }
 
-if [[ "$PREVIOUS_STAGE" == final && "$PREVIOUS_SHA" != none ]]; then
-  rollback_compatible_with="$PREVIOUS_SHA"
-else
-  rollback_compatible_with=""
-fi
+rollback_compatible_with="$(alpha_tournament_rollback_target "$PREVIOUS_SHA" "$PREVIOUS_STAGE")"
 
 api_digest="$(aws ecr describe-images --repository-name teameet-alpha-v1-api --image-ids "imageTag=${IMAGE_TAG}" --query 'imageDetails[0].imageDigest' --output text)"
 web_digest="$(aws ecr describe-images --repository-name teameet-alpha-v1-web --image-ids "imageTag=${IMAGE_TAG}" --query 'imageDetails[0].imageDigest' --output text)"
@@ -362,7 +368,7 @@ if manifest_version_id="$(aws s3api head-object --bucket "$DEPLOY_BUCKET" --key 
   validate_existing_manifest "$manifest"
 else
   created_at="$(git show -s --format=%cI "$RELEASE_SHA")"
-  jq -n --arg sha "$RELEASE_SHA" --arg version "$RELEASE_VERSION" --arg createdAt "$created_at" --arg bucket "$DEPLOY_BUCKET" --arg sourceVersionId "$SOURCE_VERSION_ID" --arg sourceSha256 "$SOURCE_SHA256" --arg migrationBase "$MIGRATION_BASE_SHA" --arg rollbackCompatible "$rollback_compatible_with" --arg registry "$REGISTRY" --arg apiDigest "$api_digest" --arg webDigest "$web_digest" --arg schema "$TASK168_SCHEMA_SHA256" --arg m11 "$TASK168_M11_SHA256" '{schemaVersion:1,environment:"alpha",release:{sha:$sha,version:$version,createdAt:$createdAt},source:{bucket:$bucket,key:("releases/"+$sha+".tar.gz"),versionId:$sourceVersionId,sha256:$sourceSha256},database:{migrationPolicy:"task168-final",rollbackMode:"final-only",compatibilityCheck:"expand-contract-sql-v1",migrationValidatedFrom:(if $migrationBase=="none" then null else $migrationBase end),rollbackCompatibleWith:(if $rollbackCompatible=="" then null else $rollbackCompatible end),task168:{stage:"final",schemaSha256:$schema,runtimeClientSchemaSha256:$schema,m11Sha256:$m11}},images:{api:{repository:($registry+"/teameet-alpha-v1-api"),digest:$apiDigest,uri:($registry+"/teameet-alpha-v1-api@"+$apiDigest)},web:{repository:($registry+"/teameet-alpha-v1-web"),digest:$webDigest,uri:($registry+"/teameet-alpha-v1-web@"+$webDigest)}}}' > "$manifest"
+  jq -n --arg sha "$RELEASE_SHA" --arg version "$RELEASE_VERSION" --arg createdAt "$created_at" --arg bucket "$DEPLOY_BUCKET" --arg sourceVersionId "$SOURCE_VERSION_ID" --arg sourceSha256 "$SOURCE_SHA256" --arg migrationBase "$MIGRATION_BASE_SHA" --arg rollbackCompatible "$rollback_compatible_with" --arg registry "$REGISTRY" --arg apiDigest "$api_digest" --arg webDigest "$web_digest" --arg schema "$TASK168_SCHEMA_SHA256" --arg m11 "$TASK168_M11_SHA256" '{schemaVersion:1,environment:"alpha",release:{sha:$sha,version:$version,createdAt:$createdAt},source:{bucket:$bucket,key:("releases/"+$sha+".tar.gz"),versionId:$sourceVersionId,sha256:$sourceSha256},database:{tournamentRuntimeVersion:2,migrationPolicy:"task168-final",rollbackMode:"final-only",compatibilityCheck:"expand-contract-sql-v1",migrationValidatedFrom:(if $migrationBase=="none" then null else $migrationBase end),rollbackCompatibleWith:(if $rollbackCompatible=="" then null else $rollbackCompatible end),task168:{stage:"final",schemaSha256:$schema,runtimeClientSchemaSha256:$schema,m11Sha256:$m11}},images:{api:{repository:($registry+"/teameet-alpha-v1-api"),digest:$apiDigest,uri:($registry+"/teameet-alpha-v1-api@"+$apiDigest)},web:{repository:($registry+"/teameet-alpha-v1-web"),digest:$webDigest,uri:($registry+"/teameet-alpha-v1-web@"+$webDigest)}}}' > "$manifest"
   manifest_version_id="$(aws s3api put-object --bucket "$DEPLOY_BUCKET" --key "$manifest_key" --body "$manifest" --content-type application/json --if-none-match '*' --expected-bucket-owner "$EXPECTED_BUCKET_OWNER" --query VersionId --output text)"
 fi
 [[ "$manifest_version_id" =~ ^[A-Za-z0-9._+=/-]{1,1024}$ ]]

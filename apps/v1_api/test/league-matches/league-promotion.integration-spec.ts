@@ -645,6 +645,36 @@ describe('리그 승강 확정 (Task 153)', () => {
   });
 
   describe('하위호환 — 단발 리그', () => {
+    it('6팀 배치 리그를 3/3으로 전환하고 동시 확정은 한 번만 생성하며 원본을 보존한다', async () => {
+      const teams = await Promise.all(Array.from({ length: 6 }, (_, i) => createTeam(`conversion-${i}`)));
+      const created = await asAdmin(http().post('/api/v1/admin/league-matches')).send({
+        title: `배치 리그 ${suiteId}`, sportId, regionId,
+        startsOn: '2030-01-01T00:00:00Z', endsOn: '2030-03-01T00:00:00Z', teamIds: teams.map((t) => t.id),
+      }).expect(201);
+      const leagueId: string = created.body.data.leagueId;
+      await finishLeague(leagueId);
+      const original = await prisma.v1Tournament.findUniqueOrThrow({ where: { id: leagueId } });
+      const matches = await prisma.v1TeamMatch.findMany({ where: { leagueId }, orderBy: { id: 'asc' } });
+      const path = `/api/v1/admin/league-matches/${leagueId}/series-conversion`;
+      await http().post(`${path}/preview`).send({ tierSizes: [3, 3] }).expect(401);
+      const preview = await asAdmin(http().post(`${path}/preview`)).send({ tierSizes: [3, 3] }).expect(201);
+      const entries: Array<{ teamId: string; suggestedTier: number }> = preview.body.data.entries;
+      expect(entries).toHaveLength(6);
+      expect(preview.body.data.boundaryTies).toHaveLength(0);
+      const body = { title: `새 체계 ${suiteId}`, tierSizes: [3, 3], startsOn: '2030-04-01T00:00:00Z', endsOn: '2030-06-01T00:00:00Z', fingerprint: preview.body.data.fingerprint, entries: entries.map((e) => ({ teamId: e.teamId, tier: e.suggestedTier })) };
+      const responses = await Promise.all([asAdmin(http().post(`${path}/commit`)).send(body), asAdmin(http().post(`${path}/commit`)).send(body)]);
+      expect(responses.map((r) => r.status).sort()).toEqual([201, 409]);
+      const winner = responses.find((r) => r.status === 201)!;
+      const seriesId: string = winner.body.data.seriesId;
+      const leagues = await prisma.v1Tournament.findMany({ where: { seriesId }, include: { registrations: true }, orderBy: { tier: 'asc' } });
+      expect(leagues.map((l) => [l.seasonNo, l.tier, l.registrations.length])).toEqual([[1, 1, 3], [1, 2, 3]]);
+      expect(leagues.flatMap((l) => l.registrations.map((r) => r.teamId)).sort()).toEqual(teams.map((t) => t.id).sort());
+      expect(await prisma.v1Tournament.findUniqueOrThrow({ where: { id: leagueId } })).toEqual(original);
+      expect(await prisma.v1TeamMatch.findMany({ where: { leagueId }, orderBy: { id: 'asc' } })).toEqual(matches);
+      expect((await asAdmin(http().get(path)).expect(200)).body.data.seriesId).toBe(seriesId);
+      expect(await prisma.v1AdminActionLog.count({ where: { action: 'league_series.convert_independent', targetId: leagueId } })).toBe(1);
+    });
+
     it('시리즈에 속하지 않은 리그는 티어가 없고 공개 목록·순위표에도 티어가 붙지 않는다', async () => {
       const teamA = await createTeam('solo-a');
       const teamB = await createTeam('solo-b');

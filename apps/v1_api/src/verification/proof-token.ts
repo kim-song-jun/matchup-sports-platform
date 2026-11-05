@@ -46,9 +46,18 @@ function sign(payload: string, secret: string): string {
   return createHmac('sha256', secret).update(payload).digest('base64url');
 }
 
-export function issueProofToken(buildPayload: ProofPayloadBuilder, nowMs: number): string {
+/**
+ * Keyed digest of a value under the proof secret, namespaced by `label`. Lets a token name an account or other id
+ * without carrying it: the holder can neither read the id back nor produce the digest of another one.
+ */
+export function proofDigest(label: string, value: string): string {
+  return sign(`${label}:${value}`, assertProofSecret());
+}
+
+/** `ttlMs` is for a token with its own lifetime (the social link token); the proofs of a finished check keep the default. */
+export function issueProofToken(buildPayload: ProofPayloadBuilder, nowMs: number, ttlMs: number = PROOF_TTL_MS): string {
   const secret = assertProofSecret();
-  const payload = buildPayload(nowMs + PROOF_TTL_MS);
+  const payload = buildPayload(nowMs + ttlMs);
   return `${Buffer.from(payload).toString('base64url')}.${sign(payload, secret)}`;
 }
 

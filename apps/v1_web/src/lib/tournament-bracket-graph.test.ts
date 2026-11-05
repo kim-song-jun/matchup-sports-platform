@@ -192,3 +192,15 @@ describe('connector symmetry', () => {
     expect(bracketContentCenter({ top: 24, height: 80 }, [])).toBe(64);
   });
 });
+
+it('128강과 64강은 같은 저장 phase를 사용해도 실제 라운드·부전승 연결이 섞이지 않는다', () => {
+  const rounds = [
+    { key: '128강', label: '128강', fixtures: [{ ...fixture('r128'), groupId: 'large' }] },
+    { key: 'round64', label: '64강', fixtures: [{ ...fixture('r64', [source('r128', 'AWAY')]), groupId: 'small', homeRegistrationId: 'team-bye' }] },
+  ];
+  const groups = [{ id: 'large', phase: 'round64', groupTeams: [{ id: 'bye128', registrationId: 'team-bye', isBye: true, sortOrder: 0, byeTarget: { fixtureId: 'r64', side: 'HOME' } }] }, { id: 'small', phase: 'round64', groupTeams: [] }] as unknown as V1TournamentGroup[];
+  const graph = buildBracketGraph(rounds, groups);
+  expect(graph.nodes.find(node => node.id === 'bye-slot:bye128')?.round).toBe('128강');
+  expect(graph.edges).toContainEqual({ source: 'bye-slot:bye128', target: 'r64', side: 'HOME', outcome: 'BYE' });
+  expect(graph.edges).toContainEqual({ source: 'r128', target: 'r64', side: 'AWAY', outcome: 'WINNER' });
+});

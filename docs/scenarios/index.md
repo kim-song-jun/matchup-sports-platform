@@ -1,14 +1,49 @@
+## 2026-10-30 — 배정 대회 디렉터 전체 관리
+
+[시나리오](./scoped-tournament-director-management.md) · [Task 20261122](../../.github/tasks/20261122-scoped-tournament-director-management.md).
+A안(기존 관리 화면 재사용) 선택. 전용 담당 목록과 관리 10개 섹션, 대회/하위 리소스 스코프와 사용자·배정 감사 구현.
+2026-11-04 사용자 요청으로 배정 대회는 결과 공식 확정·무효화까지 허용하고 리그 제한은 유지. 로컬 계약 검증 PASS(API 관련 25 suite, Web 63 tests, 양쪽 tsc·규칙 검사), alpha 수동 0/10 섹션·0/3 viewport(미배포).
+
+## 2026-11-04 — 독립 대진 초기화와 예선 수정·팀 배정
+
+[작업](../../.github/tasks/20261111-preliminary-edit-reset.md) · PR #2151. 예선·결선 대진 초기화와 예선 편집을 독립 처리한다. 대진이 없는 상태에서 조별리그 편성 및 확정팀 수동/무작위/부분 배정을 저장한다. API28/Web22·양쪽 타입검사 PASS, 실제 DB 시나리오 추가 후 CI 대기. Alpha before 3/3·오류/실패 응답0, 변경 후 기능 0/5(초기화/차단/편성 수정/수동 배정/자동 배정)·viewport 0/3. 본인 소유 임시 대회 취소·비공개/QA 팀2개 해체·브라우저 종료 완료. 기존 사용자 대회 초기화는 실행하지 않았다. PR #2151은 dev `0eed744874`에 반영됐다. #2101에서는 담당 디렉터 권한 통합과 회귀를 추가 검증한다.
+
+## 2026-11-04 — 미정 결선 선생성과 별도 진출팀 배정
+
+[시나리오](./multi-finals-deferred-teams-20261104.md) · [task](../../.github/tasks/20261057-admin-bracket-canvas.md). 사용자 B안: 대진 생성과 배정 화면 분리. API15/Web146/실제PG10 tests, 양쪽 typecheck·surface/pattern PASS. 미정 시드 선생성, 전체 순위/동률 수동 선택, 기존 경기 ID/일정 보존을 검증했다. alpha 기능0/7·viewport0/3이며 브라우저 도구 초기화 오류와 미배포가 blocker다.
+
+사용자 공개 순위표 후속: league_knockouts의 조별/결선 표시 gate 누락 수정. 신규 회귀 RED3→신규5개 포함 공개177/177·Web tsc/pattern PASS. 실제 alpha 공개 API는 예선3조·42경기/결선8편성을 제공하지만 예선 배정팀·순위행·완료0이다. API 읽기와 브라우저 검증을 구분하며 신규 화면 검증은 여전히 미실행이다.
+
+## 2026-11-02 — 정규리그 + N개 토너먼트 확장
+
+[작업 문서](../../.github/tasks/20261057-admin-bracket-canvas.md#2026-11-02-extension--정규리그--n개-토너먼트) · [시나리오](./18-regular-tournament-split-finals.md#2026-11-02-extension--n개-토너먼트와-진출팀-직접-선택). PR1858 고정 두 결선을 별도 format으로 일반화. 순위 제안 뒤 참가팀 추가·제외·이동, 예선 보존, N개 결선/범위 시상. 구현·로컬 검증 진행, alpha0/10·after0/3이며 배포/운영 변경 없음.
+
+## 2026-10-12 — 정규대회 상·하위 결선과 시상
+
+[작업 문서](../../.github/tasks/20261057-admin-bracket-canvas.md#2026-10-12-extension-정규대회-하나--상위하위-결선--시상-두-세트) · [실행 시나리오](./18-regular-tournament-split-finals.md). 하나의 대회에서 조 1·2위는 상위, 3·4위는 하위 결선으로 배정한다. 팀 시상 안내와 개인상 범위는 어드민이 설정한다. Backend521·Web226·스키마 바인딩7개 계약은 좁은 재실행을 포함해 통과했다. 독립 Sol static review의 모바일 단계 순서·읽기 권한 두 결함은 수정·재검토 PASS. PR#1858 커밋본 CI와 변경 후 alpha/3폭 QA는 대기 중이며 전체 완료를 의미하지 않는다.
+## 2026-10-30 — 업체 전달용 대회 운영 체험
+
+[시나리오](./tournament-ops-demo.md) · [Task20261123](../../.github/tasks/20261123-tournament-ops-demo.md). 5단계·3개 역할의 명시적 샘플 시뮬레이터, 실제 API 쓰기 없음. local26 tests/tsc/pattern PASS, 신규 Alpha0/5·0/3폭·기능0/12.
+
 ## 2026-10-28 — 결과·운영 결선 표시 순서와 단판 합산
 
 [시나리오](./tournament-round-display.md) · [Task20261119](../../.github/tasks/20261119-tournament-round-display.md).
 종료결과는 결승→3위전, 운영은3위전→결승. 단판4강의 가짜 합산 제거, 실제2차전 유지.
 저장데이터·진출·일정 변경0. API221/Web203 PASS, alpha0/3(미배포).
 
+## 2026-10-30 — 단계·조·경기별 시간 편집 리뷰 후속
+
+[Task 20261029](../../.github/tasks/20261029-tournament-stage-period-settings.md) · [시나리오](./tournament-period-overrides.md) · PR #2091. 설정 우선순위·상속·시작 잠금과 취소 후 재진입·운영자 간 단계 시간 충돌을 검증한다. 신규8개 RED → 관련5개 파일 고유187개 GREEN·Web 타입 검사 PASS. 변경 후 alpha 0/9·after viewport 0/3이며 커밋·push·배포는 하지 않았다.
+
 ## 2026-10-28 — 6강 결승 직행 토너먼트
 
 [시나리오](./six-team-knockout.md) · [Task 20261118](../../.github/tasks/20261118-six-team-knockout.md).
 A안 코드 구현: 정원6/토너먼트 선택·확정6팀 생성·공식 성적 비교·운영자 진출 지정·전용 공개 대진표.
 API212/Web116·격리 DB 통합4·양쪽 타입/표면·패턴·schema drift0 PASS. Alpha after0/3(미배포), 커밋/PR/배포 없음.
+
+## 2026-10-28 — 운영 콘솔 팀 파울 안내 (MD-QA #189)
+
+[Task 20261122](../../.github/tasks/20261122-mdqa-189-team-foul-display.md) · [OPS-FOUL-189](./19-game-operations-result-correction.md#ops-foul-189-팀-파울-피리어드-안내) · PR #2087. 집계 규칙을 유지하고 피리어드 이름·다음 피리어드의 다시 세기만 안내한다. 전반/하프타임/후반·단판·추가 피리어드의 alpha 실행 0/4, after viewport 0/3이다. 기존 결과 정정 화면의 과거 증거와 구분한다.
 
 ## 2026-10-23 — 경기 기록 기본 공개
 
@@ -29,6 +64,8 @@ API212/Web116·격리 DB 통합4·양쪽 타입/표면·패턴·schema drift0 PA
 최신 dev 기반 단위·SSR·MSW 및 양쪽 타입/표면·패턴 검사 PASS. 실제 DB0/5·alpha0/8·after viewport0/3.
 사용자 요청으로 dev 대상 PR을 생성한다. 머지·배포 및 alpha 실측은 후속이다.
 
+PR #2094 후속: [레벨·지역 검색·개최순·필터 오류 회귀](./competition-discovery-filters-2026-10-22.md#pr-2094-회귀-시나리오)를 추가했다. KST 오늘/진행 중/날짜 미정 유지·종료 직접 선택 예외와 입력칸 오류·최소 금액 요약을 포함한다. 위 수치는 최초 구현의 과거 증거이며 새 후속 alpha는 0/7·viewport 0/3이다.
+
 [빈 템플릿 조 정리](./empty-template-group-cleanup.md) · Task20261100/PR2019. 로컬 DB·단위·타입 검증 완료, hotfix CI/alpha/main/production 진행 중. 운영 대회는 조회만 수행.
 
 ## 2026-10-21 — 결선 경기일정 기본 문구
@@ -39,7 +76,7 @@ API212/Web116·격리 DB 통합4·양쪽 타입/표면·패턴·schema drift0 PA
 
 [시나리오](./finalist-assignment.md) · [Task 20261099](../../.github/tasks/20261099-finalist-assignment.md). 조별 공식 순위 확인/배정안 조정/자동·수동 배정, 14·15팀 불균등 조 지원 및 기존12강 유지. API36·Web121·실제 임시 DB7 및 양쪽 타입/표면·패턴 PASS. Alpha before3/3(실제 로그인), after0/3(미배포). 지정 대회 데이터 변경 없음.
 
-신규 리그 모집 마감 생성·명시적 시작(2026-10-18): [시나리오](./league-explicit-start.md). PR 호환성 보강: API192·DB68 assertion PASS, 신규 migration 단독 회귀 exit 0. Web38·양쪽 타입·표면/패턴 PASS. 전체 DB runner 종료 대기는 별도 기록, CI 확인과 미배포 alpha 0/3이 후속.
+신규 리그 명시적 시작: [시나리오](./league-explicit-start.md). **PR #2065 / 2026-10-27 결정으로 새 리그는 초안(draft), 신청은 접수 중(open)에서만 허용한다.** 옛 모집 마감 생성·진행 중 접수 기대를 시나리오에서 교체했다. API192·DB68·Web38은 2026-10-18 명시적 시작 구현의 과거 증거이며 #2065의 새 검증 수치가 아니다. 변경 후 alpha 390/768/1440 검증은 0/3이다.
 
 ## 2026-10-17 — 대진 표시 문구·경기 정보 편집
 

@@ -117,6 +117,31 @@ export function readV1Session(
   cookieHeader: string | undefined,
   configuration: { readonly secret: string; readonly nowMs?: number },
 ): V1Session | null {
+  const payload = readVerifiedPayload(cookieHeader, configuration);
+  return payload ? { userId: payload.sub, sessionEpoch: payload.ep ?? 0 } : null;
+}
+
+/** Seconds since the cookie session was issued, or null when the request carries no valid cookie session. */
+export function readV1SessionAgeSeconds(
+  cookieHeader: string | undefined,
+  configuration: { readonly secret: string; readonly nowMs?: number },
+): number | null {
+  const payload = readVerifiedPayload(cookieHeader, configuration);
+  if (!payload) return null;
+  const now = Math.floor((configuration.nowMs ?? Date.now()) / 1_000);
+  return Math.max(0, now - payload.iat);
+}
+
+/** Age of the request's cookie session under the configured secret; null without a valid cookie session. */
+export function readCurrentV1SessionAgeSeconds(cookieHeader: string | undefined): number | null {
+  const { sessionSecret } = currentRuntimeConfiguration();
+  return isStrongSessionSecret(sessionSecret) ? readV1SessionAgeSeconds(cookieHeader, { secret: sessionSecret }) : null;
+}
+
+function readVerifiedPayload(
+  cookieHeader: string | undefined,
+  configuration: { readonly secret: string; readonly nowMs?: number },
+): V1SessionPayload | null {
   const token = readCookie(cookieHeader, V1_SESSION_COOKIE_NAME);
   if (!token) return null;
 
@@ -142,7 +167,7 @@ export function readV1Session(
   const now = Math.floor((configuration.nowMs ?? Date.now()) / 1_000);
   if (payload.iat > now + 60 || payload.exp <= now) return null;
   if (payload.exp - payload.iat !== SESSION_TTL_SECONDS) return null;
-  return { userId: payload.sub, sessionEpoch: payload.ep ?? 0 };
+  return payload;
 }
 
 export function resolveV1RequestIdentity(

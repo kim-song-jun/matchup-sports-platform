@@ -772,15 +772,15 @@ function previewHash(revision: { score: unknown; goalEvents: unknown; eventsHash
 afterAll(async () => cleanup?.());
 
 describe('빠른 결과 — 권한', () => {
-  it('support 어드민·대회 디렉터·일반 사용자는 403 이고 아무것도 쓰지 않는다 — 비로그인은 401, 플랫폼 어드민은 같은 경기를 확정한다', async () => {
+  it('배정 디렉터는 빠른 결과를 확정하고 support·일반 사용자는 거부한다', async () => {
     const bracket = await createBracket();
     const { gameId } = bracket.semi1;
-    // 디렉터는 이 대회의 스태프 배정이 있어도 어드민이 아니면 이 경로를 못 쓴다.
+    // 디렉터 권한은 이 대회에만 적용한다.
     await prisma.v1TournamentStaffAssignment.create({
       data: { tournamentId: bracket.tournamentId, userId: users.director, role: 'TOURNAMENT_DIRECTOR', grantedByUserId: users.ops },
     });
 
-    for (const userId of [users.support, users.director, users.plain]) {
+    for (const userId of [users.support, users.plain]) {
       const response = await quickResult(gameId, userId, { home: 1, away: 0 });
       expect(response.status).toBe(403);
       expect(response.body.code).toBe('PERMISSION_DENIED');
@@ -789,7 +789,10 @@ describe('빠른 결과 — 권한', () => {
     expect(await revisionCount(gameId)).toBe(0);
     expect(await outboxCount(gameId, 'GAME_RESULT_OFFICIAL')).toBe(0);
 
-    expect((await quickResult(gameId, users.ops, { home: 1, away: 0 })).status).toBe(201);
+    const other = await createBracket();
+    expect((await quickResult(other.semi1.gameId, users.director, { home: 1, away: 0 })).status).toBe(403);
+    expect((await quickResult(gameId, users.director, { home: 1, away: 0 })).status).toBe(201);
+    expect((await quickResult(other.semi1.gameId, users.ops, { home: 1, away: 0 })).status).toBe(201);
   });
 });
 

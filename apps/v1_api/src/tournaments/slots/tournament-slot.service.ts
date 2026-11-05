@@ -2,7 +2,7 @@ import { randomInt } from 'node:crypto';
 import { ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { Prisma, type V1TournamentSlotKind } from '@prisma/client';
 import type { V1AuthUser } from '../../auth/v1-auth-user';
-import { AdminContextService, type V1ActiveAdmin } from '../../common/admin-context.service';
+import { AdminContextService, type V1TournamentManager } from '../../common/admin-context.service';
 import { GamesService } from '../../games/games.service';
 import { lockGameRows } from '../../games/roster/game-row-lock';
 import { assignLeagueFixtureSideInTx } from '../../league-matches/league-fixture-side-assignment';
@@ -15,6 +15,7 @@ import { syncByeSlotInTx } from './bye-slot-sync';
 import { setByeSideInTx } from './bye-side';
 import { lockCompetitionForBracketMutationInTx, lockCompetitionForSlotReleaseInTx } from './competition-bracket-lock';
 import { fillSlotsFromStandings, previewGroupRankStandings, type FillOverride } from './group-rank-fill';
+import { assertBracketTrackRegistrationEligible } from './bracket-track-eligibility';
 import { pickRandomAssignments } from './random-assignment';
 import { previewFinalistAssignment, applyFinalistAssignment } from './finalist-assignment';
 import type { FinalistAssignmentDto } from './dto/finalist-assignment.dto';
@@ -25,7 +26,7 @@ import { assertSlotFixturesNotStarted, isSlotFixtureStarted, loadSlotUsingFixtur
 type Tx = Prisma.TransactionClient;
 
 export type SlotMutationContext = {
-  admin: V1ActiveAdmin;
+  admin: V1TournamentManager;
   adminContext: AdminContextService;
   games: GamesService;
 };
@@ -60,7 +61,7 @@ const alreadyPlaced = () =>
 
 async function assertPlaceable(
   tx: Tx,
-  slot: { id: string; tournamentId: string; kind: V1TournamentSlotKind; groupId: string | null },
+  slot: { id: string; tournamentId: string; kind: V1TournamentSlotKind; groupId: string | null; group?: { phase: string; bracketTrack: string } | null },
   registrationId: string,
 ): Promise<void> {
   const registration = await tx.v1TournamentRegistration.findFirst({
@@ -89,6 +90,18 @@ async function assertPlaceable(
     select: { id: true },
   });
   if (placed !== null) throw alreadyPlaced();
+  if (
+    slot.kind === 'GROUP_RANK' && slot.groupId !== null && slot.group?.phase !== 'group' &&
+    (slot.group?.bracketTrack === 'upper' || slot.group?.bracketTrack === 'lower')
+  ) {
+    await assertBracketTrackRegistrationEligible(tx, {
+      tournamentId: slot.tournamentId,
+      groupId: slot.groupId,
+      bracketTrack: slot.group.bracketTrack,
+      registrationId,
+      slotId: slot.id,
+    });
+  }
 }
 
 async function assignSlotCore(
@@ -100,7 +113,16 @@ async function assignSlotCore(
 ): Promise<{ tournamentId: string; fixtureIds: string[] }> {
   const slot = await tx.v1TournamentSlot.findUnique({
     where: { id: slotId },
-    select: { id: true, tournamentId: true, kind: true, groupId: true, position: true, byeSortOrder: true, registrationId: true },
+    select: {
+      id: true,
+      tournamentId: true,
+      kind: true,
+      groupId: true,
+      position: true,
+      byeSortOrder: true,
+      registrationId: true,
+      group: { select: { phase: true, bracketTrack: true } },
+    },
   });
   if (slot === null) throw slotNotFound();
   const competition = await findTournamentOnSurface(tx, ALL_COMPETITION_KINDS, {
@@ -271,7 +293,7 @@ export class TournamentSlotService {
     private readonly games: GamesService,
   ) {}
 
-  private context(admin: V1ActiveAdmin): SlotMutationContext {
+  private context(admin: V1TournamentManager): SlotMutationContext {
     return { admin, adminContext: this.adminContext, games: this.games };
   }
 
@@ -287,15 +309,16 @@ export class TournamentSlotService {
   }
 
   /** `GamesService` 를 따로 받지 않는 호출자(등록 서비스)를 위한 얇은 래퍼. */
-  releaseForRegistrationInTx(tx: Tx, admin: V1ActiveAdmin, registrationId: string): Promise<void> {
+  releaseForRegistrationInTx(tx: Tx, admin: V1TournamentManager, registrationId: string): Promise<void> {
     return releaseSlotsForRegistrationInTx(tx, this.context(admin), registrationId);
   }
 
   async assignSlot(user: V1AuthUser, slotId: string, registrationId: string | null) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
-    const slot = await this.prisma.v1TournamentSlot.findUnique({ where: { id: slotId }, select: { tournamentId: true } });
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { slotId });
+    const slot = await this.prisma.v1TournamentSlot.findUnique({ where: { id: slotId }, select: { tournamentId: true, group: { select: { phase: true } } } });
     if (slot === null) throw slotNotFound();
     const competition = await this.loadCompetition(this.prisma, slot.tournamentId);
+    if (competition.format === 'league_knockouts' && slot.group?.phase !== 'group') throw new ConflictException({ code: 'MULTI_FINAL_SELECTION_REQUIRED', message: '토너먼트 설정에서 진출팀을 편집한 뒤 대진을 다시 생성해 주세요.' });
     return this.prisma.$transaction(async (tx) => {
       await lockCompetitionForBracketMutationInTx(tx, competition);
       const affectedTeamMatchIds = await assignSlotInTx(tx, this.context(admin), slotId, registrationId);
@@ -305,7 +328,7 @@ export class TournamentSlotService {
   }
 
   async setByeSide(user: V1AuthUser, slotId: string, side: 'HOME' | 'AWAY', expectedSide: 'HOME' | 'AWAY') {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { slotId });
     const slot = await this.prisma.v1TournamentSlot.findUnique({ where: { id: slotId }, select: { tournamentId: true } });
     if (!slot) throw slotNotFound();
     const competition = await this.loadCompetition(this.prisma, slot.tournamentId);
@@ -316,7 +339,7 @@ export class TournamentSlotService {
   }
 
   async randomFill(user: V1AuthUser, competitionId: string) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { tournamentId: competitionId });
     const competition = await this.loadCompetition(this.prisma, competitionId);
     return this.prisma.$transaction(async (tx) => {
       await lockCompetitionForBracketMutationInTx(tx, competition);

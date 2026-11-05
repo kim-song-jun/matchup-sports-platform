@@ -68,14 +68,17 @@ export function planBracketTemplateCounts(input: BracketTemplateInput): Template
   }
   const size = input.groupCount * input.advancePerGroup;
   if (![2, 4, 8, 16].includes(size) || (size === 2 && input.thirdPlace)) return null;
+  const split = input.lowerBracket === true;
+  if (split && (input.advancePerGroup !== 2 || ![2, 4, 8].includes(input.groupCount) || input.teamsPerGroup < 4)) return null;
   const third = input.thirdPlace ? 1 : 0;
+  const bracketCount = split ? 2 : 1;
   const stageFixtures = input.groupCount * ((input.teamsPerGroup * (input.teamsPerGroup - 1)) / 2) * input.legs;
   return {
-    groups: input.groupCount + Math.log2(size) + third,
-    slots: input.groupCount * input.teamsPerGroup + size,
-    fixtures: stageFixtures + (size - 1) + third,
+    groups: input.groupCount + (Math.log2(size) + third) * bracketCount,
+    slots: input.groupCount * input.teamsPerGroup + size * bracketCount,
+    fixtures: stageFixtures + (size - 1 + third) * bracketCount,
     // 결선 첫 라운드는 순위 자리가 대신해 연결선이 없다 — 둘째 라운드부터 양쪽 연결(size - 2) + 3·4위전 패자 2.
-    edges: size - 2 + third * 2,
+    edges: (size - 2 + third * 2) * bracketCount,
   };
 }
 

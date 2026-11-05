@@ -248,58 +248,27 @@ describe('Task 22 G-3: DIRECTOR_OFFICIALIZE denial audit + flag snapshot', () =>
     await prisma.$disconnect();
   });
 
-  it('audits a denied director void attempt while DIRECTOR_OFFICIALIZE is off, with the flag snapshot and no state change', async () => {
+  it('audits an assigned director void with the flag off and persists the new pointer', async () => {
     const { gameId, officialRevisionId } = await buildOfficialGame(ids.denialFixture);
-
     await prisma.v1GameOperationFlag.update({ where: { key: 'DIRECTOR_OFFICIALIZE' }, data: { value: 'off' } });
-    const flagBeforeDenial = await prisma.v1GameOperationFlag.findUniqueOrThrow({
-      where: { key: 'DIRECTOR_OFFICIALIZE' },
+    const before = await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId } });
+    const result = await resultReview.voidResultRevision(authUser(ids.director), gameId, officialRevisionId, 'director-full-void', {
+      expectedVersion: before.version, clientCommandId: 'director-full-void', reason: 'assigned director full management',
     });
-
-    const gameBeforeDenial = await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId } });
-    const denied = await captureFailure(() =>
-      resultReview.voidResultRevision(authUser(ids.director), gameId, officialRevisionId, 'task22g3-void-denied', {
-        expectedVersion: gameBeforeDenial.version,
-        clientCommandId: 'task22g3-void-denied',
-        reason: 'director attempts void while the gate is off',
-      }),
-    );
-    expectHttpCode(denied, 403, 'DIRECTOR_OFFICIALIZE_DISABLED');
-
-    // The game's pointer/version must be completely untouched by a denied attempt.
+    expect(result.revisionState).toBe('VOID');
     const game = await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId } });
-    expect(game.currentOfficialRevisionId).toBe(officialRevisionId);
-    expect(game.version).toBe(gameBeforeDenial.version);
-
-    const auditRows = await prisma.v1OperationAudit.findMany({
-      where: { resourceType: 'GAME', resourceId: gameId, action: 'RESULT_REVISION_VOID_DENIED' },
-    });
-    expect(auditRows).toHaveLength(1);
-    const audit = auditRows[0];
-    // `V1OperationAudit.actorType` only distinguishes USER vs SYSTEM
-    // (`V1OperationActorType` has no per-role variants); the actor's
-    // tournament-scoped role and authorization subject are carried in the
-    // `after` JSON payload instead (see the service's `withResultCommand`).
-    expect(audit.actorType).toBe('USER');
-    expect(audit.actorUserId).toBe(ids.director);
-    expect(audit.tournamentId).toBe(ids.tournament);
-    expect(audit.teamMatchId).toBe(ids.denialFixture);
-    expect(audit.after).toMatchObject({
-      denied: true,
-      code: 'DIRECTOR_OFFICIALIZE_DISABLED',
-      actorRole: 'tournament_director',
-      authorizationSubject: `assignment:${ids.directorAssignment}@0`,
-      directorOfficializeFlag: { value: 'off', version: flagBeforeDenial.version },
-    });
+    expect(game.currentOfficialRevisionId).toBe(result.revisionId);
+    expect(game.version).toBeGreaterThan(before.version);
+    const audits = await prisma.v1OperationAudit.findMany({ where: { resourceType: 'GAME', resourceId: gameId, action: 'RESULT_REVISION_VOID' } });
+    expect(audits).toHaveLength(1);
+    expect(audits[0]).toMatchObject({ actorType: 'USER', actorUserId: ids.director, tournamentId: ids.tournament });
+    expect(audits[0].after).toMatchObject({ actorRole: 'tournament_director', authorizationSubject: `assignment:${ids.directorAssignment}@0`, authorizationPolicy: 'assigned_tournament_full_management' });
   });
 
-  it('audits an allowed director void with the actor role, authorizationSubject, and flag value/version snapshot while the gate is on', async () => {
+  it('audits an allowed director void with the same scoped authorization while the flag is on', async () => {
     const { gameId, officialRevisionId } = await buildOfficialGame(ids.successFixture);
 
     await prisma.v1GameOperationFlag.update({ where: { key: 'DIRECTOR_OFFICIALIZE' }, data: { value: 'on' } });
-    const flagBeforeSuccess = await prisma.v1GameOperationFlag.findUniqueOrThrow({
-      where: { key: 'DIRECTOR_OFFICIALIZE' },
-    });
 
     const gameBeforeVoid = await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId } });
     const voided = await resultReview.voidResultRevision(authUser(ids.director), gameId, officialRevisionId, 'task22g3-void-allowed', {
@@ -326,7 +295,7 @@ describe('Task 22 G-3: DIRECTOR_OFFICIALIZE denial audit + flag snapshot', () =>
       revisionState: 'VOID',
       actorRole: 'tournament_director',
       authorizationSubject: `assignment:${ids.directorAssignment}@0`,
-      directorOfficializeFlag: { value: 'on', version: flagBeforeSuccess.version },
+      authorizationPolicy: 'assigned_tournament_full_management',
     });
 
     // Reaffirms the flag gate is not itself audited by this lane (Task 5's

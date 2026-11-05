@@ -1,0 +1,99 @@
+{
+  "phase": "before-visibility",
+  "runtime": "local Next.js; synthetic API fixtures; no real login/database",
+  "sourceHead": "31dbbc9aac7527cd6be790cc6a4baba9d3a82736",
+  "shots": [
+    {
+      "file": "before-visibility-overview-1440.png",
+      "path": "/tournament-management/tournaments/21010000-0000-4000-8000-000000000001/overview",
+      "width": 1440,
+      "overflow": false,
+      "title": "Teameet"
+    },
+    {
+      "file": "before-visibility-overview-768.png",
+      "path": "/tournament-management/tournaments/21010000-0000-4000-8000-000000000001/overview",
+      "width": 768,
+      "overflow": false,
+      "title": "Teameet"
+    },
+    {
+      "file": "before-visibility-overview-390.png",
+      "path": "/tournament-management/tournaments/21010000-0000-4000-8000-000000000001/overview",
+      "width": 390,
+      "overflow": false,
+      "title": "Teameet"
+    }
+  ],
+  "errors": [
+    {
+      "type": "http",
+      "status": 500,
+      "path": "/socket.io/"
+    },
+    {
+      "type": "console",
+      "message": "Failed to load resource: the server responded with a status of 500 (Internal Server Error)"
+    },
+    {
+      "type": "http",
+      "status": 403,
+      "path": "/api/v1/admin/me"
+    },
+    {
+      "type": "console",
+      "message": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    },
+    {
+      "type": "http",
+      "status": 500,
+      "path": "/socket.io/"
+    },
+    {
+      "type": "console",
+      "message": "Failed to load resource: the server responded with a status of 500 (Internal Server Error)"
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/health"
+    },
+    {
+      "method": "GET",
+      "path": "/auth/me"
+    },
+    {
+      "method": "GET",
+      "path": "/me/settings"
+    },
+    {
+      "method": "GET",
+      "path": "/me/tournament-staff"
+    },
+    {
+      "method": "POST",
+      "path": "/logs/client-error"
+    },
+    {
+      "method": "GET",
+      "path": "/admin/tournaments/21010000-0000-4000-8000-000000000001"
+    },
+    {
+      "method": "GET",
+      "path": "/admin/me"
+    },
+    {
+      "method": "GET",
+      "path": "/tournament-ops/tournaments/21010000-0000-4000-8000-000000000001/staff"
+    },
+    {
+      "method": "POST",
+      "path": "/logs/client-error"
+    }
+  ],
+  "mutations": [],
+  "browserPid": 11047,
+  "parentPid": 11005,
+  "cleanup": "owned contexts and headed browser closed"
+}

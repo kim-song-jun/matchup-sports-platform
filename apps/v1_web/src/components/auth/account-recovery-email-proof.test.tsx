@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { http } from 'msw';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AccountRecoveryClient } from './account-recovery-client';
-import { authUiServer, failure, RECOVERY_EMAIL, RECOVERY_PHONE, renderAuthUi, resetWireScenario, wireCalls } from './mdqa133-auth-ui.fixtures';
+import { authUiServer, failure, RECOVERY_EMAIL, RECOVERY_PHONE, renderAuthUi, resetWireScenario, success, wireCalls } from './mdqa133-auth-ui.fixtures';
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: vi.fn(), back: vi.fn() }), useSearchParams: () => new URLSearchParams() }));
 vi.mock('@/lib/analytics', () => ({ trackEvent: vi.fn() }));
@@ -20,6 +20,7 @@ afterEach(() => { cleanup(); authUiServer.resetHandlers(); });
 async function verifyEmail(address = RECOVERY_EMAIL) {
   fireEvent.change(await screen.findByLabelText('이메일'), { target: { value: address } });
   const user = userEvent.setup();
+  await user.click(screen.getByRole('button', { name: '다음' }));
   await user.click(await screen.findByRole('button', { name: '인증번호 받기' }));
   await user.click(await screen.findByRole('button', { name: '확인' }));
   await screen.findByLabelText('새 비밀번호');
@@ -42,8 +43,11 @@ describe('MD-QA #133 비밀번호 복구는 독립 이메일 증명을 사용한
 
   it('아이디 찾기에서 재설정으로 전환하면 전화번호 증명을 이어 쓰지 않는다', async () => {
     renderAuthUi(<AccountRecoveryClient />);
+    fireEvent.click(screen.getByRole('button', { name: '아이디·로그인 방법 찾기' }));
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
     fireEvent.change(screen.getByLabelText('휴대폰 번호'), { target: { value: RECOVERY_PHONE } });
-    fireEvent.click(screen.getByRole('tab', { name: '비밀번호 재설정' }));
+    fireEvent.click(screen.getByRole('button', { name: '비밀번호 재설정' }));
 
     expect(await screen.findByLabelText('이메일')).toBeInTheDocument();
     expect(screen.queryByLabelText('휴대폰 번호')).not.toBeInTheDocument();
@@ -81,17 +85,47 @@ describe('MD-QA #133 비밀번호 복구는 독립 이메일 증명을 사용한
     await verifyEmail();
     await submitPassword();
 
+    expect(await screen.findByRole('alert')).toHaveTextContent('비밀번호가 없는 계정이에요');
     expect(await screen.findByRole('link', { name: '로그인 화면으로' })).toHaveAttribute('href', '/login');
     expect(screen.queryByLabelText('새 비밀번호')).not.toBeInTheDocument();
     expect(screen.queryByText('비밀번호를 바꿨어요')).not.toBeInTheDocument();
   });
 
-  it('아이디 찾기의 기존 전화번호 조회는 비밀번호 변경 없이 유지한다', async () => {
+  it.each(['kakao', 'apple'])('이메일 인증 후 %s 로그인 방법 조회 요청으로 이어진다', async (provider) => {
+    const lookups: Array<{ email: string; proofToken: string }> = [];
+    authUiServer.use(http.post<never, { email: string; proofToken: string }>('*/api/v1/auth/recovery/email/find-account', async ({ request }) => {
+      const body = await request.json();
+      lookups.push(body);
+      return success({ maskedEmail: 'ow***@example.test', providers: [provider], hasPassword: false, withdrawalPendingUntil: null });
+    }));
     renderAuthUi(<AccountRecoveryClient />);
-    fireEvent.change(screen.getByLabelText('휴대폰 번호'), { target: { value: RECOVERY_PHONE } });
     const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: '아이디·로그인 방법 찾기' }));
+    await user.click(screen.getByRole('button', { name: '다음' }));
+    await user.click(screen.getByRole('button', { name: '이메일로 찾기' }));
+    await user.click(screen.getByRole('button', { name: '다음' }));
+    fireEvent.change(screen.getByLabelText('이메일'), { target: { value: RECOVERY_EMAIL } });
+    expect(lookups).toHaveLength(0);
+    await user.click(screen.getByRole('button', { name: '다음' }));
     await user.click(screen.getByRole('button', { name: '인증번호 받기' }));
     await user.click(await screen.findByRole('button', { name: '확인' }));
+    const label = provider === 'kakao' ? '카카오' : 'Apple';
+    expect(await screen.findByText(new RegExp(`${label} 로그인으로 가입했어요`))).toBeVisible();
+    expect(lookups).toEqual([{ email: RECOVERY_EMAIL, proofToken: 'email-proof' }]);
+    expect(wireCalls.emailReset).toHaveLength(0);
+  });
+
+  it('아이디 찾기의 기존 전화번호 조회는 비밀번호 변경 없이 유지한다', async () => {
+    renderAuthUi(<AccountRecoveryClient />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: '아이디·로그인 방법 찾기' }));
+    await user.click(screen.getByRole('button', { name: '다음' }));
+    await user.click(screen.getByRole('button', { name: '다음' }));
+    fireEvent.change(screen.getByLabelText('휴대폰 번호'), { target: { value: RECOVERY_PHONE } });
+    await user.click(screen.getByRole('button', { name: '다음' }));
+    await user.click(screen.getByRole('button', { name: '인증번호 받기' }));
+    await screen.findByRole('button', { name: '확인' });
+    await user.click(screen.getByRole('button', { name: '확인' }));
 
     expect(await screen.findByText('ow***@example.test')).toBeInTheDocument();
     expect(wireCalls.phoneVerify).toEqual([{ phone: RECOVERY_PHONE, code: '123456', purpose: 'password_reset' }]);

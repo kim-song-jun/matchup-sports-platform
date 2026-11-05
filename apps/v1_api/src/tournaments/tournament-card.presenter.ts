@@ -1,12 +1,11 @@
 import { capacityLimitOf } from './registration-capacity';
+import { isRegistrationWindowOpen } from './registration-window';
 import type { TournamentListRow } from './tournaments-read.query';
 
 export function presentTournamentCard(row: TournamentListRow, now = new Date()) {
   const capacityLimit = capacityLimitOf(row);
   return {
-    registrationOpen: (row.kind === 'regular_league'
-      ? !['completed', 'cancelled', 'on_hold'].includes(row.status) && row.registrationDeadlineAt !== null && row.registrationDeadlineAt >= now
-      : row.status === 'open' && (!row.registrationDeadlineAt || row.registrationDeadlineAt >= now))
+    registrationOpen: isRegistrationWindowOpen(row.status, row.registrationDeadlineAt, now.getTime())
       && (capacityLimit === null || row._count.registrations + row.registrations.length < capacityLimit),
     id: row.id,
     sportId: row.sportId,

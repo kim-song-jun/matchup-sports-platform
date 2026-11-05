@@ -8,8 +8,8 @@
  * paid · confirmed`를 모두 정원 점유로 세므로(`tournament-registrations.service.ts`),
  * 입금대기 팀이 정원을 채운 대회는 "5 / 8"처럼 여유가 있어 보여도 실제로는 신청을 받을 수 없다.
  * 그 간극이 "왜 신청이 안 받아지냐"의 원인이었다.
- * 정규 리그는 fixture 생성 뒤에도 미래 registrationDeadlineAt까지 신청할 수 있다.
- * 참가팀 정원은 별도 maxTeams로 판정하며 null·미설정은 무제한이다.
+ * 정규 리그도 대회와 같이 접수 중(open)일 때만 받는다(2026-10-27, 서버 `registration-window.ts`).
+ * 리그 참가팀 정원은 별도 maxTeams로 판정하며 null·미설정은 무제한이다.
  */
 
 export type TournamentRegistrationBlockReason =
@@ -64,24 +64,12 @@ export function resolveTournamentCapacity(tournament: TournamentCapacityInput): 
 
 /**
  * 새 신청(취소 후 재신청 포함)을 막는 이유. 막을 이유가 없으면 null.
- * 일반 대회는 서버가 거절하는 순서와 같게 상태 → 마감 → 정원을 검사한다. 정규 리그는
- * 종료 상태와 마감에 이어 선택적 참가팀 정원을 검사한다.
+ * 대회와 정규 리그 모두 서버가 거절하는 순서와 같게 상태 → 마감 → 정원을 검사한다.
  */
 export function resolveTournamentRegistrationBlock(
   tournament: TournamentCapacityInput,
   now: Date = new Date(),
 ): TournamentRegistrationBlockReason | null {
-  if (tournament.kind === 'regular_league') {
-    // The API keeps league registration open while a future deadline exists, even
-    // after fixture generation changes the mirror status to in_progress. Leagues
-    // reserve places independently of the registration time/status window.
-    if (tournament.status === 'completed' || tournament.status === 'cancelled') return 'not_open';
-    if (!tournament.registrationDeadlineAt) return 'not_open';
-    const deadline = new Date(tournament.registrationDeadlineAt).getTime();
-    if (!Number.isFinite(deadline)) return 'not_open';
-    if (deadline < now.getTime()) return 'deadline_passed';
-    return resolveTournamentCapacity(tournament).isFull ? 'capacity_full' : null;
-  }
   if (tournament.status !== 'open') return 'not_open';
   if (tournament.registrationDeadlineAt) {
     const deadline = new Date(tournament.registrationDeadlineAt).getTime();

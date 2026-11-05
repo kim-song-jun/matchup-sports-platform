@@ -25,7 +25,8 @@ export function AuthFixedCta({ children }: { children: ReactNode }) {
     if (typeof ResizeObserver === 'undefined') return () => frame.style.removeProperty(CTA_HEIGHT_VAR);
 
     const observer = new ResizeObserver(sync);
-    observer.observe(node);
+    // Native insets can change only the padding; observing the content box misses that resize.
+    observer.observe(node, { box: 'border-box' });
     return () => {
       observer.disconnect();
       frame.style.removeProperty(CTA_HEIGHT_VAR);

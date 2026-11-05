@@ -56,10 +56,8 @@ describe('canWriteTournamentAdmin', () => {
     }
   });
 
-  it('스태프 역할에는 대회 관리 쓰기를 아직 열지 않는다', () => {
-    // 화면을 어드민으로 들여올 때 화면별로 정한다 — 미리 넓히면 서버가 막더라도
-    // "쓸 수 있는 것처럼 보이는" 결함이 된다.
-    expect(canWriteTournamentAdmin('TOURNAMENT_DIRECTOR')).toBe(false);
+  it('배정 디렉터는 관리할 수 있고 필드·조회 담당자는 관리할 수 없다', () => {
+    expect(canWriteTournamentAdmin('TOURNAMENT_DIRECTOR')).toBe(true);
     expect(canWriteTournamentAdmin('FIELD_OPERATOR')).toBe(false);
     expect(canWriteTournamentAdmin('SUPPORT_READONLY')).toBe(false);
   });

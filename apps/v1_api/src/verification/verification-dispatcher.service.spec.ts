@@ -1,8 +1,13 @@
-import { ServiceUnavailableException } from '@nestjs/common';
+import { Logger, ServiceUnavailableException } from '@nestjs/common';
 import type { SmsEventLogService } from './sms-event-log.service';
 import type { EmailSender } from './email/email-sender';
 import type { SmsSender } from './sms/sms-sender';
+import { recordEmailDeliveryFailure } from './email/email-delivery-failure';
 import { VerificationDispatcherService, isTestAddress } from './verification-dispatcher.service';
+
+// The window folding and payload are covered in email-delivery-failure.spec; here only the hand-off is.
+jest.mock('./email/email-delivery-failure', () => ({ recordEmailDeliveryFailure: jest.fn() }));
+const recordFailure = recordEmailDeliveryFailure as jest.Mock;
 
 function emailMock(enabled = false, send = jest.fn().mockResolvedValue(undefined)): EmailSender {
   return { enabled, send };
@@ -67,13 +72,22 @@ describe('VerificationDispatcherService', () => {
     });
   });
 
-  it('phone + provider 미설정 + dev-echo on → 발송 없이 통과(devEchoActive)', async () => {
+  it('예약된 테스트 번호만 dev-echo로 처리하고 로그에는 인증번호를 남기지 않는다', async () => {
     process.env.V1_VERIFICATION_DEV_ECHO = 'true';
     const sms = smsMock(false);
     const d = new VerificationDispatcherService(sms, emailMock(), eventLogStub(), prismaStub());
-    await expect(d.send('phone', '01012345678', '123456')).resolves.toBeUndefined();
+    const logs = jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+    await expect(d.send('phone', '01000001234', '123456')).resolves.toBeUndefined();
+    expect(JSON.stringify(logs.mock.calls)).not.toContain('123456');
+    logs.mockRestore();
     expect(sms.send).not.toHaveBeenCalled();
-    expect(d.devEchoActive).toBe(true);
+    expect(await d.mayEchoCode({ channel: 'phone', address: '01000001234' })).toBe(true);
+  });
+
+  it('실제 번호는 dev-echo가 켜져 있어도 문자 발송 수단이 없으면 실패한다', async () => {
+    process.env.V1_VERIFICATION_DEV_ECHO = 'true';
+    const d = new VerificationDispatcherService(smsMock(false), emailMock(), eventLogStub(), prismaStub());
+    await expect(d.send('phone', '01012345678', '123456')).rejects.toMatchObject({ response: { code: 'SMS_NOT_CONFIGURED' } });
   });
 
   it('phone + provider 미설정 + dev-echo off → SMS_NOT_CONFIGURED로 설정오류를 표면화한다', async () => {
@@ -83,20 +97,34 @@ describe('VerificationDispatcherService', () => {
     await expect(d.send('phone', '01012345678', '123456')).rejects.toMatchObject({
       response: { code: 'SMS_NOT_CONFIGURED' },
     });
-    expect(d.devEchoActive).toBe(false);
+    expect(await d.mayEchoCode({ channel: 'phone', address: '01000001234' })).toBe(false);
   });
 
-  it('provider 실발송 가능하면 dev-echo 가 켜져 있어도 devEchoActive=false (OTP 미노출)', () => {
-    process.env.V1_VERIFICATION_DEV_ECHO = 'true';
-    const d = new VerificationDispatcherService(smsMock(true), emailMock(), eventLogStub(), prismaStub());
-    expect(d.devEchoActive).toBe(false);
-  });
-
-  it('email 채널은 SMS 를 타지 않고 로그 스텁으로만 처리한다', async () => {
+  it('메일 발송 수단이 없으면 성공으로 가장하지 않고 SMS도 보내지 않는다', async () => {
     const sms = smsMock(true);
     const d = new VerificationDispatcherService(sms, emailMock(), eventLogStub(), prismaStub());
-    await expect(d.send('email', 'a@b.com', '123456')).resolves.toBeUndefined();
+    await expect(d.send('email', 'a@b.com', '123456')).rejects.toMatchObject({ response: { code: 'EMAIL_SEND_UNAVAILABLE' } });
     expect(sms.send).not.toHaveBeenCalled();
+  });
+
+  it('실제 주소로는 dev-echo가 켜져 있어도 발송 수단이 없으면 실패한다', async () => {
+    process.env.V1_VERIFICATION_DEV_ECHO = 'true';
+    const d = new VerificationDispatcherService(smsMock(false), emailMock(false), eventLogStub(), prismaStub());
+    await expect(d.send('email', 'someone@gmail.com', '123456')).rejects.toMatchObject({ response: { code: 'EMAIL_SEND_UNAVAILABLE' } });
+  });
+
+  it('실제 발송이 설정된 Alpha에서도 예약된 테스트 주소만 실제 메일 없이 테스트한다', async () => {
+    process.env.V1_VERIFICATION_DEV_ECHO = 'true';
+    const email = emailMock(true);
+    const sms = smsMock(true);
+    const d = new VerificationDispatcherService(sms, email, eventLogStub(), prismaStub());
+    await expect(d.send('email', 'qa@teameet.test', '123456')).resolves.toBeUndefined();
+    await expect(d.send('phone', '01000001234', '123456')).resolves.toBeUndefined();
+    expect(email.send).not.toHaveBeenCalled();
+    expect(sms.send).not.toHaveBeenCalled();
+    expect(await d.mayEchoCode({ channel: 'email', address: 'qa@teameet.test' })).toBe(true);
+    expect(await d.mayEchoCode({ channel: 'phone', address: '01000001234' })).toBe(true);
+    expect(await d.mayEchoCode({ channel: 'email', address: 'user@gmail.com' })).toBe(false);
   });
 
   // 이메일 채널이 로그 스텁이던 시절엔 코드가 아무 데도 안 가면서 요청은 성공으로 보였다.
@@ -121,12 +149,66 @@ describe('VerificationDispatcherService', () => {
       .rejects.toMatchObject({ response: { code: 'EMAIL_SEND_FAILED' } });
   });
 
-  // 실제로 메일을 보내면서 응답에 코드까지 실어 보내면 OTP 를 그대로 노출하는 셈이다.
-  it('email provider 가 살아 있으면 devEcho 가 켜져 있어도 devCode 를 노출하지 않는다', () => {
+  describe('메일 발송 실패 알림', () => {
+    const failing = (purpose?: 'password_reset' | 'login_step_up') => {
+      const error = Object.assign(new Error('not authorized'), { name: 'AccessDeniedException' });
+      const send = jest.fn().mockRejectedValue(error);
+      const prisma = prismaStub();
+      const d = new VerificationDispatcherService(smsMock(false), emailMock(true, send), eventLogStub(), prisma);
+      return { d, error, prisma, run: () => d.send('email', 'runner@example.com', '123456', purpose) };
+    };
+
+    beforeEach(() => recordFailure.mockReset());
+
+    it('발송이 실패하면 용도와 오류를 기록하고 호출자에게는 그대로 EMAIL_SEND_FAILED 를 준다', async () => {
+      const { run, error, prisma } = failing('password_reset');
+
+      await expect(run()).rejects.toMatchObject({ response: { code: 'EMAIL_SEND_FAILED' } });
+
+      expect(recordFailure).toHaveBeenCalledTimes(1);
+      expect(recordFailure).toHaveBeenCalledWith(prisma, { purpose: 'password_reset', error });
+    });
+
+    it('용도를 넘기지 않은 호출은 기본 용도(verify)로 기록한다', async () => {
+      await expect(failing().run()).rejects.toMatchObject({ response: { code: 'EMAIL_SEND_FAILED' } });
+
+      expect(recordFailure).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ purpose: 'verify' }));
+    });
+
+    it('알림 기록이 실패해도 호출자가 받는 오류는 바뀌지 않고, 기록 실패는 로그로 남는다', async () => {
+      recordFailure.mockRejectedValue(new Error('db down'));
+      const logError = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+      const { run } = failing('login_step_up');
+
+      await expect(run()).rejects.toMatchObject({ response: { code: 'EMAIL_SEND_FAILED' } });
+
+      expect(logError).toHaveBeenCalledWith(expect.stringContaining('db down'));
+      logError.mockRestore();
+    });
+
+    it('발송이 성공하면 아무것도 기록하지 않는다', async () => {
+      const d = new VerificationDispatcherService(smsMock(false), emailMock(true), eventLogStub(), prismaStub());
+
+      await d.send('email', 'runner@example.com', '123456');
+
+      expect(recordFailure).not.toHaveBeenCalled();
+    });
+
+    it('SMS 발송 실패는 메일 알림 대상이 아니다', async () => {
+      const sms = smsMock(true, jest.fn().mockRejectedValue(new Error('solapi down')));
+      const d = new VerificationDispatcherService(sms, emailMock(), eventLogStub(), prismaStub());
+
+      await expect(d.send('phone', '01012345678', '123456')).rejects.toMatchObject({ response: { code: 'SMS_SEND_FAILED' } });
+
+      expect(recordFailure).not.toHaveBeenCalled();
+    });
+  });
+
+  it('email provider가 살아 있어도 dev-echo는 테스트 주소에만 적용된다', async () => {
     process.env.V1_VERIFICATION_DEV_ECHO = 'true';
     const d = new VerificationDispatcherService(smsMock(false), emailMock(true), eventLogStub(), prismaStub());
 
-    expect(d.devEchoActive).toBe(false);
+    expect(await d.mayEchoCode({ channel: 'email', address: 'user@gmail.com' })).toBe(false);
   });
 
   describe('mayEchoCode', () => {
@@ -144,10 +226,10 @@ describe('VerificationDispatcherService', () => {
       expect(await d.mayEchoCode({ channel: 'email', address: 'someone@gmail.com' })).toBe(false);
     });
 
-    it('never echoes when a real sender is configured, even to a test address', async () => {
+    it('never echoes to a real address when a sender is configured', async () => {
       process.env.V1_VERIFICATION_DEV_ECHO = 'true';
       const d = new VerificationDispatcherService(smsMock(false), emailMock(true), eventLogStub(), prismaStub());
-      expect(await d.mayEchoCode({ channel: 'email', address: 'qa@teameet.test' })).toBe(false);
+      expect(await d.mayEchoCode({ channel: 'email', address: 'user@gmail.com' })).toBe(false);
     });
 
     it('withholds the code from admin and tournament staff accounts, by user id or by the address they own', async () => {
@@ -159,6 +241,7 @@ describe('VerificationDispatcherService', () => {
         },
       );
       expect(await d.mayEchoCode({ channel: 'email', address: 'Admin@teameet.test' })).toBe(false);
+      expect(await d.mayEchoCode({ channel: 'email', address: 'Admin@teameet.test', userId: 'player' })).toBe(false);
       expect(await d.mayEchoCode({ channel: 'phone', address: '01000000001' })).toBe(false);
       expect(await d.mayEchoCode({ channel: 'email', address: 'new@teameet.test', userId: 'staff' })).toBe(false);
       expect(await d.mayEchoCode({ channel: 'email', address: 'player@teameet.test' })).toBe(true);

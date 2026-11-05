@@ -385,13 +385,9 @@
   }
 }
 
-/* ─── Fix (4): team-new 모바일 스크롤 하단 여백 ─────────────────────────────────
- * 고정 CTA(~72px 버튼 + 8px gap + 16px 상하 padding ≈ 96px) +
- * safe-area-inset-bottom(홈 바가 있는 기기 ~34px) 합산 ≈ 124px 이상.
- * 매치 위저드(.tm-create-shell padding-bottom) 동일 패턴 적용.
- * desktop에서는 .tm-team-form-grid .tm-create-shell이 padding:0 0 48px으로 재정의하므로
- * 이 규칙은 사실상 모바일(<1024)에서만 유효하다.
+/* 모바일 고정 CTA의 실제 높이와 안전 영역을 비워 마지막 입력이 가려지지 않게 한다.
+ * 데스크톱에서는 폼 그리드 규칙이 이 여백을 덮어쓴다.
  */
 .tm-team-form-main {
-  padding-bottom: calc(124px + var(--v1-shell-safe-bottom));
+  padding-bottom: max(calc(124px + var(--v1-shell-safe-bottom)), calc(var(--tm-create-cta-height, 0px) + 16px));
 }

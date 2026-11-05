@@ -3,10 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { EmailLoginClient } from './email-login-client';
 import { V1ApiError } from '@/lib/api-client';
 import { __resetNavigationHistoryForTests, installNavigationHistory } from '@/lib/navigation-history';
+import { peekPendingSocialLink, savePendingSocialLink } from '@/lib/pending-social-link';
 import { getSavedRedirectPath, resolveAuthContinuationPath } from '@/lib/session-storage';
+import { readWithdrawalCancel } from '@/lib/withdrawal-cancel-storage';
 
 const router = vi.hoisted(() => ({
   replace: vi.fn(),
+  push: vi.fn(),
   back: vi.fn(),
 }));
 
@@ -197,5 +200,58 @@ describe('EmailLoginClient back to the login start screen', () => {
 
     expect(router.back).toHaveBeenCalledTimes(1);
     expect(router.replace).not.toHaveBeenCalled();
+  });
+});
+
+describe('EmailLoginClient 탈퇴 철회와 대기 연결 안내', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    nativeApple.available = false;
+    window.sessionStorage.clear();
+    window.history.replaceState({}, '', '/login/email');
+  });
+
+  const withdrawalError = (details?: Record<string, unknown>) => new V1ApiError({
+    status: 'error', statusCode: 403, code: 'ACCOUNT_WITHDRAWAL_PENDING', message: '탈퇴 신청 중인 계정이에요.', details, timestamp: '2026-10-31T00:00:00.000Z',
+  });
+
+  it('자격이 맞은 탈퇴 신청 계정은 철회 토큰을 보관하고 철회 화면으로 보낸다', async () => {
+    window.history.replaceState({}, '', '/login/email?redirect=%2Fchat');
+    hooks.loginMutate.mockImplementation((_body: unknown, callbacks: LoginCallbacks) =>
+      callbacks.onError?.(withdrawalError({ withdrawalCancelToken: 'withdrawal-token-1', expiresInSeconds: 600 })));
+    render(<EmailLoginClient />);
+
+    await submitLogin('withdrawn@example.com', 'password123');
+
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith('/auth/withdrawal-cancel'));
+    expect(readWithdrawalCancel()).toMatchObject({ token: 'withdrawal-token-1', returnTo: '/chat' });
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('철회 토큰이 없는 403 은 철회 화면으로 보내지 않고 일반 실패 문구를 보여 준다', async () => {
+    hooks.loginMutate.mockImplementation((_body: unknown, callbacks: LoginCallbacks) => callbacks.onError?.(withdrawalError()));
+    render(<EmailLoginClient />);
+
+    await submitLogin('withdrawn@example.com', 'password123');
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('지금은 로그인할 수 없어요');
+    expect(router.push).not.toHaveBeenCalled();
+    expect(readWithdrawalCancel()).toBeNull();
+  });
+
+  it('대기 연결 토큰이 있으면 로그인하면 연결된다고 알리고, 연결 안 하기로 끊을 수 있다', async () => {
+    savePendingSocialLink({ next: 'sign_in_then_link', provider: 'kakao', linkToken: 'link-token-1', linkTokenExpiresInSeconds: 600 });
+    render(<EmailLoginClient />);
+
+    expect(await screen.findByText(/로그인하면 카카오 로그인이 이 계정에 연결돼요\./)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '연결 안 하기' }));
+
+    expect(screen.queryByText(/로그인하면 카카오 로그인이 이 계정에 연결돼요\./)).not.toBeInTheDocument();
+    expect(peekPendingSocialLink()).toBeNull();
+  });
+
+  it('대기 연결 토큰이 없으면 안내를 그리지 않는다', () => {
+    render(<EmailLoginClient />);
+    expect(screen.queryByRole('button', { name: '연결 안 하기' })).not.toBeInTheDocument();
   });
 });

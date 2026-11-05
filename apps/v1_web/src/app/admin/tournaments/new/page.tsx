@@ -3,8 +3,8 @@ import { SixTeamModeField } from '@/components/admin/bracket-canvas/six-team-mod
 
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, ArrowRight, Check, ChevronLeft, Copy, Lock } from 'lucide-react';
-import { useEffect, useReducer, useRef, useState, type FocusEvent, type MouseEvent } from 'react';
+import { ArrowLeft, ArrowRight, Check, ChevronLeft, Copy } from 'lucide-react';
+import { useEffect, useMemo, useReducer, useRef, useState, type FocusEvent, type MouseEvent } from 'react';
 import {
   useV1AdminTournament,
   useV1AdminTournaments,
@@ -17,8 +17,10 @@ import {
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage, extractErrorCode } from '@/lib/error-message';
 import { formatWithComma, onlyDigits } from '@/lib/number-format';
-import type { V1Tournament, V1TournamentFormat, V1TournamentGenderCategory } from '@/types/api';
+import type { V1Tournament, V1TournamentFormat } from '@/types/api';
 import { AdminPageHeader, AdminToasts, useAdminToast } from '@/components/admin';
+import { WizardStepper } from '@/components/admin/wizard-stepper';
+import { GenderCategoryField } from '@/components/admin/gender-category-field';
 import { TournamentImagesField } from '@/components/admin/tournaments/tournament-images-field';
 import {
   PrizeBreakdownEditor,
@@ -52,11 +54,13 @@ import {
   isShortLeadTime,
   periodLabels,
   switchPeriodCount,
+  TOURNAMENT_PERIOD_PHASES,
+  tournamentPeriodPhaseLabel,
   validateTournamentCreateStep,
   type TournamentCreateAction,
   type TournamentCreateState,
 } from './tournament-create-model';
-import { useSaveTournamentPeriodSettings, useTournamentPeriodSettings } from '@/hooks/use-tournament-period-settings';
+import { useSaveTournamentPeriodSettings, useTournamentPeriodSettings, type TournamentPeriodPhase } from '@/hooks/use-tournament-period-settings';
 import { CompetitionTemplateCard } from '@/shared/ui/competition-template-card';
 
 function scrollBehavior(): ScrollBehavior {
@@ -91,6 +95,7 @@ export default function AdminTournamentsNewPage() {
   const changeStatus = useV1ChangeTournamentStatus(state.draftId ?? '');
   const uploadImages = useV1UploadImages();
   const savePeriods = useSaveTournamentPeriodSettings();
+  const savedPeriodSettings = useTournamentPeriodSettings(state.draftId ?? draftIdParam ?? '');
   const pending = createTournament.isPending || updateTournament.isPending || savePeriods.isPending;
   const selectedSport = sports?.find((sport) => sport.id === state.sportId);
   const previousWithBank = previousTournaments?.items.find(
@@ -206,7 +211,7 @@ export default function AdminTournamentsNewPage() {
     // "공개 확인" 단계는 초안이 실제로 만들어진 뒤에만 들어갈 수 있다 — 검증만 통과했다고
     // 스텝 버튼을 직접 눌러 건너뛸 수 있으면, 대회가 없는 채로 "접수 시작하기"를 누르는
     // 상황이 생긴다(잠김 상태, 스테퍼 버튼도 이 조건으로 disabled 처리).
-    if (nextStep === CONFIRM_STEP_INDEX && (!state.draftId || state.periodMinutesDirty || pending)) return;
+    if (nextStep === CONFIRM_STEP_INDEX && (!state.draftId || state.periodMinutesDirty || state.stagePeriodMinutesDirty || pending)) return;
     if (nextStep === CONFIRM_STEP_INDEX && hasUnsavedTournamentChanges(state)) {
       dispatch({ type: 'set-step', step: LAST_INPUT_STEP_INDEX });
       showToast('저장하지 않은 대회 정보가 있어요. 저장하고 계속하기를 눌러 반영해 주세요.', 'error');
@@ -298,40 +303,65 @@ export default function AdminTournamentsNewPage() {
 
     // 운영자가 경기 시간을 고쳤으면 대회 저장 직후 피리어드 설정으로 저장한다 — 생성 API 는 종목
     // 기본 피리어드로 만들고, 피리어드는 감사·버전 검사를 갖춘 전용 API 가 소유한다.
-    const persistPeriods = (tournament: V1Tournament) => {
+    const persistPeriods = async (tournament: V1Tournament) => {
       // 생성 ID는 즉시 유지하되 두 저장이 모두 끝나야 공개 확인을 허용한다.
       dispatch({ type: 'draft-saved', tournament });
-      if (!state.periodMinutesDirty) {
+      if (!state.periodMinutesDirty && !state.stagePeriodMinutesDirty) {
         const savedPayload = mapTournamentToWizardFields(tournament).savedPayload;
         if (!hasUnsavedTournamentChanges(latestStateRef.current, savedPayload)) {
           dispatch({ type: 'draft-created', tournament });
         }
         return;
       }
-      savePeriods.mutate(
-        {
-          tournamentId: tournament.id,
-          expectedVersion: tournament.updatedAt,
-          periods: state.periodMinutes.map((value) => ({ durationMinutes: Number(value) })),
-        },
-        {
-          onSuccess: (result) => {
-            if (!result.expectedVersion) {
-              showToast('경기 시간 저장 버전을 확인하지 못했어요. 초안을 다시 불러와 주세요.', 'error');
-              return;
-            }
-            dispatch({ type: 'periods-saved', updatedAt: result.expectedVersion });
-            const updatedTournament = { ...tournament, updatedAt: result.expectedVersion };
-            const savedPayload = mapTournamentToWizardFields(updatedTournament).savedPayload;
-            if (!hasUnsavedTournamentChanges(latestStateRef.current, savedPayload)) {
-              dispatch({ type: 'draft-created', tournament: updatedTournament });
-            }
-          },
-          onError: (error) => {
-            showToast(extractErrorMessage(error, '대회는 초안으로 저장했지만 경기 시간을 저장하지 못했어요. 저장하고 계속하기로 다시 시도해 주세요.'), 'error');
-          },
-        },
-      );
+      let expectedVersion = tournament.updatedAt;
+      try {
+        if (state.periodMinutesDirty) {
+          const saved = await savePeriods.mutateAsync({
+            tournamentId: tournament.id,
+            expectedVersion,
+            periods: state.periodMinutes.map((value) => ({ durationMinutes: Number(value) })),
+          });
+          if (!saved.expectedVersion) throw new Error('경기 시간 저장 버전을 확인하지 못했어요.');
+          expectedVersion = saved.expectedVersion;
+        }
+        if (state.stagePeriodMinutesDirty) {
+          const nextPhases = new Set(Object.keys(state.stagePeriodMinutes) as TournamentPeriodPhase[]);
+          // 기존 초안을 다시 연 경우에는 저장 직전에 서버 값을 새로 읽는다. 화면 진입 직후
+          // 캐시가 비어 있어도 제거한 단계 설정을 놓치지 않기 위해서다.
+          const existingSettings = state.draftId || draftIdParam
+            ? (await savedPeriodSettings.refetch()).data
+            : savedPeriodSettings.data;
+          const removed = (existingSettings?.stageOverrides ?? []).filter((override) => !nextPhases.has(override.phase));
+          for (const override of removed) {
+            const saved = await savePeriods.mutateAsync({
+              tournamentId: tournament.id, expectedVersion, phase: override.phase, inheritDefault: true,
+            });
+            if (!saved.expectedVersion) throw new Error('단계별 경기 시간 저장 버전을 확인하지 못했어요.');
+            expectedVersion = saved.expectedVersion;
+          }
+          for (const [phase, values] of Object.entries(state.stagePeriodMinutes) as Array<[TournamentPeriodPhase, string[]]>) {
+            const saved = await savePeriods.mutateAsync({
+              tournamentId: tournament.id,
+              expectedVersion,
+              phase,
+              periods: values.map((value) => ({ durationMinutes: Number(value) })),
+            });
+            if (!saved.expectedVersion) throw new Error('단계별 경기 시간 저장 버전을 확인하지 못했어요.');
+            expectedVersion = saved.expectedVersion;
+          }
+        }
+        dispatch({ type: 'periods-saved', updatedAt: expectedVersion });
+        const updatedTournament = { ...tournament, updatedAt: expectedVersion };
+        const savedPayload = mapTournamentToWizardFields(updatedTournament).savedPayload;
+        if (!hasUnsavedTournamentChanges(latestStateRef.current, savedPayload)) {
+          dispatch({ type: 'draft-created', tournament: updatedTournament });
+        }
+      } catch (error) {
+        // 앞선 저장이 성공했으면 대회 버전이 이미 올라갔다. 그 버전으로 맞춰 둬야 "저장하고 계속하기" 재시도가
+        // 버전 충돌로 막히지 않는다. 이미 저장된 값은 서버가 그대로 넘기므로(changed: false) 다시 보내도 된다.
+        if (expectedVersion !== tournament.updatedAt) dispatch({ type: 'draft-version-synced', updatedAt: expectedVersion });
+        showToast(extractErrorMessage(error, '대회는 초안으로 저장했지만 경기 시간을 저장하지 못했어요. 저장하고 계속하기로 다시 시도해 주세요.'), 'error');
+      }
     };
 
     if (state.draftId) {
@@ -341,7 +371,7 @@ export default function AdminTournamentsNewPage() {
       }
       updateTournament.mutate({ ...payload, expectedVersion: state.draftUpdatedAt }, {
         onSuccess: (tournament) => {
-          persistPeriods(tournament);
+          void persistPeriods(tournament);
         },
         onError: (error) => {
           if (extractErrorCode(error) === 'TOURNAMENT_VERSION_CONFLICT') {
@@ -356,7 +386,7 @@ export default function AdminTournamentsNewPage() {
 
     createTournament.mutate(payload, {
       onSuccess: (tournament) => {
-        persistPeriods(tournament);
+        void persistPeriods(tournament);
         // draftId를 URL에 남겨 새로고침해도 같은 초안을 이어가고, 다시 만들지 않게 한다.
         router.replace(`${pathname}?draftId=${tournament.id}`);
       },
@@ -374,7 +404,7 @@ export default function AdminTournamentsNewPage() {
 
   /** "확인" 단계의 주 CTA — 되돌리기 어려운 전환(초안 → 접수 중)이라 확인 모달을 거친다. */
   const handleStartRegistration = async () => {
-    if (!state.draftId || state.periodMinutesDirty || pending) return;
+    if (!state.draftId || state.periodMinutesDirty || state.stagePeriodMinutesDirty || pending) return;
     if (hasUnsavedTournamentChanges(state)) {
       goToStep(CONFIRM_STEP_INDEX);
       return;
@@ -421,7 +451,14 @@ export default function AdminTournamentsNewPage() {
       />
 
       <form ref={formRef} onSubmit={handleCreateOrUpdateDraft} noValidate className="pb-28">
-        <WizardStepper currentStep={state.step} hasDraft={state.draftId !== null && !state.periodMinutesDirty} onSelect={goToStep} />
+        {/* 확인 단계는 경기 시간 저장까지 끝난 초안에서만 연다. */}
+        <WizardStepper
+          steps={TOURNAMENT_CREATE_STEPS}
+          currentStep={state.step}
+          onSelect={goToStep}
+          ariaLabel="대회 생성 단계"
+          isLocked={(index) => index === CONFIRM_STEP_INDEX && !(state.draftId !== null && !state.periodMinutesDirty && !state.stagePeriodMinutesDirty)}
+        />
 
         <div className="mx-auto mt-5 max-w-4xl rounded-2xl border border-[var(--border)] bg-[var(--card-surface)]">
           <div className="border-b border-[var(--border)] px-5 py-5 sm:px-7">
@@ -585,88 +622,6 @@ export default function AdminTournamentsNewPage() {
   );
 }
 
-/**
- * done/current/locked 3상태 + 진행률 표시 — components/admin/operation-flag-gate-stepper.tsx의
- * 패턴을 그대로 따른다. "locked"는 오직 확인 단계(CONFIRM_STEP_INDEX)에만 적용된다: 초안이
- * 아직 없으면 버튼 자체를 disabled로 막아 "대회 없이 확인 화면으로 건너뛰기"를 원천 차단한다
- * (goToStep의 방어 로직과 이중화). 나머지 단계는 기존처럼 검증만 통과하면 앞으로 건너뛸 수 있다.
- */
-function WizardStepper({
-  currentStep,
-  hasDraft,
-  onSelect,
-}: {
-  currentStep: number;
-  hasDraft: boolean;
-  onSelect: (step: number) => void;
-}) {
-  const doneCount = TOURNAMENT_CREATE_STEPS.filter((_, index) => index < currentStep).length;
-
-  return (
-    <div className="mx-auto max-w-4xl">
-      <div className="mb-2 flex items-center justify-between gap-3">
-        <p className="text-xs font-semibold text-[var(--text-body)]">
-          {TOURNAMENT_CREATE_STEPS.length}단계 중 {doneCount}단계 완료
-        </p>
-      </div>
-      <div className="mb-3 h-1.5 w-full overflow-hidden rounded-full bg-[var(--grey100)]">
-        <div
-          className="h-full rounded-full bg-blue-500 transition-[width] duration-150"
-          style={{ width: `${(doneCount / TOURNAMENT_CREATE_STEPS.length) * 100}%` }}
-        />
-      </div>
-      <nav aria-label="대회 생성 단계">
-        <ol className="grid grid-cols-5 gap-1 rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-2 sm:gap-2">
-          {TOURNAMENT_CREATE_STEPS.map((step, index) => {
-            const active = index === currentStep;
-            const done = index < currentStep;
-            const locked = index === CONFIRM_STEP_INDEX && !hasDraft && !active;
-            const statusLabel = done ? '완료' : active ? '진행 중' : locked ? '잠김' : '';
-            return (
-              <li key={step.title}>
-                <button
-                  type="button"
-                  onClick={() => onSelect(index)}
-                  disabled={locked}
-                  aria-current={active ? 'step' : undefined}
-                  aria-label={`${index + 1}단계 ${step.title}${statusLabel ? ` — ${statusLabel}` : ''}`}
-                  title={step.description}
-                  className={[
-                    'flex min-h-[64px] w-full items-center gap-2 rounded-xl px-2 text-left transition-colors sm:px-3',
-                    'disabled:cursor-not-allowed disabled:opacity-60',
-                    active ? 'bg-[var(--blue50)] text-[var(--blue700)]' : 'text-[var(--text-caption)] hover:bg-[var(--grey50)] disabled:hover:bg-transparent',
-                  ].join(' ')}
-                >
-                  <span
-                    aria-hidden="true"
-                    className={[
-                      'grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-bold',
-                      // locked는 색상으로는 upcoming(아직 안 온 단계)과 구분하지 않는다 —
-                      // 자물쇠 아이콘 자체가 신호이고, 바깥 버튼의 disabled 스타일이 이미
-                      // "지금 누를 수 없음"을 전달한다.
-                      active
-                        ? 'bg-blue-500 text-white'
-                        : done
-                          ? 'bg-[var(--blue50)] text-[var(--blue700)]'
-                          : 'tm-on-tint bg-[var(--grey150)] text-[var(--text-caption)]',
-                    ].join(' ')}
-                  >
-                    {done ? <Check size={14} /> : locked ? <Lock size={12} /> : index + 1}
-                  </span>
-                  <span className="hidden min-w-0 sm:block" aria-hidden="true">
-                    <span className="block truncate text-xs font-bold">{step.title}</span>
-                    <span className="mt-0.5 block truncate text-[length:var(--font-size-caption)]">{step.description}</span>
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ol>
-      </nav>
-    </div>
-  );
-}
-
 type SetField = (
   field: Exclude<
     keyof TournamentCreateState,
@@ -738,6 +693,9 @@ function BasicStep({
           <CompetitionTemplateCard mode="radio" name="format" value="group_knockout" checked={state.format === 'group_knockout'}
             onChange={(value) => setField('format', value as V1TournamentFormat)} graphic="groups"
             title="조별리그 + 토너먼트" description="조별 경기 순위에 따라 결선에 진출해요." meta="조별 예선 → 결선 대진" />
+          <CompetitionTemplateCard mode="radio" name="format" value="league_knockouts" checked={state.format === 'league_knockouts'}
+            onChange={(value) => setField('format', value as V1TournamentFormat)} graphic="groups"
+            title="정규리그 + N개 토너먼트" description="예선 조별리그 뒤 여러 토너먼트를 운영해요. 진출팀은 순위로 제안받고 직접 편집해요." meta="예선 → 진출팀 편집 → 복수 결선" />
           <CompetitionTemplateCard mode="radio" name="format" value="knockout" checked={state.format === 'knockout'}
             onChange={(value) => setField('format', value as V1TournamentFormat)} graphic="knockout"
             title="토너먼트만" description="정해진 대진으로 경기하고, 패하면 탈락해요." meta="4·8·12·16팀 템플릿 지원" />
@@ -750,44 +708,11 @@ function BasicStep({
         </div>
       </fieldset>
 
-      <fieldset className="min-w-0">
-        <legend className="text-sm font-semibold text-[var(--text-body)]">성별 카테고리</legend>
-        <p className="mt-1 text-xs text-[var(--text-caption)]">
-          혼성 대회는 3단계에서 남녀 최소·최대 인원을 설정할 수 있어요.
-        </p>
-        <div className="mt-2 grid grid-cols-3 gap-2">
-          {([
-            ['mixed', '혼성'],
-            ['male', '남성부'],
-            ['female', '여성부'],
-          ] as const).map(([value, label]) => (
-            <label
-              key={value}
-              className={[
-                'grid min-h-[52px] cursor-pointer place-items-center rounded-xl border text-sm font-bold transition-colors',
-                state.genderCategory === value
-                  ? 'border-blue-500 bg-[var(--blue50)] text-[var(--blue700)]'
-                  : 'border-[var(--border)] text-[var(--text-body)]',
-              ].join(' ')}
-            >
-              <input
-                type="radio"
-                name="gender-category"
-                checked={state.genderCategory === value}
-                onChange={() => {
-                  dispatch({
-                    type: 'set-field',
-                    field: 'genderCategory',
-                    value: value as V1TournamentGenderCategory,
-                  });
-                }}
-                className="sr-only"
-              />
-              {label}
-            </label>
-          ))}
-        </div>
-      </fieldset>
+      <GenderCategoryField
+        value={state.genderCategory}
+        onChange={(value) => dispatch({ type: 'set-field', field: 'genderCategory', value })}
+        hint="혼성 대회는 3단계에서 남녀 최소·최대 인원을 설정할 수 있어요."
+      />
     </div>
   );
 }
@@ -966,6 +891,31 @@ function ParticipationStep({
     if (periodSourceKey === '') return;
     dispatch({ type: 'prefill-period-minutes', value: periodSourceKey.split(',') });
   }, [periodSourceKey, dispatch]);
+  const stagePeriodSourceKey = JSON.stringify(draftPeriodSettings.data?.stageOverrides.map((override) => ({
+    phase: override.phase,
+    periods: override.periods?.map((period) => String(period.durationMinutes)) ?? [],
+  })) ?? []);
+  useEffect(() => {
+    if (!state.draftId || !draftPeriodSettings.data) return;
+    const values = Object.fromEntries(draftPeriodSettings.data.stageOverrides.map((override) => [
+      override.phase,
+      override.periods?.map((period) => String(period.durationMinutes)) ?? [],
+    ])) as Partial<Record<TournamentPeriodPhase, string[]>>;
+    dispatch({ type: 'prefill-stage-period-minutes', value: values });
+  }, [state.draftId, stagePeriodSourceKey, draftPeriodSettings.data, dispatch]);
+  const [stageToAdd, setStageToAdd] = useState<TournamentPeriodPhase>('group');
+  const configuredStagePhases = useMemo(
+    () => Object.keys(state.stagePeriodMinutes) as TournamentPeriodPhase[],
+    [state.stagePeriodMinutes],
+  );
+  const availableStagePhases = useMemo(
+    () => TOURNAMENT_PERIOD_PHASES.filter((option) => !configuredStagePhases.includes(option.value)),
+    [configuredStagePhases],
+  );
+  useEffect(() => {
+    if (availableStagePhases.some((option) => option.value === stageToAdd)) return;
+    if (availableStagePhases[0]) setStageToAdd(availableStagePhases[0].value);
+  }, [availableStagePhases, stageToAdd]);
   const periodNames = periodLabels(state.periodMinutes.length);
   const periodTotal = state.periodMinutes.reduce((sum, value) => sum + (Number(value) || 0), 0);
 
@@ -978,7 +928,7 @@ function ParticipationStep({
           value={state.teamCount}
           onChange={(value) => setField('teamCount', value)}
           min={2}
-          max={64}
+          max={state.format === 'league_knockouts' ? undefined : 64}
           disabled={pending}
           error={errors.teamCount}
           required
@@ -1111,6 +1061,52 @@ function ParticipationStep({
               ))}
             </div>
             <p className="text-[length:var(--font-size-caption)] text-[var(--text-caption)]">한 경기 총 {periodTotal}분</p>
+          </div>
+        </Field>
+      ) : null}
+
+      {state.periodMinutes.length > 0 ? (
+        <Field
+          id="stage-period-settings"
+          label="단계별 경기 시간 (선택)"
+          hint="추가하지 않은 단계는 위 경기 시간을 그대로 써요. 예: 조별리그 단판 15분, 결승 전·후반 각 10분. 대회를 만든 뒤에도 단계별로 바꿀 수 있어요."
+          error={errors.stagePeriodMinutes}
+        >
+          <div className="grid gap-3">
+            {configuredStagePhases.map((phase) => {
+              const values = state.stagePeriodMinutes[phase] ?? [];
+              const names = periodLabels(values.length);
+              return (
+                <div key={phase} className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-strong)]">{tournamentPeriodPhaseLabel(phase)}</p>
+                    <button type="button" disabled={pending} onClick={() => dispatch({ type: 'remove-stage-period-minutes', phase })} className="h-[44px] rounded-lg px-3 text-[length:var(--font-size-caption)] font-medium text-red-600 hover:bg-red-50 disabled:opacity-50">기본값 사용</button>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label={`${tournamentPeriodPhaseLabel(phase)} 경기 방식`}>
+                    {([{ count: 2, label: '전·후반' }, { count: 1, label: '단판' }] as const).map((option) => (
+                      <button key={option.count} type="button" disabled={pending} aria-pressed={values.length === option.count} onClick={() => { if (values.length !== option.count) dispatch({ type: 'set-stage-period-minutes', phase, value: switchPeriodCount(values.length ? values : state.periodMinutes, option.count) }); }} className={`min-h-[44px] rounded-xl border px-3 text-[length:var(--font-size-body-sm)] font-semibold ${values.length === option.count ? 'border-blue-500 bg-blue-500 text-white' : 'border-[var(--border)] bg-[var(--card-surface)] text-[var(--text-body)]'}`}>{option.label}</button>
+                    ))}
+                  </div>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    {values.map((value, index) => (
+                      <label key={`${phase}-${index}`} className="grid gap-1 text-[length:var(--font-size-caption)] font-medium text-[var(--text-muted)]">
+                        {names[index]} (분)
+                        <input type="number" inputMode="numeric" min={1} max={240} value={value} disabled={pending} onChange={(event) => { const next = [...values]; next[index] = event.target.value; dispatch({ type: 'set-stage-period-minutes', phase, value: next }); }} className="h-[44px] rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-[length:var(--font-size-body-sm)] text-[var(--text-strong)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500" />
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+            {availableStagePhases.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2">
+                <label htmlFor="stage-period-phase-select" className="sr-only">경기 시간 재정의를 추가할 단계</label>
+                <select id="stage-period-phase-select" value={stageToAdd} onChange={(event) => setStageToAdd(event.target.value as TournamentPeriodPhase)} disabled={pending} className="h-[44px] min-w-32 rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-[length:var(--font-size-body-sm)] text-[var(--text-strong)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500">
+                  {availableStagePhases.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
+                <button type="button" disabled={pending} onClick={() => dispatch({ type: 'set-stage-period-minutes', phase: stageToAdd, value: [...state.periodMinutes] })} className="h-[44px] rounded-xl px-4 text-[length:var(--font-size-body-sm)] font-semibold text-blue-600 hover:bg-[var(--surface-soft)] disabled:opacity-50">단계 추가</button>
+              </div>
+            )}
           </div>
         </Field>
       ) : null}
@@ -1572,7 +1568,7 @@ function NumberField({
   value: string;
   onChange: (value: string) => void;
   min: number;
-  max: number;
+  max?: number;
   disabled: boolean;
   error?: string;
   required?: boolean;

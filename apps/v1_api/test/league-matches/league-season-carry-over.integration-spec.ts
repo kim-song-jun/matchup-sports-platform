@@ -28,8 +28,8 @@ describe('리그 시즌 승계 — 같은 티어 값 복사', () => {
     return prisma.v1Team.create({ data: { ownerUserId: adminUserId, sportId, regionId, name: `carry-${suiteId}-${teamSeq}` } });
   };
 
-  const TIER1 = { coverImageUrl: '/uploads/2026/10/tier1.webp', entryFee: 70000, bankName: '국민은행', bankAccount: `T1-${suiteId}`, bankHolder: '일부팀' };
-  const TIER2 = { coverImageUrl: '/uploads/2026/10/tier2.webp', entryFee: 50000, bankName: '신한은행', bankAccount: `T2-${suiteId}`, bankHolder: '이부팀' };
+  const TIER1 = { coverImageUrl: '/uploads/2026/10/tier1.webp', entryFee: 70000, bankName: '국민은행', bankAccount: `T1-${suiteId}`, bankHolder: '일부팀', genderCategory: 'male' as const };
+  const TIER2 = { coverImageUrl: '/uploads/2026/10/tier2.webp', entryFee: 50000, bankName: '신한은행', bankAccount: `T2-${suiteId}`, bankHolder: '이부팀', genderCategory: 'female' as const };
 
   async function officializeFixture(teamMatchId: string, score: { home: number; away: number }) {
     const game = await prisma.v1Game.findUniqueOrThrow({ where: { teamMatchId } });
@@ -63,7 +63,7 @@ describe('리그 시즌 승계 — 같은 티어 값 복사', () => {
   });
   afterAll(async () => cleanup?.());
 
-  it('새 시즌은 같은 티어의 이미지·참가비·계좌를 이어받고(서로 바뀌지 않음) 설정 시각은 비워 둔다', async () => {
+  it('새 시즌은 같은 티어의 이미지·참가비·계좌·성별을 이어받고(서로 바뀌지 않음) 설정 시각은 비워 둔다', async () => {
     const teams = [await createTeam(), await createTeam(), await createTeam(), await createTeam()];
     const created = await asAdmin(http().post('/api/v1/admin/league-series')).send({
       title: `승계 ${suiteId}`, sportId, regionId, tierCount: 2,
@@ -111,7 +111,8 @@ describe('리그 시즌 승계 — 같은 티어 값 복사', () => {
     const nextRoundOf = async (leagueId: string) => (await http().get(`/api/v1/league-matches/${leagueId}`).expect(200)).body.data.nextRound;
     expect(await nextRoundOf(leagueIds[1])).toMatchObject({ leagueId: next[1].id, seasonNo: 2, registrationOpen: false, registrationDeadlineAt: null });
     const deadline = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    await prisma.v1Tournament.update({ where: { id: next[0].id }, data: { registrationDeadlineAt: deadline } });
+    // 2026-10-27: 대회처럼 접수 중(open)이어야 신청을 받는다 — 마감만 놓아서는 열리지 않는다.
+    await prisma.v1Tournament.update({ where: { id: next[0].id }, data: { status: 'open', registrationDeadlineAt: deadline } });
     expect(await nextRoundOf(leagueIds[0])).toMatchObject({ leagueId: next[0].id, seasonNo: 2, registrationOpen: true, registrationDeadlineAt: deadline.toISOString() });
     // 마지막 시즌에는 다음 회차가 없다.
     expect(await nextRoundOf(next[0].id)).toBeNull();

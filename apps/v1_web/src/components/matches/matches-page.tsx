@@ -6,6 +6,7 @@ import Link from 'next/link';
 import type { ChangeEvent, FocusEvent } from 'react';
 import { useRef, useState } from 'react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
+import { useCreateCtaSpace } from '@/components/v1-ui/use-create-cta-space';
 import { Card, EmptyState, ErrorState, InfoRow, ListItem } from '@/components/v1-ui/primitives';
 import { Button } from '@/components/v1-ui/button';
 import { ChevronLeftIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
@@ -599,6 +600,8 @@ export function MatchDetailPageView({ model, lifecyclePanel }: { model: MatchDet
   );
 }
 export function MatchCreatePageView({ model }: { model: MatchCreateViewModel }) {
+  const fixedCtaRef = useRef<HTMLDivElement>(null);
+  useCreateCtaSpace(fixedCtaRef);
   const edit = model.mode === 'edit' || model.step === 'edit';
   const wizardStep = model.step === 'edit' ? 'info' : model.step;
   const stepNo = stepToNumber(wizardStep);
@@ -665,7 +668,7 @@ export function MatchCreatePageView({ model }: { model: MatchCreateViewModel }) 
           </section>
         ) : null}
       </div>
-      <div className="tm-fixed-cta tm-create-fixed-cta">
+      <div ref={fixedCtaRef} className="tm-fixed-cta tm-create-fixed-cta">
         <div className="tm-create-fixed-cta-actions">
           {secondaryAction ? (
             <button className="tm-btn tm-btn-lg tm-btn-neutral" type="button" onClick={secondaryAction}>{wizardStep === 'sport' ? (edit ? '변경 취소' : '취소') : '이전'}</button>

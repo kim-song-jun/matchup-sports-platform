@@ -1,7 +1,7 @@
 import { ConflictException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { V1CompetitionKind, type Prisma } from '@prisma/client';
 import type { V1AuthUser } from '../../auth/v1-auth-user';
-import type { AdminContextService, V1ActiveAdmin } from '../../common/admin-context.service';
+import type { AdminContextService, V1TournamentManager } from '../../common/admin-context.service';
 import type { PrismaService } from '../../prisma/prisma.service';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from '../tournament-surface-lookup';
 import { loadGroupRankPreview, type GroupRankPreview } from './load-group-rank-preview';
@@ -28,8 +28,11 @@ export function planFillFromStandings(preview: GroupRankPreview, overrides: read
     if (row.state === 'group_incomplete') {
       throw invalidOverride(`${row.label}은 조별 경기가 아직 끝나지 않아 팀을 고를 수 없어요.`);
     }
-    const allowed =
-      row.state === 'tied' ? new Set(row.tiedRegistrationIds) : preview.groupMembers.get(override.slotId);
+    const allowed = row.state === 'tied'
+      ? new Set(row.tiedRegistrationIds)
+      : row.bracketTrack === 'overall'
+        ? preview.groupMembers.get(override.slotId)
+        : new Set(row.candidateRegistrationId === null ? [] : [row.candidateRegistrationId]);
     if (allowed === undefined || !allowed.has(override.registrationId)) {
       throw invalidOverride(`${row.label}에 넣을 수 없는 팀이에요.`);
     }
@@ -74,11 +77,11 @@ async function requireTournament(prisma: PrismaService, tournamentId: string) {
 }
 
 export async function previewGroupRankStandings(
-  deps: { prisma: PrismaService; adminContext: Pick<AdminContextService, 'getActiveAdmin'> },
+  deps: { prisma: PrismaService; adminContext: Pick<AdminContextService, 'getTournamentAdmin'> },
   user: V1AuthUser,
   tournamentId: string,
 ) {
-  await deps.adminContext.getActiveAdmin(user.id);
+  await deps.adminContext.getTournamentAdmin(user.id, { tournamentId });
   await requireTournament(deps.prisma, tournamentId);
   const { rows } = await loadGroupRankPreview(deps.prisma, tournamentId);
   return { slots: rows };
@@ -86,12 +89,12 @@ export async function previewGroupRankStandings(
 
 export type FillDeps = {
   prisma: PrismaService;
-  adminContext: Pick<AdminContextService, 'getMutationAdmin' | 'logAdminAction'>;
+  adminContext: Pick<AdminContextService, 'getTournamentMutationAdmin' | 'logAdminAction'>;
   lock: (tx: Prisma.TransactionClient, competition: { id: string; kind: V1CompetitionKind }) => Promise<void>;
   /** 바뀔 자리를 먼저 모두 비운 뒤 넣는 배치 — PR-1b `assignSlotsBatchInTx`. */
   assignBatch: (
     tx: Prisma.TransactionClient,
-    admin: V1ActiveAdmin,
+    admin: V1TournamentManager,
     changes: readonly { slotId: string; registrationId: string | null }[],
   ) => Promise<unknown>;
   transactionOptions: { timeout: number; maxWait: number };
@@ -103,7 +106,7 @@ export async function fillSlotsFromStandings(
   tournamentId: string,
   overrides: readonly FillOverride[],
 ) {
-  const admin = await deps.adminContext.getMutationAdmin(user.id);
+  const admin = await deps.adminContext.getTournamentMutationAdmin(user.id, { tournamentId });
   const tournament = await requireTournament(deps.prisma, tournamentId);
   return deps.prisma.$transaction(async (tx) => {
     await deps.lock(tx, { id: tournament.id, kind: tournament.kind ?? V1CompetitionKind.regular_tournament });

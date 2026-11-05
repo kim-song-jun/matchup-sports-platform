@@ -76,3 +76,46 @@ main-only 승격 머지 커밋을 release 준비 브랜치를 통해 dev에 흡�
 - Local validation PASS: frontend 3 files / 43 tests (random rejection, wizard, recorded event list); actual backend worker-recycling contract 1 test (10 unrelated cases intentionally excluded); frontend lint/typecheck PASS. No visual layout or API/DB contract changes. Touched source debt-marker grep clean.
 
 - Remediation PR #2099 (base=dev), pinned head 49e9c6932ef8d3e8e1dfbc28ce4f0a743201f394; CI 40890144186 pending. Main #2098 remains unmerged. Follow-up release/version candidate prepared independently on chore/release-codeql-1.12.2 via Changesets CLI 2.30.0: fixed API/Web 1.12.2 and one consumed Web patch; no extra runtime changes. Publish metadata PR only after #2099 merges and its ancestry is integrated.
+
+## 2026-11-05: Promotion PR #2153 / 1.13.0 preparation
+
+- User authorized fixing promotion blockers, delivering a dev PR and preparing main promotion. Main merge/production approval remain user-only.
+- Base: dev 3a4db97fe; main b50074f90. Draft main PR #2153 has 53 unconsumed Changesets, next fixed version 1.13.0, and 7 new CodeQL high findings.
+- Owned: Kakao OAuth state storage/callers and regression tests; league-series-conversion service/spec; two Alpha QA URL filters; this task; Changesets, app package versions and changelogs. No schema changes, security alert dismissal, feature PR #2152 merge, or production operations.
+- Acceptance: targeted OAuth and conversion tests; committed-tree validation; dev PR CI and CodeQL; release gate; latest Alpha commit/release; main PR #2153 checks ready.
+- Plan: [x] security fixes and focused validation; [x] consume Changesets / 1.13.0; [x] security dev PR and CI; [ ] release dev PR and CI; [ ] final dev merge / Alpha; [ ] refresh promotion PR.
+- Implementation: store SHA-256 OAuth verifiers (single-use and legacy in-flight redirects preserved), bound tier loop locally to 1..3, compare parsed URL origins exactly. No visible layout/API schema changes.
+- Environment: existing shared dependencies were Linux links; isolated worktree has its own frozen-lockfile Windows installation. Host: 28 logical CPUs, load 2%, available RAM ~6.5 GiB; tests use one worker. Docker status command stalled; no DB or integration workload is started.
+- Progress Snapshot: isolated branch fix/release-ready-2153 in _worktrees/release-ready-2153; fixes under focused validation. #2152 remains outside release scope.
+
+- Focused validation: OAuth 5 files / 88 tests passed (one stale raw-nonce assertion corrected, utility file rerun); API conversion 14 tests passed. Concurrent callback consumption and hash failure explicitly covered.
+
+- API lint/typecheck and surface checker PASS. Web typecheck PASS; pattern checker first failed because Windows cmd resolved POSIX commands incorrectly, then the unchanged checker PASS under Git Bash via a temporary Node child-process shell adapter. No gate rules were changed. QA script syntax checks and touched-source debt grep clean.
+
+- Security remediation PR #2154 published to dev at 71c60469f. Release changes kept on separate local branch release/version-1.13.0-2153 to preserve the ordinary dev Changeset gate.
+- Canonical prepare-only PASS using deployed origin/dev as baseline: consumed 54 Changesets including security patch; fixed API/Web 1.13.0; both CHANGELOGs updated; main promotion gate PASS. No lockfile/schema changes.
+- Next: #2154 exact-head CI/CodeQL, merge to dev and sync; deliver release metadata PR; verify resulting dev/Alpha and #2153.
+
+- #2154 exact-head CI 41969726728 PASS (Gates/API/Web, including real-DB integration, units and builds). Merged to dev as 8a2dc4733; root and dedicated local dev immediately fast-forwarded.
+- Release branch incorporated origin/dev; PR diff is release metadata + task only (59 files), no runtime/schema changes. Next: publish and validate the release PR, then merge dev and verify Alpha/final main checks.
+- Manual-browser limitation: both Computer Use and browser runtime failed to start with Windows path-not-found (os error 3). No browser was opened, no credentials used, and no successful provider-account authentication is claimed. OAuth regression journeys passed in tests; live account-login smoke remains an operator check.
+
+### Follow-up CodeQL evidence (2026-11-05)
+- Scan 41973741588 completed; URL findings resolved, but 5 high findings remain. Official CodeQL models treat serializeKakaoOAuthAttempt as a heuristic sensitive source and only recognize protect/encode/encrypt call barriers; the existing SHA-256 verifier is non-secret and independently tested. Rename the actual hash+JSON operation to encodeKakaoStateVerifier (no raw state storage, no suppression).
+- Loop query requires proof of an actual array or structural early exit. Add Array.isArray service guard and a literal maximum of 3 iterations with a tierCount break, plus array-like payload regression.
+- Owned follow-up paths: conversion service/spec; verifier helper and its three test callers; Changeset; this task. Existing #2156 candidate is held until this follow-up merges and its release metadata is refreshed.
+
+- Follow-up local validation PASS: OAuth 3 files / 64 tests; conversion 15 tests including array-like object rejection; Web/API typechecks; diff check and touched-source debt grep clean. Source-based CodeQL review used official CleartextStorageCustomizations/SensitiveActions and LoopBoundInjection models; no alerts dismissed and no query configuration changed.
+
+### Current preparation cursor (2026-11-05)
+- Security #2154 merged to dev 8a2dc4733 with full CI PASS. Follow-up #2159 head 80968647a is under CI; no main merge is authorized.
+- Candidate incorporated #2159 locally, preserved both task histories during the task-only merge conflict, restored only owned unreleased metadata from its source baseline, then reran canonical prepare-only: 55 Changesets consumed, API/Web 1.13.0, main gate PASS. Source is still subject to #2159 CI and later CodeQL.
+- #2156 remains Draft at its previous remote head until #2159 merges; next publish the refreshed metadata-only diff against new dev. Latest promotion evidence and operator smoke status will be maintained in #2153 body/checks; no successful external-provider login is claimed.
+
+- Follow-up #2159 exact-head CI 41975675957 PASS (Gates/API/Web) and merged to dev 68dc9eaa4. Root and dedicated dev immediately fast-forwarded. Release candidate incorporated that dev merge; net PR scope remains metadata/task only, with 55 consumed Changesets and API/Web 1.13.0.
+- Browser recovery evidence: existing headed Playwright CLI worked in an isolated anonymous Chrome context after the default tool runtime failed. At Alpha 8a2dc4733, 1440x1000, actual CTA generated a SHA-256 verifier with no raw nonce in storage; matching state forwarded exactly one synthetic-code exchange to an explicitly mocked 401 boundary, tampered state forwarded zero auth POSTs, both attempts were consumed, retry nonce was fresh, and address bars were cleared. External provider authentication was not performed. Redirect origin matched Alpha, uncaught page errors=0; console/network only expected anonymous auth/me 401 and deliberately mocked auth/kakao 401. Owned browser PID 29008 / parent 39840 closed.
+- Earlier Alpha 3a4db97fe baseline showed raw state persistence; its initial screenshot is in the conversation capture. Preserved later baseline screenshot (same UI, pre-follow-up SHA 8a2dc4733): system temp teameet-2153-baseline-8a2dc47332e8.png. Final exact-head browser smoke and Alpha/CodeQL evidence will be recorded in promotion PR #2153.
+
+### Latest dev integration / 59 Changesets
+- Other work merged #2152/#2155/#2157/#2158 after security #2159. Current dev ea2671efa now includes roster transfer/season QA, mock-seed 409 retry, league guidance/minimum-roster/empty-state fixes, and low-severity league notice/reapply/deadline fixes. These are included by the dev-to-main head, replacing the earlier exclusion snapshot. No added migrations or version baseline changes in these four merges.
+- Root/dedicated dev fast-forwarded to ea2671efa. Candidate merged latest dev and canonical prepare-only regenerated from its unreleased inputs: 59 Changesets consumed, fixed API/Web 1.13.0, main promotion gate PASS. Next publish #2156 metadata-only candidate, validate its combined CI, merge dev, verify latest exact-head Alpha/CodeQL and repeat headed OAuth smoke.

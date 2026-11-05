@@ -9,17 +9,19 @@ import { trackEvent } from '@/lib/analytics';
 import { extractErrorMessage } from '@/lib/error-message';
 import { reportClientError } from '@/lib/client-error-reporter';
 import { getInitializedKakaoJsSdk } from '@/lib/kakao-js-sdk';
+import { storeKakaoOAuthAttempt } from '@/lib/kakao-oauth';
 import { isNativeKakaoSignInAvailable, requestNativeKakaoSignIn } from '@/lib/native-kakao';
 import { detectNativeShell } from '@/lib/native-bridge';
 import { clearV1IdentityCache } from '@/lib/query-keys';
 import { clearSavedRedirectPath, getSavedRedirectPath, saveRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
 import type { V1AuthSessionResponse } from '@/types/api';
-import { generateKakaoOAuthState, isSocialOnboardingRoute, KAKAO_OAUTH_STATE_STORAGE_KEY } from './auth.view-model';
+import { generateKakaoOAuthState, isSocialOnboardingRoute } from './auth.view-model';
+import { routeSocialLoginRecovery } from './login-recovery-route';
 
 const NATIVE_FAILURE_MESSAGE = '카카오 로그인에 실패했어요. 잠시 후 다시 시도해 주세요.';
 const SDK_PREFLIGHT_TIMEOUT_MS = 8_000;
 
-// 카카오 로그인 버튼(클라이언트). 클릭 시점에 CSRF 방지 state를 생성·저장한 뒤 경로를 고른다.
+// 카카오 로그인 버튼(클라이언트). 클릭 시점에 CSRF 방지 state를 생성·저장(mode: 'login')한 뒤 경로를 고른다.
 // state 저장이 SSR 시점이 아닌 실제 브라우저에서 일어나야 kakao-callback-client.tsx의
 // 대조 검증이 성립한다(로그인 CSRF/세션 고정 방지).
 //   1) 셸이 sign-in-with-kakao 를 광고하면 네이티브 SDK 토큰 → POST /auth/kakao/token
@@ -84,6 +86,13 @@ export function KakaoLoginButton({
         router.replace('/auth/blocked');
         return;
       }
+      const recovery = routeSocialLoginRecovery(err, getSavedRedirectPath());
+      if (recovery) {
+        trackEvent('login_failed', { method: 'kakao', reason: err instanceof V1ApiError ? err.code : 'unknown' });
+        if (recovery.type === 'navigate') router.replace(recovery.path);
+        else setError(recovery.message);
+        return;
+      }
       failNative(err instanceof V1ApiError ? err.code : 'unknown', extractErrorMessage(err, NATIVE_FAILURE_MESSAGE));
     } finally {
       busyRef.current = false;
@@ -129,7 +138,7 @@ export function KakaoLoginButton({
     }
   };
 
-  const handleClick = (event: MouseEvent<HTMLAnchorElement>) => {
+  const handleClick = async (event: MouseEvent<HTMLAnchorElement>) => {
     event.preventDefault();
     if (busyRef.current) return;
     setError(null);
@@ -138,11 +147,13 @@ export function KakaoLoginButton({
       void signInNative();
       return;
     }
+    busyRef.current = true;
     const state = generateKakaoOAuthState();
     try {
-      window.sessionStorage.setItem(KAKAO_OAUTH_STATE_STORAGE_KEY, state);
+      await storeKakaoOAuthAttempt({ state, mode: 'login', returnTo: null });
       saveRedirectPath(new URLSearchParams(window.location.search).get('redirect'));
     } catch {
+      busyRef.current = false;
       // sessionStorage 사용 불가(프라이빗 모드/quota 초과) 시 CSRF 방지 state를 저장할 수 없어
       // 안전한 로그인이 불가능하다. 조용히 실패하지 않고 사용자에게 알린 뒤 중단한다(fail-closed).
       window.alert('브라우저 설정으로 로그인을 진행할 수 없어요. 시크릿/프라이빗 모드를 끄고 다시 시도해 주세요.');

@@ -10,6 +10,7 @@ import {
   type TournamentStaffAssignmentResult,
   type TournamentStaffAuditContext,
 } from '../../tournaments/staff/tournament-staff.service';
+import { findOwnTeamFixtureIds } from '../../tournaments/staff/own-team-fixture';
 import type { GrantTournamentStaffDto } from './dto/grant-tournament-staff.dto';
 import type { RevokeTournamentStaffDto } from './dto/revoke-tournament-staff.dto';
 import type { SearchStaffCandidatesDto } from './dto/search-staff-candidates.dto';
@@ -277,8 +278,11 @@ export class TournamentOperationsStaffService {
           },
           orderBy: [{ startAt: 'asc' }, { id: 'asc' }],
         });
+        // 자기 팀 경기는 콘솔이 막히므로(MD-QA #193) 담당 경기 목록에도 띄우지 않는다.
+        const ownTeamFixtureIds = await findOwnTeamFixtureIds(this.prisma, userId, fixtures.map((fixture) => fixture.id));
         group.fixtures.push(
           ...fixtures.flatMap((fixture) => {
+            if (ownTeamFixtureIds.has(fixture.id)) return [];
             const game = fixture.game;
             const details = fixture.tournamentDetails;
             const fixtureTournamentId = fixture.tournamentId;

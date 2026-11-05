@@ -46,7 +46,7 @@ function makeHarness() {
         ownerUserId: `owner-of-${args.where.id}`,
       })),
     },
-    v1TournamentRegistration: { upsert: registrationCreate },
+    v1TournamentRegistration: { upsert: registrationCreate, findUnique: jest.fn().mockResolvedValue(null) },
     // 거울 생성이 로스터 자동 확정 예약(D10)까지 함께 한다 — 그 예약은 아웃박스 행을
     // `$executeRaw` 로 넣는다. fake 에 없으면 "tx.$executeRaw is not a function" 으로
     // dual-write 단언에 닿기도 전에 죽는다(이 스펙이 재는 건 거울이지 예약이 아니다).
@@ -119,8 +119,8 @@ describe('seedSeason — 통합 축 거울 dual-write', () => {
       regionId: 'region-1',
       tier: 1,
       seasonNo: 1,
-      // 신규 시즌은 모집 마감에서 운영자 시작을 기다린다.
-      status: 'closed',
+      // 신규 시즌은 대회처럼 초안에서 운영자의 접수 시작이나 리그 시작을 기다린다.
+      status: 'draft',
       requiresExplicitStart: true,
     });
   });

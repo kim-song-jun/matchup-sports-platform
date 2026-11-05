@@ -341,10 +341,10 @@ describe('buildTournamentStages — 정규 리그 거울 행', () => {
       }),
     );
 
-    // 리그는 두 칸(풀리그 · 시상)이다. 조별/4강/결승 칸이 하나라도 있으면 틀렸다.
+    // 리그는 두 칸(풀리그 · 시즌 종료)이다. 조별/4강/결승 칸이 하나라도 있으면 틀렸다.
     expect(shape(stages)).toEqual([
       ['풀리그', 'active'],
-      ['시상', 'upcoming'],
+      ['시즌 종료', 'upcoming'],
     ]);
   });
 

@@ -1,9 +1,11 @@
+import { webcrypto } from 'node:crypto';
 import { useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { parseKakaoOAuthAttempt } from '@/lib/kakao-oauth';
 import { getSavedRedirectPath, saveRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
 import { RequireAuth } from './require-auth';
 import { PendingSocialSignupGate } from './pending-social-signup-gate';
@@ -13,7 +15,9 @@ import { TermsClient } from './terms-client';
 import { KakaoLoginButton } from './kakao-login-button';
 import { KakaoCallbackClient } from './kakao-callback-client';
 import { KAKAO_OAUTH_STATE_STORAGE_KEY } from './auth.view-model';
-import { authSession, compliance, createRedirectFixture, makeAuth, PENDING, stepForRoute } from './social-link-required-redirect-fixtures';
+import { authSession, compliance, createRedirectFixture, makeAuth, PENDING, stepForRoute } from './required-step-redirect.fixtures';
+
+afterEach(() => { vi.unstubAllGlobals(); });
 
 const navigation = vi.hoisted(() => ({ pathname: '/', replace: vi.fn(), push: vi.fn(), refresh: vi.fn() }));
 const sdk = vi.hoisted(() => ({ authorize: vi.fn() }));
@@ -58,6 +62,8 @@ function openJourney(path: string) {
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterAll(() => server.close());
 beforeEach(() => {
+
+  vi.stubGlobal('crypto', webcrypto);
   cleanup();
   window.localStorage.clear();
   window.sessionStorage.clear();
@@ -77,12 +83,14 @@ const newSignupPrefill = { name: '김러너', phone: '01087654321', gender: 'fem
 async function completeSignup(user: ReturnType<typeof userEvent.setup>) {
   fireEvent.change(await screen.findByLabelText('닉네임'), { target: { value: '카카오러너' } });
   await user.click(screen.getByRole('button', { name: '중복 확인' }));
-  const submit = await screen.findByRole('button', { name: '운동 설정으로 계속' });
+  await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled());
+  await user.click(screen.getByRole('button', { name: '다음' }));
+  const submit = await screen.findByRole('button', { name: '확인하고 계속' });
   await waitFor(() => expect(submit).toBeEnabled());
   await user.click(submit);
   await screen.findByRole('button', { name: /풋살/ });
   expect(state.profileRequests).toBe(1);
-  expect(state.phoneOnlyRequests).toBe(0);
+  expect(state.linkRequests).toBe(0);
 }
 async function finishOnboarding(user: ReturnType<typeof userEvent.setup>) {
   await user.click(await screen.findByRole('button', { name: /풋살/ }));
@@ -104,6 +112,42 @@ async function expectDestination(path: string) {
 }
 
 describe('적대적 인증 continuation의 실제 consumer 계약', () => {
+  it('재동의가 필요하면 이메일 설정 없이 약관 다음 온보딩과 원 목적지로 돌아간다', async () => {
+    state.auth.socialSignupPrefill = newSignupPrefill;
+    saveStoredV1Session({ userId: PENDING });
+    saveRedirectPath('/teams/new?from=signup');
+    server.use(
+      http.post('*/api/v1/auth/social-profile', async () => {
+        state.profileRequests++;
+        state.auth = makeAuth('signup_done', PENDING, true);
+        state.auth.termsCompliance = compliance(false);
+        return success(authSession(state.auth, '/terms?mode=renewal'));
+      }),
+    );
+    const user = openJourney('/signup/social');
+    fireEvent.change(await screen.findByLabelText('닉네임'), { target: { value: '카카오러너' } });
+    await user.click(screen.getByRole('button', { name: '중복 확인' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled());
+    await user.click(screen.getByRole('button', { name: '다음' }));
+    await user.click(screen.getByRole('button', { name: '확인하고 계속' }));
+    await user.click(await screen.findByRole('button', { name: /전체 동의/ }));
+    await user.click(screen.getByRole('button', { name: '동의하고 계속하기' }));
+    await finishOnboarding(user);
+    await expectDestination('/teams/new?from=signup');
+    expect(state.acceptRequests).toBe(1);
+  });
+
+  it('소셜 가입 직후 이메일 인증 요청 없이 실제 온보딩으로 이어진다', async () => {
+    state.auth.socialSignupPrefill = newSignupPrefill;
+    saveStoredV1Session({ userId: PENDING });
+    let emailRequests = 0;
+    server.use(http.post('*/api/v1/auth/link/email/request', () => { emailRequests++; return success({}); }));
+    const user = openJourney('/signup/social');
+    await completeSignup(user);
+    expect(emailRequests).toBe(0);
+    expect(screen.queryByRole('heading', { name: '이메일을 입력해 주세요' })).not.toBeInTheDocument();
+  });
+
   it('RequireAuth→OAuth에 저장한 nested 원 목적지는 가입 완료와 온보딩 네 단계를 마친 뒤 복귀한다', async () => {
     state.auth.socialSignupPrefill = newSignupPrefill;
     let oauthRequests = 0;
@@ -120,7 +164,8 @@ describe('적대적 인증 continuation의 실제 consumer 계약', () => {
     await user.click(screen.getByRole('link', { name: '카카오로 로그인' }));
     await waitFor(() => expect(sdk.authorize).toHaveBeenCalledTimes(1));
     expect(getSavedRedirectPath()).toBe(nested);
-    const oauthState = window.sessionStorage.getItem(KAKAO_OAUTH_STATE_STORAGE_KEY);
+    const oauthState = sdk.authorize.mock.calls[0]?.[0]?.state;
+    expect(parseKakaoOAuthAttempt(window.sessionStorage.getItem(KAKAO_OAUTH_STATE_STORAGE_KEY))?.state).toMatch(/^sha256:/);
     if (!oauthState) throw new Error('OAuth state가 실제 버튼에서 저장되지 않았어요.');
     act(() => navigation.replace(`/callback/kakao?code=fixture-code&state=${encodeURIComponent(oauthState)}`));
     await screen.findByRole('button', { name: '나중에 입력할게요' });
@@ -158,6 +203,11 @@ describe('적대적 인증 continuation의 실제 consumer 계약', () => {
       return success(authSession(state.auth, '/terms?mode=renewal'));
     }));
     const user = openJourney('/signup/social');
+    if (mode === 'activity') {
+      await screen.findByRole('heading', { name: '어떤 닉네임으로 활동할까요?' });
+      await waitFor(() => expect(screen.getByRole('button', { name: '다음' })).toBeEnabled());
+      await user.click(screen.getByRole('button', { name: '다음' }));
+    }
     const submit = await screen.findByRole('button', { name: mode === 'defer' ? '나중에 입력할게요' : '입력 완료하고 계속하기' });
     await waitFor(() => expect(submit).toBeEnabled());
     await user.click(submit);

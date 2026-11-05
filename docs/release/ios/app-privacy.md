@@ -68,7 +68,7 @@ Apple 정의 요약: **수집(collect)** = 기기 밖으로 보내 실시간 요
 
 ## 4. 개인정보처리방침과의 정합성 (제출 전 보완 권장)
 
-App Store 심사자는 신고 내용과 방침을 대조한다(5.1.1). 현재 방침(`/terms?document=privacy`, 최종 변경 2026-08-31)은:
+App Store 심사자는 신고 내용과 방침을 대조한다(5.1.1). 현재 방침(`/terms?document=privacy`, v1.7, 최종 변경 2026-11-01)은:
 
 - **Android 절(11항)만 있고 iOS 절이 없다.** APNs 토큰·기기 모델·앱 버전, Apple 로그인(이름·이메일, 이메일 가리기 릴레이 주소),
   카메라·사진 선택(파일 선택기를 직접 실행한 경우만), 위치 권한 조건을 iOS 기준으로 적어야 한다.
@@ -77,4 +77,4 @@ App Store 심사자는 신고 내용과 방침을 대조한다(5.1.1). 현재 �
 - 방침 2항의 "환불 계좌정보"는 코드에 저장 필드가 없다(`schema.prisma` 검색 결과 0건). 실제로 문의 채널로만 받는다면
   방침은 그대로 두되 App Privacy 는 "고객 지원" 항목으로 충분하다.
 
-수정 위치: `apps/v1_web/src/components/auth/terms-client.tsx` 의 `getPrivacyPolicySections()` — 웹 변경이며 이 문서 PR 범위 밖이다.
+수정 위치: 방침 본문은 웹 코드가 아니라 관리 약관 문서(`privacy_policy`)다. 새 불변 리비전을 게시해야 하며(`apps/v1_api/prisma/migrations/` 의 방침 리비전 마이그레이션 참고) 이 문서 PR 범위 밖이다.

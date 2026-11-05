@@ -1,3 +1,13 @@
+배정된 대회의 활성 디렉터는 빠른 결과 입력·공식 확정·무효화도 허용한다. 게임 ID의 실제 소속 대회를 확인하며 리그 디렉터의 별도 제한은 유지한다. [대회 권한 계약](./domains/tournaments.md#scoped-director-management).
+
+수상 추천용 관리자 선수 기록 조회는 해당 대회의 활성 디렉터도 허용하며, 다른 대회는 403으로 거부한다. [대회 권한 계약](./domains/tournaments.md#scoped-director-management)을 따른다.
+
+N개 결선 대회의 초기화와 예선 수정은 owner/ops 또는 해당 대회 활성 디렉터의 별도 변경 액션이다. expectedRevision, 대회 advisory lock, 경기 행 잠금, 감사 로그와 원자적 저장을 사용한다. 시작/기록/결과가 있으면 초기화는 409이며 예선 수정은 기존 대진이 없을 때만 허용한다. [대회 계약](./domains/tournaments.md)을 따른다.
+
+토너먼트별 최종 순위는 공식 결승 및 3·4위전 결과를 범위별로 표시한다. N개 결선의 미확정/동률 자동 명단은 409 대신 null로 유지하며 진출 규칙 수만큼 미정 시드를 선생성한다. 같은 구조의 후속 배정은 기존 경기와 일정을 유지한다. [대회 계약](./domains/tournaments.md)을 따른다.
+
+관리자 대회 CRUD 응답은 저장된 nullable `kind`를 포함하며 대진·시상 기능의 종류 판정에 사용한다. [대회 계약](./domains/tournaments.md)을 따른다.
+
 6강 전용 진출 결정은 기존 관리자 가드/응답 envelope를 따르며, source version 충돌은409, 참가·방식 조합 오류는422이다. [도메인 계약](./domains/tournaments.md#6강-결승-직행-방식-2026-10-28) 참조.
 
 신규 가입자의 경기 기록은 기본 공개이며, 기존 회원은 활성·가입 완료·미설정인 경우에만 공개로 초기화한다. 직접 비공개 선택과 실명·개별 기록 숨김 정책은 유지한다. [가입 계약](./domains/auth.md#signup-flow) · [설정 계약](./domains/users.md#경기-기록-공개-설정).
@@ -11,6 +21,8 @@
 신규 리그는 모집완료(`closed`)로 생성하고 운영자가 명시적으로 시작한다. 관리자 목록·상세는 `lifecycleStatus`를 제공하며, 시작 전 경기 시작·결과 초안 생성·제출은 `409 LEAGUE_NOT_STARTED`다. 생성 정원이 선택한 서로 다른 팀 수보다 작으면 `422 LEAGUE_CAPACITY_BELOW_TEAM_COUNT`로 쓰기 전에 거부한다. [리그 계약](./domains/league-matches.md#new-league-lifecycle-2026-10-18)을 따른다.
 
 # Global v1 API contract
+
+대회 관리 API의 권한은 플랫폼 관리자 또는 해당 대회의 활성 `TOURNAMENT_DIRECTOR` 배정이다. 전역 관리자 게이트는 유지한다. 하위 리소스 ID의 실제 소속 대회를 서버에서 확인하고 범위 밖 요청은 `403 PERMISSION_DENIED`다. 자세한 범위와 예외는 [대회 계약](./domains/tournaments.md#scoped-director-management)을 따른다.
 
 대진 v2 생성은 게임 명령 헤더 대신 body의 `requestId`와 서버 `previewHash`를 사용한다. 각 조의 `groups[].legs`(1·2회전)가 기존 최상위 `legs`보다 우선하며 둘 다 없으면 1회전이다. 초안·미리보기·실제 생성·경기 상한은 같은 조별 회전 설정을 사용한다. 같은 키의 입력 변경·오래된 미리보기·초안 revision 충돌은 409이며 부분 생성은 없다. 권한과 출시 플래그는 [대회 v2 계약](./domains/tournaments.md#유연한-대진-v2-2026-10-27)을 따른다.
 
@@ -246,3 +258,5 @@ status inputs are defined in [Tournaments](./domains/tournaments.md#competition-
 
 
 대회 생성·수정의 `prizeBreakdown`은 nullable string(최대 4,000자)이다. 기존 구분자 텍스트와 `@teameet/prizes/v1:` 접두의 분류 JSON 문자열을 지원하며, 소비자는 공용 파서로 읽는다. 이 필드를 원문 그대로 사용자에게 렌더하지 않는다. [대회 시상 계획 계약](./domains/tournaments.md#categorized-prize-plans) 참고.
+
+- 정규대회 진행 방식 `league_knockouts`는 한 대회의 예선 조별리그와 이름을 가진 N개 토너먼트다. 정규리그 시즌/승강과 별개이며 기존 `group_knockout`은 유지한다. 이 방식의 시상 `bracketTrack`은 고정 enum 대신 설정된 토너먼트 이름을 받으며 서비스가 대회 소속을 검증한다. 상세는 [대회 계약](./domains/tournaments.md#정규리그--n개-토너먼트-league_knockouts).

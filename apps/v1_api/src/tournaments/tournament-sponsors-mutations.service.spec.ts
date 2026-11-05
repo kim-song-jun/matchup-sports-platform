@@ -109,7 +109,7 @@ function serviceFixture() {
   };
   prisma.$transaction.mockImplementation((cb: (tx: typeof prisma) => Promise<unknown>) => cb(prisma));
   const adminContext = {
-    getMutationAdmin: jest.fn().mockResolvedValue(ownerAdmin),
+    getTournamentMutationAdmin: jest.fn().mockResolvedValue(ownerAdmin),
     logAdminAction: jest.fn((admin, input, tx) => tx.v1AdminActionLog.create({ data: input })),
   };
   const service = new TournamentSponsorsService(prisma as never, adminContext as never);

@@ -24,6 +24,21 @@
 
 # V1 Tournaments API
 
+## Scoped director management
+
+- 수상 추천용 `GET /admin/tournaments/:tournamentId/player-records`도 활성 관리자 또는 해당 대회 디렉터만 조회한다. 타 대회는 `403 PERMISSION_DENIED`이며 기록 집계 전에 거부한다. 공개 랭킹의 동의 필터를 대신 사용하지 않는다.
+
+Task 20261122: `/tournament-management`는 디렉터 전용 담당 대회 목록이고 `/tournament-management/tournaments/:id/{section}`은 기존 관리자 상세의 10개 섹션을 재사용한다. 공개 대회 탐색 목록은 유지한다.
+
+- 기존 `/admin/tournaments` 목록은 플랫폼 관리자의 경우 기존 범위, 일반 스태프의 경우 활성 디렉터 배정 대회로 제한한다. 상태별 합계에도 같은 범위를 적용한다. 배정이 전혀 없는 일반 계정은 `403 PERMISSION_DENIED`다.
+- 대회 상세·설정·공개 설정·상태/대진 공개·신청/입금확인/취소·명단/자격심사/CSV·대진/자리/편성·공지·협찬·캠페인·후기/시상/통계는 해당 대회의 활성 디렉터가 기존 관리자 API로 수행할 수 있다. DTO·응답·pagination·상태 전이·멱등성·경기 시작 후 변경 보호는 유지한다.
+- 배정은 사용자 계정 활성, 대회 미삭제, regular_tournament 또는 호환 null kind, 시작 시각 도달, 미해제, 미만료를 모두 요구한다. 일반 현장/조회 스태프는 관리 권한을 얻지 않는다. 플랫폼 support는 읽기 전용을 유지한다(별도의 디렉터 배정이 있으면 그 대회의 배정 권한을 사용한다).
+- 신청·선수·경기·조·조편성·자리·공지 ID만 받는 액션은 DB에서 실제 소속 대회를 확인한다. 잘못된 대회 및 타 대회 하위 ID 접근은 `403 PERMISSION_DENIED`다.
+- 디렉터를 플랫폼 관리자처럼 가장하지 않는다. 변경은 `V1OperationAudit`에 실제 `actorUserId`, `tournamentId`, `_authorization`의 역할/배정 ID/배정 버전을 기록하고 상태 이력은 user actor로 남긴다. 대진 생성 재시도·결선 배정·선출 심사는 관리자와 디렉터 양쪽 감사 이력을 조회한다. 관리자 FK가 없는 입금 확인은 기존 nullable 관리자 FK와 실제 사용자 운영 감사 기록을 함께 사용한다. 스키마/마이그레이션 변경은 없다.
+- 대회 생성, mock seed, 공통 경기 설정의 외부 변경, 플랫폼 전역 팝업/회원/리그 관리 권한은 추가하지 않는다. 공통 불변 경기 설정의 조회는 디렉터도 가능하며 대회 편집의 내부 경로에서 필요한 새 불변 버전을 생성할 수 있다.
+- **2026-11-04 변경: 배정된 대회의 활성 디렉터는 결과 공식 확정·무효화와 빠른 결과 입력까지 허용한다. `DIRECTOR_OFFICIALIZE`는 리그 디렉터에만 적용하며 리그 거부 감사는 유지한다.** 디렉터 추가/해제의 기존 플랫폼 권한 경계, takeover 및 경기별 커맨드 검증도 유지한다.
+- 웹은 `마이페이지 → 담당 대회 → 대회 관리`로 진입한다. 운영 보드/스태프 링크와 관리 복귀는 같은 대회를 유지한다. 권한 조회 실패는 재시도, 배정 없음은 접근 거부를 보여준다. UI 숨김에 의존하지 않고 API가 최종 권한을 판정한다.
+
 ## 유연한 대진 v2 (2026-10-27)
 
 모든 경로의 prefix는 `/api/v1/admin/tournaments/:tournamentId/bracket/template`이다. V1AuthGuard와 mutation admin(owner/ops)을 요구하며 support와 비관리자는 거절한다.
@@ -96,7 +111,7 @@ values return `400`) and returns `{ tournamentId, isPublic }`. It requires an ac
 mutation administrator, is a no-op without audit when the value is unchanged, records
 `tournament.visibility` in the admin audit otherwise, and returns
 `409 TOURNAMENT_VERSION_CONFLICT` if a concurrent request changed the value first.
-The admin tournament detail includes `isPublic`.
+Admin tournament list/create/detail/update responses include the stored nullable `kind` discriminator (`regular_tournament` for regular tournaments; historical rows may be `null`). Bracket and award management use this field to determine available actions. The admin tournament detail includes `isPublic`.
 `GET /api/v1/admin/tournaments` accepts an optional `visibility=public|hidden` filter
 (any other value returns `400`); it narrows the rows, `pageInfo` and the `summary` status
 counts together, and omitting it keeps every row. `public` means published (`isPublic`) and
@@ -238,24 +253,24 @@ the web explicitly requests `all` for its default tab.
 
 | Query | Values / behavior |
 |---|---|
-| `phase` | `upcoming` = draft/open/closed intersected with public gate; `ongoing` = in_progress; `completed` = completed |
-| `registration` | `open` = accepting new registrations; `closed` = remaining public competitions |
+| `stage` | The state the card shows (one badge): `preparing` = draft (regular leagues only; a tournament draft stays hidden), `recruiting` = `open`, deadline not passed, capacity left, `recruit_closed` = stored `closed`, or `open` whose deadline passed or capacity is full, `ongoing` = in_progress, `completed` = completed. It filters on the same group rank the list order uses, so badge, filter and order cannot disagree |
 | `sportId` | UUID, existing sport filter |
 | `genderCategory` | mixed/male/female/unspecified; unspecified matches null |
 | `format` | league/knockout/group_knockout; format is not competition kind |
 | `feeMin`, `feeMax` | integer KRW, inclusive 0–2147483647; max=0 selects free |
 | `dateFrom`, `dateTo` | real calendar date YYYY-MM-DD, inclusive Asia/Seoul day boundaries; period overlap; undated rows excluded |
-| `sort` | latest (createdAt desc), deadline (deadline asc), scheduled (start asc); nulls last, id byte-order asc ties; absent sort retains the existing lifecycle-group ordering |
 | `withTotal` | literal string true adds actual total to cursor pageInfo; numbered pages already include total |
 
-`deadline` also enforces registration=open. Tournament admission requires status=open,
+**Order (2026-11-03).** There is no `sort` parameter; the list has one fixed order: in progress → recruiting → preparing → recruitment closed → finished. Inside a group the most recently registered row (`createdAt`) comes first; the finished group is most recently ended first (`scheduledEndAt ?? scheduledAt`). Rows without that date sort last in their group and `id` (byte order) breaks ties. The old `phase`, `registration` and `sort` parameters are removed; the global `forbidNonWhitelisted` pipe answers them with 400, and the web no longer sends them.
+
+Tournament admission requires status=open,
 no expired deadline (null is permitted), and confirmed + awaiting_payment + payment_checking +
 paid registrations below teamCount. Leagues require a non-null unexpired deadline and a
 nonterminal lifecycle; optional maxTeams is checked against the same reserved registrations (null means unlimited), and in_progress leagues can still accept entries.
 The deadline equality instant is open. `registrationOpen` on every list item uses the same
 window/capacity semantics, independent of the viewer's individual team eligibility.
 
-All conditions and sort apply before pagination in the existing SQL keyset query. Default cursors remain compatible; explicit-sort cursors carry their sort mode and cannot be reused across modes.
+All conditions apply before pagination in the existing SQL keyset query. The cursor carries `[group, sortAt, id]`; a cursor from the removed sort modes (four parts) is rejected as an empty window.
 Legacy `status` is retained and intersects new filters. Contradictory filters return an empty
 list. Reversed date or fee ranges return 400 `INVALID_FILTER_RANGE`; malformed/unknown inputs
 are rejected by the existing DTO validation pipe. Gender/format/fee conditions narrow to
@@ -275,6 +290,16 @@ integration database. Unit/UI/MSW checks do not replace that verification or alp
 
 
 ## Individual awards
+
+Individual award items also carry `bracketTrack: 'overall' | 'upper' | 'lower'`. Omitted write scope defaults to `overall`; historical rows are preserved as `overall`. Award types are unique within `(tournamentId, bracketTrack)`, so one regular tournament may award the same MVP type separately in its upper and lower finals. A repeated type within one scope is rejected. Split scopes require `kind=regular_tournament`; other competition kinds retain overall awards. Notification identity includes the track, so moving the same recipient/type to a different scope creates the appropriate new award notification. Public award snapshots include the scope while retaining the existing recipient-account privacy gate.
+
+## Team award announcements
+
+`GET /api/v1/admin/tournaments/:tournamentId/award-sets` reads per-final prize announcements; `PUT` replaces them atomically with `{ awardSets: [{ bracketTrack: 'upper' | 'lower', prizePool?: number | null, prizeSummary?: string | null, prizeBreakdown?: string | null }] }`. The list has at most two entries and each track appears once. `[]` clears the split announcements. `prizePool` is an integer from 0 to 2147483647. These routes apply only to regular tournaments. Read access permits an active support admin; writes require an active mutation-capable admin and record an audit entry in the replacement transaction. Prize and personal-award replacement transactions share the competition lock with bracket changes.
+
+The existing tournament-level prize fields remain the overall announcement. Split announcements are stored separately; editing or clearing them does not overwrite overall prize fields. Public tournament detail includes `awardSets[]` with `bracketTrack` and nullable prize fields; admin GET/PUT additionally returns each row's `id`. Overall and split announcements can both be displayed with their scope labels. These are announcements, with each final's official result supplying its winning teams; they do not trigger a payment.
+
+## Award recipient and fixture contracts
 
 `GET /api/v1/admin/tournaments/:tournamentId/awards` returns the saved award list, and `PUT` to the same path replaces it atomically. Each admin item contains `awardType`, `awardLabel`, nullable `iconKey`, `recipientName`, nullable `recipientUserId`, nullable `teamName`, nullable `note`, and optional `sortOrder` on writes. New writes require a UUID `recipientUserId`; the nullable admin read shape only accommodates historical rows that could not be linked without ambiguity. `iconKey` accepts `trophy`, `crown`, `goal`, `shield`, `glove`, `handshake`, `sparkles`, `medal`, or `star`; unknown values are rejected by DTO validation. Public `GET /api/v1/tournaments/:id` keeps the display snapshot but deliberately omits `recipientUserId`, so a public award cannot bypass the user's record-consent gate to reveal account linkage. Existing rows with `iconKey=null` retain the legacy `awardType`-based icon mapping in the Web client.
 
@@ -367,6 +392,15 @@ On update, `null` clears nullable bank details when the resulting `entryFee` is 
 
 피리어드 설정 저장은 새 설정 버전을 대회(리그)에 연결하면서 **끝나지 않았고 시작 전인 경기**(게임 `SCHEDULED`, 이벤트·결과·시작된 피리어드 없음 — 라인업 제출은 무관)도 같은 버전으로 옮기고 경기 피리어드 행 수를 맞춘다. 옮기는 대상은 피리어드 말고는 현재 설정과 같은 버전을 따르던 경기뿐이다(라인업·결과 규칙이 다른 버전으로 남은 경기는 그대로). 같은 피리어드를 다시 저장하면 버전은 바뀌지 않고(`changed: false`) 예전 버전에 남은 시작 전 경기만 따라온다. 응답 `fixturesRepointed`가 옮긴 경기 수다. 시작했거나 끝난 경기는 만든 때의 피리어드 그대로다. 경기 종료 예정 시각(`endAt`)은 바꾸지 않는다.
 
+정규 대회는 기본 피리어드에 더해 단계별 재정의를 저장할 수 있다. `GET /api/v1/admin/tournaments/:tournamentId/periods`의 `stageOverrides[]`는 `phase`(`group|round64|round32|round16|round12|quarter|semi|final|third_place`)와 그 단계의 피리어드를 반환한다. 같은 PATCH에 `phase`를 보내면 해당 단계만 저장하고, `phase`와 `inheritDefault: true`를 보내면 재정의를 삭제해 대회 기본값을 다시 상속한다. 단계 재정의가 없는 새 경기는 기본 설정을 고정하고, 재정의가 있으면 해당 단계 설정을 고정한다. 단계 변경은 그 단계의 시작 전 경기만 옮기며 다른 단계·시작한 경기·완료 경기는 그대로다. 대회 기본값 변경도 명시적 단계 재정의를 덮어쓰지 않는다. 종목을 바꾸면(대진이 없을 때만 가능) 단계 재정의는 이전 종목 규칙을 가리키므로 함께 지운다. 정규 리그는 단계 재정의를 지원하지 않는다.
+
+단계 설정은 피리어드만 소유한다. 출전 인원·이벤트·결과 정책 같은 대회 기본 경기 규칙이 다른 버전으로 바뀌면 단계 설정 버전도 같은 트랜잭션에서 새 기본 규칙에 재기반(rebase)하고 자기 피리어드만 유지한다. 따라서 단계 재정의가 다른 규칙을 과거 버전에 고정하지 않는다. 기존 대회에는 단계 행이 없으므로 배포 후에도 지금과 동일하게 기본 설정만 사용한다.
+
+조·경기별 재정의(2026-10-29): 경기 시간은 대회 기본값 → 단계 → 조 → 경기 순서로 좁아지고, 좁은 설정이 있으면 넓은 설정이 바뀌어도 그 범위의 경기는 따라가지 않는다. 어느 범위를 저장해도 대회 기본 설정(`competitionConfigVersionId`)은 바뀌지 않는다. 같은 PATCH에 `phase`·`groupId`·`teamMatchId` 중 **하나만** 보낸다(둘 이상이면 `400 TOURNAMENT_PERIOD_SCOPE_CONFLICT`). `inheritDefault: true`는 그 범위의 재정의를 지우고 바로 위 피리어드를 다시 따른다. 경기별 재정의를 지울 때는 경기의 현재 출전 인원·결과 규칙을 보존하고 위 설정의 피리어드만 적용한다.
+- `groupId`: 조별리그 조(`phase=group`) 하나. 강 단계 조는 블록이 보통 하나라 단계 설정 한 곳에서만 바꾼다(`400 TOURNAMENT_GROUP_PERIODS_UNSUPPORTED`, 정규 리그도 같은 코드). GET 응답의 `groupOverrides[]`(`groupId`, `name`, `competitionConfigVersionId`, `periods`)로 돌려준다. 조 설정이 있는 조에 새 경기를 만들면 그 조 설정을 고정한다. 대회 기본 규칙이 바뀌면 단계 설정처럼 피리어드만 지켜 재기반한다. 종목을 바꾸면 단계 재정의와 함께 지운다.
+- `teamMatchId`: 대회·정규 리그의 시작 전 경기 하나. 그 경기가 지금 따르는 규칙에서 피리어드만 바꾼 버전으로 옮기고 `V1TeamMatch.periodOverride=true`로 표시한다. 시작했거나 끝난 경기는 `409 TEAM_MATCH_PERIODS_LOCKED`. 대회 버전(`expectedVersion`)을 올리지 않아 여러 경기를 이어서 고쳐도 충돌하지 않는다. 설정 GET 응답의 `matchOverrideCount`는 현재 경기별 재정의 수다.
+- `GET /api/v1/admin/tournaments/:tournamentId/periods/matches/:teamMatchId`: 경기 수정 화면용. `{ teamMatchId, expectedVersion, overridden, editable, periods, legacyPeriodCount, inherited: { source: group|stage|default, phase, groupName, periods } }` — `periods`는 경기가 지금 쓰는 값, `inherited`는 경기 설정을 지우면 따를 위 설정이다.
+
 피리어드 이름: 요청은 시간만 보내고 이름·코드는 서버가 정한다. 전·후반을 하나로 줄이면 `SINGLE_PERIOD`(단일), 단판을 다시 둘로 나누면 `FIRST_HALF`·`SECOND_HALF`(전반·후반)로 저장한다(MD-QA #159). 단판을 세 개 이상으로 나누면 이전 `SINGLE_PERIOD`(단일)를 이어 받지 않고 모든 행을 `PERIOD_N`(N피리어드)으로 새로 정한다. 그 밖에는 같은 순서의 기존 이름을 유지하고, 새로 붙는 피리어드만 `PERIOD_N`(N피리어드)이다.
 
 초안 재저장: `PATCH /api/v1/admin/tournaments/:tournamentId`에 출전 인원·교체 정책을 다시 보내거나 변경해도 현재 고정된 설정의 피리어드·이벤트·결과·순위·공개 정책은 유지한다. 별도 이름으로 등록한 설정도 현재 종목/이름 계열에서 동일 버전을 재사용하고, 실제 라인업 변경은 같은 계열의 다른 섹션을 보존한 불변 새 버전으로 처리한다. 기존 v1 설정에서 `lineup.positions/formations` 키가 없으면 버전 쓰기도 부재를 유지한다(읽기 응답은 `[]`로 정규화). 명시적으로 잘못된 포지션/대형 목록의 검증은 그대로 적용한다. 생성 마법사는 피리어드 PATCH 성공 전에는 공개 확인·접수 시작을 허용하지 않는다. 실패 시 초안 ID와 입력을 유지하며 같은 초안에서 재시도한다.
@@ -404,8 +438,8 @@ Paid tournaments (`entryFee > 0`) require `bankName`, `bankAccount`, and `bankHo
 ## Task 6 fixture Game and result gate
 
 `POST /api/v1/admin/tournaments/:tournamentId/fixtures` uses `CreateFixtureDto` and requires an
-authenticated mutation-capable admin. In its source transaction, it copies the tournament's
-active `competitionConfigVersionId` to the fixture and creates exactly one `TEAM_MATCH`
+authenticated mutation-capable admin. In its source transaction, it resolves the effective
+group → stage → tournament-default `competitionConfigVersionId` for the new fixture and creates exactly one `TEAM_MATCH`
 Game with HOME/AWAY side snapshots and the registered participant snapshots. A missing or
 inactive pin fails with `409 COMPETITION_CONFIG_REQUIRED` and rolls back both fixture and Game.
 The deterministic fixture command is derived from tournament, round, fixture number, and leg;
@@ -493,7 +527,7 @@ The list (`GET /api/v1/tournaments`) and detail (`GET /api/v1/tournaments/:tourn
 | `POST` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/cancel-request` | user, team manager+ | `CancelRegistrationRequestDto` | `draft` becomes `cancelled`; active statuses become `cancel_requested` |
 | `POST` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/cancel-request/withdraw` | user, team manager+ | empty body | `cancel_requested` returns to its saved previous status |
 
-일반 대회와 정규 리그는 이 신청 경로를 공유한다. 운영자 신청 관리도 같은 등록을 다룬다:
+일반 대회와 정규 리그는 이 신청 경로를 공유한다. 신청은 둘 다 상태가 `open`(접수 중)이고 마감 전일 때만 받는다(2026-10-27 — 리그도 마감 시각만으로 열리지 않는다). 아니면 `409 TOURNAMENT_NOT_OPEN`, 마감이 지났으면 `409 REGISTRATION_DEADLINE_PASSED`이고 판정은 `src/tournaments/registration-window.ts` 하나다. 운영자 신청 관리도 같은 등록을 다룬다:
 
 | Method | Path | Auth | Request | Response |
 |---|---|---|---|---|
@@ -720,14 +754,21 @@ All team roster mutations lock the registration row and re-read `rosterLockedAt`
 
 ### 조별+결선 템플릿과 순위대로 채우기 (2026-10)
 
+- Optional `lowerBracket: true` creates both upper and lower finals inside the same regular tournament. It requires `groupCount: 2 | 4 | 8`, `teamsPerGroup: 4..6`, and `advancePerGroup: 2`; other combinations are rejected with `BRACKET_TEMPLATE_UNSUPPORTED`. Omitted/false retains the existing single-final template, including three-team groups. Group-stage groups have `bracketTrack: 'overall'`; knockout groups carry `upper` or `lower`. Upper slots reference ranks 1/2, lower slots 3/4, with the same cross-group pairing pattern. Ranks 5/6 do not enter either final. `thirdPlace` adds a third-place game to both tracks. Fixture numbers remain unique across the whole event and the 240-fixture limit still applies.
+- Admin/public group projections include `bracketTrack`. Split group-stage standings include `qualificationByTrack: { upper, lower }`, each using the existing qualification shape; legacy `qualification` continues to describe the upper track. Actual lower-slot placements must not enter the upper qualifiers. Manual winner/loser links require matching tracks; cross-track links, including split-to-overall links, return `BRACKET_TRACK_MISMATCH`.
+- A split `GROUP_RANK` slot whose rank is resolved accepts only that resolved team, including manual overrides. Legacy overall slots retain the existing same-source-group override contract. A source group feeding split rank slots must retain `advanceCount: 2`; changing it returns `BRACKET_TRACK_ADVANCE_COUNT_LOCKED`.
+- Direct slot assignment, group-team placement, and fixture participant creation/editing also validate official group-rank eligibility for the destination track. Incomplete ranks return `BRACKET_TRACK_RANK_UNRESOLVED`; a wrong rank or an existing opposite-track placement returns `BRACKET_TRACK_RANK_MISMATCH`. A replacement that removes split finals while scoped team or personal awards remain returns `BRACKET_TRACK_AWARDS_REQUIRE_RESCOPING` before teardown; the operator must clear or re-scope the awards first.
+- `fill-from-standings.overrides` supports at most **32** entries to cover ranks 1–4 from eight groups. The completeness, tie, locking, registration, and duplicate-team contracts below still apply to both tracks.
+
 - `POST /admin/tournaments/:tournamentId/bracket/template` 에 `kind: 'group_knockout'` 이 추가됐다: `{ kind, groupCount: 2..8, teamsPerGroup: 3..6, advancePerGroup: 1|2, legs: 1|2, thirdPlace: boolean, replaceExisting? }`. 대회 `format` 이 `group_knockout` 이어야 한다(아니면 422 `BRACKET_TEMPLATE_FORMAT_MISMATCH`). 결선 크기 `groupCount × advancePerGroup` 는 2·4·8·16 만 가능하고(그 밖은 422 `BRACKET_TEMPLATE_UNSUPPORTED`) 결승 한 경기뿐(2조×1팀)이면 `thirdPlace` 를 켤 수 없다(422 같은 코드). 계획 경기 수가 240 을 넘으면 422 `BRACKET_TEMPLATE_TOO_LARGE`.
 - 만들어지는 것: 조 `A조…`(`advanceCount` = advancePerGroup) · 조마다 ENTRY 자리와 라운드로빈 빈 경기(`league_r{n}`, 회전 `legs`) · 결선 그룹(16강/8강/4강/결승/3위 결정전 — 16강은 8조×2 일 때만, 결승 다음이 3위 결정전)과 빈 경기 · 결선 첫 라운드 사이드에 GROUP_RANK 자리(교차 대진: 2조×1 A1–B1 / 2조×2 A1–B2·B1–A2 / 4조×1 A1–D1·B1–C1 / 4조×2 A1–B2·C1–D2·B1–A2·D1–C2 / 8조×1 A1–H1·D1–E1·B1–G1·C1–F1 / 8조×2 16강 A1–B2·C1–D2·E1–F2·G1–H2·B1–A2·D1–C2·F1–E2·H1–G2) · 이후 라운드 WINNER 연결(3·4위전은 4강 LOSER).
 - `GET /admin/tournaments/:tournamentId/slots/standings-preview`: 어드민(support 포함). 응답 `{ slots: [{ slotId, label, state: 'ready'|'tied'|'group_incomplete', candidateRegistrationId, candidateTeamName, tiedRegistrationIds, currentRegistrationId }] }`, 올라올 조 순서 → 순위 순. 조의 비삭제·비취소 경기가 전부 OFFICIAL 이고 조 순위표가 그 결과를 반영했을 때만 `ready`/`tied`. 정본 §5 동점 처리(승점 → 득실 → 다득점 → 맞대결 → 적은 실점)를 다 쓰고도 갈리지 않은 완전 동률 구간에 그 순위가 걸리면 `tied`(`tiedRegistrationIds` = 동률 팀 전체, 후보 없음). 대회 설정 규칙의 저장 순위와 §5 가 어긋나는 자리도 `tied`. 정규 리그 id 는 404 `TOURNAMENT_NOT_FOUND`.
-- `POST /admin/tournaments/:tournamentId/slots/fill-from-standings` `{ overrides?: [{ slotId, registrationId }] }`(최대 16개, uuid): mutation admin. 응답 `{ assignments: [{ slotId, registrationId }], skipped: [{ slotId, reason: 'tied'|'group_incomplete' }] }`. `ready` 자리 + override 를 한 트랜잭션에서 배정한다 — 바뀔 자리를 먼저 모두 비운 뒤 넣어 A1↔A2 맞바꾸기가 유일 제약에 걸리지 않는다. override 허용 범위: `tied` 자리는 `tiedRegistrationIds` 안의 팀, `ready` 자리는 그 조 소속 팀, `group_incomplete` 자리는 불가(422 `SLOT_REGISTRATION_INVALID`). 같은 팀이 두 자리에 배정되면 409 `SLOT_TEAM_ALREADY_PLACED`, 결선 경기가 시작된 자리가 바뀌어야 하면 409 `SLOT_LOCKED`(이미 맞게 들어 있는 자리는 건드리지 않는다). 시작 전이면 다시 채울 수 있다. 감사 `tournament.slots.fill_from_standings`.
+- `POST /admin/tournaments/:tournamentId/slots/fill-from-standings` `{ overrides?: [{ slotId, registrationId }] }`(최대 32개, uuid): mutation admin. 응답 `{ assignments: [{ slotId, registrationId }], skipped: [{ slotId, reason: 'tied'|'group_incomplete' }] }`. `ready` 자리 + override 를 한 트랜잭션에서 배정한다 — 바뀔 자리를 먼저 모두 비운 뒤 넣어 A1↔A2 맞바꾸기가 유일 제약에 걸리지 않는다. override 허용 범위: `tied` 자리는 `tiedRegistrationIds` 안의 팀, `ready` 자리는 그 조 소속 팀, `group_incomplete` 자리는 불가(422 `SLOT_REGISTRATION_INVALID`). 같은 팀이 두 자리에 배정되면 409 `SLOT_TEAM_ALREADY_PLACED`, 결선 경기가 시작된 자리가 바뀌어야 하면 409 `SLOT_LOCKED`(이미 맞게 들어 있는 자리는 건드리지 않는다). 시작 전이면 다시 채울 수 있다. 감사 `tournament.slots.fill_from_standings`.
 
 ### 5조·20팀 → 12강 성적 비교 배정
 
 - 위 조별+결선 템플릿에 `qualificationMode: 'cross_group_round12'`를 보내면 기존 결선 크기 제한 대신 정확히 `groupCount: 5, teamsPerGroup: 4, advancePerGroup: 2, legs: 1`을 요구한다. 조별 30경기 + 결선 11경기, ENTRY 20 + GROUP_RANK 8 + BYE 4자리, 진출 연결 10개를 만든다. `thirdPlace: true`면 경기 1개·연결 2개 추가. 모든 팀은 미정으로 생성한다.
+- `qualificationMode: 'cross_group_round12'`와 `lowerBracket: true`는 함께 지원하지 않아 422 `BRACKET_TEMPLATE_UNSUPPORTED`를 반환한다. `qualificationMode`를 생략하면 기존 조별+결선 템플릿과 상·하위 결선 입력 계약이 유지된다.
 - 목록과 그림 모두 같은 템플릿 API를 사용한다. 조별 ENTRY 자리 편집은 연결된 조별 경기 전체에 반영된다. `group_knockout`의 `slots/random-fill`은 조별 ENTRY만 채우며 결선 BYE를 무작위로 채우지 않는다.
 - `GET /admin/tournaments/:tournamentId/bracket/round12-preview`: active admin(support 포함). 응답 `{ version, teams, ranks, targets }`. `teams[]`는 등록 ID·팀명·조·승점·득점·실점, `ranks[]`는 각 조 1~3위의 후보 등록 ID, `targets[]`는 시드·표시명·경기 ID·HOME/AWAY·slotId(없으면 null)·현재 등록·부전승 위치를 제공한다.
 - 조별 4팀·서로 한 번씩 6경기, 확정 참가 20팀, 모든 조별 결과 OFFICIAL 및 순위 반영이 필요하다. 조 내 순위는 기존 공통 규칙과 동률 후보를 사용한다. 같은 순위끼리 조 간 비교는 승점→득실→다득점이며 완전 동률은 운영자가 결정한다. 서로 다른 조의 팀에는 맞대결 기준을 쓰지 않는다.
@@ -834,3 +875,44 @@ Legacy delimiter-separated text remains readable. New admin saves use `@teameet/
 공개 종료 결과는 결승 → 3·4위전 → 4강 → 이전 라운드로 읽는다.
 단판은 단일 경기로 표시하며, 합산은 같은 단계/편성·경기번호의1·2차전이 모두 공식 점수와 같은 참가팀 식별자를 가질 때만 보여준다.
 팀명으로 같은 대진이라고 추정하거나 미확정 점수를0점으로 합산하지 않는다.
+
+### 정규리그 + N개 토너먼트 (`league_knockouts`)
+
+PR1858의 정규대회 분리 결선을 일반화한 별도 `format`이다. `kind=regular_tournament`이며 시즌 승강 정규리그가 아니다. 기존 `group_knockout`은 유지한다.
+
+인증은 `V1AuthGuard`; GET은 활성 관리자(support 포함) 또는 해당 대회의 활성 디렉터, 모든 쓰기·미리보기는 owner/ops 또는 해당 대회의 활성 디렉터를 요구한다. `reset`과 예선 편집도 같은 대회 범위 검사와 사용자·배정 감사 경로를 사용하며, 타 대회·해제·만료 배정·조회 역할은 403이다. 기존 시작/이벤트/결과 보호, revision·잠금·원자성은 유지한다. prefix는 `/api/v1/admin/tournaments/:tournamentId/bracket/multi-finals`이다.
+
+| Method/path | Contract |
+|---|---|
+| GET `/` | `revision`, 예선 `groups`, 이름·규칙·저장 명단·`suggestedRegistrationIds`·`unresolved`·`manual`을 포함한 `finals`, 확정 참가팀 `registrations`, `generated`, 조별 전체 `groupStandings`(groupId/name/complete/rows). rows는 registrationId/teamName/position/points/wins/draws/losses/goalsFor/goalsAgainst/tiedRegistrationIds. complete는 모든 자리 배정·공식 결과·최신 순위 반영까지 확인한다. |
+| POST `/setup` | `{ expectedRevision, groups:[{name,capacity,legs,registrationIds?}], finals:[{name,rules:[{groupId,rank}],thirdPlace,registrationIds?}] }`. 초기 `groupId`는 groups 배열의 0부터 시작하는 인덱스 문자열. 예선 조·자리·풀리그만 생성하고 반환 시 실제 group UUID로 바꾼다. 이미 예선이 있으면 409. |
+| POST `/reset` | `{ expectedRevision }`. 독립 액션으로 모든 예선·결선 대진과 일정·자리·순위·결선 팀 선택을 초기화한다. 참가 신청, 예선 조 UUID/설정/팀 선택, 결선 이름·진출 규칙은 유지한다. 시작/이벤트/공식 결과/누락 Game이 하나라도 있거나 대회 종료·취소·보관 상태면 `409 BRACKET_LOCKED`. 경기 행 잠금 후 검사하고 전체 정리·revision 증가·감사를 같은 트랜잭션에서 처리한다. 성공 응답은 GET view. |
+| PUT `/preliminary` | setup과 동일 payload. 기존 설정이 있고 대회 전체에 살아 있는 대진이 하나도 없을 때만 예선 편성을 재생성한다. 기존 대진이 있으면 자동 초기화하지 않고 `409 BRACKET_NOT_EMPTY`. 규칙 groupId는 편집한 groups 배열 인덱스 문자열이며 저장 시 새 UUID로 연결한다. 시상 범위의 결선 삭제/이름 변경은 기존 rescoping 보호를 적용한다. 성공 응답은 GET view. |
+| PUT `/selection` | `{ expectedRevision, finals }`. 이후 `rule.groupId`는 실제 예선 UUID. 같은 이름·순서·참가 자리 수·3/4위전 구조면 기존 대진을 보존하고 명단만 저장한다. 구조가 달라지면 시작 전 결선만 비운다. 시작/결과/이벤트가 있는 결선은 409. |
+| POST `/preview` | 저장된 명단 또는 공식 예선 순위를 사용해 `plan`, 결선별 명단, `counts`, `revision`, `previewHash`를 반환. 자동 명단에서 미확정/동률이 있거나 어느 예선 조라도 종료/순위 반영 전이면 registrationIds=null로 유지하고 rules.length만큼 실제 미정 시드를 만든다. 경기 번호는 살아 있는 예선 최대 번호 다음부터 시작한다. |
+| POST `/generate` | `{ expectedRevision, previewHash, requestId }`. 대회 잠금 안에서 재검증 후 N개 결선과 부전승/승자·패자 연결을 원자적으로 생성. 미정 명단은 슬롯을 비운 상태로 생성한다. 같은 구조의 후속 배정은 기존 경기 ID·일정·장소·진출 연결을 유지하고 시드를 일괄 교체한다. 같은 requestId/hash는 기존 결과 반환; hash가 다르면 409. |
+
+`registrationIds` 생략/null은 순위 기반 제안이다. 팀이 아직 미정이면 진출 규칙 수로 대진을 먼저 만들며, 미정 자리를 부전승으로 취급하지 않는다. 실제 참가팀을 배정한 뒤에는 승인 명단을 저장하므로 순위 재계산으로 덮어쓰지 않는다. 명시적인 배열은 수동 명단이며 빈 배열도 초안으로 저장할 수 있지만 명시적 2팀 미만 결선은 생성할 수 없다. 규칙과 팀이 모두 없는 결선도 규모를 추측하지 않고 422로 거절한다. 같은 대회 확정팀의 수동 교체·이동과 한 팀/순위 출처당 한 결선 제한은 유지한다. 순위 채우기 API는 이 결선의 직접 선택 시드를 변경하지 않는다.
+
+관리자 UI는 대진 생성(예선 편성→토너먼트 규칙→미리보기)과 진출팀 배정(전체 순위/동률·자동 선택/수동 변경→미리보기)을 분리한다. 배정 UI는 전체 예선 공식 순위 반영 뒤 활성화하며 기존 자리 수에 맞는 명단을 요구한다. 동률은 후보를 보여주되 임의 확정하지 않는다.
+
+GET은 살아 있는 전체 경기 수 `fixtureCount`, 예선 경기 수 `preliminaryFixtureCount`, 각 예선 `groups[].registrationIds`를 함께 반환한다. 조 밖의 수동 경기까지 전체 경기 수로 편집 잠금을 판정한다. 팀 선택은 실제 ENTRY 자리 순서이며 초기화 뒤에도 보존한다. 예선 단계의 초기화와 편성 수정은 독립 액션이다. 기존 대진이 있으면 편성은 읽기 전용이며 초기화를 자동 실행하지 않는다. 대진이 없으면 조 수·이름·정원·회전과 확정 참가팀의 수동/무작위 배정을 편집한다. 예선 그룹 registrationIds는 정원 이하의 부분 배열도 허용하며 나머지는 미정 자리다. 같은 팀의 조 간/조 내 중복, 정원 초과, 미확정/다른 대회 팀은 422다. UI는 빈 선택을 제거한 DTO 호환 배열을 보내고 자동 배정 뒤 미배정 팀 수를 표시한다. 초기화 실패를 성공 처리하지 않는다.
+
+공개 `/tournaments/:id/bracket`의 순위·대진표는 `league_knockouts`에도 조별리그/결선 보기를 제공한다. 공개 상세의 `groups[].phase`, `standings`, `qualificationByTrack`, `bracketTrack`, `fixtures`를 그대로 사용하며 팀 미정 결선도 표시한다. 예선에 아직 팀·성적이 없으면 조별 영역을 유지하고 순위 행은 지어내지 않는다. 기존 대진 공개 시각·신원 가림 계약은 유지한다.
+
+예선 조 수·팀 수에 기존 8/16/64팀 또는 240경기 템플릿 상한을 적용하지 않는다. 최소 조당 2팀, 1/2회전이다. 서버/DB의 정수·요청 및 트랜잭션 자원 한계는 여전히 적용되며 실패를 부분 성공으로 처리하지 않는다. 결선은 2팀 이상이며 3·4위전은 4팀 이상에서 가능하다.
+
+결선 범위 `bracketTrack`은 이 방식에서 토너먼트 이름(중복 불가)이다. `overall/upper/lower`는 기존 범위를 위해 예약한다. 대진 그룹·시상·개인상 유일키·알림 identity가 이 범위를 사용한다. 토너먼트 삭제/이름 변경 시 연결된 시상을 먼저 재지정해야 한다. 결선 참가팀을 바꾸는 일반 자리/직접 경기 편집 대신 위 selection API를 사용한다. 기존 slot 배정 API로 예선 빈 자리는 배정할 수 있다.
+
+오류: `MULTI_FINAL_INVALID`(422: 잘못된 순위/중복/다른 대회·미확정 팀/자리 수 부족), `MULTI_FINAL_STALE`(409: revision/preview 변경), `MULTI_FINAL_SELECTION_REQUIRED`(409: 전용 편집 필요), `BRACKET_LOCKED`, `BRACKET_TRACK_AWARDS_REQUIRE_RESCOPING`. 미확정 순위는 더 이상 대진 선생성을 409로 막지 않는다. 기존 응답 envelope/권한 오류 계약은 동일하다. 운영자 변경 전후 명단·규칙과 생성 요청을 감사 로그로 남긴다.
+
+
+### 토너먼트별 최종 순위와 공용 mock 계약 (2026-11-03)
+
+분리·이름 결선의 공개 결과 화면은 각 `groups[].bracketTrack` 안에서 공식 완료된 `final` 및 `third_place` 경기만 사용한다. 결승의 우승/준우승과 3·4위전의 3/4위를 각각 표시하며 정규 점수가 같으면 공식 승부차기 점수를 따른다. 표시용 round 이름이 달라도 group phase가 판정 기준이며 다른 토너먼트의 결과와 섞지 않는다.
+
+공용 MSW의 named-finals fixture는 샘플 4팀·예선 2개 조로 이미 설정된 대회다. `named-finals-fixtures.ts`와 `named-finals-handlers.ts`가 시상 GET/PUT 및 공개 상세를 같은 상태로 제공하며 빈 배열 저장은 두 응답 모두 초기화한다. 실제 api-client wire 검증은 MSW 공용 등록을 사용해 실패 시 이전 상태 보존·권한·시상 범위·수동 명단·stale preview·중복 생성 재생을 확인한다. 미확정 순위는 성공으로 꾸미지 않고 409로 반환한다. 샘플에는 새 예선 생성이 없으며 setup은 실제 이미 설정된 대회처럼 409다. 이는 실제 DB/alpha QA를 대체하지 않는다.
+
+
+### 디렉터 관리와 최신 대회 기능 통합 — 2026-11-04
+담당 대회의 활성 디렉터는 다중 결선 조회·설정·선택·미리보기·생성, 결선별 시상 세트, 단계·조·경기 시간 설정과 개별 경기 시간 조회도 사용할 수 있다. 다른 대회·해제 배정은 도메인 읽기/쓰기 전에 403이다. 생성 요청 재시도는 관리자와 디렉터의 감사 이력을 함께 조회하고, 파생 경기 설정 버전의 생성 감사도 실제 디렉터 사용자·배정으로 기록한다. 전역 경기 설정 카탈로그 작성·대회 생성 권한은 확장하지 않는다.

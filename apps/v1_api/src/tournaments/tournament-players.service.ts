@@ -1,3 +1,4 @@
+import { findTournamentManagementAction } from '../common/tournament-management-history';
 import {
   BadRequestException,
   ConflictException,
@@ -14,7 +15,7 @@ import {
   V1TournamentStatus,
 } from '@prisma/client';
 import { isRosterMutableTournament, rosterBlockReason } from './roster-cleanup';
-import { AdminContextService, type V1ActiveAdmin } from '../common/admin-context.service';
+import { AdminContextService, type V1TournamentManager } from '../common/admin-context.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { isPhoneVerificationEnforced } from '../verification/phone-verification-access';
 import { V1AuthUser } from '../auth/v1-auth-user';
@@ -183,14 +184,11 @@ export class TournamentPlayersService {
     tx: Prisma.TransactionClient,
     playerId: string,
   ): Promise<boolean> {
-    const ruling = await tx.v1AdminActionLog.findFirst({
-      where: {
+    const ruling = await findTournamentManagementAction(tx, {
         action: 'player.eligibility',
         targetType: 'tournament_player',
         targetId: playerId,
-      },
-      select: { id: true },
-    });
+      });
     return ruling !== null;
   }
 
@@ -325,7 +323,7 @@ export class TournamentPlayersService {
     dto: AddPlayerDto,
     options: {
       allowLockedAndExpired?: boolean;
-      auditAs?: { admin: V1ActiveAdmin; action: string };
+      auditAs?: { admin: V1TournamentManager; action: string };
     } = {},
   ) {
     return this.prisma.$transaction(async (tx) => {
@@ -695,7 +693,7 @@ export class TournamentPlayersService {
     playerId: string,
     dto: { jerseyNumber: number | null; goalkeeper?: boolean },
   ) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { registrationId });
     const scope = await this.prisma.v1TournamentRegistration.findUnique({
       where: { id: registrationId }, select: { tournamentId: true },
     });
@@ -722,7 +720,7 @@ export class TournamentPlayersService {
   }
 
   async listPlayersForAdmin(user: V1AuthUser, registrationId: string) {
-    await this.adminContext.getActiveAdmin(user.id);
+    await this.adminContext.getTournamentAdmin(user.id, { registrationId });
 
     const registration = await this.prisma.v1TournamentRegistration.findUnique({
       where: { id: registrationId },
@@ -781,7 +779,7 @@ export class TournamentPlayersService {
    */
   async exportCsv(user: V1AuthUser, registrationId: string) {
     // 어드민 게이트(getActiveAdmin: support도 조회 허용)
-    const admin = await this.adminContext.getActiveAdmin(user.id);
+    const admin = await this.adminContext.getTournamentAdmin(user.id, { registrationId });
 
     const registration = await this.prisma.v1TournamentRegistration.findUnique({
       where: { id: registrationId },
@@ -829,7 +827,7 @@ export class TournamentPlayersService {
    * 명단이 빈 팀도 블록을 남긴다 — 운영자가 "누가 아직 안 냈는지"를 이 파일에서 본다.
    */
   async exportTournamentCsv(user: V1AuthUser, tournamentId: string) {
-    const admin = await this.adminContext.getActiveAdmin(user.id);
+    const admin = await this.adminContext.getTournamentAdmin(user.id, { tournamentId });
 
     // 신청 탭은 대회·리그가 함께 쓴다(리그는 tournamentId = leagueId).
     const tournament = await findTournamentOnSurface(this.prisma, ALL_COMPETITION_KINDS, {
@@ -903,7 +901,7 @@ export class TournamentPlayersService {
    * 개인정보 자체는 적지 않고 행 수만 적는다. 기록이 실패하면 내려받기도 실패한다(PII 는 기록 우선).
    */
   private logRosterExport(
-    admin: V1ActiveAdmin,
+    admin: V1TournamentManager,
     targetType: 'tournament' | 'tournament_registration',
     targetId: string,
     rowCount: number,
@@ -947,7 +945,7 @@ export class TournamentPlayersService {
    * 마감이 지난 뒤 운영 판단으로 조정해야 하는 상황을 손댈 방법이 없었다.
    */
   async addPlayerForAdmin(user: V1AuthUser, registrationId: string, dto: AddPlayerDto) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { registrationId });
 
     const registration = await this.prisma.v1TournamentRegistration.findUnique({
       where: { id: registrationId },
@@ -984,7 +982,7 @@ export class TournamentPlayersService {
     // 이 목록은 오직 "선수 추가" 폼을 채우기 위해 존재한다. 그런데 명단에 없는 팀원의 실명까지
     // 담고 있으므로, 추가 권한이 없는 support 어드민이 읽을 이유가 없다 — 조회 게이트를 쓰기
     // 게이트와 같은 높이로 맞춘다(addPlayerForAdmin 과 동일한 getMutationAdmin).
-    await this.adminContext.getMutationAdmin(user.id);
+    await this.adminContext.getTournamentMutationAdmin(user.id, { registrationId });
 
     const registration = await this.prisma.v1TournamentRegistration.findUnique({
       where: { id: registrationId },
@@ -1100,7 +1098,7 @@ export class TournamentPlayersService {
 
   /** 어드민이 명단에서 선수를 뺀다. 팀 경로와 달리 잠금·마감을 넘길 수 있다. */
   async removePlayerForAdmin(user: V1AuthUser, playerId: string) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { playerId });
 
     const removed = await this.prisma.$transaction(async (tx) => {
       const player = await tx.v1TournamentPlayer.findFirst({
@@ -1168,7 +1166,7 @@ export class TournamentPlayersService {
   }
 
   async updateEligibility(user: V1AuthUser, playerId: string, dto: UpdatePlayerEligibilityDto) {
-    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const admin = await this.adminContext.getTournamentMutationAdmin(user.id, { playerId });
 
     const player = await this.prisma.v1TournamentPlayer.findFirst({
       where: { id: playerId, removedAt: null },

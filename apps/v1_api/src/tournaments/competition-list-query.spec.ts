@@ -14,11 +14,14 @@ const card = (overrides: Record<string, unknown> = {}) => ({
 } as unknown as Row);
 
 describe('목록 API 입력 검증', () => {
-  it('모집·진행·기간·무료 조건과 총 건수 입력을 변환한다', async () => {
-    await expect(parse({ kind: 'tournament', phase: 'upcoming', registration: 'open', dateFrom: '2026-11-01', feeMax: '0', withTotal: 'true' })).resolves.toMatchObject({ feeMax: 0, phase: 'upcoming', registration: 'open', withTotal: 'true' });
+  it('상태·기간·무료 조건과 총 건수 입력을 변환한다', async () => {
+    await expect(parse({ kind: 'tournament', stage: 'recruiting', dateFrom: '2026-11-01', feeMax: '0', withTotal: 'true' })).resolves.toMatchObject({ feeMax: 0, stage: 'recruiting', withTotal: 'true' });
+  });
+  it.each(['preparing', 'recruiting', 'recruit_closed', 'ongoing', 'completed'])('상태 필터 %s 를 받는다', async (stage) => {
+    await expect(parse({ stage })).resolves.toMatchObject({ stage });
   });
   it.each([
-    { phase: 'draft' }, { registration: 'yes' }, { sort: 'random' }, { format: 'unknown' },
+    { stage: 'draft' }, { stage: 'upcoming' }, { sort: 'latest' }, { phase: 'upcoming' }, { registration: 'open' }, { format: 'unknown' },
     { feeMin: '-1' }, { feeMax: '3.5' }, { feeMax: '99999999999' },
     { dateFrom: '0000-01-01' }, { dateFrom: '2026-02-30' }, { dateTo: '2026-11-01T00:00:00Z' }, { withTotal: 'false' }, { arbitrary: 'value' },
   ])('잘못된 필터를 400으로 거절한다: %j', async (input) => {
@@ -35,14 +38,14 @@ describe('목록 응답의 신규 신청 접수 판정', () => {
     expect(presentTournamentCard(card({ _count: { registrations: 2 }, registrations: [{ status: 'payment_checking' }, { status: 'paid' }] }), now).registrationOpen).toBe(false);
     expect(presentTournamentCard(card({ _count: { registrations: 2 }, registrations: [{ status: 'payment_checking' }] }), now).registrationOpen).toBe(true);
   });
-  it('대회 마감 미설정은 접수 가능하지만 리그 미설정은 접수하지 않는다', () => {
+  it('대회와 리그 모두 접수 중이면 마감 미설정도 접수한다', () => {
     expect(presentTournamentCard(card({ registrationDeadlineAt: null }), now).registrationOpen).toBe(true);
-    expect(presentTournamentCard(card({ kind: 'regular_league', registrationDeadlineAt: null }), now).registrationOpen).toBe(false);
+    expect(presentTournamentCard(card({ kind: 'regular_league', registrationDeadlineAt: null }), now).registrationOpen).toBe(true);
   });
-  it('리그는 진행 중에도 마감 전이면 정원 없이 접수한다', () => {
-    expect(presentTournamentCard(card({ kind: 'regular_league', status: 'in_progress', teamCount: 0 }), now).registrationOpen).toBe(true);
-    expect(presentTournamentCard(card({ kind: 'regular_league', status: 'in_progress', maxTeams: 1 }), now).registrationOpen).toBe(false);
-    for (const status of ['completed', 'cancelled', 'on_hold']) {
+  it('리그도 접수 중일 때만 받는다 — 시작·보류·종료 상태는 마감이 남아도 닫는다', () => {
+    expect(presentTournamentCard(card({ kind: 'regular_league', teamCount: 0 }), now).registrationOpen).toBe(true);
+    expect(presentTournamentCard(card({ kind: 'regular_league', maxTeams: 1 }), now).registrationOpen).toBe(false);
+    for (const status of ['draft', 'closed', 'in_progress', 'completed', 'cancelled', 'on_hold']) {
       expect(presentTournamentCard(card({ kind: 'regular_league', status }), now).registrationOpen).toBe(false);
     }
   });

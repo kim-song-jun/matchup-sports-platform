@@ -5,6 +5,7 @@ import type { CSSProperties, FocusEvent, ReactNode } from 'react';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Check, ChevronDown, Info, Lock } from 'lucide-react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
+import { useCreateCtaSpace } from '@/components/v1-ui/use-create-cta-space';
 import { AppBackLink } from '@/components/v1-ui/app-back-link';
 import { AlertBanner, Card, EmptyState, ErrorState, KPIStat, SectionTitle } from '@/components/v1-ui/primitives';
 import { ChevronLeftIcon, ChevronRightIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
@@ -1042,6 +1043,7 @@ export function TeamFormPageView({
   const errorRef = useRef<HTMLDivElement>(null);
   const formFieldsRef = useRef<HTMLDivElement>(null);
   const fixedCtaRef = useRef<HTMLDivElement>(null);
+  useCreateCtaSpace(fixedCtaRef);
   const focusFrameRef = useRef<number | null>(null);
   const submitFrameRef = useRef<number | null>(null);
   const viewportFrameRef = useRef<number | null>(null);

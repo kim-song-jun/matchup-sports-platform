@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // alpha 에서 회원가입과 로그인이 끝까지 되는지 실제로 해 본다.
 //
-// 왜 자동화할 수 있게 됐나: alpha 는 인증번호를 발송하지 않고 응답에 실어 보낸다
+// 왜 자동화할 수 있게 됐나: alpha 는 예약된 테스트 번호의 인증번호를 응답에 실어 보낸다
 // (docker-compose.alpha.yml 의 V1_VERIFICATION_DEV_ECHO). 실제 문자를 기다려야 하면 이 흐름은
 // 사람이 폰을 들고 있어야만 돌릴 수 있고, 그래서 그동안 가입 경로는 E2E 에서 통째로 빠져
 // 있었다 — 기존 계정을 재사용하는 시나리오만 돌았다.
@@ -107,7 +107,7 @@ async function main() {
   const devCode = issue.json?.data?.devCode;
   record('인증번호 발급', issue.status === 200 && typeof devCode === 'string' && /^\d{6}$/.test(devCode),
     issue.status === 200 && !devCode
-      ? 'devCode 없음 — 발송 수단이 살아 있어 우회가 꺼져 있다(dispatcher 는 sms·email 이 모두 비활성일 때만 코드를 싣는다)'
+      ? 'devCode 없음 — 테스트 번호와 dev-echo 설정, 계정 권한을 확인하세요'
       : `${issue.status}, devCode ${devCode ? '받음' : '없음'}`);
 
   // 4 ── 틀린 코드는 막혀야 한다. 이게 없으면 5·6의 통과가 아무것도 증명하지 못한다.

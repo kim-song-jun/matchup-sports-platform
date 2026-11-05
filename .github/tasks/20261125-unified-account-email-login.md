@@ -19,6 +19,18 @@ Status: In Progress
 - 수정 검증: 가입 보완 후 돌아올 URL을 검사하는 새 테스트 RED 확인(가입 정보 입력 링크 없음) → 로그인 방법 화면 61/61 GREEN, Web 타입·패턴 검사 PASS. 가입 보완은 서버 `canLinkAfterSignup=true`일 때만 안내하며 연결 권한 자체는 부여하지 않는다.
 - 사용자 확인(2026-11-05): 지금은 실제 계정의 인증번호·비밀번호를 직접 입력하기 어려우므로 나머지 검증을 우선 진행한다. 실계정 이메일 추가 완료와 그 수단으로의 재로그인은 보류이며 전체 완료 조건에 남는다.
 
+## Progress Snapshot — 2026-11-05 후속 검수
+
+- 수행: Codex 메인. 서브에이전트·로컬 웹 서버를 시작하지 않았다.
+- PR #2165는 dev `982ca40bc3e9c824ce7e6dfe64c489a69d78b793`에 머지했고 matching CI 42017212392·Alpha 배포 42017212314가 통과했다. 실제 Alpha Web/API 헤더와 DB health를 확인했다. 가입을 미룬 상태는 브라우저 한정 auth/me fixture로 안내 → `/signup/social` → 로그인 방법 왕복을 확인하고 fixture를 제거했다. 실계정의 가입 완료·이메일 연결 완료 증거로 세지 않는다.
+- 실제 인증 증거: Alpha 카카오 인증 후 원래 계정 복원, 운영 카카오 인증 후 지정 목적지 복귀, 일회용 QA 계정의 이메일 로그인·이메일/휴대폰 계정 찾기·이메일 비밀번호 재설정 후 같은 QA 계정 재로그인. 휴대폰만으로 비밀번호 재설정은 409로 거절되며 기존 계정 세션이 유지됐다. 실제 메일/SMS 수신과 카카오+이메일이 연결된 한 실계정의 양쪽 재로그인은 미검증이다.
+- 이메일 연결 보호: 기존 QA 계정의 오래된 세션은 403 `RECENT_LOGIN_REQUIRED`, 재로그인 후 같은 계정으로 연결 화면 복귀, 이미 가진 이메일 수단은 409 `SOCIAL_LINK_PROVIDER_EXISTS` 안내를 확인했다. 인증번호 발송·신원 추가·공유 QA 비밀번호 변경은 하지 않았다.
+- 모바일 후속 PR #2166은 dev `0b7720cb7d068b05735039e3445ef4b374642ed7`에 머지됐다. PR exact-head `74a3f7e32a5261f7896c493be61cb79d130b845e` CI 42023072760은 통과했다. 새 dev CI 42030531109는 Web·Gates 통과, API 마이그레이션 재생 검사 진행 중이고 Alpha 42030531284는 해당 CI를 기다린다. 이 시점 실제 Alpha는 `982ca40b`이므로 다섯 모바일 수정의 배포본 검수는 미완료다.
+- 릴리스 준비: 미소비 patch Changeset 3개(다음 시즌 링크 #2161, 가입 보완 안내 #2165, 모바일 수정 #2166). 릴리스 계약 24/24 통과. main에만 있던 `de8082bd` 머지 이력은 로컬 준비 브랜치의 `3aaad5ae`로 흡수했고 파일 트리는 dev `0b7720cb`와 동일하다. 아직 버전 소비·dev 릴리스 PR·main 승격은 하지 않았다. source가 검증된 `origin/dev`와 같음을 확인한 뒤 `DEV_REF=origin/dev`를 지정해 정본 `--prepare-only`로 준비한다.
+- 브라우저 재개 조건: 기존 ego TaskSpace 69가 더 이상 존재하지 않는다. 현재 남은 사용자 소유 공간 0은 건드리지 않았다. 새 검수 공간 생성은 사용자 확인 대기이며 재생성·다른 브라우저 우회는 하지 않았다. 앞선 캡처와 측정은 과거 실측 증거로 유지한다.
+- 사용자 보류는 유지: 실계정 이메일 인증번호·비밀번호 직접 입력, Android·iPhone 실기기, 실제 Apple 인증. 전체 목표를 완료로 표시하지 않는다. main 승격 PR 생성·머지는 저장소 정본에 따라 사용자가 수행한다.
+- 비공개 증거: `teameet-unified-auth-20261105`의 `progress-checkpoint.json`, `mobile-pr-ci-test-proof.json`, `alpha-deferred-state-fixture-results.json`, `alpha-email-link-relogin-and-duplicate.json`, `role-api-preconditions*.json`, `route-coverage-matrix.json`. 자격증명·코드·쿠키·개인 식별자는 커밋하지 않는다.
+
 ## Context
 앞선 작업(20261124)으로 이메일 가입자가 카카오·애플을 자기 계정에 붙일 수 있게 됐다(`POST /auth/link/kakao|apple|pending`).
 반대 방향이 비어 있다. 카카오·애플로 가입한 사람은 **이메일 + 비밀번호 로그인을 더할 길이 없다.**
@@ -118,7 +130,7 @@ Expected result: 같은 계정이 이메일·비밀번호로도 로그인된다.
 - [x] `docs/api/domains/auth.md` (엔드포인트·에러 코드·보안 노트), `docs/api/auth-and-session.md`
 ### Sequential
 - [x] 통합 스펙을 일회용 Postgres 16 컨테이너에서 실행(컨테이너는 끝난 뒤 삭제)
-- [ ] 머지 후 alpha 실측 — 화면 PR 이후 실제 계정으로(데이터를 바꾸므로 사용자 승인 후)
+- [ ] 머지 후 Alpha 실계정 연결 완료 — 사용자 인증번호·비밀번호 직접 입력 대기. 이미 확인한 로그인·복구·보호 흐름과 구분한다.
 
 ## Acceptance Criteria
 - [x] Original conditions 중 서버·데이터 계층·문서 항목 전부 충족, 화면 항목은 별도 PR

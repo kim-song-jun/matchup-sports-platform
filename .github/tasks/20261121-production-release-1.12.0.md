@@ -106,3 +106,8 @@ main-only 승격 머지 커밋을 release 준비 브랜치를 통해 dev에 흡�
 - Owned follow-up paths: conversion service/spec; verifier helper and its three test callers; Changeset; this task. Existing #2156 candidate is held until this follow-up merges and its release metadata is refreshed.
 
 - Follow-up local validation PASS: OAuth 3 files / 64 tests; conversion 15 tests including array-like object rejection; Web/API typechecks; diff check and touched-source debt grep clean. Source-based CodeQL review used official CleartextStorageCustomizations/SensitiveActions and LoopBoundInjection models; no alerts dismissed and no query configuration changed.
+
+### Current preparation cursor (2026-11-05)
+- Security #2154 merged to dev 8a2dc4733 with full CI PASS. Follow-up #2159 head 80968647a is under CI; no main merge is authorized.
+- Candidate incorporated #2159 locally, preserved both task histories during the task-only merge conflict, restored only owned unreleased metadata from its source baseline, then reran canonical prepare-only: 55 Changesets consumed, API/Web 1.13.0, main gate PASS. Source is still subject to #2159 CI and later CodeQL.
+- #2156 remains Draft at its previous remote head until #2159 merges; next publish the refreshed metadata-only diff against new dev. Latest promotion evidence and operator smoke status will be maintained in #2153 body/checks; no successful external-provider login is claimed.

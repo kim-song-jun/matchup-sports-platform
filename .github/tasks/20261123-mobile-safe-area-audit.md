@@ -56,6 +56,7 @@ Android WebView 로그인, 작성 취소 모달, 대회 필터의 하단 가림 
 - 2026-11-05: 비공개 자료의 기존 QA 스태프 계정으로 Alpha 이메일 로그인과 실제 디렉터 배정을 확인했다. QA 대회의 담당 대회 관리 12개 경로를 320/768/1440px 36개 표시 상태로 읽기 전용 관찰했다. 운영·대회 데이터 변경 없음. 캠페인 없음 404는 정상 빈 상태로 표시된다.
 - 2026-11-05: 신청 관리 320px에서 카드 목록의 고정 최소 폭 360px 때문에 문서 폭이 376px로 늘어남을 확인했다. `AdminCardList`의 선호 최소 폭을 컨테이너 폭 이하로 제한해 좁은 화면은 한 열로 줄고 넓은 화면의 기존 자동 열 배치는 유지한다. 실제 Alpha DOM 임시 적용에서 문서 376→320px, 카드 360→288px 확인. 배포본 재검수는 별도로 진행한다.
 - 2026-11-05: 수정 식의 실제 Alpha 임시 적용에서 320/360/390/768/1440px 모두 가로 넘침 0을 확인했고 신청 관리 기존 기능 테스트 40/40, Web 타입·패턴 검사를 통과했다. CSS 기하를 jsdom의 클래스 문자열 검사로 대체하지 않으며 배포 후 동일 QA 대회의 실제 화면으로 확인한다.
+- 2026-11-05: 시상 관리의 `+ 항목 추가`가 설명 문구와 같은 flex 행에서 줄어들어 320px에서는 버튼 63×74px/텍스트 67px 높이, 390px에서는 텍스트 43px 높이로 줄바꿈되는 결함을 확인했다. 설명은 줄어들 수 있게 하고 버튼은 줄어들지 않는 한 줄·44px 터치 높이로 조정한다. 실제 Alpha 임시 적용은 320/390/768/1440px에서 버튼 약 99×44px/텍스트 19px, 문서 가로 넘침 0. 서버 저장 없이 전후 캡처했으며 배포 후 재검수는 별도로 진행한다.
 - 추가 검증 연결: 통합 계정 검증과 발견된 가입 보완 진입 결함은 [Task 20261125](./20261125-unified-account-email-login.md), PR #2165에서 추적한다. 실제 카카오 로그인은 Alpha·운영에서 확인했고 일회용 QA 계정으로 이메일 로그인·복구를 검증했다. 실사용자 이메일 추가의 인증번호·비밀번호 입력은 사용자 요청으로 보류 중이다.
 - 2026-11-03: PR #2133·#2134 머지 후 Alpha `84ebe114ebea19973d2cc276b50691c05f8ac33f` 배포와 API DB health 정상 확인. 144개 route 중 133개는 진입 또는 캡처를 시도했으나 권한 거부·로딩·리디렉션도 포함하고 전 플랫폼 검증 PASS는 아니다. 상세 `/Users/sungjun/.codex/qa-evidence/teameet-mobile-20261103/route-attempts.json`.
 - 변경 후 대회 필터는 390x844 Chromium 터치 스와이프에서 scrollTop 0→125; 로그인·약관 관련 10개 화면에서 360x640 및 하단 48px 모사 시 보이는 컨트롤의 안전 경계 침범 후보는 없었다. 화면별 고정 영역에 가려진 본문까지 이 수치로 보장하지 않는다.
@@ -91,7 +92,7 @@ Android WebView 로그인, 작성 취소 모달, 대회 필터의 하단 가림 
 - [ ] `/tournament-management` — Alpha QA 디렉터 기본 표시 3개 viewport 관찰; 전체 상태·플랫폼 미검증
 - [ ] `/tournament-management/tournaments/[id]` — Alpha QA 디렉터 기본 표시 3개 viewport 관찰; 전체 상태·플랫폼 미검증
 - [ ] `/tournament-management/tournaments/[id]/announcements` — Alpha QA 디렉터 기본 표시 3개 viewport 관찰; 전체 상태·플랫폼 미검증
-- [ ] `/tournament-management/tournaments/[id]/awards` — Alpha QA 디렉터 기본 표시 3개 viewport 관찰; 전체 상태·플랫폼 미검증
+- [ ] `/tournament-management/tournaments/[id]/awards` — 모바일 항목 추가 버튼의 세로 줄바꿈 확인·수정 검증 진행; 전체 상태·플랫폼 미검증
 - [ ] `/tournament-management/tournaments/[id]/bracket` — Alpha QA 디렉터 기본 표시 3개 viewport 관찰; 전체 상태·플랫폼 미검증
 - [ ] `/tournament-management/tournaments/[id]/campaign` — Alpha QA 디렉터 캠페인 없음 상태 3개 viewport 관찰; 전체 상태·플랫폼 미검증
 - [ ] `/tournament-management/tournaments/[id]/info` — Alpha QA 디렉터 기본 표시 3개 viewport 관찰; 전체 상태·플랫폼 미검증

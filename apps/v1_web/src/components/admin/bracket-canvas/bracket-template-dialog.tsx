@@ -1,5 +1,7 @@
 'use client';
 
+import { useV1DataSource } from '@/components/providers/v1-data-source';
+
 import { SixTeamTemplateDialog } from './six-team-template-dialog';
 import { X } from 'lucide-react';
 import { createPortal } from 'react-dom';
@@ -73,6 +75,7 @@ function templateStagePreview(input: BracketTemplateInput): string {
 }
 
 export function BracketTemplateDialog(props: BracketTemplateDialogProps) {
+  const { v1Get } = useV1DataSource();
   const [legacy, setLegacy] = useState(false);
   const [standard, setStandard] = useState(false);
   useEffect(() => { if (!props.open) setStandard(false); }, [props.open]);

@@ -1,10 +1,13 @@
 'use client';
+
+import { useV1DataSource } from '@/components/providers/v1-data-source';
+
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { v1Get, v1Post } from '@/lib/api-client';
 import { v1Keys } from '@/lib/query-keys';
 import type { CrossGroupApplyInput, CrossGroupPreview } from '@/types/cross-group-round12';
 
 export function useCrossGroupRound12Preview(tournamentId: string, enabled: boolean) {
+  const { v1Get } = useV1DataSource();
   return useQuery({
     queryKey: ['cross-group-round12', tournamentId],
     queryFn: () => v1Get<CrossGroupPreview>(`/admin/tournaments/${tournamentId}/bracket/round12-preview`),
@@ -12,6 +15,7 @@ export function useCrossGroupRound12Preview(tournamentId: string, enabled: boole
   });
 }
 export function useApplyCrossGroupRound12(tournamentId: string) {
+  const { v1Post } = useV1DataSource();
   const client = useQueryClient();
   return useMutation({
     mutationFn: (input: CrossGroupApplyInput) => v1Post<{ assignments: { slotId: string; registrationId: string }[] }>(

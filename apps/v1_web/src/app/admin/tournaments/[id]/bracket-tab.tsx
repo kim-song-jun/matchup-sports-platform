@@ -1,5 +1,7 @@
 'use client';
 
+import { useV1DataSource } from '@/components/providers/v1-data-source';
+
 import { useId, useState } from 'react';
 import Link from 'next/link';
 import { Check, RefreshCw, Pencil, Trash2, ChevronRight } from 'lucide-react';
@@ -154,6 +156,7 @@ export function BracketTab({
   canWrite: boolean;
   tournamentFormat?: 'knockout' | 'league' | 'group_knockout' | 'league_knockouts';
 }) {
+  const { v1Post, v1Patch } = useV1DataSource();
   const { data: bracket, isPending, isError, error, refetch } = useV1AdminBracket(tournamentId);
   const [round12AutoOpen, setRound12AutoOpen] = useState(false);
   const createGroup = useV1CreateGroup(tournamentId);

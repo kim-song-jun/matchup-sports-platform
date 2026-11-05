@@ -25,7 +25,8 @@ async function fingerprintState(state: string): Promise<string> {
   return `sha256:${Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')}`;
 }
 
-export async function serializeKakaoOAuthAttempt(attempt: KakaoOAuthAttempt): Promise<string> {
+/** Encode a non-secret SHA-256 verifier and redirect metadata; never persist the nonce. */
+export async function encodeKakaoStateVerifier(attempt: KakaoOAuthAttempt): Promise<string> {
   return JSON.stringify({
     state: await fingerprintState(attempt.state),
     mode: attempt.mode,
@@ -58,7 +59,7 @@ export function parseKakaoOAuthAttempt(raw: string | null): KakaoOAuthAttempt | 
 /** 저장소를 쓸 수 없으면(프라이빗 모드·quota) 던진다 — state 대조 없이 인가를 시작하면 안 된다. */
 export async function storeKakaoOAuthAttempt(attempt: KakaoOAuthAttempt): Promise<void> {
   // Only a verifier crosses the redirect in storage, never the raw OAuth nonce.
-  window.sessionStorage.setItem(KAKAO_OAUTH_STATE_STORAGE_KEY, await serializeKakaoOAuthAttempt(attempt));
+  window.sessionStorage.setItem(KAKAO_OAUTH_STATE_STORAGE_KEY, await encodeKakaoStateVerifier(attempt));
 }
 
 /**

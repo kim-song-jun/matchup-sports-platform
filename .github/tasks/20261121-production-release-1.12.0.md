@@ -99,3 +99,10 @@ main-only 승격 머지 커밋을 release 준비 브랜치를 통해 dev에 흡�
 - #2154 exact-head CI 41969726728 PASS (Gates/API/Web, including real-DB integration, units and builds). Merged to dev as 8a2dc4733; root and dedicated local dev immediately fast-forwarded.
 - Release branch incorporated origin/dev; PR diff is release metadata + task only (59 files), no runtime/schema changes. Next: publish and validate the release PR, then merge dev and verify Alpha/final main checks.
 - Manual-browser limitation: both Computer Use and browser runtime failed to start with Windows path-not-found (os error 3). No browser was opened, no credentials used, and no successful provider-account authentication is claimed. OAuth regression journeys passed in tests; live account-login smoke remains an operator check.
+
+### Follow-up CodeQL evidence (2026-11-05)
+- Scan 41973741588 completed; URL findings resolved, but 5 high findings remain. Official CodeQL models treat serializeKakaoOAuthAttempt as a heuristic sensitive source and only recognize protect/encode/encrypt call barriers; the existing SHA-256 verifier is non-secret and independently tested. Rename the actual hash+JSON operation to encodeKakaoStateVerifier (no raw state storage, no suppression).
+- Loop query requires proof of an actual array or structural early exit. Add Array.isArray service guard and a literal maximum of 3 iterations with a tierCount break, plus array-like payload regression.
+- Owned follow-up paths: conversion service/spec; verifier helper and its three test callers; Changeset; this task. Existing #2156 candidate is held until this follow-up merges and its release metadata is refreshed.
+
+- Follow-up local validation PASS: OAuth 3 files / 64 tests; conversion 15 tests including array-like object rejection; Web/API typechecks; diff check and touched-source debt grep clean. Source-based CodeQL review used official CleartextStorageCustomizations/SensitiveActions and LoopBoundInjection models; no alerts dismissed and no query configuration changed.

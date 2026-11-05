@@ -5,7 +5,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { serializeKakaoOAuthAttempt } from '@/lib/kakao-oauth';
+import { encodeKakaoStateVerifier } from '@/lib/kakao-oauth';
 import { peekPendingSocialLink, savePendingSocialLink } from '@/lib/pending-social-link';
 import { readWithdrawalCancel } from '@/lib/withdrawal-cancel-storage';
 import { LINK_MSW, PENDING_LINK_MSW, WITHDRAWAL_MSW } from '@/test/msw/auth-link-handlers';
@@ -58,7 +58,7 @@ function Journey({ initialRoute }: { initialRoute: string }) {
 }
 
 async function openCallback(code: string) {
-  window.sessionStorage.setItem(KAKAO_OAUTH_STATE_STORAGE_KEY, await serializeKakaoOAuthAttempt({ state: 'state-1', mode: 'login', returnTo: null }));
+  window.sessionStorage.setItem(KAKAO_OAUTH_STATE_STORAGE_KEY, await encodeKakaoStateVerifier({ state: 'state-1', mode: 'login', returnTo: null }));
   const path = `/callback/kakao?code=${code}&state=state-1`;
   window.history.replaceState({}, '', path);
   navigation.pathname = '/callback/kakao';

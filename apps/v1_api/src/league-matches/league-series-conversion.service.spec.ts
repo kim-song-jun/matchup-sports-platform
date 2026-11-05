@@ -36,6 +36,13 @@ async function bodyOf(s: ReturnType<typeof setup>) {
   return { title: '정규 리그', startsOn: '2030-01-01T00:00:00Z', endsOn: '2030-03-01T00:00:00Z', tierSizes: [3, 3], fingerprint: preview.fingerprint, entries: preview.entries.map((e) => ({ teamId: e.teamId, tier: e.suggestedTier, reason: '' })) };
 }
 describe('독립 리그 최초 티어 배정', () => {
+  it('rejects array-like JSON objects before opening a write transaction', async () => {
+    const s = setup();
+    const body = await bodyOf(s);
+    s.prisma.$transaction.mockClear();
+    await expect(s.service.commit(actor, 'source', { ...body, tierSizes: { length: 3 } as unknown as number[] })).rejects.toMatchObject({ response: { code: 'LEAGUE_CONVERSION_SIZES_INVALID' } });
+    expect(s.prisma.$transaction).not.toHaveBeenCalled();
+  });
   it.each([{ tierSizes: [] }, { tierSizes: [2, 2, 2, 2] }])('rejects invalid tier counts before opening a write transaction: %j', async ({ tierSizes }) => {
     const s = setup();
     const body = await bodyOf(s);

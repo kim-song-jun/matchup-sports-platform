@@ -149,6 +149,12 @@ export class LeagueSeriesConversionService {
 
   async commit(user: V1AuthUser, leagueId: string, dto: CommitLeagueConversionDto) {
     const admin = await this.admins.getMutationAdmin(user.id);
+    if (!Array.isArray(dto.tierSizes)) {
+      throw new UnprocessableEntityException({
+        code: 'LEAGUE_CONVERSION_SIZES_INVALID',
+        message: '각 티어에 2팀 이상, 모든 참가팀을 한 번씩 배정해 주세요.',
+      });
+    }
     const tierCount = dto.tierSizes.length;
     if (!Number.isInteger(tierCount) || tierCount < 1 || tierCount > 3) {
       throw new UnprocessableEntityException({
@@ -191,7 +197,8 @@ export class LeagueSeriesConversionService {
             },
           });
           const leagues = [];
-          for (let tier = 1; tier <= tierCount; tier++) {
+          for (let tier = 1; tier <= 3; tier++) {
+            if (tier > tierCount) break;
             const id = randomUUID();
             const title = `${dto.title.trim()} 1시즌 ${tier}부`;
             const data = leagueMirrorCreateData({

@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { KakaoCallbackClient } from './kakao-callback-client';
 import { KAKAO_OAUTH_STATE_STORAGE_KEY } from './auth.view-model';
 import { V1ApiError } from '@/lib/api-client';
-import { serializeKakaoOAuthAttempt } from '@/lib/kakao-oauth';
+import { encodeKakaoStateVerifier } from '@/lib/kakao-oauth';
 import { peekPendingSocialLink } from '@/lib/pending-social-link';
 import { readWithdrawalCancel } from '@/lib/withdrawal-cancel-storage';
 
@@ -52,7 +52,7 @@ async function primeValidOAuthState(stored: string = 'state-123') {
 }
 
 async function primeLinkAttempt(returnTo: string | null = '/my/settings/login-methods') {
-  window.sessionStorage.setItem(KAKAO_OAUTH_STATE_STORAGE_KEY, await serializeKakaoOAuthAttempt({ state: 'state-123', mode: 'link', returnTo }));
+  window.sessionStorage.setItem(KAKAO_OAUTH_STATE_STORAGE_KEY, await encodeKakaoStateVerifier({ state: 'state-123', mode: 'link', returnTo }));
   searchParamsValue = new URLSearchParams({ code: 'auth-code', state: 'state-123' });
 }
 
@@ -230,7 +230,7 @@ describe('KakaoCallbackClient 로그인 충돌과 탈퇴 철회', () => {
   });
 
   it('새 형식(JSON, mode=login) 저장값도 로그인으로 읽는다', async () => {
-    await primeValidOAuthState(await serializeKakaoOAuthAttempt({ state: 'state-123', mode: 'login', returnTo: null }));
+    await primeValidOAuthState(await encodeKakaoStateVerifier({ state: 'state-123', mode: 'login', returnTo: null }));
     api.v1Post.mockResolvedValue({ session: { userId: 'u1', userEmail: null }, next: { route: '/home' } });
     render(<KakaoCallbackClient />);
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/home'));

@@ -83,7 +83,7 @@ main-only 승격 머지 커밋을 release 준비 브랜치를 통해 dev에 흡�
 - Base: dev 3a4db97fe; main b50074f90. Draft main PR #2153 has 53 unconsumed Changesets, next fixed version 1.13.0, and 7 new CodeQL high findings.
 - Owned: Kakao OAuth state storage/callers and regression tests; league-series-conversion service/spec; two Alpha QA URL filters; this task; Changesets, app package versions and changelogs. No schema changes, security alert dismissal, feature PR #2152 merge, or production operations.
 - Acceptance: targeted OAuth and conversion tests; committed-tree validation; dev PR CI and CodeQL; release gate; latest Alpha commit/release; main PR #2153 checks ready.
-- Plan: [ ] security fixes and focused validation; [ ] consume Changesets / 1.13.0; [ ] dev PR and CI; [ ] dev merge / Alpha; [ ] refresh promotion PR.
+- Plan: [x] security fixes and focused validation; [x] consume Changesets / 1.13.0; [x] security dev PR and CI; [ ] release dev PR and CI; [ ] final dev merge / Alpha; [ ] refresh promotion PR.
 - Implementation: store SHA-256 OAuth verifiers (single-use and legacy in-flight redirects preserved), bound tier loop locally to 1..3, compare parsed URL origins exactly. No visible layout/API schema changes.
 - Environment: existing shared dependencies were Linux links; isolated worktree has its own frozen-lockfile Windows installation. Host: 28 logical CPUs, load 2%, available RAM ~6.5 GiB; tests use one worker. Docker status command stalled; no DB or integration workload is started.
 - Progress Snapshot: isolated branch fix/release-ready-2153 in _worktrees/release-ready-2153; fixes under focused validation. #2152 remains outside release scope.
@@ -95,3 +95,7 @@ main-only 승격 머지 커밋을 release 준비 브랜치를 통해 dev에 흡�
 - Security remediation PR #2154 published to dev at 71c60469f. Release changes kept on separate local branch release/version-1.13.0-2153 to preserve the ordinary dev Changeset gate.
 - Canonical prepare-only PASS using deployed origin/dev as baseline: consumed 54 Changesets including security patch; fixed API/Web 1.13.0; both CHANGELOGs updated; main promotion gate PASS. No lockfile/schema changes.
 - Next: #2154 exact-head CI/CodeQL, merge to dev and sync; deliver release metadata PR; verify resulting dev/Alpha and #2153.
+
+- #2154 exact-head CI 41969726728 PASS (Gates/API/Web, including real-DB integration, units and builds). Merged to dev as 8a2dc4733; root and dedicated local dev immediately fast-forwarded.
+- Release branch incorporated origin/dev; PR diff is release metadata + task only (59 files), no runtime/schema changes. Next: publish and validate the release PR, then merge dev and verify Alpha/final main checks.
+- Manual-browser limitation: both Computer Use and browser runtime failed to start with Windows path-not-found (os error 3). No browser was opened, no credentials used, and no successful provider-account authentication is claimed. OAuth regression journeys passed in tests; live account-login smoke remains an operator check.

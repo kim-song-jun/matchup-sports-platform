@@ -18,6 +18,16 @@ async function expectAboveSystemBar(locator: import('@playwright/test').Locator,
   expect(rect!.y + rect!.height).toBeLessThanOrEqual(height - bottom);
 }
 
+async function openManagedTeam(page: import('@playwright/test').Page) {
+  await loginAs(page, personas.owner.email);
+  await page.goto('/my/teams');
+  const managedTeam = page.locator('a[href^="/teams/"]').filter({ has: page.getByText('팀장', { exact: true }) }).first();
+  await expect(managedTeam).toBeVisible();
+  await managedTeam.click();
+  await expect(page).toHaveURL(/\/teams\/[^/?]+(?:\?|$)/);
+  return new URL(page.url()).pathname;
+}
+
 test.describe('mobile safe area and touch', () => {
   test.skip(({ isMobile }) => !isMobile, 'These contracts exercise mobile viewport and touch.');
   test.use({ viewport: { width: 390, height: 640 } });
@@ -68,11 +78,7 @@ test.describe('mobile safe area and touch', () => {
   });
 
   test('team jersey number actions remain reachable with a late inset and a short viewport', async ({ page }) => {
-    await loginAs(page, personas.owner.email);
-    await page.goto('/my/teams');
-    const managedTeam = page.locator('a[href^="/teams/"]').filter({ hasText: '팀장' }).first();
-    await expect(managedTeam).toBeVisible();
-    await managedTeam.click();
+    await openManagedTeam(page);
     await page.getByRole('link', { name: /^멤버 관리/ }).click();
     await page.getByRole('button', { name: / 관리$/ }).first().click();
     await page.getByRole('button', { name: '등번호 지정', exact: true }).click();
@@ -93,6 +99,27 @@ test.describe('mobile safe area and touch', () => {
     await expectAboveSystemBar(save, 64);
     await dialog.getByRole('button', { name: '취소', exact: true }).click();
     await expect(dialog).toHaveCount(0);
+  });
+
+  test('team dissolution content remains above its actions when a native inset arrives', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 640 });
+    const teamPath = await openManagedTeam(page);
+    await page.goto(`${teamPath}/dissolve`);
+    const actions = page.locator('.tm-fixed-cta');
+    await expect(actions).toBeVisible();
+    const scroller = page.locator('.tm-scroll-area');
+    const content = scroller.locator('.tm-content-enter').filter({ has: page.getByRole('heading', { level: 2 }) });
+    const lastContent = content.locator(':scope > :last-child');
+    await expect(lastContent).toBeVisible();
+    for (const bottom of [0, 34, 48, 64]) {
+      await setNativeBottom(page, bottom);
+      await expect.poll(async () => {
+        await scroller.evaluate((node) => { node.scrollTop = node.scrollHeight; });
+        const last = await lastContent.boundingBox();
+        const cta = await actions.boundingBox();
+        return last && cta ? Math.round(last.y + last.height - cta.y) : null;
+      }).toBeLessThanOrEqual(0);
+    }
   });
 
   test('withdrawal reason remains above fixed actions as the native inset changes', async ({ page }) => {

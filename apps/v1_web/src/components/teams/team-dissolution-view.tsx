@@ -1,9 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import type { ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 import { Ban, CalendarX, Check, MessageSquareOff, Radio, Swords, Trophy, UserX } from 'lucide-react';
 import { AlertBanner, Card, TextField } from '@/components/v1-ui/primitives';
+import { useCreateCtaSpace } from '@/components/v1-ui/use-create-cta-space';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { dissolutionBlockerItemSummary, dissolutionBlockerTitle } from '@/lib/team-dissolution-blockers';
 import type { V1TeamDissolutionBlocker, V1TeamDissolutionPreview } from '@/types/api';
@@ -30,11 +31,13 @@ function RowIcon({ tone, children }: { tone: Tone; children: ReactNode }) {
   );
 }
 
-const pageStyle = { padding: '16px var(--v1-shell-page-x) calc(148px + var(--v1-shell-safe-bottom))' };
+const pageStyle = { padding: '16px var(--v1-shell-page-x) calc(var(--tm-create-cta-height, 0px) + 16px)' };
 
 function DissolveFooter({ note, cancelHref, action }: { note: string; cancelHref: string; action: ReactNode }) {
+  const fixedCtaRef = useRef<HTMLDivElement>(null);
+  useCreateCtaSpace(fixedCtaRef);
   return (
-    <div className="tm-fixed-cta">
+    <div ref={fixedCtaRef} className="tm-fixed-cta">
       <div className="tm-text-caption" style={{ marginBottom: 8 }}>{note}</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
         <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={cancelHref}>취소</Link>

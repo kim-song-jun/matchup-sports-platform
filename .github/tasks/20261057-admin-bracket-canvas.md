@@ -1184,3 +1184,14 @@ Status: In Progress
 - Rule-only correction: 순위 목적지를 수정해도 기존 승인 명단을 null로 만들지 않는다. 같은 크기의 규칙 저장은 현재 실제 슬롯과 명단을 그대로 보존하고 새 추천 적용은 독립 assignment 확정으로만 수행한다. UI→실제 selection payload 회귀를 추가했다.
 
 - Final UI boundary validation: 규칙 화면은 단일 저장 액션으로 완료하고 결선 preview/generate를 호출하지 않는다. 기존 승인 명단/크기는 유지하며 변경되는 것은 목적지 규칙뿐이다. 신규 rule-only 회귀 포함 Web16/16 PASS. 최신 로컬 API101 PASS/양쪽 tsc PASS. 이후 CI·리뷰 결과를 최종 SHA 기준으로 확인한다.
+
+### 2026-11-06 current verification / resume cursor
+
+- Runtime code cursor: `364b5d071` (dev PR2169). Source changes complete; code remains frozen pending remote validation/review.
+- Local: API101/Web16 regressions PASS; API/Web typecheck PASS; API surface761/Web pattern PASS; committed diff-check and untracked-import check PASS.
+- Docker alternative: PostgreSQL16.15 binaries extracted under `/tmp/teameet-assignment-pg`, isolated localhost55486, approved test DB `ulw_v1_integration_assignment`, latest Prisma schema only. No existing DB, alpha data, or env files accessed. Owned PID10171 stopped and absence verified.
+- Actual PostgreSQL: new capacity→rules→assignment and independent-final/other-final-LIVE integration cases2/2 PASS. Separate `/tmp/teameet-cross-assignment-qa.cjs` exercised actual4-group/12-team preview→cross assignment, exact draw persistence, fixture ID preservation and broken quarterfinal-edge rejection422; both outcomes PASS. This is functional evidence on a fresh current schema, not migration-history replay proof.
+- Alpha BEFORE: real administrator login, 1440/768/390 captures3/3; console0/network failures0; mutation0. Evidence `/tmp/teameet-multi-finals-evidence/`; browser/controller5751/5763 closed. AFTER alpha0/3 and feature0/7 because no deployment.
+- Remote code-head CI: Gates PASS5m56s, Web PASS12m54s; API remained in `V1 migration replay + drift gate` on run42061455599 as of2026-11-06 01:34 KST. No API failure output yet. This pending state must not be called a pass.
+- Copilot: official requests accepted with empty requested_reviewers; final-head recovery response explicitly matched364b5d071, but no review record or findings/clean result arrived. No settings/account/merge-rule changes and no review bypass.
+- Remaining: final PR CI/review, dev merge (base must be rechecked), alpha serving-SHA verification, AFTER headed QA and screenshots. No main promotion. Review result absence blocks merge under repository S6. No final completion/PR-ready claim.

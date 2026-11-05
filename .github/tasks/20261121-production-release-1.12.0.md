@@ -91,3 +91,7 @@ main-only 승격 머지 커밋을 release 준비 브랜치를 통해 dev에 흡�
 - Focused validation: OAuth 5 files / 88 tests passed (one stale raw-nonce assertion corrected, utility file rerun); API conversion 14 tests passed. Concurrent callback consumption and hash failure explicitly covered.
 
 - API lint/typecheck and surface checker PASS. Web typecheck PASS; pattern checker first failed because Windows cmd resolved POSIX commands incorrectly, then the unchanged checker PASS under Git Bash via a temporary Node child-process shell adapter. No gate rules were changed. QA script syntax checks and touched-source debt grep clean.
+
+- Security remediation PR #2154 published to dev at 71c60469f. Release changes kept on separate local branch release/version-1.13.0-2153 to preserve the ordinary dev Changeset gate.
+- Canonical prepare-only PASS using deployed origin/dev as baseline: consumed 54 Changesets including security patch; fixed API/Web 1.13.0; both CHANGELOGs updated; main promotion gate PASS. No lockfile/schema changes.
+- Next: #2154 exact-head CI/CodeQL, merge to dev and sync; deliver release metadata PR; verify resulting dev/Alpha and #2153.

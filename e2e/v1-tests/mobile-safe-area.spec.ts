@@ -67,6 +67,34 @@ test.describe('mobile safe area and touch', () => {
     await dialog.getByRole('button', { name: '계속 작성' }).click();
   });
 
+  test('team jersey number actions remain reachable with a late inset and a short viewport', async ({ page }) => {
+    await loginAs(page, personas.owner.email);
+    await page.goto('/my/teams');
+    const managedTeam = page.locator('a[href^="/teams/"]').filter({ hasText: '팀장' }).first();
+    await expect(managedTeam).toBeVisible();
+    await managedTeam.click();
+    await page.getByRole('link', { name: /^멤버 관리/ }).click();
+    await page.getByRole('button', { name: / 관리$/ }).first().click();
+    await page.getByRole('button', { name: '등번호 지정', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: /님 등번호$/ });
+    const input = dialog.getByRole('spinbutton');
+    const save = dialog.getByRole('button', { name: '저장', exact: true });
+    await expect(input).toBeFocused();
+    for (const bottom of [0, 34, 48, 64]) {
+      await setNativeBottom(page, bottom);
+      await dialog.evaluate((node) => { node.scrollTop = node.scrollHeight; });
+      await expectAboveSystemBar(save, bottom);
+    }
+    await page.setViewportSize({ width: 320, height: 360 });
+    await input.fill('1000');
+    await expect(dialog.getByText('0부터 999 사이의 숫자를 넣어 주세요.')).toBeVisible();
+    await expect(save).toBeDisabled();
+    await dialog.evaluate((node) => { node.scrollTop = node.scrollHeight; });
+    await expectAboveSystemBar(save, 64);
+    await dialog.getByRole('button', { name: '취소', exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+  });
+
   test('withdrawal reason remains above fixed actions as the native inset changes', async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 640 });
     await loginAs(page, personas.owner.email);

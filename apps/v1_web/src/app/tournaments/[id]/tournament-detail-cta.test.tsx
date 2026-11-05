@@ -479,6 +479,13 @@ describe('정규 리그 — 다음 시즌 입구', () => {
     expect(screen.getByTestId('next-league-invite-sidebar')).toHaveTextContent('재참가 팀 team-a');
   });
 
+  // 2026-11-04 알파 QA: 끝난 리그의 데스크톱 우측 레일(최종 결과)에 다음 시즌 입구가 없었다 — 모바일에만 보였다.
+  it('끝난 리그는 데스크톱 우측 레일에도 다음 시즌 입구를 둔다', () => {
+    myTeamsMock.mockReturnValue({ data: [{ teamId: 'team-a', role: 'owner' }], isError: false });
+    render(<TournamentDetailView tournament={league('completed')} myRegistration={registration('confirmed')} />);
+    expect(screen.getByTestId('next-league-invite-sidebar')).toHaveTextContent('재참가 팀 team-a');
+  });
+
   it.each(['confirmed', 'draft', 'awaiting_payment'] as const)(
     'PR 통합 회귀: 최근 신청(%s)이 다른 팀이어도 운영 중인 확정 팀의 재참가를 안내한다', (status) => {
       const latest = { ...registration(status), id: 'reg-b', teamId: 'team-b' };

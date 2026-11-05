@@ -331,6 +331,15 @@ export interface V1PublicLeagueDetail extends Omit<V1AdminLeagueDetail, V1AdminO
   nextRound?: V1LeagueNextRound | null;
   /** 독립 리그가 이어 가는 지난 시즌(공개된 리그만). */
   previousRound?: V1LeagueSeasonLink | null;
+  /** 리그 체계로 전환한 독립 리그의 첫 시즌 티어들(1부부터)과 편성 팀. 전환하지 않았으면 빈 배열. */
+  nextSeasonTiers?: V1LeagueNextSeasonTier[];
+}
+
+export interface V1LeagueNextSeasonTier {
+  leagueId: string;
+  title: string;
+  tier: number | null;
+  teamIds: string[];
 }
 
 export interface V1LeagueNextRound {
@@ -342,6 +351,8 @@ export interface V1LeagueNextRound {
   endsOn: string;
   registrationOpen: boolean;
   registrationDeadlineAt: string | null;
+  /** 다음 시즌에 참가 확정된 팀. 배포 전 응답에는 없을 수 있다. */
+  teamIds?: string[];
 }
 
 export interface V1CloseLeagueRegistrationPayload {

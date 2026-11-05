@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { ArrowRight, ClipboardCheck, Radio, CalendarClock } from 'lucide-react';
 import { formatKstDateShort, formatKstTime } from '@/lib/date-utils';
+import { josa } from '@/lib/korean';
 import type { LeagueNextAction } from '@/lib/league-next-action';
 
 const CARD_COPY = {
@@ -36,7 +37,7 @@ export function LeagueNextActionCard({
         : `${matchupLabel} 경기가 끝났어요 · 결과를 확정해 주세요`
       : action.kind === 'live'
         ? `${matchupLabel} 경기가 진행 중이에요`
-        : `다음 경기는 ${matchupLabel}예요`;
+        : `다음 경기는 ${josa(matchupLabel, ['이에요', '예요'])}`;
   const detail =
     action.kind === 'confirm'
       ? '확정하면 순위표와 전적에 반영돼요.'

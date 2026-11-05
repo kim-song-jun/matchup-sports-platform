@@ -51,6 +51,14 @@ function openModal() {
 }
 
 describe('TournamentInquirySection', () => {
+  it('리그의 문의 영역과 모달 제목도 리그로 표시한다', () => {
+    hookMocks.authMode = 'authenticated';
+    render(<TournamentInquirySection tournamentId="tournament-1" tournamentTitle="테스트 리그" targetLabel="리그" />);
+    expect(screen.getByRole('region', { name: '리그 문의' })).toHaveTextContent('리그 문의는 회원가입');
+    fireEvent.click(screen.getByRole('button', { name: '문의하기' }));
+    expect(screen.getByRole('dialog')).toHaveTextContent('리그 문의하기');
+  });
+
   beforeEach(() => {
     hookMocks.mutate.mockClear();
     hookMocks.push.mockClear();

@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { BlockedAction } from '@/components/v1-ui/blocked-action';
 import { v1Get } from '@/lib/api-client';
 import { extractErrorMessage } from '@/lib/error-message';
-import type { V1LeagueNextRound, V1PublicLeagueDetail } from '@/types/league-match';
+import type { V1LeagueNextRound, V1LeagueNextSeasonTier, V1PublicLeagueDetail } from '@/types/league-match';
 
 /**
  * 다음 리그 안내가 어디로 보내는지. 다음 시즌이 신청을 받으면 신청 화면(재참가 팀이면 그 팀이 골라진 채 — `?team=`),
@@ -32,6 +32,20 @@ export function nextLeagueInviteAction(nextRound: V1LeagueNextRound | null, retu
   return { href: '/tournaments?kind=league', label: '다른 리그 둘러보기', description: '다른 리그의 참가 일정도 확인해 보세요.' };
 }
 
+/**
+ * 리그 체계로 전환한 리그의 다음 시즌 입구. 티어마다 리그가 따로라, 보는 사람의 팀이 편성된 티어로 보내고
+ * 편성된 팀이 없으면 첫 티어로 보낸다. 재참가 신청은 없다 — 전환이 팀과 명단을 이미 넣었다.
+ */
+export function convertedSeasonInviteAction(tiers: readonly V1LeagueNextSeasonTier[], myTeamIds: readonly string[]) {
+  const mine = tiers.find((tier) => tier.teamIds.some((teamId) => myTeamIds.includes(teamId)));
+  const target = mine ?? tiers[0];
+  return {
+    href: `/tournaments/${target.leagueId}`,
+    label: '다음 시즌 보기',
+    description: mine ? `우리 팀은 "${mine.title}"에 편성됐어요.` : '리그 체계 첫 시즌이 시작돼요.',
+  };
+}
+
 type State = { leagueId: string } & (
   | { status: 'loading' }
   | { status: 'success'; data: V1PublicLeagueDetail }
@@ -43,19 +57,25 @@ type State = { leagueId: string } & (
  * `returningTeamId` — 이 리그에서 참가 확정됐던 내 팀(팀장·매니저). 다음 시즌이 신청을 받으면 그 팀이 골라진 신청 화면으로
  * 보내는 '다음 시즌 재참가 신청'이 된다(독립 리그 → 독립 리그, 2026-11-03 사용자 선택).
  */
-type InviteProps = { leagueId: string; variant?: 'mobile' | 'sidebar'; returningTeamId?: string | null };
+type InviteProps = {
+  leagueId: string;
+  variant?: 'mobile' | 'sidebar';
+  returningTeamId?: string | null;
+  /** 이 리그에 확정됐던 내 팀 전부(팀원 포함) — 체계로 전환한 리그에서 내 팀의 티어를 찾는다. */
+  myTeamIds?: readonly string[];
+};
 
-export function LeagueNextRegistrationInvite({ leagueId, variant = 'mobile', returningTeamId = null }: InviteProps) {
+export function LeagueNextRegistrationInvite({ leagueId, variant = 'mobile', returningTeamId = null, myTeamIds = [] }: InviteProps) {
   if (variant === 'sidebar') {
     return <section aria-label="다음 리그 참가 안내" style={{ display: 'grid', gap: 'var(--spacing-2)' }}>
       <h3 className="tm-text-body font-semibold text-[var(--text-strong)]">다음 리그에서 함께 뛰어요</h3>
-      <LeagueNextRegistrationInviteContent leagueId={leagueId} variant={variant} returningTeamId={returningTeamId} />
+      <LeagueNextRegistrationInviteContent leagueId={leagueId} variant={variant} returningTeamId={returningTeamId} myTeamIds={myTeamIds} />
     </section>;
   }
-  return <LeagueNextRegistrationInviteContent leagueId={leagueId} variant={variant} returningTeamId={returningTeamId} />;
+  return <LeagueNextRegistrationInviteContent leagueId={leagueId} variant={variant} returningTeamId={returningTeamId} myTeamIds={myTeamIds} />;
 }
 
-function LeagueNextRegistrationInviteContent({ leagueId, variant, returningTeamId = null }: InviteProps) {
+function LeagueNextRegistrationInviteContent({ leagueId, variant, returningTeamId = null, myTeamIds = [] }: InviteProps) {
   const [state, setState] = useState<State>({ leagueId, status: 'loading' });
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
@@ -75,7 +95,17 @@ function LeagueNextRegistrationInviteContent({ leagueId, variant, returningTeamI
   if (state.status === 'error') {
     return <ErrorState compact message={state.message} onRetry={() => setAttempt((value) => value + 1)} />;
   }
-  const { href, label, description } = nextLeagueInviteAction(state.data.nextRound ?? null, returningTeamId);
+  const tiers = state.data.nextSeasonTiers ?? [];
+  const nextRound = state.data.nextRound ?? null;
+  // 다음 시즌에 이미 확정된 내 팀이 있으면 재참가 신청 대신 그 시즌으로 보낸다(MD-QA #208).
+  const joinedNext = nextRound !== null
+    && (nextRound.teamIds ?? []).some((teamId) => teamId === returningTeamId || myTeamIds.includes(teamId));
+  const converted = nextRound === null && tiers.length > 0;
+  const { href, label, description } = joinedNext
+    ? { href: `/tournaments/${nextRound.leagueId}`, label: '다음 시즌 보기', description: '우리 팀은 다음 시즌에 참가 확정됐어요.' }
+    : converted
+      ? convertedSeasonInviteAction(tiers, myTeamIds)
+      : nextLeagueInviteAction(nextRound, returningTeamId);
   if (variant === 'sidebar') {
     return <div style={{ display: 'grid', gap: 'var(--spacing-2)' }}>
       <p className="tm-text-caption text-[var(--text-muted)]" style={{ margin: 0 }}>{description}</p>
@@ -90,7 +120,7 @@ function LeagueNextRegistrationInviteContent({ leagueId, variant, returningTeamI
       className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
       style={{ fontSize: 'var(--font-size-body-lg)' }}
     >
-      {returningTeamId !== null && state.data.nextRound?.registrationOpen === true ? label : '다음 리그에서 함께 뛰어요'}
+      {joinedNext || converted || (returningTeamId !== null && nextRound?.registrationOpen === true) ? label : '다음 리그에서 함께 뛰어요'}
     </Link>
     <p className="tm-text-caption" style={{ margin: 0, color: 'var(--text-muted)', textAlign: 'center' }}>
       {description}

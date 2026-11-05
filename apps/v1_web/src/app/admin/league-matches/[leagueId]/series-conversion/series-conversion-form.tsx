@@ -179,7 +179,7 @@ export function LeagueConversionForm({ leagueId }: { leagueId: string }) {
     <section className="space-y-4">
       <h2 className="tm-text-body-lg font-bold">리그 체계로 전환</h2>
       <p className="tm-text-caption text-[var(--text-muted)]">
-        공식 최종 순위로 첫 시즌의 티어를 나눠요. 기존 경기·순위·선수 기록은 그대로 남아요. 이후 시즌의 승강 규칙은
+        공식 최종 순위로 첫 시즌의 티어를 나눠요. 팀마다 이 리그의 참가 명단도 옮겨 와요. 기존 경기·순위·선수 기록은 그대로 남아요. 이후 시즌의 승강 규칙은
         생성된 체계의 수정 화면에서 정해요.
       </p>
       <fieldset disabled={busy} className="space-y-4">

@@ -787,7 +787,7 @@ describe('TournamentDetailView — completed vs non-completed section rendering'
     expect(screen.queryByText(/시즌 주차 수/)).not.toBeInTheDocument();
   });
 
-  it('keeps the season-week explanation for a regular league mirror row (group_knockout format)', () => {
+  it('uses fixture-based guidance and season completion for a regular league mirror row', () => {
     const tournament = makeTournament({
       id: 't1',
       status: 'open',
@@ -799,9 +799,10 @@ describe('TournamentDetailView — completed vs non-completed section rendering'
 
     render(createElement(TournamentDetailView, { tournament, myRegistration: null }));
 
-    expect(screen.getByText('참가한 모든 팀이 서로 맞붙어요. 맞붙는 횟수는 시즌 주차 수에 따라 달라져요.')).toBeInTheDocument();
+    expect(screen.getByText('참가한 모든 팀이 서로 맞붙어요. 몇 번씩 맞붙는지는 대진표에서 확인할 수 있어요.')).toBeInTheDocument();
     expect(screen.queryByText('결선 진출')).not.toBeInTheDocument();
-    expect(screen.queryByText(/대진표에서 확인할 수 있어요/)).not.toBeInTheDocument();
+    expect(screen.getByText('시즌 종료')).toBeInTheDocument();
+    expect(screen.queryByText(/최종 순위에 따라 상금/)).not.toBeInTheDocument();
   });
 
   it('keeps the application guide, flow explainer, and standings-moved notice for open tournaments (non-destructive)', () => {
@@ -869,7 +870,8 @@ describe('TournamentDetailView — completed vs non-completed section rendering'
     expect(screen.getByText('팀원은 미선택 상태로 진행하거나 추후 수정할 수 있어요.', { exact: false })).toBeInTheDocument();
     expect(screen.getByText('입금 확인 후 대회 참가가 확정돼요.', { exact: false })).toBeInTheDocument();
     expect(screen.getByText('선수단 확정')).toBeInTheDocument();
-    expect(screen.getByText('마감일 전까지 등록을 완료해 주세요.', { exact: false })).toBeInTheDocument();
+    expect(screen.getAllByText('선수단은 명단이 잠기기 전까지 등록·수정할 수 있어요.', { exact: false })).toHaveLength(2);
+    expect(screen.queryByText('마감일 전까지 등록을 완료해 주세요.', { exact: false })).not.toBeInTheDocument();
     expect(screen.queryByText('운영진 검토')).not.toBeInTheDocument();
   });
 

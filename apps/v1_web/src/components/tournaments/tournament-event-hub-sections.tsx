@@ -5,8 +5,10 @@ import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 import { Card } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
+import { competitionNounOf } from '@/lib/competition-kind';
+import { formatTournamentDateTimeLong } from '@/lib/date-utils';
 import { withFromPath } from '@/lib/session-storage';
-import type { V1TournamentParticipantTeam, V1TournamentStatus } from '@/types/api';
+import type { V1CompetitionKind, V1TournamentParticipantTeam, V1TournamentStatus } from '@/types/api';
 
 type ParticipantTeamBuckets = {
   confirmed: V1TournamentParticipantTeam[];
@@ -27,11 +29,20 @@ export function getParticipantTeamBuckets(
   };
 }
 
-export function TournamentApplicationGuideSection({ isFreeEntry }: { isFreeEntry: boolean }) {
+export function TournamentApplicationGuideSection({ isFreeEntry, kind, rosterDeadlineAt }: {
+  isFreeEntry: boolean;
+  kind?: V1CompetitionKind | null;
+  rosterDeadlineAt?: string | null;
+}) {
+  const isLeague = kind === 'regular_league';
+  const noun = competitionNounOf(kind);
+  const rosterGuide = rosterDeadlineAt
+    ? `선수단은 명단 마감(${formatTournamentDateTimeLong(rosterDeadlineAt)}) 전까지 등록·수정할 수 있어요.`
+    : '선수단은 명단이 잠기기 전까지 등록·수정할 수 있어요. 상세한 수정 가능 여부는 참가 선수 화면에서 확인해 주세요.';
   const steps = [
     {
       title: '팀 준비',
-      body: '팀밋 회원가입 후 팀을 만들거나 기존 팀에 합류해요. 대회 신청은 팀장·매니저가 진행할 수 있어요.',
+      body: `팀밋 회원가입 후 팀을 만들거나 기존 팀에 합류해요. ${noun} 신청은 팀장·매니저가 진행할 수 있어요.`,
     },
     {
       title: '팀 선택',
@@ -40,19 +51,22 @@ export function TournamentApplicationGuideSection({ isFreeEntry }: { isFreeEntry
     isFreeEntry
       ? {
           title: '운영진 확인',
-          body: '신청하면 바로 접수돼요. 입금 절차는 없어요. 운영진이 신청 내용을 확인하면 대회 참가가 확정돼요.',
+          body: `신청하면 바로 접수돼요. 입금 절차는 없어요. 운영진이 신청 내용을 확인하면 ${noun} 참가가 확정돼요.`,
         }
-      : {
+      : isLeague ? {
+          title: '입금 안내 확인',
+          body: '신청 내역의 계좌와 운영진 안내를 확인해 입금해 주세요. 운영진의 입금 확인과 참가 확정 상태는 신청 내역에서 확인할 수 있어요.',
+        } : {
           title: '2시간 내 입금 확인',
           body: '계좌 안내 후 2시간 안에 입금이 확인되지 않으면 신청이 취소될 수 있어요. 입금 확인 후 대회 참가가 확정돼요.',
         },
     {
       title: '선수단 확정',
-      body: '대회 페이지 내에서 선수단을 등록하고 수정해요. 마감일 전까지 등록을 완료해 주세요.',
+      body: `${noun} 페이지에서 선수단을 등록하고 수정해요. ${rosterGuide}`,
     },
     {
-      title: '대회 후 기록',
-      body: '확정 팀은 일정표와 대진표를 확인하고, 종료 후 결과·영상·리뷰와 다음 대회를 이어서 볼 수 있어요.',
+      title: `${noun} 후 기록`,
+      body: `확정 팀은 일정표와 대진표를 확인하고, 종료 후 결과·영상·리뷰와 다음 ${noun}를 이어서 볼 수 있어요.`,
     },
   ];
 
@@ -63,10 +77,10 @@ export function TournamentApplicationGuideSection({ isFreeEntry }: { isFreeEntry
       </div>
       <Card pad={16} style={{ marginTop: 4 }}>
         <div className="tm-text-label" style={{ color: 'var(--text-strong)' }}>
-          이 대회는 팀 단위로 신청해요
+          이 {noun}는 팀 단위로 신청해요
         </div>
         <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, marginTop: 4 }}>
-          팀장·매니저가 팀을 선택해 신청하고, {isFreeEntry ? '운영진 확인' : '입금 확인'} 후 참가가 확정돼요. 선수단은 마감일 전까지 등록·수정할 수 있어요.
+          팀장·매니저가 팀을 선택해 신청하고, {isFreeEntry ? '운영진 확인' : '입금 확인'} 후 참가가 확정돼요. {rosterGuide}
         </div>
         <ol style={{ display: 'grid', gap: 12, listStyle: 'none', margin: '16px 0 0', padding: 0 }}>
           {steps.map((step, index) => (

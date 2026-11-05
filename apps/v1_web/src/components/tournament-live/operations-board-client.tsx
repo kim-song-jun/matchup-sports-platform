@@ -2,7 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import Link from 'next/link';
+import { ScopedLink as Link } from '@/components/providers/navigation-scope';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { Ellipsis, RefreshCw } from 'lucide-react';

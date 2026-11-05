@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
-import Link from 'next/link';
+import { ScopedLink as Link } from '@/components/providers/navigation-scope';
 import {
   useGameResultRevisions,
   useOfficializeResultRevision,

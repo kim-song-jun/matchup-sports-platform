@@ -6,11 +6,18 @@ import { usePathname, useRouter } from 'next/navigation';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Copy, RotateCcw } from 'lucide-react';
 import { V1DataSourceProvider } from '@/components/providers/v1-data-source';
+import { NavigationScopeProvider } from '@/components/providers/navigation-scope';
 import { TournamentManagementContent } from '@/app/admin/tournaments/[id]/tournament-admin-shell';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { ADMIN_DEMO_ID, ADMIN_DEMO_STORAGE_KEY, createAdminDemoSource, restoreAdminDemo, runAdminDemo } from '@/lib/tournament-admin-demo';
 import { DEMO_PATH } from '@/lib/tournament-ops-demo';
 import styles from './demo.module.css';
+
+const demoNavigationScope = {
+  allow: (pathname: string) => pathname === DEMO_PATH || pathname.startsWith(DEMO_PATH + '/') || pathname.startsWith('#') || pathname.startsWith('?'),
+  reason: '실제 서비스로 연결되는 이 화면은 체험에서 열 수 없어요.',
+  disabledLabel: '체험 제외',
+};
 
 export function TournamentOpsDemo({ children }: { children: ReactNode }) {
   // The sample must not read, populate or invalidate the signed-in account's query cache.
@@ -88,11 +95,11 @@ export function TournamentOpsDemo({ children }: { children: ReactNode }) {
       {storageError && <p className={styles.error} role="alert">{storageError}</p>}
       {error && <p className={styles.error} role="alert">{error}</p>}
       {notice && <p className={styles.notice} role="status">{notice}</p>}
-      {ready && !storageError && <QueryClientProvider client={client}><V1DataSourceProvider source={source}>
+      {ready && !storageError && <QueryClientProvider client={client}><V1DataSourceProvider source={source}><NavigationScopeProvider scope={demoNavigationScope}>
         <TournamentManagementContent id={ADMIN_DEMO_ID} role="PLATFORM_OPS" navigation={{ basePath: DEMO_PATH, listHref: DEMO_PATH, operationsBasePath: DEMO_PATH, localPopups: true }}>
           <div key={pathname} role="region" aria-label="대회 관리 내용">{children}</div>
         </TournamentManagementContent>
-      </V1DataSourceProvider></QueryClientProvider>}
+      </NavigationScopeProvider></V1DataSourceProvider></QueryClientProvider>}
       {!ready && !storageError && <p role="status">체험을 준비하고 있어요.</p>}
       <details className={styles.guide} id="demo-guide"><summary className={styles.quiet}>체험 안내와 공유 주소</summary>
         <p className={styles.muted}>신청 관리에서 4팀을 확정하고 대진 관리에서 4팀 토너먼트를 만들어 보세요. 팀을 배정한 뒤 점수 입력으로 결과를 확정하면 결승과 통계에 반영돼요.</p>

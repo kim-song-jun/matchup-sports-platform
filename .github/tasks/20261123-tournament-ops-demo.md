@@ -61,7 +61,8 @@ Updated: 2026-11-05
 ## Security Notes
 PLATFORM_OPS는 체험 전용 UI의 역할 값이다. 실제 세션·관리자 배정·서버 인증을 만들지 않는다.
 로컬 source는 알 수 없는 경로도 실제 서버로 넘기지 않는다. 샘플 명령은 저장에 성공한 뒤에만 메모리에 반영한다.
-공유 URL에는 개인 정보·체험 이력을 넣지 않는다. 실제 서비스 링크는 체험 밖으로 이동시키지 않고 이유를 표시한다.
+공유 URL에는 개인 정보·체험 이력을 넣지 않는다. 체험 엔티티의 실제 서비스 링크는 ScopedLink에서 anchor 자체를 만들지 않아
+Next prefetch·새 탭 열기까지 막고 비활성 사유를 표시한다. 정책 provider 밖의 실제 화면은 원래 NextLink로 동작한다.
 
 ## Risks & Dependencies
 체험은 4팀 풋살 토너먼트 범위다. 파일 업로드, 외부 캠페인 발행, 실제 회원 초대, 경기별 출전 명단 조정은 지원하지 않으며 오류로 표시한다.
@@ -76,9 +77,10 @@ PLATFORM_OPS는 체험 전용 UI의 역할 값이다. 실제 세션·관리자 �
 
 ## Progress Snapshot
 - Worktree: `_worktrees/tournament-demo-admin-parity`, branch `fix/tournament-demo-admin-parity-20261105`.
-- Actual UI tests 19 PASS, model tests 5 PASS. 기존 셸·빠른 대진·신청·결과 invalidation 회귀 41 PASS.
+- Actual UI tests 19 PASS, model tests 5 PASS, navigation scope tests 2 PASS. 기존 셸·빠른 대진·신청·결과 invalidation 회귀 41 PASS.
 - tsc PASS. Windows의 POSIX find 호환 문제로 패턴 게이트는 동일 source를 WSL에서 실행해 PASS.
 - Alpha before: `0b7720cb7`, 390/768/1440 3/3, page/console errors 0, 가로 overflow 0.
 - Alpha after: 미배포, 0/13개 화면·0/3폭. 완료로 표기하지 않는다.
 - Evidence: `docs/screenshots/tournament-admin-demo-20261105/`, runner `scripts/qa/capture-tournament-admin-demo.cjs`.
 - QA는 별도 headed Chrome을 사용했고 소유 PID/PPID 및 종료를 JSON report에 기록했다.
+- PR #2168: base dev, 첫 head `130390d86`. CI와 Copilot 리뷰 진행 중. 링크 prefetch 격리 보완을 다음 head에 포함한다.

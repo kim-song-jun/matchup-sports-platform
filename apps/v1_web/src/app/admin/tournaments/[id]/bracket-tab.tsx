@@ -3,7 +3,7 @@
 import { useV1DataSource } from '@/components/providers/v1-data-source';
 
 import { useId, useState } from 'react';
-import Link from 'next/link';
+import { ScopedLink as Link } from '@/components/providers/navigation-scope';
 import { Check, RefreshCw, Pencil, Trash2, ChevronRight } from 'lucide-react';
 import { isBracketPublished as isBracketPublishedNow } from '@/lib/bracket-visibility';
 import { onlyDigits } from '@/lib/number-format';

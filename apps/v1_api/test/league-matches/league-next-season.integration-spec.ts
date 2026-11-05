@@ -194,6 +194,9 @@ describe('독립 리그 다음 시즌 잇기', () => {
       select: { status: true, entrySource: true },
     })).toEqual({ status: 'confirmed', entrySource: 'seeded' });
     expect(await playersOf(season2, team.b)).toEqual([{ userId: players.b1, jerseyNumber: 13, eligibilityStatus: 'needs_review' }]);
+    // MD-QA #208: 지난 시즌 화면이 이 팀에게 재참가 신청을 다시 걸지 않도록 확정 팀을 알려 준다.
+    const previousPublic = (await http().get(`/api/v1/league-matches/${season1}`).expect(200)).body.data;
+    expect(previousPublic.nextRound.teamIds).toContain(team.b);
   });
 
   // 2026-11-04 알파 QA: 입금 대기 팀을 넣으면 결제가 '대기'인 채 참가 확정이 됐다.

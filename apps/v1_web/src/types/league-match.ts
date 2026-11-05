@@ -351,6 +351,8 @@ export interface V1LeagueNextRound {
   endsOn: string;
   registrationOpen: boolean;
   registrationDeadlineAt: string | null;
+  /** 다음 시즌에 참가 확정된 팀. 배포 전 응답에는 없을 수 있다. */
+  teamIds?: string[];
 }
 
 export interface V1CloseLeagueRegistrationPayload {

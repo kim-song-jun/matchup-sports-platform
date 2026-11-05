@@ -527,6 +527,17 @@ describe('TournamentDetailPageClient — 우리 팀 참가 카드(Task 180 R-1 A
       get.mockImplementation(originalGet);
     }
   });
+
+  // MD-QA #209: 공지는 정규 대회에만 있다 — 리그 상세가 참가자 공지를 부르면 404 가 콘솔에 찍혔다.
+  it.each([['regular_league', 0], ['regular_tournament', 1]] as const)('%s 참가자 공지 조회 %s번', async (kind, calls) => {
+    tournamentApiMocks.useV1Tournament.mockReturnValue({
+      data: makeTournament({ kind }), isPending: false, isError: false, error: null, refetch: vi.fn(),
+    });
+    tournamentApiMocks.useV1MyRegistrations.mockReturnValue({ data: [{ id: 'reg-a', teamId: 'team-a', status: 'confirmed' }] });
+    render(<TournamentDetailPageClient tournamentId="tournament-1" />);
+    await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
+    await waitFor(() => expect(vi.mocked(v1Get).mock.calls.filter(([path]) => path.endsWith('/announcements/me'))).toHaveLength(calls));
+  });
 });
 
 describe('TournamentDetailPageClient — 리그 방식 일정', () => {

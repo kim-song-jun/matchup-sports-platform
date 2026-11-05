@@ -309,6 +309,15 @@ describe('LeagueAdminShell', () => {
       expect(openMutate).toHaveBeenCalledWith({ registrationDeadlineAt: '2099-01-01T14:00:00.000Z' }, expect.anything());
     });
 
+    it('정해 둔 마감을 바꾸면 그대로 연다는 안내를 거둔다', () => {
+      query.value = loaded({ state: 'draft', lifecycleStatus: 'draft', ...configuredFee, registrationDeadlineAt: '2099-01-01T14:00:00.000Z' });
+      renderShell();
+      fireEvent.click(screen.getByRole('button', { name: '접수 시작하기' }));
+      const dialog = screen.getByRole('dialog', { name: '접수를 시작할까요?' });
+      fireEvent.change(within(dialog).getByLabelText('신청 마감 (한국 시간)'), { target: { value: '2099-01-02T23:00' } });
+      expect(within(dialog).queryByText('정해 둔 마감이 채워져 있어요. 그대로 두면 이 마감까지 받아요.')).not.toBeInTheDocument();
+    });
+
         it('접수 중인 리그는 접수 마감하기로 닫는다', () => {
       query.value = loaded({ state: 'draft', lifecycleStatus: 'open', ...configuredFee, registrationDeadlineAt: '2099-01-01T00:00:00.000Z', activeRegistrationCount: 3, confirmedRegistrationCount: 1 });
       renderShell();

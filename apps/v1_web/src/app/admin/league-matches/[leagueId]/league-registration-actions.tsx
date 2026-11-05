@@ -141,7 +141,7 @@ function OpenRegistrationAction({ leagueId, league, showToast }: {
                 className="block min-h-[44px] w-full rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-[length:var(--font-size-body-sm)] text-[var(--text-strong)] disabled:opacity-50"
               />
               {/* MD-QA #211: 정해 둔 마감이 있으면 아래 '마감 없이 받기' 때문에 마감이 사라지는 것처럼 보였다. */}
-              {savedDeadline !== '' && !noDeadline ? (
+              {savedDeadline !== '' && deadline === savedDeadline && !noDeadline ? (
                 <p className="mt-1 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
                   정해 둔 마감이 채워져 있어요. 그대로 두면 이 마감까지 받아요.
                 </p>

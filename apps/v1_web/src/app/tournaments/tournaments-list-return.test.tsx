@@ -519,7 +519,7 @@ describe('MD-QA #55 — 모바일 대회 목록 더 보기 복귀', () => {
     await expectMobileCards(20);
     await user.click(screen.getByRole('button', { name: '더 보기' }));
     await expectMobileCards(40);
-    await user.click(screen.getByRole('link', { name: '모바일 대회 1 — 풋살 — 진행 중' }));
+    await user.click(screen.getByRole('link', { name: '모바일 대회 1 — 풋살 — 대회 진행 중' }));
     await screen.findByRole('heading', { level: 1, name: '모바일 대회 1' });
 
     // When: 상세 상단 액션 또는 브라우저 history로 목록에 돌아간다.

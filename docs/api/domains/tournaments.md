@@ -270,7 +270,7 @@ nonterminal lifecycle; optional maxTeams is checked against the same reserved re
 The deadline equality instant is open. `registrationOpen` on every list item uses the same
 window/capacity semantics, independent of the viewer's individual team eligibility.
 
-All conditions apply before pagination in the existing SQL keyset query. The cursor carries `[group, sortAt, id]`; a cursor from the removed sort modes (four parts) is rejected as an empty window.
+All conditions apply before pagination in the existing SQL keyset query. The cursor carries `["v2", group, sortAt, id]`. A cursor without the version tag (the three-part cursor from before the 2026-11-03 order, or the four-part cursor with a sort mode) is rejected as an empty window, because its group numbers and sort key mean something else now; bump the tag whenever the meaning of `group` or `sortAt` changes again.
 Legacy `status` is retained and intersects new filters. Contradictory filters return an empty
 list. Reversed date or fee ranges return 400 `INVALID_FILTER_RANGE`; malformed/unknown inputs
 are rejected by the existing DTO validation pipe. Gender/format/fee conditions narrow to

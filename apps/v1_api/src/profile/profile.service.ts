@@ -37,6 +37,7 @@ import { enqueueRosterResync, teamMembersTargets } from '../games/roster/roster-
 import { removeUserFromActiveRosters } from '../tournaments/roster-cleanup';
 import { verifyPhoneProofToken } from '../verification/phone-proof-token';
 import { isPhoneVerificationEnforced } from '../verification/phone-verification-access';
+import { SIGNUP_AGE_RESTRICTED_RESPONSE, isSignupAgeEligible } from '../auth/dto/required-signup-profile.dto';
 import {
   UpdateMyPreferencesDto,
   UpdateMyRecordConsentDto,
@@ -175,6 +176,12 @@ export class ProfileService {
 
     if (birthDate && !isValidBirthDate(birthDate)) {
       throw validationError('Birth date must be a valid YYYYMMDD value', 'birthDate');
+    }
+    // Only a changed value is checked, so an account already holding an under-14 date can still edit other fields.
+    // Legacy stored values may carry separators ('YYYY-MM-DD'); compare digits only.
+    const storedBirthDate = (before?.profile?.birthDate ?? '').replace(/\D/g, '');
+    if (birthDate && birthDate !== storedBirthDate && !isSignupAgeEligible(birthDate)) {
+      throw new BadRequestException(SIGNUP_AGE_RESTRICTED_RESPONSE);
     }
 
     const [existingEmail, existingEmailIdentity, existingPhone, existingNickname] = await Promise.all([

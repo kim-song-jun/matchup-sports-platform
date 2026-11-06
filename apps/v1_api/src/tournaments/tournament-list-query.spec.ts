@@ -114,3 +114,28 @@ describe('single state order and filter', () => {
     expect(queryRaw).not.toHaveBeenCalled();
   });
 });
+
+describe('gender filter spans every kind', () => {
+  const build = async (query: Parameters<typeof listTournamentIds>[1]) => {
+    const statements: Prisma.Sql[] = [];
+    const queryRaw = jest.fn(async (strings: TemplateStringsArray, ...values: unknown[]) => {
+      statements.push(Prisma.sql(strings, ...values)); return [];
+    });
+    await listTournamentIds({ $queryRaw: queryRaw } as never, query, { limit: 5 });
+    return statements[0];
+  };
+
+  // `kind=tournament` is excluded here: its own surface SQL already contains the tournament condition.
+  it.each(['league', 'all'] as const)('kind=%s: gender alone does not narrow the list to tournaments', async (kind) => {
+    const statement = await build({ kind, genderCategory: 'female' });
+    expect(statement.text).toContain('t.gender_category::text = $');
+    expect(statement.values).toContain('female');
+    // The tournament-only narrowing (`regular_tournament OR kind IS NULL`) comes from format/fee, never from gender.
+    expect(statement.text).not.toContain("t.kind::text = 'regular_tournament' OR t.kind IS NULL");
+  });
+
+  it.each([{ format: 'knockout' }, { feeMax: 0 }, { feeMin: 1000 }] as const)('format and fee still narrow to tournaments: %j', async (extra) => {
+    const statement = await build({ kind: 'all', ...extra } as never);
+    expect(statement.text).toContain("t.kind::text = 'regular_tournament' OR t.kind IS NULL");
+  });
+});

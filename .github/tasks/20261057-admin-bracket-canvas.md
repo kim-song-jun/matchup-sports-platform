@@ -1207,3 +1207,13 @@ Status: In Progress
 - Remaining: focused real-DB/unit/type/surface validation, exact-path commit/PR2169 update, latest Copilot clean and CI, dev merge/FF sync, Alpha SHA/health and headed after QA. Default UI runtimes failed initialization; own headed Chrome PID22720/controller16392 is open for administrator login (no credentials persisted).
 
 - Repair validation PASS: full230-migration LF replay on fresh isolated PostgreSQL; both formerly failing integration suites17/17, related unit suites56/56, API typecheck0/surface761 PASS, diff-check/debt grep clean. Owned PostgreSQL PID2444 stopped and absence verified. Latest PR-head CI and review still pending; Alpha after QA remains unverified.
+
+### PR #2169 Alpha 배포 검증 완료 (2026-11-06)
+- 사용자 승인으로 이번 PR의 Copilot 리뷰만 생략. PR CI 42140173651, dev CI 42146237897, Alpha deploy 42146237891 성공.
+- dev merge 및 실제 Alpha 응답 commit: fdd1e20495ed5f4a9d0bc5e11cbc83809591b7ac. DB health 정상. main 변경 없음.
+- 실제 관리자 로그인, 기존 미완료 예선의 배정 차단, 1440x1000 / 768x1024 / 390x844 화면 확인. 가로 넘침 없음. before/after PNG 첨부.
+- Alpha 전용 목업 생성 UI로 16팀 league_knockouts 생성: 예선 24경기 + 결선 14경기 = 38경기, 라인업 64건. 상·하위 각 8팀 실제 배정과 공식 순위 확인.
+- 같은 QA 대회에서 상위 추천 배치 → 대진 확인 → 진출팀 확정 클릭 완료. 해당 흐름 관찰에서 page/network 오류 없음. 최초 로그인 400은 재시도로 해소됐으며 원인은 확정하지 않음.
+- 검증 소유 대회 f0072b3c-9358-42d8-8496-e2d231002786은 visibility PATCH 200 / cancelled status POST 201로 비공개·취소 정리. 기존 대회 데이터는 수정하지 않음.
+- 12팀 교차 배치와 다른 토너먼트 LIVE 상태는 로컬 DB 통합 테스트 범위이며 이번 Alpha UI에서는 재현하지 않음. 로컬 통합 17/17, 단위 56/56, API 타입/표면 검사 통과.
+- 증거는 qa/pr2169-alpha-evidence 원격 브랜치에 보관하며 런타임 배포 브랜치와 별도다. 헤드풀 QA 브라우저 종료 완료.

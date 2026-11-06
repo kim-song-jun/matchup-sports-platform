@@ -461,6 +461,11 @@ export function BracketScheduleTab({
   // and finals stored in a shared semifinal group.
   const roundByFixture = new Map<string, { key: string; label: string }>();
   const groupIds = new Set<string>();
+  const finalTracks = tournament?.format === 'league_knockouts' ? [...new Map([...tournament.groups].sort((a, b) => a.sortOrder - b.sortOrder)
+    .filter(group => group.phase !== 'group' && group.bracketTrack && !['overall', 'upper', 'lower'].includes(group.bracketTrack))
+    .map(group => [group.bracketTrack!, { id: group.bracketTrack!, label: group.bracketTrack!, colorIndex: group.bracketColorIndex,
+      fixtureIds: tournament.fixtures.filter(fixture => tournament.groups.some(candidate => candidate.id === fixture.groupId && candidate.bracketTrack === group.bracketTrack)).map(fixture => fixture.id) }])).values()] : [];
+  const finalByFixture = new Map(finalTracks.flatMap(track => track.fixtureIds.map(id => [id, track] as const)));
   if (tournament && !isRegularLeague) {
     const sections = partitionTournamentSections(tournament.format, tournament.fixtures, tournament.groups);
     sections.groupPhaseGroups.forEach(group => groupIds.add(group.id));
@@ -470,7 +475,10 @@ export function BracketScheduleTab({
   }
   const normalizeEntry = (entry: typeof firstPage.items[number]) => {
     const round = roundByFixture.get(entry.fixtureId);
-    if (round) return { ...entry, round: round.key, groupName: round.label };
+    if (round) {
+      const final = finalByFixture.get(entry.fixtureId);
+      return { ...entry, round: round.key, groupName: final ? `${final.label} · ${getRoundLabel(round.key)}` : round.label };
+    }
     if (entry.groupId && groupIds.has(entry.groupId) && !tournamentRoundLabel(entry.round).startsWith('조별')) {
       return { ...entry, round: 'group' };
     }
@@ -491,6 +499,7 @@ export function BracketScheduleTab({
       tournamentId={tournamentId}
       prioritizeLiveGames
       knockoutOnly={tournament?.format === 'knockout'}
+      finalTracks={finalTracks}
       isRegularLeague={isRegularLeague}
       data={combined}
       hasNextPage={hasNextPage}

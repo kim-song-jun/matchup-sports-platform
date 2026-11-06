@@ -201,6 +201,27 @@ function makeFixture(
 }
 
 describe('정규리그 + N개 토너먼트 공개 순위와 결선', () => {
+  it('경기 일정은 상세 fixture 식별자로 토너먼트를 연결하고 저장된 색과 강수로 필터한다', () => {
+    const tournament = namedTournament();
+    tournament.groups.find(group => group.id === 'named-1')!.bracketColorIndex = 7;
+    const items: PublicScheduleEntry[] = tournament.fixtures.map(fixture => ({
+      fixtureId: fixture.id, round: 'final', fixtureNumber: fixture.fixtureNumber, legNumber: 1,
+      // The schedule response may omit the knockout group; the detail fixture owns it.
+      groupId: null, groupName: null, scheduledAt: null, venue: null, fieldId: null, fieldName: null,
+      home: null, away: null, homeSlotLabel: fixture.homeSlotLabel ?? null, awaySlotLabel: fixture.awaySlotLabel ?? null,
+      visibilityMode: 'live', status: 'scheduled', resultState: 'pending', scoreStatus: 'unavailable',
+      score: null, clock: null, periodBreak: null, scorers: [], cards: [], outcome: null, hasVideo: false,
+    }));
+    const { container } = renderBracketPage(tournament, { tournamentId: tournament.id, tournamentTitle: tournament.title,
+      bracketPublished: true, items: [], unscheduled: items, standings: [], nextCursor: null });
+    fireEvent.click(screen.getByRole('tab', { name: '결선' }));
+    const tracks = within(screen.getByRole('navigation', { name: '일정 토너먼트 선택' }));
+    expect(tracks.getByRole('button', { name: '챌린지' }).querySelector('span')).toHaveClass('tm-final-color-7');
+    fireEvent.click(tracks.getByRole('button', { name: '챌린지' }));
+    fireEvent.click(within(screen.getByRole('navigation', { name: '일정 결선 단계 선택' })).getByRole('button', { name: '결승' }));
+    expect([...container.querySelectorAll('a[href*="/matches/"]')].map(link => link.getAttribute('href')?.split('?')[0])).toEqual(['/tournaments/public-named-finals/matches/named-game-1']);
+    expect(screen.getByText('챌린지 · 결승')).toBeInTheDocument();
+  });
   function namedTournament(withFinals = true): V1TournamentDetail {
     return makeTournament({ id: 'public-named-finals', kind: 'regular_tournament', format: 'league_knockouts', status: 'in_progress',
       bracketPublishedAt: '2026-11-04T00:00:00Z',

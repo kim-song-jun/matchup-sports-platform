@@ -293,7 +293,15 @@ async function resetPasswordByRecoveryEmail(request: Request) {
     return authProofError('EMAIL_NOT_VERIFIED', '이메일 본인인증을 다시 진행해 주세요.');
   }
   if (email === PASSWORD_UNAVAILABLE_MSW.email) return passwordLoginUnavailableResponse();
-  // 비밀번호는 활성 계정만 바꾼다 — 탈퇴 유예 계정은 찾을 수 없는 것과 같다.
+  // 비밀번호는 활성 계정만 바꾼다. 탈퇴 유예 계정은 바꾸지 않고 종료일과 함께 403 으로 알린다(메일함 증명 뒤라 공개해도 된다).
+  if (email === WITHDRAWAL_PENDING_RECOVERY_MSW.email) {
+    return HttpResponse.json({
+      status: 'error', statusCode: 403, code: 'ACCOUNT_WITHDRAWAL_PENDING',
+      message: '탈퇴를 신청한 계정이라 비밀번호를 바꿀 수 없어요. 로그인하면 탈퇴를 취소할 수 있어요.',
+      details: { withdrawalPendingUntil: WITHDRAWAL_PENDING_RECOVERY_MSW.withdrawalPendingUntil },
+      timestamp: new Date().toISOString(),
+    }, { status: 403 });
+  }
   if (email !== v1UserFixture.email?.trim().toLowerCase()) {
     return authProofError('ACCOUNT_NOT_FOUND', '이 이메일로 가입된 계정을 찾지 못했어요.', 404);
   }

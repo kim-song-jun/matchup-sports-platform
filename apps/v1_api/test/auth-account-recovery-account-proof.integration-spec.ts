@@ -279,16 +279,19 @@ describe('V1 account recovery requires independent email proof', () => {
       expect(withMailbox.body.data).toMatchObject({ withdrawalPending: true, maskedEmail: 'in***@integration.test', withdrawalPendingUntil: GRACE_ENDS_AT });
     });
 
-    it('still cannot have its password reset by email', async () => {
+    it('cannot have its password reset by email, and is told it is withdrawing along with the end date', async () => {
       await startWithdrawal(EMAIL_USER, REQUESTED_AT);
       const proofToken = await proveMailbox(EMAIL);
-      const before = await prisma.v1AuthIdentity.findUnique({ where: { id: `${PREFIX}-email-identity` } });
+      const before = await accountState();
 
       const response = await request(app.getHttpServer()).post('/api/v1/auth/recovery/email/reset-password')
         .send({ email: EMAIL, proofToken, newPassword: REPLACEMENT_PASSWORD });
 
-      expect({ status: response.status, code: response.body.code }).toEqual({ status: 404, code: 'ACCOUNT_NOT_FOUND' });
-      expect(await prisma.v1AuthIdentity.findUnique({ where: { id: `${PREFIX}-email-identity` } })).toEqual(before);
+      expect({ status: response.status, code: response.body.code, details: response.body.details }).toEqual({
+        status: 403, code: 'ACCOUNT_WITHDRAWAL_PENDING', details: { withdrawalPendingUntil: GRACE_ENDS_AT },
+      });
+      expect(response.headers['set-cookie']).toBeUndefined();
+      expect(await accountState()).toEqual(before);
     });
   });
 

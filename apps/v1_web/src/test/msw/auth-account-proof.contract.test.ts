@@ -244,10 +244,12 @@ describe('email lookup also finds an account waiting out its withdrawal grace', 
       .resolves.toEqual({ maskedEmail: 'wi***@example.com', providers: ['email'], hasPassword: true, withdrawalPending: true, withdrawalPendingUntil });
   });
 
-  it('still refuses to reset the password of such an account', async () => {
-    const { email } = WITHDRAWAL_PENDING_RECOVERY_MSW;
+  it('refuses to reset the password of such an account and says why, with the end date', async () => {
+    const { email, withdrawalPendingUntil } = WITHDRAWAL_PENDING_RECOVERY_MSW;
     await expect(v1Post('/auth/recovery/email/reset-password', { email, proofToken: await proveMailbox(email), newPassword }))
-      .rejects.toMatchObject({ statusCode: 404, code: 'ACCOUNT_NOT_FOUND' } satisfies Partial<V1ApiError>);
+      .rejects.toMatchObject({
+        statusCode: 403, code: 'ACCOUNT_WITHDRAWAL_PENDING', details: { withdrawalPendingUntil },
+      } satisfies Partial<V1ApiError>);
   });
 });
 

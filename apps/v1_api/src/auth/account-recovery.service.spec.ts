@@ -1,4 +1,4 @@
-import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailVerificationService } from '../verification/email-verification.service';
 import { issueEmailProofToken } from '../verification/email-proof-token';
@@ -458,13 +458,42 @@ describe('AccountRecoveryService — 탈퇴 유예 중인 계정의 이메일을
     expect(hit).toEqual(miss);
   });
 
-  it('비밀번호 재설정은 여전히 활성 계정만 대상이라 탈퇴 대기 계정에는 쓰지 않는다', async () => {
+  // 메일함 증명을 마쳤으니 날짜를 알려도 된다. 비밀번호는 바꾸지 않고, 화면이 탈퇴 안내로 갈 수 있게 알린다.
+  it('비밀번호 재설정은 탈퇴 대기 계정에 403 ACCOUNT_WITHDRAWAL_PENDING 과 종료일로 답하고 아무것도 바꾸지 않는다', async () => {
     const { prisma, update } = prismaWithEmailHolders({ withdrawal_pending: { [PENDING_EMAIL]: pendingUser } });
+
+    const failure = await service(prisma)
+      .resetPasswordByEmail({ email: PENDING_EMAIL, proofToken: proofFor(PENDING_EMAIL), newPassword: 'brand-new-password' })
+      .catch((error: unknown) => error as ForbiddenException);
+
+    expect(failure).toBeInstanceOf(ForbiddenException);
+    expect((failure as ForbiddenException).getResponse()).toMatchObject({
+      code: 'ACCOUNT_WITHDRAWAL_PENDING',
+      details: { withdrawalPendingUntil: '2026-10-31T00:00:00.000Z' },
+    });
+    expect(update).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(realtimeGateway.forceDisconnectUser).not.toHaveBeenCalled();
+    expect(loginSecurity.forgetEmail).not.toHaveBeenCalled();
+  });
+
+  it('탈퇴 신청 기록이 없는 탈퇴 대기 계정도 날짜만 null 로 같은 403 을 받는다', async () => {
+    const { prisma } = prismaWithEmailHolders({ withdrawal_pending: { [PENDING_EMAIL]: pendingUser } }, null);
 
     await expect(
       service(prisma).resetPasswordByEmail({ email: PENDING_EMAIL, proofToken: proofFor(PENDING_EMAIL), newPassword: 'brand-new-password' }),
-    ).rejects.toMatchObject({ response: { code: 'ACCOUNT_NOT_FOUND' }, status: 404 });
-    expect(update).not.toHaveBeenCalled();
+    ).rejects.toMatchObject({ status: 403, response: { code: 'ACCOUNT_WITHDRAWAL_PENDING', details: { withdrawalPendingUntil: null } } });
+  });
+
+  it('같은 주소에 활성 계정이 있으면 그 계정의 비밀번호를 바꾼다', async () => {
+    const { prisma } = prismaWithEmailHolders({
+      active: { [EMAIL]: emailUser },
+      withdrawal_pending: { [EMAIL]: pendingUser },
+    });
+
+    await expect(
+      service(prisma).resetPasswordByEmail({ email: EMAIL, proofToken: proofFor(EMAIL), newPassword: 'brand-new-password' }),
+    ).resolves.toEqual({ ok: true });
   });
 });
 

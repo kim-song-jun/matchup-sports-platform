@@ -27,6 +27,9 @@ import { formatPhone, normalizeSeparatedDigits } from './signup-profile-validati
 import styles from './account-recovery.module.css';
 
 type Mode = 'find-id' | 'reset-password';
+
+/** 탈퇴 신청 중인 계정의 비밀번호 재설정을 서버가 거절할 때의 코드(로그인 거절과 같은 코드, 철회 토큰은 없다). */
+const WITHDRAWAL_PENDING_CODE = 'ACCOUNT_WITHDRAWAL_PENDING';
 type FindMethod = 'phone' | 'email';
 type RecoveryStep = 'purpose' | 'method' | 'identity' | 'verify' | 'result' | 'password' | 'complete';
 
@@ -206,15 +209,21 @@ export function AccountRecoveryClient({ initialMode, backHref = '/login/email', 
     if (!token || !mounted.current || emailFlowGeneration !== emailRequestGeneration.current) return;
     setEmailProofToken(token);
     setError(null);
-    if (mode === 'reset-password') {
-      if (!returnToSettings || (currentAccount.data && normalizedEmail === accountEmail.trim().toLowerCase())) setStep('password');
+    if (mode === 'reset-password' && returnToSettings) {
+      // 로그인한 사람의 계정은 탈퇴 신청 중일 수 없어 조회 없이 바로 비밀번호 단계로 간다.
+      if (currentAccount.data && normalizedEmail === accountEmail.trim().toLowerCase()) setStep('password');
       return;
     }
-    if (findMethod !== 'email') return;
+    if (mode === 'find-id' && findMethod !== 'email') return;
     const lookupGeneration = emailRequestGeneration.current;
     try {
       const account = await findAccountByEmail.mutateAsync({ email: normalizedEmail, proofToken: token });
       if (!mounted.current || lookupGeneration !== emailRequestGeneration.current) return;
+      // 탈퇴 신청 중인 계정은 비밀번호를 바꿀 수 없으므로 비밀번호 단계로 보내지 않고 탈퇴 안내를 보여 준다.
+      if (mode === 'reset-password' && !account.withdrawalPending) {
+        setStep('password');
+        return;
+      }
       setFound(account);
       setStep('result');
     } catch (err) {
@@ -256,6 +265,11 @@ export function AccountRecoveryClient({ initialMode, backHref = '/login/email', 
       if (extractErrorCode(err) === 'PASSWORD_LOGIN_UNAVAILABLE') {
         setResetBlockedSocialOnly(true);
         setStep('result');
+        return;
+      }
+      // 인증한 뒤에 탈퇴를 신청한 계정 — 조회를 다시 해서 같은 탈퇴 안내로 간다(그 사이 활성으로 돌아왔다면 비밀번호 단계에 남는다).
+      if (extractErrorCode(err) === WITHDRAWAL_PENDING_CODE) {
+        await onEmailVerified(emailProofToken);
         return;
       }
       setError(extractErrorMessage(err, '비밀번호를 바꾸지 못했어요.'));
@@ -366,11 +380,11 @@ export function AccountRecoveryClient({ initialMode, backHref = '/login/email', 
             <p className="tm-text-body" role="status">가입한 로그인 방법을 확인하고 있어요.</p>
           ) : null}
 
-          {step === 'result' && found && mode === 'find-id' ? (
+          {step === 'result' && found && (mode === 'find-id' || found.withdrawalPending) ? (
             withdrawalGraceEnd !== null ? (
-              <FoundAccountWithdrawalGuide account={found} until={withdrawalGraceEnd} emailLoginHref={emailLoginHref} loginHref={loginHref} />
+              <FoundAccountWithdrawalGuide account={found} until={withdrawalGraceEnd} emailLoginHref={emailLoginHref} loginHref={loginHref} via={phoneFlow ? 'phone' : 'email'} />
             ) : (
-              <FoundAccountCard account={found} emailLoginHref={emailLoginHref} loginHref={loginHref} onResetPassword={() => switchMode('reset-password')} showRecycledNumberHelp={findMethod === 'phone'} />
+              <FoundAccountCard account={found} emailLoginHref={emailLoginHref} loginHref={loginHref} onResetPassword={() => switchMode('reset-password')} showRecycledNumberHelp={phoneFlow} />
             )
           ) : null}
 
@@ -408,7 +422,7 @@ export function AccountRecoveryClient({ initialMode, backHref = '/login/email', 
             <Card pad={16} className="tm-auth-soft-card tm-auth-soft-card-error">
               <div className="tm-text-body-lg">계정을 확인하지 못했어요</div>
               <div className="tm-text-caption" role="alert">{error}</div>
-              {step === 'verify' && mode === 'find-id' && findMethod === 'email' && emailProofToken ? (
+              {step === 'verify' && !phoneFlow && !returnToSettings && emailProofToken ? (
                 <Button type="button" variant="neutral" size="sm" loading={findAccountByEmail.isPending} onClick={() => void onEmailVerified(emailProofToken)}>다시 확인하기</Button>
               ) : null}
               {step === 'verify' && phoneFlow && proofToken ? (

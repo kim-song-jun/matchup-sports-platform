@@ -1,4 +1,12 @@
-import { BadRequestException, ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { V1AuthProvider } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
@@ -69,7 +77,7 @@ type AccountStatus = 'active' | 'withdrawal_pending';
 interface RecoverableUser {
   id: string;
   email: string | null;
-  authIdentities: { provider: string; passwordHash: string | null }[];
+  authIdentities: { id: string; provider: string; passwordHash: string | null }[];
 }
 
 @Injectable()
@@ -197,18 +205,25 @@ export class AccountRecoveryService {
       });
     }
 
-    // 비밀번호는 활성 계정에만 만든다. 탈퇴 유예 계정은 찾기·안내의 대상일 뿐이다.
-    const user = await this.findEmailHolder(email, 'active');
-    // 사서함 주인임을 이미 증명한 뒤라, 가입 여부를 알려 줘도 남의 정보가 새지 않는다
+    // 사서함 주인임을 이미 증명한 뒤라, 가입 여부와 탈퇴 대기 여부를 알려 줘도 남의 정보가 새지 않는다
     // (증명 전 단계인 requestPasswordResetEmail 에서는 그래서 아무것도 드러내지 않는다).
-    if (!user) {
+    const holder = await this.findRecoverableByEmail(email);
+    if (!holder) {
       throw new NotFoundException({
         code: 'ACCOUNT_NOT_FOUND',
         message: '이 이메일로 가입된 계정을 찾지 못했어요.',
       });
     }
+    // 비밀번호는 활성 계정에만 만든다. 탈퇴 유예 계정은 바꾸지 않고, 화면이 탈퇴 안내로 갈 수 있게 알린다.
+    if (holder.accountStatus === 'withdrawal_pending') {
+      throw new ForbiddenException({
+        code: 'ACCOUNT_WITHDRAWAL_PENDING',
+        message: '탈퇴를 신청한 계정이라 비밀번호를 바꿀 수 없어요. 로그인하면 탈퇴를 취소할 수 있어요.',
+        details: { withdrawalPendingUntil: await withdrawalPendingUntil(this.prisma, { id: holder.user.id, accountStatus: holder.accountStatus }) },
+      });
+    }
 
-    return this.applyNewPassword(user, email, dto.newPassword);
+    return this.applyNewPassword(holder.user, email, dto.newPassword);
   }
 
   /**

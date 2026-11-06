@@ -46,7 +46,7 @@
 | `POST` | `/api/v1/auth/recovery/email/request` | none | `{ email }` | `{ sent: true, expiresAt, devCode? }` |
 | `POST` | `/api/v1/auth/recovery/email/confirm` | none | `{ email, code }` | `{ verified, proofToken }` |
 | `POST` | `/api/v1/auth/recovery/email/find-account` | none | `{ email, proofToken }` | after email proof: `{ providers, hasPassword, withdrawalPending, maskedEmail, withdrawalPendingUntil }`; finds an `active` account first, then a `withdrawal_pending` one |
-| `POST` | `/api/v1/auth/recovery/email/reset-password` | none | `{ email, proofToken, newPassword }`; `newPassword` follows the [password rule](#password-rule) | `{ ok: true }`; `active` accounts only, a `withdrawal_pending` one answers `404 ACCOUNT_NOT_FOUND` |
+| `POST` | `/api/v1/auth/recovery/email/reset-password` | none | `{ email, proofToken, newPassword }`; `newPassword` follows the [password rule](#password-rule) | `{ ok: true }`; changes `active` accounts only. A `withdrawal_pending` holder gets `403 ACCOUNT_WITHDRAWAL_PENDING` with `details: { withdrawalPendingUntil }` (ISO or `null`) and nothing is written — see [Account enumeration](#account-enumeration) |
 | `POST` | `/api/v1/auth/withdrawal/cancel` | none (the token is the credential) | `{ token }` | login-shaped session response + `teameet_v1_session` cookie |
 
 Account deletion is not on this controller — see `POST /api/v1/me/withdrawal-request`
@@ -253,7 +253,12 @@ after the caller has proven the number is theirs.
 
 `email/request` mails the code to an address held by a `withdrawal_pending` account as well as an `active` one, and answers every
 address identically. Without that mail a withdrawing member could never prove the mailbox, and so never be told the grace end date.
-Password reset is unchanged: it still acts on `active` accounts only.
+Password reset still acts on `active` accounts only. For a `withdrawal_pending` holder `email/reset-password` answers
+`403 ACCOUNT_WITHDRAWAL_PENDING` with `details: { withdrawalPendingUntil }` instead of `404 ACCOUNT_NOT_FOUND`, so the form can send the member to the
+withdrawal guide rather than leave them at a password step that cannot succeed. This is the same mailbox-proof tier as `email/find-account`
+(the proof is already verified, so the date is not revealed to anyone who does not hold the mailbox), and unlike the sign-in refusal of the same
+code it carries no `withdrawalCancelToken`: the member still has to sign in to cancel. Nothing changes — password, `sessionEpoch`, sockets, login
+restrictions — when this refusal is returned.
 
 ### Lookup by phone number
 

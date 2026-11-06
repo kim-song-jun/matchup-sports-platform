@@ -14,15 +14,19 @@ function loginStepBody(account: V1FoundAccount, socialNames: string, hasEmail: b
 }
 
 /**
- * 계정 찾기에서 번호를 쥔 계정이 탈퇴 유예 중일 때의 결과. 로그인하면 탈퇴 철회 화면이 이어지므로 버튼은
+ * 계정 찾기(번호 또는 이메일)나 이메일 비밀번호 재설정에서 찾은 계정이 탈퇴 유예 중일 때의 결과. 로그인하면 탈퇴 철회 화면이 이어지므로 버튼은
  * 그 계정의 로그인 수단으로 가는 길이다. 로그인할 수 있는 수단이 이 환경에 없으면 문의 창구로 보낸다.
  */
-export function FoundAccountWithdrawalGuide({ account, until, emailLoginHref, loginHref }: {
+export function FoundAccountWithdrawalGuide({ account, until, emailLoginHref, loginHref, via = 'phone' }: {
   account: V1FoundAccount;
   until: string;
   emailLoginHref: string;
   loginHref: string;
+  /** 무엇으로 이 계정을 찾았는지 — 유예가 끝나면 다시 쓸 수 있게 되는 것(번호 또는 이메일)을 문구에 맞춘다. */
+  via?: 'phone' | 'email';
 }) {
+  // 목적격 조사까지 붙여 둔다 — 번호는 모음으로, 이메일은 받침으로 끝난다.
+  const reused = via === 'email' ? '이메일을' : '번호를';
   const summary = describeFoundAccount(account, { emailLoginHref, loginHref });
   const [primary, ...others] = summary.links;
   const hasWays = usableWithdrawalDate(until) !== null;
@@ -35,7 +39,7 @@ export function FoundAccountWithdrawalGuide({ account, until, emailLoginHref, lo
       until={until}
       head={{
         title: '탈퇴를 신청한 계정이에요',
-        lead: hasWays ? '이 번호를 다시 쓰는 방법은 두 가지예요.' : undefined,
+        lead: hasWays ? `이 ${reused} 다시 쓰는 방법은 두 가지예요.` : undefined,
         account: summary.value ? { label: summary.label, value: summary.value } : undefined,
       }}
       steps={[
@@ -43,7 +47,7 @@ export function FoundAccountWithdrawalGuide({ account, until, emailLoginHref, lo
         { title: '탈퇴 신청을 취소해요', body: '로그인하면 취소할 수 있는 화면이 나와요.' },
         { title: '계정을 다시 쓸 수 있어요' },
       ]}
-      waitedText="이 번호를 다시 쓸 수 있어요"
+      waitedText={`이 ${reused} 다시 쓸 수 있어요`}
       actions={(
         <>
           {primary ? (

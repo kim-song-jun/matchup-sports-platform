@@ -86,6 +86,16 @@ async function fillNewPassword(value = 'brand-new-pass') {
   fireEvent.change(screen.getByLabelText('새 비밀번호 확인'), { target: { value } });
 }
 
+/** 비밀번호 재설정은 메일함 증명 뒤에 계정이 탈퇴 대기인지 먼저 조회한다. 기본은 활성 계정이다. */
+const ACTIVE_EMAIL_ACCOUNT: V1FoundAccount = {
+  maskedEmail: 'ru***@example.com', providers: ['email'], hasPassword: true, withdrawalPending: false, withdrawalPendingUntil: null,
+};
+
+function resetEmailLookup(account: V1FoundAccount = ACTIVE_EMAIL_ACCOUNT) {
+  hooks.findAccountByEmailMutateAsync.mockReset();
+  hooks.findAccountByEmailMutateAsync.mockResolvedValue(account);
+}
+
 describe('AccountRecoveryClient', () => {
   it('목적과 인증 수단을 차례로 고르고 이전 단계로 돌아갈 수 있다', () => {
     render(<AccountRecoveryClient />);
@@ -100,6 +110,7 @@ describe('AccountRecoveryClient', () => {
   });
   beforeEach(() => {
     vi.clearAllMocks();
+    resetEmailLookup();
     nativeApple.available = false;
     hooks.verifyPurpose = null;
     hooks.emailCardEmail = null;
@@ -522,6 +533,7 @@ describe('AccountRecoveryClient', () => {
 describe('AccountRecoveryClient — 이메일 재설정', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetEmailLookup();
     hooks.emailCardEmail = null;
     hooks.resetPasswordByEmailMutateAsync.mockResolvedValue({ ok: true });
   });
@@ -649,5 +661,87 @@ describe('AccountRecoveryClient — 이메일 재설정', () => {
     expect(screen.getByLabelText('휴대폰 번호')).toBeInTheDocument();
     goToEmailReset();
     expect(screen.queryByLabelText('새 비밀번호')).not.toBeInTheDocument();
+  });
+  describe('메일함을 인증한 계정이 탈퇴 대기이면 비밀번호 단계 대신 탈퇴 안내로 간다', () => {
+    // 지난 날짜는 화면이 "모른다"로 다루므로 먼 미래로 둔다.
+    const UNTIL = '2099-01-31T00:00:00.000Z';
+    const PENDING_EMAIL_ACCOUNT: V1FoundAccount = { ...ACTIVE_EMAIL_ACCOUNT, withdrawalPending: true, withdrawalPendingUntil: UNTIL };
+    const verifyMailbox = () => {
+      goToEmailReset();
+      enterEmail();
+      fireEvent.click(screen.getByRole('button', { name: '__stub_email_verify__' }));
+    };
+
+    it('같은 탈퇴 안내(방법 1·2)를 이메일 문구로 보여 주고 새 비밀번호 칸은 그리지 않는다', async () => {
+      resetEmailLookup(PENDING_EMAIL_ACCOUNT);
+      render(<AccountRecoveryClient />);
+      verifyMailbox();
+
+      expect(await screen.findByRole('heading', { name: '탈퇴를 신청한 계정이에요' })).toBeInTheDocument();
+      expect(screen.getByText('이 이메일을 다시 쓰는 방법은 두 가지예요.')).toBeInTheDocument();
+      expect(screen.queryByText(/이 번호를/)).not.toBeInTheDocument();
+      expect(screen.getByText('이 이메일을 다시 쓸 수 있어요')).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: '로그인하고 탈퇴 취소하기' })).toHaveAttribute('href', '/login/email');
+      expect(screen.queryByPlaceholderText('8자 이상')).not.toBeInTheDocument();
+      expect(hooks.findAccountByEmailMutateAsync).toHaveBeenCalledWith({ email: 'runner@example.com', proofToken: 'EMAIL-RESET-TOKEN' });
+      expect(hooks.resetPasswordByEmailMutateAsync).not.toHaveBeenCalled();
+    });
+
+    it('끝나는 날을 모르는 탈퇴 대기 계정도 비밀번호 단계로 보내지 않고 취소 안내만 보여 준다', async () => {
+      resetEmailLookup({ ...PENDING_EMAIL_ACCOUNT, withdrawalPendingUntil: null });
+      render(<AccountRecoveryClient />);
+      verifyMailbox();
+
+      expect(await screen.findByText('탈퇴를 신청한 계정이에요. 로그인하면 탈퇴를 취소할 수 있어요.')).toBeInTheDocument();
+      expect(screen.queryByPlaceholderText('8자 이상')).not.toBeInTheDocument();
+      expect(screen.queryByText(/번호를 쥔 사람/)).not.toBeInTheDocument();
+    });
+
+    it('활성 계정은 조회 한 번 뒤 그대로 비밀번호 단계로 간다', async () => {
+      render(<AccountRecoveryClient />);
+      verifyMailbox();
+
+      expect(await screen.findByPlaceholderText('8자 이상')).toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: '탈퇴를 신청한 계정이에요' })).not.toBeInTheDocument();
+      expect(hooks.findAccountByEmailMutateAsync).toHaveBeenCalledTimes(1);
+    });
+
+    it('조회가 일시 실패하면 비밀번호 단계로 넘어가지 않고 다시 확인할 수 있다', async () => {
+      hooks.findAccountByEmailMutateAsync.mockReset();
+      hooks.findAccountByEmailMutateAsync.mockRejectedValueOnce(new Error('일시 오류')).mockResolvedValueOnce(PENDING_EMAIL_ACCOUNT);
+      render(<AccountRecoveryClient />);
+      verifyMailbox();
+
+      expect(await screen.findByText('일시 오류')).toBeVisible();
+      expect(screen.queryByPlaceholderText('8자 이상')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: '다시 확인하기' }));
+      expect(await screen.findByRole('heading', { name: '탈퇴를 신청한 계정이에요' })).toBeInTheDocument();
+    });
+
+    // 인증을 마친 뒤 다른 곳에서 탈퇴를 신청한 경우 — 서버가 저장 시점에 거절하면 같은 안내로 간다.
+    it('비밀번호를 저장할 때 서버가 ACCOUNT_WITHDRAWAL_PENDING 으로 거절하면 같은 안내로 바뀐다', async () => {
+      hooks.findAccountByEmailMutateAsync.mockReset();
+      hooks.findAccountByEmailMutateAsync.mockResolvedValueOnce(ACTIVE_EMAIL_ACCOUNT).mockResolvedValueOnce(PENDING_EMAIL_ACCOUNT);
+      hooks.resetPasswordByEmailMutateAsync.mockRejectedValueOnce(Object.assign(new Error('탈퇴를 신청한 계정이라 비밀번호를 바꿀 수 없어요.'), {
+        code: 'ACCOUNT_WITHDRAWAL_PENDING',
+      }));
+      render(<AccountRecoveryClient />);
+      verifyMailbox();
+      await fillNewPassword();
+      fireEvent.click(screen.getByRole('button', { name: '비밀번호 바꾸기' }));
+
+      expect(await screen.findByRole('heading', { name: '탈퇴를 신청한 계정이에요' })).toBeInTheDocument();
+      expect(screen.queryByPlaceholderText('8자 이상')).not.toBeInTheDocument();
+      expect(hooks.findAccountByEmailMutateAsync).toHaveBeenCalledTimes(2);
+    });
+
+    it('설정에서 들어온 로그인 사용자는 조회 없이 바로 비밀번호 단계로 간다', async () => {
+      render(<AccountRecoveryClient initialMode="reset-password" backHref="/my/settings" />);
+      fireEvent.click(screen.getByRole('button', { name: '다음' }));
+      fireEvent.click(screen.getByRole('button', { name: '__stub_email_verify__' }));
+
+      expect(await screen.findByPlaceholderText('8자 이상')).toBeInTheDocument();
+      expect(hooks.findAccountByEmailMutateAsync).not.toHaveBeenCalled();
+    });
   });
 });

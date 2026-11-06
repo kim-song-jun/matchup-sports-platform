@@ -39,6 +39,7 @@ import {
   resolveLeagueChampions,
 } from '../league-matches/league-standings';
 import { LEAGUE_TIE_BREAK_ORDER } from '../league-matches/league-tie-break';
+import { findConversionSourceLeague } from '../league-matches/league-season-link';
 import { readPublicRostersForRegistrations, type PublicRosterPlayer } from './public-roster';
 import { isPublicLiveEnabled } from '../games/public-records/public-live-flag';
 
@@ -239,23 +240,17 @@ export class TournamentsReadService {
         ? await loadGroupStandingSummaries(this.prisma, tournamentId)
         : new Map<string, GroupStandingSummary>();
 
-    // 독립 리그가 이어 가는 지난·다음 시즌(2026-11-03, 다음 시즌은 2026-11-05) — 공개 상세 제목 아래 링크.
-    // 공개 조건을 통과한 리그만 싣는다. 종료된 지난 시즌에서 이어진 다음 시즌으로 바로 넘어가게 한다.
+    // 이어진 이전 시즌 — 공개 상세의 '이전 시즌 보기'(데스크톱 레일·모바일 본문 카드, 2026-11-06). 공개된 리그만 싣는다.
+    // 독립 리그는 `previousLeagueId` 로 이은 지난 시즌, 리그 체계로 전환해 만든 첫 시즌 티어는 원본 리그다.
+    // 다음 시즌은 다음 리그 안내(`GET /league-matches/:id` 의 nextRound·nextSeasonTiers)가 맡는다.
     const isLeague = row.kind === V1CompetitionKind.regular_league;
-    const [previousSeason, nextSeason] = await Promise.all([
-      isLeague && row.previousLeagueId !== null
-        ? findPublicTournamentOnSurface(this.prisma, ['regular_league'], {
-            where: { id: row.previousLeagueId, deletedAt: null },
-            select: { id: true, title: true },
-          })
-        : null,
-      isLeague
-        ? findPublicTournamentOnSurface(this.prisma, ['regular_league'], {
-            where: { previousLeagueId: row.id, deletedAt: null },
-            select: { id: true, title: true },
-          })
-        : null,
-    ]);
+    const linkedPrevious = isLeague && row.previousLeagueId !== null
+      ? await findPublicTournamentOnSurface(this.prisma, ['regular_league'], {
+          where: { id: row.previousLeagueId, deletedAt: null },
+          select: { id: true, title: true },
+        })
+      : null;
+    const previousSeason = linkedPrevious ?? (isLeague ? await findConversionSourceLeague(this.prisma, row) : null);
 
     return {
       ...presentTournamentDetail(
@@ -268,7 +263,6 @@ export class TournamentsReadService {
         groupStandingSummaries,
       ),
       previousSeason: previousSeason === null ? null : { leagueId: previousSeason.id, title: previousSeason.title },
-      nextSeason: nextSeason === null ? null : { leagueId: nextSeason.id, title: nextSeason.title },
     };
   }
 

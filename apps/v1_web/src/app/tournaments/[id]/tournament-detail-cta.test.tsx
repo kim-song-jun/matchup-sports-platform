@@ -522,22 +522,19 @@ describe('정규 리그 — 다음 시즌 입구', () => {
     expect(screen.getByTestId('next-league-invite-mobile')).toHaveTextContent('재참가 팀 없음');
   });
 
-  it('지난 시즌이 있으면 제목 아래에 지난 시즌 리그로 가는 링크를 둔다', () => {
-    render(<TournamentDetailView tournament={league('open', { previousSeason: { leagueId: 'league-0', title: '가을 리그' } })} myRegistration={null} />);
-    expect(screen.getAllByRole('link', { name: '가을 리그' })[0]).toHaveAttribute('href', '/tournaments/league-0');
-  });
-
-  // 2026-11-05: 종료된 지난 시즌 화면에서 이어진 다음 시즌으로 바로 넘어간다.
-  it('다음 시즌이 있으면 제목 아래에 다음 시즌 리그로 가는 링크를 둔다', () => {
-    render(<TournamentDetailView tournament={league('completed', { nextSeason: { leagueId: 'league-2', title: '겨울 리그' } })} myRegistration={null} />);
-    expect(screen.getByText(/다음 시즌 ·/)).toBeInTheDocument();
-    expect(screen.getAllByRole('link', { name: '겨울 리그' })[0]).toHaveAttribute('href', '/tournaments/league-2');
-  });
-
-  it('대조군: 지난·다음 시즌이 없으면 링크도 없다', () => {
-    render(<TournamentDetailView tournament={league('open')} myRegistration={null} />);
+  // 2026-11-06 사용자 선택: 이전 시즌은 제목 아래 작은 링크가 아니라 다음 시즌 입구와 같은 자리(데스크톱 레일·모바일 본문 카드)에 둔다.
+  it.each(['open', 'completed'] as const)('%s 리그에 이전 시즌이 있으면 레일과 모바일 카드에 이전 시즌 보기를 둔다', (status) => {
+    render(<TournamentDetailView tournament={league(status, { previousSeason: { leagueId: 'league-0', title: '가을 리그' } })} myRegistration={null} />);
+    const links = screen.getAllByRole('link', { name: '이전 시즌 보기' });
+    expect(links).toHaveLength(2);
+    for (const link of links) expect(link).toHaveAttribute('href', '/tournaments/league-0');
+    expect(screen.getAllByText('가을 리그').length).toBeGreaterThan(0);
     expect(screen.queryByText(/지난 시즌 ·/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/다음 시즌 ·/)).not.toBeInTheDocument();
+  });
+
+  it('대조군: 이전 시즌이 없으면 이전 시즌 보기도 없다', () => {
+    render(<TournamentDetailView tournament={league('open')} myRegistration={null} />);
+    expect(screen.queryByRole('link', { name: '이전 시즌 보기' })).not.toBeInTheDocument();
   });
 });
 

@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { ScopedLink as Link } from '@/components/providers/navigation-scope';
 import { useEffect, useId, useMemo, useState } from 'react';
 import { AlertBanner } from '@/components/v1-ui/primitives';
 import { Button } from '@/components/v1-ui/button';

@@ -689,3 +689,4 @@ now includes nullable `rulesText`, rendered as operating guidance only when popu
 - (2026-11-04) 리그 체계 전환 commit 은 티어 등록마다 원본 리그를 출처로 `copyPreviousSeasonRoster` 를 돌린다. 공개 `GET /league-matches/:leagueId` 는 체계로 전환한 종료 독립 리그에 `nextSeasonTiers: Array<{leagueId,title,tier,teamIds}>`(첫 시즌 공개 티어, 1부부터, 확정 팀)를 싣고 그 밖에는 빈 배열이다.
 - (2026-11-05) 공개 `GET /league-matches/:leagueId` 의 `nextRound` 에 `teamIds`(다음 시즌에 참가 확정된 팀)가 붙는다. 화면은 이미 확정된 내 팀에게 재참가 신청 대신 '다음 시즌 보기'를 건다.
 - (2026-11-05) 리그 체계에 속한 리그의 참가 신청 생성(`POST /tournaments/:id/registrations`)과 제출(`.../submit`)은 같은 시즌 다른 티어에 이미 확정된 팀을 409 `LEAGUE_TEAM_INVALID`로 막는다(확정과 같은 `findLeagueAdmissionBlocker`). 전엔 입금 확인까지 지나 확정에서야 막혔다.
+- (2026-11-05) 공개 `GET /tournaments/:id` 는 정규 리그에 `nextSeason: {leagueId,title}|null`(이 리그를 `previousLeagueId` 로 이은 공개 리그)을 싣는다. 상세 제목 아래 '다음 시즌 · ○○' 링크가 쓴다.

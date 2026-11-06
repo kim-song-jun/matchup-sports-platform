@@ -159,6 +159,28 @@ const KAKAO_BUTTON = '카카오 연결하기';
 const EMAIL_LINK = '이메일 연결하기';
 
 describe('LoginMethodsPageClient - 로그인 수단 표시', () => {
+  it('가입 정보를 미룬 계정은 연결 금지 대신 입력 후 돌아올 경로를 보여 준다', async () => {
+    const account = me(['kakao']);
+    server.use(http.get('*/api/v1/auth/me', () => ok({
+      ...account,
+      user: {
+        ...account.user,
+        onboardingStatus: 'social_profile_deferred',
+        canLinkLoginMethods: false,
+        canLinkAfterSignup: true,
+      },
+    })));
+    render(<LoginMethodsPageClient />);
+    const completeSignup = await screen.findByRole('link', { name: '가입 정보 입력하기' });
+    const destination = new URL(completeSignup.getAttribute('href')!, 'https://teameet.test');
+    expect(destination.pathname).toBe('/signup/social');
+    expect(destination.searchParams.get('redirect')).toBe('/my/settings/login-methods');
+    expect(screen.queryByText('이 계정에서는 로그인 방법을 추가할 수 없어요.')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: EMAIL_LINK })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: KAKAO_BUTTON })).not.toBeInTheDocument();
+    expect(within(rowOf('카카오 로그인')).getByText('연결됨')).toBeInTheDocument();
+  });
+
   it('운영 권한 계정은 연결할 수 없는 로그인 추가 버튼을 보여 주지 않는다', async () => {
     server.use(http.get('*/api/v1/auth/me', () => ok({ ...me(['email']), user: { ...me(['email']).user, canLinkLoginMethods: false } })));
     render(<LoginMethodsPageClient />);

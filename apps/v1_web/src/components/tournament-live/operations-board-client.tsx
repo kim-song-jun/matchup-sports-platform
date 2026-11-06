@@ -2,7 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import Link from 'next/link';
+import { ScopedLink as Link } from '@/components/providers/navigation-scope';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { Ellipsis, RefreshCw } from 'lucide-react';
@@ -42,6 +42,7 @@ import type {
 import { V1_GAME_STATES, V1_STABLE_WARNING_CODES } from '@/types/api';
 import { competitionMatchLabel } from '@/lib/tournament-round-label';
 import { DESKTOP_LIST_MEDIA_QUERY, useMediaQuery } from '@/hooks/use-media-query';
+import { useV1DataSource } from '@/components/providers/v1-data-source';
 
 function ExpandedResultPanel({
   gameId,
@@ -239,6 +240,7 @@ interface Props {
 }
 
 export function OperationsBoardClient({ tournamentId }: Props) {
+  const { v1Get } = useV1DataSource();
   const router = useRouter();
   const pathname = usePathname();
   // 이 화면은 스태프 표면과 어드민 표면 양쪽에서 렌더된다 — 본문 링크도 nav 와 같이
@@ -363,7 +365,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
       const page = await fetchV1TournamentOperationsBoardPage(queryClient, tournamentId, {
         ...filters,
         cursor,
-      });
+      }, v1Get);
       setOlderItems((prev) => [...prev, ...page.items]);
       setOlderLiveWarnings((prev) => [...prev, ...page.liveWarnings]);
       setOlderCursor(page.nextCursor);
@@ -372,7 +374,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
     } finally {
       setLoadingMore(false);
     }
-  }, [olderCursor, board.data?.nextCursor, queryClient, tournamentId, filters]);
+  }, [olderCursor, board.data?.nextCursor, queryClient, tournamentId, filters, v1Get]);
 
   const items = useMemo(() => [...(board.data?.items ?? []), ...olderItems], [board.data?.items, olderItems]);
   const nextCursor = olderCursor !== undefined ? olderCursor : (board.data?.nextCursor ?? null);

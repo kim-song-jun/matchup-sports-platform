@@ -21,9 +21,9 @@ A안(기존 관리 화면 재사용) 선택. 전용 담당 목록과 관리 10�
 ## 2026-10-12 — 정규대회 상·하위 결선과 시상
 
 [작업 문서](../../.github/tasks/20261057-admin-bracket-canvas.md#2026-10-12-extension-정규대회-하나--상위하위-결선--시상-두-세트) · [실행 시나리오](./18-regular-tournament-split-finals.md). 하나의 대회에서 조 1·2위는 상위, 3·4위는 하위 결선으로 배정한다. 팀 시상 안내와 개인상 범위는 어드민이 설정한다. Backend521·Web226·스키마 바인딩7개 계약은 좁은 재실행을 포함해 통과했다. 독립 Sol static review의 모바일 단계 순서·읽기 권한 두 결함은 수정·재검토 PASS. PR#1858 커밋본 CI와 변경 후 alpha/3폭 QA는 대기 중이며 전체 완료를 의미하지 않는다.
-## 2026-10-30 — 업체 전달용 대회 운영 체험
+## 2026-11-05 — 실제 어드민을 사용하는 대회 운영 체험
 
-[시나리오](./tournament-ops-demo.md) · [Task20261123](../../.github/tasks/20261123-tournament-ops-demo.md). 5단계·3개 역할의 명시적 샘플 시뮬레이터, 실제 API 쓰기 없음. local26 tests/tsc/pattern PASS, 신규 Alpha0/5·0/3폭·기능0/12.
+[시나리오](./tournament-ops-demo.md) · [Task20261123](../../.github/tasks/20261123-tournament-ops-demo.md) · PR #2168. 사용자 A안: 실제 관리 셸·11개 섹션·스태프/운영 보드를 재사용하고 로컬 source·캐시·링크 prefetch를 격리한다. 관련97 tests/tsc/pattern PASS. Alpha before3/3·오류/가로 넘침0, after0/13개 화면·0/3폭(미배포).
 
 ## 2026-10-28 — 결과·운영 결선 표시 순서와 단판 합산
 

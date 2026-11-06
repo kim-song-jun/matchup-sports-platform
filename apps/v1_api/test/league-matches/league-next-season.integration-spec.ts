@@ -164,6 +164,10 @@ describe('독립 리그 다음 시즌 잇기', () => {
     expect(nextPublic.previousRound).toEqual({ leagueId: season1, title: `1시즌 ${suiteId}` });
     const detail = (await http().get(`/api/v1/tournaments/${season2}`).expect(200)).body.data;
     expect(detail.previousSeason).toEqual({ leagueId: season1, title: `1시즌 ${suiteId}` });
+    // 2026-11-05: 지난 시즌 상세는 이어진 다음 시즌을 알려 준다(제목 아래 '다음 시즌' 링크).
+    const previousDetail = (await http().get(`/api/v1/tournaments/${season1}`).expect(200)).body.data;
+    expect(previousDetail.nextSeason).toEqual({ leagueId: season2, title: expect.any(String) });
+    expect(detail.nextSeason).toBeNull();
   });
 
   it('지난 시즌 팀이 재참가 신청을 내면 지난 명단 중 아직 팀에 있는 선수를 지난 번호로 옮겨 담는다', async () => {

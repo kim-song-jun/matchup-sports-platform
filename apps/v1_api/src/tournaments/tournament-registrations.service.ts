@@ -26,6 +26,7 @@ import { CAPACITY_HOLD_STATUSES, capacityLimitOf, countCapacityReservations, isC
 import { isRegistrationWindowOpen } from './registration-window';
 import { ALL_COMPETITION_KINDS, findTournamentOnSurface, findTournamentOnSurfaceOrThrow } from './tournament-surface-lookup';
 import { copyPreviousSeasonRoster } from '../league-matches/league-roster-autofill';
+import { findLeagueAdmissionBlocker, leagueAdmissionBlockerMessage } from '../league-matches/league-team-admission';
 
 /** cancel-request로 어드민 처리가 필요한 상태(이미 운영에 반영됨). */
 const CANCELLABLE_VIA_REQUEST: V1TournamentRegistration['status'][] = [
@@ -150,10 +151,29 @@ export class TournamentRegistrationsService {
     }
   }
 
+  /**
+   * 같은 시즌 다른 티어에 이미 확정된 팀은 신청부터 받지 않는다(2026-11-05 알파 QA — 확정에서야 막혀
+   * 입금까지 받은 뒤 거절됐다). 판정은 확정·어드민 추가와 같은 `findLeagueAdmissionBlocker` 다.
+   * 활성·종목은 이 서비스가 따로 보고, 이미 참가 중인 팀은 기존 신청을 돌려주므로 형제 티어만 본다.
+   */
+  private async assertNotInSiblingTier(
+    db: Prisma.TransactionClient,
+    tournament: { id: string; kind: V1CompetitionKind | null; seriesId: string | null },
+    teamId: string,
+  ) {
+    // 형제 티어는 리그 체계에 속한 리그에만 있다.
+    if (tournament.kind !== V1CompetitionKind.regular_league || !tournament.seriesId) return;
+    const blocker = await findLeagueAdmissionBlocker(db, { leagueId: tournament.id, teamId });
+    if (blocker?.kind === 'SIBLING_TIER') {
+      throw new ConflictException({ code: 'LEAGUE_TEAM_INVALID', message: leagueAdmissionBlockerMessage(blocker) });
+    }
+  }
+
   async create(user: V1AuthUser, tournamentId: string, dto: CreateRegistrationDto) {
     const tournament = await this.loadOpenTournament(tournamentId);
     const teamSportId = await this.assertTeamManager(dto.teamId, user.id);
     this.assertTeamSportMatchesTournament(teamSportId, tournament.sportId);
+    await this.assertNotInSiblingTier(this.prisma, tournament, dto.teamId);
 
     const existing = await this.prisma.v1TournamentRegistration.findUnique({
       where: { tournamentId_teamId: { tournamentId, teamId: dto.teamId } },
@@ -352,6 +372,8 @@ export class TournamentRegistrationsService {
           message: '정원이 가득 차서 더 이상 신청할 수 없어요.',
         });
       }
+      // 초안을 둔 사이에 형제 티어에 확정됐을 수 있다 — 입금 안내 전에 다시 본다.
+      await this.assertNotInSiblingTier(tx, lockedTournament, registration.teamId);
 
       // ## 참가비가 0 이면 입금 단계를 건너뛴다 (Task 164 BE-4, 정본 §4 "스텝 최소")
       // 지금까지는 `entryFee` 와 무관하게 `awaiting_payment` 로 보냈고, 그 상태는

@@ -15,6 +15,7 @@ import { isLeagueCompetition } from '@/lib/competition-kind';
 import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import { withFromPath } from '@/lib/session-storage';
 import { competitionMatchLabel } from '@/lib/tournament-round-label';
+import { bracketStageLabel } from '@/lib/bracket-stage-label';
 import { bracketTrackLabel, effectiveBracketTrack } from '@/lib/bracket-track';
 import type {
   V1LeagueOverallStandingsResponse,
@@ -1152,10 +1153,7 @@ export function ResultsPageContent({ tournament }: { tournament: V1TournamentDet
   const fixtureLabel = (fixture: V1TournamentFixture) => {
     const group = groupsById.get(fixture.groupId ?? '');
     const name = group?.name.trim() ?? '';
-    const track = bracketTrackLabel(group?.bracketTrack);
-    const prefix = track ? `${track} · ` : '';
-    // The surrounding section already names this tournament; preserve the edited stage name once.
-    return (prefix && name.startsWith(prefix) ? name.slice(prefix.length) : name)
+    return bracketStageLabel(group?.bracketTrack, name)
       || ROUND_LABEL_MAP[knockoutKind(fixture) ?? ''] || fixture.round;
   };
 

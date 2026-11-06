@@ -14,8 +14,9 @@ import {
   TournamentProgressStepper,
   buildTournamentStages,
 } from '@/components/tournaments/tournament-progress-stepper';
+import { bracketStageLabel } from '@/lib/bracket-stage-label';
 import { BracketFilterRow } from '@/components/tournaments/bracket-filter-row';
-import { TournamentBracket, groupFixturesByRound, getRoundLabel } from '@/components/tournaments/tournament-bracket';
+import { TournamentBracket, groupFixturesByRound } from '@/components/tournaments/tournament-bracket';
 import { LeagueProgressSummary, LeagueTeamFixturesDetail } from '@/components/tournaments/league-inline-records';
 import {
   TournamentStandingsTable,
@@ -35,7 +36,7 @@ import {
   toStandingsRows as publicStandingsToRows,
 } from '@/components/public-game-records/schedule-content';
 import { competitionFormatLabel, isLeagueCompetition } from '@/lib/competition-kind';
-import { tournamentRoundLabel } from '@/lib/tournament-round-label';
+import { isKnockoutRound, tournamentRoundLabel } from '@/lib/tournament-round-label';
 import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import { hasStoredV1Session, withFromPath } from '@/lib/session-storage';
 import type {
@@ -459,7 +460,8 @@ export function BracketScheduleTab({
 
   // Use the same phase/round resolver as the bracket, including custom group names
   // and finals stored in a shared semifinal group.
-  const roundByFixture = new Map<string, { key: string; label: string }>();
+  const roundByFixture = new Map<string, { key: string; label: string; sourceRound: string; groupName: string | null }>();
+  const groupById = new Map(tournament?.groups.map(group => [group.id, group]) ?? []);
   const groupIds = new Set<string>();
   const finalTracks = tournament?.format === 'league_knockouts' ? [...new Map([...tournament.groups].sort((a, b) => a.sortOrder - b.sortOrder)
     .filter(group => group.phase !== 'group' && group.bracketTrack && !['overall', 'upper', 'lower'].includes(group.bracketTrack))
@@ -470,14 +472,15 @@ export function BracketScheduleTab({
     const sections = partitionTournamentSections(tournament.format, tournament.fixtures, tournament.groups);
     sections.groupPhaseGroups.forEach(group => groupIds.add(group.id));
     groupFixturesByRound(sections.knockoutFixtures, tournament.groups).forEach(round => {
-      round.fixtures.forEach(fixture => roundByFixture.set(fixture.id, round));
+      round.fixtures.forEach(fixture => roundByFixture.set(fixture.id, { key: round.key, label: round.label, sourceRound: fixture.round, groupName: groupById.get(fixture.groupId ?? '')?.name ?? null }));
     });
   }
   const normalizeEntry = (entry: typeof firstPage.items[number]) => {
     const round = roundByFixture.get(entry.fixtureId);
     if (round) {
       const final = finalByFixture.get(entry.fixtureId);
-      return { ...entry, round: round.key, groupName: final ? `${final.label} · ${getRoundLabel(round.key)}` : round.label };
+      const displayRound = final && isKnockoutRound(round.sourceRound) ? round.sourceRound : round.key;
+      return { ...entry, round: displayRound, groupName: final ? (round.groupName || entry.groupName || `${final.label} · ${tournamentRoundLabel(displayRound)}`) : round.label };
     }
     if (entry.groupId && groupIds.has(entry.groupId) && !tournamentRoundLabel(entry.round).startsWith('조별')) {
       return { ...entry, round: 'group' };
@@ -611,6 +614,14 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
   const bracketGroups = filterGroups(activeFinalTrack);
   const bracketFixtures = filterFixtures(activeFinalTrack);
   const knockoutRounds = groupFixturesByRound(bracketFixtures, bracketGroups);
+  function roundFilterLabel(round: (typeof knockoutRounds)[number]): string {
+    if (!namedFinals) return round.label;
+    const fixtureGroupIds = new Set(round.fixtures.map(fixture => fixture.groupId));
+    const labels = bracketGroups.filter(group => fixtureGroupIds.has(group.id)
+      || (group.phase === round.key && group.groupTeams.some(team => team.isBye)))
+      .map(group => bracketStageLabel(group.bracketTrack, group.name));
+    return [...new Set(labels)].filter(Boolean).join(' · ') || round.label;
+  }
   function selectFinalTrack(track: string | null) {
     const rounds = groupFixturesByRound(filterFixtures(track), filterGroups(track));
     setSelectedRoundKey(previous => rounds.some(round => round.key === previous) ? previous : null);
@@ -804,7 +815,7 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
             <BracketFilterRow label="토너먼트 선택" showLabel items={[{ id: '', label: '전체' }, ...finalTracks]} activeId={activeFinalTrack ?? ''} onSelect={id => selectFinalTrack(id || null)} />
           ) : null}
           {showKnockoutBracket && knockoutRounds.length > 0 ? (
-            <BracketFilterRow label="결선 단계 선택" showLabel={finalTracks.length > 1} items={[{ id: '', label: '전체' }, ...knockoutRounds.map(round => ({ id: round.key, label: namedFinals ? getRoundLabel(round.key) : round.label }))]} activeId={activeRoundKey ?? ''} onSelect={id => setSelectedRoundKey(id || null)} />
+            <BracketFilterRow label="결선 단계 선택" showLabel={finalTracks.length > 1} items={[{ id: '', label: '전체' }, ...knockoutRounds.map(round => ({ id: round.key, label: roundFilterLabel(round) }))]} activeId={activeRoundKey ?? ''} onSelect={id => setSelectedRoundKey(id || null)} />
           ) : null}
           <div className="tm-tourn-sub-grid tm-bracket-page-grid">
             {/* 선택한 단계만 한 칼럼으로 표시한다. */}

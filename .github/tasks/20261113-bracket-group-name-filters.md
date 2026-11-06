@@ -145,3 +145,10 @@ Status: In Progress
 Copilot 요청은 CLI/REST/공식 GraphQL 두 경로에서 성공 응답을 받았지만 양쪽 최신 head에 실제 리뷰/실행 이벤트가 아직 없다. 연결 계정 seeungmin의 저장소 write 권한은 확인했으며, 원인은 권한/요금제로 단정하지 않았다. 사용자에게 GitHub 직접 리뷰 요청을 비동기로 부탁했고 계정·결제·머지 규칙은 변경하지 않았다. 해당 리뷰 조건 충족 전 머지/alpha 배포는 대기다.
 
 계약 동기화 GREEN: 5 files/83 tests PASS, 단일 worker. 실제 경기장 입력명과 결과 상세 링크·조별 경기 수 검증을 유지했다. 증거 `/tmp/teameet-pr2195-name-contract-tests.json`.
+
+
+### 필터 호출부 보정 및 이번 배포의 리뷰 예외 승인
+사용자가 "진행해줘 리뷰없어도"라고 명시 승인했다. 이번 #2181/#2195 배포에 한해 Copilot 리뷰 완료 조건을 생략하고 CI·자체 검증·스레드 확인으로 진행한다. 계정/요금제/리포지토리 머지 규칙은 바꾸지 않고 Copilot clean으로 표시하지 않는다.
+추가로 BracketScheduleTab이 저장한 12강 round/조 이름을 phase 이름으로 덮어쓰고, 순위·대진 필터도 getRoundLabel(phase)을 사용하던 누락을 확인했다. 호출부는 실제 결선 round·저장 그룹 이름을 유지하며 잘못된 조별 round는 기존 phase 분류로 보정한다. 토너먼트 접두어 제거는 bracketStageLabel 공통 함수로 일정·결과·대진 필터가 재사용한다. 생성기·구조 분류 중복 수정은 추가하지 않는다. 새 호출부 회귀 4개 중 3개 RED 확인 후, 해당 파일 65개 GREEN 및 관련 다른 4 files/128개 PASS로 총 193개 계약 검증. 테스트 보정 중 링크 accessible name을 가정하던 assertion은 실제 fixture 상세 href와 필터 후 링크 수 검증으로 정리했다.
+
+호출부 최종 검증: Web 타입 검사 PASS. 실제 scheduled fixture 계약을 만족한 호출부 65개 재검증 PASS이며 공유 표시/일정/결과 관련 128개와 합쳐 193개 PASS. 선행 #2181은 dev fbe0f244a6에 머지됐고 해당 push CI 및 alpha 배포 대기 중이다.

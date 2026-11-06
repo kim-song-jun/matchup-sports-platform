@@ -34,7 +34,7 @@ export function tournamentRoundLabel(round: string): string {
 }
 
 /** 결선은 저장한 조 이름을 표시 이름으로 쓴다. 조별·예선은 조 이름과 라운드를 함께 쓴다. */
-function isKnockoutRound(round: string): boolean {
+export function isKnockoutRound(round: string): boolean {
   return /^(\d+강|준결승|결승|3·4위전)$/.test(tournamentRoundLabel(round).trim());
 }
 

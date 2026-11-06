@@ -1,5 +1,6 @@
 'use client';
 
+import { bracketStageLabel } from '@/lib/bracket-stage-label';
 import { type ReactNode, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Film, MapPin } from 'lucide-react';
@@ -971,8 +972,7 @@ export function ScheduleContent({
       .sort((a, b) => compareTournamentRounds(a.round, b.round))) {
       const key = scheduleGroupKey(entry);
       const name = entry.groupName?.trim() || tournamentRoundLabel(entry.round);
-      const prefix = `${trackByFixture.get(entry.fixtureId)} · `;
-      const label = name.startsWith(prefix) ? name.slice(prefix.length) : name;
+      const label = bracketStageLabel(trackByFixture.get(entry.fixtureId), name);
       const row = rounds.get(key) ?? { key, names: new Set<string>() };
       row.names.add(label);
       rounds.set(key, row);

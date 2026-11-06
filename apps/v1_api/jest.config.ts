@@ -5,9 +5,12 @@ import type { Config } from 'jest';
 // 자정 경계에서 갈리는 것을 없앤다.
 process.env.TZ = 'UTC';
 
+// Jest 는 변환만 한다(tsconfig.spec.json 의 isolatedModules). 타입은 `tsc -p tsconfig.spec.json`
+// (lint·CI type-check)이 테스트 파일까지 한 번에 본다. 타입체크 변환은 재시작된 통합 워커마다
+// TS 프로그램을 새로 만들어 스위트당 약 7초씩 더 든다.
 const base: Partial<Config> = {
   moduleFileExtensions: ['js', 'json', 'ts'],
-  transform: { '^.+\\.(t|j)s$': 'ts-jest' },
+  transform: { '^.+\\.(t|j)s$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.spec.json' }] },
   testEnvironment: 'node',
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',

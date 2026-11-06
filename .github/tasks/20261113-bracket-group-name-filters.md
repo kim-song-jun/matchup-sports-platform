@@ -138,3 +138,10 @@ Status: In Progress
 
 ## PR 완료 및 alpha 배포 승인 (2026-11-06)
 사용자가 PR 완료 후 alpha 배포를 승인했다. 선행 #2181 CI는 PASS이며 최신 Copilot 리뷰를 요청했다. #2195의 Gates 실패는 보정 migration의 TEMP SELECT/UPDATE가 자동 additive 판정 대상이 아니어서 발생했다. 기존 exact file+statement 검토 목록에 SQL 세 문장만 승인 근거와 선행 #2181의 rolling/rollback 호환 조건을 기록하고, 다른 파일·다른 SQL 거절을 self-test로 증명한다. 게이트 일반 규칙을 완화하지 않는다. #2181을 먼저 머지·alpha 배포·서빙 SHA 확인한 뒤 #2195를 dev에 맞추고 CI/리뷰 완료 후 후속 배포한다.
+
+
+### 전체 CI의 공개 이름 계약 회귀 동기화
+#2195의 Gates/API는 PASS. Web 전체 908 files / 11071 tests 중 5 files의 5 cases가 기존 "결선 조 이름 숨김" 기대를 유지해 실패했다. 요청한 저장 이름 표시 계약에 맞춰 담당 경기·운영 보드·영상·결과 검토·결과 분류 테스트의 이름 기대를 동기화했다. 조별/결선 분류와 경기 상세 링크·경기장 입력 이름 검증은 유지/보강한다. 로컬에서는 해당 5 files만 단일 worker로 재검증하고 전체 반복은 CI가 수행한다.
+Copilot 요청은 CLI/REST/공식 GraphQL 두 경로에서 성공 응답을 받았지만 양쪽 최신 head에 실제 리뷰/실행 이벤트가 아직 없다. 연결 계정 seeungmin의 저장소 write 권한은 확인했으며, 원인은 권한/요금제로 단정하지 않았다. 사용자에게 GitHub 직접 리뷰 요청을 비동기로 부탁했고 계정·결제·머지 규칙은 변경하지 않았다. 해당 리뷰 조건 충족 전 머지/alpha 배포는 대기다.
+
+계약 동기화 GREEN: 5 files/83 tests PASS, 단일 worker. 실제 경기장 입력명과 결과 상세 링크·조별 경기 수 검증을 유지했다. 증거 `/tmp/teameet-pr2195-name-contract-tests.json`.

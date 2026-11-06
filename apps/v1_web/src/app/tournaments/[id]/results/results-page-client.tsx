@@ -1148,9 +1148,16 @@ export function ResultsPageContent({ tournament }: { tournament: V1TournamentDet
     .filter((f) => f.status === 'completed' && f.result !== null && knockoutKind(f) !== null)
     .sort((a, b) => knockoutOrder(a) - knockoutOrder(b));
 
-  const groupNames = new Map(tournament.groups.map(group => [group.id, group.name]));
-  const fixtureLabel = (fixture: V1TournamentFixture) => groupNames.get(fixture.groupId ?? '')?.trim()
-    || ROUND_LABEL_MAP[knockoutKind(fixture) ?? ''] || fixture.round;
+  const groupsById = new Map(tournament.groups.map(group => [group.id, group]));
+  const fixtureLabel = (fixture: V1TournamentFixture) => {
+    const group = groupsById.get(fixture.groupId ?? '');
+    const name = group?.name.trim() ?? '';
+    const track = bracketTrackLabel(group?.bracketTrack);
+    const prefix = track ? `${track} · ` : '';
+    // The surrounding section already names this tournament; preserve the edited stage name once.
+    return (prefix && name.startsWith(prefix) ? name.slice(prefix.length) : name)
+      || ROUND_LABEL_MAP[knockoutKind(fixture) ?? ''] || fixture.round;
+  };
 
   return (
     <div className="tm-tourn-sub-page" style={{ paddingBottom: 40 }}>

@@ -1,3 +1,4 @@
+-- Depends on #2181 phase-based slot matching before enabling regeneration.
 -- Only generated first-round names are repaired. IDs, phases, results, byes and edges stay unchanged.
 BEGIN;
 CREATE TEMP TABLE knockout_display_repairs ON COMMIT DROP AS
@@ -10,7 +11,11 @@ WITH seed_counts AS (
     power(2, ceil(ln(c.size::numeric) / ln(2::numeric)))::integer AS width,
     EXISTS (SELECT 1 FROM jsonb_array_elements(
       CASE WHEN jsonb_typeof(t.multi_finals->'finals') = 'array' THEN t.multi_finals->'finals' ELSE '[]'::jsonb END
-    ) f WHERE f->>'name' = g.bracket_track) AS named
+    ) f WHERE f->>'name' = g.bracket_track AND CASE
+      WHEN jsonb_typeof(f->'capacity') = 'number' THEN (f->>'capacity')::numeric = c.size
+      WHEN jsonb_typeof(f->'registrationIds') = 'array' THEN jsonb_array_length(f->'registrationIds') = c.size
+      ELSE jsonb_array_length(CASE WHEN jsonb_typeof(f->'rules') = 'array' THEN f->'rules' ELSE '[]'::jsonb END) = c.size
+    END) AS named
   FROM v1_tournament_groups g JOIN seed_counts c ON c.group_id = g.id
   JOIN v1_tournaments t ON t.id = g.tournament_id
   WHERE g.phase <> 'group' AND c.size >= 6 AND c.size % 2 = 0 AND (c.size & (c.size - 1)) <> 0

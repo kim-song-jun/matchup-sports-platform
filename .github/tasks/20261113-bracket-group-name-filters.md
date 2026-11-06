@@ -124,3 +124,13 @@ Status: In Progress
 - migration도 #2181과 동일하게 짝수 6팀 이상·비정규 규모·명명된 토너먼트에 한정한다. 홀수/일반 유연 대진/운영자 지정 이름과 round/phase/ID/결과/연결/시드는 보존한다.
 - dev 대상 Draft PR로 제출한다. #2181의 재생성 보호가 먼저 반영되어야 조 이름 수정 뒤 대진 재생성도 안전하다. #2181 머지 전 이 후속 PR은 머지하지 않는다.
 - 위의 API334/Web297 검증은 중복 제거 전 snapshot의 기록이며 최종 PR 검증 수치로 재사용하지 않는다. 최신 #2181 + dev + 후속 diff를 격리 통합해 관련 검증을 다시 기록한다.
+
+
+### 후속 PR 최종 통합 검증 (중복 제거 후)
+- 실제 PR은 dev `53e2bb3171` 기준이며 #2181 생성기/공개 대진 분류/관리자 그림/단계 방식/재생성 보호 코드와 테스트를 포함하지 않는다. Draft + 선행 #2181 의존성을 명시한다.
+- 검증 조합은 별도 `/tmp/teameet-bracket-pr2181-check`: 최신 dev + #2181 `b15c94df5` + 후속 변경이다. 결과 카드 라벨 한 줄의 충돌은 저장한 단계 이름 우선·#2181 강수 fallback 유지로 해결했다. #2181 머지 후 해당 기준으로 후속 브랜치를 다시 맞춘다.
+- 첫 통합 Web 397개 중 1개가 토너먼트 접두어 중복으로 RED. 섹션 이름과 단계 이름을 분리해 보정하고 해당 파일의 18개(사용자 지정 단계 이름/경기 상세 링크 신규 회귀 포함) GREEN. 나머지 380개 PASS와 합쳐 총 398개/11 files PASS다.
+- API 관련 9 suites/335 tests PASS. 진출팀 배정/규칙·초기화·이름 변경·권한/버전·부전승/강수 회귀를 포함한다.
+- migration 검증은 `scripts/qa/verify-knockout-display-migration.mjs`로 재현한다. 짝수 6/10/12팀 보정, 홀수/2의 제곱/일반 flexible/사용자 지정 이름·round/설정 정원 불일치 보호 등 10개 PostgreSQL 시나리오와 두 번 실행 멱등성 PASS. 설정 정원과 실제 시드 자리 수가 일치하는 대상만 보정한다. 실환경 DB 쓰기는 없다.
+- `node scripts/release/check-changeset-policy.mjs --repo . --changed-files-file /tmp/teameet-bracket-pr-changed-files.txt` PASS(behavior 12 paths / Changeset patch).
+- PR 작성은 코드/committed diff와 재생성 의존성을 검증한 뒤 수행한다. after alpha/관리자 로그인 QA/전체 migration chain replay는 후속 게이트로 남는다.

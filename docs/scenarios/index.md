@@ -1,6 +1,6 @@
 ## 2026-11-06 — 결선 실제 강수·조 이름 수정·종료 화면 (검증/배포 대기)
 
-[시나리오](./multi-finals-deferred-teams-20261104.md#2026-11-06--실제-강수조-이름-수정종료-화면-후속) · [task](../../.github/tasks/20261113-bracket-group-name-filters.md). 선행 #2181의 강수 생성 규칙에 맞춘 기존 자동 명칭 보정, 구조 보호를 유지한 조 이름 수정 및 예선 설정·revision 동기화, 공개 명칭 반영, 토너먼트별 기존 최종결과 UI 재사용을 구현했다. API334/Web297·양쪽 타입/pattern/surface PASS, 격리 PostgreSQL 보정6시나리오/재실행 PASS. alpha before 공개6/6(console/network/overflow0), after 공개0/6·admin0/3폭(미배포/관리자 인증 미제공). CI/전체 migration replay 미실행, 실환경 데이터 변경 없음.
+[시나리오](./multi-finals-deferred-teams-20261104.md#2026-11-06--실제-강수조-이름-수정종료-화면-후속) · [task](../../.github/tasks/20261113-bracket-group-name-filters.md). 선행 #2181의 강수 생성 규칙에 맞춘 기존 자동 명칭 보정, 구조 보호를 유지한 조 이름 수정 및 예선 설정·revision 동기화, 공개 명칭 반영, 토너먼트별 기존 최종결과 UI 재사용을 구현했다. #2181 통합 회귀 API335/Web398 PASS, 격리 PostgreSQL 보정10시나리오/재실행 PASS. 생성기 중복 수정은 제외하고 #2181 의존 Draft PR로 제출한다. alpha before 공개6/6(console/network/overflow0), after 공개0/6·admin0/3폭(미배포/관리자 인증 미제공). CI/전체 migration replay 미실행, 실환경 데이터 변경 없음.
 
 ## 2026-11-06 — N개 토너먼트별 독립 진출팀 확정 (진행 중)
 

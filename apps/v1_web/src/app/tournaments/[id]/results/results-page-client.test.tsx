@@ -512,6 +512,16 @@ describe('ResultsPageContent — 16강 결선 결과', () => {
 });
 
 
+it('토너먼트별 경기 카드에 수정한 단계 이름을 중복 접두어 없이 표시한다', () => {
+  const group = { ...leagueGroup({ id: 'edited-stage', name: '프리미어 · 준결승 특별전', standings: [] }), phase: 'semi', bracketTrack: '프리미어' } as V1TournamentGroup;
+  const fixture = { ...leagueFixtureWithVideo(), id: 'edited-match', groupId: group.id, round: 'semi', videos: [] };
+  render(<ResultsPageContent tournament={baseTournament({ format: 'league_knockouts', groups: [group], fixtures: [fixture] })} />);
+  const matches = within(screen.getByRole('region', { name: '프리미어 경기' }));
+  expect(matches.getByText('준결승 특별전')).toBeInTheDocument();
+  expect(matches.queryByText('프리미어 · 준결승 특별전')).not.toBeInTheDocument();
+  expect(matches.getByRole('link')).toHaveAttribute('href', expect.stringContaining('/matches/edited-match'));
+});
+
 it.each(['upper', '챔피언 토너먼트'])('공식 3·4위와 승부차기 승패를 %s 최종 순위에 반영한다', track => {
   const groups = ['final', 'third_place'].map((phase, i) => ({
     id: `tracked-${phase}`, name: phase, phase, sortOrder: i, advanceCount: null, groupTeams: [], standings: [], qualification: null, bracketTrack: track,

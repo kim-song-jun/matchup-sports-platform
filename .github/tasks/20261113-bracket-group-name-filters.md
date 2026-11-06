@@ -134,3 +134,7 @@ Status: In Progress
 - migration 검증은 `scripts/qa/verify-knockout-display-migration.mjs`로 재현한다. 짝수 6/10/12팀 보정, 홀수/2의 제곱/일반 flexible/사용자 지정 이름·round/설정 정원 불일치 보호 등 10개 PostgreSQL 시나리오와 두 번 실행 멱등성 PASS. 설정 정원과 실제 시드 자리 수가 일치하는 대상만 보정한다. 실환경 DB 쓰기는 없다.
 - `node scripts/release/check-changeset-policy.mjs --repo . --changed-files-file /tmp/teameet-bracket-pr-changed-files.txt` PASS(behavior 12 paths / Changeset patch).
 - PR 작성은 코드/committed diff와 재생성 의존성을 검증한 뒤 수행한다. after alpha/관리자 로그인 QA/전체 migration chain replay는 후속 게이트로 남는다.
+
+
+## PR 완료 및 alpha 배포 승인 (2026-11-06)
+사용자가 PR 완료 후 alpha 배포를 승인했다. 선행 #2181 CI는 PASS이며 최신 Copilot 리뷰를 요청했다. #2195의 Gates 실패는 보정 migration의 TEMP SELECT/UPDATE가 자동 additive 판정 대상이 아니어서 발생했다. 기존 exact file+statement 검토 목록에 SQL 세 문장만 승인 근거와 선행 #2181의 rolling/rollback 호환 조건을 기록하고, 다른 파일·다른 SQL 거절을 self-test로 증명한다. 게이트 일반 규칙을 완화하지 않는다. #2181을 먼저 머지·alpha 배포·서빙 SHA 확인한 뒤 #2195를 dev에 맞추고 CI/리뷰 완료 후 후속 배포한다.

@@ -2188,6 +2188,20 @@ button:disabled {
   border-radius: var(--radius-container);
 }
 
+/*
+ * responsiveBackgroundImageVars(lib/assets.ts)가 심은 두 변수 중 폭에 맞는 한 장만 배경으로 쓴다.
+ * 브라우저는 계산된 background-image 에 남은 URL 만 받으므로 좁은 화면은 넓은 쪽을 요청하지 않는다.
+ */
+.tm-responsive-bg {
+  background-image: var(--tm-bg-image, none);
+}
+
+@media (min-width: 1024px) {
+  .tm-responsive-bg {
+    background-image: var(--tm-bg-image-wide, var(--tm-bg-image, none));
+  }
+}
+
 .tm-pressable {
   transition: transform var(--duration-fast) ease, opacity var(--duration-fast) ease;
 }

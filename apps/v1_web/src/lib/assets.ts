@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import { getImageProps } from 'next/image';
 
 export function publicAssetPath(path: string) {
@@ -35,4 +36,19 @@ export function optimizedImageSrc(path: string, displayWidth: number): string {
 /** CSS `background`/`background-image` 용 `url("…")`. 원본을 직접 넣지 말고 이것을 쓴다. */
 export function optimizedCssUrl(path: string, displayWidth: number): string {
   return cssUrl(optimizedImageSrc(path, displayWidth));
+}
+
+type ResponsiveBackgroundVars = Record<'--tm-bg-image' | '--tm-bg-image-wide', string>;
+
+/**
+ * 폭에 따라 다른 크기의 사진을 받는 CSS 배경. 배경 한 장은 URL 이 하나뿐이라, 좁은 화면용·넓은 화면용을
+ * 사용자 지정 속성 두 개로 나눠 담고 `.tm-responsive-bg`(globals.css)가 폭에 맞는 쪽만 background-image 로 쓴다.
+ * 요소의 인라인 `background`/`backgroundImage` 와 함께 쓰면 이 클래스가 진다 — 위치·크기는 longhand 로 둔다.
+ */
+export function responsiveBackgroundImageVars(path: string, narrowWidth: number, wideWidth: number): CSSProperties {
+  const vars: ResponsiveBackgroundVars = {
+    '--tm-bg-image': optimizedCssUrl(path, narrowWidth),
+    '--tm-bg-image-wide': optimizedCssUrl(path, wideWidth),
+  };
+  return vars as CSSProperties;
 }

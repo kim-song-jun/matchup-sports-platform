@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isOptimizableImagePath, optimizedCssUrl, optimizedImageSrc, publicAssetPath } from './assets';
+import { isOptimizableImagePath, optimizedCssUrl, optimizedImageSrc, publicAssetPath, responsiveBackgroundImageVars } from './assets';
 
 function optimizerParams(src: string) {
   const url = new URL(src, 'http://localhost');
@@ -53,5 +53,29 @@ describe('optimizedCssUrl', () => {
 
   it('escapes CSS string control characters, quotes, and backslashes', () => {
     expect(optimizedCssUrl('https://cdn.example.com/a\\b"c\n.png', 40)).toBe('url("https://cdn.example.com/a\\\\b\\"c\\a .png")');
+  });
+});
+
+describe('responsiveBackgroundImageVars', () => {
+  const vars = (path: string, narrow: number, wide: number) =>
+    responsiveBackgroundImageVars(path, narrow, wide) as Record<string, string>;
+  const requestOf = (css: string) => optimizerParams(css.slice(5, -2));
+
+  it('좁은 화면용·넓은 화면용 주소를 서로 다른 폭의 사용자 지정 속성 두 개로 낸다', () => {
+    const style = vars('/uploads/2026/11/a.png', 600, 960);
+
+    expect(Object.keys(style).sort()).toEqual(['--tm-bg-image', '--tm-bg-image-wide']);
+    expect(requestOf(style['--tm-bg-image'])).toEqual({ pathname: '/_next/image', url: '/uploads/2026/11/a.png', w: '1200' });
+    expect(requestOf(style['--tm-bg-image-wide'])).toEqual({ pathname: '/_next/image', url: '/uploads/2026/11/a.png', w: '1920' });
+  });
+
+  it('최적화할 수 없는 경로는 두 속성이 같은 원본 주소를 가리킨다', () => {
+    const external = vars('https://cdn.example.com/banner.png', 600, 960);
+    expect(external['--tm-bg-image']).toBe('url("https://cdn.example.com/banner.png")');
+    expect(external['--tm-bg-image-wide']).toBe(external['--tm-bg-image']);
+
+    const blob = vars('blob:https://teameet.co.kr/123', 600, 960);
+    expect(blob['--tm-bg-image']).toBe('url("blob:https://teameet.co.kr/123")');
+    expect(blob['--tm-bg-image-wide']).toBe(blob['--tm-bg-image']);
   });
 });

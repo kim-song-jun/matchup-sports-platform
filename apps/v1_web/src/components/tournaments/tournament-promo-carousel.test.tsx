@@ -142,39 +142,58 @@ describe('TournamentPromoCarousel', () => {
 });
 
 /**
- * 슬라이드 배경은 `background: url(…) center/cover` 단축 속성이라 jsdom 이 파싱하지 못하고 버린다.
- * 서버 렌더 마크업의 `style` 속성에는 컴포넌트가 낸 값이 그대로 남으므로 그쪽에서 읽는다.
+ * 브라우저가 처음 받는 서버 렌더 마크업의 `style` 속성에서 컴포넌트가 낸 선언을 그대로 읽는다.
  */
-function slideBackgrounds(items: V1TournamentListItem[]) {
+function slideCards(items: V1TournamentListItem[]) {
   const doc = new DOMParser().parseFromString(renderToStaticMarkup(<TournamentPromoCarousel items={items} />), 'text/html');
-  return [...doc.querySelectorAll('.tm-tournament-promo-card')].map((card) => card.getAttribute('style') ?? '');
+  return [...doc.querySelectorAll('.tm-tournament-promo-card')].map((card) => ({
+    classes: card.classList,
+    style: card.getAttribute('style') ?? '',
+  }));
 }
 
-function imageRequest(background: string) {
-  const quoted = /url\("([^"]+)"\)/.exec(background);
+function declaration(style: string, property: string) {
+  return new RegExp(`(?:^|;)\\s*${property}\\s*:\\s*([^;]*)`).exec(style)?.[1] ?? null;
+}
+
+function imageRequest(background: string | null) {
+  const quoted = background ? /url\("([^"]+)"\)/.exec(background) : null;
   if (!quoted) return null;
   const url = new URL(quoted[1], 'http://localhost');
   return { pathname: url.pathname, url: url.searchParams.get('url') ?? quoted[1], w: url.searchParams.get('w') };
 }
 
 describe('TournamentPromoCarousel 홍보 이미지', () => {
-  it('업로드한 홍보 이미지는 원본이 아니라 1920 폭 최적화 주소로 받는다', () => {
-    const [background] = slideBackgrounds([{ ...promo('with-photo', 0), promoListImageUrl: '/uploads/2026/11/banner.png' }]);
+  it('업로드한 홍보 이미지는 좁은 화면 1200 폭·넓은 화면 1920 폭 최적화 주소를 함께 싣는다', () => {
+    const [card] = slideCards([{ ...promo('with-photo', 0), promoListImageUrl: '/uploads/2026/11/banner.png' }]);
 
-    expect(background).toContain('center/cover');
-    expect(imageRequest(background)).toEqual({ pathname: '/_next/image', url: '/uploads/2026/11/banner.png', w: '1920' });
+    expect(card.classes.contains('tm-responsive-bg')).toBe(true);
+    expect(imageRequest(declaration(card.style, '--tm-bg-image'))).toEqual({ pathname: '/_next/image', url: '/uploads/2026/11/banner.png', w: '1200' });
+    expect(imageRequest(declaration(card.style, '--tm-bg-image-wide'))).toEqual({ pathname: '/_next/image', url: '/uploads/2026/11/banner.png', w: '1920' });
   });
 
-  it('최적화 서버가 받아 올 수 없는 외부 주소는 원본 그대로 둔다', () => {
-    const [background] = slideBackgrounds([{ ...promo('external', 0), promoListImageUrl: 'https://cdn.example.com/banner.png' }]);
+  it('인라인에는 background 단축 속성도 background-image 도 두지 않는다 — .tm-responsive-bg 를 덮기 때문이다', () => {
+    const [card] = slideCards([{ ...promo('with-photo', 0), promoListImageUrl: '/uploads/2026/11/banner.png' }]);
 
-    expect(imageRequest(background)).toEqual({ pathname: '/banner.png', url: 'https://cdn.example.com/banner.png', w: null });
+    expect(declaration(card.style, 'background')).toBeNull();
+    expect(declaration(card.style, 'background-image')).toBeNull();
+    expect(declaration(card.style, 'background-position')).toBe('center');
+    expect(declaration(card.style, 'background-size')).toBe('cover');
   });
 
-  it('이미지가 없으면 브랜드 그라디언트를 쓴다', () => {
-    const [background] = slideBackgrounds([promo('no-photo', 0)]);
+  it('최적화 서버가 받아 올 수 없는 외부 주소는 두 속성 모두 원본 그대로 둔다', () => {
+    const [card] = slideCards([{ ...promo('external', 0), promoListImageUrl: 'https://cdn.example.com/banner.png' }]);
+    const expected = { pathname: '/banner.png', url: 'https://cdn.example.com/banner.png', w: null };
 
-    expect(imageRequest(background)).toBeNull();
-    expect(background).toContain('var(--brand-hero-gradient)');
+    expect(imageRequest(declaration(card.style, '--tm-bg-image'))).toEqual(expected);
+    expect(imageRequest(declaration(card.style, '--tm-bg-image-wide'))).toEqual(expected);
+  });
+
+  it('이미지가 없으면 브랜드 그라디언트를 쓰고 반응형 배경 클래스는 붙이지 않는다', () => {
+    const [card] = slideCards([promo('no-photo', 0)]);
+
+    expect(card.classes.contains('tm-responsive-bg')).toBe(false);
+    expect(declaration(card.style, '--tm-bg-image')).toBeNull();
+    expect(declaration(card.style, 'background')).toBe('var(--brand-hero-gradient)');
   });
 });

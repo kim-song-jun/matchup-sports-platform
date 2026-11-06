@@ -10,7 +10,7 @@ import { Card, EmptyState, ErrorState, InfoRow, ListItem } from '@/components/v1
 import { Button } from '@/components/v1-ui/button';
 import { ChevronLeftIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
-import { optimizedCssUrl } from '@/lib/assets';
+import { optimizedCssUrl, responsiveBackgroundImageVars } from '@/lib/assets';
 import { SportIllustration } from '@/components/v1-ui/sport-illustration';
 import { MatchTypeSegment } from '@/components/v1-ui/match-type-segment';
 import { ListSummaryCounts } from '@/components/v1-ui/list-summary-counts';
@@ -36,10 +36,12 @@ import { matchGenderRuleLabel } from '@/lib/v1-status-labels';
 /*
  * 사진이 그려지는 자리의 가장 넓은 CSS 폭(px). optimizedCssUrl 이 2배 밀도 폭으로 올려 받는다.
  * 상세 히어로는 데스크톱에서 1072px 까지 가지만 2배(2144)면 3840 폭으로 올림되므로 1920 폭에 맞춘다(대회 홍보 배너와 같다).
+ * 휴대폰·태블릿은 앱 프레임 상한 600px 라 1200 폭으로 충분하다.
  */
 const MATCH_ROW_THUMB_PX = 96; // .tm-match-row-thumb
 const MATCH_LIST_MEDIA_PX = 320; // .tm-match-rail-h > * (≥1024px)
-const MATCH_DETAIL_HERO_PX = 960; // .tm-match-detail-hero → 1920 폭
+const MATCH_DETAIL_HERO_NARROW_PX = 600; // .tm-match-detail-hero <1024px → 1200 폭
+const MATCH_DETAIL_HERO_WIDE_PX = 960; // .tm-match-detail-hero ≥1024px → 1920 폭
 const MATCH_CREATE_PREVIEW_PX = 600; // .tm-match-create-shell 최대 폭
 
 /**
@@ -372,7 +374,7 @@ export function MatchDetailPageView({ model, lifecyclePanel }: { model: MatchDet
         {/* 사진이 없으면 그래픽을 위, 카피를 아래로 쌓는다(영상 pCc9GspeYfg 02 의 4칸 모듈).
             예전에는 사진 히어로와 같은 면에 그래픽을 우하단 구석으로 얹어 아이콘 버튼·오버레이
             텍스트와 자리를 다퉜다 — alpha 에서 실제로 겹쳐 한 번 옮긴 자리다. */}
-        <div className={`tm-match-detail-hero${match.image ? '' : ' tm-match-detail-hero-stack'}`} style={match.image ? { backgroundImage: optimizedCssUrl(match.image, MATCH_DETAIL_HERO_PX) } : undefined}>
+        <div className={`tm-match-detail-hero${match.image ? ' tm-responsive-bg' : ' tm-match-detail-hero-stack'}`} style={match.image ? responsiveBackgroundImageVars(match.image, MATCH_DETAIL_HERO_NARROW_PX, MATCH_DETAIL_HERO_WIDE_PX) : undefined}>
           {match.image ? null : (
             <div className="tm-match-hero-graphic">
               {/* 이 자리는 176px(≥1024 208px)이라 agy-3d-graphic 기준의 "큰 자리"다 —

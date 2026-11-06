@@ -12,8 +12,8 @@ import { hashPassword } from './password-hash';
 /** `Prisma.TransactionClient` and `PrismaService` both satisfy this, so the conflict check runs inside or outside a transaction. */
 type EmailLookupClient = Pick<Prisma.TransactionClient, 'v1User'>;
 
-/** Names the new login in the owner's security notice ("{name} 로그인이 연결됐어요"). */
-const EMAIL_LOGIN_LABEL = '이메일·비밀번호';
+/** Names the login in the owner's security notices ("{name} 로그인이 연결됐어요"). */
+export const EMAIL_LOGIN_LABEL = '이메일·비밀번호';
 
 /**
  * Adds an email + password login to the account the caller is signed in as (the reverse of `AccountLinkService`).
@@ -97,18 +97,15 @@ export class EmailLinkService {
     await assertEmailFree(tx, callerId, email);
 
     const now = new Date();
-    const identity = await tx.v1AuthIdentity.create({
-      data: {
-        userId: callerId,
-        provider: V1AuthProvider.email,
-        providerUserKey: email,
-        email,
-        passwordHash,
-        status: 'active',
-        lastLoginAt: now,
-      },
-      select: { id: true },
-    });
+    // A login this account removed earlier (POST /auth/identities/unlink) is brought back instead of adding a second row.
+    const removed = await findRemovedEmailLogin(tx, callerId, email);
+    const loginData = { providerUserKey: email, email, passwordHash, status: 'active', unlinkedAt: null, lastLoginAt: now } as const;
+    const identity = removed
+      ? await tx.v1AuthIdentity.update({ where: { id: removed.id }, data: loginData, select: { id: true } })
+      : await tx.v1AuthIdentity.create({
+          data: { userId: callerId, provider: V1AuthProvider.email, ...loginData },
+          select: { id: true },
+        });
     // The address that proved itself becomes the account's email, replacing a contact email the account carried.
     await tx.v1User.update({ where: { id: callerId }, data: { email, emailVerifiedAt: now, signupEmailLoginRequired: false } });
     await tx.v1StatusChangeLog.create({
@@ -125,9 +122,20 @@ export class EmailLinkService {
     // The same security notice a social link leaves: it ignores notification settings and is stored with the link or not at all.
     return this.notifications.createInTransaction(tx, callerId, 'social_identity_linked', {
       vars: { name: EMAIL_LOGIN_LABEL },
-      businessKey: `email-link:${identity.id}`,
+      // A restored row keeps its id, so each re-link needs a key of its own or its notice would be dropped as a repeat.
+      businessKey: removed ? `email-link:${identity.id}:${now.getTime()}` : `email-link:${identity.id}`,
     });
   }
+}
+
+/** The caller's removed email login to bring back; one already on this address wins, so the move cannot land on another removed row's key. */
+async function findRemovedEmailLogin(tx: Prisma.TransactionClient, callerId: string, email: string) {
+  const removed = await tx.v1AuthIdentity.findMany({
+    where: { userId: callerId, provider: V1AuthProvider.email, status: 'unlinked' },
+    orderBy: { createdAt: 'asc' },
+    select: { id: true, providerUserKey: true },
+  });
+  return removed.find((identity) => identity.providerUserKey === email) ?? removed[0] ?? null;
 }
 
 /** Refuses an address another account holds as its email or as its email login key; says nothing else about that account. */

@@ -1996,6 +1996,29 @@ describe('TeamMatchDetailPageView — 지금 할 일 카드 (H6)', () => {
     expect(hero.queryByText('신청 후 승인')).not.toBeInTheDocument();
   });
 
+  it('마감된 매치에서 승인된 신청 팀 시점 히어로도 "모집 중"·"신청 후 승인"을 말하지 않는다', () => {
+    const model = getTeamMatchDetailViewModel('approved');
+    model.match.applicantTeams = [];
+    model.match.closed = true;
+    const { container } = renderPage(<TeamMatchDetailPageView model={model} />);
+
+    const hero = within(container.querySelector<HTMLElement>('.tm-team-vs-row')!);
+    expect(hero.getByText('모집 마감')).toBeInTheDocument();
+    expect(hero.queryByText('모집 중')).not.toBeInTheDocument();
+    expect(hero.queryByText('신청 후 승인')).not.toBeInTheDocument();
+  });
+
+  it('대조군 — 모집 중인 매치에서 승인된 신청 팀 시점 히어로는 상대 모집을 안내한다', () => {
+    const model = getTeamMatchDetailViewModel('approved');
+    model.match.applicantTeams = [];
+    model.match.closed = false;
+    const { container } = renderPage(<TeamMatchDetailPageView model={model} />);
+
+    const hero = within(container.querySelector<HTMLElement>('.tm-team-vs-row')!);
+    expect(hero.getByText('모집 중')).toBeInTheDocument();
+    expect(hero.getByText('신청 후 승인')).toBeInTheDocument();
+  });
+
   it('마감된 매치의 거절 확인 창은 다시 신청할 수 있다고 말하지 않는다', async () => {
     const model = hostModel([applicant('합정'), applicant('성수')]);
     model.match.apiStatus = 'closed';

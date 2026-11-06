@@ -180,6 +180,7 @@ function teamMatchOpponentLabel(mode: TeamMatchDetailViewModel['mode'], match: T
     // 매치에서 먼저 승인된 팀이 홈팀이 되는 경우에는 아직 상대팀이 없다. 이때 뷰어의
     // 개인 상태("승인 완료")를 상대팀 이름처럼 표시하면 모집 중인 슬롯이 사라진다.
     const approvedOpponent = match.applicantTeams.find((team) => team.status === '승인 완료');
+    if (!approvedOpponent && match.closed) return '모집 마감';
     return approvedOpponent?.name ?? '모집 중';
   }
   if (mode === 'mine') {
@@ -187,7 +188,7 @@ function teamMatchOpponentLabel(mode: TeamMatchDetailViewModel['mode'], match: T
     // '승인 완료' 항목)로 실제 상대팀 이름을 보여줘야 한다 — 그 전까지는 '신청팀'
     // placeholder로 바꾸지 않는다. 승인 전 상대팀 슬롯은 다른 뷰어와 동일한 모집 상태다.
     const approvedOpponent = match.applicantTeams.find((team) => team.status === '승인 완료');
-    // 호스트는 viewerState 때문에 status 가 항상 'mine' 이라 마감 여부는 match.closed 로 본다.
+    // 호스트는 viewerState 때문에 match.status 가 항상 'mine' 으로 계산되므로 마감 여부는 match.closed 로 판정한다.
     if (!approvedOpponent && match.closed) return '모집 마감';
     return approvedOpponent?.name ?? '모집 중';
   }
@@ -207,7 +208,8 @@ function teamMatchOpponentSub(mode: TeamMatchDetailViewModel['mode'], match: Tea
   if (mode === 'pending') return '승인 대기';
   if (mode === 'approved') {
     const approvedOpponent = match.applicantTeams.find((team) => team.status === '승인 완료');
-    return approvedOpponent ? '참가 확정' : '신청 후 승인';
+    if (approvedOpponent) return '참가 확정';
+    return match.closed ? null : '신청 후 승인';
   }
   if (mode === 'mine') {
     const approvedOpponent = match.applicantTeams.find((team) => team.status === '승인 완료');

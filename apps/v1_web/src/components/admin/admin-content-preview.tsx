@@ -55,10 +55,10 @@ export function AdminContentPreview({ payload }: { payload: AdminContentPreviewP
     <section className="mt-5 rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4" aria-labelledby={titleId}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 id={titleId} className="text-base font-bold text-[var(--text-strong)]">실제 화면 미리보기</h2>
+          <h2 id={titleId} className="tm-text-body-lg font-bold text-[var(--text-strong)]">실제 화면 미리보기</h2>
           {previewAllowed
-            ? <p className="mt-1 text-xs text-[var(--text-muted)]">저장 전 내용을 실제 사용자 컴포넌트와 viewport로 확인합니다.</p>
-            : <p role="status" className="mt-1 text-xs text-[var(--text-muted)]">{scope?.reason} 작성한 내용은 체험에 저장할 수 있어요.</p>}
+            ? <p className="mt-1 tm-text-caption text-[var(--text-muted)]">저장 전 내용을 실제 사용자 컴포넌트와 viewport로 확인해요.</p>
+            : <p role="status" className="mt-1 tm-text-caption text-[var(--text-muted)]">{scope?.reason} 작성한 내용은 체험에 저장할 수 있어요.</p>}
         </div>
         {previewAllowed && <div className="tm-on-tint inline-flex rounded-xl bg-[var(--surface-soft)] p-1" aria-label="미리보기 화면 크기">
           <DeviceButton active={device === 'desktop'} onClick={() => setDevice('desktop')} label="웹"><Monitor /></DeviceButton>

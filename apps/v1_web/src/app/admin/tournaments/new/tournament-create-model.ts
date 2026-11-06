@@ -38,10 +38,13 @@ export const TOURNAMENT_CREATE_STEPS = [
 export const LAST_INPUT_STEP_INDEX = TOURNAMENT_CREATE_STEPS.length - 2;
 export const CONFIRM_STEP_INDEX = TOURNAMENT_CREATE_STEPS.length - 1;
 
-/** 단계별 경기 시간을 정할 수 있는 대회 단계. 생성 마법사와 대회 정보의 피리어드 편집기가 같이 쓴다. */
+/**
+ * 단계별 경기 시간을 정할 수 있는 대회 단계. 생성 마법사와 대회 정보의 피리어드 편집기가 같이 쓴다.
+ * round16 은 정규리그 + N개 토너먼트에서 12팀 결선의 첫 라운드('12강')도 담는다 — 그 라운드의 단계 코드가 틀 기준(16칸)이다.
+ */
 export const TOURNAMENT_PERIOD_PHASES: ReadonlyArray<{ value: TournamentPeriodPhase; label: string }> = [
   { value: 'group', label: '조별리그' }, { value: 'round64', label: '64강' },
-  { value: 'round32', label: '32강' }, { value: 'round16', label: '16강' },
+  { value: 'round32', label: '32강' }, { value: 'round16', label: '16강 · 12팀 결선의 12강' },
   { value: 'round12', label: '12강' }, { value: 'quarter', label: '8강' },
   { value: 'semi', label: '4강' }, { value: 'final', label: '결승' },
   { value: 'third_place', label: '3·4위전' },

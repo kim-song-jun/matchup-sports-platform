@@ -417,6 +417,12 @@ function CoChampionBanner({ names }: { names: string[] }) {
   );
 }
 
+/** 경기가 'N강'(12강·6강…)으로 불리면 그 이름을 그대로 쓴다 — 단계 코드는 틀 기준이라 12강이 round16 이다. */
+function largeRoundName(round: string): string | null {
+  const name = round.trim();
+  return /^\d+강$/.test(name) ? name : null;
+}
+
 /* ── 최종 순위 테이블 ── */
 const ROUND_LABEL_MAP: Record<string, string> = {
   final: '결승', '결승': '결승',
@@ -1154,7 +1160,7 @@ export function ResultsPageContent({ tournament }: { tournament: V1TournamentDet
     const group = groupsById.get(fixture.groupId ?? '');
     const name = group?.name.trim() ?? '';
     return bracketStageLabel(group?.bracketTrack, name)
-      || ROUND_LABEL_MAP[knockoutKind(fixture) ?? ''] || fixture.round;
+      || largeRoundName(fixture.round) || ROUND_LABEL_MAP[knockoutKind(fixture) ?? ''] || fixture.round;
   };
 
   return (

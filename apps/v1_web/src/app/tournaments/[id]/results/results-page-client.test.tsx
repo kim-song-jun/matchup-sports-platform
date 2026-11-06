@@ -509,6 +509,18 @@ describe('ResultsPageContent — 16강 결선 결과', () => {
     expect(screen.getByRole('link', { name: /성수 FC 3 대 1 한강 유나이티드/ })).toBeInTheDocument();
     expect(screen.getAllByText('16강').length).toBeGreaterThan(0);
   });
+
+  // 2026-11-06: N개 토너먼트의 12팀 첫 라운드는 단계 코드가 round16 이어도 경기 이름(12강)을 그대로 보인다.
+  it('phase=round16 조의 경기라도 라운드 이름이 12강이면 12강으로 보인다', () => {
+    const tournament = baseTournament({
+      format: 'league_knockouts',
+      groups: [{ ...leagueGroup({ id: 'g-r12', name: '프리미어 · 12강', standings: [] }), phase: 'round16', bracketTrack: '프리미어' }],
+      fixtures: [{ ...leagueFixtureWithVideo(), id: 'fx-r12', groupId: 'g-r12', round: '12강', videos: [] }],
+    });
+    render(<ResultsPageContent tournament={tournament} />);
+    expect(screen.getAllByText('12강').length).toBeGreaterThan(0);
+    expect(screen.queryByText('16강')).not.toBeInTheDocument();
+  });
 });
 
 

@@ -51,6 +51,24 @@ describe('정규리그 + N개 토너먼트 plans', () => {
     const final = plan.fixtures.find(f => plan.groups.find(g => g.key === f.groupKey)?.phase === 'final')!;
     expect(played.get(final.key)?.size).toBe(size); expect(appearances.size).toBe(size); expect([...appearances.values()].every(n => n === 1)).toBe(true); expect(plan.fixtures[0].fixtureNumber).toBe(31);
   });
+  // 2026-11-06: 12팀 첫 라운드가 '16강'으로 나와 대회 규정(12강)과 달랐다. 이름만 팀 수로 부르고 단계 코드는 틀 기준을 유지한다.
+  it.each([
+    [12, ['12강', '8강', '4강', '결승'], ['round16', 'quarter', 'semi', 'final']],
+    [6, ['6강', '4강', '결승'], ['quarter', 'semi', 'final']],
+    [10, ['10강', '8강', '4강', '결승'], ['round16', 'quarter', 'semi', 'final']],
+    [14, ['14강', '8강', '4강', '결승'], ['round16', 'quarter', 'semi', 'final']],
+    [8, ['8강', '4강', '결승'], ['quarter', 'semi', 'final']],
+    [16, ['16강', '8강', '4강', '결승'], ['round16', 'quarter', 'semi', 'final']],
+    [5, ['8강', '4강', '결승'], ['quarter', 'semi', 'final']],
+    [3, ['4강', '결승'], ['semi', 'final']],
+  ] as const)('%i팀 결선의 라운드 이름은 %j 이고 단계 코드는 그대로다', (size, labels, phases) => {
+    const plan = planNamedFinals([{ name: '프리미어', rules: [], thirdPlace: false, registrationIds: Array.from({ length: size }, (_, i) => `t${i}`) }]);
+    expect(plan.groups.map(g => g.name)).toEqual(labels.map(label => `프리미어 · ${label}`));
+    expect(plan.groups.map(g => g.phase)).toEqual(phases);
+    // 경기의 round 값도 같은 이름이다 — 화면의 경기 이름·일정이 이 값을 그대로 쓴다.
+    const roundsOfGroup = labels.map((_, i) => [...new Set(plan.fixtures.filter(f => f.groupKey === plan.groups[i].key).map(f => f.round))]);
+    expect(roundsOfGroup).toEqual(labels.map(label => [label]));
+  });
   it('3개 결선이 경기·승자/패자 연결·시상 범위를 공유하지 않는다', () => {
     const finals = [4, 5, 6].map((size, i) => ({ name: `토너먼트${i}`, thirdPlace: true, rules: [], registrationIds: Array.from({ length: size }, (_, j) => `t${i}-${j}`) }));
     const plan = planNamedFinals(finals); expect(new Set(plan.groups.map(g => g.bracketTrack)).size).toBe(3); expect(plan.fixtures).toHaveLength(15);

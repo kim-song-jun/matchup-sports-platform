@@ -64,6 +64,10 @@ async function runFlow(page) {
     const page = await context.newPage();
     page.on('pageerror', (e) => report.errors.push({ type: 'pageerror', message: e.message }));
     page.on('console', (e) => { if (e.type() === 'error') report.errors.push({ type: 'console', message: e.text() }); });
+    page.on('response', (r) => {
+      const url = new URL(r.url());
+      if (url.origin === origin && r.status() >= 400) report.errors.push({ type: 'network', status: r.status(), path: url.pathname });
+    });
     page.on('request', (r) => {
       const url = new URL(r.url());
       if (url.origin === origin && url.pathname.startsWith('/api/')) report.apiRequests.push({ method: r.method(), path: url.pathname });
@@ -71,6 +75,7 @@ async function runFlow(page) {
     const initial = await page.goto(origin + demo, { waitUntil: 'domcontentloaded' });
     await page.locator('h1').waitFor();
     report.deployedCommit = initial.headers()['x-teameet-commit'] ?? null;
+    if (process.env.QA_EXPECTED_COMMIT) assert.equal(report.deployedCommit, process.env.QA_EXPECTED_COMMIT, 'Unexpected deployed commit');
     if (mode === 'after') {
       assert.equal(await page.getByRole('navigation', { name: '대회 관리 섹션' }).getByRole('link').count(), 11);
       await runFlow(page);
@@ -82,6 +87,10 @@ async function runFlow(page) {
         await page.goto(origin + route, { waitUntil: 'domcontentloaded' });
         await page.locator('h1').first().waitFor();
         if (mode === 'after') await page.getByRole('region', { name: '대회 관리 내용' }).waitFor();
+        if (mode === 'after' && section === 'popups') {
+          assert.equal(await page.locator('iframe').count(), 0, 'Demo embedded a real service document');
+          await page.getByRole('status').filter({ hasText: '실제 서비스로 연결되는 이 화면은 체험에서 열 수 없어요.' }).waitFor();
+        }
         await page.evaluate(() => Promise.race([document.fonts.ready, new Promise(resolve => setTimeout(resolve, 5000))]));
         const file = `${mode}-${section}-${width}.png`;
         await page.screenshot({ path: path.join(output, file), fullPage: true });
@@ -96,9 +105,32 @@ async function runFlow(page) {
       await page.getByRole('heading', { name: 'Teameet 파트너컵 · 샘플', exact: true }).waitFor();
       await page.getByRole('navigation', { name: '대회 관리 섹션' }).getByRole('link', { name: '대진 관리 0', exact: true }).waitFor();
       report.verdicts.push({ flow: 'healthy sample reset restores default title and empty bracket', verdict: 'PASS' });
+      await page.evaluate(() => {
+        sessionStorage.setItem('qa-pr2168-unrelated', 'preserve');
+        sessionStorage.setItem('teameet.tournament-admin-demo.v2', '{broken');
+      });
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await page.getByRole('alert').filter({ hasText: '체험 기록을 읽거나 저장하지 못했어요' }).waitFor();
+      assert.equal(await page.getByRole('navigation', { name: '대회 관리 섹션' }).count(), 0);
+      await page.getByRole('button', { name: '체험 초기화', exact: true }).click();
+      await page.getByRole('dialog').getByRole('button', { name: '체험 초기화', exact: true }).click();
+      await page.getByRole('heading', { name: 'Teameet 파트너컵 · 샘플', exact: true }).waitFor();
+      assert.equal(await page.evaluate(() => sessionStorage.getItem('qa-pr2168-unrelated')), 'preserve');
+      report.verdicts.push({ flow: 'corrupt history blocks management and reset preserves unrelated storage', verdict: 'PASS' });
+      await page.evaluate(() => {
+        Object.defineProperty(navigator.clipboard, 'writeText', { configurable: true, value: async () => { throw new Error('QA clipboard denied'); } });
+      });
+      await page.getByRole('button', { name: '공유 링크 복사', exact: true }).click();
+      await page.getByRole('alert').filter({ hasText: '직접 선택해 복사' }).waitFor();
+      await page.getByText('체험 안내와 공유 주소', { exact: true }).click();
+      assert.equal(await page.getByLabel('공유할 체험 주소').inputValue(), origin + demo);
+      report.verdicts.push({ flow: 'clipboard failure exposes a directly copyable share URL', verdict: 'PASS' });
+      await page.evaluate(() => sessionStorage.removeItem('qa-pr2168-unrelated'));
     }
     assert(!report.apiRequests.some((r) => /sample-partner-cup|sample-registration|sample-fixture|sample-game/.test(r.path)), 'Sample reached a live API');
+    if (mode === 'after') assert(report.apiRequests.every((r) => r.method === 'GET' && r.path === '/api/v1/health'), 'Demo reached an account or entity API');
     assert(!report.errors.some((e) => e.type === 'pageerror'), 'Runtime page error');
+    assert.equal(report.errors.length, 0, 'Console or network errors');
     assert(report.verdicts.every((v) => v.verdict === 'PASS'), 'Viewport overflow');
     await context.close();
   } catch (e) {

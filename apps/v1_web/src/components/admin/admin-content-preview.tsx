@@ -1,8 +1,9 @@
 'use client';
 
 import { Monitor, Smartphone } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { browserAppRoute } from '@/lib/app-route';
+import { useNavigationScope } from '@/components/providers/navigation-scope';
 import type { V1RichContentDocument } from '@/types/api';
 
 export type AdminContentPreviewPayload =
@@ -26,6 +27,9 @@ export function AdminContentPreview({ payload }: { payload: AdminContentPreviewP
   const [device, setDevice] = useState<'desktop' | 'mobile'>('desktop');
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const previewSrc = browserAppRoute('/admin-content-preview');
+  const scope = useNavigationScope();
+  const previewAllowed = !scope || scope.allow(previewSrc);
+  const titleId = useId();
 
   const sendPreview = () => {
     iframeRef.current?.contentWindow?.postMessage(
@@ -48,18 +52,20 @@ export function AdminContentPreview({ payload }: { payload: AdminContentPreviewP
   }, [payload]);
 
   return (
-    <section className="mt-5 rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4" aria-labelledby="content-preview-title">
+    <section className="mt-5 rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4" aria-labelledby={titleId}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 id="content-preview-title" className="text-base font-bold text-[var(--text-strong)]">실제 화면 미리보기</h2>
-          <p className="mt-1 text-xs text-[var(--text-muted)]">저장 전 내용을 실제 사용자 컴포넌트와 viewport로 확인합니다.</p>
+          <h2 id={titleId} className="text-base font-bold text-[var(--text-strong)]">실제 화면 미리보기</h2>
+          {previewAllowed
+            ? <p className="mt-1 text-xs text-[var(--text-muted)]">저장 전 내용을 실제 사용자 컴포넌트와 viewport로 확인합니다.</p>
+            : <p role="status" className="mt-1 text-xs text-[var(--text-muted)]">{scope?.reason} 작성한 내용은 체험에 저장할 수 있어요.</p>}
         </div>
-        <div className="tm-on-tint inline-flex rounded-xl bg-[var(--surface-soft)] p-1" aria-label="미리보기 화면 크기">
+        {previewAllowed && <div className="tm-on-tint inline-flex rounded-xl bg-[var(--surface-soft)] p-1" aria-label="미리보기 화면 크기">
           <DeviceButton active={device === 'desktop'} onClick={() => setDevice('desktop')} label="웹"><Monitor /></DeviceButton>
           <DeviceButton active={device === 'mobile'} onClick={() => setDevice('mobile')} label="모바일"><Smartphone /></DeviceButton>
-        </div>
+        </div>}
       </div>
-      <div className="mt-4 overflow-auto rounded-xl bg-[var(--surface-soft)] p-3">
+      {previewAllowed && <div className="mt-4 overflow-auto rounded-xl bg-[var(--surface-soft)] p-3">
         <iframe
           ref={iframeRef}
           title={`${payload.kind === 'notice' ? '공지사항' : '팝업'} ${device === 'desktop' ? '웹' : '모바일'} 미리보기`}
@@ -72,7 +78,7 @@ export function AdminContentPreview({ payload }: { payload: AdminContentPreviewP
             maxWidth: '100%',
           }}
         />
-      </div>
+      </div>}
     </section>
   );
 }

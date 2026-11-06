@@ -51,7 +51,7 @@ Updated: 2026-11-05
 - [x] 전역 fetch/MSW interception, 오류 시 실제 API fallback, 실패한 저장의 성공 표시는 없다.
 - [x] 저장된 응답 객체를 신뢰하지 않고 검증된 명령 이력을 재생해 복원한다.
 - [x] 실제 ID가 포함된 미지원 동작은 오류로 거부한다.
-- [ ] 최신 head의 Copilot clean, CI 통과, dev 머지, 배포 SHA 확인 및 Alpha after QA.
+- [ ] 최신 head CI 통과, dev 머지, 배포 SHA 확인 및 Alpha after QA. Copilot은 2026-11-06 사용자 승인 예외이며 clean으로 표기하지 않는다.
 
 ## Tech Debt Resolved
 기존 별도 단계형 UI·스타일·모델·모델 테스트를 제거하고 실제 화면과 현재 체험 계약으로 대체했다.
@@ -76,6 +76,15 @@ Next prefetch·새 탭 열기까지 막고 비활성 사유를 표시한다. 정
 - 실제 어드민의 4팀 대진 마법사·빠른 점수 확정을 사용한다. 별도 라이브 기록 시뮬레이터는 남기지 않는다.
 
 ## Progress Snapshot
+- 2026-11-06 Alpha 첫 실측: #2168을 포함한 `408b665a685eba127fda127167954a04b418085e`, 배포 run `42139280720` SUCCESS,
+  API DB health=true. 실제 정보 편집·4팀 확정·대진 생성/배정·점수 확정·새로고침·정상/손상 초기화·공유 실패 안내 PASS.
+  13개 화면 × 3폭=39/39 overflow 없음. 다만 팝업 미리보기 iframe이 `/admin-content-preview`를 열어 실제 `/admin/me`를 3회 조회했고
+  401/console errors 6건으로 QA FAIL. `initial-alpha-report.json`과 `initial-alpha-popups-{390,768,1440}.png`에 실패 증거를 보존한다.
+  iframe에도 navigation scope를 적용해 실제 관리자 문서 로드를 차단하고 제한 사유를 표시하는 후속 수정 진행.
+  회귀 RED: `admin-content-preview.test.tsx`에서 실제 관리자 iframe이 남는 것을 확인(1 failed, 1 passed).
+- 2026-11-06: 사용자 요청으로 PR #2168을 dev에 머지했다. Merge SHA `29e256c14ca95ee8f33662a65bf3f9771df72887`.
+  PR head `9afd13a30`의 Gates/API/Web CI는 모두 PASS. Copilot 리뷰 0건, 기존 사용자 승인 예외를 적용했다.
+  Alpha run `42137997922`는 merge SHA의 CI run `42137997982` 완료를 기다린다. 변경 후 QA는 배포 완료 뒤 진행한다.
 - Worktree: `_worktrees/tournament-demo-admin-parity`, branch `fix/tournament-demo-admin-parity-20261105`.
 - Actual UI tests 19 PASS, model tests 5 PASS, navigation scope tests 2 PASS. 기존 셸·빠른 대진·신청·결과 invalidation 회귀 41 PASS, 운영 보드 회귀 30 PASS(총97).
 - tsc PASS. Windows의 POSIX find 호환 문제로 패턴 게이트는 동일 source를 WSL에서 실행해 PASS.

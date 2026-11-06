@@ -6,13 +6,18 @@ import { createContext, useContext, type ComponentProps, type ReactNode } from '
 type NavigationScope = { allow: (pathname: string) => boolean; reason: string; disabledLabel?: string };
 const NavigationScopeContext = createContext<NavigationScope | null>(null);
 
+/** Embedded documents must obey the same boundary as links; React context does not cross an iframe. */
+export function useNavigationScope() {
+  return useContext(NavigationScopeContext);
+}
+
 export function NavigationScopeProvider({ scope, children }: { scope: NavigationScope; children: ReactNode }) {
   return <NavigationScopeContext.Provider value={scope}>{children}</NavigationScopeContext.Provider>;
 }
 
 /** Block at render time, so Next cannot prefetch a real page with a sample entity ID. */
 export function ScopedLink(props: ComponentProps<typeof NextLink>) {
-  const scope = useContext(NavigationScopeContext);
+  const scope = useNavigationScope();
   const href = typeof props.href === 'string' ? props.href : props.href.pathname ?? '';
   if (scope && !scope.allow(href)) {
     return <span role="link" aria-disabled="true" className={props.className} title={scope.reason}

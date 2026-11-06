@@ -62,8 +62,8 @@ async function completePhoneVerification(): Promise<void> {
 function fillAccountStep(): void {
   fireEvent.change(screen.getByLabelText(/^닉네임/), { target: { value: '테스트닉' } });
   fireEvent.change(screen.getByLabelText(/^이메일/), { target: { value: 'signup@example.com' } });
-  fireEvent.change(screen.getByPlaceholderText('8자 이상'), { target: { value: 'password123' } });
-  fireEvent.change(screen.getByPlaceholderText('비밀번호 다시 입력'), { target: { value: 'password123' } });
+  fireEvent.change(screen.getByPlaceholderText('8자 이상'), { target: { value: 'Sunny-ride-4' } });
+  fireEvent.change(screen.getByPlaceholderText('비밀번호 다시 입력'), { target: { value: 'Sunny-ride-4' } });
 
   // 칸을 벗어나면 0.5초를 기다리지 않고 바로 중복을 확인한다.
   fireEvent.blur(screen.getByLabelText(/^닉네임/));
@@ -545,12 +545,32 @@ describe('SignupClient 닉네임·이메일 자동 중복 확인', () => {
     render(<SignupClient />);
     fireEvent.change(screen.getByLabelText(/^닉네임/), { target: { value: '테스트닉' } });
     fireEvent.change(screen.getByLabelText(/^이메일/), { target: { value: 'signup@example.com' } });
-    fireEvent.change(screen.getByPlaceholderText('8자 이상'), { target: { value: 'password123' } });
-    fireEvent.change(screen.getByPlaceholderText('비밀번호 다시 입력'), { target: { value: 'password123' } });
+    fireEvent.change(screen.getByPlaceholderText('8자 이상'), { target: { value: 'Sunny-ride-4' } });
+    fireEvent.change(screen.getByPlaceholderText('비밀번호 다시 입력'), { target: { value: 'Sunny-ride-4' } });
     fireEvent.blur(screen.getByLabelText(new RegExp(`^${label}`)));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(message);
     expect(screen.getByRole('button', { name: '본인인증 하기' })).toBeDisabled();
+  });
+
+  // 서버가 거절할 비밀번호에 "사용할 수 있는 비밀번호예요"를 띄우면 안 된다 — 서버와 같은 판정 파일을 쓴다.
+  it('서버가 거절할 흔한 비밀번호는 사용할 수 있다고 하지 않고 이유를 알리며 다음 단계를 막는다', async () => {
+    render(<SignupClient />);
+    fillAccountStep();
+    const next = screen.getByRole('button', { name: '본인인증 하기' });
+    await waitFor(() => expect(next).toBeEnabled());
+
+    fireEvent.change(screen.getByPlaceholderText('8자 이상'), { target: { value: 'Qwer1234' } });
+    fireEvent.change(screen.getByPlaceholderText('비밀번호 다시 입력'), { target: { value: 'Qwer1234' } });
+
+    expect(screen.getByPlaceholderText('8자 이상')).toHaveAccessibleDescription('너무 흔한 비밀번호예요. 다른 비밀번호를 정해 주세요.');
+    expect(screen.queryByText('사용할 수 있는 비밀번호예요.')).not.toBeInTheDocument();
+    expect(next).toBeDisabled();
+
+    fireEvent.change(screen.getByPlaceholderText('8자 이상'), { target: { value: 'Sunny-ride-4' } });
+    fireEvent.change(screen.getByPlaceholderText('비밀번호 다시 입력'), { target: { value: 'Sunny-ride-4' } });
+    expect(screen.getByText('사용할 수 있는 비밀번호예요.')).toBeInTheDocument();
+    expect(next).toBeEnabled();
   });
 
   it('확인을 마친 값을 고치면 이전 판정이 사라져 다음 단계가 다시 막힌다', async () => {
@@ -895,7 +915,7 @@ describe('SignupClient 이미 가입된 번호 안내', () => {
     const everything = [window.sessionStorage, window.localStorage].flatMap((storage) => (
       Object.keys(storage).map((key) => `${key}=${storage.getItem(key)}`)
     )).join('\n');
-    expect(everything).not.toContain('password123');
+    expect(everything).not.toContain('Sunny-ride-4');
   });
 
   it('원래 가려던 곳(redirect)이 있으면 이메일과 함께 보관해, 로그인 뒤 연결을 마치거나 미루고 돌아갈 수 있게 한다', async () => {

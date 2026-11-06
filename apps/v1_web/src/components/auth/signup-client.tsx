@@ -22,6 +22,7 @@ import { V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
 import { clearV1IdentityCache } from '@/lib/query-keys';
 import { clearPendingEmailLink, savePendingEmailLink } from '@/lib/pending-email-link';
+import { COMMON_PASSWORD_MESSAGE, accountPasswordIssue } from '@/lib/account-password-rules';
 import { clearPendingSocialLink } from '@/lib/pending-social-link';
 import { getSavedRedirectPath, sanitizeRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
 import { displayInitials } from '@/lib/display-initials';
@@ -194,9 +195,11 @@ export function SignupClient() {
   });
   const passwordMismatch = passwordConfirm.length > 0 && password !== passwordConfirm;
   const passwordMatch = passwordConfirm.length > 0 && password === passwordConfirm;
-  const passwordTooShort = password.length > 0 && password.length < 8;
-  const passwordLongEnough = password.length >= 8;
-  const accountReady = nicknameCheck.verified && emailCheck.verified && passwordLongEnough && passwordMatch;
+  const passwordIssue = accountPasswordIssue(password);
+  const passwordTooShort = password.length > 0 && passwordIssue === 'too_short';
+  const passwordTooCommon = passwordIssue === 'too_common';
+  const passwordUsable = passwordIssue === null;
+  const accountReady = nicknameCheck.verified && emailCheck.verified && passwordUsable && passwordMatch;
   // normalizeSeparatedDigits 는 하이픈·공백만 걷어내므로 'ROLLING10ab' 같은 값도 길이 11이 된다.
   // 길이만 보고 인증을 열면 문자가 섞인 값으로 유료 SMS 발송을 시도하게 되므로 숫자 11자리만 허용한다.
   const isSendablePhone = /^\d{11}$/.test(phoneDigits);
@@ -417,8 +420,8 @@ export function SignupClient() {
         ? duplicateHint('닉네임', nicknameCheck.waiting)
         : !emailCheck.verified
           ? duplicateHint('이메일', emailCheck.waiting)
-          : !passwordLongEnough
-            ? '비밀번호는 8자 이상이어야 해요.'
+          : !passwordUsable
+            ? passwordTooCommon ? COMMON_PASSWORD_MESSAGE : '비밀번호는 8자 이상이어야 해요.'
             : '비밀번호 확인이 일치해야 해요.'
       : step === 'verify'
         ? !isSendablePhone
@@ -496,9 +499,11 @@ export function SignupClient() {
                 placeholder="8자 이상"
                 feedback={passwordTooShort
                   ? { kind: 'error', message: '8자 이상 입력해 주세요.' }
-                  : passwordLongEnough
-                    ? { kind: 'success', message: '사용할 수 있는 비밀번호예요.' }
-                    : null}
+                  : passwordTooCommon
+                    ? { kind: 'error', message: COMMON_PASSWORD_MESSAGE }
+                    : passwordUsable
+                      ? { kind: 'success', message: '사용할 수 있는 비밀번호예요.' }
+                      : null}
               />
 
               <AuthPasswordField

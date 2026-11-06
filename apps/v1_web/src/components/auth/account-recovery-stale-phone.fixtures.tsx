@@ -9,8 +9,12 @@ import { authUiServer, failure, RECOVERY_EMAIL, RECOVERY_PHONE, success, wireCal
 
 export const OTHER_PHONE = '01098765432';
 export const OLD_PHONE_ERROR = '이전 번호의 합성 계정 조회 오류예요.';
-export const SOCIAL_ACCOUNT = { maskedEmail: 'ka***@example.test', providers: ['kakao'], hasPassword: false, withdrawalPendingUntil: null } satisfies V1FoundAccount;
-export const EMAIL_ACCOUNT = { maskedEmail: 'ow***@example.test', providers: ['email'], hasPassword: true, withdrawalPendingUntil: null } satisfies V1FoundAccount;
+// A phone lookup carries no masked email, so the result card names the login method instead.
+export const SOCIAL_ACCOUNT = { maskedEmail: null, providers: ['kakao'], hasPassword: false, withdrawalPending: false, withdrawalPendingUntil: null } satisfies V1FoundAccount;
+export const EMAIL_ACCOUNT = { maskedEmail: null, providers: ['email'], hasPassword: true, withdrawalPending: false, withdrawalPendingUntil: null } satisfies V1FoundAccount;
+/** What the result card prints in the value slot for each account above. */
+export const SOCIAL_ACCOUNT_SHOWN = '카카오';
+export const EMAIL_ACCOUNT_SHOWN = '이메일';
 
 function deferredResponse() {
   let accept: ((response: Response) => void) | undefined;

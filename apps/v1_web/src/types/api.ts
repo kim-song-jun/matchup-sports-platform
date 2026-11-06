@@ -86,12 +86,18 @@ export type V1User = {
   onboardingStatus: string;
 };
 
-/** 휴대폰 본인인증으로 찾은 계정. 이메일은 마스킹된 값만 내려온다. */
+/**
+ * 계정 찾기로 찾은 계정. 휴대폰 인증만으로는 가입 수단(`providers`·`hasPassword`)과 탈퇴 대기 여부까지만 오고,
+ * `maskedEmail`·`withdrawalPendingUntil` 은 null 이다. 메일함 소유를 증명한 요청(이메일 찾기, 또는 번호 찾기에
+ * 같은 계정의 `email`+`emailProofToken` 을 함께 보낸 요청)에만 채워진다. 이메일은 마스킹된 값만 내려온다.
+ */
 export type V1FoundAccount = {
   maskedEmail: string | null;
   providers: string[];
   hasPassword: boolean;
-  /** 이 번호를 쥔 계정이 탈퇴 유예 중이면 유예가 끝나는 시각(ISO). 활성 계정이거나 탈퇴 신청 기록이 없으면 null. */
+  /** 탈퇴를 신청해 유예 중인 계정이면 true. 끝나는 날은 `withdrawalPendingUntil` 이 메일함 증명 뒤에만 채운다. */
+  withdrawalPending: boolean;
+  /** 탈퇴 유예가 끝나는 시각(ISO). 메일함 증명이 없거나 활성 계정이거나 탈퇴 신청 기록이 없으면 null. */
   withdrawalPendingUntil: string | null;
 };
 

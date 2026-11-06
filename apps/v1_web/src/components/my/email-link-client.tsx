@@ -25,6 +25,7 @@ import {
   SOCIAL_LINK_ADMIN_FORBIDDEN_CODE,
   SOCIAL_LINK_PROVIDER_EXISTS_CODE,
 } from '@/lib/auth-error-codes';
+import { COMMON_PASSWORD_MESSAGE, accountPasswordIssue } from '@/lib/account-password-rules';
 import { EMAIL_SEND_UNAVAILABLE_CODE, RECENT_LOGIN_REQUIRED_CODE } from '@/lib/auth-link-errors';
 import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
 import { emailLinkPath, LOGIN_METHODS_PATH, parseEmailLinkReturnTo } from '@/lib/link-result';
@@ -38,7 +39,6 @@ type Step = FormStep | 'done';
 
 const FORM_STEPS: readonly FormStep[] = ['email', 'code', 'password'];
 const MAX_EMAIL_LENGTH = 254;
-const MIN_PASSWORD_LENGTH = 8;
 
 const SEND_UNAVAILABLE_MESSAGE = '지금은 인증 메일을 보낼 수 없어요. 잠시 후 다시 시도해 주세요.';
 const OFFER_NOTE = '방금 가입하려던 이메일이에요. 비밀번호는 저장하지 않아서 새로 정해 주세요.';
@@ -203,7 +203,8 @@ export function EmailLinkClient() {
 
   const sendReady = normalizedEmail.length <= MAX_EMAIL_LENGTH && isPlausibleEmail(normalizedEmail);
   const codeStillValid = otp.phase === 'sent' && !otp.expired;
-  const passwordLongEnough = password.length >= MIN_PASSWORD_LENGTH;
+  const passwordIssue = accountPasswordIssue(password);
+  const passwordUsable = passwordIssue === null;
   const passwordMatch = passwordConfirm.length > 0 && password === passwordConfirm;
 
   const emailStepBusy = requestEmail.isPending;
@@ -236,7 +237,7 @@ export function EmailLinkClient() {
             }
       : {
           label: completeLink.isPending ? '연결하는 중...' : '연결하기',
-          disabled: !passwordLongEnough || !passwordMatch || completeLink.isPending,
+          disabled: !passwordUsable || !passwordMatch || completeLink.isPending,
           loading: completeLink.isPending,
           onClick: () => { void submitPassword(); },
         };
@@ -249,7 +250,9 @@ export function EmailLinkClient() {
         : normalizedEmail === '' ? '이메일을 입력해 주세요.' : '이메일 형식을 확인해 주세요.'
       : step === 'code'
         ? '인증번호 6자리를 입력해 주세요.'
-        : !passwordLongEnough ? '비밀번호는 8자 이상이어야 해요.' : '비밀번호 확인이 일치해야 해요.';
+        : !passwordUsable
+          ? passwordIssue === 'too_common' ? COMMON_PASSWORD_MESSAGE : '비밀번호는 8자 이상이어야 해요.'
+          : '비밀번호 확인이 일치해야 해요.';
 
   const copy = step === 'email'
     ? {
@@ -365,9 +368,9 @@ export function EmailLinkClient() {
                 onChange={setPassword}
                 placeholder="8자 이상"
                 feedback={password.length > 0
-                  ? passwordLongEnough
+                  ? passwordUsable
                     ? { kind: 'success', message: '사용할 수 있는 비밀번호예요.' }
-                    : { kind: 'error', message: '8자 이상 입력해 주세요.' }
+                    : { kind: 'error', message: passwordIssue === 'too_common' ? COMMON_PASSWORD_MESSAGE : '8자 이상 입력해 주세요.' }
                   : null}
               />
               <AuthPasswordField

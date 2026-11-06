@@ -645,11 +645,19 @@ describe('EmailLinkService.complete', () => {
 
     it('find-account by phone lists email among the providers and reports a password', async () => {
       const { verified, complete, recovery } = await build(kakaoCaller());
-      const find = () => recovery.findAccountByPhone({ phone: PHONE, proofToken: issuePhoneProofToken(PHONE, 'password_reset') });
-      expect(await find()).toMatchObject({ maskedEmail: 'co***@kakao-mail.example', providers: ['kakao'], hasPassword: false });
+      // The masked address only comes back with a proof for the account's own mailbox.
+      const find = (mailbox: string) => recovery.findAccountByPhone({
+        phone: PHONE,
+        proofToken: issuePhoneProofToken(PHONE, 'password_reset'),
+        email: mailbox,
+        emailProofToken: issueEmailProofToken(mailbox, 'password_reset'),
+      });
+      expect(await find('contact@kakao-mail.example')).toMatchObject({ maskedEmail: 'co***@kakao-mail.example', providers: ['kakao'], hasPassword: false });
       await complete(await verified());
 
-      expect(await find()).toMatchObject({ maskedEmail: 'ru***@example.com', providers: ['kakao', 'email'], hasPassword: true });
+      expect(await find(NEW_EMAIL)).toMatchObject({ maskedEmail: 'ru***@example.com', providers: ['kakao', 'email'], hasPassword: true });
+      // The old contact address is no longer this account's mailbox.
+      expect(await find('contact@kakao-mail.example')).toMatchObject({ maskedEmail: null, providers: ['kakao', 'email'], hasPassword: true });
     });
   });
 

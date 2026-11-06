@@ -494,6 +494,29 @@ describe('EmailLinkClient — 비밀번호 단계', () => {
     expect(connect).toBeEnabled();
   });
 
+  // 서버가 거절할 비밀번호에 "사용할 수 있는 비밀번호예요"를 띄우면 안 된다 — 서버와 같은 판정 파일을 쓴다.
+  it('서버가 거절할 흔한 비밀번호는 사용할 수 있다고 하지 않고 이유를 알리며 버튼을 잠근다', async () => {
+    const user = userEvent.setup();
+    renderClient();
+    await heading(EMAIL_STEP);
+    await reachPasswordStep(user);
+
+    await user.type(screen.getByLabelText('비밀번호'), 'Qwer1234');
+    await user.type(screen.getByLabelText('비밀번호 확인'), 'Qwer1234');
+
+    expect(screen.getByLabelText('비밀번호')).toHaveAccessibleDescription('너무 흔한 비밀번호예요. 다른 비밀번호를 정해 주세요.');
+    expect(screen.queryByText('사용할 수 있는 비밀번호예요.')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('비밀번호')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByRole('button', { name: '연결하기' })).toBeDisabled();
+
+    await user.clear(screen.getByLabelText('비밀번호'));
+    await user.clear(screen.getByLabelText('비밀번호 확인'));
+    await user.type(screen.getByLabelText('비밀번호'), PASSWORD);
+    await user.type(screen.getByLabelText('비밀번호 확인'), PASSWORD);
+    expect(screen.getByText('사용할 수 있는 비밀번호예요.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '연결하기' })).toBeEnabled();
+  });
+
   it('보기 토글은 그 칸의 글자만 드러내고 누른 상태를 알린다', async () => {
     const user = userEvent.setup();
     renderClient();

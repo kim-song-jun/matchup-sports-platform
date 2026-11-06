@@ -12,6 +12,7 @@ import {
   useV1FindAccountByEmail,
   useV1ResetPasswordByEmail,
 } from '@/hooks/use-v1-api';
+import { COMMON_PASSWORD_MESSAGE, accountPasswordIssue } from '@/lib/account-password-rules';
 import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
 import { sanitizeRedirectPath } from '@/lib/session-storage';
 import { usableWithdrawalDate } from '@/lib/withdrawal-grace';
@@ -59,6 +60,9 @@ function FoundAccountCard({ account, emailLoginHref, loginHref, onResetPassword,
     <Card pad={16} className="tm-auth-soft-card">
       <div className="tm-text-body-lg">{label}</div>
       {value ? <div className="tm-text-heading" style={{ marginTop: 4 }}>{value}</div> : null}
+      {account.withdrawalPending ? (
+        <div className="tm-text-caption" style={{ marginTop: 8 }}>탈퇴를 신청한 계정이에요. 로그인하면 탈퇴를 취소할 수 있어요.</div>
+      ) : null}
       {guidance ? <div className="tm-text-caption" style={{ marginTop: 8 }}>{guidance}</div> : null}
       {appleUnavailable ? <div className="tm-text-caption" style={{ marginTop: 4 }}>Apple 로그인은 iOS 앱에서 쓸 수 있어요.</div> : null}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 16 }}>
@@ -234,7 +238,8 @@ export function AccountRecoveryClient({ initialMode, backHref = '/login/email', 
   const matchesCurrentAccount = !returnToSettings || Boolean(currentAccount.data
     && normalizedEmail && normalizedEmail === accountEmail.trim().toLowerCase());
   const passwordFormVisible = mode === 'reset-password' && verifiedForReset && matchesCurrentAccount && !resetBlockedSocialOnly && !resetDone;
-  const passwordReady = newPassword.length >= 8 && newPassword === passwordConfirm;
+  const passwordIssue = accountPasswordIssue(newPassword);
+  const passwordReady = passwordIssue === null && newPassword === passwordConfirm;
 
   const submitReset = async () => {
     if (!mounted.current || mode !== 'reset-password' || emailFlowGeneration !== emailRequestGeneration.current
@@ -382,6 +387,7 @@ export function AccountRecoveryClient({ initialMode, backHref = '/login/email', 
               <label className="tm-auth-field" htmlFor={`${fieldId}-password`}>
                 <span className="tm-text-label">새 비밀번호</span>
                 <input id={`${fieldId}-password`} className="tm-input tm-auth-input" onChange={(event) => setNewPassword(event.target.value)} placeholder="8자 이상" type="password" value={newPassword} />
+                {passwordIssue === 'too_common' ? <span className="tm-text-caption tm-auth-field-helper-error" role="alert">{COMMON_PASSWORD_MESSAGE}</span> : null}
               </label>
               <label className="tm-auth-field" htmlFor={`${fieldId}-password-confirm`}>
                 <span className="tm-text-label">새 비밀번호 확인</span>

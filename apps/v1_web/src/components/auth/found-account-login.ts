@@ -6,7 +6,7 @@ export type FoundAccountLoginLink = { href: string; label: string; kakao: boolea
 export type FoundAccountSummary = {
   /** 안내 카드의 첫 줄 라벨. */
   label: string;
-  /** 라벨 아래 값(마스킹 이메일 또는 소셜 이름). 보여 줄 게 없으면 null. */
+  /** 라벨 아래 값(마스킹 이메일, 없으면 가입 수단 이름). 보여 줄 게 없으면 null. */
   value: string | null;
   /** 이 환경의 로그인 첫 화면에 있는 소셜 제공자 이름을 `·` 로 이은 것. 없으면 빈 문자열. */
   socialNames: string;
@@ -26,6 +26,8 @@ export function describeFoundAccount(
   const hasApple = account.providers.includes('apple');
   const appleButton = hasApple && isNativeAppleSignInAvailable();
   const socialNames = [hasKakao ? '카카오' : null, hasApple ? 'Apple' : null].filter(Boolean).join('·');
+  // 번호로만 찾으면 마스킹 이메일이 오지 않는다 — 비밀번호 로그인이 있는 계정은 값 자리에 '이메일'이라고 알린다.
+  const methodNames = [account.hasPassword ? '이메일' : null, socialNames || null].filter(Boolean).join('·');
   const links: FoundAccountLoginLink[] = [
     ...(account.hasPassword ? [{ href: emailLoginHref, label: socialNames ? '이메일로 로그인하기' : '로그인하러 가기', kakao: false }] : []),
     ...(hasKakao ? [{ href: loginHref, label: '카카오로 로그인하기', kakao: true }] : []),
@@ -33,10 +35,10 @@ export function describeFoundAccount(
   ];
   let label = '가입한 로그인 방법';
   if (account.maskedEmail) label = '가입한 이메일';
-  else if (!socialNames) label = '로그인 방법을 확인하지 못했어요';
+  else if (!methodNames) label = '로그인 방법을 확인하지 못했어요';
   return {
     label,
-    value: account.maskedEmail ?? (socialNames || null),
+    value: account.maskedEmail ?? (methodNames || null),
     socialNames,
     appleUnavailable: hasApple && !appleButton,
     links,

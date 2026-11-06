@@ -10932,3 +10932,13 @@ html[data-teameet-native-app='android'] .tm-search-error-toast {
 .tm-final-color-7 { color: var(--final-7-text); background: var(--final-7-bg); }
 .tm-final-color-8 { color: var(--final-8-text); background: var(--final-8-bg); }
 .tm-final-color-9 { color: var(--final-9-text); background: var(--final-9-bg); }
+
+/* Each filter keeps its own horizontal scroll offset, including on narrow desktops. */
+.tm-bracket-filter-row { padding: 12px 20px 0; min-width: 0; }
+.tm-bracket-filter-row > p { margin-bottom: 4px; }
+.tm-bracket-filter-scroll { display: flex; flex-wrap: nowrap; gap: 8px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; padding: 4px 0; }
+.tm-bracket-filter-scroll > button { flex-shrink: 0; white-space: nowrap; }
+.tm-bracket-filter-dot { display: inline-block; width: 8px; height: 8px; border-radius: var(--radius-pill); background: currentColor; margin-right: 4px; }
+
+.tm-bracket-round-jumps { display: flex; flex-wrap: nowrap; gap: 8px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; margin-bottom: 12px; padding: 4px 0; }
+.tm-bracket-round-jumps > button { flex-shrink: 0; white-space: nowrap; }

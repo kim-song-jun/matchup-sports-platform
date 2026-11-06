@@ -868,11 +868,12 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
         { id: 'final-c', name: 'Renamed', colorIndex: 2, rules: [], thirdPlace: false },
         { id: 'final-a', name: 'Champion', colorIndex: 0, rules: [], thirdPlace: false },
       ] },
-      groups: [{ id: 'group-a', name: 'A', phase: 'group', sortOrder: 0, advanceCount: null, bracketTrack: 'overall', groupTeams: [], byeSlots: [], standings: [] }],
+      groups: [{ id: 'group-a', name: 'A', phase: 'group', sortOrder: 0, advanceCount: null, bracketTrack: 'overall', groupTeams: [], byeSlots: [], standings: [] }, { id: 'final-renamed', name: 'Renamed Final', phase: 'final', sortOrder: 1, advanceCount: null, bracketTrack: 'Renamed', groupTeams: [], byeSlots: [], standings: [] }],
     } as never);
     const summary = new Map([['group-a', { sharedRankByRegistrationId: new Map<string, number>(), qualification: null,
       qualificationByTrack: { Champion: { advancingRegistrationIds: ['r1'], undecided: false }, Renamed: { advancingRegistrationIds: ['r2'], undecided: false }, Pending: null } }]]);
     const result = presentTournamentDetail(row, true, new Date(), false, [], new Map(), summary);
+    expect(result.groups[1]).toMatchObject({ bracketColorIndex: 2 });
     expect(result.groups[0].qualificationByTrack).toEqual({
       Champion: { advancingRegistrationIds: ['r1'], undecided: false, colorIndex: 0 },
       Renamed: { advancingRegistrationIds: ['r2'], undecided: false, colorIndex: 2 }, Pending: null,

@@ -78,7 +78,7 @@ function getFixturePhase(round: string): keyof typeof PHASE_ORDER | null {
   return null;
 }
 
-function getRoundLabel(key: string): string {
+export function getRoundLabel(key: string): string {
   return PHASE_LABEL[key] ?? key;
 }
 
@@ -858,7 +858,7 @@ function SingleTournamentBracket({ fixtures, groups, selectedRoundKey }: Tournam
   return (
     <div>
       {mainRounds.length > 1 && (
-        <nav aria-label="대진 단계 이동" className="flex flex-wrap gap-2 mb-3">
+        <nav aria-label="대진 단계 이동" className="tm-bracket-round-jumps">
           {mainRounds.map((round) => (
             <button key={round.key} type="button" className="tm-chip" onClick={() => {
               const container = scrollRef.current;

@@ -4102,6 +4102,9 @@ export type V1TournamentGroup = {
   qualification: V1TournamentGroupQualification | null;
   /** Older serialized groups may omit this; omission has the same meaning as overall. */
   bracketTrack?: V1TournamentBracketTrack;
+  /** Stable color available even before preliminary qualification is resolved. */
+  bracketColorIndex?: number;
+
   qualificationByTrack?: Record<string, V1TournamentGroupQualification | null>;
 };
 

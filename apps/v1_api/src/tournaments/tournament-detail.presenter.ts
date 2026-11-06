@@ -460,6 +460,7 @@ export function presentTournamentDetail(
       name: group.name,
       phase: group.phase,
       bracketTrack: group.bracketTrack,
+      ...(group.phase !== 'group' && finalColors.has(group.bracketTrack) ? { bracketColorIndex: finalColors.get(group.bracketTrack) } : {}),
       sortOrder: group.sortOrder,
       advanceCount: group.advanceCount,
       qualification: groupStandingSummaries.get(group.id)?.qualification ?? null,

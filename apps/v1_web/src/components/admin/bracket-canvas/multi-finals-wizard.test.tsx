@@ -11,7 +11,7 @@ const success = (data: unknown) => HttpResponse.json({ status: 'success', data }
 const registrations = ['가팀', '나팀', '다팀', '라팀'].map((name, i) => ({ id: `reg-${i}`, team: { id: `team-${i}`, name } }));
 const savedView = (): MultiFinalView => ({ revision: 1, groups: [{ id: 'g-1', name: 'A조', capacity: 4, legs: 1 }], generated: false, registrations,
   groupStandings: [{ groupId: 'g-1', name: 'A조', complete: true, rows: registrations.map((reg, i) => ({ registrationId: reg.id, teamName: reg.team.name, position: i + 1, points: 9 - i * 3, wins: 3 - i, draws: 0, losses: i, goalsFor: 3 - i, goalsAgainst: i, tiedRegistrationIds: [] })) }],
-  finals: [{ name: '챔피언', thirdPlace: false, rules: [{ groupId: 'g-1', rank: 1 }, { groupId: 'g-1', rank: 2 }], registrationIds: null, manual: false, suggestedRegistrationIds: ['reg-0', 'reg-1'], unresolved: [] }] });
+  finals: [{ id: 'final-0', colorIndex: 0, name: '챔피언', thirdPlace: false, rules: [{ groupId: 'g-1', rank: 1 }, { groupId: 'g-1', rank: 2 }], registrationIds: null, manual: false, suggestedRegistrationIds: ['reg-0', 'reg-1'], unresolved: [] }] });
 const server = setupServer(http.post('*/api/v1/logs/client-error', () => success({})));
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => { cleanup(); server.resetHandlers(); });

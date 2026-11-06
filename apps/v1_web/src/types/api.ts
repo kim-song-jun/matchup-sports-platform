@@ -4104,7 +4104,6 @@ export type V1TournamentGroup = {
   bracketTrack?: V1TournamentBracketTrack;
   /** Stable color available even before preliminary qualification is resolved. */
   bracketColorIndex?: number;
-
   qualificationByTrack?: Record<string, V1TournamentGroupQualification | null>;
 };
 

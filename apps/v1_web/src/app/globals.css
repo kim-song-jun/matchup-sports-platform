@@ -10910,7 +10910,7 @@ html[data-teameet-native-app='android'] .tm-search-error-toast {
   --final-8-text: #526c24; --final-8-bg: #eef3e3;
   --final-9-text: #925092; --final-9-bg: #f6ebf6;
 }
-.dark {
+:root.dark {
   --final-0-text: #8dbbff; --final-0-bg: #182b45;
   --final-1-text: #ffc286; --final-1-bg: #362819;
   --final-2-text: #79d6ca; --final-2-bg: #17332f;
@@ -10936,9 +10936,10 @@ html[data-teameet-native-app='android'] .tm-search-error-toast {
 /* Each filter keeps its own horizontal scroll offset, including on narrow desktops. */
 .tm-bracket-filter-row { padding: 12px 20px 0; min-width: 0; }
 .tm-bracket-filter-row > p { margin-bottom: 4px; }
-.tm-bracket-filter-scroll { display: flex; flex-wrap: nowrap; gap: 8px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; padding: 4px 0; }
+/* 4px padding (net zero via negative margin) keeps chip focus rings inside the scroll box. */
+.tm-bracket-filter-scroll { display: flex; flex-wrap: nowrap; gap: 8px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; padding: 4px; margin-inline: -4px; }
 .tm-bracket-filter-scroll > button { flex-shrink: 0; white-space: nowrap; }
 .tm-bracket-filter-dot { display: inline-block; width: 8px; height: 8px; border-radius: var(--radius-pill); background: currentColor; margin-right: 4px; }
 
-.tm-bracket-round-jumps { display: flex; flex-wrap: nowrap; gap: 8px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; margin-bottom: 12px; padding: 4px 0; }
+.tm-bracket-round-jumps { display: flex; flex-wrap: nowrap; gap: 8px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; margin-bottom: 12px; padding: 4px; }
 .tm-bracket-round-jumps > button { flex-shrink: 0; white-space: nowrap; }

@@ -138,6 +138,8 @@ export class MultiFinalsService {
       if (!tournament.competitionConfigVersionId) throw new ConflictException({ code: 'COMPETITION_CONFIG_REQUIRED', message: '대회 경기 규칙을 먼저 저장해 주세요.' });
       const confirmed = new Set((await this.confirmed(tx, id)).map(r => r.id)); this.assertTeams(dto.finals, confirmed);
       for (const group of dto.groups) for (const reg of group.registrationIds ?? []) if (!confirmed.has(reg)) invalidMultiFinal('이 대회의 확정 참가팀만 선택할 수 있어요.');
+      // Resolve identities before any teardown so a stale or duplicate id fails without destructive work.
+      const colored = reconcileFinalColors(this.config(tournament.multiFinals), dto.finals.map(f => ({ ...f, name: f.name.trim() })));
       if (editing) {
         const scopes = dto.finals.map(f => f.name.trim());
         if (await tx.v1TournamentAward.count({ where: { tournamentId: id, bracketTrack: { notIn: ['overall', ...scopes] } } })
@@ -155,7 +157,7 @@ export class MultiFinalsService {
       const assignments = dto.groups.flatMap((g, i) => (g.registrationIds ?? []).map((registrationId, j) => ({ slotId: materialized.slotIds.get(`${i}:${j}`)!, registrationId })));
       if (assignments.length) await assignSlotsBatchInTx(tx, { admin, adminContext: this.admins, games: this.games }, assignments);
       const config: Config = { groups: dto.groups.map((g, i) => ({ id: materialized.groupIds.get(String(i))!, name: g.name.trim(), capacity: g.capacity, legs: g.legs })),
-        ...reconcileFinalColors(this.config(tournament.multiFinals), dto.finals.map(f => ({ ...f, name: f.name.trim(), rules: f.rules.map(rule => ({ ...rule, groupId: materialized.groupIds.get(rule.groupId)! })) }))) };
+        finals: colored.finals.map(f => ({ ...f, rules: f.rules.map(rule => ({ ...rule, groupId: materialized.groupIds.get(rule.groupId)! })) })), nextColorIndex: colored.nextColorIndex };
       await tx.v1Tournament.update({ where: { id }, data: { multiFinals: JSON.parse(JSON.stringify(config)), multiFinalsRevision: { increment: 1 } } });
       await this.admins.logAdminAction(admin, { action: editing ? 'tournament.multi_finals.preliminary.update' : 'tournament.multi_finals.setup', targetType: 'tournament', targetId: id, beforeJson: tournament.multiFinals ?? undefined, afterJson: JSON.parse(JSON.stringify(config)) }, tx);
       return this.view(tx, id);
@@ -202,9 +204,9 @@ export class MultiFinalsService {
         tx.v1TournamentAwardSet.count({ where: { tournamentId: id, bracketTrack: { notIn: scopes } } }),
       ]);
       if (awards || awardSets) throw new ConflictException({ code: 'BRACKET_TRACK_AWARDS_REQUIRE_RESCOPING', message: '삭제·이름 변경할 토너먼트의 시상 범위를 먼저 정리해 주세요.' });
+      const next: Config = { ...config, ...reconcileFinalColors(config, dto.finals.map(f => ({ ...f, name: f.name.trim() }))) };
       if (sameNamedFinalStructure(config.finals, dto.finals)) await this.assertUnstarted(tx, id);
       else await this.clearFinals(tx, admin, id);
-      const next: Config = { ...config, ...reconcileFinalColors(config, dto.finals.map(f => ({ ...f, name: f.name.trim() }))) };
       await tx.v1Tournament.update({ where: { id }, data: { multiFinals: JSON.parse(JSON.stringify(next)), multiFinalsRevision: { increment: 1 } } });
       await this.admins.logAdminAction(admin, { action: 'tournament.multi_finals.selection', targetType: 'tournament', targetId: id, beforeJson: JSON.parse(JSON.stringify(config)), afterJson: JSON.parse(JSON.stringify(next)) }, tx);
       return this.view(tx, id);

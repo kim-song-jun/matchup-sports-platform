@@ -1,0 +1,42 @@
+{
+  "browserPid": 21004,
+  "parentPid": 20986,
+  "persona": "public anonymous",
+  "results": [
+    {
+      "kind": "single",
+      "width": 390,
+      "errors": [
+        {
+          "text": "Failed to load resource: the server responded with a status of 401 ()",
+          "location": {
+            "url": "https://alpha.teameet.co.kr/api/v1/auth/me",
+            "lineNumber": 0,
+            "columnNumber": 0
+          }
+        }
+      ],
+      "failedResponses": [
+        {
+          "path": "/api/v1/auth/me",
+          "status": 401
+        }
+      ],
+      "abortedRequests": [
+        {
+          "path": "/g/collect",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "path": "/g/collect",
+          "error": "net::ERR_ABORTED"
+        }
+      ],
+      "serving": "79504b070382d43fed2bc70c8c9014d5bc4659ea",
+      "text": "종점FS 우승!\n경기 결과 보기",
+      "overflow": false,
+      "resultLinkReached": true
+    }
+  ],
+  "cleanup": true
+}

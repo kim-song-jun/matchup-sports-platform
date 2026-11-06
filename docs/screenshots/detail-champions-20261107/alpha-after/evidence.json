@@ -1,0 +1,228 @@
+{
+  "expected": "e8c5a7bbe938d7934df6c7287d9381fb255f67a3",
+  "browserPid": 22410,
+  "parentPid": 22357,
+  "persona": "public anonymous",
+  "results": [
+    {
+      "kind": "multi",
+      "width": 390,
+      "errors": [
+        {
+          "text": "Failed to load resource: the server responded with a status of 401 ()",
+          "location": {
+            "url": "https://alpha.teameet.co.kr/api/v1/auth/me",
+            "lineNumber": 0,
+            "columnNumber": 0
+          }
+        }
+      ],
+      "failedResponses": [
+        {
+          "path": "/api/v1/auth/me",
+          "status": 401
+        }
+      ],
+      "abortedRequests": [
+        {
+          "path": "/g/collect",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "path": "/g/collect",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "path": "/g/collect",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "path": "/tournaments/699952df-2a35-4e17-a70d-547d624bf3dd/results",
+          "error": "net::ERR_ABORTED"
+        }
+      ],
+      "serving": "e8c5a7bbe938d7934df6c7287d9381fb255f67a3",
+      "text": "토너먼트별 우승팀\n프리미어\nQC1106 리허설 01팀\n챌린지\nQC1106 리허설 03팀\n경기 결과 보기",
+      "overflow": false,
+      "resultLinkReached": true
+    },
+    {
+      "kind": "single",
+      "width": 390,
+      "errors": [
+        {
+          "text": "Failed to load resource: the server responded with a status of 401 ()",
+          "location": {
+            "url": "https://alpha.teameet.co.kr/api/v1/auth/me",
+            "lineNumber": 0,
+            "columnNumber": 0
+          }
+        }
+      ],
+      "failedResponses": [
+        {
+          "path": "/api/v1/auth/me",
+          "status": 401
+        }
+      ],
+      "abortedRequests": [
+        {
+          "path": "/g/collect",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "path": "/g/collect",
+          "error": "net::ERR_ABORTED"
+        }
+      ],
+      "serving": "e8c5a7bbe938d7934df6c7287d9381fb255f67a3",
+      "text": "종점FS 우승!\n경기 결과 보기",
+      "overflow": false,
+      "resultLinkReached": true
+    },
+    {
+      "kind": "multi",
+      "width": 768,
+      "errors": [
+        {
+          "text": "Failed to load resource: the server responded with a status of 401 ()",
+          "location": {
+            "url": "https://alpha.teameet.co.kr/api/v1/auth/me",
+            "lineNumber": 0,
+            "columnNumber": 0
+          }
+        }
+      ],
+      "failedResponses": [
+        {
+          "path": "/api/v1/auth/me",
+          "status": 401
+        }
+      ],
+      "abortedRequests": [
+        {
+          "path": "/g/collect",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "path": "/g/collect",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "path": "/g/collect",
+          "error": "net::ERR_ABORTED"
+        }
+      ],
+      "serving": "e8c5a7bbe938d7934df6c7287d9381fb255f67a3",
+      "text": "토너먼트별 우승팀\n프리미어\nQC1106 리허설 01팀\n챌린지\nQC1106 리허설 03팀\n경기 결과 보기",
+      "overflow": false,
+      "resultLinkReached": true
+    },
+    {
+      "kind": "single",
+      "width": 768,
+      "errors": [
+        {
+          "text": "Failed to load resource: the server responded with a status of 401 ()",
+          "location": {
+            "url": "https://alpha.teameet.co.kr/api/v1/auth/me",
+            "lineNumber": 0,
+            "columnNumber": 0
+          }
+        }
+      ],
+      "failedResponses": [
+        {
+          "path": "/api/v1/auth/me",
+          "status": 401
+        }
+      ],
+      "abortedRequests": [
+        {
+          "path": "/g/collect",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "path": "/g/collect",
+          "error": "net::ERR_ABORTED"
+        }
+      ],
+      "serving": "e8c5a7bbe938d7934df6c7287d9381fb255f67a3",
+      "text": "종점FS 우승!\n경기 결과 보기",
+      "overflow": false,
+      "resultLinkReached": true
+    },
+    {
+      "kind": "multi",
+      "width": 1440,
+      "errors": [
+        {
+          "text": "Failed to load resource: the server responded with a status of 401 ()",
+          "location": {
+            "url": "https://alpha.teameet.co.kr/api/v1/auth/me",
+            "lineNumber": 0,
+            "columnNumber": 0
+          }
+        }
+      ],
+      "failedResponses": [
+        {
+          "path": "/api/v1/auth/me",
+          "status": 401
+        }
+      ],
+      "abortedRequests": [
+        {
+          "path": "/g/collect",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "path": "/tournaments/699952df-2a35-4e17-a70d-547d624bf3dd/bracket",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "path": "/tournaments/699952df-2a35-4e17-a70d-547d624bf3dd/results",
+          "error": "net::ERR_ABORTED"
+        }
+      ],
+      "serving": "e8c5a7bbe938d7934df6c7287d9381fb255f67a3",
+      "text": "토너먼트별 우승팀\n프리미어\nQC1106 리허설 01팀\n챌린지\nQC1106 리허설 03팀\n경기 결과 보기",
+      "overflow": false,
+      "resultLinkReached": true
+    },
+    {
+      "kind": "single",
+      "width": 1440,
+      "errors": [
+        {
+          "text": "Failed to load resource: the server responded with a status of 401 ()",
+          "location": {
+            "url": "https://alpha.teameet.co.kr/api/v1/auth/me",
+            "lineNumber": 0,
+            "columnNumber": 0
+          }
+        }
+      ],
+      "failedResponses": [
+        {
+          "path": "/api/v1/auth/me",
+          "status": 401
+        }
+      ],
+      "abortedRequests": [
+        {
+          "path": "/g/collect",
+          "error": "net::ERR_ABORTED"
+        }
+      ],
+      "serving": "e8c5a7bbe938d7934df6c7287d9381fb255f67a3",
+      "text": "종점FS 우승!\n경기 결과 보기",
+      "overflow": false,
+      "resultLinkReached": true
+    }
+  ],
+  "cleanup": true,
+  "verdict": "PASS: 6/6 display, result navigation and overflow checks",
+  "expectedAnonymousAuthResponse": "Each fresh anonymous browser context receives auth/me401, also observed in the before baseline; recorded without claiming console/network zero.",
+  "unexpectedErrors": []
+}

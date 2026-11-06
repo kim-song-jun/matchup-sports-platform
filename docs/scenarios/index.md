@@ -1,3 +1,7 @@
+## 2026-11-07 — 상세 토너먼트별 우승팀 (#2196, alpha 확인 완료)
+
+[Task](../../.github/tasks/20261113-bracket-group-name-filters.md). 다중 결선 완료 대회 상세의 우승 안내를 토너먼트별로 표시하며 단일은 기존 팀명 우승! 유지. CI/alpha 배포 PASS(serving e8c5a7bbe9). 공개다중/단일×390/768/1440 6/6 표시·결과링크·overflow 검사 PASS. 익명 auth/me401은 baseline과 동일, 그 외 오류0. [사후 증거](../screenshots/detail-champions-20261107/alpha-after/evidence.json).
+
 ## 2026-11-06 — 결선 실제 강수·조 이름 수정·종료 화면 (검증/배포 대기)
 
 [시나리오](./multi-finals-deferred-teams-20261104.md#2026-11-06--실제-강수조-이름-수정종료-화면-후속) · [task](../../.github/tasks/20261113-bracket-group-name-filters.md). 선행 #2181의 강수 생성 규칙에 맞춘 기존 자동 명칭 보정, 구조 보호를 유지한 조 이름 수정 및 예선 설정·revision 동기화, 공개 명칭 반영, 토너먼트별 기존 최종결과 UI 재사용을 구현했다. #2181 통합 회귀 API335/Web398 PASS, 격리 PostgreSQL 보정10시나리오/재실행 PASS. 생성기 중복 수정은 제외하고 #2181 의존 Draft PR로 제출한다. alpha before 공개6/6(console/network/overflow0), after 공개0/6·admin0/3폭(미배포/관리자 인증 미제공). CI/전체 migration replay 미실행, 실환경 데이터 변경 없음.

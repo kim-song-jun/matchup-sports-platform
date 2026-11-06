@@ -166,3 +166,19 @@ Copilot 요청은 CLI/REST/공식 GraphQL 두 경로에서 성공 응답을 받�
 
 ### 상세 우승 안내 PR/alpha 승인 (2026-11-07)
 사용자가 로컬 결과를 확인한 뒤 PR 제출·리뷰 생략·alpha 배포를 명시 승인했다. 이번 변경의 Copilot 조건은 사용자 예외로 생략하며 CI/충돌/미해결 스레드를 확인해 dev에 머지한다. 단일 대회의 기존 안내를 유지하고 다중 결선만 트랙별 우승팀/미확정 상태를 표시한다. 기존85개 회귀와 타입 검사 및 local3폭 증거를 재사용하고 전체 검증은 CI가 수행한다. alpha after3폭·실제 serving SHA·결과 링크·console/network 확인은 배포 후 실행한다.
+
+
+### #2196 dev 머지 및 alpha 배포 추적
+- 사용자 명시 승인으로 Copilot 리뷰를 생략했다. PR #2196 CI42251298418 Gates/API/Web 모두 SUCCESS, base dev / MERGEABLE+CLEAN / unresolved0 확인 후 merge했다.
+- merge `e8c5a7bbe938d7934df6c7287d9381fb255f67a3`, matching dev push CI42252813357 / alpha42252813368 진행 중. 로컬 dev를 origin/dev에 동기화했다.
+- local85 tests/typecheck/pattern PASS. 로컬 서버19525/19542는 종료했으며 브라우저19644/21004도 종료했다. 코드의 untracked dependency symlink를 제거하고 tracked diff를 확인했다.
+- 사후 증거는 fresh docs/detail-champions-alpha-20261107에서 기록한다. 단일 기준선: 실제 alpha completed knockout8c4199cd의 종점FS 우승 및 결과링크 정상, 모바일 screenshot 확보. 익명 auth/me401과 분석 요청 취소는 원본 증거에 별도 기록했다.
+
+
+### #2196 alpha 검증 완료 (2026-11-07 KST)
+- matching dev push CI [42252813357](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/42252813357) Gates/API/Web 모두 SUCCESS. [alpha 배포42252813368](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/42252813368) SUCCESS.
+- HTTP200, release `1.13.4-alpha.20261107.ge8c5a7bbe938`, serving `e8c5a7bbe938d7934df6c7287d9381fb255f67a3` 실제 확인.
+- 공개 다중/단일2routes×390/768/1440=6/6 PASS. 다중은 프리미어 QC1106 리허설01팀/챌린지03팀, 단일은 기존 종점FS 우승! 유지. 실제 결과 링크 클릭6/6 도착, overflow0, 예상 밖 오류0.
+- 익명 fresh context마다 auth/me401이 console/network에 기록됐다(변경 전 단일 기준선에서도 동일). 분석/Next prefetch 취소는 증거에 분리 기록했다. console/network 전체0으로 주장하지 않는다.
+- [사후 증거](../../docs/screenshots/detail-champions-20261107/alpha-after/evidence.json), 변경 전alpha/후local 및 실제 배포후3폭 screenshot 포함. headed browser22410(parent22357) 종료. local서버19525/19542 및 이전 브라우저도 종료.
+- 이번 작업은 사용자 명시 예외로 Copilot 리뷰 없이 완료했으며 clean 리뷰로 판정하지 않았다. dev 머지·alpha 배포 완료, main/prod 변경 없음.

@@ -68,8 +68,7 @@ function buildFilterSql(query: TournamentListQueryDto): Prisma.Sql {
   if (query.sportId) conditions.push(Prisma.sql`t.sport_id = ${query.sportId}`);
   // The card's single state badge is the list's group, so the filter selects exactly the rows showing that badge.
   if (query.stage) conditions.push(Prisma.sql`(${GROUP_RANK_SQL}) = ${STAGE_RANK[query.stage]}`);
-  if (query.genderCategory) conditions.push(query.genderCategory === 'unspecified'
-    ? Prisma.sql`t.gender_category IS NULL` : Prisma.sql`t.gender_category::text = ${query.genderCategory}`);
+  if (query.genderCategory) conditions.push(Prisma.sql`t.gender_category::text = ${query.genderCategory}`);
   if (query.format) conditions.push(Prisma.sql`t.format::text = ${query.format}`);
   if (query.feeMin !== undefined) conditions.push(Prisma.sql`t.entry_fee >= ${query.feeMin}`);
   if (query.feeMax !== undefined) conditions.push(Prisma.sql`t.entry_fee <= ${query.feeMax}`);

@@ -54,7 +54,12 @@ describe('대회·리그 필터 URL 계약', () => {
     expect(discoveryRangeError(read('dateFrom=2026-11-30&dateTo=2026-11-01'))).toEqual({ field: 'date', message: expect.stringContaining('종료 날짜') });
     expect(discoveryRangeError(read('feeMin=100&feeMax=0', 'tournament'))).toEqual({ field: 'fee', message: expect.stringContaining('최대 참가비') });
   });
-  it('성별 미지정과 무료를 명시적으로 보존한다', () => {
-    expect(competitionDiscoveryHref(read('genderCategory=unspecified&feeMax=0', 'tournament'))).toBe('/tournaments?kind=tournament&genderCategory=unspecified&feeMax=0');
+  it('성별과 무료를 명시적으로 보존한다', () => {
+    expect(competitionDiscoveryHref(read('genderCategory=female&feeMax=0', 'tournament'))).toBe('/tournaments?kind=tournament&genderCategory=female&feeMax=0');
+  });
+  it('성별 미지정 값은 더 이상 읽지 않고 전체 탭도 대회 탭으로 좁히지 않는다(옛 링크)', () => {
+    expect(read('genderCategory=unspecified', 'tournament').genderCategory).toBeUndefined();
+    expect(competitionDiscoveryHref(read('genderCategory=unspecified&feeMax=0', 'tournament'))).toBe('/tournaments?kind=tournament&feeMax=0');
+    expect(read('genderCategory=unspecified')).toEqual({ kind: 'all' });
   });
 });

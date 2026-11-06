@@ -255,7 +255,7 @@ the web explicitly requests `all` for its default tab.
 |---|---|
 | `stage` | The state the card shows (one badge): `preparing` = draft (regular leagues only; a tournament draft stays hidden), `recruiting` = `open`, deadline not passed, capacity left, `recruit_closed` = stored `closed`, or `open` whose deadline passed or capacity is full, `ongoing` = in_progress, `completed` = completed. It filters on the same group rank the list order uses, so badge, filter and order cannot disagree |
 | `sportId` | UUID, existing sport filter |
-| `genderCategory` | mixed/male/female/unspecified; unspecified matches null |
+| `genderCategory` | mixed/male/female. A tournament whose gender is empty (`null`, from before the choice was required) is not selectable here and appears only while no gender filter is set; `unspecified` was removed on 2026-11-06 and is now a 400 |
 | `format` | league/knockout/group_knockout; format is not competition kind |
 | `feeMin`, `feeMax` | integer KRW, inclusive 0–2147483647; max=0 selects free |
 | `dateFrom`, `dateTo` | real calendar date YYYY-MM-DD, inclusive Asia/Seoul day boundaries; period overlap; undated rows excluded |

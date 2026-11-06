@@ -156,3 +156,13 @@ Copilot 요청은 CLI/REST/공식 GraphQL 두 경로에서 성공 응답을 받�
 최신 dev(#2181 포함) 통합 후 일정/결과/페이지 호출부/공유 이름 회귀 5 files/194 tests PASS. 알려진 결과 카드 라벨 충돌은 저장 이름 우선과 실제 강수 fallback을 함께 유지해 해결했다. 읽기 전용 headed alpha 검증 도구 `scripts/qa/verify-bracket-results-alpha.mjs`를 준비했으며, 배포 뒤 3폭의 종료·일정·순위 펼침/승무패 computed color·가로 넘침·console/network와 실제 서빙 SHA를 확인한다. 관리자 인증 QA는 별도 미검증으로 기록한다.
 
 #2181을 실제 최신 dev로 통합한 커밋 bd5f2fbfe 기준 Web 타입 검사 PASS. 배포 후 캡처 도구 문법 검사 PASS.
+
+
+## 2026-11-07 상세 우승 안내 후속 — 로컬 미리보기
+사용자 승인: 기존 완료 대회 안내 카드에서 토너먼트별 이름+우승팀을 두 줄로 표시한다. 단일은 기존 `팀명 우승!` 유지. 이번 요청은 로컬 미리보기이며 배포하지 않는다. 사용자 명시 요청으로 alpha-only QA 규칙의 로컬 서버 금지 예외를 적용한다. Owned: tournament-detail-client.tsx/.test.ts, 이 문서. 두 결승을 phase로 분리하고 미확정 결선은 결과 확정 대기. 기존 결과 링크/상세 레이아웃 유지. 로컬은 alpha 공개 API만 조회하며 데이터 수정은 없다.
+
+로컬 최종 검증: 새 회귀2개 RED(기존83개 PASS) → 전체85개 GREEN. Web tsc --noEmit --incremental false PASS. 실제 alpha before/로컬 after 각390/768/1440 6/6 실행, pageerror0/가로넘침0, 두 우승팀 텍스트와 결과 href 확인. headed browser19644(parent19626) 종료. screenshots `docs/screenshots/detail-champions-20261107/`. 사용자 로컬 확인을 위해 Next dev3013 실행 유지(exec session44195); alpha/prod 배포·PR·커밋 없음. Next가 자동 변경한 next-env.d.ts는 tracked 기준으로 정리했다.
+
+
+### 상세 우승 안내 PR/alpha 승인 (2026-11-07)
+사용자가 로컬 결과를 확인한 뒤 PR 제출·리뷰 생략·alpha 배포를 명시 승인했다. 이번 변경의 Copilot 조건은 사용자 예외로 생략하며 CI/충돌/미해결 스레드를 확인해 dev에 머지한다. 단일 대회의 기존 안내를 유지하고 다중 결선만 트랙별 우승팀/미확정 상태를 표시한다. 기존85개 회귀와 타입 검사 및 local3폭 증거를 재사용하고 전체 검증은 CI가 수행한다. alpha after3폭·실제 serving SHA·결과 링크·console/network 확인은 배포 후 실행한다.

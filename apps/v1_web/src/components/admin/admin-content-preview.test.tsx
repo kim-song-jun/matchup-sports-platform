@@ -10,7 +10,7 @@ describe('AdminContentPreview', () => {
     </NavigationScopeProvider>);
     expect(screen.queryByTitle(/미리보기/)).not.toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('실제 서비스로 연결되는 이 화면은 체험에서 열 수 없어요.');
-    expect(screen.queryByRole('button', { name: '웹', exact: true })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '웹' })).not.toBeInTheDocument();
   });
   it('points the preview iframe at the root-relative admin-content-preview route', () => {
     render(

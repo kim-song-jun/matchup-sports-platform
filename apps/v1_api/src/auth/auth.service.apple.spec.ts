@@ -7,6 +7,7 @@ import { AuthService } from './auth.service';
 import { readWithdrawalCancelToken } from './withdrawal-cancel-token';
 import { LoginSecurityService } from './login-security/login-security.service';
 import { LoginStepUpService } from './login-security/login-step-up.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
 import { PhoneVerificationService } from '../verification/phone-verification.service';
@@ -36,11 +37,14 @@ describe('AuthService.appleSignIn', () => {
   let prisma: ReturnType<typeof buildPrismaMock>;
   const appleIdentity = { verifyIdentityToken: jest.fn(), issueNonce: jest.fn() };
   const appleTokens = { storeFromAuthorizationCode: jest.fn() };
+  const NOTICE = { id: 'notice-1', targetType: 'system', targetId: null, title: '로그인 수단이 연결됐어요', body: null, deepLink: '/my/settings' };
+  const notifications = { createInTransaction: jest.fn(), deliverCreated: jest.fn() };
 
   function buildPrismaMock() {
     return {
       v1User: { findUnique: jest.fn(), create: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
-      v1AuthIdentity: { findUnique: jest.fn(), create: jest.fn(), update: jest.fn() },
+      v1AuthIdentity: { findUnique: jest.fn(), findFirst: jest.fn(), create: jest.fn(), update: jest.fn() },
+      v1StatusChangeLog: { create: jest.fn() },
       v1UserOnboardingProgress: { upsert: jest.fn() },
       $transaction: jest.fn(),
     };
@@ -59,6 +63,9 @@ describe('AuthService.appleSignIn', () => {
     prisma = buildPrismaMock();
     jest.clearAllMocks();
     prisma.v1User.updateMany.mockResolvedValue({ count: 1 });
+    prisma.v1AuthIdentity.findFirst.mockResolvedValue(null);
+    prisma.v1AuthIdentity.create.mockResolvedValue({ id: 'apple-identity-1' });
+    notifications.createInTransaction.mockResolvedValue(NOTICE);
     (prisma.$transaction as jest.Mock).mockImplementation((arg: unknown) =>
       typeof arg === 'function'
         ? (arg as (tx: typeof prisma) => Promise<unknown>)(prisma)
@@ -77,6 +84,7 @@ describe('AuthService.appleSignIn', () => {
         { provide: AppleTokenService, useValue: appleTokens },
         { provide: LoginSecurityService, useValue: {} },
         { provide: LoginStepUpService, useValue: {} },
+        { provide: NotificationsService, useValue: notifications },
       ],
     }).compile();
 
@@ -146,12 +154,16 @@ describe('AuthService.appleSignIn', () => {
     expect(prisma.v1User.create.mock.calls[0][0].data.email).toBe('zzz@privaterelay.appleid.com');
   });
 
+  /** The account row the link transaction reads: a plain member whose address we verified. */
+  const verifiedMember = (overrides: Record<string, unknown> = {}) => ({
+    id: 'user-9', email: 'someone@example.com', accountStatus: 'active', emailVerifiedAt: new Date('2026-01-01'), adminUser: null,
+    ...overrides,
+  });
+
   it('links to an existing account when Apple vouches for it AND we verified that address ourselves', async () => {
     appleIdentity.verifyIdentityToken.mockResolvedValue(claims({ email: 'Someone@Example.com' }));
     prisma.v1AuthIdentity.findUnique.mockResolvedValue(null);
-    prisma.v1User.findUnique.mockResolvedValue({
-      id: 'user-9', email: 'someone@example.com', accountStatus: 'active', emailVerifiedAt: new Date('2026-01-01'),
-    });
+    prisma.v1User.findUnique.mockResolvedValue(verifiedMember());
 
     await signIn();
 
@@ -159,19 +171,90 @@ describe('AuthService.appleSignIn', () => {
     expect(prisma.v1AuthIdentity.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ userId: 'user-9', provider: V1AuthProvider.apple }) }),
     );
+    expect(prisma.v1StatusChangeLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        targetType: 'auth_identity', targetId: 'apple-identity-1', toStatus: 'linked', actorUserId: 'user-9', reason: 'apple_verified_email',
+      }),
+    });
     expect(prisma.v1User.create).not.toHaveBeenCalled();
+  });
+
+  it('tells the account about the Apple login it just gained, and pushes that only after the link has committed', async () => {
+    appleIdentity.verifyIdentityToken.mockResolvedValue(claims({ email: 'Someone@Example.com' }));
+    prisma.v1AuthIdentity.findUnique.mockResolvedValue(null);
+    prisma.v1User.findUnique.mockResolvedValue(verifiedMember());
+    let committed = false;
+    let deliveredAfterCommit: boolean | null = null;
+    const runTransaction = (prisma.$transaction as jest.Mock).getMockImplementation() as (arg: unknown) => Promise<unknown>;
+    (prisma.$transaction as jest.Mock).mockImplementation(async (arg: unknown) => {
+      const result = await runTransaction(arg);
+      committed = true;
+      return result;
+    });
+    notifications.deliverCreated.mockImplementation(() => { deliveredAfterCommit = committed; });
+
+    await signIn();
+
+    expect(notifications.createInTransaction).toHaveBeenCalledWith(prisma, 'user-9', 'social_identity_linked', {
+      vars: { name: 'Apple' },
+      businessKey: 'social-link:apple-identity-1',
+    });
+    expect(notifications.deliverCreated).toHaveBeenCalledWith('user-9', 'social_identity_linked', NOTICE);
+    expect(deliveredAfterCommit).toBe(true);
+  });
+
+  it('refuses a second Apple login for an account that already has one, after the account row is locked', async () => {
+    appleIdentity.verifyIdentityToken.mockResolvedValue(claims({ email: 'Someone@Example.com' }));
+    prisma.v1AuthIdentity.findUnique.mockResolvedValue(null);
+    prisma.v1User.findUnique.mockResolvedValue(verifiedMember());
+    prisma.v1AuthIdentity.findFirst.mockResolvedValue({ id: 'older-apple-identity' });
+
+    await expect(signIn()).rejects.toMatchObject({ status: 409, response: { code: 'SOCIAL_LINK_PROVIDER_EXISTS' } });
+
+    expect(prisma.v1AuthIdentity.findFirst).toHaveBeenCalledWith({
+      where: { userId: 'user-9', provider: V1AuthProvider.apple, status: 'active' },
+      select: { id: true },
+    });
+    // A login another transaction attached while this one waited for the row is only visible once the row is held.
+    expect(prisma.v1User.updateMany.mock.invocationCallOrder[0]).toBeLessThan(prisma.v1AuthIdentity.findFirst.mock.invocationCallOrder[0]);
+    expect(prisma.v1AuthIdentity.create).not.toHaveBeenCalled();
+    expect(prisma.v1StatusChangeLog.create).not.toHaveBeenCalled();
+    expect(notifications.createInTransaction).not.toHaveBeenCalled();
+    expect(notifications.deliverCreated).not.toHaveBeenCalled();
+    expect(prisma.v1User.create).not.toHaveBeenCalled();
+  });
+
+  it.each(['active', 'suspended'])('refuses an operator account whose admin grant is %s without touching it', async (status) => {
+    appleIdentity.verifyIdentityToken.mockResolvedValue(claims({ email: 'Someone@Example.com' }));
+    prisma.v1AuthIdentity.findUnique.mockResolvedValue(null);
+    prisma.v1User.findUnique.mockResolvedValue(verifiedMember({ adminUser: { status } }));
+
+    await expect(signIn()).rejects.toMatchObject({ status: 403, response: { code: 'SOCIAL_LINK_ADMIN_FORBIDDEN' } });
+
+    expect(prisma.v1User.updateMany).not.toHaveBeenCalled();
+    expect(prisma.v1AuthIdentity.create).not.toHaveBeenCalled();
+    expect(prisma.v1StatusChangeLog.create).not.toHaveBeenCalled();
+    expect(prisma.v1User.create).not.toHaveBeenCalled();
+    expect(notifications.createInTransaction).not.toHaveBeenCalled();
+    expect(notifications.deliverCreated).not.toHaveBeenCalled();
+  });
+
+  it('still links an account whose admin grant was revoked', async () => {
+    appleIdentity.verifyIdentityToken.mockResolvedValue(claims({ email: 'Someone@Example.com' }));
+    prisma.v1AuthIdentity.findUnique.mockResolvedValue(null);
+    prisma.v1User.findUnique.mockResolvedValue(verifiedMember({ adminUser: { status: 'revoked' } }));
+
+    await signIn();
+
+    expect(prisma.v1AuthIdentity.create).toHaveBeenCalledTimes(1);
   });
 
   it('does not create an Apple identity when the candidate changes before the transaction re-read', async () => {
     appleIdentity.verifyIdentityToken.mockResolvedValue(claims({ email: 'Someone@Example.com' }));
     prisma.v1AuthIdentity.findUnique.mockResolvedValue(null);
     prisma.v1User.findUnique
-      .mockResolvedValueOnce({
-        id: 'user-9', email: 'someone@example.com', accountStatus: 'active', emailVerifiedAt: new Date('2026-01-01'),
-      })
-      .mockResolvedValueOnce({
-        id: 'user-9', email: 'changed@example.com', accountStatus: 'active', emailVerifiedAt: new Date('2026-01-01'),
-      });
+      .mockResolvedValueOnce(verifiedMember())
+      .mockResolvedValueOnce(verifiedMember({ email: 'changed@example.com' }));
 
     await expect(signIn()).rejects.toMatchObject({
       response: { code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL', details: { next: 'sign_in_then_link', provider: 'apple', linkToken: expect.any(String), linkTokenExpiresInSeconds: 1800 } },
@@ -182,9 +265,7 @@ describe('AuthService.appleSignIn', () => {
   it('does not create an Apple identity when the guarded candidate claim affects zero rows', async () => {
     appleIdentity.verifyIdentityToken.mockResolvedValue(claims({ email: 'Someone@Example.com' }));
     prisma.v1AuthIdentity.findUnique.mockResolvedValue(null);
-    prisma.v1User.findUnique.mockResolvedValue({
-      id: 'user-9', email: 'someone@example.com', accountStatus: 'active', emailVerifiedAt: new Date('2026-01-01'),
-    });
+    prisma.v1User.findUnique.mockResolvedValue(verifiedMember());
     prisma.v1User.updateMany.mockResolvedValue({ count: 0 });
 
     await expect(signIn()).rejects.toMatchObject({

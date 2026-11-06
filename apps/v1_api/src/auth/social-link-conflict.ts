@@ -43,6 +43,14 @@ export function signInThenLinkConflict(
   });
 }
 
+/** The account already holds an active login of this provider, so no second one is attached to it. */
+export function socialProviderExists(provider: LinkableSocialProvider): ConflictException {
+  return new ConflictException({
+    code: 'SOCIAL_LINK_PROVIDER_EXISTS',
+    message: `이 계정에는 이미 다른 ${SOCIAL_PROVIDER_LABELS[provider]} 계정이 연결돼 있어요.`,
+  });
+}
+
 /**
  * The same advice without a token, for a collision the person has not proven they are part of (a number typed in
  * but never verified): they can still link from settings after signing in, but nothing is attached automatically.

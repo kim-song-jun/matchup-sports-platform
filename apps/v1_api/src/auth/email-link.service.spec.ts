@@ -233,7 +233,7 @@ async function build(seed: Seed, options: { echo?: boolean; sendFails?: boolean;
     scheduleSprayDetection: jest.fn(),
     forgetEmail: jest.fn().mockResolvedValue(undefined),
   };
-  const auth = new AuthService({} as never, db.prisma as never, {} as never, {} as never, {} as never, loginSecurity as never, {} as never);
+  const auth = new AuthService({} as never, db.prisma as never, {} as never, {} as never, {} as never, loginSecurity as never, {} as never, notifications as never);
   jest.spyOn(auth, 'me').mockResolvedValue({ user: { signupEmailLoginRequired: false }, onboarding: { status: 'completed', missing: [] } } as never);
   const recovery = new AccountRecoveryService(db.prisma as never, {} as never, loginSecurity as never, { forceDisconnectUser: jest.fn() });
 

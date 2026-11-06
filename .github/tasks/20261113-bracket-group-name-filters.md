@@ -152,3 +152,7 @@ Copilot 요청은 CLI/REST/공식 GraphQL 두 경로에서 성공 응답을 받�
 추가로 BracketScheduleTab이 저장한 12강 round/조 이름을 phase 이름으로 덮어쓰고, 순위·대진 필터도 getRoundLabel(phase)을 사용하던 누락을 확인했다. 호출부는 실제 결선 round·저장 그룹 이름을 유지하며 잘못된 조별 round는 기존 phase 분류로 보정한다. 토너먼트 접두어 제거는 bracketStageLabel 공통 함수로 일정·결과·대진 필터가 재사용한다. 생성기·구조 분류 중복 수정은 추가하지 않는다. 새 호출부 회귀 4개 중 3개 RED 확인 후, 해당 파일 65개 GREEN 및 관련 다른 4 files/128개 PASS로 총 193개 계약 검증. 테스트 보정 중 링크 accessible name을 가정하던 assertion은 실제 fixture 상세 href와 필터 후 링크 수 검증으로 정리했다.
 
 호출부 최종 검증: Web 타입 검사 PASS. 실제 scheduled fixture 계약을 만족한 호출부 65개 재검증 PASS이며 공유 표시/일정/결과 관련 128개와 합쳐 193개 PASS. 선행 #2181은 dev fbe0f244a6에 머지됐고 해당 push CI 및 alpha 배포 대기 중이다.
+
+최신 dev(#2181 포함) 통합 후 일정/결과/페이지 호출부/공유 이름 회귀 5 files/194 tests PASS. 알려진 결과 카드 라벨 충돌은 저장 이름 우선과 실제 강수 fallback을 함께 유지해 해결했다. 읽기 전용 headed alpha 검증 도구 `scripts/qa/verify-bracket-results-alpha.mjs`를 준비했으며, 배포 뒤 3폭의 종료·일정·순위 펼침/승무패 computed color·가로 넘침·console/network와 실제 서빙 SHA를 확인한다. 관리자 인증 QA는 별도 미검증으로 기록한다.
+
+#2181을 실제 최신 dev로 통합한 커밋 bd5f2fbfe 기준 Web 타입 검사 PASS. 배포 후 캡처 도구 문법 검사 PASS.

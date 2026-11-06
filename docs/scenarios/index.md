@@ -27,7 +27,7 @@ A안(기존 관리 화면 재사용) 선택. 전용 담당 목록과 관리 10�
 [작업 문서](../../.github/tasks/20261057-admin-bracket-canvas.md#2026-10-12-extension-정규대회-하나--상위하위-결선--시상-두-세트) · [실행 시나리오](./18-regular-tournament-split-finals.md). 하나의 대회에서 조 1·2위는 상위, 3·4위는 하위 결선으로 배정한다. 팀 시상 안내와 개인상 범위는 어드민이 설정한다. Backend521·Web226·스키마 바인딩7개 계약은 좁은 재실행을 포함해 통과했다. 독립 Sol static review의 모바일 단계 순서·읽기 권한 두 결함은 수정·재검토 PASS. PR#1858 커밋본 CI와 변경 후 alpha/3폭 QA는 대기 중이며 전체 완료를 의미하지 않는다.
 ## 2026-11-05 — 실제 어드민을 사용하는 대회 운영 체험
 
-[시나리오](./tournament-ops-demo.md) · [Task20261123](../../.github/tasks/20261123-tournament-ops-demo.md) · PR #2168 dev 머지·Alpha 배포 완료. 최초 after13/13개 화면·3/3폭·가로 넘침0, 주요 기능 PASS. 팝업 미리보기 iframe의 실제 admin/me 401을 발견해 격리 수정과 재배포 QA 진행 중. 최초 실패는 initial-alpha-report.json에 보존한다.
+[시나리오](./tournament-ops-demo.md) · [Task20261123](../../.github/tasks/archive/20261123-tournament-ops-demo.md) · PR #2168·#2170 dev 머지 및 Alpha `a8cb59951` 검증 완료. 13/13개 화면·3/3폭(39/39), 주요 편집·신청 확정·대진·점수·복원·초기화·공유 실패 안내 PASS. iframe 관리자 요청 결함 수정 후 계정/엔티티 API·console/network 오류·가로 넘침0. [갤러리](../screenshots/tournament-admin-demo-20261105/index.html), 최종 after-report.json 및 최초 실패 증거 보존.
 
 ## 2026-10-28 — 결과·운영 결선 표시 순서와 단판 합산
 

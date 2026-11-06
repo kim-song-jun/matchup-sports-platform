@@ -1281,6 +1281,79 @@ describe('TeamsService', () => {
           expect.objectContaining({ where: expect.objectContaining({ teamId: 'team-1', status: 'removed' }) }),
         );
       });
+
+      function rosterRow(status: 'active' | 'left' | 'removed') {
+        return {
+          ...membershipRow({ id: `row-${status}`, role: 'member', status, userId: `${status}-user` }),
+          user: {
+            phone: '010-4444-5555',
+            profile: {
+              nickname: `${status}-nick`,
+              displayName: `${status} Display`,
+              realName: `${status} Real Name`,
+              profileImageUrl: null,
+              birthDate: new Date('1992-02-03'),
+              gender: 'female',
+            },
+          },
+        };
+      }
+
+      it.each([
+        { viewer: owner, role: 'owner' as const, status: 'left' as const },
+        { viewer: owner, role: 'owner' as const, status: 'removed' as const },
+        { viewer: manager, role: 'manager' as const, status: 'left' as const },
+        { viewer: manager, role: 'manager' as const, status: 'removed' as const },
+      ])('hide private profile fields of $status rows from an active $role', async ({ viewer, role, status }) => {
+        publicTeamViewedBy(membershipRow({ role, userId: viewer.id }));
+        prisma.v1TeamMembership.findMany.mockResolvedValueOnce([rosterRow(status)]);
+
+        const result = await service.members(viewer, 'team-1', { status });
+
+        expect(result.items).toHaveLength(1);
+        expect(result.items[0]).toMatchObject({
+          userId: `${status}-user`,
+          displayName: `${status}-nick`,
+          status,
+          realName: null,
+          phone: null,
+          birthDate: null,
+          gender: null,
+        });
+      });
+
+      it.each([
+        { viewer: owner, role: 'owner' as const },
+        { viewer: manager, role: 'manager' as const },
+      ])('keep private profile fields of active rows for the same $role', async ({ viewer, role }) => {
+        publicTeamViewedBy(membershipRow({ role, userId: viewer.id }));
+        prisma.v1TeamMembership.findMany.mockResolvedValueOnce([rosterRow('active')]);
+
+        const result = await service.members(viewer, 'team-1', {});
+
+        expect(result.items[0]).toMatchObject({
+          userId: 'active-user',
+          realName: 'active Real Name',
+          phone: '010-4444-5555',
+          birthDate: new Date('1992-02-03'),
+          gender: 'female',
+        });
+      });
+
+      it('never gives an ordinary member the private profile fields of other active rows', async () => {
+        publicTeamViewedBy(membershipRow({ role: 'member', userId: member.id }));
+        prisma.v1TeamMembership.findMany.mockResolvedValueOnce([rosterRow('active')]);
+
+        const result = await service.members(member, 'team-1', {});
+
+        expect(result.items[0]).toMatchObject({
+          userId: 'active-user',
+          realName: null,
+          phone: null,
+          birthDate: null,
+          gender: null,
+        });
+      });
     });
 
     it('detail allows non-members to preview members when public visibility is enabled', async () => {

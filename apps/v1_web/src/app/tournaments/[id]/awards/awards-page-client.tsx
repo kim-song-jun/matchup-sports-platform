@@ -31,7 +31,7 @@ import { formatEntryFee } from '@/lib/date-utils';
 import { parsePrizeRows } from '@/lib/prize-breakdown';
 import { GroupedPrizes } from '@/components/tournaments/grouped-prizes';
 import { PendingReviewsCard } from '@/components/tournaments/pending-review-card';
-import { publicAssetPath } from '@/lib/assets';
+import { isOptimizableImagePath, publicAssetPath } from '@/lib/assets';
 import { TournamentAwardIcon } from '@/components/tournaments/tournament-award-icon';
 import { isLeagueCompetition } from '@/lib/competition-kind';
 import { displayInitials } from '@/lib/display-initials';
@@ -727,7 +727,7 @@ export function ReviewFormModal({
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {photoUrls.map((url) => (
               <div key={url} style={{ position: 'relative', width: 64, height: 64, borderRadius: 10, overflow: 'hidden', flexShrink: 0 }}>
-                <Image src={publicAssetPath(url)} alt="" loading="lazy" width={64} height={64} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <Image src={publicAssetPath(url)} unoptimized={!isOptimizableImagePath(url)} alt="" loading="lazy" width={64} height={64} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 <button
                   type="button"
                   onClick={() => setPhotoUrls((prev) => prev.filter((u) => u !== url))}
@@ -812,7 +812,7 @@ export function ReviewCard({ review }: { review: V1TournamentReview }) {
         <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
           {photoUrls.map((url) => (
             <a key={url} href={publicAssetPath(url)} target="_blank" rel="noreferrer" style={{ display: 'block', width: 72, height: 72, borderRadius: 'var(--radius-chip)', overflow: 'hidden', flexShrink: 0 }}>
-              <Image src={publicAssetPath(url)} alt="" loading="lazy" width={72} height={72} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <Image src={publicAssetPath(url)} unoptimized={!isOptimizableImagePath(url)} alt="" loading="lazy" width={72} height={72} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </a>
           ))}
         </div>

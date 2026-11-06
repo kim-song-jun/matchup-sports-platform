@@ -1,4 +1,5 @@
 import { act, cleanup, render, screen } from '@testing-library/react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HomePageView } from './home-page';
 import type { V1TeamMatch, V1TournamentListItem } from '@/types/api';
@@ -456,5 +457,41 @@ describe('independent #1679 cached recommendation expiry', () => {
     act(() => { vi.advanceTimersByTime(60_000); });
     // Then: users no longer see an ineligible application link.
     expect(screen.queryByRole('link', { name: /expiring-team/ })).not.toBeInTheDocument();
+  });
+});
+
+describe('HomePageView — 사진은 그려지는 폭에 맞춘 최적화 주소로 받는다', () => {
+  const UPLOAD = '/uploads/2026/11/home-photo.png';
+
+  beforeEach(() => {
+    useV1AllTournamentsMock.mockReturnValue({ data: [], isPending: false, isError: false, isLoading: false, refetch: vi.fn() });
+    useV1TournamentsMock.mockReturnValue({ data: { items: [] }, isPending: false, isError: false });
+    useV1TeamMatchesMock.mockReturnValue({ data: { items: [] }, isPending: false, isError: false });
+  });
+
+  // jsdom 은 `background: url(...) center/cover` 단축 속성을 버려서 DOM 으로는 읽을 수 없다.
+  // 서버 렌더 문자열의 style 속성은 값을 그대로 담는다.
+  function backgroundRequest(model: HomeViewModel, selector: string) {
+    const host = document.createElement('div');
+    host.innerHTML = renderToStaticMarkup(<HomePageView model={model} />);
+    const style = host.querySelector(selector)?.getAttribute('style') ?? '';
+    const quoted = /url\("([^"]+)"\) center\/cover/.exec(style);
+    expect(quoted, `${selector}: ${style}`).not.toBeNull();
+    const url = new URL(quoted![1], 'http://localhost');
+    return { pathname: url.pathname, url: url.searchParams.get('url'), w: url.searchParams.get('w') };
+  }
+
+  it('추천 히어로(최대 560px)는 1200 폭으로 받는다', () => {
+    const model = buildModel({ featuredMatch: { ...matchCard('featured-photo'), imageUrl: UPLOAD } });
+
+    expect(backgroundRequest(model, '.tm-featured-media'))
+      .toEqual({ pathname: '/_next/image', url: UPLOAD, w: '1200' });
+  });
+
+  it('추천 매치 레일 카드(최대 336px)는 750 폭으로 받는다', () => {
+    const model = buildModel({ recommendedMatches: [{ ...matchCard('rec-photo'), imageUrl: UPLOAD }] });
+
+    expect(backgroundRequest(model, '.tm-match-card-media'))
+      .toEqual({ pathname: '/_next/image', url: UPLOAD, w: '750' });
   });
 });

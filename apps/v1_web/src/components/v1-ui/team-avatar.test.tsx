@@ -65,4 +65,16 @@ describe('TeamAvatar', () => {
     rerender(<TeamAvatar teamId="team-1" name="팀" logoUrl={null} />);
     expect(resolveNextImageSrc(container.querySelector('img'))).toMatch(/^\/images\/team-logos\/team-logo-\d{2}\.jpg$/);
   });
+
+  it('keeps an external logo URL as-is because the optimizer cannot fetch it', () => {
+    const { container } = render(<TeamAvatar teamId="team-1" name="팀" logoUrl="https://k.kakaocdn.net/dn/logo.png" />);
+    expect(container.querySelector('img')?.getAttribute('src')).toBe('https://k.kakaocdn.net/dn/logo.png');
+  });
+
+  it('requests an uploaded logo through the optimizer', () => {
+    const { container } = render(<TeamAvatar teamId="team-1" name="팀" logoUrl="/uploads/2026/11/logo.png" />);
+    const src = new URL(container.querySelector('img')!.getAttribute('src')!, 'http://localhost');
+    expect(src.pathname).toBe('/_next/image');
+    expect(src.searchParams.get('url')).toBe('/uploads/2026/11/logo.png');
+  });
 });

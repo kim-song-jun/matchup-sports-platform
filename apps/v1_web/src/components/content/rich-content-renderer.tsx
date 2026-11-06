@@ -1,7 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { publicAssetPath } from '@/lib/assets';
+import { isOptimizableImagePath, publicAssetPath } from '@/lib/assets';
 import { resolveRichContent } from '@/lib/rich-content';
 import { isSafePopupLink } from '@/lib/popup-targets';
 import type { V1RichContentDocument, V1RichContentMark, V1RichContentNode } from '@/types/api';
@@ -45,20 +45,24 @@ function renderNode(node: V1RichContentNode, key: string): ReactNode {
       return <hr key={key} />;
     case 'hardBreak':
       return <br key={key} />;
-    case 'image':
-      return node.attrs?.src && node.attrs.alt ? (
+    case 'image': {
+      if (!node.attrs?.src || !node.attrs.alt) return null;
+      const src = publicAssetPath(node.attrs.src);
+      return (
         <figure key={key}>
+          {/* 작성자가 붙여 넣은 외부 URL 은 최적화기가 못 받아 오므로 원본 그대로 둔다. */}
           <Image
-            src={publicAssetPath(node.attrs.src)}
+            src={src}
             alt={node.attrs.alt}
             width={1200}
             height={800}
             sizes="(max-width: 640px) 100vw, 760px"
-            unoptimized
+            unoptimized={!isOptimizableImagePath(src)}
           />
           {node.attrs.title ? <figcaption>{node.attrs.title}</figcaption> : null}
         </figure>
-      ) : null;
+      );
+    }
     default:
       return null;
   }

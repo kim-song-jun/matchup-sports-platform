@@ -6,9 +6,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pause, Play } from 'lucide-react';
 import { ErrorState } from '@/components/v1-ui/primitives';
 import { TrophyIcon } from '@/components/v1-ui/icons';
-import { cssUrl } from '@/lib/assets';
+import { optimizedCssUrl } from '@/lib/assets';
 import { getSortedTournamentPromos, resolveTournamentImage } from '@/lib/tournament-promo';
 import type { V1TournamentListItem } from '@/types/api';
+
+// 슬라이드 폭은 데스크톱 1440 에서 1072px 지만 스크림 아래 홍보 배너라 960 이면 충분하다.
+// 1072 로 올리면 2배 폭이 3840 단계로 넘어간다.
+const PROMO_CARD_DISPLAY_WIDTH = 960;
 
 type TournamentPromoCarouselProps = {
   items: V1TournamentListItem[];
@@ -162,7 +166,7 @@ export function TournamentPromoCarousel({
                   aria-label={`${title} 자세히 보기`}
                   style={{
                     background: imageUrl
-                      ? `${cssUrl(imageUrl)} center/cover`
+                      ? `${optimizedCssUrl(imageUrl, PROMO_CARD_DISPLAY_WIDTH)} center/cover`
                       : 'var(--brand-hero-gradient)',
                   }}
                 >

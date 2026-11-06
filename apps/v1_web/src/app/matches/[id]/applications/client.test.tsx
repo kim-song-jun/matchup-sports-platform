@@ -87,6 +87,17 @@ describe('개인 매치 신청 관리', () => {
     expect(screen.getByText('호스트 · 참가 인원에 포함')).toBeInTheDocument();
   });
 
+  it('신청자 사진은 44px 칸에 맞춘 폭으로 최적화기를 거쳐 받는다', () => {
+    confirmedApplication({ profileImageUrl: '/uploads/2026/11/applicant.png' });
+    const avatar = screen.getByRole('link', { name: '참가자 프로필 보기' }).querySelector<HTMLElement>('[role="img"]');
+    const match = /url\("?([^")]+)"?\)/.exec(avatar?.style.backgroundImage ?? '');
+    expect(match).not.toBeNull();
+    const params = new URL(match![1], 'http://localhost');
+    expect(params.pathname).toBe('/_next/image');
+    expect(params.searchParams.get('url')).toBe('/uploads/2026/11/applicant.png');
+    expect(params.searchParams.get('w')).toBe('96');
+  });
+
   it('신청자 프로필을 클릭하면 개인 프로필 페이지로 이동한다', () => {
     confirmedApplication({ applicantUserId: 'user-77' });
     expect(screen.getByRole('link', { name: '참가자 프로필 보기' })).toHaveAttribute(

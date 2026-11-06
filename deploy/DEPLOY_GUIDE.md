@@ -12,6 +12,7 @@ Nginx는 v1 Web을 별도 브라우저 prefix 없이 루트에 제공한다.
 |---|---|---|
 | `/` 및 페이지 경로 | `v1_web:3013` | Next.js Web |
 | `/_next/static/*` | `v1_web:3013` | 정적 빌드 자산 |
+| `/_next/image` | `v1_web:3013` | 표시 폭에 맞춘 WebP 변환(Next 의 `Cache-Control` 을 그대로 통과) |
 | `/api/v1/*` | `v1_api:8121` | canonical backend API |
 | `/uploads/*` | `v1_api:8121/uploads/*` | 업로드 자산 |
 

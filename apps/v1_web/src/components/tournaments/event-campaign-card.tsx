@@ -55,6 +55,7 @@ export function EventCampaignCard({
           sportCode={item.tournament.sport.code}
           alt=""
           className={styles.image}
+          sizes="(min-width: 1024px) 360px, 100vw"
         />
         <span className={`tm-badge ${status.badgeClass} ${styles.status}`}>{status.label}</span>
       </div>

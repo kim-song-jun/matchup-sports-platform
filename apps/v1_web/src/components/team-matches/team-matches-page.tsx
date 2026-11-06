@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
@@ -18,7 +17,6 @@ import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { CreateField, FieldErrorText, GenderRuleSelector, MissingFieldsBanner, MultiPresetChipSelector, PresetChipSelector } from '@/components/v1-ui/create-form-fields';
 import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
-import { cssUrl } from '@/lib/assets';
 import { formatAmountNumber } from '@/lib/date-utils';
 import { matchGenderRuleLabel, TEAM_MATCH_CANCELLED_LABEL } from '@/lib/v1-status-labels';
 // 사진 없는 팀매치의 종목 그래픽 — 매치·홈과 같은 공용 컴포넌트를 쓴다(웨이브8에서
@@ -39,7 +37,7 @@ import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import { withFromPath } from '@/lib/session-storage';
 import { HostApplicationsCard, HostApplicationsErrorCard, HostWaitingCard, MatchProgressCard, PendingApplicationCard } from './team-match-now-card';
 import { TeamMatchApplyTeamSheet, TeamMatchManageMenuSheet } from './team-match-detail-sheets';
-import { TeamMatchImagesField, TeamMatchImagesPreview, teamMatchImage, teamMatchBackgroundImage } from './team-match-images';
+import { TEAM_MATCH_HERO_WIDTH, TEAM_MATCH_THUMB_WIDTH, TeamMatchImagesField, TeamMatchImagesPreview, teamMatchImage, teamMatchBackgroundImage } from './team-match-images';
 import { TeamMatchLevelRangeField } from './team-match-level-range-field';
 import { TeamMatchRulesFields } from './team-match-rules-fields';
 import { teamMatchRuleSummary, teamMatchSavedRuleSummary } from './team-match-rules-draft';
@@ -647,7 +645,7 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
             <div
               className={`tm-team-vs-hero${detailImage ? ' tm-team-vs-hero-photo' : ' tm-team-vs-hero-sport'}`}
               style={detailImage ? {
-                backgroundImage: teamMatchBackgroundImage(detailImage, match.sport),
+                backgroundImage: teamMatchBackgroundImage(detailImage, match.sport, TEAM_MATCH_HERO_WIDTH),
                 backgroundPosition: 'center',
                 backgroundRepeat: 'no-repeat',
                 backgroundSize: 'cover',
@@ -1102,7 +1100,7 @@ function TeamMatchCard({ match, fromHref }: { match: TeamMatchModel; fromHref: s
           같은 토글의 개인 탭은 131px·5.88장).
           그래서 개인 탭과 같은 행 카드(.tm-match-row)로 통일한다 — 새 카드 체계를 만들지 않고
           이미 배포된 규칙을 그대로 쓴다. */}
-      <div className={`tm-match-row-thumb${listImage ? '' : ' tm-match-media-sport'}`} style={listImage ? { backgroundImage: teamMatchBackgroundImage(listImage, match.sport) } : undefined}>
+      <div className={`tm-match-row-thumb${listImage ? '' : ' tm-match-media-sport'}`} style={listImage ? { backgroundImage: teamMatchBackgroundImage(listImage, match.sport, TEAM_MATCH_THUMB_WIDTH) } : undefined}>
         {listImage ? null : <SportIllustration sport={match.sport} sizes="76px" />}
 
       </div>

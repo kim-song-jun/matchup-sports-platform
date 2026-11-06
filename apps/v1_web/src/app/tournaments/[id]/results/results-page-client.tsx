@@ -411,6 +411,12 @@ function CoChampionBanner({ names }: { names: string[] }) {
   );
 }
 
+/** 경기가 'N강'(12강·6강…)으로 불리면 그 이름을 그대로 쓴다 — 단계 코드는 틀 기준이라 12강이 round16 이다. */
+function largeRoundName(round: string): string | null {
+  const name = round.trim();
+  return /^\d+강$/.test(name) ? name : null;
+}
+
 /* ── 최종 순위 테이블 ── */
 const ROUND_LABEL_MAP: Record<string, string> = {
   final: '결승', '결승': '결승',
@@ -685,7 +691,7 @@ function KnockoutResultsTable({
 
       {earlierFixtures.map((fixture) => fixture.result && (
         <div key={fixture.id} style={cardStyle}>
-          <MatchRow label={ROUND_LABEL_MAP[kindOf(fixture) ?? ''] ?? '결선'}
+          <MatchRow label={largeRoundName(fixture.round) ?? ROUND_LABEL_MAP[kindOf(fixture) ?? ''] ?? '결선'}
             home={fixture.homeTeamName} away={fixture.awayTeamName}
             homeScore={fixture.result.homeScore} awayScore={fixture.result.awayScore}
             winner={getWinnerSide(fixture.result)} hasPenalty={fixture.result.hasPenalty}

@@ -114,6 +114,11 @@ describe('N개 결선 실제 DB 저장·공식 순위·수동 편집·재생성'
     expect(preview.plan.slots).toHaveLength(6);
     await service.generate(user, tournamentId, { expectedRevision: first.revision, previewHash: preview.previewHash, requestId: randomUUID() });
     const idsBefore = await prisma.v1TournamentMatchDetails.findMany({ where: { tournamentId, group: { phase: { not: 'group' } } }, orderBy: { fixtureNumber: 'asc' }, select: { teamMatchId: true } });
+    // 2026-11-06: 6팀 첫 라운드는 틀 기준 '8강'이 아니라 대회 규정의 '6강'으로 저장된다(단계 코드는 틀 기준 그대로).
+    const knockoutGroups = await prisma.v1TournamentGroup.findMany({ where: { tournamentId, phase: { not: 'group' } }, orderBy: { sortOrder: 'asc' }, select: { name: true, phase: true } });
+    expect(knockoutGroups).toEqual([{ name: '프리미어 · 6강', phase: 'quarter' }, { name: '프리미어 · 4강', phase: 'semi' }, { name: '프리미어 · 결승', phase: 'final' }]);
+    const firstRound = await prisma.v1TournamentMatchDetails.findMany({ where: { tournamentId, group: { name: '프리미어 · 6강' } }, select: { round: true } });
+    expect(firstRound.map(row => row.round)).toEqual(['6강', '6강']);
     const current = await service.get(user, tournamentId);
     expect(current.finals[0].capacity).toBe(6);
     const rules = current.groups.flatMap(group => [1, 2, 3].map(rank => ({ groupId: group.id, rank })));

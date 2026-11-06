@@ -59,7 +59,8 @@ describe('사진 있는 매치 상세 히어로', () => {
     expect(hero.classList.contains('tm-match-detail-hero-stack')).toBe(false);
     expect(hero.querySelector('.tm-match-hero-graphic')).toBeNull();
     expect(queryImageBySrc(container, '/illustrations/sport-futsal-640.webp')).toBeNull();
-    expect(hero.style.backgroundImage).toContain('/uploads/real.webp');
+    // 원본이 아니라 히어로 폭(1080)에 맞춘 최적화 주소를 받아야 한다.
+    expect(hero.style.backgroundImage).toBe('url("/_next/image?url=%2Fuploads%2Freal.webp&w=1080&q=75")');
   });
 });
 

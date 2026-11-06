@@ -15,7 +15,7 @@ import { ReviewHighlightLine } from '@/components/v1-ui/review-highlight-line';
 import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
 import { FieldErrorText } from '@/components/v1-ui/create-form-fields';
 import { revealAndFocus } from '@/components/v1-ui/reveal-and-focus';
-import { cssUrl } from '@/lib/assets';
+import { optimizedCssUrl } from '@/lib/assets';
 import { useV1PublicTeamReviewSummary } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { isTeamLogoPreset, TEAM_LOGO_PRESETS } from '@/lib/team-logo-presets';
@@ -1014,11 +1014,15 @@ function TeamContactRow({ href, unavailableReason, children }: { href?: string; 
   );
 }
 
+// 팀 상단 이미지가 그려지는 최대 폭: 상세 히어로 카드 데스크톱 1440 632px·태블릿 560px, 폼 미리보기 560px 이하.
+// 600 이면 2배 폭이 1200 단계에 걸린다.
+const TEAM_COVER_DISPLAY_WIDTH = 600;
+
 function teamHeroStyle(team: Pick<TeamModel, 'coverImageUrl'>): CSSProperties {
   if (!team.coverImageUrl) return { position: 'relative' };
   return {
     position: 'relative',
-    backgroundImage: `linear-gradient(180deg, rgba(20, 24, 31, 0.45), rgba(20, 24, 31, 0.72)), ${cssUrl(team.coverImageUrl)}`,
+    backgroundImage: `linear-gradient(180deg, rgba(20, 24, 31, 0.45), rgba(20, 24, 31, 0.72)), ${optimizedCssUrl(team.coverImageUrl, TEAM_COVER_DISPLAY_WIDTH)}`,
     backgroundSize: 'cover',
     backgroundPosition: 'center',
   };
@@ -1677,7 +1681,7 @@ function TeamCoverImageField({
           minHeight: 210,
           borderRadius: 'var(--radius-field)',
           border: '1px solid var(--border-strong)',
-          background: coverImageUrl ? `${cssUrl(coverImageUrl)} center/cover` : 'var(--grey50)',
+          background: coverImageUrl ? `${optimizedCssUrl(coverImageUrl, TEAM_COVER_DISPLAY_WIDTH)} center/cover` : 'var(--grey50)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',

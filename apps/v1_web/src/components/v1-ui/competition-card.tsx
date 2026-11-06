@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { getSportAccent } from '@/lib/v1-sport-accent';
-import { publicAssetPath } from '@/lib/assets';
+import { isOptimizableImagePath, publicAssetPath } from '@/lib/assets';
 import { SportGlyph } from '@/components/v1-ui/sport-glyph';
 
 /**
@@ -78,6 +78,7 @@ export function CompetitionThumbnail({
 }) {
   const sportAccent = getSportAccent(sportCode);
   if (imageUrl) {
+    const src = publicAssetPath(imageUrl);
     return (
       <div
         aria-hidden="true"
@@ -92,12 +93,12 @@ export function CompetitionThumbnail({
         }}
       >
         <Image
-          src={publicAssetPath(imageUrl)}
+          src={src}
           alt=""
           width={56}
           height={56}
           sizes="56px"
-          unoptimized
+          unoptimized={!isOptimizableImagePath(src)}
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
         />
       </div>

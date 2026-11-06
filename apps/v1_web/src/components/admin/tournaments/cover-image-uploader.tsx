@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import { ImagePlus, Trash2 } from 'lucide-react';
 import { useId, useRef } from 'react';
-import { publicAssetPath } from '@/lib/assets';
+import { isOptimizableImagePath, publicAssetPath } from '@/lib/assets';
 
 const COVER_EXAMPLE = '/mock/generated/futsal-rooftop.webp';
 
@@ -40,6 +40,7 @@ export function CoverImageUploader({
   const inputId = `tournament-cover-${generatedId.replaceAll(':', '')}`;
   const inputRef = useRef<HTMLInputElement>(null);
   const locked = uploading || disabled;
+  const previewSrc = publicAssetPath(value ?? COVER_EXAMPLE);
 
   return (
     <div className="flex flex-col gap-2">
@@ -56,14 +57,14 @@ export function CoverImageUploader({
               contain(로고) 모드의 빈 상태에서 그대로 노출되면 엉뚱한 예시·설명이 된다. */}
           {value || previewFit === 'cover' ? (
             <Image
-              src={publicAssetPath(value ?? COVER_EXAMPLE)}
+              src={previewSrc}
               alt={value ? (previewAlt ?? '선택한 대회 커버 미리보기') : '대회 커버 이미지 예시'}
               fill
               sizes="(max-width: 640px) 100vw, 240px"
               className={`${previewFit === 'contain' ? 'object-contain p-3' : 'object-cover'} ${value ? '' : 'opacity-55'}`}
               loading={eager ? 'eager' : 'lazy'}
               fetchPriority={eager ? 'high' : 'auto'}
-              unoptimized
+              unoptimized={!isOptimizableImagePath(previewSrc)}
             />
           ) : (
             <div className="absolute inset-0 grid place-items-center" aria-hidden="true">

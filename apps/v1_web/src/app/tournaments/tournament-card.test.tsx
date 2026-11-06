@@ -1,6 +1,6 @@
 import { act, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { publicAssetPath } from '@/lib/assets';
+import { resolveNextImageSrc } from '@/test/next-image';
 import type { V1TournamentListItem } from '@/types/api';
 import { TournamentCard } from './tournament-card';
 
@@ -190,7 +190,7 @@ describe('TournamentCard — 커버 이미지 fallback', () => {
     );
 
     const img = container.querySelector('img');
-    expect(img).toHaveAttribute('src', publicAssetPath('/uploads/cover-real.jpg'));
+    expect(resolveNextImageSrc(img)).toBe('/uploads/cover-real.jpg');
   });
 
   it('falls back to promoHomeImageUrl when coverImageUrl is missing but a promo photo exists', () => {
@@ -201,7 +201,7 @@ describe('TournamentCard — 커버 이미지 fallback', () => {
     );
 
     const img = container.querySelector('img');
-    expect(img).toHaveAttribute('src', publicAssetPath('/uploads/promo-home.jpg'));
+    expect(resolveNextImageSrc(img)).toBe('/uploads/promo-home.jpg');
   });
 
   it('prefers coverImageUrl over promoHomeImageUrl when both are present', () => {
@@ -215,7 +215,7 @@ describe('TournamentCard — 커버 이미지 fallback', () => {
     );
 
     const img = container.querySelector('img');
-    expect(img).toHaveAttribute('src', publicAssetPath('/uploads/cover-real.jpg'));
+    expect(resolveNextImageSrc(img)).toBe('/uploads/cover-real.jpg');
   });
 
   it('renders the sport-glyph fallback when neither coverImageUrl nor promoHomeImageUrl exist', () => {

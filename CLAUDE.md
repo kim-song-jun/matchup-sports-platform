@@ -244,7 +244,7 @@ infra/load/               → k6 부하 테스트 하네스
 pnpm --filter v1_api dev          # API (8121)
 pnpm --filter v1_web dev          # Web (3013) — 검증 목적으로는 띄우지 않는다(아래 "운영 워크플로" 7)
 pnpm --filter v1_web lint         # tsc --noEmit + scripts/v1-pattern-check.mjs
-pnpm --filter v1_api lint         # tsc --noEmit + scripts/v1-surface-check.mjs
+pnpm --filter v1_api lint         # tsc -p tsconfig.spec.json(테스트 포함) + scripts/v1-surface-check.mjs
 pnpm --filter v1_web build
 pnpm v1:db:generate | v1:db:migrate | v1:db:push | v1:db:studio | v1:db:seed
 ```
@@ -252,7 +252,7 @@ pnpm v1:db:generate | v1:db:migrate | v1:db:push | v1:db:studio | v1:db:seed
 ```bash
 pnpm --filter v1_web test              # Vitest(jsdom) — src/**/*.test.{ts,tsx}. 반드시 apps/v1_web 기준으로 실행
 pnpm --filter v1_api test              # Jest unit — src/**/*.spec.ts
-pnpm --filter v1_api test:integration  # Jest integration(--runInBand) — test/**/*.integration-spec.ts, DB 필요
+pnpm --filter v1_api test:integration  # Jest integration(워커 1개, 1GB 넘으면 재시작) — test/**/*.integration-spec.ts, DB 필요
 pnpm v1:test                           # 위 v1_api unit + v1_web test
 pnpm test:e2e:v1                       # Playwright — e2e/v1.config.ts (v1 스택 가동 전제)
 ```

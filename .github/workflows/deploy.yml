@@ -543,7 +543,7 @@ jobs:
         run: node --test --test-concurrency=1 scripts/qa/check-v1-api-build-boundary.test.mjs
 
       - name: V1 API type-check
-        run: pnpm --filter v1_api exec tsc --noEmit
+        run: pnpm --filter v1_api exec tsc --noEmit -p tsconfig.spec.json
 
       # 대회 표면 게이트: `v1Tournament.findUnique/findFirst` **원시 호출 수**를 파일별
       # baseline 으로 묶어 늘지 못하게 한다(줄었는데 baseline 이 그대로여도 실패).

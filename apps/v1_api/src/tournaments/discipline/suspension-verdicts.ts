@@ -84,8 +84,7 @@ export async function readSuspensionRules(
  *
  * **주입 서비스가 아니라 평범한 export 함수인 이유**: 이 코드를 쓰는 `GamesService`·
  * `TeamMatchLineupService` 의 생성자에 인자를 하나 더하면 그 클래스를 직접 `new` 하는
- * 스펙들이 전부 깨진다(`GamesService` 쪽만 통합 스펙 41곳 — CI 실측이고, 그 스펙들의
- * 타입은 로컬 `tsc -p tsconfig.json` 대상 밖이라 로컬에서는 보이지도 않는다). `tx` 를
+ * 스펙들이 전부 깨진다(`GamesService` 쪽만 통합 스펙 41곳). `tx` 를
  * 인자로 받으면 호출부의 트랜잭션을 그대로 쓸 수 있어 **제출과 같은 스냅샷**에서 읽는
  * 이점도 유지된다.
  *

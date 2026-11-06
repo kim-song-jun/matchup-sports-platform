@@ -8,6 +8,9 @@ process.env.TZ = 'UTC';
 // Jest 는 변환만 한다(tsconfig.spec.json 의 isolatedModules). 타입은 `tsc -p tsconfig.spec.json`
 // (lint·CI type-check)이 테스트 파일까지 한 번에 본다. 타입체크 변환은 재시작된 통합 워커마다
 // TS 프로그램을 새로 만들어 스위트당 약 7초씩 더 든다.
+// 함정: 변환 전용은 import 한 문자열 유니온(Prisma enum) 필드의 design:type 을 String 대신
+// Object 로 낸다. 그 필드는 ValidationPipe 의 enableImplicitConversion 이 문자열로 바꾸지 않아,
+// 비문자열 입력(배열 등)을 테스트는 거절하고 운영 빌드는 받을 수 있다.
 const base: Partial<Config> = {
   moduleFileExtensions: ['js', 'json', 'ts'],
   transform: { '^.+\\.(t|j)s$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.spec.json' }] },

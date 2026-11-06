@@ -941,3 +941,5 @@ GET은 살아 있는 전체 경기 수 `fixtureCount`, 예선 경기 수 `prelim
 - Public tournament detail `groups[].qualificationByTrack[track].colorIndex` identifies the stable destination color. Null qualification stays null; completion/publication/privacy gates are unchanged. Built-in upper/lower use 0/1. Palette order: blue, orange, teal, purple, rose, ochre, indigo, brown, olive, mauve. Indices beyond 9 cycle the palette; destination text remains present. Deleted indices are not compacted.
 
 - Public `groups[].bracketColorIndex` exposes the stored named-final color on knockout groups independently of preliminary completion, allowing consistent filter dots before teams qualify.
+
+- Admin GET bracket `groups[].bracketColorIndex` mirrors the server-owned named-final color so vertically separated admin diagram sections use the same destination colors as public standings and filters. No additional query or migration.

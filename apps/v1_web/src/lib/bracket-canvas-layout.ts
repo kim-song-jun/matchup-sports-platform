@@ -81,7 +81,7 @@ function bracketColumns(groups: readonly V1AdminBracketGroup[], fixtures: readon
     .map((group) => ({
       key: group.id,
       groupId: group.id,
-      label: bracketTrackLabel(group.bracketTrack) ? `${bracketTrackLabel(group.bracketTrack)} · ${group.name}` : group.name,
+      label: bracketTrackLabel(group.bracketTrack) && !group.name.startsWith(bracketTrackLabel(group.bracketTrack)! + ' · ') ? `${bracketTrackLabel(group.bracketTrack)} · ${group.name}` : group.name,
       fixtures: fixtures.filter((fixture) => fixture.groupId === group.id).sort(compareFixtures),
     }));
   const known = new Set(groups.map((group) => group.id));

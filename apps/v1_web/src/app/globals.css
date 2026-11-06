@@ -10943,3 +10943,9 @@ html[data-teameet-native-app='android'] .tm-search-error-toast {
 
 .tm-bracket-round-jumps { display: flex; flex-wrap: nowrap; gap: 8px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; margin-bottom: 12px; padding: 4px; }
 .tm-bracket-round-jumps > button { flex-shrink: 0; white-space: nowrap; }
+
+.tm-admin-final-section { scroll-margin-top: 80px; min-width: 0; }
+.tm-admin-final-summary { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; cursor: pointer; padding: 16px 0; font-size: var(--font-size-body-lg); font-weight: 700; }
+.tm-admin-final-summary::before { content: '▸'; }
+.tm-admin-final-section[open] > .tm-admin-final-summary::before { content: '▾'; }
+.tm-admin-final-summary > span:first-of-type { flex: 1; min-width: 0; overflow-wrap: anywhere; }

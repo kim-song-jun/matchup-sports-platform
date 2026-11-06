@@ -1,7 +1,7 @@
 // apps/v1_api/src/tournaments/slots/group-rank-preview.spec.ts
 import { FOOTBALL_V1_CONFIG } from '../competition-config/competition-config';
 import { calculateCompetitionStandings } from '../competition-config/competition-standings';
-import { resolveGroupRank, summarizeGroupStanding, type GroupRankSource } from './group-rank-preview';
+import { resolveStoredGroupRank, resolveGroupRank, summarizeGroupStanding, type GroupRankSource } from './group-rank-preview';
 
 type Result = readonly [home: string, away: string, homeScore: number, awayScore: number];
 
@@ -328,5 +328,24 @@ describe('summarizeGroupStanding', () => {
       const summary = summarizeGroupStanding(sourceOf(['A', 'B', 'C'], CLEAN), 5, none);
       expect(summary?.qualification).toEqual({ advancingRegistrationIds: ['A', 'B', 'C'], undecided: false });
     });
+  });
+});
+
+describe('N개 토너먼트의 공식 저장 순위 추천', () => {
+  it('승자승과 득실차 기준이 갈려도 공식 순위와 같은 팀을 반환한다', () => {
+    const source = sourceOf(['A', 'B', 'C', 'D'], RULES_DISAGREE);
+    for (const row of source.standings) {
+      expect(resolveStoredGroupRank(source, row.position!)).toEqual({ state: 'ready', registrationId: row.registrationId });
+    }
+  });
+  it('완전 동률의 저장 시드 순위도 다른 계산기로 재해석하지 않는다', () => {
+    const source = sourceOf(['A', 'B', 'C'], TIE_THREE);
+    const row = source.standings.find(row => row.position === 1)!;
+    expect(resolveStoredGroupRank(source, 1)).toEqual({ state: 'ready', registrationId: row.registrationId });
+  });
+  it('공식 결과 미완료·낡은 표·없는 순위는 추측하지 않는다', () => {
+    expect(resolveStoredGroupRank(sourceOf(['A', 'B', 'C'], CLEAN, { unofficialIndex: 0 }), 1)).toEqual({ state: 'group_incomplete' });
+    expect(resolveStoredGroupRank(sourceOf(['A', 'B', 'C'], CLEAN), 4)).toEqual({ state: 'group_incomplete' });
+    expect(resolveStoredGroupRank(sourceOf(['A', 'B', 'C'], CLEAN, { officialAt: new Date('2026-11-06T01:00:00Z'), recalculatedAt: new Date('2026-11-06T00:00:00Z') }), 1)).toEqual({ state: 'group_incomplete' });
   });
 });

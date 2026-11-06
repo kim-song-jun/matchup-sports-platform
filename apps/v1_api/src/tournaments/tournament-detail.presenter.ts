@@ -6,6 +6,8 @@ import {
   type ParticipantNameProfileRow,
 } from '../games/public-records/participant-name-gating';
 import type { LeagueFixtureListItem } from '../league-matches/league-fixture-list-source';
+import { normalizeFinalColors } from './multi-finals/multi-finals-colors';
+import type { FinalColorConfig } from './multi-finals/multi-finals-colors';
 import type { TournamentDetailRow } from './tournaments-read.query';
 import { resolveTournamentFixtureOfficialResult } from './tournament-fixture-official-result';
 import type { PublicRosterPlayer } from './public-roster';
@@ -318,6 +320,8 @@ export function presentTournamentDetail(
   // 같은 조건으로 감춰진다. 대진표 공개 여부(bracketPublished)와는 독립 — 대진표는
   // 공개돼도(구조는 보여도) 모집 중이면 그 안의 팀 식별 정보만 별도로 가려진다.
   const hideIdentity = shouldHideParticipantIdentity(row.status, staffBypass);
+  const finalConfig = row.multiFinals as unknown as FinalColorConfig | null;
+  const finalColors = new Map((finalConfig?.finals ? normalizeFinalColors(finalConfig).finals : []).map(final => [final.name, final.colorIndex]));
 
   return {
     sixTeamMode: row.sixTeamMode,
@@ -456,11 +460,14 @@ export function presentTournamentDetail(
       name: group.name,
       phase: group.phase,
       bracketTrack: group.bracketTrack,
+      ...(group.phase !== 'group' && finalColors.has(group.bracketTrack) ? { bracketColorIndex: finalColors.get(group.bracketTrack) } : {}),
       sortOrder: group.sortOrder,
       advanceCount: group.advanceCount,
       qualification: groupStandingSummaries.get(group.id)?.qualification ?? null,
       ...(groupStandingSummaries.get(group.id)?.qualificationByTrack
-        ? { qualificationByTrack: groupStandingSummaries.get(group.id)!.qualificationByTrack }
+        ? { qualificationByTrack: Object.fromEntries(Object.entries(groupStandingSummaries.get(group.id)!.qualificationByTrack!).map(([track, qualification], index) => {
+            return [track, qualification === null ? null : { ...qualification, colorIndex: finalColors.get(track) ?? (track === 'upper' ? 0 : track === 'lower' ? 1 : index) }];
+          })) }
         : {}),
       groupTeams: [...group.groupTeams, ...(group.byeSlots ?? []).map((slot) => ({ ...slot, registrationId: null, registration: null, isBye: true }))].map((groupTeam) => {
         const slot = groupTeam.isBye ? group.slots?.find(candidate => candidate.byeSortOrder != null && candidate.byeSortOrder === groupTeam.sortOrder) : undefined;

@@ -14,6 +14,7 @@ export class FinalRankRuleDto {
 export const MULTI_FINAL_POLICIES = ['rank_order', 'cross_group_top3'] as const;
 export type MultiFinalPolicy = typeof MULTI_FINAL_POLICIES[number];
 export class NamedFinalDto {
+  @IsOptional() @IsUUID() id?: string;
   @IsOptional() @IsInt() @Min(2) capacity?: number;
   @IsOptional() @IsIn(MULTI_FINAL_POLICIES) assignmentPolicy?: MultiFinalPolicy;
   @IsString() @MaxLength(80) name!: string;

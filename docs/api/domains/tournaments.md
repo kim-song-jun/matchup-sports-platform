@@ -934,3 +934,12 @@ GET은 살아 있는 전체 경기 수 `fixtureCount`, 예선 경기 수 `prelim
 
 ### 디렉터 관리와 최신 대회 기능 통합 — 2026-11-04
 담당 대회의 활성 디렉터는 다중 결선 조회·설정·선택·미리보기·생성, 결선별 시상 세트, 단계·조·경기 시간 설정과 개별 경기 시간 조회도 사용할 수 있다. 다른 대회·해제 배정은 도메인 읽기/쓰기 전에 403이다. 생성 요청 재시도는 관리자와 디렉터의 감사 이력을 함께 조회하고, 파생 경기 설정 버전의 생성 감사도 실제 디렉터 사용자·배정으로 기록한다. 전역 경기 설정 카탈로그 작성·대회 생성 권한은 확장하지 않는다.
+
+### Stable final destination colors
+- `NamedFinalDto.id` is an optional UUID returned by multi-finals GET/setup/selection. Editors must round-trip it when renaming or reordering. Unknown or duplicate IDs are rejected. New finals omit it. Legacy requests without IDs match by unchanged name; renaming without an ID creates a new destination.
+- Admin final responses include server-owned `colorIndex`; do not submit it. The JSON config persists final identity, colorIndex and monotonic nextColorIndex (no schema migration). Existing configs derive colors from stored order and persist on mutation. Generate/reset/assignment retain identity and color.
+- Public tournament detail `groups[].qualificationByTrack[track].colorIndex` identifies the stable destination color. Null qualification stays null; completion/publication/privacy gates are unchanged. Built-in upper/lower use 0/1. Palette order: blue, orange, teal, purple, rose, ochre, indigo, brown, olive, mauve. Indices beyond 9 cycle the palette; destination text remains present. Deleted indices are not compacted.
+
+- Public `groups[].bracketColorIndex` exposes the stored named-final color on knockout groups independently of preliminary completion, allowing consistent filter dots before teams qualify.
+
+- Admin GET bracket `groups[].bracketColorIndex` mirrors the server-owned named-final color so vertically separated admin diagram sections use the same destination colors as public standings and filters. No additional query or migration.

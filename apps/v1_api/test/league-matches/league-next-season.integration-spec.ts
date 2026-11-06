@@ -164,10 +164,6 @@ describe('독립 리그 다음 시즌 잇기', () => {
     expect(nextPublic.previousRound).toEqual({ leagueId: season1, title: `1시즌 ${suiteId}` });
     const detail = (await http().get(`/api/v1/tournaments/${season2}`).expect(200)).body.data;
     expect(detail.previousSeason).toEqual({ leagueId: season1, title: `1시즌 ${suiteId}` });
-    // 2026-11-05: 지난 시즌 상세는 이어진 다음 시즌을 알려 준다(제목 아래 '다음 시즌' 링크).
-    const previousDetail = (await http().get(`/api/v1/tournaments/${season1}`).expect(200)).body.data;
-    expect(previousDetail.nextSeason).toEqual({ leagueId: season2, title: expect.any(String) });
-    expect(detail.nextSeason).toBeNull();
   });
 
   it('지난 시즌 팀이 재참가 신청을 내면 지난 명단 중 아직 팀에 있는 선수를 지난 번호로 옮겨 담는다', async () => {
@@ -265,6 +261,9 @@ describe('독립 리그 다음 시즌 잇기', () => {
     expect(publicSource.nextSeasonTiers).toEqual([
       { leagueId: tier1, title: `전환 체계 ${suiteId} 1시즌 1부`, tier: 1, teamIds: expect.arrayContaining([team.a, team.b, team.c]) },
     ]);
+    // 2026-11-06: 전환으로 만든 첫 시즌 티어의 '이전 시즌 보기'는 원본 리그로 간다.
+    const tierDetail = (await http().get(`/api/v1/tournaments/${tier1}`).expect(200)).body.data;
+    expect(tierDetail.previousSeason).toEqual({ leagueId: source, title: `전환 원본 ${suiteId}` });
 
     // 2026-11-05 알파 QA: 1부 팀이 같은 시즌 2부에 신청·입금까지 하고 확정에서야 막혔다 — 신청부터 막는다.
     const {

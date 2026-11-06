@@ -415,6 +415,23 @@ export function showsNextLeagueInvite(
   return blockReason !== null && !hasActiveRegistration;
 }
 
+/**
+ * 이어진 이전 시즌으로 가는 입구. 데스크톱은 우측 레일, 모바일은 '우리 팀 참가' 아래 본문 카드다 — 다음 시즌 입구
+ * ('다음 리그에서 함께 뛰어요')와 같은 자리에 둔다(2026-11-06 사용자 선택, 제목 아래 작은 링크를 대신한다).
+ * 독립 리그는 `previousLeagueId` 로 이은 지난 시즌, 리그 체계 첫 시즌 티어는 전환한 원본 리그다.
+ */
+function PreviousSeasonNav({ season }: { season: { leagueId: string; title: string } }) {
+  return (
+    <section aria-label="이전 시즌" style={{ display: 'grid', gap: 'var(--spacing-2)' }}>
+      <h3 className="tm-text-body font-semibold text-[var(--text-strong)]">이전 시즌</h3>
+      <p className="tm-text-caption text-[var(--text-muted)]" style={{ margin: 0 }}>{season.title}</p>
+      <Link href={`/tournaments/${encodeURIComponent(season.leagueId)}`} className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block">
+        이전 시즌 보기
+      </Link>
+    </section>
+  );
+}
+
 /** 이 리그에 확정됐던 내 팀 전부(팀원 포함) — 체계로 전환한 리그에서 내 팀이 편성된 티어를 찾는다. */
 function confirmedTeamIdsOf(registrations: readonly V1TournamentRegistration[]): string[] {
   return registrations.filter((registration) => registration.status === 'confirmed').map((registration) => registration.teamId);
@@ -887,22 +904,6 @@ export function TournamentDetailView({
             {sportAccent.label}
           </span>
         </div>
-        {/* 독립 리그가 이어 가는 지난·다음 시즌(2026-11-03, 다음 시즌은 2026-11-05) — 공개된 리그만 서버가 싣는다.
-            종료된 지난 시즌은 우승팀만 보여 다음 시즌으로 이어진 줄 몰랐다 — 같은 자리에 다음 시즌 링크를 둔다. */}
-        {[
-          { label: '지난 시즌', link: tournament.previousSeason },
-          { label: '다음 시즌', link: tournament.nextSeason },
-        ].map(({ label, link }) => link ? (
-          <p key={label} className="tm-text-caption" style={{ margin: 'var(--spacing-1) 0 0', color: 'var(--text-muted)' }}>
-            {`${label} · `}
-            <Link
-              href={`/tournaments/${encodeURIComponent(link.leagueId)}`}
-              className="font-medium text-[var(--blue700)] underline underline-offset-2"
-            >
-              {link.title}
-            </Link>
-          </p>
-        ) : null)}
       </div>
     </div>
     </>
@@ -915,6 +916,11 @@ export function TournamentDetailView({
       <section aria-label="대회 기본 정보" style={{ marginTop: 20 }}>
         {headerIdentitySection}
         {!entryInAside ? entrySection : null}
+        {tournament.previousSeason ? (
+          <Card className="tm-hide-desktop" pad={16} style={{ marginBottom: 'var(--spacing-4)' }}>
+            <PreviousSeasonNav season={tournament.previousSeason} />
+          </Card>
+        ) : null}
 
         {/* 핵심 정보 — 하나의 카드로 통합(기존: 틴트 3카드 + 별도 info 카드로 분산).
             일정·정원·참가비는 데스크탑 우측 sticky 레일과 중복되어 모바일 전용(tm-hide-desktop). */}
@@ -1059,6 +1065,11 @@ export function TournamentDetailView({
       <section aria-label="대회 기본 정보" style={{ marginTop: 20 }}>
         {headerIdentitySection}
         {entrySection}
+        {tournament.previousSeason ? (
+          <Card className="tm-hide-desktop" pad={16} style={{ marginBottom: 'var(--spacing-4)' }}>
+            <PreviousSeasonNav season={tournament.previousSeason} />
+          </Card>
+        ) : null}
       </section>
 
       <CompletedResultHero tournament={tournament} />
@@ -1236,10 +1247,13 @@ export function TournamentDetailView({
   const nextLeagueInvite = isLeagueMirror && (registrationBlock !== null || tournament.status === 'completed')
     ? <div className="mb-4"><LeagueNextRegistrationInvite leagueId={tournament.id} variant="sidebar" returningTeamId={returningTeamId} myTeamIds={confirmedTeamIdsOf(myRegistrations)} /></div>
     : null;
+  const previousSeasonRail = tournament.previousSeason
+    ? <div className="mb-4"><PreviousSeasonNav season={tournament.previousSeason} /></div>
+    : null;
   const leagueUsesProgressRail = isLeagueMirror && (tournament.status === 'in_progress' || tournament.status === 'closed');
   const railCTA = isOpen && !leagueUsesProgressRail ? (
     isLeagueMirror ? (
-      hasActiveRegistration && !showsCapacity ? null : (
+      hasActiveRegistration && !showsCapacity && previousSeasonRail === null ? null : (
       <aside className="tm-tournament-rail tm-show-desktop" role="complementary" aria-label="리그 참가 신청">
         <div className="tm-text-label" style={{ color: 'var(--text-strong)', marginBottom: 2 }}>
           {hasActiveRegistration ? '내 리그 신청' : '리그 참가 신청'}
@@ -1266,6 +1280,7 @@ export function TournamentDetailView({
           </div>
         ) : null}
         {!hasActiveRegistration ? <ApplyCTAButtons tournament={tournament} blockReason={registrationBlock} myRegistration={myRegistration} /> : null}
+        {previousSeasonRail ? <div className="mt-4">{previousSeasonRail}</div> : null}
       </aside>
       )
     ) : (
@@ -1360,6 +1375,7 @@ export function TournamentDetailView({
         <ChevronRight size={17} strokeWidth={2.5} style={{ color: 'rgba(255,255,255,0.65)', flexShrink: 0 }} aria-hidden="true" />
       </Link>
       {nextLeagueInvite}
+      {previousSeasonRail}
       {/* Key facts */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1414,6 +1430,7 @@ export function TournamentDetailView({
         <ChevronRight size={17} strokeWidth={2.5} style={{ color: 'var(--text-caption)', flexShrink: 0 }} aria-hidden="true" />
       </Link>
       {nextLeagueInvite}
+      {previousSeasonRail}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>일정</span>
@@ -1447,6 +1464,7 @@ export function TournamentDetailView({
         <ChevronRight size={17} strokeWidth={2.5} style={{ color: 'rgba(255,255,255,0.55)', flexShrink: 0 }} aria-hidden="true" />
       </Link>
       {nextLeagueInvite}
+      {previousSeasonRail}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>일정</span>

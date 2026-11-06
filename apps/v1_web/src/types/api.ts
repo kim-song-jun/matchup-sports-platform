@@ -4250,10 +4250,8 @@ export type V1SixTeamBracket = { rounds: [string, string, string, string, string
   swapSemi?: boolean; swapFinal?: boolean;
   manual: boolean; winners: Record<string, string>; needsReview: boolean };
 export type V1TournamentDetail = {
-  /** 정규 리그가 이어 가는 지난 시즌(독립 리그 → 독립 리그, 공개된 리그만). 대회·옛 응답은 없음. */
+  /** 이어진 이전 시즌(독립 리그의 지난 시즌, 전환한 체계 첫 시즌 티어는 원본 리그 — 공개된 리그만). 대회·옛 응답은 없음. */
   previousSeason?: { leagueId: string; title: string } | null;
-  /** 이어진 다음 시즌(공개된 리그만). 종료된 지난 시즌에서 바로 넘어가는 링크. 대회·옛 응답은 없음. */
-  nextSeason?: { leagueId: string; title: string } | null;
   sixTeamMode?: boolean;
   sixTeamBracket?: V1SixTeamBracket | null;
   id: string;

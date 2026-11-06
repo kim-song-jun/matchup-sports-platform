@@ -54,12 +54,32 @@ function createWith(step: 'info' | 'confirm', image: string) {
 }
 
 describe('매치 상세 히어로', () => {
-  it('데스크톱 1072px 의 2배(3840)가 아니라 1920 폭으로 받는다', () => {
+  function heroWith(image: string) {
     const base = getMatchDetailViewModel();
-    const { container } = render(<MatchDetailPageView model={{ ...base, match: { ...base.match, image: UPLOAD } }} />);
+    const { container } = render(<MatchDetailPageView model={{ ...base, match: { ...base.match, image } }} />);
+    return pick(container, '.tm-match-detail-hero');
+  }
 
-    expect(optimizerRequest(pick(container, '.tm-match-detail-hero').style.backgroundImage))
+  it('휴대폰·태블릿은 1200 폭, 데스크톱은 3840 이 아니라 1920 폭 주소를 함께 싣는다', () => {
+    const hero = heroWith(UPLOAD);
+
+    expect(hero.classList.contains('tm-responsive-bg')).toBe(true);
+    expect(optimizerRequest(hero.style.getPropertyValue('--tm-bg-image')))
+      .toEqual({ pathname: '/_next/image', url: UPLOAD, w: '1200' });
+    expect(optimizerRequest(hero.style.getPropertyValue('--tm-bg-image-wide')))
       .toEqual({ pathname: '/_next/image', url: UPLOAD, w: '1920' });
+  });
+
+  it('인라인 background-image 를 두지 않는다 — .tm-responsive-bg 가 폭에 맞는 쪽을 고르게 한다', () => {
+    expect(heroWith(UPLOAD).style.backgroundImage).toBe('');
+  });
+
+  it('최적화할 수 없는 외부 사진은 두 속성이 같은 원본을 가리킨다', () => {
+    const external = 'https://cdn.example.com/hero.png';
+    const hero = heroWith(external);
+
+    expect(hero.style.getPropertyValue('--tm-bg-image')).toBe(`url("${external}")`);
+    expect(hero.style.getPropertyValue('--tm-bg-image-wide')).toBe(`url("${external}")`);
   });
 });
 

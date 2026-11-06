@@ -1270,3 +1270,31 @@ Separate preliminary and named-final diagrams vertically; preserve horizontal ro
 - Rendering now separates preliminary/other fixtures and every named final into vertically stacked native details, with independent canvas/SVG/scroll geometry, complete source-label/shared-slot lock context, jump navigation that opens and focuses the destination, server-owned color dot and match count. Repeated track title prefixes removed. Existing single/upper-lower/six-team layouts stay on the existing single renderer.
 - Actual Alpha admin baseline at 1440/768/390 captured from owned private20-team QA tournament; no page/network errors observed. Chrome41968/controller55576 exited normally. QA tournament stays private, unchanged by this task.
 - Filter head113419e58 CI42168900113 all SUCCESS. This admin extension requires NEW exact-head CI/review after push. No merge or Alpha deployment yet and no #2173 review waiver received. Keep this unmerged worktree; main/prod remain out of scope.
+
+## 2026-11-06 follow-up: 경기 일정 필터 정합성
+Status: In Progress
+### Context / Goal / Original Conditions
+PR2173 deployed colors and bracket filters but ScheduleContent retained its combined wrapping group/round filter. User authorized fixing, new dev PR, and Alpha deployment. Apply the already approved UX to 경기 일정 without new design choices.
+### User Scenarios / Acceptance Criteria
+- [ ] 결선 > 전체·토너먼트 이름 > 전체·실제 강수. All uses union; selected final limits available rounds. Preserve common round, reset unavailable round.
+- [ ] Two/three/ten finals retain actual names and stable color dots; single final omits name row.
+- [ ] Group/name/round rows independently scroll horizontally with no wrap.
+- [ ] Scheduled/live/unscheduled and 내 팀만 share the same predicates. URL state/deep links/back/forward and fixture detail return preserve selected final and round.
+- [ ] Single/upper-lower/pure-league behavior and auth/publication gates retained.
+### Test Scenarios
+Focused ScheduleContent behavior and route wiring; existing schedule/history/league regressions; one Web type/pattern run; exact-head CI/review; Alpha3viewports screenshots/network evidence.
+### Parallel Work Breakdown / Ownership
+Single agent; own fresh fix/schedule-final-filters-20261106 worktree from origin/dev1245860f0. Owned ScheduleContent, bracket schedule wiring, focused tests, changeset and this task. No backend/API/schema migration, main/prod, other sessions' files/processes.
+### Tech Debt Resolved / Security Notes
+Reuse BracketFilterRow; eliminate wrapping duplicate filter implementation and keep local draft state. Stable track colors come from existing tournament-detail metadata, never infer identity by translated name parsing. Preserve existing visibility and session gates.
+### Risks & Dependencies / Ambiguity Log
+Schedule rows have no bracketTrack, so hub supplies fixture-ID keyed final metadata from its existing detail response, including rows whose schedule groupId is null. Standalone /schedule redirects to /bracket; regular league uses separate wrapper. No new API request. PR2173 review waiver is not assumed for this new PR.
+### Progress Snapshot
+Fresh branch1245860f0 (includes PR2180 image work). Narrow tests added for union/reset/common round/10final URL restoration; dependencies installed in owned WSL worktree, ignore-scripts. No local Next server.
+### Schedule filter validation snapshot
+- RED: new N-final schedule cases failed2/2 on old implementation because 일정 토너먼트 선택 did not exist.
+- GREEN: four focused suites164/164 PASS (schedule75, actual bracket route61, URL-return14, league14). Includes10final deep-link/re-entry/popstate, common/missing rounds, live/unscheduled/mine intersection, single-final hidden-name row, fixture-ID association with null schedule.groupId and saved color.
+- Changes: supply named-final fixture IDs/colors from the already loaded tournament detail; keep per-entry named group headings; add scheduleFinal to existing local draft/URL sync and fixture return source; reuse independent BracketFilterRow with padded=false inside existing schedule padding. No extra API requests or backend/DB changes.
+- Baseline Alpha1245860f0 captured after deploy42183991187 SUCCESS at1440/768/390. Actual login through player fixture account, read-only tournamentf67894a6; no page/network errors observed in this scoped baseline. Browser28716/controller14088 closed normally. Do not alter that existing tournament.
+- Web lint/tsc pending; commit/PR/CI/Copilot/Alpha after verification remain. Own browser helper/dependencies in Windows TEMP/teameet-schedule-final-browser, WSL install/test/lint logs prefixed teameet-schedule-final. No local Next/DB runtime.
+- Final pre-commit Web lint (tsc --noEmit + v1 pattern check) PASS. Focused164/164 and diff/debt checks passed; baseline images reviewed. Ready for exact-scope commit and latest-head CI/review.

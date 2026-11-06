@@ -24,7 +24,7 @@ type Props = {
   page?: number;
   pending: boolean;
 };
-const GENDER_LABELS = { male: '남성부', female: '여성부', mixed: '혼성', unspecified: '미지정' };
+const GENDER_LABELS = { male: '남성부', female: '여성부', mixed: '혼성' };
 const FORMAT_LABELS = { league: '리그 방식', knockout: '토너먼트', group_knockout: '조별+결선', league_knockouts: '정규리그+복수 결선' };
 
 function FilterChoices({ title, value, options, onChange }: {

@@ -21,7 +21,7 @@ describe('목록 API 입력 검증', () => {
     await expect(parse({ stage })).resolves.toMatchObject({ stage });
   });
   it.each([
-    { stage: 'draft' }, { stage: 'upcoming' }, { sort: 'latest' }, { phase: 'upcoming' }, { registration: 'open' }, { format: 'unknown' },
+    { stage: 'draft' }, { stage: 'upcoming' }, { genderCategory: 'unspecified' }, { sort: 'latest' }, { phase: 'upcoming' }, { registration: 'open' }, { format: 'unknown' },
     { feeMin: '-1' }, { feeMax: '3.5' }, { feeMax: '99999999999' },
     { dateFrom: '0000-01-01' }, { dateFrom: '2026-02-30' }, { dateTo: '2026-11-01T00:00:00Z' }, { withTotal: 'false' }, { arbitrary: 'value' },
   ])('잘못된 필터를 400으로 거절한다: %j', async (input) => {

@@ -729,7 +729,7 @@ describe('TournamentPlayersService', () => {
     ]);
   });
 
-  it.each([true, false, undefined])('addPlayer: 골레이 %s를 저장·복원하고 프로필 성별을 응답한다', async (goalkeeper) => {
+  it.each([true, false, undefined])('addPlayer: 골키퍼 %s를 저장·복원하고 프로필 성별을 응답한다', async (goalkeeper) => {
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
     prisma.v1TeamMembership.findFirst
       .mockResolvedValueOnce({ id: 'mem-1', role: 'manager' })

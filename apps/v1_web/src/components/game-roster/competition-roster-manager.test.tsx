@@ -95,9 +95,9 @@ describe('공통 명단 관리의 실제 탭·저장 흐름', () => {
     open('registration');
     const noun = value === 'regular_league' ? '리그' : '대회';
     expect(await screen.findByText((_, element) => element?.tagName === 'P' &&
-      element.textContent === `선수 명단·등번호·골레이 설정은 ${noun}의 모든 경기에 공통으로 적용돼요.바꾼 내용은 아직 시작하지 않은 경기에 반영되고, 이미 시작한 경기의 출전 기록은 그대로예요.시작한 경기의 기록을 고쳐야 하면 운영진에게 문의해 주세요.`)).toBeInTheDocument();
+      element.textContent === `선수 명단·등번호·골키퍼(GK) 설정은 ${noun}의 모든 경기에 공통으로 적용돼요.바꾼 내용은 아직 시작하지 않은 경기에 반영되고, 이미 시작한 경기의 출전 기록은 그대로예요.시작한 경기의 기록을 고쳐야 하면 운영진에게 문의해 주세요.`)).toBeInTheDocument();
   });
-  it.each([false, true])('통합 명단 선수 추가는 골레이 %s를 POST에 전달한다', async goalkeeper => {
+  it.each([false, true])('통합 명단 선수 추가는 골키퍼 %s를 POST에 전달한다', async goalkeeper => {
     let body: Record<string, unknown> | undefined;
     server.use(
       http.get('*/api/v1/teams/:id/members', () => ok({ items: [{ userId: 'new-player', displayName: '새선수',
@@ -113,7 +113,7 @@ describe('공통 명단 관리의 실제 탭·저장 흐름', () => {
     await screen.findByRole('option', { name: /새선수/ });
     fireEvent.change(screen.getByLabelText(/팀원 선택/), { target: { value: 'new-player' } });
     expect(screen.getByLabelText('성별')).toHaveValue('여성');
-    if (goalkeeper) fireEvent.click(screen.getByRole('checkbox', { name: '골레이로 등록해요' }));
+    if (goalkeeper) fireEvent.click(screen.getByRole('checkbox', { name: '골키퍼(GK)로 등록해요' }));
     fireEvent.click(screen.getByRole('button', { name: '선수 등록' }));
     await waitFor(() => expect(body).toMatchObject({ userId: 'new-player', goalkeeper }));
   });

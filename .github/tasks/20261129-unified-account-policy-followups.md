@@ -43,7 +43,7 @@ Status: In Progress
 | G1 | `POST /auth/identities/unlink { provider: 'kakao'\|'apple'\|'email' }`. 로그인 필수, 최근 30분 로그인 아니면 403 `RECENT_LOGIN_REQUIRED`, 호출자 가드(운영자 403 `SOCIAL_LINK_ADMIN_FORBIDDEN`·정지·가입 미완료)는 `link-caller-guards.ts` 재사용. 활성 신원 없으면 404 `LOGIN_METHOD_NOT_FOUND`, 남은 활성 수단이 그것뿐이면 409 `LAST_LOGIN_METHOD`. 성공 시 신원 `status=unlinked`(이메일이면 비밀번호 해시 제거), `sessionEpoch`+1 후 현재 쿠키 재발급, 상태 로그 `login_method_removed`, 알림 `social_identity_unlinked`. `users.email` 은 연락 이메일로 남는다. 같은 `(provider, providerUserKey)` 를 다시 연결하면 기존 행을 되살린다 |
 | G9 | `POST /auth/sessions/revoke-others` — `sessionEpoch`+1, 현재 쿠키 재발급, 상태 로그 `sessions_revoked`. 최근 로그인 요구 없음 |
 | G3 | 부분 유니크 인덱스 `(user_id, provider) WHERE status = 'active'`(idempotent 마이그레이션). 자동 연결 경로(`linkExistingKakaoIdentity`·`linkExistingSocialIdentity`)에 같은 제공자 검사(409 `SOCIAL_LINK_PROVIDER_EXISTS`) |
-| G4 | 자동 연결 경로에 운영자 거절(연결하지 않고 기존 충돌 응답으로) + 성공 시 `social_identity_linked` 알림 |
+| G4 | 자동 연결 경로에 운영자 거절 403 `SOCIAL_LINK_ADMIN_FORBIDDEN`(명시적 연결과 같은 코드 — "원래 계정으로 로그인하면 연결돼요" 409 안내는 운영자에게 거짓이 되므로 쓰지 않는다, 레인 B 검토 반영) + 성공 시 `social_identity_linked` 알림 |
 | G5 | 이메일 변경 증명: 새 주소로 인증번호(목적 분리 — `email_change`) → 10분 `emailChangeToken`. `PATCH /me/profile` 에서 이메일이 바뀌면 그 토큰이 필수(없거나 다른 주소면 400 `EMAIL_CHANGE_PROOF_REQUIRED`). 비밀번호 계정은 로그인 ID 가 바뀌므로 최근 30분 로그인도 요구. 변경 후 `emailVerifiedAt`=지금 |
 | G10 | `POST /auth/recovery/email/find-account` 가 메일함 증명 뒤 탈퇴 대기 계정도 찾고 `withdrawalPendingUntil` 을 싣는다(휴대폰 경로와 같은 모양) |
 | G11 | 공통 비밀번호 규칙에 흔한 비밀번호 목록 차단(400, 해요체 안내). 웹의 즉시 안내도 같은 목록·같은 결과(목록은 한 곳) |
@@ -107,4 +107,6 @@ Status: In Progress
 - G7 문구는 법무 확인 필요. G8 은 Apple 개발자 콘솔 확인(사용자) 필요.
 
 ## Ambiguity Log
+- G4 운영자 거절 응답: 처음 계약은 "기존 충돌 응답(409)"이었으나, 운영자 계정은 원래 계정에 로그인해도 연결이 거절되어 409 안내가 거짓이 된다 → 403 `SOCIAL_LINK_ADMIN_FORBIDDEN`(레인 B #2187).
+- 스키마 해시 바인딩: 레인 B(#2187)와 레인 D(G5)가 모두 `schema.prisma` 를 바꾼다 — 나중에 머지하는 PR 이 최신 dev 기준으로 해시 5곳을 다시 핀한다.
 - G14 "탈퇴 대기 날짜는 숨기고": 번호 경로에서는 날짜를 숨기되 "로그인하면 탈퇴를 취소할 수 있어요" 안내는 남긴다(본인이 철회 경로를 찾을 수 있게). 10-31 결정 3A(번호 인증 뒤 탈퇴 신청 중 안내)를 이 범위로 좁힌다.

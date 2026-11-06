@@ -95,6 +95,60 @@ describe('N개 결선 실제 DB 저장·공식 순위·수동 편집·재생성'
     expect(after.teamMatch.startAt).toEqual(scheduledAt);
     expect([after.homeRegistrationId, after.awayRegistrationId]).toEqual([registrationIds[0], registrationIds[5]]);
   });
+  it('규칙 없는 capacity로 먼저 생성하고 이후 규칙 연결과 실제 팀 확정을 별도로 수행한다', async () => {
+    const first = await service.setup(user, tournamentId, { expectedRevision: 0,
+      groups: [0, 1].map(i => ({ name: `${i + 1}조`, capacity: 5, legs: 1 as const, registrationIds: registrationIds.slice(i * 5, i * 5 + 5) })),
+      finals: [{ name: '프리미어', capacity: 6, rules: [], thirdPlace: false, registrationIds: null }] });
+    const preview = await service.preview(user, tournamentId);
+    expect(preview.plan.slots).toHaveLength(6);
+    await service.generate(user, tournamentId, { expectedRevision: first.revision, previewHash: preview.previewHash, requestId: randomUUID() });
+    const idsBefore = await prisma.v1TournamentMatchDetails.findMany({ where: { tournamentId, group: { phase: { not: 'group' } } }, orderBy: { fixtureNumber: 'asc' }, select: { teamMatchId: true } });
+    const current = await service.get(user, tournamentId);
+    expect(current.finals[0].capacity).toBe(6);
+    const rules = current.groups.flatMap(group => [1, 2, 3].map(rank => ({ groupId: group.id, rank })));
+    await service.select(user, tournamentId, { expectedRevision: current.revision, finals: [{ ...current.finals[0], rules }] });
+    await finishPreliminary();
+    const ready = await service.get(user, tournamentId);
+    expect(ready.finals[0].registrationIds).toBeNull();
+    const suggestion = await service.assignmentPreview(user, tournamentId, { expectedRevision: ready.revision, finalName: '프리미어', assignmentPolicy: 'rank_order' });
+    const filled = await service.assign(user, tournamentId, { expectedRevision: ready.revision, finalName: '프리미어', registrationIds: suggestion.registrationIds, sourceVersion: suggestion.sourceVersion });
+    expect(filled.finals[0].registrationIds).toHaveLength(6);
+    const idsAfter = await prisma.v1TournamentMatchDetails.findMany({ where: { tournamentId, group: { phase: { not: 'group' } } }, orderBy: { fixtureNumber: 'asc' }, select: { teamMatchId: true } });
+    expect(idsAfter).toEqual(idsBefore);
+  });
+  it('한 결선을 확정해도 다른 빈 결선과 예선을 보존하고, 시작한 다른 결선에 영향 없이 나머지를 확정한다', async () => {
+    const first = await service.setup(user, tournamentId, { expectedRevision: 0,
+      groups: [0, 1].map(i => ({ name: `${i + 1}조`, capacity: 5, legs: 1 as const, registrationIds: registrationIds.slice(i * 5, i * 5 + 5) })),
+      finals: [
+        { name: '챔피언', thirdPlace: false, rules: [{ groupId: '0', rank: 1 }, { groupId: '1', rank: 1 }], registrationIds: null },
+        { name: '챌린지', thirdPlace: false, rules: [0, 1].flatMap(i => [2, 3, 4, 5].map(rank => ({ groupId: String(i), rank }))), registrationIds: null },
+      ] });
+    const preview = await service.preview(user, tournamentId);
+    await service.generate(user, tournamentId, { expectedRevision: first.revision, previewHash: preview.previewHash, requestId: randomUUID() });
+    await finishPreliminary();
+    const beforePreliminary = await preliminarySnapshot();
+    const snapshot = (track: string) => prisma.v1TournamentMatchDetails.findMany({
+      where: { tournamentId, group: { bracketTrack: track }, teamMatch: { deletedAt: null } },
+      orderBy: { fixtureNumber: 'asc' }, include: { teamMatch: { include: { game: true } } },
+    });
+    const challengeBefore = await snapshot('챌린지');
+    const current = await service.get(user, tournamentId);
+    const result = await service.assign(user, tournamentId, { expectedRevision: current.revision, finalName: '챔피언', registrationIds: [registrationIds[0], registrationIds[5]] });
+    const champion = await snapshot('챔피언');
+    expect([champion[0].homeRegistrationId, champion[0].awayRegistrationId]).toEqual([registrationIds[0], registrationIds[5]]);
+    expect(await snapshot('챌린지')).toEqual(challengeBefore);
+    expect(result.finals[1].registrationIds).toBeNull();
+    await prisma.v1Game.update({ where: { id: champion[0].teamMatch.game!.id }, data: { state: 'LIVE' } });
+    const championBefore = await snapshot('챔피언');
+    const remaining = registrationIds.filter((_, index) => index !== 0 && index !== 5);
+    const next = await service.assign(user, tournamentId, { expectedRevision: result.revision, finalName: '챌린지', registrationIds: remaining });
+    expect(next.finals[1].registrationIds).toEqual(remaining);
+    expect(await snapshot('챔피언')).toEqual(championBefore);
+    expect(await preliminarySnapshot()).toEqual(beforePreliminary);
+    const filled = await prisma.v1TournamentSlot.findMany({ where: { tournamentId, kind: 'GROUP_RANK', group: { bracketTrack: '챌린지' } }, orderBy: { position: 'asc' } });
+    expect(filled.map(slot => slot.registrationId)).toEqual(remaining);
+    expect((await snapshot('챌린지')).map(row => row.teamMatchId)).toEqual(challengeBefore.map(row => row.teamMatchId));
+  });
   it('순위 밖 팀을 포함해 3개 결선 명단을 저장하고 재계산 뒤에도 유지하며 예선을 보존한다', async () => {
     const first = await setup(); await finishPreliminary(); const before = await preliminarySnapshot();
     const finals = [
@@ -121,7 +175,7 @@ describe('N개 결선 실제 DB 저장·공식 순위·수동 편집·재생성'
     const changed = await service.select(user, tournamentId, { expectedRevision: next.revision, finals: [{ ...finals[0], registrationIds: [registrationIds[0], registrationIds[9]] }] });
     expect(changed.generated).toBe(false); expect(await preliminarySnapshot()).toEqual(before);
   }, 30000);
-  it('완전 동률은 전체 순위와 후보를 제공하고 수동 선택을 기존 미정 대진에 배정한다', async () => {
+  it('완전 동률도 공식 저장 순위로 추천하고 수동 선택은 기존 미정 대진에 배정한다', async () => {
     await setup();
     const pending = await service.preview(user, tournamentId);
     await service.generate(user, tournamentId, { expectedRevision: pending.revision, previewHash: pending.previewHash, requestId: randomUUID() });
@@ -129,9 +183,8 @@ describe('N개 결선 실제 DB 저장·공식 순위·수동 편집·재생성'
     await finishPreliminary(true);
     const view = await service.get(user, tournamentId);
     expect(view.groupStandings.every(group => group.complete && group.rows.length === 5)).toBe(true);
-    expect(view.finals[0].suggestedRegistrationIds).toEqual([]);
-    expect(view.finals[0].unresolved.map(rule => rule.state)).toEqual(['tied', 'tied']);
-    expect(view.finals[0].unresolved[0].tiedRegistrationIds).toHaveLength(5);
+    expect(view.finals[0].suggestedRegistrationIds).toHaveLength(2);
+    expect(view.finals[0].unresolved).toEqual([]);
     expect((await service.preview(user, tournamentId)).finals[0].registrationIds).toBeNull();
     const selected = await service.select(user, tournamentId, { expectedRevision: view.revision,
       finals: [{ name: '챔피언', thirdPlace: false, rules: view.finals[0].rules, registrationIds: [registrationIds[2], registrationIds[7]] }] });

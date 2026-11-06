@@ -101,6 +101,15 @@ export function resolveGroupRank(source: GroupRankSource, rank: number): GroupRa
   return resolveRankIn(source, leagueOf(source, results), rank);
 }
 
+/** N개 결선은 대회 계산기로 저장한 공식 순위를 그대로 사용한다.
+ * 별도의 리그 계산기로 순서를 재해석하면 승자승 우선 순위를 가짜 동률로 바꾸게 된다.
+ */
+export function resolveStoredGroupRank(source: GroupRankSource, rank: number): GroupRankResolution {
+  if (settledResults(source) === null) return INCOMPLETE;
+  const rows = source.standings.filter(row => row.position === rank && source.registrationIds.includes(row.registrationId));
+  return rows.length === 1 ? { state: 'ready', registrationId: rows[0].registrationId } : INCOMPLETE;
+}
+
 export type GroupQualification = { advancingRegistrationIds: string[]; undecided: boolean };
 export type QualificationTrack = string;
 export type GroupStandingSummary = {

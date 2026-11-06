@@ -878,6 +878,23 @@ Legacy delimiter-separated text remains readable. New admin saves use `@teameet/
 
 ### 정규리그 + N개 토너먼트 (`league_knockouts`)
 
+#### 토너먼트 하나의 진출팀 확정 (2026-11-06)
+
+`PUT /api/v1/admin/tournaments/:tournamentId/bracket/multi-finals/assignment`
+
+- body: `{ expectedRevision: number, finalName: string, registrationIds: UUID[], assignmentPolicy?: "rank_order" | "cross_group_top3", sourceVersion?: string }`. 이름은 저장된 토너먼트 이름과 정확히 일치하며 배열 순서가 시드 순서다.
+- 기존 `V1AuthGuard`와 `getTournamentMutationAdmin`을 적용한다. owner/ops 또는 해당 대회 디렉터만 쓰며 support/조회 역할/타 대회 배정은 거절한다.
+- 예선 공식 결과와 순위 반영 완료 후 생성된 해당 결선의 모든 GROUP_RANK 자리를 원자적으로 채운다. 자리 수는 기존 대진과 같아야 한다. 임의의 크기 변경·대진 재생성·일정 변경은 하지 않는다.
+- 다른 토너먼트의 설정/명단/경기는 유지한다. 다른 토너먼트가 LIVE여도 선택한 토너먼트가 시작 전이면 배정할 수 있다. 같은 팀은 두 결선에 중복 배정하지 않는다. 다른 결선에 저장된 명단의 참가 상태는 이 요청에서 수정하지 않는다.
+- stale revision은 `409 MULTI_FINAL_STALE`, 미완료 예선은 `409 MULTI_FINAL_PRELIMINARY_INCOMPLETE`, 없는/불일치 대진은 `409 MULTI_FINAL_BRACKET_REQUIRED`, 선택한 결선의 시작·기록·결과는 `409 BRACKET_LOCKED`, 잘못된 팀/중복/자리 수/이름은 `422 MULTI_FINAL_INVALID`다. CAS 실패 후 새 명단을 다시 조회해야 한다.
+- 잠금은 대회 bracket advisory lock → 선택 결선 Game id 순서이며, 실제 슬롯 변경과 JSON 명단/revision 증가 및 `tournament.multi_finals.assign` 감사는 한 트랜잭션이다. 응답은 최신 multi-finals GET과 같은 view다. 명시적으로 선택한 팀은 이후 예선 결과 재계산으로 덮어쓰지 않는다.
+- `finals[].capacity`는 선택적인 명시적 자리 수(정수≥2)다. 신규 생성 UI는 `capacity`와 빈 `rules`로 팀 미정 대진을 먼저 만들고, 별도 규칙 UI에서 각 조 순위별 목적지를 연결한다. rules 수가 capacity를 넘거나 명시 명단 길이가 capacity와 다르면 422다. 이전 저장 데이터와 클라이언트의 capacity 생략은 기존 `registrationIds.length` 또는 `rules.length`를 사용하며 슬롯/일정을 마이그레이션하지 않는다. 규칙 편집 UI는 이 크기와 기존 승인 명단을 고정해 순위 연결 변경만으로 실제 팀/대진 크기가 바뀌지 않도록 한다. 새 추천 명단의 적용은 별도 assignment 확정이다.
+- `POST /assignment-preview`: `{ expectedRevision, finalName, assignmentPolicy?: 'rank_order' | 'cross_group_top3' }` → `{ revision, finalName, assignmentPolicy, registrationIds, sourceVersion }`. 관리자/디렉터 전용 읽기 미리보기로 명단/대진을 저장하지 않는다. 기본값 `rank_order`는 공식 저장 순위의 규칙 순서, `cross_group_top3`는 아래 교차 배치다. `sourceVersion`은 공식 순위 원천을 해시하며 확정 시 달라지면 `409 MULTI_FINAL_STALE`다. 미리보기/확정 사이 예선 정정은 게임 행 잠금 후 재검증한다.
+- `cross_group_top3`는 예선 4개 조 각각의 1~3위가 한 결선의 12개 규칙 자리를 구성할 때만 GET의 `crossGroupTopThreeAvailable=true`로 제공한다. config의 조 순서 A/B/C/D에서 1위는 시드1/2/3/4(12강 부전승)이고, 해당 8강 상대 쪽의 2위는 B/C/D/A로 고정한다. 3위는 해당 12강의 2위 및 다음 8강의 1위와 같은 조가 되지 않는 모든 유효 순열 중 균등 추첨한다. 동일 조 회피는 12강·8강에 한정한다. 확정은 미리 본 배열을 그대로 사용하며 재추첨하지 않는다. 서버는 시드 배열과 실제 저장된 12강→8강 연결까지 검사해 같은 조 회피가 깨지는 편집 대진을 422로 거절하고 선택 정책을 JSON 명단 및 감사에 보존한다. 팀/시드를 직접 바꾸면 UI는 `rank_order` 수동 배치로 전환한다.
+- `preview`/`generate`는 결과가 모두 나왔어도 추천만으로 자동 명단을 확정하지 않는다. 미승인 결선은 명시 capacity(생략한 이전 계약은 규칙 자리 수)를 유지한 빈 대진이며 실제 팀 반영은 위 확정 API로 분리한다. 이미 승인된 명단은 유지한다.
+- 화면은 기존 모달 재사용(A안)으로 대진 생성, 토너먼트 배정 규칙, 토너먼트별 진출팀 배정을 별도 진입점으로 제공한다. 확정 전 대진 확인은 저장하지 않으며 확정 후 모달에서 다른 토너먼트를 이어서 선택할 수 있다.
+
+
 PR1858의 정규대회 분리 결선을 일반화한 별도 `format`이다. `kind=regular_tournament`이며 시즌 승강 정규리그가 아니다. 기존 `group_knockout`은 유지한다.
 
 인증은 `V1AuthGuard`; GET은 활성 관리자(support 포함) 또는 해당 대회의 활성 디렉터, 모든 쓰기·미리보기는 owner/ops 또는 해당 대회의 활성 디렉터를 요구한다. `reset`과 예선 편집도 같은 대회 범위 검사와 사용자·배정 감사 경로를 사용하며, 타 대회·해제·만료 배정·조회 역할은 403이다. 기존 시작/이벤트/결과 보호, revision·잠금·원자성은 유지한다. prefix는 `/api/v1/admin/tournaments/:tournamentId/bracket/multi-finals`이다.
@@ -889,10 +906,10 @@ PR1858의 정규대회 분리 결선을 일반화한 별도 `format`이다. `kin
 | POST `/reset` | `{ expectedRevision }`. 독립 액션으로 모든 예선·결선 대진과 일정·자리·순위·결선 팀 선택을 초기화한다. 참가 신청, 예선 조 UUID/설정/팀 선택, 결선 이름·진출 규칙은 유지한다. 시작/이벤트/공식 결과/누락 Game이 하나라도 있거나 대회 종료·취소·보관 상태면 `409 BRACKET_LOCKED`. 경기 행 잠금 후 검사하고 전체 정리·revision 증가·감사를 같은 트랜잭션에서 처리한다. 성공 응답은 GET view. |
 | PUT `/preliminary` | setup과 동일 payload. 기존 설정이 있고 대회 전체에 살아 있는 대진이 하나도 없을 때만 예선 편성을 재생성한다. 기존 대진이 있으면 자동 초기화하지 않고 `409 BRACKET_NOT_EMPTY`. 규칙 groupId는 편집한 groups 배열 인덱스 문자열이며 저장 시 새 UUID로 연결한다. 시상 범위의 결선 삭제/이름 변경은 기존 rescoping 보호를 적용한다. 성공 응답은 GET view. |
 | PUT `/selection` | `{ expectedRevision, finals }`. 이후 `rule.groupId`는 실제 예선 UUID. 같은 이름·순서·참가 자리 수·3/4위전 구조면 기존 대진을 보존하고 명단만 저장한다. 구조가 달라지면 시작 전 결선만 비운다. 시작/결과/이벤트가 있는 결선은 409. |
-| POST `/preview` | 저장된 명단 또는 공식 예선 순위를 사용해 `plan`, 결선별 명단, `counts`, `revision`, `previewHash`를 반환. 자동 명단에서 미확정/동률이 있거나 어느 예선 조라도 종료/순위 반영 전이면 registrationIds=null로 유지하고 rules.length만큼 실제 미정 시드를 만든다. 경기 번호는 살아 있는 예선 최대 번호 다음부터 시작한다. |
+| POST `/preview` | 저장된 승인 명단만 반영해 `plan`, 결선별 명단, `counts`, `revision`, `previewHash`를 반환. 승인 전 명단은 예선 완료 여부와 관계없이 registrationIds=null로 유지하고 rules.length만큼 실제 미정 시드를 만든다. 경기 번호는 살아 있는 예선 최대 번호 다음부터 시작한다. |
 | POST `/generate` | `{ expectedRevision, previewHash, requestId }`. 대회 잠금 안에서 재검증 후 N개 결선과 부전승/승자·패자 연결을 원자적으로 생성. 미정 명단은 슬롯을 비운 상태로 생성한다. 같은 구조의 후속 배정은 기존 경기 ID·일정·장소·진출 연결을 유지하고 시드를 일괄 교체한다. 같은 requestId/hash는 기존 결과 반환; hash가 다르면 409. |
 
-`registrationIds` 생략/null은 순위 기반 제안이다. 팀이 아직 미정이면 진출 규칙 수로 대진을 먼저 만들며, 미정 자리를 부전승으로 취급하지 않는다. 실제 참가팀을 배정한 뒤에는 승인 명단을 저장하므로 순위 재계산으로 덮어쓰지 않는다. 명시적인 배열은 수동 명단이며 빈 배열도 초안으로 저장할 수 있지만 명시적 2팀 미만 결선은 생성할 수 없다. 규칙과 팀이 모두 없는 결선도 규모를 추측하지 않고 422로 거절한다. 같은 대회 확정팀의 수동 교체·이동과 한 팀/순위 출처당 한 결선 제한은 유지한다. 순위 채우기 API는 이 결선의 직접 선택 시드를 변경하지 않는다.
+`registrationIds` 생략/null은 순위 기반 제안이다. 팀이 아직 미정이면 명시 capacity 또는 이전 계약의 진출 규칙 수로 대진을 먼저 만들며, 미정 자리를 부전승으로 취급하지 않는다. 실제 참가팀을 배정한 뒤에는 승인 명단을 저장하므로 순위 재계산으로 덮어쓰지 않는다. 명시적인 배열은 수동 명단이며 빈 배열도 초안으로 저장할 수 있지만 명시적 2팀 미만 결선은 생성할 수 없다. 규칙과 팀이 모두 없는 결선도 규모를 추측하지 않고 422로 거절한다. 같은 대회 확정팀의 수동 교체·이동과 한 팀/순위 출처당 한 결선 제한은 유지한다. 순위 채우기 API는 이 결선의 직접 선택 시드를 변경하지 않는다.
 
 관리자 UI는 대진 생성(예선 편성→토너먼트 규칙→미리보기)과 진출팀 배정(전체 순위/동률·자동 선택/수동 변경→미리보기)을 분리한다. 배정 UI는 전체 예선 공식 순위 반영 뒤 활성화하며 기존 자리 수에 맞는 명단을 요구한다. 동률은 후보를 보여주되 임의 확정하지 않는다.
 

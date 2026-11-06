@@ -7,6 +7,15 @@ describe('정규리그 + N개 토너먼트 plans', () => {
     expect(() => planPreliminaryGroups([{ name: 'A조', capacity: 4, legs: 1, registrationIds: ['r1', 'r1'] }])).toThrow();
     expect(() => planPreliminaryGroups([{ name: 'A조', capacity: 2, legs: 1, registrationIds: ['r1'] }, { name: 'B조', capacity: 2, legs: 1, registrationIds: ['r1'] }])).toThrow();
   });
+  it('진출 규칙 설정 전에도 자리 수만으로 12팀의 빈 대진을 만든다', () => {
+    const final = { name: '프리미어', capacity: 12, rules: [], thirdPlace: true, registrationIds: null };
+    validateNamedFinals([final], new Map());
+    const plan = planNamedFinals([final]);
+    expect(plan.slots).toHaveLength(12);
+    expect(plan.byeSlots).toHaveLength(4);
+    expect(plan.fixtures).toHaveLength(12);
+    expect(() => validateNamedFinals([{ ...final, registrationIds: ['r1', 'r2'] }], new Map())).toThrow();
+  });
   it('진출팀 미정이어도 순위 규칙의 자리 수로 결선과 부전승을 만든다', () => {
     const rules = Array.from({ length: 5 }, (_, i) => ({ groupId: `g${i}`, rank: 1 }));
     const plan = planNamedFinals([{ name: '미정 결선', rules, thirdPlace: true, registrationIds: null }]);

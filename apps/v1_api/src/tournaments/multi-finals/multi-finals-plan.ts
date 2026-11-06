@@ -14,6 +14,7 @@ export function validateNamedFinals(finals: readonly NamedFinalDto[], groups: Re
     const name = final.name.trim();
     if (!name || name.length > 80 || ['overall', 'upper', 'lower'].includes(name) || names.has(name)) invalidMultiFinal('토너먼트 이름을 중복 없이 입력해 주세요.');
     names.add(name);
+    if (final.capacity !== undefined && (!Number.isSafeInteger(final.capacity) || final.capacity < 2 || final.rules.length > final.capacity || final.registrationIds != null && final.registrationIds.length !== final.capacity)) invalidMultiFinal('진출 규칙과 선택한 팀 수는 토너먼트 자리 수에 맞춰 주세요.');
     for (const rule of final.rules) {
       const capacity = groups.get(rule.groupId); const key = JSON.stringify([rule.groupId, rule.rank]);
       if (!capacity || !Number.isInteger(rule.rank) || rule.rank < 1 || rule.rank > capacity || rules.has(key)) invalidMultiFinal('각 조의 순위는 존재하는 토너먼트 한 곳에만 연결해 주세요.');
@@ -44,9 +45,9 @@ export function planPreliminaryGroups(groups: readonly PreliminaryGroupDto[]): B
   return plan;
 }
 
-/** Pending participants occupy real seeds. Only leaves outside the capacity are byes. */
+/** Explicit capacity lets creation precede rank rules; legacy definitions keep their original size. */
 export function namedFinalSize(final: NamedFinalDto): number {
-  return final.registrationIds == null ? final.rules.length : final.registrationIds.length;
+  return final.capacity ?? (final.registrationIds == null ? final.rules.length : final.registrationIds.length);
 }
 
 /** Team changes with identical topology can fill existing games without losing their schedule. */

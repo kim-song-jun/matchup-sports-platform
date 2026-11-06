@@ -1137,3 +1137,61 @@ PR1858 latest-dev merge 30개 충돌 파일. generated Prisma client/의존성 �
 - 좁은 검증: service/plan 단위 13/13 PASS, WSL의 실제 bash/git/jq로 runtime rollback 8/8 PASS, bash syntax PASS. jq1.8.1 공식 배포 바이너리의 SHA256을 공식 checksum과 대조했다. 운영 DB rollback 실험은 하지 않았다.
 - Phase C in_progress: API/Web typecheck0, API surface752 PASS, diff-check PASS. Web pattern checker는 Windows cmd의 POSIX find/grep 구문 비호환으로 실행 실패했으며 성공으로 집계하지 않는다. 전체 pattern/실제 DB 통합 검증은 최신 head의 Linux CI에서 확인한다. exact-path commit 및 PR 갱신 후 최신 CI 통과, dev merge와 alpha 배포 상태 확인을 진행한다.
 - Progress Snapshot: alpha 미배포 상태의 신규 수동 QA0/10·viewport0/3은 그대로 유지한다. 배포 완료 후 실제 serving SHA 및 health를 별도로 기록한다.
+
+## 2026-11-06 extension — N개 토너먼트별 독립 진출팀 확정
+
+Status: In Progress
+
+### Context / Goal
+예선·결선 대진 생성과 실제 진출팀 확정을 분리하고, `league_knockouts`의 토너먼트 하나만 독립적으로 배정한다. 현재 배정은 모든 결선의 명단 저장/재생성을 한 번에 실행해 한 결선의 미확정 상태가 다른 결선을 막는다. 순위표는 대회 계산기, 추천은 리그 계산기를 사용해 순위 불일치를 동률로 표시한다.
+
+### Original Conditions / Acceptance Criteria
+- [x] `league_knockouts`에만 적용하며 기존 조별+결선 계약은 유지한다.
+- [x] 대진 생성/진출 규칙 설정/토너먼트별 진출팀 확정을 구분한다.
+- [x] 선택한 토너먼트만 원자적으로 확정하고 다른 결선의 명단·진행 상태·일정·경기 ID를 보존한다.
+- [x] 예선 미완료·미확정 팀·중복·자리 수 불일치·stale revision·선택한 결선의 시작/기록은 서버에서 거절한다.
+- [x] 순위표와 추천은 대회 계산기로 저장된 공식 순위를 함께 사용한다. 기존 시드 배정에 4개 조 12팀의 교차 배치 옵션을 추가했다.
+- [x] A/B/C 제시 후 사용자 A안 선택. 기존 모달에서 토너먼트 선택→명단/시드→해당 대진 확인→독립 확정하며 기존 두 결선 일괄 저장 단계를 제거했다.
+
+### User Scenarios / Test Scenarios
+- 예선과 빈 결선을 만든 뒤 프리미어만 선택/확정해 대진에 반영한다. 챌린지 미확정 상태는 유지한다.
+- 다른 결선이 시작됐어도 아직 시작하지 않은 선택 결선의 배정은 허용한다.
+- 확정 전 미리보기/취소는 명단이나 경기 데이터를 저장하지 않는다.
+- 권한, CAS, 다른 대회 팀, 중복 시드, 미완료 조, 시작한 결선은 실패 원인을 노출한다.
+
+### Parallel Work Breakdown / Ownership
+서브에이전트 없이 순차 실행. Owned: multi-finals API/DTO/service/tests, hook/wizard/page/tests, API 문서, canonical flow 변경 이력, 본 task·시나리오·changeset. Forbidden: 원본 dirty tree WIP, 다른 진행 방식 변경, 실대회 데이터 변경, main 승격.
+
+### Tech Debt Resolved / Security Notes
+기존 대회별 권한/슬롯 배치/감사/게임 잠금을 재사용한다. 토너먼트별 확정은 전체 결선 재생성 API를 사용하지 않는다. 개인정보·로그인 정보는 저장하지 않는다.
+
+### Risks & Dependencies / Ambiguity Log
+- 사용자 A안 선택 완료. 새 기준은 순위 계산 옵션이 아니라 시드 배치 옵션이다. 후속 확인: 1위4팀은 8강 직행, 2·3위8팀은 12강4경기. A/B/C/D의 8강 1위 상대 쪽에 B/C/D/A의 2위 고정, 3위는 두 상대 조를 피해 균등 추첨한다. 미리 본 배열을 그대로 저장한다.
+- Docker daemon 연결 실패(npipe dockerDesktopLinuxEngine 없음)로 실제 DB 통합은 로컬 미실행. headed Playwright는 임시 라이브러리 추출로 준비했고 alpha 변경 전 1440/768/390 캡처 및 console/network 확인 완료(0오류), 쓰기0. controller PID5751/browser5763 트리는 종료했다. 증거 `/tmp/teameet-multi-finals-evidence/`. 변경 후 alpha 수동 QA는 미배포 상태라 대기.
+
+### Progress Snapshot
+- Phase 1 completed: 최신 origin/dev `0b7720cb7d06`에서 `/tmp/teameet-multi-finals-20261106`, `fix/multi-finals-independent-assignment-20261106` 격리. 기존 원본 트리 수정 없음.
+- Phase 2 completed: 화면/DTO/hook/선택 정책/미리보기 sourceVersion/대상 결선 독립 확정 구현. 새로운 옵션은 적합한12팀 결선에서만 표시하며 수동 편집 시 기본 방식으로 전환한다.
+- Phase 3 in_progress: API101 회귀, Web15, 양쪽 tsc0, Web pattern PASS/API surface761 PASS, diff-check PASS. 실제 DB 통합 회귀는 추가했으나 daemon 없음으로 로컬 미실행. 변경 전 alpha3/3폭 PASS, 변경 후 alpha0/3폭·기능0/7. 커밋본 CI/리뷰와 alpha 검증 대기.
+
+- Review follow-up: 교차 배치 옵션은 실제12자리일 때만 제공한다. 생성 뒤 운영자가 편집한 실제12강→8강 연결도 검증해 같은 조 회피가 깨지는 그래프를 거절한다. 순위/시드 배열만 보고 성공 처리하지 않는다. 유효 순열 전수 및 실제plan의 승자 연결 변조 회귀로 확인했다.
+- Delivery cursor: dev 대상 draft PR2169, 최초 커밋 daf8ca3c5. 원격 credential helper의 오래된 경로는 해당 push에서만 gh helper로 override했으며 전역 설정 변경0. 커밋본 CI 진행 중.
+
+- Flow completeness fix: 생성 단계의 필수 순위 매핑을 제거했다. 신규 `capacity`로 이름·자리 수·3/4위전만 정해 빈 결선을 만들고, 별도 rules 화면에서 목적지를 연결한다. 이전 JSON/클라이언트의 capacity 생략은 기존 명단/규칙 수를 사용한다. 규칙 편집 시 기존 크기를 고정해 연결 수 변경으로 경기/일정이 재생성되는 것을 방지한다. 규칙 미설정 결선은 배정 UI에서 명시적으로 안내한다.
+
+- Capacity follow-up validation: 규칙 없는12자리 생성/진출 규칙 연결/명단 확정의 실제 DB 통합 회귀를 추가했다(CI 대상). 로컬 API101·Web15, 양쪽 타입 검사 PASS. 생성 단계의 순위 선택 제거와 별도 규칙 단계 진입을 실제 렌더/API payload로 검증했다. 기존 PR head의 Web/Gates CI는 PASS, API migration replay는 진행 중이며 이 후속 커밋은 새 CI 대상이다.
+
+- Rule-only correction: 순위 목적지를 수정해도 기존 승인 명단을 null로 만들지 않는다. 같은 크기의 규칙 저장은 현재 실제 슬롯과 명단을 그대로 보존하고 새 추천 적용은 독립 assignment 확정으로만 수행한다. UI→실제 selection payload 회귀를 추가했다.
+
+- Final UI boundary validation: 규칙 화면은 단일 저장 액션으로 완료하고 결선 preview/generate를 호출하지 않는다. 기존 승인 명단/크기는 유지하며 변경되는 것은 목적지 규칙뿐이다. 신규 rule-only 회귀 포함 Web16/16 PASS. 최신 로컬 API101 PASS/양쪽 tsc PASS. 이후 CI·리뷰 결과를 최종 SHA 기준으로 확인한다.
+
+### 2026-11-06 current verification / resume cursor
+
+- Runtime code cursor: `364b5d071` (dev PR2169). Source changes complete; code remains frozen pending remote validation/review.
+- Local: API101/Web16 regressions PASS; API/Web typecheck PASS; API surface761/Web pattern PASS; committed diff-check and untracked-import check PASS.
+- Docker alternative: PostgreSQL16.15 binaries extracted under `/tmp/teameet-assignment-pg`, isolated localhost55486, approved test DB `ulw_v1_integration_assignment`, latest Prisma schema only. No existing DB, alpha data, or env files accessed. Owned PID10171 stopped and absence verified.
+- Actual PostgreSQL: new capacity→rules→assignment and independent-final/other-final-LIVE integration cases2/2 PASS. Separate `/tmp/teameet-cross-assignment-qa.cjs` exercised actual4-group/12-team preview→cross assignment, exact draw persistence, fixture ID preservation and broken quarterfinal-edge rejection422; both outcomes PASS. This is functional evidence on a fresh current schema, not migration-history replay proof.
+- Alpha BEFORE: real administrator login, 1440/768/390 captures3/3; console0/network failures0; mutation0. Evidence `/tmp/teameet-multi-finals-evidence/`; browser/controller5751/5763 closed. AFTER alpha0/3 and feature0/7 because no deployment.
+- Remote code-head CI: Gates PASS5m56s, Web PASS12m54s; API remained in `V1 migration replay + drift gate` on run42061455599 as of2026-11-06 01:34 KST. No API failure output yet. This pending state must not be called a pass.
+- Copilot: official requests accepted with empty requested_reviewers; final-head recovery response explicitly matched364b5d071, but no review record or findings/clean result arrived. No settings/account/merge-rule changes and no review bypass.
+- Remaining: final PR CI/review, dev merge (base must be rechecked), alpha serving-SHA verification, AFTER headed QA and screenshots. No main promotion. Review result absence blocks merge under repository S6. No final completion/PR-ready claim.

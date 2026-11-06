@@ -7,7 +7,7 @@ import { BottomSheet } from './bottom-sheet';
 import { FilterIcon } from './icons';
 import {
   competitionDiscoveryHref,
-  competitionStageOptions,
+  competitionStageRows,
   discoveryRangeError,
   type CompetitionDiscoveryFilters,
 } from '@/lib/competition-discovery';
@@ -74,7 +74,12 @@ function DiscoveryFilterSheet({ filters, sports, page }: { filters: CompetitionD
         }}>초기화</button>
       </div>
       <div className={styles.sections}>
-        <FilterChoices title="상태" value={draft.stage} options={competitionStageOptions(filters.kind)} onChange={(value) => set('stage', value as typeof draft.stage)} />
+        {competitionStageRows(filters.kind).map((row) => {
+          // 두 줄은 하나의 선택이다 — 이 줄의 값이면 그 값을, 다른 줄의 값이면 이 줄은 '전체'로 보인다.
+          const own = row.options.some((option) => option.value === draft.stage);
+          return <FilterChoices key={row.title} title={row.title} value={own ? draft.stage : undefined} options={row.options}
+            onChange={(value) => { if (value !== undefined || own) set('stage', value as typeof draft.stage); }} />;
+        })}
         <FilterChoices title="종목" value={draft.sportId} options={sports.map((sport) => ({ value: sport.id, label: sport.label }))} onChange={(value) => set('sportId', value)} />
         {tournament && <FilterChoices title="성별 부문" value={draft.genderCategory} options={Object.entries(GENDER_LABELS).map(([value, label]) => ({ value, label }))} onChange={(value) => set('genderCategory', value as typeof draft.genderCategory)} />}
         <fieldset className={styles.group}>

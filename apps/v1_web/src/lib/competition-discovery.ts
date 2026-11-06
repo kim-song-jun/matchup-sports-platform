@@ -100,9 +100,15 @@ export function competitionDiscoverySeedPath(filters: CompetitionDiscoveryFilter
   return `/tournaments?${params}`;
 }
 
-/** 필터 시트의 상태 선택지. 대회 탭에는 '준비 중'이 없다(대회 초안은 비공개). */
-export function competitionStageOptions(kind: CompetitionKind): Array<{ value: CompetitionStage; label: string }> {
-  return COMPETITION_STAGES
-    .filter((stage) => !(kind === 'tournament' && stage === 'preparing'))
-    .map((stage) => ({ value: stage, label: COMPETITION_STAGE_LABEL[stage] }));
+/**
+ * 필터 시트의 상태 두 줄 — 5개 상태를 모집 상태(신청 접수 중·접수 마감)와 진행 상태(준비 중·진행 중·종료)로 나눈다.
+ * 두 줄은 따로 걸리는 필터가 아니라 하나의 선택이다(`stage` 하나). 한 줄에서 고르면 다른 줄은 '전체'로 돌아가므로
+ * 안 나오는 조합이 없다. 대회 탭에는 '준비 중'이 없다(대회 초안은 비공개).
+ */
+export function competitionStageRows(kind: CompetitionKind): Array<{ title: string; options: Array<{ value: CompetitionStage; label: string }> }> {
+  const option = (stage: CompetitionStage) => ({ value: stage, label: COMPETITION_STAGE_LABEL[stage] });
+  return [
+    { title: '모집 상태', options: (['recruiting', 'recruit_closed'] as const).map(option) },
+    { title: '진행 상태', options: (['preparing', 'ongoing', 'completed'] as const).filter((stage) => !(kind === 'tournament' && stage === 'preparing')).map(option) },
+  ];
 }

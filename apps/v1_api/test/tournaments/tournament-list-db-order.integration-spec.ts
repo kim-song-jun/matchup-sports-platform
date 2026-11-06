@@ -205,10 +205,11 @@ describe('대회 공개 목록 DB 정렬·페이지 계약', () => {
     for (const cursor of [
       id('o-soon'),
       'no-such-id',
-      forge([9, null, 'x']),
-      forge([0, '9999-99-99 99:99:99', 'x']),
-      forge([0, '2026-02-30 10:00:00', 'x']),
-      // The old four-part cursor carried a sort mode that no longer exists.
+      forge(['v2', 9, null, 'x']),
+      forge(['v2', 0, '9999-99-99 99:99:99', 'x']),
+      forge(['v2', 0, '2026-02-30 10:00:00', 'x']),
+      // Cursors issued before the 2026-11-03 order: three parts, or four with a sort mode that no longer exists.
+      forge([0, '2026-03-01 10:00:00', 'x']),
       forge([0, '2026-03-01 10:00:00', 'x', 'latest']),
     ]) {
       const res = await list({ cursor, limit: 5 });

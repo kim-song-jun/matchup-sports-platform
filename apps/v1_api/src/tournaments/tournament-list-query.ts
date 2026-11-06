@@ -148,9 +148,17 @@ function isRealTimestampText(text: string): boolean {
  * The cursor carries the sort key the row had when its page was served. Recomputing it from the row
  * would move a cursor row between groups when its deadline passes or its capacity fills mid-scroll,
  * and the next page would skip or repeat rows.
+ *
+ * The first element is a version tag. The group numbers and the sort key changed meaning on 2026-11-03
+ * (old 2 = closed, 3 = finished; new 2 = preparing, 3 = closed, 4 = finished; start ascending -> registration
+ * descending), and a cursor from before that has the same three-part shape. A page that is still open across
+ * the deploy would skip or repeat rows, so the old shapes are refused instead of reinterpreted. Bump the tag
+ * whenever the meaning of `grp` or `sortAt` changes again.
  */
+const CURSOR_VERSION = 'v2';
+
 function encodeCursor(key: CursorKey): string {
-  return Buffer.from(JSON.stringify([key.grp, key.sortAt, key.id])).toString('base64url');
+  return Buffer.from(JSON.stringify([CURSOR_VERSION, key.grp, key.sortAt, key.id])).toString('base64url');
 }
 
 function decodeCursor(token: string): CursorKey | null {
@@ -160,8 +168,8 @@ function decodeCursor(token: string): CursorKey | null {
   } catch {
     return null;
   }
-  if (!Array.isArray(parsed) || parsed.length !== 3) return null;
-  const [grp, sortAt, id] = parsed;
+  if (!Array.isArray(parsed) || parsed.length !== 4 || parsed[0] !== CURSOR_VERSION) return null;
+  const [, grp, sortAt, id] = parsed;
   if (!Number.isInteger(grp) || grp < 0 || grp > 5) return null;
   if (sortAt !== null && !(typeof sortAt === 'string' && isRealTimestampText(sortAt))) return null;
   if (typeof id !== 'string' || id.length === 0 || id.length > 64) return null;

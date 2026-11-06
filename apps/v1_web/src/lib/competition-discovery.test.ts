@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { competitionDiscoveryHref, competitionStageOptions, discoveryRangeError, readCompetitionDiscovery, switchCompetitionKind } from './competition-discovery';
+import { competitionDiscoveryHref, competitionStageRows, discoveryRangeError, readCompetitionDiscovery, switchCompetitionKind } from './competition-discovery';
 
 const read = (query: string, kind: 'all' | 'tournament' | 'league' = 'all') => readCompetitionDiscovery(new URLSearchParams(query), kind);
 
@@ -28,9 +28,10 @@ describe('대회·리그 필터 URL 계약', () => {
   it('대회 탭에는 준비 중 상태가 없다', () => {
     expect(read('stage=preparing', 'tournament').stage).toBeUndefined();
     expect(switchCompetitionKind(read('stage=preparing', 'league'), 'tournament').stage).toBeUndefined();
-    expect(competitionStageOptions('tournament').map((option) => option.label)).toEqual(['접수 중', '접수 마감', '진행 중', '종료']);
-    expect(competitionStageOptions('league').map((option) => option.label)).toEqual(['준비 중', '접수 중', '접수 마감', '진행 중', '종료']);
-    expect(competitionStageOptions('all').map((option) => option.label)).toEqual(['준비 중', '접수 중', '접수 마감', '진행 중', '종료']);
+    const rows = (kind: 'all' | 'tournament' | 'league') => competitionStageRows(kind).map((row) => [row.title, row.options.map((option) => option.label)]);
+    expect(rows('tournament')).toEqual([['모집 상태', ['신청 접수 중', '접수 마감']], ['진행 상태', ['진행 중', '종료']]]);
+    expect(rows('league')).toEqual([['모집 상태', ['신청 접수 중', '접수 마감']], ['진행 상태', ['준비 중', '진행 중', '종료']]]);
+    expect(rows('all')).toEqual(rows('league'));
   });
   it('옛 정렬·진행·모집 링크 값은 읽지 않는다', () => {
     const result = read('sort=deadline&phase=ongoing&registration=open', 'league');

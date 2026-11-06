@@ -47,7 +47,7 @@ import { FORFEIT_LOSER_SCORE, FORFEIT_WINNER_SCORE } from '../league-matches/lea
 import { promoteLeagueOnGameActivityInTx } from '../league-matches/league-slot-status';
 import { assertPenaltyShootoutPersistable } from './core/penalty-shootout-outcome';
 import { isTeamMatchRosterDependentEventType } from './core/team-match-lineup-window';
-import { isCommandConcurrencyConflict } from './command-concurrency-error';
+import { commandConcurrencyConflict, isCommandConcurrencyConflict } from './command-concurrency-error';
 import { endLiveGamePeriod } from './period-transition';
 import { gameOperationAuditScope } from './game-operation-audit-scope';
 import {
@@ -569,7 +569,7 @@ function assertClockNotDrifted(occurredAt: string): void {
   if (!Number.isFinite(occurredAtMs) || Math.abs(Date.now() - occurredAtMs) > CLOCK_DRIFT_TOLERANCE_MS) {
     throw new UnprocessableEntityException({
       code: 'CLOCK_DRIFT',
-      message: 'occurredAt has drifted from server time by more than 30 seconds',
+      message: '기기 시각과 서버 시각이 30초 넘게 차이 나요. 기기의 날짜와 시간을 확인해 주세요.',
     });
   }
 }
@@ -675,7 +675,7 @@ export function extractEndPenalties(payload: Record<string, unknown>): StoredPen
   ) {
     throw new UnprocessableEntityException({
       code: 'TOURNAMENT_PENALTY_INVALID',
-      message: 'penalties must be an object with non-negative integer home and away scores',
+      message: '승부차기 점수(penalties)는 home과 away가 모두 0 이상의 정수여야 해요.',
     });
   }
   const home = (raw as { home: number; away: number }).home;
@@ -683,7 +683,7 @@ export function extractEndPenalties(payload: Record<string, unknown>): StoredPen
   if (home === away) {
     throw new UnprocessableEntityException({
       code: 'TOURNAMENT_PENALTY_INVALID',
-      message: 'A penalty shootout must produce a decisive winner',
+      message: '승부차기는 승자가 갈려야 해요. 두 팀 점수를 서로 다르게 입력해 주세요.',
     });
   }
   // 선축(먼저 찬 팀). `PenaltyScoreDto`가 이미 `'HOME'|'AWAY'`만 통과시키지만, 이
@@ -714,7 +714,7 @@ export function extractEndPenalties(payload: Record<string, unknown>): StoredPen
   if ((takenHome === undefined) !== (takenAway === undefined)) {
     throw new UnprocessableEntityException({
       code: 'TOURNAMENT_PENALTY_INVALID',
-      message: 'penalties.takenHome and penalties.takenAway must be provided together',
+      message: 'penalties.takenHome과 penalties.takenAway는 함께 보내 주세요.',
     });
   }
   // 성공 수가 시도 수를 넘을 수는 없다. 이건 정책과 무관한 산술 불변식이라
@@ -723,14 +723,14 @@ export function extractEndPenalties(payload: Record<string, unknown>): StoredPen
   if (takenHome !== undefined && takenAway !== undefined && (home > takenHome || away > takenAway)) {
     throw new UnprocessableEntityException({
       code: 'TOURNAMENT_PENALTY_INVALID',
-      message: 'penalties scored count cannot exceed the number of kicks taken',
+      message: '성공한 킥 수(home, away)는 시도한 킥 수(takenHome, takenAway)보다 클 수 없어요.',
     });
   }
   const operatorOverrideRaw = (raw as { operatorOverride?: unknown }).operatorOverride;
   if (operatorOverrideRaw !== undefined && typeof operatorOverrideRaw !== 'boolean') {
     throw new UnprocessableEntityException({
       code: 'TOURNAMENT_PENALTY_INVALID',
-      message: 'penalties.operatorOverride must be a boolean when provided',
+      message: 'penalties.operatorOverride 값은 true 또는 false여야 해요.',
     });
   }
   // `true`일 때만 싣는다. `false`를 저장하면 "우회 아님"이 두 가지 표현(키 부재 ·
@@ -745,7 +745,7 @@ export function extractEndPenalties(payload: Record<string, unknown>): StoredPen
   if (firstKickSideKey !== 'HOME' && firstKickSideKey !== 'AWAY') {
     throw new UnprocessableEntityException({
       code: 'TOURNAMENT_PENALTY_INVALID',
-      message: "penalties.firstKickSideKey must be 'HOME' or 'AWAY' when provided",
+      message: "penalties.firstKickSideKey 값은 'HOME' 또는 'AWAY'여야 해요.",
     });
   }
   return { home, away, firstKickSideKey, ...counts, ...override };
@@ -758,7 +758,7 @@ function parseKickCount(raw: unknown, key: 'takenHome' | 'takenAway'): number | 
   if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
     throw new UnprocessableEntityException({
       code: 'TOURNAMENT_PENALTY_INVALID',
-      message: `penalties.${key} must be a non-negative integer when provided`,
+      message: `penalties.${key} 값은 0 이상의 정수여야 해요.`,
     });
   }
   return value;
@@ -1020,10 +1020,7 @@ function mapIdentityEventError(error: unknown) {
     // withParticipantCommand 의 P2034 처리가 원래 같은 코드를 내려는 것이었는데, 여기서
     // 먼저 ConflictException 으로 바꿔 던지는 바람에 도달하지 못하고 있었다.
     if (error.code === 'P2034') {
-      return new ConflictException({
-        code: 'COMMAND_CONCURRENCY_CONFLICT',
-        message: '동시에 처리된 요청이 있어요. 최신 상태를 다시 불러와 주세요.',
-    });
+      return commandConcurrencyConflict();
     }
     // P2002 는 반대로 신원 테이블의 유일성이 실제로 깨진 것(같은 요청의 중복 이벤트 등)이라
     // 도메인 코드를 유지한다.
@@ -2084,7 +2081,7 @@ export class GamesService {
         if (game.state === V1GameState.ENDED || game.state === V1GameState.CANCELLED) {
           throw new ConflictException({
             code: 'TERMINAL_GAME_IMMUTABLE',
-            message: 'Terminal games reject event mutation',
+            message: '이미 끝났거나 취소된 경기는 기록을 바꿀 수 없어요.',
           });
         }
         if (
@@ -2338,10 +2335,7 @@ export class GamesService {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         isCommandConcurrencyConflict(error.code, error.meta, error.message)
       ) {
-        throw new ConflictException({
-          code: 'COMMAND_CONCURRENCY_CONFLICT',
-          message: 'A concurrent command won; reload the current game version and retry',
-        });
+        throw commandConcurrencyConflict();
       }
       throw error;
     }
@@ -4918,10 +4912,7 @@ export class GamesService {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         isCommandConcurrencyConflict(error.code, error.meta, error.message)
       ) {
-        throw new ConflictException({
-          code: 'COMMAND_CONCURRENCY_CONFLICT',
-          message: 'A concurrent command won; reload the current version and retry',
-        });
+        throw commandConcurrencyConflict();
       }
       throw error;
     }
@@ -5177,10 +5168,7 @@ export class GamesService {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         isCommandConcurrencyConflict(error.code, error.meta, error.message)
       ) {
-        throw new ConflictException({
-          code: 'COMMAND_CONCURRENCY_CONFLICT',
-          message: 'A concurrent command won; reload the current game version and retry',
-        });
+        throw commandConcurrencyConflict();
       }
       throw error;
     }

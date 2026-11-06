@@ -199,12 +199,15 @@ function GroupStandingsSection({
     Object.keys(trackQualifications).length > 0;
   const hasResolvedTrackQualifications = Object.values(trackQualifications ?? {}).some(value => value != null);
   const advancingLabels = new Map<string, string[]>();
+  const advancingColors = new Map<string, number>();
   if (stageComplete && hasResolvedTrackQualifications) {
-    for (const [track, qualification] of Object.entries(trackQualifications ?? {})) {
+    for (const [index, [track, qualification]] of Object.entries(trackQualifications ?? {}).entries()) {
       if (qualification == null) continue;
       for (const registrationId of qualification.advancingRegistrationIds) {
         const labels = advancingLabels.get(registrationId) ?? [];
-        labels.push(track === 'upper' ? '상위 진출' : track === 'lower' ? '하위 진출' : `${track} 진출`);
+        const label = track === 'upper' ? '상위 진출' : track === 'lower' ? '하위 진출' : `${track} 진출`;
+        labels.push(label);
+        advancingColors.set(label, qualification?.colorIndex ?? (track === 'upper' ? 0 : track === 'lower' ? 1 : index));
         advancingLabels.set(registrationId, labels);
       }
     }
@@ -259,6 +262,7 @@ function GroupStandingsSection({
         rows={toGroupStandingsRows(group)}
         advancingKeys={advancingKeys}
         advancingLabels={hasResolvedTrackQualifications ? advancingLabels : undefined}
+        advancingColors={advancingColors}
         ariaLabel={`${group.name} 순위표`}
         renderDetail={(row) => <TeamFixturesDetail teamId={row.teamId} fixtures={groupFixtures} />}
         fromHref={fromHref}

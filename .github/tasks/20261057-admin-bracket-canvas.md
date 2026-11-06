@@ -1207,3 +1207,37 @@ Status: In Progress
 - Remaining: focused real-DB/unit/type/surface validation, exact-path commit/PR2169 update, latest Copilot clean and CI, dev merge/FF sync, Alpha SHA/health and headed after QA. Default UI runtimes failed initialization; own headed Chrome PID22720/controller16392 is open for administrator login (no credentials persisted).
 
 - Repair validation PASS: full230-migration LF replay on fresh isolated PostgreSQL; both formerly failing integration suites17/17, related unit suites56/56, API typecheck0/surface761 PASS, diff-check/debt grep clean. Owned PostgreSQL PID2444 stopped and absence verified. Latest PR-head CI and review still pending; Alpha after QA remains unverified.
+
+
+## 2026-11-06 follow-up: stable public qualification colors
+Status: In progress
+### Context / Goal
+User approved the local 10-color badge preview without T numbering. Use blue, orange, teal, purple, rose, ochre, indigo, brown, olive, mauve in setup order; retain existing colors across changes.
+### Original Conditions
+All qualification badges and promoted rows used blue. Named finals used mutable names as their only identity.
+### User Scenarios / Acceptance Criteria
+- [ ] Two/three/ten finals use the first two/three/ten palette colors.
+- [ ] Rename/reorder/delete/add preserves surviving destination colors across reload and generate/reset/assignment.
+- [ ] Actual confirmed qualification gates remain unchanged; names remain visible; no T prefix.
+- [ ] Desktop/tablet/mobile and dark mode remain legible.
+### Parallel Work Breakdown / Owned Scope
+Single agent. Multi-finals identity/color helper, DTO/service, admin wizard identity round-trip, public detail presenter/type, public standings badge styles/tests, API docs and changeset. No other session resources or main changes.
+### Test Scenarios
+Lifecycle JSON round-trip, duplicate/stale identity rejection, 2/3/10 colors, public route qualification mapping, admin rename identity round-trip, API/web type checks, CI/review, Alpha browser screenshots.
+### Tech Debt Resolved
+Remove dependence on mutable names or rendered row order for color identity.
+### Security Notes
+No new auth path; color is server-owned; existing publication/qualification/privacy gates unchanged. No schema migration.
+### Risks & Dependencies
+Existing configs derive initial color from stored order. Old clients renaming without returned ID create a new destination. More than ten lifetime color positions cycle the palette; names remain the discriminator. Copilot clean and Alpha checks pending.
+### Ambiguity Log
+Approved badge-only local sample, no T prefixes. Main/prod out of scope.
+### Progress Snapshot
+Implementation in isolated feat/final-colors-20261106 from origin/dev ec705f79d.
+
+### Validation snapshot
+- API unit: selected five suites 95 assertions covered across initial run and focused correction rerun; final colors/assignment/presenter rerun 74/74. Existing preview/reset suites passed. Web three suites 82/82; updated API-to-badge route assertions additionally 2/2.
+- API lint/tsc + surface check and web lint/tsc + v1 pattern check passed. Light/dark 20 text/background contrast pairs minimum 4.79:1.
+- Real DB integration assertions added for persisted identity/color across generate and rename (CI execution pending).
+- Alpha baseline captured at 390/768/1440. Existing baseline image optimizer 400 and a transient health 503 observed; subsequent health HTTP 200 with DB true. Do not classify these pre-existing responses as a clean session.
+- UI gallery will be posted after dev merge and exact Alpha deployment, per repository workflow. New PR review waiver has not been requested; previous #2169 exception is not assumed for this change.

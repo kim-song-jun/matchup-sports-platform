@@ -6,7 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 export type MultiFinalRule = { groupId: string; rank: number };
 export type MultiFinalPolicy = 'rank_order' | 'cross_group_top3';
-export type MultiFinalDefinition = { capacity?: number; assignmentPolicy?: MultiFinalPolicy; name: string; thirdPlace: boolean; rules: MultiFinalRule[]; registrationIds?: string[] | null };
+export type MultiFinalDefinition = { id?: string; capacity?: number; assignmentPolicy?: MultiFinalPolicy; name: string; thirdPlace: boolean; rules: MultiFinalRule[]; registrationIds?: string[] | null };
 export type MultiFinalGroup = { id: string; name: string; capacity: number; legs: 1 | 2; registrationIds?: string[] };
 export type MultiFinalGroupStanding = {
   groupId: string; name: string; complete: boolean;

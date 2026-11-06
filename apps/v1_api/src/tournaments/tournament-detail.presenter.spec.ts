@@ -855,13 +855,30 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
     }]]);
 
     const presented = presentTournamentDetail(row, true, new Date(), false, [], new Map(), summaries);
-    expect(presented.groups[0]).toMatchObject({ bracketTrack: 'overall', qualificationByTrack: summaries.get('group-a')!.qualificationByTrack });
+    expect(presented.groups[0]).toMatchObject({ bracketTrack: 'overall', qualificationByTrack: { upper: { colorIndex: 0 }, lower: { colorIndex: 1 } } });
     expect(presented.awards[0]).toMatchObject({ bracketTrack: 'lower' });
     expect(presented.awardSets).toEqual([
       { bracketTrack: 'upper', prizePool: 100000, prizeSummary: '상위 우승', prizeBreakdown: null },
       { bracketTrack: 'lower', prizePool: 50000, prizeSummary: '하위 우승', prizeBreakdown: null },
     ]);
   });
+  it('uses stored destination colors after reordering names and preserves unresolved null', () => {
+    const row = baseRow({
+      multiFinals: { nextColorIndex: 4, finals: [
+        { id: 'final-c', name: 'Renamed', colorIndex: 2, rules: [], thirdPlace: false },
+        { id: 'final-a', name: 'Champion', colorIndex: 0, rules: [], thirdPlace: false },
+      ] },
+      groups: [{ id: 'group-a', name: 'A', phase: 'group', sortOrder: 0, advanceCount: null, bracketTrack: 'overall', groupTeams: [], byeSlots: [], standings: [] }],
+    } as never);
+    const summary = new Map([['group-a', { sharedRankByRegistrationId: new Map<string, number>(), qualification: null,
+      qualificationByTrack: { Champion: { advancingRegistrationIds: ['r1'], undecided: false }, Renamed: { advancingRegistrationIds: ['r2'], undecided: false }, Pending: null } }]]);
+    const result = presentTournamentDetail(row, true, new Date(), false, [], new Map(), summary);
+    expect(result.groups[0].qualificationByTrack).toEqual({
+      Champion: { advancingRegistrationIds: ['r1'], undecided: false, colorIndex: 0 },
+      Renamed: { advancingRegistrationIds: ['r2'], undecided: false, colorIndex: 2 }, Pending: null,
+    });
+  });
+
 });
 
 
@@ -1237,4 +1254,5 @@ describe('presentTournamentDetail — 조별 공개 순위표 요약', () => {
     expect(groups[0].standings.map((s) => s.sharedRank)).toEqual([1, 1, 1]);
     expect(groups[0].qualification?.advancingRegistrationIds).toEqual(['b', 'c']);
   });
+
 });

@@ -37,7 +37,7 @@ function MultiFinalsSetupWizard({ tournamentId, open, onClose, onApplied, mode =
   async function close() { if (busy) return; if (dirty && !await confirm({ title: '설정 닫기', message: '저장하지 않은 변경을 닫을까요?', confirmLabel: '닫기' })) return; onClose(); }
   const { dialogRef, mounted, onBackdropClick } = useModalA11y({ open, onClose: () => void close(), pending: busy });
   function hydrate(view: MultiFinalView) {
-    setServer(view); setGroups(view.groups); setFinals(view.finals.map(f => ({ name: f.name, capacity: f.capacity ?? f.registrationIds?.length ?? f.rules.length, thirdPlace: f.thirdPlace, rules: f.rules, registrationIds: f.registrationIds, assignmentPolicy: f.assignmentPolicy })));
+    setServer(view); setGroups(view.groups); setFinals(view.finals.map(f => ({ id: f.id, name: f.name, capacity: f.capacity ?? f.registrationIds?.length ?? f.rules.length, thirdPlace: f.thirdPlace, rules: f.rules, registrationIds: f.registrationIds, assignmentPolicy: f.assignmentPolicy })));
   }
   useEffect(() => {
     if (!open) { initialized.current = false; setServer(null); return; }

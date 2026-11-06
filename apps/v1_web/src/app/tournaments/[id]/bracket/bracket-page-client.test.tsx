@@ -259,10 +259,10 @@ describe('정규리그 + N개 토너먼트 공개 순위와 결선', () => {
 
   it('예선 종료 후 API가 확정한 이름별 진출팀 표시를 조별 순위에 연결한다', () => {
     const tournament = namedTournament();
-    tournament.groups[0].qualificationByTrack = { '챔피언': { advancingRegistrationIds: ['r-a'], undecided: false } };
+    tournament.groups[0].qualificationByTrack = { '챔피언': { advancingRegistrationIds: ['r-a'], undecided: false, colorIndex: 7 } };
     tournament.fixtures.push(makeFixture({ id: 'pre-a-finished', groupId: 'pre-a', status: 'completed', homeRegistrationId: 'r-a', awayRegistrationId: 'other-a' }));
     renderBracketStandingsTab(tournament);
-    expect(within(screen.getByRole('region', { name: 'A조 순위' })).getByText('챔피언 진출')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'A조 순위' })).getByText('챔피언 진출')).toHaveClass('tm-final-color-7');
   });
 });
 
@@ -778,7 +778,9 @@ describe('BracketPageContent — 조별 진출 안내 문구 제거', () => {
     renderBracketStandingsTab(tournament);
 
     const table = screen.getByRole('table', { name: 'A조 순위표' });
-    expect(highlightedTeams(table)).toEqual(['03팀', '06팀']);
+    expect(highlightedTeams(table)).toEqual([]);
+    expect(within(table).getByText('상위 진출')).toHaveClass('tm-final-color-0');
+    expect(within(table).getByText('하위 진출')).toHaveClass('tm-final-color-1');
     expect(within(table).getByText('상위 진출')).toBeInTheDocument();
     expect(within(table).getByText('하위 진출')).toBeInTheDocument();
   });

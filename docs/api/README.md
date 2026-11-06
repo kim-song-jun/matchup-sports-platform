@@ -163,3 +163,5 @@ Current Kakao signup and existing-account linking use the [provider contact conf
 
 승부차기 정정의 성공·시도 횟수와 명시적 `operatorOverride:false`의 예외 승계 해제는
 [대회 운영 계약](./domains/tournament-operations.md)을 따른다. 결과 정정 초안 생성과 공식 확정은 별도 단계다.
+
+- Tournament detail qualification colors and stable named-final identity: see [tournaments](domains/tournaments.md#stable-final-destination-colors).

@@ -142,6 +142,7 @@ it('토너먼트 배정 규칙은 예선 편성 단계 없이 독립 진입한�
 
 it('순위 목적지 수정은 확정 명단을 비우지 않고 규칙만 저장한다', async () => {
   const view = savedView(); view.generated = true; view.fixtureCount = 8;
+  view.finals[0].id = 'd0cca905-ff8d-4598-91c5-13c8e3ee612a';
   view.finals[0].registrationIds = ['reg-0', 'reg-1']; view.finals[0].manual = true;
   view.finals.push({ ...view.finals[0], name: '챌린지', rules: [{ groupId: 'g-1', rank: 3 }, { groupId: 'g-1', rank: 4 }], registrationIds: ['reg-2', 'reg-3'] });
   let submitted: { finals: MultiFinalView['finals'] } | undefined;
@@ -159,4 +160,5 @@ it('순위 목적지 수정은 확정 명단을 비우지 않고 규칙만 저�
   expect(submitted?.finals.map(final => final.registrationIds)).toEqual([['reg-0', 'reg-1'], ['reg-2', 'reg-3']]);
   expect(submitted?.finals[0].rules).toEqual([{ groupId: 'g-1', rank: 2 }, { groupId: 'g-1', rank: 3 }]);
   expect(submitted?.finals[0].capacity).toBe(2);
+  expect(submitted?.finals[0].id).toBe(view.finals[0].id);
 });

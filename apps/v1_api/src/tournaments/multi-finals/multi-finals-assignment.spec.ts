@@ -62,7 +62,8 @@ describe('토너먼트 하나의 독립 진출팀 확정', () => {
     const result = await service.assign(user, 't', input);
     expect(result.revision).toBe(5);
     expect(result.finals[0].registrationIds).toEqual(['r1', 'r2']);
-    expect(row.multiFinals.finals[1]).toEqual(other);
+    expect(row.multiFinals.finals[1]).toMatchObject(other);
+    expect(result.finals[1]).toMatchObject({ colorIndex: 1, id: expect.any(String) });
     expect(assignSlotsBatchInTx).toHaveBeenCalledWith(tx, expect.anything(), [{ slotId: 's1', registrationId: 'r1' }, { slotId: 's2', registrationId: 'r2' }]);
     expect(tx.v1TournamentMatchDetails.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ group: { phase: { not: 'group' }, bracketTrack: '프리미어' } }) }));
   });

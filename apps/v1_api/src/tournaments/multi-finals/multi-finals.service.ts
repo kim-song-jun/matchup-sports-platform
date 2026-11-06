@@ -1,3 +1,4 @@
+import { normalizeFinalColors, reconcileFinalColors } from './multi-finals-colors';
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { createHash } from 'node:crypto';
@@ -20,7 +21,7 @@ import { crossGroupTopThree, supportsCrossGroupTopThree, validCrossGroupBracket,
 import { invalidMultiFinal, namedFinalSize, planNamedFinals, planPreliminaryGroups, sameNamedFinalStructure, validateNamedFinals } from './multi-finals-plan';
 
 type Tx = Prisma.TransactionClient;
-type Config = { groups: Array<{ id: string; name: string; capacity: number; legs: 1 | 2; registrationIds?: string[] }>; finals: NamedFinalDto[] };
+type Config = { groups: Array<{ id: string; name: string; capacity: number; legs: 1 | 2; registrationIds?: string[] }>; finals: NamedFinalDto[]; nextColorIndex?: number };
 const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const stale = () => new ConflictException({ code: 'MULTI_FINAL_STALE', message: '설정이나 경기 상태가 바뀌었어요. 다시 불러와 주세요.' });
 const options = { timeout: 45_000, maxWait: 5_000 };
@@ -42,7 +43,7 @@ export class MultiFinalsService {
   private assertMutable(status: string) {
     if (status === 'completed' || status === 'cancelled' || status === 'archived') throw new ConflictException({ code: 'BRACKET_LOCKED', message: '종료·취소된 대회의 대진 구조는 변경할 수 없어요.' });
   }
-  private config(value: Prisma.JsonValue | null): Config | null { return value === null ? null : value as unknown as Config; }
+  private config(value: Prisma.JsonValue | null): Config | null { return value === null ? null : { ...(value as unknown as Config), ...normalizeFinalColors(value as unknown as Config) }; }
   private async confirmed(tx: Tx, id: string) {
     return tx.v1TournamentRegistration.findMany({ where: { tournamentId: id, status: 'confirmed' },
       select: { id: true, team: { select: { id: true, name: true } } }, orderBy: { id: 'asc' } });
@@ -154,7 +155,7 @@ export class MultiFinalsService {
       const assignments = dto.groups.flatMap((g, i) => (g.registrationIds ?? []).map((registrationId, j) => ({ slotId: materialized.slotIds.get(`${i}:${j}`)!, registrationId })));
       if (assignments.length) await assignSlotsBatchInTx(tx, { admin, adminContext: this.admins, games: this.games }, assignments);
       const config: Config = { groups: dto.groups.map((g, i) => ({ id: materialized.groupIds.get(String(i))!, name: g.name.trim(), capacity: g.capacity, legs: g.legs })),
-        finals: dto.finals.map(f => ({ ...f, name: f.name.trim(), rules: f.rules.map(rule => ({ ...rule, groupId: materialized.groupIds.get(rule.groupId)! })) })) };
+        ...reconcileFinalColors(this.config(tournament.multiFinals), dto.finals.map(f => ({ ...f, name: f.name.trim(), rules: f.rules.map(rule => ({ ...rule, groupId: materialized.groupIds.get(rule.groupId)! })) }))) };
       await tx.v1Tournament.update({ where: { id }, data: { multiFinals: JSON.parse(JSON.stringify(config)), multiFinalsRevision: { increment: 1 } } });
       await this.admins.logAdminAction(admin, { action: editing ? 'tournament.multi_finals.preliminary.update' : 'tournament.multi_finals.setup', targetType: 'tournament', targetId: id, beforeJson: tournament.multiFinals ?? undefined, afterJson: JSON.parse(JSON.stringify(config)) }, tx);
       return this.view(tx, id);
@@ -203,7 +204,7 @@ export class MultiFinalsService {
       if (awards || awardSets) throw new ConflictException({ code: 'BRACKET_TRACK_AWARDS_REQUIRE_RESCOPING', message: '삭제·이름 변경할 토너먼트의 시상 범위를 먼저 정리해 주세요.' });
       if (sameNamedFinalStructure(config.finals, dto.finals)) await this.assertUnstarted(tx, id);
       else await this.clearFinals(tx, admin, id);
-      const next: Config = { ...config, finals: dto.finals.map(f => ({ ...f, name: f.name.trim() })) };
+      const next: Config = { ...config, ...reconcileFinalColors(config, dto.finals.map(f => ({ ...f, name: f.name.trim() }))) };
       await tx.v1Tournament.update({ where: { id }, data: { multiFinals: JSON.parse(JSON.stringify(next)), multiFinalsRevision: { increment: 1 } } });
       await this.admins.logAdminAction(admin, { action: 'tournament.multi_finals.selection', targetType: 'tournament', targetId: id, beforeJson: JSON.parse(JSON.stringify(config)), afterJson: JSON.parse(JSON.stringify(next)) }, tx);
       return this.view(tx, id);
@@ -286,9 +287,9 @@ export class MultiFinalsService {
   }
   private async previewInTx(tx: Tx, id: string) {
     const view = await this.view(tx, id);
-    const finals: NamedFinalDto[] = view.finals.map(f => {
+    const finals: NamedFinalDto[] = view.finals.map(({ suggestedRegistrationIds: _suggested, unresolved: _unresolved, manual: _manual, crossGroupTopThreeAvailable: _cross, ...f }) => {
       // Preserve the entire pending roster: a partial suggestion must never shrink the bracket.
-      return { name: f.name, capacity: f.capacity, rules: f.rules, thirdPlace: f.thirdPlace, assignmentPolicy: f.assignmentPolicy,
+      return { ...f, name: f.name, capacity: f.capacity, rules: f.rules, thirdPlace: f.thirdPlace, assignmentPolicy: f.assignmentPolicy,
         registrationIds: f.registrationIds ?? null };
     });
     validateNamedFinals(finals, new Map(view.groups.map(g => [g.id, g.capacity])));
@@ -343,7 +344,7 @@ export class MultiFinalsService {
       }));
       const config = this.config(tournament.multiFinals)!;
       // Freeze the approved roster. Result recalculation never reselects or refills these seeds.
-      const next = { ...config, finals: preview.finals.map(f => ({ name: f.name, rules: f.rules, thirdPlace: f.thirdPlace, capacity: f.capacity, registrationIds: f.registrationIds, assignmentPolicy: f.assignmentPolicy })) };
+      const next = { ...config, finals: preview.finals.map(f => ({ ...f, name: f.name, rules: f.rules, thirdPlace: f.thirdPlace, capacity: f.capacity, registrationIds: f.registrationIds, assignmentPolicy: f.assignmentPolicy })) };
       await tx.v1Tournament.update({ where: { id }, data: { multiFinals: JSON.parse(JSON.stringify(next)), multiFinalsRevision: { increment: 1 } } });
       const revision = tournament.multiFinalsRevision + 1;
       await this.admins.logAdminAction(admin, { action: 'tournament.multi_finals.generate', targetType: 'tournament', targetId: id, afterJson: { requestId: dto.requestId, previewHash: dto.previewHash, revision, counts: preview.counts, finals: JSON.parse(JSON.stringify(next.finals)) } }, tx);

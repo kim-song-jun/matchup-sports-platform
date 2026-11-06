@@ -187,6 +187,8 @@ function teamMatchOpponentLabel(mode: TeamMatchDetailViewModel['mode'], match: T
     // '승인 완료' 항목)로 실제 상대팀 이름을 보여줘야 한다 — 그 전까지는 '신청팀'
     // placeholder로 바꾸지 않는다. 승인 전 상대팀 슬롯은 다른 뷰어와 동일한 모집 상태다.
     const approvedOpponent = match.applicantTeams.find((team) => team.status === '승인 완료');
+    // 호스트는 viewerState 때문에 status 가 항상 'mine' 이라 마감 여부는 match.closed 로 본다.
+    if (!approvedOpponent && match.closed) return '모집 마감';
     return approvedOpponent?.name ?? '모집 중';
   }
   if (match.status === 'closed') {
@@ -213,6 +215,8 @@ function teamMatchOpponentSub(mode: TeamMatchDetailViewModel['mode'], match: Tea
     // 신청이 들어온 사실을 히어로가 먼저 말한다(H6 A-1).
     const requested = match.applicantTeams.filter((team) => team.applicationStatus === 'requested').length;
     if (requested > 0) return `신청 ${requested}팀 대기`;
+    // 마감된 매치는 더 이상 신청을 받지 않으므로 '신청 후 승인' 안내도 걷는다.
+    if (match.closed) return null;
     // 목록을 못 받았으면 신청 수를 모른다 — '신청 후 승인'(아직 없음)으로 떨어뜨리지 않는다.
     return applicationsFailed ? null : '신청 후 승인';
   }
@@ -430,7 +434,7 @@ export function TeamMatchDetailPageView({ model, recordEntry, lifecyclePanel }: 
   const rejectApplicant = async (team: ApplicantTeam) => {
     const accepted = await confirm({
       title: `${team.name} 신청을 거절할까요?`,
-      message: `거절하면 ${team.name}에 알림이 가요. 모집이 계속되는 동안에는 다시 신청할 수 있어요.`,
+      message: `거절하면 ${team.name}에 알림이 가요. ${match.closed ? '모집이 마감돼서 다시 신청할 수 없어요.' : '모집이 계속되는 동안에는 다시 신청할 수 있어요.'}`,
       confirmLabel: '거절하기',
       cancelLabel: '닫기',
       tone: 'danger',

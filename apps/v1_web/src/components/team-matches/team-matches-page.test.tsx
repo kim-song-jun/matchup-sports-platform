@@ -1973,6 +1973,49 @@ describe('TeamMatchDetailPageView — 지금 할 일 카드 (H6)', () => {
     expect(screen.queryByText('신청 목록을 불러오지 못했어요')).not.toBeInTheDocument();
   });
 
+  it('마감된 매치 — 호스트 히어로 상대팀 칸이 "모집 중"이 아니라 "모집 마감"이고, 대기 신청은 그대로 센다', () => {
+    const model = hostModel([applicant('합정')]);
+    model.match.apiStatus = 'closed';
+    model.match.closed = true;
+    const { container } = renderPage(<TeamMatchDetailPageView model={model} />);
+
+    const hero = within(container.querySelector<HTMLElement>('.tm-team-vs-row')!);
+    expect(hero.getByText('모집 마감')).toBeInTheDocument();
+    expect(hero.queryByText('모집 중')).not.toBeInTheDocument();
+    expect(hero.getByText('신청 1팀 대기')).toBeInTheDocument();
+  });
+
+  it('마감된 매치에 대기 신청이 없으면 히어로가 "신청 후 승인"을 약속하지 않는다', () => {
+    const model = hostModel([applicant('합정', { applicationStatus: 'rejected', status: '거절', onApprove: undefined, onReject: undefined })]);
+    model.match.apiStatus = 'closed';
+    model.match.closed = true;
+    const { container } = renderPage(<TeamMatchDetailPageView model={model} />);
+
+    const hero = within(container.querySelector<HTMLElement>('.tm-team-vs-row')!);
+    expect(hero.getByText('모집 마감')).toBeInTheDocument();
+    expect(hero.queryByText('신청 후 승인')).not.toBeInTheDocument();
+  });
+
+  it('마감된 매치의 거절 확인 창은 다시 신청할 수 있다고 말하지 않는다', async () => {
+    const model = hostModel([applicant('합정'), applicant('성수')]);
+    model.match.apiStatus = 'closed';
+    model.match.closed = true;
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '성수 신청 거절' }));
+    const dialog = await screen.findByRole('dialog', { name: '성수 신청을 거절할까요?' });
+    expect(dialog).toHaveTextContent('모집이 마감돼서 다시 신청할 수 없어요.');
+    expect(dialog).not.toHaveTextContent('모집이 계속되는 동안');
+  });
+
+  it('대조군 — 모집 중인 매치의 거절 확인 창은 다시 신청할 수 있다고 안내한다', async () => {
+    renderPage(<TeamMatchDetailPageView model={hostModel([applicant('합정')])} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '합정 신청 거절' }));
+    const dialog = await screen.findByRole('dialog', { name: '합정 신청을 거절할까요?' });
+    expect(dialog).toHaveTextContent('모집이 계속되는 동안에는 다시 신청할 수 있어요.');
+  });
+
   it('신청이 3팀 이상이면 2팀만 펼치고 나머지는 더 보기로 연다', () => {
     renderPage(<TeamMatchDetailPageView model={hostModel([applicant('A'), applicant('B'), applicant('C')])} />);
 

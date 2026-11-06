@@ -220,13 +220,13 @@ export function AwardsTab({
           </>
         )}
       </section> : null}
-      <div className="flex items-center justify-between mb-4">
-        <div>
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <div className="min-w-0">
           <h3 className="text-[length:var(--font-size-body)] font-bold text-[var(--text-strong)]">개인 어워드</h3>
           <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)] mt-0.5">MVP, 득점왕 등 개인 수상자를 입력하세요. 사용자 페이지(시상·리뷰)에 표시돼요.</p>
         </div>
         {canWrite && (
-          <button type="button" onClick={addRow} className="inline-flex items-center text-xs text-[var(--blue700)] font-semibold px-3 min-h-[36px] rounded-lg border border-[var(--tint-blue-border)] hover:bg-[var(--blue50)]">+ 항목 추가</button>
+          <button type="button" onClick={addRow} className="inline-flex shrink-0 items-center whitespace-nowrap text-xs text-[var(--blue700)] font-semibold px-3 min-h-[44px] rounded-lg border border-[var(--tint-blue-border)] hover:bg-[var(--blue50)]">+ 항목 추가</button>
         )}
       </div>
 

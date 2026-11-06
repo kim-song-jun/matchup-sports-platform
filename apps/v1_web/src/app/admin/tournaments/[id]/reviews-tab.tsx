@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import { Search, Star } from 'lucide-react';
-import { publicAssetPath } from '@/lib/assets';
+import { isOptimizableImagePath, publicAssetPath } from '@/lib/assets';
 import { useV1AdminTournamentReviews, useV1HideReview, useV1UnhideReview } from '@/hooks/use-v1-api';
 import type { V1AdminTournamentReview } from '@/types/api';
 import { UserAvatar } from '@/components/v1-ui/user-avatar';
@@ -317,6 +317,7 @@ function ReviewModerationCard({
             >
               <Image
                 src={publicAssetPath(url)}
+                unoptimized={!isOptimizableImagePath(url)}
                 alt=""
                 loading="lazy"
                 width={56}

@@ -121,9 +121,10 @@ test.describe('[host] 매치 생성 위저드 — 종목 선택 영속', () => {
     const created = envelopeData<{ matchId: string }>(await createResponse.json());
     await page.waitForURL(new RegExp(`/matches/${created.matchId}$`));
     await expect(page.locator('.tm-match-detail-title')).toHaveText(title);
+    // 히어로는 원본이 아니라 `/_next/image?url=<인코딩된 업로드 경로>` 를 CSS 변수로 받는다.
     await expect(page.locator('.tm-match-detail-hero')).toHaveAttribute(
       'style',
-      new RegExp(uploadedImageUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
+      new RegExp(`/_next/image\\?url=${encodeURIComponent(uploadedImageUrl).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}&`),
     );
 
     await page.goto(`/matches/${created.matchId}/edit`, { waitUntil: 'domcontentloaded' });

@@ -1,5 +1,7 @@
 'use client';
 
+import { useV1DataSource } from '@/components/providers/v1-data-source';
+
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { v1Delete, v1Get, v1Post } from '@/lib/api-client';
 import { v1Keys } from '@/lib/query-keys';
@@ -320,6 +322,7 @@ export function useV1SetGameRosterParticipation(gameId: string | null, sideId: s
 
 /** 팀 owner·manager·플랫폼 운영자 전용 — 팀원이면 서버가 403 이다. */
 export function useV1TeamGameRosters(teamId: string | null, options?: { enabled?: boolean }) {
+  const { v1Get } = useV1DataSource();
   return useQuery({
     queryKey: v1Keys.teamGameRosters(teamId ?? ''),
     queryFn: () => {
@@ -333,6 +336,7 @@ export function useV1TeamGameRosters(teamId: string | null, options?: { enabled?
 
 /** 여러 경기 빼기·되돌리기를 한 트랜잭션으로. 시작된 경기가 섞이면 전부 409(`details.gameIds`). */
 export function useV1ApplyGameRosterBatch(teamId: string) {
+  const { v1Post } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (changes: V1GameRosterBatchChange[]) =>
@@ -388,6 +392,7 @@ export function useV1MemberUnavailability(
   userId: string | null,
   options?: { enabled?: boolean },
 ) {
+  const { v1Get } = useV1DataSource();
   return useQuery({
     queryKey: v1Keys.teamMemberUnavailability(teamId ?? '', userId ?? ''),
     queryFn: () => {
@@ -430,6 +435,7 @@ function afterUnavailabilityWrite(queryClient: QueryClient, teamId: string, user
 
 /** 결장 기간 등록(owner·manager·플랫폼 운영자, 본인 불가). 기간 안 시작 전 대회·리그 경기에서 빠진다. */
 export function useV1CreateMemberUnavailability(teamId: string, userId: string) {
+  const { v1Post } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (payload: V1CreateMemberUnavailabilityPayload) =>
@@ -440,6 +446,7 @@ export function useV1CreateMemberUnavailability(teamId: string, userId: string) 
 
 /** 결장 기간 취소. 이미 취소면 `alreadyApplied: true`. */
 export function useV1RevokeMemberUnavailability(teamId: string, userId: string) {
+  const { v1Delete } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (unavailabilityId: string) =>
@@ -458,6 +465,7 @@ export function useV1AdminRegistrationGameRosters(
   registrationId: string | null,
   options?: { enabled?: boolean },
 ) {
+  const { v1Get } = useV1DataSource();
   return useQuery({
     queryKey: v1Keys.adminRegistrationGameRosters(tournamentId ?? '', registrationId ?? ''),
     queryFn: () => {

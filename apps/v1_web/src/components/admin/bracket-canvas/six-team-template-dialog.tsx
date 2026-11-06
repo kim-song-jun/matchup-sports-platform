@@ -1,4 +1,7 @@
 'use client';
+
+import { useV1DataSource } from '@/components/providers/v1-data-source';
+
 import { useId, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -23,6 +26,7 @@ import type { BracketTemplateDialogProps } from './bracket-template-dialog';
 export function SixTeamTemplateDialog(
   props: BracketTemplateDialogProps & { onStandard: () => void }
 ) {
+  const { v1Post } = useV1DataSource();
   const id = useId();
   const teams = useV1AdminTournamentRegistrations(props.tournamentId);
   const confirmed = (teams.data?.items ?? []).filter(
@@ -273,6 +277,7 @@ export function SixTeamDecisionPanel({
 }: {
   tournamentId: string;
 }) {
+  const { v1Get, v1Put } = useV1DataSource();
   const base = `/admin/tournaments/${encodeURIComponent(tournamentId)}`;
   const queryClient = useQueryClient();
   const tournament = useQuery({

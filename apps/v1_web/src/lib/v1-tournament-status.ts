@@ -1,5 +1,5 @@
 import type { V1TournamentStatus } from '@/types/api';
-import { COMPETITION_STAGE_LABEL, leagueStateLabel, type CompetitionStage } from './v1-status-labels';
+import { COMPETITION_STAGE_LABEL, TOURNAMENT_ONGOING_CARD_LABEL, leagueStateLabel, type CompetitionStage } from './v1-status-labels';
 
 export type TournamentStatusConfig = { badgeClass: string; label: string };
 
@@ -70,6 +70,6 @@ export function getCompetitionCardStatus(status: string, registrationOpen: boole
     : status === 'completed' ? 'completed'
     : null;
   if (stage === null) return isRegularLeague ? getLeagueStatusConfig(status) : getTournamentStatusConfig(status as V1TournamentStatus);
-  const label = stage === 'ongoing' && isRegularLeague ? leagueStateLabel('active') : COMPETITION_STAGE_LABEL[stage];
+  const label = stage === 'ongoing' ? (isRegularLeague ? leagueStateLabel('active') : TOURNAMENT_ONGOING_CARD_LABEL) : COMPETITION_STAGE_LABEL[stage];
   return { badgeClass: CARD_STAGE_BADGE[stage], label };
 }

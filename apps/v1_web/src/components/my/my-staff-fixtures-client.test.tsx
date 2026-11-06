@@ -213,10 +213,10 @@ describe('MyStaffFixturesPageClient', () => {
     expect(screen.getByText(label)).toBeInTheDocument();
   });
 
-  // 같은 경기는 어디서나 같은 이름이다(2026-10-02 확정) — 조 경기는 조 이름과 라운드, 결선·조 없음은 라운드만.
+  // 같은 경기는 어디서나 같은 이름이다(2026-10-02 확정) — 조 경기는 조 이름과 라운드, 결선은 저장한 조 이름, 조 없음은 라운드만.
   it.each([
     ['조 경기', { round: 'league_r2', groupName: 'A조' }, 'A조 · 조별리그 2라운드 · 1번 경기'],
-    ['결선', { round: 'semi', groupName: '본선' }, '4강 · 1번 경기'],
+    ['결선', { round: 'semi', groupName: '본선' }, '본선 · 1번 경기'],
     ['조 없음', { round: 'league_r2', groupName: null }, '조별리그 2라운드 · 1번 경기'],
   ])('%s의 이름을 다른 화면과 같은 규칙으로 쓴다', (_case, over, name) => {
     mockData([assignment({ fixtureIds: ['fx-1'] })], [entry({ fixtureId: 'fx-1', ...over })]);

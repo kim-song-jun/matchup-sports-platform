@@ -4,6 +4,7 @@ import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { queryImageBySrc, resolveNextImageSrc } from '@/test/next-image';
 import { TEAM_LOGO_PRESETS } from '@/lib/team-logo-presets';
+import { backgroundRequests } from './team-match-images.test-fixture';
 import { TeamMatchCreatePageView, TeamMatchDetailPageView, TeamMatchListPageView } from './team-matches-page';
 import { getTeamMatchCreateViewModel, getTeamMatchDetailViewModel, getTeamMatchListViewModel } from './team-matches.view-model';
 import { TEAM_MATCH_WITHDRAW_CONFIRM } from './team-match-cancel-confirm';
@@ -74,12 +75,15 @@ describe('team match images', () => {
     const list = getTeamMatchListViewModel();
     list.matches = [{ ...list.matches[0], ...images }];
     const first = renderPage(<TeamMatchListPageView model={list} />);
-    expect(first.container.querySelector<HTMLElement>('.tm-match-row-thumb')?.style.backgroundImage).toContain(images.listImageUrl);
+    // 96px 썸네일은 256, 600px 히어로는 1200 폭의 최적화 주소로 받는다(원본을 직접 넣으면 pathname 이 /uploads/… 가 된다).
+    expect(backgroundRequests(first.container.querySelector<HTMLElement>('.tm-match-row-thumb')!.style.backgroundImage)[0])
+      .toEqual({ pathname: '/_next/image', url: images.listImageUrl, w: '256' });
     first.unmount();
     const detail = getTeamMatchDetailViewModel();
     detail.match = { ...detail.match, ...images };
     const second = renderPage(<TeamMatchDetailPageView model={detail} />);
-    expect(second.container.querySelector<HTMLElement>('.tm-team-vs-hero')?.style.backgroundImage).toContain(images.imageUrl);
+    expect(backgroundRequests(second.container.querySelector<HTMLElement>('.tm-team-vs-hero')!.style.backgroundImage)[0])
+      .toEqual({ pathname: '/_next/image', url: images.imageUrl, w: '1200' });
   });
 
   it('renders the authorized rule preview as a direct detail action', () => {
@@ -115,8 +119,11 @@ describe('team match images', () => {
     const { container } = renderPage(<TeamMatchListPageView model={model} />);
     const media = container.querySelector<HTMLElement>('.tm-match-row-thumb');
 
-    expect(media?.style.backgroundImage).toContain('https://cdn.example.com/team-match.webp');
-    expect(media?.style.backgroundImage).toContain('/illustrations/sport-soccer-640.webp');
+    // 외부 주소는 최적화 서버가 받아 올 수 없어 그대로 두고, 그 뒤 로컬 종목 이미지 층만 최적화 주소다.
+    expect(backgroundRequests(media!.style.backgroundImage)).toEqual([
+      { pathname: '/team-match.webp', url: 'https://cdn.example.com/team-match.webp', w: null },
+      { pathname: '/_next/image', url: '/illustrations/sport-soccer-640.webp', w: '256' },
+    ]);
     expect(media?.style.backgroundImage).not.toContain('linear-gradient');
     expect(media?.textContent).toBe('');
     expect(screen.getByText(model.matches[0].title).closest('a')?.getAttribute('href')).toContain(`/team-matches/${model.matches[0].id}`);
@@ -130,8 +137,10 @@ describe('team match images', () => {
       const { container } = renderPage(<TeamMatchListPageView model={model} />);
       const media = container.querySelector<HTMLElement>('.tm-match-row-thumb');
 
-      expect(media?.style.backgroundImage).toContain(imageUrl);
-      expect(media?.style.backgroundImage).toContain('/illustrations/sport-soccer-640.webp');
+      expect(backgroundRequests(media!.style.backgroundImage)).toEqual([
+        { pathname: '/_next/image', url: imageUrl, w: '256' },
+        { pathname: '/_next/image', url: '/illustrations/sport-soccer-640.webp', w: '256' },
+      ]);
       expect(media?.style.backgroundImage).not.toContain('linear-gradient');
       expect(media?.closest('a')).toHaveClass('tm-card-closed');
       expect(media?.textContent).toBe('');
@@ -158,8 +167,10 @@ describe('team match images', () => {
     const { container } = renderPage(<TeamMatchDetailPageView model={model} />);
     const hero = container.querySelector<HTMLElement>('.tm-team-vs-hero');
 
-    expect(hero?.style.backgroundImage).toContain('/uploads/team-match-cover.webp');
-    expect(hero?.style.backgroundImage).toContain('/illustrations/sport-soccer-640.webp');
+    expect(backgroundRequests(hero!.style.backgroundImage)).toEqual([
+      { pathname: '/_next/image', url: '/uploads/team-match-cover.webp', w: '1200' },
+      { pathname: '/_next/image', url: '/illustrations/sport-soccer-640.webp', w: '1200' },
+    ]);
     expect(hero?.style.backgroundImage).not.toContain('linear-gradient');
     expect(hero).toHaveClass('tm-team-vs-hero-photo');
     expect(hero?.querySelector('.tm-team-vs-summary')).not.toBeNull();

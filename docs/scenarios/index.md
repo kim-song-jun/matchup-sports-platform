@@ -1,3 +1,11 @@
+## 2026-11-06 — 결선 실제 강수·조 이름 수정·종료 화면 (검증/배포 대기)
+
+[시나리오](./multi-finals-deferred-teams-20261104.md#2026-11-06--실제-강수조-이름-수정종료-화면-후속) · [task](../../.github/tasks/20261113-bracket-group-name-filters.md). 선행 #2181의 강수 생성 규칙에 맞춘 기존 자동 명칭 보정, 구조 보호를 유지한 조 이름 수정 및 예선 설정·revision 동기화, 공개 명칭 반영, 토너먼트별 기존 최종결과 UI 재사용을 구현했다. #2181 통합 회귀 API335/Web398 PASS, 격리 PostgreSQL 보정10시나리오/재실행 PASS. 생성기 중복 수정은 제외하고 #2181 의존 Draft PR로 제출한다. alpha before 공개6/6(console/network/overflow0), after 공개0/6·admin0/3폭(미배포/관리자 인증 미제공). CI/전체 migration replay 미실행, 실환경 데이터 변경 없음.
+
+## 2026-11-06 — N개 토너먼트별 독립 진출팀 확정 (진행 중)
+
+[task](../../.github/tasks/20261057-admin-bracket-canvas.md#2026-11-06-extension--n개-토너먼트별-독립-진출팀-확정). 최신 dev에서 격리 구현. 토너먼트 한 곳의 확정 API 및 CAS/권한/예선 완료/기록/중복/자리 수 보호를 추가했다. 사용자 A안 및 1위 부전승/2위 교차 고정/3위 같은 조 회피 배치 확인 완료. API101/Web16 회귀·양쪽 typecheck/규칙 검사 PASS. Docker 대안인 격리 PostgreSQL16.15에서 신규 통합2/2와 교차 배정/그래프 훼손 거절을 실제 검증했다(최신 스키마 기능 검증; migration replay는 원격 CI 별도). [시나리오](./multi-finals-deferred-teams-20261104.md#2026-11-06--토너먼트별-독립-확정과-교차-시드-배치). 변경 전 alpha3폭은 console/network0오류로 캡처했으며 변경 후 기능0/7·viewport0/3은 CI/리뷰·머지·배포 대기다.
+
 ## 2026-10-30 — 배정 대회 디렉터 전체 관리
 
 [시나리오](./scoped-tournament-director-management.md) · [Task 20261122](../../.github/tasks/20261122-scoped-tournament-director-management.md).
@@ -21,9 +29,9 @@ A안(기존 관리 화면 재사용) 선택. 전용 담당 목록과 관리 10�
 ## 2026-10-12 — 정규대회 상·하위 결선과 시상
 
 [작업 문서](../../.github/tasks/20261057-admin-bracket-canvas.md#2026-10-12-extension-정규대회-하나--상위하위-결선--시상-두-세트) · [실행 시나리오](./18-regular-tournament-split-finals.md). 하나의 대회에서 조 1·2위는 상위, 3·4위는 하위 결선으로 배정한다. 팀 시상 안내와 개인상 범위는 어드민이 설정한다. Backend521·Web226·스키마 바인딩7개 계약은 좁은 재실행을 포함해 통과했다. 독립 Sol static review의 모바일 단계 순서·읽기 권한 두 결함은 수정·재검토 PASS. PR#1858 커밋본 CI와 변경 후 alpha/3폭 QA는 대기 중이며 전체 완료를 의미하지 않는다.
-## 2026-10-30 — 업체 전달용 대회 운영 체험
+## 2026-11-05 — 실제 어드민을 사용하는 대회 운영 체험
 
-[시나리오](./tournament-ops-demo.md) · [Task20261123](../../.github/tasks/20261123-tournament-ops-demo.md). 5단계·3개 역할의 명시적 샘플 시뮬레이터, 실제 API 쓰기 없음. local26 tests/tsc/pattern PASS, 신규 Alpha0/5·0/3폭·기능0/12.
+[시나리오](./tournament-ops-demo.md) · [Task20261123](../../.github/tasks/archive/20261123-tournament-ops-demo.md) · PR #2168·#2170 dev 머지 및 Alpha `a8cb59951` 검증 완료. 13/13개 화면·3/3폭(39/39), 주요 편집·신청 확정·대진·점수·복원·초기화·공유 실패 안내 PASS. iframe 관리자 요청 결함 수정 후 계정/엔티티 API·console/network 오류·가로 넘침0. [갤러리](../screenshots/tournament-admin-demo-20261105/index.html), 최종 after-report.json 및 최초 실패 증거 보존.
 
 ## 2026-10-28 — 결과·운영 결선 표시 순서와 단판 합산
 

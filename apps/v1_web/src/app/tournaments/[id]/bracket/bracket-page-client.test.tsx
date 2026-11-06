@@ -201,6 +201,61 @@ function makeFixture(
 }
 
 describe('정규리그 + N개 토너먼트 공개 순위와 결선', () => {
+  it('경기 일정은 상세 fixture 식별자로 토너먼트를 연결하고 저장된 색과 강수로 필터한다', () => {
+    const tournament = namedTournament();
+    tournament.groups.find(group => group.id === 'named-1')!.bracketColorIndex = 7;
+    const items: PublicScheduleEntry[] = tournament.fixtures.map(fixture => ({
+      fixtureId: fixture.id, round: 'final', fixtureNumber: fixture.fixtureNumber, legNumber: 1,
+      // The schedule response may omit the knockout group; the detail fixture owns it.
+      groupId: null, groupName: null, scheduledAt: null, venue: null, fieldId: null, fieldName: null,
+      home: null, away: null, homeSlotLabel: fixture.homeSlotLabel ?? null, awaySlotLabel: fixture.awaySlotLabel ?? null,
+      visibilityMode: 'live', status: 'scheduled', resultState: 'pending', scoreStatus: 'unavailable',
+      score: null, clock: null, periodBreak: null, scorers: [], cards: [], outcome: null, hasVideo: false,
+    }));
+    const { container } = renderBracketPage(tournament, { tournamentId: tournament.id, tournamentTitle: tournament.title,
+      bracketPublished: true, items: [], unscheduled: items, standings: [], nextCursor: null });
+    fireEvent.click(screen.getByRole('tab', { name: '결선' }));
+    const tracks = within(screen.getByRole('navigation', { name: '일정 토너먼트 선택' }));
+    expect(tracks.getByRole('button', { name: '챌린지' }).querySelector('span')).toHaveClass('tm-final-color-7');
+    fireEvent.click(tracks.getByRole('button', { name: '챌린지' }));
+    fireEvent.click(within(screen.getByRole('navigation', { name: '일정 결선 단계 선택' })).getByRole('button', { name: '결승' }));
+    expect([...container.querySelectorAll('a[href*="/matches/"]')].map(link => link.getAttribute('href')?.split('?')[0])).toEqual(['/tournaments/public-named-finals/matches/named-game-1']);
+    expect(screen.getByText('챌린지 · 결승')).toBeInTheDocument();
+  });
+  it.each([['챔피언 · 12강', '12강'], ['챔피언 · 본선 첫 경기', '본선 첫 경기']])('일정 호출부가 저장한 %s 이름과 12강 round를 유지한다', (name, label) => {
+    const tournament = namedTournament();
+    tournament.groups.push(makeGroup({ id: 'champ-first', phase: 'round16', name, bracketTrack: '챔피언' }));
+    tournament.fixtures.push(makeFixture({ id: 'first-match', status: 'scheduled', groupId: 'champ-first', round: '12강', fixtureNumber: 18 }));
+    const item = { fixtureId: 'first-match', round: '12강', fixtureNumber: 18, legNumber: 1, groupId: null, groupName: null,
+      scheduledAt: null, venue: null, fieldId: null, fieldName: null, home: null, away: null, homeSlotLabel: null, awaySlotLabel: null,
+      visibilityMode: 'live', status: 'scheduled', resultState: 'pending', scoreStatus: 'unavailable', score: null, clock: null,
+      periodBreak: null, scorers: [], cards: [], outcome: null, hasVideo: false } as PublicScheduleEntry;
+    renderBracketPage(tournament, { tournamentId: tournament.id, tournamentTitle: tournament.title, bracketPublished: true, items: [], unscheduled: [item], standings: [], nextCursor: null });
+    fireEvent.click(screen.getByRole('tab', { name: '결선' }));
+    const rounds = within(screen.getByRole('navigation', { name: '일정 결선 단계 선택' }));
+    fireEvent.click(rounds.getByRole('button', { name: label }));
+    expect(rounds.queryByRole('button', { name: '16강' })).not.toBeInTheDocument();
+    const links = screen.getAllByRole('link').filter(link => link.getAttribute('href')?.includes('/matches/'));
+    expect(links).toHaveLength(1);
+    expect(links[0]).toHaveAttribute('href', expect.stringContaining('/matches/first-match'));
+    expect(screen.getAllByText(name).length).toBeGreaterThan(0);
+  });
+
+  it.each([['챔피언 · 12강', '12강'], ['챔피언 · 본선 첫 경기', '본선 첫 경기']])('대진 필터는 저장한 %s 이름으로 실제 경기를 선택한다', (name, label) => {
+    const tournament = namedTournament();
+    tournament.groups.push(makeGroup({ id: 'champ-first', phase: 'round16', name, bracketTrack: '챔피언' }));
+    tournament.fixtures.push(makeFixture({ id: 'first-match', status: 'scheduled', groupId: 'champ-first', round: '12강', fixtureNumber: 18, homeTeamName: '첫 경기 홈팀', awayTeamName: '첫 경기 원정팀' }));
+    renderBracketStandingsTab(tournament);
+    fireEvent.click(screen.getByRole('tab', { name: '결선' }));
+    fireEvent.click(within(screen.getByRole('navigation', { name: '토너먼트 선택' })).getByRole('button', { name: '챔피언' }));
+    const rounds = within(screen.getByRole('navigation', { name: '결선 단계 선택' }));
+    fireEvent.click(rounds.getByRole('button', { name: label }));
+    expect(rounds.queryByRole('button', { name: '16강' })).not.toBeInTheDocument();
+    expect(screen.getAllByText('첫 경기 홈팀').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('첫 경기 원정팀').length).toBeGreaterThan(0);
+    expect(screen.queryByText('미정 홈 0')).not.toBeInTheDocument();
+  });
+
   function namedTournament(withFinals = true): V1TournamentDetail {
     return makeTournament({ id: 'public-named-finals', kind: 'regular_tournament', format: 'league_knockouts', status: 'in_progress',
       bracketPublishedAt: '2026-11-04T00:00:00Z',
@@ -259,11 +314,60 @@ describe('정규리그 + N개 토너먼트 공개 순위와 결선', () => {
 
   it('예선 종료 후 API가 확정한 이름별 진출팀 표시를 조별 순위에 연결한다', () => {
     const tournament = namedTournament();
-    tournament.groups[0].qualificationByTrack = { '챔피언': { advancingRegistrationIds: ['r-a'], undecided: false } };
+    tournament.groups[0].qualificationByTrack = { '챔피언': { advancingRegistrationIds: ['r-a'], undecided: false, colorIndex: 7 } };
     tournament.fixtures.push(makeFixture({ id: 'pre-a-finished', groupId: 'pre-a', status: 'completed', homeRegistrationId: 'r-a', awayRegistrationId: 'other-a' }));
     renderBracketStandingsTab(tournament);
-    expect(within(screen.getByRole('region', { name: 'A조 순위' })).getByText('챔피언 진출')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'A조 순위' })).getByText('챔피언 진출')).toHaveClass('tm-final-color-7');
   });
+  it('filters named finals first, shows canonical rounds, preserves common rounds and resets missing rounds', () => {
+    const tournament = namedTournament();
+    tournament.groups.push(makeGroup({ id: 'champ-semi', phase: 'semi', name: '챔피언 · 4강', bracketTrack: '챔피언' }));
+    tournament.fixtures.push(makeFixture({ id: 'champ-semi-game', status: 'scheduled', groupId: 'champ-semi', round: '4강', fixtureNumber: 19 }));
+    renderBracketStandingsTab(tournament);
+    fireEvent.click(screen.getByRole('tab', { name: '결선' }));
+    const tracks = screen.getByRole('navigation', { name: '토너먼트 선택' });
+    const rounds = screen.getByRole('navigation', { name: '결선 단계 선택' });
+    expect(within(rounds).getByRole('button', { name: '4강' })).toBeInTheDocument();
+    fireEvent.click(within(rounds).getByRole('button', { name: '결승' }));
+    fireEvent.click(within(tracks).getByRole('button', { name: '챌린지' }));
+    expect(within(rounds).getByRole('button', { name: '결승' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(rounds).queryByRole('button', { name: '4강' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '챔피언' })).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '챌린지' })).toBeInTheDocument();
+    fireEvent.click(within(tracks).getByRole('button', { name: '챔피언' }));
+    fireEvent.click(within(rounds).getByRole('button', { name: '4강' }));
+    fireEvent.click(within(tracks).getByRole('button', { name: '프렌즈' }));
+    expect(within(rounds).getByRole('button', { name: '전체' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(within(tracks).getByRole('button', { name: '전체' }));
+    expect(screen.getByRole('region', { name: '챔피언' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '챌린지' })).toBeInTheDocument();
+  });
+  it('hides the tournament row for one final and provides all ten names for ten finals', () => {
+    const tournament = namedTournament();
+    tournament.groups = tournament.groups.filter(group => group.phase === 'group' || group.bracketTrack === '챔피언');
+    tournament.fixtures = tournament.fixtures.filter(fixture => fixture.groupId === 'named-0');
+    renderBracketStandingsTab(tournament);
+    fireEvent.click(screen.getByRole('tab', { name: '결선' }));
+    expect(screen.queryByRole('navigation', { name: '토너먼트 선택' })).not.toBeInTheDocument();
+    expect(within(screen.getByRole('navigation', { name: '결선 단계 선택' })).getByRole('button', { name: '결승' })).toBeInTheDocument();
+  });
+  it('offers ten long tournament names in an independent scroll row', () => {
+    const tournament = namedTournament(false);
+    for (let i = 0; i < 10; i++) {
+      tournament.groups.push(makeGroup({ id: 'ten-'+i, phase: 'final', name: '장문 토너먼트 '+i+' · 결승', bracketTrack: '장문 토너먼트 '+i, bracketColorIndex: i }));
+      tournament.fixtures.push(makeFixture({ id: 'game-'+i, status: 'scheduled', groupId: 'ten-'+i, round: '결승', fixtureNumber: i+20 }));
+    }
+    renderBracketStandingsTab(tournament);
+    fireEvent.click(screen.getByRole('tab', { name: '결선' }));
+    const row = screen.getByRole('navigation', { name: '토너먼트 선택' });
+    expect(within(row).getAllByRole('button')).toHaveLength(11);
+    expect(row).toHaveClass('tm-bracket-filter-scroll');
+    fireEvent.click(within(row).getByRole('button', { name: '장문 토너먼트 9' }));
+    expect(screen.getByRole('region', { name: '장문 토너먼트 9' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '장문 토너먼트 0' })).not.toBeInTheDocument();
+    expect(row.querySelector('.tm-final-color-9')).toBeInTheDocument();
+  });
+
 });
 
 /**
@@ -778,7 +882,9 @@ describe('BracketPageContent — 조별 진출 안내 문구 제거', () => {
     renderBracketStandingsTab(tournament);
 
     const table = screen.getByRole('table', { name: 'A조 순위표' });
-    expect(highlightedTeams(table)).toEqual(['03팀', '06팀']);
+    expect(highlightedTeams(table)).toEqual([]);
+    expect(within(table).getByText('상위 진출')).toHaveClass('tm-final-color-0');
+    expect(within(table).getByText('하위 진출')).toHaveClass('tm-final-color-1');
     expect(within(table).getByText('상위 진출')).toBeInTheDocument();
     expect(within(table).getByText('하위 진출')).toBeInTheDocument();
   });

@@ -34,6 +34,18 @@ describe('BracketGroupCard — 결선 진출 슬롯', () => {
       onDeleteGroup={vi.fn()} onRemoveGroupTeam={vi.fn()} autoFocus={false} showToast={vi.fn()} />,
   );
 
+  it('N개 토너먼트 구조를 잠근 채 조 이름 수정만 허용한다', () => {
+    const edit = vi.fn();
+    render(<BracketGroupCard group={semi} allGroups={[semi]} allStandings={[]} fixtures={[]} confirmedTeamItems={[]}
+      assignGroupTeam={noopMutation() as unknown as ReturnType<typeof import('@/hooks/use-v1-api').useV1AssignGroupTeam>}
+      createFixture={noopMutation()} isAutoGenerating={false} onAutoGenerate={vi.fn()} onEditGroup={edit}
+      onDeleteGroup={vi.fn()} onRemoveGroupTeam={vi.fn()} autoFocus={false} showToast={vi.fn()} structureEditable={false} nameEditable />);
+    fireEvent.click(screen.getByRole('button', { name: '4강 수정' }));
+    expect(edit).toHaveBeenCalledWith(semi);
+    expect(screen.queryByRole('button', { name: '4강 삭제' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /자동.*생성/ })).not.toBeInTheDocument();
+  });
+
   it('일부만 배정한 결선은 팀 수를 표시하되 준비 완료로 단정하지 않는다', () => {
     renderSlotCard(true);
     expect(screen.getByRole('button', { name: /4강.*1팀 배정됨/ })).not.toHaveTextContent('준비완료');

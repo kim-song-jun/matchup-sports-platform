@@ -25,7 +25,7 @@ export function seedTournamentRoundLabel(round: string): string {
   return SEED_TOURNAMENT_PHASE_LABEL[trimmed.toLowerCase()] ?? trimmed;
 }
 
-/** 결선 라운드(8강·4강·결승·3·4위전 …)만 조 이름을 붙이지 않는다 — 그 밖(조별·예선·운영자 입력)은 조 이름과 함께 쓴다. */
+/** 결선은 저장한 조 이름을 표시 이름으로 쓴다. 조별·예선은 조 이름과 라운드를 함께 쓴다. */
 function isKnockoutRound(round: string): boolean {
   return /^(\d+강|준결승|결승|3·4위전)$/.test(seedTournamentRoundLabel(round).trim());
 }
@@ -48,6 +48,7 @@ export function seedCompetitionMatchLabel({
   // 리그 방식 대회는 조가 하나('리그')라 조별리그가 아니다 — "리그 · 조별리그 1라운드" 대신 "리그 1라운드"(MD-QA #171).
   const leagueRound = LEAGUE_ROUND.exec(round.trim());
   if (leagueRound !== null && group === LEAGUE_FORMAT_GROUP) return withinGroup ? `${Number(leagueRound[1])}라운드` : `리그 ${Number(leagueRound[1])}라운드`;
-  if (withinGroup || group === '' || isKnockoutRound(round) || group === seedTournamentRoundLabel(round)) return roundPart;
+  if (withinGroup || group === '' || group === seedTournamentRoundLabel(round)) return roundPart;
+  if (isKnockoutRound(round)) return `${group}${leg}`;
   return `${group} · ${roundPart}`;
 }

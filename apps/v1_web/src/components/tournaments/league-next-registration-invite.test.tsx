@@ -19,8 +19,9 @@ const league = {
 beforeEach(() => get.mockReset());
 
 describe.each(['mobile', 'sidebar'] as const)('다음 리그 CTA (%s)', (variant) => {
-  const openLabel = variant === 'mobile' ? '다음 리그에서 함께 뛰어요' : '다음 리그 참가 신청';
-  const closedLabel = variant === 'mobile' ? '다음 리그에서 함께 뛰어요' : '다음 시즌 보기';
+  // 2026-11-06: 모바일 버튼도 실제로 가는 곳을 적는다(고정 문구 '다음 리그에서 함께 뛰어요'는 리그 목록으로 갈 때도 떴다).
+  const openLabel = '다음 리그 참가 신청';
+  const closedLabel = '다음 시즌 보기';
   it('실제 다음 리그의 신청 경로를 연결하고 현재 리그로 신청하지 않는다', async () => {
     get.mockResolvedValue(league);
     render(<LeagueNextRegistrationInvite leagueId="current-league" variant={variant} />);
@@ -41,7 +42,7 @@ describe.each(['mobile', 'sidebar'] as const)('다음 리그 CTA (%s)', (variant
     get.mockResolvedValue({ ...league, nextRound: null });
     render(<LeagueNextRegistrationInvite leagueId="current-league" variant={variant} />);
     await screen.findByText('다른 리그의 참가 일정도 확인해 보세요.');
-    expect(screen.getByRole('link', { name: variant === 'mobile' ? '다음 리그에서 함께 뛰어요' : '다른 리그 둘러보기' }))
+    expect(screen.getByRole('link', { name: '다른 리그 둘러보기' }))
       .toHaveAttribute('href', '/tournaments?kind=league');
   });
 
@@ -95,17 +96,22 @@ describe('리그 체계로 전환한 리그의 다음 시즌 입구', () => {
     ],
   };
 
-  it.each(['mobile', 'sidebar'] as const)('내 팀이 편성된 티어로 보낸다 (%s)', async (variant) => {
+  // 2026-11-06 사용자 선택: 티어마다 버튼을 하나씩 두고 내 팀 티어를 맨 앞에 둔다.
+  it.each(['mobile', 'sidebar'] as const)('티어마다 버튼을 두고 내 팀 티어를 맨 앞에 둔다 (%s)', async (variant) => {
     get.mockResolvedValue(converted);
     render(<LeagueNextRegistrationInvite leagueId="current-league" variant={variant} myTeamIds={['team-b']} />);
-    expect(await screen.findByRole('link', { name: '다음 시즌 보기' })).toHaveAttribute('href', '/tournaments/tier-2');
-    expect(screen.getByText('우리 팀은 "체계 1시즌 2부"에 편성됐어요.')).toBeInTheDocument();
+    await screen.findByText('우리 팀은 "체계 1시즌 2부"에 편성됐어요.');
+    const links = screen.getAllByRole('link');
+    expect(links.map((link) => [link.textContent, link.getAttribute('href')])).toEqual([
+      ['다음 시즌 2부 보기', '/tournaments/tier-2'],
+      ['다음 시즌 1부 보기', '/tournaments/tier-1'],
+    ]);
   });
 
-  it('편성된 팀이 없으면 첫 티어로 보낸다', async () => {
+  it('편성된 팀이 없으면 1부부터 둔다', async () => {
     get.mockResolvedValue(converted);
     render(<LeagueNextRegistrationInvite leagueId="current-league" variant="sidebar" />);
-    expect(await screen.findByRole('link', { name: '다음 시즌 보기' })).toHaveAttribute('href', '/tournaments/tier-1');
-    expect(screen.getByText('리그 체계 첫 시즌이 시작돼요.')).toBeInTheDocument();
+    expect(await screen.findByText('리그 체계 첫 시즌이 시작돼요.')).toBeInTheDocument();
+    expect(screen.getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual(['/tournaments/tier-1', '/tournaments/tier-2']);
   });
 });

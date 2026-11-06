@@ -16,7 +16,7 @@ import { buildBracketGraph, bracketConnectionPath, bracketContentCenter, type Br
 import { Trophy } from 'lucide-react';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
-import { bracketTrackLabel, effectiveBracketTrack } from '@/lib/bracket-track';
+import { bracketTrackLabel, effectiveBracketTrack, isNamedBracketTrack } from '@/lib/bracket-track';
 import type { V1TournamentFixture, V1TournamentGroup } from '@/types/api';
 
 /* ── 라운드 그룹핑 (기존 pure logic 유지) ── */
@@ -78,7 +78,7 @@ function getFixturePhase(round: string): keyof typeof PHASE_ORDER | null {
   return null;
 }
 
-function getRoundLabel(key: string): string {
+export function getRoundLabel(key: string): string {
   return PHASE_LABEL[key] ?? key;
 }
 
@@ -96,8 +96,12 @@ export function groupFixturesByRound(
 
     const group = fixture.groupId ? groupById.get(fixture.groupId) : undefined;
     const largeRound = /^(\d+)강$/.exec(fixture.round.trim());
-    key = largeRound && Number(largeRound[1]) > 64 ? fixture.round : fixturePhase ?? group?.phase ?? fixture.round;
-    sortIndex = largeRound && Number(largeRound[1]) > 64 ? -Math.log2(Number(largeRound[1])) : PHASE_ORDER[key] ?? 100;
+    // N개 토너먼트의 그룹은 라운드 하나씩이라 그룹의 단계 코드가 곧 열이다. 부전승 있는 첫 라운드는 경기 이름('12강')과
+    // 단계 코드(round16)가 달라 이름으로 분류하면 12강 열이 따로 생기고 16강 열은 빈 채 남는다.
+    const beyondPhaseCodes = largeRound !== null && Number(largeRound[1]) > 64;
+    const trackedPhase = group !== undefined && group.phase !== 'group' && isNamedBracketTrack(group.bracketTrack) && !beyondPhaseCodes ? group.phase : null;
+    key = trackedPhase ?? (beyondPhaseCodes ? fixture.round : fixturePhase ?? group?.phase ?? fixture.round);
+    sortIndex = beyondPhaseCodes ? -Math.log2(Number(largeRound![1])) : PHASE_ORDER[key] ?? 100;
 
     const existing = roundMap.get(key);
     if (existing) {
@@ -858,7 +862,7 @@ function SingleTournamentBracket({ fixtures, groups, selectedRoundKey }: Tournam
   return (
     <div>
       {mainRounds.length > 1 && (
-        <nav aria-label="대진 단계 이동" className="flex flex-wrap gap-2 mb-3">
+        <nav aria-label="대진 단계 이동" className="tm-bracket-round-jumps">
           {mainRounds.map((round) => (
             <button key={round.key} type="button" className="tm-chip" onClick={() => {
               const container = scrollRef.current;

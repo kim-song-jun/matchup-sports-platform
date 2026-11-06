@@ -508,8 +508,14 @@ export const COMPETITION_STAGES = ['preparing', 'recruiting', 'recruit_closed', 
 export type CompetitionStage = (typeof COMPETITION_STAGES)[number];
 export const COMPETITION_STAGE_LABEL: Record<CompetitionStage, string> = {
   preparing: '준비 중',
-  recruiting: '접수 중',
+  recruiting: '신청 접수 중',
   recruit_closed: '접수 마감',
   ongoing: '진행 중',
   completed: '종료',
 };
+
+/**
+ * 카드 배지의 진행 중은 종류를 말한다 — 대회는 '대회 진행 중', 리그는 '시즌 진행 중'(`leagueStateLabel('active')`).
+ * 필터의 상태 이름(`COMPETITION_STAGE_LABEL.ongoing`)은 두 종류가 같이 쓰므로 그대로 '진행 중'이다(2026-11-05).
+ */
+export const TOURNAMENT_ONGOING_CARD_LABEL = '대회 진행 중';

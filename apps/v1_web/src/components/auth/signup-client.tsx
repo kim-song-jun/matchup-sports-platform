@@ -17,7 +17,7 @@ import {
   useV1UpdateProfile,
   useV1UploadImages,
 } from '@/hooks/use-v1-api';
-import { cssUrl } from '@/lib/assets';
+import { optimizedCssUrl } from '@/lib/assets';
 import { V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
 import { clearV1IdentityCache } from '@/lib/query-keys';
@@ -70,6 +70,9 @@ const STEP_COPY: Record<WizardStep, { title: string; sub?: string }> = {
 
 /** 인증 성공 표시를 볼 시간을 준 뒤 다음 단계로 넘긴다 — 즉시 전환하면 무엇이 처리됐는지 알 수 없다. */
 const VERIFY_ADVANCE_DELAY_MS = 900;
+
+/** `.tm-auth-profile-preview` 의 72×72 — globals.css 와 같아야 한다. */
+const PROFILE_PREVIEW_SIZE = 72;
 
 const onboardingDraftKey = 'teameet.v1.onboardingDraft';
 
@@ -566,7 +569,7 @@ export function SignupClient() {
                 {/* 행 전체가 파일 선택 라벨이다 — 아바타·문구·버튼이 각자 같은 일을 하지 않는다. */}
                 <label className="tm-auth-profile-upload-main tm-pressable">
                   <span className="tm-auth-profile-preview-trigger">
-                    <span className="tm-auth-profile-preview" style={profileImageUrl ? { backgroundImage: cssUrl(profileImageUrl) } : undefined}>
+                    <span className="tm-auth-profile-preview" style={profileImageUrl ? { backgroundImage: optimizedCssUrl(profileImageUrl, PROFILE_PREVIEW_SIZE) } : undefined}>
                       {profileImageUrl ? null : <span className="tm-text-caption">{displayInitials(realName || normalizedNickname, { fallback: 'T' })}</span>}
                     </span>
                     {profileImageUrl ? null : (

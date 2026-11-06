@@ -18,7 +18,7 @@ describe('listTournamentIds cursor validation', () => {
     ['hour 24', '2026-03-01 24:00:00'],
     ['year 0000', '0000-01-01 00:00:00'],
   ])('rejects a well-shaped but non-existent timestamp (%s) without reaching the database', async (_label, sortAt) => {
-    expect(await run(token([0, sortAt, 'x']))).toEqual({ rows: [], queried: 0 });
+    expect(await run(token(['v2', 0, sortAt, 'x']))).toEqual({ rows: [], queried: 0 });
   });
 
   it.each([
@@ -26,7 +26,7 @@ describe('listTournamentIds cursor validation', () => {
     ['microseconds', '2026-03-01 10:00:00.123456'],
     ['leap day', '2028-02-29 23:59:59'],
   ])('lets a real timestamp (%s) through to the query', async (_label, sortAt) => {
-    expect(await run(token([1, sortAt, 'x']))).toEqual({ rows: [], queried: 1 });
+    expect(await run(token(['v2', 1, sortAt, 'x']))).toEqual({ rows: [], queried: 1 });
   });
 });
 
@@ -102,12 +102,40 @@ describe('single state order and filter', () => {
     expect(statement.text).toContain('t.is_public = true');
   });
 
-  it('carries only [group, sortAt, id] in the cursor and refuses the old four-part cursor', async () => {
+  it('carries a version tag with [group, sortAt, id] in the cursor and refuses every older shape', async () => {
     const queryRaw = jest.fn().mockResolvedValue([{ id: 'a', grp: 1, sort_at: '2026-11-01 09:00:00.123456' }]);
     const rows = await listTournamentIds({ $queryRaw: queryRaw } as never, {}, { limit: 1 });
-    expect(JSON.parse(Buffer.from(rows[0].cursor, 'base64url').toString('utf8'))).toEqual([1, '2026-11-01 09:00:00.123456', 'a']);
+    expect(JSON.parse(Buffer.from(rows[0].cursor, 'base64url').toString('utf8'))).toEqual(['v2', 1, '2026-11-01 09:00:00.123456', 'a']);
     queryRaw.mockClear();
-    expect(await listTournamentIds({ $queryRaw: queryRaw } as never, {}, { limit: 1, cursor: token([1, '2026-11-01 09:00:00', 'a', 'latest']) })).toEqual([]);
+    // The deploy-time shapes: three parts (before the 2026-11-03 order) and four parts with a sort mode.
+    for (const old of [[1, '2026-11-01 09:00:00', 'a'], [1, '2026-11-01 09:00:00', 'a', 'latest'], ['v1', 1, '2026-11-01 09:00:00', 'a']]) {
+      expect(await listTournamentIds({ $queryRaw: queryRaw } as never, {}, { limit: 1, cursor: token(old) })).toEqual([]);
+    }
     expect(queryRaw).not.toHaveBeenCalled();
+  });
+});
+
+describe('gender filter spans every kind', () => {
+  const build = async (query: Parameters<typeof listTournamentIds>[1]) => {
+    const statements: Prisma.Sql[] = [];
+    const queryRaw = jest.fn(async (strings: TemplateStringsArray, ...values: unknown[]) => {
+      statements.push(Prisma.sql(strings, ...values)); return [];
+    });
+    await listTournamentIds({ $queryRaw: queryRaw } as never, query, { limit: 5 });
+    return statements[0];
+  };
+
+  // `kind=tournament` is excluded here: its own surface SQL already contains the tournament condition.
+  it.each(['league', 'all'] as const)('kind=%s: gender alone does not narrow the list to tournaments', async (kind) => {
+    const statement = await build({ kind, genderCategory: 'female' });
+    expect(statement.text).toContain('t.gender_category::text = $');
+    expect(statement.values).toContain('female');
+    // The tournament-only narrowing (`regular_tournament OR kind IS NULL`) comes from format/fee, never from gender.
+    expect(statement.text).not.toContain("t.kind::text = 'regular_tournament' OR t.kind IS NULL");
+  });
+
+  it.each([{ format: 'knockout' }, { feeMax: 0 }, { feeMin: 1000 }] as const)('format and fee still narrow to tournaments: %j', async (extra) => {
+    const statement = await build({ kind: 'all', ...extra } as never);
+    expect(statement.text).toContain("t.kind::text = 'regular_tournament' OR t.kind IS NULL");
   });
 });

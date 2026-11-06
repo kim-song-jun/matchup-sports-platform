@@ -1,5 +1,7 @@
 'use client';
 
+import { useV1DataSource } from '@/components/providers/v1-data-source';
+
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { resultReviewKeys } from '@/hooks/use-tournament-result-review';
 import { V1ApiError, v1Get, v1Patch, v1Post, v1Put } from '@/lib/api-client';
@@ -26,6 +28,7 @@ import type {
 export type BracketCompetitionScope = 'tournament' | 'league';
 
 export function useV1SetByeSide(tournamentId: string) {
+  const { v1Put } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ slotId, ...body }: { slotId: string; side: 'HOME' | 'AWAY'; expectedSide: 'HOME' | 'AWAY' }) =>
@@ -46,6 +49,7 @@ function invalidateCompetitionViews(queryClient: QueryClient, competitionId: str
 
 /** `POST /admin/tournaments/:id/bracket/template` — 평탄한 kind 별 필드 + `replaceExisting`. */
 export function useV1ApplyBracketTemplate(tournamentId: string) {
+  const { v1Post } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (payload: V1ApplyBracketTemplatePayload) =>
@@ -61,6 +65,7 @@ export function useV1ApplyBracketTemplate(tournamentId: string) {
 
 /** `PUT /admin/tournament-slots/:slotId/assignment` — registrationId null 이면 자리를 비운다. */
 export function useV1AssignTournamentSlot(competitionId: string, scope: BracketCompetitionScope) {
+  const { v1Put } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ slotId, registrationId }: { slotId: string; registrationId: string | null }) =>
@@ -71,6 +76,7 @@ export function useV1AssignTournamentSlot(competitionId: string, scope: BracketC
 
 /** `POST /admin/tournaments/:id/slots/random-fill` — 리그도 같은 경로(id = 리그 id). */
 export function useV1RandomFillSlots(competitionId: string, scope: BracketCompetitionScope) {
+  const { v1Post } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: () => v1Post<V1RandomFillResult>(`/admin/tournaments/${competitionId}/slots/random-fill`),
@@ -83,6 +89,7 @@ export function useV1RandomFillSlots(competitionId: string, scope: BracketCompet
  * 서버가 `Idempotency-Key` 와 본문 `clientCommandId` 의 일치를 검사하므로 한 번 호출에 한 id 를 둘 다에 쓴다.
  */
 export function useV1QuickResult(competitionId: string, scope: BracketCompetitionScope) {
+  const { v1Post } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ gameId, expectedVersion, score }: { gameId: string; expectedVersion: number; score: V1QuickResultScore }) => {
@@ -105,6 +112,7 @@ export function useV1QuickResult(competitionId: string, scope: BracketCompetitio
 
 /** `PATCH /admin/fixtures/:id/bracket-sources` — 둘 다 null 이면 연결을 모두 해제한다. */
 export function useV1SetBracketSources(tournamentId: string) {
+  const { v1Patch } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({
@@ -126,6 +134,7 @@ export function useV1SetBracketSources(tournamentId: string) {
  * 처리 여부를 모르는 실패(연결 끊김·5xx)면 남긴다. 화면이 도중에 사라져도 판정이 끝나도록 mutationFn 안에서 한다.
  */
 export function useV1AddBracketFixture(tournamentId: string) {
+  const { v1Post } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: V1AddBracketFixtureInput) => {
@@ -156,6 +165,7 @@ export function useV1ApplyLeagueTemplate(leagueId: string) {
 
 /** `GET /admin/tournaments/:id/slots/standings-preview` — read fresh each time the dialog opens. */
 export function useV1SlotStandingsPreview(tournamentId: string, enabled: boolean) {
+  const { v1Get } = useV1DataSource();
   return useQuery({
     queryKey: v1Keys.adminTournamentSlotStandings(tournamentId),
     queryFn: () => v1Get<V1SlotStandingsPreview>(`/admin/tournaments/${tournamentId}/slots/standings-preview`),
@@ -166,6 +176,7 @@ export function useV1SlotStandingsPreview(tournamentId: string, enabled: boolean
 
 /** `POST /admin/tournaments/:id/slots/fill-from-standings` — tied slots send the chosen team via overrides. */
 export function useV1FillSlotsFromStandings(tournamentId: string) {
+  const { v1Post } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: V1FillSlotsFromStandingsInput) =>

@@ -1,10 +1,14 @@
+리그+토너먼트의 조 이름 수정은 구조 편집과 분리한다. 저장 이름은 공개 일정·대진·경기 결과에 반영하며 예선 설정과 revision을 원자적으로 갱신한다. 기존 N개 토너먼트의 자동 생성 명칭은 선행 PR #2181의 짝수 6팀 이상 강수 규칙에 맞춰 보정한다. [대회 계약](./domains/tournaments.md#조-이름과-결선-규모-표시-2026-11-06).
+
 배정된 대회의 활성 디렉터는 빠른 결과 입력·공식 확정·무효화도 허용한다. 게임 ID의 실제 소속 대회를 확인하며 리그 디렉터의 별도 제한은 유지한다. [대회 권한 계약](./domains/tournaments.md#scoped-director-management).
+
+리그 + N개 토너먼트는 토너먼트별 독립 진출팀 확정과 공식 순위 기반 추천/4개 조 12팀 교차 배치를 제공한다. 미리보기는 저장하지 않으며 확정은 선택한 결선만 원자적으로 변경한다. [대회 계약](./domains/tournaments.md#토너먼트-하나의-진출팀-확정-2026-11-06).
 
 수상 추천용 관리자 선수 기록 조회는 해당 대회의 활성 디렉터도 허용하며, 다른 대회는 403으로 거부한다. [대회 권한 계약](./domains/tournaments.md#scoped-director-management)을 따른다.
 
 N개 결선 대회의 초기화와 예선 수정은 owner/ops 또는 해당 대회 활성 디렉터의 별도 변경 액션이다. expectedRevision, 대회 advisory lock, 경기 행 잠금, 감사 로그와 원자적 저장을 사용한다. 시작/기록/결과가 있으면 초기화는 409이며 예선 수정은 기존 대진이 없을 때만 허용한다. [대회 계약](./domains/tournaments.md)을 따른다.
 
-토너먼트별 최종 순위는 공식 결승 및 3·4위전 결과를 범위별로 표시한다. N개 결선의 미확정/동률 자동 명단은 409 대신 null로 유지하며 진출 규칙 수만큼 미정 시드를 선생성한다. 같은 구조의 후속 배정은 기존 경기와 일정을 유지한다. [대회 계약](./domains/tournaments.md)을 따른다.
+토너먼트별 최종 순위는 공식 결승 및 3·4위전 결과를 범위별로 표시한다. N개 결선의 미승인 명단은 null로 유지하며 명시 capacity 또는 이전 계약의 진출 규칙 수만큼 미정 시드를 선생성한다. 생성 UI는 이름·자리 수만 정하고 순위별 목적지는 별도 규칙 화면에서 연결한다. 같은 구조의 후속 배정은 기존 경기와 일정을 유지한다. [대회 계약](./domains/tournaments.md)을 따른다.
 
 관리자 대회 CRUD 응답은 저장된 nullable `kind`를 포함하며 대진·시상 기능의 종류 판정에 사용한다. [대회 계약](./domains/tournaments.md)을 따른다.
 
@@ -260,3 +264,6 @@ status inputs are defined in [Tournaments](./domains/tournaments.md#competition-
 대회 생성·수정의 `prizeBreakdown`은 nullable string(최대 4,000자)이다. 기존 구분자 텍스트와 `@teameet/prizes/v1:` 접두의 분류 JSON 문자열을 지원하며, 소비자는 공용 파서로 읽는다. 이 필드를 원문 그대로 사용자에게 렌더하지 않는다. [대회 시상 계획 계약](./domains/tournaments.md#categorized-prize-plans) 참고.
 
 - 정규대회 진행 방식 `league_knockouts`는 한 대회의 예선 조별리그와 이름을 가진 N개 토너먼트다. 정규리그 시즌/승강과 별개이며 기존 `group_knockout`은 유지한다. 이 방식의 시상 `bracketTrack`은 고정 enum 대신 설정된 토너먼트 이름을 받으며 서비스가 대회 소속을 검증한다. 상세는 [대회 계약](./domains/tournaments.md#정규리그--n개-토너먼트-league_knockouts).
+
+### Qualification display metadata
+Tournament qualification destinations may carry a server-owned colorIndex. Editors round-trip the returned named-final id; colors are persisted independently of labels/order. Existing auth, publication and qualification gates apply (see domains/tournaments.md).

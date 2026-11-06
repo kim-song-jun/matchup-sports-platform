@@ -35,7 +35,7 @@ describe('LeagueCoverImageControl', () => {
     empty.unmount();
 
     renderControl('/uploads/2026/10/a.webp');
-    expect(screen.getByRole('img', { name: '상세 이미지 미리보기' }).style.backgroundImage).toContain('/uploads/2026/10/a.webp');
+    expect(decodeURIComponent(screen.getByRole('img', { name: '상세 이미지 미리보기' }).style.backgroundImage)).toContain('/uploads/2026/10/a.webp');
     expect(screen.getByLabelText('상세 이미지')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '상세 이미지 제거' })).toBeInTheDocument();
   });
@@ -84,7 +84,7 @@ describe('LeagueCoverImageControl', () => {
     renderControl('/uploads/detail.webp', '/uploads/old-list.webp');
     await act(async () => fireEvent.change(screen.getByLabelText('목록 이미지'), { target: { files: [file()] } }));
     expect(saveMutate.mock.calls[0][0]).toEqual({ listImageUrl: '/uploads/list.webp' });
-    expect(screen.getByRole('img', { name: '상세 이미지 미리보기' }).style.backgroundImage).toContain('/uploads/detail.webp');
+    expect(decodeURIComponent(screen.getByRole('img', { name: '상세 이미지 미리보기' }).style.backgroundImage)).toContain('/uploads/detail.webp');
   });
 
   it('목록 제거 확인은 목록 필드만 null로 저장한다', () => {

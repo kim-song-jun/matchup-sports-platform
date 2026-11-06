@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { publicAssetPath } from '@/lib/assets';
+import { resolveNextImageSrc } from '@/test/next-image';
 import { emptySponsorForm } from './tournament-sponsors-admin-model';
 import { TournamentSponsorForm } from './tournament-sponsors-form';
 
@@ -38,8 +39,7 @@ describe('TournamentSponsorForm', () => {
       setField,
     });
 
-    expect(screen.getByAltText('선택한 협찬사 로고 미리보기')).toHaveAttribute(
-      'src',
+    expect(resolveNextImageSrc(screen.getByAltText('선택한 협찬사 로고 미리보기'))).toBe(
       publicAssetPath('/uploads/2026/08/partner.webp'),
     );
     // 공용 CoverImageUploader 재사용으로 제거 버튼 라벨이 공용 문구('이미지 제거')가 됐다 —

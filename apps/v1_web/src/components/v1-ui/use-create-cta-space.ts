@@ -21,7 +21,14 @@ export function useCreateCtaSpace(ref: RefObject<HTMLDivElement | null>, enabled
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(sync);
     // A native inset can change only padding, so observe the entire border box.
     observer?.observe(cta, { box: 'border-box' });
+    // Keyboard CSS can restore fixed positioning without changing the bar's dimensions.
+    const keyboardObserver = new MutationObserver(sync);
+    keyboardObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class', 'data-teameet-native-keyboard'],
+    });
     return () => {
+      keyboardObserver.disconnect();
       observer?.disconnect();
       window.removeEventListener('resize', sync);
       scroll.style.removeProperty(CTA_HEIGHT_VAR);

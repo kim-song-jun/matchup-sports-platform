@@ -12,7 +12,7 @@ import {
   type SideLabelContext,
 } from '@/lib/bracket-canvas-layout';
 import { formatGameResultScoreWithPenalties } from '@/lib/game-result-score';
-import { bracketTrackLabel } from '@/lib/bracket-track';
+import { bracketGroupLabel, bracketTrackLabel, isNamedBracketTrack } from '@/lib/bracket-track';
 import { buildLeagueBoard, type LeagueBoardNode, type LeagueBoardSide } from '@/lib/league-board-model';
 import type {
   V1AdminBracketFixture,
@@ -132,7 +132,7 @@ export function bracketMobileNode(
     fixtureId: fixture.id,
     ...(fixture.fieldId === undefined ? {} : { fieldId: fixture.fieldId }),
     groupId: fixture.groupId,
-    title: `${bracketTrackLabel(bracketTrack) ? `${bracketTrackLabel(bracketTrack)} · ` : ''}${groupName ? `${groupName} · ` : ''}${fixture.fixtureNumber}번 경기`,
+    title: `${groupName ? `${bracketGroupLabel(bracketTrack, groupName)} · ` : bracketTrackLabel(bracketTrack) ? `${bracketTrackLabel(bracketTrack)} · ` : ''}${fixture.fixtureNumber}번 경기`,
     state,
     home: bracketMobileSide(fixture, 'HOME', labels),
     away: bracketMobileSide(fixture, 'AWAY', labels),
@@ -253,15 +253,17 @@ export function buildBracketMobileRounds(input: {
     }
     if (nodes.length === 0) continue;
 
-    const bucket = PHASE_BUCKET[group.phase as V1TournamentGroupPhase] ?? { key: `phase:${group.phase}`, label: group.name };
+    const phaseBucket = PHASE_BUCKET[group.phase as V1TournamentGroupPhase] ?? { key: `phase:${group.phase}`, label: group.name };
+    // N개 토너먼트의 부전승 있는 첫 라운드는 단계 코드(round16·quarter)와 이름('12강'·'6강')이 다르다 — 탭 이름은 경기가 쓰는 이름을 따른다.
+    const largeRound = input.fixtures.find((f) => f.groupId === group.id && /^\d+강$/.test(f.round.trim()))?.round.trim();
+    const bucket = group.phase !== 'group' && isNamedBracketTrack(group.bracketTrack) && largeRound !== undefined ? { ...phaseBucket, label: largeRound } : phaseBucket;
     let round = roundByKey.get(bucket.key);
     if (!round) {
       round = { key: bucket.key, label: bucket.label, sections: [] };
       roundByKey.set(bucket.key, round);
       rounds.push(round);
     }
-    const trackLabel = bracketTrackLabel(group.bracketTrack);
-    round.sections.push({ key: group.id, heading: trackLabel ? `${trackLabel} · ${group.name}` : group.name, nodes });
+    round.sections.push({ key: group.id, heading: bracketGroupLabel(group.bracketTrack, group.name), nodes });
     if (group.phase === 'third_place') thirdPlaceSectionKeys.add(group.id);
   }
 

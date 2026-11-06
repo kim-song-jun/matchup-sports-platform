@@ -278,8 +278,8 @@ export type V1LinkEmailCompleteResult = {
  */
 
 /**
- * `POST /me/email-change/request` — 서버가 정규화(소문자·공백 제거)해서 보낸다. 비밀번호 계정(이메일이 로그인 ID)은 로그인한 지
- * 30분이 넘으면 403 `RECENT_LOGIN_REQUIRED`. 지금 쓰는 주소는 400 `EMAIL_UNCHANGED`, 다른 계정이 쓰는 주소는 409 `EMAIL_CONFLICT`.
+ * `POST /me/email-change/request` — 서버가 정규화(소문자·공백 제거)해서 보낸다. 로그인한 지 30분이 넘으면(모든 계정) 403
+ * `RECENT_LOGIN_REQUIRED`. 지금 쓰는 주소는 400 `EMAIL_UNCHANGED`, 다른 계정이 쓰는 주소는 409 `EMAIL_CONFLICT`.
  */
 export type V1EmailChangeRequestPayload = {
   email: string;

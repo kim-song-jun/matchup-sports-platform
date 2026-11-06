@@ -78,7 +78,7 @@ function requestOutcome(rawEmail: string) {
     case EMAIL_CHANGE_MSW.emails.taken:
       return fail(409, 'EMAIL_CONFLICT', '이미 다른 계정에서 쓰는 이메일이에요.');
     case EMAIL_CHANGE_MSW.emails.recentLoginRequired:
-      return fail(403, 'RECENT_LOGIN_REQUIRED', '보안을 위해 다시 로그인한 뒤 연결해 주세요.', { maxAgeSeconds: EMAIL_CHANGE_MSW.maxAgeSeconds });
+      return fail(403, 'RECENT_LOGIN_REQUIRED', '이메일을 바꾸려면 다시 로그인해 주세요.', { maxAgeSeconds: EMAIL_CHANGE_MSW.maxAgeSeconds });
     case EMAIL_CHANGE_MSW.emails.mailUnavailable:
       return fail(503, 'EMAIL_SEND_UNAVAILABLE', '지금은 인증 메일을 보낼 수 없어요. 잠시 후 다시 시도해 주세요.');
     case EMAIL_CHANGE_MSW.emails.cooldown:

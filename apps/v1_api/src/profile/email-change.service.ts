@@ -12,7 +12,7 @@ import { EMAIL_CHANGE_TOKEN_TTL_SECONDS, issueEmailChangeToken } from './email-c
  * The two steps before `PATCH /me/profile` may change the account email: mail a code to the new address, check it.
  * The session proves the account and the mailed code proves the address; the profile save then spends the token.
  *
- * `request` is the only step that checks how recent the sign-in is; the 10 minutes the `emailChangeToken` lives bound
+ * `request` is the only step that checks how recent the sign-in is (every account); the 10 minutes the `emailChangeToken` lives bound
  * the window for the save.
  */
 @Injectable()
@@ -27,15 +27,13 @@ export class EmailChangeService {
     if (user.accountStatus !== 'active') {
       throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Account cannot be modified' });
     }
+    // Every account, not only a password account whose login ID this is: a verified email also lets Kakao/Apple attach
+    // themselves to the account, so a stolen old session must not be able to point it at the thief's mailbox.
+    assertRecentLogin(sessionAgeSeconds, 'email_change');
     const email = normalizeEmail(dto.email);
 
-    const caller = await this.prisma.v1User.findUnique({
-      where: { id: user.id },
-      select: { email: true, authIdentities: { where: { status: 'active' }, select: { passwordHash: true } } },
-    });
+    const caller = await this.prisma.v1User.findUnique({ where: { id: user.id }, select: { email: true } });
     if (!caller) throw new NotFoundException({ code: 'NOT_FOUND', message: 'V1 user was not found' });
-    // A password account signs in with this address, so a stolen old session must not be able to move it.
-    if (caller.authIdentities.some((identity) => Boolean(identity.passwordHash))) assertRecentLogin(sessionAgeSeconds);
     if (caller.email !== null && normalizeEmail(caller.email) === email) {
       throw new BadRequestException({ code: 'EMAIL_UNCHANGED', message: '지금 쓰는 이메일과 같아요.' });
     }

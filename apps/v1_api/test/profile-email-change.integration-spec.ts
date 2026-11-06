@@ -276,7 +276,7 @@ describe('V1 changing the account email needs a code mailed to the new address i
     expect(await prisma.v1VerificationToken.count({ where: { userId: PASSWORD_USER } })).toBe(0);
   });
 
-  describe('a password account needs a recent sign-in to ask for the code', () => {
+  describe('every account needs a recent sign-in to ask for the code', () => {
     const withSession = (userId: string, seconds: number, email: string) =>
       request(app.getHttpServer()).post(api('/me/email-change/request')).set('Cookie', cookieIssuedAgo(userId, seconds)).send({ email });
 
@@ -288,10 +288,13 @@ describe('V1 changing the account email needs a code mailed to the new address i
       expect(fresh.status).toBe(200);
     });
 
-    it('does not ask a social account, whose contact email opens nothing', async () => {
-      const response = await withSession(SOCIAL_USER, 31 * 60, NEW_EMAIL);
+    it('refuses a social account on a stale session too, and mails nothing', async () => {
+      const stale = await withSession(SOCIAL_USER, 31 * 60, NEW_EMAIL);
+      const fresh = await withSession(SOCIAL_USER, 5 * 60, NEW_EMAIL);
 
-      expect(response.status).toBe(200);
+      expect([stale.status, stale.body.code, stale.body.message]).toEqual([403, 'RECENT_LOGIN_REQUIRED', '이메일을 바꾸려면 다시 로그인해 주세요.']);
+      expect(fresh.status).toBe(200);
+      expect(await prisma.v1VerificationToken.count({ where: { userId: SOCIAL_USER } })).toBe(1);
     });
   });
 

@@ -287,15 +287,36 @@ describe('EmailChangeService', () => {
     });
   });
 
-  describe('a password account signs in with its email, so the session must be recent', () => {
-    it('refuses a session older than the limit, before the address is looked at or mailed', async () => {
-      const { service, mails } = harness(passwordAccount());
+  describe('every account needs a recent sign-in, so a stolen old session cannot point the account at the thief\'s mailbox', () => {
+    it.each([
+      ['a password account', () => passwordAccount(), caller()],
+      ['a social account', () => socialAccount(), caller({ email: null })],
+    ])('refuses %s on a session older than the limit, before the address is looked at or mailed', async (_name, seed, user) => {
+      const { service, mails, tokens } = harness(seed());
 
-      await expect(service.requestCode(caller(), { email: 'taken@example.com' }, STALE)).rejects.toMatchObject({
-        response: { code: 'RECENT_LOGIN_REQUIRED', details: { maxAgeSeconds: RECENT_LOGIN_MAX_AGE_SECONDS } },
+      await expect(service.requestCode(user, { email: 'taken@example.com' }, STALE)).rejects.toMatchObject({
+        response: {
+          code: 'RECENT_LOGIN_REQUIRED',
+          message: '이메일을 바꾸려면 다시 로그인해 주세요.',
+          details: { maxAgeSeconds: RECENT_LOGIN_MAX_AGE_SECONDS },
+        },
         status: 403,
       });
-      expect(mails).toEqual([]);
+      expect([mails, tokens]).toEqual([[], []]);
+    });
+
+    it('refuses a request that carries no cookie session in production, and takes it elsewhere', async () => {
+      const savedEnv = process.env.NODE_ENV;
+      try {
+        process.env.NODE_ENV = 'production';
+        await expect(harness(socialAccount()).service.requestCode(caller({ email: null }), { email: NEW_EMAIL }, null)).rejects.toMatchObject({
+          response: { code: 'RECENT_LOGIN_REQUIRED' },
+        });
+        process.env.NODE_ENV = 'test';
+        await expect(harness(socialAccount()).service.requestCode(caller({ email: null }), { email: NEW_EMAIL }, null)).resolves.toMatchObject({ sent: true });
+      } finally {
+        process.env.NODE_ENV = savedEnv;
+      }
     });
 
     it('takes a session right at the limit', async () => {
@@ -304,10 +325,10 @@ describe('EmailChangeService', () => {
       await expect(service.requestCode(caller(), { email: NEW_EMAIL }, RECENT_LOGIN_MAX_AGE_SECONDS)).resolves.toMatchObject({ sent: true });
     });
 
-    it('does not ask a social account, whose contact email moves no login', async () => {
+    it('takes a fresh session for a social account', async () => {
       const { service } = harness(socialAccount());
 
-      await expect(service.requestCode(caller({ email: null }), { email: NEW_EMAIL }, STALE)).resolves.toMatchObject({ sent: true });
+      await expect(service.requestCode(caller({ email: null }), { email: NEW_EMAIL }, FRESH)).resolves.toMatchObject({ sent: true });
     });
   });
 });

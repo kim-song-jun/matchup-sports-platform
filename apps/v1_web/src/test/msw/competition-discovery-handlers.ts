@@ -31,8 +31,7 @@ export function createCompetitionDiscoveryHandlers(api: string, fixtures: readon
       if (query.get('sportId') && item.sportId !== query.get('sportId')) return false;
       if (stage && stageOf(item) !== stage) return false;
       if (query.get('genderCategory')) {
-        const gender = query.get('genderCategory') === 'unspecified' ? null : query.get('genderCategory');
-        if (league || item.genderCategory !== gender) return false;
+        if (league || item.genderCategory !== query.get('genderCategory')) return false;
       }
       if (query.get('format') && (league || item.format !== query.get('format'))) return false;
       if (query.has('feeMin') && (league || item.entryFee < Number(query.get('feeMin')))) return false;

@@ -115,8 +115,9 @@ export class TournamentListQueryDto {
   kind?: CompetitionListKind;
 
   @IsOptional()
-  @IsIn(['mixed', 'male', 'female', 'unspecified'])
-  genderCategory?: 'mixed' | 'male' | 'female' | 'unspecified';
+  // 성별 미지정(`null`)은 필터로 고르지 않는다(2026-11-06). 값이 비어 있는 옛 대회는 성별 필터를 걸지 않을 때만 나온다.
+  @IsIn(['mixed', 'male', 'female'])
+  genderCategory?: 'mixed' | 'male' | 'female';
 
   @IsOptional()
   @IsString()

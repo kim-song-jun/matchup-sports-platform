@@ -66,6 +66,13 @@ describe('필터 선택·적용', () => {
     fireEvent.click(dialog.getByRole('button', { name: '결과 보기' }));
     expect(navigation.replace).toHaveBeenCalledWith('/tournaments?kind=league', { scroll: false });
   });
+  it('대회 시트의 성별 부문에는 미지정이 없다', () => {
+    render(<CompetitionDiscoveryControls {...props} sheetOpen />);
+    const dialog = within(screen.getByRole('dialog', { name: '대회·리그 필터' }));
+    const genders = within(dialog.getByRole('group', { name: '성별 부문' }));
+    expect(genders.getAllByRole('button').map((button) => button.textContent)).toEqual(['전체', '남성부', '여성부', '혼성']);
+    expect(dialog.queryByRole('button', { name: '미지정' })).not.toBeInTheDocument();
+  });
   it('대회 시트의 진행 상태 줄에는 준비 중이 없다', () => {
     render(<CompetitionDiscoveryControls {...props} sheetOpen />);
     const dialog = within(screen.getByRole('dialog', { name: '대회·리그 필터' }));

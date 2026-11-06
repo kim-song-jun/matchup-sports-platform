@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { ScopedLink as Link } from '@/components/providers/navigation-scope';
 import { useState, type ReactNode } from 'react';
 import { ChevronLeft } from 'lucide-react';
 import type { AdminToastVariant } from '@/components/admin';

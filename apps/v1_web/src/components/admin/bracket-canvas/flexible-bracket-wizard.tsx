@@ -1,5 +1,7 @@
 'use client';
 
+import { useV1DataSource } from '@/components/providers/v1-data-source';
+
 import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -29,6 +31,7 @@ function distribute(total: number, count: number): Group[] {
 }
 
 export function FlexibleBracketWizard(props: BracketTemplateDialogProps & { onLegacy: () => void }) {
+  const { v1Get, v1Post, v1Put } = useV1DataSource();
   const { open, tournamentId, format, onClose, onApplied, showToast, onLegacy, hasExistingBracket } = props;
   const prefix = useId();
   const base = `/admin/tournaments/${encodeURIComponent(tournamentId)}/bracket/template`;

@@ -1,3 +1,4 @@
+import { useV1DataSource } from '@/components/providers/v1-data-source';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { v1Get, v1Patch, v1Post } from '@/lib/api-client';
 import { v1Keys } from '@/lib/query-keys';
@@ -69,6 +70,7 @@ export function useV1TournamentCampaign(slug: string) {
 }
 
 export function useV1AdminTournamentCampaign(id: string) {
+  const { v1Get } = useV1DataSource();
   return useQuery({
     queryKey: v1Keys.adminTournamentCampaign(id),
     queryFn: () => v1Get<V1TournamentCampaign>(`/admin/tournaments/${id}/campaign`),
@@ -77,6 +79,7 @@ export function useV1AdminTournamentCampaign(id: string) {
 }
 
 export function useV1AdminTournamentCampaignPreview(id: string, enabled = true) {
+  const { v1Get } = useV1DataSource();
   return useQuery({
     queryKey: adminTournamentCampaignPreviewKey(id),
     queryFn: () => v1Get<V1AdminTournamentCampaignPreview>(
@@ -87,6 +90,7 @@ export function useV1AdminTournamentCampaignPreview(id: string, enabled = true) 
 }
 
 export function useV1CreateTournamentCampaign(id: string) {
+  const { v1Post } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: V1CreateTournamentCampaignPayload) =>
@@ -100,6 +104,7 @@ export function useV1CreateTournamentCampaign(id: string) {
 }
 
 export function useV1UpdateTournamentCampaign(id: string) {
+  const { v1Patch } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: V1UpdateTournamentCampaignPayload) =>
@@ -116,6 +121,7 @@ export function useV1UpdateTournamentCampaign(id: string) {
 }
 
 export function useV1ChangeTournamentCampaignStatus(id: string) {
+  const { v1Post } = useV1DataSource();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: V1ChangeTournamentCampaignStatusPayload) =>

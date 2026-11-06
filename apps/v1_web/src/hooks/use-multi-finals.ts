@@ -1,6 +1,8 @@
 'use client';
+
+import { useV1DataSource } from '@/components/providers/v1-data-source';
+
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { v1Get, v1Post, v1Put } from '@/lib/api-client';
 
 export type MultiFinalRule = { groupId: string; rank: number };
 export type MultiFinalDefinition = { name: string; thirdPlace: boolean; rules: MultiFinalRule[]; registrationIds?: string[] | null };
@@ -23,6 +25,7 @@ export type MultiFinalPreview = { plan?: {
   edges: Array<{ sourceFixtureKey: string; targetFixtureKey: string; targetSide: string; outcome: string }>;
 }; revision: number; previewHash: string; counts: { fixtures: number; byes: number; tournaments: number }; finals: MultiFinalDefinition[] };
 export function useMultiFinals(id: string, enabled: boolean) {
+  const { v1Get, v1Post, v1Put } = useV1DataSource();
   const client = useQueryClient(); const path = `/admin/tournaments/${encodeURIComponent(id)}/bracket/multi-finals`;
   const refresh = () => client.invalidateQueries({ predicate: query => query.queryKey.some(key => key === id) });
   const view = useQuery({ queryKey: ['multi-finals', id], queryFn: () => v1Get<MultiFinalView>(path), enabled,

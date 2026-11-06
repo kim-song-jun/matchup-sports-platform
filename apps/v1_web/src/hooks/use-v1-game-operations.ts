@@ -1,3 +1,4 @@
+import { useV1DataSource } from '@/components/providers/v1-data-source';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { retryTransientFailure, v1Get, v1Patch, v1Post } from '@/lib/api-client';
 import { v1Keys } from '@/lib/query-keys';
@@ -45,6 +46,7 @@ export function useV1Game(gameId: string | null) {
 }
 
 export function useV1GameEventsBackfill(gameId: string | null, afterSequence: number) {
+  const { v1Get } = useV1DataSource();
   return useQuery({
     queryKey: [...v1Keys.gameEvents(gameId ?? ''), afterSequence] as const,
     queryFn: () =>

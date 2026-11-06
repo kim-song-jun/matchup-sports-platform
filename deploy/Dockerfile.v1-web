@@ -74,7 +74,10 @@ ENV HOSTNAME=0.0.0.0
 EXPOSE 3013
 
 # 고정 UID/GID(1001) — v1-api와 동일 정책.
+# .next/cache/images 는 v1_web_image_cache 볼륨 자리다. 이미지에 app 소유로 만들어 둬야
+# 새 볼륨이 이 소유권을 물려받는다 — 없으면 Docker 가 root 소유로 만들어 변환 결과를 못 쓴다.
 RUN addgroup -S -g 1001 app && adduser -S -u 1001 -G app app \
+  && mkdir -p /app/apps/v1_web/.next/cache/images \
   && chown -R app:app /app
 
 USER app

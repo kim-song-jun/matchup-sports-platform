@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { useId, useRef, useState } from 'react';
 import type { KeyboardEvent, ReactNode } from 'react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
+import { useCreateCtaSpace } from '@/components/v1-ui/use-create-cta-space';
 import { Card, EmptyState, ErrorState, KPIStat } from '@/components/v1-ui/primitives';
 import { ChevronRightIcon } from '@/components/v1-ui/icons';
 import { SegmentedTabs, type SegmentedTabsItem } from '@/components/v1-ui/segmented-tabs';
@@ -207,6 +208,8 @@ export function ReviewSourcePageView({
   openKey: string | null;
   submitting: boolean;
 }) {
+  const fixedCtaRef = useRef<HTMLDivElement>(null);
+  useCreateCtaSpace(fixedCtaRef);
   const progress = model ? getReviewProgress(model.targets, drafts) : null;
   // 부분 입력이 하나라도 있으면 잠근다 — 예전엔 태그 없는 대상을 말없이 빼고 보냈다.
   const canSubmit = progress !== null && progress.ready.length > 0 && progress.incomplete.length === 0;
@@ -255,7 +258,7 @@ export function ReviewSourcePageView({
           </>
         ) : null}
       </div>
-      <div className={admin ? 'mt-6' : 'tm-fixed-cta'}>
+      <div ref={fixedCtaRef} className={admin ? 'mt-6' : 'tm-fixed-cta'}>
         {/* 서버 계약(SubmitReviewDto 의 `@ArrayMinSize(1)`)이 별점과 태그를 모두 요구해서 버튼을
             풀어줄 수는 없다 — 왜 못 보내는지, 누가 덜 끝났는지를 말해준다.
             `aria-describedby` 로 버튼에 묶어 스크린리더도 비활성 이유를 읽게 한다. */}

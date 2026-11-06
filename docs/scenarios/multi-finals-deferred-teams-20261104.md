@@ -72,3 +72,6 @@ Persona: mutation 권한 운영 관리자. Route: `/admin/tournaments/:id/bracke
 로컬 API334/Web297 회귀, 양쪽 타입 및 pattern/surface PASS. 데이터 보정은 격리 PostgreSQL(PGlite) 6 시나리오와 재실행 멱등성 PASS. alpha before: 공개 2 routes × 3 widths = 6/6, console/network/overflow 오류 0, cleanup 완료. [증거](../screenshots/bracket-results-followup-20261106/before-evidence.json). alpha after: 공개0/6, admin0/3 widths(미배포/인증 미제공). CI와 전체 migration chain replay는 미실행이며 실제 사용자 대회의 데이터/상태를 변경하지 않았다.
 
 #2181 중복 정리: 강수 생성/관리자 그림/단계 코드/재생성 보존은 #2181이 담당한다. 이 후속 PR에는 해당 생성기·공개 대진 분류 중복 수정을 포함하지 않는다. migration은 짝수 6팀 이상 명명된 결선의 자동 명칭만 보정하며 홀수/일반 flexible 대진/사용자 지정 이름은 보존한다. 이전 로컬 수치는 중복 제거 전 snapshot이며 최종 통합 검증 결과는 task의 후속 PR 절을 따른다. #2181 머지 전 후속 PR은 Draft로 유지한다.
+
+
+2026-11-07 최종: #2181/#2195 dev 머지와 matching CI/alpha 배포 PASS(serving79504b0703). 공개6/6폭·순위 펼침 승무패3/3색 및 결과2열/1열 확인. ID/결과/배정 보존. 종료 console/network0, 순위 업로드 로고5개 이미지400(원본404)은 잔여 오류로 기록. 관리자 실측0/3폭은 인증 미제공으로 미검증. [after evidence](../screenshots/bracket-results-followup-20261106/after-evidence.json). 과거 미배포 기록보다 이 최종 기록을 우선한다.

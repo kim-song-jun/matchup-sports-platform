@@ -1,6 +1,6 @@
-## 2026-11-06 — 결선 실제 강수·조 이름 수정·종료 화면 (검증/배포 대기)
+## 2026-11-07 — 결선 실제 강수·조 이름 수정·종료 화면 (alpha 배포, 일부 QA 잔여)
 
-[시나리오](./multi-finals-deferred-teams-20261104.md#2026-11-06--실제-강수조-이름-수정종료-화면-후속) · [task](../../.github/tasks/20261113-bracket-group-name-filters.md). 선행 #2181의 강수 생성 규칙에 맞춘 기존 자동 명칭 보정, 구조 보호를 유지한 조 이름 수정 및 예선 설정·revision 동기화, 공개 명칭 반영, 토너먼트별 기존 최종결과 UI 재사용을 구현했다. #2181 통합 회귀 API335/Web398 PASS, 격리 PostgreSQL 보정10시나리오/재실행 PASS. 생성기 중복 수정은 제외하고 #2181 의존 Draft PR로 제출한다. alpha before 공개6/6(console/network/overflow0), after 공개0/6·admin0/3폭(미배포/관리자 인증 미제공). CI/전체 migration replay 미실행, 실환경 데이터 변경 없음.
+[시나리오](./multi-finals-deferred-teams-20261104.md#2026-11-06--실제-강수조-이름-수정종료-화면-후속) · [task](../../.github/tasks/20261113-bracket-group-name-filters.md). #2181/#2195 dev 순차 머지 및 matching CI/alpha 배포 PASS, serving79504b0703. 공개2routes×3폭6/6 실행: 12강·필터문구·승무패3색·결과PC2열/모바일1열·가로넘침0 확인. 종료 화면 console/network0, 순위 펼침 업로드 로고5개의 이미지400은 오류로 기록(원본404). 각 대회14groups/84fixtures ID·결과·배정 보존, 자동 이름2/round8만 보정. 관리자 이름 저장 실측0/3폭(인증 미제공), network clean은 미판정. Copilot은 사용자 명시 예외로 생략. [사후 증거](../screenshots/bracket-results-followup-20261106/after-evidence.json).
 
 ## 2026-11-06 — N개 토너먼트별 독립 진출팀 확정 (진행 중)
 

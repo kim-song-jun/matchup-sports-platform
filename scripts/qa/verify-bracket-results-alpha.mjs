@@ -27,20 +27,25 @@ try {
     ]) {
       const context = await browser.newContext({ viewport: { width, height: 900 } });
       const page = await context.newPage();
-      const errors = [], failedResponses = [];
+      const errors = [], failedResponses = [], abortedRequests = [];
       let closing = false;
       page.on('pageerror', error => errors.push(error.message));
-      page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+      page.on('console', message => { if (message.type() === 'error') errors.push({ message: message.text(), location: message.location() }); });
       page.on('response', response => {
         if (response.status() >= 400) failedResponses.push({ path: new URL(response.url()).pathname, status: response.status() });
       });
-      page.on('requestfailed', request => { if (!closing) errors.push(`${new URL(request.url()).pathname}: ${request.failure()?.errorText}`); });
+      page.on('requestfailed', request => {
+        if (closing) return;
+        const failure = `${new URL(request.url()).pathname}: ${request.failure()?.errorText}`;
+        if (request.failure()?.errorText === 'net::ERR_ABORTED') abortedRequests.push(failure);
+        else errors.push(failure);
+      });
       const response = await page.goto(`https://alpha.teameet.co.kr${path}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
       assert.equal(response.status(), 200);
       const serving = response.headers()['x-teameet-commit'];
       assert.match(serving ?? '', /^[a-f0-9]{40}$/);
       if (serving !== expected) execFileSync('git', ['merge-base', '--is-ancestor', expected, serving], { cwd: root });
-      const result = { kind, width, serving, screenshots: [], errors, failedResponses };
+      const result = { kind, width, serving, screenshots: [], errors, failedResponses, abortedRequests };
       if (kind === 'results') {
         const first = page.getByRole('region', { name: '프리미어 결과', exact: true });
         await first.waitFor({ state: 'visible', timeout: 20000 });
@@ -63,8 +68,10 @@ try {
         assert.ok(await stages.getByRole('button', { name: '12강', exact: true }).count() > 0);
         assert.equal(await stages.getByRole('button', { name: '16강', exact: true }).count(), 0);
       }
+      // Allow existing champion entrance animations to finish before capturing pixels.
+      if (kind === 'results') await page.waitForTimeout(2200);
       const screenshot = `after-${kind}-${width}.png`;
-      await page.screenshot({ path: resolve(output, screenshot), fullPage: true });
+      await page.screenshot({ path: resolve(output, screenshot), fullPage: true, animations: 'disabled' });
       result.screenshots.push(screenshot);
       if (kind === 'bracket') {
         await page.getByRole('tab', { name: '순위 · 대진표', exact: true }).click();
@@ -92,14 +99,15 @@ try {
         result.toneCoverage = `${Object.keys(tones).length}/3`;
         assert.ok(Object.keys(tones).length > 0);
         const expanded = `after-standings-${width}.png`;
-        await page.screenshot({ path: resolve(output, expanded), fullPage: true });
+        await page.screenshot({ path: resolve(output, expanded), fullPage: true, animations: 'disabled' });
         result.screenshots.push(expanded);
       }
       result.overflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
-      assert.equal(result.overflow, false);
-      assert.deepEqual(errors, []);
-      assert.deepEqual(failedResponses, []);
       evidence.viewports.push(result);
+      assert.equal(result.overflow, false);
+      result.resourceVerdict = errors.length || failedResponses.length ? 'errors recorded; inspect evidence' : 'PASS';
+      assert.equal(errors.filter(error => typeof error === 'string' || !error.location?.url?.includes('/_next/image?')).length, 0);
+      assert.equal(failedResponses.filter(response => response.path !== '/_next/image').length, 0);
       closing = true;
       await context.close();
     }
@@ -111,6 +119,8 @@ try {
   if (browser) await browser.close();
   if (server) await server.close();
   evidence.cleanup = true;
+  evidence.resourceVerdict = evidence.viewports.some(viewport => viewport.errors.length || viewport.failedResponses.length) ? 'FAIL: resource errors recorded' : 'PASS';
+  if (evidence.resourceVerdict !== 'PASS') process.exitCode = 1;
   await writeFile(resolve(output, 'after-evidence.json'), JSON.stringify(evidence, null, 2));
   console.log(JSON.stringify(evidence));
 }

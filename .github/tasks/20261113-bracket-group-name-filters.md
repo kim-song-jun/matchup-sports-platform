@@ -1,6 +1,6 @@
 # 결선 조 이름 및 대진 하위 필터
 
-Status: In Progress
+Status: Deployed — partial alpha QA (admin auth and image resource issues remain)
 Owner: Codex
 
 ## 경기 일정 후속 수정 (2026-10-28)
@@ -156,3 +156,23 @@ Copilot 요청은 CLI/REST/공식 GraphQL 두 경로에서 성공 응답을 받�
 최신 dev(#2181 포함) 통합 후 일정/결과/페이지 호출부/공유 이름 회귀 5 files/194 tests PASS. 알려진 결과 카드 라벨 충돌은 저장 이름 우선과 실제 강수 fallback을 함께 유지해 해결했다. 읽기 전용 headed alpha 검증 도구 `scripts/qa/verify-bracket-results-alpha.mjs`를 준비했으며, 배포 뒤 3폭의 종료·일정·순위 펼침/승무패 computed color·가로 넘침·console/network와 실제 서빙 SHA를 확인한다. 관리자 인증 QA는 별도 미검증으로 기록한다.
 
 #2181을 실제 최신 dev로 통합한 커밋 bd5f2fbfe 기준 Web 타입 검사 PASS. 배포 후 캡처 도구 문법 검사 PASS.
+
+
+## dev 머지 및 alpha 배포 추적 (2026-11-07 KST)
+- 사용자 리뷰 예외 승인으로 #2181과 #2195를 dev에 순서대로 머지했다. Copilot clean 판정은 하지 않았다.
+- #2181 merge `fbe0f244a6dee75ae878f7293fdc870d32f864e5`: matching dev push CI 42236260786 PASS, alpha 배포 42236260815 PASS. 공개 landing HTTP200 및 해당 serving SHA 확인 후에만 #2195를 머지했다.
+- #2195 최종 head `2097c6be6eef3b8ffd67151d6ba08874be424d9a`: CI 42237754700 Gates/API/Web 모두 PASS. 실제 전체 migration replay+drift 및 API/Web tests/build 포함. base dev / MERGEABLE+CLEAN / 미해결 스레드 0을 확인했다.
+- #2195 merge `79504b070382d43fed2bc70c8c9014d5bc4659ea`: matching dev push CI 42239893187, alpha 배포 42239893216 진행 중. 로컬 dev 포인터를 해당 origin/dev로 동기화했고 기존 공유 트리 WIP는 보존했다.
+- 사후 증거는 최신 dev 기반 fresh `docs/bracket-alpha-evidence-20261107` 격리 작업트리에서 기록한다. alpha after 실측과 관리자 인증 실측은 아직 PASS가 아니다.
+
+Matching dev push CI 42239893187 Gates/API/Web 모두 PASS. alpha 42239893216은 immutable API/Web image 빌드 단계로 진행했다.
+
+
+## alpha 배포 및 사후 QA (2026-11-07 KST, 최종 기록)
+- #2181 → #2195 dev 순차 머지 완료. #2195 matching dev push CI [42239893187](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/42239893187) 및 [alpha 배포 42239893216](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/42239893216) SUCCESS. 공개 HTTP200 / release `1.13.4-alpha.20261107.g79504b070382` / serving SHA `79504b070382d43fed2bc70c8c9014d5bc4659ea`.
+- 공개 두 routes × 390/768/1440 = 6/6 실행, 스크린샷 9개와 추가 desktop viewport 확보. 결과 PC2열·390/768 1열, 토너먼트별 우승/순위/경기 링크, 12강 필터와 안내 문구 제거 PASS. 각 폭 순위 펼침의 승무패 3/3 computed colors PASS, overflow 0.
+- 종료 화면 console/network 오류 0/3폭. 순위 펼침에서는 각 폭 기존 업로드 로고 5개의 `/_next/image` 400을 관찰했다. 원본 `/uploads/2026/07/9e5063a2-3886-4dc9-8683-55eede4be9c9.png`도 HTTP404, 최적화 응답은 `The requested resource isn't a valid image.`다. 변경 전 순위 펼침 네트워크 기준선은 없으므로 신규 회귀/기존 장애로 단정하지 않는다. 전체 network clean으로 판정하지 않으며 리소스 오류를 증거에 보존한다.
+- 두 대회 각 groups14/fixtures84의 ID·phase·결과·일정·팀 배정/연결 및 순위 수치 보존 PASS. 각 대회 자동 group name2개와 fixture round8개만 16강→12강 보정. standings.recalculatedAt4개씩 재계산 시각이 달라졌으며 순위 수치는 동일하다.
+- 관리자 인증 미제공으로 실제 조 이름 저장 alpha UI0/3폭은 미검증. 구현/권한·revision·설정 동기화 자동 회귀는 PASS지만 이를 실제 로그인 검증으로 대체하지 않는다.
+- 증거: [after](../../docs/screenshots/bracket-results-followup-20261106/after-evidence.json), [data preservation](../../docs/screenshots/bracket-results-followup-20261106/data-preservation-evidence.json). headed 브라우저 PID17204(parent17183), 재캡처 parent17968 모두 종료. 초기 진단 브라우저도 종료했다. Full-page 애니메이션 합성 캡처 누락은 finite animation 완료 캡처와 실제 viewport 대조로 보정했으며 앱 CSS는 변경하지 않았다.
+- Copilot 리뷰는 사용자 명시 예외로 생략. 본 기록이 이전 미배포/CI미실행 snapshot보다 최신이다. main/prod 변경 없음.

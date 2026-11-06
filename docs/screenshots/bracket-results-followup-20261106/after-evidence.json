@@ -1,0 +1,391 @@
+{
+  "expected": "79504b070382d43fed2bc70c8c9014d5bc4659ea",
+  "persona": "public anonymous",
+  "viewports": [
+    {
+      "kind": "results",
+      "width": 390,
+      "serving": "79504b070382d43fed2bc70c8c9014d5bc4659ea",
+      "screenshots": [
+        "after-results-390.png"
+      ],
+      "errors": [],
+      "failedResponses": [],
+      "abortedRequests": [
+        "/g/collect: net::ERR_ABORTED",
+        "/g/collect: net::ERR_ABORTED"
+      ],
+      "columns": 1,
+      "overflow": false,
+      "resourceVerdict": "PASS"
+    },
+    {
+      "kind": "bracket",
+      "width": 390,
+      "serving": "79504b070382d43fed2bc70c8c9014d5bc4659ea",
+      "screenshots": [
+        "after-bracket-390.png",
+        "after-standings-390.png"
+      ],
+      "errors": [
+        {
+          "message": "Failed to load resource: the server responded with a status of 400 ()",
+          "location": {
+            "url": "https://alpha.teameet.co.kr/_next/image?url=%2Fuploads%2F2026%2F07%2F9e5063a2-3886-4dc9-8683-55eede4be9c9.png&w=32&q=75",
+            "lineNumber": 0,
+            "columnNumber": 0
+          }
+        },
+        {
+          "message": "Failed to load resource: the server responded with a status of 400 ()",
+          "location": {
+            "url": "https://alpha.teameet.co.kr/_next/image?url=%2Fuploads%2F2026%2F08%2F16730e0b-8c77-4fce-9f11-43d0aad1bce5.png&w=32&q=75",
+            "lineNumber": 0,
+            "columnNumber": 0
+          }
+        },
+        {
+          "message": "Failed to load resource: the server responded with a status of 400 ()",
+          "location": {
+            "url": "https://alpha.teameet.co.kr/_next/image?url=%2Fuploads%2F2026%2F07%2F8e210e0c-b101-4d81-8737-c5ef6f7280af.jpg&w=32&q=75",
+            "lineNumber": 0,
+            "columnNumber": 0
+          }
+        },
+        {
+          "message": "Failed to load resource: the server responded with a status of 400 ()",
+          "location": {
+            "url": "https://alpha.teameet.co.kr/_next/image?url=%2Fuploads%2F2026%2F07%2Fa2bc3753-277e-4dbc-89eb-4f67afd2b250.png&w=32&q=75",
+            "lineNumber": 0,
+            "columnNumber": 0
+          }
+        },
+        {
+          "message": "Failed to load resource: the server responded with a status of 400 ()",
+          "location": {
+            "url": "https://alpha.teameet.co.kr/_next/image?url=%2Fuploads%2F2026%2F08%2F1ca93965-95a2-44dd-92e1-218f21be696f.jpg&w=32&q=75",
+            "lineNumber": 0,
+            "columnNumber": 0
+          }
+        }
+      ],
+      "failedResponses": [
+        {
+          "path": "/_next/image",
+          "status": 400
+        },
+        {
+          "path": "/_next/image",
+          "status": 400
+        },
+        {
+          "path": "/_next/image",
+          "status": 400
+        },
+        {
+          "path": "/_next/image",
+          "status": 400
+        },
+        {
+          "path": "/_next/image",
+          "status": 400
+        }
+      ],
+      "abortedRequests": [
+        "/g/collect: net::ERR_ABORTED",
+        "/g/collect: net::ERR_ABORTED",
+        "/g/collect: net::ERR_ABORTED"
+      ],
+      "tones": {
+        "승": {
+          "outcome": "승",
+          "color": "rgb(27, 100, 218)",
+          "background": "rgb(232, 243, 255)",
+          "colorToken": "var(--blue700)",
+          "backgroundToken": "var(--blue50)"
+        },
+        "무": {
+          "outcome": "무",
+          "color": "rgb(78, 89, 104)",
+          "background": "rgb(242, 244, 246)",
+          "colorToken": "var(--text-body)",
+          "backgroundToken": "var(--surface-soft)"
+        },
+        "패": {
+          "outcome": "패",
+          "color": "rgb(180, 35, 50)",
+          "background": "rgb(254, 235, 236)",
+          "colorToken": "var(--red700)",
+          "backgroundToken": "var(--red50)"
+        }
+      },
+      "toneCoverage": "3/3",
+      "overflow": false,
+      "resourceVerdict": "errors recorded; inspect evidence"
+    },
+    {
+      "kind": "results",
+      "width": 768,
+      "serving": "79504b070382d43fed2bc70c8c9014d5bc4659ea",
+      "screenshots": [
+        "after-results-768.png"
+      ],
+      "errors": [],
+      "failedResponses": [],
+      "abortedRequests": [
+        "/g/collect: net::ERR_ABORTED",
+        "/g/collect: net::ERR_ABORTED"
+      ],
+      "columns": 1,
+      "overflow": false,
+      "resourceVerdict": "PASS"
+    },
+    {
+      "kind": "bracket",
+      "width": 768,
+      "serving": "79504b070382d43fed2bc70c8c9014d5bc4659ea",
+      "screenshots": [
+        "after-bracket-768.png",
+        "after-standings-768.png"
+      ],
+      "errors": [
+        {
+          "message": "Failed to load resource: the server responded with a status of 400 ()",
+          "location": {
+            "url": "https://alpha.teameet.co.kr/_next/image?url=%2Fuploads%2F2026%2F07%2F8e210e0c-b101-4d81-8737-c5ef6f7280af.jpg&w=32&q=75",
+            "lineNumber": 0,
+            "columnNumber": 0
+          }
+        },
+        {
+          "message": "Failed to load resource: the server responded with a status of 400 ()",
+          "location": {
+            "url": "https://alpha.teameet.co.kr/_next/image?url=%2Fuploads%2F2026%2F07%2F9e5063a2-3886-4dc9-8683-55eede4be9c9.png&w=32&q=75",
+            "lineNumber": 0,
+            "columnNumber": 0
+          }
+        },
+        {
+          "message": "Failed to load resource: the server responded with a status of 400 ()",
+          "location": {
+            "url": "https://alpha.teameet.co.kr/_next/image?url=%2Fuploads%2F2026%2F08%2F16730e0b-8c77-4fce-9f11-43d0aad1bce5.png&w=32&q=75",
+            "lineNumber": 0,
+            "columnNumber": 0
+          }
+        },
+        {
+          "message": "Failed to load resource: the server responded with a status of 400 ()",
+          "location": {
+            "url": "https://alpha.teameet.co.kr/_next/image?url=%2Fuploads%2F2026%2F07%2Fa2bc3753-277e-4dbc-89eb-4f67afd2b250.png&w=32&q=75",
+            "lineNumber": 0,
+            "columnNumber": 0
+          }
+        },
+        {
+          "message": "Failed to load resource: the server responded with a status of 400 ()",
+          "location": {
+            "url": "https://alpha.teameet.co.kr/_next/image?url=%2Fuploads%2F2026%2F08%2F1ca93965-95a2-44dd-92e1-218f21be696f.jpg&w=32&q=75",
+            "lineNumber": 0,
+            "columnNumber": 0
+          }
+        }
+      ],
+      "failedResponses": [
+        {
+          "path": "/_next/image",
+          "status": 400
+        },
+        {
+          "path": "/_next/image",
+          "status": 400
+        },
+        {
+          "path": "/_next/image",
+          "status": 400
+        },
+        {
+          "path": "/_next/image",
+          "status": 400
+        },
+        {
+          "path": "/_next/image",
+          "status": 400
+        }
+      ],
+      "abortedRequests": [
+        "/g/collect: net::ERR_ABORTED",
+        "/g/collect: net::ERR_ABORTED",
+        "/tournaments/f67894a6-1c89-456b-8c00-e8f87f4d3520/matches/01a63d9f-df8d-59b1-aad8-57c65f4de220: net::ERR_ABORTED",
+        "/g/collect: net::ERR_ABORTED"
+      ],
+      "tones": {
+        "승": {
+          "outcome": "승",
+          "color": "rgb(27, 100, 218)",
+          "background": "rgb(232, 243, 255)",
+          "colorToken": "var(--blue700)",
+          "backgroundToken": "var(--blue50)"
+        },
+        "무": {
+          "outcome": "무",
+          "color": "rgb(78, 89, 104)",
+          "background": "rgb(242, 244, 246)",
+          "colorToken": "var(--text-body)",
+          "backgroundToken": "var(--surface-soft)"
+        },
+        "패": {
+          "outcome": "패",
+          "color": "rgb(180, 35, 50)",
+          "background": "rgb(254, 235, 236)",
+          "colorToken": "var(--red700)",
+          "backgroundToken": "var(--red50)"
+        }
+      },
+      "toneCoverage": "3/3",
+      "overflow": false,
+      "resourceVerdict": "errors recorded; inspect evidence"
+    },
+    {
+      "kind": "results",
+      "width": 1440,
+      "serving": "79504b070382d43fed2bc70c8c9014d5bc4659ea",
+      "screenshots": [
+        "after-results-1440.png"
+      ],
+      "errors": [],
+      "failedResponses": [],
+      "abortedRequests": [
+        "/team-matches: net::ERR_ABORTED",
+        "/g/collect: net::ERR_ABORTED",
+        "/g/collect: net::ERR_ABORTED"
+      ],
+      "columns": 2,
+      "overflow": false,
+      "resourceVerdict": "PASS"
+    },
+    {
+      "kind": "bracket",
+      "width": 1440,
+      "serving": "79504b070382d43fed2bc70c8c9014d5bc4659ea",
+      "screenshots": [
+        "after-bracket-1440.png",
+        "after-standings-1440.png"
+      ],
+      "errors": [
+        {
+          "message": "Failed to load resource: the server responded with a status of 400 ()",
+          "location": {
+            "url": "https://alpha.teameet.co.kr/_next/image?url=%2Fuploads%2F2026%2F07%2Fa2bc3753-277e-4dbc-89eb-4f67afd2b250.png&w=32&q=75",
+            "lineNumber": 0,
+            "columnNumber": 0
+          }
+        },
+        {
+          "message": "Failed to load resource: the server responded with a status of 400 ()",
+          "location": {
+            "url": "https://alpha.teameet.co.kr/_next/image?url=%2Fuploads%2F2026%2F07%2F8e210e0c-b101-4d81-8737-c5ef6f7280af.jpg&w=32&q=75",
+            "lineNumber": 0,
+            "columnNumber": 0
+          }
+        },
+        {
+          "message": "Failed to load resource: the server responded with a status of 400 ()",
+          "location": {
+            "url": "https://alpha.teameet.co.kr/_next/image?url=%2Fuploads%2F2026%2F07%2F9e5063a2-3886-4dc9-8683-55eede4be9c9.png&w=32&q=75",
+            "lineNumber": 0,
+            "columnNumber": 0
+          }
+        },
+        {
+          "message": "Failed to load resource: the server responded with a status of 400 ()",
+          "location": {
+            "url": "https://alpha.teameet.co.kr/_next/image?url=%2Fuploads%2F2026%2F08%2F1ca93965-95a2-44dd-92e1-218f21be696f.jpg&w=32&q=75",
+            "lineNumber": 0,
+            "columnNumber": 0
+          }
+        },
+        {
+          "message": "Failed to load resource: the server responded with a status of 400 ()",
+          "location": {
+            "url": "https://alpha.teameet.co.kr/_next/image?url=%2Fuploads%2F2026%2F08%2F16730e0b-8c77-4fce-9f11-43d0aad1bce5.png&w=32&q=75",
+            "lineNumber": 0,
+            "columnNumber": 0
+          }
+        }
+      ],
+      "failedResponses": [
+        {
+          "path": "/_next/image",
+          "status": 400
+        },
+        {
+          "path": "/_next/image",
+          "status": 400
+        },
+        {
+          "path": "/_next/image",
+          "status": 400
+        },
+        {
+          "path": "/_next/image",
+          "status": 400
+        },
+        {
+          "path": "/_next/image",
+          "status": 400
+        }
+      ],
+      "abortedRequests": [
+        "/g/collect: net::ERR_ABORTED",
+        "/g/collect: net::ERR_ABORTED",
+        "/g/collect: net::ERR_ABORTED"
+      ],
+      "tones": {
+        "승": {
+          "outcome": "승",
+          "color": "rgb(27, 100, 218)",
+          "background": "rgb(232, 243, 255)",
+          "colorToken": "var(--blue700)",
+          "backgroundToken": "var(--blue50)"
+        },
+        "무": {
+          "outcome": "무",
+          "color": "rgb(78, 89, 104)",
+          "background": "rgb(242, 244, 246)",
+          "colorToken": "var(--text-body)",
+          "backgroundToken": "var(--surface-soft)"
+        },
+        "패": {
+          "outcome": "패",
+          "color": "rgb(180, 35, 50)",
+          "background": "rgb(254, 235, 236)",
+          "colorToken": "var(--red700)",
+          "backgroundToken": "var(--red50)"
+        }
+      },
+      "toneCoverage": "3/3",
+      "overflow": false,
+      "resourceVerdict": "errors recorded; inspect evidence"
+    }
+  ],
+  "cleanup": true,
+  "adminVerified": false,
+  "process": {
+    "browserPid": 17204,
+    "parentPid": 17183
+  },
+  "resourceVerdict": "FAIL: missing source uploads cause image optimizer 400 responses in standings",
+  "desktopCaptureNote": "Full-page Chromium compositor capture initially omitted animated hero paint; recaptured with finite animations finished (animations disabled) and added actual viewport screenshot. No app CSS changed.",
+  "desktopRecapture": {
+    "parentPid": 17968,
+    "browserClosed": true,
+    "heroComputedOpacity": [
+      "1",
+      "1"
+    ],
+    "screenshots": [
+      "after-results-1440.png",
+      "after-results-desktop-viewport.png"
+    ]
+  }
+}

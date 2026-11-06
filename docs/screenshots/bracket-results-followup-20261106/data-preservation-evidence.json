@@ -1,0 +1,196 @@
+{
+  "bracket": {
+    "groups": 14,
+    "fixtures": 84,
+    "changes": {
+      "groups": [
+        {
+          "id": "0c31c39f-59cd-4628-9a1b-fd943e3507c3",
+          "field": "name",
+          "before": "프리미어 · 16강",
+          "after": "프리미어 · 12강"
+        },
+        {
+          "id": "2dbdab49-0ac9-4a65-b2ad-10d7d5f9c048",
+          "field": "name",
+          "before": "챌린지 · 16강",
+          "after": "챌린지 · 12강"
+        }
+      ],
+      "fixtures": [
+        {
+          "id": "506198c8-0cdb-54cf-8a2a-6e3690af83c8",
+          "field": "round",
+          "before": "16강",
+          "after": "12강"
+        },
+        {
+          "id": "f1f9e9bc-8f65-55c2-927c-e936e0a4f98e",
+          "field": "round",
+          "before": "16강",
+          "after": "12강"
+        },
+        {
+          "id": "01a63d9f-df8d-59b1-aad8-57c65f4de220",
+          "field": "round",
+          "before": "16강",
+          "after": "12강"
+        },
+        {
+          "id": "fc1fede3-ed76-53ab-977b-6a50fc4b6648",
+          "field": "round",
+          "before": "16강",
+          "after": "12강"
+        },
+        {
+          "id": "2dbf0b75-1a86-5f0e-9683-330b1586f683",
+          "field": "round",
+          "before": "16강",
+          "after": "12강"
+        },
+        {
+          "id": "008a35a4-5b13-5182-afc2-be32601694f5",
+          "field": "round",
+          "before": "16강",
+          "after": "12강"
+        },
+        {
+          "id": "39cb4422-05fb-5ee8-ac42-9ddbb244e704",
+          "field": "round",
+          "before": "16강",
+          "after": "12강"
+        },
+        {
+          "id": "76ea2ac9-33db-5ed6-a5b7-01846f080b6a",
+          "field": "round",
+          "before": "16강",
+          "after": "12강"
+        }
+      ]
+    },
+    "metadataChanges": [
+      {
+        "id": "26ab4375-46f5-4a3c-a8ab-69265e47dfe5",
+        "field": "standings.recalculatedAt",
+        "before": "2026-11-06T11:31:56.082Z",
+        "after": "2026-11-06T15:27:10.585Z"
+      },
+      {
+        "id": "98bdd319-68ee-4c63-8712-03036c0e73d9",
+        "field": "standings.recalculatedAt",
+        "before": "2026-11-06T11:31:56.082Z",
+        "after": "2026-11-06T15:27:10.585Z"
+      },
+      {
+        "id": "a1c893ae-3555-4bc8-8ca4-bdd3121c341a",
+        "field": "standings.recalculatedAt",
+        "before": "2026-11-06T11:31:56.082Z",
+        "after": "2026-11-06T15:27:10.585Z"
+      },
+      {
+        "id": "19686119-263f-42b5-bfc5-be925f10f589",
+        "field": "standings.recalculatedAt",
+        "before": "2026-11-06T11:31:56.082Z",
+        "after": "2026-11-06T15:27:10.585Z"
+      }
+    ],
+    "unexpected": []
+  },
+  "results": {
+    "groups": 14,
+    "fixtures": 84,
+    "changes": {
+      "groups": [
+        {
+          "id": "779ce061-527e-4936-80af-4be75663ce6d",
+          "field": "name",
+          "before": "프리미어 · 16강",
+          "after": "프리미어 · 12강"
+        },
+        {
+          "id": "83418c0e-55cb-47d1-830b-892db22332fc",
+          "field": "name",
+          "before": "챌린지 · 16강",
+          "after": "챌린지 · 12강"
+        }
+      ],
+      "fixtures": [
+        {
+          "id": "a77fd23f-e008-5860-b336-b586c5ce282b",
+          "field": "round",
+          "before": "16강",
+          "after": "12강"
+        },
+        {
+          "id": "a61480d8-8707-54fe-8a60-66b51ee526d0",
+          "field": "round",
+          "before": "16강",
+          "after": "12강"
+        },
+        {
+          "id": "98ee085e-d004-5a23-8c2c-41c1ab2656af",
+          "field": "round",
+          "before": "16강",
+          "after": "12강"
+        },
+        {
+          "id": "a49fc34f-eaf5-5628-81c2-16d1e9e336b0",
+          "field": "round",
+          "before": "16강",
+          "after": "12강"
+        },
+        {
+          "id": "c4d0c491-503b-508b-8b56-420278f933e6",
+          "field": "round",
+          "before": "16강",
+          "after": "12강"
+        },
+        {
+          "id": "2b7ba35a-39e3-5cb6-bc59-b6815ce60e39",
+          "field": "round",
+          "before": "16강",
+          "after": "12강"
+        },
+        {
+          "id": "b3458248-fb37-5919-865d-9bbdd38041ba",
+          "field": "round",
+          "before": "16강",
+          "after": "12강"
+        },
+        {
+          "id": "f11022ea-b6ee-5652-a239-23a012df3989",
+          "field": "round",
+          "before": "16강",
+          "after": "12강"
+        }
+      ]
+    },
+    "metadataChanges": [
+      {
+        "id": "0d808507-9d7c-4a5d-9e2a-851529d66ac5",
+        "field": "standings.recalculatedAt",
+        "before": "2026-11-06T11:31:57.462Z",
+        "after": "2026-11-06T15:27:11.932Z"
+      },
+      {
+        "id": "5025f49f-26ab-4788-bff6-be22276d8edf",
+        "field": "standings.recalculatedAt",
+        "before": "2026-11-06T11:31:57.462Z",
+        "after": "2026-11-06T15:27:11.932Z"
+      },
+      {
+        "id": "80fa702d-ba78-49ac-9de7-d09629bcd5e1",
+        "field": "standings.recalculatedAt",
+        "before": "2026-11-06T11:31:57.462Z",
+        "after": "2026-11-06T15:27:11.932Z"
+      },
+      {
+        "id": "99030627-8d71-4d8a-bfb1-9eb276adecd3",
+        "field": "standings.recalculatedAt",
+        "before": "2026-11-06T11:31:57.462Z",
+        "after": "2026-11-06T15:27:11.932Z"
+      }
+    ],
+    "unexpected": []
+  }
+}

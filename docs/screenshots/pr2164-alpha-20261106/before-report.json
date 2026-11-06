@@ -1,0 +1,20 @@
+{
+  "mode": "before",
+  "persona": "anonymous public visitor",
+  "origin": "https://alpha.teameet.co.kr",
+  "screenshots": [
+    "before-cards-390.png",
+    "before-filter-390.png",
+    "before-cards-768.png",
+    "before-filter-768.png",
+    "before-cards-1440.png",
+    "before-filter-1440.png"
+  ],
+  "errors": [],
+  "failedRequests": [],
+  "verdicts": [],
+  "cleanup": true,
+  "browserPid": 41592,
+  "parentPid": 42776,
+  "commit": "0b7720cb7d068b05735039e3445ef4b374642ed7"
+}

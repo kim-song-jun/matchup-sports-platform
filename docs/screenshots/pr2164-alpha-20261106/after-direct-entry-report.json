@@ -1,0 +1,65 @@
+{
+  "mode": "after",
+  "persona": "anonymous public visitor",
+  "origin": "https://alpha.teameet.co.kr",
+  "screenshots": [
+    "after-cards-390.png",
+    "after-filter-390.png",
+    "after-cards-768.png",
+    "after-filter-768.png",
+    "after-cards-1440.png",
+    "after-filter-1440.png"
+  ],
+  "errors": [
+    {
+      "type": "pageerror",
+      "message": "Minified React error #419; visit https://react.dev/errors/419 for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+    },
+    {
+      "type": "pageerror",
+      "message": "Minified React error #419; visit https://react.dev/errors/419 for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+    },
+    {
+      "type": "pageerror",
+      "message": "Minified React error #419; visit https://react.dev/errors/419 for the full message or use the non-minified dev environment for full errors and additional helpful warnings."
+    }
+  ],
+  "failedRequests": [],
+  "verdicts": [
+    {
+      "width": 390,
+      "flow": "league: progress to recruiting, other-row All preserves selection, apply updates URL",
+      "verdict": "PASS"
+    },
+    {
+      "width": 390,
+      "flow": "tournament filter excludes preparing",
+      "verdict": "PASS"
+    },
+    {
+      "width": 768,
+      "flow": "league: progress to recruiting, other-row All preserves selection, apply updates URL",
+      "verdict": "PASS"
+    },
+    {
+      "width": 768,
+      "flow": "tournament filter excludes preparing",
+      "verdict": "PASS"
+    },
+    {
+      "width": 1440,
+      "flow": "league: progress to recruiting, other-row All preserves selection, apply updates URL",
+      "verdict": "PASS"
+    },
+    {
+      "width": 1440,
+      "flow": "tournament filter excludes preparing",
+      "verdict": "PASS"
+    }
+  ],
+  "cleanup": true,
+  "browserPid": 19828,
+  "parentPid": 47876,
+  "commit": "408b665a685eba127fda127167954a04b418085e",
+  "failure": "[{\"type\":\"pageerror\",\"message\":\"Minified React error #419; visit https://react.dev/errors/419 for the full message or use the non-minified dev environment for full errors and additional helpful warnings.\"},{\"type\":\"pageerror\",\"message\":\"Minified React error #419; visit https://react.dev/errors/419 for the full message or use the non-minified dev environment for full errors and additional helpful warnings.\"},{\"type\":\"pageerror\",\"message\":\"Minified React error #419; visit https://react.dev/errors/419 for the full message or use the non-minified dev environment for full errors and additional helpful warnings.\"}]\n\n3 !== 0\n"
+}

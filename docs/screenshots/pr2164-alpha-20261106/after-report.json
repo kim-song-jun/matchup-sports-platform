@@ -1,0 +1,51 @@
+{
+  "mode": "after",
+  "persona": "anonymous public visitor",
+  "origin": "https://alpha.teameet.co.kr",
+  "screenshots": [
+    "after-cards-390.png",
+    "after-filter-390.png",
+    "after-cards-768.png",
+    "after-filter-768.png",
+    "after-cards-1440.png",
+    "after-filter-1440.png"
+  ],
+  "errors": [],
+  "failedRequests": [],
+  "verdicts": [
+    {
+      "width": 390,
+      "flow": "league: progress to recruiting, other-row All preserves selection, apply updates URL",
+      "verdict": "PASS"
+    },
+    {
+      "width": 390,
+      "flow": "tournament filter excludes preparing",
+      "verdict": "PASS"
+    },
+    {
+      "width": 768,
+      "flow": "league: progress to recruiting, other-row All preserves selection, apply updates URL",
+      "verdict": "PASS"
+    },
+    {
+      "width": 768,
+      "flow": "tournament filter excludes preparing",
+      "verdict": "PASS"
+    },
+    {
+      "width": 1440,
+      "flow": "league: progress to recruiting, other-row All preserves selection, apply updates URL",
+      "verdict": "PASS"
+    },
+    {
+      "width": 1440,
+      "flow": "tournament filter excludes preparing",
+      "verdict": "PASS"
+    }
+  ],
+  "cleanup": true,
+  "browserPid": 38136,
+  "parentPid": 64076,
+  "commit": "408b665a685eba127fda127167954a04b418085e"
+}

@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { trackEvent } from '@/lib/analytics';
-import { publicAssetPath } from '@/lib/assets';
+import { isOptimizableImagePath, publicAssetPath } from '@/lib/assets';
 import { countAt, viewTimelineProgress } from '@/lib/landing/landing-v4-motion';
 import type { LandingLiveTeamMatch } from '@/lib/landing/landing-v4-data';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
@@ -56,6 +56,12 @@ export function LandingV4Count({ value, order }: { value: number; order: number 
   );
 }
 
+/**
+ * 옆 카드가 없으면 큰 카드가 컨테이너를 다 쓴다(1200 − 패딩 32×2 = 1136). 옆 카드가 있을 때(~680)는 이 값이 상한이라
+ * 업로드 사진이 더 크게 내려오지만 흐려지지는 않는다.
+ */
+const BIG_CARD_SIZES = '(min-width: 1024px) 1136px, 100vw';
+
 /** CSS 의 `animation-range` 와 같은 값이어야 한다(landing-v4.css .tm-landing-v4-tcard-media). */
 const PARALLAX_RANGE = 'cover 0% cover 100%';
 
@@ -76,9 +82,10 @@ export function LandingV4Parallax({ src, illustration }: { src: string; illustra
     if (!byScript) ref.current?.style.removeProperty('--tm-landing-v4-k');
   }, [byScript]);
 
+  const imageSrc = publicAssetPath(src);
   return (
     <span ref={ref} className="tm-landing-v4-tcard-media" data-kind={illustration ? 'illustration' : 'photo'}>
-      <Image src={publicAssetPath(src)} alt="" fill sizes="(min-width: 1024px) 720px, 100vw" unoptimized={!illustration} />
+      <Image src={imageSrc} alt="" fill sizes={BIG_CARD_SIZES} unoptimized={!isOptimizableImagePath(imageSrc)} />
     </span>
   );
 }

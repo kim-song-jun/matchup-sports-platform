@@ -17,12 +17,14 @@ import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { ChevronLeftIcon } from '@/components/v1-ui/icons';
 import { AppBackLink } from '@/components/v1-ui/app-back-link';
 import { extractErrorMessage } from '@/lib/error-message';
-import { cssUrl } from '@/lib/assets';
+import { optimizedCssUrl } from '@/lib/assets';
 import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { displayInitials } from '@/lib/display-initials';
 import type { V1MatchApplication } from '@/types/api';
 
 type Attendance = Record<string, 'completed' | 'no_show'>;
+
+const APPLICANT_AVATAR_SIZE = 44;
 
 export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
   const router = useRouter();
@@ -387,12 +389,12 @@ function ApplicationRow({
             role="img"
             aria-hidden="true"
             style={{
-              width: 44,
-              height: 44,
+              width: APPLICANT_AVATAR_SIZE,
+              height: APPLICANT_AVATAR_SIZE,
               borderRadius: 'var(--radius-field)',
               backgroundColor: 'var(--grey200)',
               backgroundImage: application.profileImageUrl
-                ? cssUrl(application.profileImageUrl)
+                ? optimizedCssUrl(application.profileImageUrl, APPLICANT_AVATAR_SIZE)
                 : undefined,
               backgroundPosition: 'center',
               backgroundSize: 'cover',

@@ -2123,6 +2123,15 @@ describe('TournamentBracketService', () => {
     });
   });
 
+  it('getBracket: named diagram color is stable even without preliminary standings', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
+    prisma.v1Tournament.findFirst.mockResolvedValue({ ...tournamentRow(), multiFinals: { finals: [{name:'챔피언',colorIndex:7,rules:[],thirdPlace:false}] } });
+    prisma.v1TournamentGroup.findMany.mockResolvedValue([{ ...groupRow({id:'named',name:'결승',phase:'final',sortOrder:0}), bracketTrack:'챔피언',groupTeams:[],byeSlots:[] }]);
+    prisma.v1TournamentStanding.findMany.mockResolvedValue([]);
+    const result = await service.getBracket(ownerUser,'tournament-1');
+    expect(result.groups[0]).toMatchObject({bracketColorIndex:7,bracketTrack:'챔피언'});
+  });
+
   it('getBracket: displays third-place before final without rewriting stored groups', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdmin);
     prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());

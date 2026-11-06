@@ -11,7 +11,7 @@ const server = setupServer(...v1MswHandlers, http.post('*/api/v1/logs/client-err
 const admin = `/admin/tournaments/${NAMED_FINALS_ID}`;
 const path = `${admin}/bracket/multi-finals`;
 const publicPath = `/tournaments/${NAMED_FINALS_ID}`;
-const editable = (view: MultiFinalView) => view.finals.map(({ manual: _m, suggestedRegistrationIds: _s, unresolved: _u, ...row }) => row);
+const editable = (view: MultiFinalView) => view.finals.map(({ manual: _m, suggestedRegistrationIds: _s, unresolved: _u, colorIndex: _c, ...row }) => row);
 beforeAll(() => { vi.stubEnv('NEXT_PUBLIC_API_URL', 'http://localhost/api/v1'); server.listen({ onUnhandledRequest: 'error' }); });
 beforeEach(() => namedFinalsMsw.reset());
 afterEach(() => server.resetHandlers());

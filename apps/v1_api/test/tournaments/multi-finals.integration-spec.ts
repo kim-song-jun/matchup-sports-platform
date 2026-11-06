@@ -168,6 +168,7 @@ describe('N개 결선 실제 DB 저장·공식 순위·수동 편집·재생성'
       { name: '프렌즈', rules: [], thirdPlace: true, registrationIds: registrationIds.slice(6, 10) },
     ];
     const saved = await service.select(user, tournamentId, { expectedRevision: first.revision, finals });
+    expect(saved.finals).toMatchObject([{ colorIndex: 0 }, { colorIndex: 1 }, { colorIndex: 2 }]);
     await prisma.$transaction(tx => recalculateStandingsInTx(tx, tournamentId));
     expect((await service.get(user, tournamentId)).finals.map(f => f.registrationIds)).toEqual(finals.map(f => f.registrationIds));
     const preview = await service.preview(user, tournamentId); expect(preview.counts).toEqual({ tournaments: 3, fixtures: 8, byes: 2 });
@@ -183,7 +184,9 @@ describe('N개 결선 실제 DB 저장·공식 순위·수동 편집·재생성'
     const slots = await prisma.v1TournamentSlot.findMany({ where: { tournamentId, group: { phase: { not: 'group' } } } });
     expect(slots).toHaveLength(10); expect(new Set(slots.map(s => s.registrationId)).size).toBe(10);
     const next = await service.get(user, tournamentId);
-    const changed = await service.select(user, tournamentId, { expectedRevision: next.revision, finals: [{ ...finals[0], registrationIds: [registrationIds[0], registrationIds[9]] }] });
+    const changed = await service.select(user, tournamentId, { expectedRevision: next.revision, finals: [{ ...finals[0], id: next.finals[0].id, name: '새 챔피언', registrationIds: [registrationIds[0], registrationIds[9]] }] });
+    expect(next.finals).toMatchObject([{ id: saved.finals[0].id, colorIndex: 0 }, { id: saved.finals[1].id, colorIndex: 1 }, { id: saved.finals[2].id, colorIndex: 2 }]);
+    expect(changed.finals[0]).toMatchObject({ id: saved.finals[0].id, colorIndex: 0, name: '새 챔피언' });
     expect(changed.generated).toBe(false); expect(await preliminarySnapshot()).toEqual(before);
   }, 30000);
   it('완전 동률도 공식 저장 순위로 추천하고 수동 선택은 기존 미정 대진에 배정한다', async () => {

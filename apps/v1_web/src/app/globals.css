@@ -10891,3 +10891,56 @@ html[data-teameet-native-app='android'] .tm-search-error-toast {
     grid-template-columns: 1fr;
   }
 }
+
+/* Stable tournament destination colors. Index order is a public display contract. */
+:root {
+  --final-0-text: #1b64da; --final-0-bg: #e8f3ff;
+  --final-1-text: #9a4d00; --final-1-bg: #fff1e1;
+  --final-2-text: #08746f; --final-2-bg: #e3f5f1;
+  --final-3-text: #7045b5; --final-3-bg: #f1ebfa;
+  --final-4-text: #ad3c67; --final-4-bg: #fcebf2;
+  --final-5-text: #806000; --final-5-bg: #f9f2d9;
+  --final-6-text: #4956a8; --final-6-bg: #eceefa;
+  --final-7-text: #875535; --final-7-bg: #f5ebe3;
+  --final-8-text: #526c24; --final-8-bg: #eef3e3;
+  --final-9-text: #925092; --final-9-bg: #f6ebf6;
+}
+:root.dark {
+  --final-0-text: #8dbbff; --final-0-bg: #182b45;
+  --final-1-text: #ffc286; --final-1-bg: #362819;
+  --final-2-text: #79d6ca; --final-2-bg: #17332f;
+  --final-3-text: #c8a9ff; --final-3-bg: #2b2340;
+  --final-4-text: #ffa4c6; --final-4-bg: #3d2430;
+  --final-5-text: #e5ce77; --final-5-bg: #33301b;
+  --final-6-text: #aebaff; --final-6-bg: #252c45;
+  --final-7-text: #d7b292; --final-7-bg: #332a24;
+  --final-8-text: #b6d483; --final-8-bg: #2a321f;
+  --final-9-text: #e2a8de; --final-9-bg: #38263a;
+}
+.tm-final-color-0 { color: var(--final-0-text); background: var(--final-0-bg); }
+.tm-final-color-1 { color: var(--final-1-text); background: var(--final-1-bg); }
+.tm-final-color-2 { color: var(--final-2-text); background: var(--final-2-bg); }
+.tm-final-color-3 { color: var(--final-3-text); background: var(--final-3-bg); }
+.tm-final-color-4 { color: var(--final-4-text); background: var(--final-4-bg); }
+.tm-final-color-5 { color: var(--final-5-text); background: var(--final-5-bg); }
+.tm-final-color-6 { color: var(--final-6-text); background: var(--final-6-bg); }
+.tm-final-color-7 { color: var(--final-7-text); background: var(--final-7-bg); }
+.tm-final-color-8 { color: var(--final-8-text); background: var(--final-8-bg); }
+.tm-final-color-9 { color: var(--final-9-text); background: var(--final-9-bg); }
+
+/* Each filter keeps its own horizontal scroll offset, including on narrow desktops. */
+.tm-bracket-filter-row { padding: 12px 20px 0; min-width: 0; }
+.tm-bracket-filter-row > p { margin-bottom: 4px; }
+/* 4px padding (net zero via negative margin) keeps chip focus rings inside the scroll box. */
+.tm-bracket-filter-scroll { display: flex; flex-wrap: nowrap; gap: 8px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; padding: 4px; margin-inline: -4px; }
+.tm-bracket-filter-scroll > button { flex-shrink: 0; white-space: nowrap; }
+.tm-bracket-filter-dot { display: inline-block; width: 8px; height: 8px; border-radius: var(--radius-pill); background: currentColor; margin-right: 4px; }
+
+.tm-bracket-round-jumps { display: flex; flex-wrap: nowrap; gap: 8px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; margin-bottom: 12px; padding: 4px; }
+.tm-bracket-round-jumps > button { flex-shrink: 0; white-space: nowrap; }
+
+.tm-admin-final-section { scroll-margin-top: 80px; min-width: 0; }
+.tm-admin-final-summary { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; cursor: pointer; padding: 16px 0; font-size: var(--font-size-body-lg); font-weight: 700; }
+.tm-admin-final-summary::before { content: '▸'; }
+.tm-admin-final-section[open] > .tm-admin-final-summary::before { content: '▾'; }
+.tm-admin-final-summary > span:first-of-type { flex: 1; min-width: 0; overflow-wrap: anywhere; }

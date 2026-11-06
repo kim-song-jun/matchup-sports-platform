@@ -198,6 +198,19 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
     </Card>
   ) : null;
 
+  let rosterEntry: ReactNode;
+  if (!managerNavigation) {
+    rosterEntry = <RegistrationRosterEntry view={data} variant="block" />;
+  } else if (data.viewerRole !== 'STAFF') {
+    rosterEntry = (
+      <Button variant="ghost" size="sm" onClick={managerNavigation.showPlayers}>
+        {data.viewerRole === 'TEAM_MANAGER' ? '선수 추가·번호·GK 관리' : '참가 선수 보기'}
+      </Button>
+    );
+  } else {
+    rosterEntry = null;
+  }
+
   return (
     <div
       style={{
@@ -344,9 +357,7 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
             ))}
           </ul>
         )}
-        {managerNavigation
-          ? data.viewerRole === 'STAFF' ? null : <Button variant="ghost" size="sm" onClick={managerNavigation.showPlayers}>{data.viewerRole === 'TEAM_MANAGER' ? '선수 추가·번호·GK 관리' : '참가 선수 보기'}</Button>
-          : <RegistrationRosterEntry view={data} variant="block" />}
+        {rosterEntry}
       </RosterSection>
 
       {!canEdit && !managerNavigation && data.excluded.length > 0 ? (

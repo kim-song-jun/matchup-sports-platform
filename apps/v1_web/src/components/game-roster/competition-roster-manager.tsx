@@ -73,7 +73,7 @@ export function CompetitionRosterManager(entry: Entry) {
   const adminRegistrationsHref = initialRoster.data?.viewerRole === 'ADMIN'
     ? `/admin/${initialRoster.data.competitionKind === 'LEAGUE' ? 'league-matches' : 'tournaments'}/${encodeURIComponent(initialRoster.data.competitionId)}/registrations`
     : null;
-  // 대회 스태프는 admin 콘솔도 팀 전용 참가 명단 API 도 없다 — 경기 단위 명단이 유일한 입구다.
+  // 대회 스태프는 admin 콘솔도 팀 전용 참가 명단 API도 없다 — 경기 단위 명단이 유일한 입구다.
   const staffViewer = initialRoster.data?.viewerRole === 'STAFF';
 
   return <RosterManagerNavigation.Provider value={navigation}>

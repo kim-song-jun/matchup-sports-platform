@@ -79,6 +79,7 @@ import {
   toAdminInquiryRow,
 } from './fixtures';
 import { PASSWORD_UNAVAILABLE_MSW, passwordLoginUnavailableResponse, v1AuthLinkMswHandlers } from './auth-link-handlers';
+import { v1EmailChangeMswHandlers } from './profile-email-change-handlers';
 import { v1AuthStepUpMswHandlers } from './auth-step-up-handlers';
 import { v1GameRosterMswHandlers } from './game-roster-handlers';
 import { v1AdminUserPhoneReleaseMswHandlers } from './admin-user-phone-release-handlers';
@@ -786,6 +787,7 @@ export const v1MswHandlers = [
   http.post(`${api}/auth/recovery/email/find-account`, ({ request }) => findAccountByRecoveryEmail(request)),
   http.post(`${api}/auth/recovery/email/reset-password`, ({ request }) => resetPasswordByRecoveryEmail(request)),
   ...v1AuthLinkMswHandlers,
+  ...v1EmailChangeMswHandlers,
   ...v1AuthStepUpMswHandlers,
   http.post(`${api}/auth/register`, async ({ request }) => {
     const body = await request.json();

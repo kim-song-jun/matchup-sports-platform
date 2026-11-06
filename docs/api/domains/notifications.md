@@ -145,6 +145,7 @@ fan-out되며, 한 채널의 개별 발송 실패는 알림 row 자체나 다른
 이벤트는 `activityEnabled`가 아니라 `importantEnabled`로 게이팅된다.
 로그인한 계정에 카카오·Apple 로그인이 연결되거나(`POST /auth/link/{provider}`) 이메일·비밀번호 로그인이 더해지면(`POST /auth/link/email/complete`, 본문 "이메일·비밀번호 로그인이 연결됐어요…") 그 계정에 `social_identity_linked`(targetType `system`, 딥링크
 `/my/settings`)를 남긴다 — 보안 알림이라 알림 설정과 무관하게 항상 남고, 알림함 행은 연결과 같은 트랜잭션 안에서 만든다(푸시·실시간 전달은 커밋 뒤).
+로그인한 계정의 이메일이 새 주소의 인증을 거쳐 바뀌면(`PATCH /me/profile` + `emailChangeToken`, [계정 이메일 변경](./users.md#계정-이메일-변경)) 그 계정에 `email_changed`(targetType `system`, 딥링크 `/my/settings`, 본문 "이메일이 ab***@example.com(으)로 바뀌었어요. 본인이 아니라면 고객센터로 문의해 주세요.")를 같은 방식으로 남긴다. 주소는 앞 두 글자만 남기고 가려서 싣는다. 이메일을 지우는 저장에는 남기지 않는다.
 운영자가 계정에서 휴대폰 번호를 해제하면(`POST /admin/users/:userId/phone/release`) 그 계정에 `phone_released_by_operator`(targetType `system`, 딥링크 `/my/phone-verify`, 본문 "운영자가 이 계정의 휴대폰 번호를 해제했어요…")를 같은 방식으로 남긴다. 번호는 본문에 싣지 않는다.
 
 팀 초대를 받으면 `team_invitation_received`(targetType `team`, targetId는 팀 id)를 emit하고 딥링크는 팀 상세가

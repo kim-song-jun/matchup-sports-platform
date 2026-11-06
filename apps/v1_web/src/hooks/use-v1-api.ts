@@ -97,6 +97,10 @@ import type {
   V1AuthMe,
   V1AuthSessionResponse,
   V1CancelWithdrawalPayload,
+  V1EmailChangeRequestPayload,
+  V1EmailChangeRequestResult,
+  V1EmailChangeVerifyPayload,
+  V1EmailChangeVerifyResult,
   V1LinkApplePayload,
   V1LinkKakaoPayload,
   V1LinkEmailCompletePayload,
@@ -432,6 +436,20 @@ export function useV1LinkEmailComplete() {
   return useMutation({
     mutationFn: (body: V1LinkEmailCompletePayload) => v1Post<V1LinkEmailCompleteResult>('/auth/link/email/complete', body),
     onSuccess: () => invalidateLoginMethodQueries(queryClient),
+  });
+}
+
+/** 계정 이메일 변경 1단계: 새 주소로 인증번호를 보낸다. 계정에는 아무것도 쓰지 않는다. */
+export function useV1EmailChangeRequest() {
+  return useMutation({
+    mutationFn: (body: V1EmailChangeRequestPayload) => v1Post<V1EmailChangeRequestResult>('/me/email-change/request', body),
+  });
+}
+
+/** 2단계: 인증번호를 맞추고 `emailChangeToken` 을 받는다. 이 토큰을 `useV1UpdateProfile` 의 `emailChangeToken` 으로 넘겨야 이메일이 바뀐다. */
+export function useV1EmailChangeVerify() {
+  return useMutation({
+    mutationFn: (body: V1EmailChangeVerifyPayload) => v1Post<V1EmailChangeVerifyResult>('/me/email-change/verify', body),
   });
 }
 
@@ -3157,6 +3175,8 @@ export function useV1UpdateProfile() {
       realName?: string | null;
       nickname: string;
       email?: string | null;
+      /** 지금과 다른 주소로 바꿀 때만 필요 — `useV1EmailChangeVerify` 가 준 토큰. 없으면 서버가 400 `EMAIL_CHANGE_PROOF_REQUIRED`. */
+      emailChangeToken?: string | null;
       profileImageUrl?: string | null;
       phone?: string | null;
       /** 번호를 바꿀 때만 필요 — 서버가 register 와 동일하게 본인인증 증명을 요구한다. */

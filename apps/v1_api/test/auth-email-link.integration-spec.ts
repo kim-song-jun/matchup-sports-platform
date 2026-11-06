@@ -246,7 +246,7 @@ describe('V1 adding an email login to a social account integration', () => {
       request(app.getHttpServer()).post(api(path)).set('Cookie', staleCookie()).send(body);
 
     it('a session past the recent-login limit cannot mint a link code through /verification/email/request', async () => {
-      // The account email is whatever the account says it is (PATCH /me/profile sets it freely): here, an address the caller reads.
+      // The contact email is whatever address the account holds (a Kakao-reported or earlier-proven one): here, an address the caller reads.
       const attackerMailbox = `${PREFIX}-attacker@integration.test`;
       await prisma.v1User.update({ where: { id: CALLER }, data: { email: attackerMailbox } });
       const refused = await withStaleSession('/auth/link/email/request', { email: NEW_EMAIL });

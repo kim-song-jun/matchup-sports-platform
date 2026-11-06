@@ -76,6 +76,9 @@ export type NotificationEventType =
   // 운영자가 이 계정의 휴대폰 번호를 해제했을 때 그 계정에게. 보안 알림이라 social_identity_linked 와 같이
   // 설정과 무관하게 해제와 같은 트랜잭션에서 남긴다. 도착지는 번호를 다시 인증하는 화면이다.
   | 'phone_released_by_operator'
+  // 로그인한 계정의 이메일(연락·로그인 ID)이 바뀌었을 때 그 계정에게. 보안 알림이라 알림 설정과 무관하게 변경과 같은
+  // 트랜잭션에서 남긴다(createInTransaction). 이메일 증명을 거친 변경에만 보내고, 주소는 가려서 싣는다.
+  | 'email_changed'
   // H3: 팀장·어드민이 팀을 보관(해체)하면 팀원 전원과 가입 신청자에게 한 번 알린다. 도착지는 해체된 팀 페이지.
   | 'team_dissolved'
   // Task 12, reminders lane: fired by the durable worker (jobs/schedule-reminders/schedule-reminder.service.ts)
@@ -332,7 +335,7 @@ function targetTypeForEvent(type: NotificationEventType): V1NotificationTargetTy
   if (type === 'inquiry_answered') {
     return 'inquiry';
   }
-  if (type === 'social_identity_linked' || type === 'phone_released_by_operator') {
+  if (type === 'social_identity_linked' || type === 'phone_released_by_operator' || type === 'email_changed') {
     return 'system';
   }
   if (type === 'team_dissolved') {
@@ -480,7 +483,7 @@ function deepLinkForEvent(
   if (type === 'team_invitation_declined' && targetId) {
     return `/teams/${targetId}/members?tab=invitations`;
   }
-  if (type === 'social_identity_linked') {
+  if (type === 'social_identity_linked' || type === 'email_changed') {
     return '/my/settings';
   }
   if (type === 'phone_released_by_operator') {
@@ -645,6 +648,7 @@ const EVENT_TITLES: Record<NotificationEventType, string> = {
   inquiry_answered: '문의에 답변이 등록됐어요',
   social_identity_linked: '로그인 수단이 연결됐어요',
   phone_released_by_operator: '휴대폰 번호가 해제됐어요',
+  email_changed: '계정 이메일이 바뀌었어요',
   team_dissolved: '팀이 해체됐어요',
   schedule_rsvp_deadline_reminder: '참석 여부를 알려주세요',
   schedule_guest_recruitment_close_reminder: '용병 모집이 곧 마감돼요',
@@ -736,6 +740,7 @@ const EVENT_BODIES: Record<NotificationEventType, string> = {
   inquiry_answered: '답변 내용을 확인해 주세요.',
   social_identity_linked: '{name} 로그인이 연결됐어요. 본인이 아니라면 고객센터로 문의해 주세요.',
   phone_released_by_operator: '운영자가 이 계정의 휴대폰 번호를 해제했어요. 계정은 그대로이고, 휴대폰 번호를 다시 인증해 주세요.',
+  email_changed: '이메일이 {name}(으)로 바뀌었어요. 본인이 아니라면 고객센터로 문의해 주세요.',
   team_dissolved: '지난 기록은 그대로 남아요.',
   schedule_rsvp_deadline_reminder: 'RSVP 마감 전에 참석 여부를 남겨주세요.',
   schedule_guest_recruitment_close_reminder: '모집 마감 전에 신청 현황을 확인해 주세요.',

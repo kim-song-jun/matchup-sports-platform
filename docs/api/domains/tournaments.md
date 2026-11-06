@@ -892,6 +892,7 @@ Legacy delimiter-separated text remains readable. New admin saves use `@teameet/
 - `POST /assignment-preview`: `{ expectedRevision, finalName, assignmentPolicy?: 'rank_order' | 'cross_group_top3' }` → `{ revision, finalName, assignmentPolicy, registrationIds, sourceVersion }`. 관리자/디렉터 전용 읽기 미리보기로 명단/대진을 저장하지 않는다. 기본값 `rank_order`는 공식 저장 순위의 규칙 순서, `cross_group_top3`는 아래 교차 배치다. `sourceVersion`은 공식 순위 원천을 해시하며 확정 시 달라지면 `409 MULTI_FINAL_STALE`다. 미리보기/확정 사이 예선 정정은 게임 행 잠금 후 재검증한다.
 - `cross_group_top3`는 예선 4개 조 각각의 1~3위가 한 결선의 12개 규칙 자리를 구성할 때만 GET의 `crossGroupTopThreeAvailable=true`로 제공한다. config의 조 순서 A/B/C/D에서 1위는 시드1/2/3/4(12강 부전승)이고, 해당 8강 상대 쪽의 2위는 B/C/D/A로 고정한다. 3위는 해당 12강의 2위 및 다음 8강의 1위와 같은 조가 되지 않는 모든 유효 순열 중 균등 추첨한다. 동일 조 회피는 12강·8강에 한정한다. 확정은 미리 본 배열을 그대로 사용하며 재추첨하지 않는다. 서버는 시드 배열과 실제 저장된 12강→8강 연결까지 검사해 같은 조 회피가 깨지는 편집 대진을 422로 거절하고 선택 정책을 JSON 명단 및 감사에 보존한다. 팀/시드를 직접 바꾸면 UI는 `rank_order` 수동 배치로 전환한다.
 - `preview`/`generate`는 결과가 모두 나왔어도 추천만으로 자동 명단을 확정하지 않는다. 미승인 결선은 명시 capacity(생략한 이전 계약은 규칙 자리 수)를 유지한 빈 대진이며 실제 팀 반영은 위 확정 API로 분리한다. 이미 승인된 명단은 유지한다.
+- 결과를 포함하는 관리자 목업 생성도 빈 대진 생성 후 결선별 `assignment-preview` → `assignment`를 순서대로 수행한다. 각 확정의 최신 revision과 sourceVersion을 사용하고, 모든 결선 확정 뒤 명단을 동기화한다. 배정 실패를 빈 결선 생성 성공으로 숨기지 않는다.
 - 화면은 기존 모달 재사용(A안)으로 대진 생성, 토너먼트 배정 규칙, 토너먼트별 진출팀 배정을 별도 진입점으로 제공한다. 확정 전 대진 확인은 저장하지 않으며 확정 후 모달에서 다른 토너먼트를 이어서 선택할 수 있다.
 
 

@@ -1195,3 +1195,15 @@ Status: In Progress
 - Remote code-head CI: Gates PASS5m56s, Web PASS12m54s; API remained in `V1 migration replay + drift gate` on run42061455599 as of2026-11-06 01:34 KST. No API failure output yet. This pending state must not be called a pass.
 - Copilot: official requests accepted with empty requested_reviewers; final-head recovery response explicitly matched364b5d071, but no review record or findings/clean result arrived. No settings/account/merge-rule changes and no review bypass.
 - Remaining: final PR CI/review, dev merge (base must be rechecked), alpha serving-SHA verification, AFTER headed QA and screenshots. No main promotion. Review result absence blocks merge under repository S6. No final completion/PR-ready claim.
+
+### 2026-11-06 PR2169 CI repair and Alpha delivery
+
+- User authorized fixing the current PR and deploying to Alpha; main/prod are out of scope.
+- Own isolated worktree `_worktrees/pr2169-alpha-fix`, branch `fix/pr2169-alpha-20261106`, created after fresh origin/dev fetch (29e256c14), then integrated PR head b3bd74ac0. Preserve other sessions and their WIP.
+- RED evidence: exact-head CI42066264451 failed 2/193 integration suites. Existing generation test expected automatic participants; real mock-seed flow omitted explicit assignment, leaving 24 instead of32 submitted lineup sides.
+- Fix: keep generation unassigned; update the existing integration test to explicitly preview/confirm and retain fixture ID/schedule assertions. Mock generation now confirms each final through assignmentPreview/assign, carries the current revision/sourceVersion, and syncs rosters only after successful assignments. Existing mock integration's32-lineup and actual qualification roster assertions remain unchanged.
+- Owned follow-up: mock seed service, multi-finals integration test, relevant API documentation/Changeset, this task. No schema/migration or UI design changes in the repair itself.
+- Local preparation: own WSL dependencies and localhost PostgreSQL16.4 on55489; no existing DB or env files read. Windows CRLF altered a historical policy SQL hash, so a separate LF copy matching Git blobs was replayed into a fresh approved test DB; all230 migrations passed. Do not count the initial CRLF attempt as a pass.
+- Remaining: focused real-DB/unit/type/surface validation, exact-path commit/PR2169 update, latest Copilot clean and CI, dev merge/FF sync, Alpha SHA/health and headed after QA. Default UI runtimes failed initialization; own headed Chrome PID22720/controller16392 is open for administrator login (no credentials persisted).
+
+- Repair validation PASS: full230-migration LF replay on fresh isolated PostgreSQL; both formerly failing integration suites17/17, related unit suites56/56, API typecheck0/surface761 PASS, diff-check/debt grep clean. Owned PostgreSQL PID2444 stopped and absence verified. Latest PR-head CI and review still pending; Alpha after QA remains unverified.

@@ -90,6 +90,17 @@ describe('N개 결선 실제 DB 저장·공식 순위·수동 편집·재생성'
     expect(view.groupStandings.map(group => group.rows.length)).toEqual([5, 5]);
     const fill = await service.preview(user, tournamentId);
     await service.generate(user, tournamentId, { expectedRevision: fill.revision, previewHash: fill.previewHash, requestId: randomUUID() });
+    const unassigned = await prisma.v1TournamentMatchDetails.findFirstOrThrow({ where: { tournamentId, group: { phase: 'final' }, teamMatch: { deletedAt: null } } });
+    expect([unassigned.homeRegistrationId, unassigned.awayRegistrationId]).toEqual([null, null]);
+    const current = await service.get(user, tournamentId);
+    const assignment = await service.assignmentPreview(user, tournamentId, {
+      expectedRevision: current.revision, finalName: '챔피언', assignmentPolicy: 'rank_order',
+    });
+    await service.assign(user, tournamentId, {
+      expectedRevision: assignment.revision, finalName: assignment.finalName,
+      registrationIds: assignment.registrationIds, assignmentPolicy: assignment.assignmentPolicy,
+      sourceVersion: assignment.sourceVersion,
+    });
     const after = await prisma.v1TournamentMatchDetails.findFirstOrThrow({ where: { tournamentId, group: { phase: 'final' }, teamMatch: { deletedAt: null } }, include: { teamMatch: true } });
     expect(after.teamMatchId).toBe(before.teamMatchId);
     expect(after.teamMatch.startAt).toEqual(scheduledAt);

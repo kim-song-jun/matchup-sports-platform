@@ -54,12 +54,12 @@ function createWith(step: 'info' | 'confirm', image: string) {
 }
 
 describe('매치 상세 히어로', () => {
-  it('데스크톱 1072px 가 아니라 1080 폭으로 받는다', () => {
+  it('데스크톱 1072px 의 2배(3840)가 아니라 1920 폭으로 받는다', () => {
     const base = getMatchDetailViewModel();
     const { container } = render(<MatchDetailPageView model={{ ...base, match: { ...base.match, image: UPLOAD } }} />);
 
     expect(optimizerRequest(pick(container, '.tm-match-detail-hero').style.backgroundImage))
-      .toEqual({ pathname: '/_next/image', url: UPLOAD, w: '1080' });
+      .toEqual({ pathname: '/_next/image', url: UPLOAD, w: '1920' });
   });
 });
 

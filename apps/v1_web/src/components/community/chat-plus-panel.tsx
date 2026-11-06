@@ -117,9 +117,9 @@ function PlusTile({ label, disabled, onClick, children }: { label: string; disab
   );
 }
 
-// 뷰어 <img> 는 width 가 없어 받은 비트맵의 자연 폭이 곧 레이아웃 폭이다 — 1440 뷰포트의 1408px(좌우 패딩 16×2)을
-// 1배로 채우는 1920 폭으로 받는다(helper 가 2배 해서 960 → 1920). 더 작게 받으면 큰 원본이 작게 그려진다.
-const VIEWER_MAX_WIDTH = 960;
+// 뷰어 <img> 는 width 가 없어 받은 비트맵의 자연 폭이 곧 레이아웃 폭이다 — 1440 뷰포트(1408px = 1440 − 패딩 16×2)를
+// 2배 밀도로 채우게 받는다(3840 단계, 원본보다 크게 늘리지는 않는다). 확대 보기라 원본보다 흐려지면 안 된다.
+const VIEWER_MAX_WIDTH = 1408;
 
 /** 사진 전체 화면 보기 — ESC·뒤로가기·배경·닫기 버튼으로 닫힌다(포커스 가둠·복원은 useModalA11y). */
 export function ChatImageViewer({ url, onClose }: { url: string | null; onClose: () => void }) {

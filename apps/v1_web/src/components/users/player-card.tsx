@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { CalendarCheck, Camera, Clock, HeartHandshake, Lock, Settings, Share2, Sparkles, Target, UserRound, Zap } from 'lucide-react';
-import { publicAssetPath } from '@/lib/assets';
+import { isOptimizableImagePath, publicAssetPath } from '@/lib/assets';
 import { AvatarFallback } from '@/components/v1-ui/avatar-fallback';
 import { josa } from '@/lib/korean';
 import type { V1PlayerCard, V1PlayerCardStat } from '@/types/api';
@@ -427,6 +427,7 @@ export function PlayerCard({
                 <Image
                   key={photoUrl}
                   src={publicAssetPath(photoUrl)}
+                  unoptimized={!isOptimizableImagePath(photoUrl)}
                   alt=""
                   fill
                   sizes="138px"

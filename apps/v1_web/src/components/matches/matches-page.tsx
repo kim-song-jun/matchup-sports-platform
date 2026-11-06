@@ -35,11 +35,11 @@ import { matchGenderRuleLabel } from '@/lib/v1-status-labels';
 
 /*
  * 사진이 그려지는 자리의 가장 넓은 CSS 폭(px). optimizedCssUrl 이 2배 밀도 폭으로 올려 받는다.
- * 상세 히어로는 데스크톱에서 1072px 까지 가지만 2배(2144)면 3840 폭으로 올림되므로 1080 폭에 맞춘다.
+ * 상세 히어로는 데스크톱에서 1072px 까지 가지만 2배(2144)면 3840 폭으로 올림되므로 1920 폭에 맞춘다(대회 홍보 배너와 같다).
  */
 const MATCH_ROW_THUMB_PX = 96; // .tm-match-row-thumb
 const MATCH_LIST_MEDIA_PX = 320; // .tm-match-rail-h > * (≥1024px)
-const MATCH_DETAIL_HERO_PX = 540; // .tm-match-detail-hero → 1080 폭
+const MATCH_DETAIL_HERO_PX = 960; // .tm-match-detail-hero → 1920 폭
 const MATCH_CREATE_PREVIEW_PX = 600; // .tm-match-create-shell 최대 폭
 
 /**

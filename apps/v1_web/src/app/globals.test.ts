@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -865,5 +866,28 @@ describe('필터 시트의 [닫기][적용하기] 줄은 시트 바닥 고정 �
     expect(actions).toMatch(/margin:\s*8px 0 calc\(-1 \* var\(--tm-filter-sheet-pad-bottom\)\)/);
     expect(actions).toMatch(/padding:\s*12px 0 var\(--tm-filter-sheet-pad-bottom\)/);
     expect(actions).toMatch(/background:\s*var\(--bg\)/);
+  });
+});
+
+describe('player card brand mark mask', () => {
+  // teameet-mark-mask.webp 는 teameet-mark.png 의 알파만 옮긴 무손실 WebP 다. 원본을 바꾸면 마스크도 다시 만든다:
+  // sharp({ create: { width, height, channels: 3, background: '#000' } }).joinChannel(<원본 알파 raw>).webp({ lossless: true })
+  const markPng = readFileSync(resolve(process.cwd(), 'public/brand/teameet-mark.png'));
+  const maskWebp = readFileSync(resolve(process.cwd(), 'public/brand/teameet-mark-mask.webp'));
+
+  it('masks every player card mark with the WebP, not the 93KB PNG', () => {
+    const brandMasks = [...globalsCss.matchAll(/mask:\s*url\('(\/brand\/[^']+)'\)/g)].map((m) => m[1]);
+    expect(brandMasks.length).toBeGreaterThan(0);
+    expect(new Set(brandMasks)).toEqual(new Set(['/brand/teameet-mark-mask.webp']));
+  });
+
+  it('was generated from the current brand mark at full resolution', () => {
+    expect(
+      createHash('sha256').update(markPng).digest('hex'),
+      'teameet-mark.png 가 바뀌었다 — teameet-mark-mask.webp 를 다시 만들고 이 해시를 고친다',
+    ).toBe('3a1a6f889d0b9cb830c2978bbb81d915908f52b3264e7be0159f6efade65ec6a');
+    expect(maskWebp.toString('ascii', 8, 16)).toBe('WEBPVP8L');
+    const bits = maskWebp.readUInt32LE(21);
+    expect([(bits & 0x3fff) + 1, ((bits >>> 14) & 0x3fff) + 1]).toEqual([markPng.readUInt32BE(16), markPng.readUInt32BE(20)]);
   });
 });

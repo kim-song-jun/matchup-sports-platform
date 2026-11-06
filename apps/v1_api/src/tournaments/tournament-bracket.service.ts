@@ -50,7 +50,7 @@ import {
   type TournamentFixtureOfficialGoal,
   type TournamentFixtureGameForResult,
 } from './tournament-fixture-official-result';
-import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
+import { findTournamentOnSurface, findTournamentOnSurfaceOrThrow, TOURNAMENT_KINDS } from './tournament-surface-lookup';
 import { assertNewFixtureScheduleKeepsStageOrder } from './tournament-schedule-order';
 import { assertNotInOppositeFinalStageInTx, assertNotInOtherGroupInTx, assertSidesNotSlotLinked, createGroupInTx, deleteTournamentGroupInTx, ensureGroupPhaseTeamsInTx, recalculateStandingsInTx, softDeleteTournamentFixtureInTx, updateTournamentFixtureInTx } from './tournament-bracket-tx';
 import { participantDisplayName } from './participant-display-name';
@@ -1236,6 +1236,12 @@ export class TournamentBracketService {
       throw new NotFoundException({ code: 'GROUP_NOT_FOUND', message: '조를 찾을 수 없어요.' });
     }
     this.assertLeagueGroupShape(group.tournament.format, group.tournament.kind, group.phase, dto.advanceCount);
+    if (dto.name !== undefined && !dto.name.trim()) {
+      throw new BadRequestException({ code: 'GROUP_NAME_REQUIRED', message: '조 이름을 입력해 주세요.' });
+    }
+    if (group.tournament.format === 'league_knockouts' && dto.advanceCount !== undefined) {
+      throw new ConflictException({ code: 'MULTI_FINAL_SELECTION_REQUIRED', message: '진출 규칙은 토너먼트별 진출팀 배정에서 수정해 주세요.' });
+    }
     const updated = await this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`league-fixture-generation:${group.tournamentId}`}, 0))`;
       const previous = await tx.v1TournamentGroup.findUnique({ where: { id: groupId } });
@@ -1258,6 +1264,23 @@ export class TournamentBracketService {
             message: '상·하위 결선에 연결된 조는 상위 2팀·하위 2팀 구성을 유지해야 해요.',
           });
         }
+      }
+      // Same advisory lock as multi-finals edits: preserve rules/teams and invalidate stale editors.
+      if (group.tournament.format === 'league_knockouts' && dto.name !== undefined && dto.name.trim() !== previous.name) {
+        const tournament = await findTournamentOnSurfaceOrThrow(tx, TOURNAMENT_KINDS, { where: { id: group.tournamentId, deletedAt: null }, select: { multiFinals: true } });
+        const config = tournament.multiFinals;
+        if (!config || typeof config !== 'object' || Array.isArray(config) || !Array.isArray(config.groups)) {
+          throw new ConflictException({ code: 'MULTI_FINAL_CONFIG_REQUIRED', message: '예선·토너먼트 설정을 먼저 확인해 주세요.' });
+        }
+        const configured = config.groups.some(item => item !== null && typeof item === 'object' && !Array.isArray(item) && item.id === groupId);
+        if (previous.phase === 'group' && !configured) {
+          throw new ConflictException({ code: 'MULTI_FINAL_CONFIG_REQUIRED', message: '예선 조 설정이 일치하지 않아요. 새로고침해 주세요.' });
+        }
+        const groups = config.groups.map(item => previous.phase === 'group' && item !== null && typeof item === 'object' && !Array.isArray(item) && item.id === groupId ? { ...item, name: dto.name!.trim() } : item);
+        await tx.v1Tournament.update({ where: { id: group.tournamentId }, data: {
+          multiFinals: { ...config, groups } as Prisma.InputJsonObject,
+          multiFinalsRevision: { increment: 1 },
+        } });
       }
       const row = await tx.v1TournamentGroup.update({
         where: { id: groupId },

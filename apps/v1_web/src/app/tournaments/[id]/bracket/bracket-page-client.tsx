@@ -159,14 +159,14 @@ function TeamFixturesDetail({ teamId, fixtures }: { teamId: string | null; fixtu
               gap: 8,
               padding: '8px 12px',
               borderRadius: 10,
-              background: 'var(--blue50)',
+              background: outcome === '승' ? 'var(--blue50)' : outcome === '패' ? 'var(--red50)' : 'var(--surface-soft)',
               fontSize: 12,
             }}
           >
             <span style={{ color: 'var(--text-caption)', minWidth: 26 }}>{isHome ? '홈' : '원정'}</span>
             <span style={{ color: 'var(--text-strong)', fontWeight: 600, flex: 1, minWidth: 0 }}>{opponent}</span>
             {outcome ? (
-              <span className="tab-num" style={{ color: 'var(--text-strong)', fontWeight: 700 }}>
+              <span className="tab-num" style={{ color: outcome === '승' ? 'var(--blue700)' : outcome === '패' ? 'var(--red700)' : 'var(--text-body)', fontWeight: 700 }}>
                 {outcome} {scored}-{conceded}
               </span>
             ) : (

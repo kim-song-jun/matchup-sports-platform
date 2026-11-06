@@ -195,6 +195,15 @@ it('분리 결선이 끝나면 상위·하위 결승 우승자를 각각 공개�
 
   expect(screen.getByRole('region', { name: '상위 결선 결과' })).toHaveTextContent('상위 우승팀');
   expect(screen.getByRole('region', { name: '하위 결선 결과' })).toHaveTextContent('하위 우승팀');
+  const upper = within(screen.getByRole('region', { name: '상위 결선 결과' }));
+  expect(upper.getAllByText('득실차')).toHaveLength(2);
+  const upperRanking = within(screen.getByRole('region', { name: '상위 결선 순위' }));
+  expect(upperRanking.getByText('상위 준우승팀')).toBeInTheDocument();
+  expect(upperRanking.queryByText('하위 우승팀')).not.toBeInTheDocument();
+  expect(upperRanking.getByText('GF')).toBeInTheDocument();
+  const lowerMatches = within(screen.getByRole('region', { name: '하위 결선 경기' }));
+  expect(lowerMatches.getByRole('link')).toHaveAttribute('href', expect.stringContaining('/matches/lower-final-fixture'));
+  expect(lowerMatches.queryByText('상위 우승팀')).not.toBeInTheDocument();
 });
 
 /**
@@ -514,6 +523,8 @@ it.each(['upper', '챔피언 토너먼트'])('공식 3·4위와 승부차기 승
   }));
   render(<ResultsPageContent tournament={baseTournament({ format: track === 'upper' ? 'group_knockout' : 'league_knockouts', groups, fixtures })} />);
   const ranking = within(screen.getByRole('region', { name: `${track === 'upper' ? '상위 결선' : track} 순위` }));
-  expect(ranking.getByText('3위 · 3위팀')).toBeInTheDocument();
-  expect(ranking.getByText('4위 · 4위팀')).toBeInTheDocument();
+  expect(ranking.getByText('3위팀')).toBeInTheDocument();
+  expect(ranking.getByText('3위')).toBeInTheDocument();
+  expect(ranking.getByText('4위팀')).toBeInTheDocument();
+  expect(ranking.getByText('4위')).toBeInTheDocument();
 });

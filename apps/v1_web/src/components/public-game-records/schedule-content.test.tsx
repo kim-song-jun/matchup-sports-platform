@@ -22,6 +22,17 @@ function makeData(overrides: Partial<PublicTournamentScheduleResponse> = {}): Pu
 }
 
 describe('ScheduleContent — 순위표 팀 링크', () => {
+  it('저장한 결선 조 이름을 필터와 경기 묶음에 표시하고 실제 경기를 선택한다', () => {
+    render(<ScheduleContent tournamentId="tour-1" knockoutOnly finalTracks={[{ id: '프리미어', label: '프리미어', colorIndex: 0, fixtureIds: ['first', 'last'] }]}
+      data={makeData({ items: [fixtureEntry({ fixtureId: 'first', round: '12강', groupId: 'first-group', groupName: '프리미어 · 본선 첫 경기' }),
+        fixtureEntry({ fixtureId: 'last', round: 'final', groupId: 'final-group', groupName: '프리미어 · 우승 결정전' })] })} />);
+    const filter = within(screen.getByRole('navigation', { name: '일정 결선 단계 선택' }));
+    fireEvent.click(filter.getByRole('button', { name: '본선 첫 경기' }));
+    expect(screen.getAllByRole('link')).toHaveLength(1);
+    expect(screen.getByRole('link').getAttribute('href')).toContain('/matches/first');
+    expect(screen.getByText('프리미어 · 본선 첫 경기')).toBeInTheDocument();
+  });
+
   it('N개 일정은 토너먼트와 강수를 독립 선택하고 진행 중·시간 미정 경기까지 거른다', () => {
     const finalTracks = [
       { id: '프리미어', label: '프리미어', colorIndex: 0, fixtureIds: ['p-semi', 'p-final'] },

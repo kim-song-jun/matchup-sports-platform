@@ -945,3 +945,10 @@ GET은 살아 있는 전체 경기 수 `fixtureCount`, 예선 경기 수 `prelim
 - Public `groups[].bracketColorIndex` exposes the stored named-final color on knockout groups independently of preliminary completion, allowing consistent filter dots before teams qualify.
 
 - Admin GET bracket `groups[].bracketColorIndex` mirrors the server-owned named-final color so vertically separated admin diagram sections use the same destination colors as public standings and filters. No additional query or migration.
+
+
+### 조 이름과 결선 규모 표시 (2026-11-06)
+
+`PATCH /admin/groups/:groupId`의 `name`은 `league_knockouts`에서도 구조/경기 진행 상태를 바꾸지 않고 수정할 수 있다. 공백 이름은 400 `GROUP_NAME_REQUIRED`, 진출 수 동시 수정은 409 `MULTI_FINAL_SELECTION_REQUIRED`다. 기존 관리자 mutation 권한과 대진 advisory lock·감사 로그를 적용한다. 예선 이름은 `multiFinals.groups[].name`에 원자적으로 동기화하고 이름 변경 시 `multiFinalsRevision`을 증가시켜 기존 진출팀 편집의 revision 검증을 유지한다. 결선 단계 조 이름 변경은 토너먼트 identity/bracketTrack/규칙/팀 배정/시상 범위를 바꾸지 않는다.
+
+새 N개 토너먼트의 강수 생성 규칙은 선행 PR #2181이 담당한다(짝수 6팀 이상, 2의 제곱 제외; 홀수는 기존 명칭 유지). 이 후속 변경에는 생성기 중복 수정을 포함하지 않는다. 12팀의 대진은 내부 round16 구조·4팀 부전승·8강 연결을 유지하면서 표시 round/name만 12강으로 저장한다. 기존 대진의 자동 생성 이름/round는 migration으로 보정하며 운영자 지정 이름과 phase·경기 ID·결과·edge·slot은 보존한다. 사용자 일정·대진·경기 이름은 저장한 그룹 이름을 우선하며 단계 판정은 이름 변경과 분리한다.

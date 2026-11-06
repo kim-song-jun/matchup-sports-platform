@@ -1,3 +1,7 @@
+## 2026-11-06 — 결선 실제 강수·조 이름 수정·종료 화면 (검증/배포 대기)
+
+[시나리오](./multi-finals-deferred-teams-20261104.md#2026-11-06--실제-강수조-이름-수정종료-화면-후속) · [task](../../.github/tasks/20261113-bracket-group-name-filters.md). 선행 #2181의 강수 생성 규칙에 맞춘 기존 자동 명칭 보정, 구조 보호를 유지한 조 이름 수정 및 예선 설정·revision 동기화, 공개 명칭 반영, 토너먼트별 기존 최종결과 UI 재사용을 구현했다. API334/Web297·양쪽 타입/pattern/surface PASS, 격리 PostgreSQL 보정6시나리오/재실행 PASS. alpha before 공개6/6(console/network/overflow0), after 공개0/6·admin0/3폭(미배포/관리자 인증 미제공). CI/전체 migration replay 미실행, 실환경 데이터 변경 없음.
+
 ## 2026-11-06 — N개 토너먼트별 독립 진출팀 확정 (진행 중)
 
 [task](../../.github/tasks/20261057-admin-bracket-canvas.md#2026-11-06-extension--n개-토너먼트별-독립-진출팀-확정). 최신 dev에서 격리 구현. 토너먼트 한 곳의 확정 API 및 CAS/권한/예선 완료/기록/중복/자리 수 보호를 추가했다. 사용자 A안 및 1위 부전승/2위 교차 고정/3위 같은 조 회피 배치 확인 완료. API101/Web16 회귀·양쪽 typecheck/규칙 검사 PASS. Docker 대안인 격리 PostgreSQL16.15에서 신규 통합2/2와 교차 배정/그래프 훼손 거절을 실제 검증했다(최신 스키마 기능 검증; migration replay는 원격 CI 별도). [시나리오](./multi-finals-deferred-teams-20261104.md#2026-11-06--토너먼트별-독립-확정과-교차-시드-배치). 변경 전 alpha3폭은 console/network0오류로 캡처했으며 변경 후 기능0/7·viewport0/3은 CI/리뷰·머지·배포 대기다.

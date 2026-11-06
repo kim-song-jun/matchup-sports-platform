@@ -34,7 +34,8 @@ export const KNOWN_ERROR_MESSAGES: Record<string, string> = {
   COMMAND_IDEMPOTENCY_KEY_MISMATCH: '요청을 다시 시도하지 못했어요. 화면을 새로고침한 뒤 다시 시도해 주세요.',
   IDEMPOTENCY_PAYLOAD_CONFLICT: '요청 내용이 바뀌어 다시 시도하지 못했어요. 화면을 새로고침해 주세요.',
   // TOURNAMENT_PENALTY_REQUIRED·NOT_ALLOWED·INVALID 는 서버가 원인별 한국어 문구를 보내므로 매핑하지 않는다.
-  // 아래 두 코드의 서버 문구는 API 호출자가 고칠 필드 이름을 담고 있어 화면용 안내를 둔다.
+  // INVALID 중 필드 이름이 든 변종은 폼이 보내기 전에 막는 값이라 화면에 닿지 않는다.
+  // 아래 두 코드는 서버 문구에 API 호출자용 필드 이름이 들어 있고 폼의 사전 검증을 지나서도 올 수 있어 화면용 안내를 둔다.
   TOURNAMENT_PENALTY_KICK_COUNTS_REQUIRED:
     '승부차기 결과를 변경하려면 양 팀의 실제 시도 횟수를 입력해 주세요.',
   TOURNAMENT_PENALTY_UNDECIDED:

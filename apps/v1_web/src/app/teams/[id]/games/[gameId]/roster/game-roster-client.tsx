@@ -344,7 +344,9 @@ export function GameRosterClient({ teamId, gameId }: { teamId: string; gameId: s
             ))}
           </ul>
         )}
-        {managerNavigation ? <Button variant="ghost" size="sm" onClick={managerNavigation.showPlayers}>{data.viewerRole === 'TEAM_MANAGER' ? '선수 추가·번호·GK 관리' : '참가 선수 보기'}</Button> : <RegistrationRosterEntry view={data} variant="block" />}
+        {managerNavigation
+          ? data.viewerRole === 'STAFF' ? null : <Button variant="ghost" size="sm" onClick={managerNavigation.showPlayers}>{data.viewerRole === 'TEAM_MANAGER' ? '선수 추가·번호·GK 관리' : '참가 선수 보기'}</Button>
+          : <RegistrationRosterEntry view={data} variant="block" />}
       </RosterSection>
 
       {!canEdit && !managerNavigation && data.excluded.length > 0 ? (

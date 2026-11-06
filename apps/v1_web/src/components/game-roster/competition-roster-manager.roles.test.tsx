@@ -107,20 +107,21 @@ describe('MD-QA157 실제 명단 소비자의 역할별 참가 선수 진입', (
     expect(participantReads).toBe(0);
   });
 
-  it('팀원이 아닌 대회 스태프는 팀장 문의 대신 경기 출전 탭으로 안내받는다', async () => {
+  it('팀원이 아닌 대회 스태프는 경기 출전 탭에 참가 선수 버튼이 없고, 참가 선수 탭에서 팀장 문의 대신 경기 출전 탭 안내를 받는다', async () => {
     // Given: 스태프는 admin 콘솔 권한도, 팀 전용 참가 신청 ID도 받지 않는다.
     role = 'none'; roster.setViewerRole('STAFF');
     open();
     await screen.findByRole('checkbox', { name: '김민재 이번 경기 출전' });
-    // When: 참가 선수 탭으로 이동한다.
+    // Then: 눌러도 읽을 수 없는 참가 선수 화면으로 가는 버튼이 경기 출전 탭에 없다.
+    expect(screen.queryByRole('button', { name: '참가 선수 보기' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '선수 추가·번호·GK 관리' })).not.toBeInTheDocument();
+    // When: 참가 선수 탭으로 직접 이동한다.
     fireEvent.click(screen.getByRole('tab', { name: '참가 선수' }));
-    // Then: 막다른 문의 문구 대신 경기별 명단으로 가는 버튼이 있고, 눌러서 실제로 이동한다.
+    // Then: 막다른 문의 문구 대신 경기 출전 탭 안내만 있고, 순환하는 버튼도 없다.
     expect(await screen.findByText(/경기 출전 탭에서/)).toBeInTheDocument();
     expect(screen.queryByText(/팀장에게 문의/)).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: '신청 관리로 이동' })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '경기 출전 보기' }));
-    expect(screen.getByRole('tab', { name: '경기 출전' })).toHaveAttribute('aria-selected', 'true');
-    expect(await screen.findByRole('checkbox', { name: '김민재 이번 경기 출전' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '경기 출전 보기' })).not.toBeInTheDocument();
     expect(participantReads).toBe(0);
   });
 

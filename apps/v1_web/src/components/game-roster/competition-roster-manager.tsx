@@ -96,10 +96,9 @@ export function CompetitionRosterManager(entry: Entry) {
           <AlertBanner tone="info" message={adminRegistrationsHref
             ? '신청 관리에서 해당 팀의 명단 검토를 열어 참가 선수를 확인해 주세요.'
             : staffViewer
-              ? '대회 스태프는 이 탭에서 참가 선수를 바꾸지 않아요. 경기별 출전 선수는 경기 출전 탭에서 확인해 주세요.'
+              ? '대회 스태프는 이 탭에서 참가 선수를 바꾸지 않아요. 경기별 출전 선수는 위의 경기 출전 탭에서 확인해 주세요.'
               : '등록된 참가 명단이 없거나 참가 명단 관리 권한이 없어요. 신청 내역을 확인하거나 팀장에게 문의해 주세요.'} />
           {adminRegistrationsHref ? <Link href={adminRegistrationsHref} className="tm-btn tm-btn-md tm-btn-outline mt-3">신청 관리로 이동</Link> : null}
-          {!adminRegistrationsHref && staffViewer ? <Button variant="outline" className="mt-3" onClick={() => move(() => setTab('game'))}>경기 출전 보기</Button> : null}
         </div> : <>
           <div className={styles.picker}>
             <label className="tm-text-caption" htmlFor={`${ids}-game-select`}>출전을 관리할 경기</label>

@@ -1272,15 +1272,15 @@ Separate preliminary and named-final diagrams vertically; preserve horizontal ro
 - Filter head113419e58 CI42168900113 all SUCCESS. This admin extension requires NEW exact-head CI/review after push. No merge or Alpha deployment yet and no #2173 review waiver received. Keep this unmerged worktree; main/prod remain out of scope.
 
 ## 2026-11-06 follow-up: 경기 일정 필터 정합성
-Status: In Progress
+Status: Done
 ### Context / Goal / Original Conditions
 PR2173 deployed colors and bracket filters but ScheduleContent retained its combined wrapping group/round filter. User authorized fixing, new dev PR, and Alpha deployment. Apply the already approved UX to 경기 일정 without new design choices.
 ### User Scenarios / Acceptance Criteria
-- [ ] 결선 > 전체·토너먼트 이름 > 전체·실제 강수. All uses union; selected final limits available rounds. Preserve common round, reset unavailable round.
-- [ ] Two/three/ten finals retain actual names and stable color dots; single final omits name row.
-- [ ] Group/name/round rows independently scroll horizontally with no wrap.
-- [ ] Scheduled/live/unscheduled and 내 팀만 share the same predicates. URL state/deep links/back/forward and fixture detail return preserve selected final and round.
-- [ ] Single/upper-lower/pure-league behavior and auth/publication gates retained.
+- [x] 결선 > 전체·토너먼트 이름 > 전체·실제 강수. All uses union; selected final limits available rounds. Preserve common round, reset unavailable round.
+- [x] Two/three/ten finals retain actual names and stable color dots; single final omits name row.
+- [x] Group/name/round rows independently scroll horizontally with no wrap.
+- [x] Scheduled/live/unscheduled and 내 팀만 share the same predicates. URL state/deep links/back/forward and fixture detail return preserve selected final and round.
+- [x] Single/upper-lower/pure-league behavior and auth/publication gates retained.
 ### Test Scenarios
 Focused ScheduleContent behavior and route wiring; existing schedule/history/league regressions; one Web type/pattern run; exact-head CI/review; Alpha3viewports screenshots/network evidence.
 ### Parallel Work Breakdown / Ownership
@@ -1298,3 +1298,13 @@ Fresh branch1245860f0 (includes PR2180 image work). Narrow tests added for union
 - Baseline Alpha1245860f0 captured after deploy42183991187 SUCCESS at1440/768/390. Actual login through player fixture account, read-only tournamentf67894a6; no page/network errors observed in this scoped baseline. Browser28716/controller14088 closed normally. Do not alter that existing tournament.
 - Web lint/tsc pending; commit/PR/CI/Copilot/Alpha after verification remain. Own browser helper/dependencies in Windows TEMP/teameet-schedule-final-browser, WSL install/test/lint logs prefixed teameet-schedule-final. No local Next/DB runtime.
 - Final pre-commit Web lint (tsc --noEmit + v1 pattern check) PASS. Focused164/164 and diff/debt checks passed; baseline images reviewed. Ready for exact-scope commit and latest-head CI/review.
+
+### PR2184 Alpha delivery / completed cursor (2026-11-06)
+- User explicitly authorized review-less Alpha deployment for this PR. Source086be357c: local164/164 plus Web tsc/pattern PASS; PR CI42188114761 Gates/API/Web all SUCCESS. Merged into dev as642204f855eef87fe8093635bd97932156b94cfc at08:59:47UTC.
+- Dev642 CI42191673728 was superseded/cancelled when PR2185 merged; its Alpha42191675185 failed only while waiting for matching CI, before runtime changes. Followed descendantd8d5e08e7d06a813dad3972ab7f441c606ebaa66 (ancestor check passed), CI42192383480 all SUCCESS and Alpha42192383542 SUCCESS. No retry or forced deployment of obsolete SHA.
+- Actual landing HTTP200, x-teameet-commit=d8d5e08e7d06a813dad3972ab7f441c606ebaa66, release1.13.2-alpha.20261106.gd8d5e08e7d06; health HTTP200/db=true at09:26:57UTC. No main/prod actions.
+- Headed ordinary-player QA on read-only tournamentf67894a6: actual login then /home hydration; actual schedule tab shows separate named-final and canonical-round rows at1440/768/390. All captures document-overflow=false, aligned spacing, no wrapping. Two finals each have12 API fixtures/one final; choosing 프리미어+결승 displays only5703e515, 챌린지+결승 only1e88527d. Common round preserved. Opened real fixture, waited for rendered 장소 heading, then browser back restored schedule/프리미어/결승 and the filtered match.
+- Extra320px QA: round row288px/content357px/scrollLeft69 after wheel+last-chip selection; name row remained scrollLeft0 and document overflow=false. Native independent scrolling and selection reveal verified. before/after3widths and return/320 evidence reviewed visually.
+- Scoped schedule after captures report no page/network errors. First over-fast login returned400, then retry after form hydration succeeded. The fixture detail rendered successfully but its roster requests returned404 and identity-link pending403; these are outside the modified filter pane, so do not claim an error-free whole session.
+- Ten-final live browser check was unavailable: own previous QA tournament5dab06e4 remains cancelled and public page correctly returned404 even after temporary visibility=true. No success evidence claimed; removed the404 screenshot. Visibility restored=false with200 at09:30:57UTC; cancellation retained. No other tournament mutated. Ten-final selection/URL restoration is covered by the new regression test; no new seed/reset performed.
+- Browser27612/controller34316 and contexts closed normally; both PIDs absent. Owned WSL dependency directories removed after source validation/merge; evidence branchqa/pr2184-alpha-evidence retains screenshots/report for same-PR gallery. Cleanup only this task's worktree/branches/temp/log resources after pushing evidence; preserve all other sessions and root WIP.
